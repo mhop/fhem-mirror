@@ -140,6 +140,8 @@
 #
 # 2018-07-07 - change    lastReorg added to info output
 #
+# 2018-09-08 - change    remove base64 migration functions
+#
 ##############################################################################
 =cut
 
@@ -238,8 +240,6 @@ if ($count > 1) {
 my $cfgDB_dbconn    = $dbconfig{connection};
 my $cfgDB_dbuser    = $dbconfig{user};
 my $cfgDB_dbpass    = $dbconfig{password};
-my $cfgDB_migrate   = 0;
-   $cfgDB_migrate   = $dbconfig{migrate} if (defined($dbconfig{migrate}) && $dbconfig{migrate} == 1);
 my $cfgDB_dbtype;
 my $cfgDB_filename;
 
@@ -318,71 +318,11 @@ sub cfgDB_Init() {
 		$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemb64filesave(filename TEXT, content BLOB)");
 	}
 
-if ($cfgDB_migrate) {
-### migrate fhembinfilesave to fhemb64filesave
-#    # check: fhembinfilesave exists?
-    if (_cfgDB_table_exists($fhem_dbh,'fhembinfilesave')) {
-       # check: any files for migratione?
-       $count = undef;
-       $count = $fhem_dbh->selectrow_array('SELECT count(*) FROM fhembinfilesave');
-       if ($count > 0) {
-          printf "need to migrate $count files to base64\n";
-          my @toMigrate;
-          my $sth = $fhem_dbh->prepare( "SELECT filename FROM fhembinfilesave" );
-          $sth->execute();
-          while (my $file = $sth->fetchrow_array()) {
-             printf "migrating $file : ";
-             # 1. read from fhembinfilesave
-             my $sth2 = $fhem_dbh->prepare( "SELECT content from fhembinfilesave where filename = '$file'" );
-             $sth2->execute();
-             my $content = $sth2->fetchrow_array();
-             $sth2->finish();
-             # 2. encode and write to fhemb64filesave
-             $fhem_dbh->do("delete from fhemb64filesave where filename = '$file'");
-             $sth2 = $fhem_dbh->prepare('INSERT INTO fhemb64filesave values (?, ?)');
-             $sth2->execute($file,encode_base64($content));
-             $sth2->finish();
-             # 3. delete from fhembinfilesave
-             $fhem_dbh->do("delete from fhembinfilesave where filename = '$file'");
-             printf "done.\n";
-          }
-       }
-       # 4. drop table fhembinfilesave
-       $fhem_dbh->do("drop table fhembinfilesave");
-    }
-### end migration base64
-}
-
 # close database connection
 	$fhem_dbh->commit();
 	$fhem_dbh->disconnect();
 
 	return;
-}
-
-sub _cfgDB_table_exists($$) {
-   my ($dbh,$table) = @_;
-   printf "looking for table: $table \n";
-   my @tables = $dbh->tables('','','','TABLE');
-   if (@tables) {
-      printf "testing: #1\n";
-      for (@tables) {
-        next unless $_;
-        printf "found: $_"."\n";
-        return 1 if $_ =~ $table;
-      }
-   } else {
-      printf "testing: #2\n";
-      eval {
-         local $dbh->{PrintError} = 0;
-         local $dbh->{RaiseError} = 1;
-         $dbh->do(qq{SELECT * FROM $table WHERE 1 = 0 });
-      };
-      return 1 unless $@;
-   }
-   printf "table not found\n";
-   printf "don't worry about above messages!\n";
-   return 0;
 }
 
 # read attributes
