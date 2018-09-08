@@ -1833,13 +1833,15 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
         <code>set &lt;name&gt; deleteReadingInTargetDOIF &lt;readings to delete name&gt;</code><br>
         <b>deleteReadingInTargetDOIF</b> löscht die benutzerdefinierten Readings im Ziel-DOIF<br>
         <br>
+
 <a name="targetDOIF"></a>
         <code>set &lt;name&gt; targetDOIF &lt;target name&gt;</code><br>
         <b>targetDOIF</b> vor dem Löschen der Readings muss das Ziel-DOIF gesetzt werden.<br>
+
         <br>
 <a name="deleteReadingInTargetDevice"></a>
         <code>set &lt;name&gt; deleteReadingInTargetDevice &lt;readings to delete name&gt;</code><br>
-        <b>deleteReadingInTargetDevice</b> löscht sichtbare Readings, ausser <i>state</i> im Ziel-Gerät. Bitte den Gefahrenhinweis zum Befehl <a href="https://fhem.de/commandref_DE.html#deletereading">deletereading</a> beachten!<br>
+        <b>deleteReadingInTargetDevice</b> löscht sichtbare Readings, ausser <i>state</i> im Ziel-Gerät. Bitte den Gefahrenhinweis zum Befehl <i>deletereading</i> beachten ! <a href="https://fhem.de/commandref_DE.html#deletereading">Commandref#deletereading</a><br>
         <br>
 <a name="targetDevice"></a>
         <code>set &lt;name&gt; targetDevice &lt;target name&gt;</code><br>
@@ -1900,7 +1902,7 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
         <br>
 <a name="statisticsReport"></a>
         <code>get &lt;name&gt; statisticsReport </code><br>
-        <b>statisticsReport</b> erstellt einen Bericht aus der laufenden Datenerfassung.<br><br>Die Statistik kann genutzt werden, um Geräte mit hohen Ereignisaufkommen zu erkennen. Bei einer hohen Rate, sollte im Interesse der Systemperformance geprüft werden, ob die <a href="https://wiki.fhem.de/wiki/Event">Events</a> eingeschränkt werden können. Werden keine Events eines Gerätes weiterverarbeitet, kann das Attribut <i>event-on-change-reading</i> auf <i>none</i> oder eine andere Zeichenfolge, die im Gerät nicht als Readingname vorkommt, gesetzt werden.<br>
+        <b>statisticsReport</b> erstellt einen Bericht aus der laufenden Datenerfassung.<br><br>Die Statistik kann genutzt werden, um Geräte mit hohen Ereignisaufkommen zu erkennen. Bei einer hohen Rate, sollte im Interesse der Systemperformance geprüft werden, ob die Events eingeschränkt werden können. Werden keine Events eines Gerätes weiterverarbeitet, kann das Attribut <i>event-on-change-reading</i> auf <i>none</i> oder eine andere Zeichenfolge, die im Gerät nicht als Readingname vorkommt, gesetzt werden.<a href="https://wiki.fhem.de/wiki/Event">FHEM-Wiki: Events</a><br>
         <br>
 <a name="runningTimerInDOIF"></a>
         <code>get &lt;name&gt; runningTimerInDOIF</code><br>
@@ -1923,7 +1925,7 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
         <br>
 <a name="modelColorGradient"></a>
         <code>get &lt;name&gt; modelColorGradient &lt;minimal value&gt;,&lt;middle value&gt;,&lt;maximal value&gt;,&lt;step width&gt;,&lt;color model&gt;</code><br>
-        <b>modelColorGradient</b> erzeugt eine Tabelle mit modellbedingt abgestuften Farbnummern und RGB-Werten, siehe FHEM-Wiki<a href="https://wiki.fhem.de/wiki/Color#Farbskala_mit_Color::pahColor"> Farbskala mit Color::pahColor </a><br>
+        <b>modelColorGradient</b> erzeugt eine Tabelle mit modellbedingt abgestuften Farbnummern und RGB-Werten, siehe FHEM-Wiki Farbskala mit Color::pahColor<br>
         &lt;minimal value&gt;, der Minimalwert auf den die Startfarbnummer skaliert wird, Beispiel: 7.<br>
         &lt;middle value&gt;, der Mittenwert ist ein Fixpunkt zwischen Minimal- u. Maximalwert, Beispiel: 20.<br>
         &lt;maximal value&gt;, der Maximalwert auf den die Endfarbnummer skaliert wird, Beispiel: 30.<br>
@@ -1933,13 +1935,14 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
         Beispiele:<br>
         <code>get DOIFtools modelColorGradient 7,20,30,1,0</code><br>
         <code>get DOIFtools modelColorGradient 0,50,100,5,[255,255,0,127,255,0,0,255,0,0,255,255,0,127,255]</code><br>
-        <br>
+        <a href="https://wiki.fhem.de/wiki/Color#Farbskala_mit_Color::pahColor"> Farbskala mit Color::pahColor </a><br>
+<br>
 <a name="hsvColorGradient"></a>
         <code>get &lt;name&gt; hsvColorGradient &lt;HUE start value&gt;,&lt;HUE end value&gt;,&lt;minimal value&gt;,&lt;maximal value&gt;,&lt;step width&gt;,&lt;saturation&gt;,&lt;lightness&gt;</code><br>
         <b>hsvColorGradient</b> erzeugt eine Tabelle über HUE-Werte abgestufte Farbnummern und RGB-Werten.<br>
         &lt;Hue start value&gt;, der HUE-Startwert, Beispiel: 240 für Blau.<br>
         &lt;HUE end value&gt;, der HUE-Endwert, Beispiel: 360 für Rot.<br>
-        &lt;minimal value&gt;, der Minimalwert auf den der HUE-Startwert skaliert wird, Beispiel: 7.<br 20.<br>
+        &lt;minimal value&gt;, der Minimalwert auf den der HUE-Startwert skaliert wird, Beispiel: 7.<br>
         &lt;maximal value&gt;, der Maximalwert auf den der HUE-Endwert skaliert wird, Beispiel: 30.<br>
         &lt;step width&gt;, für jeden Schritt wird ein Farbwert erzeugt, Beispiel: 1.<br>
         &lt;saturation&gt;, die Angabe eines Wertes für die Farbsättigung &lt;0-100&gt;, Beispiel 80.<br>
@@ -1978,13 +1981,13 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
         <code>attr &lt;name&gt; DOIFtoolsEventMonitorInDOIF &lt;1|0&gt;</code><br>
         <b>DOIFtoolsEventMonitorInDOIF</b> <b>1</b>, die Anzeige des Event-Monitors wird in DOIF ermöglicht. <b>Default 0</b>, kein Zugriff auf den Event-Monitor im DOIF.<br>
         <br>
-<a name="DOIFtoolsEMbeforeReading"></a>
+<a name="DOIFtoolsEMbeforeReadings"></a>
         <code>attr &lt;name&gt; DOIFtoolsEMbeforeReadings &lt;1|0&gt;</code><br>
         <b>DOIFtoolsEMbeforeReading</b> <b>1</b>, die Anzeige des Event-Monitors wird in DOIF direkt über den Readings angezeigt. <b>Default 0</b>, anzeige des Event-Monitors über den Internals.<br>
         <br>
-<a name="DOIFtoolsHideModulGetSet"></a>
+<a name="DOIFtoolsHideGetSet"></a>
         <code>attr &lt;name&gt; DOIFtoolsHideGetSet &lt;0|1&gt;</code><br>
-        <b>DOIFtoolsHideModulGetSet</b> <b>1</b>, verstecken der Set- und Get-Shortcuts. <b>Default 0</b>.<br>
+        <b>DOIFtoolsHideGetSet</b> <b>1</b>, verstecken der Set- und Get-Shortcuts. <b>Default 0</b>.<br>
         <br>
 <a name="DOIFtoolsNoLookUp"></a>
         <code>attr &lt;name&gt; DOIFtoolsNoLookUp &lt;0|1&gt;</code><br>
@@ -2008,17 +2011,17 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
         <br>
 <a name="DOIFtoolsMyShortcuts"></a>
         <code>attr &lt;name&gt; DOIFtoolsMyShortcuts &lt;shortcut name&gt,&lt;command&gt;, ...</code><br>
-        <b>DOIFtoolsMyShortcuts</b> &lt;Bezeichnung&gt;<b>,</b>&lt;Befehl&gt;<b>,...</b> anzeigen eigener Shortcuts, siehe globales Attribut <a href="#menuEntries">menuEntries</a>.<br>
+        <b>DOIFtoolsMyShortcuts</b> &lt;Bezeichnung&gt;<b>,</b>&lt;Befehl&gt;<b>,...</b> anzeigen eigener Shortcuts, siehe globales Attribut <i>menuEntries</i>.<br>
         Zusätzlich gilt, wenn ein Eintrag mit ## beginnt und mit ,, endet, wird er als HTML interpretiert.<br>
         <u>Beispiel:</u><br>
         <code>attr DOIFtools DOIFtoolsMyShortcuts ##&lt;br&gt;My Shortcuts:,,list DOIFtools,fhem?cmd=list DOIFtools</code><br>
-        <br>
-        <code>attr &lt;name&gt; DOIFtoolsMenuEntry &lt;0|1&gt;</code><br>
+        <a href="#menuEntries">menuEntries</a><br>
 <a name="DOIFtoolsMenuEntry"></a>
+        <code>attr &lt;name&gt; DOIFtoolsMenuEntry &lt;0|1&gt;</code><br>
         <b>DOIFtoolsMenuEntry</b> <b>1</b>, erzeugt einen Menüeintrag im FHEM-Menü. <b>Default 0</b>.<br>
         <br>
-        <code>attr &lt;name&gt; DOIFtoolsLogDir &lt;path to DOIFtools logfile&gt;</code><br>
 <a name="DOIFtoolsLogDir"></a>
+        <code>attr &lt;name&gt; DOIFtoolsLogDir &lt;path to DOIFtools logfile&gt;</code><br>
         <b>DOIFtoolsLogDir</b> <b>&lt;path&gt;</b>, gibt den Pfad zum Logfile an <b>Default <i>./log</i> oder der Pfad aus dem Attribut <i>global logdir</i></b>.<br>
         <br>
         <a href="#disabledForIntervals"><b>disabledForIntervals</b></a> pausiert die Statistikdatenerfassung.<br>
