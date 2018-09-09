@@ -737,11 +737,12 @@ FW_answerCall($)
   $FW_RETTYPE = "text/html; charset=$FW_encoding";
 
   $MW_dir = "$attr{global}{modpath}/FHEM";
-  $FW_sp = AttrVal($FW_wname, "stylesheetPrefix", "");
+  $FW_sp = AttrVal($FW_wname, "stylesheetPrefix", "f18");
   $FW_ss = ($FW_sp =~ m/smallscreen/);
   $FW_tp = ($FW_sp =~ m/smallscreen|touchpad/);
+  my $spDir = ($FW_sp eq "default" ? "" : "$FW_sp:");
   @FW_iconDirs = grep { $_ } split(":", AttrVal($FW_wname, "iconPath",
-                                "$FW_sp:default:fhemSVG:openautomation"));
+                                "${spDir}fhemSVG:openautomation:default"));
   @FW_fhemwebjs = ("fhemweb.js");
   push(@FW_fhemwebjs, "$FW_sp.js") if(-r "$FW_dir/pgm2/$FW_sp.js");
 
@@ -2296,11 +2297,7 @@ FW_style($$)
     FW_pO "</table>$end";
 
   } elsif($a[1] eq "set") {
-    if($a[2] eq "default") {
-      CommandDeleteAttr(undef, "$FW_wname stylesheetPrefix");
-    } else {
-      CommandAttr(undef, "$FW_wname stylesheetPrefix $a[2]");
-    }
+    CommandAttr(undef, "$FW_wname stylesheetPrefix $a[2]");
     $FW_styleStamp = time();
     $FW_RET =~ s,/style.css\?v=\d+,/style.css?v=$FW_styleStamp,;
     FW_addContent($start);
@@ -2953,11 +2950,13 @@ FW_Notify($$)
     $FW_wname = $ntfy->{SNAME};
     $FW_ME = "/" . AttrVal($FW_wname, "webname", "fhem");
     $FW_subdir = ($h->{iconPath} ? "/floorplan/$h->{iconPath}" : ""); # 47864
-    $FW_sp = AttrVal($FW_wname, "stylesheetPrefix", 0);
+    $FW_sp = AttrVal($FW_wname, "stylesheetPrefix", "f18");
+    $FW_sp = "" if($FW_sp eq "default");
     $FW_ss = ($FW_sp =~ m/smallscreen/);
     $FW_tp = ($FW_sp =~ m/smallscreen|touchpad/);
+    my $spDir = ($FW_sp eq "default" ? "" : "$FW_sp:");
     @FW_iconDirs = grep { $_ } split(":", AttrVal($FW_wname, "iconPath",
-                                "$FW_sp:default:fhemSVG:openautomation"));
+                                "${spDir}fhemSVG:openautomation:default"));
     if($h->{iconPath}) {
       unshift @FW_iconDirs, $h->{iconPath};
       FW_readIcons($h->{iconPath});
@@ -3704,7 +3703,7 @@ FW_widgetOverride($$)
     <li>iconPath<br>
       colon separated list of directories where the icons are read from.
       The directories start in the fhem/www/images directory. The default is
-      $styleSheetPrefix:default:fhemSVG:openautomation<br>
+      $styleSheetPrefix:fhemSVG:openautomation:default<br>
       Set it to fhemSVG:openautomation to get only SVG images.
       </li>
       <br>
@@ -4406,7 +4405,7 @@ FW_widgetOverride($$)
       Durch Doppelpunkt getrennte Aufz&auml;hlung der Verzeichnisse, in
       welchen nach Icons gesucht wird.  Die Verzeichnisse m&uuml;ssen unter
       fhem/www/images angelegt sein. Standardeinstellung ist:
-      $styleSheetPrefix:default:fhemSVG:openautomation<br>
+      $styleSheetPrefix:fhemSVG:openautomation:default<br>
       Setzen Sie den Wert auf fhemSVG:openautomation um nur SVG Bilder zu
       benutzen.
       </li><br>
