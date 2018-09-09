@@ -1,4 +1,5 @@
 ##############################################
+##############################################
 # $Id$
 package main;
 use strict;
@@ -233,6 +234,14 @@ sub HMinfo_status($){##########################################################
   my %errFltN;
   my %err;
 
+  if(defined $modules{CUL_HM}{defptr}{"000000"}){ #update action detector
+    CUL_HM_Set($defs{$modules{CUL_HM}{defptr}{"000000"}{NAME}},
+                     $modules{CUL_HM}{defptr}{"000000"}{NAME},"update");
+  }
+  foreach(devspec2array("TYPE=CUL_HM:FILTER=model=CCU-FHEM:FILTER=DEF=......")){
+    CUL_HM_Set($defs{$_}, $_,"update"); #update all ccu devices
+  }
+  
   foreach (@erro){    #prepare reading filter for error counts
     my ($p,@a) = split ":",$_;
     $errFlt{$p}{x}=1; # add at least one reading
