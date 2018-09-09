@@ -76,16 +76,8 @@ sub MQTT_GENERIC_BRIDGE_Initialize($) {
     #CTRL_ATTR_NAME_GLOBAL_PREFIX.CTRL_ATTR_NAME_SUBSCRIBE.":textField-long ".
     CTRL_ATTR_NAME_GLOBAL_TYPE_EXCLUDE.":textField-long ".
     CTRL_ATTR_NAME_GLOBAL_DEV_EXCLUDE.":textField-long ".
-    #"mqttTopicPrefix ".
     "disable:1,0 ".
     "debug:0,1 ".
-    #"qos ".
-    #"retain ".
-    #"publish-topic-base ".
-    #"publishState ".
-    #"publishReading_.* ".
-    #"subscribeSet ".
-    #"subscribeSet_.* ".
     $main::readingFnAttributes;
 
     main::LoadModule("MQTT");
@@ -97,7 +89,6 @@ sub MQTT_GENERIC_BRIDGE_Initialize($) {
         if(defined($defs{$d}{TYPE})) {
           if($defs{$d}{TYPE} eq "MQTT_GENERIC_BRIDGE") {
             $defs{$d}{".initialized"} = 0;
-            #Log3($hash->{NAME},1,"MQTT-GB:DEBUG:> !!!!!!!!!!!!!!! $d");
           }
         }
       }
@@ -190,8 +181,6 @@ sub publishDeviceUpdate($$$$);
 sub UpdateSubscriptionsSingleDevice($$);
 sub InitializeDevices($);
 sub firstInit($);
-sub reFirstInit($);
-sub checkFirstInit($);
 sub removeOldUserAttr($;$$);
 sub IsObservedAttribute($$);
 sub defineGlobalTypeExclude($;$);
@@ -208,14 +197,12 @@ sub retrieveIODev($);
 sub isIODevMQTT2($);
 sub isIODevMQTT($);
 sub initUserAttr($);
+sub createRegexpForTopic($);
+sub isDebug($);
 
 sub isDebug($) {
   my ($hash) = @_;
   return AttrVal($hash->{NAME},"debug",0);  
-  #if($hash->{'.debug'}) {
-  #  return 1;
-  #}
-  #return 0;
 }
 
 # Device define
@@ -263,7 +250,8 @@ sub Define() {
   #   $hash->{subscribeExpr} = [];
   # }
   
-  checkFirstInit($hash);
+  # noetig hier beim Anlegen im laufendem Betrieb
+  firstInit($hash);
 
   return undef;
 }
@@ -277,7 +265,6 @@ sub Undefine() {
 }
 
 sub retrieveIODev($) {
-  return 'MQTT'; # TEST!
   my ($hash) = @_;
   my $iodn = AttrVal($hash->{NAME}, "IODev", undef);
   my $iodt = undef;
@@ -327,31 +314,15 @@ sub initUserAttr($) {
   }
 }
 
-sub checkFirstInit($) {
-  my ($hash) = @_;
-  #Log3($hash->{NAME},1,"checkFirstInit : ".Dumper($hash->{+HELPER}->{HS_FLAG_FIRST_INIT_DONE}));
-  return if $hash->{+HELPER}->{HS_FLAG_FIRST_INIT_DONE};
-  firstInit($hash);
-}
-
-sub reFirstInit($) {
-  my ($hash) = @_;
-  #Log3($hash->{NAME},1,"reFirstInit : ".Dumper($hash->{+HELPER}->{HS_FLAG_FIRST_INIT_DONE}));
-  $hash->{+HELPER}->{HS_FLAG_FIRST_INIT_DONE} = 0;
-  firstInit($hash);
-}
-
 # Erstinitialization. 
 # Variablen werden im HASH abgelegt, userattr der betroffenen Geraete wird erweitert, MQTT-Initialisierungen.
 sub firstInit($) {
   my ($hash) = @_;
-    
+  
+  # IO    
   AssignIoPort($hash);
 
-  #Log3($hash->{NAME},1,"firstInit [start] : ".Dumper($hash->{+HELPER}->{HS_FLAG_FIRST_INIT_DONE}));
   if ($main::init_done) {
-    # IO
-
     $hash->{+HELPER}->{+HS_FLAG_INITIALIZED} = 0;
 
     return unless defined(AttrVal($hash->{NAME},"IODev",undef));
@@ -373,13 +344,7 @@ sub firstInit($) {
       InternalTimer(gettimeofday()+$hash->{+HELPER}->{+HS_PROP_NAME_INTERVAL}, "MQTT::GENERIC_BRIDGE::timerProc", $hash, 0);
     }
 
-    #Log3($hash->{NAME},1,"firstInit [isMqtt: ".isIODevMQTT($hash)."] : ".Dumper($hash->{subscribe}));
     MQTT::client_start($hash) if isIODevMQTT($hash); #if defined $hash->{+HELPER}->{+IO_DEV_TYPE} and $hash->{+HELPER}->{+IO_DEV_TYPE} eq 'MQTT';
-    $hash->{+HELPER}->{HS_FLAG_FIRST_INIT_DONE} = 1;
-    #Log3($hash->{NAME},1,"firstInit [done] : ".Dumper($hash->{+HELPER}->{HS_FLAG_FIRST_INIT_DONE}));
-    #Log3($hash->{NAME},1,"firstInit [done] : ".Dumper($hash->{IODev}));
-  } else {
-    Log3($hash->{NAME},1,"firstInit [main init not done!]");
   }
 }
 
@@ -643,8 +608,6 @@ sub getDevicePublishRecIntern($$$$$) {
   $topic = $globalReadingMap->{'topic'} if (defined($globalReadingMap) and !defined($topic));
   $topic = $globalDefaultReadingMap->{'topic'} if (defined($globalDefaultReadingMap) and !defined($topic));
 
-  #Log3('xxx',1,"MQTT-GB:DEBUG:> getDevicePublishRec> topic ".Dumper($topic));
-
   return undef unless defined $topic;
   # eval
   if($topic =~ m/^{.*}$/) {
@@ -751,7 +714,7 @@ sub _evalValue($$$$$$) {
 # return: map (device1->{reading}=>reading1, device1->{expression}=>{...}, deviceN->{reading}=>readingM)
 sub searchDeviceForTopic($$) {
   my($hash, $topic) = @_;
-  # TODO ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~>
+  
   my $ret = {};
   my $map = $hash->{+HS_TAB_NAME_DEVICES};
   if(defined ($map)) {
@@ -860,10 +823,6 @@ sub CreateSingleDeviceTableAttrSubscribe($$$$) {
               my $topic = _evalValue($hash->{NAME},$val,$base,$dev,'$reading','$name');
               $rmap->{'topicOrig'} = $val;
 
-              #$rmap->{'wildcardDev'}=index($topic, '$device');       
-              #$rmap->{'wildcardReading'}=index($topic, '$reading');  
-              #$rmap->{'wildcardName'}=index($topic, '$name');        
-              
               $rmap->{'topicExp'}=createRegexpForTopic($topic);
 
               $topic =~ s/\$reading/+/g;
@@ -891,13 +850,6 @@ sub deleteEmptyDevices($$$) {
   return unless defined $map->{$devMapName};
 
   # Wenn keine Eintraege => Device loeschen
-  #Log3($hash->{NAME},1,"MQTT-GB:DEBUG:> >>> deleteEmptyDevices: ".(keys %{$map->{$devMapName}})." - ".Dumper($map->{$devMapName}));
-  if(defined($map->{$devMapName}->{':publish'})) {
-    #Log3($hash->{NAME},1,"MQTT-GB:DEBUG:> >>> deleteEmptyDevices: :publish ".(keys %{$map->{$devMapName}->{':publish'}})." - ".Dumper($map->{$devMapName}->{':publish'}));
-    #if(keys %{$map->{$devMapName}->{':publish'}} == 0) {
-    #  delete($map->{$devMapName}->{':publish'});  
-    #}
-  }
   if(keys %{$map->{$devMapName}} == 0) {
     delete($map->{$devMapName});
   }
@@ -906,7 +858,6 @@ sub deleteEmptyDevices($$$) {
 sub CreateSingleDeviceTable($$$$$) {
   my ($hash, $dev, $devMapName, $prefix, $map) = @_;
   # Divece-Attribute fuer ein bestimmtes Device aus Device-Attributen auslesen
-  #my $prefix = $hash->{+HS_PROP_NAME_PREFIX};
   CreateSingleDeviceTableAttrDefaults($hash, $devMapName, $map, AttrVal($dev, $prefix.CTRL_ATTR_NAME_DEFAULTS, undef));
   CreateSingleDeviceTableAttrAlias($hash, $devMapName, $map, AttrVal($dev, $prefix.CTRL_ATTR_NAME_ALIAS, undef)); 
   CreateSingleDeviceTableAttrPublish($hash, $devMapName, $map, AttrVal($dev, $prefix.CTRL_ATTR_NAME_PUBLISH, undef));
@@ -1000,12 +951,9 @@ sub UpdateSubscriptionsSingleDevice($$) {
 
 sub UpdateSubscriptions($) {
   my ($hash) = @_;
-    #RemoveAllSubscripton($hash);
-    #return;
 
   updateDevCount($hash);
 
-  #return unless defined $hash->{+HELPER}->{+IO_DEV_TYPE};
   return unless isIODevMQTT($hash); #if $hash->{+HELPER}->{+IO_DEV_TYPE} eq 'MQTT2_SERVER';
 
   my $topicMap = {};
@@ -1015,13 +963,8 @@ sub UpdateSubscriptions($) {
       my $smap = $gmap->{$dname}->{':subscribe'};
       #Log3($hash->{NAME},1,"MQTT-GB:DEBUG:> UpdateSubscriptions: smap = ".Dumper($gmap->{$dname}));
       if(defined($smap)) {
-        # foreach my $rname (keys %{$smap}) {
-        #   my $topic = $smap->{$rname}->{'topic'};
-        #   $topicMap->{$topic}=1 if defined $topic;
-        # }
         foreach my $rmap (@{$smap}) {
           my $topic = $rmap->{'topic'};
-          #$topicMap->{$topic}=1 if defined $topic;
           $topicMap->{$topic}->{'qos'}=$rmap->{'qos'} if defined $topic;
         }
       }
@@ -1060,17 +1003,14 @@ sub UpdateSubscriptions($) {
     #Log3($hash->{NAME},1,"MQTT-GB:DEBUG:> UpdateSubscriptions: subscribe: topic = ".Dumper($topic).", qos = ".Dumper($qos).", retain = ".Dumper($retain));
     client_subscribe_topic($hash,$topic,$qos,$retain) ;
   }
-
-  # TODO ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~>
 }
 
 sub RemoveAllSubscripton($) {
   my ($hash) = @_;
-  #return unless defined $hash->{+HELPER}->{+IO_DEV_TYPE};
+
   return unless isIODevMQTT($hash); #if $hash->{+HELPER}->{+IO_DEV_TYPE} eq 'MQTT2_SERVER';
 
-  # alle Subscription kuendigen (beim undefine)
-  
+  # alle Subscription kuendigen (beim undefine)  
   if (defined($hash->{subscribe}) and (@{$hash->{subscribe}})) {
     my $msgid = send_unsubscribe($hash->{IODev},
       topics => [@{$hash->{subscribe}}],
@@ -1084,7 +1024,7 @@ sub RemoveAllSubscripton($) {
 
 sub InitializeDevices($) {
   my ($hash) = @_;
-  # alles neu aifbauen
+  # alles neu aufbauen
   # Deviceliste neu aufbauen, ggf., alte subscription kuendigen, neue abonieren
   CreateDevicesTable($hash);
   #UpdateSubscriptions($hash);
@@ -1102,11 +1042,6 @@ my %getsDebug = (
   "debugReinit" => "",
   "debugShowPubRec" => ""
 );
-# if ($DEBUG) {
-#   $getsDebug{"debugInfo"}="";
-#   $getsDebug{"debugReinit"}="";
-#   $getsDebug{"debugShowPubRec"}="";
-# }
 
 sub Get($$$@) {
   my ($hash, $name, $command, $args) = @_;
@@ -1225,21 +1160,15 @@ sub Get($$$@) {
 }
 sub Notify() {
   my ($hash,$dev) = @_;
-  #Log3($hash->{NAME},1,">>>>>>>>>>>>>> : ".Dumper($dev));
   if( $dev->{NAME} eq "global" ) {
-    #Log3($hash->{NAME},1,">>>>>>>>>>>>>> : ".Dumper($dev));
     if( grep(m/^(INITIALIZED|REREADCFG)$/, @{$dev->{CHANGED}}) ) {
-      #Log3($hash->{NAME},1,">INITIALIZED>>>>>>>>>>>>> >>>>>>>>>>>>>>>>>>>>>>>>>>: ".Dumper(AttrVal($hash->{NAME},"IODev",'-')));
-      #Log3($hash->{NAME},1,">INITIALIZED>>>>>>>>>>>>> >>>>>>>>>>>>>>>>>>>>>>>>>>: ".Dumper($main::attr{$hash->{NAME}}));
-      checkFirstInit($hash);
-      #InternalTimer(gettimeofday()+1, "MQTT::GENERIC_BRIDGE::checkFirstInit", $hash, 0);
+      firstInit($hash);
     }
     
     my $max = int(@{$dev->{CHANGED}});
     for (my $i = 0; $i < $max; $i++) {
       my $s = $dev->{CHANGED}[$i];
       $s = "" if(!defined($s));
-      #Log3($hash->{NAME},1,">>>>>>>>>>>>>> : ".Dumper($s));
       if($s =~ m/^RENAMED ([^ ]*) ([^ ]*)$/) {
         # Device renamed
         my ($old, $new) = ($1, $2);
@@ -1290,43 +1219,12 @@ sub Notify() {
     return "" unless ($size>0);
   }
 
-#Log3($hash->{NAME},1,"Notify for $dev->{NAME}>>>>>>>>  ".Dumper($dev)) if $dev->{NAME} eq 'sonoff_8';
-#Log3($hash->{NAME},1,"Notify for $dev->{NAME}>>>>>>>>  ".Dumper(deviceEvents($dev,1))) if $dev->{NAME} eq 'sonoff_8';
-
-  #foreach my $event (@{$dev->{CHANGED}}) {
   foreach my $event (@{deviceEvents($dev,1)}) {
     #Log3($hash->{NAME},1,"Notify for $dev->{NAME} event: $event STATE: $dev->{STATE}");
     $event =~ /^([^:]+)(: )?(.*)$/;
     #Log3($hash->{NAME},1,"MQTT-GB:DEBUG:> event: $event, '".((defined $1) ? $1 : "-undef-")."', '".((defined $3) ? $3 : "-undef-")."'");
-    my $devreading = undef;
-    my $devval = undef;
-    # pruefen, ob der neue Wert dem 'state' des Devices entspricht
-    #   {$defs{$dev}{STATE}}
-    #Log3($hash->{NAME},1,"Notify for $dev->{NAME} : state: ".ReadingsVal($dev->{NAME},'state','nö'));
-    # Wenn Readings 'state' existiert. Nicht STATE! Wenn der Wert dem neuen 'change' gleich ist. Wenn der ReadingsTimestamp frisch ist => dann state annehmen.
-    #my $vState = ReadingsVal($dev->{NAME},'state',undef);
-    #my $tState = ReadingsTimestamp($dev->{NAME},'state',undef);
-    #my $aState = ReadingsAge($dev->{NAME},'state',-1);
-    #Log3($hash->{NAME},1,"Notify for $dev->{NAME}>>>>>>>> vState: $vState, tState: $tState, age: $aState ");# if $hash->{NAME} eq 'sonoff_8';
-    #unless (defined ($vState) and ($vState eq $event) and ($aState <= 1)) {
-    #if (!defined ($vState) or ($vState ne $event)) {
-    #if ($dev->{STATE} ne $event) {
-    #if (defined $3 and $3 ne "") {
-      # $vState = 'undef' unless defined $vState;
-      #Log3($hash->{NAME},1,"Notify recognise state change = no : event: $event, old_state: $vState, state age: $aState");
-      #send reading=$1 value=$3
-      #publishDeviceUpdate($hash, $dev, $1, $3);
-      $devreading = $1;
-      $devval = $3;
-    # } else {
-    #   #Log3($hash->{NAME},1,"Notify recognise state change = yes : event: $event, old_state: $vState, state age: $aState");
-    #   #send reading=state value=$1
-    #   #publishDeviceUpdate($hash, $dev, 'state', $1);
-    #   $devreading = 'state';
-    #   #$devval = $1;
-    #   $devval = $event;
-    # }
-    #Log3($hash->{NAME},1,"Notify for $dev->{NAME} reading: $devreading, val: $devval");
+    my $devreading = $1;
+    my $devval = $3;
     if(defined $devreading and defined $devval) {
       # wenn ueberwachtes device and reading
       publishDeviceUpdate($hash, $dev, $devreading, $devval);
@@ -1438,7 +1336,7 @@ sub isTypeDevReadingExcluded($$$$) {
 
 sub doPublish($$$$$) {
   my ($hash,$topic,$message,$qos,$retain) = @_;
-  #return unless defined $hash->{+HELPER}->{+IO_DEV_TYPE};
+
   if (isIODevMQTT2($hash)){ #if ($hash->{+HELPER}->{+IO_DEV_TYPE} eq 'MQTT2_SERVER') {
     # TODO: publish MQTT2
 
@@ -1524,12 +1422,6 @@ sub publishDeviceUpdate($$$$) {
         doPublish($hash,$topic,$message,$qos,$retain);
     }
 
-    # #Log3($hash->{NAME},1,"publishDeviceUpdate for $devn, $reading, $value, topic: $topic, message: $message");
-    # if(defined($topic) and defined($message)) {
-    #   $msgid = send_publish($hash->{IODev}, topic => $topic, message => $message, qos => $qos, retain => $retain);
-    #   readingsSingleUpdate($hash,"transmission-state","outgoing publish sent",1);
-    # }
-    # $hash->{message_ids}->{$msgid}++ if defined $msgid;
   }
 }
 
@@ -1597,26 +1489,20 @@ sub Attr($$$$) {
       }
       last;
     };
-    #
+    
     $attribute eq "IODev" and do {
       my $ioDevType = undef;
       $ioDevType = $defs{$value}{TYPE} if defined ($value) and defined ($defs{$value});
       $hash->{+HELPER}->{+IO_DEV_TYPE} = $ioDevType;
-      #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE DEBUG: attr: ??? IODev");
       
       if ($command eq "set") {
-        #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE DEBUG: attr: set IODev");
         my $oldValue = $main::attr{$name}{IODev};
         if ($main::init_done) {
-          #unless (defined ($hash->{IODev}) and ($hash->{IODev} eq $value) ) {
           unless (defined ($oldValue) and ($oldValue eq $value) ) {
             #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE DEBUG: attr: change IODev");
             MQTT::client_stop($hash) if defined($main::attr{$name}{IODev}) and ($main::attr{$name}{IODev} eq 'MQTT');
             $main::attr{$name}{IODev} = $value;
-            #$hash->{IODev} = $value;
-            reFirstInit($hash);
-            #RemoveAllSubscripton($hash);
-            #MQTT::client_start($hash) if defined ($ioDevType) and ($ioDevType eq 'MQTT');
+            firstInit($hash);
           }
         }
       } else {
@@ -1635,16 +1521,20 @@ sub ioDevConnect($) {
   my $hash = shift;
   return if isIODevMQTT2($hash); #if $hash->{+HELPER}->{+IO_DEV_TYPE} eq 'MQTT2_SERVER';
 
+  # ueberraschenderweise notwendig fuer eine subscribe-Initialisierung.
   MQTT::client_start($hash) if isIODevMQTT($hash);
 
   #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE DEBUG: ioDevConnect");
+
   # TODO
 }
 
 sub ioDevDisconnect($) {
   my $hash = shift;
   return if isIODevMQTT2($hash); #if $hash->{+HELPER}->{+IO_DEV_TYPE} eq 'MQTT2_SERVER';
+  
   #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE DEBUG: ioDevDisconnect");
+
   # TODO
 }
 
