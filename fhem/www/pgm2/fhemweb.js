@@ -1027,7 +1027,7 @@ FW_doUpdate(evt)
     input = evt.data;
     FW_longpollOffset = 0;
 
-  } else {
+  } else if(FW_pollConn != undefined) {
     if(FW_pollConn.readyState == 4 && !FW_leaving) {
       if(FW_pollConn.status == "400") {
         location.reload();

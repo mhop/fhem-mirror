@@ -6,19 +6,20 @@ textarea, .ui-dialog.ui-widget textarea { font-family:Courier; }
 input,textarea { border-style:ridge; }
 input.maininput { margin-left:10px; }
 #logo {
-  position:absolute; top:6.5px; left:50px; width:32px; height:32px; z-index:10;
+  position:absolute; top:6.5px; left:10px; width:32px; height:32px; z-index:10;
   background-image:url(../images/default/fhemicon.png);
   background-size: contain; background-repeat: no-repeat;
 }
-#menuBtn { position: absolute; top:6.5px; left:10px; width:32px; height:32px; }
-#hdr     { position: absolute; top:10px; left:48px; }
+#menuBtn { position: absolute; top:6.5px; left:10px; width:32px; height:32px;
+           display:none; }
+#hdr     { position: absolute; top:10px; left:40px; }
 #content { 
-  position: absolute; top:50px; left:10px; bottom:0; right: 0; 
+  position: absolute; top:50px; left:130px; bottom:0; right: 0; 
   padding-right: 10px; 
   padding-bottom: 10px;
 }
 #menu {
-  top:50px; bottom:10px; left:-120%;
+  top:50px; bottom:10px; left:10px;
   z-index:20;
   display:inline-block;
   padding:0 0.5em 0.5em 0;
@@ -26,7 +27,7 @@ input.maininput { margin-left:10px; }
 }
 #menu > table td { padding-top: 2px; }
 
-#menu.visible  { left:10px!important; }
+#menu.hidden  { left:-120%!important; }
 #console { width:100%; top:2em; bottom:0px; position:absolute; overflow-y:auto;}
 #errmsg  { background-color: #000000; color: #FFFFFF;
            position:fixed; top:0px; left:40px; z-index: 10; }

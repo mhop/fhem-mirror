@@ -3,7 +3,7 @@ FW_version["f18.js"] = "$Id$";
 
 // TODO: hierMenu+Pin,SVGcolors,floorplan
 // Known bugs: AbsSize is wrong for ColorSlider
-var f18_attr={}, f18_sd, f18_icon={}, f18_room, f18_grid=20;
+var f18_attr={}, f18_sd, f18_icon={}, f18_room, f18_grid=20, f18_margin=10;
 var f18_small = (screen.width < 480 || screen.height < 480);
 
 $(window).resize(f18_resize);
@@ -80,7 +80,7 @@ f18_menu()
 
   $("<div id='menuBtn'></div>").prependTo("div#menuScrollArea")
     .css( {"background-image":"url('"+f18_icon.bars+"')", "cursor":"pointer" })
-    .click(function(){ $("#menu").toggleClass("visible") });
+    .click(function(){ $("#menu").toggleClass("hidden") });
 
   $("div#menu").prepend("<div></div>");
   f18_addPin("div#menu > div:first", "menu", true, fixMenu, f18_small);
@@ -93,12 +93,13 @@ f18_menu()
         f18_getAttr("hideLogo") ? "none" : "block");
     if(f18_getAttr("Pinned.menu")) {
       $("body").addClass("pinnedMenu");
-      $("#menu").removeClass("visible");
-      $("#content").css("left", (parseInt($("div#menu").width())+20)+"px");
+      $("#menu").removeClass("hidden");
+      $("#content").css("left",
+                        (parseInt($("div#menu").width())+2*f18_margin)+"px");
 
     } else {
       $("body").removeClass("pinnedMenu");
-      $("#content").css("left", "");
+      $("#content").css("left", f18_margin);
     }
     f18_resize();
   }
@@ -357,7 +358,7 @@ f18_special()
     addHider("hidePin", true, "Hide pin", function(c){
       $("div.pinHeader div.pin").css("display", c ? "none":"block");
     });
-    addHider("fixedInput", true, "Fixed input and menu", f18_setFixedInput);
+    addHider("fixedInput", false, "Fixed input and menu", f18_setFixedInput);
     addHider("wrapcolumns",false,"Wrap columns<br>on small screen",
                         f18_setWrapColumns);
 
@@ -374,16 +375,8 @@ f18_special()
 function
 f18_setFixedInput()
 {
-  $("#menu,#menuBtn,#content,#hdr")
-    .css(f18_getAttr("fixedInput") ?
-      { position:"fixed", overflow:"auto" } :
-      { position:"absolute", overflow:"visible" });
-}
-
-function
-f18_setFixedInput()
-{
-  $("body").toggleClass("fixedInput", f18_getAttr("fixedInput"));
+  // togleClass is true for undefined
+  $("body").toggleClass("fixedInput", f18_getAttr("fixedInput") ? true:false);
   f18_resize();
 }
 
@@ -424,8 +417,10 @@ f18_resize()
                              display: hi ? "none":"block"});
   $("#menu,#content").css("top", (hi && pm && hl) ? "10px" : "50px");
   $("#hdr").css({ left:(rm ? 10 : left)+'px' });
+  $("#menuBtn").toggle(!pm || f18_small);
   $("#menuBtn").css({ left:(rm ? "auto":"10px"), right:(rm ? "10px":"auto") });
   $("#logo")   .css({ left:(rm ? "auto":lleft ), right:(rm ? "48px":"auto") });
+  $("#menu").toggleClass("hidden", !pm);
 }
 
 function
