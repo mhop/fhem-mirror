@@ -175,19 +175,6 @@ SVG_Rename($$)
   SVG_Set($hash, $new, "copyGplotFile");   # Forum #59786
 }
 
-
-
-sub
-jsSVG_getAttrs($;$)
-{
-  my ($d , $flt) = @_;
-  return join("&#01;", map { #00 arrives as 65533 in JS
-     my $v=$attr{$d}{$_};
-     $v =~ s/'/&#39;/g;
-    "$_=$v";
-  } grep { $flt ? $flt->{$_} : 1 } keys %{$attr{$d}});
-}
-
 sub
 SVG_getplotsize($)
 {
