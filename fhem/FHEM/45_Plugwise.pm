@@ -107,7 +107,8 @@ require "$attr{global}{modpath}/FHEM/DevIo.pm";
   $hash->{SetFn}   = "PW_Set";
   $hash->{GetFn}   = "PW_Get";
   $hash->{StateFn} = "PW_SetState";
-  $hash->{AttrList}= "do_not_notify:1,0 interval circlecount WattFormat showCom autosync";
+  $hash->{AttrList}= "do_not_notify:1,0 interval circlecount WattFormat showCom autosync".
+  					  $readingFnAttributes;;
   $hash->{ShutdownFn} = "PW_Shutdown";
 }
 
@@ -171,7 +172,7 @@ sub PW_GetUpdate($)
 			delete $hash->{helper}->{circles}->{$n};
 		} elsif (time > $hash->{helper}->{circles}->{$n}->{lastContact} +900) {
 			command($hash,'history',$hash->{helper}->{circles}->{$n}->{name},4);
-			Log 3,"GetLog offline Circle $n";
+			Log3 $hash,4,"GetLog offline Circle $n";
 		}
 	}
   }
@@ -215,7 +216,7 @@ sub PW_Write
  		command($hash,'history',$reciever,$a) if($a ne -1);
   	}
   	else
-  	{	Log3 $hash,3,$msg;
+  	{	Log3 $hash,4,$msg;
   	}
   	return undef;
 }
