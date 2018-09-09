@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 3.11.0     02.09.2018       reduceLog, reduceLogNbl - optional "days newer than" part added
 # 3.10.10    05.08.2018       commandref revised reducelogNbl
 # 3.10.9     23.06.2018       commandref added hint about special characters in passwords
 # 3.10.8     21.04.2018       addLog - not available reading can be added as new one (forum:#86966)
@@ -206,7 +207,7 @@ use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 no if $] >= 5.017011, warnings => 'experimental::smartmatch'; 
 
-my $DbLogVersion = "3.10.10";
+my $DbLogVersion = "3.11.0";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -511,10 +512,12 @@ sub DbLog_Set($@) {
 	my $ret;
 
     if ($a[1] eq 'reduceLog') {
+        my ($od,$nd) = split(":",$a[2]);         # $od - Tage älter als , $nd - Tage neuer als
+        if ($nd && $nd <= $od) {return "The second day value must be greater than the first one ! ";}
 	    if (defined($a[3]) && $a[3] !~ /^average$|^average=.+|^EXCLUDE=.+$|^INCLUDE=.+$/i) {
             return "ReduceLog syntax error in set command. Please see commandref for help.";
         }
-        if (defined $a[2] && $a[2] =~ /^\d+$/) {
+        if (defined $a[2] && $a[2] =~ /(^\d+$)|(^\d+:\d+$)/) {
             $ret = DbLog_reduceLog($hash,@a);
 			InternalTimer(gettimeofday()+5, "DbLog_execmemcache", $hash, 0);
         } else {
@@ -523,10 +526,12 @@ sub DbLog_Set($@) {
         }
     }
 	elsif ($a[1] eq 'reduceLogNbl') {
+        my ($od,$nd) = split(":",$a[2]);         # $od - Tage älter als , $nd - Tage neuer als
+        if ($nd && $nd <= $od) {return "The second day value must be greater than the first one ! ";}
 	    if (defined($a[3]) && $a[3] !~ /^average$|^average=.+|^EXCLUDE=.+$|^INCLUDE=.+$/i) {
             return "ReduceLogNbl syntax error in set command. Please see commandref for help.";
         }
-        if (defined $a[2] && $a[2] =~ /^\d+$/) {
+        if (defined $a[2] && $a[2] =~ /(^\d+$)|(^\d+:\d+$)/) {
             if ($hash->{HELPER}{REDUCELOG_PID} && $hash->{HELPER}{REDUCELOG_PID}{pid} !~ m/DEAD/) {  
                 $ret = "reduceLogNbl already in progress. Please wait for the current process to finish.";
             } else {
@@ -539,7 +544,7 @@ sub DbLog_Set($@) {
                 return;
             }
         } else {
-            Log3($name, 1, "DbLog $name: reduceLogNbl error, no <days> given.");
+            Log3($name, 1, "DbLog $name: reduceLogNbl syntax error, no <days>[:<days>] given.");
             $ret = "reduceLogNbl error, no <days> given.";
         }
     }
@@ -3872,7 +3877,7 @@ return($txt);
 #########################################################################################
 sub DbLog_reduceLog($@) {
     my ($hash,@a) = @_;
-    my ($ret,$cmd,$row,$filter,$exclude,$c,$day,$hour,$lastHour,$updDate,$updHour,$average,$processingDay,$lastUpdH,%hourlyKnown,%averageHash,@excludeRegex,@dayRows,@averageUpd,@averageUpdD);
+    my ($ret,$row,$filter,$exclude,$c,$day,$hour,$lastHour,$updDate,$updHour,$average,$processingDay,$lastUpdH,%hourlyKnown,%averageHash,@excludeRegex,@dayRows,@averageUpd,@averageUpdD);
     my ($name,$startTime,$currentHour,$currentDay,$deletedCount,$updateCount,$sum,$rowCount,$excludeCount) = ($hash->{NAME},time(),99,0,0,0,0,0,0);
     my $dbh = DbLog_ConnectNewDBH($hash);
     return if(!$dbh);
@@ -3895,19 +3900,32 @@ sub DbLog_reduceLog($@) {
     my $tm = ($useta)?"ON":"OFF";
     Log3 $hash->{NAME}, 4, "DbLog $name -> AutoCommit mode: $ac, Transaction mode: $tm";
     
-    if ($hash->{MODEL} eq 'SQLITE')        { $cmd = "datetime('now', '-$a[2] days')"; }
-    elsif ($hash->{MODEL} eq 'MYSQL')      { $cmd = "DATE_SUB(CURDATE(),INTERVAL $a[2] DAY)"; }
-    elsif ($hash->{MODEL} eq 'POSTGRESQL') { $cmd = "NOW() - INTERVAL '$a[2]' DAY"; }
-    else { $ret = 'Unknown database type.'; }
+    my ($od,$nd) = split(":",$a[2]);         # $od - Tage älter als , $nd - Tage neuer als
+    my ($ots,$nts);
+    if ($hash->{MODEL} eq 'SQLITE') { 
+        $ots = "datetime('now', '-$od days')";
+        $nts = "datetime('now', '-$nd days')" if($nd);
+    } elsif ($hash->{MODEL} eq 'MYSQL') { 
+        $ots = "DATE_SUB(CURDATE(),INTERVAL $od DAY)"; 
+        $nts = "DATE_SUB(CURDATE(),INTERVAL $nd DAY)" if($nd); 
+    } elsif ($hash->{MODEL} eq 'POSTGRESQL') { 
+        $ots = "NOW() - INTERVAL '$od' DAY"; 
+        $nts = "NOW() - INTERVAL '$nd' DAY" if($nd);
+    } else { 
+        $ret = 'Unknown database type.'; 
+    }
     
-    if ($cmd) {
-        my $sth_del = $dbh->prepare_cached("DELETE FROM history WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND (VALUE=?)");
-        my $sth_upd = $dbh->prepare_cached("UPDATE history SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND (VALUE=?)");
-        my $sth_delD = $dbh->prepare_cached("DELETE FROM history WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
-        my $sth_updD = $dbh->prepare_cached("UPDATE history SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
-        my $sth_get = $dbh->prepare("SELECT TIMESTAMP,DEVICE,'',READING,VALUE FROM history WHERE "
-            .($a[-1] =~ /^INCLUDE=(.+):(.+)$/i ? "DEVICE like '$1' AND READING like '$2' AND " : '')
-            ."TIMESTAMP < $cmd ORDER BY TIMESTAMP ASC");  # '' was EVENT, no longer in use
+    if ($ots) {
+	    my ($sth_del, $sth_upd, $sth_delD, $sth_updD, $sth_get);
+        eval { $sth_del  = $dbh->prepare_cached("DELETE FROM history WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND (VALUE=?)");
+               $sth_upd  = $dbh->prepare_cached("UPDATE history SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND (VALUE=?)");
+               $sth_delD = $dbh->prepare_cached("DELETE FROM history WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
+               $sth_updD = $dbh->prepare_cached("UPDATE history SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
+               $sth_get  = $dbh->prepare("SELECT TIMESTAMP,DEVICE,'',READING,VALUE FROM history WHERE "
+                           .($a[-1] =~ /^INCLUDE=(.+):(.+)$/i ? "DEVICE like '$1' AND READING like '$2' AND " : '')
+                           ."TIMESTAMP < $ots".($nts?" AND TIMESTAMP >= $nts ":" ")."ORDER BY TIMESTAMP ASC");  # '' was EVENT, no longer in use
+		     };
+        
         $sth_get->execute();
         
         do {
@@ -4141,7 +4159,7 @@ sub DbLog_reduceLogNbl($) {
     my @a          = @{$hash->{HELPER}{REDUCELOG}};
 	my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
     delete $hash->{HELPER}{REDUCELOG};
-    my ($ret,$cmd,$row,$filter,$exclude,$c,$day,$hour,$lastHour,$updDate,$updHour,$average,$processingDay,$lastUpdH,%hourlyKnown,%averageHash,@excludeRegex,@dayRows,@averageUpd,@averageUpdD);
+    my ($ret,$row,$filter,$exclude,$c,$day,$hour,$lastHour,$updDate,$updHour,$average,$processingDay,$lastUpdH,%hourlyKnown,%averageHash,@excludeRegex,@dayRows,@averageUpd,@averageUpdD);
     my ($startTime,$currentHour,$currentDay,$deletedCount,$updateCount,$sum,$rowCount,$excludeCount) = (time(),99,0,0,0,0,0,0);
     my $dbh;
 	
@@ -4172,6 +4190,7 @@ sub DbLog_reduceLogNbl($) {
     if (defined($a[3])) {
         $average = ($a[3] =~ /average=day/i) ? "AVERAGE=DAY" : ($a[3] =~ /average/i) ? "AVERAGE=HOUR" : 0;
     }
+    
     Log3($name, 3, "DbLog $name: reduceLogNbl requested with DAYS=$a[2]"
         .(($average || $filter) ? ', ' : '').(($average) ? "$average" : '')
         .(($average && $filter) ? ", " : '').(($filter) ? uc((split('=',$a[-1]))[0]).'='.(split('=',$a[-1]))[1] : ''));
@@ -4179,13 +4198,23 @@ sub DbLog_reduceLogNbl($) {
     my $ac = ($dbh->{AutoCommit})?"ON":"OFF";
     my $tm = ($useta)?"ON":"OFF";
     Log3 $hash->{NAME}, 4, "DbLog $name -> AutoCommit mode: $ac, Transaction mode: $tm";
+
+    my ($od,$nd) = split(":",$a[2]);         # $od - Tage älter als , $nd - Tage neuer als
+    my ($ots,$nts);
+    if ($hash->{MODEL} eq 'SQLITE') { 
+        $ots = "datetime('now', '-$od days')";
+        $nts = "datetime('now', '-$nd days')" if($nd);
+    } elsif ($hash->{MODEL} eq 'MYSQL') { 
+        $ots = "DATE_SUB(CURDATE(),INTERVAL $od DAY)"; 
+        $nts = "DATE_SUB(CURDATE(),INTERVAL $nd DAY)" if($nd); 
+    } elsif ($hash->{MODEL} eq 'POSTGRESQL') { 
+        $ots = "NOW() - INTERVAL '$od' DAY"; 
+        $nts = "NOW() - INTERVAL '$nd' DAY" if($nd);
+    } else { 
+        $ret = 'Unknown database type.'; 
+    }
     
-    if ($hash->{MODEL} eq 'SQLITE')        { $cmd = "datetime('now', '-$a[2] days')"; }
-    elsif ($hash->{MODEL} eq 'MYSQL')      { $cmd = "DATE_SUB(CURDATE(),INTERVAL $a[2] DAY)"; }
-    elsif ($hash->{MODEL} eq 'POSTGRESQL') { $cmd = "NOW() - INTERVAL '$a[2]' DAY"; }
-    else { $ret = 'Unknown database type.'; }
-    
-    if ($cmd) {
+    if ($ots) {
 	    my ($sth_del, $sth_upd, $sth_delD, $sth_updD, $sth_get);
         eval { $sth_del  = $dbh->prepare_cached("DELETE FROM history WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND (VALUE=?)");
                $sth_upd  = $dbh->prepare_cached("UPDATE history SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND (VALUE=?)");
@@ -4193,7 +4222,7 @@ sub DbLog_reduceLogNbl($) {
                $sth_updD = $dbh->prepare_cached("UPDATE history SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
                $sth_get  = $dbh->prepare("SELECT TIMESTAMP,DEVICE,'',READING,VALUE FROM history WHERE "
                            .($a[-1] =~ /^INCLUDE=(.+):(.+)$/i ? "DEVICE like '$1' AND READING like '$2' AND " : '')
-                           ."TIMESTAMP < $cmd ORDER BY TIMESTAMP ASC");  # '' was EVENT, no longer in use
+                           ."TIMESTAMP < $ots".($nts?" AND TIMESTAMP >= $nts ":" ")."ORDER BY TIMESTAMP ASC");  # '' was EVENT, no longer in use
 		     };
         if ($@) {
             my $err = encode_base64($@,"");
@@ -5469,8 +5498,8 @@ sub dbReadings($@) {
       <ul>In asynchronous mode (<a href="#DbLogattr">attribute</a> asyncMode=1), the in memory cached data will be deleted. 
       With this command data won't be written from cache into the database. </ul><br>
 	  
-    <code>set &lt;name&gt; reduceLog &lt;n&gt; [average[=day]] [exclude=device1:reading1,device2:reading2,...]</code> <br><br>
-      <ul>Reduces records older than &lt;n&gt; days to one record (the 1st) each hour per device & reading. <br>
+    <code>set &lt;name&gt; reduceLog &lt;no&gt;[:&lt;nn&gt;] [average[=day]] [exclude=device1:reading1,device2:reading2,...]</code> <br><br>
+      <ul>Reduces records older than &lt;no&gt; days and (optional) newer than &lt;nn&gt; days to one record (the 1st) each hour per device & reading. <br>
           Within the device/reading name <b>SQL-Wildcards "%" and "_"</b> can be used. <br><br>
           
 		  With the optional argument 'average' not only the records will be reduced, but all numerical values of an hour 
@@ -5494,7 +5523,7 @@ sub dbReadings($@) {
           
       </ul><br>
 	  
-    <code>set &lt;name&gt; reduceLogNbl &lt;n&gt; [average[=day]] [exclude=device1:reading1,device2:reading2,...]</code> <br><br>
+    <code>set &lt;name&gt; reduceLogNbl &lt;no&gt;[:&lt;nn&gt;] [average[=day]] [exclude=device1:reading1,device2:reading2,...]</code> <br><br>
       <ul>Same function as "set &lt;name&gt; reduceLog" but FHEM won't be blocked due to this function is implemented 
       non-blocking ! <br><br>
       
@@ -6518,9 +6547,9 @@ sub dbReadings($@) {
       <ul>Im asynchronen Modus (<a href="#DbLogattr">Attribut</a> asyncMode=1), werden die im Speicher gecachten Daten gelöscht. 
       Es werden keine Daten aus dem Cache in die Datenbank geschrieben. </ul><br>
 	  
-    <code>set &lt;name&gt; reduceLog &lt;n&gt; [average[=day]] [exclude=device1:reading1,device2:reading2,...] </code><br><br>
-      <ul>Reduziert historische Datensätze, die älter sind als &lt;n&gt; Tage auf einen Eintrag (den ersten) pro Stunde je 
-          Device & Reading.<br>
+    <code>set &lt;name&gt; reduceLog &lt;no&gt;[:&lt;nn&gt;] [average[=day]] [exclude=device1:reading1,device2:reading2,...] </code><br><br>
+      <ul>Reduziert historische Datensätze, die älter sind als &lt;no&gt; Tage und (optional) neuer sind als &lt;nn&gt; Tage 
+          auf einen Eintrag (den ersten) pro Stunde je Device & Reading.<br>
           Innerhalb von device/reading können <b>SQL-Wildcards "%" und "_"</b> verwendet werden. <br><br>
 		  
 		  Das Reading "reduceLogState" zeigt den Ausführungsstatus des letzten reduceLog-Befehls. <br><br>
@@ -6549,7 +6578,7 @@ sub dbReadings($@) {
           
           </ul><br>
 		  
-    <code>set &lt;name&gt; reduceLogNbl &lt;n&gt; [average[=day]] [exclude=device1:reading1,device2:reading2,...]</code><br><br>
+    <code>set &lt;name&gt; reduceLogNbl &lt;no&gt;[:&lt;nn&gt;] [average[=day]] [exclude=device1:reading1,device2:reading2,...]</code><br><br>
 	      <ul>
 	      Führt die gleiche Funktion wie "set &lt;name&gt; reduceLog" aus. Im Gegensatz zu reduceLog wird mit FHEM wird durch den Befehl reduceLogNbl nicht 
 	      mehr blockiert da diese Funktion non-blocking implementiert ist ! 

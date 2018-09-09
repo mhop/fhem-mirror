@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 93_DbLog: 3.11.0, function reduceLog[Nbl] syntax extended to limit 
+                               days to reduce (pls. see commandref for details)
   - change:  01_FHEMWEB.pm: change default style to f18
   - change:  01_FHEMWEB.pm: change iconPath: to fhemSVG:openautomation:default
   - bugfix:  72_XiaomiDevice: update vacuum volume readings after set
