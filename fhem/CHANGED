@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  72_XiaomiDevice: update vacuum volume readings after set
   - change:  98_DOIFtools: improved direct help contetn
   - change:  38_netatmo: removed rain sum readings
   - feature: 00_MYSENSORS: FOTA (thanks Beta-User), gateway fix (thanks Sidey)

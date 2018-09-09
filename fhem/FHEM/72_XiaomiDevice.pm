@@ -2631,6 +2631,7 @@ sub XiaomiDevice_ParseJSON($$)
   return InternalTimer( gettimeofday() + 30, "XiaomiDevice_GetUpdate", $hash) if($msgtype eq "set_dnd_timer");
   return InternalTimer( gettimeofday() + 5, "XiaomiDevice_GetSettings", $hash) if($msgtype eq "set_timer" || $msgtype eq "upd_timer" || $msgtype eq "del_timer");
   return InternalTimer( gettimeofday() + 5, "XiaomiDevice_GetSettings", $hash) if($msgtype eq "reset_consumable");
+  return InternalTimer( gettimeofday() + 5, "XiaomiDevice_GetSettings", $hash) if($msgtype eq "change_sound_volume");
   return InternalTimer( gettimeofday() + 5, "XiaomiDevice_GetSettings", $hash) if($msgtype eq "set_carpet_mode");
   return InternalTimer( gettimeofday() + 30, "XiaomiDevice_GetUpdate", $hash) if($msgtype eq "set_dnd_timer");
 
