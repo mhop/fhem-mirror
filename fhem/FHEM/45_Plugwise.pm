@@ -130,12 +130,12 @@ sub PW_Define($$)
   $firstrun=0;
   $hash->{DeviceName} = $dev;
 
-  if( $init_done ) {
-	  $attr{$name}{room}="Plugwise";
-	  $attr{$name}{interval}=10;
-	  $attr{$name}{circlecount}=50;
-	  $attr{$name}{WattFormat}="%0.f";
-  }
+#  if( $init_done ) {
+#	  $attr{$name}{room}="Plugwise";
+#	  $attr{$name}{interval}=10;
+#	  $attr{$name}{circlecount}=50;
+#	  $attr{$name}{WattFormat}="%0.f";
+#  }
   my $ret = DevIo_OpenDev( $hash, 0, undef);
   InternalTimer(gettimeofday()+5, "PW_GetUpdate", $hash, 0);
   return undef;
@@ -341,7 +341,8 @@ sub PW_Read($)
 		my $v=$1;
  		if ($v=~/\x83?\x05\x05\x03\x03(\w+)/) {
     		$body = process_response($hash,$1);
-			if($body ne undef) {
+    		if (length $body) {
+#			if ($body ne undef) {
 				my $str2=AttrVal($hash->{NAME},"showCom","xyz");
 				my $showcom=qr/$str2/;
 				if ($body->{showCom} =~ $showcom) {readingsSingleUpdate($hash,"communication", $body->{showCom},1)}
@@ -387,6 +388,7 @@ sub PW_Read($)
 	        	        return undef;
 		             }
 	        	 }
+ #   		}
     		}
 		} elsif ($v=~/\x23.*/) {}
 		  elsif ($v=~/[0-9A-F]{16}/){} 
