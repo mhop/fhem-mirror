@@ -150,7 +150,7 @@ sub PW_Circle_Set($@)
 	}
 	else
         {
-          return "Unknown argument $opt, choose one of on-for-timer off-for-timer on off getLog syncTime removeNode ping status";
+          return "Unknown argument $opt, choose one of on-for-timer off-for-timer on off toggle getLog syncTime removeNode ping status";
         }
 }
 sub PW_Circle_OnOffTimer($) {
