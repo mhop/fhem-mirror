@@ -32,7 +32,7 @@ sub HProtocolTank_Initialize($) {
   $hash->{ParseFn}        = "HProtocolTank_Parse";
   $hash->{FingerprintFn}  = "HProtocolTank_Fingerprint";
   $hash->{Match}          = "^[a-zA-Z0-9_]+ [a-zA-Z0-9_]+ [+-]*[0-9]+([.][0-9]+)?";
-  $hash->{AttrList}       = "event-on-update-reading";
+  $hash->{AttrList}       = $readingFnAttributes;
 }
 
 sub HProtocolTank_Define($$) {

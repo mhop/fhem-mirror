@@ -57,12 +57,15 @@ sub HProtocolGateway_Initialize($) {
 sub HProtocolGateway_Define($$) {
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
+  my $name = $hash->{NAME};
 
   return "Wrong syntax: use define <name> HProtocolGateway </dev/tty???>" if(int(@a) != 3);
 
   $hash->{helper}{DeviceName} = $a[2];
   $hash->{Clients}  = "HProtocolTank";
   $hash->{STATE} = "Initialized";
+
+  $attr{$name}{room} = "HProtocol";
 
   HProtocolGateway_DeviceConfig($hash);
   
@@ -73,33 +76,26 @@ sub HProtocolGateway_Define($$) {
 
 sub HProtocolGateway_Get($$@) {
 	my ($hash, $name, $opt, @args) = @_;
-
 	return "\"get $name\" needs at least one argument" unless(defined($opt));
-
 	if ($opt eq "update") {
-    HProtocolGateway_GetUpdate($hash);
-    return "Done.";
+    		HProtocolGateway_GetUpdate($hash);
+    		return "Done.";
 	} else {
     # IMPORTANT! This defines the list of possible commands
     my $list = "update:noArg";
 		return "Unknown argument $opt, choose one of $list";
 	}
-
   return -1;
 }
 
 sub HProtocolGateway_Set($@) {                                      
     my ($hash, @a) = @_;
-	
-	my $name = $a[0];
+    my $name = $a[0];
     my $cmd =  $a[1];
-
     if(!defined($sets{$cmd})) {
 	    return 'Unknown argument ' . $cmd . ', choose one of ' . join(' ', keys %sets)  . ":noArg"
 	}
-	
 	if ($cmd eq 'readValues') {
-	   
 	   RemoveInternalTimer($hash);
 	   InternalTimer(gettimeofday() + 1, 'HProtocolGateway_GetUpdate', $hash, 0);
 	}
@@ -196,6 +192,11 @@ sub HProtocolGateway_ParseMessage($$) {
     # convert to HEX
     $check = sprintf '%02X', $check;
     
+    # Unitronics Vision130
+    if ($water == 0 && $temperature == 0 && $probe_offset == 0 && $version == 0 && $error == 0 && $checksum == 0 ) {
+      $check = 0;
+    }
+
     return if($check ne $checksum);
 
     my ($filllevel,$volume,$ullage) = (0,0,0); 
