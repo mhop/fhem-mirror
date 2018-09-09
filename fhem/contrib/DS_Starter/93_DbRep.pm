@@ -6409,7 +6409,7 @@ sub mysql_DoDumpClientSide($) {
          $sql_text = "";
 
          if ($db_tables{$tablename}{skip_data} == 0) {
-             Log3 ($name, 3, "DbRep $name - $rct records inserted (size of backupfile: ".DbRep_byteOutput($filesize).")");
+             Log3 ($name, 3, "DbRep $name - $rct records inserted (size of backupfile: ".DbRep_byteOutput($filesize).")") if($filesize);
 		     $totalrecords += $rct;
          } else {
 		     Log3 ($name, 3, "DbRep $name - Dumping structure of $tablename (Type ".$db_tables{$tablename}{Engine}." ) (size of backupfile: ".DbRep_byteOutput($filesize).")");
@@ -6434,7 +6434,13 @@ sub mysql_DoDumpClientSide($) {
  if($compress) {
      # $err nicht auswerten -> wenn compress fehlerhaft wird unkomprimiertes dumpfile verwendet
      ($err,$backupfile) = DbRep_dumpCompress($hash,$backupfile);
-     $filesize = (@{stat("$dump_path$backupfile")})[7];
+         
+     my $fref = stat("$dump_path$backupfile");    
+     if ($fref =~ /ARRAY/) {
+         $filesize = (@{stat("$dump_path$backupfile")})[7];
+     } else {
+         $filesize = (stat("$dump_path$backupfile"))[7];
+     }
  }
  
  # Dumpfile per FTP senden und versionieren
@@ -6453,8 +6459,11 @@ sub mysql_DoDumpClientSide($) {
 
  $rt = $rt.",".$brt;
  
- my $fsize = DbRep_byteOutput($filesize);
- $fsize = encode_base64($fsize,"");
+ my $fsize = '';
+ if($filesize) {
+    $fsize = DbRep_byteOutput($filesize);
+    $fsize = encode_base64($fsize,"");
+ }
  
  Log3 ($name, 3, "DbRep $name - Finished backup of database $dbname, total time used: ".sprintf("%.0f",$brt)." sec.");
  
@@ -6595,10 +6604,17 @@ sub mysql_DoDumpServerSide($) {
  my $dump_path_def = $attr{global}{modpath}."/log/";
  my $dump_path_loc = AttrVal($name,"dumpDirLocal", $dump_path_def);
  $dump_path_loc    = $dump_path_loc."/" unless($dump_path_loc =~ m/\/$/);
- my $filesize = (stat($dump_path_loc.$bfile))[7]?(stat($dump_path_loc.$bfile))[7]:"n.a.";
+ 
+ my $filesize;
+ my $fref = stat($dump_path_loc.$bfile);    
+ if ($fref =~ /ARRAY/) {
+     $filesize = (@{stat($dump_path_loc.$bfile)})[7];
+ } else {
+     $filesize = (stat($dump_path_loc.$bfile))[7];
+ }
  
  Log3 ($name, 3, "DbRep $name - Number of exported datasets: $drh");
- Log3 ($name, 3, "DbRep $name - Size of backupfile: ".DbRep_byteOutput($filesize));
+ Log3 ($name, 3, "DbRep $name - Size of backupfile: ".DbRep_byteOutput($filesize)) if($filesize);
  
  # Dumpfile per FTP senden und versionieren
  my ($ftperr,$ftpmsg,@ftpfd) = DbRep_sendftp($hash,$bfile); 
@@ -6614,8 +6630,11 @@ sub mysql_DoDumpServerSide($) {
  # Background-Laufzeit ermitteln
  my $brt = tv_interval($bst);
  
- my $fsize = DbRep_byteOutput($filesize);
- $fsize = encode_base64($fsize,"");
+ my $fsize = '';
+ if($filesize) {
+     $fsize = DbRep_byteOutput($filesize);
+     $fsize = encode_base64($fsize,"");
+ }
 
  $rt = $rt.",".$brt;
  
@@ -8231,9 +8250,15 @@ sub DbRep_WriteToDumpFile ($$) {
 		}
         print DATEI $inh;
         close(DATEI);
+        
+        my $fref = stat($sql_file);    
+        if ($fref =~ /ARRAY/) {
+            $filesize = (@{stat($sql_file)})[7];
+        } else {
+            $filesize = (stat($sql_file))[7];
+        }
     }
-    
-$filesize = (@{stat($sql_file)})[7];
+
 return ($filesize,undef);
 }
 
