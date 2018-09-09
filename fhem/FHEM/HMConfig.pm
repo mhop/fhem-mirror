@@ -1682,12 +1682,12 @@ $culHmRegChan{"HM-OU-CFM-TW02"}         = $culHmRegChan{"HM-OU-CFM-PL02"};
                       ,getRegRaw     => "[List0|List1|List2|List3|List4|List5|List6] ... [-PeerChannel-]"
                       ,getConfig     => ""
                       ,regSet        => "[prep|exec] -regName- -value- ... [-peerChannel-]"
-                      ,clear         => "[readings|trigger|register|oldRegs|rssi|msgEvents|attack|all]"
+                      ,clear         => "[readings|trigger|register|oldRegs|rssi|msgEvents|msgErrors|attack|all]"
                       ,templateDel   => "tmplt"
 );
 %culHmGlobalSetsVrtDev = (# virtuals and devices without subtype
                        virtual       => "-noButtons-"
-                      ,clear         => "[readings|rssi|msgEvents|unknownDev]"
+                      ,clear         => "[readings|rssi|msgErrors|msgErrors|unknownDev]"
 );
 
 %culHmReglSets         = (# entities with regList
