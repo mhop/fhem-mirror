@@ -126,7 +126,10 @@ sub PW_Circle_Set($@)
 	if($opt eq "on"||$opt eq "off")  
     {
 		IOWrite($hash,$hash->{CODE},$opt);
-    } elsif($opt =~ "(on|off)-for-timer")  
+    } elsif ($opt eq "toggle") {
+		$opt = ReadingsVal($name,"state","off") eq "off" ? "on" : "off";
+		IOWrite($hash,$hash->{CODE},$opt);    	
+    }elsif($opt =~ "(on|off)-for-timer")  
     {
     	if (@a == 1) {
 			IOWrite($hash,$hash->{CODE},$1);
