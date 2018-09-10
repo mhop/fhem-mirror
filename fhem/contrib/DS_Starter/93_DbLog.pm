@@ -513,10 +513,12 @@ sub DbLog_Set($@) {
 	my $ret;
 
     if ($a[1] eq 'reduceLog') {
+        my ($od,$nd) = split(":",$a[2]);         # $od - Tage älter als , $nd - Tage neuer als
+        if ($nd && $nd <= $od) {return "The second day value must be greater than the first one ! ";}
 	    if (defined($a[3]) && $a[3] !~ /^average$|^average=.+|^EXCLUDE=.+$|^INCLUDE=.+$/i) {
             return "ReduceLog syntax error in set command. Please see commandref for help.";
         }
-        if (defined $a[2] && $a[2] =~ /^\d+$/) {
+        if (defined $a[2] && $a[2] =~ /(^\d+$)|(^\d+:\d+$)/) {
             $ret = DbLog_reduceLog($hash,@a);
 			InternalTimer(gettimeofday()+5, "DbLog_execmemcache", $hash, 0);
         } else {
@@ -525,6 +527,8 @@ sub DbLog_Set($@) {
         }
     }
 	elsif ($a[1] eq 'reduceLogNbl') {
+        my ($od,$nd) = split(":",$a[2]);         # $od - Tage älter als , $nd - Tage neuer als
+        if ($nd && $nd <= $od) {return "The second day value must be greater than the first one ! ";}
 	    if (defined($a[3]) && $a[3] !~ /^average$|^average=.+|^EXCLUDE=.+$|^INCLUDE=.+$/i) {
             return "ReduceLogNbl syntax error in set command. Please see commandref for help.";
         }
