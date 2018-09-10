@@ -414,7 +414,7 @@ f18_resize()
   left += hl ? 0 : 40;
   left += pm ? 0 : 44;
   var lleft = (pm ? 10 : 52);
-  $("input.maininput").css({ width:(w-left-(FW_isiOS ? 26 : 24))+'px', 
+  $("input.maininput").css({ width:(w-left-(FW_isiOS ? 36 : 24))+'px', 
                              "margin-left":(rm ? "0px" : "10px"),
                              display: hi ? "none":"block"});
   $("#menu,#content").css("top", (hi && pm && hl) ? "10px" : "50px");
@@ -422,6 +422,8 @@ f18_resize()
   $("#menuBtn").toggle(!pm || f18_small);
   $("#menuBtn").css({ left:(rm ? "auto":"10px"), right:(rm ? "10px":"auto") });
   $("#logo")   .css({ left:(rm ? "auto":lleft ), right:(rm ? "48px":"auto") });
+  if(FW_isiOS)
+    $("#logo,#menuBtn").css({ top:'12px'});
 }
 
 function
