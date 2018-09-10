@@ -747,8 +747,8 @@ sub MSwitch_Set($@) {
 	if ((($cmd eq 'on') || ($cmd eq 'off')) && ($args[0] ne ''))
 	{
 	readingsSingleUpdate( $hash, "Parameter", $args[0], 1 );
-	if ($cmd eq 'on'){$args[0] = "$name:on_with_Parameter:$args[0]";}
-	if ($cmd eq 'off'){$args[0] = "$name:off_with_Parameter:$args[0]";}
+	#if ($cmd eq 'on'){$args[0] = "$name:on_with_Parameter:$args[0]";}
+	#if ($cmd eq 'off'){$args[0] = "$name:off_with_Parameter:$args[0]";}
 	}
 	
 	#######################################
