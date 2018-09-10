@@ -107,7 +107,7 @@ require "$attr{global}{modpath}/FHEM/DevIo.pm";
   $hash->{SetFn}   = "PW_Set";
   $hash->{GetFn}   = "PW_Get";
   $hash->{StateFn} = "PW_SetState";
-  $hash->{AttrList}= "do_not_notify:1,0 interval circlecount WattFormat showCom autosync".
+  $hash->{AttrList}= "do_not_notify:1,0 interval circlecount WattFormat showCom autosync ".
   					  $readingFnAttributes;;
   $hash->{ShutdownFn} = "PW_Shutdown";
 }
