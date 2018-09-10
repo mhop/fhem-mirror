@@ -4376,9 +4376,9 @@ setReadingsVal($$$$)
 {
   my ($hash,$rname,$val,$ts) = @_;
 
-  if( $hash->{".or"} && grep($rname =~ m/^$_$/, @{$hash->{".or"}}) ) {
-    if( $hash->{READINGS}{$rname} && 
-        $hash->{READINGS}{$rname}{VAL} &&
+  if($hash->{".or"} && grep($rname =~ m/^$_$/, @{$hash->{".or"}}) ) {
+    if(defined($hash->{READINGS}{$rname}) && 
+       defined($hash->{READINGS}{$rname}{VAL}) &&
         $hash->{READINGS}{$rname}{VAL} ne $val ) {
       $hash->{OLDREADINGS}{$rname}{VAL} = $hash->{READINGS}{$rname}{VAL};
       $hash->{OLDREADINGS}{$rname}{TIME} = $hash->{READINGS}{$rname}{TIME};
