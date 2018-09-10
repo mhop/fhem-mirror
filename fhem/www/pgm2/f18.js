@@ -75,6 +75,8 @@ $(document).ready(function(){
 function
 f18_menu()
 {
+  $("#menu").toggleClass("hidden", f18_small || !f18_getAttr("Pinned.menu"));
+
   if($("#menuScrollArea #menuBtn").length)
     return fixMenu();
 
@@ -420,7 +422,6 @@ f18_resize()
   $("#menuBtn").toggle(!pm || f18_small);
   $("#menuBtn").css({ left:(rm ? "auto":"10px"), right:(rm ? "10px":"auto") });
   $("#logo")   .css({ left:(rm ? "auto":lleft ), right:(rm ? "48px":"auto") });
-  $("#menu").toggleClass("hidden", !pm);
 }
 
 function
