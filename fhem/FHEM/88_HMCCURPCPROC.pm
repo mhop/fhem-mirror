@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 1.0.006
+#  Version 1.1
 #
 #  Subprocess based RPC Server module for HMCCU.
 #
@@ -35,7 +35,7 @@ use SetExtensions;
 ######################################################################
 
 # HMCCURPC version
-my $HMCCURPCPROC_VERSION = '1.0.006';
+my $HMCCURPCPROC_VERSION = '1.0.007';
 
 # Maximum number of events processed per call of Read()
 my $HMCCURPCPROC_MAX_EVENTS = 100;
@@ -105,6 +105,7 @@ my $BINRPC_ERROR          = 0x42696EFF;
 # Standard functions
 sub HMCCURPCPROC_Initialize ($);
 sub HMCCURPCPROC_Define ($$);
+sub HMCCURPCPROC_InitDevice ($$);
 sub HMCCURPCPROC_Undef ($$);
 sub HMCCURPCPROC_Shutdown ($);
 sub HMCCURPCPROC_Attr ($@);
@@ -115,7 +116,7 @@ sub HMCCURPCPROC_SetError ($$$);
 sub HMCCURPCPROC_SetState ($$);
 sub HMCCURPCPROC_ProcessEvent ($$);
 
-# RPC server functions
+# RPC server control functions
 sub HMCCURPCPROC_GetRPCServerID ($$);
 sub HMCCURPCPROC_RegisterCallback ($$);
 sub HMCCURPCPROC_DeRegisterCallback ($$);
@@ -217,8 +218,10 @@ sub HMCCURPCPROC_Define ($$)
 	my $ioname = '';
 	my $rpcip = '';
 	my $iface;
-	my $usage = "Usage: define $name HMCCURPCPROC { CCUHost } { RPCPort | RPCInterface } [iodev={device}]";
+	my $usage = "Usage: define $name HMCCURPCPROC { CCUHost | iodev={device} } { RPCPort | RPCInterface }";
 	
+	$hash->{version} = $HMCCURPCPROC_VERSION;
+
 	if (exists ($h->{iodev})) {
 		$ioname = $h->{iodev};
 		return $usage if (scalar (@$a) < 3);
@@ -246,6 +249,8 @@ sub HMCCURPCPROC_Define ($$)
 			my $dh = $defs{$d};
 			next if (!exists ($dh->{TYPE}) || !exists ($dh->{NAME}));
 			next if ($dh->{TYPE} ne 'HMCCU');
+	
+			# The following call will fail during FHEM start if CCU is not ready
 			my $ifhost = HMCCU_GetRPCServerInfo ($dh, $iface, 'host');
 			next if (!defined ($ifhost));
 			if ($dh->{host} eq $hash->{host} || $ifhost eq $hash->{host} || $ifhost eq $rpcip) {
@@ -253,61 +258,108 @@ sub HMCCURPCPROC_Define ($$)
 				last;
 			}
 		}
-		return "Can't find HMCCU I/O device" if (!defined ($hmccu_hash));
-		$ioname = $hmccu_hash->{NAME};
 	}
-		
+
+	# Store some definitions for delayed initialization
+	$hash->{hmccu}{devspec} = $iface;
+	$hash->{rpcip} = $rpcip;
+			
+	if ($init_done) {
+		# Interactive define command while CCU not ready or no IO device defined
+		if (!defined ($hmccu_hash)) {
+			my ($ccuactive, $ccuinactive) = HMCCU_IODeviceStates ();
+			if ($ccuinactive > 0) {
+				return "CCU and/or IO device not ready. Please try again later";
+			}
+			else {
+				return "Cannot detect IO device";
+			}
+		}
+	}
+	else {
+		# CCU not ready during FHEM start
+		if (!defined ($hmccu_hash) || $hmccu_hash->{ccustate} ne 'active') {
+			Log3 $name, 2, "HMCCURPCPROC: [$name] Cannot detect IO device, maybe CCU not ready. Trying later ...";
+			readingsSingleUpdate ($hash, "state", "Pending", 1);
+			$hash->{ccudevstate} = 'pending';
+			return undef;
+		}
+	}
+
+	# Initialize FHEM device, set IO device
+	my $rc = HMCCURPCPROC_InitDevice ($hmccu_hash, $hash);
+	return "Invalid port or interface $iface" if ($rc == 1);
+	return "Can't assign I/O device $ioname" if ($rc == 2);
+	return "Invalid local IP address ".$hash->{hmccu}{localaddr} if ($rc == 3);
+
+	return undef;
+}
+
+######################################################################
+# Initialization of FHEM device.
+# Called during Define() or by HMCCU after CCU ready.
+# Return 0 on successful initialization or >0 on error:
+# 1 = Invalid port or interface
+# 2 = Cannot assign IO device
+# 3 = Invalid local IP address
+######################################################################
+
+sub HMCCURPCPROC_InitDevice ($$) {
+	my ($hmccu_hash, $dev_hash) = @_;
+	my $name = $dev_hash->{NAME};
+	my $iface = $dev_hash->{hmccu}{devspec};
+	
 	# Check if interface is valid
 	my $ifname = HMCCU_GetRPCServerInfo ($hmccu_hash, $iface, 'name'); 
 	my $ifport = HMCCU_GetRPCServerInfo ($hmccu_hash, $iface, 'port'); 
-	return "Invalid port or interface $iface" if (!defined ($ifname) || !defined ($ifport));
+	return 1 if (!defined ($ifname) || !defined ($ifport));
 
 	# Check if RPC device with same interface already exists
 	for my $d (keys %defs) {
 		my $dh = $defs{$d};
 		next if (!exists ($dh->{TYPE}) || !exists ($dh->{NAME}));
-		if ($dh->{TYPE} eq 'HMCCURPCPROC' && $dh->{NAME} ne $name) {
+		if ($dh->{TYPE} eq 'HMCCURPCPROC' && $dh->{NAME} ne $name && IsDisabled ($dh->{NAME}) != 1) {
 			return "RPC device for CCU/port already exists"
-				if ($hash->{host} eq $dh->{host} && $dh->{rpcport} == $ifport);
+				if ($dev_hash->{host} eq $dh->{host} && exists ($dh->{rpcport}) && $dh->{rpcport} == $ifport);
 		}
 	}
 	
 	# Detect local IP address and check if CCU is reachable
-	my $localaddr = HMCCU_TCPConnect ($hash->{host}, $ifport);
-	return "Can't connect to CCU ".$hash->{host}." port $ifport" if ($localaddr eq '');
-	$hash->{hmccu}{localaddr} = $localaddr;
-	$hash->{hmccu}{defaultaddr} = $hash->{hmccu}{localaddr};
+	my $localaddr = HMCCU_TCPConnect ($dev_hash->{host}, $ifport);
+	return "Can't connect to CCU ".$dev_hash->{host}." port $ifport" if ($localaddr eq '');
+	$dev_hash->{hmccu}{localaddr} = $localaddr;
+	$dev_hash->{hmccu}{defaultaddr} = $dev_hash->{hmccu}{localaddr};
 
 	# Get unique ID for RPC server: last 2 segments of local IP address
 	# Do not append random digits because of https://forum.fhem.de/index.php/topic,83544.msg797146.html#msg797146
-	my @ipseg = split (/\./, $hash->{hmccu}{localaddr});
-	return "Invalid local IP address ".$hash->{hmccu}{localaddr} if (scalar (@ipseg) != 4);
-	$hash->{rpcid} = sprintf ("%03d%03d", $ipseg[2], $ipseg[3]);
+	my @ipseg = split (/\./, $dev_hash->{hmccu}{localaddr});
+	return 3 if (scalar (@ipseg) != 4);
+	$dev_hash->{rpcid} = sprintf ("%03d%03d", $ipseg[2], $ipseg[3]);
 
 	# Set I/O device and store reference for RPC device in I/O device
-	AssignIoPort ($hash, $hmccu_hash->{NAME});
-	$hmccu_hash->{hmccu}{interfaces}{$ifname}{device} = $name;
+	my $ioname = $hmccu_hash->{NAME};
+	return 2 if (!HMCCU_AssignIODevice ($dev_hash, $ioname, $ifname));
 
 	# Store internals
-	$hash->{rpcip}        = $rpcip;
-	$hash->{rpcport}      = $ifport;
-	$hash->{rpcinterface} = $ifname;
-	$hash->{ccuip}        = $hmccu_hash->{ccuip};
-	$hash->{ccutype}      = $hmccu_hash->{ccutype};
-	$hash->{CCUNum}       = $hmccu_hash->{CCUNum};
-	$hash->{ccustate}     = $hmccu_hash->{ccustate};
-	$hash->{version}      = $HMCCURPCPROC_VERSION;
+	$dev_hash->{rpcport}      = $ifport;
+	$dev_hash->{rpcinterface} = $ifname;
+	$dev_hash->{ccuip}        = $hmccu_hash->{ccuip};
+	$dev_hash->{ccutype}      = $hmccu_hash->{ccutype};
+	$dev_hash->{CCUNum}       = $hmccu_hash->{CCUNum};
+	$dev_hash->{ccustate}     = $hmccu_hash->{ccustate};
 	
 	Log3 $name, 1, "HMCCURPCPROC: [$name] Initialized version $HMCCURPCPROC_VERSION for interface $ifname with I/O device $ioname";
 
 	# Set some attributes
-	$attr{$name}{stateFormat} = "rpcstate/state";
-	$attr{$name}{verbose} = 2;
+	if ($init_done) {
+		$attr{$name}{stateFormat} = "rpcstate/state";
+		$attr{$name}{verbose} = 2;
+	}
 
-	HMCCURPCPROC_ResetRPCState ($hash);
-	HMCCURPCPROC_SetState ($hash, 'Initialized');
+	HMCCURPCPROC_ResetRPCState ($dev_hash);
+	HMCCURPCPROC_SetState ($dev_hash, 'Initialized');
 	
-	return undef;
+	return 0;
 }
 
 ######################################################################
@@ -386,7 +438,7 @@ sub HMCCURPCPROC_Set ($@)
 	my $opt = shift @$a;
 
 	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
-	my $options = $ccuflags =~ /expert/ ? "cleanup:noArg deregister:noArg rpcrequest rpcserver:on,off" : "";
+	my $options = $ccuflags =~ /expert/ ? "cleanup:noArg deregister:noArg register:noArg rpcrequest rpcserver:on,off" : "";
 	my $busyoptions = $ccuflags =~ /expert/ ? "rpcserver:off" : "";
 
 	return "HMCCURPCPROC: CCU busy, choose one of $busyoptions"
@@ -395,6 +447,21 @@ sub HMCCURPCPROC_Set ($@)
 	if ($opt eq 'cleanup') {
 		HMCCURPCPROC_Housekeeping ($hash);
 		return undef;
+	}
+	elsif ($opt eq 'register') {
+		if ($hash->{RPCState} eq 'running') {
+			my ($rc, $rcmsg) = HMCCURPCPROC_RegisterCallback ($hash, 2);
+			if ($rc) {
+				$hash->{ccustate} = 'active';
+				return HMCCURPCPROC_SetState ($hash, "OK");
+			}
+			else {
+				return HMCCURPCPROC_SetError ($hash, $rcmsg, 2);
+			}
+		}
+		else {
+			return HMCCURPCPROC_SetError ($hash, "RPC server not running", 2);
+		}
 	}
 	elsif ($opt eq 'deregister') {
 		my ($rc, $err) = HMCCURPCPROC_DeRegisterCallback ($hash, 1);
@@ -759,7 +826,7 @@ sub HMCCURPCPROC_ProcessEvent ($$)
 		$rh->{sumdelay} += $delay;
 		$rh->{avgdelay} = $rh->{sumdelay}/$rh->{rec}{$et};
 		$hash->{ccustate} = 'active' if ($hash->{ccustate} ne 'active');
-		Log3 $name, 2, "HMCCURPCPROC: [$name] Received CENTRAL event. ".$t[2]."=".$t[3] if ($t[1] eq 'CENTRAL');
+		Log3 $name, 3, "HMCCURPCPROC: [$name] Received CENTRAL event. ".$t[2]."=".$t[3] if ($t[1] eq 'CENTRAL');
 		my ($add, $chn) = split (/:/, $t[1]);
 		return defined ($chn) ? ($et, $clkey, $add, $chn, $t[2], $t[3]) : undef;
 	}
@@ -1079,7 +1146,7 @@ sub HMCCURPCPROC_InitRPCServer ($$$$)
 	Log3 $name, 4, "HMCCURPCPROC: [$name] Adding callback for modified devices for server $clkey";
 	$server->add_method (
 	   { name=>"updateDevice",
-	     signature=>["string string string int"],
+	     signature=>["string string string int", "string string string i4"],
 	     code=>\&HMCCURPCPROC_UpdateDeviceCB
 	   }
 	);
@@ -1096,7 +1163,7 @@ sub HMCCURPCPROC_InitRPCServer ($$$$)
 	# Callback for readded devices
 	Log3 $name, 4, "HMCCURPCPROC: [$name] Adding callback for readded devices for server $clkey";
 	$server->add_method (
-	   { name=>"replaceDevice",
+	   { name=>"readdedDevice",
 	     signature=>["string string array"],
 	     code=>\&HMCCURPCPROC_ReaddDeviceCB
 	   }
@@ -2563,7 +2630,8 @@ sub HMCCURPCPROC_DecodeResponse ($)
       <code>define myccurpc HMCCURPCPROC iodev=myccudev BidCos-RF</code><br/>
       <br/><br/>
       The parameter <i>HostOrIP</i> is the hostname or IP address of a Homematic CCU2.
-      The I/O device can also be specified with parameter iodev. Supported interfaces or
+      The I/O device can also be specified with parameter iodev. If more than one CCU exist
+      it's highly recommended to specify IO device with option iodev. Supported interfaces or
       ports are:
       <table>
       <tr><td><b>Port</b></td><td><b>Interface</b></td></tr>
@@ -2580,7 +2648,14 @@ sub HMCCURPCPROC_DecodeResponse ($)
    <a name="HMCCURPCPROCset"></a>
    <b>Set</b><br/><br/>
    <ul>
-		<li><b> set &lt;name&gt; rpcrequest &lt;method&gt; [&lt;parameters&gt;]</b><br/>
+      <li><b>set &lt;name&gt; deregister</b><br/>
+         Deregister RPC server at CCU.
+      </li><br/>
+      <li><b>set &lt;name&gt; register</b><br/>
+         Register RPC server at CCU. RPC server must be running. Helpful when CCU lost
+         connection to FHEM and events timed out.
+      </li><br/>
+		<li><b>set &lt;name&gt; rpcrequest &lt;method&gt; [&lt;parameters&gt;]</b><br/>
 			Send RPC request to CCU. The result is displayed in FHEM browser window. See EQ-3
 			RPC XML documentation for mor information about valid methods and requests.
 		</li><br/>

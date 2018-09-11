@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.2.003
+#  Version 4.2.005
 #
 #  Configuration parameters for HomeMatic devices.
 #
@@ -334,6 +334,13 @@ use vars qw(%HMCCU_SCRIPTS);
 	statedatapoint   => "LUX",
 	stripnumber      => 1
 	},
+	"HmIP-SLO" => {
+	_description     => "Lichtsensor",
+	_channels        => "1",
+	ccureadingfilter => "_ILLUMINATION\$",
+	statedatapoint   => "CURRENT_ILLUMINATION",
+	stripnumber      => 1
+	},
 	"HM-CC-SCD" => {
 	_description     => "CO2 Sensor",
 	_channels        => "1",
@@ -648,7 +655,7 @@ use vars qw(%HMCCU_SCRIPTS);
 	},
 	"HM-CC-RT-DN" => {
 	_description     => "Heizkoerperthermostat",
-	ccureadingfilter => "(TEMPERATURE|VALVE_STATE|CONTROL)",
+	ccureadingfilter => "(TEMPERATURE|VALVE_STATE|CONTROL|BATTERY_STATE)",
 	cmdIcon          => "Auto:sani_heating_automatic Manu:sani_heating_manual Boost:sani_heating_boost on:general_an off:general_aus",
 	controldatapoint => "4.SET_TEMPERATURE",
 	eventMap         => "/datapoint 4.MANU_MODE 20.0:Manu/datapoint 4.AUTO_MODE 1:Auto/datapoint 4.BOOST_MODE 1:Boost/datapoint 4.MANU_MODE 4.5:off/datapoint 4.MANU_MODE 30.5:on/",
@@ -764,6 +771,12 @@ use vars qw(%HMCCU_SCRIPTS);
 	_description     => "Lichtsensor",
 	ccureadingfilter => "LUX",
 	statedatapoint   => "1.LUX",
+	stripnumber      => 1
+	},
+	"HmIP-SLO" => {
+	_description     => "Lichtsensor",
+	ccureadingfilter => "_ILLUMINATION\$",
+	statedatapoint   => "1.CURRENT_ILLUMINATION",
 	stripnumber      => 1
 	},
 	"HM-CC-SCD" => {
@@ -1079,23 +1092,36 @@ if (odev) {
 		code        => qq(
 string devid;
 string chnid;
-string sifId;
+string sifid;
+string prgid;
 foreach(devid, root.Devices().EnumUsedIDs()) {
    object odev=dom.GetObject(devid);
-   string intid=odev.Interface();
-   string intna=dom.GetObject(intid).Name();
-   integer cc=0;
-   foreach (chnid, odev.Channels()) {
-      object ochn=dom.GetObject(chnid);
-      WriteLine("C;" # ochn.Address() # ";" # ochn.Name() # ";" # ochn.ChnDirection());
-      cc=cc+1;
+   if(odev) {
+      var intid=odev.Interface();
+      object oiface=dom.GetObject(intid);
+      if(oiface) {
+         string intna=oiface.Name();
+         integer cc=0;
+         foreach (chnid, odev.Channels()) {
+            object ochn=dom.GetObject(chnid);
+            WriteLine("C;" # ochn.Address() # ";" # ochn.Name() # ";" # ochn.ChnDirection());
+            cc=cc+1;
+         }
+         WriteLine("D;" # intna # ";" # odev.Address() # ";" # odev.Name() # ";" # odev.HssType() # ";" # cc);
+      }
    }
-   WriteLine("D;" # intna # ";" # odev.Address() # ";" # odev.Name() # ";" # odev.HssType() # ";" # cc);
 }
-foreach(sifId, root.Interfaces().EnumIDs()) {
-  object oIf=dom.GetObject(sifId);
+foreach(sifid, root.Interfaces().EnumIDs()) {
+  object oIf=dom.GetObject(sifid);
   if (oIf) {
     WriteLine("I;" # oIf.Name() # ';' # oIf.InterfaceInfo() # ';' # oIf.InterfaceUrl());
+  }
+}
+string prgid;
+foreach(prgid, dom.GetObject(ID_PROGRAMS).EnumIDs()) {
+  object oProg=dom.GetObject(prgid);
+  if(oProg) {
+    WriteLine ("P;" # oProg.Name() # ";" # oProg.Active() # ";" # oProg.Internal());
   }
 }
 		)
@@ -1266,6 +1292,21 @@ foreach(itemID, dom.GetObject(ID_DEVICES).EnumUsedIDs()) {
 object lObjDevice = xmlrpc.GetObjectByHSSAddress(interfaces.Get("\$iface"),"\$address");
 if (lObjDevice) {
   WriteLine (lObjDevice.Name());
+}
+		)
+	},
+	"GetGroupDevices" => {
+		description => "Get virtual group configuration",
+		syntax      => "",
+		parameters  => 0,
+		code        => qq(
+string lGetOut = "";
+string lGetErr = "";
+string lCommand = "cat /usr/local/etc/config/groups.gson";
+integer lResult;
+lResult = system.Exec(lCommand,&lGetOut,&lGetErr);
+if(lResult == 0) {
+  WriteLine(lGetOut);
 }
 		)
 	}

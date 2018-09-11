@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.2.003
+#  Version 4.3
 #
 #  (c) 2018 zap (zap01 <at> t-online <dot> de)
 #
@@ -62,14 +62,16 @@ use SetExtensions;
 
 # use Time::HiRes qw( gettimeofday usleep );
 
+sub HMCCUCHN_Initialize ($);
 sub HMCCUCHN_Define ($@);
+sub HMCCUCHN_InitDevice ($$);
 sub HMCCUCHN_Set ($@);
 sub HMCCUCHN_Get ($@);
 sub HMCCUCHN_Attr ($@);
 
-##################################################
+######################################################################
 # Initialize module
-##################################################
+######################################################################
 
 sub HMCCUCHN_Initialize ($)
 {
@@ -90,9 +92,9 @@ sub HMCCUCHN_Initialize ($)
 		"substexcl stripnumber peer:textField-long ". $readingFnAttributes;
 }
 
-##################################################
+######################################################################
 # Define device
-##################################################
+######################################################################
 
 sub HMCCUCHN_Define ($@)
 {
@@ -108,50 +110,101 @@ sub HMCCUCHN_Define ($@)
 
 	my $hmccu_hash = undef;
 	
-	# IO device can be set by command line parameter iodev
-	if (exists ($h->{iodev})) {
-		$hmccu_hash = $defs{$h->{iodev}} if (exists ($defs{$h->{iodev}}));
-	}
-	$hmccu_hash = HMCCU_FindIODevice ($devspec) if (!defined ($hmccu_hash));
-	return "Cannot detect IO device" if (!defined ($hmccu_hash));
-
-	return "Invalid or unknown CCU channel name or address"
-		if (! HMCCU_IsValidChannel ($hmccu_hash, $devspec, 7));
-
-	my ($di, $da, $dn, $dt, $dc) = HMCCU_GetCCUDeviceParam ($hmccu_hash, $devspec);
-	return "Invalid or unknown CCU device name or address" if (!defined ($da));
-
-	$hash->{ccuif} = $di;
-	$hash->{ccuaddr} = $da;
-	$hash->{ccuname} = $dn;
-	$hash->{ccutype} = $dt;
+	# Store some definitions for delayed initialization
+	$hash->{hmccu}{devspec} = $devspec;
+	
+	# Defaults
 	$hash->{channels} = 1;
 	$hash->{statevals} = 'devstate';
-
+	
 	# Parse optional command line parameters
 	my $n = 0;
 	my $arg = shift @$a;
 	while (defined ($arg)) {
 		return $usage if ($n == 3);
 		if    ($arg eq 'readonly') { $hash->{statevals} = $arg; }
-		elsif ($arg eq 'defaults') { HMCCU_SetDefaults ($hash); }
+		elsif ($arg eq 'defaults' && !$init_done) { HMCCU_SetDefaults ($hash); }
 		else { return $usage; }
 		$n++;
 		$arg = shift @$a;
 	}
-
-	# Inform HMCCU device about client device
-	AssignIoPort ($hash, $hmccu_hash->{NAME});
-
-	readingsSingleUpdate ($hash, "state", "Initialized", 1);
-	$hash->{ccudevstate} = 'active';
+	
+	# IO device can be set by command line parameter iodev, otherwise try to detect IO device
+	if (exists ($h->{iodev})) {
+		return "Specified IO Device ".$h->{iodev}." does not exist" if (!exists ($defs{$h->{iodev}}));
+		return "Specified IO Device ".$h->{iodev}." is not a HMCCU device"
+			if ($defs{$h->{iodev}}->{TYPE} ne 'HMCCU');
+		$hmccu_hash = $defs{$h->{iodev}};
+	}
+	else {
+		# The following call will fail during FHEM start if CCU is not ready
+		$hmccu_hash = HMCCU_FindIODevice ($devspec);
+	}
+	
+	if ($init_done) {
+		# Interactive define command while CCU not ready or no IO device defined
+		if (!defined ($hmccu_hash)) {
+			my ($ccuactive, $ccuinactive) = HMCCU_IODeviceStates ();
+			if ($ccuinactive > 0) {
+				return "CCU and/or IO device not ready. Please try again later";
+			}
+			else {
+				return "Cannot detect IO device";
+			}
+		}
+	}
+	else {
+		# CCU not ready during FHEM start
+		if (!defined ($hmccu_hash) || $hmccu_hash->{ccustate} ne 'active') {
+			Log3 $name, 2, "HMCCUCHN: [$devname] Cannot detect IO device, maybe CCU not ready. Trying later ...";
+			readingsSingleUpdate ($hash, "state", "Pending", 1);
+			$hash->{ccudevstate} = 'pending';
+			return undef;
+		}
+	}
+	
+	# Initialize FHEM device, set IO device
+	my $rc = HMCCUCHN_InitDevice ($hmccu_hash, $hash);
+	return "Invalid or unknown CCU channel name or address" if ($rc == 1);
+	return "Can't assign I/O device ".$hmccu_hash->{NAME} if ($rc == 2);
 
 	return undef;
 }
 
-#####################################
+######################################################################
+# Initialization of FHEM device.
+# Called during Define() or by HMCCU after CCU ready.
+# Return 0 on successful initialization or >0 on error:
+# 1 = Invalid channel name or address
+# 2 = Cannot assign IO device
+######################################################################
+
+sub HMCCUCHN_InitDevice ($$) {
+	my ($hmccu_hash, $dev_hash) = @_;
+	my $devspec = $dev_hash->{hmccu}{devspec};
+	
+	return 1 if (!HMCCU_IsValidChannel ($hmccu_hash, $devspec, 7));
+
+	my ($di, $da, $dn, $dt, $dc) = HMCCU_GetCCUDeviceParam ($hmccu_hash, $devspec);
+	return 1 if (!defined ($da));
+
+	# Inform HMCCU device about client device
+	return 2 if (!HMCCU_AssignIODevice ($dev_hash, $hmccu_hash->{NAME}, undef));
+
+	$dev_hash->{ccuif} = $di;
+	$dev_hash->{ccuaddr} = $da;
+	$dev_hash->{ccuname} = $dn;
+	$dev_hash->{ccutype} = $dt;
+
+	readingsSingleUpdate ($dev_hash, "state", "Initialized", 1);
+	$dev_hash->{ccudevstate} = 'active';
+	
+	return 0;
+}
+
+######################################################################
 # Set attribute
-#####################################
+######################################################################
 
 sub HMCCUCHN_Attr ($@)
 {
@@ -195,6 +248,8 @@ sub HMCCUCHN_Set ($@)
 
 	my $rocmds = "clear config defaults:noArg";
 	
+	# Get I/O device, check device state
+	return HMCCU_SetError ($hash, -19) if (!defined ($hash->{ccudevstate}) || $hash->{ccudevstate} eq 'pending');
 	return HMCCU_SetError ($hash, -3) if (!defined ($hash->{IODev}));
 	return undef if ($hash->{statevals} eq 'readonly' && $opt ne '?' &&
 		$opt !~ /^(clear|config|defaults)$/);
@@ -211,7 +266,7 @@ sub HMCCUCHN_Set ($@)
 	my $ccutype = $hash->{ccutype};
 	my $ccuaddr = $hash->{ccuaddr};
 	my $ccuif = $hash->{ccuif};
-	my $statevals = AttrVal ($name, "statevals", '');
+	my $statevals = AttrVal ($name, 'statevals', '');
 	my ($sc, $sd, $cc, $cd) = HMCCU_GetSpecialDatapoints ($hash, '', 'STATE', '', '');
 
 	my $result = '';
@@ -919,12 +974,12 @@ sub HMCCUCHN_Get ($@)
          set my_switch on
          </code>
       </li><br/>
-      <li><b>stripnumber [&lt;datapoint-expr&gt;!]{<u>0</u>|1|2|-n|%fmt}[;...]</b><br/>
+      <li><b>stripnumber [&lt;datapoint-expr&gt;!]{0|1|2|-n|%fmt}[;...]</b><br/>
       	Remove trailing digits or zeroes from floating point numbers, round or format
       	numbers. If attribute is negative (-0 is valid) floating point values are rounded
       	to the specified number of digits before they are stored in readings. The meaning of
       	values 0,1,2 is:<br/>
-      	0 = Floating point numbers are stored as read from CCU (i.e. with trailing zeros)<br/>
+      	0 = Floating point numbers are stored as integer.<br/>
       	1 = Trailing zeros are stripped from floating point numbers except one digit.<br/>
    		2 = All trailing zeros are stripped from floating point numbers.<br/>
    		With %fmt one can specify any valid sprintf() format string.<br/>

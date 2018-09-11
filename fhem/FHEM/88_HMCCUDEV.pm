@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.2.003
+#  Version 4.3
 #
 #  (c) 2018 zap (zap01 <at> t-online <dot> de)
 #
@@ -65,7 +65,9 @@ use SetExtensions;
 
 # use Time::HiRes qw( gettimeofday usleep );
 
+sub HMCCUDEV_Initialize ($);
 sub HMCCUDEV_Define ($@);
+sub HMCCUDEV_InitDevice ($$);
 sub HMCCUDEV_Set ($@);
 sub HMCCUDEV_Get ($@);
 sub HMCCUDEV_Attr ($@);
@@ -110,20 +112,39 @@ sub HMCCUDEV_Define ($@)
 	my $devname = shift @$a;
 	my $devtype = shift @$a;
 	my $devspec = shift @$a;
-	my $gdcount = 0;
 
 	my $hmccu_hash = undef;
 	
-	# IO device can be set by command line parameter iodev
-	if (exists ($h->{iodev})) {
-		$hmccu_hash = $defs{$h->{iodev}} if (exists ($defs{$h->{iodev}}));
-	}
+	# Store some definitions for delayed initialization
+	$hash->{hmccu}{devspec} = $devspec;
+	$hash->{hmccu}{groupexp} = $h->{groupexp} if (exists ($h->{groupexp}));
+	$hash->{hmccu}{group} = $h->{group} if (exists ($h->{group}));
 
+	# Defaults
+	$hash->{statevals} = 'devstate';
+	
+	# Parse optional command line parameters
+	foreach my $arg (@$a) {
+		if    ($arg eq 'readonly') { $hash->{statevals} = $arg; }
+		elsif ($arg eq 'defaults' && !$init_done) { HMCCU_SetDefaults ($hash); }
+		elsif ($arg =~ /^[0-9]+$/) { $attr{$name}{statechannel} = $arg; }
+		else { return $usage; }
+	}
+	
+	# IO device can be set by command line parameter iodev, otherwise try to detect IO device
+	if (exists ($h->{iodev})) {
+		return "Specified IO Device ".$h->{iodev}." does not exist" if (!exists ($defs{$h->{iodev}}));
+		return "Specified IO Device ".$h->{iodev}." is not a HMCCU device"
+			if ($defs{$h->{iodev}}->{TYPE} ne 'HMCCU');
+		$hmccu_hash = $defs{$h->{iodev}};
+	}
+	else {
+		# The following call will fail during FHEM start if CCU is not ready
+		$hmccu_hash = $devspec eq 'virtual' ? HMCCU_GetHash (0) : HMCCU_FindIODevice ($devspec);
+	}
+		
 	if ($devspec eq 'virtual') {
 		# Virtual device FHEM only
-		$hmccu_hash = HMCCU_GetHash (0);
-		return "Cannot detect IO device" if (!defined ($hmccu_hash));
-	
 		my $no = 0;
 		foreach my $d (sort keys %defs) {
 			my $ch = $defs{$d};
@@ -137,43 +158,77 @@ sub HMCCUDEV_Define ($@)
 		$hash->{ccuname} = "none";
 		$hash->{statevals} = 'readonly';
 	}
+	
+	if ($init_done) {
+		# Interactive define command while CCU not ready
+		if (!defined ($hmccu_hash)) {
+			my ($ccuactive, $ccuinactive) = HMCCU_IODeviceStates ();
+			if ($ccuinactive > 0) {
+				return "CCU and/or IO device not ready. Please try again later";
+			}
+			else {
+				return "Cannot detect IO device";
+			}
+		}
+	}
 	else {
-		$hmccu_hash = HMCCU_FindIODevice ($devspec) if (!defined ($hmccu_hash));
-		return "Cannot detect IO device" if (!defined ($hmccu_hash));
-		
-		return "Invalid or unknown CCU device name or address: $devspec"
-			if (! HMCCU_IsValidDevice ($hmccu_hash, $devspec, 7));
-
-		my ($di, $da, $dn, $dt, $dc) = HMCCU_GetCCUDeviceParam ($hmccu_hash, $devspec);
-		return "Invalid or unknown CCU device name or address: $devspec" if (!defined ($da));
-		
-		$hash->{ccuif} = $di;
-		$hash->{ccuaddr} = $da;
-		$hash->{ccuname} = $dn;
-		$hash->{ccutype} = $dt;
-		$hash->{channels} = $dc;
-		$hash->{statevals} = 'devstate';
+		# CCU not ready during FHEM start
+		if (!defined ($hmccu_hash) || $hmccu_hash->{ccustate} ne 'active') {
+			Log3 $name, 2, "HMCCUDEV: [$devname] Cannot detect IO device, maybe CCU not ready. Trying later ...";
+			readingsSingleUpdate ($hash, "state", "Pending", 1);
+			$hash->{ccudevstate} = 'pending';
+			return undef;
+		}
 	}
 
-	# Parse optional command line parameters
-	foreach my $arg (@$a) {
-		if    ($arg eq 'readonly') { $hash->{statevals} = $arg; }
-		elsif ($arg eq 'defaults') { HMCCU_SetDefaults ($hash); }
-		elsif ($arg =~ /^[0-9]+$/) { $attr{$name}{statechannel} = $arg; }
-		else { return $usage; }
-	}
+	# Initialize FHEM device, set IO device
+	my $rc = HMCCUDEV_InitDevice ($hmccu_hash, $hash);
+	return "Invalid or unknown CCU device name or address" if ($rc == 1);
+	return "Can't assign I/O device ".$hmccu_hash->{NAME} if ($rc == 2);
+	return "No devices in group" if ($rc == 3);
+
+	return undef;
+}
+
+######################################################################
+# Initialization of FHEM device.
+# Called during Define() or by HMCCU after CCU ready.
+# Return 0 on successful initialization or >0 on error:
+# 1 = Invalid channel name or address
+# 2 = Cannot assign IO device
+# 3 = No devices in group
+######################################################################
+
+sub HMCCUDEV_InitDevice ($$)
+{
+	my ($hmccu_hash, $dev_hash) = @_;
+	my $devspec = $dev_hash->{hmccu}{devspec};
+	my $gdcount = 0;
+	my $gdname = $devspec;
+	
+	return 1 if (! HMCCU_IsValidDevice ($hmccu_hash, $devspec, 7));
+
+	my ($di, $da, $dn, $dt, $dc) = HMCCU_GetCCUDeviceParam ($hmccu_hash, $devspec);
+	return 1 if (!defined ($da));
+	$gdname = $dn;
+	
+	$dev_hash->{ccuif} = $di;
+	$dev_hash->{ccuaddr} = $da;
+	$dev_hash->{ccuname} = $dn;
+	$dev_hash->{ccutype} = $dt;
+	$dev_hash->{channels} = $dc;
 
 	# Parse group options
-	if ($hash->{ccuif} eq "VirtualDevices") {
-		if (exists ($h->{groupexp}) && $hash->{ccuif} eq "VirtualDevices") {
+	if ($dev_hash->{ccuif} eq "VirtualDevices") {
+		if (exists ($dev_hash->{hmccu}{groupexp})) {
 			my @devlist;
-			$gdcount = HMCCU_GetMatchingDevices ($hmccu_hash, $h->{groupexp}, 'dev', \@devlist);
+			$gdcount = HMCCU_GetMatchingDevices ($hmccu_hash, $dev_hash->{hmccu}{groupexp}, 'dev', \@devlist);
 			return "No matching CCU devices found" if ($gdcount == 0);
-			$hash->{ccugroup} = join (',', @devlist);
+			$dev_hash->{ccugroup} = join (',', @devlist);
 		}
-		elsif (exists ($h->{group}) && $hash->{ccuif} eq "VirtualDevices") {
-			my @gdevlist = split (",", $h->{group});
-			$hash->{ccugroup} = '' if (@gdevlist > 0);
+		elsif (exists ($dev_hash->{hmccu}{group})) {
+			my @gdevlist = split (",", $dev_hash->{hmccu}{group});
+			$dev_hash->{ccugroup} = '' if (@gdevlist > 0);
 			foreach my $gd (@gdevlist) {
 				my ($gda, $gdc, $gdo) = ('', '', '', '');
 
@@ -183,26 +238,32 @@ sub HMCCUDEV_Define ($@)
 				$gdo = $gda;
 				$gdo .= ':'.$gdc if ($gdc ne '');
 
-				if (exists ($hash->{ccugroup}) && $hash->{ccugroup} ne '') {
-					$hash->{ccugroup} .= ",".$gdo;
+				if (exists ($dev_hash->{ccugroup}) && $dev_hash->{ccugroup} ne '') {
+					$dev_hash->{ccugroup} .= ",".$gdo;
 				}
 				else {
-					$hash->{ccugroup} = $gdo;
+					$dev_hash->{ccugroup} = $gdo;
 				}
 				
 				$gdcount++;
 			}
 		}
+		else {
+			my @devlist = HMCCU_GetGroupMembers ($hmccu_hash, $gdname);
+			$gdcount = scalar (@devlist);
+			$dev_hash->{ccugroup} = join (',', @devlist);
+		}
 
-		return "No devices in group" if ($hash->{ccuif} eq "VirtualDevices" && $gdcount == 0);
+		return 3 if ($gdcount == 0);
 	}
+
+	# Inform HMCCU device about client device
+	return 2 if (!HMCCU_AssignIODevice ($dev_hash, $hmccu_hash->{NAME}, undef));
 	
-	AssignIoPort ($hash, $hmccu_hash->{NAME});
-
-	readingsSingleUpdate ($hash, "state", "Initialized", 1);
-	$hash->{ccudevstate} = 'active';
-
-	return undef;
+	readingsSingleUpdate ($dev_hash, "state", "Initialized", 1);
+	$dev_hash->{ccudevstate} = 'active';
+	
+	return 0;
 }
 
 #####################################
@@ -252,9 +313,10 @@ sub HMCCUDEV_Set ($@)
 	# Valid commands for read only devices
 	my $rocmds = "clear config defaults:noArg";
 
-	# Get I/O device
-	my $hmccu_hash = HMCCU_GetHash ($hash);
-	return HMCCU_SetError ($hash, -3) if (!defined ($hmccu_hash));
+	# Get I/O device, check device state
+	return HMCCU_SetError ($hash, -19) if (!defined ($hash->{ccudevstate}) || $hash->{ccudevstate} eq 'pending');
+	return HMCCU_SetError ($hash, -3) if (!defined ($hash->{IODev}));
+	my $hmccu_hash = $hash->{IODev};
 	my $hmccu_name = $hmccu_hash->{NAME};
 
 	# Handle read only and disabled devices
@@ -274,7 +336,7 @@ sub HMCCUDEV_Set ($@)
 	my $ccuaddr = $hash->{ccuaddr};
 	my $ccuif = $hash->{ccuif};
 	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
-	my $statevals = AttrVal ($name, "statevals", '');
+	my $statevals = AttrVal ($name, 'statevals', '');
 	my ($sc, $sd, $cc, $cd) = HMCCU_GetSpecialDatapoints ($hash, '', 'STATE', '', '');
 
 	my $result = '';
@@ -545,8 +607,8 @@ sub HMCCUDEV_Get ($@)
 	my $opt = shift @$a;
 
 	# Get I/O device
-	my $hmccu_hash = HMCCU_GetHash ($hash);
-	return HMCCU_SetError ($hash, -3) if (!defined ($hmccu_hash));
+	return HMCCU_SetError ($hash, -3) if (!defined ($hash->{IODev}));
+	my $hmccu_hash = $hash->{IODev};
 	my $hmccu_name = $hmccu_hash->{NAME};
 
 	# Handle disabled devices
@@ -740,12 +802,14 @@ sub HMCCUDEV_Get ($@)
       <br/><br/>
       If option 'readonly' is specified no set command will be available. With option 'defaults'
       some default attributes depending on CCU device type will be set. Default attributes are only
-      available for some device types. Parameter <i>statechannel</i> corresponds to attribute
-      'statechannel'.<br/>
+      available for some device types. The option is ignored during FHEM start.
+      Parameter <i>statechannel</i> corresponds to attribute 'statechannel'.<br/>
       A HMCCUDEV device supports CCU group devices. The CCU devices or channels related to a group
       device are specified by using options 'group' or 'groupexp' followed by the names or
       addresses of the CCU devices or channels. By using 'groupexp' one can specify a regular
-      expression for CCU device or channel names.<br/>
+      expression for CCU device or channel names. Since version 4.2.009 of HMCCU HMCCUDEV
+      is able to detect members of group devices automatically. So options 'group' or
+      'groupexp' are no longer necessary to define a group device.<br/>
       It's also possible to group any kind of CCU devices or channels without defining a real
       group in CCU by using option 'virtual' instead of a CCU device specification. 
       <br/><br/>
