@@ -38,6 +38,7 @@
 #  Versions History:
 #
 # 8.0.0        07.09.2018       get filesize in DbRep_WriteToDumpFile corrected, restoreMySQL for clientSide dumps
+#                               minor fixes
 # 7.20.0       04.09.2018       deviceRename can operate a Device name with blank, e.g. 'current balance' as old device name
 # 7.19.0       25.08.2018       attribute "valueFilter" to filter datasets in fetchrows
 # 7.18.2       02.08.2018       fix in fetchrow function (forum:#89886), fix highlighting
@@ -8426,6 +8427,7 @@ sub DbRep_deldumpfiles ($$) {
   my $dbloghash     = $hash->{dbloghash};
   my $dump_path_def = $attr{global}{modpath}."/log/";
   my $dump_path_loc = AttrVal($name,"dumpDirLocal", $dump_path_def);
+  $dump_path_loc    = $dump_path_loc."/" unless($dump_path_loc =~ m/\/$/);
   my $dfk           = AttrVal($name,"dumpFilesKeep", 3);
   my $pfix          = (split '\.', $bfile)[1];
   my $dbname        = (split '_', $bfile)[0];
@@ -8437,8 +8439,17 @@ sub DbRep_deldumpfiles ($$) {
       return @fd;
   }
   my @files = sort grep {/^$file$/} readdir(DH);
-  @files = sort { (@{stat("$dump_path_loc/$a")})[9] cmp (@{stat("$dump_path_loc/$b")})[9] } @files
-        if(AttrVal("global", "archivesort", "alphanum") eq "timestamp");
+  
+  my $fref = stat("$dump_path_loc/$bfile"); 
+  
+  if ($fref =~ /ARRAY/) {
+      @files = sort { (@{stat("$dump_path_loc/$a")})[9] cmp (@{stat("$dump_path_loc/$b")})[9] } @files
+            if(AttrVal("global", "archivesort", "alphanum") eq "timestamp");
+  } else {
+      @files = sort { (stat("$dump_path_loc/$a"))[9] cmp (stat("$dump_path_loc/$b"))[9] } @files
+            if(AttrVal("global", "archivesort", "alphanum") eq "timestamp");
+  }
+  
   closedir(DH);
   
   Log3($name, 5, "DbRep $name - Dump files have been found in dumpDirLocal '$dump_path_loc': ".join(', ',@files) );
@@ -11653,7 +11664,7 @@ sub bdump {
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> dumpDirRemote            </td><td>: das Erstellungsverzeichnis des Dumpfile dem entfernten Server </td></tr>
+                                      <tr><td> dumpDirRemote            </td><td>: das Erstellungsverzeichnis des Dumpfile auf dem entfernten Server </td></tr>
                                       <tr><td> dumpCompress             </td><td>: Komprimierung des Dumpfiles nach der Erstellung </td></tr>
                                       <tr><td> dumpDirLocal             </td><td>: Directory des lokal gemounteten dumpDirRemote-Verzeichnisses  </td></tr>
 	                                  <tr><td> dumpFilesKeep            </td><td>: Anzahl der aufzubwahrenden Dumpfiles </td></tr>
