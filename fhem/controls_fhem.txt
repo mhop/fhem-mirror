@@ -1,4 +1,4 @@
-REV 17313
+REV 17321
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -25,7 +25,7 @@ UPD 2018-09-10_07:45:02 257890 ./CHANGED
 UPD 2018-09-05_07:45:04 37945 ./MAINTAINER.txt
 UPD 2018-09-09_07:45:03 39688 ./configDB.pm
 UPD 2018-08-27_07:45:04 20439 ./fhem.cfg.demo
-UPD 2018-09-05_07:45:11 150632 ./fhem.pl
+UPD 2018-09-11_07:45:09 150647 ./fhem.pl
 UPD 2018-03-11_07:45:03 22076 FHEM/00_CM11.pm
 UPD 2018-06-26_07:45:03 57519 FHEM/00_CUL.pm
 UPD 2018-03-04_07:45:03 76990 FHEM/00_DFPlayerMini.pm
@@ -243,7 +243,7 @@ UPD 2017-12-02_07:45:02 17913 FHEM/44_S7_DWrite.pm
 UPD 2017-11-29_07:45:02 20344 FHEM/44_S7_S5Client.pm
 UPD 2017-11-28_07:45:03 34206 FHEM/44_S7_S7Client.pm
 UPD 2016-08-03_07:45:11 7592 FHEM/44_TEK603.pm
-UPD 2018-09-10_07:45:02 54772 FHEM/45_Plugwise.pm
+UPD 2018-09-11_07:45:03 54773 FHEM/45_Plugwise.pm
 UPD 2018-04-28_07:45:03 21512 FHEM/45_TRX.pm
 UPD 2017-10-27_07:45:02 29024 FHEM/46_Aqicn.pm
 UPD 2018-09-10_07:45:02 11837 FHEM/46_PW_Circle.pm
@@ -457,7 +457,7 @@ UPD 2016-04-26_07:45:11 33223 FHEM/98_HourCounter.pm
 UPD 2017-12-02_07:45:02 66644 FHEM/98_Hyperion.pm
 UPD 2017-01-04_07:45:02 21573 FHEM/98_IF.pm
 UPD 2018-08-31_07:45:03 4884 FHEM/98_JsonList2.pm
-UPD 2018-09-06_07:45:02 231294 FHEM/98_MSwitch.pm
+UPD 2018-09-11_07:45:03 231296 FHEM/98_MSwitch.pm
 UPD 2016-03-12_07:45:14 49251 FHEM/98_MaxScanner.pm
 UPD 2017-09-05_07:45:02 34104 FHEM/98_MediaList.pm
 UPD 2018-01-14_07:45:02 121875 FHEM/98_Modbus.pm
@@ -683,8 +683,8 @@ UPD 2018-09-10_07:45:06 3549248 docs/commandref.html
 UPD 2018-09-10_07:45:08 2185446 docs/commandref_DE.html
 UPD 2018-07-16_07:45:03 76259 docs/commandref_frame.html
 UPD 2018-07-16_07:45:03 85715 docs/commandref_frame_DE.html
-UPD 2018-09-10_07:45:08 196347 docs/commandref_modular.html
-UPD 2018-09-10_07:45:09 207061 docs/commandref_modular_DE.html
+UPD 2018-09-11_07:45:09 196347 docs/commandref_modular.html
+UPD 2018-09-11_07:45:09 207061 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2024,8 +2024,9 @@ UPD 2015-07-28_14:05:34 14618 www/pgm2/dashboard_darkstyle.css
 UPD 2015-07-28_14:05:34 14236 www/pgm2/dashboard_ios7.css
 UPD 2015-07-28_14:05:34 14171 www/pgm2/dashboard_style.css
 UPD 2018-03-26_07:45:02 5908 www/pgm2/defaultCommon.css
+UPD 2018-09-11_07:45:03 3636 www/pgm2/defaultfloorplanstyle.css
 UPD 2017-12-04_07:45:02 2286 www/pgm2/doif.js
-UPD 2018-09-10_07:45:02 28495 www/pgm2/f18.js
+UPD 2018-09-11_07:45:03 28592 www/pgm2/f18.js
 UPD 2018-09-10_07:45:02 8768 www/pgm2/f18style.css
 UPD 2018-05-27_13:13:25 7515 www/pgm2/fhemdoc_modular.js
 UPD 2018-09-10_07:45:02 57884 www/pgm2/fhemweb.js
@@ -2043,7 +2044,6 @@ UPD 2017-12-30_07:45:03 26099 www/pgm2/fhemweb_uzsu.js
 UPD 2018-02-19_07:45:04 28576 www/pgm2/fhemweb_weekprofile.js
 UPD 2015-07-28_14:05:34 223 www/pgm2/floorplan_click.js
 UPD 2015-07-28_14:05:34 3246 www/pgm2/floorplan_drag.js
-UPD 2015-07-28_14:05:34 3636 www/pgm2/floorplanstyle.css
 UPD 2015-07-28_14:05:34 418 www/pgm2/images/ui-bg_diagonals-thick_18_b81900_40x40.png
 UPD 2015-07-28_14:05:34 312 www/pgm2/images/ui-bg_diagonals-thick_20_666666_40x40.png
 UPD 2015-07-28_14:05:34 180 www/pgm2/images/ui-bg_flat_0_aaaaaa_40x100.png
