@@ -272,10 +272,12 @@ sub expandJSON_isPmInstalled($$)
   <p>Expand a JSON object from a reading into individual readings</p>
 
   <ul>
-    <li>Requirement: perl module JSON<br>
+    <li>Requirements: perl module JSON<br>
       Use "cpan install JSON" or operating system's package manager to install
       Perl JSON Modul. Depending on your os the required package is named: 
-      libjson-perl or perl-JSON.
+      libjson-perl or perl-JSON. Additionally JSON::XS may be required if
+      Boolean values (true/false) are missing. Package name for this lib is
+      libjson-xs-perl or perl-JSON-XS.
     </li>
     <li>
       Decoding of JSON objects is fully implemented. JSON arrays are supported
