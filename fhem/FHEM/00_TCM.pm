@@ -795,6 +795,7 @@ my %gets120 = (
 # Get commands TCM 310
 my %gets310 = (
   "baseID" => {packetType => 5, cmd => "08", BaseID => "1,4", RemainingWriteCycles => "5,1"},
+  "dutycycleLimit" => {packetType => 5, cmd => "23", DutyCycle => "1,1", Slots => "2,1", SlotPeriod => "3,2", ActualSlotLeft => "5,2", LoadAfterActual => "7,1"},
   "filter" => {packetType => 5, cmd => "0F", "Type:Value" => "1,0,1:4"},
   "frequencyInfo" => {packetType => 5, cmd => "25", Frequency => "1,1", Protocol => "2,1"},
   "noiseThreshold" => {packetType => 5, cmd => "33", NoiseThreshold => "1,1"},
@@ -1555,6 +1556,8 @@ TCM_Undef($$)
     <li>baseID<br>
       Get the BaseID. You need this command in order to control EnOcean devices,
       see the <a href="#EnOceandefine">EnOcean</a> paragraph.</li>
+    <li>dutycycleLimit<br>
+       Read actual duty cycle limit values.</li>
     <li>filter<br>
       Get supplied filters. Description of the filter parameters, see
       <a href="https://www.enocean.com/esp">EnOcean Serial Protocol 3 (ESP3)</a></li>
