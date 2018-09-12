@@ -1342,15 +1342,21 @@ CommandInclude($$)
   $currcfgfile = $arg;
 
   my $bigcmd = "";
+  my $lineno = 0;
   $rcvdquit = 0;
   while(my $l = <$fh>) {
+    $lineno++;
     $l =~ s/[\r\n]//g;
 
     if($l =~ m/^(.*)\\ *$/) {       # Multiline commands
       $bigcmd .= "$1\n";
+
     } else {
       my $tret = AnalyzeCommandChain($cl, $bigcmd . $l);
-      push @ret, $tret if(defined($tret));
+      if(defined($tret)) {
+        Log 5, "$arg line $lineno returned >$tret<";
+        push @ret, $tret;
+      }
       $bigcmd = "";
     }
     last if($rcvdquit);
