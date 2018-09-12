@@ -714,7 +714,7 @@ TCM_Parse310($$$)
   } else {
     my @ans;
     foreach my $k (sort keys %{$ptr}) {
-      next if($k eq "cmd" || $k eq "arg" || $k eq "packetType");
+      next if($k eq "cmd" || $k eq "oCmd" || $k eq "arg" || $k eq "packetType");
       my ($off, $len, $type) = split(",", $ptr->{$k});
       my $data;
       if ($len == 0) {
@@ -798,8 +798,8 @@ my %gets310 = (
   "filter" => {packetType => 5, cmd => "0F", "Type:Value" => "1,0,1:4"},
   "frequencyInfo" => {packetType => 5, cmd => "25", Frequency => "1,1", Protocol => "2,1"},
   "noiseThreshold" => {packetType => 5, cmd => "33", NoiseThreshold => "1,1"},
-  #"numSecureDevicesIn" => {packetType => 5, cmd => "1D00", Number => "1,1"},
-  #"numSecureDevicesOut" => {packetType => 5, cmd => "1D01", Number => "1,1"},
+  "numSecureDevicesIn" => {packetType => 5, cmd => "1D", oCmd => "00", Number => "1,1"},
+  "numSecureDevicesOut" => {packetType => 5, cmd => "1D",oCmd => "01", Number => "1,1"},
   "remanRepeating" => {packetType => 5, cmd => "31", Repeated => "1,1"},
   "repeater" => {packetType => 5, cmd => "0A", RepEnable => "1,1", RepLevel => "2,1"},
   "stepCode" => {packetType => 5, cmd => "27", HWRevision => "1,1", Stepcode => "2,1"},
@@ -835,8 +835,11 @@ TCM_Get($@)
     return "Unknown argument $cmd, choose one of " . join(':noArg ', sort keys %gets310) . ':noArg' if(!defined($cmdhash));
     Log3 $name, 3, "TCM $name get $cmd";
     my $cmdHex = $cmdhash->{cmd};
+    my $oCmdHex = '';
+    $oCmdHex = $cmdhash->{oCmd} if (exists $cmdhash->{oCmd});
     $hash->{helper}{SetAwaitCmdResp} = 1;
-    TCM_Write($hash, sprintf("%04X00%02X", length($cmdHex)/2, $cmdhash->{packetType}), $cmdHex);
+    #TCM_Write($hash, sprintf("%04X00%02X", length($cmdHex)/2, $cmdhash->{packetType}), $cmdHex);
+    TCM_Write($hash, sprintf("%04X%02X%02X", length($cmdHex)/2, length($oCmdHex)/2, $cmdhash->{packetType}), $cmdHex . $oCmdHex);
     ($err, $msg) = TCM_ReadAnswer($hash, "get $cmd");
     $msg = TCM_Parse310($hash, $msg, $cmdhash) if(!$err);
 
