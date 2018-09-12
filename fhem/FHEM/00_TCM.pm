@@ -1,21 +1,17 @@
 ##############################################
 # $Id$
 
-# by r.koenig at koeniglich.de
-#
-# This modules handles the communication with a TCM 120 or TCM 310 / TCM 400J EnOcean
-# transceiver chip. As the protocols are radically different, this is actually 2
-# drivers in one.
+# This modules handles the communication with a TCM 120 or TCM 310 / TCM 400J /
+# TCM 515 EnOcean transceiver chip. As the protocols are radically different,
+# this is actually 2 drivers in one.
 # See also:
 #  TCM_120_User_Manual_V1.53_02.pdf
-#  EnOcean Serial Protocol 3 (ESP3) (for the TCM 310, TCM 400J)
+#  EnOcean Serial Protocol 3 (ESP3) (for the TCM 310, TCM 400J, TCM 515)
 
 # TODO:
 # Check BSC Temp
 # Check Stick Temp
 # Check Stick WriteRadio
-
-# Check Stick RSS
 
 package main;
 
@@ -548,8 +544,32 @@ TCM_Read($)
         # packet type EVENT
         $mdata =~ m/^(..)(.*)$/;
         $packetType = sprintf "%01X", $packetType;
-        #EnOcean:PacketType:eventCode:MessageData
-        Dispatch($hash, "EnOcean:$packetType:$1:$2", undef);
+        my $eventCode = $1;
+        my $messageData = $2;
+        if (hex($eventCode) <= 3) {
+          #EnOcean:PacketType:eventCode:messageData
+          Dispatch($hash, "EnOcean:$packetType:$eventCode:$messageData", undef);
+        } elsif (hex($eventCode) == 4) {
+          # CO_READY
+          my @resetCause = ('voltage_supply_drop', 'reset_pin', 'watchdog', 'flywheel', 'parity_error', 'hw_parity_error', 'memory_request_error', 'wake_up', 'wake_up', 'unknown');
+          my @secureMode = ('standard', 'extended');
+          $hash->{RESET_CAUSE} = $resetCause[hex($messageData)];
+          $hash->{SECURE_MODE} = $secureMode[hex($odata)];
+          Log3 $name, 2, "TCM $name EVENT RESET_CAUSE: $hash->{RESET_CAUSE} SECURE_MODE: $hash->{SECURE_MODE}";
+        } elsif (hex($eventCode) == 5) {
+          # CO_EVENT_SECUREDEVICES
+        } elsif (hex($eventCode) == 6) {
+          # CO_DUTYCYCLE_LIMIT
+          my @dutycycleLimit = ('released', 'reached');
+          $hash->{DUTYCYCLE_LIMIT} = $dutycycleLimit[hex($messageData)];
+          Log3 $name, 2, "TCM $name EVENT DUTYCYCLE_LIMIT: $hash->{DUTYCYCLE_LIMIT}";
+        } elsif (hex($eventCode) == 7) {
+          # CO_TRANSMIT_FAILED
+          my @transmitFailed = ('CSMA_failed', 'no_ack_received');
+          $hash->{TRANSMIT_FAILED} = $transmitFailed[hex($messageData)];
+          Log3 $name, 2, "TCM $name EVENT TRANSMIT_FAILED: $hash->{TRANSMIT_FAILED}";
+        } else {
+        }
 
       } elsif ($packetType == 5) {
         # packet type COMMON_COMMAND
@@ -776,10 +796,12 @@ my %gets120 = (
 my %gets310 = (
   "baseID" => {packetType => 5, cmd => "08", BaseID => "1,4", RemainingWriteCycles => "5,1"},
   "filter" => {packetType => 5, cmd => "0F", "Type:Value" => "1,0,1:4"},
-  "numSecureDevicesIn" => {packetType => 5, cmd => "1D00", Number => "1,1"},
-  "numSecureDevicesOut" => {packetType => 5, cmd => "1D01", Number => "1,1"},
-  "repeater" => {packetType => 5, cmd => "0A", RepEnable => "1,1", RepLevel => "2,1"},
   "frequencyInfo" => {packetType => 5, cmd => "25", Frequency => "1,1", Protocol => "2,1"},
+  "noiseThreshold" => {packetType => 5, cmd => "33", NoiseThreshold => "1,1"},
+  #"numSecureDevicesIn" => {packetType => 5, cmd => "1D00", Number => "1,1"},
+  #"numSecureDevicesOut" => {packetType => 5, cmd => "1D01", Number => "1,1"},
+  "remanRepeating" => {packetType => 5, cmd => "31", Repeated => "1,1"},
+  "repeater" => {packetType => 5, cmd => "0A", RepEnable => "1,1", RepLevel => "2,1"},
   "stepCode" => {packetType => 5, cmd => "27", HWRevision => "1,1", Stepcode => "2,1"},
   "smartAckLearnMode" => {packetType => 6, cmd => "02", Enable => "1,1", Extended => "2,1"},
   "smartAckLearnedClients" => {packetType => 6, cmd => "06", "ClientID:CtrlID:Mailbox" => "1,0,4:4:1"},
@@ -801,7 +823,7 @@ TCM_Get($@)
     # TCM 120
     my $rawcmd = $gets120{$cmd};
     return "Unknown argument $cmd, choose one of " . join(':noArg ', sort keys %gets120) . ':noArg' if(!defined($rawcmd));
-    Log3 $name, 3, "TCM get $name $cmd";
+    Log3 $name, 3, "TCM $name get $cmd";
     $rawcmd .= "000000000000000000";
     TCM_Write($hash, "", $rawcmd);
     ($err, $msg) = TCM_ReadAnswer($hash, "get $cmd");
@@ -811,7 +833,7 @@ TCM_Get($@)
     # TCM 310
     my $cmdhash = $gets310{$cmd};
     return "Unknown argument $cmd, choose one of " . join(':noArg ', sort keys %gets310) . ':noArg' if(!defined($cmdhash));
-    Log3 $name, 3, "TCM get $name $cmd";
+    Log3 $name, 3, "TCM $name get $cmd";
     my $cmdHex = $cmdhash->{cmd};
     $hash->{helper}{SetAwaitCmdResp} = 1;
     TCM_Write($hash, sprintf("%04X00%02X", length($cmdHex)/2, $cmdhash->{packetType}), $cmdHex);
@@ -856,23 +878,28 @@ my %sets120 = (    # Name, Data to send to the CUL, Regexp for the answer
 
 # Set commands TCM 310
 my %sets310 = (
-  "init" => {},
-  "teach" => {packetType => 5, arg=> "\\d+"},
-  "sleep" => {packetType => 5, cmd => "01", arg => "00[0-9A-F]{6}"},
-  "reset" => {packetType => 5, cmd => "02"},
-  "bist" => {packetType => 5, cmd => "06", BIST_Result => "1,1"},
   "baseID" => {packetType => 5, cmd => "07", arg => "FF[8-9A-F][0-9A-F]{5}"},
-  "repeater" => {packetType => 5, cmd => "09", arg => "0[0-1]0[0-2]"},
+  "baudrate" => {packetType => 5, cmd => "24", arg => "0[0-3]"},
+  "bist" => {packetType => 5, cmd => "06", BIST_Result => "1,1"},
   "filterAdd" => {packetType => 5, cmd => "0B", arg => "0[0-3][0-9A-F]{8}[048C]0"},
   "filterDel" => {packetType => 5, cmd => "0C", arg => "0[0-3][0-9A-F]{8}"},
   "filterDelAll" => {packetType => 5, cmd => "0D"},
   "filterEnable" => {packetType => 5, cmd => "0E", arg => "0[01]0[0189]"},
+  "init" => {},
   "maturity" => {packetType => 5, cmd => "10", arg => "0[0-1]"},
-  "subtel" => {packetType => 5, cmd => "11", arg => "0[0-1]"},
   "mode" => {packetType => 5, cmd => "1C", arg => "0[0-1]"},
-  "baudrate" => {packetType => 5, cmd => "24", arg => "0[0-3]"},
+  "noiseThreshold" => {packetType => 5, cmd => "32", arg => "2E|2F|3[0-8]"},
+  "remanCode" => {packetType => 5, cmd => "2E", arg => "[0-9A-F]{8}"},
+  "remanRepeating" => {packetType => 5, cmd => "30", arg => "0[0-1]"},
+  "reset" => {packetType => 5, cmd => "02"},
+  "resetEvents" => {},
+  "repeater" => {packetType => 5, cmd => "09", arg => "0[0-1]0[0-2]"},
+  "sleep" => {packetType => 5, cmd => "01", arg => "00[0-9A-F]{6}"},
   "smartAckLearn" => {packetType => 6, cmd => "01", arg => "\\d+"},
   "smartAckMailboxMax" => {packetType => 6, cmd => "08", arg => "\\d+"},
+  "startupDelay" => {packetType => 5, cmd => "2F", arg => "[0-9A-F]{2}"},
+  "subtel" => {packetType => 5, cmd => "11", arg => "0[0-1]"},
+  "teach" => {packetType => 5, arg=> "\\d+"},
 );
 
 # Set
@@ -921,7 +948,7 @@ sub TCM_Set($@)
 
     $cmdHex .= $arg;
   }
-  Log3 $name, 3, "TCM set $name $cmd $logArg";
+  Log3 $name, 3, "TCM $name set $cmd $logArg";
 
   if($cmd eq "teach") {
     if ($arg == 0) {
@@ -951,6 +978,13 @@ sub TCM_Set($@)
     # TCM310
     if($cmd eq "init") {
       TCM_InitSerialCom($hash);
+      return;
+    }
+    if($cmd eq "resetEvents") {
+      delete $hash->{RESET_CAUSE};
+      delete $hash->{SECURE_MODE};
+      delete $hash->{DUTYCYCLE_LIMIT};
+      delete $hash->{TRANSMIT_FAILED};
       return;
     }
     $hash->{helper}{SetAwaitCmdResp} = 1;
@@ -1097,6 +1131,7 @@ sub TCM_ReadAnswer($$)
           shift(@{$hash->{helper}{awaitCmdResp}});
           return ("wrong data checksum: got $crc, computed $mycrc", undef);
         }
+
         if ($packetType == 1) {
           # packet type RADIO
           $mdata =~ m/^(..)(.*)(........)(..)$/;
@@ -1157,8 +1192,41 @@ sub TCM_ReadAnswer($$)
             $data = $rest;
             next;
           }
+        } elsif ($packetType == 4) {
+          #####
+          # packet type EVENT
+          $mdata =~ m/^(..)(.*)$/;
+          my $eventCode = $1;
+          my $messageData = $2;
+          if (hex($eventCode) <= 3) {
+            my $packetTypeHex = sprintf "%01X", $packetType;
+            #EnOcean:PacketType:eventCode:messageData
+            Dispatch($hash, "EnOcean:$packetTypeHex:$eventCode:$messageData", undef);
+          } elsif (hex($eventCode) == 4) {
+            # CO_READY
+            my @resetCause = ('voltage_supply_drop', 'reset_pin', 'watchdog', 'flywheel', 'parity_error', 'hw_parity_error', 'memory_request_error', 'wake_up', 'wake_up', 'unknown');
+            my @secureMode = ('standard', 'extended');
+            $hash->{RESET_CAUSE} = $resetCause[hex($messageData)];
+            $hash->{SECURE_MODE} = $secureMode[hex($odata)];
+            Log3 $name, 2, "TCM $name EVENT RESET_CAUSE: $hash->{RESET_CAUSE} SECURE_MODE: $hash->{SECURE_MODE}";
+          } elsif (hex($eventCode) == 5) {
+            # CO_EVENT_SECUREDEVICES
+          } elsif (hex($eventCode) == 6) {
+            # CO_DUTYCYCLE_LIMIT
+            my @dutycycleLimit = ('released', 'reached');
+            $hash->{DUTYCYCLE_LIMIT} = $dutycycleLimit[hex($messageData)];
+            Log3 $name, 2, "TCM $name EVENT DUTYCYCLE_LIMIT: $hash->{DUTYCYCLE_LIMIT}";
+          } elsif (hex($eventCode) == 7) {
+            # CO_TRANSMIT_FAILED
+            my @transmitFailed = ('CSMA_failed', 'no_ack_received');
+            $hash->{TRANSMIT_FAILED} = $transmitFailed[hex($messageData)];
+            Log3 $name, 2, "TCM $name EVENT TRANSMIT_FAILED: $hash->{TRANSMIT_FAILED}";
+          }
+          $data = $rest;
+          $hash->{PARTIAL} = $rest;
+          next;
         } else {
-          return ("Evaluation of the command $arg aborted because the received data telegram is not supported.", undef)
+          return ("$arg ERROR: received data telegram PacketType: $packetType Data: $mdata not supported.", undef)
         }
       }
     }
@@ -1292,14 +1360,14 @@ TCM_Undef($$)
 <a name="TCM"></a>
 <h3>TCM</h3>
 <ul>
-  The TCM module serves an USB or TCP/IP connected TCM 120 or TCM 310x, TCM 410J
+  The TCM module serves an USB or TCP/IP connected TCM 120 or TCM 310x, TCM 410J, TCM 515
   EnOcean Transceiver module. These are mostly packaged together with a serial to USB
   chip and an antenna, e.g. the BSC BOR contains the TCM 120, the <a
   href="http://www.enocean.com/de/enocean_module/usb-300-oem/">USB 300</a> from
-  EnOcean and the EUL from busware contains a TCM 310. See also the datasheet
+  EnOcean and the EUL from busware contains a TCM 310 or TCM 515. See also the datasheet
   available from <a href="http://www.enocean.com">www.enocean.com</a>.
   <br>
-  As the TCM 120 and the TCM 310, TCM 410J speak completely different protocols, this
+  As the TCM 120 and the TCM 310, TCM 410J, TCM 515 speak completely different protocols, this
   module implements 2 drivers in one. It is the "physical" part for the <a
   href="#EnOcean">EnOcean</a> module.<br><br>
   Please note that EnOcean repeaters also send Fhem data telegrams again. Use
@@ -1332,11 +1400,11 @@ TCM_Undef($$)
     <code>define &lt;name&gt; TCM [ESP2|ESP3] &lt;device&gt;</code> <br>
     <br>
     First you have to specify the type of the EnOcean Transceiver Chip, i.e
-    either ESP2 for the TCM 120 or ESP3 for the TCM 310x, TCM 410J, USB 300, USB400J.<br><br>
+    either ESP2 for the TCM 120 or ESP3 for the TCM 310x, TCM 410J, TCM 515, USB 300, USB400J, USB 500.<br><br>
     <code>device</code> can take the same parameters (@baudrate, @directio,
     TCP/IP, none) like the <a href="#CULdefine">CUL</a>, but you probably have
     to specify the baudrate: the TCM 120 should be opened with 9600 Baud, the
-    TCM 310 with 57600 baud. For Eltako FGW14 devices, type has to be set to 120 and
+    TCM 310 and TCM 515 with 57600 baud. For Eltako FGW14 devices, type has to be set to 120 and
     the baudrate has to be set to 57600 baud if the FGW14 operating mode
     rotary switch is on position 6.<br><br>
 
@@ -1377,7 +1445,7 @@ TCM_Undef($$)
     For details see the TCM 120 User Manual available from <a href="http://www.enocean.com">www.enocean.com</a>.
   <br><br>
   </ul>
-  <ul><b>ESP3 (TCM 310x, TCM 410J, USB 300, USB400J)</b><br>
+  <ul><b>ESP3 (TCM 310x, TCM 410J, TCM 515, USB 300, USB400J, USB 515)</b><br>
     <li>baseID [FF800000 ... FFFFFF80]<br>
       Set the BaseID.<br>
       Note: The firmware executes this command only up to then times to prevent misuse.</li>
@@ -1409,6 +1477,31 @@ TCM_Undef($$)
       mode = 00: Compatible mode - ERP1 - gateway uses Packet Type 1 to transmit and receive radio telegrams<br>
       mode = 01: Advanced mode - ERP2 - gateway uses Packet Type 10 to transmit and receive radio telegrams
       (for FSK products with advanced protocol)</li>
+    <li>noiseThreshold [2E|2F|30|31|32|33|34|35|36|37|38]<br>
+      Modifies the noise threshold of the EnOcean device.<br>
+      noiseThreshold = 2E: -100 dBm<br>
+      noiseThreshold = 2F: -99 dBm<br>
+      noiseThreshold = 30: -98 dBm<br>
+      noiseThreshold = 31: -97 dBm<br>
+      noiseThreshold = 32: -96 dBm (default)<br>
+      noiseThreshold = 33: -95 dBm<br>
+      noiseThreshold = 34: -94 dBm<br>
+      noiseThreshold = 35: -93 dBm<br>
+      noiseThreshold = 36: -92 dBm<br>
+      noiseThreshold = 37: -91 dBm<br>
+      noiseThreshold = 38: -90 dBm</li>
+    <li>remanCode [00000000-FFFFFFFF]<br>
+      Sets secure code to unlock Remote Management functionality by radio.</li>
+    <li>remanRepeating [00|01]<br>
+      Select if REMAN telegrams originating from this module can be repeated: off = 00, on = 01.</li>
+    <li>reset<br>
+      Reset the device</li>
+    <li>resetEvents<br>
+      Reset generated events</li>
+    <li>repeater [0000|0101|0102]<br>
+      Set Repeater Level: off = 0000, 1 = 0101, 2 = 0102.</li>
+    <li>sleep &lt;t/10 ms&gt; (Range: 00000000 ... 00FFFFFF)<br>
+      Enter the energy saving mode</li>
     <li>smartAckLearn &lt;t/s&gt;<br>
       Set Fhem in Smart Ack learning mode.<br>
       The post master fuctionality must be activated using the command <code>smartAckMailboxMax</code> in advance.<br>
@@ -1423,14 +1516,15 @@ TCM_Undef($$)
       Set Fhem in learning mode for RBS, 1BS, 4BS, GP, STE and UTE teach-in / teach-out, see <a href="#TCM_learningMode">learningMode</a>.<br>
       The command is always required for STE, GB, UTE and to teach-in bidirectional actuators
       e. g. EEP 4BS (RORG A5-20-XX)</li>
-    <li>reset<br>
-      Reset the device</li>
-    <li>repeater [0000|0101|0102]<br>
-      Set Repeater Level: off = 0000, 1 = 0101, 2 = 0102.</li>
-    <li>sleep &lt;t/10 ms&gt; (Range: 00000000 ... 00FFFFFF)<br>
-      Enter the energy saving mode</li>
+    <li>startupDelay [00-FF]<br>
+      Sets the startup delay [10ms]: the time before the system initializes.</li>
     <li>subtel [00|01]<br>
       Transmitting additional subtelegram info: Enable = 01, Disable = 00</li>
+    <li>teach &lt;t/s&gt;<br>
+      Set Fhem in learning mode, see <a href="#TCM_learningMode">learningMode</a>.<br>
+      The command is always required for UTE and to teach-in bidirectional actuators
+      e. g. EEP 4BS (RORG A5-20-XX),
+      see <a href="#EnOcean_teach-in">Teach-In / Teach-Out</a>.</li>
     <br>
     For details see the EnOcean Serial Protocol 3 (ESP3) available from
     <a href="http://www.enocean.com">www.enocean.com</a>.
@@ -1466,6 +1560,8 @@ TCM_Undef($$)
       <a href="https://www.enocean.com/esp">EnOcean Serial Protocol 3 (ESP3)</a></li>
     <li>numSecureDev<br>
       Read number of teached in secure devices.</li>
+    <li>remanRepeating<br>
+      REMAN telegrams originating from this module can be repeated: off = 00, on = 01.</li>
     <li>repeater<br>
       Read Repeater Level: off = 0000, 1 = 0101, 2 = 0102.</li>
     <li>smartAckLearnMode<br>
