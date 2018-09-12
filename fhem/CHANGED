@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  74_XiaomiBTLESens: fix bug in disabledForInterval (Forum #835350)
   - change:  88_HMCCU: New release
   - feature: 93_DbLog: 3.11.0, function reduceLog[Nbl] syntax extended to limit 
                                days to reduce (pls. see commandref for details)

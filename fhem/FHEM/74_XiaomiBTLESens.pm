@@ -50,7 +50,7 @@ eval "use Blocking;1" or $missingModul .= "Blocking ";
 #use Data::Dumper;          only for Debugging
 
 
-my $version = "2.2.0";
+my $version = "2.2.2";
 
 
 
@@ -170,7 +170,6 @@ sub XiaomiBTLESens_Define($$) {
     CommandAttr(undef,$name . ' room XiaomiBTLESens') if( AttrVal($name,'room','none') eq 'none' );
     
     Log3 $name, 3, "XiaomiBTLESens ($name) - defined with BTMAC $hash->{BTMAC}";
-    Log3 $name, 1, "XiaomiBTLESens ($name) - readings battery and batteryLevel a deprecated and will be remove in future";
     
     $modules{XiaomiBTLESens}{defptr}{$hash->{BTMAC}} = $hash;
     return undef;
@@ -216,7 +215,7 @@ sub XiaomiBTLESens_Attr(@) {
             return "check disabledForIntervals Syntax HH:MM-HH:MM or 'HH:MM-HH:MM HH:MM-HH:MM ...'"
             unless($attrVal =~ /^((\d{2}:\d{2})-(\d{2}:\d{2})\s?)+$/);
             Log3 $name, 3, "XiaomiBTLESens ($name) - disabledForIntervals";
-            readingsSingleUpdate ( $hash, "state", "disabled", 1 );
+            XiaomiBTLESens_stateRequest($hash);
         }
 	
         elsif( $cmd eq "del" ) {
@@ -277,7 +276,6 @@ sub XiaomiBTLESens_Notify($$) {
                                                     or grep /^DELETEATTR.$name.interval$/,@{$events}
                                                     or grep /^DELETEATTR.$name.model$/,@{$events}
                                                     or grep /^ATTR.$name.model.+/,@{$events}
-                                                    or grep /resetBatteryTimestamp$/,@{$events}
                                                     or grep /^ATTR.$name.interval.[0-9]+/,@{$events}) and $devname eq 'global')
                                                     or grep /^resetBatteryTimestamp$/,@{$events}) and $init_done
                                                     or ((grep /^INITIALIZED$/,@{$events}
@@ -338,7 +336,7 @@ sub XiaomiBTLESens_stateRequestTimer($) {
     RemoveInternalTimer($hash);
     XiaomiBTLESens_stateRequest($hash);
 
-    InternalTimer( gettimeofday()+$hash->{INTERVAL}+int(rand(90)), "XiaomiBTLESens_stateRequestTimer", $hash );
+    InternalTimer( gettimeofday()+$hash->{INTERVAL}+int(rand(300)), "XiaomiBTLESens_stateRequestTimer", $hash );
     
     Log3 $name, 4, "XiaomiBTLESens ($name) - stateRequestTimer: Call Request Timer";
 }
@@ -478,8 +476,7 @@ sub XiaomiBTLESens_ExecGatttool_Run($) {
         
             my $grepGatttool;
             my $gatttoolCmdlineStaticEscaped = CometBlueBTLE_CmdlinePreventGrepFalsePositive("gatttool -i $hci -b $mac");
-            #$grepGatttool = qx(ps ax| grep -E \'gatttool -i $hci -b $mac\' | grep -v grep) if($sshHost eq 'none');
-            #$grepGatttool = qx(ssh $sshHost 'ps ax| grep -E "gatttool -i $hci -b $mac" | grep -v grep') if($sshHost ne 'none');
+
             $grepGatttool = qx(ps ax| grep -E \'$gatttoolCmdlineStaticEscaped\') if($sshHost eq 'none');
             $grepGatttool = qx(ssh $sshHost 'ps ax| grep -E "$gatttoolCmdlineStaticEscaped"') if($sshHost ne 'none');
 
