@@ -50,7 +50,7 @@ my %device_models = (  1 => { 1 => "Smart Scale", 2 => "Wireless Scale", 3 => "S
                        2 => { 21 => "Smart Baby Monitor", 22 => "Home", 22 => "Home v2", },
                        4 => { 41 => "iOS Blood Pressure Monitor", 42 => "Wireless Blood Pressure Monitor", 43 => "BPM", 44 => "BPM+", },
                       16 => { 51 => "Pulse Ox", 52 => "Activite", 53 => "Activite v2", 54 => "Go", 55 => "Steel HR", },
-                      32 => { 60 => "Aura", 61 => "Sleep Sensor", 61 => "Aura v2", 62 => "Sleep Mat", },
+                      32 => { 60 => "Aura", 61 => "Sleep Sensor", 62 => "Sleep Mat", },
                       64 => { 70 => "Thermo", }, );
 
                       #Firmware files: cdnfw_withings_net
@@ -386,7 +386,7 @@ sub withings_Define($$) {
   #CommandAttr(undef,"$name DbLogExclude .*");
 
 
-  my $resolve = inet_aton("healthmate.withings.com");
+  my $resolve = inet_aton("scalews.health.nokia.com");
   if(!defined($resolve))
   {
     $hash->{STATE} = "DNS error";
@@ -394,7 +394,7 @@ sub withings_Define($$) {
     return undef;
   }
 
-  $hash->{STATE} = "Initialized";
+  $hash->{STATE} = "Initialized" if( $hash->{SUBTYPE} eq "ACCOUNT" );
 
   if( $init_done ) {
     withings_initUser($hash) if( $hash->{SUBTYPE} eq "USER" );
@@ -418,7 +418,7 @@ sub withings_InitWait($) {
 
   RemoveInternalTimer($hash);
 
-  my $resolve = inet_aton("healthmate.withings.com");
+  my $resolve = inet_aton("scalews.health.nokia.com");
   if(!defined($resolve))
   {
     $hash->{STATE} = "DNS error";
@@ -448,7 +448,7 @@ sub withings_Notify($$) {
   return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
   Log3 "withings", 5, "withings: notify";
 
-  my $resolve = inet_aton("healthmate.withings.com");
+  my $resolve = inet_aton("scalews.health.nokia.com");
   if(!defined($resolve))
   {
     $hash->{STATE} = "DNS error";
@@ -536,7 +536,7 @@ sub withings_getSessionKey($) {
   # if( !defined($hash->{helper}{appliver}) || !defined($hash->{helper}{csrf_token}) || !defined($hash->{SessionTimestamp}) || gettimeofday() - $hash->{SessionTimestamp} > (30*60) )#!defined($hash->{helper}{appliver}) || !defined($hash->{helper}{csrf_token}))
   # {
   #   my($err0,$data0) = HttpUtils_BlockingGet({
-  #     url => $hash->{'.https'}."://healthmate.withings.com/",
+  #     url => $hash->{'.https'}."://scalews.health.nokia.com/",
   #     timeout => 10,
   #     noshutdown => 1,
   #   });
@@ -622,7 +622,7 @@ sub withings_getSessionKey($) {
   if( !$hash->{AccountID} || length($hash->{AccountID} < 2 ) ) {
 
     ($err,$data) = HttpUtils_BlockingGet({
-      url => $hash->{'.https'}."://healthmate.withings.com/index/service/account",
+      url => $hash->{'.https'}."://scalews.withings.com/index/service/account",
       timeout => 10,
       noshutdown => 1,
       data => {sessionid => $hash->{SessionKey}, appname => 'my2', appliver=> $hash->{helper}{appliver}, apppfm => 'web', action => 'get'},
@@ -939,7 +939,7 @@ sub withings_getUsers($) {
   withings_getSessionKey($hash);
 
   my ($err,$data) = HttpUtils_BlockingGet({
-    url => $hash->{'.https'}."://healthmate.withings.com/index/service/account",
+    url => $hash->{'.https'}."://scalews.health.nokia.com/index/service/account",
     timeout => 10,
     noshutdown => 1,
     data => {sessionid => $hash->{SessionKey}, accountid => $hash->{AccountID} , recurse_use => '1', recurse_devtype => '1', listmask => '5', allusers => 't' , appname => 'my2', appliver=> $hash->{helper}{appliver}, apppfm => 'web', action => 'getuserslist'},
@@ -979,7 +979,7 @@ sub withings_getDevices($) {
   withings_getSessionKey($hash);
 
   my ($err,$data) = HttpUtils_BlockingGet({
-    url => $hash->{'.https'}."://healthmate.withings.com/index/service/association",
+    url => $hash->{'.https'}."://scalews.health.nokia.com/index/service/association",
     timeout => 10,
     noshutdown => 1,
     data => {sessionid => $hash->{SessionKey}, accountid => $hash->{AccountID} , type => '-1', enrich => 't' , appname => 'my2', appliver=> $hash->{helper}{appliver}, apppfm => 'web', action => 'getbyaccountid'},
@@ -1020,7 +1020,7 @@ sub withings_getDeviceDetail($) {
   withings_getSessionKey( $hash->{IODev} );
 
   my ($err,$data) = HttpUtils_BlockingGet({
-    url => $hash->{'.https'}."://healthmate.withings.com/index/service/device",
+    url => $hash->{'.https'}."://scalews.health.nokia.com/index/service/device",
     timeout => 10,
     noshutdown => 1,
     data => {sessionid => $hash->{IODev}->{SessionKey}, deviceid => $hash->{Device} , appname => 'my2', appliver=> $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getproperties'},
@@ -1067,7 +1067,7 @@ sub withings_getDeviceLink($) {
   withings_getSessionKey( $hash->{IODev} );
 
   my ($err,$data) = HttpUtils_BlockingGet({
-    url => $hash->{'.https'}."://healthmate.withings.com/index/service/v2/link",
+    url => $hash->{'.https'}."://scalews.health.nokia.com/index/service/v2/link",
     timeout => 10,
     noshutdown => 1,
     data => {sessionid => $hash->{IODev}->{SessionKey}, deviceid => $hash->{Device} , appname => 'my2', appliver=> $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'get'},
@@ -1105,7 +1105,7 @@ sub withings_getDeviceProperties($) {
   withings_getSessionKey( $hash->{IODev} );
 
   HttpUtils_NonblockingGet({
-    url => "https://healthmate.withings.com/index/service/device",
+    url => "https://scalews.health.nokia.com/index/service/device",
     timeout => 30,
     noshutdown => 1,
     data => {sessionid => $hash->{IODev}->{SessionKey}, deviceid=> $hash->{Device}, appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getproperties'},
@@ -1141,7 +1141,7 @@ sub withings_getDeviceReadingsScale($) {
   $enddate = $now if ($enddate > $now);
 
   HttpUtils_NonblockingGet({
-    url => "https://healthmate.withings.com/index/service/v2/measure",
+    url => "https://scalews.health.nokia.com/index/service/v2/measure",
     timeout => 30,
     noshutdown => 1,
     data => {sessionid => $hash->{IODev}->{SessionKey}, deviceid=> $hash->{Device}, meastype => '12,35', startdate => int($lastupdate), enddate => int($enddate), devicetype => '16', appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getmeashf'},
@@ -1176,7 +1176,7 @@ sub withings_getDeviceReadingsBedside($) {
   $enddate = $now if ($enddate > $now);
 
   HttpUtils_NonblockingGet({
-    url => "https://healthmate.withings.com/index/service/v2/measure",
+    url => "https://scalews.health.nokia.com/index/service/v2/measure",
     timeout => 30,
     noshutdown => 1,
     data => {sessionid => $hash->{IODev}->{SessionKey}, deviceid=> $hash->{Device}, meastype => '12,13,14,15,56', startdate => int($lastupdate), enddate => int($enddate), devicetype => '16', appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getmeashf'},
@@ -1211,7 +1211,7 @@ sub withings_getDeviceReadingsHome($) {
   $enddate = $now if ($enddate > $now);
 
   HttpUtils_NonblockingGet({
-    url => "https://healthmate.withings.com/index/service/v2/measure",
+    url => "https://scalews.health.nokia.com/index/service/v2/measure",
     timeout => 30,
     noshutdown => 1,
     data => {sessionid => $hash->{IODev}->{SessionKey}, deviceid=> $hash->{Device}, meastype => '12,13,14,15,58', startdate => int($lastupdate), enddate => int($enddate), devicetype => '16', appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getmeashf'},
@@ -1245,7 +1245,7 @@ sub withings_getDeviceEventsBaby($) {
 
 
   HttpUtils_NonblockingGet({
-    url => "https://healthmate.withings.com/index/service/event",
+    url => "https://scalews.health.nokia.com/index/service/event",
     timeout => 30,
     noshutdown => 1,
     data => {activated => '0', action => 'get', sessionid => $hash->{IODev}->{SessionKey}, deviceid=> $hash->{Device}, type => '10,11,12,13,14,15,20', begindate => int($lastupdate)},
@@ -1312,7 +1312,7 @@ sub withings_getDeviceAlertsBaby($) {
   $lastupdate = $hash->{lastsessiondate} if(defined($hash->{lastsessiondate}) and $hash->{lastsessiondate} < $lastupdate);
 
   HttpUtils_NonblockingGet({
-    url => "https://healthmate.withings.com/index/service/event",
+    url => "https://scalews.health.nokia.com/index/service/event",
     timeout => 30,
     noshutdown => 1,
     data => {activated => '1', action => 'get', sessionid => $hash->{IODev}->{SessionKey}, deviceid=> $hash->{Device}, type => '10,11,12,13,14,15,20', begindate => int($lastupdate)},
@@ -1437,7 +1437,7 @@ sub withings_getUserDetail($) {
   withings_getSessionKey( $hash->{IODev} );
 
   my ($err,$data) = HttpUtils_BlockingGet({
-    url => $hash->{'.https'}."://healthmate.withings.com/index/service/user",
+    url => $hash->{'.https'}."://scalews.health.nokia.com/index/service/user",
     timeout => 10,
     noshutdown => 1,
     data => {sessionid => $hash->{IODev}->{SessionKey}, userid => $hash->{User} , appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getbyuserid'},
@@ -1466,13 +1466,13 @@ sub withings_poll($;$) {
   return undef if(IsDisabled($name));
 
 
-  my $resolve = inet_aton("healthmate.withings.com");
-  if(!defined($resolve))
-  {
-    $hash->{STATE} = "DNS error";
-    InternalTimer( gettimeofday() + 3600, "withings_poll", $hash, 0);
-    return undef;
-  }
+  #my $resolve = inet_aton("scalews.health.nokia.com");
+  #if(!defined($resolve))
+  #{
+  #  $hash->{STATE} = "DNS error";
+  #  InternalTimer( gettimeofday() + 3600, "withings_poll", $hash, 0);
+  #  return undef;
+  #}
 
 
 
@@ -1562,7 +1562,7 @@ sub withings_getUserReadingsDaily($) {
   my $enddateymd = strftime("%Y-%m-%d", localtime($enddate));
 
   HttpUtils_NonblockingGet({
-    url => "https://healthmate.withings.com/index/service/v2/aggregate",
+    url => "https://scalews.health.nokia.com/index/service/v2/aggregate",
     timeout => 60,
     noshutdown => 1,
     data => {sessionid => $hash->{IODev}->{SessionKey},  userid=> $hash->{User}, range => '1', meastype => '36,37,38,40,41,49,50,51,52,53,87', startdateymd => $startdateymd, enddateymd => $enddateymd, appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getbyuserid'},
@@ -1580,7 +1580,7 @@ sub withings_getUserReadingsDaily($) {
   $enddateymd = strftime("%Y-%m-%d", localtime($enddate));
 
   HttpUtils_NonblockingGet({
-    url => "https://healthmate.withings.com/index/service/v2/activity",
+    url => "https://scalews.health.nokia.com/index/service/v2/activity",
     timeout => 60,
     noshutdown => 1,
     data => {sessionid => $hash->{IODev}->{SessionKey},  userid=> $hash->{User}, subcategory => '37', startdateymd => $startdateymd, enddateymd => $enddateymd, appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getbyuserid'},
@@ -1626,7 +1626,7 @@ sub withings_getUserReadingsCommon($) {
   $enddate = $now if ($enddate > $now);
 
   HttpUtils_NonblockingGet({
-    url => "https://healthmate.withings.com/index/service/measure",
+    url => "https://scalews.health.nokia.com/index/service/measure",
     timeout => 60,
     noshutdown => 1,
     data => {sessionid => $hash->{IODev}->{SessionKey}, category => '1',  userid=> $hash->{User}, offset => '0', limit => '400', startdate => int($lastupdate), enddate => int($enddate), appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getmeas'},
@@ -1664,7 +1664,7 @@ sub withings_getUserReadingsSleep($) {
   #    data => {sessionid => $hash->{IODev}->{SessionKey}, userid=> $hash->{User}, meastype => '43,44,11,57,59,60,61,62,63,64,65,66,67,68,69,70', startdate => int($lastupdate), enddate => int($enddate), devicetype => '32', appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getvasistas'},
 
   HttpUtils_NonblockingGet({
-    url => "https://healthmate.withings.com/index/service/v2/measure",
+    url => "https://scalews.health.nokia.com/index/service/v2/measure",
     timeout => 60,
     noshutdown => 1,
     data => {sessionid => $hash->{IODev}->{SessionKey}, userid=> $hash->{User}, meastype => '11,39,41,43,44,57,59,87', startdate => int($lastupdate), enddate => int($enddate), devicetype => '32', appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getvasistas'},
@@ -1698,7 +1698,7 @@ sub withings_getUserReadingsSleepDebug($) {
   $enddate = $now if ($enddate > $now);
 
   HttpUtils_NonblockingGet({
-    url => "https://healthmate.withings.com/index/service/v2/measure",
+    url => "https://scalews.health.nokia.com/index/service/v2/measure",
     timeout => 60,
     noshutdown => 1,
     data => {sessionid => $hash->{IODev}->{SessionKey}, userid=> $hash->{User}, meastype => '60,61,62,63,64,65,66,67,68,69,70', startdate => int($lastupdate), enddate => int($enddate), devicetype => '32', appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getvasistas'},
@@ -1736,7 +1736,7 @@ sub withings_getUserReadingsActivity($) {
  Log3 "withings", 5, "$name: getactivityreadings ".$lastupdate." to ".$enddate;
 
   HttpUtils_NonblockingGet({
-    url => "https://healthmate.withings.com/index/service/v2/measure",
+    url => "https://scalews.health.nokia.com/index/service/v2/measure",
     timeout => 60,
     noshutdown => 1,
     data => {sessionid => $hash->{IODev}->{SessionKey}, userid=> $hash->{User}, meastype => '36,37,38,39,40,41,42,43,44,59,70,87,90', startdate => int($lastupdate), enddate => int($enddate), devicetype => '16', appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getvasistas'},
@@ -1836,8 +1836,9 @@ sub withings_parseMeasureGroups($$) {
         $newlastupdate = $lastupdate-1;
       }
 
-     readingsSingleUpdate( $hash, ".lastData", $newlastupdate+1, 0 );
      $hash->{LAST_DATA} = FmtDateTime( $newlastupdate );
+     $newlastupdate = int(time) if($newlastupdate > (time+3600));
+     readingsSingleUpdate( $hash, ".lastData", $newlastupdate+1, 0 );
 
 
      delete $hash->{CHANGETIME};
@@ -1917,8 +1918,9 @@ sub withings_parseMeasurements($$) {
         $newlastupdate = $lastupdate-1;
       }
 
-      readingsSingleUpdate( $hash, ".lastData", $newlastupdate+1, 0 );
       $hash->{LAST_DATA} = FmtDateTime( $newlastupdate );
+      $newlastupdate = int(time) if($newlastupdate > (time+3600));
+      readingsSingleUpdate( $hash, ".lastData", $newlastupdate+1, 0 );
 
 
       delete $hash->{CHANGETIME};
@@ -2255,13 +2257,15 @@ sub withings_parseVasistas($$;$) {
 
     my ($seconds) = gettimeofday();
 
+    $hash->{LAST_DATA} = FmtDateTime( $newlastupdate );
+    $newlastupdate = int(time) if($newlastupdate > (time+3600));
+
    if($datatype =~ /Debug/)
    {
      readingsSingleUpdate( $hash, ".lastDebug", $newlastupdate, 0 );
    } else {
      readingsSingleUpdate( $hash, ".lastData", $newlastupdate, 0 );
    }
-    $hash->{LAST_DATA} = FmtDateTime( $newlastupdate );
 
     Log3 $name, 4, "$name: got ".$i.' entries from Vasistas (latest: '.FmtDateTime($newlastupdate).')';
 
@@ -2449,12 +2453,15 @@ sub withings_parseEvents($$) {
         $newlastupdate = $lastupdate-1;
       }
 
+      $hash->{LAST_DATA} = FmtDateTime( $newlastupdate );
+      $newlastupdate = int(time) if($newlastupdate > (time+3600));
+      $lastalertupdate = int(time) if($lastalertupdate > (time+3600));
+
       readingsBeginUpdate($hash);
       readingsBulkUpdate( $hash, ".lastAlert", $lastalertupdate, 0 );
       readingsBulkUpdate( $hash, ".lastData", $newlastupdate+1, 0 );
       readingsEndUpdate($hash,0);
 
-      $hash->{LAST_DATA} = FmtDateTime( $newlastupdate );
 
 
       delete $hash->{CHANGETIME};
@@ -3138,7 +3145,7 @@ sub withings_Dispatch($$$) {
     $data =~ s/\n//g;
     if( $data !~ /{.*}/ or $data =~ /</)
     {
-      Log3 $name, 1, "$name: invalid json detected: >>$data<< " . $param->{type} if($data ne "[]");
+      Log3 $name, 1, "$name: invalid json detected: " . $param->{type} . " >>".substr( $data, 0, 64 )."<<" if($data ne "[]");
       return undef;
     }
 
