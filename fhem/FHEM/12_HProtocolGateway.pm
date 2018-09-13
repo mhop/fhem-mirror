@@ -114,8 +114,8 @@ sub HProtocolGateway_GetUpdate($) {
     } elsif ($mode eq "Ullage") {
       $command = "\$C";
     }
-
-    my $msg = $command . $tankHash->{READINGS}{hID}{VAL} . "\r\n";
+    my $hID = AttrVal($tankHash->{NAME},"hID","");
+    my $msg = $command . $hID . "\r\n";
     DevIo_SimpleWrite($hash, $msg , 2);
     my ($err, $data) = HProtocolGateway_ReadAnswer($hash,$tankHash);
     Log3 $name, 5, "err:". $err;
@@ -202,7 +202,7 @@ sub HProtocolGateway_ParseMessage($$) {
     my ($filllevel,$volume,$ullage) = (0,0,0); 
     my $mode = AttrVal($tankHash->{NAME},"mode","");
 
-    if ($mode eq "Filllevel") {
+    if ($mode eq "FillLevel") {
       $filllevel = $tankdata;
       $volume = HProtocolGateway_Tank($hash,$tankHash,$filllevel);
     } elsif ($mode eq "Volume") {

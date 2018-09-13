@@ -33,7 +33,8 @@ sub HProtocolTank_Initialize($) {
   $hash->{FingerprintFn}  = "HProtocolTank_Fingerprint";
   $hash->{AttrFn}         = "HProtocolGateway_Attr";
   $hash->{Match}          = "^[a-zA-Z0-9_]+ [a-zA-Z0-9_]+ [+-]*[0-9]+([.][0-9]+)?";
-  $hash->{AttrList}       = "mode:Filllevel,Volume,Ullage " .
+  $hash->{AttrList}       = "hID " .
+                            "mode:FillLevel,Volume,Ullage " .
                             "type " .
                             $readingFnAttributes;
 }
@@ -125,7 +126,6 @@ sub HProtocolTank_Attr (@) {
   <b>Define</b>
   <ul>
     <code>define tank01 HProtocolTank HProtocolGateway<br />
-          setreading tank01 hID 01<br />
     </code>
     <br />
 
@@ -136,8 +136,6 @@ sub HProtocolTank_Attr (@) {
   <a name="HProtocolTank"></a>
   <b>Readings</b>
   <ul>
-    <li>hID<br />
-    01 - 32 Tank Number / Tank Address (99 for testing only)</li>
     <li>ullage<br />
     0..999999 Ullage in litres</li>
     <li>filllevel<br />
@@ -161,8 +159,10 @@ sub HProtocolTank_Attr (@) {
   <a name="HProtocolTank"></a>
   <b>Attributes</b>
   <ul>
+    <li>hID<br />
+    01 - 32 Tank Number / Tank Address (99 for testing only)</li>
     <li>mode<br />
-    Filllevel, Volume, Ullage</li>
+    FillLevel, Volume, Ullage</li>
     <li>type<br />
     Strapping Table csv file / tank01.csv</li>
   </ul><br />
