@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.3
+#  Version 4.3.001
 #
 #  Module for communication between FHEM and Homematic CCU2.
 #
@@ -107,7 +107,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.3';
+my $HMCCU_VERSION = '4.3.001';
 
 # Default RPC port (BidCos-RF)
 my $HMCCU_RPC_PORT_DEFAULT = 2001;
@@ -1304,7 +1304,7 @@ sub HMCCU_Shutdown ($)
 	my $name = $hash->{NAME};
 
 	# Shutdown RPC server
-	if (HMCCU_IsFlag ($name, "(extrpc|procrpc")) {
+	if (HMCCU_IsFlag ($name, "(extrpc|procrpc)")) {
 		HMCCU_StopExtRPCServer ($hash);
 	}
 	else {
