@@ -50,7 +50,7 @@ my %device_models = (  1 => { 1 => "Smart Scale", 2 => "Wireless Scale", 3 => "S
                        2 => { 21 => "Smart Baby Monitor", 22 => "Home", 22 => "Home v2", },
                        4 => { 41 => "iOS Blood Pressure Monitor", 42 => "Wireless Blood Pressure Monitor", 43 => "BPM", 44 => "BPM+", },
                       16 => { 51 => "Pulse Ox", 52 => "Activite", 53 => "Activite v2", 54 => "Go", 55 => "Steel HR", },
-                      32 => { 60 => "Aura", 61 => "Sleep Sensor", 62 => "Sleep Mat", },
+                      32 => { 60 => "Aura", 61 => "Sleep Sensor", 62 => "Sleep Mat", 63 => "Sleep", },
                       64 => { 70 => "Thermo", }, );
 
                       #Firmware files: cdnfw_withings_net
@@ -873,13 +873,13 @@ sub withings_initDevice($) {
   $hash->{lastweighindate} = $device->{lastweighindate} if( defined($device->{lastweighindate}) );
 
 
-  if((defined($hash->{typeID}) && $hash->{typeID} == 16) or (defined($hash->{modelID}) && $hash->{modelID} == 61))
+  if((defined($hash->{typeID}) && $hash->{typeID} == 16) or (defined($hash->{typeID}) && $hash->{typeID} == 32 && defined($hash->{modelID}) && $hash->{modelID} != 60))
   {
     my $devicelink = withings_getDeviceLink( $hash );
-    if(defined($devicelink->{userid}))
+    if(defined($devicelink) && defined($devicelink->{linkuserid}))
     {
-      $hash->{User} = $devicelink->{userid};
-      $hash->{UserDevice} = $modules{$hash->{TYPE}}{defptr}{"U".$devicelink->{userid}} if defined($modules{$hash->{TYPE}}{defptr}{"U".$devicelink->{userid}});
+      $hash->{User} = $devicelink->{linkuserid};
+      $hash->{UserDevice} = $modules{$hash->{TYPE}}{defptr}{"U".$devicelink->{linkuserid}} if defined($modules{$hash->{TYPE}}{defptr}{"U".$devicelink->{linkuserid}});
     }
   }
 
@@ -979,7 +979,7 @@ sub withings_getDevices($) {
   withings_getSessionKey($hash);
 
   my ($err,$data) = HttpUtils_BlockingGet({
-    url => $hash->{'.https'}."://scalews.health.nokia.com/index/service/association",
+    url => $hash->{'.https'}."://scalews.withings.com/cgi-bin/association",
     timeout => 10,
     noshutdown => 1,
     data => {sessionid => $hash->{SessionKey}, accountid => $hash->{AccountID} , type => '-1', enrich => 't' , appname => 'my2', appliver=> $hash->{helper}{appliver}, apppfm => 'web', action => 'getbyaccountid'},
@@ -1067,10 +1067,10 @@ sub withings_getDeviceLink($) {
   withings_getSessionKey( $hash->{IODev} );
 
   my ($err,$data) = HttpUtils_BlockingGet({
-    url => $hash->{'.https'}."://scalews.health.nokia.com/index/service/v2/link",
+    url => $hash->{'.https'}."://scalews.health.nokia.com/cgi-bin/association",
     timeout => 10,
     noshutdown => 1,
-    data => {sessionid => $hash->{IODev}->{SessionKey}, deviceid => $hash->{Device} , appname => 'my2', appliver=> $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'get'},
+    data => {sessionid => $hash->{IODev}->{SessionKey}, appname => 'hmw', appliver=> $hash->{IODev}->{helper}{appliver}, enrich => 't', action => 'getbyaccountid'},
   });
 
   #my $ua = LWP::UserAgent->new;
@@ -1087,7 +1087,13 @@ sub withings_getDeviceLink($) {
     return undef;
   }
 
-  return $json->{body};
+  foreach my $association (@{$json->{body}{associations}}) {
+    next if( !defined($association->{deviceid}) );
+    next if( $association->{deviceid} ne $hash->{Device} );
+    return $association->{deviceproperties};
+  }
+
+  return undef;
 }
 
 
@@ -1512,7 +1518,7 @@ sub withings_poll($;$) {
       withings_getDeviceProperties($hash) if($force > 1 || $lastProperties <= ($now - $intervalProperties));
       withings_getDeviceReadingsBedside($hash) if($force || $lastData <= ($now - $intervalData));
     }
-    elsif(defined($hash->{modelID}) && $hash->{modelID} eq '61') {
+    elsif(defined($hash->{modelID}) && ($hash->{modelID} eq '61' || $hash->{modelID} eq '62' || $hash->{modelID} eq '63')) {
       withings_getDeviceProperties($hash) if($force > 1 || $lastProperties <= ($now - $intervalProperties));
       withings_getUserReadingsSleep($hash) if($force || $lastData <= ($now - $intervalData));
       withings_getUserReadingsSleepDebug($hash) if($force || $lastDebug <= ($now - $intervalDebug));
