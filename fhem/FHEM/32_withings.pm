@@ -10,7 +10,7 @@
 #
 #
 ##############################################################################
-# Release 05 / 2018-03-01
+# Release 06 / 2018-09-13
 
 package main;
 
@@ -1147,7 +1147,7 @@ sub withings_getDeviceReadingsScale($) {
   $enddate = $now if ($enddate > $now);
 
   HttpUtils_NonblockingGet({
-    url => "https://scalews.health.nokia.com/index/service/v2/measure",
+    url => "https://scalews.health.nokia.com/cgi-bin/v2/measure",
     timeout => 30,
     noshutdown => 1,
     data => {sessionid => $hash->{IODev}->{SessionKey}, deviceid=> $hash->{Device}, meastype => '12,35', startdate => int($lastupdate), enddate => int($enddate), devicetype => '16', appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getmeashf'},
@@ -1182,7 +1182,7 @@ sub withings_getDeviceReadingsBedside($) {
   $enddate = $now if ($enddate > $now);
 
   HttpUtils_NonblockingGet({
-    url => "https://scalews.health.nokia.com/index/service/v2/measure",
+    url => "https://scalews.health.nokia.com/cgi-bin/v2/measure",
     timeout => 30,
     noshutdown => 1,
     data => {sessionid => $hash->{IODev}->{SessionKey}, deviceid=> $hash->{Device}, meastype => '12,13,14,15,56', startdate => int($lastupdate), enddate => int($enddate), devicetype => '16', appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getmeashf'},
@@ -1217,7 +1217,7 @@ sub withings_getDeviceReadingsHome($) {
   $enddate = $now if ($enddate > $now);
 
   HttpUtils_NonblockingGet({
-    url => "https://scalews.health.nokia.com/index/service/v2/measure",
+    url => "https://scalews.health.nokia.com/cgi-bin/v2/measure",
     timeout => 30,
     noshutdown => 1,
     data => {sessionid => $hash->{IODev}->{SessionKey}, deviceid=> $hash->{Device}, meastype => '12,13,14,15,58', startdate => int($lastupdate), enddate => int($enddate), devicetype => '16', appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getmeashf'},
@@ -1670,7 +1670,7 @@ sub withings_getUserReadingsSleep($) {
   #    data => {sessionid => $hash->{IODev}->{SessionKey}, userid=> $hash->{User}, meastype => '43,44,11,57,59,60,61,62,63,64,65,66,67,68,69,70', startdate => int($lastupdate), enddate => int($enddate), devicetype => '32', appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getvasistas'},
 
   HttpUtils_NonblockingGet({
-    url => "https://scalews.health.nokia.com/index/service/v2/measure",
+    url => "https://scalews.health.nokia.com/cgi-bin/v2/measure",
     timeout => 60,
     noshutdown => 1,
     data => {sessionid => $hash->{IODev}->{SessionKey}, userid=> $hash->{User}, meastype => '11,39,41,43,44,57,59,87', startdate => int($lastupdate), enddate => int($enddate), devicetype => '32', appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getvasistas'},
@@ -1704,7 +1704,7 @@ sub withings_getUserReadingsSleepDebug($) {
   $enddate = $now if ($enddate > $now);
 
   HttpUtils_NonblockingGet({
-    url => "https://scalews.health.nokia.com/index/service/v2/measure",
+    url => "https://scalews.health.nokia.com/cgi-bin/v2/measure",
     timeout => 60,
     noshutdown => 1,
     data => {sessionid => $hash->{IODev}->{SessionKey}, userid=> $hash->{User}, meastype => '60,61,62,63,64,65,66,67,68,69,70', startdate => int($lastupdate), enddate => int($enddate), devicetype => '32', appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getvasistas'},
@@ -1742,7 +1742,7 @@ sub withings_getUserReadingsActivity($) {
  Log3 "withings", 5, "$name: getactivityreadings ".$lastupdate." to ".$enddate;
 
   HttpUtils_NonblockingGet({
-    url => "https://scalews.health.nokia.com/index/service/v2/measure",
+    url => "https://scalews.health.nokia.com/cgi-bin/v2/measure",
     timeout => 60,
     noshutdown => 1,
     data => {sessionid => $hash->{IODev}->{SessionKey}, userid=> $hash->{User}, meastype => '36,37,38,39,40,41,42,43,44,59,70,87,90', startdate => int($lastupdate), enddate => int($enddate), devicetype => '16', appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getvasistas'},
@@ -1848,7 +1848,7 @@ sub withings_parseMeasureGroups($$) {
 
 
      delete $hash->{CHANGETIME};
-     Log3 $name, 4, "$name: got ".$i.' entries from MeasureGroups (latest: '.FmtDateTime($newlastupdate).')';
+     Log3 $name, 3, "$name: got ".$i.' entries from MeasureGroups (latest: '.FmtDateTime($newlastupdate).')';
 
     }
 
@@ -1858,7 +1858,7 @@ sub withings_parseMeasurements($$) {
   my ($hash, $json) = @_;
   my $name = $hash->{NAME};
   #parse
-  Log3 "withings", 5, "$name: parsemeasurements";
+  Log3 "withings", 4, "$name: parsemeasurements";
   my ($now) = time;
   my $lastupdate = ReadingsVal( $name, ".lastData", ($now-21*24*60*60) );
   my $newlastupdate = $lastupdate;
@@ -1930,7 +1930,7 @@ sub withings_parseMeasurements($$) {
 
 
       delete $hash->{CHANGETIME};
-      Log3 $name, 4, "$name: got ".$i.' entries from Measurements (latest: '.FmtDateTime($newlastupdate).')';
+      Log3 $name, 3, "$name: got ".$i.' entries from Measurements (latest: '.FmtDateTime($newlastupdate).')';
 
 
     }
