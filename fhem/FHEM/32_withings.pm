@@ -507,6 +507,7 @@ sub withings_getToken($) {
     Log3 "withings", 2, "withings: json evaluation error on getToken ".$@;
     return undef;
   }
+  Log3 "withings", 1, "withings: getToken json error ".$json->{error} if(defined($json->{error}));
 
   my $once = $json->{body}{once};
   $hash->{Once} = $once;
@@ -637,6 +638,7 @@ sub withings_getSessionKey($) {
         Log3 $name, 2, "$name: json evaluation error on getSessionKey ".$@;
         return undef;
       }
+      Log3 $name, 1, "withings: getSessionKey json error ".$json->{error} if(defined($json->{error}));
 
       foreach my $account (@{$json->{body}{account}}) {
           next if( !defined($account->{id}) );
@@ -958,6 +960,7 @@ sub withings_getUsers($) {
     Log3 $name, 2, "$name: json evaluation error on getUsers ".$@;
     return undef;
   }
+  Log3 $name, 1, "withings: getUsers json error ".$json->{error} if(defined($json->{error}));
 
   my @users = ();
   foreach my $user (@{$json->{body}{users}}) {
@@ -998,6 +1001,7 @@ sub withings_getDevices($) {
     Log3 $name, 2, "$name: json evaluation error on getDevices ".$@;
     return undef;
   }
+  Log3 $name, 1, "withings: getDevices json error ".$json->{error} if(defined($json->{error}));
   Log3 "withings", 5, "$name: getdevices ".Dumper($json);
 
   my @devices = ();
@@ -1035,6 +1039,7 @@ sub withings_getDeviceDetail($) {
     Log3 $name, 2, "$name: json evaluation error on getDeviceDetail ".$@;
     return undef;
   }
+  Log3 $name, 1, "withings: getDeviceDetail json error ".$json->{error} if(defined($json->{error}));
 
   if($json)
   {
@@ -1086,6 +1091,7 @@ sub withings_getDeviceLink($) {
     Log3 $name, 2, "$name: json evaluation error on getDeviceLink ".$@;
     return undef;
   }
+  Log3 $name, 1, "withings: getDeviceLink json error ".$json->{error} if(defined($json->{error}));
 
   foreach my $association (@{$json->{body}{associations}}) {
     next if( !defined($association->{deviceid}) );
@@ -1359,6 +1365,7 @@ sub withings_getVideoLink($) {
     Log3 $name, 2, "$name: json evaluation error on getVideoLink ".$@;
     return undef;
   }
+  Log3 $name, 1, "withings: getVideoLink json error ".$json->{error} if(defined($json->{error}));
 
   if(defined($json->{body}{device}))
   {
@@ -1395,6 +1402,7 @@ sub withings_getS3Credentials($) {
     Log3 $name, 2, "$name: json evaluation error on getS3Credentials ".$@;
     return undef;
   }
+  Log3 $name, 1, "withings: getS3Credentials json error ".$json->{error} if(defined($json->{error}));
 
   if(defined($json->{body}{sts}))
   {
@@ -1456,6 +1464,7 @@ sub withings_getUserDetail($) {
     Log3 $name, 2, "$name: json evaluation error on getUserDetail ".$@;
     return undef;
   }
+  Log3 $name, 1, "withings: getUserDetail json error ".$json->{error} if(defined($json->{error}));
 
   return $json->{body}{users}[0];
 }
@@ -1568,7 +1577,7 @@ sub withings_getUserReadingsDaily($) {
   my $enddateymd = strftime("%Y-%m-%d", localtime($enddate));
 
   HttpUtils_NonblockingGet({
-    url => "https://scalews.health.nokia.com/index/service/v2/aggregate",
+    url => "https://scalews.health.nokia.com/cgi-bin/v2/aggregate",
     timeout => 60,
     noshutdown => 1,
     data => {sessionid => $hash->{IODev}->{SessionKey},  userid=> $hash->{User}, range => '1', meastype => '36,37,38,40,41,49,50,51,52,53,87', startdateymd => $startdateymd, enddateymd => $enddateymd, appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getbyuserid'},
@@ -1586,7 +1595,7 @@ sub withings_getUserReadingsDaily($) {
   $enddateymd = strftime("%Y-%m-%d", localtime($enddate));
 
   HttpUtils_NonblockingGet({
-    url => "https://scalews.health.nokia.com/index/service/v2/activity",
+    url => "https://scalews.health.nokia.com/cgi-bin/v2/activity",
     timeout => 60,
     noshutdown => 1,
     data => {sessionid => $hash->{IODev}->{SessionKey},  userid=> $hash->{User}, subcategory => '37', startdateymd => $startdateymd, enddateymd => $enddateymd, appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getbyuserid'},
@@ -2198,7 +2207,7 @@ sub withings_parseVasistas($$;$) {
         my @readingsvalue = (@{$values[$j++]});
         if($readingsdate <= $lastupdate)
         {
-          Log3 $name, 4, "$name: old vasistas skipped: ".FmtDateTime($readingsdate);
+          Log3 $name, 5, "$name: old vasistas skipped: ".FmtDateTime($readingsdate);
           next;
         }
 
@@ -3161,8 +3170,9 @@ sub withings_Dispatch($$$) {
       Log3 $name, 2, "$name: json evaluation error on dispatch type ".$param->{type}." ".$@;
       return undef;
     }
+    Log3 $name, 1, "withings: Dispatch ".$param->{type}." json error ".$json->{error} if(defined($json->{error}));
 
-    Log3 $name, 4, "$name: json returned: ".Dumper($json);
+    Log3 $name, 5, "$name: json returned: ".Dumper($json);
 
     if(defined($param->{enddate}))
     {
