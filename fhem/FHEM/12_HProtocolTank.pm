@@ -31,8 +31,11 @@ sub HProtocolTank_Initialize($) {
   $hash->{DefFn}          = "HProtocolTank_Define";
   $hash->{ParseFn}        = "HProtocolTank_Parse";
   $hash->{FingerprintFn}  = "HProtocolTank_Fingerprint";
+  $hash->{AttrFn}         = "HProtocolGateway_Attr";
   $hash->{Match}          = "^[a-zA-Z0-9_]+ [a-zA-Z0-9_]+ [+-]*[0-9]+([.][0-9]+)?";
-  $hash->{AttrList}       = $readingFnAttributes;
+  $hash->{AttrList}       = "mode:Filllevel,Volume,Ullage " .
+                            "type " .
+                            $readingFnAttributes;
 }
 
 sub HProtocolTank_Define($$) {
@@ -92,6 +95,18 @@ sub HProtocolTank_Fingerprint($$) {
   # this message is a duplicate message. Refer to FHEM Wiki.
 }
 
+sub HProtocolTank_Attr (@) {
+    my ($command, $name, $attr, $val) =  @_;
+    my $hash = $defs{$name};
+    my $msg = '';
+
+    if ($attr eq 'type') {
+      $attr{$name}{type} = $val;
+    } elsif ($attr eq 'mode') {
+      $attr{$name}{mode} = $val;
+    }
+}
+
 1;
 
 
@@ -122,7 +137,7 @@ sub HProtocolTank_Fingerprint($$) {
   <b>Readings</b>
   <ul>
     <li>hID<br />
-    01 - 99 Tank Number / Tank Address</li>
+    01 - 32 Tank Number / Tank Address (99 for testing only)</li>
     <li>ullage<br />
     0..999999 Ullage in litres</li>
     <li>filllevel<br />
@@ -141,6 +156,15 @@ sub HProtocolTank_Fingerprint($$) {
     00..999 Software version</li>
     <li>error<br />
     0..9 00.. Probe error</li>
+  </ul><br />
+
+  <a name="HProtocolTank"></a>
+  <b>Attributes</b>
+  <ul>
+    <li>mode<br />
+    Filllevel, Volume, Ullage</li>
+    <li>type<br />
+    Strapping Table csv file / tank01.csv</li>
   </ul><br />
 
 

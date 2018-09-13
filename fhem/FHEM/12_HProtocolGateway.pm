@@ -48,9 +48,8 @@ sub HProtocolGateway_Initialize($) {
                       "baudrate:300,600,1200,2400,4800,9600 " .
                       "parityBit:N,E,O " .
                       "databitsLength:5,6,7,8 " .
-                      "stopBit " .
+                      "stopBit:0,1" .
                       "pollIntervalMins " .
-                      "mode:Filllevel,Volume,Ullage " .
                       "path";
 }
 
@@ -108,10 +107,11 @@ sub HProtocolGateway_GetUpdate($) {
 
   foreach (@tankList) {
     my $tankHash = $_;
+    my $mode = AttrVal($tankHash->{NAME},"mode","");
     my $command = "\$A";
-    if ($attr{$name}{mode} eq "Volume") {
+    if ($mode eq "Volume") {
       $command = "\$B";
-    } elsif ($attr{$name}{mode} eq "Ullage") {
+    } elsif ($mode eq "Ullage") {
       $command = "\$C";
     }
 
@@ -200,13 +200,14 @@ sub HProtocolGateway_ParseMessage($$) {
     return if($check ne $checksum);
 
     my ($filllevel,$volume,$ullage) = (0,0,0); 
+    my $mode = AttrVal($tankHash->{NAME},"mode","");
 
-    if ($attr{$name}{mode} eq "Filllevel") {
+    if ($mode eq "Filllevel") {
       $filllevel = $tankdata;
       $volume = HProtocolGateway_Tank($hash,$tankHash,$filllevel);
-    } elsif ($attr{$name}{mode} eq "Volume") {
+    } elsif ($mode eq "Volume") {
       $volume = $tankdata;
-    } elsif ($attr{$name}{mode} eq "Ullage") {
+    } elsif ($mode eq "Ullage") {
       $ullage = $tankdata;
     }
 
@@ -305,8 +306,6 @@ sub HProtocolGateway_Attr (@) {
 	    } else {
 	       RemoveInternalTimer($hash);
         }
-    } elsif ($attr eq 'mode') {
-      $attr{$name}{mode} = $val;
     } elsif ($attr eq 'path') {
       $attr{$name}{path} = $val; 
     } elsif ($attr eq 'baudrate') {
@@ -351,9 +350,11 @@ sub HProtocolGateway_Poll($) {
 sub HProtocolGateway_Tank($$$) {
   my ($hash,$tankHash,$filllevel) = @_;
   my $name = $hash->{NAME};
+  my $path = AttrVal($name,"path","");
+  my $type = AttrVal($tankHash->{NAME},"type","");
 
   my %TankChartHash;
-  open my $fh, '<', $attr{$name}{path}.'tank'.$tankHash->{READINGS}{hID}{VAL}.'.csv' or die "Cannot open: $!";
+  open my $fh, '<', $path.$type or die "Cannot open: $!";
   while (my $line = <$fh>) {
     $line =~ s/\s*\z//;
     my @array = split /,/, $line;
@@ -393,7 +394,6 @@ sub HProtocolGateway_Tank($$$) {
   <ul>
     <code>define &lt;name&gt; HProtocolGateway /dev/tty???<br />
     attr &lt;name&gt; pollIntervalMins 2<br />
-    attr &lt;name&gt; mode Filllevel<br />
     attr &lt;name&gt; path /opt/fhem/<br />
     attr &lt;name&gt; baudrate 1200<br />
     attr &lt;name&gt; databitsLength 8<br />
@@ -420,7 +420,25 @@ sub HProtocolGateway_Tank($$$) {
     2430,58275<br />
     </code> 
 
+  
     <br /><br /> 
+
+  <a name="HProtocolGateway"></a>
+  <b>Attributes</b>
+  <ul>
+    <li>pollIntervalMins<br />
+    poll Interval in Mins</li>
+    <li>path<br />
+    Strapping Table csv file path</li>
+    <li>baudrate<br />
+    Baudrate / 300, 600, 1200, 2400, 4800, 9600</li>
+    <li>databitsLength<br />
+    Databits Length / 5, 6, 7, 8</li>
+    <li>parityBit<br />
+    Parity Bit / N, E, O</li>
+    <li>stopBit<br />
+    Stop Bit / 0, 1</li>
+  </ul><br />
 
   </ul><br />
 
