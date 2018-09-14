@@ -47,7 +47,7 @@ my $yaahmname;
 my $yaahmlinkname   = "Profile";     # link text
 my $yaahmhiddenroom = "ProfileRoom"; # hidden room
 my $yaahmpublicroom = "Unsorted";    # public room
-my $yaahmversion    = "1.54";
+my $yaahmversion    = "2.0";
 my $firstcall       = 1;
     
 my %yaahm_transtable_EN = ( 
@@ -353,7 +353,7 @@ sub YAAHM_Initialize ($) {
   $hash->{GetFn}       = "YAAHM_Get";
   $hash->{UndefFn}     = "YAAHM_Undef";   
   $hash->{AttrFn}      = "YAAHM_Attr";
-  my $attst            = "linkname publicroom hiddenroom lockstate:locked,unlocked simulation:0,1 ".
+  my $attst            = "linkname publicroom hiddenroom lockstate:locked,unlocked simulation:0,1 norepeat:0,1 ".
                          "modecolor0 modecolor1 modecolor2 modecolor3 statecolor0 statecolor1 statecolor2 statecolor3 ".
                          "timeHelper modeHelper modeAuto:0,1 stateDevices:textField-long stateInterval noicons:0,1 stateWarning stateHelper stateAuto:0,1 ".
                          "holidayDevices:textField-long vacationDevices:textField-long specialDevices:textField-long";
@@ -450,6 +450,10 @@ sub YAAHM_Define ($$) {
    $hash->{DATA}{"DD"}  = ();
    push(@{$hash->{DATA}{"DD"}},{%defaultdayproperties});
    push(@{$hash->{DATA}{"DD"}},{%defaultdayproperties});
+   
+   #-- initial mode and state
+   $hash->{DATA}{"HSM"}{"state"}="unsecured";
+   $hash->{DATA}{"HSM"}{"mode"}="normal";
  }
  
  #-- determine Astro device
@@ -1123,73 +1127,90 @@ sub YAAHM_time {
   my $lval = sprintf("%02d%02d",$hour,$min);
   my $mval = $dailytable{"morning"}[0];
   my $nval = $dailytable{"night"}[0];
-  my $tval = $dailytable{$targettime}[0];
-  
-  $mval =~ s/://;
-  $nval =~ s/://;
-  $tval =~ s/://;
-  
-  #-- targetphase always according to real time, not to command time
-  my $targetphase = ( ($lval >= $mval) && ( $nval > $lval ) ) ? "daytime" : "nighttime";
-  
-  #-- iterate through table to find next event
-  my $nexttime;
-  my $sval;   
-  my $oval="0000";
-  foreach my $key (sort YAAHM_dsort keys %dailytable){
-    $nexttime = $key;
-    $sval     = $dailytable{$key}[0];
-    next
-      if (!defined($sval));
-    $sval     =~ s/://;
-    last
-      if ( ($lval <= $sval) && ( $lval > $oval ) );
-    $oval     = $sval;
-  }
-  my $ma = defined($attr{$name}{"modeAuto"}) && ($attr{$name}{"modeAuto"} == 1);
-  my $sa = defined($attr{$name}{"stateAuto"}) && ($attr{$name}{"stateAuto"} == 1);
-  
-  #Log 1,"===================> YAAHM Fehlersuche ma,sa = $ma,$sa   exec=$exec";
-      
-  #-- automatically leave party mode at morning time or when going to bed
-  # TODO 
-  # TODO Fehler ! Wird nach party um Mitternacht aufgerufen und sichert das Haus, aber in jeder Zeile ein fehler undefined
-  if( $currmode eq "party" && $targettime =~ /(morning)|(sleep)/ && $ma ){
-    $msg  = YAAHM_mode($name,"normal",$exec)."\n";
-    $msg .= YAAHM_state($name,"secured",$exec)."\n"
-      if( $currstate eq "unsecured" && $targettime eq "sleep" && $sa );
-  
-  #-- automatically leave absence mode at wakeup time
-  #   Ist das wirklich clever ? Was passiert, wenn der Wecker nicht ausgestellt wurde
-  }elsif( $currmode eq "absence" && $targettime =~ /(wakeup)/ && $ma ){
-    $msg = YAAHM_mode($name,"normal",$exec)."\n";
-  
-  #-- automatically leave donotdisturb mode at any time event
-  }elsif( $currmode eq "donotdisturb" && $ma ){
-    $msg = YAAHM_mode($name,"normal",$exec)."\n";
-    
-  #-- automatically secure the house at night time or when going to bed (if not absence, and if not party)
-  }elsif( $currmode eq "normal" && $currstate eq "unsecured" && $targettime =~ /(night)|(sleep)/ && $sa ){
-    $msg = YAAHM_state($name,"secured",$exec)."\n";
-  }
-  
-  $hash->{DATA}{"HSM"}{"time"} = $targettime;
-  
-  YAAHM_checkMonthly($hash,'event',$targettime);
   
   readingsBeginUpdate($hash);
-  readingsBulkUpdate($hash,"prev_housetime",$prevtime);
-  readingsBulkUpdate($hash,"next_housetime",$nexttime);
-  readingsBulkUpdate($hash,"housetime",$targettime);
-  readingsBulkUpdate($hash,"tr_housetime",$yaahm_tt->{$targettime});
-  readingsBulkUpdate($hash,"housephase",$targetphase);
-  readingsBulkUpdate($hash,"tr_housephase",$yaahm_tt->{$targetphase});
+  #-- is this a daily timer event ?
+  my $regex = "((".join(")|(",@times)."))";
+  my $isdaily = ( $targettime =~ /$regex/ )?1:0;
+  if( $isdaily ){
+    my $tval = $dailytable{$targettime}[0];
+  
+    $mval =~ s/://;
+    $nval =~ s/://;
+    $tval =~ s/://;
+  
+    #-- targetphase always according to real time, not to command time
+    my $targetphase = ( ($lval >= $mval) && ( $nval > $lval ) ) ? "daytime" : "nighttime";
+  
+    #-- iterate through table to find next event
+    my $nexttime;
+    my $sval;   
+    my $oval="0000";
+    foreach my $key (sort YAAHM_dsort keys %dailytable){
+      $nexttime = $key;
+      $sval     = $dailytable{$key}[0];
+      next
+        if (!defined($sval));
+      $sval     =~ s/://;
+      last
+        if ( ($lval <= $sval) && ( $lval > $oval ) );
+      $oval     = $sval;
+    }
+    my $ma = defined($attr{$name}{"modeAuto"}) && ($attr{$name}{"modeAuto"} == 1);
+    my $sa = defined($attr{$name}{"stateAuto"}) && ($attr{$name}{"stateAuto"} == 1);
+      
+    #-- automatically leave party mode at morning time or when going to bed
+    # TODO 
+    # TODO Fehler ! Wird nach party um Mitternacht aufgerufen und sichert das Haus, aber in jeder Zeile ein fehler undefined
+    if( $currmode eq "party" && $targettime =~ /(morning)|(sleep)/ && $ma ){
+      Log3 $name, 1,"[YAAHM_time] Leaving party mode because modeAuto=1";
+      $msg  = YAAHM_mode($name,"normal",$exec)."\n";
+      if( $currstate eq "unsecured" && $targettime eq "sleep" && $sa ){
+        Log3 $name, 1,"[YAAHM_time] Securing the house because stateAuto=1";
+        $msg .= YAAHM_state($name,"secured",$exec)."\n"
+      };
+  
+    #-- automatically leave absence mode at wakeup time
+    #   Ist das wirklich clever ? Was passiert, wenn der Wecker nicht ausgestellt wurde
+    }elsif( $currmode eq "absence" && $targettime =~ /(wakeup)/ && $ma ){ 
+      Log3 $name, 1,"[YAAHM_time] Leaving absence mode because modeAuto=1";
+      $msg = YAAHM_mode($name,"normal",$exec)."\n";
+  
+    #-- automatically leave donotdisturb mode at any time event
+    }elsif( $currmode eq "donotdisturb" && $ma ){
+      Log3 $name, 1,"[YAAHM_time] Leaving donotdisturb mode because modeAuto=1"; 
+      $msg = YAAHM_mode($name,"normal",$exec)."\n";
+    
+    #-- automatically secure the house at night time or when going to bed (if not absence, and if not party)
+    }elsif( $currmode eq "normal" && $currstate eq "unsecured" && $targettime =~ /(night)|(sleep)/ && $sa ){
+      Log3 $name, 1,"[YAAHM_time] Securing the house because stateAuto=1";
+      $msg = YAAHM_state($name,"secured",$exec)."\n";
+    }
+  
+    $hash->{DATA}{"HSM"}{"time"} = $targettime;
+  
+    YAAHM_checkMonthly($hash,'event',$targettime);
+  
+    readingsBulkUpdate($hash,"prev_housetime",$prevtime);
+    readingsBulkUpdate($hash,"next_housetime",$nexttime);
+    readingsBulkUpdate($hash,"housetime",$targettime);
+    readingsBulkUpdate($hash,"tr_housetime",$yaahm_tt->{$targettime});
+    readingsBulkUpdate($hash,"housephase",$targetphase);
+    readingsBulkUpdate($hash,"tr_housephase",$yaahm_tt->{$targetphase});
+  }
+  #-- before fixing new times
+  #   if manual wake/sleep/timer, the time for the current day needs to be set to empty, 
+  #   but second execution on the same day is blocked if attribute norepeat is set.
   if( $targettime eq "wakeup" ){
     $hash->{DATA}{"WT"}[0]{"next"} = "";
     readingsBulkUpdate($hash,"next_0","");
   }elsif( $targettime eq "sleep" ){ 
     $hash->{DATA}{"WT"}[1]{"next"} = "";
     readingsBulkUpdate($hash,"next_1","");
+  }elsif( $targettime =~ /timer_(\d+)/ ){ 
+    my $i = $1;
+    $hash->{DATA}{"WT"}[$i]{"next"} = "";
+    readingsBulkUpdate($hash,"next_".$i,"");
   }
   readingsEndUpdate($hash,1); 
   YAAHM_setWeeklyTime($hash);
@@ -1203,31 +1224,52 @@ sub YAAHM_time {
   my $ival;
   my $wupn;
   
-  #-- todo here: what should we do, if the timer is NOT enabled and we get up or go to bed anyhow ???
-  if( $targettime eq "wakeup" ){
-    $wupn = $hash->{DATA}{"WT"}[0]{"name"};
-    $ival = (ReadingsVal($name.".wtimer_0.IF","mode","") ne "disabled");
-    $xval = $ival ? $hash->{DATA}{"WT"}[0]{"action"} : "";
-    $msg .= "Simulation ".$xval." from weekly profile ".$wupn;
-    $msg .= " (disabled)"
-      if !$ival;
-  }elsif( $targettime eq "sleep" ){ 
-    $wupn = $hash->{DATA}{"WT"}[1]{"name"};
-    $ival = (ReadingsVal($name.".wtimer_1.IF","mode","") ne "disabled");
-    $xval = $ival ? $hash->{DATA}{"WT"}[1]{"action"} : "";
-    $msg .= "Simulation ".$xval." from weekly profile ".$wupn;
-    $msg .= " (disabled)"
-      if !$ival;
+  #-- after fixing new time
+  #-- TODO here: what should we do, if the timer is NOT enabled and we get up or go to bed anyhow ???
+  if( $targettime =~ /((wakeup)|(sleep)|(timer_(\d+)))/ ){
+    my $timerno="";
+    if( $targettime eq "wakeup" ){
+      $timerno=0;
+    }elsif( $targettime eq "sleep" ){ 
+      $timerno=1;
+    }elsif( $targettime =~ /timer_(\d+)/ ){ 
+      $timerno = $1;
+    }
+    $wupn = $hash->{DATA}{"WT"}[$timerno]{"name"};
+    $ival = (ReadingsVal($name.".wtimer_".$timerno.".IF","mode","") ne "disabled");
+    $xval = $ival ? $hash->{DATA}{"WT"}[$timerno]{"action"} : "";
+    my $norep = AttrVal($name,"norepeat",0);
+    if( $exec==1 ){
+      if( $hash->{DATA}{"WT"}[$timerno]{"done"} && $norep ){
+        $msg = "Not executing action for timer $targettime, already done";
+        Log3 $name,3,"[YAAHM_time] ".$msg;
+        return $msg;
+      }else{
+        Log3 $name,1,"[YAAHM_time] executing action $xval for timer $targettime";
+        fhem($xval);
+        $hash->{DATA}{"WT"}[$timerno]{"done"} = 1;
+        return;
+      }
+    }elsif( $exec==0 ){
+      $msg .= "Simulation ".$xval." from timer ".$targettime;
+      $msg .= " (disabled)"
+        if !$ival;
+      Log3 $name,1,"[YAAHM_time] ".$msg;
+      return $msg;
+    }
+ 
+  #-- any other 
   }else{
     $xval  = $dailytable{$targettime}[2];
-    $msg  .= "Simulation ".$xval;
-  }
-  if( $exec==1 ){
-    Log3 $name,1,"[YAAHM_time] ecxecuting $xval";
-    fhem($xval);
-  }elsif( $exec==0 ){
-    Log3 $name,1,"[YAAHM_time] ".$msg;
-    return $msg;
+    $msg   = "Simulation ".$xval;
+    if( $exec==1 ){
+      Log3 $name,1,"[YAAHM_time] ecxecuting $xval";
+      fhem($xval);
+      return
+    }elsif( $exec==0 ){
+      Log3 $name,1,"[YAAHM_time] ".$msg;
+      return $msg;
+    }
   }
 }
 
@@ -1281,6 +1323,7 @@ sub YAAHM_nextWeeklyTime {
   
   #-- all logic in setweeklytime     
   $hash->{DATA}{"WT"}[$i]{"next"} = $time; 
+  $hash->{DATA}{"WT"}[$i]{"done"} = 0;
   YAAHM_setWeeklyTime($hash);                                                   
    
 }
@@ -1654,8 +1697,7 @@ sub YAAHM_startDayTimer($) {
     my $f2 = defined($defaultdailytable{$key}[1]);
     my $f3 = defined($hash->{DATA}{"DT"}{$key}[2]) && $hash->{DATA}{"DT"}{$key}[2] ne "";
 
-    #-- uh oh, double execution of functions !!! Do this in YAAHM_time, NOT in timer
-    #my $xval = "{YAAHM_time('".$name."','".$key."')},".$hash->{DATA}{"DT"}{$key}[2];
+    #-- to prevent double execution of functions do this in YAAHM_time, NOT in timer
     my $xval = "{YAAHM_time('".$name."','".$key."',1)}";
     
     #-- entries in the default table with no entry are single-timers
@@ -1731,16 +1773,15 @@ sub YAAHM_startWeeklyTimer($) {
     $res .= "\nand ([" .$name. ":housemode] =~ \"".$v4a."\")";
     $res .= "\nand ([" .$name. ":todayType] =~ \"".$v4b."\")";
     
-    #-- action - explicitly in timer, not in YAAHM_time
-    my $xval = "";
+    #-- to prevent double execution of functions do this in YAAHM_time, NOT in timer
+    my $xval;
     if( $i==0 ){
-      $xval  = "{YAAHM_time('".$name."','wakeup',0)},".$hash->{DATA}{"WT"}[$i]{"action"};
+      $xval  = "{YAAHM_time('".$name."','wakeup',1)}";
     }elsif( $i==1 ){
-      $xval  = "{YAAHM_time('".$name."','sleep',0)},".$hash->{DATA}{"WT"}[$i]{"action"};
+      $xval  = "{YAAHM_time('".$name."','sleep',1)}";
     }else{
-      $xval  = $hash->{DATA}{"WT"}[$i]{"action"};
+      $xval  = "{YAAHM_time('".$name."','timer_".$i."',1)}";
     }
-
     #-- action
     $res .= ")\n(".$xval.")";
     
@@ -1770,7 +1811,7 @@ sub YAAHM_setWeeklyTime($) {
   my $name = $hash->{NAME};
   
   #-- weekly profile times
-  my ($sg0,$sg1,$sg0mod,$sg1mod,$sg0en,$sg1en,$ring_0,$ring_1,$ng);
+  my ($sg0,$sg1,$ring_0x,$ring_1x,$ring_0e,$ring_1e,$ring_0,$ring_1,$ng);
   
   #-- iterate over timers
   for( my $i=0;$i<int( @{$hash->{DATA}{"WT"}} );$i++){
@@ -1780,45 +1821,45 @@ sub YAAHM_setWeeklyTime($) {
     if( ReadingsVal($name.".wtimer_".$i.".IF","mode","") eq "disabled" ){
       $sg0 = "off";
       $sg1 = "off";
-      $sg0en = "disabled (timer)";
-      $sg1en = "disabled (timer)";
+      $ring_0e = "disabled (timer)";
+      $ring_1e = "disabled (timer)";
     #-- if the timer is enabled, we'll use its timing values
     }else{
       $sg0 = $hash->{DATA}{"WT"}[$i]{ $weeklytable[$hash->{DATA}{"DD"}[0]{"weekday"}] } ;
       $sg1 = $hash->{DATA}{"WT"}[$i]{ $weeklytable[$hash->{DATA}{"DD"}[1]{"weekday"}] };
-      $sg0en = "enabled";
-      $sg1en = "enabled";
+      $ring_0e = "enabled";
+      $ring_1e = "enabled";
       #-- next higher priority for "off" is daytype 
       my $wupad = $hash->{DATA}{"WT"}[$i]{"acti_d"}.",workday,weekend"; 
       #-- start with tomorrow
       if( index($wupad, $hash->{DATA}{"DD"}[1]{"daytype"}) == -1 ){
-        $sg1mod = "off (".substr(ReadingsVal($name,"tr_tomorrowType",""),0,3).")";
-        $sg1en  = "disabled (".ReadingsVal($name,"tomorrowType","").")";
+        $ring_1x = "off (".substr(ReadingsVal($name,"tr_tomorrowType",""),0,3).")";
+        $ring_1e  = "disabled (".ReadingsVal($name,"tomorrowType","").")";
       }elsif( ($hash->{DATA}{"DD"}[1]{"vacflag"} == 1 ) && index($wupad,"vacation") == -1 ){
-        $sg1mod = "off (".substr($yaahm_tt->{"vacation"},0,3).")";
-        $sg1en  = "disabled (vacation)";
+        $ring_1x = "off (".substr($yaahm_tt->{"vacation"},0,3).")";
+        $ring_1e  = "disabled (vacation)";
       }else{
-        $sg1mod = $sg1;
+        $ring_1x = $sg1;
       }
       #-- because today we might also have an influence of housemode
       if( index($wupad, $hash->{DATA}{"DD"}[0]{"daytype"}) == -1 ){
-        $sg0mod = "off (".substr(ReadingsVal($name,"tr_todayType",""),0,3).")";
-        $sg0en  = "disabled (".ReadingsVal($name,"todayType","").")";
+        $ring_0x = "off (".substr(ReadingsVal($name,"tr_todayType",""),0,3).")";
+        $ring_0e  = "disabled (".ReadingsVal($name,"todayType","").")";
       }elsif( ($hash->{DATA}{"DD"}[0]{"vacflag"} == 1 ) && index($wupad,"vacation") == -1 ){
-        $sg0mod = "off (".substr($yaahm_tt->{"vacation"},0,3).")";
-        $sg0en  = "disabled (vacation)";
+        $ring_0x = "off (".substr($yaahm_tt->{"vacation"},0,3).")";
+        $ring_0e  = "disabled (vacation)";
       }else{
       #-- next higher priority for "off" (only today !) is housemode 
         my $wupam = $hash->{DATA}{"WT"}[$i]{"acti_m"}.",normal";
         if( index($wupam, ReadingsVal($name,"housemode","")) == -1 ){
-          $sg0mod = "off (".substr(ReadingsVal($name,"tr_housemode",""),0,3).")";
-          $sg0en  = "disabled (".ReadingsVal($name,"housemode","").")";
+          $ring_0x = "off (".substr(ReadingsVal($name,"tr_housemode",""),0,3).")";
+          $ring_0e  = "disabled (".ReadingsVal($name,"housemode","").")";
         }else{
-          $sg0mod = $sg0;
+          $ring_0x = $sg0;
         }
       }   
     }  
-    #Log 1,"====> AFTER INITIAL CHECK TIMER $i sg0=$sg0  sg0mod=$sg0mod  sg1=$sg1  sg1mod=$sg1mod  ng=$ng";
+    
     #-- no "next" time specification
     if( !defined($ng) || $ng eq "" ){
       $ring_0 = $sg0;
@@ -1853,15 +1894,15 @@ sub YAAHM_setWeeklyTime($) {
       }elsif( $nga eq "off" ){
         #-- today's waketime not over => we mean today
         if( $tga ne "off" && ($tga > $lga)){
-          if( $sg0mod !~ /^off/ ){
-            $sg0mod = "off (man)";
+          if( $ring_0x !~ /^off/ ){
+            $ring_0x = "off (man)";
             $ring_0 = "off";
             $ring_1 = $sg1;
           }
         #-- today's waketime over => we mean tomorrow
         }else{
-          if( $sg1mod !~ /^off/ ){
-            $sg1mod = "off (man)";
+          if( $ring_1x !~ /^off/ ){
+            $ring_1x = "off (man)";
             $ring_0 = $sg0;
             $ring_1 = "$sg1 (off)";
           }
@@ -1872,39 +1913,39 @@ sub YAAHM_setWeeklyTime($) {
         if( $nga > $lga ){
           #-- the same as original waketime => restore ! (do we come here at all ?)
           #if( $ng eq $sg0 ){
-          #  $sg0mod = $sg0;
+          #  $ring_0x = $sg0;
           #  $ring_0 = $sg0;
           #  $ng     = "";
           #  $hash->{DATA}{"WT"}[$i]{ "next" } = "";
           #-- new manual waketime tomorrow
           #}else{
-            $sg0mod = "$ng (man)";
-            $ring_0 = $ng;
+            $ring_0x = "$ng (man)";
+            $ring_0  = $ng;
           #}
           $ring_1 = $sg1;
         #-- "next" before current time => we mean tomorrow
         }else{
           #-- the same as original waketime => restore ! (do we come here at all ?)
           #if( $ng eq $sg1 ){
-          #  $sg0mod = $sg1;
+          #  $ring_0x = $sg1;
           #  $ring_1 = $sg1;
           #  $ng     = "";
           #  $hash->{DATA}{"WT"}[$i]{ "next" } = "";
           #}else{
-            $sg1mod = "$ng (man)";
-            $ring_1 = "$sg1 ($ng)";
+            $ring_1x = "$ng (man)";
+            $ring_1  = "$sg1 ($ng)";
           #}
           $ring_0 = $sg0;
         }
       }
     }
-    $hash->{DATA}{"WT"}[$i]{"ring_0"} = $ring_0; 
-    $hash->{DATA}{"WT"}[$i]{"ring_1"} = $ring_1; 
-    $hash->{DATA}{"WT"}[$i]{"ring_0x"} = $sg0mod; 
-    $hash->{DATA}{"WT"}[$i]{"ring_1x"} = $sg1mod;  
-    $hash->{DATA}{"WT"}[$i]{"ring_0e"} = $sg0en;  
-    $hash->{DATA}{"WT"}[$i]{"ring_1e"} = $sg1en;  
-    #Log 1,"====> AFTER FINAL   CHECK TIMER $i sg0=$sg0  sg0mod=$sg0mod  sg1=$sg1  sg1mod=$sg1mod  ng=$ng";
+    $hash->{DATA}{"WT"}[$i]{"ring_0"}  = $ring_0; 
+    $hash->{DATA}{"WT"}[$i]{"ring_1"}  = $ring_1; 
+    $hash->{DATA}{"WT"}[$i]{"ring_0x"} = $ring_0x; 
+    $hash->{DATA}{"WT"}[$i]{"ring_1x"} = $ring_1x;  
+    $hash->{DATA}{"WT"}[$i]{"ring_0e"} = $ring_0e;  
+    $hash->{DATA}{"WT"}[$i]{"ring_1e"} = $ring_1e;  
+    #Log 1,"====> AFTER FINAL   CHECK TIMER $i sg0=$sg0  ring_0x=$ring_0x  sg1=$sg1  ring_1x=$ring_1x  ng=$ng";
     #Log 1,"                                   ".$hash->{DATA}{"WT"}[$i]{"ring_0x"}."               ".$hash->{DATA}{"WT"}[$i]{"ring_1x"}; 
     #-- notation: 
     #  today_i    is today's waketime of timer i   
@@ -1920,12 +1961,12 @@ sub YAAHM_setWeeklyTime($) {
     readingsBeginUpdate($hash);
     readingsBulkUpdate( $hash, "today_".$i,$sg0 );  
     readingsBulkUpdate( $hash, "tomorrow_".$i,$sg1 );
-    readingsBulkUpdate( $hash, "today_".$i."_e",$sg0en );  
-    readingsBulkUpdate( $hash, "tomorrow_".$i."_e",$sg1en );
+    readingsBulkUpdate( $hash, "today_".$i."_e",$ring_0e );  
+    readingsBulkUpdate( $hash, "tomorrow_".$i."_e",$ring_1e );
     readingsBulkUpdate( $hash, "ring_".$i,$ring_0 );    
     readingsBulkUpdate( $hash, "ring_".$i."_1",$ring_1 ); 
-    readingsBulkUpdate( $hash, "ring_".$i."x",$sg0mod );    
-    readingsBulkUpdate( $hash, "ring_".$i."_1x",$sg1mod ); 
+    readingsBulkUpdate( $hash, "ring_".$i."x",$ring_0x );    
+    readingsBulkUpdate( $hash, "ring_".$i."_1x",$ring_1x ); 
     readingsBulkUpdate( $hash, "next_".$i,$ng );    
    
     readingsEndUpdate($hash,1);  
@@ -1937,7 +1978,9 @@ sub YAAHM_setWeeklyTime($) {
 #
 # YAAHM_sayWeeklyTime - say the next weekly time
 #
-# Parameter name = name of device addressed
+# Parameter hash = hash of YAAHM dvice
+#           timer = number of timer 
+#           sp = 1 => output for speech device
 #
 #########################################################################################
 
@@ -1945,13 +1988,13 @@ sub YAAHM_sayWeeklyTime($$$) {
   my ($hash,$timer,$sp) = @_;
   my $name = $hash->{NAME};
   
-  my ($tod,$tom,$ton,$hl,$ml,$tl,$ht,$mt,$tt,$tsay,$chg,$msg,$hw,$mw,$pt,$rea);
+  my ($tod,$tom,$ton,$hl,$ml,$tl,$ht,$mt,$tt,$tsay,$chg,$msg,$hw,$mw,$pt,$rea,$done,$norep);
   
   #--determine which timer (duplicate check when coming from set)
   
   if( $timer >= int( @{$hash->{DATA}{"WT"}}) ){
     $msg = "Error, timer number $timer does not exist, number musst be smaller than ".int( @{$hash->{DATA}{"WT"}});
-    Log3 $name,1,"[YAAHM_sayNextTime] ".$msg;
+    Log3 $name,1,"[YAAHM_sayWeeklyTime] ".$msg;
     return $msg;
   }
   
@@ -1961,6 +2004,8 @@ sub YAAHM_sayWeeklyTime($$$) {
   #-- get timer values from readings, because these include vacation settings and special time
   $tod  = $hash->{DATA}{"WT"}[$timer]{"ring_0x"};
   $tom  = $hash->{DATA}{"WT"}[$timer]{"ring_1x"};
+  $done = $hash->{DATA}{"WT"}[$timer]{"done"};
+  $norep = AttrVal($name,"norepeat",0);
 
   #-- current local time
   ($hl,$ml) = split(':',strftime('%H:%M', localtime(time)));
@@ -1968,11 +2013,13 @@ sub YAAHM_sayWeeklyTime($$$) {
   
   #-- today off AND tomorrow any time or off => compare this time with current time
   if( $tod =~ /^off.*/ ){
+  
     #-- tomorrow any time
     if( $tom =~ /(\d?\d):(\d\d)(:(\d\d))?/ && $tom !~ /.*\(off\)$/ ){
       #Log 1,"===========> |$1|$2|$3|$4";
       ($ht,$mt) = split('[\s:]',$tom);
       $tt=60*$ht+$mt;
+      
       #-- wakeup tomorrow later than now
       if( $tt < $tl ){
         $hw = $1*1;
@@ -1992,13 +2039,15 @@ sub YAAHM_sayWeeklyTime($$$) {
       $pt  = $yaahm_tt->{"undecid"}; 
       $msg .= " ".$yaahm_tt->{"undecid"};
     }
+    
   #-- today nontrivial => compare this time with current time
   }elsif( $tod =~ /(\d?\d):(\d\d)(:(\d\d))?/ ){
     #Log 1,"===========> |$1|$2|$3|$4";
     ($ht,$mt) = split('[\s:]',$tod);
     $tt=60*$ht+$mt;
-    #-- wakeup later today
-    if( $tt >= $tl ){
+    
+    #-- wakeup later today, and ( not yet done - or done, but repeat possible)
+    if( ($tt >= $tl) && (($done == 0) | (($done == 1)&&($norep == 0))) ){
       $hw = $1*1;
       $mw = $2*1;
       $pt = sprintf("%d:%02d",$hw,$mw)." ".lc($yaahm_tt->{"today"});
@@ -2338,6 +2387,11 @@ sub YAAHM_GetDayStatus($) {
     $yaahm_tt = \%yaahm_transtable_EN;
   }
   
+  #-- iterate over timers to reset the "done" flag
+  for( my $i=0;$i<int( @{$hash->{DATA}{"WT"}} );$i++){
+   $hash->{DATA}{"WT"}[$i]{"done"} = 0;
+  }
+  
   my ($ret,$line,$fline,$date);
   my (@lines,@chunks,@tday,@eday,@sday,@tmor,@ttwo);
   my ($todaydesc,$todaytype,$tomdesc,$tomtype,$twodesc,$twotype);
@@ -2650,6 +2704,7 @@ sub YAAHM_GetDayStatus($) {
   YAAHM_setWeeklyTime($hash);
   
   readingsEndUpdate($hash,1);
+  
   return undef;
 
 }
@@ -3924,7 +3979,9 @@ sub YAAHM_Longtable($){
                 <li>On time (event) <i>wakeup</i>, <i>absence</i> mode will be reset to <i>normal</i> mode.</li>
                 <li>On <i>any</i> time (event), <i>donotdisturb</i> mode will be reset to <i>normal</i> mode.</li>
                 </ul>
-                </li>          
+                </li>    
+            <li><<a name="yaahm_norepeat"><code>attr &lt;name&gt; norepeat 0|1</code></a>
+                <br/> if set to 1, repeated executions of wakeup, sleep and other timer events from the weekly programme will be suppressed.</li>      
             <li><a name="yaahm_statedevices"><code>attr &lt;name&gt; stateDevices (&lt;device&gt;:&lt;state-unsecured&gt;:&lt;state-secured&gt;:&lt;state-protected&gt;:&lt;state-guarded&gt;,)*</code></a>
                 <br />comma separated list of devices and their state in each of the house (security) states. Each of the listed devices will be checked in the interval given by the <i>stateInterval</i> attribute
                 for its proper state, and a <i>stateWarning</i> function will be called if it is not in the proper state.</li>

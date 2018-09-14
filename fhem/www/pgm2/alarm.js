@@ -1,6 +1,6 @@
 //########################################################################################
 // alarm.js
-// Version 4.03
+// Version 5.0
 // See 95_Alarm for licensing
 //########################################################################################
 //# Prof. Dr. Peter A. Henning
@@ -258,8 +258,10 @@ function alarm_set(name) {
     for (var i = 0;
     i < alarmno;
     i++) {
+        FW_cmd(url + '?XHR=1&fwcsrf=' + csrfToken + '&cmd.' + name + '=attr%20' + name + '%20level' + i + 'cond%20' + document.getElementById('l' + i + 'c').value);
         FW_cmd(url + '?XHR=1&fwcsrf=' + csrfToken + '&cmd.' + name + '=attr%20' + name + '%20level' + i + 'start%20' + document.getElementById('l' + i + 's').value);
         FW_cmd(url + '?XHR=1&fwcsrf=' + csrfToken + '&cmd.' + name + '=attr%20' + name + '%20level' + i + 'end%20' + document.getElementById('l' + i + 'e').value);
+        FW_cmd(url + '?XHR=1&fwcsrf=' + csrfToken + '&cmd.' + name + '=attr%20' + name + '%20level' + i + 'autocan%20' + document.getElementById('l' + i + 'o').value);
         FW_cmd(url + '?XHR=1&fwcsrf=' + csrfToken + '&cmd.' + name + '=attr%20' + name + '%20level' + i + 'msg%20' + document.getElementById('l' + i + 'm').value);
         if (document.getElementById('l' + i + 'x').checked == true) {
             val = "armed";
