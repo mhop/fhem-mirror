@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.3
+#  Version 4.3.001
 #
 #  (c) 2018 zap (zap01 <at> t-online <dot> de)
 #
@@ -126,7 +126,7 @@ sub HMCCUDEV_Define ($@)
 	# Parse optional command line parameters
 	foreach my $arg (@$a) {
 		if    ($arg eq 'readonly') { $hash->{statevals} = $arg; }
-		elsif ($arg eq 'defaults' && !$init_done) { HMCCU_SetDefaults ($hash); }
+		elsif ($arg eq 'defaults' && $init_done) { HMCCU_SetDefaults ($hash); }
 		elsif ($arg =~ /^[0-9]+$/) { $attr{$name}{statechannel} = $arg; }
 		else { return $usage; }
 	}
