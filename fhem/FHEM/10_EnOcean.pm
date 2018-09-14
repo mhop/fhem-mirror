@@ -353,6 +353,7 @@ my %EnO_eepConfig = (
   "D2.11.06" => {attr => {subType => "roomCtrlPanel.01", comMode => "biDir", webCmd => "setpointTemp"}, GPLOT => "EnO_D2-10-xx:Temp/SPT/Humi,"},
   "D2.11.07" => {attr => {subType => "roomCtrlPanel.01", comMode => "biDir", webCmd => "setpointTemp"}, GPLOT => "EnO_D2-10-xx:Temp/SPT/Humi,"},
   "D2.11.08" => {attr => {subType => "roomCtrlPanel.01", comMode => "biDir", webCmd => "setpointTemp"}, GPLOT => "EnO_D2-10-xx:Temp/SPT/Humi,"},
+  "D2.14.30" => {attr => {subType => "multiFuncSensor.30"}, GPLOT => "EnO_temp4humi4:Temp/Humi,"},
   "D2.20.00" => {attr => {subType => "fanCtrl.00", webCmd => "fanSpeed"}, GPLOT => "EnO_fanSpeed4humi4:FanSpeed/Humi,"},
   "D2.32.00" => {attr => {subType => "currentClamp.00"}, GPLOT => "EnO_D2-32-xx:Current,"},
   "D2.32.01" => {attr => {subType => "currentClamp.01"}, GPLOT => "EnO_D2-32-xx:Current,"},
@@ -10825,6 +10826,26 @@ sub EnOcean_Parse($$)
       }
       CommandDeleteReading(undef, "$name waitingCmds");
 
+    } elsif ($st eq "multiFuncSensor.30") {
+      # Sensor for Smoke, Air quality, Hygrothermal comfort, Temperature and Humidity
+      # (D2-14-30)
+      push @event, "3:alarm:" . ($db[5] & 0x80 == 0 ? 'off' : 'smoke-alarm');
+      push @event, "3:sensorFaultMode:" . ($db[5] & 0x40 == 0 ? 'off' : 'on');
+      push @event, "3:smokeAlarmMaintenance:" . ($db[5] & 0x20 == 0 ? 'ok' : 'not_done');
+      push @event, "3:smokeAlarmHumidity:" . ($db[5] & 0x10 == 0 ? 'ok' : 'not_ok');
+      push @event, "3:smokeAlarmTemperature:" . ($db[5] & 8 == 0 ? 'ok' : 'not_ok');
+      push @event, "3:maintenanceLast:" . (($db[5] & 7) << 5 | $db[4] >> 3);
+      my @energyStorage = ('ok', 'medium', 'low', 'critical');
+      push @event, "3:battery:" . $energyStorage[($db[4] & 6) >> 1];
+      push @event, "3:endOffLife:" . (($db[4] & 1) << 7 | $db[3] >> 1);
+      push @event, "3:temperature:" . sprintf "%0.1f", (($db[3] & 1) << 7 | $db[2] >> 1) / 5;
+      push @event, "3:humidity:" . sprintf "%0.1f", (($db[2] & 1) << 7 | $db[1] >> 1) / 2;
+      my @comfort = ('good', 'medium', 'bad', 'error');
+      push @event, "3:hygrothermalComfort:" . $comfort[(($db[1] & 1) << 1 | $db[0] >> 7)];
+      my @airQuality = ('optimal', 'air_dry', 'humidity_high', 'temperature_humidity_high', undef, undef, 'error');
+      push @event, "3:airQuality:" . $airQuality[($db[0] & 0x70) >> 4];
+      push @event, "3:state:" . ($db[5] & 0x80 == 0 ? 'off' : 'smoke-alarm');
+
     } elsif ($st eq "fanCtrl.00") {
       # Fan Control
       # (D2-20-00 - D2-20-02)
@@ -20463,6 +20484,30 @@ EnOcean_Delete($$)
        The attr subType must be roomCtrlPanel.01. This is done if the device was
        created by autocreate. To control the device, it must be bidirectional paired by Smart Ack,
        see <a href="#EnOcean_smartAck">SmartAck Learning</a>.
+     </li>
+     <br><br>
+
+     <li>Sensor for Smoke, Air quality, Hygrothermal comfort, Temperature and Humidity (D2-14-30)<br>
+        [INSAFE+ Origin I870EO untested]<br>
+     <ul>
+       <li>off|smoke-alarm</li>
+       <li>airQuality: optimal|air_dry|humidity_high|teperature_humidity_high|error</li>
+       <li>alarm: off|smoke-alarm</li>
+       <li>battery: ok|medium|low|critical</li>
+       <li>endOffLife: t/month (Range t = 0...120 month</li>
+       <li>humidity: rH/%</li>
+       <li>hygrothermalComfort: good|medium|bad|error</li>
+       <li>maintenanceLast: t/week (Range t = 0...250 week</li>
+       <li>sensorFaultMode: off|on</li>
+       <li>smokeAlarmHumidity: ok|not_ok</li>
+       <li>smokeAlarmMaintenance: ok|not_done</li>
+       <li>smokeAlarmTemperature: ok|not_ok</li>
+       <li>teach: &lt;result of teach procedure&gt;</li>
+       <li>temperature: t/&#176C (Sensor Range: t = 0 &#176C ... 50 &#176C)</li>
+       <li>state: off|smoke-alarm</li>
+     </ul><br>
+       The attr subType must be multiFuncSensor.30. This is done if the device was
+       created by autocreate.
      </li>
      <br><br>
 
