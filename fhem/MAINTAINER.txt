@@ -196,6 +196,7 @@ FHEM/36_LaCrosse.pm          HCS                  Sonstige Systeme
 FHEM/36_LaCrosseGateway.pm   HCS                  Sonstige Systeme
 FHEM/36_EMT7110.pm           HCS                  Sonstige Systeme
 FHEM/36_Level.pm             HCS                  Sonstige Systeme
+FHEM/36_Shelly.pm            pahenning            Sonstige Systeme
 FHEM/36_Vallox.pm            Skjall               http://forum.fhem.de/index.php/topic,71325.0.html
 FHEM/36_WMBUS.pm             kaihs                Sonstige Systeme
 FHEM/37_NotifyAndroidTV.pm   justme1968           Multimedia
@@ -405,7 +406,7 @@ FHEM/94_PWM.pm               jamesgo              Heizungssteuerung/Raumklima
 FHEM/95_FLOORPLAN.pm         ulimaass             Frontends/FLOORPLAN
 FHEM/95_Alarm.pm             pahenning            Unterstützende Dienste
 FHEM/95_Astro.pm             pahenning            Unterstützende Dienste
-FHEM/95_Babble.pm             pahenning            Unterstützende Dienste
+FHEM/95_Babble.pm            pahenning            Unterstützende Dienste
 FHEM/95_PostMe.pm            pahenning            Unterstützende Dienste
 FHEM/95_YAAHM.pm             pahenning            Unterstützende Dienste
 FHEM/95_Dashboard.pm         DS_Starter/orphan    Frontends
