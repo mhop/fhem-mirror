@@ -1,9 +1,9 @@
 ########################################################################################
 #
-# Shelly.pm
+#  Shelly.pm
 #
-# FHEM module to communicate with Shelly switch/roller actor
-# Prof. Dr. Peter A. Henning, 2018
+#  FHEM module to communicate with Shelly switch/roller actor
+#  Prof. Dr. Peter A. Henning, 2018
 # 
 #  $Id$
 #
