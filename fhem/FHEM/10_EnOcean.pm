@@ -10829,22 +10829,33 @@ sub EnOcean_Parse($$)
     } elsif ($st eq "multiFuncSensor.30") {
       # Sensor for Smoke, Air quality, Hygrothermal comfort, Temperature and Humidity
       # (D2-14-30)
-      push @event, "3:alarm:" . ($db[5] & 0x80 == 0 ? 'off' : 'smoke-alarm');
-      push @event, "3:sensorFaultMode:" . ($db[5] & 0x40 == 0 ? 'off' : 'on');
-      push @event, "3:smokeAlarmMaintenance:" . ($db[5] & 0x20 == 0 ? 'ok' : 'not_done');
-      push @event, "3:smokeAlarmHumidity:" . ($db[5] & 0x10 == 0 ? 'ok' : 'not_ok');
-      push @event, "3:smokeAlarmTemperature:" . ($db[5] & 8 == 0 ? 'ok' : 'not_ok');
-      push @event, "3:maintenanceLast:" . (($db[5] & 7) << 5 | $db[4] >> 3);
+      my @airQuality = ('optimal', 'air_dry', 'humidity_high', 'temperature_humidity_high', '', '', 'error');
+      my @comfort = ('good', 'medium', 'bad', 'error');
       my @energyStorage = ('ok', 'medium', 'low', 'critical');
-      push @event, "3:battery:" . $energyStorage[($db[4] & 6) >> 1];
+      my $alarm = ($db[5] & 0x80) == 0 ? 'off' : 'smoke-alarm';
+      my $battery = $energyStorage[($db[4] & 6) >> 1];
+      if (!exists($hash->{helper}{lastAlarm}) || $hash->{helper}{lastAlarm} ne $alarm || ReadingsVal($name, 'alarm', '') eq 'dead_sensor') {
+        push @event, "3:alarm:" . $alarm;
+      }
+      if (!exists($hash->{helper}{lastBattery}) || $hash->{helper}{lastBattery} ne $battery) {
+        push @event, "3:battery:" . $battery;
+      }
+      push @event, "3:sensorFaultMode:" . (($db[5] & 0x40) == 0 ? 'off' : 'on');
+      push @event, "3:smokeAlarmMaintenance:" . (($db[5] & 0x20) == 0 ? 'ok' : 'not_done');
+      push @event, "3:smokeAlarmHumidity:" . (($db[5] & 0x10) == 0 ? 'ok' : 'not_ok');
+      push @event, "3:smokeAlarmTemperature:" . (($db[5] & 8) == 0 ? 'ok' : 'not_ok');
+      push @event, "3:maintenanceLast:" . (($db[5] & 7) << 5 | $db[4] >> 3);
       push @event, "3:endOffLife:" . (($db[4] & 1) << 7 | $db[3] >> 1);
       push @event, "3:temperature:" . sprintf "%0.1f", (($db[3] & 1) << 7 | $db[2] >> 1) / 5;
       push @event, "3:humidity:" . sprintf "%0.1f", (($db[2] & 1) << 7 | $db[1] >> 1) / 2;
-      my @comfort = ('good', 'medium', 'bad', 'error');
       push @event, "3:hygrothermalComfort:" . $comfort[(($db[1] & 1) << 1 | $db[0] >> 7)];
-      my @airQuality = ('optimal', 'air_dry', 'humidity_high', 'temperature_humidity_high', undef, undef, 'error');
       push @event, "3:airQuality:" . $airQuality[($db[0] & 0x70) >> 4];
-      push @event, "3:state:" . ($db[5] & 0x80 == 0 ? 'off' : 'smoke-alarm');
+      push @event, "3:state:" . $alarm;
+      $hash->{helper}{lastAlarm} = $alarm;
+      $hash->{helper}{lastBattery} = $battery;
+      RemoveInternalTimer($hash->{helper}{timer}{alarm}) if (exists $hash->{helper}{timer}{alarm});
+      @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
+      InternalTimer(gettimeofday() + 1440, 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
 
     } elsif ($st eq "fanCtrl.00") {
       # Fan Control
@@ -20492,7 +20503,7 @@ EnOcean_Delete($$)
      <ul>
        <li>off|smoke-alarm</li>
        <li>airQuality: optimal|air_dry|humidity_high|teperature_humidity_high|error</li>
-       <li>alarm: off|smoke-alarm</li>
+       <li>alarm: off|smoke-alarm|dead_sensor</li>
        <li>battery: ok|medium|low|critical</li>
        <li>endOffLife: t/month (Range t = 0...120 month</li>
        <li>humidity: rH/%</li>
