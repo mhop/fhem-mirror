@@ -47,7 +47,7 @@ my $yaahmname;
 my $yaahmlinkname   = "Profile";     # link text
 my $yaahmhiddenroom = "ProfileRoom"; # hidden room
 my $yaahmpublicroom = "Unsorted";    # public room
-my $yaahmversion    = "2.0";
+my $yaahmversion    = "2.01";
 my $firstcall       = 1;
     
 my %yaahm_transtable_EN = ( 
@@ -1128,7 +1128,6 @@ sub YAAHM_time {
   my $mval = $dailytable{"morning"}[0];
   my $nval = $dailytable{"night"}[0];
   
-  readingsBeginUpdate($hash);
   #-- is this a daily timer event ?
   my $regex = "((".join(")|(",@times)."))";
   my $isdaily = ( $targettime =~ /$regex/ )?1:0;
@@ -1191,6 +1190,7 @@ sub YAAHM_time {
   
     YAAHM_checkMonthly($hash,'event',$targettime);
   
+    readingsBeginUpdate($hash);
     readingsBulkUpdate($hash,"prev_housetime",$prevtime);
     readingsBulkUpdate($hash,"next_housetime",$nexttime);
     readingsBulkUpdate($hash,"housetime",$targettime);
@@ -1263,7 +1263,7 @@ sub YAAHM_time {
     $xval  = $dailytable{$targettime}[2];
     $msg   = "Simulation ".$xval;
     if( $exec==1 ){
-      Log3 $name,1,"[YAAHM_time] ecxecuting $xval";
+      Log3 $name,1,"[YAAHM_time] executing $xval";
       fhem($xval);
       return
     }elsif( $exec==0 ){
