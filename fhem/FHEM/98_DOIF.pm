@@ -2821,13 +2821,12 @@ DOIF_SleepTrigger ($)
 sub DOIF_set_Exec
 {
   my ($hash,$timername,$seconds,$subname,$param)=@_;
-  $param="" if (!defined $param);
   my $current = gettimeofday();
   my $next_time = $current+$seconds;
   $hash->{ptimer}{$timername}{time}=$next_time;
   $hash->{ptimer}{$timername}{name}=$timername;
   $hash->{ptimer}{$timername}{subname}=$subname;
-  $hash->{ptimer}{$timername}{param}=$param;
+  $hash->{ptimer}{$timername}{param}=$param if (defined $param);
   $hash->{ptimer}{$timername}{hash}=$hash;
   RemoveInternalTimer(\$hash->{ptimer}{$timername});
   if ($seconds > 0) {
@@ -2869,8 +2868,12 @@ sub DOIF_ExecTimer
   my $timername=${$timer}->{name};
   my $name=$hash->{NAME};
   my $subname=${$timer}->{subname};
-  my $param=${$timer}->{param};
-  eval ("$subname(\"$param\")");
+  my $param=${$timer}->{param} if (defined ${$timer}->{param});
+  if (!defined ($param)) {
+    eval ("$subname");
+  } else {
+    eval ('$subname("$param")');
+  }
   if ($@) {
     Log3 ($defs{$name}{NAME},1 , "$name error in $subname: $@");
     readingsSingleUpdate ($hash, "error", "in $subname: $@",0);
@@ -3453,15 +3456,16 @@ DOIF (ausgeprochen: du if, übersetzt: tue wenn) ist ein universelles Modul mit 
 Mit diesem Modul ist es möglich, einfache wie auch komplexere Automatisierungsvorgänge zu definieren oder in Perl zu programmieren.
 Ereignisse, Zeittrigger, Readings oder Status werden durch DOIF-spezifische Angaben in eckigen Klammern angegeben. Sie führen zur Triggerung des Moduls und damit zur Auswertung und Ausführung der definierten Anweisungen.<br>
 <br>
-Das Modul verfügt über zwei Modi: FHEM-Modus und <a href="#DOIF_Perl_Modus"><b>[NEU]</b> Perl-Modus</a>. Der Modus eines definierten DOIF-Devices wird automatisch aufgrund der Definition vom Modul erkannt
+Das Modul verfügt über zwei Modi: FHEM-Modus und <a href="#DOIF_Perl_Modus"><b>Perl-Modus</b></a>. Der Modus eines definierten DOIF-Devices wird automatisch aufgrund der Definition vom Modul erkannt
 (FHEM-Modus beginnt mit einer runden Klammer auf).
+Der Perl-Modus kommt weitgehend ohne Attribute aus, er ist aufgrund seiner Flexibilität,
+der Möglichkeit strukturiert zu programmieren und seiner hohen Performance insb. bei umfangreichen Automatisierungsaufgaben dem FHEM-Modus vorzuziehen. Hier geht´s zum <a href="#DOIF_Perl_Modus"><b>Perl-Modus</b></a>.
 Beide Modi sind innerhalb eines DOIF-Devices nicht miteinander kombinierbar. Im Folgendem wird der FHEM-Modus beschrieben.<br> 
 <br>
 Syntax FHEM-Modus:<br>
 <br>
 <ol><code>define &lt;name&gt; DOIF (&lt;Bedingung&gt;) (&lt;Befehle&gt;) DOELSEIF (&lt;Bedingung&gt;) (&lt;Befehle&gt;) DOELSEIF ... DOELSE (&lt;Befehle&gt;)</code></ol>
 <br>
-Im FHEM-Modus lassen sich Automatisierungsabläufe ohne Perlkenntnisse definieren. 
 Die Angaben werden immer von links nach rechts abgearbeitet. Logische Abfragen werden in DOIF/DOELSEIF-Bedingungen vornehmlich mit Hilfe von and/or-Operatoren erstellt. 
 Zu beachten ist, dass nur die Bedingungen überprüft werden,
 die zum ausgelösten Event das dazughörige Device bzw. die dazugehörige Triggerzeit beinhalten.
@@ -5539,35 +5543,79 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
 <a name="DOIF_Perl_Modus"></a>
 <b>Perl Modus</b><br>
 <br>
-Im Perl-Modus lassen sich insb. komplexere Abläufe innerhalb eines DOIF-Devices in Perl programmieren.
-Der Anwender hat mehr Einfluss auf den Ablauf der Steuerung als im FHEM-Modus. Einfache Perlkenntnise werden in diesem Modus vorausgesetzt.<br>
-<br>
-Die Steuerungsabläufe werden im Gegensatz zum FHEM-Modus nicht durch Attibute beinflusst, daher werden im Perl-Modus selten Attribute benötigt. 
-Die Auswahl der <a href="#DOIF_Attribute_Perl_Modus">DOIF-spezifischen Attribute im Perl-Modus</a> ist auf einige sinnvolle beschränkt.<br>
-<br>
-Der Status des Moduls wird nicht vom Modul gesetzt, er kann vom Anwender mit Hilfe der Funktion <code>set_Reading</code> verändert werden, siehe <a href="#DOIF_Spezifische_Perl-Funktionen_im_Perl-Modus">spezifische Perl-Funktionen im Perl-Modus</a>.
-DOIF-spezifische <a href="#DOIF_Operanden">Operanden-Angaben in eckigen Klammern</a> entsprechen vollständig den Angaben im FHEM-Modus des Moduls. Sie können an beliebiger Stelle im Perlcode angegeben werden, wo auch Perl-Funktionen angegeben werden können.<br>
+Der Perl-Modus ist sowohl für einfache, als auch für komplexere Automatisierungsabläufe geeignet. Der Anwender hat mehr Einfluss auf den Ablauf der Steuerung als im FHEM-Modus.
+Die Abläufe lassen sich, wie in höheren Programmiersprachen üblich, strukturiert programmieren. Zum Zeitpunkt der Definition werden alle DOIF-spezifischen Angaben in Perl übersetzt, zum Zeitpunkt der Ausführung wird nur noch Perl ausgeführt, damit wird maximale Performance gewährleistet.<br>
 <br>
 Syntax Perl-Modus:<br>
 <br>
-<ol><code>define &lt;name&gt; DOIF &lt;Blockname&gt; {&lt;Perl mit DOIF-Syntax in eckigen Klammern&gt;} &lt;Blockname&gt; {&lt;Perl mit DOIF-Syntax in eckigen Klammern&gt;} ...</code></ol><br>
+<ol><code>define &lt;name&gt; DOIF &lt;Blockname&gt; {&lt;Perlcode mit Ereignis-/Zeittriggern in eckigen Klammern&gt;}</code></ol>
 <br>
-Ein Perlblock wird ausgeführt, wenn dieser, bedingt durch DOIF-spezifischen Angaben in eckigen Klammern innerhalb des Blocks, getriggert wird.
-Es wird die vollständige Perl-Syntax unterstützt. Es können beliebig viele Perlblöcke definiert werden. Der Name eines Blocks ist optional. Wird ein Perlblock mit dem Namen "init" benannt, so wird er ausgeführt, nachdem das FHEM-System hochgefahren wurde. Er bietet sich insb. an, um Instatnzvariablen des Moduls vorzubelegen.<br>
-Ein besonderer Perlblock ist der Block namens "subs". Dieser Block wird nur zum Definitionszeitpunkt ausgeführt. In diesem Block sollten vornehmlich Perlfunktionen definiert werden, die innerhalb des DOIFs genutzt werden. Um eine möglichst hohe Kompatibilität zu Perl sicherzustellen, wird keine DOIF-Syntax in eckigen Klammern unterstützt, insb. gibt es keine Trigger, die den Block ausführen können.<br>
+Ein Perlblock wird ausgeführt, wenn dieser bedingt durch <a href="#DOIF_Operanden">Ereignis- und Zeittrigger in eckigen Klammern</a> innerhalb des Blocks, getriggert wird.
+Es wird die vollständige Perl-Syntax unterstützt. Es können beliebig viele Perlblöcke innerhalb eines DOIF-Devices definiert werden. Sie werden unabhängig voneinander durch passende Trigger ausgeführt. Der Name eines Blocks ist optional.<br>
 <br>
-FHEM-Befehle werden durch den Aufruf der Perlfunktion <code>fhem"..."</code> ausgeführt. Im Gegensatz zum FHEM-Modus können im Perl-Modus mehrere Blöcke unabhängig voneinander, ausgelöst durch einen Ereignis- oder Zeit-Trigger, ausgeführt werden. So kann die Funktionalität mehrer DOIF-Module im FHEM-Modus innerhalb eines DOIF-Moduls im Perl-Moduls realisiert werden.<br>
+Der Status des Moduls wird nicht vom Modul gesetzt, er kann vom Anwender mit Hilfe der Funktion <code>set_Reading</code> verändert werden, siehe <a href="#DOIF_Spezifische_Perl-Funktionen_im_Perl-Modus">spezifische Perl-Funktionen im Perl-Modus</a>.
+FHEM-Befehle werden durch den Aufruf der Perlfunktion <code>fhem"..."</code> ausgeführt.<br>
 <br>
-Im Perl-Modus gibt es keinen wait-Timer, stattdessen kann der Benutzer mit der Funktion <code>set_Timer</code> beliebig viele eigene Timer definieren, die unabhängig voneinander gesetzt und ausgewertet werden können, siehe <a href="#DOIF_Spezifische_Perl-Funktionen_im_Perl-Modus">Spezifische Perl-Funktionen im Perl-Modus</a>.<br>
+Der Benutzer kann mit der Funktion <code>set_Timer/set_Exec</code> beliebig viele eigene Timer definieren, die unabhängig voneinander gesetzt und ausgewertet werden können, siehe <a href="#DOIF_Spezifische_Perl-Funktionen_im_Perl-Modus">Spezifische Perl-Funktionen im Perl-Modus</a>.<br>
 <br>
-Zum Zeitpunkt der Definition werden alle DOIF-spezifischen Angaben in Perl übersetzt, zum Zeitpunkt der Ausführung wird nur noch Perl ausgeführt, damit wird maximale Performance gewährleistet.<br>
+Definitionen im FHEM-Modus der Form:<br>
 <br>
+<code>DOIF (&lt;Bedingung mit Trigger&gt;) (&lt;FHEM-Befehle&gt;) DOELSE (&lt;FHEM-Befehle&gt;)</code><br>
+<br>
+lassen sich wie folgt in Perl-Modus übertragen:<br>
+<br>
+<code>DOIF {if (&lt;Bedingung mit Trigger&gt;) {fhem"&lt;FHEM-Befehle&gt;"} else {fhem"&lt;FHEM-Befehle&gt;"}}</code><br>
+<br>
+Die Bedingungen des FHEM-Modus können ohne Änderungen in Perl-Modus übernommen werden können.<br>
+<br>
+Im Perl-Modus können beliebig viele Blöcke definiert werden, die unabhängig von einander durch einen Trigger ausgewertet und zur Ausführung führen können:<br>
+<br>
+<code>DOIF<br>
+{ if (&lt;Bedingung mit Trigger&gt;) ... }<br>
+{ if (&lt;Bedingung mit Trigger&gt;) ... }<br>
+...</code><br>
+<br>
+Im Perlmodus sind beliebige Hierarchietiefen möglich:<br>
+<br>
+<code>DOIF<br>
+{ if (&lt;Bedingung&gt;) {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(&lt;Bedingung&gt;)&nbsp;{<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(...<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;...<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+&nbsp;&nbsp;}<br>
+}</code><br>
+<br>
+Bemerkung: Innerhalb eines DOIF-Blocks muss mindestens ein Trigger in irgendeiner Bedingung definiert werden, damit der gesamte Block beim passenden Trigger ausgewertet wird.<br>
+<br>
+<u>Eigene Funktionen</u><br>
+<br>
+Ein besonderer Perlblock ist der Block namens "subs". In diesem Block werden Perlfunktionen definiert werden, die innerhalb des DOIFs genutzt werden. 
+Um eine möglichst hohe Kompatibilität zu Perl sicherzustellen, wird keine DOIF-Syntax in eckigen Klammern unterstützt, insb. gibt es keine Trigger, die den Block ausführen können.<br>
+<br>
+Beispiel:<br>
+<br><code>
+DOIF 
+subs { ## Definition von Perlfunktionen lamp_on und lamp_off<br>
+&nbsp; sub lamp_on {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fhem"set&nbsp;lamp&nbsp;on";<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_Reading("state","on",1);<br>
+&nbsp;&nbsp;}<br>
+&nbsp;&nbsp;sub&nbsp;lamp_off&nbsp;{<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fhem"set&nbsp;lamp&nbsp;off";<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_Reading("state","off",1);<br>
+&nbsp;&nbsp;}<br>
+}<br>
+{if ([06:00]) {lamp_on()&nbsp;&nbsp;# Um 06:00 Uhr wird die Funktion lamp_on aufgerufen }<br>
+{if ([08:00]) {lamp_off() # Um 08:00 Uhr wird die Funktion lamp_off aufgerufen }<br>
+</code><br>
 <a name="DOIF_Einfache_Anwendungsbeispiele_Perl"></a>
 <u>Einfache Anwendungsbeispiele (vgl. <a href="#DOIF_Einfache_Anwendungsbeispiele">Anwendungsbeispiele im FHEM-Modus</a>):</u><ol>
 <br>
 <code>define di_rc_tv DOIF {if ([remotecontol:"on"]) {fhem"set tv on"} else {fhem"set tv off"}}</code><br>
 <br>
-<code>define di_clock_radio DOIF {if ([06:30|Mo Di Mi] or [08:30|Do Fr Sa So]) {fhem"set radio on"} elsif ([08:00|Mo Di Mi] or [09:30|Do Fr Sa So]) {fhem"set radio off"}}</code><br>
+<code>define di_clock_radio DOIF {if ([06:30|Mo Di Mi] or [08:30|Do Fr Sa So]) {fhem"set radio on"}} {if ([08:00|Mo Di Mi] or [09:30|Do Fr Sa So]) {fhem"set radio off"}}</code><br>
 <br>
 <code>define di_lamp DOIF {if ([06:00-09:00] and [sensor:brightness] < 40) {fhem"set lamp:FILTER=STATE!=on on"} else {fhem"set lamp:FILTER=STATE!=off off"}}</code><br>
 <br>
@@ -5587,33 +5635,50 @@ Timer holen: <code><b>get_Timer(&lt;TimerEvent&gt;)</code></b>, Returnwert: 0, w
 <br>
 Laufenden Timer löschen: <code><b>del_Timer(&lt;TimerEvent&gt;)</code></b><br>
 <br>
-<u>Funktionstimer</u><br>
+Beispiel: Das Event "hello" 30 Sekunden verzögert auslösen:<br>
 <br>
-Timer setzen: <code><b>set_Exec(&lt;timerName&gt;, &lt;seconds&gt;, &lt;function&gt, &lt;parameter&gt)</code></b>, mit &lt;timerName&gt;: beliebige Angabe, sie spezifiziert eindeutig einen Timer, 
-welcher nach Ablauf die angegebene Perl-Funktion &lt;function&gt; mit optionalen Parameter &lt;parameter&gt; aufruft. Die Perlfunkion muss eindeutig sein und in FHEM zuvor deklariert worden sein.
+<code>set_Time("event",30,"hello");</code><br>
+<br>
+<u>Ausführungstimer</u><br>
+<br>
+Timer setzen: <code><b>set_Exec(&lt;timerName&gt;, &lt;seconds&gt;, &lt;perlCode&gt, &lt;parameter&gt)</code></b>, mit &lt;timerName&gt;: beliebige Angabe, sie spezifiziert eindeutig einen Timer, 
+welcher nach Ablauf den angegebenen Perlcode &lt;perlCode&gt; aufruft. Falls als Perlcode eine Perlfunktion angegeben wird, kann optional ein Übergabeparameter &lt;parameter&gt; angegeben werden. Die Perlfunkion muss eindeutig sein und in FHEM zuvor deklariert worden sein.
 Wird set_Exec mit dem gleichen &lt;timerName&gt; vor seinem Ablauf erneut aufgerufen, so wird der laufender Timer gelöscht und neugesetzt.<br>
 <br>
 Timer holen: <code><b>get_Exec(&lt;timerName&gt;)</code></b>, Returnwert: 0, wenn Timer abgelaufen oder nicht gesetzt ist, sonst Anzahl der Sekunden bis zum Ablauf des Timers<br>
 <br>
 Laufenden Timer löschen: <code><b>del_Exec(&lt;timerName&gt;)</code></b><br>
 <br>
+Beispiel: Lampe verzögert um 30 Sekunden ausschalten:<br>
+<br>
+<code>set_Exec("aus",30,'fhem"set lamp off"');</code><br>
 <br>
 Ein beliebiges FHEM-Event absetzen: <code><b>set_Event(&lt;Event&gt;)</code></b><br>
 <br>
 Reading schreiben: <code><b>set_Reading(&lt;readingName&gt;,&lt;content&gt;,&lt;trigger&gt;)</code></b>, mit &lt;trigger&gt;: 0 ohne Trigger, 1 mit Trigger<br>
 <br>
-Es können alle in FHEM vorhanden Funktionen genutzt werden. Größere Perlblöcke sollten in eigene Funktionen im subs-Block ausgelagert werden.
-Der Anwender hat die Möglichkeit Instanzvariablen beginnen mit $_ zu nutzen. Sie müssen nicht deklariert werden. Deren Gültigkeitsbereich ist ein definiertes DOIF-Device. Wenn sie nicht vorbelegt werden, gelten sie als nicht definiert. Das lässt sich abfragen mit:<br>
+<u>init-Block</u><br>
+<br>
+Wird ein Perlblock mit dem Namen "init" benannt, so wird er ausgeführt, nachdem das FHEM-System hochgefahren wurde. Er bietet sich insb. an, um Instanzvariablen des Moduls vorzubelegen.<br>
+<br>
+<u>Instanzvariablen</u><br>
+<br>
+Instanzvariablen sind Devicevariablen, die global innerhalb eines DOIF-Devices genutzt werden können. Sie beginnen mit $_ und müssen nicht deklariert werden. Wenn sie nicht vorbelegt werden, gelten sie als nicht definiert. Das lässt sich abfragen mit:<br>
+<br>
 <code>if (defined $_...) ...</code><br>
 <br>
-Instanzvariablen überleben nicht den Neustart, sie können jedoch im init-Block aus Readings vorbelegt werden.<br>
+Instanzvariablen überleben nicht den Neustart, sie können jedoch z.B. im init-Block, der beim Systemstart ausgewertet wird, aus Readings vorbelegt werden.<br>
 <br>
 Bsp. Vorbelgung einer Instanzvariablen beim Systemstart mit dem Status des Moduls:<br>
+<br>
 <code>init {$_status=ReadingsVal("$SELF","state",0)}</code><br>
+<br>
 alternativ<br>
+<br>
 <code>init {$_status=[?$SELF:state]}</code><br>
 <br>
 Instanzvariablen lassen sich indizieren, z. B.:<br>
+<br>
 <code>my $i=0;<br>
 $_betrag{$i}=100;</code><br>
 <br>
@@ -5653,23 +5718,29 @@ Für unterschiedliche blockierende Funktionen ist jeweils ein eigener Name (&lt;
 <br>
 <b>Weitere Anwendungsbeispiele:</b><br>
 <br>
+<a name="DOIF_Treppenhauslicht mit Bewegungsmelder"></a>
+<u>Treppenhauslicht mit Bewegungsmelder</u><br>
+<br><code>
+define&nbsp;di_light&nbsp;DOIF&nbsp;{<br>
+&nbsp;&nbsp;if&nbsp;(["FS:motion"])&nbsp;{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;bei&nbsp;Bewegung<br>
+&nbsp;&nbsp;&nbsp;&nbsp;fhem"set&nbsp;lamp&nbsp;on"&nbsp;if&nbsp;([?lamp]&nbsp;ne&nbsp;"on");&nbsp;&nbsp;&nbsp;#&nbsp;Lampe&nbsp;einschalten,&nbsp;wenn&nbsp;sie&nbsp;nicht&nbsp;an&nbsp;ist<br>
+&nbsp;&nbsp;&nbsp;&nbsp;set_Exec("off",30,'fhem"set&nbsp;lamp&nbsp;off"');&nbsp;&nbsp;#&nbsp;Timer&nbsp;namens&nbsp;"off"&nbsp;für&nbsp;das&nbsp;Ausschalten&nbsp;der&nbsp;Lampe&nbsp;auf&nbsp;30&nbsp;Sekunden&nbsp;setzen&nbsp;bzw.&nbsp;verlängern<br>
+&nbsp;&nbsp;}<br>
+}<br>
+</code>
+<br>
 <a name="DOIF_Einknopf_Fernbedienung"></a>
 <u>Einknopf-Fernbedienung</u><br>
 <br>
 Anforderung: Wenn eine Taste innerhalb von zwei Sekunden zwei mal betätig wird, soll der Rollladen nach oben, bei einem Tastendruck nach unten.<br>
 <br>
 <code>
-define di_shutter DOIF {&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Block zur Auswertung des Tastendruckes<br>
-&nbsp;&nbsp;if (["FS:^on$"] and get_Timer("Timer_shutter")==0){ # wenn Taste betätigt wird und kein Timer läuft<br>
-&nbsp;&nbsp;&nbsp;&nbsp;set_Timer("Timer_shutter",2);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Timer für zwei Sekunden setzen<br>
-&nbsp;&nbsp;} else {&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# wenn Timer läuft, d.h. ein weitere Tastendruck innerhalb von zwei Sekunden<br>
-&nbsp;&nbsp;&nbsp;&nbsp;del_Timer("Timer_shutter")&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Timer löschen<br>
-&nbsp;&nbsp;&nbsp;&nbsp;fhem"set shutter up";&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Rollladen hoch<br>
-&nbsp;&nbsp;}<br>
-}<br>
-{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Block für die Bearbeitung des Timerevents<br>
-&nbsp;&nbsp;if ([$SELF:"Timer_shutter"]){&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # wenn nach zwei Sekunden Timer abläuft, d.h. nur ein Tastendruck<br>
-&nbsp;&nbsp;&nbsp;&nbsp;fhem"set shutter down";&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Rollladen runter<br>
+define&nbsp;di_shutter&nbsp;DOIF&nbsp;{<br>
+&nbsp;&nbsp;if&nbsp;(["FS:^on$"]&nbsp;and&nbsp;!get_Exec("shutter")){&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;wenn&nbsp;Taste&nbsp;betätigt&nbsp;wird&nbsp;und&nbsp;kein&nbsp;Timer&nbsp;läuft<br>
+&nbsp;&nbsp;&nbsp;&nbsp;set_Exec("shutter",2,'fhem"set&nbsp;shutter&nbsp;down"');&nbsp;&nbsp;&nbsp;#&nbsp;Timer&nbsp;zum&nbsp;shutter&nbsp;down&nbsp;auf&nbsp;zwei&nbsp;Sekunden&nbsp;setzen<br>
+&nbsp;&nbsp;}&nbsp;else&nbsp;{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;wenn&nbsp;Timer&nbsp;läuft,&nbsp;d.h.&nbsp;ein&nbsp;weitere&nbsp;Tastendruck&nbsp;innerhalb&nbsp;von&nbsp;zwei&nbsp;Sekunden<br>
+&nbsp;&nbsp;&nbsp;&nbsp;del_Timer("shutter");&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;Timer&nbsp;löschen<br>
+&nbsp;&nbsp;&nbsp;&nbsp;fhem"set&nbsp;shutter&nbsp;up";&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;Rollladen&nbsp;hoch<br>
 &nbsp;&nbsp;}<br>
 }<br>
 </code>
@@ -5679,43 +5750,12 @@ define di_shutter DOIF {&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&n
 Im folgenden Beispiel wird die Nutzung von Instanzvariablen demonstriert.<br>
 <br>
 <code>
-define di_count DOIF {&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Block zur Auswertung des Ereignisses<br>
-&nbsp;&nbsp;if (["FS:on"] and get_Timer("Timer_counter")==0){ # wenn Ereignis (hier "FS:on") eintritt und kein Timer läuft<br>
-&nbsp;&nbsp;&nbsp;&nbsp;$_count=1;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# setze count-Variable auf 1<br>
-&nbsp;&nbsp;&nbsp;&nbsp;set_Timer("Timer_counter",3600);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# setze Timer auf eine Stunde<br>
-&nbsp;&nbsp;} else {<br>
-&nbsp;&nbsp;&nbsp;&nbsp;$_count++;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# wenn Timer bereits läuft zähle Ereignis<br>
-&nbsp;&nbsp;}<br>
-}<br>
-{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Block für die Auswertung nach Ablauf des Timers<br>
-&nbsp;&nbsp;if ([$SELF:"Timer_counter"]) {&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# wenn Timer nach einer Stunde abläuft<br>
-&nbsp;&nbsp;&nbsp;&nbsp;if ($_count > 10) {<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Log 3,"count: $_count action";&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# protokolliere im Log die Anzahl der Ereignisse, wenn sie über 10 ist<br>
-&nbsp;&nbsp;&nbsp;&nbsp;}<br>
-&nbsp;&nbsp;}<br>
-}<br>
-</code><br>
-<br>
-<a name="DOIF_Treppenhauslicht mit Bewegungsmelder"></a>
-<u>Treppenhauslicht mit Bewegungsmelder</u><br>
-<br><code><br>
-define di_light DOIF<br>
-subs {&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Block "subs" zur Definition eigener Perl-Funktionen, hier ist nur Perl erlaubt ohne DOIF-Syntax<br>
-&nbsp;&nbsp;sub ein {&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Perlfunktion "ein" zum Einschalten wird definiert<br>
-&nbsp;&nbsp;&nbsp;&nbsp;if (ReadingsVal ("lamp","state","") ne "on") {<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fhem"set lamp on";<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_Reading ("state","on",1);<br>
-&nbsp;&nbsp;&nbsp;&nbsp;}<br>
-&nbsp;&nbsp;}<br>
-&nbsp;&nbsp;sub aus {&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Perlfunkton "aus" zum Ausschalten wird definiert<br>
-&nbsp;&nbsp;&nbsp;&nbsp;fhem"set lamp off";<br>
-&nbsp;&nbsp;&nbsp;&nbsp;set_Reading ("state","off",1);<br>
-&nbsp;&nbsp;}<br>
-}<br>
-bewegung {&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Block namens "bewegung" reagiert auf Bewegung von FS<br>
-&nbsp;&nbsp;if (["FS:motion"]) {<br>
-&nbsp;&nbsp;&nbsp;&nbsp;ein();&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Perlfunktion "ein" wird ausgeführt<br>
-&nbsp;&nbsp;&nbsp;&nbsp;set_Exec("light_off",10,"aus");&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Timer namens "light_off"für das Ausschalten über Perlfunktion "aus" wird gesetzt bzw. verlängert<br>
+define&nbsp;di_count&nbsp;DOIF&nbsp;{<br>
+&nbsp;&nbsp;if&nbsp;(["FS:on"]&nbsp;and&nbsp;!get_Exec("counter"))&nbsp;{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;wenn&nbsp;Ereignis&nbsp;(hier&nbsp;"FS:on")&nbsp;eintritt&nbsp;und&nbsp;kein&nbsp;Timer&nbsp;läuft<br>
+&nbsp;&nbsp;&nbsp;&nbsp;$_count=1;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;setze&nbsp;count-Variable&nbsp;auf&nbsp;1<br>
+&nbsp;&nbsp;&nbsp;&nbsp;set_Exec("counter",3600,'Log&nbsp;(3,"count:&nbsp;$_count&nbsp;action")&nbsp;if&nbsp;($_count&nbsp;>&nbsp;10)');&nbsp;&nbsp;#&nbsp;setze&nbsp;Timer&nbsp;auf&nbsp;eine&nbsp;Stunde&nbsp;zum&nbsp;Protokollieren&nbsp;der&nbsp;Anzahl&nbsp;der&nbsp;Ereignisse,&nbsp;wenn&nbsp;sie&nbsp;über&nbsp;10&nbsp;ist<br>
+&nbsp;&nbsp;}&nbsp;else&nbsp;{<br>
+&nbsp;&nbsp;&nbsp;&nbsp;$_count++;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;wenn&nbsp;Timer&nbsp;bereits&nbsp;läuft&nbsp;zähle&nbsp;Ereignis<br>
 &nbsp;&nbsp;}<br>
 }<br>
 </code>
