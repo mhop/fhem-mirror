@@ -347,5 +347,4 @@ setstate sunRise Next: 05:57:09
 setstate sunRise 2018-08-26 08:08:39 state Next: 05:57:09
 setstate sunSet Next: 20:57:55
 setstate sunSet 2018-08-25 21:11:31 state Next: 20:57:55
-setstate telnetPort 2018-08-25 21:11:31 state Initialized
 setstate wlCinema initialized

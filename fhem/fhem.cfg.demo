@@ -1,24 +1,11 @@
 attr global userattr cmdIcon devStateIcon devStateStyle icon lightSceneParamsToSave lightSceneRestoreOnlyIfChanged:1,0 sortby structexclude webCmd webCmdLabel:textField-long widgetOverride
-attr global autoload_undefined_devices 1
-attr global autosave 0
-attr global backup_before_update 0
 attr global logfile -
 attr global modpath .
-attr global motd SecurityCheck:\
-  WEB is not password protected\
-  telnetPort is not password protected\
-\
-Protect this FHEM installation by defining an allowed device with define allowed allowed\
-You can disable this message with attr global motd none
 attr global mseclog 1
 attr global room System
 attr global sendStatistics never
 attr global statefile ./demolog/fhem.save
-attr global updateInBackground 1
 attr global verbose 3
-
-define telnetPort telnet 7072 global
-attr telnetPort room System
 
 define WEB FHEMWEB 8083 global
 attr WEB JavaScripts codemirror/fhem_codemirror.js
