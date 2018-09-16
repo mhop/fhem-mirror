@@ -2870,7 +2870,7 @@ sub DOIF_ExecTimer
   my $subname=${$timer}->{subname};
   my $param=${$timer}->{param} if (defined ${$timer}->{param});
   if (!defined ($param)) {
-    eval ("$subname");
+    eval ($subname);
   } else {
     eval ('$subname("$param")');
   }
@@ -5566,7 +5566,7 @@ lassen sich wie folgt in Perl-Modus übertragen:<br>
 <br>
 <code>DOIF {if (&lt;Bedingung mit Trigger&gt;) {fhem"&lt;FHEM-Befehle&gt;"} else {fhem"&lt;FHEM-Befehle&gt;"}}</code><br>
 <br>
-Die Bedingungen des FHEM-Modus können ohne Änderungen in Perl-Modus übernommen werden können.<br>
+Die Bedingungen des FHEM-Modus können ohne Änderungen in Perl-Modus übernommen werden.<br>
 <br>
 Im Perl-Modus können beliebig viele Blöcke definiert werden, die unabhängig von einander durch einen Trigger ausgewertet und zur Ausführung führen können:<br>
 <br>
@@ -5591,7 +5591,7 @@ Bemerkung: Innerhalb eines DOIF-Blocks muss mindestens ein Trigger in irgendeine
 <br>
 <u>Eigene Funktionen</u><br>
 <br>
-Ein besonderer Perlblock ist der Block namens "subs". In diesem Block werden Perlfunktionen definiert werden, die innerhalb des DOIFs genutzt werden. 
+Ein besonderer Perlblock ist der Block namens "subs". In diesem Block werden Perlfunktionen definiert, die innerhalb des DOIFs genutzt werden. 
 Um eine möglichst hohe Kompatibilität zu Perl sicherzustellen, wird keine DOIF-Syntax in eckigen Klammern unterstützt, insb. gibt es keine Trigger, die den Block ausführen können.<br>
 <br>
 Beispiel:<br>
