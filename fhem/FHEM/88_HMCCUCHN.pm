@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.3.001
+#  Version 4.3.002
 #
 #  (c) 2018 zap (zap01 <at> t-online <dot> de)
 #
@@ -123,7 +123,9 @@ sub HMCCUCHN_Define ($@)
 	while (defined ($arg)) {
 		return $usage if ($n == 3);
 		if    ($arg eq 'readonly') { $hash->{statevals} = $arg; }
-		elsif ($arg eq 'defaults' && $init_done) { HMCCU_SetDefaults ($hash); }
+		elsif ($arg eq 'defaults') {
+			HMCCU_SetDefaults ($hash) if ($init_done);
+		}
 		else { return $usage; }
 		$n++;
 		$arg = shift @$a;

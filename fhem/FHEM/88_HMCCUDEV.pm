@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.3.001
+#  Version 4.3.002
 #
 #  (c) 2018 zap (zap01 <at> t-online <dot> de)
 #
@@ -126,7 +126,9 @@ sub HMCCUDEV_Define ($@)
 	# Parse optional command line parameters
 	foreach my $arg (@$a) {
 		if    ($arg eq 'readonly') { $hash->{statevals} = $arg; }
-		elsif ($arg eq 'defaults' && $init_done) { HMCCU_SetDefaults ($hash); }
+		elsif ($arg eq 'defaults') {
+			HMCCU_SetDefaults ($hash) if ($init_done);
+		}
 		elsif ($arg =~ /^[0-9]+$/) { $attr{$name}{statechannel} = $arg; }
 		else { return $usage; }
 	}
@@ -466,10 +468,18 @@ sub HMCCUDEV_Set ($@)
 		return HMCCU_SetState ($hash, "OK");
 	}
 	elsif ($opt eq 'pct') {
-		return HMCCU_SetError ($hash, -11) if ($sc eq '');
-		return HMCCU_SetError ($hash, "Can't find LEVEL datapoint for device type $ccutype")
-		   if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $sc, "LEVEL", 2));
-
+		return HMCCU_SetError ($hash, -11) if ($sc eq '' && $cc eq '');
+		my $dp;
+		if (HMCCU_IsValidDatapoint ($hash, $ccutype, $cc, "LEVEL", 2)) {
+			$dp = "$cc.LEVEL";
+		}
+		elsif (HMCCU_IsValidDatapoint ($hash, $ccutype, $sc, "LEVEL", 2)) {
+			$dp = "$sc.LEVEL";
+		}
+		else {
+			return HMCCU_SetError ($hash, "Can't find LEVEL datapoint for device type $ccutype")
+		}
+		
 		my $objname = '';
 		my $objvalue = shift @$a;
 		return HMCCU_SetError ($hash, "Usage: set $name pct {value} [{ontime} [{ramptime}]]")
@@ -503,7 +513,7 @@ sub HMCCUDEV_Set ($@)
 		}
 
 		# Set level	
-		$objname = $ccuif.'.'.$ccuaddr.':'.$sc.'.LEVEL';
+		$objname = $ccuif.'.'.$ccuaddr.':'.$dp;
 		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		
@@ -588,7 +598,8 @@ sub HMCCUDEV_Set ($@)
 				$retmsg .= " on-for-timer on-till"
 					if (HMCCU_IsValidDatapoint ($hash, $hash->{ccutype}, $sc, "ON_TIME", 2));
 				$retmsg .= " pct"
-					if (HMCCU_IsValidDatapoint ($hash, $hash->{ccutype}, $sc, "LEVEL", 2));
+					if (HMCCU_IsValidDatapoint ($hash, $hash->{ccutype}, $sc, "LEVEL", 2) ||
+						HMCCU_IsValidDatapoint ($hash, $hash->{ccutype}, $cc, "LEVEL", 2));
 			}
 		}
 
