@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 3.12.0     04.09.2018       corrected SVG-select (https://forum.fhem.de/index.php/topic,65860.msg815640.html#msg815640)
 # 3.11.0     02.09.2018       reduceLog, reduceLogNbl - optional "days newer than" part added
 # 3.10.10    05.08.2018       commandref revised reducelogNbl
 # 3.10.9     23.06.2018       commandref added hint about special characters in passwords
@@ -207,7 +208,7 @@ use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 no if $] >= 5.017011, warnings => 'experimental::smartmatch'; 
 
-my $DbLogVersion = "3.11.0";
+my $DbLogVersion = "3.12.0";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -2262,11 +2263,12 @@ sub DbLog_PushAsyncAborted(@) {
 sub DbLog_explode_datetime($%) {
   my ($t, %def) = @_;
   my %retv;
-
+  
   my (@datetime, @date, @time);
   @datetime = split(" ", $t); #Datum und Zeit auftrennen
   @date = split("-", $datetime[0]);
   @time = split(":", $datetime[1]) if ($datetime[1]);
+  
   if ($date[0]) {$retv{year}  = $date[0];} else {$retv{year}  = $def{year};}
   if ($date[1]) {$retv{month} = $date[1];} else {$retv{month} = $def{month};}
   if ($date[2]) {$retv{day}   = $date[2];} else {$retv{day}   = $def{day};}
@@ -2275,8 +2277,8 @@ sub DbLog_explode_datetime($%) {
   if ($time[2]) {$retv{second}= $time[2];} else {$retv{second}= $def{second};}
 
   $retv{datetime}=DbLog_implode_datetime($retv{year}, $retv{month}, $retv{day}, $retv{hour}, $retv{minute}, $retv{second});
-
-  #Log 1, Dumper(%retv);
+  
+  # Log 1, Dumper(%retv);
   return %retv
 }
 
@@ -2549,7 +2551,14 @@ sub DbLog_Get($@) {
   %to_datetime   = DbLog_explode_datetime($to, DbLog_explode_datetime("2099-01-01 00:00:00", ()));
   $from = $from_datetime{datetime};
   $to = $to_datetime{datetime};
-
+  
+  if($to =~ /(\d{4})-(\d{2})-(\d{2}) 23:59:59/) {
+     # 03.09.2018 : https://forum.fhem.de/index.php/topic,65860.msg815640.html#msg815640
+     $to =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
+     my $tc = timelocal($6, $5, $4, $3, $2-1, $1-1900);
+     $tc++;
+     $to = strftime "%Y-%m-%d %H:%M:%S", localtime($tc);
+  }
 
   my ($retval,$retvaldummy,$hour,$sql_timestamp, $sql_device, $sql_reading, $sql_value, $type, $event, $unit) = "";
   my @ReturnArray;
@@ -2696,12 +2705,12 @@ sub DbLog_Get($@) {
     $stm2 .= "AND READING LIKE '".$readings[$i]->[1]."' " if(($readings[$i]->[1] !~ m(^%$)) && ($readings[$i]->[1] =~ m(\%)));
 
     $stm2 .= "AND TIMESTAMP >= $sqlspec{from_timestamp} ";
-    $stm2 .= "AND TIMESTAMP < $sqlspec{to_timestamp} ";
+    $stm2 .= "AND TIMESTAMP <= $sqlspec{to_timestamp} ";           # 03.09.2018 : https://forum.fhem.de/index.php/topic,65860.msg815640.html#msg815640            
     $stm2 .= "ORDER BY TIMESTAMP";
 
     if($deltacalc) {
       $stmdelta .= "AND TIMESTAMP >= $sqlspec{from_timestamp} ";
-      $stmdelta .= "AND TIMESTAMP < $sqlspec{to_timestamp} ";
+      $stmdelta .= "AND TIMESTAMP <= $sqlspec{to_timestamp} ";     # 03.09.2018 : https://forum.fhem.de/index.php/topic,65860.msg815640.html#msg815640    
 
       $stmdelta .= "GROUP BY $sqlspec{order_by_hour} " if($deltacalc);
       $stmdelta .= "ORDER BY TIMESTAMP";
@@ -2709,7 +2718,6 @@ sub DbLog_Get($@) {
     } else {
       $stm = $stm2;
     }
-
 
     Log3 $hash->{NAME}, 4, "Processing Statement: $stm";
 
