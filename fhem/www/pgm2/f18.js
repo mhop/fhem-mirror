@@ -25,7 +25,7 @@ $(document).ready(function(){
   }
 
   if(!f18_sd.f18) {
-    f18_attr = { "Pinned.menu":"true" };
+    f18_attr = { "Pinned.menu":"true", "hidePin":"true" };
     f18_resetCol();
     f18_sd.f18 = f18_attr;
   }
