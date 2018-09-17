@@ -2,6 +2,7 @@
 #
 # fhem bridge to mqtt (see http://mqtt.org)
 #
+# Copyright (C) 2018 Alexander Schulz
 # Copyright (C) 2017 Stephan Eisler
 # Copyright (C) 2014 - 2016 Norbert Truchsess
 #
