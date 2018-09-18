@@ -623,7 +623,7 @@ sub withings_getSessionKey($) {
   if( !$hash->{AccountID} || length($hash->{AccountID} < 2 ) ) {
 
     ($err,$data) = HttpUtils_BlockingGet({
-      url => $hash->{'.https'}."://scalews.withings.com/cgi-bin/v2/account",
+      url => $hash->{'.https'}."://scalews.withings.com/cgi-bin/account",
       timeout => 10,
       noshutdown => 1,
       data => {sessionid => $hash->{SessionKey}, appname => 'my2', appliver=> $hash->{helper}{appliver}, apppfm => 'web', action => 'get', enrich => 't'},
