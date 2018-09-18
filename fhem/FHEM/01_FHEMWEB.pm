@@ -3740,7 +3740,8 @@ FW_widgetOverride($$)
         only the deviceName or have the form deviceName.event or deviceName.*.
         This is always the case when using the <a href="#plotEditor">Plot
         editor</a>. The SVG will be reloaded for <b>any</b> event triggered by
-        this deviceName. Default is off.
+        this deviceName. Default is off. Note: the plotEmbed attribute must be
+        set.
         </li>
         <br>
 
@@ -4444,7 +4445,8 @@ FW_widgetOverride($$)
         bzw. deviceName.*. Wenn man den <a href="#plotEditor">Plot Editor</a>
         benutzt, ist das &uuml;brigens immer der Fall. Die SVG Datei wird bei
         <b>jedem</b> ausl&ouml;senden Event dieses Ger&auml;tes neu geladen.
-        Die Voreinstellung ist aus.
+        Die Voreinstellung ist aus. Achtung: das plotEmbed Attribute muss
+        gesetzt sein.
         </li><br>
 
     <a name="mainInputLength"></a>
