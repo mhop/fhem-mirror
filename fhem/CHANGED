@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  38_netatmo: fixed changed values and deprecated API calls
   - bugfix:  93_DbLog: 3.12.1, crash if SVG called (forum:#91285)
   - change:  32_withings: API endpoint changed back to Withings servers
   - bugfix:  93_DbLog: 3.12.0, SVG-select corrected

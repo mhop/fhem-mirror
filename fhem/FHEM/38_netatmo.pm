@@ -894,11 +894,15 @@ netatmo_checkConnection($)
 
   Log3 $name, 3, "$name: refreshing connection information";
 
+  my $json = '{"limit":2,"divider":3,"zoom":18,"lat_ne":0.1,"lon_ne":-0.1,"lat_sw":0.1,"lon_sw":-0.1,"date_end":"last","quality":1}';
 
   HttpUtils_NonblockingGet({
-    url => "https://".$hash->{helper}{apiserver}."/api/readtimeline",
+    url => "https://".$hash->{helper}{apiserver}."/api/getpublicmeasures",
+    method => "POST",
     timeout => 5,
+    header => "Content-Type: application/json\r\nAuthorization: Bearer ".$hash->{access_token},
     hash => $hash,
+    data => $json,
     callback => \&netatmo_parseConnection,
   });
   return undef;
@@ -945,7 +949,12 @@ netatmo_parseConnection($$$)
         Log3 $name, 2, "$name: invalid json evaluation on connection check ".$@;
         return undef;
       }
-      $hash->{network} = "ok" if($json->{status} eq "ok");
+      if(!defined($json->{status})) {
+        Log3 $name, 2, "$name: invalid json data on connection check: \n".$data;
+      } else {
+        Log3 $name, 4, "$name: connection check: \n".$data;
+        $hash->{network} = "ok" if($json->{status} eq "ok");
+      }
     }
   return undef;
 }
@@ -3105,7 +3114,7 @@ netatmo_autocreatehomecoach($;$)
     if($cmdret) {
       Log3 $name, 1, "$name: Autocreate: An error occurred while creating device for id '$id': $cmdret";
     } else {
-      $cmdret= CommandAttr(undef,"$devname alias ".encode_utf8($device->{name})) if( defined($device->{name}) );
+      $cmdret= CommandAttr(undef,"$devname alias ".encode_utf8($device->{station_name})) if( defined($device->{station_name}) );
       $cmdret= CommandAttr(undef,"$devname room netatmo");
       $cmdret= CommandAttr(undef,"$devname IODev $name");
       $cmdret= CommandAttr(undef,"$devname devStateIcon .*:no-icon");
@@ -5824,7 +5833,7 @@ netatmo_Get($$@)
       my $ret;
       foreach my $homecoach (@{$homecoachs}) {
         $ret .= "\n" if( $ret );
-        $ret .= "$homecoach->{_id}\t$homecoach->{firmware}\t$homecoach->{type}\t$homecoach->{name}";
+        $ret .= "$homecoach->{_id}\t$homecoach->{firmware}\t$homecoach->{type}\t$homecoach->{station_name}";
       }
 
       $ret = "id\t\t\tfw\ttype\t name\n" . $ret if( $ret );
