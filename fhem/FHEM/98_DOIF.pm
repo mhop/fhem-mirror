@@ -2078,7 +2078,7 @@ sub CheckRegexpDoIf
               }
               return $i;
             }
-            my $max = int(@{$eventa});
+            my $max=defined $eventa ? int(@{$eventa}):0;
             my $s;
             my $found;
             for (my $j = 0; $j < $max; $j++) {
@@ -2872,7 +2872,7 @@ sub DOIF_ExecTimer
   if (!defined ($param)) {
     eval ($subname);
   } else {
-    eval ('$subname("$param")');
+    eval ("$subname(\"$param\")");
   }
   if ($@) {
     Log3 ($defs{$name}{NAME},1 , "$name error in $subname: $@");
@@ -5548,10 +5548,10 @@ Die Abläufe lassen sich, wie in höheren Programmiersprachen üblich, strukturi
 <br>
 Syntax Perl-Modus:<br>
 <br>
-<ol><code>define &lt;name&gt; DOIF &lt;Blockname&gt; {&lt;Perlcode mit Ereignis-/Zeittriggern in eckigen Klammern&gt;}</code></ol>
+<ol><code>define &lt;name&gt; DOIF &lt;Blockname&gt; {&lt;Ereignisblock: Perlcode mit Ereignis-/Zeittriggern in eckigen Klammern&gt;}</code></ol>
 <br>
-Ein Perlblock wird ausgeführt, wenn dieser bedingt durch <a href="#DOIF_Operanden">Ereignis- und Zeittrigger in eckigen Klammern</a> innerhalb des Blocks, getriggert wird.
-Es wird die vollständige Perl-Syntax unterstützt. Es können beliebig viele Perlblöcke innerhalb eines DOIF-Devices definiert werden. Sie werden unabhängig voneinander durch passende Trigger ausgeführt. Der Name eines Blocks ist optional.<br>
+Ein Ereignisblock wird ausgeführt, wenn dieser bedingt durch <a href="#DOIF_Operanden">Ereignis- und Zeittrigger in eckigen Klammern</a> innerhalb des Blocks, getriggert wird.
+Es wird die vollständige Perl-Syntax unterstützt. Es können beliebig viele Ereignisblöcke innerhalb eines DOIF-Devices definiert werden. Sie werden unabhängig voneinander durch passende Trigger ausgeführt. Der Name eines Ereignisblocks ist optional.<br>
 <br>
 Der Status des Moduls wird nicht vom Modul gesetzt, er kann vom Anwender mit Hilfe der Funktion <code>set_Reading</code> verändert werden, siehe <a href="#DOIF_Spezifische_Perl-Funktionen_im_Perl-Modus">spezifische Perl-Funktionen im Perl-Modus</a>.
 FHEM-Befehle werden durch den Aufruf der Perlfunktion <code>fhem"..."</code> ausgeführt.<br>
@@ -5560,22 +5560,34 @@ Der Benutzer kann mit der Funktion <code>set_Timer/set_Exec</code> beliebig viel
 <br>
 Definitionen im FHEM-Modus der Form:<br>
 <br>
-<code>DOIF (&lt;Bedingung mit Trigger&gt;) (&lt;FHEM-Befehle&gt;) DOELSE (&lt;FHEM-Befehle&gt;)</code><br>
+&nbsp;&nbsp;<code>DOIF (&lt;Bedingung mit Trigger&gt;) (&lt;FHEM-Befehle&gt;) DOELSE (&lt;FHEM-Befehle&gt;)</code><br>
 <br>
 lassen sich wie folgt in Perl-Modus übertragen:<br>
 <br>
-<code>DOIF {if (&lt;Bedingung mit Trigger&gt;) {fhem"&lt;FHEM-Befehle&gt;"} else {fhem"&lt;FHEM-Befehle&gt;"}}</code><br>
+&nbsp;&nbsp;<code>DOIF {if (&lt;Bedingung mit Trigger&gt;) {fhem"&lt;FHEM-Befehle&gt;"} else {fhem"&lt;FHEM-Befehle&gt;"}}</code><br>
 <br>
 Die Bedingungen des FHEM-Modus können ohne Änderungen in Perl-Modus übernommen werden.<br>
 <br>
-Im Perl-Modus können beliebig viele Blöcke definiert werden, die unabhängig von einander durch einen Trigger ausgewertet und zur Ausführung führen können:<br>
+<a name="DOIF_Einfache_Anwendungsbeispiele_Perl"></a>
+<u>Einfache Anwendungsbeispiele (vgl. <a href="#DOIF_Einfache_Anwendungsbeispiele">Anwendungsbeispiele im FHEM-Modus</a>):</u><ol>
+<br>
+<code>define di_rc_tv DOIF {if ([remotecontol:"on"]) {fhem"set tv on"} else {fhem"set tv off"}}</code><br>
+<br>
+<code>define di_clock_radio DOIF {if ([06:30|Mo Di Mi] or [08:30|Do Fr Sa So]) {fhem"set radio on"}} {if ([08:00|Mo Di Mi] or [09:30|Do Fr Sa So]) {fhem"set radio off"}}</code><br>
+<br>
+<code>define di_lamp DOIF {if ([06:00-09:00] and [sensor:brightness] < 40) {fhem"set lamp:FILTER=STATE!=on on"} else {fhem"set lamp:FILTER=STATE!=off off"}}</code><br>
+<br>
+</ol>
+Bemerkung: Im Gegensatz zum FHEM-Modus arbeitet der Perl-Modus ohne Zustandsauswertung, daher muss der Anwender selbst darauf achten, wiederholende Ausführungen zu vermeiden (im oberen Beispiel z.B. mit FILTER-Option)<br>
+<br>
+Es können beliebig viele Ereignisblöcke definiert werden, die unabhängig von einander durch einen Trigger ausgewertet und zur Ausführung führen können:<br>
 <br>
 <code>DOIF<br>
 { if (&lt;Bedingung mit Trigger&gt;) ... }<br>
 { if (&lt;Bedingung mit Trigger&gt;) ... }<br>
 ...</code><br>
 <br>
-Im Perlmodus sind beliebige Hierarchietiefen möglich:<br>
+Es sind beliebige Hierarchietiefen möglich:<br>
 <br>
 <code>DOIF<br>
 { if (&lt;Bedingung&gt;) {<br>
@@ -5587,11 +5599,11 @@ Im Perlmodus sind beliebige Hierarchietiefen möglich:<br>
 &nbsp;&nbsp;}<br>
 }</code><br>
 <br>
-Bemerkung: Innerhalb eines DOIF-Blocks muss mindestens ein Trigger in irgendeiner Bedingung definiert werden, damit der gesamte Block beim passenden Trigger ausgewertet wird.<br>
+Bemerkung: Innerhalb eines Ereignisblocks muss mindestens ein Trigger in irgendeiner Bedingung definiert werden, damit der gesamte Block beim passenden Trigger ausgewertet wird.<br>
 <br>
 <u>Eigene Funktionen</u><br>
 <br>
-Ein besonderer Perlblock ist der Block namens "subs". In diesem Block werden Perlfunktionen definiert, die innerhalb des DOIFs genutzt werden. 
+Ein besonderer Block ist der Block namens "subs". In diesem Block werden Perlfunktionen definiert, die innerhalb des DOIFs genutzt werden. 
 Um eine möglichst hohe Kompatibilität zu Perl sicherzustellen, wird keine DOIF-Syntax in eckigen Klammern unterstützt, insb. gibt es keine Trigger, die den Block ausführen können.<br>
 <br>
 Beispiel:<br>
@@ -5607,20 +5619,9 @@ subs { ## Definition von Perlfunktionen lamp_on und lamp_off<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_Reading("state","off",1);<br>
 &nbsp;&nbsp;}<br>
 }<br>
-{if ([06:00]) {lamp_on()&nbsp;&nbsp;# Um 06:00 Uhr wird die Funktion lamp_on aufgerufen }<br>
-{if ([08:00]) {lamp_off() # Um 08:00 Uhr wird die Funktion lamp_off aufgerufen }<br>
+{if ([06:00]) {lamp_on()}}&nbsp;&nbsp;## Um 06:00 Uhr wird die Funktion lamp_on aufgerufen<br>
+{if ([08:00]) {lamp_off()}} ## Um 08:00 Uhr wird die Funktion lamp_off aufgerufen<br>
 </code><br>
-<a name="DOIF_Einfache_Anwendungsbeispiele_Perl"></a>
-<u>Einfache Anwendungsbeispiele (vgl. <a href="#DOIF_Einfache_Anwendungsbeispiele">Anwendungsbeispiele im FHEM-Modus</a>):</u><ol>
-<br>
-<code>define di_rc_tv DOIF {if ([remotecontol:"on"]) {fhem"set tv on"} else {fhem"set tv off"}}</code><br>
-<br>
-<code>define di_clock_radio DOIF {if ([06:30|Mo Di Mi] or [08:30|Do Fr Sa So]) {fhem"set radio on"}} {if ([08:00|Mo Di Mi] or [09:30|Do Fr Sa So]) {fhem"set radio off"}}</code><br>
-<br>
-<code>define di_lamp DOIF {if ([06:00-09:00] and [sensor:brightness] < 40) {fhem"set lamp:FILTER=STATE!=on on"} else {fhem"set lamp:FILTER=STATE!=off off"}}</code><br>
-<br>
-</ol>
-Bemerkung: Im Gegensatz zum FHEM-Modus arbeitet der Perl-Modus ohne Zustandsauswertung, daher muss der Anwender selbst darauf achten, wiederholende Ausführungen zu vermeiden (im oberen Beispiel z.B. mit FILTER-Option)<br>
 <br>
 <a name="DOIF_Spezifische_Perl-Funktionen_im_Perl-Modus"></a>
 <b>Spezifische Perl-Funktionen im Perl-Modus</b><br>
@@ -5637,7 +5638,7 @@ Laufenden Timer löschen: <code><b>del_Timer(&lt;TimerEvent&gt;)</code></b><br>
 <br>
 Beispiel: Das Event "hello" 30 Sekunden verzögert auslösen:<br>
 <br>
-<code>set_Time("event",30,"hello");</code><br>
+<code>set_Time("hell",30);</code><br>
 <br>
 <u>Ausführungstimer</u><br>
 <br>
@@ -5659,7 +5660,7 @@ Reading schreiben: <code><b>set_Reading(&lt;readingName&gt;,&lt;content&gt;,&lt;
 <br>
 <u>init-Block</u><br>
 <br>
-Wird ein Perlblock mit dem Namen "init" benannt, so wird er ausgeführt, nachdem das FHEM-System hochgefahren wurde. Er bietet sich insb. an, um Instanzvariablen des Moduls vorzubelegen.<br>
+Wird ein Perlblock mit dem Namen "init" benannt, so wird dieser Block beim Systemstart ausgeführt. Er bietet sich insb. an, um Instanzvariablen des Moduls vorzubelegen.<br>
 <br>
 <u>Instanzvariablen</u><br>
 <br>
