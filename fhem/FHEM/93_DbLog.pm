@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 3.12.1     19.09.2018       use Time::Local (forum:#91285)
 # 3.12.0     04.09.2018       corrected SVG-select (https://forum.fhem.de/index.php/topic,65860.msg815640.html#msg815640)
 # 3.11.0     02.09.2018       reduceLog, reduceLogNbl - optional "days newer than" part added
 # 3.10.10    05.08.2018       commandref revised reducelogNbl
@@ -205,10 +206,11 @@ eval "use DBI;1" or my $DbLogMMDBI = "DBI";
 use Data::Dumper;
 use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
+use Time::Local;
 use Encode qw(encode_utf8);
 no if $] >= 5.017011, warnings => 'experimental::smartmatch'; 
 
-my $DbLogVersion = "3.12.0";
+my $DbLogVersion = "3.12.1";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
