@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.3.001
+#  Version 4.3.002
 #
 #  Module for communication between FHEM and Homematic CCU2.
 #
@@ -25,6 +25,7 @@
 #  set <name> execute <ccu_program>
 #  set <name> importdefaults <filename>
 #  set <name> hmscript {<scriptfile>|!<function>|'['<code>']'} [dump] [<parname>=<value> [...]]
+#  set <name> rpcregister [{all|<interface>}]
 #  set <name> rpcserver {on|off|restart}
 #  set <name> var [<type>] <name> <value> [<parameter>=<value> [...]]
 #
@@ -37,7 +38,7 @@
 #                                        [defattr] [duplicates] [save] [<attr>=<val> [...]]}]
 #  get <name> dump {devtypes|datapoints} [<filter>]
 #  get <name> dutycycle
-#  get <name> exportdefaults {filename}
+#  get <name> exportdefaults {filename} [csv]
 #  get <name> firmware [{type-expr}|full]
 #  get <name> parfile [<parfile>]
 #  get <name> rpcevents
@@ -245,6 +246,7 @@ sub HMCCU_AggregationRules ($$);
 
 # Handling of default attributes
 sub HMCCU_ExportDefaults ($);
+sub HMCCU_ExportDefaultsCSV ($);
 sub HMCCU_ImportDefaults ($);
 sub HMCCU_FindDefaults ($$);
 sub HMCCU_SetDefaults ($);
@@ -313,6 +315,7 @@ sub HMCCU_IODeviceStates ();
 sub HMCCU_IsFlag ($$);
 
 # Handle interfaces, devices and channels
+sub HMCCU_CreateDevice ($$$$$);
 sub HMCCU_FormatDeviceInfo ($);
 sub HMCCU_GetAddress ($$$$);
 sub HMCCU_GetCCUDeviceParam ($$);
@@ -489,7 +492,7 @@ sub HMCCU_Define ($$)
 	if ($hash->{ccustate} eq 'active') {
 		# If CCU is alive read devices, channels, interfaces and groups
 		HMCCU_Log ($hash, 1, "HMCCU: Initializing device", 0);
-		HMCCU_InitDevice ($hash);
+		$rc = HMCCU_InitDevice ($hash);
 	}
 	
 	if ($hash->{ccustate} ne 'active' || $rc > 0) {
@@ -848,6 +851,56 @@ sub HMCCU_ExportDefaults ($)
 		foreach my $a (sort keys %{$HMCCU_DEV_DEFAULTS->{$t}}) {
 			print DEFFILE "$a=".$HMCCU_DEV_DEFAULTS->{$t}{$a}."\n";
 		}
+	}
+
+	close (DEFFILE);
+
+	return 1;
+}
+
+######################################################################
+# Export default attributes as CSV file.
+######################################################################
+
+sub HMCCU_ExportDefaultsCSV ($)
+{
+	my ($filename) = @_;
+	
+	my %attrlist = (
+		'_type' => '', '_description' => '', '_channels' => '',
+		'ccureadingfilter' => '', 'ccureadingname' => '', 'ccuscaleval' => '', 'cmdIcon' => '', 'controldatapoint' => '',
+		'eventMap' => '', 'event-on-change-reading' => '', 'event-on-update-reading' => '', 
+		'genericDeviceType' => '',
+		'hmstatevals' => '',
+		'statedatapoint' => '', 'statevals' => '', 'stripnumber' => '', 'substexcl' => '', 'substitute' => '',
+		'webCmd' => '', 'widgetOverride' => ''
+	);
+	
+	return 0 if (!open (DEFFILE, ">$filename"));
+
+	# Write header
+	print DEFFILE "_flag,".join (',', sort keys %attrlist)."\n";
+
+	# Write channel configurations
+	foreach my $t (keys %{$HMCCU_CHN_DEFAULTS}) {
+		print DEFFILE "C";
+		$attrlist{'_type'} = $t;
+		foreach $a (sort keys %attrlist) {
+			my $v = exists ($HMCCU_CHN_DEFAULTS->{$t}{$a}) ? $HMCCU_CHN_DEFAULTS->{$t}{$a} : $attrlist{$a};
+			print DEFFILE ",\"$v\"";
+		}
+		print DEFFILE "\n";
+	}
+
+	# Write device configurations
+	foreach my $t (keys %{$HMCCU_DEV_DEFAULTS}) {
+		print DEFFILE "D";
+		$attrlist{'_type'} = $t;
+		foreach $a (sort keys %attrlist) {
+			my $v = exists ($HMCCU_DEV_DEFAULTS->{$t}{$a}) ? $HMCCU_DEV_DEFAULTS->{$t}{$a} : $attrlist{$a};
+			print DEFFILE ",\"$v\"";
+		}
+		print DEFFILE "\n";
 	}
 
 	close (DEFFILE);
@@ -1327,7 +1380,12 @@ sub HMCCU_Set ($@)
 	my $name = shift @$a;
 	my $opt = shift @$a;
 	my $options = "var delete execute hmscript cleardefaults:noArg defaults:noArg ".
-		"importdefaults rpcserver:on,off,restart datapoint ackmessages:noArg";
+		"importdefaults rpcregister:all rpcserver:on,off,restart datapoint ackmessages:noArg";
+	my @ifList = HMCCU_GetRPCInterfaceList ($hash);
+	if (scalar (@ifList) > 0) {
+		my $ifStr = join (',', @ifList);
+		$options =~ s/register:all/rpcregister:all,$ifStr/;
+	}
 	my $usage = "HMCCU: Unknown argument $opt, choose one of $options";
 	my $host = $hash->{host};
 
@@ -1341,6 +1399,7 @@ sub HMCCU_Set ($@)
 	my $ccureqtimeout = AttrVal ($name, "ccuReqTimeout", $HMCCU_TIMEOUT_REQUEST);
 	my $readingformat = HMCCU_GetAttrReadingFormat ($hash, $hash);
 	my $substitute = HMCCU_GetAttrSubstitute ($hash, $hash);
+	my $result;
 
 	# Add program names to command execute
 	if (exists ($hash->{hmccu}{prg})) {
@@ -1361,7 +1420,6 @@ sub HMCCU_Set ($@)
 		my $objname = shift @$a;
 		my $objvalue = shift @$a;
 		$usage = "set $name $opt [{'bool'|'list'|'number'|'test'}] variable value [param=value [...]]";
-		my $result;
 		
 		return HMCCU_SetError ($hash, $usage) if (!defined ($objvalue));
 
@@ -1395,7 +1453,7 @@ sub HMCCU_Set ($@)
 		return HMCCU_SetError ($hash, $usage)
 			if (!defined ($objname) || $objtype !~ /^(OT_VARDP|OT_DEVICE)$/);
 		
-		my $result = HMCCU_HMScriptExt ($hash, "!DeleteObject", { name => $objname, type => $objtype });
+		$result = HMCCU_HMScriptExt ($hash, "!DeleteObject", { name => $objname, type => $objtype });
 
 		return HMCCU_SetError ($hash, -2) if ($result =~ /^ERROR:.*/);
 		return HMCCU_SetState ($hash, "OK");
@@ -1468,6 +1526,25 @@ sub HMCCU_Set ($@)
 		HMCCU_UpdateMultipleDevices ($hash, \%objects) if ($objcount > 0);
 
 		return defined ($dump) ? $response : undef;
+	}
+	elsif ($opt eq 'rpcregister') {
+		return HMCCU_SetError ($hash, "HMCCU: Command not supported by internal RPC server")
+			if ($ccuflags !~ /procrpc/);
+			
+		my $ifName = shift @$a;
+		$result = '';
+		@ifList = (defined ($ifName) && $ifName ne 'all') ? ($ifName) : HMCCU_GetRPCInterfaceList ($hash);
+		
+		foreach my $i (@ifList) {
+			my ($rpcdev, $save) = HMCCU_GetRPCDevice ($hash, 0, $i);
+			if ($rpcdev eq '') {
+				Log3 $name, 2, "HMCCU: Can't find HMCCURPCPROC device for interface $i";
+				next;
+			}
+			my $res = AnalyzeCommandChain (undef, "set $rpcdev register");
+			$result .= $res if (defined ($res));
+		}
+		return HMCCU_SetState ($hash, "OK", $result);
 	}
 	elsif ($opt eq 'rpcserver') {
 		my $action = shift @$a;
@@ -1884,10 +1961,14 @@ sub HMCCU_Get ($@)
 	}
 	elsif ($opt eq 'exportdefaults') {
 		my $filename = shift @$a;
-		$usage = "Usage: get $name $opt filename";		
-		return HMCCU_SetError ($hash, $usage) if (!defined ($filename));
+		my $csv = shift @$a;
 		
-		my $rc = HMCCU_ExportDefaults ($filename);
+		$csv = 'default' if (!defined ($csv));
+		$usage = "Usage: get $name $opt filename [{csv|default}]";		
+		return HMCCU_SetError ($hash, $usage) if (!defined ($filename));
+		return HMCCU_SetError ($hash, $usage) if ($csv !~ /^(default|csv)$/);
+
+		my $rc = $csv ne 'csv' ? HMCCU_ExportDefaults ($filename) : HMCCU_ExportDefaultsCSV ($filename);
 		return HMCCU_SetError ($hash, -16) if ($rc == 0);
 		return HMCCU_SetState ($hash, "OK", "Default attributes written to $filename");
 	}
@@ -2688,7 +2769,7 @@ sub HMCCU_UpdateClients ($$$$$)
 				}
 				else {
 					Log3 $fhname, 2, "HMCCU: Update of device ".$ch->{ccuaddr}." failed"
-						if ($ch->{ccuif} ne 'VirtualDevices');
+						if ($ch->{ccuif} ne 'VirtualDevices' && $ch->{ccuif} ne 'fhem');
 				}
 				$c_err++;
 			}
@@ -2699,6 +2780,61 @@ sub HMCCU_UpdateClients ($$$$$)
 	}
 
 	return ($c_ok, $c_err);
+}
+
+##########################################################################
+# Create virtual device in internal device tables.
+# If sourceAddr is specified, parameter newType will be ignored.
+# Return 0 on success or error code:
+# 1 = newType not defined
+# 2 = Device with newType not found in internal tables
+##########################################################################
+
+sub HMCCU_CreateDevice ($$$$$)
+{
+	my ($hash, $newAddr, $newName, $newType, $sourceAddr) = @_;
+	
+	my %object;
+	
+	if (!defined ($sourceAddr)) {
+		# Search for type in device table
+		return 1 if (!defined ($newType));
+		for my $da (keys %{$hash->{hmccu}{dev}}) {
+			if ($hash->{hmccu}{dev}{$da}{type} eq $newType) {
+				$sourceAddr = $da;
+				last;
+			}
+		}
+		return 2 if (!defined ($sourceAddr));
+	}
+	else {
+		$newType = $hash->{hmccu}{dev}{$sourceAddr}{type};
+	}
+	
+	# Device attributes
+	$object{$newAddr}{flag}      = 'N';
+	$object{$newAddr}{addtype}   = 'dev';
+	$object{$newAddr}{channels}  = $hash->{hmccu}{dev}{$sourceAddr}{channels};
+	$object{$newAddr}{name}      = $newName;
+	$object{$newAddr}{type}      = $newType;
+   $object{$newAddr}{interface} = 'fhem';
+	$object{$newAddr}{chndir}    = 0;
+	
+	# Channel attributes
+	for (my $chn=0; $chn<$object{$newAddr}{channels}; $chn++) {
+		my $ca = "$newAddr:$chn";
+		$object{$ca}{flag}     = 'N';
+		$object{$ca}{addtype}  = 'chn';
+		$object{$ca}{channels} = 1;
+		$object{$ca}{name}     = "$newName:$chn";
+		$object{$ca}{chndir}   = $hash->{hmccu}{dev}{"$sourceAddr:$chn"}{chndir};
+		$object{$ca}{rxmode}   = $hash->{hmccu}{dev}{"$sourceAddr:$chn"}{rxmode};
+		$object{$ca}{usetype}  = $hash->{hmccu}{dev}{"$sourceAddr:$chn"}{usetype};
+	}
+	
+	HMCCU_UpdateDeviceTable ($hash, \%object);
+		
+	return 0;
 }
 
 ##########################################################################
@@ -2768,9 +2904,11 @@ sub HMCCU_UpdateDeviceTable ($$)
 				if (defined ($devices->{$da}{rxmode}));
 			$hash->{hmccu}{dev}{$da}{chndir}    = $devices->{$da}{chndir}
 				if (defined ($devices->{$da}{chndir}));
-			$hash->{hmccu}{adr}{$nm}{address}   = $da;
-			$hash->{hmccu}{adr}{$nm}{addtype}   = $hash->{hmccu}{dev}{$da}{addtype};
-			$hash->{hmccu}{adr}{$nm}{valid}     = 1 if (defined ($nm));
+			if (defined ($nm)) {
+				$hash->{hmccu}{adr}{$nm}{address}   = $da;
+				$hash->{hmccu}{adr}{$nm}{addtype}   = $hash->{hmccu}{dev}{$da}{addtype};
+				$hash->{hmccu}{adr}{$nm}{valid}     = 1;
+			}
 		}
 		elsif ($devices->{$da}{flag} eq 'D' && exists ($hash->{hmccu}{dev}{$da})) {
 			# Device deleted, mark as invalid
@@ -2932,7 +3070,7 @@ sub HMCCU_UpdateSingleDevice ($$$)
 	
 	# Build device list including virtual devices
 	my @grplist = ($cltname);
-	my @virlist = HMCCU_FindClientDevices ($ccuhash, "HMCCUDEV", undef, "ccuif=VirtualDevices");
+	my @virlist = HMCCU_FindClientDevices ($ccuhash, "HMCCUDEV", undef, "ccuif=(VirtualDevices|fhem)");
 	foreach my $vd (@virlist) {
 		my $vh = $defs{$vd};
 		next if (!defined ($vh->{ccugroup}));
@@ -2974,7 +3112,7 @@ sub HMCCU_UpdateSingleDevice ($$$)
 
 		my @devlist = ($ch->{ccuaddr});
 		push @devlist, split (",", $ch->{ccugroup})
-			if ($ch->{ccuif} eq 'VirtualDevices' && exists ($ch->{ccugroup}));
+			if (($ch->{ccuif} eq 'VirtualDevices' || $ch->{ccuif} eq 'fhem') && exists ($ch->{ccugroup}));
 				
 		readingsBeginUpdate ($ch);
 		
@@ -3730,27 +3868,39 @@ sub HMCCU_GetDeviceInfo ($$$)
 	my ($hash, $device, $ccuget) = @_;
 	my $name = $hash->{NAME};
 	my $devname = '';
+	my $response = '';
 
 	my $hmccu_hash = HMCCU_GetHash ($hash);
 	return '' if (!defined ($hmccu_hash));
 
-	$ccuget = HMCCU_GetAttribute ($hmccu_hash, $hash, 'ccuget', 'Value') if ($ccuget eq 'Attr');
-
-	my ($int, $add, $chn, $dpt, $nam, $flags) = HMCCU_ParseObject ($hmccu_hash, $device, 0);
-	if ($flags == $HMCCU_FLAG_ADDRESS) {
-		$devname = HMCCU_GetDeviceName ($hmccu_hash, $add, '');
-		return '' if ($devname eq '');
+	my @devlist;
+	if ($hash->{ccuif} eq 'fhem' && exists ($hash->{ccugroup})) {
+		push @devlist, split (",", $hash->{ccugroup}); 
 	}
 	else {
-		$devname = $nam;
+		push @devlist, $device;
 	}
+	return '' if (scalar (@devlist) == 0);
+	
+	$ccuget = HMCCU_GetAttribute ($hmccu_hash, $hash, 'ccuget', 'Value') if ($ccuget eq 'Attr');
 
-	my $response = HMCCU_HMScriptExt ($hmccu_hash, "!GetDeviceInfo", 
-		{ devname => $devname, ccuget => $ccuget });
-	HMCCU_Trace ($hash, 2, undef,
-		"Device=$device Devname=$devname<br>".
-		"Script response = \n".$response."<br>".
-		"Script = GetDeviceInfo");
+	for my $dev (@devlist) {
+		my ($int, $add, $chn, $dpt, $nam, $flags) = HMCCU_ParseObject ($hmccu_hash, $dev, 0);
+		if ($flags == $HMCCU_FLAG_ADDRESS) {
+			$devname = HMCCU_GetDeviceName ($hmccu_hash, $add, '');
+			return '' if ($devname eq '');
+		}
+		else {
+			$devname = $nam;
+		}
+
+		$response .= HMCCU_HMScriptExt ($hmccu_hash, "!GetDeviceInfo", 
+			{ devname => $devname, ccuget => $ccuget });
+		HMCCU_Trace ($hash, 2, undef,
+			"Device=$devname Devname=$devname<br>".
+			"Script response = \n".$response."<br>".
+			"Script = GetDeviceInfo");
+	}
 
 	return $response;
 }
@@ -4786,7 +4936,8 @@ sub HMCCU_GetRPCDevice ($$$)
 			if (!defined ($ifname));
 		$rpcdevname = HMCCU_GetRPCServerInfo ($hash, $ifname, 'device');
 		$rpchost = HMCCU_GetRPCServerInfo ($hash, $ifname, 'host');
-		return ($rpcdevname, 0) if (defined ($rpcdevname) || !defined ($rpchost));
+		return ($rpcdevname, 0) if (defined ($rpcdevname));
+		return ('', 0) if (!defined ($rpchost));
 #		$rpcdevtype = 'HMCCURPCPROC';
 	}
 # 	elsif ($ccuflags =~ /extrpc/) {
@@ -6035,11 +6186,12 @@ sub HMCCU_GetUpdate ($$$)
 	elsif (HMCCU_IsValidDevice ($hmccu_hash, $addr, $HMCCU_FL_ADDRESS)) {
 		$nam = HMCCU_GetDeviceName ($hmccu_hash, $addr, '');
 		return -1 if ($nam eq '');
-		$list = $nam;
+		$list = $nam if ($cl_hash->{ccuif} ne 'fhem');
 		$script = "!GetDatapointsByDevice";
 
 		# Consider members of group device
-		if ($type eq 'HMCCUDEV' && $cl_hash->{ccuif} eq 'VirtualDevices' &&
+		if ($type eq 'HMCCUDEV' &&
+			($cl_hash->{ccuif} eq 'VirtualDevices' || $cl_hash->{ccuif} eq 'fhem') &&
 			exists ($cl_hash->{ccugroup})) {
 			foreach my $gd (split (",", $cl_hash->{ccugroup})) {
 				$nam = HMCCU_GetDeviceName ($hmccu_hash, $gd, '');
@@ -6076,6 +6228,21 @@ sub HMCCU_GetUpdate ($$$)
 		}
 		next if ($chn eq '');
 		$events{$add}{$chn}{$dpt} = $value;
+	}
+	
+	if ($cl_hash->{ccuif} eq 'fhem') {
+		# Calculate datapoints of virtual group device
+		if ($cl_hash->{ccutype} ne 'n/a') {
+			foreach my $da (split (",", $cl_hash->{ccugroup})) {
+				foreach my $cn (keys %{$events{$da}}) {
+					foreach my $dp (keys %{$events{$da}{$cn}}) {
+						if (defined ($events{$da}{$cn}{$dp})) {
+							$events{$cl_hash->{ccuaddr}}{$cn}{$dp} = $events{$da}{$cn}{$dp}
+						}
+					}
+				}
+			}
+		}
 	}
 	
 	HMCCU_UpdateSingleDevice ($hmccu_hash, $cl_hash, \%events);
@@ -7373,6 +7540,9 @@ sub HMCCU_CCURPC_ListDevicesCB ($$)
       <li><b>set &lt;name&gt; importdefaults &lt;filename&gt;</b><br/>
       	Import default attributes from file.
       </li><br/>
+      <li><b>set &lt;name&gt; rpcregister [{all | &lt;interface&gt;}]</b><br/>
+      	Register RPC servers at CCU.
+      </li><br/>
       <li><b>set &lt;name&gt; rpcserver {on | off | restart}</b><br/>
          Start, stop or restart RPC server(s). This command executed with option 'on'
          will fork a RPC server process for each RPC interface defined in attribute 'rpcinterfaces'.
@@ -7441,7 +7611,7 @@ sub HMCCU_CCURPC_ListDevicesCB ($$)
          iface_conn_n = interface connection state (1=connected, 0=disconnected)<br/>
          iface_ducy_n = duty cycle of interface (0-100)
       </li><br/>
-      <li><b>get &lt;name&gt; exportdefaults &lt;filename&gt;</b><br/>
+      <li><b>get &lt;name&gt; exportdefaults &lt;filename&gt; [{<u>default</u>|csv}]</b><br/>
       	Export default attributes into file.
       </li><br/>
       <li><b>get &lt;name&gt; firmware [{&lt;type-expr&gt; | full}]</b><br/>

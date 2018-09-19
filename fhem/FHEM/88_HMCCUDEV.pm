@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.3.002
+#  Version 4.3.003
 #
 #  (c) 2018 zap (zap01 <at> t-online <dot> de)
 #
@@ -108,6 +108,16 @@ sub HMCCUDEV_Define ($@)
 		"['readonly'] ['defaults'] [iodev={iodev-name}] ".
 		"[{groupexp=regexp|group={device|channel}[,...]]";
 	return $usage if (scalar (@$a) < 3);
+	
+	my @errmsg = (
+		"OK",
+		"Invalid or unknown CCU device name or address",
+		"Can't assign I/O device",
+		"No devices in group",
+		"No matching CCU devices found",
+		"Type of virtual device not defined",
+		"Device type not found"
+	);
 
 	my $devname = shift @$a;
 	my $devtype = shift @$a;
@@ -144,22 +154,6 @@ sub HMCCUDEV_Define ($@)
 		# The following call will fail during FHEM start if CCU is not ready
 		$hmccu_hash = $devspec eq 'virtual' ? HMCCU_GetHash (0) : HMCCU_FindIODevice ($devspec);
 	}
-		
-	if ($devspec eq 'virtual') {
-		# Virtual device FHEM only
-		my $no = 0;
-		foreach my $d (sort keys %defs) {
-			my $ch = $defs{$d};
-			next if (!exists ($ch->{TYPE}));
-			next if ($ch->{TYPE} ne 'HMCCUDEV' || $d eq $name);
-			next if ($ch->{ccuif} ne 'VirtualDevices' || $ch->{ccuname} ne 'none');
-			$no++;
-		}
-		$hash->{ccuif} = "VirtualDevices";
-		$hash->{ccuaddr} = sprintf ("VIR%07d", $no+1);
-		$hash->{ccuname} = "none";
-		$hash->{statevals} = 'readonly';
-	}
 	
 	if ($init_done) {
 		# Interactive define command while CCU not ready
@@ -185,9 +179,7 @@ sub HMCCUDEV_Define ($@)
 
 	# Initialize FHEM device, set IO device
 	my $rc = HMCCUDEV_InitDevice ($hmccu_hash, $hash);
-	return "Invalid or unknown CCU device name or address" if ($rc == 1);
-	return "Can't assign I/O device ".$hmccu_hash->{NAME} if ($rc == 2);
-	return "No devices in group" if ($rc == 3);
+	return $errmsg[$rc] if ($rc > 0);
 
 	return undef;
 }
@@ -199,64 +191,107 @@ sub HMCCUDEV_Define ($@)
 # 1 = Invalid channel name or address
 # 2 = Cannot assign IO device
 # 3 = No devices in group
+# 4 = No matching CCU devices found
+# 5 = Type of virtual device not defined
+# 6 = Device type not found
 ######################################################################
 
 sub HMCCUDEV_InitDevice ($$)
 {
 	my ($hmccu_hash, $dev_hash) = @_;
+	my $name = $dev_hash->{NAME};
 	my $devspec = $dev_hash->{hmccu}{devspec};
 	my $gdcount = 0;
 	my $gdname = $devspec;
 	
-	return 1 if (! HMCCU_IsValidDevice ($hmccu_hash, $devspec, 7));
+	if ($devspec eq 'virtual') {
+		# Virtual device FHEM only, search for free address
+		my $no = 0;
+		foreach my $d (sort keys %defs) {
+			my $ch = $defs{$d};
+			next if (!exists ($ch->{TYPE}));
+			next if ($ch->{TYPE} ne 'HMCCUDEV' || $d eq $name);
+			next if ($ch->{ccuif} ne 'fhem' || $ch->{ccuname} ne 'virtual');
+			$no++;
+		}
+		$dev_hash->{ccuif}     = 'fhem';
+		$dev_hash->{ccuaddr}   = sprintf ("VIR%07d", $no+1);
+		$dev_hash->{ccuname}   = 'virtual';
+	}
+	else {
+		return 1 if (!HMCCU_IsValidDevice ($hmccu_hash, $devspec, 7));
 
-	my ($di, $da, $dn, $dt, $dc) = HMCCU_GetCCUDeviceParam ($hmccu_hash, $devspec);
-	return 1 if (!defined ($da));
-	$gdname = $dn;
+		my ($di, $da, $dn, $dt, $dc) = HMCCU_GetCCUDeviceParam ($hmccu_hash, $devspec);
+		return 1 if (!defined ($da));
+		$gdname = $dn;
+
+		$dev_hash->{ccuif}    = $di;
+		$dev_hash->{ccuaddr}  = $da;
+		$dev_hash->{ccuname}  = $dn;
+		$dev_hash->{ccutype}  = $dt;
+		$dev_hash->{channels} = $dc;
+	}
 	
-	$dev_hash->{ccuif} = $di;
-	$dev_hash->{ccuaddr} = $da;
-	$dev_hash->{ccuname} = $dn;
-	$dev_hash->{ccutype} = $dt;
-	$dev_hash->{channels} = $dc;
-
 	# Parse group options
-	if ($dev_hash->{ccuif} eq "VirtualDevices") {
+	if ($dev_hash->{ccuif} eq 'VirtualDevices' || $dev_hash->{ccuif} eq 'fhem') {
+		my @devlist = ();
 		if (exists ($dev_hash->{hmccu}{groupexp})) {
-			my @devlist;
+			# Group devices specified by name expression
 			$gdcount = HMCCU_GetMatchingDevices ($hmccu_hash, $dev_hash->{hmccu}{groupexp}, 'dev', \@devlist);
-			return "No matching CCU devices found" if ($gdcount == 0);
-			$dev_hash->{ccugroup} = join (',', @devlist);
+			return 4 if ($gdcount == 0);
 		}
 		elsif (exists ($dev_hash->{hmccu}{group})) {
+			# Group devices specified by comma separated name list
 			my @gdevlist = split (",", $dev_hash->{hmccu}{group});
 			$dev_hash->{ccugroup} = '' if (@gdevlist > 0);
 			foreach my $gd (@gdevlist) {
 				my ($gda, $gdc, $gdo) = ('', '', '', '');
 
-				return "Invalid device or channel $gd" if (!HMCCU_IsValidDevice ($hmccu_hash, $gd, 7));
+				return 1 if (!HMCCU_IsValidDevice ($hmccu_hash, $gd, 7));
 
 				($gda, $gdc) = HMCCU_GetAddress ($hmccu_hash, $gd, '', '');
 				$gdo = $gda;
 				$gdo .= ':'.$gdc if ($gdc ne '');
-
-				if (exists ($dev_hash->{ccugroup}) && $dev_hash->{ccugroup} ne '') {
-					$dev_hash->{ccugroup} .= ",".$gdo;
-				}
-				else {
-					$dev_hash->{ccugroup} = $gdo;
-				}
-				
+				push @devlist, $gdo;
 				$gdcount++;
 			}
 		}
 		else {
-			my @devlist = HMCCU_GetGroupMembers ($hmccu_hash, $gdname);
+			# Group specified by CCU virtual group name
+			@devlist = HMCCU_GetGroupMembers ($hmccu_hash, $gdname);
 			$gdcount = scalar (@devlist);
-			$dev_hash->{ccugroup} = join (',', @devlist);
+			return 5 if ($gdcount == 0);
 		}
 
 		return 3 if ($gdcount == 0);
+		
+		$dev_hash->{ccugroup} = join (',', @devlist);
+		if ($devspec eq 'virtual') {
+			my $dev = shift @devlist;
+			my $devtype = HMCCU_GetDeviceType ($hmccu_hash, $dev, 'n/a');
+			my $devna = $devtype eq 'n/a' ? 1 : 0;
+			for my $d (@devlist) {
+				if (HMCCU_GetDeviceType ($hmccu_hash, $d, 'n/a') ne $devtype) {
+					$devna = 1;
+					last;
+				}
+			}
+			
+			my $rc = 0;
+			if ($devna) {
+				$dev_hash->{ccutype} = 'n/a';
+				$dev_hash->{statevals} = 'readonly';
+				$rc = HMCCU_CreateDevice ($hmccu_hash, $dev_hash->{ccuaddr}, $name, undef, $dev); 
+			}
+			else {
+				$dev_hash->{ccutype} = $devtype;
+				$rc = HMCCU_CreateDevice ($hmccu_hash, $dev_hash->{ccuaddr}, $name, $devtype, $dev); 
+			}
+			return $rc+4 if ($rc > 0);
+						
+			# Set default attributes
+			$attr{$name}{ccureadingformat} = 'name';
+		}
 	}
 
 	# Inform HMCCU device about client device
@@ -642,7 +677,7 @@ sub HMCCUDEV_Get ($@)
 	my $result = '';
 	my $rc;
 
-	if ($ccuif eq "VirtualDevices" && $hash->{ccuname} eq "none" && $opt ne 'update') {
+	if ($ccuif eq "VirtualDevices" && $hash->{ccuname} eq "virtual" && $opt ne 'update') {
 		return "HMCCUDEV: Unknown argument $opt, choose one of update:noArg";
 	}
 
@@ -688,19 +723,19 @@ sub HMCCUDEV_Get ($@)
 			return HMCCU_SetError ($hash, "Usage: get $name update [{'State'|'Value'}]");
 		}
 
-		if ($hash->{ccuname} ne 'none') {
+		if ($hash->{ccuname} ne 'virtual') {
 			$rc = HMCCU_GetUpdate ($hash, $ccuaddr, $ccuget);
 			return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		}
 
 		# Update other devices belonging to group
-		if ($hash->{ccuif} eq "VirtualDevices" && exists ($hash->{ccugroup})) {
-			my @vdevs = split (",", $hash->{ccugroup});
-			foreach my $vd (@vdevs) {
-				$rc = HMCCU_GetUpdate ($hash, $vd, $ccuget);
-				return HMCCU_SetError ($hash, $rc) if ($rc < 0);
-			}
-		}
+# 		if ($hash->{ccuif} eq "VirtualDevices" && exists ($hash->{ccugroup})) {
+# 			my @vdevs = split (",", $hash->{ccugroup});
+# 			foreach my $vd (@vdevs) {
+# 				$rc = HMCCU_GetUpdate ($hash, $vd, $ccuget);
+# 				return HMCCU_SetError ($hash, $rc) if ($rc < 0);
+# 			}
+# 		}
 
 		return undef;
 	}

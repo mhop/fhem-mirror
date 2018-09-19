@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.2.005
+#  Version 4.3
 #
 #  Configuration parameters for HomeMatic devices.
 #
@@ -128,6 +128,21 @@ use vars qw(%HMCCU_SCRIPTS);
 	stripnumber      => 1,
 	substexcl        => "control",
 	substitute       => "ERROR_REDUCED,ERROR_OVERHEAT!(0|false):no,(1|true):yes;LEVEL!#0-0:off,#1-100:on;DIRECTION!0:none,1:up,2:down,3:undefined",
+	webCmd           => "control:on:off",
+	widgetOverride   => "control:slider,0,10,100"	
+	},
+	"HmIP-BDT" => {
+	_description     => "Dimmaktor",
+	_channels        => "4",
+	ccureadingfilter => "(ERROR_CODE|ERROR_OVERHEAT|ACTUAL_TEMPERATURE|ACTIVITY_STATE|LEVEL)",
+	ccuscaleval      => "LEVEL:0:1:0:100",
+	controldatapoint => "LEVEL",
+	hmstatevals      => "ACTUAL_TEMPERATURE_STATUS!2:tempOverflow,3:tempUnderflow;ERROR_OVERHEAT!(1|true):overheat",
+	statedatapoint   => "LEVEL",
+	statevals        => "on:100,off:0",
+	stripnumber      => 1,
+	substexcl        => "control",
+	substitute       => "LEVEL!#0-0:off,#1-100:on;ACTIVITY_STATE!0:unknown,1:up,2:down,3:stop;ERROR_OVERHEAT!(0|false):no,(1|true):yes;ACTUAL_TEMPERATURE_STATUS!0:normal,1:unknown,2:overflow,3:underflow",
 	webCmd           => "control:on:off",
 	widgetOverride   => "control:slider,0,10,100"	
 	},
@@ -275,6 +290,23 @@ use vars qw(%HMCCU_SCRIPTS);
 	substitute       => "LEVEL!#0-0:closed,#100-100:open;DIRECTION!0:stop,1:up,2:down,3:undefined;WORKING!(0|false):no,(1|true):yes",
 	webCmd           => "control:up:stop:down",
 	widgetOverride   => "control:slider,0,10,100"
+	},
+	"HmIP-BROLL" => {
+	_description     => "Rollladenaktor",
+	_channels        => "4",
+	ccureadingfilter => "(ERROR_CODE|ERROR_OVERHEAT|ACTUAL_TEMPERATURE|LEVEL|ACTIVITY_STATE)",
+	ccureadingname   => "LEVEL:+pct",
+	ccuscaleval      => "LEVEL:0:1:0:100",
+	cmdIcon          => "up:fts_shutter_up stop:fts_shutter_manual down:fts_shutter_down",
+	controldatapoint => "LEVEL",
+	hmstatevals      => "ACTUAL_TEMPERATURE_STATUS!2:tempOverflow,3:tempUnderflow;ERROR_OVERHEAT!(1|true):overheat",
+	eventMap         => "/datapoint STOP true:stop/datapoint LEVEL 0:down/datapoint LEVEL 100:up/",
+	statedatapoint   => "LEVEL",
+	stripnumber      => 1,
+	substexcl        => "control|pct",
+	substitute       => "LEVEL!#0-0:closed,#100-100:open;ACTIVITY_STATE!0:unknown,1:up,2:down,3:stop;ERROR_OVERHEAT!(0|false):no,(1|true):yes;ACTUAL_TEMPERATURE_STATUS!0:normal,1:unknown,2:overflow,3:underflow",
+	webCmd           => "control:up:stop:down",
+	widgetOverride   => "control:slider,0,10,100"	
 	},
 	"HM-WDS40-TH-I|HM-WDS10-TH-O|HM-WDS20-TH-O|IS-WDS-TH-OD-S-R3|ASH550I|ASH550" => {
 	_description     => "Temperatur/Luftfeuchte Sensor",
@@ -504,7 +536,8 @@ use vars qw(%HMCCU_SCRIPTS);
 	substitute       => "STATE!(true|1):on,(false|0):off",
 	webCmd           => "control",
 	widgetOverride   => "control:uzsuToggle,off,on"
-	},	"HM-LC-Dim1L-Pl|HM-LC-Dim1L-Pl-2|HM-LC-Dim1L-CV|HM-LC-Dim2L-CV|HM-LC-Dim2L-SM|HM-LC-Dim1L-Pl-3|HM-LC-Dim1L-CV-2" => {
+	},
+	"HM-LC-Dim1L-Pl|HM-LC-Dim1L-Pl-2|HM-LC-Dim1L-CV|HM-LC-Dim2L-CV|HM-LC-Dim2L-SM|HM-LC-Dim1L-Pl-3|HM-LC-Dim1L-CV-2" => {
 	_description     => "Funk-Anschnitt-Dimmaktor",
 	ccureadingfilter => "(^LEVEL\$|DIRECTION)",
 	ccuscaleval      => "LEVEL:0:1:0:100",
@@ -546,6 +579,20 @@ use vars qw(%HMCCU_SCRIPTS);
 	stripnumber      => 1,
 	substexcl        => "control",
 	substitute       => "ERROR_OVERHEAT,ERROR_OVERLOAD,ERROR_REDUCED!(0|false):no,(1|true):yes;LEVEL!#0-0:off,#1-100:on;DIRECTION!0:none,1:up,2:down,3:undefined",
+	webCmd           => "control:on:off",
+	widgetOverride   => "control:slider,0,10,100"	
+	},
+	"HmIP-BDT" => {
+	_description     => "Dimmaktor",
+	ccureadingfilter => "(ERROR_CODE|ERROR_OVERHEAT|ACTUAL_TEMPERATURE|ACTIVITY_STATE|LEVEL)",
+	ccuscaleval      => "LEVEL:0:1:0:100",
+	controldatapoint => "4.LEVEL",
+	hmstatevals      => "ACTUAL_TEMPERATURE_STATUS!2:tempOverflow,3:tempUnderflow;ERROR_OVERHEAT!(1|true):overheat",
+	statedatapoint   => "4.LEVEL",
+	statevals        => "on:100,off:0",
+	stripnumber      => 1,
+	substexcl        => "control",
+	substitute       => "LEVEL!#0-0:off,#1-100:on;ACTIVITY_STATE!0:unknown,1:up,2:down,3:stop;ERROR_OVERHEAT!(0|false):no,(1|true):yes;ACTUAL_TEMPERATURE_STATUS!0:normal,1:unknown,2:overflow,3:underflow",
 	webCmd           => "control:on:off",
 	widgetOverride   => "control:slider,0,10,100"	
 	},
@@ -639,6 +686,22 @@ use vars qw(%HMCCU_SCRIPTS);
 	webCmd           => "control:up:stop:down",
 	widgetOverride   => "control:slider,0,10,100"
 	},
+	"HmIP-BROLL" => {
+	_description     => "Rollladenaktor",
+	ccureadingfilter => "(ERROR_CODE|ERROR_OVERHEAT|ACTUAL_TEMPERATURE|LEVEL|ACTIVITY_STATE|SELF_CALIBRATION_RESULT)",
+	ccureadingname   => "LEVEL:+pct",
+	ccuscaleval      => "LEVEL:0:1:0:100",
+	cmdIcon          => "up:fts_shutter_up stop:fts_shutter_manual down:fts_shutter_down",
+	controldatapoint => "4.LEVEL",
+	hmstatevals      => "ACTUAL_TEMPERATURE_STATUS!2:tempOverflow,3:tempUnderflow;ERROR_OVERHEAT!(1|true):overheat",
+	eventMap         => "/datapoint 4.STOP true:stop/datapoint 4.LEVEL 0:down/datapoint 4.LEVEL 100:up/datapoint 3.SELF_CALIBRATION 0:stopCalibration/datapoint 3.SELF_CALIBRATION 1:startCalibration/",
+	statedatapoint   => "4.LEVEL",
+	stripnumber      => 1,
+	substexcl        => "control|pct",
+	substitute       => "LEVEL!#0-0:closed,#100-100:open;ACTIVITY_STATE!0:unknown,1:up,2:down,3:stop;ERROR_OVERHEAT!(0|false):no,(1|true):yes;ACTUAL_TEMPERATURE_STATUS!0:normal,1:unknown,2:overflow,3:underflow;SELF_CALIBRATION_RESULT!(0|false):failed,(1|true):ok",
+	webCmd           => "control:up:stop:down",
+	widgetOverride   => "control:slider,0,10,100"	
+	},
 	"HM-TC-IT-WM-W-EU" => {
 	_description     => "Wandthermostat",
 	ccureadingfilter => "(^HUMIDITY|^TEMPERATURE|^SET_TEMPERATURE|^WINDOW_OPEN)",
@@ -683,7 +746,7 @@ use vars qw(%HMCCU_SCRIPTS);
 	webCmd           => "control:Boost:Auto:Manual:Holiday:on:off",
 	widgetOverride   => "control:slider,4.5,0.5,30.5,1"
 	},
-	"HmIP-WTH|HmIP-WTH-2" => {
+	"HmIP-WTH|HmIP-WTH-2|HmIP-BWTH" => {
 	_description     => "Wandthermostat HM-IP",
 	controldatapoint => "1.SET_POINT_TEMPERATURE",
 	eventMap         => "/datapoint 1.BOOST_MODE true:Boost/datapoint 1.CONTROL_MODE 0:Auto/datapoint 1.CONTROL_MODE 1:Manual/datapoint 1.CONTROL_MODE 2:Holiday/datapoint 1.SET_POINT_TEMPERATURE 4.5:off/datapoint 1.SET_POINT_TEMPERATURE 30.5:on/",
@@ -730,16 +793,18 @@ use vars qw(%HMCCU_SCRIPTS);
 	},
 	"HM-CC-VG-1" => {
 	_description     => "Heizungsgruppe",
-	ccureadingfilter => "(^SET_TEMPERATURE|^TEMPERATURE|^HUMIDITY|^VALVE|^CONTROL|^WINDOW_OPEN)",
+	ccucalculate     => "dewpoint:DEWPOINT:1.ACTUAL_TEMPERATURE,1.ACTUAL_HUMIDITY",
+	ccureadingfilter => "1.(^SET_TEMPERATURE|^ACTUAL|^VALVE|^CONTROL);2.^WINDOW_OPEN;4.^VALVE",
 	cmdIcon          => "Auto:sani_heating_automatic Manu:sani_heating_manual Boost:sani_heating_boost on:general_an off:general_aus",
 	controldatapoint => "1.SET_TEMPERATURE",
 	eventMap         => "/datapoint 1.MANU_MODE 20.0:Manu/datapoint 1.AUTO_MODE 1:Auto/datapoint 1.BOOST_MODE 1:Boost/datapoint 1.MANU_MODE 4.5:off/datapoint 1.MANU_MODE 30.5:on/",
 	statedatapoint   => "1.SET_TEMPERATURE",
+	stateFormat      => "T: 1.ACTUAL_TEMPERATURE° H: 1.ACTUAL_HUMIDITY% D: 1.SET_TEMPERATURE° P: DEWPOINT° V: 4.VALVE_STATE% 1.CONTROL_MODE",
 	stripnumber      => 1,
 	substexcl        => "control",
 	substitute       => "CONTROL_MODE!0:AUTO,1:MANU,2:PARTY,3:BOOST;WINDOW_OPEN_REPORTING!(true|1):open,(false|0):closed;SET_TEMPERATURE!#0-4.5:off,#30.5-40:on",
 	webCmd           => "control:Auto:Manu:Boost:on:off",
-	widgetOverride   => "control:slider,3.5,0.5,30.5,1"
+	widgetOverride   => "control:slider,4.5,0.5,30.5,1"
 	},
 	"HM-Sec-MD|HM-Sec-MDIR|HM-Sec-MDIR-2|HM-Sec-MDIR-3" => {
 	_description     => "Bewegungsmelder",
@@ -754,6 +819,14 @@ use vars qw(%HMCCU_SCRIPTS);
 	eventMap         => "/datapoint 1.MOTION_DETECTION_ACTIVE 1:detection-on/datapoint 1.MOTION_DETECTION_ACTIVE 0:detection-off/",
 	statedatapoint   => "1.MOTION",
 	substitute       => "MOTION!(0|false):no,(1|true):yes"
+	},
+	"HmIP-SMI55" => {
+	_description     => "Bewegungsmelder",
+	ccureadingfilter => "(ILLUMINATION|MOTION|PRESS)",
+	"event-on-update-reading" => ".*",
+	eventMap         => "/datapoint 3.MOTION_DETECTION_ACTIVE 1:detection-on/datapoint 3.MOTION_DETECTION_ACTIVE 0:detection-off/datapoint 3.RESET_MOTION 1:reset/",
+	statedatapoint   => "3.MOTION",
+	substitute       => "PRESS_LONG,PRESS_SHORT!(1|true):pressed,(0|false):released;MOTION,MOTION_DETECTION_ACTIVE!(0|false):no,(1|true):yes;ILLUMINATION_STATUS!0:normal,1:unknown,2:overflow"
 	},
 	"HmIP-SPI" => {
 	_description     => "Anwesenheitssensor",
