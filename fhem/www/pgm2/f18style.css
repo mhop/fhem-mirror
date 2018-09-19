@@ -27,6 +27,12 @@ input.maininput { margin-left:10px; }
 }
 #menu > table td { padding-top: 2px; }
 
+/* Hide the scrollbar for fixed input */
+body.fixedInput[data-os=linux] div#content::-webkit-scrollbar   {display:none;}
+body.fixedInput[data-os=linux] div#menu::-webkit-scrollbar      {display:none;}
+body.fixedInput[data-os=windows] div#content::-webkit-scrollbar {display:none;}
+body.fixedInput[data-os=windows] div#menu::-webkit-scrollbar    {display:none;}
+
 #menu.hidden  { left:-120%!important; }
 #console { width:100%; top:2em; bottom:0px; position:absolute; overflow-y:auto;}
 #errmsg  { background-color: #000000; color: #FFFFFF;

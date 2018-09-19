@@ -13,6 +13,14 @@ var FW_root = "/fhem";  // root
 var FW_availableJs={};
 var FW_urlParams={};
 var embedLoadRetry = 100;
+var FW_os = "unknown";
+
+if(FW_isiOS) { FW_os = "iOS";
+} else if(navigator.userAgent.indexOf("Android") >= 0) { FW_os = "android";
+} else if(navigator.userAgent.indexOf("OS X")    >= 0) { FW_os = "osx";
+} else if(navigator.userAgent.indexOf("Windows") >= 0) { FW_os = "windows";
+} else if(navigator.userAgent.indexOf("Linux")   >= 0) { FW_os = "linux";
+}
 
 // createFn returns an HTML Element, which may contain 
 // - setValueFn, which is called when data via longpoll arrives
@@ -72,6 +80,8 @@ FW_jqueryReadyFn()
     return;
   FW_docReady = true;
   FW_serverGenerated = $("body").attr("generated");
+  if(!FW_serverGenerated)       // called from commandref.html
+    return;
   FW_longpollType = $("body").attr("longpoll");
   var ajs = $("body").attr("data-availableJs");
   if(ajs) {
@@ -309,6 +319,7 @@ FW_jqueryReadyFn()
   FW_rawDef();
   FW_treeMenu();
 
+  $("body").attr("data-os", FW_os);
   // automatic reload for style change
   if(location.search.indexOf("cmd=style%20select") > 0) {
     $('a[href*="style set"],a[onclick*="style set"]').each(function(){
