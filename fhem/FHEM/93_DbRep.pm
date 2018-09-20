@@ -37,6 +37,7 @@
 ###########################################################################################################################
 #  Versions History:
 #
+# 8.0.1        20.09.2018       DbRep_getMinTs improved
 # 8.0.0        11.09.2018       get filesize in DbRep_WriteToDumpFile corrected, restoreMySQL for clientSide dumps
 #                               minor fixes
 # 7.20.0       04.09.2018       deviceRename can operate a Device name with blank, e.g. 'current balance' as old device name
@@ -347,7 +348,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
 
-my $DbRepVersion = "8.0.0";
+my $DbRepVersion = "8.0.1";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -1378,7 +1379,8 @@ sub DbRep_getMinTs($) {
  # SQL-Startzeit
  my $st = [gettimeofday];
  
- eval { $mints = $dbh->selectrow_array("SELECT min(TIMESTAMP) FROM history;"); }; 
+ # eval { $mints = $dbh->selectrow_array("SELECT min(TIMESTAMP) FROM history;"); }; 
+ eval { $mints = $dbh->selectrow_array("select TIMESTAMP from history limit 1;"); }; 
  
  $dbh->disconnect;
  
@@ -1421,8 +1423,8 @@ sub DbRep_getMinTsDone($) {
       return;
   }
   
-  $hash->{HELPER}{MINTS} = $mints;
   my $state = ($hash->{LASTCMD} eq "minTimestamp")?"done":"connected";
+  $state    = "invalid timestamp \"$mints\" found in database - please delete it" if($mints =~ /^0000-00-00.*$/);
 
   readingsBeginUpdate($hash);
   ReadingsBulkUpdateValue ($hash, "timestamp_oldest_dataset", $mints) if($hash->{LASTCMD} eq "minTimestamp");
