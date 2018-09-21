@@ -1585,15 +1585,13 @@ DOIF_CheckTimers($$$$)
   my $end;
   my $intervaltimer;
     
-  if ($timer !~ /^\s*(\[.*\]|\{.*\}|\(.*\)|\+.*|[0-9][0-9]:.*|:[0-5][0-9])$/ and $hash->{MODEL} eq "Perl") {
-    return ($timer,"no timer");
-  }
   
   $timer =~ s/\s//g;
   ($timer,$days)=SplitDoIf('|',$timer);
   $days="" if (!defined $days);
   ($timer,$intervaltimer)=SplitDoIf(',',$timer);
   ($time,$end)=SplitDoIf('-',$timer);
+  
   if (defined $intervaltimer) {
     if (!defined $end) {
       return($timer,"intervaltimer without time interval");
@@ -1601,12 +1599,18 @@ DOIF_CheckTimers($$$$)
   }
   $i=$hash->{helper}{last_timer}++;
   if (defined $time) {
+    if ($time !~ /^\s*(\[.*\]|\{.*\}|\(.*\)|\+.*|[0-9][0-9]:.*|:[0-5][0-9])$/ and $hash->{MODEL} eq "Perl") {
+      return ($timer,"no timer");
+    }
     ($result,$err) = DOIF_getTime($hash,$condition,$time,$trigger,$i,$days);
     return ($result,$err) if ($err);
   } else {
     return($timer,"no timer defined");
   }
   if (defined $end) {
+    if ($end !~ /^\s*(\[.*\]|\{.*\}|\(.*\)|\+.*|[0-9][0-9]:.*|:[0-5][0-9])$/ and $hash->{MODEL} eq "Perl") {
+      return ($timer,"no timer");
+    }
     ($result,$err) = DOIF_getTime($hash,$condition,$end,$trigger,$hash->{helper}{last_timer}++,$days);
     return ($result,$err) if ($err);
   }
