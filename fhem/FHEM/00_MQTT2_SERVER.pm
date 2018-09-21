@@ -339,7 +339,7 @@ MQTT2_SERVER_Read($@)
         delete($hash->{answerScheduled});
         my $r = $defs{$sname}{retain};
         foreach my $tp (sort { $r->{$a}{ts} <=> $r->{$b}{ts} } keys %{$r}) {
-          MQTT2_SERVER_sendto($hash, $tp, $r->{$tp}{val});
+          MQTT2_SERVER_sendto($defs{$sname}, $hash, $tp, $r->{$tp}{val});
         }
       }, undef, 0);
     }
@@ -394,7 +394,8 @@ MQTT2_SERVER_doPublish($$$$;$)
   }
 
   foreach my $clName (keys %{$tgt->{clients}}) {
-    MQTT2_SERVER_sendto($defs{$clName}, $tp, $val) if($src->{NAME} ne $clName);
+    MQTT2_SERVER_sendto($tgt, $defs{$clName}, $tp, $val)
+        if($src->{NAME} ne $clName);
   }
 
   if(defined($src->{cid})) { # "real" MQTT client
@@ -410,9 +411,9 @@ MQTT2_SERVER_doPublish($$$$;$)
 ######################################
 # send topic to client if its subscription matches the topic
 sub
-MQTT2_SERVER_sendto($$$)
+MQTT2_SERVER_sendto($$$$)
 {
-  my ($hash, $topic, $val) = @_;
+  my ($shash, $hash, $topic, $val) = @_;
   return if(IsDisabled($hash->{NAME}));
   $val = "" if(!defined($val));
   foreach my $s (keys %{$hash->{subscriptions}}) {
@@ -420,6 +421,7 @@ MQTT2_SERVER_sendto($$$)
     $re =~ s,/?#,\\b.*,g;
     $re =~ s,\+,\\b[^/]+\\b,g;
     if($topic =~ m/^$re$/) {
+      Log3 $shash, 5, "$hash->{NAME} $hash->{cid} => $topic:$val";
       addToWritebuffer($hash,
         pack("C",0x30).
         MQTT2_SERVER_calcRemainingLength(2+length($topic)+length($val)).
