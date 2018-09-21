@@ -1646,8 +1646,9 @@ FW_roomOverview($)
                         FW_makeImage($icoName,$icoName,"icon")."&nbsp;" : "";
 
         if($l1 eq "Save config") {
-          $l1 .= '</a> <a id="saveCheck" class="changed" style="visibility:'.
-                      (int(@structChangeHist) ? 'visible' : 'hidden').'">?';
+          $l1 .= '</span></a> '.
+                  '<a id="saveCheck" class="changed" style="visibility:'.
+                  (int(@structChangeHist) ? 'visible' : 'hidden').'"><span>?';
         }
 
         # Force external browser if FHEMWEB is installed as an offline app.
@@ -2046,7 +2047,6 @@ sub
 FW_returnFileAsStream($$$$$)
 {
   my ($path, $suffix, $type, $doEsc, $cacheable) = @_;
-
   my $etag;
 
   if($cacheable) {
