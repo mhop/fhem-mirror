@@ -1,4 +1,4 @@
-REV 17375
+REV 17377
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2018-09-20_07:45:03 258576 ./CHANGED
+UPD 2018-09-21_07:45:02 258683 ./CHANGED
 UPD 2018-09-15_07:45:02 38011 ./MAINTAINER.txt
 UPD 2018-09-09_07:45:03 39688 ./configDB.pm
 UPD 2018-09-17_07:45:03 19987 ./fhem.cfg.demo
@@ -415,7 +415,7 @@ UPD 2018-07-10_07:45:14 16502 FHEM/91_watchdog.pm
 UPD 2018-08-21_07:45:03 54919 FHEM/92_FileLog.pm
 UPD 2017-08-14_07:45:02 11589 FHEM/92_SingleFileLog.pm
 UPD 2018-09-20_07:45:03 345466 FHEM/93_DbLog.pm
-UPD 2018-09-13_07:45:06 654319 FHEM/93_DbRep.pm
+UPD 2018-09-21_07:45:02 654542 FHEM/93_DbRep.pm
 UPD 2018-09-18_07:45:02 18106 FHEM/93_FHEM2FHEM.pm
 UPD 2018-08-25_07:45:03 110254 FHEM/93_Log2Syslog.pm
 UPD 2018-02-09_07:45:02 66936 FHEM/93_PWMR.pm
@@ -684,8 +684,8 @@ UPD 2018-09-20_07:45:06 3560413 docs/commandref.html
 UPD 2018-09-20_07:45:08 2187148 docs/commandref_DE.html
 UPD 2018-07-16_07:45:03 76259 docs/commandref_frame.html
 UPD 2018-07-16_07:45:03 85715 docs/commandref_frame_DE.html
-UPD 2018-09-20_07:45:09 196708 docs/commandref_modular.html
-UPD 2018-09-20_07:45:10 207403 docs/commandref_modular_DE.html
+UPD 2018-09-21_07:45:08 196708 docs/commandref_modular.html
+UPD 2018-09-21_07:45:09 207403 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
