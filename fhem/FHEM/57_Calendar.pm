@@ -3643,7 +3643,7 @@ sub CalendarEventsAsHtml($;$) {
   <br>The double semicolon masks the semicolon. <a href="#perl">Perl specials</a> cannot be used.<br>
   <br>
   To add a missing end time, the following plug-in can be used:<br><br>
-  <code>attr MyCalendar onCreateEvent { $e->{end}= $e->{start}+86400 unless(defined($e->{summary})) }</code><br>
+  <code>attr MyCalendar onCreateEvent { $e->{end}= $e->{start}+86400 unless(defined($e->{end})) }</code><br>
   </ul>
   <br><br>
 
