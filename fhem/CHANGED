@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  34_ESPEasy: get/set cmd handling rewritten, more supported ESP
+             Easy cmds, user defined cmds/mappings, nfx plugin handling
+             changed (Forum #91353)
   - change:  93_DbRep: an invalid timestamp will put into state if found on
                        startup
   - bugfix:  38_netatmo: fixed changed values and deprecated API calls
