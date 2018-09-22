@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  57_Calendar.pm: make ical file work again
   - change:  34_ESPEasy: get/set cmd handling rewritten, more supported ESP
              Easy cmds, user defined cmds/mappings, nfx plugin handling
              changed (Forum #91353)
@@ -16,7 +17,7 @@
   - feature: 93_DbRep: V8.0.0, restoreMySQL for clientSide dumps implemented
   - bugfix:  74_XiaomiBTLESens: fix bug in disabledForInterval (Forum #835350)
   - change:  88_HMCCU: New release
-  - feature: 93_DbLog: 3.11.0, function reduceLog[Nbl] syntax extended to limit 
+  - feature: 93_DbLog: 3.11.0, function reduceLog[Nbl] syntax extended to limit
                                days to reduce (pls. see commandref for details)
   - change:  01_FHEMWEB.pm: change default style to f18
   - change:  01_FHEMWEB.pm: change iconPath: to fhemSVG:openautomation:default
@@ -24,27 +25,27 @@
   - change:  98_DOIFtools: improved direct help contetn
   - change:  38_netatmo: removed rain sum readings
   - feature: 00_MYSENSORS: FOTA (thanks Beta-User), gateway fix (thanks Sidey)
-  - new:     12_HProtocolGateway / 12_HProtocolTank 
+  - new:     12_HProtocolGateway / 12_HProtocolTank
   - bugfix:  72_XiaomiDevice: remove unused battery readings for new fans
-  - feature: 49_SSCam: activate/deactivate cam internal PIR-sensor 
-  - new:     10_MQTT_GENERIC_BRIDGE an MQTT bridge, which simultaneously 
-             collects data from several FHEM devices and passes 
-             their readings via MQTT or set readings from 
-             the incoming MQTT messages or executes them 
+  - feature: 49_SSCam: activate/deactivate cam internal PIR-sensor
+  - new:     10_MQTT_GENERIC_BRIDGE an MQTT bridge, which simultaneously
+             collects data from several FHEM devices and passes
+             their readings via MQTT or set readings from
+             the incoming MQTT messages or executes them
              as a 'set' command on the configured FHEM device.
   - feature: 72_XiaomiDevice: vacuum events, resume zoned cleanup
   - feature: 51_MOBILEALERTS: Added MA10120PRO
   - feature: 51_MOBILEALERTS: Added TFA30.3060.01.IT
   - change:  89_FULLY: Set start URL and bug fixes
-  - bugfix:  49_SSCam: V7.0.1, enable/disable issue 
+  - bugfix:  49_SSCam: V7.0.1, enable/disable issue
              (forum.fhem.de/index.php/topic,45671.msg830869.html#msg830869)
   - change:  98_DOIFtools: add help labels in commandref for attr, set and get
                 add MODEL to statistics report, check DOIF excludes Perl mode
   - new:     98_MSwitch.pm: Multi Switch Modul
-  - feature: 93_DbRep: V7.19.0, attribute "valueFilter" to filter datasets in 
+  - feature: 93_DbRep: V7.19.0, attribute "valueFilter" to filter datasets in
                                 fetchrows
   - feature: 49_SSCam: V7.0.0, compatibility to SVS 8.2.0
-  - feature: 93_Log2Syslog: V4.8.5, new Syslog-Server Mode and some other 
+  - feature: 93_Log2Syslog: V4.8.5, new Syslog-Server Mode and some other
                             improvements, version is moved from contrib
   - bugfix:  73_GardenaSmartBridge fix get humidity bug, add rename Fn
   - change:  71_YAMAHA_AVR: renamed attributes:
@@ -54,17 +55,17 @@
              already configured values will be converted by FHEM automatically
   - feature: 71_YAMAHA_AVR: add new set command tunerFrequencyBand to change
              between FM and DAB band on DAB-based models
-  - bugfix:  71_YAMAHA_AVR: fix set commands preset/presetUp/presetDown for 
+  - bugfix:  71_YAMAHA_AVR: fix set commands preset/presetUp/presetDown for
              input tuner on DAB based models
   - bugfix:  71_YAMAHA_AVR: fix set commands remoteControl tunerPresetUp,
-             tunerPresetDown and tunerFrequency for DAB based models 
+             tunerPresetDown and tunerFrequency for DAB based models
   - added:   98_systemd_watchdog: tested and moved from contrib
   - bugfix:  36_Vallox: Initialization bug fixed
-  - added:   00_MQTT: ability for client notifications: on connect, 
+  - added:   00_MQTT: ability for client notifications: on connect,
                       on disconnect, on timeout
-  - fixed:   00_MQTT: failure on handling with mqtt-devices without 
+  - fixed:   00_MQTT: failure on handling with mqtt-devices without
                       or with wrong devio attributes
-  - change:  maintainer change for 00_MQTT, 10_MQTT_DEVICE, 10_MQTT_BRIDGE 
+  - change:  maintainer change for 00_MQTT, 10_MQTT_DEVICE, 10_MQTT_BRIDGE
              (eisler => hexenmeister)
   - feature: 36_Vallox: Added DF Method, Added CO2SetPoint Handling, Optimized
   - feature: 59_WUup: added attribute unit_solarradiation
@@ -74,7 +75,7 @@
   - bugfix:  93_DbRep: fix in fetchrow function (forum:#89886),fix highlighting
   - bugfix:  82_LGTV_WebOS: fix set cmd for AmazonLovefilm
   - feature: 51_MOBILEALERTS: added feature to adjust values in define
-  - changed: 09_CUL_FHTTK: adapted battery reading to new common reading 
+  - changed: 09_CUL_FHTTK: adapted battery reading to new common reading
                 Forum #87575
   - bugfix:  82_LGTV_WebOS: fix uninitialized value
   - change:  98_dewpoint: adjust log level for FAN/ALARM on/off to 4

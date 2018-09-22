@@ -2525,6 +2525,7 @@ sub Calendar_ProcessUpdate($$$) {
   my $name = $hash->{NAME};
   my $removeall = $param->{removeall};
   my $t= $param->{t};
+  my $type= $hash->{".fhem"}{type};
 
   if(exists($hash->{".fhem"}{subprocess})) {
       Log3 $hash, 2, "Calendar $name: update in progress, process aborted.";
@@ -2537,11 +2538,30 @@ sub Calendar_ProcessUpdate($$$) {
 
   delete($hash->{".fhem"}{iCalendar});
 
+  my $httpresponsecode= $param->{code};
+
   if($errmsg) {
     Log3 $name, 1, "Calendar $name: retrieval failed with error message $errmsg";
     readingsSingleUpdate($hash, "state", "error ($errmsg)", 1);
   } else {
-    readingsSingleUpdate($hash, "state", "retrieved", 1);
+    if($type eq "url") {
+      if($httpresponsecode != 200) {
+        $errmsg= "retrieval failed with HTTP response code $httpresponsecode";
+        Log3 $name, 1, "Calendar $name: $errmsg";
+        readingsSingleUpdate($hash, "state", "error ($errmsg)", 1);
+        Log3 $name, 5, "Calendar $name: HTTP response header:\n" .
+          $param->{httpheader};
+      } else {
+        Log3 $name, 5, "Calendar $name: HTTP response code $httpresponsecode";
+        readingsSingleUpdate($hash, "state", "retrieved", 1);
+      }
+    } elsif($type eq "file") {
+      Log3 $name, 5, "Calendar $name: file retrieval successful";
+      readingsSingleUpdate($hash, "state", "retrieved", 1);
+    } else {
+      # this case never happens by virtue of _Define, so just
+      die "Software Error";
+    }
   }
 
   if($errmsg or !defined($ics) or ("$ics" eq "") ) {
@@ -2824,7 +2844,8 @@ sub Calendar_UpdateCalendar($$) {
                 #
                 # and same SEQUENCE
                 #
-                if($v0->sameValue($v, "LAST-MODIFIED")) {
+                if($v0->sameValue($v, "LAST-MODIFIED") &&
+                   $v0->sameValue($v, "DTSTAMP")) {
                     #
                     # is not modified
                     #
