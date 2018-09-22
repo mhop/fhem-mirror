@@ -38,7 +38,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "1.0";
+my $version = "1.1";
 
 #-- these we may get on request
 my %gets = (
@@ -69,7 +69,7 @@ my %shelly_models = (
     "shelly1" => [1,0,0,],
     "shelly2" => [2,1,1],
     "shellyplug" => [1,0,1],
-    "shelly4" => [4,0,0]
+    "shelly4" => [4,0,4]
     );
     
 my %shelly_regs = (
@@ -202,11 +202,12 @@ sub Shelly_Attr(@) {
       fhem("deletereading ".$name." last_dir.*");
       fhem("deletereading ".$name." pct.*");
     }
-    #-- no meters
-    if( $shelly_models{$model}[2] == 0){
+
+    #-- always clear readings for meters
+    #if( $shelly_models{$model}[2] <= 1){
       fhem("deletereading ".$name." power.*");
       fhem("deletereading ".$name." overpower.*");
-    }
+    #}
   #---------------------------------------  
   }elsif ( ($cmd eq "set") && ($attrName =~ /mode/) ) {
     if( $model ne "shelly2" ){
@@ -339,38 +340,9 @@ sub Shelly_Set ($@) {
   my $mode  =  AttrVal($name,"mode","relay");
   my $time;
   
-  #-- we have a Shelly 1 or ShellyPlug switch type device
-  if( ($model eq "shelly1") || ($model eq "shellyplug") ){ 
-    
-    #-- WEB asking for command list 
-    if( $cmd eq "?" ) {   
-      $newkeys = join(" ", sort keys %setssw);
-      #$newkeys =~ s/on\s/on:0,1 /;
-      #$newkeys =~ s/off\s/off:0,1 /;
-      return "[Shelly_Set] Unknown argument " . $cmd . ", choose one of ".$newkeys;
-    }
-    
-    if( $cmd =~ /^((on)|(off)).*/ ){
-      if( $cmd =~ /(.*)-for-timer/ ){
-        $cmd = $1;
-        $time = shift @a;
-        if( $cmd !~ /^(on)|(off)$/ ){
-          $msg = "Error: wrong command $cmd";
-          Log3 $name, 1,"[Shelly_Set] ";
-          return $msg;
-        }
-        if( $time !~ /\d+/ ){
-          $msg = "Error: wrong time spec $time, must be <integer> only";
-          Log3 $name, 1,"[Shelly_Set] ".$msg;
-          return $msg;
-        }
-        $cmd = $cmd."&timer=$time";
-      }
-      Shelly_onoff($hash,0,"?turn=".$cmd);
-    }
-  
-  #-- we have a Shelly 2 switch type device
-  }elsif( ($model eq "shelly2") && ($mode eq "relay") ){ 
+  #-- we have a Shelly 1,4 or ShellyPlug switch type device
+  #-- or we have a Shelly 2 switch type device
+  if( ($model eq "shelly1") || ($model eq "shelly4") || ($model eq "shellyplug") || (($model eq "shelly2") && ($mode eq "relay")) ){ 
     
     #-- WEB asking for command list 
     if( $cmd eq "?" ) {   
@@ -382,8 +354,7 @@ sub Shelly_Set ($@) {
     
     if( $cmd =~ /^((on)|(off)).*/ ){
       my $channel = $value;
-      #-- TODO for shelly1/plug/4
-      if( $channel !~ /[01]/ ){
+      if( ($channel !~ /[0123]/) || $channel >= $shelly_models{$model}[0] ){
         if( !defined($channel) ){
           $channel = AttrVal($name,"defchannel",undef);
           if( !defined($channel) ){
@@ -612,8 +583,8 @@ sub Shelly_Set ($@) {
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash,"state","OK");
   
-  #-- we have a Shelly 1 or Shelly 2  or ShellyPlug switch type device
-  if( ($model eq "shelly1") || (($model eq "shelly2") && ($mode eq "relay"))|| ($model eq "shellyplug") ){
+  #-- we have a Shelly 1, Shelly 4, Shelly 2  or ShellyPlug switch type device
+  if( ($model eq "shelly1") || ($model eq "shellyplug") || ($model eq "shelly4") || (($model eq "shelly2") && ($mode eq "relay")) ){
     for( my $i=0;$i<$channels;$i++){
       $subs = (($channels == 1) ? "" : "_".$i);
       $ison       = $jhash->{'relays'}[$i]{'ison'};
