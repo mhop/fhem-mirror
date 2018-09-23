@@ -38,7 +38,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "1.11";
+my $version = "1.12";
 
 #-- these we may get on request
 my %gets = (
@@ -132,7 +132,8 @@ sub Shelly_Define($$) {
   };
     
   $hash->{DURATION} = 0;
-  $hash->{BLOCKED} = 0;
+  $hash->{MOVING} = 0;
+  delete $hash->{BLOCKED};
   $hash->{INTERVAL} = 60;
   
   $modules{Shelly}{defptr}{$a[0]} = $hash;
@@ -141,10 +142,16 @@ sub Shelly_Define($$) {
   my $oid = $init_done;
   $init_done = 1;
   readingsBeginUpdate($hash);
-  readingsBulkUpdate($hash,"state","initialized");
+  my $err = Shelly_status($hash);
+  if( !defined($err) ){
+    readingsBulkUpdate($hash,"state","initialized");
+    readingsBulkUpdate($hash,"network","connected");
+  }else{
+    readingsBulkUpdate($hash,"state",$err);
+    readingsBulkUpdate($hash,"network","not connected");
+  }
   readingsEndUpdate($hash,1); 
      
-  InternalTimer(gettimeofday() + 5, "Shelly_status", $hash,1);
   $init_done = $oid;
   
   return undef;
@@ -179,6 +186,9 @@ sub Shelly_Attr(@) {
   
   my $model =  AttrVal($name,"model","shelly2");
   my $mode  =  AttrVal($name,"mode","relay");
+
+  #-- temporary code
+  delete $hash->{BLOCKED};
   
   #---------------------------------------  
   if ( ($cmd eq "set") && ($attrName =~ /model/) ) {
@@ -201,6 +211,8 @@ sub Shelly_Attr(@) {
       fhem("deletereading ".$name." stop_reason.*");
       fhem("deletereading ".$name." last_dir.*");
       fhem("deletereading ".$name." pct.*");
+      delete $hash->{MOVING};
+      delete $hash->{DURATION};
     }
 
     #-- always clear readings for meters
@@ -354,7 +366,8 @@ sub Shelly_Set ($@) {
     
     if( $cmd =~ /^((on)|(off)).*/ ){
       my $channel = $value;
-      if( ($channel !~ /[0123]/) || $channel >= $shelly_models{$model}[0] ){
+     
+      if( !defined($channel) || ($channel !~ /[0123]/) || $channel >= $shelly_models{$model}[0] ){
         if( !defined($channel) ){
           $channel = AttrVal($name,"defchannel",undef);
           if( !defined($channel) ){
@@ -393,7 +406,7 @@ sub Shelly_Set ($@) {
       return "[Shelly_Set] Unknown argument " . $cmd . ", choose one of ".$newkeys;
     }
     
-    if( $hash->{BLOCKED} ){
+    if( $hash->{MOVING} ){
       $msg = "Error: roller blind still moving, wait for some time";
       Log3 $name,1,"[Shelly_Set] ".$msg;
       return $msg
@@ -436,7 +449,7 @@ sub Shelly_Set ($@) {
           $cmd = "?go=close&duration=".$time; 
         }
       }
-      $hash->{BLOCKED} = 1;
+      $hash->{MOVING} = 1;
       $hash->{DURATION} = $time;
       Shelly_updown($hash,$cmd);
     } 
@@ -483,10 +496,13 @@ sub Shelly_Set ($@) {
   my $name = $hash->{NAME};
   my $url;
   my $state = $hash->{READINGS}{state}{VAL};
+  my $net   = $hash->{READINGS}{network}{VAL};
+  return
+    if( $net ne "connected" );
 
   my $model =  AttrVal($name,"model","");
 
-  if ( $hash && !$data){
+  if ( $hash && !$err && !$data ){
      $url    = "http://".$hash->{TCPIP}."/".$cmd;
      Log3 $name, 1,"[Shelly_configure] called with only hash  => Issue a non-blocking call to $url";  
      HttpUtils_NonblockingGet({
@@ -532,12 +548,8 @@ sub Shelly_Set ($@) {
   my $name = $hash->{NAME};
   my $url;
   my $state = $hash->{READINGS}{state}{VAL};
-  
-  #-- reset blocking due to existing movement
-  $hash->{BLOCKED} = 0;
-  $hash->{DURATION} = 0;
     
-  if ( $hash && !$data){
+  if ( $hash && !$err && !$data ){
      $url    = "http://".$hash->{TCPIP}."/status";
      Log3 $name, 5,"[Shelly_status] called with only hash  => Issue a non-blocking call to $url";  
      HttpUtils_NonblockingGet({
@@ -548,8 +560,10 @@ sub Shelly_Set ($@) {
   }elsif ( $hash && $err ){
     Log3 $name, 1,"[Shelly_status]  has error $err";
     readingsSingleUpdate($hash,"state","Error",1);
-    return;
+    readingsSingleUpdate($hash,"network","not connected",1);
+    return $err;
   }
+ 
   Log3 $name, 5,"[Shelly_status] has obtained data $data";
     
   my $json = JSON->new->utf8;
@@ -569,7 +583,8 @@ sub Shelly_Set ($@) {
   my ($subs,$ison,$overpower,$power,$rstate,$rpower,$rstopreason,$rlastdir);
   
   readingsBeginUpdate($hash);
-  readingsBulkUpdate($hash,"state","OK");
+  readingsBulkUpdateIfChanged($hash,"state","OK");
+  readingsBulkUpdateIfChanged($hash,"network","connected",1);
   
   #-- we have a Shelly 1, Shelly 4, Shelly 2  or ShellyPlug switch type device
   if( ($model eq "shelly1") || ($model eq "shellyplug") || ($model eq "shelly4") || (($model eq "shelly2") && ($mode eq "relay")) ){
@@ -591,6 +606,9 @@ sub Shelly_Set ($@) {
     
   #-- we have a Shelly 2 roller type device
   }elsif( ($model eq "shelly2") && ($mode eq "roller") ){ 
+   #-- reset blocking due to existing movement
+    $hash->{MOVING} = 0;
+    $hash->{DURATION} = 0;
     for( my $i=0;$i<$rollers;$i++){
       $subs = ($rollers == 1) ? "" : "_".$i;
       $rstate       = $jhash->{'rollers'}[$i]{'state'};
@@ -671,13 +689,17 @@ sub Shelly_Set ($@) {
   my $name = $hash->{NAME};
   my $url;
   my $state = $hash->{READINGS}{state}{VAL};
+  my $net   = $hash->{READINGS}{network}{VAL};
+  return
+    if( $net ne "connected" );
   
   my $model =  AttrVal($name,"model","");
+  
   #-- empty cmd parameter
   $cmd = ""
     if( !defined($cmd) );
     
-  if ( $hash && !$data){
+  if ( $hash && !$err && !$data ){
      $url    = "http://".$hash->{TCPIP}."/roller/0".$cmd;
      Log3 $name, 5,"[Shelly_updown] called with only hash  => Issue a non-blocking call to $url";  
      HttpUtils_NonblockingGet({
@@ -774,10 +796,13 @@ sub Shelly_Set ($@) {
   my $name = $hash->{NAME};
   my $url;
   my $state = $hash->{READINGS}{state}{VAL};
+  my $net   = $hash->{READINGS}{network}{VAL};
+  return
+    if( $net ne "connected" );
   
   my $model =  AttrVal($name,"model","");
     
-  if ( $hash && !$data){
+  if ( $hash && !$err && !$data ){
      $url    = "http://".$hash->{TCPIP}."/relay/".$channel.$cmd;
      Log3 $name, 5,"[Shelly_onoff] called with only hash  => Issue a non-blocking call to $url";  
      HttpUtils_NonblockingGet({
@@ -860,10 +885,13 @@ sub Shelly_Set ($@) {
   my $name = $hash->{NAME};
   my $url;
   my $state = $hash->{READINGS}{state}{VAL};
+  my $net   = $hash->{READINGS}{network}{VAL};
+  return
+    if( $net ne "connected" );
    
   my $model =  AttrVal($name,"model","");
     
-  if ( $hash && !$data){
+  if ( $hash && !$err && !$data ){
      $url    = "http://".$hash->{TCPIP}."/meter/".$channel;
      Log3 $name, 5,"[Shelly_meter] called with only hash  => Issue a non-blocking call to $url";  
      HttpUtils_NonblockingGet({
