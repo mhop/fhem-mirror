@@ -1,6 +1,6 @@
 //########################################################################################
 // alarm.js
-// Version 5.0
+// Version 5.01
 // See 95_Alarm for licensing
 //########################################################################################
 //# Prof. Dr. Peter A. Henning
@@ -268,7 +268,7 @@ function alarm_set(name) {
         } else {
             val = "disarmed";
         }
-        FW_cmd(url + '?XHR=1&fwcsrf=' + csrfToken + '&cmd.' + name + '=attr%20' + name + '%20level' + i + 'xec%20' + val);
+        //FW_cmd(url + '?XHR=1&fwcsrf=' + csrfToken + '&cmd.' + name + '=attr%20' + name + '%20level' + i + 'xec%20' + val);
     }
     
     // acquiring data for each sensor
