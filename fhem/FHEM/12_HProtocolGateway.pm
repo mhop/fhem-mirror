@@ -363,7 +363,7 @@ sub HProtocolGateway_Tank($$$) {
   }
   close $fh;
 
-  my $messwert = $filllevel/10;
+  my $messwert = $filllevel/100;
   my $volume = 0;
 
   foreach my $level (sort keys %TankChartHash) {
