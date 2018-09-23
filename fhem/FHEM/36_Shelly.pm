@@ -2,7 +2,7 @@
 #
 #  Shelly.pm
 #
-#  FHEM module to communicate with Shelly switch/roller actor
+#  FHEM module to communicate with Shelly switch/roller actor devices
 #  Prof. Dr. Peter A. Henning, 2018
 # 
 #  $Id$
@@ -38,7 +38,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "1.12";
+my $version = "1.2";
 
 #-- these we may get on request
 my %gets = (
@@ -292,7 +292,7 @@ sub Shelly_Get ($@) {
     my $txt = "relay";
     $txt = "roller"
       if( ($model eq "shelly2") && ($mode eq "roller") );
-    return $shelly_regs{$txt}."\n\nSet/Get these registers by calling set/get $name config &lt;register&gt; [<channel>] &lt;value&gt;";
+    return $shelly_regs{$txt}."\n\nSet/Get these registers by calling set/get $name config &lt;registername&gt; [&lt;channel&gt;] &lt;value&gt;";
   
   #-- configuration register
   }elsif($a[1] eq "config") {
@@ -504,7 +504,7 @@ sub Shelly_Set ($@) {
 
   if ( $hash && !$err && !$data ){
      $url    = "http://".$hash->{TCPIP}."/".$cmd;
-     Log3 $name, 1,"[Shelly_configure] called with only hash  => Issue a non-blocking call to $url";  
+     Log3 $name, 5,"[Shelly_configure] called with only hash  => Issue a non-blocking call to $url";  
      HttpUtils_NonblockingGet({
         url      => $url,
         callback=>sub($$$){ Shelly_configure($hash,$cmd,$_[1],$_[2]) }
@@ -528,7 +528,7 @@ sub Shelly_Set ($@) {
   #-- isolate register name
   my $reg = substr($cmd,index($cmd,"?")+1);
   my $val = $jhash->{$reg};
-  readingsSingleUpdate($hash,"config",$reg."=".$val,0);
+  readingsSingleUpdate($hash,"config",$reg."=".$val,1);
   
   return undef;
 }
@@ -944,6 +944,12 @@ sub Shelly_Set ($@) {
          </ul>
         <a name="Shellyset"></a>
         <h4>Set</h4>  
+        For Shelly all Shelly devices
+        <ul>
+        <li><a name="shelly_sconfig"></a>
+                <code>set &lt;name&gt; config <registername> [channel] <value></code>
+                <br />set the value of a configuration register</li>
+        </ul>
         For Shelly switching devices (mode=relay for model=shelly2, standard for all other models) 
         <ul>
             <li><a name="shelly_onoff"></a>
@@ -965,12 +971,18 @@ sub Shelly_Set ($@) {
         <a name="Shellyget"></a>
         <h4>Get</h4>
         <ul>
+            <li><a name="shelly_config"></a>
+                <code>get &lt;name&gt; config <registername> [channel]</code>
+                <br />get the value of a configuration register and writes it in reading config</li>
+            <li><a name="shelly_registers"></a>
+                <code>get &lt;name&gt; registers</code>
+                <br />displays the names of the configuration registers for this device</li>      
             <li><a name="shelly_status"></a>
                 <code>get &lt;name&gt; status</code>
                 <br />returns the current devices status.</li>
             <li><a name="shelly_version"></a>
                 <code>get &lt;name&gt; version</code>
-                <br />Display the version of the module</li>             
+                <br />display the version of the module</li>              
         </ul>
         <a name="Shellyattr"></a>
         <h4>Attributes</h4>
