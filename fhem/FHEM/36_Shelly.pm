@@ -38,7 +38,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "1.1";
+my $version = "1.11";
 
 #-- these we may get on request
 my %gets = (
@@ -362,7 +362,7 @@ sub Shelly_Set ($@) {
             Log3 $name, 1,"[Shelly_Set] ".$msg;
             return $msg;
           }else{
-            Log3 $name, 1,"[Shelly_Set] Warning: wrong channel given, switching default channel $channel";
+            Log3 $name, 4,"[Shelly_Set] switching default channel $channel";
           }
         }
       }
@@ -483,15 +483,9 @@ sub Shelly_Set ($@) {
   my $name = $hash->{NAME};
   my $url;
   my $state = $hash->{READINGS}{state}{VAL};
-  
-  #if( ($state ne "initialized") && ($state ne "alive") ){
-  #  Log3 $name, 1,"[DoorPi_Cmd] cannot be called, no connection";
-  #  return
-  #}
+
   my $model =  AttrVal($name,"model","");
-  
-  #if( $model eq "shelly
-    
+
   if ( $hash && !$data){
      $url    = "http://".$hash->{TCPIP}."/".$cmd;
      Log3 $name, 1,"[Shelly_configure] called with only hash  => Issue a non-blocking call to $url";  
@@ -542,12 +536,6 @@ sub Shelly_Set ($@) {
   #-- reset blocking due to existing movement
   $hash->{BLOCKED} = 0;
   $hash->{DURATION} = 0;
-  
-  #if( ($state ne "initialized") && ($state ne "alive") ){
-  #  Log3 $name, 1,"[DoorPi_Cmd] cannot be called, no connection";
-  #  return
-  #}
-  
     
   if ( $hash && !$data){
      $url    = "http://".$hash->{TCPIP}."/status";
@@ -684,10 +672,6 @@ sub Shelly_Set ($@) {
   my $url;
   my $state = $hash->{READINGS}{state}{VAL};
   
-  #if( ($state ne "initialized") && ($state ne "alive") ){
-  #  Log3 $name, 1,"[DoorPi_Cmd] cannot be called, no connection";
-  #  return
-  #}
   my $model =  AttrVal($name,"model","");
   #-- empty cmd parameter
   $cmd = ""
@@ -791,10 +775,6 @@ sub Shelly_Set ($@) {
   my $url;
   my $state = $hash->{READINGS}{state}{VAL};
   
-  #if( ($state ne "initialized") && ($state ne "alive") ){
-  #  Log3 $name, 1,"[DoorPi_Cmd] cannot be called, no connection";
-  #  return
-  #}
   my $model =  AttrVal($name,"model","");
     
   if ( $hash && !$data){
@@ -856,8 +836,11 @@ sub Shelly_Set ($@) {
   readingsBulkUpdate($hash,"overpower".$subs,$overpower)
     if( $shelly_models{$model}[2] > 0);
   readingsEndUpdate($hash,1);
-  InternalTimer(gettimeofday()+ 1, "Shelly_meter", $hash,0)
-    if( $shelly_models{$model}[2] > 0);
+  
+  #InternalTimer(gettimeofday()+ 1, "Shelly_meter", $hash,0)
+  #  if( $shelly_models{$model}[2] > 0);
+  #-- Call status after switch.
+  InternalTimer(int(gettimeofday()+1.5), "Shelly_status", $hash,0);
 
   return undef;
 }
@@ -865,34 +848,31 @@ sub Shelly_Set ($@) {
 ########################################################################################
 #
 # Shelly_meter - Retrieve data from meter
-#                 acts as callable program Shelly_meter0($hash,$cmd)
-#                 and as callback program  Shelly_meter0($hash,$cmd,$err,$data)
+#                 acts as callable program Shelly_meter($hash,$channel,cmd)
+#                 and as callback program  Shelly_meter0($hash,$channel,$cmd,$err,$data)
 # 
-# Parameter hash, cmd = command 
+# Parameter hash, channel, cmd = command 
 #
 ########################################################################################
 
  sub Shelly_meter {
-  my ($hash, $err, $data) = @_;
+  my ($hash, $channel, $err, $data) = @_;
   my $name = $hash->{NAME};
   my $url;
   my $state = $hash->{READINGS}{state}{VAL};
-  
-  #if( ($state ne "initialized") && ($state ne "alive") ){
-  #  Log3 $name, 1,"[DoorPi_Cmd] cannot be called, no connection";
-  #  return
-  #}
+   
+  my $model =  AttrVal($name,"model","");
     
   if ( $hash && !$data){
-     $url    = "http://".$hash->{TCPIP}."/meter/0";
+     $url    = "http://".$hash->{TCPIP}."/meter/".$channel;
      Log3 $name, 5,"[Shelly_meter] called with only hash  => Issue a non-blocking call to $url";  
      HttpUtils_NonblockingGet({
         url      => $url,
-        callback=>sub($$$){ Shelly_meter($hash,$_[1],$_[2]) }
+        callback=>sub($$$){ Shelly_meter($hash,$channel,$_[1],$_[2]) }
      });
      return undef;
   }elsif ( $hash && $err ){
-    Log3 $name, 1,"[Shelly_meter  has error $err";
+    Log3 $name, 1,"[Shelly_meter has error $err";
     readingsSingleUpdate($hash,"state","Error",1);
     return;
   }
@@ -908,7 +888,10 @@ sub Shelly_Set ($@) {
   
   my $power   = $jhash->{'power'};
   
-  readingsSingleUpdate($hash,"power",$power,1);
+  #-- 
+  my $subs = ($shelly_models{$model}[2] ==1) ? "" : "_".$channel;
+
+  readingsSingleUpdate($hash,"power".$subs,$power,1);
   return undef;
 }
 
