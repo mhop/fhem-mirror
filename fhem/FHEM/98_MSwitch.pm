@@ -7183,14 +7183,14 @@ sub MSwitch_dec($$) {
 my ( $hash, $todec) = @_;
 my $name = $hash->{NAME};
 $todec =~ s/\n//g;
-#$todec =~ s/#\[wa\]/|/g; 
+$todec =~ s/#\[wa\]/|/g; 
 
 
 	$todec =~ s/\$NAME/$hash->{helper}{eventfrom}/;
 	
 	$todec =~ s/MSwitch_Self/$name/;
 	
-	
+
 	
 	
 	
@@ -7361,7 +7361,7 @@ sub MSwitch_makefreecmd($$) {
 				$cs =~ s/#.*\n//g;	
 				# entferne zeilenumbruch
 				$cs =~ s/\n//g;
-				
+				$cs =~ s/#\[wa\]/|/g; 
 				# ersetze Eventvariablen
 				$ersetzung = ReadingsVal( $name, "EVTPART3", "" );
 				$cs =~ s/\$EVTPART3/$ersetzung/g;
