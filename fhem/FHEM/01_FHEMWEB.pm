@@ -1276,6 +1276,7 @@ FW_makeTable($$$@)
           $v = $1;
         } else {
           $v = FW_htmlEscape($v);
+          $v = "<pre>$v</pre>" if($v =~ m/\n/);
         }
 
         my $ifid = "class='dval' informId='$name-$prefix$n'";
@@ -1305,7 +1306,7 @@ FW_makeTable($$$@)
           FW_pH "cmd=list%20TYPE=$val", $val,1;
 
         } else {
-           $val = "<pre>$val</pre>" if($val =~ m/\n/ && $title eq "Attributes");
+           $val = "<pre>$val</pre>" if($val =~ m/\n/);
            FW_pO "<td><div $tattr>".
                    join(",", map { ($_ ne $name && $defs{$_}) ?
                      FW_pH( "detail=$_", $_ ,0,"",1,1) : $_ } split(",",$val)).
