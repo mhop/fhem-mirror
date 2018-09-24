@@ -48,7 +48,7 @@ sub HProtocolGateway_Initialize($) {
                       "baudrate:300,600,1200,2400,4800,9600 " .
                       "parityBit:N,E,O " .
                       "databitsLength:5,6,7,8 " .
-                      "stopBit:0,1" .
+                      "stopBit:0,1 " .
                       "pollIntervalMins " .
                       "path";
 }
