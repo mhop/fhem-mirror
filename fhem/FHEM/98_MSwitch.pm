@@ -730,6 +730,10 @@ sub MSwitch_Set($@) {
 
     return "" if ( IsDisabled($name) && ($cmd eq 'on' || $cmd eq 'off') );# Return without any further action if the module is disabled
 	my $execids = "0";
+	
+	
+	
+	
 	# verry special commands readingactivated
 	my $special='';
 	my $cs = ReadingsVal( $name,'.sysconf', 'undef' );
@@ -746,13 +750,25 @@ sub MSwitch_Set($@) {
 	$cs =~ s/#\[ko\]/,/g;
 	$cs =~ s/#.*\n//g;	
 	$cs =~ s/\n//g;
-	eval($cs);
+	
+	my $return ="no value";
+	$return = eval($cs);
             if ($@) 
 			{
                 Log3( $name, 1,"$name MSwitch_repeat: ERROR $cs: $@ " . __LINE__ );
+				#MSwitch_LOG( $name, 5,"$name MSwitch_repeat: ERROR $cs: $@ " . __LINE__ );
+				
             }
-	} 
 			
+		#MSwitch_LOG( $name, 5,"$name MSwitch_repeat: $return" );	
+		
+		return if $return eq "exit";
+	} 
+	############################	
+
+	
+
+		
 	if (!defined $args[0]) { $args[0]='';}
 	if ( $cmd eq 'exec_cmd1' && $args[0] eq 'ID')
 	{
@@ -1334,7 +1350,7 @@ sub MSwitch_Set($@) {
 			# teste auf delayinhalt
 			MSwitch_LOG( $name, 5, "$name: teste auf timerstatus -> $testtstate"  ); 
             $testtstate =~ s/[A-Za-z0-9#\.\-_]//g;
-            if ( $testtstate eq "[:]" ) 
+            if ( $testtstate eq "[:]" || $testtstate eq "[\$:]"  ) 
 			{
                 $devicedetails{$timerkey} =eval MSwitch_Checkcond_state( $devicedetails{$timerkey}, $name );
                 my $hdel = ( substr( $devicedetails{$timerkey}, 0, 2 ) ) * 3600;
@@ -1361,6 +1377,15 @@ sub MSwitch_Set($@) {
 			MSwitch_LOG( $name, 5, "$name: teste auf delay -> ".$devicedetails{$timerkey}  ); 
 
 			my $conditionkey = $device . "_condition".$cmd; 
+			
+			
+			
+			
+			
+			
+			
+			
+			MSwitch_LOG( $name, 5, "$name: TIMERKEY -> ".$devicedetails{$timerkey}  );
 			
             if (   $devicedetails{$timerkey} eq "0" || $devicedetails{$timerkey} eq "" )
                 {
@@ -3142,7 +3167,7 @@ sub MSwitch_fhemwebFn($$$$) {
             if ( $testtimestroff ne '[random]' ) 
 			{
                 $testtimestroff =~ s/[A-Za-z0-9#\.\-_]//g;
-                if ( $testtimestroff eq "[:]" ) 
+                if ( $testtimestroff eq "[:]" || $testtimestroff eq "[\$:]" ) 
 				{
                     $timestroff =
                      $savedetails{ $aktdevice . '_timeoff' };    #sekunden
@@ -3176,7 +3201,7 @@ sub MSwitch_fhemwebFn($$$$) {
             if ( $testtimestron ne '[random]' ) 
 			{
                 $testtimestron =~ s/[A-Za-z0-9#\.\-_]//g;
-                if ( $testtimestron eq "[:]" ) 
+                if ( $testtimestron eq "[:]"  || $testtimestron eq "[\$:]" ) 
 				{
                     $timestron =$savedetails{ $aktdevice . '_timeon' };    #sekunden
                 }
@@ -4678,7 +4703,13 @@ sub MSwitch_makeCmdHash($) {
         if ( $testtimestroff ne '[random]' )
 		{
             $testtimestroff =~ s/[A-Za-z0-9#\.\-_]//g;
-            if ( $testtimestroff ne "[:]" ) 
+			
+			
+			
+			#Log3( $Name, 0,"testtimestron -> $testtimestroff" . __LINE__ );
+			
+			
+            if ( $testtimestroff ne "[:]" && $testtimestroff ne "[\$:]" ) 
 			{
                 my $hdel = ( substr( $detailarray[7], 0, 2 ) ) * 3600;
                 my $mdel = ( substr( $detailarray[7], 3, 2 ) ) * 60;
@@ -4697,7 +4728,7 @@ sub MSwitch_makeCmdHash($) {
             $testtimestron =~ s/[A-Za-z0-9#\.\-_]//g;
 			
 
-            if ( $testtimestron ne "[:]" ) 
+            if ( $testtimestron ne "[:]" && $testtimestroff ne "[\$:]" ) 
 			{
                 my $hdel = substr( $detailarray[8], 0, 2 ) * 3600;
                 my $mdel = substr( $detailarray[8], 3, 2 ) * 60;
@@ -4908,7 +4939,7 @@ sub MSwitch_Exec_Notif($$$$$) {
         my $testtstate = $devicedetails{$timerkey};
         $testtstate =~ s/[A-Za-z0-9#\.\-_]//g;
 
-        if ( $testtstate eq "[:]" ) 
+        if ( $testtstate eq "[:]" || $testtstate eq "[\$:]") 
 		{
 		
             $devicedetails{$timerkey} =
@@ -4940,6 +4971,8 @@ sub MSwitch_Exec_Notif($$$$$) {
             #Variabelersetzung
             $cs =~ s/\$NAME/$hash->{helper}{eventfrom}/;
 			$cs =~ s/\$SELF/$name/;
+			
+			
             if (   $devicedetails{$timerkey} eq "0" || $devicedetails{$timerkey} eq "" )
             {
                 # teste auf condition
@@ -5047,6 +5080,30 @@ sub MSwitch_Exec_Notif($$$$$) {
             }
             else 
 			{
+			# ################### magictimer
+				# my $x = 0;
+				# while ( $devicedetails{$timerkey} =~ m/(.*?)(\$SELF)(.*)?/)
+				# {
+				# my $firstpart = $1;
+				# my $secondpart = $2;
+				# my $lastpart = $3;
+				# $devicedetails{$timerkey} = $firstpart.$name.$lastpart;
+				# $x++;
+				# last if $x > 10;    #notausstieg
+				# }
+			    # # setmagic ersetzun
+				# MSwitch_LOG( $name, 5, "vor freecmd: ".$cs );	
+				# $x =0;
+				# while ( $devicedetails{$timerkey} =~ m/(.*)\[(.*)\:(.*)\](.*)/ ) 
+					# {
+					# $x++;                        # notausstieg notausstieg
+					# last if $x > 20;             # notausstieg notausstieg
+					# my $setmagic = ReadingsVal( $2, $3, 0 );
+					# $devicedetails{$timerkey} = $1.$setmagic.$4;
+					# }
+			###################
+			
+			
                 if ( AttrVal( $name, 'MSwitch_RandomTime', '' ) ne ''&& $devicedetails{$timerkey} eq '[random]' )
                 {
                     $devicedetails{$timerkey} =
@@ -5589,11 +5646,36 @@ sub MSwitch_checkcondition($$$) {
 
 sub MSwitch_Checkcond_state($$) {
     my ( $condition, $name ) = @_;
+	
+	
+	
+	MSwitch_LOG( $name, 5, "----------------------------------------"  );
+	MSwitch_LOG( $name, 5, "$name: MSwitch_Checkcond_state -> ".$condition  ); 
+	MSwitch_LOG( $name, 5, "----------------------------------------"   ); 
+	
+	
+	my $x = 0;
+    while ( $condition =~ m/(.*?)(\$SELF)(.*)?/)
+	{
+		my $firstpart = $1;
+		my $secondpart = $2;
+		my $lastpart = $3;
+		$condition = $firstpart.$name.$lastpart;
+		$x++;
+		last if $x > 10;    #notausstieg
+	}
+	
+	
+	
+	
     $condition =~ s/\[//;
     $condition =~ s/\]//;
     my @reading = split( /:/, $condition );
     my $return  = "ReadingsVal('$reading[0]', '$reading[1]', 'undef')";
     my $test    = ReadingsVal( $reading[0], $reading[1], 'undef' );
+	
+	MSwitch_LOG( $name, 5, "$name: MSwitch_Checkcond_state OUT -> ".$return  ); 
+	
     return $return;
 }
 ####################
@@ -6825,6 +6907,12 @@ sub MSwitch_replace_delay($$) {
     my $name = $hash->{NAME};
     my $time  = time;
     my $ltime = TimeNow();
+	
+	MSwitch_LOG( $name, 5, "----------------------------------------"  );
+	MSwitch_LOG( $name, 5, "$name: MSwitch_replace_delay-> $timerkey"  ); 
+	MSwitch_LOG( $name, 5, "----------------------------------------"  );
+	
+	
     my ( $aktdate, $akttime ) = split / /, $ltime;
     my $hh = ( substr( $timerkey, 0, 2 ) );
     my $mm = ( substr( $timerkey, 2, 2 ) );
@@ -7216,10 +7304,15 @@ my @changes = split( /\|/, $cs );
 	$x++;
 	}
 	my $newdevices  = join( ',', @devices );
-	readingsSingleUpdate( $hash, ".Device_Affected", $newdevices, 0 );
+readingsSingleUpdate( $hash, ".Device_Affected", $newdevices, 0 );
+
+
+
+
 
 	#details
 	my $tochange2 = ReadingsVal( $name, ".Device_Affected_Details", "" );
+Log3( $name, 0, "vor change: ".$tochange2 );	
 	my @devicesdetails = split( /#\[ND\]/,$tochange2 );
 	$x =0;
 	foreach  (@devicesdetails)
@@ -7229,7 +7322,27 @@ my @changes = split( /\|/, $cs );
 	$x++;
 	}
 	$tochange2  = join( '#[ND]', @devicesdetails );
-	readingsSingleUpdate( $hash, ".Device_Affected_Details", $tochange2, 0 );
+	
+#Log3( $name, 0, "oldname: ".$oldname );	
+#Log3( $name, 0, "newname: ".$newname );	
+
+#Log3( $name, 0, "navh change: ".$tochange2 );	
+	
+	my $x = 0;
+    while ( $tochange2 =~ m/(.*?)($names[0])(.*)?/)
+	{
+		my $firstpart = $1;
+		my $secondpart = $2;
+		my $lastpart = $3;
+		$tochange2 = $firstpart.$names[1].$lastpart;
+		$x++;
+		last if $x > 10;    #notausstieg
+	}
+	
+#	Log3( $name, 0, "navh 2 change: ".$tochange2 );	
+	
+	
+readingsSingleUpdate( $hash, ".Device_Affected_Details", $tochange2, 0 );
 	}
 fhem("deletereading $name .change");
 fhem("deletereading $name .change_info");
