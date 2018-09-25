@@ -31,6 +31,9 @@
 # ABU 20180706 changed eval, removed stateCopy
 # ABU 20180706 fixed doku: changed readonly in listenonly
 # ABU 20180815 updated link in doku, changed (dpt16$) to dpt16 in set, tried to fix öast-sender (replaced bulk by single in decoding loop)
+# ABU 20180829 added dpt9.0020, tried workaround in putCmd, remove non printable chars
+# ABU 20180925 added dpt3.007, added last-sender "fhem"
+
 
 package main;
 
@@ -133,6 +136,7 @@ my %dpttypes = (
 	  
 	#Step value (four-bit)
 	"dpt3" 			=> {CODE=>"dpt3", UNIT=>"", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,3}/i, MIN=>-100, MAX=>100},
+	"dpt3.007" 		=> {CODE=>"dpt3", UNIT=>"%", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,3}/i, MIN=>-100, MAX=>100},	
 
 	# 1-Octet unsigned value
 	"dpt5" 			=> {CODE=>"dpt5", UNIT=>"", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,3}/i, MIN=>0, MAX=>255},
@@ -169,6 +173,7 @@ my %dpttypes = (
 	"dpt9.008"	 	=> {CODE=>"dpt9", UNIT=>"ppm", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/i, MIN=>-670760, MAX=>670760},	
 	"dpt9.009"	 	=> {CODE=>"dpt9", UNIT=>"m&sup3/h", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/i, MIN=>-670760, MAX=>670760},	
 	"dpt9.010"	 	=> {CODE=>"dpt9", UNIT=>"s", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/i, MIN=>-670760, MAX=>670760},	
+	"dpt9.020"		=> {CODE=>"dpt9", UNIT=>"mV", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/i, MIN=>-670760, MAX=>670760},
 	"dpt9.021"	 	=> {CODE=>"dpt9", UNIT=>"mA", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/i, MIN=>-670760, MAX=>670760},		
 	"dpt9.024"	 	=> {CODE=>"dpt9", UNIT=>"kW", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/i, MIN=>-670760, MAX=>670760},	
 	"dpt9.025"	 	=> {CODE=>"dpt9", UNIT=>"l/h", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/i, MIN=>-670760, MAX=>670760},	
@@ -996,6 +1001,7 @@ KNX_Set($@) {
 		}
 		
 		readingsBulkUpdate($hash, "state", $state);
+		readingsBulkUpdate($hash, "last-sender", "fhem");
 		readingsEndUpdate($hash, 1);
 	}							
 	
@@ -1284,7 +1290,9 @@ KNX_Parse($$) {
 
 				$value = KNX_eval ($hash, $gadName, $value, $cmdAttr);
 				
-				if ($orgValue ne $value)
+				#if ($orgValue ne $value)
+				#try to fix: answer only, if eval was successful
+				if (($orgValue ne $value) and ($value !~ m/ERROR/i))
 				{
 					Log3 ($deviceName, 5, "parse device hash (r): $deviceHash name: $deviceName - put replaced via command $cmdAttr - value: $value");
 					readingsSingleUpdate($deviceHash, $putString, $value,1);								
@@ -2024,7 +2032,10 @@ KNX_decodeByDpt ($$$) {
 		}
 
 		#convert to latin-1
-		$state = encode ("utf8", $state) if ($model =~ m/16.001/);		
+		$state = encode ("utf8", $state) if ($model =~ m/16.001/);
+
+		#remove non printable chars
+		$state =~ s/[\x00-\x1F]+//g;	
 	}
 	#DateTime
 	elsif ($code eq "dpt19")
@@ -2205,6 +2216,7 @@ The answer from the bus-device is not shown in the toolbox, but is treated like 
 <ul>dpt1.023 move up/down, move and step mode</ul>
 <ul>dpt2 on, off, forceOn, forceOff</ul>
 <ul>dpt3 -100..+100</ul>
+<ul>dpt3.007 -100..+100 %</ul>
 <ul>dpt5 0..255</ul>
 <ul>dpt5.001 0..100 %</ul>
 <ul>dpt5.003 0..360 &deg;</ul>
