@@ -38,7 +38,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "1.21";
+my $version = "1.3";
 
 #-- these we may get on request
 my %gets = (
@@ -61,7 +61,7 @@ my %setsrol = (
   "closed:noArg"  => "C",
   "open:noArg"    => "O",
   "stop:noArg"    => "S",
-  "pct"           => "P" 
+  "pct:slider,0,1,100"           => "P" 
 ); 
 
 my %shelly_models = (
@@ -100,7 +100,7 @@ sub Shelly_Initialize ($) {
   #$hash->{NotifyFn} = "Shelly_Notify";
   #$hash->{InitFn}   = "Shelly_Init";
 
-  $hash->{AttrList}= "verbose model:".join(",",(keys %shelly_models))." mode:relay,roller defchannel maxtime maxpower interval ".
+  $hash->{AttrList}= "verbose model:".join(",",(keys %shelly_models))." mode:relay,roller defchannel maxtime maxpower interval pct100:open:closed ".
                      $readingFnAttributes;
 }
 
@@ -247,6 +247,13 @@ sub Shelly_Attr(@) {
       return
     }
     Shelly_configure($hash,"settings?maxtime=".$attrVal);
+  
+  #---------------------------------------  
+  }elsif ( ($cmd eq "set") && ($attrName eq "pct100") ) {
+    if( ($model ne "shelly2") || ($mode ne "roller" ) ){
+      Log3 $name,1,"[Shelly_Attr] setting the pct100 attribute only works for model=shelly2 and mode=roller";
+      return
+    }
     
   #---------------------------------------  
   }elsif ( ($cmd eq "set") && ($attrName eq "interval") ) {
@@ -400,6 +407,7 @@ sub Shelly_Set ($@) {
   #-- we have a Shelly 2 roller type device
   }elsif( ($model eq "shelly2") && ($mode eq "roller") ){ 
     my $channel = $value;
+    my $max=AttrVal($name,"maxtime",undef);  
     #-- WEB asking for command list 
     if( $cmd eq "?" ) {   
       $newkeys = join(" ", sort keys %setsrol);
@@ -414,26 +422,39 @@ sub Shelly_Set ($@) {
     
     if( $cmd eq "closed" ){
       Shelly_updown($hash,"?go=close");
+      $hash->{DURATION} = $max;
     }elsif( $cmd eq "open" ){
       Shelly_updown($hash,"?go=open");
+      $hash->{DURATION} = $max;
     }elsif( $cmd eq "stop" ){
       Shelly_updown($hash,"?go=stop");
+      $hash->{DURATION} = 0;
     }elsif( $cmd eq "pct" ){
       my $tpct = $value;
       my $pos  = ReadingsVal($name,"position","");
       my $pct  = ReadingsVal($name,"pct",undef); 
-      my $max=AttrVal($name,"maxtime",undef);  
+      
       if( !$max ){
         $msg = "Error: pct value can be set only if maxtime attribute is set properly";
         Log3 $name,1,"[Shelly_Set] ".$msg;
         return $msg
       }
-      
+      my $normal = (AttrVal($name,"pct100","open") eq "open");
       if( $pos eq "open" ){
-        $time = int(($max*(100-$tpct))/10)/10;
+        #-- 100% = open
+        if($normal){
+          $time = int(($max*(100-$tpct))/10)/10;
+        }else{
+          $time = int(($max*$pct)/10)/10;
+        }
         $cmd = "?go=close&duration=".$time; 
       }elsif( $pos eq "closed" ){
-        $time = int(($max*$tpct)/10)/10;
+        #-- 100% = open
+        if($normal){
+          $time = int(($max*$tpct)/10)/10;
+        }else{
+          $time = int(($max*(100-$tpct))/10)/10;
+        }
         $cmd = "?go=open&duration=".$time; 
       }else{
         if( !defined($pct) ){
@@ -443,10 +464,20 @@ sub Shelly_Set ($@) {
         }
         if( $tpct > $pct ){
           $time = int(($max*($tpct-$pct))/10)/10;
-          $cmd = "?go=open&duration=".$time; 
+          #-- 100% = open
+          if($normal){
+            $cmd = "?go=open&duration=".$time; 
+          }else{ 
+            $cmd = "?go=close&duration=".$time; 
+          }  
         }else{
           $time = int(($max*($pct-$tpct))/10)/10;
-          $cmd = "?go=close&duration=".$time; 
+          #-- 100% = open
+          if($normal){
+            $cmd = "?go=close&duration=".$time;       
+          }else{
+            $cmd = "?go=open&duration=".$time; 
+          }   
         }
       }
       $hash->{MOVING} = 1;
@@ -621,10 +652,11 @@ sub Shelly_Set ($@) {
       
       my $pct;
       #-- renormalize position
+      my $normal = (AttrVal($name,"pct100","open") eq "open");
       if( $rstate eq "open" ){
-        $pct = 100;
+        $pct = $normal?100:0;
       }elsif( $rstate eq "closed" ){
-        $pct = 0;
+        $pct = $normal?0:100;
       }else{
        $pct = ReadingsVal($name,"pct",undef);
        $pct = "unknown"
@@ -728,31 +760,55 @@ sub Shelly_Set ($@) {
     }
   }
   
-  my ($rstate,$rpower,$rstopreason,$rlastdir,$pct);
+  my ($rstate,$rpower,$rstopreason,$rlastdir,$pct,$normal,$pctopen,$pctclose);
   
   #-- immediately after moving blind
   if( $cmd ne ""){
-    $rstate = "moving";
-    $pct = ReadingsVal($name,"pct",undef);
+    $rstate  = "moving";
+    $pct     = ReadingsVal($name,"pct",undef);
+    $normal  = (AttrVal($name,"pct100","open") eq "open");
+    $pctopen = ($normal && ($pct == 100)) || (!$normal && ($pct == 0));
+    $pctclose= ($normal && ($pct == 0)) || (!$normal && ($pct == 100));
     #-- timer command
     if( index($cmd,"&") ne "-1"){
       my $max = AttrVal($name,"maxtime",undef);  
       my $dir = substr($cmd,4,index($cmd,"&")-4);
       my $dur = substr($cmd,index($cmd,"&")+10);
-      if( (!defined($pct) && ($dir eq "close")) || ($pct == 100) ){
-        $pct = 100-int((100*$dur)/$max);
+      if( (!defined($pct) && ($dir eq "close")) || $pctopen ){
+        #-- 100% = open
+        if( $normal ){
+          $pct = 100-int((100*$dur)/$max);
+        }else{
+          $pct = int((100*$dur)/$max);
+        }
       }elsif( $dir eq "close" ){
-        $pct = $pct-int((100*$dur)/$max);
-        $pct = 0
-          if( $pct < 0);
-      }elsif( (!defined($pct) && ($dir eq "open")) || ($pct == 0) ){
-        $pct = int((100*$dur)/$max);
+        #-- 100% = open
+        if( $normal ){
+          $pct = $pct-int((100*$dur)/$max);
+        }else{
+          $pct = $pct+int((100*$dur)/$max);
+        }     
+      }elsif( (!defined($pct) && ($dir eq "open")) || $pctclose ){
+        #-- 100% = open
+        if( $normal ){
+          $pct = int((100*$dur)/$max);
+        }else{
+          $pct = 100-int((100*$dur)/$max);
+        }
       }elsif( $dir eq "open" ){
-        $pct = $pct+int((100*$dur)/$max);
-        $pct = 100
-          if( $pct > 100);
+        #-- 100% = open
+        if( $normal ){
+          $pct = $pct+int((100*$dur)/$max);
+        }else{         
+          $pct = $pct-int((100*$dur)/$max);
+        }
       }     
     }
+    $pct = 0
+      if( $pct < 0);
+    $pct = 100
+      if( $pct > 100);
+      
     readingsBeginUpdate($hash);
     readingsBulkUpdate($hash,"state","OK");
     readingsBulkUpdate($hash,"position",$rstate);
@@ -1004,6 +1060,8 @@ sub Shelly_Set ($@) {
         <ul>
             <li><a name="shelly_maxtime"><code>attr &lt;name&gt; maxtime <float> </code></a>
                 <br />time needed for a complete drive upward or downward</li>
+            <li><a name="shelly_pct100"><code>attr &lt;name&gt; pct100 open|closed (default:open) </code></a>
+                <br />is pct=100 open or closed ? </li>
         </ul>
         <br/>Standard attributes   
         <ul>
