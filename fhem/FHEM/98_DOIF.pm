@@ -25,6 +25,8 @@ use Blocking;
 use Color;
 use vars qw($FW_CSRF);
 
+my $hs;
+
 sub DOIF_cmd ($$$$);
 sub DOIF_Notify ($$);
 
@@ -1113,13 +1115,13 @@ sub ReplaceAggregateDoIf($$$)
   
   if (defined $default) {
     $match="" if (!defined $match);
-    $block="AggregateDoIf(".'$hash'.",'$aggrType','$nameExp','$reading','$match','$default')";
+    $block="::AggregateDoIf(".'$hash'.",'$aggrType','$nameExp','$reading','$match','$default')";
   } elsif (defined $match) {
-    $block="AggregateDoIf(".'$hash'.",'$aggrType','$nameExp','$reading','$match')";
+    $block="::AggregateDoIf(".'$hash'.",'$aggrType','$nameExp','$reading','$match')";
   } elsif (defined $reading) {
-    $block="AggregateDoIf(".'$hash'.",'$aggrType','$nameExp','$reading')";
+    $block="::AggregateDoIf(".'$hash'.",'$aggrType','$nameExp','$reading')";
   } else {
-     $block="AggregateDoIf(".'$hash'.",'$aggrType','$nameExp')";
+     $block="::AggregateDoIf(".'$hash'.",'$aggrType','$nameExp')";
   }
   
   if ($eval) {
@@ -1172,11 +1174,11 @@ sub ReplaceEventDoIf($)
     if (defined $filter) {
       return ($block,"default value must be defined")
     } else {
-      $block="EventDoIf('$nameExp',".'$hash,'."'$notifyExp',0)";
+      $block="::EventDoIf('$nameExp',".'$hash,'."'$notifyExp',0)";
       return ($block,undef);
     }
   }
-  $block="EventDoIf('$nameExp',".'$hash,'."'$notifyExp',0,'$filter','$output','$default')";
+  $block="::EventDoIf('$nameExp',".'$hash,'."'$notifyExp',0,'$filter','$output','$default')";
   return ($block,undef);
 }
 
@@ -1213,15 +1215,15 @@ sub ReplaceReadingDoIf($)
     if ($reading) {
       if (substr($reading,0,1) eq "\?") {
         $notifyExp=substr($reading,1);
-        return("EventDoIf('$name',".'$hash,'."'$notifyExp',1)","",$name,undef,undef);
+        return("::EventDoIf('$name',".'$hash,'."'$notifyExp',1)","",$name,undef,undef);
       } elsif ($reading =~ /^"(.*)"$/g)  {
         $notifyExp=$1;
-        return("EventDoIf('$name',".'$hash,'."'$notifyExp',1)","",$name,undef,undef);
+        return("::EventDoIf('$name',".'$hash,'."'$notifyExp',1)","",$name,undef,undef);
       }
       $internal = substr($reading,1) if (substr($reading,0,1) eq "\&");
       if ($format) {
         if ($format eq "sec") {
-          return("ReadingSecDoIf('$name','$reading')","",$name,$reading,undef);
+          return("::ReadingSecDoIf('$name','$reading')","",$name,$reading,undef);
         } elsif (substr($format,0,1) eq '[') { #old Syntax
           ($beginning,$regExp,$err,$tailBlock)=GetBlockDoIf($format,'[\[\]]');
           return ($regExp,$err) if ($err);
@@ -1248,15 +1250,15 @@ sub ReplaceReadingDoIf($)
         $param=",'$default'";
       }
       if ($internal) {
-        return("InternalDoIf(".'$hash'.",'$name','$internal'".$param.")","",$name,undef,$internal);
+        return("::InternalDoIf(".'$hash'.",'$name','$internal'".$param.")","",$name,undef,$internal);
       } else {
-        return("ReadingValDoIf(".'$hash'.",'$name','$reading'".$param.")","",$name,$reading,undef);
+        return("::ReadingValDoIf(".'$hash'.",'$name','$reading'".$param.")","",$name,$reading,undef);
       }
     } else {
       if ($default) {
         $param=",'$default'";
       }
-      return("InternalDoIf(".'$hash'.",'$name','STATE'".$param.")","",$name,undef,'STATE');
+      return("::InternalDoIf(".'$hash'.",'$name','STATE'".$param.")","",$name,undef,'STATE');
     }
   }
 }
@@ -1620,9 +1622,9 @@ DOIF_CheckTimers($$$$)
   }
   if (defined $end) {
     if ($days eq "") {
-      $block='DOIF_time($hash,'.$i.','.($i+1).',$wday,$hms)';
+      $block='::DOIF_time($hash,'.$i.','.($i+1).',$wday,$hms)';
     } else {
-      $block='DOIF_time($hash,'.$i.','.($i+1).',$wday,$hms,"'.$days.'")';
+      $block='::DOIF_time($hash,'.$i.','.($i+1).',$wday,$hms,"'.$days.'")';
     }
     $hash->{interval}{$i}=-1;
     $hash->{interval}{($i+1)}=$i;
@@ -1633,9 +1635,9 @@ DOIF_CheckTimers($$$$)
     }
   } else {
     if ($days eq "") {
-      $block='DOIF_time_once($hash,'.$i.',$wday)';
+      $block='::DOIF_time_once($hash,'.$i.',$wday)';
     } else {
-      $block='DOIF_time_once($hash,'.$i.',$wday,"'.$days.'")';
+      $block='::DOIF_time_once($hash,'.$i.',$wday,"'.$days.'")';
     }
   }
   if ($init_done) {
@@ -1865,7 +1867,9 @@ sub DOIF_CheckCond($$) {
   }
   $cmdFromAnalyze="$hash->{NAME}: ".sprintf("warning in condition c%02d",($condition+1));
   $lastWarningMsg="";
-  my $ret = eval $command;
+  $hs=$hash;
+  my $ret=$hash->{MODEL} eq "Perl" ? eval("package DOIF; $command"):eval ($command);  
+  #my $ret = eval ($command);
   if($@){
     $@ =~ s/^(.*) at \(eval.*\)(.*)$/$1,$2/;
     $err = sprintf("condition c%02d",($condition+1)).": $@";
@@ -2264,7 +2268,7 @@ DOIF_Notify($$)
   my $err;
   my $eventa;
   my $eventas;
-  
+
   $eventa = deviceEvents($dev, AttrVal($pn, "addStateEvent", 0));
   $eventas = deviceEvents($dev, 1);
   
@@ -2822,132 +2826,6 @@ DOIF_SleepTrigger ($)
   return undef;
 }
 
-sub DOIF_set_Exec
-{
-  my ($hash,$timername,$seconds,$subname,$param)=@_;
-  my $current = gettimeofday();
-  my $next_time = $current+$seconds;
-  $hash->{ptimer}{$timername}{time}=$next_time;
-  $hash->{ptimer}{$timername}{name}=$timername;
-  $hash->{ptimer}{$timername}{subname}=$subname;
-  $hash->{ptimer}{$timername}{param}=$param if (defined $param);
-  $hash->{ptimer}{$timername}{hash}=$hash;
-  RemoveInternalTimer(\$hash->{ptimer}{$timername});
-  if ($seconds > 0) {
-    readingsSingleUpdate ($hash,"timer_$timername",strftime("%d.%m.%Y %H:%M:%S",localtime($next_time)),0);
-  }
-  InternalTimer($next_time, "DOIF_ExecTimer",\$hash->{ptimer}{$timername}, 0);
-}
-
-
-sub DOIF_get_Exec
-{
-  my ($hash,$timername)=@_;
-  my $current = gettimeofday();
-  if (defined $hash->{ptimer}{$timername}{time}) {
-    my $sec=$hash->{ptimer}{$timername}{time}-$current;
-    if ($sec > 0) {
-      return ($sec);
-    } else {
-      delete ($hash->{ptimer}{$timername}{time});
-      return (0);
-    }
-  } else {
-    return (0);
-  }
-}
-
-sub DOIF_del_Exec
-{
-  my ($hash,$timername)=@_;
-  RemoveInternalTimer(\$hash->{ptimer}{$timername});
-  delete $hash->{ptimer}{$timername};
-  delete ($defs{$hash->{NAME}}{READINGS}{"timer_$timername"});
-}
-
-sub DOIF_ExecTimer
-{
-  my ($timer)=@_;
-  my $hash=${$timer}->{hash};
-  my $timername=${$timer}->{name};
-  my $name=$hash->{NAME};
-  my $subname=${$timer}->{subname};
-  my $param=${$timer}->{param} if (defined ${$timer}->{param});
-  if (!defined ($param)) {
-    eval ($subname);
-  } else {
-    eval ("$subname(\"$param\")");
-  }
-  if ($@) {
-    Log3 ($defs{$name}{NAME},1 , "$name error in $subname: $@");
-    readingsSingleUpdate ($hash, "error", "in $subname: $@",0);
-  }
-  delete ($defs{$name}{READINGS}{"timer_$timername"});
-}
-
-sub DOIF_set_Timer
-{
-  my ($hash,$event,$seconds)=@_;
-  my $name=$hash->{NAME};
-  my $timername="$name:$event";
-  my $current = gettimeofday();
-  my $next_time = $current+$seconds;
-  RemoveInternalTimer($timername);
-  $hash->{ptimer}{$timername}=$next_time;
-  if ($seconds > 0) {
-    $event =~ s/\W/_/g;
-    readingsSingleUpdate ($hash,"timer_$event",strftime("%d.%m.%Y %H:%M:%S",localtime($next_time)),0);
-  }
-  InternalTimer($next_time, "DOIF_PerlTimer", $timername, 0);
-}
-
-
-
-sub DOIF_get_Timer
-{
-  my ($hash,$event)=@_;
-  my $name=$hash->{NAME};
-  my $timername="$name:$event";
-  my $current = gettimeofday();
-  if (defined $hash->{ptimer}{$timername}) {
-    my $sec=$hash->{ptimer}{$timername}-$current;
-    if ($sec > 0) {
-      return ($sec);
-    } else {
-      delete ($hash->{ptimer}{$timername});
-      return (0);
-    }
-  } else {
-    return (0);
-  }
-}
-
-sub DOIF_PerlTimer
-{
-  my ($timername)=@_;
-  my ($name,$event)=split(":",$timername);
-  DoTrigger($name, $event);
-  $event =~ s/\W/_/g;
-  delete ($defs{$name}{READINGS}{"timer_$event"});
-}
-
-sub DOIF_del_Timer
-{
-  my ($hash,$event)=@_;
-  my $name=$hash->{NAME};
-  my $timername="$name:$event";
-  delete $hash->{ptimer}{$timername};
-  $event =~ s/\W/_/g;
-  delete ($defs{$hash->{NAME}}{READINGS}{"timer_$event"});
-  RemoveInternalTimer($timername);
-}
-
-sub DOIF_set_Event
-{
-  my ($hash,$event)=@_;
-  DOIF_set_Timer($hash,$event,0);
-}
-
 sub
 CmdDoIfPerl($$)
 {
@@ -2958,7 +2836,7 @@ CmdDoIfPerl($$)
   my $err="";
   my $i=0;
 
-#def modify
+  #def modify
   if ($init_done)
   {
     DOIF_delTimer($hash);
@@ -2975,14 +2853,6 @@ CmdDoIfPerl($$)
 
   return("","") if ($tail =~ /^ *$/);
 
-  $tail =~ s/set_Timer[ \t]*\(/DOIF_set_Timer\(\$hash,/g;  
-  $tail =~ s/get_Timer[ \t]*\(/DOIF_get_Timer\(\$hash,/g;
-  $tail =~ s/del_Timer[ \t]*\(/DOIF_del_Timer\(\$hash,/g;
-  $tail =~ s/set_Exec[ \t]*\(/DOIF_set_Exec\(\$hash,/g;
-  $tail =~ s/get_Exec[ \t]*\(/DOIF_get_Exec\(\$hash,/g;
-  $tail =~ s/del_Exec[ \t]*\(/DOIF_del_Exec\(\$hash,/g;
-  $tail =~ s/set_Event[ \t]*\(/DOIF_set_Event\(\$hash,/g;
-  $tail =~ s/set_Reading[ \t]*\(/readingsSingleUpdate\(\$hash,/g;
   $tail =~ s/\$_(\w+)/\$hash->\{var\}\{$1\}/g;
   
   while ($tail ne "") {
@@ -2992,7 +2862,7 @@ CmdDoIfPerl($$)
       my $blockname=$1;
       if ($blockname eq "subs") {
         $perlblock =~ s/\$SELF/$hash->{NAME}/g;
-        $perlblock ="no warnings 'redefine';".$perlblock;
+        $perlblock ="no warnings 'redefine';package DOIF;".$perlblock;
         eval ($perlblock);
         if ($@) {
           return ("error in defs block",$@);
@@ -3133,7 +3003,7 @@ DOIF_Define($$$)
   return undef if (AttrVal($hash->{NAME},"disable",""));
   my $err;
   my $msg;
-  
+
   if (!$cmd) {
     $cmd="";
     $defs{$hash->{NAME}}{DEF}="##";
@@ -3392,8 +3262,286 @@ DOIF_Get($@)
   return undef;
 }
 
+sub DOIF_PerlTimer
+{
+  my ($timername)=@_;
+  my ($name,$event)=split(":",$timername);
+  DoTrigger($name, $event);
+  $event =~ s/\W/_/g;
+  delete ($::defs{$name}{READINGS}{"timer_$event"});
+}
+
+
+package DOIF;
+
+use Date::Parse qw(str2time);
+use Time::HiRes qw(gettimeofday);
+
+sub DOIF_ExecTimer
+{
+  my ($timer)=@_;
+  my $hash=${$timer}->{hash};
+  my $timername=${$timer}->{name};
+  my $name=$hash->{NAME};
+  my $subname=${$timer}->{subname};
+  my $param=${$timer}->{param} if (defined ${$timer}->{param});
+  $hs=$hash;
+  if (!defined ($param)) {
+    eval ("package DOIF;$subname");
+  } else {
+    #eval ("package DOIF;$subname(\"$param\")");
+    eval('no strict "refs";&{$subname}($param);use strict "refs"');
+  }
+  if ($@) {
+    ::Log3 ($::defs{$name}{NAME},1 , "$name error in $subname: $@");
+    ::readingsSingleUpdate ($hash, "error", "in $subname: $@",0);
+  }
+  delete ($::defs{$name}{READINGS}{"timer_$timername"});
+}
+
+sub set_Exec
+{
+  my ($timername,$seconds,$subname,$param)=@_;
+  my $current = ::gettimeofday();
+  my $next_time = $current+$seconds;
+  $hs->{ptimer}{$timername}{time}=$next_time;
+  $hs->{ptimer}{$timername}{name}=$timername;
+  $hs->{ptimer}{$timername}{subname}=$subname;
+  $hs->{ptimer}{$timername}{param}=$param if (defined $param);
+  $hs->{ptimer}{$timername}{hash}=$hs;
+  ::RemoveInternalTimer(\$hs->{ptimer}{$timername});
+  if ($seconds > 0) {
+    ::readingsSingleUpdate ($hs,"timer_$timername",::strftime("%d.%m.%Y %H:%M:%S",localtime($next_time)),0);
+  }
+  ::InternalTimer($next_time, "DOIF::DOIF_ExecTimer",\$hs->{ptimer}{$timername}, 0);
+}
+
+
+sub get_Exec
+{
+  my ($timername)=@_;
+  my $current = ::gettimeofday();
+  if (defined $hs->{ptimer}{$timername}{time}) {
+    my $sec=$hs->{ptimer}{$timername}{time}-$current;
+    if ($sec > 0) {
+      return ($sec);
+    } else {
+      delete ($hs->{ptimer}{$timername}{time});
+      return (0);
+    }
+  } else {
+    return (0);
+  }
+}
+
+sub del_Exec
+{
+  my ($timername)=@_;
+  ::RemoveInternalTimer(\$hs->{ptimer}{$timername});
+  delete $hs->{ptimer}{$timername};
+  delete ($::defs{$hs->{NAME}}{READINGS}{"timer_$timername"});
+}
+
+
+sub set_Timer
+{
+  my ($event,$seconds)=@_;
+  my $name=$hs->{NAME};
+  my $timername="$name:$event";
+  my $current = ::gettimeofday();
+  my $next_time = $current+$seconds;
+  ::RemoveInternalTimer($timername);
+  $hs->{ptimer}{$timername}=$next_time;
+  if ($seconds > 0) {
+    $event =~ s/\W/_/g;
+    ::readingsSingleUpdate ($hs,"timer_$event",::strftime("%d.%m.%Y %H:%M:%S",localtime($next_time)),0);
+  }
+  ::InternalTimer($next_time, "DOIF_PerlTimer", $timername, 0);
+}
+
+
+
+sub get_Timer
+{
+  my ($event)=@_;
+  my $name=$hs->{NAME};
+  my $timername="$name:$event";
+  my $current = ::gettimeofday();
+  if (defined $hs->{ptimer}{$timername}) {
+    my $sec=$hs->{ptimer}{$timername}-$current;
+    if ($sec > 0) {
+      return ($sec);
+    } else {
+      delete ($hs->{ptimer}{$timername});
+      return (0);
+    }
+  } else {
+    return (0);
+  }
+}
+
+sub del_Timer
+{
+  my ($event)=@_;
+  my $name=$hs->{NAME};
+  my $timername="$name:$event";
+  delete $hs->{ptimer}{$timername};
+  $event =~ s/\W/_/g;
+  delete ($::defs{$hs->{NAME}}{READINGS}{"timer_$event"});
+  ::RemoveInternalTimer($timername);
+}
+
+sub set_Event
+{
+  my ($event)=@_;
+  set_Timer($event,0);
+}
+
+sub set_State
+{
+  my ($content)=@_;
+  return(::readingsSingleUpdate($hs,"state",$content,1));
+}
+
+sub set_Reading
+{
+  my ($reading,$content,$trigger)=@_;
+  if (defined $trigger) {
+    return(::readingsSingleUpdate($hs,$reading,$content,$trigger));
+  } else {
+    return(::readingsSingleUpdate($hs,$reading,$content,0));
+  }
+}
+
+sub set_Reading_Begin
+{
+  return(::readingsBeginUpdate  ($hs));
+}
+
+sub set_Reading_Update ($$@)
+{
+  my ($reading,$value,$changed)= @_;
+  return(::readingsBulkUpdate($hs, $reading, $value,$changed));
+}
+
+sub set_Reading_End
+{
+  my ($trigger)=@_;
+  return(::readingsEndUpdate($hs,$trigger));
+}
+
+sub get_State
+{
+  my ($default)=@_;
+  if (defined $default) {
+    return(::ReadingsVal($hs->{NAME},"state",$default));
+  } else {
+    return(::ReadingsVal($hs->{NAME},"state",""));
+  }
+}  
+
+sub get_Reading
+{
+  my ($reading,$default)=@_;
+  if (defined $default) {
+    return(::ReadingsVal($hs->{NAME},$reading,$default));
+  } else {
+    return(::ReadingsVal($hs->{NAME},$reading,""));
+  }
+} 
+
+sub fhem_set {
+  my ($content)=@_;
+  return(::CommandSet(undef,$content));
+}
+
+sub fhem {
+  my ($content)=@_;
+  return(::fhem($content));
+}
+
+sub Log {
+  my ($loglevel, $text) = @_;
+  return(::Log3(undef, $loglevel, $text));
+}
+
+sub Log3 {
+  my ($dev, $loglevel, $text) = @_;
+  return(::Log3($dev, $loglevel, $text));
+}
+
+sub InternalVal {
+  my ($d,$n,$default) = @_;
+  return(::InternalVal($d,$n,$default));
+}
+
+sub InternalNum {
+  my ($d,$n,$default,$round) = @_;
+  return(::InternalNum($d,$n,$default,$round));
+}
+
+sub OldReadingsVal {
+  my ($d,$n,$default) = @_;
+  return(::OldReadingsVal($d,$n,$default));
+}
+
+sub OldReadingsNum {
+  my ($d,$n,$default,$round) = @_;
+  return(::OldReadingsNum($d,$n,$default,$round));
+}
+
+sub OldReadingsTimestamp {
+  my ($d,$n,$default) = @_;
+  return(::OldReadingsTimestamp($d,$n,$default));
+}
+
+sub ReadingsVal {
+  my ($device,$reading,$default)=@_;
+  return(::ReadingsVal($device,$reading,$default));
+}
+
+sub ReadingsNum {
+  my ($d,$n,$default,$round) = @_;
+  return(::ReadingsNum($d,$n,$default,$round));
+}
+
+sub ReadingsTimestamp {
+  my ($d,$n,$default) = @_;
+  return(::ReadingsTimestamp($d,$n,$default));
+}
+
+sub ReadingsAge {
+  my ($device,$reading,$default) = @_;
+  return(::ReadingsAge($device,$reading,$default));
+}
+
+sub Value($) {
+  my ($d) = @_;
+  return(::Value($d));
+}
+
+sub OldValue {
+  my ($d) = @_;
+  return(::OldValue($d));
+}
+
+sub OldTimestamp {
+  my ($d) = @_;
+  return(::OldTimestamp($d));
+}
+
+sub AttrVal {
+  my ($d,$n,$default) = @_;
+  return(::AttrVal($d,$n,$default));
+}
+
+sub AttrNum {
+  my ($d,$n,$default,$round) = @_;
+  return (::AttrNum($d,$n,$default,$round));
+}
 
 1;
+
 
 =pod
 =item helper
@@ -5557,8 +5705,8 @@ Syntax Perl-Modus:<br>
 Ein Ereignisblock wird ausgeführt, wenn dieser bedingt durch <a href="#DOIF_Operanden">Ereignis- und Zeittrigger in eckigen Klammern</a> innerhalb des Blocks, getriggert wird.
 Es wird die vollständige Perl-Syntax unterstützt. Es können beliebig viele Ereignisblöcke innerhalb eines DOIF-Devices definiert werden. Sie werden unabhängig voneinander durch passende Trigger ausgeführt. Der Name eines Ereignisblocks ist optional.<br>
 <br>
-Der Status des Moduls wird nicht vom Modul gesetzt, er kann vom Anwender mit Hilfe der Funktion <code>set_Reading</code> verändert werden, siehe <a href="#DOIF_Spezifische_Perl-Funktionen_im_Perl-Modus">spezifische Perl-Funktionen im Perl-Modus</a>.
-FHEM-Befehle werden durch den Aufruf der Perlfunktion <code>fhem"..."</code> ausgeführt.<br>
+Der Status des Moduls wird nicht vom Modul gesetzt, er kann vom Anwender mit Hilfe der Funktion <code>set_State</code> verändert werden, siehe <a href="#DOIF_Spezifische_Perl-Funktionen_im_Perl-Modus">spezifische Perl-Funktionen im Perl-Modus</a>.
+FHEM-Befehle werden durch den Aufruf der Perlfunktion <code>fhem"..."</code> ausgeführt. Für den häufig genutzten fhem-Befehl <b>set</b> wurde eine kompatible Perlfunkton namens <b>fhem_set</b> definiert. Sie ist performanter und sollte bevorzugt verwendet werden, da das Parsen nach dem FHEM-set Befehl entfällt.<br>
 <br>
 Der Benutzer kann mit der Funktion <code>set_Timer/set_Exec</code> beliebig viele eigene Timer definieren, die unabhängig voneinander gesetzt und ausgewertet werden können, siehe <a href="#DOIF_Spezifische_Perl-Funktionen_im_Perl-Modus">Spezifische Perl-Funktionen im Perl-Modus</a>.<br>
 <br>
@@ -5603,7 +5751,38 @@ Es sind beliebige Hierarchietiefen möglich:<br>
 &nbsp;&nbsp;}<br>
 }</code><br>
 <br>
-Bemerkung: Innerhalb eines Ereignisblocks muss mindestens ein Trigger in irgendeiner Bedingung definiert werden, damit der gesamte Block beim passenden Trigger ausgewertet wird.<br>
+Bemerkung: Innerhalb eines Ereignisblocks muss mindestens ein Trigger definiert werden, damit der gesamte Block beim passenden Trigger ausgeführt wird.<br>
+<br>
+Es können ebenso Ereignisblöcke ohne if-else-Abfragen definiert werden:<br>
+<br>
+Loggen des Zustands vom Device FS:<br>
+<br><code>DOIF {Log 3,"State from FS: ".[FS:state]}</code><br>
+<br>
+Das Schalten der Lampe mit dem Status von FS:<br>
+<br>
+<code>DOIF {fhem("set lamp ".[FS:state])}</code><br>
+<br>
+entspricht mit dem performanteren Perl-Befehl <code>fhem_set</code>:<br>
+<br>
+<code>DOIF {fhem_set("lamp ".[FS:state])}</code><br>
+<br>
+Das Setzen des eigenen Status mit dem Status von FS:<br>
+<br>
+<code>DOIF {set_State([FS:state])}</code><br>
+<br>
+Das Setzen des eigenen Readings "temperature" mit dem Wert des Readings "temperature" des Raumes "livingroom":<br>
+<br>
+<code>DOIF {set_Reading("temperature",[livingroom:temperature])}</code><br>
+<br>
+Einfache Zeit- oder Ereignistrigger können ebenfalls ohne if-Anweisungen definiert werden:<br>
+<br>
+Schalte lampe um 08:00 Uhr ein:<br>
+<br>
+<code>DOIF {[08:00];fhem_set("lamp on")}</code><br>
+<br>
+Lampe ausschalten, beim Auftreten des Events "FS:on":<br>
+<br>
+<code>DOIF {["FS:on"];fhem_set("lamp off")}</code><br>
 <br>
 <u>Eigene Funktionen</u><br>
 <br>
@@ -5615,17 +5794,40 @@ Beispiel:<br>
 DOIF 
 subs { ## Definition von Perlfunktionen lamp_on und lamp_off<br>
 &nbsp; sub lamp_on {<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fhem"set&nbsp;lamp&nbsp;on";<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_Reading("state","on",1);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fhem_set("lamp&nbsp;on");<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_State("on");<br>
 &nbsp;&nbsp;}<br>
 &nbsp;&nbsp;sub&nbsp;lamp_off&nbsp;{<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fhem"set&nbsp;lamp&nbsp;off";<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_Reading("state","off",1);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fhem_set("lamp&nbsp;off");<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_State("off");<br>
 &nbsp;&nbsp;}<br>
 }<br>
-{if ([06:00]) {lamp_on()}}&nbsp;&nbsp;## Um 06:00 Uhr wird die Funktion lamp_on aufgerufen<br>
-{if ([08:00]) {lamp_off()}} ## Um 08:00 Uhr wird die Funktion lamp_off aufgerufen<br>
+{[06:00];lamp_on()}&nbsp;&nbsp;&nbsp;## Um 06:00 Uhr wird die Funktion lamp_on aufgerufen<br>
+{[08:00}];lamp_off()} ## Um 08:00 Uhr wird die Funktion lamp_off aufgerufen<br>
 </code><br>
+<br>
+<u>Eigene Funktionen mit Parametern</u><br>
+<br>
+Unter Verwendung von Funktionsparamerter lassen sich Definitionen oft vereinfachen, das obige Beispiel lässt sich mit Hilfe nur einer Funktion kürzer wie folgt definieren:<br>
+<br><code>
+DOIF 
+subs { ## Definition der Perlfunktion lamp<br>
+&nbsp; sub lamp {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;my ($state)=@_; # Variable $state mit dem Parameter belegen<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fhem_set("lamp&nbsp;$state");<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_State($state);<br>
+&nbsp;&nbsp;}<br>
+}<br>
+{[06:00];lamp("on")}&nbsp;&nbsp;## Um 06:00 Uhr wird die Funktion lamp mit Parameter "on" aufgerufen<br>
+{[08:00];lamp("off")} ## Um 08:00 Uhr wird die Funktion lamp mit dem Parameter "off" aufgerufen<br>
+</code><br>
+<br>
+<br>Der Namensraum im Perl-Modus ist gekapselt. Selbst definierte Funktionen können nicht bereits existierende Perlfunktionen in FHEM überschreiben.
+Selten genutze Funktionen aus dem Namensraum von FHEM müssen mit vorangestellem Doppelpunkt (Namensraum main von FHEM) angegeben werden: ::&lt;perlfunction&gt;<br>
+<br>
+Folgende FHEM-Perlfunktonen wurden im DOIF-Namensraum definiert: <code><b>fhem, Log, Log3, InternVal, InternalNum, OldReadingsVal, OldReadingsNum, OldReadingsTimestamp, ReadingsVal, ReadingsNum, ReadingsTeimestamp, ReadingsAge, Value, OldValue, OldTimestamp, AttrVal, AttrNum</code></b><br>
+<br>
+Die obigen Funktionen können wie gewohnt ohne vorangestellten Doppelpunkt genutzt werden.<br>
 <br>
 <a name="DOIF_Spezifische_Perl-Funktionen_im_Perl-Modus"></a>
 <b>Spezifische Perl-Funktionen im Perl-Modus</b><br>
@@ -5642,7 +5844,7 @@ Laufenden Timer löschen: <code><b>del_Timer(&lt;TimerEvent&gt;)</code></b><br>
 <br>
 Beispiel: Das Event "hello" 30 Sekunden verzögert auslösen:<br>
 <br>
-<code>set_Time("hell",30);</code><br>
+<code>set_Time("hello",30);</code><br>
 <br>
 <u>Ausführungstimer</u><br>
 <br>
@@ -5656,11 +5858,52 @@ Laufenden Timer löschen: <code><b>del_Exec(&lt;timerName&gt;)</code></b><br>
 <br>
 Beispiel: Lampe verzögert um 30 Sekunden ausschalten:<br>
 <br>
-<code>set_Exec("aus",30,'fhem"set lamp off"');</code><br>
+<code>set_Exec("aus",30,'fhem_set("lamp off")');</code><br>
 <br>
 Ein beliebiges FHEM-Event absetzen: <code><b>set_Event(&lt;Event&gt;)</code></b><br>
 <br>
-Reading schreiben: <code><b>set_Reading(&lt;readingName&gt;,&lt;content&gt;,&lt;trigger&gt;)</code></b>, mit &lt;trigger&gt;: 0 ohne Trigger, 1 mit Trigger<br>
+Beispiel: Setze das Event "on":<br>
+<br>
+<code>set_Event("on");</code><br>
+<br>
+Status setzen: <code><b>set_State(&lt;value&gt;,&lt;trigger&gt;)</code></b>, mit &lt;trigger&gt;: 0 ohne Trigger, 1 mit Trigger, &lt;trigger&gt; ist optional, default ist 1<br>
+<br>
+Beispiel: Status auf "on" setzen:<br>
+<br>
+<code>set_State("on");</code><br>
+<br>
+Status des eigenen Devices holen: <code><b>get_State()</code></b><br>
+<br>
+Beispiel: Schalte lampe mit dem eigenen Status:<br>
+<br>
+<code>fhem_set("lamp ".get_State());</code><br>
+<br>
+Eigenes Reading schreiben: <code><b>set_Reading(&lt;readingName&gt;,&lt;value&gt;,&lt;trigger&gt;)</code></b>, mit &lt;trigger&gt;: 0 ohne Trigger, 1 mit Trigger, &lt;trigger&gt; ist optional, default ist 0<br>
+<br>
+<code>set_Reading("weather","cold");</code><br>
+<br>
+Reading des eigenen Devices holen: <code><b>get_Reading("readingName")</code></b><br>
+<br>
+Beispiel: Schalte Lampe mit dem Inhalt des eigenen Readings "dim":<br>
+<br>
+<code>fhem_set("lamp ".get_Reading("dim"));</code><br>
+<br>
+Setzen mehrere Readings des eigenen Devices in einem Eventblock:<br>
+<br>
+<code><b>set_Reading_Begin()</code></b><br>
+<code><b>set_Reading_Update(&lt;readingName&gt;,&lt;value&gt;,&lt;change&gt;)</code></b>, &lt;change&gt; ist optional<br>
+<code><b>set_Reading_End(&lt;trigger&gt;)</code></b>, mit &lt;trigger&gt;: 0 ohne Trigger, 1 mit Trigger, &lt;trigger&gt;<br>
+<br>
+Die obigen Funktionen entsprechen den FHEM-Perlfunktionen: <code>readingsBegin, readingsBulkUpdate, readingsEndUpdate</code>.<br>
+<br>
+Beispiel:<br>
+<br>
+Die Readings "temperature" und "humidity" sollen in einem Eventblock mit dem zuvor belegten Inhalt der Perlvariablen $temp bzw. $hum belegt werden.<br>
+<br>
+<code>set_Reading_Begin;</code><br>
+<code>set_Reading_Update("temperature",$temp);</code><br>
+<code>set_Reading_Update("humidity",$hum);</code><br>
+<code>set_Reading_End(1);</code><br>
 <br>
 <u>init-Block</u><br>
 <br>
@@ -5728,8 +5971,8 @@ Für unterschiedliche blockierende Funktionen ist jeweils ein eigener Name (&lt;
 <br><code>
 define&nbsp;di_light&nbsp;DOIF&nbsp;{<br>
 &nbsp;&nbsp;if&nbsp;(["FS:motion"])&nbsp;{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;bei&nbsp;Bewegung<br>
-&nbsp;&nbsp;&nbsp;&nbsp;fhem"set&nbsp;lamp&nbsp;on"&nbsp;if&nbsp;([?lamp]&nbsp;ne&nbsp;"on");&nbsp;&nbsp;&nbsp;#&nbsp;Lampe&nbsp;einschalten,&nbsp;wenn&nbsp;sie&nbsp;nicht&nbsp;an&nbsp;ist<br>
-&nbsp;&nbsp;&nbsp;&nbsp;set_Exec("off",30,'fhem"set&nbsp;lamp&nbsp;off"');&nbsp;&nbsp;#&nbsp;Timer&nbsp;namens&nbsp;"off"&nbsp;für&nbsp;das&nbsp;Ausschalten&nbsp;der&nbsp;Lampe&nbsp;auf&nbsp;30&nbsp;Sekunden&nbsp;setzen&nbsp;bzw.&nbsp;verlängern<br>
+&nbsp;&nbsp;&nbsp;&nbsp;fhem_set("lamp&nbsp;on")&nbsp;if&nbsp;([?lamp]&nbsp;ne&nbsp;"on");&nbsp;&nbsp;&nbsp;#&nbsp;Lampe&nbsp;einschalten,&nbsp;wenn&nbsp;sie&nbsp;nicht&nbsp;an&nbsp;ist<br>
+&nbsp;&nbsp;&nbsp;&nbsp;set_Exec("off",30,'fhem_set("lamp&nbsp;off")');&nbsp;&nbsp;#&nbsp;Timer&nbsp;namens&nbsp;"off"&nbsp;für&nbsp;das&nbsp;Ausschalten&nbsp;der&nbsp;Lampe&nbsp;auf&nbsp;30&nbsp;Sekunden&nbsp;setzen&nbsp;bzw.&nbsp;verlängern<br>
 &nbsp;&nbsp;}<br>
 }<br>
 </code>
@@ -5742,10 +5985,10 @@ Anforderung: Wenn eine Taste innerhalb von zwei Sekunden zwei mal betätig wird,
 <code>
 define&nbsp;di_shutter&nbsp;DOIF&nbsp;{<br>
 &nbsp;&nbsp;if&nbsp;(["FS:^on$"]&nbsp;and&nbsp;!get_Exec("shutter")){&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;wenn&nbsp;Taste&nbsp;betätigt&nbsp;wird&nbsp;und&nbsp;kein&nbsp;Timer&nbsp;läuft<br>
-&nbsp;&nbsp;&nbsp;&nbsp;set_Exec("shutter",2,'fhem"set&nbsp;shutter&nbsp;down"');&nbsp;&nbsp;&nbsp;#&nbsp;Timer&nbsp;zum&nbsp;shutter&nbsp;down&nbsp;auf&nbsp;zwei&nbsp;Sekunden&nbsp;setzen<br>
+&nbsp;&nbsp;&nbsp;&nbsp;set_Exec("shutter",2,'fhem_set("shutter&nbsp;down")');&nbsp;&nbsp;&nbsp;#&nbsp;Timer&nbsp;zum&nbsp;shutter&nbsp;down&nbsp;auf&nbsp;zwei&nbsp;Sekunden&nbsp;setzen<br>
 &nbsp;&nbsp;}&nbsp;else&nbsp;{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;wenn&nbsp;Timer&nbsp;läuft,&nbsp;d.h.&nbsp;ein&nbsp;weitere&nbsp;Tastendruck&nbsp;innerhalb&nbsp;von&nbsp;zwei&nbsp;Sekunden<br>
 &nbsp;&nbsp;&nbsp;&nbsp;del_Timer("shutter");&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;Timer&nbsp;löschen<br>
-&nbsp;&nbsp;&nbsp;&nbsp;fhem"set&nbsp;shutter&nbsp;up";&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;Rollladen&nbsp;hoch<br>
+&nbsp;&nbsp;&nbsp;&nbsp;fhem_set("shutter&nbsp;up");&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;Rollladen&nbsp;hoch<br>
 &nbsp;&nbsp;}<br>
 }<br>
 </code>
