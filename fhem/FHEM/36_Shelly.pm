@@ -38,7 +38,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "1.2";
+my $version = "1.21";
 
 #-- these we may get on request
 my %gets = (
@@ -658,7 +658,7 @@ sub Shelly_Set ($@) {
   my $hascloud = $jhash->{'cloud'}{'enabled'};
   if( $hascloud ){
     my $hasconn  = ($jhash->{'cloud'}{'connected'}) ? "connected" : "not connected";
-    readingsBulkUpdateIfChanged($hash,"cloud","enabled($$hasconn)");  
+    readingsBulkUpdateIfChanged($hash,"cloud","enabled($hasconn)");  
   }else{
     readingsBulkUpdateIfChanged($hash,"cloud","disabled");  
   }
