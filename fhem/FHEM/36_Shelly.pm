@@ -38,7 +38,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "1.3";
+my $version = "1.31";
 
 #-- these we may get on request
 my %gets = (
@@ -374,15 +374,19 @@ sub Shelly_Set ($@) {
     if( $cmd =~ /^((on)|(off)).*/ ){
       my $channel = $value;
      
-      if( !defined($channel) || ($channel !~ /[0123]/) || $channel >= $shelly_models{$model}[0] ){
-        if( !defined($channel) ){
-          $channel = AttrVal($name,"defchannel",undef);
+      if( $shelly_models{$model}[0] == 1){
+       $channel = 0
+      }else{  
+        if( !defined($channel) || ($channel !~ /[0123]/) || $channel >= $shelly_models{$model}[0] ){
           if( !defined($channel) ){
-            $msg = "Error: wrong channel $channel given and defchannel attribute not set properly";
-            Log3 $name, 1,"[Shelly_Set] ".$msg;
-            return $msg;
-          }else{
-            Log3 $name, 4,"[Shelly_Set] switching default channel $channel";
+            $channel = AttrVal($name,"defchannel",undef);
+            if( !defined($channel) ){
+              $msg = "Error: wrong channel $channel given and defchannel attribute not set properly";
+              Log3 $name, 1,"[Shelly_Set] ".$msg;
+              return $msg;
+            }else{
+              Log3 $name, 4,"[Shelly_Set] switching default channel $channel";
+            }
           }
         }
       }
@@ -654,8 +658,10 @@ sub Shelly_Set ($@) {
       #-- renormalize position
       my $normal = (AttrVal($name,"pct100","open") eq "open");
       if( $rstate eq "open" ){
+        #-- 100% = open in case normal
         $pct = $normal?100:0;
       }elsif( $rstate eq "closed" ){
+        #-- 100% = open in case normal
         $pct = $normal?0:100;
       }else{
        $pct = ReadingsVal($name,"pct",undef);
