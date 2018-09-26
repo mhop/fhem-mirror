@@ -33,6 +33,7 @@
 # ABU 20180815 updated link in doku, changed (dpt16$) to dpt16 in set, tried to fix öast-sender (replaced bulk by single in decoding loop)
 # ABU 20180829 added dpt9.0020, tried workaround in putCmd, remove non printable chars
 # ABU 20180925 added dpt3.007, added last-sender "fhem"
+# ABU 20180926 fixed KNX_Eval in line 1291 (replaced hash by deviceHash), fixed decoding dpt3
 
 
 package main;
@@ -1288,7 +1289,7 @@ KNX_Parse($$) {
 			{			
 				my $orgValue = $value;
 
-				$value = KNX_eval ($hash, $gadName, $value, $cmdAttr);
+				$value = KNX_eval ($deviceHash, $gadName, $value, $cmdAttr);
 				
 				#if ($orgValue ne $value)
 				#try to fix: answer only, if eval was successful
@@ -1900,16 +1901,23 @@ KNX_decodeByDpt ($$$) {
 		#get numeric value
 		$numval = hex ($value);
 
-		$state = 1 if ($numval & 7);
-		$state = 3 if ($numval & 6);
-		$state = 6 if ($numval & 5);
-		$state = 12 if ($numval & 4);
-		$state = 25 if ($numval & 3);
-		$state = 50 if ($numval & 2);
-		$state = 100 if ($numval & 1);
-				
 		#get dim-direction
-		$state = 0 - $state if (not ($numval & 8));
+		my $sign = 1;
+		if ($numval >= 8)
+		{
+			$sign = 0;
+			$numval -= 8;
+		}
+
+		$state = 100 if ($numval >= 1);
+		$state = 50 if ($numval >= 2);
+		$state = 25 if ($numval >= 3);
+		$state = 12 if ($numval >= 4);
+		$state = 6 if ($numval >= 5);
+		$state = 3 if ($numval >= 6);
+		$state = 1 if ($numval >= 7);
+				
+		$state = 0 - $state if ($sign == 1);
 		
 		$state = sprintf ("%.0f", $state);
 	}
