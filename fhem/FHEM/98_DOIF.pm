@@ -3262,16 +3262,6 @@ DOIF_Get($@)
   return undef;
 }
 
-sub DOIF_PerlTimer
-{
-  my ($timername)=@_;
-  my ($name,$event)=split(":",$timername);
-  DoTrigger($name, $event);
-  $event =~ s/\W/_/g;
-  delete ($::defs{$name}{READINGS}{"timer_$event"});
-}
-
-
 package DOIF;
 
 use Date::Parse qw(str2time);
@@ -3290,7 +3280,7 @@ sub DOIF_ExecTimer
     eval ("package DOIF;$subname");
   } else {
     #eval ("package DOIF;$subname(\"$param\")");
-    eval('no strict "refs";&{$subname}($param);use strict "refs"');
+    eval('package DOIF;no strict "refs";&{$subname}($param);use strict "refs"');
   }
   if ($@) {
     ::Log3 ($::defs{$name}{NAME},1 , "$name error in $subname: $@");
@@ -3315,7 +3305,6 @@ sub set_Exec
   }
   ::InternalTimer($next_time, "DOIF::DOIF_ExecTimer",\$hs->{ptimer}{$timername}, 0);
 }
-
 
 sub get_Exec
 {
@@ -3342,59 +3331,10 @@ sub del_Exec
   delete ($::defs{$hs->{NAME}}{READINGS}{"timer_$timername"});
 }
 
-
-sub set_Timer
-{
-  my ($event,$seconds)=@_;
-  my $name=$hs->{NAME};
-  my $timername="$name:$event";
-  my $current = ::gettimeofday();
-  my $next_time = $current+$seconds;
-  ::RemoveInternalTimer($timername);
-  $hs->{ptimer}{$timername}=$next_time;
-  if ($seconds > 0) {
-    $event =~ s/\W/_/g;
-    ::readingsSingleUpdate ($hs,"timer_$event",::strftime("%d.%m.%Y %H:%M:%S",localtime($next_time)),0);
-  }
-  ::InternalTimer($next_time, "DOIF_PerlTimer", $timername, 0);
-}
-
-
-
-sub get_Timer
-{
-  my ($event)=@_;
-  my $name=$hs->{NAME};
-  my $timername="$name:$event";
-  my $current = ::gettimeofday();
-  if (defined $hs->{ptimer}{$timername}) {
-    my $sec=$hs->{ptimer}{$timername}-$current;
-    if ($sec > 0) {
-      return ($sec);
-    } else {
-      delete ($hs->{ptimer}{$timername});
-      return (0);
-    }
-  } else {
-    return (0);
-  }
-}
-
-sub del_Timer
-{
-  my ($event)=@_;
-  my $name=$hs->{NAME};
-  my $timername="$name:$event";
-  delete $hs->{ptimer}{$timername};
-  $event =~ s/\W/_/g;
-  delete ($::defs{$hs->{NAME}}{READINGS}{"timer_$event"});
-  ::RemoveInternalTimer($timername);
-}
-
 sub set_Event
 {
   my ($event)=@_;
-  set_Timer($event,0);
+  ::DoTrigger($hs->{NAME}, $event);
 }
 
 sub set_State
@@ -3455,9 +3395,9 @@ sub fhem_set {
   return(::CommandSet(undef,$content));
 }
 
-sub fhem {
-  my ($content)=@_;
-  return(::fhem($content));
+sub fhem ($@){
+  my ($param, $silent) = @_;
+  return(::fhem($param, $silent));
 }
 
 sub Log {
@@ -5706,11 +5646,12 @@ Ein Ereignisblock wird ausgeführt, wenn dieser bedingt durch <a href="#DOIF_Ope
 Es wird die vollständige Perl-Syntax unterstützt. Es können beliebig viele Ereignisblöcke innerhalb eines DOIF-Devices definiert werden. Sie werden unabhängig voneinander durch passende Trigger ausgeführt. Der Name eines Ereignisblocks ist optional.<br>
 <br>
 Der Status des Moduls wird nicht vom Modul gesetzt, er kann vom Anwender mit Hilfe der Funktion <code>set_State</code> verändert werden, siehe <a href="#DOIF_Spezifische_Perl-Funktionen_im_Perl-Modus">spezifische Perl-Funktionen im Perl-Modus</a>.
-FHEM-Befehle werden durch den Aufruf der Perlfunktion <code>fhem"..."</code> ausgeführt. Für den häufig genutzten fhem-Befehl <b>set</b> wurde eine kompatible Perlfunkton namens <b>fhem_set</b> definiert. Sie ist performanter und sollte bevorzugt verwendet werden, da das Parsen nach dem FHEM-set Befehl entfällt.<br>
+FHEM-Befehle werden durch den Aufruf der Perlfunktion <code>fhem("...")</code> ausgeführt. Für den häufig genutzten fhem-Befehl <b>set</b> wurde eine kompatible Perlfunkton namens <b>fhem_set</b> definiert.
+Sie ist performanter und sollte bevorzugt verwendet werden, da das Parsen nach dem FHEM set-Befehl entfällt.<br>
 <br>
-Der Benutzer kann mit der Funktion <code>set_Timer/set_Exec</code> beliebig viele eigene Timer definieren, die unabhängig voneinander gesetzt und ausgewertet werden können, siehe <a href="#DOIF_Spezifische_Perl-Funktionen_im_Perl-Modus">Spezifische Perl-Funktionen im Perl-Modus</a>.<br>
+Der Benutzer kann mit der Funktion <code>set_Exec</code> beliebig viele eigene Timer definieren, die unabhängig voneinander gesetzt und ausgewertet werden können, siehe <a href="#DOIF_Spezifische_Perl-Funktionen_im_Perl-Modus">Spezifische Perl-Funktionen im Perl-Modus</a>.<br>
 <br>
-Definitionen im FHEM-Modus der Form:<br>
+Definitionen im FHEM-Modus mit do-Attribut der Form:<br>
 <br>
 &nbsp;&nbsp;<code>DOIF (&lt;Bedingung mit Trigger&gt;) (&lt;FHEM-Befehle&gt;) DOELSE (&lt;FHEM-Befehle&gt;)</code><br>
 <br>
@@ -5786,7 +5727,7 @@ Lampe ausschalten, beim Auftreten des Events "FS:on":<br>
 <br>
 <u>Eigene Funktionen</u><br>
 <br>
-Ein besonderer Block ist der Block namens "subs". In diesem Block werden Perlfunktionen definiert, die innerhalb des DOIFs genutzt werden. 
+Ein besonderer Block ist der Block namens <b>subs</b>. In diesem Block werden Perlfunktionen definiert, die innerhalb des DOIFs genutzt werden. 
 Um eine möglichst hohe Kompatibilität zu Perl sicherzustellen, wird keine DOIF-Syntax in eckigen Klammern unterstützt, insb. gibt es keine Trigger, die den Block ausführen können.<br>
 <br>
 Beispiel:<br>
@@ -5802,8 +5743,8 @@ subs { ## Definition von Perlfunktionen lamp_on und lamp_off<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_State("off");<br>
 &nbsp;&nbsp;}<br>
 }<br>
-{[06:00];lamp_on()}&nbsp;&nbsp;&nbsp;## Um 06:00 Uhr wird die Funktion lamp_on aufgerufen<br>
-{[08:00}];lamp_off()} ## Um 08:00 Uhr wird die Funktion lamp_off aufgerufen<br>
+{[06:00];lamp_on()}&nbsp;&nbsp;## Um 06:00 Uhr wird die Funktion lamp_on aufgerufen<br>
+{[08:00];lamp_off()} ## Um 08:00 Uhr wird die Funktion lamp_off aufgerufen<br>
 </code><br>
 <br>
 <u>Eigene Funktionen mit Parametern</u><br>
@@ -5813,7 +5754,7 @@ Unter Verwendung von Funktionsparamerter lassen sich Definitionen oft vereinfach
 DOIF 
 subs { ## Definition der Perlfunktion lamp<br>
 &nbsp; sub lamp {<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;my ($state)=@_; # Variable $state mit dem Parameter belegen<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;my ($state)=@_;&nbsp;&nbsp# Variable $state mit dem Parameter belegen<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fhem_set("lamp&nbsp;$state");<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_State($state);<br>
 &nbsp;&nbsp;}<br>
@@ -5822,43 +5763,30 @@ subs { ## Definition der Perlfunktion lamp<br>
 {[08:00];lamp("off")} ## Um 08:00 Uhr wird die Funktion lamp mit dem Parameter "off" aufgerufen<br>
 </code><br>
 <br>
-<br>Der Namensraum im Perl-Modus ist gekapselt. Selbst definierte Funktionen können nicht bereits existierende Perlfunktionen in FHEM überschreiben.
-Selten genutze Funktionen aus dem Namensraum von FHEM müssen mit vorangestellem Doppelpunkt (Namensraum main von FHEM) angegeben werden: ::&lt;perlfunction&gt;<br>
+Der Namensraum im Perl-Modus ist gekapselt. Selbstdefinierte Funktionen im DOIF-Device können nicht bereits existierende Perlfunktionen in FHEM (Namensraum main) überschreiben.
+Funktionen aus dem Namensraum main müssen mit vorangestellem Doppelpunkt angegeben werden: <code>::&lt;perlfunction&gt;</code><br>
 <br>
-Folgende FHEM-Perlfunktonen wurden im DOIF-Namensraum definiert: <code><b>fhem, Log, Log3, InternVal, InternalNum, OldReadingsVal, OldReadingsNum, OldReadingsTimestamp, ReadingsVal, ReadingsNum, ReadingsTeimestamp, ReadingsAge, Value, OldValue, OldTimestamp, AttrVal, AttrNum</code></b><br>
+Eigene Perlfunktionen, die in myutils ausgelagert sind, befinden sich ebenfalls im Namensraum main. Wenn sie ausschließich in DOIF-Devices benutzt werden sollen, so kann am Anfang vor deren Definition in myutils "package DOIF;" angegeben werden.
+In diesen Fall sind auch diese Funktion im DOIF-Device bekannt - sie können dann ohne vorangestellten Doppelpunkt genutzt werden.<br>
 <br>
-Die obigen Funktionen können wie gewohnt ohne vorangestellten Doppelpunkt genutzt werden.<br>
+Folgende FHEM-Perlfunktonen wurden ebenfalls im DOIF-Namensraum definiert, sie können, wie gewohnt ohne Doppelpunkt genutzt werden:<br>
+<br>
+<code><b>fhem, Log, Log3, InternVal, InternalNum, OldReadingsVal, OldReadingsNum, OldReadingsTimestamp, ReadingsVal, ReadingsNum, ReadingsTimestamp, ReadingsAge, Value, OldValue, OldTimestamp, AttrVal, AttrNum</code></b><br>
 <br>
 <a name="DOIF_Spezifische_Perl-Funktionen_im_Perl-Modus"></a>
 <b>Spezifische Perl-Funktionen im Perl-Modus</b><br>
 <br>
-<u>Ereignistimer</u><br>
+FHEM set-Befehl ausführen: <code><b>fhem_set(&lt;content&gt;)</code></b>, mit &lt;content&gt; Übergabeparameter des FHEM set-Befehls<br>
 <br>
-Timer setzen: <code><b>set_Timer(&lt;TimerEvent&gt;, &lt;seconds&gt;)</code></b>, mit &lt;TimerEvent&gt;: beliebige Angabe, sie spezifiziert eindeutig einen Timer und ist gleichzeitig ein Ereignis,
-welches nach Ablauf des Timers in FHEM erzeugt wird. Auf dieses Ereignis kann wie üblich mit der DOIF-Syntax durch die Angabe [$SELF:"^&lt;TimerEvent&gt;$"] reagiert werden.
-Wird set_Timer mit dem gleichen &lt;TimerEvent&gt vor seinem Ablauf erneut aufgerufen, so wird der laufender Timer gelöscht und neugesetzt.<br>
+Beispiel: Lampe ausschalten:<br>
 <br>
-Timer holen: <code><b>get_Timer(&lt;TimerEvent&gt;)</code></b>, Returnwert: 0, wenn Timer abgelaufen oder nicht gesetzt ist, sonst Anzahl der Sekunden bis zum Ablauf des Timers<br>
+<code>fhem_set("lamp off");</code><br>
 <br>
-Laufenden Timer löschen: <code><b>del_Timer(&lt;TimerEvent&gt;)</code></b><br>
+entspricht:<br>
 <br>
-Beispiel: Das Event "hello" 30 Sekunden verzögert auslösen:<br>
+<code>fhem("set lamp off");</code><br>
 <br>
-<code>set_Time("hello",30);</code><br>
-<br>
-<u>Ausführungstimer</u><br>
-<br>
-Timer setzen: <code><b>set_Exec(&lt;timerName&gt;, &lt;seconds&gt;, &lt;perlCode&gt, &lt;parameter&gt)</code></b>, mit &lt;timerName&gt;: beliebige Angabe, sie spezifiziert eindeutig einen Timer, 
-welcher nach Ablauf den angegebenen Perlcode &lt;perlCode&gt; aufruft. Falls als Perlcode eine Perlfunktion angegeben wird, kann optional ein Übergabeparameter &lt;parameter&gt; angegeben werden. Die Perlfunkion muss eindeutig sein und in FHEM zuvor deklariert worden sein.
-Wird set_Exec mit dem gleichen &lt;timerName&gt; vor seinem Ablauf erneut aufgerufen, so wird der laufender Timer gelöscht und neugesetzt.<br>
-<br>
-Timer holen: <code><b>get_Exec(&lt;timerName&gt;)</code></b>, Returnwert: 0, wenn Timer abgelaufen oder nicht gesetzt ist, sonst Anzahl der Sekunden bis zum Ablauf des Timers<br>
-<br>
-Laufenden Timer löschen: <code><b>del_Exec(&lt;timerName&gt;)</code></b><br>
-<br>
-Beispiel: Lampe verzögert um 30 Sekunden ausschalten:<br>
-<br>
-<code>set_Exec("aus",30,'fhem_set("lamp off")');</code><br>
+Der Aufruf der fhem_set-Funktion ist performater, da das Parsen nach dem set-Befehl im Gegensatz zum Aufruf mit der Funkton <code>fhem</code> entfällt.<br>
 <br>
 Ein beliebiges FHEM-Event absetzen: <code><b>set_Event(&lt;Event&gt;)</code></b><br>
 <br>
@@ -5868,27 +5796,27 @@ Beispiel: Setze das Event "on":<br>
 <br>
 Status setzen: <code><b>set_State(&lt;value&gt;,&lt;trigger&gt;)</code></b>, mit &lt;trigger&gt;: 0 ohne Trigger, 1 mit Trigger, &lt;trigger&gt; ist optional, default ist 1<br>
 <br>
-Beispiel: Status auf "on" setzen:<br>
+Beispiel: Status des eignen DOIF-Device auf "on" setzen:<br>
 <br>
 <code>set_State("on");</code><br>
 <br>
-Status des eigenen Devices holen: <code><b>get_State()</code></b><br>
+Status des eigenen DOIF-Devices holen: <code><b>get_State()</code></b><br>
 <br>
 Beispiel: Schalte lampe mit dem eigenen Status:<br>
 <br>
 <code>fhem_set("lamp ".get_State());</code><br>
 <br>
-Eigenes Reading schreiben: <code><b>set_Reading(&lt;readingName&gt;,&lt;value&gt;,&lt;trigger&gt;)</code></b>, mit &lt;trigger&gt;: 0 ohne Trigger, 1 mit Trigger, &lt;trigger&gt; ist optional, default ist 0<br>
+Reading des eigenen DOIF-Devices schreiben: <code><b>set_Reading(&lt;readingName&gt;,&lt;value&gt;,&lt;trigger&gt;)</code></b>, mit &lt;trigger&gt;: 0 ohne Trigger, 1 mit Trigger, &lt;trigger&gt; ist optional, default ist 0<br>
 <br>
 <code>set_Reading("weather","cold");</code><br>
 <br>
-Reading des eigenen Devices holen: <code><b>get_Reading("readingName")</code></b><br>
+Reading des eigenen DOIF-Devices holen: <code><b>get_Reading(&lt;readingName&gt;)</code></b><br>
 <br>
 Beispiel: Schalte Lampe mit dem Inhalt des eigenen Readings "dim":<br>
 <br>
 <code>fhem_set("lamp ".get_Reading("dim"));</code><br>
 <br>
-Setzen mehrere Readings des eigenen Devices in einem Eventblock:<br>
+Setzen mehrerer Readings des eigenen DOIF-Devices in einem Eventblock:<br>
 <br>
 <code><b>set_Reading_Begin()</code></b><br>
 <code><b>set_Reading_Update(&lt;readingName&gt;,&lt;value&gt;,&lt;change&gt;)</code></b>, &lt;change&gt; ist optional<br>
@@ -5898,20 +5826,50 @@ Die obigen Funktionen entsprechen den FHEM-Perlfunktionen: <code>readingsBegin, 
 <br>
 Beispiel:<br>
 <br>
-Die Readings "temperature" und "humidity" sollen in einem Eventblock mit dem zuvor belegten Inhalt der Perlvariablen $temp bzw. $hum belegt werden.<br>
+Die Readings "temperature" und "humidity" sollen in einem Eventblock mit dem zuvor belegten Inhalt der Variablen $temp bzw. $hum belegt werden.<br>
 <br>
 <code>set_Reading_Begin;</code><br>
 <code>set_Reading_Update("temperature",$temp);</code><br>
 <code>set_Reading_Update("humidity",$hum);</code><br>
 <code>set_Reading_End(1);</code><br>
 <br>
+<u>Ausführungstimer</u><br>
+<br>
+Mit Hilfe von Ausführungstimern können Anweisungen verzögert ausgeführt werden. Im Gegensatz zum FHEM-Modus können beliebig viele Timer gleichzeitig genutzt werden.
+Ein Ausführungstimer wird mit einem Timer-Namen eindeutig definiert. Über den Timer-Namen kann die Restlaufzeit abgefragt werden, ebenfalls kann er vor seinem Ablauf gelöscht werden.<br>
+<br>
+Timer setzen: <code><b>set_Exec(&lt;timerName&gt;, &lt;seconds&gt;, &lt;perlCode&gt, &lt;parameter&gt)</code></b>, mit &lt;timerName&gt;: beliebige Angabe, sie spezifiziert eindeutig einen Timer, 
+welcher nach Ablauf den angegebenen Perlcode &lt;perlCode&gt; aufruft. Falls als Perlcode eine Perlfunktion angegeben wird, kann optional ein Übergabeparameter &lt;parameter&gt; angegeben werden. Die Perlfunkion muss eindeutig sein und in FHEM zuvor deklariert worden sein.
+Wird set_Exec mit dem gleichen &lt;timerName&gt; vor seinem Ablauf erneut aufgerufen, so wird der laufender Timer gelöscht und neugesetzt.<br>
+<br>
+Timer holen: <code><b>get_Exec(&lt;timerName&gt;)</code></b>, Returnwert: 0, wenn Timer abgelaufen oder nicht gesetzt ist, sonst Anzahl der Sekunden bis zum Ablauf des Timers<br>
+<br>
+Laufenden Timer löschen: <code><b>del_Exec(&lt;timerName&gt;)</code></b><br>
+<br>
+Beispiel: Funktion namens "lamp" mit dem Übergabeparameter "on" 5 Sekunden verögert aufrufen:<br>
+<br>
+<code>set_Exec("lamp_timer",30,'lamp','on');</code><br>
+<br>
+alternativ<br>
+<br>
+<code>set_Exec("lamp_timer",30,'lamp("on")');</code><br>
+<br>
+Beispiel: Lampe verzögert um 30 Sekunden ausschalten:<br>
+<br>
+<code>set_Exec("off",30,'fhem_set("lamp off")');</code><br>
+<br>
+Beispiel: Das Event "off" 30 Sekunden verzögert auslösen:<br>
+<br>
+<code>set_Exec("off_Event",30,'set_Event("off")');</code><br>
+<br>
 <u>init-Block</u><br>
 <br>
-Wird ein Perlblock mit dem Namen "init" benannt, so wird dieser Block beim Systemstart ausgeführt. Er bietet sich insb. an, um Instanzvariablen des Moduls vorzubelegen.<br>
+Wird ein Ereignisblock mit dem Namen <b>init</b> benannt, so wird dieser Block beim Systemstart ausgeführt. Er bietet sich insb. an, um Device-Variablen des Moduls vorzubelegen.<br>
 <br>
-<u>Instanzvariablen</u><br>
+<u>Device-Variablen</u><br>
 <br>
-Instanzvariablen sind Devicevariablen, die global innerhalb eines DOIF-Devices genutzt werden können. Sie beginnen mit $_ und müssen nicht deklariert werden. Wenn sie nicht vorbelegt werden, gelten sie als nicht definiert. Das lässt sich abfragen mit:<br>
+Device-Variablen sind sogenannte Instanzvariablen, die global innerhalb eines DOIF-Devices genutzt werden können. Deren Inhalt bleibt während der Laufzeit des System erhalten. Sie beginnen mit <b>$_</b> und müssen nicht deklariert werden.
+Wenn sie nicht vorbelegt werden, gelten sie als nicht definiert. Das lässt sich abfragen mit:<br>
 <br>
 <code>if (defined $_...) ...</code><br>
 <br>
@@ -5919,11 +5877,7 @@ Instanzvariablen überleben nicht den Neustart, sie können jedoch z.B. im init-
 <br>
 Bsp. Vorbelgung einer Instanzvariablen beim Systemstart mit dem Status des Moduls:<br>
 <br>
-<code>init {$_status=ReadingsVal("$SELF","state",0)}</code><br>
-<br>
-alternativ<br>
-<br>
-<code>init {$_status=[?$SELF:state]}</code><br>
+<code>init {$_status=get_State()}</code><br>
 <br>
 Instanzvariablen lassen sich indizieren, z. B.:<br>
 <br>
@@ -5936,14 +5890,16 @@ Ebenso funktionieren hash-Variablen z. B.: <br>
 <u>Blokierende Funktionsaufrufe (blocking calls)</u><br>
 <br>
 DOIF verwaltet blockierende Funktionsaufrufe, d.h. die in diesem Zusammenhang gestarteten FHEM-Instanzen werden gelöscht, beim Herunterfahren (shutdown), Wiedereinlesen der Konfiguration (rereadcfg) Änderung der Konfiguration (modify) und Deaktivieren des Gerätes (disabled).<br>
+<br>
 Die Handhabung von blockierenden Funktionsaufrufen ist im FHEMwiki erklärt, s. <a href="https://wiki.fhem.de/wiki/Blocking_Call">Blocking Call</a>.<br>
-Der von der Funktion BlockingCall zurückgegebene Datensatz ist unterhalb von $_blockingcalls abzulegen, z.B.<br>
+<br>
+Der von der Funktion BlockingCall zurückgegebene Datensatz ist unterhalb von <b>$_blockingcalls</b> abzulegen, z.B.<br>
 <br>
 <code>$_blockingcalls{&lt;blocking call name&gt;} = BlockingCall(&lt;blocking function&gt;, &lt;argument&gt;, &lt;finish function&gt;, &lt;timeout&gt;, &lt;abort function&gt;, &lt;abort argument&gt;) unless(defined($_blockingcalls{&lt;blocking call name&gt;}));</code><br>
 <br>
 Für unterschiedliche blockierende Funktionen ist jeweils ein eigener Name (&lt;blocking call name&gt;) unterhalb von $_blockingcalls anzulegen.<br>
 <br>
-<b>$_blockingcalls</b> ist eine für DOIF reservierte Variable und darf nur in der beschriebenen Weise verwendet werden.<br>
+<b>$_blockingcalls</b> ist eine für DOIF reservierte Variable und darf nur in der beschriebener Weise verwendet werden.<br>
 <br>
 <a name="DOIF_Attribute_Perl_Modus"></a>
 <u>Nutzbare Attribute im Perl-Modus</u><br>
@@ -5970,7 +5926,7 @@ Für unterschiedliche blockierende Funktionen ist jeweils ein eigener Name (&lt;
 <u>Treppenhauslicht mit Bewegungsmelder</u><br>
 <br><code>
 define&nbsp;di_light&nbsp;DOIF&nbsp;{<br>
-&nbsp;&nbsp;if&nbsp;(["FS:motion"])&nbsp;{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;bei&nbsp;Bewegung<br>
+&nbsp;&nbsp;if&nbsp;(["FS:motion"])&nbsp;{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;bei&nbsp;Bewegung<br>
 &nbsp;&nbsp;&nbsp;&nbsp;fhem_set("lamp&nbsp;on")&nbsp;if&nbsp;([?lamp]&nbsp;ne&nbsp;"on");&nbsp;&nbsp;&nbsp;#&nbsp;Lampe&nbsp;einschalten,&nbsp;wenn&nbsp;sie&nbsp;nicht&nbsp;an&nbsp;ist<br>
 &nbsp;&nbsp;&nbsp;&nbsp;set_Exec("off",30,'fhem_set("lamp&nbsp;off")');&nbsp;&nbsp;#&nbsp;Timer&nbsp;namens&nbsp;"off"&nbsp;für&nbsp;das&nbsp;Ausschalten&nbsp;der&nbsp;Lampe&nbsp;auf&nbsp;30&nbsp;Sekunden&nbsp;setzen&nbsp;bzw.&nbsp;verlängern<br>
 &nbsp;&nbsp;}<br>
@@ -5985,17 +5941,17 @@ Anforderung: Wenn eine Taste innerhalb von zwei Sekunden zwei mal betätig wird,
 <code>
 define&nbsp;di_shutter&nbsp;DOIF&nbsp;{<br>
 &nbsp;&nbsp;if&nbsp;(["FS:^on$"]&nbsp;and&nbsp;!get_Exec("shutter")){&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;wenn&nbsp;Taste&nbsp;betätigt&nbsp;wird&nbsp;und&nbsp;kein&nbsp;Timer&nbsp;läuft<br>
-&nbsp;&nbsp;&nbsp;&nbsp;set_Exec("shutter",2,'fhem_set("shutter&nbsp;down")');&nbsp;&nbsp;&nbsp;#&nbsp;Timer&nbsp;zum&nbsp;shutter&nbsp;down&nbsp;auf&nbsp;zwei&nbsp;Sekunden&nbsp;setzen<br>
+&nbsp;&nbsp;&nbsp;&nbsp;set_Exec("shutter",2,'fhem_set("shutter&nbsp;down")');&nbsp;#&nbsp;Timer&nbsp;zum&nbsp;shutter&nbsp;down&nbsp;auf&nbsp;zwei&nbsp;Sekunden&nbsp;setzen<br>
 &nbsp;&nbsp;}&nbsp;else&nbsp;{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;wenn&nbsp;Timer&nbsp;läuft,&nbsp;d.h.&nbsp;ein&nbsp;weitere&nbsp;Tastendruck&nbsp;innerhalb&nbsp;von&nbsp;zwei&nbsp;Sekunden<br>
-&nbsp;&nbsp;&nbsp;&nbsp;del_Timer("shutter");&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;Timer&nbsp;löschen<br>
-&nbsp;&nbsp;&nbsp;&nbsp;fhem_set("shutter&nbsp;up");&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;Rollladen&nbsp;hoch<br>
+&nbsp;&nbsp;&nbsp;&nbsp;del_Exec("shutter");&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;Timer&nbsp;löschen<br>
+&nbsp;&nbsp;&nbsp;&nbsp;fhem_set("shutter&nbsp;up");&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;Rollladen&nbsp;hoch<br>
 &nbsp;&nbsp;}<br>
 }<br>
 </code>
 <br>
 <u>Aktion auslösen, wenn innerhalb einer bestimmten Zeitspanne ein Ereignis x mal eintritt</u><br>
 <br>
-Im folgenden Beispiel wird die Nutzung von Instanzvariablen demonstriert.<br>
+Im folgenden Beispiel wird die Nutzung von Device-Variablen demonstriert.<br>
 <br>
 <code>
 define&nbsp;di_count&nbsp;DOIF&nbsp;{<br>
@@ -6011,23 +5967,17 @@ define&nbsp;di_count&nbsp;DOIF&nbsp;{<br>
 <a name="DOIF_Fenster_offen_Meldung"></a>
 <u>Verzögerte Fenster-offen-Meldung mit Wiederholung für mehrere Fenster</u><br>
 <br>
-<code>define di_window DOIF {&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Block zum Auswerten des Ereignisses: "Fenster geöffnet"<br>
-&nbsp;&nbsp;if (["_window$:open"]) {&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # wenn ein Fensterdevice endend mit "_window" geöffnet wird<br>
-&nbsp;&nbsp;&nbsp;&nbsp;set_Timer ("WINDOW_$DEVICE",600) # setze einen Timer auf 10 Minuten<br>
+<code>
+define di_window DOIF<br>
+subs {<br>
+&nbsp;&nbsp;sub logwin {&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Definition der Funkton namens "logwin"<br>
+&nbsp;&nbsp;&nbsp;&nbsp;my ($window)=@_;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # übernehme Parameter in die Variable $window<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Log 3,"Fenster offen, bitte schließen: $window"; # protokolliere Fenster-Offen-Meldung<br>
+&nbsp;&nbsp;&nbsp;&nbsp;set_Exec ("$window",1800,"logwin",$window);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# setze Timer auf 30 Minuten für eine wiederholte Meldung<br>
 &nbsp;&nbsp;}<br>
 }<br>
-{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Block zum Auswerten des Ereignisses: "Fenster gechlossen"<br>
-&nbsp;&nbsp;if (["_window$:closed"]) {<br>
-&nbsp;&nbsp;&nbsp;&nbsp;del_Timer ("WINDOW_$DEVICE")&nbsp;&nbsp;&nbsp;&nbsp; # Timer löschen, wenn Fenster geschlossen wird<br>
-&nbsp;&nbsp;}<br>
-}<br>
-{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Block zur Auswertung des zuvor gesetzten Timers<br>
-&nbsp;&nbsp;if (["^$SELF:^WINDOW_"]) {&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # wenn das zuvor gesetzte Timerevent kommt<br>
-&nbsp;&nbsp;&nbsp;&nbsp;my ($window,$device)=split("_","$EVENT");&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# bestimme das Device aus dem Timerevent "WINDOW_$DEVICE"<br>
-&nbsp;&nbsp;&nbsp;&nbsp;Log 3,"Fenster offen, bitte schließen: $device"; # Meldung wird protokolliert<br>
-&nbsp;&nbsp;&nbsp;&nbsp;set_Timer ("WINDOW_$device",1800)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# setze einen neuen Timer für das Fenster für eine erneute Meldung in 30 Minuten<br>
-&nbsp;&nbsp;}<br>
-}<br>
+{ if (["_window$:open"]) {set_Exec ("$DEVICE",600,'logwin("$DEVICE")')}} # wenn, Fenster geöffnet wird, dann setze Timer auf Funktion zum Loggen namens "logwin"<br>
+{ if (["_window$:closed"]) {del_Exec ("$DEVICE")}}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # wenn, Fenster geschlossen wird, dann lösche Timer<br>
 </code>
 </ul>
 =end html_DE
