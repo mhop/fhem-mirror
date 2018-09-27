@@ -92,6 +92,7 @@ sub MSwitch_confchange($$);
 my %sets = (
     "on"             => "noArg",
     "off"            => "noArg",
+	"reload_timer"   => "noArg",
     "active"         => "noArg",
     "inactive"       => "noArg",
     "devices"        => "noArg",
@@ -832,15 +833,15 @@ sub MSwitch_Set($@) {
 		
         if ( AttrVal( $name, 'MSwitch_Mode', 'Full' ) eq "Notify" ) 
 		{
-			return "Unknown argument $cmd, choose one of active:noArg inactive:noArg del_delays:noArg backup_MSwitch:all_devices fakeevent exec_cmd1 exec_cmd2 exec_cmd1+2 wait";
+			return "Unknown argument $cmd, choose one of active:noArg inactive:noArg del_delays:noArg backup_MSwitch:all_devices fakeevent exec_cmd1 exec_cmd2 exec_cmd1+2 wait reload_timer:noArg";
 		}
         elsif ( AttrVal( $name, 'MSwitch_Mode', 'Full' ) eq "Toggle" )
 		{
-			return "Unknown argument $cmd, choose one of on offdel_delays:noArg backup_MSwitch:all_devices fakeevent wait";
+			return "Unknown argument $cmd, choose one of on offdel_delays:noArg backup_MSwitch:all_devices fakeevent wait reload_timer:noArg";
 		}
         else 
 		{
-			return "Unknown argument $cmd, choose one of on off  del_delays:noArg backup_MSwitch:all_devices fakeevent exec_cmd1 exec_cmd2 exec_cmd1+2 wait $special";
+			return "Unknown argument $cmd, choose one of on off  del_delays:noArg backup_MSwitch:all_devices fakeevent exec_cmd1 exec_cmd2 exec_cmd1+2 wait reload_timer:noArg $special";
 				
         }
     }
@@ -851,6 +852,16 @@ sub MSwitch_Set($@) {
 		MSwitch_Createnumber1($hash);
 	}	
 
+	
+	
+#######################################
+	if ( $cmd eq 'reload_timer' )
+		{
+        MSwitch_Clear_timer($hash);
+        MSwitch_Createtimer($hash);
+				return;
+        }
+	
 #######################################
 	if ( $cmd eq 'VUpdate' )
 		{
@@ -7190,7 +7201,7 @@ $todec =~ s/#\[wa\]/|/g;
 	
 	$todec =~ s/MSwitch_Self/$name/;
 	
-
+	
 	
 	
 	
@@ -7361,7 +7372,7 @@ sub MSwitch_makefreecmd($$) {
 				$cs =~ s/#.*\n//g;	
 				# entferne zeilenumbruch
 				$cs =~ s/\n//g;
-				$cs =~ s/#\[wa\]/|/g; 
+				
 				# ersetze Eventvariablen
 				$ersetzung = ReadingsVal( $name, "EVTPART3", "" );
 				$cs =~ s/\$EVTPART3/$ersetzung/g;
