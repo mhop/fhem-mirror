@@ -30,7 +30,7 @@
 ##########################################################################################################################
 #  Versions History:
 #
-# 5.0.1      27.09.2018       Log2Syslog_closesock if write error:.*
+# 5.0.1      27.09.2018       Log2Syslog_closesock if write error:.* , delete readings code changed 
 # 5.0.0      26.09.2018       TCP-Server in Collector-mode, HIPCACHE added, PROFILE as Internal, Parse_Err_No as reading,
 #                             octetCount attribute, TCP-SSL-support, set "reopen" command, code fixes
 # 4.8.5      20.08.2018       BSD/parseFn parsing changed, BSD setpayload changed, new variable $IGNORE in parseFn
@@ -1208,10 +1208,8 @@ sub Log2Syslog_Attr ($$$$) {
     }
     
     if ($aName =~ /makeEvent/) {
-        if($aVal =~ /intern/ || $cmd eq "del") {
-            foreach my $reading (grep { /MSG_/ } keys %{$defs{$name}{READINGS}}) {
-                readingsDelete($defs{$name}, $reading);
-            }
+        foreach my $key(keys%{$defs{$name}{READINGS}}) {
+            delete($defs{$name}{READINGS}{$key}) if($key !~ /state|Transfered_logs_per_minute|SSL_.*|Parse_Err_No/);
         }
     }    
     
