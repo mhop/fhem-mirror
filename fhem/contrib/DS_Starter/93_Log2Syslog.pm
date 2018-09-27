@@ -30,8 +30,9 @@
 ##########################################################################################################################
 #  Versions History:
 #
+# 5.0.1      27.09.2018       Log2Syslog_closesock if write error:.*
 # 5.0.0      26.09.2018       TCP-Server in Collector-mode, HIPCACHE added, PROFILE as Internal, Parse_Err_No as reading,
-#                             octetCount attribute, TCP-SSL-support, code fixes
+#                             octetCount attribute, TCP-SSL-support, set "reopen" command, code fixes
 # 4.8.5      20.08.2018       BSD/parseFn parsing changed, BSD setpayload changed, new variable $IGNORE in parseFn
 # 4.8.4      15.08.2018       BSD parsing changed
 # 4.8.3      14.08.2018       BSD setpayload changed, BSD parsing changed, Internal MYFQDN 
@@ -89,7 +90,7 @@ eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $Mis
 #
 sub Log2Syslog_Log3slog($$$);
 
-my $Log2SyslogVn = "5.0.0";
+my $Log2SyslogVn = "5.0.1";
 
 # Mappinghash BSD-Formatierung Monat
 our %Log2Syslog_BSDMonth = (
@@ -885,12 +886,7 @@ sub Log2Syslog_parsePayload($$) {
           $err = 1;
           Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - no parseFn defined."); 
       }
-  }
-  
-  if(AttrVal($name, "TLS", 0)) {
-      # wenn Transport Layer Security (TLS) -> Transport Mapping for Syslog https://tools.ietf.org/pdf/rfc5425.pdf
-	  
-  } 	
+  }	
 
 return ($err,$ignore,$sev,$phost,$ts,$pl);
 }
@@ -1104,8 +1100,8 @@ sub Log2Syslog_Attr ($$$$) {
                 InternalTimer(gettimeofday()+0.5, "Log2Syslog_initServer", "$name,global", 0);                 
 			} 
 		} else {
-		    Log2Syslog_closesock($hash,1);    # Clientsocket schließen 
-            Log2Syslog_downServer($hash);     # Serversocket schließen
+		    Log2Syslog_closesock($hash,1);          # Clientsocket schließen 
+            Log2Syslog_downServer($hash);           # Serversocket schließen
 		}         
     }
 	
@@ -1148,7 +1144,7 @@ sub Log2Syslog_Attr ($$$$) {
         
         if($aName =~ /port/ && $hash->{MODEL} =~ /Collector/ && $init_done) {
             return "$aName \"$aVal\" is not valid because privileged ports are only usable by super users. Use a port grater than 1023."  if($aVal < 1024);
-            Log2Syslog_downServer($hash);                                                      # Serversocket schließen
+            Log2Syslog_downServer($hash,1);                                                      # Serversocket schließen
             InternalTimer(gettimeofday()+0.5, "Log2Syslog_initServer", "$name,global", 0);
             readingsSingleUpdate ($hash, 'Parse_Err_No', 0, 1);                                # Fehlerzähler für Parse-Errors auf 0			
         } elsif ($aName =~ /port/ && $hash->{MODEL} !~ /Collector/) {
@@ -1164,7 +1160,7 @@ sub Log2Syslog_Attr ($$$$) {
         InternalTimer(gettimeofday()+2, "Log2Syslog_deleteMemLock", $hash, 0);
         
         if($hash->{MODEL} eq "Collector") {
-            Log2Syslog_downServer($hash);                                                      # Serversocket schließen
+            Log2Syslog_downServer($hash,1);                                                      # Serversocket schließen
             InternalTimer(gettimeofday()+0.5, "Log2Syslog_initServer", "$name,global", 0);
 			readingsSingleUpdate ($hash, 'Parse_Err_No', 0, 1);                                # Fehlerzähler für Parse-Errors auf 0
         } else {
@@ -1284,12 +1280,13 @@ sub Log2Syslog_eventlog($$) {
 				  Log2Syslog_Log3slog($name, 4, "Log2Syslog $name - Payload sequence $pid sent\n");	
               } else {
                   my $err = $!;
-				  Log2Syslog_Log3slog($name, 4, "Log2Syslog $name - Warning - Payload sequence $pid NOT sent: $err\n");	
+				  Log2Syslog_Log3slog($name, 3, "Log2Syslog $name - Warning - Payload sequence $pid NOT sent: $err\n");	
                   $st = "write error: $err";                 
 			  }
           }
       } 
-      # Log2Syslog_closesock($hash);
+   
+      Log2Syslog_closesock($hash) if($st =~ /^write error:.*/);
   }
   
   my $evt = ($st eq $hash->{HELPER}{OLDSTATE})?0:1;
@@ -1349,10 +1346,11 @@ sub Log2Syslog_fhemlog($$) {
 		      Log2Syslog_Log3slog($name, 4, "Log2Syslog $name - Payload sequence $pid sent\n");	
           } else {
               my $err = $!;
-			  Log2Syslog_Log3slog($name, 4, "Log2Syslog $name - Warning - Payload sequence $pid NOT sent: $err\n");	
+			  Log2Syslog_Log3slog($name, 3, "Log2Syslog $name - Warning - Payload sequence $pid NOT sent: $err\n");	
               $st = "write error: $err";             
 	      }  
-          # Log2Syslog_closesock($hash);
+          
+          Log2Syslog_closesock($hash) if($st =~ /^write error:.*/);
 	  }
   }
   
@@ -1399,10 +1397,11 @@ sub Log2Syslog_sendTestMsg($$) {
           $st = "maintenance";          
       } else {
           my $err = $!;
-	      Log2Syslog_Log3slog($name, 4, "$name - Warning - Payload sequence $pid NOT sent: $err\n");	
+	      Log2Syslog_Log3slog($name, 3, "$name - Warning - Payload sequence $pid NOT sent: $err\n");	
           $st = "write error: $err";              
 	  }  
-      Log2Syslog_closesock($hash);
+      
+      Log2Syslog_closesock($hash) if($st =~ /^write error:.*/);
   }
   
   my $evt = ($st eq $hash->{HELPER}{OLDSTATE})?0:1;
@@ -1537,7 +1536,7 @@ sub Log2Syslog_opensock ($;$$) {
   }
   
   Log2Syslog_Log3slog($name, 3, "Log2Syslog $name - $lo") if($lo);
-  Log2Syslog_Log3slog($name, 3, "Log2Syslog $name - $lof") if($lof && !$supresslog);
+  Log2Syslog_Log3slog($name, 3, "Log2Syslog $name - $lof") if($lof && !$supresslog && !$hash->{CLIENTSOCKET});
   
   $hash->{CLIENTSOCKET} = $sock if($sock);
     
@@ -1772,7 +1771,7 @@ sub Log2Syslog_evalPeer($) {
       $protocol = "tcp";
   } 
   my ($phost,$paddr,$pport, $pipaddr);
-    
+  
   no warnings 'uninitialized';
   if($protocol =~ /tcp/) {
       $pipaddr = $hash->{HELPER}{TCPPADDR};    # gespeicherte IP-Adresse 
@@ -1782,7 +1781,7 @@ sub Log2Syslog_evalPeer($) {
           $phost = gethostbyaddr($paddr, AF_INET);
           $hash->{HIPCACHE}{$pipaddr} = $phost if($phost);
       }
-  } else {
+  } elsif ($protocol =~ /udp/ && $socket) {
       # Protokoll UDP
       ($pport, $paddr) = sockaddr_in($socket->peername) if($socket->peername);
       $pipaddr = inet_ntoa($paddr) if($paddr);
@@ -1794,7 +1793,7 @@ sub Log2Syslog_evalPeer($) {
   }
   Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name - message peer: $phost,$pipaddr");
   use warnings;
-  $phost = $phost?$phost:$pipaddr;
+  $phost = $phost?$phost:$pipaddr?$pipaddr:"unknown";
 
 return ($phost); 
 }
