@@ -1371,6 +1371,8 @@ sub Log2Syslog_sendTestMsg($$) {
   if($own) {
       # eigene Testmessage ohne Formatanpassung raw senden
       $data = $own;
+      $pid = $hash->{SEQNO};                                 # PayloadID zur Nachverfolgung der Eventabfolge 
+      $hash->{SEQNO}++;
   
   } else {   
       $ts = TimeNow();
