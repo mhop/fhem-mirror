@@ -997,7 +997,7 @@ sub Log2Syslog_Set($@) {
   my $prop    = $a[2];
   
   my $setlist = "Unknown argument $opt, choose one of ".
-                "reopen ".	
+                "reopen:noArg ".	
                 (($hash->{MODEL} =~ /Sender/)?"sendTestMessage ":"")
                 ;
   
