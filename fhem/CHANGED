@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  55_DWD_OpenData: KML based forecast, readings have changed,
+             attr forecastProperties must be updated (forum #83097)
   - bugfix:  12_HProtocolGateway: Filllevel conversion corrected
   - bugfix:  57_Calendar.pm: make ical file work again
   - change:  34_ESPEasy: get/set cmd handling rewritten, more supported ESP
