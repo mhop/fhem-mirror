@@ -3413,7 +3413,16 @@ sub MSwitch_fhemwebFn($$$$) {
 		$triggercondition =~ s/#\[ti\]/~/g;
 		$triggercondition =~ s/#\[sp\]/ /g;
 	
-    my @triggertimes = split( /~/, ReadingsVal( $Name, '.Trigger_time', '' ) );
+	
+	#MSwitch_LOG( $name, 5, "$name: aufruf on/off -> $cmd"  );
+	
+	my $triggertime = ReadingsVal( $Name, '.Trigger_time', '' );
+	$triggertime =~ s/#\[dp\]/:/g;
+	
+	
+	
+	
+    my @triggertimes = split( /~/, $triggertime );
     my $condition   = ReadingsVal( $Name, '.Trigger_time', '' );
     my $lenght      = length($condition);
     my $timeon      = '';
@@ -3421,6 +3430,11 @@ sub MSwitch_fhemwebFn($$$$) {
     my $timeononly  = '';
     my $timeoffonly = '';
 
+	
+	
+	
+	
+	
     if ( $lenght != 0 ) {
         $timeon      = substr( $triggertimes[0], 2 );
         $timeoff     = substr( $triggertimes[1], 3 );
@@ -4552,12 +4566,19 @@ if ( ReadingsVal( $Name, '.change', 'undef') ne "undef")
 	\$(\"#aw_trig\").click(function(){
 	var nm = \$(t).attr(\"nm\");
 	trigdev = \$(\"[name=trigdev]\").val();
-	timeon =  \$(\"[name=timeon]\").val()+':';
-	timeoff =  \$(\"[name=timeoff]\").val()+':';
-	timeononly =  \$(\"[name=timeononly]\").val()+':';
-	timeoffonly =  \$(\"[name=timeoffonly]\").val()+':';
+	//trigdev = trigdev.replace(/\:/g,'#[dp]');
+	//alert(trigdev);
+	
+	
+	timeon =  \$(\"[name=timeon]\").val();
+	timeoff =  \$(\"[name=timeoff]\").val();
+	timeononly =  \$(\"[name=timeononly]\").val();
+	timeoffonly =  \$(\"[name=timeoffonly]\").val();
+	
+
 	trigdevcond = \$(\"[name=triggercondition]\").val();
-	//trigdevcond = trigdevcond.replace(/:/g,'.');
+	
+	//trigdevcond = trigdevcond.replace(/:/g,'#[dp]');
 	
 	trigdevcond = trigdevcond.replace(/\\./g,'#[pt]');
 	trigdevcond = trigdevcond.replace(/:/g,'#[dp]');
@@ -4566,12 +4587,32 @@ if ( ReadingsVal( $Name, '.change', 'undef') ne "undef")
 	trigdevcond = trigdevcond.replace(/ /g,'#[sp]');
 	
 	trigdevcond = trigdevcond+':';
+	
+	
+	
 	timeon = timeon.replace(/ /g, '');
 	timeoff = timeoff.replace(/ /g, '');
-	timeoff = timeoff.replace(/ /g, '');
+	timeononly = timeononly.replace(/ /g, '');
 	timeoffonly = timeoffonly.replace(/ /g, '');
+	
+	timeon = timeon.replace(/:/g, '#[dp]');
+	timeoff = timeoff.replace(/:/g, '#[dp]');
+	timeononly = timeononly.replace(/:/g, '#[dp]');
+	timeoffonly = timeoffonly.replace(/:/g, '#[dp]');
+	
+	
+	timeon = timeon+':';
+	timeoff = timeoff+':';
+	timeononly = timeononly+':';
+	timeoffonly = timeoffonly+':';
+	
+	
+	//alert(timeon);
+	
 	trigwhite = \$(\"[name=triggerwhitelist]\").val();
 	var  def = nm+\" set_trigger  \"+trigdev+\" \"+timeon+\" \"+timeoff+\" \"+timeononly+\" \"+timeoffonly+\" \"+trigdevcond+\" \"+trigwhite+\" \" ;
+	
+	//alert(def);
 	def =  encodeURIComponent(def);
 	location = location.pathname+\"?detail=" . $Name . "&cmd=set \"+addcsrf(def);
 	});
@@ -5813,8 +5854,25 @@ sub MSwitch_Createtimer($) {
     my ($hash) = @_;
     my $Name = $hash->{NAME};
 
+	
+	MSwitch_LOG( $Name, 5,"crete timer");
+	
+	
     # keine timer vorhenden
     my $condition = ReadingsVal( $Name, '.Trigger_time', '' );
+	
+	
+	$condition =~ s/#\[dp\]/:/g;
+	
+				my	$x =0;
+				while ( $condition =~ m/(.*)\[(.*[^0-9]{2})\:(.*[^0-9]{2})\](.*)/ ) 
+					{
+					$x++;                        # notausstieg notausstieg
+					last if $x > 20;             # notausstieg notausstieg
+					my $setmagic = ReadingsVal( $2, $3, 0 );
+					$condition = $1.'['.$setmagic.']'.$4;
+					}
+	
     my $lenght = length($condition);
 
     #remove all timers
@@ -5854,6 +5912,12 @@ sub MSwitch_Createtimer($) {
     $timer[1] = '' if ( !defined $timer[1] );
     $timer[2] = '' if ( !defined $timer[2] );
     $timer[3] = '' if ( !defined $timer[3] );
+ 
+ MSwitch_LOG( $Name, 5,"timer0  $timer[0]");
+ MSwitch_LOG( $Name, 5,"timer1  $timer[1]");
+ MSwitch_LOG( $Name, 5,"timer2  $timer[2]");
+ MSwitch_LOG( $Name, 5,"timer3  $timer[3]");
+ 
  
     # lösche bei notify und toggle
     if ( AttrVal( $Name, 'MSwitch_Mode', 'Full' ) eq "Notify" )
@@ -7218,7 +7282,7 @@ $todec =~ s/#\[wa\]/|/g;
 
 
  # setmagic ersetzun
-				my $x =0;
+				 $x =0;
 				while ( $todec =~ m/(.*)\[(.*)\:(.*)\](.*)/ ) 
 					{
 					$x++;                        # notausstieg notausstieg
@@ -7339,7 +7403,7 @@ Log3( $name, 0, "vor change: ".$tochange2 );
 
 #Log3( $name, 0, "navh change: ".$tochange2 );	
 	
-	my $x = 0;
+	$x = 0;
     while ( $tochange2 =~ m/(.*?)($names[0])(.*)?/)
 	{
 		my $firstpart = $1;
