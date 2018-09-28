@@ -1685,7 +1685,7 @@ sub Calendar_Initialize($) {
   $hash->{NotifyFn}= "Calendar_Notify";
   $hash->{AttrList}=  "update:sync,async,none removevcalendar:0,1 " .
   "cutoffOlderThan hideOlderThan hideLaterThan onCreateEvent " .
-  "ignoreCancelled:0,1 " .
+  "ignoreCancelled:0,1 quirks " .
   "SSLVerify:0,1 defaultFormat defaultTimeFormat " .
   $readingFnAttributes;
 }
@@ -2719,11 +2719,15 @@ sub Calendar_UpdateCalendar($$) {
 
   my ($hash, $ical)= @_;
 
+  my $name= $hash->{NAME};
+
+  my @quirks= split(",", AttrVal($name, "quirks", ""));
+  my $nodtstamp= "ignoreDTSTAMP" ~~ @quirks;
+
   # *******************************
   # *** Step 1 Digest Parser Result
   # *******************************
 
-  my $name= $hash->{NAME};
   my $error= $ical->{error};
   my $state= $ical->{state};
 
@@ -2811,6 +2815,7 @@ sub Calendar_UpdateCalendar($$) {
         $cutoff= $t- $cutoffT;
     }
 
+
   foreach my $v (grep { $_->{type} eq "VEVENT" } @{$root->{entries}}) {
 
         # totally skip outdated calendar entries
@@ -2857,7 +2862,7 @@ sub Calendar_UpdateCalendar($$) {
                 # and same SEQUENCE
                 #
                 if($v0->sameValue($v, "LAST-MODIFIED") &&
-                   $v0->sameValue($v, "DTSTAMP")) {
+                   ($nodtstamp || $v0->sameValue($v, "DTSTAMP"))) {
                     #
                     # is not modified
                     #
@@ -3531,6 +3536,15 @@ sub CalendarEventsAsHtml($;$) {
         although they are cancelled.
     </li><p>
 
+    <li><code>quirks &lt;values&gt;</code><br>
+        Parameters to handle special situations. <code>&lt;values&gt;</code> is
+        a comma-separated list of the following keywords:
+        <ul>
+          <li><code>ignoreDtStamp</code>: if present, a modified DTSTAMP attribute of a calendar event
+          does not signify that the calendar event was modified.</li>
+        </ul>
+    </li><p>
+
 
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
@@ -3992,6 +4006,17 @@ sub CalendarEventsAsHtml($;$) {
         Dieses Attribut auf 1 setzen, falls Termine in einer
         Serie zur&uuml;ckgegeben werden, die gel&ouml;scht sind.
     </li><p>
+
+    <li><code>quirks &lt;values&gt;</code><br>
+        Parameter f&uuml;r spezielle Situationen. <code>&lt;values&gt;</code> ist
+        eine mit Kommas getrennte Liste der folgenden Schl&uuml;sselw&ouml;rter:
+        <ul>
+          <li><code>ignoreDtStamp</code>: wenn gesetzt, dann zeigt
+          ein ver&auml;ndertes DTSTAMP Attribut eines Termins nicht an, dass
+          der Termin ver&auml;ndert wurde.</li>
+        </ul>
+    </li><p>
+
 
 <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
