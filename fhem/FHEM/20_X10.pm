@@ -89,15 +89,18 @@ my %unitcodes_snd  = qw( 1 0110   2 1110   3 0010   4 1010
                         13 0000  14 1000  15 0100  16 1100);
 
 
-my %functions_set = ( "on"      => 0,
-                      "off"     => 0,
-                      "dimup"   => 1,
+my %functions_set = ( "on" => 0,
+                      "off" => 0,
+                      "dimup" => 1,
                       "dimdown" => 1,
-		      "dimto"   => 1,
+		                  "dimto" => 1,
                       "on-till" => 1,
-		      "on-for-timer" => 1,
+            		      "on-for-timer" => 1,
+                      "all_units_off" => 0,
+                      "all_units_on" => 0,
+                      "all_lights_off" => 0,
+                      "all_lights_on" => 0,
                     );
-
 
 my %models = (
     lm12	=> 'dimmer',

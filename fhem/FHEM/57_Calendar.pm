@@ -2814,14 +2814,26 @@ sub Calendar_UpdateCalendar($$) {
   foreach my $v (grep { $_->{type} eq "VEVENT" } @{$root->{entries}}) {
 
         # totally skip outdated calendar entries
-	next if(
-          defined($cutoffOlderThan) &&
-          $v->hasKey("DTEND") &&
-          $v->tm($v->value("DTEND")) < $cutoff &&
-          !$v->hasKey("RRULE")
-        );
+        if($cutoffOlderThan) {
+          if(!$v->isRecurring()) {
+            # non recurring event
+            next if(
+              defined($cutoffOlderThan) &&
+              $v->hasKey("DTEND") &&
+              $v->tm($v->value("DTEND")) < $cutoff
+              );
+          } else {
+            # recurring event, inspect
+            my $rrule= $v->value("RRULE");
+            my @rrparts= split(";", $rrule);
+            my %r= map { split("=", $_); } @rrparts;
+            if(exists($r{"UNTIL"})) {
+              next if($v->tm($r{"UNTIL"}) < $cutoff)
+            }
+          }
+        }
 
-	#main::Debug "Merging " . $v->asString();
+	      #main::Debug "Merging " . $v->asString();
         my $found= 0;
         my $added= 0; # flag to prevent multiple additions
         $n++;
@@ -3493,10 +3505,10 @@ sub CalendarEventsAsHtml($;$) {
         <p>
 
     <li><code>cutoffOlderThan &lt;timespec&gt;</code><br>
-        This attribute cuts off all non-recurring calendar events that ended a timespan cutoffOlderThan
+        This attribute cuts off all calendar events that ended a timespan cutoffOlderThan
         before the last update of the calendar. The purpose of setting this attribute is to save memory.
         Such calendar events cannot be accessed at all from FHEM. Calendar events are not cut off if
-        they are recurring or if they have no end time (DTEND).
+        they are recurring with no end of series (UNTIL) or if they have no end time (DTEND).
     </li><p>
 
     <li><code>onCreateEvent &lt;perl-code&gt;</code><br>
@@ -3952,9 +3964,10 @@ sub CalendarEventsAsHtml($;$) {
         <p>
 
     <li><code>cutoffOlderThan &lt;timespec&gt;</code><br>
-        Dieses Attribut schneidet alle nicht wiederkehrenden Termine weg, die eine Zeitspanne cutoffOlderThan
+        Dieses Attribut schneidet alle Termine weg, die eine Zeitspanne cutoffOlderThan
         vor der letzten Aktualisierung des Kalenders endeten. Der Zweck dieses Attributs ist es Speicher zu
-        sparen. Auf solche Termine kann gar nicht mehr aus FHEM heraus zugegriffen werden. Serientermine und
+        sparen. Auf solche Termine kann gar nicht mehr aus FHEM heraus zugegriffen
+        werden. Serientermine ohne Ende (UNTIL) und
         Termine ohne Endezeitpunkt (DTEND) werden nicht weggeschnitten.
     </li><p>
 
