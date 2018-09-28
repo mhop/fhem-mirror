@@ -1304,7 +1304,7 @@ sub FRITZBOX_Readout_Run_Web($)
    $queryStr .= "&box_dect=dect:settings/enabled"; # DECT Sender
    $queryStr .= "&handsetCount=dect:settings/Handset/count"; # Anzahl Handsets
    $queryStr .= "&handset=dect:settings/Handset/list(User,Manufacturer,Model,FWVersion)"; # DECT Handsets
-   $queryStr .= "&wlanList=wlan:settings/wlanlist/list(mac,speed,speed_rx,rssi)"; # WLAN devices
+   $queryStr .= "&wlanList=wlan:settings/wlanlist/list(mac,speed,speed_rx,rssi,is_guest)"; # WLAN devices
    $queryStr .= "&wlanListNew=wlan:settings/wlanlist/list(mac,speed,rssi)"; # WLAN devices fw>=6.69
    #wlan:settings/wlanlist/list(hostname,mac,UID,state,rssi,quality,is_turbo,cipher,wmm_active,powersave,is_ap,ap_state,is_repeater,flags,flags_set,mode,is_guest,speed,speed_rx,channel_width,streams)   #wlan:settings/wlanlist/list(hostname,mac,UID,state,rssi,quality,is_turbo,wmm_active,cipher,powersave,is_repeater,flags,flags_set,mode,is_guest,speed,speed_rx,speed_rx_max,speed_tx_max,channel_width,streams,mu_mimo_group,is_fail_client)   
    $queryStr .= "&lanDevice=landevice:settings/landevice/list(mac,ip,ethernet,ethernet_port,guest,name,active,online,wlan,speed,UID)"; # LAN devices
@@ -1388,9 +1388,9 @@ sub FRITZBOX_Readout_Run_Web($)
       return $name."|".encode_base64($returnStr,"");
    }
 
-   # !!! copes with fw 6.69 !!!
+   # !!! copes with fw >=6.69 and fw < 7 !!!
    if ( ref $result->{wlanList} ne 'ARRAY' ) {
-      FRITZBOX_Log $hash, 4, "Recognized query answer of firmware 6.69";
+      FRITZBOX_Log $hash, 4, "Recognized query answer of firmware >=6.69 and < 7";
       my $result2;
       my $newQueryPart; 
       
@@ -1532,15 +1532,16 @@ sub FRITZBOX_Readout_Run_Web($)
 
 # Create WLAN-List
    my %wlanList;
-   #to keep compatibility with firmware <= v3.67
+   #to keep compatibility with firmware <= v3.67 and >=7
    if ( ref $result->{wlanList} eq 'ARRAY' ) {
       foreach ( @{ $result->{wlanList} } ) {
          my $mac = $_->{mac};
          $mac =~ s/:/_/g;
-         $wlanList{$mac}{speed} .= $_->{speed};
-         $wlanList{$mac}{speed_rx} .= $_->{speed_rx};
+         # Anscheinend gibt es sowohl für repeater als auch für FBoxen Anmeldungen
+         $wlanList{$mac}{speed} = $_->{speed}   if ! defined $wlanList{$mac}{speed} || $_->{speed} ne "0";
+         $wlanList{$mac}{speed_rx} = $_->{speed_rx} if ! defined $wlanList{$mac}{speed_rx} || $_->{speed_rx} ne "0";
          #$wlanList{$mac}{speed_rx} = $result_lan->{$_->{_node}};
-         $wlanList{$mac}{rssi} .= $_->{rssi};
+         $wlanList{$mac}{rssi} = $_->{rssi} if ! defined $wlanList{$mac}{rssi} || $_->{rssi} ne "0";
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->wlanDevice->".$mac."->speed", $_->{speed};
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->wlanDevice->".$mac."->speed_rx", $wlanList{$mac}{speed_rx};
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->wlanDevice->".$mac."->rssi", $_->{rssi};
@@ -1569,7 +1570,10 @@ sub FRITZBOX_Readout_Run_Web($)
          if ( $_->{active} ) {
             my $mac = $_->{mac};
             $mac =~ s/:/_/g;
-            if ( !$_->{ethernet} && $_->{wlan} ) {
+            # if ( !$_->{ethernet} && $_->{wlan} ) { # funktioniert nicht mehr seit v7
+            if ( defined $wlanList{$mac} ) {
+               $wlanCount++;
+               $gWlanCount++      if $_->{guest} eq "1" || $wlanList{$mac}{is_guest} eq "1" ;
                $dName .= " (";
                $dName .= "g"    if $_->{guest};
                $dName .= "WLAN";
@@ -1588,8 +1592,8 @@ sub FRITZBOX_Readout_Run_Web($)
             }
             my $rName = "mac_".$mac;
             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, $dName;
-            $wlanCount++      if $_->{wlan} ;
-            $gWlanCount++      if $_->{wlan}  && $_->{guest} ;
+            # $wlanCount++      if $_->{wlan} ;
+            # $gWlanCount++      if $_->{wlan}  && $_->{guest} ;
             # Remove mac address from oldLanDevice-List
             delete $oldLanDevice{$rName}   if exists $oldLanDevice{$rName};
          }
