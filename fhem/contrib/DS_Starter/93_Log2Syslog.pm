@@ -35,7 +35,7 @@ use warnings;
 
 # Versions History intern:
 our %Log2Syslog_vHistoryIntern = (
-  "5.1.0"  => "29.09.2018  new get <name> versionHistory command",
+  "5.1.0"  => "29.09.2018  new get <name> versionNotes command",
   "5.0.1"  => "27.09.2018  Log2Syslog_closesock if write error:.* , delete readings code changed",
   "5.0.0"  => "26.09.2018  TCP-Server in Collector-mode, HIPCACHE added, PROFILE as Internal, Parse_Err_No as reading,
                            octetCount attribute, TCP-SSL-support, set 'reopen' command, code fixes",
@@ -83,7 +83,7 @@ our %Log2Syslog_vHistoryIntern = (
 
 # Versions History extern:
 our %Log2Syslog_vHistoryExtern = (
-  "5.1.0"  => "29.09.2018 new get &lt;name&gt; versionHistory command ",
+  "5.1.0"  => "29.09.2018 new get &lt;name&gt; versionNotes command ",
   "5.0.1"  => "27.09.2018 automatic reconnect to syslog-server in case of write error ",
   "5.0.0"  => "26.09.2018 <li>TCP Server mode is possible now for Collector devices<\li><li>the used parse-profile is shown as Internal<\li><li>Parse_Err_No counts faulty persings since start<\li><li>new octetCount attribute switches the syslog framing method (see also RFC6587 <a href=\"https://tools.ietf.org/html/rfc6587\">Transmission of Syslog Messages over TCP</a>)<\li><li>TCP SSL-support<\li><li>new set 'reopen' command to reconnect a broken connection<\li><li>some code fixes ",
   "4.8.5"  => "20.08.2018 BSD/parseFn parse changed, BSD setpayload changed, new variable \$IGNORE in parseFn ",
@@ -1086,7 +1086,7 @@ sub Log2Syslog_Get($@) {
   my $st;
   my $getlist = "Unknown argument $opt, choose one of ".
                 (($hash->{MODEL} !~ /Collector/)?"certInfo:noArg ":"").
-                "versionHistory:noArg "				
+                "versionNotes:noArg "				
                 ;
   
   return if(AttrVal($name, "disable", "") eq "1");
@@ -1103,7 +1103,7 @@ sub Log2Syslog_Get($@) {
 	  return $cert if($cert);
 	  return "no SSL session has been created";
 	  
-  } elsif ($opt =~ /versionHistory/) {
+  } elsif ($opt =~ /versionNotes/) {
 	  my $header;
 	  $header  = "<b>Module release information table</b><br>";
 	  
@@ -2172,9 +2172,9 @@ Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.095 fhemtest.myds.me Test
     <br>
     
     <ul>
-    <li><b>versionHistory </b><br>
+    <li><b>versionNotes </b><br>
         <br>
-        Shows release informations about the module. Contains only main informations for module users.
+        Shows release informations and hints about the module. Contains only main informations for module users.
     </li>
     </ul>
     <br>
@@ -2818,9 +2818,9 @@ Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.095 fhemtest.myds.me Test
     <br>
     
     <ul>
-    <li><b>versionHistory </b><br>
+    <li><b>versionNotes </b><br>
         <br>
-        Zeigt Release Informationen des Moduls an. Es sind nur Informationen mit Bedeutung für den Modulnutzer 
+        Zeigt Release Informationen und Hinweise zum Modul an. Es sind nur Informationen mit Bedeutung für den Modulnutzer 
         enthalten.
     </li>
     </ul>
