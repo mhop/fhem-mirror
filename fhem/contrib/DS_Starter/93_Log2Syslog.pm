@@ -28,56 +28,101 @@
 #       TLS Transport according to RFC5425 https://tools.ietf.org/pdf/rfc5425.pdf as well
 #
 ##########################################################################################################################
-#  Versions History:
-#
-# 5.0.1      27.09.2018       Log2Syslog_closesock if write error:.* , delete readings code changed 
-# 5.0.0      26.09.2018       TCP-Server in Collector-mode, HIPCACHE added, PROFILE as Internal, Parse_Err_No as reading,
-#                             octetCount attribute, TCP-SSL-support, set "reopen" command, code fixes
-# 4.8.5      20.08.2018       BSD/parseFn parsing changed, BSD setpayload changed, new variable $IGNORE in parseFn
-# 4.8.4      15.08.2018       BSD parsing changed
-# 4.8.3      14.08.2018       BSD setpayload changed, BSD parsing changed, Internal MYFQDN 
-# 4.8.2      13.08.2018       rename makeMsgEvent to makeEvent
-# 4.8.1      12.08.2018       IETF-Syslog without VERSION changed, Log verbose 1 to 2 changed in parsePayload
-# 4.8.0      12.08.2018       enhanced IETF Parser to match logs without version 
-# 4.7.0      10.08.2018       Parser for TPLink
-# 4.6.1      10.08.2018       some perl warnings, changed IETF Parser
-# 4.6.0      08.08.2018       set sendTestMessage added, Attribute "contDelimiter", "respectSeverity"
-# 4.5.1      07.08.2018       BSD Regex changed, setpayload of BSD changed 
-# 4.5.0      06.08.2018       Regex capture groups used in parsePayload to set variables, parsing of BSD changed,
-#                             Attribute "makeMsgEvent" added
-# 4.4.0      04.08.2018       Attribute "outputFields" added
-# 4.3.0      03.08.2018       Attribute "parseFn" added
-# 4.2.0      03.08.2018       evaluate sender peer ip-address/hostname, use it as reading in event generation
-# 4.1.0      02.08.2018       state event generation changed
-# 4.0.0      30.07.2018       server mode (Collector)
-# 3.2.1      04.05.2018       fix compatibility with newer IO::Socket::SSL on debian 9, attr ssldebug for
-#                             debugging SSL messages
-# 3.2.0      22.11.2017       add NOTIFYDEV if possible
-# 3.1.0      28.08.2017       get-function added, commandref revised, $readingFnAttributes deleted
-# 3.0.0      27.08.2017       change attr type to protocol, ready to check in
-# 2.6.0      26.08.2017       more than one Log2Syslog device can be created
-# 2.5.2      26.08.2018       fix in splitting timestamp, change Log2Syslog_trate using internaltimer with attr 
-#                             rateCalcRerun, function Log2Syslog_closesock
-# 2.5.1      24.08.2017       some fixes
-# 2.5.0      23.08.2017       TLS encryption available, new readings, $readingFnAttributes
-# 2.4.1      21.08.2017       changes in sub Log2Syslog_charfilter, change PROCID to $hash->{SEQNO}
-#                             switch to non-blocking in subs event/Log2Syslog_fhemlog
-# 2.4.0      20.08.2017       new sub Log2Syslog_Log3slog for entries in local fhemlog only -> verbose support
-# 2.3.1      19.08.2017       commandref revised
-# 2.3.0      18.08.2017       new parameter "ident" in DEF, sub setidex, Log2Syslog_charfilter
-# 2.2.0      17.08.2017       set BSD data length, set only acceptable characters (USASCII) in payload
-#                             commandref revised
-# 2.1.0      17.08.2017       sub Log2Syslog_opensock created
-# 2.0.0      16.08.2017       create syslog without SYS::SYSLOG
-# 1.1.1      13.08.2017       registrate Log2Syslog_fhemlog to %loginform in case of sending fhem-log
-#                             attribute timeout, commandref revised
-# 1.1.0      26.07.2017       add regex search to sub Log2Syslog_fhemlog
-# 1.0.0      25.07.2017       initial version
-
 package main;
 
 use strict;
 use warnings;
+
+# Versions History intern:
+our %Log2Syslog_vHistoryIntern = (
+  "5.1.0"  => "29.09.2018  new get <name> versionHistory command",
+  "5.0.1"  => "27.09.2018  Log2Syslog_closesock if write error:.* , delete readings code changed",
+  "5.0.0"  => "26.09.2018  TCP-Server in Collector-mode, HIPCACHE added, PROFILE as Internal, Parse_Err_No as reading,
+                           octetCount attribute, TCP-SSL-support, set 'reopen' command, code fixes",
+  "4.8.5"  => "20.08.2018  BSD/parseFn parsing changed, BSD setpayload changed, new variable \$IGNORE in parseFn",
+  "4.8.4"  => "15.08.2018  BSD parsing changed",
+  "4.8.3"  => "14.08.2018  BSD setpayload changed, BSD parsing changed, Internal MYFQDN", 
+  "4.8.2"  => "13.08.2018  rename makeMsgEvent to makeEvent",
+  "4.8.1"  => "12.08.2018  IETF-Syslog without VERSION changed, Log verbose 1 to 2 changed in parsePayload",
+  "4.8.0"  => "12.08.2018  enhanced IETF Parser to match logs without version", 
+  "4.7.0"  => "10.08.2018  Parser for TPLink",
+  "4.6.1"  => "10.08.2018  some perl warnings, changed IETF Parser",
+  "4.6.0"  => "08.08.2018  set sendTestMessage added, Attribute 'contDelimiter', 'respectSeverity'",
+  "4.5.1"  => "07.08.2018  BSD Regex changed, setpayload of BSD changed",
+  "4.5.0"  => "06.08.2018  Regex capture groups used in parsePayload to set variables, parsing of BSD changed,
+                           Attribute 'makeMsgEvent' added",
+  "4.4.0"  => "04.08.2018  Attribute 'outputFields' added",
+  "4.3.0"  => "03.08.2018  Attribute 'parseFn' added",
+  "4.2.0"  => "03.08.2018  evaluate sender peer ip-address/hostname, use it as reading in event generation",
+  "4.1.0"  => "02.08.2018  state event generation changed",
+  "4.0.0"  => "30.07.2018  server mode (Collector)",
+  "3.2.1"  => "04.05.2018  fix compatibility with newer IO::Socket::SSL on debian 9, attr ssldebug for
+                           debugging SSL messages",
+  "3.2.0"  => "22.11.2017  add NOTIFYDEV if possible",
+  "3.1.0"  => "28.08.2017  get-function added, commandref revised, \$readingFnAttributes deleted",
+  "3.0.0"  => "27.08.2017  change attr type to protocol, ready to check in",
+  "2.6.0"  => "26.08.2017  more than one Log2Syslog device can be created",
+  "2.5.2"  => "26.08.2018  fix in splitting timestamp, change Log2Syslog_trate using internaltimer with attr 
+                           rateCalcRerun, function Log2Syslog_closesock",
+  "2.5.1"  => "24.08.2017  some fixes",
+  "2.5.0"  => "23.08.2017  TLS encryption available, new readings, \$readingFnAttributes",
+  "2.4.1"  => "21.08.2017  changes in sub Log2Syslog_charfilter, change PROCID to \$hash->{SEQNO}
+                           switch to non-blocking in subs event/Log2Syslog_fhemlog",
+  "2.4.0"  => "20.08.2017  new sub Log2Syslog_Log3slog for entries in local fhemlog only -> verbose support",
+  "2.3.1"  => "19.08.2017  commandref revised",
+  "2.3.0"  => "18.08.2017  new parameter 'ident' in DEF, sub setidex, Log2Syslog_charfilter",
+  "2.2.0"  => "17.08.2017  set BSD data length, set only acceptable characters (USASCII) in payload,
+                           commandref revised",
+  "2.1.0"  => "17.08.2017  sub Log2Syslog_opensock created",
+  "2.0.0"  => "16.08.2017  create syslog without SYS::SYSLOG",
+  "1.1.1"  => "13.08.2017  registrate Log2Syslog_fhemlog to %loginform in case of sending fhem-log
+                           attribute timeout, commandref revised",
+  "1.1.0"  => "26.07.2017  add regex search to sub Log2Syslog_fhemlog",
+  "1.0.0"  => "25.07.2017  initial version"
+);
+
+# Versions History extern:
+our %Log2Syslog_vHistoryExtern = (
+  "5.1.0"  => "29.09.2018 new get &lt;name&gt; versionHistory command ",
+  "5.0.1"  => "27.09.2018 automatic reconnect to syslog-server in case of write error ",
+  "5.0.0"  => "26.09.2018 TCP-Server for Collector is possible now, PROFILE as Internal, Parse_Err_No as reading, new octetCount attribute (see also RFC6587 <a href=\"https://tools.ietf.org/html/rfc6587\">Transmission of Syslog Messages over TCP</a>), TCP SSL-support, new set 'reopen' command, some code fixes ",
+  "4.8.5"  => "20.08.2018 BSD/parseFn parse changed, BSD setpayload changed, new variable \$IGNORE in parseFn ",
+  "4.8.4"  => "15.08.2018 BSD parse changed again ",
+  "4.8.3"  => "14.08.2018 BSD setpayload changed, BSD parse changed, new Internal MYFQDN ", 
+  "4.8.2"  => "13.08.2018 rename makeMsgEvent to makeEvent ",
+  "4.8.1"  => "12.08.2018 IETF-Syslog without VERSION changed, Log verbose 1 to 2 changed in parsePayload ",
+  "4.8.0"  => "12.08.2018 enhanced IETF Parser to match logs without version ", 
+  "4.7.0"  => "10.08.2018 Parser for TPLink added ",
+  "4.6.1"  => "10.08.2018 fix some perl warnings, changed IETF Parser ",
+  "4.6.0"  => "08.08.2018 set sendTestMessage added, new attributes 'contDelimiter', 'respectSeverity' ",
+  "4.5.1"  => "07.08.2018 BSD Regex changed, setpayload of BSD changed ",
+  "4.5.0"  => "06.08.2018 parsing of BSD changed, attribute 'makeMsgEvent' added ",
+  "4.4.0"  => "04.08.2018 Attribute 'outputFields' added ",
+  "4.3.0"  => "03.08.2018 Attribute 'parseFn' added ",
+  "4.2.0"  => "03.08.2018 evaluate sender peer ip-address/hostname and use it as reading in event generation ",
+  "4.1.0"  => "02.08.2018 state event generation changed ",
+  "4.0.0"  => "30.07.2018 Server mode (Collector) implemented ",
+  "3.2.1"  => "04.05.2018 fix compatibility with newer IO::Socket::SSL on debian 9, attribute ssldebug for debugging SSL messages ",
+  "3.2.0"  => "22.11.2017 add NOTIFYDEV if possible ",
+  "3.1.0"  => "28.08.2017 get-function added, commandref revised ",
+  "3.0.0"  => "27.08.2017 change attr type to protocol, ready to first check in ",
+  "2.6.0"  => "26.08.2017 more than one Log2Syslog device can be created ",
+  "2.5.2"  => "26.08.2018 attribute rateCalcRerun ",
+  "2.5.1"  => "24.08.2017 some bugfixes ",
+  "2.5.0"  => "23.08.2017 TLS encryption available to Sender ",
+  "2.4.1"  => "21.08.2017 change PROCID to \$hash->{SEQNO}, switch to non-blocking in subs event/fhemlog ",
+  "2.4.0"  => "20.08.2017 new sub for entries in local fhemlog only including verbose support ",
+  "2.3.1"  => "19.08.2017 commandref revised ",
+  "2.3.0"  => "18.08.2017 new parameter 'ident' in Define to indentify sylog source ",
+  "2.2.0"  => "17.08.2017 set BSD data length, set only acceptable characters (USASCII) in payload ",
+  "2.0.0"  => "16.08.2017 create syslog without perl module SYS::SYSLOG ",
+  "1.1.0"  => "26.07.2017 add regex search to sub Log2Syslog_fhemlog ",
+  "1.0.0"  => "25.07.2017 initial version "
+);
+
+###############################################################################
+#    Modul Einbindung
+#
 use TcpServerUtils;
 use Scalar::Util qw(looks_like_number);
 use Encode qw(encode_utf8);
@@ -85,12 +130,11 @@ use Encode qw(encode_utf8);
 eval "use IO::Socket::INET;1" or my $MissModulSocket = "IO::Socket::INET";
 eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $MissModulNDom = "Net::Domain";
 
+
 ###############################################################################
 # Forward declarations
 #
 sub Log2Syslog_Log3slog($$$);
-
-my $Log2SyslogVn = "5.0.1";
 
 # Mappinghash BSD-Formatierung Monat
 our %Log2Syslog_BSDMonth = (
@@ -264,7 +308,7 @@ sub Log2Syslog_Define($@) {
   }
 
   $hash->{SEQNO}            = 1;                            # PROCID in IETF, wird kontinuierlich hochgezählt
-  $hash->{VERSION}          = $Log2SyslogVn;
+  $hash->{VERSION}          = (reverse sort(keys %Log2Syslog_vHistoryIntern))[0];
   $logInform{$hash->{NAME}} = "Log2Syslog_fhemlog";         # Funktion die in hash %loginform für $name eingetragen wird
   $hash->{HELPER}{SSLVER}   = "n.a.";                       # Initialisierung
   $hash->{HELPER}{SSLALGO}  = "n.a.";                       # Initialisierung
@@ -1041,13 +1085,14 @@ sub Log2Syslog_Get($@) {
   my $prop    = $a[2];
   my $st;
   my $getlist = "Unknown argument $opt, choose one of ".
-                "certinfo:noArg " 
+                (($hash->{MODEL} !~ /Collector/)?"certInfo:noArg ":"").
+                "versionHistory:noArg "				
                 ;
   
-  return if(AttrVal($name, "disable", "") eq "1" || $hash->{MODEL} =~ /Collector/);
+  return if(AttrVal($name, "disable", "") eq "1");
   
   my($sock,$cert,@certs);
-  if ($opt =~ /certinfo/) {
+  if ($opt =~ /certInfo/) {
       if(ReadingsVal($name,"SSL_Version","n.a.") ne "n.a.") {
           ($sock,$st) = Log2Syslog_opensock($hash,0);
 		  if($sock) {
@@ -1058,6 +1103,39 @@ sub Log2Syslog_Get($@) {
 	  return $cert if($cert);
 	  return "no SSL session has been created";
 	  
+  } elsif ($opt =~ /versionHistory/) {
+	  my $header;
+	  $header  = "<b>Module release information table</b><br>";
+	  
+	  # Ausgabetabelle erstellen
+	  my ($ret,$val0,$val1);
+	  $ret  = "<html>";
+	  $ret .= sprintf("<div class=\"makeTable wide\"; style=\"text-align:left\">$header <br>");
+	  $ret .= "<table class=\"block wide internals\">";
+	  $ret .= "<tbody>";
+	  $ret .= "<tr class=\"even\">";
+	  my $i = 0;
+	  foreach my $key (reverse sort(keys %Log2Syslog_vHistoryExtern)) {
+		  ($val0,$val1) = split(/\s/,$Log2Syslog_vHistoryExtern{$key},2);
+		  $ret .= sprintf("<td><b>$key</b>  </td><td>$val0  </td><td>$val1</td>" );
+		  $ret .= "</tr>";
+          $i++;
+          if ($i & 1) {
+              # $i ist ungerade
+		      $ret .= "<tr class=\"odd\">";
+          } else {
+              $ret .= "<tr class=\"even\">";
+          }
+	  }
+
+	  $ret .= "</tr>";
+	  $ret .= "</tbody>";
+	  $ret .= "</table>";
+	  $ret .= "</div>";
+	  $ret .= "</html>";
+					
+	return $ret;
+  
   } else {
       return "$getlist";
   } 
@@ -2087,7 +2165,16 @@ Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.095 fhemtest.myds.me Test
     <ul>
     <li><b>certinfo </b><br>
         <br>
-        Show informations about the server certificate if a TLS-session was created (Reading "SSL_Version" isn't "n.a.").
+        On a SenderDevice the command shows informations about the server certificate in case a TLS-session was created 
+        (Reading "SSL_Version" isn't "n.a.").
+    </li>
+    </ul>
+    <br>
+    
+    <ul>
+    <li><b>versionHistory </b><br>
+        <br>
+        Shows release informations about the module. Contains only main informations for module users.
     </li>
     </ul>
     <br>
@@ -2724,7 +2811,17 @@ Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.095 fhemtest.myds.me Test
     <ul>
     <li><b>certinfo </b><br>
         <br>
-        Zeigt Informationen zum Serverzertifikat wenn eine TLS-Session aufgebaut wurde (Reading "SSL_Version" ist nicht "n.a.").
+        Zeigt auf einem Sender-Device Informationen zum Serverzertifikat an sofern eine TLS-Session aufgebaut wurde 
+        (Reading "SSL_Version" ist nicht "n.a.").
+    </li>
+    </ul>
+    <br>
+    
+    <ul>
+    <li><b>versionHistory </b><br>
+        <br>
+        Zeigt Release Informationen des Moduls an. Es sind nur Informationen mit Bedeutung für den Modulnutzer 
+        enthalten.
     </li>
     </ul>
     <br>
