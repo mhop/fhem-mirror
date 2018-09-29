@@ -1117,7 +1117,7 @@ sub Log2Syslog_Get($@) {
 	  my $i = 0;
 	  foreach my $key (reverse sort(keys %Log2Syslog_vHistoryExtern)) {
 		  ($val0,$val1) = split(/\s/,$Log2Syslog_vHistoryExtern{$key},2);
-		  $ret .= sprintf("<td><b>$key</b>  </td><td>$val0  </td><td>$val1</td>" );
+		  $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0  </td><td>$val1</td>" );
 		  $ret .= "</tr>";
           $i++;
           if ($i & 1) {
