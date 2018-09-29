@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  72_XiaomiDevice: better handling of definition w/ missing token
+  - change:  32_withings: add in_bed for sleep trackers, ignore inactive users
   - change:  57_Calendar: new attribute quirks with ignoreDtStamp value.
   - change:  57_Calendar: cutoffOlderThan also removes recurring events when
              the series has ended.

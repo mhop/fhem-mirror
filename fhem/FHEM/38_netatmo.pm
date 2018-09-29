@@ -11,7 +11,7 @@
 #
 #
 ##############################################################################
-# Release 20 / 2018-09-09
+# Release 20 / 2018-09-20
 
 package main;
 
@@ -78,6 +78,8 @@ netatmo_Define($$)
   my $subtype;
   if($a[2] eq "WEBHOOK") {
     $subtype = "WEBHOOK";
+    $hash->{model} = "WEBHOOK";
+
     my $d = $modules{$hash->{TYPE}}{defptr}{"WEBHOOK"};
     return "Netatmo webkook already defined as $d->{NAME}" if( defined($d) && $d->{NAME} ne $name );
 
@@ -116,6 +118,7 @@ netatmo_Define($$)
 
     if( $a[3] && $a[3] =~ m/[\da-f]{2}(:[\da-f]{2}){5}/ )
     {
+      $hash->{model} = "PUBLIC";
 
       my $device = $a[3];
       $hash->{Device} = $device;
@@ -200,6 +203,8 @@ netatmo_Define($$)
       $hash->{Rad} = $rad;
 
       $subtype = "PUBLIC";
+      $hash->{model} = "WEATHERMAP";
+
       $modules{$hash->{TYPE}}{defptr}{$hash->{Lat}.$hash->{Lon}.$hash->{Rad}} = $hash;
 
       my $account = $modules{$hash->{TYPE}}{defptr}{"account"};
@@ -233,6 +238,7 @@ netatmo_Define($$)
 
   } elsif( ($a[2] eq "FORECAST" && @a == 4 ) ) {
     $subtype = "FORECAST";
+    $hash->{model} = "FORECAST";
 
     my $device = $a[3];
 
@@ -291,6 +297,7 @@ netatmo_Define($$)
 
   } elsif( ($a[2] eq "HEATINGHOME" && @a == 4 ) ) {
     $subtype = "HEATINGHOME";
+    $hash->{model} = "HEATINGHOME";
 
     my $home = $a[@a-1];
 
@@ -307,6 +314,7 @@ netatmo_Define($$)
 
   } elsif( ($a[2] eq "HEATINGROOM" && @a == 5 ) ) {
     $subtype = "HEATINGROOM";
+    $hash->{model} = "HEATINGROOM";
 
     my $room = $a[@a-1];
     my $home = $a[@a-2];
@@ -325,6 +333,7 @@ netatmo_Define($$)
 
   } elsif( ($a[2] eq "HOME" && @a == 4 ) ) {
     $subtype = "HOME";
+    $hash->{model} = "HOME";
 
     my $home = $a[@a-1];
 
@@ -341,6 +350,7 @@ netatmo_Define($$)
 
   } elsif( ($a[2] eq "PERSON" && @a == 5 ) ) {
     $subtype = "PERSON";
+    $hash->{model} = "PERSON";
 
     my $home = $a[@a-2];
     my $person = $a[@a-1];
@@ -389,6 +399,7 @@ netatmo_Define($$)
 
   } elsif( @a == 6  || ($a[2] eq "ACCOUNT" && @a == 7 ) ) {
     $subtype = "ACCOUNT";
+    $hash->{model} = "ACCOUNT";
     $hash->{network} = "ok";
 
     delete($hash->{access_token});
@@ -3723,14 +3734,14 @@ netatmo_parseGlobal($$)
             }
             if(defined($moduledata->{dashboard_data}{sum_rain_24}))
             {
-              my $rain_day = ReadingsVal($module->{NAME},"rain_day",0);
-              if($moduledata->{dashboard_data}{sum_rain_24} < $rain_day)
-              {
-                my $rain_total = ReadingsVal($module->{NAME},"rain_total",0);
-                $rain_total += $rain_day;
-                readingsSingleUpdate($module,"rain_total",$rain_total,1);
-                Log3 $name, 1, $module->{NAME}.":_added rain ".$rain_day." (to ".$rain_total.")";
-              }
+              # my $rain_day = ReadingsVal($module->{NAME},"rain_day",0);
+              # if($moduledata->{dashboard_data}{sum_rain_24} < $rain_day)
+              # {
+              #   my $rain_total = ReadingsVal($module->{NAME},"rain_total",0);
+              #   $rain_total += $rain_day;
+              #   readingsSingleUpdate($module,"rain_total",$rain_total,1);
+              #   Log3 $name, 1, $module->{NAME}.":_added rain ".$rain_day." (to ".$rain_total.")";
+              # }
               readingsBeginUpdate($module);
               $module->{".updateTimestamp"} = FmtDateTime($moduledata->{dashboard_data}{time_utc});
               readingsBulkUpdate( $module, "rain_day", $moduledata->{dashboard_data}{sum_rain_24}, 1 );

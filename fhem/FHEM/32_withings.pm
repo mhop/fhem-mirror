@@ -10,7 +10,7 @@
 #
 #
 ##############################################################################
-# Release 07 / 2018-09-18
+# Release 08 / 2018-09-28
 
 package main;
 
@@ -341,14 +341,18 @@ sub withings_Define($$) {
 
     CommandAttr(undef,"$name IODev $a[4]");
 
-  } elsif( @a == 4 && $a[2] =~ m/^\d+$/ && $a[3] =~ m/^[\w-]+$/i  ) {
+  } elsif( @a == 4 && $a[2] =~ m/^\d+$/ && $a[3] =~ m/^[\w:-]+$/i ) {
     $subtype = "USER";
 
     my $user = $a[2];
     my $key = $a[3];
 
+    my $accesskey = withings_encrypt($key);
+    Log3 $name, 3, "$name: encrypt $key to $accesskey" if($key ne $accesskey);
+    $hash->{DEF} = "$user $accesskey";
+
     $hash->{User} = $user;
-    $hash->{Key} = $key;
+    #$hash->{Key} = $accesskey; #not needed
 
     my $d = $modules{$hash->{TYPE}}{defptr}{"U$user"};
     return "device $user already defined as $d->{NAME}" if( defined($d) && $d->{NAME} ne $name );
@@ -380,7 +384,7 @@ sub withings_Define($$) {
   }
 
   $hash->{NAME} = $name;
-  $hash->{SUBTYPE} = $subtype;
+  $hash->{SUBTYPE} = $subtype if(defined($subtype));
 
 
   #CommandAttr(undef,"$name DbLogExclude .*");
@@ -527,7 +531,7 @@ sub withings_getSessionKey($) {
   if(!defined($resolve))
   {
     $hash->{SessionTimestamp} = 0;
-    Log3 "withings", 1, "$name: DNS error on getSessionData";
+    Log3 $name, 1, "$name: DNS error on getSessionData";
     return undef;
   }
 
@@ -543,18 +547,18 @@ sub withings_getSessionKey($) {
   #   });
   #   if($err0 || !defined($data0))
   #   {
-  #     Log3 "withings", 1, "$name: appliver call failed! ".$err0;
+  #     Log3 $name, 1, "$name: appliver call failed! ".$err0;
   #     return undef;
   #   }
   #   $data1 = $data0;
   #   $data0 =~ /appliver=([^.*]+)\&/;
   #   $hash->{helper}{appliver} = $1;
   #   if(!defined($hash->{helper}{appliver})) {
-  #     Log3 "withings", 1, "$name: APPLIVER ERROR ";
+  #     Log3 $name, 1, "$name: APPLIVER ERROR ";
   #     $hash->{STATE} = "APPLIVER error";
   #     return undef;
   #   }
-  #   Log3 "withings", 4, "$name: appliver ".$hash->{helper}{appliver};
+  #   Log3 $name, 4, "$name: appliver ".$hash->{helper}{appliver};
   # #}
   # 
   # 
@@ -564,11 +568,11 @@ sub withings_getSessionKey($) {
   #   $hash->{helper}{csrf_token} = $1;
   #   
   #   if(!defined($hash->{helper}{csrf_token})) {
-  #     Log3 "withings", 1, "$name: CSRF ERROR ";
+  #     Log3 $name, 1, "$name: CSRF ERROR ";
   #     $hash->{STATE} = "CSRF error";
   #     return undef;
   #   }
-  #   Log3 "withings", 4, "$name: csrf_token ".$hash->{helper}{csrf_token};
+  #   Log3 $name, 4, "$name: csrf_token ".$hash->{helper}{csrf_token};
   #}
 
     #my $ua = LWP::UserAgent->new;
@@ -580,7 +584,7 @@ sub withings_getSessionKey($) {
     # $resolve = inet_aton("account.withings.com");
     # if(!defined($resolve))
     # {
-    #   Log3 "withings", 1, "$name: DNS error on getSessionKey.";
+    #   Log3 $name, 1, "$name: DNS error on getSessionKey.";
     #   return undef;
     # }
 
@@ -596,7 +600,7 @@ sub withings_getSessionKey($) {
 
   if ($err || !defined($data) || $data =~ /Authentification failed/ || $data =~ /not a valid/)
   {
-    Log3 "withings", 1, "$name: LOGIN ERROR ";
+    Log3 $name, 1, "$name: LOGIN ERROR ";
     $hash->{STATE} = "Login error";
     return undef;
   }
@@ -608,12 +612,12 @@ sub withings_getSessionKey($) {
       $hash->{SessionTimestamp} = (gettimeofday())[0] if( $hash->{SessionKey} );
       $hash->{STATE} = "Connected" if( $hash->{SessionKey} );
       $hash->{STATE} = "Session error" if( !$hash->{SessionKey} );
-      Log3 "withings", 4, "$name: sessionkey ".$hash->{SessionKey};
+      Log3 $name, 4, "$name: sessionkey ".$hash->{SessionKey};
     }
     else
     {
       $hash->{STATE} = "Cookie error";
-      Log3 "withings", 1, "$name: COOKIE ERROR ";
+      Log3 $name, 1, "$name: COOKIE ERROR ";
       $hash->{helper}{appliver} = '9855c478';
       $hash->{helper}{csrf_token} = '9855c478';
       return undef;
@@ -648,15 +652,15 @@ sub withings_getSessionKey($) {
           }
           else
           {
-            Log3 "withings", 4, "$name: account email: ".$account->{email};
+            Log3 $name, 4, "$name: account email: ".$account->{email};
           }
       }
-      Log3 "withings", 4, "$name: accountid ".$hash->{AccountID};
+      Log3 $name, 4, "$name: accountid ".$hash->{AccountID};
     }
     else
     {
       $hash->{STATE} = "Account error";
-      Log3 "withings", 1, "$name: ACCOUNT ERROR ";
+      Log3 $name, 1, "$name: ACCOUNT ERROR ";
       return undef;
     }
   }
@@ -667,15 +671,14 @@ sub withings_getSessionKey($) {
 sub withings_connect($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  Log3 "withings", 5, "$name: connect";
+  Log3 $name, 5, "$name: connect";
 
   $hash->{'.https'} = "https";
   $hash->{'.https'} = "http" if( AttrVal($name, "nossl", 0) );
 
-  #my $cmdret= CommandAttr(undef,"$name room WithingsTest");
-  #$cmdret= CommandAttr(undef,"$name verbose 5");
-
   withings_getSessionKey( $hash );
+
+  return undef; #no more autocreate on start
 
   foreach my $d (keys %defs) {
     next if(!defined($defs{$d}));
@@ -691,11 +694,12 @@ sub withings_connect($) {
       Log3 $name, 2, "$name: user '$user->{id}' already defined";
       next;
     }
-    next if($user->{firstname} eq "Repository-User");
+    next if($user->{usertype} ne "1" || $user->{status} ne "0");
 
     my $id = $user->{id};
     my $devname = "withings_U". $id;
-    my $define= "$devname withings $id $user->{publickey}";
+    my $publickey = withings_encrypt($user->{publickey});
+    my $define= "$devname withings $id $publickey";
 
     Log3 $name, 2, "$name: create new device '$devname' for user '$id'";
 
@@ -761,7 +765,7 @@ sub withings_connect($) {
 sub withings_autocreate($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  Log3 "withings", 5, "$name: autocreate";
+  Log3 $name, 5, "$name: autocreate";
 
   $hash->{'.https'} = "https";
   $hash->{'.https'} = "http" if( AttrVal($name, "nossl", 0) );
@@ -777,11 +781,12 @@ sub withings_autocreate($) {
       Log3 $name, 2, "$name: user '$user->{id}' already defined";
       next;
     }
-    next if($user->{firstname} eq "Repository-User");
+    next if($user->{usertype} ne "1" || $user->{status} ne "0");
 
     my $id = $user->{id};
     my $devname = "withings_U". $id;
-    my $define= "$devname withings $id $user->{publickey}";
+    my $publickey = withings_encrypt($user->{publickey});
+    my $define= "$devname withings $id $publickey";
 
     Log3 $name, 2, "$name: create new device '$devname' for user '$id'";
 
@@ -844,7 +849,7 @@ sub withings_autocreate($) {
 sub withings_initDevice($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  Log3 "withings", 5, "$name: initdevice ".$hash->{Device};
+  Log3 $name, 5, "$name: initdevice ".$hash->{Device};
 
   AssignIoPort($hash);
   if(defined($hash->{IODev}->{NAME})) {
@@ -904,7 +909,7 @@ sub withings_initDevice($) {
 sub withings_initUser($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  Log3 "withings", 5, "$name: inituser ".$hash->{User};
+  Log3 $name, 5, "$name: inituser ".$hash->{User};
 
   AssignIoPort($hash);
   if(defined($hash->{IODev}->{NAME})) {
@@ -936,7 +941,7 @@ sub withings_initUser($) {
 sub withings_getUsers($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  Log3 "withings", 5, "$name: getusers";
+  Log3 $name, 5, "$name: getusers";
 
   withings_getSessionKey($hash);
 
@@ -977,7 +982,7 @@ sub withings_getUsers($) {
 sub withings_getDevices($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  Log3 "withings", 5, "$name: getdevices";
+  Log3 $name, 5, "$name: getdevices";
 
   withings_getSessionKey($hash);
 
@@ -1002,7 +1007,7 @@ sub withings_getDevices($) {
     return undef;
   }
   Log3 $name, 1, "withings: getDevices json error ".$json->{error} if(defined($json->{error}));
-  Log3 "withings", 5, "$name: getdevices ".Dumper($json);
+  Log3 $name, 5, "$name: getdevices ".Dumper($json);
 
   my @devices = ();
   foreach my $association (@{$json->{body}{associations}}) {
@@ -1018,7 +1023,7 @@ sub withings_getDevices($) {
 sub withings_getDeviceDetail($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  Log3 "withings", 5, "$name: getdevicedetail ".$hash->{Device};
+  Log3 $name, 5, "$name: getdevicedetail ".$hash->{Device};
 
   return undef if( !defined($hash->{IODev}) );
   withings_getSessionKey( $hash->{IODev} );
@@ -1030,7 +1035,7 @@ sub withings_getDeviceDetail($) {
     data => {sessionid => $hash->{IODev}->{SessionKey}, deviceid => $hash->{Device} , appname => 'my2', appliver=> $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getproperties'},
   });
 
-  #Log3 "withings", 5, "$name: getdevicedetaildata ".Dumper($data);
+  #Log3 $name, 5, "$name: getdevicedetaildata ".Dumper($data);
   return undef if(!defined($data));
 
   my $json = eval { JSON->new->utf8(0)->decode($data) };
@@ -1066,7 +1071,7 @@ sub withings_getDeviceDetail($) {
 sub withings_getDeviceLink($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  Log3 "withings", 5, "$name: getdevicelink ".$hash->{Device};
+  Log3 $name, 5, "$name: getdevicelink ".$hash->{Device};
 
   return undef if( !defined($hash->{IODev}) );
   withings_getSessionKey( $hash->{IODev} );
@@ -1110,7 +1115,7 @@ sub withings_getDeviceProperties($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
-  Log3 "withings", 5, "$name: getdeviceproperties ".$hash->{Device};
+  Log3 $name, 5, "$name: getdeviceproperties ".$hash->{Device};
   return undef if( !defined($hash->{Device}) );
 
   return undef if( !defined($hash->{IODev}) );
@@ -1140,7 +1145,7 @@ sub withings_getDeviceProperties($) {
 sub withings_getDeviceReadingsScale($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  Log3 "withings", 5, "$name: getscalereadings ".$hash->{Device};
+  Log3 $name, 5, "$name: getscalereadings ".$hash->{Device};
   return undef if( !defined($hash->{Device}) );
 
   return undef if( !defined($hash->{IODev}) );
@@ -1175,7 +1180,7 @@ sub withings_getDeviceReadingsScale($) {
 sub withings_getDeviceReadingsBedside($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  Log3 "withings", 5, "$name: getaurareadings ".$hash->{Device};
+  Log3 $name, 5, "$name: getaurareadings ".$hash->{Device};
   return undef if( !defined($hash->{Device}) );
 
   return undef if( !defined($hash->{IODev}) );
@@ -1210,7 +1215,7 @@ sub withings_getDeviceReadingsBedside($) {
 sub withings_getDeviceReadingsHome($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  Log3 "withings", 5, "$name: gethomereadings ".$hash->{Device};
+  Log3 $name, 5, "$name: gethomereadings ".$hash->{Device};
   return undef if( !defined($hash->{Device}) );
 
   return undef if( !defined($hash->{IODev}) );
@@ -1245,7 +1250,7 @@ sub withings_getDeviceReadingsHome($) {
 sub withings_getDeviceEventsBaby($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  Log3 "withings", 5, "$name: getbabyevents ".$hash->{Device};
+  Log3 $name, 5, "$name: getbabyevents ".$hash->{Device};
   return undef if( !defined($hash->{Device}) );
 
   return undef if( !defined($hash->{IODev}) );
@@ -1280,7 +1285,7 @@ sub withings_getDeviceEventsBaby($) {
 sub withings_getDeviceAlertsHome($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  Log3 "withings", 5, "$name: gethomealerts ".$hash->{Device};
+  Log3 $name, 5, "$name: gethomealerts ".$hash->{Device};
   return undef if( !defined($hash->{Device}) );
 
   return undef if( !defined($hash->{IODev}) );
@@ -1313,7 +1318,7 @@ sub withings_getDeviceAlertsHome($) {
 sub withings_getDeviceAlertsBaby($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  Log3 "withings", 5, "$name: getbabyevents ".$hash->{Device};
+  Log3 $name, 5, "$name: getbabyevents ".$hash->{Device};
   return undef if( !defined($hash->{Device}) );
 
   return undef if( !defined($hash->{IODev}) );
@@ -1345,7 +1350,7 @@ sub withings_getDeviceAlertsBaby($) {
 sub withings_getVideoLink($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  Log3 "withings", 5, "$name: getbabyvideo ".$hash->{Device};
+  Log3 $name, 5, "$name: getbabyvideo ".$hash->{Device};
   return undef if( !defined($hash->{Device}) );
 
   return undef if( !defined($hash->{IODev}) );
@@ -1384,7 +1389,7 @@ sub withings_getS3Credentials($) {
   return undef if( $hash->{sts_expiretime} && $hash->{sts_expiretime} > time - 3600 ); # min 1h
 
   return undef if( !defined($hash->{IODev}) );
-  Log3 "withings", 5, "$name: gets3credentials ".$hash->{Device};
+  Log3 $name, 5, "$name: gets3credentials ".$hash->{Device};
 
   withings_getSessionKey( $hash->{IODev} );
 
@@ -1442,7 +1447,7 @@ sub withings_signS3Link($$$;$) {
 sub withings_getUserDetail($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  Log3 "withings", 5, "$name: getuserdetails ".$hash->{User};
+  Log3 $name, 5, "$name: getuserdetails ".$hash->{User};
   return undef if( !defined($hash->{User}) );
 
   return undef if( $hash->{SUBTYPE} ne "USER" );
@@ -1495,14 +1500,14 @@ sub withings_poll($;$) {
 
   if( $hash->{SUBTYPE} eq "DEVICE" ) {
     my $intervalData = AttrVal($name,"intervalData",900);
-    my $intervalDebug = AttrVal($name,"intervalDebug",900);
+    my $intervalDebug = AttrVal($name,"intervalDebug",AttrVal($name,"intervalData",900));
+    my $intervalProperties = AttrVal($name,"intervalProperties",AttrVal($name,"intervalData",900));
     my $lastData = ReadingsVal( $name, ".pollData", 0 );
     my $lastDebug = ReadingsVal( $name, ".pollDebug", 0 );
-    my $intervalProperties = AttrVal($name,"intervalProperties",43200);
     my $lastProperties = ReadingsVal( $name, ".pollProperties", 0 );
 
     if(defined($hash->{modelID}) && $hash->{modelID} eq '4') {
-      withings_getDeviceProperties($hash) if($force > 1 || $lastData <= ($now - $intervalData));
+      withings_getDeviceProperties($hash) if($force > 1 || $lastProperties <= ($now - $intervalProperties));
       withings_getDeviceReadingsScale($hash) if($force || $lastData <= ($now - $intervalData));
     }
     elsif(defined($hash->{modelID}) && $hash->{modelID} eq '21') {
@@ -1563,7 +1568,7 @@ sub withings_poll($;$) {
 sub withings_getUserReadingsDaily($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  Log3 "withings", 5, "$name: getuserdailystats ".$hash->{User};
+  Log3 $name, 5, "$name: getuserdailystats ".$hash->{User};
 
   return undef if( !defined($hash->{IODev}) );
   withings_getSessionKey( $hash->{IODev} );
@@ -1630,7 +1635,7 @@ sub withings_getUserReadingsDaily($) {
 sub withings_getUserReadingsCommon($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  Log3 "withings", 5, "$name: getuserreadings ".$hash->{User};
+  Log3 $name, 5, "$name: getuserreadings ".$hash->{User};
 
   return undef if( !defined($hash->{IODev}) );
   withings_getSessionKey( $hash->{IODev} );
@@ -1666,7 +1671,7 @@ sub withings_getUserReadingsCommon($) {
 sub withings_getUserReadingsSleep($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  Log3 "withings", 5, "$name: getsleepreadings ".$hash->{User};
+  Log3 $name, 5, "$name: getsleepreadings ".$hash->{User};
 
   return undef if( !defined($hash->{IODev}) );
   withings_getSessionKey( $hash->{IODev} );
@@ -1701,7 +1706,7 @@ sub withings_getUserReadingsSleep($) {
 sub withings_getUserReadingsSleepDebug($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  Log3 "withings", 5, "$name: getsleepreadingsdebug ".$hash->{User};
+  Log3 $name, 5, "$name: getsleepreadingsdebug ".$hash->{User};
 
   return undef if( !defined($hash->{IODev}) );
   withings_getSessionKey( $hash->{IODev} );
@@ -1737,7 +1742,7 @@ sub withings_getUserReadingsActivity($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
-  Log3 "withings", 5, "$name: getactivityreadings ".$hash->{User};
+  Log3 $name, 5, "$name: getactivityreadings ".$hash->{User};
 
   return undef if( !defined($hash->{IODev}) );
   withings_getSessionKey( $hash->{IODev} );
@@ -1748,7 +1753,7 @@ sub withings_getUserReadingsActivity($) {
   my $enddate = ($lastupdate+(8*60*60));
   $enddate = $now if ($enddate > $now);
 
- Log3 "withings", 5, "$name: getactivityreadings ".$lastupdate." to ".$enddate;
+ Log3 $name, 5, "$name: getactivityreadings ".$lastupdate." to ".$enddate;
 
   HttpUtils_NonblockingGet({
     url => "https://scalews.withings.com/cgi-bin/v2/measure",
@@ -1776,7 +1781,7 @@ sub withings_parseProperties($$) {
   my ($hash,$json) = @_;
   my $name = $hash->{NAME};
 
-  Log3 "withings", 5, "$name: parsedevice";
+  Log3 $name, 5, "$name: parsedevice";
 
   #parse
   my $detail = $json->{body};
@@ -1799,7 +1804,7 @@ sub withings_parseMeasureGroups($$) {
   my ($hash, $json) = @_;
   my $name = $hash->{NAME};
   #parse
-  Log3 "withings", 5, "$name: parsemeasuregroups";
+  Log3 $name, 5, "$name: parsemeasuregroups";
   my ($now) = int(time);
   my $lastupdate = ReadingsVal( $name, ".lastData", ($now-21*24*60*60) );
   my $newlastupdate = $lastupdate;
@@ -1858,7 +1863,7 @@ sub withings_parseMeasureGroups($$) {
 
 
      delete $hash->{CHANGETIME};
-     Log3 $name, 3, "$name: got ".$i.' entries from MeasureGroups (latest: '.FmtDateTime($newlastupdate).')';
+     Log3 $name, (($i>0)?3:4), "$name: got ".$i.' entries from MeasureGroups (latest: '.FmtDateTime($newlastupdate).')';
 
     }
 
@@ -1868,7 +1873,7 @@ sub withings_parseMeasurements($$) {
   my ($hash, $json) = @_;
   my $name = $hash->{NAME};
   #parse
-  Log3 "withings", 4, "$name: parsemeasurements";
+  Log3 $name, 4, "$name: parsemeasurements";
   my ($now) = time;
   my $lastupdate = ReadingsVal( $name, ".lastData", ($now-21*24*60*60) );
   my $newlastupdate = $lastupdate;
@@ -1940,7 +1945,7 @@ sub withings_parseMeasurements($$) {
 
 
       delete $hash->{CHANGETIME};
-      Log3 $name, 3, "$name: got ".$i.' entries from Measurements (latest: '.FmtDateTime($newlastupdate).')';
+      Log3 $name, (($i>0)?3:4), "$name: got ".$i.' entries from Measurements (latest: '.FmtDateTime($newlastupdate).')';
 
 
     }
@@ -1956,7 +1961,7 @@ sub withings_parseAggregate($$) {
   my ($hash, $json) = @_;
   my $name = $hash->{NAME};
   #parse
-  Log3 "withings", 5, "$name: parseaggregate";
+  Log3 $name, 5, "$name: parseaggregate";
 
   #return undef;
   my ($now) = time;
@@ -2056,7 +2061,7 @@ sub withings_parseAggregate($$) {
 
 
       delete $hash->{CHANGETIME};
-      Log3 $name, 4, "$name: got ".$i.' entries from Aggregate (latest: '.FmtDateTime($newlastupdate).')';
+      Log3 $name, (($i>0)?3:4), "$name: got ".$i.' entries from Aggregate (latest: '.FmtDateTime($newlastupdate).')';
 
 
     }
@@ -2071,7 +2076,7 @@ sub withings_parseActivity($$) {
   my ($hash, $json) = @_;
   my $name = $hash->{NAME};
   #parse
-  Log3 "withings", 5, "$name: parseactivity";
+  Log3 $name, 5, "$name: parseactivity";
 
   my ($now) = time;
   my $lastupdate = ReadingsVal( $name, ".lastActivity", ($now-21*24*60*60) );
@@ -2152,7 +2157,7 @@ sub withings_parseActivity($$) {
 
 
       delete $hash->{CHANGETIME};
-      Log3 $name, 4, "$name: got ".$i.' entries from Activity (latest: '.FmtDateTime($newlastupdate).')';
+      Log3 $name, (($i>0)?3:4), "$name: got ".$i.' entries from Activity (latest: '.FmtDateTime($newlastupdate).')';
 
 
     }
@@ -2167,7 +2172,7 @@ sub withings_parseWorkouts($$) {
   my ($hash, $json) = @_;
   my $name = $hash->{NAME};
   #parse
-  Log3 "withings", 1, "$name: parseworkouts\n".Dumper($json);
+  Log3 $name, 1, "$name: parseworkouts\n".Dumper($json);
 
 return undef;
 
@@ -2180,7 +2185,7 @@ sub withings_parseVasistas($$;$) {
   my ($hash, $json, $datatype) = @_;
   my $name = $hash->{NAME};
   #parse
-  Log3 "withings", 5, "$name: parsevasistas";
+  Log3 $name, 5, "$name: parsevasistas";
 
   my ($now) = time;
   my $lastupdate = ReadingsVal( $name, ".lastData", ($now-21*24*60*60) );
@@ -2196,7 +2201,7 @@ sub withings_parseVasistas($$;$) {
     my $readingsdate;
     my $newlastupdate = $lastupdate;
 
-
+    my $iscurrent = 0;
 
     foreach my $series ( @{$json->{body}{series}}) {
       $j=0;
@@ -2252,7 +2257,19 @@ sub withings_parseVasistas($$;$) {
             $newlastupdate = $readingsdate if($readingsdate > $newlastupdate);
             $i++;
           }
-
+#start in-bed detection
+          if($iscurrent == 0 && $datatype =~ /Sleep/){
+            if($i>40 && $readingsdate > time()-3600){
+              $iscurrent = 1;
+              #Log3 $name, 1, "$name: in-bed: ".FmtDateTime($readingsdate) if($i>0);
+              readingsBeginUpdate($hash);
+              $hash->{".updateTimestamp"} = FmtDateTime($readingsdate);
+              readingsBulkUpdate( $hash, "in_bed", 1, 1 );
+              $hash->{CHANGETIME}[0] = FmtDateTime($readingsdate);
+              readingsEndUpdate($hash,1);
+            }
+          }
+#end in-bed detection
         }
       }
     }
@@ -2263,6 +2280,15 @@ sub withings_parseVasistas($$;$) {
       $newlastupdate = $device->{lastsessiondate} if($device->{lastsessiondate} and $device->{lastsessiondate} < $newlastupdate);
       $newlastupdate = $device->{lastweighindate} if($device->{lastweighindate} and $device->{lastweighindate} < $newlastupdate);
 
+      #start in-bed detection
+      if($datatype =~ /Sleep/ && $iscurrent == 0){
+        if($device->{lastweighindate} > (time()-1800)){
+          readingsSingleUpdate( $hash, "in_bed", 1, 1 );
+        } else {
+          readingsSingleUpdate( $hash, "in_bed", 0, 1 );
+        }
+      }
+      #end in-bed detection
     }
     $newlastupdate = $now if($newlastupdate > $now);
     if($newlastupdate < ($lastupdate-1))
@@ -2284,7 +2310,7 @@ sub withings_parseVasistas($$;$) {
      readingsSingleUpdate( $hash, ".lastData", $newlastupdate, 0 );
    }
 
-    Log3 $name, 4, "$name: got ".$i.' entries from Vasistas (latest: '.FmtDateTime($newlastupdate).')';
+    Log3 $name, (($i>0)?3:4), "$name: got ".$i.' entries from Vasistas (latest: '.FmtDateTime($newlastupdate).')';
 
     }
   }
@@ -2297,7 +2323,7 @@ sub withings_parseTimeline($$) {
   my ($hash, $json) = @_;
   my $name = $hash->{NAME};
   #parse
-  Log3 "withings", 5, "$name: parsemetimeline ";
+  Log3 $name, 5, "$name: parsemetimeline ";
 
   my ($now) = time;
   my $lastupdate = ReadingsVal( $name, ".lastAlert", ($now-21*24*60*60) );
@@ -2321,12 +2347,12 @@ sub withings_parseTimeline($$) {
         }
         elsif($event->{class} eq 'deleted')
         {
-          Log3 "withings", 5, "withings: event " . FmtDateTime($event->{epoch})." Event was deleted";
+          Log3 $name, 5, "withings: event " . FmtDateTime($event->{epoch})." Event was deleted";
           next;
         }
         elsif($event->{class} ne 'noise_detected' && $event->{class} ne 'movement_detected' && $event->{class} ne 'alert_environment' && $event->{class} ne 'offline' && $event->{class} ne 'online' && $event->{class} ne 'snapshot')
         {
-          Log3 "withings", 2, "withings: alert class unknown " . $event->{class};
+          Log3 $name, 2, "withings: alert class unknown " . $event->{class};
           next;
         }
 
@@ -2377,7 +2403,7 @@ sub withings_parseTimeline($$) {
 
 
      delete $hash->{CHANGETIME};
-     Log3 $name, 4, "$name: got ".$i.' entries from Timeline (latest: '.FmtDateTime($newlastupdate).')';
+     Log3 $name, (($i>0)?3:4), "$name: got ".$i.' entries from Timeline (latest: '.FmtDateTime($newlastupdate).')';
 
     }
 
@@ -2388,7 +2414,7 @@ sub withings_parseEvents($$) {
   my ($hash, $json) = @_;
   my $name = $hash->{NAME};
   #parse
-  Log3 "withings", 5, "$name: parseevents";
+  Log3 $name, 5, "$name: parseevents";
   my ($now) = time;
   my $lastupdate = ReadingsVal( $name, ".lastData", ($now-21*24*60*60) );
   my $lastalertupdate = ReadingsVal( $name, ".lastAlert", ($now-21*24*60*60) );
@@ -2410,7 +2436,7 @@ sub withings_parseEvents($$) {
         $hash->{".updateTimestamp"} = FmtDateTime($event->{date});
         my $changeindex = 0;
 
-        #Log3 "withings", 5, "withings: event " . FmtDateTime($event->{date})." ".$event->{type}." ".$event->{activated}."/".$event->{measure}{value};
+        #Log3 $name, 5, "withings: event " . FmtDateTime($event->{date})." ".$event->{type}." ".$event->{activated}."/".$event->{measure}{value};
 
         my $reading = $event_types{$event->{type}}->{reading};
         my $value = "notice";
@@ -2482,7 +2508,7 @@ sub withings_parseEvents($$) {
 
 
       delete $hash->{CHANGETIME};
-      Log3 $name, 4, "$name: got ".$i.' entries from Events (latest: '.FmtDateTime($newlastupdate).')';
+      Log3 $name, (($i>0)?3:4), "$name: got ".$i.' entries from Events (latest: '.FmtDateTime($newlastupdate).')';
 
       }
 
@@ -2550,10 +2576,10 @@ sub withings_Get($$@) {
       my $users = withings_getUsers($hash);
       my $ret;
       foreach my $user (@{$users}) {
-        $ret .= "$user->{id}\t\[$user->{shortname}\]\t$user->{publickey}\t$user->{firstname} $user->{lastname}\n";
+        $ret .= "$user->{id}\t\[$user->{shortname}\]\t$user->{publickey}   \t$user->{usertype}/$user->{status}\t$user->{firstname} $user->{lastname}\n";
       }
 
-      $ret = "id\tshort\tpublickey\t\tname\n" . $ret if( $ret );;
+      $ret = "id\tshort\tpublickey\tusertype/status\tname\n" . $ret if( $ret );;
       $ret = "no users found" if( !$ret );
       return $ret;
     }
@@ -3172,7 +3198,7 @@ sub withings_Dispatch($$$) {
       Log3 $name, 2, "$name: json evaluation error on dispatch type ".$param->{type}." ".$@;
       return undef;
     }
-    Log3 $name, 1, "withings: Dispatch ".$param->{type}." json error ".$json->{error} if(defined($json->{error}));
+    Log3 $name, 1, "$name: Dispatch ".$param->{type}." json error ".$json->{error} if(defined($json->{error}));
 
     Log3 $name, 5, "$name: json returned: ".Dumper($json);
 
