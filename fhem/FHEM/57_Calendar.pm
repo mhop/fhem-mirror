@@ -2722,7 +2722,7 @@ sub Calendar_UpdateCalendar($$) {
   my $name= $hash->{NAME};
 
   my @quirks= split(",", AttrVal($name, "quirks", ""));
-  my $nodtstamp= "ignoreDTSTAMP" ~~ @quirks;
+  my $nodtstamp= "ignoreDtStamp" ~~ @quirks;
 
   # *******************************
   # *** Step 1 Digest Parser Result
