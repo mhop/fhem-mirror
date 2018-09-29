@@ -85,7 +85,7 @@ our %Log2Syslog_vHistoryIntern = (
 our %Log2Syslog_vHistoryExtern = (
   "5.1.0"  => "29.09.2018 new get &lt;name&gt; versionHistory command ",
   "5.0.1"  => "27.09.2018 automatic reconnect to syslog-server in case of write error ",
-  "5.0.0"  => "26.09.2018 TCP-Server for Collector is possible now, PROFILE as Internal, Parse_Err_No as reading, new octetCount attribute (see also RFC6587 <a href=\"https://tools.ietf.org/html/rfc6587\">Transmission of Syslog Messages over TCP</a>), TCP SSL-support, new set 'reopen' command, some code fixes ",
+  "5.0.0"  => "26.09.2018 <li>TCP Server mode is possible now for Collector devices<\li><li>the used parse-profile is shown as Internal<\li><li>Parse_Err_No counts faulty persings since start<\li><li>new octetCount attribute switches the syslog framing method (see also RFC6587 <a href=\"https://tools.ietf.org/html/rfc6587\">Transmission of Syslog Messages over TCP</a>)<\li><li>TCP SSL-support<\li><li>new set 'reopen' command to reconnect a broken connection<\li><li>some code fixes ",
   "4.8.5"  => "20.08.2018 BSD/parseFn parse changed, BSD setpayload changed, new variable \$IGNORE in parseFn ",
   "4.8.4"  => "15.08.2018 BSD parse changed again ",
   "4.8.3"  => "14.08.2018 BSD setpayload changed, BSD parse changed, new Internal MYFQDN ", 
