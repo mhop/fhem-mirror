@@ -43,7 +43,7 @@ sub Revolt_Define($$)
   AssignIoPort($hash);
   
   my $name = $a[0]; 
-  $attr{$name}{"event-aggregator"} = "power::none:median:120,energy::none:median:120,avgpower::none:median:120" if(!defined($attr{$name}{"event-aggregator"}));
+  $attr{$name}{"event-aggregator"} = "power::none:median:120,energy::none:median:120" if(!defined($attr{$name}{"event-aggregator"}));
   $attr{$name}{"stateFormat"} = "P: power E: energy V: voltage C: current Pf: pf" if(!defined($attr{$name}{"stateFormat"}));
   
   return undef;
@@ -126,10 +126,7 @@ sub Revolt_Parse($$)
 
     my $timediff = gettimeofday() - str2time($def->{READINGS}{".lastenergy"}{TIME});
     if (($lastval != $energy) && (($energy - $lastval) < (3.65 * ($timediff / 3600.0)))) {
-        my $avg = (($energy - $lastval) * 1000.0 * 3600.0) / $timediff;
         readingsBulkUpdate($def, ".lastenergy", $energy, 1);
-        readingsBulkUpdate($def, "avgpower", sprintf("%.2f", $avg), 1);
-        #Log3  $def,3, "$name:timediff $timediff, lastval $lastval, energy $energy, avg $avg";
     }
 
     readingsBulkUpdate($def, "state", "active",  0);
@@ -178,7 +175,6 @@ sub Revolt_Parse($$)
   <a name="RevoltReadings"></a>
   <b>Readings</b>
   <ul>
-    <li>avgpower  [W]</li>
     <li>energy    [kWh]</li>
     <li>power     [W]</li>
     <li>voltage   [V]</li>
