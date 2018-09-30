@@ -38,7 +38,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "1.31";
+my $version = "1.33";
 
 #-- these we may get on request
 my %gets = (
@@ -357,7 +357,7 @@ sub Shelly_Set ($@) {
   
   my $model =  AttrVal($name,"model","shelly2");
   my $mode  =  AttrVal($name,"mode","relay");
-  my $time;
+  my ($channel,$time);
   
   #-- we have a Shelly 1,4 or ShellyPlug switch type device
   #-- or we have a Shelly 2 switch type device
@@ -372,8 +372,14 @@ sub Shelly_Set ($@) {
     }
     
     if( $cmd =~ /^((on)|(off)).*/ ){
-      my $channel = $value;
-     
+      $channel = $value;
+      if( $cmd =~ /(.*)-for-timer/ ){
+        $time = shift @a;
+        if( !defined($time) ){
+          $time    = $value;
+          $channel = undef;
+        }
+      }
       if( $shelly_models{$model}[0] == 1){
        $channel = 0
       }else{  
@@ -392,14 +398,8 @@ sub Shelly_Set ($@) {
       }
       if( $cmd =~ /(.*)-for-timer/ ){
         $cmd = $1;
-        my $time = shift @a;
-        if( $cmd !~ /^(on)|(off)$/ ){
-          $msg = "Error: wrong command $cmd";
-          Log3 $name, 1,"[Shelly_Set] ".$msg;
-          return $msg
-        }
         if( $time !~ /\d+/ ){
-          $msg = "Error: wrong time spec $time, must be <integer> only";
+          $msg = "Error: wrong time spec $time, must be <integer>";
           Log3 $name, 1,"[Shelly_Set] ".$msg;
           return $msg;
         }
@@ -596,6 +596,10 @@ sub Shelly_Set ($@) {
     Log3 $name, 1,"[Shelly_status]  has error $err";
     readingsSingleUpdate($hash,"state","Error",1);
     readingsSingleUpdate($hash,"network","not connected",1);
+    #-- cyclic update nevertheless
+    RemoveInternalTimer($hash);
+    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "Shelly_status", $hash, 1)
+      if( $hash->{INTERVAL} ne "0" );
     return $err;
   }
  
@@ -710,7 +714,6 @@ sub Shelly_Set ($@) {
   
   return undef;
 }
-
 
 ########################################################################################
 #
@@ -866,7 +869,7 @@ sub Shelly_Set ($@) {
     
   if ( $hash && !$err && !$data ){
      $url    = "http://".$hash->{TCPIP}."/relay/".$channel.$cmd;
-     Log3 $name, 5,"[Shelly_onoff] called with only hash  => Issue a non-blocking call to $url";  
+     Log3 $name, 1,"[Shelly_onoff] called with only hash  => Issue a non-blocking call to $url";  
      HttpUtils_NonblockingGet({
         url      => $url,
         callback=>sub($$$){ Shelly_onoff($hash,$channel,$cmd,$_[1],$_[2]) }
@@ -911,7 +914,7 @@ sub Shelly_Set ($@) {
   if( $ison ne $cmd ) {
     Log3 $name,1,"[Shelly_onoff] returns without success, cmd=$cmd but ison=$ison";
   }
-  if( $overpower eq "1") {
+  if( defined($overpower) && $overpower eq "1") {
     Log3 $name,1,"[Shelly_onoff] switched off automatically because of overpower signal";
   }
   #-- 
