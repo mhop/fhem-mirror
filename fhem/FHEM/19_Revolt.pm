@@ -101,22 +101,28 @@ sub Revolt_Parse($$)
   $energy -= AttrVal($name, "EnergyAdjustValue", 0);
   
   my $isInvalid = 0;
-  my $energydiff = 0;
-  my $maxenergy = 0;
+  #my $energydiff = 0;
+  #my $maxenergy = 0;
 
-  if (defined($def->{READINGS}{"energy"})) {
-    my $timediff = gettimeofday() - str2time($def->{READINGS}{"energy"}{TIME});
-    $energydiff = $energy - $def->{READINGS}{"energy"}{VAL};
-    $maxenergy = 3.65 * ($timediff / 3600.0);
-  }
+  #TODO: This plausability check will stop accepting values forever after 
+  #receiving a very small outlier once. We could use abs(...), but what about
+  #changing energyadjustvalue etc.? Do we really need this at all?
+  #
+  #if (defined($def->{READINGS}{"energy"})) {
+  # my $timediff = gettimeofday() - str2time($def->{READINGS}{"energy"}{TIME});
+  #  $energydiff = $energy - $def->{READINGS}{"energy"}{VAL};
+  #  $maxenergy = 3.65 * ($timediff / 3600.0);
+  #}
+  #if ($energydiff > $maxenergy) {
+  #  $isInvalid = 1;
+  #}
 
   if (0 == $pf) {
     $pf = 0.0001;
   }
   # plausability check partly taken from http://www.sknorrell.de/blog/energiemesssung-mit-revolt-nc-5462/
   if (($voltage < 80) || ($freq > 65) || ($power > 3650) || ($current > 16) ||
-      ((($power / $voltage / $pf) > 0.00999) && (0 == $current)) ||
-      ($energydiff > $maxenergy)) {
+      ((($power / $voltage / $pf) > 0.00999) && (0 == $current))) {
     $isInvalid = 1;
   }
 
