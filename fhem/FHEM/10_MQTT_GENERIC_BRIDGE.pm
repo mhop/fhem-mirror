@@ -33,6 +33,7 @@
 #
 # 30.09.2018 0.9.9
 #   feature finished: globalTypeExclude und globalDeviceExclude incl. Commandref
+#   bugfix   : initialization
 #
 # 29.09.2018 0.9.9
 #   quick fix: received messages forward exclude for 'dummy'
@@ -545,6 +546,8 @@ sub firstInit($) {
     } else {
       readingsSingleUpdate($hash,"transmission-state","unknown IO device",1);
     }
+
+    $hash->{+HELPER}->{+HS_FLAG_INITIALIZED} = 1;
 
     # senden attr changes at start:
     # im firstinit schleife ueber alle devices im map und bei mode 'A' senden
@@ -1354,7 +1357,7 @@ sub CreateDevicesTable($) {
 
   $hash->{+HS_TAB_NAME_DEVICES} = $map;
   UpdateSubscriptions($hash);
-  $hash->{+HELPER}->{+HS_FLAG_INITIALIZED} = 1;
+  #$hash->{+HELPER}->{+HS_FLAG_INITIALIZED} = 1;
 }
 
 # Ueberbleibsel eines Optimierungsversuchs
@@ -1445,6 +1448,7 @@ sub InitializeDevices($) {
   my ($hash) = @_;
   # alles neu aufbauen
   # Deviceliste neu aufbauen, ggf., alte subscription kuendigen, neue abonieren
+  #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> ------------ InitializeDevices --------------");
   CreateDevicesTable($hash);
   #UpdateSubscriptions($hash);
 }
@@ -1689,7 +1693,8 @@ sub checkPublishDeviceReadingsUpdates($$) {
   # nicht, wenn deaktivert
   return "" if(main::IsDisabled($hash->{NAME}));
 
-  CheckInitialization($hash);
+  #CheckInitialization($hash);
+  #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> checkPublishDeviceReadingsUpdates ------------------------ ");
 
   # Pruefen, ob ein ueberwachtes Geraet vorliegt 
   my $devName = $dev->{NAME}; 
@@ -2196,6 +2201,7 @@ sub doSetUpdate($$$$$) {
   if($mode eq 'S') {
     my $err;
     my @args = split ("[ \t]+",$message);
+    #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> mqttGenericBridge_triggeredReading=".Dumper($dhash->{'.mqttGenericBridge_triggeredReading'}));
     if(($reading eq '') or ($reading eq 'state')) {
       $dhash->{'.mqttGenericBridge_triggeredReading'}="state" if $dhash->{TYPE} eq 'dummy'; # Schneller Hack
       #$err = DoSet($device,$message);
@@ -2239,7 +2245,7 @@ sub doSetUpdate($$$$$) {
 # Routine MQTT-Message Callback
 sub onmessage($$$) {
   my ($hash,$topic,$message) = @_;
-  CheckInitialization($hash);
+  #CheckInitialization($hash);
   #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> onmessage: $topic => $message");
 
   $hash->{+HELPER}->{+HS_PROP_NAME_INCOMING_CNT}++; 
