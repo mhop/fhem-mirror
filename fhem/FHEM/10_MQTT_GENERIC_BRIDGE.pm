@@ -30,6 +30,12 @@
 # 
 # CHANGE LOG
 #
+#
+# 30.09.2018 0.9.9
+#   feature finished: globalTypeExclude und globalDeviceExclude incl. Commandref
+#
+# 29.09.2018 0.9.9
+#   quick fix: received messages forward exclude for 'dummy'
 # 
 # 27.09.2018 0.9.9
 #   imroved  : auch bei stopic-Empfang wird nicht weiter gepublisht (s.u.)
@@ -45,7 +51,7 @@
 #              Triggern ein Flag gesetzt, das weiteres Publish dieser 
 #              Nachricht verhindert. Damit kann selbe Reading fuer Empfang und 
 #              Senden verwendet wqerden, ohne dass es zu Loops kommt.
-#              Zusaetzlich gibt es jetzt für den Subscribe ein 
+#              Zusaetzlich gibt es jetzt fuer den Subscribe ein 
 #              'self-trigger-topic' (auch 'sttopic'), wo trotzdem weiter
 #              gepublisht wird. Achtung! Gefahr von Loops und wohl eher
 #              ein Sonderfall, wird daher wird nicht in Commandref aufgenommen.
@@ -126,6 +132,7 @@
 #
 ###############################################################################
 
+# TODO: globalForwardTypeExclude (default: dummy) Leer/Komma separiert?
 
 # Ideen:
 #
@@ -177,7 +184,7 @@ use warnings;
 
 #my $DEBUG = 1;
 my $cvsid = '$Id$';
-my $VERSION = "version 0.9.8 by hexenmeister\n$cvsid";
+my $VERSION = "version 0.9.9 by hexenmeister\n$cvsid";
 
 my %sets = (
 );
@@ -336,7 +343,7 @@ sub IsObservedAttribute($$);
 sub defineGlobalTypeExclude($;$);
 sub defineGlobalDevExclude($;$);
 sub defineDefaultGlobalExclude($);
-sub isTypeDevReadingExcluded($$$$);
+sub isTypeDevReadingExcluded($$$$$);
 sub getDevicePublishRecIntern($$$$$);
 sub getDevicePublishRec($$$);
 sub isConnected($);
@@ -540,7 +547,7 @@ sub firstInit($) {
     }
 
     # senden attr changes at start:
-    # im firstinit schleife über alle devices im map und bei mode 'A' senden
+    # im firstinit schleife ueber alle devices im map und bei mode 'A' senden
     # publishDeviceUpdate($hash, $defs{$sdev}, 'A', $attrName, $val);
     # ggf. vorkehrungen treffen, falls nicht connected
 
@@ -1716,11 +1723,13 @@ sub checkPublishDeviceReadingsUpdates($$) {
 #   Parameter:
 #     $hash: HASH
 #     $valueType: Werteliste im Textformat fuer TYPE:readings Excludes (getrennt durch Leerzeichen).
-#       Ein einzelner Wert bedeutet, dass ein Geraetetyp mit diesem Namen komplett ignoriert wird (also fuer alle seine Readings).
+#       Ein einzelner Wert bedeutet, dass ein Geraetetyp mit diesem Namen komplett ignoriert wird (also fuer alle seine Readings und jede Richtung).
 #       Durch ein Doppelpunkt getrennte Paare werden als Type:Reading interptretiert. 
 #       Das Bedeutet, dass an dem gegebenen Type die genannte Reading nicht uebertragen wird.
 #       Ein Stern anstatt Type oder auch Reading bedeutet, dass alle Readings eines Geretaetyps 
 #       bzw. genannte Readings an jedem Geraetetyp ignoriert werden.
+#       Zusaetzlich kann auch die Richtung optional angegeben werden (pub oder sub). Dann gilt die Ausnahme entsprechend nur fuers Senden oder nur fuer Empfang.
+# TEST: {Dumper(MQTT::GENERIC_BRIDGE::defineGlobalTypeExclude($defs{'mqttGenericBridge'},'sub:type:reading pub:*:reading2 sub:*:* test'))}
 sub defineGlobalTypeExclude($;$) {
   my ($hash, $valueType) = @_;
   #$valueType = AttrVal($hash->{NAME}, CTRL_ATTR_NAME_GLOBAL_TYPE_EXCLUDE, DEFAULT_GLOBAL_TYPE_EXCLUDES) unless defined $valueType;
@@ -1731,47 +1740,100 @@ sub defineGlobalTypeExclude($;$) {
 
   $hash->{+HS_PROP_NAME_GLOBAL_EXCLUDES_READING} = {};
   $hash->{+HS_PROP_NAME_GLOBAL_EXCLUDES_TYPE} = {};
-  my @list = split("[ \t][ \t]*", $valueType);
-  foreach (@list) {
-    next if($_ eq "");
-    my($type, $reading) = split(/:/, $_);
-    $hash->{+HS_PROP_NAME_GLOBAL_EXCLUDES_READING}->{$reading}=1 if (defined($reading) and ($type eq '*'));
+
+  # my @list = split("[ \t][ \t]*", $valueType);
+  # foreach (@list) {
+  #   next if($_ eq "");
+  #   my($type, $reading) = split(/:/, $_);
+  #   $hash->{+HS_PROP_NAME_GLOBAL_EXCLUDES_READING}->{$reading}=1 if (defined($reading) and ($type eq '*'));
+  #   $reading='*' unless defined $reading;
+  #   $hash->{+HS_PROP_NAME_GLOBAL_EXCLUDES_TYPE}->{$type}=$reading if($type ne '*');
+  # }
+
+
+  my($unnamed, $named) = MQTT::parseParams($valueType,'\s',' ','=', undef);
+  foreach my $val (@$unnamed) {
+    next if($val eq '');
+    my($dir, $type, $reading) = split(/:/, $val);
+    if ((!defined $reading) and ($dir ne 'pub') and ($dir ne 'sub')) {
+      $reading=$type;
+      $type=$dir;
+      $dir=undef;
+    }
+    next if($type eq '');
     $reading='*' unless defined $reading;
-    $hash->{+HS_PROP_NAME_GLOBAL_EXCLUDES_TYPE}->{$type}=$reading if($type ne '*');
+    $reading = '*' if $reading eq '';
+    #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> defineGlobalTypeExclude: dir, type, reading: ".Dumper(($dir, $type, $reading)));
+    if (!defined $dir) {
+      $hash->{+HS_PROP_NAME_GLOBAL_EXCLUDES_READING}->{'pub'}->{$reading}=1 if (defined($reading) and ($type eq '*'));
+      $hash->{+HS_PROP_NAME_GLOBAL_EXCLUDES_TYPE}->{'pub'}->{$type}=$reading if($type ne '*');
+      $hash->{+HS_PROP_NAME_GLOBAL_EXCLUDES_READING}->{'sub'}->{$reading}=1 if (defined($reading) and ($type eq '*'));
+      $hash->{+HS_PROP_NAME_GLOBAL_EXCLUDES_TYPE}->{'sub'}->{$type}=$reading if($type ne '*');
+    } elsif (($dir eq 'pub') or ($dir eq 'sub')) {
+      $hash->{+HS_PROP_NAME_GLOBAL_EXCLUDES_READING}->{$dir}->{$reading}=1 if (defined($reading) and ($type eq '*'));
+      $hash->{+HS_PROP_NAME_GLOBAL_EXCLUDES_TYPE}->{$dir}->{$type}=$reading if($type ne '*');
+    }
+
   }
+  return ($hash->{+HS_PROP_NAME_GLOBAL_EXCLUDES_READING}, $hash->{+HS_PROP_NAME_GLOBAL_EXCLUDES_TYPE});
 }
 
 # Definiert Liste der auszuschliessenden DeviceName/Readings-Kombinationen.
 #   Parameter:
 #     $hash: HASH
-#     $valueName: Werteliste im Textformat fuer DeviceName:reading Excludes (getrennt durch Leerzeichen).
-#       Ein einzelner Wert bedeutet, dass ein Geraet mit diesem Namen komplett ignoriert wird (also fuer alle seine Readings).
+#     $valueName: Werteliste im Textformat fuer [pub:|sub:]DeviceName:reading Excludes (getrennt durch Leerzeichen).
+#       Ein einzelner Wert bedeutet, dass ein Geraet mit diesem Namen komplett ignoriert wird (also fuer alle seine Readings und jede Richtung).
 #       Durch ein Doppelpunkt getrennte Paare werden als DeviceName:Reading interptretiert. 
 #       Das Bedeutet, dass an dem gegebenen Geraet die genannte Reading nicht uebertragen wird.
 #       Ein Stern anstatt Reading bedeutet, dass alle Readings eines Geraets ignoriert werden.
+#       Ein Stern anstatt des Geraetenamens ist nicht erlaubt (benutzen Sie in diesem Fall GlobalTypeExclude).
+#       Zusaetzlich kann auch die Richtung optional angegeben werden (pub oder sub). Dann gilt die Ausnahme entsprechend nur fuers Senden oder nur fuer Empfang.
+# TEST {Dumper(MQTT::GENERIC_BRIDGE::defineGlobalDevExclude($defs{'mqttGenericBridge'},'sub:dev1:reading1 dev2:reading2 dev3 pub:a: *:* test'))}
 sub defineGlobalDevExclude($;$) {
   my ($hash, $valueName) = @_;
-  #$valueName = AttrVal($hash->{NAME}, CTRL_ATTR_NAME_GLOBAL_DEV_EXCLUDE, DEFAULT_GLOBAL_DEV_EXCLUDES) unless defined $valueName;
   $valueName = DEFAULT_GLOBAL_DEV_EXCLUDES unless defined $valueName;
   $valueName.= ' '.DEFAULT_GLOBAL_DEV_EXCLUDES if defined $valueName;
-  #$main::attr{$hash->{NAME}}{+CTRL_ATTR_NAME_GLOBAL_DEV_EXCLUDE} = $valueName;
   # HS_PROP_NAME_GLOBAL_EXCLUDES_DEVICES
 
   $hash->{+HS_PROP_NAME_GLOBAL_EXCLUDES_DEVICES}={};
-  my @list = split("[ \t][ \t]*", $valueName);
-  foreach (@list) {
-    next if($_ eq "");
-    my($dev, $reading) = split(/:/, $_);
-    $reading='*' unless defined $reading;
-    $hash->{+HS_PROP_NAME_GLOBAL_EXCLUDES_DEVICES}->{$dev}=$reading if($dev ne '*');
+
+  # my @list = split("[ \t][ \t]*", $valueName);
+  # foreach (@list) {
+  #   next if($_ eq "");
+  #   my($dev, $reading) = split(/:/, $_);
+  #   $reading='*' unless defined $reading;
+  #   $hash->{+HS_PROP_NAME_GLOBAL_EXCLUDES_DEVICES}->{$dev}=$reading if($dev ne '*');
+  # }
+
+  my($unnamed, $named) = MQTT::parseParams($valueName,'\s',' ','=', undef);
+  foreach my $val (@$unnamed) {
+    next if($val eq '');
+    my($dir, $dev, $reading) = split(/:/, $val);
+    if ((!defined $reading) and ($dir ne 'pub') and ($dir ne 'sub')) {
+      $reading=$dev;
+      $dev=$dir;
+      $dir=undef;
+    }
+    next if($dev eq '');
+    $reading = '*' unless defined $reading;
+    $reading = '*' if $reading eq '';
+    #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> defineGlobalDevExclude: dir, dev, reading: ".Dumper(($dir, $dev, $reading)));
+    if (!defined $dir) {
+      $hash->{+HS_PROP_NAME_GLOBAL_EXCLUDES_DEVICES}->{'pub'}->{$dev}=$reading  if($dev ne '*');
+      $hash->{+HS_PROP_NAME_GLOBAL_EXCLUDES_DEVICES}->{'sub'}->{$dev}=$reading  if($dev ne '*');
+    } elsif (($dir eq 'pub') or ($dir eq 'sub')) {
+      $hash->{+HS_PROP_NAME_GLOBAL_EXCLUDES_DEVICES}->{$dir}->{$dev}=$reading if($dev ne '*');
+    }
+
   }
+  return $hash->{+HS_PROP_NAME_GLOBAL_EXCLUDES_DEVICES};
 }
 
 # Setzt Liste der auszuschliessenden Type/Readings-Kombinationenb auf Defaultwerte zurueck (also falls Attribut nicht definiert ist).
 sub defineDefaultGlobalExclude($) {
   my ($hash) = @_;  
-  defineGlobalTypeExclude($hash, undef);
-  defineGlobalDevExclude($hash, undef);
+  defineGlobalTypeExclude($hash, AttrVal($hash->{NAME}, CTRL_ATTR_NAME_GLOBAL_TYPE_EXCLUDE, DEFAULT_GLOBAL_TYPE_EXCLUDES));
+  defineGlobalDevExclude($hash, AttrVal($hash->{NAME}, CTRL_ATTR_NAME_GLOBAL_DEV_EXCLUDE, DEFAULT_GLOBAL_DEV_EXCLUDES));
 }
 
 # Prueft, ob Type/Reading- oder Geraete/Reading-Kombination von der Uebertragung ausgeschlossen werden soll, 
@@ -1781,21 +1843,26 @@ sub defineDefaultGlobalExclude($) {
 #     $type:    Geraetetyp
 #     $devName: Geraetename
 #     $reading: Reading
-sub isTypeDevReadingExcluded($$$$) {
-  my ($hash, $type, $devName, $reading) = @_;
+sub isTypeDevReadingExcluded($$$$$) {
+  my ($hash, $direction, $type, $devName, $reading) = @_;
 
   # pruefen, ob im Geraet ignore steht
   my $devDisable = $main::attr{$devName}{$hash->{+HS_PROP_NAME_PREFIX}.CTRL_ATTR_NAME_IGNORE};
   $devDisable = '0' unless defined $devDisable;
-  return 1 if(($devDisable eq 'both') or ($devDisable eq 'outgoing'));
+  return 1 if $devDisable eq 'both';
+  return 1 if (($direction eq 'pub') and ($devDisable eq 'outgoing'));
+  return 1 if (($direction eq 'sub') and ($devDisable eq 'incoming'));
 
   # Exclude tables
   my $gExcludesTypeMap = $hash->{+HS_PROP_NAME_GLOBAL_EXCLUDES_TYPE};
+  $gExcludesTypeMap = $gExcludesTypeMap->{$direction} if defined $gExcludesTypeMap;
   my $gExcludesReadingMap = $hash->{+HS_PROP_NAME_GLOBAL_EXCLUDES_READING};
+  $gExcludesReadingMap = $gExcludesReadingMap->{$direction} if defined $gExcludesReadingMap;
   my $gExcludesDevMap = $hash->{+HS_PROP_NAME_GLOBAL_EXCLUDES_DEVICES};
+  $gExcludesDevMap = $gExcludesDevMap->{$direction} if defined $gExcludesDevMap;
 
   # readings
-  return 1 if (defined($gExcludesTypeMap) and ($gExcludesReadingMap->{$reading}));
+  return 1 if (defined($gExcludesReadingMap) and ($gExcludesReadingMap->{$reading}));
 
   # types
   my $exType=$gExcludesTypeMap->{$type} if defined $gExcludesTypeMap;
@@ -1906,7 +1973,7 @@ sub publishDeviceUpdate($$$$$) {
   return if($type eq "MQTT");
   return if($reading eq "transmission-state");
   # extra definierte (ansonsten gilt eine Defaultliste) Types/Readings auschliessen.
-  return if(isTypeDevReadingExcluded($hash, $type, $devn, $reading));
+  return if(isTypeDevReadingExcluded($hash, 'pub', $type, $devn, $reading));
 
   #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> publishDeviceUpdate for $devn, $reading, $value");
   my $pubRec = getDevicePublishRec($hash, $devn, $reading);
@@ -2122,16 +2189,19 @@ sub ioDevDisconnect($) {
 # Params: Bridge-Hash, Modus (R=Readings, A=Attribute), Reading/Attribute-Name, Nachricht
 sub doSetUpdate($$$$$) {
   my ($hash,$mode,$device,$reading,$message) = @_;
+
+  my $dhash = $defs{$device};
+  return unless defined $dhash;
+  
   if($mode eq 'S') {
     my $err;
     my @args = split ("[ \t]+",$message);
-    my $dhash = $defs{$device};
     if(($reading eq '') or ($reading eq 'state')) {
-      $dhash->{'.mqttGenericBridge_triggeredReading'}="state";
+      $dhash->{'.mqttGenericBridge_triggeredReading'}="state" if $dhash->{TYPE} eq 'dummy'; # Schneller Hack
       #$err = DoSet($device,$message);
       $err = DoSet($device,@args);
     } else {
-      $dhash->{'.mqttGenericBridge_triggeredReading'}=$reading;
+      $dhash->{'.mqttGenericBridge_triggeredReading'}=$reading if $dhash->{TYPE} eq 'dummy'; # Schneller Hack
       #$err = DoSet($device,$reading,$message);
       $err = DoSet($device,$reading,@args);
     }
@@ -2145,11 +2215,9 @@ sub doSetUpdate($$$$$) {
   } elsif($mode eq 'R' or $mode eq 'T') {
     # R - Normale Topic (beim Empfang nicht weiter publishen)
     # T - Selt-Trigger-Topic (Sonderfall, auch wenn gerade empfangen, kann weiter getriggert/gepublisht werden. Vorsicht! Gefahr von 'Loops'!)
-
-    my $dhash = $defs{$device};
     readingsBeginUpdate($dhash);
     if ($mode eq 'R') {
-      $dhash->{'.mqttGenericBridge_triggeredReading'}=$reading;
+      $dhash->{'.mqttGenericBridge_triggeredReading'}=$reading if $dhash->{TYPE} eq 'dummy'; # Schneller Hack
     }
     readingsBulkUpdate($dhash,$reading,$message);
     readingsEndUpdate($dhash,1);
@@ -2185,6 +2253,13 @@ sub onmessage($$$) {
         my $mode = $fMap->{$deviceKey}->{'mode'};
         my $expression = $fMap->{$deviceKey}->{'expression'};
 
+        next unless defined $device;
+        next unless defined $reading;
+
+        my $dhash = $defs{$device};
+        next unless defined $dhash;
+        next if(isTypeDevReadingExcluded($hash, 'sub', $dhash->{TYPE}, $device, $reading));
+
         my $redefMap=undef;
 
         if(defined $expression) {
@@ -2216,8 +2291,8 @@ sub onmessage($$$) {
           use strict "refs";
         }
 
-        next unless defined $device;
-        next unless defined $reading;
+        #next unless defined $device;
+        #next unless defined $reading;
 
         next unless defined $message;
 
@@ -2362,7 +2437,6 @@ sub onmessage($$$) {
      </p>
    </li>
 
-<!--
    <li>
     <p>globalSubscribe ! TODO - is currently not supported and may not be implemented at all!<br/>
         Defines topics / flags for MQTT transmission. These are used if there are no suitable values in the respective device.
@@ -2371,10 +2445,11 @@ sub onmessage($$$) {
    </li>
 
    <li>
-    <p>globalTypeExclude ! TODO - is currently not implemented!<br/>
-        Defines (device) types and readings that should not be used in the transmission.
-        A single value means that a device is completely ignored (for all its readings). 
-        Colon separated pairs are interpreted as 'Type:Reading'. 
+    <p>globalTypeExclude<br/>
+        Defines (device) types and readings that should not be considered in the transmission.
+        Values can be specified separately for each direction (buplish or subscribe). Use prefixes 'pub:' and 'sub:' for this purpose.
+        A single value means that a device is completely ignored (for all its readings and both directions). 
+        Colon separated pairs are interpreted as '[sub:|pub:]Type:Reading'. 
         This means that the given reading is not transmitted on all devices of the given type. 
         An '*' instead of type or reading means that all readings of a device type or named readings are ignored on every device type.</p>
         <p>Example:<br/>
@@ -2382,15 +2457,15 @@ sub onmessage($$$) {
    </li>
 
    <li>
-    <p>globalDeviceExclude ! TODO - is currently not implemented!<br/>
+    <p>globalDeviceExclude<br/>
         Defines device names and readings that should not be transferred. 
-        A single value means that a device with that name is completely ignored (for all its readings).
-        Colon-separated pairs are interpreted as 'Device:Reading'. 
+        Values can be specified separately for each direction (buplish or subscribe). Use prefixes 'pub:' and 'sub:' for this purpose.
+        A single value means that a device with that name is completely ignored (for all its readings and both directions).
+        Colon-separated pairs are interpreted as '[sub:|pub:]Device:Reading'. 
         This means that the given reading is not transmitted to the given device.</p>
         <p>Example:<br/>
             <code>attr &lt;dev&gt; globalDeviceExclude Test Bridge:transmission-state</code></p>
    </li>
-        -->
 
    <p>For the monitored devices, a list of the possible attributes is automatically extended by several further entries. 
       They all begin with a prefix previously defined in the bridge. These attributes are used to configure the actual MQTT mapping.<br/>
@@ -2731,7 +2806,6 @@ sub onmessage($$$) {
      </p>
    </li>
 
-<!--
    <li>
     <p>globalSubscribe ! TODO - wird derzeit nicht unterstuetzt und wird moeglicherweise gar nicht implementiert !<br/>
         Definiert Topics/Flags fuer die Aufnahme der Werte aus der MQTT-Uebertragung. Sie greifen, falls in dem jeweiligen Geraet 
@@ -2740,10 +2814,11 @@ sub onmessage($$$) {
    </li>
 
    <li>
-    <p>globalTypeExclude ! TODO - ist derzeit nicht implementiert !<br/>
+    <p>globalTypeExclude<br/>
         Definiert (Geraete-)Typen und Readings, die nicht bei der Uebertragung beruecksichtigt werden. 
-        Ein einzelner Wert bedeutet, dass ein Geraet diesen Types komplett ignoriert wird (also fuer alle seine Readings).
-        Durch ein Doppelpunkt getrennte Paare werden als Type:Reading interptretiert. 
+        Werte koennen getrennt fuer jede Richtung (buplish oder subscribe) vorangestellte Prefixe 'pub:' und 'sub:' angegeben werden.
+        Ein einzelner Wert bedeutet, dass ein Geraet diesen Types komplett ignoriert wird (also fuer alle seine Readings und beide Richtungen).
+        Durch ein Doppelpunkt getrennte Paare werden als [sub:|pub:]Type:Reading interptretiert. 
         Das Bedeutet, dass an dem gegebenen Type die genannte Reading nicht uebertragen wird.
         Ein Stern anstatt Type oder auch Reading bedeutet, dass alle Readings eines Geretaetyps
         bzw. genannte Readings an jedem Geraetetyp ignoriert werden. </p>
@@ -2752,15 +2827,15 @@ sub onmessage($$$) {
    </li>
 
    <li>
-    <p>globalDeviceExclude ! TODO - ist derzeit nicht implementiert !<br/>
-        Definiert Geraetenamen und Readings, die nicht uebertragen werden. 
-        Ein einzelner Wert bedeutet, dass ein Geraet mit diesem Namen komplett ignoriert wird (also fuer alle seine Readings).
-        Durch ein Doppelpunkt getrennte Paare werden als Device:Reading interptretiert. 
+    <p>globalDeviceExclude<br/>
+        Definiert Geraetenamen und Readings, die nicht uebertragen werden.
+        Werte koennen getrennt fuer jede Richtung (buplish oder subscribe) vorangestellte Prefixe 'pub:' und 'sub:' angegeben werden.
+        Ein einzelner Wert bedeutet, dass ein Geraet mit diesem Namen komplett ignoriert wird (also fuer alle seine Readings und beide Richtungen).
+        Durch ein Doppelpunkt getrennte Paare werden als [sub:|pub:]Device:Reading interptretiert. 
         Das Bedeutet, dass an dem gegebenen Geraet die genannte Reading nicht uebertragen wird.</p>
         <p>Beispiel:<br/>
             <code>attr &lt;dev&gt; globalDeviceExclude Test Bridge:transmission-state</code></p>
    </li>
-        -->
 
    <p>Fuer die ueberwachten Geraete wird eine Liste der moeglichen Attribute automatisch um mehrere weitere Eintraege ergaenzt. 
       Sie fangen alle mit vorher in der Bridge definiertem Prefix an. Ueber diese Attribute wird die eigentliche MQTT-Anbindung konfiguriert.<br/>
