@@ -1394,7 +1394,7 @@ sub FRITZBOX_Readout_Run_Web($)
       my $result2;
       my $newQueryPart; 
       
-    # gets WLAN speed for fw>=6.69
+    # gets WLAN speed for fw>=6.69 and < 7
       $queryStr="";
       foreach ( @{ $result->{wlanListNew} } ) {
          $newQueryPart = "&".$_->{_node}."=wlan:settings/".$_->{_node}."/speed_rx";
@@ -1408,7 +1408,7 @@ sub FRITZBOX_Readout_Run_Web($)
          }
       }
 
-    # gets LAN-Port for fw>=6.69
+    # gets LAN-Port for fw>=6.69 and fw<7
       foreach ( @{ $result->{lanDeviceNew} } ) {
          $newQueryPart = "&".$_->{_node}."=landevice:settings/".$_->{_node}."/ethernet_port";
          if (length($queryStr.$newQueryPart) < 4050) {
@@ -1537,7 +1537,7 @@ sub FRITZBOX_Readout_Run_Web($)
       foreach ( @{ $result->{wlanList} } ) {
          my $mac = $_->{mac};
          $mac =~ s/:/_/g;
-         # Anscheinend gibt es sowohl für repeater als auch für FBoxen Anmeldungen
+         # Anscheinend gibt es Anmeldungen sowohl für Repeater als auch für FBoxen 
          $wlanList{$mac}{speed} = $_->{speed}   if ! defined $wlanList{$mac}{speed} || $_->{speed} ne "0";
          $wlanList{$mac}{speed_rx} = $_->{speed_rx} if ! defined $wlanList{$mac}{speed_rx} || $_->{speed_rx} ne "0";
          #$wlanList{$mac}{speed_rx} = $result_lan->{$_->{_node}};
@@ -1573,8 +1573,10 @@ sub FRITZBOX_Readout_Run_Web($)
             $mac =~ s/:/_/g;
             # if ( !$_->{ethernet} && $_->{wlan} ) { # funktioniert nicht mehr seit v7
             if ( defined $wlanList{$mac} ) {
+               # Copes with fw>=7
+               $_->{guest} = $wlanList{$mac}{is_guest}  if defined $wlanList{$mac}{is_guest} && $_->{guest} eq "";
                $wlanCount++;
-               $gWlanCount++      if $_->{guest} eq "1" || $wlanList{$mac}{is_guest} eq "1" ;
+               $gWlanCount++      if $_->{guest} eq "1";
                $dName .= " (";
                $dName .= "g"    if $_->{guest};
                $dName .= "WLAN";
