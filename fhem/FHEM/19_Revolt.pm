@@ -113,7 +113,7 @@ sub Revolt_Parse($$)
   if (0 == $pf) {
     $pf = 0.0001;
   }
-  if (($freq > 55) || ($power > 3650) || ($current > 16) ||
+  if (($voltage < 80) || ($freq > 65) || ($power > 3650) || ($current > 16) ||
       ((($power / $voltage / $pf) > 0.00999) && (0 == $current)) ||
       ($energydiff > $maxenergy)) {
     $isInvalid = 1;
