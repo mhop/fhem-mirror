@@ -459,16 +459,16 @@ HCS_getValues($$) {
   foreach my $d (sort keys %defs) {
     my $t = $defs{$d}{TYPE};
     # skipping unneeded devices
-    next if($t ne "FHT" && $t ne "CUL_HM" && $t ne "MAX" && $t ne "ZWave");
+    next if($t ne "FHT" && $t ne "CUL_HM" && $t ne "HMCCUDEV" && $t ne "MAX" && $t ne "ZWave");
     next if($t eq "MAX" && !$defs{$d}{type});
     next if($t eq "MAX" && $defs{$d}{type} !~ m/HeatingThermostat/);
 
-    next if($t eq "CUL_HM" && ( !$attr{$d}{model}
-                || !( ($attr{$d}{model} eq "HM-CC-TC" && !$defs{$d}{device})
+    next if( ($t eq "CUL_HM" || $t eq "HMCCUDEV") && ( !$attr{$d}{model}
+                || !(  ($attr{$d}{model} eq "HM-CC-TC" && !$defs{$d}{device})
                     || ($attr{$d}{model} eq "HM-TC-IT-WM-W-EU" && !$defs{$d}{device})
                     || ($attr{$d}{model} eq "HmIP-WTH-2" && !$defs{$d}{device})
+                    || ($attr{$d}{model} eq "HmIP-eTRV" && !$defs{$d}{device}) 
                     || ($attr{$d}{model} eq "HM-CC-RT-DN" && !$defs{$d}{device}) )) );
-    
     next if($t eq "ZWave" && $attr{$d}{classes} !~ m/THERMOSTAT_SETPOINT/);
 
     $devs{$d}{actuator}     = ReadingsVal($d,"valveposition","n/a") if($t =~ m/(MAX)/);
@@ -484,9 +484,11 @@ HCS_getValues($$) {
     $devs{$d}{ignored}      = ($attr{$d}{ignore} && $attr{$d}{ignore} == 1) ? 1 : 0;
 
     $devs{$d}{tempDesired}  = ReadingsVal($d,"desired-temp","n/a")       if($t =~ m/(FHT|CUL_HM)/);
+    $devs{$d}{tempDesired}  = ReadingsVal($d,"1.SET_POINT_TEMPERATURE","n/a")   if($t =~ m/(HMCCUDEV)/);
     $devs{$d}{tempDesired}  = ReadingsVal($d,"desiredTemperature","n/a") if($t =~ m/(MAX)/);
     $devs{$d}{tempDesired}  = ReadingsNum($d,"setpointTemp","n/a",1)     if($t =~ m/(ZWave)/);
     $devs{$d}{tempMeasured} = ReadingsVal($d,"measured-temp","n/a")      if($t =~ m/(FHT|CUL_HM)/);
+    $devs{$d}{tempMeasured} = ReadingsVal($d,"1.ACTUAL_TEMPERATURE","n/a")      if($t =~ m/(HMCCUDEV)/);
     $devs{$d}{tempMeasured} = ReadingsNum($d,"temperature","n/a",1)      if($t =~ m/(MAX|ZWave)/);
 
     $devs{$d}{tempDesired}  = ($t =~ m/(FHT)/) ? 5.5 : 4.5               if($devs{$d}{tempDesired} eq "off");
