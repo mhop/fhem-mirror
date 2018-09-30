@@ -105,7 +105,7 @@ FHEM/14_SD_WS09.pm           Sidey/pejonp         Sonstige Systeme
 FHEM/14_SD_RSL.pm            Sidey/Ralf9          Sonstige Systeme
 FHEM/17_SIS_PMS.pm           painseeker           Sonstiges
 FHEM/18_CUL_HOERMANN.pm      rudolfkoenig         SlowRF
-FHEM/19_Revolt.pm            martinppp/mehf       SlowRF
+FHEM/19_Revolt.pm            yoda_gh              SlowRF
 FHEM/19_VBUSIF.pm            Tobias/pejonp        Sonstige Systeme
 FHEM/20_FRM_AD.pm            jensb                Sonstige Systeme
 FHEM/20_FRM_ROTENC.pm        ntruchsess           Sonstige Systeme

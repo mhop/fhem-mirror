@@ -1,8 +1,9 @@
-##############################################
-#                                            #
-# Written by Martin Paulat, 2013             #
-#                                            #
-##############################################
+#                                            
+# Written by Martin Paulat, 2013             
+# mainted by Gernot Hillier (yoda_gh), 2018- 
+#            <gernot@hillier.de>             
+#                                           
+# $Id$
 
 package main;
 
@@ -129,6 +130,9 @@ Revolt_Parse($$)
 1;
 
 =pod
+=item device
+=item summary Receive power, energy, voltage etc. from Revolt NC-5462 433MHz devices
+=item summary_DE Energieverbrauch von Revolt NC-5462 über 433MHz empfangen
 =begin html
 
 <a name="Revolt"></a>
