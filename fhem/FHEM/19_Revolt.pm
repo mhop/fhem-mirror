@@ -113,6 +113,7 @@ sub Revolt_Parse($$)
   if (0 == $pf) {
     $pf = 0.0001;
   }
+  # plausability check partly taken from http://www.sknorrell.de/blog/energiemesssung-mit-revolt-nc-5462/
   if (($voltage < 80) || ($freq > 65) || ($power > 3650) || ($current > 16) ||
       ((($power / $voltage / $pf) > 0.00999) && (0 == $current)) ||
       ($energydiff > $maxenergy)) {
