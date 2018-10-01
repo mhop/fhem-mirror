@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.3.002
+#  Version 4.3.003
 #
 #  Module for communication between FHEM and Homematic CCU2.
 #
@@ -108,7 +108,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.3.001';
+my $HMCCU_VERSION = '4.3.003';
 
 # Default RPC port (BidCos-RF)
 my $HMCCU_RPC_PORT_DEFAULT = 2001;
@@ -1405,7 +1405,7 @@ sub HMCCU_Set ($@)
 	if (exists ($hash->{hmccu}{prg})) {
 		my @progs = ();
 		foreach my $p (keys %{$hash->{hmccu}{prg}}) {
-			push (@progs, $p) if ($hash->{hmccu}{prg}{$p}{internal} eq 'false');
+			push (@progs, $p) if ($hash->{hmccu}{prg}{$p}{internal} eq 'false' && $p !~ /^\$/);
 		}
 		if (scalar (@progs) > 0) {
 			my $prgopt = "execute:".join(',', @progs);
@@ -4126,6 +4126,7 @@ sub HMCCU_GetDeviceList ($)
 		my $typeprefix = '';
 
 		if ($hmdata[0] eq 'D') {
+			# Device
 			next if (scalar (@hmdata) != 6);
 			# 1=Interface 2=Device-Address 3=Device-Name 4=Device-Type 5=Channel-Count
 			$objects{$hmdata[2]}{addtype}   = 'dev';
@@ -4145,6 +4146,7 @@ sub HMCCU_GetDeviceList ($)
 			}
 		}
 		elsif ($hmdata[0] eq 'C') {
+			# Channel
 			next if (scalar (@hmdata) != 4);
 			# 1=Channel-Address 2=Channel-Name 3=Direction
 			$objects{$hmdata[1]}{addtype}   = 'chn';
@@ -4155,6 +4157,7 @@ sub HMCCU_GetDeviceList ($)
 			$objects{$hmdata[1]}{chndir}    = $hmdata[3];
 		}
 		elsif ($hmdata[0] eq 'I') {
+			# Interface
 			next if (scalar (@hmdata) != 4);
 			# 1=Interface-Name 2=Interface Info 3=URL
 			my $ifurl = $hmdata[3];
@@ -4190,6 +4193,7 @@ sub HMCCU_GetDeviceList ($)
 			}
 		}
 		elsif ($hmdata[0] eq 'P') {
+			# Program
 			next if (scalar (@hmdata) != 4);
 			# 1=Program-Name 2=Active-Flag 3=Internal-Flag
 			$hash->{hmccu}{prg}{$hmdata[1]}{active} = $hmdata[2]; 

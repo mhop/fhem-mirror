@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  88_HMCCU: Temporary CCU programs are ignored now.
   - change:  19_Revolt: allow adjustment of energy value, filtering of 
              implausible values
   - bugfix:  72_XiaomiDevice: better handling of definition w/ missing token
