@@ -43,7 +43,7 @@ sub Revolt_Define($$)
   AssignIoPort($hash);
   
   my $name = $a[0]; 
-  $attr{$name}{"event-aggregator"} = "power::none:median:120,energy::none:median:120" if(!defined($attr{$name}{"event-aggregator"}));
+  #$attr{$name}{"event-aggregator"} = "power::none:median:120,energy::none:median:120" if(!defined($attr{$name}{"event-aggregator"}));
   $attr{$name}{"stateFormat"} = "P: power E: energy V: voltage C: current Pf: pf" if(!defined($attr{$name}{"stateFormat"}));
   
   return undef;
@@ -161,7 +161,18 @@ sub Revolt_Parse($$)
 <a name="Revolt"></a>
 <h3>Revolt NC-5462</h3>
 <ul>
-  Provides voltage, current, frequency, power, pf, energy readings for Revolt NC-5462 devices via CUL.
+  Provides energy consumption readings for Revolt NC-5462 devices via CUL or
+  SIGNALduino (433MHz).
+  <br><br>
+  These devices send telegrams with measured values every few seconds. Many 
+  users saw problems with cheap 433MHz receivers - and even with good 
+  receivers, wrong values are received quite often, leading to outliers
+  in plots and sporadic autocreation of devices with wrong IDs.
+  <br><br>
+  This module now ignores implausible telegrams (e.g. voltage below 80),
+  but to further reduce outliers and event frequency, you should use the common
+  attributes described below. You also might want to disable autocreation of
+  Revolt devices once all of yours are detected.
   <br><br>
 
   <a name="RevoltDefine"></a>
@@ -179,15 +190,30 @@ sub Revolt_Parse($$)
     <li>EnergyAdjustValue: adjust the energy reading (energy = energy - EnergyAdjustValue)</li>
   </ul>
   <br>
+  <b>Common attributes</b>
+  <ul>
+    <li><a href="#event-aggregator">event-aggregator</a>: To reduce the high sending frequency and filter reception errors, you can use FHEM's event-aggregator. Common examples:
+      <ul>
+        <li><tt>power:60:linear:mean,energy:36000:none:v</tt> reduce sampling frequency to one power event per minute and one energy value per 10 hours, other events can be disabled via <tt>event-on-change-reading</tt> or <tt>event-on-update-reading</tt>.</li>
+        <li><tt>power::none:median:120,energy::none:median:120</tt> keep sampling frequency untouched, but filter outliers using statistical median</li>
+      </ul>
+    </li>
+    <li><a href="#event-min-interval">event-min-interval</a></li>
+    <li><a href="#event-on-change-reading">event-on-change-reading</a>: can be used to disable events for readings you don't need. See documentation for details.</li>
+    <li><a href="#event-on-update-reading">event-on-update-reading</a>: can be used to disable events for readings you don't need. See documentatino for details.</li> 
+  </ul>
   <a name="RevoltReadings"></a>
   <b>Readings</b>
   <ul>
-    <li>energy    [kWh]</li>
+    <li>energy    [kWh]: Total energy consumption summed up in the NC-5462
+        devices. It seems you can't reset this counter and it will wrap around
+        to 0 at 655.35 kWh. The EnergyAdjustValue attribute (see above) allows
+        to adapt the reading, e.g. when you connect a new device.</li>
     <li>power     [W]</li>
     <li>voltage   [V]</li>
     <li>current   [A]</li>
     <li>frequency [Hz]</li>
-    <li>Pf</li>
+    <li>Pf: Power factor</li>
   </ul>
 
 </ul>
