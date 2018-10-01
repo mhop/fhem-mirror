@@ -34,8 +34,8 @@ use strict;
 use warnings;
 
 # Versions History intern:
-our %Log2Syslog_vHistoryIntern = (
-  "5.1.0"  => "29.09.2018  new get <name> versionNotes command",
+our %Log2Syslog_vNotesIntern = (
+  "5.1.0"  => "01.10.2018  new get <name> versionNotes command",
   "5.0.1"  => "27.09.2018  Log2Syslog_closesock if write error:.* , delete readings code changed",
   "5.0.0"  => "26.09.2018  TCP-Server in Collector-mode, HIPCACHE added, PROFILE as Internal, Parse_Err_No as reading,
                            octetCount attribute, TCP-SSL-support, set 'reopen' command, code fixes",
@@ -82,7 +82,7 @@ our %Log2Syslog_vHistoryIntern = (
 );
 
 # Versions History extern:
-our %Log2Syslog_vHistoryExtern = (
+our %Log2Syslog_vNotesExtern = (
   "5.1.0"  => "29.09.2018 new get &lt;name&gt; versionNotes command ",
   "5.0.1"  => "27.09.2018 automatic reconnect to syslog-server in case of write error ",
   "5.0.0"  => "26.09.2018 <li>TCP Server mode is possible now for Collector devices<\li><li>the used parse-profile is shown as Internal<\li><li>Parse_Err_No counts faulty persings since start<\li><li>new octetCount attribute switches the syslog framing method (see also RFC6587 <a href=\"https://tools.ietf.org/html/rfc6587\">Transmission of Syslog Messages over TCP</a>)<\li><li>TCP SSL-support<\li><li>new set 'reopen' command to reconnect a broken connection<\li><li>some code fixes ",
@@ -118,6 +118,13 @@ our %Log2Syslog_vHistoryExtern = (
   "2.0.0"  => "16.08.2017 create syslog without perl module SYS::SYSLOG ",
   "1.1.0"  => "26.07.2017 add regex search to sub Log2Syslog_fhemlog ",
   "1.0.0"  => "25.07.2017 initial version "
+);
+
+# Hint Hash
+our %Log2Syslog_vHintsExt = (
+  "3" => "The <a href=\"https://tools.ietf.org/pdf/rfc5425.pdf\"> RFC5425</a> TLS Transport Protocol",
+  "2" => "The basics of <a href=\"https://tools.ietf.org/html/rfc3164\"> RFC3164 (BSD)</a> protocol",
+  "1" => "Informations about <a href=\"https://tools.ietf.org/html/rfc5424\"> RFC5424 (IETF)</a> syslog protocol"
 );
 
 ###############################################################################
@@ -308,7 +315,7 @@ sub Log2Syslog_Define($@) {
   }
 
   $hash->{SEQNO}            = 1;                            # PROCID in IETF, wird kontinuierlich hochgezählt
-  $hash->{VERSION}          = (reverse sort(keys %Log2Syslog_vHistoryIntern))[0];
+  $hash->{VERSION}          = (reverse sort(keys %Log2Syslog_vNotesIntern))[0];
   $logInform{$hash->{NAME}} = "Log2Syslog_fhemlog";         # Funktion die in hash %loginform für $name eingetragen wird
   $hash->{HELPER}{SSLVER}   = "n.a.";                       # Initialisierung
   $hash->{HELPER}{SSLALGO}  = "n.a.";                       # Initialisierung
@@ -1104,8 +1111,8 @@ sub Log2Syslog_Get($@) {
 	  return "no SSL session has been created";
 	  
   } elsif ($opt =~ /versionNotes/) {
-	  my $header;
-	  $header  = "<b>Module release information table</b><br>";
+	  my $header  = "<b>Module release information table</b><br>";
+      my $header1 = "<b>Helpful hints</b><br>";
 	  
 	  # Ausgabetabelle erstellen
 	  my ($ret,$val0,$val1);
@@ -1115,9 +1122,31 @@ sub Log2Syslog_Get($@) {
 	  $ret .= "<tbody>";
 	  $ret .= "<tr class=\"even\">";
 	  my $i = 0;
-	  foreach my $key (reverse sort(keys %Log2Syslog_vHistoryExtern)) {
-		  ($val0,$val1) = split(/\s/,$Log2Syslog_vHistoryExtern{$key},2);
+	  foreach my $key (reverse sort(keys %Log2Syslog_vNotesExtern)) {
+		  ($val0,$val1) = split(/\s/,$Log2Syslog_vNotesExtern{$key},2);
 		  $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0  </td><td>$val1</td>" );
+		  $ret .= "</tr>";
+          $i++;
+          if ($i & 1) {
+              # $i ist ungerade
+		      $ret .= "<tr class=\"odd\">";
+          } else {
+              $ret .= "<tr class=\"even\">";
+          }
+	  }
+	  $ret .= "</tr>";
+	  $ret .= "</tbody>";
+	  $ret .= "</table>";
+	  $ret .= "</div>";
+          
+	  $ret .= sprintf("<div class=\"makeTable wide\"; style=\"text-align:left\">$header1 <br>");
+	  $ret .= "<table class=\"block wide internals\">";
+	  $ret .= "<tbody>";
+	  $ret .= "<tr class=\"even\">";          
+	  $i = 0;
+	  foreach my $key (reverse sort(keys %Log2Syslog_vHintsExt)) {
+		  $val0 = $Log2Syslog_vHintsExt{$key};
+		  $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0</td>" );
 		  $ret .= "</tr>";
           $i++;
           if ($i & 1) {
