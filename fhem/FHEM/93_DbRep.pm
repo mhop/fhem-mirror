@@ -35,302 +35,334 @@
 # This module uses credentials of the DbLog-Device
 #
 ###########################################################################################################################
-#  Versions History:
-#
-# 8.0.1        20.09.2018       DbRep_getMinTs improved
-# 8.0.0        11.09.2018       get filesize in DbRep_WriteToDumpFile corrected, restoreMySQL for clientSide dumps
-#                               minor fixes
-# 7.20.0       04.09.2018       deviceRename can operate a Device name with blank, e.g. 'current balance' as old device name
-# 7.19.0       25.08.2018       attribute "valueFilter" to filter datasets in fetchrows
-# 7.18.2       02.08.2018       fix in fetchrow function (forum:#89886), fix highlighting
-# 7.18.1       03.06.2018       commandref revised
-# 7.18.0       02.06.2018       possible use of y:(\d) for timeDiffToNow, timeOlderThan , minor fixes of timeOlderThan
-#                               delEntries considers executeBeforeDump,executeAfterDump
-# 7.17.3       30.04.2017       writeToDB - readingname can be replaced by the value of attribute "readingNameMap"
-# 7.17.2       22.04.2017       fix don't writeToDB if device name contain "." only, minor fix in DbReadingsVal
-# 7.17.1       20.04.2017       fix "§" is deleted by carfilter
-# 7.17.0       17.04.2018       new function DbReadingsVal
-# 7.16.0       13.04.2018       new function dbValue (blocking)
-# 7.15.2       12.04.2018       fix in setting MODEL, prevent fhem from crash if wrong timestamp "0000-00-00" found in db 
-# 7.15.1       11.04.2018       sqlCmd accept widget textField-long, Internal MODEL is set
-# 7.15.0       24.03.2018       new command sqlSpecial
-# 7.14.8       21.03.2018       fix no save into database if value=0 (DbRep_OutputWriteToDB) 
-# 7.14.7       21.03.2018       exportToFile,importFromFile can use file as an argument and executeBeforeDump, 
-#                               executeAfterDump is considered
-# 7.14.6       18.03.2018       attribute expimpfile can use some kinds of wildcards (exportToFile, importFromFile 
-#                               adapted)
-# 7.14.5       17.03.2018       perl warnings of DbLog $dn,$dt,$evt,$rd in changeval_Push & complex
-# 7.14.4       11.03.2018       increased timeout of BlockingCall in DbRep_firstconnect
-# 7.14.3       07.03.2018       DbRep_firstconnect changed - get lowest timestamp in database, DbRep_Connect deleted
-# 7.14.2       04.03.2018       fix perl warning
-# 7.14.1       01.03.2018       currentfillup_Push bugfix for PostgreSQL
-# 7.14.0       26.02.2018       syncStandby
-# 7.13.3       25.02.2018       commandref revised (forum:#84953)
-# 7.13.2       24.02.2018       DbRep_firstconnect changed, bug fix in DbRep_collaggstr for aggregation = month
-# 7.13.1       20.02.2018       commandref revised
-# 7.13.0       17.02.2018       changeValue can handle perl code {} as "new string"
-# 7.12.0       16.02.2018       compression of dumpfile, restore of compressed files possible
-# 7.11.0       12.02.2018       new command "repairSQLite" to repair a corrupted SQLite database
-# 7.10.0       10.02.2018       bugfix delete attr timeYearPeriod if set other time attributes, new "changeValue" command
-# 7.9.0        09.02.2018       new attribute "avgTimeWeightMean" (time weight mean calculation), code review of selection
-#                               routines, maxValue handle negative values correctly, 
-#                               one security second for correct create TimeArray in DbRep_normRelTime
-# 7.8.1        04.02.2018       bugfix if IsDisabled (again), code review, bugfix last dataset is not selected if timestamp
-#                               is fully set ("date time"), fix "$runtime_string_next = "$runtime_string_next.999";" if 
-#                               $runtime_string_next is part of sql-execute place holder AND contains date+time
-# 7.8.0        04.02.2018       new command "eraseReadings"  
-# 7.7.1        03.02.2018       minor fix in DbRep_firstconnect if IsDisabled
-# 7.7.0        29.01.2018       attribute "averageCalcForm", calculation sceme "avgDailyMeanGWS", "avgArithmeticMean" for 
-#                               averageValue
-# 7.6.1        27.01.2018       new attribute "sqlCmdHistoryLength" and "fetchMarkDuplicates" for highlighting multiple
-#                               datasets by fetchrows
-# 7.6.0        26.01.2018       events containing "|" possible in fetchrows & delSeqDoublets, fetchrows displays multiple  
-#                               $k entries with timestamp suffix $k (as index), sqlCmdHistory (avaiable if sqlCmd was 
-#                               executed)
-# 7.5.5        25.01.2018       minor change in delSeqDoublets
-# 7.5.4        24.01.2018       delseqdoubl_DoParse reviewed to optimize memory usage, executeBeforeDump executeAfterDump 
-#                               now available for "delSeqDoublets"
-# 7.5.3        23.01.2018       new attribute "ftpDumpFilesKeep", version management added to FTP-usage
-# 7.5.2        23.01.2018       fix typo DumpRowsCurrrent, dumpFilesKeep can be set to "0", commandref revised
-# 7.5.1        20.01.2018       DbRep_DumpDone changed to create background_processing_time before execute "executeAfterProc" 
-#                               Commandref updated
-# 7.5.0        16.01.2018       DbRep_OutputWriteToDB, set options display/writeToDB for (max|min|sum|average|diff)Value
-# 7.4.1        14.01.2018       fix old dumpfiles not deleted by dumpMySQL clientSide
-# 7.4.0        09.01.2018       dumpSQLite/restoreSQLite, 
-#                               backup/restore now available when DbLog-device has reopen xxxx running, 
-#                               executeBeforeDump executeAfterDump also available for optimizeTables, vacuum, restoreMySQL, 
-#                               restoreSQLite, 
-#                               attribute executeBeforeDump / executeAfterDump renamed to executeBeforeProc & executeAfterProc
-# 7.3.1        08.01.2018       fix syntax error for perl < 5.20
-# 7.3.0        07.01.2018       DbRep-charfilter avoid control characters in datasets to export, impfile_Push errortext
-#                               improved, 
-#                               expfile_DoParse changed to use aggregation for split selects in timeslices (avoid heavy 
-#                               memory consumption)
-# 7.2.1        04.01.2018       bugfix month out of range that causes fhem crash
-# 7.2.0        27.12.2017       new attribute "seqDoubletsVariance"
-# 7.1.0        22.12.2017       new attribute timeYearPeriod for reports correspondig to e.g. electricity billing,
-#                               bugfix connection check is running after restart allthough dev is disabled 
-# 7.0.0        18.12.2017       don't set $runtime_string_first,$runtime_string_next,$ts if time/aggregation-attributes 
-#                               not set, change_Push redesigned, new command get blockinginfo, identify if reopen is 
-#                               running on dblog-device and postpone the set-command
-# 6.4.3        17.12.2017       bugfix in delSeqDoublets, fetchrows if datasets contain characters like "' <blank> and s.o.
-# 6.4.2        15.12.2017       change "delSeqDoublets" to respect attribute "limit" (adviceDelete,adviceRemain), 
-#                               commandref revised
-# 6.4.1        13.12.2017       new Attribute "sqlResultFieldSep" for field separate options of sqlCmd result
-# 6.4.0        10.12.2017       prepare module for usage of datetime picker widget (Forum:#35736) 
-# 6.3.2        05.12.2017       make direction of fetchrows switchable ASC <-> DESC by attribute fetchRoute
-# 6.3.1        04.12.2017       fix DBD::mysql::st execute failed: Expression #1 of SELECT list is not in GROUP BY clause
-#                               and contains nonaggregated column 'DEVELfhem.history.TIMESTAMP' which is not functionally 
-#                               dependent on columns in GROUP BY clause; this is incompatible with 
-#                               sql_mode=only_full_group_by  
-#                               Forum:https://forum.fhem.de/index.php/topic,65860.msg725595.html#msg725595 ,
-#                               fix currentfillup_Push PostgreSQL -> use $runtime_string_next as Timestring during current
-#                               insert
-# 6.3.0        04.12.2017       support addition format d:xx h:xx m:xx s:xx for attributes timeDiffToNow, timeOlderThan
-# 6.2.3        04.12.2017       fix localtime(time); (current time deduction) in DbRep_createTimeArray
-# 6.2.2        01.12.2017       support all aggregations for delSeqDoublets, better output filesize when mysql dump finished
-# 6.2.1        30.11.2017       support delSeqDoublets without device,reading is set and support device-devspec, reading list,
-#                               minor fixes in delSeqDoublets
-# 6.2.0        29.11.2017       enhanced command delSeqDoublets by "delete"
-# 6.1.0        29.11.2017       new command delSeqDoublets (adviceRemain,adviceDelete), add Option to LASTCMD
-# 6.0.0        18.11.2017       FTP transfer dumpfile after dump, delete old dumpfiles within Blockingcall (avoid freezes)
-#                               commandref revised, minor fixes
-# 5.8.6        30.10.2017       don't limit attr reading, device if the attr contains a list
-# 5.8.5        19.10.2017       filter unwanted characters in "procinfo"-result 
-# 5.8.4        17.10.2017       DbRep_createSelectSql, DbRep_createDeleteSql, currentfillup_Push switch to devspec 
-# 5.8.3        16.10.2017       change to use DbRep_createSelectSql: minValue,diffValue - DbRep_createDeleteSql: delEntries
-# 5.8.2        15.10.2017       sub DbRep_createTimeArray
-# 5.8.1        15.10.2017       change to use DbRep_createSelectSql: sumValue,averageValue,exportToFile,maxValue
-# 5.8.0        15.10.2017       adapt DbRep_createSelectSql for better performance if time/aggregation not set, 
-#                               can set table as flexible argument for countEntries, fetchrows (default: history),
-#                               minor fixes
-# 5.7.1        13.10.2017       tableCurrentFillup fix for PostgreSQL, commandref revised
-# 5.7.0        09.10.2017       tableCurrentPurge, tableCurrentFillup
-# 5.6.4        05.10.2017       abortFn's adapted to use abortArg (Forum:77472)
-# 5.6.3        01.10.2017       fix crash of fhem due to wrong rmday-calculation if month is changed, Forum:#77328
-# 5.6.2        28.08.2017       commandref revised
-# 5.6.1        18.07.2017       commandref revised, minor fixes
-# 5.6.0        17.07.2017       default timeout changed to 86400, new get-command "procinfo" (MySQL)
-# 5.5.2        16.07.2017       dbmeta_DoParse -> show variables (no global)
-# 5.5.1        16.07.2017       wrong text output in state when restoreMySQL was aborted by timeout
-# 5.5.0        10.07.2017       replace $hash->{dbloghash}{DBMODEL} by $hash->{dbloghash}{MODEL} (DbLog was changed)
-# 5.4.0        03.07.2017       restoreMySQL - restore of csv-files (from dumpServerSide), 
-#                               RestoreRowsHistory/ DumpRowsHistory, Commandref revised
-# 5.3.1        28.06.2017       vacuum for SQLite added, readings enhanced for optimizeTables / vacuum, commandref revised
-# 5.3.0        26.06.2017       change of DbRep_mysqlOptimizeTables, new command optimizeTables
-# 5.2.1        25.06.2017       bugfix in sqlCmd_DoParse (PRAGMA, UTF8, SHOW)
-# 5.2.0        14.06.2017       UTF-8 support for MySQL (fetchrows, srvinfo, expfile, impfile, insert)
-# 5.1.0        13.06.2017       column "UNIT" added to fetchrow result
-# 5.0.6        13.06.2017       add Aria engine to DbRep_mysqlOptimizeTables
-# 5.0.5        12.06.2017       bugfixes in DbRep_DumpAborted, some changes in dumpMySQL, optimizeTablesBeforeDump added to
-#                               mysql_DoDumpServerSide, new reading DumpFileCreatedSize
-# 5.0.4        09.06.2017       some improvements and changes of mysql_DoDump, commandref revised, new attributes 
-#                               executeBeforeDump, executeAfterDump
-# 5.0.3        07.06.2017       mysql_DoDumpServerSide added
-# 5.0.2        06.06.2017       little improvements in mysql_DoDumpClientSide
-# 5.0.1        05.06.2017       dependencies between dumpMemlimit and dumpSpeed created, enhanced verbose 5 logging
-# 5.0.0        04.06.2017       MySQL Dump nonblocking added
-# 4.16.1       22.05.2017       encode json without JSON module, requires at least fhem.pl 14348 2017-05-22 20:25:06Z
-# 4.16.0       22.05.2017       format json as option of sqlResultFormat, state will never be deleted in "DbRep_delread" 
-# 4.15.1       20.05.2017       correction of commandref
-# 4.15.0       17.05.2017       SUM(VALUE),AVG(VALUE) recreated for PostgreSQL, Code reviewed and optimized
-# 4.14.2       16.05.2017       SQL-Statements optimized for Wildcard "%" usage if used, Wildcard "_" isn't supported
-#                               furthermore, "averageValue", "sumValue", "maxValue", "minValue", "countEntries" 
-#                               performance optimized, 
-#                               commandref revised  
-# 4.14.1       16.05.2017       limitation of fetchrows result datasets to 1000 by attr limit 
-# 4.14.0       15.05.2017       UserExitFn added as separate sub (DbRep_userexit) and attr userExitFn defined,
-#                               new subs ReadingsBulkUpdateTimeState, ReadingsBulkUpdateValue, 
-#                               ReadingsSingleUpdateValue, commandref revised
-# 4.13.7       11.05.2017       attribute sqlResultSingleFormat became sqlResultFormat, sqlResultSingle deleted and 
-#                               sqlCmd contains now all format possibilities (separated,mline,sline,table), 
-#                               commandref revised 
-# 4.13.6       10.05.2017       minor changes
-# 4.13.5       09.05.2017       cover dbh prepare in eval to avoid crash (sqlResult_DoParse)
-# 4.13.4       09.05.2017       attribute sqlResultSingleFormat: mline sline table, attribute "allowDeletion" is now
-#                               also valid for sqlResult, sqlResultSingle and delete command is forced
-# 4.13.3       09.05.2017       flexible format of reading SqlResultRow_xxx for proper and sort sequence 
-# 4.13.2       09.05.2017       sqlResult, sqlResultSingle are able to execute delete, insert, update commands
-#                               error corrections
-# 4.13.1       09.05.2017       change substitution in sqlResult, sqlResult_DoParse
-# 4.13.0       09.05.2017       acceptance of viegener change with some corrections (separating lines with ]|[ in Singleline)
-# viegener     07.05.2017       New sets sqlSelect execute arbitrary sql command returning each row as single reading (fields separated with |)
-#                               allowing replacement of timestamp values according to attribute definition --> §timestamp_begin§ etc
-#                               and sqlSelectSingle for executing an sql command returning a single reading (separating lines with §) 
-# 4.12.2       17.04.2017       DbRep_checkUsePK changed
-# 4.12.1       07.04.2017       get tableinfo changed for MySQL
-# 4.12.0       31.03.2017       support of primary key for insert functions
-# 4.11.4       29.03.2017       bugfix timestamp in minValue, maxValue if VALUE contains more than one
-#                               numeric value (like in sysmon)
-# 4.11.3       26.03.2017       usage of daylight saving time changed to avoid wrong selection when wintertime
-#                               switch to summertime, minor bug fixes
-# 4.11.2       16.03.2017       bugfix in func dbmeta_DoParse (SQLITE_DB_FILENAME)
-# 4.11.1       28.02.2017       commandref completed
-# 4.11.0       18.02.2017       added [current|previous]_[month|week|day|hour]_begin and 
-#                               [current|previous]_[month|week|day|hour]_end as options of timestamp
-# 4.10.3       01.02.2017       rename reading "diff-overrun_limit-" to "diff_overrun_limit_", 
-#                               DbRep_collaggstr day aggregation changed back from 4.7.5 change
-# 4.10.2       16.01.2017       bugfix uninitialized value $renmode if RenameAgent
-# 4.10.1       30.11.2016       bugfix importFromFile format problem if UNIT-field wasn't set
-# 4.10         28.12.2016       del_DoParse changed to use Wildcards, del_ParseDone changed to use readingNameMap
-# 4.9          23.12.2016       function readingRename added
-# 4.8.6        17.12.2016       new bugfix group by-clause due to incompatible changes made in MyQL 5.7.5
-#                               (Forum #msg541103)
-# 4.8.5        16.12.2016       bugfix group by-clause due to Forum #msg540610
-# 4.8.4        13.12.2016       added "group by ...,table_schema" to select in dbmeta_DoParse due to Forum #msg539228,
-#                               commandref adapted, changed "not_enough_data_in_period" to "less_data_in_period"
-# 4.8.3        12.12.2016       balance diff to next period if value of period is 0 between two periods with 
-#                               values 
-# 4.8.2        10.12.2016       bugfix negativ diff if balanced
-# 4.8.1        10.12.2016       added balance diff to diffValue, a difference between the last value of an
-#                               old aggregation period to the first value of a new aggregation period will be take over now
-# 4.8          09.12.2016       diffValue selection chenged to "between"
-# 4.7.7        08.12.2016       code review
-# 4.7.6        07.12.2016       DbRep version as internal, check if perl module DBI is installed
-# 4.7.5        05.12.2016       DbRep_collaggstr day aggregation changed
-# 4.7.4        28.11.2016       sub DbRep_calcount changed due to Forum #msg529312
-# 4.7.3        20.11.2016       new diffValue function made suitable to SQLite
-# 4.7.2        20.11.2016       commandref adapted, state = Warnings adapted
-# 4.7.1        17.11.2016       changed fieldlength to DbLog new standard, diffValue state Warnings due to 
-#                               several situations and generate readings not_enough_data_in_period, diff-overrun_limit
-# 4.7          16.11.2016       sub diffValue changed due to Forum #msg520154, attr diffAccept added,
-#                               diffValue now able to calculate if counter was going to 0
-# 4.6.1        01.11.2016       daylight saving time check improved
-# 4.6          31.10.2016       bugfix calc issue due to daylight saving time end (winter time)
-# 4.5.1        18.10.2016       get svrinfo contains SQLite database file size (MB),
-#                               modified timeout routine
-# 4.5          17.10.2016       get data of dbstatus, dbvars, tableinfo, svrinfo (database dependend)
-# 4.4          13.10.2016       get function prepared
-# 4.3          11.10.2016       Preparation of get metadata
-# 4.2          10.10.2016       allow SQL-Wildcards (% _) in attr reading & attr device
-# 4.1.3        09.10.2016       bugfix delEntries running on SQLite
-# 4.1.2        08.10.2016       old device in DEF of connected DbLog device will substitute by renamed device if 
-#                               it is present in DEF 
-# 4.1.1        06.10.2016       NotifyFn is getting events from global AND own device, set is reduced if
-#                               ROLE=Agent, english commandref enhanced
-# 4.1          05.10.2016       DbRep_Attr changed 
-# 4.0          04.10.2016       Internal/Attribute ROLE added, sub DbRep_firstconnect changed 
-#                               NotifyFN activated to start deviceRename if ROLE=Agent
-# 3.13         03.10.2016       added deviceRename to rename devices in database, new Internal DATABASE
-# 3.12         02.10.2016       function minValue added
-# 3.11.1       30.09.2016       bugfix include first and next day in calculation if Timestamp is exactly 'YYYY-MM-DD 00:00:00'
-# 3.11         29.09.2016       maxValue calculation moved to background to reduce FHEM-load
-# 3.10.1       28.09.2016       sub impFile -> changed $dbh->{AutoCommit} = 0 to $dbh->begin_work
-# 3.10         27.09.2016       diffValue calculation moved to background to reduce FHEM-load,
-#                               new reading background_processing_time
-# 3.9.1        27.09.2016       Internal "LASTCMD" added
-# 3.9          26.09.2016       new function importFromFile to import data from file (CSV format)
-# 3.8          16.09.2016       new attr readingPreventFromDel to prevent readings from deletion
-#                               when a new operation starts
-# 3.7.3        11.09.2016       changed format of diffValue-reading if no value was selected
-# 3.7.2        04.09.2016       problem in diffValue fixed if if no value was selected
-# 3.7.1        31.08.2016       Reading "errortext" added, commandref continued, exportToFile changed,
-#                               diffValue changed to fix wrong timestamp if error occur
-# 3.7          30.08.2016       exportToFile added (exports data to file (CSV format)
-# 3.6          29.08.2016       plausibility checks of database column character length
-# 3.5.2        21.08.2016       fit to new commandref style
-# 3.5.1        20.08.2016       commandref continued
-# 3.5          18.08.2016       new attribute timeOlderThan
-# 3.4.4        12.08.2016       current_year_begin, previous_year_begin, current_year_end, previous_year_end
-#                               added as possible values for timestmp attribute
-# 3.4.3        09.08.2016       fields for input using "insert" changed to "date,time,value,unit". Attributes
-#                               device, reading will be used to complete dataset,
-#                               now more informations available about faulty datasets in arithmetic operations
-# 3.4.2        05.08.2016       commandref complemented, fieldlength used in function "insert" trimmed to 32 
-# 3.4.1        04.08.2016       check of numeric value type in functions maxvalue, diffvalue
-# 3.4          03.08.2016       function "insert" added
-# 3.3.3        16.07.2016       bugfix of aggregation=week if month start is 01 and month end is 12 AND 
-#                               the last week of december is "01" like in 2014 (checked in version 11804)
-# 3.3.2        16.07.2016       readings completed with begin of selection range to ensure valid reading order,
-#                               also done if readingNameMap is set
-# 3.3.1        15.07.2016       function "diffValue" changed, write "-" if no value
-# 3.3          12.07.2016       function "diffValue" added
-# 3.2.1        12.07.2016       DbRep_Notify prepared, switched from readingsSingleUpdate to readingsBulkUpdate
-# 3.2          11.07.2016       handling of db-errors is relocated to blockingcall-subs (checked in version 11785)
-# 3.1.1        10.07.2016       state turns to initialized and connected after attr "disabled" is switched from "1" to "0"
-# 3.1          09.07.2016       new Attr "timeDiffToNow" and change subs according to that
-# 3.0          04.07.2016       no selection if timestamp isn't set and aggregation isn't set with fetchrows, delEntries
-# 2.9.9        03.07.2016       english version of commandref completed
-# 2.9.8        01.07.2016       changed fetchrows_ParseDone to handle readingvalues with whitespaces correctly
-# 2.9.7        30.06.2016       moved {DBLOGDEVICE} to {HELPER}{DBLOGDEVICE}
-# 2.9.6        30.06.2016       sql-call changed for countEntries, averageValue, sumValue avoiding
-#                               problems if no timestamp is set and aggregation is set
-# 2.9.5        30.06.2016       format of readingnames changed again (substitute ":" with "-" in time)
-# 2.9.4        30.06.2016       change readingmap to readingNameMap, prove of unsupported characters added
-# 2.9.3        27.06.2016       format of readingnames changed avoiding some problems after restart and splitting
-# 2.9.2        27.06.2016       use Time::Local added, DbRep_firstconnect added
-# 2.9.1        26.06.2016       german commandref added  
-# 2.9          25.06.2016       attributes showproctime, timeout added
-# 2.8.1        24.06.2016       sql-creation of sumValue, maxValue, fetchrows changed 
-#                               main-routine changed
-# 2.8          24.06.2016       function averageValue changed to nonblocking function
-# 2.7.1        24.06.2016       changed blockingcall routines, changed to unique abort-function
-# 2.7          23.06.2016       changed function countEntries to nonblocking
-# 2.6.3        22.06.2016       abort-routines changed, dbconnect-routines changed
-# 2.6.2        21.06.2016       aggregation week corrected
-# 2.6.1        20.06.2016       routine maxval_ParseDone corrected
-# 2.6          31.05.2016       maxValue changed to nonblocking function
-# 2.5.3        31.05.2016       function delEntries changed
-# 2.5.2        31.05.2016       ping check changed, DbRep_Connect changed
-# 2.5.1        30.05.2016       sleep in nb-functions deleted
-# 2.5          30.05.2016       changed to use own $dbh with DbLog-credentials, function sumValue, fetchrows
-# 2.4.2        29.05.2016       function sumValue changed
-# 2.4.1        29.05.2016       function fetchrow changed
-# 2.4          29.05.2016       changed to nonblocking function for sumValue
-# 2.3          28.05.2016       changed sumValue to "prepare" with placeholders
-# 2.2          27.05.2016       changed fetchrow and delEntries function to "prepare" with placeholders
-#                               added nonblocking function for delEntries
-# 2.1          25.05.2016       codechange
-# 2.0          24.05.2016       added nonblocking function for fetchrow
-# 1.2          21.05.2016       function and attribute for delEntries added
-# 1.1          20.05.2016       change result-format of "count", move runtime-counter to sub DbRep_collaggstr
-# 1.0          19.05.2016       Initial
-#
-
 package main;
 
 use strict;                           
 use warnings;
+
+# Versions History intern
+our %DbRep_vNotesIntern = (
+  "8.1.0"  => "02.10.2018  new get versionNotes command ",
+  "8.0.1"  => "20.09.2018  DbRep_getMinTs improved",
+  "8.0.0"  => "11.09.2018  get filesize in DbRep_WriteToDumpFile corrected, restoreMySQL for clientSide dumps, minor fixes ",
+  "7.20.0"  => "04.09.2018  deviceRename can operate a Device name with blank, e.g. 'current balance' as old device name ",
+  "7.19.0"  => "25.08.2018  attribute 'valueFilter' to filter datasets in fetchrows ",
+  "7.18.2"  => "02.08.2018  fix in fetchrow function (forum:#89886), fix highlighting ",
+  "7.18.1"  => "03.06.2018  commandref revised ",
+  "7.18.0"  => "02.06.2018  possible use of y:(\\d) for timeDiffToNow, timeOlderThan , minor fixes of timeOlderThan, delEntries considers executeBeforeDump,executeAfterDump ",
+  "7.17.3"  => "30.04.2017  writeToDB - readingname can be replaced by the value of attribute 'readingNameMap' ",
+  "7.17.2"  => "22.04.2017  fix don't writeToDB if device name contain '.' only, minor fix in DbReadingsVal ",
+  "7.17.1"  => "20.04.2017  fix '§' is deleted by carfilter ",
+  "7.17.0"  => "17.04.2018  new function DbReadingsVal ",
+  "7.16.0"  => "13.04.2018  new function dbValue (blocking) ",
+  "7.15.2"  => "12.04.2018  fix in setting MODEL, prevent fhem from crash if wrong timestamp '0000-00-00' found in db ",
+  "7.15.1"  => "11.04.2018  sqlCmd accept widget textField-long, Internal MODEL is set ",
+  "7.15.0"  => "24.03.2018  new command sqlSpecial ",
+  "7.14.8"  => "21.03.2018  fix no save into database if value=0 (DbRep_OutputWriteToDB) ",
+  "7.14.7"  => "21.03.2018  exportToFile,importFromFile can use file as an argument and executeBeforeDump, executeAfterDump is considered ",
+  "7.14.6"  => "18.03.2018  attribute expimpfile can use some kinds of wildcards (exportToFile, importFromFile adapted) ",
+  "7.14.5"  => "17.03.2018  perl warnings of DbLog \$dn,\$dt,\$evt,\$rd in changeval_Push & complex ",
+  "7.14.4"  => "11.03.2018  increased timeout of BlockingCall in DbRep_firstconnect ",
+  "7.14.3"  => "07.03.2018  DbRep_firstconnect changed - get lowest timestamp in database, DbRep_Connect deleted ",
+  "7.14.2"  => "04.03.2018  fix perl warning ",
+  "7.14.1"  => "01.03.2018  currentfillup_Push bugfix for PostgreSQL ",
+  "7.14.0"  => "26.02.2018  syncStandby ",
+  "7.13.3"  => "25.02.2018  commandref revised (forum:#84953) ",
+  "7.13.2"  => "24.02.2018  DbRep_firstconnect changed, bug fix in DbRep_collaggstr for aggregation = month ",
+  "7.13.1"  => "20.02.2018  commandref revised ",
+  "7.13.0"  => "17.02.2018  changeValue can handle perl code {} as 'new string' ",
+  "7.12.0"  => "16.02.2018  compression of dumpfile, restore of compressed files possible ",
+  "7.11.0"  => "12.02.2018  new command 'repairSQLite' to repair a corrupted SQLite database ",
+  "7.10.0"  => "10.02.2018  bugfix delete attr timeYearPeriod if set other time attributes, new 'changeValue' command ",
+  "7.9.0"  => "09.02.2018  new attribute 'avgTimeWeightMean' (time weight mean calculation), code review of selection routines, maxValue handle negative values correctly, one security second for correct create TimeArray in DbRep_normRelTime ",
+  "7.8.1"  => "04.02.2018  bugfix if IsDisabled (again), code review, bugfix last dataset is not selected if timestamp is fully set ('date time'), fix '\$runtime_string_next' = '\$runtime_string_next.999';' if \$runtime_string_next is part of sql-execute place holder AND contains date+time ",
+  "7.8.0"  => "04.02.2018  new command 'eraseReadings' ", 
+  "7.7.1"  => "03.02.2018  minor fix in DbRep_firstconnect if IsDisabled ",
+  "7.7.0"  => "29.01.2018  attribute 'averageCalcForm', calculation sceme 'avgDailyMeanGWS', 'avgArithmeticMean' for averageValue ",
+  "7.6.1"  => "27.01.2018  new attribute 'sqlCmdHistoryLength' and 'fetchMarkDuplicates' for highlighting multiple datasets by fetchrows ",
+  "7.6.0"  => "26.01.2018  events containing '|' possible in fetchrows & delSeqDoublets, fetchrows displays multiple \$k entries with timestamp suffix \$k (as index), sqlCmdHistory (avaiable if sqlCmd was executed) ",
+  "7.5.5"  => "25.01.2018  minor change in delSeqDoublets ",
+  "7.5.4"  => "24.01.2018  delseqdoubl_DoParse reviewed to optimize memory usage, executeBeforeDump executeAfterDump now available for 'delSeqDoublets' ",
+  "7.5.3"  => "23.01.2018  new attribute 'ftpDumpFilesKeep', version management added to FTP-usage ",
+  "7.5.2"  => "23.01.2018  fix typo DumpRowsCurrrent, dumpFilesKeep can be set to '0', commandref revised ",
+  "7.5.1"  => "20.01.2018  DbRep_DumpDone changed to create background_processing_time before execute 'executeAfterProc' Commandref updated ",
+  "7.5.0"  => "16.01.2018  DbRep_OutputWriteToDB, set options display/writeToDB for (max|min|sum|average|diff)Value ",
+  "7.4.1"  => "14.01.2018  fix old dumpfiles not deleted by dumpMySQL clientSide ",
+  "7.4.0"  => "09.01.2018  dumpSQLite/restoreSQLite, backup/restore now available when DbLog-device has reopen xxxx running, executeBeforeDump executeAfterDump also available for optimizeTables, vacuum, restoreMySQL, restoreSQLite, attribute executeBeforeDump / executeAfterDump renamed to executeBeforeProc & executeAfterProc ",
+  "7.3.1"  => "08.01.2018  fix syntax error for perl < 5.20 ",
+  "7.3.0"  => "07.01.2018  DbRep-charfilter avoid control characters in datasets to export, impfile_Push errortext improved, expfile_DoParse changed to use aggregation for split selects in timeslices (avoid heavy memory consumption) ",
+  "7.2.1"  => "04.01.2018  bugfix month out of range that causes fhem crash ",
+  "7.2.0"  => "27.12.2017  new attribute 'seqDoubletsVariance' ",
+  "7.1.0"  => "22.12.2017  new attribute timeYearPeriod for reports correspondig to e.g. electricity billing, bugfix connection check is running after restart allthough dev is disabled ",
+  "7.0.0"  => "18.12.2017  don't set \$runtime_string_first,\$runtime_string_next,\$ts if time/aggregation-attributes not set, change_Push redesigned, new command get blockinginfo, identify if reopen is running on dblog-device and postpone the set-command ",
+  "6.4.3"  => "17.12.2017  bugfix in delSeqDoublets, fetchrows if datasets contain characters like \"' <blank> and s.o. ",
+  "6.4.2"  => "15.12.2017  change 'delSeqDoublets' to respect attribute 'limit' (adviceDelete,adviceRemain), commandref revised ",
+  "6.4.1"  => "13.12.2017  new Attribute 'sqlResultFieldSep' for field separate options of sqlCmd result ",
+  "6.4.0"  => "10.12.2017  prepare module for usage of datetime picker widget (Forum:#35736) ",
+  "6.3.2"  => "05.12.2017  make direction of fetchrows switchable ASC <-> DESC by attribute fetchRoute ",
+  "6.3.1"  => "04.12.2017  fix DBD::mysql::st execute failed: Expression #1 of SELECT list is not in GROUP BY clause and contains nonaggregated column 'DEVELfhem.history.TIMESTAMP' which is not functionally dependent on columns in GROUP BY clause; this is incompatible with sql_mode=only_full_group_by Forum:https://forum.fhem.de/index.php/topic,65860.msg725595.html#msg725595 , fix currentfillup_Push PostgreSQL -> use \$runtime_string_next as Timestring during current insert ",
+  "6.3.0"  => "04.12.2017  support addition format d:xx h:xx m:xx s:xx for attributes timeDiffToNow, timeOlderThan ",
+  "6.2.3"  => "04.12.2017  fix localtime(time); (current time deduction) in DbRep_createTimeArray ",
+  "6.2.2"  => "01.12.2017  support all aggregations for delSeqDoublets, better output filesize when mysql dump finished ",
+  "6.2.1"  => "30.11.2017  support delSeqDoublets without device,reading is set and support device-devspec, reading list, minor fixes in delSeqDoublets ",
+  "6.2.0"  => "29.11.2017  enhanced command delSeqDoublets by 'delete' ",
+  "6.1.0"  => "29.11.2017  new command delSeqDoublets (adviceRemain,adviceDelete), add Option to LASTCMD ",
+  "6.0.0"  => "18.11.2017  FTP transfer dumpfile after dump, delete old dumpfiles within Blockingcall (avoid freezes) commandref revised, minor fixes ",
+  "5.8.6"  => "30.10.2017  don't limit attr reading, device if the attr contains a list ",
+  "5.8.5"  => "19.10.2017  filter unwanted characters in 'procinfo'-result ",
+  "5.8.4"  => "17.10.2017  DbRep_createSelectSql, DbRep_createDeleteSql, currentfillup_Push switch to devspec ",
+  "5.8.3"  => "16.10.2017  change to use DbRep_createSelectSql: minValue,diffValue - DbRep_createDeleteSql: delEntries ",
+  "5.8.2"  => "15.10.2017  sub DbRep_createTimeArray ",
+  "5.8.1"  => "15.10.2017  change to use DbRep_createSelectSql: sumValue,averageValue,exportToFile,maxValue ",
+  "5.8.0"  => "15.10.2017  adapt DbRep_createSelectSql for better performance if time/aggregation not set, can set table as flexible argument for countEntries, fetchrows (default: history), minor fixes ",
+  "5.7.1"  => "13.10.2017  tableCurrentFillup fix for PostgreSQL, commandref revised ",
+  "5.7.0"  => "09.10.2017  tableCurrentPurge, tableCurrentFillup ",
+  "5.6.4"  => "05.10.2017  abortFn's adapted to use abortArg (Forum:77472) ",
+  "5.6.3"  => "01.10.2017  fix crash of fhem due to wrong rmday-calculation if month is changed, Forum:#77328 ",
+  "5.6.2"  => "28.08.2017  commandref revised ",
+  "5.6.1"  => "18.07.2017  commandref revised, minor fixes ",
+  "5.6.0"  => "17.07.2017  default timeout changed to 86400, new get-command 'procinfo' (MySQL) ",
+  "5.5.2"  => "16.07.2017  dbmeta_DoParse -> show variables (no global) ",
+  "5.5.1"  => "16.07.2017  wrong text output in state when restoreMySQL was aborted by timeout ",
+  "5.5.0"  => "10.07.2017  replace \$hash->{dbloghash}{DBMODEL} by \$hash->{dbloghash}{MODEL} (DbLog was changed) ",
+  "5.4.0"  => "03.07.2017  restoreMySQL - restore of csv-files (from dumpServerSide), RestoreRowsHistory/ DumpRowsHistory, Commandref revised ",
+  "5.3.1"  => "28.06.2017  vacuum for SQLite added, readings enhanced for optimizeTables / vacuum, commandref revised ",
+  "5.3.0"  => "26.06.2017  change of DbRep_mysqlOptimizeTables, new command optimizeTables ",
+  "5.2.1"  => "25.06.2017  bugfix in sqlCmd_DoParse (PRAGMA, UTF8, SHOW) ",
+  "5.2.0"  => "14.06.2017  UTF-8 support for MySQL (fetchrows, srvinfo, expfile, impfile, insert) ",
+  "5.1.0"  => "13.06.2017  column 'UNIT' added to fetchrow result ",
+  "5.0.6"  => "13.06.2017  add Aria engine to DbRep_mysqlOptimizeTables ",
+  "5.0.5"  => "12.06.2017  bugfixes in DbRep_DumpAborted, some changes in dumpMySQL, optimizeTablesBeforeDump added to mysql_DoDumpServerSide, new reading DumpFileCreatedSize ",
+  "5.0.4"  => "09.06.2017  some improvements and changes of mysql_DoDump, commandref revised, new attributes executeBeforeDump, executeAfterDump ",
+  "5.0.3"  => "07.06.2017  mysql_DoDumpServerSide added ",
+  "5.0.2"  => "06.06.2017  little improvements in mysql_DoDumpClientSide ",
+  "5.0.1"  => "05.06.2017  dependencies between dumpMemlimit and dumpSpeed created, enhanced verbose 5 logging ",
+  "5.0.0"  => "04.06.2017  MySQL Dump nonblocking added ",
+  "4.16.1"  => "22.05.2017  encode json without JSON module, requires at least fhem.pl 14348 2017-05-22 20:25:06Z ",
+  "4.16.0"  => "22.05.2017  format json as option of sqlResultFormat, state will never be deleted in 'DbRep_delread' ",
+  "4.15.1"  => "20.05.2017  correction of commandref ",
+  "4.15.0"  => "17.05.2017  SUM(VALUE),AVG(VALUE) recreated for PostgreSQL, Code reviewed and optimized ",
+  "4.14.2"  => "16.05.2017  SQL-Statements optimized for Wildcard '%' usage if used, Wildcard '_' isn't supported furthermore, \"averageValue\", \"sumValue\", \"maxValue\", \"minValue\", \"countEntries\" performance optimized, commandref revised  ",
+  "4.14.1"  => "16.05.2017  limitation of fetchrows result datasets to 1000 by attr limit ",
+  "4.14.0"  => "15.05.2017  UserExitFn added as separate sub (DbRep_userexit) and attr userExitFn defined, new subs ReadingsBulkUpdateTimeState, ReadingsBulkUpdateValue, ReadingsSingleUpdateValue, commandref revised ",
+  "4.13.7"  => "11.05.2017  attribute sqlResultSingleFormat became sqlResultFormat, sqlResultSingle deleted and sqlCmd contains now all format possibilities (separated,mline,sline,table), commandref revised ",
+  "4.13.6"  => "10.05.2017  minor changes ",
+  "4.13.5"  => "09.05.2017  cover dbh prepare in eval to avoid crash (sqlResult_DoParse) ",
+  "4.13.4"  => "09.05.2017  attribute sqlResultSingleFormat: mline sline table, attribute 'allowDeletion' is now also valid for sqlResult, sqlResultSingle and delete command is forced ",
+  "4.13.3"  => "09.05.2017  flexible format of reading SqlResultRow_xxx for proper and sort sequence ",
+  "4.13.2"  => "09.05.2017  sqlResult, sqlResultSingle are able to execute delete, insert, update commands error corrections ",
+  "4.13.1"  => "09.05.2017  change substitution in sqlResult, sqlResult_DoParse ",
+  "4.13.0"  => "09.05.2017  acceptance of viegener change with some corrections (separating lines with ]|[ in Singleline) ",
+  "4.12.3"  => "07.05.2017  New sets sqlSelect execute arbitrary sql command returning each row as single reading (fields separated with |) allowing replacement of timestamp values according to attribute definition --> §timestamp_begin§ etc and sqlSelectSingle for executing an sql command returning a single reading (separating lines with §) ",
+  "4.12.2"  => "17.04.2017  DbRep_checkUsePK changed ",
+  "4.12.1"  => "07.04.2017  get tableinfo changed for MySQL ",
+  "4.12.0"  => "31.03.2017  support of primary key for insert functions ",
+  "4.11.4"  => "29.03.2017  bugfix timestamp in minValue, maxValue if VALUE contains more than one numeric value (like in sysmon) ",
+  "4.11.3"  => "26.03.2017  usage of daylight saving time changed to avoid wrong selection when wintertime switch to summertime, minor bug fixes ",
+  "4.11.2"  => "16.03.2017  bugfix in func dbmeta_DoParse (SQLITE_DB_FILENAME) ",
+  "4.11.1"  => "28.02.2017  commandref completed ",
+  "4.11.0"  => "18.02.2017  added [current|previous]_[month|week|day|hour]_begin and [current|previous]_[month|week|day|hour]_end as options of timestamp ",
+  "4.10.3"  => "01.02.2017  rename reading 'diff-overrun_limit-' to 'diff_overrun_limit_', DbRep_collaggstr day aggregation changed back from 4.7.5 change ",
+  "4.10.2"  => "16.01.2017  bugfix uninitialized value \$renmode if RenameAgent ",
+  "4.10.1"  => "30.11.2016  bugfix importFromFile format problem if UNIT-field wasn't set ",
+  "4.10.0"  => "28.12.2016  del_DoParse changed to use Wildcards, del_ParseDone changed to use readingNameMap ",
+  "4.9.0"  => "23.12.2016  function readingRename added ",
+  "4.8.6"  => "17.12.2016  new bugfix group by-clause due to incompatible changes made in MyQL 5.7.5 (Forum #msg541103) ",
+  "4.8.5"  => "16.12.2016  bugfix group by-clause due to Forum #msg540610 ",
+  "4.8.4"  => "13.12.2016  added 'group by ...,table_schema' to select in dbmeta_DoParse due to Forum #msg539228, commandref adapted, changed 'not_enough_data_in_period' to 'less_data_in_period' ",
+  "4.8.3"  => "12.12.2016  balance diff to next period if value of period is 0 between two periods with values  ",
+  "4.8.2"  => "10.12.2016  bugfix negativ diff if balanced ",
+  "4.8.1"  => "10.12.2016  added balance diff to diffValue, a difference between the last value of an old aggregation period to the first value of a new aggregation period will be take over now ",
+  "4.8.0"  => "09.12.2016  diffValue selection chenged to 'between' ",
+  "4.7.7"  => "08.12.2016  code review ",
+  "4.7.6"  => "07.12.2016  DbRep version as internal, check if perl module DBI is installed ",
+  "4.7.5"  => "05.12.2016  DbRep_collaggstr day aggregation changed ",
+  "4.7.4"  => "28.11.2016  sub DbRep_calcount changed due to Forum #msg529312 ",
+  "4.7.3"  => "20.11.2016  new diffValue function made suitable to SQLite ",
+  "4.7.2"  => "20.11.2016  commandref adapted, state = Warnings adapted ",
+  "4.7.1"  => "17.11.2016  changed fieldlength to DbLog new standard, diffValue state Warnings due to several situations and generate readings not_enough_data_in_period, diff-overrun_limit ",
+  "4.7.0"  => "16.11.2016  sub diffValue changed due to Forum #msg520154, attr diffAccept added, diffValue now able to calculate if counter was going to 0 ",
+  "4.6.0"  => "31.10.2016  bugfix calc issue due to daylight saving time end (winter time) ",
+  "4.5.1"  => "18.10.2016  get svrinfo contains SQLite database file size (MB), modified timeout routine ",
+  "4.5.0"  => "17.10.2016  get data of dbstatus, dbvars, tableinfo, svrinfo (database dependend) ",
+  "4.4.0"  => "13.10.2016  get function prepared ",
+  "4.3.0"  => "11.10.2016  Preparation of get metadata ",
+  "4.2.0"  => "10.10.2016  allow SQL-Wildcards (% _) in attr reading & attr device ",
+  "4.1.3"  => "09.10.2016  bugfix delEntries running on SQLite ",
+  "4.1.2"  => "08.10.2016  old device in DEF of connected DbLog device will substitute by renamed device if it is present in DEF ",
+  "4.1.1"  => "06.10.2016  NotifyFn is getting events from global AND own device, set is reduced if ROLE=Agent, english commandref enhanced ",
+  "4.1.0"  => "05.10.2016  DbRep_Attr changed  ",
+  "4.0.0"  => "04.10.2016  Internal/Attribute ROLE added, sub DbRep_firstconnect changed NotifyFN activated to start deviceRename if ROLE=Agent ",
+  "3.13.0"  => "03.10.2016  added deviceRename to rename devices in database, new Internal DATABASE ",
+  "3.12.0"  => "02.10.2016  function minValue added ",
+  "3.11.1"  => "30.09.2016  bugfix include first and next day in calculation if Timestamp is exactly 'YYYY-MM-DD 00:00:00' ",
+  "3.11.0"  => "29.09.2016  maxValue calculation moved to background to reduce FHEM-load ",
+  "3.10.1"  => "28.09.2016  sub impFile -> changed \$dbh->{AutoCommit} = 0 to \$dbh->begin_work ",
+  "3.10.0"  => "27.09.2016  diffValue calculation moved to background to reduce FHEM-load, new reading background_processing_time ",
+  "3.9.1"  => "27.09.2016  Internal 'LASTCMD' added ",
+  "3.9.0"  => "26.09.2016  new function importFromFile to import data from file (CSV format) ",
+  "3.8.0"  => "16.09.2016  new attr readingPreventFromDel to prevent readings from deletion when a new operation starts ",
+  "3.7.3"  => "11.09.2016  changed format of diffValue-reading if no value was selected ",
+  "3.7.2"  => "04.09.2016  problem in diffValue fixed if if no value was selected ",
+  "3.7.1"  => "31.08.2016  Reading 'errortext' added, commandref continued, exportToFile changed, diffValue changed to fix wrong timestamp if error occur ",
+  "3.7.0"  => "30.08.2016  exportToFile added exports data to file (CSV format) ",
+  "3.6.0"  => "29.08.2016  plausibility checks of database column character length ",
+  "3.5.2"  => "21.08.2016  fit to new commandref style ",
+  "3.5.1"  => "20.08.2016  commandref continued ",
+  "3.5.0"  => "18.08.2016  new attribute timeOlderThan ",
+  "3.4.4"  => "12.08.2016  current_year_begin, previous_year_begin, current_year_end, previous_year_end added as possible values for timestmp attribute ",
+  "3.4.3"  => "09.08.2016  fields for input using 'insert' changed to 'date,time,value,unit'. Attributes device, reading will be used to complete dataset, now more informations available about faulty datasets in arithmetic operations ",
+  "3.4.2"  => "05.08.2016  commandref complemented, fieldlength used in function 'insert' trimmed to 32 ",
+  "3.4.1"  => "04.08.2016  check of numeric value type in functions maxvalue, diffvalue ",
+  "3.4.0"  => "03.08.2016  function 'insert' added ",
+  "3.3.3"  => "16.07.2016  bugfix of aggregation=week if month start is 01 and month end is 12 AND the last week of december is '01' like in 2014 (checked in version 11804) ",
+  "3.3.2"  => "16.07.2016  readings completed with begin of selection range to ensure valid reading order, also done if readingNameMap is set ",
+  "3.3.1"  => "15.07.2016  function 'diffValue' changed, write '-' if no value ",
+  "3.3.0"  => "12.07.2016  function 'diffValue' added ",
+  "3.2.1"  => "12.07.2016  DbRep_Notify prepared, switched from readingsSingleUpdate to readingsBulkUpdate ",
+  "3.2.0"  => "11.07.2016  handling of db-errors is relocated to blockingcall-subs (checked in version 11785) ",
+  "3.1.1"  => "10.07.2016  state turns to initialized and connected after attr 'disabled' is switched from '1' to '0' ",
+  "3.1.0"  => "09.07.2016  new Attr 'timeDiffToNow' and change subs according to that ",
+  "3.0.0"  => "04.07.2016  no selection if timestamp isn't set and aggregation isn't set with fetchrows, delEntries ",
+  "2.9.9"  => "03.07.2016  english version of commandref completed ",
+  "2.9.8"  => "01.07.2016  changed fetchrows_ParseDone to handle readingvalues with whitespaces correctly ",
+  "2.9.7"  => "30.06.2016  moved {DBLOGDEVICE} to {HELPER}{DBLOGDEVICE} ",
+  "2.9.6"  => "30.06.2016  sql-call changed for countEntries, averageValue, sumValue avoiding problems if no timestamp is set and aggregation is set ",
+  "2.9.5"  => "30.06.2016  format of readingnames changed again (substitute ':' with '-' in time) ",
+  "2.9.4"  => "30.06.2016  change readingmap to readingNameMap, prove of unsupported characters added ",
+  "2.9.3"  => "27.06.2016  format of readingnames changed avoiding some problems after restart and splitting ",
+  "2.9.2"  => "27.06.2016  use Time::Local added, DbRep_firstconnect added ",
+  "2.9.1"  => "26.06.2016  german commandref added   ",
+  "2.9.0"  => "25.06.2016  attributes showproctime, timeout added ",
+  "2.8.1"  => "24.06.2016  sql-creation of sumValue, maxValue, fetchrows changed main-routine changed ",
+  "2.8.0"  => "24.06.2016  function averageValue changed to nonblocking function ",
+  "2.7.1"  => "24.06.2016  changed blockingcall routines, changed to unique abort-function ",
+  "2.7.0"  => "23.06.2016  changed function countEntries to nonblocking ",
+  "2.6.3"  => "22.06.2016  abort-routines changed, dbconnect-routines changed ",
+  "2.6.2"  => "21.06.2016  aggregation week corrected ",
+  "2.6.1"  => "20.06.2016  routine maxval_ParseDone corrected ",
+  "2.6.0"  => "31.05.2016  maxValue changed to nonblocking function ",
+  "2.5.3"  => "31.05.2016  function delEntries changed ",
+  "2.5.2"  => "31.05.2016  ping check changed, DbRep_Connect changed ",
+  "2.5.1"  => "30.05.2016  sleep in nb-functions deleted ",
+  "2.5.0"  => "30.05.2016  changed to use own \$dbh with DbLog-credentials, function sumValue, fetchrows ",
+  "2.4.2"  => "29.05.2016  function sumValue changed ",
+  "2.4.1"  => "29.05.2016  function fetchrow changed ",
+  "2.4.0"  => "29.05.2016  changed to nonblocking function for sumValue ",
+  "2.3.0"  => "28.05.2016  changed sumValue to 'prepare' with placeholders ",
+  "2.2.0"  => "27.05.2016  changed fetchrow and delEntries function to 'prepare' with placeholders added nonblocking function for delEntries ",
+  "2.1.0"  => "25.05.2016  codechange ",
+  "2.0.0"  => "24.05.2016  added nonblocking function for fetchrow ",
+  "1.2.0"  => "21.05.2016  function and attribute for delEntries added ",
+  "1.1.0"  => "20.05.2016  change result-format of 'count', move runtime-counter to sub DbRep_collaggstr ",
+  "1.0.0"  => "19.05.2016  Initial"
+);
+
+# Versions History extern:
+our %DbRep_vNotesExtern = (
+  "8.1.0"  => "01.10.2018 new get versionNotes command ",
+  "8.0.0"  => "11.09.2018 get filesize in DbRep_WriteToDumpFile corrected, restoreMySQL for clientSide dumps, minor fixes ",
+  "7.20.0"  => "04.09.2018 deviceRename can operate a Device name with blank, e.g. 'current balance' as old device name ",
+  "7.19.0"  => "25.08.2018 attribute 'valueFilter' to filter datasets in fetchrows ",
+  "7.18.2"  => "02.08.2018 fix in fetchrow function (forum:#89886), fix highlighting ",
+  "7.18.0"  => "02.06.2018 possible use of y:(\\d) for timeDiffToNow, timeOlderThan , minor fixes of timeOlderThan, delEntries considers executeBeforeDump,executeAfterDump ",
+  "7.17.3"  => "30.04.2017 writeToDB - readingname can be replaced by the value of attribute 'readingNameMap' ",
+  "7.17.0"  => "17.04.2018 new function DbReadingsVal ",
+  "7.16.0"  => "13.04.2018 new function dbValue (blocking) ",
+  "7.15.2"  => "12.04.2018 fix in setting MODEL, prevent fhem from crash if wrong timestamp '0000-00-00' found in db ",
+  "7.15.1"  => "11.04.2018 sqlCmd accept widget textField-long, Internal MODEL is set ",
+  "7.15.0"  => "24.03.2018 new command sqlSpecial ",
+  "7.14.7"  => "21.03.2018 exportToFile,importFromFile can use file as an argument and executeBeforeDump, executeAfterDump is considered ",
+  "7.14.6"  => "18.03.2018 attribute expimpfile can use some kinds of wildcards (exportToFile, importFromFile adapted) ",
+  "7.14.3"  => "07.03.2018 DbRep_firstconnect changed - get lowest timestamp in database, DbRep_Connect deleted ",
+  "7.14.0"  => "26.02.2018 new syncStandby command",
+  "7.12.0"  => "16.02.2018 compression of dumpfile, restore of compressed files possible ",
+  "7.11.0"  => "12.02.2018 new command 'repairSQLite' to repair a corrupted SQLite database ",
+  "7.10.0"  => "10.02.2018 bugfix delete attr timeYearPeriod if set other time attributes, new 'changeValue' command ",
+  "7.9.0"  => "09.02.2018 new attribute 'avgTimeWeightMean' (time weight mean calculation), code review of selection routines, maxValue handle negative values correctly, one security second for correct create TimeArray in DbRep_normRelTime ",
+  "7.8.1"  => "04.02.2018 bugfix if IsDisabled (again), code review, bugfix last dataset is not selected if timestamp is fully set ('date time'), fix '\$runtime_string_next' = '\$runtime_string_next.999';' if \$runtime_string_next is part of sql-execute place holder AND contains date+time ",
+  "7.8.0"  => "04.02.2018 new command 'eraseReadings' ", 
+  "7.7.1"  => "03.02.2018 minor fix in DbRep_firstconnect if IsDisabled ",
+  "7.7.0"  => "29.01.2018 attribute 'averageCalcForm', calculation sceme 'avgDailyMeanGWS', 'avgArithmeticMean' for averageValue ",
+  "7.6.1"  => "27.01.2018 new attribute 'sqlCmdHistoryLength' and 'fetchMarkDuplicates' for highlighting multiple datasets by fetchrows ",
+  "7.5.3"  => "23.01.2018 new attribute 'ftpDumpFilesKeep', version management added to FTP-usage ",
+  "7.4.1"  => "14.01.2018 fix old dumpfiles not deleted by dumpMySQL clientSide ",
+  "7.4.0"  => "09.01.2018 dumpSQLite/restoreSQLite, backup/restore now available when DbLog-device has reopen xxxx running, executeBeforeDump executeAfterDump also available for optimizeTables, vacuum, restoreMySQL, restoreSQLite, attribute executeBeforeDump / executeAfterDump renamed to executeBeforeProc & executeAfterProc ",
+  "7.3.1"  => "08.01.2018 fix syntax error for perl < 5.20 ",
+  "7.1.0"  => "22.12.2017 new attribute timeYearPeriod for reports correspondig to e.g. electricity billing, bugfix connection check is running after restart allthough dev is disabled ",
+  "6.4.1"  => "13.12.2017 new Attribute 'sqlResultFieldSep' for field separate options of sqlCmd result ",
+  "6.4.0"  => "10.12.2017 prepare module for usage of datetime picker widget (Forum:#35736) ",
+  "6.1.0"  => "29.11.2017 new command delSeqDoublets (adviceRemain,adviceDelete), add Option to LASTCMD ",
+  "6.0.0"  => "18.11.2017 FTP transfer dumpfile after dump, delete old dumpfiles within Blockingcall (avoid freezes) commandref revised, minor fixes ",
+  "5.6.4"  => "05.10.2017 abortFn's adapted to use abortArg (Forum:77472) ",
+  "5.6.3"  => "01.10.2017 fix crash of fhem due to wrong rmday-calculation if month is changed, Forum:#77328 ",
+  "5.6.0"  => "17.07.2017 default timeout changed to 86400, new get-command 'procinfo' (MySQL) ",
+  "5.4.0"  => "03.07.2017 restoreMySQL - restore of csv-files (from dumpServerSide), RestoreRowsHistory/ DumpRowsHistory, Commandref revised ",
+  "5.3.1"  => "28.06.2017 vacuum for SQLite added, readings enhanced for optimizeTables / vacuum, commandref revised ",
+  "5.3.0"  => "26.06.2017 change of DbRep_mysqlOptimizeTables, new command optimizeTables ",
+  "5.0.6"  => "13.06.2017 add Aria engine to DbRep_mysqlOptimizeTables ",
+  "5.0.3"  => "07.06.2017 mysql_DoDumpServerSide added ",
+  "5.0.1"  => "05.06.2017 dependencies between dumpMemlimit and dumpSpeed created, enhanced verbose 5 logging ",
+  "5.0.0"  => "04.06.2017 MySQL Dump nonblocking added ",
+  "4.16.1"  => "22.05.2017 encode json without JSON module, requires at least fhem.pl 14348 2017-05-22 20:25:06Z ",
+  "4.14.1"  => "16.05.2017 limitation of fetchrows result datasets to 1000 by attr limit ",
+  "4.14.0"  => "15.05.2017 UserExitFn added as separate sub (DbRep_userexit) and attr userExitFn defined, new subs ReadingsBulkUpdateTimeState, ReadingsBulkUpdateValue, ReadingsSingleUpdateValue, commandref revised ",
+  "4.13.4"  => "09.05.2017 attribute sqlResultSingleFormat: mline sline table, attribute 'allowDeletion' is now also valid for sqlResult, sqlResultSingle and delete command is forced ",
+  "4.13.2"  => "09.05.2017 sqlResult, sqlResultSingle are able to execute delete, insert, update commands error corrections ",
+  "4.12.0"  => "31.03.2017 support of primary key for insert functions ",
+  "4.11.4"  => "29.03.2017 bugfix timestamp in minValue, maxValue if VALUE contains more than one numeric value (like in sysmon) ",
+  "4.11.3"  => "26.03.2017 usage of daylight saving time changed to avoid wrong selection when wintertime switch to summertime, minor bug fixes ",
+  "4.11.2"  => "16.03.2017 bugfix in func dbmeta_DoParse (SQLITE_DB_FILENAME) ",
+  "4.11.0"  => "18.02.2017 added [current|previous]_[month|week|day|hour]_begin and [current|previous]_[month|week|day|hour]_end as options of timestamp ",
+  "4.10.2"  => "16.01.2017 bugfix uninitialized value \$renmode if RenameAgent ",
+  "4.10.1"  => "30.11.2016 bugfix importFromFile format problem if UNIT-field wasn't set ",
+  "4.9.0"  => "23.12.2016 function readingRename added ",
+  "4.8.6"  => "17.12.2016 new bugfix group by-clause due to incompatible changes made in MyQL 5.7.5 (Forum #msg541103) ",
+  "4.8.5"  => "16.12.2016 bugfix group by-clause due to Forum #msg540610 ",
+  "4.7.6"  => "07.12.2016 DbRep version as internal, check if perl module DBI is installed ",
+  "4.7.4"  => "28.11.2016 sub DbRep_calcount changed due to Forum #msg529312 ",
+  "4.7.3"  => "20.11.2016 new diffValue function made suitable to SQLite ",
+  "4.6.0"  => "31.10.2016 bugfix calc issue due to daylight saving time end (winter time) ",
+  "4.5.1"  => "18.10.2016 get svrinfo contains SQLite database file size (MB), modified timeout routine ",
+  "4.2.0"  => "10.10.2016 allow SQL-Wildcards (% _) in attr reading & attr device ",
+  "4.1.3"  => "09.10.2016 bugfix delEntries running on SQLite ",
+  "3.13.0"  => "03.10.2016 added deviceRename to rename devices in database, new Internal DATABASE ",
+  "3.12.0"  => "02.10.2016 function minValue added ",
+  "3.11.1"  => "30.09.2016 bugfix include first and next day in calculation if Timestamp is exactly 'YYYY-MM-DD 00:00:00' ",
+  "3.9.0"  => "26.09.2016 new function importFromFile to import data from file (CSV format) ",
+  "3.8.0"  => "16.09.2016 new attr readingPreventFromDel to prevent readings from deletion when a new operation starts ",
+  "3.7.2"  => "04.09.2016 problem in diffValue fixed if if no value was selected ",
+  "3.7.1"  => "31.08.2016 Reading 'errortext' added, commandref continued, exportToFile changed, diffValue changed to fix wrong timestamp if error occur ",
+  "3.7.0"  => "30.08.2016 exportToFile added exports data to file (CSV format) ",
+  "3.5.0"  => "18.08.2016 new attribute timeOlderThan ",
+  "3.4.4"  => "12.08.2016 current_year_begin, previous_year_begin, current_year_end, previous_year_end added as possible values for timestamp attribute ",
+  "3.4.0"  => "03.08.2016 function 'insert' added ",
+  "3.3.1"  => "15.07.2016 function 'diffValue' changed, write '-' if no value ",
+  "3.3.0"  => "12.07.2016 function 'diffValue' added ",
+  "3.1.1"  => "10.07.2016 state turns to initialized and connected after attr 'disabled' is switched from '1' to '0' ",
+  "3.1.0"  => "09.07.2016 new Attr 'timeDiffToNow' and change subs according to that ",
+  "3.0.0"  => "04.07.2016 no selection if timestamp isn't set and aggregation isn't set with fetchrows, delEntries ",
+  "2.9.8"  => "01.07.2016 changed fetchrows_ParseDone to handle readingvalues with whitespaces correctly ",
+  "2.9.5"  => "30.06.2016 format of readingnames changed again (substitute ':' with '-' in time) ",
+  "2.9.4"  => "30.06.2016 change readingmap to readingNameMap, prove of unsupported characters added ",
+  "2.9.3"  => "27.06.2016 format of readingnames changed avoiding some problems after restart and splitting ",
+  "2.9.0"  => "25.06.2016 attributes showproctime, timeout added ",
+  "2.8.0"  => "24.06.2016 function averageValue changed to nonblocking function ",
+  "2.7.0"  => "23.06.2016 changed function countEntries to nonblocking ",
+  "2.6.2"  => "21.06.2016 aggregation week corrected ",
+  "2.6.1"  => "20.06.2016 routine maxval_ParseDone corrected ",
+  "2.6.0"  => "31.05.2016 maxValue changed to nonblocking function ",
+  "2.4.0"  => "29.05.2016 changed to nonblocking function for sumValue ",
+  "2.0.0"  => "24.05.2016 added nonblocking function for fetchrow ",
+  "1.2.0"  => "21.05.2016 function and attribute for delEntries added ",
+  "1.0.0"  => "19.05.2016 Initial"
+);
+
+# Hint Hash
+our %DbRep_vHintsExt = (
+  "1" => "Some helpful <a href=\"https://wiki.fhem.de/wiki/DbRep_-_Reporting_und_Management_von_DbLog-Datenbankinhalten#Praxisbeispiele_.2F_Hinweise_und_L.C3.B6sungsans.C3.A4tze_f.C3.BCr_verschiedene_Aufgaben\">FHEM-Wiki</a> Entries"
+);
+
 use POSIX qw(strftime);
 use Time::HiRes qw(gettimeofday tv_interval);
 use Scalar::Util qw(looks_like_number);
@@ -456,7 +488,7 @@ sub DbRep_Define($@) {
   $hash->{ROLE}                = AttrVal($name, "role", "Client");
   $hash->{MODEL}               = $hash->{ROLE};
   $hash->{HELPER}{DBLOGDEVICE} = $a[2];
-  $hash->{VERSION}             = $DbRepVersion;
+  $hash->{VERSION}             = (reverse sort(keys %DbRep_vNotesIntern))[0];
   $hash->{NOTIFYDEV}           = "global,".$name;                     # nur Events dieser Devices an DbRep_Notify weiterleiten 
   my $dbconn                   = $defs{$a[2]}{dbconn};
   $hash->{DATABASE}            = (split(/;|=/, $dbconn))[1];
@@ -912,7 +944,8 @@ sub DbRep_Get($@) {
                 (($dbmodel eq "MYSQL")?"dbstatus:noArg ":"").
                 (($dbmodel eq "MYSQL")?"tableinfo:noArg ":"").
 				(($dbmodel eq "MYSQL")?"procinfo:noArg ":"").
-                (($dbmodel eq "MYSQL")?"dbvars:noArg ":"") 
+                (($dbmodel eq "MYSQL")?"dbvars:noArg ":"").
+                "versionNotes:noArg "                
                 ;
   
   return if(IsDisabled($name));
@@ -966,6 +999,61 @@ sub DbRep_Get($@) {
       }  
       my ($err,$ret) = DbRep_dbValue($name,$sqlcmd);
       return $err?$err:$ret;
+  
+  } elsif ($opt =~ /versionNotes/) {
+	  my $header  = "<b>Module release information table</b><br>";
+      my $header1 = "<b>Helpful hints</b><br>";
+	  
+	  # Ausgabetabelle erstellen
+	  my ($ret,$val0,$val1);
+	  $ret  = "<html>";
+	  $ret .= sprintf("<div class=\"makeTable wide\"; style=\"text-align:left\">$header <br>");
+	  $ret .= "<table class=\"block wide internals\">";
+	  $ret .= "<tbody>";
+	  $ret .= "<tr class=\"even\">";
+	  my $i = 0;
+	  foreach my $key (reverse sort(keys %DbRep_vNotesExtern)) {
+		  ($val0,$val1) = split(/\s/,$DbRep_vNotesExtern{$key},2);
+		  $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0  </td><td>$val1</td>" );
+		  $ret .= "</tr>";
+          $i++;
+          if ($i & 1) {
+              # $i ist ungerade
+		      $ret .= "<tr class=\"odd\">";
+          } else {
+              $ret .= "<tr class=\"even\">";
+          }
+	  }
+	  $ret .= "</tr>";
+	  $ret .= "</tbody>";
+	  $ret .= "</table>";
+	  $ret .= "</div>";
+          
+	  $ret .= sprintf("<div class=\"makeTable wide\"; style=\"text-align:left\">$header1 <br>");
+	  $ret .= "<table class=\"block wide internals\">";
+	  $ret .= "<tbody>";
+	  $ret .= "<tr class=\"even\">";          
+	  $i = 0;
+	  foreach my $key (reverse sort(keys %DbRep_vHintsExt)) {
+		  $val0 = $DbRep_vHintsExt{$key};
+		  $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0</td>" );
+		  $ret .= "</tr>";
+          $i++;
+          if ($i & 1) {
+              # $i ist ungerade
+		      $ret .= "<tr class=\"odd\">";
+          } else {
+              $ret .= "<tr class=\"even\">";
+          }
+	  }
+
+	  $ret .= "</tr>";
+	  $ret .= "</tbody>";
+	  $ret .= "</table>";
+	  $ret .= "</div>";
+	  $ret .= "</html>";
+					
+	return $ret;
   
   } else {
       return "$getlist";
