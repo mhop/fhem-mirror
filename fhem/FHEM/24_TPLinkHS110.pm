@@ -105,11 +105,12 @@ sub TPLinkHS110_Get($$)
 	        Type     => SOCK_STREAM,
        		Timeout  => $hash->{TIMEOUT} )
 	        or return "Couldn't connect to $remote_host:$remote_port: $@\n";
-	$socket->send($c);
-	my $data;
-	my $retval = $socket->recv($data,8192);
+	$socket->write($c);
+    IO::Socket::Timeout->enable_timeouts_on($socket);
+    $socket->read_timeout(.5);
+    my $data;
+    $data = <$socket>;
 	$socket->close();
-	unless( defined $retval) { return undef; }
 	
     readingsBeginUpdate($hash);
     $data = decrypt(substr($data,4));
@@ -153,11 +154,12 @@ sub TPLinkHS110_Get($$)
 		        Type     => SOCK_STREAM,
 	       		Timeout  => $hash->{TIMEOUT} )
 		        or return "Couldn't connect to $remote_host:$remote_port: $@\n";
-		$socket->send($rc);
-		my $rdata;
-		$retval = $socket->recv($rdata,8192);
-		$socket->close();
-		unless( defined $retval) { return undef; }
+		$socket->write($rc);
+        $socket->write($c);
+        IO::Socket::Timeout->enable_timeouts_on($socket);
+        $socket->read_timeout(.5);
+        my $rdata;
+        $rdata = <$socket>;
 		$rdata = decrypt(substr($rdata,4));
 
 		if (length($rdata)==0) {
@@ -169,7 +171,9 @@ sub TPLinkHS110_Get($$)
         if(!$success) {
             readingsEndUpdate($hash, 1);
 			return; 
-		}
+		} else {
+            Log3 $hash, 1, "TPLinkHS110: $name Realtime data updated";
+        }
 		
 		my %emeterReadings = ();
 
@@ -202,13 +206,16 @@ sub TPLinkHS110_Get($$)
 		        Type     => SOCK_STREAM,
 	       		Timeout  => $hash->{TIMEOUT} )
 		        or return "Couldn't connect to $remote_host:$remote_port: $@\n";
-		$socket->send($c);
-		my $data;
-		$retval = $socket->recv($data,8192);
+		$socket->write($c);
+        IO::Socket::Timeout->enable_timeouts_on($socket);
+        $socket->read_timeout(.5);
+        my $data;
+        $data = <$socket>;
 		$socket->close();
-		unless( defined $retval) { return undef; }
 		$data = decrypt(substr($data,4));
-        
+
+        Log3 $hash, 3, "TPLinkHS110: $name Updating daystat. Data: " . $data;
+
         ($success,$json) = TPLinkHS110__evaljson($name,$data);
         if($success && $json) {
 			my $total=0;
@@ -232,11 +239,16 @@ sub TPLinkHS110_Get($$)
 			$count = @{$json->{'emeter'}->{'get_daystat'}->{'day_list'}};
 			readingsBulkUpdate($hash, "monthly_total", $total);
 			if ($count) { readingsBulkUpdate($hash, "daily_average", $total/$count)};
+            Log3 $hash, 1, "TPLinkHS110: $name Daystat updated";
         } else {
+            Log3 $hash, 1, "TPLinkHS110: $name Error updating daystat. Success: " . $success . ", json: " . $json;
+            Log3 $hash, 3, "TPLinkHS110: $name Updating readings";
             readingsEndUpdate($hash, 1);
-			return;       
+            Log3 $hash, 3, "TPLinkHS110: $name Get end";
+			return;
         }
 	}
+    Log3 $hash, 3, "TPLinkHS110: $name Updating readings";
 	readingsEndUpdate($hash, 1);
 	Log3 $hash, 3, "TPLinkHS110: $name Get end";
 }
@@ -275,11 +287,12 @@ sub TPLinkHS110_Set($$)
 	        Type     => SOCK_STREAM,
        		Timeout  => $hash->{TIMEOUT})
 	        or return "Couldn't connect to $remote_host:$remote_port: $@\n";
-	$socket->send($c);
-	my $data;
-	my $retval = $socket->recv($data,8192);
+	$socket->write($c);
+    IO::Socket::Timeout->enable_timeouts_on($socket);
+    $socket->read_timeout(.5);
+    my $data;
+    $data = <$socket>;
 	$socket->close();
-	unless( defined $retval) { return undef; }
     
     readingsBeginUpdate($hash);
 	$data = decrypt(substr($data,4));
@@ -365,11 +378,12 @@ sub TPLinkHS110_Attr {
 		        Type     => SOCK_STREAM,
 	       		Timeout  => $hash->{TIMEOUT} )
 		        or return "Couldn't connect to $remote_host:$remote_port: $@\n";
-		$socket->send($c);
-		my $data;
-		my $retval = $socket->recv($data,8192);
+        $socket->write($c);
+        IO::Socket::Timeout->enable_timeouts_on($socket);
+        $socket->read_timeout(.5);
+        my $data;
+        $data = <$socket>;
 		$socket->close();
-		unless( defined $retval) { return undef; }
 		$data = decrypt(substr($data,4));
 		my $json;
 		eval {
