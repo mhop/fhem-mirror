@@ -3264,7 +3264,7 @@ DOIF_Get($@)
 
 package DOIF;
 
-use Date::Parse qw(str2time);
+#use Date::Parse qw(str2time);
 use Time::HiRes qw(gettimeofday);
 
 sub DOIF_ExecTimer
@@ -3552,7 +3552,7 @@ Das Modul verfügt über zwei Modi: FHEM-Modus und <a href="#DOIF_Perl_Modus"><b
 (FHEM-Modus beginnt mit einer runden Klammer auf).
 Der Perl-Modus kommt weitgehend ohne Attribute aus, er ist aufgrund seiner Flexibilität,
 der Möglichkeit strukturiert zu programmieren und seiner hohen Performance insb. bei umfangreichen Automatisierungsaufgaben dem FHEM-Modus vorzuziehen. Hier geht´s zum <a href="#DOIF_Perl_Modus"><b>Perl-Modus</b></a>.
-Beide Modi sind innerhalb eines DOIF-Devices nicht miteinander kombinierbar. Im Folgendem wird der FHEM-Modus beschrieben.<br> 
+Beide Modi sind innerhalb eines DOIF-Devices nicht miteinander kombinierbar.<br> 
 <br>
 Syntax FHEM-Modus:<br>
 <br>
@@ -3566,9 +3566,8 @@ für das die dazugehörige Bedingung in der abgearbeiteten Reihenfolge wahr ist.
 Das DOIF-Modul arbeitet mit Zuständen. Jeder Ausführungszweig DOIF/DOELSEIF..DOELSEIF/DOELSE stellt einen eigenen Zustand dar (cmd_1, cmd_2, usw.).
 Das Modul merkt sich den zuletzt ausgeführten Ausführungszweig und wiederholt diesen standardmäßig nicht.
 Ein Ausführungszweig wird erst dann wieder ausgeführt, wenn zwischenzeitlich ein anderer Ausführungszweig ausgeführt wurde, also ein Statuswechsel des DOIF-Moduls stattgefunden hat.
-Dieses Verhalten ist sinnvoll, um zu verhindern, dass zyklisch sendende Sensoren (Temperatur, Feuchtigkeit, Helligkeit, usw.) zu ständiger Wiederholung des selben Befehls oder Befehlsabfolge führen.<br>
+Dieses Verhalten ist sinnvoll, um zu verhindern, dass zyklisch sendende Sensoren (Temperatur, Feuchtigkeit, Helligkeit, usw.) zu ständiger Wiederholung des selben Befehls oder Befehlsabfolge führen.
 Das Verhalten des Moduls im FHEM-Modus kann durch diverse Attribute verändert werden. Im FHEM-Modus wird maximal nur ein Zweig pro Ereignis- oder Zeit-Trigger ausgeführt, es gibt nur einen Wait-Timer.<br>
-
 <br>
 <a name="DOIF_Einfache_Anwendungsbeispiele"></a>
 <u>Einfache Anwendungsbeispiele (vgl. <a href="#DOIF_Einfache_Anwendungsbeispiele_Perl">Anwendungsbeispiele im Perl-Modus</a>):</u><ol>
@@ -3589,7 +3588,7 @@ Eine ausführliche Erläuterung der obigen Anwendungsbeispiele kann hier nachgel
 <a href="https://wiki.fhem.de/wiki/DOIF/Einsteigerleitfaden,_Grundfunktionen_und_Erl%C3%A4uterungen#Erste_Schritte_mit_DOIF:_Zeit-_und_Ereignissteuerung">Erste Schritte mit DOIF</a><br><br>
 <br>
 <a name="DOIF_Inhaltsuebersicht"></a>
-<b>Inhaltsübersicht</b><br>
+<b>Inhaltsübersicht</b> (Beispiele im Perl-Modus sind besonders gekennzeichnet)<br>
 <ul><br>
   <a href="#DOIF_Lesbarkeit_der_Definitionen">Lesbarkeit der Definitionen</a><br>
   <a href="#DOIF_Ereignissteuerung">Ereignissteuerung</a><br>
@@ -3641,9 +3640,6 @@ Eine ausführliche Erläuterung der obigen Anwendungsbeispiele kann hier nachgel
   <a href="https://wiki.fhem.de/wiki/DOIF">DOIF im FHEM-Wiki</a><br>
   <a href="https://forum.fhem.de/index.php/board,73.0.html">DOIF im FHEM-Forum</a><br>
   <a href="#DOIF_Kurzreferenz">Kurzreferenz</a><br>
-  <a href="#DOIF_PerlFunktionen_kurz">Perl-Funktionen</a><br>
-  <a href="#DOIF_Perl_Modus">DOIF Perl-Modus</a><br>
-  <a href="#DOIF_Einfache_Anwendungsbeispiele_Perl">Anwendungsbeispiele im Perl-Modus</a><br>
 <!-- Vorlage Inhaltsübersicht und Sprungmarke-->
   <a href="#DOIF_"></a><br>
 <a name="DOIF_"></a>
@@ -3705,36 +3701,45 @@ Das Modul unterstützt dazu Einrückungen, Zeilenumbrüche an beliebiger Stelle 
 Die Formatierungen lassen sich im DEF-Editor der Web-Oberfläche vornehmen.<br>
 <br>
 So könnte eine Definition aussehen:<br>
+<table>
+<tr><td><code>define di_Modul DOIF ([Switch1] eq "on" and [Switch2] eq "on")</code></td><td>&nbsp;<code>## wenn Schalter 1 und Schalter 2 on ist</code><br></td></tr>
+<tr><td><ol><code>(set lamp on)</code>                                                    </td><td>&nbsp;<code>## wird Lampe eingeschaltet</code></ol></td></tr>
+<tr><td><code>DOELSE</code>                                                               </td><td>&nbsp;<code>## im sonst-Fall, also wenn einer der Schalter off ist</code><br></td></tr>
+<tr><td><ol><code>(set lamp off)</code>                                                   </td><td>&nbsp;<code>## wird die Lampe ausgeschaltet</code></ol></td></tr>
 <br>
-<code>define di_Modul DOIF ([Switch1] eq "on" and [Switch2] eq "on")  ## wenn Schalter 1 und Schalter 2 on ist<br>
-<br>
-<ol>(set lamp on) ## wird Lampe eingeschaltet</ol>
-<br>
-DOELSE ## im sonst-Fall, also wenn einer der Schalter off ist<br>
-<br>
-<ol>(set lamp off) ## wird die Lampe ausgeschaltet</ol></code>
+</table><br>
+<a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
+<table>
+<code>define di_Modul DOIF </code>
+<tr><td>{<code>&nbsp;if ([Switch1] eq "on" and [Switch2] eq "on") {</code></td><td>&nbsp;<code>## wenn Schalter 1 und Schalter 2 on ist</code><br></td></tr>
+<tr><td><ol><code>fhem_set "set lamp on"</code>               </td><td>&nbsp;<code>## wird Lampe eingeschaltet</code></ol></td></tr>
+<tr><td><code>&nbsp;&nbsp;}&nbsp;elsif {</code>                                </td><td>&nbsp;<code>## im sonst-Fall, also wenn einer der Schalter off ist</code><br></td></tr>
+<tr><td><ol><code>fhem_set "lamp off"</code>                  </td><td>&nbsp;<code>## wird die Lampe ausgeschaltet</code></ol></td></tr>
+<tr><td><code>&nbsp;&nbsp;}</code><br></td></tr>
+<tr><td><code>}</code><br></td></tr>
+</table>
 <br>
 Im Folgenden wird die Funktionalität des Moduls im Einzelnen an vielen praktischen Beispielen erklärt.<br>
 <br>
 <a name="DOIF_Ereignissteuerung"></a>
 <b>Ereignissteuerung</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
-Vergleichende Abfragen werden, wie in Perl gewohnt, mit Operatoren <code>==, !=, <, <=, >, >=</code> bei Zahlen und mit <code>eq, ne, lt, le, gt, ge, =~, !~</code> bei Zeichenketten angegeben.
+Vergleichende Abfragen werden in der Bedingung, mit Perl-Operatoren <code>==, !=, <, <=, >, >=</code> bei Zahlen und mit <code>eq, ne, lt, le, gt, ge, =~, !~</code> bei Zeichenketten angegeben.
 Logische Verknüpfungen sollten zwecks Übersichtlichkeit mit <code>and</code> bzw. <code>or</code> vorgenommen werden.
-Selbstverständlich lassen sich auch alle anderen Perl-Operatoren verwenden, da die Auswertung der Bedingung vom Perl-Interpreter vorgenommen wird.
 Die Reihenfolge der Auswertung wird, wie in höheren Sprachen üblich, durch runde Klammern beeinflusst.
 Status werden mit <code>[&lt;devicename&gt;]</code>, Readings mit <code>[&lt;devicename&gt;:&lt;readingname&gt;]</code>,
 Internals mit <code>[&lt;devicename&gt;:&&lt;internal&gt;]</code> angegeben.<br>
 <br>
-<u>Anwendungsbeispiel</u>: Einfache Ereignissteuerung mit einmaliger Ausführung beim Zustandswechsel, "remotecontrol" ist hier ein Device, es wird in eckigen Klammern angegeben. Ausgewertet wird der Status des Devices - nicht das Event.<br>
+<u>Anwendungsbeispiel</u>: Einfache Ereignissteuerung, "remotecontrol" ist hier ein Device, es wird in eckigen Klammern angegeben. Ausgewertet wird der Status des Devices - nicht das Event.<br>
 <br>
 <code>define di_garage DOIF ([remotecontrol] eq "on") (set garage on) DOELSEIF ([remotecontrol] eq "off") (set garage off)</code><br>
 <br>
 Das Modul wird getriggert, sobald das angegebene Device hier "remotecontrol" ein Event erzeugt. Das geschieht, wenn irgendein Reading oder der Status von "remotecontrol" aktualisiert wird.
-Ausgewertet wird hier der Zustand des Status von remotecontrol nicht das Event selbst. Die Ausführung erfolgt standardmäßig einmalig nur nach Zustandswechsel des Moduls.
+Ausgewertet wird hier der Zustand des Status von remotecontrol nicht das Event selbst. Im FHEM-Modus arbeitet das Modul mit Zuständen, indem es den eigenen Status auswertet.
+Die Ausführung erfolgt standardmäßig nur ein mal, bis ein anderer DOIF-Zweig und damit eine Ändernung des eigenen Status erfolgt.
 Das bedeutet, dass ein mehrmaliges Drücken der Fernbedienung auf "on" nur einmal "set garage on" ausführt. Die nächste mögliche Ausführung ist "set garage off", wenn Fernbedienung "off" liefert.
 <a name="DOIF_do_always"></a>
-Wünscht man eine Ausführung des gleichen Befehls mehrfach nacheinander bei jedem Trigger, unabhängig davon welchen Zustand das DOIF-Modul hat,
+Wünscht man eine Ausführung des gleichen Befehls mehrfach nacheinander bei jedem Trigger, unabhängig davon welchen Status das DOIF-Modul hat,
 weil z. B. Garage nicht nur über die Fernbedienung geschaltet wird, dann muss man das per "do always"-Attribut angeben:<br>
 <br>
 <code>attr di_garage do always</code><br>
@@ -3750,6 +3755,13 @@ Ohne <code>do always</code> wird hier dagegen erst wieder "set heating on" ausge
 Soll bei Nicht-Erfüllung aller Bedingungen ein Zustandswechsel erfolgen, so muss man ein DOELSE am Ende der Definition anhängen. Ausnahme ist eine einzige Bedingung ohne do always, wie im obigen Beispiel,
  hierbei wird intern ein virtuelles DOELSE angenommen, um bei Nicht-Erfüllung der Bedingung einen Zustandswechsel in cmd_2 zu provozieren, da sonst nur ein einziges Mal geschaltet werden könnte, da das Modul aus dem cmd_1-Zustand nicht mehr herauskäme.<br>
 <br>
+<a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
+<br>
+Im Perl-Modus arbeitet das DOIF-Modul im Gegensatz zum FHEM-Modus ohne den eigenen Status auszuwerten. Es kommt immer zur Auswertung des definierten Block, wenn er getriggert wird.
+Diese Verhalten entspricht dem Verhalten mit dem Attribut do always im FHEM-Modus. Damit bei zyklisch sendenden Sensoren nicht zum ständigen Schalten kommt, muss das Schalten unterbunden werden. Das obige Beispiel lässt sich, wie folgt definieren:<br>
+<br>
+<code>define di_heating DOIF {if ([sens:temperature] < 20) {if (Value("heating") ne "on") {fhem_set"heating on"}}}</code><br>
+<br> 
 <a name="DOIF_Teilausdruecke_abfragen"></a>
 <b>Teilausdrücke abfragen</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
@@ -3759,6 +3771,9 @@ Abfragen nach Vorkommen eines Wortes innerhalb einer Zeichenkette können mit Hi
 <br>
 <code>define di_garage DOIF ([remotecontrol] =~ "Long") (set garage on)<br>
 attr di_garage do always</code><br>
+<br>
+<a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
+<code>define di_garage DOIF {if ([remotecontrol] =~ "Long") {fhem_set"garage on"}}</code><br>
 <br>
 Weitere Möglichkeiten bei der Nutzung des Perl-Operators: <code>=~</code>, insbesondere in Verbindung mit regulären Ausdrücken, können in der Perl-Dokumentation nachgeschlagen werden.<br>
 <br>
@@ -3771,6 +3786,9 @@ Die Syntax lautet: <code>[&lt;devicename&gt;:"&lt;regex&gt;"]</code><br>
 <u>Anwendungsbeispiel</u>: wie oben, jedoch wird hier nur das Ereignis (welches im Eventmonitor erscheint) ausgewertet und nicht der Status von "remotecontrol" wie im vorherigen Beispiel<br>
 <br>
 <code>define di_garage DOIF ([remotecontrol:"on"]) (set garage on) DOELSEIF ([remotecontrol:"off"]) (set garage off)</code><br>
+<br>
+<a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
+<code>define di_garage DOIF {if ([remotecontrol:"on"]) {fhem_set"garage on"} elsif ([remotecontrol:"off"]) {fhem_set"garage off"}}</code><br>
 <br>
 In diesem Beispiel wird nach dem Vorkommen von "on" innerhalb des Events gesucht.
 Falls "on" gefunden wird, wird der Ausdruck wahr und der DOIF-Fall wird ausgeführt, ansonsten wird der DOELSEIF-Fall entsprechend ausgewertet.
@@ -3800,43 +3818,15 @@ Entsprechend können Perl-Variablen in der DOIF-Bedingung ausgewertet werden, si
 <br>
 <u>Anwendungsbeispiele</u>:<br>
 <br>
-Loggen aller Ereignisse in FHEM<br>
-<br>
-<code>define di_all_events DOIF ([""]) ({Log 3,"Events from device $DEVICE:$EVENTS"})<br>
-<br>
-attr di_all_events do always<br></code>
-<br>
 "Fenster offen"-Meldung<br>
 <br>
 <code>define di_window_open (["^window_:open"]) (set Pushover msg 'alarm' 'open windows $DEVICE' '' 2 'persistent' 30 3600)<br>
-<br>
 attr di_window_open do always</code><br>
 <br>
+<a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
+<code>define di_window_open {if (["^window_:open"]) {fhem_set"Pushover msg 'alarm' 'open windows $DEVICE' '' 2 'persistent' 30 3600"}}</code><br>
+<br>
 Hier werden alle Fenster, die mit dem Device-Namen "window_" beginnen auf "open" im Event überwacht.<br>
-<br>
-Rollladen auf Lüften stellen<br>
-<br>
-<code>define di_air DOIF (["^window_contact_:open|tilted"]) (set {("$DEVICE"=~/^window_contact_(.*)/;"shutters_$1")} 10)<br>
-<br>
-attr di_air do always</code><br>
-<br>
-Hier werden alle Fensterkontakte, die mit dem Device-Namen "window_contact_" beginnen auf "open" oder "tilted" im Event überwacht
-und der entsprechende Rollladen mit der gleichen Endung auf Lüften per <code>set shutters_&lt;postfix&gt; 10</code> gestellt.
-In diesem Beispiel wird die Möglichkeit genutzt bei FHEM-Befehlen Perlcode innerhalb der Klammern {(...)} einzufügen. Siehe <a href="#DOIF_Berechnungen_im_Ausfuehrungsteil">Berechnungen im Ausführungsteil</a><br>
-<br>
-<a href="#DOIF_Fenster_offen_Meldung">Verzögerte "Fenster offen"-Meldung im Perl-Modus für mehrere Fenster</a><br>
-<br>
-Batteriewarnung per E-Mail verschicken<br>
-<br>
-<code>define di_battery DOIF ([":battery: low"] and [?$SELF:B_$DEVICE] ne "low")<br>
-  <ol>({DebianMail('yourname@gmail.com', 'FHEM - battery warning from device: $DEVICE')}, setreading $SELF B_$DEVICE low)</ol>
-DOELSEIF ([":battery: ok"] and [?$SELF:B_$DEVICE] ne "ok")<br>
-  <ol>(setreading $SELF B_$DEVICE ok)</ol>
-<br>
-attr di_battery do always</code><br>
-<br>
-Eine aktuelle Übersicht aller Batterie-Status entsteht gleichzeitig in den Readings des di_battery-DOIF-Moduls.<br>
-<br>
 <br>
 Allgemeine Ereignistrigger können ebenfalls so definiert werden, dass sie nicht nur wahr zum Triggerzeitpunkt und sonst nicht wahr sind,
  sondern Inhalte des Ereignisses zurückliefern. Initiiert wird dieses Verhalten durch die Angabe eines Default-Wertes.<br>
@@ -3847,7 +3837,11 @@ Syntax:<br>
 <br>
 Anwendungsbeispiel:<br>
 <br>
-<code>define di_warning DOIF ([":^temperature",0]< 0 and [06:00-09:00] ) (set pushmsg danger of frost)</code><br>
+<code>define di_warning DOIF ([":^temperature",0]< 0) (set pushmsg danger of frost $DEVICE)</code><br>
+<code>attr di_warning do always</code><br>
+<br>
+<a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
+<code>define di_warning DOIF {if ([":^temperature",0]< 0) {fhem_set"pushmsg danger of frost $DEVICE}}</code><br>
 <br>
 Damit wird auf alle Devices getriggert, die mit "temperature" im Event beginnen. Zurückgeliefert wird der Wert, der im Event hinter "temperature: " steht.
 Wenn kein Event stattfindet, wird der Defaultwert, hier 0,  zurückgeliefert.
@@ -3912,7 +3906,7 @@ Der Inhalt des Dummys Alarm soll in einem Text eingebunden werden:<br>
 Die Definition von regulären Ausdrücken mit Nutzung der Perl-Variablen $1, $2 usw. kann in der Perldokumentation nachgeschlagen werden.<br>
 <br>
 <a name="DOIF_Angaben_im_Ausfuehrungsteil"></a>
-<b>Angaben im Ausführungsteil</b>:&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
+<b>Angaben im Ausführungsteil (gilt nur für FHEM-Modus)</b>:&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
 Der Ausführungsteil wird durch runde Klammern eingeleitet. Es werden standardmäßig FHEM-Befehle angegeben, wie z. B.: <code>...(set lamp on)</code><br>
 <br>
@@ -4102,13 +4096,20 @@ Einschalten um 8:00 Uhr, ausschalten um 10:00 Uhr.<br>
 <br>
 <code>define di_light DOIF ([08:00]) (set switch on) DOELSEIF ([10:00]) (set switch off)</code><br>
 <br>
+<a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
+<code>define di_light DOIF<br>
+{[08:00];fhem_set"switch on"}<br>
+{[10:00];fhem_set"switch on"}<br>
+</code><br>
+<br>
 Zeitsteuerung mit mehreren Zeitschaltpunkten:<br>
 <br>
 <code>define di_light DOIF ([08:00] or [10:00] or [20:00]) (set switch on) DOELSEIF ([09:00] or [11:00] or [00:00]) (set switch off)</code><br>
 <br>
-Zeitangaben können ebenfalls in Sekunden angegeben werden. Es handelt sich dann um Sekundenangaben nach Mitternacht, hier also um 01:00 Uhr:<br>
-<br>
-<code>define di_light DOIF ([3600]) (set lamp on)</code><br>
+<a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
+<code>define di_light DOIF<br>
+{if ([08:00] or [10:00] or [20:00]) {fhem_set"switch on"}}<br>
+{if ([09:00] or [11:00] or [00:00]) {fhem_set"switch off"}}</code><br>
 <br>
 <a name="DOIF_Relative_Zeitangaben"></a>
 <b>Relative Zeitangaben</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
@@ -4120,9 +4121,10 @@ Zeitangaben, die mit Pluszeichen beginnen, werden relativ behandelt, d. h. die a
 <code>define di_save DOIF ([+01:00]) (save)<br>
 attr di_save do always</code><br>
 <br>
-Ebenfalls lassen sich relative Angaben in Sekunden angeben. Das obige Beispiel entspricht:<br>
+<a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
+<code>define di_save DOIF {[+01:00];fhem"save"}}</code><br>
 <br>
-<code>define di_save DOIF ([+3600]) (save)</code><br>
+Ebenfalls lassen sich relative Angaben in Sekunden angeben. [+01:00] entspricht [+3600];
 <br>
 <a name="DOIF_Zeitangaben_nach_Zeitraster_ausgerichtet"></a>
 <b>Zeitangaben nach Zeitraster ausgerichtet</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
@@ -4131,14 +4133,12 @@ Das Format lautet: [:MM] MM sind Minutenangaben zwischen 00 und 59.<br>
 <br>
 <u>Anwendungsbeispiel</u>: Viertelstunden-Gong<br>
 <br>
-<code>define di_gong DOIF ([:00])<br>
-  <ol>({system ("mplayer /opt/fhem/Sound/BigBen_00.mp3 -volume 90 −really−quiet &")})</ol>
-DOELSEIF ([:15])<br>
-  <ol>({system ("mplayer /opt/fhem/Sound/BigBen_15.mp3 -volume 90 −really−quiet &")})</ol>
-DOELSEIF ([:30])<br>
-  <ol>({system ("mplayer /opt/fhem/Sound/BigBen_30.mp3 -volume 90 −really−quiet &")})</ol>
-DOELSEIF ([:45])<br>
-  <ol>({system ("mplayer /opt/fhem/Sound/BigBen_45.mp3 -volume 90 −really−quiet &")})</ol></code>
+<a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
+<code>define di_gong DOIF<br>
+ {[:00];system"mplayer /opt/fhem/Sound/BigBen_00.mp3 -volume 90 −really−quiet &"}<br>
+ {[:15];system"mplayer /opt/fhem/Sound/BigBen_15.mp3 -volume 90 −really−quiet &"}<br>
+ {[:30];system"mplayer /opt/fhem/Sound/BigBen_30.mp3 -volume 90 −really−quiet &"}<br>
+ {[:45];system"mplayer /opt/fhem/Sound/BigBen_45.mp3 -volume 90 −really−quiet &"}</code><br>
 <br>
 <a name="DOIF_Relative_Zeitangaben_nach_Zeitraster_ausgerichtet"></a>
 <b>Relative Zeitangaben nach Zeitraster ausgerichtet</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
@@ -4150,6 +4150,9 @@ Das Format lautet: [+:MM] MM sind Minutenangaben zwischen 1 und 59.<br>
 <code>define di_gong DOIF ([+:15]) (set Gong_mp3 playTone 1)<br>
 attr di_gong do always</code><br>
 <br>
+<a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
+<code>define di_gong DOIF {[+:15];fhem_set"Gong_mp3 playTone 1"}</code><br>
+<br>
 <a name="DOIF_Zeitangaben_nach_Zeitraster_ausgerichtet_alle_X_Stunden"></a>
 <b>Zeitangaben nach Zeitraster ausgerichtet alle X Stunden</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
@@ -4159,6 +4162,9 @@ Format: [+[h]:MM] mit: h sind Stundenangaben zwischen 2 und 23 und MM Minuten zw
 <br>
 <code>define di_gong DOIF ([+[2]:05]) (set pump on-for-timer 300)<br>
 attr di_gong do always</code><br>
+<br>
+<a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
+<code>define di_gong DOIF {[+[2]:05];set_fhem"pump on-for-timer 300"}</code><br>
 <br>
 <a name="DOIF_Wochentagsteuerung"></a>
 <b>Wochentagsteuerung</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
@@ -4182,7 +4188,12 @@ Beispiel: <code>di_mydoif attr weekdays Son,Mon,Die,Mit,Don,Fre,Sam,Wochenende,A
 <u>Anwendungsbeispiel</u>: Radio soll am Wochenende und an Feiertagen um 08:30 Uhr eingeschaltet und um 09:30 Uhr ausgeschaltet werden. Am Montag und Mittwoch soll das Radio um 06:30 Uhr eingeschaltet und um 07:30 Uhr ausgeschaltet werden. Hier mit englischen Bezeichnern:<br>
 <br>
 <code>define di_radio DOIF ([06:30|Mo We] or [08:30|WE]) (set radio on) DOELSEIF ([07:30|Mo We] or [09:30|WE]) (set radio off)</code><br>
+<code>attr di_radio weekdays Su,Mo,Tu,We,Th,Fr,Sa,WE,WD</code><br>
 <br>
+<a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
+<code>define di_radio DOIF<br>
+{if ([06:30|Mo We] or [08:30|WE]) {fhem_set"radio on"}}<br>
+{if ([07:30|Mo We] or [09:30|WE]) {fhem_set"radio off"}}</code><br>
 <code>attr di_radio weekdays Su,Mo,Tu,We,Th,Fr,Sa,WE,WD</code><br>
 <br>
 Bemerkung: Es ist unerheblich wie die definierten Wochenttagbezeichner beim Timer angegeben werden. Sie können mit beliebigen Trennzeichen oder ohne Trennzeichen direkt aneinander angegeben werden.<br>
@@ -4195,7 +4206,12 @@ Anstatt einer direkten Wochentagangabe, kann ein Status oder Reading in eckigen 
 set myweekday monday wednesday thursday weekend<br>
 <br>
 define di_radio DOIF ([06:30|[myweekday]]) (set radio on) DOELSEIF ([07:30|[myweekday]]) (set radio off)<br>
+attr di_radio weekdays sunday,monday,thuesday,wednesday,thursday,friday,saturday,weekend,workdays</code><br>
 <br>
+<a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
+<code>define di_radio DOIF<br>
+{[06:30|[myweekday]];fhem_set"radio on"}<br>
+{[07:30|[myweekday]];fhem_set"radio off"}<br><br>
 attr di_radio weekdays sunday,monday,thuesday,wednesday,thursday,friday,saturday,weekend,workdays</code><br>
 <br>
 <a name="DOIF_Zeitsteuerung_mit_Zeitintervallen"></a>
@@ -4213,13 +4229,15 @@ Radio soll zwischen 8:00 und 10:00 Uhr an sein:<br>
 <br>
 <code>define di_radio DOIF ([08:00-10:00]) (set radio on) DOELSE (set radio off) </code><br>
 <br>
+<a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
+<code>define di_radio DOIF {if ([08:00-10:00]) {fhem_set"radio on"} else {fhem_set"radio off"}}</code><br>
+<br>
 mit mehreren Zeitintervallen:<br>
 <br>
 <code>define di_radio DOIF ([08:00-10:00] or [20:00-22:00]) (set radio on) DOELSE (set radio off) </code><br>
 <br>
-Radio soll nur sonntags (0) eingeschaltet werden:<br>
-<br>
-<code>define di_radio DOIF ([08:00-10:00|0]) (set radio on) DOELSE (set radio off) </code><br>
+<a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
+<code>define di_radio DOIF {if ([08:00-10:00] or [20:00-22:00]) {fhem_set"radio on"} else {fhem_set"radio off"}}</code><br>
 <br>
 Nur montags, mittwochs und freitags:<br>
 <br>
@@ -4243,9 +4261,19 @@ Einschalten am Freitag ausschalten am Montag:<br>
 <br>
 <code>define di_light DOIF ([22:00|5]) (set light on) DOELSEIF ([10:00|1]) (set light off) </code><br>
 <br>
+<a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
+<code>define di_light DOIF<br>
+{[22:00|5];fhem_set"light on"}<br>
+{[10:00|1];fhem_set"light off"}</code><br>
+<br>
 Schalten mit Zeitfunktionen, hier: bei Sonnenaufgang und Sonnenuntergang:<br>
 <br>
 <code>define di_light DOIF ([{sunrise(900,"06:00","08:00")}]) (set outdoorlight off) DOELSEIF ([{sunset(900,"17:00","21:00")}]) (set outdoorlight on)</code><br>
+<br>
+<a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
+<code>define di_light DOIF<br>
+{[{sunrise(900,"06:00","08:00")}];fhem_set"outdoorlight off"}<br>
+{[{sunset(900,"17:00","21:00")}];fhem_set"outdoorlight on"}</code><br>
 <br>
 <a name="DOIF_Indirekten_Zeitangaben"></a>
 <b>Indirekten Zeitangaben</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
@@ -4257,8 +4285,12 @@ Statt fester Zeitangaben können Status, Readings oder Internals angegeben werde
 <br>
 <code>define time dummy<br>
 set time 08:00<br>
+<br>
 define di_time DOIF ([[time]])(set lamp on)<br>
 attr di_time do always</code><br>
+<br>
+<a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
+<code>define di_time DOIF {[[time]];fhem_set"lamp on"}</code><br>
 <br>
 Die indirekte Angabe kann ebenfalls mit einer Zeitfunktion belegt werden. Z. B. <br>
 <br>
@@ -4268,7 +4300,12 @@ Das Dummy kann auch mit einer Sekundenzahl belegt werden, oder als relative Zeit
 <br>
 <code>define time dummy<br>
 set time 300<br>
-define di_time DOIF ([+[time]])(save)</code><br>
+<br>
+define di_time DOIF ([+[time]])(save)<br>
+attr di_time do always</code><br>
+<br>
+<a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
+<code>define di_time DOIF {[+[time]];fhem"save"}</code><br>
 <br>
 Ebenfalls funktionieren indirekte Zeitangaben mit Zeitintervallen. Hier wird die Ein- und Ausschaltzeit jeweils über einen Dummy bestimmt:<br>
 <br>
@@ -4280,6 +4317,9 @@ set end 10:00<br>
 <br>
 define di_time DOIF ([[begin]-[end]]) (set radio on) DOELSE (set radio off)</code><br>
 <br>
+<a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
+<code>define di_time DOIF {if([[begin]-[end]]) {fhem_set"radio on"} else {fhem_set"radio off"}}</code><br>
+<br>
 Indirekte Zeitangaben können auch als Übergabeparameter für Zeitfunktionen, wie z. B. sunset oder sunrise übergeben werden:<br>
 <br>
 <code>define di_time DOIF ([{sunrise(0,"[begin]","09:00")}-{sunset(0,"18:00","[end]")}]) (set lamp off) DOELSE (set lamp on) </code><br>
@@ -4289,16 +4329,17 @@ Bei einer Änderung des angegebenen Status oder Readings wird die geänderte Zei
 Angabe eines Readings als Zeitangabe. Beispiel: Schalten anhand eines Twilight-Readings:<br>
 <br>
 <code>define di_time DOIF ([[myTwilight:ss_weather]])(set lamp on)</code><br>
+<code>attr di_timer do always</code><br>
 <br>
-Dynamische Änderung einer Zeitangabe.<br>
-<br>
-<u>Anwendungsbeispiel</u>: Die Endzeit soll abhängig von der Beginnzeit mit Hilfe einer eigenen Perl-Funktion, hier: <code>OffTime()</code>, bestimmt werden. <code>begin</code> und <code>end</code> sind Dummys, wie oben definiert:<br>
-<br>
-<code>define di_time DOIF ([[begin]-[end]]) (set lamp on, set end {(OffTime("[begin]"))}) DOELSE (set lamp off)</code><br>
+<a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
+<code>define di_time DOIF {[[myTwilight:ss_weather]];fhem_set"lamp on"}</code><br>
 <br>
 Indirekte Zeitangaben lassen sich mit Wochentagangaben kombinieren, z. B.:<br>
 <br>
 <code>define di_time DOIF ([[begin]-[end]|7]) (set radio on) DOELSE (set radio off)</code><br>
+<br>
+<a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
+<code>define di_time DOIF {if ([[begin]-[end]|7]) {fhem_set"radio on"} else {fhem_set"radio off"}}</code><br>
 <br>
 <a name="DOIF_Zeitsteuerung_mit_Zeitberechnung"></a>
 <b>Zeitsteuerung mit Zeitberechnung</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
@@ -4316,6 +4357,12 @@ Lampe wird nach Sonnenuntergang zwischen 900 und 1500 (900+600) Sekunden zufäll
    <ol>(set lamp on)</ol>
 DOELSEIF ([([23:00]+int(rand(600)))])<br>
    <ol>(set lamp off) </ol></code>
+<br>
+<a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
+<code>define di_light DOIF<br>
+{[({sunset()}+900+int(rand(600)))];fhem_set"lamp on"}<br>
+{[([23:00]+int(rand(600)))];;fhem_set"lamp off"}<br>
+</code><br>
 <br>
 Zeitberechnung können ebenfalls in Zeitintervallen genutzt werden.<br>
 <br>
@@ -4356,12 +4403,18 @@ Innerhalb des definierten Zeitintervalls, triggert der definierte Timer. Außerh
 <code>define di_pump DOIF ([08:00-22:00,+:30])(set pump on-for-timer 300)<br>
 attr di_pump do always </code><br>
 <br>
+<a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
+<code>define di_pump DOIF {[08:00-22:00,+:30];set_fhem"pump on-for-timer 300"}</code><br>
+<br>
 Es wird um 08:00, 08:30, 09:00, ..., 21:30 Uhr die Anweisung ausgeführt. Um 22:00 wird das letzte Mal getriggert, das Zeitintervall ist zu diesem Zeitpunkt nicht mehr wahr.<br>
 <br>
 Es lassen sich ebenso indirekte Timer, Timer-Funktionen, Zeitberechnungen sowie Wochentage miteinander kombinieren.<br>
 <br>
 <code>define di_rand_lamp DOIF ([{sunset()}-[end:state],+(rand(600)+900)|Sa So])(set lamp on-for-timer 300)<br>
 attr di_rand_lamp do always</code><br>
+<br>
+<a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
+<code>define di_rand_lamp DOIF {[{sunset()}-[end:state],+(rand(600)+900)|Sa So];fhem_set"lamp on-for-timer 300"}</code><br>
 <br>
 <a name="DOIF_Kombination_von_Ereignis_und_Zeitsteuerung_mit_logischen_Abfragen"></a>
 <b>Kombination von Ereignis- und Zeitsteuerung mit logischen Abfragen</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
@@ -4383,6 +4436,9 @@ Angaben in eckigen Klammern, die mit einem Fragezeichen beginnen, führen zu kei
 <br>
 <code>define di_motion DOIF ([?06:00-10:00] and [button] and [?Home] eq "present")(set lamp on-for-timer 600)<br>
 attr di_motion do always</code><br>
+<br>
+<a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
+<code>define di_motion DOIF {if ([?06:00-10:00] and [button] and [?Home] eq "present"){fhem_set"lamp on-for-timer 600"}}</code><br>
 <br>
 <a name="DOIF_Nutzung_von_Readings_Status_oder_Internals_im_Ausfuehrungsteil"></a>
 <b>Nutzung von Readings, Status oder Internals im Ausführungsteil</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
@@ -5694,37 +5750,40 @@ Es sind beliebige Hierarchietiefen möglich:<br>
 <br>
 Bemerkung: Innerhalb eines Ereignisblocks muss mindestens ein Trigger definiert werden, damit der gesamte Block beim passenden Trigger ausgeführt wird.<br>
 <br>
-Es können ebenso Ereignisblöcke ohne if-else-Abfragen definiert werden:<br>
-<br>
-Loggen des Zustands vom Device FS:<br>
-<br><code>DOIF {Log 3,"State from FS: ".[FS:state]}</code><br>
-<br>
-Das Schalten der Lampe mit dem Status von FS:<br>
-<br>
-<code>DOIF {fhem("set lamp ".[FS:state])}</code><br>
-<br>
-entspricht mit dem performanteren Perl-Befehl <code>fhem_set</code>:<br>
-<br>
-<code>DOIF {fhem_set("lamp ".[FS:state])}</code><br>
-<br>
-Das Setzen des eigenen Status mit dem Status von FS:<br>
-<br>
-<code>DOIF {set_State([FS:state])}</code><br>
-<br>
-Das Setzen des eigenen Readings "temperature" mit dem Wert des Readings "temperature" des Raumes "livingroom":<br>
-<br>
-<code>DOIF {set_Reading("temperature",[livingroom:temperature])}</code><br>
-<br>
-Einfache Zeit- oder Ereignistrigger können ebenfalls ohne if-Anweisungen definiert werden:<br>
-<br>
-Schalte lampe um 08:00 Uhr ein:<br>
-<br>
-<code>DOIF {[08:00];fhem_set("lamp on")}</code><br>
-<br>
-Lampe ausschalten, beim Auftreten des Events "FS:on":<br>
-<br>
-<code>DOIF {["FS:on"];fhem_set("lamp off")}</code><br>
-<br>
+<a name="DOIF_Inhaltsuebersicht"></a>
+<b>Inhaltsübersicht</b> (Beispiele im Perlmodus sind besonders gekennzeichnet)<br>
+<ul><br>
+  <a href="#DOIF_Lesbarkeit_der_Definitionen">Lesbarkeit der Definitionen</a><br>
+  <a href="#DOIF_Ereignissteuerung">Ereignissteuerung</a><br>
+  <a href="#DOIF_Teilausdruecke_abfragen">Teilausdrücke abfragen</a><br>
+  <a href="#DOIF_Ereignissteuerung_ueber_Auswertung_von_Events">Ereignissteuerung über Auswertung von Events</a><br>
+  <a href="#DOIF_Angaben_im_Ausfuehrungsteil">Angaben im Ausführungsteil</a><br>
+  <a href="#DOIF_Filtern_nach_Zahlen">Filtern nach Ausdrücken mit Ausgabeformatierung</a><br>
+  <a href="#DOIF_aggregation">Aggregieren von Werten</a><br>
+  <a href="#DOIF_Zeitsteuerung">Zeitsteuerung</a><br>
+  <a href="#DOIF_Relative_Zeitangaben">Relative Zeitangaben</a><br>
+  <a href="#DOIF_Zeitangaben_nach_Zeitraster_ausgerichtet">Zeitangaben nach Zeitraster ausgerichtet</a><br>
+  <a href="#DOIF_Relative_Zeitangaben_nach_Zeitraster_ausgerichtet">Relative Zeitangaben nach Zeitraster ausgerichtet</a><br>
+  <a href="#DOIF_Zeitangaben_nach_Zeitraster_ausgerichtet_alle_X_Stunden">Zeitangaben nach Zeitraster ausgerichtet alle X Stunden</a><br>
+  <a href="#DOIF_Wochentagsteuerung">Wochentagsteuerung</a><br>
+  <a href="#DOIF_Zeitsteuerung_mit_Zeitintervallen">Zeitsteuerung mit Zeitintervallen</a><br>
+  <a href="#DOIF_Indirekten_Zeitangaben">Indirekten Zeitangaben</a><br>
+  <a href="#DOIF_Zeitsteuerung_mit_Zeitberechnung">Zeitsteuerung mit Zeitberechnung</a><br>
+  <a href="#DOIF_Intervall-Timer">Intervall-Timer</a><br>
+  <a href="#DOIF_Kombination_von_Ereignis_und_Zeitsteuerung_mit_logischen_Abfragen">Kombination von Ereignis- und Zeitsteuerung mit logischen Abfragen</a><br>
+  <a href="#DOIF_Zeitintervalle_Readings_und_Status_ohne_Trigger">Zeitintervalle, Readings und Status ohne Trigger</a><br>
+  <a href="#DOIF_notexist">Ersatzwert für nicht existierende Readings oder Status</a><br>
+  <a href="#DOIF_Zeitspanne_eines_Readings_seit_der_letzten_Aenderung">Zeitspanne eines Readings seit der letzten Änderung</a><br>
+  <a href="#DOIF_setList__readingList">Darstellungselement mit Eingabemöglichkeit im Frontend und Schaltfunktion</a><br>
+  <a href="#DOIF_uiTable">uiTable, das User Interface</a><br>
+  <a href="#DOIF_Reine_Statusanzeige_ohne_Ausfuehrung_von_Befehlen">Reine Statusanzeige ohne Ausführung von Befehlen</a><br>
+  <a href="#DOIF_state">Anpassung des Status mit Hilfe des Attributes <code>state</code></a><br>
+  <a href="#DOIF_DOIF_Readings">Erzeugen berechneter Readings<br>
+  <a href="#DOIF_disable">Deaktivieren des Moduls</a><br>
+  <a href="https://wiki.fhem.de/wiki/DOIF">DOIF im FHEM-Wiki</a><br>
+  <a href="https://forum.fhem.de/index.php/board,73.0.html">DOIF im FHEM-Forum</a><br>
+  <a href="#DOIF_Kurzreferenz">Kurzreferenz</a><br>
+</ul><br>
 <u>Eigene Funktionen</u><br>
 <br>
 Ein besonderer Block ist der Block namens <b>subs</b>. In diesem Block werden Perlfunktionen definiert, die innerhalb des DOIFs genutzt werden. 
@@ -5889,17 +5948,19 @@ Ebenso funktionieren hash-Variablen z. B.: <br>
 <br>
 <u>Blokierende Funktionsaufrufe (blocking calls)</u><br>
 <br>
-DOIF verwaltet blockierende Funktionsaufrufe, d.h. die in diesem Zusammenhang gestarteten FHEM-Instanzen werden gelöscht, beim Herunterfahren (shutdown), Wiedereinlesen der Konfiguration (rereadcfg) Änderung der Konfiguration (modify) und Deaktivieren des Gerätes (disabled).<br>
+DOIF verwaltet blockierende Funktionsaufrufe, d.h. die in diesem Zusammenhang gestarteten FHEM-Instanzen werden gel&ouml;scht, beim Herunterfahren (shutdown), Wiedereinlesen der Konfiguration (rereadcfg) &Auml;nderung der Konfiguration (modify) und Deaktivieren des Ger&auml;tes (disabled).<br>
 <br>
-Die Handhabung von blockierenden Funktionsaufrufen ist im FHEMwiki erklärt, s. <a href="https://wiki.fhem.de/wiki/Blocking_Call">Blocking Call</a>.<br>
+Die Handhabung von blockierenden Funktionsaufrufen ist im FHEMwiki erkl&auml;rt, s. <a href="https://wiki.fhem.de/wiki/Blocking_Call">Blocking Call</a>.<br>
 <br>
-Der von der Funktion BlockingCall zurückgegebene Datensatz ist unterhalb von <b>$_blockingcalls</b> abzulegen, z.B.<br>
+Der von der Funktion BlockingCall zur&uuml;ckgegebene Datensatz ist unterhalb von <b>$_blockingcalls</b> abzulegen, z.B.<br>
 <br>
-<code>$_blockingcalls{&lt;blocking call name&gt;} = BlockingCall(&lt;blocking function&gt;, &lt;argument&gt;, &lt;finish function&gt;, &lt;timeout&gt;, &lt;abort function&gt;, &lt;abort argument&gt;) unless(defined($_blockingcalls{&lt;blocking call name&gt;}));</code><br>
+<code>$_blockingcalls{&lt;blocking call name&gt;} = ::BlockingCall(&lt;blocking function&gt;, &lt;argument&gt;, &lt;finish function&gt;, &lt;timeout&gt;, &lt;abort function&gt;, &lt;abort argument&gt;) unless(defined($_blockingcalls{&lt;blocking call name&gt;}));</code><br>
 <br>
-Für unterschiedliche blockierende Funktionen ist jeweils ein eigener Name (&lt;blocking call name&gt;) unterhalb von $_blockingcalls anzulegen.<br>
+F&uuml;r unterschiedliche blockierende Funktionen ist jeweils ein eigener Name (&lt;blocking call name&gt;) unterhalb von $_blockingcalls anzulegen.<br>
 <br>
-<b>$_blockingcalls</b> ist eine für DOIF reservierte Variable und darf nur in der beschriebener Weise verwendet werden.<br>
+Wenn <i>&lt;blocking function&gt;</i>, <i>&lt;finish function&gt;</i> und <i>&lt;abort function&gt;</i> im Package DOIF definiert werden, dann ist dem Funktionsnamen <i>DOIF::</i> voranzustellen, im Aufruf der Funktion BlockingCall, z.B. <code>DOIF::&lt;blocking function&gt;</code> <br>
+<br>
+<b>$_blockingcalls</b> ist eine f&uuml;r DOIF reservierte Variable und darf nur in der beschriebener Weise verwendet werden.<br>
 <br>
 <a name="DOIF_Attribute_Perl_Modus"></a>
 <u>Nutzbare Attribute im Perl-Modus</u><br>
