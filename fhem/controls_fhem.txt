@@ -1,4 +1,4 @@
-REV 17448
+REV 17451
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2018-10-02_07:45:02 259620 ./CHANGED
+UPD 2018-10-03_07:45:03 259679 ./CHANGED
 UPD 2018-10-01_07:45:02 38011 ./MAINTAINER.txt
 UPD 2018-09-09_07:45:03 39688 ./configDB.pm
 UPD 2018-09-17_07:45:03 19987 ./fhem.cfg.demo
@@ -158,7 +158,7 @@ UPD 2018-04-13_07:45:03 136840 FHEM/23_LUXTRONIK2.pm
 UPD 2015-07-28_14:05:31 5069 FHEM/23_WEBIO.pm
 UPD 2015-07-28_14:05:31 5626 FHEM/23_WEBIO_12DIGITAL.pm
 UPD 2015-07-28_14:05:31 10651 FHEM/24_NetIO230B.pm
-UPD 2018-07-03_07:45:02 19968 FHEM/24_TPLinkHS110.pm
+UPD 2018-10-03_07:45:03 20677 FHEM/24_TPLinkHS110.pm
 UPD 2018-05-09_07:45:02 355062 FHEM/26_KM273.pm
 UPD 2018-06-12_07:45:06 61702 FHEM/26_tahoma.pm
 UPD 2018-05-27_13:13:25 91572 FHEM/30_DUOFERN.pm
@@ -415,7 +415,7 @@ UPD 2018-07-10_07:45:14 16502 FHEM/91_watchdog.pm
 UPD 2018-08-21_07:45:03 54919 FHEM/92_FileLog.pm
 UPD 2017-08-14_07:45:02 11589 FHEM/92_SingleFileLog.pm
 UPD 2018-09-20_07:45:03 345466 FHEM/93_DbLog.pm
-UPD 2018-09-21_07:45:02 654542 FHEM/93_DbRep.pm
+UPD 2018-10-03_07:45:03 664020 FHEM/93_DbRep.pm
 UPD 2018-09-18_07:45:02 18106 FHEM/93_FHEM2FHEM.pm
 UPD 2018-08-25_07:45:03 110254 FHEM/93_Log2Syslog.pm
 UPD 2018-02-09_07:45:02 66936 FHEM/93_PWMR.pm
@@ -684,8 +684,8 @@ UPD 2018-10-02_07:45:05 3577301 docs/commandref.html
 UPD 2018-10-01_07:45:07 2193355 docs/commandref_DE.html
 UPD 2018-07-16_07:45:03 76259 docs/commandref_frame.html
 UPD 2018-07-16_07:45:03 85715 docs/commandref_frame_DE.html
-UPD 2018-10-02_07:45:08 197434 docs/commandref_modular.html
-UPD 2018-10-02_07:45:09 208124 docs/commandref_modular_DE.html
+UPD 2018-10-03_07:45:09 197434 docs/commandref_modular.html
+UPD 2018-10-03_07:45:10 208124 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
