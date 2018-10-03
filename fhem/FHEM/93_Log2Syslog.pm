@@ -1,6 +1,6 @@
-######################################################################################################################
+##########################################################################################################################
 # $Id$
-######################################################################################################################
+##########################################################################################################################
 #       93_Log2Syslog.pm
 #
 #       (c) 2017-2018 by Heiko Maaz
@@ -27,66 +27,123 @@
 #       and RFC 3164 https://tools.ietf.org/html/rfc3164 and
 #       TLS Transport according to RFC5425 https://tools.ietf.org/pdf/rfc5425.pdf as well
 #
-######################################################################################################################
-#  Versions History:
-#
-# 4.8.5      20.08.2018       BSD/parseFn parsing changed, BSD setpayload changed, new variable $IGNORE in parseFn
-# 4.8.4      15.08.2018       BSD parsing changed
-# 4.8.3      14.08.2018       BSD setpayload changed, BSD parsing changed, Internal MYFQDN 
-# 4.8.2      13.08.2018       rename makeMsgEvent to makeEvent
-# 4.8.1      12.08.2018       IETF-Syslog without VERSION changed, Log verbose 1 to 2 changed in parsePayload
-# 4.8.0      12.08.2018       enhanced IETF Parser to match logs without version 
-# 4.7.0      10.08.2018       Parser for TPLink
-# 4.6.1      10.08.2018       some perl warnings, changed IETF Parser
-# 4.6.0      08.08.2018       set sendTestMessage added, Attribute "contDelimiter", "respectSeverity"
-# 4.5.1      07.08.2018       BSD Regex changed, setpayload of BSD changed 
-# 4.5.0      06.08.2018       Regex capture groups used in parsePayload to set variables, parsing of BSD changed,
-#                             Attribute "makeMsgEvent" added
-# 4.4.0      04.08.2018       Attribute "outputFields" added
-# 4.3.0      03.08.2018       Attribute "parseFn" added
-# 4.2.0      03.08.2018       evaluate sender peer ip-address/hostname, use it as reading in event generation
-# 4.1.0      02.08.2018       state event generation changed
-# 4.0.0      30.07.2018       server mode (Collector)
-# 3.2.1      04.05.2018       fix compatibility with newer IO::Socket::SSL on debian 9, attr ssldebug for
-#                             debugging SSL messages
-# 3.2.0      22.11.2017       add NOTIFYDEV if possible
-# 3.1.0      28.08.2017       get-function added, commandref revised, $readingFnAttributes deleted
-# 3.0.0      27.08.2017       change attr type to protocol, ready to check in
-# 2.6.0      26.08.2017       more than one Log2Syslog device can be created
-# 2.5.2      26.08.2018       fix in splitting timestamp, change Log2Syslog_trate using internaltimer with attr 
-#                             rateCalcRerun, function Log2Syslog_closesock
-# 2.5.1      24.08.2017       some fixes
-# 2.5.0      23.08.2017       TLS encryption available, new readings, $readingFnAttributes
-# 2.4.1      21.08.2017       changes in sub Log2Syslog_charfilter, change PROCID to $hash->{SEQNO}
-#                             switch to non-blocking in subs event/Log2Syslog_fhemlog
-# 2.4.0      20.08.2017       new sub Log2Syslog_Log3slog for entries in local fhemlog only -> verbose support
-# 2.3.1      19.08.2017       commandref revised
-# 2.3.0      18.08.2017       new parameter "ident" in DEF, sub setidex, Log2Syslog_charfilter
-# 2.2.0      17.08.2017       set BSD data length, set only acceptable characters (USASCII) in payload
-#                             commandref revised
-# 2.1.0      17.08.2017       sub Log2Syslog_opensock created
-# 2.0.0      16.08.2017       create syslog without SYS::SYSLOG
-# 1.1.1      13.08.2017       registrate Log2Syslog_fhemlog to %loginform in case of sending fhem-log
-#                             attribute timeout, commandref revised
-# 1.1.0      26.07.2017       add regex search to sub Log2Syslog_fhemlog
-# 1.0.0      25.07.2017       initial version
-
+##########################################################################################################################
 package main;
 
 use strict;
 use warnings;
+
+# Versions History intern:
+our %Log2Syslog_vNotesIntern = (
+  "5.2.0"  => "02.10.2018  added direct help for attributes",
+  "5.1.0"  => "01.10.2018  new get <name> versionNotes command",
+  "5.0.1"  => "27.09.2018  Log2Syslog_closesock if write error:.* , delete readings code changed",
+  "5.0.0"  => "26.09.2018  TCP-Server in Collector-mode, HIPCACHE added, PROFILE as Internal, Parse_Err_No as reading,
+                           octetCount attribute, TCP-SSL-support, set 'reopen' command, code fixes",
+  "4.8.5"  => "20.08.2018  BSD/parseFn parsing changed, BSD setpayload changed, new variable \$IGNORE in parseFn",
+  "4.8.4"  => "15.08.2018  BSD parsing changed",
+  "4.8.3"  => "14.08.2018  BSD setpayload changed, BSD parsing changed, Internal MYFQDN", 
+  "4.8.2"  => "13.08.2018  rename makeMsgEvent to makeEvent",
+  "4.8.1"  => "12.08.2018  IETF-Syslog without VERSION changed, Log verbose 1 to 2 changed in parsePayload",
+  "4.8.0"  => "12.08.2018  enhanced IETF Parser to match logs without version", 
+  "4.7.0"  => "10.08.2018  Parser for TPLink",
+  "4.6.1"  => "10.08.2018  some perl warnings, changed IETF Parser",
+  "4.6.0"  => "08.08.2018  set sendTestMessage added, Attribute 'contDelimiter', 'respectSeverity'",
+  "4.5.1"  => "07.08.2018  BSD Regex changed, setpayload of BSD changed",
+  "4.5.0"  => "06.08.2018  Regex capture groups used in parsePayload to set variables, parsing of BSD changed,
+                           Attribute 'makeMsgEvent' added",
+  "4.4.0"  => "04.08.2018  Attribute 'outputFields' added",
+  "4.3.0"  => "03.08.2018  Attribute 'parseFn' added",
+  "4.2.0"  => "03.08.2018  evaluate sender peer ip-address/hostname, use it as reading in event generation",
+  "4.1.0"  => "02.08.2018  state event generation changed",
+  "4.0.0"  => "30.07.2018  server mode (Collector)",
+  "3.2.1"  => "04.05.2018  fix compatibility with newer IO::Socket::SSL on debian 9, attr ssldebug for
+                           debugging SSL messages",
+  "3.2.0"  => "22.11.2017  add NOTIFYDEV if possible",
+  "3.1.0"  => "28.08.2017  get-function added, commandref revised, \$readingFnAttributes deleted",
+  "3.0.0"  => "27.08.2017  change attr type to protocol, ready to check in",
+  "2.6.0"  => "26.08.2017  more than one Log2Syslog device can be created",
+  "2.5.2"  => "26.08.2018  fix in splitting timestamp, change Log2Syslog_trate using internaltimer with attr 
+                           rateCalcRerun, function Log2Syslog_closesock",
+  "2.5.1"  => "24.08.2017  some fixes",
+  "2.5.0"  => "23.08.2017  TLS encryption available, new readings, \$readingFnAttributes",
+  "2.4.1"  => "21.08.2017  changes in sub Log2Syslog_charfilter, change PROCID to \$hash->{SEQNO}
+                           switch to non-blocking in subs event/Log2Syslog_fhemlog",
+  "2.4.0"  => "20.08.2017  new sub Log2Syslog_Log3slog for entries in local fhemlog only -> verbose support",
+  "2.3.1"  => "19.08.2017  commandref revised",
+  "2.3.0"  => "18.08.2017  new parameter 'ident' in DEF, sub setidex, Log2Syslog_charfilter",
+  "2.2.0"  => "17.08.2017  set BSD data length, set only acceptable characters (USASCII) in payload,
+                           commandref revised",
+  "2.1.0"  => "17.08.2017  sub Log2Syslog_opensock created",
+  "2.0.0"  => "16.08.2017  create syslog without SYS::SYSLOG",
+  "1.1.1"  => "13.08.2017  registrate Log2Syslog_fhemlog to %loginform in case of sending fhem-log
+                           attribute timeout, commandref revised",
+  "1.1.0"  => "26.07.2017  add regex search to sub Log2Syslog_fhemlog",
+  "1.0.0"  => "25.07.2017  initial version"
+);
+
+# Versions History extern:
+our %Log2Syslog_vNotesExtern = (
+  "5.2.0"  => "02.10.2018 direct help for attributes added",
+  "5.1.0"  => "29.09.2018 new get &lt;name&gt; versionNotes command ",
+  "5.0.1"  => "27.09.2018 automatic reconnect to syslog-server in case of write error ",
+  "5.0.0"  => "26.09.2018 <li>TCP Server mode is possible now for Collector devices<\li><li>the used parse-profile is shown as Internal<\li><li>Parse_Err_No counts faulty persings since start<\li><li>new octetCount attribute switches the syslog framing method (see also RFC6587 <a href=\"https://tools.ietf.org/html/rfc6587\">Transmission of Syslog Messages over TCP</a>)<\li><li>TCP SSL-support<\li><li>new set 'reopen' command to reconnect a broken connection<\li><li>some code fixes ",
+  "4.8.5"  => "20.08.2018 BSD/parseFn parse changed, BSD setpayload changed, new variable \$IGNORE in parseFn ",
+  "4.8.4"  => "15.08.2018 BSD parse changed again ",
+  "4.8.3"  => "14.08.2018 BSD setpayload changed, BSD parse changed, new Internal MYFQDN ", 
+  "4.8.2"  => "13.08.2018 rename makeMsgEvent to makeEvent ",
+  "4.8.1"  => "12.08.2018 IETF-Syslog without VERSION changed, Log verbose 1 to 2 changed in parsePayload ",
+  "4.8.0"  => "12.08.2018 enhanced IETF Parser to match logs without version ", 
+  "4.7.0"  => "10.08.2018 Parser for TPLink added ",
+  "4.6.1"  => "10.08.2018 fix some perl warnings, changed IETF Parser ",
+  "4.6.0"  => "08.08.2018 set sendTestMessage added, new attributes 'contDelimiter', 'respectSeverity' ",
+  "4.5.1"  => "07.08.2018 BSD Regex changed, setpayload of BSD changed ",
+  "4.5.0"  => "06.08.2018 parsing of BSD changed, attribute 'makeMsgEvent' added ",
+  "4.4.0"  => "04.08.2018 Attribute 'outputFields' added ",
+  "4.3.0"  => "03.08.2018 Attribute 'parseFn' added ",
+  "4.2.0"  => "03.08.2018 evaluate sender peer ip-address/hostname and use it as reading in event generation ",
+  "4.1.0"  => "02.08.2018 state event generation changed ",
+  "4.0.0"  => "30.07.2018 Server mode (Collector) implemented ",
+  "3.2.1"  => "04.05.2018 fix compatibility with newer IO::Socket::SSL on debian 9, attribute ssldebug for debugging SSL messages ",
+  "3.2.0"  => "22.11.2017 add NOTIFYDEV if possible ",
+  "3.1.0"  => "28.08.2017 get-function added, commandref revised ",
+  "3.0.0"  => "27.08.2017 change attr type to protocol, ready to first check in ",
+  "2.6.0"  => "26.08.2017 more than one Log2Syslog device can be created ",
+  "2.5.2"  => "26.08.2018 attribute rateCalcRerun ",
+  "2.5.1"  => "24.08.2017 some bugfixes ",
+  "2.5.0"  => "23.08.2017 TLS encryption available to Sender ",
+  "2.4.1"  => "21.08.2017 change PROCID to \$hash->{SEQNO}, switch to non-blocking in subs event/fhemlog ",
+  "2.4.0"  => "20.08.2017 new sub for entries in local fhemlog only including verbose support ",
+  "2.3.1"  => "19.08.2017 commandref revised ",
+  "2.3.0"  => "18.08.2017 new parameter 'ident' in Define to indentify sylog source ",
+  "2.2.0"  => "17.08.2017 set BSD data length, set only acceptable characters (USASCII) in payload ",
+  "2.0.0"  => "16.08.2017 create syslog without perl module SYS::SYSLOG ",
+  "1.1.0"  => "26.07.2017 add regex search to sub Log2Syslog_fhemlog ",
+  "1.0.0"  => "25.07.2017 initial version "
+);
+
+# Hint Hash
+our %Log2Syslog_vHintsExt = (
+  "3" => "The <a href=\"https://tools.ietf.org/pdf/rfc5425.pdf\">RFC5425</a> TLS Transport Protocol",
+  "2" => "The basics of <a href=\"https://tools.ietf.org/html/rfc3164\">RFC3164 (BSD)</a> protocol",
+  "1" => "Informations about <a href=\"https://tools.ietf.org/html/rfc5424\">RFC5424 (IETF)</a> syslog protocol"
+);
+
+###############################################################################
+#    Modul Einbindung
+#
+use TcpServerUtils;
 use Scalar::Util qw(looks_like_number);
 use Encode qw(encode_utf8);
-use Net::Domain qw(hostname hostfqdn hostdomain);
+# use Net::Domain qw(hostname hostfqdn hostdomain);
 eval "use IO::Socket::INET;1" or my $MissModulSocket = "IO::Socket::INET";
 eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $MissModulNDom = "Net::Domain";
+
 
 ###############################################################################
 # Forward declarations
 #
 sub Log2Syslog_Log3slog($$$);
-
-my $Log2SyslogVn = "4.8.5";
 
 # Mappinghash BSD-Formatierung Monat
 our %Log2Syslog_BSDMonth = (
@@ -200,6 +257,7 @@ sub Log2Syslog_Initialize($) {
                       "parseProfile:BSD,IETF,TPLink-Switch,raw,ParseFn ".
                       "parseFn:textField-long ".
                       "respectSeverity:multiple-strict,Emergency,Alert,Critical,Error,Warning,Notice,Informational,Debug ".
+                      "octetCount:1,0 ".
                       "ssldebug:0,1,2,3 ".
 					  "TLS:1,0 ".
 					  "timeout ".
@@ -232,8 +290,10 @@ sub Log2Syslog_Define($@) {
   
   if(int(@a)-3 < 0){
       # Einrichtung Servermode (Collector)
-      Log3 ($name, 3, "Log2Syslog $name - entering Syslog servermode ...");
-      $hash->{MODEL} = "Collector";
+      Log2Syslog_Log3slog ($hash, 3, "Log2Syslog $name - entering Syslog servermode ..."); 
+      $hash->{MODEL}        = "Collector";
+      $hash->{PROFILE}      = "IETF";                          
+      readingsSingleUpdate ($hash, 'Parse_Err_No', 0, 1);  # Fehlerzähler für Parse-Errors auf 0
       Log2Syslog_initServer("$name,global");
   } else {
       # Sendermode
@@ -253,11 +313,11 @@ sub Log2Syslog_Define($@) {
       # nur Events dieser Devices an NotifyFn weiterleiten, NOTIFYDEV wird gesetzt wenn möglich
       notifyRegexpChanged($hash, $hash->{HELPER}{EVNTLOG}) if($hash->{HELPER}{EVNTLOG});
 		
-      $hash->{PEERHOST}         = $a[2];                    # Destination Host (Syslog Server)
+      $hash->{PEERHOST} = $a[2];                            # Destination Host (Syslog Server)
   }
 
   $hash->{SEQNO}            = 1;                            # PROCID in IETF, wird kontinuierlich hochgezählt
-  $hash->{VERSION}          = $Log2SyslogVn;
+  $hash->{VERSION}          = (reverse sort(keys %Log2Syslog_vNotesIntern))[0];
   $logInform{$hash->{NAME}} = "Log2Syslog_fhemlog";         # Funktion die in hash %loginform für $name eingetragen wird
   $hash->{HELPER}{SSLVER}   = "n.a.";                       # Initialisierung
   $hash->{HELPER}{SSLALGO}  = "n.a.";                       # Initialisierung
@@ -284,44 +344,56 @@ return undef;
 sub Log2Syslog_initServer($) {
   my ($a) = @_;
   my ($name,$global) = split(",",$a);
-  my $hash     = $defs{$name};
+  my $hash           = $defs{$name};
+  my $err;
 
   RemoveInternalTimer($hash, "Log2Syslog_initServer");
-  return if(IsDisabled($name));
+  return if(IsDisabled($name) || $hash->{SERVERSOCKET});
   
-  if($init_done != 1) {
-      InternalTimer(gettimeofday()+5, "Log2Syslog_initServer", "$name,$global", 0);
+  if($init_done != 1 || Log2Syslog_IsMemLock($hash)) {
+      InternalTimer(gettimeofday()+1, "Log2Syslog_initServer", "$name,$global", 0);
 	  return;
   }
   # Inititialisierung FHEM ist fertig -> Attribute geladen
   my $port     = AttrVal($name, "TLS", 0)?AttrVal($name, "port", 6514):AttrVal($name, "port", 1514);
   my $protocol = lc(AttrVal($name, "protocol", "udp"));
-  my $lh = $global ? ($global eq "global"? undef : $global) : ($hash->{IPV6} ? "::1" : "127.0.0.1");
+  my $lh = ($global ? ($global eq "global" ? undef : $global) : ($hash->{IPV6} ? "::1" : "127.0.0.1"));
   
-  Log3 $hash, 3, "Log2Syslog $name - Opening socket ...";
+  Log2Syslog_Log3slog ($hash, 3, "Log2Syslog $name - Opening socket on interface \"$global\" ...");
   
-  $hash->{SERVERSOCKET} = IO::Socket::INET->new(
-    Domain    => ($hash->{IPV6} ? AF_INET6() : AF_UNSPEC), # Linux bug
-    LocalHost => $lh,
-    Proto     => $protocol,
-    LocalPort => $port, 
-    ReuseAddr => 1
-  ); 
-  if(!$hash->{SERVERSOCKET}) {
-      my $err = "Can't open Syslog Collector at $port: $!";
-      Log3 ($hash, 1, "Log2Syslog $name - $err");
-      readingsSingleUpdate ($hash, 'state', $err, 1);
-      return;      
+  if($protocol =~ /udp/) {
+      $hash->{SERVERSOCKET} = IO::Socket::INET->new(
+        Domain    => ($hash->{IPV6} ? AF_INET6() : AF_UNSPEC), # Linux bug
+        LocalHost => $lh,
+        Proto     => $protocol,
+        LocalPort => $port, 
+        ReuseAddr => 1
+      ); 
+      if(!$hash->{SERVERSOCKET}) {
+          $err = "Can't open Syslog Collector at $port: $!";
+          Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - $err");
+          readingsSingleUpdate ($hash, 'state', $err, 1);
+          return;      
+      }
+      $hash->{FD}   = $hash->{SERVERSOCKET}->fileno();
+      $hash->{PORT} = $hash->{SERVERSOCKET}->sockport();           
+  } else {
+      $lh = "global" if(!$lh);
+      my $ret = TcpServer_Open($hash,$port,$lh);
+      if($ret) {        
+          $err = "Can't open Syslog TCP Collector at $port: $ret";
+          Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - $err");
+          readingsSingleUpdate ($hash, 'state', $err, 1);
+          return; 
+      }
   }
   
-  $hash->{FD}               = $hash->{SERVERSOCKET}->fileno();
-  $hash->{PORT}             = $hash->{SERVERSOCKET}->sockport();
   $hash->{PROTOCOL}         = $protocol;
   $hash->{SEQNO}            = 1;                            # PROCID wird kontinuierlich pro empfangenen Datensatz hochgezählt
   $hash->{HELPER}{OLDSEQNO} = $hash->{SEQNO};               # Init Sequenznummer f. Ratenbestimmung
   $hash->{INTERFACE}        = $lh?$lh:"global";
   
-  Log3 ($hash, 3, "Log2Syslog $name - port $hash->{PORT}/$protocol opened for Syslog Collector on interface \"$hash->{INTERFACE}\"");
+  Log2Syslog_Log3slog ($hash, 3, "Log2Syslog $name - port $hash->{PORT}/$protocol opened for Syslog Collector on interface \"$hash->{INTERFACE}\"");
   readingsSingleUpdate ($hash, "state", "initialized", 1);
   delete($readyfnlist{"$name.$port"});
   $selectlist{"$name.$port"} = $hash;
@@ -329,120 +401,222 @@ sub Log2Syslog_initServer($) {
 return;
 }
 
-#################################################################################################
-#                       Syslog Collector Daten empfangen
-#                       (im Collector Model)
-#################################################################################################
+########################################################################################################
+#                        Syslog Collector Daten empfangen (im Collector-Mode)
+#  
+#                                        !!!!! Achtung !!!!!
+#  Kontextswitch des $hash beachten:  initialer TCP-Server <-> temporärer TCP-Server ohne SERVERSOCKET
+#
+########################################################################################################
 # called from the global loop, when the select for hash->{FD} reports data
-sub Log2Syslog_Read($) {
-  my ($hash) = @_;
-  my $name   = $hash->{NAME};
-  my $socket = $hash->{SERVERSOCKET};
-  my $st     = ReadingsVal($name,"state","active");
-  my $pp     = AttrVal($name, "parseProfile", "IETF");
-  my $mevt   = AttrVal($name, "makeEvent", "intern");          # wie soll Reading/Eventerstellt werden
-  my $sevevt = AttrVal($name, "respectSeverity", "");             # welcher Schweregrad soll berücksichtigt werden (default: alle)
-  my ($err,$sev,$data,$ts,$phost,$pl,$ignore);
+sub Log2Syslog_Read($@) {
+  my ($hash,$reread) = @_;
+  my $socket         = $hash->{SERVERSOCKET};
+  my ($err,$sev,$data,$ts,$phost,$pl,$ignore,$st,$len,$evt,$pen);  
   
-  return if(IsDisabled($name) || $hash->{MODEL} !~ /Collector/);
-
+  return if($init_done != 1);
+  
+  my $mlen = 8192;                                               # maximale Länge des Syslog-Frames als Begrenzung falls kein EOF
+                                                                 # vom Sender initiiert wird (Endlosschleife vermeiden)
+  if($hash->{TEMPORARY}) {
+      # temporäre Instanz angelegt durch TcpServer_Accept
+      $len = 8192;
+      ($st,$data,$hash) = Log2Syslog_getifdata($hash,$len,$mlen,$reread);
+  }
+  
+  my $name     = $hash->{NAME};
+  return if(IsDisabled($name) || Log2Syslog_IsMemLock($hash));
+  my $pp       = AttrVal($name, "parseProfile", "IETF");
+  my $mevt     = AttrVal($name, "makeEvent", "intern");          # wie soll Reading/Event erstellt werden
+  my $sevevt   = AttrVal($name, "respectSeverity", "");          # welcher Schweregrad soll berücksichtigt werden (default: alle)
+    
   if($pp =~ /BSD/) {
-      # BSD-Format  
-      unless($socket->recv($data, $RFC3164len{DL})) {
-          # ungültige BSD-Payload
-          return if(length($data) == 0);
-          Log2Syslog_Log3slog ($hash, 3, "Log2Syslog $name - received ".length($data)." bytes, but a BSD-message has to be 1024 bytes or less.");
-          Log2Syslog_Log3slog ($hash, 3, "Log2Syslog $name - Seq \"$hash->{SEQNO}\" invalid data: $data"); 
-          $st = "receive error - see logfile";          
-      } else {
-          # parse Payload  
-          ($err,$ignore,$sev,$phost,$ts,$pl) = Log2Syslog_parsePayload($hash,$data);      
-          $hash->{SEQNO}++;
-          if($err) {
-              $st = "parse error - see logfile";
-          } elsif ($ignore) {
-              Log3 $name, 5, "Log2Syslog $name -> dataset was ignored by parseFn";
-          } else {
-              return if($sevevt && $sevevt !~ m/$sev/);            # Message nicht berücksichtigen
-              $st = "active";
-              if($mevt =~ /intern/) {
-                  # kein Reading, nur Event
-                  $pl = "$phost: $pl";
-                  Log2Syslog_Trigger($hash,$ts,$pl);
-              } elsif ($mevt =~ /reading/) {
-                  # Reading, Event abhängig von event-on-.*
-                  readingsSingleUpdate($hash, "MSG_$phost", $pl, 1);
-              } else {
-                  # Reading ohne Event
-                  readingsSingleUpdate($hash, "MSG_$phost", $pl, 0);
-              }
-          }
-      }
+      # BSD-Format
+          $len = $RFC3164len{DL};
   
-  } elsif($pp =~ /IETF/) {
-      # IETF-Format
-      unless($socket->recv($data, $RFC5425len{DL})) {
-          # ungültige IETF-Payload
-          return if(length($data) == 0);
-          Log2Syslog_Log3slog ($hash, 3, "Log2Syslog $name - received ".length($data)." bytes, but a IETF-message has to be 8192 bytes or less.");
-          Log2Syslog_Log3slog ($hash, 3, "Log2Syslog $name - Seq \"$hash->{SEQNO}\" invalid data: $data");
-          $st = "receive error - see logfile";            
-      } else {
-          # parse Payload  
-          ($err,$ignore,$sev,$phost,$ts,$pl) = Log2Syslog_parsePayload($hash,$data);      
-          $hash->{SEQNO}++;
-          if($err) {
-              $st = "parse error - see logfile";
-          } elsif ($ignore) {
-              Log3 $name, 5, "Log2Syslog $name -> dataset was ignored by parseFn";
-          } else {
-              return if($sevevt && $sevevt !~ m/$sev/);            # Message nicht berücksichtigen
-              $st = "active";
-              if($mevt =~ /intern/) {
-                  # kein Reading, nur Event
-                  $pl = "$phost: $pl";
-                  Log2Syslog_Trigger($hash,$ts,$pl);
-              } elsif ($mevt =~ /reading/) {
-                  # Reading, Event abhängig von event-on-.*
-                  readingsSingleUpdate($hash, "MSG_$phost", $pl, 1);
-              } else {
-                  # Reading ohne Event
-                  readingsSingleUpdate($hash, "MSG_$phost", $pl, 0);
-              }
-          }
-      }  
+  } elsif ($pp =~ /IETF/) {
+      # IETF-Format   
+          $len = $RFC5425len{DL};     
+      
   } else {
       # raw oder User eigenes Format
-      $socket->recv($data, 8192);
-      ($err,$ignore,$sev,$phost,$ts,$pl) = Log2Syslog_parsePayload($hash,$data);      
-      $hash->{SEQNO}++;
-      if($err) {
-          $st = "parse error - see logfile";
-      } elsif ($ignore) {
-          Log3 $name, 5, "Log2Syslog $name -> dataset was ignored by parseFn";
-      } else {
-          return if($sevevt && $sevevt !~ m/$sev/);            # Message nicht berücksichtigen
-          $st = "active";
-          if($mevt =~ /intern/) {
-              # kein Reading, nur Event
-              $pl = "$phost: $pl";
-              Log2Syslog_Trigger($hash,$ts,$pl);
-          } elsif ($mevt =~ /reading/) {
-              # Reading, Event abhängig von event-on-.*
-              readingsSingleUpdate($hash, "MSG_$phost", $pl, 1);
-          } else {
-              # Reading ohne Event
-              readingsSingleUpdate($hash, "MSG_$phost", $pl, 0);
-          }
-      }      
+          $len = 8192;        
+  } 
   
+  if($socket) {
+      ($st,$data,$hash) = Log2Syslog_getifdata($hash,$len,$mlen,$reread);
   }
-  # readingsSingleUpdate($hash, "state", $st, 1) if($st ne OldValue($name));  
-  my $evt = ($st eq $hash->{HELPER}{OLDSTATE})?0:1;
-  readingsSingleUpdate($hash, "state", $st, $evt);
-  $hash->{HELPER}{OLDSTATE} = $st;  
   
+  if($data) {
+      # parse Payload 
+      my (@load,$mlen,$msg,$tail);
+      if($data =~ /^(?<mlen>(\d+))\s(?<tail>.*)/s) {
+          # Syslog Sätze mit Octet Count -> Transmission of Syslog Messages over TCP https://tools.ietf.org/html/rfc6587
+          my $i = 0;
+          $mlen = $+{mlen};
+	      $tail = $+{tail};	      
+          $msg  = substr($tail,0,$mlen);
+          chomp $msg;
+          push @load, $msg;
+          $tail = substr($tail,$mlen);          
+          Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> LEN$i: $mlen, MSG$i: $msg, TAIL$i: $tail"); 
+          
+          while($tail && $tail =~ /^(?<mlen>(\d+))\s(?<tail>.*)/s) {
+              $i++;
+              $mlen = $+{mlen};
+              $tail = $+{tail};	      
+              $msg  = substr($tail,0,$mlen);
+              chomp $msg;
+              push @load, $msg;
+              $tail = substr($tail,$mlen);           
+              Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> LEN$i: $mlen, MSG$i: $msg, TAIL$i: $tail");             
+          }   
+      } else {
+          @load = split("[\r\n]",$data);
+      }
+ 
+      foreach my $line (@load) {          
+          ($err,$ignore,$sev,$phost,$ts,$pl) = Log2Syslog_parsePayload($hash,$line);       
+          $hash->{SEQNO}++;
+          if($err) {
+              $pen = ReadingsVal($name, "Parse_Err_No", 0);
+              $pen++;
+              readingsSingleUpdate($hash, 'Parse_Err_No', $pen, 1);
+              $st = "parse error - see logfile";
+          } elsif ($ignore) {
+              Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> dataset was ignored by parseFn");
+          } else {
+              return if($sevevt && $sevevt !~ m/$sev/);            # Message nicht berücksichtigen
+              $st = "active";
+              if($mevt =~ /intern/) {
+                  # kein Reading, nur Event
+                  $pl = "$phost: $pl";
+                  Log2Syslog_Trigger($hash,$ts,$pl);
+              } elsif ($mevt =~ /reading/) {
+                  # Reading, Event abhängig von event-on-.*
+                  readingsSingleUpdate($hash, "MSG_$phost", $pl, 1);
+              } else {
+                  # Reading ohne Event
+                  readingsSingleUpdate($hash, "MSG_$phost", $pl, 0);
+              }
+          }
+          $evt = ($st eq $hash->{HELPER}{OLDSTATE})?0:1;
+          readingsSingleUpdate($hash, "state", $st, $evt);
+          $hash->{HELPER}{OLDSTATE} = $st; 
+      }
+  }
+      
 return;
+}
+
+###############################################################################
+#                  Daten vom Interface holen 
+#
+# Die einzige Aufgabe der Instanz mit SERVERSOCKET ist TcpServer_Accept 
+# durchzufuehren (und evtl. noch Statistiken). Durch den Accept wird eine 
+# weitere Instanz des gleichen Typs angelegt die eine Verbindung repraesentiert 
+# und im ReadFn die eigentliche Arbeit macht:
+#
+# - ohne SERVERSOCKET dafuer mit CD/FD, PEER und PORT. CD/FD enthaelt den 
+#   neuen Filedeskriptor.
+# - mit TEMPORARY (damit es nicht gespeichert wird)
+# - SNAME verweist auf die "richtige" Instanz, damit man die Attribute 
+#   abfragen kann.
+# - TcpServer_Accept traegt den neuen Filedeskriptor in die globale %selectlist 
+#   ein. Damit wird ReadFn von fhem.pl/select mit dem temporaeren Instanzhash 
+#   aufgerufen, wenn Daten genau bei dieser Verbindung anstehen.
+#   (sSiehe auch "list TYPE=FHEMWEB", bzw. "man -s2 accept")
+# 
+###############################################################################
+sub Log2Syslog_getifdata($$@) {
+  my ($hash,$len,$mlen,$reread)   = @_;
+  my $name     = $hash->{NAME};
+  my $socket   = $hash->{SERVERSOCKET};
+  my $protocol = lc(AttrVal($name, "protocol", "udp"));
+  if($hash->{TEMPORARY}) {
+      # temporäre Instanz abgelegt durch TcpServer_Accept
+      $protocol = "tcp";
+  }
+  my $st = ReadingsVal($name,"state","active");
+  my ($data,$ret);
+  
+  if($socket && $protocol =~ /udp/) { 
+      # UDP Datagramm empfangen
+      Log2Syslog_Log3slog ($hash, 4, "Log2Syslog $name - ####################################################### ");
+      Log2Syslog_Log3slog ($hash, 4, "Log2Syslog $name - #########        new Syslog UDP Parsing       ######### ");
+      Log2Syslog_Log3slog ($hash, 4, "Log2Syslog $name - ####################################################### ");      
+      unless($socket->recv($data, $len)) {
+          Log2Syslog_Log3slog ($hash, 3, "Log2Syslog $name - Seq \"$hash->{SEQNO}\" invalid data: $data"); 
+          $data = '' if(length($data) == 0);
+          $st = "receive error - see logfile";
+      }              
+  } elsif ($protocol =~ /tcp/) {
+      if($hash->{SERVERSOCKET}) {   # Accept and create a child
+          my $nhash = TcpServer_Accept($hash, "Log2Syslog");
+          return ($st,$data,$hash) if(!$nhash);
+          $nhash->{CD}->blocking(0);
+		  if($nhash->{SSL}) {
+		      my $sslver  = $nhash->{CD}->get_sslversion();
+		      my $sslalgo = $nhash->{CD}->get_fingerprint(); 
+			  readingsSingleUpdate($hash, "SSL_Version", $sslver, 1);
+			  readingsSingleUpdate($hash, "SSL_Algorithm", $sslalgo, 1);	  
+		  }
+		  return ($st,$data,$hash);
+      }
+
+      my $sname = $hash->{SNAME};
+      my $cname = $hash->{NAME};
+      my $shash = $defs{$sname};    # Hash des Log2Syslog-Devices bei temporärer TCP-Serverinstanz
+      
+      Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - ####################################################### ");
+      Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - #########        new Syslog TCP Parsing       ######### ");
+      Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - ####################################################### ");
+      Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - childname: $cname");
+      $st       = ReadingsVal($sname,"state","active");
+      my $c = $hash->{CD};
+      if($c) {
+          $shash->{HELPER}{TCPPADDR} = $hash->{PEER};
+          if(!$reread) {
+              my $buf;  	  		  
+              my $off = 0;
+              $ret = sysread($c, $buf, $len);  # returns undef on error, 0 at end of file and Integer, number of bytes read on success.                
+              
+              if(!defined($ret) && $! == EWOULDBLOCK ){
+			      # error
+                  $hash->{wantWrite} = 1 if(TcpServer_WantWrite($hash));
+                  $hash = $shash;
+                  return ($st,undef,$hash); 
+
+              } elsif (!$ret) {
+			      # end of file
+                  CommandDelete(undef, $cname); 
+                  $hash = $shash;
+                  Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - Connection closed for $cname: ".(defined($ret) ? 'EOF' : $!));
+                  return ($st,undef,$hash); 
+              
+              }
+              $hash->{BUF} .= $buf;
+              
+              if($hash->{SSL} && $c->can('pending')) {
+                  while($c->pending()) {
+                      sysread($c, $buf, 1024);
+                      $hash->{BUF} .= $buf;
+                  }
+              }
+              
+              $data = $hash->{BUF};
+              delete $hash->{BUF};
+              $hash = $shash;
+              Log2Syslog_Log3slog ($shash, 5, "Log2Syslog $sname - Buffer content:\n$data");         
+          }
+      }
+      
+  } else {
+      $st = "error - no socket opened";
+      $data = '';
+  }
+
+return ($st,$data,$hash); 
 }
 
 ###############################################################################
@@ -477,14 +651,11 @@ sub Log2Syslog_parsePayload($$) {
             CONT    => \$cont,
             DATA    => \$data
            );
-    
-  Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name - ###  new Syslog message Parsing ### ");
   
   # Sender Host / IP-Adresse ermitteln, $phost wird Reading im Event
-  my ($phost,$paddr) = Log2Syslog_evalPeer($hash);
-  $phost = $phost?$phost:$paddr;
+  my ($phost) = Log2Syslog_evalPeer($hash);
   
-  Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name - raw message -> $data");
+  Log2Syslog_Log3slog ($hash, 4, "Log2Syslog $name - raw message -> $data");
   
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);       # Istzeit Ableitung
   $year = $year+1900;
@@ -605,7 +776,7 @@ sub Log2Syslog_parsePayload($$) {
           $err = 1;
           Log2Syslog_Log3slog ($hash, 2, "Log2Syslog $name - error parse msg -> $data");  
 	      no warnings 'uninitialized'; 
-          Log2Syslog_Log3slog($name, 5, "$name - parsed fields -> PRI: $prival, IETF: $ietf, DATE: $date, TIME: $time, HOST: $host, ID: $id, PID: $pid, MID: $mid, SDFIELD: $sdfield, CONT: $cont");
+          Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name - parsed fields -> PRI: $prival, IETF: $ietf, DATE: $date, TIME: $time, HOST: $host, ID: $id, PID: $pid, MID: $mid, SDFIELD: $sdfield, CONT: $cont");
 		  use warnings;          
       } else {
           $ts = "$date $time";
@@ -718,7 +889,7 @@ sub Log2Syslog_parsePayload($$) {
 
  	      eval $parseFn;
           if($@) {
-	          Log3 $name, 2, "Log2Syslog $name -> error parseFn: $@";
+              Log2Syslog_Log3slog ($hash, 2, "Log2Syslog $name -> error parseFn: $@"); 
               $err = 1;
           }
          		 
@@ -768,12 +939,7 @@ sub Log2Syslog_parsePayload($$) {
           $err = 1;
           Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - no parseFn defined."); 
       }
-  }
-  
-  if(AttrVal($name, "TLS", 0)) {
-      # wenn Transport Layer Security (TLS) -> Transport Mapping for Syslog https://tools.ietf.org/pdf/rfc5425.pdf
-	  
-  } 	
+  }	
 
 return ($err,$ignore,$sev,$phost,$ts,$pl);
 }
@@ -812,27 +978,50 @@ sub Log2Syslog_Undef($$) {
   
   RemoveInternalTimer($hash);
   
-  if($hash->{MODEL} =~ /Collector/) {
-      Log2Syslog_downServer($hash);
-  }
-  
+  Log2Syslog_closesock($hash,1);    # Clientsocket schließen 
+  Log2Syslog_downServer($hash,1);   # Serversocket schließen, kill children
+
 return undef;
 }
 
 ###############################################################################
 #                         Collector-Socket schließen
 ###############################################################################
-sub Log2Syslog_downServer($) {
-  my ($hash)   = @_;
+sub Log2Syslog_downServer($;$) {
+  my ($hash,$delchildren)   = @_;
   my $name     = $hash->{NAME};
   my $port     = $hash->{PORT};
   my $protocol = $hash->{PROTOCOL};
+  my $ret;
   
-  return if(!$hash->{SERVERSOCKET});
+  return if(!$hash->{SERVERSOCKET} || $hash->{MODEL} !~ /Collector/);
+  Log2Syslog_Log3slog ($hash, 3, "Log2Syslog $name - Closing server socket $protocol/$port ...");
   
-  Log3 $hash, 3, "Log2Syslog $name - Closing socket $protocol/$port ...";
-  my $ret = $hash->{SERVERSOCKET}->close();
-  Log3 $hash, 1, "Log2Syslog $name - Can't close Syslog Collector at port $port: $!" if(!$ret);
+  if($protocol =~ /tcp/) {
+      TcpServer_Close($hash);
+      delete($hash->{CONNECTS});
+      delete($hash->{SERVERSOCKET});
+      
+      if($delchildren) {
+          my @children = devspec2array($name."_.*");
+          foreach (@children) {
+              my $child = $_;
+              if($child ne $name."_.*") {
+                  CommandDelete(undef, $child); 
+                  Log2Syslog_Log3slog ($hash, 3, "Log2Syslog $name - child instance $child deleted."); 
+              }
+          }
+		  delete($hash->{HELPER}{SSLALGO});
+	      delete($hash->{HELPER}{SSLVER});
+		  readingsSingleUpdate($hash, "SSL_Version", "n.a.", 1);
+	      readingsSingleUpdate($hash, "SSL_Algorithm", "n.a.", 1);
+      }
+      return;
+  }
+  
+  $ret = $hash->{SERVERSOCKET}->close();  
+  
+  Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - Can't close Syslog Collector at port $port: $!") if(!$ret);
   delete($hash->{SERVERSOCKET});
   delete($selectlist{"$name.$port"});
   delete($readyfnlist{"$name.$port"});
@@ -861,10 +1050,11 @@ sub Log2Syslog_Set($@) {
   my $prop    = $a[2];
   
   my $setlist = "Unknown argument $opt, choose one of ".
-                "sendTestMessage " 
+                "reopen:noArg ".	
+                (($hash->{MODEL} =~ /Sender/)?"sendTestMessage ":"")
                 ;
   
-  return if(AttrVal($name, "disable", "") eq "1" || $hash->{MODEL} !~ /Sender/);
+  return if(AttrVal($name, "disable", "") eq "1");
   
   if($opt =~ /sendTestMessage/) {
       my $own;
@@ -875,6 +1065,17 @@ sub Log2Syslog_Set($@) {
       }
 	  Log2Syslog_sendTestMsg($hash,$own);
   
+  } elsif($opt =~ /reopen/) {
+        $hash->{HELPER}{MEMLOCK} = 1;
+        InternalTimer(gettimeofday()+2, "Log2Syslog_deleteMemLock", $hash, 0);     
+        
+        Log2Syslog_closesock($hash,1);                                                         # Clientsocket schließen
+        Log2Syslog_downServer($hash,1);                                                        # Serversocket schließen     
+        if($hash->{MODEL} =~ /Collector/) {                                                    # Serversocket öffnen
+            InternalTimer(gettimeofday()+0.5, "Log2Syslog_initServer", "$name,global", 0);  
+            readingsSingleUpdate ($hash, 'Parse_Err_No', 0, 1);                                # Fehlerzähler für Parse-Errors auf 0			
+        }
+		
   } else {
       return "$setlist";
   }  
@@ -883,7 +1084,7 @@ return undef;
 }
 
 ###############################################################################
-#              Get
+#                                    Get
 ###############################################################################
 sub Log2Syslog_Get($@) {
   my ($hash, @a) = @_;
@@ -891,25 +1092,81 @@ sub Log2Syslog_Get($@) {
   my $name    = $a[0];
   my $opt     = $a[1];
   my $prop    = $a[2];
-  
+  my $st;
   my $getlist = "Unknown argument $opt, choose one of ".
-                "certinfo:noArg " 
+                (($hash->{MODEL} !~ /Collector/)?"certInfo:noArg ":"").
+                "versionNotes:noArg "				
                 ;
   
   return if(AttrVal($name, "disable", "") eq "1");
   
   my($sock,$cert,@certs);
-  if ($opt =~ /certinfo/) {
+  if ($opt =~ /certInfo/) {
       if(ReadingsVal($name,"SSL_Version","n.a.") ne "n.a.") {
-	      $sock = Log2Syslog_opensock($hash);
-		  if(defined($sock)) {
+          ($sock,$st) = Log2Syslog_opensock($hash,0);
+		  if($sock) {
 		      $cert = $sock->dump_peer_certificate();
-		      Log2Syslog_closesock($hash,$sock);
+		      # Log2Syslog_closesock($hash);
 		  }
 	  }
 	  return $cert if($cert);
 	  return "no SSL session has been created";
 	  
+  } elsif ($opt =~ /versionNotes/) {
+	  my $header  = "<b>Module release information table</b><br>";
+      my $header1 = "<b>Helpful hints</b><br>";
+	  
+	  # Ausgabetabelle erstellen
+	  my ($ret,$val0,$val1);
+	  $ret  = "<html>";
+	  $ret .= sprintf("<div class=\"makeTable wide\"; style=\"text-align:left\">$header <br>");
+	  $ret .= "<table class=\"block wide internals\">";
+	  $ret .= "<tbody>";
+	  $ret .= "<tr class=\"even\">";
+	  my $i = 0;
+	  foreach my $key (reverse sort(keys %Log2Syslog_vNotesExtern)) {
+		  ($val0,$val1) = split(/\s/,$Log2Syslog_vNotesExtern{$key},2);
+		  $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0  </td><td>$val1</td>" );
+		  $ret .= "</tr>";
+          $i++;
+          if ($i & 1) {
+              # $i ist ungerade
+		      $ret .= "<tr class=\"odd\">";
+          } else {
+              $ret .= "<tr class=\"even\">";
+          }
+	  }
+	  $ret .= "</tr>";
+	  $ret .= "</tbody>";
+	  $ret .= "</table>";
+	  $ret .= "</div>";
+          
+	  $ret .= sprintf("<div class=\"makeTable wide\"; style=\"text-align:left\">$header1 <br>");
+	  $ret .= "<table class=\"block wide internals\">";
+	  $ret .= "<tbody>";
+	  $ret .= "<tr class=\"even\">";          
+	  $i = 0;
+	  foreach my $key (reverse sort(keys %Log2Syslog_vHintsExt)) {
+		  $val0 = $Log2Syslog_vHintsExt{$key};
+		  $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0</td>" );
+		  $ret .= "</tr>";
+          $i++;
+          if ($i & 1) {
+              # $i ist ungerade
+		      $ret .= "<tr class=\"odd\">";
+          } else {
+              $ret .= "<tr class=\"even\">";
+          }
+	  }
+
+	  $ret .= "</tr>";
+	  $ret .= "</tbody>";
+	  $ret .= "</table>";
+	  $ret .= "</div>";
+	  $ret .= "</html>";
+					
+	return $ret;
+  
   } else {
       return "$getlist";
   } 
@@ -921,7 +1178,7 @@ return undef;
 sub Log2Syslog_Attr ($$$$) {
     my ($cmd,$name,$aName,$aVal) = @_;
     my $hash = $defs{$name};
-    my $do;
+    my ($do,$st);
       
     # $cmd can be "del" or "set"
     # $name is device name
@@ -931,7 +1188,7 @@ sub Log2Syslog_Attr ($$$$) {
          return "\"$aName\" is only valid for model \"Collector\"";
 	}
     
-	if ($cmd eq "set" && $hash->{MODEL} =~ /Collector/ && $aName =~ /addTimestamp|contDelimiter|addStateEvent|protocol|logFormat|timeout|TLS/) {
+	if ($cmd eq "set" && $hash->{MODEL} =~ /Collector/ && $aName =~ /addTimestamp|contDelimiter|addStateEvent|logFormat|octetCount|ssldebug|timeout/) {
         return "\"$aName\" is only valid for model \"Sender\"";
 	}
     
@@ -941,9 +1198,20 @@ sub Log2Syslog_Attr ($$$$) {
             $do = $aVal?1:0;
         }
         $do = 0 if($cmd eq "del");
-        my $val = ($do&&$aVal=~/maintenance/)?"maintenance":($do&&$aVal==1)?"disabled":"active";
+        $st = ($do&&$aVal=~/maintenance/)?"maintenance":($do&&$aVal==1)?"disabled":"initialized";
 		
-        readingsSingleUpdate($hash, "state", $val, 1);
+        $hash->{HELPER}{MEMLOCK} = 1;
+        InternalTimer(gettimeofday()+2, "Log2Syslog_deleteMemLock", $hash, 0);
+		
+        if($do==0 || $aVal=~/maintenance/) {
+		    if($hash->{MODEL} =~ /Collector/) {
+                Log2Syslog_downServer($hash,1);     # Serversocket schließen und wieder öffnen
+                InternalTimer(gettimeofday()+0.5, "Log2Syslog_initServer", "$name,global", 0);                 
+			} 
+		} else {
+		    Log2Syslog_closesock($hash,1);          # Clientsocket schließen 
+            Log2Syslog_downServer($hash);           # Serversocket schließen
+		}         
     }
 	
     if ($aName eq "TLS") {
@@ -952,11 +1220,22 @@ sub Log2Syslog_Attr ($$$$) {
         }
         $do = 0 if($cmd eq "del");
         if ($do == 0) {		
-            $hash->{HELPER}{SSLVER}  = "n.a.";
-            $hash->{HELPER}{SSLALGO} = "n.a.";
-			readingsSingleUpdate($hash, "SSL_Version", "n.a.", 1);
-            readingsSingleUpdate($hash, "SSL_Algorithm", "n.a.", 1);
-		}
+            delete $hash->{SSL};
+		} else {
+            if($hash->{MODEL} =~ /Collector/) {
+                $attr{$name}{protocol} = "TCP" if(AttrVal($name, "protocol", "UDP") ne "TCP");
+                TcpServer_SetSSL($hash);
+            }
+        }
+        $hash->{HELPER}{MEMLOCK} = 1;
+        InternalTimer(gettimeofday()+2, "Log2Syslog_deleteMemLock", $hash, 0);     
+        
+        Log2Syslog_closesock($hash,1);                                                         # Clientsocket schließen
+        Log2Syslog_downServer($hash,1);                                                        # Serversocket schließen     
+        if($hash->{MODEL} =~ /Collector/) {
+            InternalTimer(gettimeofday()+0.5, "Log2Syslog_initServer", "$name,global", 0);     # Serversocket öffnen
+            readingsSingleUpdate ($hash, 'Parse_Err_No', 0, 1);                                # Fehlerzähler für Parse-Errors auf 0			
+        }              
     }
     
     if ($aName =~ /rateCalcRerun/) {
@@ -968,11 +1247,33 @@ sub Log2Syslog_Attr ($$$$) {
 	
 	if ($cmd eq "set" && $aName =~ /port|timeout/) {
         if($aVal !~ m/^\d+$/) { return " The Value of \"$aName\" is not valid. Use only figures !";}
+        
+        $hash->{HELPER}{MEMLOCK} = 1;
+        InternalTimer(gettimeofday()+2, "Log2Syslog_deleteMemLock", $hash, 0);
+        
         if($aName =~ /port/ && $hash->{MODEL} =~ /Collector/ && $init_done) {
             return "$aName \"$aVal\" is not valid because privileged ports are only usable by super users. Use a port grater than 1023."  if($aVal < 1024);
-            Log2Syslog_downServer($hash);
-            RemoveInternalTimer($hash, "Log2Syslog_initServer");
-            InternalTimer(gettimeofday()+1.5, "Log2Syslog_initServer", "$name,global", 0);
+            Log2Syslog_downServer($hash,1);                                                      # Serversocket schließen
+            InternalTimer(gettimeofday()+0.5, "Log2Syslog_initServer", "$name,global", 0);
+            readingsSingleUpdate ($hash, 'Parse_Err_No', 0, 1);                                # Fehlerzähler für Parse-Errors auf 0			
+        } elsif ($aName =~ /port/ && $hash->{MODEL} !~ /Collector/) {
+            Log2Syslog_closesock($hash,1);                                                     # Clientsocket schließen               
+        }
+	}
+    
+	if ($aName =~ /protocol/) {
+        if($aVal =~ /UDP/) {
+            $attr{$name}{TLS} = 0 if(AttrVal($name, "TLS", 0));        
+        }
+        $hash->{HELPER}{MEMLOCK} = 1;
+        InternalTimer(gettimeofday()+2, "Log2Syslog_deleteMemLock", $hash, 0);
+        
+        if($hash->{MODEL} eq "Collector") {
+            Log2Syslog_downServer($hash,1);                                                      # Serversocket schließen
+            InternalTimer(gettimeofday()+0.5, "Log2Syslog_initServer", "$name,global", 0);
+			readingsSingleUpdate ($hash, 'Parse_Err_No', 0, 1);                                # Fehlerzähler für Parse-Errors auf 0
+        } else {
+            Log2Syslog_closesock($hash,1);                                                     # Clientsocket schließen  
         }
 	}
     
@@ -999,19 +1300,25 @@ sub Log2Syslog_Attr ($$$$) {
           return $err if($err);
 	}
     
-	if ($cmd eq "set" && $aName =~ /parseProfile/ && $aVal =~ /ParseFn/) {
-          return "You have to define a parse-function via attribute \"parseFn\" first !" if(!AttrVal($name,"parseFn",""));
-	}
+	if ($aName =~ /parseProfile/) {
+          if ($cmd eq "set" && $aVal =~ /ParseFn/) {
+              return "You have to define a parse-function via attribute \"parseFn\" first !" if(!AttrVal($name,"parseFn",""));
+	      }
+          if ($cmd eq "set") {
+              $hash->{PROFILE} = $aVal;
+          } else {
+              $hash->{PROFILE} = "IETF";
+          }
+          readingsSingleUpdate ($hash, 'Parse_Err_No', 0, 1);  # Fehlerzähler für Parse-Errors auf 0
+    }
     
     if ($cmd eq "del" && $aName =~ /parseFn/ && AttrVal($name,"parseProfile","") eq "ParseFn" ) {
           return "You use a parse-function via attribute \"parseProfile\". Please change/delete attribute \"parseProfile\" first !";
     }
     
     if ($aName =~ /makeEvent/) {
-        if($aVal =~ /intern/ || $cmd eq "del") {
-            foreach my $reading (grep { /MSG_/ } keys %{$defs{$name}{READINGS}}) {
-                readingsDelete($defs{$name}, $reading);
-            }
+        foreach my $key(keys%{$defs{$name}{READINGS}}) {
+            delete($defs{$name}{READINGS}{$key}) if($key !~ /state|Transfered_logs_per_minute|SSL_.*|Parse_Err_No/);
         }
     }    
     
@@ -1028,9 +1335,21 @@ sub Log2Syslog_eventlog($$) {
   my $rex     = $hash->{HELPER}{EVNTLOG};
   my $st      = ReadingsVal($name,"state","active");
   my $sendsev = AttrVal($name, "respectSeverity", "");              # Nachrichten welcher Schweregrade sollen gesendet werden
-  my ($prival,$sock,$data,$pid,$sevAstxt);
+  my ($prival,$data,$sock,$pid,$sevAstxt);
   
-  return if(IsDisabled($name) || !$rex || $hash->{MODEL} !~ /Sender/);
+  if(IsDisabled($name)) {
+      $st = AttrVal($name, "disable", "0"); 
+	  $st = ($st =~ /maintenance/)?$st:"disabled";
+	  my $evt = ($st eq $hash->{HELPER}{OLDSTATE})?0:1;
+	  readingsSingleUpdate($hash, "state", $st, $evt);
+	  $hash->{HELPER}{OLDSTATE} = $st;
+      return;
+  }
+  
+  if($init_done != 1 || !$rex || $hash->{MODEL} !~ /Sender/ || Log2Syslog_IsMemLock($hash)) {
+      return;
+  }
+  
   my $events = deviceEvents($dev, AttrVal($name, "addStateEvent", 0));
   return if(!$events);
 
@@ -1039,9 +1358,9 @@ sub Log2Syslog_eventlog($$) {
   my $tn  = $dev->{NTFY_TRIGGERTIME};
   my $ct  = $dev->{CHANGETIME};
   
-  $sock = Log2Syslog_opensock($hash);
-  
-  if(defined($sock)) { 
+  ($sock,$st) = Log2Syslog_opensock($hash,0);
+	
+  if($sock) { 
       for (my $i = 0; $i < $max; $i++) {
           my $txt = $events->[$i];
           $txt = "" if(!defined($txt));
@@ -1056,26 +1375,27 @@ sub Log2Syslog_eventlog($$) {
 	          ($prival,$sevAstxt) = Log2Syslog_setprival($txt);
               if($sendsev && $sendsev !~ m/$sevAstxt/) {
                   # nicht senden wenn Severity nicht in "respectSeverity" enthalten
-                  Log2Syslog_Log3slog($name, 5, "$name - Warning - Payload NOT sent due to Message Severity not in attribute \"respectSeverity\"\n");
+                  Log2Syslog_Log3slog($name, 5, "Log2Syslog $name - Warning - Payload NOT sent due to Message Severity not in attribute \"respectSeverity\"\n");
                   next;        
               }
 
 	          ($data,$pid) = Log2Syslog_setpayload($hash,$prival,$date,$time,$otp,"event");	
               next if(!$data);			  
           
-			  my $ret = syswrite $sock, $data."\n";
+			  my $ret = syswrite ($sock,$data);
 			  if($ret && $ret > 0) {      
-				  Log2Syslog_Log3slog($name, 4, "$name - Payload sequence $pid sent\n");	
+				  Log2Syslog_Log3slog($name, 4, "Log2Syslog $name - Payload sequence $pid sent\n");	
               } else {
                   my $err = $!;
-				  Log2Syslog_Log3slog($name, 4, "$name - Warning - Payload sequence $pid NOT sent: $err\n");	
+				  Log2Syslog_Log3slog($name, 3, "Log2Syslog $name - Warning - Payload sequence $pid NOT sent: $err\n");	
                   $st = "write error: $err";                 
 			  }
           }
       } 
-      Log2Syslog_closesock($hash,$sock);
+   
+      Log2Syslog_closesock($hash) if($st =~ /^write error:.*/);
   }
-
+  
   my $evt = ($st eq $hash->{HELPER}{OLDSTATE})?0:1;
   readingsSingleUpdate($hash, "state", $st, $evt);
   $hash->{HELPER}{OLDSTATE} = $st; 
@@ -1094,7 +1414,18 @@ sub Log2Syslog_fhemlog($$) {
   my $sendsev = AttrVal($name, "respectSeverity", "");              # Nachrichten welcher Schweregrade sollen gesendet werden
   my ($prival,$sock,$err,$ret,$data,$pid,$sevAstxt);
   
-  return if(IsDisabled($name) || !$rex || $hash->{MODEL} !~ /Sender/);
+  if(IsDisabled($name)) {
+      $st = AttrVal($name, "disable", "1"); 
+	  $st = ($st =~ /maintenance/)?$st:"disabled";
+	  my $evt = ($st eq $hash->{HELPER}{OLDSTATE})?0:1;
+	  readingsSingleUpdate($hash, "state", $st, $evt);
+	  $hash->{HELPER}{OLDSTATE} = $st;
+      return;
+  }
+  
+  if($init_done != 1 || !$rex || $hash->{MODEL} !~ /Sender/ || Log2Syslog_IsMemLock($hash)) {
+      return;
+  }
 	
   my ($date,$time,$vbose,undef,$txt) = split(" ",$raw,5);
   $txt = Log2Syslog_charfilter($hash,$txt);
@@ -1107,25 +1438,26 @@ sub Log2Syslog_fhemlog($$) {
 	  ($prival,$sevAstxt) = Log2Syslog_setprival($txt,$vbose);
       if($sendsev && $sendsev !~ m/$sevAstxt/) {
           # nicht senden wenn Severity nicht in "respectSeverity" enthalten
-          Log2Syslog_Log3slog($name, 5, "$name - Warning - Payload NOT sent due to Message Severity not in attribute \"respectSeverity\"\n");
+          Log2Syslog_Log3slog($name, 5, "Log2Syslog $name - Warning - Payload NOT sent due to Message Severity not in attribute \"respectSeverity\"\n");
           return;        
       }
 	  
       ($data,$pid) = Log2Syslog_setpayload($hash,$prival,$date,$time,$otp,"fhem");	
 	  return if(!$data);
+      
+      ($sock,$st) = Log2Syslog_opensock($hash,0);
 	  
-      $sock = Log2Syslog_opensock($hash);
-	  
-      if (defined($sock)) {
-	      $ret = syswrite $sock, $data."\n" if($data);
+      if ($sock) {
+	      $ret = syswrite($sock,$data) if($data);
 		  if($ret && $ret > 0) {  
-		      Log2Syslog_Log3slog($name, 4, "$name - Payload sequence $pid sent\n");	
+		      Log2Syslog_Log3slog($name, 4, "Log2Syslog $name - Payload sequence $pid sent\n");	
           } else {
               my $err = $!;
-			  Log2Syslog_Log3slog($name, 4, "$name - Warning - Payload sequence $pid NOT sent: $err\n");	
+			  Log2Syslog_Log3slog($name, 3, "Log2Syslog $name - Warning - Payload sequence $pid NOT sent: $err\n");	
               $st = "write error: $err";             
 	      }  
-          Log2Syslog_closesock($hash,$sock);
+          
+          Log2Syslog_closesock($hash) if($st =~ /^write error:.*/);
 	  }
   }
   
@@ -1143,11 +1475,13 @@ sub Log2Syslog_sendTestMsg($$) {
   my ($hash,$own) = @_;                              
   my $name        = $hash->{NAME};
   my $st          = ReadingsVal($name,"state","active");
-  my ($prival,$ts,$tim,$date,$time,$sock,$err,$ret,$data,$pid,$otp);
+  my ($prival,$ts,$sock,$tim,$date,$time,$err,$ret,$data,$pid,$otp);
   
   if($own) {
       # eigene Testmessage ohne Formatanpassung raw senden
       $data = $own;
+      $pid = $hash->{SEQNO};                                 # PayloadID zur Nachverfolgung der Eventabfolge 
+      $hash->{SEQNO}++;
   
   } else {   
       $ts = TimeNow();
@@ -1162,19 +1496,21 @@ sub Log2Syslog_sendTestMsg($$) {
       ($data,$pid) = Log2Syslog_setpayload($hash,$prival,$date,$time,$otp,"fhem");	
 	  return if(!$data);
   }  
-      
-  $sock = Log2Syslog_opensock($hash);
+    
+  ($sock,$st) = Log2Syslog_opensock($hash,0);
 	  
-  if (defined($sock)) {
+  if ($sock) {
 	  $ret = syswrite $sock, $data."\n" if($data);
 	  if($ret && $ret > 0) {  
-	      Log2Syslog_Log3slog($name, 4, "$name - Payload sequence $pid sent\n");	
+	      Log2Syslog_Log3slog($name, 4, "$name - Payload sequence $pid sent\n");
+          $st = "maintenance";          
       } else {
           my $err = $!;
-	      Log2Syslog_Log3slog($name, 4, "$name - Warning - Payload sequence $pid NOT sent: $err\n");	
+	      Log2Syslog_Log3slog($name, 3, "$name - Warning - Payload sequence $pid NOT sent: $err\n");	
           $st = "write error: $err";              
 	  }  
-      Log2Syslog_closesock($hash,$sock);
+      
+      Log2Syslog_closesock($hash) if($st =~ /^write error:.*/);
   }
   
   my $evt = ($st eq $hash->{HELPER}{OLDSTATE})?0:1;
@@ -1221,8 +1557,8 @@ return($txt);
 ###############################################################################
 #                        erstelle Socket 
 ###############################################################################
-sub Log2Syslog_opensock ($) { 
-  my ($hash)   = @_;
+sub Log2Syslog_opensock ($;$$) { 
+  my ($hash,$supresslog)   = @_;
   my $name     = $hash->{NAME};
   my $host     = $hash->{PEERHOST};
   my $port     = AttrVal($name, "TLS", 0)?AttrVal($name, "port", 6514):AttrVal($name, "port", 514);
@@ -1230,9 +1566,15 @@ sub Log2Syslog_opensock ($) {
   my $st       = ReadingsVal($name,"state","active");
   my $timeout  = AttrVal($name, "timeout", 0.5);
   my $ssldbg   = AttrVal($name, "ssldebug", 0);
-  my ($sock,$lo,$sslver,$sslalgo);
+  my ($sock,$lo,$lof,$sslver,$sslalgo);
   
   return undef if($init_done != 1 || $hash->{MODEL} !~ /Sender/);
+  
+  if($hash->{CLIENTSOCKET}) {
+      return($hash->{CLIENTSOCKET},$st);
+  }
+  
+  Log2Syslog_Log3slog ($hash, 3, "Log2Syslog $name - Opening client socket on port \"$port\" ...") if(!$supresslog);
  
   if(AttrVal($name, "TLS", 0)) {
       # TLS gesicherte Verbindung
@@ -1269,7 +1611,7 @@ sub Log2Syslog_opensock ($) {
 			      $sslver  = $sock->get_sslversion();
 			      $sslalgo = $sock->get_fingerprint();
 			      $sslalgo = (split("\\\$",$sslalgo))[0];
-			      $lo      = "Socket opened for Host: $host, Protocol: $protocol, Port: $port, TLS: 0";
+			      $lof     = "Socket opened for Host: $host, Protocol: $protocol, Port: $port, TLS: 1";
                   $st      = "active";
 		      }
 		  }
@@ -1283,17 +1625,14 @@ sub Log2Syslog_opensock ($) {
       if (!$sock) {
 	      undef $sock;
           $st = "unable open socket for $host, $protocol, $port: $!";
+          $lo = "Socket not opened: $!";
       } else {
           $sock->blocking(0);
           $st = "active";
           # Logausgabe (nur in das fhem Logfile !)
-          $lo = "Socket opened for Host: $host, Protocol: $protocol, Port: $port, TLS: 0";
+          $lof = "Socket opened for Host: $host, Protocol: $protocol, Port: $port, TLS: 0";
       }
   }
-
-  my $evt = ($st eq $hash->{HELPER}{OLDSTATE})?0:1;
-  readingsSingleUpdate($hash, "state", $st, $evt);
-  $hash->{HELPER}{OLDSTATE} = $st;
   
   if($sslver ne $hash->{HELPER}{SSLVER}) {
       readingsSingleUpdate($hash, "SSL_Version", $sslver, 1);
@@ -1305,22 +1644,45 @@ sub Log2Syslog_opensock ($) {
 	  $hash->{HELPER}{SSLALGO} = $sslalgo;
   }
   
-  Log2Syslog_Log3slog($name, 5, "$name - $lo") if($lo);
+  Log2Syslog_Log3slog($name, 3, "Log2Syslog $name - $lo") if($lo);
+  Log2Syslog_Log3slog($name, 3, "Log2Syslog $name - $lof") if($lof && !$supresslog && !$hash->{CLIENTSOCKET});
   
-return($sock);
+  $hash->{CLIENTSOCKET} = $sock if($sock);
+    
+return($sock,$st);
 }
 
 ###############################################################################
 #                          Socket schließen
 ###############################################################################
-sub Log2Syslog_closesock($$) {
-  my ($hash,$sock) = @_;
-  
-  shutdown($sock, 1);
-  if(AttrVal($hash->{NAME}, "TLS", 0)) {
-      $sock->close(SSL_no_shutdown => 1);
-  } else {
-      $sock->close();
+sub Log2Syslog_closesock($;$$) {
+  my ($hash,$dolog) = @_;
+  my $name = $hash->{NAME};
+  my $st   = "closed";
+  my $evt;
+
+  my $sock = $hash->{CLIENTSOCKET};
+  if($sock) {
+      Log2Syslog_Log3slog ($hash, 3, "Log2Syslog $name - Closing client socket ...") if($dolog);
+      shutdown($sock, 1);
+      if(AttrVal($hash->{NAME}, "TLS", 0) && ReadingsVal($name,"SSL_Algorithm", "n.a.") ne "n.a.") {
+          $sock->close(SSL_no_shutdown => 1);
+          $hash->{HELPER}{SSLVER}  = "n.a.";
+          $hash->{HELPER}{SSLALGO} = "n.a.";
+          readingsSingleUpdate($hash, "SSL_Version", "n.a.", 1);
+          readingsSingleUpdate($hash, "SSL_Algorithm", "n.a.", 1);
+      } else {
+          $sock->close();
+      }
+      Log2Syslog_Log3slog ($hash, 3, "Log2Syslog $name - Client socket closed ...") if($dolog);
+
+      delete($hash->{CLIENTSOCKET});
+      
+      if($dolog) {
+          $evt = ($st eq $hash->{HELPER}{OLDSTATE})?0:1;
+          readingsSingleUpdate($hash, "state", $st, $evt);
+          $hash->{HELPER}{OLDSTATE} = $st;
+      }
   }
   
 return; 
@@ -1423,14 +1785,15 @@ sub Log2Syslog_setpayload ($$$$$$) {
 	  use warnings;
   }
   
-  if($data =~ /\s$/){$data =~ s/\s$//;}
-  my $dl = length($data);                                   # Länge muss ! für TLS stimmen, sonst keine Ausgabe !
+  if($data =~ /\s$/) {$data =~ s/\s$//;}
+  $data = $data."\n";
+  my $dl = length($data);                               # Länge muss ! für TLS stimmen, sonst keine Ausgabe !
   
   # wenn Transport Layer Security (TLS) -> Transport Mapping for Syslog https://tools.ietf.org/pdf/rfc5425.pdf
-  if(AttrVal($name, "TLS", 0)) {
-	  $data = "$dl $data";
-	  $data = substr($data,0, ($RFC5425len{DL}-1));         # Länge Total begrenzen 
-	  Log2Syslog_Log3slog($name, 4, "$name - SSL-Payload created with length: ".(($dl>($RFC5425len{DL}-1))?($RFC5425len{DL}-1):$dl) ); 
+  # oder Octet counting -> Transmission of Syslog Messages over TCP https://tools.ietf.org/html/rfc6587
+  if(AttrVal($name, "TLS", 0) || AttrVal($name, "octetCount", 0)) { 
+      $data = "$dl $data";
+	  Log2Syslog_Log3slog($name, 4, "$name - Payload created with octet count length: ".$dl); 
   } 
   
   my $ldat = ($dl>130)?(substr($data,0, 130)." ..."):$data;
@@ -1449,13 +1812,11 @@ sub Log2Syslog_Log3slog($$$) {
   $dev = $dev->{NAME} if(defined($dev) && ref($dev) eq "HASH");
      
   if(defined($dev) &&
-     defined($attr{$dev}) &&
-     defined (my $devlevel = $attr{$dev}{verbose})) {
-    return if($loglevel > $devlevel);
-
+      defined($attr{$dev}) &&
+      defined (my $devlevel = $attr{$dev}{verbose})) {
+      return if($loglevel > $devlevel);
   } else {
-    return if($loglevel > $attr{global}{verbose});
-
+      return if($loglevel > $attr{global}{verbose});
   }
 
   my ($seconds, $microseconds) = gettimeofday();
@@ -1510,21 +1871,64 @@ return;
 #                  Peer IP-Adresse und Host ermitteln (Sender der Message)
 ###############################################################################
 sub Log2Syslog_evalPeer($) {
-  my ($hash) = @_;
-  my $name   = $hash->{NAME};
-  my $socket = $hash->{SERVERSOCKET};
-  my ($phost,$paddr);
+  my ($hash)   = @_;
+  my $name     = $hash->{NAME};
+  my $socket   = $hash->{SERVERSOCKET};
+  my $protocol = lc(AttrVal($name, "protocol", "udp"));
+  if($hash->{TEMPORARY}) {
+      # temporäre Instanz abgelegt durch TcpServer_Accept
+      $protocol = "tcp";
+  } 
+  my ($phost,$paddr,$pport, $pipaddr);
   
-  my($pport, $pipaddr) = sockaddr_in($socket->peername);
-  $phost = gethostbyaddr($pipaddr, AF_INET);
-  $paddr = inet_ntoa($pipaddr);
-  no warnings 'uninitialized'; 
-  Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name - message peerhost: $phost,$paddr");
+  no warnings 'uninitialized';
+  if($protocol =~ /tcp/) {
+      $pipaddr = $hash->{HELPER}{TCPPADDR};    # gespeicherte IP-Adresse 
+      $phost = $hash->{HIPCACHE}{$pipaddr};    # zuerst IP/Host-Kombination aus Cache nehmen falls vorhanden     
+      if(!$phost) {
+          $paddr = inet_aton($pipaddr);      
+          $phost = gethostbyaddr($paddr, AF_INET);
+          $hash->{HIPCACHE}{$pipaddr} = $phost if($phost);
+      }
+  } elsif ($protocol =~ /udp/ && $socket) {
+      # Protokoll UDP
+      ($pport, $paddr) = sockaddr_in($socket->peername) if($socket->peername);
+      $pipaddr = inet_ntoa($paddr) if($paddr);
+      $phost = $hash->{HIPCACHE}{$pipaddr};    # zuerst IP/Host-Kombination aus Cache nehmen falls vorhanden   
+      if(!$phost) {  
+          $phost = gethostbyaddr($paddr, AF_INET);
+          $hash->{HIPCACHE}{$pipaddr} = $phost if($phost);
+      }
+  }
+  Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name - message peer: $phost,$pipaddr");
   use warnings;
+  $phost = $phost?$phost:$pipaddr?$pipaddr:"unknown";
 
-return ($phost,$paddr); 
+return ($phost); 
 }
 
+###############################################################################
+#                    Memory-Lock
+# - solange gesetzt erfolgt keine Socketöffnung
+# - löschen Sperre über Internaltimer
+###############################################################################
+sub Log2Syslog_IsMemLock($) {
+  my ($hash) = @_;
+  my $ret    = 0;
+ 
+  $ret = 1 if($hash->{HELPER}{MEMLOCK});
+
+return ($ret); 
+}
+
+sub Log2Syslog_deleteMemLock($) {
+  my ($hash) = @_;
+  
+  RemoveInternalTimer($hash, "Log2Syslog_deleteMemLock");
+  delete($hash->{HELPER}{MEMLOCK});
+
+return; 
+}
 
 1;
 
@@ -1548,7 +1952,7 @@ return ($phost,$paddr);
   <b>Prerequisits</b>
   <ul>
     <br/>
-    The additional perl module "IO::Socket::INET" must be installed on your system. <br>
+    The additional perl modules "IO::Socket::INET" and "IO::Socket::SSL" (if SSL is used) must be installed on your system. <br>
 	Install this package from cpan or by <br><br>
     
 	<code>apt-get install libio-socket-multicast-perl (only on Debian based installations) </code><br>
@@ -1629,7 +2033,8 @@ return ($phost,$paddr);
 	<br>
 	After definition of a Collectors Syslog-messages in IETF-format according to RFC5424 are expected. If the data are not
     delivered in this record format and can't be parsed, the Reading "state" will contain the message 
-	<b>"parse error - see logfile"</b> and the received Syslog-data are printed into the FHEM Logfile in raw-format. <br>
+	<b>"parse error - see logfile"</b> and the received Syslog-data are printed into the FHEM Logfile in raw-format. The
+    reading "Parse_Err_No" contains the number of parse-errors since module start.<br>
 	
 	By the <a href="#Log2Syslogattr">attribute</a> "parseProfile" you can try to use another predefined parse-profile  
     or you can create an own parse-profile as well. <br><br>
@@ -1758,6 +2163,15 @@ Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.095 fhemtest.myds.me Test
   <b>Set</b>
   <ul>
     <br> 
+	
+    <ul>
+    <li><b>reopen </b><br>
+        <br>
+        Closes an existing Client/Server-connection and open it again. 
+		This command can be helpful in case of e.g. "broken pipe"-errors.
+    </li>
+    </ul>
+    <br>
     
     <ul>
     <li><b>sendTestMessage [&lt;Message&gt;] </b><br>
@@ -1782,7 +2196,16 @@ Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.095 fhemtest.myds.me Test
     <ul>
     <li><b>certinfo </b><br>
         <br>
-        Show informations about the server certificate if a TLS-session was created (Reading "SSL_Version" isn't "n.a.").
+        On a SenderDevice the command shows informations about the server certificate in case a TLS-session was created 
+        (Reading "SSL_Version" isn't "n.a.").
+    </li>
+    </ul>
+    <br>
+    
+    <ul>
+    <li><b>versionNotes </b><br>
+        <br>
+        Shows release informations and hints about the module. Contains only main informations for module users.
     </li>
     </ul>
     <br>
@@ -1815,6 +2238,7 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
     <br>
 
     <ul>
+	<a name="addStateEvent"></a>
     <li><b>addStateEvent </b><br>
         <br>
         The attribute is only usable for device type "Sender".         
@@ -1826,6 +2250,7 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
     <br>
     
     <ul>
+	<a name="contDelimiter"></a>
     <li><b>contDelimiter </b><br>
         <br>
         The attribute is only usable for device type "Sender". 
@@ -1838,6 +2263,7 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
     <br>
 	
     <ul>
+	<a name="disable"></a>
     <li><b>disable [1 | 0 | maintenance] </b><br>
         <br>
         This device will be activated, deactivated respectSeverity set into the maintenance-mode. 
@@ -1849,6 +2275,7 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
     <br>
 	
     <ul>
+	<a name="logFormat"></a>
     <li><b>logFormat [ BSD | IETF ]</b><br>
         <br>
         This attribute is only usable for device type "Sender".  
@@ -1860,6 +2287,7 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
     <br>
     
     <ul>
+	<a name="makeEvent"></a>
     <li><b>makeEvent [ intern | no | reading ]</b><br>
         <br>
         The attribute is only usable for device type "Collector". 
@@ -1881,6 +2309,21 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
     <br>
     
     <ul>
+	<a name="octetCount"></a>
+    <li><b>octetCount </b><br>
+        <br>
+        The attribute is only usable for device type "Sender". <br>
+        If set, the Syslog Framing is changed from Non-Transparent-Framing (default) to Octet-Framing.
+        The Syslog-Reciver must support Octet-Framing !
+        For further informations see RFC6587 <a href="https://tools.ietf.org/html/rfc6587">"Transmission of Syslog Messages 
+        over TCP"</a>. 
+    </li>
+    </ul>
+    <br>
+    <br>
+    
+    <ul>
+	<a name="outputFields"></a>
     <li><b>outputFields </b><br>
         <br>
         The attribute is only usable for device type "Collector".
@@ -1894,6 +2337,7 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
     <br>
     
     <ul>
+	<a name="parseFn"></a>
     <li><b>parseFn {&lt;Parsefunktion&gt;} </b><br>
         <br>
         The attribute is only usable for device type "Collector".
@@ -1946,6 +2390,7 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
     <br>
     
     <ul>
+	<a name="parseProfile"></a>
     <li><b>parseProfile [ BSD | IETF | ... | ParseFn | raw ] </b><br>
         <br>
         Selection of a parse profile. The attribute is only usable for device type "Collector".
@@ -2010,19 +2455,10 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
     </li>
     </ul>
     <br>
-	
-    <ul>
-    <li><b>protocol [ TCP | UDP ]</b><br>
-        <br>
-        Sets the socket protocol which should be used. You can choose UDP or TCP (MODEL Sender). <br>
-		Default value is "UDP" if not specified.
-        A Syslog-Server (MODEL Collector) uses UDP.
-    </li>
-    </ul>
-    <br>
     <br>
 	
     <ul>
+	<a name="port"></a>
     <li><b>port &lt;Port&gt;</b><br>
         <br>
         The used port. For a Sender the default-port is 514.
@@ -2031,8 +2467,20 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
     </ul>
     <br>
     <br>
+    
+    <ul>
+	<a name="protocol"></a>
+    <li><b>protocol [ TCP | UDP ]</b><br>
+        <br>
+        Sets the socket protocol which should be used. You can choose UDP or TCP. <br>
+		Default value is "UDP" if not specified.
+    </li>
+    </ul>
+    <br>
+    <br>
 	
     <ul>
+	<a name="rateCalcRerun"></a>
     <li><b>rateCalcRerun &lt;Zeit in Sekunden&gt; </b><br>
         <br>
         Rerun cycle for calculation of log transfer rate (Reading "Transfered_logs_per_minute") in seconds (>=60).  
@@ -2044,6 +2492,7 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
     <br>
     
     <ul>
+	<a name="respectSeverity"></a>
     <li><b>respectSeverity </b><br>
         <br>
         Messages are only forwarded (Sender) respectively the receipt considered (Collector), whose severity is included 
@@ -2055,9 +2504,10 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
     <br>
     
     <ul>
+	<a name="ssldebug"></a>
     <li><b>ssldebug</b><br>
         <br>
-        Debugging level of SSL messages. <br><br>
+        Debugging level of SSL messages. The attribute is only usable for device type "Sender". <br><br>
         <ul>
         <li> 0 - No debugging (default).  </li>
         <li> 1 - Print out errors from <a href="http://search.cpan.org/~sullr/IO-Socket-SSL-2.056/lib/IO/Socket/SSL.pod">IO::Socket::SSL</a> and ciphers from <a href="http://search.cpan.org/~mikem/Net-SSLeay-1.85/lib/Net/SSLeay.pod">Net::SSLeay</a>. </li>
@@ -2070,16 +2520,42 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
     <br>
 	
     <ul>
+	<a name="TLS"></a>
     <li><b>TLS</b><br>
         <br>
-        This attribute is only usable for device type "Sender".  
-        A secured connection to a Syslog-Server is used. The protocol will be switched to TCP automatically.
+        A client (Sender) establish a secured connection to a Syslog-Server. 
+		A Syslog-Server (Collector) provide to establish a secured connection. 
+		The protocol will be switched to TCP automatically.
+		<br<br>
+		
+		Thereby a Collector device can use TLS, a certificate has to be created or available.
+		With following steps a certicate can be created: <br><br>
+		
+		1. in the FHEM basis directory create the directory "certs": <br>
+    <pre>
+    sudo mkdir /opt/fhem/certs
+    </pre>
+		
+		2. create the SSL certicate: <br>
+    <pre>
+    cd /opt/fhem/certs
+    sudo openssl req -new -x509 -nodes -out server-cert.pem -days 3650 -keyout server-key.pem
+	</pre>		
+	
+		3. set file/directory permissions: <br>
+    <pre>
+    sudo chown -R fhem:dialout /opt/fhem/certs
+    sudo chmod 644 /opt/fhem/certs/*.pem
+    sudo chmod 711 /opt/fhem/certs
+	</pre>
+	
     </li>
     </ul>
     <br>
     <br>
     
     <ul>
+	<a name="timeout"></a>
     <li><b>timeout</b><br>
         <br>
         This attribute is only usable for device type "Sender".  
@@ -2090,6 +2566,7 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
     <br>
 	
     <ul>
+	<a name="verbose"></a>
     <li><b>verbose</b><br>
         <br>
         Please see global <a href="#attributes">attribute</a> "verbose".
@@ -2110,7 +2587,8 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
     <table>  
     <colgroup> <col width=35%> <col width=65%> </colgroup>
       <tr><td><b>MSG_&lt;Host&gt;</b>               </td><td> the last successful parsed Syslog-message from &lt;Host&gt; </td></tr>
-	  <tr><td><b>SSL_Algorithm</b>                  </td><td> used SSL algorithm if SSL is enabled and active </td></tr>
+	  <tr><td><b>Parse_Err_No</b>                   </td><td> the number of parse errors since start </td></tr>
+      <tr><td><b>SSL_Algorithm</b>                  </td><td> used SSL algorithm if SSL is enabled and active </td></tr>
       <tr><td><b>SSL_Version</b>                    </td><td> the used TLS-version if encryption is enabled and is active</td></tr>
 	  <tr><td><b>Transfered_logs_per_minute</b>     </td><td> the average number of forwarded logs/events per minute </td></tr>
     </table>    
@@ -2137,7 +2615,7 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
   <b>Voraussetzungen</b>
   <ul>
     <br/>
-    Es wird das Perl Modul "IO::Socket::INET" benötigt und muss installiert sein. <br>
+    Es werden die Perl Module "IO::Socket::INET" und "IO::Socket::SSL" (wenn SSL benutzt) benötigt und müssen installiert sein. <br>
     Das Modul kann über CPAN oder mit <br><br>
 	
     <code>apt-get install libio-socket-multicast-perl (auf Debian Linux Systemen) </code><br><br>
@@ -2220,7 +2698,8 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
 	<br>
 	Nach der Definition des Collectors werden die Syslog-Meldungen im IETF-Format gemäß RFC5424 erwartet. Werden die Daten 
     nicht in diesem Format geliefert bzw. können nicht geparst werden, erscheint im Reading "state" die Meldung 
-	<b>"parse error - see logfile"</b> und die empfangenen Syslog-Daten werden im Logfile im raw-Format ausgegeben. <br>
+	<b>"parse error - see logfile"</b> und die empfangenen Syslog-Daten werden im Logfile im raw-Format ausgegeben. Das Reading
+    "Parse_Err_No" enthält die Anzahl der Parse-Fehler seit Modulstart. <br>
 	
 	In diesem Fall kann mit dem	<a href="#Log2Syslogattr">Attribut</a> "parseProfile" ein anderes vordefiniertes Parse-Profil 
     eingestellt bzw. ein eigenes Profil definiert werden. <br><br>
@@ -2348,6 +2827,15 @@ Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.095 fhemtest.myds.me Test
   <b>Set</b>
   <ul>
     <br> 
+	
+    <ul>
+    <li><b>reopen </b><br>
+        <br>
+        Schließt eine bestehende Client/Server-Verbindung und öffnet sie erneut. 
+		Der Befehl kann z.B. bei "broken pipe"-Fehlern hilfreich sein.
+    </li>
+    </ul>
+    <br>
     
     <ul>
     <li><b>sendTestMessage [&lt;Message&gt;] </b><br>
@@ -2371,7 +2859,17 @@ Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.095 fhemtest.myds.me Test
     <ul>
     <li><b>certinfo </b><br>
         <br>
-        Zeigt Informationen zum Serverzertifikat wenn eine TLS-Session aufgebaut wurde (Reading "SSL_Version" ist nicht "n.a.").
+        Zeigt auf einem Sender-Device Informationen zum Serverzertifikat an sofern eine TLS-Session aufgebaut wurde 
+        (Reading "SSL_Version" ist nicht "n.a.").
+    </li>
+    </ul>
+    <br>
+    
+    <ul>
+    <li><b>versionNotes </b><br>
+        <br>
+        Zeigt Release Informationen und Hinweise zum Modul an. Es sind nur Informationen mit Bedeutung für den Modulnutzer 
+        enthalten.
     </li>
     </ul>
     <br>
@@ -2406,6 +2904,7 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
     <br>
 
     <ul>
+	<a name="addStateEvent"></a>
     <li><b>addStateEvent </b><br>
         <br>
         Das Attribut ist nur für "Sender" verwendbar. Wenn gesetzt, werden state-events mit dem Reading "state" ergänzt.<br>
@@ -2416,6 +2915,7 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
     <br>
     
     <ul>
+	<a name="contDelimiter"></a>
     <li><b>contDelimiter </b><br>
         <br>
         Das Attribut ist nur für "Sender" verwendbar. Es enthält ein zusätzliches Zeichen welches unmittelber vor das 
@@ -2428,6 +2928,7 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
     <br>
 	
     <ul>
+	<a name="disable"></a>
     <li><b>disable [1 | 0 | maintenance] </b><br>
         <br>
         Das Device wird aktiviert, deaktiviert bzw. in den Maintenance-Mode geschaltet. Im Maintenance-Mode kann mit dem 
@@ -2438,6 +2939,7 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
     <br>
 	
     <ul>
+	<a name="logFormat"></a>
     <li><b>logFormat [ BSD | IETF ]</b><br>
         <br>
         Das Attribut ist nur für "Sender" verwendbar.  Es stellt das Protokollformat ein. (default: "IETF") <br>
@@ -2447,6 +2949,7 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
     <br>
     
     <ul>
+	<a name="makeEvent"></a>
     <li><b>makeEvent [ intern | no | reading ]</b><br>
         <br>
         Das Attribut ist nur für "Collector" verwendbar.  Mit dem Attribut wird das Verhalten der Event- bzw.
@@ -2468,6 +2971,21 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
     <br>
     
     <ul>
+	<a name="octetCount"></a>
+    <li><b>octetCount </b><br>
+        <br>
+        Das Attribut ist nur für "Sender" verfügbar. <br>
+        Wenn gesetzt, wird das Syslog Framing von Non-Transparent-Framing (default) in Octet-Framing geändert.
+        Der Syslog-Empfänger muss Octet-Framing unterstützen !
+        Für weitere Informationen siehe RFC6587 <a href="https://tools.ietf.org/html/rfc6587">"Transmission of Syslog Messages 
+        over TCP"</a>. 
+    </li>
+    </ul>
+    <br>
+    <br>
+    
+    <ul>
+	<a name="outputFields"></a>
     <li><b>outputFields </b><br>
         <br>
         Das Attribut ist nur für "Collector" verwendbar.
@@ -2481,6 +2999,7 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
     <br>
     
     <ul>
+	<a name="parseFn"></a>
     <li><b>parseFn {&lt;Parsefunktion&gt;} </b><br>
         <br>
         Das Attribut ist nur für Device-MODEL "Collector" verwendbar. Es wird die eingegebene Perl-Funktion auf die 
@@ -2532,9 +3051,10 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
     <br>
     
     <ul>
+	<a name="parseProfile"></a>
     <li><b>parseProfile [ BSD | IETF | ... | ParseFn | raw ] </b><br>
         <br>
-        Auswahl eines Parsing-Profiles. Das Attribut ist nur für Device-MODEL "Collector" verwendbar.
+        Auswahl eines Parsing-Profiles. Das Attribut ist nur für Device-Model "Collector" verwendbar.
         <br><br>
     
         <ul>  
@@ -2596,18 +3116,10 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
     </li>
     </ul>
     <br>
-	
-    <ul>
-    <li><b>protocol [ TCP | UDP ]</b><br>
-        <br>
-        Setzt den Protokolltyp der verwendet werden soll. Es kann UDP oder TCP gewählt werden (MODEL Sender). <br>
-		Standard ist "UDP" wenn nichts spezifiziert ist.
-        Ein Syslog-Server (MODEL Collector) verwendet UDP.
-    </li>
-    </ul>
     <br>
 	
     <ul>
+	<a name="port"></a>
     <li><b>port &lt;Port&gt;</b><br>
         <br>
         Der verwendete Port. Für einen Sender ist der default-Port 514, für einen Collector (Syslog-Server) der Port 1514.
@@ -2615,8 +3127,20 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
     </ul>
     <br>
     <br>
+    
+    <ul>
+	<a name="protocol"></a>
+    <li><b>protocol [ TCP | UDP ]</b><br>
+        <br>
+        Setzt den Protokolltyp der verwendet werden soll. Es kann UDP oder TCP gewählt werden. <br>
+		Standard ist "UDP" wenn nichts spezifiziert ist.
+    </li>
+    </ul>
+    <br>
+    <br>
 	
     <ul>
+	<a name="rateCalcRerun"></a>
     <li><b>rateCalcRerun &lt;Zeit in Sekunden&gt; </b><br>
         <br>
         Wiederholungszyklus für die Bestimmung der Log-Transferrate (Reading "Transfered_logs_per_minute") in Sekunden (>=60).
@@ -2628,6 +3152,7 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
     <br>
     
     <ul>
+	<a name="respectSeverity"></a>
     <li><b>respectSeverity </b><br>
         <br>
         Es werden nur Nachrichten übermittelt (Sender) bzw. beim Empfang berücksichtigt (Collector), deren Schweregrad im 
@@ -2639,13 +3164,14 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
     <br>
     
     <ul>
+	<a name="ssldebug"></a>
     <li><b>ssldebug</b><br>
         <br>
-        Debugging Level von SSL Messages. <br><br>
+        Debugging Level von SSL Messages. Das Attribut ist nur für Device-MODEL "Sender" verwendbar. <br><br>
         <ul>
         <li> 0 - Kein Debugging (default).  </li>
         <li> 1 - Ausgabe Errors von from <a href="http://search.cpan.org/~sullr/IO-Socket-SSL-2.056/lib/IO/Socket/SSL.pod">IO::Socket::SSL</a> und ciphers von <a href="http://search.cpan.org/~mikem/Net-SSLeay-1.85/lib/Net/SSLeay.pod">Net::SSLeay</a>. </li>
-        <li> 2 - zusätzliche Ausgabe von Informationen über den Protokollfluss von <a href="http://search.cpan.org/~sullr/IO-Socket-SSL-2.056/lib/IO/Socket/SSL.pod">IO::Socket::SSL</a> und Fortschritinformationen von <a href="http://search.cpan.org/~mikem/Net-SSLeay-1.85/lib/Net/SSLeay.pod">Net::SSLeay</a>. </li>
+        <li> 2 - zusätzliche Ausgabe von Informationen über den Protokollfluss von <a href="http://search.cpan.org/~sullr/IO-Socket-SSL-2.056/lib/IO/Socket/SSL.pod">IO::Socket::SSL</a> und Fortschrittinformationen von <a href="http://search.cpan.org/~mikem/Net-SSLeay-1.85/lib/Net/SSLeay.pod">Net::SSLeay</a>. </li>
         <li> 3 - zusätzliche Ausgabe einiger Dumps von <a href="http://search.cpan.org/~sullr/IO-Socket-SSL-2.056/lib/IO/Socket/SSL.pod">IO::Socket::SSL</a> und <a href="http://search.cpan.org/~mikem/Net-SSLeay-1.85/lib/Net/SSLeay.pod">Net::SSLeay</a>. </li>
         </ul>
     </li>
@@ -2654,17 +3180,42 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
     <br>
 	
     <ul>
+	<a name="TLS"></a>
     <li><b>TLS</b><br>
         <br>
-        Das Attribut ist nur für "Sender" verwendbar.
-        Es wird eine gesicherte Verbindung zum Syslog-Server aufgebaut. Das Protokoll schaltet automatisch
-        auf TCP um.
+        Ein Client (Sender) baut eine gesicherte Verbindung zum Syslog-Server auf. 
+		Ein Syslog-Server (Collector) stellt eine gesicherte Verbindung zur Verfügung. 
+		Das Protokoll schaltet automatisch auf TCP um.
+		<br<br>
+		
+		Damit ein Collector TLS verwenden kann, muss ein Zertifikat erstellt werden bzw. vorhanden sein.
+		Mit folgenden Schritten kann ein Zertifikat erzeugt werden: <br><br>
+		
+		1. im FHEM-Basisordner das Verzeichnis "certs" anlegen: <br>
+    <pre>
+    sudo mkdir /opt/fhem/certs
+    </pre>
+		
+		2. SSL Zertifikat erstellen: <br>
+    <pre>
+    cd /opt/fhem/certs
+    sudo openssl req -new -x509 -nodes -out server-cert.pem -days 3650 -keyout server-key.pem
+	</pre>		
+	
+		3. Datei/Verzeichnis-Rechte setzen: <br>
+    <pre>
+    sudo chown -R fhem:dialout /opt/fhem/certs
+    sudo chmod 644 /opt/fhem/certs/*.pem
+    sudo chmod 711 /opt/fhem/certs
+	</pre>	
+		
     </li>
     </ul>
     <br>
     <br>
     
     <ul>
+	<a name="timeout"></a>
     <li><b>timeout</b><br>
         <br>
         Das Attribut ist nur für "Sender" verwendbar.
@@ -2675,6 +3226,7 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
     <br>
 	
     <ul>
+	<a name="verbose"></a>
     <li><b>verbose</b><br>
         <br>
         Verbose-Level entsprechend dem globalen <a href="#attributes">Attribut</a> "verbose".
@@ -2695,7 +3247,8 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
     <table>  
     <colgroup> <col width=35%> <col width=65%> </colgroup>
       <tr><td><b>MSG_&lt;Host&gt;</b>               </td><td> die letzte erfolgreich geparste Syslog-Message von &lt;Host&gt; </td></tr>
-	  <tr><td><b>SSL_Algorithm</b>                  </td><td> der verwendete SSL Algorithmus wenn SSL eingeschaltet und aktiv ist </td></tr>
+	  <tr><td><b>Parse_Err_No</b>                   </td><td> die Anzahl der Parse-Fehler seit Start </td></tr>
+      <tr><td><b>SSL_Algorithm</b>                  </td><td> der verwendete SSL Algorithmus wenn SSL eingeschaltet und aktiv ist </td></tr>
       <tr><td><b>SSL_Version</b>                    </td><td> die verwendete TLS-Version wenn die Verschlüsselung aktiv ist</td></tr>
 	  <tr><td><b>Transfered_logs_per_minute</b>     </td><td> die durchschnittliche Anzahl der übertragenen/empfangenen Logs/Events pro Minute </td></tr>
     </table>    
