@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.3.003
+#  Version 4.3.004
 #
 #  Module for communication between FHEM and Homematic CCU2.
 #
@@ -108,7 +108,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.3.003';
+my $HMCCU_VERSION = '4.3.004';
 
 # Default RPC port (BidCos-RF)
 my $HMCCU_RPC_PORT_DEFAULT = 2001;
@@ -4438,7 +4438,12 @@ sub HMCCU_GetCCUDeviceParam ($$)
 		}
 		else {
 			if (exists ($hash->{hmccu}{adr}{$param})) {
+				# param is a device name
 				$add = $hash->{hmccu}{adr}{$param}{address};
+			}
+			elsif (exists ($hash->{hmccu}{dev}{$param})) {
+				# param is a non standard device or channel address
+				$add = $param;
 			}
 		}
 	}
