@@ -1429,7 +1429,7 @@ SVG_render($$$$$$$$$$)
   ######################
   # Rectangle
   SVG_pO "<rect x='$x' y='$y' width ='$w' height ='$h' rx='8' ry='8' ".
-        "fill='red' class='border'/>";
+        "fill='none' class='border'/>";
 
   my ($off1,$off2) = ($x+$w/2, 3*$y/4);
   my $title = ($conf{title} ? $conf{title} : " ");
