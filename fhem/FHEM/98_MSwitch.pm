@@ -37,7 +37,7 @@ use POSIX;
 
 # Version #######################################################
 my $autoupdate = 'on'; #off/on
-my $version = 'V2.00';
+my $version = 'V2.01';
 my $vupdate = 'V2.00';
 my $savecount = 30;
 my $standartstartdelay =60;
@@ -131,6 +131,8 @@ sub MSwitch_Initialize($) {
     my ($hash) = @_;
     $hash->{SetFn}             = "MSwitch_Set";
     $hash->{AsyncOutput}       = "MSwitch_AsyncOutput";
+	$hash->{RenameFn}            = "MSwitch_Rename";
+	$hash->{CopyFn}            = "MSwitch_Copy";
     $hash->{GetFn}             = "MSwitch_Get";
     $hash->{DefFn}             = "MSwitch_Define";
     $hash->{UndefFn}           = "MSwitch_Undef";
@@ -167,6 +169,50 @@ sub MSwitch_Initialize($) {
       . "  MSwitch_Wait";
     $hash->{FW_addDetailToSummary} = 0;
 }
+####################
+sub MSwitch_Rename ($)
+{
+	my ( $new_name, $old_name ) = @_;
+	my $hash_new = $defs{$new_name};
+	
+#Log3( $new_name, 0,"new_name " .$new_name  );
+#Log3( $new_name, 0,"old_name " .$old_name  );	
+	
+$modules{MSwitch}{defptr}{$new_name} = $hash_new;
+
+#foreach my $testdevice ( keys %{ $modules{MSwitch}{defptr} } )    #
+   # {
+     #  Log3( $new_name, 0,"dev " .$testdevice  );	
+	  # Log3( $new_name, 0,"devnhash " .$defs{$testdevice}  );
+    #}
+
+
+
+}
+
+####################
+sub MSwitch_Copy ($)
+{
+	my ( $old_name, $new_name ) = @_;
+	my $hash = $defs{$new_name};
+	my @areadings =
+      qw(.Device_Affected .Device_Affected_Details .Device_Events .First_init .Trigger_Whitelist .Trigger_cmd_off .Trigger_cmd_on .Trigger_condition .Trigger_off .Trigger_on .Trigger_time .V_Check Exec_cmd Trigger_device Trigger_log last_event state .sysconf Sys_Extension) ;    #alle readings
+  
+	my $cs = "attr $new_name disable 1";
+    my $errors = AnalyzeCommandChain( undef, $cs );
+    if ( defined($errors) ) 
+		{
+           Log3( $new_name, 1, "ERROR $cs" );
+        }
+	  
+	 foreach my $key (@areadings) 
+		{
+        my $tmp = ReadingsVal( $old_name, $key, 'undef' );
+		fhem("setreading ".$new_name." ".$key." ".$tmp);
+        }
+	MSwitch_LoadHelper($hash);
+}
+
 ####################
 sub MSwitch_summary($) {
     my ( $wname, $name, $room ) = @_;
@@ -524,7 +570,7 @@ sub MSwitch_Get($$@) {
     }
 ####################
     if ( $opt eq 'restore_MSwitch_Data' && $args[0] eq "all_Devices" ) {
-        open( BACKUPDATEI, "<MSwitch_backup.cfg" )
+        open( BACKUPDATEI, "<MSwitch_backup_$vupdate.cfg" )
           || return "no Backupfile found\n";
         close(BACKUPDATEI);
         $hash->{helper}{RESTORE_ANSWER} = $hash->{CL};
@@ -1361,14 +1407,43 @@ sub MSwitch_Set($@) {
 			# teste auf delayinhalt
 			MSwitch_LOG( $name, 5, "$name: teste auf timerstatus -> $testtstate"  ); 
             $testtstate =~ s/[A-Za-z0-9#\.\-_]//g;
-            if ( $testtstate eq "[:]" || $testtstate eq "[\$:]"  ) 
-			{
-                $devicedetails{$timerkey} =eval MSwitch_Checkcond_state( $devicedetails{$timerkey}, $name );
-                my $hdel = ( substr( $devicedetails{$timerkey}, 0, 2 ) ) * 3600;
-                my $mdel = ( substr( $devicedetails{$timerkey}, 3, 2 ) ) * 60;
-                my $sdel = ( substr( $devicedetails{$timerkey}, 6, 2 ) ) * 1;
-                $devicedetails{$timerkey} = $hdel + $mdel + $sdel;
-            }
+			
+			
+			
+			
+			
+		       if ( $testtstate eq "[:]" || $testtstate eq "[\$:]") 
+		{
+		
+            $devicedetails{$timerkey} =
+            eval MSwitch_Checkcond_state( $devicedetails{$timerkey}, $name );
+			
+			
+			
+	if ($devicedetails{$timerkey} =~ m/[0-9]\d:[0-9]\d:[0-9]\d/)
+	{
+	MSwitch_LOG( $name, 5,"$name:   format ok ");
+	
+	  my $hdel = ( substr( $devicedetails{$timerkey}, 0, 2 ) ) * 3600;
+      my $mdel = ( substr( $devicedetails{$timerkey}, 3, 2 ) ) * 60;
+      my $sdel = ( substr( $devicedetails{$timerkey}, 6, 2 ) ) * 1;
+      $devicedetails{$timerkey} = $hdel + $mdel + $sdel;
+			
+			
+	}	
+	else 
+	{
+	MSwitch_LOG( $name, 1,"$name: ERROR Timerformat ".$devicedetails{$timerkey}." fehlerhaf ");
+	$devicedetails{$timerkey} = 0;
+	}
+			
+			
+			
+          
+        }
+			
+			
+			
 			MSwitch_LOG( $name, 5, "$name: timerstatus nach test -> ".$devicedetails{$timerkey}  ); 
 			
 			# suche befehl
@@ -2132,9 +2207,9 @@ sub MSwitch_Notify($$) {
                     if ( $ar2 eq '' )    { next LOOP31; }
                     my $returncmd = 'undef';
 					
-					MSwitch_LOG( $ownName, 5,"$ownName: aufruf execnotif  $_ $ar2, $ar3, $ar4 ");
+					#MSwitch_LOG( $ownName, 0,"$ownName: aufruf execnotif  $_ $ar2, $ar3, $ar4 ");
                     $returncmd = MSwitch_Exec_Notif( $own_hash, $ar2, $ar3, $ar4,$execids );
-					MSwitch_LOG( $ownName, 5,"$ownName: ergebniss execnotif -> ".$returncmd);
+					#MSwitch_LOG( $ownName, 0,"$ownName: ergebniss execnotif -> ".$returncmd);
 					
                     if ( defined $returncmd && $returncmd ne 'undef' ) 
 					{
@@ -2271,6 +2346,11 @@ sub MSwitch_fhemwebFn($$$$) {
     my $jsvarset = '';
     my $j1       = '';
 	my $border =0;
+	
+	
+	#Log3( $Name, 0,"hash ---> $hash " . __LINE__ );
+	#Log3( $Name, 0,"name ---> $Name " . __LINE__ );
+	
 	
 	if ( AttrVal( $Name, 'MSwitch_Debug', "0" ) eq '4' )
 	{
@@ -3529,7 +3609,7 @@ if ( ReadingsVal( $Name, '.change', 'undef') ne "undef")
 	foreach my $changes (@change) 
 		{
 		my @set =  split( "#", $changes );
-		$out ."<tr class='even'>";
+		$out .="<tr class='even'>";
 		$out .="<td>";
 		$out .= $set[1];
 		$out .="</td>";
@@ -4784,6 +4864,8 @@ sub MSwitch_makeCmdHash($) {
 			{
                 my $hdel = substr( $detailarray[8], 0, 2 ) * 3600;
                 my $mdel = substr( $detailarray[8], 3, 2 ) * 60;
+				
+				
                 my $sdel = substr( $detailarray[8], 6, 2 ) * 1;
 
 				$detailarray[8] = $hdel + $mdel + $sdel;
@@ -4989,17 +5071,41 @@ sub MSwitch_Exec_Notif($$$$$) {
         my $key      = $device . "_" . $comand;
         my $timerkey = $device . "_time" . $comand;
         my $testtstate = $devicedetails{$timerkey};
+		
+#MSwitch_LOG( $name, 0,"$name: testtstat1e -> ".$testtstate);		
         $testtstate =~ s/[A-Za-z0-9#\.\-_]//g;
+#MSwitch_LOG( $name, 0,"$name:testtstate2 -> ".$testtstate);
 
-        if ( $testtstate eq "[:]" || $testtstate eq "[\$:]") 
+
+
+             if ( $testtstate eq "[:]" || $testtstate eq "[\$:]") 
 		{
 		
             $devicedetails{$timerkey} =
             eval MSwitch_Checkcond_state( $devicedetails{$timerkey}, $name );
-            my $hdel = ( substr( $devicedetails{$timerkey}, 0, 2 ) ) * 3600;
-            my $mdel = ( substr( $devicedetails{$timerkey}, 3, 2 ) ) * 60;
-            my $sdel = ( substr( $devicedetails{$timerkey}, 6, 2 ) ) * 1;
-            $devicedetails{$timerkey} = $hdel + $mdel + $sdel;
+			
+			
+			
+	if ($devicedetails{$timerkey} =~ m/[0-9]\d:[0-9]\d:[0-9]\d/)
+	{
+	MSwitch_LOG( $name, 5,"$name:   format ok ");
+	
+	  my $hdel = ( substr( $devicedetails{$timerkey}, 0, 2 ) ) * 3600;
+      my $mdel = ( substr( $devicedetails{$timerkey}, 3, 2 ) ) * 60;
+      my $sdel = ( substr( $devicedetails{$timerkey}, 6, 2 ) ) * 1;
+      $devicedetails{$timerkey} = $hdel + $mdel + $sdel;
+			
+			
+	}	
+	else 
+	{
+	MSwitch_LOG( $name, 1,"$name: ERROR Timerformat ".$devicedetails{$timerkey}." fehlerhaf ");
+	$devicedetails{$timerkey} = 0;
+	}
+			
+			
+			
+          
         }
 		MSwitch_LOG( $name, 5,"$name:     timer des devices -> ".$devicedetails{$timerkey});
         # teste auf condition
@@ -5316,13 +5422,13 @@ sub MSwitch_Restartcmd($) {
 	
     my $hash = $modules{MSwitch}{defptr}{$name};
 	
-	MSwitch_LOG( $name, 5, "$name: msga4 -> ".$msgarray[4]);
-	MSwitch_LOG( $name, 5, "$name: msga5 -> ".$msgarray[5]);
-	MSwitch_LOG( $name, 5, "$name: msga6 -> ".$msgarray[6]);
+	#MSwitch_LOG( $name, 5, "$name: msga4 -> ".$msgarray[4]);
+	#MSwitch_LOG( $name, 5, "$name: msga5 -> ".$msgarray[5]);
+	#MSwitch_LOG( $name, 5, "$name: msga6 -> ".$msgarray[6]);
 	
-	MSwitch_LOG( $name, 5, "$name: befehl -> ".$cs);
-	MSwitch_LOG( $name, 5, "$name: event -> ".$event);
-	MSwitch_LOG( $name, 5, "$name: device -> ".$device);
+	#MSwitch_LOG( $name, 5, "$name: befehl -> ".$cs);
+	#MSwitch_LOG( $name, 5, "$name: event -> ".$event);
+	#MSwitch_LOG( $name, 5, "$name: device -> ".$device);
 	#MSwitch_LOG( $name, 5, "$name: befehl -> ".$cs);
 	
 	MSwitch_LOG( $name, 5, "$name: erstelle cmdhash -> ".$name);
@@ -5723,7 +5829,7 @@ sub MSwitch_Checkcond_state($$) {
     $condition =~ s/\[//;
     $condition =~ s/\]//;
     my @reading = split( /:/, $condition );
-    my $return  = "ReadingsVal('$reading[0]', '$reading[1]', 'undef')";
+    my $return  = "ReadingsVal('$reading[0]', '$reading[1]', '00:00:00')";
     my $test    = ReadingsVal( $reading[0], $reading[1], 'undef' );
 	
 	MSwitch_LOG( $name, 5, "$name: MSwitch_Checkcond_state OUT -> ".$return  ); 
@@ -5855,7 +5961,7 @@ sub MSwitch_Createtimer($) {
     my $Name = $hash->{NAME};
 
 	
-	MSwitch_LOG( $Name, 5,"crete timer");
+	MSwitch_LOG( $Name, 5,"create timer");
 	
 	
     # keine timer vorhenden
@@ -5865,7 +5971,9 @@ sub MSwitch_Createtimer($) {
 	$condition =~ s/#\[dp\]/:/g;
 	
 				my	$x =0;
-				while ( $condition =~ m/(.*)\[(.*[^0-9]{2})\:(.*[^0-9]{2})\](.*)/ ) 
+				# (.*)\[(.*[a-zA-Z].*)\:(.*)\](.*)
+				#while ( $condition =~ m/(.*)\[(.*[^0-9]{2})\:(.*[^0-9]{2})\](.*)/ ) 
+				while ( $condition =~ m/(.*)\[(.*[a-zA-Z].*)\:(.*)\](.*)/ ) 
 					{
 					$x++;                        # notausstieg notausstieg
 					last if $x > 20;             # notausstieg notausstieg
@@ -5891,7 +5999,7 @@ sub MSwitch_Createtimer($) {
     $key = 'ly';
     $condition =~ s/$key//ig;
 
-	my $x =0;
+	$x =0;
 	# achtung perl 5.30
 	  while ($condition =~ m/(.*).\{(.*)\}.(.*)/ )
     {
@@ -6595,7 +6703,7 @@ sub MSwitch_backup_this($) {
     my $Name   = $hash->{NAME};
     my $Zeilen = ("");
 	my $Zeilen1 ="";
-    open( BACKUPDATEI, "<MSwitch_backup_$vupdate.cfg" ) || return "no Backupfile found\n";
+    open( BACKUPDATEI, "<MSwitch_backup_$vupdate.cfg" ) || return "no Backupfile found!\n";
     while (<BACKUPDATEI>)
 	{
         $Zeilen = $Zeilen . $_;
@@ -6756,7 +6864,7 @@ sub MSwitch_backup_all($) {
     my $Name   = $hash->{NAME};
     my $answer = '';
     my $Zeilen = ("");
-    open( BACKUPDATEI, "<MSwitch_backup_$vupdate.cfg" )|| return "$Name|no Backupfile found\n";
+    open( BACKUPDATEI, "<MSwitch_backup_$vupdate.cfg" )|| return "$Name|no Backupfile MSwitch_backup_$vupdate.cfg found\n";
     while (<BACKUPDATEI>) 
 	{
         $Zeilen = $Zeilen . $_;
@@ -6764,6 +6872,8 @@ sub MSwitch_backup_all($) {
     close(BACKUPDATEI);
     foreach my $testdevice ( keys %{ $modules{MSwitch}{defptr} } )    #
     {
+	
+	Log3( $testdevice, 0, "MSWITCH-RESTORE: ".$testdevice );
         my $devhash = $defs{$testdevice};
         $Zeilen =~ s/\n/[NL]/g;
 
@@ -6803,6 +6913,7 @@ sub MSwitch_backup_all($) {
                  }
 
 		MSwitch_LoadHelper($devhash);
+		Log3( $testdevice, 0, "MSWITCH-RESTORE ready -> ".$testdevice );
         $answer = $answer . "MSwitch $testdevice restored.\n";
     }
     return $answer;
