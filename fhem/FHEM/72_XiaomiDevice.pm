@@ -2158,7 +2158,7 @@ sub XiaomiDevice_ParseJSON($$)
     readingsBulkUpdate( $hash, "child_lock", $json->{result}[11], 1 ) if(defined($json->{result}[11]));
     readingsBulkUpdate( $hash, "temperature", $json->{result}[12]/10, 1 ) if(defined($json->{result}[12]) && $json->{result}[12] ne "null");
     readingsBulkUpdate( $hash, "humidity", $json->{result}[13], 1 ) if(defined($json->{result}[13]) && $json->{result}[13] ne "null");
-    readingsBulkUpdate( $hash, "speed", $json->{result}[14], 1 ) if(defined($json->{result}[14]));
+    readingsBulkUpdate( $hash, "speed", (($json->{result}[2] eq "off")?"0":$json->{result}[14]), 1 ) if(defined($json->{result}[14]));
     readingsBulkUpdate( $hash, "button_pressed", $json->{result}[15], 1 ) if(defined($json->{result}[15]) && $json->{result}[15] ne "null");
     readingsEndUpdate($hash,1);
     return undef;
@@ -2176,7 +2176,7 @@ sub XiaomiDevice_ParseJSON($$)
     $fanspeed = 0 if($json->{result}[0] eq "off");
     readingsBulkUpdate( $hash, "level", $fanspeed, 1 ) if(defined($json->{result}[2]));
     readingsBulkUpdate( $hash, "mode", (int($json->{result}[2])>0)?"natural":"straight", 1 ) if(defined($json->{result}[2]));
-    readingsBulkUpdate( $hash, "speed", $json->{result}[3], 1 ) if(defined($json->{result}[3]));
+    readingsBulkUpdate( $hash, "speed", (($json->{result}[0] eq "off")?"0":$json->{result}[3]), 1 ) if(defined($json->{result}[3]));
     readingsEndUpdate($hash,1);
     return undef;
   }

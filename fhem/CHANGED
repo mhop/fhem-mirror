@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  72_XiaomiDevice: set incorrect fan speed to 0
   - bugfix:  38_netatmo: increased timeouts to counter server issues, logging
   - bugfix:  88_HMCCU: Detection of non standard addresses
   - feature: 93_Log2Syslog: TCP-Server in Collector-mode / SSL-support and a 
