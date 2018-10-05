@@ -3712,7 +3712,7 @@ So könnte eine Definition aussehen:<br>
 <table>
 <code>define di_Modul DOIF </code>
 <tr><td>{<code>&nbsp;if ([Switch1] eq "on" and [Switch2] eq "on") {</code></td><td>&nbsp;<code>## wenn Schalter 1 und Schalter 2 on ist</code><br></td></tr>
-<tr><td><ol><code>fhem_set "set lamp on"</code>               </td><td>&nbsp;<code>## wird Lampe eingeschaltet</code></ol></td></tr>
+<tr><td><ol><code>fhem_set "lamp on"</code>               </td><td>&nbsp;<code>## wird Lampe eingeschaltet</code></ol></td></tr>
 <tr><td><code>&nbsp;&nbsp;}&nbsp;elsif {</code>                                </td><td>&nbsp;<code>## im sonst-Fall, also wenn einer der Schalter off ist</code><br></td></tr>
 <tr><td><ol><code>fhem_set "lamp off"</code>                  </td><td>&nbsp;<code>## wird die Lampe ausgeschaltet</code></ol></td></tr>
 <tr><td><code>&nbsp;&nbsp;}</code><br></td></tr>
@@ -4122,7 +4122,7 @@ Zeitangaben, die mit Pluszeichen beginnen, werden relativ behandelt, d. h. die a
 attr di_save do always</code><br>
 <br>
 <a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
-<code>define di_save DOIF {[+01:00];fhem"save"}}</code><br>
+<code>define di_save DOIF {[+01:00];fhem"save"}</code><br>
 <br>
 Ebenfalls lassen sich relative Angaben in Sekunden angeben. [+01:00] entspricht [+3600];
 <br>
@@ -4164,7 +4164,7 @@ Format: [+[h]:MM] mit: h sind Stundenangaben zwischen 2 und 23 und MM Minuten zw
 attr di_gong do always</code><br>
 <br>
 <a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
-<code>define di_gong DOIF {[+[2]:05];set_fhem"pump on-for-timer 300"}</code><br>
+<code>define di_gong DOIF {[+[2]:05];fhem_set"pump on-for-timer 300"}</code><br>
 <br>
 <a name="DOIF_Wochentagsteuerung"></a>
 <b>Wochentagsteuerung</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
@@ -4404,7 +4404,7 @@ Innerhalb des definierten Zeitintervalls, triggert der definierte Timer. Außerh
 attr di_pump do always </code><br>
 <br>
 <a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
-<code>define di_pump DOIF {[08:00-22:00,+:30];set_fhem"pump on-for-timer 300"}</code><br>
+<code>define di_pump DOIF {[08:00-22:00,+:30];fhem_set"pump on-for-timer 300"}</code><br>
 <br>
 Es wird um 08:00, 08:30, 09:00, ..., 21:30 Uhr die Anweisung ausgeführt. Um 22:00 wird das letzte Mal getriggert, das Zeitintervall ist zu diesem Zeitpunkt nicht mehr wahr.<br>
 <br>
