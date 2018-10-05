@@ -5961,19 +5961,19 @@ sub MSwitch_Createtimer($) {
     my $Name = $hash->{NAME};
 
 	
-	MSwitch_LOG( $Name, 5,"create timer");
+	
 	
 	
     # keine timer vorhenden
     my $condition = ReadingsVal( $Name, '.Trigger_time', '' );
-	
+	#MSwitch_LOG( $Name, 0,"create timer: ".$condition);
 	
 	$condition =~ s/#\[dp\]/:/g;
 	
 				my	$x =0;
 				# (.*)\[(.*[a-zA-Z].*)\:(.*)\](.*)
-				#while ( $condition =~ m/(.*)\[(.*[^0-9]{2})\:(.*[^0-9]{2})\](.*)/ ) 
-				while ( $condition =~ m/(.*)\[(.*[a-zA-Z].*)\:(.*)\](.*)/ ) 
+				while ( $condition =~ m/(.*)\[(.*[^0-9]{2})\:(.*[^0-9]{2})\](.*)/ ) 
+				#while ( $condition =~ m/(.*)\[(.*[a-zA-Z].*)\:(.*)\](.*)/ ) 
 					{
 					$x++;                        # notausstieg notausstieg
 					last if $x > 20;             # notausstieg notausstieg
@@ -5983,6 +5983,10 @@ sub MSwitch_Createtimer($) {
 	
     my $lenght = length($condition);
 
+	
+	#MSwitch_LOG( $Name, 0,"create timer: ".$condition);
+	
+	
     #remove all timers
     MSwitch_Clear_timer($hash);
 
@@ -6021,10 +6025,10 @@ sub MSwitch_Createtimer($) {
     $timer[2] = '' if ( !defined $timer[2] );
     $timer[3] = '' if ( !defined $timer[3] );
  
- MSwitch_LOG( $Name, 5,"timer0  $timer[0]");
- MSwitch_LOG( $Name, 5,"timer1  $timer[1]");
- MSwitch_LOG( $Name, 5,"timer2  $timer[2]");
- MSwitch_LOG( $Name, 5,"timer3  $timer[3]");
+ MSwitch_LOG( $Name, 0,"timer0  $timer[0]");
+ MSwitch_LOG( $Name, 0,"timer1  $timer[1]");
+ MSwitch_LOG( $Name, 0,"timer2  $timer[2]");
+ MSwitch_LOG( $Name, 0,"timer3  $timer[3]");
  
  
     # lösche bei notify und toggle
