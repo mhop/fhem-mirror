@@ -103,6 +103,7 @@ span.sort-item-delete-link {
 
 svg { height:32px; width:32px; vertical-align:middle; margin:2px 0; }
 svg:not([fill]) { fill:#fff; }
+svg.on,svg.FS20_on { fill:orange!important; }
 g.on { fill:red; }
 
 /* next lines are for remotecontrol */
