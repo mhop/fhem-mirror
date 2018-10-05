@@ -11,7 +11,7 @@
 #
 #
 ##############################################################################
-# Release 20 / 2018-09-20
+# Release 21 / 2018-10-06
 
 package main;
 
@@ -797,7 +797,7 @@ netatmo_refreshToken($;$)
   if( $nonblocking ) {
     HttpUtils_NonblockingGet({
       url => "https://".$hash->{helper}{apiserver}."/oauth2/token",
-      timeout => 20,
+      timeout => 30,
       noshutdown => 1,
       data => {grant_type => 'refresh_token', client_id => $hash->{helper}{client_id},  client_secret=> $hash->{helper}{client_secret}, refresh_token => $hash->{refresh_token}},
         hash => $hash,
@@ -847,7 +847,7 @@ netatmo_refreshAppToken($;$)
   if( $nonblocking ) {
     HttpUtils_NonblockingGet({
       url => "https://app.netatmo.net/oauth2/token",
-      timeout => 20,
+      timeout => 30,
       noshutdown => 1,
       header => "$auth",
       data => {grant_type => 'refresh_token', refresh_token => $hash->{refresh_token_app}},
@@ -910,7 +910,7 @@ netatmo_checkConnection($)
   HttpUtils_NonblockingGet({
     url => "https://".$hash->{helper}{apiserver}."/api/getpublicmeasures",
     method => "POST",
-    timeout => 5,
+    timeout => 30,
     header => "Content-Type: application/json\r\nAuthorization: Bearer ".$hash->{access_token},
     hash => $hash,
     data => $json,
@@ -1018,7 +1018,7 @@ netatmo_parseUnban($$$)
 
   HttpUtils_NonblockingGet({
     url => "https://auth.netatmo.com/en-US/access/login?next_url=https://dev.netatmo.com/dev/myaccount",
-    timeout => 5,
+    timeout => 30,
     hash => $hash,
     ignoreredirects => 1,
     type => 'unban',
@@ -1068,7 +1068,7 @@ netatmo_parseUnban2($$$)
 
   HttpUtils_NonblockingGet({
     url => "https://dev.netatmo.com/api/unbanapp",
-    timeout => 5,
+    timeout => 30,
     hash => $hash,
     type => 'unban',
     header => "Referer: https://dev.netatmo.com/dev/myaccount\r\nAuthorization: Bearer ".$accesstoken."\r\nContent-Type: application/json;charset=utf-8\r\nCookie: netatmocomci_csrf_cookie_na=".$csrf_token."; netatmocomlocale=en-US; netatmocomacces_token=".$accesstoken,
@@ -1219,7 +1219,7 @@ netatmo_getDevices($;$)
   } else {
     HttpUtils_NonblockingGet({
       url => "https://".$hash->{helper}{apiserver}."/api/getstationsdata",
-      timeout => 20,
+      timeout => 30,
       noshutdown => 1,
       data => { access_token => $hash->{access_token}, },
       hash => $hash,
@@ -1254,7 +1254,7 @@ netatmo_getHomes($;$)
   } else {
     HttpUtils_NonblockingGet({
       url => "https://".$hash->{helper}{apiserver}."/api/gethomedata",
-      timeout => 20,
+      timeout => 30,
       noshutdown => 1,
       data => { access_token => $hash->{access_token}, },
       hash => $hash,
@@ -1289,7 +1289,7 @@ netatmo_getThermostats($;$)
   } else {
     HttpUtils_NonblockingGet({
       url => "https://".$hash->{helper}{apiserver}."/api/gethomesdata",
-      timeout => 20,
+      timeout => 30,
       noshutdown => 1,
       data => { access_token => $hash->{access_token}, },
       hash => $hash,
@@ -1326,7 +1326,7 @@ netatmo_getHomecoachs($;$)
   } else {
     HttpUtils_NonblockingGet({
       url => "https://".$hash->{helper}{apiserver}."/api/gethomecoachsdata",
-      timeout => 20,
+      timeout => 30,
       noshutdown => 1,
       data => { access_token => $hash->{access_token}, },
       hash => $hash,
@@ -1372,7 +1372,7 @@ netatmo_pingCamera($;$)
   } else {
     HttpUtils_NonblockingGet({
       url => $pingurl,
-      timeout => 10,
+      timeout => 30,
       sslargs => { SSL_hostname => '', },
       data => { access_token => $iohash->{access_token}, },
       hash => $hash,
@@ -1534,7 +1534,7 @@ netatmo_getEvents($)
 
   HttpUtils_NonblockingGet({
     url => "https://".$iohash->{helper}{apiserver}."/api/getnextevents",
-    timeout => 20,
+    timeout => 60,
     noshutdown => 1,
     data => { access_token => $iohash->{access_token}, home_id => $hash->{Home}, event_id => $hash->{lastevent}, },
     hash => $hash,
@@ -1589,7 +1589,7 @@ netatmo_getPublicDevices($$;$$$$)
   if( $blocking ) {
     my($err,$data) = HttpUtils_BlockingGet({
       url => "https://".$iohash->{helper}{apiserver}."/api/getpublicdata",
-      timeout => 5,
+      timeout => 10,
       noshutdown => 1,
       data => { access_token => $iohash->{access_token}, lat_ne => $lat_ne, lon_ne => $lon_ne, lat_sw => $lat_sw, lon_sw => $lon_sw },
     });
@@ -1598,7 +1598,7 @@ netatmo_getPublicDevices($$;$$$$)
   } else {
     HttpUtils_NonblockingGet({
       url => "https://".$iohash->{helper}{apiserver}."/api/getpublicdata",
-      timeout => 20,
+      timeout => 60,
       noshutdown => 1,
       data => { access_token => $iohash->{access_token}, lat_ne => $lat_ne, lon_ne => $lon_ne, lat_sw => $lat_sw, lon_sw => $lon_sw, filter => 'true' },
       hash => $hash,
@@ -1717,7 +1717,7 @@ netatmo_requestDeviceReadings($@)
 
   HttpUtils_NonblockingGet({
     url => "https://".$iohash->{helper}{apiserver}."/api/getmeasure",
-    timeout => 20,
+    timeout => 60,
     noshutdown => 1,
     data => \%data,
     hash => $hash,
@@ -1750,7 +1750,7 @@ netatmo_initHome($@)
 #    data => \%data,
   HttpUtils_NonblockingGet({
     url => "https://app.netatmo.net/api/gethomesdata",
-    timeout => 20,
+    timeout => 30,
     noshutdown => 1,
     header => "Content-Type: application/json\r\nAuthorization: Bearer ".$iohash->{access_token_app},
     hash => $hash,
@@ -1786,7 +1786,7 @@ netatmo_requestHomeReadings($@)
 #    data => \%data,
   HttpUtils_NonblockingGet({
     url => "https://app.netatmo.net/api/gethomesdata",
-    timeout => 20,
+    timeout => 60,
     noshutdown => 1,
     header => "Content-Type: application/json\r\nAuthorization: Bearer ".$iohash->{access_token_app},
     hash => $hash,
@@ -1817,7 +1817,7 @@ netatmo_requestThermostatReadings($@)
 
   HttpUtils_NonblockingGet({
     url => "https://".$iohash->{helper}{apiserver}."/api/getthermostatsdata",
-    timeout => 20,
+    timeout => 60,
     noshutdown => 1,
     data => \%data,
     hash => $hash,
@@ -1852,7 +1852,7 @@ netatmo_initHeatingHome($@)
 #    data => \%data,
   HttpUtils_NonblockingGet({
     url => "https://app.netatmo.net/api/gethomesdata",
-    timeout => 20,
+    timeout => 30,
     noshutdown => 1,
     header => "Content-Type: application/json\r\nAuthorization: Bearer ".$iohash->{access_token_app},
     data => \%data,
@@ -1894,7 +1894,7 @@ netatmo_pollHeatingHome($@)
 #    data => \%data,
   HttpUtils_NonblockingGet({
     url => "https://my.netatmo.com/syncapi/v1/gethomestatus",
-    timeout => 20,
+    timeout => 60,
     noshutdown => 1,
     header => "Content-Type: application/json;charset=utf-8\r\nAuthorization: Bearer ".$iohash->{access_token},
     data => $json,
@@ -1948,7 +1948,7 @@ netatmo_pollHeatingRoom($@)
 #    data => \%data,
   HttpUtils_NonblockingGet({
     url => "https://app.netatmo.net/api/getroommeasure",
-    timeout => 20,
+    timeout => 60,
     noshutdown => 1,
     header => "Content-Type: application/json\r\nAuthorization: Bearer ".$iohash->{access_token_app},
     data => $json,
@@ -2000,7 +2000,7 @@ netatmo_setRoomMode($$;$)
 
   HttpUtils_NonblockingGet({
       url => "https://".$iohash->{helper}{apiserver}."/syncapi/v1/setthermpoint",
-      timeout => 20,
+      timeout => 30,
       noshutdown => 1,
       header => "Content-Type: application/json\r\nAuthorization: Bearer ".$iohash->{access_token},
       data => $json,
@@ -2038,7 +2038,7 @@ netatmo_setRoomTemp($$;$)
 
   HttpUtils_NonblockingGet({
       url => "https://".$iohash->{helper}{apiserver}."/syncapi/v1/setthermpoint",
-      timeout => 20,
+      timeout => 30,
       noshutdown => 1,
       header => "Content-Type: application/json\r\nAuthorization: Bearer ".$iohash->{access_token},
       data => $json,
@@ -2073,7 +2073,7 @@ netatmo_requestPersonReadings($)
 
   HttpUtils_NonblockingGet({
     url => "https://".$iohash->{helper}{apiserver}."/api/getlasteventof",
-    timeout => 20,
+    timeout => 60,
     noshutdown => 1,
     data => \%data,
     hash => $hash,
@@ -2119,7 +2119,7 @@ netatmo_setPresence($$)
 
   HttpUtils_NonblockingGet({
     url => "https://app.netatmo.net/api/setpersons".$urlstatus,
-    timeout => 20,
+    timeout => 30,
     noshutdown => 1,
     method => "POST",
     header => "Content-Type: application/json\r\nAuthorization: Bearer ".$iohash->{access_token_app},
@@ -2205,7 +2205,7 @@ netatmo_setNotifications($$$)
 
   HttpUtils_NonblockingGet({
     url => "https://app.netatmo.net/api/updatehome",
-    timeout => 20,
+    timeout => 30,
     noshutdown => 1,
     method => "POST",
     header => "Content-Type: application/x-www-form-urlencoded; charset=UTF-8\r\nAuthorization: Bearer ".$iohash->{access_token_app},
@@ -2234,7 +2234,7 @@ netatmo_setCamera($$$)
 
   HttpUtils_NonblockingGet({
       url => $commandurl,
-      timeout => 20,
+      timeout => 30,
       noshutdown => 1,
       verify_hostname => 0,
       hash => $hash,
@@ -2262,7 +2262,7 @@ netatmo_setCameraSetting($$$)
 
   HttpUtils_NonblockingGet({
       url => $commandurl,
-      timeout => 20,
+      timeout => 30,
       noshutdown => 1,
       verify_hostname => 0,
       hash => $hash,
@@ -2290,7 +2290,7 @@ netatmo_setFloodlight($$)
 
   HttpUtils_NonblockingGet({
       url => $commandurl,
-      timeout => 20,
+      timeout => 30,
       noshutdown => 1,
       verify_hostname => 0,
       hash => $hash,
@@ -2319,7 +2319,7 @@ netatmo_setIntensity($$)
 
   HttpUtils_NonblockingGet({
       url => $commandurl,
-      timeout => 20,
+      timeout => 30,
       noshutdown => 1,
       verify_hostname => 0,
       hash => $hash,
@@ -2349,7 +2349,7 @@ netatmo_setPresenceConfig($$)
 
   HttpUtils_NonblockingGet({
       url => $commandurl,
-      timeout => 20,
+      timeout => 30,
       noshutdown => 1,
       verify_hostname => 0,
       hash => $hash,
@@ -2378,7 +2378,7 @@ netatmo_getPresenceConfig($)
 
   HttpUtils_NonblockingGet({
       url => $commandurl,
-      timeout => 20,
+      timeout => 30,
       noshutdown => 1,
       verify_hostname => 0,
       hash => $hash,
@@ -2414,7 +2414,7 @@ netatmo_setTagCalibration($$)
 
   HttpUtils_NonblockingGet({
       url => $commandurl,
-      timeout => 20,
+      timeout => 30,
       noshutdown => 1,
       verify_hostname => 0,
       hash => $hash,
@@ -2453,7 +2453,7 @@ netatmo_setThermostatMode($$;$)
 
   HttpUtils_NonblockingGet({
       url => "https://".$iohash->{helper}{apiserver}."/api/setthermpoint",
-      timeout => 20,
+      timeout => 30,
       noshutdown => 1,
       data => \%data,
       hash => $hash,
@@ -2486,7 +2486,7 @@ netatmo_setThermostatTemp($$;$$)
 
   HttpUtils_NonblockingGet({
       url => "https://".$iohash->{helper}{apiserver}."/api/setthermpoint",
-      timeout => 20,
+      timeout => 30,
       noshutdown => 1,
       data => \%data,
       hash => $hash,
@@ -2522,7 +2522,7 @@ netatmo_setThermostatProgram($$)
 
   HttpUtils_NonblockingGet({
       url => "https://".$iohash->{helper}{apiserver}."/api/switchschedule",
-      timeout => 20,
+      timeout => 30,
       noshutdown => 1,
       data => \%data,
       hash => $hash,
@@ -2655,7 +2655,7 @@ netatmo_dispatch($$$)
   $hash->{openRequests} -= 1 if( $param->{type} eq 'getmeasure' );
 
   if( $err ) {
-    Log3 $name, 2, "$name: http request failed: $err";
+    Log3 $name, 2, "$name: ".$param->{type}." request failed: $err";
     if($err =~ /refused/ ){
       RemoveInternalTimer($hash);
       InternalTimer(gettimeofday()+3600, "netatmo_poll", $hash);
@@ -3486,7 +3486,7 @@ netatmo_parseReadings($$;$)
                 $hash->{helper}{NEXT_POLL} = $nextdata;
                 Log3 $name, 3, "$name: next extended dynamic update from device ($requested) at ".FmtDateTime($nextdata);
               } else {
-              Log3 $name, 2, "$name: invalid time for dynamic update from device ($requested): ".FmtDateTime($nextdata);
+                Log3 $name, 3, "$name: invalid time for dynamic update from device ($requested): ".FmtDateTime($nextdata);
             }
           }
         }
@@ -5578,7 +5578,7 @@ netatmo_pollGlobal($)
 
   HttpUtils_NonblockingGet({
       url => "https://".$hash->{helper}{apiserver}."/api/getstationsdata",
-      timeout => 20,
+      timeout => 60,
       noshutdown => 1,
       data => { access_token => $hash->{access_token}, },
       hash => $hash,
@@ -5602,7 +5602,7 @@ netatmo_pollGlobalHealth($)
 
   HttpUtils_NonblockingGet({
       url => "https://".$hash->{helper}{apiserver}."/api/gethomecoachsdata",
-      timeout => 20,
+      timeout => 60,
       noshutdown => 1,
       data => { access_token => $hash->{access_token}, },
       hash => $hash,
@@ -5641,7 +5641,7 @@ netatmo_pollForecast($)
 
   HttpUtils_NonblockingGet({
       url => "https://app.netatmo.net/api/simplifiedfuturemeasure",
-      timeout => 20,
+      timeout => 60,
       noshutdown => 1,
       data => { device_id => $hash->{Station}, },
       header => "Authorization: Bearer ".$iohash->{access_token_app},
@@ -6069,7 +6069,7 @@ netatmo_registerWebhook($)
   
   HttpUtils_NonblockingGet({
     url => "https://".$iohash->{helper}{apiserver}."/api/addwebhook",
-    timeout => 20,
+    timeout => 30,
     noshutdown => 1,
     data => { access_token => $iohash->{access_token}, url => $webhookurl, app_type => 'app_security', },
     hash => $hash,
@@ -6094,7 +6094,7 @@ netatmo_dropWebhook($)
   
   HttpUtils_NonblockingGet({
     url => "https://".$iohash->{helper}{apiserver}."/api/dropwebhook",
-    timeout => 20,
+    timeout => 30,
     noshutdown => 1,
     data => { access_token => $iohash->{access_token}, app_type => 'app_security', },
     hash => $hash,
