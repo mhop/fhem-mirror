@@ -1,4 +1,4 @@
-REV 17459
+REV 17464
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2018-10-04_07:45:03 259945 ./CHANGED
+UPD 2018-10-06_07:45:02 260082 ./CHANGED
 UPD 2018-10-01_07:45:02 38011 ./MAINTAINER.txt
 UPD 2018-09-09_07:45:03 39688 ./configDB.pm
 UPD 2018-09-17_07:45:03 19987 ./fhem.cfg.demo
@@ -223,7 +223,7 @@ UPD 2017-07-01_07:45:02 152744 FHEM/37_plex.pm
 UPD 2017-12-10_07:45:03 31453 FHEM/38_Broadlink.pm
 UPD 2017-05-31_07:45:02 28640 FHEM/38_CO20.pm
 UPD 2016-02-09_07:45:13 15879 FHEM/38_JawboneUp.pm
-UPD 2018-09-30_07:45:02 237122 FHEM/38_netatmo.pm
+UPD 2018-10-06_07:45:02 237142 FHEM/38_netatmo.pm
 UPD 2018-03-18_07:45:02 80208 FHEM/39_Talk2Fhem.pm
 UPD 2018-03-02_07:47:09 24286 FHEM/39_alexa.pm
 UPD 2017-04-21_07:45:02 2759 FHEM/39_siri.pm
@@ -348,7 +348,7 @@ UPD 2018-01-29_07:45:02 123938 FHEM/71_YAMAHA_NP.pm
 UPD 2018-03-19_07:45:04 80986 FHEM/72_FB_CALLLIST.pm
 UPD 2018-05-09_07:45:02 113204 FHEM/72_FB_CALLMONITOR.pm
 UPD 2018-10-01_07:45:02 221693 FHEM/72_FRITZBOX.pm
-UPD 2018-09-30_07:45:02 150996 FHEM/72_XiaomiDevice.pm
+UPD 2018-10-06_07:45:02 151068 FHEM/72_XiaomiDevice.pm
 UPD 2018-06-03_07:45:03 47236 FHEM/73_AMADCommBridge.pm
 UPD 2018-04-14_07:45:02 89324 FHEM/73_ElectricityCalculator.pm
 UPD 2018-08-24_07:45:02 35702 FHEM/73_GardenaSmartBridge.pm
@@ -441,7 +441,7 @@ UPD 2016-08-19_14:49:02 4984 FHEM/98_CULflash.pm
 UPD 2017-05-10_07:45:02 47704 FHEM/98_ComfoAir.pm
 UPD 2017-09-20_07:45:02 9013 FHEM/98_CustomReadings.pm
 UPD 2018-01-10_07:45:02 60933 FHEM/98_DLNARenderer.pm
-UPD 2018-10-04_07:45:03 265411 FHEM/98_DOIF.pm
+UPD 2018-10-06_07:45:02 265406 FHEM/98_DOIF.pm
 UPD 2018-09-09_07:45:03 111923 FHEM/98_DOIFtools.pm
 UPD 2017-11-06_07:45:02 40228 FHEM/98_Dooya.pm
 UPD 2016-10-29_07:45:14 28678 FHEM/98_EDIPLUG.pm
@@ -681,11 +681,11 @@ UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
 UPD 2018-10-04_07:45:06 3579602 docs/commandref.html
-UPD 2018-10-04_07:45:08 2201370 docs/commandref_DE.html
+UPD 2018-10-06_07:45:07 2201365 docs/commandref_DE.html
 UPD 2018-07-16_07:45:03 76259 docs/commandref_frame.html
 UPD 2018-07-16_07:45:03 85715 docs/commandref_frame_DE.html
-UPD 2018-10-05_07:45:08 197608 docs/commandref_modular.html
-UPD 2018-10-05_07:45:09 208298 docs/commandref_modular_DE.html
+UPD 2018-10-06_07:45:08 197608 docs/commandref_modular.html
+UPD 2018-10-06_07:45:09 208298 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2016,7 +2016,7 @@ UPD 2018-03-08_07:45:03 9598 www/pgm2/console.js
 UPD 2017-02-18_07:45:02 1064 www/pgm2/darkCommon.css
 UPD 2015-07-28_14:05:34 4334 www/pgm2/darkfloorplanstyle.css
 UPD 2017-02-24_07:45:02 4813 www/pgm2/darksmallscreenstyle.css
-UPD 2017-02-18_07:45:02 5640 www/pgm2/darkstyle.css
+UPD 2018-10-06_07:45:02 5686 www/pgm2/darkstyle.css
 UPD 2015-11-22_17:53:09 2502 www/pgm2/darksvg_defs.svg
 UPD 2015-07-28_14:05:34 2808 www/pgm2/darksvg_style.css
 UPD 2015-07-28_14:05:34 30 www/pgm2/darktouchpadstyle.css
