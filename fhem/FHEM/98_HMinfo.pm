@@ -1080,8 +1080,7 @@ sub HMinfo_getEntities(@) { ###################################################
     my $eHash = $modules{CUL_HM}{defptr}{$id};
     my $eName = $eHash->{NAME};
     next if ( !$eName || $eName !~ m/$re/);
-    my $eIg   = CUL_HM_Get($eHash,$eName,"param","ignore");
-    $eIg = "" if ($eIg eq "undefined");
+    my $eIg   = CUL_HM_getAttr($eName,"ignore","");
     next if (!$doIgn && $eIg);
     next if (!(($doDev && $eHash->{helper}{role}{dev}) ||
                ($doChn && $eHash->{helper}{role}{chn})));
