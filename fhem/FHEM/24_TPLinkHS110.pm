@@ -155,7 +155,6 @@ sub TPLinkHS110_Get($$)
 	       		Timeout  => $hash->{TIMEOUT} )
 		        or return "Couldn't connect to $remote_host:$remote_port: $@\n";
 		$socket->write($rc);
-        $socket->write($c);
         IO::Socket::Timeout->enable_timeouts_on($socket);
         $socket->read_timeout(.5);
         my $rdata;
@@ -172,7 +171,7 @@ sub TPLinkHS110_Get($$)
             readingsEndUpdate($hash, 1);
 			return; 
 		} else {
-            Log3 $hash, 1, "TPLinkHS110: $name Realtime data updated";
+            Log3 $hash, 2, "TPLinkHS110: $name Realtime data updated";
         }
 		
 		my %emeterReadings = ();
@@ -239,7 +238,7 @@ sub TPLinkHS110_Get($$)
 			$count = @{$json->{'emeter'}->{'get_daystat'}->{'day_list'}};
 			readingsBulkUpdate($hash, "monthly_total", $total);
 			if ($count) { readingsBulkUpdate($hash, "daily_average", $total/$count)};
-            Log3 $hash, 1, "TPLinkHS110: $name Daystat updated";
+            Log3 $hash, 2, "TPLinkHS110: $name Daystat updated";
         } else {
             Log3 $hash, 1, "TPLinkHS110: $name Error updating daystat. Success: " . $success . ", json: " . $json;
             Log3 $hash, 3, "TPLinkHS110: $name Updating readings";
