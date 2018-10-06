@@ -3331,7 +3331,7 @@ sub CUL_HM_parseCommon(@){#####################################################
         ($format,$data) = ($1,$2) if ($mhp->{p} =~ m/^(..)(.*)/);
         my $list = $rspWait->{forList};
         $list = "00" if (!$list); #use the default
-        if ($format eq "02"){ # list 2: format aa:dd aa:dd ...
+        if    ($format eq "02"){ # list 2: format aa:dd aa:dd ...
           $data =~ s/(..)(..)/ $1:$2/g;
         }
         elsif ($format eq "03"){ # list 3: format aa:dddd
@@ -3363,13 +3363,14 @@ sub CUL_HM_parseCommon(@){#####################################################
         }
 
         if ($data =~ m/00:00$/){ # this was the last message in the block
+          my $peerId = CUL_HM_peerChId($peer,$mhp->{devH}{DEF});
           if($list eq "00"){
             push @evtEt,[$mhp->{devH},0,"PairedTo:".CUL_HM_getRegFromStore($mhp->{devN},"pairCentral",0,"")];
           }
           CUL_HM_respPendRm($mhp->{devH});
           delete $mhp->{cHash}{helper}{shadowReg}{$regLNp};   #rm shadow
           # peerChannel name from/for user entry. <IDorName> <deviceID> <ioID>
-          CUL_HM_updtRegDisp($mhp->{cHash},$list,$peer);
+          CUL_HM_updtRegDisp($mhp->{cHash},$list,$peerId);
         }
         else{
           CUL_HM_respPendToutProlong($mhp->{devH});#wasn't last - reschedule timer
@@ -3389,7 +3390,7 @@ sub CUL_HM_parseCommon(@){#####################################################
       my $peer = ($peerID ne "00000000") ? CUL_HM_peerChName($peerID,"000000") : "";
       
       if($data eq "00"){#update finished for mStp 05. Now update display
-        CUL_HM_updtRegDisp($fHash,$list,$peer);
+        CUL_HM_updtRegDisp($fHash,$list,$peerID);
       }
       else{
         my $regLNp = "RegL_".$list.".".$peer;
@@ -3422,7 +3423,7 @@ sub CUL_HM_parseCommon(@){#####################################################
             $shdwReg =~ s/ $a:..// if ($shdwReg);# confirmed: remove from shadow
           }
           CUL_HM_UpdtReadSingle($fHash,$regLN,$rCur,0);
-          CUL_HM_updtRegDisp($fHash,$list,$peer) if ($mhp->{mStp} eq "04");
+          CUL_HM_updtRegDisp($fHash,$list,$peerID) if ($mhp->{mStp} eq "04");
         }
       }
       $ret= "parsed"; # send ACK 
@@ -4143,7 +4144,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     if ($sectIn eq "all") {
       @sectL = ("rssi","msgEvents","readings","attack");#readings is last - it schedules a reread possible
     }
-    elsif($sectIn =~ m/(rssi|trigger|msgEvents|readings|oldRegs|register|unknownDev|attack)/){
+    elsif($sectIn =~ m/(rssi|trigger|msgEvents|msgErrors|readings|oldRegs|register|unknownDev|attack)/){
       @sectL = ($sectIn);
     }
     else{
@@ -4205,6 +4206,13 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         CUL_HM_unQEntity($name,"qReqConf");
         CUL_HM_unQEntity($name,"qReqStat");
         CUL_HM_protState($hash,"Info_Cleared");
+      }
+      elsif($sect eq "msgErrors"){
+        delete $hash->{protResndFail};
+        delete $hash->{protResnd};
+        delete $hash->{protCmdDel};
+        delete $hash->{protNACK};
+        delete $hash->{protIOerr};
       }
       elsif($sect eq "rssi"){
         delete $defs{$name}{helper}{rssi};
@@ -8030,7 +8038,7 @@ sub CUL_HM_updtRegDisp($$$) {
   
   my $regLN = ($hash->{helper}{expert}{raw}?"":".")
               .sprintf("RegL_%02X.",$listNo)
-              .($peerId?CUL_HM_peerChName($peerId,$devId):"");
+              .($peerId ? CUL_HM_peerChName($peerId,$devId) : "");
   if (($md eq "HM-MOD-Re-8") && $listNo == 0){#handle Fw bug 
     CUL_HM_ModRe8($hash,$regLN);
   }
