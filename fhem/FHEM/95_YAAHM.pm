@@ -3,6 +3,9 @@
 # YAAHM.pm
 #
 # Yet Another Auto Home Module for FHEM
+# 
+# Problem: Wenn man trotz Feiertag geweckt werden möchte, wird zwar die Weckzeit richtig gesetzt - 
+# aber da "Wakeup" voM Timer ausgelöst wird und der nach den Zusatzbedingungen daytype etc fragt, gehen die rollläden eben nicht auf
 #
 # Prof. Dr. Peter A. Henning
 #
@@ -47,7 +50,7 @@ my $yaahmname;
 my $yaahmlinkname   = "Profile";     # link text
 my $yaahmhiddenroom = "ProfileRoom"; # hidden room
 my $yaahmpublicroom = "Unsorted";    # public room
-my $yaahmversion    = "2.01";
+my $yaahmversion    = "2.02";
 my $firstcall       = 1;
     
 my %yaahm_transtable_EN = ( 
@@ -1770,8 +1773,9 @@ sub YAAHM_startWeeklyTimer($) {
     my $v4a = ($g4a ne "") ? "(normal)|(".join(')|(',split(',',$g4a)).")" : "(normal)";
     my $v4b = ($g4b ne "") ? "(workday)|(weekend)|(".join(')|(',split(',',$g4b)).")" : "(workday)|(weekend)";
     
-    $res .= "\nand ([" .$name. ":housemode] =~ \"".$v4a."\")";
-    $res .= "\nand ([" .$name. ":todayType] =~ \"".$v4b."\")";
+    $res .= "\nand ((([" .$name. ":housemode] =~ \"".$v4a."\")";
+    $res .= "\nand ([" .$name. ":todayType] =~ \"".$v4b."\")) ";
+    $res .= "\nor ([".$name.":ring_".$i."x] =~ \".*\(man\)\")) ";
     
     #-- to prevent double execution of functions do this in YAAHM_time, NOT in timer
     my $xval;
