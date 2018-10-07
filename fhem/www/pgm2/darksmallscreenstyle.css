@@ -115,3 +115,18 @@ div.tiny { font-size:10px; }
   table.block slider { float: none; }
   table.block select { text-align: center; }
 }
+
+/* commandref */
+body.commandref ul { -webkit-padding-start:0; }
+body.commandref div#menuScrollArea div#menu a { margin-left:10px; }
+body.commandref table.class_device { word-break:break-all; }
+
+body.commandref div#right { top:48px; left:5px; right:5px; }
+body.commandref div#menuScrollArea {
+  top:0px; left:10px; right:10px; height:48px; 
+  position:fixed; z-index:30; background-color:inherit;
+}
+body.commandref div#menu { top:15px; left:40px; }
+body.commandref div#menu a { margin-left:20px; }
+body.commandref div#menu br { display:none; }
+body.commandref div#menu h3 { display:none; }

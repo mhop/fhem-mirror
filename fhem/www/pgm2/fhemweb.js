@@ -80,8 +80,7 @@ FW_jqueryReadyFn()
     return;
   FW_docReady = true;
   FW_serverGenerated = $("body").attr("generated");
-  if(!FW_serverGenerated)       // called from commandref.html
-    return;
+
   FW_longpollType = $("body").attr("longpoll");
   var ajs = $("body").attr("data-availableJs");
   if(ajs) {
@@ -887,7 +886,7 @@ FW_rawDef()
   });
 }
 
-var FW_arrowDown, FW_arrowRight;
+var FW_arrowDown="", FW_arrowRight="";
 function
 FW_treeMenu()
 {

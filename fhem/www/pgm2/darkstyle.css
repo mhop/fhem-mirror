@@ -140,3 +140,5 @@ div#svgmarker {
   color:white; background:black;
   border:2px solid white; border-radius:4px;
 }
+
+body.commandref div#menuScrollArea { position:fixed; }

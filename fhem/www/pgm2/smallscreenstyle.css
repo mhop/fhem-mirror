@@ -73,3 +73,19 @@ button.dist { margin:5px; }
   table.block slider { float: none; }
   table.block select { text-align: center; }
 }
+
+
+body.commandref ul { -webkit-padding-start:0; }
+body.commandref div#menuScrollArea div#menu a { margin-left:10px; }
+body.commandref table.class_device { word-break:break-all; }
+
+body.commandref div#right { top:48px; }
+body.commandref div#logo { display:none; }
+body.commandref div#menu {
+  position:fixed; z-index:30; background-color:#FFFFE7;
+  top:0px; left:0px; right:10px; height:48px; 
+}
+body.commandref div#menu a { margin:20px; }
+body.commandref div#menu br { display:none; }
+body.commandref div#menu h3 { display:none; }
+body.commandref div#right { left:5px; right:5px }
