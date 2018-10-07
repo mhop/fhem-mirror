@@ -743,9 +743,13 @@ sub MSwitch_Get($$@) {
         $timehash = $hash->{helper}{delays};
         foreach my $a ( sort keys %{$timehash} ) 
 		{
+		
+		
+		
+		
             my $b      = substr( $hash->{helper}{delays}{$a}, 0, 10 );
             my $time   = FmtDateTime($b);
-            my @timers = split( /,/, $a );
+            my @timers = split( /#\[tr\]/, $a );
             $ret .= "<div nowrap>" . $time . " " . $timers[0] . "</div>";
         }
         if ( $ret ne "<div nowrap>Schaltzeiten (at - kommandos).</div><hr><div nowrap>aktive Delays:</div><hr>")
@@ -1244,8 +1248,10 @@ sub MSwitch_Set($@) {
     if ( $cmd eq "details" ) 
 	{
 	# setze devices details
+	#Log3( 'test', 0, 'array: '.$args[0] );
     $args[0] = urlDecode( $args[0] );
-
+	$args[0] =~ s/#\[pr\]/%/g; 
+#Log3( 'test', 0, 'array: '.$args[0] );
         my @devices =split( /,/, ReadingsVal( $name, '.Device_Affected', '' ) );
 		my @inputcmds = split( /#\[ND\]/, $args[0] );
 		my $counter     = 0;
@@ -1338,7 +1344,7 @@ sub MSwitch_Set($@) {
 		# ersetzung sonderzeichen etc mscode
 		# auskommentierte wurden bereits dur jscript ersetzt
 		
-		$args[0] = urlDecode( $args[0] );
+		#$args[0] = urlDecode( $args[0] );
 		$savedetails =~ s/\n/#[nl]/g; 
 		$savedetails =~ s/\t/    /g; 
 		$savedetails =~ s/ /#[sp]/g; 
@@ -1348,6 +1354,7 @@ sub MSwitch_Set($@) {
 		$savedetails =~ s/^#\]/#[ec]/g;
 		$savedetails =~ s/\|/#[wa]/g;
 		$savedetails =~ s/\|/#[ti]/g;
+		#$savedetails =~ s/%/#[ti]/g;
         readingsSingleUpdate( $hash, ".Device_Affected_Details", $savedetails,0 );
         return;
     }
@@ -4727,8 +4734,12 @@ if ( ReadingsVal( $Name, '.change', 'undef') ne "undef")
 	devices = devices.replace(/:/g,'#[dp]');
 	devices = devices.replace(/;/g,'#[se]');
 	devices = devices.replace(/ /g,'#[sp]');
+	devices = devices.replace(/%/g,'#[pr]');
+	
+	
 	devices =  encodeURIComponent(devices);
 
+	//alert(devices);
 	var  def = nm+\" details \"+devices+\" \";
 	
 	location = location.pathname+\"?detail=" . $Name . "&cmd=set \"+addcsrf(def);
@@ -5966,25 +5977,33 @@ sub MSwitch_Createtimer($) {
 	
     # keine timer vorhenden
     my $condition = ReadingsVal( $Name, '.Trigger_time', '' );
-	#MSwitch_LOG( $Name, 0,"create timer: ".$condition);
+	
 	
 	$condition =~ s/#\[dp\]/:/g;
-	
+	#MSwitch_LOG( $Name, 0,"create timer: ".$condition);
 				my	$x =0;
 				# (.*)\[(.*[a-zA-Z].*)\:(.*)\](.*)
-				while ( $condition =~ m/(.*)\[(.*[^0-9]{2})\:(.*[^0-9]{2})\](.*)/ ) 
+				#while ( $condition =~ m/(.*)\[(.*[^0-9]{2})\:(.*[^0-9]{2})\](.*)/ ) 
 				#while ( $condition =~ m/(.*)\[(.*[a-zA-Z].*)\:(.*)\](.*)/ ) 
+				while ( $condition =~ m/(.*)(\[)([0-9]?[a-zA-Z]{1}.*)\:(.*)(\])(.*)/ ) 
 					{
+					#MSwitch_LOG( $Name, 0,"create timer1: ".$1);
+					#MSwitch_LOG( $Name, 0,"create timer2: ".$2);
+					#MSwitch_LOG( $Name, 0,"create timer3: ".$3);
+					#MSwitch_LOG( $Name, 0,"create timer4: ".$4);
+					
 					$x++;                        # notausstieg notausstieg
 					last if $x > 20;             # notausstieg notausstieg
-					my $setmagic = ReadingsVal( $2, $3, 0 );
-					$condition = $1.'['.$setmagic.']'.$4;
+					my $setmagic = ReadingsVal( $3, $4, 0 );
+					$condition = $1.'['.$setmagic.']'.$6;
+					
+					#MSwitch_LOG( $Name, 0,"create timer: ".$condition);
 					}
 	
     my $lenght = length($condition);
 
 	
-	#MSwitch_LOG( $Name, 0,"create timer: ".$condition);
+	
 	
 	
     #remove all timers
@@ -6025,10 +6044,10 @@ sub MSwitch_Createtimer($) {
     $timer[2] = '' if ( !defined $timer[2] );
     $timer[3] = '' if ( !defined $timer[3] );
  
- MSwitch_LOG( $Name, 0,"timer0  $timer[0]");
- MSwitch_LOG( $Name, 0,"timer1  $timer[1]");
- MSwitch_LOG( $Name, 0,"timer2  $timer[2]");
- MSwitch_LOG( $Name, 0,"timer3  $timer[3]");
+ #MSwitch_LOG( $Name, 0,"timer0  $timer[0]");
+ #MSwitch_LOG( $Name, 0,"timer1  $timer[1]");
+ #MSwitch_LOG( $Name, 0,"timer2  $timer[2]");
+ #MSwitch_LOG( $Name, 0,"timer3  $timer[3]");
  
  
     # lösche bei notify und toggle
@@ -7502,7 +7521,7 @@ readingsSingleUpdate( $hash, ".Device_Affected", $newdevices, 0 );
 
 	#details
 	my $tochange2 = ReadingsVal( $name, ".Device_Affected_Details", "" );
-Log3( $name, 0, "vor change: ".$tochange2 );	
+#Log3( $name, 0, "vor change: ".$tochange2 );	
 	my @devicesdetails = split( /#\[ND\]/,$tochange2 );
 	$x =0;
 	foreach  (@devicesdetails)
