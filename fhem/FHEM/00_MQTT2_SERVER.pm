@@ -319,6 +319,9 @@ MQTT2_SERVER_Read($@)
     MQTT2_SERVER_doPublish($hash, $defs{$sname}, $tp, $val, $cf & 0x01);
 
   ####################################
+  } elsif($cpt eq "PUBACK") { # ignore it
+
+  ####################################
   } elsif($cpt eq "SUBSCRIBE") {
     Log3 $sname, 4, "$cname $hash->{cid} $cpt";
     my $pid = unpack('n', substr($pl, 0, 2));
@@ -357,14 +360,17 @@ MQTT2_SERVER_Read($@)
     }
     addToWritebuffer($hash, pack("CCn", 0xb0, 2, $pid)); # UNSUBACK
 
+  ####################################
   } elsif($cpt eq "PINGREQ") {
     Log3 $sname, 4, "$cname $hash->{cid} $cpt";
     addToWritebuffer($hash, pack("C*", 0xd0, 0)); # pingresp
 
+  ####################################
   } elsif($cpt eq "DISCONNECT") {
     Log3 $sname, 4, "$cname $hash->{cid} $cpt";
     CommandDelete(undef, $cname);
 
+  ####################################
   } else {
     Log 1, "M2: Unhandled packet $cpt, disconneting $cname";
     CommandDelete(undef, $cname);
