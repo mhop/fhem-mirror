@@ -8,6 +8,9 @@
 #
 #############################################################
 #
+# v2.0.5 - 20181007
+# - BUGFIX:  ssh bugfixes by CoolTux
+#
 # v2.0.4 - 20180224
 # - FEATURE: support childlock
 #
@@ -156,7 +159,7 @@ sub EQ3BT_Initialize($) {
     $hash->{GetFn}    = 'EQ3BT_Get';
     $hash->{SetFn}    = 'EQ3BT_Set';
     $hash->{AttrFn}   = 'EQ3BT_Attribute';
-    $hash->{AttrList}  = 'sshHost maxRetries timeout '.
+    $hash->{AttrList}  = 'sshHost maxRetries timeout blockingCallLoglevel '.
                             $readingFnAttributes;
     
     return undef;
@@ -171,7 +174,8 @@ sub EQ3BT_Define($$) {
     my $sshHost;
     
     $hash->{STATE} = "initialized";
-    $hash->{VERSION} = "2.0.4";
+    $hash->{VERSION} = "2.0.5";
+    $hash->{loglevel} = 4;
     Log3 $hash, 3, "EQ3BT: EQ-3 Bluetooth Thermostat ".$hash->{VERSION};
     
     if (int(@a) > 4) {
@@ -235,12 +239,20 @@ sub EQ3BT_pairDevice {
 }
 
 sub EQ3BT_Attribute($$$$) {
-    my ($mode, $devName, $attrName, $attrValue) = @_;
+    my ( $cmd, $name, $attrName, $attrVal ) = @_;
+    my $hash                                = $defs{$name};
     
-    if($mode eq "set") {
-        
-    } elsif($mode eq "del") {
-        
+    if($cmd eq "set") {
+        if( $attrName eq "blockingCallLoglevel" ) {
+            $hash->{loglevel} = $attrVal;
+            Log3 $name, 3, "EQ3BT ($name) - set blockingCallLoglevel to $attrVal";
+        }
+    
+    } elsif($cmd eq "del") {
+        if( $attrName eq "blockingCallLoglevel" ) {
+            $hash->{loglevel} = 4;
+            Log3 $name, 3, "EQ3BT ($name) - set blockingCallLoglevel to $attrVal";
+        }
     }
     
     return undef;
@@ -499,15 +511,19 @@ sub EQ3BT_execGatttool($) {
     my ($name, $mac, $workType, $handle, $value, $listen) = split("\\|", $string);
     my $wait = 1;
     my $hash = $main::defs{$name};
+    my $sshHost     = AttrVal($name,"sshHost","none");
+    my $gatttool;   # = qx(which gatttool);
     
-    my $gatttool = qx(which gatttool);
+    $gatttool                               = qx(which gatttool) if($sshHost eq 'none');
+    $gatttool                               = qx(ssh $sshHost 'which gatttool') if($sshHost ne 'none');
     chomp $gatttool;
     
-    if(-x $gatttool) {
+    #if(-x $gatttool) {
+    if(defined($gatttool) and ($gatttool)) {
         my $gtResult;
         my $cmd;
-        my $sshHost     = AttrVal($name,"sshHost","none");
-
+        my $hciDevice = "hci".$hash->{helper}{hcidevices}[$hash->{helper}{currenthcidevice}];
+    
         while($wait) {
             my $grepGatttool = qx(ps ax| grep -E \'gatttool -b $mac\' | grep -v grep);
             if(not $grepGatttool =~ /^\s*$/) {
@@ -518,6 +534,18 @@ sub EQ3BT_execGatttool($) {
                 $wait = 0;
             }
         }
+        
+        
+        $cmd .= "ssh $sshHost '" if($sshHost ne 'none');
+        $cmd .= "timeout " . AttrVal($name, "timeout", 15) . " " if($listen);
+        $cmd .= "gatttool -i $hciDevice -b $mac ";
+        $cmd .= "--char-write-req -a $handle -n $value";
+        $cmd .= " --listen" if($listen);
+        $cmd .= " 2>&1 /dev/null";
+        $cmd .= "'" if($sshHost ne 'none');
+        
+        
+        
 
         if($value eq "03") {
             my ($sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst) = localtime(time);
@@ -525,24 +553,24 @@ sub EQ3BT_execGatttool($) {
             $value .= $currentDate;
         }
 
-        my $hciDevice = "hci".$hash->{helper}{hcidevices}[$hash->{helper}{currenthcidevice}];
+        
         #my $cmd = "gatttool -b $mac -i $hciDevice --char-write-req --handle=$handle --value=$value";
-        if( $sshHost ne 'none' ) {
-            $cmd = "ssh $sshHost 'gatttool -b $mac -i $hciDevice --char-write-req --handle=$handle --value=$value";
-        } else {
-            $cmd = "gatttool -b $mac -i $hciDevice --char-write-req --handle=$handle --value=$value";
-        }
-        
-        if(defined($listen) && $listen eq "listen") {
-            $cmd = "timeout ".AttrVal($name, "timeout", 15)." ".$cmd." --listen";
-        }
-        
-        #redirect stderr to stdout
-        if( $sshHost ne 'none' ) {
-            $cmd .= " 2>&1'";
-        } else {
-            $cmd .= " 2>&1";
-        }
+#         if( $sshHost ne 'none' ) {
+#             $cmd = "ssh $sshHost 'gatttool -b $mac -i $hciDevice --char-write-req --handle=$handle --value=$value";
+#         } else {
+#             $cmd = "gatttool -b $mac -i $hciDevice --char-write-req --handle=$handle --value=$value";
+#         }
+#         
+#         if(defined($listen) && $listen eq "listen") {
+#             $cmd = "timeout ".AttrVal($name, "timeout", 15)." ".$cmd." --listen";
+#         }
+#         
+#         #redirect stderr to stdout
+#         if( $sshHost ne 'none' ) {
+#             $cmd .= " 2>&1'";
+#         } else {
+#             $cmd .= " 2>&1";
+#         }
 
         Log3 $name, 5, "EQ3BT ($name): $cmd";
         $gtResult = qx($cmd);
