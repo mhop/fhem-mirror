@@ -1054,7 +1054,8 @@ sub
 DUOFERN_Parse($$)
 {
   my ($hash,$msg) = @_;
-
+  my @retval = ();
+  
   my $code = substr($msg,30,6);
   $code = substr($msg,36,6) if ($msg =~ m/81.{42}/);
 
@@ -1063,7 +1064,6 @@ DUOFERN_Parse($$)
   my $def = $modules{DUOFERN}{defptr}{$code};
    
   my $def01;
-  my $def02;
   
   if(!$def) {
     DoTrigger("global","UNDEFINED DUOFERN_$code DUOFERN $code");
@@ -1165,7 +1165,7 @@ DUOFERN_Parse($$)
           foreach my $reading (@readingsBlindMode){
             delete($hash->{READINGS}{$reading});
             delete($statusValue{$reading});
-            Log3 $hash, 1, "DUOFERN blinds mode ".$reading;
+            #Log3 $hash, 1, "DUOFERN blinds mode ".$reading;
           }
         }
         
@@ -1249,8 +1249,8 @@ DUOFERN_Parse($$)
           readingsBulkUpdate($hashA, $key,  $statusValue{$key},     1);  
         }
         readingsEndUpdate($hashA, 1); # Notify is done by Dispatch
-         
-        DoTrigger($hashA->{NAME}, undef);
+        
+        push (@retval, $hashA->{NAME}) if ($hashA->{NAME} ne $name);
       }
 
     } else {
@@ -1308,7 +1308,6 @@ DUOFERN_Parse($$)
         }
         
         readingsSingleUpdate($hash, "event", $sensorMsg{$id}{name}.$chan, 1);
-        DoTrigger($hash->{NAME},$sensorMsg{$id}{name}.$chan);
       }        
     }
   
@@ -1417,10 +1416,10 @@ DUOFERN_Parse($$)
     Log3 $hash, 3, "DUOFERN unknown msg: $msg";
   }
   
-  DoTrigger($def01->{NAME}, undef) if ($def01);
-  DoTrigger($def02->{NAME}, undef) if ($def02);
-  
-  return $name;
+  push (@retval, $def01->{NAME}) if ($def01); 
+  push (@retval, $name);
+      
+  return @retval;
 }
 
 #####################################
