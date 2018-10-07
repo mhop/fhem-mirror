@@ -24,5 +24,11 @@ enable the old feature.
       wget 'http://fhemhost:8083/fhem?cmd=set%20device%20on&fwcsrf=mySecret'
     There are other solutions in the FHEM wiki.
 
-- 20XX-XX-XX (5.9)
+- 2018-10-07 (5.9)
   - the default for the setStructType structure attribute changed from 1 to 0
+  - the default for the style setting changed to f18, the old "default" is
+    still present.
+  - the default for the iconPath changed from default:fhemSVG:openautomation to 
+    fhemSVG:openautomation:default. NOTE: the old version may be needed for
+    FLORRPLAN users
+  - the default fhem.cfg does not contain a telnet definition
