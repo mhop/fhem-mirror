@@ -42,6 +42,7 @@ use warnings;
 
 # Versions History intern
 our %DbRep_vNotesIntern = (
+  "8.2.0"  => "05.10.2018  direct help for attributes ",
   "8.1.0"  => "02.10.2018  new get versionNotes command ",
   "8.0.1"  => "20.09.2018  DbRep_getMinTs improved",
   "8.0.0"  => "11.09.2018  get filesize in DbRep_WriteToDumpFile corrected, restoreMySQL for clientSide dumps, minor fixes ",
@@ -260,6 +261,7 @@ our %DbRep_vNotesIntern = (
 
 # Versions History extern:
 our %DbRep_vNotesExtern = (
+  "8.2.0"  => "05.10.2018 direct help for attributes ",
   "8.1.0"  => "01.10.2018 new get versionNotes command ",
   "8.0.0"  => "11.09.2018 get filesize in DbRep_WriteToDumpFile corrected, restoreMySQL for clientSide dumps, minor fixes ",
   "7.20.0"  => "04.09.2018 deviceRename can operate a Device name with blank, e.g. 'current balance' as old device name ",
@@ -360,6 +362,7 @@ our %DbRep_vNotesExtern = (
 
 # Hint Hash
 our %DbRep_vHintsExt = (
+  "2" => "<a href='https://www.dwd.de/DE/leistungen/klimadatendeutschland/beschreibung_tagesmonatswerte.html'>Rules</a> of german weather service for calculation of average temperatures. ",
   "1" => "Some helpful <a href=\"https://wiki.fhem.de/wiki/DbRep_-_Reporting_und_Management_von_DbLog-Datenbankinhalten#Praxisbeispiele_.2F_Hinweise_und_L.C3.B6sungsans.C3.A4tze_f.C3.BCr_verschiedene_Aufgaben\">FHEM-Wiki</a> Entries"
 );
 
@@ -4772,7 +4775,7 @@ sub fetchrows_ParseDone($) {
   
   ReadingsBulkUpdateValue($hash, "number_fetched_rows", ($nrows>$limit)?$nrows-1:$nrows);
   ReadingsBulkUpdateTimeState($hash,$brt,$rt,($nrows-$limit>0)?
-      "<html>done - Warning: present rows exceed specified limit, adjust attribute <a href='https://fhem.de/commandref${sfx}.html#DbRepattrlimit' target='_blank'>limit</a></html>":"done");
+      "<html>done - Warning: present rows exceed specified limit, adjust attribute <a href='https://fhem.de/commandref${sfx}.html#limit' target='_blank'>limit</a></html>":"done");
   readingsEndUpdate($hash, 1);
 
   delete($hash->{HELPER}{RUNNING_PID});
@@ -5021,7 +5024,7 @@ sub delseqdoubl_ParseDone($) {
   my $rnam = ($opt =~ /adviceRemain/)?"number_rows_to_remain":($opt =~ /adviceDelete/)?"number_rows_to_delete":"number_rows_deleted"; 
   ReadingsBulkUpdateValue($hash, "$rnam", "$nrows");
   ReadingsBulkUpdateTimeState($hash,$brt,$rt,($l >= $limit)?
-      "<html>done - Warning: not all items are shown, adjust attribute <a href='https://fhem.de/commandref${sfx}.html#DbRepattrlimit' target='_blank'>limit</a> if you want see more</html>":"done");
+      "<html>done - Warning: not all items are shown, adjust attribute <a href='https://fhem.de/commandref${sfx}.html#limit' target='_blank'>limit</a> if you want see more</html>":"done");
   readingsEndUpdate($hash, 1);
 
   delete($hash->{HELPER}{RUNNING_PID});
@@ -9571,19 +9574,6 @@ return;
                                  timestamp-<a href="#DbRepattr">attributes</a> which are set. 
                                  The reading to evaluate must be specified by attribute "reading".  <br>
                                  By attribute "averageCalcForm" the calculation variant for average determination will be configured.
-                                 At the moment the following methods are implemented: <br><br>
-
-	                               <ul>
-                                   <table>  
-                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>avgArithmeticMean</b>  </td><td>: the arithmetic average is calculated (default) </td></tr>
-                                      <tr><td> <b>avgDailyMeanGWS</b>    </td><td>: calculates the daily medium temperature according the 
-                                                                                    <a href='https://www.dwd.de/DE/leistungen/klimadatendeutschland/beschreibung_tagesmonatswerte.html'>specifications</a> of german weather service. <br>
-                                                                                    This variant uses aggregation "day" automatically. </td></tr>
-                                      <tr><td> <b>avgTimeWeightMean</b>  </td><td>: calcultes a time weighted average mean value is calculated </td></tr>
-								   </table>
-	                               </ul>
-	                               <br>
                                  
                                  Is no or the option "display" specified, the results are only displayed. Using 
                                  option "writeToDB" the calculated results are stored in the database with a new reading
@@ -10135,7 +10125,7 @@ return;
 								 <b>Note:</b> <br>
                                  Although the module is designed non-blocking, a huge number of selection result (huge number of rows) 
 								 can overwhelm the browser session respectively FHEMWEB. 
-								 Due to the sample space can be limited by <a href="#DbRepattrlimit">attribute</a> "limit". 
+								 Due to the sample space can be limited by <a href="#limit">attribute</a> "limit". 
                                  Of course ths attribute can be increased if your system capabilities allow a higher workload. <br><br>
 								 </li> <br> 
                                  
@@ -10453,7 +10443,7 @@ return;
                                  (Standby-database). <br>
                                  Here the "&lt;DbLog-Device Standby&gt;" is the DbLog-Device what is connected to the 
                                  Standby-database. <br><br>
-                                 All the datasets which are determined by timestamp-<a href="#DbRepattrlimit">attributes</a>
+                                 All the datasets which are determined by timestamp-<a href="#limit">attributes</a>
                                  or respectively the attributes "device", "reading" are transmitted. <br>
                                  The datasets are transmitted in time slices accordingly to the adjusted aggregation.
                                  If the attribute "aggregation" has value "no" or "month", the datasets are transmitted 
@@ -10671,18 +10661,35 @@ return $ret;
   <br><br>
   
   <ul><ul>
+  <a name="aggregation"></a>
   <li><b>aggregation </b>     - Aggregation of Device/Reading-selections. Possible is hour, day, week, month or "no". 
                                 Delivers e.g. the count of database entries for a day (countEntries), Summation of 
 								difference values of a reading (sumValue) and so on. Using aggregation "no" (default) an 
 								aggregation don't happens but the output contaims all values of Device/Reading in the defined time period.  </li> <br>
 
+  <a name="allowDeletion"></a>
   <li><b>allowDeletion </b>   - unlocks the delete-function  </li> <br>
-  
-  <li><b>averageCalcForm </b> - specifies the calculation variant of average peak by "averageValue".                                 
+
+  <a name="averageCalcForm"></a>  
+  <li><b>averageCalcForm </b> - specifies the calculation variant of average peak by "averageValue". <br><br>
+
+                                 At the moment the following methods are implemented: <br><br>
+
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=20%> <col width=80%> </colgroup>
+                                      <tr><td><b>avgArithmeticMean :</b> </td><td>the arithmetic average is calculated (default) </td></tr>
+                                      <tr><td><b>avgDailyMeanGWS :</b>   </td><td>calculates the daily medium temperature according the 
+                                                                                  specifications of german weather service (pls. see helpful hints by get versionNotes). <br>
+                                                                                  This variant uses aggregation "day" automatically. </td></tr>
+                                      <tr><td><b>avgTimeWeightMean :</b> </td><td>calculates a time weighted average mean value is calculated </td></tr>
+								   </table>
+	                               </ul>								   
                                 </li><br>
 
+  <a name="device"></a>
   <li><b>device </b>          - Selection of a particular device. <br>
-                                You can specify <a href="https://fhem.de/commandref.html#devspec">device specifications (devspec)</a>. <br> 
+                                You can specify device specifications (devspec). <br> 
 								Inside of device specifications a SQL wildcard (%) will be evaluated as a normal ASCII-character. 
 								The device names are derived from device specification and the active devices in FHEM before 
                                 SQL selection will be carried out. </li> <br>
@@ -10700,15 +10707,21 @@ return $ret;
 								<code>attr &lt;name&gt; device %5000</code> <br>
 								# select datasets of devices ending with "5000" <br>  								
 								</ul>
+                                <br>
+                                <a name="DbRep_device"></a>
+                                Please see also <a href="#devspec">device specifications (devspec)</a>.
 								<br><br>
 
-  <li><b>diffAccept </b>      - valid for function diffValue. diffAccept determines the threshold,  up to that a calaculated difference between two 
-                                straight sequently datasets should be commenly accepted (default = 20). <br>
-                                Hence faulty DB entries with a disproportional high difference value will be eliminated and don't tamper the result.
-                                If a threshold overrun happens, the reading "diff_overrun_limit_&lt;diffLimit&gt;" will be generated 
-								(&lt;diffLimit&gt; will be substituted with the present prest attribute value). <br>
-								The reading contains a list of relevant pair of values. Using verbose=3 this list will also be reported in the FHEM
-                                logfile. 								
+  <a name="diffAccept"></a>
+  <li><b>diffAccept </b>      - valid for function diffValue. diffAccept determines the threshold,  up to that a calaculated 
+                                difference between two straight sequently datasets should be commenly accepted 
+                                (default = 20). <br>
+                                Hence faulty DB entries with a disproportional high difference value will be eliminated and 
+                                don't tamper the result.
+                                If a threshold overrun happens, the reading "diff_overrun_limit_&lt;diffLimit&gt;" will be 
+                                generated (&lt;diffLimit&gt; will be substituted with the present prest attribute value). <br>
+								The reading contains a list of relevant pair of values. Using verbose=3 this list will also 
+                                be reported in the FHEM logfile. 								
 								</li><br> 
 
                                 <ul>
@@ -10722,37 +10735,46 @@ return $ret;
 							    # Now you have to decide if the (second) dataset should be deleted, ignored of the attribute diffAccept should be adjusted. 
                                 </ul><br> 
 
-								 
+
+  <a name="disable"></a>								
   <li><b>disable </b>         - deactivates the module  </li> <br>
-  
+
+  <a name="dumpComment"></a>  
   <li><b>dumpComment </b>     - User-comment. It will be included in the header of the created dumpfile by 
                                 command "dumpMySQL clientSide".   </li> <br>
-                                
+
+  <a name="dumpCompress"></a>                                
   <li><b>dumpCompress </b>    - if set, the dump files are compressed after operation of "dumpMySQL" bzw. "dumpSQLite" </li> <br>
-  
+
+  <a name="dumpDirLocal"></a>  
   <li><b>dumpDirLocal </b>    - Target directory of database dumps by command "dumpMySQL clientSide"
                                 (default: "{global}{modpath}/log/" on the FHEM-Server). <br>
 								In this directory also the internal version administration searches for old backup-files 
 								and deletes them if the number exceeds attribute "dumpFilesKeep". 
 								The attribute is also relevant to publish a local mounted directory "dumpDirRemote" to
 								DbRep. </li> <br>
-								
+
+  <a name="dumpDirRemote"></a>								
   <li><b>dumpDirRemote </b>   - Target directory of database dumps by command "dumpMySQL serverSide" 
                                 (default: the Home-directory of MySQL-Server on the MySQL-Host). </li> <br>
-  
+
+  <a name="dumpMemlimit"></a>								
   <li><b>dumpMemlimit </b>    - tolerable memory consumption for the SQL-script during generation period (default: 100000 characters). 
                                 Please adjust this parameter if you may notice memory bottlenecks and performance problems based 
 								on it on your specific hardware. </li> <br>
-  
+
+  <a name="dumpSpeed"></a>								
   <li><b>dumpSpeed </b>       - Number of Lines which will be selected in source database with one select by dump-command 
                                 "dumpMySQL ClientSide" (default: 10000). 
                                 This parameter impacts the run-time and consumption of resources directly.  </li> <br>
 
+  <a name="dumpFilesKeep"></a>
   <li><b>dumpFilesKeep </b>   - The specified number of dumpfiles remain in the dump directory (default: 3). 
                                 If there more (older) files has been found, these files will be deleted after a new database dump 
 								was created successfully. 
 								The global attrubute "archivesort" will be considered. </li> <br> 
   
+  <a name="executeAfterProc"></a>
   <li><b>executeAfterProc </b> - you can specify a FHEM-command which should be executed <b>after dump</b>. <br>
                                  Perl functions have to be enclosed in {} .<br><br>
 
@@ -10776,6 +10798,7 @@ sub adump {
 </ul>
 </li>
   
+  <a name="executeBeforeProc"></a>
   <li><b>executeBeforeProc </b> - you can specify a FHEM-command which should be executed <b>before dump</b>. <br>
                                   Perl functions have to be enclosed in {} .<br><br>
 
@@ -10799,14 +10822,13 @@ sub bdump {
 </ul>
 </li>
 
+  <a name="expimpfile"></a>
   <li><b>expimpfile </b>      - Path/filename for data export/import. <br><br>
    
                                 The filename may contain wildcards which are replaced by corresponding values 
                                 (see subsequent table).
                                 Furthermore filename can contain %-wildcards of the POSIX strftime function of the underlying OS (see your 
                                 strftime manual). <br>
-                                About POSIX wildcard usage please see also explanations in <a href="https://fhem.de/commandref.html#FileLog">Filelog</a>. <br>
-                                <br>
 
 	                            <ul>
                                   <table>  
@@ -10831,11 +10853,18 @@ sub bdump {
 								<code>attr &lt;name&gt; expimpfile /sds1/backup/exptest_%TSB.csv     </code> <br>
                                 <code>attr &lt;name&gt; expimpfile /sds1/backup/exptest_%Y-%m-%d.csv </code> <br>
 								</ul>
+                                <br>
+                                
+                                <a name="DbRep_expimpfile"></a>
+                                About POSIX wildcard usage please see also explanations in 
+                                <a href="https://fhem.de/commandref.html#FileLog">Filelog</a>. <br>
 								<br><br>
-  
+
+  <a name="fetchMarkDuplicates"></a>
   <li><b>fetchMarkDuplicates </b> 
                               - Highlighting of multiple occuring datasets in result of "fetchrows" command </li> <br>
-  
+
+  <a name="fetchRoute"></a>
   <li><b>fetchRoute [descent | ascent] </b>  - specify the direction of data selection of the fetchrows-command. <br><br>
                                                           <ul>
                                                           <b>descent</b> - the data are read descent (default). If 
@@ -10847,40 +10876,52 @@ sub bdump {
 														  </ul>
 														  
 														</li> <br><br>
-  
+ 
+  <a name="ftpUse"></a> 
   <li><b>ftpUse </b>          - FTP Transfer after dump will be switched on (without SSL encoding). The created 
                                 database backup file will be transfered non-blocking to the FTP-Server (Attribut "ftpServer"). 
 							    </li> <br>
-								
+
+  <a name="ftpUseSSL"></a>								
   <li><b>ftpUseSSL </b>       - FTP Transfer with SSL encoding after dump. The created database backup file will be transfered 
                                 non-blocking to the FTP-Server (Attribut "ftpServer"). </li> <br>
-								
+
+  <a name="ftpUser"></a>								
   <li><b>ftpUser </b>         - User for FTP-server login, default: "anonymous". </li> <br>
-  
+
+  <a name="ftpDebug"></a>  
   <li><b>ftpDebug </b>        - debugging of FTP communication for diagnostics. </li> <br>
-  
+
+  <a name="ftpDir"></a>  
   <li><b>ftpDir </b>          - directory on FTP-server in which the file will be send into (default: "/"). </li> <br>
-  
+
+  <a name="ftpDumpFilesKeep"></a>  
   <li><b>ftpDumpFilesKeep </b> - leave the number of dump files in FTP-destination &lt;ftpDir&gt; (default: 3). Are there more 
-                                (older) dump files present, these files are deleted after a new dump was transfered successfully. </li> <br>   
-  
+                                 (older) dump files present, these files are deleted after a new dump was transfered successfully. </li> <br>   
+
+  <a name="ftpPassive"></a>								
   <li><b>ftpPassive </b>      - set if passive FTP is to be used </li> <br>
-  
+
+  <a name="ftpPort"></a>  
   <li><b>ftpPort </b>         - FTP-Port, default: 21 </li> <br>
-  
+
+  <a name="ftpPwd"></a>  
   <li><b>ftpPwd </b>          - password of FTP-User, is not set by default </li> <br>
-  
+
+  <a name="ftpServer"></a>  
   <li><b>ftpServer </b>       - name or IP-address of FTP-server. <b>absolutely essential !</b> </li> <br>
-  
+
+  <a name="ftpTimeout"></a>  
   <li><b>ftpTimeout </b>      - timeout of FTP-connection in seconds (default: 30). </li> <br>
   
-  <a name="DbRepattrlimit"></a>
+  <a name="limit"></a>
   <li><b>limit </b>           - limits the number of selected datasets by the "fetchrows", or the shown datasets of "delSeqDoublets adviceDelete", 
                                 "delSeqDoublets adviceRemain" commands (default: 1000). 
                                 This limitation should prevent the browser session from overload and 
 								avoids FHEMWEB from blocking. Please change the attribut according your requirements or change the 
 								selection criteria (decrease evaluation period). </li> <br>
-  
+
+  <a name="optimizeTablesBeforeDump"></a>								
   <li><b>optimizeTablesBeforeDump </b>  - if set to "1", the database tables will be optimized before executing the dump
                                           (default: 0).  
                                           Thereby the backup run-time time will be extended. <br><br>
@@ -10892,6 +10933,7 @@ sub bdump {
 										  </ul>
                                           </li> <br> 
 
+  <a name="reading"></a>
   <li><b>reading </b>         - Selection of a particular reading.
                                 More than one reading are specified as a comma separated list. <br>
 								If SQL wildcard (%) is set in a list, it will be evaluated as a normal ASCII-character. <br>
@@ -10905,14 +10947,22 @@ sub bdump {
 								</ul>
 								<br><br>
 
+  <a name="readingNameMap"></a>
   <li><b>readingNameMap </b>  - the name of the analyzed reading can be overwritten for output  </li> <br>
 
-  <li><b>role </b>            - the role of the DbRep-device. Standard role is "Client". The role "Agent" is described 
-                                in section <a href="#DbRepAutoRename">DbRep-Agent</a>. </li> <br>    
+  <a name="role"></a>
+  <li><b>role </b>            - the role of the DbRep-device. Standard role is "Client". <br>
+  
+                                <a name="DbRep_role"></a>
+                                The role "Agent" is described in section <a href="#DbRepAutoRename">DbRep-Agent</a>. 
+                                
+                                </li> <br>    
 
+  <a name="readingPreventFromDel"></a>
   <li><b>readingPreventFromDel </b>  - comma separated list of readings which are should prevent from deletion when a 
                                        new operation starts  </li> <br>
-                                       
+
+  <a name="seqDoubletsVariance"></a>                                       
   <li><b>seqDoubletsVariance </b> - accepted variance (+/-) for the command "set &lt;name&gt; delSeqDoublets". <br>
                                     The value of this attribute describes the variance up to it consecutive numeric values (VALUE) of
                                     datasets are handled as identical and should be deleted. "seqDoubletsVariance" is an absolut numerical value, 
@@ -10925,10 +10975,12 @@ sub bdump {
 								    </ul>
 								    <br><br> 
 
+  <a name="showproctime"></a>
   <li><b>showproctime </b>    - if set, the reading "sql_processing_time" shows the required execution time (in seconds) 
                                 for the sql-requests. This is not calculated for a single sql-statement, but the summary 
 								of all sql-statements necessara for within an executed DbRep-function in background. </li> <br>
 
+  <a name="showStatus"></a>
   <li><b>showStatus </b>      - limits the sample space of command "get &lt;name&gt; dbstatus". SQL-Wildcard (%) can be used.    </li> <br>
 
                                 <ul>
@@ -10936,7 +10988,8 @@ sub bdump {
                                 attr &lt;name&gt; showStatus %uptime%,%qcache%  <br>
                                 # Only readings with containing "uptime" and "qcache" in name will be shown <br>
                                 </ul><br>  
-  
+
+  <a name="showVariables"></a>
   <li><b>showVariables </b>   - limits the sample space of command "get &lt;name&gt; dbvars". SQL-Wildcard (%) can be used. </li> <br>
 
                                 <ul>
@@ -10944,7 +10997,8 @@ sub bdump {
                                 attr &lt;name&gt; showVariables %version%,%query_cache% <br>
                                 # Only readings with containing "version" and "query_cache" in name will be shown <br>
                                 </ul><br>  
-                              
+
+  <a name="showSvrInfo"></a>								
   <li><b>showSvrInfo </b>     - limits the sample space of command "get &lt;name&gt; svrinfo". SQL-Wildcard (%) can be used.    </li> <br>
 
                                 <ul>
@@ -10952,7 +11006,8 @@ sub bdump {
                                 attr &lt;name&gt; showSvrInfo %SQL_CATALOG_TERM%,%NAME%  <br>
                                 # Only readings with containing "SQL_CATALOG_TERM" and "NAME" in name will be shown <br>
                                 </ul><br>  
-                              
+
+  <a name="showTableInfo"></a>								
   <li><b>showTableInfo </b>   - limits the tablename which is selected by command "get &lt;name&gt; tableinfo". SQL-Wildcard 
                                 (%) can be used.   </li> <br>
 
@@ -10961,27 +11016,29 @@ sub bdump {
                                 attr &lt;name&gt; showTableInfo current,history  <br>
                                 # Only informations about tables "current" and "history" will be shown <br>
                                 </ul><br>  
-								
+  
+  <a name="sqlCmdHistoryLength"></a>								
   <li><b>sqlCmdHistoryLength </b> 
                               - activates the command history of "sqlCmd" and determines the length of it  </li> <br>
 
-  
+  <a name="sqlResultFieldSep"></a>
   <li><b>sqlResultFieldSep </b> - determines the used field separator (default: "|") in the result of some sql-commands.  </li> <br>
 
+  <a name="sqlResultFormat"></a>
   <li><b>sqlResultFormat </b> - determines the formatting of the "set &lt;name&gt; sqlCmd" command result. 
                                 Possible options are: <br><br>
                                 <ul>
                                 <b>separated </b> - every line of the result will be generated sequentially in a single 
 								                    reading. (default) <br><br>
                                 <b>mline </b>     - the result will be generated as multiline in 
-								                    <a href="#DbRepReadings">Reading</a> SqlResult. 
+								                    Reading SqlResult. 
 													<br><br>	
                                 <b>sline </b>     - the result will be generated as singleline in 
-								                    <a href="#DbRepReadings">Reading</a> SqlResult. 
+								                    Reading SqlResult. 
 													Datasets are separated by "]|[". <br><br>
                                 <b>table </b>     - the result will be generated as an table in 
-								                    <a href="#DbRepReadings">Reading</a> SqlResult. <br><br>
-                                <b>json </b>      - creates <a href="#DbRepReadings">Reading</a> SqlResult as a JSON 
+								                    Reading SqlResult. <br><br>
+                                <b>json </b>      - creates the Reading SqlResult as a JSON 
 								                    coded hash. 
 								                    Every hash-element consists of the serial number of the dataset (key)
 													and its value. </li> <br><br> 
@@ -11014,7 +11071,7 @@ sub bdump {
         </ul>
 		<br>  
         
-                                
+  <a name="timeYearPeriod"></a>                     
   <li><b>timeYearPeriod </b> - By this attribute an annual time period will be determined for database data selection. 
                                The time limits are calculated dynamically during execution time. Every time an annual period is determined. 
                                Periods of less than a year are not possible to set. <br>
@@ -11031,9 +11088,11 @@ sub bdump {
                                # If the current date >= 01. january und =< 24. june, than AAAA = current year-1 and BBBB = current year
 							   </ul>
 							   <br><br>
-                              
+
+  <a name="timestamp_begin"></a>							   
   <li><b>timestamp_begin </b> - begin of data selection (*)  </li> <br>
-  
+
+  <a name="timestamp_end"></a>  
   <li><b>timestamp_end </b>   - end of data selection. If not set the current date/time combination will be used. (*) </li> <br>
   
   (*) The format of timestamp is as used with DbLog "YYYY-MM-DD HH:MM:SS". For the attributes "timestamp_begin", "timestamp_end" 
@@ -11076,7 +11135,8 @@ sub bdump {
   If the attribute "timeDiffToNow" will be set, the attributes "timestamp_begin" respectively "timestamp_end" will be deleted if they were set before.
   The setting of "timestamp_begin" respectively "timestamp_end" causes the deletion of attribute "timeDiffToNow" if it was set before as well.
   <br><br>
-  
+
+  <a name="timeDiffToNow"></a>  
   <li><b>timeDiffToNow </b>   - the <b>begin</b> of data selection will be set to the timestamp <b>"&lt;current time&gt; - 
                                 &lt;timeDiffToNow&gt;"</b> dynamically (e.g. if set to 86400, the last 24 hours are considered by data 
 								selection). The time period will be calculated dynamically at execution time.     </li> <br> 
@@ -11098,6 +11158,7 @@ sub bdump {
 								</ul>
 								<br><br>								
 
+  <a name="timeOlderThan"></a>
   <li><b>timeOlderThan </b>   - the <b>end</b> of data selection will be set to the timestamp <b>"&lt;aktuelle Zeit&gt; - 
                                 &lt;timeOlderThan&gt;"</b> dynamically. Always the datasets up to timestamp 
 								"&lt;current time&gt; - &lt;timeOlderThan&gt;" will be considered (e.g. if set to 
@@ -11105,8 +11166,10 @@ sub bdump {
 								execution time. <br>
 								The valid input format for attribute "timeOlderThan" is identical to attribute "timeDiffToNow". </li> <br> 
 
+  <a name="timeout"></a>
   <li><b>timeout </b>         - set the timeout-value for Blocking-Call Routines in background in seconds (default 86400)  </li> <br>
 
+  <a name="userExitFn"></a>
   <li><b>userExitFn   </b>   - provides an interface to execute user specific program code. <br>
                                To activate the interfaace at first you should implement the subroutine which will be 
                                called by the interface in your 99_myUtls.pm as shown in by the example:     <br>
@@ -11147,7 +11210,8 @@ sub bdump {
 							   </ul>
 							   </li>
 							   <br><br> 
-                               
+  
+  <a name="valueFilter"></a>  
   <li><b>valueFilter </b>     - Regular expression to filter datasets within particular functions. The regex is  
                                 applied to the whole selected dataset (inclusive Device, Reading and so on). 
                                 Please compare to explanations of relevant set-commands. </li> <br> 
@@ -11401,22 +11465,7 @@ sub bdump {
                                  gegebenen Zeitgrenzen ( siehe <a href="#DbRepattr">Attribute</a>). 
                                  Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" 
 								 angegeben sein. <br>
-                                 Mit dem Attribut "averageCalcForm" wird die Berechnungsvariante zur Mittelwertermittlung definiert.
-                                 Zur Zeit sind folgende Varianten implementiert: <br><br>
-
-	                               <ul>
-                                   <table>  
-                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>avgArithmeticMean</b>  </td><td>: es wird der arithmetische Mittelwert berechnet 
-                                                                                    (default) </td></tr>
-                                      <tr><td> <b>avgDailyMeanGWS</b>    </td><td>: berechnet die Tagesmitteltemperatur entsprechend den
-                                                                                    <a href='https://www.dwd.de/DE/leistungen/klimadatendeutschland/beschreibung_tagesmonatswerte.html'>Vorschriften</a> des Deutschen Wetterdienstes. <br>
-                                                                                    Diese Variante verwendet automatisch die Aggregation "day". </td></tr>
-                                      <tr><td> <b>avgTimeWeightMean</b>  </td><td>: berechnet den zeitgewichteten Mittelwert </td></tr>
-								   </table>
-	                               </ul>
-	                               <br>
-                                   
+                                 Mit dem Attribut "averageCalcForm" wird die Berechnungsvariante zur Mittelwertermittlung definiert.                               
                                  Ist keine oder die Option "display" angegeben, werden die Ergebnisse nur angezeigt. Mit 
                                  der Option "writeToDB" werden die Berechnungsergebnisse mit einem neuen Readingnamen
                                  in der Datenbank gespeichert. <br>
@@ -11968,7 +12017,7 @@ sub bdump {
                                  Auch wenn das Modul bezüglich der Datenbankabfrage nichtblockierend arbeitet, kann eine 
 								 zu große Ergebnismenge (Anzahl Zeilen bzw. Readings) die Browsersesssion bzw. FHEMWEB 
 								 blockieren. Aus diesem Grund wird die Ergebnismenge mit dem 
-								 <a href="#DbRepattrlimit">Attribut</a> "limit" begrenzt. Bei Bedarf kann dieses Attribut 
+								 <a href="#limit">Attribut</a> "limit" begrenzt. Bei Bedarf kann dieses Attribut 
 								 geändert werden, falls eine Anpassung der Selektionsbedingungen nicht möglich oder 
 								 gewünscht ist. <br><br>
 								 </li> <br> 								 
@@ -12301,7 +12350,7 @@ sub bdump {
                                  Datenbank (Standby-Datenbank) übertragen. 
                                  Dabei ist "&lt;DbLog-Device Standby&gt;" das DbLog-Device, welches mit der Standby-Datenbank
                                  verbunden ist. <br><br>
-                                 Es werden alle Datensätze übertragen, die durch Timestamp-<a href="#DbRepattrlimit">Attribute</a>
+                                 Es werden alle Datensätze übertragen, die durch Timestamp-<a href="#limit">Attribute</a>
                                  bzw. die Attribute "device", "reading" bestimmt sind. <br>
                                  Die Datensätze werden dabei in Zeitscheiben entsprechend der eingestellten Aggregation übertragen.
                                  Hat das Attribut "aggregation" den Wert "no" oder "month", werden die Datensätze automatisch 
@@ -12527,16 +12576,39 @@ return $ret;
   <br><br>
   
   <ul><ul>
-  <li><b>aggregation </b>     - Zusammenfassung der Device/Reading-Selektionen in Stunden,Tages,Kalenderwochen,Kalendermonaten oder "no". Liefert z.B. die Anzahl der DB-Einträge am Tag (countEntries), Summation von Differenzwerten eines Readings (sumValue), usw. Mit Aggregation "no" (default) erfolgt keine Zusammenfassung in einem Zeitraum sondern die Ausgabe ergibt alle Werte eines Device/Readings zwischen den definierten Zeiträumen.  </li> <br>
-
+  <a name="aggregation"></a>
+  <li><b>aggregation </b>     - Zusammenfassung der Device/Reading-Selektionen in Stunden,Tage,Kalenderwochen,Kalendermonaten 
+                                oder "no". <br>
+                                Liefert z.B. die Anzahl der DB-Einträge am Tag (countEntries), Summierung von 
+                                Differenzwerten eines Readings (sumValue), usw. <br>
+                                Mit Aggregation "no" (default) erfolgt keine Zusammenfassung in einem Zeitraum, sondern die 
+                                Ausgabe wird aus allen Werten einer Device/Reading-Kombination zwischen den definierten 
+                                Zeiträumen ermittelt.  </li> <br>
+  
+  <a name="allowDeletion"></a>
   <li><b>allowDeletion </b>   - schaltet die Löschfunktion des Moduls frei   </li> <br>
   
-  <li><b>averageCalcForm </b> - legt die Berechnungsvariante für die Ermittlung des Durchschnittswertes mit "averageValue" fest.                                 
-                                </li><br>
+  <a name="averageCalcForm"></a>
+  <li><b>averageCalcForm </b> - legt die Berechnungsvariante für die Ermittlung des Durchschnittswertes mit "averageValue" 
+                                fest.<br><br>
 
+                                Zur Zeit sind folgende Varianten implementiert: <br><br>
+
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=20%> <col width=80%> </colgroup>
+                                      <tr><td> <b>avgArithmeticMean :</b>  </td><td>es wird der arithmetische Mittelwert berechnet (default) </td></tr>
+                                      <tr><td> <b>avgDailyMeanGWS :</b>    </td><td>berechnet die Tagesmitteltemperatur entsprechend den
+                                                                                    Vorschriften des deutschen Wetterdienstes (siehe "helpful hints" mit Funktion get versionNotes). <br>
+                                                                                    Diese Variante verwendet automatisch die Aggregation "day". </td></tr>
+                                      <tr><td> <b>avgTimeWeightMean :</b>  </td><td>berechnet den zeitgewichteten Mittelwert </td></tr>
+								   </table>
+	                               </ul>
+                                </li><br>
+ 
+  <a name="device"></a>
   <li><b>device </b>          - Abgrenzung der DB-Selektionen auf ein bestimmtes Device. <br>
-                                Es können <a href="https://fhem.de/commandref_DE.html#devspec">Geräte-Spezifikationen (devspec)</a>
-								angegeben werden. <br> 
+                                Es können Geräte-Spezifikationen (devspec) angegeben werden. <br> 
 								Innerhalb von Geräte-Spezifikationen wird SQL-Wildcard (%) als normales ASCII-Zeichen gewertet. 
 								Die Devicenamen werden vor der Selektion aus der Geräte-Spezifikationen und den aktuell in FHEM 
 								vorhandenen Devices abgeleitet. </li> <br>
@@ -12549,8 +12621,13 @@ return $ret;
 								<code>attr &lt;name&gt; device SMA_Energymeter,MySTP_5000</code> <br>
 								<code>attr &lt;name&gt; device %5000</code> <br>
 								</ul>
+                                
+                                <br>
+                                <a name="DbRep_device"></a>
+                                Siehe <a href="#devspec">Geräte-Spezifikationen (devspec)</a>.
 								<br><br>
 
+  <a name="diffAccept"></a>
   <li><b>diffAccept </b>      - gilt für Funktion diffValue. diffAccept legt fest bis zu welchem Schwellenwert eine berechnete positive Werte-Differenz 
                                 zwischen zwei unmittelbar aufeinander folgenden Datensätzen akzeptiert werden soll (Standard ist 20). <br>
 								Damit werden fehlerhafte DB-Einträge mit einem unverhältnismäßig hohen Differenzwert von der Berechnung ausgeschlossen und 
@@ -12569,35 +12646,43 @@ return $ret;
 							      Differenzwert. <br>
 							      # Es ist zu entscheiden ob der Datensatz gelöscht, ignoriert, oder das Attribut diffAccept angepasst werden sollte. 
                                   </ul><br> 
-							  
+
+  <a name="disable"></a>								  
   <li><b>disable </b>         - deaktiviert das Modul   </li> <br>
-  
+
+  <a name="dumpComment"></a>  
   <li><b>dumpComment </b>     - User-Kommentar. Er wird im Kopf des durch den Befehl "dumpMyQL clientSide" erzeugten Dumpfiles 
                                 eingetragen.   </li> <br>
-                                
+  <a name="dumpCompress"></a>                                
   <li><b>dumpCompress </b>    - wenn gesetzt, werden die Dumpfiles nach "dumpMySQL" bzw. "dumpSQLite" komprimiert </li> <br>
-  
+
+  <a name="dumpDirLocal"></a>  
   <li><b>dumpDirLocal </b>    - Zielverzeichnis für die Erstellung von Dumps mit "dumpMySQL clientSide". 
                                 default: "{global}{modpath}/log/" auf dem FHEM-Server. <br>
 								Ebenfalls werden in diesem Verzeichnis alte Backup-Files durch die interne Versionsverwaltung von 
 								"dumpMySQL" gesucht und gelöscht wenn die gefundene Anzahl den Attributwert "dumpFilesKeep"
 								überschreitet. Das Attribut dient auch dazu ein lokal gemountetes Verzeichnis "dumpDirRemote"
 								DbRep bekannt zu machen. </li> <br>
-								
+
+  <a name="dumpDirRemote"></a>								
   <li><b>dumpDirRemote </b>   - Zielverzeichnis für die Erstellung von Dumps mit "dumpMySQL serverSide". 
                                 default: das Home-Dir des MySQL-Servers auf dem MySQL-Host </li> <br>
-  
-  <li><b>dumpMemlimit </b>    - erlaubter Speicherverbrauch für SQL-Script zur Generierungszeit (default: 100000 Zeichen). 
+
+  <a name="dumpMemlimit"></a>								
+  <li><b>dumpMemlimit </b>    - erlaubter Speicherverbrauch für das Dump SQL-Script zur Generierungszeit (default: 100000 Zeichen). 
                                 Bitte den Parameter anpassen, falls es zu Speicherengpässen und damit verbundenen Performanceproblemen
                                 kommen sollte. </li> <br>
-  
+
+  <a name="dumpSpeed"></a>								
   <li><b>dumpSpeed </b>       - Anzahl der abgerufenen Zeilen aus der Quelldatenbank (default: 10000) pro Select durch "dumpMySQL ClientSide". 
                                 Dieser Parameter hat direkten Einfluß auf die Laufzeit und den Ressourcenverbrauch zur Laufzeit.  </li> <br>
 
+  <a name="dumpFilesKeep"></a>
   <li><b>dumpFilesKeep </b>   - Es wird die angegebene Anzahl Dumpfiles im Dumpdir belassen (default: 3). Sind mehr (ältere) Dumpfiles 
                                 vorhanden, werden diese gelöscht nachdem ein neuer Dump erfolgreich erstellt wurde. Das globale
 								Attribut "archivesort" wird berücksichtigt. </li> <br> 
-  
+
+  <a name="executeAfterProc"></a>
   <li><b>executeAfterProc </b> - Es kann ein FHEM-Kommando angegeben werden welches <b>nach dem Dump</b> ausgeführt werden soll. <br>
                                  Funktionen sind in {} einzuschließen.<br><br>
 
@@ -12620,7 +12705,8 @@ sub adump {
 </pre>
 </ul>
 </li>
-								
+		
+  <a name="executeBeforeProc"></a>		
   <li><b>executeBeforeProc </b> - Es kann ein FHEM-Kommando angegeben werden welches <b>vor dem Dump</b> ausgeführt werden soll. <br>
                                  Funktionen sind in {} einzuschließen.<br><br>
 
@@ -12644,12 +12730,12 @@ sub bdump {
 </ul>
 </li>
   
+  <a name="expimpfile"></a>
   <li><b>expimpfile </b>      - Pfad/Dateiname für Export/Import in/aus einem File.  <br><br>
   
                                 Der Dateiname kann Platzhalter enthalten die gemäß der nachfolgenden Tabelle ersetzt werden.
                                 Weiterhin können %-wildcards der POSIX strftime-Funktion des darunterliegenden OS enthalten 
                                 sein (siehe auch strftime Beschreibung). <br>
-                                Zur POSIX Wildcardverwendung siehe auch die Erläuterungen zu <a href="https://fhem.de/commandref_DE.html#FileLog">Filelog</a>. <br>
                                 <br>
 
 	                            <ul>
@@ -12675,11 +12761,17 @@ sub bdump {
 								<code>attr &lt;name&gt; expimpfile /sds1/backup/exptest_%TSB.csv     </code> <br>
                                 <code>attr &lt;name&gt; expimpfile /sds1/backup/exptest_%Y-%m-%d.csv </code> <br>
 								</ul>
+                                <br>
+                                
+                                <a name="DbRep_expimpfile"></a>
+                                Zur POSIX Wildcardverwendung siehe auch die Erläuterungen zu <a href="#FileLog">Filelog</a>. 
 								<br><br>
   
+  <a name="fetchMarkDuplicates"></a>
   <li><b>fetchMarkDuplicates </b> 
                               - Markierung von mehrfach vorkommenden Datensätzen im Ergebnis des "fetchrows" Kommandos </li> <br>
   
+  <a name="fetchRoute"></a>
   <li><b>fetchRoute [descent | ascent] </b>  - bestimmt die Leserichtung des fetchrows-Befehl. <br><br>
                                                           <ul>
                                                           <b>descent</b> - die Datensätze werden absteigend gelesen (default). Wird 
@@ -12691,42 +12783,55 @@ sub bdump {
 														  </ul>
 														  
 														</li> <br><br>
-  
-  <li><b>ftpUse </b>          - FTP Transfer nach dem Dump wird eingeschaltet (ohne SSL Verschlüsselung). Das erzeugte 
+ 
+  <a name="ftpUse"></a> 
+  <li><b>ftpUse </b>          - FTP Transfer nach einem Dump wird eingeschaltet (ohne SSL Verschlüsselung). Das erzeugte 
                                 Datenbank Backupfile wird non-blocking zum angegebenen FTP-Server (Attribut "ftpServer") 
 								übertragen. </li> <br>
-								
-  <li><b>ftpUseSSL </b>       - FTP Transfer mit SSL Verschlüsselung nach dem Dump wird eingeschaltet. Das erzeugte 
+
+  <a name="ftpUseSSL"></a>								
+  <li><b>ftpUseSSL </b>       - FTP Transfer mit SSL Verschlüsselung nach einem Dump wird eingeschaltet. Das erzeugte 
                                 Datenbank Backupfile wird non-blocking zum angegebenen FTP-Server (Attribut "ftpServer") 
 								übertragen. </li> <br>
-								
-  <li><b>ftpUser </b>         - User zur Anmeldung am FTP-Server, default: "anonymous". </li> <br>
-  
+
+  <a name="ftpUser"></a>								
+  <li><b>ftpUser </b>         - User zur Anmeldung am FTP-Server nach einem Dump, default: "anonymous". </li> <br>
+ 
+  <a name="ftpDebug"></a> 
   <li><b>ftpDebug </b>        - Debugging der FTP Kommunikation zur Fehlersuche. </li> <br>
-  
-  <li><b>ftpDir </b>          - Verzeichnis des FTP-Servers in welches das File übertragen werden soll (default: "/"). </li> <br>
-  
+
+  <a name="ftpDir"></a>  
+  <li><b>ftpDir </b>          - Verzeichnis des FTP-Servers in welches das File nach einem Dump übertragen werden soll 
+                                (default: "/"). </li> <br>
+
+  <a name="ftpDumpFilesKeep"></a>  
   <li><b>ftpDumpFilesKeep </b> - Es wird die angegebene Anzahl Dumpfiles im &lt;ftpDir&gt; belassen (default: 3). Sind mehr 
-                                (ältere) Dumpfiles vorhanden, werden diese gelöscht nachdem ein neuer Dump erfolgreich 
-                                übertragen wurde. </li> <br> 
-  
+                                 (ältere) Dumpfiles vorhanden, werden diese gelöscht nachdem ein neuer Dump erfolgreich 
+                                 übertragen wurde. </li> <br> 
+
+  <a name="ftpPassive"></a>								
   <li><b>ftpPassive </b>      - setzen wenn passives FTP verwendet werden soll </li> <br>
-  
+
+  <a name="ftpPort"></a>  
   <li><b>ftpPort </b>         - FTP-Port, default: 21 </li> <br>
-  
+
+  <a name="ftpPwd"></a>  
   <li><b>ftpPwd </b>          - Passwort des FTP-Users, default nicht gesetzt </li> <br>
-  
-  <li><b>ftpServer </b>       - Name oder IP-Adresse des FTP-Servers. <b>notwendig !</b> </li> <br>
-  
-  <li><b>ftpTimeout </b>      - Timeout für die FTP-Verbindung in Sekunden (default: 30). </li> <br>
-								 
-  <a name="DbRepattrlimit"></a>
+
+  <a name="ftpServer"></a>  
+  <li><b>ftpServer </b>       - Name oder IP-Adresse des FTP-Servers zur Übertragung von Files nach einem Dump. </li> <br>
+
+  <a name="ftpTimeout"></a>  
+  <li><b>ftpTimeout </b>      - Timeout für eine FTP-Verbindung in Sekunden (default: 30). </li> <br>
+ 
+  <a name="limit"></a>
   <li><b>limit </b>           - begrenzt die Anzahl der resultierenden Datensätze im select-Statement von "fetchrows", bzw. der anzuzeigenden Datensätze
                                 der Kommandos "delSeqDoublets adviceDelete", "delSeqDoublets adviceRemain" (default 1000). 
 								Diese Limitierung soll eine Überlastung der Browsersession und ein 
 								blockieren von FHEMWEB verhindern. Bei Bedarf entsprechend ändern bzw. die 
 								Selektionskriterien (Zeitraum der Auswertung) anpassen. </li> <br>
-								
+
+  <a name="optimizeTablesBeforeDump"></a>								
   <li><b>optimizeTablesBeforeDump </b>  - wenn "1", wird vor dem Datenbankdump eine Tabellenoptimierung ausgeführt (default: 0).  
                                           Dadurch verlängert sich die Laufzeit des Dump. <br><br>
                                           <ul>
@@ -12736,7 +12841,8 @@ sub bdump {
                                           <br>
 										  </ul>
                                           </li> <br> 
-  
+ 
+  <a name="reading"></a>
   <li><b>reading </b>         - Abgrenzung der DB-Selektionen auf ein bestimmtes oder mehrere Readings.
                                 Mehrere Readings werden als Komma separierte Liste angegeben. <br>
 								SQL Wildcard (%) wird in einer Liste als normales ASCII-Zeichen gewertet. <br>
@@ -12749,18 +12855,27 @@ sub bdump {
 								<code>attr &lt;name&gt; reading etotal,etoday</code> <br>
 								</ul>
 								<br><br>
-  
+
+  <a name="readingNameMap"></a>								
   <li><b>readingNameMap </b>  - der Name des ausgewerteten Readings wird mit diesem String für die Anzeige überschrieben  </li> <br>
   
+  <a name="readingPreventFromDel"></a>
   <li><b>readingPreventFromDel </b>  - Komma separierte Liste von Readings die vor einer neuen Operation nicht gelöscht 
                                 werden sollen  </li> <br>
-								
+
+  <a name="role"></a>								
   <li><b>role </b>            - die Rolle des DbRep-Device. Standard ist "Client". Die Rolle "Agent" ist im Abschnitt 
-                                <a href="#DbRepAutoRename">DbRep-Agent</a> beschrieben.   </li> <br>
-								
+                                "DbRep-Agent" beschrieben. <br>  
+                                
+                                <a name="DbRep_role"></a>
+                                Siehe auch Abschnitt <a href="#DbRepAutoRename">DbRep-Agent</a>.
+                                </li> <br>
+
+  <a name="seqDoubletsVariance"></a>								
   <li><b>seqDoubletsVariance </b> - akzeptierte Abweichung (+/-) für das Kommando "set &lt;name&gt; delSeqDoublets". <br>
-                                    Der Wert des Attributs beschreibt die Abweichung bis zu der aufeinanderfolgende numerische Werte (VALUE) von 
-                                    Datensätze als gleich angesehen und gelöscht werden sollen. "seqDoubletsVariance" ist ein absoluter Zahlenwert, 
+                                    Der Wert des Attributs beschreibt die Abweichung bis zu der aufeinanderfolgende numerische 
+                                    Werte (VALUE) von Datensätze als gleich angesehen und gelöscht werden sollen. 
+                                    "seqDoubletsVariance" ist ein absoluter Zahlenwert, 
                                     der sowohl als positive als auch negative Abweichung verwendet wird. </li> <br>
 
                                     <ul>
@@ -12769,12 +12884,14 @@ sub bdump {
 								    <code>attr &lt;name&gt; seqDoubletsVariance 1.45   </code> <br>
 								    </ul>
 								    <br><br>                                     
-                                
+ 
+  <a name="showproctime"></a> 
   <li><b>showproctime </b>    - wenn gesetzt, zeigt das Reading "sql_processing_time" die benötigte Abarbeitungszeit (in Sekunden) 
                                 für die SQL-Ausführung der durchgeführten Funktion. Dabei wird nicht ein einzelnes 
 								SQl-Statement, sondern die Summe aller notwendigen SQL-Abfragen innerhalb der jeweiligen 
 								Funktion betrachtet.   </li> <br>
-								
+
+  <a name="showStatus"></a>								
   <li><b>showStatus </b>      - grenzt die Ergebnismenge des Befehls "get &lt;name&gt; dbstatus" ein. Es können SQL-Wildcard (%) verwendet werden.    </li> <br>
 
                                 <ul>
@@ -12782,7 +12899,8 @@ sub bdump {
                                 attr &lt;name&gt; showStatus %uptime%,%qcache%  <br>
                                 # Es werden nur Readings erzeugt die im Namen "uptime" und "qcache" enthalten <br>
                                 </ul><br>  
-  
+
+  <a name="showVariables"></a>								
   <li><b>showVariables </b>   - grenzt die Ergebnismenge des Befehls "get &lt;name&gt; dbvars" ein. Es können SQL-Wildcard (%) verwendet werden.    </li> <br>
 
                                 <ul>
@@ -12790,7 +12908,8 @@ sub bdump {
                                 attr &lt;name&gt; showVariables %version%,%query_cache% <br>
                                 # Es werden nur Readings erzeugt die im Namen "version" und "query_cache" enthalten <br>
                                 </ul><br>  
-                              
+
+  <a name="showSvrInfo"></a>                             
   <li><b>showSvrInfo </b>     - grenzt die Ergebnismenge des Befehls "get &lt;name&gt; svrinfo" ein. Es können SQL-Wildcard (%) verwendet werden.    </li> <br>
 
                                 <ul>
@@ -12798,7 +12917,8 @@ sub bdump {
                                 attr &lt;name&gt; showSvrInfo %SQL_CATALOG_TERM%,%NAME%  <br>
                                 # Es werden nur Readings erzeugt die im Namen "SQL_CATALOG_TERM" und "NAME" enthalten <br>
                                 </ul><br>  
-                              
+
+  <a name="showTableInfo"></a>								
   <li><b>showTableInfo </b>   - grenzt die Ergebnismenge des Befehls "get &lt;name&gt; tableinfo" ein. Es können SQL-Wildcard (%) verwendet werden.    </li> <br>
 
                                 <ul>
@@ -12807,24 +12927,28 @@ sub bdump {
                                 # Es werden nur Information der Tabellen "current" und "history" angezeigt <br>
                                 </ul><br>  
 
-  <li><b>sqlResultFieldSep </b> - legt den verwendeten Feldseparator (default: "|") im Ergebnis des Kommandos "set ... sqlCmd" fest.    </li> <br>
-  
+  <a name="sqlResultFieldSep"></a>
+  <li><b>sqlResultFieldSep </b> - legt den verwendeten Feldseparator (default: "|") im Ergebnis des Kommandos 
+                                  "set ... sqlCmd" fest.    </li> <br>
+ 
+  <a name="sqlCmdHistoryLength"></a> 
   <li><b>sqlCmdHistoryLength </b> 
                               - aktiviert die Kommandohistorie von "sqlCmd" und legt deren Länge fest  </li> <br>
-								
+
+  <a name="sqlResultFormat"></a>							  
   <li><b>sqlResultFormat </b> - legt die Formatierung des Ergebnisses des Kommandos "set &lt;name&gt; sqlCmd" fest. 
                                 Mögliche Optionen sind: <br><br>
   
 								<ul>
                                 <b>separated </b> - die Ergebniszeilen werden als einzelne Readings fortlaufend 
                                                     generiert. (default)<br><br> 
-                                <b>mline </b>     - das Ergebnis wird als Mehrzeiler im <a href="#DbRepReadings">Reading</a>
+                                <b>mline </b>     - das Ergebnis wird als Mehrzeiler im Reading
                                                     SqlResult dargestellt. <br><br>	
-                                <b>sline </b>     - das Ergebnis wird als Singleline im <a href="#DbRepReadings">Reading</a>
+                                <b>sline </b>     - das Ergebnis wird als Singleline im Reading
                                                     SqlResult dargestellt. Satztrenner ist"]|[". <br><br>
-                                <b>table </b>     - das Ergebnis wird als Tabelle im <a href="#DbRepReadings">Reading</a>
+                                <b>table </b>     - das Ergebnis wird als Tabelle im Reading
                                                     SqlResult dargestellt. <br><br>	
-                                <b>json </b>      - erzeugt das <a href="#DbRepReadings">Reading</a> SqlResult als
+                                <b>json </b>      - erzeugt das Reading SqlResult als
 								                    JSON-kodierten Hash.
 													Jedes Hash-Element (Ergebnissatz) setzt sich aus der laufenden Nummer
 													des Datensatzes (Key) und dessen Wert zusammen. </li><br><br>
@@ -12855,7 +12979,8 @@ sub bdump {
   	    </pre>  	
 													
                                 </ul><br>  
-                                
+
+  <a name="timeYearPeriod"></a>                                
   <li><b>timeYearPeriod </b> - Mit Hilfe dieses Attributes wird eine jährliche Zeitperiode für die Datenbankselektion bestimmt. 
                                Die Zeitgrenzen werden zur Ausführungszeit dynamisch berechnet. Es wird immer eine Jahresperiode 
                                bestimmt. Eine unterjährige Angabe ist nicht möglich. <br>
@@ -12874,8 +12999,10 @@ sub bdump {
 							   </ul>
 							   <br><br>
   
+  <a name="timestamp_begin"></a> 
   <li><b>timestamp_begin </b> - der zeitliche Beginn für die Datenselektion (*)   </li> <br>
-  
+
+  <a name="timestamp_end"></a>   
   <li><b>timestamp_end </b>   - das zeitliche Ende für die Datenselektion. Wenn nicht gesetzt wird immer die aktuelle 
                                 Datum/Zeit-Kombi für das Ende der Selektion eingesetzt. (*)  </li> <br>
 															
@@ -12920,9 +13047,11 @@ sub bdump {
   
   Wird das Attribut "timeDiffToNow" gesetzt, werden die eventuell gesetzten anderen Zeit-Attribute 
   ("timestamp_begin","timestamp_end","timeYearPeriod") gelöscht.
-  Das Setzen von "timestamp_begin" bzw. "timestamp_end" bedingt die Löschung von anderen Zeit-Attribute falls sie vorher gesetzt waren.
+  Das Setzen von "timestamp_begin" bzw. "timestamp_end" bedingt die Löschung von anderen Zeit-Attribute falls sie vorher 
+  gesetzt waren.
   <br><br>
   
+  <a name="timeDiffToNow"></a> 
   <li><b>timeDiffToNow </b>   - der <b>Selektionsbeginn</b> wird auf den Zeitpunkt <b>"&lt;aktuelle Zeit&gt; - &lt;timeDiffToNow&gt;"</b> 
                                 gesetzt (z.b. werden die letzten 24 Stunden in die Selektion eingehen wenn das Attribut auf "86400" gesetzt 
 								wurde). Die Timestampermittlung erfolgt dynamisch zum Ausführungszeitpunkt.     </li> <br>
@@ -12943,17 +13072,20 @@ sub bdump {
                                 # die Startzeit wird auf "aktuelle Zeit - 1,5 Jahre gesetzt <br>
 								</ul>
 								<br><br>
-								
+
+  <a name="timeOlderThan"></a> 								
   <li><b>timeOlderThan </b>   - das <b>Selektionsende</b> wird auf den Zeitpunkt <b>"&lt;aktuelle Zeit&gt; - &lt;timeOlderThan&gt;"</b> 
                                 gesetzt. Dadurch werden alle Datensätze bis zu dem Zeitpunkt "&lt;aktuelle 
 								Zeit&gt; - &lt;timeOlderThan&gt;" berücksichtigt (z.b. wenn auf 86400 gesetzt, werden alle
 								Datensätze die älter als ein Tag sind berücksichtigt). Die Timestampermittlung erfolgt 
 								dynamisch zum Ausführungszeitpunkt. <br>
 								Es gelten die gleichen Eingabeformate wie für das Attribut "timeDiffToNow".   </li> <br> 
-								
+
+  <a name="timeout"></a> 								
   <li><b>timeout </b>         - das Attribut setzt den Timeout-Wert für die Blocking-Call Routinen in Sekunden  
                                 (Default: 86400) </li> <br>
-								
+
+  <a name="userExitFn"></a> 								
   <li><b>userExitFn   </b>    - stellt eine Schnittstelle zur Ausführung eigenen Usercodes zur Verfügung. <br>
                                 Um die Schnittstelle zu aktivieren, wird zunächst die aufzurufende Subroutine in 
 							    99_myUtls.pm nach folgendem Muster erstellt:     <br>
@@ -12996,7 +13128,8 @@ sub bdump {
 							   </li>
 							   <br>
                                <br>
-                               
+
+  <a name="valueFilter"></a>                                
   <li><b>valueFilter </b>     - Regulärer Ausdruck zur Filterung von Datensätzen innerhalb bestimmter Funktionen. Der 
                                 Regex auf den gesamten selektierten Datensatz (inkl. Device, Reading usw.) angewendet. 
                                 Bitte vergleichen sie die Erläuterungen zu den entsprechenden Set-Kommandos. </li> <br> 
