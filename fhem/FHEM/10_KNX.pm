@@ -34,6 +34,7 @@
 # ABU 20180829 added dpt9.0020, tried workaround in putCmd, remove non printable chars
 # ABU 20180925 added dpt3.007, added last-sender "fhem"
 # ABU 20180926 fixed KNX_Eval in line 1291 (replaced hash by deviceHash), fixed decoding dpt3
+# ABU 20181007 fixed dpt19
 
 
 package main;
@@ -1813,12 +1814,13 @@ KNX_encodeByDpt ($$$) {
 			my $hoffset;
 			
 			#add offsets
+			#$year+=1900;
 			$mon++;	
 			# calculate offset for weekday
 			$wday = 7 if ($wday eq "0");
 			
 			$hexval = 0;
-			$hexval = sprintf ("00%.8x", (($secs<<16) + ($mins<<24) + ($hours<<32) + ($wday<<37) + ($mday<<40) + ($mon<<48) + ($year<<56)));
+			$hexval = sprintf ("00%.16x", (($secs<<16) + ($mins<<24) + ($hours<<32) + ($mday<<40) + ($mon<<48) + ($year<<56)));
 			
 		} else
 		{
@@ -1831,7 +1833,7 @@ KNX_encodeByDpt ($$$) {
 			my $wday = 0;
 			
 			$hexval = 0;
-			$hexval = sprintf ("00%.8x", (($ss<<16) + ($mi<<24) + ($hh<<32) + ($wday<<37) + ($dd<<40) + ($mm<<48) + ($yyyy<<56)));
+			$hexval = sprintf ("00%.16x", (($ss<<16) + ($mi<<24) + ($hh<<32) + ($dd<<40) + ($mm<<48) + ($yyyy<<56)));
 		}
 		$numval = 0;
 	}	
@@ -2049,14 +2051,17 @@ KNX_decodeByDpt ($$$) {
 	elsif ($code eq "dpt19")
 	{
 		$numval = $value;
-		my $time = hex (substr ($value, 6, 6));
-		my $date = hex (substr ($value, 0, 6));
+		my $time = hex (substr ($numval, 8, 6));
+		my $date = hex (substr ($numval, 2, 6));
 		my $secs  = ($time & 0x3F) >> 0;
 		my $mins  = ($time & 0x3F00) >> 8;
 		my $hours = ($time & 0x1F0000) >> 16;
-		my $day   = ($date & 0x1F) >> 0;
-		my $month = ($date & 0x0F00) >> 8;
-		my $year  = ($date & 0xFFFF0000) >> 16;		
+		#my $day   = ($date & 0x1F) >> 0;
+		#my $month = ($date & 0x0F00) >> 8;
+		#my $year  = ($date & 0xFFFF0000) >> 16;		
+		my $day   = ($date & 0xFF) >> 0;
+		my $month = ($date & 0xFF00) >> 8;
+		my $year  = ($date & 0xFF0000) >> 16;		
 		
 		$year += 1900;
 		$state = sprintf("%02d.%02d.%04d_%02d:%02d:%02d", $day, $month, $year, $hours, $mins, $secs);	
