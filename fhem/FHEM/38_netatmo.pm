@@ -902,6 +902,7 @@ netatmo_checkConnection($)
   my $name = $hash->{NAME};
 
   return undef if($hash->{network} eq "ok");
+  return undef if(!defined($hash->{access_token}));
 
   Log3 $name, 3, "$name: refreshing connection information";
 
@@ -1109,7 +1110,8 @@ netatmo_initDevice($)
 
   if(IsDisabled($name) || !defined($name)) {
     RemoveInternalTimer($hash);
-    $hash->{STATE} = "Disabled";
+    #$hash->{STATE} = "Disabled";
+    readingsSingleUpdate($hash, "active", "disabled", 1);
     return undef;
   }
 
@@ -1186,7 +1188,8 @@ netatmo_initDevice($)
 
   if(IsDisabled($name) || !defined($name)) {
     RemoveInternalTimer($hash);
-    $hash->{STATE} = "Disabled";
+    #$hash->{STATE} = "Disabled";
+    readingsSingleUpdate($hash, "active", "disabled", 1);
     return undef;
   }
 
@@ -1588,19 +1591,19 @@ netatmo_getPublicDevices($$;$$$$)
 
   if( $blocking ) {
     my($err,$data) = HttpUtils_BlockingGet({
-      url => "https://".$iohash->{helper}{apiserver}."/api/getpublicdata",
+      url => "https://".$iohash->{helper}{apiserver}."/api/getpublicmeasures",
       timeout => 10,
       noshutdown => 1,
-      data => { access_token => $iohash->{access_token}, lat_ne => $lat_ne, lon_ne => $lon_ne, lat_sw => $lat_sw, lon_sw => $lon_sw },
+      data => { access_token => $iohash->{access_token}, lat_ne => $lat_ne, lon_ne => $lon_ne, lat_sw => $lat_sw, lon_sw => $lon_sw, quality => 1, divider => 8, limit => 4, zoom => 10, date_end => 'last' },
     });
 
       return netatmo_dispatch( {hash=>$hash,type=>'publicdata'},$err,$data );
   } else {
     HttpUtils_NonblockingGet({
-      url => "https://".$iohash->{helper}{apiserver}."/api/getpublicdata",
+      url => "https://".$iohash->{helper}{apiserver}."/api/getpublicmeasures",
       timeout => 60,
       noshutdown => 1,
-      data => { access_token => $iohash->{access_token}, lat_ne => $lat_ne, lon_ne => $lon_ne, lat_sw => $lat_sw, lon_sw => $lon_sw, filter => 'true' },
+      data => { access_token => $iohash->{access_token}, lat_ne => $lat_ne, lon_ne => $lon_ne, lat_sw => $lat_sw, lon_sw => $lon_sw, quality => 1, divider => 8, limit => 4, zoom => 10, date_end => 'last' },
       hash => $hash,
       type => 'publicdata',
       callback => \&netatmo_dispatch,
@@ -2542,7 +2545,8 @@ netatmo_poll($)
 
   if(IsDisabled($name) || !defined($name)) {
     RemoveInternalTimer($hash);
-    $hash->{STATE} = "Disabled";
+    #$hash->{STATE} = "Disabled";
+    readingsSingleUpdate($hash, "active", "disabled", 1);
     return undef;
   }
 

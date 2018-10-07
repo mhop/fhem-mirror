@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  38_netatmo: changed weathermap calls to new endpoints
   - feature: 5.9 released
 
 - 2018-10-07 (5.9)
