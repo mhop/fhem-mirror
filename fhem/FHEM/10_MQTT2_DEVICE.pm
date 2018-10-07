@@ -153,10 +153,27 @@ MQTT2_DEVICE_Parse($$)
   return keys %fnd;
 }
 
+# compatibility: the first version was implemented as MQTT2_JSON and published.
 sub
 MQTT2_JSON($;$)
 {
   return json2nameValue($_[0], $_[1]);
+}
+
+sub
+MQTT2_getCmdHash($)
+{
+  my ($list) = @_;
+  my (%h, @cmd);
+  map { 
+    my ($k,$v) = split(" ",$_,2);
+    push @cmd, $k;
+    $k =~ s/:.*//; # potential arguments
+    $h{$k} = $v;
+  }
+  grep /./,
+  split("\n", $list);
+  return (\%h, join(" ",@cmd));
 }
 
 
@@ -167,15 +184,11 @@ MQTT2_DEVICE_Get($@)
   my ($hash, @a) = @_;
   return "Not enough arguments for get" if(!defined($a[1]));
 
-  my %gets;
-  map {  my ($k,$v) = split(" ",$_,2); $gets{$k} = $v; }
-        grep /./,
-        split("\n", AttrVal($hash->{NAME}, "getList", ""));
-  return "Unknown argument $a[1], choose one of ".join(" ",sort keys %gets)
-        if(!$gets{$a[1]});
+  my ($gets,$cmdList) = MQTT2_getCmdHash(AttrVal($hash->{NAME}, "getList", ""));
+  return "Unknown argument $a[1], choose one of $cmdList" if(!$gets->{$a[1]});
   return undef if(IsDisabled($hash->{NAME}));
 
-  my ($getReading, $cmd) = split(" ",$gets{$a[1]},2);
+  my ($getReading, $cmd) = split(" ",$gets->{$a[1]},2);
   if($hash->{CL}) {
     my $tHash = { hash=>$hash, CL=>$hash->{CL}, reading=>$getReading };
     $hash->{asyncGet} = $tHash;
@@ -207,13 +220,10 @@ MQTT2_DEVICE_Set($@)
   my ($hash, @a) = @_;
   return "Not enough arguments for set" if(!defined($a[1]));
 
-  my %sets;
-  map {  my ($k,$v) = split(" ",$_,2); $sets{$k} = $v; }
-        grep /./,
-        split("\n", AttrVal($hash->{NAME}, "setList", ""));
+  my ($sets,$cmdList) = MQTT2_getCmdHash(AttrVal($hash->{NAME}, "setList", ""));
   my $cmdName = $a[1];
-  my $cmd = $sets{$cmdName};
-  return SetExtensions($hash, join(" ", sort keys %sets), @a) if(!$cmd);
+  my $cmd = $sets->{$cmdName};
+  return SetExtensions($hash, $cmdList, @a) if(!$cmd);
   return undef if(IsDisabled($hash->{NAME}));
 
   shift @a;

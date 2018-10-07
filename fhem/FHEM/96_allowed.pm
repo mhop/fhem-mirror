@@ -201,7 +201,7 @@ allowed_Authenticate($$$$)
     return ($pw eq $param) ? 1 : 2;
 
   } else {
-    $param =~ m/^basicAuth:(.*)/;
+    $param =~ m/^basicAuth:(.*)/ if($param);
     return allowed_CheckBasicAuth($me, $cl, $1,
                                 AttrVal($aName,"basicAuth",undef), $param);
 
