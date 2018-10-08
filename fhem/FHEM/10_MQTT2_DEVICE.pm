@@ -176,6 +176,36 @@ MQTT2_getCmdHash($)
   return (\%h, join(" ",@cmd));
 }
 
+#############################
+# replace {} and $EVENT. Used both in set and get
+sub
+MQTT2_buildCmd($$$)
+{
+  my ($hash, $a, $cmd) = @_;
+
+  shift @{$a};
+  if($cmd =~ m/^{.*}$/) {
+    $cmd = EvalSpecials($cmd, ("%EVENT"=>join(" ",@{$a}), "%NAME"=>$hash->{NAME}));
+    $cmd = AnalyzeCommandChain($hash->{CL}, $cmd);
+    return if(!$cmd);
+
+  } else {
+    if($cmd =~ m/\$EV/) {       # replace EVENT & $EVTPART
+      my $event = join(" ",@{$a});
+      $cmd =~ s/\$EVENT/$event/g;
+      for(my $i=0; $i<@{$a}; $i++) {
+        my $n = "\\\$EVTPART$i";
+        $cmd =~ s/$n/$a->[$i]/ge;
+      }
+    } else {
+      shift @{$a};
+      $cmd .= " ".join(" ",@{$a}) if(@{$a});
+    }
+  }
+
+  $cmd =~ s/\$DEVICETOPIC/$hash->{DEVICETOPIC}/g;
+  return $cmd;
+}
 
 #############################
 sub
@@ -198,18 +228,10 @@ MQTT2_DEVICE_Get($@)
     }, $tHash, 0);
   }
 
-  shift @a;
-  if($cmd =~ m/^{.*}$/) {
-    $cmd = EvalSpecials($cmd, ("%EVENT"=>join(" ",@a), "%NAME"=>$hash->{NAME}));
-    $cmd = AnalyzeCommandChain($hash->{CL}, $cmd);
-    return if(!$cmd);
-  } else {
-    shift @a;
-    $cmd .= " ".join(" ",@a) if(@a);
-  }
-
-  $cmd =~ s/\$DEVICETOPIC/$hash->{DEVICETOPIC}/g;
+  $cmd = MQTT2_buildCmd($hash, \@a, $cmd);
+  return if(!$cmd);
   IOWrite($hash, split(" ",$cmd,2));
+
   return undef;
 }
 
@@ -226,18 +248,8 @@ MQTT2_DEVICE_Set($@)
   return SetExtensions($hash, $cmdList, @a) if(!$cmd);
   return undef if(IsDisabled($hash->{NAME}));
 
-  shift @a;
-  if($cmd =~ m/^{.*}$/) {
-    my $NAME = $hash->{NAME};
-    $cmd = EvalSpecials($cmd, ("%EVENT"=>join(" ",@a), "%NAME"=>$hash->{NAME}));
-    $cmd = AnalyzeCommandChain($hash->{CL}, $cmd);
-    return if(!$cmd);
-  } else {
-    shift @a;
-    $cmd .= " ".join(" ",@a) if(@a);
-  }
-
-  $cmd =~ s/\$DEVICETOPIC/$hash->{DEVICETOPIC}/g;
+  $cmd = MQTT2_buildCmd($hash, \@a, $cmd);
+  return if(!$cmd);
   IOWrite($hash, split(" ",$cmd,2));
   readingsSingleUpdate($hash, "state", $cmdName, 1);
   return undef;
@@ -440,9 +452,10 @@ MQTT2_DEVICE_Undef($$)
       <ul>
         <li>arguments to the set command will be appended to the message
           published (not for the perl expression)</li>
-        <li>if using a perl expressions, the command arguments are available as
-          $EVENT, $EVTPART0, etc. The perl expression must return a string
-          containing the topic and the message separated by a space.</li>
+        <li>the command arguments are available as $EVENT, $EVTPART0, etc.,
+          bot in the perl expression and the "normal" topic variant.</li>
+        <li>the perl expression must return a string containing the topic and
+          the message separated by a space.</li>
         <li>SetExtensions is activated</li>
         <li>if the topic name ends with :r, then the retain flag is set</li>
       </ul>
@@ -470,9 +483,10 @@ MQTT2_DEVICE_Undef($$)
           Use a set and a notify/DOIF/etc definition for such a purpose</li>
         <li>arguments to the get command will be appended to the message
           published (not for the perl expression)</li>
-        <li>if using a perl expressions, the command arguments are available as
-          $EVENT, $EVTPART0, etc. The perl expression must return a string
-          containing the topic and the message separated by a space.</li>
+        <li>the command arguments are available as $EVENT, $EVTPART0, etc.
+          </li>
+        <li>the perl expression must return a string containing the topic and
+          the message separated by a space.</li>
       </ul>
       </li><br>
 
