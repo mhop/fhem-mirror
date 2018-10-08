@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 3.12.2     07.10.2018       $hash->{HELPER}{REOPEN_RUNS_UNTIL} contains the time until the DB is closed 
 # 3.12.1     19.09.2018       use Time::Local (forum:#91285)
 # 3.12.0     04.09.2018       corrected SVG-select (https://forum.fhem.de/index.php/topic,65860.msg815640.html#msg815640)
 # 3.11.0     02.09.2018       reduceLog, reduceLogNbl - optional "days newer than" part added
@@ -210,7 +211,7 @@ use Time::Local;
 use Encode qw(encode_utf8);
 no if $] >= 5.017011, warnings => 'experimental::smartmatch'; 
 
-my $DbLogVersion = "3.12.1";
+my $DbLogVersion = "3.12.2";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -588,6 +589,7 @@ sub DbLog_Set($@) {
             DbLog_ConnectPush($hash);
             if($hash->{HELPER}{REOPEN_RUNS}) {
 			    delete $hash->{HELPER}{REOPEN_RUNS};
+                delete $hash->{HELPER}{REOPEN_RUNS_UNTIL};
                 RemoveInternalTimer($hash, "reopen");
             }
 			DbLog_execmemcache($hash) if($async);
@@ -610,7 +612,8 @@ sub DbLog_Set($@) {
 			my $ts = (split(" ",FmtDateTime(gettimeofday()+$a[2])))[1];
 			Log3($name, 2, "DbLog $name: Connection closed until $ts ($a[2] seconds).");
 			readingsSingleUpdate($hash, "state", "closed until $ts ($a[2] seconds)", 1);
-            InternalTimer(gettimeofday()+$a[2], "DbLog_reopen", $hash, 0);			
+            InternalTimer(gettimeofday()+$a[2], "DbLog_reopen", $hash, 0);
+            $hash->{HELPER}{REOPEN_RUNS_UNTIL} = $ts;			
 		}
     }
     elsif ($a[1] eq 'rereadcfg') {
@@ -4730,6 +4733,7 @@ sub DbLog_reopen ($){
   if(DbLog_ConnectPush($hash)) {
       # Statusbit "Kein Schreiben in DB erlauben" löschen
       my $delay = delete $hash->{HELPER}{REOPEN_RUNS};
+      delete $hash->{HELPER}{REOPEN_RUNS_UNTIL};
 	  Log3($name, 2, "DbLog $name: Database connection reopened (it was $delay seconds closed).") if($delay);
 	  readingsSingleUpdate($hash, "state", "reopened", 1);
 	  $hash->{HELPER}{OLDSTATE} = "reopened";

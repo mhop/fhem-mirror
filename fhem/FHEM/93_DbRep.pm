@@ -42,6 +42,7 @@ use warnings;
 
 # Versions History intern
 our %DbRep_vNotesIntern = (
+  "8.2.1"  => "07.10.2018  \$hash->{dbloghash}{HELPER}{REOPEN_RUNS_UNTIL} contains the time until DB is closed ",
   "8.2.0"  => "05.10.2018  direct help for attributes ",
   "8.1.0"  => "02.10.2018  new get versionNotes command ",
   "8.0.1"  => "20.09.2018  DbRep_getMinTs improved",
@@ -718,7 +719,7 @@ sub DbRep_Set($@) {
   ##        keine Aktionen außer die über diesem Eintrag solange Reopen xxxx im DbLog-Device läuft
   #######################################################################################################
   if ($hash->{dbloghash}{HELPER}{REOPEN_RUNS} && $opt !~ /\?/) {
-      my $ro = (split(" ",FmtDateTime(gettimeofday()+$hash->{dbloghash}{HELPER}{REOPEN_RUNS})))[1];
+      my $ro = $hash->{dbloghash}{HELPER}{REOPEN_RUNS_UNTIL};
       Log3 ($name, 3, "DbRep $name - connection $dblogdevice to db $dbname is closed until $ro - $opt postponed");
 	  ReadingsSingleUpdateValue ($hash, "state", "connection $dblogdevice to $dbname is closed until $ro - $opt postponed", 1);
 	  return;
@@ -954,7 +955,7 @@ sub DbRep_Get($@) {
   return if(IsDisabled($name));
   
   if ($hash->{dbloghash}{HELPER}{REOPEN_RUNS} && $opt !~ /\?|procinfo|blockinginfo/) {
-      my $ro = (split(" ",FmtDateTime(gettimeofday()+$hash->{dbloghash}{HELPER}{REOPEN_RUNS})))[1];
+      my $ro = $hash->{dbloghash}{HELPER}{REOPEN_RUNS_UNTIL};
       Log3 ($name, 3, "DbRep $name - connection $dblogdevice to db $dbname is closed until $ro - $opt postponed");
 	  ReadingsSingleUpdateValue ($hash, "state", "connection $dblogdevice to $dbname is closed until $ro - $opt postponed", 1);
 	  return;
