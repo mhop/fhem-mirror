@@ -290,7 +290,7 @@ my %sleepers;                   # list of sleepers
 $init_done = 0;
 $lastDefChange = 0;
 $readytimeout = ($^O eq "MSWin32") ? 0.1 : 5.0;
-$featurelevel = 5.8; # see also GlobalAttr
+$featurelevel = 5.9; # see also GlobalAttr
 
 
 $modules{Global}{ORDER} = -1;
@@ -316,7 +316,7 @@ my @globalAttrList = qw(
   dnsServer
   dupTimeout
   exclude_from_update
-  featurelevel:5.5,5.6,5.7,5.8,99.99
+  featurelevel:5.5,5.6,5.7,5.8,5.9,99.99
   genericDisplayType:switch,outlet,light,blind,speaker,thermostat
   holiday2we
   httpcompress:0,1
@@ -2634,7 +2634,7 @@ GlobalAttr($$$$)
   if($type eq "del") {
     my %noDel = ( modpath=>1, verbose=>1, logfile=>1 );
     return "The global attribute $name cannot be deleted" if($noDel{$name});
-    $featurelevel = 5.8 if($name eq "featurelevel");
+    $featurelevel = 5.9 if($name eq "featurelevel");
     $haveInet6    = 0   if($name eq "useInet6"); # IPv6
     return undef;
   }
