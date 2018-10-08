@@ -4038,7 +4038,8 @@ sub DbLog_reduceLog($@) {
                             }
                         };
                         if ($@) {
-                            Log3($hash->{NAME}, 3, "DbLog $name: reduceLog average=hour ! FAILED ! for day $processingDay");
+                            $err = $@;
+                            Log3($hash->{NAME}, 2, "DbLog $name - reduceLogNbl ! FAILED ! for day $processingDay: $err");
                             eval {$dbh->rollback() if(!$dbh->{AutoCommit});};
                             @averageUpdD = ();
                         } else {
@@ -4104,7 +4105,8 @@ sub DbLog_reduceLog($@) {
 							}
                         };
                         if ($@) {
-                            Log3($hash->{NAME}, 3, "DbLog $name: reduceLog average=day ! FAILED ! for day $processingDay");
+                            $err = $@;
+                            Log3($hash->{NAME}, 2, "DbLog $name - reduceLogNbl ! FAILED ! for day $processingDay: $err");
                             eval {$dbh->rollback() if(!$dbh->{AutoCommit});};
                         } else {
                             eval {$dbh->commit() if(!$dbh->{AutoCommit});};
