@@ -1015,12 +1015,15 @@ sub MOBILEALERTS_decodeTemperature($) {
     #Illegal value
     return -9999 if ( ( $temperature & 0x1000 ) == 0x1000 );
 
+    #Clear flags
+    $temperature &= 0x7ff;
+
     #Negativ Values
-    return ( 0x800 - ( $temperature & 0x7ff ) ) * -0.1
-      if ( ( $temperature & 0x400 ) == 0x400 );
+    return ( 0x800 - $temperature ) * -0.1
+      if ( $temperature > 1100 );
 
     #Positiv Values
-    return ( $temperature & 0x7ff ) * 0.1;
+    return $temperature * 0.1;
 }
 
 sub MOBILEALERTS_temperatureToString($) {
