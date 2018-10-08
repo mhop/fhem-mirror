@@ -3891,7 +3891,7 @@ return($txt);
 #########################################################################################
 sub DbLog_reduceLog($@) {
     my ($hash,@a) = @_;
-    my ($ret,$row,$filter,$exclude,$c,$day,$hour,$lastHour,$updDate,$updHour,$average,$processingDay,$lastUpdH,%hourlyKnown,%averageHash,@excludeRegex,@dayRows,@averageUpd,@averageUpdD);
+    my ($ret,$row,$err,$filter,$exclude,$c,$day,$hour,$lastHour,$updDate,$updHour,$average,$processingDay,$lastUpdH,%hourlyKnown,%averageHash,@excludeRegex,@dayRows,@averageUpd,@averageUpdD);
     my ($name,$startTime,$currentHour,$currentDay,$deletedCount,$updateCount,$sum,$rowCount,$excludeCount) = ($hash->{NAME},time(),99,0,0,0,0,0,0);
     my $dbh = DbLog_ConnectNewDBH($hash);
     return if(!$dbh);
