@@ -2844,7 +2844,7 @@ CmdDoIfPerl($$)
     readingsBeginUpdate($hash);
     readingsBulkUpdate($hash,"state","initialized");
     readingsBulkUpdate ($hash,"mode","enabled");
-    readingsEndUpdate($hash, 1);
+    readingsEndUpdate($hash, 0);
     $hash->{helper}{globalinit}=1;
   }
   
@@ -3703,9 +3703,9 @@ Die Formatierungen lassen sich im DEF-Editor der Web-Oberfläche vornehmen.<br>
 So könnte eine Definition aussehen:<br>
 <table>
 <tr><td><code>define di_Modul DOIF ([Switch1] eq "on" and [Switch2] eq "on")</code></td><td>&nbsp;<code>## wenn Schalter 1 und Schalter 2 on ist</code><br></td></tr>
-<tr><td><ol><code>(set lamp on)</code>                                                    </td><td>&nbsp;<code>## wird Lampe eingeschaltet</code></ol></td></tr>
-<tr><td><code>DOELSE</code>                                                               </td><td>&nbsp;<code>## im sonst-Fall, also wenn einer der Schalter off ist</code><br></td></tr>
-<tr><td><ol><code>(set lamp off)</code>                                                   </td><td>&nbsp;<code>## wird die Lampe ausgeschaltet</code></ol></td></tr>
+<tr><td><ol><code>(set lamp on)</code>                                             </td><td>&nbsp;<code>## wird Lampe eingeschaltet</code></ol></td></tr>
+<tr><td><code>DOELSE</code>                                                        </td><td>&nbsp;<code>## im sonst-Fall, also wenn einer der Schalter off ist</code><br></td></tr>
+<tr><td><ol><code>(set lamp off)</code>                                            </td><td>&nbsp;<code>## wird die Lampe ausgeschaltet</code></ol></td></tr>
 <br>
 </table><br>
 <a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
@@ -3713,8 +3713,8 @@ So könnte eine Definition aussehen:<br>
 <code>define di_Modul DOIF </code>
 <tr><td>{<code>&nbsp;if ([Switch1] eq "on" and [Switch2] eq "on") {</code></td><td>&nbsp;<code>## wenn Schalter 1 und Schalter 2 on ist</code><br></td></tr>
 <tr><td><ol><code>fhem_set "lamp on"</code>               </td><td>&nbsp;<code>## wird Lampe eingeschaltet</code></ol></td></tr>
-<tr><td><code>&nbsp;&nbsp;}&nbsp;elsif {</code>                                </td><td>&nbsp;<code>## im sonst-Fall, also wenn einer der Schalter off ist</code><br></td></tr>
-<tr><td><ol><code>fhem_set "lamp off"</code>                  </td><td>&nbsp;<code>## wird die Lampe ausgeschaltet</code></ol></td></tr>
+<tr><td><code>&nbsp;&nbsp;}&nbsp;else {</code>            </td><td>&nbsp;<code>## im sonst-Fall, also wenn einer der Schalter off ist</code><br></td></tr>
+<tr><td><ol><code>fhem_set "lamp off"</code>              </td><td>&nbsp;<code>## wird die Lampe ausgeschaltet</code></ol></td></tr>
 <tr><td><code>&nbsp;&nbsp;}</code><br></td></tr>
 <tr><td><code>}</code><br></td></tr>
 </table>
@@ -3791,7 +3791,7 @@ Die Syntax lautet: <code>[&lt;devicename&gt;:"&lt;regex&gt;"]</code><br>
 <code>define di_garage DOIF {if ([remotecontrol:"on"]) {fhem_set"garage on"} elsif ([remotecontrol:"off"]) {fhem_set"garage off"}}</code><br>
 <br>
 In diesem Beispiel wird nach dem Vorkommen von "on" innerhalb des Events gesucht.
-Falls "on" gefunden wird, wird der Ausdruck wahr und der DOIF-Fall wird ausgeführt, ansonsten wird der DOELSEIF-Fall entsprechend ausgewertet.
+Falls "on" gefunden wird, wird der Ausdruck wahr und der if-Fall wird ausgeführt, ansonsten wird der else-if-Fall entsprechend ausgewertet.
 Die Auswertung von reinen Ereignissen bietet sich dann an, wenn ein Modul keinen Status oder Readings benutzt, die man abfragen kann, wie z. B. beim Modul "sequence".
 Die Angabe von regulären Ausdrücken kann recht komplex werden und würde die Aufzählung aller Möglichkeiten an dieser Stelle den Rahmen sprengen.
 Weitere Informationen zu regulären Ausdrücken sollten in der Perl-Dokumentation nachgeschlagen werden.
@@ -3820,11 +3820,11 @@ Entsprechend können Perl-Variablen in der DOIF-Bedingung ausgewertet werden, si
 <br>
 "Fenster offen"-Meldung<br>
 <br>
-<code>define di_window_open (["^window_:open"]) (set Pushover msg 'alarm' 'open windows $DEVICE' '' 2 'persistent' 30 3600)<br>
+<code>define di_window_open DOIF (["^window_:open"]) (set Pushover msg 'alarm' 'open windows $DEVICE' '' 2 'persistent' 30 3600)<br>
 attr di_window_open do always</code><br>
 <br>
 <a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
-<code>define di_window_open {if (["^window_:open"]) {fhem_set"Pushover msg 'alarm' 'open windows $DEVICE' '' 2 'persistent' 30 3600"}}</code><br>
+<code>define di_window_open DOIF {if (["^window_:open"]) {fhem_set"Pushover msg 'alarm' 'open windows $DEVICE' '' 2 'persistent' 30 3600"}}</code><br>
 <br>
 Hier werden alle Fenster, die mit dem Device-Namen "window_" beginnen auf "open" im Event überwacht.<br>
 <br>
@@ -4066,13 +4066,11 @@ attr di_Raumtemp state In folgenden Zimmern ist zu kalt: [@"^Rooms":temperature:
 Es soll beim Öffnen eines Fensters eine Meldung über alle geöffneten Fenster erfolgen:<br>
 <br>
 <code>define di_Fenster DOIF (["^Window:open"]) (push "Folgende Fenster: [@"^Window:state:"open"] sind geöffnet")</code><br>
-<br>
 attr di_Fenster do always<br>
 <br>
 Wenn im Wohnzimmer eine Lampe ausgeschaltet wird, sollen alle anderen Lampen im Wohnzimmer ebenfalls ausgeschaltet werden, die noch an sind:<br>
 <br>
 <code>define di_lamp DOIF (["^lamp_livingroom: off"]) (set [@"^lamp_livingroom":state:"on","defaultdummy"] off)<br>
-<br>
 attr di_lamp DOIF do always</code><br>
 <br>
 Mit der Angabe des Default-Wertes "defaultdummy", wird verhindert, dass der set-Befehl eine Fehlermeldung liefert, wenn die Device-Liste leer ist. Der angegebene Default-Dummy muss zuvor definiert werden.<br>
@@ -4081,9 +4079,10 @@ Für reine Perlangaben gibt es eine entsprechende Perlfunktion namens <code>Aggr
 <br>
 <u>Beispiele</u><br>
 <br>
-<code>define di_Fenster DOIF (["^Window:open"]) {foreach (AggrDoIf('@','^windows','state','"open"')) {Log3 "di_Fenster",3,"Das Fenster $_ ist noch offen"}}</code><br>
+<a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
+<code>define di_Fenster DOIF {if (["^Window:open"]) {foreach (AggrDoIf('@','^windows','state','"open"')) {Log3 "di_Fenster",3,"Das Fenster $_ ist noch offen"}}}</code><br>
 <br>
-<code>define di_Temperature DOIF (["^room:temperature"]) {foreach (AggrDoIf('@','^room','temperature','$_ < 15')) {Log3 "di_Temperatur",3,"im Zimmer $_ ist zu kalt"}}</code><br>
+<code>define di_Temperature DOIF {if (["^room:temperature"]) {foreach (AggrDoIf('@','^room','temperature','$_ < 15')) {Log3 "di_Temperatur",3,"im Zimmer $_ ist zu kalt"}}</code><br>
 <br>
 <a name="DOIF_Zeitsteuerung"></a>
 <b>Zeitsteuerung</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
@@ -5692,7 +5691,7 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
 <b>Perl Modus</b><br>
 <br>
 Der Perl-Modus ist sowohl für einfache, als auch für komplexere Automatisierungsabläufe geeignet. Der Anwender hat mehr Einfluss auf den Ablauf der Steuerung als im FHEM-Modus.
-Die Abläufe lassen sich, wie in höheren Programmiersprachen üblich, strukturiert programmieren. Zum Zeitpunkt der Definition werden alle DOIF-spezifischen Angaben in Perl übersetzt, zum Zeitpunkt der Ausführung wird nur noch Perl ausgeführt, damit wird maximale Performance gewährleistet.<br>
+Die Abläufe lassen sich, wie in höheren Programmiersprachen üblich, strukturiert programmieren. Zum Zeitpunkt der Definition werden alle DOIF-spezifischen Angaben in Perl übersetzt, zum Zeitpunkt der Ausführung wird nur noch Perl ausgeführt, dadurch wird maximale Performance gewährleistet.<br>
 <br>
 Syntax Perl-Modus:<br>
 <br>
@@ -5720,28 +5719,41 @@ Die Bedingungen des FHEM-Modus können ohne Änderungen in Perl-Modus übernomme
 <a name="DOIF_Einfache_Anwendungsbeispiele_Perl"></a>
 <u>Einfache Anwendungsbeispiele (vgl. <a href="#DOIF_Einfache_Anwendungsbeispiele">Anwendungsbeispiele im FHEM-Modus</a>):</u><ol>
 <br>
-<code>define di_rc_tv DOIF {if ([remotecontol:"on"]) {fhem"set tv on"} else {fhem"set tv off"}}</code><br>
+<code>define di_rc_tv DOIF {if ([remotecontol:"on"]) {fhem_set"tv on"} else {fhem_set"tv off"}}</code><br>
 <br>
-<code>define di_clock_radio DOIF {if ([06:30|Mo Di Mi] or [08:30|Do Fr Sa So]) {fhem"set radio on"}} {if ([08:00|Mo Di Mi] or [09:30|Do Fr Sa So]) {fhem"set radio off"}}</code><br>
+<code>define di_clock_radio DOIF {if ([06:30|Mo Di Mi] or [08:30|Do Fr Sa So]) {fhem_set"radio on"}} {if ([08:00|Mo Di Mi] or [09:30|Do Fr Sa So]) {fhem_set"radio off"}}</code><br>
 <br>
-<code>define di_lamp DOIF {if ([06:00-09:00] and [sensor:brightness] < 40) {fhem"set lamp:FILTER=STATE!=on on"} else {fhem"set lamp:FILTER=STATE!=off off"}}</code><br>
+<code>define di_lamp DOIF {if ([06:00-09:00] and [sensor:brightness] < 40) {fhem_set"lamp:FILTER=STATE!=on on"} else {fhem_set"lamp:FILTER=STATE!=off off"}}</code><br>
 <br>
 </ol>
-Bemerkung: Im Gegensatz zum FHEM-Modus arbeitet der Perl-Modus ohne Zustandsauswertung, daher muss der Anwender selbst darauf achten, wiederholende Ausführungen zu vermeiden (im oberen Beispiel z.B. mit FILTER-Option)<br>
+Bemerkung: Im Gegensatz zum FHEM-Modus arbeitet der Perl-Modus ohne Auswertung des eigenen Status (Zustandsauswertung), daher muss der Anwender selbst darauf achten, wiederholende Ausführungen zu vermeiden (im oberen Beispiel z.B. mit FILTER-Option)<br>
 <br>
-Es können beliebig viele Ereignisblöcke definiert werden, die unabhängig von einander durch einen Trigger ausgewertet und zur Ausführung führen können:<br>
+Es können beliebig viele Ereignisblöcke definiert werden, die unabhängig von einander durch einen oder mehrere Trigger ausgewertet und zur Ausführung führen können:<br>
 <br>
 <code>DOIF<br>
-{ if (&lt;Bedingung mit Trigger&gt;) ... }<br>
-{ if (&lt;Bedingung mit Trigger&gt;) ... }<br>
+{ if (&lt;Bedingung mit Triggern&gt;) ... }<br>
+{ if (&lt;Bedingung mit Triggern&gt;) ... }<br>
 ...</code><br>
+<br>
+Einzelne Ereignis-/Zeittrigger, die nicht logisch mit anderen Bedingungen oder Triggern ausgewertet werden müssen, können auch ohne if-Anweisung angegeben werden, z. B.:<br>
+<br>
+<code>DOIF<br>
+{["lamp:on"];...}<br>
+{[08:00];...}<br>
+...</code><br>
+<br>
+Ereignis-/Zeittrigger sind intern Perlfunktionen, daher können sie an beliebiger Stelle im Perlcode angegeben werden, wo Perlfunktionen vorkommen dürfen, z. B.:<br>
+<br>
+<code>DOIF {Log 1,"state of lamp: ".[lamp:state]}</code><br>
+<br>
+<code>DOIF {fhem_set("lamp ".[remote:state])}</code><br>
 <br>
 Es sind beliebige Hierarchietiefen möglich:<br>
 <br>
 <code>DOIF<br>
 { if (&lt;Bedingung&gt;) {<br>
 &nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(&lt;Bedingung&gt;)&nbsp;{<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(...<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(&lt;Bedingung mit Triggern&gt;...<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;...<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br>
 &nbsp;&nbsp;&nbsp;&nbsp;}<br>
