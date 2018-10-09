@@ -2338,7 +2338,7 @@ DOIF_Notify($$)
     }
   }
 
-  return "" if (defined $hash->{helper}{cur_cmd_nr});
+  return "" if (defined $hash->{helper}{cur_cmd_nr} and $hash->{MODEL} ne "Perl");
   return "" if (ReadingsVal($pn,"mode","") eq "disabled");
   
   $ret=0;
