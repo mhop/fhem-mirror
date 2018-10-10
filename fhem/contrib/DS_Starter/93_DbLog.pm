@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 3.12.4     10.10.2018       give non-saved datasets back in asynch mode only if transaction is used
 # 3.12.3     08.10.2018       Log output of recuceLogNbl enhanced, some functions renamed
 # 3.12.2     07.10.2018       $hash->{HELPER}{REOPEN_RUNS_UNTIL} contains the time the DB is closed 
 # 3.12.1     19.09.2018       use Time::Local (forum:#91285)
@@ -212,7 +213,7 @@ use Time::Local;
 use Encode qw(encode_utf8);
 no if $] >= 5.017011, warnings => 'experimental::smartmatch'; 
 
-my $DbLogVersion = "3.12.3";
+my $DbLogVersion = "3.12.4";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -2098,7 +2099,7 @@ sub DbLog_PushAsync(@) {
       $errorh = $@;
       Log3 $hash->{NAME}, 2, "DbLog $name -> Error table history - $errorh";
       $error = encode_base64($errorh,"");
-      $rowlback = $rowlist;	
+      $rowlback = $rowlist if($useta);	# nicht gespeicherte Datensätze nur zurück geben wenn Transaktion ein
   } 
   
   # update or insert current
@@ -5800,15 +5801,16 @@ sub DbLog_dbReadings($@) {
 	  <code>attr &lt;device&gt; commitMode [basic_ta:on | basic_ta:off | ac:on_ta:on | ac:on_ta:off | ac:off_ta:on]
 	  </code><br>
 	  
-      Change the usage of database autocommit- and/or transaction- behavior. <br> 
-	  This attribute is an advanced feature and should only be used in a concrete case of need or support case. <br><br>
+      Change the usage of database autocommit- and/or transaction- behavior. <br>
+      If transaction "off" is used, not saved datasets are not returned to cache in asynchronous mode. <br>      
+	  This attribute is an advanced feature and should only be used in a concrete situation or support case. <br><br>
 	  
 	  <ul>
       <li>basic_ta:on   - autocommit server basic setting / transaktion on (default) </li>
 	  <li>basic_ta:off  - autocommit server basic setting / transaktion off </li>
 	  <li>ac:on_ta:on   - autocommit on / transaktion on </li>
 	  <li>ac:on_ta:off  - autocommit on / transaktion off </li>
-	  <li>ac:off_ta:on  - autocommit off / transaktion on (autocommit off set transaktion on implicitly) </li>
+	  <li>ac:off_ta:on  - autocommit off / transaktion on (autocommit "off" set transaktion "on" implicitly) </li>
 	  </ul>
 	  
     </ul>
@@ -6906,6 +6908,8 @@ sub DbLog_dbReadings($@) {
 	  </code><br>
 	  
       Ändert die Verwendung der Datenbank Autocommit- und/oder Transaktionsfunktionen. 
+      Wird Transaktion "aus" verwendet, werden im asynchronen Modus nicht gespeicherte Datensätze nicht an den Cache zurück
+      gegeben.      
 	  Dieses Attribut ist ein advanced feature und sollte nur im konkreten Bedarfs- bzw. Supportfall geändert werden.<br><br>
 	  
 	  <ul>
@@ -6913,7 +6917,7 @@ sub DbLog_dbReadings($@) {
 	  <li>basic_ta:off  - Autocommit Servereinstellung / Transaktion aus </li>
 	  <li>ac:on_ta:on   - Autocommit ein / Transaktion ein </li>
 	  <li>ac:on_ta:off  - Autocommit ein / Transaktion aus </li>
-	  <li>ac:off_ta:on  - Autocommit aus / Transaktion ein (Autocommit aus impliziert Transaktion ein) </li>
+	  <li>ac:off_ta:on  - Autocommit aus / Transaktion ein (Autocommit "aus" impliziert Transaktion "ein") </li>
 	  </ul>
 	  
     </ul>
