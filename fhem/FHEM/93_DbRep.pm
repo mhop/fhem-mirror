@@ -42,6 +42,7 @@ use warnings;
 
 # Versions History intern
 our %DbRep_vNotesIntern = (
+  "8.2.2"  => "07.10.2018  DbRep_getMinTs changed, fix don't get the real min timestamp in rare cases ",
   "8.2.1"  => "07.10.2018  \$hash->{dbloghash}{HELPER}{REOPEN_RUNS_UNTIL} contains the time until DB is closed ",
   "8.2.0"  => "05.10.2018  direct help for attributes ",
   "8.1.0"  => "02.10.2018  new get versionNotes command ",
@@ -262,6 +263,7 @@ our %DbRep_vNotesIntern = (
 
 # Versions History extern:
 our %DbRep_vNotesExtern = (
+  "8.2.2"  => "07.10.2018 fix don't get the real min timestamp in rare cases ",
   "8.2.0"  => "05.10.2018 direct help for attributes ",
   "8.1.0"  => "01.10.2018 new get versionNotes command ",
   "8.0.0"  => "11.09.2018 get filesize in DbRep_WriteToDumpFile corrected, restoreMySQL for clientSide dumps, minor fixes ",
@@ -1472,7 +1474,8 @@ sub DbRep_getMinTs($) {
  my $st = [gettimeofday];
  
  # eval { $mints = $dbh->selectrow_array("SELECT min(TIMESTAMP) FROM history;"); }; 
- eval { $mints = $dbh->selectrow_array("select TIMESTAMP from history limit 1;"); }; 
+ # eval { $mints = $dbh->selectrow_array("select TIMESTAMP from history limit 1;"); }; 
+ eval { $mints = $dbh->selectrow_array("select TIMESTAMP from history order by TIMESTAMP limit 1;"); };   
  
  $dbh->disconnect;
  
