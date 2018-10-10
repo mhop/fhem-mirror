@@ -121,6 +121,7 @@ TcpServer_Accept($$)
         SSL_cipher_list => 'HIGH:!RC4:!eNULL:!aNULL',
         Timeout       => 4,
         });
+      $! = EINVAL if(!$clientinfo[0]->blocking() && $!==EWOULDBLOCK);
     };
     my $err = $!;
     if( !$ret
