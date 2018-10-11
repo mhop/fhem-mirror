@@ -222,8 +222,8 @@ sub HProtocolGateway_ParseMessage($$) {
     if ($sign eq "-") { $probe_offset = int($probe_offset) * -1 };
   
     my $volume_15C = $volume * (1 + 0.00084 * ( 15 - $temperature ));
-    $volume_15C = int($volume_15C); 
-
+    $volume_15C = Math::Round::nearest('0.01',$volume_15C);
+    
     # Update all received readings
     HProtocolGateway_UpdateTankDevice($hash, $tankHash->{NAME}, "ullage", $ullage);
     HProtocolGateway_UpdateTankDevice($hash, $tankHash->{NAME}, "filllevel", $filllevel);
