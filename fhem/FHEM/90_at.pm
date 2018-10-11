@@ -61,7 +61,7 @@ at_Define($$)
   }
 
   return "Wrong timespec, use \"[+][*[{count}]]<time or func>\""
-                                        if($tm !~ m/^(\+)?(\*({\d+})?)?(.*)$/);
+                                        if($tm !~ m/^(\+)?(\*(\{\d+\})?)?(.*)$/);
   my ($rel, $rep, $cnt, $tspec) = ($1, $2, $3, $4);
 
   my ($abstime, $err, $hr, $min, $sec, $fn);
@@ -211,7 +211,7 @@ at_adjustAlign($$)
   my($hash, $attrVal) = @_;
 
   my ($tm, $command) = split("[ \t]+", $hash->{DEF}, 2);
-  $tm =~ m/^(\+)?(\*({\d+})?)?(.*)$/;
+  $tm =~ m/^(\+)?(\*(\{\d+\})?)?(.*)$/;
   my ($rel, $rep, $cnt, $tspec) = ($1, $2, $3, $4);
   return "startTimes: $hash->{NAME} is not relative" if(!$rel);
 
