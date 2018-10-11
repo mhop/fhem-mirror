@@ -28,6 +28,7 @@ package main;
 use strict;
 use warnings;
 use DevIo;
+use Math::Round qw/round/;
 
 my @tankList = undef;
 
@@ -192,8 +193,8 @@ sub HProtocolGateway_ParseMessage($$) {
     # convert to HEX
     $check = sprintf '%02X', $check;
     
-    # Unitronics Vision130
-    if ($water == 0 && $temperature == 0 && $probe_offset == 0 && $version == 0 && $error == 0 && $checksum == 0 ) {
+    # Unitronics
+    if ($version == 0 && $error == 0 && $checksum == 0) {
       $check = 0;
     }
 
@@ -203,7 +204,7 @@ sub HProtocolGateway_ParseMessage($$) {
     my $mode = AttrVal($tankHash->{NAME},"mode","");
 
     if ($mode eq "FillLevel") {
-      $filllevel = $tankdata;
+      $filllevel = $tankdata/100;
       $volume = HProtocolGateway_Tank($hash,$tankHash,$filllevel);
     } elsif ($mode eq "Volume") {
       $volume = $tankdata;
@@ -363,14 +364,17 @@ sub HProtocolGateway_Tank($$$) {
   }
   close $fh;
 
-  my $messwert = $filllevel/100;
   my $volume = 0;
-
+  my $volume1 = 0;
+  my $level1 = 0;
   foreach my $level (sort keys %TankChartHash) {
-    if ($level ne "level" && $messwert <= $level) {
-	    $volume = $TankChartHash{$level};
+    if ($level ne "level" && $filllevel <= $level) {
+      $volume = $volume1 + ($TankChartHash{$level} - $volume1) / ($level - $level1) * ($filllevel-$level1);
+      $volume = Math::Round::nearest('0.01',$volume);
       last;
     }
+    $level1 = $level;
+    $volume1 = $TankChartHash{$level};
   }
   return $volume;
 }

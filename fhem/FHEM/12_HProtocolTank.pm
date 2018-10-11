@@ -149,7 +149,7 @@ sub HProtocolTank_Attr (@) {
     <li>waterlevel<br />
     0..9999 Water level in mm</li>
     <li>probe_offset<br />
-    -9999 - +9999 Probe offset in mm)</li>
+    -9999 - +9999 Probe offset in mm</li>
     <li>version<br />
     00..999 Software version</li>
     <li>error<br />
