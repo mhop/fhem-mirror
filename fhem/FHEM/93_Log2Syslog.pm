@@ -35,6 +35,7 @@ use warnings;
 
 # Versions History intern:
 our %Log2Syslog_vNotesIntern = (
+  "5.2.1"  => "08.10.2018  setpayload of BSD-format changed, commandref revised ",
   "5.2.0"  => "02.10.2018  added direct help for attributes",
   "5.1.0"  => "01.10.2018  new get <name> versionNotes command",
   "5.0.1"  => "27.09.2018  Log2Syslog_closesock if write error:.* , delete readings code changed",
@@ -84,6 +85,7 @@ our %Log2Syslog_vNotesIntern = (
 
 # Versions History extern:
 our %Log2Syslog_vNotesExtern = (
+  "5.2.1"  => "08.10.2018 Send format of BSD changed. The TAG-field was changed to \"IDENT[PID]: \" ",
   "5.2.0"  => "02.10.2018 direct help for attributes added",
   "5.1.0"  => "29.09.2018 new get &lt;name&gt; versionNotes command ",
   "5.0.1"  => "27.09.2018 automatic reconnect to syslog-server in case of write error ",
@@ -1741,7 +1743,7 @@ sub Log2Syslog_setpayload ($$$$$$) {
   my $myhost = $hash->{MYHOST}?$hash->{MYHOST}:"0.0.0.0";
   my $myfqdn = $hash->{MYFQDN}?$hash->{MYFQDN}:"0.0.0.0";
   my $lf     = AttrVal($name, "logFormat", "IETF");
-  my $tag    = AttrVal($name, "contDelimiter", "");         # Trennzeichen vor Content (z.B. für Synology nötig)
+  my $cdl    = AttrVal($name, "contDelimiter", "");         # Trennzeichen vor Content (z.B. für Synology nötig)
   my $data;
   
   return undef,undef if(!$otp);
@@ -1752,13 +1754,13 @@ sub Log2Syslog_setpayload ($$$$$$) {
   
   if ($lf eq "BSD") {
       # BSD Protokollformat https://tools.ietf.org/html/rfc3164
-      $time  = (split(/\./,$time))[0] if($time =~ m/\./);   # msec ist nicht erlaubt
-	  $month = $Log2Syslog_BSDMonth{$month};                # Monatsmapping, z.B. 01 -> Jan
-	  $day   =~ s/0/ / if($day =~ m/^0.*$/);                # in Tagen < 10 muss 0 durch Space ersetzt werden
-	  $ident = substr($ident,0, $RFC3164len{TAG});          # Länge TAG Feld begrenzen
+      $time   = (split(/\./,$time))[0] if($time =~ m/\./);   # msec ist nicht erlaubt
+	  $month  = $Log2Syslog_BSDMonth{$month};                # Monatsmapping, z.B. 01 -> Jan
+	  $day    =~ s/0/ / if($day =~ m/^0.*$/);                # in Tagen < 10 muss 0 durch Space ersetzt werden
+	  my $tag = substr($ident,0, $RFC3164len{TAG});          # Länge TAG Feld begrenzen
 	  no warnings 'uninitialized'; 
-      $ident = $ident.$tag."[$pid]:";
-      $data  = "<$prival>$month $day $time $myhost $ident$otp";
+      $tag = $tag."[$pid]: ".$cdl;                           # TAG-Feld um PID und Content-Delimiter ergänzen
+      $data  = "<$prival>$month $day $time $myhost $tag$otp";
 	  use warnings;
 	  $data = substr($data,0, ($RFC3164len{DL}-1));         # Länge Total begrenzen
   }
@@ -1780,7 +1782,7 @@ sub Log2Syslog_setpayload ($$$$$$) {
       
       no warnings 'uninitialized';
       if ($IETFver == 1) {
-          $data = "<$prival>$IETFver $tim $myfqdn $ident $pid $mid $sdfield $tag$otp";
+          $data = "<$prival>$IETFver $tim $myfqdn $ident $pid $mid $sdfield $cdl$otp";
       }
 	  use warnings;
   }
@@ -1953,9 +1955,11 @@ return;
   <ul>
     <br/>
     The additional perl modules "IO::Socket::INET" and "IO::Socket::SSL" (if SSL is used) must be installed on your system. <br>
-	Install this package from cpan or by <br><br>
+	Install this package from cpan or, on Debian based installations, better by: <br><br>
     
-	<code>apt-get install libio-socket-multicast-perl (only on Debian based installations) </code><br>
+    <code>sudo apt-get install libio-socket-multicast-perl</code><br>
+    <code>sudo apt-get install libio-socket-ssl-perl</code><br><br>
+    
   </ul>
   <br>
   
@@ -2120,7 +2124,7 @@ Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.095 fhemtest.myds.me Test
 	The structure of the payload differs dependent of the used logFormat. <br><br>
 	
 	<b>logFormat IETF:</b> <br><br>
-	"&lt;PRIVAL&gt;IETFVERS TIME MYHOST IDENT PID MID [SD-FIELD] :MESSAGE" <br><br> 
+	"&lt;PRIVAL&gt;IETFVERS TIME MYHOST IDENT PID MID [SD-FIELD] MESSAGE" <br><br> 
 		
     <ul>  
     <table>  
@@ -2139,7 +2143,7 @@ Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.095 fhemtest.myds.me Test
     <br>	
 	
 	<b>logFormat BSD:</b> <br><br>
-	"&lt;PRIVAL&gt;MONTH DAY TIME MYHOST IDENT[PID]:MESSAGE" <br><br>
+	"&lt;PRIVAL&gt;MONTH DAY TIME MYHOST IDENT[PID]: MESSAGE" <br><br>
     
     <ul>  
     <table>  
@@ -2149,7 +2153,7 @@ Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.095 fhemtest.myds.me Test
 	  <tr><td> DAY      </td><td> day of month according to RFC3164 </td></tr>
 	  <tr><td> TIME     </td><td> timestamp according to RFC3164 </td></tr>
       <tr><td> MYHOST   </td><td> Internal MYHOST </td></tr>
-      <tr><td> IDENT    </td><td> ident-Tag from DEF if set, or else the own device name. The statement will be completed by "_fhem" (FHEM-Log) respectively "_event" (Event-Log). </td></tr>
+      <tr><td> TAG      </td><td> ident-Tag from DEF if set, or else the own device name. The statement will be completed by "_fhem" (FHEM-Log) respectively "_event" (Event-Log). </td></tr>
       <tr><td> PID      </td><td> the message-id (sequence number) </td></tr>
       <tr><td> MESSAGE  </td><td> the dataset to transfer </td></tr>
     </table>
@@ -2616,9 +2620,10 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
   <ul>
     <br/>
     Es werden die Perl Module "IO::Socket::INET" und "IO::Socket::SSL" (wenn SSL benutzt) benötigt und müssen installiert sein. <br>
-    Das Modul kann über CPAN oder mit <br><br>
+    Das Modul kann über CPAN oder, auf Debian Linux Systemen, besser mit <br><br>
 	
-    <code>apt-get install libio-socket-multicast-perl (auf Debian Linux Systemen) </code><br><br>
+    <code>sudo apt-get install libio-socket-multicast-perl</code><br>
+    <code>sudo apt-get install libio-socket-ssl-perl</code><br><br>
 	
 	installiert werden.
   </ul>
@@ -2784,7 +2789,7 @@ Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.095 fhemtest.myds.me Test
 	Der Aufbau der Payload unterscheidet sich je nach verwendeten logFormat. <br><br>
 	
 	<b>logFormat IETF:</b> <br><br>
-	"&lt;PRIVAL&gt;IETFVERS TIME MYHOST IDENT PID MID [SD-FIELD] :MESSAGE" <br><br>
+	"&lt;PRIVAL&gt;IETFVERS TIME MYHOST IDENT PID MID [SD-FIELD] MESSAGE" <br><br>
 		
     <ul>  
     <table>  
@@ -2803,7 +2808,7 @@ Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.095 fhemtest.myds.me Test
     <br>	
 	
 	<b>logFormat BSD:</b> <br><br>
-	"&lt;PRIVAL&gt;MONTH DAY TIME MYHOST IDENT[PID]:MESSAGE" <br><br>
+	"&lt;PRIVAL&gt;MONTH DAY TIME MYHOST IDENT[PID]: MESSAGE" <br><br>
 		
     <ul>  
     <table>  
@@ -2813,7 +2818,7 @@ Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.095 fhemtest.myds.me Test
 	  <tr><td> DAY      </td><td> Tag des Monats nach RFC3164 </td></tr>
 	  <tr><td> TIME     </td><td> Zeitangabe nach RFC3164 </td></tr>
       <tr><td> MYHOST   </td><td> Internal MYHOST </td></tr>
-      <tr><td> IDENT    </td><td> Ident-Tag aus DEF wenn angegeben, sonst der eigene Devicename. Die Angabe wird mit "_fhem" (FHEM-Log) bzw. "_event" (Event-Log) ergänzt. </td></tr>
+      <tr><td> TAG      </td><td> Ident-Tag aus DEF wenn angegeben, sonst der eigene Devicename. Die Angabe wird mit "_fhem" (FHEM-Log) bzw. "_event" (Event-Log) ergänzt. </td></tr>
       <tr><td> PID      </td><td> Die ID der Mitteilung (= Sequenznummer) </td></tr>
       <tr><td> MESSAGE  </td><td> der zu übertragende Datensatz </td></tr>
     </table>
