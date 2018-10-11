@@ -35,7 +35,7 @@ allowed_Initialize($)
     validFor
   );
   use warnings 'qw';
-  $hash->{AttrList} = join(" ", @attrList);
+  $hash->{AttrList} = join(" ", @attrList)." ".$readingFnAttributes;
 
   $hash->{UndefFn} = "allowed_Undef";
   $hash->{FW_detailFn} = "allowed_fhemwebFn";
