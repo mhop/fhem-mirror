@@ -1,4 +1,4 @@
-REV 17498
+REV 17502
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2018-10-09_07:45:03 260373 ./CHANGED
+UPD 2018-10-11_07:45:02 260450 ./CHANGED
 UPD 2018-10-01_07:45:02 38011 ./MAINTAINER.txt
 UPD 2018-09-09_07:45:03 39688 ./configDB.pm
 UPD 2018-09-17_07:45:03 19987 ./fhem.cfg.demo
@@ -417,7 +417,7 @@ UPD 2018-07-10_07:45:14 16502 FHEM/91_watchdog.pm
 UPD 2018-08-21_07:45:03 54919 FHEM/92_FileLog.pm
 UPD 2017-08-14_07:45:02 11589 FHEM/92_SingleFileLog.pm
 UPD 2018-10-09_07:45:03 345735 FHEM/93_DbLog.pm
-UPD 2018-10-09_07:45:03 668074 FHEM/93_DbRep.pm
+UPD 2018-10-11_07:45:02 668368 FHEM/93_DbRep.pm
 UPD 2018-09-18_07:45:02 18106 FHEM/93_FHEM2FHEM.pm
 UPD 2018-10-04_07:45:03 133878 FHEM/93_Log2Syslog.pm
 UPD 2018-02-09_07:45:02 66936 FHEM/93_PWMR.pm
@@ -547,7 +547,7 @@ UPD 2015-07-28_14:05:31 11758 FHEM/SHC_parser.pm
 UPD 2018-08-08_07:45:02 5504 FHEM/SetExtensions.pm
 UPD 2017-05-21_07:45:02 7416 FHEM/SubProcess.pm
 UPD 2017-11-16_07:45:02 3372 FHEM/TR064Utils.pm
-UPD 2018-08-12_07:45:03 7720 FHEM/TcpServerUtils.pm
+UPD 2018-10-11_07:45:02 7790 FHEM/TcpServerUtils.pm
 UPD 2016-02-22_07:45:12 27613 FHEM/TimeSeries.pm
 UPD 2017-05-29_07:45:02 49037 FHEM/UConv.pm
 UPD 2017-04-30_07:45:02 137531 FHEM/Unit.pm
@@ -686,8 +686,8 @@ UPD 2018-10-09_07:45:06 3586615 docs/commandref.html
 UPD 2018-10-10_07:45:08 2204454 docs/commandref_DE.html
 UPD 2018-10-08_07:45:02 76228 docs/commandref_frame.html
 UPD 2018-10-08_07:45:02 85677 docs/commandref_frame_DE.html
-UPD 2018-10-10_07:45:09 198726 docs/commandref_modular.html
-UPD 2018-10-10_07:45:10 209411 docs/commandref_modular_DE.html
+UPD 2018-10-11_07:45:09 198726 docs/commandref_modular.html
+UPD 2018-10-11_07:45:09 209411 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
