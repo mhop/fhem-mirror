@@ -1956,6 +1956,7 @@ FW_svgCollect($)
 {
   my ($cname,$d,$enc) = split(",",$_[0],3);
   my $h = $FW_svgData{$cname};
+  return if(!$h); #91956
   my ($res, $atEnds) = ($h->{RES}, $h->{ATENDS});
   $res->{$d} = decode_base64($enc);
   return if(int(keys %{$res}) != int(@{$atEnds}));
