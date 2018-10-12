@@ -2,6 +2,7 @@
 #
 # $Id$
 #
+#
 #  Copyright notice
 #
 #  Release 2018-10 First version
@@ -109,14 +110,13 @@ sub Iluminize_Set($$)
 
     return "\"set $name\" needs at least one argument" unless(defined($cmd));
 
-
     my $command;
     if ($cmd eq "on") {
         $command = $on;
-        $hash->{STATE} = "on";
+        readingsSingleUpdate($hash, "state", "on", 1);
     } elsif($cmd eq "off") {
         $command = $off;
-        $hash->{STATE} = "off";
+        readingsSingleUpdate($hash, "state", "off", 1);
     } else {
         return SetExtensions($hash, $cmdList, $name, $cmd, @args);
     }
@@ -164,6 +164,7 @@ sub Iluminize_Attr($$$$) {
 
 
 =pod
+
 =begin html
 
 <a name="Iluminize"></a>
@@ -187,6 +188,7 @@ sub Iluminize_Attr($$$$) {
     <code>define &lt;name&gt; Iluminize &lt;ip/hostname&gt;</code><br>
     	<br>
     	Definiert ein Iluminize LED Wifi-Licht
+
 =end html_DE
 
 =item summary Support for Iluminize wifi controlled led stripe
