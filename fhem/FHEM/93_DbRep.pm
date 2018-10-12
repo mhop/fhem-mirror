@@ -42,6 +42,7 @@ use warnings;
 
 # Versions History intern
 our %DbRep_vNotesIntern = (
+  "8.2.3"  => "07.10.2018  check availability of DbLog-device at definition time of DbRep-device ",
   "8.2.2"  => "07.10.2018  DbRep_getMinTs changed, fix don't get the real min timestamp in rare cases ",
   "8.2.1"  => "07.10.2018  \$hash->{dbloghash}{HELPER}{REOPEN_RUNS_UNTIL} contains the time until DB is closed ",
   "8.2.0"  => "05.10.2018  direct help for attributes ",
@@ -486,9 +487,11 @@ sub DbRep_Define($@) {
  
   my @a = split("[ \t][ \t]*", $def);
   
-  if(int(@a) < 2) {
-        return "You need to specify more parameters.\n". "Format: define <name> DbRep <DbLog-Device> <Reading> <Timestamp-Begin> <Timestamp-Ende>";
-        }
+  if(!$a[2]) {
+      return "You need to specify more parameters.\n". "Format: define <name> DbRep <DbLog-Device>";
+  } elsif (!$defs{$a[2]}) {
+      return "The specified DbLog-Device \"$a[2]\" doesn't exist.";
+  }
   
   $hash->{LASTCMD}             = " ";
   $hash->{ROLE}                = AttrVal($name, "role", "Client");
@@ -1473,9 +1476,9 @@ sub DbRep_getMinTs($) {
  # SQL-Startzeit
  my $st = [gettimeofday];
  
- # eval { $mints = $dbh->selectrow_array("SELECT min(TIMESTAMP) FROM history;"); }; 
+ eval { $mints = $dbh->selectrow_array("SELECT min(TIMESTAMP) FROM history;"); }; 
  # eval { $mints = $dbh->selectrow_array("select TIMESTAMP from history limit 1;"); }; 
- eval { $mints = $dbh->selectrow_array("select TIMESTAMP from history order by TIMESTAMP limit 1;"); };   
+ # eval { $mints = $dbh->selectrow_array("select TIMESTAMP from history order by TIMESTAMP limit 1;"); };   
  
  $dbh->disconnect;
  

@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  93_DbRep: V8.2.3, check availability of DbLog-device at 
+                       definition time of DbRep-device
   - change:  93_Log2Syslog: send BSD-format changed, commandref revised
   - bugfix:  93_DbRep: fix don't get the real min timestamp in special cases
   - bugfix:  51_MOBILEALERTS: Fix temperature for MA10320PRO
