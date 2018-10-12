@@ -955,7 +955,6 @@ sub DbLog_ParseEvent($$$)
   if   ($reading =~ m(^temperature)) { $unit= "°C"; } # wenn reading mit temperature beginnt
   elsif($reading =~ m(^humidity)) { $unit= "%"; }
 
-
   # the interpretation of the argument depends on the device type
   # EMEM, M232Counter, M232Voltage return plain numbers
   if(($type eq "M232Voltage") ||
@@ -3880,7 +3879,8 @@ return($useac,$useta);
 ###############################################################################
 sub DbLog_charfilter ($) { 
   my ($txt) = @_;
-  
+  my ($p,$a);
+
   # nur erwünschte Zeichen ASCII %d32-126 und Sonderzeichen
   $txt =~ s/ß/ss/g;
   $txt =~ s/ä/ae/g;
@@ -3890,8 +3890,9 @@ sub DbLog_charfilter ($) {
   $txt =~ s/Ö/Oe/g;
   $txt =~ s/Ü/Ue/g;
   $txt =~ s/€/EUR/g;
+  $txt =~ s/^\xb0/°/g;
+  
   $txt =~ tr/ A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\\]^_`{|}~°//cd;
-  $txt =~ s/\xB0C/°C/g;
   
 return($txt);
 }
