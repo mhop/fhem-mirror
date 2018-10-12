@@ -47,7 +47,7 @@ my $deltaT   = 65;  # Correction time in s
 my %Astro;
 my %Date;
 
-my $astroversion = 1.49;
+my $astroversion = 1.50;
 
 #-- These we may get on request
 my %gets = (
@@ -1217,7 +1217,7 @@ sub Astro_Compute($){
   $Astro{MoonDiameter} = Astro_round($moonCoor->{diameter}*$RAD*60.,1); # angular diameter in arc seconds
   $Astro{MoonAge}      = Astro_round($moonCoor->{age}*$RAD,1);
   $Astro{MoonPhaseN}   = Astro_round($moonCoor->{phasen},2);
-  $Astro{MoonPhaseI}   = $astro_tt->{$moonCoor->{phasei}};
+  $Astro{MoonPhaseI}   = $moonCoor->{phasei};
   $Astro{MoonPhaseS}   = $astro_tt->{$moonCoor->{phases}};
   
   #-- calculate distance from the observer (on the surface of earth) to the center of the moon
@@ -1521,7 +1521,7 @@ sub Astro_Get($@) {
          (default: EN=english). For German output set <code>attr global language DE</code>.</li>
         <li>The time zone is determined automatically from the local settings of the <br/>
         operating system. If geocordinates from a different time zone are used, the results are<br/>
-        not corrected automatically.
+        not corrected automatically.</li>
         <li>Some definitions determining the observer position are used<br/>
         from the global device, i.e.<br/>
         <code>attr global longitude &lt;value&gt;</code><br/>
@@ -1539,7 +1539,6 @@ sub Astro_Get($@) {
         <a name="Astroget"></a>
         <h4>Get</h4>
         Attention: Get-calls are NOT written into the readings of the device ! Readings change only through periodic updates !<br/>
-       </li>
         <ul>
             <li><a name="astro_json"></a>
                 <code>get &lt;name&gt; json [&lt;reading&gt;]</code><br/>
@@ -1581,7 +1580,7 @@ sub Astro_Get($@) {
 <a name="Astro"></a>
 <h3>Astro</h3>
 <ul>
-Absichtlich keine deutsche Dokumentation vorhanden, die englische Version gibt es hier: <a href="/fhem/docs/commandref.html#Astro">Astro</a> 
+<a href="https://wiki.fhem.de/wiki/Modul_Astro">Deutsche Dokumentation im Wiki</a> vorhanden, die englische Version gibt es hier: <a href="/fhem/docs/commandref.html#Astro">Astro</a> 
 </ul>
 =end html_DE
 =cut
