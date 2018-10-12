@@ -16,7 +16,8 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
-# 3.12.4     10.10.2018       give non-saved datasets back in asynch mode only if transaction is used
+# 3.12.5     12.10.2018       charFilter: "\xB0C" substitution by "°C" added and usage in DbLog_Log changed
+# 3.12.4     10.10.2018       return non-saved datasets back in asynch mode only if transaction is used
 # 3.12.3     08.10.2018       Log output of recuceLogNbl enhanced, some functions renamed
 # 3.12.2     07.10.2018       $hash->{HELPER}{REOPEN_RUNS_UNTIL} contains the time the DB is closed 
 # 3.12.1     19.09.2018       use Time::Local (forum:#91285)
@@ -213,7 +214,7 @@ use Time::Local;
 use Encode qw(encode_utf8);
 no if $] >= 5.017011, warnings => 'experimental::smartmatch'; 
 
-my $DbLogVersion = "3.12.4";
+my $DbLogVersion = "3.12.5";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -1268,7 +1269,7 @@ sub DbLog_Log($$) {
           my $next = 0;
           my $event = $events->[$i];
           $event = "" if(!defined($event));
-		  $event = DbLog_charfilter($event) if(AttrVal($name, "useCharfilter",0));
+		  # $event = DbLog_charfilter($event) if(AttrVal($name, "useCharfilter",0));
           Log3 $name, 4, "DbLog $name -> check Device: $dev_name , Event: $event" if($vb4show && !$hash->{HELPER}{".RUNNING_PID"});  
 	  
 	      if($dev_name =~ m/^$re$/ || "$dev_name:$event" =~ m/^$re$/ || $DbLogSelectionMode eq 'Include') {
@@ -1283,6 +1284,13 @@ sub DbLog_Log($$) {
               if(!defined $reading) {$reading = "";}
               if(!defined $value) {$value = "";}
               if(!defined $unit || $unit eq "") {$unit = AttrVal("$dev_name", "unit", "");}
+              
+              if(AttrVal($name, "useCharfilter",0)) {
+                  $event   = DbLog_charfilter($event);
+                  $reading = DbLog_charfilter($reading);
+                  $value   = DbLog_charfilter($value);
+                  $unit    = DbLog_charfilter($unit);
+              }
               
               # Devices / Readings ausschließen durch Attribut "excludeDevs"
               # attr <device> excludeDevs [<devspec>#]<Reading1>,[<devspec>#]<Reading2>,[<devspec>#]<Reading..>
@@ -3868,12 +3876,12 @@ return($useac,$useta);
 }
 
 ###############################################################################
-#              Zeichencodierung für Payload filtern 
+#              Zeichen von Feldevents filtern 
 ###############################################################################
 sub DbLog_charfilter ($) { 
   my ($txt) = @_;
   
-  # nur erwünschte Zeichen in payload, ASCII %d32-126
+  # nur erwünschte Zeichen ASCII %d32-126 und Sonderzeichen
   $txt =~ s/ß/ss/g;
   $txt =~ s/ä/ae/g;
   $txt =~ s/ö/oe/g;
@@ -3882,7 +3890,8 @@ sub DbLog_charfilter ($) {
   $txt =~ s/Ö/Oe/g;
   $txt =~ s/Ü/Ue/g;
   $txt =~ s/€/EUR/g;
-  $txt =~ tr/ A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\\]^_`{|}~//cd;      
+  $txt =~ tr/ A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\\]^_`{|}~°//cd;
+  $txt =~ s/\xB0C/°C/g;
   
 return($txt);
 }
