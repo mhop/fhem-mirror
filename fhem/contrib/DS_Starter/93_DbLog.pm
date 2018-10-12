@@ -3890,9 +3890,11 @@ sub DbLog_charfilter ($) {
   $txt =~ s/Ö/Oe/g;
   $txt =~ s/Ü/Ue/g;
   $txt =~ s/€/EUR/g;
-  $txt =~ s/^\xb0/°/g;
+  $txt =~ s/\xb0/1degree1/g;
   
-  $txt =~ tr/ A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\\]^_`{|}~°//cd;
+  $txt =~ tr/ A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\\]^_`{|}~//cd;
+  
+  $txt =~ s/1degree1/°/g;
   
 return($txt);
 }
