@@ -91,8 +91,6 @@ sub ZoneMinder_Define {
     $hash->{helper}{ZM_PASSWORD} = $a[4];
   }
 
-#  Log3 $name, 3, "ZoneMinder ($name) - Define done ... module=$module, zmHost=$zmHost";
-
   DevIo_CloseDev($hash) if (DevIo_IsOpen($hash));
   DevIo_OpenDev($hash, 0, undef);
 
@@ -118,13 +116,13 @@ sub ZoneMinder_getZmWebUrl {
   #use private or public LAN for Web access?
   my $publicAddress = ZoneMinder_getPublicAddress($hash);
   my $zmHost = '';
-#  Log3 $name, 0, "ZoneMinder ($name) - publicAddress: $publicAddress, usePublic: $usePublic";
+
   if ($publicAddress and $usePublic) {
     $zmHost = $publicAddress;
   } else {
     $zmHost = $hash->{helper}{ZM_HOST};
+    $zmHost = "http://$zmHost";
   }
-  $zmHost = "http://$zmHost";
   $zmHost .= '/' if (not $zmHost =~ m/\/$/);
 
   my $zmWebContext = $attr{$name}{webConsoleContext};
