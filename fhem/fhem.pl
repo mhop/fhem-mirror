@@ -4988,7 +4988,8 @@ json2nameValue($;$)
       while($val) {
         $val = eObj($ret, $name."_$idx", $val, $val, $prefix);
         $val =~ s/^\s*,\s*//;
-        $idx++
+        $val =~ s/\s*$//;
+        $idx++;
       }
     } elsif($val =~ m/^([0-9.-]+)(.*)$/s) {
       $ret->{"$prefix$name"} = $1;
@@ -4999,7 +5000,7 @@ json2nameValue($;$)
       $in = $2;
 
     } else {
-      Log 1, "Error parsing $val";
+      Log 1, "Error parsing >$val< for $prefix$name";
       $in = "";
     }
     return $in;
