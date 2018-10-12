@@ -1913,6 +1913,7 @@ FW_showRoom()
   my %res;
   my ($idx,$svgIdx) = (1,1);
   @atEnds =  sort { $sortIndex{$a} cmp $sortIndex{$b} } @atEnds;
+  $FW_svgData{$FW_cname} = { FW_RET=>$FW_RET, RES=>\%res, ATENDS=>\@atEnds };
   foreach my $d (@atEnds) {
     no strict "refs";
     my $fn = $modules{$defs{$d}{TYPE}}{FW_summaryFn};
@@ -1936,11 +1937,7 @@ sub
 FW_svgDone($$$)
 {
   my ($res, $atEnds, $delayedReturn) = @_;
-
-  if(int(keys %{$res}) != int(@{$atEnds})) {
-    $FW_svgData{$FW_cname} = { FW_RET=>$FW_RET, RES=>$res, ATENDS=>$atEnds };
-    return -2 ;
-  }
+  return -2 if(int(keys %{$res}) != int(@{$atEnds}));
 
   foreach my $d (@{$atEnds}) {
     FW_pO $res->{$d};
@@ -1956,7 +1953,6 @@ FW_svgCollect($)
 {
   my ($cname,$d,$enc) = split(",",$_[0],3);
   my $h = $FW_svgData{$cname};
-  return if(!$h); #91956
   my ($res, $atEnds) = ($h->{RES}, $h->{ATENDS});
   $res->{$d} = decode_base64($enc);
   return if(int(keys %{$res}) != int(@{$atEnds}));
