@@ -145,6 +145,7 @@ FHEM/23_LUXTRONIK2.pm        tupol                Heizungssteuerung/Raumklima (l
 FHEM/23_WEBIO.pm             sachag               Sonstiges
 FHEM/23_WEBIO_12DIGITAL.pm   sachag               Sonstiges
 FHEM/24_NetIO230B.pm         rudolfkoenig/orphan  Sonstiges
+FHEM/24_Iluminize.pm	     VolkerKettenbach     Sonstige Systeme
 FHEM/24_TPLinkHS110.pm	     VolkerKettenbach     Sonstige Systeme
 FHEM/26_tahoma.pm            mike3436             Sonstige Systeme
 FHEM/30_DUOFERN              telekatz             Sonstige Systeme
