@@ -37,7 +37,7 @@ use POSIX;
 
 # Version #######################################################
 my $autoupdate = 'on'; #off/on
-my $version = 'V2.01';
+my $version = 'V2.01a';
 my $vupdate = 'V2.00';
 my $savecount = 30;
 my $standartstartdelay =60;
@@ -86,6 +86,7 @@ sub MSwitch_dec($$);
 sub MSwitch_makefreecmd($$);
 sub MSwitch_clearlog($);
 sub MSwitch_LOG($$$);
+sub MSwitch_Getsupport($);
 sub MSwitch_confchange($$);
 
 
@@ -585,6 +586,11 @@ sub MSwitch_Get($$@) {
 ####################
     if ( $opt eq 'get_config' ) {
         $ret = MSwitch_Getconfig($hash);
+        return $ret;
+    }
+####################
+    if ( $opt eq 'get_support_site' ) {
+        $ret = MSwitch_Getsupport($hash);
         return $ret;
     }
 ####################
@@ -6773,7 +6779,96 @@ sub MSwitch_backup_this($) {
 }
 
 # ################################
+sub MSwitch_Getsupport($){
+    my ($hash) = @_;
+	my $Name = $hash->{NAME};
+	my $out='';
+	$out .="Modulversion: $version\\n";
+	$out .="Datenstruktur: $vupdate\\n";
+	$out .="\\n----- Devicename -----\\n";
+	$out .="$Name\\n";
+	$out .="\\n----- Attribute -----\\n";
+	
+	        my %keys;
+        foreach my $attrdevice ( keys %{ $attr{$Name} } )       #geht
+        {
+         
+			
+			$out .="Attribut $attrdevice: ". AttrVal( $Name, $attrdevice, '' )."\\n";
+			
+        }
+	
+	$out .="\\n----- Trigger -----\\n";
+	$out .="Trigger device:  ";
+	my $tmp = ReadingsVal( $Name, 'Trigger_device', 'undef' );
+	$out .="$tmp\\n";
+	$out .="Trigger time: ";
+	$tmp = ReadingsVal( $Name, '.Trigger_time', 'undef' );
+	$tmp =~ s/~/ /g;
+	$out .="$tmp\\n";
+	$out .="Trigger condition: ";
+	$tmp = ReadingsVal( $Name, '.Trigger_condition', 'undef' );
+	$out .="$tmp\\n";
+	$out .="Trigger Device Global Whitelist: ";
+	$tmp = ReadingsVal( $Name, '.Trigger_Whitelist', 'undef' );
+	$out .="$tmp\\n";
+	$out .="\\n----- Trigger Details -----\\n";
+	$out .="Trigger cmd1: ";
+	$tmp = ReadingsVal( $Name, '.Trigger_on', 'undef' );
+	$out .="$tmp\\n";
+	$out .="Trigger cmd2: ";
+	$tmp = ReadingsVal( $Name, '.Trigger_off', 'undef' );
+	$out .="$tmp\\n";
+	$out .="Trigger cmd3: ";
+	$tmp = ReadingsVal( $Name, '.Trigger_cmd_on', 'undef' );
+	$out .="$tmp\\n";
+	$out .="Trigger cmd4: ";
+	$tmp = ReadingsVal( $Name, '.Trigger_cmd_off', 'undef' );
+	$out .="$tmp\\n";
+	
+	my %savedetails = MSwitch_makeCmdHash($hash);
+	$out .="\\n----- Device Actions -----\\n";
 
+	my @affecteddevices = split( /#\[ND\]/, ReadingsVal( $Name, '.Device_Affected_Details', 'no_device' ) );
+	
+	foreach (@affecteddevices)
+		{
+		my @devicesplit  = split( /#\[NF\]/, $_ );
+	
+		$out .="\\nDevice: ".$devicesplit[0]."\\n";	
+		$out .="cmd1: ".$devicesplit[1]." ".$devicesplit[3]."\\n";	
+		$out .="cmd2: ".$devicesplit[2]." ".$devicesplit[4]."\\n";	
+		$out .="cmd1 condition: ".$devicesplit[9]."\\n";	
+		$out .="cmd2 condition: ".$devicesplit[10]."\\n";
+		$out .="cmd1 delay: ".$devicesplit[7]."\\n";	
+		$out .="cmd2 delay: ".$devicesplit[8]."\\n";
+		$out .="repeats: ".$devicesplit[11]."\\n";
+        $out .="repeats delay: ".$devicesplit[12]."\\n";		
+		$out .="priority: ".$devicesplit[13]."\\n";	
+		$out .="id: ".$devicesplit[14]."\\n";
+		}
+	
+		$out =~ s/#\[dp\]/:/g;
+		$out =~ s/#\[pt\]/./g;
+		$out =~ s/#\[ti\]/~/g;
+		$out =~ s/#\[sp\]/ /g;
+		$out =~ s/#\[nl\]/\n/g;
+		$out =~ s/#\[se\]/;/g;
+		$out =~ s/#\[dp\]/:/g;
+		$out =~ s/\(DAYS\)/|/g;
+	    $out =~ s/#\[ko\]/,/g; #neu
+		$out =~ s/#\[bs\]/\\/g; #neu
+	
+    asyncOutput( $hash->{CL},
+            "<html><center>Supportanfragen bitte im Forum stellen:<a href=\"https://forum.fhem.de/index.php/topic,86199.0.html\">Fhem-Forum</a><br>Bei Devicespezifischen Fragen bitte untenstehene Datei anhängen, das erleichtert Anfragen erheblich.<br>&nbsp;<br><textarea name=\"edit1\" id=\"edit1\" rows=\""
+          . "40\" cols=\"180\" STYLE=\"font-family:Arial;font-size:9pt;\">"
+          . $out
+          . "</textarea><br></html>"
+    );
+	
+    return;
+}
+##################
 sub MSwitch_Getconfig($) {
     my ($hash) = @_;
     my $Name = $hash->{NAME}; 
