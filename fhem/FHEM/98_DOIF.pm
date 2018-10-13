@@ -79,8 +79,10 @@ sub DOIF_delAll($)
   foreach my $key (keys %{$hash->{Regex}}) {
     delete $hash->{Regex}{$key} if ($key !~ "STATE|DOIF_Readings|uiTable");
   }
+  
+  my $readings = ($hash->{MODEL} eq "Perl") ? "^(Device|error|warning|cmd|e_|timer_|wait_|matched_|last_cmd|mode|block_)":"^(Device|state|error|warning|cmd|e_|timer_|wait_|matched_|last_cmd|mode|block_)";
   foreach my $key (keys %{$defs{$hash->{NAME}}{READINGS}}) {
-    delete $defs{$hash->{NAME}}{READINGS}{$key} if ($key =~ "^(Device|state|error|warning|cmd|e_|timer_|wait_|matched_|last_cmd|mode|block_)");
+    delete $defs{$hash->{NAME}}{READINGS}{$key} if ($key =~ $readings);
   }
 }
 
@@ -1349,7 +1351,7 @@ sub setDOIF_Reading
     Log3 ($hash->{NAME},3 , "$hash->{NAME}: warning in DOIF_Readings: $DOIF_Reading");
   } 
   $lastWarningMsg="";
-  if ($ret ne ReadingsVal($hash->{NAME},$DOIF_Reading,"")){
+  if ($ret ne ReadingsVal($hash->{NAME},$DOIF_Reading,"") or !defined $defs{$hash->{NAME}}{READINGS}{$DOIF_Reading}) {
     push (@{$hash->{helper}{DOIF_Readings_events}},"$DOIF_Reading: $ret");
     readingsSingleUpdate ($hash,$DOIF_Reading,$ret,0);
   }
@@ -2292,7 +2294,7 @@ DOIF_Notify($$)
       readingsBulkUpdate ($hash,"cmd",0);
       readingsEndUpdate($hash, 0);
     }
-    
+     
     if (defined $hash->{perlblock}{init}) {
       if (($ret,$err)=DOIF_CheckCond($hash,$hash->{perlblock}{init})) {
         if ($err) {
@@ -2842,9 +2844,9 @@ CmdDoIfPerl($$)
     DOIF_delTimer($hash);
     DOIF_delAll ($hash);
     readingsBeginUpdate($hash);
-    readingsBulkUpdate($hash,"state","initialized");
+    #readingsBulkUpdate($hash,"state","initialized");
     readingsBulkUpdate ($hash,"mode","enabled");
-    readingsEndUpdate($hash, 0);
+    readingsEndUpdate($hash, 1);
     $hash->{helper}{globalinit}=1;
   }
   
@@ -3020,7 +3022,7 @@ DOIF_Define($$$)
   } else {
     $hash->{MODEL}="Perl";
     #$defs{$hash->{NAME}}{".AttrList"}  = "disable:0,1 loglevel:0,1,2,3,4,5,6 startup state initialize notexist checkReadingEvent:1,0 addStateEvent:1,0 weekdays setList:textField-long readingList DOIF_Readings:textField-long uiTable:textField-long ".$readingFnAttributes;
-    setDevAttrList($hash->{NAME},"disable:0,1 loglevel:0,1,2,3,4,5,6 startup state initialize notexist checkReadingEvent:0,1 addStateEvent:1,0 weekdays setList:textField-long readingList DOIF_Readings:textField-long uiTable:textField-long ".$readingFnAttributes);
+    setDevAttrList($hash->{NAME},"disable:0,1 loglevel:0,1,2,3,4,5,6 notexist checkReadingEvent:0,1 addStateEvent:1,0 weekdays setList:textField-long readingList DOIF_Readings:textField-long uiTable:textField-long ".$readingFnAttributes);
     ($msg,$err)=CmdDoIfPerl($hash,$cmd);
   }  
   if ($err ne "") {
@@ -3070,7 +3072,9 @@ DOIF_Attr(@)
     DOIF_delTimer($hash);
     DOIF_delAll ($hash);
     readingsBeginUpdate($hash);
-    readingsBulkUpdate ($hash, "state", "deactivated");
+    if ($hash->{MODEL} ne "Perl") {
+      readingsBulkUpdate ($hash, "state", "deactivated");
+    }
     readingsBulkUpdate ($hash, "mode", "deactivated");
     readingsEndUpdate  ($hash, 1);
   } elsif($a[0] eq "set" && $a[2] eq "state") {
@@ -3120,7 +3124,13 @@ DOIF_Attr(@)
   } elsif($a[0] eq "set" && $a[2] eq "DOIF_Readings") {
     my ($def,$err)=addDOIF_Readings($hash,$a[3]);
     if ($err) {
-       return ("error in DOIF_Readings $def, $err");
+      return ("error in DOIF_Readings $def, $err");
+    } else {
+      if ($init_done) {
+        foreach my $reading (keys %{$hash->{"DOIF_Readings"}}) {
+          setDOIF_Reading ($hash,$reading,"");
+        }
+      }
     }
   } elsif($a[0] eq "del" && ($a[2] eq "DOIF_Readings")) {
     delete ($hash->{DOIF_Readings});
@@ -3176,21 +3186,27 @@ DOIF_Set($@)
   }
   if ($arg eq "disable") {
       readingsBeginUpdate  ($hash);
-      readingsBulkUpdate($hash,"last_cmd",ReadingsVal($pn,"state",""));
-      readingsBulkUpdate($hash, "state", "disabled");
+      if ($hash->{MODEL} ne "Perl") {
+        readingsBulkUpdate($hash,"last_cmd",ReadingsVal($pn,"state",""));
+        readingsBulkUpdate($hash, "state", "disabled");
+      }
       readingsBulkUpdate($hash, "mode", "disabled");
       readingsEndUpdate    ($hash, 1);
   } elsif ($arg eq "initialize" ) {
       readingsSingleUpdate ($hash,"mode","enabled",1);
-      delete ($defs{$hash->{NAME}}{READINGS}{cmd_nr});
-	  delete ($defs{$hash->{NAME}}{READINGS}{cmd});
-	  delete ($defs{$hash->{NAME}}{READINGS}{cmd_seqnr});
-      delete ($defs{$hash->{NAME}}{READINGS}{cmd_event});
-      readingsSingleUpdate($hash, "state","initialize",1);
+      if ($hash->{MODEL} ne "Perl") {
+        delete ($defs{$hash->{NAME}}{READINGS}{cmd_nr});
+        delete ($defs{$hash->{NAME}}{READINGS}{cmd});
+        delete ($defs{$hash->{NAME}}{READINGS}{cmd_seqnr});
+        delete ($defs{$hash->{NAME}}{READINGS}{cmd_event});
+        readingsSingleUpdate($hash, "state","initialize",1);
+      }
   } elsif ($arg eq "enable" ) {
       #delete ($defs{$hash->{NAME}}{READINGS}{mode});
-      readingsSingleUpdate ($hash,"state",ReadingsVal($pn,"last_cmd",""),0) if (ReadingsVal($pn,"last_cmd","") ne "");
-      delete ($defs{$hash->{NAME}}{READINGS}{last_cmd});
+      if ($hash->{MODEL} ne "Perl") {
+        readingsSingleUpdate ($hash,"state",ReadingsVal($pn,"last_cmd",""),0) if (ReadingsVal($pn,"last_cmd","") ne "");
+        delete ($defs{$hash->{NAME}}{READINGS}{last_cmd});
+      }
       readingsSingleUpdate ($hash,"mode","enabled",1)
   } elsif ($arg eq "checkall" ) {
     $hash->{helper}{triggerDev}="";
@@ -3209,15 +3225,17 @@ DOIF_Set($@)
       $setList =~ s/\n/ /g;
 	  my $cmdList="";
     my $checkall="";
+    my $initialize="";
     if ($hash->{MODEL} ne "Perl") {
       $checkall="checkall:noArg";
+      $initialize="initialize:noArg";
       my $max_cond=keys %{$hash->{condition}};
       $max_cond++ if (defined ($hash->{do}{$max_cond}{0}) or ($max_cond == 1 and !(AttrVal($pn,"do","") or AttrVal($pn,"repeatsame",""))));
       for (my $i=0; $i <$max_cond;$i++) {
        $cmdList.="cmd_".($i+1).":noArg ";
 	    }
     }
-	  return "unknown argument ? for $pn, choose one of disable:noArg initialize:noArg enable:noArg $checkall $cmdList $setList";
+	  return "unknown argument ? for $pn, choose one of disable:noArg enable:noArg $initialize $checkall $cmdList $setList";
    } else {
       my @rl = split(" ", AttrVal($pn, "readingList", ""));
       my $doRet;
@@ -5701,7 +5719,7 @@ Ein Ereignisblock wird ausgeführt, wenn dieser bedingt durch <a href="#DOIF_Ope
 Es wird die vollständige Perl-Syntax unterstützt. Es können beliebig viele Ereignisblöcke innerhalb eines DOIF-Devices definiert werden. Sie werden unabhängig voneinander durch passende Trigger ausgeführt. Der Name eines Ereignisblocks ist optional.<br>
 <br>
 Der Status des Moduls wird nicht vom Modul gesetzt, er kann vom Anwender mit Hilfe der Funktion <code>set_State</code> verändert werden, siehe <a href="#DOIF_Spezifische_Perl-Funktionen_im_Perl-Modus">spezifische Perl-Funktionen im Perl-Modus</a>.
-FHEM-Befehle werden durch den Aufruf der Perlfunktion <code>fhem("...")</code> ausgeführt. Für den häufig genutzten fhem-Befehl <b>set</b> wurde eine kompatible Perlfunkton namens <b>fhem_set</b> definiert.
+FHEM-Befehle werden durch den Aufruf der Perlfunktion <code>fhem("...")</code> ausgeführt. Für den häufig genutzten fhem-Befehl <b>set</b> wurde eine kompatible Perlfunktion namens <b>fhem_set</b> definiert.
 Sie ist performanter und sollte bevorzugt verwendet werden, da das Parsen nach dem FHEM set-Befehl entfällt.<br>
 <br>
 Der Benutzer kann mit der Funktion <code>set_Exec</code> beliebig viele eigene Timer definieren, die unabhängig voneinander gesetzt und ausgewertet werden können, siehe <a href="#DOIF_Spezifische_Perl-Funktionen_im_Perl-Modus">Spezifische Perl-Funktionen im Perl-Modus</a>.<br>
@@ -5840,7 +5858,7 @@ Funktionen aus dem Namensraum main müssen mit vorangestellem Doppelpunkt angege
 Eigene Perlfunktionen, die in myutils ausgelagert sind, befinden sich ebenfalls im Namensraum main. Wenn sie ausschließich in DOIF-Devices benutzt werden sollen, so kann am Anfang vor deren Definition in myutils "package DOIF;" angegeben werden.
 In diesen Fall sind auch diese Funktion im DOIF-Device bekannt - sie können dann ohne vorangestellten Doppelpunkt genutzt werden.<br>
 <br>
-Folgende FHEM-Perlfunktonen wurden ebenfalls im DOIF-Namensraum definiert, sie können, wie gewohnt ohne Doppelpunkt genutzt werden:<br>
+Folgende FHEM-Perlfunktionen wurden ebenfalls im DOIF-Namensraum definiert, sie können, wie gewohnt ohne Doppelpunkt genutzt werden:<br>
 <br>
 <code><b>fhem, Log, Log3, InternVal, InternalNum, OldReadingsVal, OldReadingsNum, OldReadingsTimestamp, ReadingsVal, ReadingsNum, ReadingsTimestamp, ReadingsAge, Value, OldValue, OldTimestamp, AttrVal, AttrNum</code></b><br>
 <br>
@@ -5857,7 +5875,7 @@ entspricht:<br>
 <br>
 <code>fhem("set lamp off");</code><br>
 <br>
-Der Aufruf der fhem_set-Funktion ist performater, da das Parsen nach dem set-Befehl im Gegensatz zum Aufruf mit der Funkton <code>fhem</code> entfällt.<br>
+Der Aufruf der fhem_set-Funktion ist performater, da das Parsen nach dem set-Befehl im Gegensatz zum Aufruf mit der Funktion <code>fhem</code> entfällt.<br>
 <br>
 Ein beliebiges FHEM-Event absetzen: <code><b>set_Event(&lt;Event&gt;)</code></b><br>
 <br>
@@ -5917,7 +5935,7 @@ Timer holen: <code><b>get_Exec(&lt;timerName&gt;)</code></b>, Returnwert: 0, wen
 <br>
 Laufenden Timer löschen: <code><b>del_Exec(&lt;timerName&gt;)</code></b><br>
 <br>
-Beispiel: Funktion namens "lamp" mit dem Übergabeparameter "on" 5 Sekunden verögert aufrufen:<br>
+Beispiel: Funktion namens "lamp" mit dem Übergabeparameter "on" 30 Sekunden verzögert aufrufen:<br>
 <br>
 <code>set_Exec("lamp_timer",30,'lamp','on');</code><br>
 <br>
@@ -5982,12 +6000,9 @@ Wenn <i>&lt;blocking function&gt;</i>, <i>&lt;finish function&gt;</i> und <i>&lt
   <a href="#DOIF_checkReadingEvent">checkReadingEvent</a> &nbsp;
   <a href="#DOIF_DOIF_Readings">DOIF_Readings</a> &nbsp;
   <a href="#DOIF_disable">disable</a> &nbsp;
-  <a href="#DOIF_initialize">initialize</a> &nbsp;
   <a href="#DOIF_notexist">notexist</a> &nbsp;
   <a href="#DOIF_setList__readingList">readingList</a> &nbsp;
   <a href="#DOIF_setList__readingList">setList</a> &nbsp;
-  <a href="#DOIF_startup">startup</a> &nbsp;
-  <a href="#DOIF_state">state</a> &nbsp;
   <a href="#DOIF_uiTable">uiTable</a> &nbsp;
   <a href="#DOIF_weekdays">weekdays</a> &nbsp;
   <br><a href="#readingFnAttributes">readingFnAttributes</a> &nbsp;
@@ -6043,7 +6058,7 @@ define&nbsp;di_count&nbsp;DOIF&nbsp;{<br>
 <code>
 define di_window DOIF<br>
 subs {<br>
-&nbsp;&nbsp;sub logwin {&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Definition der Funkton namens "logwin"<br>
+&nbsp;&nbsp;sub logwin {&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Definition der Funktion namens "logwin"<br>
 &nbsp;&nbsp;&nbsp;&nbsp;my ($window)=@_;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # übernehme Parameter in die Variable $window<br>
 &nbsp;&nbsp;&nbsp;&nbsp;Log 3,"Fenster offen, bitte schließen: $window"; # protokolliere Fenster-Offen-Meldung<br>
 &nbsp;&nbsp;&nbsp;&nbsp;set_Exec ("$window",1800,"logwin",$window);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# setze Timer auf 30 Minuten für eine wiederholte Meldung<br>
