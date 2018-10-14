@@ -1165,14 +1165,16 @@ AnalyzeCommand($$;$)
   #############
   # Search for abbreviation
   sub
-  getAbbr($$)
+  getAbbr($$;$)
   {
-    my ($fn,$h) = @_;
+    my ($fn,$h,$isMod) = @_;
     my $lcfn = lc($fn);
     my $fnlen = length($fn);
-    return $fn if(defined($h->{$fn}));
+    return $fn if(defined($h->{$fn}) && ($isMod || $h->{$fn}{Fn})); # speedup
     foreach my $f (sort keys %{$h}) {
-      if(length($f) >= $fnlen && lc(substr($f,0,$fnlen)) eq $lcfn) {
+      if(length($f) >= $fnlen && 
+         lc(substr($f,0,$fnlen)) eq $lcfn &&
+         ($isMod || $h->{$f}{Fn})) {
         Log 5, "AnalyzeCommand: trying $f for $fn";
         return $f;
       }
@@ -1190,7 +1192,7 @@ AnalyzeCommand($$;$)
   if(!$cmds{$fn} || !defined($cmds{$fn}{Fn})) {
     my $modName;
     $modName = $cmds{$fn}{ModuleName} if($cmds{$fn} && $cmds{$fn}{ModuleName});
-    $modName = getAbbr($fn,\%modules) if(!$modName);
+    $modName = getAbbr($fn,\%modules,1) if(!$modName);
 
     LoadModule($modName) if($modName);
     my $lfn = getAbbr($fn,\%cmds);
