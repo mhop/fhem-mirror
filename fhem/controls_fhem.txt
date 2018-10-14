@@ -1,4 +1,4 @@
-REV 17522
+REV 17525
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -444,7 +444,7 @@ UPD 2016-08-19_14:49:02 4984 FHEM/98_CULflash.pm
 UPD 2017-05-10_07:45:02 47704 FHEM/98_ComfoAir.pm
 UPD 2017-09-20_07:45:02 9013 FHEM/98_CustomReadings.pm
 UPD 2018-01-10_07:45:02 60933 FHEM/98_DLNARenderer.pm
-UPD 2018-10-10_07:45:03 266084 FHEM/98_DOIF.pm
+UPD 2018-10-14_07:45:02 266553 FHEM/98_DOIF.pm
 UPD 2018-09-09_07:45:03 111923 FHEM/98_DOIFtools.pm
 UPD 2017-11-06_07:45:02 40228 FHEM/98_Dooya.pm
 UPD 2016-10-29_07:45:14 28678 FHEM/98_EDIPLUG.pm
@@ -660,7 +660,7 @@ UPD 2017-05-15_07:45:02 2779 FHEM/lib/UPnP/sonos_tunein_quadratic.jpg
 UPD 2017-05-15_07:45:02 1979 FHEM/lib/UPnP/sonos_tunein_round.png
 UPD 2018-10-09_07:45:03 14596 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
 UPD 2018-08-09_07:45:03 249740 FHEM/lib/openzwave_deviceconfig.xml.gz
-UPD 2018-10-09_07:45:03 102687 FHEM/lib/openzwave_manufacturer_specific.xml
+UPD 2018-10-14_07:45:02 102783 FHEM/lib/openzwave_manufacturer_specific.xml
 UPD 2018-07-23_07:45:03 26070 FHEM/lib/zwave_alliancelinks.csv.gz
 UPD 2017-01-11_07:45:02 22473 FHEM/lib/zwave_pepperlinks.csv.gz
 UPD 2018-03-10_07:45:02 16040 FHEM/msgSchema.pm
@@ -684,11 +684,11 @@ UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
 UPD 2018-10-13_07:45:06 3587051 docs/commandref.html
-UPD 2018-10-13_07:45:08 2204923 docs/commandref_DE.html
+UPD 2018-10-14_07:45:08 2204792 docs/commandref_DE.html
 UPD 2018-10-08_07:45:02 76228 docs/commandref_frame.html
 UPD 2018-10-08_07:45:02 85677 docs/commandref_frame_DE.html
-UPD 2018-10-13_07:45:09 198874 docs/commandref_modular.html
-UPD 2018-10-13_07:45:10 209555 docs/commandref_modular_DE.html
+UPD 2018-10-14_07:45:09 198874 docs/commandref_modular.html
+UPD 2018-10-14_07:45:09 209555 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
