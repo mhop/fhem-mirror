@@ -30,6 +30,25 @@
 # 
 # CHANGE LOG
 #
+# 14.10.2018 0.9.9
+#   change   :  'mqttForward' dokumentiert
+#   improved :  Laden von MQTT-Modul in BEGIN-Block verlagert. 
+#               Es gab Meldungen ueber Probleme (undefined subroutine) wenn
+#               MQTT-Modul in fhem.cfg nach dem Bridge-Modul stand.
+#
+# 11.10.2018 0.9.9
+#   change   : 'self-trigger-topic' wieder ausgebaut.
+#   feature  : 'mqttForward' Attribute fuer ueberwachte Geraete implmentiert.
+#              Moegliche Werte derzeit: 'all' und 'none'. 
+#              Bei 'none' werden per MQTT angekommene Nachrichten nicht 
+#              aus dem selben Device per MQTT weiter gepublisht.
+#              'all' bewirkt das Gegenteil.
+#              Fehlt der Attribut, dann wird standartmaeßig für alle 
+#              Geraetetypen außer 'Dummy' 'all' angenommen und entsprechend
+#              'none' für Dummies. 
+#              Deise Einstellung ist notwendig, damit Aktoren ihren zustand 
+#              zurueckmelden koennen, jedoch Dummies beim Einsatz als 
+#              FHEM-UI-Schalter keine Endlosschleifen verursachen.
 #
 # 30.09.2018 0.9.9
 #   feature finished: globalTypeExclude und globalDeviceExclude incl. Commandref
@@ -203,6 +222,7 @@ use constant {
   CTRL_ATTR_NAME_PUBLISH             => "Publish",
   CTRL_ATTR_NAME_SUBSCRIBE           => "Subscribe",
   CTRL_ATTR_NAME_IGNORE              => "Disable",
+  CTRL_ATTR_NAME_FORWARD             => "Forward",
   CTRL_ATTR_NAME_GLOBAL_TYPE_EXCLUDE => "globalTypeExclude",
   CTRL_ATTR_NAME_GLOBAL_DEV_EXCLUDE  => "globalDeviceExclude",
   CTRL_ATTR_NAME_GLOBAL_PREFIX       => "global"
@@ -236,7 +256,7 @@ sub MQTT_GENERIC_BRIDGE_Initialize($) {
     "debug:0,1 ".
     $main::readingFnAttributes;
 
-    main::LoadModule("MQTT");
+    #main::LoadModule("MQTT");
 
     # Beim ModulReload Deviceliste loeschen (eig. nur fuer bei der Entwicklung nuetzich)
     #if($DEBUG) {
@@ -268,6 +288,7 @@ use Net::MQTT::Constants;
 #}
 
 BEGIN {
+  main::LoadModule("MQTT");
   MQTT->import(qw(:all));
 
   GP_Import(qw(
@@ -297,6 +318,7 @@ BEGIN {
     CTRL_ATTR_NAME_PUBLISH
     CTRL_ATTR_NAME_SUBSCRIBE
     CTRL_ATTR_NAME_IGNORE
+    CTRL_ATTR_NAME_FORWARD
     CTRL_ATTR_NAME_GLOBAL_TYPE_EXCLUDE
     CTRL_ATTR_NAME_GLOBAL_DEV_EXCLUDE
     CTRL_ATTR_NAME_GLOBAL_PREFIX
@@ -504,6 +526,7 @@ sub initUserAttr($) {
     addToDevAttrList($dev, $prefix.CTRL_ATTR_NAME_PUBLISH.":textField-long");
     addToDevAttrList($dev, $prefix.CTRL_ATTR_NAME_SUBSCRIBE.":textField-long");
     addToDevAttrList($dev, $prefix.CTRL_ATTR_NAME_IGNORE.":both,incoming,outgoing");
+    addToDevAttrList($dev, $prefix.CTRL_ATTR_NAME_FORWARD.":all,none");
   }
   return \@devices;
 }
@@ -628,6 +651,7 @@ sub removeOldUserAttr($;$$$) {
     # delFromDevAttrList($dev,$prefix.CTRL_ATTR_NAME_PUBLISH.":textField-long");
     # delFromDevAttrList($dev,$prefix.CTRL_ATTR_NAME_SUBSCRIBE.":textField-long");
     # delFromDevAttrList($dev,$prefix.CTRL_ATTR_NAME_IGNORE.":both,incoming,outgoing");
+    # delFromDevAttrList($dev,$prefix.CTRL_ATTR_NAME_FORWARD.":all,none");
     # => stattdessen selbst loeschen (nur die 'userattr')
     my $ua = $main::attr{$dev}{userattr};
     if (defined $ua) {
@@ -642,6 +666,8 @@ sub removeOldUserAttr($;$$$) {
       delete $h{$prefix.CTRL_ATTR_NAME_SUBSCRIBE.":textField-long"};
       #delete $h{$prefix.CTRL_ATTR_NAME_IGNORE};
       delete $h{$prefix.CTRL_ATTR_NAME_IGNORE.":both,incoming,outgoing"};
+      #delete $h{$prefix.CTRL_ATTR_NAME_FORWARD};
+      delete $h{$prefix.CTRL_ATTR_NAME_FORWARD.":all,none"};
       if(!keys %h && defined($main::attr{$dev}{userattr})) {
         # ganz loeschen, wenn nichts mehr drin
         delete $main::attr{$dev}{userattr};
@@ -670,6 +696,9 @@ sub IsObservedAttribute($$) {
     return 1;
   }
   if($aname eq $prefix.CTRL_ATTR_NAME_IGNORE) {
+    return 1;
+  }
+  if($aname eq $prefix.CTRL_ATTR_NAME_FORWARD) {
     return 1;
   }
 
@@ -1163,11 +1192,12 @@ sub CreateSingleDeviceTableAttrSubscribe($$$$) {
         if(!defined($ident) or !defined($name)) { next; }
 
         $ident = 'topic' if $ident eq 'readings-topic';
-        $ident = 'sttopic' if $ident eq 'self-trigger-topic';
+        #$ident = 'sttopic' if $ident eq 'self-trigger-topic';
         $ident = 'stopic' if $ident eq 'set-topic';
         $ident = 'atopic' if $ident eq 'attr-topic';
 
-        if(($ident eq 'topic') or ($ident eq 'sttopic') or 
+        if(($ident eq 'topic') or 
+         #($ident eq 'sttopic') or 
           ($ident eq 'stopic') or ($ident eq 'atopic') or 
           ($ident eq 'qos') or ($ident eq 'retain') or 
           ($ident eq 'expression')) {
@@ -1182,11 +1212,12 @@ sub CreateSingleDeviceTableAttrSubscribe($$$$) {
             #$rmap->{'evalTarget'} = $namePart =~ /^{.+}.*$/;
             $rmap->{'dev'}=$dev;
             $rmap->{$ident}=$val;
-            if(($ident eq 'topic') or ($ident eq 'sttopic') or
+            if(($ident eq 'topic') or 
+             #($ident eq 'sttopic') or
               ($ident eq 'stopic') or ($ident eq 'atopic')) { # -> topic
 
               $rmap->{'mode'} = 'R';
-              $rmap->{'mode'} = 'T' if $ident eq 'sttopic';
+              #$rmap->{'mode'} = 'T' if $ident eq 'sttopic';
               $rmap->{'mode'} = 'S' if $ident eq 'stopic';
               $rmap->{'mode'} = 'A' if $ident eq 'atopic';
 
@@ -1886,6 +1917,25 @@ sub isTypeDevReadingExcluded($$$$$) {
   return undef;
 }
 
+# Prueft, ob per MQTT ankommende Nachrichten ggf. per MQTT weiter geleitet werden duerfen.
+#  Parameter:
+#     $hash:    HASH
+#     $devName: Geraetename
+#     $reading: Reading (ggf. for future use)
+sub isDoForward($$$) {
+  my ($hash, $devName, $reading) = @_;
+  my $doForward = $main::attr{$devName}{$hash->{+HS_PROP_NAME_PREFIX}.CTRL_ATTR_NAME_FORWARD};
+
+  $doForward = 'none' if (!defined($doForward) and ($defs{$devName}->{TYPE} eq 'dummy')); # Hack fuer Dummy-Devices
+
+  $doForward = 'all' unless defined $doForward;
+
+  #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> isDoForward $devName => $doForward");
+
+  return 1 if $doForward eq 'all';
+  return 0;
+}
+
 # MQTT-Nachricht senden
 # Params: Bridge-Hash, Topic, Nachricht, QOS- und Retain-Flags
 sub doPublish($$$$$$$$) {
@@ -2113,8 +2163,10 @@ sub Attr($$$$) {
     (($attribute eq $prefix.CTRL_ATTR_NAME_DEFAULTS) or 
       ($attribute eq $prefix.CTRL_ATTR_NAME_ALIAS) or 
       ($attribute eq $prefix.CTRL_ATTR_NAME_PUBLISH) or 
-      ($attribute eq $prefix.CTRL_ATTR_NAME_SUBSCRIBE)or 
-      ($attribute eq $prefix.CTRL_ATTR_NAME_IGNORE))and do {
+      ($attribute eq $prefix.CTRL_ATTR_NAME_SUBSCRIBE) or 
+      ($attribute eq $prefix.CTRL_ATTR_NAME_IGNORE) or
+      ($attribute eq $prefix.CTRL_ATTR_NAME_FORWARD)
+    ) and do {
       if ($command eq "set") {
         return "this attribute is not allowed here";
       }
@@ -2198,16 +2250,18 @@ sub doSetUpdate($$$$$) {
   my $dhash = $defs{$device};
   return unless defined $dhash;
   
+  my $doForward = isDoForward($hash, $device,$reading);
+
   if($mode eq 'S') {
     my $err;
     my @args = split ("[ \t]+",$message);
     #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> mqttGenericBridge_triggeredReading=".Dumper($dhash->{'.mqttGenericBridge_triggeredReading'}));
     if(($reading eq '') or ($reading eq 'state')) {
-      $dhash->{'.mqttGenericBridge_triggeredReading'}="state" if $dhash->{TYPE} eq 'dummy'; # Schneller Hack
+      $dhash->{'.mqttGenericBridge_triggeredReading'}="state" unless $doForward;
       #$err = DoSet($device,$message);
       $err = DoSet($device,@args);
     } else {
-      $dhash->{'.mqttGenericBridge_triggeredReading'}=$reading if $dhash->{TYPE} eq 'dummy'; # Schneller Hack
+      $dhash->{'.mqttGenericBridge_triggeredReading'}=$reading unless $doForward;
       #$err = DoSet($device,$reading,$message);
       $err = DoSet($device,$reading,@args);
     }
@@ -2218,13 +2272,13 @@ sub doSetUpdate($$$$$) {
     }
     Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE: setUpdate: error in set command: ".$err);
     return "error in set command: $err";
-  } elsif($mode eq 'R' or $mode eq 'T') {
+  } elsif($mode eq 'R') { # or $mode eq 'T') {
     # R - Normale Topic (beim Empfang nicht weiter publishen)
     # T - Selt-Trigger-Topic (Sonderfall, auch wenn gerade empfangen, kann weiter getriggert/gepublisht werden. Vorsicht! Gefahr von 'Loops'!)
     readingsBeginUpdate($dhash);
-    if ($mode eq 'R') {
-      $dhash->{'.mqttGenericBridge_triggeredReading'}=$reading if $dhash->{TYPE} eq 'dummy'; # Schneller Hack
-    }
+    #if ($mode eq 'R') {
+      $dhash->{'.mqttGenericBridge_triggeredReading'}=$reading unless $doForward;
+    #}
     readingsBulkUpdate($dhash,$reading,$message);
     readingsEndUpdate($dhash,1);
     # wird in 'notify' entfernt # delete $dhash->{'.mqttGenericBridge_triggeredReading'};
@@ -2582,6 +2636,20 @@ sub onmessage($$$) {
                     attr &lt;dev&gt; mqttSubscribe state:stopic={"/TEST/light/set"} state:expression={"R1"=>$value, "R2"=>"Val: $value", "R3"=>"x"}
                     attr &lt;dev&gt; mqttSubscribe verbose:atopic={"/TEST/light/verbose"}
                  </code></p>
+        </p>
+    </li>
+
+    <li>
+        <p><a name="MQTT_GENERIC_BRIDGEmqttForward">mqttForward</a><br/>
+            This attribute defines what happens when one and the same reading is both subscribed and posted. 
+            Possible values: 'all' and 'none'.<br/>
+            If 'none' is selected, than messages received via MQTT will not be published from the same device.<br/>
+            The setting 'all' does the opposite, so that the forwarding is possible.<br/>
+      If this attribute is missing, the default setting for all device types except 'dummy' is 'all' 
+      (so that actuators can receive commands and send their changes in the same time) and for dummies 'none' is used. 
+      This was chosen because dummies are often used as a kind of GUI switch element. 
+      In this case, 'all' might cause an endless loop of messages.
+            </p>
         </p>
     </li>
 
@@ -2961,11 +3029,25 @@ sub onmessage($$$) {
     </li>
 
     <li>
+        <p><a name="MQTT_GENERIC_BRIDGEmqttForward">mqttForward</a><br/>
+            Dieses Attribut definiert was passiert, wenn eine und dieselbe Reading sowohl aboniert als auch gepublisht wird. 
+            Moegliche Werte: 'all' und 'none'. <br/>
+            Bei 'none' werden per MQTT angekommene Nachrichten nicht aus dem selben Gerät per MQTT weiter gesendet.<br/>
+            Die Einstellung 'all' bewirkt das Gegenteil, also damit wird das Weiterleiten ermoeglicht.<br/>
+            Fehlt dieser Attribut, dann wird standartmaeßig für alle Geraetetypen außer 'Dummy' die Einstellung 'all' angenommen 
+            (damit koennen Aktoren Befehle empfangen und ihre Änderungen im gleichem Zug weiter senden) 
+            und fuer Dummies wird 'none' verwendet. Das wurde so gewaehlt, weil Dummies oft als eine Art GUI-Schalterelement verwendet werden. 
+            In diesem Fall wuerde 'all' unter Umstaenden eine Endlosschleife der Nachrichten verursachen.
+            </p>
+        </p>
+    </li>
+    
+    <li>
         <p><a name="MQTT_GENERIC_BRIDGEmqttDisable">mqttDisable</a><br/>
             Wird dieses Attribut in einem Geraet gesetzt, wird dieses Geraet vom Versand  bzw. Empfang der Readingswerten ausgeschlossen.</p>
         </p>
     </li>
-    
+
 </ul>
  
 <p><b>Beispiele</b></p>
