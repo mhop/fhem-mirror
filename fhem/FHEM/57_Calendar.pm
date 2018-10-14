@@ -2564,13 +2564,13 @@ sub Calendar_ProcessUpdate($$$) {
     }
   }
 
+  $hash->{".fhem"}{t}= $t;
   if($errmsg or !defined($ics) or ("$ics" eq "") ) {
     Log3 $hash, 1, "Calendar $name: retrieved no or empty data";
     readingsSingleUpdate($hash, "state", "error (no or empty data)", 1);
     Calendar_CheckAndRearm($hash);
   } else {
     $hash->{".fhem"}{iCalendar}= $ics; # the plain text iCalendar
-    $hash->{".fhem"}{t}= $t;
     $hash->{".fhem"}{removeall}= $removeall;
     if(AttrVal($name, "update", "sync") eq "async") {
       Calendar_AsynchronousUpdateCalendar($hash);
@@ -3191,6 +3191,10 @@ sub CalendarEventsAsHtml($;$) {
     URL starts with <code>https://</code> and the perl module IO::Socket::SSL is not installed on your system, you can
     replace it by <code>http://</code> if and only if there is no redirection to the <code>https://</code> URL.
     Check with your browser first if unsure.<br><br>
+
+    Note for users of Netxtcloud Calendar: you can use an URL of the form
+    <code>https://admin:admin@demo.nextcloud.com/wid0ohgh/remote.php/dav/calendars/admin/personal/?export</code>.
+    <p>
 
     The optional parameter <code>interval</code> is the time between subsequent updates
     in seconds. It defaults to 3600 (1 hour).<br><br>
@@ -3828,6 +3832,11 @@ sub CalendarEventsAsHtml($;$) {
     Sollte Deine Google-Kalender-URL mit <code>https://</code> beginnen und das Perl-Modul IO::Socket::SSL ist nicht auf Deinem Systeme installiert,
 	kannst Du in der URL  <code>https://</code> durch <code>http://</code> ersetzen, falls keine automatische Umleitung auf die <code>https://</code> URL erfolgt.
     Solltest Du unsicher sein, ob dies der Fall ist, &uuml;berpr&uuml;fe es bitte zuerst mit Deinem Browser.<br><br>
+
+    Hinweis f&uuml;r Nutzer des Nextcloud-Kalenders: Du kannst eine URL der folgenden Form benutzen:
+    <code>https://admin:admin@demo.nextcloud.com/wid0ohgh/remote.php/dav/calendars/admin/personal/?export</code>.<p>
+
+
 
     Der optionale Parameter <code>interval</code> bestimmt die Zeit in Sekunden zwischen den Updates. Default-Wert ist 3600 (1 Stunde).<br><br>
 
