@@ -36,11 +36,13 @@ MQTT2_SERVER_Initialize($)
 
   no warnings 'qw';
   my @attrList = qw(
+    SSL:0,1
+    autocreate
     disable:0,1
     disabledForIntervals
-    autocreate
     rawEvents
-    SSL:0,1
+    sslVersion
+    sslCertPrefix
   );
   use warnings 'qw';
   $hash->{AttrList} = join(" ", @attrList);
@@ -579,6 +581,15 @@ MQTT2_SERVER_getStr($$)
     <li>SSL<br>
       Enable SSL (i.e. TLS)
       </li><br>
+
+    <li>sslVersion<br>
+       See the global attribute sslVersion.
+       </li><br>
+
+    <li>sslCertPrefix<br>
+       Set the prefix for the SSL certificate, default is certs/server-, see
+       also the SSL attribute.
+       </li><br>
 
     <a name="autocreate"></a>
     <li>autocreate<br>

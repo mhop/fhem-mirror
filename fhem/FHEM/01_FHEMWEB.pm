@@ -187,9 +187,10 @@ FHEMWEB_Initialize($)
     refresh
     reverseLogs:0,1
     roomIcons
-    sortRooms
     showUsedFiles:0,1
+    sortRooms
     sslVersion
+    sslCertPrefix
     smallscreen:unused
     smallscreenCommands:0,1
     stylesheetPrefix
@@ -3911,6 +3912,12 @@ FW_widgetOverride($$)
        See the global attribute sslVersion.
        </li><br>
 
+    <a name="sslCertPrefix"></a>
+    <li>sslCertPrefix<br>
+       Set the prefix for the SSL certificate, default is certs/server-, see
+       also the HTTPS attribute.
+       </li><br>
+
     <a name="styleData"></a>
     <li>styleData<br>
       data-storage used by dynamic styles like f18
@@ -4612,6 +4619,12 @@ FW_widgetOverride($$)
     <li>sslVersion<br>
       Siehe das global Attribut sslVersion.
       </li><br>
+
+    <a name="sslCertPrefix"></a>
+    <li>sslCertPrefix<br>
+       Setzt das Pr&auml;fix der SSL-Zertifikate, die Voreinstellung ist
+       certs/server-, siehe auch das HTTP Attribut.
+       </li><br>
 
     <a name="styleData"></a>
     <li>styleData<br>

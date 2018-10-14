@@ -20,9 +20,22 @@ telnet_Initialize($)
   $hash->{AsyncOutputFn}  = "telnet_Output";
   $hash->{UndefFn} = "telnet_Undef";
   $hash->{AttrFn}  = "telnet_Attr";
-  $hash->{AttrList} = "globalpassword password prompt allowedCommands ".
-                        "allowfrom SSL connectTimeout connectInterval ".
-                        "encoding:utf8,latin1 sslVersion";
+  no warnings 'qw';
+  my @attrList = qw(
+    SSL
+    allowedCommands
+    allowfrom
+    connectInterval
+    connectTimeout
+    encoding:utf8,latin1
+    globalpassword
+    password
+    prompt
+    sslCertPrefix
+    sslVersion
+  );
+  use warnings 'qw';
+  $hash->{AttrList} = join(" ", @attrList);
   $hash->{ActivateInformFn} = "telnet_ActivateInform";
   $hash->{CanAuthenticate} = 2;
 
@@ -514,6 +527,10 @@ telnet_ActivateInform($)
      <li>sslVersion<br>
         See the global attribute sslVersion.
         </li><br>
+     <li>sslCertPrefix<br>
+        Set the prefix for the SSL certificate, default is certs/server-, see
+        also the SSL attribute.
+        </li><br>
 
   </ul>
 
@@ -655,6 +672,11 @@ telnet_ActivateInform($)
      <li>sslVersion<br>
         Siehe das global Attribut sslVersion.
         </li><br>
+
+     <li>sslCertPrefix<br>
+       Setzt das Pr&auml;fix der SSL-Zertifikate, die Voreinstellung ist
+       certs/server-, siehe auch das SSL Attribut.
+      </li><br>
 
   </ul>
 

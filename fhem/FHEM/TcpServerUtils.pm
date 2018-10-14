@@ -111,12 +111,13 @@ TcpServer_Accept($$)
     # Certs directory must be in the modpath, i.e. at the same level as the
     # FHEM directory
     my $mp = AttrVal("global", "modpath", ".");
+    my $certPrefix = AttrVal($name, "sslCertPrefix", "certs/server-");
     my $ret;
     eval {
       $ret = IO::Socket::SSL->start_SSL($clientinfo[0], {
         SSL_server    => 1, 
-        SSL_key_file  => "$mp/certs/server-key.pem",
-        SSL_cert_file => "$mp/certs/server-cert.pem",
+        SSL_key_file  => "$mp/${certPrefix}key.pem",
+        SSL_cert_file => "$mp/${certPrefix}cert.pem",
         SSL_version => $sslVersion,
         SSL_cipher_list => 'HIGH:!RC4:!eNULL:!aNULL',
         Timeout       => 4,
