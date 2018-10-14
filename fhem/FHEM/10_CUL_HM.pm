@@ -3245,7 +3245,6 @@ sub CUL_HM_parseCommon(@){#####################################################
         $paired = 1;
       }
     }
-
     if($paired == 0 && CUL_HM_getRxType($mhp->{devH}) & 0x14){#no pair -send config?
       CUL_HM_appFromQ($mhp->{devN},"cf");   # stack cmds if waiting
       my $ioId = CUL_HM_h2IoId($mhp->{devH}{IODev});
@@ -3283,9 +3282,9 @@ sub CUL_HM_parseCommon(@){#####################################################
           (undef,@peers) = unpack 'A2(A8)*',$mhp->{p};
         }
 
-        $_ = '00000000' foreach (grep /^000000/,@peers);#correct bad term(6 chars) from rain sens)
-        $_ .= '0x' foreach (grep /^......$/,@peers);    #if channel is unknown we assume at least a device
-        $chnhash->{helper}{peerIDsRaw}.= ",".join",",@peers;
+        $_ = '00000000' foreach (grep /^000000/ ,@peers);#correct bad term(6 chars) from rain sens)
+        $_ .= '0x'      foreach (grep /^......$/,@peers);#if channel is unknown we assume at least a device
+        $chnhash->{helper}{peerIDsRaw} .= ",".join(",",@peers);
 
         CUL_HM_ID2PeerList ($chnName,$_,1) foreach (@peers);
         if (grep /00000000/,@peers) {# last entry, peerList is complete
@@ -8729,7 +8728,6 @@ sub CUL_HM_ActCheck($) {# perform supervision
   my @event;
   my ($cntUnkn,$cntAliv,$cntDead,$cnt_Off) =(0,0,0,0);
   my $autoTry = CUL_HM_getAttrInt($actName,"actAutoTry",0);
-  
   foreach my $devId (split(",",$peerIDs)){
     next if (!$devId);
     my $devName = CUL_HM_id2Name($devId);
@@ -8759,7 +8757,7 @@ sub CUL_HM_ActCheck($) {# perform supervision
           || $tSince gt $tLast){   #no message received in window
         if ($actHash->{helper}{$devId}{start} lt $tSince){  
           if($autoTry) { #try to send a statusRequest?
-            if (!$actHash->{helper}{$devId}{try} || $actHash->{helper}{$devId}{try} < 2){
+            if (!$actHash->{helper}{$devId}{try} || $actHash->{helper}{$devId}{try} < 4){
               $actHash->{helper}{$devId}{try} = $actHash->{helper}{$devId}{try}
                                                  ? ($actHash->{helper}{$devId}{try} + 1)
                                                  : 1;
@@ -9473,7 +9471,7 @@ sub CUL_HM_reglUsed($) {# provide data for HMinfo
 
   my @pNames;
   push @pNames,CUL_HM_peerChName($_,$devId)
-             foreach (grep !/00000000/,split(",",AttrVal($name,"peerIDs","")));
+             foreach (grep !/(00000000|x)/,split(",",AttrVal($name,"peerIDs","")));#dont check 'x' peers
 
   my @lsNo;
   my $mId = CUL_HM_getMId($hash);
@@ -9999,7 +9997,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
             set myChannel peerBulk 12345601 unset # remove peer 123456 channel 01<br>
           </code></ul>
         </li>
-        <li><B>regBulk  &lt;reg List&gt;:&lt;peer&gt; &lt;addr1:data1&gt; &lt;addr2:data2&gt;...</B><a name="CUL_HMregBulk"></a><br>
+        <li><B>regBulk  &lt;reg List&gt;.&lt;peer&gt; &lt;addr1:data1&gt; &lt;addr2:data2&gt;...</B><a name="CUL_HMregBulk"></a><br>
           This command will replace the former regRaw. It allows to set register
           in raw format. Its main purpose is to restore a complete register list
           to values secured before. <br>
@@ -11423,7 +11421,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
             set myChannel peerBulk 12345601 unset # entferne Peer 123456 Kanal 01<br>
           </code></ul>
         </li>
-        <li><B>regBulk &lt;reg List&gt;:&lt;peer&gt; &lt;addr1:data1&gt; &lt;addr2:data2&gt;...</B><a name="CUL_HMregBulk"></a><br>
+        <li><B>regBulk &lt;reg List&gt;.&lt;peer&gt; &lt;addr1:data1&gt; &lt;addr2:data2&gt;...</B><a name="CUL_HMregBulk"></a><br>
           Dieser Befehl ersetzt das bisherige regRaw. Er erlaubt Register mit Rohdaten zu
           beschreiben. Hauptzweck ist das komplette Wiederherstellen eines zuvor gesicherten
           Registers. <br>
