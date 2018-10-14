@@ -3357,8 +3357,12 @@ sub set_Event
 
 sub set_State
 {
-  my ($content)=@_;
-  return(::readingsSingleUpdate($hs,"state",$content,1));
+  my ($content,$trigger)=@_;
+  if (defined $trigger) {
+    return(::readingsSingleUpdate($hs,"state",$content,$trigger));
+  } else {
+    return(::readingsSingleUpdate($hs,"state",$content,1));
+  }
 }
 
 sub set_Reading
