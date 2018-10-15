@@ -33,13 +33,63 @@ package main;
 use strict;
 use warnings;
 
+sub Iluminize_Initialize($)
+{
+    my ($hash) = @_;
+
+    $hash->{DefFn}      = "Iluminize::Define";
+    $hash->{ReadFn}     = "Iluminize::Get";
+    $hash->{SetFn}      = "Iluminize::Set";
+    $hash->{UndefFn}    = "Iluminize::Undefine";
+    $hash->{DeleteFn}   = "Iluminize::Delete";
+    $hash->{AttrFn}     = "Iluminize::Attr";
+    $hash->{AttrList}   = "$readingFnAttributes";
+}
+
+
+
+package Iluminize;
+
+use strict;
+use warnings;
+use POSIX;
 use IO::Socket::INET;
 use IO::Socket::Timeout;
-
 use SetExtensions;
+use GPUtils qw(:all);  # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 
+## Import der FHEM Funktionen
+BEGIN {
+    GP_Import(qw(
+        readingsSingleUpdate
+        readingsBulkUpdate
+        readingsBulkUpdateIfChanged
+        readingsBeginUpdate
+        readingsEndUpdate
+        Log3
+        CommandAttr
+        AttrVal
+        ReadingsVal
+        CommandDefMod
+        modules
+        setKeyValue
+        getKeyValue
+        getUniqueId
+        RemoveInternalTimer
+        InternalTimer
+        defs
+        init_done
+        IsDisabled
+        deviceEvents
+        HttpUtils_NonblockingGet
+        gettimeofday
+        Dispatch
+        SetExtensions
+    ))
+};
 
-my $on =   chr(hex("55")) .
+my $on =
+    chr(hex("55")) .
     chr(hex("99")) .
     chr(hex("5e")) .
     chr(hex("bb")) .
@@ -52,7 +102,8 @@ my $on =   chr(hex("55")) .
     chr(hex("aa")) .
     chr(hex("aa"));
 
-my $off=   chr(hex("55")) .
+my $off=
+    chr(hex("55")) .
     chr(hex("99")) .
     chr(hex("5e")) .
     chr(hex("bb")) .
@@ -66,20 +117,7 @@ my $off=   chr(hex("55")) .
     chr(hex("aa"));
 
 
-sub Iluminize_Initialize($)
-{
-    my ($hash) = @_;
-
-    $hash->{DefFn}      = "Iluminize_Define";
-    $hash->{ReadFn}     = "Iluminize_Get";
-    $hash->{SetFn}      = "Iluminize_Set";
-    $hash->{UndefFn}    = "Iluminize_Undefine";
-    $hash->{DeleteFn}   = "Iluminize_Delete";
-    $hash->{AttrFn}     = "Iluminize_Attr";
-    $hash->{AttrList}   = "$readingFnAttributes";
-}
-
-sub Iluminize_Define($$)
+sub Define($$)
 {
     my ($hash, $def) = @_;
     my $name= $hash->{NAME};
@@ -95,10 +133,10 @@ sub Iluminize_Define($$)
 }
 
 # No get so far
-sub Iluminize_Get($$) {}
+sub Get($$) {}
 
 
-sub Iluminize_Set($$)
+sub Set($$)
 {
     my ($hash, $name, $cmd, @args) = @_;
     my $cmdList = "on off";
@@ -134,7 +172,7 @@ sub Iluminize_Set($$)
 }
 
 
-sub Iluminize_Undefine($$)
+sub Undefine($$)
 {
     my ($hash, $arg) = @_;
     my $name= $hash->{NAME};
@@ -144,7 +182,7 @@ sub Iluminize_Undefine($$)
 
 
 
-sub Iluminize_Delete($$) {
+sub Delete($$) {
     my ($hash, $arg) = @_;
     my $name= $hash->{NAME};
     Log3 $hash, 0, "Ilumnize: $name deleted.";
@@ -153,7 +191,7 @@ sub Iluminize_Delete($$) {
 
 
 
-sub Iluminize_Attr($$$$) {
+sub Attr($$$$) {
     my ($cmd, $name, $aName, $aVal) = @_;
     my $hash = $defs{$name};
 
@@ -164,6 +202,8 @@ sub Iluminize_Attr($$$$) {
 
 
 =pod
+=item summary Support for Iluminize wifi controlled led stripe
+=item summary_DE Support für die Iluminize wlan LED-Produkte
 
 =begin html
 
@@ -191,6 +231,3 @@ sub Iluminize_Attr($$$$) {
 
 =end html_DE
 
-=item summary Support for Iluminize wifi controlled led stripe
-
-=item summary_DE Support für die Iluminize wlan LED-Produkte
