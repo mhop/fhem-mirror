@@ -659,6 +659,7 @@ IT_Define($$)
 {
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
+  my $ioname = $modules{IT}{defptr}{ioname};
 
   # calculate transmit code from IT A-P rotary switches
   if($a[2] =~ /^([A-O])(([0]{0,1}[1-9])|(1[0-6]))$/i) {
@@ -848,7 +849,7 @@ IT_Define($$)
   $hash->{CODE}{$ncode++} = $code;
   $modules{IT}{defptr}{$code}{$name}   = $hash;
   
-  AssignIoPort($hash);
+  AssignIoPort($hash, $ioname);
 }
 
 #############################
@@ -885,6 +886,7 @@ IT_Parse($$)
   my $def;
   my $newstate;
   my @list;
+  $modules{IT}{defptr}{ioname} = $ioname;
   if ((substr($msg, 0, 1)) ne 'i') {
     Log3 $hash,4,"$ioname IT: message not supported by IT \"$msg\"!";
     return undef;
@@ -1529,7 +1531,7 @@ Examples:
       - at the CUL can the ITclock found out from the raw messages (X31).
     </li><br>
     
-    <a name="ITfrequency"></a> </li>
+    <a name="ITfrequency"></a>
     <li>ITfrequency<br>
       Sets the frequency of the sender.
     </li><br>
@@ -1816,7 +1818,7 @@ Beispiele:
       - Beim CUL kann die ITclock aus den raw Daten (X31) ermittelt werden.
     </li><br>
       
-    <a name="ITfrequency"></a> </li>
+    <a name="ITfrequency"></a>
     <li>ITfrequency<br>
       Setzt die Sendefrequenz.
     </li><br>
