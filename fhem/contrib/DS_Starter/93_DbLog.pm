@@ -1268,7 +1268,7 @@ sub DbLog_Log($$) {
           my $next = 0;
           my $event = $events->[$i];
           $event = "" if(!defined($event));
-		  # $event = DbLog_charfilter($event) if(AttrVal($name, "useCharfilter",0));
+		  $event = DbLog_charfilter($event) if(AttrVal($name, "useCharfilter",0));
           Log3 $name, 4, "DbLog $name -> check Device: $dev_name , Event: $event" if($vb4show && !$hash->{HELPER}{".RUNNING_PID"});  
 	  
 	      if($dev_name =~ m/^$re$/ || "$dev_name:$event" =~ m/^$re$/ || $DbLogSelectionMode eq 'Include') {
@@ -1284,12 +1284,7 @@ sub DbLog_Log($$) {
               if(!defined $value) {$value = "";}
               if(!defined $unit || $unit eq "") {$unit = AttrVal("$dev_name", "unit", "");}
               
-              if(AttrVal($name, "useCharfilter",0)) {
-                  $event   = DbLog_charfilter($event);
-                  $reading = DbLog_charfilter($reading);
-                  $value   = DbLog_charfilter($value);
-                  $unit    = DbLog_charfilter($unit);
-              }
+              $unit = DbLog_charfilter($unit) if(AttrVal($name, "useCharfilter",0));
               
               # Devices / Readings ausschließen durch Attribut "excludeDevs"
               # attr <device> excludeDevs [<devspec>#]<Reading1>,[<devspec>#]<Reading2>,[<devspec>#]<Reading..>
