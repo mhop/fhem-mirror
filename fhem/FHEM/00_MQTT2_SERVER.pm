@@ -529,7 +529,6 @@ MQTT2_SERVER_getStr($$)
     <ul>
     <li>to set user/password use an allowed instance and its basicAuth
       feature (set/attr)</li>
-    <li>retained messages are lost after a FHEM restart</li>
     <li>the retain flag is not propagated by publish</li>
     <li>only QOS 0 and 1 is implemented</li>
     </ul>
