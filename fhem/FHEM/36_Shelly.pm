@@ -38,7 +38,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "1.35";
+my $version = "1.36";
 
 #-- these we may get on request
 my %gets = (
@@ -1001,7 +1001,7 @@ sub Shelly_Set ($@) {
         <a name="Shellydefine"></a>
         <h4>Define</h4>
         <p>
-            <code>define &lt;name&gt; Shelly  &lt;IP address&gt;</code>
+            <code>define &lt;name&gt; Shelly &lt;IP address&gt;</code>
             <br />Defines the Shelly device. </p>
         Notes: <ul>
         <li>The attribute <code>model</code> <b>must</b> be set</li>
@@ -1012,7 +1012,7 @@ sub Shelly_Set ($@) {
         For Shelly all Shelly devices
         <ul>
         <li><a name="shelly_sconfig"></a>
-                <code>set &lt;name&gt; config <registername> [channel] &lt;value&gt;</code>
+                <code>set &lt;name&gt; config <registername> [&lt;channel&gt;] &lt;value&gt;</code>
                 <br />set the value of a configuration register</li>
         </ul>
         For Shelly switching devices (mode=relay for model=shelly2, standard for all other models) 
@@ -1022,7 +1022,7 @@ sub Shelly_Set ($@) {
                 <br />switches channel &lt;channel&gt; on or off.</li>
             <li><a name="shelly_onofftimer"></a>
                 <code>set &lt;name&gt; on-for-timer|off-for-timer &lt;channel&gt; &lt;time&gt;</code>
-                <br />switches channel <channel> on or off for &lt;time&gt; seconds.</li>           
+                <br />switches &lt;channel&gt; on or off for &lt;time&gt; seconds.</li>           
         </ul>
         <br/>For Shelly roller blind devices (mode=roller for model=shelly2)  
         <ul>
@@ -1037,7 +1037,7 @@ sub Shelly_Set ($@) {
         <h4>Get</h4>
         <ul>
             <li><a name="shelly_config"></a>
-                <code>get &lt;name&gt; config &lt;registername&gt; [channel]</code>
+                <code>get &lt;name&gt; config &lt;registername&gt; [$lt;channel&gt;]</code>
                 <br />get the value of a configuration register and writes it in reading config</li>
             <li><a name="shelly_registers"></a>
                 <code>get &lt;name&gt; registers</code>
