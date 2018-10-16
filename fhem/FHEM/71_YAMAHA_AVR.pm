@@ -1884,7 +1884,12 @@ YAMAHA_AVR_ParseResponse($$$)
                     readingsBulkUpdateIfChanged($hash, "currentArtist", "");
                 }
 
-                if($data =~ /<Meta_Info>.*?<Station>(.+?)<\/Station>.*?<\/Meta_Info>/)
+
+                if($data =~ /<Band>DAB<\/Band>/ and $data =~ /<Meta_Info>.*?<Service_Label>(.+?)<\/Service_Label>.*?<\/Meta_Info>/) # RX-481D provides always Meta-Info for DAB and Tuner
+                {
+                    readingsBulkUpdate($hash, "currentStation", YAMAHA_AVR_html2txt($1));
+                }
+                elsif($data =~ /<Meta_Info>.*?<Station>(.+?)<\/Station>.*?<\/Meta_Info>/)
                 {
                     readingsBulkUpdate($hash, "currentStation", YAMAHA_AVR_html2txt($1));
                 }
@@ -1892,7 +1897,7 @@ YAMAHA_AVR_ParseResponse($$$)
                 {
                     readingsBulkUpdate($hash, "currentStation", YAMAHA_AVR_html2txt($1));
                 }
-                elsif($data =~ /<DAB>.*?<Meta_Info>.*?<Service_Label>(.+?)<\/Service_Label>.*?<\/Meta_Info>.*?<\/DAB>/)
+                elsif($data =~ /<Meta_Info>.*?<Station>(.+?)<\/Station>.*?<\/Meta_Info>/)
                 {
                     readingsBulkUpdate($hash, "currentStation", YAMAHA_AVR_html2txt($1));
                 }
@@ -1918,8 +1923,12 @@ YAMAHA_AVR_ParseResponse($$$)
                 {
                     readingsBulkUpdateIfChanged($hash, "currentAlbum", "");
                 }
-                
-                if($data =~ /<Meta_Info>.*?<Song>(.+?)<\/Song>.*?<\/Meta_Info>/)
+
+                if($data =~ /<Band>DAB<\/Band>/ and $data =~ /<Meta_Info>.*?<DLS>(.+?)<\/DLS>.*?<\/Meta_Info>/) # RX-481D provides always Meta-Info for DAB and FM
+                {
+                    readingsBulkUpdate($hash, "currentTitle", YAMAHA_AVR_html2txt($1));
+                }
+                elsif($data =~ /<Meta_Info>.*?<Song>(.+?)<\/Song>.*?<\/Meta_Info>/)
                 {
                     readingsBulkUpdate($hash, "currentTitle", YAMAHA_AVR_html2txt($1));
                 }
@@ -1943,11 +1952,15 @@ YAMAHA_AVR_ParseResponse($$$)
                 elsif($data =~ /<Meta_Info>.*?<Radio_Text_B>(.+?)<\/Radio_Text_B>.*?<\/Meta_Info>/)    
                 {         
                     readingsBulkUpdate($hash, "currentTitle", YAMAHA_AVR_html2txt($1));        
+                }
+                elsif($data =~ /<Meta_Info>.*?<Radio_Text>(.+?)<\/Radio_Text>.*?<\/Meta_Info>/) # RX-V481D
+                {
+                    readingsBulkUpdate($hash, "currentTitle", YAMAHA_AVR_html2txt($1));
                 }    
-                elsif($data =~ /<DAB>.*?<DLS>(.+?)<\/DLS>.*?<\/DAB>/)
-                {         
-                    readingsBulkUpdate($hash, "currentTitle", YAMAHA_AVR_html2txt($1));        
-                } 
+                                                                     
+                          
+                                                                                               
+                  
                 else
                 {
                     readingsBulkUpdateIfChanged($hash, "currentTitle", "");
@@ -1964,12 +1977,14 @@ YAMAHA_AVR_ParseResponse($$$)
                     readingsBulkUpdate($hash, "playStatus", "playing");
                 }
                 
-                if($data =~ /<Tuning>.*?<Freq>(?:<Current>)?<Val>(\d+?)<\/Val><Exp>(\d+?)<\/Exp><Unit>(.*?)<\/Unit>(?:<\/Current>)?.*<\/Tuning>/ or $data =~ /<DAB>.*?<Signal_Info>.*?<Freq><Val>(\d+?)<\/Val><Exp>(\d+?)<\/Exp><Unit>(.*?)<\/Unit><\/Freq>.*<\/Signal_Info>.*<\/DAB>/ or(YAMAHA_AVR_isModel_DSP($hash) and $data =~ /<Tuning>.*?<Freq><Val>(\d+?)<\/Val><Exp>(\d+?)<\/Exp><Unit>(.*?)<\/Unit><\/Freq>.*?<\/Tuning>/))
+                if(($data =~ /<Band>DAB<\/Band>/ and $data =~ /<DAB>.*?<Signal_Info>.*?<Freq><Val>(\d+?)<\/Val><Exp>(\d+?)<\/Exp><Unit>(.*?)<\/Unit><\/Freq>.*?<\/Signal_Info>.*?<\/DAB>/) or  # RX-481D provides always Meta-Info for DAB and FM
+                   ($data =~ /<Tuning>.*?<Freq>(?:<Current>)?<Val>(\d+?)<\/Val><Exp>(\d+?)<\/Exp><Unit>(.*?)<\/Unit>(?:<\/Current>)?.*?<\/Tuning>/)  or 
+                   (YAMAHA_AVR_isModel_DSP($hash) and $data =~ /<Tuning>.*?<Freq><Val>(\d+?)<\/Val><Exp>(\d+?)<\/Exp><Unit>(.*?)<\/Unit><\/Freq>.*?<\/Tuning>/))
                 {
                     readingsBulkUpdate($hash, "currentStationFrequency", sprintf("%.$2f", ($1 / (10 ** $2)))." $3");
                     readingsBulkUpdate($hash, "tunerFrequency", sprintf("%.$2f", ($1 / (10 ** $2))));
-                    
-                    if($data =~ /<(?:Tuning|DAB)>.*?<Band>(.+?)<\/Band>.*?<\/(?:Tuning|DAB)>/)
+                                                                          
+                    if($data =~ /<Band>(.+?)<\/Band>/)
                     {
                         readingsBulkUpdate($hash, "tunerFrequencyBand", uc($1));
                     }
