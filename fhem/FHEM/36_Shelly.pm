@@ -38,7 +38,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "1.36";
+my $version = "1.40";
 
 #-- these we may get on request
 my %gets = (
@@ -374,11 +374,8 @@ sub Shelly_Set ($@) {
     if( $cmd =~ /^((on)|(off)).*/ ){
       $channel = $value;
       if( $cmd =~ /(.*)-for-timer/ ){
-        $time = shift @a;
-        if( !defined($time) ){
-          $time    = $value;
-          $channel = undef;
-        }
+        $time = $value;
+        $channel = shift @a;
       }
       if( $shelly_models{$model}[0] == 1){
        $channel = 0
@@ -996,6 +993,7 @@ sub Shelly_Set ($@) {
 =begin html
 
 <a name="Shelly"></a>
+<h3>Shelly</h3>
 <ul>
         <p> FHEM module to communicate with a Shelly switch/roller actuator</p>
         <a name="Shellydefine"></a>
@@ -1018,11 +1016,11 @@ sub Shelly_Set ($@) {
         For Shelly switching devices (mode=relay for model=shelly2, standard for all other models) 
         <ul>
             <li><a name="shelly_onoff"></a>
-                <code>set &lt;name&gt; on|off &lt;channel&gt; </code>
-                <br />switches channel &lt;channel&gt; on or off.</li>
+                <code>set &lt;name&gt; on|off  [&lt;channel&gt;] </code>
+                <br />switches channel &lt;channel&gt; on or off. Only if model=shelly2/4: If the channel parameter is omitted, the module will switch the channel defined in the defchannel attribute.</li>
             <li><a name="shelly_onofftimer"></a>
-                <code>set &lt;name&gt; on-for-timer|off-for-timer &lt;channel&gt; &lt;time&gt;</code>
-                <br />switches &lt;channel&gt; on or off for &lt;time&gt; seconds.</li>           
+                <code>set &lt;name&gt; on-for-timer|off-for-timer &lt;time&gt; [&lt;channel&gt;] </code>
+                <br />switches &lt;channel&gt; on or off for &lt;time&gt; seconds. Only if model=shelly2/4: If the channel parameter is omitted, the module will switch the channel defined in the defchannel attribute.</li>           
         </ul>
         <br/>For Shelly roller blind devices (mode=roller for model=shelly2)  
         <ul>
@@ -1063,7 +1061,7 @@ sub Shelly_Set ($@) {
         <br/>For Shelly switching devices (mode=relay for model=shelly2, standard for all other models) 
         <ul>
         <li><a name="shelly_defchannel"><code>attr &lt;name&gt; defchannel <integer> (only for model=shelly2|shelly4)</code></a>
-                <br />for multi-channel switches: Which channel will be switched, if a simple on|off command is received without channel number</li>
+                <br />for multi-channel switches: Which channel will be switched, if a command is received without channel number</li>
         </ul>
         <br/>For Shelly roller blind devices (mode=roller for model=shelly2)
         <ul>
