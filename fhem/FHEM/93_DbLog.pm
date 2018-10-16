@@ -16,7 +16,10 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
-# 3.12.2     07.10.2018       $hash->{HELPER}{REOPEN_RUNS_UNTIL} contains the time until the DB is closed 
+# 3.12.5     12.10.2018       charFilter: "\xB0C" substitution by "°C" added and usage in DbLog_Log changed
+# 3.12.4     10.10.2018       return non-saved datasets back in asynch mode only if transaction is used
+# 3.12.3     08.10.2018       Log output of recuceLogNbl enhanced, some functions renamed
+# 3.12.2     07.10.2018       $hash->{HELPER}{REOPEN_RUNS_UNTIL} contains the time the DB is closed 
 # 3.12.1     19.09.2018       use Time::Local (forum:#91285)
 # 3.12.0     04.09.2018       corrected SVG-select (https://forum.fhem.de/index.php/topic,65860.msg815640.html#msg815640)
 # 3.11.0     02.09.2018       reduceLog, reduceLogNbl - optional "days newer than" part added
@@ -149,7 +152,7 @@
 # 2.10.8     27.01.2017       DbLog_setinternalcols delayed at fhem start
 # 2.10.7     25.01.2017       $hash->{HELPER}{COLSET} in DbLog_setinternalcols, DbLog_Push changed due to 
 #                             issue Turning on AutoCommit failed
-# 2.10.6     24.01.2017       DbLog_connect changed "connect_cashed" to "connect", DbLog_Get, chartQuery now uses 
+# 2.10.6     24.01.2017       DbLog_connect changed "connect_cashed" to "connect", DbLog_Get, DbLog_chartQuery now uses 
 #                             DbLog_ConnectNewDBH, Attr asyncMode changed -> delete reading cacheusage reliable if mode was switched
 # 2.10.5     23.01.2017       count, userCommand, deleteOldDays now uses DbLog_ConnectNewDBH
 #                             DbLog_Push line 1107 changed
@@ -159,7 +162,7 @@
 # 2.10.1     19.01.2017       commandref edited, cache events don't get lost even if other errors than "db not available" occure  
 # 2.10       18.10.2017       new attribute cacheLimit, showNotifyTime
 # 2.9.3      17.01.2017       new sub DbLog_ConnectNewDBH (own new dbh for separate use in functions except logging functions),
-#                             DbLog_sampleDataFn, dbReadings now use DbLog_ConnectNewDBH
+#                             DbLog_sampleDataFn, DbLog_dbReadings now use DbLog_ConnectNewDBH
 # 2.9.2      16.01.2017       new bugfix for SQLite issue SVGs, DbLog_Log changed to $dev_hash->{CHANGETIME}, DbLog_Push 
 #                             changed (db handle new separated)
 # 2.9.1      14.01.2017       changed DbLog_ParseEvent to CallInstanceFn, renamed flushCache to purgeCache,
@@ -211,7 +214,7 @@ use Time::Local;
 use Encode qw(encode_utf8);
 no if $] >= 5.017011, warnings => 'experimental::smartmatch'; 
 
-my $DbLogVersion = "3.12.2";
+my $DbLogVersion = "3.12.5";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -221,7 +224,7 @@ my %columns = ("DEVICE"  => 64,
                "UNIT"    => 32
               );
 					 
-sub dbReadings($@);
+sub DbLog_dbReadings($@);
 
 ################################################################
 sub DbLog_Initialize($)
@@ -952,7 +955,6 @@ sub DbLog_ParseEvent($$$)
   if   ($reading =~ m(^temperature)) { $unit= "°C"; } # wenn reading mit temperature beginnt
   elsif($reading =~ m(^humidity)) { $unit= "%"; }
 
-
   # the interpretation of the argument depends on the device type
   # EMEM, M232Counter, M232Voltage return plain numbers
   if(($type eq "M232Voltage") ||
@@ -1281,6 +1283,8 @@ sub DbLog_Log($$) {
               if(!defined $reading) {$reading = "";}
               if(!defined $value) {$value = "";}
               if(!defined $unit || $unit eq "") {$unit = AttrVal("$dev_name", "unit", "");}
+              
+              $unit = DbLog_charfilter($unit) if(AttrVal($name, "useCharfilter",0));
               
               # Devices / Readings ausschließen durch Attribut "excludeDevs"
               # attr <device> excludeDevs [<devspec>#]<Reading1>,[<devspec>#]<Reading2>,[<devspec>#]<Reading..>
@@ -2097,7 +2101,7 @@ sub DbLog_PushAsync(@) {
       $errorh = $@;
       Log3 $hash->{NAME}, 2, "DbLog $name -> Error table history - $errorh";
       $error = encode_base64($errorh,"");
-      $rowlback = $rowlist;	
+      $rowlback = $rowlist if($useta);	# nicht gespeicherte Datensätze nur zurück geben wenn Transaktion ein
   } 
   
   # update or insert current
@@ -2511,7 +2515,7 @@ sub DbLog_Get($@) {
   my $utf8 = defined($hash->{UTF8})?$hash->{UTF8}:0;
   my $dbh;
   
-  return dbReadings($hash,@a) if $a[1] =~ m/^Readings/;
+  return DbLog_dbReadings($hash,@a) if $a[1] =~ m/^Readings/;
 
   return "Usage: get $a[0] <in> <out> <from> <to> <column_spec>...\n".
      "  where column_spec is <device>:<reading>:<default>:<fn>\n" .
@@ -2541,8 +2545,8 @@ sub DbLog_Get($@) {
   } elsif($outf eq "array"){
 
   } elsif(lc($outf) eq "webchart") {
-    # redirect the get request to the chartQuery function
-    return chartQuery($hash, @_);
+    # redirect the get request to the DbLog_chartQuery function
+    return DbLog_chartQuery($hash, @_);
   }
 
   my @readings = ();
@@ -3866,12 +3870,13 @@ return($useac,$useta);
 }
 
 ###############################################################################
-#              Zeichencodierung für Payload filtern 
+#              Zeichen von Feldevents filtern 
 ###############################################################################
 sub DbLog_charfilter ($) { 
   my ($txt) = @_;
-  
-  # nur erwünschte Zeichen in payload, ASCII %d32-126
+  my ($p,$a);
+
+  # nur erwünschte Zeichen ASCII %d32-126 und Sonderzeichen
   $txt =~ s/ß/ss/g;
   $txt =~ s/ä/ae/g;
   $txt =~ s/ö/oe/g;
@@ -3880,7 +3885,11 @@ sub DbLog_charfilter ($) {
   $txt =~ s/Ö/Oe/g;
   $txt =~ s/Ü/Ue/g;
   $txt =~ s/€/EUR/g;
-  $txt =~ tr/ A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\\]^_`{|}~//cd;      
+  $txt =~ s/\xb0/1degree1/g;
+  
+  $txt =~ tr/ A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\\]^_`{|}~//cd;
+  
+  $txt =~ s/1degree1/°/g;
   
 return($txt);
 }
@@ -3890,7 +3899,7 @@ return($txt);
 #########################################################################################
 sub DbLog_reduceLog($@) {
     my ($hash,@a) = @_;
-    my ($ret,$row,$filter,$exclude,$c,$day,$hour,$lastHour,$updDate,$updHour,$average,$processingDay,$lastUpdH,%hourlyKnown,%averageHash,@excludeRegex,@dayRows,@averageUpd,@averageUpdD);
+    my ($ret,$row,$err,$filter,$exclude,$c,$day,$hour,$lastHour,$updDate,$updHour,$average,$processingDay,$lastUpdH,%hourlyKnown,%averageHash,@excludeRegex,@dayRows,@averageUpd,@averageUpdD);
     my ($name,$startTime,$currentHour,$currentDay,$deletedCount,$updateCount,$sum,$rowCount,$excludeCount) = ($hash->{NAME},time(),99,0,0,0,0,0,0);
     my $dbh = DbLog_ConnectNewDBH($hash);
     return if(!$dbh);
@@ -4037,7 +4046,8 @@ sub DbLog_reduceLog($@) {
                             }
                         };
                         if ($@) {
-                            Log3($hash->{NAME}, 3, "DbLog $name: reduceLog average=hour ! FAILED ! for day $processingDay");
+                            $err = $@;
+                            Log3($hash->{NAME}, 2, "DbLog $name - reduceLogNbl ! FAILED ! for day $processingDay: $err");
                             eval {$dbh->rollback() if(!$dbh->{AutoCommit});};
                             @averageUpdD = ();
                         } else {
@@ -4103,7 +4113,8 @@ sub DbLog_reduceLog($@) {
 							}
                         };
                         if ($@) {
-                            Log3($hash->{NAME}, 3, "DbLog $name: reduceLog average=day ! FAILED ! for day $processingDay");
+                            $err = $@;
+                            Log3($hash->{NAME}, 2, "DbLog $name - reduceLogNbl ! FAILED ! for day $processingDay: $err");
                             eval {$dbh->rollback() if(!$dbh->{AutoCommit});};
                         } else {
                             eval {$dbh->commit() if(!$dbh->{AutoCommit});};
@@ -4174,7 +4185,7 @@ sub DbLog_reduceLogNbl($) {
     delete $hash->{HELPER}{REDUCELOG};
     my ($ret,$row,$filter,$exclude,$c,$day,$hour,$lastHour,$updDate,$updHour,$average,$processingDay,$lastUpdH,%hourlyKnown,%averageHash,@excludeRegex,@dayRows,@averageUpd,@averageUpdD);
     my ($startTime,$currentHour,$currentDay,$deletedCount,$updateCount,$sum,$rowCount,$excludeCount) = (time(),99,0,0,0,0,0,0);
-    my $dbh;
+    my ($dbh,$err);
 	
 	Log3 ($name, 5, "DbLog $name -> Start DbLog_reduceLogNbl");
 	
@@ -4188,7 +4199,7 @@ sub DbLog_reduceLogNbl($) {
         eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1 });};
     }
     if ($@) {
-        my $err = encode_base64($@,"");
+        $err = encode_base64($@,"");
         Log3 ($name, 2, "DbLog $name -> DbLog_reduceLogNbl - $@");
         Log3 ($name, 5, "DbLog $name -> DbLog_reduceLogNbl finished");
         return "$name|''|$err";
@@ -4238,7 +4249,7 @@ sub DbLog_reduceLogNbl($) {
                            ."TIMESTAMP < $ots".($nts?" AND TIMESTAMP >= $nts ":" ")."ORDER BY TIMESTAMP ASC");  # '' was EVENT, no longer in use
 		     };
         if ($@) {
-            my $err = encode_base64($@,"");
+            $err = encode_base64($@,"");
             Log3 ($name, 2, "DbLog $name -> DbLog_reduceLogNbl - $@");
             Log3 ($name, 5, "DbLog $name -> DbLog_reduceLogNbl finished");
             return "$name|''|$err";
@@ -4246,7 +4257,7 @@ sub DbLog_reduceLogNbl($) {
 		
 		eval { $sth_get->execute(); };
         if ($@) {
-            my $err = encode_base64($@,"");
+            $err = encode_base64($@,"");
             Log3 ($name, 2, "DbLog $name -> DbLog_reduceLogNbl - $@");
             Log3 ($name, 5, "DbLog $name -> DbLog_reduceLogNbl finished");
             return "$name|''|$err";
@@ -4293,7 +4304,8 @@ sub DbLog_reduceLogNbl($) {
                                 }
                             };
                             if ($@) {
-                                Log3($hash->{NAME}, 3, "DbLog $name: reduceLogNbl ! FAILED ! for day $processingDay");
+                                $err = $@;
+                                Log3($hash->{NAME}, 2, "DbLog $name - reduceLogNbl ! FAILED ! for day $processingDay: $err");
                                 eval {$dbh->rollback() if(!$dbh->{AutoCommit});};
 								if ($@) {
                                     Log3 ($name, 2, "DbLog $name -> DbLog_reduceLogNbl - $@");
@@ -4360,7 +4372,8 @@ sub DbLog_reduceLogNbl($) {
                             }
                         };
                         if ($@) {
-                            Log3($hash->{NAME}, 3, "DbLog $name: reduceLogNbl average=hour ! FAILED ! for day $processingDay");
+                            $err = $@;
+                            Log3($hash->{NAME}, 2, "DbLog $name - reduceLogNbl average=hour ! FAILED ! for day $processingDay: $err");
                             eval {$dbh->rollback() if(!$dbh->{AutoCommit});};
 							if ($@) {
                                 Log3 ($name, 2, "DbLog $name -> DbLog_reduceLogNbl - $@");
@@ -4866,7 +4879,7 @@ return ($desc, \@htmlArr, join("<br>", @example));
 # Error handling, returns a JSON String
 #
 ################################################################
-sub jsonError($) {
+sub DbLog_jsonError($) {
   my $errormsg = $_[0]; 
   my $json = '{"success": "false", "msg":"'.$errormsg.'"}';
   return $json;
@@ -4878,7 +4891,7 @@ sub jsonError($) {
 # Prepare the SQL String
 #
 ################################################################
-sub prepareSql(@) {
+sub DbLog_prepareSql(@) {
 
     my ($hash, @a) = @_;
     my $starttime = $_[5];
@@ -5056,14 +5069,14 @@ sub prepareSql(@) {
 # Do the query
 #
 ################################################################
-sub chartQuery($@) {
+sub DbLog_chartQuery($@) {
 
-    my ($sql, $countsql) = prepareSql(@_);
+    my ($sql, $countsql) = DbLog_prepareSql(@_);
 
     if ($sql eq "error") {
-       return jsonError("Could not setup SQL String. Maybe the Database is busy, please try again!");
+       return DbLog_jsonError("Could not setup SQL String. Maybe the Database is busy, please try again!");
     } elsif ($sql eq "errordb") {
-       return jsonError("The Database Type is not supported!");
+       return DbLog_jsonError("The Database Type is not supported!");
     }
 
     my ($hash, @a) = @_;
@@ -5074,10 +5087,10 @@ sub chartQuery($@) {
     
     if (defined $countsql && $countsql ne "") {
         my $query_handle = $dbhf->prepare($countsql) 
-        or return jsonError("Could not prepare statement: " . $dbhf->errstr . ", SQL was: " .$countsql);
+        or return DbLog_jsonError("Could not prepare statement: " . $dbhf->errstr . ", SQL was: " .$countsql);
         
         $query_handle->execute() 
-        or return jsonError("Could not execute statement: " . $query_handle->errstr);
+        or return DbLog_jsonError("Could not execute statement: " . $query_handle->errstr);
 
         my @data = $query_handle->fetchrow_array();
         $totalcount = join(", ", @data);
@@ -5086,11 +5099,11 @@ sub chartQuery($@) {
 
     # prepare the query
     my $query_handle = $dbhf->prepare($sql) 
-        or return jsonError("Could not prepare statement: " . $dbhf->errstr . ", SQL was: " .$sql);
+        or return DbLog_jsonError("Could not prepare statement: " . $dbhf->errstr . ", SQL was: " .$sql);
     
     # execute the query
     $query_handle->execute() 
-        or return jsonError("Could not execute statement: " . $query_handle->errstr);
+        or return DbLog_jsonError("Could not execute statement: " . $query_handle->errstr);
     
     my $columns = $query_handle->{'NAME'};
     my $columncnt;
@@ -5149,7 +5162,7 @@ return $jsonstring;
 # get <dbLog> ReadingsVal       <device> <reading> <default>
 # get <dbLog> ReadingsTimestamp <device> <reading> <default>
 #
-sub dbReadings($@) {
+sub DbLog_dbReadings($@) {
   my($hash,@a) = @_;
   
   my $dbhf = DbLog_ConnectNewDBH($hash);
@@ -5795,15 +5808,16 @@ sub dbReadings($@) {
 	  <code>attr &lt;device&gt; commitMode [basic_ta:on | basic_ta:off | ac:on_ta:on | ac:on_ta:off | ac:off_ta:on]
 	  </code><br>
 	  
-      Change the usage of database autocommit- and/or transaction- behavior. <br> 
-	  This attribute is an advanced feature and should only be used in a concrete case of need or support case. <br><br>
+      Change the usage of database autocommit- and/or transaction- behavior. <br>
+      If transaction "off" is used, not saved datasets are not returned to cache in asynchronous mode. <br>      
+	  This attribute is an advanced feature and should only be used in a concrete situation or support case. <br><br>
 	  
 	  <ul>
       <li>basic_ta:on   - autocommit server basic setting / transaktion on (default) </li>
 	  <li>basic_ta:off  - autocommit server basic setting / transaktion off </li>
 	  <li>ac:on_ta:on   - autocommit on / transaktion on </li>
 	  <li>ac:on_ta:off  - autocommit on / transaktion off </li>
-	  <li>ac:off_ta:on  - autocommit off / transaktion on (autocommit off set transaktion on implicitly) </li>
+	  <li>ac:off_ta:on  - autocommit off / transaktion on (autocommit "off" set transaktion "on" implicitly) </li>
 	  </ul>
 	  
     </ul>
@@ -6901,6 +6915,8 @@ sub dbReadings($@) {
 	  </code><br>
 	  
       Ändert die Verwendung der Datenbank Autocommit- und/oder Transaktionsfunktionen. 
+      Wird Transaktion "aus" verwendet, werden im asynchronen Modus nicht gespeicherte Datensätze nicht an den Cache zurück
+      gegeben.      
 	  Dieses Attribut ist ein advanced feature und sollte nur im konkreten Bedarfs- bzw. Supportfall geändert werden.<br><br>
 	  
 	  <ul>
@@ -6908,7 +6924,7 @@ sub dbReadings($@) {
 	  <li>basic_ta:off  - Autocommit Servereinstellung / Transaktion aus </li>
 	  <li>ac:on_ta:on   - Autocommit ein / Transaktion ein </li>
 	  <li>ac:on_ta:off  - Autocommit ein / Transaktion aus </li>
-	  <li>ac:off_ta:on  - Autocommit aus / Transaktion ein (Autocommit aus impliziert Transaktion ein) </li>
+	  <li>ac:off_ta:on  - Autocommit aus / Transaktion ein (Autocommit "aus" impliziert Transaktion "ein") </li>
 	  </ul>
 	  
     </ul>
