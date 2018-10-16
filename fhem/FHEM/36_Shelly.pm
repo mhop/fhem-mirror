@@ -38,7 +38,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "1.33";
+my $version = "1.35";
 
 #-- these we may get on request
 my %gets = (
@@ -1012,17 +1012,17 @@ sub Shelly_Set ($@) {
         For Shelly all Shelly devices
         <ul>
         <li><a name="shelly_sconfig"></a>
-                <code>set &lt;name&gt; config <registername> [channel] <value></code>
+                <code>set &lt;name&gt; config <registername> [channel] &lt;value&gt;</code>
                 <br />set the value of a configuration register</li>
         </ul>
         For Shelly switching devices (mode=relay for model=shelly2, standard for all other models) 
         <ul>
             <li><a name="shelly_onoff"></a>
-                <code>set &lt;name&gt; on|off <channel> </code>
-                <br />switches channel <channel> on or off.</li>
+                <code>set &lt;name&gt; on|off &lt;channel&gt; </code>
+                <br />switches channel &lt;channel&gt; on or off.</li>
             <li><a name="shelly_onofftimer"></a>
-                <code>set &lt;name&gt; on-for-timer|off-for-time <channel> <time></code>
-                <br />switches channel <channel> on or off for <time> seconds.</li>           
+                <code>set &lt;name&gt; on-for-timer|off-for-timer &lt;channel&gt; &lt;time&gt;</code>
+                <br />switches channel <channel> on or off for &lt;time&gt; seconds.</li>           
         </ul>
         <br/>For Shelly roller blind devices (mode=roller for model=shelly2)  
         <ul>
@@ -1030,14 +1030,14 @@ sub Shelly_Set ($@) {
                 <code>set &lt;name&gt; open|closed|stop </code>
                 <br />drives the roller blind open, closed or to a stop.</li>      
             <li><a name="shelly_pct"></a>
-                <code>set &lt;name&gt; pct <integer percent value> </code>
-                <br />drives the roller blind to a partially closed position (100=closed, 0=open)</li>      
+                <code>set &lt;name&gt; pct &lt;integer percent value&gt; </code>
+                <br />drives the roller blind to a partially closed position (100=open, 0=closed)</li>      
         </ul>
         <a name="Shellyget"></a>
         <h4>Get</h4>
         <ul>
             <li><a name="shelly_config"></a>
-                <code>get &lt;name&gt; config <registername> [channel]</code>
+                <code>get &lt;name&gt; config &lt;registername&gt; [channel]</code>
                 <br />get the value of a configuration register and writes it in reading config</li>
             <li><a name="shelly_registers"></a>
                 <code>get &lt;name&gt; registers</code>
@@ -1067,7 +1067,7 @@ sub Shelly_Set ($@) {
         </ul>
         <br/>For Shelly roller blind devices (mode=roller for model=shelly2)
         <ul>
-            <li><a name="shelly_maxtime"><code>attr &lt;name&gt; maxtime <float> </code></a>
+            <li><a name="shelly_maxtime"><code>attr &lt;name&gt; maxtime &lt;float&gt; </code></a>
                 <br />time needed for a complete drive upward or downward</li>
             <li><a name="shelly_pct100"><code>attr &lt;name&gt; pct100 open|closed (default:open) </code></a>
                 <br />is pct=100 open or closed ? </li>
