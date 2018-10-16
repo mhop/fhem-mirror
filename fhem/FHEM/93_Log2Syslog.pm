@@ -35,6 +35,7 @@ use warnings;
 
 # Versions History intern:
 our %Log2Syslog_vNotesIntern = (
+  "5.3.0"  => "16.10.2018  attribute sslCertPrefix added (Forum:#92030), module hints & release info order switched ",
   "5.2.1"  => "08.10.2018  setpayload of BSD-format changed, commandref revised ",
   "5.2.0"  => "02.10.2018  added direct help for attributes",
   "5.1.0"  => "01.10.2018  new get <name> versionNotes command",
@@ -85,6 +86,7 @@ our %Log2Syslog_vNotesIntern = (
 
 # Versions History extern:
 our %Log2Syslog_vNotesExtern = (
+  "5.3.0"  => "16.10.2018 attribute sslCertPrefix added to support multiple SSL-keys (Forum:#92030)",
   "5.2.1"  => "08.10.2018 Send format of BSD changed. The TAG-field was changed to \"IDENT[PID]: \" ",
   "5.2.0"  => "02.10.2018 direct help for attributes added",
   "5.1.0"  => "29.09.2018 new get &lt;name&gt; versionNotes command ",
@@ -261,6 +263,7 @@ sub Log2Syslog_Initialize($) {
                       "respectSeverity:multiple-strict,Emergency,Alert,Critical,Error,Warning,Notice,Informational,Debug ".
                       "octetCount:1,0 ".
                       "ssldebug:0,1,2,3 ".
+                      "sslCertPrefix ".
 					  "TLS:1,0 ".
 					  "timeout ".
 	                  "protocol:UDP,TCP ".
@@ -1117,32 +1120,12 @@ sub Log2Syslog_Get($@) {
   } elsif ($opt =~ /versionNotes/) {
 	  my $header  = "<b>Module release information table</b><br>";
       my $header1 = "<b>Helpful hints</b><br>";
+      my $i;
 	  
 	  # Ausgabetabelle erstellen
 	  my ($ret,$val0,$val1);
 	  $ret  = "<html>";
-	  $ret .= sprintf("<div class=\"makeTable wide\"; style=\"text-align:left\">$header <br>");
-	  $ret .= "<table class=\"block wide internals\">";
-	  $ret .= "<tbody>";
-	  $ret .= "<tr class=\"even\">";
-	  my $i = 0;
-	  foreach my $key (reverse sort(keys %Log2Syslog_vNotesExtern)) {
-		  ($val0,$val1) = split(/\s/,$Log2Syslog_vNotesExtern{$key},2);
-		  $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0  </td><td>$val1</td>" );
-		  $ret .= "</tr>";
-          $i++;
-          if ($i & 1) {
-              # $i ist ungerade
-		      $ret .= "<tr class=\"odd\">";
-          } else {
-              $ret .= "<tr class=\"even\">";
-          }
-	  }
-	  $ret .= "</tr>";
-	  $ret .= "</tbody>";
-	  $ret .= "</table>";
-	  $ret .= "</div>";
-          
+      
 	  $ret .= sprintf("<div class=\"makeTable wide\"; style=\"text-align:left\">$header1 <br>");
 	  $ret .= "<table class=\"block wide internals\">";
 	  $ret .= "<tbody>";
@@ -1165,7 +1148,30 @@ sub Log2Syslog_Get($@) {
 	  $ret .= "</tbody>";
 	  $ret .= "</table>";
 	  $ret .= "</div>";
-	  $ret .= "</html>";
+
+	  $ret .= sprintf("<div class=\"makeTable wide\"; style=\"text-align:left\">$header <br>");
+	  $ret .= "<table class=\"block wide internals\">";
+	  $ret .= "<tbody>";
+	  $ret .= "<tr class=\"even\">";
+	  $i = 0;
+	  foreach my $key (reverse sort(keys %Log2Syslog_vNotesExtern)) {
+		  ($val0,$val1) = split(/\s/,$Log2Syslog_vNotesExtern{$key},2);
+		  $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0  </td><td>$val1</td>" );
+		  $ret .= "</tr>";
+          $i++;
+          if ($i & 1) {
+              # $i ist ungerade
+		      $ret .= "<tr class=\"odd\">";
+          } else {
+              $ret .= "<tr class=\"even\">";
+          }
+	  }
+	  $ret .= "</tr>";
+	  $ret .= "</tbody>";
+	  $ret .= "</table>";
+	  $ret .= "</div>";
+          	  
+      $ret .= "</html>";
 					
 	return $ret;
   
@@ -2508,6 +2514,18 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
     <br>
     
     <ul>
+	<a name="sslCertPrefix"></a>
+    <li><b>sslCertPrefix</b><br>
+        <br>
+        Set the prefix for the SSL certificate, default is "certs/server-". 
+        Setting this attribute you are able to specify different SSL-certificates for different Log2Syslog devices.
+        See also the TLS attribute.
+    </li>
+    </ul>
+    <br>
+    <br>
+    
+    <ul>
 	<a name="ssldebug"></a>
     <li><b>ssldebug</b><br>
         <br>
@@ -3163,6 +3181,19 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
         Es werden nur Nachrichten übermittelt (Sender) bzw. beim Empfang berücksichtigt (Collector), deren Schweregrad im 
         Attribut enthalten ist.
         Ist "respectSeverity" nicht gesetzt, werden Nachrichten aller Schweregrade verarbeitet.
+    </li>
+    </ul>
+    <br>
+    <br>
+    
+    <ul>
+	<a name="sslCertPrefix"></a>
+    <li><b>sslCertPrefix</b><br>
+        <br>
+        Setzt das Präfix der SSL-Zertifikate, die Voreinstellung ist "certs/server-". 
+        Mit diesem Attribut kann für verschiedene Log2Syslog-Devices die Verwendung unterschiedlicher SSL-Zertifikate 
+        bestimmt werden.
+        Siehe auch das "TLS" Attribut.
     </li>
     </ul>
     <br>
