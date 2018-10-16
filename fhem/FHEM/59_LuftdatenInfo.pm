@@ -437,6 +437,9 @@ sub LuftdatenInfo_ParseHttpResponse($) {
         elsif($_->{value_type} =~ /P2$/){
           $_->{value_type} = "PM2.5";
         }
+        elsif($_->{value_type} =~ /_air_quality$/){
+          $_->{value_type} = "airQuality";
+        }
         elsif($_->{value_type} =~ /_height$/){
           $_->{value_type} = "altitude";
         }
@@ -619,6 +622,15 @@ sub LuftdatenInfo_statusRequest($) {
     <b>Readings</b><br>
     <ul>
       <li>
+        <code>airQuality</code>
+        1 => good<br>
+        2 => moderate<br>
+        3 => unhealthy for sensitive groups<br>
+        4 => unhealthy<br>
+        5 => very unhealthy<br>
+        6 => hazardous<br>
+      </li>
+      <li>
         <code>altitude</code>
       </li>
       <li>
@@ -789,6 +801,15 @@ sub LuftdatenInfo_statusRequest($) {
     <a name="LuftdatenInforeadings"></a>
     <b>Readings</b><br>
     <ul>
+      <li>
+        <code>airQuality</code>
+        1 => gut<br>
+        2 => mittelmä&suml;ig<br>
+        3 => ungesund für empfindliche Menschen<br>
+        4 => ungesund<br>
+        5 => sehr ungesund<br>
+        6 => katastrophal<br>
+      </li>
       <li>
         <code>altitude</code><br>
         Höhe über NN
