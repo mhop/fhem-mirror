@@ -60,26 +60,6 @@ use warnings;
 
 my $version = "1.4.0";
 
-# # Declare functions
-# sub Attr(@);
-# sub Define($$);
-# sub Initialize($);
-# sub Set($@);
-# sub Write($@);
-# sub Undef($$);
-# sub Delete($$);
-# sub ResponseProcessing($$);
-# sub ErrorHandling($$$);
-# sub WriteReadings($$);
-# sub ParseJSON($$);
-# sub getDevices($);
-# sub getToken($);
-# sub createHttpValueStrings($@);
-# sub Notify($$);
-# sub StorePassword($$);
-# sub ReadPassword($);
-# sub DeletePassword($);
-# sub Rename(@);
 
 sub GardenaSmartBridge_Initialize($) {
 
@@ -166,7 +146,7 @@ sub Define($$) {
     my @a = split( "[ \t][ \t]*", $def );
 
     return "too few parameters: define <NAME> GardenaSmartBridge"
-      if ( @a < 2 or @a > 4 );
+      if ( @a != 2 );
     return
 "Cannot define Gardena Bridge device. Perl modul ${missingModul}is missing."
       if ($missingModul);
@@ -180,9 +160,6 @@ sub Define($$) {
 
     CommandAttr( undef, $name . ' room GardenaSmart' )
       if ( AttrVal( $name, 'room', 'none' ) eq 'none' );
-
-    CommandDefMod( undef, $name . ' ' . $hash->{TYPE} )
-      if ( @a > 2 );    # fix new define
 
     readingsSingleUpdate( $hash, 'token', 'none',        1 );
     readingsSingleUpdate( $hash, 'state', 'initialized', 1 );
@@ -277,8 +254,6 @@ sub Notify($$) {
     my $events  = deviceEvents( $dev, 1 );
     return if ( !$events );
 
-#Log3 $name, 1, "GardenaSmartBridge ($name) - Im Notify: DEVTYPE: $devtype, DEVNAME: $devname EVENT: @{$events}";
-
     getToken($hash)
       if (
         (
@@ -337,8 +312,6 @@ sub Notify($$) {
 sub Set($@) {
 
     my ( $hash, $name, $cmd, @args ) = @_;
-
-    #my ($arg, @params) = @args;
 
     if ( lc $cmd eq 'getdevicesstate' ) {
         getDevices($hash);
@@ -408,7 +381,6 @@ sub Write($@) {
         }
     );
 
-#Log3 $name, 4, "GardenaSmartBridge ($name) - Send with URL: $hash->{URL}$uri, HEADER: $header, DATA: $payload, METHOD: $method";
     Log3 $name, 4,
 "GardenaSmartBridge ($name) - Send with URL: $hash->{URL}$uri, HEADER: secret!, DATA: secret!, METHOD: $method";
 }
@@ -1025,7 +997,6 @@ sub DeletePassword($) {
 
     my $hash = shift;
 
-    #my $index = $hash->{TYPE}."_".$hash->{NAME}."_passwd";
     setKeyValue( $hash->{TYPE} . "_" . $hash->{NAME} . "_passwd", undef );
 
     return undef;

@@ -58,19 +58,6 @@ package main;
 use strict;
 use warnings;
 
-# # Declare functions
-# sub GardenaSmartDevice_Attr(@);
-# sub GardenaSmartDevice_Define($$);
-# sub GardenaSmartDevice_Initialize($);
-# sub GardenaSmartDevice_Set($@);
-# sub GardenaSmartDevice_Undef($$);
-# sub GardenaSmartDevice_WriteReadings($$);
-# sub GardenaSmartDevice_Parse($$);
-# sub GardenaSmartDevice_ReadingLangGerman($$);
-# sub GardenaSmartDevice_RigRadingsValue($$);
-# sub GardenaSmartDevice_Zulu2LocalString($);
-# sub GardenaSmartDevice_SetPredefinedStartPoints($@);
-
 my $version = "1.4.0";
 
 sub GardenaSmartDevice_Initialize($) {
@@ -129,7 +116,8 @@ BEGIN {
           AssignIoPort
           modules
           IOWrite
-          defs)
+          defs
+          makeDeviceName)
     );
 }
 
@@ -179,11 +167,9 @@ sub Define($$) {
         and $d->{IODev} == $hash->{IODev}
         and $d->{NAME} ne $name );
 
-#$attr{$name}{room}          = "GardenaSmart"    if( not defined( $attr{$name}{room} ) );
     CommandAttr( undef, $name . ' room GardenaSmart' )
       if ( AttrVal( $name, 'room', 'none' ) eq 'none' );
 
-#$attr{$name}{model}         = $category         if( not defined( $attr{$name}{model} ) );
     CommandAttr( undef, $name . ' model ' . $category )
       if ( AttrVal( $name, 'model', 'none' ) eq 'none' );
 
@@ -218,8 +204,6 @@ sub Attr(@) {
 sub Set($@) {
 
     my ( $hash, $name, $cmd, @args ) = @_;
-
-    #my ($arg, @params) = @args;
 
     my $payload;
     my $abilities = '';
