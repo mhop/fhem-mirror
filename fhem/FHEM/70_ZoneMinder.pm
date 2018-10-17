@@ -123,8 +123,8 @@ sub ZoneMinder_getZmWebUrl {
     $zmHost = $publicAddress;
   } else {
     $zmHost = $hash->{helper}{ZM_HOST};
+    $zmHost = "http://$zmHost";
   }
-  $zmHost = "http://$zmHost";
   $zmHost .= '/' if (not $zmHost =~ m/\/$/);
 
   my $zmWebContext = $attr{$name}{webConsoleContext};
