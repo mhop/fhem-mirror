@@ -5159,7 +5159,7 @@ Beispiel<br>
 <code>define heating DOIF {if ([switch] eq "on" and [$SELF:frost]) {fhem_set"heating on"} else {fhem_set"heating off"}}<br>
 attr heating DOIF_Readings frost:([outdoor:temperature] < 0)</code><br>
 <br>
-Das Reading frost triggert nur dann die definierte Abfrage, wenn sich sein Zustand ändert. Dadurch wird sichergestellt, das ein wiederholtes Schalten der Heizung vermieden wird, obwohl der Sensor outdoor zyklisch sendet.<br>
+Das Reading frost triggert nur dann die definierte Abfrage, wenn sich sein Zustand ändert. Dadurch wird sichergestellt, dass ein wiederholtes Schalten der Heizung vermieden wird, obwohl der Sensor outdoor zyklisch sendet.<br>
 <br>
 Beispiel: Push-Mitteilung über die durchschnittliche Temperatur aller Zimmer<br>
 <br>
