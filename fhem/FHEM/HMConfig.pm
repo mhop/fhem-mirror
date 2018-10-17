@@ -1678,7 +1678,7 @@ $culHmRegChan{"HM-OU-CFM-TW02"}         = $culHmRegChan{"HM-OU-CFM-PL02"};
 
 ##############################---set---########################################
 %culHmGlobalSets       = (# all but virtuals
-                       regBulk       => "-list-:-peer- -addr1:data1- -addr2:data2- ..."
+                       regBulk       => "-list-.-peer- -addr1:data1- -addr2:data2- ..."
                       ,getRegRaw     => "[List0|List1|List2|List3|List4|List5|List6] ... [-PeerChannel-]"
                       ,getConfig     => ""
                       ,regSet        => "[prep|exec] -regName- -value- ... [-peerChannel-]"
