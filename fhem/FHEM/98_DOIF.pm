@@ -5144,8 +5144,8 @@ Da man beliebige Perl-Ausdrücke verwenden kann, lässt sich z. B. der Mittelwer
 <br>
 <a name="DOIF_Readings"></a>
 Mit Hilfe des Attributes DOIF_Readings können eigene Readings innerhalb des DOIF definiert werden, auf die man im selben DOIF-Moduls zugreifen kann.
-Die Nutzung ist insbesondere dann sinnvoll, wenn mehrfach die gleichen Berechnungen innerhalb eines DOIF-Modus vorgenommen werden sollen.
-DOIF_Readings-Berechnungen funktionieren ressourcenschonend ohne Erzeugung FHEM-Events nach außen. Änderungen dieser Readings triggern allerdings das eigene DOIF-Modul, wenn sich deren Inhalt ändert.<br>
+Die Nutzung ist insbesondere dann sinnvoll, wenn zyklisch sendende Sensoren, im Perl-Modus oder mit dem Attribut do always, abgefragt werden.
+DOIF_Readings-Berechnungen funktionieren ressourcenschonend ohne Erzeugung FHEM-Events nach außen. Änderungen dieser Readings triggern allerdings das eigene DOIF-Modul, allerdings nur, wenn sich deren Inhalt ändert.<br>
 <br>
 Syntax<br>
 <br>
@@ -5153,24 +5153,21 @@ Syntax<br>
 <br>
 <code>&lt;definition&gt;</code>: Beliebiger Perlausdruck ergänzt um DOIF-Syntax in eckigen Klammern. Angaben in eckigen Klammern wirken triggernd und aktualisieren das definierte Reading.<br>
 <br>
+Beispiel<br>
+<br>
+<a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
+<code>define heating DOIF {if ([switch] eq "on" and [$SELF:frost]) {fhem_set"heating on"} else {fhem_set"heating off"}}<br>
+attr heating DOIF_Readings frost:([outdoor:temperature] < 0)</code><br>
+<br>
+Das Reading frost triggert nur dann die definierte Abfrage, wenn sich sein Zustand ändert. Dadurch wird sichergestellt, das ein wiederholtes Schalten der Heizung vermieden wird, obwohl der Sensor outdoor zyklisch sendet.<br>
+<br>
 Beispiel: Push-Mitteilung über die durchschnittliche Temperatur aller Zimmer<br>
 <br>
 <code>define di_temp DOIF ([$SELF:temperature]&gt;20) (push "Die Durchschnittstemperatur ist höher als 20 Grad, sie beträgt [$SELF:temperature]")<br>
-DOELSE<br>
 <br>
 attr di_temp DOIF_Readings temperature:[#average:d2:":temperature":temperature]<br></code>
 <br>
 Hierbei wird der aufwändig berechnete Durchschnittswert nur einmal berechnet, statt zwei mal, wenn man die Aggregationsfunktion direkt in der Bedingung und im Ausführungsteil angeben würde.<br>
-<br>
-Mit DOIF_Readings ist es ebenfalls möglich eine Wiederholung des Schaltens eines DOIF-Moduls mit do always zu provozieren und gleichzeitig zyklisch sendende Sensoren abzufragen.<br>
-<br>
-Beispiel<br>
-<br>
-<code>define heating DOIF ([switch] eq "on" and [$SELF:frost] eq "on") (set heating on) DOELSE (set heating off)<br>
-attr heating do always<br>
-attr heating DOIF_Readings frost:([outdoor:temperature] < 0 ? "on" : "off")</code><br>
-<br>
-Das Attribut do always ist in diesem Beispiel unkritisch, obwohl Temperatur zyklisch gesendet wird, da das Reading "frost" nur dann die Bedingung triggert, wenn sich dessen Inhalt ändert<br>
 <br>
 <a name="DOIF_initialize"></a>
 <b>Vorbelegung des Status mit Initialisierung nach dem Neustart</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
@@ -5730,16 +5727,17 @@ Der Benutzer kann mit der Funktion <code>set_Exec</code> beliebig viele eigene T
 <br>
 Definitionen im FHEM-Modus mit do-Attribut der Form:<br>
 <br>
-&nbsp;&nbsp;<code>DOIF (&lt;Bedingung mit Trigger&gt;) (&lt;FHEM-Befehle&gt;) DOELSE (&lt;FHEM-Befehle&gt;)</code><br>
+<ol><code>DOIF (&lt;Bedingung mit Trigger&gt;) (&lt;FHEM-Befehle&gt;) DOELSE (&lt;FHEM-Befehle&gt;)</code><br></ol>
 <br>
 lassen sich wie folgt in Perl-Modus übertragen:<br>
 <br>
-&nbsp;&nbsp;<code>DOIF {if (&lt;Bedingung mit Trigger&gt;) {fhem"&lt;FHEM-Befehle&gt;"} else {fhem"&lt;FHEM-Befehle&gt;"}}</code><br>
+<ol><code>DOIF {if (&lt;Bedingung mit Trigger&gt;) {fhem"&lt;FHEM-Befehle&gt;"} else {fhem"&lt;FHEM-Befehle&gt;"}}</code><br></ol>
 <br>
 Die Bedingungen des FHEM-Modus können ohne Änderungen in Perl-Modus übernommen werden.<br>
 <br>
 <a name="DOIF_Einfache_Anwendungsbeispiele_Perl"></a>
-<u>Einfache Anwendungsbeispiele (vgl. <a href="#DOIF_Einfache_Anwendungsbeispiele">Anwendungsbeispiele im FHEM-Modus</a>):</u><ol>
+<u>Einfache Anwendungsbeispiele (vgl. <a href="#DOIF_Einfache_Anwendungsbeispiele">Anwendungsbeispiele im FHEM-Modus</a>):</u>
+<ol>
 <br>
 <code>define di_rc_tv DOIF {if ([remotecontol:"on"]) {fhem_set"tv on"} else {fhem_set"tv off"}}</code><br>
 <br>
@@ -5748,7 +5746,8 @@ Die Bedingungen des FHEM-Modus können ohne Änderungen in Perl-Modus übernomme
 <code>define di_lamp DOIF {if ([06:00-09:00] and [sensor:brightness] < 40) {fhem_set"lamp:FILTER=STATE!=on on"} else {fhem_set"lamp:FILTER=STATE!=off off"}}</code><br>
 <br>
 </ol>
-Bemerkung: Im Gegensatz zum FHEM-Modus arbeitet der Perl-Modus ohne Auswertung des eigenen Status (Zustandsauswertung), daher muss der Anwender selbst darauf achten, wiederholende Ausführungen zu vermeiden (im oberen Beispiel z.B. mit FILTER-Option)<br>
+Bemerkung: Im Gegensatz zum FHEM-Modus arbeitet der Perl-Modus ohne Auswertung des eigenen Status (Zustandsauswertung),
+daher muss der Anwender selbst darauf achten, wiederholende Ausführungen zu vermeiden (im oberen Beispiel z.B. mit FILTER-Option). Elegant lässt sich das Problem der wiederholenden Ausführung bei zyklisch sendenden Sensoren mit Hilfe des Attributes <a href="#DOIF_DOIF_Readings">DOIF_Readings</a> lösen.<br>
 <br>
 Es können beliebig viele Ereignisblöcke definiert werden, die unabhängig von einander durch einen oder mehrere Trigger ausgewertet und zur Ausführung führen können:<br>
 <br>
