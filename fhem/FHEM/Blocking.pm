@@ -172,6 +172,8 @@ BlockingStart(;$)
     my $pid = fhemFork;
     if(!defined($pid)) {
       Log 1, "Cannot fork: $!";
+      stacktrace() if(AttrVal("global", "verbose", 1) >= 5);
+      DoTrigger("global", "CANNOT_FORK", 1);
       return $curr;
     }
 
