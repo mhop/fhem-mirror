@@ -555,12 +555,15 @@ EOF
         but the next time will be computed.</li><br>
 
     <a name="disabledForIntervals"></a>
-    <li>disabledForIntervals HH:MM-HH:MM HH:MM-HH-MM...<br>
+    <li>disabledForIntervals HH:MM-HH:MM HH:MM-HH:MM ...<br>
         Space separated list of HH:MM or D@HH:MM tupels. If the current time is
         between the two time specifications, the current device is disabled.
         Instead of HH:MM you can also specify HH or HH:MM:SS. D is the day of
-        the week, with 0 indicating Sunday and 3 indicating Wednesday. To
-        specify an interval spawning midnight, you have to specify two
+        the week, with 0 indicating Sunday and 3 indicating Wednesday.
+        Specifying the day for the "from" part does _not_ specify it for the
+        "to" part, i.e.  1@00-24 will disable from monday to the end of the
+        week, but not on sunday (as 1@00 is greater than any time on sunday).
+        To specify an interval spawning midnight, you have to specify two
         intervals, e.g.:
         <ul>
           23:00-24:00 00:00-01:00
@@ -745,13 +748,17 @@ EOF
         Ausf&uuml;hrungszeit berechnet.</li><br>
 
     <a name="disabledForIntervals"></a>
-    <li>disabledForIntervals HH:MM-HH:MM HH:MM-HH-MM...<br>
+    <li>disabledForIntervals HH:MM-HH:MM HH:MM-HH:MM ...<br>
         Das Argument ist eine Leerzeichengetrennte Liste von Minuszeichen-
         getrennten HH:MM oder D@HH:MM Paaren. Falls die aktuelle Uhrzeit
         zwischen diesen Werten f&auml;llt, dann wird die Ausf&uuml;hrung, wie
         beim disable, ausgesetzt. Statt HH:MM kann man auch HH oder HH:MM:SS
         angeben.  D ist der Tag der Woche, mit 0 als Sonntag and 3 als
-        Mittwoch.  Um einen Intervall um Mitternacht zu spezifizieren, muss man
+        Mittwoch. Die Angabe des Wochentags f&uuml;r den "von" Wert impliziert
+        _nicht_ den gleichen Tag f&uuml;r den "bis" Wert, z.Bsp.  deaktiviert
+        1@00-24 die Asf&uuml;hrung von Montag bis Ende der Woche, aber nicht
+        Sonntag (da alle Zeitangaben am Montag vor 1@00 liegen).
+        Um einen Intervall um Mitternacht zu spezifizieren, muss man
         zwei einzelne angeben, z.Bsp.:
         <ul>
           23:00-24:00 00:00-01:00
