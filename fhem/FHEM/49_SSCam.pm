@@ -27,6 +27,7 @@
 #########################################################################################################################
 #  Versions History:
 # 
+# 7.1.1  18.10.2018    Message of "Your current/simulated SVS-version..." changed, commandref corrected
 # 7.1.0  02.09.2018    PIR Sensor enable/disable, SSCam_Set/SSCam_Get optimized
 # 7.0.1  27.08.2018    enable/disable issue (https://forum.fhem.de/index.php/topic,45671.msg830869.html#msg830869)
 # 7.0.0  27.07.2018    compatibility to API v2.8
@@ -249,7 +250,7 @@ use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
 # Version und getestete SVS-Version
-my $SSCamVersion = "7.1.0";
+my $SSCamVersion = "7.1.1";
 my $compstat     = "8.2.0";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
@@ -4836,7 +4837,7 @@ sub SSCam_camop_parse ($) {
                     readingsSingleUpdate($hash, "compstate", "true", 1);
                 } else {
                     readingsSingleUpdate($hash, "compstate", "false", 1);
-                    Log3($name, 2, "$name - WARNING - your current/simulated SVS-version may be incompatible to the SSCam version $hash->{VERSION}");
+                    Log3($name, 2, "$name - WARNING - The current/simulated SVS-version $avsc may be incompatible to your SSCam version $hash->{VERSION}. Please update SScam or inform the SSCam maintainer.");
                 }
                 
                 if (!exists($data->{'data'}{'customizedPortHttp'})) {
@@ -7465,7 +7466,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
 	as an link to external use. It has to be specified as "http(s)://&lt;servername&gt;:&lt;port&gt;"  </li><br>
 
   <li><b>loginRetries</b><br>
-    set the amount of login-repetitions in case of failure (default = 1)   </li><br>
+    set the amount of login-repetitions in case of failure (default = 3)   </li><br>
   
   <li><b>noQuotesForSID</b><br>
     this attribute may be helpfull in some cases to avoid errormessage "402 - permission denied" and makes login 
@@ -8746,7 +8747,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
 	"http(s)://&lt;servername&gt;:&lt;port&gt;"   </li><br>
   
   <li><b>loginRetries</b><br>
-    setzt die Anzahl der Login-Wiederholungen im Fehlerfall (default = 1)   </li><br>
+    setzt die Anzahl der Login-Wiederholungen im Fehlerfall (default = 3)   </li><br>
   
   <li><b>noQuotesForSID</b><br>
     dieses Attribut kann in bestimmten Fällen die Fehlermeldung "402 - permission denied" 
