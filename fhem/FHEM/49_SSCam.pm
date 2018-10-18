@@ -4837,7 +4837,7 @@ sub SSCam_camop_parse ($) {
                     readingsSingleUpdate($hash, "compstate", "true", 1);
                 } else {
                     readingsSingleUpdate($hash, "compstate", "false", 1);
-                    Log3($name, 2, "$name - WARNING - The current/simulated SVS-version $avsc may be incompatible to your SSCam version $hash->{VERSION}. Please update SScam or inform the SSCam maintainer.");
+                    Log3($name, 2, "$name - WARNING - The current/simulated SVS-version ".$major.$minor.(($small=~/\d/)?$small:0)." may be incompatible to your SSCam version $hash->{VERSION}. Please update SScam or inform the SSCam maintainer.");
                 }
                 
                 if (!exists($data->{'data'}{'customizedPortHttp'})) {
