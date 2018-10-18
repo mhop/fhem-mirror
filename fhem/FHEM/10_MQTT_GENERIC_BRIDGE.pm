@@ -29,12 +29,16 @@
 ###############################################################################
 # 
 # CHANGE LOG
+# 
+# 18.10.2018 0.9.9
+#   bugfix   : qos/retain/expression aus 'mqttDefaults' in Device wurden nicht
+#              verwendet (Fehler bei der Suche (Namen))
 #
 # 14.10.2018 0.9.9
-#   change   :  'mqttForward' dokumentiert
-#   improved :  Laden von MQTT-Modul in BEGIN-Block verlagert. 
-#               Es gab Meldungen ueber Probleme (undefined subroutine) wenn
-#               MQTT-Modul in fhem.cfg nach dem Bridge-Modul stand.
+#   change   : 'mqttForward' dokumentiert
+#   improved : Laden von MQTT-Modul in BEGIN-Block verlagert. 
+#              Es gab Meldungen ueber Probleme (undefined subroutine) wenn
+#              MQTT-Modul in fhem.cfg nach dem Bridge-Modul stand.
 #
 # 11.10.2018 0.9.9
 #   change   : 'self-trigger-topic' wieder ausgebaut.
@@ -190,6 +194,7 @@
 #   - Variablen in Expression funktionieren nicht, wenn Topic kein perl-Expression ist
 #   - atopic wird in devInfo nicht dargestellt
 #   - beim Aendern von mqttXXX und globalXXX mit Zeilenumbruechen werden interne Tabellen nicht aktualisiert
+#   - qos/retain ueber mqttDefaults funktionieren nicht (in publish als *:retaind=1 dagegen schon)
 #
 # [testing]
 # 
@@ -883,7 +888,8 @@ sub getDevicePublishRecIntern($$$$$) {
 
   # reading map
   my $readingMap = $publishMap->{$reading} if defined $publishMap;
-  my $defaultReadingMap = $publishMap->{'*'} if defined $publishMap;
+  #my $defaultReadingMap = $publishMap->{'*'} if defined $publishMap;
+  my $defaultReadingMap = $devMap->{':defaults'} if defined $publishMap;
   
   # global reading map
   my $globalReadingMap = $globalPublishMap->{$reading} if defined $globalPublishMap;
@@ -960,48 +966,59 @@ sub retrieveQosRetainExpression($$$$) {
   my $retain = undef;
   my $expression = undef;
 
+  # Log3('GB',1,"MQTT_GENERIC_BRIDGE: retrieveQosRetainExpression: globalDefaultReadingMap: ".Dumper($globalDefaultReadingMap));
+  # Log3('GB',1,"MQTT_GENERIC_BRIDGE: retrieveQosRetainExpression: globalReadingMap: ".Dumper($globalReadingMap));
+  # Log3('GB',1,"MQTT_GENERIC_BRIDGE: retrieveQosRetainExpression: defaultReadingMap: ".Dumper($defaultReadingMap));
+  # Log3('GB',1,"MQTT_GENERIC_BRIDGE: retrieveQosRetainExpression: readingMap: ".Dumper($readingMap));
+
   if(defined $readingMap) {
     $qos =          $readingMap->{'qos'};
     $retain =       $readingMap->{'retain'};
     $expression =   $readingMap->{'expression'};
-    if(defined($readingMap->{':defaults'})) {
-      $qos =        $readingMap->{':defaults'}->{'pub:qos'} unless defined $qos;
-      $retain =     $readingMap->{':defaults'}->{'pub:retain'} unless defined $retain;
-      $expression = $readingMap->{':defaults'}->{'expression'} unless defined $expression;
-    }
+    # if(defined($readingMap->{':defaults'})) {
+    #   $qos =        $readingMap->{':defaults'}->{'pub:qos'} unless defined $qos;
+    #   $retain =     $readingMap->{':defaults'}->{'pub:retain'} unless defined $retain;
+    #   $expression = $readingMap->{':defaults'}->{'expression'} unless defined $expression;
+    # }
   }
 
   if(defined $defaultReadingMap) {
+    $qos =          $defaultReadingMap->{'pub:qos'} unless defined $qos;
+    $retain =       $defaultReadingMap->{'pub:retain'} unless defined $retain;
+    $expression =   $defaultReadingMap->{'pub:expression'} unless defined $expression;
     $qos =          $defaultReadingMap->{'qos'} unless defined $qos;
     $retain =       $defaultReadingMap->{'retain'} unless defined $retain;
     $expression =   $defaultReadingMap->{'expression'} unless defined $expression;
-    if(defined($defaultReadingMap->{':defaults'})) {
-      $qos =        $defaultReadingMap->{':defaults'}->{'pub:qos'} unless defined $qos;
-      $retain =     $defaultReadingMap->{':defaults'}->{'pub:retain'} unless defined $retain;
-      $expression = $defaultReadingMap->{':defaults'}->{'expression'} unless defined $expression;
-    }
+    # if(defined($defaultReadingMap->{':defaults'})) {
+    #   $qos =        $defaultReadingMap->{':defaults'}->{'pub:qos'} unless defined $qos;
+    #   $retain =     $defaultReadingMap->{':defaults'}->{'pub:retain'} unless defined $retain;
+    #   $expression = $defaultReadingMap->{':defaults'}->{'expression'} unless defined $expression;
+    # }
   }
 
   if(defined $globalReadingMap) {
     $qos =          $globalReadingMap->{'qos'};
     $retain =       $globalReadingMap->{'retain'};
     $expression =   $globalReadingMap->{'expression'} unless defined $expression;
-    if(defined($globalReadingMap->{':defaults'})) {
-      $qos =        $globalReadingMap->{':defaults'}->{'pub:qos'} unless defined $qos;
-      $retain =     $globalReadingMap->{':defaults'}->{'pub:retain'} unless defined $retain;
-      $expression = $globalReadingMap->{':defaults'}->{'expression'} unless defined $expression;
-    }
+    # if(defined($globalReadingMap->{':defaults'})) {
+    #   $qos =        $globalReadingMap->{':defaults'}->{'pub:qos'} unless defined $qos;
+    #   $retain =     $globalReadingMap->{':defaults'}->{'pub:retain'} unless defined $retain;
+    #   $expression = $globalReadingMap->{':defaults'}->{'expression'} unless defined $expression;
+    # }
   }
   
   if(defined $globalDefaultReadingMap) {
+    $qos =          $globalDefaultReadingMap->{'pub:qos'} unless defined $qos;
+    $retain =       $globalDefaultReadingMap->{'pub:retain'} unless defined $retain;
+    $expression =   $globalDefaultReadingMap->{'pub:expression'} unless defined $expression;
     $qos =          $globalDefaultReadingMap->{'qos'} unless defined $qos;
     $retain =       $globalDefaultReadingMap->{'retain'} unless defined $retain;
     $expression =   $globalDefaultReadingMap->{'expression'} unless defined $expression;
-    if(defined($globalDefaultReadingMap->{':defaults'})) {
-      $qos =        $globalDefaultReadingMap->{':defaults'}->{'pub:qos'} unless defined $qos;
-      $retain =     $globalDefaultReadingMap->{':defaults'}->{'pub:retain'} unless defined $retain;
-      $expression = $globalDefaultReadingMap->{':defaults'}->{'expression'} unless defined $expression;
-    }
+    # if(defined($globalDefaultReadingMap->{':defaults'})) {
+    #   $qos =        $globalDefaultReadingMap->{':defaults'}->{'pub:qos'} unless defined $qos;
+    #   $retain =     $globalDefaultReadingMap->{':defaults'}->{'pub:retain'} unless defined $retain;
+    #   $expression = $globalDefaultReadingMap->{':defaults'}->{'expression'} unless defined $expression;
+    # }
   }
 
   $qos = 0 unless defined $qos;
