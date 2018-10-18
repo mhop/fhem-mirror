@@ -1267,6 +1267,7 @@ HUEDevice_Parse($$)
       $readings{voltage} = $state->{voltage} if( defined($state->{voltage}) );
       $readings{current} = $state->{current} if( defined($state->{current}) );
       $readings{consumption} = $state->{consumption} if( defined($state->{consumption}) );
+      $readings{water} = $state->{water} if( defined($state->{water}) );
     }
 
     if( scalar keys %readings ) {

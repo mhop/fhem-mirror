@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 31_HUEDevice: added water reading for Xiaomi Aqara Water sensor
   - bugfix:  73_GardenaSmartBridge/Device
                 fix Undefined subroutine &GardenaSmartDevice
   - change:  93_DbLog: Log output of recuceLogNbl & use of charFilter enhanced
