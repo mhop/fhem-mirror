@@ -48,7 +48,7 @@ my @ampllist = (24, 27, 30, 33, 36, 38, 40, 42); # rAmpl(dB)
 my $sccMods = "STACKABLE_CC:TSSTACKED:STACKABLE";
 my $culNameRe = "^(CUL|TSCUL)\$";
 
-my $clientsSlowRF    = ":FS20:FHT.*:KS300:USF1000:BS:HMS: ".
+my $clientsSlowRF    = ":FS20:FHT.*:KS300:USF1000:BS:HMS:FS20V: ".
                        ":CUL_EM:CUL_WS:CUL_FHTTK:CUL_HOERMANN: ".
                        ":ESA2000:CUL_IR:CUL_TX:Revolt:IT:UNIRoll:SOMFY: ".
                        ":$sccMods:CUL_RFR::CUL_TCM97001:CUL_REDIRECT:";
@@ -58,6 +58,7 @@ my $clientsWMBus     = ":WMBUS:HMS:CUL_IR:$sccMods:";
 my $clientsKOPP_FC   = ":KOPP_FC:HMS:CUL_IR:$sccMods:";
 
 my %matchListSlowRF = (
+    "0:FS20V"     => "^81..(04|0c)..0101a001......00[89a-f]...",
     "1:USF1000"   => "^81..(04|0c)..0101a001a5ceaa00....",
     "2:BS"        => "^81..(04|0c)..0101a001a5cf",
     "3:FS20"      => "^81..(04|0c)..0101a001",
