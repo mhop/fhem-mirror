@@ -394,7 +394,7 @@ sub stateRequestTimer($) {
     stateRequest($hash);
 
     InternalTimer( gettimeofday() + $hash->{INTERVAL} + int( rand(300) ),
-        "XiaomiBTLESens_stateRequestTimer", $hash );
+        "XiaomiBTLESens::stateRequestTimer", $hash );
 
     Log3 $name, 4,
       "XiaomiBTLESens ($name) - stateRequestTimer: Call Request Timer";
