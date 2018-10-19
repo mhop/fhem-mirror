@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 89_FULLY: New commands for sound playback and photo.
   - bugfix:  74_XiaomiBTLESens: fix disableForTimer Problem after reboot
   - feature: 31_HUEDevice: added water reading for Xiaomi Aqara Water sensor
   - bugfix:  73_GardenaSmartBridge/Device

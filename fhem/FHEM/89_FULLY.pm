@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#  89_FULLY.pm 0.8
+#  89_FULLY.pm 0.9
 #
 #  $Id$
 #
@@ -35,9 +35,10 @@ sub FULLY_Abort ($);
 sub FULLY_UpdateReadings ($$);
 sub FULLY_Ping ($$);
 
-my $FULLY_VERSION = "0.8";
+my $FULLY_VERSION = "0.9";
 my $FULLY_TIMEOUT = 4;
 my $FULLY_POLL_INTERVAL = 3600;
+my $FULLY_REQUIRED_VERSION = 1.27;
 
 my $FULLY_FHEM_COMMAND = qq(
 function SendRequest(FHEM_Address, Devicename, Command) {
@@ -93,15 +94,14 @@ sub FULLY_Define ($$)
 	$hash->{host} = $$a[2];
 	$hash->{version} = $FULLY_VERSION;
 	$hash->{onForTimer} = 'off';
-#	$hash->{remoteAdmin} = '<html><a href="http://'.$hash->{host}.':2323">Remote Admin</a></html>';
 	$hash->{fully}{password} = $$a[3];
 	$hash->{fully}{schedule} = 0;
 
-	Log3 $name, 1, "FULLY: Version $FULLY_VERSION Opening device ".$hash->{host};
+	Log3 $name, 1, "FULLY: [$name] Version $FULLY_VERSION Opening device ".$hash->{host};
 	
 	my $result = FULLY_GetDeviceInfo ($name);
 	if (!FULLY_UpdateReadings ($hash, $result)) {
-		Log3 $name, 2, "FULLY: Update of device info failed";
+		Log3 $name, 2, "FULLY: [$name] Update of device info failed";
 	}
 
 	if (@$a == 5) {
@@ -130,7 +130,7 @@ sub FULLY_Attr ($@)
 			if ($attrval >= 10 && $attrval <= 86400) {
 				my $curval = AttrVal ($name, 'pollInterval', $FULLY_POLL_INTERVAL);
 				if ($attrval != $curval) {
-					Log3 $name, 2, "FULLY: Polling interval set to $attrval";
+					Log3 $name, 2, "FULLY: [$name] Polling interval set to $attrval";
 					RemoveInternalTimer ($hash);
 					$hash->{nextUpdate} = strftime "%d.%m.%Y %H:%M:%S", localtime (time+$attrval);
 					InternalTimer (gettimeofday()+$attrval, "FULLY_UpdateDeviceInfo", $hash, 0);
@@ -218,17 +218,21 @@ sub FULLY_Set ($@)
 	my ($hash, $a, $h) = @_;
 	my $name = shift @$a;
 	my $opt = shift @$a;
-	my $options = "brightness clearCache:noArg exit:noArg lock:noArg motionDetection:on,off ".
-		"off:noArg on:noArg on-for-timer restart:noArg screenOffTimer screenSaver:start,stop ".
-		"screenSaverTimer screenSaverURL speak startURL unlock:noArg url";
+	my $options = "brightness photo:noArg clearCache:noArg exit:noArg lock:noArg motionDetection:on,off ".
+		"off:noArg on:noArg on-for-timer playSound restart:noArg screenOffTimer screenSaver:start,stop ".
+		"screenSaverTimer screenSaverURL speak startURL stopSound:noArg unlock:noArg url ".
+		"volume";
 	my $response;
 	
 	# Fully commands without argument
 	my %cmds = (
 		"clearCache" => "clearCache",
-		"exit" => "exitApp", "restart" => "restartApp",
+		"photo" => "getCamshot",
+		"exit" => "exitApp",
+		"restart" => "restartApp",
 		"on" => "screenOn", "off" => "screenOff",
-		"lock" => "enabledLockedMode", "unlock" => "disableLockedMode"
+		"lock" => "enabledLockedMode", "unlock" => "disableLockedMode",
+		"stopSound" => "stopSound"
 	);
 	
 	my $disable = AttrVal ($name, 'disable', 0);
@@ -329,6 +333,22 @@ sub FULLY_Set ($@)
 		my $enctext = urlEncode ($text);
 		$response = FULLY_Execute ($hash, "textToSpeech", { "text" => "$enctext" }, 1);
 	}
+	elsif ($opt eq 'playSound') {
+		my $url = shift @$a;
+		my $loop = shift @$a;
+		$loop = defined ($loop) ? 'true' : 'false';
+		return "Usage: set $name playSound {url} [loop]" if (!defined ($url));
+		$response = FULLY_Execute ($hash, "playSound",
+			{ "url" => "$url", "loop" => "$loop"}, 1);
+	}
+	elsif ($opt eq 'volume') {
+		my $level = shift @$a;
+		my $stream = shift @$a;
+		return "Usage: set $name volume {level} {stream}"
+			if (!defined ($stream) || $level !~ /^[0-9]+$/ || $stream !~ /^[0-9]+$/);
+		$response = FULLY_Execute ($hash, "setAudioVolume",
+			{ "level" => "$level", "stream" => "$stream"}, 1);
+	}
 	elsif ($opt eq 'url') {
 		my $url = shift @$a;
 		my $cmd = defined ($url) ? "loadURL" : "loadStartURL";
@@ -340,7 +360,7 @@ sub FULLY_Set ($@)
 	
 	my $result = FULLY_ProcessDeviceInfo ($name, $response);
 	if (!FULLY_UpdateReadings ($hash, $result)) {
-		Log3 $name, 2, "FULLY: Command failed";
+		Log3 $name, 2, "FULLY: [$name] Command failed";
 		return "FULLY: Command failed";
 	}
 	
@@ -365,11 +385,11 @@ sub FULLY_Get ($@)
 	if ($opt eq 'info') {
 		my $result = FULLY_Execute ($hash, 'deviceInfo', undef, 1);
 		if (!defined ($result) || $result eq '') {
-			Log3 $name, 2, "FULLY: Command failed";
+			Log3 $name, 2, "FULLY: [$name] Command failed";
 			return "FULLY: Command failed";
 		}
 		elsif ($response =~ /Wrong password/) {
-			Log3 $name, 2, "FULLY: Wrong password";
+			Log3 $name, 2, "FULLY: [$name] Wrong password";
 			return "FULLY: Wrong password";
 		}
 
@@ -386,7 +406,7 @@ sub FULLY_Get ($@)
 	elsif ($opt eq 'update') {
 		my $result = FULLY_GetDeviceInfo ($name);
 		if (!FULLY_UpdateReadings ($hash, $result)) {
-			Log3 $name, 2, "FULLY: Command failed";
+			Log3 $name, 2, "FULLY: [$name] Command failed";
 			return "FULLY: Command failed";
 		}
 	}
@@ -428,7 +448,7 @@ sub FULLY_Execute ($$$$)
 	my $i = 0;
 	while ($i <= $repeatCommand && (!defined ($response) || $response eq '')) {
 		$response = GetFileFromURL ("$url&password=".$hash->{fully}{password}, $timeout);
-		Log3 $name, 4, "FULLY: HTTP response empty" if (defined ($response) && $response eq '');
+		Log3 $name, 4, "FULLY: [$name] HTTP response empty" if (defined ($response) && $response eq '');
 		$i++;
 	}
 	
@@ -511,6 +531,10 @@ sub FULLY_ProcessDeviceInfo ($$)
 		elsif ($rn eq 'screen_status') {
 			$parameters .= "|state=$rv";
 		}
+		elsif ($rn eq 'fully_version') {
+			Log3 $name, 1, "FULLY: [$name] Version of fully browser is $rv. Version $FULLY_REQUIRED_VERSION is required."
+				if ($rv < $FULLY_REQUIRED_VERSION);
+		}
 		$parameters .= "|$rn=$rv";
 	}
 	
@@ -535,10 +559,10 @@ sub FULLY_GotDeviceInfo ($)
 	
 	my $rc = FULLY_UpdateReadings ($hash, $string);
 	if (!$rc) {
-		Log3 $name, 2, "FULLY: Request timed out";
+		Log3 $name, 2, "FULLY: [$name] Request timed out";
 		if ($hash->{fully}{schedule} == 0) {
 			$hash->{fully}{schedule} += 1;
-			Log3 $name, 2, "FULLY: Rescheduling in $timeout seconds.";
+			Log3 $name, 2, "FULLY: [$name] Rescheduling in $timeout seconds.";
 			$pollInterval = $timeout;
 		}
 		else {
@@ -565,10 +589,10 @@ sub FULLY_Abort ($)
 
 	delete $hash->{fully}{bc} if (exists ($hash->{fully}{bc}));		
 
-	Log3 $name, 2, "FULLY: request timed out";
+	Log3 $name, 2, "FULLY: [$name] request timed out";
 	if ($hash->{fully}{schedule} == 0) {
 		$hash->{fully}{schedule} += 1;
-		Log3 $name, 2, "FULLY: Rescheduling in $timeout seconds.";
+		Log3 $name, 2, "FULLY: [$name] Rescheduling in $timeout seconds.";
 		$pollInterval = $timeout;
 	}
 	else {
@@ -591,13 +615,13 @@ sub FULLY_UpdateReadings ($$)
 	my $rc = 1;
 
 	if (!defined ($result) || $result eq '') {
-		Log3 $name, 2, "FULLY: empty response";
+		Log3 $name, 2, "FULLY: [$name] empty response";
 		return 0;
 	}
 	
 	my @parameters = split ('\|', $result);
 	if (scalar (@parameters) == 0) {
-		Log3 $name, 2, "FULLY: empty response";
+		Log3 $name, 2, "FULLY: [$name] empty response";
 		return 0;
 	}
 	
@@ -642,7 +666,7 @@ sub FULLY_Ping ($$)
 		$temp = qx(ping -c $count $host 2>&1);
 	}
 	
-	Log3 $name, 4, "FULLY: Ping response = $temp" if (defined ($temp));
+	Log3 $name, 4, "FULLY: [$name] Ping response = $temp" if (defined ($temp));
 	
 	sleep (1);
 	
@@ -696,6 +720,13 @@ sub FULLY_Ping ($$)
 		<li><b>set &lt;name&gt; on-for-timer [{ &lt;Seconds&gt; | <u>forever</u> | off }]</b><br/>
 			Set timer for display. Default is forever.
 		</li><br/>
+		<li><b>set &lt;name&gt; photo</b><br/>
+			Take a picture with device cam. Setting motion detection must be enabled. Picture
+			can be viewed in remote admin interface under device info.
+		</li><br/>
+		<li><b>set &lt;name&gt; playSound &lt;url&gt; [loop]</b><br/>
+			Play sound from URL.
+		</li><br/>
 		<li><b>set &lt;name&gt; restart</b><br/>
 			Restart Fully.
 		</li><br/>
@@ -718,8 +749,15 @@ sub FULLY_Ping ($$)
 		<li><b>set &lt;name&gt; startURL &lt;URL&gt;</b><br/>
 			Show this URL when FULLY starts.<br/>
 		</li><br/>
+		<li><b>set &lt;name&gt; stopSound</b><br/>
+			Stop playback of sound if playback has been started with option <i>loop</i>.
+		</li><br/>
 		<li><b>set &lt;name&gt; url [&lt;URL&gt;]</b><br/>
 			Navigate to <i>URL</i>. If no URL is specified navigate to start URL.
+		</li><br/>
+		<li><b>set &lt;name&gt; volume &lt;level&gt; &lt;stream&gt;</b><br/>
+			Set audio volume. Range of parameter <i>level</i> is 0-100, range of parameter
+			<i>stream</i> is 1-10. 
 		</li><br/>
    </ul>
    <br/>
