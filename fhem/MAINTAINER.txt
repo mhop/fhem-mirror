@@ -329,11 +329,13 @@ FHEM/70_PushNotifier.pm      xusader              Unterstuetzende Dienste
 FHEM/70_Pushalot.pm          Talkabout            Unterstuetzende Dienste
 FHEM/70_Pushsafer.pm         markusbloch          Unterstuetzende Dienste
 FHEM/70_DoorPi.pm            pahenning            Automatisierung
+FHEM/70_ZoneMinder.pm        delmar               Sonstige Systeme
 FHEM/71_ONKYO_AVR_ZONE.pm    loredo               Multimedia
 FHEM/71_PHILIPS_AUDIO.pm     ra666ack             Multimedia
 FHEM/71_YAMAHA_AVR.pm        markusbloch          Multimedia
 FHEM/71_YAMAHA_BD.pm         markusbloch          Multimedia
 FHEM/71_YAMAHA_NP.pm         ra666ack             Multimedia
+FHEM/71_ZM_Monitor.pm        delmar               Sonstige Systeme
 FHEM/72_FB_CALLMONITOR.pm    markusbloch          Unterstuetzende Dienste
 FHEM/72_FB_CALLLIST.pm       markusbloch          Frontends
 FHEM/72_FRITZBOX.pm          tupol                FRITZBOX (link als PM an tupol)
