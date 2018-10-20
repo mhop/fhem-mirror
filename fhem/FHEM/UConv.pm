@@ -705,7 +705,8 @@ sub mph2bft($) {
 
 sub distance($$$$;$$) {
     my ( $lat1, $lng1, $lat2, $lng2, $rnd, $unit ) = @_;
-    return "0.0" if ( $lat1 eq $lat2 && $lng1 eq $lng2 );
+    return _round( "0.000000000", $rnd )
+      if ( $lat1 eq $lat2 && $lng1 eq $lng2 );
 
     use constant M_PI => 4 * atan2( 1, 1 );
     my $pi80 = M_PI / 180;
