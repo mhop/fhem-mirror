@@ -1142,7 +1142,8 @@ sub SSCam_Get($@) {
                    "svsinfo:noArg ".
 				   "listLog ".
 				   "storedCredentials:noArg ".
-				   "scanVirgin:noArg "
+				   "scanVirgin:noArg ".
+                   "versionNotes "
                    ;
 	}
 				  
