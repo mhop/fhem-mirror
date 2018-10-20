@@ -1476,19 +1476,22 @@ sub RESIDENTStk_DurationTimer($;$) {
     return undef;
 }
 
-sub RESIDENTStk_SetLocation($$$;$$$$$$) {
-    my ( $name, $location, $trigger, $id, $time,
-        $lat, $long, $address, $device ) = @_;
-    my $hash         = $defs{$name};
-    my $TYPE         = GetType($name);
-    my $prefix       = RESIDENTStk_GetPrefixFromType($name);
-    my $state        = ReadingsVal( $name, "state", "initialized" );
-    my $presence     = ReadingsVal( $name, "presence", "present" );
-    my $currLocation = ReadingsVal( $name, "location", "-" );
-    my $currWayhome  = ReadingsVal( $name, "wayhome", "0" );
-    my $currLat      = ReadingsVal( $name, "locationLat", "-" );
-    my $currLong     = ReadingsVal( $name, "locationLong", "-" );
-    my $currAddr     = ReadingsVal( $name, "locationAddr", "" );
+sub RESIDENTStk_SetLocation(@) {
+    my (
+        $name,    $location,   $trigger, $id,       $time,
+        $lat,     $long,       $address, $device,   $posLat,
+        $posLong, $posLocDist, $motion,  $wifiSSID, $wifiBSSID
+    ) = @_;
+    my $hash          = $defs{$name};
+    my $TYPE          = GetType($name);
+    my $prefix        = RESIDENTStk_GetPrefixFromType($name);
+    my $state         = ReadingsVal( $name, "state", "initialized" );
+    my $presence      = ReadingsVal( $name, "presence", "present" );
+    my $currLocation  = ReadingsVal( $name, "location", "-" );
+    my $currWayhome   = ReadingsVal( $name, "wayhome", "0" );
+    my $currLat       = ReadingsVal( $name, "locationLat", "-" );
+    my $currLong      = ReadingsVal( $name, "locationLong", "-" );
+    my $currAddr      = ReadingsVal( $name, "locationAddr", "" );
     $id   = "-" if ( !$id   || $id eq "" );
     $lat  = "-" if ( !$lat  || $lat eq "" );
     $long = "-" if ( !$long || $long eq "" );
