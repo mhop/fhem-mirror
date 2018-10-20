@@ -1478,29 +1478,40 @@ sub RESIDENTStk_DurationTimer($;$) {
 
 sub RESIDENTStk_SetLocation(@) {
     my (
-        $name,    $location,   $trigger, $id,       $time,
-        $lat,     $long,       $address, $device,   $posLat,
-        $posLong, $posLocDist, $motion,  $wifiSSID, $wifiBSSID
+        $name,     $location, $trigger,     $id,         $time,
+        $lat,      $long,     $address,     $device,     $radius,
+        $posLat,   $posLong,  $posDistHome, $posDistLoc, $motion,
+        $wifiSSID, $wifiBSSID
     ) = @_;
-    my $hash          = $defs{$name};
-    my $TYPE          = GetType($name);
-    my $prefix        = RESIDENTStk_GetPrefixFromType($name);
-    my $state         = ReadingsVal( $name, "state", "initialized" );
-    my $presence      = ReadingsVal( $name, "presence", "present" );
-    my $currLocation  = ReadingsVal( $name, "location", "-" );
-    my $currWayhome   = ReadingsVal( $name, "wayhome", "0" );
-    my $currLat       = ReadingsVal( $name, "locationLat", "-" );
-    my $currLong      = ReadingsVal( $name, "locationLong", "-" );
-    my $currAddr      = ReadingsVal( $name, "locationAddr", "" );
+    my $hash            = $defs{$name};
+    my $TYPE            = GetType($name);
+    my $prefix          = RESIDENTStk_GetPrefixFromType($name);
+    my $state           = ReadingsVal( $name, "state", "initialized" );
+    my $presence        = ReadingsVal( $name, "presence", "present" );
+    my $currLocation    = ReadingsVal( $name, "location", "-" );
+    my $currWayhome     = ReadingsVal( $name, "wayhome", "0" );
+    my $currLat         = ReadingsVal( $name, "locationLat", "-" );
+    my $currLong        = ReadingsVal( $name, "locationLong", "-" );
+    my $currRadius      = ReadingsVal( $name, "locationRadius", "" );
+    my $currAddr        = ReadingsVal( $name, "locationAddr", "" );
+    my $currPosLat      = ReadingsVal( $name, "positionLat", "" );
+    my $currPosLong     = ReadingsVal( $name, "positionLong", "" );
+    my $currPosDistHome = ReadingsVal( $name, "positionDistHome", "" );
+    my $currPosDistLoc  = ReadingsVal( $name, "positionDistLocation", "" );
+    my $currPosMotion   = ReadingsVal( $name, "positionMotion", "" );
+    my $currPosSSID     = ReadingsVal( $name, "positionSSID", "" );
+    my $currPosBSSID    = ReadingsVal( $name, "positionBSSID", "" );
     $id   = "-" if ( !$id   || $id eq "" );
     $lat  = "-" if ( !$lat  || $lat eq "" );
     $long = "-" if ( !$long || $long eq "" );
     $address = "" if ( !$address );
     $time    = "" if ( !$time );
     $device  = "" if ( !$device );
+    $posLat  = "" if ( !$posLat || $posLat eq "-" );
+    $posLong = "" if ( !$posLong || $posLong eq "-" );
 
     Log3 $name, 5,
-"$TYPE $name: received location information: id=$id name=$location trig=$trigger date=$time lat=$lat long=$long address:$address device=$device";
+"$TYPE $name: received location information: id=$id name=$location trig=$trigger date=$time lat=$lat long=$long posLat=$posLat posLong=$posLong address:$address device=$device";
 
     my $searchstring;
 
@@ -1521,6 +1532,61 @@ sub RESIDENTStk_SetLocation(@) {
       if ( $trigger == 1 );
     readingsBulkUpdate( $hash, "locationPresence", "absent" )
       if ( $trigger == 0 );
+
+    # travelled distance for location
+    my $locTravDist = "";
+    if ( $lat ne "" && $long ne "" ) {
+        my $locLatVal = ReadingsVal( $name, "locationLat", "-" );
+        $locLatVal = ReadingsVal( $name, "lastLocationLat", "-" )
+          if ( $locLatVal eq "-" );
+        my $locLongVal = ReadingsVal( $name, "locationLong", "-" );
+        $locLongVal = ReadingsVal( $name, "lastLocationLong", "-" )
+          if ( $locLongVal eq "-" );
+
+        if ( $locLatVal ne "-" && $locLongVal ne "-" ) {
+            $locTravDist =
+              UConv::distance( $lat, $long, $locLatVal, $locLongVal, 2 );
+        }
+    }
+
+    # travelled distance for position
+    my $posTravDist = "";
+    if ( $posLat ne "" && $posLong ne "" ) {
+        my $currPosLatVal  = ReadingsVal( $name, "positionLat",  "" );
+        my $currPosLongVal = ReadingsVal( $name, "positionLong", "" );
+
+        if ( $currPosLatVal ne "" && $currPosLongVal ne "" ) {
+            $posTravDist = UConv::distance( $posLat, $posLong, $currPosLatVal,
+                $currPosLongVal, 2 );
+        }
+    }
+
+    # backup last known position
+    foreach (
+        'positionLat',      'positionLong',
+        'positionDistHome', 'positionDistLocation',
+        'positionMotion',   'positionSSID',
+        'positionBSSID',    'positionTravDistance',
+        'locationTravDistance'
+      )
+    {
+        my $currReading = $_;
+        my $lastReading = "last" . $_;
+        my $currVal     = ReadingsVal( $name, $currReading, undef );
+        readingsBulkUpdate( $hash, $lastReading, $currVal )
+          if ( defined($currVal) );
+    }
+
+    # update position based readings
+    readingsBulkUpdate( $hash, "positionLat",          $posLat );
+    readingsBulkUpdate( $hash, "positionLong",         $posLong );
+    readingsBulkUpdate( $hash, "positionDistHome",     $posDistHome );
+    readingsBulkUpdate( $hash, "positionDistLocation", $posDistLoc );
+    readingsBulkUpdate( $hash, "positionMotion",       $motion );
+    readingsBulkUpdate( $hash, "positionSSID",         $wifiSSID );
+    readingsBulkUpdate( $hash, "positionBSSID",        $wifiBSSID );
+    readingsBulkUpdate( $hash, "positionTravDistance", $posTravDist );
+    readingsBulkUpdate( $hash, "locationTravDistance", $locTravDist );
 
     # check for implicit state change
     #
@@ -1633,15 +1699,17 @@ sub RESIDENTStk_SetLocation(@) {
       )
     {
         Log3 $name, 5, "$TYPE $name: archiving last known location";
-        readingsBulkUpdate( $hash, "lastLocationLat",  $currLat );
-        readingsBulkUpdate( $hash, "lastLocationLong", $currLong );
-        readingsBulkUpdate( $hash, "lastLocationAddr", $currAddr )
+        readingsBulkUpdate( $hash, "lastLocationLat",    $currLat );
+        readingsBulkUpdate( $hash, "lastLocationLong",   $currLong );
+        readingsBulkUpdate( $hash, "lastLocationRadius", $currRadius );
+        readingsBulkUpdate( $hash, "lastLocationAddr",   $currAddr )
           if ( $currAddr ne "" );
         readingsBulkUpdate( $hash, "lastLocation", $currLocation );
     }
 
-    readingsBulkUpdate( $hash, "locationLat",  $lat );
-    readingsBulkUpdate( $hash, "locationLong", $long );
+    readingsBulkUpdate( $hash, "locationLat",    $lat );
+    readingsBulkUpdate( $hash, "locationLong",   $long );
+    readingsBulkUpdate( $hash, "locationRadius", $radius );
 
     if ( $address ne "" ) {
         readingsBulkUpdate( $hash, "locationAddr", $address );
