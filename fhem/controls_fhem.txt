@@ -1,4 +1,4 @@
-REV 17566
+REV 17568
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2018-10-19_07:45:03 261208 ./CHANGED
+UPD 2018-10-20_07:45:04 261274 ./CHANGED
 UPD 2018-10-13_07:45:03 38075 ./MAINTAINER.txt
 UPD 2018-09-09_07:45:03 39688 ./configDB.pm
 UPD 2018-09-17_07:45:03 19987 ./fhem.cfg.demo
@@ -406,7 +406,7 @@ UPD 2015-07-28_14:05:31 12845 FHEM/88_VantagePro2.pm
 UPD 2015-07-28_14:05:31 4198 FHEM/88_WEBCOUNT.pm
 UPD 2018-05-01_07:45:03 39556 FHEM/88_xs1Bridge.pm
 UPD 2018-04-14_07:45:02 22528 FHEM/88_xs1Dev.pm
-UPD 2018-08-29_07:45:04 21359 FHEM/89_FULLY.pm
+UPD 2018-10-20_07:45:04 22965 FHEM/89_FULLY.pm
 UPD 2016-01-05_07:45:12 44169 FHEM/89_HEATRONIC.pm
 UPD 2016-07-11_07:45:14 62016 FHEM/89_VCONTROL.pm
 UPD 2016-12-07_07:45:10 15485 FHEM/90_SIGNALduino_un.pm
@@ -683,12 +683,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2018-10-19_07:45:07 3589988 docs/commandref.html
+UPD 2018-10-20_07:45:08 3590621 docs/commandref.html
 UPD 2018-10-19_07:45:09 2207536 docs/commandref_DE.html
 UPD 2018-10-08_07:45:02 76228 docs/commandref_frame.html
 UPD 2018-10-08_07:45:02 85677 docs/commandref_frame_DE.html
-UPD 2018-10-19_07:45:09 198933 docs/commandref_modular.html
-UPD 2018-10-19_07:45:10 209614 docs/commandref_modular_DE.html
+UPD 2018-10-20_07:45:11 198933 docs/commandref_modular.html
+UPD 2018-10-20_07:45:12 209614 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
