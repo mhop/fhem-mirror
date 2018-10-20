@@ -117,6 +117,7 @@ sub GEOFANCY_CGI() {
     my $time        = "";
     my $locName     = "";
     my $posLocDist  = "";
+    my $posHomeDist = "";
     my $locTravDist = "";
     my $motion      = "";
     my $wifiSSID    = "";
@@ -486,6 +487,21 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
 "GEOFANCY $name: Unknown device UUID $device: Set attribute devAlias for $name or assign $device to any ROOMMATE or GUEST device using attribute r*_geofenceUUIDs"
       if ( $deviceAlias eq "-" );
 
+    # distance between home and position
+    my $homeLat  = AttrVal( "global", "latitude",  undef );
+    my $homeLong = AttrVal( "global", "longitude", undef );
+    if ( $homeLat && $homeLong ) {
+        Debug "$homeLat $homeLong";
+        if ( $posLat ne "" && $posLong ne "" ) {
+            $posHomeDist =
+              UConv::distance( $posLat, $posLong, $homeLat, $homeLong, 2 );
+        }
+        elsif ( $lat ne "" && $long ne "" ) {
+            $posHomeDist =
+              UConv::distance( $lat, $long, $homeLat, $homeLong, 2 );
+        }
+    }
+
     # distance between location and position
     if ( $lat ne "" && $long ne "" && $posLat ne "" && $posLong ne "" ) {
         $posLocDist = UConv::distance( $posLat, $posLong, $lat, $long, 2 );
@@ -563,8 +579,9 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
 
         # backup last known position
         foreach (
-            'PosSSID', 'PosBSSID',   'PosMotion',   'PosLat',
-            'PosLong', 'PosLocDist', 'PosTravDist', 'LocTravDist'
+            'PosSSID',    'PosBSSID',    'PosMotion',
+            'PosLat',     'PosLong',     'PosHomeDist',
+            'PosLocDist', 'PosTravDist', 'LocTravDist'
           )
         {
             $currReading = "curr" . $_ . "_" . $deviceAlias;
@@ -578,6 +595,8 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
         readingsBulkUpdate( $hash, "currPosMotion_" . $deviceAlias, $motion );
         readingsBulkUpdate( $hash, "currPosLat_" . $deviceAlias,    $posLat );
         readingsBulkUpdate( $hash, "currPosLong_" . $deviceAlias,   $posLong );
+        readingsBulkUpdate( $hash, "currPosHomeDist_" . $deviceAlias,
+            $posHomeDist );
         readingsBulkUpdate( $hash, "currPosLocDist_" . $deviceAlias,
             $posLocDist );
         readingsBulkUpdate( $hash, "currLocTravDist_" . $deviceAlias,

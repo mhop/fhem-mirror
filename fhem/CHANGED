@@ -3,8 +3,8 @@
   - feature: 98_GEOFANCY: add new reading LocTravDist; add support for
                 Geofency.app webhook attributes currentLatitude,
                 currentLongitude, motion, wifiSSID and wifiBSSID.
-                New readings: PosBSSID, PosLat, PosLocDist, PosLong, PosMotion,
-                PosSSID, PosTravDist
+                New readings: PosBSSID, PosLat, PosHomeDist, PosLocDist,
+                PosLong, PosMotion, PosSSID, PosTravDist
   - bugfix:  98_GEOFANCY: fixed last* readings
   - feature: 89_FULLY: New commands for sound playback and photo.
   - bugfix:  74_XiaomiBTLESens: fix disableForTimer Problem after reboot
