@@ -583,6 +583,18 @@ sub wpsm2lux($;$) {
 ### Nautic unit conversions
 ###
 
+# Speed: convert smi (statute miles) to nmi (nautical miles)
+sub smi2nmi($;$) {
+    my ( $data, $rnd ) = @_;
+    return _round( $data * 0.8684, $rnd );
+}
+
+# Speed: convert km (kilometer) to nmi (nautical miles)
+sub km2nmi($;$) {
+    my ( $data, $rnd ) = @_;
+    return _round( smi2nmi( km2mi( $data, 9 ), 9 ), $rnd );
+}
+
 # Speed: convert km/h to knots
 sub kph2kn($;$) {
     my ( $data, $rnd ) = @_;
@@ -691,8 +703,10 @@ sub mph2bft($) {
 ### Differential conversions
 ###
 
-sub distance($$$$;$) {
-    my ( $lat1, $lng1, $lat2, $lng2, $miles ) = @_;
+sub distance($$$$;$$) {
+    my ( $lat1, $lng1, $lat2, $lng2, $rnd, $unit ) = @_;
+    return "0.0" if ( $lat1 eq $lat2 && $lng1 eq $lng2 );
+
     use constant M_PI => 4 * atan2( 1, 1 );
     my $pi80 = M_PI / 180;
     $lat1 *= $pi80;
@@ -709,7 +723,8 @@ sub distance($$$$;$) {
     my $c = 2 * atan2( sqrt($a), sqrt( 1 - $a ) );
     my $km = $r * $c;
 
-    return ( $miles ? km2mi($km) : $km );
+    return _round(
+        ( $unit eq "nmi" ? km2nmi($km) : ( $unit ? km2mi($km) : $km ) ), $rnd );
 }
 
 #################################
