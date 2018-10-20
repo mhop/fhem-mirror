@@ -35,7 +35,7 @@ package main;
 use strict;
 use warnings;
 
-my $version = "2.4.0";
+my $version = "2.4.2";
 
 sub XiaomiBTLESens_Initialize($) {
 
@@ -100,7 +100,7 @@ BEGIN {
           modules
           Log3
           CommandAttr
-          attr
+#           attr
           AttrVal
           ReadingsVal
           IsDisabled
@@ -886,14 +886,13 @@ sub ThermoHygroSensHandle0x10($$) {
     my @numberOfHex = split( ' ', $notification );
 
     $notification =~ s/\s+//g;
-
     $readings{'temperature'} = pack( 'H*', substr( $notification, 4, 8 ) );
 
     if ( scalar(@numberOfHex) < 14 ) {
-        $readings{'humidity'} = pack( 'H*', substr( $notification, 16, 8 ) );
+        $readings{'humidity'} = pack( 'H*', substr( $notification, 18, 8 ) );
     }
     else {
-        $readings{'humidity'} = pack( 'H*', substr( $notification, 18, 8 ) );
+        $readings{'humidity'} = pack( 'H*', substr( $notification, 16, 8 ) );
     }
 
     $hash->{helper}{CallBattery} = 0;
