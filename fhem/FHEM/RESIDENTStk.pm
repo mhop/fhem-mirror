@@ -1571,7 +1571,7 @@ sub RESIDENTStk_SetLocation(@) {
       )
     {
         my $currReading = $_;
-        my $lastReading = "last" . $_;
+        my $lastReading = "last" . ucfirst($_);
         my $currVal     = ReadingsVal( $name, $currReading, undef );
         readingsBulkUpdate( $hash, $lastReading, $currVal )
           if ( defined($currVal) );
