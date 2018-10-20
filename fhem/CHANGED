@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 49_SSCam: direct help for attributes, new get versionNotes command
   - change:  ROOMMATE, GUEST: Support for updated GEOFANCY version
   - feature: 98_GEOFANCY: add new reading LocTravDist; add support for
                 Geofency.app webhook attributes radius, currentLatitude,

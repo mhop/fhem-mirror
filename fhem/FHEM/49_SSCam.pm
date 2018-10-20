@@ -25,232 +25,276 @@
 #       along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #########################################################################################################################
-#  Versions History:
 # 
-# 7.1.1  18.10.2018    Message of "Your current/simulated SVS-version..." changed, commandref corrected
-# 7.1.0  02.09.2018    PIR Sensor enable/disable, SSCam_Set/SSCam_Get optimized
-# 7.0.1  27.08.2018    enable/disable issue (https://forum.fhem.de/index.php/topic,45671.msg830869.html#msg830869)
-# 7.0.0  27.07.2018    compatibility to API v2.8
-# 6.0.1  04.07.2018    Reading CamFirmware
-# 6.0.0  03.07.2018    HTTPS Support, buttons for refresh SSCamSTRM-devices
-# 5.3.0  29.06.2018    changes regarding to "createStreamDev ... generic", refresh reading parentState of all 
-#                      SSCamSTRM devices with PARENT=SSCam-device, control elements for runView within fhemweb, 
-#                      new CamLive.*-Readings, minor fixes
-# 5.2.7  26.06.2018    fix state turns to "off" even though cam is disabled
-# 5.2.6  20.06.2018    running stream as human readable entry for SSCamSTRM-Device, goAbsPTZ fix set-entry für non-PTZ
-# 5.2.5  18.06.2018    trigger lastsnap_fw to SSCamSTRM-Device only if snap was done by it.
-# 5.2.4  17.06.2018    SSCam_composegallery added and write warning if old composegallery-weblink device is used 
-# 5.2.3  16.06.2018    no SSCamSTRM refresh when snapgetinfo was running without taken a snap by SSCamSTRM-Device
-# 5.2.2  16.06.2018    compatibility to SSCamSTRM V 1.1.0
-# 5.2.1  14.06.2018    design change of SSCam_StreamDev, change in event generation for SSCam_StreamDev, fix global vars
-# 5.2.0  14.06.2018    support longpoll refresh of SSCamSTRM-Devices
-# 5.1.0  13.06.2018    more control elements (Start/Stop Recording, Take Snapshot) in func SSCam_StreamDev
-#                      control of detaillink is moved to SSCamSTRM-device
-# 5.0.1  12.06.2018    control of page refresh improved (for e.g. Floorplan,Dashboard)
-# 5.0.0  11.06.2018    HLS Streaming, Buttons for Streaming-Devices, use of module SSCamSTRM for Streaming-Devices, 
-#                      deletion of Streaming-devices if SSCam-device is deleted, some more improvements, minor bugfixes
-# 4.3.0  27.05.2018    HLS preparation changed
-# 4.2.0  22.05.2018    PTZ-Panel integrated to created StreamDevice
-# 4.1.0  05.05.2018    use SYNO.SurveillanceStation.VideoStream instead of SYNO.SurveillanceStation.VideoStreaming,
-#                      preparation for hls
-# 4.0.0  01.05.2018    AudioStream possibility added
-# 3.10.0 24.04.2018    createStreamDev added, new features lastrec_fw_MJPEG, lastrec_fw_MPEG4/H.264 added to 
-#                      playback MPEG4/H.264 videos
-# 3.9.2  21.04.2018    minor fixes
-# 3.9.1  20.04.2018    Attribute ptzPanel_use, initial webcommands in DeviceOverview changed, minor fixes ptzPanel
-# 3.9.0  17.04.2018    control panel & PTZcontrol weblink device for PTZ cams
-# 3.8.4  06.04.2018    Internal MODEL changed to SVS or "CamVendor - CamModel" for Cams
-# 3.8.3  05.04.2018    bugfix V3.8.2, $OpMode "Start" changed, composegallery changed
-# 3.8.2  04.04.2018    $attr replaced by AttrVal, SSCam_wdpollcaminfo redesigned
-# 3.8.1  04.04.2018    some codereview like new sub SSCam_jboolmap
-# 3.8.0  03.04.2018    new reading PresetHome, setHome command, minor fixes
-# 3.7.0  26.03.2018    minor details of setPreset changed, new command delPreset
-# 3.6.0  25.03.2018    setPreset command, changed SSCam_wdpollcaminfo, SSCam_getcaminfoall
-# 3.5.0  22.03.2018    new get command listPresets
-# 3.4.0  21.03.2018    new commands startTracking, stopTracking
-# 3.3.1  20.03.2018    new readings CapPTZObjTracking, CapPTZPresetNumber
-# 3.3.0  25.02.2018    code review, API bug fix of runview lastrec, commandref revised (forum:#84953)
-# 3.2.4  18.11.2017    fix bug don't retrieve SSCam_getptzlistpreset if cam is disabled
-# 3.2.3  08.10.2017    set optimizeParams, get caminfo (simple), minor bugfix, commandref revised
-# 3.2.2  03.10.2017    make functions ready to use "SYNO.SurveillanceStation.PTZ" version 5, minor fixes, commandref 
-#                      revised
-# 3.2.1  02.10.2017    change some "SYNO.SurveillanceStation.Camera" methods to version 9             
-# 3.2.0  27.09.2017    new command get listLog, change to $hash->{HELPER}{".SNAPHASH"} for avoid huge "list"-report
-# 3.1.0  26.09.2017    move extevent from CAM to SVS model, Reading PollState enhanced for CAM-Model, minor fixes
-# 3.0.0  23.09.2017    Internal MODEL SVS or CAM -> distinguish/support Cams and SVS in different devices
-#                      new comand get storedCredentials, commandref revised
-# 2.9.0  20.09.2017    new function get homeModeState, minor fixes at simu_SVSversion, commandref revised
-# 2.8.2  19.09.2017    some preparations for version 9 of API "SYNO.SurveillanceStation.Camera", SSCam_logout added to function
-#                      get scanVirginirgin
-# 2.8.1  17.09.2017    attr simu_SVSversion changed, $mjpegHttp quotes dependend if noQuotesForSID set, commandref revised
-# 2.8.0  07.09.2017    Home Mode, commandref revised
-# 2.7.1  28.08.2017    minor fixes
-# 2.7.0  20.08.2017    bugfix if credentials not set, set maximum password lenth to 20
-# 2.6.3  12.08.2017    get snapGallery can also be triggered by at or notify (better use than "set"), commandref revised
-# 2.6.2  11.08.2017    set snapGallery can be triggered by at or notify
-# 2.6.1  07.08.2017    some changes in composegallery if createSnapGallery used, room Snapshots changed to SnapGalllery
-#                      commandref revised
-# 2.6.0  06.08.2017    new command createSnapGallery
-# 2.5.4  05.08.2017    analyze $hash->{CL} in SetFn bzw. GetFn, set snapGallery only if snapGalleryBoost=1 is set,
-#                      some snapGallery improvements and fixes
-# 2.5.3  02.08.2017    implement snapGallery as set-command
-# 2.5.2  01.08.2017    get snapGallery with or without snapGalleryBoost (some more attributes for snapGallery)
-# 2.5.1  31.07.2017    sub composegallery (no polling necessary)
-# 2.5.0  31.07.2017    logtext revised, new get snapGallery command
-# 2.4.1  29.07.2017    fix behavior of state when starting lastsnap_fw, fix "uninitialized value in pattern match (m//) 
-#                      at ./FHEM/49_SSCam.pm line 2895"
-# 2.4.0  28.07.2017    new set command runView lastsnap_fw, commandref revised, minor fixes
-# 2.3.2  28.07.2017    code change of SSCam_getcaminfo (params of Internaltimer)
-# 2.3.1  28.07.2017    code review creating log entries when pollnologging is set/unset
-# 2.3.0  27.07.2017    new "get snapinfo" command, minor fixes
-# 2.2.4  25.07.2017    avoid error "Operation Getptzlistpreset of Camera ... was not successful" if cam is disabled
-# 2.2.3  30.06.2017    fix if SVSversion small "0", create events for "snap"
-# 2.2.2  11.06.2017    bugfix SSCam_login, SSCam_login_return, 
-#                      Forum: https://forum.fhem.de/index.php/topic,45671.msg646701.html#msg646701
-# 2.2.1  15.05.2017    avoid FW_detailFn because of FW_deviceOverview is active (double streams in detailview if on)
-# 2.2.0  10.05.2017    check if JSON module has been loaded successfully, DeviceOverview available, options of 
-#                      runView changed image->live_fw, link->live_link, link_open->live_open, lastrec ->lastrec_fw,
-#                      commandref revised
-# 2.1.4  08.05.2017    commandref changed
-# 2.1.3  05.05.2017    issue of operation error if CAMID is set and SID isn't valid, more login-errorcodes evaluation
-# 2.1.2  04.05.2017    default login retries increased to 3
-# 2.1.1  17.04.2017    SSCam_runliveview routine changed, {HELPER}{SID_STRM} deleted
-# 2.1.0  12.04.2017    some codereview, getapisites cached, CAMID cached, rewrite logs from verbose 4 to 5,
-#                      get scanVirgin, commandref replenished
-# 2.0.0  10.04.2017    redesign login procedure, fix Reading SVSversion use SMALL version, new attr loginRetries
-# 1.42   15.03.2017    SSCam_camop changed to get all cam id's and names
-# 1.41   15.03.2017    minor bugfix of blank character in state "disabled" (row 3383)
-# 1.40   21.01.2017    downgrade of API apicammaxver in SVS 8.0.0
-# 1.39   20.01.2017    compatibility to SVS 8.0.0, Version in Internals, execute SSCam_getsvsinfo after set credentials
-# 1.37   10.10.2016    bugfix Experimental keys on scalar is now forbidden (Perl >= 5.23)
-#                      (Forum: #msg501709)
-# 1.36   18.09.2016    bugfix of get presets, get patrols of zoom-cams without pan/tilt
-# 1.35   17.09.2016    internal timer of start-routines optimized
-# 1.34   15.09.2016    simu_SVSversion changed, added 407 errorcode message, external recording changed 
-#                      for SVS 7.2
-# 1.33   21.08.2016    function get stmUrlPath added, fit to new commandref style, attribute showStmInfoFull added
-# 1.32.1 18.08.2016    empty event LastSnapId fixed
-# 1.32   17.08.2016    Logging of verbose 4 changed
-# 1.31   15.08.2016    Attr "noQuotesForSID" added, avoid possible 402 - permission denied problems 
-#                      in some SVS/DS-combinations
-# 1.30   15.08.2016    commandref revised, more v4 logging in special case 
-# 1.29   02.07.2016    add regex for adaption SVS version, url call for "snap" changed 
-# 1.28   30.06.2016    Attr "showPassInLog" added, per default no password will be shown in log 
-# 1.27   29.06.2016    Attr "simu_SVSversion" added, sub login_nonbl changed, 
-#                      sub camret_nonbl changed (getlistptzpreset) due to 7.2 problem
-# 1.26.3 28.06.2016    Time::HiRes added
-# 1.26.2 05.05.2016    change: get "snapfileinfo" will get back an Infomessage if Reading "LastSnapId" 
-#                      isn't available
-# 1.26.1 27.04.2016    bugfix module will not load due to Unknown warnings category 'experimental'
-#                      when using an older perl version 
-# 1.26   22.04.2016    Attribute "disable" to deactivate the module added
-# 1.25   18.04.2016    motion detection parameters can be entered if  
-#                      motion detection by camera or SVS is used
-# 1.24   16.04.2016    behavior of "set ... on" changed, Attr "recextend" added
-#                      please have a look at commandref and Wiki
-#                      bugfix: setstate-warning if FHEM will restarted and SVS is not reachable
-#                      (Forum: #308)
-# 1.23.2 12.04.2016    code review, no functional changes
-# 1.23.1 07.04.2016    command check for set cmd's don't work completely
-# 1.23   02.04.2016    change to RemoveInternalTimer for functions
-# 1.22   27.03.2016    bugfix "link_open" doesn't work after last update
-# 1.21   23.03.2016    added "lastrec"," lastrec_open" to playback last recording 
-# 1.20.3 19.03.2016    change: delay of InternalTimer(s) changed
-#                      "ptzlistpresets" - "id" changed to "position" according to Synology-ticket
-#                      run "SSCam_geteventlist" automatically after recording-stop
-# 1.20.2 14.03.2016    change: routine "SSCam_initonboot" changed
-# 1.20.1 12.03.2016    bugfix: default recordtime 15 s is used if attribute "rectime" is set to "0"
-# 1.20   09.03.2016    command "extevent" added
-# 1.19.3 07.03.2016    bugfix "uninitialized value $lastrecstarttime",
-#                      "uninitialized value $lastrecstoptime",
-#                      new attribute "videofolderMap"
-# 1.19.2 06.03.2016    Reading "CamLastRec" added which contains Path/name
-#                      of last recording
-# 1.19.1 28.02.2016    enhanced command runView by option "link_open" to
-#                      open a streamlink immediately
-# 1.19   25.02.2016    functions for cam-livestream added
-# 1.18.1 21.02.2016    fixed a problem that the state is "disable" instead of
-#                      "disabled" if a camera is disabled and FHEM will be restarted
-# 1.18   20.02.2016    function "get ... eventlist" added,
-#                      Reading "CamEventNum" added which containes total number of
-#                      camera events,
-#                      change usage of reading "LastUpdateTime" 
-# 1.17   19.02.2016    function "runPatrol" added that starts predefined patrols
-#                      of PTZ-cameras,
-#                      Reading "CamDetMotSc" added
-# 1.16.1 17.02.2016    Reading "CamExposureControl" added
-# 1.16   16.02.2016    set up of motion detection source now possible
-# 1.15   15.02.2016    control of exposure mode day, night & auto is possible now
-# 1.14   14.02.2016    The port in DEF-String is optional now,
-#                      if not given, default port 5000 is used
-# 1.13.2 13.02.2016    fixed a problem that manual updates using "getcaminfoall" are
-#                      leading to additional pollingloops if polling is used,
-#                      attribute "debugactivetoken" added for debugging-use 
-# 1.13.1 12.02.2016    fixed a problem that a usersession won't be destroyed if a
-#                      function couldn't be executed successfully
-# 1.13                 feature for retrieval snapfilename added
-# 1.12.1 09.02.2016    bugfix: "goAbsPTZ" may be unavailable on Windows-systems
-# 1.12   08.02.2016    added function "move" for continuous PTZ action
-# 1.11.1 07.02.2016    entries with loglevel "2" reviewed, changed to loglevel "3"
-# 1.11   05.02.2016    added function "goPreset" and "goAbsPTZ" to control the move of PTZ lense
-#                      to absolute positions
-#                      refere to commandref or have a look in forum at: 
-#                      http://forum.fhem.de/index.php/topic,45671.msg404275.html#msg404275 ,
-#                      http://forum.fhem.de/index.php/topic,45671.msg404892.html#msg404892
-# 1.10   02.02.2016    added function "svsinfo" to get informations about installed SVS-package,
-#                      if Availability = " disconnected" then "state"-value will be "disconnected" too,
-#                      saved Credentials were deleted from file if a device will be deleted
-# 1.9.1  31.01.2016    a little bit code optimization
-# 1.9    28.01.2016    fixed the problem a recording may still stay active if fhem
-#                      will be restarted after a recording was triggered and
-#                      the recordingtime wasn't be over,
-#                      Enhancement of readings.
-# 1.8    25.01.2016    changed define in order to remove credentials from string,
-#                      added "set credentials" command to save username/password,
-#                      added Attribute "session" to make login-session selectable,
-#                      Note: You have to adapt your define-strings !!
-#                      Refere to commandref or look in forum at: 
-#                      http://forum.fhem.de/index.php/topic,45671.msg397449.html#msg397449
-# 1.7    18.01.2016    Attribute "httptimeout" added
-# 1.6    16.01.2016    Change the define-string related to rectime.
-#                      Note: See all changes to rectime usage in commandref or here:
-#                      http://forum.fhem.de/index.php/topic,45671.msg391664.html#msg391664
-# 1.5.1  11.01.2016    Vars "USERNAME" and "RECTIME" removed from internals,
-#                      Var (Internals) "SERVERNAME" changed to "SERVERADDR",
-#                      minor change of Log messages,
-#                      Note: use rereadcfg in order to activate the changes
-# 1.5     04.01.2016   Function "Get" for creating Camera-Readings integrated,
-#                      Attributs pollcaminfoall, pollnologging  added,
-#                      Function for Polling Cam-Infos added.
-# 1.4     23.12.2015   function "enable" and "disable" for SS-Cams added,
-#                      changed timout of Http-calls to a higher value
-# 1.3     19.12.2015   function "snap" for taking snapshots added,
-#                      fixed a bug that functions may impact each other 
-# 1.2     14.12.2015   improve usage of verbose-modes
-# 1.1     13.12.2015   use of InternalTimer instead of fhem(sleep)
-# 1.0     12.12.2015   changed completly to HttpUtils_NonblockingGet for calling websites nonblocking, 
-#                      LWP is not needed anymore
-#
-#
-# Definition: define <name> SSCam <camname> <ServerAddr> [ServerPort] 
+# Definition: define <name> SSCam <camname> <ServerAddr> [ServerPort] [Protocol]
 # 
 # Example of defining a Cam-device: define CamCP1 SSCAM Carport 192.168.2.20 [5000] [HTTP(S)]
 # Example of defining a SVS-device: define SDS1 SSCAM SVS 192.168.2.20 [5000] [HTTP(S)]
 #
 
 package main;
+
+use strict;                           
+use warnings;
+
+# Versions History intern
+our %SSCam_vNotesIntern = (
+  "7.2.0"  => "20.10.2018  direct help for attributes, new get versionNotes command, fix PERL WARNING: Use of uninitialized value \$small, get versionNotes ",
+  "7.1.1"  => "18.10.2018  Message of \"Your current/simulated SVS-version...\" changed, commandref corrected ",
+  "7.1.0"  => "02.09.2018  PIR Sensor enable/disable, SSCam_Set/SSCam_Get optimized ",
+  "7.0.1"  => "27.08.2018  enable/disable issue (https://forum.fhem.de/index.php/topic,45671.msg830869.html#msg830869) ",
+  "7.0.0"  => "27.07.2018  compatibility to API v2.8 ",
+  "6.0.1"  => "04.07.2018  Reading CamFirmware ",
+  "6.0.0"  => "03.07.2018  HTTPS Support, buttons for refresh SSCamSTRM-devices ",
+  "5.3.0"  => "29.06.2018  changes regarding to \"createStreamDev ... generic\", refresh reading parentState of all, SSCamSTRM devices with PARENT=SSCam-device, control elements for runView within fhemweb, new CamLive.*-Readings, minor fixes ",
+  "5.2.7"  => "26.06.2018  fix state turns to \"off\" even though cam is disabled ",
+  "5.2.6"  => "20.06.2018  running stream as human readable entry for SSCamSTRM-Device, goAbsPTZ fix set-entry für non-PTZ ",
+  "5.2.5"  => "18.06.2018  trigger lastsnap_fw to SSCamSTRM-Device only if snap was done by it. ",
+  "5.2.4"  => "17.06.2018  SSCam_composegallery added and write warning if old composegallery-weblink device is used  ",
+  "5.2.3"  => "16.06.2018  no SSCamSTRM refresh when snapgetinfo was running without taken a snap by SSCamSTRM-Device ",
+  "5.2.2"  => "16.06.2018  compatibility to SSCamSTRM V 1.1.0 ",
+  "5.2.1"  => "14.06.2018  design change of SSCam_StreamDev, change in event generation for SSCam_StreamDev, fix global vars ",
+  "5.2.0"  => "14.06.2018  support longpoll refresh of SSCamSTRM-Devices ",
+  "5.1.0"  => "13.06.2018  more control elements (Start/Stop Recording, Take Snapshot) in func SSCam_StreamDev, control of detaillink is moved to SSCamSTRM-device ",
+  "5.0.1"  => "12.06.2018  control of page refresh improved (for e.g. Floorplan,Dashboard) ",
+  "5.0.0"  => "11.06.2018  HLS Streaming, Buttons for Streaming-Devices, use of module SSCamSTRM for Streaming-Devices, deletion of Streaming-devices if SSCam-device is deleted, some more improvements, minor bugfixes ",
+  "4.3.0"  => "27.05.2018  HLS preparation changed ",
+  "4.2.0"  => "22.05.2018  PTZ-Panel integrated to created StreamDevice ",
+  "4.1.0"  => "05.05.2018  use SYNO.SurveillanceStation.VideoStream instead of SYNO.SurveillanceStation.VideoStreaming, preparation for hls ",
+  "4.0.0"  => "01.05.2018  AudioStream possibility added ",
+  "3.10.0"  => "24.04.2018  createStreamDev added, new features lastrec_fw_MJPEG, lastrec_fw_MPEG4/H.264 added to playback MPEG4/H.264 videos ",
+  "3.9.2"  => "21.04.2018  minor fixes ",
+  "3.9.1"  => "20.04.2018  Attribute ptzPanel_use, initial webcommands in DeviceOverview changed, minor fixes ptzPanel ",
+  "3.9.0"  => "17.04.2018  control panel & PTZcontrol weblink device for PTZ cams ",
+  "3.8.4"  => "06.04.2018  Internal MODEL changed to SVS or \"CamVendor - CamModel\" for Cams ",
+  "3.8.3"  => "05.04.2018  bugfix V3.8.2, \$OpMode \"Start\" changed, composegallery changed ",
+  "3.8.2"  => "04.04.2018  \$attr replaced by AttrVal, SSCam_wdpollcaminfo redesigned ",
+  "3.8.1"  => "04.04.2018  some codereview like new sub SSCam_jboolmap ",
+  "3.8.0"  => "03.04.2018  new reading PresetHome, setHome command, minor fixes ",
+  "3.7.0"  => "26.03.2018  minor details of setPreset changed, new command delPreset ",
+  "3.6.0"  => "25.03.2018  setPreset command, changed SSCam_wdpollcaminfo, SSCam_getcaminfoall ",
+  "3.5.0"  => "22.03.2018  new get command listPresets ",
+  "3.4.0"  => "21.03.2018  new commands startTracking, stopTracking ",
+  "3.3.1"  => "20.03.2018  new readings CapPTZObjTracking, CapPTZPresetNumber ",
+  "3.3.0"  => "25.02.2018  code review, API bug fix of runview lastrec, commandref revised (forum:#84953) ",
+  "3.2.4"  => "18.11.2017  fix bug don't retrieve SSCam_getptzlistpreset if cam is disabled ",
+  "3.2.3"  => "08.10.2017  set optimizeParams, get caminfo (simple), minor bugfix, commandref revised ",
+  "3.2.2"  => "03.10.2017  make functions ready to use \"SYNO.SurveillanceStation.PTZ\" version 5, minor fixes, commandref revised ",
+  "3.2.1"  => "02.10.2017  change some \"SYNO.SurveillanceStation.Camera\" methods to version 9 ", 
+  "3.2.0"  => "27.09.2017  new command get listLog, change to \$hash->{HELPER}{\".SNAPHASH\"} for avoid huge \"list\"-report ",
+  "3.1.0"  => "26.09.2017  move extevent from CAM to SVS model, Reading PollState enhanced for CAM-Model, minor fixes ",
+  "3.0.0"  => "23.09.2017  Internal MODEL SVS or CAM -> distinguish/support Cams and SVS in different devices new comand get storedCredentials, commandref revised ",
+  "2.9.0"  => "20.09.2017  new function get homeModeState, minor fixes at simu_SVSversion, commandref revised ",
+  "2.8.2"  => "19.09.2017  some preparations for version 9 of API \"SYNO.SurveillanceStation.Camera\", SSCam_logout added to function get scanVirginirgin ",
+  "2.8.1"  => "17.09.2017  attr simu_SVSversion changed, \$mjpegHttp quotes dependend if noQuotesForSID set, commandref revised ",
+  "2.8.0"  => "07.09.2017  Home Mode, commandref revised ",
+  "2.7.1"  => "28.08.2017  minor fixes ",
+  "2.7.0"  => "20.08.2017  bugfix if credentials not set, set maximum password lenth to 20 ",
+  "2.6.3"  => "12.08.2017  get snapGallery can also be triggered by at or notify (better use than \"set\"), commandref revised ",
+  "2.6.2"  => "11.08.2017  set snapGallery can be triggered by at or notify ",
+  "2.6.1"  => "07.08.2017  some changes in composegallery if createSnapGallery used, room Snapshots changed to SnapGalllery commandref revised ",
+  "2.6.0"  => "06.08.2017  new command createSnapGallery ",
+  "2.5.4"  => "05.08.2017  analyze \$hash->{CL} in SetFn bzw. GetFn, set snapGallery only if snapGalleryBoost=1 is set, some snapGallery improvements and fixes ",
+  "2.5.3"  => "02.08.2017  implement snapGallery as set-command ",
+  "2.5.2"  => "01.08.2017  get snapGallery with or without snapGalleryBoost (some more attributes for snapGallery) ",
+  "2.5.1"  => "31.07.2017  sub composegallery (no polling necessary) ",
+  "2.5.0"  => "31.07.2017  logtext revised, new get snapGallery command ",
+  "2.4.1"  => "29.07.2017  fix behavior of state when starting lastsnap_fw, fix \"uninitialized value in pattern match\" ",
+  "2.4.0"  => "28.07.2017  new set command runView lastsnap_fw, commandref revised, minor fixes ",
+  "2.3.2"  => "28.07.2017  code change of SSCam_getcaminfo (params of Internaltimer) ",
+  "2.3.1"  => "28.07.2017  code review creating log entries when pollnologging is set/unset ",
+  "2.3.0"  => "27.07.2017  new \"get snapinfo\" command, minor fixes ",
+  "2.2.4"  => "25.07.2017  avoid error \"Operation Getptzlistpreset of Camera ... was not successful\" if cam is disabled ",
+  "2.2.3"  => "30.06.2017  fix if SVSversion small \"0\", create events for \"snap\" ",
+  "2.2.2"  => "11.06.2017  bugfix SSCam_login, SSCam_login_return, Forum: https://forum.fhem.de/index.php/topic,45671.msg646701.html#msg646701 ",
+  "2.2.1"  => "15.05.2017  avoid FW_detailFn because of FW_deviceOverview is active (double streams in detailview if on) ",
+  "2.2.0"  => "10.05.2017  check if JSON module has been loaded successfully, DeviceOverview available, options of runView changed image->live_fw, link->live_link, link_open->live_open, lastrec ->lastrec_fw ",
+  "2.1.4"  => "08.05.2017  commandref changed ",
+  "2.1.3"  => "05.05.2017  issue of operation error if CAMID is set and SID isn't valid, more login-errorcodes evaluation ",
+  "2.1.2"  => "04.05.2017  default login retries increased to 3 ",
+  "2.1.1"  => "17.04.2017  SSCam_runliveview routine changed, {HELPER}{SID_STRM} deleted ",
+  "2.1.0"  => "12.04.2017  some codereview, getapisites cached, CAMID cached, rewrite logs from verbose 4 to 5, get scanVirgin ",
+  "2.0.0"  => "10.04.2017  redesign login procedure, fix Reading SVSversion use SMALL version, new attr loginRetries ",
+  "1.42.0"  => "15.03.2017  SSCam_camop changed to get all cam id's and names ",
+  "1.41.0"  => "15.03.2017  minor bugfix of blank character in state \"disabled\" (row 3383) ",
+  "1.40.0"  => "21.01.2017  downgrade of API apicammaxver in SVS 8.0.0 ",
+  "1.39.0"  => "20.01.2017  compatibility to SVS 8.0.0, Version in Internals, execute SSCam_getsvsinfo after set credentials ",
+  "1.37.0"  => "10.10.2016  bugfix Experimental keys on scalar is now forbidden (Perl >= 5.23) (Forum: #msg501709) ",
+  "1.36.0"  => "18.09.2016  bugfix of get presets, get patrols of zoom-cams without pan/tilt ",
+  "1.35.0"  => "17.09.2016  internal timer of start-routines optimized ",
+  "1.34.0"  => "15.09.2016  simu_SVSversion changed, added 407 errorcode message, external recording changed for SVS 7.2 ",
+  "1.33.0"  => "21.08.2016  function get stmUrlPath added, fit to new commandref style, attribute showStmInfoFull added ",
+  "1.32.1"  => "18.08.2016  empty event LastSnapId fixed ",
+  "1.32.0"  => "17.08.2016  Logging of verbose 4 changed ",
+  "1.31.0"  => "15.08.2016  Attr \"noQuotesForSID\" added, avoid possible 402 - permission denied problems in some SVS/DS-combinations ",
+  "1.30.0"  => "15.08.2016  commandref revised, more v4 logging in special case ",
+  "1.29.0"  => "02.07.2016  add regex for adaption SVS version, url call for \"snap\" changed  ",
+  "1.28.0"  => "30.06.2016  Attr \"showPassInLog\" added, per default no password will be shown in log ",
+  "1.27.0"  => "29.06.2016  Attr \"simu_SVSversion\" added, sub login_nonbl changed, sub camret_nonbl changed (getlistptzpreset) due to 7.2 problem ",
+  "1.26.3"  => "28.06.2016  Time::HiRes added ",
+  "1.26.2"  => "05.05.2016  change: get \"snapfileinfo\" will get back an Infomessage if Reading \"LastSnapId\" isn't available ",
+  "1.26.1"  => "27.04.2016  bugfix module will not load due to Unknown warnings category 'experimental' when using an older perl version  ",
+  "1.26.0"  => "22.04.2016  Attribute \"disable\" to deactivate the module added ",
+  "1.25.0"  => "18.04.2016  motion detection parameters can be entered if motion detection by camera or SVS is used ",
+  "1.24.0"  => "16.04.2016  behavior of \"set ... on\" changed, Attr \"recextend\" added, bugfix: setstate-warning if FHEM will restarted and SVS is not reachable (Forum: #308) ",
+  "1.23.2"  => "12.04.2016  code review, no functional changes ",
+  "1.23.1"  => "07.04.2016  command check for set cmd's don't work completely ",
+  "1.23.0"  => "02.04.2016  change to RemoveInternalTimer for functions ",
+  "1.22.0"  => "27.03.2016  bugfix \"link_open\" doesn't work after last update ",
+  "1.21.0"  => "23.03.2016  added \"lastrec\", \"lastrec_open\" to playback last recording  ",
+  "1.20.3"  => "19.03.2016  change: delay of InternalTimer(s) changed \"ptzlistpresets\" - \"id\" changed to \"position\" according to Synology-ticket run \"SSCam_geteventlist\" automatically after recording-stop ",
+  "1.20.2"  => "14.03.2016  change: routine \"SSCam_initonboot\" changed ",
+  "1.20.1"  => "12.03.2016  bugfix: default recordtime 15 s is used if attribute \"rectime\" is set to \"0\" ",
+  "1.20.0"  => "09.03.2016  command \"extevent\" added ",
+  "1.19.3"  => "07.03.2016  bugfix \"uninitialized value \$lastrecstarttime\", \"uninitialized value \$lastrecstoptime\", new attribute \"videofolderMap\" ",
+  "1.19.2"  => "06.03.2016  Reading \"CamLastRec\" added which contains Path/name of last recording ",
+  "1.19.1"  => "28.02.2016  enhanced command runView by option \"link_open\" to open a streamlink immediately ",
+  "1.19.0"  => "25.02.2016  functions for cam-livestream added ",
+  "1.18.1"  => "21.02.2016  fixed a problem that the state is \"disable\" instead of \"disabled\" if a camera is disabled and FHEM will be restarted ",
+  "1.18.0"  => "20.02.2016  function \"get ... eventlist\" added, Reading \"CamEventNum\" added which containes total number of camera events, change usage of reading \"LastUpdateTime\"  ",
+  "1.17.0"  => "19.02.2016  function \"runPatrol\" added that starts predefined patrols of PTZ-cameras, Reading \"CamDetMotSc\" added ",
+  "1.16.1"  => "17.02.2016  Reading \"CamExposureControl\" added ",
+  "1.16.0"  => "16.02.2016  set up of motion detection source now possible ",
+  "1.15.0"  => "15.02.2016  control of exposure mode day, night & auto is possible now ",
+  "1.14.0"  => "14.02.2016  The port in DEF-String is optional now, if not given, default port 5000 is used ",
+  "1.13.2"  => "13.02.2016  fixed a problem that manual updates using \"getcaminfoall\" are leading to additional pollingloops if polling is used, attribute \"debugactivetoken\" added for debugging-use  ",
+  "1.13.1"  => "12.02.2016  fixed a problem that a usersession won't be destroyed if a function couldn't be executed successfully ",
+  "1.12.1"  => "09.02.2016  bugfix: \"goAbsPTZ\" may be unavailable on Windows-systems ",
+  "1.12.0"  => "08.02.2016  added function \"move\" for continuous PTZ action ",
+  "1.11.1"  => "07.02.2016  entries with loglevel \"2\" reviewed, changed to loglevel \"3\" ",
+  "1.11.0"  => "05.02.2016  added function \"goPreset\" and \"goAbsPTZ\" to control the move of PTZ lense to absolute positions (http://forum.fhem.de/index.php/topic,45671.msg404275.html#msg404275), (http://forum.fhem.de/index.php/topic,45671.msg404892.html#msg404892) ",
+  "1.10.0"  => "02.02.2016  added function \"svsinfo\" to get informations about installed SVS-package, if Availability = \"disconnected\" then \"state\"-value will be \"disconnected\" too, saved Credentials were deleted from file if a device will be deleted ",
+  "1.9.1"  => "01.01.2016  a little bit code optimization ",
+  "1.9.0"  => "28.01.2016  fixed the problem a recording may still stay active if fhem will be restarted after a recording was triggered and the recordingtime wasn't be over, Enhancement of readings. ",
+  "1.8.0"  => "25.01.2016  changed define in order to remove credentials from string, added \"set credentials\" command to save username/password, added Attribute \"session\" to make login-session selectable ",
+  "1.7.0"  => "18.01.2016  Attribute \"httptimeout\" added ",
+  "1.6.0"  => "16.01.2016  Change the define-string related to rectime. (http://forum.fhem.de/index.php/topic,45671.msg391664.html#msg391664)   ",                
+  "1.5.1"  => "11.01.2016  Vars \"USERNAME\" and \"RECTIME\" removed from internals, Var (Internals) \"SERVERNAME\" changed to \"SERVERADDR\" ",
+  "1.5.0"  => "04.01.2016  Function \"Get\" for creating Camera-Readings integrated, Attributs pollcaminfoall, pollnologging  added, Function for Polling Cam-Infos added. ",
+  "1.4.0"  => "23.12.2015  function \"enable\" and \"disable\" for SS-Cams added, changed timout of Http-calls to a higher value ",
+  "1.3.0"  => "19.12.2015  function \"snap\" for taking snapshots added, fixed a bug that functions may impact each other  ",
+  "1.2.0"  => "14.12.2015  improve usage of verbose-modes ",
+  "1.1.0"  => "13.12.2015  use of InternalTimer instead of fhem(sleep) ",
+  "1.0.0"  => "12.12.2015  initial, changed completly to HttpUtils_NonblockingGet "
+);
+
+# Versions History extern
+our %SSCam_vNotesExtern = (
+  "7.2.0"  => "20.10.2018 direct help for attributes, new get versionNotes command, please see commandref for details ",
+  "7.1.1"  => "18.10.2018 Message of \"current/simulated SVS-version...\" changed, commandref corrected ",
+  "7.1.0"  => "02.09.2018 PIR Sensor enable/disable, SSCam_Set/SSCam_Get optimized ",
+  "7.0.1"  => "27.08.2018 enable/disable issue (https://forum.fhem.de/index.php/topic,45671.msg830869.html#msg830869) ",
+  "7.0.0"  => "27.07.2018 compatibility to API v2.8 ",
+  "6.0.1"  => "04.07.2018 Reading CamFirmware ",
+  "6.0.0"  => "03.07.2018 HTTPS Support, buttons for refresh SSCamSTRM-devices ",
+  "5.2.7"  => "26.06.2018 fix state turns to \"off\" even though cam is disabled ",
+  "5.2.5"  => "18.06.2018 trigger lastsnap_fw to SSCamSTRM-Device only if snap was done by it. ",
+  "5.2.4"  => "17.06.2018 SSCam_composegallery added and write warning if old composegallery-weblink device is used  ",
+  "5.2.2"  => "16.06.2018 compatibility to SSCamSTRM V 1.1.0 ",
+  "5.2.1"  => "14.06.2018 design change of SSCam_StreamDev, change in event generation for SSCam_StreamDev, fix global vars ",
+  "5.2.0"  => "14.06.2018 support longpoll refresh of SSCamSTRM-Devices ",
+  "5.1.0"  => "13.06.2018 more control elements (Start/Stop Recording, Take Snapshot) in func SSCam_StreamDev, control of detaillink is moved to SSCamSTRM-device ",
+  "5.0.1"  => "12.06.2018 control of page refresh improved (for e.g. Floorplan,Dashboard) ",
+  "4.2.0"  => "22.05.2018 PTZ-Panel integrated to created StreamDevice ",
+  "4.0.0"  => "01.05.2018 AudioStream possibility added ",
+  "3.10.0"  => "24.04.2018 createStreamDev added, new features lastrec_fw_MJPEG, lastrec_fw_MPEG4/H.264 added to playback MPEG4/H.264 videos ",
+  "3.9.1"  => "20.04.2018 Attribute ptzPanel_use, initial webcommands in DeviceOverview changed, minor fixes ptzPanel ",
+  "3.9.0"  => "17.04.2018 control panel & PTZcontrol weblink device for PTZ cams ",
+  "3.8.4"  => "06.04.2018 Internal MODEL changed to SVS or \"CamVendor - CamModel\" for Cams ",
+  "3.8.3"  => "05.04.2018 bugfix V3.8.2, \$OpMode \"Start\" changed, composegallery changed ",
+  "3.6.0"  => "25.03.2018 setPreset command ",
+  "3.5.0"  => "22.03.2018 new get command listPresets ",
+  "3.4.0"  => "21.03.2018 new commands startTracking, stopTracking ",
+  "3.3.1"  => "20.03.2018 new readings CapPTZObjTracking, CapPTZPresetNumber ",
+  "3.3.0"  => "25.02.2018 code review, API bug fix of runview lastrec, commandref revised (forum:#84953) ",
+  "3.2.4"  => "18.11.2017 fix bug don't retrieve SSCam_getptzlistpreset if cam is disabled ",
+  "3.2.3"  => "08.10.2017 set optimizeParams, get caminfo (simple), minor bugfix, commandref revised ",
+  "3.2.0"  => "27.09.2017 new command get listLog, change to \$hash->{HELPER}{\".SNAPHASH\"} for avoid huge \"list\"-report ",
+  "3.1.0"  => "26.09.2017 move extevent from CAM to SVS model, Reading PollState enhanced for CAM-Model, minor fixes ",
+  "3.0.0"  => "23.09.2017 Internal MODEL SVS or CAM -> distinguish/support Cams and SVS in different devices new comand get storedCredentials, commandref revised ",
+  "2.9.0"  => "20.09.2017 new function get homeModeState, minor fixes at simu_SVSversion, commandref revised ",
+  "2.6.0"  => "06.08.2017 new command createSnapGallery ",
+  "2.5.4"  => "05.08.2017 analyze \$hash->{CL} in SetFn bzw. GetFn, set snapGallery only if snapGalleryBoost=1 is set, some snapGallery improvements and fixes ",
+  "2.5.3"  => "02.08.2017 implement snapGallery as set-command ",
+  "2.2.2"  => "11.06.2017 bugfix SSCam_login, SSCam_login_return, Forum: https://forum.fhem.de/index.php/topic,45671.msg646701.html#msg646701 ",
+  "1.39.0"  => "20.01.2017 compatibility to SVS 8.0.0, Version in Internals, execute SSCam_getsvsinfo after set credentials ",
+  "1.37.0"  => "10.10.2016 bugfix Experimental keys on scalar is now forbidden (Perl >= 5.23) (Forum: #msg501709) ",
+  "1.34.0"  => "15.09.2016 simu_SVSversion changed, added 407 errorcode message, external recording changed for SVS 7.2 ",
+  "1.33.0"  => "21.08.2016 function get stmUrlPath added, fit to new commandref style, attribute showStmInfoFull added ",
+  "1.31.0"  => "15.08.2016 Attr \"noQuotesForSID\" added, avoid possible 402 - permission denied problems in some SVS/DS-combinations ",
+  "1.28.0"  => "30.06.2016 Attr \"showPassInLog\" added, per default no password will be shown in log ",
+  "1.27.0"  => "29.06.2016 Attr \"simu_SVSversion\" added, sub login_nonbl changed, sub camret_nonbl changed (getlistptzpreset) due to 7.2 problem ",
+  "1.26.2"  => "05.05.2016 change: get \"snapfileinfo\" will get back an Infomessage if Reading \"LastSnapId\" isn't available ",
+  "1.26.1"  => "27.04.2016 bugfix module will not load due to Unknown warnings category 'experimental' when using an older perl version  ",
+  "1.26.0"  => "22.04.2016 Attribute \"disable\" to deactivate the module added ",
+  "1.25.0"  => "18.04.2016 motion detection parameters can be entered if motion detection by camera or SVS is used ",
+  "1.24.0"  => "16.04.2016 behavior of \"set ... on\" changed, Attr \"recextend\" added, bugfix: setstate-warning if FHEM will restarted and SVS is not reachable (Forum: #308) ",
+  "1.22.0"  => "27.03.2016 bugfix \"link_open\" doesn't work after last update ",
+  "1.21.0"  => "23.03.2016 added \"lastrec\", \"lastrec_open\" to playback last recording  ",
+  "1.20.0"  => "09.03.2016 command \"extevent\" added ",
+  "1.19.3"  => "07.03.2016 bugfix \"uninitialized value \$lastrecstarttime\", \"uninitialized value \$lastrecstoptime\", new attribute \"videofolderMap\" ",
+  "1.19.2"  => "06.03.2016 Reading \"CamLastRec\" added which contains Path/name of last recording ",
+  "1.19.1"  => "28.02.2016 enhanced command runView by option \"link_open\" to open a streamlink immediately ",
+  "1.19.0"  => "25.02.2016 functions for cam-livestream added ",
+  "1.18.1"  => "21.02.2016 fixed a problem that the state is \"disable\" instead of \"disabled\" if a camera is disabled and FHEM will be restarted ",
+  "1.18.0"  => "20.02.2016 function \"get ... eventlist\" added, Reading \"CamEventNum\" added which containes total number of camera events, change usage of reading \"LastUpdateTime\"  ",
+  "1.17.0"  => "19.02.2016 function \"runPatrol\" added that starts predefined patrols of PTZ-cameras, Reading \"CamDetMotSc\" added ",
+  "1.16.0"  => "16.02.2016 set up of motion detection source now possible ",
+  "1.15.0"  => "15.02.2016 control of exposure mode day, night & auto is possible now ",
+  "1.14.0"  => "14.02.2016 The port in DEF-String is optional now, if not given, default port 5000 is used ",
+  "1.13.2"  => "13.02.2016 fixed a problem that manual updates using \"getcaminfoall\" are leading to additional pollingloops if polling is used, attribute \"debugactivetoken\" added for debugging-use  ",
+  "1.13.1"  => "12.02.2016 fixed a problem that a usersession won't be destroyed if a function couldn't be executed successfully ",
+  "1.12.0"  => "08.02.2016 added function \"move\" for continuous PTZ action ",
+  "1.11.0"  => "05.02.2016 added function \"goPreset\" and \"goAbsPTZ\" to control the move of PTZ lense to absolute positions (http://forum.fhem.de/index.php/topic,45671.msg404275.html#msg404275), (http://forum.fhem.de/index.php/topic,45671.msg404892.html#msg404892) ",
+  "1.10.0"  => "02.02.2016 added function \"svsinfo\" to get informations about installed SVS-package, if Availability = \"disconnected\" then \"state\"-value will be \"disconnected\" too, saved Credentials were deleted from file if a device will be deleted ",
+  "1.7.0"  => "18.01.2016 Attribute \"httptimeout\" added ",
+  "1.6.0"  => "16.01.2016 Change the define-string related to rectime. (http://forum.fhem.de/index.php/topic,45671.msg391664.html#msg391664)   ",                
+  "1.5.1"  => "11.01.2016 Vars \"USERNAME\" and \"RECTIME\" removed from internals, Var (Internals) \"SERVERNAME\" changed to \"SERVERADDR\" ",
+  "1.5.0"  => "04.01.2016 Function \"Get\" for creating Camera-Readings integrated, Attributs pollcaminfoall, pollnologging added, Function for Polling Cam-Infos added. ",
+  "1.4.0"  => "23.12.2015 function \"enable\" and \"disable\" for SS-Cams added, changed timout of Http-calls to a higher value ",
+  "1.3.0"  => "19.12.2015 function \"snap\" for taking snapshots added, fixed a bug that functions may impact each other  ",
+  "1.0.0"  => "12.12.2015 initial, changed completly to HttpUtils_NonblockingGet "
+);
+
+# Hint Hash en
+our %SSCam_vHintsExt_en = (
+  "5" => "Find more Informations about manage users and the appropriate privilege profiles in ".
+         "<a href=\"https://www.synology.com/en-global/knowledgebase/Surveillance/help/SurveillanceStation/user\">Surveillance Station online help</a> ",
+  "4" => "The message Meldung \"WARNING - The current/simulated SVS-version ... may be incompatible with SSCam version...\" means that ".
+         "the used SSCam version was currently not tested with the installed version of Synology Surveillance Station (Reading \"SVSversion\"). ".
+         "The compatible SVS-Version is printed out in the Internal COMPATIBILITY.\n".
+         "<b>Actions:</b> At first please update your SSCam version. If the message does appear furthermore, please inform the SSCam Maintainer. ".
+         "To ignore this message temporary, you may reduce the verbose level of your SSCam device. ",
+  "3" => "Link to SSCam <a href=\"https://fhem.de/commandref.html#SSCam\">english commandRef</a> ",
+  "2" => "You can create own PTZ-control icons with a template available in SVN which can be downloaded here: <a href=\"https://svn.fhem.de/trac/browser/trunk/fhem/contrib/sscam\">contrib/sscam/black_btn_CAM_Template.pdn</a>.\n". 
+         "This template can be edited with Paint.Net for example. ",
+  "1" => "Some helpful <a href=\"https://wiki.fhem.de/wiki/SSCAM_-_Steuerung_von_Kameras_in_Synology_Surveillance_Station\">FHEM-Wiki</a> notes"
+);
+
+# Hint Hash de
+our %SSCam_vHintsExt_de = (
+  "5" => "Informationen zum Management von Usern und entsprechenden Rechte-Profilen sind in der ".
+         "<a href=\"https://www.synology.com/de-de/knowledgebase/Surveillance/help/SurveillanceStation/user\">Surveillance Station Online-Hilfe</a> zu finden.",
+
+  "4" => "Die Meldung \"WARNING - The current/simulated SVS-version ... may be incompatible with SSCam version...\" ist ein Hinweis darauf, dass ".
+         "die eingesetzte SSCam Version noch nicht mit der verwendeten Version von Synology Surveillance Station (Reading \"SVSversion\") getestet ".
+         "wurde. Die kompatible SVS-Version ist im Internal COMPATIBILITY ersichtlich.\n".
+         "<b>Maßnahmen:</b> Bitte SSCam zunächst updaten. Sollte die Meldung weiterhin auftreten, bitte den SSCam Maintainer informieren. Zur ".
+         "vorübergehenden Ignorierung kann der verbose Level des SSCam-Devices entsprechend reduziert werden. ",
+  "3" => "Link zur deutschen SSCam <a href=\"https://fhem.de/commandref_DE.html#SSCam\">commandRef</a> ",
+  "2" => "Zur Erstellung eigener PTZ-Steuericons gibt es eine Vorlage im SVN die hier <a href=\"https://svn.fhem.de/trac/browser/trunk/fhem/contrib/sscam\">contrib/sscam/black_btn_CAM_Template.pdn</a> heruntergeladen werden kann.\n".
+          "Diese Vorlage kann zum Beispiel mit Paint.Net bearbeitet werden. ",
+  "1" => "Hilfreiche Hinweise zu SSCam im <a href=\"https://wiki.fhem.de/wiki/SSCAM_-_Steuerung_von_Kameras_in_Synology_Surveillance_Station\">FHEM-Wiki</a>"
+);
               
 eval "use JSON qw( decode_json );1;" or my $SScamMMDBI = "JSON";  # Debian: apt-get install libjson-perl
 use Data::Dumper;                                                 # Perl Core module
-use strict;                           
-use warnings;
 use MIME::Base64;
 use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-# Version und getestete SVS-Version
-my $SSCamVersion = "7.1.1";
+# getestete SVS-Version
 my $compstat     = "8.2.0";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
@@ -374,7 +418,7 @@ sub SSCam_Define($@) {
   $hash->{SERVERADDR}    = $serveraddr;
   $hash->{SERVERPORT}    = $serverport;
   $hash->{CAMNAME}       = $camname;
-  $hash->{VERSION}       = $SSCamVersion;
+  $hash->{VERSION}       = (reverse sort(keys %SSCam_vNotesIntern))[0];
   $hash->{MODEL}         = ($camname =~ m/^SVS$/i)?"SVS":"CAM";                  # initial, CAM wird später ersetzt durch CamModel
   $hash->{PROTOCOL}      = $proto;
   $hash->{COMPATIBILITY} = $compstat;                                            # getestete SVS-version Kompatibilität 
@@ -1087,7 +1131,8 @@ sub SSCam_Get($@) {
                    "eventlist:noArg ".
 	        	   "stmUrlPath:noArg ".
 				   "storedCredentials:noArg ".
-				   "scanVirgin:noArg "
+				   "scanVirgin:noArg ".
+                   "versionNotes " 
                    ;
 	} else {
         # getlist für SVS Devices
@@ -1208,9 +1253,88 @@ sub SSCam_Get($@) {
 		# "1" ist Statusbit für manuelle Abfrage, kein Einstieg in Pollingroutine
         SSCam_getcaminfoall($hash,1);
     
-	} else {
+	} elsif ($opt =~ /versionNotes/) {
+	  my $header  = "<b>Module release information</b><br>";
+      my $header1 = "<b>Helpful hints</b><br>";
+      my %hs;
+	  
+	  # Ausgabetabelle erstellen
+	  my ($ret,$val0,$val1);
+      my $i = 0;
+	  
+      $ret  = "<html>";
+      
+      # Hints
+      if(!$arg || $arg =~ /hints/ || $arg =~ /[\d]+/) {
+          $ret .= sprintf("<div class=\"makeTable wide\"; style=\"text-align:left\">$header1 <br>");
+          $ret .= "<table class=\"block wide internals\">";
+          $ret .= "<tbody>";
+          $ret .= "<tr class=\"even\">";  
+          if($arg && $arg =~ /[\d]+/) {
+              if(AttrVal("global","language","EN") eq "DE") {
+                  %hs = ( $arg => $SSCam_vHintsExt_de{$arg} ); 
+              } else {
+                  %hs = ( $arg => $SSCam_vHintsExt_en{$arg} ); 
+              }                   
+          } else {
+              if(AttrVal("global","language","EN") eq "DE") {
+                  %hs = %SSCam_vHintsExt_de;
+              } else {
+                  %hs = %SSCam_vHintsExt_en; 
+              }
+          }          
+          $i = 0;
+          foreach my $key (reverse sort(keys %hs)) {
+              $val0 = $hs{$key};
+              $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0</td>" );
+              $ret .= "</tr>";
+              $i++;
+              if ($i & 1) {
+                  # $i ist ungerade
+                  $ret .= "<tr class=\"odd\">";
+              } else {
+                  $ret .= "<tr class=\"even\">";
+              }
+          }
+          $ret .= "</tr>";
+          $ret .= "</tbody>";
+          $ret .= "</table>";
+          $ret .= "</div>";
+      }
+	  
+      # Notes
+      if(!$arg || $arg =~ /rel/) {
+          $ret .= sprintf("<div class=\"makeTable wide\"; style=\"text-align:left\">$header <br>");
+          $ret .= "<table class=\"block wide internals\">";
+          $ret .= "<tbody>";
+          $ret .= "<tr class=\"even\">";
+          $i = 0;
+          foreach my $key (reverse sort(keys %SSCam_vNotesExtern)) {
+              ($val0,$val1) = split(/\s/,$SSCam_vNotesExtern{$key},2);
+              $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0  </td><td>$val1</td>" );
+              $ret .= "</tr>";
+              $i++;
+              if ($i & 1) {
+                  # $i ist ungerade
+                  $ret .= "<tr class=\"odd\">";
+              } else {
+                  $ret .= "<tr class=\"even\">";
+              }
+          }
+          $ret .= "</tr>";
+          $ret .= "</tbody>";
+          $ret .= "</table>";
+          $ret .= "</div>";
+	  }
+      
+      $ret .= "</html>";
+					
+	  return $ret;
+  
+    } else {
         return "$getlist";
 	}
+
 return $ret;  # not generate trigger out of command
 }
 
@@ -2885,12 +3009,11 @@ sub SSCam_getcaminfo($) {
     
     RemoveInternalTimer($hash, "SSCam_getcaminfo");
     return if(IsDisabled($name));
-    
+
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
         $hash->{OPMODE} = "Getcaminfo";
         $hash->{HELPER}{ACTIVE} = "on";
-        $hash->{HELPER}{LOGINRETRIES} = 0;
-		
+        $hash->{HELPER}{LOGINRETRIES} = 0;	
         if (AttrVal($name,"debugactivetoken",0)) {
             Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
         } 
@@ -4825,7 +4948,7 @@ sub SSCam_camop_parse ($) {
                     my @vl = split (/\.|-/,AttrVal($name, "simu_SVSversion", ""));
                     $major = $vl[0];
                     $minor = $vl[1];
-					$small = ($vl[2] =~ /\d/)?$vl[2]:undef;
+					$small = ($vl[2] =~ /\d/)?$vl[2]:'';
                     $build = "xxxx-simu";
                 }
                 
@@ -4837,7 +4960,7 @@ sub SSCam_camop_parse ($) {
                     readingsSingleUpdate($hash, "compstate", "true", 1);
                 } else {
                     readingsSingleUpdate($hash, "compstate", "false", 1);
-                    Log3($name, 2, "$name - WARNING - The current/simulated SVS-version ".$major.$minor.(($small=~/\d/)?$small:0)." may be incompatible to your SSCam version $hash->{VERSION}. Please update SScam or inform the SSCam maintainer.");
+                    Log3($name, 2, "$name - WARNING - The current/simulated SVS-version ".$major.$minor.(($small=~/\d/)?$small:0)." may be incompatible with SSCam version $hash->{VERSION}. For further information execute \"get <name> versionNotes 4\".");
                 }
                 
                 if (!exists($data->{'data'}{'customizedPortHttp'})) {
@@ -7359,9 +7482,19 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   
   Determines common informations about the installed SVS-version and other properties. <br>
   </ul>
-  <br><br>  
+  <br><br> 
+
+  <ul>
+  <li><b> get &lt;name&gt; versionNotes [hints | rel | &lt;key&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM/SVS)</li> <br>
+  
+  Shows realease informations and/or hints about the module. It contains only main release informations for module users. <br>
+  If no options are specified, both release informations and hints will be shown. "rel" shows only release informations and
+  "hints" shows only hints. By the &lt;key&gt;-specification only the hint with the specified number is shown.
+  </ul>
+  <br><br>   
   
   
+  <a name="SSCamPolling"></a>
   <b>Polling of Camera/SVS-Properties</b><br><br>
   <ul>
   Retrieval of Camera-Properties can be done automatically if the attribute "pollcaminfoall" will be set to a value &gt; 10. <br>
@@ -7426,12 +7559,15 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   
   <ul>
   <ul>
+  <a name="debugactivetoken"></a>
   <li><b>debugactivetoken</b><br>
     if set the state of active token will be logged - only for debugging, don't use it in normal operation ! </li><br>
   
+  <a name="disable"></a>
   <li><b>disable</b><br>
     deactivates the device definition </li><br>
     
+  <a name="genericStrmHtmlTag"></a>
   <li><b>genericStrmHtmlTag</b><br>
   This attribute contains HTML-Tags for video-specification in a Streaming-Device of type "generic". 
   (see also "set &lt;name&gt; createStreamDev generic") <br><br> 
@@ -7448,10 +7584,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     <br><br>
     </li>
   
+  <a name="httptimeout"></a>
   <li><b>httptimeout</b><br>
     Timeout-Value of HTTP-Calls to Synology Surveillance Station, Default: 4 seconds (if httptimeout = "0" 
 	or not set) </li><br>
   
+  <a name="htmlattr"></a>
   <li><b>htmlattr</b><br>
     additional specifications to inline oictures to manipulate the behavior of stream, e.g. size of the image.	</li><br>
 	
@@ -7461,32 +7599,40 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
         </ul>
 		<br>
   
+  <a name="livestreamprefix"></a>
   <li><b>livestreamprefix</b><br>
     overwrites the specifications of protocol, servername and port for further use of the livestream address, e.g. 
 	as an link to external use. It has to be specified as "http(s)://&lt;servername&gt;:&lt;port&gt;"  </li><br>
 
+  <a name="loginRetries"></a>
   <li><b>loginRetries</b><br>
     set the amount of login-repetitions in case of failure (default = 3)   </li><br>
   
+  <a name="noQuotesForSID"></a>
   <li><b>noQuotesForSID</b><br>
-    this attribute may be helpfull in some cases to avoid errormessage "402 - permission denied" and makes login 
+    this attribute may be helpful in some cases to avoid errormessage "402 - permission denied" and makes login 
 	possible.  </li><br>
   
+  <a name="pollcaminfoall"></a>
   <li><b>pollcaminfoall</b><br>
     Interval of automatic polling the Camera properties (if <= 10: no polling, if &gt; 10: polling with interval) </li><br>
 
+   <a name="pollnologging"></a>
   <li><b>pollnologging</b><br>
     "0" resp. not set = Logging device polling active (default), "1" = Logging device polling inactive</li><br>
-    
+   
+  <a name="ptzPanel_Home"></a>
   <li><b>ptzPanel_Home</b><br>
     In the PTZ-control panel the Home-Icon (in attribute "ptzPanel_row02") is automatically assigned to the value of 
     Reading "PresetHome".
     With "ptzPanel_Home" you can change the assignment to another preset from the available Preset list. </li><br> 
-    
+  
+  <a name="ptzPanel_iconPath"></a>  
   <li><b>ptzPanel_iconPath</b><br>
     Path for icons used in PTZ-control panel, default is "www/images/sscam". 
     The attribute value will be used for all icon-files except *.svg. </li><br> 
 
+  <a name="ptzPanel_iconPrefix"></a>
   <li><b>ptzPanel_iconPrefix</b><br>
     Prefix for icons used in PTZ-control panel, default is "black_btn_". 
     The attribute value will be used for all icon-files except *.svg. <br>
@@ -7494,6 +7640,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     attributes "ptzPanel_row[00-09]" just with the subsequent part of name, e.g. "CAMDOWN.png".
     </li><br>   
 
+  <a name="ptzPanel_row00"></a>
   <li><b>ptzPanel_row[00-09] &lt;command&gt;:&lt;icon&gt;,&lt;command&gt;:&lt;icon&gt;,... </b><br>
     For PTZ-cameras the attributes "ptzPanel_row00" to "ptzPanel_row04" are created automatically for usage by 
     the PTZ-control panel. <br>
@@ -7504,9 +7651,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     If needed the assignment for Home-button in "ptzPanel_row02" can be changed by attribute "ptzPanel_Home". <br>
     The icons are searched in path "ptzPanel_iconPath". The value of "ptzPanel_iconPrefix" is prepend to the icon filename.
     Own extensions of the PTZ-control panel can be done using the attributes "ptzPanel_row05" to "ptzPanel_row09". 
-    For creation of own icons a template is provided in the SVN: 
-    <a href="https://svn.fhem.de/trac/browser/trunk/fhem/contrib/sscam">contrib/sscam/black_btn_CAM_Template.pdn</a>. This
-    template can be edited by e.g. Paint.Net.  <br><br>
+    For creation of own icons a template is provided in the SVN. Further information can be get by "get &lt;name&gt; versionNotes 2". 
+    <br><br>
     
     <b>Note:</b> <br>
     For an empty field please use ":CAMBLANK.png" respectively ":CAMBLANK.png,:CAMBLANK.png,:CAMBLANK.png,..." for an empty 
@@ -7521,25 +7667,33 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
 		<br>
     </li><br>      
 
+  <a name="ptzPanel_use"></a>
   <li><b>ptzPanel_use</b><br>
     Switch the usage of a PTZ-control panel in detail view respectively a created StreamDevice off or on 
     (default: on). </li><br> 
   
+  <a name="rectime"></a>
   <li><b>rectime</b><br>
    determines the recordtime when a recording starts. If rectime = 0 an endless recording will be started. If 
    it isn't defined, the default recordtime of 15s is activated </li><br>
   
+  <a name="recextend"></a>
   <li><b>recextend</b><br>
     "rectime" of a started recording will be set new. Thereby the recording time of the running recording will be 
 	extended </li><br>
   
+  <a name="session"></a>
   <li><b>session</b><br>
     selection of login-Session. Not set or set to "DSM" -&gt; session will be established to DSM (Sdefault). 
-	"SurveillanceStation" -&gt; session will be established to SVS </li><br>
+	"SurveillanceStation" -&gt; session will be established to SVS. <br>
+    For establish a sesion with Surveillance Station you have to create a user with suitable privilege profile in SVS.
+    If you need more infomations please execute "get &lt;name&gt; versionNotes 5".    </li><br>
   
+  <a name="simu_SVSversion"></a>
   <li><b>simu_SVSversion</b><br>
     simulates another SVS version. (only a lower version than the installed one is possible !)  </li><br>
-	
+    
+  <a name="snapGalleryBoost"></a>
   <li><b>snapGalleryBoost</b><br>
     If set, the last snapshots (default 3) will be retrieved by Polling, will be stored in the FHEM-servers main memory
     and can be displayed by the "set/get ... snapGallery" command. <br>
@@ -7547,9 +7701,11 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
 	If the attribute is set, you can't specify arguments in addition to the "set/get ... snapGallery" command. 
     (see also attribut "snapGalleryNumber") </li><br>
   
+  <a name="snapGalleryColumns"></a>
   <li><b>snapGalleryColumns</b><br>
     The number of snapshots which shall appear in one row of the gallery popup (default 3). </li><br>
 	
+  <a name="snapGalleryHtmlAttr"></a>
   <li><b>snapGalleryHtmlAttr</b><br>
     the image parameter can be controlled by this attribute. <br>
 	If the attribute isn't set, the value of attribute "htmlattr" will be used. <br>
@@ -7561,26 +7717,32 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
         </ul>
 		<br>
         </li>
-		
+	
+  <a name="snapGalleryNumber"></a>	
   <li><b>snapGalleryNumber</b><br>
     The number of snapshots to retrieve (default 3). </li><br>
 	
+  <a name="snapGallerySize"></a>
   <li><b>snapGallerySize</b><br>
      By this attribute the quality of the snapshot images can be controlled (default "Icon"). <br>
 	 If mode "Full" is set, the images are retrieved with their original available resolution. That requires more ressources 
 	 and may slow down the display. By setting attribute "snapGalleryBoost=1" the display may accelerated, because in that case
 	 the images will be retrieved by continuous polling and need only bring to display. </li><br>
   
+  <a name="showStmInfoFull"></a>
   <li><b>showStmInfoFull</b><br>
     additional stream informations like LiveStreamUrl, StmKeyUnicst, StmKeymjpegHttp will be created  </li><br>
   
+  <a name="showPassInLog"></a>
   <li><b>showPassInLog</b><br>
     if set the used password will be shown in logfile with verbose 4. (default = 0) </li><br>
   
+  <a name="videofolderMap"></a>
   <li><b>videofolderMap</b><br>
     replaces the content of reading "VideoFolder", Usage if e.g. folders are mountet with different names than original 
 	(SVS) </li><br>
   
+  <a name="verbose"></a>
   <li><b>verbose</b></li><br>
   
   <ul>
@@ -8637,9 +8799,21 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   </ul>
   <br><br> 
   
+  <ul>
+  <li><b> get &lt;name&gt; versionNotes [hints | rel | &lt;key&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM/SVS)</li> <br>
+  
+  Zeigt Release Informationen und/oder Hinweise zum Modul an. Es sind nur Release Informationen mit Bedeutung für den 
+  Modulnutzer enthalten. <br>
+  Sind keine Optionen angegben, werden sowohl Release Informationen als auch Hinweise angezeigt. "rel" zeigt nur Release
+  Informationen und "hints" nur Hinweise an. Mit der &lt;key&gt;-Angabe wird der Hinweis mit der angegebenen Nummer 
+  angezeigt.
+  </ul>
+  <br><br> 
+  
   </ul>
   <br><br>
 
+  <a name="SSCamPolling"></a>
   <b>Polling der Kamera/SVS-Eigenschaften:</b><br><br>
 
   Die Abfrage der Kameraeigenschaften erfolgt automatisch, wenn das Attribut "pollcaminfoall" (siehe Attribute) mit einem Wert &gt; 10 gesetzt wird. <br>
@@ -8704,13 +8878,16 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   
   <ul>
   <ul>
+  <a name="debugactivetoken"></a>
   <li><b>debugactivetoken</b><br> 
     wenn gesetzt wird der Status des Active-Tokens gelogged - nur für Debugging, nicht im 
     normalen Betrieb benutzen ! </li><br>
   
+  <a name="disable"></a>
   <li><b>disable</b><br>
     deaktiviert das Gerätemodul bzw. die Gerätedefinition </li><br>
-    
+  
+  <a name="genericStrmHtmlTag"></a>  
   <li><b>genericStrmHtmlTag</b><br>
   Das Attribut enthält HTML-Tags zur Video-Spezifikation in einem Streaming-Device von Typ "generic". 
   (siehe "set &lt;name&gt; createStreamDev generic") <br><br> 
@@ -8727,10 +8904,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     <br><br>
     </li>
   
+  <a name="httptimeout"></a>
   <li><b>httptimeout</b><br>
     Timeout-Wert für HTTP-Aufrufe zur Synology Surveillance Station, Default: 4 Sekunden (wenn 
     httptimeout = "0" oder nicht gesetzt) </li><br>
   
+  <a name="htmlattr"></a>
   <li><b>htmlattr</b><br>
   ergänzende Angaben zur Inline-Bilddarstellung um das Verhalten wie Bildgröße zu beeinflussen. <br><br> 
   
@@ -8741,35 +8920,43 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
 		<br>
         </li>
   
+  <a name="livestreamprefix"></a>
   <li><b>livestreamprefix</b><br>
     überschreibt die Angaben zu Protokoll, Servernamen und Port zur Weiterverwendung der 
     Livestreamadresse als z.B. externer Link. Anzugeben in der Form 
 	"http(s)://&lt;servername&gt;:&lt;port&gt;"   </li><br>
   
+  <a name="loginRetries"></a>
   <li><b>loginRetries</b><br>
     setzt die Anzahl der Login-Wiederholungen im Fehlerfall (default = 3)   </li><br>
   
+  <a name="noQuotesForSID"></a>
   <li><b>noQuotesForSID</b><br>
     dieses Attribut kann in bestimmten Fällen die Fehlermeldung "402 - permission denied" 
     vermeiden und ein login ermöglichen.  </li><br>                      
   
+  <a name="pollcaminfoall"></a>
   <li><b>pollcaminfoall</b><br>
     Intervall der automatischen Eigenschaftsabfrage (Polling) einer Kamera (kleiner/gleich 10: kein 
     Polling, größer 10: Polling mit Intervall) </li><br>
-
+  
+  <a name="pollnologging"></a>
   <li><b>pollnologging</b><br>
     "0" bzw. nicht gesetzt = Logging Gerätepolling aktiv (default), "1" = Logging 
     Gerätepolling inaktiv </li><br>
-    
+  
+  <a name="ptzPanel_Home"></a>  
   <li><b>ptzPanel_Home</b><br>
     Im PTZ-Steuerungspaneel wird dem Home-Icon (im Attribut "ptzPanel_row02") automatisch der Wert des Readings 
     "PresetHome" zugewiesen.
     Mit "ptzPanel_Home" kann diese Zuweisung mit einem Preset aus der verfügbaren Preset-Liste geändert werden. </li><br> 
-    
+  
+  <a name="ptzPanel_iconPath"></a>  
   <li><b>ptzPanel_iconPath</b><br>
     Pfad für Icons im PTZ-Steuerungspaneel, default ist "www/images/sscam". 
     Der Attribut-Wert wird für alle Icon-Dateien außer *.svg verwendet. </li><br> 
 
+  <a name="ptzPanel_iconPrefix"></a>
   <li><b>ptzPanel_iconPrefix</b><br>
     Prefix für Icon-Dateien im PTZ-Steuerungspaneel, default ist "black_btn_". 
     Der Attribut-Wert wird für alle Icon-Dateien außer *.svg verwendet. <br>
@@ -8777,6 +8964,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     Attributen "ptzPanel_row[00-09]" nur noch mit dem darauf folgenden Teilstring, z.B. "CAMDOWN.png" benannt zu werden.
     </li><br>    
 
+  <a name="ptzPanel_row00"></a>
   <li><b>ptzPanel_row[00-09] &lt;command&gt;:&lt;icon&gt;,&lt;command&gt;:&lt;icon&gt;,... </b><br>
     Für PTZ-Kameras werden automatisch die Attribute "ptzPanel_row00" bis "ptzPanel_row04" zur Verwendung im
     PTZ-Steuerungspaneel angelegt. <br>
@@ -8787,9 +8975,9 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     Bei Bedarf kann die Belegung der Home-Taste in "ptzPanel_row02" geändert werden mit dem Attribut "ptzPanel_Home". <br>
     Die Icons werden im Pfad "ptzPanel_iconPath" gesucht. Dem Icon-Namen wird "ptzPanel_iconPrefix" vorangestellt.
     Eigene Erweiterungen des PTZ-Steuerungspaneels können über die Attribute "ptzPanel_row05" bis "ptzPanel_row09" 
-    vorgenommen werden. Zur Erstellung eigener Icons gibt es eine Vorlage im SVN: 
-    <a href="https://svn.fhem.de/trac/browser/trunk/fhem/contrib/sscam">contrib/sscam/black_btn_CAM_Template.pdn</a>. Diese
-    Vorlage kann zum Beispiel mit Paint.Net bearbeitet werden.    <br><br>
+    vorgenommen werden. Zur Erstellung eigener Icons gibt es eine Vorlage im SVN. Für weitere Informationen bitte
+    "get &lt;name&gt; versionNotes 2" ausführen.
+    <br><br>
     
     <b>Hinweis</b> <br>
     Für eine Leerfeld verwenden sie bitte ":CAMBLANK.png" bzw. ":CAMBLANK.png,:CAMBLANK.png,:CAMBLANK.png,..." für eine 
@@ -8804,36 +8992,46 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
 		<br>
     </li><br>  
 
+  <a name="ptzPanel_use"></a>
   <li><b>ptzPanel_use</b><br>
     Die Anzeige des PTZ-Steuerungspaneels in der Detailanzeige bzw. innerhalb eines generierten Streamdevice wird 
     ein- bzw. ausgeschaltet (default ein). </li><br>    
-    
+  
+  <a name="rectime"></a>  
   <li><b>rectime</b><br>
     festgelegte Aufnahmezeit wenn eine Aufnahme gestartet wird. Mit rectime = 0 wird eine 
     Endlosaufnahme gestartet. Ist "rectime" nicht gesetzt, wird der Defaultwert von 15s 
 	verwendet.</li><br>
   
+  <a name="recextend"></a>
   <li><b>recextend</b><br>
     "rectime" einer gestarteten Aufnahme wird neu gesetzt. Dadurch verlängert sich die 
     Aufnahemzeit einer laufenden Aufnahme </li><br>
   
+  <a name="session"></a>
   <li><b>session</b><br>
     Auswahl der Login-Session. Nicht gesetzt oder "DSM" -> session wird mit DSM aufgebaut 
-    (Standard). "SurveillanceStation" -> Session-Aufbau erfolgt mit SVS </li><br>
+    (Standard). "SurveillanceStation" -> Session-Aufbau erfolgt mit SVS. <br>
+    Um eine Session mit der Surveillance Station aufzubauen muss ein Nutzer mit passenden Privilegien Profil in der SVS
+    angelegt werden. Für weitere Informationen bitte "get &lt;name&gt; versionNotes 5" ausführen.  </li><br>
   
+  <a name="simu_SVSversion"></a>
   <li><b>simu_SVSversion</b><br>
     Simuliert eine andere SVS-Version. (es ist nur eine niedrigere als die installierte SVS 
     Version möglich !) </li><br>
 	
+  <a name="snapGalleryBoost"></a>
   <li><b>snapGalleryBoost</b><br>
     Wenn gesetzt, werden die letzten Schnappschüsse (default 3) über Polling im Speicher gehalten und mit "set/get snapGallery" 
 	aufbereitet angezeigt. Dieser Modus bietet sich an wenn viele bzw. Fullsize Images angezeigt werden sollen. 
 	Ist das Attribut eingeschaltet, können bei "set/get snapGallery" keine Argumente mehr mitgegeben werden. 
     (siehe Attribut "snapGalleryNumber") </li><br>
   
+  <a name="snapGalleryColumns"></a>
   <li><b>snapGalleryColumns</b><br>
     Die Anzahl der Snaps die in einer Reihe im Popup erscheinen sollen (default 3). </li><br>
 	
+  <a name="snapGalleryHtmlAttr"></a>
   <li><b>snapGalleryHtmlAttr</b><br>
     hiermit kann die Bilddarstellung beeinflusst werden. <br>
 	Ist das Attribut nicht gesetzt, wird das Attribut "htmlattr" verwendet. <br>
@@ -8846,27 +9044,33 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
 		<br>
         </li>
 		
+  <a name="snapGalleryNumber"></a>
   <li><b>snapGalleryNumber</b><br>
     Die Anzahl der abzurufenden Schnappschüsse (default 3). </li><br>
 	
+  <a name="snapGallerySize"></a>  
   <li><b>snapGallerySize</b><br>
      Mit diesem Attribut kann die Qualität der Images eingestellt werden (default "Icon"). <br>
 	 Im Modus "Full" wird die original vorhandene Auflösung der Images abgerufen. Dies erfordert mehr Ressourcen und kann die 
 	 Anzeige verlangsamen. Mit "snapGalleryBoost=1" kann die Ausgabe beschleunigt werden, da in diesem Fall die Aufnahmen über 
 	 Polling abgerufen und nur noch zur Anzeige gebracht werden. </li><br>
 	
+  <a name="showStmInfoFull"></a>
   <li><b>showStmInfoFull</b><br>
     zusaätzliche Streaminformationen wie LiveStreamUrl, StmKeyUnicst, StmKeymjpegHttp werden 
     ausgegeben</li><br>
   
+  <a name="showPassInLog"></a>
   <li><b>showPassInLog</b><br>
-    wenn gesetzt wird das verwendete Passwort im Logfile (verbose 4) angezeigt. 
+    Wenn gesetzt, wird das verwendete Passwort im Logfile mit verbose 4 angezeigt. 
     (default = 0) </li><br>
   
+  <a name="videofolderMap"></a>
   <li><b>videofolderMap</b><br>
     ersetzt den Inhalt des Readings "VideoFolder", Verwendung z.B. bei gemounteten 
     Verzeichnissen </li><br>
   
+  <a name="verbose"></a>
   <li><b>verbose</b> </li><br>
   
   <ul>
