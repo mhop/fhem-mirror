@@ -503,6 +503,7 @@ FHEM/98_version.pm           markusbloch          Sonstiges
 FHEM/98_weblink.pm           rudolfkoenig         Frontends/FHEMWEB
 FHME/98_weekprofile.pm       risiko               Frontends
 FHEM/98_STOCKQUOTES.pm       vbs                  Unterstuetzende Dienste
+FHEM/98_SmarterCoffee        CoolTux              Sonstige Systeme
 FHEM/99_SUNRISE_EL.pm        rudolfkoenig         Automatisierung
 FHEM/99_Utils.pm             rudolfkoenig         Automatisierung
 FHEM/99_Venetian.pm          Christian.Kühnel     Automatisierung
