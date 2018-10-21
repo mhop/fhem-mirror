@@ -6708,12 +6708,16 @@ sub SSCam_experror {
     </pre>
     
     The password length has a maximum of 20 characters. <br> 
-	The operator can, dependend on what functions are planned to execute, create an user in DSM respectively in Synology Surveillance Station as well. <br>
-    If the user is member of admin-group, he has access to all module functions. Without this membership the user can only execute functions with lower need of rights. <br>
+	The operator can, dependend on what functions are planned to execute, create an user in DSM respectively in Synology 
+    Surveillance Station as well. <br>
+    If the user is member of admin-group, he has access to all module functions. Without this membership the user can only 
+    execute functions with lower need of rights. <br>
     The required minimum rights to execute functions are listed in a table further down. <br>
     
-    Alternatively to DSM-user a user created in SVS can be used. Also in that case a user of type "manager" has the right to execute all functions, <br>
-    whereat the access to particular cameras can be restricted by the privilege profile (please see help function in SVS for details).  <br>
+    Alternatively to DSM-user a user created in SVS can be used. Also in that case a user of type "manager" has the right to 
+    execute all functions, <br>
+    whereat the access to particular cameras can be restricted by the privilege profile (please see help function in SVS for 
+    details).  <br>
     As best practice it is proposed to create an user in DSM as well as in SVS too:  <br><br>
     
     <ul>
@@ -6722,13 +6726,16 @@ sub SSCam_experror {
     </ul>
     <br>
     
-    Using the <a href="#SSCamattr">Attribute</a> "session" can be selected, if the session should be established to DSM or the SVS instead. <br>
-    If the session will be established to DSM, SVS Web-API methods are available as well as further API methods of other API's what possibly needed for processing. <br><br>
+    Using the <a href="#SSCamattr">Attribute</a> "session" can be selected, if the session should be established to DSM or the 
+    SVS instead. Further informations about user management in SVS are available by execute  
+    "get &lt;name&gt; versionNotes 5".<br>
+    If the session will be established to DSM, SVS Web-API methods are available as well as further API methods of other API's 
+    what possibly needed for processing. <br><br>
     
     After device definition the default is "login to DSM", that means credentials with admin rights can be used to test all camera-functions firstly. <br>
     After this the credentials can be switched to a SVS-session with a restricted privilege profile as needed on dependency what module functions are want to be executed. <br><br>
     
-    The following list shows the minimum rights what the particular module function needs. <br><br>
+    The following list shows the <b>minimum rights</b> that the particular module function needs. <br><br>
     <ul>
       <table>
       <colgroup> <col width=20%> <col width=80%> </colgroup>
@@ -6741,7 +6748,7 @@ sub SSCam_experror {
       <tr><td><li>set ... expmode            </td><td> session: ServeillanceStation - manager       </li></td></tr>
       <tr><td><li>set ... extevent           </td><td> session: DSM - user as member of admin-group   </li></td></tr>
       <tr><td><li>set ... goPreset           </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
-      <tr><td><li>set ... homeMode           </td><td> ssession: ServeillanceStation - observer with privilege Home Mode switch  </li></td></tr>
+      <tr><td><li>set ... homeMode           </td><td> ssession: ServeillanceStation - observer with privilege Home Mode switch (valid for <b>SVS-device ! </b>) </li></td></tr>
 	  <tr><td><li>set ... motdetsc           </td><td> session: ServeillanceStation - manager       </li></td></tr>
 	  <tr><td><li>set ... runPatrol          </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
       <tr><td><li>set ... goAbsPTZ           </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
@@ -6764,11 +6771,13 @@ sub SSCam_experror {
       <tr><td><li>get ... stmUrlPath         </td><td> session: ServeillanceStation - observer    </li></td></tr>      
       </table>
     </ul>
-      <br><br>
+    <br><br>
+    </ul>
     
-    <a name="SSCam_HTTPTimeout"></a>
-    <b>HTTP-Timeout Settings</b><br><br>
+<a name="SSCam_HTTPTimeout"></a>
+<b>HTTP-Timeout Settings</b><br><br>
     
+  <ul>  
     All functions of SSCam use HTTP-calls to SVS Web API. <br>
     The default-value of HTTP-Timeout amounts 4 seconds. You can set the <a href="#SSCamattr">attribute</a> "httptimeout" > 0 to adjust the value as needed in your technical environment. <br>
     
@@ -8009,27 +8018,34 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     </pre>
     
 	Die Passwortlänge beträgt maximal 20 Zeichen. <br> 
-    Der Anwender kann in Abhängigkeit der beabsichtigten einzusetzenden Funktionen einen Nutzer im DSM bzw. in der Surveillance Station einrichten. <br>
-    Ist der DSM-Nutzer der Gruppe Administratoren zugeordnet, hat er auf alle Funktionen Zugriff. Ohne diese Gruppenzugehörigkeit können nur Funktionen mit niedrigeren <br>
-    Rechtebedarf ausgeführt werden. Die benötigten Mindestrechte der Funktionen sind in der Tabelle weiter unten aufgeführt. <br>
+    Der Anwender kann in Abhängigkeit der beabsichtigten einzusetzenden Funktionen einen Nutzer im DSM bzw. in der Surveillance 
+    Station einrichten. <br>
+    Ist der DSM-Nutzer der Gruppe Administratoren zugeordnet, hat er auf alle Funktionen Zugriff. Ohne diese Gruppenzugehörigkeit 
+    können nur Funktionen mit niedrigeren Rechtebedarf ausgeführt werden. Die benötigten Mindestrechte der Funktionen sind in 
+    der Tabelle weiter unten aufgeführt. <br>
     
-    Alternativ zum DSM-Nutzer kann ein in der SVS angelegter Nutzer verwendet werden. Auch in diesem Fall hat ein Nutzer vom Typ Manager das Recht alle Funktionen  <br>
-    auszuführen, wobei der Zugriff auf bestimmte Kameras/ im Privilegienprofil beschränkt werden kann (siehe Hilfefunktion in SVS). <br>
-    Als Best Practice wird vorgeschlagen jeweils einen User im DSM und einen in der SVS anzulegen: <br><br>
+    Alternativ zum DSM-Nutzer kann ein in der SVS angelegter Nutzer verwendet werden. Auch in diesem Fall hat ein Nutzer vom 
+    Typ Manager das Recht alle Funktionen auszuführen, wobei der Zugriff auf bestimmte Kameras/ im Privilegienprofil beschränkt 
+    werden kann (siehe Hilfefunktion in SVS). <br>
+    Als Best Practice wird vorgeschlagen, jeweils einen User im DSM und einen in der SVS anzulegen: <br><br>
     
     <ul>
-    <li>DSM-User als Mitglied der Admin-Gruppe: uneingeschränkter Test aller Modulfunktionen -> session:DSM  </li>
+    <li>DSM-User als Mitglied der Admin-Gruppe: uneingeschränkter Test aller Modulfunktionen -> session: DSM  </li>
     <li>SVS-User als Manager oder Betrachter: angepasstes Privilegienprofil -> session: SurveillanceStation  </li>
     </ul>
     <br>
     
-    Über das <a href="#SSCamattr">Attribut</a> "session" kann ausgewählt werden, ob die Session mit dem DSM oder der SVS augebaut werden soll. <br>
-    Erfolgt der Session-Aufbau mit dem DSM, stehen neben der SVS Web-API auch darüber hinaus gehende API-Zugriffe zur Verfügung die unter Umständen zur Verarbeitung benötigt werden. <br><br>
+    Über das <a href="#SSCamattr">Attribut</a> "session" kann ausgewählt werden, ob die Session mit dem DSM oder der SVS 
+    aufgebaut werden soll. Weitere Informationen zum Usermanagement in der SVS sind verfügbar mit 
+    "get &lt;name&gt; versionNotes 5".<br>
+    Erfolgt der Session-Aufbau mit dem DSM, stehen neben der SVS Web-API auch darüber hinausgehende API-Zugriffe zur Verfügung,
+    die unter Umständen zur Verarbeitung benötigt werden. <br><br>
     
-    Nach der Gerätedefinition ist die Grundeinstellung "Login in das DSM", d.h. es können Credentials mit Admin-Berechtigungen genutzt werden um zunächst alle <br>
-    Funktionen der Kameras testen zu können. Danach können die Credentials z.B. in Abhängigkeit der benötigten Funktionen auf eine SVS-Session mit entsprechend beschränkten Privilegienprofil umgestellt werden. <br><br>
+    Nach der Gerätedefinition ist die Grundeinstellung "Login in das DSM", d.h. es können Credentials mit Admin-Berechtigungen 
+    genutzt werden um zunächst alle Funktionen der Kameras testen zu können. Danach können die Credentials z.B. in Abhängigkeit 
+    der benötigten Funktionen auf eine SVS-Session mit entsprechend beschränkten Privilegienprofil umgestellt werden. <br><br>
     
-    Die nachfolgende Aufstellung zeigt die Mindestanforderungen der jeweiligen Modulfunktionen an die Nutzerrechte. <br><br>
+    Die nachfolgende Aufstellung zeigt die <b>Mindestanforderungen</b> der jeweiligen Modulfunktionen an die Nutzerrechte. <br><br>
     <ul>
       <table>
       <colgroup> <col width=20%> <col width=80%> </colgroup>
@@ -8040,7 +8056,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
       <tr><td><li>set ... expmode            </td><td> session: ServeillanceStation - Manager       </li></td></tr>
       <tr><td><li>set ... extevent           </td><td> session: DSM - Nutzer Mitglied von Admin-Gruppe     </li></td></tr>
 	  <tr><td><li>set ... goPreset           </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
-      <tr><td><li>set ... homeMode           </td><td> session: ServeillanceStation - Betrachter mit Privileg Home-Modus schalten     </li></td></tr>
+      <tr><td><li>set ... homeMode           </td><td> session: ServeillanceStation - Betrachter mit Privileg Home-Modus schalten ( gilt für <b>SVS-Device !</b> )  </li></td></tr>
 	  <tr><td><li>set ... goAbsPTZ           </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
 	  <tr><td><li>set ... move               </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
       <tr><td><li>set ... motdetsc           </td><td> session: ServeillanceStation - Manager       </li></td></tr>
@@ -8065,15 +8081,17 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
       <tr><td><li>get ... stmUrlPath         </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       </table>
     </ul>
-      <br><br>
+    <br><br>
+    </ul>
     
+<a name="SSCam_HTTPTimeout"></a>
+<b>HTTP-Timeout setzen</b><br><br>
     
-    <a name="SSCam_HTTPTimeout"></a>
-    <b>HTTP-Timeout setzen</b><br><br>
-    
+    <ul>
     Alle Funktionen dieses Moduls verwenden HTTP-Aufrufe gegenüber der SVS Web API. <br>
-    Der Standardwert für den HTTP-Timeout beträgt 4 Sekunden. Durch Setzen des <a href="#SSCamattr">Attributes</a> "httptimeout" > 0 kann dieser Wert bei Bedarf entsprechend den technischen Gegebenheiten angepasst werden. <br>
-     
+    Der Standardwert für den HTTP-Timeout beträgt 4 Sekunden. Durch Setzen des 
+    <a href="#SSCamattr">Attributes</a> "httptimeout" > 0 kann dieser Wert bei Bedarf entsprechend den technischen 
+    Gegebenheiten angepasst werden. <br> 
     
   </ul>
   <br><br><br>
@@ -8808,6 +8826,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   Sind keine Optionen angegben, werden sowohl Release Informationen als auch Hinweise angezeigt. "rel" zeigt nur Release
   Informationen und "hints" nur Hinweise an. Mit der &lt;key&gt;-Angabe wird der Hinweis mit der angegebenen Nummer 
   angezeigt.
+  Ist das Attribut "language = DE" im global Device gesetzt, erfolgt die Ausgabe der Hinweise in deutscher Sprache.
   </ul>
   <br><br> 
   
