@@ -463,7 +463,7 @@ logProxy_shiftTime($$)
 
   $time =~ s/ /_/;
 
-  if( $offset =~ m/((-)?\d)*m/ ) {
+  if( $offset =~ m/((-)?\d+)m/ ) {
     my @t = split("[-_:]", $time);
     $time = mktime($t[5],$t[4],$t[3],$t[2],$t[1]-1+$1,$t[0]-1900,0,0,-1);;
   } else {
