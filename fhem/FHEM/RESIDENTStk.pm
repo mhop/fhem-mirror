@@ -4,7 +4,6 @@ package main;
 use strict;
 use warnings;
 use Data::Dumper;
-use Time::Local;
 
 use Unit;
 our (@RESIDENTStk_attr);
@@ -415,14 +414,14 @@ sub RESIDENTStk_Set($@) {
                 readingsBulkUpdate(
                     $hash,
                     "lastDurSleep",
-                    RESIDENTStk_TimeDiff(
+                    UConv::duration(
                         $datetime, ReadingsVal( $name, "lastSleep", "" )
                     )
                 );
                 readingsBulkUpdate(
                     $hash,
                     "lastDurSleep_cr",
-                    RESIDENTStk_TimeDiff(
+                    UConv::duration(
                         $datetime, ReadingsVal( $name, "lastSleep", "" ),
                         "min"
                     )
@@ -517,7 +516,7 @@ sub RESIDENTStk_Set($@) {
                         readingsBulkUpdate(
                             $hash,
                             "lastDurAbsence",
-                            RESIDENTStk_TimeDiff(
+                            UConv::duration(
                                 $datetime,
                                 ReadingsVal( $name, "lastDeparture", "-" )
                             )
@@ -525,7 +524,7 @@ sub RESIDENTStk_Set($@) {
                         readingsBulkUpdate(
                             $hash,
                             "lastDurAbsence_cr",
-                            RESIDENTStk_TimeDiff(
+                            UConv::duration(
                                 $datetime,
                                 ReadingsVal( $name, "lastDeparture", "-" ),
                                 "min"
@@ -541,7 +540,7 @@ sub RESIDENTStk_Set($@) {
                         readingsBulkUpdate(
                             $hash,
                             "lastDurPresence",
-                            RESIDENTStk_TimeDiff(
+                            UConv::duration(
                                 $datetime,
                                 ReadingsVal( $name, "lastArrival", "-" )
                             )
@@ -549,7 +548,7 @@ sub RESIDENTStk_Set($@) {
                         readingsBulkUpdate(
                             $hash,
                             "lastDurPresence_cr",
-                            RESIDENTStk_TimeDiff(
+                            UConv::duration(
                                 $datetime,
                                 ReadingsVal( $name, "lastArrival", "-" ), "min"
                             )
@@ -3462,30 +3461,6 @@ sub RESIDENTStk_TimeSum($$) {
         return substr( UConv::s2hms( $timestamp1 + $timestamp2 ), 0, -3 );
     }
 
-}
-
-sub RESIDENTStk_TimeDiff ($$;$) {
-    my ( $datetimeNow, $datetimeOld, $format ) = @_;
-
-    if ( $datetimeNow eq "" || $datetimeOld eq "" ) {
-        $datetimeNow = "1970-01-01 00:00:00";
-        $datetimeOld = "1970-01-01 00:00:00";
-    }
-
-    my $timestampNow = time_str2num($datetimeNow);
-    my $timestampOld = time_str2num($datetimeOld);
-    my $timeDiff     = $timestampNow - $timestampOld;
-
-    # return seconds
-    return round( $timeDiff, 0 )
-      if ( defined($format) && $format eq "sec" );
-
-    # return minutes
-    return round( $timeDiff / 60, 0 )
-      if ( defined($format) && $format eq "min" );
-
-    # return human readable format
-    return UConv::s2hms( round( $timeDiff, 0 ) );
 }
 
 sub RESIDENTStk_InternalTimer($$$$$) {
