@@ -1,4 +1,4 @@
-REV 17582
+REV 17584
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -260,7 +260,7 @@ UPD 2018-04-03_07:45:06 57938 FHEM/46_TRX_WEATHER.pm
 UPD 2018-01-24_07:45:02 18229 FHEM/46_TeslaPowerwall2AC.pm
 UPD 2018-02-14_07:45:02 37065 FHEM/47_OBIS.pm
 UPD 2015-07-28_14:05:31 26441 FHEM/49_IPCAM.pm
-UPD 2018-10-21_07:45:03 474709 FHEM/49_SSCam.pm
+UPD 2018-10-22_07:45:02 475195 FHEM/49_SSCam.pm
 UPD 2018-07-04_07:45:03 10638 FHEM/49_SSCamSTRM.pm
 UPD 2018-03-12_07:45:04 46280 FHEM/49_TBot_List.pm
 UPD 2018-10-15_07:45:02 62521 FHEM/50_HP1000.pm
@@ -684,12 +684,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2018-10-21_07:45:07 3609322 docs/commandref.html
-UPD 2018-10-21_07:45:08 2209406 docs/commandref_DE.html
+UPD 2018-10-22_07:45:05 3609515 docs/commandref.html
+UPD 2018-10-22_07:45:07 2209699 docs/commandref_DE.html
 UPD 2018-10-08_07:45:02 76228 docs/commandref_frame.html
 UPD 2018-10-08_07:45:02 85677 docs/commandref_frame_DE.html
-UPD 2018-10-21_07:45:09 199619 docs/commandref_modular.html
-UPD 2018-10-21_07:45:10 210270 docs/commandref_modular_DE.html
+UPD 2018-10-22_07:45:08 199619 docs/commandref_modular.html
+UPD 2018-10-22_07:45:09 210270 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
