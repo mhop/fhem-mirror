@@ -58,7 +58,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 # Versions History intern
 our %DbRep_vNotesIntern = (
   "8.4.0"  => "22.10.2018  countEntries separately for every reading if attribute \"countEntriesDetail\" is set, ".
-                           "versionNotes changed to support en/de ",
+                           "versionNotes changed to support en/de, get dbValue as textfield-long ",
   "8.3.0"  => "17.10.2018  reduceLog from DbLog integrated into DbRep, textField-long as default for sqlCmd, both attributes timeOlderThan and timeDiffToNow can be set at same time",
   "8.2.3"  => "07.10.2018  check availability of DbLog-device at definition time of DbRep-device ",  
   "8.2.2"  => "07.10.2018  DbRep_getMinTs changed, fix don't get the real min timestamp in rare cases ",  
@@ -120,7 +120,8 @@ our %DbRep_vNotesIntern = (
 # Versions History extern:
 our %DbRep_vNotesExtern = (
   "8.4.0"  => "22.10.2018 New attribute \"countEntriesDetail\". Function countEntries creates number of datasets for every ".
-                          "reading separately if attribute \"countEntriesDetail\" is set. Get versionNotes changed to support en/de. ",
+                          "reading separately if attribute \"countEntriesDetail\" is set. Get versionNotes changed to support en/de. ".
+                          "Function \"get dbValue\" opens an editor window ",
   "8.3.0"  => "17.10.2018 reduceLog from DbLog integrated into DbRep, textField-long as default for sqlCmd, both attributes ".
                           "timeOlderThan and timeDiffToNow can be set at same time -> the selection time between timeOlderThan ".
                           "and timeDiffToNow can be calculated dynamically ",
@@ -820,7 +821,7 @@ sub DbRep_Get($@) {
                 "svrinfo:noArg ".
 				"blockinginfo:noArg ".
                 "minTimestamp:noArg ".
-                "dbValue ".
+                "dbValue:textField-long ".
                 (($dbmodel eq "MYSQL")?"dbstatus:noArg ":"").
                 (($dbmodel eq "MYSQL")?"tableinfo:noArg ":"").
 				(($dbmodel eq "MYSQL")?"procinfo:noArg ":"").
@@ -10465,7 +10466,7 @@ return;
                                       <tr><td> <b>device</b>                </td><td>: select only datasets which are contain &lt;device&gt; </td></tr>
                                       <tr><td> <b>reading</b>               </td><td>: select only datasets which are contain &lt;reading&gt; </td></tr>
                                       <tr><td> <b>time.*</b>                </td><td>: A number of attributes to limit selection by time </td></tr>
-                                      <tr><td> <b>valueFilter</b>           </td><td>: filter datasets which are to show by a regular expression </td></tr>
+                                      <tr><td> <b>valueFilter</b>           </td><td>: Filter datasets which are to show by a regular expression. The regex is applied to the whole selected dataset. </td></tr>
                                    </table>
 	                               </ul>
 	                               <br>
@@ -11038,11 +11039,11 @@ return $ret;
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=20%> <col width=80%> </colgroup>
-                                      <tr><td><b>avgArithmeticMean :</b> </td><td>the arithmetic average is calculated (default) </td></tr>
-                                      <tr><td><b>avgDailyMeanGWS :</b>   </td><td>calculates the daily medium temperature according the 
-                                                                                  specifications of german weather service (pls. see helpful hints by get versionNotes). <br>
-                                                                                  This variant uses aggregation "day" automatically. </td></tr>
-                                      <tr><td><b>avgTimeWeightMean :</b> </td><td>calculates a time weighted average mean value is calculated </td></tr>
+                                      <tr><td><b>avgArithmeticMean                          :</b> </td><td>the arithmetic average is calculated (default) </td></tr>
+                                      <tr><td style="vertical-align:top"><b>avgDailyMeanGWS :</b> <td>calculates the daily medium temperature according the 
+                                                                                                  specifications of german weather service (pls. see "get &lt;name&gt; versionNotes 2"). <br>
+                                                                                                  This variant uses aggregation "day" automatically. </td></tr>
+                                      <tr><td><b>avgTimeWeightMean                          :</b> </td><td>calculates a time weighted average mean value is calculated </td></tr>
 								   </table>
 	                               </ul>								   
                                 </li><br>
@@ -11630,8 +11631,9 @@ sub bdump {
   
   <a name="valueFilter"></a>  
   <li><b>valueFilter </b>     - Regular expression to filter datasets within particular functions. The regex is  
-                                applied to the whole selected dataset (inclusive Device, Reading and so on). 
-                                Please compare to explanations of relevant set-commands. </li> <br> 
+                                applied to a particular field or to the whole selected dataset (inclusive Device, Reading and 
+                                so on). 
+                                Please consider the explanations within the set-commands. </li> <br> 
 							   
 </ul>
 </ul></ul>
@@ -12438,13 +12440,13 @@ sub bdump {
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>fetchRoute</b>            </td><td>: Leserichtung des Selekts innerhalb der Datenbank </td></tr>
+                                      <tr><td> <b>fetchRoute</b>            </td><td>: Leserichtung der Selektion innerhalb der Datenbank </td></tr>
                                       <tr><td> <b>limit</b>                 </td><td>: begrenzt die Anzahl zu selektierenden bzw. anzuzeigenden Datensätze  </td></tr>
                                       <tr><td> <b>fetchMarkDuplicates</b>   </td><td>: Hervorhebung von gefundenen Dubletten </td></tr>
                                       <tr><td> <b>device</b>                </td><td>: Selektion nur von Datensätzen die &lt;device&gt; enthalten </td></tr>
                                       <tr><td> <b>reading</b>               </td><td>: Selektion nur von Datensätzen die &lt;reading&gt; enthalten </td></tr>
                                       <tr><td> <b>time.*</b>                </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
-                                      <tr><td> <b>valueFilter</b>           </td><td>: filtert die anzuzeigenden Datensätze mit einem regulären Ausdruck </td></tr>
+                                      <tr><td> <b>valueFilter</b>           </td><td>: filtert die anzuzeigenden Datensätze mit einem regulären Ausdruck. Der Regex wird auf den gesamten anzuzeigenden Datensatz angewendet. </td></tr>
                                    </table>
 	                               </ul>
 	                               <br>
@@ -13109,11 +13111,11 @@ return $ret;
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=20%> <col width=80%> </colgroup>
-                                      <tr><td> <b>avgArithmeticMean :</b>  </td><td>es wird der arithmetische Mittelwert berechnet (default) </td></tr>
-                                      <tr><td> <b>avgDailyMeanGWS :</b>    </td><td>berechnet die Tagesmitteltemperatur entsprechend den
-                                                                                    Vorschriften des deutschen Wetterdienstes (siehe "helpful hints" mit Funktion get versionNotes). <br>
-                                                                                    Diese Variante verwendet automatisch die Aggregation "day". </td></tr>
-                                      <tr><td> <b>avgTimeWeightMean :</b>  </td><td>berechnet den zeitgewichteten Mittelwert </td></tr>
+                                      <tr><td> <b>avgArithmeticMean                          :</b> </td><td>es wird der arithmetische Mittelwert berechnet (default) </td></tr>
+                                      <tr><td style="vertical-align:top"> <b>avgDailyMeanGWS :</b> <td>berechnet die Tagesmitteltemperatur entsprechend den
+                                                                                                   Vorschriften des deutschen Wetterdienstes (siehe "get &lt;name&gt; versionNotes 2"). <br>
+                                                                                                   Diese Variante verwendet automatisch die Aggregation "day". </td></tr>
+                                      <tr><td> <b>avgTimeWeightMean                          :</b> </td><td>berechnet den zeitgewichteten Mittelwert </td></tr>
 								   </table>
 	                               </ul>
                                 </li><br>
@@ -13699,8 +13701,9 @@ sub bdump {
 
   <a name="valueFilter"></a>                                
   <li><b>valueFilter </b>     - Regulärer Ausdruck zur Filterung von Datensätzen innerhalb bestimmter Funktionen. Der 
-                                Regex auf den gesamten selektierten Datensatz (inkl. Device, Reading usw.) angewendet. 
-                                Bitte vergleichen sie die Erläuterungen zu den entsprechenden Set-Kommandos. </li> <br> 
+                                Regex wird auf ein bestimmtes Feld oder den gesamten selektierten Datensatz (inkl. Device, 
+                                Reading usw.) angewendet. 
+                                Bitte beachten sie die Erläuterungen zu den entsprechenden Set-Kommandos. </li> <br> 
                                 
 
 </ul></ul>
