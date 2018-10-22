@@ -8,6 +8,7 @@ use Scalar::Util qw(looks_like_number);
 use POSIX qw(strftime);
 use Data::Dumper;
 
+
 ####################
 # Translations
 
@@ -726,6 +727,30 @@ sub distance($$$$;$$) {
 
     return _round(
         ( $unit eq "nmi" ? km2nmi($km) : ( $unit ? km2mi($km) : $km ) ), $rnd );
+}
+
+sub duration ($$;$) {
+    my ( $datetimeNow, $datetimeOld, $format ) = @_;
+
+    if ( $datetimeNow eq "" || $datetimeOld eq "" ) {
+        $datetimeNow = "1970-01-01 00:00:00";
+        $datetimeOld = "1970-01-01 00:00:00";
+    }
+
+    my $timestampNow = main::time_str2num($datetimeNow);
+    my $timestampOld = main::time_str2num($datetimeOld);
+    my $timeDiff     = $timestampNow - $timestampOld;
+
+    # return seconds
+    return _round( $timeDiff, 0 )
+      if ( defined($format) && $format eq "sec" );
+
+    # return minutes
+    return _round( $timeDiff / 60, 0 )
+      if ( defined($format) && $format eq "min" );
+
+    # return human readable format
+    return s2hms( _round( $timeDiff, 0 ) );
 }
 
 #################################
