@@ -505,7 +505,6 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
     my $homeLat  = AttrVal( "global", "latitude",  undef );
     my $homeLong = AttrVal( "global", "longitude", undef );
     if ( $homeLat && $homeLong ) {
-        Debug "$homeLat $homeLong";
         if ( $posLat ne "" && $posLong ne "" ) {
             $posDistHome =
               UConv::distance( $posLat, $posLong, $homeLat, $homeLong, 2 );
