@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  38_netatmo: changed connection check mechanism
   - new:     98_SmarterCoffee: new modul for SmarterCoffee devices
   - bugfix:  74_XiaomiBTLESens: fix humidity bug
   - feature: 49_SSCam: direct help for attributes, new get versionNotes command

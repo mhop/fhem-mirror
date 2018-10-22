@@ -11,12 +11,13 @@
 #
 #
 ##############################################################################
-# Release 21 / 2018-10-06
+# Release 22 / 2018-10-22
 
 package main;
 
 use strict;
 use warnings;
+no warnings qw(redefine);
 
 use Encode qw(encode_utf8 decode_utf8);
 use JSON;
@@ -896,28 +897,37 @@ netatmo_refreshAppTokenTimer($)
 }
 
 sub
-netatmo_checkConnection($)
+netatmo_checkConnection($;$)
 {
-  my ($hash) = @_;
+  my ($hash,$forcecheck) = @_;
   my $name = $hash->{NAME};
 
-  return undef if($hash->{network} eq "ok");
+  return undef if(!$forcecheck && $hash->{network} eq "ok");
   return undef if(!defined($hash->{access_token}));
-
   Log3 $name, 3, "$name: refreshing connection information";
 
-  my $json = '{"limit":2,"divider":3,"zoom":18,"lat_ne":0.1,"lon_ne":-0.1,"lat_sw":0.1,"lon_sw":-0.1,"date_end":"last","quality":1}';
-
   HttpUtils_NonblockingGet({
-    url => "https://".$hash->{helper}{apiserver}."/api/getpublicmeasures",
+    url => "https://".$hash->{helper}{apiserver}."/api/getuser",
     method => "POST",
     timeout => 30,
     header => "Content-Type: application/json\r\nAuthorization: Bearer ".$hash->{access_token},
     hash => $hash,
-    data => $json,
     callback => \&netatmo_parseConnection,
   });
   return undef;
+
+  # my $json = '{"limit":2,"divider":3,"zoom":18,"lat_ne":0.1,"lon_ne":-0.1,"lat_sw":0.1,"lon_sw":-0.1,"date_end":"last","quality":1}';
+  #
+  # HttpUtils_NonblockingGet({
+  #   url => "https://".$hash->{helper}{apiserver}."/api/getpublicmeasures",
+  #   method => "POST",
+  #   timeout => 30,
+  #   header => "Content-Type: application/json\r\nAuthorization: Bearer ".$hash->{access_token},
+  #   hash => $hash,
+  #   data => $json,
+  #   callback => \&netatmo_parseConnection,
+  # });
+  # return undef;
 }
 
 sub
@@ -947,12 +957,13 @@ netatmo_parseConnection($$$)
       $hash->{status} = "timeout";
       $hash->{network} = "disconnected";
     }
-    
+    readingsSingleUpdate($hash, "active", "error", 1);
     return undef;
   } elsif( $data ) {
       $data =~ s/\n//g;
       if( $data !~ m/^{.*}$/ ) {
         Log3 $name, 2, "$name: invalid json on connection check";
+        Log3 $name, 4, "$name: ".$data;
         return undef;
       }
       my $json = eval { JSON->new->utf8(0)->decode($data) };
@@ -966,6 +977,7 @@ netatmo_parseConnection($$$)
       } else {
         Log3 $name, 4, "$name: connection check: \n".$data;
         $hash->{network} = "ok" if($json->{status} eq "ok");
+        readingsSingleUpdate($hash, "active", "ok", 1) if($json->{status} eq "ok");
       }
     }
   return undef;
@@ -1896,7 +1908,7 @@ netatmo_pollHeatingHome($@)
 #    url => "https://".$iohash->{helper}{apiserver}."/api/gethomedata",
 #    data => \%data,
   HttpUtils_NonblockingGet({
-    url => "https://my.netatmo.com/syncapi/v1/gethomestatus",
+    url => "https://".$iohash->{helper}{apiserver}."/syncapi/v1/gethomestatus",
     timeout => 60,
     noshutdown => 1,
     header => "Content-Type: application/json;charset=utf-8\r\nAuthorization: Bearer ".$iohash->{access_token},
@@ -2701,7 +2713,7 @@ netatmo_dispatch($$$)
       RemoveInternalTimer($hash);
       InternalTimer(gettimeofday()+300, "netatmo_poll", $hash);
       Log3 $name, 2, "$name: invalid json detected";
-      Log3 $name, 5, "$name: $data";
+      Log3 $name, 4, "$name: $data";
       $hash->{status} = "error";
       $hash->{network} = "ok" if($hash->{SUBTYPE} eq "ACCOUNT");
       $hash->{IODev}->{network} = "ok" if($hash->{SUBTYPE} ne "ACCOUNT");
@@ -3511,7 +3523,7 @@ netatmo_parseReadings($$;$)
             $hash->{helper}{NEXT_POLL} = $nextdata;
             Log3 $name, 3, "$name: next extended dynamic update ($requested) at ".FmtDateTime($nextdata);
           } else {
-          Log3 $name, 2, "$name: invalid time for dynamic update ($requested): ".FmtDateTime($nextdata);
+            Log3 $name, 3, "$name: invalid time for dynamic update ($requested): ".FmtDateTime($nextdata);
           }
         }
       } elsif(defined($last_time) && int($last_time) > 0) {
@@ -5774,7 +5786,7 @@ netatmo_Get($$@)
       return undef;
     }
   } elsif( $hash->{SUBTYPE} eq "ACCOUNT" ) {
-    $list = "update:noArg devices:noArg homes:noArg thermostats:noArg homecoachs:noArg public showAccount:noArg";
+    $list = "update:noArg devices:noArg homes:noArg thermostats:noArg homecoachs:noArg public showAccount:noArg"; #checkConnection:noArg";
 
     if( $cmd eq "update" ) {
       netatmo_poll($hash);
@@ -5793,6 +5805,12 @@ netatmo_Get($$@)
       $password = netatmo_decrypt( $password );
 
       return "username: $username\npassword: $password";
+    }
+
+    if( $cmd eq 'checkConnection' )
+    {
+      netatmo_checkConnection($hash,1);
+      return undef;
     }
 
     if( $cmd eq "devices" ) {
