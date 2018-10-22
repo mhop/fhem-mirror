@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  93_DbLog: timer not deleted if reopen after reopen xxx executed
+             (forum.fhem.de/index.php/topic,91869.msg848433.html#msg848433)
   - feature: 70_ZoneMinder: added attribute loginInterval and setter for login
   - bugfix:  38_netatmo: changed connection check mechanism
   - new:     98_SmarterCoffee: new modul for SmarterCoffee devices

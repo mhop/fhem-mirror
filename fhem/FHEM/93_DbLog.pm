@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 3.12.6     22.10.2018       fix timer not deleted if reopen after reopen xxx (Forum: https://forum.fhem.de/index.php/topic,91869.msg848433.html#msg848433)
 # 3.12.5     12.10.2018       charFilter: "\xB0C" substitution by "°C" added and usage in DbLog_Log changed
 # 3.12.4     10.10.2018       return non-saved datasets back in asynch mode only if transaction is used
 # 3.12.3     08.10.2018       Log output of recuceLogNbl enhanced, some functions renamed
@@ -214,7 +215,7 @@ use Time::Local;
 use Encode qw(encode_utf8);
 no if $] >= 5.017011, warnings => 'experimental::smartmatch'; 
 
-my $DbLogVersion = "3.12.5";
+my $DbLogVersion = "3.12.6";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -593,7 +594,7 @@ sub DbLog_Set($@) {
             if($hash->{HELPER}{REOPEN_RUNS}) {
 			    delete $hash->{HELPER}{REOPEN_RUNS};
                 delete $hash->{HELPER}{REOPEN_RUNS_UNTIL};
-                RemoveInternalTimer($hash, "reopen");
+                RemoveInternalTimer($hash, "DbLog_reopen");
             }
 			DbLog_execmemcache($hash) if($async);
             $ret = "Reopen executed.";
