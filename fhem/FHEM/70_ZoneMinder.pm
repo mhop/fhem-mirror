@@ -53,7 +53,7 @@ sub ZoneMinder_Initialize {
   $hash->{WriteFn}   = "ZoneMinder_Write";
   $hash->{ReadyFn}   = "ZoneMinder_Ready";
 
-  $hash->{AttrList} = "interval publicAddress webConsoleContext " . $readingFnAttributes;
+  $hash->{AttrList} = "loginInterval publicAddress webConsoleContext " . $readingFnAttributes;
   $hash->{MatchList} = { "1:ZM_Monitor" => "^.*" };
 
   Log3 '', 3, "ZoneMinder - Initialize done ...";
@@ -182,6 +182,7 @@ sub ZoneMinder_API_Login_Callback {
   my $name = $hash->{NAME};
 
   $hash->{APILoginStatus} = $param->{code};
+  Log3 $name, 3, "ZoneMinder ($name) - login status: $hash->{APILoginStatus}";
 
   if($err ne "") {
     Log3 $name, 0, "error while requesting ".$param->{url}." - $err";
@@ -205,7 +206,9 @@ sub ZoneMinder_API_Login_Callback {
     }
   }
 
-  InternalTimer(gettimeofday() + 3600, "ZoneMinder_API_Login", $hash);
+  RemoveInternalTimer($hash, "ZoneMinder_API_Login");
+  my $interval = AttrVal($name, 'loginInterval', 3600);
+  InternalTimer(gettimeofday() + $interval, "ZoneMinder_API_Login", $hash);
   
   return undef;
 }
@@ -624,11 +627,16 @@ sub ZoneMinder_Get {
 }
 
 sub ZoneMinder_Set {
-  my ( $hash, $param ) = @_;
+  my ( $hash, $name, $opt, $args ) = @_;
 
-  my $name = $hash->{NAME};
+  if ("login" eq $opt) {
+    Log3 $name, 1, "ZoneMinder ($name) - Manually triggered Login";
+    ZoneMinder_API_Login($hash);
+    return undef;
+  }
+
 #  Log3 $name, 3, "ZoneMinder ($name) - Set done ...";
-  return undef;
+  return "Unknown argument $opt, choose one of login";
 }
 
 sub ZoneMinder_Ready {
