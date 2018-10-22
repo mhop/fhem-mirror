@@ -1477,40 +1477,45 @@ sub RESIDENTStk_DurationTimer($;$) {
 
 sub RESIDENTStk_SetLocation(@) {
     my (
-        $name,     $location, $trigger,     $id,         $time,
-        $lat,      $long,     $address,     $device,     $radius,
-        $posLat,   $posLong,  $posDistHome, $posDistLoc, $motion,
-        $wifiSSID, $wifiBSSID
+        $name,       $location,      $trigger,     $id,
+        $time,       $lat,           $long,        $address,
+        $device,     $radius,        $posLat,      $posLong,
+        $posAddress, $posBeaconUUID, $posDistHome, $posDistLoc,
+        $motion,     $wifiSSID,      $wifiBSSID
     ) = @_;
-    my $hash            = $defs{$name};
-    my $TYPE            = GetType($name);
-    my $prefix          = RESIDENTStk_GetPrefixFromType($name);
-    my $state           = ReadingsVal( $name, "state", "initialized" );
-    my $presence        = ReadingsVal( $name, "presence", "present" );
-    my $currLocation    = ReadingsVal( $name, "location", "-" );
-    my $currWayhome     = ReadingsVal( $name, "wayhome", "0" );
-    my $currLat         = ReadingsVal( $name, "locationLat", "-" );
-    my $currLong        = ReadingsVal( $name, "locationLong", "-" );
-    my $currRadius      = ReadingsVal( $name, "locationRadius", "" );
-    my $currAddr        = ReadingsVal( $name, "locationAddr", "" );
-    my $currPosLat      = ReadingsVal( $name, "positionLat", "" );
-    my $currPosLong     = ReadingsVal( $name, "positionLong", "" );
-    my $currPosDistHome = ReadingsVal( $name, "positionDistHome", "" );
-    my $currPosDistLoc  = ReadingsVal( $name, "positionDistLocation", "" );
-    my $currPosMotion   = ReadingsVal( $name, "positionMotion", "" );
-    my $currPosSSID     = ReadingsVal( $name, "positionSSID", "" );
-    my $currPosBSSID    = ReadingsVal( $name, "positionBSSID", "" );
+    my $hash              = $defs{$name};
+    my $TYPE              = GetType($name);
+    my $prefix            = RESIDENTStk_GetPrefixFromType($name);
+    my $state             = ReadingsVal( $name, "state", "initialized" );
+    my $presence          = ReadingsVal( $name, "presence", "present" );
+    my $currLocation      = ReadingsVal( $name, "location", "-" );
+    my $currWayhome       = ReadingsVal( $name, "wayhome", "0" );
+    my $currLat           = ReadingsVal( $name, "locationLat", "-" );
+    my $currLong          = ReadingsVal( $name, "locationLong", "-" );
+    my $currRadius        = ReadingsVal( $name, "locationRadius", "" );
+    my $currAddr          = ReadingsVal( $name, "locationAddr", "" );
+    my $currPosLat        = ReadingsVal( $name, "positionLat", "" );
+    my $currPosLong       = ReadingsVal( $name, "positionLong", "" );
+    my $currPosAddr       = ReadingsVal( $name, "positionAddr", "" );
+    my $currPosBeaconUUID = ReadingsVal( $name, "positionBeaconUUID", "" );
+    my $currPosDistHome   = ReadingsVal( $name, "positionDistHome", "" );
+    my $currPosDistLoc    = ReadingsVal( $name, "positionDistLocation", "" );
+    my $currPosMotion     = ReadingsVal( $name, "positionMotion", "" );
+    my $currPosSSID       = ReadingsVal( $name, "positionSSID", "" );
+    my $currPosBSSID      = ReadingsVal( $name, "positionBSSID", "" );
     $id   = "-" if ( !$id   || $id eq "" );
     $lat  = "-" if ( !$lat  || $lat eq "" );
     $long = "-" if ( !$long || $long eq "" );
-    $address = "" if ( !$address );
-    $time    = "" if ( !$time );
-    $device  = "" if ( !$device );
-    $posLat  = "" if ( !$posLat || $posLat eq "-" );
-    $posLong = "" if ( !$posLong || $posLong eq "-" );
+    $address       = ""  if ( !$address );
+    $time          = ""  if ( !$time );
+    $device        = ""  if ( !$device );
+    $posLat        = ""  if ( !$posLat || $posLat eq "-" );
+    $posLong       = ""  if ( !$posLong || $posLong eq "-" );
+    $posAddress    = "-" if ( !$posAddress || $posAddress eq "" );
+    $posBeaconUUID = ""  if ( !$posBeaconUUID || $posBeaconUUID eq "-" );
 
     Log3 $name, 5,
-"$TYPE $name: received location information: id=$id name=$location trig=$trigger date=$time lat=$lat long=$long posLat=$posLat posLong=$posLong address:$address device=$device";
+"$TYPE $name: received location information: id=$id name=$location trig=$trigger date=$time lat=$lat long=$long posLat=$posLat posLong=$posLong address=$address device=$device";
 
     my $searchstring;
 
@@ -1527,10 +1532,18 @@ sub RESIDENTStk_SetLocation(@) {
     $searchstring = quotemeta($location);
 
     # update locationPresence
-    readingsBulkUpdate( $hash, "locationPresence", "present" )
-      if ( $trigger == 1 );
-    readingsBulkUpdate( $hash, "locationPresence", "absent" )
-      if ( $trigger == 0 );
+    # if ( $posBeaconUUID eq "" ) {
+        readingsBulkUpdate( $hash, "locationPresence", "present" )
+          if ( $trigger == 1 );
+        readingsBulkUpdate( $hash, "locationPresence", "absent" )
+          if ( $trigger == 0 );
+    # }
+
+    # # update positionPresence
+    # readingsBulkUpdate( $hash, "positionPresence", "present" )
+    #   if ( $trigger == 1 );
+    # readingsBulkUpdate( $hash, "positionPresence", "absent" )
+    #   if ( $trigger == 0 );
 
     # travelled distance for location
     my $locTravDist = "";
@@ -1563,6 +1576,7 @@ sub RESIDENTStk_SetLocation(@) {
     # backup last known position
     foreach (
         'positionLat',      'positionLong',
+        'positionAddr',     'positionBeaconUUID',
         'positionDistHome', 'positionDistLocation',
         'positionMotion',   'positionSSID',
         'positionBSSID',    'positionTravDistance',
@@ -1579,6 +1593,8 @@ sub RESIDENTStk_SetLocation(@) {
     # update position based readings
     readingsBulkUpdate( $hash, "positionLat",          $posLat );
     readingsBulkUpdate( $hash, "positionLong",         $posLong );
+    readingsBulkUpdate( $hash, "positionAddr",         $posAddress );
+    readingsBulkUpdate( $hash, "positionBeaconUUID",   $posBeaconUUID );
     readingsBulkUpdate( $hash, "positionDistHome",     $posDistHome );
     readingsBulkUpdate( $hash, "positionDistLocation", $posDistLoc );
     readingsBulkUpdate( $hash, "positionMotion",       $motion );

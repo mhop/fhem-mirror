@@ -701,11 +701,11 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
         $locName = $id if ( $locName eq "" );
 
         RESIDENTStk_SetLocation(
-            $deviceAlias, $locName,    $trigger, $id,
-            $time,        $lat,        $long,    $address,
-            $device,      $radius,     $posLat,  $posLong,
-            $posDistHome, $posDistLoc, $motion,  $wifiSSID,
-            $wifiBSSID
+            $deviceAlias, $locName,       $trigger,     $id,
+            $time,        $lat,           $long,        $address,
+            $device,      $radius,        $posLat,      $posLong,
+            $posAddress,  $posBeaconUUID, $posDistHome, $posDistLoc,
+            $motion,      $wifiSSID,      $wifiBSSID
         ) if ( IsDevice( $deviceAlias, "ROOMMATE|GUEST" ) );
     }
 
