@@ -57,7 +57,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Versions History intern
 our %DbRep_vNotesIntern = (
-  "8.4.0"  => "22.10.2018  countEntries for every reading if multiple readings set, versionNotes changed to support en/de ",
+  "8.4.0"  => "22.10.2018  countEntries separately for every reading if attribute \"countEntriesDetail\" is set, ".
+                           "versionNotes changed to support en/de ",
   "8.3.0"  => "17.10.2018  reduceLog from DbLog integrated into DbRep, textField-long as default for sqlCmd, both attributes timeOlderThan and timeDiffToNow can be set at same time",
   "8.2.3"  => "07.10.2018  check availability of DbLog-device at definition time of DbRep-device ",  
   "8.2.2"  => "07.10.2018  DbRep_getMinTs changed, fix don't get the real min timestamp in rare cases ",  
@@ -118,8 +119,11 @@ our %DbRep_vNotesIntern = (
 
 # Versions History extern:
 our %DbRep_vNotesExtern = (
-  "8.4.0"  => "22.10.2018  countEntries for every reading and summary created with \"ALLREADINGS\" if multiple readings set, versionNotes changed to support en/de ",
-  "8.3.0"  => "17.10.2018 reduceLog from DbLog integrated into DbRep, textField-long as default for sqlCmd, both attributes timeOlderThan and timeDiffToNow can be set at same time -> so the selection time between can be calculated dynamically ",
+  "8.4.0"  => "22.10.2018 New attribute \"countEntriesDetail\". Function countEntries creates number of datasets for every ".
+                          "reading separately if attribute \"countEntriesDetail\" is set. Get versionNotes changed to support en/de. ",
+  "8.3.0"  => "17.10.2018 reduceLog from DbLog integrated into DbRep, textField-long as default for sqlCmd, both attributes ".
+                          "timeOlderThan and timeDiffToNow can be set at same time -> the selection time between timeOlderThan ".
+                          "and timeDiffToNow can be calculated dynamically ",
   "8.2.2"  => "07.10.2018 fix don't get the real min timestamp in rare cases ",
   "8.2.0"  => "05.10.2018 direct help for attributes ",
   "8.1.0"  => "01.10.2018 new get versionNotes command ",
@@ -261,6 +265,7 @@ sub DbRep_Initialize($) {
                        "reading ".                       
                        "allowDeletion:1,0 ".
                        "averageCalcForm:avgArithmeticMean,avgDailyMeanGWS,avgTimeWeightMean ".
+                       "countEntriesDetail:1,0 ".
                        "device " .
 					   "dumpComment ".
                        "dumpCompress:1,0 ".
@@ -2556,6 +2561,7 @@ sub count_DoParse($) {
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
+ my $ced        = AttrVal($name,"countEntriesDetail",0);
  my ($dbh,$sql,$sth,$err);
 
  # Background-Startzeit
@@ -2584,8 +2590,12 @@ sub count_DoParse($) {
     
  # DB-Abfrage zeilenweise für jeden Timearray-Eintrag
  my ($arrstr,@rsf,$ttail);
- my $addon   = "group by READING";
- my $selspec = "READING, COUNT(*)";
+ my $addon   = '';
+ my $selspec = "COUNT(*)";
+ if($ced) {
+     $addon   = "group by READING";
+     $selspec = "READING, COUNT(*)";
+ }
  
  foreach my $row (@ts) {
      my @a                     = split("#", $row);
@@ -2618,18 +2628,21 @@ sub count_DoParse($) {
          $dbh->disconnect;
          return "$name|''|$device|$reading|''|$err|$table";
      }
-	 
-	 # DB-Abfrage -> Ergebnis in @arr aufnehmen
-     while (my @line = $sth->fetchrow_array()) {    
-         Log3 ($name, 5, "DbRep $name - SQL result: @line") if(@line);  
-         $tc += $line[1] if($line[1]);       # total count für Reading
-         $arrstr .= $runtime_string."#".$line[0]."#".$line[1]."#".$ttail;  
-     }
-     # total count (über alle selected Readings) für Zeitabschnitt hinzufügen wenn Reagingsliste angegeben
-     my (undef,undef,undef,$ranz) = DbRep_specsForSql($hash,$device,$reading);
-     if($ranz > 1) {
-         $arrstr .= $runtime_string."#"."ALLREADINGS"."#".$tc."#".$ttail;  
-     }
+     
+     if($ced) {
+         # detaillierter Readings-Count
+         while (my @line = $sth->fetchrow_array()) {    
+             Log3 ($name, 5, "DbRep $name - SQL result: @line");  
+             $tc += $line[1] if($line[1]);                                              # total count für Reading
+             $arrstr .= $runtime_string."#".$line[0]."#".$line[1]."#".$ttail;  
+         }
+         # total count (über alle selected Readings) für Zeitabschnitt einfügen
+         $arrstr .= $runtime_string."#"."ALLREADINGS"."#".$tc."#".$ttail;
+     } else {
+         my @line = $sth->fetchrow_array();
+         Log3 ($name, 5, "DbRep $name - SQL result: $line[0]") if($line[0]);
+         $arrstr .= $runtime_string."#"."ALLREADINGS"."#".$line[0]."#".$ttail;
+     }     
  }
  
  $sth->finish;
@@ -9976,8 +9989,9 @@ return;
                                                    If time.* attributes not set, all entries of the table will be count. 
 												   The <a href="#DbRepattr">attributes</a> "device" and "reading" can be used to 
 												   limit the evaluation.  <br>
-                                                   If more than one reading in attribute "reading" is specified, the number of every reading 
-                                                   is printed out and the summary is reported labeled by "ALLREADINGS". <br><br>
+                                                   By default the summary of all counted datasets, labeled by "ALLREADINGS", will be created.
+                                                   If the attribute "countEntriesDetail" is set, the number of every reading  
+                                                   is reported additionally. <br><br>                                                   
                                                    
                                                    The relevant attributes for this function are: <br><br>
 
@@ -9985,6 +9999,7 @@ return;
                                                    <table>  
                                                       <colgroup> <col width=5%> <col width=95%> </colgroup>
                                                       <tr><td> <b>aggregation</b>       </td><td>: aggregatiion/grouping of time intervals </td></tr>
+                                                      <tr><td> <b>countEntriesDetail</b></td><td>: detailed report the count of datasets (per reading) </td></tr>
                                                       <tr><td> <b>device</b>            </td><td>: selection only of datasets which contain &lt;device&gt; </td></tr>
                                                       <tr><td> <b>reading</b>           </td><td>: selection only of datasets which contain &lt;reading&gt; </td></tr>
                                                       <tr><td> <b>time.*</b>            </td><td>: a number of attributes to limit selection by time </td></tr>
@@ -11032,6 +11047,11 @@ return $ret;
 	                               </ul>								   
                                 </li><br>
 
+  <a name="countEntriesDetail"></a>
+  <li><b>countEntriesDetail </b>   - If set, the function countEntries creates a detailed report of counted datasets of
+                                     every reading. By default only the summary of counted datasets is reported. 
+                                     </li> <br>
+  
   <a name="device"></a>
   <li><b>device </b>          - Selection of a particular device. <br>
                                 You can specify device specifications (devspec). <br> 
@@ -11949,8 +11969,9 @@ sub bdump {
                                  Sind die Timestamps nicht gesetzt, werden alle Einträge der Tabelle gezählt. 
                                  Beschränkungen durch die <a href="#DbRepattr">Attribute</a> Device bzw. Reading 
 								 gehen in die Selektion mit ein. <br>
-                                 Ist mehr als ein Reading im Attribut "reading" angegeben, wird die Anzahl jedes einzelnen Readings 
-                                 ausgegeben und zusätzlich eine Summierung, gekennzeichnet mit "ALLREADINGS", erstellt. <br><br>                               
+                                 Standardmäßig wird die Summe aller Datensätze, gekennzeichnet mit "ALLREADINGS", erstellt.
+                                 Ist das Attribut "countEntriesDetail" gesetzt, wird die Anzahl jedes einzelnen Readings 
+                                 zusätzlich ausgegeben. <br><br>                               
                                  
                                  Die für diese Funktion relevanten Attribute sind: <br><br>
 
@@ -11958,6 +11979,7 @@ sub bdump {
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
                                       <tr><td> <b>aggregation</b>       </td><td>: Zusammenfassung/Gruppierung von Zeitintervallen </td></tr>
+                                      <tr><td> <b>countEntriesDetail</b></td><td>: detaillierte Ausgabe der Datensatzanzahl </td></tr>
                                       <tr><td> <b>device</b>            </td><td>: Selektion nur von Datensätzen die &lt;device&gt; enthalten </td></tr>
                                       <tr><td> <b>reading</b>           </td><td>: Selektion nur von Datensätzen die &lt;reading&gt; enthalten </td></tr>
                                       <tr><td> <b>time.*</b>            </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
@@ -13096,7 +13118,13 @@ return $ret;
 	                               </ul>
                                 </li><br>
  
-  <a name="device"></a>
+  <a name="countEntriesDetail"></a>
+  <li><b>countEntriesDetail </b>   - Wenn gesetzt, erstellt die Funktion "countEntries" eine detallierte Ausgabe der Datensatzzahl
+                                     pro Reading und Zeitintervall.
+                                     Standardmäßig wird nur die Summe aller selektierten Datensätze ausgegeben. 
+                                     </li> <br>
+
+ <a name="device"></a>
   <li><b>device </b>          - Abgrenzung der DB-Selektionen auf ein bestimmtes Device. <br>
                                 Es können Geräte-Spezifikationen (devspec) angegeben werden. <br> 
 								Innerhalb von Geräte-Spezifikationen wird SQL-Wildcard (%) als normales ASCII-Zeichen gewertet. 
