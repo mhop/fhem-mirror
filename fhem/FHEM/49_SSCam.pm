@@ -1420,6 +1420,7 @@ sub SSCam_initonboot ($) {
      if (!$hash->{CREDENTIALS}) {
          Log3($name, 2, "$name - Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"");
      } else {
+         readingsSingleUpdate($hash, "compstate", "true", 0);                                        # Anfangswert f. versionCheck setzen
          # allg. SVS-Eigenschaften abrufen
          SSCam_getsvsinfo($hash);
          
@@ -4882,6 +4883,7 @@ sub SSCam_camop_parse ($) {
                     $build = "xxxx-simu";
                 }
                 
+                # Kompatibilitätscheck
                 my $avsc   = $major.$minor.(($small=~/\d/)?$small:0); 
                 my $avcomp = $hash->{COMPATIBILITY};
                 $avcomp    =~ s/\.//g;
