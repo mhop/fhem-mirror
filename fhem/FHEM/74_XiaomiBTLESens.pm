@@ -35,7 +35,7 @@ package main;
 use strict;
 use warnings;
 
-my $version = "2.4.2";
+my $version = "2.4.3";
 
 sub XiaomiBTLESens_Initialize($) {
 
@@ -860,6 +860,7 @@ sub ThermoHygroSensHandle0x18($$) {
     Log3 $name, 4, "XiaomiBTLESens ($name) - Thermo/Hygro Sens Handle0x18";
 
     chomp($notification);
+    $notification =~ s/ //g;
 
     ### neue Vereinheitlichung für Batteriereadings Forum #800017
     $readings{'batteryPercent'} = hex( "0x" . $notification );
