@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  49_SSCam: COMPATIBILITY changed to 8.2.1
   - bugfix:  74_XiaomiBTLESens : fix warning Illegal hexadecimal digit
                                  ignored
   - bugfix:  93_DbLog: timer not deleted if reopen after reopen xxx executed

@@ -39,6 +39,7 @@ use warnings;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "7.2.1"  => "23.10.2018  new routine SSCam_versionCheck, COMPATIBILITY changed to 8.2.1 ",
   "7.2.0"  => "20.10.2018  direct help for attributes, new get versionNotes command, fix PERL WARNING: Use of uninitialized value \$small, get versionNotes ",
   "7.1.1"  => "18.10.2018  Message of \"Your current/simulated SVS-version...\" changed, commandref corrected ",
   "7.1.0"  => "02.09.2018  PIR Sensor enable/disable, SSCam_Set/SSCam_Get optimized ",
@@ -77,109 +78,12 @@ our %SSCam_vNotesIntern = (
   "3.4.0"  => "21.03.2018  new commands startTracking, stopTracking ",
   "3.3.1"  => "20.03.2018  new readings CapPTZObjTracking, CapPTZPresetNumber ",
   "3.3.0"  => "25.02.2018  code review, API bug fix of runview lastrec, commandref revised (forum:#84953) ",
-  "3.2.4"  => "18.11.2017  fix bug don't retrieve SSCam_getptzlistpreset if cam is disabled ",
-  "3.2.3"  => "08.10.2017  set optimizeParams, get caminfo (simple), minor bugfix, commandref revised ",
-  "3.2.2"  => "03.10.2017  make functions ready to use \"SYNO.SurveillanceStation.PTZ\" version 5, minor fixes, commandref revised ",
-  "3.2.1"  => "02.10.2017  change some \"SYNO.SurveillanceStation.Camera\" methods to version 9 ", 
-  "3.2.0"  => "27.09.2017  new command get listLog, change to \$hash->{HELPER}{\".SNAPHASH\"} for avoid huge \"list\"-report ",
-  "3.1.0"  => "26.09.2017  move extevent from CAM to SVS model, Reading PollState enhanced for CAM-Model, minor fixes ",
-  "3.0.0"  => "23.09.2017  Internal MODEL SVS or CAM -> distinguish/support Cams and SVS in different devices new comand get storedCredentials, commandref revised ",
-  "2.9.0"  => "20.09.2017  new function get homeModeState, minor fixes at simu_SVSversion, commandref revised ",
-  "2.8.2"  => "19.09.2017  some preparations for version 9 of API \"SYNO.SurveillanceStation.Camera\", SSCam_logout added to function get scanVirginirgin ",
-  "2.8.1"  => "17.09.2017  attr simu_SVSversion changed, \$mjpegHttp quotes dependend if noQuotesForSID set, commandref revised ",
-  "2.8.0"  => "07.09.2017  Home Mode, commandref revised ",
-  "2.7.1"  => "28.08.2017  minor fixes ",
-  "2.7.0"  => "20.08.2017  bugfix if credentials not set, set maximum password lenth to 20 ",
-  "2.6.3"  => "12.08.2017  get snapGallery can also be triggered by at or notify (better use than \"set\"), commandref revised ",
-  "2.6.2"  => "11.08.2017  set snapGallery can be triggered by at or notify ",
-  "2.6.1"  => "07.08.2017  some changes in composegallery if createSnapGallery used, room Snapshots changed to SnapGalllery commandref revised ",
-  "2.6.0"  => "06.08.2017  new command createSnapGallery ",
-  "2.5.4"  => "05.08.2017  analyze \$hash->{CL} in SetFn bzw. GetFn, set snapGallery only if snapGalleryBoost=1 is set, some snapGallery improvements and fixes ",
-  "2.5.3"  => "02.08.2017  implement snapGallery as set-command ",
-  "2.5.2"  => "01.08.2017  get snapGallery with or without snapGalleryBoost (some more attributes for snapGallery) ",
-  "2.5.1"  => "31.07.2017  sub composegallery (no polling necessary) ",
-  "2.5.0"  => "31.07.2017  logtext revised, new get snapGallery command ",
-  "2.4.1"  => "29.07.2017  fix behavior of state when starting lastsnap_fw, fix \"uninitialized value in pattern match\" ",
-  "2.4.0"  => "28.07.2017  new set command runView lastsnap_fw, commandref revised, minor fixes ",
-  "2.3.2"  => "28.07.2017  code change of SSCam_getcaminfo (params of Internaltimer) ",
-  "2.3.1"  => "28.07.2017  code review creating log entries when pollnologging is set/unset ",
-  "2.3.0"  => "27.07.2017  new \"get snapinfo\" command, minor fixes ",
-  "2.2.4"  => "25.07.2017  avoid error \"Operation Getptzlistpreset of Camera ... was not successful\" if cam is disabled ",
-  "2.2.3"  => "30.06.2017  fix if SVSversion small \"0\", create events for \"snap\" ",
-  "2.2.2"  => "11.06.2017  bugfix SSCam_login, SSCam_login_return, Forum: https://forum.fhem.de/index.php/topic,45671.msg646701.html#msg646701 ",
-  "2.2.1"  => "15.05.2017  avoid FW_detailFn because of FW_deviceOverview is active (double streams in detailview if on) ",
-  "2.2.0"  => "10.05.2017  check if JSON module has been loaded successfully, DeviceOverview available, options of runView changed image->live_fw, link->live_link, link_open->live_open, lastrec ->lastrec_fw ",
-  "2.1.4"  => "08.05.2017  commandref changed ",
-  "2.1.3"  => "05.05.2017  issue of operation error if CAMID is set and SID isn't valid, more login-errorcodes evaluation ",
-  "2.1.2"  => "04.05.2017  default login retries increased to 3 ",
-  "2.1.1"  => "17.04.2017  SSCam_runliveview routine changed, {HELPER}{SID_STRM} deleted ",
-  "2.1.0"  => "12.04.2017  some codereview, getapisites cached, CAMID cached, rewrite logs from verbose 4 to 5, get scanVirgin ",
-  "2.0.0"  => "10.04.2017  redesign login procedure, fix Reading SVSversion use SMALL version, new attr loginRetries ",
-  "1.42.0"  => "15.03.2017  SSCam_camop changed to get all cam id's and names ",
-  "1.41.0"  => "15.03.2017  minor bugfix of blank character in state \"disabled\" (row 3383) ",
-  "1.40.0"  => "21.01.2017  downgrade of API apicammaxver in SVS 8.0.0 ",
-  "1.39.0"  => "20.01.2017  compatibility to SVS 8.0.0, Version in Internals, execute SSCam_getsvsinfo after set credentials ",
-  "1.37.0"  => "10.10.2016  bugfix Experimental keys on scalar is now forbidden (Perl >= 5.23) (Forum: #msg501709) ",
-  "1.36.0"  => "18.09.2016  bugfix of get presets, get patrols of zoom-cams without pan/tilt ",
-  "1.35.0"  => "17.09.2016  internal timer of start-routines optimized ",
-  "1.34.0"  => "15.09.2016  simu_SVSversion changed, added 407 errorcode message, external recording changed for SVS 7.2 ",
-  "1.33.0"  => "21.08.2016  function get stmUrlPath added, fit to new commandref style, attribute showStmInfoFull added ",
-  "1.32.1"  => "18.08.2016  empty event LastSnapId fixed ",
-  "1.32.0"  => "17.08.2016  Logging of verbose 4 changed ",
-  "1.31.0"  => "15.08.2016  Attr \"noQuotesForSID\" added, avoid possible 402 - permission denied problems in some SVS/DS-combinations ",
-  "1.30.0"  => "15.08.2016  commandref revised, more v4 logging in special case ",
-  "1.29.0"  => "02.07.2016  add regex for adaption SVS version, url call for \"snap\" changed  ",
-  "1.28.0"  => "30.06.2016  Attr \"showPassInLog\" added, per default no password will be shown in log ",
-  "1.27.0"  => "29.06.2016  Attr \"simu_SVSversion\" added, sub login_nonbl changed, sub camret_nonbl changed (getlistptzpreset) due to 7.2 problem ",
-  "1.26.3"  => "28.06.2016  Time::HiRes added ",
-  "1.26.2"  => "05.05.2016  change: get \"snapfileinfo\" will get back an Infomessage if Reading \"LastSnapId\" isn't available ",
-  "1.26.1"  => "27.04.2016  bugfix module will not load due to Unknown warnings category 'experimental' when using an older perl version  ",
-  "1.26.0"  => "22.04.2016  Attribute \"disable\" to deactivate the module added ",
-  "1.25.0"  => "18.04.2016  motion detection parameters can be entered if motion detection by camera or SVS is used ",
-  "1.24.0"  => "16.04.2016  behavior of \"set ... on\" changed, Attr \"recextend\" added, bugfix: setstate-warning if FHEM will restarted and SVS is not reachable (Forum: #308) ",
-  "1.23.2"  => "12.04.2016  code review, no functional changes ",
-  "1.23.1"  => "07.04.2016  command check for set cmd's don't work completely ",
-  "1.23.0"  => "02.04.2016  change to RemoveInternalTimer for functions ",
-  "1.22.0"  => "27.03.2016  bugfix \"link_open\" doesn't work after last update ",
-  "1.21.0"  => "23.03.2016  added \"lastrec\", \"lastrec_open\" to playback last recording  ",
-  "1.20.3"  => "19.03.2016  change: delay of InternalTimer(s) changed \"ptzlistpresets\" - \"id\" changed to \"position\" according to Synology-ticket run \"SSCam_geteventlist\" automatically after recording-stop ",
-  "1.20.2"  => "14.03.2016  change: routine \"SSCam_initonboot\" changed ",
-  "1.20.1"  => "12.03.2016  bugfix: default recordtime 15 s is used if attribute \"rectime\" is set to \"0\" ",
-  "1.20.0"  => "09.03.2016  command \"extevent\" added ",
-  "1.19.3"  => "07.03.2016  bugfix \"uninitialized value \$lastrecstarttime\", \"uninitialized value \$lastrecstoptime\", new attribute \"videofolderMap\" ",
-  "1.19.2"  => "06.03.2016  Reading \"CamLastRec\" added which contains Path/name of last recording ",
-  "1.19.1"  => "28.02.2016  enhanced command runView by option \"link_open\" to open a streamlink immediately ",
-  "1.19.0"  => "25.02.2016  functions for cam-livestream added ",
-  "1.18.1"  => "21.02.2016  fixed a problem that the state is \"disable\" instead of \"disabled\" if a camera is disabled and FHEM will be restarted ",
-  "1.18.0"  => "20.02.2016  function \"get ... eventlist\" added, Reading \"CamEventNum\" added which containes total number of camera events, change usage of reading \"LastUpdateTime\"  ",
-  "1.17.0"  => "19.02.2016  function \"runPatrol\" added that starts predefined patrols of PTZ-cameras, Reading \"CamDetMotSc\" added ",
-  "1.16.1"  => "17.02.2016  Reading \"CamExposureControl\" added ",
-  "1.16.0"  => "16.02.2016  set up of motion detection source now possible ",
-  "1.15.0"  => "15.02.2016  control of exposure mode day, night & auto is possible now ",
-  "1.14.0"  => "14.02.2016  The port in DEF-String is optional now, if not given, default port 5000 is used ",
-  "1.13.2"  => "13.02.2016  fixed a problem that manual updates using \"getcaminfoall\" are leading to additional pollingloops if polling is used, attribute \"debugactivetoken\" added for debugging-use  ",
-  "1.13.1"  => "12.02.2016  fixed a problem that a usersession won't be destroyed if a function couldn't be executed successfully ",
-  "1.12.1"  => "09.02.2016  bugfix: \"goAbsPTZ\" may be unavailable on Windows-systems ",
-  "1.12.0"  => "08.02.2016  added function \"move\" for continuous PTZ action ",
-  "1.11.1"  => "07.02.2016  entries with loglevel \"2\" reviewed, changed to loglevel \"3\" ",
-  "1.11.0"  => "05.02.2016  added function \"goPreset\" and \"goAbsPTZ\" to control the move of PTZ lense to absolute positions (http://forum.fhem.de/index.php/topic,45671.msg404275.html#msg404275), (http://forum.fhem.de/index.php/topic,45671.msg404892.html#msg404892) ",
-  "1.10.0"  => "02.02.2016  added function \"svsinfo\" to get informations about installed SVS-package, if Availability = \"disconnected\" then \"state\"-value will be \"disconnected\" too, saved Credentials were deleted from file if a device will be deleted ",
-  "1.9.1"  => "01.01.2016  a little bit code optimization ",
-  "1.9.0"  => "28.01.2016  fixed the problem a recording may still stay active if fhem will be restarted after a recording was triggered and the recordingtime wasn't be over, Enhancement of readings. ",
-  "1.8.0"  => "25.01.2016  changed define in order to remove credentials from string, added \"set credentials\" command to save username/password, added Attribute \"session\" to make login-session selectable ",
-  "1.7.0"  => "18.01.2016  Attribute \"httptimeout\" added ",
-  "1.6.0"  => "16.01.2016  Change the define-string related to rectime. (http://forum.fhem.de/index.php/topic,45671.msg391664.html#msg391664)   ",                
-  "1.5.1"  => "11.01.2016  Vars \"USERNAME\" and \"RECTIME\" removed from internals, Var (Internals) \"SERVERNAME\" changed to \"SERVERADDR\" ",
-  "1.5.0"  => "04.01.2016  Function \"Get\" for creating Camera-Readings integrated, Attributs pollcaminfoall, pollnologging  added, Function for Polling Cam-Infos added. ",
-  "1.4.0"  => "23.12.2015  function \"enable\" and \"disable\" for SS-Cams added, changed timout of Http-calls to a higher value ",
-  "1.3.0"  => "19.12.2015  function \"snap\" for taking snapshots added, fixed a bug that functions may impact each other  ",
-  "1.2.0"  => "14.12.2015  improve usage of verbose-modes ",
-  "1.1.0"  => "13.12.2015  use of InternalTimer instead of fhem(sleep) ",
   "1.0.0"  => "12.12.2015  initial, changed completly to HttpUtils_NonblockingGet "
 );
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
+  "7.2.1"  => "23.10.2018 COMPATIBILITY changed to 8.2.1 ",
   "7.2.0"  => "20.10.2018 direct help for attributes, new get versionNotes command, please see commandref for details ",
   "7.1.1"  => "18.10.2018 Message of \"current/simulated SVS-version...\" changed, commandref corrected ",
   "7.1.0"  => "02.09.2018 PIR Sensor enable/disable, SSCam_Set/SSCam_Get optimized ",
@@ -295,7 +199,7 @@ use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
 # getestete SVS-Version
-my $compstat     = "8.2.0";
+my $compstat     = "8.2.1";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -740,6 +644,7 @@ sub SSCam_Set($@) {
           InternalTimer(gettimeofday()+11, "SSCam_getptzlistpreset", $hash, 0);
           RemoveInternalTimer($hash, "SSCam_getptzlistpatrol");
           InternalTimer(gettimeofday()+12, "SSCam_getptzlistpatrol", $hash, 0);
+          SSCam_versionCheck($hash);
 		  return "Username and Password saved successfully";
 	  } else {
 		   return "Error while saving Username / Password - see logfile for details";
@@ -1533,6 +1438,7 @@ sub SSCam_initonboot ($) {
              RemoveInternalTimer("SSCam_getsnapinfo"); 
              InternalTimer(gettimeofday()+0.9, "SSCam_getsnapinfo", "$name:$slim:$ssize", 0); 
 		 }
+         SSCam_versionCheck($hash);                                                                  # Einstieg in regelmäßigen Check Kompatibilität
      }
          
      # Subroutine Watchdog-Timer starten (sollen Cam-Infos regelmäßig abgerufen werden ?), verzögerter zufälliger Start 0-30s 
@@ -1543,6 +1449,29 @@ sub SSCam_initonboot ($) {
       InternalTimer(gettimeofday()+1, "SSCam_initonboot", $hash, 0);
   }
 return;
+}
+
+###############################################################################
+#          Dauerschleife Kompatibilitätscheck SSCam <-> SVS
+###############################################################################
+sub SSCam_versionCheck($) {
+  my ($hash) = @_;
+  my $name   = $hash->{NAME};
+  my $rc     = 7196;
+  
+  RemoveInternalTimer($hash, "SSCam_versionCheck");
+  return if(IsDisabled($name));
+
+  my $cs = ReadingsVal($name, "compstate", "true");
+  if($cs eq "false") {
+      Log3($name, 2, "$name - WARNING - The current/simulated SVS-version ".ReadingsVal($name, "SVSversion", "").
+       " may be incompatible with SSCam version $hash->{VERSION}. ".
+       "For further information execute \"get <name> versionNotes 4\".");
+  }
+  
+InternalTimer(gettimeofday()+$rc, "SSCam_versionCheck", $hash, 0);
+
+return; 
 }
 
 ######################################################################################
@@ -4956,13 +4885,14 @@ sub SSCam_camop_parse ($) {
                 my $avsc   = $major.$minor.(($small=~/\d/)?$small:0); 
                 my $avcomp = $hash->{COMPATIBILITY};
                 $avcomp    =~ s/\.//g;
-
+                
+                my $compstate;
                 if($avsc <= $avcomp) {
-                    readingsSingleUpdate($hash, "compstate", "true", 1);
+                    $compstate = "true";
                 } else {
-                    readingsSingleUpdate($hash, "compstate", "false", 1);
-                    Log3($name, 2, "$name - WARNING - The current/simulated SVS-version ".$major.$minor.(($small=~/\d/)?$small:0)." may be incompatible with SSCam version $hash->{VERSION}. For further information execute \"get <name> versionNotes 4\".");
+                    $compstate = "false";
                 }
+                readingsSingleUpdate($hash, "compstate", $compstate, 1);
                 
                 if (!exists($data->{'data'}{'customizedPortHttp'})) {
                     delete $defs{$name}{READINGS}{SVScustomPortHttp};
