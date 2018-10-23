@@ -823,14 +823,14 @@ sub RESIDENTS_UpdateReadings (@) {
             readingsBulkUpdate(
                 $hash,
                 "lastDurSleep",
-                RESIDENTStk_TimeDiff(
+                UConv::duration(
                     $datetime, ReadingsVal( $name, "lastSleep", "" )
                 )
             );
             readingsBulkUpdate(
                 $hash,
                 "lastDurSleep_cr",
-                RESIDENTStk_TimeDiff(
+                UConv::duration(
                     $datetime, ReadingsVal( $name, "lastSleep", "" ), "min"
                 )
             );
@@ -854,14 +854,14 @@ sub RESIDENTS_UpdateReadings (@) {
                 readingsBulkUpdate(
                     $hash,
                     "lastDurAbsence",
-                    RESIDENTStk_TimeDiff(
+                    UConv::duration(
                         $datetime, ReadingsVal( $name, "lastDeparture", "-" )
                     )
                 );
                 readingsBulkUpdate(
                     $hash,
                     "lastDurAbsence_cr",
-                    RESIDENTStk_TimeDiff(
+                    UConv::duration(
                         $datetime, ReadingsVal( $name, "lastDeparture", "-" ),
                         "min"
                     )
@@ -876,14 +876,14 @@ sub RESIDENTS_UpdateReadings (@) {
                 readingsBulkUpdate(
                     $hash,
                     "lastDurPresence",
-                    RESIDENTStk_TimeDiff(
+                    UConv::duration(
                         $datetime, ReadingsVal( $name, "lastArrival", "-" )
                     )
                 );
                 readingsBulkUpdate(
                     $hash,
                     "lastDurPresence_cr",
-                    RESIDENTStk_TimeDiff(
+                    UConv::duration(
                         $datetime, ReadingsVal( $name, "lastArrival", "-" ),
                         "min"
                     )
