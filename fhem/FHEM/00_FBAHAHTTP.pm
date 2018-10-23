@@ -46,6 +46,9 @@ FBAHAHTTP_Define($$)
       CommandAttr(undef, "$d IODev $hash->{NAME}");
       CommandDelete(undef, $n) if($defs{$n});
       $defs{$d}{IODev} = $hash;
+
+      my $oldNr = $defs{$d}{IODev}{NR}; # Forum #92286
+      $hash->{NR} = $oldNr if($hash->{NR} > $oldNr);
     }
   }
   $hash->{CmdStack} = ();
