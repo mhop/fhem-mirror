@@ -27,6 +27,8 @@
 #  Credits:
 #  - viegener for some input
 #  - some proposals to boost and improve SQL-Statements by JoeALLb
+#  - function reduceLog created by Claudiu Schuster (rapster) was copied from DbLog (Version 3.12.3 08.10.2018)
+#    and changed to meet the requirements of DbRep
 #
 ###########################################################################################################################
 #
@@ -39,12 +41,28 @@ package main;
 
 use strict;                           
 use warnings;
+use POSIX qw(strftime);
+use Time::HiRes qw(gettimeofday tv_interval);
+use Scalar::Util qw(looks_like_number);
+eval "use DBI;1" or my $DbRepMMDBI = "DBI";
+use DBI::Const::GetInfoType;
+use Blocking;
+use Color;                           # colorpicker Widget
+use Time::Local;
+use Encode qw(encode_utf8);
+use IO::Compress::Gzip qw(gzip $GzipError);
+use IO::Uncompress::Gunzip qw(gunzip $GunzipError);
+# no if $] >= 5.018000, warnings => 'experimental';
+no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Versions History intern
 our %DbRep_vNotesIntern = (
-  "8.2.3"  => "07.10.2018  check availability of DbLog-device at definition time of DbRep-device ",
-  "8.2.2"  => "07.10.2018  DbRep_getMinTs changed, fix don't get the real min timestamp in rare cases ",
-  "8.2.1"  => "07.10.2018  \$hash->{dbloghash}{HELPER}{REOPEN_RUNS_UNTIL} contains the time until DB is closed ",
+  "8.4.0"  => "22.10.2018  countEntries separately for every reading if attribute \"countEntriesDetail\" is set, ".
+                           "versionNotes changed to support en/de, get dbValue as textfield-long ",
+  "8.3.0"  => "17.10.2018  reduceLog from DbLog integrated into DbRep, textField-long as default for sqlCmd, both attributes timeOlderThan and timeDiffToNow can be set at same time",
+  "8.2.3"  => "07.10.2018  check availability of DbLog-device at definition time of DbRep-device ",  
+  "8.2.2"  => "07.10.2018  DbRep_getMinTs changed, fix don't get the real min timestamp in rare cases ",  
+  "8.2.1"  => "07.10.2018  \$hash->{dbloghash}{HELPER}{REOPEN_RUNS_UNTIL} contains time until DB is closed ",
   "8.2.0"  => "05.10.2018  direct help for attributes ",
   "8.1.0"  => "02.10.2018  new get versionNotes command ",
   "8.0.1"  => "20.09.2018  DbRep_getMinTs improved",
@@ -96,174 +114,17 @@ our %DbRep_vNotesIntern = (
   "7.3.1"  => "08.01.2018  fix syntax error for perl < 5.20 ",
   "7.3.0"  => "07.01.2018  DbRep-charfilter avoid control characters in datasets to export, impfile_Push errortext improved, expfile_DoParse changed to use aggregation for split selects in timeslices (avoid heavy memory consumption) ",
   "7.2.1"  => "04.01.2018  bugfix month out of range that causes fhem crash ",
-  "7.2.0"  => "27.12.2017  new attribute 'seqDoubletsVariance' ",
-  "7.1.0"  => "22.12.2017  new attribute timeYearPeriod for reports correspondig to e.g. electricity billing, bugfix connection check is running after restart allthough dev is disabled ",
-  "7.0.0"  => "18.12.2017  don't set \$runtime_string_first,\$runtime_string_next,\$ts if time/aggregation-attributes not set, change_Push redesigned, new command get blockinginfo, identify if reopen is running on dblog-device and postpone the set-command ",
-  "6.4.3"  => "17.12.2017  bugfix in delSeqDoublets, fetchrows if datasets contain characters like \"' <blank> and s.o. ",
-  "6.4.2"  => "15.12.2017  change 'delSeqDoublets' to respect attribute 'limit' (adviceDelete,adviceRemain), commandref revised ",
-  "6.4.1"  => "13.12.2017  new Attribute 'sqlResultFieldSep' for field separate options of sqlCmd result ",
-  "6.4.0"  => "10.12.2017  prepare module for usage of datetime picker widget (Forum:#35736) ",
-  "6.3.2"  => "05.12.2017  make direction of fetchrows switchable ASC <-> DESC by attribute fetchRoute ",
-  "6.3.1"  => "04.12.2017  fix DBD::mysql::st execute failed: Expression #1 of SELECT list is not in GROUP BY clause and contains nonaggregated column 'DEVELfhem.history.TIMESTAMP' which is not functionally dependent on columns in GROUP BY clause; this is incompatible with sql_mode=only_full_group_by Forum:https://forum.fhem.de/index.php/topic,65860.msg725595.html#msg725595 , fix currentfillup_Push PostgreSQL -> use \$runtime_string_next as Timestring during current insert ",
-  "6.3.0"  => "04.12.2017  support addition format d:xx h:xx m:xx s:xx for attributes timeDiffToNow, timeOlderThan ",
-  "6.2.3"  => "04.12.2017  fix localtime(time); (current time deduction) in DbRep_createTimeArray ",
-  "6.2.2"  => "01.12.2017  support all aggregations for delSeqDoublets, better output filesize when mysql dump finished ",
-  "6.2.1"  => "30.11.2017  support delSeqDoublets without device,reading is set and support device-devspec, reading list, minor fixes in delSeqDoublets ",
-  "6.2.0"  => "29.11.2017  enhanced command delSeqDoublets by 'delete' ",
-  "6.1.0"  => "29.11.2017  new command delSeqDoublets (adviceRemain,adviceDelete), add Option to LASTCMD ",
-  "6.0.0"  => "18.11.2017  FTP transfer dumpfile after dump, delete old dumpfiles within Blockingcall (avoid freezes) commandref revised, minor fixes ",
-  "5.8.6"  => "30.10.2017  don't limit attr reading, device if the attr contains a list ",
-  "5.8.5"  => "19.10.2017  filter unwanted characters in 'procinfo'-result ",
-  "5.8.4"  => "17.10.2017  DbRep_createSelectSql, DbRep_createDeleteSql, currentfillup_Push switch to devspec ",
-  "5.8.3"  => "16.10.2017  change to use DbRep_createSelectSql: minValue,diffValue - DbRep_createDeleteSql: delEntries ",
-  "5.8.2"  => "15.10.2017  sub DbRep_createTimeArray ",
-  "5.8.1"  => "15.10.2017  change to use DbRep_createSelectSql: sumValue,averageValue,exportToFile,maxValue ",
-  "5.8.0"  => "15.10.2017  adapt DbRep_createSelectSql for better performance if time/aggregation not set, can set table as flexible argument for countEntries, fetchrows (default: history), minor fixes ",
-  "5.7.1"  => "13.10.2017  tableCurrentFillup fix for PostgreSQL, commandref revised ",
-  "5.7.0"  => "09.10.2017  tableCurrentPurge, tableCurrentFillup ",
-  "5.6.4"  => "05.10.2017  abortFn's adapted to use abortArg (Forum:77472) ",
-  "5.6.3"  => "01.10.2017  fix crash of fhem due to wrong rmday-calculation if month is changed, Forum:#77328 ",
-  "5.6.2"  => "28.08.2017  commandref revised ",
-  "5.6.1"  => "18.07.2017  commandref revised, minor fixes ",
-  "5.6.0"  => "17.07.2017  default timeout changed to 86400, new get-command 'procinfo' (MySQL) ",
-  "5.5.2"  => "16.07.2017  dbmeta_DoParse -> show variables (no global) ",
-  "5.5.1"  => "16.07.2017  wrong text output in state when restoreMySQL was aborted by timeout ",
-  "5.5.0"  => "10.07.2017  replace \$hash->{dbloghash}{DBMODEL} by \$hash->{dbloghash}{MODEL} (DbLog was changed) ",
-  "5.4.0"  => "03.07.2017  restoreMySQL - restore of csv-files (from dumpServerSide), RestoreRowsHistory/ DumpRowsHistory, Commandref revised ",
-  "5.3.1"  => "28.06.2017  vacuum for SQLite added, readings enhanced for optimizeTables / vacuum, commandref revised ",
-  "5.3.0"  => "26.06.2017  change of DbRep_mysqlOptimizeTables, new command optimizeTables ",
-  "5.2.1"  => "25.06.2017  bugfix in sqlCmd_DoParse (PRAGMA, UTF8, SHOW) ",
-  "5.2.0"  => "14.06.2017  UTF-8 support for MySQL (fetchrows, srvinfo, expfile, impfile, insert) ",
-  "5.1.0"  => "13.06.2017  column 'UNIT' added to fetchrow result ",
-  "5.0.6"  => "13.06.2017  add Aria engine to DbRep_mysqlOptimizeTables ",
-  "5.0.5"  => "12.06.2017  bugfixes in DbRep_DumpAborted, some changes in dumpMySQL, optimizeTablesBeforeDump added to mysql_DoDumpServerSide, new reading DumpFileCreatedSize ",
-  "5.0.4"  => "09.06.2017  some improvements and changes of mysql_DoDump, commandref revised, new attributes executeBeforeDump, executeAfterDump ",
-  "5.0.3"  => "07.06.2017  mysql_DoDumpServerSide added ",
-  "5.0.2"  => "06.06.2017  little improvements in mysql_DoDumpClientSide ",
-  "5.0.1"  => "05.06.2017  dependencies between dumpMemlimit and dumpSpeed created, enhanced verbose 5 logging ",
-  "5.0.0"  => "04.06.2017  MySQL Dump nonblocking added ",
-  "4.16.1"  => "22.05.2017  encode json without JSON module, requires at least fhem.pl 14348 2017-05-22 20:25:06Z ",
-  "4.16.0"  => "22.05.2017  format json as option of sqlResultFormat, state will never be deleted in 'DbRep_delread' ",
-  "4.15.1"  => "20.05.2017  correction of commandref ",
-  "4.15.0"  => "17.05.2017  SUM(VALUE),AVG(VALUE) recreated for PostgreSQL, Code reviewed and optimized ",
-  "4.14.2"  => "16.05.2017  SQL-Statements optimized for Wildcard '%' usage if used, Wildcard '_' isn't supported furthermore, \"averageValue\", \"sumValue\", \"maxValue\", \"minValue\", \"countEntries\" performance optimized, commandref revised  ",
-  "4.14.1"  => "16.05.2017  limitation of fetchrows result datasets to 1000 by attr limit ",
-  "4.14.0"  => "15.05.2017  UserExitFn added as separate sub (DbRep_userexit) and attr userExitFn defined, new subs ReadingsBulkUpdateTimeState, ReadingsBulkUpdateValue, ReadingsSingleUpdateValue, commandref revised ",
-  "4.13.7"  => "11.05.2017  attribute sqlResultSingleFormat became sqlResultFormat, sqlResultSingle deleted and sqlCmd contains now all format possibilities (separated,mline,sline,table), commandref revised ",
-  "4.13.6"  => "10.05.2017  minor changes ",
-  "4.13.5"  => "09.05.2017  cover dbh prepare in eval to avoid crash (sqlResult_DoParse) ",
-  "4.13.4"  => "09.05.2017  attribute sqlResultSingleFormat: mline sline table, attribute 'allowDeletion' is now also valid for sqlResult, sqlResultSingle and delete command is forced ",
-  "4.13.3"  => "09.05.2017  flexible format of reading SqlResultRow_xxx for proper and sort sequence ",
-  "4.13.2"  => "09.05.2017  sqlResult, sqlResultSingle are able to execute delete, insert, update commands error corrections ",
-  "4.13.1"  => "09.05.2017  change substitution in sqlResult, sqlResult_DoParse ",
-  "4.13.0"  => "09.05.2017  acceptance of viegener change with some corrections (separating lines with ]|[ in Singleline) ",
-  "4.12.3"  => "07.05.2017  New sets sqlSelect execute arbitrary sql command returning each row as single reading (fields separated with |) allowing replacement of timestamp values according to attribute definition --> §timestamp_begin§ etc and sqlSelectSingle for executing an sql command returning a single reading (separating lines with §) ",
-  "4.12.2"  => "17.04.2017  DbRep_checkUsePK changed ",
-  "4.12.1"  => "07.04.2017  get tableinfo changed for MySQL ",
-  "4.12.0"  => "31.03.2017  support of primary key for insert functions ",
-  "4.11.4"  => "29.03.2017  bugfix timestamp in minValue, maxValue if VALUE contains more than one numeric value (like in sysmon) ",
-  "4.11.3"  => "26.03.2017  usage of daylight saving time changed to avoid wrong selection when wintertime switch to summertime, minor bug fixes ",
-  "4.11.2"  => "16.03.2017  bugfix in func dbmeta_DoParse (SQLITE_DB_FILENAME) ",
-  "4.11.1"  => "28.02.2017  commandref completed ",
-  "4.11.0"  => "18.02.2017  added [current|previous]_[month|week|day|hour]_begin and [current|previous]_[month|week|day|hour]_end as options of timestamp ",
-  "4.10.3"  => "01.02.2017  rename reading 'diff-overrun_limit-' to 'diff_overrun_limit_', DbRep_collaggstr day aggregation changed back from 4.7.5 change ",
-  "4.10.2"  => "16.01.2017  bugfix uninitialized value \$renmode if RenameAgent ",
-  "4.10.1"  => "30.11.2016  bugfix importFromFile format problem if UNIT-field wasn't set ",
-  "4.10.0"  => "28.12.2016  del_DoParse changed to use Wildcards, del_ParseDone changed to use readingNameMap ",
-  "4.9.0"  => "23.12.2016  function readingRename added ",
-  "4.8.6"  => "17.12.2016  new bugfix group by-clause due to incompatible changes made in MyQL 5.7.5 (Forum #msg541103) ",
-  "4.8.5"  => "16.12.2016  bugfix group by-clause due to Forum #msg540610 ",
-  "4.8.4"  => "13.12.2016  added 'group by ...,table_schema' to select in dbmeta_DoParse due to Forum #msg539228, commandref adapted, changed 'not_enough_data_in_period' to 'less_data_in_period' ",
-  "4.8.3"  => "12.12.2016  balance diff to next period if value of period is 0 between two periods with values  ",
-  "4.8.2"  => "10.12.2016  bugfix negativ diff if balanced ",
-  "4.8.1"  => "10.12.2016  added balance diff to diffValue, a difference between the last value of an old aggregation period to the first value of a new aggregation period will be take over now ",
-  "4.8.0"  => "09.12.2016  diffValue selection chenged to 'between' ",
-  "4.7.7"  => "08.12.2016  code review ",
-  "4.7.6"  => "07.12.2016  DbRep version as internal, check if perl module DBI is installed ",
-  "4.7.5"  => "05.12.2016  DbRep_collaggstr day aggregation changed ",
-  "4.7.4"  => "28.11.2016  sub DbRep_calcount changed due to Forum #msg529312 ",
-  "4.7.3"  => "20.11.2016  new diffValue function made suitable to SQLite ",
-  "4.7.2"  => "20.11.2016  commandref adapted, state = Warnings adapted ",
-  "4.7.1"  => "17.11.2016  changed fieldlength to DbLog new standard, diffValue state Warnings due to several situations and generate readings not_enough_data_in_period, diff-overrun_limit ",
-  "4.7.0"  => "16.11.2016  sub diffValue changed due to Forum #msg520154, attr diffAccept added, diffValue now able to calculate if counter was going to 0 ",
-  "4.6.0"  => "31.10.2016  bugfix calc issue due to daylight saving time end (winter time) ",
-  "4.5.1"  => "18.10.2016  get svrinfo contains SQLite database file size (MB), modified timeout routine ",
-  "4.5.0"  => "17.10.2016  get data of dbstatus, dbvars, tableinfo, svrinfo (database dependend) ",
-  "4.4.0"  => "13.10.2016  get function prepared ",
-  "4.3.0"  => "11.10.2016  Preparation of get metadata ",
-  "4.2.0"  => "10.10.2016  allow SQL-Wildcards (% _) in attr reading & attr device ",
-  "4.1.3"  => "09.10.2016  bugfix delEntries running on SQLite ",
-  "4.1.2"  => "08.10.2016  old device in DEF of connected DbLog device will substitute by renamed device if it is present in DEF ",
-  "4.1.1"  => "06.10.2016  NotifyFn is getting events from global AND own device, set is reduced if ROLE=Agent, english commandref enhanced ",
-  "4.1.0"  => "05.10.2016  DbRep_Attr changed  ",
-  "4.0.0"  => "04.10.2016  Internal/Attribute ROLE added, sub DbRep_firstconnect changed NotifyFN activated to start deviceRename if ROLE=Agent ",
-  "3.13.0"  => "03.10.2016  added deviceRename to rename devices in database, new Internal DATABASE ",
-  "3.12.0"  => "02.10.2016  function minValue added ",
-  "3.11.1"  => "30.09.2016  bugfix include first and next day in calculation if Timestamp is exactly 'YYYY-MM-DD 00:00:00' ",
-  "3.11.0"  => "29.09.2016  maxValue calculation moved to background to reduce FHEM-load ",
-  "3.10.1"  => "28.09.2016  sub impFile -> changed \$dbh->{AutoCommit} = 0 to \$dbh->begin_work ",
-  "3.10.0"  => "27.09.2016  diffValue calculation moved to background to reduce FHEM-load, new reading background_processing_time ",
-  "3.9.1"  => "27.09.2016  Internal 'LASTCMD' added ",
-  "3.9.0"  => "26.09.2016  new function importFromFile to import data from file (CSV format) ",
-  "3.8.0"  => "16.09.2016  new attr readingPreventFromDel to prevent readings from deletion when a new operation starts ",
-  "3.7.3"  => "11.09.2016  changed format of diffValue-reading if no value was selected ",
-  "3.7.2"  => "04.09.2016  problem in diffValue fixed if if no value was selected ",
-  "3.7.1"  => "31.08.2016  Reading 'errortext' added, commandref continued, exportToFile changed, diffValue changed to fix wrong timestamp if error occur ",
-  "3.7.0"  => "30.08.2016  exportToFile added exports data to file (CSV format) ",
-  "3.6.0"  => "29.08.2016  plausibility checks of database column character length ",
-  "3.5.2"  => "21.08.2016  fit to new commandref style ",
-  "3.5.1"  => "20.08.2016  commandref continued ",
-  "3.5.0"  => "18.08.2016  new attribute timeOlderThan ",
-  "3.4.4"  => "12.08.2016  current_year_begin, previous_year_begin, current_year_end, previous_year_end added as possible values for timestmp attribute ",
-  "3.4.3"  => "09.08.2016  fields for input using 'insert' changed to 'date,time,value,unit'. Attributes device, reading will be used to complete dataset, now more informations available about faulty datasets in arithmetic operations ",
-  "3.4.2"  => "05.08.2016  commandref complemented, fieldlength used in function 'insert' trimmed to 32 ",
-  "3.4.1"  => "04.08.2016  check of numeric value type in functions maxvalue, diffvalue ",
-  "3.4.0"  => "03.08.2016  function 'insert' added ",
-  "3.3.3"  => "16.07.2016  bugfix of aggregation=week if month start is 01 and month end is 12 AND the last week of december is '01' like in 2014 (checked in version 11804) ",
-  "3.3.2"  => "16.07.2016  readings completed with begin of selection range to ensure valid reading order, also done if readingNameMap is set ",
-  "3.3.1"  => "15.07.2016  function 'diffValue' changed, write '-' if no value ",
-  "3.3.0"  => "12.07.2016  function 'diffValue' added ",
-  "3.2.1"  => "12.07.2016  DbRep_Notify prepared, switched from readingsSingleUpdate to readingsBulkUpdate ",
-  "3.2.0"  => "11.07.2016  handling of db-errors is relocated to blockingcall-subs (checked in version 11785) ",
-  "3.1.1"  => "10.07.2016  state turns to initialized and connected after attr 'disabled' is switched from '1' to '0' ",
-  "3.1.0"  => "09.07.2016  new Attr 'timeDiffToNow' and change subs according to that ",
-  "3.0.0"  => "04.07.2016  no selection if timestamp isn't set and aggregation isn't set with fetchrows, delEntries ",
-  "2.9.9"  => "03.07.2016  english version of commandref completed ",
-  "2.9.8"  => "01.07.2016  changed fetchrows_ParseDone to handle readingvalues with whitespaces correctly ",
-  "2.9.7"  => "30.06.2016  moved {DBLOGDEVICE} to {HELPER}{DBLOGDEVICE} ",
-  "2.9.6"  => "30.06.2016  sql-call changed for countEntries, averageValue, sumValue avoiding problems if no timestamp is set and aggregation is set ",
-  "2.9.5"  => "30.06.2016  format of readingnames changed again (substitute ':' with '-' in time) ",
-  "2.9.4"  => "30.06.2016  change readingmap to readingNameMap, prove of unsupported characters added ",
-  "2.9.3"  => "27.06.2016  format of readingnames changed avoiding some problems after restart and splitting ",
-  "2.9.2"  => "27.06.2016  use Time::Local added, DbRep_firstconnect added ",
-  "2.9.1"  => "26.06.2016  german commandref added   ",
-  "2.9.0"  => "25.06.2016  attributes showproctime, timeout added ",
-  "2.8.1"  => "24.06.2016  sql-creation of sumValue, maxValue, fetchrows changed main-routine changed ",
-  "2.8.0"  => "24.06.2016  function averageValue changed to nonblocking function ",
-  "2.7.1"  => "24.06.2016  changed blockingcall routines, changed to unique abort-function ",
-  "2.7.0"  => "23.06.2016  changed function countEntries to nonblocking ",
-  "2.6.3"  => "22.06.2016  abort-routines changed, dbconnect-routines changed ",
-  "2.6.2"  => "21.06.2016  aggregation week corrected ",
-  "2.6.1"  => "20.06.2016  routine maxval_ParseDone corrected ",
-  "2.6.0"  => "31.05.2016  maxValue changed to nonblocking function ",
-  "2.5.3"  => "31.05.2016  function delEntries changed ",
-  "2.5.2"  => "31.05.2016  ping check changed, DbRep_Connect changed ",
-  "2.5.1"  => "30.05.2016  sleep in nb-functions deleted ",
-  "2.5.0"  => "30.05.2016  changed to use own \$dbh with DbLog-credentials, function sumValue, fetchrows ",
-  "2.4.2"  => "29.05.2016  function sumValue changed ",
-  "2.4.1"  => "29.05.2016  function fetchrow changed ",
-  "2.4.0"  => "29.05.2016  changed to nonblocking function for sumValue ",
-  "2.3.0"  => "28.05.2016  changed sumValue to 'prepare' with placeholders ",
-  "2.2.0"  => "27.05.2016  changed fetchrow and delEntries function to 'prepare' with placeholders added nonblocking function for delEntries ",
-  "2.1.0"  => "25.05.2016  codechange ",
-  "2.0.0"  => "24.05.2016  added nonblocking function for fetchrow ",
-  "1.2.0"  => "21.05.2016  function and attribute for delEntries added ",
-  "1.1.0"  => "20.05.2016  change result-format of 'count', move runtime-counter to sub DbRep_collaggstr ",
   "1.0.0"  => "19.05.2016  Initial"
 );
 
 # Versions History extern:
 our %DbRep_vNotesExtern = (
+  "8.4.0"  => "22.10.2018 New attribute \"countEntriesDetail\". Function countEntries creates number of datasets for every ".
+                          "reading separately if attribute \"countEntriesDetail\" is set. Get versionNotes changed to support en/de. ".
+                          "Function \"get dbValue\" opens an editor window ",
+  "8.3.0"  => "17.10.2018 reduceLog from DbLog integrated into DbRep, textField-long as default for sqlCmd, both attributes ".
+                          "timeOlderThan and timeDiffToNow can be set at same time -> the selection time between timeOlderThan ".
+                          "and timeDiffToNow can be calculated dynamically ",
   "8.2.2"  => "07.10.2018 fix don't get the real min timestamp in rare cases ",
   "8.2.0"  => "05.10.2018 direct help for attributes ",
   "8.1.0"  => "01.10.2018 new get versionNotes command ",
@@ -330,7 +191,7 @@ our %DbRep_vNotesExtern = (
   "4.7.3"  => "20.11.2016 new diffValue function made suitable to SQLite ",
   "4.6.0"  => "31.10.2016 bugfix calc issue due to daylight saving time end (winter time) ",
   "4.5.1"  => "18.10.2016 get svrinfo contains SQLite database file size (MB), modified timeout routine ",
-  "4.2.0"  => "10.10.2016 allow SQL-Wildcards (% _) in attr reading & attr device ",
+  "4.2.0"  => "10.10.2016 allow SQL-Wildcards in attr reading & attr device ",
   "4.1.3"  => "09.10.2016 bugfix delEntries running on SQLite ",
   "3.13.0"  => "03.10.2016 added deviceRename to rename devices in database, new Internal DATABASE ",
   "3.12.0"  => "02.10.2016 function minValue added ",
@@ -364,30 +225,20 @@ our %DbRep_vNotesExtern = (
   "1.0.0"  => "19.05.2016 Initial"
 );
 
-# Hint Hash
-our %DbRep_vHintsExt = (
+# Hint Hash en
+our %DbRep_vHintsExt_en = (
   "2" => "<a href='https://www.dwd.de/DE/leistungen/klimadatendeutschland/beschreibung_tagesmonatswerte.html'>Rules</a> of german weather service for calculation of average temperatures. ",
-  "1" => "Some helpful <a href=\"https://wiki.fhem.de/wiki/DbRep_-_Reporting_und_Management_von_DbLog-Datenbankinhalten#Praxisbeispiele_.2F_Hinweise_und_L.C3.B6sungsans.C3.A4tze_f.C3.BCr_verschiedene_Aufgaben\">FHEM-Wiki</a> Entries"
+  "1" => "Some helpful <a href=\"https://wiki.fhem.de/wiki/DbRep_-_Reporting_und_Management_von_DbLog-Datenbankinhalten#Praxisbeispiele_.2F_Hinweise_und_L.C3.B6sungsans.C3.A4tze_f.C3.BCr_verschiedene_Aufgaben\">FHEM-Wiki</a> Entries."
 );
 
-use POSIX qw(strftime);
-use Time::HiRes qw(gettimeofday tv_interval);
-use Scalar::Util qw(looks_like_number);
-eval "use DBI;1" or my $DbRepMMDBI = "DBI";
-use DBI::Const::GetInfoType;
-use Blocking;
-use Color;                           # colorpicker Widget
-use Time::Local;
-use Encode qw(encode_utf8);
-use IO::Compress::Gzip qw(gzip $GzipError);
-use IO::Uncompress::Gunzip qw(gunzip $GunzipError);
-# no if $] >= 5.018000, warnings => 'experimental';
-no if $] >= 5.017011, warnings => 'experimental::smartmatch';  
+# Hint Hash de
+our %DbRep_vHintsExt_de = (
+  "2" => "<a href='https://www.dwd.de/DE/leistungen/klimadatendeutschland/beschreibung_tagesmonatswerte.html'>Regularien</a> des deutschen Wetterdienstes zur Berechnung von Durchschnittstemperaturen. ",
+  "1" => "Hilfreiche Hinweise zu DbRep im <a href=\"https://wiki.fhem.de/wiki/DbRep_-_Reporting_und_Management_von_DbLog-Datenbankinhalten#Praxisbeispiele_.2F_Hinweise_und_L.C3.B6sungsans.C3.A4tze_f.C3.BCr_verschiedene_Aufgaben\">FHEM-Wiki</a>."
+);
 
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
-
-my $DbRepVersion = "8.0.1";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -415,6 +266,7 @@ sub DbRep_Initialize($) {
                        "reading ".                       
                        "allowDeletion:1,0 ".
                        "averageCalcForm:avgArithmeticMean,avgDailyMeanGWS,avgTimeWeightMean ".
+                       "countEntriesDetail:1,0 ".
                        "device " .
 					   "dumpComment ".
                        "dumpCompress:1,0 ".
@@ -575,7 +427,8 @@ sub DbRep_Set($@) {
                 (($hash->{ROLE} ne "Agent")?"fetchrows:history,current ":"").  
                 (($hash->{ROLE} ne "Agent")?"diffValue:display,writeToDB ":"").   
                 (($hash->{ROLE} ne "Agent")?"insert ":"").
-                (($hash->{ROLE} ne "Agent")?"sqlCmd ":"").
+                (($hash->{ROLE} ne "Agent")?"reduceLog ":"").
+                (($hash->{ROLE} ne "Agent")?"sqlCmd:textField-long ":"").
                 (($hash->{ROLE} ne "Agent" && $hl)?"sqlCmdHistory:".$hl." ":"").
                 (($hash->{ROLE} ne "Agent")?"sqlSpecial:50mostFreqLogsLast2days,allDevCount,allDevReadCount ":"").
                 (($hash->{ROLE} ne "Agent")?"syncStandby ":"").
@@ -679,7 +532,26 @@ sub DbRep_Set($@) {
       DbRep_beforeproc($hash, "delSeq");	  
       DbRep_Main($hash,$opt,$prop); 
       return undef;      
-  } 
+  }
+  
+  if ($opt =~ m/reduceLog/ && $hash->{ROLE} ne "Agent") {
+      if ($hash->{HELPER}{RUNNING_REDUCELOG} && $hash->{HELPER}{RUNNING_REDUCELOG}{pid} !~ m/DEAD/) {  
+          return "reduceLog already in progress. Please wait for the current process to finish.";
+      } else {
+          delete $hash->{HELPER}{RUNNING_REDUCELOG};
+          my @b = @a;
+          shift(@b);
+          $hash->{LASTCMD} = join(" ",@b);
+          $hash->{HELPER}{REDUCELOG} = \@a;
+          Log3 ($name, 3, "DbRep $name - ################################################################");
+          Log3 ($name, 3, "DbRep $name - ###                    new reduceLog run                     ###");
+          Log3 ($name, 3, "DbRep $name - ################################################################");
+          # Befehl vor Procedure ausführen
+          DbRep_beforeproc($hash, "reduceLog");	   
+          DbRep_Main($hash,$opt);
+          return undef;
+      }
+  }
   
   if ($hash->{HELPER}{RUNNING_BACKUP_CLIENT}) {
       $setlist = "Unknown argument $opt, choose one of ".
@@ -949,12 +821,12 @@ sub DbRep_Get($@) {
                 "svrinfo:noArg ".
 				"blockinginfo:noArg ".
                 "minTimestamp:noArg ".
-                "dbValue ".
+                "dbValue:textField-long ".
                 (($dbmodel eq "MYSQL")?"dbstatus:noArg ":"").
                 (($dbmodel eq "MYSQL")?"tableinfo:noArg ":"").
 				(($dbmodel eq "MYSQL")?"procinfo:noArg ":"").
                 (($dbmodel eq "MYSQL")?"dbvars:noArg ":"").
-                "versionNotes:noArg "                
+                "versionNotes "                
                 ;
   
   return if(IsDisabled($name));
@@ -1010,59 +882,82 @@ sub DbRep_Get($@) {
       return $err?$err:$ret;
   
   } elsif ($opt =~ /versionNotes/) {
-	  my $header  = "<b>Module release information table</b><br>";
+	  my $header  = "<b>Module release information</b><br>";
       my $header1 = "<b>Helpful hints</b><br>";
-	  
+	  my %hs;
+      
 	  # Ausgabetabelle erstellen
 	  my ($ret,$val0,$val1);
-	  $ret  = "<html>";
-	  $ret .= sprintf("<div class=\"makeTable wide\"; style=\"text-align:left\">$header <br>");
-	  $ret .= "<table class=\"block wide internals\">";
-	  $ret .= "<tbody>";
-	  $ret .= "<tr class=\"even\">";
-	  my $i = 0;
-	  foreach my $key (reverse sort(keys %DbRep_vNotesExtern)) {
-		  ($val0,$val1) = split(/\s/,$DbRep_vNotesExtern{$key},2);
-		  $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0  </td><td>$val1</td>" );
-		  $ret .= "</tr>";
-          $i++;
-          if ($i & 1) {
-              # $i ist ungerade
-		      $ret .= "<tr class=\"odd\">";
+      my $i = 0;
+	  
+      $ret  = "<html>";
+      
+      # Hints
+      if(!$prop || $prop =~ /hints/ || $prop =~ /[\d]+/) {
+          $ret .= sprintf("<div class=\"makeTable wide\"; style=\"text-align:left\">$header1 <br>");
+          $ret .= "<table class=\"block wide internals\">";
+          $ret .= "<tbody>";
+          $ret .= "<tr class=\"even\">";
+          if($prop && $prop =~ /[\d]+/) {
+              if(AttrVal("global","language","EN") eq "DE") {
+                  %hs = ( $prop => $DbRep_vHintsExt_de{$prop} ); 
+              } else {
+                  %hs = ( $prop => $DbRep_vHintsExt_en{$prop} ); 
+              }                   
           } else {
-              $ret .= "<tr class=\"even\">";
+              if(AttrVal("global","language","EN") eq "DE") {
+                  %hs = %DbRep_vHintsExt_de;
+              } else {
+                  %hs = %DbRep_vHintsExt_en; 
+              }
+          }           
+          $i = 0;
+          foreach my $key (reverse sort(keys %hs)) {
+              $val0 = $hs{$key};
+              $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0</td>" );
+              $ret .= "</tr>";
+              $i++;
+              if ($i & 1) {
+                  # $i ist ungerade
+                  $ret .= "<tr class=\"odd\">";
+              } else {
+                  $ret .= "<tr class=\"even\">";
+              }
           }
-	  }
-	  $ret .= "</tr>";
-	  $ret .= "</tbody>";
-	  $ret .= "</table>";
-	  $ret .= "</div>";
-          
-	  $ret .= sprintf("<div class=\"makeTable wide\"; style=\"text-align:left\">$header1 <br>");
-	  $ret .= "<table class=\"block wide internals\">";
-	  $ret .= "<tbody>";
-	  $ret .= "<tr class=\"even\">";          
-	  $i = 0;
-	  foreach my $key (reverse sort(keys %DbRep_vHintsExt)) {
-		  $val0 = $DbRep_vHintsExt{$key};
-		  $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0</td>" );
-		  $ret .= "</tr>";
-          $i++;
-          if ($i & 1) {
-              # $i ist ungerade
-		      $ret .= "<tr class=\"odd\">";
-          } else {
-              $ret .= "<tr class=\"even\">";
+          $ret .= "</tr>";
+          $ret .= "</tbody>";
+          $ret .= "</table>";
+          $ret .= "</div>";
+      }
+	  
+      # Notes
+      if(!$prop || $prop =~ /rel/) {
+          $ret .= sprintf("<div class=\"makeTable wide\"; style=\"text-align:left\">$header <br>");
+          $ret .= "<table class=\"block wide internals\">";
+          $ret .= "<tbody>";
+          $ret .= "<tr class=\"even\">";
+          $i = 0;
+          foreach my $key (reverse sort(keys %DbRep_vNotesExtern)) {
+              ($val0,$val1) = split(/\s/,$DbRep_vNotesExtern{$key},2);
+              $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0  </td><td>$val1</td>" );
+              $ret .= "</tr>";
+              $i++;
+              if ($i & 1) {
+                  # $i ist ungerade
+                  $ret .= "<tr class=\"odd\">";
+              } else {
+                  $ret .= "<tr class=\"even\">";
+              }
           }
-	  }
-
-	  $ret .= "</tr>";
-	  $ret .= "</tbody>";
-	  $ret .= "</table>";
-	  $ret .= "</div>";
-	  $ret .= "</html>";
+          $ret .= "</tr>";
+          $ret .= "</tbody>";
+          $ret .= "</table>";
+          $ret .= "</div>";
+      }
+	  
+      $ret .= "</html>";
 					
-	return $ret;
+	  return $ret;
   
   } else {
       return "$getlist";
@@ -1244,6 +1139,7 @@ sub DbRep_Attr($$$$) {
             if ($a =~ /^current$|^previous$/ && $b =~ /^hour$|^day$|^week$|^month$|^year$/ && $c =~ /^begin$|^end$/) {
                 delete($attr{$name}{timeDiffToNow}) if ($attr{$name}{timeDiffToNow});
                 delete($attr{$name}{timeOlderThan}) if ($attr{$name}{timeOlderThan});
+                delete($attr{$name}{timeYearPeriod}) if ($attr{$name}{timeYearPeriod});
                 return undef;
             }
             $aVal = DbRep_formatpicker($aVal);		
@@ -1260,6 +1156,7 @@ sub DbRep_Attr($$$$) {
             }
             delete($attr{$name}{timeDiffToNow}) if ($attr{$name}{timeDiffToNow});
             delete($attr{$name}{timeOlderThan}) if ($attr{$name}{timeOlderThan});
+            delete($attr{$name}{timeYearPeriod}) if ($attr{$name}{timeYearPeriod});
         }
 		if ($aName =~ /ftpTimeout|timeout|diffAccept/) {
             unless ($aVal =~ /^[0-9]+$/) { return " The Value of $aName is not valid. Use only figures 0-9 without decimal places !";}
@@ -1272,7 +1169,6 @@ sub DbRep_Attr($$$$) {
 			    { return "The Value of \"$aName\" isn't valid. Set simple seconds like \"86400\" or use form like \"y:1 d:10 h:6 m:12 s:20\". Refer to commandref !";}
             delete($attr{$name}{timestamp_begin}) if ($attr{$name}{timestamp_begin});
             delete($attr{$name}{timestamp_end}) if ($attr{$name}{timestamp_end});
-            delete($attr{$name}{timeOlderThan}) if ($attr{$name}{timeOlderThan});
             delete($attr{$name}{timeYearPeriod}) if ($attr{$name}{timeYearPeriod});
         } 
 		if ($aName eq "timeOlderThan") {
@@ -1280,7 +1176,6 @@ sub DbRep_Attr($$$$) {
 			    { return "The Value of \"$aName\" isn't valid. Set simple seconds like \"86400\" or use form like \"y:1 d:10 h:6 m:12 s:20\". Refer to commandref !";}
             delete($attr{$name}{timestamp_begin}) if ($attr{$name}{timestamp_begin});
             delete($attr{$name}{timestamp_end}) if ($attr{$name}{timestamp_end});
-            delete($attr{$name}{timeDiffToNow}) if ($attr{$name}{timeDiffToNow});
             delete($attr{$name}{timeYearPeriod}) if ($attr{$name}{timeYearPeriod});
         }
 		if ($aName eq "dumpMemlimit" || $aName eq "dumpSpeed") {
@@ -1478,7 +1373,7 @@ sub DbRep_getMinTs($) {
  
  eval { $mints = $dbh->selectrow_array("SELECT min(TIMESTAMP) FROM history;"); }; 
  # eval { $mints = $dbh->selectrow_array("select TIMESTAMP from history limit 1;"); }; 
- # eval { $mints = $dbh->selectrow_array("select TIMESTAMP from history order by TIMESTAMP limit 1;"); };   
+ # eval { $mints = $dbh->selectrow_array("select TIMESTAMP from history order by TIMESTAMP limit 1;"); }; 
  
  $dbh->disconnect;
  
@@ -1576,6 +1471,7 @@ sub DbRep_Main($$;$) {
              $hash->{HELPER}{RUNNING_BCKPREST_SERVER} ||
              $hash->{HELPER}{RUNNING_RESTORE}         ||
              $hash->{HELPER}{RUNNING_REPAIR}          ||
+             $hash->{HELPER}{RUNNING_REDUCELOG}       ||
              $hash->{HELPER}{RUNNING_OPTIMIZE})       && 
              $opt !~ /dumpMySQL|restoreMySQL|dumpSQLite|restoreSQLite|optimizeTables|vacuum|repairSQLite/ );
  
@@ -1669,7 +1565,7 @@ sub DbRep_Main($$;$) {
      Log3 ($name, 4, "DbRep $name - Timestamp end human readable: not set") if($opt !~ /tableCurrentPurge/); 
  }
  
- Log3 ($name, 4, "DbRep $name - Aggregation: $aggregation") if($opt !~ /tableCurrentPurge|tableCurrentFillup|fetchrows|insert/); 
+ Log3 ($name, 4, "DbRep $name - Aggregation: $aggregation") if($opt !~ /tableCurrentPurge|tableCurrentFillup|fetchrows|insert|reduceLog/); 
  
  #####  Funktionsaufrufe ##### 
  if ($opt eq "sumValue") {
@@ -1749,6 +1645,13 @@ sub DbRep_Main($$;$) {
     # Befehl vor Procedure ausführen
     DbRep_beforeproc($hash, "syncStandby");
     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_syncStandby", "$name§$device§$reading§$runtime_string_first§$runtime_string_next§$ts§$prop", "DbRep_syncStandbyDone", $to, "DbRep_ParseAborted", $hash);     
+ }
+ 
+ if ($opt =~ /reduceLog/) {	
+     $hash->{HELPER}{RUNNING_REDUCELOG} = BlockingCall("DbRep_reduceLog", "$name|$runtime_string_first|$runtime_string_next", "DbRep_reduceLogDone", $to, "DbRep_reduceLogAborted", $hash);
+	 ReadingsSingleUpdateValue ($hash, "state", "reduceLog database is running - be patient and see Logfile !", 1);
+     $hash->{HELPER}{RUNNING_REDUCELOG}{loglevel} = 5 if($hash->{HELPER}{RUNNING_REDUCELOG});  # Forum #77057 
+     return;
  }
                               
 $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057
@@ -2659,7 +2562,8 @@ sub count_DoParse($) {
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
- my ($dbh,$sql,$sth,$err,$selspec);
+ my $ced        = AttrVal($name,"countEntriesDetail",0);
+ my ($dbh,$sql,$sth,$err);
 
  # Background-Startzeit
  my $bst = [gettimeofday];
@@ -2681,22 +2585,38 @@ sub count_DoParse($) {
  # Timestampstring to Array
  my @ts = split("\\|", $ts);
  Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts"); 
- 
+  
  # SQL-Startzeit
  my $st = [gettimeofday];
     
  # DB-Abfrage zeilenweise für jeden Timearray-Eintrag
- my $arrstr;
+ my ($arrstr,@rsf,$ttail);
+ my $addon   = '';
+ my $selspec = "COUNT(*)";
+ if($ced) {
+     $addon   = "group by READING";
+     $selspec = "READING, COUNT(*)";
+ }
+ 
  foreach my $row (@ts) {
      my @a                     = split("#", $row);
      my $runtime_string        = $a[0];
      my $runtime_string_first  = $a[1];
-     my $runtime_string_next   = $a[2];      
+     my $runtime_string_next   = $a[2];
+     my $tc = 0;
+     
+     if($aggregation eq "hour") {
+         @rsf   = split(/[" "\|":"]/,$runtime_string_first);
+         $ttail = $rsf[0]."_".$rsf[1]."|";         
+     } else {
+         @rsf   = split(" ",$runtime_string_first);
+         $ttail = $rsf[0]."|";         
+     }     
 
      if ($IsTimeSet || $IsAggrSet) {
-         $sql = DbRep_createSelectSql($hash,$table,"COUNT(*)",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",'');
+         $sql = DbRep_createSelectSql($hash,$table,$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",$addon);
 	 } else {
-	     $sql = DbRep_createSelectSql($hash,$table,"COUNT(*)",$device,$reading,undef,undef,''); 
+	     $sql = DbRep_createSelectSql($hash,$table,$selspec,$device,$reading,undef,undef,$addon); 
 	 }
      Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
      
@@ -2709,19 +2629,21 @@ sub count_DoParse($) {
          $dbh->disconnect;
          return "$name|''|$device|$reading|''|$err|$table";
      }
-	 
-	 # DB-Abfrage -> Ergebnis in @arr aufnehmen
-     my @line = $sth->fetchrow_array();
      
-     Log3 ($name, 5, "DbRep $name - SQL result: $line[0]") if($line[0]);   
-	 
-     if($aggregation eq "hour") {
-         my @rsf = split(/[" "\|":"]/,$runtime_string_first);
-         $arrstr .= $runtime_string."#".$line[0]."#".$rsf[0]."_".$rsf[1]."|";  
+     if($ced) {
+         # detaillierter Readings-Count
+         while (my @line = $sth->fetchrow_array()) {    
+             Log3 ($name, 5, "DbRep $name - SQL result: @line");  
+             $tc += $line[1] if($line[1]);                                              # total count für Reading
+             $arrstr .= $runtime_string."#".$line[0]."#".$line[1]."#".$ttail;  
+         }
+         # total count (über alle selected Readings) für Zeitabschnitt einfügen
+         $arrstr .= $runtime_string."#"."ALLREADINGS"."#".$tc."#".$ttail;
      } else {
-         my @rsf = split(" ",$runtime_string_first);
-         $arrstr .= $runtime_string."#".$line[0]."#".$rsf[0]."|"; 
-     }
+         my @line = $sth->fetchrow_array();
+         Log3 ($name, 5, "DbRep $name - SQL result: $line[0]") if($line[0]);
+         $arrstr .= $runtime_string."#"."ALLREADINGS"."#".$line[0]."#".$ttail;
+     }     
  }
  
  $sth->finish;
@@ -2738,7 +2660,7 @@ sub count_DoParse($) {
 
  $rt = $rt.",".$brt;
  
- return "$name|$arrstr|$device|$reading|$rt|0|$table";
+ return "$name|$arrstr|$device|$rt|0|$table";
 }
 
 ####################################################################################################
@@ -2752,12 +2674,10 @@ sub count_ParseDone($) {
   my $arrstr     = decode_base64($a[1]);
   my $device     = $a[2];
      $device     =~ s/[^A-Za-z\/\d_\.-]/\//g;
-  my $reading    = $a[3];
-     $reading    =~ s/[^A-Za-z\/\d_\.-]/\//g;
-  my $bt         = $a[4];
+  my $bt         = $a[3];
   my ($rt,$brt)  = split(",", $bt);
-  my $err        = $a[5]?decode_base64($a[5]):undef;
-  my $table      = $a[6];
+  my $err        = $a[4]?decode_base64($a[4]):undef;
+  my $table      = $a[5];
   my $reading_runtime_string;
   
    if ($err) {
@@ -2777,10 +2697,12 @@ sub count_ParseDone($) {
   
   my @arr = split("\\|", $arrstr);
   foreach my $row (@arr) {
-      my @a                = split("#", $row);
-      my $runtime_string   = $a[0];
-      my $c                = $a[1];
-      my $rsf              = $a[2]."__";
+      my @a               = split("#", $row);
+      my $runtime_string  = $a[0];
+      my $reading         = $a[1];
+      $reading            =~ s/[^A-Za-z\/\d_\.-]/\//g;
+      my $c               = $a[2];
+      my $rsf             = $a[3]."__";
          
       if (AttrVal($hash->{NAME}, "readingNameMap", "")) {
           $reading_runtime_string = $rsf.AttrVal($hash->{NAME}, "readingNameMap", "")."__".$runtime_string;
@@ -7574,6 +7496,406 @@ return;
 }
 
 ####################################################################################################
+#           reduceLog - Historische Werte ausduennen non-blocking > Forum #41089
+#
+#           $ots - reduce Logs älter als: Attribut "timeOlderThan" oder "timestamp_begin"
+#           $nts - reduce Logs neuer als: Attribut "timeDiffToNow" oder "timestamp_end"
+####################################################################################################
+sub DbRep_reduceLog($) {
+    my ($string)   = @_;
+    my ($name,$nts,$ots) = split("\\|", $string);
+    my $hash       = $defs{$name};
+    my $dbloghash  = $hash->{dbloghash};
+    my $dbconn     = $dbloghash->{dbconn};
+    my $dbuser     = $dbloghash->{dbuser};
+    my $dblogname  = $dbloghash->{NAME};
+    my $dbmodel    = $dbloghash->{MODEL};
+    my $dbpassword = $attr{"sec$dblogname"}{secret};
+    my @a          = @{$hash->{HELPER}{REDUCELOG}};
+	my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
+    delete $hash->{HELPER}{REDUCELOG};
+    my ($ret,$row,$filter,$exclude,$c,$day,$hour,$lastHour,$updDate,$updHour,$average,$processingDay,$lastUpdH,%hourlyKnown,%averageHash,@excludeRegex,@dayRows,@averageUpd,@averageUpdD);
+    my ($startTime,$currentHour,$currentDay,$deletedCount,$updateCount,$sum,$rowCount,$excludeCount) = (time(),99,0,0,0,0,0,0);
+    my ($dbh,$err,$brt);
+	
+    Log3 ($name, 5, "DbRep $name -> Start DbLog_reduceLog");
+	
+    eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });};
+ 
+    if ($@) {
+        $err = encode_base64($@,"");
+        Log3 ($name, 2, "DbRep $name - DbRep_reduceLog - $@");
+        return "$name|''|$err|''";
+    }
+  
+    if ($a[-1] =~ /^EXCLUDE=(.+:.+)+/i) {
+        ($filter) = $a[-1] =~ /^EXCLUDE=(.+)/i;
+        @excludeRegex = split(',',$filter);
+    } elsif ($a[-1] =~ /^INCLUDE=.+:.+$/i) {
+        $filter = 1;
+    }
+    if (defined($a[2])) {
+        $average = ($a[2] =~ /average=day/i) ? "AVERAGE=DAY" : ($a[2] =~ /average/i) ? "AVERAGE=HOUR" : 0;
+    }
+    
+    Log3 ($name, 3, "DbRep $name - reduce data older than: $ots, newer than: $nts");
+    Log3 ($name, 3, "DbRep $name - reduceLog requested with options: "
+        .(($average) ? "$average" : '')
+        .(($average && $filter) ? ", " : '').(($filter) ? uc((split('=',$a[-1]))[0]).'='.(split('=',$a[-1]))[1] : ''));
+    
+    if ($ots) {
+	    my ($sth_del, $sth_upd, $sth_delD, $sth_updD, $sth_get);
+        eval { $sth_del  = $dbh->prepare_cached("DELETE FROM history WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND (VALUE=?)");
+               $sth_upd  = $dbh->prepare_cached("UPDATE history SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND (VALUE=?)");
+               $sth_delD = $dbh->prepare_cached("DELETE FROM history WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
+               $sth_updD = $dbh->prepare_cached("UPDATE history SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
+               $sth_get  = $dbh->prepare("SELECT TIMESTAMP,DEVICE,'',READING,VALUE FROM history WHERE "
+                           .($a[-1] =~ /^INCLUDE=(.+):(.+)$/i ? "DEVICE like '$1' AND READING like '$2' AND " : '')
+                           ."TIMESTAMP < '$ots'".($nts?" AND TIMESTAMP >= '$nts' ":" ")."ORDER BY TIMESTAMP ASC");  # '' was EVENT, no longer in use
+		     };
+        if ($@) {
+            $err = encode_base64($@,"");
+            Log3 ($name, 2, "DbRep $name - DbRep_reduceLog - $@");
+            return "$name|''|$err|''";
+        }
+		
+		eval { $sth_get->execute(); };
+        if ($@) {
+            $err = encode_base64($@,"");
+            Log3 ($name, 2, "DbRep $name - DbRep_reduceLog - $@");
+            return "$name|''|$err|''";
+        }
+        
+        do {
+            $row = $sth_get->fetchrow_arrayref || ['0000-00-00 00:00:00','D','','R','V'];  # || execute last-day dummy
+            $ret = 1;
+            ($day,$hour) = $row->[0] =~ /-(\d{2})\s(\d{2}):/;
+            $rowCount++ if($day != 00);
+            if ($day != $currentDay) {
+                if ($currentDay) { # false on first executed day
+                    if (scalar @dayRows) {
+                        ($lastHour) = $dayRows[-1]->[0] =~ /(.*\d+\s\d{2}):/;
+                        $c = 0;
+                        for my $delRow (@dayRows) {
+                            $c++ if($day != 00 || $delRow->[0] !~ /$lastHour/);
+                        }
+                        if($c) {
+                            $deletedCount += $c;
+                            Log3 ($name, 3, "DbRep $name - reduceLog deleting $c records of day: $processingDay");
+                            $dbh->{RaiseError} = 1;
+                            $dbh->{PrintError} = 0; 
+                            eval {$dbh->begin_work() if($dbh->{AutoCommit});};
+						    if ($@) {
+                                Log3 ($name, 2, "DbRep $name - DbRep_reduceLog - $@");
+                            }
+                            eval {
+							    my $i = 0;
+								my $k = 1;
+								my $th = ($#dayRows <= 2000)?100:($#dayRows <= 30000)?1000:10000;
+                                for my $delRow (@dayRows) {
+                                    if($day != 00 || $delRow->[0] !~ /$lastHour/) {
+                                        Log3 ($name, 4, "DbRep $name - DELETE FROM history WHERE (DEVICE=$delRow->[1]) AND (READING=$delRow->[3]) AND (TIMESTAMP=$delRow->[0]) AND (VALUE=$delRow->[4])");
+                                        $sth_del->execute(($delRow->[1], $delRow->[3], $delRow->[0], $delRow->[4]));
+										$i++;
+										if($i == $th) {
+										    my $prog = $k * $i; 
+										    Log3 ($name, 3, "DbRep $name - reduceLog deletion progress of day: $processingDay is: $prog");
+											$i = 0;
+											$k++;
+										}
+                                    }
+                                }
+                            };
+                            if ($@) {
+                                $err = $@;
+                                Log3 ($name, 2, "DbRep $name - reduceLog ! FAILED ! for day $processingDay: $err");
+                                eval {$dbh->rollback() if(!$dbh->{AutoCommit});};
+								if ($@) {
+                                    Log3 ($name, 2, "DbRep $name - DbRep_reduceLog - $@");
+                                }
+                                $ret = 0;
+                            } else {
+                                eval {$dbh->commit() if(!$dbh->{AutoCommit});};
+								if ($@) {
+                                    Log3 ($name, 2, "DbRep $name - DbRep_reduceLog - $@");
+                                }
+                            }
+                            $dbh->{RaiseError} = 0; 
+                            $dbh->{PrintError} = 1;
+                        }
+                        @dayRows = ();
+                    }
+                    
+                    if ($ret && defined($a[3]) && $a[3] =~ /average/i) {
+                        $dbh->{RaiseError} = 1;
+                        $dbh->{PrintError} = 0; 
+                        eval {$dbh->begin_work() if($dbh->{AutoCommit});};
+						if ($@) {
+                            Log3 ($name, 2, "DbRep $name - DbRep_reduceLog - $@");
+                        }
+                        eval {
+                            push(@averageUpd, {%hourlyKnown}) if($day != 00);
+                            
+                            $c = 0;
+                            for my $hourHash (@averageUpd) {  # Only count for logging...
+                                for my $hourKey (keys %$hourHash) {
+                                    $c++ if ($hourHash->{$hourKey}->[0] && scalar(@{$hourHash->{$hourKey}->[4]}) > 1);
+                                }
+                            }
+                            $updateCount += $c;
+                            Log3 ($name, 3, "DbRep $name - reduceLog (hourly-average) updating $c records of day: $processingDay") if($c); # else only push to @averageUpdD
+                            
+							my $i = 0;
+							my $k = 1;
+							my $th = ($c <= 2000)?100:($c <= 30000)?1000:10000;
+                            for my $hourHash (@averageUpd) {
+                                for my $hourKey (keys %$hourHash) {
+                                    if ($hourHash->{$hourKey}->[0]) { # true if reading is a number 
+                                        ($updDate,$updHour) = $hourHash->{$hourKey}->[0] =~ /(.*\d+)\s(\d{2}):/;
+                                        if (scalar(@{$hourHash->{$hourKey}->[4]}) > 1) {  # true if reading has multiple records this hour
+                                            for (@{$hourHash->{$hourKey}->[4]}) { $sum += $_; }
+                                            $average = sprintf('%.3f', $sum/scalar(@{$hourHash->{$hourKey}->[4]}) );
+                                            $sum = 0;
+                                            Log3 ($name, 4, "DbRep $name - UPDATE history SET TIMESTAMP=$updDate $updHour:30:00, EVENT='rl_av_h', VALUE=$average WHERE DEVICE=$hourHash->{$hourKey}->[1] AND READING=$hourHash->{$hourKey}->[3] AND TIMESTAMP=$hourHash->{$hourKey}->[0] AND VALUE=$hourHash->{$hourKey}->[4]->[0]");
+                                            $sth_upd->execute(("$updDate $updHour:30:00", 'rl_av_h', $average, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $hourHash->{$hourKey}->[0], $hourHash->{$hourKey}->[4]->[0]));
+			                                
+											$i++;
+								            if($i == $th) {
+								                my $prog = $k * $i; 
+									            Log3 ($name, 3, "DbRep $name - reduceLog (hourly-average) updating progress of day: $processingDay is: $prog");
+									            $i = 0;
+									            $k++;
+								            } 
+                                            push(@averageUpdD, ["$updDate $updHour:30:00", 'rl_av_h', $average, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $updDate]) if (defined($a[3]) && $a[3] =~ /average=day/i);
+                                        } else {
+                                            push(@averageUpdD, [$hourHash->{$hourKey}->[0], $hourHash->{$hourKey}->[2], $hourHash->{$hourKey}->[4]->[0], $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $updDate]) if (defined($a[3]) && $a[3] =~ /average=day/i);
+                                        }
+                                    }                              							
+								}
+                            }
+                        };
+                        if ($@) {
+                            $err = $@;
+                            Log3 ($name, 2, "DbRep $name - reduceLog average=hour ! FAILED ! for day $processingDay: $err");
+                            eval {$dbh->rollback() if(!$dbh->{AutoCommit});};
+							if ($@) {
+                                Log3 ($name, 2, "DbRep $name - DbRep_reduceLog - $@");
+                            }
+                            @averageUpdD = ();
+                        } else {
+                            eval {$dbh->commit() if(!$dbh->{AutoCommit});};
+							if ($@) {
+                                Log3 ($name, 2, "DbRep $name - DbRep_reduceLog - $@");
+                            }							
+                        }
+                        $dbh->{RaiseError} = 0; 
+                        $dbh->{PrintError} = 1;
+                        @averageUpd = ();
+                    }
+                    
+                    if (defined($a[3]) && $a[3] =~ /average=day/i && scalar(@averageUpdD) && $day != 00) {
+                        $dbh->{RaiseError} = 1;
+                        $dbh->{PrintError} = 0;
+                        eval {$dbh->begin_work() if($dbh->{AutoCommit});};
+						if ($@) {
+                            Log3 ($name, 2, "DbRep $name - DbRep_reduceLog - $@");
+                        }
+                        eval {
+                            for (@averageUpdD) {
+                                push(@{$averageHash{$_->[3].$_->[4]}->{tedr}}, [$_->[0], $_->[1], $_->[3], $_->[4]]);
+                                $averageHash{$_->[3].$_->[4]}->{sum} += $_->[2];
+                                $averageHash{$_->[3].$_->[4]}->{date} = $_->[5];
+                            }
+                            
+                            $c = 0;
+                            for (keys %averageHash) {
+                                if(scalar @{$averageHash{$_}->{tedr}} == 1) {
+                                    delete $averageHash{$_};
+                                } else {
+                                    $c += (scalar(@{$averageHash{$_}->{tedr}}) - 1);
+                                }
+                            }
+                            $deletedCount += $c;
+                            $updateCount += keys(%averageHash);
+                            
+							my ($id,$iu) = 0;
+							my ($kd,$ku) = 1;
+							my $thd = ($c <= 2000)?100:($c <= 30000)?1000:10000;
+							my $thu = ((keys %averageHash) <= 2000)?100:((keys %averageHash) <= 30000)?1000:10000;
+                            Log3 ($name, 3, "DbRep $name - reduceLog (daily-average) updating ".(keys %averageHash).", deleting $c records of day: $processingDay") if(keys %averageHash);
+                            for my $reading (keys %averageHash) {
+                                $average = sprintf('%.3f', $averageHash{$reading}->{sum}/scalar(@{$averageHash{$reading}->{tedr}}));
+                                $lastUpdH = pop @{$averageHash{$reading}->{tedr}};
+                                for (@{$averageHash{$reading}->{tedr}}) {
+                                    Log3 ($name, 5, "DbRep $name - DELETE FROM history WHERE DEVICE='$_->[2]' AND READING='$_->[3]' AND TIMESTAMP='$_->[0]'");
+                                    $sth_delD->execute(($_->[2], $_->[3], $_->[0]));
+							        
+									$id++;
+								    if($id == $thd) {
+								        my $prog = $kd * $id; 
+									    Log3 ($name, 3, "DbRep $name - reduceLog (daily-average) deleting progress of day: $processingDay is: $prog");
+									    $id = 0;
+									    $kd++;
+								    }
+                                }
+                                Log3 ($name, 4, "DbRep $name - UPDATE history SET TIMESTAMP=$averageHash{$reading}->{date} 12:00:00, EVENT='rl_av_d', VALUE=$average WHERE (DEVICE=$lastUpdH->[2]) AND (READING=$lastUpdH->[3]) AND (TIMESTAMP=$lastUpdH->[0])");
+                                $sth_updD->execute(($averageHash{$reading}->{date}." 12:00:00", 'rl_av_d', $average, $lastUpdH->[2], $lastUpdH->[3], $lastUpdH->[0]));
+							
+								$iu++;
+								if($iu == $thu) {
+								    my $prog = $ku * $id; 
+									Log3 ($name, 3, "DbRep $name - reduceLog (daily-average) updating progress of day: $processingDay is: $prog");
+									$iu = 0;
+									$ku++;
+								}							
+							}
+                        };
+                        if ($@) {
+                            Log3 ($name, 3, "DbRep $name - reduceLog average=day ! FAILED ! for day $processingDay");
+                            eval {$dbh->rollback() if(!$dbh->{AutoCommit});};
+							if ($@) {
+                                Log3 ($name, 2, "DbRep $name - DbRep_reduceLog - $@");
+                            }
+                        } else {
+                            eval {$dbh->commit() if(!$dbh->{AutoCommit});};
+							if ($@) {
+                                Log3 ($name, 2, "DbRep $name - DbRep_reduceLog - $@");
+                            }
+                        }
+                        $dbh->{RaiseError} = 0; 
+                        $dbh->{PrintError} = 1;
+                    }
+                    %averageHash = ();
+                    %hourlyKnown = ();
+                    @averageUpd = ();
+                    @averageUpdD = ();
+                    $currentHour = 99;
+                }
+                $currentDay = $day;
+            }
+            
+            if ($hour != $currentHour) { # forget records from last hour, but remember these for average
+                if (defined($a[3]) && $a[3] =~ /average/i && keys(%hourlyKnown)) {
+                    push(@averageUpd, {%hourlyKnown});
+                }
+                %hourlyKnown = ();
+                $currentHour = $hour;
+            }
+            if (defined $hourlyKnown{$row->[1].$row->[3]}) { # remember first readings for device per h, other can be deleted
+                push(@dayRows, [@$row]);
+                if (defined($a[3]) && $a[3] =~ /average/i && defined($row->[4]) && $row->[4] =~ /^-?(?:\d+(?:\.\d*)?|\.\d+)$/ && $hourlyKnown{$row->[1].$row->[3]}->[0]) {
+                    if ($hourlyKnown{$row->[1].$row->[3]}->[0]) {
+                        push(@{$hourlyKnown{$row->[1].$row->[3]}->[4]}, $row->[4]);
+                    }
+                }
+            } else {
+                $exclude = 0;
+                for (@excludeRegex) {
+                    $exclude = 1 if("$row->[1]:$row->[3]" =~ /^$_$/);
+                }
+                if ($exclude) {
+                    $excludeCount++ if($day != 00);
+                } else {
+                    $hourlyKnown{$row->[1].$row->[3]} = (defined($row->[4]) && $row->[4] =~ /^-?(?:\d+(?:\.\d*)?|\.\d+)$/) ? [$row->[0],$row->[1],$row->[2],$row->[3],[$row->[4]]] : [0];
+                }
+            }
+            $processingDay = (split(' ',$row->[0]))[0];
+        
+        } while( $day != 00 );
+        
+        $brt = sprintf('%.2f',time() - $startTime);
+        my $result = "Rows processed: $rowCount, deleted: $deletedCount"
+                   .((defined($a[3]) && $a[3] =~ /average/i)? ", updated: $updateCount" : '')
+                   .(($excludeCount)? ", excluded: $excludeCount" : '');
+        Log3 ($name, 3, "DbRep $name - reduceLog finished. $result");
+        $ret = $result;
+        $ret = "reduceLog finished. $result";
+    } else {
+        $err = "reduceLog needs at least one of attributes \"timeOlderThan\", \"timeDiffToNow\", \"timestamp_begin\" or \"timestamp_end\" to be set";
+        Log3 ($name, 2, "DbRep $name - ERROR - $err");
+        $err = encode_base64($err,"");
+        return "$name|''|$err|''";
+    }
+    
+	$dbh->disconnect();
+    $ret = encode_base64($ret,"");
+	Log3 ($name, 5, "DbRep $name -> DbRep_reduceLogNbl finished");
+	
+return "$name|$ret|0|$brt";
+}
+
+####################################################################################################
+#                   reduceLog non-blocking Rückkehrfunktion
+####################################################################################################
+sub DbRep_reduceLogDone($) {
+  my ($string)  = @_;
+  my @a         = split("\\|",$string);
+  my $name      = $a[0];
+  my $hash      = $defs{$name};
+  my $ret       = decode_base64($a[1]);
+  my $err       = decode_base64($a[2]) if ($a[2]);
+  my $brt       = $a[3];
+  my $dbloghash = $hash->{dbloghash};
+  my $erread;  
+  
+  delete $hash->{HELPER}{RUNNING_REDUCELOG};
+
+  if ($err) {
+      ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
+      ReadingsSingleUpdateValue ($hash, "state", "error", 1);
+      return;
+  }  
+  
+  # only for this block because of warnings if details of readings are not set
+  no warnings 'uninitialized'; 
+  
+  readingsBeginUpdate($hash);
+  ReadingsBulkUpdateValue($hash, "background_processing_time", sprintf("%.4f",$brt));
+  ReadingsBulkUpdateValue($hash, "reduceLogState", $ret);
+  readingsEndUpdate($hash, 1);
+
+  # Befehl nach Procedure ausführen
+  $erread = DbRep_afterproc($hash, "reduceLog");
+  
+  my $state = $erread?$erread:"reduceLog of $hash->{DATABASE} finished";
+  readingsBeginUpdate($hash);
+  ReadingsBulkUpdateTimeState($hash,undef,undef,$state);
+  readingsEndUpdate($hash, 1);  
+
+  use warnings;
+  
+return;
+}
+
+####################################################################################################
+#                                Abbruchroutine Timeout reduceLog
+####################################################################################################
+sub DbRep_reduceLogAborted(@) {
+  my ($hash,$cause) = @_;
+  my $name = $hash->{NAME};
+  my $dbh  = $hash->{DBH}; 
+  my $erread;
+  
+  $cause = $cause?$cause:"Timeout: process terminated";
+  Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_REDUCELOG}{fn} pid:$hash->{HELPER}{RUNNING_REDUCELOG}{pid} $cause") if($hash->{HELPER}{RUNNING_REDUCELOG});
+
+  # Befehl nach Procedure ausführen
+  no warnings 'uninitialized'; 
+  $erread = DbRep_afterproc($hash, "reduceLog");
+  $erread = ", ".(split("but", $erread))[1] if($erread);
+  
+  my $state = $cause.$erread;
+  $dbh->disconnect() if(defined($dbh));
+  ReadingsSingleUpdateValue ($hash, "state", $state, 1);
+  
+  Log3 ($name, 2, "DbRep $name - Database reduceLog aborted due to \"$cause\" ");
+  
+  delete($hash->{HELPER}{RUNNING_REDUCELOG});
+
+return;
+}
+
+####################################################################################################
 #                    Abbruchroutine Timeout Restore
 ####################################################################################################
 sub DbRep_restoreAborted(@) {
@@ -7594,9 +7916,10 @@ sub DbRep_restoreAborted(@) {
   $dbh->disconnect() if(defined($dbh));
   ReadingsSingleUpdateValue ($hash, "state", $state, 1);
   
-  Log3 ($name, 2, "DbRep $name - Database restore aborted by \"$cause\" ");
+  Log3 ($name, 2, "DbRep $name - Database restore aborted due to \"$cause\" ");
   
   delete($hash->{HELPER}{RUNNING_RESTORE});
+
 return;
 }
 
@@ -7646,7 +7969,7 @@ sub DbRep_DumpAborted(@) {
   $dbh->disconnect() if(defined($dbh));
   ReadingsSingleUpdateValue ($hash, "state", $state, 1);
   
-  Log3 ($name, 2, "DbRep $name - Database dump aborted by \"$cause\" ");
+  Log3 ($name, 2, "DbRep $name - Database dump aborted due to \"$cause\" ");
   
   delete($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
   delete($hash->{HELPER}{RUNNING_BCKPREST_SERVER});
@@ -7674,7 +7997,7 @@ sub DbRep_OptimizeAborted(@) {
   $dbh->disconnect() if(defined($dbh));
   ReadingsSingleUpdateValue ($hash, "state", $state, 1);
   
-  Log3 ($name, 2, "DbRep $name - Database optimize aborted by \"$cause\" ");
+  Log3 ($name, 2, "DbRep $name - Database optimize aborted due to \"$cause\" ");
   
   delete($hash->{HELPER}{RUNNING_OPTIMIZE}); 
 return;
@@ -7880,7 +8203,7 @@ sub DbRep_checktimeaggr ($) {
      $aggregation = "day";       # für Tagesmittelwertberechnung des deutschen Wetterdienstes immer "day"
 	 $IsAggrSet   = 1;
  }
- if($hash->{LASTCMD} =~ /delEntries|fetchrows|deviceRename|readingRename|tableCurrentFillup/) {
+ if($hash->{LASTCMD} =~ /delEntries|fetchrows|deviceRename|readingRename|tableCurrentFillup|reduceLog/) {
 	 $IsAggrSet   = 0;
 	 $aggregation = "no";
  }
@@ -9480,6 +9803,7 @@ return;
 	 <li> delete consecutive datasets with different timestamp but same values (clearing up consecutive doublets) </li>
      <li> Repair of a corrupted SQLite database ("database disk image is malformed") </li>
      <li> transmission of datasets from source database into another (Standby) database (syncStandby) </li>
+     <li> reduce the amount of datasets in database (reduceLog) </li>
      </ul></ul>
      <br>
      
@@ -9661,11 +9985,30 @@ return;
                                  </li> <br>
                                  </ul>
                                  
-    <li><b> countEntries [history|current] </b> -  provides the number of table-entries (default: history) between period set 
-	                                               by timestamp-<a href="#DbRepattr">attributes</a> if set. 
-                                                   If timestamp-attributes are not set, all entries of the table will be count. 
+    <li><b> countEntries [history|current] </b> -  provides the number of table entries (default: history) between time period set 
+	                                               by time.* -<a href="#DbRepattr">attributes</a> if set. 
+                                                   If time.* attributes not set, all entries of the table will be count. 
 												   The <a href="#DbRepattr">attributes</a> "device" and "reading" can be used to 
-												   limit the evaluation.  </li> <br>
+												   limit the evaluation.  <br>
+                                                   By default the summary of all counted datasets, labeled by "ALLREADINGS", will be created.
+                                                   If the attribute "countEntriesDetail" is set, the number of every reading  
+                                                   is reported additionally. <br><br>                                                   
+                                                   
+                                                   The relevant attributes for this function are: <br><br>
+
+	                                               <ul>
+                                                   <table>  
+                                                      <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                                      <tr><td> <b>aggregation</b>       </td><td>: aggregatiion/grouping of time intervals </td></tr>
+                                                      <tr><td> <b>countEntriesDetail</b></td><td>: detailed report the count of datasets (per reading) </td></tr>
+                                                      <tr><td> <b>device</b>            </td><td>: selection only of datasets which contain &lt;device&gt; </td></tr>
+                                                      <tr><td> <b>reading</b>           </td><td>: selection only of datasets which contain &lt;reading&gt; </td></tr>
+                                                      <tr><td> <b>time.*</b>            </td><td>: a number of attributes to limit selection by time </td></tr>
+                                                      </table>
+	                                               </ul>
+	                                               <br>                                           
+                                                   
+                                                   </li> <br>
                                                    
                            
     <li><b> delEntries </b>   -  deletes all database entries or only the database entries specified by <a href="#DbRepattr">attributes</a> Device and/or 
@@ -10123,7 +10466,7 @@ return;
                                       <tr><td> <b>device</b>                </td><td>: select only datasets which are contain &lt;device&gt; </td></tr>
                                       <tr><td> <b>reading</b>               </td><td>: select only datasets which are contain &lt;reading&gt; </td></tr>
                                       <tr><td> <b>time.*</b>                </td><td>: A number of attributes to limit selection by time </td></tr>
-                                      <tr><td> <b>valueFilter</b>           </td><td>: filter datasets of database field "VALUE" by a regular expression </td></tr>
+                                      <tr><td> <b>valueFilter</b>           </td><td>: Filter datasets which are to show by a regular expression. The regex is applied to the whole selected dataset. </td></tr>
                                    </table>
 	                               </ul>
 	                               <br>
@@ -10646,7 +10989,16 @@ return $ret;
                                  </li> 
                                  <br><br>
                                  </ul>                                                                                   
-  <br>
+  
+    <li><b> versionNotes [hints | rel | &lt;key&gt;] </b> - 
+                              Shows realease informations and/or hints about the module. It contains only main release 
+                              informations for module users. <br>
+                              If no options are specified, both release informations and hints will be shown. "rel" shows 
+                              only release informations and "hints" shows only hints. By the &lt;key&gt;-specification only 
+                              the hint with the specified number is shown.                          
+                              </li>     
+                              <br>
+  
   </ul></ul>
   
 </ul>  
@@ -10657,7 +11009,9 @@ return $ret;
 
 <br>
 <ul>
-  Using the module specific attributes you are able to define the scope of evaluation and the aggregation. <br><br>
+  Using the module specific attributes you are able to define the scope of evaluation and the aggregation. <br>
+  The listed attrbutes are not completely relevant for every function of the module. The help of set/get-commands
+  contain explicitly which attributes are relevant for the specific command. <br><br>
   
   <b>Note for SQL-Wildcard Usage:</b> <br>
   Within the attribute values of "device" and "reading" you may use SQL-Wildcard "%", Character "_" is not supported as a wildcard. 
@@ -10685,15 +11039,20 @@ return $ret;
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=20%> <col width=80%> </colgroup>
-                                      <tr><td><b>avgArithmeticMean :</b> </td><td>the arithmetic average is calculated (default) </td></tr>
-                                      <tr><td><b>avgDailyMeanGWS :</b>   </td><td>calculates the daily medium temperature according the 
-                                                                                  specifications of german weather service (pls. see helpful hints by get versionNotes). <br>
-                                                                                  This variant uses aggregation "day" automatically. </td></tr>
-                                      <tr><td><b>avgTimeWeightMean :</b> </td><td>calculates a time weighted average mean value is calculated </td></tr>
+                                      <tr><td><b>avgArithmeticMean                          :</b> </td><td>the arithmetic average is calculated (default) </td></tr>
+                                      <tr><td style="vertical-align:top"><b>avgDailyMeanGWS :</b> <td>calculates the daily medium temperature according the 
+                                                                                                  specifications of german weather service (pls. see "get &lt;name&gt; versionNotes 2"). <br>
+                                                                                                  This variant uses aggregation "day" automatically. </td></tr>
+                                      <tr><td><b>avgTimeWeightMean                          :</b> </td><td>calculates a time weighted average mean value is calculated </td></tr>
 								   </table>
 	                               </ul>								   
                                 </li><br>
 
+  <a name="countEntriesDetail"></a>
+  <li><b>countEntriesDetail </b>   - If set, the function countEntries creates a detailed report of counted datasets of
+                                     every reading. By default only the summary of counted datasets is reported. 
+                                     </li> <br>
+  
   <a name="device"></a>
   <li><b>device </b>          - Selection of a particular device. <br>
                                 You can specify device specifications (devspec). <br> 
@@ -10782,7 +11141,8 @@ return $ret;
 								The global attrubute "archivesort" will be considered. </li> <br> 
   
   <a name="executeAfterProc"></a>
-  <li><b>executeAfterProc </b> - you can specify a FHEM-command which should be executed <b>after dump</b>. <br>
+  <li><b>executeAfterProc </b> - you can specify a FHEM command or perl function which should be executed 
+                                 <b>after command execution</b>. <br>
                                  Perl functions have to be enclosed in {} .<br><br>
 
                                 <ul>
@@ -10806,8 +11166,9 @@ sub adump {
 </li>
   
   <a name="executeBeforeProc"></a>
-  <li><b>executeBeforeProc </b> - you can specify a FHEM-command which should be executed <b>before dump</b>. <br>
-                                  Perl functions have to be enclosed in {} .<br><br>
+  <li><b>executeBeforeProc </b> - you can specify a FHEM command or perl function which should be executed 
+                                 <b>before command execution</b>. <br>
+                                 Perl functions have to be enclosed in {} .<br><br>
 
                                 <ul>
 							    <b>Example:</b> <br><br>
@@ -11097,12 +11458,38 @@ sub bdump {
 							   <br><br>
 
   <a name="timestamp_begin"></a>							   
-  <li><b>timestamp_begin </b> - begin of data selection (*)  </li> <br>
+  <li><b>timestamp_begin </b> - begin of data selection  </li> <br>
+  
+  The format of timestamp is as used with DbLog "YYYY-MM-DD HH:MM:SS". For the attributes "timestamp_begin", "timestamp_end" 
+  you can also use one of the following entries. The timestamp-attribute will be dynamically set to: <br><br>
+                              <ul>
+                              <b>current_year_begin</b>     : matches "&lt;current year&gt;-01-01 00:00:00"         <br>
+                              <b>current_year_end</b>       : matches "&lt;current year&gt;-12-31 23:59:59"         <br>
+                              <b>previous_year_begin</b>    : matches "&lt;previous year&gt;-01-01 00:00:00"        <br>
+                              <b>previous_year_end</b>      : matches "&lt;previous year&gt;-12-31 23:59:59"        <br>
+                              <b>current_month_begin</b>    : matches "&lt;current month first day&gt; 00:00:00"    <br>
+                              <b>current_month_end</b>      : matches "&lt;current month last day&gt; 23:59:59"     <br>
+                              <b>previous_month_begin</b>   : matches "&lt;previous month first day&gt; 00:00:00"   <br>
+                              <b>previous_month_end</b>     : matches "&lt;previous month last day&gt; 23:59:59"    <br>
+                              <b>current_week_begin</b>     : matches "&lt;first day of current week&gt; 00:00:00"  <br>
+                              <b>current_week_end</b>       : matches "&lt;last day of current week&gt; 23:59:59"   <br>
+                              <b>previous_week_begin</b>    : matches "&lt;first day of previous week&gt; 00:00:00" <br>
+                              <b>previous_week_end</b>      : matches "&lt;last day of previous week&gt; 23:59:59"  <br>
+                              <b>current_day_begin</b>      : matches "&lt;current day&gt; 00:00:00"                <br>
+                              <b>current_day_end</b>        : matches "&lt;current day&gt; 23:59:59"                <br>
+                              <b>previous_day_begin</b>     : matches "&lt;previous day&gt; 00:00:00"               <br>
+                              <b>previous_day_end</b>       : matches "&lt;previous day&gt; 23:59:59"               <br>
+                              <b>current_hour_begin</b>     : matches "&lt;current hour&gt;:00:00"                  <br>
+                              <b>current_hour_end</b>       : matches "&lt;current hour&gt;:59:59"                  <br>
+                              <b>previous_hour_begin</b>    : matches "&lt;previous hour&gt;:00:00"                 <br>
+                              <b>previous_hour_end</b>      : matches "&lt;previous hour&gt;:59:59"                 <br> 
+                              </ul>
+                              <br><br>
 
   <a name="timestamp_end"></a>  
-  <li><b>timestamp_end </b>   - end of data selection. If not set the current date/time combination will be used. (*) </li> <br>
+  <li><b>timestamp_end </b>   - end of data selection. If not set the current date/time combination will be used.  </li> <br>
   
-  (*) The format of timestamp is as used with DbLog "YYYY-MM-DD HH:MM:SS". For the attributes "timestamp_begin", "timestamp_end" 
+  The format of timestamp is as used with DbLog "YYYY-MM-DD HH:MM:SS". For the attributes "timestamp_begin", "timestamp_end" 
   you can also use one of the following entries. The timestamp-attribute will be dynamically set to: <br><br>
                               <ul>
                               <b>current_year_begin</b>     : matches "&lt;current year&gt;-01-01 00:00:00"         <br>
@@ -11144,7 +11531,7 @@ sub bdump {
   <br><br>
 
   <a name="timeDiffToNow"></a>  
-  <li><b>timeDiffToNow </b>   - the <b>begin</b> of data selection will be set to the timestamp <b>"&lt;current time&gt; - 
+  <li><b>timeDiffToNow </b>   - the <b>begin time </b> of data selection will be set to the timestamp <b>"&lt;current time&gt; - 
                                 &lt;timeDiffToNow&gt;"</b> dynamically (e.g. if set to 86400, the last 24 hours are considered by data 
 								selection). The time period will be calculated dynamically at execution time.     </li> <br> 
 
@@ -11163,15 +11550,39 @@ sub bdump {
 								<code>attr &lt;name&gt; timeDiffToNow y:1.5</code> <br>
                                 # the start time is set to "current time - 1.5 years" <br>
 								</ul>
-								<br><br>								
+								<br>
+                                
+                                If both attributes "timeDiffToNow" and "timeOlderThan" are set, the selection  
+                                period will be calculated between of these timestamps dynamically.
+                                <br><br> 								
 
   <a name="timeOlderThan"></a>
-  <li><b>timeOlderThan </b>   - the <b>end</b> of data selection will be set to the timestamp <b>"&lt;aktuelle Zeit&gt; - 
+  <li><b>timeOlderThan </b>   - the <b>end time</b> of data selection will be set to the timestamp <b>"&lt;aktuelle Zeit&gt; - 
                                 &lt;timeOlderThan&gt;"</b> dynamically. Always the datasets up to timestamp 
 								"&lt;current time&gt; - &lt;timeOlderThan&gt;" will be considered (e.g. if set to 
 								86400, all datasets older than one day are considered). The time period will be calculated dynamically at 
-								execution time. <br>
-								The valid input format for attribute "timeOlderThan" is identical to attribute "timeDiffToNow". </li> <br> 
+								execution time. </li> <br> 
+                                
+                                <ul>
+							    <b>Examples for input format:</b> <br>
+								<code>attr &lt;name&gt; timeOlderThan 86400</code> <br>
+                                # the selection end time is set to "current time - 86400 seconds" <br>
+								<code>attr &lt;name&gt; timeOlderThan d:2 h:3 m:2 s:10</code> <br>
+                                # the selection end time is set to "current time - 2 days 3 hours 2 minutes 10 seconds" <br>							
+								<code>attr &lt;name&gt; timeOlderThan m:600</code> <br> 
+                                # the selection end time is set to "current time - 600 minutes" gesetzt <br>
+								<code>attr &lt;name&gt; timeOlderThan h:2.5</code> <br>
+                                # the selection end time is set to "current time - 2,5 hours" <br>
+								<code>attr &lt;name&gt; timeOlderThan y:1 h:2.5</code> <br>
+                                # the selection end time is set to "current time - 1 year and 2,5 hours" <br>
+								<code>attr &lt;name&gt; timeOlderThan y:1.5</code> <br>
+                                # the selection end time is set to "current time - 1.5 years" <br>
+								</ul>
+								<br>
+                                
+                                If both attributes "timeDiffToNow" and "timeOlderThan" are set, the selection  
+                                period will be calculated between of these timestamps dynamically.
+                                <br><br> 
 
   <a name="timeout"></a>
   <li><b>timeout </b>         - set the timeout-value for Blocking-Call Routines in background in seconds (default 86400)  </li> <br>
@@ -11220,8 +11631,9 @@ sub bdump {
   
   <a name="valueFilter"></a>  
   <li><b>valueFilter </b>     - Regular expression to filter datasets within particular functions. The regex is  
-                                applied to the whole selected dataset (inclusive Device, Reading and so on). 
-                                Please compare to explanations of relevant set-commands. </li> <br> 
+                                applied to a particular field or to the whole selected dataset (inclusive Device, Reading and 
+                                so on). 
+                                Please consider the explanations within the set-commands. </li> <br> 
 							   
 </ul>
 </ul></ul>
@@ -11370,6 +11782,7 @@ sub bdump {
      <li> Bereinigung sequentiell aufeinander folgender Datensätze mit unterschiedlichen Zeitstempel aber gleichen Werten (sequentielle Dublettenbereinigung) </li>
 	 <li> Reparatur einer korrupten SQLite Datenbank ("database disk image is malformed") </li>
      <li> Übertragung von Datensätzen aus der Quelldatenbank in eine andere (Standby) Datenbank (syncStandby) </li>
+     <li> Reduktion der Anzahl von Datensätzen in der Datenbank (reduceLog) </li>
      </ul></ul>
      <br>
      
@@ -11555,9 +11968,28 @@ sub bdump {
     <li><b> countEntries [history | current] </b> 
                                  -  liefert die Anzahl der Tabelleneinträge (default: history) in den gegebenen 
 	                             Zeitgrenzen (siehe <a href="#DbRepattr">Attribute</a>). 
-                                 Sind die Timestamps nicht gesetzt werden alle Einträge gezählt. 
+                                 Sind die Timestamps nicht gesetzt, werden alle Einträge der Tabelle gezählt. 
                                  Beschränkungen durch die <a href="#DbRepattr">Attribute</a> Device bzw. Reading 
-								 gehen in die Selektion mit ein.  </li> <br>
+								 gehen in die Selektion mit ein. <br>
+                                 Standardmäßig wird die Summe aller Datensätze, gekennzeichnet mit "ALLREADINGS", erstellt.
+                                 Ist das Attribut "countEntriesDetail" gesetzt, wird die Anzahl jedes einzelnen Readings 
+                                 zusätzlich ausgegeben. <br><br>                               
+                                 
+                                 Die für diese Funktion relevanten Attribute sind: <br><br>
+
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> <b>aggregation</b>       </td><td>: Zusammenfassung/Gruppierung von Zeitintervallen </td></tr>
+                                      <tr><td> <b>countEntriesDetail</b></td><td>: detaillierte Ausgabe der Datensatzanzahl </td></tr>
+                                      <tr><td> <b>device</b>            </td><td>: Selektion nur von Datensätzen die &lt;device&gt; enthalten </td></tr>
+                                      <tr><td> <b>reading</b>           </td><td>: Selektion nur von Datensätzen die &lt;reading&gt; enthalten </td></tr>
+                                      <tr><td> <b>time.*</b>            </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
+                                      </table>
+	                               </ul>
+	                               <br>
+                                   
+                                 </li> <br>
 
     <li><b> delEntries </b>   -  löscht alle oder die durch die <a href="#DbRepattr">Attribute</a> device und/oder 
 	                             reading definierten Datenbankeinträge. Die Eingrenzung über Timestamps erfolgt 
@@ -11974,7 +12406,7 @@ sub bdump {
                                  
                                  Jedes Ergebnisreading setzt sich aus dem Timestring des Datensatzes, einem Index, dem Device
                                  und dem Reading zusammen.
-                                 Die Funktion fetchrows ist in der Lage mehrfach vorkommende Datensätze (Dubletten) zu erkennen.
+                                 Die Funktion fetchrows ist in der Lage, mehrfach vorkommende Datensätze (Dubletten) zu erkennen.
                                  Solche Dubletten sind mit einem Index > 1 gekennzeichnet. <br>
                                  Dubletten können mit dem Attribut "fetchMarkDuplicates" farblich hervorgehoben werden. <br><br>
                                  
@@ -12008,13 +12440,13 @@ sub bdump {
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>fetchRoute</b>            </td><td>: Leserichtung des Selekts innerhalb der Datenbank </td></tr>
+                                      <tr><td> <b>fetchRoute</b>            </td><td>: Leserichtung der Selektion innerhalb der Datenbank </td></tr>
                                       <tr><td> <b>limit</b>                 </td><td>: begrenzt die Anzahl zu selektierenden bzw. anzuzeigenden Datensätze  </td></tr>
                                       <tr><td> <b>fetchMarkDuplicates</b>   </td><td>: Hervorhebung von gefundenen Dubletten </td></tr>
                                       <tr><td> <b>device</b>                </td><td>: Selektion nur von Datensätzen die &lt;device&gt; enthalten </td></tr>
                                       <tr><td> <b>reading</b>               </td><td>: Selektion nur von Datensätzen die &lt;reading&gt; enthalten </td></tr>
                                       <tr><td> <b>time.*</b>                </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
-                                      <tr><td> <b>valueFilter</b>           </td><td>: filtert Datensätze des Datenbankfeldes "VALUE" mit einem regulären Ausdruck </td></tr>
+                                      <tr><td> <b>valueFilter</b>           </td><td>: filtert die anzuzeigenden Datensätze mit einem regulären Ausdruck. Der Regex wird auf den gesamten anzuzeigenden Datensatz angewendet. </td></tr>
                                    </table>
 	                               </ul>
 	                               <br>
@@ -12167,7 +12599,72 @@ sub bdump {
                                  Obwohl die Funktion selbst non-blocking ausgelegt ist, sollte das zugeordnete DbLog-Device
                                  im asynchronen Modus betrieben werden um ein Blockieren von FHEMWEB zu vermeiden (Tabellen-Lock). <br><br> 
                                  </li> <br>
-                                 </ul>  
+                                 </ul>
+
+    <li><b> reduceLog [average[=day]] [exclude=device1:reading1,device2:reading2,...] [include=device:reading]</b> <br>
+                                 Reduziert historische Datensätze innerhalb der durch die "time.*"-Attribute bestimmten 
+                                 Zeitgrenzen auf einen Eintrag (den ersten) pro Stunde je Device & Reading. <br>
+                                 Es muss mindestens eines der "time.*"-Attribute gesetzt sein (siehe Tabelle unten). 
+                                 Die jeweils fehlende Zeitabgrenzung wird in diesem Fall durch das Modul errechnet.
+                                 <br><br>
+                                 
+                 	             Die für diese Funktion relevanten Attribute sind: <br><br>
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+	                                  <tr><td> <b>executeBeforeProc</b>  </td><td>: FHEM Kommando (oder perl-Routine) vor dem Export ausführen </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>   </td><td>: FHEM Kommando (oder perl-Routine) nach dem Export ausführen </td></tr>
+                                      <tr><td> <b>timeOlderThan</b>      </td><td>: es werden Datenbankeinträge <b>älter</b> als dieses Attribut reduziert </td></tr>
+                                      <tr><td> <b>timestamp_end</b>      </td><td>: es werden Datenbankeinträge <b>älter</b> als dieses Attribut reduziert </td></tr>
+                                      <tr><td> <b>timeDiffToNow</b>      </td><td>: es werden Datenbankeinträge <b>neuer</b> als dieses Attribut reduziert </td></tr>
+                                      <tr><td> <b>timestamp_begin</b>    </td><td>: es werden Datenbankeinträge <b>neuer</b> als dieses Attribut reduziert </td></tr>
+                                   </table>
+	                               </ul>
+                                   <br>
+                                 
+                                 Das Reading "reduceLogState" enthält das Ausführungsergebnis des letzten reduceLog-Befehls. <br><br>
+          
+                                 Durch die optionale Angabe von 'average' wird nicht nur die Datenbank bereinigt, sondern 
+                                 alle numerischen Werte einer Stunde werden auf einen einzigen Mittelwert reduziert. <br>
+                                 Durch die optionale Angabe von 'average=day' wird nicht nur die Datenbank bereinigt, sondern 
+                                 alle numerischen Werte eines Tages auf einen einzigen Mittelwert reduziert. 
+                                 (impliziert 'average') <br><br>
+          
+                                 Optional kann als letzer Parameter "exclude=device1:reading1,device2:reading2,...." 
+		                         angegeben werden um device/reading Kombinationen von reduceLog auszuschließen. <br>
+                                 <b>Tipp:</b> Wird "exclude=.*:.*" angegeben, wird nichts in der Datenbank gelöscht. Das kann
+                                 z.B. verwendet werden um vorab die gesetzten Zeitgrenzen und die Anzahl der zu bearbeitenden
+                                 Datenbankeinträge zu checken. <br><br>
+          
+                                 Optional kann als letzer Parameter "include=device:reading" angegeben werden um 
+		                         die auf die Datenbank ausgeführte SELECT-Abfrage einzugrenzen, was die RAM-Belastung 
+                                 verringert und die Performance erhöht. <br><br>
+          
+                                 <ul>
+                                 <b>Beispiel: </b><br><br>
+                                 
+                                 attr &lt;name&gt; timeOlderThan = d:200  <br>
+                                 set &lt;name&gt; reduceLog <br>
+                                 # Datensätze die älter als 200 Tage sind, werden auf den ersten Eintrag pro Stunde je Device & Reading
+                                 reduziert.  <br> 
+                                 <br>
+                                 
+                                 attr &lt;name&gt; timeDiffToNow = d:10 <br>
+                                 attr &lt;name&gt; timeOlderThan = d:5  <br>
+                                 set &lt;name&gt; reduceLog average include=Luftdaten_remote:% <br>
+                                 # Datensätze die älter als 5 und neuer als 10 Tage sind, werden bereinigt. Numerische Werte 
+                                 einer Stunde werden auf einen Mittelwert reduziert <br>                                  
+                                 <br>
+								 </ul>
+                                 
+								 <b>Hinweis:</b> <br>
+                                 Obwohl die Funktion selbst non-blocking ausgelegt ist, sollte das zugeordnete DbLog-Device
+                                 im asynchronen Modus betrieben werden um ein Blockieren von FHEMWEB zu vermeiden 
+                                 (Tabellen-Lock). <br>
+                                 Weiterhin wird dringend empfohlen den standard INDEX 'Search_Idx' in der Tabelle 'history' 
+                                 anzulegen ! <br>
+		                         Die Abarbeitung dieses Befehls dauert unter Umständen (ohne INDEX) extrem lange. <br><br>
+                                 </li> <br>                                 
 
     <li><b> repairSQLite </b>  - repariert eine korrupte SQLite-Datenbank. <br>
                                  Eine Korruption liegt im Allgemeinen vor wenn die Fehlermitteilung "database disk image is malformed"
@@ -12228,7 +12725,7 @@ sub bdump {
 								 verbundenen Datenbank beginnt, aufgelistet . <br><br>
 								 </li><br>
 								 
-    <li><b> sqlCmd </b>        - führt ein beliebiges Benutzer spezifisches Kommando aus. <br>
+    <li><b> sqlCmd </b>        - führt ein beliebiges benutzerspezifisches Kommando aus. <br>
                                  Enthält dieses Kommando eine Delete-Operation, muss zur Sicherheit das 
 								 <a href="#DbRepattr">Attribut</a> "allowDeletion" gesetzt sein. <br>
                                  Bei der Ausführung dieses Kommandos werden keine Einschränkungen durch gesetzte Attribute
@@ -12458,7 +12955,7 @@ sub bdump {
                                  
     <li><b> dbValue &lt;SQL-Statement&gt;</b> - 
                             Führt das angegebene SQL-Statement <b>blockierend</b> aus. Diese Funktion ist durch ihre Arbeitsweise 
-                            speziell für den Einsatz in usereigenen Scripten geeignet. <br>
+                            speziell für den Einsatz in benutzerspezifischen Scripten geeignet. <br>
                             Die Eingabe akzeptiert Mehrzeiler und gibt ebenso mehrzeilige Ergebisse zurück. 
                             Werden mehrere Felder selektiert und zurückgegeben, erfolgt die Feldtrennung mit dem Trenner 
                             des <a href="#DbRepattr">Attributes</a> "sqlResultFieldSep" (default "|"). Mehrere Ergebniszeilen 
@@ -12558,7 +13055,15 @@ return $ret;
                                  # Es werden nur Information der Tabellen "current" und "history" angezeigt
                                  </li> 
                                  <br><br>
-                                 </ul>                                                      
+                                 </ul>  
+
+    <li><b> versionNotes [hints | rel | &lt;key&gt;] </b> - 
+                             Zeigt Release Informationen und/oder Hinweise zum Modul an. Es sind nur Release Informationen mit 
+                             Bedeutung für den Modulnutzer enthalten. <br>
+                             Sind keine Optionen angegben, werden sowohl Release Informationen als auch Hinweise angezeigt. 
+                             "rel" zeigt nur Release Informationen und "hints" nur Hinweise an. Mit der &lt;key&gt;-Angabe 
+                             wird der Hinweis mit der angegebenen Nummer angezeigt.
+                             </li>                                      
                                                      
   <br>
   </ul></ul>
@@ -12571,7 +13076,9 @@ return $ret;
 
 <br>
 <ul>
-  Über die modulspezifischen Attribute wird die Abgrenzung der Auswertung und die Aggregation der Werte gesteuert. <br><br>
+  Über die modulspezifischen Attribute wird die Abgrenzung der Auswertung und die Aggregation der Werte gesteuert. <br>
+  Die hier aufgeführten Attribute sind nicht für jede Funktion des Moduls bedeutsam. In der Hilfe zu den set/get-Kommandos
+  wird explizit angegeben, welche Attribute für das jeweilige Kommando relevant sind. <br><br>
   
   <b>Hinweis zur SQL-Wildcard Verwendung:</b> <br>
   Innerhalb der Attribut-Werte für "device" und "reading" kann SQL-Wildcards "%" angegeben werden. 
@@ -12604,16 +13111,22 @@ return $ret;
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=20%> <col width=80%> </colgroup>
-                                      <tr><td> <b>avgArithmeticMean :</b>  </td><td>es wird der arithmetische Mittelwert berechnet (default) </td></tr>
-                                      <tr><td> <b>avgDailyMeanGWS :</b>    </td><td>berechnet die Tagesmitteltemperatur entsprechend den
-                                                                                    Vorschriften des deutschen Wetterdienstes (siehe "helpful hints" mit Funktion get versionNotes). <br>
-                                                                                    Diese Variante verwendet automatisch die Aggregation "day". </td></tr>
-                                      <tr><td> <b>avgTimeWeightMean :</b>  </td><td>berechnet den zeitgewichteten Mittelwert </td></tr>
+                                      <tr><td> <b>avgArithmeticMean                          :</b> </td><td>es wird der arithmetische Mittelwert berechnet (default) </td></tr>
+                                      <tr><td style="vertical-align:top"> <b>avgDailyMeanGWS :</b> <td>berechnet die Tagesmitteltemperatur entsprechend den
+                                                                                                   Vorschriften des deutschen Wetterdienstes (siehe "get &lt;name&gt; versionNotes 2"). <br>
+                                                                                                   Diese Variante verwendet automatisch die Aggregation "day". </td></tr>
+                                      <tr><td> <b>avgTimeWeightMean                          :</b> </td><td>berechnet den zeitgewichteten Mittelwert </td></tr>
 								   </table>
 	                               </ul>
                                 </li><br>
  
-  <a name="device"></a>
+  <a name="countEntriesDetail"></a>
+  <li><b>countEntriesDetail </b>   - Wenn gesetzt, erstellt die Funktion "countEntries" eine detallierte Ausgabe der Datensatzzahl
+                                     pro Reading und Zeitintervall.
+                                     Standardmäßig wird nur die Summe aller selektierten Datensätze ausgegeben. 
+                                     </li> <br>
+
+ <a name="device"></a>
   <li><b>device </b>          - Abgrenzung der DB-Selektionen auf ein bestimmtes Device. <br>
                                 Es können Geräte-Spezifikationen (devspec) angegeben werden. <br> 
 								Innerhalb von Geräte-Spezifikationen wird SQL-Wildcard (%) als normales ASCII-Zeichen gewertet. 
@@ -12690,8 +13203,9 @@ return $ret;
 								Attribut "archivesort" wird berücksichtigt. </li> <br> 
 
   <a name="executeAfterProc"></a>
-  <li><b>executeAfterProc </b> - Es kann ein FHEM-Kommando angegeben werden welches <b>nach dem Dump</b> ausgeführt werden soll. <br>
-                                 Funktionen sind in {} einzuschließen.<br><br>
+  <li><b>executeAfterProc </b> - Es kann ein FHEM-Kommando oder eine Perl-Funktion angegeben werden welche <b>nach der 
+                                  Befehlsabarbeitung</b> ausgeführt werden soll. <br>
+                                  Funktionen sind in {} einzuschließen.<br><br>
 
                                 <ul>
 							    <b>Beispiel:</b> <br><br>
@@ -12714,15 +13228,16 @@ sub adump {
 </li>
 		
   <a name="executeBeforeProc"></a>		
-  <li><b>executeBeforeProc </b> - Es kann ein FHEM-Kommando angegeben werden welches <b>vor dem Dump</b> ausgeführt werden soll. <br>
-                                 Funktionen sind in {} einzuschließen.<br><br>
+  <li><b>executeBeforeProc </b> - Es kann ein FHEM-Kommando oder eine Perl-Funktion angegeben werden welche <b>vor der 
+                                  Befehlsabarbeitung</b> ausgeführt werden soll. <br>
+                                  Funktionen sind in {} einzuschließen.<br><br>
 
-                                <ul>
-							    <b>Beispiel:</b> <br><br>
-								attr &lt;name&gt; executeBeforeProc set og_gz_westfenster on; <br>
-								attr &lt;name&gt; executeBeforeProc {bdump ("&lt;name&gt;")} <br><br>
+                                  <ul>
+							      <b>Beispiel:</b> <br><br>
+								  attr &lt;name&gt; executeBeforeProc set og_gz_westfenster on; <br>
+								  attr &lt;name&gt; executeBeforeProc {bdump ("&lt;name&gt;")} <br><br>
 								
-								# "bdump" ist eine in 99_myUtils definierte Funktion. <br>
+								  # "bdump" ist eine in 99_myUtils definierte Funktion. <br>
 								
 <pre>
 sub bdump {
@@ -13007,14 +13522,38 @@ sub bdump {
 							   <br><br>
   
   <a name="timestamp_begin"></a> 
-  <li><b>timestamp_begin </b> - der zeitliche Beginn für die Datenselektion (*)   </li> <br>
+  <li><b>timestamp_begin </b> - der zeitliche Beginn für die Datenselektion </li> <br>
+  
+  Das Format von Timestamp ist "YYYY-MM-DD HH:MM:SS". Für die Attribute "timestamp_begin", "timestamp_end" 
+  kann ebenso eine der folgenden Eingaben verwendet werden. Dabei wird das timestamp-Attribut dynamisch belegt: <br><br>
+                              <ul>
+                              <b>current_year_begin</b>     : entspricht "&lt;aktuelles Jahr&gt;-01-01 00:00:00"          <br>
+                              <b>current_year_end</b>       : entspricht "&lt;aktuelles Jahr&gt;-12-31 23:59:59"          <br>
+                              <b>previous_year_begin</b>    : entspricht "&lt;vorheriges Jahr&gt;-01-01 00:00:00"         <br>
+                              <b>previous_year_end</b>      : entspricht "&lt;vorheriges Jahr&gt;-12-31 23:59:59"         <br>
+                              <b>current_month_begin</b>    : entspricht "&lt;aktueller Monat erster Tag&gt; 00:00:00"    <br>
+                              <b>current_month_end</b>      : entspricht "&lt;aktueller Monat letzter Tag&gt; 23:59:59"   <br>
+                              <b>previous_month_begin</b>   : entspricht "&lt;Vormonat erster Tag&gt; 00:00:00"           <br>
+                              <b>previous_month_end</b>     : entspricht "&lt;Vormonat letzter Tag&gt; 23:59:59"          <br>
+                              <b>current_week_begin</b>     : entspricht "&lt;erster Tag der akt. Woche&gt; 00:00:00"     <br>
+                              <b>current_week_end</b>       : entspricht "&lt;letzter Tag der akt. Woche&gt; 23:59:59"    <br>
+                              <b>previous_week_begin</b>    : entspricht "&lt;erster Tag Vorwoche&gt; 00:00:00"           <br>
+                              <b>previous_week_end</b>      : entspricht "&lt;letzter Tag Vorwoche&gt; 23:59:59"          <br>
+                              <b>current_day_begin</b>      : entspricht "&lt;aktueller Tag&gt; 00:00:00"                 <br>
+                              <b>current_day_end</b>        : entspricht "&lt;aktueller Tag&gt; 23:59:59"                 <br>
+                              <b>previous_day_begin</b>     : entspricht "&lt;Vortag&gt; 00:00:00"                        <br>
+                              <b>previous_day_end</b>       : entspricht "&lt;Vortag&gt; 23:59:59"                        <br>
+                              <b>current_hour_begin</b>     : entspricht "&lt;aktuelle Stunde&gt;:00:00"                  <br>
+                              <b>current_hour_end</b>       : entspricht "&lt;aktuelle Stunde&gt;:59:59"                  <br>
+                              <b>previous_hour_begin</b>    : entspricht "&lt;vorherige Stunde&gt;:00:00"                 <br>
+                              <b>previous_hour_end</b>      : entspricht "&lt;vorherige Stunde&gt;:59:59"                 <br>
+                              </ul><br>
 
   <a name="timestamp_end"></a>   
   <li><b>timestamp_end </b>   - das zeitliche Ende für die Datenselektion. Wenn nicht gesetzt wird immer die aktuelle 
-                                Datum/Zeit-Kombi für das Ende der Selektion eingesetzt. (*)  </li> <br>
+                                Datum/Zeit-Kombi für das Ende der Selektion eingesetzt.  </li> <br>
 															
-  
-  (*) Das Format von Timestamp ist wie in DbLog "YYYY-MM-DD HH:MM:SS". Für die Attribute "timestamp_begin", "timestamp_end" 
+  Das Format von Timestamp ist "YYYY-MM-DD HH:MM:SS". Für die Attribute "timestamp_begin", "timestamp_end" 
   kann ebenso eine der folgenden Eingaben verwendet werden. Dabei wird das timestamp-Attribut dynamisch belegt: <br><br>
                               <ul>
                               <b>current_year_begin</b>     : entspricht "&lt;aktuelles Jahr&gt;-01-01 00:00:00"          <br>
@@ -13078,15 +13617,39 @@ sub bdump {
 								<code>attr &lt;name&gt; timeDiffToNow y:1.5</code> <br>
                                 # die Startzeit wird auf "aktuelle Zeit - 1,5 Jahre gesetzt <br>
 								</ul>
-								<br><br>
+								<br>
+                                
+                                Sind die Attribute "timeDiffToNow" und "timeOlderThan" gleichzeitig gesetzt, wird der 
+                                Selektionszeitraum zwischen diesen Zeitpunkten dynamisch kalkuliert.
+                                <br><br>
 
   <a name="timeOlderThan"></a> 								
   <li><b>timeOlderThan </b>   - das <b>Selektionsende</b> wird auf den Zeitpunkt <b>"&lt;aktuelle Zeit&gt; - &lt;timeOlderThan&gt;"</b> 
                                 gesetzt. Dadurch werden alle Datensätze bis zu dem Zeitpunkt "&lt;aktuelle 
 								Zeit&gt; - &lt;timeOlderThan&gt;" berücksichtigt (z.b. wenn auf 86400 gesetzt, werden alle
 								Datensätze die älter als ein Tag sind berücksichtigt). Die Timestampermittlung erfolgt 
-								dynamisch zum Ausführungszeitpunkt. <br>
-								Es gelten die gleichen Eingabeformate wie für das Attribut "timeDiffToNow".   </li> <br> 
+								dynamisch zum Ausführungszeitpunkt. </li> <br>
+
+                                <ul>
+							    <b>Eingabeformat Beispiel:</b> <br>
+								<code>attr &lt;name&gt; timeOlderThan 86400</code> <br>
+                                # das Selektionsende wird auf "aktuelle Zeit - 86400 Sekunden" gesetzt <br>
+								<code>attr &lt;name&gt; timeOlderThan d:2 h:3 m:2 s:10</code> <br>
+                                # das Selektionsende wird auf "aktuelle Zeit - 2 Tage 3 Stunden 2 Minuten 10 Sekunden" gesetzt <br>							
+								<code>attr &lt;name&gt; timeOlderThan m:600</code> <br> 
+                                # das Selektionsende wird auf "aktuelle Zeit - 600 Minuten" gesetzt <br>
+								<code>attr &lt;name&gt; timeOlderThan h:2.5</code> <br>
+                                # das Selektionsende wird auf "aktuelle Zeit - 2,5 Stunden" gesetzt <br>
+								<code>attr &lt;name&gt; timeOlderThan y:1 h:2.5</code> <br>
+                                # das Selektionsende wird auf "aktuelle Zeit - 1 Jahr und 2,5 Stunden" gesetzt <br>
+								<code>attr &lt;name&gt; timeOlderThan y:1.5</code> <br>
+                                # das Selektionsende wird auf "aktuelle Zeit - 1,5 Jahre gesetzt <br>
+								</ul>
+								<br>
+                                
+                                Sind die Attribute "timeDiffToNow" und "timeOlderThan" gleichzeitig gesetzt, wird der 
+                                Selektionszeitraum zwischen diesen Zeitpunkten dynamisch kalkuliert.
+                                <br><br>                               
 
   <a name="timeout"></a> 								
   <li><b>timeout </b>         - das Attribut setzt den Timeout-Wert für die Blocking-Call Routinen in Sekunden  
@@ -13138,8 +13701,9 @@ sub bdump {
 
   <a name="valueFilter"></a>                                
   <li><b>valueFilter </b>     - Regulärer Ausdruck zur Filterung von Datensätzen innerhalb bestimmter Funktionen. Der 
-                                Regex auf den gesamten selektierten Datensatz (inkl. Device, Reading usw.) angewendet. 
-                                Bitte vergleichen sie die Erläuterungen zu den entsprechenden Set-Kommandos. </li> <br> 
+                                Regex wird auf ein bestimmtes Feld oder den gesamten selektierten Datensatz (inkl. Device, 
+                                Reading usw.) angewendet. 
+                                Bitte beachten sie die Erläuterungen zu den entsprechenden Set-Kommandos. </li> <br> 
                                 
 
 </ul></ul>

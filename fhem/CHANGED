@@ -1,5 +1,11 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 93_DbRep: V8.4.0, reduceLog from DbLog integrated into DbRep, 
+                       sqlCmd/dbValue with textField-long as default, both 
+                       attributes timeOlderThan / timeDiffToNow can be set,
+                       get versionNotes changed to support en/de, new attribute
+                       "countEntriesDetail", countEntries separate count of  
+                       every reading if attribute "countEntriesDetail" is set
   - change:  49_SSCam: COMPATIBILITY changed to 8.2.1
   - bugfix:  74_XiaomiBTLESens : fix warning Illegal hexadecimal digit
                                  ignored
