@@ -1458,7 +1458,7 @@ return;
 sub SSCam_versionCheck($) {
   my ($hash) = @_;
   my $name   = $hash->{NAME};
-  my $rc     = 7196;
+  my $rc     = 21600;
   
   RemoveInternalTimer($hash, "SSCam_versionCheck");
   return if(IsDisabled($name));
