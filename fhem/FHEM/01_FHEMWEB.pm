@@ -1839,6 +1839,7 @@ FW_showRoom()
   my @devs= grep { (($FW_rooms{$FW_room} && $FW_rooms{$FW_room}{$_}) ||
                     $FW_room eq "all") && !IsIgnored($_) } keys %defs;
   my (%group, @atEnds, %usuallyAtEnd, %sortIndex);
+  my $nDevsInRoom = 0;
   foreach my $dev (@devs) {
     if($modules{$defs{$dev}{TYPE}}{FW_atPageEnd}) {
       $usuallyAtEnd{$dev} = 1;
@@ -1854,6 +1855,7 @@ FW_showRoom()
       next if($hge && $grp =~ m/$hge/);
       $sortIndex{$dev} = FW_sortIndex($dev);
       $group{$grp}{$dev} = 1;
+      $nDevsInRoom++;
     }
   }
 
@@ -1906,7 +1908,8 @@ FW_showRoom()
   }
   FW_pO "</tr>" if($maxc != -1);
 
-  FW_pO "</table><br>";
+  FW_pO "</table>";
+  FW_pO "<br>" if(@atEnds && $nDevsInRoom);
 
   # Now the "atEnds"
   my $doBC = (AttrVal($FW_wname, "plotfork", 0) &&

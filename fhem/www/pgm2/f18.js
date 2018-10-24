@@ -111,8 +111,10 @@ f18_menu()
 function
 f18_tables()
 {
-  $("table.roomoverview > tbody > tr > td > .devType:not(:first)")
+  // one-column roomoverview & readingsGroup
+  $("div#content > table > tbody > tr > td > .devType:not(:first)")
       .css("margin-top", "20px"); 
+  // multi-column roomoverview
   $("table.column tbody tr:not(:first-child) .devType")
       .css("margin-top", "20px"); 
 
