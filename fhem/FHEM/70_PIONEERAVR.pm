@@ -263,6 +263,7 @@ sub PIONEERAVR_Define($$) {
         "44" => {"name" => "mediaServer",       "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
         "45" => {"name" => "favorites",         "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
         "46" => {"name" => "airplay",           "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
+		"47" => {"name" => "DMR",               "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
         "48" => {"name" => "mhl",               "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
         "49" => {"name" => "game",              "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
         "53" => {"name" => "spotify",           "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"}
