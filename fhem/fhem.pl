@@ -5390,8 +5390,20 @@ Authenticate($$)
   foreach my $a (@authenticate) {
     my $r = CallFn($a, "AuthenticateFn", $defs{$a}, $cl, $arg);
     $needed = $r if($r);
-    return $r if($r == 1);
+    last if($r == 1);
   }
+
+  if($needed == 2 && $cl->{NAME} ne "SecurityCheck") {
+    my $adb = $cl->{AuthenticationDeniedBy};
+    if($adb) {
+      my $au = $cl->{AuthenticatedUser};
+      Log3 $adb, 3, "Login denied ".
+                    ($au ? "for user >$au< ":"")."via $cl->{NAME}";
+    }
+  } else {
+    delete $cl->{AuthenticationDeniedBy};
+  }
+
   return $needed;
 }
 

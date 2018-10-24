@@ -8,7 +8,7 @@ use vars qw(@FW_httpheader); # HTTP header, line by line
 use MIME::Base64;
 my $allowed_haveSha;
 
-sub allowed_CheckBasicAuth($$$$@);
+sub allowed_CheckBasicAuth($$$$);
 
 #####################################
 sub
@@ -26,10 +26,11 @@ allowed_Initialize($)
     allowedCommands
     allowedDevices
     allowedDevicesRegexp
+    allowedIfAuthenticatedByMe:1,0
     basicAuth
     basicAuthExpiry
     basicAuthMsg
-    disable:0,1
+    disable:1,0
     globalpassword
     password
     validFor
@@ -90,6 +91,9 @@ allowed_Authorize($$$$)
   } else {
     return 0 if(!$me->{validFor} || $me->{validFor} !~ m/\b$cl->{NAME}\b/);
   }
+  return 0 if(AttrVal($me->{NAME}, "allowedIfAuthenticatedByMe", 0) &&
+              (!$cl->{AuthenticatedBy} ||
+                $cl->{AuthenticatedBy} ne $me->{NAME}));
 
   if($type eq "cmd") {
     return 0 if(!$me->{allowedCommands});
@@ -121,6 +125,13 @@ allowed_Authenticate($$$$)
 {
   my ($me, $cl, $param) = @_;
 
+  my $doReturn = sub($$){
+    my ($r,$a) = @_;
+    $cl->{AuthenticatedBy} = $me->{NAME} if($r == 1);
+    $cl->{AuthenticationDeniedBy} = $me->{NAME} if($r == 2 && $a);
+    return $r;
+  };
+
   return 0 if($me->{disabled});
   return 0 if(!$me->{validFor} || $me->{validFor} !~ m/\b$cl->{SNAME}\b/);
   my $aName = $me->{NAME};
@@ -145,7 +156,7 @@ allowed_Authenticate($$$$)
       }
     }
 
-    my $pwok = (allowed_CheckBasicAuth($me, $cl, $secret, $basicAuth, 0) == 1);
+    my $pwok = (allowed_CheckBasicAuth($me, $cl, $secret, $basicAuth) == 1);
 
     # Add Cookie header ONLY if authentication with basicAuth was succesful
     if($pwok && (!defined($authcookie) || $secret ne $authcookie)) {
@@ -168,12 +179,12 @@ allowed_Authenticate($$$$)
       }
     }
 
-    return 1 if($pwok);
+    return &$doReturn(1, 1) if($pwok);
 
     my $msg = AttrVal($aName, "basicAuthMsg", "FHEM: login required");
     $cl->{".httpAuthHeader"} = "HTTP/1.1 401 Authorization Required\r\n".
                                "WWW-Authenticate: Basic realm=\"$msg\"\r\n";
-    return 2;
+    return &$doReturn(2, $secret);
 
   } elsif($cl->{TYPE} eq "telnet") {
     my $pw = AttrVal($aName, "password", undef);
@@ -188,30 +199,31 @@ allowed_Authenticate($$$$)
       my $password = $param;
       my $ret = eval $pw;
       Log3 $aName, 1, "password expression: $@" if($@);
-      return ($ret ? 1 : 2);
+      return &$doReturn($ret ? 1 : 2, $param);
 
     } elsif($pw =~ m/^SHA256:(.{8}):(.*)$/) {
       if($allowed_haveSha) {
-        return (Digest::SHA::sha256_base64("$1:$param") eq $2) ? 1 : 2;
+        return &$doReturn(Digest::SHA::sha256_base64("$1:$param") eq $2 ?
+                          1 : 2, $param);
       } else {
         Log3 $me, 3, "Cant load Digest::SHA to decode $me->{NAME} beiscAuth";
       }
     }
 
-    return ($pw eq $param) ? 1 : 2;
+    return &$doReturn(($pw eq $param) ? 1 : 2, $param);
 
   } else {
     $param =~ m/^basicAuth:(.*)/ if($param);
-    return allowed_CheckBasicAuth($me, $cl, $1,
-                                AttrVal($aName,"basicAuth",undef), $param);
+    return &$doReturn(allowed_CheckBasicAuth($me, $cl, $1,
+                                AttrVal($aName,"basicAuth",undef)), $param);
 
   }
 }
 
 sub
-allowed_CheckBasicAuth($$$$@)
+allowed_CheckBasicAuth($$$$)
 {
-  my ($me, $cl, $secret, $basicAuth, $verbose) = @_;
+  my ($me, $cl, $secret, $basicAuth) = @_;
 
   return 0 if(!$basicAuth);
 
@@ -239,8 +251,7 @@ allowed_CheckBasicAuth($$$$@)
     }
 
   }
-  Log3 $me, 3, "Login denied by $aName for $user via $cl->{NAME}"
-      if($pwok != 1 && ($verbose || $user));
+  $cl->{AuthenticatedUser} = $user if($user);
 
   return $pwok;
 }
@@ -427,18 +438,15 @@ EOF
         </li><br>
 
     <a name="allowedDevicesRegexp"></a>
-    <li>allowedDevices<br>
-        Comma separated list of device names which can be manipulated via the
-        frontends specified by validFor. The regexp is prepended with ^ and
-        suffixed with $, as usual.  Only devices listed in allowedDevices or
-        matching allowedDevicesRegexp may manipulated.
+    <li>allowedDevicesRegexp<br>
+        Regexp to match the devicenames, which can be manipulated. The regexp
+        is prepended with ^ and suffixed with $, as usual.
         </li><br>
 
-    <a name="allowedDevicesRegexp"></a>
-    <li>allowedDevicesRegexp<br>
-        A regexp to match device names which can be manipulated via the
-        frontends specified by validFor. Only devices listed in allowedDevices
-        or matching allowedDevicesRegexp may manipulated.
+    <a name="allowedIfAuthenticatedByMe"></a>
+    <li>allowedIfAuthenticatedByMe<br>
+        if set (to 1), then the allowed parameters will only be checked, if the
+        authentication was executed by this allowed instance.
         </li><br>
 
     <a name="basicAuth"></a>
@@ -579,6 +587,19 @@ EOF
     <li>allowedDevices<br>
         Komma getrennte Liste von Ger&auml;tenamen, die mit dem passenden
         Frontend (siehe validFor) ge&auml;ndert werden k&ouml;nnen.
+        </li><br>
+
+    <a name="allowedDevicesRegexp"></a>
+    <li>allowedDevicesRegexp<br>
+        Regexp um die Ger&auml;te zu spezifizieren, die man bearbeiten darf.
+        Das Regexp wird (wie in FHEM &uuml;blich) mit ^ und $ erg&auml;nzt.
+        </li><br>
+
+    <a name="allowedIfAuthenticatedByMe"></a>
+    <li>allowedIfAuthenticatedByMe<br>
+        falls gesetzt (auf 1), dann werden die allowed Attribute nur dann
+        angewendet, falls auch die Authentifikation durch diese allowed Instanz
+        durchgef&uuml;hrt wurde.
         </li><br>
 
     <a name="basicAuth"></a>
