@@ -605,6 +605,10 @@ sub sendClientMessage($%) {
 	refreshInternalMySTimer($hash,"Ack") if (($hash->{ack} or $hash->{IODev}->{ack}) and $hash->{timeoutAck}) ; 
 }
 
+sub onStreamMessage($$) {
+	my ($hash, $msg) = @_;
+}
+
 sub rawToMappedReading($$$$) {
   my($hash, $type, $childId, $value) = @_;
 
