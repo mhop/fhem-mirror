@@ -25,6 +25,9 @@
 ############################################################################
 #
 # Changelog:
+# 2018-10-21, v2.3
+# Feature: Attribut disable added
+#
 # 2017-01-16, v2.2
 # Feature: Quelle http://www.radiosaw.de/verkehrsmeldungen added
 #
@@ -119,6 +122,7 @@ sub Verkehrsinfo_Initialize($) {
     $hash->{AttrList} =
          "filter_exclude filter_include orderby "
 		. "msg_format:road,head,both "
+		. "disable:1,0 "
         . $readingFnAttributes;
 }
 
@@ -260,6 +264,7 @@ sub Verkehrsinfo_Set($@) {
 
 sub Verkehrsinfo_Attr(@) {
 	my ($cmd,$name,$attr_name,$attr_value) = @_;
+	my $hash = $defs{$name};
 	if($cmd eq "set") {
         if($attr_name eq "filter_exclude" || $attr_name eq "filter_include") {
 			eval { qr/$attr_value/ };
@@ -279,6 +284,23 @@ sub Verkehrsinfo_Attr(@) {
 			Log3 $name, 3, $err;
 			return $err;
 		}
+		elsif ( $attr_name eq "disable" ) {
+            if ( $attr_value == 1 ) {
+                RemoveInternalTimer($hash);
+                readingsSingleUpdate( $hash, "state", "inactive", 1 );
+                $hash->{helper}{DISABLED} = 1;
+            }
+            elsif ( $attr_value == 0 ) {
+				readingsSingleUpdate( $hash, "state", "active", 1 );
+				Verkehrsinfo_GetUpdate($hash);
+            }
+
+        }
+	}
+	elsif ( $cmd eq "del" ) {
+        if ( $attr_name eq "disable" ) {
+            Verkehrsinfo_GetUpdate($hash);
+        }
 	}
 	return undef;
 }
@@ -703,6 +725,8 @@ sub Verkehrsinfo_hf_orderby ($@) {
 				Multiple searching keywords can be seperated with the pipe "|".<br><br></li>
 			<li><i>msg_format [ road | head | both ]</i> (only Verkehrsinfo.de and RadioSAW.de)<br>
 				Using this parameter you can format the output, regarding streets, direction or both.<br><br></li>
+			<li><i>disable</i><br>
+				1 = inactive and 0 = active<br><br></li>
 			<li><i><a href="#readingFnAttributes">readingFnAttributes</a></i><br><br></li>
         </ul>
     </ul>
@@ -832,6 +856,8 @@ sub Verkehrsinfo_hf_orderby ($@) {
 				Mehrer Suchbegriffe können mit einer Pipe "|" getrennt werden.<br><br></li>
 			<li><i>msg_format [ road | head | both ]</i> (Nur Verkehrsinfo.de und RadioSAW.de)<br>
 				Über diesen Parameter kann die Meldung formatiert werden nach Strasse, Richtung oder beides<br><br></li>
+			<li><i>disable</i><br>
+				1 = inactive and 0 = active<br><br></li>
 			<li><i><a href="#readingFnAttributes">readingFnAttributes</a></i><br><br></li>
         </ul>
     </ul>
