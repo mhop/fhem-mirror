@@ -221,7 +221,7 @@ sub PIONEERAVR_Define($$) {
     # $hash->{helper}{INPUTNAMES} lists the default input names and their inputNr as provided by Pioneer.
     # This module tries to read those names and the alias names from the AVR receiver and tries to check if this input is enabled or disabled
     # So this list is just a fall back if the module can't read the names ...
-    # InputNr with player functions (play,pause,...) ("13","17","18","26","27","33","38","41","44","45","48","53");       
+    # InputNr with player functions (play,pause,...) ("13","17","18","26","27","33","38","41","44","45","48","49","53");       
     # Input number for usbDac, ipodUsb, xmRadio, homeMediaGallery, sirius, adapterPort, internetRadio, pandora, mediaServer, Favorites, mhl, spotify
     # Additionally this module tries to get information from the Pioneer AVR
     #  - about the input level adjust
@@ -263,7 +263,7 @@ sub PIONEERAVR_Define($$) {
         "44" => {"name" => "mediaServer",       "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
         "45" => {"name" => "favorites",         "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
         "46" => {"name" => "airplay",           "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
-		"47" => {"name" => "DMR",               "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
+		"47" => {"name" => "dmr",               "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
         "48" => {"name" => "mhl",               "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
         "49" => {"name" => "game",              "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
         "53" => {"name" => "spotify",           "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"}
