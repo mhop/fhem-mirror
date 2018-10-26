@@ -1821,7 +1821,7 @@ FW_sortIndex($)
 sub
 FW_showRoom()
 {
-  return 0 if(!$FW_room);
+  return 0 if(!$FW_room || $FW_hiddenroom{$FW_room});
   
   %FW_hiddengroup = ();
   foreach my $r (split(",",AttrVal($FW_wname, "hiddengroup", ""))) {
