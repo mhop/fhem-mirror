@@ -35,7 +35,7 @@ package main;
 use strict;
 use warnings;
 
-my $version = "2.4.3";
+my $version = "2.4.4";
 
 sub XiaomiBTLESens_Initialize($) {
 
@@ -860,7 +860,7 @@ sub ThermoHygroSensHandle0x18($$) {
     Log3 $name, 4, "XiaomiBTLESens ($name) - Thermo/Hygro Sens Handle0x18";
 
     chomp($notification);
-    $notification =~ s/ //g;
+    $notification =~ s/\s+//g;
 
     ### neue Vereinheitlichung für Batteriereadings Forum #800017
     $readings{'batteryPercent'} = hex( "0x" . $notification );
@@ -888,13 +888,7 @@ sub ThermoHygroSensHandle0x10($$) {
 
     $notification =~ s/\s+//g;
     $readings{'temperature'} = pack( 'H*', substr( $notification, 4, 8 ) );
-
-    if ( scalar(@numberOfHex) < 14 ) {
-        $readings{'humidity'} = pack( 'H*', substr( $notification, 18, 8 ) );
-    }
-    else {
-        $readings{'humidity'} = pack( 'H*', substr( $notification, 16, 8 ) );
-    }
+    $readings{'humidity'} = pack( 'H*', substr( $notification, 18, 8 ) );
 
     $hash->{helper}{CallBattery} = 0;
     return \%readings;
