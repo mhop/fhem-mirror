@@ -1,4 +1,4 @@
-REV 17616
+REV 17618
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -324,7 +324,7 @@ UPD 2018-04-16_07:45:03 46243 FHEM/70_MEDIAPORTAL.pm
 UPD 2017-09-25_07:45:02 66166 FHEM/70_NEUTRINO.pm
 UPD 2018-07-26_07:45:03 123829 FHEM/70_ONKYO_AVR.pm
 UPD 2017-05-29_07:45:02 138164 FHEM/70_PHTV.pm
-UPD 2018-10-25_07:45:03 177048 FHEM/70_PIONEERAVR.pm
+UPD 2018-10-26_07:45:03 177053 FHEM/70_PIONEERAVR.pm
 UPD 2016-03-11_07:45:12 7152 FHEM/70_PushNotifier.pm
 UPD 2015-10-31_07:45:12 23797 FHEM/70_Pushbullet.pm
 UPD 2018-03-10_07:45:02 72403 FHEM/70_Pushover.pm
@@ -688,8 +688,8 @@ UPD 2018-10-25_07:45:06 3617351 docs/commandref.html
 UPD 2018-10-25_07:45:08 2223618 docs/commandref_DE.html
 UPD 2018-10-08_07:45:02 76228 docs/commandref_frame.html
 UPD 2018-10-08_07:45:02 85677 docs/commandref_frame_DE.html
-UPD 2018-10-25_07:45:09 199665 docs/commandref_modular.html
-UPD 2018-10-25_07:45:10 210316 docs/commandref_modular_DE.html
+UPD 2018-10-26_07:45:09 199665 docs/commandref_modular.html
+UPD 2018-10-26_07:45:10 210316 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
