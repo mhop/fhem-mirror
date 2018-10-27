@@ -1,5 +1,5 @@
 ###############################################################################
-# 
+#
 # Developed with Kate
 #
 #  (c) 2017-2018 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
@@ -30,387 +30,486 @@
 #
 ###############################################################################
 
-        
-        
-
-
 package main;
-
-my $missingModul = "";
 
 use strict;
 use warnings;
-use POSIX;
 
-use Data::Dumper;      #only for Debugging
-
-eval "use JSON;1" or $missingModul .= "JSON ";
-
-
-
-
-my $version = "1.0.0";
-
-
-
-
-# Declare functions
-sub AptToDate_Initialize($);
-sub AptToDate_Define($$);
-sub AptToDate_Undef($$);
-sub AptToDate_Attr(@);
-sub AptToDate_Set($$@);
-sub AptToDate_Get($$@);
-sub AptToDate_Notify($$);
-sub AptToDate_ProcessUpdateTimer($);
-sub AptToDate_CleanSubprocess($);
-sub AptToDate_AsynchronousExecuteAptGetCommand($);
-sub AptToDate_OnRun();
-sub AptToDate_PollChild($);
-sub AptToDate_ExecuteAptGetCommand($);
-sub AptToDate_GetDistribution($);
-sub AptToDate_AptUpdate($);
-sub AptToDate_AptUpgradeList($);
-sub AptToDate_AptToUpgrade($);
-sub AptToDate_PreProcessing($$);
-sub AptToDate_WriteReadings($$);
-sub AptToDate_CreateUpgradeList($$);
-sub AptToDate_CreateWarningList($);
-sub AptToDate_CreateErrorList($);
-sub AptToDate_ToDay();
-
-
-
-
-
-my %regex = (   'en' => { 'update'    => '^Reading package lists...$', 'upgrade'    => '^Unpacking (\S+)\s\((\S+)\)\s+over\s+\((\S+)\)'},
-                'de' => { 'update'    => '^Paketlisten werden gelesen...$' ,'upgrade'   => '^Entpacken von (\S+)\s\((\S+)\)\s+über\s+\((\S+)\)'}
-);
-
-
-
+my $version = "1.4.0";
 
 sub AptToDate_Initialize($) {
 
     my ($hash) = @_;
 
-    $hash->{SetFn}      = "AptToDate_Set";
-    $hash->{GetFn}      = "AptToDate_Get";
-    $hash->{DefFn}      = "AptToDate_Define";
-    $hash->{NotifyFn}   = "AptToDate_Notify";
-    $hash->{UndefFn}    = "AptToDate_Undef";
-    $hash->{AttrFn}     = "AptToDate_Attr";
-    $hash->{AttrList}   = "disable:1 ".
-                            "disabledForIntervals ".
-                            "upgradeListReading:1 ".
-                            "distupgrade:1 ".
-                            $readingFnAttributes;
+    $hash->{SetFn}    = "AptToDate::Set";
+    $hash->{GetFn}    = "AptToDate::Get";
+    $hash->{DefFn}    = "AptToDate::Define";
+    $hash->{NotifyFn} = "AptToDate::Notify";
+    $hash->{UndefFn}  = "AptToDate::Undef";
+    $hash->{AttrFn}   = "AptToDate::Attr";
+    $hash->{AttrList} =
+        "disable:1 "
+      . "disabledForIntervals "
+      . "upgradeListReading:1 "
+      . "distupgrade:1 "
+      . $readingFnAttributes;
 
-
-    foreach my $d(sort keys %{$modules{AptToDate}{defptr}}) {
+    foreach my $d ( sort keys %{ $modules{AptToDate}{defptr} } ) {
         my $hash = $modules{AptToDate}{defptr}{$d};
-        $hash->{VERSION}    = $version;
+        $hash->{VERSION} = $version;
     }
 }
 
-sub AptToDate_Define($$) {
+## unserer packagename
+package AptToDate;
+
+use strict;
+use warnings;
+use POSIX;
+
+use GPUtils qw(:all)
+  ;    # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
+
+use Data::Dumper;    #only for Debugging
+
+my $missingModul = "";
+eval "use JSON;1" or $missingModul .= "JSON ";
+
+## Import der FHEM Funktionen
+BEGIN {
+    GP_Import(
+        qw(readingsSingleUpdate
+          readingsBulkUpdate
+          readingsBulkUpdateIfChanged
+          readingsBeginUpdate
+          readingsEndUpdate
+          ReadingsTimestamp
+          defs
+          modules
+          Log3
+          CommandAttr
+          attr
+          AttrVal
+          ReadingsVal
+          Value
+          IsDisabled
+          deviceEvents
+          init_done
+          gettimeofday
+          InternalTimer
+          RemoveInternalTimer)
+    );
+}
+
+my %regex = (
+    'en' => {
+        'update'  => '^Reading package lists...$',
+        'upgrade' => '^Unpacking (\S+)\s\((\S+)\)\s+over\s+\((\S+)\)'
+    },
+    'de' => {
+        'update'  => '^Paketlisten werden gelesen...$',
+        'upgrade' => '^Entpacken von (\S+)\s\((\S+)\)\s+über\s+\((\S+)\)'
+    }
+);
+
+sub Define($$) {
 
     my ( $hash, $def ) = @_;
     my @a = split( "[ \t][ \t]*", $def );
-    
-    return "too few parameters: define <name> AptToDate <HOST>" if( @a != 3 );
-    return "Cannot define AptToDate device. Perl modul ${missingModul}is missing." if ( $missingModul );
-    
 
-    my $name            = $a[0];
-    my $host            = $a[2];
+    return "too few parameters: define <name> AptToDate <HOST>" if ( @a != 3 );
+    return
+      "Cannot define AptToDate device. Perl modul ${missingModul}is missing."
+      if ($missingModul);
 
-    $hash->{VERSION}    = $version;
-    $hash->{HOST}       = $host;
-    $hash->{NOTIFYDEV}  = "global,$name";
-        
-    
-    readingsSingleUpdate($hash,"state","initialized", 1) if( ReadingsVal($name,'state','none') ne 'none');
-    CommandAttr(undef,$name . ' room AptToDate') if( AttrVal($name,'room','none') eq 'none' );
-    
+    my $name = $a[0];
+    my $host = $a[2];
+
+    $hash->{VERSION}   = $version;
+    $hash->{HOST}      = $host;
+    $hash->{NOTIFYDEV} = "global,$name";
+
+    readingsSingleUpdate( $hash, "state", "initialized", 1 )
+      if ( ReadingsVal( $name, 'state', 'none' ) ne 'none' );
+    CommandAttr( undef, $name . ' room AptToDate' )
+      if ( AttrVal( $name, 'room', 'none' ) eq 'none' );
+    CommandAttr( undef,
+        $name
+          . ' devStateIcon system.updates.available:security@red system.is.up.to.date:security@green .*in.progress:system_fhem_reboot@orange errors:message_attention@red'
+    ) if ( AttrVal( $name, 'devStateIcon', 'none' ) eq 'none' );
+
     Log3 $name, 3, "AptToDate ($name) - defined";
-    
-    $modules{AptToDate}{defptr}{$hash->{HOST}} = $hash;
-    
+
+    $modules{AptToDate}{defptr}{ $hash->{HOST} } = $hash;
+
     return undef;
 }
 
-sub AptToDate_Undef($$) {
+sub Undef($$) {
 
-    my ($hash,$arg) = @_;
-    
-    
+    my ( $hash, $arg ) = @_;
+
     my $name = $hash->{NAME};
 
-    if(exists($hash->{".fhem"}{subprocess})) {
-        my $subprocess  = $hash->{".fhem"}{subprocess};
+    if ( exists( $hash->{".fhem"}{subprocess} ) ) {
+        my $subprocess = $hash->{".fhem"}{subprocess};
         $subprocess->terminate();
         $subprocess->wait();
     }
-    
-    delete($modules{AptToDate}{defptr}{$hash->{HOST}});
-    Log3 $name, 3, "Sub AptToDate_Undef ($name) - delete device $name";
+
+    RemoveInternalTimer($hash);
+
+    delete( $modules{AptToDate}{defptr}{ $hash->{HOST} } );
+    Log3 $name, 3, "Sub AptToDate ($name) - delete device $name";
     return undef;
 }
 
-sub AptToDate_Attr(@) {
+sub Attr(@) {
 
     my ( $cmd, $name, $attrName, $attrVal ) = @_;
-    my $hash                                = $defs{$name};
+    my $hash = $defs{$name};
 
-
-    if( $attrName eq "disable" ) {
-        if( $cmd eq "set" and $attrVal eq "1" ) {
+    if ( $attrName eq "disable" ) {
+        if ( $cmd eq "set" and $attrVal eq "1" ) {
             RemoveInternalTimer($hash);
-            
-            readingsSingleUpdate ( $hash, "state", "disabled", 1 );
+
+            readingsSingleUpdate( $hash, "state", "disabled", 1 );
             Log3 $name, 3, "AptToDate ($name) - disabled";
         }
 
-        elsif( $cmd eq "del" ) {
+        elsif ( $cmd eq "del" ) {
             Log3 $name, 3, "AptToDate ($name) - enabled";
         }
     }
-    
-    elsif( $attrName eq "disabledForIntervals" ) {
-        if( $cmd eq "set" ) {
-            return "check disabledForIntervals Syntax HH:MM-HH:MM or 'HH:MM-HH:MM HH:MM-HH:MM ...'"
-            unless($attrVal =~ /^((\d{2}:\d{2})-(\d{2}:\d{2})\s?)+$/);
+
+    elsif ( $attrName eq "disabledForIntervals" ) {
+        if ( $cmd eq "set" ) {
+            return
+"check disabledForIntervals Syntax HH:MM-HH:MM or 'HH:MM-HH:MM HH:MM-HH:MM ...'"
+              unless ( $attrVal =~ /^((\d{2}:\d{2})-(\d{2}:\d{2})\s?)+$/ );
             Log3 $name, 3, "AptToDate ($name) - disabledForIntervals";
-            readingsSingleUpdate ( $hash, "state", "disabled", 1 );
+            readingsSingleUpdate( $hash, "state", "disabled", 1 );
         }
-        
-        elsif( $cmd eq "del" ) {
+
+        elsif ( $cmd eq "del" ) {
             Log3 $name, 3, "AptToDate ($name) - enabled";
-            readingsSingleUpdate ( $hash, "state", "active", 1 );
+            readingsSingleUpdate( $hash, "state", "active", 1 );
         }
     }
-    
+
     return undef;
 }
 
-sub AptToDate_Notify($$) {
+sub Notify($$) {
 
-    my ($hash,$dev) = @_;
+    my ( $hash, $dev ) = @_;
     my $name = $hash->{NAME};
-    return if (IsDisabled($name));
-    
+    return if ( IsDisabled($name) );
+
     my $devname = $dev->{NAME};
     my $devtype = $dev->{TYPE};
-    my $events = deviceEvents($dev,1);
-    return if (!$events);
+    my $events  = deviceEvents( $dev, 1 );
+    return if ( !$events );
 
-    Log3 $name, 5, "AptToDate ($name) - Notify: ".Dumper $events;       # mit Dumper
+    Log3 $name, 5, "AptToDate ($name) - Notify: " . Dumper $events; # mit Dumper
 
+    if (
+        (
+            (
+                grep /^DEFINED.$name$/,
+                @{$events}
+                or grep /^DELETEATTR.$name.disable$/,
+                @{$events}
+                or grep /^ATTR.$name.disable.0$/,
+                @{$events}
+            )
+            and $devname eq 'global'
+            and $init_done
+        )
+        or (
+            (
+                grep /^INITIALIZED$/,
+                @{$events}
+                or grep /^REREADCFG$/,
+                @{$events}
+                or grep /^MODIFIED.$name$/,
+                @{$events}
+            )
+            and $devname eq 'global'
+        )
+        or grep /^os-release_language:.(de|en)$/,
+        @{$events}
+      )
+    {
 
-    if( ((grep /^DEFINED.$name$/,@{$events} or grep /^DELETEATTR.$name.disable$/,@{$events}
-            or grep /^ATTR.$name.disable.0$/,@{$events})
-            and $devname eq 'global' and $init_done)
-            or ((grep /^INITIALIZED$/,@{$events}
-            or grep /^REREADCFG$/,@{$events}
-            or grep /^MODIFIED.$name$/,@{$events}) and $devname eq 'global')
-            or grep /^os-release_language:.(de|en)$/,@{$events} ) {
+        if (
+            ref(
+                eval { decode_json( ReadingsVal( $name, '.upgradeList', '' ) ) }
+            ) eq "HASH"
+          )
+        {
+            $hash->{".fhem"}{aptget}{packages} =
+              eval { decode_json( ReadingsVal( $name, '.upgradeList', '' ) ) }
+              ->{packages};
+        }
+        elsif (
+            ref(
+                eval { decode_json( ReadingsVal( $name, '.updatedList', '' ) ) }
+            ) eq "HASH"
+          )
+        {
+            $hash->{".fhem"}{aptget}{updatedpackages} =
+              eval { decode_json( ReadingsVal( $name, '.updatedList', '' ) ) }
+              ->{packages};
+        }
 
-        if( ReadingsVal($name,'os-release_language','none') ne 'none' ) {
-            AptToDate_ProcessUpdateTimer($hash);
-            
-        } else {
-            $hash->{".fhem"}{aptget}{cmd}   = 'getDistribution';
-            AptToDate_AsynchronousExecuteAptGetCommand($hash);
+        if ( ReadingsVal( $name, 'os-release_language', 'none' ) ne 'none' ) {
+            ProcessUpdateTimer($hash);
+
+        }
+        else {
+            $hash->{".fhem"}{aptget}{cmd} = 'getDistribution';
+            AsynchronousExecuteAptGetCommand($hash);
         }
     }
 
-    if( $devname eq $name and (grep /^repoSync:.fetched.done$/,@{$events}
-                                or grep /^toUpgrade:.successful$/,@{$events}) ) {
-        $hash->{".fhem"}{aptget}{cmd}   = 'getUpdateList';
-        AptToDate_AsynchronousExecuteAptGetCommand($hash);
+    if (
+        $devname eq $name
+        and (
+            grep /^repoSync:.fetched.done$/,
+            @{$events} or grep /^toUpgrade:.successful$/,
+            @{$events}
+        )
+      )
+    {
+        $hash->{".fhem"}{aptget}{cmd} = 'getUpdateList';
+        AsynchronousExecuteAptGetCommand($hash);
     }
 
     return;
 }
 
-sub AptToDate_Set($$@) {
-    
-    my ($hash, $name, @aa)  = @_;
-    
-    
-    my ($cmd, @args)        = @aa;
+sub Set($$@) {
 
-    if( $cmd eq 'repoSync' ) {
-        return "usage: $cmd" if( @args != 0 );
-        
-        $hash->{".fhem"}{aptget}{cmd}   = $cmd;
-        
-    } elsif( $cmd eq 'toUpgrade' ) {
-        return "usage: $cmd" if( @args != 0 );
-        
-        $hash->{".fhem"}{aptget}{cmd}   = $cmd;
-    
-    } else {
+    my ( $hash, $name, @aa ) = @_;
+
+    my ( $cmd, @args ) = @aa;
+
+    if ( $cmd eq 'repoSync' ) {
+        return "usage: $cmd" if ( @args != 0 );
+
+        $hash->{".fhem"}{aptget}{cmd} = $cmd;
+
+    }
+    elsif ( $cmd eq 'toUpgrade' ) {
+        return "usage: $cmd" if ( @args != 0 );
+
+        $hash->{".fhem"}{aptget}{cmd} = $cmd;
+
+    }
+    else {
         my $list = "repoSync:noArg";
-        $list .= " toUpgrade:noArg" if( defined($hash->{".fhem"}{aptget}{packages}) and scalar keys %{$hash->{".fhem"}{aptget}{packages}} > 0 );
-        
+        $list .= " toUpgrade:noArg"
+          if ( defined( $hash->{".fhem"}{aptget}{packages} )
+            and scalar keys %{ $hash->{".fhem"}{aptget}{packages} } > 0 );
+
         return "Unknown argument $cmd, choose one of $list";
     }
-    
-    if( ReadingsVal($name,'os-release_language','none') eq 'de' or ReadingsVal($name,'os-release_language','none') eq 'en' ) {
-        AptToDate_AsynchronousExecuteAptGetCommand($hash);
-    } else {
-        readingsSingleUpdate($hash,"state","language not supported", 1);
-        Log3 $name, 2, "AptToDate ($name) - sorry, your systems language is not supported";
+
+    if (   ReadingsVal( $name, 'os-release_language', 'none' ) eq 'de'
+        or ReadingsVal( $name, 'os-release_language', 'none' ) eq 'en' )
+    {
+        AsynchronousExecuteAptGetCommand($hash);
+    }
+    else {
+        readingsSingleUpdate( $hash, "state", "language not supported", 1 );
+        Log3 $name, 2,
+          "AptToDate ($name) - sorry, your systems language is not supported";
     }
 
     return undef;
 }
 
-sub AptToDate_Get($$@) {
-    
-    my ($hash, $name, @aa)  = @_;
-    
-    
-    my ($cmd, @args)        = @aa;
+sub Get($$@) {
 
-    if( $cmd eq 'showUpgradeList' ) {
-        return "usage: $cmd" if( @args != 0 );
+    my ( $hash, $name, @aa ) = @_;
 
-        my $ret = AptToDate_CreateUpgradeList($hash,$cmd);
-        return $ret;
-        
-    } elsif( $cmd eq 'showUpdatedList' ) {
-        return "usage: $cmd" if( @args != 0 );
+    my ( $cmd, @args ) = @aa;
 
-        my $ret = AptToDate_CreateUpgradeList($hash,$cmd);
-        return $ret;
-        
-    } elsif( $cmd eq 'showWarningList' ) {
-        return "usage: $cmd" if( @args != 0 );
+    if ( $cmd eq 'showUpgradeList' ) {
+        return "usage: $cmd" if ( @args != 0 );
 
-        my $ret = AptToDate_CreateWarningList($hash);
-        return $ret;
-        
-    } elsif( $cmd eq 'showErrorList' ) {
-        return "usage: $cmd" if( @args != 0 );
-
-        my $ret = AptToDate_CreateErrorList($hash);
+        my $ret = CreateUpgradeList( $hash, $cmd );
         return $ret;
 
-    } else {
+    }
+    elsif ( $cmd eq 'showUpdatedList' ) {
+        return "usage: $cmd" if ( @args != 0 );
+
+        my $ret = CreateUpgradeList( $hash, $cmd );
+        return $ret;
+
+    }
+    elsif ( $cmd eq 'showWarningList' ) {
+        return "usage: $cmd" if ( @args != 0 );
+
+        my $ret = CreateWarningList($hash);
+        return $ret;
+
+    }
+    elsif ( $cmd eq 'showErrorList' ) {
+        return "usage: $cmd" if ( @args != 0 );
+
+        my $ret = CreateErrorList($hash);
+        return $ret;
+
+    }
+    else {
         my $list = "";
-        $list .= " showUpgradeList:noArg" if( defined($hash->{".fhem"}{aptget}{packages}) and scalar keys %{$hash->{".fhem"}{aptget}{packages}} > 0 );
-        $list .= " showUpdatedList:noArg" if( defined($hash->{".fhem"}{aptget}{updatedpackages}) and scalar keys %{$hash->{".fhem"}{aptget}{updatedpackages}} > 0 );
-        $list .= " showWarningList:noArg" if( defined($hash->{".fhem"}{aptget}{'warnings'}) and scalar @{$hash->{".fhem"}{aptget}{'warnings'}} > 0 );
-        $list .= " showErrorList:noArg" if( defined($hash->{".fhem"}{aptget}{'errors'}) and scalar @{$hash->{".fhem"}{aptget}{'errors'}} > 0 );
+        $list .= " showUpgradeList:noArg"
+          if ( defined( $hash->{".fhem"}{aptget}{packages} )
+            and scalar keys %{ $hash->{".fhem"}{aptget}{packages} } > 0 );
+        $list .= " showUpdatedList:noArg"
+          if ( defined( $hash->{".fhem"}{aptget}{updatedpackages} )
+            and scalar
+            keys %{ $hash->{".fhem"}{aptget}{updatedpackages} } > 0 );
+        $list .= " showWarningList:noArg"
+          if ( defined( $hash->{".fhem"}{aptget}{'warnings'} )
+            and scalar @{ $hash->{".fhem"}{aptget}{'warnings'} } > 0 );
+        $list .= " showErrorList:noArg"
+          if ( defined( $hash->{".fhem"}{aptget}{'errors'} )
+            and scalar @{ $hash->{".fhem"}{aptget}{'errors'} } > 0 );
 
         return "Unknown argument $cmd, choose one of $list";
     }
 }
 
 ###################################
-sub AptToDate_ProcessUpdateTimer($) {
+sub ProcessUpdateTimer($) {
 
-    my $hash    = shift;
-    
-    
-    my $name =  $hash->{NAME};
-    
+    my $hash = shift;
+
+    my $name = $hash->{NAME};
+
     RemoveInternalTimer($hash);
-    InternalTimer( gettimeofday()+14400, "AptToDate_ProcessUpdateTimer", $hash,0 );
+    InternalTimer(
+        gettimeofday() + 14400,
+        "AptToDate::ProcessUpdateTimer",
+        $hash, 0
+    );
     Log3 $name, 4, "AptToDate ($name) - stateRequestTimer: Call Request Timer";
 
-    if( ReadingsVal($name,'os-release_language','none') eq 'de' or ReadingsVal($name,'os-release_language','none') eq 'en' ) {
-        if( !IsDisabled($name) ) {
-            if(exists($hash->{".fhem"}{subprocess})) {
-                Log3 $name, 2, "AptToDate ($name) - update in progress, process aborted.";
+    if (   ReadingsVal( $name, 'os-release_language', 'none' ) eq 'de'
+        or ReadingsVal( $name, 'os-release_language', 'none' ) eq 'en' )
+    {
+        if ( !IsDisabled($name) ) {
+            if ( exists( $hash->{".fhem"}{subprocess} ) ) {
+                Log3 $name, 2,
+                  "AptToDate ($name) - update in progress, process aborted.";
                 return 0;
             }
-        
-            readingsSingleUpdate($hash,"state","ready", 1) if( ReadingsVal($name,'state','none') eq 'none' or ReadingsVal($name,'state','none') eq 'initialized' );
-            
-            if( AptToDate_ToDay() ne (split(' ',ReadingsTimestamp($name,'repoSync','1970-01-01')))[0]) {
-                $hash->{".fhem"}{aptget}{cmd}   = 'repoSync';
-                AptToDate_AsynchronousExecuteAptGetCommand($hash);
+
+            readingsSingleUpdate( $hash, "state", "ready", 1 )
+              if ( ReadingsVal( $name, 'state', 'none' ) eq 'none'
+                or ReadingsVal( $name, 'state', 'none' ) eq 'initialized' );
+
+            if (
+                ToDay() ne (
+                    split(
+                        ' ',
+                        ReadingsTimestamp( $name, 'repoSync', '1970-01-01' )
+                    )
+                )[0]
+              )
+            {
+                $hash->{".fhem"}{aptget}{cmd} = 'repoSync';
+                AsynchronousExecuteAptGetCommand($hash);
             }
         }
-    } else {
-        readingsSingleUpdate($hash,"state","language not supported", 1);
-        Log3 $name, 2, "AptToDate ($name) - sorry, your systems language is not supported";
-    }  
+    }
+    else {
+        readingsSingleUpdate( $hash, "state", "language not supported", 1 );
+        Log3 $name, 2,
+          "AptToDate ($name) - sorry, your systems language is not supported";
+    }
 }
 
-sub AptToDate_CleanSubprocess($) {
+sub CleanSubprocess($) {
 
-    my $hash    = shift;
-    
-    
-    my $name    = $hash->{NAME};
+    my $hash = shift;
 
-    delete($hash->{".fhem"}{subprocess});
+    my $name = $hash->{NAME};
+
+    delete( $hash->{".fhem"}{subprocess} );
     Log3 $name, 4, "AptToDate ($name) - clean Subprocess";
 }
 
-
 use constant POLLINTERVAL => 1;
 
-sub AptToDate_AsynchronousExecuteAptGetCommand($) {
+sub AsynchronousExecuteAptGetCommand($) {
 
     require "SubProcess.pm";
-    my ($hash)                          = shift;
-    
-    
-    my $name                            = $hash->{NAME};
-    $hash->{".fhem"}{aptget}{lang}      = ReadingsVal($name,'os-release_language','none');
+    my ($hash) = shift;
 
-    my $subprocess                      = SubProcess->new({ onRun => \&AptToDate_OnRun });
-    $subprocess->{aptget}               = $hash->{".fhem"}{aptget};
-    $subprocess->{aptget}{host}         = $hash->{HOST};
-    $subprocess->{aptget}{debug}        = ( AttrVal($name,'verbose',0) > 3 ? 1 : 0 );
-    $subprocess->{aptget}{distupgrade}  = ( AttrVal($name,'distupgrade',0) == 1 ? 1 : 0 );
-    my $pid                         = $subprocess->run();
+    my $name = $hash->{NAME};
+    $hash->{".fhem"}{aptget}{lang} =
+      ReadingsVal( $name, 'os-release_language', 'none' );
 
-    readingsSingleUpdate($hash,'state',$hash->{".fhem"}{aptget}{cmd}.' in progress', 1);
-    
-    
-    if(!defined($pid)) {
-        Log3 $name, 1, "AptToDate ($name) - Cannot execute command asynchronously";
+    my $subprocess = SubProcess->new( { onRun => \&OnRun } );
+    $subprocess->{aptget} = $hash->{".fhem"}{aptget};
+    $subprocess->{aptget}{host} = $hash->{HOST};
+    $subprocess->{aptget}{debug} =
+      ( AttrVal( $name, 'verbose', 0 ) > 3 ? 1 : 0 );
+    $subprocess->{aptget}{distupgrade} =
+      ( AttrVal( $name, 'distupgrade', 0 ) == 1 ? 1 : 0 );
+    my $pid = $subprocess->run();
 
-        AptToDate_CleanSubprocess($hash);
-        readingsSingleUpdate($hash,'state','Cannot execute command asynchronously', 1);
+    readingsSingleUpdate( $hash, 'state',
+        $hash->{".fhem"}{aptget}{cmd} . ' in progress', 1 );
+
+    if ( !defined($pid) ) {
+        Log3 $name, 1,
+          "AptToDate ($name) - Cannot execute command asynchronously";
+
+        CleanSubprocess($hash);
+        readingsSingleUpdate( $hash, 'state',
+            'Cannot execute command asynchronously', 1 );
         return undef;
     }
 
-    Log3 $name, 4, "AptToDate ($name) - execute command asynchronously (PID= $pid)";
-    
-    $hash->{".fhem"}{subprocess}    = $subprocess;
-    
-    InternalTimer(gettimeofday()+POLLINTERVAL, "AptToDate_PollChild", $hash, 0);
+    Log3 $name, 4,
+      "AptToDate ($name) - execute command asynchronously (PID= $pid)";
+
+    $hash->{".fhem"}{subprocess} = $subprocess;
+
+    InternalTimer( gettimeofday() + POLLINTERVAL,
+        "AptToDate::PollChild", $hash, 0 );
     Log3 $hash, 4, "AptToDate ($name) - control passed back to main loop.";
 }
 
-sub AptToDate_PollChild($) {
+sub PollChild($) {
 
-    my $hash        = shift;
-    
-    
-    my $name        = $hash->{NAME};
-    my $subprocess  = $hash->{".fhem"}{subprocess};
-    my $json        = $subprocess->readFromChild();
-    
-    if(!defined($json)) {
-        Log3 $name, 5, "AptToDate ($name) - still waiting (". $subprocess->{lasterror} .").";
-        InternalTimer(gettimeofday()+POLLINTERVAL, "AptToDate_PollChild", $hash, 0);
+    my $hash = shift;
+
+    my $name       = $hash->{NAME};
+    my $subprocess = $hash->{".fhem"}{subprocess};
+    my $json       = $subprocess->readFromChild();
+
+    if ( !defined($json) ) {
+        Log3 $name, 5, "AptToDate ($name) - still waiting ("
+          . $subprocess->{lasterror} . ").";
+        InternalTimer( gettimeofday() + POLLINTERVAL,
+            "AptToDate::PollChild", $hash, 0 );
         return;
-    } else {
-        Log3 $name, 4, "AptToDate ($name) - got result from asynchronous parsing.";
+    }
+    else {
+        Log3 $name, 4,
+          "AptToDate ($name) - got result from asynchronous parsing.";
         $subprocess->wait();
         Log3 $name, 4, "AptToDate ($name) - asynchronous finished.";
-        
-        AptToDate_CleanSubprocess($hash);
-        AptToDate_PreProcessing($hash,$json);
+
+        CleanSubprocess($hash);
+        PreProcessing( $hash, $json );
     }
 }
 
@@ -418,225 +517,246 @@ sub AptToDate_PollChild($) {
 # Begin Childprozess
 ######################################
 
-sub AptToDate_OnRun() {
+sub OnRun() {
 
-    my $subprocess  = shift;
+    my $subprocess = shift;
 
+    my $response = ExecuteAptGetCommand( $subprocess->{aptget} );
 
-    my $response    = AptToDate_ExecuteAptGetCommand($subprocess->{aptget});
-
-    my $json        = eval{encode_json($response)};
-    if($@){
+    my $json = eval { encode_json($response) };
+    if ($@) {
         Log3 'AptToDate OnRun', 3, "AptToDate - JSON error: $@";
-        $json   = '{"jsonerror":"$@"}';
+        $json = '{"jsonerror":"$@"}';
     }
-    
+
     $subprocess->writeToParent($json);
 }
 
-sub AptToDate_ExecuteAptGetCommand($) {
+sub ExecuteAptGetCommand($) {
 
-    my $aptget              = shift;
+    my $aptget = shift;
 
+    my $apt = {};
+    $apt->{lang}  = $aptget->{lang};
+    $apt->{debug} = $aptget->{debug};
 
-    my $apt                 = { };
-    $apt->{lang}            = $aptget->{lang};
-    $apt->{debug}           = $aptget->{debug};
-    
-    if( $aptget->{host} ne 'localhost' ) {
-        
-        $apt->{aptgetupdate}    = 'ssh '.$aptget->{host}.' \'echo n | sudo apt-get -q update\'';
-        $apt->{distri}          = 'ssh '.$aptget->{host}.' cat /etc/os-release |';
-        $apt->{'locale'}        = 'ssh '.$aptget->{host}.' locale';
-        $apt->{aptgetupgrade}   = 'ssh '.$aptget->{host}.' \'echo n | sudo apt-get -s -q -V upgrade\'';
-        $apt->{aptgettoupgrade} = 'ssh '.$aptget->{host}.' \'echo n | sudo apt-get -y -q -V upgrade\'' if($aptget->{distupgrade} == 0);
-        $apt->{aptgettoupgrade} = 'ssh '.$aptget->{host}.' \'echo n | sudo apt-get -y -q -V dist-upgrade\'' if($aptget->{distupgrade} == 1);
+    if ( $aptget->{host} ne 'localhost' ) {
 
-    } else {
-    
+        $apt->{aptgetupdate} =
+          'ssh ' . $aptget->{host} . ' \'echo n | sudo apt-get -q update\'';
+        $apt->{distri} = 'ssh ' . $aptget->{host} . ' cat /etc/os-release |';
+        $apt->{'locale'} = 'ssh ' . $aptget->{host} . ' locale';
+        $apt->{aptgetupgrade} = 'ssh '
+          . $aptget->{host}
+          . ' \'echo n | sudo apt-get -s -q -V upgrade\'';
+        $apt->{aptgettoupgrade} = 'ssh '
+          . $aptget->{host}
+          . ' \'echo n | sudo apt-get -y -q -V upgrade\''
+          if ( $aptget->{distupgrade} == 0 );
+        $apt->{aptgettoupgrade} = 'ssh '
+          . $aptget->{host}
+          . ' \'echo n | sudo apt-get -y -q -V dist-upgrade\''
+          if ( $aptget->{distupgrade} == 1 );
+
+    }
+    else {
+
         $apt->{aptgetupdate}    = 'echo n | sudo apt-get -q update';
         $apt->{distri}          = '</etc/os-release';
         $apt->{'locale'}        = 'locale';
         $apt->{aptgetupgrade}   = 'echo n | sudo apt-get -s -q -V upgrade';
-        $apt->{aptgettoupgrade} = 'echo n | sudo apt-get -y -q -V upgrade' if($aptget->{distupgrade} == 0);
-        $apt->{aptgettoupgrade} = 'echo n | sudo apt-get -y -q -V dist-upgrade' if($aptget->{distupgrade} == 1);
+        $apt->{aptgettoupgrade} = 'echo n | sudo apt-get -y -q -V upgrade'
+          if ( $aptget->{distupgrade} == 0 );
+        $apt->{aptgettoupgrade} = 'echo n | sudo apt-get -y -q -V dist-upgrade'
+          if ( $aptget->{distupgrade} == 1 );
     }
-    
+
     my $response;
-    
-    if( $aptget->{cmd} eq 'repoSync' ) {
-        $response    = AptToDate_AptUpdate($apt);
-    } elsif( $aptget->{cmd} eq 'getUpdateList' ) {
-        $response    = AptToDate_AptUpgradeList($apt);
-    } elsif( $aptget->{cmd} eq 'getDistribution' ) {
-        $response    = AptToDate_GetDistribution($apt);
-    } elsif( $aptget->{cmd} eq 'toUpgrade' ) {
-        $response    = AptToDate_AptToUpgrade($apt);
+
+    if ( $aptget->{cmd} eq 'repoSync' ) {
+        $response = AptUpdate($apt);
+    }
+    elsif ( $aptget->{cmd} eq 'getUpdateList' ) {
+        $response = AptUpgradeList($apt);
+    }
+    elsif ( $aptget->{cmd} eq 'getDistribution' ) {
+        $response = GetDistribution($apt);
+    }
+    elsif ( $aptget->{cmd} eq 'toUpgrade' ) {
+        $response = AptToUpgrade($apt);
     }
 
     return $response;
 }
 
-sub AptToDate_GetDistribution($) {
+sub GetDistribution($) {
 
-    my $apt     = shift;
-    
-    
-    my $update  = {};
+    my $apt = shift;
 
-    if(open(DISTRI, "$apt->{distri}")) {
-        while (my $line = <DISTRI>) {
-        
+    my $update = {};
+
+    if ( open( DISTRI, "$apt->{distri}" ) ) {
+        while ( my $line = <DISTRI> ) {
+
             chomp($line);
-            print qq($line\n) if( $apt->{debug} == 1 );
-            if($line =~ m#^(.*)="?(.*)"$#i or $line =~ m#^(.*)=([a-z]+)$#i) {
-                $update->{'os-release'}{'os-release_'.$1}   = $2;
-                Log3 'Update', 4, "Distribution Daten erhalten"
+            print qq($line\n) if ( $apt->{debug} == 1 );
+            if ( $line =~ m#^(.*)="?(.*)"$#i or $line =~ m#^(.*)=([a-z]+)$#i ) {
+                $update->{'os-release'}{ 'os-release_' . $1 } = $2;
+                Log3 'Update', 4, "Distribution Daten erhalten";
             }
         }
-        
+
         close(DISTRI);
-    } else {
-        die "Couldn't use DISTRI: $!\n";
-        $update->{error}    = 'Couldn\'t use DISTRI: '.$;
     }
-    
-    if(open(LOCALE, "$apt->{'locale'} 2>&1 |")) {
-        while(my $line = <LOCALE>) {
-        
+    else {
+        die "Couldn't use DISTRI: $!\n";
+        $update->{error} = 'Couldn\'t use DISTRI: ' . $;;
+    }
+
+    if ( open( LOCALE, "$apt->{'locale'} 2>&1 |" ) ) {
+        while ( my $line = <LOCALE> ) {
+
             chomp($line);
-            print qq($line\n) if( $apt->{debug} == 1 );
-            if($line =~ m#^LANG=([a-z]+).*$#) {
-                $update->{'os-release'}{'os-release_language'}  = $1;
-                Log3 'Update', 4, "Language Daten erhalten"
+            print qq($line\n) if ( $apt->{debug} == 1 );
+            if ( $line =~ m#^LANG=([a-z]+).*$# ) {
+                $update->{'os-release'}{'os-release_language'} = $1;
+                Log3 'Update', 4, "Language Daten erhalten";
             }
         }
-        
-        $update->{'os-release'}{'os-release_language'}  = 'en' if( not defined($update->{'os-release'}{'os-release_language'}) );
+
+        $update->{'os-release'}{'os-release_language'} = 'en'
+          if ( not defined( $update->{'os-release'}{'os-release_language'} ) );
         close(LOCALE);
-    } else {
+    }
+    else {
         die "Couldn't use APT: $!\n";
-        $update->{error}    = 'Couldn\'t use LOCALE: '.$;
+        $update->{error} = 'Couldn\'t use LOCALE: ' . $;;
     }
 
     return $update;
 }
 
-sub AptToDate_AptUpdate($) {
+sub AptUpdate($) {
 
-    my $apt     = shift;
-    
-    
-    my $update  = {};
+    my $apt = shift;
 
-    if(open(APT, "$apt->{aptgetupdate} 2>&1 | ")) {
-        while (my $line = <APT>) {
+    my $update = {};
+
+    if ( open( APT, "$apt->{aptgetupdate} 2>&1 | " ) ) {
+        while ( my $line = <APT> ) {
             chomp($line);
-            print qq($line\n) if( $apt->{debug} == 1 );
-            if($line =~ m#$regex{$apt->{lang}}{update}#i) {
-                $update->{'state'}  = 'done';
+            print qq($line\n) if ( $apt->{debug} == 1 );
+            if ( $line =~ m#$regex{$apt->{lang}}{update}#i ) {
+                $update->{'state'} = 'done';
                 Log3 'Update', 4, "Daten erhalten";
 
-            } elsif($line =~ s#^E: ##) { # error
+            }
+            elsif ( $line =~ s#^E: ## ) {    # error
                 my $error = {};
                 $error->{message} = $line;
-                push(@{$update->{error}}, $error);
-                $update->{'state'}  = 'errors';
+                push( @{ $update->{error} }, $error );
+                $update->{'state'} = 'errors';
                 Log3 'Update', 4, "Error";
 
-            } elsif($line =~ s#^W: ##) { # warning
+            }
+            elsif ( $line =~ s#^W: ## ) {    # warning
                 my $warning = {};
                 $warning->{message} = $line;
-                push(@{$update->{warning}}, $warning);
-                $update->{'state'}  = 'warnings';
+                push( @{ $update->{warning} }, $warning );
+                $update->{'state'} = 'warnings';
                 Log3 'Update', 4, "Warning";
             }
         }
-        
+
         close(APT);
-    } else {
+    }
+    else {
         die "Couldn't use APT: $!\n";
-        $update->{error}    = 'Couldn\'t use APT: '.$;
+        $update->{error} = 'Couldn\'t use APT: ' . $;;
     }
 
     return $update;
 }
 
-sub AptToDate_AptUpgradeList($) {
+sub AptUpgradeList($) {
 
-    my $apt     = shift;
+    my $apt = shift;
 
-    
     my $updates = {};
 
-    if(open(APT, "$apt->{aptgetupgrade} 2>&1 |")) {
-        while(my $line = <APT>) {
+    if ( open( APT, "$apt->{aptgetupgrade} 2>&1 |" ) ) {
+        while ( my $line = <APT> ) {
             chomp($line);
-            print qq($line\n) if( $apt->{debug} == 1 );
+            print qq($line\n) if ( $apt->{debug} == 1 );
 
-            if($line =~ m#^\s+(\S+)\s+\((\S+)\s+=>\s+(\S+)\)#) {
-                my $update = {};
+            if ( $line =~ m#^\s+(\S+)\s+\((\S+)\s+=>\s+(\S+)\)# ) {
+                my $update  = {};
                 my $package = $1;
-                $update->{current} = $2;
-                $update->{new} = $3;
+                $update->{current}               = $2;
+                $update->{new}                   = $3;
                 $updates->{packages}->{$package} = $update;
 
-            } elsif($line =~ s#^W: ##) { # warning
+            }
+            elsif ( $line =~ s#^W: ## ) {    # warning
                 my $warning = {};
                 $warning->{message} = $line;
-                push(@{$updates->{warning}}, $warning);
-            
-            } elsif($line =~ s#^E: ##) { # error
+                push( @{ $updates->{warning} }, $warning );
+
+            }
+            elsif ( $line =~ s#^E: ## ) {    # error
                 my $error = {};
                 $error->{message} = $line;
-                push(@{$updates->{error}}, $error);
+                push( @{ $updates->{error} }, $error );
             }
         }
-        
+
         close(APT);
-    } else {
+    }
+    else {
         die "Couldn't use APT: $!\n";
-        $updates->{error}    = 'Couldn\'t use APT: '.$;
+        $updates->{error} = 'Couldn\'t use APT: ' . $;;
     }
 
     return $updates;
 }
 
-sub AptToDate_AptToUpgrade($) {
+sub AptToUpgrade($) {
 
-    my $apt     = shift;
+    my $apt = shift;
 
-    
     my $updates = {};
 
-    if(open(APT, "$apt->{aptgettoupgrade} 2>&1 |")) {
-        while(my $line = <APT>) {
+    if ( open( APT, "$apt->{aptgettoupgrade} 2>&1 |" ) ) {
+        while ( my $line = <APT> ) {
             chomp($line);
-            print qq($line\n) if( $apt->{debug} == 1 );
-            
-            if($line =~ m#$regex{$apt->{lang}}{upgrade}#) {
-                my $update = {};
+            print qq($line\n) if ( $apt->{debug} == 1 );
+
+            if ( $line =~ m#$regex{$apt->{lang}}{upgrade}# ) {
+                my $update  = {};
                 my $package = $1;
-                $update->{new} = $2;
-                $update->{current} = $3;
+                $update->{new}                   = $2;
+                $update->{current}               = $3;
                 $updates->{packages}->{$package} = $update;
-      
-            } elsif($line =~ s#^W: ##) { # warning
+
+            }
+            elsif ( $line =~ s#^W: ## ) {    # warning
                 my $warning = {};
                 $warning->{message} = $line;
-                push(@{$updates->{warning}}, $warning);
-            
-            } elsif($line =~ s#^E: ##) { # error
+                push( @{ $updates->{warning} }, $warning );
+
+            }
+            elsif ( $line =~ s#^E: ## ) {    # error
                 my $error = {};
                 $error->{message} = $line;
-                push(@{$updates->{error}}, $error);
+                push( @{ $updates->{error} }, $error );
             }
         }
-        
+
         close(APT);
-    } else {
+    }
+    else {
         die "Couldn't use APT: $!\n";
-        $updates->{error}    = 'Couldn\'t use APT: '.$;
+        $updates->{error} = 'Couldn\'t use APT: ' . $;;
     }
 
     return $updates;
@@ -646,145 +766,186 @@ sub AptToDate_AptToUpgrade($) {
 # End Childprozess
 ####################################################
 
-sub AptToDate_PreProcessing($$) {
+sub PreProcessing($$) {
 
-    my ($hash,$json)    = @_;
-    
-    
-    my $name            = $hash->{NAME};
-    
-    my $decode_json     = eval{decode_json($json)};
-    if($@){
+    my ( $hash, $json ) = @_;
+
+    my $name = $hash->{NAME};
+
+    my $decode_json = eval { decode_json($json) };
+    if ($@) {
         Log3 $name, 2, "AptToDate ($name) - JSON error: $@";
         return;
     }
-    
+
     Log3 $hash, 4, "AptToDate ($name) - JSON: $json";
 
-    $hash->{".fhem"}{aptget}{packages}          = $decode_json->{packages} if( $hash->{".fhem"}{aptget}{cmd} eq 'getUpdateList' );
-    $hash->{".fhem"}{aptget}{updatedpackages}   = $decode_json->{packages} if( $hash->{".fhem"}{aptget}{cmd} eq 'toUpgrade' );
-    
-    if( defined($decode_json->{warning}) or defined($decode_json->{error}) ) {
-        $hash->{".fhem"}{aptget}{'warnings'}        = $decode_json->{warning} if( defined($decode_json->{warning}) );
-        $hash->{".fhem"}{aptget}{errors}            = $decode_json->{error} if( defined($decode_json->{error}) );
-    } else {
+    if ( $hash->{".fhem"}{aptget}{cmd} eq 'getUpdateList' ) {
+        $hash->{".fhem"}{aptget}{packages} = $decode_json->{packages};
+        readingsSingleUpdate( $hash, '.upgradeList', $json, 0 );
+    }
+    elsif ( $hash->{".fhem"}{aptget}{cmd} eq 'toUpgrade' ) {
+        $hash->{".fhem"}{aptget}{updatedpackages} = $decode_json->{packages};
+        readingsSingleUpdate( $hash, '.updatedList', $json, 0 );
+    }
+
+    if (   defined( $decode_json->{warning} )
+        or defined( $decode_json->{error} ) )
+    {
+        $hash->{".fhem"}{aptget}{'warnings'} = $decode_json->{warning}
+          if ( defined( $decode_json->{warning} ) );
+        $hash->{".fhem"}{aptget}{errors} = $decode_json->{error}
+          if ( defined( $decode_json->{error} ) );
+    }
+    else {
         delete $hash->{".fhem"}{aptget}{'warnings'};
         delete $hash->{".fhem"}{aptget}{errors};
     }
-    
-    AptToDate_WriteReadings($hash,$decode_json);
+
+    WriteReadings( $hash, $decode_json );
 }
 
-sub AptToDate_WriteReadings($$) {
+sub WriteReadings($$) {
 
-    my ($hash,$decode_json)    = @_;
-    
-    my $name            = $hash->{NAME};
-    
+    my ( $hash, $decode_json ) = @_;
+
+    my $name = $hash->{NAME};
+
     Log3 $hash, 4, "AptToDate ($name) - Write Readings";
-    Log3 $hash, 5, "AptToDate ($name) - ".Dumper $decode_json;
-    Log3 $hash, 5, "AptToDate ($name) - Packges Anzahl: ".scalar keys %{$decode_json->{packages}};
-    Log3 $hash, 5, "AptToDate ($name) - Inhalt aptget cmd: ".scalar keys %{$decode_json->{packages}};
+    Log3 $hash, 5, "AptToDate ($name) - " . Dumper $decode_json;
+    Log3 $hash, 5, "AptToDate ($name) - Packges Anzahl: " . scalar
+      keys %{ $decode_json->{packages} };
+    Log3 $hash, 5, "AptToDate ($name) - Inhalt aptget cmd: " . scalar
+      keys %{ $decode_json->{packages} };
 
-    
     readingsBeginUpdate($hash);
-    
-    if( $hash->{".fhem"}{aptget}{cmd} eq 'repoSync' ) {
-        readingsBulkUpdate($hash,'repoSync',(defined($decode_json->{'state'}) ? 'fetched '.$decode_json->{'state'} : 'fetched error') );
-        $hash->{helper}{lastSync}   = AptToDate_ToDay();
+
+    if ( $hash->{".fhem"}{aptget}{cmd} eq 'repoSync' ) {
+        readingsBulkUpdate(
+            $hash,
+            'repoSync',
+            (
+                defined( $decode_json->{'state'} )
+                ? 'fetched ' . $decode_json->{'state'}
+                : 'fetched error'
+            )
+        );
+        $hash->{helper}{lastSync} = ToDay();
     }
-    
-    readingsBulkUpdateIfChanged($hash,'updatesAvailable',scalar keys %{$decode_json->{packages}}) if( $hash->{".fhem"}{aptget}{cmd} eq 'getUpdateList' );
-    readingsBulkUpdateIfChanged($hash,'upgradeListAsJSON',eval{encode_json($hash->{".fhem"}{aptget}{packages})}) if( AttrVal($name,'upgradeListReading','none') ne 'none');
-    readingsBulkUpdate($hash,'toUpgrade','successful') if( $hash->{".fhem"}{aptget}{cmd} eq 'toUpgrade' and not defined($hash->{".fhem"}{aptget}{'errors'}) and not defined($hash->{".fhem"}{aptget}{'warnings'}) );
-    
-    if( $hash->{".fhem"}{aptget}{cmd} eq 'getDistribution' ) {
-        while( my ($r,$v) = each %{$decode_json->{'os-release'}} ) {
-            readingsBulkUpdateIfChanged($hash,$r,$v);
+
+    readingsBulkUpdateIfChanged( $hash, 'updatesAvailable',
+        scalar keys %{ $decode_json->{packages} } )
+      if ( $hash->{".fhem"}{aptget}{cmd} eq 'getUpdateList' );
+    readingsBulkUpdateIfChanged( $hash, 'upgradeListAsJSON',
+        eval { encode_json( $hash->{".fhem"}{aptget}{packages} ) } )
+      if ( AttrVal( $name, 'upgradeListReading', 'none' ) ne 'none' );
+    readingsBulkUpdate( $hash, 'toUpgrade', 'successful' )
+      if (  $hash->{".fhem"}{aptget}{cmd} eq 'toUpgrade'
+        and not defined( $hash->{".fhem"}{aptget}{'errors'} )
+        and not defined( $hash->{".fhem"}{aptget}{'warnings'} ) );
+
+    if ( $hash->{".fhem"}{aptget}{cmd} eq 'getDistribution' ) {
+        while ( my ( $r, $v ) = each %{ $decode_json->{'os-release'} } ) {
+            readingsBulkUpdateIfChanged( $hash, $r, $v );
         }
     }
-    
-    if( defined($decode_json->{error}) ) {
-        readingsBulkUpdate($hash,'state',$hash->{".fhem"}{aptget}{cmd}.' Errors (get showErrorList)');
-        readingsBulkUpdate($hash,'state','errors');
-    } elsif( defined($decode_json->{warning}) ) {
-        readingsBulkUpdate($hash,'state',$hash->{".fhem"}{aptget}{cmd}.' Warnings (get showWarningList)');
-        readingsBulkUpdate($hash,'state','warnings');
-    } else {
-        
-        readingsBulkUpdate($hash,'state',(scalar keys %{$decode_json->{packages}} > 0 ? 'system updates available' : 'system is up to date') );
+
+    if ( defined( $decode_json->{error} ) ) {
+        readingsBulkUpdate( $hash, 'state',
+            $hash->{".fhem"}{aptget}{cmd} . ' Errors (get showErrorList)' );
+        readingsBulkUpdate( $hash, 'state', 'errors' );
     }
-    
-    readingsEndUpdate($hash,1);
-    
-    AptToDate_ProcessUpdateTimer($hash) if( $hash->{".fhem"}{aptget}{cmd} eq 'getDistribution' );
+    elsif ( defined( $decode_json->{warning} ) ) {
+        readingsBulkUpdate( $hash, 'state',
+            $hash->{".fhem"}{aptget}{cmd} . ' Warnings (get showWarningList)' );
+        readingsBulkUpdate( $hash, 'state', 'warnings' );
+    }
+    else {
+
+        readingsBulkUpdate(
+            $hash, 'state',
+            (
+                scalar keys %{ $decode_json->{packages} } > 0
+                ? 'system updates available'
+                : 'system is up to date'
+            )
+        );
+    }
+
+    readingsEndUpdate( $hash, 1 );
+
+    ProcessUpdateTimer($hash)
+      if ( $hash->{".fhem"}{aptget}{cmd} eq 'getDistribution' );
 }
 
-sub AptToDate_CreateUpgradeList($$) {
+sub CreateUpgradeList($$) {
 
-    my ($hash,$getCmd)  = @_;
-    
-    
+    my ( $hash, $getCmd ) = @_;
+
     my $packages;
-    $packages           = $hash->{".fhem"}{aptget}{packages} if($getCmd eq 'showUpgradeList');
-    $packages           = $hash->{".fhem"}{aptget}{updatedpackages} if($getCmd eq 'showUpdatedList');
-        
+    $packages = $hash->{".fhem"}{aptget}{packages}
+      if ( $getCmd eq 'showUpgradeList' );
+    $packages = $hash->{".fhem"}{aptget}{updatedpackages}
+      if ( $getCmd eq 'showUpdatedList' );
+
     my $ret = '<html><table><tr><td>';
     $ret .= '<table class="block wide">';
     $ret .= '<tr class="even">';
     $ret .= "<td><b>Packagename</b></td>";
-    $ret .= "<td><b>Current Version</b></td>" if($getCmd eq 'showUpgradeList');
-    $ret .= "<td><b>Over Version</b></td>" if($getCmd eq 'showUpdatedList');
-    $ret .= "<td><b>New Version</b></td>";;
+    $ret .= "<td><b>Current Version</b></td>"
+      if ( $getCmd eq 'showUpgradeList' );
+    $ret .= "<td><b>Over Version</b></td>" if ( $getCmd eq 'showUpdatedList' );
+    $ret .= "<td><b>New Version</b></td>";
     $ret .= "<td></td>";
     $ret .= '</tr>';
-    
-    if( ref($packages) eq "HASH" ) {
+
+    if ( ref($packages) eq "HASH" ) {
 
         my $linecount = 1;
-        foreach my $package (keys (%{$packages}) ) {
+        foreach my $package ( keys( %{$packages} ) ) {
             if ( $linecount % 2 == 0 ) {
                 $ret .= '<tr class="even">';
-            } else {
+            }
+            else {
                 $ret .= '<tr class="odd">';
             }
 
             $ret .= "<td>$package</td>";
             $ret .= "<td>$packages->{$package}{current}</td>";
             $ret .= "<td>$packages->{$package}{new}</td>";
-            
+
             $ret .= '</tr>';
             $linecount++;
         }
     }
-    
+
     $ret .= '</table></td></tr>';
     $ret .= '</table></html>';
 
     return $ret;
 }
 
-sub AptToDate_CreateWarningList($) {
+sub CreateWarningList($) {
 
-    my $hash        = shift;
+    my $hash = shift;
 
+    my $warnings = $hash->{".fhem"}{aptget}{'warnings'};
 
-    my $warnings    = $hash->{".fhem"}{aptget}{'warnings'};
-        
     my $ret = '<html><table><tr><td>';
     $ret .= '<table class="block wide">';
     $ret .= '<tr class="even">';
     $ret .= "<td><b>Warning List</b></td>";
     $ret .= "<td></td>";
     $ret .= '</tr>';
-    
-    if( ref($warnings) eq "ARRAY" ) {
+
+    if ( ref($warnings) eq "ARRAY" ) {
 
         my $linecount = 1;
-        foreach my $warning (@{$warnings}) {
+        foreach my $warning ( @{$warnings} ) {
             if ( $linecount % 2 == 0 ) {
                 $ret .= '<tr class="even">';
-            } else {
+            }
+            else {
                 $ret .= '<tr class="odd">';
             }
 
@@ -794,34 +955,34 @@ sub AptToDate_CreateWarningList($) {
             $linecount++;
         }
     }
-    
+
     $ret .= '</table></td></tr>';
     $ret .= '</table></html>';
 
     return $ret;
 }
 
-sub AptToDate_CreateErrorList($) {
+sub CreateErrorList($) {
 
-    my $hash    = shift;
+    my $hash = shift;
 
+    my $errors = $hash->{".fhem"}{aptget}{'errors'};
 
-    my $errors  = $hash->{".fhem"}{aptget}{'errors'};
-        
     my $ret = '<html><table><tr><td>';
     $ret .= '<table class="block wide">';
     $ret .= '<tr class="even">';
     $ret .= "<td><b>Error List</b></td>";
     $ret .= "<td></td>";
     $ret .= '</tr>';
-    
-    if( ref($errors) eq "ARRAY" ) {
+
+    if ( ref($errors) eq "ARRAY" ) {
 
         my $linecount = 1;
-        foreach my $error (@{$errors}) {
+        foreach my $error ( @{$errors} ) {
             if ( $linecount % 2 == 0 ) {
                 $ret .= '<tr class="even">';
-            } else {
+            }
+            else {
                 $ret .= '<tr class="odd">';
             }
 
@@ -831,7 +992,7 @@ sub AptToDate_CreateErrorList($) {
             $linecount++;
         }
     }
-    
+
     $ret .= '</table></td></tr>';
     $ret .= '</table></html>';
 
@@ -839,31 +1000,20 @@ sub AptToDate_CreateErrorList($) {
 }
 
 #### my little helper
-sub AptToDate_ToDay() {
+sub ToDay() {
 
-    my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst)  = localtime(gettimeofday());
-    
+    my ( $sec, $min, $hour, $mday, $month, $year, $wday, $yday, $isdst ) =
+      localtime( gettimeofday() );
+
     $month++;
-    $year+=1900;
-    
-    my $today = sprintf('%04d-%02d-%02d', $year,$month,$mday);
-    
+    $year += 1900;
+
+    my $today = sprintf( '%04d-%02d-%02d', $year, $month, $mday );
+
     return $today;
 }
 
-
-
-
-
-
 1;
-
-
-
-
-
-
-
 
 =pod
 =item device

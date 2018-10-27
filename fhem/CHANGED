@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
-  - bugfix:  74_XiaomiBTLESens : fix humidity code
+  - change:  42_AptToDate: change to package methode
+  - bugfix:  74_XiaomiBTLESens: fix humidity code
   - feature: 98_Verkehrsinfo.pm: add attribut disable
   - feature: allowed: multi-allowed changes (Forum #92423)
   - feature: 93_DbRep: V8.4.0, reduceLog from DbLog integrated into DbRep, 
