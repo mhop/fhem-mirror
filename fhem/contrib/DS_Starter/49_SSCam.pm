@@ -45,7 +45,7 @@ use HttpUtils;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
-  "7.2.2"  => "27.10.2018  Undefined subroutine &main::SSCam_ptzpanel ",
+  "7.2.2"  => "27.10.2018  fix undefined subroutine &main::SSCam_ptzpanel (https://forum.fhem.de/index.php/topic,45671.msg850505.html#msg850505) ",
   "7.2.1"  => "23.10.2018  new routine SSCam_versionCheck, COMPATIBILITY changed to 8.2.1 ",
   "7.2.0"  => "20.10.2018  direct help for attributes, new get versionNotes command, fix PERL WARNING: Use of uninitialized value \$small, get versionNotes ",
   "7.1.1"  => "18.10.2018  Message of \"Your current/simulated SVS-version...\" changed, commandref corrected ",
@@ -254,8 +254,8 @@ use vars qw($FW_subdir);  # Sub-path in URL, used by FLOORPLAN/weblink
 use vars qw($FW_room);    # currently selected room
 use vars qw($FW_detail);  # currently selected device for detail view
 
-sub SSCam_ptzpanel($;$$);
 
+################################################################
 sub SSCam_Initialize($) {
  my ($hash) = @_;
  $hash->{DefFn}        = "SSCam_Define";
@@ -274,7 +274,6 @@ sub SSCam_Initialize($) {
          "genericStrmHtmlTag ".
          "httptimeout ".
          "htmlattr ".
-         "livestreamprefix ".
 		 "loginRetries:1,2,3,4,5,6,7,8,9,10 ".
          "videofolderMap ".
          "pollcaminfoall ".
@@ -376,6 +375,10 @@ sub SSCam_Define($@) {
   }
   readingsEndUpdate($hash,1);                                          
   
+  # allg. Userattr setzen
+  my $defpref = $hash->{PROTOCOL}."://".$hash->{SERVERADDR}.":".$hash->{SERVERPORT}; 
+  addToDevAttrList($name, "livestreamprefix:sortable,$defpref");
+  
   SSCam_getcredentials($hash,1);                                                       # Credentials lesen und in RAM laden ($boot=1)      
   
   # initiale Routinen nach Restart ausführen   , verzögerter zufälliger Start
@@ -434,7 +437,12 @@ sub SSCam_Attr($$$$) {
     
     if($aName =~ m/ptzPanel_row.*|ptzPanel_Home|ptzPanel_use/) {
         InternalTimer(gettimeofday()+0.7, "SSCam_addptzattr", "$name", 0);
-    } 
+    }
+
+    if($aName =~ /livestreamprefix/ && $cmd eq "set") {
+        $aVal = (split(",",$aVal))[0];
+        $_[3] = $aVal;
+    }    
     
     if ($aName eq "disable") {
         if($cmd eq "set") {
