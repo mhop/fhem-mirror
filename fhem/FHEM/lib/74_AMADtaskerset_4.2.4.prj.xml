@@ -1,9 +1,9 @@
-<TaskerData sr="" dvi="1" tv="5.1">
-	<dmetric>1080.0,1776.0</dmetric>
+<TaskerData sr="" dvi="1" tv="5.6">
+	<dmetric>1440.0,2712.0</dmetric>
 	<Profile sr="prof1005" ve="2">
 		<cdate>1516830496835</cdate>
 		<clp>true</clp>
-		<edate>1521847866660</edate>
+		<edate>1529962335089</edate>
 		<id>1005</id>
 		<mid0>1004</mid0>
 		<nme>AutoRemote AMAD</nme>
@@ -28,36 +28,6 @@
 					<messagevar-type>java.lang.String</messagevar-type>
 					<net.dinglisch.android.tasker.EXTRA_NSR_DEPRECATED>true</net.dinglisch.android.tasker.EXTRA_NSR_DEPRECATED>
 					<net.dinglisch.android.tasker.EXTRA_NSR_DEPRECATED-type>java.lang.Boolean</net.dinglisch.android.tasker.EXTRA_NSR_DEPRECATED-type>
-					<net.dinglisch.android.tasker.RELEVANT_VARIABLES>&lt;StringArray sr=""&gt;&lt;_array_net.dinglisch.android.tasker.RELEVANT_VARIABLES0&gt;%err
-Error Code
-Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/b&amp;gt; and the action ends in error&lt;/_array_net.dinglisch.android.tasker.RELEVANT_VARIABLES0&gt;&lt;_array_net.dinglisch.android.tasker.RELEVANT_VARIABLES1&gt;%errmsg
-Error Message
-Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/b&amp;gt; and the action ends in error&lt;/_array_net.dinglisch.android.tasker.RELEVANT_VARIABLES1&gt;&lt;_array_net.dinglisch.android.tasker.RELEVANT_VARIABLES2&gt;%armessage
-The whole received AutoRemote message.
-The whole received AutoRemote message.&lt;/_array_net.dinglisch.android.tasker.RELEVANT_VARIABLES2&gt;&lt;_array_net.dinglisch.android.tasker.RELEVANT_VARIABLES3&gt;%arpar()
-Single words to the left of =:=
-Single words to the left of =:=&lt;/_array_net.dinglisch.android.tasker.RELEVANT_VARIABLES3&gt;&lt;_array_net.dinglisch.android.tasker.RELEVANT_VARIABLES4&gt;%arcomm
-Whole of the text to the right of =:=
-Whole of the text to the right of =:=&lt;/_array_net.dinglisch.android.tasker.RELEVANT_VARIABLES4&gt;&lt;_array_net.dinglisch.android.tasker.RELEVANT_VARIABLES5&gt;%artime
-Current Time
-&lt;/_array_net.dinglisch.android.tasker.RELEVANT_VARIABLES5&gt;&lt;_array_net.dinglisch.android.tasker.RELEVANT_VARIABLES6&gt;%arfiles()
-Files
-&lt;/_array_net.dinglisch.android.tasker.RELEVANT_VARIABLES6&gt;&lt;_array_net.dinglisch.android.tasker.RELEVANT_VARIABLES7&gt;%arsenderbtmac
-Sender Bluetooth Mac Address
-&lt;/_array_net.dinglisch.android.tasker.RELEVANT_VARIABLES7&gt;&lt;_array_net.dinglisch.android.tasker.RELEVANT_VARIABLES8&gt;%arsenderid
-Sender Id
-&lt;/_array_net.dinglisch.android.tasker.RELEVANT_VARIABLES8&gt;&lt;_array_net.dinglisch.android.tasker.RELEVANT_VARIABLES9&gt;%arsenderlocalip
-Sender Local IP
-&lt;/_array_net.dinglisch.android.tasker.RELEVANT_VARIABLES9&gt;&lt;_array_net.dinglisch.android.tasker.RELEVANT_VARIABLES10&gt;%arsendername
-Sender Name
-&lt;/_array_net.dinglisch.android.tasker.RELEVANT_VARIABLES10&gt;&lt;_array_net.dinglisch.android.tasker.RELEVANT_VARIABLES11&gt;%arsenderpublicip
-Sender Public IP
-&lt;/_array_net.dinglisch.android.tasker.RELEVANT_VARIABLES11&gt;&lt;_array_net.dinglisch.android.tasker.RELEVANT_VARIABLES12&gt;%arsendertype
-Sender Type
-&lt;/_array_net.dinglisch.android.tasker.RELEVANT_VARIABLES12&gt;&lt;_array_net.dinglisch.android.tasker.RELEVANT_VARIABLES13&gt;%arvia
-Way the message was sent (BT, Wifi, GCM)
-&lt;/_array_net.dinglisch.android.tasker.RELEVANT_VARIABLES13&gt;&lt;/StringArray&gt;</net.dinglisch.android.tasker.RELEVANT_VARIABLES>
-					<net.dinglisch.android.tasker.RELEVANT_VARIABLES-type>[Ljava.lang.String;</net.dinglisch.android.tasker.RELEVANT_VARIABLES-type>
 					<net.dinglisch.android.tasker.extras.VARIABLE_REPLACE_KEYS>messagevar tempvar commparamsvar message target plugininstanceid plugintypeid </net.dinglisch.android.tasker.extras.VARIABLE_REPLACE_KEYS>
 					<net.dinglisch.android.tasker.extras.VARIABLE_REPLACE_KEYS-type>java.lang.String</net.dinglisch.android.tasker.extras.VARIABLE_REPLACE_KEYS-type>
 					<net.dinglisch.android.tasker.subbundled>true</net.dinglisch.android.tasker.subbundled>
@@ -667,10 +637,35 @@ Telegram</label>
 			</ConditionList>
 		</State>
 	</Profile>
+	<Profile sr="prof1069" ve="2">
+		<cdate>1540567597382</cdate>
+		<clp>true</clp>
+		<edate>1540586468041</edate>
+		<id>1069</id>
+		<mid0>1070</mid0>
+		<nme>AMAD_doNotDisturb</nme>
+		<Event sr="con0" ve="2">
+			<code>2075</code>
+			<pri>0</pri>
+			<Int sr="arg0" val="0"/>
+			<Str sr="arg1" ve="3">zen_mode</Str>
+			<Str sr="arg2" ve="3"/>
+		</Event>
+		<State sr="con1" ve="2">
+			<code>165</code>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%AMAD_send</lhs>
+					<op>2</op>
+					<rhs>on</rhs>
+				</Condition>
+			</ConditionList>
+		</State>
+	</Profile>
 	<Profile sr="prof1071" ve="2">
 		<cdate>1439252230082</cdate>
 		<clp>true</clp>
-		<edate>1522171119557</edate>
+		<edate>1540586480780</edate>
 		<id>1071</id>
 		<mid0>1072</mid0>
 		<nme>AMAD_Media_PowerampState</nme>
@@ -693,10 +688,135 @@ Telegram</label>
 			</ConditionList>
 		</State>
 	</Profile>
+	<Profile sr="prof1073" ve="2">
+		<cdate>1540568103466</cdate>
+		<clp>true</clp>
+		<edate>1540586450556</edate>
+		<id>1073</id>
+		<mid0>1074</mid0>
+		<nme>AMAD_screenBrightness</nme>
+		<Event sr="con0" ve="2">
+			<code>2075</code>
+			<pri>0</pri>
+			<Int sr="arg0" val="2"/>
+			<Str sr="arg1" ve="3">screen_brightness</Str>
+			<Str sr="arg2" ve="3"/>
+		</Event>
+		<State sr="con1" ve="2">
+			<code>165</code>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%AMAD_send</lhs>
+					<op>2</op>
+					<rhs>on</rhs>
+				</Condition>
+			</ConditionList>
+		</State>
+	</Profile>
+	<Profile sr="prof1075" ve="2">
+		<cdate>1540568103466</cdate>
+		<clp>true</clp>
+		<edate>1540586443990</edate>
+		<id>1075</id>
+		<mid0>1076</mid0>
+		<nme>AMAD_volume</nme>
+		<Event sr="con0" ve="2">
+			<code>2075</code>
+			<pri>0</pri>
+			<Int sr="arg0" val="2"/>
+			<Str sr="arg1" ve="3">volume_music_speaker</Str>
+			<Str sr="arg2" ve="3"/>
+		</Event>
+		<State sr="con1" ve="2">
+			<code>165</code>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%AMAD_send</lhs>
+					<op>2</op>
+					<rhs>on</rhs>
+				</Condition>
+			</ConditionList>
+		</State>
+	</Profile>
+	<Profile sr="prof1077" ve="2">
+		<cdate>1540568103466</cdate>
+		<clp>true</clp>
+		<edate>1540586436081</edate>
+		<id>1077</id>
+		<mid0>1078</mid0>
+		<nme>AMAD_screenOrientationMode</nme>
+		<Event sr="con0" ve="2">
+			<code>2075</code>
+			<pri>0</pri>
+			<Int sr="arg0" val="2"/>
+			<Str sr="arg1" ve="3">accelerometer_rotation</Str>
+			<Str sr="arg2" ve="3"/>
+		</Event>
+		<State sr="con1" ve="2">
+			<code>165</code>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%AMAD_send</lhs>
+					<op>2</op>
+					<rhs>on</rhs>
+				</Condition>
+			</ConditionList>
+		</State>
+	</Profile>
+	<Profile sr="prof1081" ve="2">
+		<cdate>1540568103466</cdate>
+		<clp>true</clp>
+		<edate>1540586428603</edate>
+		<id>1081</id>
+		<mid0>1082</mid0>
+		<nme>AMAD_screenBrightnessMode</nme>
+		<Event sr="con0" ve="2">
+			<code>2075</code>
+			<pri>0</pri>
+			<Int sr="arg0" val="2"/>
+			<Str sr="arg1" ve="3">screen_brightness_mode</Str>
+			<Str sr="arg2" ve="3"/>
+		</Event>
+		<State sr="con1" ve="2">
+			<code>165</code>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%AMAD_send</lhs>
+					<op>2</op>
+					<rhs>on</rhs>
+				</Condition>
+			</ConditionList>
+		</State>
+	</Profile>
+	<Profile sr="prof1083" ve="2">
+		<cdate>1540568103466</cdate>
+		<clp>true</clp>
+		<edate>1540586418234</edate>
+		<id>1083</id>
+		<mid0>1084</mid0>
+		<nme>AMAD_volumeNotification</nme>
+		<Event sr="con0" ve="2">
+			<code>2075</code>
+			<pri>0</pri>
+			<Int sr="arg0" val="2"/>
+			<Str sr="arg1" ve="3">volume_ring_speaker</Str>
+			<Str sr="arg2" ve="3"/>
+		</Event>
+		<State sr="con1" ve="2">
+			<code>165</code>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%AMAD_send</lhs>
+					<op>2</op>
+					<rhs>on</rhs>
+				</Condition>
+			</ConditionList>
+		</State>
+	</Profile>
 	<Profile sr="prof53" ve="2">
 		<cdate>1439252230082</cdate>
 		<clp>true</clp>
-		<edate>1522171145358</edate>
+		<edate>1540586474808</edate>
 		<id>53</id>
 		<mid0>850</mid0>
 		<nme>AMAD_Media_IntentRadio</nme>
@@ -722,7 +842,7 @@ Telegram</label>
 	<Profile sr="prof971" ve="2">
 		<cdate>1480692336275</cdate>
 		<clp>true</clp>
-		<edate>1522170774304</edate>
+		<edate>1540570641598</edate>
 		<id>971</id>
 		<mid0>1036</mid0>
 		<nme>AMAD_incomingCaller</nme>
@@ -744,14 +864,14 @@ Telegram</label>
 	<Project sr="proj0" ve="2">
 		<cdate>1502789371413</cdate>
 		<name>AMAD</name>
-		<pids>53,1014,1008,1015,1020,1023,1007,1016,1013,1065,1026,1022,1028,1025,1006,1035,1024,1011,1005,971,1021,1029,1030,1017,1010,1071,1019</pids>
-		<scenes>AMAD_settings,AMAD_Dialog_Message</scenes>
-		<tids>936,1063,957,956,923,981,934,920,962,961,978,948,945,925,955,995,960,926,999,1072,985,975,950,1055,959,939,914,943,967,996,979,850,954,998,927,924,987,938,937,944,951,918,949,932,931,966,941,972,983,963,994,1002,974,1004,935,940,942,982,997,964,969,976,958,990,1003,1066,980,922,991,988,1000,946,947,916,1036,977,989,968,1001,993,992,965,970,953,973,986,1031,984</tids>
+		<pids>1030,1016,1021,1035,1020,1007,1019,1071,1022,1073,1011,1028,1006,1005,971,1010,1075,1026,1017,1069,53,1024,1029,1025,1081,1083,1013,1015,1008,1065,1014,1077,1023</pids>
+		<scenes>AMAD_settings,Lock,AMAD_Dialog_Message,AMAD_Popup</scenes>
+		<tids>975,1031,962,937,926,1063,948,970,987,955,986,999,967,953,996,981,1082,914,990,1084,925,947,1036,968,960,924,958,966,969,980,945,1004,998,938,1055,979,1002,939,949,972,993,918,957,956,978,977,1070,934,946,936,951,982,923,992,950,985,994,935,922,943,984,1074,988,920,974,1000,995,954,961,1076,997,1066,983,927,976,931,942,991,959,850,1072,940,1001,944,941,932,1003,916,973,964,989,963,965,1078</tids>
 		<Kid sr="Kid">
-			<feat0>android.hardware.camera:y</feat0>
-			<feat1>android.hardware.bluetooth:y</feat1>
-			<feat2>android.hardware.camera.flash:y</feat2>
-			<feat3>android.hardware.camera.front:y</feat3>
+			<feat0>android.hardware.bluetooth:y</feat0>
+			<feat1>android.hardware.camera.front:y</feat1>
+			<feat2>android.hardware.camera:y</feat2>
+			<feat3>android.hardware.camera.flash:y</feat3>
 			<feat4>android.hardware.wifi:y</feat4>
 			<launchID>965</launchID>
 			<mplug0>net.superblock.pushover</mplug0>
@@ -761,6 +881,16 @@ Telegram</label>
 			<vnme>1.0</vnme>
 			<vnum>10</vnum>
 		</Kid>
+		<Share sr="Share">
+			<d>Project file for the FHEM AMAD module 
+
+AMAD is an interface between SmartHome and Android device.
+
+Description:
+See the FHEM commandref description:  https://fhem.de/commandref.html#AMADDevice
+Forum entry: https://forum.fhem.de/index.php/topic,81167.0.html</d>
+			<t>AMAD</t>
+		</Share>
 		<Img sr="icon" ve="2">
 			<fle>/storage/emulated/0/Tasker/.icn/Eigene Icons/TaskerFHEM_icon.png</fle>
 		</Img>
@@ -768,14 +898,14 @@ Telegram</label>
 	<Scene sr="sceneAMAD_Dialog_Message">
 		<cdate>1502817008040</cdate>
 		<edate>1513454407485</edate>
-		<heightLand>437</heightLand>
-		<heightPort>437</heightPort>
+		<heightLand>582</heightLand>
+		<heightPort>582</heightPort>
 		<nme>AMAD_Dialog_Message</nme>
-		<widthLand>945</widthLand>
-		<widthPort>945</widthPort>
+		<widthLand>1260</widthLand>
+		<widthPort>1260</widthPort>
 		<RectElement sr="elements0">
 			<flags>4</flags>
-			<geom>0,0,944,437,0,0,944,437</geom>
+			<geom>0,0,1258,582,0,0,1258,582</geom>
 			<Str sr="arg0" ve="3">Rectangle_Hintergrund</Str>
 			<Int sr="arg1" val="0"/>
 			<Str sr="arg2" ve="3">#77333333</Str>
@@ -787,10 +917,10 @@ Telegram</label>
 		</RectElement>
 		<TextElement sr="elements1" ve="3">
 			<flags>4</flags>
-			<geom>8,0,928,340,8,0,928,340</geom>
+			<geom>10,0,1237,453,10,0,1237,453</geom>
 			<Str sr="arg0" ve="3">Text_Title</Str>
 			<Str sr="arg1" ve="3">%message</Str>
-			<Int sr="arg2" val="16"/>
+			<Int sr="arg2" val="20"/>
 			<Int sr="arg3" val="103"/>
 			<Str sr="arg4" ve="3">#FFFFFFFF</Str>
 			<Str sr="arg5" ve="3"/>
@@ -801,10 +931,10 @@ Telegram</label>
 		<TextElement sr="elements2" ve="3">
 			<clickTask>920</clickTask>
 			<flags>4</flags>
-			<geom>639,340,306,95,639,340,306,95</geom>
+			<geom>852,453,408,126,852,453,408,126</geom>
 			<Str sr="arg0" ve="3">Text_Weiter</Str>
 			<Str sr="arg1" ve="3">Weiter</Str>
-			<Int sr="arg2" val="18"/>
+			<Int sr="arg2" val="22"/>
 			<Int sr="arg3" val="105"/>
 			<Str sr="arg4" ve="3">#FF03A9F4</Str>
 			<Str sr="arg5" ve="3"/>
@@ -827,22 +957,54 @@ Telegram</label>
 			</LinkClickFilter>
 		</PropertiesElement>
 	</Scene>
+	<Scene sr="sceneAMAD_Popup">
+		<cdate>1538771127455</cdate>
+		<edate>1538771561472</edate>
+		<heightLand>-1</heightLand>
+		<heightPort>290</heightPort>
+		<nme>AMAD_Popup</nme>
+		<widthLand>-1</widthLand>
+		<widthPort>600</widthPort>
+		<TextElement sr="elements0" ve="3">
+			<flags>4</flags>
+			<geom>160,108,240,80,120,81,180,60</geom>
+			<Str sr="arg0" ve="3">Text1</Str>
+			<Str sr="arg1" ve="3"/>
+			<Int sr="arg2" val="18"/>
+			<Int sr="arg3" val="100"/>
+			<Str sr="arg4" ve="3">#00FFFFFF</Str>
+			<Str sr="arg5" ve="3"/>
+			<Int sr="arg6" val="0"/>
+			<Int sr="arg7" val="0"/>
+			<Int sr="arg8" val="0"/>
+		</TextElement>
+		<PropertiesElement sr="props">
+			<Int sr="arg0" val="1"/>
+			<Int sr="arg1" val="0"/>
+			<Str sr="arg2" ve="3">#00FFFFFF</Str>
+			<Int sr="arg3" val="0"/>
+			<Str sr="arg4" ve="3">Popup transparet</Str>
+			<Str sr="arg5" ve="3"/>
+			<Img sr="arg6" ve="2"/>
+			<Str sr="arg7" ve="3"/>
+		</PropertiesElement>
+	</Scene>
 	<Scene sr="sceneAMAD_settings">
 		<cdate>1512032010150</cdate>
 		<edate>1515014317697</edate>
-		<heightLand>720</heightLand>
-		<heightPort>1280</heightPort>
+		<heightLand>960</heightLand>
+		<heightPort>1706</heightPort>
 		<nme>AMAD_settings</nme>
-		<widthLand>1280</widthLand>
-		<widthPort>720</widthPort>
+		<widthLand>1706</widthLand>
+		<widthPort>960</widthPort>
 		<TextElement sr="elements0" ve="3">
 			<clickTask>951</clickTask>
 			<flags>4</flags>
-			<geom>0,561,159,75,651,272,133,73</geom>
+			<geom>0,748,212,100,868,362,177,97</geom>
 			<Str sr="arg0" ve="3">Text_fhemctlmode</Str>
 			<Str sr="arg1" ve="3">Control
 Mode:</Str>
-			<Int sr="arg2" val="16"/>
+			<Int sr="arg2" val="20"/>
 			<Int sr="arg3" val="100"/>
 			<Str sr="arg4" ve="3">#FFFFFFFF</Str>
 			<Str sr="arg5" ve="3"/>
@@ -853,11 +1015,11 @@ Mode:</Str>
 		<TextElement sr="elements1" ve="3">
 			<clickTask>923</clickTask>
 			<flags>4</flags>
-			<geom>0,464,159,75,651,173,133,73</geom>
+			<geom>0,618,212,100,868,230,177,97</geom>
 			<Str sr="arg0" ve="3">Text_AMADport</Str>
 			<Str sr="arg1" ve="3">AMAD
 Bridge Port:</Str>
-			<Int sr="arg2" val="16"/>
+			<Int sr="arg2" val="20"/>
 			<Int sr="arg3" val="100"/>
 			<Str sr="arg4" ve="3">#FFFFFFFF</Str>
 			<Str sr="arg5" ve="3"/>
@@ -868,11 +1030,11 @@ Bridge Port:</Str>
 		<EditTextElement sr="elements10" ve="3">
 			<flags>4</flags>
 			<focuschangeTask>938</focuschangeTask>
-			<geom>168,367,397,75,796,75,343,73</geom>
+			<geom>224,489,529,100,1061,100,457,97</geom>
 			<valueselectedTask>953</valueselectedTask>
 			<Str sr="arg0" ve="3">TextEdit_FHEMip</Str>
 			<Str sr="arg1" ve="3"/>
-			<Int sr="arg2" val="12"/>
+			<Int sr="arg2" val="16"/>
 			<Int sr="arg3" val="100"/>
 			<Str sr="arg4" ve="3">#FF000000</Str>
 			<Str sr="arg5" ve="3"/>
@@ -895,11 +1057,11 @@ Bridge Port:</Str>
 		<EditTextElement sr="elements11" ve="3">
 			<flags>4</flags>
 			<focuschangeTask>936</focuschangeTask>
-			<geom>168,464,397,75,796,173,343,73</geom>
+			<geom>224,618,529,100,1061,230,457,97</geom>
 			<valueselectedTask>955</valueselectedTask>
 			<Str sr="arg0" ve="3">TextEdit_AMADport</Str>
 			<Str sr="arg1" ve="3"/>
-			<Int sr="arg2" val="12"/>
+			<Int sr="arg2" val="16"/>
 			<Int sr="arg3" val="100"/>
 			<Str sr="arg4" ve="3">#FF000000</Str>
 			<Str sr="arg5" ve="3"/>
@@ -922,11 +1084,11 @@ Bridge Port:</Str>
 		<EditTextElement sr="elements12" ve="3">
 			<flags>4</flags>
 			<focuschangeTask>946</focuschangeTask>
-			<geom>168,271,397,75,143,272,343,73</geom>
+			<geom>224,361,529,100,190,362,457,97</geom>
 			<valueselectedTask>937</valueselectedTask>
 			<Str sr="arg0" ve="3">TextEdit_AMAD_ID</Str>
 			<Str sr="arg1" ve="3"/>
-			<Int sr="arg2" val="12"/>
+			<Int sr="arg2" val="16"/>
 			<Int sr="arg3" val="100"/>
 			<Str sr="arg4" ve="3">#FF000000</Str>
 			<Str sr="arg5" ve="3"/>
@@ -948,11 +1110,11 @@ Bridge Port:</Str>
 		</EditTextElement>
 		<EditTextElement sr="elements13" ve="3">
 			<focuschangeTask>924</focuschangeTask>
-			<geom>168,1030,397,75,796,518,343,73</geom>
+			<geom>224,1373,529,100,1061,690,457,97</geom>
 			<valueselectedTask>941</valueselectedTask>
 			<Str sr="arg0" ve="3">TextEdit_SSID</Str>
 			<Str sr="arg1" ve="3"/>
-			<Int sr="arg2" val="12"/>
+			<Int sr="arg2" val="16"/>
 			<Int sr="arg3" val="100"/>
 			<Str sr="arg4" ve="3">#FF000000</Str>
 			<Str sr="arg5" ve="3"/>
@@ -974,7 +1136,7 @@ Bridge Port:</Str>
 		</EditTextElement>
 		<SpinnerElement sr="elements14">
 			<flags>4</flags>
-			<geom>168,561,397,75,796,272,345,74</geom>
+			<geom>224,748,529,100,1061,362,460,98</geom>
 			<Str sr="arg0" ve="3">Spinner_fhemctlmode</Str>
 			<Int sr="arg1" val="0"/>
 			<Str sr="arg2" ve="3"/>
@@ -983,13 +1145,13 @@ Bridge Port:</Str>
 					<cdate>1512142679276</cdate>
 					<edate>1512142679276</edate>
 					<heightLand>74</heightLand>
-					<heightPort>75</heightPort>
+					<heightPort>133</heightPort>
 					<nme>spinner</nme>
 					<widthLand>345</widthLand>
-					<widthPort>397</widthPort>
+					<widthPort>705</widthPort>
 					<ImageElement sr="elements0" ve="2">
 						<flags>1</flags>
-						<geom>232,0,159,73,195,0,150,74</geom>
+						<geom>412,0,282,129,195,0,150,74</geom>
 						<Str sr="arg0" ve="3">Icon</Str>
 						<Img sr="arg1" ve="2">
 							<nme>hd_aaa_ext_tiles_small</nme>
@@ -998,10 +1160,10 @@ Bridge Port:</Str>
 					</ImageElement>
 					<TextElement sr="elements1" ve="3">
 						<flags>1</flags>
-						<geom>11,0,101,73,15,0,95,74</geom>
+						<geom>18,0,178,129,15,0,95,74</geom>
 						<Str sr="arg0" ve="3">Index</Str>
 						<Str sr="arg1" ve="3">1.</Str>
-						<Int sr="arg2" val="22"/>
+						<Int sr="arg2" val="26"/>
 						<Int sr="arg3" val="100"/>
 						<Str sr="arg4" ve="3">#FFFFFFFF</Str>
 						<Str sr="arg5" ve="3"/>
@@ -1011,10 +1173,10 @@ Bridge Port:</Str>
 					</TextElement>
 					<TextElement sr="elements2" ve="3">
 						<flags>5</flags>
-						<geom>0,0,397,75,0,0,345,74</geom>
+						<geom>0,0,705,133,0,0,345,74</geom>
 						<Str sr="arg0" ve="3">Label</Str>
 						<Str sr="arg1" ve="3"/>
-						<Int sr="arg2" val="12"/>
+						<Int sr="arg2" val="16"/>
 						<Int sr="arg3" val="100"/>
 						<Str sr="arg4" ve="3">#FF000000</Str>
 						<Str sr="arg5" ve="3"/>
@@ -1061,11 +1223,11 @@ Bridge Port:</Str>
 		<TextElement sr="elements15" ve="3">
 			<clickTask>985</clickTask>
 			<flags>4</flags>
-			<geom>578,76,134,75,503,75,121,73</geom>
+			<geom>770,101,178,100,670,100,161,97</geom>
 			<Str sr="arg0" ve="3">Text_getDeviceName</Str>
 			<Str sr="arg1" ve="3">auto
 set</Str>
-			<Int sr="arg2" val="16"/>
+			<Int sr="arg2" val="20"/>
 			<Int sr="arg3" val="100"/>
 			<Str sr="arg4" ve="3">#FF03A9F4</Str>
 			<Str sr="arg5" ve="3"/>
@@ -1088,11 +1250,11 @@ set</Str>
 		<TextElement sr="elements16" ve="3">
 			<clickTask>969</clickTask>
 			<flags>4</flags>
-			<geom>578,271,134,75,503,272,121,73</geom>
+			<geom>770,361,178,100,670,362,161,97</geom>
 			<Str sr="arg0" ve="3">Text_getID</Str>
 			<Str sr="arg1" ve="3">Generate
 new ID</Str>
-			<Int sr="arg2" val="16"/>
+			<Int sr="arg2" val="20"/>
 			<Int sr="arg3" val="100"/>
 			<Str sr="arg4" ve="3">#FF03A9F4</Str>
 			<Str sr="arg5" ve="3"/>
@@ -1115,11 +1277,11 @@ new ID</Str>
 		<TextElement sr="elements17" ve="3">
 			<clickTask>975</clickTask>
 			<flags>4</flags>
-			<geom>578,174,134,75,503,173,121,73</geom>
+			<geom>770,232,178,100,670,230,161,97</geom>
 			<Str sr="arg0" ve="3">Text_getIP</Str>
 			<Str sr="arg1" ve="3">get
 Device IP</Str>
-			<Int sr="arg2" val="16"/>
+			<Int sr="arg2" val="20"/>
 			<Int sr="arg3" val="100"/>
 			<Str sr="arg4" ve="3">#FF03A9F4</Str>
 			<Str sr="arg5" ve="3"/>
@@ -1141,11 +1303,11 @@ Device IP</Str>
 		</TextElement>
 		<TextElement sr="elements18" ve="3">
 			<clickTask>987</clickTask>
-			<geom>578,1030,134,75,1153,518,121,73</geom>
+			<geom>770,1373,178,100,1537,690,161,97</geom>
 			<Str sr="arg0" ve="3">Text_getSSID</Str>
 			<Str sr="arg1" ve="3">get
 SSID</Str>
-			<Int sr="arg2" val="16"/>
+			<Int sr="arg2" val="20"/>
 			<Int sr="arg3" val="100"/>
 			<Str sr="arg4" ve="3">#FF03A9F4</Str>
 			<Str sr="arg5" ve="3"/>
@@ -1168,11 +1330,11 @@ SSID</Str>
 		<TextElement sr="elements19" ve="3">
 			<clickTask>957</clickTask>
 			<flags>4</flags>
-			<geom>578,464,134,75,1153,173,121,73</geom>
+			<geom>770,618,178,100,1537,230,161,97</geom>
 			<Str sr="arg0" ve="3">Text_setPort</Str>
 			<Str sr="arg1" ve="3">default
 8090</Str>
-			<Int sr="arg2" val="16"/>
+			<Int sr="arg2" val="20"/>
 			<Int sr="arg3" val="100"/>
 			<Str sr="arg4" ve="3">#FF03A9F4</Str>
 			<Str sr="arg5" ve="3"/>
@@ -1194,11 +1356,11 @@ SSID</Str>
 		</TextElement>
 		<TextElement sr="elements2" ve="3">
 			<clickTask>954</clickTask>
-			<geom>0,1030,159,75,651,518,133,73</geom>
+			<geom>0,1373,212,100,868,690,177,97</geom>
 			<Str sr="arg0" ve="3">Text_SSID</Str>
 			<Str sr="arg1" ve="3">WLAN
 SSID:</Str>
-			<Int sr="arg2" val="16"/>
+			<Int sr="arg2" val="20"/>
 			<Int sr="arg3" val="100"/>
 			<Str sr="arg4" ve="3">#FFFFFFFF</Str>
 			<Str sr="arg5" ve="3"/>
@@ -1209,10 +1371,10 @@ SSID:</Str>
 		<TextElement sr="elements20" ve="3">
 			<clickTask>994</clickTask>
 			<flags>4</flags>
-			<geom>0,1175,182,102,0,643,374,75</geom>
+			<geom>0,1566,242,136,0,857,498,100</geom>
 			<Str sr="arg0" ve="3">Text_close</Str>
 			<Str sr="arg1" ve="3">CLOSE</Str>
-			<Int sr="arg2" val="12"/>
+			<Int sr="arg2" val="16"/>
 			<Int sr="arg3" val="100"/>
 			<Str sr="arg4" ve="3">#FF03A9F4</Str>
 			<Str sr="arg5" ve="3"/>
@@ -1223,10 +1385,10 @@ SSID:</Str>
 		<TextElement sr="elements21" ve="3">
 			<clickTask>977</clickTask>
 			<flags>4</flags>
-			<geom>283,1175,199,102,452,643,369,75</geom>
+			<geom>377,1566,265,136,602,857,492,100</geom>
 			<Str sr="arg0" ve="3">Text_autocreate</Str>
 			<Str sr="arg1" ve="3">create Device</Str>
-			<Int sr="arg2" val="12"/>
+			<Int sr="arg2" val="16"/>
 			<Int sr="arg3" val="100"/>
 			<Str sr="arg4" ve="3">#FF03A9F4</Str>
 			<Str sr="arg5" ve="3"/>
@@ -1237,10 +1399,10 @@ SSID:</Str>
 		<TextElement sr="elements22" ve="3">
 			<clickTask>939</clickTask>
 			<flags>4</flags>
-			<geom>544,1175,174,102,947,643,330,75</geom>
+			<geom>725,1566,232,136,1262,857,440,100</geom>
 			<Str sr="arg0" ve="3">Text_save</Str>
 			<Str sr="arg1" ve="3">SAVE</Str>
-			<Int sr="arg2" val="12"/>
+			<Int sr="arg2" val="16"/>
 			<Int sr="arg3" val="100"/>
 			<Str sr="arg4" ve="3">#FF03A9F4</Str>
 			<Str sr="arg5" ve="3"/>
@@ -1251,7 +1413,7 @@ SSID:</Str>
 		<SwitchElement sr="elements23">
 			<checkchangeTask>986</checkchangeTask>
 			<flags>4</flags>
-			<geom>591,884,118,74,503,518,118,73</geom>
+			<geom>788,1178,157,98,670,690,157,97</geom>
 			<Str sr="arg0" ve="3">Switch_information</Str>
 			<Int sr="arg1" val="0"/>
 			<RectElement sr="background">
@@ -1270,10 +1432,10 @@ SSID:</Str>
 		<TextElement sr="elements24" ve="3">
 			<clickTask>949</clickTask>
 			<flags>4</flags>
-			<geom>0,884,567,74,0,518,478,73</geom>
+			<geom>0,1178,756,98,0,690,637,97</geom>
 			<Str sr="arg0" ve="3">Text_information</Str>
 			<Str sr="arg1" ve="3">information Profiles</Str>
-			<Int sr="arg2" val="16"/>
+			<Int sr="arg2" val="20"/>
 			<Int sr="arg3" val="100"/>
 			<Str sr="arg4" ve="3">#FFFFFFFF</Str>
 			<Str sr="arg5" ve="3"/>
@@ -1284,10 +1446,10 @@ SSID:</Str>
 		<TextElement sr="elements25" ve="3">
 			<clickTask>940</clickTask>
 			<flags>4</flags>
-			<geom>0,957,567,74,651,444,478,73</geom>
+			<geom>0,1276,756,98,868,592,637,97</geom>
 			<Str sr="arg0" ve="3">Text_toGo</Str>
 			<Str sr="arg1" ve="3">toGo Funktion</Str>
-			<Int sr="arg2" val="16"/>
+			<Int sr="arg2" val="20"/>
 			<Int sr="arg3" val="100"/>
 			<Str sr="arg4" ve="3">#FFFFFFFF</Str>
 			<Str sr="arg5" ve="3"/>
@@ -1298,7 +1460,7 @@ SSID:</Str>
 		<SwitchElement sr="elements26">
 			<checkchangeTask>970</checkchangeTask>
 			<flags>4</flags>
-			<geom>591,957,118,74,1153,444,118,73</geom>
+			<geom>788,1276,157,98,1537,592,157,97</geom>
 			<Str sr="arg0" ve="3">Switch_toGo</Str>
 			<Int sr="arg1" val="0"/>
 			<RectElement sr="background">
@@ -1317,10 +1479,10 @@ SSID:</Str>
 		<TextElement sr="elements27" ve="3">
 			<clickTask>995</clickTask>
 			<flags>4</flags>
-			<geom>0,737,567,74,0,370,478,73</geom>
+			<geom>0,982,756,98,0,493,637,97</geom>
 			<Str sr="arg0" ve="3">Text_StatusRequest</Str>
 			<Str sr="arg1" ve="3">StatusRequest</Str>
-			<Int sr="arg2" val="16"/>
+			<Int sr="arg2" val="20"/>
 			<Int sr="arg3" val="100"/>
 			<Str sr="arg4" ve="3">#FFFFFFFF</Str>
 			<Str sr="arg5" ve="3"/>
@@ -1331,10 +1493,10 @@ SSID:</Str>
 		<TextElement sr="elements28" ve="3">
 			<clickTask>978</clickTask>
 			<flags>4</flags>
-			<geom>578,737,134,75,503,370,123,73</geom>
+			<geom>770,982,178,100,670,493,164,97</geom>
 			<Str sr="arg0" ve="3">Text_sendStatusRequest</Str>
 			<Str sr="arg1" ve="3">send</Str>
-			<Int sr="arg2" val="16"/>
+			<Int sr="arg2" val="20"/>
 			<Int sr="arg3" val="100"/>
 			<Str sr="arg4" ve="3">#FF03A9F4</Str>
 			<Str sr="arg5" ve="3"/>
@@ -1357,7 +1519,7 @@ SSID:</Str>
 		<TextElement sr="elements29" ve="3">
 			<clickTask>943</clickTask>
 			<flags>4</flags>
-			<geom>0,1124,707,53,0,593,1269,49</geom>
+			<geom>0,1498,942,70,0,790,1692,65</geom>
 			<longclickTask>990</longclickTask>
 			<Str sr="arg0" ve="3">Text_lastCommand</Str>
 			<Str sr="arg1" ve="3">%AMAD_lastSetCommand</Str>
@@ -1384,11 +1546,11 @@ SSID:</Str>
 		<TextElement sr="elements3" ve="3">
 			<clickTask>959</clickTask>
 			<flags>4</flags>
-			<geom>0,174,159,75,0,173,133,73</geom>
+			<geom>0,232,212,100,0,230,177,97</geom>
 			<Str sr="arg0" ve="3">Text_DeviceIP</Str>
 			<Str sr="arg1" ve="3">Device
 IP:</Str>
-			<Int sr="arg2" val="16"/>
+			<Int sr="arg2" val="20"/>
 			<Int sr="arg3" val="100"/>
 			<Str sr="arg4" ve="3">#FFFFFFFF</Str>
 			<Str sr="arg5" ve="3"/>
@@ -1398,7 +1560,7 @@ IP:</Str>
 		</TextElement>
 		<OvalElement sr="elements30">
 			<flags>4</flags>
-			<geom>682,16,19,19,1243,16,19,19</geom>
+			<geom>909,21,25,25,1657,21,25,25</geom>
 			<Str sr="arg0" ve="3">Oval_online</Str>
 			<Int sr="arg1" val="0"/>
 			<Str sr="arg2" ve="3">#FF424242</Str>
@@ -1409,7 +1571,7 @@ IP:</Str>
 		<TextElement sr="elements31" ve="3">
 			<clickTask>966</clickTask>
 			<flags>4</flags>
-			<geom>499,6,179,58,1070,0,173,50</geom>
+			<geom>665,8,238,77,1426,0,230,66</geom>
 			<Str sr="arg0" ve="3">Text_deviceState</Str>
 			<Str sr="arg1" ve="3">deviceState</Str>
 			<Int sr="arg2" val="10"/>
@@ -1423,10 +1585,10 @@ IP:</Str>
 		<TextElement sr="elements32" ve="3">
 			<clickTask>981</clickTask>
 			<flags>4</flags>
-			<geom>0,809,567,74,1,444,478,73</geom>
+			<geom>0,1078,756,98,1,592,637,97</geom>
 			<Str sr="arg0" ve="3">Text_setCommands</Str>
 			<Str sr="arg1" ve="3">setCommand Profiles</Str>
-			<Int sr="arg2" val="16"/>
+			<Int sr="arg2" val="20"/>
 			<Int sr="arg3" val="100"/>
 			<Str sr="arg4" ve="3">#FFFFFFFF</Str>
 			<Str sr="arg5" ve="3"/>
@@ -1436,7 +1598,7 @@ IP:</Str>
 		</TextElement>
 		<SwitchElement sr="elements33">
 			<flags>4</flags>
-			<geom>591,809,118,74,503,444,118,73</geom>
+			<geom>788,1078,157,98,670,592,157,97</geom>
 			<Str sr="arg0" ve="3">Switch_setCommands</Str>
 			<Int sr="arg1" val="0"/>
 			<RectElement sr="background">
@@ -1455,11 +1617,11 @@ IP:</Str>
 		<TextElement sr="elements34" ve="3">
 			<clickTask>961</clickTask>
 			<flags>4</flags>
-			<geom>0,659,159,75,651,370,133,73</geom>
+			<geom>0,878,212,100,868,493,177,97</geom>
 			<Str sr="arg0" ve="3">Text_remoteServer</Str>
 			<Str sr="arg1" ve="3">remote
 Server:</Str>
-			<Int sr="arg2" val="16"/>
+			<Int sr="arg2" val="20"/>
 			<Int sr="arg3" val="100"/>
 			<Str sr="arg4" ve="3">#FFFFFFFF</Str>
 			<Str sr="arg5" ve="3"/>
@@ -1469,7 +1631,7 @@ Server:</Str>
 		</TextElement>
 		<SpinnerElement sr="elements35">
 			<flags>4</flags>
-			<geom>168,659,397,75,796,370,345,74</geom>
+			<geom>224,878,529,100,1061,493,460,98</geom>
 			<Str sr="arg0" ve="3">Spinner_remoteServer</Str>
 			<Int sr="arg1" val="0"/>
 			<Str sr="arg2" ve="3"/>
@@ -1478,13 +1640,13 @@ Server:</Str>
 					<cdate>1512142679276</cdate>
 					<edate>1512142679276</edate>
 					<heightLand>74</heightLand>
-					<heightPort>75</heightPort>
+					<heightPort>133</heightPort>
 					<nme>spinner</nme>
 					<widthLand>345</widthLand>
-					<widthPort>397</widthPort>
+					<widthPort>705</widthPort>
 					<ImageElement sr="elements0" ve="2">
 						<flags>1</flags>
-						<geom>232,0,159,73,195,0,150,74</geom>
+						<geom>412,0,282,129,195,0,150,74</geom>
 						<Str sr="arg0" ve="3">Icon</Str>
 						<Img sr="arg1" ve="2">
 							<nme>hd_aaa_ext_tiles_small</nme>
@@ -1493,10 +1655,10 @@ Server:</Str>
 					</ImageElement>
 					<TextElement sr="elements1" ve="3">
 						<flags>1</flags>
-						<geom>11,0,101,73,15,0,95,74</geom>
+						<geom>18,0,178,129,15,0,95,74</geom>
 						<Str sr="arg0" ve="3">Index</Str>
 						<Str sr="arg1" ve="3">1.</Str>
-						<Int sr="arg2" val="22"/>
+						<Int sr="arg2" val="26"/>
 						<Int sr="arg3" val="100"/>
 						<Str sr="arg4" ve="3">#FFFFFFFF</Str>
 						<Str sr="arg5" ve="3"/>
@@ -1506,10 +1668,10 @@ Server:</Str>
 					</TextElement>
 					<TextElement sr="elements2" ve="3">
 						<flags>5</flags>
-						<geom>0,0,397,75,0,0,345,74</geom>
+						<geom>0,0,705,133,0,0,345,74</geom>
 						<Str sr="arg0" ve="3">Label</Str>
 						<Str sr="arg1" ve="3"/>
-						<Int sr="arg2" val="12"/>
+						<Int sr="arg2" val="16"/>
 						<Int sr="arg3" val="100"/>
 						<Str sr="arg4" ve="3">#FF000000</Str>
 						<Str sr="arg5" ve="3"/>
@@ -1556,11 +1718,11 @@ Server:</Str>
 		<TextElement sr="elements4" ve="3">
 			<clickTask>998</clickTask>
 			<flags>4</flags>
-			<geom>0,271,159,75,0,272,133,73</geom>
+			<geom>0,361,212,100,0,362,177,97</geom>
 			<Str sr="arg0" ve="3">Text_AMAD_ID</Str>
 			<Str sr="arg1" ve="3">AMAD
 ID:</Str>
-			<Int sr="arg2" val="16"/>
+			<Int sr="arg2" val="20"/>
 			<Int sr="arg3" val="100"/>
 			<Str sr="arg4" ve="3">#FFFFFFFF</Str>
 			<Str sr="arg5" ve="3"/>
@@ -1571,11 +1733,11 @@ ID:</Str>
 		<TextElement sr="elements5" ve="3">
 			<clickTask>962</clickTask>
 			<flags>4</flags>
-			<geom>0,76,159,75,0,75,133,73</geom>
+			<geom>0,101,212,100,0,100,177,97</geom>
 			<Str sr="arg0" ve="3">Text_DeviceName</Str>
 			<Str sr="arg1" ve="3">Device
 Name:</Str>
-			<Int sr="arg2" val="16"/>
+			<Int sr="arg2" val="20"/>
 			<Int sr="arg3" val="100"/>
 			<Str sr="arg4" ve="3">#FFFFFFFF</Str>
 			<Str sr="arg5" ve="3"/>
@@ -1597,10 +1759,10 @@ Name:</Str>
 		</TextElement>
 		<TextElement sr="elements6" ve="3">
 			<flags>4</flags>
-			<geom>168,0,349,74,478,0,369,74</geom>
+			<geom>224,0,465,98,637,0,492,98</geom>
 			<Str sr="arg0" ve="3">Text_Title</Str>
 			<Str sr="arg1" ve="3">AMAD for Tasker</Str>
-			<Int sr="arg2" val="12"/>
+			<Int sr="arg2" val="16"/>
 			<Int sr="arg3" val="100"/>
 			<Str sr="arg4" ve="3">#FFFFFFFF</Str>
 			<Str sr="arg5" ve="3"/>
@@ -1611,11 +1773,11 @@ Name:</Str>
 		<EditTextElement sr="elements7" ve="3">
 			<flags>4</flags>
 			<focuschangeTask>976</focuschangeTask>
-			<geom>168,76,397,75,143,75,343,73</geom>
+			<geom>224,101,529,100,190,100,457,97</geom>
 			<valueselectedTask>982</valueselectedTask>
 			<Str sr="arg0" ve="3">TextEdit_DeviceName</Str>
 			<Str sr="arg1" ve="3"/>
-			<Int sr="arg2" val="12"/>
+			<Int sr="arg2" val="16"/>
 			<Int sr="arg3" val="100"/>
 			<Str sr="arg4" ve="3">#FF000000</Str>
 			<Str sr="arg5" ve="3"/>
@@ -1638,11 +1800,11 @@ Name:</Str>
 		<EditTextElement sr="elements8" ve="3">
 			<flags>4</flags>
 			<focuschangeTask>980</focuschangeTask>
-			<geom>168,174,397,75,143,173,343,73</geom>
+			<geom>224,232,529,100,190,230,457,97</geom>
 			<valueselectedTask>956</valueselectedTask>
 			<Str sr="arg0" ve="3">TextEdit_DeviceIP</Str>
 			<Str sr="arg1" ve="3"/>
-			<Int sr="arg2" val="12"/>
+			<Int sr="arg2" val="16"/>
 			<Int sr="arg3" val="100"/>
 			<Str sr="arg4" ve="3">#FF000000</Str>
 			<Str sr="arg5" ve="3"/>
@@ -1665,11 +1827,11 @@ Name:</Str>
 		<TextElement sr="elements9" ve="3">
 			<clickTask>979</clickTask>
 			<flags>4</flags>
-			<geom>0,367,159,75,651,75,133,73</geom>
+			<geom>0,489,212,100,868,100,177,97</geom>
 			<Str sr="arg0" ve="3">Text_FHEMip</Str>
 			<Str sr="arg1" ve="3">AMAD
 Bridge IP:</Str>
-			<Int sr="arg2" val="16"/>
+			<Int sr="arg2" val="20"/>
 			<Int sr="arg3" val="100"/>
 			<Str sr="arg4" ve="3">#FFFFFFFF</Str>
 			<Str sr="arg5" ve="3"/>
@@ -1688,10 +1850,240 @@ Bridge IP:</Str>
 			<Str sr="arg7" ve="3"/>
 		</PropertiesElement>
 	</Scene>
+	<Scene sr="sceneLock">
+		<cdate>1466518302628</cdate>
+		<edate>1466518302628</edate>
+		<heightLand>1437</heightLand>
+		<heightPort>1740</heightPort>
+		<nme>Lock</nme>
+		<widthLand>1376</widthLand>
+		<widthPort>1376</widthPort>
+		<TextElement sr="elements0" ve="3">
+			<flags>4</flags>
+			<geom>17,0,1357,212,17,0,1357,212</geom>
+			<Str sr="arg0" ve="3">Title</Str>
+			<Str sr="arg1" ve="3">Title</Str>
+			<Int sr="arg2" val="44"/>
+			<Int sr="arg3"/>
+			<Str sr="arg4" ve="3">#FF0099CC</Str>
+			<Str sr="arg5" ve="3"/>
+			<Int sr="arg6" val="3"/>
+			<Int sr="arg7"/>
+			<Int sr="arg8"/>
+		</TextElement>
+		<ButtonElement sr="elements1" ve="3">
+			<clickTask>-936</clickTask>
+			<flags>5</flags>
+			<geom>580,1184,212,212,1032,580,212,212</geom>
+			<Str sr="arg0" ve="3">Digit0</Str>
+			<Str sr="arg1" ve="3">0</Str>
+			<Int sr="arg2" val="36"/>
+			<Int sr="arg3"/>
+			<Str sr="arg4" ve="3">#FFFFFFFF</Str>
+			<Str sr="arg5" ve="3"/>
+			<Int sr="arg6"/>
+			<Img sr="arg7" ve="2"/>
+		</ButtonElement>
+		<ButtonElement sr="elements10" ve="3">
+			<clickTask>-936</clickTask>
+			<flags>5</flags>
+			<geom>881,881,212,212,730,881,212,212</geom>
+			<Str sr="arg0" ve="3">Digit9</Str>
+			<Str sr="arg1" ve="3">9</Str>
+			<Int sr="arg2" val="36"/>
+			<Int sr="arg3"/>
+			<Str sr="arg4" ve="3">#FFFFFFFF</Str>
+			<Str sr="arg5" ve="3"/>
+			<Int sr="arg6"/>
+			<Img sr="arg7" ve="2"/>
+		</ButtonElement>
+		<TextElement sr="elements11" ve="3">
+			<flags>5</flags>
+			<geom>64,1461,1245,212,64,1160,1245,212</geom>
+			<Str sr="arg0" ve="3">CodeText</Str>
+			<Str sr="arg1" ve="3"/>
+			<Int sr="arg2" val="44"/>
+			<Int sr="arg3"/>
+			<Str sr="arg4" ve="3">#FFFFFFFF</Str>
+			<Str sr="arg5" ve="3"/>
+			<Int sr="arg6" val="0"/>
+			<Int sr="arg7"/>
+			<Int sr="arg8"/>
+			<RectElement sr="background">
+				<flags>4</flags>
+				<geom>-1,-1,-1,-1,-1,-1,-1,-1</geom>
+				<Str sr="arg0" ve="3"/>
+				<Int sr="arg1" val="2"/>
+				<Str sr="arg2" ve="3">#24777777</Str>
+				<Str sr="arg3" ve="3">#68777777</Str>
+				<Int sr="arg4" val="1"/>
+				<Str sr="arg5" ve="3">#FF0099CC</Str>
+				<Int sr="arg6" val="5"/>
+				<Int sr="arg7" val="0"/>
+			</RectElement>
+		</TextElement>
+		<RectElement sr="elements12">
+			<flags>4</flags>
+			<geom>0,212,1376,8,-2,-2,-2,-2</geom>
+			<Str sr="arg0" ve="3">Header</Str>
+			<Int sr="arg1" val="0"/>
+			<Str sr="arg2" ve="3">#77333333</Str>
+			<Str sr="arg3" ve="3"/>
+			<Int sr="arg4" val="0"/>
+			<Str sr="arg5" ve="3">#FF000000</Str>
+			<Int sr="arg6" val="0"/>
+			<Int sr="arg7" val="0"/>
+		</RectElement>
+		<ButtonElement sr="elements13" ve="3">
+			<clickTask>-936</clickTask>
+			<flags>5</flags>
+			<geom>277,1184,212,212,1032,881,212,212</geom>
+			<Str sr="arg0" ve="3">AcceptButton</Str>
+			<Str sr="arg1" ve="3"/>
+			<Int sr="arg2" val="36"/>
+			<Int sr="arg3"/>
+			<Str sr="arg4" ve="3">#FF000000</Str>
+			<Str sr="arg5" ve="3"/>
+			<Int sr="arg6"/>
+			<Img sr="arg7" ve="2">
+				<nme>hd_navigation_accept</nme>
+			</Img>
+		</ButtonElement>
+		<ButtonElement sr="elements14" ve="3">
+			<clickTask>-936</clickTask>
+			<flags>5</flags>
+			<geom>881,1184,212,212,1032,277,212,212</geom>
+			<Str sr="arg0" ve="3">CancelButton</Str>
+			<Str sr="arg1" ve="3"/>
+			<Int sr="arg2" val="36"/>
+			<Int sr="arg3"/>
+			<Str sr="arg4" ve="3">#FF000000</Str>
+			<Str sr="arg5" ve="3"/>
+			<Int sr="arg6"/>
+			<Img sr="arg7" ve="2">
+				<nme>hd_content_remove</nme>
+			</Img>
+		</ButtonElement>
+		<ButtonElement sr="elements2" ve="3">
+			<clickTask>-936</clickTask>
+			<flags>5</flags>
+			<geom>277,277,212,212,126,277,212,212</geom>
+			<Str sr="arg0" ve="3">Digit1</Str>
+			<Str sr="arg1" ve="3">1</Str>
+			<Int sr="arg2" val="36"/>
+			<Int sr="arg3"/>
+			<Str sr="arg4" ve="3">#FFFFFFFF</Str>
+			<Str sr="arg5" ve="3"/>
+			<Int sr="arg6"/>
+			<Img sr="arg7" ve="2"/>
+		</ButtonElement>
+		<ButtonElement sr="elements3" ve="3">
+			<clickTask>-936</clickTask>
+			<flags>5</flags>
+			<geom>580,277,212,212,428,277,212,212</geom>
+			<Str sr="arg0" ve="3">Digit2</Str>
+			<Str sr="arg1" ve="3">2</Str>
+			<Int sr="arg2" val="36"/>
+			<Int sr="arg3"/>
+			<Str sr="arg4" ve="3">#FFFFFFFF</Str>
+			<Str sr="arg5" ve="3"/>
+			<Int sr="arg6"/>
+			<Img sr="arg7" ve="2"/>
+		</ButtonElement>
+		<ButtonElement sr="elements4" ve="3">
+			<clickTask>-936</clickTask>
+			<flags>5</flags>
+			<geom>881,277,212,212,730,277,212,212</geom>
+			<Str sr="arg0" ve="3">Digit3</Str>
+			<Str sr="arg1" ve="3">3</Str>
+			<Int sr="arg2" val="36"/>
+			<Int sr="arg3"/>
+			<Str sr="arg4" ve="3">#FFFFFFFF</Str>
+			<Str sr="arg5" ve="3"/>
+			<Int sr="arg6"/>
+			<Img sr="arg7" ve="2"/>
+		</ButtonElement>
+		<ButtonElement sr="elements5" ve="3">
+			<clickTask>-936</clickTask>
+			<flags>5</flags>
+			<geom>277,580,212,212,126,580,212,212</geom>
+			<Str sr="arg0" ve="3">Digit4</Str>
+			<Str sr="arg1" ve="3">4</Str>
+			<Int sr="arg2" val="36"/>
+			<Int sr="arg3"/>
+			<Str sr="arg4" ve="3">#FFFFFFFF</Str>
+			<Str sr="arg5" ve="3"/>
+			<Int sr="arg6"/>
+			<Img sr="arg7" ve="2"/>
+		</ButtonElement>
+		<ButtonElement sr="elements6" ve="3">
+			<clickTask>-936</clickTask>
+			<flags>5</flags>
+			<geom>580,580,212,212,428,580,212,212</geom>
+			<Str sr="arg0" ve="3">Digit5</Str>
+			<Str sr="arg1" ve="3">5</Str>
+			<Int sr="arg2" val="36"/>
+			<Int sr="arg3"/>
+			<Str sr="arg4" ve="3">#FFFFFFFF</Str>
+			<Str sr="arg5" ve="3"/>
+			<Int sr="arg6"/>
+			<Img sr="arg7" ve="2"/>
+		</ButtonElement>
+		<ButtonElement sr="elements7" ve="3">
+			<clickTask>-936</clickTask>
+			<flags>5</flags>
+			<geom>881,580,212,212,730,580,212,212</geom>
+			<Str sr="arg0" ve="3">Digit6</Str>
+			<Str sr="arg1" ve="3">6</Str>
+			<Int sr="arg2" val="36"/>
+			<Int sr="arg3"/>
+			<Str sr="arg4" ve="3">#FFFFFFFF</Str>
+			<Str sr="arg5" ve="3"/>
+			<Int sr="arg6"/>
+			<Img sr="arg7" ve="2"/>
+		</ButtonElement>
+		<ButtonElement sr="elements8" ve="3">
+			<clickTask>-936</clickTask>
+			<flags>5</flags>
+			<geom>277,881,212,212,126,881,212,212</geom>
+			<Str sr="arg0" ve="3">Digit7</Str>
+			<Str sr="arg1" ve="3">7</Str>
+			<Int sr="arg2" val="36"/>
+			<Int sr="arg3"/>
+			<Str sr="arg4" ve="3">#FFFFFFFF</Str>
+			<Str sr="arg5" ve="3"/>
+			<Int sr="arg6"/>
+			<Img sr="arg7" ve="2"/>
+		</ButtonElement>
+		<ButtonElement sr="elements9" ve="3">
+			<clickTask>-936</clickTask>
+			<flags>5</flags>
+			<geom>580,881,212,212,428,881,212,212</geom>
+			<Str sr="arg0" ve="3">Digit8</Str>
+			<Str sr="arg1" ve="3">8</Str>
+			<Int sr="arg2" val="36"/>
+			<Int sr="arg3"/>
+			<Str sr="arg4" ve="3">#FFFFFFFF</Str>
+			<Str sr="arg5" ve="3"/>
+			<Int sr="arg6"/>
+			<Img sr="arg7" ve="2"/>
+		</ButtonElement>
+		<PropertiesElement sr="props">
+			<Int sr="arg0" val="1"/>
+			<Int sr="arg1" val="0"/>
+			<Str sr="arg2" ve="3">#FF000000</Str>
+			<Int sr="arg3" val="0"/>
+			<Str sr="arg4" ve="3">Lock</Str>
+			<Str sr="arg5" ve="3"/>
+			<Img sr="arg6" ve="2"/>
+			<Str sr="arg7" ve="3"/>
+		</PropertiesElement>
+	</Scene>
 	<Task sr="task1000">
 		<cdate>1503612579492</cdate>
 		<edate>1522170599858</edate>
 		<id>1000</id>
+		<pri>6</pri>
 		<rty>1</rty>
 		<Action sr="act0" ve="7">
 			<code>130</code>
@@ -1709,7 +2101,6 @@ Bridge IP:</Str>
 		<cdate>1503691080060</cdate>
 		<edate>1522170853234</edate>
 		<id>1001</id>
-		<pri>100</pri>
 		<rty>1</rty>
 		<Action sr="act0" ve="7">
 			<code>547</code>
@@ -1827,6 +2218,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 		<cdate>1503612579492</cdate>
 		<edate>1522170710421</edate>
 		<id>1003</id>
+		<pri>6</pri>
 		<Action sr="act0" ve="7">
 			<code>130</code>
 			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
@@ -1841,10 +2233,10 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 	</Task>
 	<Task sr="task1004">
 		<cdate>1503693866986</cdate>
-		<edate>1526108249339</edate>
+		<edate>1540574005380</edate>
 		<id>1004</id>
 		<nme>AMAD_SetCommands</nme>
-		<pri>100</pri>
+		<pri>6</pri>
 		<rty>2</rty>
 		<Action sr="act0" ve="7">
 			<code>547</code>
@@ -1878,50 +2270,6 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 			<Int sr="arg4" val="0"/>
 		</Action>
 		<Action sr="act100" ve="7">
-			<code>548</code>
-			<label>no root</label>
-			<Str sr="arg0" ve="3">AMAD: "set clearNotificationBar all" benötigt Root rechte</Str>
-			<Int sr="arg1" val="1"/>
-			<ConditionList sr="if">
-				<bool0>And</bool0>
-				<Condition sr="c0" ve="3">
-					<lhs>%tpe_app</lhs>
-					<op>2</op>
-					<rhs>All</rhs>
-				</Condition>
-				<Condition sr="c1" ve="3">
-					<lhs>%ROOT</lhs>
-					<op>2</op>
-					<rhs>no</rhs>
-				</Condition>
-			</ConditionList>
-		</Action>
-		<Action sr="act101" ve="7">
-			<code>130</code>
-			<label>no root</label>
-			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
-			<Int sr="arg1">
-				<var>%priority+1</var>
-			</Int>
-			<Str sr="arg2" ve="3">setreading</Str>
-			<Str sr="arg3" ve="3">"automagicState": "set clearNotificationBar all: only works on rooted Devices"</Str>
-			<Str sr="arg4" ve="3"/>
-			<Int sr="arg5" val="0"/>
-			<ConditionList sr="if">
-				<bool0>And</bool0>
-				<Condition sr="c0" ve="3">
-					<lhs>%tpe_app</lhs>
-					<op>2</op>
-					<rhs>All</rhs>
-				</Condition>
-				<Condition sr="c1" ve="3">
-					<lhs>%ROOT</lhs>
-					<op>2</op>
-					<rhs>no</rhs>
-				</Condition>
-			</ConditionList>
-		</Action>
-		<Action sr="act102" ve="7">
 			<code>43</code>
 			<ConditionList sr="if">
 				<Condition sr="c0" ve="3">
@@ -1931,11 +2279,11 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act103" ve="7">
+		<Action sr="act101" ve="7">
 			<code>62</code>
 			<Str sr="arg0" ve="3">0,500,500,500</Str>
 		</Action>
-		<Action sr="act104" ve="7">
+		<Action sr="act102" ve="7">
 			<code>43</code>
 			<ConditionList sr="if">
 				<Condition sr="c0" ve="3">
@@ -1945,11 +2293,11 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act105" ve="7">
+		<Action sr="act103" ve="7">
 			<code>25</code>
 			<Int sr="arg0" val="0"/>
 		</Action>
-		<Action sr="act106" ve="7">
+		<Action sr="act104" ve="7">
 			<code>43</code>
 			<ConditionList sr="if">
 				<Condition sr="c0" ve="3">
@@ -1959,7 +2307,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act107" ve="7">
+		<Action sr="act105" ve="7">
 			<code>877</code>
 			<Str sr="arg0" ve="3">%tpe_action</Str>
 			<Int sr="arg1" val="0"/>
@@ -1972,7 +2320,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 			<Str sr="arg8" ve="3"/>
 			<Int sr="arg9" val="0"/>
 		</Action>
-		<Action sr="act108" ve="7">
+		<Action sr="act106" ve="7">
 			<code>43</code>
 			<ConditionList sr="if">
 				<Condition sr="c0" ve="3">
@@ -1982,7 +2330,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act109" ve="7">
+		<Action sr="act107" ve="7">
 			<code>130</code>
 			<label>currentFlowsetUpdate</label>
 			<Str sr="arg0" ve="3">AMAD_UpdateFlowset</Str>
@@ -1993,6 +2341,21 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 			<Str sr="arg3" ve="3"/>
 			<Str sr="arg4" ve="3"/>
 			<Int sr="arg5" val="1"/>
+		</Action>
+		<Action sr="act108" ve="7">
+			<code>43</code>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%command</lhs>
+					<op>2</op>
+					<rhs>installFlow</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act109" ve="7">
+			<code>548</code>
+			<Str sr="arg0" ve="3">AMAD: "Flow install: not supported by Tasker"</Str>
+			<Int sr="arg1" val="1"/>
 		</Action>
 		<Action sr="act11" ve="7">
 			<code>37</code>
@@ -2006,21 +2369,6 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 			</ConditionList>
 		</Action>
 		<Action sr="act110" ve="7">
-			<code>43</code>
-			<ConditionList sr="if">
-				<Condition sr="c0" ve="3">
-					<lhs>%command</lhs>
-					<op>2</op>
-					<rhs>installFlow</rhs>
-				</Condition>
-			</ConditionList>
-		</Action>
-		<Action sr="act111" ve="7">
-			<code>548</code>
-			<Str sr="arg0" ve="3">AMAD: "Flow install: not supported by Tasker"</Str>
-			<Int sr="arg1" val="1"/>
-		</Action>
-		<Action sr="act112" ve="7">
 			<code>130</code>
 			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
 			<Int sr="arg1">
@@ -2031,7 +2379,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 			<Str sr="arg4" ve="3"/>
 			<Int sr="arg5" val="0"/>
 		</Action>
-		<Action sr="act113" ve="7">
+		<Action sr="act111" ve="7">
 			<code>43</code>
 			<ConditionList sr="if">
 				<Condition sr="c0" ve="3">
@@ -2041,12 +2389,12 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act114" ve="7">
+		<Action sr="act112" ve="7">
 			<code>90</code>
 			<Str sr="arg0" ve="3">%tpe_callnumber</Str>
 			<Int sr="arg1" val="1"/>
 		</Action>
-		<Action sr="act115" ve="7">
+		<Action sr="act113" ve="7">
 			<code>30</code>
 			<Int sr="arg0" val="0"/>
 			<Int sr="arg1">
@@ -2063,7 +2411,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act116" ve="7">
+		<Action sr="act114" ve="7">
 			<code>733</code>
 			<ConditionList sr="if">
 				<Condition sr="c0" ve="3">
@@ -2073,7 +2421,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act117" ve="7">
+		<Action sr="act115" ve="7">
 			<code>43</code>
 			<ConditionList sr="if">
 				<Condition sr="c0" ve="3">
@@ -2083,8 +2431,29 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act118" ve="7">
+		<Action sr="act116" ve="7">
 			<code>733</code>
+		</Action>
+		<Action sr="act117" ve="7">
+			<code>43</code>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%command</lhs>
+					<op>2</op>
+					<rhs>startDaydream</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act118" ve="7">
+			<code>20</code>
+			<App sr="arg0">
+				<appClass>com.android.systemui.Somnambulator</appClass>
+				<appPkg>com.android.systemui</appPkg>
+				<label>Bildschirmschoner</label>
+			</App>
+			<Str sr="arg1" ve="3"/>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
 		</Action>
 		<Action sr="act119" ve="7">
 			<code>43</code>
@@ -2092,7 +2461,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				<Condition sr="c0" ve="3">
 					<lhs>%command</lhs>
 					<op>2</op>
-					<rhs>startDaydream</rhs>
+					<rhs>sendSms</rhs>
 				</Condition>
 			</ConditionList>
 		</Action>
@@ -2105,33 +2474,13 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 			<Int sr="arg4" val="0"/>
 		</Action>
 		<Action sr="act120" ve="7">
-			<code>20</code>
-			<App sr="arg0">
-				<appClass>com.android.systemui.Somnambulator</appClass>
-				<appPkg>com.android.systemui</appPkg>
-				<label>Bildschirmschoner</label>
-			</App>
-			<Str sr="arg1" ve="3"/>
-			<Int sr="arg2" val="0"/>
-			<Int sr="arg3" val="0"/>
-		</Action>
-		<Action sr="act121" ve="7">
-			<code>43</code>
-			<ConditionList sr="if">
-				<Condition sr="c0" ve="3">
-					<lhs>%command</lhs>
-					<op>2</op>
-					<rhs>sendSms</rhs>
-				</Condition>
-			</ConditionList>
-		</Action>
-		<Action sr="act122" ve="7">
 			<code>41</code>
 			<Str sr="arg0" ve="3">%tpe_smsnumber</Str>
 			<Str sr="arg1" ve="3">%tpe_smsmessage</Str>
 			<Int sr="arg2" val="1"/>
+			<Str sr="arg3" ve="3"/>
 		</Action>
-		<Action sr="act123" ve="7">
+		<Action sr="act121" ve="7">
 			<code>43</code>
 			<ConditionList sr="if">
 				<Condition sr="c0" ve="3">
@@ -2141,7 +2490,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act124" ve="7">
+		<Action sr="act122" ve="7">
 			<code>548</code>
 			<label>Baustelle</label>
 			<Str sr="arg0" ve="3">AMAD: "set screen lock|unlock" wird noch nicht unterstützt</Str>
@@ -2154,7 +2503,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act125" ve="7">
+		<Action sr="act123" ve="7">
 			<code>130</code>
 			<label>Baustelle</label>
 			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
@@ -2173,7 +2522,61 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
+		<Action sr="act124" ve="7">
+			<code>547</code>
+			<on>false</on>
+			<Str sr="arg0" ve="3">%tmp</Str>
+			<Str sr="arg1" ve="3">%tpe_lockPIN</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+		</Action>
+		<Action sr="act125" ve="7">
+			<code>15</code>
+			<on>false</on>
+			<Str sr="arg0" ve="3"/>
+			<Str sr="arg1" ve="3">t5Vd4lR8ETDVZMflkst2Fg==</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="1"/>
+			<Str sr="arg5" ve="3"/>
+			<Str sr="arg6" ve="3">Lock</Str>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%tpe_lockmod</lhs>
+					<op>2</op>
+					<rhs>lock</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
 		<Action sr="act126" ve="7">
+			<code>48</code>
+			<on>false</on>
+			<se>false</se>
+			<Str sr="arg0" ve="3">Lock</Str>
+			<Int sr="arg1" val="0"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%tpe_lockmod</lhs>
+					<op>2</op>
+					<rhs>unlock</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act127" ve="7">
+			<code>49</code>
+			<on>false</on>
+			<se>false</se>
+			<Str sr="arg0" ve="3">Lock</Str>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%tpe_lockmod</lhs>
+					<op>2</op>
+					<rhs>unlock</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act128" ve="7">
 			<code>43</code>
 			<ConditionList sr="if">
 				<Condition sr="c0" ve="3">
@@ -2183,45 +2586,14 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act127" ve="7">
-			<code>548</code>
-			<label>Baustelle</label>
-			<Str sr="arg0" ve="3">AMAD: "set screen on" wird noch nicht unterstützt</Str>
-			<Int sr="arg1" val="1"/>
-			<ConditionList sr="if">
-				<Condition sr="c0" ve="3">
-					<lhs>%tpe_screen</lhs>
-					<op>2</op>
-					<rhs>on</rhs>
-				</Condition>
-			</ConditionList>
-		</Action>
-		<Action sr="act128" ve="7">
-			<code>130</code>
-			<label>Baustelle</label>
-			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
-			<Int sr="arg1">
-				<var>%priority+1</var>
-			</Int>
-			<Str sr="arg2" ve="3">setreading</Str>
-			<Str sr="arg3" ve="3">"automagicState": "set screen on: not supported by Tasker"</Str>
-			<Str sr="arg4" ve="3"/>
-			<Int sr="arg5" val="0"/>
-			<ConditionList sr="if">
-				<Condition sr="c0" ve="3">
-					<lhs>%tpe_screen</lhs>
-					<op>2</op>
-					<rhs>on</rhs>
-				</Condition>
-			</ConditionList>
-		</Action>
 		<Action sr="act129" ve="7">
-			<code>16</code>
+			<code>806</code>
+			<Int sr="arg0" val="500"/>
 			<ConditionList sr="if">
 				<Condition sr="c0" ve="3">
 					<lhs>%tpe_screen</lhs>
 					<op>2</op>
-					<rhs>off</rhs>
+					<rhs>on</rhs>
 				</Condition>
 			</ConditionList>
 		</Action>
@@ -2232,6 +2604,32 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 			<Int sr="arg2" val="0"/>
 		</Action>
 		<Action sr="act130" ve="7">
+			<code>248</code>
+			<se>false</se>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%tpe_screen</lhs>
+					<op>2</op>
+					<rhs>off</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act131" ve="7">
+			<code>812</code>
+			<Int sr="arg0">
+				<var>%tpe_screenontime</var>
+			</Int>
+			<Int sr="arg1" val="0"/>
+			<Int sr="arg2" val="0"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%tpe_screenontime</lhs>
+					<op>12</op>
+					<rhs></rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act132" ve="7">
 			<code>43</code>
 			<label>takepicture</label>
 			<ConditionList sr="if">
@@ -2242,7 +2640,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act131" ve="7">
+		<Action sr="act133" ve="7">
 			<code>101</code>
 			<se>false</se>
 			<Int sr="arg0" val="1"/>
@@ -2263,7 +2661,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act132" ve="7">
+		<Action sr="act134" ve="7">
 			<code>101</code>
 			<se>false</se>
 			<Int sr="arg0" val="0"/>
@@ -2284,12 +2682,12 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act133" ve="7">
+		<Action sr="act135" ve="7">
 			<code>548</code>
 			<Str sr="arg0" ve="3">AMAD: %command</Str>
 			<Int sr="arg1" val="1"/>
 		</Action>
-		<Action sr="act134" ve="7">
+		<Action sr="act136" ve="7">
 			<code>43</code>
 			<label>takescreenshot</label>
 			<ConditionList sr="if">
@@ -2300,17 +2698,17 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act135" ve="7">
+		<Action sr="act137" ve="7">
 			<code>176</code>
 			<Str sr="arg0" ve="3">AMADscreenshot</Str>
 			<Int sr="arg1" val="1"/>
 		</Action>
-		<Action sr="act136" ve="7">
+		<Action sr="act138" ve="7">
 			<code>548</code>
 			<Str sr="arg0" ve="3">AMAD: %command</Str>
 			<Int sr="arg1" val="1"/>
 		</Action>
-		<Action sr="act137" ve="7">
+		<Action sr="act139" ve="7">
 			<code>43</code>
 			<label>setBrightnessMode</label>
 			<ConditionList sr="if">
@@ -2321,7 +2719,12 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act138" ve="7">
+		<Action sr="act14" ve="7">
+			<code>39</code>
+			<Str sr="arg0" ve="3">%cmdpair</Str>
+			<Str sr="arg1" ve="3">%valueall()</Str>
+		</Action>
+		<Action sr="act140" ve="7">
 			<code>808</code>
 			<Int sr="arg0" val="1"/>
 			<ConditionList sr="if">
@@ -2332,7 +2735,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act139" ve="7">
+		<Action sr="act141" ve="7">
 			<code>808</code>
 			<Int sr="arg0" val="0"/>
 			<ConditionList sr="if">
@@ -2343,27 +2746,22 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act14" ve="7">
-			<code>39</code>
-			<Str sr="arg0" ve="3">%cmdpair</Str>
-			<Str sr="arg1" ve="3">%valueall()</Str>
-		</Action>
-		<Action sr="act140" ve="7">
-			<code>38</code>
-		</Action>
-		<Action sr="act141" ve="7">
-			<code>38</code>
-		</Action>
 		<Action sr="act142" ve="7">
+			<code>38</code>
+		</Action>
+		<Action sr="act143" ve="7">
+			<code>38</code>
+		</Action>
+		<Action sr="act144" ve="7">
 			<code>43</code>
 			<label>wrong ID</label>
 		</Action>
-		<Action sr="act143" ve="7">
+		<Action sr="act145" ve="7">
 			<code>548</code>
 			<Str sr="arg0" ve="3">AMAD: Befehl mit falscher AMAD_ID empfangen</Str>
 			<Int sr="arg1" val="1"/>
 		</Action>
-		<Action sr="act144" ve="7">
+		<Action sr="act146" ve="7">
 			<code>38</code>
 		</Action>
 		<Action sr="act15" ve="7">
@@ -2838,7 +3236,6 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 		</Action>
 		<Action sr="act56" ve="7">
 			<code>822</code>
-			<label>Baustelle</label>
 			<Int sr="arg0" val="0"/>
 			<ConditionList sr="if">
 				<Condition sr="c0" ve="3">
@@ -2849,34 +3246,30 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 			</ConditionList>
 		</Action>
 		<Action sr="act57" ve="7">
-			<code>548</code>
-			<label>Baustelle</label>
-			<Str sr="arg0" ve="3">AMAD: "set screenOrientation landscape|portrait" wird noch nicht unterstützt</Str>
-			<Int sr="arg1" val="1"/>
+			<code>318</code>
+			<label>portrait</label>
+			<se>false</se>
+			<Int sr="arg0" val="1"/>
+			<Int sr="arg1" val="0"/>
 			<ConditionList sr="if">
 				<Condition sr="c0" ve="3">
 					<lhs>%tpe_orientation</lhs>
-					<op>4</op>
-					<rhs>landscape|portrait</rhs>
+					<op>2</op>
+					<rhs>portrait</rhs>
 				</Condition>
 			</ConditionList>
 		</Action>
 		<Action sr="act58" ve="7">
-			<code>130</code>
-			<label>Baustelle</label>
-			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
-			<Int sr="arg1">
-				<var>%priority+1</var>
-			</Int>
-			<Str sr="arg2" ve="3">setreading</Str>
-			<Str sr="arg3" ve="3">"automagicState": "set screenOrientation landscape|portrait: not supported by Tasker"</Str>
-			<Str sr="arg4" ve="3"/>
-			<Int sr="arg5" val="0"/>
+			<code>318</code>
+			<label>landscape</label>
+			<se>false</se>
+			<Int sr="arg0" val="3"/>
+			<Int sr="arg1" val="0"/>
 			<ConditionList sr="if">
 				<Condition sr="c0" ve="3">
 					<lhs>%tpe_orientation</lhs>
-					<op>4</op>
-					<rhs>landscape|portrait</rhs>
+					<op>2</op>
+					<rhs>landscape</rhs>
 				</Condition>
 			</ConditionList>
 		</Action>
@@ -2899,22 +3292,28 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 			<Int sr="arg4" val="0"/>
 		</Action>
 		<Action sr="act60" ve="7">
-			<code>548</code>
-			<label>Baustelle</label>
-			<Str sr="arg0" ve="3">AMAD: "set screenFullscreen on|off" wird noch nicht unterstützt</Str>
-			<Int sr="arg1" val="1"/>
+			<code>906</code>
+			<se>false</se>
+			<Int sr="arg0" val="0"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%tpe_fullscreen</lhs>
+					<op>2</op>
+					<rhs>off</rhs>
+				</Condition>
+			</ConditionList>
 		</Action>
 		<Action sr="act61" ve="7">
-			<code>130</code>
-			<label>Baustelle</label>
-			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
-			<Int sr="arg1">
-				<var>%priority+1</var>
-			</Int>
-			<Str sr="arg2" ve="3">setreading</Str>
-			<Str sr="arg3" ve="3">"automagicState": "set screenFullscreen on|off: not supported by Tasker"</Str>
-			<Str sr="arg4" ve="3"/>
-			<Int sr="arg5" val="0"/>
+			<code>906</code>
+			<se>false</se>
+			<Int sr="arg0" val="3"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%tpe_fullscreen</lhs>
+					<op>2</op>
+					<rhs>on</rhs>
+				</Condition>
+			</ConditionList>
 		</Action>
 		<Action sr="act62" ve="7">
 			<code>43</code>
@@ -3079,88 +3478,63 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 			</ConditionList>
 		</Action>
 		<Action sr="act75" ve="7">
-			<code>123</code>
-			<Str sr="arg0" ve="3">svc nfc enable</Str>
-			<Int sr="arg1" val="0"/>
-			<Int sr="arg2" val="1"/>
-			<Str sr="arg3" ve="3"/>
-			<Str sr="arg4" ve="3"/>
-			<Str sr="arg5" ve="3"/>
+			<code>317</code>
+			<Int sr="arg0" val="0"/>
 			<ConditionList sr="if">
-				<bool0>And</bool0>
-				<Condition sr="c0" ve="3">
-					<lhs>%tpe_nfc</lhs>
-					<op>2</op>
-					<rhs>on</rhs>
-				</Condition>
-				<Condition sr="c1" ve="3">
-					<lhs>%ROOT</lhs>
-					<op>2</op>
-					<rhs>yes</rhs>
-				</Condition>
-			</ConditionList>
-		</Action>
-		<Action sr="act76" ve="7">
-			<code>123</code>
-			<Str sr="arg0" ve="3">svc nfc disable</Str>
-			<Int sr="arg1" val="0"/>
-			<Int sr="arg2" val="1"/>
-			<Str sr="arg3" ve="3"/>
-			<Str sr="arg4" ve="3"/>
-			<Str sr="arg5" ve="3"/>
-			<ConditionList sr="if">
-				<bool0>And</bool0>
 				<Condition sr="c0" ve="3">
 					<lhs>%tpe_nfc</lhs>
 					<op>2</op>
 					<rhs>off</rhs>
 				</Condition>
-				<Condition sr="c1" ve="3">
-					<lhs>%ROOT</lhs>
+			</ConditionList>
+		</Action>
+		<Action sr="act76" ve="7">
+			<code>317</code>
+			<Int sr="arg0" val="1"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%tpe_nfc</lhs>
 					<op>2</op>
-					<rhs>yes</rhs>
+					<rhs>on</rhs>
 				</Condition>
 			</ConditionList>
 		</Action>
 		<Action sr="act77" ve="7">
-			<code>548</code>
-			<label>no root</label>
-			<Str sr="arg0" ve="3">AMAD: "set nfc on|off" benötigt Root rechte</Str>
-			<Int sr="arg1" val="1"/>
-			<ConditionList sr="if">
-				<Condition sr="c0" ve="3">
-					<lhs>%ROOT</lhs>
-					<op>2</op>
-					<rhs>no</rhs>
-				</Condition>
-			</ConditionList>
-		</Action>
-		<Action sr="act78" ve="7">
-			<code>130</code>
-			<label>no root</label>
-			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
-			<Int sr="arg1">
-				<var>%priority+1</var>
-			</Int>
-			<Str sr="arg2" ve="3">setreading</Str>
-			<Str sr="arg3" ve="3">"automagicState": "set nfc on|off: only works on rooted Devices"</Str>
-			<Str sr="arg4" ve="3"/>
-			<Int sr="arg5" val="0"/>
-			<ConditionList sr="if">
-				<Condition sr="c0" ve="3">
-					<lhs>%ROOT</lhs>
-					<op>2</op>
-					<rhs>no</rhs>
-				</Condition>
-			</ConditionList>
-		</Action>
-		<Action sr="act79" ve="7">
 			<code>43</code>
 			<ConditionList sr="if">
 				<Condition sr="c0" ve="3">
 					<lhs>%command</lhs>
 					<op>2</op>
 					<rhs>systemcommand</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act78" ve="7">
+			<code>130</code>
+			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
+			<Int sr="arg1">
+				<var>%priority+1</var>
+			</Int>
+			<Str sr="arg2" ve="3">setreading</Str>
+			<Str sr="arg3" ve="3">airplanemode@@on</Str>
+			<Str sr="arg4" ve="3"/>
+			<Int sr="arg5" val="0"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%tpe_syscmd</lhs>
+					<op>2</op>
+					<rhs>airplanemodeON</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act79" ve="7">
+			<code>333</code>
+			<Int sr="arg0" val="1"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%tpe_syscmd</lhs>
+					<op>2</op>
+					<rhs>airplanemodeON</rhs>
 				</Condition>
 			</ConditionList>
 		</Action>
@@ -3183,35 +3557,6 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 			</ConditionList>
 		</Action>
 		<Action sr="act80" ve="7">
-			<code>130</code>
-			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
-			<Int sr="arg1">
-				<var>%priority+1</var>
-			</Int>
-			<Str sr="arg2" ve="3">setreading</Str>
-			<Str sr="arg3" ve="3">airplanemode@@on</Str>
-			<Str sr="arg4" ve="3"/>
-			<Int sr="arg5" val="0"/>
-			<ConditionList sr="if">
-				<Condition sr="c0" ve="3">
-					<lhs>%tpe_syscmd</lhs>
-					<op>2</op>
-					<rhs>airplanemodeON</rhs>
-				</Condition>
-			</ConditionList>
-		</Action>
-		<Action sr="act81" ve="7">
-			<code>333</code>
-			<Int sr="arg0" val="1"/>
-			<ConditionList sr="if">
-				<Condition sr="c0" ve="3">
-					<lhs>%tpe_syscmd</lhs>
-					<op>2</op>
-					<rhs>airplanemodeON</rhs>
-				</Condition>
-			</ConditionList>
-		</Action>
-		<Action sr="act82" ve="7">
 			<code>59</code>
 			<Int sr="arg0" val="3"/>
 			<ConditionList sr="if">
@@ -3222,7 +3567,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act83" ve="7">
+		<Action sr="act81" ve="7">
 			<code>59</code>
 			<Int sr="arg0" val="0"/>
 			<ConditionList sr="if">
@@ -3233,7 +3578,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act84" ve="7">
+		<Action sr="act82" ve="7">
 			<code>43</code>
 			<ConditionList sr="if">
 				<Condition sr="c0" ve="3">
@@ -3243,7 +3588,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act85" ve="7">
+		<Action sr="act83" ve="7">
 			<code>312</code>
 			<Int sr="arg0" val="2"/>
 			<ConditionList sr="if">
@@ -3254,7 +3599,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act86" ve="7">
+		<Action sr="act84" ve="7">
 			<code>312</code>
 			<Int sr="arg0" val="1"/>
 			<ConditionList sr="if">
@@ -3265,7 +3610,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act87" ve="7">
+		<Action sr="act85" ve="7">
 			<code>312</code>
 			<Int sr="arg0" val="0"/>
 			<ConditionList sr="if">
@@ -3276,7 +3621,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act88" ve="7">
+		<Action sr="act86" ve="7">
 			<code>312</code>
 			<Int sr="arg0" val="3"/>
 			<ConditionList sr="if">
@@ -3287,7 +3632,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act89" ve="7">
+		<Action sr="act87" ve="7">
 			<code>43</code>
 			<ConditionList sr="if">
 				<Condition sr="c0" ve="3">
@@ -3297,13 +3642,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act9" ve="7">
-			<code>590</code>
-			<Str sr="arg0" ve="3">%receive4</Str>
-			<Str sr="arg1" ve="3">?</Str>
-			<Int sr="arg2" val="0"/>
-		</Action>
-		<Action sr="act90" ve="7">
+		<Action sr="act88" ve="7">
 			<code>294</code>
 			<Int sr="arg0" val="1"/>
 			<ConditionList sr="if">
@@ -3314,7 +3653,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act91" ve="7">
+		<Action sr="act89" ve="7">
 			<code>294</code>
 			<Int sr="arg0" val="0"/>
 			<ConditionList sr="if">
@@ -3325,7 +3664,13 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act92" ve="7">
+		<Action sr="act9" ve="7">
+			<code>590</code>
+			<Str sr="arg0" ve="3">%receive4</Str>
+			<Str sr="arg1" ve="3">?</Str>
+			<Int sr="arg2" val="0"/>
+		</Action>
+		<Action sr="act90" ve="7">
 			<code>43</code>
 			<ConditionList sr="if">
 				<Condition sr="c0" ve="3">
@@ -3335,7 +3680,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act93" ve="7">
+		<Action sr="act91" ve="7">
 			<code>445</code>
 			<Str sr="arg0" ve="3">%tpe_notifypath%tpe_notifyfile</Str>
 			<Int sr="arg1" val="0"/>
@@ -3343,7 +3688,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 			<Int sr="arg3" val="5"/>
 			<Int sr="arg4" val="1"/>
 		</Action>
-		<Action sr="act94" ve="7">
+		<Action sr="act92" ve="7">
 			<code>43</code>
 			<ConditionList sr="if">
 				<Condition sr="c0" ve="3">
@@ -3353,13 +3698,13 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act95" ve="7">
+		<Action sr="act93" ve="7">
 			<code>548</code>
 			<label>Baustelle</label>
 			<Str sr="arg0" ve="3">AMAD: "set changetoBtDevice" wird noch nicht unterstützt</Str>
 			<Int sr="arg1" val="1"/>
 		</Action>
-		<Action sr="act96" ve="7">
+		<Action sr="act94" ve="7">
 			<code>130</code>
 			<label>Baustelle</label>
 			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
@@ -3371,7 +3716,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 			<Str sr="arg4" ve="3"/>
 			<Int sr="arg5" val="0"/>
 		</Action>
-		<Action sr="act97" ve="7">
+		<Action sr="act95" ve="7">
 			<code>43</code>
 			<ConditionList sr="if">
 				<Condition sr="c0" ve="3">
@@ -3381,7 +3726,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act98" ve="7">
+		<Action sr="act96" ve="7">
 			<code>779</code>
 			<Str sr="arg0" ve="3"/>
 			<Int sr="arg1" val="0"/>
@@ -3393,7 +3738,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act99" ve="7">
+		<Action sr="act97" ve="7">
 			<code>123</code>
 			<se>false</se>
 			<Str sr="arg0" ve="3">service call notification 1</Str>
@@ -3416,12 +3761,56 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
+		<Action sr="act98" ve="7">
+			<code>548</code>
+			<label>no root</label>
+			<Str sr="arg0" ve="3">AMAD: "set clearNotificationBar all" benötigt Root rechte</Str>
+			<Int sr="arg1" val="1"/>
+			<ConditionList sr="if">
+				<bool0>And</bool0>
+				<Condition sr="c0" ve="3">
+					<lhs>%tpe_app</lhs>
+					<op>2</op>
+					<rhs>All</rhs>
+				</Condition>
+				<Condition sr="c1" ve="3">
+					<lhs>%ROOT</lhs>
+					<op>2</op>
+					<rhs>no</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act99" ve="7">
+			<code>130</code>
+			<label>no root</label>
+			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
+			<Int sr="arg1">
+				<var>%priority+1</var>
+			</Int>
+			<Str sr="arg2" ve="3">setreading</Str>
+			<Str sr="arg3" ve="3">"automagicState": "set clearNotificationBar all: only works on rooted Devices"</Str>
+			<Str sr="arg4" ve="3"/>
+			<Int sr="arg5" val="0"/>
+			<ConditionList sr="if">
+				<bool0>And</bool0>
+				<Condition sr="c0" ve="3">
+					<lhs>%tpe_app</lhs>
+					<op>2</op>
+					<rhs>All</rhs>
+				</Condition>
+				<Condition sr="c1" ve="3">
+					<lhs>%ROOT</lhs>
+					<op>2</op>
+					<rhs>no</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
 	</Task>
 	<Task sr="task1031">
 		<cdate>1517260534313</cdate>
 		<edate>1522170754384</edate>
 		<id>1031</id>
-		<pri>100</pri>
+		<pri>6</pri>
 		<rty>2</rty>
 		<Action sr="act0" ve="7">
 			<code>37</code>
@@ -4732,7 +5121,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 		<cdate>1439252234311</cdate>
 		<edate>1522171129360</edate>
 		<id>1066</id>
-		<pri>100</pri>
+		<pri>6</pri>
 		<rty>1</rty>
 		<Action sr="act0" ve="7">
 			<code>590</code>
@@ -4848,9 +5237,110 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 			<Int sr="arg4" val="0"/>
 		</Action>
 	</Task>
+	<Task sr="task1070">
+		<cdate>1540567620790</cdate>
+		<edate>1540586468041</edate>
+		<id>1070</id>
+		<rty>1</rty>
+		<Action sr="act0" ve="7">
+			<code>547</code>
+			<Str sr="arg0" ve="3">%interrupt</Str>
+			<Str sr="arg1" ve="3">always</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%INTERRUPT</lhs>
+					<op>2</op>
+					<rhs>all</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act1" ve="7">
+			<code>547</code>
+			<Str sr="arg0" ve="3">%interrupt</Str>
+			<Str sr="arg1" ve="3">onlyImportant</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%INTERRUPT</lhs>
+					<op>2</op>
+					<rhs>priority</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act2" ve="7">
+			<code>547</code>
+			<Str sr="arg0" ve="3">%interrupt</Str>
+			<Str sr="arg1" ve="3">never</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%INTERRUPT</lhs>
+					<op>2</op>
+					<rhs>none</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act3" ve="7">
+			<code>547</code>
+			<Str sr="arg0" ve="3">%interrupt</Str>
+			<Str sr="arg1" ve="3">alarmClockOnly</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%INTERRUPT</lhs>
+					<op>2</op>
+					<rhs>alarms</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act4" ve="7">
+			<code>547</code>
+			<label>doNotDisturb</label>
+			<Str sr="arg0" ve="3">%setreading</Str>
+			<Str sr="arg1" ve="3">"doNotDisturb": "%interrupt"</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%interrupt</lhs>
+					<op>3</op>
+					<rhs>\%interrupt</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act5" ve="7">
+			<code>547</code>
+			<Str sr="arg0" ve="3">%fhemcmd</Str>
+			<Str sr="arg1" ve="3">setreading</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+		</Action>
+		<Action sr="act6" ve="7">
+			<code>130</code>
+			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
+			<Int sr="arg1">
+				<var>%priority</var>
+			</Int>
+			<Str sr="arg2" ve="3">%fhemcmd</Str>
+			<Str sr="arg3" ve="3">%setreading</Str>
+			<Str sr="arg4" ve="3"/>
+			<Int sr="arg5" val="0"/>
+		</Action>
+	</Task>
 	<Task sr="task1072">
 		<cdate>1439252234311</cdate>
-		<edate>1522171119557</edate>
+		<edate>1540586480780</edate>
 		<id>1072</id>
 		<pri>6</pri>
 		<rty>1</rty>
@@ -4950,9 +5440,263 @@ PAUSED: %paused</Str>
 			<Int sr="arg5" val="0"/>
 		</Action>
 	</Task>
+	<Task sr="task1074">
+		<cdate>1540568107989</cdate>
+		<edate>1540586450556</edate>
+		<id>1074</id>
+		<pri>6</pri>
+		<rty>1</rty>
+		<Action sr="act0" ve="7">
+			<code>547</code>
+			<label>screenBrightness</label>
+			<Str sr="arg0" ve="3">%setreading</Str>
+			<Str sr="arg1" ve="3">"screenBrightness": "%BRIGHT"</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%BRIGHT</lhs>
+					<op>12</op>
+					<rhs></rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act1" ve="7">
+			<code>547</code>
+			<Str sr="arg0" ve="3">%fhemcmd</Str>
+			<Str sr="arg1" ve="3">setreading</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+		</Action>
+		<Action sr="act2" ve="7">
+			<code>130</code>
+			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
+			<Int sr="arg1">
+				<var>%priority</var>
+			</Int>
+			<Str sr="arg2" ve="3">%fhemcmd</Str>
+			<Str sr="arg3" ve="3">%setreading</Str>
+			<Str sr="arg4" ve="3"/>
+			<Int sr="arg5" val="0"/>
+		</Action>
+	</Task>
+	<Task sr="task1076">
+		<cdate>1540568107989</cdate>
+		<edate>1540586443990</edate>
+		<id>1076</id>
+		<rty>1</rty>
+		<Action sr="act0" ve="7">
+			<code>547</code>
+			<label>volume</label>
+			<Str sr="arg0" ve="3">%setreading</Str>
+			<Str sr="arg1" ve="3">"volume": "%VOLM"</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%VOLM</lhs>
+					<op>12</op>
+					<rhs></rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act1" ve="7">
+			<code>547</code>
+			<Str sr="arg0" ve="3">%fhemcmd</Str>
+			<Str sr="arg1" ve="3">setreading</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+		</Action>
+		<Action sr="act2" ve="7">
+			<code>130</code>
+			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
+			<Int sr="arg1">
+				<var>%priority</var>
+			</Int>
+			<Str sr="arg2" ve="3">%fhemcmd</Str>
+			<Str sr="arg3" ve="3">%setreading</Str>
+			<Str sr="arg4" ve="3"/>
+			<Int sr="arg5" val="0"/>
+		</Action>
+	</Task>
+	<Task sr="task1078">
+		<cdate>1540568107989</cdate>
+		<edate>1540586436081</edate>
+		<id>1078</id>
+		<rty>1</rty>
+		<Action sr="act0" ve="7">
+			<code>348</code>
+			<Int sr="arg0" val="0"/>
+			<Str sr="arg1" ve="3"/>
+			<Str sr="arg2" ve="3">%autorotate</Str>
+		</Action>
+		<Action sr="act1" ve="7">
+			<code>547</code>
+			<label>screenOrientationMode</label>
+			<Str sr="arg0" ve="3">%setreading</Str>
+			<Str sr="arg1" ve="3">"screenOrientationMode": "auto"</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%autorotate</lhs>
+					<op>2</op>
+					<rhs>on</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act2" ve="7">
+			<code>547</code>
+			<label>screenOrientationMode</label>
+			<Str sr="arg0" ve="3">%setreading</Str>
+			<Str sr="arg1" ve="3">"screenOrientationMode": "manual"</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%autorotate</lhs>
+					<op>2</op>
+					<rhs>off</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act3" ve="7">
+			<code>547</code>
+			<Str sr="arg0" ve="3">%fhemcmd</Str>
+			<Str sr="arg1" ve="3">setreading</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+		</Action>
+		<Action sr="act4" ve="7">
+			<code>130</code>
+			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
+			<Int sr="arg1">
+				<var>%priority</var>
+			</Int>
+			<Str sr="arg2" ve="3">%fhemcmd</Str>
+			<Str sr="arg3" ve="3">%setreading</Str>
+			<Str sr="arg4" ve="3"/>
+			<Int sr="arg5" val="0"/>
+		</Action>
+	</Task>
+	<Task sr="task1082">
+		<cdate>1540568107989</cdate>
+		<edate>1540586428603</edate>
+		<id>1082</id>
+		<rty>1</rty>
+		<Action sr="act0" ve="7">
+			<code>235</code>
+			<label>screenBrightnessMode</label>
+			<se>false</se>
+			<Int sr="arg0" val="2"/>
+			<Str sr="arg1" ve="3">screen_brightness_mode</Str>
+			<Str sr="arg2" ve="3"/>
+			<Int sr="arg3" val="0"/>
+			<Str sr="arg4" ve="3">%autobright</Str>
+		</Action>
+		<Action sr="act1" ve="7">
+			<code>547</code>
+			<label>screenBrightnessMode</label>
+			<Str sr="arg0" ve="3">%setreading</Str>
+			<Str sr="arg1" ve="3">"screenBrightnessMode": "on"</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%autobright</lhs>
+					<op>2</op>
+					<rhs>1</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act2" ve="7">
+			<code>547</code>
+			<label>screenBrightnessMode</label>
+			<Str sr="arg0" ve="3">%setreading</Str>
+			<Str sr="arg1" ve="3">"screenBrightnessMode": "off"</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%autobright</lhs>
+					<op>2</op>
+					<rhs>0</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act3" ve="7">
+			<code>547</code>
+			<Str sr="arg0" ve="3">%fhemcmd</Str>
+			<Str sr="arg1" ve="3">setreading</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+		</Action>
+		<Action sr="act4" ve="7">
+			<code>130</code>
+			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
+			<Int sr="arg1">
+				<var>%priority</var>
+			</Int>
+			<Str sr="arg2" ve="3">%fhemcmd</Str>
+			<Str sr="arg3" ve="3">%setreading</Str>
+			<Str sr="arg4" ve="3"/>
+			<Int sr="arg5" val="0"/>
+		</Action>
+	</Task>
+	<Task sr="task1084">
+		<cdate>1540568107989</cdate>
+		<edate>1540586418234</edate>
+		<id>1084</id>
+		<rty>1</rty>
+		<Action sr="act0" ve="7">
+			<code>547</code>
+			<label>volumeNotification</label>
+			<Str sr="arg0" ve="3">%setreading</Str>
+			<Str sr="arg1" ve="3">"volumeNotification": "%VOLN"</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%VOLN</lhs>
+					<op>12</op>
+					<rhs></rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act1" ve="7">
+			<code>547</code>
+			<Str sr="arg0" ve="3">%fhemcmd</Str>
+			<Str sr="arg1" ve="3">setreading</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+		</Action>
+		<Action sr="act2" ve="7">
+			<code>130</code>
+			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
+			<Int sr="arg1">
+				<var>%priority</var>
+			</Int>
+			<Str sr="arg2" ve="3">%fhemcmd</Str>
+			<Str sr="arg3" ve="3">%setreading</Str>
+			<Str sr="arg4" ve="3"/>
+			<Int sr="arg5" val="0"/>
+		</Action>
+	</Task>
 	<Task sr="task850">
 		<cdate>1439252234311</cdate>
-		<edate>1522171145358</edate>
+		<edate>1540586474808</edate>
 		<id>850</id>
 		<pri>6</pri>
 		<rty>1</rty>
@@ -5106,7 +5850,7 @@ URL: %url</Str>
 	</Task>
 	<Task sr="task914">
 		<cdate>1511727021932</cdate>
-		<edate>1522170056287</edate>
+		<edate>1534758404099</edate>
 		<id>914</id>
 		<nme>AMAD_getDeviceIP</nme>
 		<pri>100</pri>
@@ -6856,6 +7600,7 @@ TWlKU5rSlKY0pSlNaUpTmtKUpjSlfTWTSP4HD723A9m6n1sAAAAASUVORK5CYII=
 		<cdate>1512509936846</cdate>
 		<edate>1512509936846</edate>
 		<id>924</id>
+		<pri>9</pri>
 		<Action sr="act0" ve="7">
 			<code>55</code>
 			<Str sr="arg0" ve="3">%scene_name</Str>
@@ -7049,6 +7794,7 @@ TWlKU5rSlKY0pSlNaUpTmtKUpjSlfTWTSP4HD723A9m6n1sAAAAASUVORK5CYII=
 		<cdate>1503612864622</cdate>
 		<edate>1522170659399</edate>
 		<id>931</id>
+		<pri>1006</pri>
 		<Action sr="act0" ve="7">
 			<code>130</code>
 			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
@@ -7065,6 +7811,7 @@ TWlKU5rSlKY0pSlNaUpTmtKUpjSlfTWTSP4HD723A9m6n1sAAAAASUVORK5CYII=
 		<cdate>1503689826684</cdate>
 		<edate>1522170487667</edate>
 		<id>932</id>
+		<pri>1006</pri>
 		<Action sr="act0" ve="7">
 			<code>130</code>
 			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
@@ -7096,11 +7843,23 @@ TWlKU5rSlKY0pSlNaUpTmtKUpjSlfTWTSP4HD723A9m6n1sAAAAASUVORK5CYII=
 	</Task>
 	<Task sr="task935">
 		<cdate>1503829156475</cdate>
-		<edate>1521313394014</edate>
+		<edate>1540595724785</edate>
 		<id>935</id>
 		<nme>AMAD_UpdateFlowset</nme>
 		<pri>100</pri>
 		<Action sr="act0" ve="7">
+			<code>104</code>
+			<Str sr="arg0" ve="3">https://taskernet.com/shares/?user=AS35m8mfUdMiSyg%2B6qtSQgVfheXbVAesWjJMrODPeBFDeG5xRTm2T%2BYtd3ixcI0GVFP5yX2Pa3yVKQ%3D%3D&amp;id=Project%3AAMAD</Str>
+		</Action>
+		<Action sr="act1" ve="7">
+			<code>137</code>
+			<Int sr="arg0" val="0"/>
+			<Str sr="arg1" ve="3"/>
+		</Action>
+		<Action sr="act10" ve="7">
+			<code>38</code>
+		</Action>
+		<Action sr="act2" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%path</Str>
 			<Str sr="arg1" ve="3">/storage/emulated/0/Tasker</Str>
@@ -7108,43 +7867,20 @@ TWlKU5rSlKY0pSlNaUpTmtKUpjSlfTWTSP4HD723A9m6n1sAAAAASUVORK5CYII=
 			<Int sr="arg3" val="0"/>
 			<Int sr="arg4" val="0"/>
 		</Action>
-		<Action sr="act1" ve="7">
+		<Action sr="act3" ve="7">
 			<code>342</code>
 			<Int sr="arg0" val="5"/>
 			<Str sr="arg1" ve="3">%path</Str>
 			<Str sr="arg2" ve="3">%exists</Str>
 			<Int sr="arg3" val="0"/>
 		</Action>
-		<Action sr="act10" ve="7">
-			<code>38</code>
-		</Action>
-		<Action sr="act2" ve="7">
+		<Action sr="act4" ve="7">
 			<code>37</code>
 			<ConditionList sr="if">
 				<Condition sr="c0" ve="3">
 					<lhs>%exists</lhs>
 					<op>2</op>
 					<rhs>true</rhs>
-				</Condition>
-			</ConditionList>
-		</Action>
-		<Action sr="act3" ve="7">
-			<code>342</code>
-			<Int sr="arg0" val="5"/>
-			<Str sr="arg1" ve="3">%path/projects</Str>
-			<Str sr="arg2" ve="3">%exists</Str>
-			<Int sr="arg3" val="0"/>
-		</Action>
-		<Action sr="act4" ve="7">
-			<code>409</code>
-			<Str sr="arg0" ve="3">%path/projects</Str>
-			<Int sr="arg1" val="0"/>
-			<Int sr="arg2" val="0"/>
-			<ConditionList sr="if">
-				<Condition sr="c0" ve="3">
-					<lhs>%exists</lhs>
-					<op>2</op>
-					<rhs>false</rhs>
 				</Condition>
 			</ConditionList>
 		</Action>
@@ -7232,7 +7968,7 @@ Code: %HTTPR</Str>
 		<cdate>1512064023268</cdate>
 		<edate>1512064023268</edate>
 		<id>937</id>
-		<pri>102</pri>
+		<pri>9</pri>
 		<Action sr="act0" ve="7">
 			<code>598</code>
 			<label>check input</label>
@@ -7332,6 +8068,7 @@ Code: %HTTPR</Str>
 		<cdate>1512509955759</cdate>
 		<edate>1512509955759</edate>
 		<id>941</id>
+		<pri>9</pri>
 		<Action sr="act0" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%enter</Str>
@@ -7464,6 +8201,7 @@ Code: %HTTPR</Str>
 		<cdate>1503690545406</cdate>
 		<edate>1522170738674</edate>
 		<id>945</id>
+		<pri>1006</pri>
 		<Action sr="act0" ve="7">
 			<code>130</code>
 			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
@@ -7480,6 +8218,7 @@ Code: %HTTPR</Str>
 		<cdate>1512506004674</cdate>
 		<edate>1512506004674</edate>
 		<id>946</id>
+		<pri>9</pri>
 		<Action sr="act0" ve="7">
 			<code>55</code>
 			<Str sr="arg0" ve="3">%scene_name</Str>
@@ -7915,7 +8654,7 @@ Art der Steuerung von FHEM set Befehlen, welche über die Bridge als Steuerbefeh
 		<cdate>1512506655696</cdate>
 		<edate>1512506655696</edate>
 		<id>953</id>
-		<pri>102</pri>
+		<pri>9</pri>
 		<Action sr="act0" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%enter</Str>
@@ -7992,7 +8731,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 		<cdate>1512032849766</cdate>
 		<edate>1512032849766</edate>
 		<id>955</id>
-		<pri>102</pri>
+		<pri>9</pri>
 		<Action sr="act0" ve="7">
 			<code>598</code>
 			<label>check input</label>
@@ -8031,7 +8770,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 		<cdate>1512032849766</cdate>
 		<edate>1512032849766</edate>
 		<id>956</id>
-		<pri>102</pri>
+		<pri>9</pri>
 		<Action sr="act0" ve="7">
 			<code>598</code>
 			<label>check input</label>
@@ -8137,7 +8876,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 	</Task>
 	<Task sr="task960">
 		<cdate>1502789397309</cdate>
-		<edate>1528637269209</edate>
+		<edate>1540595634107</edate>
 		<id>960</id>
 		<nme>AMAD_informations</nme>
 		<pri>100</pri>
@@ -8154,7 +8893,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 			<code>547</code>
 			<label>flowsetVersionAtDevice</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
-			<Str sr="arg1" ve="3">"flowsetVersionAtDevice": "4.2.3 (Tasker)"</Str>
+			<Str sr="arg1" ve="3">"flowsetVersionAtDevice": "4.2.4 (Tasker)"</Str>
 			<Int sr="arg2" val="0"/>
 			<Int sr="arg3" val="0"/>
 			<Int sr="arg4" val="0"/>
@@ -8400,6 +9139,17 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 			<Str sr="arg9" ve="3"/>
 		</Action>
 		<Action sr="act24" ve="7">
+			<code>235</code>
+			<label>screenBrightnessMode</label>
+			<on>false</on>
+			<se>false</se>
+			<Int sr="arg0" val="2"/>
+			<Str sr="arg1" ve="3">screen_brightness_mode</Str>
+			<Str sr="arg2" ve="3"/>
+			<Int sr="arg3" val="0"/>
+			<Str sr="arg4" ve="3">%autobright</Str>
+		</Action>
+		<Action sr="act25" ve="7">
 			<code>547</code>
 			<label>screenBrightnessMode</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
@@ -8415,7 +9165,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act25" ve="7">
+		<Action sr="act26" ve="7">
 			<code>547</code>
 			<label>screenBrightnessMode</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
@@ -8431,13 +9181,13 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act26" ve="7">
+		<Action sr="act27" ve="7">
 			<code>348</code>
 			<Int sr="arg0" val="1"/>
 			<Str sr="arg1" ve="3"/>
 			<Str sr="arg2" ve="3">%orientation</Str>
 		</Action>
-		<Action sr="act27" ve="7">
+		<Action sr="act28" ve="7">
 			<code>547</code>
 			<label>screenOrientation</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
@@ -8453,27 +9203,11 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act28" ve="7">
+		<Action sr="act29" ve="7">
 			<code>348</code>
 			<Int sr="arg0" val="0"/>
 			<Str sr="arg1" ve="3"/>
 			<Str sr="arg2" ve="3">%autorotate</Str>
-		</Action>
-		<Action sr="act29" ve="7">
-			<code>547</code>
-			<label>screenOrientationMode</label>
-			<Str sr="arg0" ve="3">%setreading</Str>
-			<Str sr="arg1" ve="3">%setreading,"screenOrientationMode": "auto"</Str>
-			<Int sr="arg2" val="0"/>
-			<Int sr="arg3" val="0"/>
-			<Int sr="arg4" val="0"/>
-			<ConditionList sr="if">
-				<Condition sr="c0" ve="3">
-					<lhs>%autorotate</lhs>
-					<op>2</op>
-					<rhs>on</rhs>
-				</Condition>
-			</ConditionList>
 		</Action>
 		<Action sr="act3" ve="7">
 			<code>547</code>
@@ -8495,6 +9229,22 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 			<code>547</code>
 			<label>screenOrientationMode</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
+			<Str sr="arg1" ve="3">%setreading,"screenOrientationMode": "auto"</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%autorotate</lhs>
+					<op>2</op>
+					<rhs>on</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act31" ve="7">
+			<code>547</code>
+			<label>screenOrientationMode</label>
+			<Str sr="arg0" ve="3">%setreading</Str>
 			<Str sr="arg1" ve="3">%setreading,"screenOrientationMode": "manual"</Str>
 			<Int sr="arg2" val="0"/>
 			<Int sr="arg3" val="0"/>
@@ -8507,17 +9257,9 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act31" ve="7">
-			<code>547</code>
-			<Str sr="arg0" ve="3">%setstate</Str>
-			<Str sr="arg1" ve="3">inaktiv</Str>
-			<Int sr="arg2" val="0"/>
-			<Int sr="arg3" val="0"/>
-			<Int sr="arg4" val="0"/>
-		</Action>
 		<Action sr="act32" ve="7">
 			<code>547</code>
-			<Str sr="arg0" ve="3">%infostate</Str>
+			<Str sr="arg0" ve="3">%setstate</Str>
 			<Str sr="arg1" ve="3">inaktiv</Str>
 			<Int sr="arg2" val="0"/>
 			<Int sr="arg3" val="0"/>
@@ -8531,47 +9273,14 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 			<Int sr="arg3" val="0"/>
 			<Int sr="arg4" val="0"/>
 			<ConditionList sr="if">
-				<bool0>Or</bool0>
-				<bool1>Or</bool1>
 				<Condition sr="c0" ve="3">
-					<lhs>%PENABLED</lhs>
-					<op>4</op>
-					<rhs>AutoRemote AMAD</rhs>
-				</Condition>
-				<Condition sr="c1" ve="3">
-					<lhs>%PENABLED</lhs>
-					<op>4</op>
-					<rhs>TNES AMAD</rhs>
-				</Condition>
-				<Condition sr="c2" ve="3">
-					<lhs>%PENABLED</lhs>
-					<op>2</op>
-					<rhs>Pushover AMAD</rhs>
-				</Condition>
-			</ConditionList>
-		</Action>
-		<Action sr="act34" ve="7">
-			<code>547</code>
-			<Str sr="arg0" ve="3">%infostate</Str>
-			<Str sr="arg1" ve="3">aktiv</Str>
-			<Int sr="arg2" val="0"/>
-			<Int sr="arg3" val="0"/>
-			<Int sr="arg4" val="0"/>
-			<ConditionList sr="if">
-				<bool0>And</bool0>
-				<Condition sr="c0" ve="3">
-					<lhs>%PENABLED</lhs>
-					<op>4</op>
-					<rhs>AMAD_InformationFlow</rhs>
-				</Condition>
-				<Condition sr="c1" ve="3">
-					<lhs>%AMAD_send</lhs>
+					<lhs>%AMAD_receive</lhs>
 					<op>2</op>
 					<rhs>on</rhs>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act35" ve="7">
+		<Action sr="act34" ve="7">
 			<code>547</code>
 			<label>flow_SetCommands</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
@@ -8580,7 +9289,30 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 			<Int sr="arg3" val="0"/>
 			<Int sr="arg4" val="0"/>
 		</Action>
+		<Action sr="act35" ve="7">
+			<code>547</code>
+			<Str sr="arg0" ve="3">%infostate</Str>
+			<Str sr="arg1" ve="3">inaktiv</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+		</Action>
 		<Action sr="act36" ve="7">
+			<code>547</code>
+			<Str sr="arg0" ve="3">%infostate</Str>
+			<Str sr="arg1" ve="3">aktiv</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%AMAD_send</lhs>
+					<op>2</op>
+					<rhs>on</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act37" ve="7">
 			<code>547</code>
 			<label>flow_informations</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
@@ -8589,7 +9321,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 			<Int sr="arg3" val="0"/>
 			<Int sr="arg4" val="0"/>
 		</Action>
-		<Action sr="act37" ve="7">
+		<Action sr="act38" ve="7">
 			<code>547</code>
 			<label>volume</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
@@ -8605,7 +9337,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act38" ve="7">
+		<Action sr="act39" ve="7">
 			<code>547</code>
 			<label>volumeNotification</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
@@ -8620,22 +9352,6 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 					<rhs></rhs>
 				</Condition>
 			</ConditionList>
-		</Action>
-		<Action sr="act39" ve="7">
-			<code>664</code>
-			<label>Query Alarm</label>
-			<se>false</se>
-			<Str sr="arg0" ve="3">contres</Str>
-			<Str sr="arg1" ve="3">CONTEXT</Str>
-			<Str sr="arg2" ve="3">getContentResolver
-{ContentResolver} ()</Str>
-			<Str sr="arg3" ve="3"/>
-			<Str sr="arg4" ve="3"/>
-			<Str sr="arg5" ve="3"/>
-			<Str sr="arg6" ve="3"/>
-			<Str sr="arg7" ve="3"/>
-			<Str sr="arg8" ve="3"/>
-			<Str sr="arg9" ve="3"/>
 		</Action>
 		<Action sr="act4" ve="7">
 			<code>130</code>
@@ -8652,6 +9368,22 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 			<code>664</code>
 			<label>Query Alarm</label>
 			<se>false</se>
+			<Str sr="arg0" ve="3">contres</Str>
+			<Str sr="arg1" ve="3">CONTEXT</Str>
+			<Str sr="arg2" ve="3">getContentResolver
+{ContentResolver} ()</Str>
+			<Str sr="arg3" ve="3"/>
+			<Str sr="arg4" ve="3"/>
+			<Str sr="arg5" ve="3"/>
+			<Str sr="arg6" ve="3"/>
+			<Str sr="arg7" ve="3"/>
+			<Str sr="arg8" ve="3"/>
+			<Str sr="arg9" ve="3"/>
+		</Action>
+		<Action sr="act41" ve="7">
+			<code>664</code>
+			<label>Query Alarm</label>
+			<se>false</se>
 			<Str sr="arg0" ve="3">%alarm</Str>
 			<Str sr="arg1" ve="3">android.provider.Settings$System</Str>
 			<Str sr="arg2" ve="3">getString
@@ -8664,7 +9396,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 			<Str sr="arg8" ve="3"/>
 			<Str sr="arg9" ve="3"/>
 		</Action>
-		<Action sr="act41" ve="7">
+		<Action sr="act42" ve="7">
 			<code>37</code>
 			<ConditionList sr="if">
 				<Condition sr="c0" ve="3">
@@ -8674,7 +9406,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act42" ve="7">
+		<Action sr="act43" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%blank</Str>
 			<Str sr="arg1" ve="3"> </Str>
@@ -8682,13 +9414,13 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 			<Int sr="arg3" val="0"/>
 			<Int sr="arg4" val="0"/>
 		</Action>
-		<Action sr="act43" ve="7">
+		<Action sr="act44" ve="7">
 			<code>590</code>
 			<Str sr="arg0" ve="3">%alarm</Str>
 			<Str sr="arg1" ve="3">.,%blank</Str>
 			<Int sr="arg2" val="0"/>
 		</Action>
-		<Action sr="act44" ve="7">
+		<Action sr="act45" ve="7">
 			<code>547</code>
 			<label>nextAlarmDay</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
@@ -8704,7 +9436,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act45" ve="7">
+		<Action sr="act46" ve="7">
 			<code>547</code>
 			<label>nextAlarmTime</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
@@ -8720,10 +9452,10 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act46" ve="7">
+		<Action sr="act47" ve="7">
 			<code>43</code>
 		</Action>
-		<Action sr="act47" ve="7">
+		<Action sr="act48" ve="7">
 			<code>547</code>
 			<label>nextAlarmDay|Time</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
@@ -8732,16 +9464,8 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 			<Int sr="arg3" val="0"/>
 			<Int sr="arg4" val="0"/>
 		</Action>
-		<Action sr="act48" ve="7">
-			<code>38</code>
-		</Action>
 		<Action sr="act49" ve="7">
-			<code>547</code>
-			<Str sr="arg0" ve="3">%fhemcmd</Str>
-			<Str sr="arg1" ve="3">setreading</Str>
-			<Int sr="arg2" val="0"/>
-			<Int sr="arg3" val="0"/>
-			<Int sr="arg4" val="0"/>
+			<code>38</code>
 		</Action>
 		<Action sr="act5" ve="7">
 			<code>547</code>
@@ -8760,6 +9484,14 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 			</ConditionList>
 		</Action>
 		<Action sr="act50" ve="7">
+			<code>547</code>
+			<Str sr="arg0" ve="3">%fhemcmd</Str>
+			<Str sr="arg1" ve="3">setreading</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+		</Action>
+		<Action sr="act51" ve="7">
 			<code>130</code>
 			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
 			<Int sr="arg1">
@@ -10042,7 +10774,7 @@ Hierüber wird festgelegt, über welchen Dienst die setCommands empfangen werden
 		<cdate>1502904145564</cdate>
 		<edate>1523024457613</edate>
 		<id>972</id>
-		<pri>100</pri>
+		<pri>6</pri>
 		<Action sr="act0" ve="7">
 			<code>130</code>
 			<Str sr="arg0" ve="3">AMAD_informations</Str>
@@ -10075,6 +10807,7 @@ Hierüber wird festgelegt, über welchen Dienst die setCommands empfangen werden
 		<cdate>1511708875113</cdate>
 		<edate>1522170312044</edate>
 		<id>974</id>
+		<pri>1006</pri>
 		<Action sr="act0" ve="7">
 			<code>130</code>
 			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
@@ -10142,6 +10875,7 @@ Hierüber wird festgelegt, über welchen Dienst die setCommands empfangen werden
 		<cdate>1512505794248</cdate>
 		<edate>1512505794248</edate>
 		<id>976</id>
+		<pri>9</pri>
 		<Action sr="act0" ve="7">
 			<code>55</code>
 			<Str sr="arg0" ve="3">%scene_name</Str>
@@ -10712,6 +11446,7 @@ Bitten prüfe die eingetragene Daten.</Str>
 		<cdate>1512505998767</cdate>
 		<edate>1512505998767</edate>
 		<id>980</id>
+		<pri>9</pri>
 		<Action sr="act0" ve="7">
 			<code>55</code>
 			<Str sr="arg0" ve="3">%scene_name</Str>
@@ -10755,7 +11490,7 @@ Bitten prüfe die eingetragene Daten.</Str>
 		<cdate>1512032849766</cdate>
 		<edate>1512032849766</edate>
 		<id>982</id>
-		<pri>102</pri>
+		<pri>9</pri>
 		<Action sr="act0" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%enter</Str>
@@ -11204,7 +11939,6 @@ Bitten prüfe die eingetragene Daten.</Str>
 		<cdate>1503692408945</cdate>
 		<edate>1522170208960</edate>
 		<id>991</id>
-		<pri>100</pri>
 		<rty>1</rty>
 		<Action sr="act0" ve="7">
 			<code>547</code>
@@ -11294,6 +12028,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 		<cdate>1503612978140</cdate>
 		<edate>1522170409344</edate>
 		<id>992</id>
+		<pri>6</pri>
 		<rty>1</rty>
 		<Action sr="act0" ve="7">
 			<code>30</code>
@@ -11415,7 +12150,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 		<cdate>1503937837718</cdate>
 		<edate>1503937837718</edate>
 		<id>994</id>
-		<pri>102</pri>
+		<pri>9</pri>
 		<Action sr="act0" ve="7">
 			<code>49</code>
 			<Str sr="arg0" ve="3">%scene_name</Str>
@@ -11694,6 +12429,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 		<cdate>1503612743210</cdate>
 		<edate>1522170630736</edate>
 		<id>997</id>
+		<pri>1006</pri>
 		<Action sr="act0" ve="7">
 			<code>130</code>
 			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
@@ -11718,11 +12454,26 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 	</Task>
 	<Task sr="task999">
 		<cdate>1503611036750</cdate>
-		<edate>1522170108727</edate>
+		<edate>1533585674453</edate>
 		<id>999</id>
 		<nme>AMAD_SDK2Name</nme>
 		<rty>1</rty>
 		<Action sr="act0" ve="7">
+			<code>547</code>
+			<Str sr="arg0" ve="3">%androidversion</Str>
+			<Str sr="arg1" ve="3">9.0 Pie</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%SDK</lhs>
+					<op>8</op>
+					<rhs>28</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act1" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
 			<Str sr="arg1" ve="3">8.1 Oreo</Str>
@@ -11737,10 +12488,10 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act1" ve="7">
+		<Action sr="act10" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
-			<Str sr="arg1" ve="3">8.0 Oreo</Str>
+			<Str sr="arg1" ve="3">4.2 - 4.2.2 Jelly Bean MR1</Str>
 			<Int sr="arg2" val="0"/>
 			<Int sr="arg3" val="0"/>
 			<Int sr="arg4" val="0"/>
@@ -11748,11 +12499,11 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				<Condition sr="c0" ve="3">
 					<lhs>%SDK</lhs>
 					<op>8</op>
-					<rhs>26</rhs>
+					<rhs>17</rhs>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act10" ve="7">
+		<Action sr="act11" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
 			<Str sr="arg1" ve="3">4.1 - 4.1.1  Jelly Bean</Str>
@@ -11767,7 +12518,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act11" ve="7">
+		<Action sr="act12" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
 			<Str sr="arg1" ve="3">4.0.3 - 4.0.4 Ice Cream Sandwich MR1</Str>
@@ -11782,7 +12533,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act12" ve="7">
+		<Action sr="act13" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
 			<Str sr="arg1" ve="3">4.0 - 4.0.2 Ice Cream Sandwich</Str>
@@ -11797,12 +12548,27 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act13" ve="7">
+		<Action sr="act14" ve="7">
 			<code>126</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
 			<Int sr="arg1" val="1"/>
 		</Action>
 		<Action sr="act2" ve="7">
+			<code>547</code>
+			<Str sr="arg0" ve="3">%androidversion</Str>
+			<Str sr="arg1" ve="3">8.0 Oreo</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%SDK</lhs>
+					<op>8</op>
+					<rhs>26</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act3" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
 			<Str sr="arg1" ve="3">7.1 Nougat</Str>
@@ -11817,7 +12583,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act3" ve="7">
+		<Action sr="act4" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
 			<Str sr="arg1" ve="3">7.0 Nougat</Str>
@@ -11832,7 +12598,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act4" ve="7">
+		<Action sr="act5" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
 			<Str sr="arg1" ve="3">6.0 Marshmallow</Str>
@@ -11847,7 +12613,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act5" ve="7">
+		<Action sr="act6" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
 			<Str sr="arg1" ve="3">5.1 Lollipop MR1</Str>
@@ -11862,7 +12628,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act6" ve="7">
+		<Action sr="act7" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
 			<Str sr="arg1" ve="3">5.0 Lollipop</Str>
@@ -11877,7 +12643,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act7" ve="7">
+		<Action sr="act8" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
 			<Str sr="arg1" ve="3">4.4 KitKat</Str>
@@ -11892,7 +12658,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act8" ve="7">
+		<Action sr="act9" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
 			<Str sr="arg1" ve="3">4.3 Jelly Bean MR2</Str>
@@ -11904,21 +12670,6 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 					<lhs>%SDK</lhs>
 					<op>8</op>
 					<rhs>18</rhs>
-				</Condition>
-			</ConditionList>
-		</Action>
-		<Action sr="act9" ve="7">
-			<code>547</code>
-			<Str sr="arg0" ve="3">%androidversion</Str>
-			<Str sr="arg1" ve="3">4.2 - 4.2.2 Jelly Bean MR1</Str>
-			<Int sr="arg2" val="0"/>
-			<Int sr="arg3" val="0"/>
-			<Int sr="arg4" val="0"/>
-			<ConditionList sr="if">
-				<Condition sr="c0" ve="3">
-					<lhs>%SDK</lhs>
-					<op>8</op>
-					<rhs>17</rhs>
 				</Condition>
 			</ConditionList>
 		</Action>
