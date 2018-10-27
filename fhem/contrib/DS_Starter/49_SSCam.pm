@@ -36,10 +36,16 @@ package main;
 
 use strict;                           
 use warnings;
+eval "use JSON qw( decode_json );1;" or my $SScamMMDBI = "JSON";  # Debian: apt-get install libjson-perl
+use Data::Dumper;                                                 # Perl Core module
+use MIME::Base64;
+use Time::HiRes;
+use HttpUtils;
+# no if $] >= 5.017011, warnings => 'experimental';  
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
-  "7.2.2"  => "24.10.2018  attribute \"livestreamprefix\" to widget sortable ",
+  "7.2.2"  => "27.10.2018  Undefined subroutine &main::SSCam_ptzpanel ",
   "7.2.1"  => "23.10.2018  new routine SSCam_versionCheck, COMPATIBILITY changed to 8.2.1 ",
   "7.2.0"  => "20.10.2018  direct help for attributes, new get versionNotes command, fix PERL WARNING: Use of uninitialized value \$small, get versionNotes ",
   "7.1.1"  => "18.10.2018  Message of \"Your current/simulated SVS-version...\" changed, commandref corrected ",
@@ -84,7 +90,6 @@ our %SSCam_vNotesIntern = (
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
-  "7.2.2"  => "24.10.2018 attribute \"livestreamprefix\" contains defined port and server address for possible selction ",
   "7.2.1"  => "23.10.2018 COMPATIBILITY changed to 8.2.1 ",
   "7.2.0"  => "20.10.2018 direct help for attributes, new get versionNotes command, please see commandref for details ",
   "7.1.1"  => "18.10.2018 Message of \"current/simulated SVS-version...\" changed, commandref corrected ",
@@ -193,13 +198,6 @@ our %SSCam_vHintsExt_de = (
   "1" => "Hilfreiche Hinweise zu SSCam im <a href=\"https://wiki.fhem.de/wiki/SSCAM_-_Steuerung_von_Kameras_in_Synology_Surveillance_Station\">FHEM-Wiki</a>"
 );
               
-eval "use JSON qw( decode_json );1;" or my $SScamMMDBI = "JSON";  # Debian: apt-get install libjson-perl
-use Data::Dumper;                                                 # Perl Core module
-use MIME::Base64;
-use Time::HiRes;
-use HttpUtils;
-# no if $] >= 5.017011, warnings => 'experimental';  
-
 # getestete SVS-Version
 my $compstat     = "8.2.1";
 
@@ -247,7 +245,7 @@ my %SSCam_errlist = (
   600 => "Presetname and PresetID not found in Hash",
 );
 
-# Standardvariablen
+# Standardvariablen und Forward-Declaration
 my $SSCam_slim = 3;                          # default Anzahl der abzurufenden Schnappschüsse mit snapGallery
 my $SSCAM_snum = "1,2,3,4,5,6,7,8,9,10";     # mögliche Anzahl der abzurufenden Schnappschüsse mit snapGallery
 
@@ -255,6 +253,8 @@ use vars qw($FW_ME);      # webname (default is fhem), used by 97_GROUP/weblink
 use vars qw($FW_subdir);  # Sub-path in URL, used by FLOORPLAN/weblink
 use vars qw($FW_room);    # currently selected room
 use vars qw($FW_detail);  # currently selected device for detail view
+
+sub SSCam_ptzpanel($;$$);
 
 sub SSCam_Initialize($) {
  my ($hash) = @_;
@@ -274,6 +274,7 @@ sub SSCam_Initialize($) {
          "genericStrmHtmlTag ".
          "httptimeout ".
          "htmlattr ".
+         "livestreamprefix ".
 		 "loginRetries:1,2,3,4,5,6,7,8,9,10 ".
          "videofolderMap ".
          "pollcaminfoall ".
@@ -373,13 +374,9 @@ sub SSCam_Define($@) {
   } else {
       readingsBulkUpdate($hash,"state", "Initialized");                          # Init für "state" wenn SVS  
   }
-  readingsEndUpdate($hash,1);  
-
-  # allg. Userattr setzen
-  my $defpref = $hash->{PROTOCOL}."://".$hash->{SERVERADDR}.":".$hash->{SERVERPORT}; 
-  addToDevAttrList($name, "livestreamprefix:sortable,$defpref");  
+  readingsEndUpdate($hash,1);                                          
   
-  SSCam_getcredentials($hash,1);                                                 # Credentials lesen und in RAM laden ($boot=1)      
+  SSCam_getcredentials($hash,1);                                                       # Credentials lesen und in RAM laden ($boot=1)      
   
   # initiale Routinen nach Restart ausführen   , verzögerter zufälliger Start
   RemoveInternalTimer($hash, "SSCam_initonboot");
@@ -417,8 +414,7 @@ return undef;
 
 ################################################################
 sub SSCam_Attr($$$$) {
-    my @a = @_;
-    my ($cmd,$name,$aName,$aVal) = @a;
+    my ($cmd,$name,$aName,$aVal) = @_;
     my $hash = $defs{$name};
     my ($do,$val);
       
@@ -438,11 +434,6 @@ sub SSCam_Attr($$$$) {
     
     if($aName =~ m/ptzPanel_row.*|ptzPanel_Home|ptzPanel_use/) {
         InternalTimer(gettimeofday()+0.7, "SSCam_addptzattr", "$name", 0);
-    } 
-    
-    if($aName =~ /livestreamprefix/ && $cmd eq "set") {
-        $aVal = (split(",",$aVal))[0];
-        $_[3] = $aVal;
     } 
     
     if ($aName eq "disable") {
