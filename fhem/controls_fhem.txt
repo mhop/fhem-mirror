@@ -1,4 +1,4 @@
-REV 17622
+REV 17629
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2018-10-27_07:45:02 263010 ./CHANGED
+UPD 2018-10-28_07:45:03 263116 ./CHANGED
 UPD 2018-10-21_07:45:03 38276 ./MAINTAINER.txt
 UPD 2018-09-09_07:45:03 39688 ./configDB.pm
 UPD 2018-09-17_07:45:03 19987 ./fhem.cfg.demo
@@ -230,7 +230,7 @@ UPD 2018-03-02_07:47:09 24286 FHEM/39_alexa.pm
 UPD 2017-04-21_07:45:02 2759 FHEM/39_siri.pm
 UPD 2016-04-26_07:45:11 13443 FHEM/40_RFXCOM.pm
 UPD 2018-07-05_07:45:04 35494 FHEM/41_OREGON.pm
-UPD 2018-07-18_07:45:03 31743 FHEM/42_AptToDate.pm
+UPD 2018-10-28_07:45:03 33353 FHEM/42_AptToDate.pm
 UPD 2017-05-26_07:45:02 29928 FHEM/42_Nextion.pm
 UPD 2015-07-28_14:05:31 8038 FHEM/42_RFXMETER.pm
 UPD 2017-06-01_07:45:02 21914 FHEM/42_SMARTMON.pm
@@ -590,7 +590,7 @@ UPD 2017-09-10_16:01:38 422 FHEM/holiday/sn.holiday
 UPD 2017-09-10_16:01:38 405 FHEM/holiday/st.holiday
 UPD 2017-09-10_16:01:38 392 FHEM/holiday/th.holiday
 UPD 2018-06-02_07:45:03 330219 FHEM/lib/74_AMADautomagicFlowset_4.2.3.xml
-UPD 2018-06-20_07:45:04 410988 FHEM/lib/74_AMADtaskerset_4.2.3.prj.xml
+UPD 2018-10-28_07:45:03 428826 FHEM/lib/74_AMADtaskerset_4.2.4.prj.xml
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
 UPD 2018-01-13_07:45:02 21899 FHEM/lib/Device/Firmata/Constants.pm
@@ -688,8 +688,8 @@ UPD 2018-10-25_07:45:06 3617351 docs/commandref.html
 UPD 2018-10-25_07:45:08 2223618 docs/commandref_DE.html
 UPD 2018-10-08_07:45:02 76228 docs/commandref_frame.html
 UPD 2018-10-08_07:45:02 85677 docs/commandref_frame_DE.html
-UPD 2018-10-27_07:45:09 199665 docs/commandref_modular.html
-UPD 2018-10-27_07:45:09 210316 docs/commandref_modular_DE.html
+UPD 2018-10-28_07:45:09 199665 docs/commandref_modular.html
+UPD 2018-10-28_07:45:10 210316 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
