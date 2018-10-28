@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#  89_FULLY.pm 0.9
+#  89_FULLY.pm 0.9.001
 #
 #  $Id$
 #
@@ -35,7 +35,7 @@ sub FULLY_Abort ($);
 sub FULLY_UpdateReadings ($$);
 sub FULLY_Ping ($$);
 
-my $FULLY_VERSION = "0.9";
+my $FULLY_VERSION = "0.9.001";
 my $FULLY_TIMEOUT = 4;
 my $FULLY_POLL_INTERVAL = 3600;
 my $FULLY_REQUIRED_VERSION = 1.27;
@@ -532,8 +532,14 @@ sub FULLY_ProcessDeviceInfo ($$)
 			$parameters .= "|state=$rv";
 		}
 		elsif ($rn eq 'fully_version') {
-			Log3 $name, 1, "FULLY: [$name] Version of fully browser is $rv. Version $FULLY_REQUIRED_VERSION is required."
-				if ($rv < $FULLY_REQUIRED_VERSION);
+			if ($rv =~ /^([0-9]\.[0-9]+).*/) {
+				my $cv = $1;
+				Log3 $name, 1, "FULLY: [$name] Version of fully browser is $rv. Version $FULLY_REQUIRED_VERSION is required."
+					if ($cv < $FULLY_REQUIRED_VERSION);
+			}
+			else {
+				Log3 $name, 2, "FULLY: [$name] Cannot detect version of fully browser.";
+			}
 		}
 		$parameters .= "|$rn=$rv";
 	}

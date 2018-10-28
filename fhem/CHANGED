@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  89_FULLY: fixed version check bug
   - feature: 74_AMADtaskerset: import with share link
   - change:  42_AptToDate: change to package methode
   - bugfix:  74_XiaomiBTLESens: fix humidity code
