@@ -26,29 +26,30 @@
 #       along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #########################################################################################################################
-#  Versions History:
-# 
-# 1.2.4  27.10.2018    Undefined subroutine &main::SSCam_ptzpanel
-# 1.2.3  03.07.2018    behavior changed if device is disabled
-# 1.2.2  26.06.2018    make changes for generic stream dev
-# 1.2.1  23.06.2018    no name add-on if MODEL is snapgallery
-# 1.2.0  20.06.2018    running stream as human readable entry for SSCamSTRM-Device
-# 1.1.0  16.06.2018    attr hideDisplayName regarding to Forum #88667
-# 1.0.1  14.06.2018    commandref revised
-# 1.0.0  14.06.2018    switch to longpoll refresh
-# 0.4    13.06.2018    new attribute "noDetaillink" (deleted in V1.0.0)
-# 0.3    12.06.2018    new attribute "forcePageRefresh"
-# 0.2    11.06.2018    check in with SSCam 5.0.0
-# 0.1    10.06.2018    initial Version
-
 
 package main;
 
 use strict;
 use warnings;
 
-my $SSCamSTRMVersion = "1.2.4";
+# Versions History intern
+our %SSCamSTRM_vNotesIntern = (
+  "1.3.0"  => "28.10.2018  direct help for attributes, new attribute \"autoLoop\" ",
+  "1.2.4"  => "27.10.2018  fix undefined subroutine &main::SSCam_ptzpanel (https://forum.fhem.de/index.php/topic,45671.msg850505.html#msg850505) ",
+  "1.2.3"  => "03.07.2018  behavior changed if device is disabled ",
+  "1.2.2"  => "26.06.2018  make changes for generic stream dev ",
+  "1.2.1"  => "23.06.2018  no name add-on if MODEL is snapgallery ",
+  "1.2.0"  => "20.06.2018  running stream as human readable entry for SSCamSTRM-Device ",
+  "1.1.0"  => "16.06.2018  attr hideDisplayName regarding to Forum #88667 ",
+  "1.0.1"  => "14.06.2018  commandref revised ",
+  "1.0.0"  => "14.06.2018  switch to longpoll refresh ",
+  "0.4.0"  => "13.06.2018  new attribute \"noDetaillink\" (deleted in V1.0.0) ",
+  "0.3.0"  => "12.06.2018  new attribute \"forcePageRefresh\" ",
+  "0.2.0"  => "11.06.2018  check in with SSCam 5.0.0 ",
+  "0.1.0"  => "10.06.2018  initial Version "
+);
 
+# Standardvariablen und Forward-Declaration
 sub SSCam_ptzpanel($;$$);
 sub SSCam_StreamDev($$$);
 
@@ -57,7 +58,12 @@ sub SSCamSTRM_Initialize($) {
   my ($hash) = @_;
 
   $hash->{DefFn}              = "SSCamSTRM_Define";
-  $hash->{AttrList}           = "disable:1,0 forcePageRefresh:1,0 htmlattr hideDisplayName:1,0 ";
+  $hash->{AttrList}           = "autoLoop:selectnumbers,10,0.2,1800,0,log10 ".
+                                "disable:1,0 ". 
+                                "forcePageRefresh:1,0 ". 
+                                "htmlattr ".
+                                "hideDisplayName:1,0 "
+                                ;
   $hash->{FW_summaryFn}       = "SSCamSTRM_FwFn";
   $hash->{FW_detailFn}        = "SSCamSTRM_FwFn";
   $hash->{AttrFn}             = "SSCamSTRM_Attr";
@@ -80,7 +86,7 @@ sub SSCamSTRM_Define($$) {
   $arg   =~ s/'//g;
   ($hash->{PARENT},$hash->{MODEL}) = ((split(",",$arg))[0],(split(",",$arg))[2]);
   
-  $hash->{VERSION} = $SSCamSTRMVersion;
+  $hash->{VERSION} = $hash->{VERSION} = (reverse sort(keys %SSCamSTRM_vNotesIntern))[0];
   $hash->{LINK}    = $link;
   
   readingsSingleUpdate($hash,"state", "initialized", 1);      # Init für "state" 
@@ -112,13 +118,15 @@ return undef;
 }
 
 ################################################################
-sub SSCamSTRM_FwFn($$$$) {
+sub SSCamSTRM_FwFn($;$$$) {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
-  my $hash   = $defs{$d};
+  my $hash;
+  if (ref($FW_wname) eq "HASH" ) {
+		    $d = $FW_wname->{NAME};
+  }
+  $hash      = $defs{$d};
   my $link   = $hash->{LINK};
   
-  # return undef if(IsDisabled($d));
-
   $link = AnalyzePerlCommand(undef, $link) if($link =~ m/^{(.*)}$/s);
   my $show = $defs{$hash->{PARENT}}->{HELPER}{ACTSTRM} if($hash->{MODEL} =~ /switched/);
   $show = $show?"($show)":"";
@@ -136,6 +144,16 @@ sub SSCamSTRM_FwFn($$$$) {
       }  
   } else {
       $ret .= $link;  
+  }
+  
+  if($d) {
+      # Autoloop zur stabilen Anzeige in Anwendungen (z.B. Dashboard)
+      RemoveInternalTimer($hash);
+      my $al = AttrVal($d, "autoLoop", 0);
+      if($al) {      
+          InternalTimer(gettimeofday()+$al, "SSCamSTRM_FwFn", $hash, 0);
+          Log3($d, 5, "$d - next start of autoLoop: ".FmtDateTime(gettimeofday()+$al));
+      }
   }
 
 return $ret;
@@ -196,30 +214,41 @@ Dependend of the Streaming-Device state, different buttons are provided to start
   <ul>
   <ul>
 
-    <li><b>disable</b><br>
-      deactivates the device definition
+    <a name="autoLoop"></a>
+    <li><b>autoLoop</b><br>
+      If set, the video source is recalled after the specified time (seconds) within the device.
+      This may stabilize the video playback in some reasons.
     </li>
     <br>
     
+    <a name="disable"></a>
+    <li><b>disable</b><br>
+      Deactivates the device.
+    </li>
+    <br>
+    
+    <a name="forcePageRefresh"></a>
     <li><b>forcePageRefresh</b><br>
       The attribute is evaluated by SSCam. <br>
-      If set, a reload of all browser pages with active FHEMWEB-connections will be enforced. 
+      If set, a reload of all browser pages with active FHEMWEB connections will be enforced. 
       This may be helpful if problems with longpoll are appear.       
     </li>
     <br>
     
+    <a name="hideDisplayName"></a>
     <li><b>hideDisplayName</b><br>
-      hide the device/alias name (link to detail view)     
+      Hide the device/alias name (link to detail view).     
     </li>
     <br>
     
     <a name="htmlattr"></a>
     <li><b>htmlattr</b><br>
-      HTML attributes to be used for Streaming device e.g.: <br><br>
+      Additional HTML tags to manipulate the streaming device. <br>
       <ul>
-        <code>
+      <ul>
+        <b>Example: </b><br>
         attr &lt;name&gt; htmlattr width="480" height="560" <br>
-        </code>
+      </ul>
       </ul>
     </li>
   
@@ -279,31 +308,39 @@ Abhängig vom Zustand des Streaming-Devices werden zum Start von Aktionen unters
   <ul>
   <ul>
   
+    <a name="autoLoop"></a>
+    <li><b>autoLoop</b><br>
+      Wenn gesetzt, wird die Videoquelle innerhalb des Devices nach der eingestellten Zeit (Sekunden) neu aufgerufen.
+      Dies kann in manchen Fällen die Wiedergabe innerhalb einer Anwendung stabilisieren.
+    </li>
+    <br>
+  
+    <a name="disable"></a>
     <li><b>disable</b><br>
-      aktiviert/deaktiviert das Device
+      Aktiviert/deaktiviert das Device.
     </li>
     <br>
     
+    <a name="forcePageRefresh"></a>
     <li><b>forcePageRefresh</b><br>
       Das Attribut wird durch SSCam ausgewertet. <br>
       Wenn gesetzt, wird ein Reload aller Browserseiten mit aktiven FHEMWEB-Verbindungen bei bestimmten Aktionen erzwungen. 
-      Das kann hilfreich sein, falls es mit Longpoll Probleme geben sollte.
-      eingefügt ist.       
+      Das kann hilfreich sein, falls es mit Longpoll Probleme geben sollte.     
     </li>
     <br>
     
+    <a name="hideDisplayName"></a>
     <li><b>hideDisplayName</b><br>
-      verbirgt den Device/Alias-Namen (Link zur Detailansicht)     
+      Verbirgt den Device/Alias-Namen (Link zur Detailansicht).    
     </li>
     <br>
     
     <a name="htmlattr"></a>
     <li><b>htmlattr</b><br>
-      HTML-Attribute zur Darstellungsänderung des SSCam Streaming Device z.B.: <br><br>
+      Zusätzliche HTML Tags zur Darstellungsänderung im Streaming Device. <br>
       <ul>
-        <code>
+        <b>Beispiel: </b><br>
         attr &lt;name&gt; htmlattr width="480" height="560" <br>
-        </code>
       </ul>
     </li>
 
