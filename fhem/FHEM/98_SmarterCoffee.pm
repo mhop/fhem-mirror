@@ -110,7 +110,7 @@ package main;
 use strict;
 use warnings;
 
-my $version = "1.0.0";
+my $version = "1.0.1";
 
 sub SmarterCoffee_Initialize($) {
     my ($hash) = @_;
@@ -180,7 +180,8 @@ BEGIN {
           gettimeofday
           InternalTimer
           RemoveInternalTimer
-          DoTrigger)
+          DoTrigger
+          parseParams)
     );
 }
 
