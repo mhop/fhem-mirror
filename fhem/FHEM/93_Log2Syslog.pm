@@ -32,9 +32,15 @@ package main;
 
 use strict;
 use warnings;
+use TcpServerUtils;
+use Scalar::Util qw(looks_like_number);
+use Encode qw(encode_utf8);
+eval "use IO::Socket::INET;1" or my $MissModulSocket = "IO::Socket::INET";
+eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $MissModulNDom = "Net::Domain";
 
 # Versions History intern:
 our %Log2Syslog_vNotesIntern = (
+  "5.3.1"  => "21.10.2018  get of FQDN changed ",
   "5.3.0"  => "16.10.2018  attribute sslCertPrefix added (Forum:#92030), module hints & release info order switched ",
   "5.2.1"  => "08.10.2018  setpayload of BSD-format changed, commandref revised ",
   "5.2.0"  => "02.10.2018  added direct help for attributes",
@@ -133,22 +139,6 @@ our %Log2Syslog_vHintsExt = (
   "1" => "Informations about <a href=\"https://tools.ietf.org/html/rfc5424\">RFC5424 (IETF)</a> syslog protocol"
 );
 
-###############################################################################
-#    Modul Einbindung
-#
-use TcpServerUtils;
-use Scalar::Util qw(looks_like_number);
-use Encode qw(encode_utf8);
-# use Net::Domain qw(hostname hostfqdn hostdomain);
-eval "use IO::Socket::INET;1" or my $MissModulSocket = "IO::Socket::INET";
-eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $MissModulNDom = "Net::Domain";
-
-
-###############################################################################
-# Forward declarations
-#
-sub Log2Syslog_Log3slog($$$);
-
 # Mappinghash BSD-Formatierung Monat
 our %Log2Syslog_BSDMonth = (
   "01" => "Jan",
@@ -237,6 +227,11 @@ my %RFC5425len = ("DL"  => 8192,          # max. Lange Message insgesamt mit TLS
                   "PID" => 128,           # max. Länge Proc-ID
                   "MID" => 32             # max. Länge MSGID
                   );
+                  
+###############################################################################
+# Forward declarations
+#
+sub Log2Syslog_Log3slog($$$);
 
 ###############################################################################
 sub Log2Syslog_Initialize($) {
@@ -290,8 +285,9 @@ sub Log2Syslog_Define($@) {
   delete($hash->{HELPER}{FHEMLOG});
   delete($hash->{HELPER}{IDENT});
   
-  $hash->{MYFQDN} = hostfqdn();                            # MYFQDN eigener Host (f. IETF)
   $hash->{MYHOST} = hostname();                            # eigener Host (lt. RFC nur Hostname f. BSD)
+  my $myfqdn = hostfqdn();                                 # MYFQDN eigener Host (f. IETF)
+  $hash->{MYFQDN} = $myfqdn?$myfqdn:$hash->{MYHOST};       
   
   if(int(@a)-3 < 0){
       # Einrichtung Servermode (Collector)
@@ -1747,7 +1743,7 @@ sub Log2Syslog_setpayload ($$$$$$) {
   my $name   = $hash->{NAME};
   my $ident  = ($hash->{HELPER}{IDENT}?$hash->{HELPER}{IDENT}:$name)."_".$lt;
   my $myhost = $hash->{MYHOST}?$hash->{MYHOST}:"0.0.0.0";
-  my $myfqdn = $hash->{MYFQDN}?$hash->{MYFQDN}:"0.0.0.0";
+  my $myfqdn = $hash->{MYFQDN}?$hash->{MYFQDN}:$myhost;
   my $lf     = AttrVal($name, "logFormat", "IETF");
   my $cdl    = AttrVal($name, "contDelimiter", "");         # Trennzeichen vor Content (z.B. für Synology nötig)
   my $data;
