@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.3.003
+#  Version 4.3.004
 #
 #  (c) 2018 zap (zap01 <at> t-online <dot> de)
 #
@@ -67,6 +67,7 @@ use SetExtensions;
 
 sub HMCCUDEV_Initialize ($);
 sub HMCCUDEV_Define ($@);
+sub HMCCUDEV_Delete ($$);
 sub HMCCUDEV_InitDevice ($$);
 sub HMCCUDEV_Set ($@);
 sub HMCCUDEV_Get ($@);
@@ -81,18 +82,20 @@ sub HMCCUDEV_Initialize ($)
 	my ($hash) = @_;
 
 	$hash->{DefFn} = "HMCCUDEV_Define";
+	$hash->{DeleteFn} = "HMCCUDEV_Delete";
 	$hash->{SetFn} = "HMCCUDEV_Set";
 	$hash->{GetFn} = "HMCCUDEV_Get";
 	$hash->{AttrFn} = "HMCCUDEV_Attr";
 	$hash->{parseParams} = 1;
 
-	$hash->{AttrList} = "IODev ccucalculate:textField-long ". 
+	$hash->{AttrList} = "IODev ccuaggregate:textField-long ccucalculate:textField-long ". 
 		"ccuflags:multiple-strict,ackState,nochn0,trace ccureadingfilter:textField-long ".
 		"ccureadingformat:name,namelc,address,addresslc,datapoint,datapointlc ".
 		"ccureadingname:textField-long ".
 		"ccureadings:0,1 ccuget:State,Value ccuscaleval ccuverify:0,1,2 disable:0,1 ".
 		"hmstatevals:textField-long statevals substexcl substitute:textField-long statechannel ".
-		"statedatapoint controldatapoint stripnumber peer:textField-long ".$readingFnAttributes;
+		"statedatapoint controldatapoint stripnumber peer:textField-long ".
+		$readingFnAttributes;
 }
 
 #####################################
@@ -105,7 +108,7 @@ sub HMCCUDEV_Define ($@)
 	my $name = $hash->{NAME};
 	
 	my $usage = "Usage: define $name HMCCUDEV {device|'virtual'} [state-channel] ".
-		"['readonly'] ['defaults'] [iodev={iodev-name}] ".
+		"['readonly'] ['defaults'] [iodev={iodev-name}] [address={virtual-device-no}]".
 		"[{groupexp=regexp|group={device|channel}[,...]]";
 	return $usage if (scalar (@$a) < 3);
 	
@@ -116,7 +119,8 @@ sub HMCCUDEV_Define ($@)
 		"No devices in group",
 		"No matching CCU devices found",
 		"Type of virtual device not defined",
-		"Device type not found"
+		"Device type not found",
+		"Too many virtual devices"
 	);
 
 	my $devname = shift @$a;
@@ -126,9 +130,21 @@ sub HMCCUDEV_Define ($@)
 	my $hmccu_hash = undef;
 	
 	# Store some definitions for delayed initialization
-	$hash->{hmccu}{devspec} = $devspec;
+	$hash->{hmccu}{devspec}  = $devspec;
 	$hash->{hmccu}{groupexp} = $h->{groupexp} if (exists ($h->{groupexp}));
-	$hash->{hmccu}{group} = $h->{group} if (exists ($h->{group}));
+	$hash->{hmccu}{group}    = $h->{group} if (exists ($h->{group}));
+
+	if (exists ($h->{address})) {
+		if ($init_done || $devspec ne 'virtual') {
+			return "Option address not allowed";
+		}
+		else {
+			$hash->{hmccu}{address}  = $h->{address};
+		}
+	}
+	else {
+		return "Option address not specified" if (!$init_done && $devspec eq 'virtual');
+	}
 
 	# Defaults
 	$hash->{statevals} = 'devstate';
@@ -151,10 +167,10 @@ sub HMCCUDEV_Define ($@)
 		$hmccu_hash = $defs{$h->{iodev}};
 	}
 	else {
-		# The following call will fail during FHEM start if CCU is not ready
+		# The following call will fail for non virtual devices during FHEM start if CCU is not ready
 		$hmccu_hash = $devspec eq 'virtual' ? HMCCU_GetHash (0) : HMCCU_FindIODevice ($devspec);
 	}
-	
+
 	if ($init_done) {
 		# Interactive define command while CCU not ready
 		if (!defined ($hmccu_hash)) {
@@ -194,6 +210,7 @@ sub HMCCUDEV_Define ($@)
 # 4 = No matching CCU devices found
 # 5 = Type of virtual device not defined
 # 6 = Device type not found
+# 7 = Too many virtual devices
 ######################################################################
 
 sub HMCCUDEV_InitDevice ($$)
@@ -205,18 +222,26 @@ sub HMCCUDEV_InitDevice ($$)
 	my $gdname = $devspec;
 	
 	if ($devspec eq 'virtual') {
-		# Virtual device FHEM only, search for free address
 		my $no = 0;
-		foreach my $d (sort keys %defs) {
-			my $ch = $defs{$d};
-			next if (!exists ($ch->{TYPE}));
-			next if ($ch->{TYPE} ne 'HMCCUDEV' || $d eq $name);
-			next if ($ch->{ccuif} ne 'fhem' || $ch->{ccuname} ne 'virtual');
-			$no++;
+		if (exists ($dev_hash->{hmccu}{address})) {
+			# Only true during FHEM start
+			$no = $dev_hash->{hmccu}{address};
 		}
-		$dev_hash->{ccuif}     = 'fhem';
-		$dev_hash->{ccuaddr}   = sprintf ("VIR%07d", $no+1);
-		$dev_hash->{ccuname}   = 'virtual';
+		else {
+			# Search for free address. Maximum of 10000 virtual devices allowed.
+			for (my $i=1; $i<=10000; $i++) {
+				my $va = sprintf ("VIR%07d", $i);
+				if (!HMCCU_IsValidDevice ($hmccu_hash, $va, 1)) {
+					$no = $i;
+					last;
+				}
+			}
+			return 7 if ($no == 0);
+			$dev_hash->{DEF} .= " address=$no";
+		}
+		$dev_hash->{ccuif}   = 'fhem';
+		$dev_hash->{ccuaddr} = sprintf ("VIR%07d", $no);
+		$dev_hash->{ccuname} = $name;
 	}
 	else {
 		return 1 if (!HMCCU_IsValidDevice ($hmccu_hash, $devspec, 7));
@@ -301,6 +326,21 @@ sub HMCCUDEV_InitDevice ($$)
 	$dev_hash->{ccudevstate} = 'active';
 	
 	return 0;
+}
+
+#####################################
+# Delete device
+#####################################
+
+sub HMCCUDEV_Delete ($$)
+{
+	my ($hash, $name) = @_;
+	
+	if ($hash->{ccuif} eq 'fhem') {
+		HMCCU_DeleteDevice ($hash);
+	}
+
+	return undef;
 }
 
 #####################################
@@ -396,7 +436,7 @@ sub HMCCUDEV_Set ($@)
 					}
 				}
 			}
-		
+
 			return HMCCU_SetError ($hash, $usage) if (!defined ($objvalue) || $objvalue eq '');
 
 			if ($objname =~ /^([0-9]+)\..+$/) {
@@ -677,7 +717,8 @@ sub HMCCUDEV_Get ($@)
 	my $result = '';
 	my $rc;
 
-	if ($ccuif eq "VirtualDevices" && $hash->{ccuname} eq "virtual" && $opt ne 'update') {
+	# Virtual devices only support command get update
+	if ($ccuif eq 'fhem' && $opt ne 'update') {
 		return "HMCCUDEV: Unknown argument $opt, choose one of update:noArg";
 	}
 
@@ -723,19 +764,18 @@ sub HMCCUDEV_Get ($@)
 			return HMCCU_SetError ($hash, "Usage: get $name update [{'State'|'Value'}]");
 		}
 
-		if ($hash->{ccuname} ne 'virtual') {
+		if ($hash->{ccuif} ne 'fhem') {
 			$rc = HMCCU_GetUpdate ($hash, $ccuaddr, $ccuget);
 			return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		}
-
-		# Update other devices belonging to group
-# 		if ($hash->{ccuif} eq "VirtualDevices" && exists ($hash->{ccugroup})) {
-# 			my @vdevs = split (",", $hash->{ccugroup});
-# 			foreach my $vd (@vdevs) {
-# 				$rc = HMCCU_GetUpdate ($hash, $vd, $ccuget);
-# 				return HMCCU_SetError ($hash, $rc) if ($rc < 0);
-# 			}
-# 		}
+		else {
+			# Update all devices belonging to group
+			my @vdevs = split (",", $hash->{ccugroup});
+			foreach my $vd (@vdevs) {
+				$rc = HMCCU_GetUpdate ($hash, $vd, $ccuget);
+				return HMCCU_SetError ($hash, $rc) if ($rc < 0);
+			}
+		}
 
 		return undef;
 	}
@@ -856,8 +896,8 @@ sub HMCCUDEV_Get ($@)
       expression for CCU device or channel names. Since version 4.2.009 of HMCCU HMCCUDEV
       is able to detect members of group devices automatically. So options 'group' or
       'groupexp' are no longer necessary to define a group device.<br/>
-      It's also possible to group any kind of CCU devices or channels without defining a real
-      group in CCU by using option 'virtual' instead of a CCU device specification. 
+      It's also possible to group any kind of CCU devices without defining a real group
+      in CCU by using option 'virtual' instead of a CCU device specification. 
       <br/><br/>
       Examples:<br/>
       <code>
