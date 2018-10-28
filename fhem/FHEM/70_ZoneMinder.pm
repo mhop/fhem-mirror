@@ -53,7 +53,7 @@ sub ZoneMinder_Initialize {
   $hash->{WriteFn}   = "ZoneMinder_Write";
   $hash->{ReadyFn}   = "ZoneMinder_Ready";
 
-  $hash->{AttrList} = "loginInterval publicAddress webConsoleContext " . $readingFnAttributes;
+  $hash->{AttrList} = "usePublicUrlForZmWeb:0,1 loginInterval publicAddress webConsoleContext " . $readingFnAttributes;
   $hash->{MatchList} = { "1:ZM_Monitor" => "^.*" };
 
   Log3 '', 3, "ZoneMinder - Initialize done ...";
@@ -146,9 +146,10 @@ sub ZoneMinder_getPublicAddress {
 # is built by using web-url, and adding /api
 sub ZoneMinder_getZmApiUrl {
   my ($hash) = @_;
+  my $name = $hash->{NAME};
   
-  #use private LAN for API access for a start
-  my $zmWebUrl = ZoneMinder_getZmWebUrl($hash, 0);
+  my $usePublicUrlForZmWeb = AttrVal($name, 'usePublicUrlForZmWeb', 0);
+  my $zmWebUrl = ZoneMinder_getZmWebUrl($hash, $usePublicUrlForZmWeb);
   return "$zmWebUrl/api";
 }
 
@@ -159,7 +160,8 @@ sub ZoneMinder_API_Login {
   my $username = urlEncode($hash->{helper}{ZM_USERNAME});
   my $password = urlEncode($hash->{helper}{ZM_PASSWORD});
 
-  my $zmWebUrl = ZoneMinder_getZmWebUrl($hash);
+  my $usePublicUrlForZmWeb = AttrVal($name, 'usePublicUrlForZmWeb', 0);
+  my $zmWebUrl = ZoneMinder_getZmWebUrl($hash, $usePublicUrlForZmWeb);
   my $loginUrl = "$zmWebUrl/index.php?username=$username&password=$password&action=login&view=console";
 
   Log3 $name, 4, "ZoneMinder ($name) - loginUrl: $loginUrl";
