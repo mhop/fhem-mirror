@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  93_DbRep: V8.6.0, devices and readings can be excluded by 
+                       EXCLUDE-option in attributes "reading/device", 
+                       reduceLog use attributes "device/reading" - see
+                       commandref for further information
   - change:  73_AMADCommBridge 74_AMADDevice: change commandref, change version
   - feature: 70_ZoneMinder: introduced Attribute usePublicUrlForZmWeb
   - bugfix   98_SmarterCoffee: fix fhem crash bug

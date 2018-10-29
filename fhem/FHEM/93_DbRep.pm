@@ -57,6 +57,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Versions History intern
 our %DbRep_vNotesIntern = (
+  "8.6.0"  => "29.10.2018  reduceLog use attributes device/reading (can be overwritten by set-options) ",
+  "8.5.0"  => "27.10.2018  versionNotes revised, EXCLUDE of reading/device possible (DbRep_specsForSql changed) ",
   "8.4.0"  => "22.10.2018  countEntries separately for every reading if attribute \"countEntriesDetail\" is set, ".
                            "versionNotes changed to support en/de, get dbValue as textfield-long ",
   "8.3.0"  => "17.10.2018  reduceLog from DbLog integrated into DbRep, textField-long as default for sqlCmd, both attributes timeOlderThan and timeDiffToNow can be set at same time",
@@ -72,9 +74,9 @@ our %DbRep_vNotesIntern = (
   "7.18.2"  => "02.08.2018  fix in fetchrow function (forum:#89886), fix highlighting ",
   "7.18.1"  => "03.06.2018  commandref revised ",
   "7.18.0"  => "02.06.2018  possible use of y:(\\d) for timeDiffToNow, timeOlderThan , minor fixes of timeOlderThan, delEntries considers executeBeforeDump,executeAfterDump ",
-  "7.17.3"  => "30.04.2017  writeToDB - readingname can be replaced by the value of attribute 'readingNameMap' ",
-  "7.17.2"  => "22.04.2017  fix don't writeToDB if device name contain '.' only, minor fix in DbReadingsVal ",
-  "7.17.1"  => "20.04.2017  fix '§' is deleted by carfilter ",
+  "7.17.3"  => "30.04.2018  writeToDB - readingname can be replaced by the value of attribute 'readingNameMap' ",
+  "7.17.2"  => "22.04.2018  fix don't writeToDB if device name contain '.' only, minor fix in DbReadingsVal ",
+  "7.17.1"  => "20.04.2018  fix '§' is deleted by carfilter ",
   "7.17.0"  => "17.04.2018  new function DbReadingsVal ",
   "7.16.0"  => "13.04.2018  new function dbValue (blocking) ",
   "7.15.2"  => "12.04.2018  fix in setting MODEL, prevent fhem from crash if wrong timestamp '0000-00-00' found in db ",
@@ -119,6 +121,8 @@ our %DbRep_vNotesIntern = (
 
 # Versions History extern:
 our %DbRep_vNotesExtern = (
+  "8.6.0"  => "29.10.2018 reduceLog use attributes device/reading (can be overwritten by set-options) ",
+  "8.5.0"  => "27.10.2018 devices and readings can be excluded by EXCLUDE-option in attributes \$reading/\$device ",
   "8.4.0"  => "22.10.2018 New attribute \"countEntriesDetail\". Function countEntries creates number of datasets for every ".
                           "reading separately if attribute \"countEntriesDetail\" is set. Get versionNotes changed to support en/de. ".
                           "Function \"get dbValue\" opens an editor window ",
@@ -133,7 +137,7 @@ our %DbRep_vNotesExtern = (
   "7.19.0"  => "25.08.2018 attribute 'valueFilter' to filter datasets in fetchrows ",
   "7.18.2"  => "02.08.2018 fix in fetchrow function (forum:#89886), fix highlighting ",
   "7.18.0"  => "02.06.2018 possible use of y:(\\d) for timeDiffToNow, timeOlderThan , minor fixes of timeOlderThan, delEntries considers executeBeforeDump,executeAfterDump ",
-  "7.17.3"  => "30.04.2017 writeToDB - readingname can be replaced by the value of attribute 'readingNameMap' ",
+  "7.17.3"  => "30.04.2018 writeToDB - readingname can be replaced by the value of attribute 'readingNameMap' ",
   "7.17.0"  => "17.04.2018 new function DbReadingsVal ",
   "7.16.0"  => "13.04.2018 new function dbValue (blocking) ",
   "7.15.2"  => "12.04.2018 fix in setting MODEL, prevent fhem from crash if wrong timestamp '0000-00-00' found in db ",
@@ -156,6 +160,7 @@ our %DbRep_vNotesExtern = (
   "7.4.1"  => "14.01.2018 fix old dumpfiles not deleted by dumpMySQL clientSide ",
   "7.4.0"  => "09.01.2018 dumpSQLite/restoreSQLite, backup/restore now available when DbLog-device has reopen xxxx running, executeBeforeDump executeAfterDump also available for optimizeTables, vacuum, restoreMySQL, restoreSQLite, attribute executeBeforeDump / executeAfterDump renamed to executeBeforeProc & executeAfterProc ",
   "7.3.1"  => "08.01.2018 fix syntax error for perl < 5.20 ",
+  "7.3.0"  => "07.01.2018 charfilter avoid control characters in datasets to exportToFile / importFromFile, changed to use aggregation for split selects in timeslices by exportToFile (avoid heavy memory consumption) ",
   "7.1.0"  => "22.12.2017 new attribute timeYearPeriod for reports correspondig to e.g. electricity billing, bugfix connection check is running after restart allthough dev is disabled ",
   "6.4.1"  => "13.12.2017 new Attribute 'sqlResultFieldSep' for field separate options of sqlCmd result ",
   "6.4.0"  => "10.12.2017 prepare module for usage of datetime picker widget (Forum:#35736) ",
@@ -227,12 +232,14 @@ our %DbRep_vNotesExtern = (
 
 # Hint Hash en
 our %DbRep_vHintsExt_en = (
+  "3" => "Features and restrictions of complex <a href=\"https://fhem.de/commandref.html#devspec\">device specifications (devspec) ",
   "2" => "<a href='https://www.dwd.de/DE/leistungen/klimadatendeutschland/beschreibung_tagesmonatswerte.html'>Rules</a> of german weather service for calculation of average temperatures. ",
   "1" => "Some helpful <a href=\"https://wiki.fhem.de/wiki/DbRep_-_Reporting_und_Management_von_DbLog-Datenbankinhalten#Praxisbeispiele_.2F_Hinweise_und_L.C3.B6sungsans.C3.A4tze_f.C3.BCr_verschiedene_Aufgaben\">FHEM-Wiki</a> Entries."
 );
 
 # Hint Hash de
 our %DbRep_vHintsExt_de = (
+  "3" => "Merkmale und Restriktionen von komplexen <a href=\"https://fhem.de/commandref_DE.html#devspec\">Geräte-Spezifikationen (devspec) ",
   "2" => "<a href='https://www.dwd.de/DE/leistungen/klimadatendeutschland/beschreibung_tagesmonatswerte.html'>Regularien</a> des deutschen Wetterdienstes zur Berechnung von Durchschnittstemperaturen. ",
   "1" => "Hilfreiche Hinweise zu DbRep im <a href=\"https://wiki.fhem.de/wiki/DbRep_-_Reporting_und_Management_von_DbLog-Datenbankinhalten#Praxisbeispiele_.2F_Hinweise_und_L.C3.B6sungsans.C3.A4tze_f.C3.BCr_verschiedene_Aufgaben\">FHEM-Wiki</a>."
 );
@@ -1648,7 +1655,7 @@ sub DbRep_Main($$;$) {
  }
  
  if ($opt =~ /reduceLog/) {	
-     $hash->{HELPER}{RUNNING_REDUCELOG} = BlockingCall("DbRep_reduceLog", "$name|$runtime_string_first|$runtime_string_next", "DbRep_reduceLogDone", $to, "DbRep_reduceLogAborted", $hash);
+     $hash->{HELPER}{RUNNING_REDUCELOG} = BlockingCall("DbRep_reduceLog", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "DbRep_reduceLogDone", $to, "DbRep_reduceLogAborted", $hash);
 	 ReadingsSingleUpdateValue ($hash, "state", "reduceLog database is running - be patient and see Logfile !", 1);
      $hash->{HELPER}{RUNNING_REDUCELOG}{loglevel} = 5 if($hash->{HELPER}{RUNNING_REDUCELOG});  # Forum #77057 
      return;
@@ -7503,7 +7510,7 @@ return;
 ####################################################################################################
 sub DbRep_reduceLog($) {
     my ($string)   = @_;
-    my ($name,$nts,$ots) = split("\\|", $string);
+    my ($name,$d,$r,$nts,$ots) = split("\\|", $string);
     my $hash       = $defs{$name};
     my $dbloghash  = $hash->{dbloghash};
     my $dbconn     = $dbloghash->{dbconn};
@@ -7514,7 +7521,8 @@ sub DbRep_reduceLog($) {
     my @a          = @{$hash->{HELPER}{REDUCELOG}};
 	my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
     delete $hash->{HELPER}{REDUCELOG};
-    my ($ret,$row,$filter,$exclude,$c,$day,$hour,$lastHour,$updDate,$updHour,$average,$processingDay,$lastUpdH,%hourlyKnown,%averageHash,@excludeRegex,@dayRows,@averageUpd,@averageUpdD);
+    my ($ret,$row,$filter,$exclude,$c,$day,$hour,$lastHour,$updDate,$updHour,$average,$processingDay,$lastUpdH);
+    my (%hourlyKnown,%averageHash,@excludeRegex,@dayRows,@averageUpd,@averageUpdD);
     my ($startTime,$currentHour,$currentDay,$deletedCount,$updateCount,$sum,$rowCount,$excludeCount) = (time(),99,0,0,0,0,0,0);
     my ($dbh,$err,$brt);
 	
@@ -7534,6 +7542,31 @@ sub DbRep_reduceLog($) {
     } elsif ($a[-1] =~ /^INCLUDE=.+:.+$/i) {
         $filter = 1;
     }
+   
+    my ($idevs,$idanz,$ireading,$iranz,$edevs,$edanz,$ereading,$eranz) = DbRep_specsForSql($hash,$d,$r);
+    
+    # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
+    my ($IsTimeSet,$IsAggrSet,$aggregation) = DbRep_checktimeaggr($hash); 
+    Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet"); 
+    
+    my $sql;
+    my $table = "history";
+    my $selspec = "TIMESTAMP,DEVICE,'',READING,VALUE";
+    my $addon = "ORDER BY TIMESTAMP ASC";
+    
+    if($filter) {
+        # Option EX/INCLUDE wurde angegeben
+        $sql = "SELECT TIMESTAMP,DEVICE,'',READING,VALUE FROM history WHERE "
+                    .($a[-1] =~ /^INCLUDE=(.+):(.+)$/i ? "DEVICE like '$1' AND READING like '$2' AND " : '')
+                    ."TIMESTAMP <= '$ots'".($nts?" AND TIMESTAMP >= '$nts' ":" ")."ORDER BY TIMESTAMP ASC";
+    } elsif ($IsTimeSet || $IsAggrSet) {
+        $sql = DbRep_createSelectSql($hash,$table,$selspec,$d,$r,"'$nts'","'$ots'",$addon);
+	} else {
+	    $sql = DbRep_createSelectSql($hash,$table,$selspec,$d,$r,undef,undef,$addon); 
+	}
+    
+    Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
+    
     if (defined($a[2])) {
         $average = ($a[2] =~ /average=day/i) ? "AVERAGE=DAY" : ($a[2] =~ /average/i) ? "AVERAGE=HOUR" : 0;
     }
@@ -7541,17 +7574,16 @@ sub DbRep_reduceLog($) {
     Log3 ($name, 3, "DbRep $name - reduce data older than: $ots, newer than: $nts");
     Log3 ($name, 3, "DbRep $name - reduceLog requested with options: "
         .(($average) ? "$average" : '')
-        .(($average && $filter) ? ", " : '').(($filter) ? uc((split('=',$a[-1]))[0]).'='.(split('=',$a[-1]))[1] : ''));
-    
+        .($filter ? ((($average && $filter) ? ", " : '').(uc((split('=',$a[-1]))[0]).'='.(split('=',$a[-1]))[1])) :
+        ((($idanz || $iranz) ? " INCLUDE -> " : '').($idanz ? "Devs: ".$idevs : '').($iranz ? " Readings: ".$ireading : '').(($edanz || $eranz) ? " EXCLUDE -> " : '').($edanz ? "Devs: ".$edevs : '').($eranz ? " Readings: ".$ereading : '')) ));
+        
     if ($ots) {
 	    my ($sth_del, $sth_upd, $sth_delD, $sth_updD, $sth_get);
         eval { $sth_del  = $dbh->prepare_cached("DELETE FROM history WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND (VALUE=?)");
                $sth_upd  = $dbh->prepare_cached("UPDATE history SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND (VALUE=?)");
                $sth_delD = $dbh->prepare_cached("DELETE FROM history WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
                $sth_updD = $dbh->prepare_cached("UPDATE history SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
-               $sth_get  = $dbh->prepare("SELECT TIMESTAMP,DEVICE,'',READING,VALUE FROM history WHERE "
-                           .($a[-1] =~ /^INCLUDE=(.+):(.+)$/i ? "DEVICE like '$1' AND READING like '$2' AND " : '')
-                           ."TIMESTAMP < '$ots'".($nts?" AND TIMESTAMP >= '$nts' ":" ")."ORDER BY TIMESTAMP ASC");  # '' was EVENT, no longer in use
+               $sth_get  = $dbh->prepare($sql);
 		     };
         if ($@) {
             $err = encode_base64($@,"");
@@ -7626,7 +7658,7 @@ sub DbRep_reduceLog($) {
                         @dayRows = ();
                     }
                     
-                    if ($ret && defined($a[3]) && $a[3] =~ /average/i) {
+                    if ($ret && defined($a[2]) && $a[2] =~ /average/i) {
                         $dbh->{RaiseError} = 1;
                         $dbh->{PrintError} = 0; 
                         eval {$dbh->begin_work() if($dbh->{AutoCommit});};
@@ -7693,7 +7725,7 @@ sub DbRep_reduceLog($) {
                         @averageUpd = ();
                     }
                     
-                    if (defined($a[3]) && $a[3] =~ /average=day/i && scalar(@averageUpdD) && $day != 00) {
+                    if (defined($a[2]) && $a[2] =~ /average=day/i && scalar(@averageUpdD) && $day != 00) {
                         $dbh->{RaiseError} = 1;
                         $dbh->{PrintError} = 0;
                         eval {$dbh->begin_work() if($dbh->{AutoCommit});};
@@ -7775,7 +7807,7 @@ sub DbRep_reduceLog($) {
             }
             
             if ($hour != $currentHour) { # forget records from last hour, but remember these for average
-                if (defined($a[3]) && $a[3] =~ /average/i && keys(%hourlyKnown)) {
+                if (defined($a[2]) && $a[2] =~ /average/i && keys(%hourlyKnown)) {
                     push(@averageUpd, {%hourlyKnown});
                 }
                 %hourlyKnown = ();
@@ -7783,7 +7815,7 @@ sub DbRep_reduceLog($) {
             }
             if (defined $hourlyKnown{$row->[1].$row->[3]}) { # remember first readings for device per h, other can be deleted
                 push(@dayRows, [@$row]);
-                if (defined($a[3]) && $a[3] =~ /average/i && defined($row->[4]) && $row->[4] =~ /^-?(?:\d+(?:\.\d*)?|\.\d+)$/ && $hourlyKnown{$row->[1].$row->[3]}->[0]) {
+                if (defined($a[2]) && $a[2] =~ /average/i && defined($row->[4]) && $row->[4] =~ /^-?(?:\d+(?:\.\d*)?|\.\d+)$/ && $hourlyKnown{$row->[1].$row->[3]}->[0]) {
                     if ($hourlyKnown{$row->[1].$row->[3]}->[0]) {
                         push(@{$hourlyKnown{$row->[1].$row->[3]}->[4]}, $row->[4]);
                     }
@@ -7803,9 +7835,9 @@ sub DbRep_reduceLog($) {
         
         } while( $day != 00 );
         
-        $brt = sprintf('%.2f',time() - $startTime);
+        $brt = time() - $startTime;
         my $result = "Rows processed: $rowCount, deleted: $deletedCount"
-                   .((defined($a[3]) && $a[3] =~ /average/i)? ", updated: $updateCount" : '')
+                   .((defined($a[2]) && $a[2] =~ /average/i)? ", updated: $updateCount" : '')
                    .(($excludeCount)? ", excluded: $excludeCount" : '');
         Log3 ($name, 3, "DbRep $name - reduceLog finished. $result");
         $ret = $result;
@@ -7850,7 +7882,7 @@ sub DbRep_reduceLogDone($) {
   no warnings 'uninitialized'; 
   
   readingsBeginUpdate($hash);
-  ReadingsBulkUpdateValue($hash, "background_processing_time", sprintf("%.4f",$brt));
+  ReadingsBulkUpdateValue($hash, "background_processing_time", sprintf("%.2f",$brt));
   ReadingsBulkUpdateValue($hash, "reduceLogState", $ret);
   readingsEndUpdate($hash, 1);
 
@@ -8039,22 +8071,32 @@ sub DbRep_createSelectSql($$$$$$$$) {
  my ($hash,$table,$selspec,$device,$reading,$tf,$tn,$addon) = @_;
  my $name    = $hash->{NAME};
  my $dbmodel = $hash->{dbloghash}{MODEL};
- my ($sql,$devs,$danz,$ranz);
+ my $sql;
  my $tnfull = 0;
  
- ($devs,$danz,$reading,$ranz) = DbRep_specsForSql($hash,$device,$reading);
+ my ($idevs,$idanz,$ireading,$iranz,$edevs,$edanz,$ereading,$eranz) = DbRep_specsForSql($hash,$device,$reading);
  
  if($tn && $tn =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/) {
      $tnfull = 1;
  }
  
  $sql = "SELECT $selspec FROM $table where ";
- $sql .= "DEVICE LIKE '$devs' AND "      if($danz <= 1 && $devs !~ m(^%$) && $devs =~ m(\%));
- $sql .= "DEVICE = '$devs' AND "         if($danz <= 1 && $devs !~ m(\%));
- $sql .= "DEVICE IN ($devs) AND "        if($danz > 1);
- $sql .= "READING LIKE '$reading' AND "  if($ranz <= 1 && $reading !~ m(^%$) && $reading =~ m(\%));
- $sql .= "READING = '$reading' AND "     if($ranz <= 1 && $reading !~ m(\%));
- $sql .= "READING IN ($reading) AND "    if($ranz > 1);
+ # included devices
+ $sql .= "DEVICE LIKE '$idevs' AND "          if($idanz <= 1 && $idevs !~ m(^%$) && $idevs =~ m(\%));
+ $sql .= "DEVICE = '$idevs' AND "             if($idanz <= 1 && $idevs !~ m(\%));
+ $sql .= "DEVICE IN ($idevs) AND "            if($idanz > 1);
+ # excluded devices
+ $sql .= "DEVICE NOT LIKE '$edevs' AND "      if($edanz && $edanz == 1 && $edevs =~ m(\%));
+ $sql .= "DEVICE != '$edevs' AND "            if($edanz && $edanz == 1 && $edevs !~ m(\%));
+ $sql .= "DEVICE NOT IN ($edevs) AND "        if($edanz > 1);
+ # included readings
+ $sql .= "READING LIKE '$ireading' AND "      if($iranz <= 1 && $ireading !~ m(^%$) && $ireading =~ m(\%));
+ $sql .= "READING = '$ireading' AND "         if($iranz <= 1 && $ireading !~ m(\%));
+ $sql .= "READING IN ($ireading) AND "        if($iranz > 1);
+ # excluded readings
+ $sql .= "READING NOT LIKE '$ereading' AND "  if($eranz && $eranz == 1 && $ereading =~ m(\%));
+ $sql .= "READING != '$ereading' AND "        if($eranz && $eranz == 1 && $ereading !~ m(\%));
+ $sql .= "READING NOT IN ($ereading) AND "    if($eranz > 1);
  if (($tf && $tn)) {
      $sql .= "TIMESTAMP >= $tf AND TIMESTAMP ".($tnfull?"<=":"<")." $tn ";
  } else {
@@ -8076,22 +8118,32 @@ sub DbRep_createUpdateSql($$$$$$$$) {
  my ($hash,$table,$selspec,$device,$reading,$tf,$tn,$addon) = @_;
  my $name    = $hash->{NAME};
  my $dbmodel = $hash->{dbloghash}{MODEL};
- my ($sql,$devs,$danz,$ranz);
+ my $sql;
  my $tnfull = 0;
  
- ($devs,$danz,$reading,$ranz) = DbRep_specsForSql($hash,$device,$reading);
+ my ($idevs,$idanz,$ireading,$iranz,$edevs,$edanz,$ereading,$eranz) = DbRep_specsForSql($hash,$device,$reading);
  
  if($tn =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/) {
      $tnfull = 1;
  }
 
  $sql = "UPDATE $table SET $selspec AND ";
- $sql .= "DEVICE LIKE '$devs' AND "      if($danz <= 1 && $devs !~ m(^%$) && $devs =~ m(\%));
- $sql .= "DEVICE = '$devs' AND "         if($danz <= 1 && $devs !~ m(\%));
- $sql .= "DEVICE IN ($devs) AND "        if($danz > 1);
- $sql .= "READING LIKE '$reading' AND "  if($ranz <= 1 && $reading !~ m(^%$) && $reading =~ m(\%));
- $sql .= "READING = '$reading' AND "     if($ranz <= 1 && $reading !~ m(\%));
- $sql .= "READING IN ($reading) AND "    if($ranz > 1);
+ # included devices
+ $sql .= "DEVICE LIKE '$idevs' AND "          if($idanz <= 1 && $idevs !~ m(^%$) && $idevs =~ m(\%));
+ $sql .= "DEVICE = '$idevs' AND "             if($idanz <= 1 && $idevs !~ m(\%));
+ $sql .= "DEVICE IN ($idevs) AND "            if($idanz > 1);
+ # excluded devices
+ $sql .= "DEVICE NOT LIKE '$edevs' AND "      if($edanz && $edanz == 1 && $edevs =~ m(\%));
+ $sql .= "DEVICE != '$edevs' AND "            if($edanz && $edanz == 1 && $edevs !~ m(\%));
+ $sql .= "DEVICE NOT IN ($edevs) AND "        if($edanz > 1);
+ # included readings
+ $sql .= "READING LIKE '$ireading' AND "      if($iranz <= 1 && $ireading !~ m(^%$) && $ireading =~ m(\%));
+ $sql .= "READING = '$ireading' AND "         if($iranz <= 1 && $ireading !~ m(\%));
+ $sql .= "READING IN ($ireading) AND "        if($iranz > 1);
+ # excluded readings
+ $sql .= "READING NOT LIKE '$ereading' AND "  if($eranz && $eranz == 1 && $ereading =~ m(\%));
+ $sql .= "READING != '$ereading' AND "        if($eranz && $eranz == 1 && $ereading !~ m(\%));
+ $sql .= "READING NOT IN ($ereading) AND "    if($eranz > 1);
  if (($tf && $tn)) {
      $sql .= "TIMESTAMP >= $tf AND TIMESTAMP ".($tnfull?"<=":"<")." $tn ";
  } else {
@@ -8113,7 +8165,7 @@ sub DbRep_createDeleteSql($$$$$$$) {
  my ($hash,$table,$device,$reading,$tf,$tn,$addon) = @_;
  my $name    = $hash->{NAME};
  my $dbmodel = $hash->{dbloghash}{MODEL};
- my ($sql,$devs,$danz,$ranz);
+ my $sql;
  my $tnfull = 0;
  
  if($table eq "current") {
@@ -8121,19 +8173,29 @@ sub DbRep_createDeleteSql($$$$$$$) {
 	 return $sql;
  }
  
- ($devs,$danz,$reading,$ranz) = DbRep_specsForSql($hash,$device,$reading);
+ my ($idevs,$idanz,$ireading,$iranz,$edevs,$edanz,$ereading,$eranz) = DbRep_specsForSql($hash,$device,$reading);
  
  if($tn =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/) {
      $tnfull = 1;
  }
  
  $sql = "delete FROM $table where ";
- $sql .= "DEVICE LIKE '$devs' AND "      if($danz <= 1 && $devs !~ m(^%$) && $devs =~ m(\%));
- $sql .= "DEVICE = '$devs' AND "         if($danz <= 1 && $devs !~ m(\%));
- $sql .= "DEVICE IN ($devs) AND "        if($danz > 1);
- $sql .= "READING LIKE '$reading' AND "  if($ranz <= 1 && $reading !~ m(^%$) && $reading =~ m(\%));
- $sql .= "READING = '$reading' AND "     if($ranz <= 1 && $reading !~ m(\%));
- $sql .= "READING IN ($reading) AND "    if($ranz > 1);
+ # included devices
+ $sql .= "DEVICE LIKE '$idevs' AND "          if($idanz <= 1 && $idevs !~ m(^%$) && $idevs =~ m(\%));
+ $sql .= "DEVICE = '$idevs' AND "             if($idanz <= 1 && $idevs !~ m(\%));
+ $sql .= "DEVICE IN ($idevs) AND "            if($idanz > 1);
+ # excluded devices
+ $sql .= "DEVICE NOT LIKE '$edevs' AND "      if($edanz && $edanz == 1 && $edevs =~ m(\%));
+ $sql .= "DEVICE != '$edevs' AND "            if($edanz && $edanz == 1 && $edevs !~ m(\%));
+ $sql .= "DEVICE NOT IN ($edevs) AND "        if($edanz > 1);
+ # included readings
+ $sql .= "READING LIKE '$ireading' AND "      if($iranz <= 1 && $ireading !~ m(^%$) && $ireading =~ m(\%));
+ $sql .= "READING = '$ireading' AND "         if($iranz <= 1 && $ireading !~ m(\%));
+ $sql .= "READING IN ($ireading) AND "        if($iranz > 1);
+ # excluded readings
+ $sql .= "READING NOT LIKE '$ereading' AND "  if($eranz && $eranz == 1 && $ereading =~ m(\%));
+ $sql .= "READING != '$ereading' AND "        if($eranz && $eranz == 1 && $ereading !~ m(\%));
+ $sql .= "READING NOT IN ($ereading) AND "    if($eranz > 1);
  if ($tf && $tn) {
      $sql .= "TIMESTAMP >= '$tf' AND TIMESTAMP ".($tnfull?"<=":"<")." '$tn' $addon;";
  } else {
@@ -8154,26 +8216,85 @@ sub DbRep_specsForSql($$$) {
  my ($hash,$device,$reading) = @_;
  my $name    = $hash->{NAME};
  
- my @dvspcs = devspec2array($device);
- my $devs = join(",",@dvspcs);
- $devs =~ s/'/''/g;               # escape ' with ''
- my $danz = $#dvspcs+1;
- if ($danz > 1) {
-     $devs =~ s/,/','/g;
-	 $devs = "'".$devs."'";
+ ##### inkludierte / excludierte Devices und deren Anzahl ermitteln #####
+ my ($idevice,$edevice) = ('','');
+ my ($idevs,$edevs)     = ('','');
+ my ($idanz,$edanz)     = (0,0);
+ if($device =~ /EXCLUDE=/i) {
+     ($idevice,$edevice) = split(/EXCLUDE=/i,$device);
+	 $idevice = $idevice?DbRep_trim($idevice):"%";
+ } else {
+     $idevice = $device;
  }
- Log3 $name, 5, "DbRep $name - Device specifications use for select: $devs";
  
- $reading =~ s/'/''/g;            # escape ' with ''
- my @reads = split(",",$reading);
- my $ranz = $#reads+1;
- if ($ranz > 1) {
-     $reading =~ s/,/','/g;
-	 $reading = "'".$reading."'";
+ # Devices inkludiert
+ my @idvspcs = devspec2array($idevice);
+ $idevs = join(",",@idvspcs);
+ $idevs =~ s/'/''/g;               # escape ' with ''
+ 
+ $idanz = $#idvspcs+1;
+ if($idanz > 1) {
+	 $idevs =~ s/,/','/g;
+	 $idevs = "'".$idevs."'";
  }
- Log3 $name, 5, "DbRep $name - Reading specification use for select: $reading";
+ 
+ # Devices exkludiert
+ if($edevice) {
+	 my @edvspcs = devspec2array($edevice);
+	 $edevs = join(",",@edvspcs);
+	 $edevs =~ s/'/''/g;               # escape ' with ''
+	 
+	 $edanz = $#edvspcs+1;
+	 if($edanz > 1) {
+		 $edevs =~ s/,/','/g;
+		 $edevs = "'".$edevs."'";
+	 }
+ }
+ 
+ Log3 $name, 5, "DbRep $name - Devices for operation - included: $idevs , excluded: $edevs";
+ 
+ ##### inkludierte / excludierte Readings und deren Anzahl ermitteln #####
+ my ($ireading,$ereading) = ('','');
+ my ($iranz,$eranz)       = (0,0);
+ $reading =~ s/'/''/g;            # escape ' with ''
+ 
+ if($reading =~ /EXCLUDE=/i) {
+     ($ireading,$ereading) = split(/EXCLUDE=/i,$reading);
+	 $ireading = $ireading?DbRep_trim($ireading):"%";
+ } else {
+     $ireading = $reading;
+ }
 
-return ($devs,$danz,$reading,$ranz);
+ # Readings inkludiert
+ my @ireads = split(",",$ireading);
+ $iranz = $#ireads+1;
+ if($iranz > 1) {
+	 $ireading =~ s/,/','/g;
+	 $ireading = "'".$ireading."'";
+ }
+ 
+ if($ereading) {
+     # Readings exkludiert
+	 my @ereads = split(",",$ereading);
+	 $eranz = $#ereads+1;
+	 if($eranz > 1) {
+		 $ereading =~ s/,/','/g;
+		 $ereading = "'".$ereading."'";
+	 }
+ }
+ 
+ Log3 $name, 5, "DbRep $name - Readings for operation - included: $ireading, excluded: $ereading ";
+
+return ($idevs,$idanz,$ireading,$iranz,$edevs,$edanz,$ereading,$eranz);
+}
+
+####################################################################################################
+#             Leerzeichen am Anfang / Ende eines strings entfernen           
+####################################################################################################
+sub DbRep_trim ($) {
+ my $str = shift;
+ $str =~ s/^\s+|\s+$//g;
+return ($str);
 }
 
 ####################################################################################################
@@ -9938,17 +10059,19 @@ return;
                                  
                                  The strings have to be quoted and separated by comma.
                                  A "string" can be: <br>
-                                 
-<pre>
-&lt;old string&gt; : * a simple string with/without spaces, e.g. "OL 12"
-               * a string with usage of SQL-wildcard, e.g. "%OL%"
-                 
-&lt;new string&gt; : * a simple string with/without spaces, e.g. "12 kWh"
-               * Perl code embedded in "{}" with quotes, e.g. "{($VALUE,$UNIT) = split(" ",$VALUE)}". 
-                 The perl expression the variables $VALUE and $UNIT are committed to. The variables are changable within
-                 the perl code. The returned value of VALUE and UNIT are saved into the database field 
-                 VALUE respectively UNIT of the dataset.                        
-</pre>
+                                
+                                <table>  
+                                <colgroup> <col width=15%> <col width=85%> </colgroup>
+                                   <tr><td style="vertical-align:top"><b>&lt;old string&gt; :</b> <td><li>a simple string with/without spaces, e.g. "OL 12" </li>
+									                                                                  <li>a string with usage of SQL-wildcard, e.g. "%OL%" </li> </td></tr>
+                                   <tr><td style="vertical-align:top"><b>&lt;new string&gt; :</b> <td><li>a simple string with/without spaces, e.g. "12 kWh" </li>
+                                                                                                      <li>Perl code embedded in "{}" with quotes, e.g. "{($VALUE,$UNIT) = split(" ",$VALUE)}". 
+                                                                                                          The perl expression the variables $VALUE and $UNIT are committed to. 
+								  																	      The variables are changable within the perl code. The returned value 
+																										  of VALUE and UNIT are saved into the database field VALUE respectively 
+																										  UNIT of the dataset. </li></td></tr>
+								 </table>
+	                             <br>
                                  
                                  <b>Examples: </b> <br>
                                  set &lt;name&gt; changeValue "OL","12 OL"  <br>               
@@ -9969,8 +10092,8 @@ return;
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>device</b>            </td><td>: selection only of datasets which contain &lt;device&gt; </td></tr>
-                                      <tr><td> <b>reading</b>           </td><td>: selection only of datasets which contain &lt;reading&gt; </td></tr>
+                                      <tr><td> <b>device</b>            </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
+                                      <tr><td> <b>reading</b>           </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>                                      
                                       <tr><td> <b>time.*</b>            </td><td>: a number of attributes to limit selection by time </td></tr>
  	                                  <tr><td> <b>executeBeforeProc</b> </td><td>: execute a FHEM command (or perl-routine) before start of changeValue </td></tr>
                                       <tr><td> <b>executeAfterProc</b>  </td><td>: execute a FHEM command (or perl-routine) after changeValue is finished </td></tr>
@@ -10001,8 +10124,8 @@ return;
                                                       <colgroup> <col width=5%> <col width=95%> </colgroup>
                                                       <tr><td> <b>aggregation</b>       </td><td>: aggregatiion/grouping of time intervals </td></tr>
                                                       <tr><td> <b>countEntriesDetail</b></td><td>: detailed report the count of datasets (per reading) </td></tr>
-                                                      <tr><td> <b>device</b>            </td><td>: selection only of datasets which contain &lt;device&gt; </td></tr>
-                                                      <tr><td> <b>reading</b>           </td><td>: selection only of datasets which contain &lt;reading&gt; </td></tr>
+                                                      <tr><td> <b>device</b>            </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
+                                                      <tr><td> <b>reading</b>           </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>
                                                       <tr><td> <b>time.*</b>            </td><td>: a number of attributes to limit selection by time </td></tr>
                                                       </table>
 	                                               </ul>
@@ -10031,9 +10154,8 @@ return;
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
                                       <tr><td> <b>allowDeletion</b>     </td><td>: unlock the delete function </td></tr>
-                                      <tr><td> <b>device</b>            </td><td>: selection only of datasets which contain &lt;device&gt; </td></tr>
-                                      <tr><td> <b>reading</b>           </td><td>: selection only of datasets which contain &lt;reading&gt; </td></tr>
-                                      <tr><td> <b>time.*</b>            </td><td>: a number of attributes to limit selection by time </td></tr>
+                                      <tr><td> <b>device</b>            </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
+                                      <tr><td> <b>reading</b>           </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>                                      <tr><td> <b>time.*</b>            </td><td>: a number of attributes to limit selection by time </td></tr>
  	                                  <tr><td> <b>executeBeforeProc</b> </td><td>: execute a FHEM command (or perl-routine) before start of delEntries </td></tr>
                                       <tr><td> <b>executeAfterProc</b>  </td><td>: execute a FHEM command (or perl-routine) after delEntries is finished </td></tr>
                                       </table>
@@ -10408,8 +10530,8 @@ return;
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
                                       <tr><td> <b>aggregation</b>        </td><td>: determination of selection time slices </td></tr>
-                                      <tr><td> <b>device</b>             </td><td>: select only datasets which are contain &lt;device&gt; </td></tr>
-	                                  <tr><td> <b>reading</b>            </td><td>: select only datasets which are contain &lt;reading&gt; </td></tr>
+                                      <tr><td> <b>device</b>             </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
+                                      <tr><td> <b>reading</b>            </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>                                      <tr><td> <b>time.*</b>            </td><td>: a number of attributes to limit selection by time </td></tr>
 	                                  <tr><td> <b>executeBeforeProc</b>  </td><td>: execution of FHEM command (or perl-routine) before export </td></tr>
                                       <tr><td> <b>executeAfterProc</b>   </td><td>: execution of FHEM command (or perl-routine) after export </td></tr>
 	                                  <tr><td> <b>expimpfile</b>         </td><td>: the name of exportfile </td></tr>
@@ -10463,8 +10585,8 @@ return;
                                       <tr><td> <b>fetchRoute</b>            </td><td>: direction of selection read in database </td></tr>
                                       <tr><td> <b>limit</b>                 </td><td>: limits the number of datasets to select and display </td></tr>
                                       <tr><td> <b>fetchMarkDuplicates</b>   </td><td>: Highlighting of found doublets </td></tr>
-                                      <tr><td> <b>device</b>                </td><td>: select only datasets which are contain &lt;device&gt; </td></tr>
-                                      <tr><td> <b>reading</b>               </td><td>: select only datasets which are contain &lt;reading&gt; </td></tr>
+                                      <tr><td> <b>device</b>                </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
+                                      <tr><td> <b>reading</b>               </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>                                      <tr><td> <b>time.*</b>            </td><td>: a number of attributes to limit selection by time </td></tr>
                                       <tr><td> <b>time.*</b>                </td><td>: A number of attributes to limit selection by time </td></tr>
                                       <tr><td> <b>valueFilter</b>           </td><td>: Filter datasets which are to show by a regular expression. The regex is applied to the whole selected dataset. </td></tr>
                                    </table>
@@ -10807,8 +10929,8 @@ return;
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
                                       <tr><td> <b>aggregation</b>  </td><td>: adjustment of time slices for data transmission (hour,day,week) </td></tr>
-                                      <tr><td> <b>device</b>       </td><td>: transmit only datasets which are contain &lt;device&gt; </td></tr>
-                                      <tr><td> <b>reading</b>      </td><td>: transmit only datasets which are contain &lt;reading&gt; </td></tr>
+                                      <tr><td> <b>device</b>       </td><td>: include or exclude &lt;device&gt; for transmission </td></tr>
+                                      <tr><td> <b>reading</b>      </td><td>: include or exclude &lt;reading&gt; for transmission </td></tr>                                      <tr><td> <b>time.*</b>            </td><td>: a number of attributes to limit selection by time </td></tr>
                                       <tr><td> <b>time.*</b>       </td><td>: A number of attributes to limit selection by time  </td></tr>
                                    </table>
 	                               </ul>
@@ -11054,11 +11176,15 @@ return $ret;
                                      </li> <br>
   
   <a name="device"></a>
-  <li><b>device </b>          - Selection of a particular device. <br>
-                                You can specify device specifications (devspec). <br> 
-								Inside of device specifications a SQL wildcard (%) will be evaluated as a normal ASCII-character. 
+  <li><b>device </b>          - Selection of particular or several devices. <br>
+                                You can specify a list of devices separated by "," or use device specifications (devspec). <br> 
+								Inside of lists or device specifications a SQL wildcard (%) will be evaluated as a normal 
+                                ASCII-character. 
 								The device names are derived from device specification and the active devices in FHEM before 
-                                SQL selection will be carried out. </li> <br>
+                                SQL selection will be carried out. <br>
+                                If the the device, list or device specification is prepended by "EXCLUDE=", 
+                                the devices are excluded from database selection.                                
+                                </li> <br>
   
                                 <ul>
 							    <b>Examples:</b> <br>
@@ -11071,11 +11197,18 @@ return $ret;
 								<code>attr &lt;name&gt; device SMA_Energymeter,MySTP_5000</code> <br>
 								# select datasets of devices "SMA_Energymeter" and "MySTP_5000" <br>
 								<code>attr &lt;name&gt; device %5000</code> <br>
-								# select datasets of devices ending with "5000" <br>  								
+								# select datasets of devices ending with "5000" <br> 
+                                <code>attr &lt;name&gt; device TYPE=SSCam EXCLUDE=SDS1_SVS </code> <br> 
+                                # select datasets of devices TYPE SSCam but exclude device "SDS1_SVS" <br>                                 
+                                <code>attr &lt;name&gt; device EXCLUDE=SDS1_SVS </code> <br>
+                                # select all devices except device "SDS1_SVS" <br> 
+                                <code>attr &lt;name&gt; device EXCLUDE=TYPE=SSCam </code> <br>
+                                # select all devices except devices of TYPE "SSCam" <br>								
 								</ul>
                                 <br>
-                                <a name="DbRep_device"></a>
-                                Please see also <a href="#devspec">device specifications (devspec)</a>.
+                                
+                                If you need more information about device specifications, execute 
+                                "get &lt;name&gt; versionNotes 3".
 								<br><br>
 
   <a name="diffAccept"></a>
@@ -11302,9 +11435,11 @@ sub bdump {
                                           </li> <br> 
 
   <a name="reading"></a>
-  <li><b>reading </b>         - Selection of a particular reading.
-                                More than one reading are specified as a comma separated list. <br>
+  <li><b>reading </b>         - Selection of particular or several readings.
+                                More than one reading can be specified by a comma separated list. <br>
 								If SQL wildcard (%) is set in a list, it will be evaluated as a normal ASCII-character. <br>
+                                If the reading or the reading-list is prepended by "EXCLUDE=", those readings are excluded 
+                                from database selection.
                                 </li> <br>  
 								
                                 <ul>
@@ -11312,6 +11447,8 @@ sub bdump {
 								<code>attr &lt;name&gt; reading etotal</code> <br> 
 								<code>attr &lt;name&gt; reading et%</code> <br>
 								<code>attr &lt;name&gt; reading etotal,etoday</code> <br>
+                                <code>attr &lt;name&gt; reading etotal,etoday EXCLUDE=state  </code> <br>
+                                <code>attr &lt;name&gt; reading etotal,etoday EXCLUDE=Einspeisung%  </code> <br>
 								</ul>
 								<br><br>
 
@@ -11919,16 +12056,17 @@ sub bdump {
                                  Die Strings werden in Doppelstrich eingeschlossen und durch Komma getrennt. 
                                  Dabei kann "String" sein: <br>
                                  
-<pre>
-&lt;alter String&gt; : * ein einfacher String mit/ohne Leerzeichen, z.B. "OL 12"
-                 * ein String mit Verwendung von SQL-Wildcard, z.B. "%OL%"
-                 
-&lt;neuer String&gt; : * ein einfacher String mit/ohne Leerzeichen, z.B. "12 kWh"
-                 * Perl Code eingeschlossen in "{}" inkl. Quotes, z.B. "{($VALUE,$UNIT) = split(" ",$VALUE)}". 
-                   Dem Perl-Ausdruck werden die Variablen $VALUE und $UNIT übergeben. Sie können innerhalb
-                   des Perl-Code geändert werden. Der zurückgebene Wert von $VALUE und $UNIT wird in dem Feld 
-                   VALUE bzw. UNIT des Datensatzes gespeichert.                        
-</pre>
+                                <table>  
+                                <colgroup> <col width=15%> <col width=85%> </colgroup>
+                                   <tr><td style="vertical-align:top"><b>&lt;old string&gt; :</b> <td><li>ein einfacher String mit/ohne Leerzeichen, z.B. "OL 12" </li>
+									                                                                  <li>ein String mit Verwendung von SQL-Wildcard, z.B. "%OL%" </li> </td></tr>
+                                   <tr><td style="vertical-align:top"><b>&lt;new string&gt; :</b> <td><li>ein einfacher String mit/ohne Leerzeichen, z.B. "12 kWh" </li>
+                                                                                                      <li>Perl Code eingeschlossen in "{}" inkl. Quotes, z.B. "{($VALUE,$UNIT) = split(" ",$VALUE)}". 
+                                                                                                          Dem Perl-Ausdruck werden die Variablen $VALUE und $UNIT übergeben. Sie können innerhalb
+                                                                                                          des Perl-Code geändert werden. Der zurückgebene Wert von $VALUE und $UNIT wird in dem Feld 
+                                                                                                          VALUE bzw. UNIT des Datensatzes gespeichert. </li></td></tr>
+								</table>
+                                <br>
                                  
                                  <b>Beispiele: </b> <br>
                                  set &lt;name&gt; changeValue "OL","12 OL"  <br>               
@@ -11949,8 +12087,8 @@ sub bdump {
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>device</b>            </td><td>: Selektion nur von Datensätzen die &lt;device&gt; enthalten </td></tr>
-                                      <tr><td> <b>reading</b>           </td><td>: Selektion nur von Datensätzen die &lt;reading&gt; enthalten </td></tr>
+                                      <tr><td> <b>device</b>            </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
+                                      <tr><td> <b>reading</b>           </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
                                       <tr><td> <b>time.*</b>            </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
 	                                  <tr><td> <b>executeBeforeProc</b> </td><td>: ausführen FHEM Kommando (oder perl-Routine) vor Start changeValue </td></tr>
                                       <tr><td> <b>executeAfterProc</b>  </td><td>: ausführen FHEM Kommando (oder perl-Routine) nach Ende changeValue </td></tr>
@@ -11982,9 +12120,8 @@ sub bdump {
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
                                       <tr><td> <b>aggregation</b>       </td><td>: Zusammenfassung/Gruppierung von Zeitintervallen </td></tr>
                                       <tr><td> <b>countEntriesDetail</b></td><td>: detaillierte Ausgabe der Datensatzanzahl </td></tr>
-                                      <tr><td> <b>device</b>            </td><td>: Selektion nur von Datensätzen die &lt;device&gt; enthalten </td></tr>
-                                      <tr><td> <b>reading</b>           </td><td>: Selektion nur von Datensätzen die &lt;reading&gt; enthalten </td></tr>
-                                      <tr><td> <b>time.*</b>            </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
+                                      <tr><td> <b>device</b>            </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
+                                      <tr><td> <b>reading</b>           </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>                                      <tr><td> <b>time.*</b>            </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
                                       </table>
 	                               </ul>
 	                               <br>
@@ -12012,9 +12149,8 @@ sub bdump {
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
                                       <tr><td> <b>allowDeletion</b>     </td><td>: Freischaltung der Löschfunktion </td></tr>
-                                      <tr><td> <b>device</b>            </td><td>: Selektion nur von Datensätzen die &lt;device&gt; enthalten </td></tr>
-                                      <tr><td> <b>reading</b>           </td><td>: Selektion nur von Datensätzen die &lt;reading&gt; enthalten </td></tr>
-                                      <tr><td> <b>time.*</b>            </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
+                                      <tr><td> <b>device</b>            </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
+                                      <tr><td> <b>reading</b>           </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>                                      <tr><td> <b>time.*</b>            </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
 	                                  <tr><td> <b>executeBeforeProc</b> </td><td>: ausführen FHEM Kommando (oder perl-Routine) vor Start delEntries </td></tr>
                                       <tr><td> <b>executeAfterProc</b>  </td><td>: ausführen FHEM Kommando (oder perl-Routine) nach Ende delEntries </td></tr>
                                       </table>
@@ -12385,9 +12521,8 @@ sub bdump {
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
                                       <tr><td> <b>aggregation</b>        </td><td>: Festlegung der Selektionspaketierung </td></tr>
-                                      <tr><td> <b>device</b>             </td><td>: Einschränkung des Exports auf ein bestimmtes Device  </td></tr>
-	                                  <tr><td> <b>reading</b>            </td><td>: Einschränkung des Exports auf ein bestimmtes Reading </td></tr>
-	                                  <tr><td> <b>executeBeforeProc</b>  </td><td>: FHEM Kommando (oder perl-Routine) vor dem Export ausführen </td></tr>
+                                      <tr><td> <b>device</b>             </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
+                                      <tr><td> <b>reading</b>            </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>	                                  <tr><td> <b>executeBeforeProc</b>  </td><td>: FHEM Kommando (oder perl-Routine) vor dem Export ausführen </td></tr>
                                       <tr><td> <b>executeAfterProc</b>   </td><td>: FHEM Kommando (oder perl-Routine) nach dem Export ausführen </td></tr>
 	                                  <tr><td> <b>expimpfile</b>         </td><td>: der Name des Exportfiles </td></tr>
                                       <tr><td> <b>time.*</b>             </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
@@ -12443,9 +12578,8 @@ sub bdump {
                                       <tr><td> <b>fetchRoute</b>            </td><td>: Leserichtung der Selektion innerhalb der Datenbank </td></tr>
                                       <tr><td> <b>limit</b>                 </td><td>: begrenzt die Anzahl zu selektierenden bzw. anzuzeigenden Datensätze  </td></tr>
                                       <tr><td> <b>fetchMarkDuplicates</b>   </td><td>: Hervorhebung von gefundenen Dubletten </td></tr>
-                                      <tr><td> <b>device</b>                </td><td>: Selektion nur von Datensätzen die &lt;device&gt; enthalten </td></tr>
-                                      <tr><td> <b>reading</b>               </td><td>: Selektion nur von Datensätzen die &lt;reading&gt; enthalten </td></tr>
-                                      <tr><td> <b>time.*</b>                </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
+                                      <tr><td> <b>device</b>                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
+                                      <tr><td> <b>reading</b>               </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>                                      <tr><td> <b>time.*</b>                </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
                                       <tr><td> <b>valueFilter</b>           </td><td>: filtert die anzuzeigenden Datensätze mit einem regulären Ausdruck. Der Regex wird auf den gesamten anzuzeigenden Datensatz angewendet. </td></tr>
                                    </table>
 	                               </ul>
@@ -12601,12 +12735,27 @@ sub bdump {
                                  </li> <br>
                                  </ul>
 
-    <li><b> reduceLog [average[=day]] [exclude=device1:reading1,device2:reading2,...] [include=device:reading]</b> <br>
+    <li><b> reduceLog [average[=day]] [EXCLUDE=device1:reading1,device2:reading2,...] [INCLUDE=device:reading]</b> <br>
                                  Reduziert historische Datensätze innerhalb der durch die "time.*"-Attribute bestimmten 
                                  Zeitgrenzen auf einen Eintrag (den ersten) pro Stunde je Device & Reading. <br>
                                  Es muss mindestens eines der "time.*"-Attribute gesetzt sein (siehe Tabelle unten). 
                                  Die jeweils fehlende Zeitabgrenzung wird in diesem Fall durch das Modul errechnet.
                                  <br><br>
+                                 
+                                 Durch die optionale Angabe von 'average' wird nicht nur die Datenbank bereinigt, sondern 
+                                 alle numerischen Werte einer Stunde werden auf einen einzigen Mittelwert reduziert. <br>
+                                 Durch die optionale Angabe von 'average=day' wird nicht nur die Datenbank bereinigt, sondern 
+                                 alle numerischen Werte eines Tages auf einen einzigen Mittelwert reduziert. 
+                                 (impliziert 'average') <br><br>
+                                 
+                                 Mit den Attributen "device" und "reading" können die zu berücksichtigenden Datensätze eingeschlossen
+                                 bzw. ausgeschlossen werden. Beide Eingrenzungen reduzieren die selektierten Daten und verringern den
+                                 Ressourcenbedarf. <br><br>
+                                 
+                                 Optional kann der Befehl durch die Zusätze "exclude" bzw. "include" ergänzt werden um 
+                                 device/reading Kombinationen von reduceLog auszuschließen bzw. einzuschließen.
+                                 Diese Angabe wird als Regex ausgewertet und überschreibt die Attribute "device" und reading",
+                                 die in diesem Fall nicht beachtet werden. <br><br>
                                  
                  	             Die für diese Funktion relevanten Attribute sind: <br><br>
 	                               <ul>
@@ -12614,6 +12763,8 @@ sub bdump {
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
 	                                  <tr><td> <b>executeBeforeProc</b>  </td><td>: FHEM Kommando (oder perl-Routine) vor dem Export ausführen </td></tr>
                                       <tr><td> <b>executeAfterProc</b>   </td><td>: FHEM Kommando (oder perl-Routine) nach dem Export ausführen </td></tr>
+                                      <tr><td> <b>device</b>             </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
+                                      <tr><td> <b>reading</b>            </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>                                      <tr><td> <b>time.*</b>       </td><td>: Attribute zur Zeitabgrenzung der zu übertragenden Datensätze.  </td></tr>
                                       <tr><td> <b>timeOlderThan</b>      </td><td>: es werden Datenbankeinträge <b>älter</b> als dieses Attribut reduziert </td></tr>
                                       <tr><td> <b>timestamp_end</b>      </td><td>: es werden Datenbankeinträge <b>älter</b> als dieses Attribut reduziert </td></tr>
                                       <tr><td> <b>timeDiffToNow</b>      </td><td>: es werden Datenbankeinträge <b>neuer</b> als dieses Attribut reduziert </td></tr>
@@ -12622,23 +12773,9 @@ sub bdump {
 	                               </ul>
                                    <br>
                                  
-                                 Das Reading "reduceLogState" enthält das Ausführungsergebnis des letzten reduceLog-Befehls. <br><br>
-          
-                                 Durch die optionale Angabe von 'average' wird nicht nur die Datenbank bereinigt, sondern 
-                                 alle numerischen Werte einer Stunde werden auf einen einzigen Mittelwert reduziert. <br>
-                                 Durch die optionale Angabe von 'average=day' wird nicht nur die Datenbank bereinigt, sondern 
-                                 alle numerischen Werte eines Tages auf einen einzigen Mittelwert reduziert. 
-                                 (impliziert 'average') <br><br>
-          
-                                 Optional kann als letzer Parameter "exclude=device1:reading1,device2:reading2,...." 
-		                         angegeben werden um device/reading Kombinationen von reduceLog auszuschließen. <br>
-                                 <b>Tipp:</b> Wird "exclude=.*:.*" angegeben, wird nichts in der Datenbank gelöscht. Das kann
-                                 z.B. verwendet werden um vorab die gesetzten Zeitgrenzen und die Anzahl der zu bearbeitenden
-                                 Datenbankeinträge zu checken. <br><br>
-          
-                                 Optional kann als letzer Parameter "include=device:reading" angegeben werden um 
-		                         die auf die Datenbank ausgeführte SELECT-Abfrage einzugrenzen, was die RAM-Belastung 
-                                 verringert und die Performance erhöht. <br><br>
+                                 Das Reading "reduceLogState" enthält das Ausführungsergebnis des letzten reduceLog-Befehls. 
+                                 
+                                 <br><br>
           
                                  <ul>
                                  <b>Beispiel: </b><br><br>
@@ -12868,9 +13005,8 @@ sub bdump {
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
                                       <tr><td> <b>aggregation</b>  </td><td>: Einstellung der Zeitscheiben zur Übertragung (hour,day,week) </td></tr>
-                                      <tr><td> <b>device</b>       </td><td>: Übertragung nur von Datensätzen die &lt;device&gt; enthalten </td></tr>
-                                      <tr><td> <b>reading</b>      </td><td>: Übertragung nur von Datensätzen die &lt;reading&gt; enthalten </td></tr>
-                                      <tr><td> <b>time.*</b>       </td><td>: Attribute zur Zeitabgrenzung der zu übertragenden Datensätze.  </td></tr>
+                                      <tr><td> <b>device</b>       </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
+                                      <tr><td> <b>reading</b>      </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>                                      <tr><td> <b>time.*</b>       </td><td>: Attribute zur Zeitabgrenzung der zu übertragenden Datensätze.  </td></tr>
                                    </table>
 	                               </ul>
 	                               <br>
@@ -13127,24 +13263,30 @@ return $ret;
                                      </li> <br>
 
  <a name="device"></a>
-  <li><b>device </b>          - Abgrenzung der DB-Selektionen auf ein bestimmtes Device. <br>
+  <li><b>device </b>          - Abgrenzung der DB-Selektionen auf ein bestimmtes oder mehrere Devices. <br>
                                 Es können Geräte-Spezifikationen (devspec) angegeben werden. <br> 
 								Innerhalb von Geräte-Spezifikationen wird SQL-Wildcard (%) als normales ASCII-Zeichen gewertet. 
 								Die Devicenamen werden vor der Selektion aus der Geräte-Spezifikationen und den aktuell in FHEM 
-								vorhandenen Devices abgeleitet. </li> <br>
+								vorhandenen Devices abgeleitet. <br>
+                                Wird dem Device bzw. der Device-Liste oder Geräte-Spezifikation ein "EXCLUDE=" vorangestellt, 
+                                werden diese Devices von der Selektion ausgeschlossen.                                
+                                </li> <br>
   
                                 <ul>
 							    <b>Beispiele:</b> <br>
-								<code>attr &lt;name&gt; device TYPE=DbRep</code> <br>
-								<code>attr &lt;name&gt; device MySTP_5000</code> <br> 
-								<code>attr &lt;name&gt; device SMA.*,MySTP.*</code> <br> 
-								<code>attr &lt;name&gt; device SMA_Energymeter,MySTP_5000</code> <br>
-								<code>attr &lt;name&gt; device %5000</code> <br>
+								<code>attr &lt;name&gt; device TYPE=DbRep </code> <br>
+								<code>attr &lt;name&gt; device MySTP_5000 </code> <br> 
+								<code>attr &lt;name&gt; device SMA.*,MySTP.* </code> <br> 
+								<code>attr &lt;name&gt; device SMA_Energymeter,MySTP_5000 </code> <br>
+								<code>attr &lt;name&gt; device %5000 </code> <br>
+                                <code>attr &lt;name&gt; device TYPE=SSCam EXCLUDE=SDS1_SVS </code> <br>	
+                                <code>attr &lt;name&gt; device EXCLUDE=SDS1_SVS </code> <br>
+                                <code>attr &lt;name&gt; device EXCLUDE=TYPE=SSCam </code> <br>
 								</ul>
                                 
                                 <br>
-                                <a name="DbRep_device"></a>
-                                Siehe <a href="#devspec">Geräte-Spezifikationen (devspec)</a>.
+                                Falls weitere Informationen zu Geräte-Spezifikationen benötigt werden, bitte 
+                                "get &lt;name&gt; versionNotes 3" ausführen.
 								<br><br>
 
   <a name="diffAccept"></a>
@@ -13365,9 +13507,12 @@ sub bdump {
                                           </li> <br> 
  
   <a name="reading"></a>
-  <li><b>reading </b>         - Abgrenzung der DB-Selektionen auf ein bestimmtes oder mehrere Readings.
+  <li><b>reading </b>         - Abgrenzung der DB-Selektionen auf ein bestimmtes oder mehrere Readings sowie exkludieren von
+                                Readings.
                                 Mehrere Readings werden als Komma separierte Liste angegeben. <br>
 								SQL Wildcard (%) wird in einer Liste als normales ASCII-Zeichen gewertet. <br>
+                                Wird dem Reading bzw. der Reading-Liste ein "EXCLUDE=" vorangestellt, werden diese Readings
+                                von der Selektion ausgeschlossen.
                                 </li> <br>  
 								
                                 <ul>
@@ -13375,6 +13520,8 @@ sub bdump {
 								<code>attr &lt;name&gt; reading etotal</code> <br>
 								<code>attr &lt;name&gt; reading et%</code> <br>
 								<code>attr &lt;name&gt; reading etotal,etoday</code> <br>
+                                <code>attr &lt;name&gt; reading etotal,etoday EXCLUDE=state  </code> <br>
+                                <code>attr &lt;name&gt; reading etotal,etoday EXCLUDE=Einspeisung%  </code> <br>
 								</ul>
 								<br><br>
 
