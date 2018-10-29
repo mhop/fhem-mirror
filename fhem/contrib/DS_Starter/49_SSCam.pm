@@ -45,7 +45,7 @@ use HttpUtils;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
-  "7.3.0"  => "28.10.2018  usage of attribute \"livestreamprefix\" changed ",
+  "7.3.0"  => "28.10.2018  usage of attribute \"livestreamprefix\" changed, exec SSCam_getStmUrlPath on boot ",
   "7.2.1"  => "23.10.2018  new routine SSCam_versionCheck, COMPATIBILITY changed to 8.2.1 ",
   "7.2.0"  => "20.10.2018  direct help for attributes, new get versionNotes command, fix PERL WARNING: Use of uninitialized value \$small, get versionNotes ",
   "7.1.1"  => "18.10.2018  Message of \"Your current/simulated SVS-version...\" changed, commandref corrected ",
@@ -1427,8 +1427,8 @@ sub SSCam_initonboot ($) {
 		 if(SSCam_IsModelCam($hash)) {
 		     # Kameraspezifische Infos holen
              SSCam_getcaminfo($hash);           
-
              SSCam_getcapabilities($hash);
+             SSCam_getStmUrlPath($hash);
              
 			 # Preset/Patrollisten in Hash einlesen zur PTZ-Steuerung
              SSCam_getptzlistpreset($hash);
