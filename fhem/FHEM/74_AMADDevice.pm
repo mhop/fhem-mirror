@@ -61,7 +61,7 @@ eval "use JSON;1" or $missingModul .= "JSON ";
 
 
 my $modulversion = "4.2.5";
-my $flowsetversion = "4.2.3";
+my $flowsetversion = "4.2.4";
 
 
 
@@ -1110,7 +1110,7 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
     <li>screen - on locked,unlocked/off locked,unlocked, state of display</li>
     <li>screenBrightness - 0-255, level of screen-brightness</li>
     <li>screenBrightnessMode - Adaptive brightness on,off</li>
-    <li>screenFullscreen - on/off, full screen mode (Automagic only)</li>
+    <li>screenFullscreen - on/off, full screen mode</li>
     <li>screenOrientation - Landscape/Portrait, screen orientation (horizontal,vertical)</li>
     <li>screenOrientationMode - auto/manual, mode for screen orientation</li>
     <li>state - current state of AMAD device</li>
@@ -1163,8 +1163,8 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
     <li>nfc - activate or deactivate the nfc Modul on/off. <b>attribute root</b></li>
     <li>openApp - start an app. <b>attribute setOpenApp</b></li>
     <li>openURL - opens a URLS in the standard browser as long as no other browser is set by the <b>attribute setOpenUrlBrowser</b>.<b>Example:</b><i> attr Tablet setOpenUrlBrowser de.ozerov.fully|de.ozerov.fully.MainActivity, first parameter: package name, second parameter: Class Name</i></li>
-    <li>screen - on/off/lock/unlock, switch screen on/off or lock/unlock screen. In Automagic "Preferences" the "Device admin functions" need to be enabled, otherwise "Screen off" does not work. <b>attribute setScreenOnForTimer</b> changes the time the display remains switched on! (Tasker supports only "off" command)</li>
-    <li>screenFullscreen - on/off, activates/deactivates full screen mode. <b>attribute setFullscreen</b> (Automagic only)</li>
+    <li>screen - on/off/lock/unlock, switch screen on/off or lock/unlock screen. In Automagic "Preferences" the "Device admin functions" need to be enabled, otherwise "Screen off" does not work. <b>attribute setScreenOnForTimer</b> changes the time the display remains switched on! (Tasker supports only "on/off" command)</li>
+    <li>screenFullscreen - on/off, activates/deactivates full screen mode. <b>attribute setFullscreen</b></li>
     <li>screenLock - Locks screen with request for PIN. <b>attribute setScreenlockPIN - enter PIN here. Only use numbers, 4-16 numbers required.</b> (Automagic only)</li>
     <li>screenOrientation - Auto,Landscape,Portait, set screen orientation (automatic, horizontal, vertical). <b>attribute setScreenOrientation</b></li>
     <li>system - issue system command (only with rooted Android devices). reboot,shutdown,airplanemodeON (can only be switched ON) <b>attribute root</b>, in Automagic "Preferences" "Root functions" need to be enabled.</li>
@@ -1298,7 +1298,7 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
     <li>screen - on locked/unlocked, off locked/unlocked gibt an ob der Bildschirm an oder aus ist und gleichzeitig gesperrt oder nicht gesperrt</li>
     <li>screenBrightness - Bildschirmhelligkeit von 0-255</li>
     <li>screenBrightnessMode - Adaptive Helligkeit on,off</li>
-    <li>screenFullscreen - on/off, Vollbildmodus (An,Aus) (nur Automagic)</li>
+    <li>screenFullscreen - on/off, Vollbildmodus (An,Aus)</li>
     <li>screenOrientation - Landscape,Portrait, Bildschirmausrichtung (Horizontal,Vertikal)</li>
     <li>screenOrientationMode - auto/manual, Modus f&uuml;r die Ausrichtung (Automatisch, Manuell)</li>
     <li>state - aktueller Status</li>
@@ -1353,10 +1353,10 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
     <li>nfc -  schaltet nfc an oder aus /on/off<b>Attribut root</b></li>
     <li>openApp - &ouml;ffnet eine ausgew&auml;hlte App. <b>Attribut setOpenApp</b></li>
     <li>openURL - &ouml;ffnet eine URL im Standardbrowser, sofern kein anderer Browser &uuml;ber das <b>Attribut setOpenUrlBrowser</b> ausgew&auml;hlt wurde.<b> Bsp:</b><i> attr Tablet setOpenUrlBrowser de.ozerov.fully|de.ozerov.fully.MainActivity, das erste ist der Package Name und das zweite der Class Name</i></li>
-    <li>screen - on/off/lock/unlock schaltet den Bildschirm ein/aus oder sperrt/entsperrt ihn, in den Automagic Einstellungen muss "Admin Funktion" gesetzt werden sonst funktioniert "Screen off" nicht. <b>Attribut setScreenOnForTimer</b> &auml;ndert die Zeit wie lange das Display an bleiben soll! (Tasker unterst&uuml;tzt nur "screen off")</li>
+    <li>screen - on/off/lock/unlock schaltet den Bildschirm ein/aus oder sperrt/entsperrt ihn, in den Automagic Einstellungen muss "Admin Funktion" gesetzt werden sonst funktioniert "Screen off" nicht. <b>Attribut setScreenOnForTimer</b> &auml;ndert die Zeit wie lange das Display an bleiben soll! (Tasker unterst&uuml;tzt nur "screen on/off")</li>
     <li>screenFullscreen - on/off, (aktiviert/deaktiviert) den Vollbildmodus. <b>Attribut setFullscreen</b></li>
     <li>screenLock - Sperrt den Bildschirm mit Pinabfrage. <b>Attribut setScreenlockPIN - hier die Pin daf&uuml;r eingeben. Erlaubt sind nur Zahlen. Es m&uuml;&szlig;en mindestens 4, bis max 16 Zeichen verwendet werden.</b></li>
-    <li>screenOrientation - Auto,Landscape,Portait, aktiviert die Bildschirmausrichtung (Automatisch,Horizontal,Vertikal). <b>Attribut setScreenOrientation</b> (Tasker unterst&uuml;tzt nur Auto on/off)</li>
+    <li>screenOrientation - Auto,Landscape,Portait, aktiviert die Bildschirmausrichtung (Automatisch,Horizontal,Vertikal). <b>Attribut setScreenOrientation</b></li>
     <li>system - setzt Systembefehle ab (nur bei gerootetet Ger&auml;en). reboot,shutdown,airplanemodeON (kann nur aktiviert werden) <b>Attribut root</b>, in den Automagic Einstellungen muss "Root Funktion" gesetzt werden</li>
     <li>takePicture - löst die Kamera aus für ein Foto <b>Attribut setTakePictureResolution</b></li>
     <li>takeScreenshot - macht ein Screenshot <b>Attribut setTakeScreenshotResolution</b></li>

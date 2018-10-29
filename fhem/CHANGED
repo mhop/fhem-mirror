@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  73_AMADCommBridge 74_AMADDevice: change commandref, change version
   - feature: 70_ZoneMinder: introduced Attribute usePublicUrlForZmWeb
   - bugfix   98_SmarterCoffee: fix fhem crash bug
   - feature: 88_HMCCU: client device update optimized
