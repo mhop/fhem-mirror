@@ -34,6 +34,7 @@ use warnings;
 
 # Versions History intern
 our %SSCamSTRM_vNotesIntern = (
+  "1.4.0"  => "29.10.2018  readingFnAttributes added ",
   "1.3.0"  => "28.10.2018  direct help for attributes, new attribute \"autoLoop\" ",
   "1.2.4"  => "27.10.2018  fix undefined subroutine &main::SSCam_ptzpanel (https://forum.fhem.de/index.php/topic,45671.msg850505.html#msg850505) ",
   "1.2.3"  => "03.07.2018  behavior changed if device is disabled ",
@@ -62,8 +63,8 @@ sub SSCamSTRM_Initialize($) {
                                 "disable:1,0 ". 
                                 "forcePageRefresh:1,0 ". 
                                 "htmlattr ".
-                                "hideDisplayName:1,0 "
-                                ;
+                                "hideDisplayName:1,0 ".
+                                $readingFnAttributes;
   $hash->{FW_summaryFn}       = "SSCamSTRM_FwFn";
   $hash->{FW_detailFn}        = "SSCamSTRM_FwFn";
   $hash->{AttrFn}             = "SSCamSTRM_Attr";
