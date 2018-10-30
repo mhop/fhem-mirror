@@ -12735,29 +12735,25 @@ sub bdump {
                                  </li> <br>
                                  </ul>
 
-    <li><b> reduceLog [average[=day]] [EXCLUDE=device1:reading1,device2:reading2,...] [INCLUDE=device:reading]</b> <br>
+    <li><b> reduceLog [average[=day]] </b> <br>
                                  Reduziert historische Datensätze innerhalb der durch die "time.*"-Attribute bestimmten 
-                                 Zeitgrenzen auf einen Eintrag (den ersten) pro Stunde je Device & Reading. <br>
+                                 Zeitgrenzen auf einen Eintrag (den ersten) pro Stunde je Device & Reading.
                                  Es muss mindestens eines der "time.*"-Attribute gesetzt sein (siehe Tabelle unten). 
                                  Die jeweils fehlende Zeitabgrenzung wird in diesem Fall durch das Modul errechnet.
                                  <br><br>
                                  
                                  Durch die optionale Angabe von 'average' wird nicht nur die Datenbank bereinigt, sondern 
-                                 alle numerischen Werte einer Stunde werden auf einen einzigen Mittelwert reduziert. <br>
-                                 Durch die optionale Angabe von 'average=day' wird nicht nur die Datenbank bereinigt, sondern 
-                                 alle numerischen Werte eines Tages auf einen einzigen Mittelwert reduziert. 
-                                 (impliziert 'average') <br><br>
+                                 alle numerischen Werte einer Stunde werden auf einen einzigen Mittelwert reduziert.
+                                 Mit der Option 'average=day' werden alle numerischen Werte eines Tages auf einen einzigen 
+                                 Mittelwert reduziert (impliziert 'average'). <br><br>
                                  
                                  Mit den Attributen "device" und "reading" können die zu berücksichtigenden Datensätze eingeschlossen
                                  bzw. ausgeschlossen werden. Beide Eingrenzungen reduzieren die selektierten Daten und verringern den
-                                 Ressourcenbedarf. <br><br>
-                                 
-                                 Optional kann der Befehl durch die Zusätze "exclude" bzw. "include" ergänzt werden um 
-                                 device/reading Kombinationen von reduceLog auszuschließen bzw. einzuschließen.
-                                 Diese Angabe wird als Regex ausgewertet und überschreibt die Attribute "device" und reading",
-                                 die in diesem Fall nicht beachtet werden. <br><br>
+                                 Ressourcenbedarf. 
+                                 Das Reading "reduceLogState" enthält das Ausführungsergebnis des letzten reduceLog-Befehls.  <br><br>
                                  
                  	             Die für diese Funktion relevanten Attribute sind: <br><br>
+                                 
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
@@ -12773,12 +12769,16 @@ sub bdump {
 	                               </ul>
                                    <br>
                                  
-                                 Das Reading "reduceLogState" enthält das Ausführungsergebnis des letzten reduceLog-Befehls. 
-                                 
-                                 <br><br>
+                                 Aus Kompatibilitätsgründen kann der Befehl optional durch die Zusätze "EXCLUDE" bzw. "INCLUDE"
+                                 ergänzt werden um device/reading Kombinationen von reduceLog auszuschließen bzw. einzuschließen: <br><br>
+                                 <ul>
+                                 "reduceLog [average[=day]] [EXCLUDE=device1:reading1,device2:reading2,...] [INCLUDE=device:reading]" <br><br> 
+                                 </ul>
+                                 Diese Angabe wird als Regex ausgewertet und überschreibt die Attribute "device" und "reading",
+                                 die in diesem Fall nicht beachtet werden. <br><br>
           
                                  <ul>
-                                 <b>Beispiel: </b><br><br>
+                                 <b>Beispiele: </b><br><br>
                                  
                                  attr &lt;name&gt; timeOlderThan = d:200  <br>
                                  set &lt;name&gt; reduceLog <br>
@@ -12786,11 +12786,27 @@ sub bdump {
                                  reduziert.  <br> 
                                  <br>
                                  
+                                 attr &lt;name&gt; timeOlderThan = d:200  <br>
+                                 set &lt;name&gt; reduceLog <br>
+                                 # Datensätze die älter als 200 Tage sind, werden auf den ersten Eintrag pro Stunde je Device & Reading
+                                 reduziert.  <br> 
+                                 <br>
+                                 
+                                 attr &lt;name&gt; timeDiffToNow = d:30  <br>
+                                 attr &lt;name&gt; device = TYPE=SONOSPLAYER EXCLUDE=Sonos_Kueche  <br>
+                                 attr &lt;name&gt; reading = room% EXCLUDE=roomNameAlias  <br>
+                                 set &lt;name&gt; reduceLog <br>
+                                 # Datensätze die neuer als 30 Tage sind, die Devices vom Typ SONOSPLAYER sind 
+                                 (außer Device "Sonos_Kueche"), die Readings mit "room" beginnen (außer "roomNameAlias"),                       
+                                 werden auf den ersten Eintrag pro Stunde je Device & Reading reduziert.  <br> 
+                                 <br>
+                                 
                                  attr &lt;name&gt; timeDiffToNow = d:10 <br>
                                  attr &lt;name&gt; timeOlderThan = d:5  <br>
-                                 set &lt;name&gt; reduceLog average include=Luftdaten_remote:% <br>
-                                 # Datensätze die älter als 5 und neuer als 10 Tage sind, werden bereinigt. Numerische Werte 
-                                 einer Stunde werden auf einen Mittelwert reduziert <br>                                  
+                                 attr &lt;name&gt; device = Luftdaten_remote  <br>
+                                 set &lt;name&gt; reduceLog average <br>
+                                 # Datensätze die älter als 5 und neuer als 10 Tage sind und DEVICE "Luftdaten_remote" enthalten, 
+                                 werden bereinigt. Numerische Werte einer Stunde werden auf einen Mittelwert reduziert <br>                                  
                                  <br>
 								 </ul>
                                  
