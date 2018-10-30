@@ -57,14 +57,21 @@ eval "use Encode::Guess;1" or $missingModul .= "Encode::Guess ";
 
 require 'Blocking.pm';
 require 'HttpUtils.pm';
+
 use vars qw($readingFnAttributes);
-
 use vars qw(%defs);
+
+my @DEweekdays = qw(Sonntag Montag Dienstag Mittwoch Donnerstag Freitag Samstag);
+my @DEmonths = ( "Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember");
+my @NLweekdays = qw(zondag maandag dinsdag woensdag donderdag vrijdag zaterdag);
+my @NLmonths = ("januari","februari","maart","april","mei","juni","juli","augustus","september","oktober","november","december");
+my @FRweekdays = qw(dimanche lundi mardi mercredi jeudi vendredi samedi);
+my @FRmonths = ("janvier","février","mars","avril","mai","juin","juillet","août","september","octobre","novembre","decembre");
+my @ENweekdays = qw(sunday monday thuesday wednesday thursday friday saturday);
+my @ENmonths = ("January","February","March","April","Mäy","June","July","August","September","October","November","December");
+
 my $MODUL           = "UWZ";
-my $version         = "2.0.0";
-
-
-
+my $version         = "2.0.3";
 
 # Declare functions
 sub UWZ_Log($$$);
@@ -140,6 +147,14 @@ sub UWZ_Map2Movie($$) {
     ## AT
     $lmap->{'niederschlag-wolken-at'}=$uwz_movie_url.'UWZ_EUROPE_AUSTRIA_COMPLETE_niwofi.mp4';
     $lmap->{'stroemung-at'}=$uwz_movie_url.'UWZ_EUROPE_AUSTRIA_COMPLETE_stfi.mp4';
+
+    ## NL
+    $lmap->{'neerslag-wolken-nl'}=$uwz_movie_url.'UWZ_EUROPE_BENELUX_COMPLETE_niwofi.mp4';
+    $lmap->{'stroming-nl'}=$uwz_movie_url.'UWZ_EUROPE_BENELUX_COMPLETE_stfi.mp4';
+
+    ## FR
+    $lmap->{'nuages-precipitations-fr'}=$uwz_movie_url.'UWZ_EUROPE_FRANCE_COMPLETE_niwofi.mp4';
+    $lmap->{'courants-fr'}=$uwz_movie_url.'UWZ_EUROPE_FRANCE_COMPLETE_stfi.mp4';
 
     ## UK
     $lmap->{'clouds-precipitation-uk'}=$uwz_movie_url.'UWZ_EUROPE_GREATBRITAIN_COMPLETE_niwofi.mp4';
@@ -271,12 +286,44 @@ sub UWZ_Map2Image($$) {
 
     ## FR
     $lmap->{'france'}=$uwz_fr_url.'france_index.png';
+    $lmap->{'alsace'}=$uwz_fr_url.'alsace_index.png';
+    $lmap->{'aquitaine'}=$uwz_fr_url.'aquitaine_index.png';
+    $lmap->{'basse-normandie'}=$uwz_fr_url.'basse-normandie_index.png';
+    $lmap->{'bretagne'}=$uwz_fr_url.'bretagne_index.png';
+    $lmap->{'champagne-ardenne'}=$uwz_fr_url.'champagne-ardenne_index.png';
+    $lmap->{'franche-comte'}=$uwz_fr_url.'franche-comte_index.png';
+    $lmap->{'haute-normandie'}=$uwz_fr_url.'haute-normandie_index.png';
+    $lmap->{'ile-de-france'}=$uwz_fr_url.'ile-de-france_index.png';
+    $lmap->{'languedoc-roussillon'}=$uwz_fr_url.'languedoc-roussillon_index.png';
+    $lmap->{'limousin'}=$uwz_fr_url.'limousin_index.png';
+    $lmap->{'lorraine'}=$uwz_fr_url.'lorraine_index.png';
+    $lmap->{'bourgogne'}=$uwz_fr_url.'bourgogne_index.png';
+    $lmap->{'centre'}=$uwz_fr_url.'centre_index.png';
+    $lmap->{'midi-pyrenees'}=$uwz_fr_url.'midi-pyrenees_index.png';
+    $lmap->{'nord-pas-de-calais'}=$uwz_fr_url.'nord-pas-de-calais_index.png';
+    $lmap->{'pays-de-la-loire'}=$uwz_fr_url.'pays-de-la-loire_index.png';
+    $lmap->{'picardie'}=$uwz_fr_url.'picardie_index.png';
+    $lmap->{'poitou-charentes'}=$uwz_fr_url.'poitou-charentes_index.png';
+    $lmap->{'provence-alpes-cote-dazur'}=$uwz_fr_url.'provence-alpes-cote-dazur_index.png';
+    $lmap->{'rhone-alpes'}=$uwz_fr_url.'rhone-alpes_index.png';
 
     ## LU
     $lmap->{'letzebuerg'}=$uwz_lu_url.'letzebuerg_index.png';
 
     ## NL
     $lmap->{'nederland'}=$uwz_nl_url.'nederland_index.png';
+    $lmap->{'drenthe'}=$uwz_nl_url.'drenthe_index.png';
+    $lmap->{'flevoland'}=$uwz_nl_url.'flevoland_index.png';
+    $lmap->{'friesland'}=$uwz_nl_url.'friesland_index.png';
+    $lmap->{'gelderland'}=$uwz_nl_url.'gelderland_index.png';
+    $lmap->{'groningen'}=$uwz_nl_url.'groningen_index.png';
+    $lmap->{'limburg'}=$uwz_nl_url.'limburg_index.png';
+    $lmap->{'noordbrabant'}=$uwz_nl_url.'noordbrabant_index.png';
+    $lmap->{'noordholland'}=$uwz_nl_url.'noordholland_index.png';
+    $lmap->{'overijssel'}=$uwz_nl_url.'overijssel_index.png';
+    $lmap->{'utrecht'}=$uwz_nl_url.'utrecht_index.png';
+    $lmap->{'zeeland'}=$uwz_nl_url.'zeeland_index.png';
+    $lmap->{'zuidholland'}=$uwz_nl_url.'zuidholland_index.png';
 
     ## NO
     $lmap->{'norwegen'}=$uwz_no_url.'norwegen_index.png';
@@ -342,6 +389,7 @@ sub UWZ_Initialize($) {
                         "sort_readings_by:severity,start,creation ".
                         "localiconbase ".
                         "intervalAtWarnLevel ".
+                        "disable:1 ".
                         $readingFnAttributes;
    
     foreach my $d(sort keys %{$modules{UWZ}{defptr}}) {
@@ -372,6 +420,12 @@ sub UWZ_Define($$) {
         my $URL_language="en";
         if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
             $URL_language="de";
+        }
+        if ( $hash->{CountryCode} ~~ [ 'NL' ] ) {
+            $URL_language="nl";
+        }
+        if ( $hash->{CountryCode} ~~ [ 'FR' ] ) {
+            $URL_language="fr";
         }
         
         $hash->{URL} =  "http://feed.alertspro.meteogroup.com/AlertsPro/AlertsProPollService.php?method=getWarning&language=" . $URL_language . "&areaID=UWZ" . $a[2] . $a[3];
@@ -470,7 +524,45 @@ sub UWZ_Get($@) {
         elsif ($a[1] =~ /^Hagel/)            { UWZ_GetCurrentHail($hash); }
         else                                 { return $usage; }
     }
-    
+
+    elsif ($hash->{CountryCode} ~~ [ 'NL' ] ) {
+        my $usage = "Unknown argument $a[1], choose one of storm:noArg sneeuw:noArg regen:noArg strenge-vorst:noArg bosbrand:noArg onweer:noArg gladheid:noArg hitte:noArg ijzel:noArg grondvorst:noArg hagel:noArg ";
+
+        return $usage if ( @a < 2 );
+
+        if    ($a[1] =~/^storm/)             { UWZ_GetCurrent($hash,2); }
+        elsif ($a[1] =~/^sneeuw/)            { UWZ_GetCurrent($hash,3); }
+        elsif ($a[1] =~/^regen/)             { UWZ_GetCurrent($hash,4); }
+        elsif ($a[1] =~/^strenge-vorst/)     { UWZ_GetCurrent($hash,5); }
+        elsif ($a[1] =~/^bosbrand/)          { UWZ_GetCurrent($hash,6); }
+        elsif ($a[1] =~/^onweer/)            { UWZ_GetCurrent($hash,7); }
+        elsif ($a[1] =~/^gladheid/)          { UWZ_GetCurrent($hash,8); }
+        elsif ($a[1] =~/^hitte/)             { UWZ_GetCurrent($hash,9); }
+        elsif ($a[1] =~/^ijzel/)             { UWZ_GetCurrent($hash,10); }
+        elsif ($a[1] =~/^grondvorst/)        { UWZ_GetCurrent($hash,11); }
+        elsif ($a[1] =~/^hagel/)             { UWZ_GetCurrentHail($hash); }
+        else                                 { return $usage; }
+        }
+
+    elsif ($hash->{CountryCode} ~~ [ 'FR' ] ) {
+        my $usage = "Unknown argument $a[1], choose one of tempete:noArg neige:noArg pluie:noArg strenge-vorst:noArg incendie-de-foret:noArg orage:noArg glissange:noArg canicule:noArg verglas:noArg grondvorst:noArg grele:noArg ";
+
+        return $usage if ( @a < 2 );
+
+        if    ($a[1] =~/^tempete/)           { UWZ_GetCurrent($hash,2); }
+        elsif ($a[1] =~/^neige/)             { UWZ_GetCurrent($hash,3); }
+        elsif ($a[1] =~/^pluie/)             { UWZ_GetCurrent($hash,4); }
+        elsif ($a[1] =~/^température/)       { UWZ_GetCurrent($hash,5); }
+        elsif ($a[1] =~/^feu-de-forêt/)      { UWZ_GetCurrent($hash,6); }
+        elsif ($a[1] =~/^orage/)             { UWZ_GetCurrent($hash,7); }
+        elsif ($a[1] =~/^route-glissante/)   { UWZ_GetCurrent($hash,8); }
+        elsif ($a[1] =~/^chaleur/)           { UWZ_GetCurrent($hash,9); }
+        elsif ($a[1] =~/^pluie-de-verglas/)  { UWZ_GetCurrent($hash,10); }
+        elsif ($a[1] =~/^gelée/)             { UWZ_GetCurrent($hash,11); }
+        elsif ($a[1] =~/^grêle/)             { UWZ_GetCurrentHail($hash); }
+        else                                 { return $usage; }
+        }
+ 
     elsif ( (lc $hash->{CountryCode}) eq  'search' ) {
         my $usage   = "Unknown argument $a[1], choose one of SearchAreaID ";
         
@@ -479,7 +571,7 @@ sub UWZ_Get($@) {
         if    ($a[1] =~ /^SearchAreaID/)            { UWZSearchLatLon($name, $a[2]); }
         elsif ($a[1] =~ /^AreaID/)                  { my @splitparam = split(/,/,$a[2]); UWZSearchAreaID($splitparam[0],$splitparam[1]); }
         else                                        { return $usage; }
-        
+    
     } else {
         my $usage   = "Unknown argument $a[1], choose one of storm:noArg snow:noArg rain:noArg extremfrost:noArg forest-fire:noArg thunderstorms:noArg glaze:noArg heat:noArg glazed-rain:noArg soil-frost:noArg hail:noArg ";
         
@@ -585,8 +677,8 @@ sub UWZ_Start($) {
     if(!$hash->{fhem}{LOCAL} && $hash->{INTERVAL} > 0) {        # set up timer if automatically call
     
         RemoveInternalTimer( $hash );
-        InternalTimer(gettimeofday() + $hash->{INTERVAL}, "UWZ_Start", $hash, 1 );  
-        return undef if( AttrVal($name, "disable", 0 ) == 1 );
+        InternalTimer(gettimeofday() + $hash->{INTERVAL}, "UWZ_Start", $hash, 1 );
+        return undef if( IsDisabled($name) );
         readingsSingleUpdate($hash,'currentIntervalMode','normal',0);
     }
 
@@ -597,6 +689,10 @@ sub UWZ_Start($) {
     } else {
         if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
             $URL_language="de";
+        } elsif ( $hash->{CountryCode} ~~ [ 'NL' ] ) {
+            $URL_language="nl";
+        } elsif ( $hash->{CountryCode} ~~ [ 'FR' ] ) {
+    $URL_language="fr";
         }
     }
     $hash->{URL} =  "http://feed.alertspro.meteogroup.com/AlertsPro/AlertsProPollService.php?method=getWarning&language=" . $URL_language . "&areaID=UWZ" . $hash->{CountryCode} . $hash->{PLZ};
@@ -668,6 +764,8 @@ sub UWZ_Done($) {
                 
                 $newState = "Warnings: " . $values{WarnCount};
                 $newState = "Warnungen: " . $values{WarnCount} if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] );
+                $newState = "Aantal waarschuwingen: " . $values{WarnCount} if ( $hash->{CountryCode} ~~ [ 'NL' ] );
+                $newState = "Avertissements: " . $values{WarnCount} if ( $hash->{CountryCode} ~~ [ 'FR' ] );
                 # end Message by CountryCode
             } else {
                 $newState = "Error: Could not capture all data. Please check CountryCode and PLZ.";
@@ -819,7 +917,30 @@ sub UWZ_Run($) {
                             "9" => "Hitze",    # 9 = hitzewarnung
                             "10" => "Glatteisregen",
                             "11" => "Bodenfrost" ); # 11 = bodenfrost
-    
+
+    my %typenames_nl_str= ( "1" => "unknown",     # <===== FIX HERE
+                            "2" => "storm",
+                            "3" => "sneeuw",
+                            "4" => "regen",
+                            "5" => "temperatuur",
+                            "6" => "bosbrand",
+                            "7" => "onweer",
+                            "8" => "gladde wegen",
+                            "9" => "hitte",    # 9 = hitzewarnung
+                            "10" => "ijzel",
+                            "11" => "grondvorst" ); # 11 = bodenfrost
+
+    my %typenames_fr_str= ( "1" => "unknown",     # <===== FIX HERE
+                            "2" => "tempete",
+                            "3" => "neige",
+                            "4" => "pluie",
+                            "5" => "températur",
+                            "6" => "feu de forêt",
+                            "7" => "orage",
+                            "8" => "route glissante",
+                            "9" => "chaleur",    # 9 = hitzewarnung
+                            "10" => "pluie de verglas",
+                            "11" => "gelée" ); # 11 = bodenfrost
 
     my %typenames_en_str= ( "1" => "unknown",     # <===== FIX HERE
                             "2" => "storm",
@@ -832,7 +953,6 @@ sub UWZ_Run($) {
                             "9" => "heat",    # 9 = hitzewarnung
                             "10" => "black ice rain",
                             "11" => "soil frost" ); # 11 = bodenfrost
-
                     
     my %severitycolor   = ( "0" => "green", 
                             "1" => "unknown", # <===== FIX HERE
@@ -915,6 +1035,29 @@ sub UWZ_Run($) {
                 UWZ_Log $hash, 4, "Warn_".$i."_uwzLevel_Str: ".$uwzlevelname{ UWZ_GetUWZLevel($hash,$single_warning->{'payload'}{'levelName'}) };
                 $message .= "Warn_".$i."_uwzLevel_Str|".$uwzlevelname{ UWZ_GetUWZLevel($hash,$single_warning->{'payload'}{'levelName'}) }."|";
 
+            } elsif ( $hash->{CountryCode} ~~ [ 'NL' ] ) {
+                UWZ_Log $hash, 4, "Warn_".$i."_Type_Str: ".$typenames_nl_str{ $single_warning->{'type'} };
+                $message .= "Warn_".$i."_Type_Str|".$typenames_nl_str{ $single_warning->{'type'} }."|";
+                my %uwzlevelname = ( "0" => "niveau groen (geen waarschuwingen)",
+                                     "1" => "niveau donkergroen (weermelding)",
+                                     "2" => "niveau geel (voorwaarschuwing)",
+                                     "3" => "waarschuwingsniveau oranje (waarschuwing voor matig noodweer)",
+                                     "4" => "waarschuwingsniveau rood (waarschuwing voor zwaar noodweer)",
+                                     "5" => "waarschuwingsniveau violet (waarschuwing voor zeer zwaar noodweer)");
+                UWZ_Log $hash, 4, "Warn_".$i."_uwzLevel_Str: ".$uwzlevelname{ UWZ_GetUWZLevel($hash,$single_warning->{'payload'}{'levelName'}) };
+                $message .= "Warn_".$i."_uwzLevel_Str|".$uwzlevelname{ UWZ_GetUWZLevel($hash,$single_warning->{'payload'}{'levelName'}) }."|";
+
+            } elsif ( $hash->{CountryCode} ~~ [ 'FR' ] ) {
+                UWZ_Log $hash, 4, "Warn_".$i."_Type_Str: ".$typenames_nl_str{ $single_warning->{'type'} };
+                $message .= "Warn_".$i."_Type_Str|".$typenames_nl_str{ $single_warning->{'type'} }."|";
+                my %uwzlevelname = ( "0" => "niveau vert (aucune alerte)",
+                                     "1" => "niveau vert foncé (indication météo)",
+                                     "2" => "niveau jaune (pré-alerte)",
+                                     "3" => "niveau d' alerte orange (alerte météo)",
+                                     "4" => "niveau d' alerte rouge (alerte météo)",
+                                     "5" => "niveau d' alerte violet (alerte météo)");
+                UWZ_Log $hash, 4, "Warn_".$i."_uwzLevel_Str: ".$uwzlevelname{ UWZ_GetUWZLevel($hash,$single_warning->{'payload'}{'levelName'}) };
+                $message .= "Warn_".$i."_uwzLevel_Str|".$uwzlevelname{ UWZ_GetUWZLevel($hash,$single_warning->{'payload'}{'levelName'}) }."|";
 
             } else {
                 UWZ_Log $hash, 4, "Warn_".$i."_Type_Str: ".$typenames_en_str{ $single_warning->{'type'} };
@@ -951,6 +1094,10 @@ sub UWZ_Run($) {
             # Begin Language by AttrVal
             if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
                 $uclang = "DE";
+            } elsif ( $hash->{CountryCode} ~~ [ 'NL' ] ) {
+                $uclang = "NL"
+            } elsif ( $hash->{CountryCode} ~~ [ 'FR' ] ) {
+        $uclang = "FR"
             } else {
                 $uclang = "EN";
             }
@@ -982,6 +1129,14 @@ sub UWZ_Run($) {
         if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
         
             $hagelcount = my @hagelmatch = $single_warning->{'payload'}{'translationsLongText'}{'DE'} =~ /Hagel/g;
+
+        } elsif ( $hash->{CountryCode} ~~ [ 'NL' ] ) {
+
+                    $hagelcount = my @hagelmatch = $single_warning->{'payload'}{'translationsLongText'}{'NL'} =~ /hagel/g;
+
+        } elsif ( $hash->{CountryCode} ~~ [ 'FR' ] ) {
+
+            $hagelcount = my @hagelmatch = $single_warning->{'payload'}{'translationsLongText'}{'FR'} =~ /grêle/g;
             
         } else {
         
@@ -1025,6 +1180,27 @@ sub UWZ_Run($) {
                                  "5" => "Warnstufe Violett (Unwetterwarnung)");
             UWZ_Log $hash, 4, "WarnUWZLevel_Str: ".$uwzlevelname{ $max };
             $message .= "WarnUWZLevel_Str|".$uwzlevelname{ $max }."|";
+
+        } elsif ($hash->{CountryCode} ~~ [ 'NL' ] ) {
+            my %uwzlevelname = ( "0" => "niveau groen (geen waarschuwingen)",
+                                 "1" => "niveau donkergroen (voorwaarschuwing)",
+                                 "2" => "niveau geel (voorwaarschuwing)",
+                                 "3" => "waarschuwingsniveau oranje (waarschuwing voor matig noodweer)",
+                                 "4" => "waarschuwingsniveau rood (waarschuwing voor zwaar noodweer)",
+                                 "5" => "waarschuwingsniveau violet (waarschuwing voor zeer zwaar noodweer)");
+            UWZ_Log $hash, 4, "WarnUWZLevel_Str: ".$uwzlevelname{ $max };
+            $message .= "WarnUWZLevel_Str|".$uwzlevelname{ $max }."|";
+
+        } elsif ($hash->{CountryCode} ~~ [ 'FR' ] ) {
+            my %uwzlevelname = ( "0" => "niveau vert (aucune alerte)",
+                                 "1" => "niveau vert foncé (indication météo)",
+                                 "2" => "niveau jaune (pré-alerte)",
+                                 "3" => "niveau d' alerte orange (alerte météo)",
+                                 "4" => "niveau d' alerte rouge (alerte météo)",
+                                 "5" => "niveau d' alerte violet (alerte météo)");
+            UWZ_Log $hash, 4, "WarnUWZLevel_Str: ".$uwzlevelname{ $max };
+            $message .= "WarnUWZLevel_Str|".$uwzlevelname{ $max }."|";
+
         } else {
             my %uwzlevelname = ( "0" => "level green (no warnings)",
                                  "1" => "level dark green (weather notice)",
@@ -1077,14 +1253,36 @@ sub UWZAsHtml($;$) {
                 $ret .= '<tr><td class="uwzIcon" style="vertical-align:top;"><img src="'.ReadingsVal($name, "Warn_".$i."_IconURL", "").'"></td>';
                 $ret .= '<td class="uwzValue"><b>'.ReadingsVal($name, "Warn_".$i."_ShortText", "").'</b><br><br>';
                 $ret .= ReadingsVal($name, "Warn_".$i."_LongText", "").'<br><br>';
-      
-                $ret .= '<table '.$attr.'><tr><th></th><th></th></tr><tr><td><b>Start:</b></td><td>'.localtime(ReadingsVal($name, "Warn_".$i."_Start", "")).'</td>';
-                
+
+                my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(ReadingsVal($name, "Warn_".$i."_Start", ""));
+                if (length($hour) == 1) {$hour = "0$hour";}
+                if (length($min) == 1) {$min = "0$min";}
+                # language by AttrVal
+                                if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
+                        $ret .= '<table '.$attr.'><tr><th></th><th></th></tr><tr><td><b>Anfang:</b></td><td>'."$DEweekdays[$wday], $mday $DEmonths[$mon] ".(1900+$year)." $hour:$min ".'Uhr</td>';
+                } elsif ( $hash->{CountryCode} ~~ [ 'NL' ] ) {
+                                $ret .= '<table '.$attr.'><tr><th></th><th></th></tr><tr><td><b>Begin:</b></td><td>'."$NLweekdays[$wday], $mday $NLmonths[$mon] ".(1900+$year)." $hour:$min ".'uur</td>';
+                } elsif ( $hash->{CountryCode} ~~ [ 'FR' ] ) {
+                                $ret .= '<table '.$attr.'><tr><th></th><th></th></tr><tr><td><b>Valide à partir du:</b></td><td>'."$FRweekdays[$wday], $mday $FRmonths[$mon] ".(1900+$year)." $hour:$min ".'heure</td>';
+                                } else {
+                                $ret .= '<table '.$attr.'><tr><th></th><th></th></tr><tr><td><b>Start:</b></td><td>'."$ENweekdays[$wday], $mday $ENmonths[$mon] ".(1900+$year)." $hour:$min ".'hour</td>';
+                }
+                # end language by AttrVal
+
+
+                ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = undef;
+                ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(ReadingsVal($name, "Warn_".$i."_End", ""));
+                if (length($hour) == 1) {$hour = "0$hour";}
+                if (length($min) == 1) {$min = "0$min";}
                 # language by AttrVal
                 if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
-                    $ret .= '<td><b>Ende:</b></td><td>'.localtime(ReadingsVal($name, "Warn_".$i."_End", "")).'</td>';
+                    $ret .= '<td><b>Ende:</b></td><td>'."$DEweekdays[$wday], $mday $DEmonths[$mon] ".(1900+$year)." $hour:$min ".'Uhr</td>';
+                } elsif ( $hash->{CountryCode} ~~ [ 'NL' ] ) {
+                    $ret .= '<td><b>Einde:</b></td><td>'."$NLweekdays[$wday], $mday $NLmonths[$mon] ".(1900+$year)." $hour:$min ".'uur</td>';
+                } elsif ( $hash->{CountryCode} ~~ [ 'FR' ] ) {
+                    $ret .= '<td><b>Jusqu\'au:</b></td><td>'."$FRweekdays[$wday], $mday $FRmonths[$mon] ".(1900+$year)." $hour:$min ".'heure</td>';
                 } else {
-                    $ret .= '<td><b>End:</b></td><td>'.localtime(ReadingsVal($name, "Warn_".$i."_End", "")).'</td>';
+                    $ret .= '<td><b>End:</b></td><td>'."$ENweekdays[$wday], $mday $ENmonths[$mon] ".(1900+$year)." $hour:$min ".'hour</td>';
                 }
                 # end language by AttrVal
                 $ret .= '</tr></table>';
@@ -1097,14 +1295,36 @@ sub UWZAsHtml($;$) {
                 $ret .= '<tr><td class="uwzIcon" style="vertical-align:top;"><img src="'.ReadingsVal($name, "Warn_".$i."_IconURL", "").'"></td>';
                 $ret .= '<td class="uwzValue"><b>'.ReadingsVal($name, "Warn_".$i."_ShortText", "").'</b><br><br>';
                 $ret .= ReadingsVal($name, "Warn_".$i."_LongText", "").'<br><br>';
-      
-                $ret .= '<table '.$attr.'><tr><th></th><th></th></tr><tr><td><b>Start:</b></td><td>'.localtime(ReadingsVal($name, "Warn_".$i."_Start", "")).'</td>';
-                
+
+                my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(ReadingsVal($name, "Warn_".$i."_Start", ""));
+                if (length($hour) == 1) {$hour = "0$hour";}
+                if (length($min) == 1) {$min = "0$min";}
                 # language by AttrVal
                 if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
-                    $ret .= '<td><b>Ende:</b></td><td>'.localtime(ReadingsVal($name, "Warn_".$i."_End", "")).'</td>';
+                   $ret .= '<table '.$attr.'><tr><th></th><th></th></tr><tr><td><b>Anfang:</b></td><td>'."$DEweekdays[$wday], $mday $DEmonths[$mon] ".(1900+$year)." $hour:$min ".'Uhr</td>';
+                } elsif ( $hash->{CountryCode} ~~ [ 'NL' ] ) {
+                   $ret .= '<table '.$attr.'><tr><th></th><th></th></tr><tr><td><b>Begin:</b></td><td>'."$NLweekdays[$wday], $mday $NLmonths[$mon] ".(1900+$year)." $hour:$min ".'uur</td>';
+                } elsif ( $hash->{CountryCode} ~~ [ 'FR' ] ) {
+                   $ret .= '<table '.$attr.'><tr><th></th><th></th></tr><tr><td><b>Valide à partir du:</b></td><td>'."$FRweekdays[$wday], $mday $FRmonths[$mon] ".(1900+$year)." $hour:$min ".'heure</td>';
                 } else {
-                    $ret .= '<td><b>End:</b></td><td>'.localtime(ReadingsVal($name, "Warn_".$i."_End", "")).'</td>';
+                   $ret .= '<table '.$attr.'><tr><th></th><th></th></tr><tr><td><b>Start:</b></td><td>'."$ENweekdays[$wday], $mday $ENmonths[$mon] ".(1900+$year)." $hour:$min ".'hour</td>';
+                }
+                # end language by AttrVal
+
+
+                ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = undef;
+                ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(ReadingsVal($name, "Warn_".$i."_End", ""));
+                if (length($hour) == 1) {$hour = "0$hour";}
+                if (length($min) == 1) {$min = "0$min";}
+                # language by AttrVal
+                if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
+                    $ret .= '<td><b>Ende:</b></td><td>'."$DEweekdays[$wday], $mday $DEmonths[$mon] ".(1900+$year)." $hour:$min ".'Uhr</td>';
+                } elsif ( $hash->{CountryCode} ~~ [ 'NL' ] ) {
+                    $ret .= '<td><b>Einde:</b></td><td>'."$NLweekdays[$wday], $mday $NLmonths[$mon] ".(1900+$year)." $hour:$min ".'uur</td>';
+                } elsif ( $hash->{CountryCode} ~~ [ 'FR' ] ) {
+                    $ret .= '<td><b>Juzqu\'au:</b></td><td>'."$FRweekdays[$wday], $mday $FRmonths[$mon] ".(1900+$year)." $hour:$min ".'heure</td>';
+                } else {
+                    $ret .= '<td><b>End:</b></td><td>'."$ENweekdays[$wday], $mday $ENmonths[$mon] ".(1900+$year)." $hour:$min ".'hour</td>';
                 }
                 # end language by AttrVal
                 $ret .= '</tr></table>';
@@ -1126,6 +1346,10 @@ sub UWZAsHtml($;$) {
         # language by AttrVal
         if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
             $ret .='<b>Keine Warnungen</b>';
+        } elsif ( $hash->{CountryCode} ~~ [ 'NL' ] ) {
+            $ret .='<b>Geen waarschuwingen</b>';
+        } elsif ( $hash->{CountryCode} ~~ [ 'FR' ] ) {
+    $ret .='<b>Aucune alerte</b>';
         } else {
             $ret .='<b>No Warnings</b>';
         }
@@ -1165,13 +1389,35 @@ sub UWZAsHtmlLite($;$) {
             for ( my $i=ReadingsVal($name, "WarnCount", "")-1; $i>=0; $i--){
                 $ret .= '<tr><td class="uwzIcon" style="vertical-align:top;"><img src="'.ReadingsVal($name, "Warn_".$i."_IconURL", "").'"></td>';
                 $ret .= '<td class="uwzValue"><b>'.ReadingsVal($name, "Warn_".$i."_ShortText", "").'</b><br><br>';
-                $ret .= '<table '.$attr.'><tr><th></th><th></th></tr><tr><td><b>Start:</b></td><td>'.localtime(ReadingsVal($name, "Warn_".$i."_Start", "")).'</td>';
+
+                my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(ReadingsVal($name, "Warn_".$i."_Start", ""));
+                if (length($hour) == 1) {$hour = "0$hour";}
+                if (length($min) == 1) {$min = "0$min";}
                 # language by AttrVal
-                
                 if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
-                    $ret .= '<td><b>Ende:</b></td><td>'.localtime(ReadingsVal($name, "Warn_".$i."_End", "")).'</td>';
+                   $ret .= '<table '.$attr.'><tr><th></th><th></th></tr><tr><td><b>Anfang:</b></td><td>'."$DEweekdays[$wday], $mday $DEmonths[$mon] ".(1900+$year)." $hour:$min ".'Uhr</td>';
+                } elsif ( $hash->{CountryCode} ~~ [ 'NL' ] ) {
+                   $ret .= '<table '.$attr.'><tr><th></th><th></th></tr><tr><td><b>Begin:</b></td><td>'."$NLweekdays[$wday], $mday $NLmonths[$mon] ".(1900+$year)." $hour:$min ".'uur</td>';
+                } elsif ( $hash->{CountryCode} ~~ [ 'FR' ] ) {
+                   $ret .= '<table '.$attr.'><tr><th></th><th></th></tr><tr><td><b>Valide à partir du:</b></td><td>'."$FRweekdays[$wday], $mday $FRmonths[$mon] ".(1900+$year)." $hour:$min ".'heure</td>';
                 } else {
-                    $ret .= '<td><b>End:</b></td><td>'.localtime(ReadingsVal($name, "Warn_".$i."_End", "")).'</td>';
+                   $ret .= '<table '.$attr.'><tr><th></th><th></th></tr><tr><td><b>Start:</b></td><td>'."$ENweekdays[$wday], $mday $ENmonths[$mon] ".(1900+$year)." $hour:$min ".'hour</td>';
+                }
+# end language by AttrVal
+
+                ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = undef;
+                ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(ReadingsVal($name, "Warn_".$i."_End", ""));
+                if (length($hour) == 1) {$hour = "0$hour";}
+                if (length($min) == 1) {$min = "0$min";}
+                # language by AttrVal
+                if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
+                    $ret .= '<td><b>Ende:</b></td><td>'."$DEweekdays[$wday], $mday $DEmonths[$mon] ".(1900+$year)." $hour:$min ".'Uhr</td>';
+                } elsif ( $hash->{CountryCode} ~~ [ 'NL' ] ) {
+                    $ret .= '<td><b>Einde:</b></td><td>'."$NLweekdays[$wday], $mday $NLmonths[$mon] ".(1900+$year)." $hour:$min ".'uur</td>';
+                } elsif ( $hash->{CountryCode} ~~ [ 'FR' ] ) {
+                    $ret .= '<td><b>Jusqu\'au:</b></td><td>'."$FRweekdays[$wday], $mday $FRmonths[$mon] ".(1900+$year)." $hour:$min ".'heure</td>';
+                } else {
+                    $ret .= '<td><b>End:</b></td><td>'."$ENweekdays[$wday], $mday $ENmonths[$mon] ".(1900+$year)." $hour:$min ".'hour</td>';
                 }
                 # end language by AttrVal
                 $ret .= '</tr></table>';
@@ -1181,13 +1427,35 @@ sub UWZAsHtmlLite($;$) {
             for ( my $i=0; $i<ReadingsVal($name, "WarnCount", ""); $i++){
                 $ret .= '<tr><td class="uwzIcon" style="vertical-align:top;"><img src="'.ReadingsVal($name, "Warn_".$i."_IconURL", "").'"></td>';
                 $ret .= '<td class="uwzValue"><b>'.ReadingsVal($name, "Warn_".$i."_ShortText", "").'</b><br><br>';
-                $ret .= '<table '.$attr.'><tr><th></th><th></th></tr><tr><td><b>Start:</b></td><td>'.localtime(ReadingsVal($name, "Warn_".$i."_Start", "")).'</td>';
+
+                my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(ReadingsVal($name, "Warn_".$i."_Start", ""));
+                if (length($hour) == 1) {$hour = "0$hour";}
+                if (length($min) == 1) {$min = "0$min";}
                 # language by AttrVal
-                
                 if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
-                    $ret .= '<td><b>Ende:</b></td><td>'.localtime(ReadingsVal($name, "Warn_".$i."_End", "")).'</td>';
+                   $ret .= '<table '.$attr.'><tr><th></th><th></th></tr><tr><td><b>Anfang:</b></td><td>'."$DEweekdays[$wday], $mday $DEmonths[$mon] ".(1900+$year)." $hour:$min ".'Uhr</td>';
+                } elsif ( $hash->{CountryCode} ~~ [ 'NL' ] ) {
+                   $ret .= '<table '.$attr.'><tr><th></th><th></th></tr><tr><td><b>Begin:</b></td><td>'."$NLweekdays[$wday], $mday $NLmonths[$mon] ".(1900+$year)." $hour:$min ".'uur</td>';
+                } elsif ( $hash->{CountryCode} ~~ [ 'FR' ] ) {
+                   $ret .= '<table '.$attr.'><tr><th></th><th></th></tr><tr><td><b>Valide à partir du:</b></td><td>'."$FRweekdays[$wday], $mday $FRmonths[$mon] ".(1900+$year)." $hour:$min ".'heure</td>';
                 } else {
-                    $ret .= '<td><b>End:</b></td><td>'.localtime(ReadingsVal($name, "Warn_".$i."_End", "")).'</td>';
+                   $ret .= '<table '.$attr.'><tr><th></th><th></th></tr><tr><td><b>Start:</b></td><td>'."$ENweekdays[$wday], $mday $ENmonths[$mon] ".(1900+$year)." $hour:$min ".'hour</td>';
+                }
+                # end language by AttrVal
+
+                ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = undef;
+                ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(ReadingsVal($name, "Warn_".$i."_End", ""));
+                if (length($hour) == 1) {$hour = "0$hour";}
+                if (length($min) == 1) {$min = "0$min";}
+                # language by AttrVal
+                if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
+                    $ret .= '<td><b>Ende:</b></td><td>'."$DEweekdays[$wday], $mday $DEmonths[$mon] ".(1900+$year)." $hour:$min ".'Uhr</td>';
+                } elsif ( $hash->{CountryCode} ~~ [ 'NL' ] ) {
+                    $ret .= '<td><b>Einde:</b></td><td>'."$NLweekdays[$wday], $mday $NLmonths[$mon] ".(1900+$year)." $hour:$min ".'uur</td>';
+                } elsif ( $hash->{CountryCode} ~~ [ 'FR' ] ) {
+                    $ret .= '<td><b>Jusqu\'au:</b></td><td>'."$FRweekdays[$wday], $mday $FRmonths[$mon] ".(1900+$year)." $hour:$min ".'heure</td>';
+                } else {
+                    $ret .= '<td><b>End:</b></td><td>'."$ENweekdays[$wday], $mday $ENmonths[$mon] ".(1900+$year)." $hour:$min ".'hour</td>';
                 }
                 # end language by AttrVal
                 $ret .= '</tr></table>';
@@ -1207,6 +1475,10 @@ sub UWZAsHtmlLite($;$) {
         # language by AttrVal
         if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
             $ret .='<b>Keine Warnungen</b>';
+        } elsif ( $hash->{CountryCode} ~~ [ 'NL' ] ) {
+            $ret .='<b>Geen waarschuwingen</b>';
+        } elsif ( $hash->{CountryCode} ~~ [ 'FR' ] ) {
+    $ret .='<b>Aucune alerte</b>';
         } else {
             $ret .='<b>No Warnings</b>';
         }
@@ -1268,8 +1540,12 @@ sub UWZAsHtmlMovie($$) {
 
     } else {
         # language by AttrVal
-        if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
+        if ( $hash->{CountryCode} ~~ [ 'DE' , 'AT' , 'CH' ] ) {
             $ret .= 'unbekannte Landbezeichnung';
+        } elsif ( $hash->{CountryCode} ~~ [ 'NL' ] ) {
+           $ret .= 'Onbekende landcode';
+        } elsif ( $hash->{CountryCode} ~~ [ 'FR' ] ) {
+           $ret .= 'code de pays inconnu';
         } else {
             $ret .='unknown movie setting';
         }
@@ -1299,8 +1575,12 @@ sub UWZAsHtmlKarteLand($$) {
         
     } else {
         # language by AttrVal
-        if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
+        if ( $hash->{CountryCode} ~~ [ 'DE' , 'AT' , 'CH' ] ) {
             $ret .= 'unbekannte Landbezeichnung';
+        } elsif ( $hash->{CountryCode} ~~ [ 'NL' ] ) {
+            $ret .= 'onbekende landcode';
+        } elsif ( $hash->{CountryCode} ~~ [ 'FR' ] ) {
+            $ret .= 'code de pays inconnu';
         } else {
             $ret .='unknown map setting';
         }       
@@ -1873,10 +2153,42 @@ sub UWZSearchAreaID($$) {
           <li>finnland</li>
           <br/>
           <li>france</li>
+          <li>alsace</li>
+          <li>aquitaine</li>
+          <li>basse-normandie</li>
+          <li>bretagne</li>
+          <li>champagne-ardenne</li>
+          <li>franche-comte</li>
+          <li>haute-normandie</li>
+          <li>ile-de-france</li>
+          <li>languedoc-roussillon</li>
+          <li>limousin</li>
+          <li>lorraine</li>
+          <li>bourgogne</li>
+          <li>centre</li>
+          <li>midi-pyrenees</li>
+          <li>nord-pas-de-calais</li>
+          <li>pays-de-la-loire</li>
+          <li>picardie</li>
+          <li>poitou-charentes</li>
+          <li>provence-alpes-cote-dazur</li>
+          <li>rhone-alpes</li>
           <br/>
           <li>letzebuerg</li>
           <br/>
           <li>nederland</li>
+          <li>drenthe</li>
+          <li>flevoland</li>
+          <li>friesland</li>
+          <li>gelderland</li>
+          <li>groningen</li>
+          <li>limburg</li>
+          <li>noordbrabant</li>
+          <li>noordholland</li>
+          <li>overijssel</li>
+          <li>utrecht</li>
+          <li>zeeland</li>
+          <li>zuidholland</li>
           <br/>
           <li>norwegen</li>
           <br/>
@@ -1923,8 +2235,14 @@ sub UWZSearchAreaID($$) {
           <li>niederschlag-wolken-at</li>
           <li>stroemung-at</li>
           <br/>
-          <li>niederschlag-wolken-uk</li>
-          <li>stroemung-uk</li>
+          <li>neerslag-wolken-nl</li>
+          <li>stroming-nl</li>
+          <br/>
+          <li>nuages-precipitations-fr</li>
+          <li>courants-fr</li>
+          <br/>
+          <li>clouds-precipitation-uk</li>
+          <li>currents-uk</li>
           <br/>
         </ul>          
         </li>
@@ -2264,10 +2582,42 @@ sub UWZSearchAreaID($$) {
           <li>finnland</li>
           <br/>
           <li>france</li>
+          <li>alsace</li>
+          <li>aquitaine</li>
+          <li>basse-normandie</li>
+          <li>bretagne</li>
+          <li>champagne-ardenne</li>
+          <li>franche-comte</li>
+          <li>haute-normandie</li>
+          <li>ile-de-france</li>
+          <li>languedoc-roussillon</li>
+          <li>limousin</li>
+          <li>lorraine</li>
+          <li>bourgogne</li>
+          <li>centre</li>
+          <li>midi-pyrenees</li>
+          <li>nord-pas-de-calais</li>
+          <li>pays-de-la-loire</li>
+          <li>picardie</li>
+          <li>poitou-charentes</li>
+          <li>provence-alpes-cote-dazur</li>
+          <li>rhone-alpes</li>
           <br/>
           <li>letzebuerg</li>
           <br/>
           <li>nederland</li>
+          <li>drenthe</li>
+          <li>flevoland</li>
+          <li>friesland</li>
+          <li>gelderland</li>
+          <li>groningen</li>
+          <li>limburg</li>
+          <li>noordbrabant</li>
+          <li>noordholland</li>
+          <li>overijssel</li>
+          <li>utrecht</li>
+          <li>zeeland</li>
+          <li>zuidholland</li>
           <br/>
           <li>norwegen</li>
           <br/>
@@ -2313,6 +2663,12 @@ sub UWZSearchAreaID($$) {
           <br/>
           <li>niederschlag-wolken-at</li>
           <li>stroemung-at</li>
+          <br/>
+          <li>neerslag-wolken-nl</li>
+          <li>stroming-nl</li>
+          <br/>
+          <li>nuages-precipitations-fr</li>
+          <li>courants-fr</li>
           <br/>
           <li>clouds-precipitation-uk</li>
           <li>currents-uk</li>
