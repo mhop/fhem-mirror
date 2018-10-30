@@ -1272,6 +1272,10 @@ FW_callCreateFn(elName, devName, vArr, currVal, set, params, cmd, finishFn)
     v0 = "uzsu";
   if(FW_availableJs[v0]) {
     loadScript("pgm2/fhemweb_"+v0+".js", function() {
+      if(!FW_widgets[vArr[0]]) {
+        log("ERROR: fhemweb_"+vArr[v0]+".js does not fill FW_widgets");
+        return;
+      }
       if(FW_widgets[vArr[0]].createFn)
         var newEl = FW_widgets[vArr[0]].createFn(elName, devName, vArr,
                                                  currVal, set, params, cmd);
