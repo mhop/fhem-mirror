@@ -45,6 +45,7 @@ use HttpUtils;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "7.3.1"  => "31.10.2018  fix connection lost failure if several SSCamSTRM devices are defined and updated by longpoll from same parent device ",
   "7.3.0"  => "28.10.2018  usage of attribute \"livestreamprefix\" changed, exec SSCam_getStmUrlPath on boot ",
   "7.2.1"  => "23.10.2018  new routine SSCam_versionCheck, COMPATIBILITY changed to 8.2.1 ",
   "7.2.0"  => "20.10.2018  direct help for attributes, new get versionNotes command, fix PERL WARNING: Use of uninitialized value \$small, get versionNotes ",
@@ -5780,18 +5781,15 @@ sub SSCam_refresh($$$$) {
   }
   
   # parentState des SSCamSTRM-Device mit Opmode updaten (mit/ohne Event)
-  my @strmdvs = devspec2array("TYPE=SSCamSTRM:FILTER=PARENT=".$name);
-  if(@strmdvs) {
-      foreach (@strmdvs) {
-          my $strmhash = $defs{$_};  
-          if($lpoll_strm) {
-              readingsSingleUpdate($strmhash,"parentState", $hash->{OPMODE}, 1);
-          } else {
-              readingsSingleUpdate($strmhash,"parentState", $hash->{OPMODE}, 0);  
-          }
-      }          
+  if($hash->{HELPER}{STRMDEV}) {
+      my $strmhash = $defs{$hash->{HELPER}{STRMDEV}};  
+      if($lpoll_strm) {
+          readingsSingleUpdate($strmhash,"parentState", $hash->{OPMODE}, 1);
+      } else {
+          readingsSingleUpdate($strmhash,"parentState", $hash->{OPMODE}, 0);  
+      }
   }
-  
+        
 return;
 }
 
