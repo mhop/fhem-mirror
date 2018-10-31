@@ -34,6 +34,7 @@ use warnings;
 
 # Versions History intern
 our %SSCamSTRM_vNotesIntern = (
+  "1.4.1"  => "31.10.2018  attribute \"autoLoop\" changed to \"autoRefresh\", new attribute \"autoRefreshFW\" ",
   "1.4.0"  => "29.10.2018  readingFnAttributes added ",
   "1.3.0"  => "28.10.2018  direct help for attributes, new attribute \"autoLoop\" ",
   "1.2.4"  => "27.10.2018  fix undefined subroutine &main::SSCam_ptzpanel (https://forum.fhem.de/index.php/topic,45671.msg850505.html#msg850505) ",
@@ -58,8 +59,11 @@ sub SSCam_StreamDev($$$);
 sub SSCamSTRM_Initialize($) {
   my ($hash) = @_;
 
+  my $fwd = join(",",devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized")); 
+  
   $hash->{DefFn}              = "SSCamSTRM_Define";
-  $hash->{AttrList}           = "autoLoop:selectnumbers,10,0.2,1800,0,log10 ".
+  $hash->{AttrList}           = "autoRefresh:selectnumbers,120,0.2,1800,0,log10 ".
+                                "autoRefreshFW:$fwd ".
                                 "disable:1,0 ". 
                                 "forcePageRefresh:1,0 ". 
                                 "htmlattr ".
@@ -121,13 +125,12 @@ return undef;
 ################################################################
 sub SSCamSTRM_FwFn($;$$$) {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
-  my $hash;
-  if (ref($FW_wname) eq "HASH" ) {
-		    $d = $FW_wname->{NAME};
-  }
-  $hash      = $defs{$d};
+  my $hash   = $defs{$d};
   my $link   = $hash->{LINK};
   
+  RemoveInternalTimer($hash);
+  $hash->{HELPER}{FW} = $FW_wname;
+ 
   $link = AnalyzePerlCommand(undef, $link) if($link =~ m/^{(.*)}$/s);
   my $show = $defs{$hash->{PARENT}}->{HELPER}{ACTSTRM} if($hash->{MODEL} =~ /switched/);
   $show = $show?"($show)":"";
@@ -147,17 +150,34 @@ sub SSCamSTRM_FwFn($;$$$) {
       $ret .= $link;  
   }
   
-  if($d) {
-      # Autoloop zur stabilen Anzeige in Anwendungen (z.B. Dashboard)
-      RemoveInternalTimer($hash);
-      my $al = AttrVal($d, "autoLoop", 0);
-      if($al) {      
-          InternalTimer(gettimeofday()+$al, "SSCamSTRM_FwFn", $hash, 0);
-          Log3($d, 5, "$d - next start of autoLoop: ".FmtDateTime(gettimeofday()+$al));
-      }
+  # Autorefresh nur des aufrufenden FHEMWEB-Devices
+  my $al = AttrVal($d, "autoRefresh", 0);
+  if($al) {  
+      InternalTimer(gettimeofday()+$al, "SSCamSTRM_refresh", $hash, 0);
+      Log3($d, 5, "$d - next start of autoRefresh: ".FmtDateTime(gettimeofday()+$al));
   }
 
 return $ret;
+}
+
+################################################################
+sub SSCamSTRM_refresh($) { 
+  my ($hash) = @_;
+  my $d      = $hash->{NAME};
+  
+  # Seitenrefresh festgelegt durch SSCamSTRM-Attribut "autoRefresh" und "autoRefreshFW"
+  my $rd = AttrVal($d, "autoRefreshFW", $hash->{HELPER}{FW});
+  { map { FW_directNotify("#FHEMWEB:$_", "location.reload('true')", "") } $rd }
+  
+  my $al = AttrVal($d, "autoRefresh", 0);
+  if($al) {      
+      InternalTimer(gettimeofday()+$al, "SSCamSTRM_refresh", $hash, 0);
+      Log3($d, 5, "$d - next start of autoRefresh: ".FmtDateTime(gettimeofday()+$al));
+  } else {
+      RemoveInternalTimer($hash);
+  }
+  
+return;
 }
 
 1;
@@ -215,10 +235,19 @@ Dependend of the Streaming-Device state, different buttons are provided to start
   <ul>
   <ul>
 
-    <a name="autoLoop"></a>
-    <li><b>autoLoop</b><br>
-      If set, the video source is recalled after the specified time (seconds) within the device.
-      This may stabilize the video playback in some reasons.
+    <a name="autoRefresh"></a>
+    <li><b>autoRefresh</b><br>
+      If set, active browser pages of the FHEMWEB-Device which has called the SSCamSTRM-Device, are new reloaded after  
+      the specified time (seconds). Browser pages of a particular FHEMWEB-Device to be refreshed can be specified by 
+      attribute "autoRefreshFW" instead.
+      This may stabilize the video playback in some cases.
+    </li>
+    <br>
+    
+    <a name="autoRefreshFW"></a>
+    <li><b>autoRefreshFW</b><br>
+      If "autoRefresh" is activated, you can specify a particular FHEMWEB-Device whose active browser pages are refreshed 
+      periodically.
     </li>
     <br>
     
@@ -231,8 +260,9 @@ Dependend of the Streaming-Device state, different buttons are provided to start
     <a name="forcePageRefresh"></a>
     <li><b>forcePageRefresh</b><br>
       The attribute is evaluated by SSCam. <br>
-      If set, a reload of all browser pages with active FHEMWEB connections will be enforced. 
-      This may be helpful if problems with longpoll are appear.       
+      If set, a reload of all browser pages with active FHEMWEB connections will be enforced when particular camera operations 
+      were finished. 
+      This may stabilize the video playback in some cases.       
     </li>
     <br>
     
@@ -309,10 +339,19 @@ Abhängig vom Zustand des Streaming-Devices werden zum Start von Aktionen unters
   <ul>
   <ul>
   
-    <a name="autoLoop"></a>
-    <li><b>autoLoop</b><br>
-      Wenn gesetzt, wird die Videoquelle innerhalb des Devices nach der eingestellten Zeit (Sekunden) neu aufgerufen.
+    <a name="autoRefresh"></a>
+    <li><b>autoRefresh</b><br>
+      Wenn gesetzt, werden aktive Browserseiten des FHEMWEB-Devices welches das SSCamSTRM-Device aufgerufen hat, nach der 
+      eingestellten Zeit (Sekunden) neu geladen. Sollen statt dessen Broserseiten eines bestimmten FHEMWEB-Devices neu 
+      geladen werden, kann dieses Device mit dem Attribut "autoRefreshFW" festgelegt werden.
       Dies kann in manchen Fällen die Wiedergabe innerhalb einer Anwendung stabilisieren.
+    </li>
+    <br>
+    
+    <a name="autoRefreshFW"></a>
+    <li><b>autoRefreshFW</b><br>
+      Ist "autoRefresh" aktiviert, kann mit diesem Attribut das FHEMWEB-Device bestimmt werden dessen aktive Browserseiten
+      regelmäßig neu geladen werden sollen.
     </li>
     <br>
   
@@ -325,8 +364,9 @@ Abhängig vom Zustand des Streaming-Devices werden zum Start von Aktionen unters
     <a name="forcePageRefresh"></a>
     <li><b>forcePageRefresh</b><br>
       Das Attribut wird durch SSCam ausgewertet. <br>
-      Wenn gesetzt, wird ein Reload aller Browserseiten mit aktiven FHEMWEB-Verbindungen bei bestimmten Aktionen erzwungen. 
-      Das kann hilfreich sein, falls es mit Longpoll Probleme geben sollte.     
+      Wenn gesetzt, wird ein Reload aller Browserseiten mit aktiven FHEMWEB-Verbindungen nach dem Abschluß bestimmter 
+      SSCam-Befehle erzwungen. 
+      Dies kann in manchen Fällen die Wiedergabe innerhalb einer Anwendung stabilisieren.     
     </li>
     <br>
     
