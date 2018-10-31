@@ -38,6 +38,8 @@
 # V 3.0.4
 #  - fixed:   74_Unifi: Readingname -UC_newClients with leading -
 #  - changed: 74_Unifi: Reading(name) for Utilization of APs with UC V 5.7/8.x
+# V 3.0.5
+#  - feature: 74_Unifi: Added readings for wan_ip and results of speedtest
 
 
 package main;
@@ -993,6 +995,12 @@ sub Unifi_GetHealth_Receive($) {
                     if (defined($h->{subsystem}) && $h->{subsystem} eq 'wlan') {
                         $hash->{wlan_health} = $h;
                     }
+                    if (defined($h->{subsystem}) && $h->{subsystem} eq 'www') {
+                        $hash->{www_health} = $h;
+                    }
+                    if (defined($h->{subsystem}) && $h->{subsystem} eq 'wan') {
+                        $hash->{wan_health} = $h;
+                    }
                 }
             }
             else { Unifi_ReceiveFailure($hash,$data->{meta}); }
@@ -1262,6 +1270,14 @@ sub Unifi_SetHealthReadings($) {
     my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
     Log3 $name, 5, "$name ($self) - executed.";
     
+    if(defined($hash->{www_health})){
+      readingsBulkUpdate($hash,'-UC_speed_ping',$hash->{www_health}->{speedtest_ping});
+      readingsBulkUpdate($hash,'-UC_speed_down',$hash->{www_health}->{xput_down});
+      readingsBulkUpdate($hash,'-UC_speed_up',$hash->{www_health}->{xput_up});
+    }
+    if(defined($hash->{wan_health})){
+      readingsBulkUpdate($hash,'-UC_wan_ip',$hash->{wan_health}->{wan_ip});
+    }
     readingsBulkUpdate($hash,'-UC_wlan_state',$hash->{wlan_health}->{status});
     readingsBulkUpdate($hash,'-UC_wlan_users',$hash->{wlan_health}->{num_user});
     readingsBulkUpdate($hash,'-UC_wlan_accesspoints',$hash->{wlan_health}->{num_ap});
@@ -1995,6 +2011,7 @@ sub Unifi_ApNames($@) {
 
 sub Unifi_initVoucherCache($){
     my ($hash) = @_;
+    #return if ( ! defined $hash->{hotspot}->{voucherCache}->{attr_value});
     my @voucherCaches=split(/,/, $hash->{hotspot}->{voucherCache}->{attr_value});
     my @notes=();
     foreach(@voucherCaches){
@@ -2389,6 +2406,7 @@ Or you can use the other readings or set and get features to control your unifi-
     <li><code>-UC_newClients</code>&nbsp;shows nameof a new client, could be a comma-separated list. Will be set to empty at next interval.</li>
     <li>Each AP has 5 readings for state (can be 'ok' or 'error'), essid's, utilization, locate and count of connected-clients.</li>
     <li>The unifi-controller has 6 readings for event-count in configured 'timePeriod', unarchived-alert count, accesspoint count, overall wlan-state (can be 'ok', 'warning', or other?), connected user count and connected guest count. </li>
+    <li>The unifi-controller has also readings for wan_ip and results of the speedtest (UC_speed_ping,UC_speed_down,UC_speed_up). </li>
     <li>The Unifi-device reading 'state' represents the connection-state to the unifi-controller (can be 'connected', 'disconnected', 'initialized' and 'disabled').</li>
     <li>Each voucher-cache has a reading with the next free voucher code.</li>
 </ul>
