@@ -36,9 +36,17 @@ package main;
 
 use strict;                           
 use warnings;
+eval "use JSON qw( decode_json );1;" or my $SScamMMDBI = "JSON";  # Debian: apt-get install libjson-perl
+use Data::Dumper;                                                 # Perl Core module
+use MIME::Base64;
+use Time::HiRes;
+use HttpUtils;
+# no if $] >= 5.017011, warnings => 'experimental';
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "7.3.1"  => "31.10.2018  fix connection lost failure if several SSCamSTRM devices are defined and updated by longpoll from same parent device ",
+  "7.3.0"  => "28.10.2018  usage of attribute \"livestreamprefix\" changed, exec SSCam_getStmUrlPath on boot ",
   "7.2.1"  => "23.10.2018  new routine SSCam_versionCheck, COMPATIBILITY changed to 8.2.1 ",
   "7.2.0"  => "20.10.2018  direct help for attributes, new get versionNotes command, fix PERL WARNING: Use of uninitialized value \$small, get versionNotes ",
   "7.1.1"  => "18.10.2018  Message of \"Your current/simulated SVS-version...\" changed, commandref corrected ",
@@ -83,6 +91,7 @@ our %SSCam_vNotesIntern = (
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
+  "7.3.0"  => "28.10.2018 In attribute \"livestreamprefix\" can now \"DEF\" be specified to overwrite livestream address by specification from device definition ",
   "7.2.1"  => "23.10.2018 COMPATIBILITY changed to 8.2.1 ",
   "7.2.0"  => "20.10.2018 direct help for attributes, new get versionNotes command, please see commandref for details ",
   "7.1.1"  => "18.10.2018 Message of \"current/simulated SVS-version...\" changed, commandref corrected ",
@@ -190,13 +199,6 @@ our %SSCam_vHintsExt_de = (
           "Diese Vorlage kann zum Beispiel mit Paint.Net bearbeitet werden. ",
   "1" => "Hilfreiche Hinweise zu SSCam im <a href=\"https://wiki.fhem.de/wiki/SSCAM_-_Steuerung_von_Kameras_in_Synology_Surveillance_Station\">FHEM-Wiki</a>"
 );
-              
-eval "use JSON qw( decode_json );1;" or my $SScamMMDBI = "JSON";  # Debian: apt-get install libjson-perl
-use Data::Dumper;                                                 # Perl Core module
-use MIME::Base64;
-use Time::HiRes;
-use HttpUtils;
-# no if $] >= 5.017011, warnings => 'experimental';  
 
 # getestete SVS-Version
 my $compstat     = "8.2.1";
@@ -433,7 +435,7 @@ sub SSCam_Attr($$$$) {
     if($aName =~ m/ptzPanel_row.*|ptzPanel_Home|ptzPanel_use/) {
         InternalTimer(gettimeofday()+0.7, "SSCam_addptzattr", "$name", 0);
     } 
-    
+       
     if ($aName eq "disable") {
         if($cmd eq "set") {
             $do = ($aVal) ? 1 : 0;
@@ -556,8 +558,7 @@ sub SSCam_Attr($$$$) {
         }
         if($aName =~ m/pollcaminfoall/) {
             return "The value of \"$aName\" has to be greater than 10 seconds." if($aVal <= 10);
-        }
-        
+        }        
     }
 
     if ($cmd eq "del") {
@@ -1427,8 +1428,8 @@ sub SSCam_initonboot ($) {
 		 if(SSCam_IsModelCam($hash)) {
 		     # Kameraspezifische Infos holen
              SSCam_getcaminfo($hash);           
-
              SSCam_getcapabilities($hash);
+             SSCam_getStmUrlPath($hash);
              
 			 # Preset/Patrollisten in Hash einlesen zur PTZ-Steuerung
              SSCam_getptzlistpreset($hash);
@@ -3806,8 +3807,6 @@ return SSCam_camop($hash);
 sub SSCam_camop ($) {  
    my ($hash) = @_;
    my $name               = $hash->{NAME};
-   my $serveraddr         = $hash->{SERVERADDR};
-   my $serverport         = $hash->{SERVERPORT};
    my $apicam             = $hash->{HELPER}{APICAM};
    my $apicampath         = $hash->{HELPER}{APICAMPATH};
    my $apicammaxver       = $hash->{HELPER}{APICAMMAXVER};  
@@ -3857,6 +3856,8 @@ sub SSCam_camop ($) {
    my $OpMode             = $hash->{OPMODE};
    my $camid              = $hash->{CAMID};
    my $proto              = $hash->{PROTOCOL};
+   my $serveraddr         = $hash->{SERVERADDR};
+   my $serverport         = $hash->{SERVERPORT};
    my ($exturl,$winname,$attr,$room,$param);
    my ($url,$snapid,$httptimeout,$expmode,$motdetsc);
        
@@ -4120,7 +4121,9 @@ sub SSCam_camop ($) {
       Log3($name, 4, "$name - trigger external event \"$hash->{HELPER}{EVENTID}\"");
       $url = "$proto://$serveraddr:$serverport/webapi/$apiextevtpath?api=$apiextevt&version=$apiextevtmaxver&method=Trigger&eventId=$hash->{HELPER}{EVENTID}&eventName=$hash->{HELPER}{EVENTID}&_sid=\"$sid\"";
    
-   } elsif ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} !~ m/snap|^live_.*hls$/) {    
+   } elsif ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} !~ m/snap|^live_.*hls$/) {
+      $exturl = AttrVal($name, "livestreamprefix", "$proto://$serveraddr:$serverport");
+      $exturl = ($exturl eq "DEF")?"$proto://$serveraddr:$serverport":$exturl;      
       if ($hash->{HELPER}{RUNVIEW} =~ m/live/) {
 	      if($apiaudiostmmaxver) {   # API "SYNO.SurveillanceStation.AudioStream" vorhanden ? (removed ab API v2.8)
               $hash->{HELPER}{AUDIOLINK} = "$proto://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmmaxver&method=Stream&cameraId=$camid&_sid=$sid"; 
@@ -4128,7 +4131,6 @@ sub SSCam_camop ($) {
               delete $hash->{HELPER}{AUDIOLINK} if($hash->{HELPER}{AUDIOLINK});
           }
 		  
-          $exturl = AttrVal($name, "livestreamprefix", "$proto://$serveraddr:$serverport");
           if($apivideostmsmaxver) {  # API "SYNO.SurveillanceStation.VideoStream" vorhanden ? (removed ab API v2.8)
               # externe URL in Reading setzen
               $exturl .= "/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
@@ -4142,7 +4144,6 @@ sub SSCam_camop ($) {
       
       } else {
           # Abspielen der letzten Aufnahme (EventId)
-          $exturl = AttrVal($name, "livestreamprefix", "$proto://$serveraddr:$serverport");
           # externe URL in Reading setzen
           $exturl .= "/webapi/$apistmpath?api=$apistm&version=$apistmmaxver&method=EventStream&eventId=$hash->{HELPER}{CAMLASTRECID}&timestamp=1&_sid=$sid"; 
               
@@ -4939,12 +4940,14 @@ sub SSCam_camop_parse ($) {
                     $unicastPath      = $data->{'data'}[0]{'rtspPath'};
 				}		
                 
-                # Rewrite Url's falls livestreamprefix ist gesetzt
+                # Rewrite Url's falls livestreamprefix ist gesetzt                  
                 if (AttrVal($name, "livestreamprefix", undef)) {
+                    my $exturl = AttrVal($name, "livestreamprefix", "$proto://$serveraddr:$serverport");
+                    $exturl = ($exturl eq "DEF")?"$proto://$serveraddr:$serverport":$exturl;
                     my @mjh = split(/\//, $mjpegHttp, 4);
-                    $mjpegHttp = AttrVal($name, "livestreamprefix", undef)."/".$mjh[3];
+                    $mjpegHttp = $exturl."/".$mjh[3];
                     my @mxh = split(/\//, $mxpegHttp, 4);
-                    $mxpegHttp = AttrVal($name, "livestreamprefix", undef)."/".$mxh[3];
+                    $mxpegHttp = $exturl."/".$mxh[3];
 					if($unicastPath) {
                         my @ucp = split(/[@\|:]/, $unicastPath);
                         my @lspf = split(/[\/\/\|:]/, AttrVal($name, "livestreamprefix", undef));
@@ -5778,18 +5781,15 @@ sub SSCam_refresh($$$$) {
   }
   
   # parentState des SSCamSTRM-Device mit Opmode updaten (mit/ohne Event)
-  my @strmdvs = devspec2array("TYPE=SSCamSTRM:FILTER=PARENT=".$name);
-  if(@strmdvs) {
-      foreach (@strmdvs) {
-          my $strmhash = $defs{$_};  
-          if($lpoll_strm) {
-              readingsSingleUpdate($strmhash,"parentState", $hash->{OPMODE}, 1);
-          } else {
-              readingsSingleUpdate($strmhash,"parentState", $hash->{OPMODE}, 0);  
-          }
-      }          
+  if($hash->{HELPER}{STRMDEV}) {
+      my $strmhash = $defs{$hash->{HELPER}{STRMDEV}};  
+      if($lpoll_strm) {
+          readingsSingleUpdate($strmhash,"parentState", $hash->{OPMODE}, 1);
+      } else {
+          readingsSingleUpdate($strmhash,"parentState", $hash->{OPMODE}, 0);  
+      }
   }
-  
+        
 return;
 }
 
@@ -7543,8 +7543,20 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   
   <a name="livestreamprefix"></a>
   <li><b>livestreamprefix</b><br>
-    overwrites the specifications of protocol, servername and port for further use of the livestream address, e.g. 
-	as an link to external use. It has to be specified as "http(s)://&lt;servername&gt;:&lt;port&gt;"  </li><br>
+    Overwrites the specifications of protocol, servername and port for further use in livestream address and 
+    StmKey.*-readings , e.g. as a link for external use. <br>
+    It can be specified of two ways as follows: <br><br> 
+
+    <table>  
+    <colgroup> <col width=25%> <col width=75%> </colgroup>
+     <tr><td> <b>DEF</b>                                        </td><td>: the protocol, servername and port as specified in device 
+                                                                           definition is used </td></tr>
+     <tr><td> <b>http(s)://&lt;servername&gt;:&lt;port&gt;</b>  </td><td>: your own address specification is used </td></tr>
+    </table>
+    <br>
+
+    Servername can be the name or the IP-address of your Synology Surveillance Station.    
+    </li><br>
 
   <a name="loginRetries"></a>
   <li><b>loginRetries</b><br>
@@ -8874,9 +8886,21 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   
   <a name="livestreamprefix"></a>
   <li><b>livestreamprefix</b><br>
-    überschreibt die Angaben zu Protokoll, Servernamen und Port zur Weiterverwendung der 
-    Livestreamadresse als z.B. externer Link. Anzugeben in der Form 
-	"http(s)://&lt;servername&gt;:&lt;port&gt;"   </li><br>
+    Überschreibt die Angaben zu Protokoll, Servernamen und Port in StmKey.*-Readings bzw. der Livestreamadresse zur 
+    Weiterverwendung z.B. als externer Link. <br>
+    Die Spezifikation kann auf zwei Arten erfolgen: <br><br> 
+
+    <table>  
+    <colgroup> <col width=25%> <col width=75%> </colgroup>
+     <tr><td> <b>DEF</b>                                        </td><td>: es wird Protokoll, Servername und Port aus der Definition
+                                                                           des SSCam-Devices verwendet </td></tr>
+     <tr><td> <b>http(s)://&lt;servername&gt;:&lt;port&gt;</b>  </td><td>: eine eigene Adressenangabe wird verwendet </td></tr>
+    </table>
+    <br>
+
+    Servername kann der Name oder die IP-Adresse der Synology Surveillance Station sein.
+    
+    </li><br>
   
   <a name="loginRetries"></a>
   <li><b>loginRetries</b><br>

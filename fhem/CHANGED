@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - changed: 49_SSCam: usage of attribute \"livestreamprefix\" changed,
+                       minor code changes, SSCamSTRM changed for compatibility
+                       and new attributes with direct attribute help
   - feature: 74_Unifi: Added readings for wan_ip and results of speedtest
   - feature: 77_UWZ: new language support, french and hollandisch
   - change:  93_DbRep: V8.6.0, devices and readings can be excluded by 
