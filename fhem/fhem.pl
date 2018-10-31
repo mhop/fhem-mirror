@@ -841,7 +841,7 @@ sub
 IsDisabled($)
 {
   my $devname = shift;
-  return 0 if(!$devname || !defined($attr{$devname}));
+  return 0 if(!$devname); # no check for $attr{$devname}, #92623
 
   return 1 if($attr{$devname}{disable});
   return 3 if($defs{$devname} && $defs{$devname}{STATE} &&
