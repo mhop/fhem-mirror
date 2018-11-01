@@ -165,6 +165,7 @@ FHEMWEB_Initialize($)
     editFileList:textField-long
     endPlotNow:1,0
     endPlotToday:1,0
+    forbiddenroom
     fwcompress:0,1
     hiddengroup
     hiddengroupRegexp
@@ -1515,9 +1516,8 @@ FW_roomOverview($)
   my ($cmd) = @_;
 
   %FW_hiddenroom = ();
-  foreach my $r (split(",",AttrVal($FW_wname, "hiddenroom", ""))) {
-    $FW_hiddenroom{$r} = 1;
-  }
+  map { $FW_hiddenroom{$_}=1 } split(",",AttrVal($FW_wname,"hiddenroom", ""));
+  map { $FW_hiddenroom{$_}=1 } split(",",AttrVal($FW_wname,"forbiddenroom",""));
 
   ##############
   # LOGO
@@ -1821,9 +1821,8 @@ FW_sortIndex($)
 sub
 FW_showRoom()
 {
-  return 0 if(!$FW_room);
-#              ($FW_hiddenroom{$FW_room} && 
-#               AttrVal($FW_wname, "defaultRoom", "") ne $FW_room)); #92433
+  return 0 if(!$FW_room ||
+              AttrVal($FW_wname,"forbiddenroom","") =~ m/\b$FW_room\b/);
   
   %FW_hiddengroup = ();
   foreach my $r (split(",",AttrVal($FW_wname, "hiddengroup", ""))) {
@@ -3639,6 +3638,13 @@ FW_widgetOverride($$)
         </li>
         <br>
 
+    <a name="forbiddenroom"></a>
+    <li>forbiddenroom<br>
+        just like hiddenroom (see below), but accessing the room or the
+        detailed view via direct URL is prohibited.
+        </li>
+        <br>
+
     <a name="hiddengroup"></a>
     <li>hiddengroup<br>
         Comma separated list of groups to "hide", i.e. not to show in any room
@@ -3657,7 +3663,7 @@ FW_widgetOverride($$)
     <li>hiddenroom<br>
         Comma separated list of rooms to "hide", i.e. not to show. Special
         values are input, detail and save, in which case the input areas, link
-        to the detailed views or save button is hidden (although each aspect
+        to the detailed views or save button are hidden (although each aspect
         still can be addressed through URL manipulation).<br>
         The list can also contain values from the additional "Howto/Wiki/FAQ"
         block.
@@ -4341,6 +4347,12 @@ FW_widgetOverride($$)
         Wird dieses FHEMWEB Attribut gesetzt, so enden Wochen- bzw. Monatsplots
         am aktuellen Tag, sonst wird die aktuelle Woche/Monat angezeigt.
         </li><br>
+
+    <a name="forbiddenroom"></a>
+    <li>forbiddenroom<br>
+       Wie hiddenroom, aber der Zugriff auf die Raum- oder Detailansicht
+       &uuml;ber direkte URL-Eingabe wird unterbunden.
+       </li><br>
 
     <a name="fwcompress"></a>
     <li>fwcompress<br>
