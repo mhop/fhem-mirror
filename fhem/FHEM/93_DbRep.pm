@@ -10236,7 +10236,8 @@ return;
 								 <br>
 								 <br>
 								 
-    <li><b> deviceRename </b> -  renames the device name of a device inside the connected database (Internal DATABASE).
+    <li><b> deviceRename &lt;old_name&gt;,&lt;new_name&gt;</b> -  
+                                 renames the device name of a device inside the connected database (Internal DATABASE).
                                  The devicename will allways be changed in the <b>entire</b> database. Possibly set time limits or restrictions by 
                                  <a href="#DbRepattr">attributes</a> device and/or reading will not be considered.  <br><br>
                                  
@@ -10730,6 +10731,89 @@ return;
                                  is operating in asynchronous mode to avoid FHEMWEB from blocking. <br><br> 
                                  </li> <br>
                                  </ul>
+                                 
+    <li><b> reduceLog [average[=day]] </b> <br>
+                                 Reduces historical records within the limits given by the "time.*"-attributes to one record 
+                                 (the 1st) each hour per device & reading. 
+                                 At least one of the "time.*"-attributes must be set (pls. see table below).
+                                 Each of missing time limit will be calculated by the module itself in this case.
+                                 <br><br>
+                                 
+                                 With the optional argument 'average' not only the records will be reduced, but all numerical 
+                                 values of an hour will be reduced to a single average.
+                                 With option 'average=day' all numerical values of a day are reduced to a single average 
+                                 (implies 'average'). <br><br>
+                                 
+                                 By setting attributes "device" and/or "reading" the records to be considered could be included
+                                 respectively excluded. Both containments delimit the selected data from database and may 
+                                 reduce the system RAM load. 
+                                 The reading "reduceLogState" contains the result of the last executed reducelog run.  <br><br>
+                                 
+                 	             The relevant attributes for this function are: <br><br>
+                                 
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+	                                  <tr><td> <b>executeBeforeProc</b>  </td><td>: execution of FHEM command (or perl-routine) before reducelog </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>   </td><td>: execution of FHEM command (or perl-routine) after reducelog </td></tr>
+                                      <tr><td> <b>device</b>             </td><td>: include or exclude &lt;device&gt; for selection </td></tr>
+                                      <tr><td> <b>reading</b>            </td><td>: include or exclude &lt;reading&gt; for selection </td></tr>                                      <tr><td> <b>time.*</b>       </td><td>: Attribute zur Zeitabgrenzung der zu übertragenden Datensätze.  </td></tr>
+                                      <tr><td> <b>timeOlderThan</b>      </td><td>: records <b>older</b> than this attribute will be reduced </td></tr>
+                                      <tr><td> <b>timestamp_end</b>      </td><td>: records <b>older</b> than this attribute will be reduced </td></tr>
+                                      <tr><td> <b>timeDiffToNow</b>      </td><td>: records <b>newer</b> than this attribute will be reduced </td></tr>
+                                      <tr><td> <b>timestamp_begin</b>    </td><td>: records <b>newer</b> than this attribute will be reduced </td></tr>
+                                   </table>
+	                               </ul>
+                                   <br>
+                                 
+                                 For compatibility reasons the reducelog command can optionally be completed with supplements "EXCLUDE" 
+                                 respectively "INCLUDE" to exclude and/or include device/reading combinations from reducelog: <br><br>
+                                 <ul>
+                                 "reduceLog [average[=day]] [EXCLUDE=device1:reading1,device2:reading2,...] [INCLUDE=device:reading]" <br><br> 
+                                 </ul>
+                                 This declaration is evaluated as Regex and overwrites the attributes "device" and "reading",
+                                 which won't be considered in this case. <br><br>
+          
+                                 <ul>
+                                 <b>Examples: </b><br><br>
+                                 
+                                 attr &lt;name&gt; timeOlderThan = d:200  <br>
+                                 set &lt;name&gt; reduceLog <br>
+                                 # Records older than 200 days are reduced to the first entry per hour of each device and reading.
+                                 <br> 
+                                 <br>
+                                 
+                                 attr &lt;name&gt; timeDiffToNow = d:200  <br>
+                                 set &lt;name&gt; reduceLog average=day <br>
+                                 # Records newer than 200 days are reduced to a single average a day of each device and reading.
+                                 <br> 
+                                 <br>
+                                 
+                                 attr &lt;name&gt; timeDiffToNow = d:30  <br>
+                                 attr &lt;name&gt; device = TYPE=SONOSPLAYER EXCLUDE=Sonos_Kueche  <br>
+                                 attr &lt;name&gt; reading = room% EXCLUDE=roomNameAlias  <br>
+                                 set &lt;name&gt; reduceLog <br>
+                                 # Records newer than 30 days which are contain devices from type SONOSPLAYER 
+                                 (except device "Sonos_Kueche"), the readings beginning with "room" (except "roomNameAlias"),                       
+                                 are reduced to the first entry per hour of each device and reading.  <br> 
+                                 <br>
+                                 
+                                 attr &lt;name&gt; timeDiffToNow = d:10 <br>
+                                 attr &lt;name&gt; timeOlderThan = d:5  <br>
+                                 attr &lt;name&gt; device = Luftdaten_remote  <br>
+                                 set &lt;name&gt; reduceLog average <br>
+                                 # Records older than 5 and newer than 10 days and contain DEVICE "Luftdaten_remote" are 
+                                 revised. Numerical values are reduced to the first entry per hour of each device and reading 
+                                 <br>                                  
+                                 <br>
+								 </ul>
+                                 
+								 <b>Note:</b> <br>
+                                 Even though the function itself is non-blocking, you have to set the attached DbLog  device into 
+                                 the asynchronous mode (attr asyncMode = 1) to avoid a blocking situation of FHEM !. <br>
+                                 It is strongly recommended to check if the default INDEX 'Search_Idx' exists on the table 
+                                 'history'! <br><br>
+                                 </li> <br>
 
     <li><b> repairSQLite </b>  - repairs a corrupted SQLite database. <br>
                                  A corruption is usally existent when the error message "database disk image is malformed"
@@ -12232,8 +12316,8 @@ sub bdump {
 								 <br>
 								 <br>
                              
-    <li><b> deviceRename </b> -  benennt den Namen eines Device innerhalb der angeschlossenen Datenbank (Internal 
-	                             DATABASE) um.
+    <li><b> deviceRename &lt;old_name&gt;,&lt;new_name&gt;</b> -  
+                                 benennt den Namen eines Device innerhalb der angeschlossenen Datenbank (Internal DATABASE) um.
                                  Der Gerätename wird immer in der <b>gesamten</b> Datenbank umgesetzt. Eventuell gesetzte 
 								 Zeitgrenzen oder Beschränkungen durch die <a href="#DbRepattr">Attribute</a> Device bzw. 
 								 Reading werden nicht berücksichtigt.  <br><br>
@@ -12786,9 +12870,9 @@ sub bdump {
                                  reduziert.  <br> 
                                  <br>
                                  
-                                 attr &lt;name&gt; timeOlderThan = d:200  <br>
-                                 set &lt;name&gt; reduceLog <br>
-                                 # Datensätze die älter als 200 Tage sind, werden auf den ersten Eintrag pro Stunde je Device & Reading
+                                 attr &lt;name&gt; timeDiffToNow = d:200  <br>
+                                 set &lt;name&gt; reduceLog average=day <br>
+                                 # Datensätze die neuer als 200 Tage sind, werden auf einen Eintrag pro Tag je Device & Reading
                                  reduziert.  <br> 
                                  <br>
                                  
