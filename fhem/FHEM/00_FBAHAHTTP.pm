@@ -244,6 +244,7 @@ FBAHAHTTP_ProcessStack($)
       if(!defined($_[2]) || $_[2] eq "") {
         if($hash->{RetriedCmd}) {
           Log3 $name, 1, "No sensible respone after reconnect, giving up";
+          $hash->{CmdStack} = ();
           return;
         }
         return if(FBAHAHTTP_connect($hash));
