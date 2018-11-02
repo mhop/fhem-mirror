@@ -106,6 +106,7 @@ sub TA_CMI_JSON_Undef($$) {
   my $name = $hash->{NAME};
 
   HttpUtils_Close($hash);
+  RemoveInternalTimer($hash);
 
   return undef;
 }
