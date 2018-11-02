@@ -405,6 +405,9 @@ sub MSwitch_summary($) {
 	\$( \".devType\" ).text( \"MSwitch Inforoom: Anzeige der Deviceinformationen, Änderungen sind nur in den Details möglich.\" );
 	});
 	</script>";
+	
+	 $ret =~ s/#dp /:/g;
+	
     return $ret;
 }
 
@@ -2048,6 +2051,10 @@ sub MSwitch_Notify($$) {
         delete( $own_hash->{READINGS}{waiting} );
     }
 
+	
+	 MSwitch_LOG( $ownName, 6, "-------------waiting passiert-----------------" );
+	
+	
     my $incommingdevice = '';
     if ( defined( $own_hash->{helper}{testevent_device} ) ) {
 
@@ -5954,6 +5961,40 @@ sub MSwitch_checkcondition($$$) {
     if ( !defined($condition) ) { return 'true'; }
     if ( $condition eq '' )     { return 'true'; }
 
+	
+	
+	
+	###### perlersetzung
+	##############
+	
+	    # my $x = 0;
+    # while ( $condition =~ m/(.*?){(.*)}(.*)?/ ) {
+        # my $firstpart  = $1;
+        # my $secondpart = $2;
+        # my $lastpart   = $3;
+        # $condition = $firstpart . "test" . $lastpart;
+        # $x++;
+        # last if $x > 10;    #notausstieg
+    # }
+	#####################################
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
     if ( AttrVal( $name, 'MSwitch_RandomNumber', '' ) ne '' ) {
         MSwitch_Createnumber($hash);
     }
@@ -6379,17 +6420,24 @@ sub MSwitch_Createtimer($) {
     $key = 'ly';
     $condition =~ s/$key//ig;
 
-    $x = 0;
-
+    $x = 0;	   
     # achtung perl 5.30
-    while ( $condition =~ m/(.*).\{(.*)\}.(.*)/ ) {
+    while ( $condition =~ m/(.*)\{(.*)\}(.*)/ ) {
         $x++;    # notausstieg
         last if $x > 20;    # notausstieg
         if ( defined $2 ) {
-            my $part2 = "[" . substr( ( eval $2 ), 0, 5 ) . "]";
-            my $test = substr( ( eval $2 ), 0, 2 ) * 1;
+		my $part1 = $1;
+		my $part3 = $3;
+			my $part2 =  eval $2 ;
+			if ($part2 !~ m/^[0-9]{2}:[0-9]{2}$|^[0-9]{2}:[0-9]{2}:[0-9]{2}$/)
+			{
+			MSwitch_LOG( $Name, 1, "$Name:  ERROR wrong format in set timer. There are no timers running. Format must be HH:MM. Format is: $part2 " );  
+			return;
+			}
+			$part2 =  substr( $part2, 0, 5 );
+			my $test = substr( $part2, 0, 2 ) * 1;
             $part2 = "" if $test > 23;
-            $condition = $1 . $part2 . $3;
+            $condition = $part1 . $part2 . $part3;
         }
     }
 
