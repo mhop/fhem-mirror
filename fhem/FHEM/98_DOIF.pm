@@ -2877,19 +2877,21 @@ CmdDoIfPerl($$)
       $hash->{perlblock}{$i}=$blockname;
       if ($blockname eq "init") {
         $hash->{perlblock}{init}=$i;
-        if ($init_done) {
-          if (($ret,$err)=DOIF_CheckCond($hash,$hash->{perlblock}{init})) {
-            if ($err) {
-              Log3 $hash->{Name},4,"$hash->{NAME}: $err in perl block init" if ($ret != -1);
-              readingsSingleUpdate ($hash, "block_init", $err,0);
-            } else {
-              readingsSingleUpdate ($hash, "block_init", "executed",0);
-            }
-          }
-        }
       }
     }
     $i++;
+  }
+  if (defined $hash->{perlblock}{init}) {
+    if ($init_done) {
+      if (($ret,$err)=DOIF_CheckCond($hash,$hash->{perlblock}{init})) {
+        if ($err) {
+          Log3 $hash->{Name},4,"$hash->{NAME}: $err in perl block init" if ($ret != -1);
+          readingsSingleUpdate ($hash, "block_init", $err,0);
+        } else {
+          readingsSingleUpdate ($hash, "block_init", "executed",0);
+        }
+      }
+    }
   }
   return("","")
 }
@@ -5143,7 +5145,7 @@ Da man beliebige Perl-Ausdrücke verwenden kann, lässt sich z. B. der Mittelwer
 <b>Erzeugen berechneter Readings</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
 <a name="DOIF_Readings"></a>
-Mit Hilfe des Attributes DOIF_Readings können eigene Readings innerhalb des DOIF definiert werden, auf die man im selben DOIF-Moduls zugreifen kann.
+Mit Hilfe des Attributes DOIF_Readings können eigene Readings innerhalb des DOIF definiert werden, auf die man im selben DOIF-Device zugreifen kann.
 Die Nutzung ist insbesondere dann sinnvoll, wenn zyklisch sendende Sensoren, im Perl-Modus oder mit dem Attribut do always, abgefragt werden.
 DOIF_Readings-Berechnungen funktionieren ressourcenschonend ohne Erzeugung FHEM-Events nach außen. Änderungen dieser Readings triggern allerdings das eigene DOIF-Modul, allerdings nur, wenn sich deren Inhalt ändert.<br>
 <br>
