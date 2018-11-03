@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 34_ESPEasy: added set cmds: active/inactive/reopen, shutdown tcp
+               server port if bridge is disabled/inactive, tcp server will be
+               started first after FHEM's global event 'INITIALIZED'.
   - new:     72_TA_CMI_JSON: introduced JSON-API integration with CMI devices
   - changed: 49_SSCam: usage of attribute \"livestreamprefix\" changed,
                        minor code changes, SSCamSTRM changed for compatibility

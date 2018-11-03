@@ -1,8 +1,7 @@
+# $Id$
 ################################################################################
 #
-# $Id$
-#
-#  34_ESPEasy.pm is a FHEM Perl module to control ESP8266 /w ESPEasy
+#  34_ESPEasy.pm is a FHEM Perl module to control ESP82xx/ESP32 /w ESPEasy
 #
 #  Copyright 2018 by dev0
 #  FHEM forum: https://forum.fhem.de/index.php?action=profile;u=7465
@@ -38,7 +37,7 @@ use HttpUtils;
 use Color;
 use SetExtensions;
 
-my $module_version      = "2.00";     # Version of this module
+my $module_version      = "2.01";     # Version of this module
 
 # ------------------------------------------------------------------------------
 # modul version and required ESP Easy firmware / JSON lib version
@@ -94,8 +93,9 @@ my %ee_map = (
   },
   pins => {  # Arduino pin names, keys must be upper case here
     # ESP82xx / ESP32
-    D0 => 16, D1 => 5,  D2 => 4, D3  => 0, D4 => 2, D5 => 14, D6 => 12,
-    D7 => 13, D8 => 15, D9 => 3, D10 => 1, RX => 3, TX => 1,  SD2 => 9,  SD3 => 10,
+    D0  => 16, D1 => 5,  D2 => 4, D3  => 0, D4 => 2, D5 => 14, D6  => 12,
+    D7  => 13, D8 => 15, D9 => 3, D10 => 1, RX => 3, TX => 1,  SD2 => 9,
+    SD3 => 10,
     # ESP32
     TOUCH0 => 4,  TOUCH1 => 0,  TOUCH2 => 21, TOUCH3 => 15, TOUCH4 => 13,
     TOUCH5 => 12, TOUCH6 => 14, TOUCH7 => 27, TOUCH8 => 33, TOUCH9 => 32,
@@ -213,6 +213,9 @@ sub ESPEasy_initDevSets($)
       user             => { args => 0, url => "",        widget => "",      usage => "<username>" },
       pass             => { args => 0, url => "",        widget => "",      usage => "<password>" },
       clearqueue       => { args => 0, url => "",        widget => "noArg", usage => "" },
+      active           => { args => 0, url => "",        widget => "noArg", usage => "" },
+      inactive         => { args => 0, url => "",        widget => "noArg", usage => "" },
+      reopen           => { args => 0, url => "",        widget => "noArg", usage => "" }
     },
     device => { # known ESP Easy plugin commands
       gpio             => { args => 2, url => $d_urlPlg, widget => "",      usage => "<pin> <0|1|off|on>" },
@@ -271,6 +274,8 @@ sub ESPEasy_initDevSets($)
       statusrequest    => { args => 0, url => "",        widget => "noArg", usage => "" },
       adminpassword    => { args => 0, url => "",        widget => "",      usage => "<password>" },
       clearreadings    => { args => 0, url => "",        widget => "noArg", usage => "" },
+      active           => { args => 0, url => "",        widget => "noArg", usage => "" },
+      inactive         => { args => 0, url => "",        widget => "noArg", usage => "" }
     },
     system => { # system commands (another url)
       erase            => { args => 0, url => $d_urlSys, widget => "noArg", usage => "" },
@@ -399,7 +404,7 @@ sub ESPEasy_initDevSets($)
       }
       # Set defaults for plugin cmds and be sure all keys are defined in following fns
       $activeSets{$p}{args}   = $d_args   if !defined $activeSets{$p}{args};
-      $activeSets{$p}{url}    = $d_urlPlg    if !defined $activeSets{$p}{url};
+      $activeSets{$p}{url}    = $d_urlPlg if !defined $activeSets{$p}{url};
       $activeSets{$p}{widget} = $d_widget if !defined $activeSets{$p}{widget};
       $activeSets{$p}{usage}  = $d_usage  if !defined $activeSets{$p}{usage};
     }
@@ -460,6 +465,7 @@ sub ESPEasy_Initialize($)
   $hash->{DeleteFn}   = "ESPEasy_Delete";
   $hash->{RenameFn}   = "ESPEasy_Rename";
   $hash->{NotifyFn}   = "ESPEasy_Notify";
+  $hash->{StateFn}    = "ESPEasy_State";
 
   #provider
   $hash->{ReadFn}     = "ESPEasy_Read";  # ESP http request will be parsed here
@@ -545,8 +551,6 @@ sub ESPEasy_Define($$)  # only called when defined, not on reload.
     $hash->{SUBTYPE} = "bridge";
     $hash->{IPV} = $ipv;
     $modules{ESPEasy}{defptr}{BRIDGE}{$ipv} = $hash;
-    Log3 $hash->{NAME}, 2, "$type $name: Opening bridge v$module_version [TCP:".($ipv==4?"IPV4:":"")."$port]";
-    ESPEasy_tcpServerOpen($hash);
     if ($init_done && !defined($hash->{OLDDEF})) {
       CommandAttr(undef,"$name room $type");
       CommandAttr(undef,"$name group $type Bridge");
@@ -573,7 +577,7 @@ sub ESPEasy_Define($$)  # only called when defined, not on reload.
     $hash->{sec}{admpwd} = getKeyValue($type."_".$name."-admpwd");
     AssignIoPort($hash,$iodev) if !defined $hash->{IODev};
     InternalTimer(gettimeofday()+5+rand(5), "ESPEasy_statusRequest", $hash);
-    readingsSingleUpdate($hash, 'state', 'opened',1);
+    readingsSingleUpdate($hash, 'state', 'Initialized',1);
     my $io = (defined($hash->{IODev}{NAME})) ? $hash->{IODev}{NAME} : "none";
     Log3 $hash->{NAME}, 4, "$type $name: Opened for $ident $host:$port using bridge $io";
   }
@@ -606,6 +610,7 @@ sub ESPEasy_Get(@)
   my $fn = $ee_gets{$subtype}{$cmd}{fn};
   $fn = $fn ne "" ? $fn : "ESPEasy_Get_$cmd";
   # exec $fn
+
   return &{\&{ $fn }}(@_);
 }
 
@@ -737,8 +742,7 @@ sub ESPEasy_Get_queuecontent(@)
 sub ESPEasy_Set($$@)
 {
   my ($hash, $name, $cmd, @params) = @_;
-  return if (IsDisabled $name);
-  my $type = $hash->{TYPE};
+  my ($type, $subtype) = ($hash->{TYPE}, $hash->{SUBTYPE});
 
   # case insensitive
   $cmd = lc($cmd) if $cmd;
@@ -757,8 +761,10 @@ sub ESPEasy_Set($$@)
 
   SetExtensionsCancel($hash); # Forum #53137
 
+  return if (IsDisabled $name) && $cmd !~ m/^(in)?active$/;
+
   # Log set command
-  Log3 $name, 3, "$type $name: set $name $cmd ".join(" ",@params) if $cmd !~  m/^(\?|user|pass|help)$/;
+  Log3 $name, 3, "$type $name: set $name $cmd ".join(" ",@params) if $cmd !~  m/^(\?|user|pass|help|active|inactive)$/;
 
   # check if there are all required arguments
   my $set = $data{ESPEasy}{$name}{sets}{$cmd};
@@ -768,6 +774,11 @@ sub ESPEasy_Set($$@)
          . "Usage: 'set $name $cmd $set->{usage}'";
   }
 
+#  if (defined &{\&{ "ESPEasy_Set_$cmd" }}) {
+#    return &{\&{ "ESPEasy_Set_$cmd" }}(@_);
+#  }
+
+  # Internal cmds
   if ($cmd eq "help") {
     my $usage = $data{ESPEasy}{$name}{sets}{$params[0]}{usage};
     return $usage ? "Usage: set $name $params[0] $usage"
@@ -775,32 +786,74 @@ sub ESPEasy_Set($$@)
                   . "See attribute userSetCmds to register your own or unsupported commands.";
   }
 
-  # Internal cmds
   elsif ($cmd =~ m/^clearqueue$/i) {
     delete $hash->{helper}{queue};
     Log3 $name, 3, "$type $name: Queues erased.";
     return undef;
   }
+
   elsif ($cmd =~ m/^user|pass$/ ) {
     setKeyValue($hash->{TYPE}."_".$hash->{NAME}."-".$cmd,$params[0]);
     $cmd eq "user" ? $hash->{".bau"} = $params[0] : $hash->{".bap"} = $params[0];
+    return undef;
   }
-  return undef if $hash->{SUBTYPE} eq "bridge";
+
+  elsif ($cmd eq "reopen" ) {
+    ESPEasy_TcpServer_Close($hash);
+    ESPEasy_TcpServer_Open($hash);
+    return undef;
+  }
+
+  elsif ($cmd =~ m/^(in)?active$/) {
+    if (AttrVal($name, "disable", 0) == 1) {
+      my $msg = "Set cmd '$cmd' ignored, attribute 'disable' is enabled.";
+      Log3 $name, 3, "$type $name: $msg";
+      return $msg;
+    }
+    elsif ($cmd eq "inactive") {
+      if ($subtype eq "bridge") {
+        ESPEasy_TcpServer_Close($hash);
+      }
+      else { # device
+
+      }
+      readingsSingleUpdate($hash, "state", "inactive", 1);
+      Log3 $name, 3, "$type $name: Device disabled";
+    }
+    elsif ($cmd eq "active") {
+      if (ReadingsVal($name, "state", "") ne "Initialized") {
+        if ($subtype eq "bridge") {
+          ESPEasy_TcpServer_Open($hash);
+        }
+        else {
+          readingsSingleUpdate($hash, "state", "Initialized", 1);
+          ESPEasy_setState($hash);
+          Log3 $name, 3, "$type $name: Device enabled";
+        }
+        return undef;
+      }
+    }
+    return undef;
+  }
 
   # Device cmds
-  if ($cmd eq "statusrequest") {
+  elsif ($cmd eq "statusrequest") {
     ESPEasy_statusRequest($hash);
     return undef;
   }
+
   elsif ($cmd eq "clearreadings") {
     ESPEasy_clearReadings($hash);
     return undef;
   }
+
   elsif ($cmd =~ m/^adminpassword$/ ) {
     setKeyValue($hash->{TYPE}."_".$hash->{NAME}."-admpwd", $params[0]);
     $hash->{sec}{admpwd} = $params[0];
     return undef;
   }
+  return undef if $subtype eq "bridge";
+
 
   # urlEncode <text> parameter
   @params = ESPEasy_urlEncodeDisplayText($hash,$cmd,@params);
@@ -857,20 +910,29 @@ sub ESPEasy_Set($$@)
 }
 
 
+## ------------------------------------------------------------------------------
+#sub ESPEasy_Set_help(@) {
+#  my ($hash, $name, $cmd, @params) = @_;
+#  my $usage = $data{ESPEasy}{$name}{sets}{$params[0]}{usage};
+#  return $usage ? "Usage: set $name $params[0] $usage"
+#                : "Note: '$params[0]' is not registered as an ESPEasy command. "
+#                . "See attribute userSetCmds to register your own or unsupported commands.";
+#}
+
+
 # ------------------------------------------------------------------------------
 sub ESPEasy_Read($) {
 
-  my ($hash) = @_;                             #hash of temporary child instance
+  my ($hash) = @_; #hash of temporary child instance
   my $name   = $hash->{NAME};
   my $ipv = $hash->{IPV} ? $hash->{IPV} : ($hash->{PEER} =~ m/:/ ? 6 : 4);
   my $bhash  = $modules{ESPEasy}{defptr}{BRIDGE}{$ipv}; #hash of original instance
   my $bname  = $bhash->{NAME};
   my $btype  = $bhash->{TYPE};
 
-  # Levering new TcpServerUtils security feature.
-  # $attr{$name}{allowfrom} = ".*" if !$attr{$name}{allowfrom};
   # Accept and create a child
   if( $hash->{SERVERSOCKET} ) {
+    # Levering new TcpServerUtils security feature, use our own TcpServer_Accept()
     my $aRet = ESPEasy_TcpServer_Accept($hash,"ESPEasy");
     return;
   }
@@ -887,8 +949,6 @@ sub ESPEasy_Read($) {
     CommandDelete( undef, $hash->{NAME} );
     return;
   }
-
-  return if (IsDisabled $bname);
 
   # Check allowed IPs
   if ( !( ESPEasy_isPeerAllowed($peer,AttrVal($bname,"allowedIPs", $d_allowedIPs)) &&
@@ -1063,6 +1123,12 @@ sub ESPEasy_Write($$$@) #called from logical's IOWrite (end of SetFn)
   my ($name,$type) = ($hash->{NAME},$hash->{TYPE});
   my ($dname,$dtype) = ($dhash->{NAME},$dhash->{TYPE});
 
+  if (IsDisabled($name)) {
+    Log3 $name, 4, "$type $name: cmd 'set $dname $cmd' ignored, bridge is disabled or inactive.";
+#      if ($cmd ne "statusrequest");
+    return undef;
+  }
+
   if ($cmd eq "cleanup") {
     delete $hash->{helper}{received};
     return undef;
@@ -1105,20 +1171,40 @@ sub ESPEasy_Notify($$)
   return if(!grep(m/^(DELETE)?ATTR $name |^INITIALIZED$|^REREADCFG$|^DEFINED/, @{$dev->{CHANGED}}));
 
   foreach (@{$dev->{CHANGED}}) {
-   if (m/^(DELETE)?ATTR ($name) (\w+)\s?(.*)?$/s) {  # /s is important multiline attrs like userSetCmds, ...
+   if (m/^(DELETE)?ATTR ($name) (\w+)\s?(.*)?$/s) {  # modifier 's' is important multiline attrs like userSetCmds, ...
       Log3 $name, 5, "$type $name: received event: $_";
 
-      if ($3 eq "disable") {
+      if ($3 eq "disable") { # attr disable = 0 or deleted
+        # --- enable ---
         if (defined $1 || (defined $4 && $4 eq "0")) {
-          Log3 $name, 4,"$type $name: Device enabled";
-          ESPEasy_resetTimer($hash) if ($hash->{SUBTYPE} eq "device");
-          readingsSingleUpdate($hash, 'state', 'opened',1);
+          # device                        (trigger only if state is disabled)
+          if ($hash->{SUBTYPE} eq "device" && ReadingsVal($name, "state", "") eq "disabled") {
+            ESPEasy_resetTimer($hash) ;
+            readingsSingleUpdate($hash, 'state', 'Initialized',1);
+            Log3 $name, 3, "$type $name: Device enabled";
+          }
+          # bridge                            (trigger only if file descriptor is defined)
+          elsif ($hash->{SUBTYPE} eq "bridge" && !defined $hash->{FD}) {
+            ESPEasy_TcpServer_Close($hash,1); #close silently
+            ESPEasy_TcpServer_Open($hash);
+          }
         }
+
+        # --- disable ---
         else {
-          Log3 $name, 3,"$type $name: Device disabled";
-          ESPEasy_clearReadings($hash) if $hash->{SUBTYPE} eq "device";
-          ESPEasy_resetTimer($hash,"stop");
-          readingsSingleUpdate($hash, "state", "disabled",1)
+          # device                         (trigger only if state != disabled)
+          if ($hash->{SUBTYPE} eq "device" && ReadingsVal($name, "state", "") ne "disabled") {
+            ESPEasy_clearReadings($hash);
+            ESPEasy_resetTimer($hash,"stop");
+            readingsSingleUpdate($hash, "state", "disabled",1);
+            Log3 $name, 3, "$type $name: Device disabled";
+          }
+          # bridge                            (trigger only if state != disabled)
+          elsif ($hash->{SUBTYPE} eq "bridge" && ReadingsVal($name, "state", "") ne "disabled") {
+						ESPEasy_TcpServer_Close($hash);
+						readingsSingleUpdate($hash, "state", "disabled",1);
+						Log3 $name, 3, "$type $name: Device disabled";
+          }
         }
       }
 
@@ -1143,7 +1229,7 @@ sub ESPEasy_Notify($$)
           ESPEasy_setState($hash);
         }
         else { #setState == 0
-          CommandSetReading(undef,"$name state opened");
+          CommandSetReading(undef,"$name state Initialized");
         }
       }
 
@@ -1166,14 +1252,10 @@ sub ESPEasy_Notify($$)
 
     } # if (m/^(DELETE)?ATTR ($name) (\w+)\s?(.*)?$/s)
 
-    elsif (m/^(INITIALIZED|REREADCFG)$/) {
+    elsif (m/^(INITIALIZED|REREADCFG|DEFINED $name)$/) {
       ESPEasy_initDevSets($hash);
       ESPEasy_initDevAttrs($hash);
-    }
-
-    elsif (m/^DEFINED (.*)/ && $name eq $1) { # manual defined while runtime
-      ESPEasy_initDevSets($hash);
-      ESPEasy_initDevAttrs($hash);
+      ESPEasy_TcpServer_Open($hash) if $hash->{SUBTYPE} eq "bridge";
     }
 
     else { #should never be reached
@@ -1427,7 +1509,7 @@ sub ESPEasy_Undef($$)
     my $ipv = $hash->{PEER} =~ m/:/ ? 6 : 4;
     my $bhash = $modules{ESPEasy}{defptr}{BRIDGE}{$ipv};
     Log3 $bhash->{NAME}, 4, "$type $name: Closing tcp session.";
-    TcpServer_Close($hash);
+    ESPEasy_TcpServer_Close($hash);
     return undef
   };
 
@@ -1438,7 +1520,7 @@ sub ESPEasy_Undef($$)
     my $ipv = $hash->{IPV};
     delete $modules{ESPEasy}{defptr}{BRIDGE}{$ipv}
       if(defined($modules{ESPEasy}{defptr}{BRIDGE}{$ipv}));
-    TcpServer_Close( $hash );
+    ESPEasy_TcpServer_Close($hash);
     Log3 $name, 2, "$type $name: Socket on port tcp/$port closed";
   }
   else {
@@ -1501,6 +1583,18 @@ sub ESPEasy_dispatch($$$@) #called by bridge -> send to logical devices
 #  Log3 $bname, 5, "$type $name: Dispatch: $msg";
   Dispatch($bhash, $msg, undef);
 
+  return undef;
+}
+
+
+# ------------------------------------------------------------------------------
+sub ESPEasy_State($$$$)
+{
+  my ($hash, $time, $reading, $val) = @_;
+
+  if($reading eq "state" && $val eq "inactive") {
+    readingsSingleUpdate($hash, "state", "inactive", 1);
+  }
   return undef;
 }
 
@@ -2061,17 +2155,71 @@ sub ESPEasy_resetTimer($;$)
 
 
 # ------------------------------------------------------------------------------
-sub ESPEasy_tcpServerOpen($) {
+# Loaned from TcpServerUtils, but no IPv4 fallback, modified logging and state
+sub ESPEasy_TcpServer_Open($)
+{
   my ($hash) = @_;
-  my $name = $hash->{NAME};
-  my $type = $hash->{TYPE};
-  my $port = ($hash->{PORT}) ? $hash->{PORT} : 8383;
+  my ($name, $type) = ($hash->{NAME}, $hash->{TYPE});
+  my $port = $hash->{PORT};
+  my $dp = "[TCP:".($hash->{IPV}==4?'IPV4:':'')."$port]";
 
-  my $ret = TcpServer_Open( $hash, $port, "global" );
-  exit(1) if ($ret && !$init_done);
-  readingsSingleUpdate($hash, "state", "initialized", 1 );
+  if($port =~ m/^IPV6:(\d+)$/i) {
+    $port = $1;
+    eval "require IO::Socket::INET6; use Socket6;";
+    if($@) {
+      readingsSingleUpdate($hash, 'state', 'error', 1);
+      Log3 $hash, 1, "$type $name: Error: Can't load INET6";
+      Log3 $hash, 1, "$type $name: $@";
+      return "error";
+    } else {
+      $hash->{IPV6} = 1;
+    }
+  }
 
-  return $ret;
+  my @opts = (
+    Domain    => ($hash->{IPV6} ? AF_INET6() : AF_UNSPEC), # Linux bug
+    LocalHost => undef,
+    LocalPort => $port,
+    Listen    => 32,    # For Windows
+    Blocking  => ($^O =~ /Win/ ? 1 : 0), # Needed for .WRITEBUFFER@darwin
+    ReuseAddr => 1
+  );
+
+  $hash->{SERVERSOCKET} = $hash->{IPV6}
+    ? IO::Socket::INET6->new(@opts)
+    : IO::Socket::INET->new(@opts);
+
+  if(!$hash->{SERVERSOCKET}) {
+    Log3 $hash, 1, "$type $name: Error: Can't open server port $dp";
+    Log3 $hash, 1, "$type $name: $!";
+    readingsSingleUpdate($hash, 'state', 'error', 1);
+    return "error";
+  }
+
+  $hash->{FD} = $hash->{SERVERSOCKET}->fileno();
+  $hash->{PORT} = $hash->{SERVERSOCKET}->sockport();
+
+  $selectlist{"$name.$port"} = $hash;
+  readingsSingleUpdate($hash, 'state', 'Initialized', 1);
+  Log3 $hash, 3, "$type $name: Bridge v$module_version port $dp opened.";
+  return undef;
+}
+
+
+# ------------------------------------------------------------------------------
+sub ESPEasy_TcpServer_Close($;$) # 1:hash 2:silent
+{
+  my ($hash, $silent) = @_;
+
+  TcpServer_Close($hash);
+
+  if (!defined $hash->{TEMPORARY} && !$silent) {
+    my ($name, $type) = ($hash->{NAME}, $hash->{TYPE});
+    my $dp = "[TCP:".($hash->{IPV}==4?'IPV4:':'').$hash->{PORT}."]";
+    Log3 $hash, 3, "$type $name: Bridge v$module_version port $dp closed.";
+  }
+
+  return undef;
 }
 
 
@@ -2098,8 +2246,8 @@ sub ESPEasy_TcpServer_Accept($$)
                 inet_ntoa($iaddr);
 
 # ------------------------------------------------------------------------------
-# Removed from sub because we have our own access control system that works in
-# a more readable and flexible way (network ranges with allow/deny and regexps).
+# Removed from sub because we have our own access control that works in a more
+# readable and flexible way (network ranges with allow/deny and regexps).
 # Our new allowed ranges default are also now:
 # 127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,fc00::/7,fe80::/10,::1
 # ------------------------------------------------------------------------------
@@ -2396,7 +2544,7 @@ sub ESPEasy_setState($)
     }
 
     my $oState = ReadingsVal($name, "state", "");
-    my $presence = ReadingsVal($name, "presence", "opened");
+    my $presence = ReadingsVal($name, "presence", "Initialized");
 
     if ($presence eq "absent" && $oState ne "absent") {
       readingsSingleUpdate($hash,"state","absent", 1 );
@@ -3129,14 +3277,28 @@ sub ESPEasy_dumpSingleLine($)
   <b>Set </b>(bridge)<br><br>
 
   <ul>
-    <li><a name="ESPEasy_bridge_set_help">help</a><br>
-      Shows set command usage<br>
-      required values: <code>help|pass|user|clearQueue</code></li><br>
+    <li><a name="ESPEasy_bridge_set_active">active</a><br>
+			Activates the current device if it was set
+			<a href="#ESPEasy_bridge_set_inactive">inactive</a> before.
+			Set active/inactive will be mostly used in scripts without the side
+			effect that the 'red question mark' will be displayed in FHEMWEB that
+			indicates unsaved configuration changes.
+			If attribute <a href="ESPEasy_bridge_attr_disable"">disabled</a> is
+			enabled (set to '1') then this set command will be ignored.
+    </li><br>
+
+    <li><a name="ESPEasy_bridge_set_inactive">inactive</a><br>
+      Opposite of set command <a href="#ESPEasy_bridge_set_active">activate</a>
+    </li><br>
 
     <li><a name="ESPEasy_bridge_set_clearqueue">clearQueue</a><br>
       Used to erase all command queues.<br>
       required value: <code>&lt;none&gt;</code><br>
       eg. : <code>set ESPBridge clearQueue</code></li><br>
+
+    <li><a name="ESPEasy_bridge_set_help">help</a><br>
+      Shows set command usage<br>
+      required values: <code>help|pass|user|clearQueue</code></li><br>
 
     <li><a name="ESPEasy_bridge_set_pass">pass</a><br>
       Specifies password used by basic authentication for incoming requests.<br>
@@ -3144,6 +3306,9 @@ sub ESPEasy_dumpSingleLine($)
       must be set to enable basic authentication, too.<br>
       required value: <code>&lt;password&gt;</code><br>
       eg. : <code>set ESPBridge pass secretpass</code></li><br>
+
+    <li><a name="ESPEasy_bridge_set_reopen">reopen</a><br>
+      Reopen TCP/IP server port for incoming connections from ESPs.</li><br>
 
     <li><a name="ESPEasy_bridge_set_user">user</a><br>
       Specifies username used by basic authentication for incoming requests.<br>
@@ -3245,7 +3410,8 @@ sub ESPEasy_dumpSingleLine($)
       Default: none (no IPs are denied)</li><br>
 
     <li><a name="ESPEasy_bridge_attr_disable">disable</a><br>
-      Used to disable device.<br>
+      Used to disable device. <a href="#ESPEasy_bridge_set_inactive">inactive</a>
+      state will be overwritten.<br>
       Possible values: 0,1<br>
       Default: 0 (eanble)</li><br>
 
@@ -3377,6 +3543,14 @@ sub ESPEasy_dumpSingleLine($)
     <br><br>
 
     <b>ESPEasy module internal commands:</b><br><br>
+
+    <li><a name="ESPEasy_device_set_active">active</a><br>
+      Works in the same way as bridge set command <a href="#ESPEasy_device_set_active">active</a>.
+    </li><br>
+
+    <li><a name="ESPEasy_device_set_inactive">inactive</a><br>
+      Works in the same way as bridge set command <a href="#ESPEasy_device_set_inactive">inactive</a>.
+    </li><br>
 
     <li><a name="ESPEasy_device_set_adminpassword">adminPassword</a><br>
       The ESP Easy 'Admin Password" is used to protect some ESP Easy commands
