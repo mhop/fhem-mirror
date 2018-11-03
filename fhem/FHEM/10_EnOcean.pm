@@ -63,7 +63,7 @@ my %EnO_rorgname = (
   "C5" => "SYSEX",    # remote management >> packet type 7 used
   "C6" => "SMLRNREQ", # Smart Ack Learn Request
   "C7" => "SMLRNANS", # Smart Ack Learn Answer
-  "D0" => "SMMBOX",   # Smart Ack Mail Box Functions
+  "D0" => "SIGNAL",   # Smart Ack Mail Box Functions
   "D1" => "MSC",      # MSC
   "D2" => "VLD",      # VLD
   "D4" => "UTE",      # UTE
@@ -337,6 +337,7 @@ my %EnO_eepConfig = (
   "D2.01.13" => {attr => {subType => "actuator.01", defaultChannel => 0}},
   "D2.01.14" => {attr => {subType => "actuator.01", defaultChannel => 0}},
   "D2.03.00" => {attr => {subType => "switch.00"}},
+  "D2.03.0A" => {attr => {subType => "switch.0A"}},
   "D2.03.10" => {attr => {subType => "windowHandle.10"}, GPLOT => "EnO_windowHandle:WindowHandle,"},
   "D2.05.00" => {attr => {subType => "blindsCtrl.00", webCmd => "opens:stop:closes:position"}, GPLOT => "EnO_position4angle4:Position/AnglePos,"},
   "D2.05.01" => {attr => {subType => "blindsCtrl.01", webCmd => "opens:stop:closes:position"}},
@@ -712,7 +713,7 @@ EnOcean_Initialize($)
                       "scaleDecimals:0,1,2,3,4,5,6,7,8,9 scaleMax scaleMin secMode:rcv,snd,bidir " .
                       "secLevel:encapsulation,encryption,off sendDevStatus:no,yes sensorMode:switch,pushbutton " .
                       "serviceOn:no,yes settingAccuracy:high,low setpointRefDev setpointSummerMode:slider,0,5,100 " .
-                      "setpointTempRefDev shutTime shutTimeCloses subDef " .
+                      "signal:off,on signOfLife:off,on signOfLifeInterval setpointTempRefDev shutTime shutTimeCloses subDef " .
                       "subDef0 subDefI subDefA subDefB subDefC subDefD subDefH subDefW " .
                       "subType:$subTypeList subTypeSet:$subTypeList subTypeReading:$subTypeList " .
                       "summerMode:off,on switchMode:switch,pushbutton " .
@@ -1097,7 +1098,11 @@ sub EnOcean_Get($@)
   my $timeNow = TimeNow();
   if (AttrVal($name, "remoteManagement", "off") eq "manager") {
     # Remote Management
-    $cmdList = "remoteDevCfg remoteFunctions:noArg remoteID:noArg remoteLinkCfg remoteLinkTableInfo:noArg remoteLinkTable remoteLinkTableGP remotePing:noArg remoteProductID:noArg remoteRepeater:noArg remoteStatus:noArg ";
+    $cmdList .= "remoteDevCfg remoteFunctions:noArg remoteID:noArg remoteLinkCfg remoteLinkTableInfo:noArg remoteLinkTable remoteLinkTableGP remotePing:noArg remoteProductID:noArg remoteRepeater:noArg remoteStatus:noArg ";
+  }
+  if (AttrVal($name, "signal", "off") eq "on") {
+    # signal telegram
+    $cmdList .= "signal:energy,revision,RXlevel,harvester ";
   }
   # control get actions
   # $updateState = -1: no get commands available e. g. sensors
@@ -1386,6 +1391,24 @@ sub EnOcean_Get($@)
       InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', $hash->{helper}{timer}{0x850}, 0);
       Log3 $name, 3, "EnOcean get $name $cmd";
 
+    } elsif ($cmd eq "signal") {
+      # trigger status massage of device
+      $rorg = "D0";
+      $destinationID = $hash->{DEF} if ($destinationID eq 'F' x 8);
+      shift(@a);
+      my $trigger = shift(@a);
+      my %trigger = ('energy' => '01', 'revision' => '02', 'RXlevel' => '03', 'harvester' => '04');
+      if (defined $trigger) {
+        if (exists $trigger{$trigger}) {
+          $data = '04' . $trigger{$trigger};
+        } else {
+          return "$cmd <trigger> wrong, choose energy|revision|RXlevel|harvester.";
+        }
+      } else {
+        return "$cmd <trigger> wrong, choose energy|revision|RXlevel|harvester.";
+      }
+      Log3 $name, 3, "EnOcean get $name $cmd $trigger";
+
     } elsif ($st eq "switch.05") {
       # Dual Channel Switch Actuator
       # (A5-11-05)
@@ -1669,7 +1692,7 @@ sub EnOcean_Get($@)
 
     } else {
       # subtype does not support get commands
-      if (AttrVal($name, "remoteManagement", "off") eq "manager") {
+      if (AttrVal($name, "remoteManagement", "off") eq "manager" || AttrVal($name, "signal", "off") eq "on") {
         return "Unknown argument $cmd, choose one of $cmdList";
       } else {
         return;
@@ -4163,7 +4186,8 @@ sub EnOcean_Set($@)
         } elsif ($cmd eq "up") {
           # up
           if (defined $a[1]) {
-            if ($a[1] =~ m/^[+-]?\d+$/ && $a[1] >= 0 && $a[1] <= 255) {
+            #if ($a[1] =~ m/^[+-]?\d+$/ && $a[1] >= 0 && $a[1] <= 255) {
+            if ($a[1] =~ m/^[+-]?\d*[.]?\d+$/ && $a[1] >= 0 && $a[1] <= 255) {
               $position = $positionStart - $a[1] / $shutTime * 100;
               if ($angleTime) {
                 $anglePos = $anglePosStart - ($angleMax - $angleMin) * $a[1] / $angleTime;
@@ -4199,7 +4223,8 @@ sub EnOcean_Set($@)
         } elsif ($cmd eq "down") {
           # down
           if (defined $a[1]) {
-            if ($a[1] =~ m/^[+-]?\d+$/ && $a[1] >= 0 && $a[1] <= 255) {
+            #if ($a[1] =~ m/^[+-]?\d+$/ && $a[1] >= 0 && $a[1] <= 255) {
+            if ($a[1] =~ m/^[+-]?\d*[.]?\d+$/ && $a[1] >= 0 && $a[1] <= 255) {
               $position = $positionStart + $a[1] / $shutTime * 100;
               if ($angleTime) {
                 $anglePos = $anglePosStart + ($angleMax - $angleMin) * $a[1] / $angleTime;
@@ -6771,7 +6796,7 @@ sub EnOcean_Parse($$)
       my $learningMode = AttrVal($IODev, "learningMode", "demand");
       my $ret = "UNDEFINED EnO_$senderID EnOcean $senderID $msg";
 
-      if ($rorgname =~ m/^GPCD|GPSD|SMLRNANS|SMREC|SMMBOX$/) {
+      if ($rorgname =~ m/^GPCD|GPSD|SMLRNANS|SMREC|SIGNAL$/) {
         Log3 undef, 4, "EnOcean Received $rorgname telegram to the unknown device with SenderID $senderID.";
         return '';
 
@@ -7090,9 +7115,16 @@ sub EnOcean_Parse($$)
         #####
         # telegram analyse needed >> 1BS, 4BS, UTE
         if (length($data) == 14) {
+          # UTE
           $rorg = "D4";
+        } elsif (length($data) == 8) {
+          # 4BS
+          $rorg = "A5";
+        } elsif (length($data) == 2) {
+          # 1BS
+          $rorg = "D5";
         } else {
-          Log3 $name, 2, "EnOcean $name security teach-in failed, UTE message is missing";
+          Log3 $name, 2, "EnOcean $name security teach-in failed, UTE, 4BS or 1BS teach-in message is missing";
           return "";
         }
       }
@@ -7332,8 +7364,7 @@ sub EnOcean_Parse($$)
       EnOcean_RLT($hash->{helper}{rlt}{param});
     } else {
       # Single Input Contact (EEP D5-00-01)
-      # [Eltako FTK, STM-250]
-        push @event, "3:state:" . ($db[0] & 1 ? "closed" : "open");
+      # [EnOcean EMCS, Eltako FTK, STM-250]
         if (!($db[0] & 8)) {
           # teach-in
           $attr{$name}{eep} = "D5-00-01";
@@ -7343,7 +7374,14 @@ sub EnOcean_Parse($$)
           Log3 $name, 2, "EnOcean $name teach-in EEP D5-00-01 Manufacturer: no ID";
           # store attr subType, manufID ...
           EnOcean_CommandSave(undef, undef);
-       }
+        }
+        push @event, "3:state:" . ($db[0] & 1 ? "closed" : "open");
+        CommandDeleteReading(undef, "$name alarm");
+        if (AttrVal($name, "signOfLife", 'off') eq 'on') {
+          RemoveInternalTimer($hash->{helper}{timer}{alarm})  if(exists $hash->{helper}{timer}{alarm});
+          @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
+          InternalTimer(gettimeofday() + AttrVal($name, "signOfLifeInterval", 1980), 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
+        }
     }
 
   } elsif ($rorg eq "A5") {
@@ -8954,7 +8992,12 @@ sub EnOcean_Parse($$)
       push @event, "3:humidity:$humi";
       push @event, "3:temperature:$temp";
       push @event, "3:telegramType:" . ($db[0] & 1 ? "event" : "heartbeat");
-
+      CommandDeleteReading(undef, "$name alarm");
+      if (AttrVal($name, "signOfLife", 'off') eq 'on') {
+        RemoveInternalTimer($hash->{helper}{timer}{alarm})  if(exists $hash->{helper}{timer}{alarm});
+        @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
+        InternalTimer(gettimeofday() + AttrVal($name, "signOfLifeInterval", 1540), 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
+      }
     } elsif ($st eq "baroSensor.01") {
       # Barometric Sensor(EEP A5-04-03)
       # [untested]
@@ -9958,7 +10001,7 @@ sub EnOcean_Parse($$)
             } else {
               $anglePos = $angleMax;
             }
-            if($position > 100) {
+            if($position >= 100) {
               $anglePos = $angleMax;
               $position = 100;
               push @event, "3:endPosition:closed";
@@ -10432,6 +10475,7 @@ sub EnOcean_Parse($$)
       }
 
     } elsif ($st eq "switch.00" || $st eq "windowHandle.10") {
+      $db[0] &= 0x0F;
       if ($db[0] == 1) {
         push @event, "3:state:open_from_tilted";
       } elsif ($db[0] == 2) {
@@ -10490,6 +10534,30 @@ sub EnOcean_Parse($$)
           push @event, "3:state:released";
         }
         push @event, "3:energyBow:released";
+      }
+
+    } elsif ($st eq "switch.0A") {
+      # Push Button - Single Button EEP D2-03-0A
+      if (!exists($hash->{helper}{batteryPrecent}) || $hash->{helper}{batteryPrecent} != $db[0]) {
+        push @event, "3:batteryPrecent:$db[0]";
+        $hash->{helper}{batteryPrecent} = $db[0];
+      }
+      if ($db[1] == 1) {
+        push @event, "3:buttonS:on";
+        RemoveInternalTimer($hash->{helper}{timer}{buttonS}) if (exists $hash->{helper}{timer}{buttonS});
+        @{$hash->{helper}{timer}{buttonS}} = ($hash, 'buttonS', 'off', 1, 5);
+        InternalTimer(gettimeofday() + 0.5, 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{buttonS}, 0);
+      } elsif ($db[1] == 2) {
+        push @event, "3:buttonD:on";
+        RemoveInternalTimer($hash->{helper}{timer}{buttonD}) if (exists $hash->{helper}{timer}{buttonD});
+        @{$hash->{helper}{timer}{buttonD}} = ($hash, 'buttonD', 'off', 1, 5);
+        InternalTimer(gettimeofday() + 0.5, 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{buttonD}, 0);
+      } elsif ($db[1] == 3) {
+        push @event, "3:buttonL:on";
+        push @event, "3:state:on";
+      } elsif ($db[1] == 4) {
+        push @event, "3:buttonL:off";
+        push @event, "3:state:off";
       }
 
     } elsif ($st =~ m/^blindsCtrl\.0[01]$/) {
@@ -11279,8 +11347,66 @@ sub EnOcean_Parse($$)
     }
 
   } elsif ($rorg eq "D0") {
-    my %smartAckMailbox = (0 => 'empty', 1 => 'not_exits', 2 => 'reset');
-    push @event, "3:smartAckMailbox:" . $smartAckMailbox{$db[0]};
+    # Signal Telegram
+    my $signalMID = hex(substr($data, 0, 2));
+    if ($signalMID == 1) {
+      push @event, "3:smartAckMailbox:empty";
+    } elsif ($signalMID == 2) {
+      push @event, "3:smartAckMailbox:not_exits";
+    } elsif ($signalMID == 3) {
+      push @event, "3:smartAckMailbox:reset";
+    } elsif ($signalMID == 4) {
+      my $responseID = $subDef eq $hash->{DEF} ? $iohash->{ChipID} : $subDef;
+      if ($db[0] == 0) {
+      } elsif ($db[0] == 1) {
+        # send MID 0x06
+        EnOcean_SndRadio(undef, $hash, 1, 'D0', '0664', $responseID, '00', 'F' x 8);
+      } elsif ($db[0] == 2) {
+        # send MID 0x07
+        my $swVersion = sprintf("%s", AttrVal('global', 'featurelevel', '99.99')) . '.00.00';
+        #my @revision = split(/\./, $swVersion);
+        $swVersion =~ /^(.*)\.(.*)\.(..)\.(..)$/;
+        EnOcean_SndRadio(undef, $hash, 1, 'D0', sprintf("07%02X%02X%02X%02X00000000", $1, $2, $3, $4), $responseID, '00', 'F' x 8);
+      } elsif ($db[0] == 3) {
+        # send MID 0x0A
+        if (exists($hash->{LASTInputDev}) && exists($hash->{"$hash->{LASTInputDev}_RSSI"}) &&
+            exists($hash->{"$hash->{LASTInputDev}_RepeatingCounter"}) && exists($hash->{"$hash->{LASTInputDev}_SubTelNum"})) {
+            my $data = '0A' . $iohash->{ChipID} . sprintf("%02X%02X%01X%01X", 127 - $hash->{"$hash->{LASTInputDev}_RSSI"},
+                                                                              127 - $hash->{"$hash->{LASTInputDev}_RSSI"},
+                                                                              $hash->{"$hash->{LASTInputDev}_SubTelNum"},
+                                                                              $hash->{"$hash->{LASTInputDev}_RepeatingCounter"});
+          EnOcean_SndRadio(undef, $hash, 1, 'D0', $data, $responseID, '00', 'F' x 8);
+        }
+      } elsif ($db[0] == 4) {
+        # send MID 0x0D
+        EnOcean_SndRadio(undef, $hash, 1, 'D0', '0D00', $responseID, '00', 'F' x 8);
+      }
+    } elsif ($signalMID == 5) {
+      $hash->{Dev_ACK} = 'signal';
+    } elsif ($signalMID == 6) {
+      push @event, "3:batteryPrecent:$db[0]";
+    } elsif ($signalMID == 7) {
+      push @event, "3:hwVersion:" . substr($data, 10, 8);
+      push @event, "3:swVersion:" . substr($data, 2, 8);
+    } elsif ($signalMID == 8) {
+      push @event, "3:trigger:heartbeat";
+    } elsif ($signalMID == 9) {
+    } elsif ($signalMID == 10) {
+      $hash->{Dev_EURID} = substr($data, 2, 8);
+      if ($db[1] < 255) {$hash->{Dev_RSSImax} = 127 - $db[1]};
+      if ($db[2] < 255) {$hash->{Dev_RSSImin} = 127 - $db[2]};
+      my $subTelNum = $db[0] >> 4;
+      if ($subTelNum > 0) {$hash->{Dev_SubTelNum} = $subTelNum};
+      my $repeatingCounter = $db[0] & 0x0F;
+      if ($repeatingCounter < 0x0F) {$hash->{Dev_RepeatingCounter} = $repeatingCounter};
+    } elsif ($signalMID == 11) {
+      Log3 $name, 2, "EnOcean $name SIGNAL: TX duty cycle " . ($db[0] >> 4 == 1 ? 'is available.' : 'limit exceeded.');
+    } elsif ($signalMID == 12) {
+      Log3 $name, 2, "EnOcean $name SIGNAL: configuration of $name changed.";
+    } elsif ($signalMID == 13) {
+      my @harvester = ('very_good', 'good', 'average', 'bad', 'very_bad');
+      push @event, "3:harvester:" . $harvester[$db[0]];
+    }
 
   } elsif ($rorg eq "B2") {
     # GP complete data (GPCD)
@@ -12897,6 +13023,27 @@ sub EnOcean_Attr(@)
 
     } else {
       $err = "attribute-value [$attrName] = $attrVal wrong";
+    }
+
+  } elsif ($attrName eq "signal") {
+    if (!defined $attrVal){
+
+    } elsif ($attrVal !~ m/^off|on$/) {
+      $err = "attribute-value [$attrName] = $attrVal wrong";
+    }
+
+  } elsif ($attrName eq "signOfLife") {
+    if (!defined $attrVal) {
+
+    } elsif ($attrVal !~ m/^off|on$/) {
+      $err = "attribute-value [$attrName] = $attrVal is not a integer number or not valid";
+    }
+
+  } elsif ($attrName eq "signOfLifeInterval") {
+    if (!defined $attrVal) {
+
+    } elsif ($attrVal !~ m/^\d+?$/ || $attrVal < 1 || $attrVal > 65535) {
+      $err = "attribute-value [$attrName] = $attrVal is not a integer number or not valid";
     }
 
   } elsif ($attrName eq "summerMode") {
@@ -15780,7 +15927,7 @@ sub EnOcean_sec_parseTeachIn($$$$) {
 
           $hash->{helper}{teachInSTE} = $cnt - 1;
           # Ok we got a lots of infos and the first part of the private key
-          return (undef, "part1: $name");
+          return (undef, "part 1 received Rlc: $rlc Key1: $key1");
 
 	} elsif ($idx == 1 && exists($hash->{helper}{teachInSTE})) {
 	  # Second part of the teach-in telegrams
@@ -15818,7 +15965,7 @@ sub EnOcean_sec_parseTeachIn($$$$) {
             }
           }
 	  delete $hash->{helper}{teachInSTE};
-	  return (undef, "part2: $name");
+	  return (undef, "part 2 received Key2: $key2");
 	}
 
 	# Sequence error?
@@ -15884,9 +16031,7 @@ sub EnOcean_sec_getRLC($$) {
 	if (hex($old_rlc) < hex($attr{$name}{$rlcVar})) {
 	  $old_rlc = $attr{$name}{$rlcVar};
 	}
-
-	#print "RLC old: $old_rlc\n";
-	Log3 $name, 5, "EnOcean $name EnOcean_sec_getRLC RLC old: $old_rlc";
+	Log3 $name, 5, "EnOcean $name EnOcean_sec_getRLC RLC old: $old_rlc " . hex($old_rlc);
 
 	# Advance RLC by one
 	my $new_rlc = hex($old_rlc) + 1;
@@ -15910,12 +16055,11 @@ sub EnOcean_sec_getRLC($$) {
 		        $attr{$name}{$rlcVar} = "000000";
                         EnOcean_CommandSave(undef, undef);
 		}
-                readingsSingleUpdate($hash, "." . $rlcVar, uc(unpack('H6',pack('N', $new_rlc))), 0);
-		$attr{$name}{$rlcVar} = uc(unpack('H6',pack('N', $new_rlc)));
+                readingsSingleUpdate($hash, "." . $rlcVar, sprintf("%06X", $new_rlc), 0);
+		$attr{$name}{$rlcVar} = sprintf("%06X", $new_rlc);
 	}
 
-	#print "RLC new: ".$attr{$name}{rlc}."\n";
-	Log3 $name, 5, "EnOcean $name EnOcean_sec_getRLC RLC new: ". $attr{$name}{$rlcVar};
+	Log3 $name, 5, "EnOcean $name EnOcean_sec_getRLC RLC new: $attr{$name}{$rlcVar} $new_rlc";
 	return $old_rlc;
 }
 
@@ -16118,9 +16262,16 @@ sub EnOcean_sec_convertToNonsecure($$$) {
       my $data_dec = EnOcean_sec_decodeVAES($rlc_expanded, $private_key, $data_expanded);
       my $data_end = unpack('H32', $data_dec);
       if ($rorg eq '30') {
-        # Extract one nibble of data
-        $data_end =~ /^.(.)/;
-        return (undef, '32', "0" . uc($1));
+        $data_end =~ /^(.{$dataLength})/;
+        return (undef, '32', uc($1));
+        #if ($dataLength == 2) {
+          # Extract one nibble of data
+        #  $data_end =~ /^.(.)/;
+        #  return (undef, '32', "0" . uc($1));
+        #} else {
+        #  $data_end =~ /^(.{$dataLength})/;
+        #  return (undef, '32', uc($1));
+        #}
       } else {
         $dataLength -= 2;
         $data_end =~ /^(..)(.{$dataLength})/;
@@ -16620,6 +16771,24 @@ EnOcean_Delete($$)
     <br><br>
   </ul>
 
+  <b>Signal Telegram</b><br>
+  <ul>
+    Signal Telegram as a feature is dedicated to signalize special events with optional data, trigger actions or
+    request responses. It extends the functionality of the device independently of used EEPs or other
+    communication profiles.<br>
+    Target key functional fields are:
+    <ul>
+      <li>Communication flow control</li>
+      <li>Energy harvesting and reporting</li>
+      <li>Failure & issues reporting</li>
+      <li>Radio link quality reporting</li>
+    </ul>
+    The Signal Telegram function commands are activated by the attribute <a href="#EnOcean_signal">signal</a>i>.
+    All commands are described in the signal telegram chapter of the <a href="#EnOcean_signalGet">get</a>-commands.
+    The content of events is described in the chapter <a href="#EnOcean_signalEvents">Signal Telegram Events</a>.
+    <br><br>
+  </ul>
+
   <b>Radio Link Test</b><br>
   <ul>
     Units supporting the Radio Link Test (RLT) shall offer a functionality that allows for radio link testing between them
@@ -16745,11 +16914,26 @@ EnOcean_Delete($$)
       If the attributes subDef* are set, this values are used as EnOcean SenderID.<br>
       For an existing device, the device can be re-parameterized by entering the EEP.<br>
     </li>
+    <li>Dev_EURID: 0000000 ... FFFFFFFF<br>
+      EnOcean ChipID of the device<br>
+    </li>
+    <li>Dev_RepeatingCounter: 0...2<br>
+      Number of forwardings by repeaters received by the device<br>
+    </li>
+    <li>Dev_RSSImax: LP/dBm<br>
+      Largest field strength received by the device<br>
+    </li>
+    <li>Dev_RSSImin: LP/dBm<br>
+      Smallest field strength received by the device<br>
+    </li>
+    <li>Dev_SubTelNum: 1...15<br>
+      Number of sub telegrams received by the device<br>
+    </li>
     <li>&lt;IODev&gt;_DestinationID: 0000000 ... FFFFFFFF<br>
       Received destination address, Broadcast radio: FFFFFFFF<br>
     </li>
-    <li>&lt;IODev&gt;_RSSI: LP/dBm<br>
-      Received signal strength indication (best value of all received subtelegrams)<br>
+    <li>&lt;IODev&gt;_PacketType: 1 ... 255<br>
+      Number of the packet type of last data telegram received<br>
     </li>
     <li>&lt;IODev&gt;_ReceivingQuality: excellent|good|bad<br>
       excellent: RSSI >= -76 dBm (internal standard antenna sufficiently)<br>
@@ -16758,6 +16942,12 @@ EnOcean_Delete($$)
     </li>
     <li>&lt;IODev&gt;_RepeatingCounter: 0...2<br>
       Number of forwardings by repeaters<br>
+    </li>
+    <li>&lt;IODev&gt;_RSSI: LP/dBm<br>
+      Received signal strength indication (best value of all received subtelegrams)<br>
+    </li>
+    <li>&lt;IODev&gt;_SubTelNum: 1...15<br>
+      Number of sub telegrams received<br>
     </li>
     <br><br>
   </ul>
@@ -17011,6 +17201,9 @@ EnOcean_Delete($$)
           initiate teach-in</li>
     </ul><br>
        The attr subType must be contact. The attribute must be set manually.
+       A monitoring period can be set for signOfLife telegrams of the sensor, see
+       <a href="#EnOcean_signOfLife">signOfLife</a> and <a href="#EnOcean_signOfLifeInterval">signOfLifeInterval</a>.
+       Default is "off" and an interval of 1980 sec.
     </li><br><br>
 
     <li>Room Sensor and Control Unit (EEP A5-10-02)<br>
@@ -18103,6 +18296,23 @@ EnOcean_Delete($$)
     </ul>
     </li><br><br>
 
+    <li><a name="EnOcean_signalGet">Signal Telegram</a>
+    <ul>
+    <code>get &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is
+        <li>signal energy<br>
+          get the energy status</li>
+        <li>signal revision<br>
+          get the revision of the device</li>
+         <li>signal RXlevel<br>
+          get the RX level of receiced request</li>
+        <li>signal harvester<br>
+          get the energy current harvested reporting</li>
+    </ul><br>
+      Trigger status messages of the device.
+    </li><br><br>
+
     <li>Dual Channel Switch Actuator (EEP A5-11-059)<br>
          [untested]<br>
     <ul>
@@ -18686,6 +18896,16 @@ EnOcean_Delete($$)
       <br>
       shutTimeCloses is supported for shutter.
     </li>
+    <li><a name="EnOcean_signal">signal</a> off|on,
+      [signal] = off is default.<br>
+      Activate the request functions of signal telegram messages.
+    </li>
+    <li><a name="EnOcean_signOfLife">signOfLife</a> off|on, [sifnOfLive] = off is default.<br>
+      Monitoring signOfLife telegrams from sensors.
+    </li>
+    <li><a name="EnOcean_signOfLifeInterval">signOfLifeInterval</a> 1...65535<br>
+      Monitoring period in seconds for signOfLife telegrams from sensors.
+    </li>
     <li><a name="subDef">subDef</a> &lt;EnOcean SenderID&gt;,
       [subDef] = [DEF] is default.<br>
       SenderID (<a href="#TCM">TCM</a> BaseID + offset) to control a bidirectional switch or actor.<br>
@@ -18878,6 +19098,17 @@ EnOcean_Delete($$)
      </li>
      <br><br>
 
+     <li><a name="EnOcean_signalEvents">Signal Telegram</a><br>
+     <ul>
+         <li>harvester: very_good|good|average|bad|very_bad</li>
+         <li>hwVersion: 00000000...FFFFFFFF</li>
+         <li>trigger: heartbeat</li>
+         <li>smartAckMailbox: empty|not_exists|reset</li>
+         <li>swVersion: 00000000...FFFFFFFF</li>
+     </ul>
+     </li>
+     <br><br>
+
      <li>Switch (EEP F6-02-01 ... F6-03-02)<br>
      <ul>
          <li>A0</li>
@@ -18964,6 +19195,22 @@ EnOcean_Delete($$)
      </li>
      <br><br>
 
+     <li>Pushbutton Switch (EEP D2-03-0A)<br>
+         [Nodon Soft Button]<br>
+     <ul>
+         <li>on</li>
+         <li>off</li>
+         <li>batteryPrecent: r/% (Sensor Range: r = 1 % ... 100 %)</li>
+         <li>buttonD: on|off</li>
+         <li>buttonL: on|off</li>
+         <li>buttonS: on|off</li>
+         <li>state: on|off</li>
+     </ul><br>
+        The attr subType must be switch.0A. This is done if the device was
+        created by autocreate.
+     </li>
+     <br><br>
+
      <li>Heating/Cooling Relay (EEP F6-02-01 ... F6-02-02)<br>
          [Eltako FAE14, FHK14, untested]<br>
      <ul>
@@ -19042,14 +19289,17 @@ EnOcean_Delete($$)
 
      <li>Single Input Contact, Door/Window Contact<br>
          1BS Telegram (EEP D5-00-01)<br>
-         [EnOcean STM 320, STM 329, STM 250, Eltako FTK, Peha D 450 FU]
+         [EnOcean EMCS, STM 320, STM 329, STM 250, Eltako FTK, Peha D 450 FU]
      <ul>
          <li>closed</li>
          <li>open</li>
+         <li>alarm: dead_sensor</li>
          <li>teach: &lt;result of teach procedure&gt;</li>
          <li>state: open|closed</li>
      </ul></li>
-        The device should be created by autocreate.
+        The device should be created by autocreate. A monitoring period can be set for signOfLife telegrams of the sensor, see
+       <a href="#EnOcean_signOfLife">signOfLife</a> and <a href="#EnOcean_signOfLifeInterval">signOfLifeInterval</a>.
+       Default is "off" and an interval of 1310 sec.
      <br><br>
 
      <li>Temperature Sensors with with different ranges (EEP A5-02-01 ... A5-02-30)<br>
@@ -19082,16 +19332,20 @@ EnOcean_Delete($$)
      <br><br>
 
      <li>Temperatur and Humidity Sensor (EEP A5-04-03)<br>
-         [untsted]<br>
+         [untested]<br>
      <ul>
        <li>T: t/&#176C H: rH/%</li>
+       <li>alarm: dead_sensor</li>
        <li>humidity: rH/% (Sensor Range: rH = 0 % ... 100 %)</li>
        <li>telegramType: heartbeat|event</li>
        <li>temperature: t/&#176C (Sensor Range: t = -20 &#176C ... 60 &#176C)</li>
        <li>state: T: t/&#176C H: rH/%</li>
      </ul><br>
-        The attr subType must be tempHumiSensor.03. This is done if the device was
-        created by autocreate.
+       The attr subType must be tempHumiSensor.03. This is done if the device was
+       created by autocreate.<br>
+       A monitoring period can be set for signOfLife telegrams of the sensor, see
+       <a href="#EnOcean_signOfLife">signOfLife</a> and <a href="#EnOcean_signOfLifeInterval">signOfLifeInterval</a>.
+       Default is "off" and an interval of 1540 sec.
      </li>
      <br><br>
 
