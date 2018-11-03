@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  38_netatmo: fixed ignored values after 'dead' state
+  - feature: 72_XiaomiDevice: load_power reading for power plug
   - feature: 34_ESPEasy: added set cmds: active/inactive/reopen, shutdown tcp
                server port if bridge is disabled/inactive, tcp server will be
                started first after FHEM's global event 'INITIALIZED'.

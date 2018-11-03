@@ -11,7 +11,7 @@
 #
 #
 ##############################################################################
-# Release 22 / 2018-10-22
+# Release 23 / 2018-11-03
 
 package main;
 
@@ -142,7 +142,7 @@ netatmo_Define($$)
         }
 
         $hash->{Module} = $module;
-        $hash->{dataTypes} = $readings if($readings);
+        $hash->{dataTypes} = $readings if(defined($readings) && $readings ne "");
         $hash->{dataTypes} = "Temperature,CO2,Humidity,Noise,Pressure,Rain,WindStrength,WindAngle,GustStrength,GustAngle,Sp_Temperature,BoilerOn,BoilerOff" if( !$readings );
 
 
@@ -1172,7 +1172,7 @@ netatmo_initDevice($)
     my $newdatatypes = "";
     my @reading_names = ();
     foreach my $type (@{$device->{data_type}}) {
-      $newdatatypes = "" if ( !defined($newdatatypes) );
+      #$newdatatypes = "" if ( !defined($newdatatypes) );
       $newdatatypes .= "," if ( $newdatatypes );
       $type = "WindStrength,WindAngle,GustStrength,GustAngle" if($type eq "Wind");
       $newdatatypes .= $type;
@@ -1187,9 +1187,9 @@ netatmo_initDevice($)
         $state_format .= "H: humidity";
       }
     }
-    if($newdatatypes ne "")
+    if(defined($newdatatypes) && $newdatatypes ne "")
     {
-      delete($hash->{dataTypes});
+      #delete($hash->{dataTypes});
       $hash->{dataTypes} = $newdatatypes;
     }
 
@@ -3422,7 +3422,7 @@ netatmo_parseReadings($$;$)
             {
               $reading = "undefined";#next;
             }
-            if(lc($requested) =~ /wind/ && ($rname eq "temperature" || $rname eq "humidity"))
+            if(lc($requested) =~ /wind/ && lc($requested) !~ /temperature/ && ($rname eq "temperature" || $rname eq "humidity"))
             {
               Log3 $name, 3, "$name netatmo - wind sensor $rname reading: $reading ($time)";
               next;# if($reading == 0);

@@ -16,6 +16,7 @@ package main;
 
 use strict;
 use warnings;
+no warnings qw(redefine);
 
 use HttpUtils;
 
@@ -47,7 +48,7 @@ my %device_types = (  0 => "User related",
                      64 => "Thermometer", );
 
 my %device_models = (  1 => { 1 => "Smart Scale", 2 => "Wireless Scale", 3 => "Smart Kid Scale", 4 => "Smart Body Analyzer", 5 => "WiFi Body Scale", 6 => "Cardio Scale", 7 => "Body Scale", },
-                       2 => { 21 => "Smart Baby Monitor", 22 => "Home", 22 => "Home v2", },
+                       2 => { 21 => "Smart Baby Monitor", 22 => "Home", 23 => "Home v2", },
                        4 => { 41 => "iOS Blood Pressure Monitor", 42 => "Wireless Blood Pressure Monitor", 43 => "BPM", 44 => "BPM+", },
                       16 => { 51 => "Pulse Ox", 52 => "Activite", 53 => "Activite v2", 54 => "Go", 55 => "Steel HR", },
                       32 => { 60 => "Aura", 61 => "Sleep Sensor", 62 => "Sleep Mat", 63 => "Sleep", },
@@ -393,7 +394,7 @@ sub withings_Define($$) {
   my $resolve = inet_aton("scalews.withings.com");
   if(!defined($resolve))
   {
-    $hash->{STATE} = "DNS error";
+    $hash->{STATE} = "DNS error" if( $hash->{SUBTYPE} eq "ACCOUNT" );
     InternalTimer( gettimeofday() + 900, "withings_InitWait", $hash, 0);
     return undef;
   }
@@ -425,7 +426,7 @@ sub withings_InitWait($) {
   my $resolve = inet_aton("scalews.withings.com");
   if(!defined($resolve))
   {
-    $hash->{STATE} = "DNS error";
+    $hash->{STATE} = "DNS error" if( $hash->{SUBTYPE} eq "ACCOUNT" );
     InternalTimer( gettimeofday() + 1800, "withings_InitWait", $hash, 0);
     return undef;
   }
@@ -455,7 +456,7 @@ sub withings_Notify($$) {
   my $resolve = inet_aton("scalews.withings.com");
   if(!defined($resolve))
   {
-    $hash->{STATE} = "DNS error";
+    $hash->{STATE} = "DNS error" if( $hash->{SUBTYPE} eq "ACCOUNT" );
     InternalTimer( gettimeofday() + 3600, "withings_InitWait", $hash, 0);
     return undef;
   }
@@ -555,7 +556,7 @@ sub withings_getSessionKey($) {
   #   $hash->{helper}{appliver} = $1;
   #   if(!defined($hash->{helper}{appliver})) {
   #     Log3 $name, 1, "$name: APPLIVER ERROR ";
-  #     $hash->{STATE} = "APPLIVER error";
+  #     $hash->{STATE} = "APPLIVER error" if( $hash->{SUBTYPE} eq "ACCOUNT" );
   #     return undef;
   #   }
   #   Log3 $name, 4, "$name: appliver ".$hash->{helper}{appliver};
@@ -569,7 +570,7 @@ sub withings_getSessionKey($) {
   #   
   #   if(!defined($hash->{helper}{csrf_token})) {
   #     Log3 $name, 1, "$name: CSRF ERROR ";
-  #     $hash->{STATE} = "CSRF error";
+  #     $hash->{STATE} = "CSRF error" if( $hash->{SUBTYPE} eq "ACCOUNT" );
   #     return undef;
   #   }
   #   Log3 $name, 4, "$name: csrf_token ".$hash->{helper}{csrf_token};
@@ -601,7 +602,7 @@ sub withings_getSessionKey($) {
   if ($err || !defined($data) || $data =~ /Authentification failed/ || $data =~ /not a valid/)
   {
     Log3 $name, 1, "$name: LOGIN ERROR ";
-    $hash->{STATE} = "Login error";
+    $hash->{STATE} = "Login error" if( $hash->{SUBTYPE} eq "ACCOUNT" );
     return undef;
   }
   else
@@ -616,7 +617,7 @@ sub withings_getSessionKey($) {
     }
     else
     {
-      $hash->{STATE} = "Cookie error";
+      $hash->{STATE} = "Cookie error" if( $hash->{SUBTYPE} eq "ACCOUNT" );
       Log3 $name, 1, "$name: COOKIE ERROR ";
       $hash->{helper}{appliver} = '9855c478';
       $hash->{helper}{csrf_token} = '9855c478';
@@ -659,7 +660,7 @@ sub withings_getSessionKey($) {
     }
     else
     {
-      $hash->{STATE} = "Account error";
+      $hash->{STATE} = "Account error" if( $hash->{SUBTYPE} eq "ACCOUNT" );
       Log3 $name, 1, "$name: ACCOUNT ERROR ";
       return undef;
     }
@@ -1489,7 +1490,7 @@ sub withings_poll($;$) {
   #my $resolve = inet_aton("scalews.withings.com");
   #if(!defined($resolve))
   #{
-  #  $hash->{STATE} = "DNS error";
+  #  $hash->{STATE} = "DNS error" if( $hash->{SUBTYPE} eq "ACCOUNT" );
   #  InternalTimer( gettimeofday() + 3600, "withings_poll", $hash, 0);
   #  return undef;
   #}

@@ -20,6 +20,8 @@ package main;
 
 use strict;
 use warnings;
+no warnings qw(redefine);
+
 use Time::Local;
 use POSIX qw( strftime );
 use Data::Dumper; #debugging
@@ -209,7 +211,7 @@ sub XiaomiDevice_Define($$$) {
 
   $hash->{helper}{packetid} = 1;
 
-  $hash->{helper}{delay} = 0;
+  $hash->{helper}{delay} = 60;
 
   $a[3] = '' if(!defined($a[3]));
   if(length($a[3]) == 32) {
@@ -1627,7 +1629,11 @@ sub XiaomiDevice_GetUpdate($)
   elsif( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "PowerPlug")
   {
     $hash->{helper}{packet}{$packetid} = "powerplug_data";
-    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_prop","params":["power", "temperature", "current", "mode", "power_consume_rate", "wifi_led", "power_price", "voltage", "power_factor", "elec_leakage"]}' );
+    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_prop","params":["power", "temperature", "current", "mode", "power_consume_rate", "wifi_led", "power_price", "voltage", "power_factor", "elec_leakage", "usb_power", "load_power", "usb_on"]}' );
+    $packetid = $hash->{helper}{packetid};
+    $hash->{helper}{packet}{$packetid} = "powerplug_power";
+    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_power","params":[]}' );
+    $hash->{helper}{packetid} = $packetid+1;
   }
   return undef;
 }
@@ -1702,7 +1708,7 @@ sub XiaomiDevice_GetSettings($)
     my $packetid = $hash->{helper}{packetid};
     $hash->{helper}{packetid} = $packetid+1;
     $hash->{helper}{packet}{$packetid} = "powerplug_data";
-    return XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_prop","params":["power", "temperature", "current", "mode", "power_consume_rate", "wifi_led", "power_price"]}' );
+    return XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_prop","params":["power", "temperature", "current", "mode", "power_consume_rate", "wifi_led", "power_price", "voltage", "power_factor", "elec_leakage", "usb_power", "load_power", "usb_on"]}' );
   }
 
 
@@ -1878,7 +1884,7 @@ sub XiaomiDevice_WriteJSON($$)
   {
     RemoveInternalTimer($hash);
     Log3 ($name, 1, "$name: internal error, values missing");
-	$hash->{helper}{delay} += 900;
+	$hash->{helper}{delay} += 300;
 	InternalTimer( gettimeofday() + $hash->{helper}{delay}, "XiaomiDevice_connect", $hash);
     return undef;
   }
@@ -2245,7 +2251,7 @@ sub XiaomiDevice_ParseJSON($$)
   {
     return undef if(!defined($json->{result}));
     return undef if(ref($json->{result}) ne "ARRAY");
-    return undef if(ref($json->{result}[0]) ne "HASH");
+    if(ref($json->{result}[0]) eq "HASH"){
     readingsBeginUpdate($hash);
     readingsBulkUpdate( $hash, "power", $json->{result}[0]{power}, 1 ) if(defined($json->{result}[0]{power}));
     readingsBulkUpdate( $hash, "temperature", $json->{result}[0]{temperature}, 1 ) if(defined($json->{result}[0]{temperature}));
@@ -2257,9 +2263,37 @@ sub XiaomiDevice_ParseJSON($$)
     readingsBulkUpdate( $hash, "voltage", $json->{result}[0]{voltage}, 1 ) if(defined($json->{result}[0]{voltage}));
     readingsBulkUpdate( $hash, "power_factor", $json->{result}[0]{power_factor}, 1 ) if(defined($json->{result}[0]{power_factor}));
     readingsBulkUpdate( $hash, "elec_leakage", $json->{result}[0]{elec_leakage}, 1 ) if(defined($json->{result}[0]{elec_leakage}));
-    readingsBulkUpdate( $hash, "button_pressed", $json->{result}[0]{button_pressed}, 1 ) if(defined($json->{result}[0]{button_pressed}));
+      readingsBulkUpdate( $hash, "usb_power", $json->{result}[0]{usb_power}, 1 ) if(defined($json->{result}[0]{usb_power}));
+      readingsBulkUpdate( $hash, "load_power", $json->{result}[0]{load_power}, 1 ) if(defined($json->{result}[0]{load_power}));
+      readingsBulkUpdate( $hash, "usb_power", ($json->{result}[0]{usb_on} eq "0" ? 'off' : 'on' ), 1 ) if(defined($json->{result}[0]{usb_on}));
     #readingsBulkUpdate( $hash, "setting", (($json->{result}[0]{setting} eq "1")?"yes":"no"), 1 ) if(defined($json->{result}[0]{setting}));
     readingsEndUpdate($hash,1);
+    } else {
+      readingsBeginUpdate($hash);
+      readingsBulkUpdate( $hash, "power", $json->{result}[0], 1 ) if(defined($json->{result}[0]));
+      readingsBulkUpdate( $hash, "temperature", $json->{result}[1], 1 ) if(defined($json->{result}[1]));
+      readingsBulkUpdate( $hash, "current", $json->{result}[2], 1 ) if(defined($json->{result}[2]));
+      readingsBulkUpdate( $hash, "power_mode", $json->{result}[3], 1 ) if(defined($json->{result}[3]));
+      readingsBulkUpdate( $hash, "power_consume_rate", $json->{result}[4], 1 ) if(defined($json->{result}[4]));
+      readingsBulkUpdate( $hash, "wifi_led", $json->{result}[5], 1 ) if(defined($json->{result}[5]));
+      readingsBulkUpdate( $hash, "power_price", $json->{result}[6], 1 ) if(defined($json->{result}[6]));
+      readingsBulkUpdate( $hash, "voltage", $json->{result}[7], 1 ) if(defined($json->{result}[7]));
+      readingsBulkUpdate( $hash, "power_factor", $json->{result}[8], 1 ) if(defined($json->{result}[8]));
+      readingsBulkUpdate( $hash, "elec_leakage", $json->{result}[9], 1 ) if(defined($json->{result}[9]));
+      readingsBulkUpdate( $hash, "usb_power", $json->{result}[10], 1 ) if(defined($json->{result}[10]));
+      readingsBulkUpdate( $hash, "load_power", $json->{result}[11], 1 ) if(defined($json->{result}[11]));
+      readingsBulkUpdate( $hash, "usb_power", ($json->{result}[12] eq "0" ? 'off' : 'on' ), 1 ) if(defined($json->{result}[12]));
+      readingsEndUpdate($hash,1);
+    }
+    return undef;
+  }
+
+  if($msgtype eq "powerplug_power")
+  {
+    Log3 $name, 2, "$name: ".Dumper($json);
+    return undef if(!defined($json->{result}));
+    return undef if(ref($json->{result}) ne "ARRAY");
+    readingsSingleUpdate( $hash, "load_power", sprintf( "%.2f" ,int($json->{result}[0])/100), 1 ) if(defined($json->{result}[0]));
     return undef;
   }
 
@@ -2753,7 +2787,7 @@ sub XiaomiDevice_connect($)
         Log3 $name, 1, "$name: connect to device failed";
         readingsSingleUpdate($hash, "state", "disconnected", 1) if($hash->{helper}{ConnectionState} ne "disconnected");
         $hash->{helper}{ConnectionState} = "disconnected";
-        $hash->{helper}{delay} += 900;
+        $hash->{helper}{delay} += 600;
         InternalTimer( gettimeofday() + $hash->{helper}{delay}, "XiaomiDevice_connect", $hash);
     }
 
@@ -2806,7 +2840,7 @@ sub XiaomiDevice_connectFail($)
   Log3 $name, 2, "$name: connection timeout";
   readingsSingleUpdate($hash, "state", "disconnected", 1) if($hash->{helper}{ConnectionState} ne "disconnected");
   $hash->{helper}{ConnectionState} = "disconnected";
-  $hash->{helper}{delay} += 300;
+  $hash->{helper}{delay} += 60;
   InternalTimer( gettimeofday() + $hash->{helper}{delay}, "XiaomiDevice_connect", $hash);
 
   return undef;
@@ -2871,7 +2905,7 @@ sub XiaomiDevice_Read($) {
     }
     Log3 $name, 3, "$name: received token: ".$token if(!defined($hash->{helper}{token}));;
     RemoveInternalTimer($hash, "XiaomiDevice_connectFail");
-    $hash->{helper}{delay} = 0;
+    $hash->{helper}{delay} = 60;
 
     if(!defined($hash->{helper}{token})){
       $hash->{helper}{token} = $token;
@@ -2901,7 +2935,7 @@ sub XiaomiDevice_Read($) {
   }
 
   RemoveInternalTimer($hash, "XiaomiDevice_connectFail");
-  $hash->{helper}{delay} = 0;
+  $hash->{helper}{delay} = 60;
 
   my $key = Digest::MD5::md5(pack('H*', $hash->{helper}{token}));
   my $iv = Digest::MD5::md5($key.pack('H*', $hash->{helper}{token}));
@@ -2941,6 +2975,10 @@ sub XiaomiDevice_Write($$)
   }
 
   my $sock = $hash->{CD};
+  if(!$sock){
+    Log3 $hash, 2, "$name: socket error";
+    return undef;
+  }
   if(!($sock->send($msg)))
   {
     # Send failed
@@ -2952,7 +2990,7 @@ sub XiaomiDevice_Write($$)
   {
     # Send successful
     Log3 $hash, 5, "$name Send SUCCESS";
-    InternalTimer(gettimeofday() + 10, "XiaomiDevice_connectFail", $hash, 0) if(length($msg) > 40);
+    InternalTimer(gettimeofday() + 30, "XiaomiDevice_connectFail", $hash, 0) if(length($msg) > 40);
   }
   Log3 $hash, 5, "$name > ".unpack('H*',$msg);
 
@@ -3007,9 +3045,9 @@ sub XiaomiDevice_DbLog_splitFn($) {
   $value = $parts[1];
 
   $unit = "";
-  $unit = "%" if($reading eq "filter");;
-  $unit = "%" if($reading =~ /humidity/);;
-  $unit = "µg/m³" if($reading =~ /pm25/);;
+  $unit = "%" if($reading eq "filter");
+  $unit = "%" if($reading =~ /humidity/);
+  $unit = "µg/m³" if($reading =~ /pm25/);
   $unit = "rpm" if($reading =~ /speed/);
   $unit = "˚C" if($reading =~ /temperature/);
   $unit = "h" if($reading =~ /usage/);
@@ -3017,11 +3055,12 @@ sub XiaomiDevice_DbLog_splitFn($) {
   $unit = "h" if($reading =~ /_used/);
   $unit = "m³" if($reading eq "filter_volume");
   $unit = "l" if($reading eq "water_volume");
-  $unit = "%" if($reading =~ /batteryPercent/);;
-  $unit = "%" if($reading =~ /fan_power/);;
-  $unit = "h" if($reading =~ /clean_time/);;
-  $unit = "m²" if($reading =~ /clean_area/);;
-  $unit = "%" if($reading =~ /consumables_/);;
+  $unit = "%" if($reading =~ /batteryPercent/);
+  $unit = "%" if($reading =~ /fan_power/);
+  $unit = "h" if($reading =~ /clean_time/);
+  $unit = "m²" if($reading =~ /clean_area/);
+  $unit = "%" if($reading =~ /consumables_/);
+  $unit = "W" if($reading eq "load_power");
 
 
   Log3 "dbsplit", 5, "xiaomi dbsplit: ".$event."  $reading: $value $unit" if(defined($value));
@@ -3283,6 +3322,10 @@ sub XiaomiDevice_DbLog_splitFn($) {
     <li><code>filter</code> <i>(AirPurifier)</i>
     <br>
     Filter life in %<br/>
+    </li><br>
+    <li><code>load_power</code> <i>(PowerPlug)</i>
+    <br>
+    Power consumption in W<br/>
     </li><br>
    </ul>
   <br>
