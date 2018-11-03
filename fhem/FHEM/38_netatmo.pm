@@ -5528,6 +5528,11 @@ netatmo_pollDevice($)
 
   $hash->{openRequests} = 0 if ( !defined(  $hash->{openRequests}) );
 
+  if( !defined($hash->{dataTypes}) && $hash->{SUBTYPE} ne "PUBLIC" && (defined($hash->{Module}) || defined($hash->{Device}) ) ) {
+    Log3 $name, 2, "$name: dataTypes missing, re-initializing device";
+    netatmo_initDevice($hash);
+  }
+
   if( $hash->{Module} )
   {
     my @types = split( ' ', $hash->{dataTypes} ) if(defined($hash->{dataTypes}));
