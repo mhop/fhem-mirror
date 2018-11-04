@@ -555,19 +555,23 @@ TCM_Read($)
           my @secureMode = ('standard', 'extended');
           $hash->{RESET_CAUSE} = $resetCause[hex($messageData)];
           $hash->{SECURE_MODE} = $secureMode[hex($odata)];
-          Log3 $name, 2, "TCM $name EVENT RESET_CAUSE: $hash->{RESET_CAUSE} SECURE_MODE: $hash->{SECURE_MODE}";
+          DoTrigger($name, "EVENT: RESET_CAUSE: $hash->{RESET_CAUSE}");
+          DoTrigger($name, "EVENT: SECURE_MODE: $hash->{SECURE_MODE}");
+          Log3 $name, 2, "TCM $name EVENT: RESET_CAUSE: $hash->{RESET_CAUSE} SECURE_MODE: $hash->{SECURE_MODE}";
         } elsif (hex($eventCode) == 5) {
           # CO_EVENT_SECUREDEVICES
         } elsif (hex($eventCode) == 6) {
           # CO_DUTYCYCLE_LIMIT
           my @dutycycleLimit = ('released', 'reached');
           $hash->{DUTYCYCLE_LIMIT} = $dutycycleLimit[hex($messageData)];
-          Log3 $name, 2, "TCM $name EVENT DUTYCYCLE_LIMIT: $hash->{DUTYCYCLE_LIMIT}";
+          DoTrigger($name, "EVENT: DUTYCYCLE_LIMIT: $hash->{DUTYCYCLE_LIMIT}");
+          Log3 $name, 2, "TCM $name EVENT: DUTYCYCLE_LIMIT: $hash->{DUTYCYCLE_LIMIT}";
         } elsif (hex($eventCode) == 7) {
           # CO_TRANSMIT_FAILED
           my @transmitFailed = ('CSMA_failed', 'no_ack_received');
           $hash->{TRANSMIT_FAILED} = $transmitFailed[hex($messageData)];
-          Log3 $name, 2, "TCM $name EVENT TRANSMIT_FAILED: $hash->{TRANSMIT_FAILED}";
+          DoTrigger($name, "EVENT: TRANSMIT_FAILED: $hash->{TRANSMIT_FAILED}");
+          Log3 $name, 2, "TCM $name EVENT: TRANSMIT_FAILED: $hash->{TRANSMIT_FAILED}";
         } else {
         }
 
