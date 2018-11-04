@@ -11383,7 +11383,7 @@ sub EnOcean_Parse($$)
       }
     } elsif ($signalMID == 5) {
       $hash->{Dev_ACK} = 'signal';
-      DoTrigger($name, "signal: Dev_ACK", 1);
+      DoTrigger($name, "SIGNAL: Dev_ACK", 1);
     } elsif ($signalMID == 6) {
       push @event, "3:batteryPrecent:$db[0]";
     } elsif ($signalMID == 7) {
@@ -11392,7 +11392,7 @@ sub EnOcean_Parse($$)
     } elsif ($signalMID == 8) {
       push @event, "3:trigger:heartbeat";
     } elsif ($signalMID == 9) {
-      DoTrigger($name, "signal: RX_WINDOW_OPEN", 1);
+      DoTrigger($name, "SIGNAL: RX_WINDOW_OPEN", 1);
     } elsif ($signalMID == 10) {
       $hash->{Dev_EURID} = substr($data, 2, 8);
       if ($db[1] < 255) {$hash->{Dev_RSSImax} = 127 - $db[1]};
@@ -11402,11 +11402,11 @@ sub EnOcean_Parse($$)
       my $repeatingCounter = $db[0] & 0x0F;
       if ($repeatingCounter < 0x0F) {$hash->{Dev_RepeatingCounter} = $repeatingCounter};
     } elsif ($signalMID == 11) {
-      DoTrigger($name, "signal: TX_DUTY_CYCLE " . ($db[0] >> 4 == 1 ? 'available.' : 'limit_exceeded'), 1);
-      Log3 $name, 2, "EnOcean $name SIGNAL: TX duty cycle " . ($db[0] >> 4 == 1 ? 'is available.' : 'limit exceeded.');
+      DoTrigger($name, "SIGNAL: DUTYCYCLE_LIMIT: " . ($db[0] >> 4 == 1 ? 'released' : 'reached'), 1);
+      Log3 $name, 2, "EnOcean $name SIGNAL: DUTYCYCLE_LIMIT: " . ($db[0] >> 4 == 1 ? 'released' : 'reached');
     } elsif ($signalMID == 12) {
-      DoTrigger($name, "signal: Dev_CHANGED", 1);
-      Log3 $name, 2, "EnOcean $name SIGNAL: configuration of $name changed.";
+      DoTrigger($name, "SIGNAL: Dev_CHANGED", 1);
+      Log3 $name, 2, "EnOcean $name SIGNAL: Dev_CHANGED";
     } elsif ($signalMID == 13) {
       my @harvester = ('very_good', 'good', 'average', 'bad', 'very_bad');
       push @event, "3:harvester:" . $harvester[$db[0]];
