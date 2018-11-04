@@ -29,6 +29,12 @@
 ###############################################################################
 # 
 # CHANGE LOG
+#
+# 04.11.2018 0.9.9
+#   bugfix   : Bei Mehrfachdefinitionen wie 'a|b|c:topic=some/$reading/thing'
+#              wurden beim Treffer alle genannten Readings aktualisiert 
+#              anstatt nur der einer passenden. 
+#   change   : forward blockieren nur fuer Readings (mode 'R').
 # 
 # 18.10.2018 0.9.9
 #   bugfix   : qos/retain/expression aus 'mqttDefaults' in Device wurden nicht
@@ -888,37 +894,38 @@ sub getDevicePublishRecIntern($$$$$) {
 
   # reading map
   my $readingMap = $publishMap->{$reading} if defined $publishMap;
-  #my $defaultReadingMap = $publishMap->{'*'} if defined $publishMap;
-  my $defaultReadingMap = $devMap->{':defaults'} if defined $publishMap;
+  my $wildcardReadingMap = $publishMap->{'*'} if defined $publishMap;
+  #my $defaultReadingMap = $devMap->{':defaults'} if defined $devMap;
   
   # global reading map
   my $globalReadingMap = $globalPublishMap->{$reading} if defined $globalPublishMap;
-  my $globalDefaultReadingMap = $globalPublishMap->{'*'} if defined $globalPublishMap;
+  my $globalWildcardReadingsMap = $globalPublishMap->{'*'} if defined $globalPublishMap;
 
   #Log3('xxx',1,"MQTT_GENERIC_BRIDGE:DEBUG:> getDevicePublishRec> readingMap ".Dumper($readingMap));
-  #Log3('xxx',1,"MQTT_GENERIC_BRIDGE:DEBUG:> getDevicePublishRec> defaultReadingMap ".Dumper($defaultReadingMap));
+  #Log3('xxx',1,"MQTT_GENERIC_BRIDGE:DEBUG:> getDevicePublishRec> wildcardReadingMap ".Dumper($wildcardReadingMap));
   #Log3('xxx',1,"MQTT_GENERIC_BRIDGE:DEBUG:> getDevicePublishRec> readingMap ".Dumper($globalReadingMap));
-  #Log3('xxx',1,"MQTT_GENERIC_BRIDGE:DEBUG:> getDevicePublishRec> defaultReadingMap ".Dumper($globalDefaultReadingMap));
+  #Log3('xxx',1,"MQTT_GENERIC_BRIDGE:DEBUG:> getDevicePublishRec> wildcardReadingMap ".Dumper($globalWildcardReadingsMap));
   # topic
   my $topic = undef;
   $topic = $readingMap->{'topic'} if defined $readingMap;
-  $topic = $defaultReadingMap->{'topic'} if (defined($defaultReadingMap) and !defined($topic));
+  $topic = $wildcardReadingMap->{'topic'} if (defined($wildcardReadingMap) and !defined($topic));
 
   # global topic
   $topic = $globalReadingMap->{'topic'} if (defined($globalReadingMap) and !defined($topic));
-  $topic = $globalDefaultReadingMap->{'topic'} if (defined($globalDefaultReadingMap) and !defined($topic));
+  $topic = $globalWildcardReadingsMap->{'topic'} if (defined($globalWildcardReadingsMap) and !defined($topic));
 
   # attr-topic
   my $atopic = undef;
   $atopic = $readingMap->{'atopic'} if defined $readingMap;
-  $atopic = $defaultReadingMap->{'atopic'} if (defined($defaultReadingMap) and !defined($atopic));
+  $atopic = $wildcardReadingMap->{'atopic'} if (defined($wildcardReadingMap) and !defined($atopic));
 
   # global attr-topic
   $atopic = $globalReadingMap->{'atopic'} if (defined($globalReadingMap) and !defined($atopic));
-  $atopic = $globalDefaultReadingMap->{'atopic'} if (defined($globalDefaultReadingMap) and !defined($atopic));
+  $atopic = $globalWildcardReadingsMap->{'atopic'} if (defined($globalWildcardReadingsMap) and !defined($atopic));
 
   # qos & retain & expression
-  my($qos, $retain, $expression) = retrieveQosRetainExpression($globalDefaultReadingMap, $globalReadingMap, $defaultReadingMap, $readingMap);
+  #my($qos, $retain, $expression) = retrieveQosRetainExpression($globalWildcardReadingsMap, $globalReadingMap, $wildcardReadingMap, $readingMap);
+  my($qos, $retain, $expression) = retrieveQosRetainExpression($globalMap->{':defaults'}, $globalReadingMap, $devMap->{':defaults'}, $readingMap);
   
   # wenn kein topic und keine expression definiert sind, kann auch nicht gesendet werden, es muss nichts mehr ausgewertet werden
   return unless (defined($topic) or defined($atopic) or defined( $expression));
@@ -926,10 +933,10 @@ sub getDevicePublishRecIntern($$$$$) {
   # resendOnConnect Option
   my $resendOnConnect = undef;
   $resendOnConnect = $readingMap->{'resendOnConnect'} if defined $readingMap;
-  $resendOnConnect = $defaultReadingMap->{'resendOnConnect'} if (defined($defaultReadingMap) and !defined($resendOnConnect));  
+  $resendOnConnect = $wildcardReadingMap->{'resendOnConnect'} if (defined($wildcardReadingMap) and !defined($resendOnConnect));  
   # global
   $resendOnConnect = $globalReadingMap->{'resendOnConnect'} if (defined($globalReadingMap) and !defined($resendOnConnect));
-  $resendOnConnect = $globalDefaultReadingMap->{'resendOnConnect'} if (defined($globalDefaultReadingMap) and !defined($resendOnConnect));
+  $resendOnConnect = $globalWildcardReadingsMap->{'resendOnConnect'} if (defined($globalWildcardReadingsMap) and !defined($resendOnConnect));
 
   # map name
   my $name = undef;
@@ -1135,12 +1142,21 @@ sub searchDeviceForTopic($$) {
           #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> searchDeviceForTopic: >>>: \$+{name}: ".$+{name}.", \$+{reading}: ".$+{reading});
           # Check named groups: $+{reading},..
           my $reading = undef;
-          if($rmap->{'wildcardTarget'}) {
-            $reading = $+{name} unless defined $reading;
-            # Remap name
-            $reading = $+{reading} unless defined $reading;
+          my $oReading = $rmap->{'reading'};
+          my $nReading = $+{name};
+          $nReading = $+{reading} unless defined $nReading;
+          if((!defined($nReading)) or ($oReading eq $nReading)) {
+            $reading = $oReading;
           }
-          $reading = $rmap->{'reading'} unless defined $reading;
+          if($rmap->{'wildcardTarget'}) {
+            # $reading = $+{name} unless defined $reading;
+            # # Remap name
+            # $reading = $+{reading} unless defined $reading;
+            $reading = $nReading;
+          }
+          #$reading = $rmap->{'reading'} unless defined $reading;
+          next unless defined $reading;
+          #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> searchDeviceForTopic: match topic: $topic, reading: $reading, nREading: $nReading, oReading: $oReading");
           my $tn = $dname.':'.$reading;
           $ret->{$tn}->{'mode'}=$rmap->{'mode'};
           $ret->{$tn}->{'reading'}=$reading;
@@ -2293,9 +2309,9 @@ sub doSetUpdate($$$$$) {
     # R - Normale Topic (beim Empfang nicht weiter publishen)
     # T - Selt-Trigger-Topic (Sonderfall, auch wenn gerade empfangen, kann weiter getriggert/gepublisht werden. Vorsicht! Gefahr von 'Loops'!)
     readingsBeginUpdate($dhash);
-    #if ($mode eq 'R') {
+    if ($mode eq 'R') {
       $dhash->{'.mqttGenericBridge_triggeredReading'}=$reading unless $doForward;
-    #}
+    }
     readingsBulkUpdate($dhash,$reading,$message);
     readingsEndUpdate($dhash,1);
     # wird in 'notify' entfernt # delete $dhash->{'.mqttGenericBridge_triggeredReading'};
@@ -2639,9 +2655,11 @@ sub onmessage($$$) {
             Furthermore the attribute 'qos' can be specified ('retain' does not make sense here).<br/>
             Topic definition can include MQTT wildcards (+ and #).<br/>
             If the reading name is defined with a '*' at the beginning, it will act as a wildcard. 
+            Several definitions with '*' should also be used as: *1:topic = ... *2:topic = ...
             The actual name of the reading (and possibly of the device) is defined by variables from the topic
             ($device (only for global definition in the bridge), $reading, $name).
-            In the topic these variables act as wildcards, of course only makes sense, if reading-name is not defined (so start with '*').<br/>
+            In the topic these variables act as wildcards, of course only makes sense, if reading-name is not defined 
+            (so start with '*', or multiple names separated with '|').<br/>
             The variable $name, unlike $reading, may be affected by the aliases defined in 'mqttAlias'. Also use of $base is allowed.<br/>
             When using 'stopic', the 'set' command is executed as 'set &lt;dev&gt; &lt;reading&gt; &lt;value&gt;'.
             For something like 'set &lt;dev&gt; &lt;value&gt;'  'state' should be used as reading-name.</p>
@@ -3027,9 +3045,11 @@ sub onmessage($$$) {
             Weiterhin kann das Attribut 'qos' angegeben werden ('retain' macht dagegen keinen Sinn).<br/>
             In der Topic-Definition koennen MQTT-Wildcards (+ und #) verwendet werden. <br/>
             Falls der Reading-Name mit einem '*'-Zeichen am Anfang definiert wird, gilt dieser als 'Platzhalter'.
+            Mehrere Definitionen mit '*' sollten somit z.B. in folgender Form verwendet werden: *1:topic=... *2:topic=...
             Der tatsaechliche Name der Reading (und ggf. des Geraetes) wird dabei durch Variablen aus dem Topic 
             definiert ($device (nur fuer globale Definition in der Bridge), $reading, $name).
-            Im Topic wirken diese Variablen als Wildcards, macht natuerlich nur Sinn, wenn Reading-Name auch nicht fest definiert ist (also faengt mit '*' an). <br/>
+            Im Topic wirken diese Variablen als Wildcards, macht natuerlich nur Sinn, wenn Reading-Name auch nicht fest definiert ist 
+            (also faengt mit '*' an, oder mehrere Namen durch '|' getrennt definiert werden).  <br/>
             Die Variable $name wird im Unterschied zu $reading ggf. ueber die in 'mqttAlias' definierten Aliases beeinflusst.
             Auch Verwendung von $base ist erlaubt.<br/>
             Bei Verwendung von 'stopic' wird das 'set'-Befehl als 'set &lt;dev&gt; &lt;reading&gt; &lt;value&gt;' ausgefuert.
