@@ -106,6 +106,7 @@ my %hueModels = (
 
  'Flex RGBW'        => {name => 'LIGHTIFY Flex RGBW'                   ,type => 'Extended color light'    ,subType => 'extcolordimmer', },
  'Classic A60 RGBW' => {name => 'LIGHTIFY Classic A60 RGBW'            ,type => 'Extended color light'    ,subType => 'extcolordimmer', },
+ 'CLA60 RGBW OSRAM' => {name => 'SMART+ Classic A60 RGBW'              ,type => 'Extended color light'    ,subType => 'extcolordimmer', },
  'Gardenspot RGB'   => {name => 'LIGHTIFY Gardenspot Mini RGB'         ,type => 'Color light'             ,subType => 'colordimmer', },
  'Surface Light TW' => {name => 'LIGHTIFY Surface light tunable white' ,type => 'Color temperature light' ,subType => 'ctdimmer', },
  'Classic A60 TW'   => {name => 'LIGHTIFY Classic A60 tunable white'   ,type => 'Color temperature light' ,subType => 'ctdimmer', },
