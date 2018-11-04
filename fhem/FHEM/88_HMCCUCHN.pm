@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.3.002
+#  Version 4.3.003
 #
 #  (c) 2018 zap (zap01 <at> t-online <dot> de)
 #
@@ -40,6 +40,7 @@
 #  attr <name> ccureadingfilter <filter-rule>[;...]
 #  attr <name> ccureadingformat { name[lc] | address[lc] | datapoint[lc] }
 #  attr <name> ccureadingname <oldname>:<newname>[;...]
+#  attr <name> ccuSetOnChange <expr>
 #  attr <name> ccuverify { 0 | 1 | 2 }
 #  attr <name> controldatapoint <datapoint>
 #  attr <name> disable { 0 | 1 }
@@ -86,7 +87,7 @@ sub HMCCUCHN_Initialize ($)
 	$hash->{AttrList} = "IODev ccucalculate ".
 		"ccuflags:multiple-strict,ackState,nochn0,trace ccureadingfilter ".
 		"ccureadingformat:name,namelc,address,addresslc,datapoint,datapointlc ".
-		"ccureadingname:textField-long ".
+		"ccureadingname:textField-long ccuSetOnChange ".
 		"ccureadings:0,1 ccuscaleval ccuverify:0,1,2 ccuget:State,Value controldatapoint ".
 		"disable:0,1 hmstatevals:textField-long statedatapoint statevals substitute:textField-long ".
 		"substexcl stripnumber peer:textField-long ". $readingFnAttributes;
@@ -277,26 +278,25 @@ sub HMCCUCHN_Set ($@)
 	if ($opt eq 'datapoint') {
 		my $usage = "Usage: set $name datapoint {datapoint} {value} [...]";
 		my %dpval;
+		my $i = 0;
+
 		while (my $objname = shift @$a) {
 			my $objvalue = shift @$a;
+			$i += 1;
 
 			return HMCCU_SetError ($hash, $usage) if (!defined ($objvalue));
 			return HMCCU_SetError ($hash, -8)
 				if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $ccuaddr, $objname, 2));
-		   
-			$objvalue =~ s/\\_/%20/g;
-			$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1, undef, '');
 
-			$objname = $ccuif.'.'.$ccuaddr.'.'.$objname;
-			$dpval{$objname} = $objvalue;
+		   my $no = sprintf ("%03d", $i);
+			$objvalue =~ s/\\_/%20/g;
+			$dpval{"$no.$ccuif.$ccuaddr.$objname"} = HMCCU_Substitute ($objvalue, $statevals, 1, undef, '');
 		}
 
 		return HMCCU_SetError ($hash, $usage) if (scalar (keys %dpval) < 1);
-		
-		foreach my $dpt (keys %dpval) {
-			$rc = HMCCU_SetDatapoint ($hash, $dpt, $dpval{$dpt});
-			return HMCCU_SetError ($hash, $rc) if ($rc < 0);
-		}
+
+		$rc = HMCCU_SetMultipleDatapoints ($hash, \%dpval);
+		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 
 		return HMCCU_SetState ($hash, "OK");
 	}
@@ -307,10 +307,10 @@ sub HMCCUCHN_Set ($@)
 		return HMCCU_SetError ($hash, "Usage: set $name control {value}") if (!defined ($objvalue));
 
 		$objvalue =~ s/\\_/%20/g;
-		$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1, undef, '');
-		
-		my $objname = $ccuif.'.'.$ccuaddr.'.'.$cd;
-		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
+
+		$rc = HMCCU_SetMultipleDatapoints ($hash,
+			{ "001.$ccuif.$ccuaddr.$cd" => HMCCU_Substitute ($objvalue, $statevals, 1, undef, '') }
+		);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		
 		return HMCCU_SetState ($hash, "OK");
@@ -325,11 +325,9 @@ sub HMCCUCHN_Set ($@)
 		return HMCCU_SetError ($hash, "Usage: set $name devstate {value}") if (!defined ($objvalue));
 
 		$objvalue =~ s/\\_/%20/g;
-		$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1, undef, '');
-
-		my $objname = $ccuif.'.'.$ccuaddr.'.'.$sd;
-
-		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
+		$rc = HMCCU_SetMultipleDatapoints ($hash,
+			{ "001.$ccuif.$ccuaddr.$sd" => HMCCU_Substitute ($objvalue, $statevals, 1, undef, '') }
+		);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 
 		return HMCCU_SetState ($hash, "OK");
@@ -346,7 +344,7 @@ sub HMCCUCHN_Set ($@)
 		my $stc = scalar (@states);
 
 		my $objname = $ccuif.'.'.$ccuaddr.'.'.$sd;
-		($rc, $result) = HMCCU_GetDatapoint ($hash, $objname);
+		($rc, $result) = HMCCU_GetDatapoint ($hash, $objname, 1);
 		return HMCCU_SetError ($hash, $rc, $result) if ($rc < 0);
 
 		my $objvalue = '';
@@ -364,8 +362,9 @@ sub HMCCUCHN_Set ($@)
 		return HMCCU_SetError ($hash, "Current device state doesn't match statevals")
 		   if ($objvalue eq '');
 
-		$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1, undef, '');
-		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
+		$rc = HMCCU_SetMultipleDatapoints ($hash,
+			{ "001.$objname" => HMCCU_Substitute ($objvalue, $statevals, 1, undef, '') }
+		);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		
 		return HMCCU_SetState ($hash, "OK");
@@ -381,40 +380,25 @@ sub HMCCUCHN_Set ($@)
 		
 		my $timespec = shift @$a;
 		my $ramptime = shift @$a;
+		my %dpval;
 
 		# Set on time
 		if (defined ($timespec)) {
 			return HMCCU_SetError ($hash, "Can't find ON_TIME datapoint for device type $ccutype")
 				if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $ccuaddr, "ON_TIME", 2));
 			if ($timespec =~ /^[0-9]{2}:[0-9]{2}/) {
-				my (undef, $h, $m, $s)  = GetTimeSpec ($timespec);
-				return HMCCU_SetError ($hash, "Wrong time format. Use HH:MM or HH:MM:SS")
-					if (!defined ($h));
-				$s += $h*3600+$m*60;
-				my @lt = localtime;
-				my $cs = $lt[2]*3600+$lt[1]*60+$lt[0];
-				$s += 86400 if ($cs > $s);
-				$timespec = $s-$cs;
+				$timespec = HMCCU_GetTimeSpec ($timespec);
+				return HMCCU_SetError ($hash, "Wrong time format. Use HH:MM[:SS]") if ($timespec < 0);
 			}
-			if ($timespec > 0) {
-				$objname = $ccuif.'.'.$ccuaddr.'.ON_TIME';
-				$rc = HMCCU_SetDatapoint ($hash, $objname, $timespec);
-				return HMCCU_SetError ($hash, $rc) if ($rc < 0);
-			}
-		}
-		
-		# Set ramp time
-		if (defined ($ramptime)) {
-			return HMCCU_SetError ($hash, "Can't find RAMP_TIME datapoint for device type $ccutype")
-				if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $ccuaddr, "RAMP_TIME", 2));
-			$objname = $ccuif.'.'.$ccuaddr.'.RAMP_TIME';
-			$rc = HMCCU_SetDatapoint ($hash, $objname, $ramptime);
-			return HMCCU_SetError ($hash, $rc) if ($rc < 0);
+			$dpval{"001.$ccuif.$ccuaddr.ON_TIME"} = $timespec if ($timespec > 0);
 		}
 
+		# Set ramp time
+		$dpval{"002.$ccuif.$ccuaddr.RAMP_TIME"} = $ramptime if (defined ($ramptime));
+
 		# Set level	
-		$objname = $ccuif.'.'.$ccuaddr.'.LEVEL';
-		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
+		$dpval{"003.$ccuif.$ccuaddr.LEVEL"} = $objvalue;
+		$rc = HMCCU_SetMultipleDatapoints ($hash, \%dpval);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		
 		return HMCCU_SetState ($hash, "OK");
@@ -434,25 +418,14 @@ sub HMCCUCHN_Set ($@)
 			if (!defined ($timespec));
 			
 		if ($opt eq 'on-till') {
-			my (undef, $h, $m, $s)  = GetTimeSpec ($timespec);
-			return HMCCU_SetError ($hash, "Wrong time format. Use HH:MM or HH:MM:SS")
-				if (!defined ($h));
-			$s += $h*3600+$m*60;
-			my @lt = localtime;
-			my $cs = $lt[2]*3600+$lt[1]*60+$lt[0];
-			$s += 86400 if ($cs > $s);
-			$timespec = $s-$cs;
+			$timespec = HMCCU_GetTimeSpec ($timespec);
+			return HMCCU_SetError ($hash, "Wrong time format. Use HH:MM[:SS]") if ($timespec < 0);
 		}
-
-		# Set time
-		my $objname = $ccuif.'.'.$ccuaddr.'.ON_TIME';
-		$rc = HMCCU_SetDatapoint ($hash, $objname, $timespec);
-		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
-				
-		# Set state
-		$objname = $ccuif.'.'.$ccuaddr.'.'.$sd;
-		my $objvalue = HMCCU_Substitute ("on", $statevals, 1, undef, '');
-		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
+		
+		$rc = HMCCU_SetMultipleDatapoints ($hash, {
+			"001.$ccuif.$ccuaddr.ON_TIME" => $timespec,
+			"002.$ccuif.$ccuaddr.$sd" => HMCCU_Substitute ("on", $statevals, 1, undef, '')
+		});
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		
 		return HMCCU_SetState ($hash, "OK");
@@ -542,7 +515,7 @@ sub HMCCUCHN_Get ($@)
 			if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $ccuaddr, $sd, 1));
 
 		my $objname = $ccuif.'.'.$ccuaddr.'.'.$sd;
-		($rc, $result) = HMCCU_GetDatapoint ($hash, $objname);
+		($rc, $result) = HMCCU_GetDatapoint ($hash, $objname, 0);
 		return HMCCU_SetError ($hash, $rc, $result) if ($rc < 0);
 		return $ccureadings ? undef : $result;
 	}
@@ -555,7 +528,7 @@ sub HMCCUCHN_Get ($@)
 			if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $ccuaddr, $objname, 1));
 
 		$objname = $ccuif.'.'.$ccuaddr.'.'.$objname;
-		($rc, $result) = HMCCU_GetDatapoint ($hash, $objname);
+		($rc, $result) = HMCCU_GetDatapoint ($hash, $objname, 0);
 		return HMCCU_SetError ($hash, $rc, $result) if ($rc < 0);
 		return $ccureadings ? undef : $result;
 	}
@@ -812,10 +785,13 @@ sub HMCCUCHN_Get ($@)
       <br/><br/>
       <li><b>ccucalculate &lt;value-type&gt;:&lt;reading&gt;[:&lt;dp-list&gt;[;...]</b><br/>
       	Calculate special values like dewpoint based on datapoints specified in
-      	<i>dp-list</i>. The result is stored in <i>reading</i>. The following <i>values</i>
-      	are supported:<br/>
+      	<i>dp-list</i>. The result is stored in <i>reading</i>. For datapoints in <i>dp-list</i>
+      	also variable notation is supported (for more information on variables see documentation of
+      	attribute 'peer').<br/>
+      	The following <i>values</i> are supported:<br/>
       	dewpoint = calculate dewpoint, <i>dp-list</i> = &lt;temperature&gt;,&lt;humidity&gt;<br/>
       	abshumidity = calculate absolute humidity, <i>dp-list</i> = &lt;temperature&gt;,&lt;humidity&gt;<br/>
+      	equ = compare datapoint values. Result is "n/a" if values are not equal.<br/>
       	inc = increment datapoint value considering reset of datapoint, <i>dp-list</i> = &lt;counter-datapoint&gt;<br/>
       	min = calculate minimum continuously, <i>dp-list</i> = &lt;datapoint&gt;<br/>
       	max = calculate maximum continuously, <i>dp-list</i> = &lt;datapoint&gt;<br/>
@@ -892,6 +868,11 @@ sub HMCCUCHN_Get ($@)
          <code>
          attr myblind ccuscale !LEVEL:0:1:0:100
          </code>
+      </li><br/>
+      <li><b>ccuSetOnChange &lt;expression&gt;</b><br/>
+      	Check if datapoint value will be changed by set command before changing datapoint value.
+      	This attribute can reduce the traffic between CCU and devices. It presumes that datapoint
+      	state in CCU is current.
       </li><br/>
       <li><b>ccuverify {<u>0</u> | 1 | 2}</b><br/>
          If set to 1 a datapoint is read for verification after set operation. If set to 2 the

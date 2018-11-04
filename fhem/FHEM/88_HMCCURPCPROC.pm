@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 1.1
+#  Version 1.2
 #
 #  Subprocess based RPC Server module for HMCCU.
 #
@@ -35,7 +35,7 @@ use SetExtensions;
 ######################################################################
 
 # HMCCURPC version
-my $HMCCURPCPROC_VERSION = '1.0.007';
+my $HMCCURPCPROC_VERSION = '1.2';
 
 # Maximum number of events processed per call of Read()
 my $HMCCURPCPROC_MAX_EVENTS = 100;
@@ -199,7 +199,7 @@ sub HMCCURPCPROC_Initialize ($)
 	
 	$hash->{parseParams} = 1;
 
-	$hash->{AttrList} = "ccuflags:multiple-strict,expert,reconnect,logEvents,ccuInit,queueEvents".
+	$hash->{AttrList} = "ccuflags:multiple-strict,expert,reconnect,logEvents,ccuInit,queueEvents,noEvents".
 		" rpcMaxEvents rpcQueueSend rpcQueueSize rpcMaxIOErrors". 
 		" rpcServerAddr rpcServerPort rpcWriteTimeout rpcAcceptTimeout".
 		" rpcConnTimeout rpcStatistics rpcEventTimeout ".
@@ -291,6 +291,8 @@ sub HMCCURPCPROC_Define ($$)
 	return "Invalid port or interface $iface" if ($rc == 1);
 	return "Can't assign I/O device $ioname" if ($rc == 2);
 	return "Invalid local IP address ".$hash->{hmccu}{localaddr} if ($rc == 3);
+	return "RPC device for CCU/port already exists" if ($rc == 4);
+	return "Cannot connect to CCU ".$hash->{host}." interface $iface" if ($rc == 5);
 
 	return undef;
 }
@@ -302,6 +304,8 @@ sub HMCCURPCPROC_Define ($$)
 # 1 = Invalid port or interface
 # 2 = Cannot assign IO device
 # 3 = Invalid local IP address
+# 4 = RPC device for CCU/port already exists
+# 5 = Cannot connect to CCU
 ######################################################################
 
 sub HMCCURPCPROC_InitDevice ($$) {
@@ -319,14 +323,14 @@ sub HMCCURPCPROC_InitDevice ($$) {
 		my $dh = $defs{$d};
 		next if (!exists ($dh->{TYPE}) || !exists ($dh->{NAME}));
 		if ($dh->{TYPE} eq 'HMCCURPCPROC' && $dh->{NAME} ne $name && IsDisabled ($dh->{NAME}) != 1) {
-			return "RPC device for CCU/port already exists"
-				if ($dev_hash->{host} eq $dh->{host} && exists ($dh->{rpcport}) && $dh->{rpcport} == $ifport);
+			return 4 if ($dev_hash->{host} eq $dh->{host} && exists ($dh->{rpcport}) &&
+				$dh->{rpcport} == $ifport);
 		}
 	}
 	
 	# Detect local IP address and check if CCU is reachable
 	my $localaddr = HMCCU_TCPConnect ($dev_hash->{host}, $ifport);
-	return "Can't connect to CCU ".$dev_hash->{host}." port $ifport" if ($localaddr eq '');
+	return 5 if ($localaddr eq '');
 	$dev_hash->{hmccu}{localaddr} = $localaddr;
 	$dev_hash->{hmccu}{defaultaddr} = $dev_hash->{hmccu}{localaddr};
 
@@ -584,6 +588,7 @@ sub HMCCURPCPROC_Read ($)
 	# Get attributes
 	my $rpcmaxevents = AttrVal ($name, 'rpcMaxEvents', $HMCCURPCPROC_MAX_EVENTS);
 	my $ccuflags     = AttrVal ($name, 'ccuflags', 'null');
+	my $hmccuflags   = AttrVal ($hmccu_hash->{NAME}, 'ccuflags', 'null');
 	my $socktimeout  = AttrVal ($name, 'rpcWriteTimeout',  $HMCCURPCPROC_TIMEOUT_WRITE);
 	
 	# Read events from queue
@@ -641,7 +646,8 @@ sub HMCCURPCPROC_Read ($)
 
 	# Update device table and client device readings
 	HMCCU_UpdateDeviceTable ($hmccu_hash, \%devices) if ($devcount > 0);
-	HMCCU_UpdateMultipleDevices ($hmccu_hash, \%events) if ($evcount > 0);
+	HMCCU_UpdateMultipleDevices ($hmccu_hash, \%events)
+		if ($evcount > 0 && $ccuflags !~ /noEvents/ && $hmccuflags !~ /noEvents/);
 	
 	Log3 $name, 4, "HMCCURPCPROC: [$name] Read finished";
 }
@@ -2684,6 +2690,7 @@ sub HMCCURPCPROC_DecodeResponse ($)
 			This flag is not supported by interfaces CUxD and HVL.<br/>
 			expert - Activate expert mode<br/>
 			logEvents - Events are written into FHEM logfile if verbose is 4<br/>
+			noEvents - Ignore events from CCU, do not update client device readings.<br/>
 			queueEvents - Always write events into queue and send them asynchronously to FHEM.
 			Frequency of event transmission to FHEM depends on attribute rpcConnTimeout.<br/>
 			reconnect - Try to re-register at CCU if no events received for rpcEventTimeout seconds<br/>

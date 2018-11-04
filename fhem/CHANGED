@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  88_HMCCU: support for CCU firmware 3.41.7
   - bugfix:  38_netatmo: fixed ignored values after 'dead' state
   - feature: 72_XiaomiDevice: load_power reading for power plug
   - feature: 34_ESPEasy: added set cmds: active/inactive/reopen, shutdown tcp
