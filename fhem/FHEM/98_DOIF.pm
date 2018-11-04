@@ -2837,7 +2837,7 @@ CmdDoIfPerl($$)
   my $ret;
   my $err="";
   my $i=0;
-
+  $hs=$hash;
   #def modify
   if ($init_done)
   {
@@ -3296,6 +3296,7 @@ sub DOIF_ExecTimer
   my $subname=${$timer}->{subname};
   my $param=${$timer}->{param} if (defined ${$timer}->{param});
   $hs=$hash;
+  delete ($::defs{$name}{READINGS}{"timer_$timername"});
   if (!defined ($param)) {
     eval ("package DOIF;$subname");
   } else {
@@ -3306,7 +3307,6 @@ sub DOIF_ExecTimer
     ::Log3 ($::defs{$name}{NAME},1 , "$name error in $subname: $@");
     ::readingsSingleUpdate ($hash, "error", "in $subname: $@",0);
   }
-  delete ($::defs{$name}{READINGS}{"timer_$timername"});
 }
 
 sub set_Exec
@@ -6069,7 +6069,7 @@ subs {<br>
 &nbsp;&nbsp;&nbsp;&nbsp;set_Exec ("$window",1800,"logwin",$window);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# setze Timer auf 30 Minuten für eine wiederholte Meldung<br>
 &nbsp;&nbsp;}<br>
 }<br>
-{ if (["_window$:open"]) {set_Exec ("$DEVICE",600,'logwin("$DEVICE")')}} # wenn, Fenster geöffnet wird, dann setze Timer auf Funktion zum Loggen namens "logwin"<br>
+{ if (["_window$:open"]) {set_Exec ("$DEVICE",600,'logwin',"$DEVICE")}} # wenn, Fenster geöffnet wird, dann setze Timer auf Funktion zum Loggen namens "logwin"<br>
 { if (["_window$:closed"]) {del_Exec ("$DEVICE")}}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # wenn, Fenster geschlossen wird, dann lösche Timer<br>
 </code>
 </ul>
