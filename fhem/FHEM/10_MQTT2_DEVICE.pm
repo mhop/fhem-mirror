@@ -435,7 +435,10 @@ MQTT2_DEVICE_Undef($$)
       </ul>
       will create different MQTT2_DEVICE instances for different hex numbers in
       the topic. Note: the newClientId is enclosed in "", as it is a perl
-      expression. Multiple tuples are separated by newline.
+      expression, should be unique, and the automatically created device will
+      be created also with this name.
+
+      Multiple tuples of &lt;regexp&gt; newClientId are separated by newline.
       </li><br>
 
     <a name="devicetopic"></a>
