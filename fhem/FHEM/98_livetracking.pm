@@ -58,7 +58,6 @@ sub livetracking_Initialize($) {
                                 "home ".
                                 "swarmHome ".
                                 "owntracksDevice ".
-                                "traccarDevice ".
                                 "beacon_0 ".
                                 "beacon_1 ".
                                 "beacon_2 ".
@@ -117,7 +116,7 @@ sub livetracking_Define($$$) {
 
   if($req)
   {
-    $hash->{NOTIFYDEV} = AttrVal($name, "owntracksDevice" , AttrVal($name, "traccarDevice" , "owntracks"));
+    $hash->{NOTIFYDEV} = AttrVal($name, "owntracksDevice" , "owntracks");
   }
   else
   {
@@ -194,7 +193,7 @@ sub livetracking_Set($$@) {
       $messagetext = '"content":"'.FmtDateTime(time()).'<br/>FHEM: <br/><br/>'.$messagetext.'",';
     }
 
-    fhem('set '.$devname.' msg {"_type":"cmd","action":"action",'.$messagetext.$notifytext.'"tst":'.time().'}');
+    fhem('set '.$devname.' cmd {"_type":"cmd","action":"action",'.$messagetext.$notifytext.'"tst":'.time().'}');
     #fhem('set '.$devname.' msg {"_type":"cmd","action":"notify", "content":"'.$notifytext.'","tst":'.time().'}') if($notifytext ne "");
   }
 
@@ -302,9 +301,6 @@ sub livetracking_Attr(@) {
   my ($command, $name, $attr, $val) = @_;
   my $hash = $defs{$name};
   if ($attr && $attr eq 'owntracksDevice') {
-    $hash->{NOTIFYDEV} = $val if defined $val;
-  }
-  if ($attr && $attr eq 'traccarDevice') {
     $hash->{NOTIFYDEV} = $val if defined $val;
   }
   elsif ($attr && $attr =~ /^(zonename_)([0-9]+)/) {
@@ -688,24 +684,22 @@ sub livetracking_Notify($$)
   {
     Log3 ($name, 6, "$name OwnTracks data: /n".Dumper($dev));
 
-    if(!($dev->{CHANGED}[0] =~ m/_type":[ ]?"location/ || $dev->{CHANGED}[0] =~ m/_type":[ ]?"position/ || $dev->{CHANGED}[0] =~ m/_type":[ ]?"transition/ || $dev->{CHANGED}[0] =~ m/_type":[ ]?"steps/ || $dev->{CHANGED}[0] =~ m/_type":[ ]?"beacon/ ))
+    my $invaliddata = 1;
+    if(($dev->{CHANGED}[0] =~ m/_type":[ ]?"location/ || $dev->{CHANGED}[0] =~ m/_type":[ ]?"position/ || $dev->{CHANGED}[0] =~ m/_type":[ ]?"transition/ || $dev->{CHANGED}[0] =~ m/_type":[ ]?"steps/ || $dev->{CHANGED}[0] =~ m/_type":[ ]?"beacon/ ))
     {
-      Log3 ($name, 5, "WRONG OWNTRACKS TYPE ".Dumper($dev->{CHANGED}[0]));
+      $invaliddata = 0;#owntracks
+    }
+    elsif(($dev->{CHANGED}[0] =~ m/position":[ ]?{/))
+    {
+      $invaliddata = 0;#traccar
+    }
+    if($invaliddata == 1){
+      Log3 ($name, 5, "WRONG MQTT TYPE ".Dumper($dev->{CHANGED}[0]));
       return undef;
     }
 
     $data= substr($dev->{CHANGED}[0],index($dev->{CHANGED}[0], ": {")+2);
     $dataset = JSON->new->utf8(0)->decode($data);
-
-  } elsif($devName eq AttrVal($name, "traccarDevice" , "traccar")) {
-    if(!($dev->{CHANGED}[0] =~ m/position":[ ]?{/))
-    {
-      Log3 ($name, 5, "WRONG TRACCAR TYPE ".Dumper($dev->{CHANGED}[0]));
-      return undef;
-    }
-
-    $data= substr($dev->{CHANGED}[0],index($dev->{CHANGED}[0], ": {")+2);
-    my $traccardata = JSON->new->utf8(0)->decode($data);
 
   } else {
     Log3 ($name, 5, "livetracks: Notify ignored from ".$devName);
@@ -1287,14 +1281,13 @@ sub livetracking_utf8clean($) {
 =item summary Position tracking via OwnTracks, OpenPaths and Swarm
 =begin html
 
-<a name="livetracking"></a>
-<h3>livetracking</h3>
+<a name="livetracking"></a><h3>livetracking</h3>
 <ul>
   This modul provides livetracking data from OpenPaths and Swarm (FourSquare).<br/>
   Swarm Token: https://foursquare.com/oauth2/authenticate?client_id=EFWJ0DNVIREJ2CY1WDIFQ4MAL0ZGZAZUYCNE0NE0XZC3NCPX&response_type=token&redirect_uri=http://localhost&display=wap
   <br/><br/>
 
-  <b>Define</b>
+  <a name="livetrackingdefine"></a><b>Define</b>
   <ul>
     <code>define &lt;name&gt; livetracking &lt;...&gt;</code>
     <br>
@@ -1303,64 +1296,72 @@ sub livetracking_utf8clean($) {
     <br>&nbsp;
     <li><code>...</code>
       <br>
-      ...
+      Reverse geocoding: Data © OpenStreetMap contributors, ODbL 1.0. https://osm.org/copyright
     </li><br>
   </ul>
 
   <br>
-  <b>Get</b>
+  <a name="livetrackingget"></a><b>Get</b>
    <ul>
-      <li><code>All/OpenPaths/Swarm</code>
-      <br>
-      Manually trigger a data update for OpenPaths/Swarm
+      <li><a name="#All">All</a>
+      <br/>
+      Manually trigger a data update for all sources (OpenPaths/Swarm)
       </li><br>
-      <li><code>owntracksLocation</code>
-      <br>
+      <li><a name="#OpenPaths">OpenPaths</a>
+      <br/>
+      Manually trigger a data update for OpenPaths
+      </li><br>
+      <li><a name="#Swarm">Swarm</a>
+      <br/>
+      Manually trigger a data update for Swarm
+      </li><br>
+      <li><a name="#owntracksLocation">owntracksLocation</a>
+      <br/>
       Request position from OwnTracks
       </li><br>
-      <li><code>owntracksSteps</code>
-      <br>
+      <li><a name="#owntracksSteps">owntracksSteps</a>
+      <br/>
       Request steps data from OwnTracks
       </li><br>
-      <li><code>address [short/long/lat,lng]</code>
-      <br>
-      Get an address from coordinates<br/>Data © OpenStreetMap contributors, ODbL 1.0. https://osm.org/copyright 
+      <li><a name="#address">address [short/long/lat,lng]</a>
+      <br/>
+      Get an address from coordinates<br/>
       </li><br>
   </ul>
 
   <br>
-  <b>Set</b>
+  <a name="livetrackingset"></a><b>Set</b>
    <ul>
-      <li><code>owntracksMessage</code>
+      <li><a name="#owntracksMessage">owntracksMessage</a>
       <br>
       Send a message to OwnTracks
       </li><br>
   </ul>
 
   <br>
-  <b>Readings</b>
+  <a name="livetrackingreadings"></a><b>Readings</b>
    <ul>
       <li><code>location</code>
       <br>
       GPS position
       </li><br>
-      <li><code>distance</code> km
+      <li><code>distance</code> (km)
       <br>
       GPS distance from home
       </li><br>
-      <li><code>accuracy</code> m
+      <li><code>accuracy</code> (m)
       <br>
       GPS accuracy
       </li><br>
-      <li><code>altitude</code> m
+      <li><code>altitude</code> (m)
       <br>
       GPS altitude
       </li><br>
-      <li><code>velocity</code> km/h
+      <li><code>velocity</code> (km/h)
       <br>
       GPS velocity
       </li><br>
-      <li><code>heading</code> deg
+      <li><code>heading</code> (deg)
       <br>
       GPS heading
       </li><br>
@@ -1368,23 +1369,23 @@ sub livetracking_utf8clean($) {
       <br>
       Swarm place name
       </li><br>
-      <li><code>steps</code> steps
+      <li><code>steps</code> (steps)
       <br>
       iOS walked steps
       </li><br>
-      <li><code>walking</code> m
+      <li><code>walking</code> (m)
       <br>
       iOS walked distance
       </li><br>
-      <li><code>floorsup</code> floors
+      <li><code>floorsup</code> (floors)
       <br>
       iOS floors walked up
       </li><br>
-      <li><code>floorsdown</code> floors
+      <li><code>floorsdown</code> (floors)
       <br>
       iOS floors walked down
       </li><br>
-      <li><code>zone_N</code> active/inactive
+      <li><code>zone_N</code> (active/inactive)
       <br>
       Zone status in OwnTracks
       </li><br>
@@ -1396,50 +1397,58 @@ sub livetracking_utf8clean($) {
       <br>
       Beacon data for saved beacons for indoor positioning
       </li><br>
-      <li><code>batteryState</code> ok/low
+      <li><code>batteryState</code> (ok/low)
       <br>
       Battery state (can be set through attribute batteryWarning )
       </li><br>
-      <li><code>batteryPercent</code> %
+      <li><code>batteryPercent</code> (%)
       <br>
       Battery percentage
+      </li><br>
+      <li><code>connection</code> (mobile/wifi/offline/unknown)
+      <br>
+      Phone connection type from OwnTracks at last position
       </li><br>
   </ul>
 
 
   <br>
-   <b>Attributes</b>
+  <a name="livetrackingattr"></a><b>Attributes</b>
    <ul>
-      <li><code>batteryWarning</code>
+      <li><a name="batteryWarning">batteryWarning</a> (%)
          <br>
          Set battery ok/low threshold
       </li><br>
-      <li><code>beacon_N</code>
+      <li><a name="beacon_0">beacon_N</a>
          <br>
          Saved beacon IDs from OwnTracks for indoor positioning, e.g.:<br/>
          FDA50693-A4E2-4FB1-AFCF-C6EB07647825,19789,1
       </li><br>
-      <li><code>zonename_N</code>
+      <li><a name="zonename_0">zonename_N</a>
          <br>
          Assign zone name from OwnTracks
       </li><br>
-      <li><code>home</code>
+      <li><a name="home">home</a> (lat,lon)
          <br>
-         Home location (lat,lon)
+         Home location
       </li><br>
-      <li><code>swarmHome</code>
+      <li><a name="swarmHome">swarmHome</a> (lat,lon)
          <br>
-         Fake home location (that is assigned to private homes for security reasons) of your Swarm home (lat,lon)
+         Fake home location (that is assigned to private homes for security reasons) of your Swarm home (exact position)
       </li><br>
-      <li><code>filterAccuracy</code>
+      <li><a name="filterAccuracy">filterAccuracy</a> (m)
          <br>
          Minimum accuracy of GPS location to update any readings
       </li><br>
-      <li><code>roundDistance, roundAltitude</code>
+      <li><a name="roundDistance">roundDistance</a> (km)
          <br>
-         Rounding for distance and altitude readings to prevent too many changes
+         Rounding for distance reading to prevent too many changes
       </li><br>
-      <li><code>owntracksDevice</code>
+      <li><a name="roundAltitude">roundAltitude</a> (m)
+         <br>
+         Rounding for altitude reading to prevent too many changes
+      </li><br>
+      <li><a name="owntracksDevice">owntracksDevice</a>
          <br>
          OwnTracks MQTT device to look for notifies from
       </li><br>
