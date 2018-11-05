@@ -10538,24 +10538,24 @@ sub EnOcean_Parse($$)
 
     } elsif ($st eq "switch.0A") {
       # Push Button - Single Button EEP D2-03-0A
-      if (!exists($hash->{helper}{batteryPrecent}) || $hash->{helper}{batteryPrecent} != $db[0]) {
-        push @event, "3:batteryPrecent:$db[0]";
-        $hash->{helper}{batteryPrecent} = $db[0];
+      if (!exists($hash->{helper}{batteryPrecent}) || $hash->{helper}{batteryPrecent} != $db[1]) {
+        push @event, "3:batteryPrecent:$db[1]";
+        $hash->{helper}{batteryPrecent} = $db[1];
       }
-      if ($db[1] == 1) {
+      if ($db[0] == 1) {
         push @event, "3:buttonS:on";
         RemoveInternalTimer($hash->{helper}{timer}{buttonS}) if (exists $hash->{helper}{timer}{buttonS});
         @{$hash->{helper}{timer}{buttonS}} = ($hash, 'buttonS', 'off', 1, 5);
         InternalTimer(gettimeofday() + 0.5, 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{buttonS}, 0);
-      } elsif ($db[1] == 2) {
+      } elsif ($db[0] == 2) {
         push @event, "3:buttonD:on";
         RemoveInternalTimer($hash->{helper}{timer}{buttonD}) if (exists $hash->{helper}{timer}{buttonD});
         @{$hash->{helper}{timer}{buttonD}} = ($hash, 'buttonD', 'off', 1, 5);
         InternalTimer(gettimeofday() + 0.5, 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{buttonD}, 0);
-      } elsif ($db[1] == 3) {
+      } elsif ($db[0] == 3) {
         push @event, "3:buttonL:on";
         push @event, "3:state:on";
-      } elsif ($db[1] == 4) {
+      } elsif ($db[0] == 4) {
         push @event, "3:buttonL:off";
         push @event, "3:state:off";
       }
