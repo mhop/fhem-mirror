@@ -131,7 +131,7 @@ autocreate_Notify($$)
       my ($name, $type, $arg) = ($1, $2, $3);
       next if(AttrVal($me, "disable", undef));
 
-      my $it = AttrVal($me, "ignoreTypes", undef);
+      my $it = AttrVal($me, "ignoreTypes", "");
       $it = "^$it\$" if($featurelevel > 5.8); # Forum #80775
 
       next if($it && $name =~ m/$it/i);
