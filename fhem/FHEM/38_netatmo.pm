@@ -1130,8 +1130,11 @@ netatmo_initDevice($)
   my $device;
   if( $hash->{Module} ) {
     $device = netatmo_getDeviceDetail( $hash, $hash->{Module} );
-  } else {
+  } elsif( $hash->{Device} ) {
     $device = netatmo_getDeviceDetail( $hash, $hash->{Device} );
+  } else {
+    Log3 $name, 2, "$name: no device details for initialization";
+    return undef;
   }
   $hash->{stationName} = encode_utf8($device->{station_name}) if( $device->{station_name} );
   $hash->{moduleName} = encode_utf8($device->{module_name}) if( $device->{module_name} );
@@ -1636,14 +1639,14 @@ netatmo_getAddress($$$$)
 
   if( $blocking ) {
     my($err,$data) = HttpUtils_BlockingGet({
-      url => "https://maps.googleapis.com/maps/api/geocode/json?latlng=$lat,$lon",
+      url => "https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=$lat&lon=$lon&addressdetails=1&limit=1",
       noshutdown => 1,
     });
 
       return netatmo_dispatch( {hash=>$hash,type=>'address'},$err,$data );
   } else {
     HttpUtils_NonblockingGet({
-      url => "https://maps.googleapis.com/maps/api/geocode/json?latlng=$lat,$lon",
+      url => "https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=$lat&lon=$lon&addressdetails=1&limit=1",
       noshutdown => 1,
       hash => $hash,
       type => 'address',
@@ -1664,14 +1667,14 @@ netatmo_getLatLong($$$)
 
   if( $blocking ) {
     my($err,$data) = HttpUtils_BlockingGet({
-      url => "https://maps.googleapis.com/maps/api/geocode/json?address=germany+$addr",
+      url => "https://nominatim.openstreetmap.org/search/$addr&format=jsonv2&addressdetails=0&limit=2",
       noshutdown => 1,
     });
 
       return netatmo_dispatch( {hash=>$hash,type=>'latlng'},$err,$data );
   } else {
     HttpUtils_NonblockingGet({
-      url => "https://maps.googleapis.com/maps/api/geocode/json?address=germany+$addr",
+      url => "https://nominatim.openstreetmap.org/search/$addr&format=jsonv2&addressdetails=0&limit=2",
       noshutdown => 1,
       hash => $hash,
       type => 'latlng',
@@ -2709,7 +2712,7 @@ netatmo_dispatch($$$)
     return undef;
   } elsif( $data ) {
     $data =~ s/\n//g;
-    if( $data !~ m/^{.*}$/ ) {
+    if( $data !~ m/^{.*}$/ && $data !~ m/^\[.*\]$/ ) {
       RemoveInternalTimer($hash);
       InternalTimer(gettimeofday()+300, "netatmo_poll", $hash);
       Log3 $name, 2, "$name: invalid json detected";
@@ -2735,7 +2738,7 @@ netatmo_dispatch($$$)
     Log3 $name, 4, "$name: dispatch return: ".$param->{type};
     Log3 $name, 5, Dumper($json);
 
-    if( $json->{error} ) {
+    if( ref($json) eq "HASH" && $json->{error} ) {
       if(ref($json->{error}) ne "HASH") {
         $hash->{STATE} = "LOGIN FAILED" if($hash->{SUBTYPE} eq "ACCOUNT");
         $hash->{status} = $json->{error};
@@ -5485,15 +5488,24 @@ netatmo_parseAddress($$)
   Log3 $name, 4, "$name: parseAddress";
   
   if( $json ) {
-    Log3 $name, 5, "$name: ".Dumper($json);
-    $hash->{status} = $json->{status};
-    $hash->{status} = $json->{error}{message} if( $json->{error} );
-    if( $hash->{status} eq "OK" ) {
-      if( $json->{results} ) {
-        return $json->{results}->[0]->{formatted_address};
+    Log3 $name, 2, "$name: ".Dumper($json);
+    #$hash->{status} = $json->{status};
+    #$hash->{status} = $json->{error}{message} if( $json->{error} );
+    if( defined($json) ) {
+      if( defined($json->{address}) ) {
+        my $addr = "";
+        $addr .= $json->{address}->{road}." " if(defined($json->{address}->{road}));
+        $addr .= $json->{address}->{house_number} if(defined($json->{address}->{house_number}));
+        #$addr .= " ".$json->{address}->{postcode}." " if(defined($json->{address}->{postcode}));
+        #$addr .= $json->{address}->{city} if(defined($json->{address}->{city}));
+        return $addr;
+      } elsif( defined($json->{display_name}) ) {
+        return $json->{display_name};
+      } else {
+        return "unknown";
       }
     } else {
-      return $hash->{status};
+      return "unknown";
     }
   }
 }
@@ -5508,14 +5520,25 @@ netatmo_parseLatLng($$)
   
   if( $json ) {
     Log3 $name, 5, "$name: ".Dumper($json);
-    $hash->{status} = $json->{status};
-    $hash->{status} = $json->{error}{message} if( $json->{error} );
-    if( $hash->{status} eq "OK" ) {
-      if( $json->{results} ) {
-        return $json->{results}->[0]->{geometry}->{bounds};
+    #$hash->{status} = $json->{status};
+    #$hash->{status} = $json->{error}{message} if( $json->{error} );
+    my $ret = "error";
+    my $comp = 0;
+    if( defined($json->[0]) ) {
+      if( defined($json->[0]->{boundingbox}) ) {
+        $ret = $json->[0]->{boundingbox};
+        #$comp = abs($json->[0]->{boundingbox}[0]-$json->[0]->{boundingbox}[1]) + abs($json->[0]->{boundingbox}[2]-$json->[0]->{boundingbox}[3]);
       }
+      #if( defined($json->[1]->{boundingbox}) ) {
+      #  if((abs($json->[1]->{boundingbox}[0]-$json->[1]->{boundingbox}[1]) + abs($json->[1]->{boundingbox}[2]-$json->[1]->{boundingbox}[3])) < $comp) {
+      #    $ret = $json->[1]->{boundingbox} ;
+      #    $comp = abs($json->[1]->{boundingbox}[0]-$json->[1]->{boundingbox}[1]) + abs($json->[1]->{boundingbox}[2]-$json->[1]->{boundingbox}[3]);
+      #    Log3 $name, 2, "$name: box1 ".$comp;
+      #  }
+      #}
+      return $ret;
     } else {
-      return $hash->{status};
+      return "error";
     }
   }
 }
@@ -5884,14 +5907,23 @@ netatmo_Get($$@)
 
       if( @args && defined($args[0]) && ( $args[0] =~ m/^\d{5}$/
                         || $args[0] =~ m/^a:/ ) ) {
-        $addr = shift @args;
-        $addr = substr($addr,2) if( $addr =~ m/^a:/ );
+
+        if($args[0] =~ m/^a:/){
+          $addr = '?';
+          $addr .= 'q='.join('+', @args);
+          $addr =~ s/a://g;
+        } elsif($args[0] =~ m/^\d{5}$/) {
+          $addr = '?';
+          $addr .= 'postalcode='.$args[0].'&';
+          $addr .= 'country=de';
+        }
 
         my $bounds =  netatmo_getLatLong( $hash,1,$addr );
-        $args[0] = $bounds->{northeast}->{lat};
-        $args[1] = $bounds->{northeast}->{lng};
-        $args[2] = $bounds->{southwest}->{lat};
-        $args[3] = $bounds->{southwest}->{lng};
+        return "data error " if( ref($bounds) ne "ARRAY" );
+        $args[0] = $bounds->[1];
+        $args[1] = $bounds->[3];
+        $args[2] = $bounds->[0];
+        $args[3] = $bounds->[2];
       } elsif(defined($args[0]) && $args[0] =~ m/,/) {
         my @latlon1 = split( ',', $args[0] );
         if($args[1] !~ m/,/){
