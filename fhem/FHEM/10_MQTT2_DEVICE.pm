@@ -22,6 +22,7 @@ MQTT2_DEVICE_Initialize($)
   no warnings 'qw';
   my @attrList = qw(
     IODev
+    bridgeRegexp:textField-long
     devicetopic
     disable:0,1
     disabledForIntervals
@@ -32,7 +33,7 @@ MQTT2_DEVICE_Initialize($)
   );
   use warnings 'qw';
   $hash->{AttrList} = join(" ", @attrList)." ".$readingFnAttributes;
-  my %h = ( re=>{}, cid=>{});
+  my %h = ( re=>{}, cid=>{}, bridge=>{} );
   $modules{MQTT2_DEVICE}{defptr} = \%h;
 }
 
@@ -128,8 +129,24 @@ MQTT2_DEVICE_Parse($$)
   # autocreate and expand readingList
   if($autocreate && !%fnd) {
     return "" if($cid && $cid =~ m/mosqpub.*/);
-    my $cidHash = $modules{MQTT2_DEVICE}{defptr}{cid}{$cid};
-    my $nn = $cidHash ? $cidHash->{NAME} : "MQTT2_$cid";
+
+    ################## bridge stuff
+    my $newCid = $cid;
+    my $bp = $modules{MQTT2_DEVICE}{defptr}{bridge};
+    foreach my $re (keys %{$bp}) {
+      next if(!("$topic:$value" =~ m/^$re$/s ||
+                "$cid:$topic:$value" =~ m/^$re$/s));
+      my $cidExpr = $bp->{$re};
+      $newCid = eval $cidExpr;
+      if($@) {
+        Log 1, "MQTT2_DEVICE: Error evaluating $cidExpr: $@";
+        return "";
+      }
+      last;
+    }
+
+    my $cidHash = $modules{MQTT2_DEVICE}{defptr}{cid}{$newCid};
+    my $nn = $cidHash ? $cidHash->{NAME} : "MQTT2_$newCid";
     PrioQueue_add(sub{
       return if(!$defs{$nn});
       my $add;
@@ -146,7 +163,8 @@ MQTT2_DEVICE_Parse($$)
       CommandAttr(undef, "$nn readingList $rl$cid:$topic:.* $add");
       MQTT2_DEVICE_Parse($iodev, $msg);
     }, undef);
-    return "UNDEFINED $nn MQTT2_DEVICE $cid" if(!$cidHash);
+
+    return "UNDEFINED $nn MQTT2_DEVICE $newCid" if(!$cidHash);
     return "";
   }
 
@@ -303,6 +321,18 @@ MQTT2_DEVICE_Attr($$)
     }
     MQTT2_DEVICE_addReading($dev, $param) if($atype eq "reading");
   }
+
+  if($attrName eq "bridgeRegexp" && $type eq "set") {
+    foreach my $el (split("\n", $param)) {
+      my ($par1, $par2) = split(" ", $el, 2);
+      next if(!$par1);
+      return "$dev attr $attrName: more parameters needed" if(!$par2);
+      eval { "Hallo" =~ m/^$par1$/ };
+      return "$dev $attrName regexp error: $@" if($@);
+      $modules{MQTT2_DEVICE}{defptr}{bridge}{$par1} = $par2;
+    }
+  }
+
   return undef;
 }
 
@@ -392,6 +422,21 @@ MQTT2_DEVICE_Undef($$)
   <a name="MQTT2_DEVICEattr"></a>
   <b>Attributes</b>
   <ul>
+
+    <a name="bridgeRegexp"></a>
+    <li>bridgeRegexp &lt;regexp&gt; newClientId ...
+      Used to automatically redirect some types of topics to different
+      MQTT2_DEVICE instances. The regexp is checked against the
+      clientid:topic:message and topic:message. The newClientId is a perl
+      expression!. Example:
+      <ul>
+        attr zigbbe2mqtt bridgeRegexp zigbee2mqtt/0x00158d0001([^:]*):.*
+                "zigbee_$1"
+      </ul>
+      will create different MQTT2_DEVICE instances for different hex numbers in
+      the topic. Note: the newClientId is enclosed in "", as it is a perl
+      expression. Multiple tuples are separated by newline.
+      </li><br>
 
     <a name="devicetopic"></a>
     <li>devicetopic value<br>
