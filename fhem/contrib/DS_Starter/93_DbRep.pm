@@ -57,6 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Versions History intern
 our %DbRep_vNotesIntern = (
+  "8.8.0"  => "05.11.2018  first connect routine switched to DbRep_Main, get COLSET from DBLOG-instance",
   "8.7.0"  => "04.11.2018  attribute valueFilter applied to functions based on 'SELECT', 'UPDATE', 'DELETE' and 'valueFilter' generally applied to field 'VALUE' ",
   "8.6.0"  => "29.10.2018  reduceLog use attributes device/reading (can be overwritten by set-options) ",
   "8.5.0"  => "27.10.2018  versionNotes revised, EXCLUDE of reading/device possible (DbRep_specsForSql changed) ",
@@ -64,11 +65,11 @@ our %DbRep_vNotesIntern = (
                            "versionNotes changed to support en/de, get dbValue as textfield-long ",
   "8.3.0"  => "17.10.2018  reduceLog from DbLog integrated into DbRep, textField-long as default for sqlCmd, both attributes timeOlderThan and timeDiffToNow can be set at same time",
   "8.2.3"  => "07.10.2018  check availability of DbLog-device at definition time of DbRep-device ",  
-  "8.2.2"  => "07.10.2018  DbRep_getMinTs changed, fix don't get the real min timestamp in rare cases ",  
+  "8.2.2"  => "07.10.2018  DbRep_getInitData changed, fix don't get the real min timestamp in rare cases ",  
   "8.2.1"  => "07.10.2018  \$hash->{dbloghash}{HELPER}{REOPEN_RUNS_UNTIL} contains time until DB is closed ",
   "8.2.0"  => "05.10.2018  direct help for attributes ",
   "8.1.0"  => "02.10.2018  new get versionNotes command ",
-  "8.0.1"  => "20.09.2018  DbRep_getMinTs improved",
+  "8.0.1"  => "20.09.2018  DbRep_getInitData improved",
   "8.0.0"  => "11.09.2018  get filesize in DbRep_WriteToDumpFile corrected, restoreMySQL for clientSide dumps, minor fixes ",
   "7.20.0"  => "04.09.2018  deviceRename can operate a Device name with blank, e.g. 'current balance' as old device name ",
   "7.19.0"  => "25.08.2018  attribute 'valueFilter' to filter datasets in fetchrows ",
@@ -368,8 +369,9 @@ sub DbRep_Define($@) {
   $hash->{ROLE}                = AttrVal($name, "role", "Client");
   $hash->{MODEL}               = $hash->{ROLE};
   $hash->{HELPER}{DBLOGDEVICE} = $a[2];
+  $hash->{HELPER}{IDRETRIES}   = 3;                                            # Anzahl wie oft versucht wird initiale Daten zu holen
   $hash->{VERSION}             = (reverse sort(keys %DbRep_vNotesIntern))[0];
-  $hash->{NOTIFYDEV}           = "global,".$name;                     # nur Events dieser Devices an DbRep_Notify weiterleiten 
+  $hash->{NOTIFYDEV}           = "global,".$name;                              # nur Events dieser Devices an DbRep_Notify weiterleiten 
   my $dbconn                   = $defs{$a[2]}{dbconn};
   $hash->{DATABASE}            = (split(/;|=/, $dbconn))[1];
   $hash->{UTF8}                = defined($defs{$a[2]}{UTF8})?$defs{$a[2]}{UTF8}:0;
@@ -381,7 +383,7 @@ sub DbRep_Define($@) {
   }
   
   RemoveInternalTimer($hash);
-  InternalTimer(gettimeofday()+int(rand(45)), 'DbRep_firstconnect', $hash, 0);
+  InternalTimer(gettimeofday()+int(rand(45)), 'DbRep_firstconnect', "$name|||", 0);
   
   Log3 ($name, 4, "DbRep $name - initialized");
   ReadingsSingleUpdateValue ($hash, 'state', 'initialized', 1);
@@ -862,7 +864,7 @@ sub DbRep_Get($@) {
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
       return "The operation \"$opt\" isn't available with database type $dbmodel" if ($dbmodel ne 'MYSQL');
 	  ReadingsSingleUpdateValue ($hash, "state", "running", 1);
-      DbRep_delread($hash);  # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
+      DbRep_delread($hash);                                          # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
       $hash->{HELPER}{RUNNING_PID} = BlockingCall("dbmeta_DoParse", "$name|$opt", "dbmeta_ParseDone", $to, "DbRep_ParseAborted", $hash);    
   
   } elsif ($opt eq "svrinfo") {
@@ -883,8 +885,10 @@ sub DbRep_Get($@) {
       return "Dump is running - try again later !" if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
       DbRep_delread($hash); 
-      ReadingsSingleUpdateValue ($hash, "state", "running", 1);   
-	  DbRep_firstconnect($hash);	  
+      ReadingsSingleUpdateValue ($hash, "state", "running", 1); 
+      $hash->{HELPER}{IDRETRIES}   = 3;                             # Anzahl wie oft versucht wird initiale Daten zu holen      
+	  $prop = $prop?$prop:'';
+      DbRep_firstconnect("$name|$opt|$prop|");	  
   
   } elsif ($opt =~ /dbValue/) {
       return "get \"$opt\" needs at least an argument" if ( @a < 3 );
@@ -1044,7 +1048,7 @@ sub DbRep_Attr($$$$) {
 		ReadingsSingleUpdateValue ($hash, "state", $val, 1);
         if ($do == 0) {
             RemoveInternalTimer($hash);
-            InternalTimer(time+5, 'DbRep_firstconnect', $hash, 0);
+            InternalTimer(time+5, 'DbRep_firstconnect', "$name|||", 0);
         } else {
             my $dbh = $hash->{DBH};
             $dbh->disconnect() if($dbh);
@@ -1342,22 +1346,33 @@ return undef;
 #        Verbindung zur DB aufbauen und den Timestamp des ältesten 
 #        Datensatzes ermitteln
 ###################################################################################
-sub DbRep_firstconnect($) {
-  my ($hash) = @_;
-  my $name       = $hash->{NAME};
-  my $to         = "120";
-  my $dbloghash  = $hash->{dbloghash};
-  my $dbconn     = $dbloghash->{dbconn};
-  my $dbuser     = $dbloghash->{dbuser};
+sub DbRep_firstconnect(@) {
+  my ($string)     = @_;
+  my ($name,$opt,$prop,$fret) = split("\\|", $string);
+  my $hash              = $defs{$name};
+  my $to                = "120";
+  my $dbloghash         = $hash->{dbloghash};
+  my $dbconn            = $dbloghash->{dbconn};
+  my $dbuser            = $dbloghash->{dbuser};
 
   RemoveInternalTimer($hash, "DbRep_firstconnect");
   return if(IsDisabled($name));
   if ($init_done == 1) {
+      # DB Struktur aus DbLog Instanz übernehmen
+      $hash->{HELPER}{DBREPCOL}{COLSET}     = $dbloghash->{HELPER}{COLSET};
+      $hash->{HELPER}{DBREPCOL}{DEVICECOL}  = $dbloghash->{HELPER}{DEVICECOL};
+      $hash->{HELPER}{DBREPCOL}{EVENTCOL}   = $dbloghash->{HELPER}{EVENTCOL};
+      $hash->{HELPER}{DBREPCOL}{READINGCOL} = $dbloghash->{HELPER}{READINGCOL};
+      $hash->{HELPER}{DBREPCOL}{TYPECOL}    = $dbloghash->{HELPER}{TYPECOL};
+      $hash->{HELPER}{DBREPCOL}{UNITCOL}    = $dbloghash->{HELPER}{UNITCOL};
+      $hash->{HELPER}{DBREPCOL}{VALUECOL}   = $dbloghash->{HELPER}{VALUECOL}; 
+      
+      # DB Strukturelemente abrufen      
       Log3 ($name, 3, "DbRep $name - Connectiontest to database $dbconn with user $dbuser") if($hash->{LASTCMD} ne "minTimestamp");
-      $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_getMinTs", "$name", "DbRep_getMinTsDone", $to, "DbRep_getMinTsAborted", $hash);        
+      $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_getInitData", "$name|$opt|$prop|$fret", "DbRep_getInitDataDone", $to, "DbRep_getInitDataAborted", $hash);        
       $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057
   } else {
-      InternalTimer(time+1, "DbRep_firstconnect", $hash, 0);
+      InternalTimer(time+1, "DbRep_firstconnect", "$name|$opt|$prop|$fret", 0);
   }
 
 return;
@@ -1366,8 +1381,9 @@ return;
 ####################################################################################################
 #     den ältesten Datensatz (Timestamp) in der DB bestimmen 
 ####################################################################################################
-sub DbRep_getMinTs($) {
- my ($name)     = @_;
+sub DbRep_getInitData($) {
+ my ($string)     = @_;
+ my ($name,$opt,$prop,$fret) = split("\\|", $string);
  my $hash       = $defs{$name};
  my $dbloghash  = $hash->{dbloghash};
  my $dbconn     = $dbloghash->{dbconn};
@@ -1391,8 +1407,6 @@ sub DbRep_getMinTs($) {
  my $st = [gettimeofday];
  
  eval { $mints = $dbh->selectrow_array("SELECT min(TIMESTAMP) FROM history;"); }; 
- # eval { $mints = $dbh->selectrow_array("select TIMESTAMP from history limit 1;"); }; 
- # eval { $mints = $dbh->selectrow_array("select TIMESTAMP from history order by TIMESTAMP limit 1;"); }; 
  
  $dbh->disconnect;
  
@@ -1404,58 +1418,63 @@ sub DbRep_getMinTs($) {
  # Background-Laufzeit ermitteln
  my $brt = tv_interval($bst);
 
- $rt = $rt.",".$brt;
+ $rt   = $rt.",".$brt;
+ no warnings 'uninitialized'; 
  
- return "$name|$mints|$rt|0";
+return "$name|$mints|$rt|0|$opt|$prop|$fret";
 }
 
 ####################################################################################################
 # Auswertungsroutine den ältesten Datensatz (Timestamp) in der DB bestimmen 
 ####################################################################################################
-sub DbRep_getMinTsDone($) {
-  my ($string) = @_;
-  my @a          = split("\\|",$string);
-  my $hash       = $defs{$a[0]};
-  my $name       = $hash->{NAME};
-  my $mints      = decode_base64($a[1]);
-  my $bt         = $a[2];
-  my ($rt,$brt)  = split(",", $bt);
-  my $err        = $a[3]?decode_base64($a[3]):undef;
+sub DbRep_getInitDataDone($) {
+  my ($string)       = @_;
+  my @a              = split("\\|",$string);
+  my $hash           = $defs{$a[0]};
+  my $name           = $hash->{NAME};
+  my $mints          = decode_base64($a[1]);
+  my $bt             = $a[2];
+  my ($rt,$brt)      = split(",", $bt);
+  my $err            = $a[3]?decode_base64($a[3]):undef;
+  my $opt            = $a[4];
+  my $prop           = $a[5];
+  my $fret           = \&{$a[6]} if($a[6]);
   my $dblogdevice    = $hash->{HELPER}{DBLOGDEVICE};
   $hash->{dbloghash} = $defs{$dblogdevice};
   my $dbconn         = $hash->{dbloghash}{dbconn};
   
-   if ($err) {
+  if ($err) {
       readingsBeginUpdate($hash);
       ReadingsBulkUpdateValue ($hash, "errortext", $err);
       ReadingsBulkUpdateValue ($hash, "state", "disconnected");
       readingsEndUpdate($hash, 1);
       delete($hash->{HELPER}{RUNNING_PID});
       Log3 ($name, 2, "DbRep $name - DB connect failed. Make sure credentials of database $hash->{DATABASE} are valid and database is reachable.");
-      return;
+  
+  } else {
+      my $state = ($hash->{LASTCMD} eq "minTimestamp")?"done":"connected";
+      $state    = "invalid timestamp \"$mints\" found in database - please delete it" if($mints =~ /^0000-00-00.*$/);
+
+      readingsBeginUpdate($hash);
+      ReadingsBulkUpdateValue ($hash, "timestamp_oldest_dataset", $mints) if($hash->{LASTCMD} eq "minTimestamp");
+      ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);
+      readingsEndUpdate($hash, 1);
+      
+      Log3 ($name, 3, "DbRep $name - Connectiontest to db $dbconn successful") if($hash->{LASTCMD} ne "minTimestamp");
+      
+      $hash->{HELPER}{MINTS} = $mints;
   }
   
-  my $state = ($hash->{LASTCMD} eq "minTimestamp")?"done":"connected";
-  $state    = "invalid timestamp \"$mints\" found in database - please delete it" if($mints =~ /^0000-00-00.*$/);
-
-  readingsBeginUpdate($hash);
-  ReadingsBulkUpdateValue ($hash, "timestamp_oldest_dataset", $mints) if($hash->{LASTCMD} eq "minTimestamp");
-  ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);
-  readingsEndUpdate($hash, 1);
-  
-  Log3 ($name, 4, "DbRep $name - Connectiontest to db $dbconn successful") if($hash->{LASTCMD} ne "minTimestamp");
-  
-  $hash->{HELPER}{MINTS} = $mints;
-  
   delete($hash->{HELPER}{RUNNING_PID});
-  
-return;
+
+return if(!$fret);
+return &$fret($hash,$opt,$prop);
 }
 
 ####################################################################################################
 #             Abbruchroutine den ältesten Datensatz (Timestamp) in der DB bestimmen 
 ####################################################################################################
-sub DbRep_getMinTsAborted(@) {
+sub DbRep_getInitDataAborted(@) {
   my ($hash,$cause) = @_;
   my $name = $hash->{NAME};
   
@@ -1562,6 +1581,16 @@ sub DbRep_Main($$;$) {
  if (exists($hash->{HELPER}{RUNNING_PID}) && $hash->{ROLE} ne "Agent") {
      Log3 ($name, 3, "DbRep $name - WARNING - old process $hash->{HELPER}{RUNNING_PID}{pid} will be killed now to start a new BlockingCall");
      BlockingKill($hash->{HELPER}{RUNNING_PID});
+ }
+ 
+ # initiale Datenermittlung wie minimal Timestamp, Datenbankstrukturen, ...
+ if(!$hash->{HELPER}{MINTS} or !$hash->{HELPER}{DBREPCOL}{COLSET}) {
+     my $dbname = $hash->{DATABASE};
+     Log3 ($name, 3, "DbRep $name - get initial structure information of database \"$dbname\", remaining attempts: ".$hash->{HELPER}{IDRETRIES});
+     $prop = $prop?$prop:'';
+     DbRep_firstconnect("$name|$opt|$prop|DbRep_Main") if($hash->{HELPER}{IDRETRIES} > 0);
+     $hash->{HELPER}{IDRETRIES}--;
+ return;
  }
  
  ReadingsSingleUpdateValue ($hash, "state", "running", 1);
