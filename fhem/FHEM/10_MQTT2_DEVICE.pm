@@ -424,13 +424,13 @@ MQTT2_DEVICE_Undef($$)
   <ul>
 
     <a name="bridgeRegexp"></a>
-    <li>bridgeRegexp &lt;regexp&gt; newClientId ...
+    <li>bridgeRegexp &lt;regexp&gt; newClientId ...<br>
       Used to automatically redirect some types of topics to different
       MQTT2_DEVICE instances. The regexp is checked against the
       clientid:topic:message and topic:message. The newClientId is a perl
       expression!. Example:
       <ul>
-        attr zigbbe2mqtt bridgeRegexp zigbee2mqtt/0x00158d0001([^:]*):.*
+        attr zigbee2mqtt bridgeRegexp zigbee2mqtt/0x00158d0001([^:]*):.*
                 "zigbee_$1"
       </ul>
       will create different MQTT2_DEVICE instances for different hex numbers in
