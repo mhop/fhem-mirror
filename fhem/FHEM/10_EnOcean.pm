@@ -11403,10 +11403,10 @@ sub EnOcean_Parse($$)
       if ($repeatingCounter < 0x0F) {$hash->{Dev_RepeatingCounter} = $repeatingCounter};
     } elsif ($signalMID == 11) {
       DoTrigger($name, "SIGNAL: DUTYCYCLE_LIMIT: " . ($db[0] >> 4 == 1 ? 'released' : 'reached'), 1);
-      Log3 $name, 2, "EnOcean $name SIGNAL: DUTYCYCLE_LIMIT: " . ($db[0] >> 4 == 1 ? 'released' : 'reached');
+      Log3 $name, 2, "EnOcean $name SIGNAL DUTYCYCLE_LIMIT: " . ($db[0] >> 4 == 1 ? 'released' : 'reached');
     } elsif ($signalMID == 12) {
       DoTrigger($name, "SIGNAL: Dev_CHANGED", 1);
-      Log3 $name, 2, "EnOcean $name SIGNAL: Dev_CHANGED";
+      Log3 $name, 2, "EnOcean $name SIGNAL Dev_CHANGED";
     } elsif ($signalMID == 13) {
       my @harvester = ('very_good', 'good', 'average', 'bad', 'very_bad');
       push @event, "3:harvester:" . $harvester[$db[0]];
