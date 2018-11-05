@@ -18,12 +18,13 @@ package main;
 
 use strict;
 use warnings;
-use Time::Local;
+no warnings qw(redefine);
 
 #use Math::Round;
 #use Net::OAuth;
 
 use JSON;
+use Time::Local;
 use URI::Escape;
 use Data::Dumper;
 
@@ -203,7 +204,7 @@ sub livetracking_Set($$@) {
 sub livetracking_Get($@) {
   my ($hash, @a) = @_;
   my $command = $a[1];
-  my $parameter = $a[2] if(defined($a[2]));
+  my $parameter = $a[2];# if(defined($a[2]));
   my $name = $hash->{NAME};
 
 
@@ -244,6 +245,7 @@ sub livetracking_Get($@) {
   }
   elsif($command eq 'address') {
      my @location = split(",",ReadingsVal($name,"location","0,0"));
+     $parameter = "" if(!defined($parameter));
      if($parameter =~ /,/){
        @location = split(",",$parameter);
      }
@@ -261,8 +263,9 @@ sub livetracking_Get($@) {
        } elsif( defined($json->{address}) ) {
          my $addr = "";
          $addr .= $json->{address}->{road}." " if(defined($json->{address}->{road}));
-         $addr .= $json->{address}->{bridleway}." " if(defined($json->{address}->{bridleway}) && !defined($json->{address}->{road}));
-         $addr .= $json->{address}->{footway}." " if(defined($json->{address}->{footway}) && !defined($json->{address}->{road}) && !defined($json->{address}->{bridleway}));
+         $addr .= $json->{address}->{path}." " if(defined($json->{address}->{path}) && !defined($json->{address}->{road}));
+         $addr .= $json->{address}->{bridleway}." " if(defined($json->{address}->{bridleway}) && !defined($json->{address}->{road}) && !defined($json->{address}->{path}) && !defined($json->{address}->{path}));
+         $addr .= $json->{address}->{footway}." " if(defined($json->{address}->{footway}) && !defined($json->{address}->{road}) && !defined($json->{address}->{path}) && !defined($json->{address}->{bridleway}));
          $addr .= $json->{address}->{house_number} if(defined($json->{address}->{house_number}));
          $addr .= "\n".$json->{address}->{neighbourhood} if(defined($json->{address}->{neighbourhood}) && $parameter eq "long");
          $addr .= "\n".$json->{address}->{suburb} if(defined($json->{address}->{suburb}) && $parameter eq "long");
@@ -270,6 +273,7 @@ sub livetracking_Get($@) {
          $addr .= $json->{address}->{postcode}." " if(defined($json->{address}->{postcode}));
          $addr .= $json->{address}->{city} if(defined($json->{address}->{city}));
          $addr .= $json->{address}->{town}." " if(defined($json->{address}->{town}) && !defined($json->{address}->{city}));
+         $addr .= $json->{address}->{village}." " if(defined($json->{address}->{village}) && !defined($json->{address}->{city}) && !defined($json->{address}->{town}));
          $addr .= "\n".$json->{address}->{county} if(defined($json->{address}->{county}) && $parameter eq "long");
          $addr .= "\n" if((defined($json->{address}->{state_district}) || defined($json->{address}->{state})) && $parameter eq "long");
          $addr .= $json->{address}->{state_district}." " if(defined($json->{address}->{state_district}) && $parameter eq "long");
@@ -1320,7 +1324,7 @@ sub livetracking_utf8clean($) {
       </li><br>
       <li><code>address [short/long/lat,lng]</code>
       <br>
-      Get address from coordinates
+      Get an address from coordinates<br/>Data © OpenStreetMap contributors, ODbL 1.0. https://osm.org/copyright 
       </li><br>
   </ul>
 
