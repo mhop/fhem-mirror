@@ -298,6 +298,7 @@ sub DbRep_Initialize($) {
 					   "executeBeforeProc ".
 					   "executeAfterProc ".
                        "expimpfile ".
+                       "fastStart:1,0 ".
 					   "fetchRoute:ascent,descent ".
                        "fetchMarkDuplicates:red,blue,brown,green,orange ".
 					   "ftpDebug:1,0 ".
@@ -383,7 +384,7 @@ sub DbRep_Define($@) {
   }
   
   RemoveInternalTimer($hash);
-  InternalTimer(gettimeofday()+int(rand(45)), 'DbRep_firstconnect', "$name|||", 0);
+  InternalTimer(gettimeofday()+int(rand(45)), 'DbRep_firstconnect', "$name||onBoot|", 0);
   
   Log3 ($name, 4, "DbRep $name - initialized");
   ReadingsSingleUpdateValue ($hash, 'state', 'initialized', 1);
@@ -1015,6 +1016,7 @@ sub DbRep_Attr($$$$) {
 						 executeBeforeProc
 						 executeAfterProc
                          expimpfile
+                         fastStart
 						 ftpUse
 						 ftpUser
 						 ftpUseSSL
@@ -1354,9 +1356,15 @@ sub DbRep_firstconnect(@) {
   my $dbloghash         = $hash->{dbloghash};
   my $dbconn            = $dbloghash->{dbconn};
   my $dbuser            = $dbloghash->{dbuser};
-
+  
   RemoveInternalTimer($hash, "DbRep_firstconnect");
   return if(IsDisabled($name));
+ 
+  if (AttrVal($name, "fastStart", 0) && $prop eq "onBoot" ) {
+      $hash->{LASTCMD} = "init database connect stopped due to attribute fastStart";
+      return;
+  } 
+  
   if ($init_done == 1) {
       # DB Struktur aus DbLog Instanz übernehmen
       $hash->{HELPER}{DBREPCOL}{COLSET}     = $dbloghash->{HELPER}{COLSET};
