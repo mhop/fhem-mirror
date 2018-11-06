@@ -57,7 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Versions History intern
 our %DbRep_vNotesIntern = (
-  "8.8.0"  => "05.11.2018  first connect routine switched to DbRep_Main, get COLSET from DBLOG-instance",
+  "8.8.0"  => "06.11.2018  first connect routine switched to DbRep_Main, get COLSET from DBLOG-instance, attribute 'fastStart' added ",
   "8.7.0"  => "04.11.2018  attribute valueFilter applied to functions based on 'SELECT', 'UPDATE', 'DELETE' and 'valueFilter' generally applied to field 'VALUE' ",
   "8.6.0"  => "29.10.2018  reduceLog use attributes device/reading (can be overwritten by set-options) ",
   "8.5.0"  => "27.10.2018  versionNotes revised, EXCLUDE of reading/device possible (DbRep_specsForSql changed) ",
@@ -123,6 +123,9 @@ our %DbRep_vNotesIntern = (
 
 # Versions History extern:
 our %DbRep_vNotesExtern = (
+  "8.8.0"  => "06.11.2018 new attribute 'fastStart'. Usually every DbRep-device is making a short connect to its database when "
+              ."FHEM is restarted. When this attribute is set, the initial connect is done when the DbRep-device is doing its "
+              ."first task. ",
   "8.7.0"  => "04.11.2018 attribute valueFilter applied to functions 'averageValue, changeValue, countEntries, delEntries, "
               ."delSeqDoublets, diffValue, exportToFile, fetchrows, maxValue, minValue, reduceLog, sumValue, syncStandby' ,"
               ." 'valueFilter' generally applied to database field 'VALUE' ",
@@ -11630,6 +11633,15 @@ sub bdump {
                                 <a href="https://fhem.de/commandref.html#FileLog">Filelog</a>. <br>
 								<br><br>
 
+  <a name="fastStart"></a>
+  <li><b>fastStart </b>       - Usually every DbRep device is making a short connect to its database when FHEM is started to
+                                retrieve some important informations and the reading "state" switches to "connected" on success.
+                                If this attrbute is set, the initial database connection is executed not till then the 
+                                DbRep device is processing its first command. <br>
+                                While the reading "state" is remaining in state "initialized" after FHEM-start. 
+                                This approach my be helpful if a lot of DbRep devices are defined.                                
+                                </li> <br>
+                                
   <a name="fetchMarkDuplicates"></a>
   <li><b>fetchMarkDuplicates </b> 
                               - Highlighting of multiple occuring datasets in result of "fetchrows" command </li> <br>
@@ -13839,7 +13851,16 @@ sub bdump {
                                 <a name="DbRep_expimpfile"></a>
                                 Zur POSIX Wildcardverwendung siehe auch die Erläuterungen zu <a href="#FileLog">Filelog</a>. 
 								<br><br>
-  
+
+  <a name="fastStart"></a>
+  <li><b>fastStart </b>       - Normalerweise verbindet sich jedes DbRep-Device beim FHEM-Start kurz mit seiner Datenbank um 
+                                benötigte Informationen abzurufen und das Reading "state" springt bei Erfolg auf "connected". 
+                                Ist dieses Attribut gesetzt, erfolgt die initiale Datenbankverbindung erst dann wenn das 
+                                DbRep-Device sein erstes Kommando ausführt. <br>
+                                Das Reading "state" verbleibt nach FHEM-Start solange im Status "initialized". Diese Einstellung
+                                kann hilfreich sein wenn viele DbRep-Devices definiert sind.                                
+                                </li> <br>
+                                
   <a name="fetchMarkDuplicates"></a>
   <li><b>fetchMarkDuplicates </b> 
                               - Markierung von mehrfach vorkommenden Datensätzen im Ergebnis des "fetchrows" Kommandos </li> <br>
