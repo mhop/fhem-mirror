@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.3.006
+#  Version 4.3.007
 #
 #  Module for communication between FHEM and Homematic CCU2/3.
 #
@@ -108,7 +108,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.3.006';
+my $HMCCU_VERSION = '4.3.007';
 
 # Default RPC port (BidCos-RF)
 my $HMCCU_RPC_PORT_DEFAULT = 2001;
@@ -3156,7 +3156,8 @@ sub HMCCU_UpdateSingleDatapoint ($$$$)
 	my ($devaddr, $chnnum) = HMCCU_SplitChnAddr ($ccuaddr);
 	$objects{$devaddr}{$chn}{$dpt} = $value;
 	
-	my $rc = HMCCU_UpdateMultipleDevices ($hmccu_hash, \%objects);
+#	my $rc = HMCCU_UpdateMultipleDevices ($hmccu_hash, \%objects);
+	my $rc = HMCCU_UpdateSingleDevice ($hmccu_hash, $hash, \%objects, undef);
 	return (ref ($rc)) ? $rc->{$devaddr}{$chn}{$dpt} : $value;
 }
 
@@ -3204,7 +3205,6 @@ sub HMCCU_UpdateSingleDevice ($$$$)
 	$vg = 1 if (($clthash->{ccuif} eq 'VirtualDevices' || $clthash->{ccuif} eq 'fhem') &&
 		exists ($clthash->{ccugroup}));
 
-	
 	HMCCU_Trace ($clthash, 2, $fnc, "$cltname Objects = ".join(',', @addlist));
 	
 	# Store the resulting readings
@@ -6023,6 +6023,7 @@ sub HMCCU_GetDatapoint ($@)
 	return (-4, $value) if ($cl_hash->{TYPE} ne 'HMCCU' && $cl_hash->{ccudevstate} eq 'deleted');
 
 	my $readingformat = HMCCU_GetAttrReadingFormat ($cl_hash, $io_hash);
+	my $substitute = HMCCU_GetAttrSubstitute ($cl_hash, $io_hash);
 	my ($statechn, $statedpt, $controlchn, $controldpt) = HMCCU_GetSpecialDatapoints (
 	   $cl_hash, '', 'STATE', '', '');
 	my $ccuget = HMCCU_GetAttribute ($io_hash, $cl_hash, 'ccuget', 'Value');
@@ -6045,9 +6046,14 @@ sub HMCCU_GetDatapoint ($@)
 
 	$value = HMCCU_HMCommand ($cl_hash, $cmd, 1);
 
-	if (defined ($value) && $value ne '' && $value ne 'null' &&
-		(!defined ($noupd) || $noupd == 0)) {
-		$value = HMCCU_UpdateSingleDatapoint ($cl_hash, $chn, $dpt, $value);
+	if (defined ($value) && $value ne '' && $value ne 'null') {
+		if (!defined ($noupd) || $noupd == 0) {
+			$value = HMCCU_UpdateSingleDatapoint ($cl_hash, $chn, $dpt, $value);
+		}
+		else {
+			my $svalue = HMCCU_ScaleValue ($cl_hash, $chn, $dpt, $value, 0);	
+			$value = HMCCU_Substitute ($svalue, $substitute, 0, $chn, $dpt);
+		}
 		HMCCU_Trace ($cl_hash, 2, $fnc, "Value of $chn.$dpt = $value"); 
 		return (1, $value);
 	}
