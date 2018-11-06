@@ -1051,10 +1051,7 @@ sub DbRep_Attr($$$$) {
         $do = 0 if($cmd eq "del");
         my $val = ($do == 1 ?  "disabled" : "initialized");
 		ReadingsSingleUpdateValue ($hash, "state", $val, 1);
-        if ($do == 0) {
-            #RemoveInternalTimer($hash);
-            #InternalTimer(time+5, 'DbRep_firstconnect', "$name|||", 0);
-        } else {
+        if ($do == 1) {
             my $dbh = $hash->{DBH};
             $dbh->disconnect() if($dbh);
         }
@@ -1365,7 +1362,7 @@ sub DbRep_firstconnect(@) {
    
   if ($init_done == 1) {
       if (AttrVal($name, "fastStart", 0) && $prop eq "onBoot" ) {
-          $hash->{LASTCMD} = "init database connect stopped due to attribute fastStart";
+          $hash->{LASTCMD} = "initial database connect stopped due to attribute 'fastStart'";
           return;
       } 
       # DB Struktur aus DbLog Instanz übernehmen
