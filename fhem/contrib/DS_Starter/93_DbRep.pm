@@ -386,11 +386,11 @@ sub DbRep_Define($@) {
       Log3 ($name, 4, "DbRep $name - history sql commandlist read from file ".$attr{global}{modpath}."/FHEM/FhemUtils/cacheDbRep");
   }
   
-  RemoveInternalTimer($hash);
-  InternalTimer(gettimeofday()+int(rand(45)), 'DbRep_firstconnect', "$name||onBoot|", 0);
-  
   Log3 ($name, 4, "DbRep $name - initialized");
   ReadingsSingleUpdateValue ($hash, 'state', 'initialized', 1);
+  
+  RemoveInternalTimer($hash);
+  InternalTimer(gettimeofday()+int(rand(45)), 'DbRep_firstconnect', "$name||onBoot|", 0);
    
 return undef;
 }
@@ -1052,8 +1052,8 @@ sub DbRep_Attr($$$$) {
         my $val = ($do == 1 ?  "disabled" : "initialized");
 		ReadingsSingleUpdateValue ($hash, "state", $val, 1);
         if ($do == 0) {
-            RemoveInternalTimer($hash);
-            InternalTimer(time+5, 'DbRep_firstconnect', "$name|||", 0);
+            #RemoveInternalTimer($hash);
+            #InternalTimer(time+5, 'DbRep_firstconnect', "$name|||", 0);
         } else {
             my $dbh = $hash->{DBH};
             $dbh->disconnect() if($dbh);
@@ -1362,13 +1362,12 @@ sub DbRep_firstconnect(@) {
   
   RemoveInternalTimer($hash, "DbRep_firstconnect");
   return if(IsDisabled($name));
- 
-  if (AttrVal($name, "fastStart", 0) && $prop eq "onBoot" ) {
-      $hash->{LASTCMD} = "init database connect stopped due to attribute fastStart";
-      return;
-  } 
-  
+   
   if ($init_done == 1) {
+      if (AttrVal($name, "fastStart", 0) && $prop eq "onBoot" ) {
+          $hash->{LASTCMD} = "init database connect stopped due to attribute fastStart";
+          return;
+      } 
       # DB Struktur aus DbLog Instanz übernehmen
       $hash->{HELPER}{DBREPCOL}{COLSET}     = $dbloghash->{HELPER}{COLSET};
       $hash->{HELPER}{DBREPCOL}{DEVICECOL}  = $dbloghash->{HELPER}{DEVICECOL};
