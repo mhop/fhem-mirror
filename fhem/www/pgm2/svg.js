@@ -236,7 +236,8 @@ sv_menu(evt, embed)
           par.divoffY = $(embed ? embed : svg).offset().top -
                        $("#content").offset().top-50 +
                        $("#content").scrollTop();
-          $("#content").append(par.div);
+          var parent = (embed ? $(embed).parent() : $(svg).parent()); 
+          $(parent).append(par.div);
 
           var pl = selNode[arrName];
           if(!pl)
