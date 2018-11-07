@@ -253,9 +253,11 @@ MQTT2_SERVER_Read($@)
   $hash->{lastMsgTime} = gettimeofday();
 
   # Lowlevel debugging
-  # my $pltxt = $pl;
-  # $pltxt =~ s/([^ -~])/"(".ord($1).")"/ge;
-  # Log3 $sname, 5, "$pltxt";
+  if(AttrVal($sname, "verbose", 1) >= 5) {
+    my $pltxt = $pl;
+    $pltxt =~ s/([^ -~])/"(".ord($1).")"/ge;
+    Log3 $sname, 5, "$cpt: $pltxt";
+  }
 
   if(!defined($hash->{cid}) && $cpt ne "CONNECT") {
     Log3 $sname, 2, "$cname $cpt before CONNECT, disconnecting";

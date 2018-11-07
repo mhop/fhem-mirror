@@ -303,7 +303,7 @@ my @globalAttrList = qw(
   archivedir
   archivesort:timestamp,alphanum
   archiveCompress
-  autoload_undefined_devices:1,0
+  autoload_undefined_devices:0,1
   autosave:1,0
   backup_before_update
   backupcmd
@@ -3806,7 +3806,7 @@ Dispatch($$;$$)
         if($dmsg =~ m/$h->{$m}/) {
           my ($order, $mname) = split(":", $m);
 
-          if($attr{global}{autoload_undefined_devices}) {
+          if(AttrVal("global", "autoload_undefined_devices", 1)) {
             my $newm = LoadModule($mname);
             $mname = $newm if($newm ne "UNDEFINED");
             if($modules{$mname} && $modules{$mname}{ParseFn}) {

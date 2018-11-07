@@ -144,6 +144,7 @@ MQTT2_DEVICE_Parse($$)
       }
       last;
     }
+    return if(!$newCid);
 
     my $cidHash = $modules{MQTT2_DEVICE}{defptr}{cid}{$newCid};
     my $nn = $cidHash ? $cidHash->{NAME} : "MQTT2_$newCid";
@@ -383,8 +384,8 @@ MQTT2_DEVICE_Undef($$)
 1;
 
 =pod
-=item summary    devices communicating via the MQTT2_SERVER
-=item summary_DE &uuml;ber den MQTT2_SERVER kommunizierende Ger&auml;te
+=item summary    devices communicating via the MQTT2_SERVER or MQTT2_CLIENT
+=item summary_DE &uuml;ber den MQTT2_SERVER oder MQTT2_CLIENT kommunizierende Ger&auml;te
 =begin html
 
 <a name="MQTT2_DEVICE"></a>

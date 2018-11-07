@@ -29,6 +29,7 @@ FHEM/00_LIRC.pm              rudolfkoenig         Sonstiges
 FHEM/00_MAXLAN.pm            rudolfkoenig/orphan  MAX
 FHEM/00_MQTT.pm              hexenmeister         MQTT
 FHEM/00_MQTT2_SERVER.pm      rudolfkoenig         MQTT
+FHEM/00_MQTT2_CLIENT.pm      rudolfkoenig         MQTT
 FHEM/00_MYSENSORS.pm         Hauswart             Sonstige Systeme
 FHEM/00_NetzerI2C.pm         klausw               Sonstige Systeme
 FHEM/00_Neuron.pm            klausw               Sonstige Systeme

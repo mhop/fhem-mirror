@@ -358,6 +358,7 @@ DevIo_OpenDev($$$;$)
 
       $hash->{TCPDev} = $conn;
       $hash->{FD} = $conn->fileno();
+      $hash->{CD} = $conn;
       $selectlist{"$name.$dev"} = $hash;
       return 1;
     };
