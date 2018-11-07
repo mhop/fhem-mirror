@@ -228,8 +228,10 @@ FBAHAHTTP_ProcessStack($)
   my $name = $hash->{NAME};
   my $msg = $hash->{CmdStack}->[0];
   my $host = ($hash->{DEF} =~ m/^http/i ? $hash->{DEF} : "http://$hash->{DEF}");
+  my $sid = $hash->{".SID"};
+  return if(!$sid);
   HttpUtils_NonblockingGet({
-    url=>"$host/webservices/homeautoswitch.lua?$msg",
+    url=>"$host/webservices/homeautoswitch.lua?sid=$sid&$msg",
     loglevel => AttrVal($name, "verbose", 4),
     timeout => AttrVal($name, "fbTimeout", 4),
     callback => sub {
@@ -280,7 +282,7 @@ FBAHAHTTP_Write($$$)
     return $ret if($ret);
     $sid = $hash->{".SID"};
   }
-  push(@{$hash->{CmdStack}}, "sid=$sid&ain=$fn&switchcmd=$msg");
+  push(@{$hash->{CmdStack}}, "ain=$fn&switchcmd=$msg");
   FBAHAHTTP_ProcessStack($hash) if(@{$hash->{CmdStack}} == 1);
 }
 
