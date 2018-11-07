@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 93_DbRep: V8.8.0, attribute valueFilter applied to more functions,
+                       new attribute 'fastStart'. (see 'get ... versionNotes')
   - feature: 00_10_MQTT2_CLIENT added (Forum #92888)
   - bugfix:  46_Aqicn: fix commandref, change to packages
   - bugfix:  88_HMCCU: fixed set toggle command

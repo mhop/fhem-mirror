@@ -57,17 +57,19 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Versions History intern
 our %DbRep_vNotesIntern = (
+  "8.8.0"  => "06.11.2018  first connect routine switched to DbRep_Main, get COLSET from DBLOG-instance, attribute 'fastStart' added ",
+  "8.7.0"  => "04.11.2018  attribute valueFilter applied to functions based on 'SELECT', 'UPDATE', 'DELETE' and 'valueFilter' generally applied to field 'VALUE' ",
   "8.6.0"  => "29.10.2018  reduceLog use attributes device/reading (can be overwritten by set-options) ",
   "8.5.0"  => "27.10.2018  versionNotes revised, EXCLUDE of reading/device possible (DbRep_specsForSql changed) ",
   "8.4.0"  => "22.10.2018  countEntries separately for every reading if attribute \"countEntriesDetail\" is set, ".
                            "versionNotes changed to support en/de, get dbValue as textfield-long ",
   "8.3.0"  => "17.10.2018  reduceLog from DbLog integrated into DbRep, textField-long as default for sqlCmd, both attributes timeOlderThan and timeDiffToNow can be set at same time",
   "8.2.3"  => "07.10.2018  check availability of DbLog-device at definition time of DbRep-device ",  
-  "8.2.2"  => "07.10.2018  DbRep_getMinTs changed, fix don't get the real min timestamp in rare cases ",  
+  "8.2.2"  => "07.10.2018  DbRep_getInitData changed, fix don't get the real min timestamp in rare cases ",  
   "8.2.1"  => "07.10.2018  \$hash->{dbloghash}{HELPER}{REOPEN_RUNS_UNTIL} contains time until DB is closed ",
   "8.2.0"  => "05.10.2018  direct help for attributes ",
   "8.1.0"  => "02.10.2018  new get versionNotes command ",
-  "8.0.1"  => "20.09.2018  DbRep_getMinTs improved",
+  "8.0.1"  => "20.09.2018  DbRep_getInitData improved",
   "8.0.0"  => "11.09.2018  get filesize in DbRep_WriteToDumpFile corrected, restoreMySQL for clientSide dumps, minor fixes ",
   "7.20.0"  => "04.09.2018  deviceRename can operate a Device name with blank, e.g. 'current balance' as old device name ",
   "7.19.0"  => "25.08.2018  attribute 'valueFilter' to filter datasets in fetchrows ",
@@ -121,6 +123,12 @@ our %DbRep_vNotesIntern = (
 
 # Versions History extern:
 our %DbRep_vNotesExtern = (
+  "8.8.0"  => "06.11.2018 new attribute 'fastStart'. Usually every DbRep-device is making a short connect to its database when "
+              ."FHEM is restarted. When this attribute is set, the initial connect is done when the DbRep-device is doing its "
+              ."first task. ",
+  "8.7.0"  => "04.11.2018 attribute valueFilter applied to functions 'averageValue, changeValue, countEntries, delEntries, "
+              ."delSeqDoublets, diffValue, exportToFile, fetchrows, maxValue, minValue, reduceLog, sumValue, syncStandby' ,"
+              ." 'valueFilter' generally applied to database field 'VALUE' ",
   "8.6.0"  => "29.10.2018 reduceLog use attributes device/reading (can be overwritten by set-options) ",
   "8.5.0"  => "27.10.2018 devices and readings can be excluded by EXCLUDE-option in attributes \$reading/\$device ",
   "8.4.0"  => "22.10.2018 New attribute \"countEntriesDetail\". Function countEntries creates number of datasets for every ".
@@ -232,6 +240,10 @@ our %DbRep_vNotesExtern = (
 
 # Hint Hash en
 our %DbRep_vHintsExt_en = (
+  "4" => "The attribute 'valueFilter' can specify a REGEXP expression that is used for additional field selection as described in set-function. "
+         ."If you need more assistance please to the manual of your used database. For example the overview about REGEXP for "
+         ."MariaDB refer to <a href=\"https://mariadb.com/kb/en/library/regular-expressions-overview\">Regular Expressions "
+         ."Overview</a>. ",
   "3" => "Features and restrictions of complex <a href=\"https://fhem.de/commandref.html#devspec\">device specifications (devspec) ",
   "2" => "<a href='https://www.dwd.de/DE/leistungen/klimadatendeutschland/beschreibung_tagesmonatswerte.html'>Rules</a> of german weather service for calculation of average temperatures. ",
   "1" => "Some helpful <a href=\"https://wiki.fhem.de/wiki/DbRep_-_Reporting_und_Management_von_DbLog-Datenbankinhalten#Praxisbeispiele_.2F_Hinweise_und_L.C3.B6sungsans.C3.A4tze_f.C3.BCr_verschiedene_Aufgaben\">FHEM-Wiki</a> Entries."
@@ -239,6 +251,10 @@ our %DbRep_vHintsExt_en = (
 
 # Hint Hash de
 our %DbRep_vHintsExt_de = (
+  "4" => "Im Attribut 'valueFilter' können REGEXP zur erweiterten Feldselektion angegeben werden. Welche Felder berücksichtigt "
+         ."werden, ist in der jeweiligen set-Funktion beschrieben. Für weitere Hilfe bitte die REGEXP-Dokumentation ihrer "
+         ."verwendeten Datenbank konsultieren. Ein Überblick über REGEXP mit MariaDB ist zum Beispiel hier verfügbar:\n"
+         ."<a href=\"https://mariadb.com/kb/en/library/regular-expressions-overview\">Regular Expressions Overview</a>. ",
   "3" => "Merkmale und Restriktionen von komplexen <a href=\"https://fhem.de/commandref_DE.html#devspec\">Geräte-Spezifikationen (devspec) ",
   "2" => "<a href='https://www.dwd.de/DE/leistungen/klimadatendeutschland/beschreibung_tagesmonatswerte.html'>Regularien</a> des deutschen Wetterdienstes zur Berechnung von Durchschnittstemperaturen. ",
   "1" => "Hilfreiche Hinweise zu DbRep im <a href=\"https://wiki.fhem.de/wiki/DbRep_-_Reporting_und_Management_von_DbLog-Datenbankinhalten#Praxisbeispiele_.2F_Hinweise_und_L.C3.B6sungsans.C3.A4tze_f.C3.BCr_verschiedene_Aufgaben\">FHEM-Wiki</a>."
@@ -285,6 +301,7 @@ sub DbRep_Initialize($) {
 					   "executeBeforeProc ".
 					   "executeAfterProc ".
                        "expimpfile ".
+                       "fastStart:1,0 ".
 					   "fetchRoute:ascent,descent ".
                        "fetchMarkDuplicates:red,blue,brown,green,orange ".
 					   "ftpDebug:1,0 ".
@@ -356,8 +373,9 @@ sub DbRep_Define($@) {
   $hash->{ROLE}                = AttrVal($name, "role", "Client");
   $hash->{MODEL}               = $hash->{ROLE};
   $hash->{HELPER}{DBLOGDEVICE} = $a[2];
+  $hash->{HELPER}{IDRETRIES}   = 3;                                            # Anzahl wie oft versucht wird initiale Daten zu holen
   $hash->{VERSION}             = (reverse sort(keys %DbRep_vNotesIntern))[0];
-  $hash->{NOTIFYDEV}           = "global,".$name;                     # nur Events dieser Devices an DbRep_Notify weiterleiten 
+  $hash->{NOTIFYDEV}           = "global,".$name;                              # nur Events dieser Devices an DbRep_Notify weiterleiten 
   my $dbconn                   = $defs{$a[2]}{dbconn};
   $hash->{DATABASE}            = (split(/;|=/, $dbconn))[1];
   $hash->{UTF8}                = defined($defs{$a[2]}{UTF8})?$defs{$a[2]}{UTF8}:0;
@@ -368,11 +386,11 @@ sub DbRep_Define($@) {
       Log3 ($name, 4, "DbRep $name - history sql commandlist read from file ".$attr{global}{modpath}."/FHEM/FhemUtils/cacheDbRep");
   }
   
-  RemoveInternalTimer($hash);
-  InternalTimer(gettimeofday()+int(rand(45)), 'DbRep_firstconnect', $hash, 0);
-  
   Log3 ($name, 4, "DbRep $name - initialized");
   ReadingsSingleUpdateValue ($hash, 'state', 'initialized', 1);
+  
+  RemoveInternalTimer($hash);
+  InternalTimer(gettimeofday()+int(rand(45)), 'DbRep_firstconnect', "$name||onBoot|", 0);
    
 return undef;
 }
@@ -850,7 +868,7 @@ sub DbRep_Get($@) {
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
       return "The operation \"$opt\" isn't available with database type $dbmodel" if ($dbmodel ne 'MYSQL');
 	  ReadingsSingleUpdateValue ($hash, "state", "running", 1);
-      DbRep_delread($hash);  # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
+      DbRep_delread($hash);                                          # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
       $hash->{HELPER}{RUNNING_PID} = BlockingCall("dbmeta_DoParse", "$name|$opt", "dbmeta_ParseDone", $to, "DbRep_ParseAborted", $hash);    
   
   } elsif ($opt eq "svrinfo") {
@@ -871,8 +889,10 @@ sub DbRep_Get($@) {
       return "Dump is running - try again later !" if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
       DbRep_delread($hash); 
-      ReadingsSingleUpdateValue ($hash, "state", "running", 1);   
-	  DbRep_firstconnect($hash);	  
+      ReadingsSingleUpdateValue ($hash, "state", "running", 1); 
+      $hash->{HELPER}{IDRETRIES}   = 3;                             # Anzahl wie oft versucht wird initiale Daten zu holen      
+	  $prop = $prop?$prop:'';
+      DbRep_firstconnect("$name|$opt|$prop|");	  
   
   } elsif ($opt =~ /dbValue/) {
       return "get \"$opt\" needs at least an argument" if ( @a < 3 );
@@ -999,6 +1019,7 @@ sub DbRep_Attr($$$$) {
 						 executeBeforeProc
 						 executeAfterProc
                          expimpfile
+                         fastStart
 						 ftpUse
 						 ftpUser
 						 ftpUseSSL
@@ -1030,10 +1051,7 @@ sub DbRep_Attr($$$$) {
         $do = 0 if($cmd eq "del");
         my $val = ($do == 1 ?  "disabled" : "initialized");
 		ReadingsSingleUpdateValue ($hash, "state", $val, 1);
-        if ($do == 0) {
-            RemoveInternalTimer($hash);
-            InternalTimer(time+5, 'DbRep_firstconnect', $hash, 0);
-        } else {
+        if ($do == 1) {
             my $dbh = $hash->{DBH};
             $dbh->disconnect() if($dbh);
         }
@@ -1330,22 +1348,38 @@ return undef;
 #        Verbindung zur DB aufbauen und den Timestamp des ältesten 
 #        Datensatzes ermitteln
 ###################################################################################
-sub DbRep_firstconnect($) {
-  my ($hash) = @_;
-  my $name       = $hash->{NAME};
-  my $to         = "120";
-  my $dbloghash  = $hash->{dbloghash};
-  my $dbconn     = $dbloghash->{dbconn};
-  my $dbuser     = $dbloghash->{dbuser};
-
+sub DbRep_firstconnect(@) {
+  my ($string)     = @_;
+  my ($name,$opt,$prop,$fret) = split("\\|", $string);
+  my $hash              = $defs{$name};
+  my $to                = "120";
+  my $dbloghash         = $hash->{dbloghash};
+  my $dbconn            = $dbloghash->{dbconn};
+  my $dbuser            = $dbloghash->{dbuser};
+  
   RemoveInternalTimer($hash, "DbRep_firstconnect");
   return if(IsDisabled($name));
+   
   if ($init_done == 1) {
+      if (AttrVal($name, "fastStart", 0) && $prop eq "onBoot" ) {
+          $hash->{LASTCMD} = "initial database connect stopped due to attribute 'fastStart'";
+          return;
+      } 
+      # DB Struktur aus DbLog Instanz übernehmen
+      $hash->{HELPER}{DBREPCOL}{COLSET}     = $dbloghash->{HELPER}{COLSET};
+      $hash->{HELPER}{DBREPCOL}{DEVICECOL}  = $dbloghash->{HELPER}{DEVICECOL};
+      $hash->{HELPER}{DBREPCOL}{EVENTCOL}   = $dbloghash->{HELPER}{EVENTCOL};
+      $hash->{HELPER}{DBREPCOL}{READINGCOL} = $dbloghash->{HELPER}{READINGCOL};
+      $hash->{HELPER}{DBREPCOL}{TYPECOL}    = $dbloghash->{HELPER}{TYPECOL};
+      $hash->{HELPER}{DBREPCOL}{UNITCOL}    = $dbloghash->{HELPER}{UNITCOL};
+      $hash->{HELPER}{DBREPCOL}{VALUECOL}   = $dbloghash->{HELPER}{VALUECOL}; 
+      
+      # DB Strukturelemente abrufen      
       Log3 ($name, 3, "DbRep $name - Connectiontest to database $dbconn with user $dbuser") if($hash->{LASTCMD} ne "minTimestamp");
-      $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_getMinTs", "$name", "DbRep_getMinTsDone", $to, "DbRep_getMinTsAborted", $hash);        
+      $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_getInitData", "$name|$opt|$prop|$fret", "DbRep_getInitDataDone", $to, "DbRep_getInitDataAborted", $hash);        
       $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057
   } else {
-      InternalTimer(time+1, "DbRep_firstconnect", $hash, 0);
+      InternalTimer(time+1, "DbRep_firstconnect", "$name|$opt|$prop|$fret", 0);
   }
 
 return;
@@ -1354,8 +1388,9 @@ return;
 ####################################################################################################
 #     den ältesten Datensatz (Timestamp) in der DB bestimmen 
 ####################################################################################################
-sub DbRep_getMinTs($) {
- my ($name)     = @_;
+sub DbRep_getInitData($) {
+ my ($string)     = @_;
+ my ($name,$opt,$prop,$fret) = split("\\|", $string);
  my $hash       = $defs{$name};
  my $dbloghash  = $hash->{dbloghash};
  my $dbconn     = $dbloghash->{dbconn};
@@ -1379,8 +1414,6 @@ sub DbRep_getMinTs($) {
  my $st = [gettimeofday];
  
  eval { $mints = $dbh->selectrow_array("SELECT min(TIMESTAMP) FROM history;"); }; 
- # eval { $mints = $dbh->selectrow_array("select TIMESTAMP from history limit 1;"); }; 
- # eval { $mints = $dbh->selectrow_array("select TIMESTAMP from history order by TIMESTAMP limit 1;"); }; 
  
  $dbh->disconnect;
  
@@ -1392,58 +1425,63 @@ sub DbRep_getMinTs($) {
  # Background-Laufzeit ermitteln
  my $brt = tv_interval($bst);
 
- $rt = $rt.",".$brt;
+ $rt   = $rt.",".$brt;
+ no warnings 'uninitialized'; 
  
- return "$name|$mints|$rt|0";
+return "$name|$mints|$rt|0|$opt|$prop|$fret";
 }
 
 ####################################################################################################
 # Auswertungsroutine den ältesten Datensatz (Timestamp) in der DB bestimmen 
 ####################################################################################################
-sub DbRep_getMinTsDone($) {
-  my ($string) = @_;
-  my @a          = split("\\|",$string);
-  my $hash       = $defs{$a[0]};
-  my $name       = $hash->{NAME};
-  my $mints      = decode_base64($a[1]);
-  my $bt         = $a[2];
-  my ($rt,$brt)  = split(",", $bt);
-  my $err        = $a[3]?decode_base64($a[3]):undef;
+sub DbRep_getInitDataDone($) {
+  my ($string)       = @_;
+  my @a              = split("\\|",$string);
+  my $hash           = $defs{$a[0]};
+  my $name           = $hash->{NAME};
+  my $mints          = decode_base64($a[1]);
+  my $bt             = $a[2];
+  my ($rt,$brt)      = split(",", $bt);
+  my $err            = $a[3]?decode_base64($a[3]):undef;
+  my $opt            = $a[4];
+  my $prop           = $a[5];
+  my $fret           = \&{$a[6]} if($a[6]);
   my $dblogdevice    = $hash->{HELPER}{DBLOGDEVICE};
   $hash->{dbloghash} = $defs{$dblogdevice};
   my $dbconn         = $hash->{dbloghash}{dbconn};
   
-   if ($err) {
+  if ($err) {
       readingsBeginUpdate($hash);
       ReadingsBulkUpdateValue ($hash, "errortext", $err);
       ReadingsBulkUpdateValue ($hash, "state", "disconnected");
       readingsEndUpdate($hash, 1);
       delete($hash->{HELPER}{RUNNING_PID});
       Log3 ($name, 2, "DbRep $name - DB connect failed. Make sure credentials of database $hash->{DATABASE} are valid and database is reachable.");
-      return;
+  
+  } else {
+      my $state = ($hash->{LASTCMD} eq "minTimestamp")?"done":"connected";
+      $state    = "invalid timestamp \"$mints\" found in database - please delete it" if($mints =~ /^0000-00-00.*$/);
+
+      readingsBeginUpdate($hash);
+      ReadingsBulkUpdateValue ($hash, "timestamp_oldest_dataset", $mints) if($hash->{LASTCMD} eq "minTimestamp");
+      ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);
+      readingsEndUpdate($hash, 1);
+      
+      Log3 ($name, 3, "DbRep $name - Connectiontest to db $dbconn successful") if($hash->{LASTCMD} ne "minTimestamp");
+      
+      $hash->{HELPER}{MINTS} = $mints;
   }
   
-  my $state = ($hash->{LASTCMD} eq "minTimestamp")?"done":"connected";
-  $state    = "invalid timestamp \"$mints\" found in database - please delete it" if($mints =~ /^0000-00-00.*$/);
-
-  readingsBeginUpdate($hash);
-  ReadingsBulkUpdateValue ($hash, "timestamp_oldest_dataset", $mints) if($hash->{LASTCMD} eq "minTimestamp");
-  ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);
-  readingsEndUpdate($hash, 1);
-  
-  Log3 ($name, 4, "DbRep $name - Connectiontest to db $dbconn successful") if($hash->{LASTCMD} ne "minTimestamp");
-  
-  $hash->{HELPER}{MINTS} = $mints;
-  
   delete($hash->{HELPER}{RUNNING_PID});
-  
-return;
+
+return if(!$fret);
+return &$fret($hash,$opt,$prop);
 }
 
 ####################################################################################################
 #             Abbruchroutine den ältesten Datensatz (Timestamp) in der DB bestimmen 
 ####################################################################################################
-sub DbRep_getMinTsAborted(@) {
+sub DbRep_getInitDataAborted(@) {
   my ($hash,$cause) = @_;
   my $name = $hash->{NAME};
   
@@ -1550,6 +1588,16 @@ sub DbRep_Main($$;$) {
  if (exists($hash->{HELPER}{RUNNING_PID}) && $hash->{ROLE} ne "Agent") {
      Log3 ($name, 3, "DbRep $name - WARNING - old process $hash->{HELPER}{RUNNING_PID}{pid} will be killed now to start a new BlockingCall");
      BlockingKill($hash->{HELPER}{RUNNING_PID});
+ }
+ 
+ # initiale Datenermittlung wie minimal Timestamp, Datenbankstrukturen, ...
+ if(!$hash->{HELPER}{MINTS} or !$hash->{HELPER}{DBREPCOL}{COLSET}) {
+     my $dbname = $hash->{DATABASE};
+     Log3 ($name, 3, "DbRep $name - get initial structure information of database \"$dbname\", remaining attempts: ".$hash->{HELPER}{IDRETRIES});
+     $prop = $prop?$prop:'';
+     DbRep_firstconnect("$name|$opt|$prop|DbRep_Main") if($hash->{HELPER}{IDRETRIES} > 0);
+     $hash->{HELPER}{IDRETRIES}--;
+ return;
  }
  
  ReadingsSingleUpdateValue ($hash, "state", "running", 1);
@@ -2570,6 +2618,7 @@ sub count_DoParse($) {
  my $dblogname  = $dbloghash->{NAME};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
  my $ced        = AttrVal($name,"countEntriesDetail",0);
+ my $vf         = AttrVal($name,"valueFilter","");
  my ($dbh,$sql,$sth,$err);
 
  # Background-Startzeit
@@ -4278,7 +4327,7 @@ sub change_Push($) {
 }
 
 ####################################################################################################
-# nichtblockierendes DB deviceRename / readingRename
+#                        nichtblockierendes DB changeValue (Field VALUE)
 ####################################################################################################
 sub changeval_Push($) {
  my ($string) = @_;
@@ -4537,7 +4586,6 @@ sub fetchrows_DoParse($) {
  my $limit      = AttrVal($name, "limit", 1000);
  my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
  my $fetchroute = AttrVal($name, "fetchRoute", "descent");
- my $valfilter  = AttrVal($name, "valueFilter", undef);         # nur Anzeige von Datensätzen die "valueFilter" enthalten
  $fetchroute    = ($fetchroute eq "descent")?"DESC":"ASC";
  my ($err,$dbh,$sth,$sql,$rowlist,$nrows);
  
@@ -4579,16 +4627,6 @@ sub fetchrows_DoParse($) {
  
  no warnings 'uninitialized'; 
  my @row_array = map { $_->[0]."_ESC_".$_->[1]."_ESC_".($_->[2] =~ s/ /_ESC_/r)."_ESC_".$_->[3]."_ESC_".$_->[4]."\n" } @{$sth->fetchall_arrayref()}; 
-
- # eventuell gesetzten Datensatz-Filter anwenden
- if($valfilter) {
- my @fiarr;
-     foreach my $row (@row_array) {
-         next if($row !~ /$valfilter/);
-         push @fiarr,$row;
-     }
- @row_array = @fiarr;   
- }
  
  use warnings;
  $nrows = $#row_array+1;                # Anzahl der Ergebniselemente  
@@ -4649,7 +4687,7 @@ sub fetchrows_ParseDone($) {
   my @row_array = split("\\|", $rowlist);
   s/_E#S#C_/\|/g for @row_array;                    # escaped Pipe return to "|"
   
-  Log3 ($name, 5, "DbRep $name - row_array decoded: @row_array");
+  Log3 ($name, 5, "DbRep $name - row_array decoded:\n @row_array");
   
   # Readingaufbereitung
   readingsBeginUpdate($hash);
@@ -8069,15 +8107,24 @@ return;
 ####################################################################################################
 sub DbRep_createSelectSql($$$$$$$$) {
  my ($hash,$table,$selspec,$device,$reading,$tf,$tn,$addon) = @_;
- my $name    = $hash->{NAME};
- my $dbmodel = $hash->{dbloghash}{MODEL};
- my $sql;
+ my $name      = $hash->{NAME};
+ my $dbmodel   = $hash->{dbloghash}{MODEL};
+ my $valfilter = AttrVal($name, "valueFilter", undef);        # Wertefilter
+ my ($sql,$vf);
  my $tnfull = 0;
  
  my ($idevs,$idanz,$ireading,$iranz,$edevs,$edanz,$ereading,$eranz) = DbRep_specsForSql($hash,$device,$reading);
  
  if($tn && $tn =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/) {
      $tnfull = 1;
+ }
+ 
+ if(defined $valfilter) {
+     if ($dbmodel eq "POSTGRESQL") {
+	     $vf = "VALUE ~ '$valfilter' AND ";
+	 } else {
+	     $vf = "VALUE REGEXP '$valfilter' AND ";
+	 }
  }
  
  $sql = "SELECT $selspec FROM $table where ";
@@ -8097,13 +8144,16 @@ sub DbRep_createSelectSql($$$$$$$$) {
  $sql .= "READING NOT LIKE '$ereading' AND "  if($eranz && $eranz == 1 && $ereading =~ m(\%));
  $sql .= "READING != '$ereading' AND "        if($eranz && $eranz == 1 && $ereading !~ m(\%));
  $sql .= "READING NOT IN ($ereading) AND "    if($eranz > 1);
+ # add valueFilter
+ $sql .= $vf if(defined $vf);
+ # Timestamp Filter
  if (($tf && $tn)) {
      $sql .= "TIMESTAMP >= $tf AND TIMESTAMP ".($tnfull?"<=":"<")." $tn ";
  } else {
      if ($dbmodel eq "POSTGRESQL") {
 	     $sql .= "true ";
 	 } else {
-	      $sql .= "1 ";
+	     $sql .= "1 ";
 	 }
  }
  $sql .= "$addon;";
@@ -8118,13 +8168,22 @@ sub DbRep_createUpdateSql($$$$$$$$) {
  my ($hash,$table,$selspec,$device,$reading,$tf,$tn,$addon) = @_;
  my $name    = $hash->{NAME};
  my $dbmodel = $hash->{dbloghash}{MODEL};
- my $sql;
+ my $valfilter = AttrVal($name, "valueFilter", undef);        # Wertefilter
+ my ($sql,$vf);
  my $tnfull = 0;
  
  my ($idevs,$idanz,$ireading,$iranz,$edevs,$edanz,$ereading,$eranz) = DbRep_specsForSql($hash,$device,$reading);
  
  if($tn =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/) {
      $tnfull = 1;
+ }
+ 
+ if(defined $valfilter) {
+     if ($dbmodel eq "POSTGRESQL") {
+	     $vf = "VALUE ~ '$valfilter' AND ";
+	 } else {
+	     $vf = "VALUE REGEXP '$valfilter' AND ";
+	 }
  }
 
  $sql = "UPDATE $table SET $selspec AND ";
@@ -8144,6 +8203,9 @@ sub DbRep_createUpdateSql($$$$$$$$) {
  $sql .= "READING NOT LIKE '$ereading' AND "  if($eranz && $eranz == 1 && $ereading =~ m(\%));
  $sql .= "READING != '$ereading' AND "        if($eranz && $eranz == 1 && $ereading !~ m(\%));
  $sql .= "READING NOT IN ($ereading) AND "    if($eranz > 1);
+ # add valueFilter
+ $sql .= $vf if(defined $vf);
+ # Timestamp Filter
  if (($tf && $tn)) {
      $sql .= "TIMESTAMP >= $tf AND TIMESTAMP ".($tnfull?"<=":"<")." $tn ";
  } else {
@@ -8165,7 +8227,8 @@ sub DbRep_createDeleteSql($$$$$$$) {
  my ($hash,$table,$device,$reading,$tf,$tn,$addon) = @_;
  my $name    = $hash->{NAME};
  my $dbmodel = $hash->{dbloghash}{MODEL};
- my $sql;
+ my $valfilter = AttrVal($name, "valueFilter", undef);        # Wertefilter
+ my ($sql,$vf);
  my $tnfull = 0;
  
  if($table eq "current") {
@@ -8177,6 +8240,14 @@ sub DbRep_createDeleteSql($$$$$$$) {
  
  if($tn =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/) {
      $tnfull = 1;
+ }
+ 
+ if(defined $valfilter) {
+     if ($dbmodel eq "POSTGRESQL") {
+	     $vf = "VALUE ~ '$valfilter' AND ";
+	 } else {
+	     $vf = "VALUE REGEXP '$valfilter' AND ";
+	 }
  }
  
  $sql = "delete FROM $table where ";
@@ -8196,6 +8267,9 @@ sub DbRep_createDeleteSql($$$$$$$) {
  $sql .= "READING NOT LIKE '$ereading' AND "  if($eranz && $eranz == 1 && $ereading =~ m(\%));
  $sql .= "READING != '$ereading' AND "        if($eranz && $eranz == 1 && $ereading !~ m(\%));
  $sql .= "READING NOT IN ($ereading) AND "    if($eranz > 1);
+ # add valueFilter
+ $sql .= $vf if(defined $vf);
+ # Timestamp Filter
  if ($tf && $tn) {
      $sql .= "TIMESTAMP >= '$tf' AND TIMESTAMP ".($tnfull?"<=":"<")." '$tn' $addon;";
  } else {
@@ -10042,6 +10116,24 @@ return;
                                  avgam_day_totalpac <br>
                                  # &lt;creation function&gt;_&lt;aggregation&gt;_&lt;original reading&gt; <br>                         
                                  </ul>
+                                 <br>
+                                 
+                                 Summarized the relevant attributes to control this function are: <br><br>
+                                 
+	                             <ul>
+                                 <table>  
+                                 <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                    <tr><td> <b>averageCalcForm</b>                        </td><td>: choose the calculation variant for average determination </td></tr>
+                                    <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
+                                    <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>                                      
+                                    <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time </td></tr>
+                                    <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
+                                    </table>
+	                             </ul>
+	                             <br>
+	                             <br>
+                                 
+             
                                  </li><br>
                                  
     <li><b> cancelDump </b>   -  stops a running database dump. </li> <br>
@@ -10092,11 +10184,12 @@ return;
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>device</b>            </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
-                                      <tr><td> <b>reading</b>           </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>                                      
-                                      <tr><td> <b>time.*</b>            </td><td>: a number of attributes to limit selection by time </td></tr>
- 	                                  <tr><td> <b>executeBeforeProc</b> </td><td>: execute a FHEM command (or perl-routine) before start of changeValue </td></tr>
-                                      <tr><td> <b>executeAfterProc</b>  </td><td>: execute a FHEM command (or perl-routine) after changeValue is finished </td></tr>
+                                      <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
+                                      <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>                                      
+                                      <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time </td></tr>
+ 	                                  <tr><td> <b>executeBeforeProc</b>                      </td><td>: execute a FHEM command (or perl-routine) before start of changeValue </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>                       </td><td>: execute a FHEM command (or perl-routine) after changeValue is finished </td></tr>
+                                      <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
                                       </table>
 	                               </ul>
 	                               <br>
@@ -10122,11 +10215,12 @@ return;
 	                                               <ul>
                                                    <table>  
                                                       <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                                      <tr><td> <b>aggregation</b>       </td><td>: aggregatiion/grouping of time intervals </td></tr>
-                                                      <tr><td> <b>countEntriesDetail</b></td><td>: detailed report the count of datasets (per reading) </td></tr>
-                                                      <tr><td> <b>device</b>            </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
-                                                      <tr><td> <b>reading</b>           </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>
-                                                      <tr><td> <b>time.*</b>            </td><td>: a number of attributes to limit selection by time </td></tr>
+                                                      <tr><td> <b>aggregation</b>                            </td><td>: aggregatiion/grouping of time intervals </td></tr>
+                                                      <tr><td> <b>countEntriesDetail</b>                     </td><td>: detailed report the count of datasets (per reading) </td></tr>
+                                                      <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
+                                                      <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>
+                                                      <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time </td></tr>
+                                                      <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
                                                       </table>
 	                                               </ul>
 	                                               <br>                                           
@@ -10155,7 +10249,8 @@ return;
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
                                       <tr><td> <b>allowDeletion</b>     </td><td>: unlock the delete function </td></tr>
                                       <tr><td> <b>device</b>            </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
-                                      <tr><td> <b>reading</b>           </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>                                      <tr><td> <b>time.*</b>            </td><td>: a number of attributes to limit selection by time </td></tr>
+                                      <tr><td> <b>reading</b>           </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>                                      
+                                      <tr><td> <b>time.*</b>            </td><td>: a number of attributes to limit selection by time </td></tr>
  	                                  <tr><td> <b>executeBeforeProc</b> </td><td>: execute a FHEM command (or perl-routine) before start of delEntries </td></tr>
                                       <tr><td> <b>executeAfterProc</b>  </td><td>: execute a FHEM command (or perl-routine) after delEntries is finished </td></tr>
                                       </table>
@@ -10231,6 +10326,25 @@ return;
                                  <b>2017-11-25_23-58-09__eg.az.fridge_Pwr__power 51.73 </b>     <br>
                                  </ul>
 								 </ul>
+                                 <br>
+                                 
+                                 Summarized the relevant attributes to control this function are: <br><br>
+
+	                             <ul>
+                                 <table>  
+                                 <colgroup> <col width=5%> <col width=95%> </colgroup>
+								    <tr><td> <b>allowDeletion</b>                          </td><td>: needs to be set to execute the delete option </td></tr>
+								    <tr><td> <b>aggregation</b>                            </td><td>: choose the aggregation period </td></tr>
+								    <tr><td> <b>limit</b>                                  </td><td>: limits ONLY the count of datasets to display </td></tr>
+                                    <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
+                                    <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>                                      
+ 	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: execute a FHEM command (or perl-routine) before start of delEntries </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: execute a FHEM command (or perl-routine) after delEntries is finished </td></tr>                       
+  						            <tr><td> <b>seqDoubletsVariance</b>                    </td><td>: Up to this value consecutive numerical datasets are handled as identical and should be deleted </td></tr>                                      
+								    <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time </td></tr>
+                                    <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
+								 </table>
+	                             </ul>
                                 
                                  </li>
 								 <br>
@@ -10263,7 +10377,7 @@ return;
                                  The difference will be generated from the first available dataset (VALUE-Field) to the last available dataset between the 
 								 specified time linits/aggregation, in which a balanced difference value of the previous aggregation period will be transfered to the
 								 following aggregation period in case this period contains a value. <br>
-								 An possible counter overrun (restart with value "0") will be considered (compare <a href="#DbRepattr">attribute</a> "diffAccept"). <br><br>
+								 A possible counter overrun (restart with value "0") will be considered (compare <a href="#DbRepattr">attribute</a> "diffAccept"). <br><br>
 								 
 								 If only one dataset will be found within the evalution period, the difference can be calculated only in combination with the balanced
 								 difference of the previous aggregation period. In this case a logical inaccuracy according the assignment of the difference to the particular aggregation period
@@ -10294,6 +10408,25 @@ return;
                                  diff_day_totalpac <br>
                                  # &lt;creation function&gt;_&lt;aggregation&gt;_&lt;original reading&gt; <br>   
                                  </ul>								 
+                                 <br>
+                                 
+                                 Summarized the relevant attributes to control this function are: <br><br>
+
+	                             <ul>
+                                 <table>  
+                                 <colgroup> <col width=5%> <col width=95%> </colgroup>
+								    <tr><td> <b>aggregation</b>                            </td><td>: choose the aggregation period </td></tr>
+								    <tr><td> <b>diffAccept</b>                             </td><td>: the maximum accepted difference between sequential records </td></tr>
+                                    <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
+                                    <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>                                      
+ 	                                <tr><td> <b>readingNameMap</b>                         </td><td>: rename the resulted reading name </td></tr>
+ 								    <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time </td></tr>
+                                    <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
+								 </table>
+	                             </ul>
+	                             <br>
+	                             <br>
+                                 
                                  </li><br>
                                  
 
@@ -10530,14 +10663,16 @@ return;
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>aggregation</b>        </td><td>: determination of selection time slices </td></tr>
-                                      <tr><td> <b>device</b>             </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
-                                      <tr><td> <b>reading</b>            </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>                                      <tr><td> <b>time.*</b>            </td><td>: a number of attributes to limit selection by time </td></tr>
-	                                  <tr><td> <b>executeBeforeProc</b>  </td><td>: execution of FHEM command (or perl-routine) before export </td></tr>
-                                      <tr><td> <b>executeAfterProc</b>   </td><td>: execution of FHEM command (or perl-routine) after export </td></tr>
-	                                  <tr><td> <b>expimpfile</b>         </td><td>: the name of exportfile </td></tr>
-                                      <tr><td> <b>time.*</b>             </td><td>: a number of attributes to limit selection by time </td></tr>
-                                   </table>
+                                      <tr><td> <b>aggregation</b>                          </td><td>: determination of selection time slices </td></tr>
+                                      <tr><td> <b>device</b>                               </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
+                                      <tr><td> <b>reading</b>                              </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>                                      <tr><td> <b>time.*</b>            </td><td>: a number of attributes to limit selection by time </td></tr>
+	                                  <tr><td> <b>executeBeforeProc</b>                    </td><td>: execution of FHEM command (or perl-routine) before export </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>                     </td><td>: execution of FHEM command (or perl-routine) after export </td></tr>
+	                                  <tr><td> <b>expimpfile</b>                           </td><td>: the name of exportfile </td></tr>
+                                      <tr><td> <b>time.*</b>                               </td><td>: a number of attributes to limit selection by time </td></tr>
+                                    <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
+
+                                      </table>
 	                               </ul>                                   
                                  
                                  </li> <br>
@@ -10583,13 +10718,13 @@ return;
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>fetchRoute</b>            </td><td>: direction of selection read in database </td></tr>
-                                      <tr><td> <b>limit</b>                 </td><td>: limits the number of datasets to select and display </td></tr>
-                                      <tr><td> <b>fetchMarkDuplicates</b>   </td><td>: Highlighting of found doublets </td></tr>
-                                      <tr><td> <b>device</b>                </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
-                                      <tr><td> <b>reading</b>               </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>                                      <tr><td> <b>time.*</b>            </td><td>: a number of attributes to limit selection by time </td></tr>
-                                      <tr><td> <b>time.*</b>                </td><td>: A number of attributes to limit selection by time </td></tr>
-                                      <tr><td> <b>valueFilter</b>           </td><td>: Filter datasets which are to show by a regular expression. The regex is applied to the whole selected dataset. </td></tr>
+                                      <tr><td> <b>fetchRoute</b>                             </td><td>: direction of selection read in database </td></tr>
+                                      <tr><td> <b>limit</b>                                  </td><td>: limits the number of datasets to select and display </td></tr>
+                                      <tr><td> <b>fetchMarkDuplicates</b>                    </td><td>: Highlighting of found doublets </td></tr>
+                                      <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
+                                      <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>                                      
+                                      <tr><td> <b>time.*</b>                                 </td><td>: A number of attributes to limit selection by time </td></tr>
+                                      <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
                                    </table>
 	                               </ul>
 	                               <br>
@@ -10676,6 +10811,22 @@ return;
                                  max_day_totalpac <br>
                                  # &lt;creation function&gt;_&lt;aggregation&gt;_&lt;original reading&gt; <br>                         
                                  </ul>
+                                 <br>
+                                 
+                                 Summarized the relevant attributes to control this function are: <br><br>
+
+	                             <ul>
+                                 <table>  
+                                 <colgroup> <col width=5%> <col width=95%> </colgroup>
+								    <tr><td> <b>aggregation</b>                            </td><td>: choose the aggregation period </td></tr>
+                                    <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
+                                    <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; from selection </td></tr> 
+                                    <tr><td> <b>readingNameMap</b>                         </td><td>: rename the resulted readings </td></tr>									
+								    <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time </td></tr>
+                                    <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
+								 </table>
+	                             </ul>                                 
+                                 
                                  </li><br>
                                  
     <li><b> minValue [display | writeToDB]</b>     
@@ -10700,6 +10851,22 @@ return;
                                  min_day_totalpac <br>
                                  # &lt;creation function&gt;_&lt;aggregation&gt;_&lt;original reading&gt; <br>                         
                                  </ul>
+                                 <br>
+                                 
+                                 Summarized the relevant attributes to control this function are: <br><br>
+
+	                             <ul>
+                                 <table>  
+                                 <colgroup> <col width=5%> <col width=95%> </colgroup>
+								    <tr><td> <b>aggregation</b>                            </td><td>: choose the aggregation period </td></tr>
+                                    <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
+                                    <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; from selection </td></tr> 
+                                    <tr><td> <b>readingNameMap</b>                         </td><td>: rename the resulted readings </td></tr>									
+								    <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time </td></tr>
+                                    <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
+								 </table>
+	                             </ul>                                   
+                                 
                                  </li><br>   
 
 	<li><b> optimizeTables </b> - optimize tables in the connected database (MySQL). <br>
@@ -10754,14 +10921,15 @@ return;
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
-	                                  <tr><td> <b>executeBeforeProc</b>  </td><td>: execution of FHEM command (or perl-routine) before reducelog </td></tr>
-                                      <tr><td> <b>executeAfterProc</b>   </td><td>: execution of FHEM command (or perl-routine) after reducelog </td></tr>
-                                      <tr><td> <b>device</b>             </td><td>: include or exclude &lt;device&gt; for selection </td></tr>
-                                      <tr><td> <b>reading</b>            </td><td>: include or exclude &lt;reading&gt; for selection </td></tr>                                      <tr><td> <b>time.*</b>       </td><td>: Attribute zur Zeitabgrenzung der zu übertragenden Datensätze.  </td></tr>
-                                      <tr><td> <b>timeOlderThan</b>      </td><td>: records <b>older</b> than this attribute will be reduced </td></tr>
-                                      <tr><td> <b>timestamp_end</b>      </td><td>: records <b>older</b> than this attribute will be reduced </td></tr>
-                                      <tr><td> <b>timeDiffToNow</b>      </td><td>: records <b>newer</b> than this attribute will be reduced </td></tr>
-                                      <tr><td> <b>timestamp_begin</b>    </td><td>: records <b>newer</b> than this attribute will be reduced </td></tr>
+	                                  <tr><td> <b>executeBeforeProc</b>                      </td><td>: execution of FHEM command (or perl-routine) before reducelog </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>                       </td><td>: execution of FHEM command (or perl-routine) after reducelog </td></tr>
+                                      <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; for selection </td></tr>
+                                      <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; for selection </td></tr>
+                                      <tr><td> <b>timeOlderThan</b>                          </td><td>: records <b>older</b> than this attribute will be reduced </td></tr>
+                                      <tr><td> <b>timestamp_end</b>                          </td><td>: records <b>older</b> than this attribute will be reduced </td></tr>
+                                      <tr><td> <b>timeDiffToNow</b>                          </td><td>: records <b>newer</b> than this attribute will be reduced </td></tr>
+                                      <tr><td> <b>timestamp_begin</b>                        </td><td>: records <b>newer</b> than this attribute will be reduced </td></tr>
+                                      <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
                                    </table>
 	                               </ul>
                                    <br>
@@ -10990,9 +11158,24 @@ return;
                                  <b>Example of building a new reading name from the original reading "totalpac":</b> <br>
                                  sum_day_totalpac <br>
                                  # &lt;creation function&gt;_&lt;aggregation&gt;_&lt;original reading&gt; <br>                         
-                                 </li> <br>
                                  </ul>
                                  <br>
+
+                                 Summarized the relevant attributes to control this function are: <br><br>
+
+	                             <ul>
+                                 <table>  
+                                 <colgroup> <col width=5%> <col width=95%> </colgroup>
+								    <tr><td> <b>aggregation</b>                            </td><td>: choose the aggregation period </td></tr>
+                                    <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
+                                    <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; from selection </td></tr> 
+                                    <tr><td> <b>readingNameMap</b>                         </td><td>: rename the resulted readings </td></tr>									
+								    <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time </td></tr>
+                                    <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
+								 </table>
+	                             </ul>                                   
+                                 
+                                 </li> <br>
                                  
     <li><b> syncStandby &lt;DbLog-Device Standby&gt; </b>    
                                  -  datasets of the connected database (source) are transmitted into another database 
@@ -11009,17 +11192,18 @@ return;
 
                                  The relevant attributes to control the syncStandby function are: <br><br>
 
-	                               <ul>
-                                   <table>  
-                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>aggregation</b>  </td><td>: adjustment of time slices for data transmission (hour,day,week) </td></tr>
-                                      <tr><td> <b>device</b>       </td><td>: include or exclude &lt;device&gt; for transmission </td></tr>
-                                      <tr><td> <b>reading</b>      </td><td>: include or exclude &lt;reading&gt; for transmission </td></tr>                                      <tr><td> <b>time.*</b>            </td><td>: a number of attributes to limit selection by time </td></tr>
-                                      <tr><td> <b>time.*</b>       </td><td>: A number of attributes to limit selection by time  </td></tr>
-                                   </table>
-	                               </ul>
-	                               <br>
-	                               <br>                                 
+	                             <ul>
+                                 <table>  
+                                 <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                    <tr><td> <b>aggregation</b>                            </td><td>: adjustment of time slices for data transmission (hour,day,week) </td></tr>
+                                    <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; for transmission </td></tr>
+                                    <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; for transmission </td></tr>                                      
+                                    <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time  </td></tr>
+                                    <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
+
+                                 </table>
+	                             </ul>
+                                
 								 </li> <br>
 		
 	<li><b> tableCurrentFillup </b> - the current-table will be filled u with an extract of the history-table.  
@@ -11445,6 +11629,15 @@ sub bdump {
                                 <a href="https://fhem.de/commandref.html#FileLog">Filelog</a>. <br>
 								<br><br>
 
+  <a name="fastStart"></a>
+  <li><b>fastStart </b>       - Usually every DbRep device is making a short connect to its database when FHEM is started to
+                                retrieve some important informations and the reading "state" switches to "connected" on success.
+                                If this attrbute is set, the initial database connection is executed not till then the 
+                                DbRep device is processing its first command. <br>
+                                While the reading "state" is remaining in state "initialized" after FHEM-start. 
+                                This approach my be helpful if a lot of DbRep devices are defined.                                
+                                </li> <br>
+                                
   <a name="fetchMarkDuplicates"></a>
   <li><b>fetchMarkDuplicates </b> 
                               - Highlighting of multiple occuring datasets in result of "fetchrows" command </li> <br>
@@ -11851,10 +12044,11 @@ sub bdump {
 							   <br><br> 
   
   <a name="valueFilter"></a>  
-  <li><b>valueFilter </b>     - Regular expression to filter datasets within particular functions. The regex is  
+  <li><b>valueFilter </b>     - Regular expression (REGEXP) to filter datasets within particular functions. The REGEXP is  
                                 applied to a particular field or to the whole selected dataset (inclusive Device, Reading and 
                                 so on). 
-                                Please consider the explanations within the set-commands. </li> <br> 
+                                Please consider the explanations within the set-commands. Further information is available 
+                                with command "get &lt;name&gt; versionNotes 4". </li> <br> 
 							   
 </ul>
 </ul></ul>
@@ -12069,7 +12263,7 @@ sub bdump {
   IO::Uncompress::Gunzip       <br>
   Blocking        (FHEM-Modul) <br><br>
   
-  Aus Performancegründen sollten zusätzlich folgender Index erstellt werden: <br>
+  Aus Performancegründen sollte zusätzlich folgender Index erstellt werden: <br>
   <code>
   CREATE INDEX Report_Idx ON `history` (TIMESTAMP, READING) USING BTREE;
   </code>
@@ -12120,9 +12314,28 @@ sub bdump {
                                  <ul>
                                  <b>Beispiel neuer Readingname gebildet aus dem Originalreading "totalpac":</b> <br>
                                  avgam_day_totalpac <br>
-                                 # &lt;Bildungsfunktion&gt;_&lt;Aggregation&gt;_&lt;Originalreading&gt; <br>                         
-                                 </li> <br>
+                                 # &lt;Bildungsfunktion&gt;_&lt;Aggregation&gt;_&lt;Originalreading&gt; <br>
                                  </ul>
+                                 <br>
+                                 
+                                 Zusammengefasst sind die zur Steuerung dieser Funktion relevanten Attribute: <br><br>
+
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+           					          <tr><td> <b>aggregation</b>                            </td><td>: Auswahl einer Aggregationsperiode </td></tr>
+                                      <tr><td> <b>averageCalcForm</b>                        </td><td>: Auswahl der Berechnungsvariante für den Durchschnitt</td></tr>
+                                      <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
+                                      <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
+                                      <tr><td> <b>readingNameMap</b>                         </td><td>: die entstehenden Ergebnisreadings werden partiell umbenannt </td></tr>									
+								      <tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
+                                      <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
+									  </table>
+	                               </ul>
+	                               <br>
+	                               <br>                           
+                                 
+                                 </li> <br>
 
     <li><b> cancelDump </b>   -  bricht einen laufenden Datenbankdump ab. </li> <br>
     
@@ -12171,11 +12384,13 @@ sub bdump {
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>device</b>            </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
-                                      <tr><td> <b>reading</b>           </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
-                                      <tr><td> <b>time.*</b>            </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
-	                                  <tr><td> <b>executeBeforeProc</b> </td><td>: ausführen FHEM Kommando (oder perl-Routine) vor Start changeValue </td></tr>
-                                      <tr><td> <b>executeAfterProc</b>  </td><td>: ausführen FHEM Kommando (oder perl-Routine) nach Ende changeValue </td></tr>
+                                      <tr><td> <b>device</b>                                  </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
+                                      <tr><td> <b>aggregation</b>                             </td><td>: Auswahl einer Aggregationsperiode </td></tr>
+                                      <tr><td> <b>reading</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
+                                      <tr><td> <b>time.*</b>                                  </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
+	                                  <tr><td> <b>executeBeforeProc</b>                       </td><td>: ausführen FHEM Kommando (oder perl-Routine) vor Start changeValue </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>                        </td><td>: ausführen FHEM Kommando (oder perl-Routine) nach Ende changeValue </td></tr>
+                                      <tr><td style="vertical-align:top"> <b>valueFilter</b>       <td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
                                       </table>
 	                               </ul>
 	                               <br>
@@ -12202,11 +12417,14 @@ sub bdump {
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>aggregation</b>       </td><td>: Zusammenfassung/Gruppierung von Zeitintervallen </td></tr>
-                                      <tr><td> <b>countEntriesDetail</b></td><td>: detaillierte Ausgabe der Datensatzanzahl </td></tr>
-                                      <tr><td> <b>device</b>            </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
-                                      <tr><td> <b>reading</b>           </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>                                      <tr><td> <b>time.*</b>            </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
-                                      </table>
+                                      <tr><td> <b>aggregation</b>                            </td><td>: Zusammenfassung/Gruppierung von Zeitintervallen </td></tr>
+                                      <tr><td> <b>countEntriesDetail</b>                     </td><td>: detaillierte Ausgabe der Datensatzanzahl </td></tr>
+                                      <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
+                                      <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>                                      
+                                      <tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
+                                      <tr><td> <b>readingNameMap</b>                         </td><td>: die entstehenden Ergebnisreadings werden partiell umbenannt </td></tr>
+                                      <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
+                                      </table>              
 	                               </ul>
 	                               <br>
                                    
@@ -12222,29 +12440,31 @@ sub bdump {
                                  beide Timestamps gesetzt <b>-&gt;</b>  gelöscht werden DB-Einträge <b>zwischen</b> diesen Zeitpunkten <br>
                                  "timeOlderThan" gesetzt  <b>-&gt;</b>  gelöscht werden DB-Einträge <b>älter</b> als aktuelle Zeit minus "timeOlderThan" <br>
                                  "timeDiffToNow" gesetzt  <b>-&gt;</b>  gelöscht werden DB-Einträge <b>ab</b> aktueller Zeit minus "timeDiffToNow" bis jetzt <br>
-                                 
+                                 </ul>                                 
                                  <br>
+                                 
                                  Aus Sicherheitsgründen muss das <a href="#DbRepattr">Attribut</a> "allowDeletion" 
 								 gesetzt sein um die Löschfunktion freizuschalten. <br><br>
                                  
                                  Die zur Steuerung von delEntries relevanten Attribute: <br><br>
 
-	                               <ul>
-                                   <table>  
-                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>allowDeletion</b>     </td><td>: Freischaltung der Löschfunktion </td></tr>
-                                      <tr><td> <b>device</b>            </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
-                                      <tr><td> <b>reading</b>           </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>                                      <tr><td> <b>time.*</b>            </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
-	                                  <tr><td> <b>executeBeforeProc</b> </td><td>: ausführen FHEM Kommando (oder perl-Routine) vor Start delEntries </td></tr>
-                                      <tr><td> <b>executeAfterProc</b>  </td><td>: ausführen FHEM Kommando (oder perl-Routine) nach Ende delEntries </td></tr>
-                                      </table>
-	                               </ul>
-	                               <br>
-	                               <br>
+	                             <ul>
+                                 <table>  
+                                 <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                    <tr><td> <b>allowDeletion</b>                          </td><td>: Freischaltung der Löschfunktion </td></tr>
+                                    <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
+                                    <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>                                      
+                                    <tr><td> <b>readingNameMap</b>                         </td><td>: die entstehenden Ergebnisreadings werden partiell umbenannt </td></tr>
+                                    <tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
+	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: ausführen FHEM Kommando (oder perl-Routine) vor Start delEntries </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: ausführen FHEM Kommando (oder perl-Routine) nach Ende delEntries </td></tr>
+                                    <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>    
+                                 </table>
+	                             </ul>
+	                             <br>
                                  
                                  </li>
 								 <br>
-                                 </ul>
 								 
     <li><b> delSeqDoublets [adviceRemain | adviceDelete | delete]</b>   -  zeigt bzw. löscht aufeinander folgende identische Datensätze.
 	                             Dazu wird Device,Reading und Value ausgewertet. Nicht gelöscht werden der erste und der letzte Datensatz 
@@ -12311,10 +12531,28 @@ sub bdump {
                                  <b>2017-11-25_23-58-09__eg.az.fridge_Pwr__power 51.73 </b>     <br>
                                  </ul>
 								 </ul>
+                                 <br>
+                                 
+                                 Zusammengefasst sind die zur Steuerung dieser Funktion relevanten Attribute: <br><br>
+
+	                             <ul>
+                                 <table>  
+                                 <colgroup> <col width=5%> <col width=95%> </colgroup>
+								    <tr><td> <b>allowDeletion</b>                          </td><td>: needs to be set to execute the delete option </td></tr>
+           					        <tr><td> <b>aggregation</b>                            </td><td>: Auswahl einer Aggregationsperiode </td></tr>
+                                    <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
+                                    <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
+                                    <tr><td> <b>readingNameMap</b>                         </td><td>: die entstehenden Ergebnisreadings werden partiell umbenannt </td></tr>									
+								    <tr><td> <b>seqDoubletsVariance</b>                    </td><td>: bis zu diesem Wert werden aufeinander folgende numerische Datensätze als identisch angesehen und werden gelöscht </td></tr> 
+									<tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
+	                                <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
+									</table>
+	                             </ul>
+	                             <br>
+	                             <br>                                 
                                 
                                  </li>
-								 <br>
-								 <br>
+
                              
     <li><b> deviceRename &lt;old_name&gt;,&lt;new_name&gt;</b> -  
                                  benennt den Namen eines Device innerhalb der angeschlossenen Datenbank (Internal DATABASE) um.
@@ -12370,9 +12608,27 @@ sub bdump {
                                  <ul>
                                  <b>Beispiel neuer Readingname gebildet aus dem Originalreading "totalpac":</b> <br>
                                  diff_day_totalpac <br>
-                                 # &lt;Bildungsfunktion&gt;_&lt;Aggregation&gt;_&lt;Originalreading&gt; <br>                         
-                                 </li> <br>
+                                 # &lt;Bildungsfunktion&gt;_&lt;Aggregation&gt;_&lt;Originalreading&gt; <br> 
                                  </ul>
+                                 <br>
+
+                                 Zusammengefasst sind die zur Steuerung dieser Funktion relevanten Attribute: <br><br>
+
+	                             <ul>
+                                 <table>  
+                                 <colgroup> <col width=5%> <col width=95%> </colgroup>
+           					        <tr><td> <b>aggregation</b>                            </td><td>: Auswahl einer Aggregationsperiode </td></tr>
+                                    <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
+                                    <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
+                                    <tr><td> <b>readingNameMap</b>                         </td><td>: die entstehenden Ergebnisreadings werden partiell umbenannt </td></tr>									
+								    <tr><td> <b>seqDoubletsVariance</b>                    </td><td>: bis zu diesem Wert werden aufeinander folgende numerische Datensätze als identisch angesehen und werden gelöscht </td></tr> 
+									<tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
+                                    <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
+									</table>
+	                             </ul>
+	                             <br>
+                                 
+                                 </li> <br>
 
     <li><b> dumpMySQL [clientSide | serverSide]</b>    
 	                             -  erstellt einen Dump der angeschlossenen MySQL-Datenbank.  <br>
@@ -12601,17 +12857,20 @@ sub bdump {
                                  exportiert werden sollen und vermeidet den "died prematurely" Abbruchfehler. <br><br>
 
                  	             Die für diese Funktion relevanten Attribute sind: <br><br>
-	                               <ul>
-                                   <table>  
-                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>aggregation</b>        </td><td>: Festlegung der Selektionspaketierung </td></tr>
-                                      <tr><td> <b>device</b>             </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
-                                      <tr><td> <b>reading</b>            </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>	                                  <tr><td> <b>executeBeforeProc</b>  </td><td>: FHEM Kommando (oder perl-Routine) vor dem Export ausführen </td></tr>
-                                      <tr><td> <b>executeAfterProc</b>   </td><td>: FHEM Kommando (oder perl-Routine) nach dem Export ausführen </td></tr>
-	                                  <tr><td> <b>expimpfile</b>         </td><td>: der Name des Exportfiles </td></tr>
-                                      <tr><td> <b>time.*</b>             </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
-                                   </table>
-	                               </ul>
+	                             
+                                 <ul>
+                                 <table>  
+                                 <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                    <tr><td> <b>aggregation</b>                            </td><td>: Festlegung der Selektionspaketierung </td></tr>
+                                    <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
+                                    <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>	                                  
+                                    <tr><td> <b>executeBeforeProc</b>                      </td><td>: FHEM Kommando (oder perl-Routine) vor dem Export ausführen </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: FHEM Kommando (oder perl-Routine) nach dem Export ausführen </td></tr>
+	                                <tr><td> <b>expimpfile</b>                             </td><td>: der Name des Exportfiles </td></tr>
+                                    <tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
+                                    <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
+                                 </table>
+	                             </ul>
 	                                
                                  </li><br>
         
@@ -12659,12 +12918,13 @@ sub bdump {
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>fetchRoute</b>            </td><td>: Leserichtung der Selektion innerhalb der Datenbank </td></tr>
-                                      <tr><td> <b>limit</b>                 </td><td>: begrenzt die Anzahl zu selektierenden bzw. anzuzeigenden Datensätze  </td></tr>
-                                      <tr><td> <b>fetchMarkDuplicates</b>   </td><td>: Hervorhebung von gefundenen Dubletten </td></tr>
-                                      <tr><td> <b>device</b>                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
-                                      <tr><td> <b>reading</b>               </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>                                      <tr><td> <b>time.*</b>                </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
-                                      <tr><td> <b>valueFilter</b>           </td><td>: filtert die anzuzeigenden Datensätze mit einem regulären Ausdruck. Der Regex wird auf den gesamten anzuzeigenden Datensatz angewendet. </td></tr>
+                                      <tr><td> <b>fetchRoute</b>                             </td><td>: Leserichtung der Selektion innerhalb der Datenbank </td></tr>
+                                      <tr><td> <b>limit</b>                                  </td><td>: begrenzt die Anzahl zu selektierenden bzw. anzuzeigenden Datensätze  </td></tr>
+                                      <tr><td> <b>fetchMarkDuplicates</b>                    </td><td>: Hervorhebung von gefundenen Dubletten </td></tr>
+                                      <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
+                                      <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>                                      
+                                      <tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
+                                      <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: filtert die anzuzeigenden Datensätze mit einem regulären Ausdruck. Der Regex wird auf Werte des DAtenbankfelder 'VALUE' angewendet. </td></tr>
                                    </table>
 	                               </ul>
 	                               <br>
@@ -12756,8 +13016,27 @@ sub bdump {
                                  <b>Beispiel neuer Readingname gebildet aus dem Originalreading "totalpac":</b> <br>
                                  max_day_totalpac <br>
                                  # &lt;Bildungsfunktion&gt;_&lt;Aggregation&gt;_&lt;Originalreading&gt; <br>                         
+                                 </ul> 
+                                 <br>
+                                 
+                                 Zusammengefasst sind die zur Steuerung dieser Funktion relevanten Attribute: <br><br>
+
+	                             <ul>
+                                 <table>  
+                                 <colgroup> <col width=5%> <col width=95%> </colgroup>
+           					        <tr><td> <b>aggregation</b>                            </td><td>: Auswahl einer Aggregationsperiode </td></tr>
+								    <tr><td> <b>limit</b>                                  </td><td>: die Anzahl der ANZUZEIGENDEN Datensätz wird beschränkt </td></tr>
+                                    <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
+                                    <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
+                                    <tr><td> <b>readingNameMap</b>                         </td><td>: die entstehenden Ergebnisreadings werden partiell umbenannt </td></tr>									
+									<tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
+                                    <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
+									</table>
+	                             </ul>
+	                             <br>                                 
+                                 
                                  </li> <br>
-                                 </ul>                                
+                                                                
                                  
     <li><b> minValue [display | writeToDB]</b>     
                                  - berechnet den Minimalwert des Datenbankfelds "VALUE" in den Zeitgrenzen 
@@ -12783,8 +13062,26 @@ sub bdump {
                                  <b>Beispiel neuer Readingname gebildet aus dem Originalreading "totalpac":</b> <br>
                                  min_day_totalpac <br>
                                  # &lt;Bildungsfunktion&gt;_&lt;Aggregation&gt;_&lt;Originalreading&gt; <br>                         
-                                 </li> <br>
-                                 </ul>                                 
+                                 </ul>
+                                 <br>
+                                 
+                                 Zusammengefasst sind die zur Steuerung dieser Funktion relevanten Attribute: <br><br>
+
+	                             <ul>
+                                 <table>  
+                                 <colgroup> <col width=5%> <col width=95%> </colgroup>
+           					        <tr><td> <b>aggregation</b>                            </td><td>: Auswahl einer Aggregationsperiode </td></tr>
+								    <tr><td> <b>limit</b>                                  </td><td>: die Anzahl der ANZUZEIGENDEN Datensätz wird beschränkt </td></tr>
+                                    <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
+                                    <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
+                                    <tr><td> <b>readingNameMap</b>                         </td><td>: die entstehenden Ergebnisreadings werden partiell umbenannt </td></tr>									
+									<tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
+                                    <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
+									</table>
+	                             </ul>
+	                             <br>                                 
+                                 
+                                 </li> <br>                                 
 								 
 	<li><b> optimizeTables </b> - optimiert die Tabellen in der angeschlossenen Datenbank (MySQL). <br>
 								  Vor und nach der Optimierung kann ein FHEM-Kommando ausgeführt werden. 
@@ -12838,20 +13135,21 @@ sub bdump {
                                  
                  	             Die für diese Funktion relevanten Attribute sind: <br><br>
                                  
-	                               <ul>
-                                   <table>  
-                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
-	                                  <tr><td> <b>executeBeforeProc</b>  </td><td>: FHEM Kommando (oder perl-Routine) vor dem Export ausführen </td></tr>
-                                      <tr><td> <b>executeAfterProc</b>   </td><td>: FHEM Kommando (oder perl-Routine) nach dem Export ausführen </td></tr>
-                                      <tr><td> <b>device</b>             </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
-                                      <tr><td> <b>reading</b>            </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>                                      <tr><td> <b>time.*</b>       </td><td>: Attribute zur Zeitabgrenzung der zu übertragenden Datensätze.  </td></tr>
-                                      <tr><td> <b>timeOlderThan</b>      </td><td>: es werden Datenbankeinträge <b>älter</b> als dieses Attribut reduziert </td></tr>
-                                      <tr><td> <b>timestamp_end</b>      </td><td>: es werden Datenbankeinträge <b>älter</b> als dieses Attribut reduziert </td></tr>
-                                      <tr><td> <b>timeDiffToNow</b>      </td><td>: es werden Datenbankeinträge <b>neuer</b> als dieses Attribut reduziert </td></tr>
-                                      <tr><td> <b>timestamp_begin</b>    </td><td>: es werden Datenbankeinträge <b>neuer</b> als dieses Attribut reduziert </td></tr>
-                                   </table>
-	                               </ul>
-                                   <br>
+	                             <ul>
+                                 <table>  
+                                 <colgroup> <col width=5%> <col width=95%> </colgroup>
+	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: FHEM Kommando (oder perl-Routine) vor dem Export ausführen </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: FHEM Kommando (oder perl-Routine) nach dem Export ausführen </td></tr>
+                                    <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
+                                    <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>                                      
+                                    <tr><td> <b>timeOlderThan</b>                          </td><td>: es werden Datenbankeinträge <b>älter</b> als dieses Attribut reduziert </td></tr>
+                                    <tr><td> <b>timestamp_end</b>                          </td><td>: es werden Datenbankeinträge <b>älter</b> als dieses Attribut reduziert </td></tr>
+                                    <tr><td> <b>timeDiffToNow</b>                          </td><td>: es werden Datenbankeinträge <b>neuer</b> als dieses Attribut reduziert </td></tr>
+                                    <tr><td> <b>timestamp_begin</b>                        </td><td>: es werden Datenbankeinträge <b>neuer</b> als dieses Attribut reduziert </td></tr>
+                                    <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
+                                 </table>
+	                             </ul>
+                                 <br>
                                  
                                  Aus Kompatibilitätsgründen kann der Befehl optional durch die Zusätze "EXCLUDE" bzw. "INCLUDE"
                                  ergänzt werden um device/reading Kombinationen von reduceLog auszuschließen bzw. einzuschließen: <br><br>
@@ -13063,28 +13361,45 @@ sub bdump {
 								 
     <li><b> sumValue [display | writeToDB]</b>     
                                  - Berechnet die Summenwerte des Datenbankfelds "VALUE" in den Zeitgrenzen 
-	                               (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow / timeOlderThan". 
-                                   Es muss das auszuwertende Reading im <a href="#DbRepattr">Attribut</a> "reading" 
-								   angegeben sein. Diese Funktion ist sinnvoll wenn fortlaufend Wertedifferenzen eines 
-								   Readings in die Datenbank geschrieben werden.  <br>
+	                             (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow / timeOlderThan". 
+                                 Es muss das auszuwertende Reading im <a href="#DbRepattr">Attribut</a> "reading" 
+								 angegeben sein. Diese Funktion ist sinnvoll wenn fortlaufend Wertedifferenzen eines 
+								 Readings in die Datenbank geschrieben werden.  <br>
                                  
-                                   Ist keine oder die Option "display" angegeben, werden die Ergebnisse nur angezeigt. Mit 
-                                   der Option "writeToDB" werden die Berechnungsergebnisse mit einem neuen Readingnamen
-                                   in der Datenbank gespeichert. <br>
-                                   Der neue Readingname wird aus einem Präfix und dem originalen Readingnamen gebildet, 
-								   wobei der originale Readingname durch das Attribut "readingNameMap" ersetzt werden kann. 
-                                   Der Präfix setzt sich aus der Bildungsfunktion und der Aggregation zusammen. <br>
-                                   Der Timestamp der neuen Readings in der Datenbank wird von der eingestellten Aggregationsperiode 
-                                   abgeleitet, sofern kein eindeutiger Zeitpunkt des Ergebnisses bestimmt werden kann. 
-                                   Das Feld "EVENT" wird mit "calculated" gefüllt.<br><br>
+                                 Ist keine oder die Option "display" angegeben, werden die Ergebnisse nur angezeigt. Mit 
+                                 der Option "writeToDB" werden die Berechnungsergebnisse mit einem neuen Readingnamen
+                                 in der Datenbank gespeichert. <br>
+                                 Der neue Readingname wird aus einem Präfix und dem originalen Readingnamen gebildet, 
+								 wobei der originale Readingname durch das Attribut "readingNameMap" ersetzt werden kann. 
+                                 Der Präfix setzt sich aus der Bildungsfunktion und der Aggregation zusammen. <br>
+                                 Der Timestamp der neuen Readings in der Datenbank wird von der eingestellten Aggregationsperiode 
+                                 abgeleitet, sofern kein eindeutiger Zeitpunkt des Ergebnisses bestimmt werden kann. 
+                                 Das Feld "EVENT" wird mit "calculated" gefüllt.<br><br>
                                  
-                                   <ul>
-                                   <b>Beispiel neuer Readingname gebildet aus dem Originalreading "totalpac":</b> <br>
-                                   sum_day_totalpac <br>
-                                   # &lt;Bildungsfunktion&gt;_&lt;Aggregation&gt;_&lt;Originalreading&gt; <br>                         
-                                   </li> <br>
-                                   </ul>
-                                   <br>
+                                 <ul>
+                                 <b>Beispiel neuer Readingname gebildet aus dem Originalreading "totalpac":</b> <br>
+                                 sum_day_totalpac <br>
+                                 # &lt;Bildungsfunktion&gt;_&lt;Aggregation&gt;_&lt;Originalreading&gt; <br>                         
+                                 </ul>
+                                 <br>
+                                 
+                                 Zusammengefasst sind die zur Steuerung dieser Funktion relevanten Attribute: <br><br>
+
+	                             <ul>
+                                 <table>  
+                                 <colgroup> <col width=5%> <col width=95%> </colgroup>
+           					        <tr><td> <b>aggregation</b>                            </td><td>: Auswahl einer Aggregationsperiode </td></tr>
+								    <tr><td> <b>limit</b>                                  </td><td>: die Anzahl der ANZUZEIGENDEN Datensätz wird beschränkt </td></tr>
+                                    <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
+                                    <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
+                                    <tr><td> <b>readingNameMap</b>                         </td><td>: die entstehenden Ergebnisreadings werden partiell umbenannt </td></tr>									
+									<tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
+                                    <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
+									</table>
+	                             </ul>
+	                             <br>                                 
+                                 
+                                 </li> <br>
                                    
     <li><b> syncStandby &lt;DbLog-Device Standby&gt; </b>    
                                  -  Es werden die Datensätze aus der angeschlossenen Datenbank (Quelle) direkt in eine weitere 
@@ -13101,17 +13416,19 @@ sub bdump {
 
                                  Die zur Steuerung der syncStandby Funktion relevanten Attribute sind: <br><br>
 
-	                               <ul>
-                                   <table>  
-                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>aggregation</b>  </td><td>: Einstellung der Zeitscheiben zur Übertragung (hour,day,week) </td></tr>
-                                      <tr><td> <b>device</b>       </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
-                                      <tr><td> <b>reading</b>      </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>                                      <tr><td> <b>time.*</b>       </td><td>: Attribute zur Zeitabgrenzung der zu übertragenden Datensätze.  </td></tr>
-                                   </table>
-	                               </ul>
-	                               <br>
-	                               <br>                                 
-								 </li> <br>
+	                             <ul>
+                                 <table>  
+                                 <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                    <tr><td> <b>aggregation</b>                            </td><td>: Einstellung der Zeitscheiben zur Übertragung (hour,day,week) </td></tr>
+                                    <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
+                                    <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>                                      
+                                    <tr><td> <b>time.*</b>                                 </td><td>: Attribute zur Zeitabgrenzung der zu übertragenden Datensätze.  </td></tr>
+                                    <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
+                                 </table>
+	                             </ul>
+	                             <br>                               
+
+                                 </li> <br>
 								 
 	<li><b> tableCurrentFillup </b> - Die current-Tabelle wird mit einem Extrakt der history-Tabelle aufgefüllt. 
 	                                  Die <a href="#DbRepattr">Attribute</a> zur Zeiteinschränkung bzw. device, reading werden ausgewertet.
@@ -13530,7 +13847,16 @@ sub bdump {
                                 <a name="DbRep_expimpfile"></a>
                                 Zur POSIX Wildcardverwendung siehe auch die Erläuterungen zu <a href="#FileLog">Filelog</a>. 
 								<br><br>
-  
+
+  <a name="fastStart"></a>
+  <li><b>fastStart </b>       - Normalerweise verbindet sich jedes DbRep-Device beim FHEM-Start kurz mit seiner Datenbank um 
+                                benötigte Informationen abzurufen und das Reading "state" springt bei Erfolg auf "connected". 
+                                Ist dieses Attribut gesetzt, erfolgt die initiale Datenbankverbindung erst dann wenn das 
+                                DbRep-Device sein erstes Kommando ausführt. <br>
+                                Das Reading "state" verbleibt nach FHEM-Start solange im Status "initialized". Diese Einstellung
+                                kann hilfreich sein wenn viele DbRep-Devices definiert sind.                                
+                                </li> <br>
+                                
   <a name="fetchMarkDuplicates"></a>
   <li><b>fetchMarkDuplicates </b> 
                               - Markierung von mehrfach vorkommenden Datensätzen im Ergebnis des "fetchrows" Kommandos </li> <br>
@@ -13947,10 +14273,11 @@ sub bdump {
                                <br>
 
   <a name="valueFilter"></a>                                
-  <li><b>valueFilter </b>     - Regulärer Ausdruck zur Filterung von Datensätzen innerhalb bestimmter Funktionen. Der 
-                                Regex wird auf ein bestimmtes Feld oder den gesamten selektierten Datensatz (inkl. Device, 
+  <li><b>valueFilter </b>     - Regulärer Ausdruck (REGEXP) zur Filterung von Datensätzen innerhalb bestimmter Funktionen. 
+                                Der REGEXP wird auf ein bestimmtes Feld oder den gesamten selektierten Datensatz (inkl. Device, 
                                 Reading usw.) angewendet. 
-                                Bitte beachten sie die Erläuterungen zu den entsprechenden Set-Kommandos. </li> <br> 
+                                Bitte beachten sie die Erläuterungen zu den entsprechenden Set-Kommandos. Weitere Informationen
+                                sind mit "get &lt;name&gt; versionNotes 4" verfügbar. </li> <br> 
                                 
 
 </ul></ul>
