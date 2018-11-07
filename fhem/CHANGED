@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  46_Aqicn: fix commandref, change to packages
   - bugfix:  88_HMCCU: fixed set toggle command
   - new:     98_livetracking: added module
   - bugfix:  38_netatmo: changed geocoding to openstreetmap
