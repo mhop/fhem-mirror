@@ -5066,7 +5066,7 @@ addToWritebuffer($$@)
   $hash->{WBCallback} = $callback;
   if(!$hash->{$wbName}) {
     $hash->{$wbName} = $txt;
-  } elsif($nolimit || length($hash->{$wbName}) < 102400) {
+  } elsif($nolimit || length($hash->{$wbName}) < 1024000) {
     $hash->{$wbName} .= $txt;
   } else {
     return 0;
