@@ -73,19 +73,21 @@ sub
 MQTT2_CLIENT_connect($)
 {
   my ($hash) = @_;
-  return DevIo_OpenDev($hash, 0, "MQTT2_CLIENT_doinit")
+  my $disco = (ReadingsVal($hash->{NAME}, "state", "") eq "disconnected");
+  $hash->{connecting} = 1 if($disco && !$hash->{connecting});
+  $hash->{nextOpenDelay} = 5;
+  return DevIo_OpenDev($hash, $disco, "MQTT2_CLIENT_doinit", sub(){})
                 if($hash->{connecting});
 }
 
 sub
-MQTT2_CLIENT_doinit($;$)
+MQTT2_CLIENT_doinit($)
 {
-  my ($hash, $subscribe) = @_;
+  my ($hash) = @_;
   my $name = $hash->{NAME};
 
-  delete($hash->{connecting});
   ############################## CONNECT
-  if(!$subscribe) {
+  if($hash->{connecting} == 1) {
     my $usr = AttrVal($name, "username", "");
     my ($err, $pwd) = getKeyValue($name);
     if($err) {
@@ -108,6 +110,7 @@ MQTT2_CLIENT_doinit($;$)
                  (pack("n", length($lwtm)).$lwtm) : "").
         ($usr ? (pack("n", length($usr)).$usr) : "").
         ($pwd ? (pack("n", length($pwd)).$pwd) : "");
+    $hash->{connecting} = 2;
     addToWritebuffer($hash,
       pack("C",0x10).
       MQTT2_CLIENT_calcRemainingLength(length($msg)).$msg);
@@ -115,7 +118,7 @@ MQTT2_CLIENT_doinit($;$)
     InternalTimer(gettimeofday()+$keepalive, "MQTT2_CLIENT_keepalive",$hash,0);
 
   ############################## SUBSCRIBE
-  } else {
+  } elsif($hash->{connecting} == 2) {
     my $msg = 
         pack("n", $hash->{FD}). # packed Identifier
         join("", map { pack("n", length($_)).$_.pack("C",0) } # QOS:0
@@ -123,6 +126,7 @@ MQTT2_CLIENT_doinit($;$)
     addToWritebuffer($hash,
       pack("C",0x80).
       MQTT2_CLIENT_calcRemainingLength(length($msg)).$msg);
+    $hash->{connecting} = 3;
 
   }
   return undef;
@@ -272,7 +276,7 @@ MQTT2_CLIENT_Read($@)
   if($cpt eq "CONNACK")  {
     my $rc = ord(substr($fb,1,1));
     if($rc == 0) {
-      MQTT2_CLIENT_doinit($hash, 1);
+      MQTT2_CLIENT_doinit($hash);
 
     } else {
       my @txt = ("Accepted", "bad proto", "bad id", "server unavailable",
@@ -283,7 +287,9 @@ MQTT2_CLIENT_Read($@)
       return;
     }
   } elsif($cpt eq "PUBACK")   { # ignore it
-  } elsif($cpt eq "SUBACK")   { # ignore it
+  } elsif($cpt eq "SUBACK")   {
+    delete($hash->{connecting});
+
   } elsif($cpt eq "PINGRESP") { # ignore it
   } elsif($cpt eq "PUBLISH")  {
     my $cf = ord(substr($fb,0,1)) & 0xf;
