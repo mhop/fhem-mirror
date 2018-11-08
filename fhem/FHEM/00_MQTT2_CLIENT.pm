@@ -251,9 +251,10 @@ MQTT2_CLIENT_Read($@)
   }
 
   my ($tlen, $off) = MQTT2_CLIENT_getRemainingLength($hash);
-  if($tlen < 0) {
+  if($tlen < 0 || $tlen+$off<=0) {
     Log3 $name, 1, "Bogus data from $name, closing connection";
     MQTT2_CLIENT_Disco($hash);
+    return;
   }
   return if(length($hash->{BUF}) < $tlen+$off);
 
