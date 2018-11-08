@@ -46,7 +46,9 @@ $(document).ready(function(){
     f18_attr["Pinned.menu"] = false;
   }
 
-  var f18_aCol = getComputedStyle($("a").get(0),null).getPropertyValue('color');
+  var f18_aCol = "rgb(39, 135, 39)";
+  if($("a").length)
+    f18_aCol = getComputedStyle($("a").get(0),null).getPropertyValue('color');
   f18_loadIcons();
   f18_loadTouch();
   for(var i in f18_icon)
