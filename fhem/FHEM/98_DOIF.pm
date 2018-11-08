@@ -652,14 +652,14 @@ sub EvalValueDoIf($$$)
   if ($err) {
     my $error="$pn: error in $attr: $err";
     Log3 $pn,4 , $error;
-    readingsSingleUpdate ($hash, "error", $error,0);
+    readingsSingleUpdate ($hash, "error", $error,1);
     $value=0;
   } else {
      my $ret = eval $value;
      if ($@) {
        my $error="$pn: error in $attr: $value";
        Log3 $pn,4 , $error;
-       readingsSingleUpdate ($hash, "error", $error,0);
+       readingsSingleUpdate ($hash, "error", $error,1);
        $value=0;
      } else {
        $value=$ret;
@@ -808,7 +808,7 @@ sub AggrIntDoIf
             $warning=1;
             $lastWarningMsg =~ s/^(.*) at \(eval.*$/$1/;
             Log3 ($hash->{NAME},3 , "$hash->{NAME}: aggregate function: warning in condition: $cond, Device: $name");
-            readingsSingleUpdate ($hash, "warning_aggr", "condition: $cond , device: $name, $lastWarningMsg",0);
+            readingsSingleUpdate ($hash, "warning_aggr", "condition: $cond , device: $name, $lastWarningMsg",1);
           } 
           $lastWarningMsg="";
         }
@@ -946,7 +946,7 @@ sub EventDoIf
             $element= eval $output;
             if ($@) {
               Log3 ($hash->{NAME},4 , "$hash->{NAME}: $@");
-              readingsSingleUpdate ($hash, "error", $@,0);
+              readingsSingleUpdate ($hash, "error", $@,1);
               return(undef);
             }
           }
@@ -992,7 +992,7 @@ sub InternalDoIf
       $element= eval $output;
       if ($@) {
         Log3 ($hash->{NAME},4 , "$hash->{NAME}: $@");
-        readingsSingleUpdate ($hash, "error", $@,0);
+        readingsSingleUpdate ($hash, "error", $@,1);
         return(undef);
       }
     }
@@ -1041,7 +1041,7 @@ sub ReadingValDoIf
         $element= eval $output;
         if ($@) {
           Log3 ($hash->{NAME},4 , "$hash->{NAME}: $@");
-          readingsSingleUpdate ($hash, "error", $@,0);
+          readingsSingleUpdate ($hash, "error", $@,1);
           return(undef);
         }
       }
@@ -1678,7 +1678,7 @@ sub DOIF_time {
   if ($err) {
     my $errmsg="error in days: $err";
     Log3 ($hash->{NAME},4 , "$hash->{NAME}: $errmsg");
-    readingsSingleUpdate ($hash, "error", $errmsg,0);
+    readingsSingleUpdate ($hash, "error", $errmsg,1);
     return 0;
   }
   $days=DOIF_weekdays($hash,$days);
@@ -1711,7 +1711,7 @@ sub DOIF_time_once {
   if ($err) {
     my $errmsg="error in days: $err";
     Log3 ($hash->{NAME},4 , "$hash->{NAME}: $errmsg");
-    readingsSingleUpdate ($hash, "error", $errmsg,0);
+    readingsSingleUpdate ($hash, "error", $errmsg,1);
     return 0;
   }
   $days=DOIF_weekdays($hash,$days);
@@ -1879,7 +1879,7 @@ sub DOIF_CheckCond($$) {
   }
   if ($lastWarningMsg) {
     $lastWarningMsg =~ s/^(.*) at \(eval.*$/$1/;
-    readingsSingleUpdate ($hash, "warning", sprintf("condition c%02d",($condition+1)).": $lastWarningMsg",0);
+    readingsSingleUpdate ($hash, "warning", sprintf("condition c%02d",($condition+1)).": $lastWarningMsg",1);
   } else {
     delete ($defs{$hash->{NAME}}{READINGS}{warning});
   }
@@ -2153,9 +2153,9 @@ sub DOIF_Perl_Trigger
       if ($err) {
         Log3 $hash->{Name},4,"$hash->{NAME}: $err in perl block ".($i+1) if ($ret != -1);
         if ($hash->{perlblock}{$i}) {
-          readingsSingleUpdate ($hash, "block_$hash->{perlblock}{$i}", $err,0);
+          readingsSingleUpdate ($hash, "block_$hash->{perlblock}{$i}", $err,1);
         } else {
-          readingsSingleUpdate ($hash, sprintf("block_%02d",($i+1)), $err,0);
+          readingsSingleUpdate ($hash, sprintf("block_%02d",($i+1)), $err,1);
         }
       } else {
         if ($hash->{perlblock}{$i}) {
@@ -2221,7 +2221,7 @@ sub DOIF_Trigger
     if (($ret,$err)=DOIF_CheckCond($hash,$i)) {
       if ($err) {
         Log3 $hash->{Name},4,"$hash->{NAME}: $err" if ($ret != -1);
-        readingsSingleUpdate ($hash, "error", $err,0);
+        readingsSingleUpdate ($hash, "error", $err,1);
         return undef;
       }
       if ($ret) {
@@ -3305,7 +3305,7 @@ sub DOIF_ExecTimer
   }
   if ($@) {
     ::Log3 ($::defs{$name}{NAME},1 , "$name error in $subname: $@");
-    ::readingsSingleUpdate ($hash, "error", "in $subname: $@",0);
+    ::readingsSingleUpdate ($hash, "error", "in $subname: $@",1);
   }
 }
 
