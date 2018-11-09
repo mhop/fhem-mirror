@@ -332,6 +332,12 @@ MQTT2_DEVICE_Attr($$)
       return "$dev $attrName regexp error: $@" if($@);
       $modules{MQTT2_DEVICE}{defptr}{bridge}{$par1} = $par2;
     }
+
+    if($init_done) {
+      my $name = $hash->{NAME};
+      AnalyzeCommandChain(undef,
+                      "deleteattr $name readingList; deletereading $name .*");
+    }
   }
 
   return undef;
@@ -437,9 +443,12 @@ MQTT2_DEVICE_Undef($$)
       will create different MQTT2_DEVICE instances for different hex numbers in
       the topic. Note: the newClientId is enclosed in "", as it is a perl
       expression, should be unique, and the automatically created device will
-      be created also with this name.
-
+      be created also with this name.<br>
+      <br>
       Multiple tuples of &lt;regexp&gt; newClientId are separated by newline.
+      <br>
+      Note: setting bridgeRegexp will remove th readingList attribute and all
+      readings.
       </li><br>
 
     <a name="devicetopic"></a>

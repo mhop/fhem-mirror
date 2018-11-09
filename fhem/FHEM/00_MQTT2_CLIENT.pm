@@ -270,7 +270,7 @@ MQTT2_CLIENT_Read($@)
   if(AttrVal($name, "verbose", 1) >= 5) {
     my $pltxt = $pl;
     $pltxt =~ s/([^ -~])/"(".ord($1).")"/ge;
-    Log3 $name, 5, "$cpt: $pltxt";
+    Log3 $name, 5, "$name: received $cpt $pltxt";
   }
 
   ####################################
@@ -328,6 +328,7 @@ MQTT2_CLIENT_doPublish($$$$)
   my $name = $hash->{NAME};
   return if(IsDisabled($name));
   $val = "" if(!defined($val));
+  Log3 $name, 5, "$name: sending PUBLISH $topic $val";
   addToWritebuffer($hash,
     pack("C",0x30).
     MQTT2_CLIENT_calcRemainingLength(2+length($topic)+length($val)).
