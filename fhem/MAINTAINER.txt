@@ -349,6 +349,7 @@ FHEM/73_PRESENCE.pm          markusbloch          Unterstuetzende Dienste
 FHEM/73_MPD.pm               Wzut                 Multimedia
 FHEM/73_AMADCommBridge.pm    CoolTux              Sonstige Systeme
 FHEM/73_GardenaSmartBridge.pm CoolTux             Sonstige Systeme
+FHEM/73_AutoShuttersControl.pm CoolTux            Automatisierung
 FHEM/74_NUKIBridge.pm        CoolTux              Sonstige Systeme
 FHEM/74_AMADDevice.pm        CoolTux              Sonstige Systeme
 FHEM/74_GardenaSmartDevice.pm CoolTux             Sonstige Systeme
