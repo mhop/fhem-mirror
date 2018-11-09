@@ -126,7 +126,8 @@ MQTT2_DEVICE_Parse($$)
     }
   }
 
-  # autocreate and expand readingList
+  #################################################
+  # autocreate and/or expand readingList
   if($autocreate && !%fnd) {
     return "" if($cid && $cid =~ m/mosqpub.*/);
 
@@ -161,7 +162,8 @@ MQTT2_DEVICE_Parse($$)
       }
       my $rl = AttrVal($nn, "readingList", "");
       $rl .= "\n" if($rl);
-      CommandAttr(undef, "$nn readingList $rl$cid:$topic:.* $add");
+      my $regexpCid = ($cid eq $newCid ? "$cid:" : "");
+      CommandAttr(undef, "$nn readingList $rl${regexpCid}$topic:.* $add");
       MQTT2_DEVICE_Parse($iodev, $msg);
     }, undef);
 
