@@ -27,6 +27,7 @@ MQTT2_CLIENT_Initialize($)
   $hash->{AttrFn}  = "MQTT2_CLIENT_Attr";
   $hash->{SetFn}   = "MQTT2_CLIENT_Set";
   $hash->{UndefFn} = "MQTT2_CLIENT_Undef";
+  $hash->{DeleteFn}= "MQTT2_CLIENT_Delete";
   $hash->{WriteFn} = "MQTT2_CLIENT_Write";
   $hash->{ReadyFn} = "MQTT2_CLIENT_connect";
 
@@ -153,6 +154,15 @@ MQTT2_CLIENT_Undef($@)
   DevIo_CloseDev($hash);
   return undef;
 }
+
+sub
+MQTT2_CLIENT_Delete($@)
+{
+  my ($hash, $arg) = @_;
+  setKeyValue($hash->{NAME}, undef);
+  return undef;
+}
+
 
 sub
 MQTT2_CLIENT_Attr(@)
