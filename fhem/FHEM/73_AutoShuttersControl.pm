@@ -38,7 +38,7 @@ package main;
 use strict;
 use warnings;
 
-my $version = "0.2.0";
+my $version = "0.2.0.1";
 
 sub AutoShuttersControl_Initialize($) {
     my ($hash) = @_;
@@ -93,8 +93,7 @@ sub AutoShuttersControl_Initialize($) {
 
 ## unserer packagename
 package AutoShuttersControl;
-no warnings "experimental::declared_refs";
-use feature "declared_refs";
+
 use strict;
 use warnings;
 use POSIX;
