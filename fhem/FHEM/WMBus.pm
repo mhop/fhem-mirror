@@ -95,6 +95,7 @@ use constant {
   ERR_FRAGMENT_UNSUPPORTED => 14,
   ERR_UNKNOWN_COMPACT_FORMAT => 15,
   ERR_CIPHER_NOT_INSTALLED => 16,
+  ERR_LINK_LAYER_INVALID => 17,
   
   # TYPE C transmission uses two different frame types
   # see http://www.st.com/content/ccc/resource/technical/document/application_note/3f/fb/35/5a/25/4e/41/ba/DM00233038.pdf/files/DM00233038.pdf/jcr:content/translations/en.DM00233038.pdf
@@ -1863,7 +1864,11 @@ sub decodeLinkLayer($$)
   my $self = shift;
   my $linklayer = shift;
 
-
+  if (length($linklayer) < TL_BLOCK_SIZE + $self->{crc_size}) {
+    $self->{errormsg} = "link layer too short";
+    $self->{errorcode} = ERR_LINK_LAYER_INVALID;
+    return 0;
+  }
   ($self->{lfield}, $self->{cfield}, $self->{mfield}) = unpack('CCv', $linklayer);
   $self->{afield} = substr($linklayer,4,6);
   $self->{afield_id} = sprintf("%08d", $self->decodeBCD(8,substr($linklayer,4,4)));
