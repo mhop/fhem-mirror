@@ -40,6 +40,7 @@ MQTT2_CLIENT_Initialize($)
     lwt
     lwtRetain
     mqttVersion:3.1.1,3.1
+    onConnect
     rawEvents
     subscriptions
     SSL
@@ -285,14 +286,16 @@ MQTT2_CLIENT_Read($@)
 
   ####################################
   if($cpt eq "CONNACK")  {
-    my $rc = ord(substr($fb,1,1));
+    my $rc = ord(substr($pl,1,1));
     if($rc == 0) {
+      my $onc = AttrVal($name, "onConnect", "");
+      MQTT2_CLIENT_doPublish($hash, split(" ", $onc, 2)) if($onc);
       MQTT2_CLIENT_doinit($hash);
 
     } else {
       my @txt = ("Accepted", "bad proto", "bad id", "server unavailable",
                   "bad user name or password", "not authorized");
-      Log3 1, $name, "$name: Connection refused, ".
+      Log3 $name, 1, "$name: Connection refused, ".
         ($rc <= int(@txt) ? $txt[$rc] : "unknown error $rc");
       MQTT2_CLIENT_Disco($hash);
       return;
@@ -314,13 +317,15 @@ MQTT2_CLIENT_Read($@)
     $val = substr($pl, $off);
     addToWritebuffer($hash, pack("CCnC*", 0x40, 2, $pid)) if($qos); # PUBACK
 
-    $val = "" if(!defined($val));
-    my $ac = AttrVal($name, "autocreate", undef) ? "autocreate:":"";
-    my $cid = $hash->{clientId};
-    Dispatch($hash, "$ac$cid:$tp:$val", undef, !$ac);
+    if(!IsDisabled($name)) {
+      $val = "" if(!defined($val));
+      my $ac = AttrVal($name, "autocreate", undef) ? "autocreate:":"";
+      my $cid = $hash->{clientId};
+      Dispatch($hash, "$ac$cid:$tp:$val", undef, !$ac);
 
-    my $re = AttrVal($name, "rawEvents", undef);
-    DoTrigger($name, "$tp:$val") if($re && $tp =~ m/$re/);
+      my $re = AttrVal($name, "rawEvents", undef);
+      DoTrigger($name, "$tp:$val") if($re && $tp =~ m/$re/);
+    }
 
   } else {
     Log 1, "M2: Unhandled packet $cpt, disconneting $name";
@@ -481,6 +486,11 @@ MQTT2_CLIENT_getStr($$)
     <a name="mqttVersion"></a>
     <li>mqttVersion 3.1,3.1.1<br>
       set the MQTT protocol version in the CONNECT header, default is 3.1
+      </li></br>
+
+    <a name="onConnect"></a>
+    <li>onConnect topic message<br>
+      publish the topic after each connect or reconnect.
       </li></br>
 
     <a name="rawEvents"></a>
