@@ -25,11 +25,12 @@
 # Supported devices are UVR1611, UVR16x2, RSM610, CAN-I/O45, CAN-EZ2, CAN-MTx2,
 # and CAN-BC2 by Technische Alternative https://www.ta.co.at/
 #
-# Information in the Wiki: https://wiki.fhem.de/wiki/UVR16x2
+# Information in the Wiki: https://wiki.fhem.de/wiki/TA_CMI_UVR16x2_UVR1611
 #
 # Discussed in FHEM Forum:
-# * https://forum.fhem.de/index.php/topic,41439.0.html
-# * https://forum.fhem.de/index.php/topic,13534.45.html
+# * https://forum.fhem.de/index.php/topic,92740.0.html (official)
+# * https://forum.fhem.de/index.php/topic,41439.0.html (previous discussions)
+# * https://forum.fhem.de/index.php/topic,13534.45.html (previous discussions)
 #
 # $Id$
 #
@@ -40,30 +41,54 @@ use strict;
 use warnings;
 use HttpUtils;
 
-sub TA_CMI_JSON_Initialize;
-sub TA_CMI_JSON_Define;
-sub TA_CMI_JSON_GetStatus;
-sub TA_CMI_JSON_Undef;
-sub TA_CMI_JSON_PerformHttpRequest;
-sub TA_CMI_JSON_ParseHttpResponse;
-sub TA_CMI_JSON_Get;
-sub TA_CMI_JSON_extractDeviceName;
-sub TA_CMI_JSON_extractVersion;
-sub TA_CMI_JSON_extractReadings;
+my %deviceNames = (
+  '80' => 'UVR1611',
+  '87' => 'UVR16x2',
+  '88' => 'RSM610',
+  '89' => 'CAN-I/O45',
+  '8B' => 'CAN-EZ2',
+  '8C' => 'CAN-MTx2',
+  '8D' => 'CAN-BC2'
+);
 
-sub TA_CMI_JSON_Initialize($) {
+my %versions = (
+  1 => '1.25.2 2016-12-12',
+  2 => '1.26.1 2017-02-24',
+  3 => '1.28.0 2017-11-09'
+);
+
+my %units = (
+   0 => '', 1 => '°C', 2 => 'W/m²', 3 => 'l/h', 4 => 'Sek', 5 => 'Min', 6 => 'l/Imp',
+   7 => 'K', 8 => '%', 10 => 'kW', 11 => 'kWh', 12 => 'MWh', 13 => 'V', 14 => 'mA',
+  15 => 'Std', 16 => 'Tage', 17 => 'Imp', 18 => 'kΩ', 19 => 'l', 20 => 'km/h',
+  21 => 'Hz', 22 => 'l/min', 23 => 'bar', 24 => '', 25 => 'km', 26 => 'm', 27 => 'mm',
+  28 => 'm³', 35 => 'l/d', 36 => 'm/s', 37 => 'm³/min', 38 => 'm³/h', 39 => 'm³/d',
+  40 => 'mm/min', 41 => 'mm/h', 42 => 'mm/d', 43 => 'Aus/Ein', 44 => 'Nein/Ja',
+  46 => '°C', 50 => '€', 51 => '$', 52 => 'g/m³', 53 => '', 54 => '°', 56 => '°',
+  57 => 'Sek', 58 => '', 59 => '%', 60 => 'Uhr', 63 => 'A', 65 => 'mbar', 66 => 'Pa',
+  67 => 'ppm'
+);
+
+my %rasStates = (
+  0 => 'Time/auto',
+  1 => 'Standard',
+  2 => 'Setback',
+  3 => 'Standby/frost pr.'
+);
+
+sub TA_CMI_JSON_Initialize {
   my ($hash) = @_;
 
   $hash->{GetFn}     = "TA_CMI_JSON_Get";
   $hash->{DefFn}     = "TA_CMI_JSON_Define";
   $hash->{UndefFn}   = "TA_CMI_JSON_Undef";
 
-  $hash->{AttrList} = "username password interval readingNamesInputs readingNamesOutputs readingNamesDL-Bus " . $readingFnAttributes;
+  $hash->{AttrList} = "username password interval readingNamesInputs readingNamesOutputs readingNamesDL-Bus readingNamesLoggingAnalog readingNamesLoggingDigital includePrettyReadings:0,1 includeUnitReadings:0,1 " . $readingFnAttributes;
 
   Log3 '', 3, "TA_CMI_JSON - Initialize done ...";
 }
 
-sub TA_CMI_JSON_Define($$) {
+sub TA_CMI_JSON_Define {
   my ( $hash, $def ) = @_;
   my @a = split( "[ \t][ \t]*", $def );
  
@@ -94,14 +119,14 @@ sub TA_CMI_JSON_Define($$) {
   return undef;
 }
 
-sub TA_CMI_JSON_GetStatus( $;$ ) {
+sub TA_CMI_JSON_GetStatus {
   my ( $hash, $delay ) = @_;
   my $name = $hash->{NAME};
 
   TA_CMI_JSON_PerformHttpRequest($hash);
 }
 
-sub TA_CMI_JSON_Undef($$) {
+sub TA_CMI_JSON_Undef {
   my ($hash, $arg) = @_; 
   my $name = $hash->{NAME};
 
@@ -111,7 +136,7 @@ sub TA_CMI_JSON_Undef($$) {
   return undef;
 }
 
-sub TA_CMI_JSON_PerformHttpRequest($) {
+sub TA_CMI_JSON_PerformHttpRequest {
     my ($hash, $def) = @_;
     my $name = $hash->{NAME};
     my $url = "http://$hash->{CMIURL}/INCLUDE/api.cgi?jsonnode=$hash->{NODEID}&jsonparam=$hash->{QUERYPARAM}";
@@ -132,37 +157,60 @@ sub TA_CMI_JSON_PerformHttpRequest($) {
     HttpUtils_NonblockingGet($param);
 }
 
-sub TA_CMI_JSON_ParseHttpResponse($) {
+sub TA_CMI_JSON_ParseHttpResponse {
   my ($param, $err, $data) = @_;
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
   my $return;
 
   if($err ne "") {
-     Log3 $name, 0, "error while requesting ".$param->{url}." - $err";                                               # Eintrag fürs Log
-#     readingsSingleUpdate($hash, "fullResponse", "ERROR", 0);                                                        # Readings erzeugen
+      Log3 $name, 0, "error while requesting ".$param->{url}." - $err";
       readingsBeginUpdate($hash);
       readingsBulkUpdate($hash, 'state', 'ERROR', 0);
       readingsBulkUpdate($hash, 'error', $err, 0);
       readingsEndUpdate($hash, 0);      
   } elsif($data ne "") {
-     my $keyValues = json2nameValue($data);
+    my $keyValues = json2nameValue($data);
 
-     $hash->{STATE} = $keyValues->{Status};
-     $hash->{CAN_DEVICE} = TA_CMI_JSON_extractDeviceName($keyValues->{Header_Device});
-     $hash->{CMI_API_VERSION} = TA_CMI_JSON_extractVersion($keyValues->{Header_Version});
-     CommandDeleteReading(undef, "$name error");
+    my $canDevice = TA_CMI_JSON_extractDeviceName($keyValues->{Header_Device});
+    $hash->{CAN_DEVICE} = $canDevice;
+    $hash->{CMI_API_VERSION} = TA_CMI_JSON_extractVersion($keyValues->{Header_Version});
+    CommandDeleteReading(undef, "$name error");
 
-     readingsBeginUpdate($hash);
-     readingsBulkUpdateIfChanged($hash, 'state', $keyValues->{Status});
-     if ( $keyValues->{Status} eq 'OK' ) {
-       my $queryParams = $hash->{QUERYPARAM};
-       TA_CMI_JSON_extractReadings($hash, $keyValues, 'Inputs') if ($queryParams =~ /I/);
-       TA_CMI_JSON_extractReadings($hash, $keyValues, 'Outputs') if ($queryParams =~ /O/);
-       TA_CMI_JSON_extractReadings($hash, $keyValues, 'DL-Bus') if ($queryParams =~ /D/);
-     }
-     
-     readingsEndUpdate($hash, 1);
+    readingsBeginUpdate($hash);
+    readingsBulkUpdateIfChanged($hash, 'state', $keyValues->{Status});
+    if ( $keyValues->{Status} eq 'OK' ) {
+      my $queryParams = $hash->{QUERYPARAM};
+
+      TA_CMI_JSON_extractReadings($hash, $keyValues, 'Inputs', 'Inputs') if ($queryParams =~ /I/);
+      TA_CMI_JSON_extractReadings($hash, $keyValues, 'Outputs', 'Outputs') if ($queryParams =~ /O/);
+
+      if ($queryParams =~ /D/) {
+        if ($canDevice eq 'UVR16x2') {
+          TA_CMI_JSON_extractReadings($hash, $keyValues, 'DL-Bus', 'DL-Bus');
+        } else {
+          Log3 $name, 0, "TA_CMI_JSON ($name) - Reading DL-Bus input is not supported on $canDevice";
+        }
+      }
+
+      if ($queryParams =~ /La/) {
+        if ($canDevice eq 'UVR16x2') {
+          TA_CMI_JSON_extractReadings($hash, $keyValues, 'LoggingAnalog', 'Logging_Analog');
+        } else {
+          Log3 $name, 0, "TA_CMI_JSON ($name) - Reading Logging Analog data is not supported on $canDevice";
+        }
+      }
+
+      if ($queryParams =~ /Ld/) {
+        if ($canDevice eq 'UVR16x2') {
+          TA_CMI_JSON_extractReadings($hash, $keyValues, 'LoggingDigital', 'Logging_Digital');
+        } else {
+          Log3 $name, 0, "TA_CMI_JSON ($name) - Reading Logging Digital data is not supported on $canDevice";
+        }
+      }
+    }
+    
+    readingsEndUpdate($hash, 1);
 
 #     Log3 $name, 3, "TA_CMI_JSON ($name) - Device: $keyValues->{Header_Device}";
   }
@@ -174,71 +222,66 @@ sub TA_CMI_JSON_ParseHttpResponse($) {
   return undef;
 }
 
-sub TA_CMI_JSON_extractDeviceName($) {
-  my ($input) = @_;
-
-  my $result;
-  if ($input eq '80') {
-    $result = 'UVR1611';
-  } elsif ($input eq '87') {
-    $result = 'UVR16x2';
-  } elsif ($input eq '88') {
-    $result = 'RSM610';
-  } elsif ($input eq '89') {
-    $result = 'CAN-I/O45';
-  } elsif ($input eq '8B') {
-    $result = 'CAN-EZ2';
-  } elsif ($input eq '8C') {
-    $result = 'CAN-MTx2';
-  } elsif ($input eq '8D') {
-    $result = 'CAN-BC2';
-  } else {
-    $result = "Unknown: $input";
-  }
-
-  return $result;
+sub TA_CMI_JSON_extractDeviceName {
+    my ($input) = @_;
+    return (defined($deviceNames{$input}) ? $deviceNames{$input} : 'unknown: ' . $input);
 }
 
-sub TA_CMI_JSON_extractVersion($) {
-  my ($input) = @_;
-  
-  my $result;
-  if ($input == 1) {
-    $result = '1.25.2 2016-12-12';
-  } elsif ($input == 2) {
-    $result = '1.26.1 2017-02-24';
-  } elsif ($input == 3) {
-    $result = '1.28.0 2017-11-09';
-  } else {
-    $result = "unknown: $input";
-  }
-  
-  return $result;
+sub TA_CMI_JSON_extractVersion {
+    my ($input) = @_;
+    return (defined($versions{$input}) ? $versions{$input} : 'unknown: ' . $input);
 }
 
-sub TA_CMI_JSON_extractReadings($$$) {
-  my ( $hash, $keyValues, $id ) = @_;
+sub TA_CMI_JSON_extractReadings {
+  my ( $hash, $keyValues, $id, $dataKey ) = @_;
   my $name = $hash->{NAME};
 
   my $readingNames = AttrVal($name, "readingNames$id", '');
   Log3 $name, 5, 'readingNames'.$id.": $readingNames";
   my @readingsArray = split(/ /, $readingNames); #1:T.Kollektor 5:T.Vorlauf
 
+  my $inclUnitReadings =  AttrVal( $name, "includeUnitReadings", 0 );
+  my $inclPrettyReadings = AttrVal( $name, "includePrettyReadings", 0 );
+
   for my $i (0 .. (@readingsArray-1)) {
     my ( $idx, $readingName ) = split(/\:/, $readingsArray[$i]);
     $readingName = makeReadingName($readingName);
 
-    my $jsonKey = 'Data_'.$id.'_'.$idx.'_Value_Value';
+    my $jsonKey = 'Data_'.$dataKey.'_'.$idx.'_Value_Value';
     my $readingValue = $keyValues->{$jsonKey};
     Log3 $name, 5, "readingName: $readingName, key: $jsonKey, value: $readingValue";
-    
     readingsBulkUpdateIfChanged($hash, $readingName, $readingValue);
+
+    $jsonKey = 'Data_'.$dataKey.'_'.$idx.'_Value_RAS';
+    my $readingRas = $keyValues->{$jsonKey};
+    if (defined($readingRas)) {
+      readingsBulkUpdateIfChanged($hash, $readingName . '_RAS', $readingRas);
+
+      if ($inclPrettyReadings) {
+        my $ras = (defined($rasStates{$readingRas}) ? $rasStates{$readingRas} : undef);
+        readingsBulkUpdateIfChanged($hash, $readingName . '_RAS_Pretty', $ras) if ($ras);
+      }
+    }
+
+    my $unit;
+    if ($inclUnitReadings || $inclPrettyReadings) {
+      $jsonKey = 'Data_'.$dataKey.'_'.$idx.'_Value_Unit';
+      my $readingUnit = $keyValues->{$jsonKey};
+      $unit = (defined($units{$readingUnit}) ? $units{$readingUnit} : 'unknown: ' . $readingUnit);
+      Log3 $name, 5, "readingName: $readingName . '_Unit', key: $jsonKey, value: $readingUnit, unit: $unit";
+
+      readingsBulkUpdateIfChanged($hash, $readingName . '_Unit', $unit) if ($inclUnitReadings);
+    }
+
+    if ($inclPrettyReadings) {
+      readingsBulkUpdateIfChanged($hash, $readingName . '_Pretty', $readingValue . ' ' . $unit);
+    }
   }
 
   return undef;
 }
 
-sub TA_CMI_JSON_Get ($@) {
+sub TA_CMI_JSON_Get {
   my ( $hash, $name, $opt, $args ) = @_;
 
   if ("update" eq $opt) {
@@ -300,6 +343,10 @@ sub TA_CMI_JSON_Get ($@) {
     <li><code>readingNamesDL-Bus {index:reading-name}</code><br>This maps received values from the DL-Bus to readings. eg <code>1:Flowrate_Solar 2:T.Solar_Backflow</code></li>
     <li><code>readingNamesInputs {index:reading-name}</code><br>This maps received values from the Inputs to readings. eg <code>1:Flowrate_Solar 2:T.Solar_Backflow</code></li>
     <li><code>readingNamesOutputs {index:reading-name}</code><br>This maps received values from the Outputs to readings. eg <code>1:Flowrate_Solar 2:T.Solar_Backflow</code></li>
+    <li><code>readingNamesLoggingAnalog {index:reading-name}</code><br>This maps received values from Analog Logging to readings. zB eg <code>1:Flowrate_Solar 2:T.Solar_Backflow</code></li>
+    <li><code>readingNamesLoggingDigital {index:reading-name}</code><br>This maps received values from Digital Logging to readings. zB eg <code>1:Flowrate_Solar 2:T.Solar_Backflow</code></li>
+    <li><code>includeUnitReadings [0:1]</code><br>Adds another reading per value, which just contains the according unit of that reading.</li>
+    <li><code>includePrettyReadings [0:1]</code><br>Adds another reading per value, which contains value plus unit of that reading.</li>
     <li><code>interval</code><br>Query interval in seconds. Minimum query interval is 60 seconds.</li>
     <li><code>username</code><br>Username for querying the JSON-API. Needs to be either admin or user privilege.</li>
     <li><code>password</code><br>Password for querying the JSON-API.</li>
@@ -352,6 +399,10 @@ Weitere Informationen zu diesem Modul im <a href="https://wiki.fhem.de/wiki/UVR1
     <li><code>readingNamesDL-Bus {index:reading-name}</code><br>Hiermit werden erhaltene Werte vom DL-Bus einem Reading zugewiesen. zB <code>1:Durchfluss_Solar 2:T.Solar_RL</code></li>
     <li><code>readingNamesInput {index:reading-name}</code><br>Hiermit werden erhaltene Werte der Eing&auml;nge einem Reading zugewiesen. zB <code>1:Durchfluss_Solar 2:T.Solar_RL</code></li>
     <li><code>readingNamesDL-Bus {index:reading-name}</code><br>Hiermit werden erhaltene Werte der Ausg&auml;nge einem Reading zugewiesen. zB <code>1:Durchfluss_Solar 2:T.Solar_RL</code></li>
+    <li><code>readingNamesLoggingAnalog {index:reading-name}</code><br>Hiermit werden erhaltene Werte vom Analog Logging einem Reading zugewiesen. zB <code>1:Durchfluss_Solar 2:T.Solar_RL</code></li>
+    <li><code>readingNamesLoggingDigital {index:reading-name}</code><br>Hiermit werden erhaltene Werte vom Digital Logging einem Reading zugewiesen. zB <code>1:Durchfluss_Solar 2:T.Solar_RL</code></li>
+    <li><code>includeUnitReadings [0:1]</code><br>Definiert, ob zu jedem Reading ein zusätzliches Reading _Name geschrieben werden soll, welches die Einheit enth&auml;lt.</li>
+    <li><code>includePrettyReadings [0:1]</code><br>Definiert, ob zu jedem Reading zusätzlich ein Reading, welches Wert und Einheit enth&auml;lt, geschrieben werden soll.</li>
     <li><code>interval</code><br>Abfrage-Intervall in Sekunden. Muss mindestens 60 sein.</li>
     <li><code>username</code><br>Username zur Abfrage der JSON-API. Muss die Berechtigungsstufe admin oder user haben.</li>
     <li><code>password</code><br>Passwort zur Abfrage der JSON-API.</li>
