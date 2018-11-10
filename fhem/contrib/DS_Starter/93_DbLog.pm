@@ -16,7 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter:
 #
-# 3.12.7     09.11.2018       addLog considers DbLogInclude (Forum:#92854)
+# 3.12.7     10.11.2018       addLog considers DbLogInclude (Forum:#92854)
 # 3.12.6     22.10.2018       fix timer not deleted if reopen after reopen xxx (Forum: https://forum.fhem.de/index.php/topic,91869.msg848433.html#msg848433)
 # 3.12.5     12.10.2018       charFilter: "\xB0C" substitution by "°C" added and usage in DbLog_Log changed
 # 3.12.4     10.10.2018       return non-saved datasets back in asynch mode only if transaction is used
@@ -5425,7 +5425,9 @@ sub DbLog_dbReadings($@) {
     </ul><br>
     
     <code>set &lt;name&gt; addLog &lt;devspec&gt;:&lt;Reading&gt; [Value] [CN=&lt;caller name&gt;] [!useExcludes] </code><br><br>
-    <ul> Inserts an additional log entry of a device/reading combination into the database. <br><br>
+    <ul> Inserts an additional log entry of a device/reading combination into the database. Readings which are possibly specified
+    in attribute "DbLogExclude" (in source device) are not logged, unless they are enclosed in attribute "DbLogInclude" 
+    or addLog was called with option "!useExcludes". <br><br>
       
       <ul>
       <li> <b>&lt;devspec&gt;:&lt;Reading&gt;</b> - The device can be declared by a <a href="#devspec">device specification 
@@ -6468,7 +6470,9 @@ sub DbLog_dbReadings($@) {
     </ul><br>
 	
     <code>set &lt;name&gt; addLog &lt;devspec&gt;:&lt;Reading&gt; [Value] [CN=&lt;caller name&gt;] [!useExcludes] </code><br><br>
-    <ul> Fügt einen zusatzlichen Logeintrag einer Device/Reading-Kombination in die Datenbank ein. <br><br>
+    <ul> Fügt einen zusatzlichen Logeintrag einer Device/Reading-Kombination in die Datenbank ein. Die eventuell in den 
+    Attributen "DbLogExclude" spezifizierten Readings (im Quelldevice) werden nicht nicht geloggt, es sei denn sie sind im 
+    Attribut "DbLogInclude"  enthalten bzw. der addLog-Aufruf erfolgte mit der Option "!useExcludes".  <br><br>
       
       <ul>
       <li> <b>&lt;devspec&gt;:&lt;Reading&gt;</b> - Das Device kann als <a href="#devspec">Geräte-Spezifikation</a> angegeben werden. <br>
