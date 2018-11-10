@@ -38,7 +38,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "1.40";
+my $version = "1.41";
 
 #-- these we may get on request
 my %gets = (
@@ -100,7 +100,7 @@ sub Shelly_Initialize ($) {
   #$hash->{NotifyFn} = "Shelly_Notify";
   #$hash->{InitFn}   = "Shelly_Init";
 
-  $hash->{AttrList}= "verbose model:".join(",",(keys %shelly_models))." mode:relay,roller defchannel maxtime maxpower interval pct100:open:closed ".
+  $hash->{AttrList}= "verbose model:".join(",",(keys %shelly_models))." mode:relay,roller defchannel maxtime maxpower interval pct100:open,closed ".
                      $readingFnAttributes;
 }
 
