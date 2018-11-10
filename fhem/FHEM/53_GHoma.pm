@@ -423,13 +423,16 @@ sub GHoma_Set($@) {					#
   my ($hash, @a) = @_;
   my $name = $a[0];
   my $type = $a[1];
-  return "Unknown argument $type, choose one of ConfigAll" unless (defined $hash->{Id} || $type eq "ConfigAll");	# set fuer den Server
+  return "Unknown argument $type, choose one of ConfigAll ConfigSingle" unless (defined $hash->{Id} || $type eq "ConfigAll" || $type eq "ConfigSingle");	# set fuer den Server
   my @sets = ('on:noArg', 'off:noArg');
   
   my $status = ReadingsVal($hash->{NAME},"state","");
   
   if($type eq "ConfigAll") {
-	GHoma_udpbroad($hash, defined $a[2] ? $a[2] : undef);
+	GHoma_udpsend($hash, defined $a[2] ? $a[2] : undef, undef );
+  } elsif($type eq "ConfigSingle") {
+  	return "$a[2] ist not an correct IP or hostname" unless $a[2] =~ /^((([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5]))|(([a-zA-Z0-9]+(-[a-zA-Z0-9]+)*)+(\.([a-zA-Z0-9]+(-[a-zA-Z0-9]+)*))*$)$/;
+	GHoma_udpsend($hash, defined $a[3] ? $a[3] : undef, $a[2] );
   } elsif($type eq "on") {
 	$type = pack('C*', (0xff));
 	readingsSingleUpdate($hash, "state", "set_on", 1) if ( $status =~ m/([set_]?o[n|ff])$/i );
@@ -465,20 +468,20 @@ sub GHoma_Undef($$) {				#
   return TcpServer_Close($hash) if defined $hash->{FD};
 }
 #####################################
-sub GHoma_udpbroad {
+sub GHoma_udpsend{
   eval "use IO::Socket::INET;";
 	return "please install IO::Socket::INET" if($@);
-  my ($hash, $ownIP) = @_;	
+  my ($hash, $ownIP, $clientIP) = @_;	
   
   # flush after every write
   $| = 1;
 
   my ($socket,$data);
   $socket = new IO::Socket::INET (
-	PeerAddr  => '255.255.255.255',
+	PeerAddr  => (defined $clientIP ? $clientIP : '255.255.255.255'),
 	PeerPort  =>  '48899',
 	Proto     => 'udp',
-	Broadcast => 1
+	Broadcast => (defined $clientIP ? 0 : 1)
   ) or die "ERROR in Socket Creation : $!\n";
 
 #send operation
@@ -490,12 +493,21 @@ sub GHoma_udpbroad {
     return "$ownIP ist not an correct IP or hostname" unless $ownIP =~ /^((([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5]))|(([a-zA-Z0-9]+(-[a-zA-Z0-9]+)*)+(\.([a-zA-Z0-9]+(-[a-zA-Z0-9]+)*))*$)$/
   }
   Log3 $hash, 1, "$hash->{NAME}: setting server address for GHoma plugs to $ownIP:$hash->{PORT}";
+
   my @sdata = (
+    "HF-A11ASSISTHREAD",
+	"+ok",
+	"AT+VER\r",
+	"AT+TCPTO\r"
+	);
+
+my @sdata = (
     "HF-A11ASSISTHREAD",
 	"+ok",
 	"AT+NETP=TCP,Client,$hash->{PORT},$ownIP\r",
 	"AT+TCPTO=120\r"
 	);
+	
   foreach (@sdata) {
   	$socket->send($_);
 	Log3 $hash, 1, "$hash->{NAME}: sende Multicast: $_";
@@ -587,9 +599,11 @@ sub GHoma_DbLog_splitFn($) {  			# Einheiten
     </ul>
     The <a href="#setExtensions"> set extensions</a> are also supported.<br>
     <br>
-	For server device:
-	<code>set &lt;name&gt; ConfigAll [IP|hostname|FQDN]</code><br>
+	For server device:<br>
+	<code>set &lt;name&gt; ConfigAll [IP|hostname|FQDN of FHEM]</code><br>
 	Setting all GHoma plugs via UDP broadcast to TCP client of FHEM servers address and port of GHoma server device.<br>
+    <code>set &lt;name&gt; ConfigSingle &lt;IP of Plug&gt; [IP|hostname|FQDN of FHEM]</code><br>
+	Setting an specific GHoma plug via UDP to TCP client of FHEM servers address and port of GHoma server device.<br>
   </ul>
 
   <a name="GHomaattr"></a>
@@ -678,10 +692,12 @@ sub GHoma_DbLog_splitFn($) {  			# Einheiten
     </ul>
     Die <a href="#setExtensions"> set extensions</a> werden auch unterst&uuml;tzt.<br>
     <br>
-  	F&uuml;r Server Device:
-	<code>set &lt;name&gt; ConfigAll [IP|hostname|FQDN]</code><br>
+  	F&uuml;r Server Device:<br>
+	<code>set &lt;name&gt; ConfigAll [IP|hostname|FQDN von FHEM]</code><br>
 	Einstellen aller GHoma Zwischenstecker &uuml;ber UDP broadcast auf TCP client mit FHEM Server Adresse und Port des GHoma Server Devices.<br>
-  </ul>
+	    <code>set &lt;name&gt; ConfigSingle &lt;IP des Zwischensteckers&gt; [IP|hostname|FQDN von FHEM]</code><br>
+	Einstellen eines einzelnen GHoma Zwischensteckers &uuml;ber UDP auf TCP client mit FHEM Server Adresse und Port des GHoma Server Devices.<br>
+</ul>
 
     
   
