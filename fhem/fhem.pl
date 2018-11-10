@@ -1043,7 +1043,8 @@ AnalyzeCommandChain($$;$)
         my $nr =  $devcount++;
         $comments{$nr}{TEXT} = $cmd;
         $comments{$nr}{CFGFN} = $currcfgfile
-            if($currcfgfile ne AttrVal("global", "configfile", ""));
+            if($currcfgfile ne AttrVal("global", "configfile", "") &&
+              !configDBUsed());
       }
     }
     return undef;
