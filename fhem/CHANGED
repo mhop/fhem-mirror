@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  98_SmarterCoffee: fix Undefined subroutine &SmarterCoffee::fhem
   - feature: 72_TA_CMI_JSON: added Logging Analog/Digital and RAS values.
   - feature: 98_livetracking: added OsmAnd server for Traccar iOS client
   - new:     73_AutoShuttersControl: Module for the automated control of
