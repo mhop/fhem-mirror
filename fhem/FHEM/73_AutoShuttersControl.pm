@@ -38,7 +38,7 @@ package main;
 use strict;
 use warnings;
 
-my $version = "0.2.0.1";
+my $version = "0.2.0.2";
 
 sub AutoShuttersControl_Initialize($) {
     my ($hash) = @_;
@@ -3098,8 +3098,8 @@ sub getRainSensorShuttersClosedPos {
     </ul>
     <br>
     This command creates a AutoShuttersControl device named shutter.<br>
-    After creating the device, all shutter devices which shall be controlled have to get set the attribut AutoShuttersControl with value 1 or 2.<br>
-    Value 1 means "Inverse or shutter e.g.: shutter up 0,shutter down 100 and the command for percentual movement is position",2 = "Homematic Style e.g.: shutter up 100,shutter down 0 and the command for percentual movement istpct.<br>
+    After creating the device, all shutter devices which shall be controlled have to get set the attribut ASC with value 1 or 2.<br>
+    Value 1 means "Inverse or shutter e.g.: shutter up 0,shutter down 100 and the command for percentual movement is position",2 = "Homematic Style e.g.: shutter up 100,shutter down 0 and the command for percentual movement is pct.<br>
     If the attribute is set, you may start automatic scan for your devices .
   </ul>
   <br><br>
@@ -3175,7 +3175,7 @@ sub getRainSensorShuttersClosedPos {
     </ul><br>
     In the shutter devices
     <ul>
-      <li>AutoShuttersControl - 0/1/2 1 = "Inverse or shutter e.g.: shutter upn 0,shutter down 100 and the command to travel is position",2 = "Homematic Style e.g.: shutter up 100,shutter down 0 and the command to travel is pct</li>
+      <li>ASC - 0/1/2 1 = "Inverse or shutter e.g.: shutter upn 0,shutter down 100 and the command to travel is position",2 = "Homematic Style e.g.: shutter up 100,shutter down 0 and the command to travel is pct</li>
       <li>ASC_Antifreeze - on/off antifreeze on or off</li>
       <li>ASC_AutoAstroModeEvening - actual REAL,CIVIL,NAUTIC,ASTRONOMIC</li>
       <li>ASC_AutoAstroModeEveningHorizon - heighth above horizon if HORIZON is selected at attribute ASC_autoAstroModeEvening.</li>
@@ -3235,7 +3235,7 @@ sub getRainSensorShuttersClosedPos {
     </ul>
     <br>
     Der Befehl erstellt ein AutoShuttersControl Device mit Namen Rolladen.<br>
-    Nachdem das Device angelegt wurde,m&uuml;ssen in allen Roll&auml;den Devices welche gesterut werden sollen das Attribut AutoShuttersControl mit Wert 1 oder 2 gesetzt werden.<br>
+    Nachdem das Device angelegt wurde,m&uuml;ssen in allen Roll&auml;den Devices welche gesteuert werden sollen das Attribut ASC mit Wert 1 oder 2 gesetzt werden.<br>
     Dabei bedeutet 1 = "Inverse oder Rollo Bsp.: Rollo Oben 0,Rollo Unten 100 und der Befehl zum Prozentualen fahren ist position",2 = "Homematic Style Bsp.: Rollo Oben 100,Rollo Unten 0 und der Befehl zum Prozentualen fahren ist pct.<br>
     Habt Ihr das Attribut gesetzt,k&ouml;nnt Ihr den automatischen Scan nach den Devices anstossen.
   </ul>
@@ -3312,7 +3312,7 @@ sub getRainSensorShuttersClosedPos {
     </ul><br>
     In den Roll&auml;den Devices
     <ul>
-      <li>AutoShuttersControl - 0/1/2 1 = "Inverse oder Rollo Bsp.: Rollo Oben 0,Rollo Unten 100 und der Befehl zum Prozentualen fahren ist position",2 = "Homematic Style Bsp.: Rollo Oben 100,Rollo Unten 0 und der Befehl zum Prozentualen fahren ist pct</li>
+      <li>ASC - 0/1/2 1 = "Inverse oder Rollo Bsp.: Rollo Oben 0,Rollo Unten 100 und der Befehl zum Prozentualen fahren ist position",2 = "Homematic Style Bsp.: Rollo Oben 100,Rollo Unten 0 und der Befehl zum Prozentualen fahren ist pct</li>
       <li>ASC_Antifreeze - on/off Frostschutz an oder aus</li>
       <li>ASC_AutoAstroModeEvening - aktuell REAL,CIVIL,NAUTIC,ASTRONOMIC</li>
       <li>ASC_AutoAstroModeEveningHorizon - H&ouml;he &uuml;ber Horizont wenn beim Attribut ASC_autoAstroModeEvening HORIZON ausgew&auml;hlt</li>
