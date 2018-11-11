@@ -1978,7 +1978,8 @@ CommandDefine($$)
   $hash{DEF}   = $a[2] if(int(@a) > 2);
   $hash{NR}    = $devcount++;
   $hash{CFGFN} = $currcfgfile
-        if($currcfgfile ne AttrVal("global", "configfile", ""));
+        if($currcfgfile ne AttrVal("global", "configfile", "") &&
+          !configDBUsed());
   $hash{CL}    = $cl;
 
   # If the device wants to issue initialization gets/sets, then it needs to be
