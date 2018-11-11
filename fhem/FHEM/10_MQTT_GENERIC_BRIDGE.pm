@@ -30,6 +30,12 @@
 # 
 # CHANGE LOG
 #
+# 11.11.2018 0.9.9
+#   change   : import fuer json2nameValue aus main.
+#              Damit geht JSON-Unterstuetzung ohne Prefix 'main::'
+#              Beispiel: 
+#              json:topic=/XTEST/json json:expression={json2nameValue($value)}
+#
 # 04.11.2018 0.9.9
 #   bugfix   : Bei Mehrfachdefinitionen wie 'a|b|c:topic=some/$reading/thing'
 #              wurden beim Treffer alle genannten Readings aktualisiert 
@@ -324,6 +330,7 @@ BEGIN {
     gettimeofday
     InternalTimer
     RemoveInternalTimer
+    json2nameValue
     CTRL_ATTR_NAME_DEFAULTS
     CTRL_ATTR_NAME_ALIAS
     CTRL_ATTR_NAME_PUBLISH
@@ -1174,7 +1181,7 @@ sub searchDeviceForTopic($$) {
 }
 
 # Erstellt RexExp-Definitionen zum Erkennen der ankommenden Topics
-# Platzhaltern werden entsprechend verarbeitet
+# Platzhalter werden entsprechend verarbeitet
 sub createRegexpForTopic($) {
   my $t = shift;
   $t =~ s|#$|.\*|;
@@ -2663,6 +2670,8 @@ sub onmessage($$$) {
             The variable $name, unlike $reading, may be affected by the aliases defined in 'mqttAlias'. Also use of $base is allowed.<br/>
             When using 'stopic', the 'set' command is executed as 'set &lt;dev&gt; &lt;reading&gt; &lt;value&gt;'.
             For something like 'set &lt;dev&gt; &lt;value&gt;'  'state' should be used as reading-name.</p>
+            <p>The often requested JSON support can be easily realized with the help of 'expression'.
+            An already existing method in fhem.pl (json2nameValue) works well. The parameter should be '$message'.</p>
             <p>Examples:<br/>
                 <code>attr &lt;dev&gt; mqttSubscribe temperature:topic=/TEST/temperature test:qos=0 *:topic={"/TEST/$reading/value"} <br/>
                     attr &lt;dev&gt; mqttSubscribe desired-temperature:stopic={"/TEST/temperature/set"}<br/>
@@ -2670,6 +2679,7 @@ sub onmessage($$$) {
                     attr &lt;dev&gt; mqttSubscribe state:stopic={"/TEST/light/set"} state:expression={$value="x"}<br/>
                     attr &lt;dev&gt; mqttSubscribe state:stopic={"/TEST/light/set"} state:expression={"R1"=>$value, "R2"=>"Val: $value", "R3"=>"x"}
                     attr &lt;dev&gt; mqttSubscribe verbose:atopic={"/TEST/light/verbose"}
+                    attr &lt;dev&gt; mqttSubscribe json:topic=/XTEST/json json:expression={json2nameValue($message)}
                  </code></p>
         </p>
     </li>
@@ -3054,6 +3064,8 @@ sub onmessage($$$) {
             Auch Verwendung von $base ist erlaubt.<br/>
             Bei Verwendung von 'stopic' wird das 'set'-Befehl als 'set &lt;dev&gt; &lt;reading&gt; &lt;value&gt;' ausgefuert.
             Fuer ein 'set &lt;dev&gt; &lt;value&gt;' soll als Reading-Name 'state' verwendet werden.</p>
+            <p>Die oft angefragte JSON-Unterst&uuml;tzung kann einfach mit Hilfe von 'expression' realisiert werden.
+            Daf&uuml;r eignet sich eine in fhem.pl bereits vorhandene Methode: json2nameValue. Als Parameter soll $message verwendet werden.</p>
             <p>Beispiele:<br/>
                 <code>attr &lt;dev&gt; mqttSubscribe temperature:topic=/TEST/temperature test:qos=0 *:topic={"/TEST/$reading/value"} <br/>
                     attr &lt;dev&gt; mqttSubscribe desired-temperature:stopic={"/TEST/temperature/set"}<br/>
@@ -3061,6 +3073,7 @@ sub onmessage($$$) {
                     attr &lt;dev&gt; mqttSubscribe state:stopic={"/TEST/light/set"} state:expression={$value="x"}<br/>
                     attr &lt;dev&gt; mqttSubscribe state:stopic={"/TEST/light/set"} state:expression={"R1"=>$value, "R2"=>"Val: $value", "R3"=>"x"}
                     attr &lt;dev&gt; mqttSubscribe verbose:atopic={"/TEST/light/verbose"}
+                    attr &lt;dev&gt; mqttSubscribe json:topic=/XTEST/json json:expression={json2nameValue($message)}
                  </code></p>
         </p>
     </li>
