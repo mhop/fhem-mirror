@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  73_AutoShuttersControl: fix ASC_twilightDevice
   - bugfix:  73_AutoShuttersControl: fix setPosSetCmd Object
   - bugfix:  73_AutoShuttersControl: fix parts of Commandref
   - bugfix:  98_SmarterCoffee: fix Undefined subroutine &SmarterCoffee::fhem
