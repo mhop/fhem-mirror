@@ -57,6 +57,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Versions History intern
 our %DbRep_vNotesIntern = (
+  "8.9.5"  => "09.11.2018  hash %dbrep_col substituted by get data from dblog device in func DbRep_firstconnect, fix importFromFile contains only SPACE ",
+  "8.9.0"  => "07.11.2018  command delDoublets added ",
   "8.8.0"  => "06.11.2018  first connect routine switched to DbRep_Main, get COLSET from DBLOG-instance, attribute 'fastStart' added ",
   "8.7.0"  => "04.11.2018  attribute valueFilter applied to functions based on 'SELECT', 'UPDATE', 'DELETE' and 'valueFilter' generally applied to field 'VALUE' ",
   "8.6.0"  => "29.10.2018  reduceLog use attributes device/reading (can be overwritten by set-options) ",
@@ -123,6 +125,7 @@ our %DbRep_vNotesIntern = (
 
 # Versions History extern:
 our %DbRep_vNotesExtern = (
+  "8.9.0"  => "07.11.2018 new command set delDoublets added. This command allows to delete multiple occuring identical records. ",
   "8.8.0"  => "06.11.2018 new attribute 'fastStart'. Usually every DbRep-device is making a short connect to its database when "
               ."FHEM is restarted. When this attribute is set, the initial connect is done when the DbRep-device is doing its "
               ."first task. ",
@@ -262,14 +265,6 @@ our %DbRep_vHintsExt_de = (
 
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
-
-my %dbrep_col = ("DEVICE"  => 64,
-                 "TYPE"    => 64,
-                 "EVENT"   => 512,
-                 "READING" => 64,
-                 "VALUE"   => 128,
-                 "UNIT"    => 32
-                );
                            
 ###################################################################################
 # DbRep_Initialize
@@ -441,6 +436,7 @@ sub DbRep_Set($@) {
                 (($hash->{ROLE} ne "Agent")?"sumValue:display,writeToDB ":"").
                 (($hash->{ROLE} ne "Agent")?"averageValue:display,writeToDB ":"").
                 (($hash->{ROLE} ne "Agent")?"changeValue ":"").
+                (($hash->{ROLE} ne "Agent")?"delDoublets:adviceDelete,delete ":"").
                 (($hash->{ROLE} ne "Agent")?"delEntries:noArg ":"").
 				(($hash->{ROLE} ne "Agent")?"delSeqDoublets:adviceRemain,adviceDelete,delete ":"").
                 "deviceRename ".
@@ -549,12 +545,12 @@ sub DbRep_Set($@) {
        return undef;
   }
   
-  if ($opt =~ m/delSeqDoublets/ && $hash->{ROLE} ne "Agent") {
+  if ($opt =~ m/delSeqDoublets|delDoublets/ && $hash->{ROLE} ne "Agent") {
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";  
       if ($prop =~ /delete/ && !AttrVal($hash->{NAME}, "allowDeletion", 0)) {
           return " Set attribute 'allowDeletion' if you want to allow deletion of any database entries. Use it with care !";
       } 
-      DbRep_beforeproc($hash, "delSeq");	  
+      DbRep_beforeproc($hash, "delDoublets");	  
       DbRep_Main($hash,$opt,$prop); 
       return undef;      
   }
@@ -717,12 +713,12 @@ sub DbRep_Set($@) {
           my $i_reading = AttrVal($hash->{NAME}, "reading", "");
           
           # Daten auf maximale Länge (entsprechend der Feldlänge in DbLog DB create-scripts) beschneiden wenn nicht SQLite
-          if ($dbmodel ne 'SQLITE') {
-              $i_device   = substr($i_device,0, $dbrep_col{DEVICE});
-              $i_reading  = substr($i_reading,0, $dbrep_col{READING});
-              $i_value    = substr($i_value,0, $dbrep_col{VALUE});
-              $i_unit     = substr($i_unit,0, $dbrep_col{UNIT}) if($i_unit);
-          }
+          #if ($dbmodel ne 'SQLITE') {
+          #    $i_device   = substr($i_device,0, $hash->{HELPER}{DBREPCOL}{DEVICE});
+          #    $i_reading  = substr($i_reading,0, $hash->{HELPER}{DBREPCOL}{READING});
+          #    $i_value    = substr($i_value,0, $hash->{HELPER}{DBREPCOL}{VALUE});
+          #    $i_unit     = substr($i_unit,0, $hash->{HELPER}{DBREPCOL}{UNIT}) if($i_unit);
+          #}
           
           $hash->{HELPER}{I_TIMESTAMP} = $i_timestamp;
           $hash->{HELPER}{I_DEVICE}    = $i_device;
@@ -1221,17 +1217,12 @@ sub DbRep_Attr($$$$) {
             delete($attr{$name}{ftpUse});
         }
 		if ($aName eq "reading" || $aName eq "device") {
-            if ($dbmodel && $dbmodel ne 'SQLITE') {
-			    my $attrname = uc($aName);
-                if ($dbmodel eq 'POSTGRESQL' && $aVal !~ m/,/) {
-                    return "Length of \"$aName\" is too big. Maximum length for database type $dbmodel is $dbrep_col{$attrname}" if(length($aVal) > $dbrep_col{$attrname});
-                } elsif ($dbmodel eq 'MYSQL' && $aVal !~ m/,/) {
-                    return "Length of \"$aName\" is too big. Maximum length for database type $dbmodel is $dbrep_col{$attrname}" if(length($aVal) > $dbrep_col{$attrname});
-                }
+            if ($aVal !~ m/,/ && $dbmodel && $dbmodel ne 'SQLITE') {
+				my $mlen = 64;
+				return "Length of \"$aName\" is too big. Maximum length for database type $dbmodel is $mlen" if(length($aVal) > $mlen);
             }
-		}
-
-    }  
+        }
+	}  
 return undef;
 }
 
@@ -1351,11 +1342,12 @@ return undef;
 sub DbRep_firstconnect(@) {
   my ($string)     = @_;
   my ($name,$opt,$prop,$fret) = split("\\|", $string);
-  my $hash              = $defs{$name};
-  my $to                = "120";
-  my $dbloghash         = $hash->{dbloghash};
-  my $dbconn            = $dbloghash->{dbconn};
-  my $dbuser            = $dbloghash->{dbuser};
+  my $hash         = $defs{$name};
+  my $to           = "120";
+  $hash->{dbloghash} = $defs{$hash->{HELPER}{DBLOGDEVICE}};
+  my $dbloghash    = $hash->{dbloghash};
+  my $dbconn       = $dbloghash->{dbconn};
+  my $dbuser       = $dbloghash->{dbuser};
   
   RemoveInternalTimer($hash, "DbRep_firstconnect");
   return if(IsDisabled($name));
@@ -1366,13 +1358,13 @@ sub DbRep_firstconnect(@) {
           return;
       } 
       # DB Struktur aus DbLog Instanz übernehmen
-      $hash->{HELPER}{DBREPCOL}{COLSET}     = $dbloghash->{HELPER}{COLSET};
-      $hash->{HELPER}{DBREPCOL}{DEVICECOL}  = $dbloghash->{HELPER}{DEVICECOL};
-      $hash->{HELPER}{DBREPCOL}{EVENTCOL}   = $dbloghash->{HELPER}{EVENTCOL};
-      $hash->{HELPER}{DBREPCOL}{READINGCOL} = $dbloghash->{HELPER}{READINGCOL};
-      $hash->{HELPER}{DBREPCOL}{TYPECOL}    = $dbloghash->{HELPER}{TYPECOL};
-      $hash->{HELPER}{DBREPCOL}{UNITCOL}    = $dbloghash->{HELPER}{UNITCOL};
-      $hash->{HELPER}{DBREPCOL}{VALUECOL}   = $dbloghash->{HELPER}{VALUECOL}; 
+      $hash->{HELPER}{DBREPCOL}{COLSET}  = $dbloghash->{HELPER}{COLSET};
+	  $hash->{HELPER}{DBREPCOL}{DEVICE}  = $dbloghash->{HELPER}{DEVICECOL};
+	  $hash->{HELPER}{DBREPCOL}{TYPE}    = $dbloghash->{HELPER}{TYPECOL};
+	  $hash->{HELPER}{DBREPCOL}{EVENT}   = $dbloghash->{HELPER}{EVENTCOL};
+	  $hash->{HELPER}{DBREPCOL}{READING} = $dbloghash->{HELPER}{READINGCOL};
+	  $hash->{HELPER}{DBREPCOL}{VALUE}   = $dbloghash->{HELPER}{VALUECOL};
+	  $hash->{HELPER}{DBREPCOL}{UNIT}    = $dbloghash->{HELPER}{UNITCOL};
       
       # DB Strukturelemente abrufen      
       Log3 ($name, 3, "DbRep $name - Connectiontest to database $dbconn with user $dbuser") if($hash->{LASTCMD} ne "minTimestamp");
@@ -1502,12 +1494,14 @@ return;
 ################################################################################################################
 sub DbRep_Main($$;$) {
  my ($hash,$opt,$prop) = @_;
- my $name        = $hash->{NAME}; 
- my $to          = AttrVal($name, "timeout", "86400");
- my $reading     = AttrVal($name, "reading", "%");
- my $device      = AttrVal($name, "device", "%");
- my $dbloghash   = $hash->{dbloghash};
- my $dbmodel     = $dbloghash->{MODEL};
+ my $name           = $hash->{NAME}; 
+ my $to             = AttrVal($name, "timeout", "86400");
+ my $reading        = AttrVal($name, "reading", "%");
+ my $device         = AttrVal($name, "device", "%");
+ my $dblogdevice    = $hash->{HELPER}{DBLOGDEVICE};
+ $hash->{dbloghash} = $defs{$dblogdevice};
+ my $dbloghash      = $hash->{dbloghash};
+ my $dbmodel        = $dbloghash->{MODEL};
  
  # Entkommentieren für Testroutine im Vordergrund
  # testexit($hash);
@@ -1638,6 +1632,11 @@ sub DbRep_Main($$;$) {
      my $table = $prop;             
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("fetchrows_DoParse", "$name|$table|$device|$reading|$runtime_string_first|$runtime_string_next", "fetchrows_ParseDone", $to, "DbRep_ParseAborted", $hash);
     
+ } elsif ($opt =~ /delDoublets/) {
+     my $cmd = $prop?$prop:"adviceDelete"; 
+     # delseqdoubl_ParseDone ist Auswertefunktion auch für delDoublets
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("deldoublets_DoParse", "$name§$cmd§$device§$reading§$ts", "delseqdoubl_ParseDone", $to, "DbRep_ParseAborted", $hash);
+    
  } elsif ($opt =~ /delSeqDoublets/) {
      my $cmd = $prop?$prop:"adviceRemain"; 
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("delseqdoubl_DoParse", "$name§$cmd§$device§$reading§$ts", "delseqdoubl_ParseDone", $to, "DbRep_ParseAborted", $hash);
@@ -1673,6 +1672,13 @@ sub DbRep_Main($$;$) {
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("diffval_DoParse", "$name§$device§$reading§$prop§$ts", "diffval_ParseDone", $to, "DbRep_ParseAborted", $hash);   
          
  } elsif ($opt eq "insert") { 
+	 # Daten auf maximale Länge (entsprechend der Feldlänge in DbLog) beschneiden wenn nicht SQLite
+	 if ($dbmodel ne 'SQLITE') {
+	     $hash->{HELPER}{I_DEVICE}  = substr($hash->{HELPER}{I_DEVICE},0, $hash->{HELPER}{DBREPCOL}{DEVICE});
+		 $hash->{HELPER}{I_READING} = substr($hash->{HELPER}{I_READING},0, $hash->{HELPER}{DBREPCOL}{READING});
+		 $hash->{HELPER}{I_VALUE}   = substr($hash->{HELPER}{I_VALUE},0, $hash->{HELPER}{DBREPCOL}{VALUE});
+		 $hash->{HELPER}{I_UNIT}    = substr($hash->{HELPER}{I_UNIT},0, $hash->{HELPER}{DBREPCOL}{UNIT}) if($hash->{HELPER}{I_UNIT});
+	 }
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("insert_Push", "$name", "insert_Done", $to, "DbRep_ParseAborted", $hash);   
          
  } elsif ($opt =~ /deviceRename|readingRename/) { 
@@ -4696,6 +4702,7 @@ sub fetchrows_ParseDone($) {
   my $zs = "";                     # Zusatz wenn device + Reading + Timestamp von folgenden DS gleich ist UND Value unterschiedlich
   my $zsz = 1;                     # Zusatzzähler
   foreach my $row (@row_array) {
+      chomp $row; 
       my @a = split("_ESC_", $row, 6);     
       my $dev = $a[0];
       my $rea = $a[1];
@@ -4758,7 +4765,158 @@ return;
 }
 
 ####################################################################################################
-#                                    DB-Abfrage delSeqDoublets
+#                                 Doubletten finden und löschen
+####################################################################################################
+sub deldoublets_DoParse($) {
+ my ($string) = @_;
+ my ($name,$opt,$device,$reading,$ts) = split("\\§", $string);
+ my $hash       = $defs{$name};
+ my $dbloghash  = $hash->{dbloghash};
+ my $dbconn     = $dbloghash->{dbconn};
+ my $dbuser     = $dbloghash->{dbuser};
+ my $dblogname  = $dbloghash->{NAME};
+ my $dbpassword = $attr{"sec$dblogname"}{secret};
+ my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
+ my $limit      = AttrVal($name, "limit", 1000);
+ my ($err,$dbh,$sth,$sql,$rowlist,$selspec,$st,$table,$addon);
+ 
+ # Background-Startzeit
+ my $bst = [gettimeofday];
+
+ eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });};
+ if ($@) {
+     $err = encode_base64($@,"");
+     Log3 ($name, 2, "DbRep $name - $@");
+     return "$name|''|''|$err|''|$opt";
+ }
+
+ # Timestampstring to Array
+ my @ts = split("\\|", $ts);
+ Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts"); 
+ 
+ # mehrfache Datensätze finden
+ # SELECT TIMESTAMP, DEVICE, READING, VALUE, count(*) FROM history WHERE TIMESTAMP > '2018-11-01 00:00:00' GROUP BY TIMESTAMP, DEVICE, READING, VALUE ASC HAVING count(*) > 1
+ $table   = "history";
+ $selspec = "TIMESTAMP,DEVICE,READING,VALUE,count(*)";
+ $addon   = "GROUP BY TIMESTAMP, DEVICE, READING, VALUE ASC HAVING count(*) > 1";
+  
+ # SQL zusammenstellen für DB-Abfrage
+ $sql = DbRep_createSelectSql($hash,$table,$selspec,$device,$reading,"?","?",$addon);
+ $sth = $dbh->prepare_cached($sql);
+ 
+ # DB-Abfrage zeilenweise für jeden Timearray-Eintrag
+ my @todel; 
+ my $ntodel  = 0;
+ my $ndel    = 0;
+ my $rt      = 0;
+ 
+ no warnings 'uninitialized'; 
+ 
+ foreach my $row (@ts) {
+     my @a                     = split("#", $row);
+     my $runtime_string        = $a[0];
+     my $runtime_string_first  = $a[1];
+     my $runtime_string_next   = $a[2];  
+     $runtime_string           = encode_base64($runtime_string,""); 
+	  
+	 # SQL-Startzeit
+     $st = [gettimeofday];
+     
+     # SQL zusammenstellen für Logausgabe
+	 my $sql1 = DbRep_createSelectSql($hash,$table,$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",$addon);  
+     Log3 ($name, 4, "DbRep $name - SQL execute: $sql1"); 
+ 
+	 eval{$sth->execute($runtime_string_first, $runtime_string_next);};
+     if ($@) {
+         $err = encode_base64($@,"");
+         Log3 ($name, 2, "DbRep $name - $@");
+         $dbh->disconnect;
+         return "$name|''|''|$err|''|$opt";
+     } 
+ 
+     # SQL-Laufzeit ermitteln
+     $rt = $rt+tv_interval($st);
+        
+     # Beginn Löschlogik, Zusammenstellen der löschenden DS (warping)
+	 # Array @warp -> die zu löschenden Datensätze
+     my (@warp);
+     my $i = 0;
+     foreach my $nr (map { $_->[1]."_ESC_".$_->[2]."_ESC_".($_->[0] =~ s/ /_ESC_/r)."_ESC_".$_->[3]."_|_".($_->[4]-1) } @{$sth->fetchall_arrayref()}) {     
+         # Reihenfolge geändert in: DEVICE,READING,DATE,TIME,VALUE,count(*)
+         if($opt =~ /adviceDelete/) {
+             push(@warp,$nr) if($#todel+1 < $limit);                   # die zu löschenden Datensätze (nur zur Anzeige) 
+         } else {        
+             push (@warp,$nr);                                         # Array der zu löschenden Datensätze
+         }
+         my $c = (split("|",$nr))[-1];
+         $ntodel = $ntodel + $c;
+         
+         if ($opt =~ /delete/) {                                       # delete Datensätze
+             my ($dev,$read,$date,$time,$val,$limit) = split(/_ESC_|_\|_/, $nr);
+             my $dt = $date." ".$time;
+             chomp($val);
+             $dev  =~ s/'/''/g;                                 # escape ' with ''
+             $read =~ s/'/''/g;                                 # escape ' with ''
+             $val  =~ s/'/''/g;                                 # escape ' with ''
+             $st = [gettimeofday];
+             my $dsql = "delete FROM $table WHERE TIMESTAMP = '$dt' AND DEVICE = '$dev' AND READING = '$read' AND VALUE = '$val' limit $limit;";
+             my $sthd = $dbh->prepare($dsql); 
+             Log3 ($name, 4, "DbRep $name - SQL execute: $dsql"); 
+                 
+             eval {$sthd->execute();};
+             if ($@) {
+                 $err = encode_base64($@,"");
+                 Log3 ($name, 2, "DbRep $name - $@");
+                 $dbh->disconnect;
+                 return "$name|''|''|$err|''|$opt";
+             } 
+             $ndel = $ndel+$sthd->rows;
+             $dbh->commit() if(!$dbh->{AutoCommit});
+                 
+             $rt = $rt+tv_interval($st);
+         }         
+         
+         $i++;
+     }
+     
+     if(@warp && $opt =~ /adviceDelete/) {
+         push(@todel,@warp);    
+     }
+ }
+ 
+ Log3 ($name, 3, "DbRep $name - number records identified to delete by \"$hash->{LASTCMD}\": $ntodel") if($ntodel && $opt =~ /advice/); 
+ Log3 ($name, 3, "DbRep $name - rows deleted by \"$hash->{LASTCMD}\": $ndel") if($ndel);
+  
+ my $retn     = ($opt =~ /adviceDelete/)?$ntodel:$ndel; 
+ my @retarray = ($opt =~ /adviceDelete/)?@todel:" ";
+ 
+ s/\|/_E#S#C_/g for @retarray;         # escape Pipe "|" 
+ if ($utf8 && @retarray) {
+     $rowlist = Encode::encode_utf8(join('|', @retarray));
+ } elsif(@retarray) {
+     $rowlist = join('|', @retarray);
+ } else {
+     $rowlist = 0;
+ }
+ 
+ use warnings;
+ Log3 ($name, 5, "DbRep $name -> row result list:\n$rowlist");
+
+ $dbh->disconnect;
+ 
+ # Daten müssen als Einzeiler zurückgegeben werden
+ $rowlist = encode_base64($rowlist,"");
+ 
+ # Background-Laufzeit ermitteln
+ my $brt = tv_interval($bst);
+
+ $rt = $rt.",".$brt;
+ 
+return "$name|$rowlist|$rt|0|$retn|$opt";
+}
+
+####################################################################################################
+#                              sequentielle Doubletten löschen
 ####################################################################################################
 sub delseqdoubl_DoParse($) {
  my ($string) = @_;
@@ -4934,7 +5092,7 @@ return "$name|$rowlist|$rt|0|$retn|$opt";
 }
 
 ####################################################################################################
-#             Auswertungsroutine delSeqDoublets
+#                      Auswertungsroutine delSeqDoublets / delDoublets
 ####################################################################################################
 sub delseqdoubl_ParseDone($) {
   my ($string) = @_;
@@ -4962,7 +5120,7 @@ sub delseqdoubl_ParseDone($) {
   } 
   
   # Befehl nach Procedure ausführen
-  $erread = DbRep_afterproc($hash, "delSeq");
+  $erread = DbRep_afterproc($hash, "delDoublets");
   
   # Readingaufbereitung
   readingsBeginUpdate($hash);
@@ -5241,14 +5399,13 @@ sub impfile_Push($) {
 	 foreach(@alarr) {
          tr/"//d;
      }
-     my $i_timestamp = $alarr[0];
-     # $i_timestamp =~ tr/"//d;
-     my $i_device    = $alarr[1];
-     my $i_type      = $alarr[2];
-     my $i_event     = $alarr[3];
-     my $i_reading   = $alarr[4];
-     my $i_value     = $alarr[5];
-     my $i_unit      = $alarr[6] ? $alarr[6]: " ";
+     my $i_timestamp = DbRep_trim($alarr[0]);
+     my $i_device    = DbRep_trim($alarr[1]);
+     my $i_type      = DbRep_trim($alarr[2]);
+     my $i_event     = DbRep_trim($alarr[3]);
+     my $i_reading   = DbRep_trim($alarr[4]);
+     my $i_value     = DbRep_trim($alarr[5]);
+     my $i_unit      = DbRep_trim($alarr[6] ? $alarr[6]: "");
      $irowcount++;
      next if(!$i_timestamp);  #leerer Datensatz
      
@@ -5264,11 +5421,11 @@ sub impfile_Push($) {
      
      # Daten auf maximale Länge (entsprechend der Feldlänge in DbLog DB create-scripts) beschneiden wenn nicht SQLite
      if ($dbmodel ne 'SQLITE') {
-         $i_device   = substr($i_device,0, $dbrep_col{DEVICE});
-         $i_event    = substr($i_event,0, $dbrep_col{EVENT});
-         $i_reading  = substr($i_reading,0, $dbrep_col{READING});
-         $i_value    = substr($i_value,0, $dbrep_col{VALUE});
-         $i_unit     = substr($i_unit,0, $dbrep_col{UNIT}) if($i_unit);
+         $i_device   = substr($i_device,0, $hash->{HELPER}{DBREPCOL}{DEVICE});
+         $i_event    = substr($i_event,0, $hash->{HELPER}{DBREPCOL}{EVENT});
+         $i_reading  = substr($i_reading,0, $hash->{HELPER}{DBREPCOL}{READING});
+         $i_value    = substr($i_value,0, $hash->{HELPER}{DBREPCOL}{VALUE});
+         $i_unit     = substr($i_unit,0, $hash->{HELPER}{DBREPCOL}{UNIT}) if($i_unit);
      }     
      
      Log3 ($name, 5, "DbRep $name -> data to insert Timestamp: $i_timestamp, Device: $i_device, Type: $i_type, Event: $i_event, Reading: $i_reading, Value: $i_value, Unit: $i_unit");     
@@ -8390,7 +8547,7 @@ sub DbRep_checktimeaggr ($) {
  if ($aggregation ne "no") {
      $IsAggrSet = 1;
  }
- if($hash->{LASTCMD} =~ /delSeqDoublets/) {
+ if($hash->{LASTCMD} =~ /delSeqDoublets|delDoublets/) {
      $aggregation = ($aggregation eq "no")?"day":$aggregation;       # wenn Aggregation "no", für delSeqDoublets immer "day" setzen
 	 $IsAggrSet   = 1;
  }
@@ -9999,6 +10156,7 @@ return;
      <li> Repair of a corrupted SQLite database ("database disk image is malformed") </li>
      <li> transmission of datasets from source database into another (Standby) database (syncStandby) </li>
      <li> reduce the amount of datasets in database (reduceLog) </li>
+     <li> delete of duplicate records (delDoublets) </li>
      </ul></ul>
      <br>
      
@@ -10227,7 +10385,67 @@ return;
                                                    
                                                    </li> <br>
                                                    
-                           
+    <li><b> delDoublets [adviceDelete | delete]</b>   -  show respectively delete duplicate/multiple datasets.
+	                             Therefore the fields TIMESTAMP, DEVICE, READING and VALUE of records are compared. <br>
+								 The <a href="#DbRepattr">attributes</a> to define the scope of aggregation,time period, device and reading are 
+								 considered. If attribute aggregation is not set or set to "no", it will change to the default aggregation 
+								 period "day".
+	                             <br><br>
+								 
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> <b>adviceDelete</b>  </td><td>: simulates the datasets to delete in database (nothing will be deleted !) </td></tr>
+                                      <tr><td> <b>delete</b>        </td><td>: deletes the doublets </td></tr>
+                                   </table>
+	                               </ul>
+	                               <br>
+
+                                 Due to security reasons the attribute <a href="#DbRepattr">attribute</a> "allowDeletion" needs
+                                 to be set for execute the "delete" option. <br>
+								 The amount of datasets to show by commands "delDoublets adviceDelete" is initially limited 
+                                 (default: 1000) and can be adjusted by <a href="#DbRepattr">attribute</a> "limit".
+								 The adjustment of "limit" has no impact to the "delDoublets delete" function, but affects 
+                                 <b>ONLY</b> the display of the data.  <br>
+							     Before and after this "delDoublets" it is possible to execute a FHEM command or Perl script 
+                                 (please see <a href="#DbRepattr">attributes</a>  "executeBeforeProc", "executeAfterProc"). 
+                                 <br><br>						   
+								  
+								 <ul>
+								 <b>Example:</b> <br><br>
+                                 Output of records to delete included their amount by "delDoublets adviceDelete": <br><br>
+								 
+								 2018-11-07_14-11-38__Dum.Energy__T 260.9_|_2 <br>
+								 2018-11-07_14-12-37__Dum.Energy__T 260.9_|_2 <br>
+								 2018-11-07_14-15-38__Dum.Energy__T 264.0_|_2 <br>
+								 2018-11-07_14-16-37__Dum.Energy__T 264.0_|_2 <br>
+								 <br>
+								 In the created readings after "_|_" the amount of the appropriate records to delete 
+								 is shown. The records are deleted by command "delDoublets delete".
+								 </ul>
+                                 <br>
+                                 
+                                 Zusammengefasst sind die zur Steuerung dieser Funktion relevanten Attribute: <br><br>
+
+	                             <ul>
+                                 <table>  
+                                 <colgroup> <col width=5%> <col width=95%> </colgroup>
+								    <tr><td> <b>allowDeletion</b>                          </td><td>: needs to be set to execute the delete option </td></tr>
+								    <tr><td> <b>aggregation</b>                            </td><td>: choose the aggregation period </td></tr>
+								    <tr><td> <b>limit</b>                                  </td><td>: limits ONLY the count of datasets to display </td></tr>
+                                    <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
+                                    <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>                                      
+ 	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: execute a FHEM command (or perl-routine) before start of the function </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: execute a FHEM command (or perl-routine) after the function is finished </td></tr>                       
+								    <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time </td></tr>
+                                    <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
+									</table>
+	                             </ul>
+	                             <br>
+	                             <br>                                 
+                                
+                                 </li>
+                                 
     <li><b> delEntries </b>   -  deletes all database entries or only the database entries specified by <a href="#DbRepattr">attributes</a> Device and/or 
 	                             Reading and the entered time period between "timestamp_begin", "timestamp_end" (if set) or "timeDiffToNow/timeOlderThan". <br><br>
                                  
@@ -10338,8 +10556,8 @@ return;
 								    <tr><td> <b>limit</b>                                  </td><td>: limits ONLY the count of datasets to display </td></tr>
                                     <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
                                     <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>                                      
- 	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: execute a FHEM command (or perl-routine) before start of delEntries </td></tr>
-                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: execute a FHEM command (or perl-routine) after delEntries is finished </td></tr>                       
+ 	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: execute a FHEM command (or perl-routine) before start of the function </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: execute a FHEM command (or perl-routine) after the function is finished </td></tr>                       
   						            <tr><td> <b>seqDoubletsVariance</b>                    </td><td>: Up to this value consecutive numerical datasets are handled as identical and should be deleted </td></tr>                                      
 								    <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time </td></tr>
                                     <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
@@ -12198,6 +12416,7 @@ sub bdump {
 	 <li> Reparatur einer korrupten SQLite Datenbank ("database disk image is malformed") </li>
      <li> Übertragung von Datensätzen aus der Quelldatenbank in eine andere (Standby) Datenbank (syncStandby) </li>
      <li> Reduktion der Anzahl von Datensätzen in der Datenbank (reduceLog) </li>
+     <li> Löschen von doppelten Datensätzen (delDoublets) </li>
      </ul></ul>
      <br>
      
@@ -12429,6 +12648,67 @@ sub bdump {
 	                               <br>
                                    
                                  </li> <br>
+                                 
+    <li><b> delDoublets [adviceDelete | delete]</b>   -  zeigt bzw. löscht doppelte / mehrfach vorkommende Datensätze.
+	                             Dazu wird Timestamp, Device,Reading und Value ausgewertet. <br>
+								 Die <a href="#DbRepattr">Attribute</a> zur Aggregation,Zeit-,Device- und Reading-Abgrenzung werden dabei 
+								 berücksichtigt. Ist das Attribut "aggregation" nicht oder auf "no" gesetzt, wird im Standard die Aggregation 
+								 "day" verwendet.
+	                             <br><br>
+								 
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> <b>adviceDelete</b>  </td><td>: ermittelt die zu löschenden Datensätze (es wird nichts gelöscht !) </td></tr>
+                                      <tr><td> <b>delete</b>        </td><td>: löscht die Dubletten </td></tr>
+                                   </table>
+	                               </ul>
+	                               <br>
+
+                                 Aus Sicherheitsgründen muss das <a href="#DbRepattr">Attribut</a> "allowDeletion" für die "delete" Option
+								 gesetzt sein. <br>
+								 Die Anzahl der anzuzeigenden Datensätze des Kommandos "delDoublets adviceDelete" ist zunächst 
+								 begrenzt (default 1000) und kann durch das <a href="#DbRepattr">Attribut</a> "limit" angepasst 
+								 werden.
+								 Die Einstellung von "limit" hat keinen Einfluss auf die "delDoublets delete" Funktion, sondern 
+								 beeinflusst <b>NUR</b> die Anzeige der Daten.	 <br>
+                                 Vor und nach der Ausführung von "delDoublets" kann ein FHEM-Kommando bzw. Perl-Routine ausgeführt 
+								 werden. (siehe <a href="#DbRepattr">Attribute</a>  "executeBeforeProc", "executeAfterProc")
+                                 <br><br>						   
+								  
+								 <ul>
+								 <b>Beispiel:</b> <br><br>
+                                 Ausgabe der zu löschenden Records inklusive der Anzahl mit "delDoublets adviceDelete": <br><br>
+								 
+								 2018-11-07_14-11-38__Dum.Energy__T 260.9_|_2 <br>
+								 2018-11-07_14-12-37__Dum.Energy__T 260.9_|_2 <br>
+								 2018-11-07_14-15-38__Dum.Energy__T 264.0_|_2 <br>
+								 2018-11-07_14-16-37__Dum.Energy__T 264.0_|_2 <br>
+								 <br>
+								 Im Werteteil der erzeugten Readings wird nach "_|_" die Anzahl der entsprechenden Datensätze
+								 ausgegeben, die mit "delDoublets delete" gelöscht werden.
+								 </ul>
+                                 <br>
+                                 
+                                 Zusammengefasst sind die zur Steuerung dieser Funktion relevanten Attribute: <br><br>
+
+	                             <ul>
+                                 <table>  
+                                 <colgroup> <col width=5%> <col width=95%> </colgroup>
+								    <tr><td> <b>allowDeletion</b>                          </td><td>: needs to be set to execute the delete option </td></tr>
+           					        <tr><td> <b>aggregation</b>                            </td><td>: Auswahl einer Aggregationsperiode </td></tr>
+                                    <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
+                                    <tr><td> <b>limit</b>                                  </td><td>: begrenzt NUR die Anzahl der anzuzeigenden Datensätze  </td></tr>
+                                    <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
+									<tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
+	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: ausführen FHEM Kommando (oder perl-Routine) vor Start des Befehls </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: ausführen FHEM Kommando (oder perl-Routine) nach Ende des Befehls </td></tr>	                                <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
+									</table>
+	                             </ul>
+	                             <br>
+	                             <br>                                 
+                                
+                                 </li>
 
     <li><b> delEntries </b>   -  löscht alle oder die durch die <a href="#DbRepattr">Attribute</a> device und/oder 
 	                             reading definierten Datenbankeinträge. Die Eingrenzung über Timestamps erfolgt 
@@ -12541,10 +12821,13 @@ sub bdump {
 								    <tr><td> <b>allowDeletion</b>                          </td><td>: needs to be set to execute the delete option </td></tr>
            					        <tr><td> <b>aggregation</b>                            </td><td>: Auswahl einer Aggregationsperiode </td></tr>
                                     <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
+                                    <tr><td> <b>limit</b>                                  </td><td>: begrenzt NUR die Anzahl der anzuzeigenden Datensätze  </td></tr>
                                     <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
                                     <tr><td> <b>readingNameMap</b>                         </td><td>: die entstehenden Ergebnisreadings werden partiell umbenannt </td></tr>									
 								    <tr><td> <b>seqDoubletsVariance</b>                    </td><td>: bis zu diesem Wert werden aufeinander folgende numerische Datensätze als identisch angesehen und werden gelöscht </td></tr> 
 									<tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
+	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: ausführen FHEM Kommando (oder perl-Routine) vor Start des Befehls </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: ausführen FHEM Kommando (oder perl-Routine) nach Ende des Befehls </td></tr>
 	                                <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
 									</table>
 	                             </ul>
@@ -12621,7 +12904,6 @@ sub bdump {
                                     <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
                                     <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
                                     <tr><td> <b>readingNameMap</b>                         </td><td>: die entstehenden Ergebnisreadings werden partiell umbenannt </td></tr>									
-								    <tr><td> <b>seqDoubletsVariance</b>                    </td><td>: bis zu diesem Wert werden aufeinander folgende numerische Datensätze als identisch angesehen und werden gelöscht </td></tr> 
 									<tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
                                     <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
 									</table>
