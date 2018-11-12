@@ -260,7 +260,7 @@ sub DbLog_Initialize($)
 							  "showproctime:1,0 ".
 							  "suppressAddLogV3:1,0 ".
                               "traceFlag:SQL,CON,ENC,DBD,TXN,ALL ".
-                              "traceLevel:0,1,2,3,4 ".
+                              "traceLevel:0,1,2,3,4,5 ".
 							  "asyncMode:1,0 ".
 							  "cacheEvents:2,1,0 ".
 							  "cacheLimit ".
