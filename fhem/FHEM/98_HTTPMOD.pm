@@ -153,6 +153,9 @@
 #               see ExtractReading function
 #   2018-07-01  own redirect handling, support for cookies with different paths / options
 #               new attributes dontRequeueAfterAuth, handleRedirects
+#   2018-08-11  put userAttr handling in a subroutine
+#   2018-08-30  put map nandling in subroutines
+#   2018-11-09  changed regex to parse set-cookie
 #
 #
 
@@ -161,8 +164,8 @@
 #               get after set um readings zu aktualisieren
 #               definierbarer prefix oder Suffix für Readingsnamen wenn sie von unterschiedlichen gets über readingXY erzeugt werden
 #
-#				set clearCookies
-#				
+#               set clearCookies
+#               
 #               reading mit Status je get (error, no match, ...) oder reading zum nachverfolgen der schritte, fehler, auth etc.
 #
 #               In _Attr bei Prüfungen auf get auch set berücksichtigen wo nötig, ebenso in der Attr Liste (oft fehlt set)
@@ -221,7 +224,7 @@ sub HTTPMOD_AddToQueue($$$$$;$$$$);
 sub HTTPMOD_JsonFlatter($$;$);
 sub HTTPMOD_ExtractReading($$$$$);
 
-my $HTTPMOD_Version = '3.5.1 - 5.7.2018';
+my $HTTPMOD_Version = '3.5.4 - 9.11.2018';
 
 #
 # FHEM module intitialisation
@@ -474,6 +477,50 @@ sub HTTPMOD_LogOldAttr($$;$)
 }
 
 
+#########################################################################
+sub HTTPMOD_ManageUserAttr($$)
+{                     
+    my ($hash, $aName) = @_;       
+    my $name    = $hash->{NAME};
+    my $modHash = $modules{$hash->{TYPE}};
+
+    # handle wild card attributes -> Add to userattr to allow modification in fhemweb
+    #Log3 $name, 3, "$name: attribute $aName checking ";
+    if (" $modHash->{AttrList} " !~ m/ ${aName}[ :;]/) {
+        # nicht direkt in der Liste -> evt. wildcard attr in AttrList
+        foreach my $la (split " ", $modHash->{AttrList}) {
+            $la =~ /([^:;]+)(:?.*)/;
+            my $vgl = $1;           # attribute name in list - probably a regex
+            my $opt = $2;           # attribute hint in list
+            if ($aName =~ $vgl) {   # yes - the name in the list now matches as regex
+                # $aName ist eine Ausprägung eines wildcard attrs
+                addToDevAttrList($name, "$aName" . $opt);    # create userattr with hint to allow change in fhemweb
+                if ($opt) {
+                    # remove old entries without hint
+                    my $ualist = $attr{$name}{userattr};
+                    $ualist = "" if(!$ualist);  
+                    my %uahash;
+                    foreach my $a (split(" ", $ualist)) {
+                        if ($a !~ /^${aName}$/) {    # entry in userattr list is attribute without hint
+                            $uahash{$a} = 1;
+                        } else {
+                            Log3 $name, 3, "$name: added hint $opt to attr $a in userattr list";
+                        }
+                    }
+                    $attr{$name}{userattr} = join(" ", sort keys %uahash);
+                }
+            }
+        }
+    } else {
+        # exakt in Liste enthalten -> sicherstellen, dass keine +* etc. drin sind.
+        if ($aName =~ /\|\*\+\[/) {
+            Log3 $name, 3, "$name: Atribute $aName is not valid. It still contains wildcard symbols";
+            return "$name: Atribute $aName is not valid. It still contains wildcard symbols";
+        }
+    }
+}
+
+
 #
 # Attr command 
 #########################################################################
@@ -481,7 +528,6 @@ sub HTTPMOD_Attr(@)
 {
     my ($cmd,$name,$aName,$aVal) = @_;
     my $hash    = $defs{$name};
-    my $modHash = $modules{$hash->{TYPE}};
     my ($sid, $old);                # might be needed inside a URLExpr
     
     # $cmd can be "del" or "set"
@@ -646,41 +692,9 @@ sub HTTPMOD_Attr(@)
             $hash->{".updateRequestHash"} = 1;
         }
         
-        # handle wild card attributes -> Add to userattr to allow modification in fhemweb
-        #Log3 $name, 3, "$name: attribute $aName checking ";
-        if (" $modHash->{AttrList} " !~ m/ ${aName}[ :;]/) {
-            # nicht direkt in der Liste -> evt. wildcard attr in AttrList
-            foreach my $la (split " ", $modHash->{AttrList}) {
-                $la =~ /([^:;]+)(:?.*)/;
-                my $vgl = $1;           # attribute name in list - probably a regex
-                my $opt = $2;           # attribute hint in list
-                if ($aName =~ $vgl) {   # yes - the name in the list now matches as regex
-                    # $aName ist eine Ausprägung eines wildcard attrs
-                    addToDevAttrList($name, "$aName" . $opt);    # create userattr with hint to allow changing by click in fhemweb
-                    if ($opt) {
-                        # remove old entries without hint
-                        my $ualist = $attr{$name}{userattr};
-                        $ualist = "" if(!$ualist);  
-                        my %uahash;
-                        foreach my $a (split(" ", $ualist)) {
-                            if ($a !~ /^${aName}$/) {    # entry in userattr list is attribute without hint
-                                $uahash{$a} = 1;
-                            } else {
-                                Log3 $name, 3, "$name: added hint $opt to attr $a in userattr list";
-                            }
-                        }
-                        $attr{$name}{userattr} = join(" ", sort keys %uahash);
-                    }
-                }
-            }
-        } else {
-            # exakt in Liste enthalten -> sicherstellen, dass keine +* etc. drin sind.
-            if ($aName =~ /\|\*\+\[/) {
-                Log3 $name, 3, "$name: Atribute $aName is not valid. It still contains wildcard symbols";
-                return "$name: Atribute $aName is not valid. It still contains wildcard symbols";
-            }
-        }
-            
+        my $err = HTTPMOD_ManageUserAttr($hash, $aName);
+        return $err if ($err);
+        
     # Deletion of Attributes
     } elsif ($cmd eq "del") {    
         #Log3 $name, 5, "$name: del attribute $aName";
@@ -1190,9 +1204,7 @@ sub HTTPMOD_UpdateHintList($)
             $map = AttrVal($name, "${context}${num}Map", "") if ($context ne "get"); # old Map for set is now IMap (Input)
             $map = AttrVal($name, "${context}${num}IMap", $map);                     # new syntax ovverides old one
             if ($map) {                                                         
-                my $hint = $map;                                                # create hint from map
-                $hint =~ s/([^,\$]+):([^,\$]+)(,?) */$2$3/g;                    # allow spaces in names
-                $hint =~ s/\s/&nbsp;/g;                                         # convert spaces for fhemweb
+                my $hint = HTTPMOD_MapToHint($map);                             # create hint from map
                 $opt  = $oName . ":$hint";                                      # opt is Name:Hint (from Map)
             } elsif (AttrVal($name, "${context}${num}NoArg", undef)) {          # NoArg explicitely specified for a set?
                 $opt = $oName . ":noArg";                            
@@ -1410,25 +1422,11 @@ sub HTTPMOD_Set($@)
 
         # Eingabevalidierung von Sets mit Definition per Attributen
         # 1. Schritt, falls definiert, per Umkehrung der Map umwandeln (z.B. Text in numerische Codes)
-        
-        
         my $map = AttrVal($name, "set${setNum}Map", "");                # old Map for set is now IMap (Input)
         $map    = AttrVal($name, "set${setNum}IMap", $map);             # new syntax ovverides old one
-        if ($map) {                                                         
-            my $rm = $map;
-            $rm =~ s/([^, ][^,\$]*):([^,][^,\$]*),? */$2:$1, /g;    # reverse map string erzeugen
-            $setVal = decode ('UTF-8', $setVal);                    # convert nbsp from fhemweb
-            $setVal =~ s/\s|&nbsp;/ /g;                             # back to normal spaces
-
-            %rmap = split (/, *|:/, $rm);                           # reverse hash aus dem reverse string                   
-
-            if (defined($rmap{$setVal})) {                  # Eintrag für den übergebenen Wert in der Map?
-                $rawVal = $rmap{$setVal};                   # entsprechender Raw-Wert für das Gerät
-                Log3 $name, 5, "$name: set found $setVal in rmap and converted to $rawVal";
-            } else {
-                Log3 $name, 3, "$name: set value $setVal did not match defined map";
-                return "set value $setVal did not match defined map";
-            }
+        if ($map) {                  
+            $rawVal = HTTPMOD_MapConvert ($hash, $map, $setVal, 1);     # use reversed map
+            return "set value $setVal did not match defined map" if (!defined($rawVal));
         } else {
             # wenn keine map, dann wenigstens sicherstellen, dass Wert numerisch - falls nicht TextArg.
             if (!AttrVal($name, "set${setNum}TextArg", undef)) {     
@@ -1606,6 +1604,59 @@ sub HTTPMOD_GetUpdate($)
 }
 
 
+###########################################################
+# return the name of the caling function for debug output
+sub HTTPMOD_Caller() 
+{
+    my ($package, $filename, $line, $subroutine, $hasargs, $wantarray, $evaltext, $is_require, $hints, $bitmask, $hinthash) = caller 2;
+    return $1 if ($subroutine =~ /main::HTTPMOD_(.*)/);
+    return $1 if ($subroutine =~ /main::(.*)/);
+    return "$subroutine";
+}
+
+
+# Try to convert a value with a map 
+# called from Set and FormatReading
+#########################################
+sub HTTPMOD_MapConvert($$$;$)
+{
+    my ($hash, $map, $val, $reverse) = @_;
+    my $name = $hash->{NAME};
+    
+    if ($reverse) {
+        $map =~ s/([^, ][^,\$]*):([^,][^,\$]*),? */$2:$1, /g;   # reverse map
+    }
+    # spaces in words allowed, separator is ',' or ':'
+    $val = decode ('UTF-8', $val);                              # convert nbsp from fhemweb
+    $val =~ s/\s|&nbsp;/ /g;                                    # back to normal spaces in case it came from FhemWeb with coded Blank
+
+    my %mapHash = split (/, *|:/, $map);                        # reverse hash aus dem reverse string                   
+
+    if (defined($mapHash{$val})) {                              # Eintrag für den übergebenen Wert in der Map?
+        my $newVal = $mapHash{$val};                            # entsprechender Raw-Wert für das Gerät
+        Log3 $name, 5, "$name: MapConvert called from " . HTTPMOD_Caller() . " converted $val to $newVal with" .
+        ($reverse ? " reversed" : "") . " map $map";
+        return $newVal;
+    } else {
+        Log3 $name, 3, "$name: MapConvert called from " . HTTPMOD_Caller() . " did not find $val in" . 
+        ($reverse ? " reversed" : "") . " map $map";
+        return undef;
+    }
+}
+
+
+# called from UpdateHintList
+#########################################
+sub HTTPMOD_MapToHint($)
+{
+    my ($map) = @_;
+    my $hint = $map;                                                # create hint from map
+    $hint =~ s/([^,\$]+):([^,\$]+)(,?) */$2$3/g;                    # allow spaces in names
+    $hint =~ s/\s/&nbsp;/g;                                         # convert spaces for fhemweb
+    return $hint;
+}
+
+
 # Try to call a parse function if defined
 #########################################
 sub HTTPMOD_TryCall($$$$)
@@ -1729,15 +1780,9 @@ sub HTTPMOD_FormatReading($$$$$)
         Log3 $name, 5, "$name: FormatReading changed value with Expr $expr from $old to $val";
     }
     
-    if ($map) {                                 # gibt es eine Map?
-        my %map = split (/, +|:/, $map);        # hash aus dem map string                   
-        if (defined($map{$val})) {              # Eintrag für den gelesenen Wert in der Map?
-            my $nVal = $map{$val};              # entsprechender sprechender Wert für den rohen Wert aus dem Gerät
-            Log3 $name, 5, "$name: FormatReading found $val in map and converted to $nVal";
-            $val = $nVal;
-        } else {
-            Log3 $name, 3, "$name: FormatReading could not match $val to defined map";
-        }
+    if ($map) {             # gibt es eine Map?
+        my $nVal = HTTPMOD_MapConvert ($hash, $map, $val);
+        $val = $nVal if (defined($nVal));
     }
     
     if ($format) {
@@ -2205,7 +2250,7 @@ sub HTTPMOD_GetCookies($$)
     Log3 $name, 5, "$name: GetCookies is looking for Cookies";
     foreach my $cookie ($header =~ m/set-cookie: ?(.*)/gi) {
         #Log3 $name, 5, "$name: GetCookies found Set-Cookie: $cookie";
-        $cookie =~ /([^,; ]+)=([^,; ]+)[;, ]*([^\v]*)/;
+        $cookie =~ /([^,; ]+)=([^,;\s\v]+)[;,\s\v]*([^\v]*)/;
         Log3 $name, 4, "$name: GetCookies parsed Cookie: $1 Wert $2 Rest $3";
         my $name  = $1;
         my $value = $2;
@@ -2922,12 +2967,12 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
         Example for a PoolManager 5:<br><br>
         <ul><code>
             define PM HTTPMOD http://MyPoolManager/cgi-bin/webgui.fcgi 60<br>
-			<br>
-			attr PM enableControlSet 1<br>
-			attr PM enableCookies 1<br>
-			attr PM enforceGoodReadingNames 1<br>
-			attr PM handleRedirects 1<br>
-			<br>
+            <br>
+            attr PM enableControlSet 1<br>
+            attr PM enableCookies 1<br>
+            attr PM enforceGoodReadingNames 1<br>
+            attr PM handleRedirects 1<br>
+            <br>
             attr PM reading01Name PH<br>
             attr PM reading01Regex 34.4001.value":[ \t]+"([\d\.]+)"<br>
             <br>
@@ -3204,12 +3249,12 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
 
         <ul><code>
         define test2 HTTPMOD none 0<br>
-		<br>
-		attr PM enableControlSet 1<br>
-		attr PM enableCookies 1<br>
-		attr PM enforceGoodReadingNames 1<br>
-		attr PM handleRedirects 1<br>
-		<br>
+        <br>
+        attr PM enableControlSet 1<br>
+        attr PM enableCookies 1<br>
+        attr PM enforceGoodReadingNames 1<br>
+        attr PM handleRedirects 1<br>
+        <br>
         attr test2 get01Name Chlor<br>
         attr test2 getURL http://192.168.70.90/cgi-bin/webgui.fcgi<br>
         attr test2 getHeader1 Content-Type: application/json<br>
@@ -3332,11 +3377,11 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
     <a name="HTTPMODnamedGroupsconfiguration"></a>
     <b>Parsing with named regex groups</b><br><br>
     <ul>
-		If you are an expert with regular expressions you can also use named capture groups in regexes for parsing and HTTPMOD will use the group names as reading names. This feature is only meant for experts who know exactly what they are doing and it is not necessary for normal users.
-		For formatting such readings the name of a capture group can be matched with a readingXYName attribute and then the correspondug formatting attributes will be used here.
+        If you are an expert with regular expressions you can also use named capture groups in regexes for parsing and HTTPMOD will use the group names as reading names. This feature is only meant for experts who know exactly what they are doing and it is not necessary for normal users.
+        For formatting such readings the name of a capture group can be matched with a readingXYName attribute and then the correspondug formatting attributes will be used here.
     </ul>
     <br>
-	
+    
     <a name="HTTPMODreplacements"></a>
     <b>Further replacements of URL, header or post data</b><br><br>
     <ul>
