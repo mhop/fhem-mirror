@@ -45,6 +45,7 @@ use HttpUtils;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "7.3.2"  => "12.11.2018  fix Warning in line 4954, set COMPATIBILITY to 8.2.2 ",
   "7.3.1"  => "31.10.2018  fix connection lost failure if several SSCamSTRM devices are defined and updated by longpoll from same parent device ",
   "7.3.0"  => "28.10.2018  usage of attribute \"livestreamprefix\" changed, exec SSCam_getStmUrlPath on boot ",
   "7.2.1"  => "23.10.2018  new routine SSCam_versionCheck, COMPATIBILITY changed to 8.2.1 ",
@@ -91,6 +92,7 @@ our %SSCam_vNotesIntern = (
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
+  "7.3.2"  => "12.11.2018 fix Warning if 'livestreamprefix' is set to DEF, COMPATIBILITY set to 8.2.2 ",
   "7.3.0"  => "28.10.2018 In attribute \"livestreamprefix\" can now \"DEF\" be specified to overwrite livestream address by specification from device definition ",
   "7.2.1"  => "23.10.2018 COMPATIBILITY changed to 8.2.1 ",
   "7.2.0"  => "20.10.2018 direct help for attributes, new get versionNotes command, please see commandref for details ",
@@ -201,7 +203,7 @@ our %SSCam_vHintsExt_de = (
 );
 
 # getestete SVS-Version
-my $compstat     = "8.2.1";
+my $compstat     = "8.2.2";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -4950,7 +4952,7 @@ sub SSCam_camop_parse ($) {
                     $mxpegHttp = $exturl."/".$mxh[3];
 					if($unicastPath) {
                         my @ucp = split(/[@\|:]/, $unicastPath);
-                        my @lspf = split(/[\/\/\|:]/, AttrVal($name, "livestreamprefix", undef));
+                        my @lspf = split(/[\/\/\|:]/, $exturl);
                         $unicastPath = $ucp[0].":".$ucp[1].":".$ucp[2]."@".$lspf[3].":".$ucp[4];
 					}
                 }
