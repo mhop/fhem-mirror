@@ -750,6 +750,7 @@ sub PHC_ParseFrames($)
         
         ($pld, $crc, $rest) = unpack ("a[$len]va*", $rest);     # v = little endian unsigned short, n would be big endian
         @data  = unpack ('C*', $pld);
+		$crc   = 0 if (!$crc);
         $crc1  = crc($frame, 16, 0xffff, 0xffff, 1, 0x1021, 1, 0);
         my $fcrc  = unpack ("H*", pack ("v", $crc));
         my $fcrc1 = unpack ("H*", pack ("v", $crc1));
@@ -949,8 +950,10 @@ sub PHC_ReadAnswer($$$)
 sub PHC_Ready($)
 {
     my ($hash) = @_;
-    return DevIo_OpenDev($hash, 1, undef)
-        if($hash->{STATE} eq "disconnected");
+	if ($hash->{STATE} eq "disconnected") {
+		$hash->{devioLoglevel} = (AttrVal($hash->{NAME}, "silentReconnect", 0) ? 4 : 3);
+		return DevIo_OpenDev($hash, 1, undef);
+	}
 
     # This is relevant for windows/USB only
     my $po = $hash->{USBDev};
@@ -997,7 +1000,7 @@ sub PHC_SplitCode($$$)
 sub PHC_LogCommand($$$$)
 {
     my ($hash, $command, $msg, $level) = @_;
-    Log3 $hash->{NAME}, $level, "$hash->{NAME}: " . PHC_Caller() . ' ' . PHC_CmdText($hash, $command) . $msg;
+    Log3 $hash->{NAME}, $level, "$hash->{NAME}: " . PHC_Caller() . ' ' . PHC_CmdText($hash, $command) . " $msg";
 }
 
 
