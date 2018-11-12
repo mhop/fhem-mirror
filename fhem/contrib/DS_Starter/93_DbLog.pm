@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter:
 #
+# 3.13.0     12.11.2018       adding attributes traceFlag, traceLevel
 # 3.12.7     10.11.2018       addLog considers DbLogInclude (Forum:#92854)
 # 3.12.6     22.10.2018       fix timer not deleted if reopen after reopen xxx (Forum: https://forum.fhem.de/index.php/topic,91869.msg848433.html#msg848433)
 # 3.12.5     12.10.2018       charFilter: "\xB0C" substitution by "°C" added and usage in DbLog_Log changed
@@ -216,7 +217,7 @@ use Time::Local;
 use Encode qw(encode_utf8);
 no if $] >= 5.017011, warnings => 'experimental::smartmatch'; 
 
-my $DbLogVersion = "3.12.7";
+my $DbLogVersion = "3.13.0";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -258,6 +259,8 @@ sub DbLog_Initialize($)
 							  "noNotifyDev:1,0 ".
 							  "showproctime:1,0 ".
 							  "suppressAddLogV3:1,0 ".
+                              "traceFlag:SQL,CON,ENC,DBD,TXN,ALL ".
+                              "traceLevel:0,1,2,3,4 ".
 							  "asyncMode:1,0 ".
 							  "cacheEvents:2,1,0 ".
 							  "cacheLimit ".
@@ -1484,6 +1487,8 @@ sub DbLog_Push(@) {
   my $name       = $hash->{NAME};
   my $DbLogType  = AttrVal($name, "DbLogType", "History");
   my $supk       = AttrVal($name, "noSupportPK", 0);
+  my $tl          = AttrVal($name, "traceLevel", 0);
+  my $tf          = AttrVal($name, "traceFlag", "SQL");
   my $errorh     = 0;
   my $error      = 0;
   my $doins = 0;  # Hilfsvariable, wenn "1" sollen inserts in Tabele current erfolgen (updates schlugen fehl) 
@@ -1647,6 +1652,7 @@ sub DbLog_Push(@) {
   }
   eval {
       if (lc($DbLogType) =~ m(history) ) {
+          $sth_ih->{TraceLevel} = "$tl|$tf" if($tl);       # Tracelevel setzen
           ($tuples, $rows) = $sth_ih->execute_array( { ArrayTupleStatus => \my @tuple_status } );
 		  my $nins_hist = 0;
 		  for my $tuple (0..$#row_array) {
@@ -1757,6 +1763,7 @@ sub DbLog_Push(@) {
   if ($errorh) {
       $error = $errorh;
   }
+  $sth_ih->{TraceLevel} = "0" if(!$tl);        # Trace ausschalten
   $dbh->{RaiseError} = 0; 
   $dbh->{PrintError} = 1;
   $dbh->disconnect if ($nh);
@@ -1895,6 +1902,8 @@ sub DbLog_PushAsync(@) {
   my $dbpassword  = $attr{"sec$name"}{secret};
   my $DbLogType   = AttrVal($name, "DbLogType", "History");
   my $supk        = AttrVal($name, "noSupportPK", 0);
+  my $tl          = AttrVal($name, "traceLevel", 0);
+  my $tf          = AttrVal($name, "traceFlag", "SQL");
   my $utf8        = defined($hash->{UTF8})?$hash->{UTF8}:0;
   my $errorh      = 0;
   my $error       = 0;
@@ -2066,6 +2075,7 @@ sub DbLog_PushAsync(@) {
   }
   eval {
       if (lc($DbLogType) =~ m(history) ) {
+          $sth_ih->{TraceLevel} = "$tl|$tf" if($tl);       # Tracelevel setzen
           ($tuples, $rows) = $sth_ih->execute_array( { ArrayTupleStatus => \my @tuple_status } );
 		  my $nins_hist = 0;
 		  my @n2hist;
@@ -6470,9 +6480,9 @@ sub DbLog_dbReadings($@) {
     </ul><br>
 	
     <code>set &lt;name&gt; addLog &lt;devspec&gt;:&lt;Reading&gt; [Value] [CN=&lt;caller name&gt;] [!useExcludes] </code><br><br>
-    <ul> Fügt einen zusatzlichen Logeintrag einer Device/Reading-Kombination in die Datenbank ein. Die eventuell in den 
-    Attributen "DbLogExclude" spezifizierten Readings (im Quelldevice) werden nicht nicht geloggt, es sei denn sie sind im 
-    Attribut "DbLogInclude"  enthalten bzw. der addLog-Aufruf erfolgte mit der Option "!useExcludes".  <br><br>
+    <ul> Fügt einen zusätzlichen Logeintrag einer Device/Reading-Kombination in die Datenbank ein. Die eventuell im Attribut 
+    "DbLogExclude" spezifizierten Readings (im Quelldevice) werden nicht geloggt, es sei denn sie sind im Attribut 
+    "DbLogInclude"  enthalten bzw. der addLog-Aufruf erfolgte mit der Option "!useExcludes".  <br><br>
       
       <ul>
       <li> <b>&lt;devspec&gt;:&lt;Reading&gt;</b> - Das Device kann als <a href="#devspec">Geräte-Spezifikation</a> angegeben werden. <br>
