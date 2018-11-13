@@ -1643,6 +1643,12 @@ sub DbLog_Push(@) {
 	  }
   }
   
+  if($tl) {
+      # Tracelevel setzen  
+      $dbh->{TraceLevel} = "$tl|$tf";       
+      $sth_ih->{TraceLevel} = "$tl|$tf";
+  }
+  
   my ($tuples, $rows);
   
   # insert into history-Tabelle
@@ -1652,7 +1658,6 @@ sub DbLog_Push(@) {
   }
   eval {
       if (lc($DbLogType) =~ m(history) ) {
-          $sth_ih->{TraceLevel} = "$tl|$tf" if($tl);       # Tracelevel setzen
           ($tuples, $rows) = $sth_ih->execute_array( { ArrayTupleStatus => \my @tuple_status } );
 		  my $nins_hist = 0;
 		  for my $tuple (0..$#row_array) {
@@ -1763,7 +1768,12 @@ sub DbLog_Push(@) {
   if ($errorh) {
       $error = $errorh;
   }
-  $sth_ih->{TraceLevel} = "0" if(!$tl);        # Trace ausschalten
+  if(!$tl) {
+      # Trace ausschalten
+      $dbh->{TraceLevel} = "0";  
+      $sth_ih->{TraceLevel} = "0";        
+  }
+  
   $dbh->{RaiseError} = 0; 
   $dbh->{PrintError} = 1;
   $dbh->disconnect if ($nh);
@@ -2062,7 +2072,13 @@ sub DbLog_PushAsync(@) {
           $sth_uc->bind_param_array(7, [@reading]);
 	  }
   }
-
+   
+  if($tl) {
+      # Tracelevel setzen  
+      $dbh->{TraceLevel} = "$tl|$tf";       
+      $sth_ih->{TraceLevel} = "$tl|$tf";
+  }  
+  
   # SQL-Startzeit
   my $st = [gettimeofday];
   
@@ -2075,7 +2091,6 @@ sub DbLog_PushAsync(@) {
   }
   eval {
       if (lc($DbLogType) =~ m(history) ) {
-          $sth_ih->{TraceLevel} = "$tl|$tf" if($tl);       # Tracelevel setzen
           ($tuples, $rows) = $sth_ih->execute_array( { ArrayTupleStatus => \my @tuple_status } );
 		  my $nins_hist = 0;
 		  my @n2hist;
