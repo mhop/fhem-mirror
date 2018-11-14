@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  73_AutoShuttersControl: fix multiple NOTIFYDEV entry's then set
+                                     scanForShutters
   - feature: 93_DbRep: new command delDoublets, minor fixes
   - change:  49_SSCam: COMPATIBILITY set to 8.2.2, minor fix
   - bugfix:  73_AutoShuttersControl: fix ASC_twilightDevice

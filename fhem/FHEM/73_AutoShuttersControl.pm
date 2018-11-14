@@ -38,7 +38,7 @@ package main;
 use strict;
 use warnings;
 
-my $version = "0.2.0.4";
+my $version = "0.2.0.5";
 
 sub AutoShuttersControl_Initialize($) {
     my ($hash) = @_;
@@ -81,6 +81,7 @@ sub AutoShuttersControl_Initialize($) {
       . "ASC_timeUpHolidayReading "
       . "ASC_shuttersDriveOffset "
       . "ASC_twilightDevice "
+      . "ASC_expert:1 "
       . $readingFnAttributes;
     $hash->{NotifyOrderPrefix} = "51-";    # Order Nummer für NotifyFn
 
@@ -539,7 +540,7 @@ sub Set($$@) {
           if ( ReadingsVal( $name, 'userAttrList', 'none' ) eq 'rolled out' );
         $list .= " createNewNotifyDev:noArg"
           if (  ReadingsVal( $name, 'userAttrList', 'none' ) eq 'rolled out'
-            and AttrVal( $name, 'verbose', 3 ) > 3 );
+            and AttrVal( $name, 'ASC_expert', 0 ) == 1 );
 
         return "Unknown argument $cmd,choose one of $list";
     }
@@ -567,7 +568,7 @@ sub Get($$@) {
           if ( ReadingsVal( $name, 'userAttrList', 'none' ) eq 'rolled out' );
         $list .= " showNotifyDevsInformations:noArg"
           if (  ReadingsVal( $name, 'userAttrList', 'none' ) eq 'rolled out'
-            and AttrVal( $name, 'verbose', 3 ) > 3 );
+            and AttrVal( $name, 'ASC_expert', 0 ) == 1 );
 
         return "Unknown argument $cmd,choose one of $list";
     }
@@ -675,7 +676,8 @@ sub ShuttersDeviceScan($) {
         $shutters->setNoOffset(0);
         $shutters->setPosSetCmd( $posSetCmds{ $defs{$_}->{TYPE} } );
     }
-    $hash->{NOTIFYDEV} = $hash->{NOTIFYDEV} . $shuttersList;
+#     $hash->{NOTIFYDEV} = $hash->{NOTIFYDEV} . $shuttersList;
+    $hash->{NOTIFYDEV} = "global," . $name . $shuttersList;
 
     if ( $ascDev->getMonitoredDevs ne 'none' ) {
         $hash->{monitoredDevs} =
@@ -840,6 +842,7 @@ sub WindowRecEventProcessing($@) {
         if ( $shutters->getDelayCmd ne 'none' )
         { # Es wird geschaut ob wärend der Fenster offen Phase ein Fahrbefehl über das Modul kam,wenn ja wird dieser aus geführt
             if ( $1 eq 'closed' ) {
+                $shutters->setLastDrive('delayed closed');
                 ShuttersCommandSet( $hash, $shuttersDev,
                     $shutters->getClosedPos );
             }
@@ -852,6 +855,7 @@ sub WindowRecEventProcessing($@) {
                 and $queryShuttersPosWinRecTilted
               )
             {
+                $shutters->setLastDrive('delayed ventilate open');
                 ShuttersCommandSet( $hash, $shuttersDev,
                     $shutters->getVentilatePos );
             }
@@ -872,6 +876,7 @@ sub WindowRecEventProcessing($@) {
             and $queryShuttersPosWinRecTilted
           )
         {
+            $shutters->setLastDrive('ventilate open');
             ShuttersCommandSet( $hash, $shuttersDev,
                 $shutters->getVentilatePos );
         }
@@ -880,6 +885,7 @@ sub WindowRecEventProcessing($@) {
             and $ascDev->getAutoShuttersControlComfort eq 'on'
             and $queryShuttersPosWinRecTilted )
         {
+            $shutters->setLastDrive('comfort open');
             ShuttersCommandSet( $hash, $shuttersDev,
                 $shutters->getPosAfterComfortOpen );
         }
