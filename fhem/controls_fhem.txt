@@ -1,4 +1,4 @@
-REV 17740
+REV 17743
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2018-11-13_07:45:04 265632 ./CHANGED
+UPD 2018-11-14_07:45:03 265762 ./CHANGED
 UPD 2018-11-10_07:45:04 38464 ./MAINTAINER.txt
 UPD 2018-09-09_07:45:03 39688 ./configDB.pm
 UPD 2018-09-17_07:45:03 19987 ./fhem.cfg.demo
@@ -355,7 +355,7 @@ UPD 2018-10-01_07:45:02 221693 FHEM/72_FRITZBOX.pm
 UPD 2018-11-11_07:45:02 16051 FHEM/72_TA_CMI_JSON.pm
 UPD 2018-11-04_07:45:06 153730 FHEM/72_XiaomiDevice.pm
 UPD 2018-10-30_07:45:03 47410 FHEM/73_AMADCommBridge.pm
-UPD 2018-11-13_07:45:04 129005 FHEM/73_AutoShuttersControl.pm
+UPD 2018-11-14_07:45:03 129333 FHEM/73_AutoShuttersControl.pm
 UPD 2018-04-14_07:45:02 89324 FHEM/73_ElectricityCalculator.pm
 UPD 2018-10-18_07:45:03 34360 FHEM/73_GardenaSmartBridge.pm
 UPD 2018-04-14_07:45:02 81612 FHEM/73_GasCalculator.pm
@@ -692,8 +692,8 @@ UPD 2018-11-13_07:45:07 3678381 docs/commandref.html
 UPD 2018-11-13_07:45:09 2268098 docs/commandref_DE.html
 UPD 2018-10-08_07:45:02 76228 docs/commandref_frame.html
 UPD 2018-10-08_07:45:02 85677 docs/commandref_frame_DE.html
-UPD 2018-11-13_07:45:10 201320 docs/commandref_modular.html
-UPD 2018-11-13_07:45:11 212015 docs/commandref_modular_DE.html
+UPD 2018-11-14_07:45:10 201320 docs/commandref_modular.html
+UPD 2018-11-14_07:45:11 212015 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
