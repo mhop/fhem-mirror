@@ -40,6 +40,7 @@ MQTT2_SERVER_Initialize($)
     autocreate
     disable:0,1
     disabledForIntervals
+    keepaliveFactor
     rawEvents
     sslVersion
     sslCertPrefix
@@ -83,7 +84,9 @@ MQTT2_SERVER_keepaliveChecker($)
       my $cHash = $defs{$clName};
       next if(!$cHash || !$cHash->{keepalive} ||
                $now < $cHash->{lastMsgTime}+$cHash->{keepalive}*$multiplier );
-      Log3 $hash, 3, "$hash->{NAME}: $clName left us (keepalive check)";
+      my $msgName = $clName;
+      $msgName .= "/".$cHash->{cid} if($cHash->{cid});
+      Log3 $hash, 3, "$hash->{NAME}: $msgName left us (keepalive check)";
       CommandDelete(undef, $clName);
     }
   }
