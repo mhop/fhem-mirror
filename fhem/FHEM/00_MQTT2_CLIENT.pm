@@ -20,8 +20,11 @@ MQTT2_CLIENT_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{Clients} = ":MQTT2_DEVICE:";
-  $hash->{MatchList}= { "1:MQTT2_DEVICE"  => "^.*" },
+  $hash->{Clients} = ":MQTT2_DEVICE:MQTT_GENERIC_BRIDGE:";
+  $hash->{MatchList}= {
+    "1:MQTT2_DEVICE"  => "^.*",
+    "2:MQTT_GENERIC_BRIDGE" => "^.*"
+  };
   $hash->{ReadFn}  = "MQTT2_CLIENT_Read";
   $hash->{DefFn}   = "MQTT2_CLIENT_Define";
   $hash->{AttrFn}  = "MQTT2_CLIENT_Attr";
