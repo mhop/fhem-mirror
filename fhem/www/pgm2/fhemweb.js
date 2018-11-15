@@ -296,20 +296,17 @@ FW_jqueryReadyFn()
     $("#devSpecHelp").remove();
     var sel = this;
     FW_getHelp(m[2], function(data) {
-      var mm = data.match(new RegExp('<a[^"]*"'+val+'[^A-Za-z_0-9]'));
-      if(mm == null) {
-        data = "";
-      } else {
-        data = data.substr(mm.index);
-        var o1 = data.indexOf('<a', 1);
-        if(o1 > 0)
-          data = data.substr(0,o1);
-      }
-      if(data) {
+      $("#content")
+        .append("<div id='workbench' style='display:none'></div>");
+      $("#content > #workbench").html(data);
+      var aTag = $("#content > #workbench").find("a[name="+val+"]");
+
+      if($(aTag).length && $(aTag).next("li").length) {
         $(sel).closest("div[cmd='"+m[1]+"']")
            .after('<div class="makeTable" id="devSpecHelp"></div>')
-        $("#devSpecHelp").html(data);
+        $("#devSpecHelp").html($(aTag).next("li").html());
       }
+      $("#content > #workbench").remove();
     });
   });
 
