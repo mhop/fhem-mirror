@@ -30,11 +30,14 @@
 # 
 # CHANGE LOG
 #
-# 15.11.2018 0.9.9
+# 15.11.2018 1.0.0
 #  fix       : Pruefung im Parse auf das richtige IODev gefixt (mqtt2).
 #  fix       : Trigger-Event bei Aenderung der Attribute (mqtt2).
 #  feature   : Beim publish (global publish related) pruefen, ob das Geraet
 #              dem devspec im DEF entspricht (falls vorhanden)
+#  feature   : Unterstuetzung fuer MQTT2 -> publish (IOWrite)
+#              retain-Flag sollte funktionieren, qos nicht,
+#              wie qos uebermittelt werden soll ist noch unklar
 #
 # 14.11.2018 0.9.9
 #  feature   : Unterstuetzung fuer MQTT2 -> subscribe (Parse)
@@ -234,7 +237,7 @@ use warnings;
 
 #my $DEBUG = 1;
 my $cvsid = '$Id$';
-my $VERSION = "version 0.9.9 by hexenmeister\n$cvsid";
+my $VERSION = "version 1.0.0 by hexenmeister\n$cvsid";
 
 my %sets = (
 );
@@ -1488,6 +1491,7 @@ sub UpdateSubscriptions($) {
   updateDevCount($hash);
 
   return unless isIODevMQTT($hash); #if $hash->{+HELPER}->{+IO_DEV_TYPE} eq 'MQTT2_SERVER';
+  # TODO: MQTT2 subscriptions
 
   my $topicMap = {};
   my $gmap = $hash->{+HS_TAB_NAME_DEVICES};
@@ -1543,6 +1547,7 @@ sub RemoveAllSubscripton($) {
   my ($hash) = @_;
 
   return unless isIODevMQTT($hash); #if $hash->{+HELPER}->{+IO_DEV_TYPE} eq 'MQTT2_SERVER';
+  # TODO MQTT2 Subscriptions
 
   # alle Subscription kuendigen (beim undefine)  
   if (defined($hash->{subscribe}) and (@{$hash->{subscribe}})) {
@@ -2071,8 +2076,13 @@ sub doPublish($$$$$$$$) {
 
   if (isIODevMQTT2($hash)){ #if ($hash->{+HELPER}->{+IO_DEV_TYPE} eq 'MQTT2_SERVER') {
     # TODO: publish MQTT2
-
-    return 'unsupported IODev';
+    # TODO qos / retain ? 
+    $topic.=':r' if $retain;
+    IOWrite($hash, $topic, $message);
+    readingsSingleUpdate($hash,"transmission-state","outgoing publish sent",1);
+    $hash->{+HELPER}->{+HS_PROP_NAME_OUTGOING_CNT}++;
+    readingsSingleUpdate($hash,"outgoing-count",$hash->{+HELPER}->{+HS_PROP_NAME_OUTGOING_CNT},1);
+    return undef;
   } elsif (isIODevMQTT($hash)) { #elsif ($hash->{+HELPER}->{+IO_DEV_TYPE} eq 'MQTT') {
     #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> doPublish for $devn, $reading, $value, topic: $topic, message: $message");
     my $msgid;
@@ -2294,7 +2304,7 @@ sub Attr($$$$) {
 # CallBack-Handler fuer IODev beim Connect
 sub ioDevConnect($) {
   my $hash = shift;
-  return if isIODevMQTT2($hash); #if $hash->{+HELPER}->{+IO_DEV_TYPE} eq 'MQTT2_SERVER'; # TODO
+  #return if isIODevMQTT2($hash); #if $hash->{+HELPER}->{+IO_DEV_TYPE} eq 'MQTT2_SERVER'; # TODO
 
   # ueberraschenderweise notwendig fuer eine subscribe-Initialisierung.
   MQTT::client_start($hash) if isIODevMQTT($hash);
@@ -2325,7 +2335,7 @@ sub ioDevConnect($) {
 # CallBack-Handler fuer IODev beim Disconnect
 sub ioDevDisconnect($) {
   my $hash = shift;
-  return if isIODevMQTT2($hash); #if $hash->{+HELPER}->{+IO_DEV_TYPE} eq 'MQTT2_SERVER';
+  #return if isIODevMQTT2($hash); #if $hash->{+HELPER}->{+IO_DEV_TYPE} eq 'MQTT2_SERVER';
 
   #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> ioDevDisconnect");
 
