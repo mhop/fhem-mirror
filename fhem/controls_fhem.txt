@@ -1,4 +1,4 @@
-REV 17743
+REV 17745
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -40,7 +40,7 @@ UPD 2016-08-19_14:49:02 3718 FHEM/00_LIRC.pm
 UPD 2016-04-26_07:45:11 33379 FHEM/00_MAXLAN.pm
 UPD 2018-09-18_07:45:02 31171 FHEM/00_MQTT.pm
 UPD 2018-11-11_07:45:02 13554 FHEM/00_MQTT2_CLIENT.pm
-UPD 2018-11-08_07:45:05 16602 FHEM/00_MQTT2_SERVER.pm
+UPD 2018-11-15_07:45:02 16707 FHEM/00_MQTT2_SERVER.pm
 UPD 2018-09-07_07:45:03 20140 FHEM/00_MYSENSORS.pm
 UPD 2017-09-07_07:45:02 25519 FHEM/00_NetzerI2C.pm
 UPD 2018-06-12_07:45:06 35015 FHEM/00_Neuron.pm
@@ -692,8 +692,8 @@ UPD 2018-11-13_07:45:07 3678381 docs/commandref.html
 UPD 2018-11-13_07:45:09 2268098 docs/commandref_DE.html
 UPD 2018-10-08_07:45:02 76228 docs/commandref_frame.html
 UPD 2018-10-08_07:45:02 85677 docs/commandref_frame_DE.html
-UPD 2018-11-14_07:45:10 201320 docs/commandref_modular.html
-UPD 2018-11-14_07:45:11 212015 docs/commandref_modular_DE.html
+UPD 2018-11-15_07:45:08 201320 docs/commandref_modular.html
+UPD 2018-11-15_07:45:09 212015 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
