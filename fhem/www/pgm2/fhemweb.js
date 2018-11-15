@@ -295,16 +295,20 @@ FW_jqueryReadyFn()
       return;
     $("#devSpecHelp").remove();
     var sel = this;
-    FW_getHelp(m[2], function(data) {
+    FW_getHelp(m[2], function(data) { // show either the next or the outer li
       $("#content")
         .append("<div id='workbench' style='display:none'></div>");
       $("#content > #workbench").html(data);
       var aTag = $("#content > #workbench").find("a[name="+val+"]");
-
-      if($(aTag).length && $(aTag).next("li").length) {
-        $(sel).closest("div[cmd='"+m[1]+"']")
-           .after('<div class="makeTable" id="devSpecHelp"></div>')
-        $("#devSpecHelp").html($(aTag).next("li").html());
+      if($(aTag).length) {
+        var liTag = $(aTag).next("li");
+        if(!$(liTag).length)
+          liTag = $(aTag).parent("li");
+        if($(liTag).length) {
+          $(sel).closest("div[cmd='"+m[1]+"']")
+             .after('<div class="makeTable" id="devSpecHelp"></div>')
+          $("#devSpecHelp").html($(liTag).html());
+        }
       }
       $("#content > #workbench").remove();
     });
