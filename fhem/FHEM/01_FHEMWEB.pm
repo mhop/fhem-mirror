@@ -2761,17 +2761,17 @@ FW_dev2image($;$)
   my ($name, $state) = @_;
   my $d = $defs{$name};
   return "" if(!$name || !$d);
+  my $devStateIcon = AttrVal($name, "devStateIcon", undef);
+  return "" if(defined($devStateIcon) && lc($devStateIcon)  eq 'none');
 
   my $type = $d->{TYPE};
   $state = $d->{STATE} if(!defined($state));
   return "" if(!$type || !defined($state));
 
   my $model = AttrVal($name, "model", "");
-
   my (undef, $rstate) = ReplaceEventMap($name, [undef, $state], 0);
 
   my ($icon, $rlink);
-  my $devStateIcon = AttrVal($name, "devStateIcon", undef);
   if(defined($devStateIcon) && $devStateIcon =~ m/^{.*}$/) {
     my ($html, $link) = eval $devStateIcon;
     Log3 $FW_wname, 1, "devStateIcon $name: $@" if($@);
