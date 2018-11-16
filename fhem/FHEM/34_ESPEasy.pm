@@ -1201,9 +1201,9 @@ sub ESPEasy_Notify($$)
           }
           # bridge                            (trigger only if state != disabled)
           elsif ($hash->{SUBTYPE} eq "bridge" && ReadingsVal($name, "state", "") ne "disabled") {
-						ESPEasy_TcpServer_Close($hash);
-						readingsSingleUpdate($hash, "state", "disabled",1);
-						Log3 $name, 3, "$type $name: Device disabled";
+            ESPEasy_TcpServer_Close($hash);
+            readingsSingleUpdate($hash, "state", "disabled",1);
+            Log3 $name, 3, "$type $name: Device disabled";
           }
         }
       }
@@ -3278,13 +3278,13 @@ sub ESPEasy_dumpSingleLine($)
 
   <ul>
     <li><a name="ESPEasy_bridge_set_active">active</a><br>
-			Activates the current device if it was set
-			<a href="#ESPEasy_bridge_set_inactive">inactive</a> before.
-			Set active/inactive will be mostly used in scripts without the side
-			effect that the 'red question mark' will be displayed in FHEMWEB that
-			indicates unsaved configuration changes.
-			If attribute <a href="ESPEasy_bridge_attr_disable"">disabled</a> is
-			enabled (set to '1') then this set command will be ignored.
+      Activates the current device if it was set
+      <a href="#ESPEasy_bridge_set_inactive">inactive</a> before.
+      Set active/inactive will be mostly used in scripts without the side
+      effect that the 'red question mark' will be displayed in FHEMWEB that
+      indicates unsaved configuration changes.
+      If attribute <a href="ESPEasy_bridge_attr_disable"">disabled</a> is
+      enabled (set to '1') then this set command will be ignored.
     </li><br>
 
     <li><a name="ESPEasy_bridge_set_inactive">inactive</a><br>
