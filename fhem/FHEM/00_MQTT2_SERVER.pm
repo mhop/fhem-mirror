@@ -378,6 +378,7 @@ MQTT2_SERVER_Read($@)
   ####################################
   } elsif($cpt eq "DISCONNECT") {
     Log3 $sname, 4, "$cname $hash->{cid} $cpt";
+    delete($hash->{lwt}); # no LWT on disconnect, see doc, chapter 3.14
     CommandDelete(undef, $cname);
 
   ####################################
@@ -457,13 +458,21 @@ MQTT2_SERVER_terminate($$)
 sub
 MQTT2_SERVER_Write($$$)
 {
-  my ($hash,$topic,$msg) = @_;
-  my $retain;
-  if($topic =~ m/^(.*):r$/) {
-    $topic = $1;
-    $retain = 1;
+  my ($hash,$function,$topicMsg) = @_;
+
+  if($function eq "publish") {
+    my ($topic, $msg) = split(" ", $topicMsg, 2);
+    my $retain;
+    if($topic =~ m/^(.*):r$/) {
+      $topic = $1;
+      $retain = 1;
+    }
+    MQTT2_SERVER_doPublish($hash, $hash, $topic, $msg, $retain);
+
+  } else {
+    my $name = $hash->{NAME};
+    Log3 $name, 1, "$name: ERROR: Ignoring function $function";
   }
-  MQTT2_SERVER_doPublish($hash, $hash, $topic, $msg, $retain);
 }
 
 sub

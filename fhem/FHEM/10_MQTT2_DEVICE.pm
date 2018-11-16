@@ -251,7 +251,7 @@ MQTT2_DEVICE_Get($@)
 
   $cmd = MQTT2_buildCmd($hash, \@a, $cmd);
   return if(!$cmd);
-  IOWrite($hash, split(" ",$cmd,2));
+  IOWrite($hash, "publish", $cmd);
 
   return undef;
 }
@@ -271,7 +271,7 @@ MQTT2_DEVICE_Set($@)
 
   $cmd = MQTT2_buildCmd($hash, \@a, $cmd);
   return if(!$cmd);
-  IOWrite($hash, split(" ",$cmd,2));
+  IOWrite($hash, "publish", $cmd);
   readingsSingleUpdate($hash, "state", $cmdName, 1);
   return undef;
 }
