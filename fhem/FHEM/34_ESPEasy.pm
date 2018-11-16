@@ -1344,6 +1344,10 @@ sub ESPEasy_Attr(@)
     $ret = "0,1,2" if ($cmd eq "set" && not $aVal =~ m/^(0|1|2)$/)
   }
 
+  elsif ($aName =~ m/^(autosave|autocreate|authentication|disable|deepSleep)$/
+      || $aName =~ m/^(presenceCheck|displayTextEncode|resendFailedCmd)$/) {
+  $ret = "0,1" if ($cmd eq "set" && not $aVal =~ m/^(0|1)$/)}
+
   elsif ($aName eq "combineDevices") {
     $ret = "0 | 1 | ESPname | ip[/netmask][,ip[/netmask]][,...]"
       if $cmd eq "set" && !(ESPEasy_isAttrCombineDevices($aVal) || $aVal =~ m/^[01]$/ )
