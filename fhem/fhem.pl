@@ -5003,6 +5003,10 @@ json2nameValue($;$)
       $ret->{"$prefix$name"} = $1;
       $in = $2;
 
+    } elsif($val =~ m/^(null)(.*)$/s) {
+      $ret->{"$prefix$name"} = undef;
+      $in = $2;
+
     } else {
       Log 1, "Error parsing >$val< for $prefix$name";
       $in = "";
