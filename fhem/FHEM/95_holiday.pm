@@ -199,6 +199,19 @@ holiday_refresh($;$$)
         Log 1, "Wrong distance spec: $l";
         next;
       }
+    } elsif($l =~ m/^6/) { # own calculation
+        my @args = split(" +", $l, 4);
+        my $res = "?";
+        no strict "refs";
+        eval { $res = &{$args[1]}($args[2]); };
+        use strict "refs";
+        if($@) {
+           Log 1, "holiday: Error in own function: $@";
+           next;
+        }
+        if($res eq $fordate) {
+           $found = $args[3];
+        }
     }
     push @foundList, $found if($found);
 
@@ -430,6 +443,28 @@ holiday_FW_detailFn($$$$)
             5 1 Mon 01 31 First Monday after Jan, 31st (1st Monday in February)<br>
           </ul>
           </li>
+      <li>6<br>
+          Use a perl function to calculate a date. Function must return the result as
+          an exact date in format "mm-dd", e.g. "12-02" <br/>
+          <br/>
+          Example:<br>
+          <ul><code>
+            6 calcAdvent 21 1.Advent<br>
+            6 calcAdvent 14 2.Advent<br>
+            6 calcAdvent  7 3.Advent<br>
+            6 calcAdvent  0 4.Advent<br>
+          </code></ul>
+          <br/>
+          Explanation:<br/>
+          <ul><code>
+          calcAdvent = name of function, e.g. included in 99_myUtils.pm<br/>
+          21 = parameter given to function<br/>
+          1.Advent = text to be shown in readings<br/>
+          </code></ul>
+          <br/>
+          this will call "calcAdvent(21)" to calculate a date.<br/>
+          Errors will be logged in Loglevel 1.<br/>
+      </li>
     </ul>
   </ul>
   <br>
@@ -560,6 +595,28 @@ holiday_FW_detailFn($$$$)
             5 1 Mon 01 31 Erster Montag in Februar<br>
           </ul>
           </li>
+      <li>6<br>
+          Datum mit einer perl Funktion berechnen. Das Ergebnis muss ein exaktes
+          Datum im Format "mm-dd" sein, z.B."12-02" <br/>
+          <br/>
+          Beispiel:<br>
+          <ul><code>
+            6 calcAdvent 21 1.Advent<br>
+            6 calcAdvent 14 2.Advent<br>
+            6 calcAdvent  7 3.Advent<br>
+            6 calcAdvent  0 4.Advent<br>
+          </code></ul>
+          <br/>
+          Erkl&auml;rung:<br/>
+          <ul><code>
+          calcAdvent = Name der Funktion, z.B. enthalten in 99_myUtils.pm<br/>
+          21 = Parameter zum Funktionsaufruf<br/>
+          1.Advent = Text f&uuml;r die Anzeige in readings<br/>
+          </code></ul>
+          <br/>
+          erzeugt einen Funktionsaufruf "calcAdvent(21)" zur Berechnung eines Datums.<br/>
+          Fehler werden im Loglevel 1 protokolliert.<br/>
+      </li>
     </ul>
   </ul>
   <br>
