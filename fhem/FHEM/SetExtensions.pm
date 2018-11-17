@@ -4,6 +4,7 @@
 package main;
 use strict;
 use warnings;
+use AttrTemplate;
 
 sub SetExtensions($$@);
 sub SetExtensionsFn($);
@@ -44,7 +45,7 @@ SetExtensions($$@)
 {
   my ($hash, $list, $name, $cmd, @a) = @_;
 
-  return "Unknown argument $cmd, choose one of " if(!$list);
+  return AttrTemplate_Set($hash, $list, $name, $cmd, @a) if(!$list);
 
   my %se_list = (
     "on-for-timer"      => 1,
@@ -74,14 +75,13 @@ SetExtensions($$@)
   }
 
   if(!$hasOn || !$hasOff) { # No extension
-    return "Unknown argument $cmd, choose one of $list";
+    return AttrTemplate_Set($hash, $list, $name, $cmd, @a);
   }
 
   if(!defined($se_list{$cmd})) {
     # Add only "new" commands
     my @mylist = grep { $list !~ m/\b$_\b/ } keys %se_list;
-    return "Unknown argument $cmd, choose one of $list " .
-        join(" ", @mylist);
+    return AttrTemplate_Set($hash, join(" ", @mylist), $name, $cmd, @a);
   }
   if($se_list{$cmd} && $se_list{$cmd} != int(@a)) {
     return "$cmd requires $se_list{$cmd} parameter";

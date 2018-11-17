@@ -750,7 +750,7 @@ FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
       var ifid = (devName+"-"+arg).replace(/([^_a-z0-9])/gi,
                                    function(m){ return "\\"+m });
       if($(".dval[informid="+ifid+"]").length == 0) {
-        if(cmd == "attr") {
+        if(cmd == "attr" || (cmd == "set" && arg == "attrTemplate")) {
           reloadIfOk = true;
         } else {
           $(this).unbind('click').click();// No element found to replace, reload
@@ -762,14 +762,15 @@ FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
         newDef = $(this).closest("form").find("[name^=val]").val();
       cmd = $(this).attr("name")+"="+cmd+" "+devName+" "+arg+" "+newDef;
     }
-
     FW_cmd(FW_root+"?"+encodeURIComponent(cmd)+"&XHR=1", function(resp){
       if(!resp && reloadIfOk)
         location.reload();
       if(resp) {
-        resp = FW_htmlQuote(resp);
-        if(resp.indexOf("\n") >= 0)
-          resp = '<pre>'+resp+'</pre>';
+        if(!resp.match(/^<html>[\s\S]*<\/html>/ ) ) {
+          resp = FW_htmlQuote(resp);
+          if(resp.indexOf("\n") >= 0)
+            resp = '<pre>'+resp+'</pre>';
+        }
         return FW_okDialog(resp);
       }
       if(isDef) {

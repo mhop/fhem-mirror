@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: attrTemplate set command added
   - bugfix:  73_AutoShuttersControl: fix logical bugs,
              change Antifreeze values
   - change:  DOIFtools: forced change to li-tags in direct help (Forum #93243)

@@ -510,6 +510,7 @@ FHEM/98_SmarterCoffee        CoolTux              Sonstige Systeme
 FHEM/99_SUNRISE_EL.pm        rudolfkoenig         Automatisierung
 FHEM/99_Utils.pm             rudolfkoenig         Automatisierung
 FHEM/99_Venetian.pm          Christian.Kühnel     Automatisierung
+FHEM/AttrTemplate.pm         rudolfkoenig         Automatisierung
 FHEM/Blocking.pm             rudolfkoenig         Automatisierung
 FHEM/DevIo.pm                rudolfkoenig         Sonstiges
 FHEM/Color.pm                justme1968           Sonstiges

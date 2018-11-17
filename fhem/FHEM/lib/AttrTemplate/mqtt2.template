@@ -1,0 +1,40 @@
+# Comments start with #. Empty lines are ignored.
+# Syntax of one entry: name: line, one optional filter: line, zero or more par: lines,  FHEM-Commands
+# filter:INTERNAL=VALUE (optional)
+# par: name of the parameter; comment; perl_code (optional)
+# perl_code returns a value for the parameter, or undef.
+# If undef, the user has to specify them (the comment is shown to the user)
+
+name:zigbee2mqtt_bridge
+filter:TYPE=MQTT2_DEVICE
+par:BRIDGENAME;name of the zigbee2mqtt bridge in the topics
+attr DEVICE setList\
+  permit_join:true,false zigbee2mqtt/BRIDGENAME/config/permit_join $EVTPART1\
+  remove:textField zigbee2mqtt/BRIDGENAME/config/remove $EVTPART1\
+  log_level:debug,info,warn,error zigbee2mqtt/BRIDGENAME/config/log_level $EVTPART1\
+  rename:textField zigbee2mqtt/BRIDGENAME/config/rename  {"old":"$EVTPART1","new":"$EVTPART2"}\
+  network_map:raw,graphviz zigbee2mqtt/BRIDGENAME/networkmap  $EVTPART1\
+  devicelist:noArg zigbee2mqtt/BRIDGENAME/config/devices
+
+
+name:zigbee2mqtt_bulb
+filter:TYPE=MQTT2_DEVICE
+par:NAMEINTHEBRIDGE;name of this device in the bridge;{ AttrVal("DEVICE","readingList","") =~ m,zigbee2mqtt/(.*):, ? $1 : undef }
+attr DEVICE icon light_control
+attr DEVICE webCmd brightness
+attr DEVICE setList \
+  on:noArg zigbee2mqtt/NAMEINTHEBRIDGE/set {"state":"ON"}\
+  off:noArg zigbee2mqtt/NAMEINTHEBRIDGE/set {"state":"OFF"}\
+  brightness:colorpicker,BRI,0,15,255 zigbee2mqtt/NAMEINTHEBRIDGE/set {"state":"on","$EVTPART0":"$EVTPART1"}
+
+
+name:zigbee2mqtt_colorbulb
+filter:TYPE=MQTT2_DEVICE
+par:NAMEINTHEBRIDGE;name of this device in the bridge;{ AttrVal("DEVICE","readingList","") =~ m,zigbee2mqtt/(.*):, ? $1 : undef }
+attr DEVICE icon light_control
+attr DEVICE webCmd brightness:color_temp
+attr DEVICE setList \
+  on:noArg zigbee2mqtt/NAMEINTHEBRIDGE/set {"state":"ON"}\
+  off:noArg zigbee2mqtt/NAMEINTHEBRIDGE/set {"state":"OFF"}\
+  brightness:colorpicker,BRI,0,15,255 zigbee2mqtt/NAMEINTHEBRIDGE/set {"state":"on","$EVTPART0":"$EVTPART1"}\
+  color_temp:colorpicker,CT,250,1,454 zigbee2mqtt/NAMEINTHEBRIDGE/set {"$EVTPART0":"$EVTPART1"}

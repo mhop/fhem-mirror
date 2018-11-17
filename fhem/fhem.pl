@@ -2870,7 +2870,9 @@ CommandAttr($$)
       $attrVal = "-" if($attrName eq "logfile");
       $attrVal = 5   if($attrName eq "verbose");
     }
+    $defs{$sdev}->{CL} = $cl;
     $ret = CallFn($sdev, "AttrFn", "set", $sdev, $attrName, $attrVal);
+    delete($defs{$sdev}->{CL});
     if($ret) {
       push @rets, $ret;
       next;
