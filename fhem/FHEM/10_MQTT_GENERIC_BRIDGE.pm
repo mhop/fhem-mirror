@@ -29,6 +29,9 @@
 ###############################################################################
 # 
 # CHANGE LOG
+# 
+# 17.11.2018 1.0.0
+#  change    : IOWrite Parameter angepasst.
 #
 # 15.11.2018 1.0.0
 #  fix       : Pruefung im Parse auf das richtige IODev gefixt (mqtt2).
@@ -2078,7 +2081,7 @@ sub doPublish($$$$$$$$) {
     # TODO: publish MQTT2
     # TODO qos / retain ? 
     $topic.=':r' if $retain;
-    IOWrite($hash, $topic, $message);
+    IOWrite($hash, "publish", $topic.' '.$message);
     readingsSingleUpdate($hash,"transmission-state","outgoing publish sent",1);
     $hash->{+HELPER}->{+HS_PROP_NAME_OUTGOING_CNT}++;
     readingsSingleUpdate($hash,"outgoing-count",$hash->{+HELPER}->{+HS_PROP_NAME_OUTGOING_CNT},1);
