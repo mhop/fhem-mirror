@@ -24,7 +24,7 @@ AttrTemplate_Initialize()
   for my $file (@files) {
     if(!open(fh,"$dir/$file")) {
       Log 1, "$me: cant open $dir/$file: $!";
-      continue;
+      next;
     }
     my ($name, %h);
     while(my $line = <fh>) {
