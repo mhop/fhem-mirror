@@ -38,7 +38,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "1.41";
+my $version = "1.5";
 
 #-- these we may get on request
 my %gets = (
@@ -55,12 +55,14 @@ my %setssw = (
   "on-for-timer"  => "T",
   "off-for-timer" => "E",
   "config"        => "C",
+  "password"      => "W"
 );
 
 my %setsrol = (
   "closed:noArg"  => "C",
   "open:noArg"    => "O",
   "stop:noArg"    => "S",
+  "password"      => "W",
   "pct:slider,0,1,100"           => "P" 
 ); 
 
@@ -100,7 +102,7 @@ sub Shelly_Initialize ($) {
   #$hash->{NotifyFn} = "Shelly_Notify";
   #$hash->{InitFn}   = "Shelly_Init";
 
-  $hash->{AttrList}= "verbose model:".join(",",(keys %shelly_models))." mode:relay,roller defchannel maxtime maxpower interval pct100:open,closed ".
+  $hash->{AttrList}= "verbose model:".join(",",(keys %shelly_models))." mode:relay,roller defchannel maxtime maxpower interval pct100:open,closed shellyuser ".
                      $readingFnAttributes;
 }
 
@@ -167,8 +169,10 @@ sub Shelly_Define($$) {
 
 sub Shelly_Undef ($) {
   my ($hash) = @_;
+  my $name = $hash->{NAME};
   delete($modules{Shelly}{defptr}{NAME});
   RemoveInternalTimer($hash);
+  my ($err, $sh_pw) = setKeyValue("SHELLY_PASSWORD_$name", undef);
   return undef;
 }
 
@@ -510,7 +514,36 @@ sub Shelly_Set ($@) {
       $v = Shelly_configure($hash,$pre.$reg."=".$val);
     }
   }
+  
+  #-- password
+  if($cmd eq "password") {
+  my $user = AttrVal($name, "shellyuser", '');
+    if(!$user){
+      my $msg = "Error: password can be set only if attribute shellyuser is set";
+      Log3 $name,1,"[Shelly_Set] ".$msg;
+      return $msg;
+    }
+    setKeyValue("SHELLY_PASSWORD_$name", $value);
+  }
   return undef;
+}
+
+########################################################################################
+#
+# Shelly_pwd - retrieve the credentials if set
+#
+# Parameter hash 
+#
+########################################################################################
+
+sub Shelly_pwd($){
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  my $user = AttrVal($name, "shellyuser", '');
+  return "" if(!$user);
+
+  my ($err, $pw) = getKeyValue("SHELLY_PASSWORD_$name");
+  return $user.":".$pw."@";
 }
 
 ########################################################################################
@@ -533,9 +566,10 @@ sub Shelly_Set ($@) {
     if( $net ne "connected" );
 
   my $model =  AttrVal($name,"model","");
+  my $creds = Shelly_pwd($hash);
 
   if ( $hash && !$err && !$data ){
-     $url    = "http://".$hash->{TCPIP}."/".$cmd;
+     $url    = "http://$creds".$hash->{TCPIP}."/".$cmd;
      Log3 $name, 5,"[Shelly_configure] called with only hash  => Issue a non-blocking call to $url";  
      HttpUtils_NonblockingGet({
         url      => $url,
@@ -580,9 +614,11 @@ sub Shelly_Set ($@) {
   my $name = $hash->{NAME};
   my $url;
   my $state = $hash->{READINGS}{state}{VAL};
+  
+  my $creds = Shelly_pwd($hash);
     
   if ( $hash && !$err && !$data ){
-     $url    = "http://".$hash->{TCPIP}."/status";
+     $url    = "http://$creds".$hash->{TCPIP}."/status";
      Log3 $name, 5,"[Shelly_status] called with only hash  => Issue a non-blocking call to $url";  
      HttpUtils_NonblockingGet({
         url      => $url,
@@ -732,13 +768,14 @@ sub Shelly_Set ($@) {
     if( $net ne "connected" );
   
   my $model =  AttrVal($name,"model","");
+  my $creds = Shelly_pwd($hash);
   
   #-- empty cmd parameter
   $cmd = ""
     if( !defined($cmd) );
     
   if ( $hash && !$err && !$data ){
-     $url    = "http://".$hash->{TCPIP}."/roller/0".$cmd;
+     $url    = "http://$creds".$hash->{TCPIP}."/roller/0".$cmd;
      Log3 $name, 5,"[Shelly_updown] called with only hash  => Issue a non-blocking call to $url";  
      HttpUtils_NonblockingGet({
         url      => $url,
@@ -863,9 +900,10 @@ sub Shelly_Set ($@) {
     if( $net ne "connected" );
   
   my $model =  AttrVal($name,"model","");
+  my $creds = Shelly_pwd($hash);
     
   if ( $hash && !$err && !$data ){
-     $url    = "http://".$hash->{TCPIP}."/relay/".$channel.$cmd;
+     $url    = "http://$creds".$hash->{TCPIP}."/relay/".$channel.$cmd;
      Log3 $name, 1,"[Shelly_onoff] called with only hash  => Issue a non-blocking call to $url";  
      HttpUtils_NonblockingGet({
         url      => $url,
@@ -952,9 +990,10 @@ sub Shelly_Set ($@) {
     if( $net ne "connected" );
    
   my $model =  AttrVal($name,"model","");
+  my $creds = Shelly_pwd($hash);
     
   if ( $hash && !$err && !$data ){
-     $url    = "http://".$hash->{TCPIP}."/meter/".$channel;
+     $url    = "http://$creds".$hash->{TCPIP}."/meter/".$channel;
      Log3 $name, 5,"[Shelly_meter] called with only hash  => Issue a non-blocking call to $url";  
      HttpUtils_NonblockingGet({
         url      => $url,
@@ -1010,8 +1049,9 @@ sub Shelly_Set ($@) {
         For Shelly all Shelly devices
         <ul>
         <li><a name="shelly_sconfig"></a>
-                <code>set &lt;name&gt; config <registername> [&lt;channel&gt;] &lt;value&gt;</code>
+                <code>set &lt;name&gt; config &lt;registername&gt; [&lt;channel&gt;] &lt;value&gt;</code>
                 <br />set the value of a configuration register</li>
+        <li><a name="shelly_password">password &lt;password&gt;</a><br>This is the only way to set the password for the Shelly web interface</li>
         </ul>
         For Shelly switching devices (mode=relay for model=shelly2, standard for all other models) 
         <ul>
@@ -1050,6 +1090,7 @@ sub Shelly_Set ($@) {
         <a name="Shellyattr"></a>
         <h4>Attributes</h4>
         <ul>
+            <li><a name="shelly_shellyuser"><code>attr &lt;name&gt; shellyuser &lt;shellyuser&gt;</code><br>username for addressing the Shelly web interface</li>
             <li><a name="shelly_model"><code>attr &lt;name&gt; model shelly1|shelly2|shelly4|shellyplug </code></a>
                 <br />type of the Shelly device</li>
             <li><a name="shelly_mode"><code>attr &lt;name&gt; mode relay|roller (only for model=shelly2)</code></a>
