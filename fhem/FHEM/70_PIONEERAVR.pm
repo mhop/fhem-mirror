@@ -155,16 +155,13 @@ sub PIONEERAVR_Initialize($) {
 sub PIONEERAVR_Define($$) {
     my ( $hash, $a, $h ) = @_;
     my $name  = $hash->{NAME};
-
-    Log3 $name, 5, "PIONEERAVR $name: called function PIONEERAVR_Define()";
-
     my $protocol = @$a[2];
 
     Log3 $name, 5, "PIONEERAVR $name: called function PIONEERAVR_Define()";
 
     if( int(@$a) != 4 || (($protocol ne "telnet") && ($protocol ne "serial"))) {
         my $msg = "Wrong syntax: define <name> PIONEERAVR telnet <ipaddress[:port]> or define <name> PIONEERAVR serial <devicename[\@baudrate]>";
-        Log3 $name, 3, "PIONEERAVR $name: " . $msg;
+        Log3 $name, 4, "PIONEERAVR $name: " . $msg;
         return $msg;
     }
 
@@ -210,8 +207,8 @@ sub PIONEERAVR_Define($$) {
         );
     }
 
-    $hash->{helper}{receiver} = undef;
-
+     $hash->{helper}{receiver} = undef;
+    
     unless ( exists( $hash->{helper}{AVAILABLE} ) and ( $hash->{helper}{AVAILABLE} == 0 ))
     {
         $hash->{helper}{AVAILABLE} = 1;
@@ -219,8 +216,8 @@ sub PIONEERAVR_Define($$) {
     }
 
     # $hash->{helper}{INPUTNAMES} lists the default input names and their inputNr as provided by Pioneer.
-    # This module tries to read those names and the alias names from the AVR receiver and tries to check if this input is enabled or disabled
-    # So this list is just a fall back if the module can't read the names ...
+    # This module can read those names and the alias names from the AVR receiver and can try to check if this input is enabled or disabled
+    # So this list is a fall back, if the module can't read the names or the reading of the names takes too long (for the user)...
     # InputNr with player functions (play,pause,...) ("13","17","18","26","27","33","38","41","44","45","48","49","53");       
     # Input number for usbDac, ipodUsb, xmRadio, homeMediaGallery, sirius, adapterPort, internetRadio, pandora, mediaServer, Favorites, mhl, spotify
     # Additionally this module tries to get information from the Pioneer AVR
@@ -268,6 +265,27 @@ sub PIONEERAVR_Define($$) {
         "49" => {"name" => "game",              "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
         "53" => {"name" => "spotify",           "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"}
     };
+
+# Input Name aliases and which inputs are enabled/disabled should be available after a restart -> setKeyValue/getKeyValue are used to store those values to a file or database.
+# Here we restore those values after a rebstart
+	my $inputindex = undef;
+	my $inputNr = undef;
+    for ( my $i=0; $i<60; $i++ ) {
+		$inputNr = sprintf '%02d', $i;
+		$inputindex = "PIONEERAVR_InputAlias_".$inputNr;
+		my ($err, $data) = getKeyValue($inputindex);
+		if (!defined $err) {
+			$hash->{helper}{INPUTNAMES}->{$inputNr}{aliasName} = $data;
+		};
+		$inputindex = "PIONEERAVR_InputEnabled_".$inputNr;
+		my ($err, $data) = getKeyValue($inputindex);
+		if (!defined $err) {
+			$hash->{helper}{INPUTNAMES}->{$inputNr}{enabled} = $data;
+		};
+		undef $err;
+		undef $data;
+	};
+
   # ----------------Human Readable command mapping table for "set" commands-----------------------
   $hash->{helper}{SETS} = {
     'main' => {
@@ -2290,6 +2308,10 @@ sub PIONEERAVR_Read($)
             # lc first
             if ( $isAlias ) {
                 $hash->{helper}{INPUTNAMES}->{$inputNr}{aliasName} = lcfirst( substr( $line,6 ) );
+                # input name aliases should be available after a restart of FHEM -> setKeyValue
+				my $inputindex = "PIONEERAVR_InputAlias_".$inputNr;
+				setKeyValue($inputindex, lcfirst( substr( $line,6 ) ));
+
             } else {
                 $hash->{helper}{INPUTNAMES}->{$inputNr}{name} = lcfirst( substr( $line,6 ) );
             }
@@ -2381,19 +2403,21 @@ sub PIONEERAVR_Read($)
         # input enabled
         } elsif ( $line=~ m/^SSC(\d\d)030(1|0)$/ ) {
 
-            #       select(undef, undef, undef, 0.001);
             # check for input skip information
             # format: ?SSC<2 digit input function nr>03
             # response: SSC<2 digit input function nr>0300: use
             # response: SSC<2 digit input function nr>0301: skip
             # response: E06: inappropriate parameter (input function nr not available on that device)
             # we can not trust "E06" as it is not sure that it is the reply for the current input nr
-
+            # the information, which inputs are enabled/disabled should be available after a restart of FHEM -> setKeyValue
+			my $inputindex = "PIONEERAVR_InputEnabled_".$1;
             if ( $2 == 1 ) {
                 $hash->{helper}{INPUTNAMES}->{$1}{enabled} = 0;
+				setKeyValue($inputindex, 0);
                 Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: InputNr: $1 is disabled";
             } elsif ( $2 == 0) {
                 $hash->{helper}{INPUTNAMES}->{$1}{enabled} = 1;
+				setKeyValue($inputindex, 1);
                 Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: InputNr: $1 is enabled";
             }
 
