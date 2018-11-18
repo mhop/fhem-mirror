@@ -1475,7 +1475,7 @@ SVG_render($$$$$$$$$$)
       $idx++;
     }
     #main::Debug "xmin= $xmin   xmax=$xmax";
-    $conf{xrange} = AnalyzeCommand(undef, $1) if($conf{xrange} =~ /^({.*})$/);
+    $conf{xrange} = AnalyzeCommand(undef, $1) if($conf{xrange} =~ /^(\{.*\})$/);
     if($conf{xrange} =~ /\[(.*):(.*)\]/) {
       $xmin = $1 if($1 ne "");
       $xmax = $2 if($2 ne "");
@@ -1726,7 +1726,7 @@ SVG_render($$$$$$$$$$)
     #-- yrange is specified in plotfile
     if($conf{$yra}) {
       $conf{$yra} = AnalyzeCommand(undef, $1)
-                         if($conf{$yra} =~ /^({.*})$/);
+                         if($conf{$yra} =~ /^(\{.*\})$/);
       if($conf{$yra} =~ /\[(.*):(.*)\]/) {
         $hmin{$a} = $1 if($1 ne "");
         $hmax{$a} = $2 if($2 ne "");

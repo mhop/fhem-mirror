@@ -2802,7 +2802,7 @@ CommandAttr($$)
       my $arg= $attrVal;
 
       # matches myReading1[:trigger2] { codecode1 }
-      my $regexi= '\s*([\w.-]+)(:\S*)?\s+((\w+)\s+)?({.*?})\s*';
+      my $regexi= '\s*([\w.-]+)(:\S*)?\s+((\w+)\s+)?(\{.*?\})\s*';
       my $regexo= '^(' . $regexi . ')(,\s*(.*))*$';
       my $rNo=0;
 
