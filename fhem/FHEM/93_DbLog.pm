@@ -14,8 +14,10 @@
 # JoeAllb, DeeSpe
 #
 ############################################################################################################################################
-#  Versions History done by DS_Starter & DeeSPe:
+#  Versions History done by DS_Starter:
 #
+# 3.13.0     12.11.2018       adding attributes traceFlag, traceLevel
+# 3.12.7     10.11.2018       addLog considers DbLogInclude (Forum:#92854)
 # 3.12.6     22.10.2018       fix timer not deleted if reopen after reopen xxx (Forum: https://forum.fhem.de/index.php/topic,91869.msg848433.html#msg848433)
 # 3.12.5     12.10.2018       charFilter: "\xB0C" substitution by "°C" added and usage in DbLog_Log changed
 # 3.12.4     10.10.2018       return non-saved datasets back in asynch mode only if transaction is used
@@ -215,7 +217,7 @@ use Time::Local;
 use Encode qw(encode_utf8);
 no if $] >= 5.017011, warnings => 'experimental::smartmatch'; 
 
-my $DbLogVersion = "3.12.6";
+my $DbLogVersion = "3.13.0";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -257,6 +259,8 @@ sub DbLog_Initialize($)
 							  "noNotifyDev:1,0 ".
 							  "showproctime:1,0 ".
 							  "suppressAddLogV3:1,0 ".
+                              "traceFlag:SQL,CON,ENC,DBD,TXN,ALL ".
+                              "traceLevel:0,1,2,3,4,5,6,7 ".
 							  "asyncMode:1,0 ".
 							  "cacheEvents:2,1,0 ".
 							  "cacheLimit ".
@@ -1483,6 +1487,8 @@ sub DbLog_Push(@) {
   my $name       = $hash->{NAME};
   my $DbLogType  = AttrVal($name, "DbLogType", "History");
   my $supk       = AttrVal($name, "noSupportPK", 0);
+  my $tl          = AttrVal($name, "traceLevel", 0);
+  my $tf          = AttrVal($name, "traceFlag", "SQL");
   my $errorh     = 0;
   my $error      = 0;
   my $doins = 0;  # Hilfsvariable, wenn "1" sollen inserts in Tabele current erfolgen (updates schlugen fehl) 
@@ -1637,6 +1643,12 @@ sub DbLog_Push(@) {
 	  }
   }
   
+  if($tl) {
+      # Tracelevel setzen  
+      $dbh->{TraceLevel} = "$tl|$tf";       
+      $sth_ih->{TraceLevel} = "$tl|$tf";
+  }
+  
   my ($tuples, $rows);
   
   # insert into history-Tabelle
@@ -1756,6 +1768,12 @@ sub DbLog_Push(@) {
   if ($errorh) {
       $error = $errorh;
   }
+  if(!$tl) {
+      # Trace ausschalten
+      $dbh->{TraceLevel} = "0";  
+      $sth_ih->{TraceLevel} = "0";        
+  }
+  
   $dbh->{RaiseError} = 0; 
   $dbh->{PrintError} = 1;
   $dbh->disconnect if ($nh);
@@ -1894,6 +1912,8 @@ sub DbLog_PushAsync(@) {
   my $dbpassword  = $attr{"sec$name"}{secret};
   my $DbLogType   = AttrVal($name, "DbLogType", "History");
   my $supk        = AttrVal($name, "noSupportPK", 0);
+  my $tl          = AttrVal($name, "traceLevel", 0);
+  my $tf          = AttrVal($name, "traceFlag", "SQL");
   my $utf8        = defined($hash->{UTF8})?$hash->{UTF8}:0;
   my $errorh      = 0;
   my $error       = 0;
@@ -2052,7 +2072,13 @@ sub DbLog_PushAsync(@) {
           $sth_uc->bind_param_array(7, [@reading]);
 	  }
   }
-
+   
+  if($tl) {
+      # Tracelevel setzen  
+      $dbh->{TraceLevel} = "$tl|$tf";       
+      $sth_ih->{TraceLevel} = "$tl|$tf";
+  }  
+  
   # SQL-Startzeit
   my $st = [gettimeofday];
   
@@ -3141,7 +3167,7 @@ sub DbLog_configcheck($) {
   } else {
       $rec  = "Switch $name to the asynchronous logmode by setting the 'asyncMode' attribute. The advantage of this mode is to log events non-blocking. <br>";
 	  $rec .= "There are attributes 'syncInterval' and 'cacheLimit' relevant for this working mode. <br>";
-	  $rec .= "Please refer to commandref for further informations about these attributes.";
+	  $rec .= "Please refer to commandref for further information about these attributes.";
   }
   $check .= "<b>Recommendation:</b> $rec <br><br>"; 
   
@@ -3623,21 +3649,27 @@ sub DbLog_AddLog($$$$$) {
 	  
 	  my $r            = $defs{$dev_name}{READINGS};
       my $DbLogExclude = AttrVal($dev_name, "DbLogExclude", undef);
+	  my $DbLogInclude = AttrVal($dev_name, "DbLogInclude", undef);
 	  my @exrds;
       my $found = 0;
-	  foreach my $rd (sort keys %{$r}) {
-           # jedes Reading des Devices auswerten
+	  foreach my $rd (sort keys %{$r}) {                                      # jedes Reading des Devices auswerten           
            my $do = 1;
-           $found = 1 if($rd =~ m/^$rdspec$/);       # Reading gefunden
+           $found = 1 if($rd =~ m/^$rdspec$/);                                # Reading gefunden
 		   if($DbLogExclude && !$nce) {
                my @v1 = split(/,/, $DbLogExclude);
                for (my $i=0; $i<int(@v1); $i++) {
-                   my @v2 = split(/:/, $v1[$i]);     # MinInterval wegschneiden, Bsp: "(temperature|humidity):600,battery:3600"
-                   if($rd =~ m,^$v2[0]$,) {
-                       # Reading matcht und soll vom addLog ausgeschlossen werden
-                       Log3 $name, 2, "DbLog $name -> Device: \"$dev_name\", reading: \"$v2[0]\" excluded by attribute DbLogExclude from addLog !" if($rd =~ m/^$rdspec$/);
-                       $do = 0;
-                   }
+                   my @v2 = split(/:/, $v1[$i]);                              # MinInterval wegschneiden, Bsp: "(temperature|humidity):600,battery:3600"
+                   if($rd =~ m,^$v2[0]$,) {                                   # Reading matcht $DbLogExclude -> ausschließen vom addLog  
+			           $do = 0;
+					   if($DbLogInclude) {
+						   my @v3 = split(/,/, $DbLogInclude);
+						   for (my $i=0; $i<int(@v3); $i++) {
+							   my @v4 = split(/:/, $v3[$i]);
+							   $do = 1 if($rd =~ m,^$v4[0]$,);                # Reading matcht $DbLogInclude -> wieder in addLog einschließen  
+						   }
+					   }                       				   
+					   Log3 $name, 2, "DbLog $name -> Device: \"$dev_name\", reading: \"$v2[0]\" excluded by attribute DbLogExclude from addLog !" if($do == 0 && $rd =~ m/^$rdspec$/);        	   
+				   }
                }
            }
            next if(!$do);
@@ -5373,7 +5405,7 @@ sub DbLog_dbReadings($@) {
     There is the special module 98_FileLogConvert.pm available to transfer filelog-data to the DbLog-database. <br>
  	The module can be downloaded <a href="https://svn.fhem.de/trac/browser/trunk/fhem/contrib/98_FileLogConvert.pm"> here</a>
 	or from directory ./contrib instead.
-	Further informations and help you can find in the corresponding <a href="https://forum.fhem.de/index.php/topic,66383.0.html"> 
+	Further information and help you can find in the corresponding <a href="https://forum.fhem.de/index.php/topic,66383.0.html"> 
 	Forumthread </a>. <br><br><br>
 	
 	<b>Reporting and Management of DbLog database content</b> <br><br>
@@ -5418,7 +5450,9 @@ sub DbLog_dbReadings($@) {
     </ul><br>
     
     <code>set &lt;name&gt; addLog &lt;devspec&gt;:&lt;Reading&gt; [Value] [CN=&lt;caller name&gt;] [!useExcludes] </code><br><br>
-    <ul> Inserts an additional log entry of a device/reading combination into the database. <br><br>
+    <ul> Inserts an additional log entry of a device/reading combination into the database. Readings which are possibly specified
+    in attribute "DbLogExclude" (in source device) are not logged, unless they are enclosed in attribute "DbLogInclude" 
+    or addLog was called with option "!useExcludes". <br><br>
       
       <ul>
       <li> <b>&lt;devspec&gt;:&lt;Reading&gt;</b> - The device can be declared by a <a href="#devspec">device specification 
@@ -6165,6 +6199,60 @@ sub DbLog_dbReadings($@) {
   </ul>
   <br>
   
+  <ul><b>traceFlag</b>
+    <ul>
+	  <code>
+	  attr &lt;device&gt; traceFlag [ALL|SQL|CON|ENC|DBD|TXN] <n>
+	  </code><br>
+      Trace flags are used to enable tracing of specific activities within the DBI and drivers. The attribute is only used for  
+      tracing of errors in case of support. <br><br>
+      
+	   <ul>
+       <table>  
+       <colgroup> <col width=10%> <col width=90%> </colgroup>
+       <tr><td> <b>ALL</b>            </td><td>turn on all DBI and driver flags  </td></tr>
+       <tr><td> <b>SQL</b>            </td><td>trace SQL statements executed (Default) </td></tr>
+       <tr><td> <b>CON</b>            </td><td>trace connection process  </td></tr>
+       <tr><td> <b>ENC</b>            </td><td>trace encoding (unicode translations etc)  </td></tr>
+       <tr><td> <b>DBD</b>            </td><td>trace only DBD messages  </td></tr>
+       <tr><td> <b>TXN</b>            </td><td>trace transactions  </td></tr>
+
+       </table>
+	   </ul>
+	   <br>
+       
+    </ul>
+  </ul>
+  <br>
+  
+  <ul><b>traceLevel</b>
+    <ul>
+	  <code>
+	  attr &lt;device&gt; traceLevel [0|1|2|3|4|5|6|7] <n>
+	  </code><br>
+      Switch on the tracing function of the module. <br>
+      <b>Caution !</b> The attribute is only used for tracing errors or in case of support. If switched on <b>very much entries</b> 
+                       will be written into the FHEM Logfile ! <br><br>
+      
+	   <ul>
+       <table>  
+       <colgroup> <col width=5%> <col width=95%> </colgroup>
+       <tr><td> <b>0</b>            </td><td>Trace disabled. (Default)  </td></tr>
+       <tr><td> <b>1</b>            </td><td>Trace top-level DBI method calls returning with results or errors. </td></tr>
+       <tr><td> <b>2</b>            </td><td>As above, adding tracing of top-level method entry with parameters.  </td></tr>
+       <tr><td> <b>3</b>            </td><td>As above, adding some high-level information from the driver
+                                             and some internal information from the DBI.  </td></tr>
+       <tr><td> <b>4</b>            </td><td>As above, adding more detailed information from the driver. </td></tr>
+       <tr><td> <b>5-7</b>          </td><td>As above but with more and more internal information.  </td></tr>
+
+       </table>
+	   </ul>
+	   <br>
+       
+    </ul>
+  </ul>
+  <br>
+  
   <ul><b>useCharfilter</b>
     <ul>
 	  <code>
@@ -6461,7 +6549,9 @@ sub DbLog_dbReadings($@) {
     </ul><br>
 	
     <code>set &lt;name&gt; addLog &lt;devspec&gt;:&lt;Reading&gt; [Value] [CN=&lt;caller name&gt;] [!useExcludes] </code><br><br>
-    <ul> Fügt einen zusatzlichen Logeintrag einer Device/Reading-Kombination in die Datenbank ein. <br><br>
+    <ul> Fügt einen zusätzlichen Logeintrag einer Device/Reading-Kombination in die Datenbank ein. Die eventuell im Attribut 
+    "DbLogExclude" spezifizierten Readings (im Quelldevice) werden nicht geloggt, es sei denn sie sind im Attribut 
+    "DbLogInclude"  enthalten bzw. der addLog-Aufruf erfolgte mit der Option "!useExcludes".  <br><br>
       
       <ul>
       <li> <b>&lt;devspec&gt;:&lt;Reading&gt;</b> - Das Device kann als <a href="#devspec">Geräte-Spezifikation</a> angegeben werden. <br>
@@ -7274,6 +7364,61 @@ sub DbLog_dbReadings($@) {
 	  attr &lt;device&gt; timeout <n>
 	  </code><br>
       Setzt den Timeout-Wert für den Schreibzyklus in die Datenbank im asynchronen Modus (default 86400s). <br>
+    </ul>
+  </ul>
+  <br>
+  
+  <ul><b>traceFlag</b>
+    <ul>
+	  <code>
+	  attr &lt;device&gt; traceFlag [ALL|SQL|CON|ENC|DBD|TXN] <n>
+	  </code><br>
+      Bestimmt das Tracing von bestimmten Aktivitäten innerhalb des Datenbankinterfaces und Treibers. Das Attribut ist nur 
+      für den Fehler- bzw. Supportfall gedacht. <br><br>
+      
+	   <ul>
+       <table>  
+       <colgroup> <col width=10%> <col width=90%> </colgroup>
+       <tr><td> <b>ALL</b>            </td><td>schaltet alle DBI- und Treiberflags an.  </td></tr>
+       <tr><td> <b>SQL</b>            </td><td>verfolgt die SQL Statement Ausführung. (Default) </td></tr>
+       <tr><td> <b>CON</b>            </td><td>verfolgt den Verbindungsprozess.  </td></tr>
+       <tr><td> <b>ENC</b>            </td><td>verfolgt die Kodierung (Unicode Übersetzung etc).  </td></tr>
+       <tr><td> <b>DBD</b>            </td><td>verfolgt nur DBD Nachrichten.  </td></tr>
+       <tr><td> <b>TXN</b>            </td><td>verfolgt Transaktionen.  </td></tr>
+
+       </table>
+	   </ul>
+	   <br>
+       
+    </ul>
+  </ul>
+  <br>
+  
+  <ul><b>traceLevel</b>
+    <ul>
+	  <code>
+	  attr &lt;device&gt; traceLevel [0|1|2|3|4|5|6|7] <n>
+	  </code><br>
+      Schaltet die Trace-Funktion des Moduls ein. <br>
+      <b>Achtung !</b> Das Attribut ist nur für den Fehler- bzw. Supportfall gedacht. Es werden <b>sehr viele Einträge</b> in 
+      das FHEM Logfile vorgenommen ! <br><br>
+      
+	   <ul>
+       <table>  
+       <colgroup> <col width=5%> <col width=95%> </colgroup>
+       <tr><td> <b>0</b>            </td><td>Tracing ist disabled. (Default)  </td></tr>
+       <tr><td> <b>1</b>            </td><td>Tracing von DBI Top-Level Methoden mit deren Ergebnissen und Fehlern </td></tr>
+       <tr><td> <b>2</b>            </td><td>Wie oben. Zusätzlich Top-Level Methodeneintäge mit Parametern.  </td></tr>
+       <tr><td> <b>3</b>            </td><td>Wie oben. Zusätzliche werden einige High-Level Informationen des Treibers und 
+                                             einige interne Informationen des DBI hinzugefügt.  </td></tr>
+       <tr><td> <b>4</b>            </td><td>Wie oben. Zusätzlich werden mehr detaillierte Informationen des Treibers 
+                                             eingefügt. </td></tr>
+       <tr><td> <b>5-7</b>          </td><td>Wie oben, aber mit mehr und mehr internen Informationen.  </td></tr>
+
+       </table>
+	   </ul>
+	   <br>
+       
     </ul>
   </ul>
   <br>
