@@ -1524,6 +1524,7 @@ PIONEERAVR_Set($@)
     my $name           = $hash->{NAME};
     my $cmd            = @$a[1];
     my $arg            = (@$a[2] ? @$a[2] : "");
+	my $arg2           = (@$a[3] ? @$a[3] : "");
     my $presence       = ReadingsVal( $name, "presence", "absent" );
     my @args           = @$a; shift @args; shift @args;
     my @setsPlayer     = ("play",
@@ -1613,6 +1614,7 @@ PIONEERAVR_Set($@)
         . " signalSelect:auto,analog,digital,hdmi,cycle"
         . " speakers:off,A,B,A+B raw"
         . " mcaccMemory:1,2,3,4,5,6 eq:on,off standingWave:on,off"
+        . " renameInputAlias"
         . " remoteControl:"
         . join(',', sort keys (%{$hash->{helper}{REMOTECONTROL}}));
 
@@ -1983,6 +1985,25 @@ PIONEERAVR_Set($@)
                 Log3 $name, 3, $err;
                 return $err;
             }
+            return undef;
+
+        # Rename InputAlias (up to 14 chars)
+        } elsif ( $cmd eq "renameInputAlias" ) {
+            Log3 $name, 3, "PIONEERAVR $name: set $cmd for inputName: $arg new name: $arg2 !";
+            my $inputToChange = undef;
+			foreach my $key ( keys %{$hash->{helper}{INPUTNAMES}} ) {
+				if ( $hash->{helper}{INPUTNAMES}->{$key}{aliasName} eq $arg ) {
+					$inputToChange = sprintf "%02d", $key;
+				} elsif ( $hash->{helper}{INPUTNAMES}->{$key}{name} eq $arg ) {
+					$inputToChange = sprintf "%02d", $key;
+				}
+			}
+			if ( defined $inputToChange ) {PIONEERAVR_Write( $hash, $arg2."1RGB".$inputToChange)}
+			else {
+				my $err = "Warning: Could not renameInputAlias as the inputName: $arg was not found!";
+				return $err;
+				};
+            Log3 $name, 3, "PIONEERAVR $name: set $cmd for inputName: $arg new name: $arg2 ! write $arg2 1RGB $inputToChange ";
             return undef;
 
         # selectScreenPage (player command) 
@@ -3477,6 +3498,7 @@ sub RC_layout_PioneerAVR() {
     </li>
     <li><b>prev</b> - Changes to the previous title. Available for the same inputs as "play".</li>
     <li><b>raw <PioneerKommando></b> - Sends the command <code>&lt;PioneerCommand&gt;</code> unchanged to the Pioneer AV receiver. A list of all available commands is available in the Pioneer documentation mentioned above</li>
+    <li><b>renameInputAlias <inputName> <newInputAlias></b> - Renames the input as it is displayed on the Pioneer AV receiver (and as it is listed in this module)</li>
     <li><b>remoteControl <attr></b> -  where <attr> is one of:
     <ul>
         <li>cursorDown</li>
@@ -3749,6 +3771,7 @@ sub RC_layout_PioneerAVR() {
     </li>
     <li><b>prev</b> - Wechselt zum vorherigen Titel. Für die gleichen Eingangsquellen wie "play".</li>
     <li><b>raw <PioneerKommando></b> - Sendet den Befehl <code><PioneerKommando></code> unverändert an den Pioneer AV Receiver. Eine Liste der verfügbaren Pioneer Kommandos ist in dem Link zur Pioneer Dokumentation oben enthalten</li>
+    <li><b>renameInputAlias <inputName> <neuerInputAlias></b> - Gibt dem Eingang <inputName> am Pioneer AV Receiver (und in diesem Modul) den neuen Namen <neuerInputAlias></li>
     <li><b>remoteControl <attr></b> -  wobei <attr> eines von folgenden sein kann:
     <ul>
         <li>cursorDown</li>
