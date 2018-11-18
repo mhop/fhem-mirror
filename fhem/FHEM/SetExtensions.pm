@@ -81,7 +81,7 @@ SetExtensions($$@)
   if(!defined($se_list{$cmd})) {
     # Add only "new" commands
     my @mylist = grep { $list !~ m/\b$_\b/ } keys %se_list;
-    return AttrTemplate_Set($hash, join(" ", @mylist), $name, $cmd, @a);
+    return AttrTemplate_Set($hash, "$list ".join(" ", @mylist), $name, $cmd,@a);
   }
   if($se_list{$cmd} && $se_list{$cmd} != int(@a)) {
     return "$cmd requires $se_list{$cmd} parameter";
