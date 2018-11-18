@@ -460,6 +460,7 @@ MQTT2_SERVER_Write($$$)
 {
   my ($hash,$function,$topicMsg) = @_;
 
+  my $name = $hash->{NAME};
   if($function eq "publish") {
     my ($topic, $msg) = split(" ", $topicMsg, 2);
     my $retain;
@@ -467,10 +468,11 @@ MQTT2_SERVER_Write($$$)
       $topic = $1;
       $retain = 1;
     }
+
+    Log3 $name, 5, "$name: PUBLISH $topicMsg";
     MQTT2_SERVER_doPublish($hash, $hash, $topic, $msg, $retain);
 
   } else {
-    my $name = $hash->{NAME};
     Log3 $name, 1, "$name: ERROR: Ignoring function $function";
   }
 }
