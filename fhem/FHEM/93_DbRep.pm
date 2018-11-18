@@ -57,6 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Versions History intern
 our %DbRep_vNotesIntern = (
+  "8.9.6"  => "15.11.2018  fix PERL WARNING: Use of uninitialized value \$fref in pattern match (m//), sub DbRep_sec2hms for hms transforming",
   "8.9.5"  => "09.11.2018  hash %dbrep_col substituted by get data from dblog device in func DbRep_firstconnect, fix importFromFile contains only SPACE ",
   "8.9.0"  => "07.11.2018  command delDoublets added ",
   "8.8.0"  => "06.11.2018  first connect routine switched to DbRep_Main, get COLSET from DBLOG-instance, attribute 'fastStart' added ",
@@ -265,6 +266,11 @@ our %DbRep_vHintsExt_de = (
 
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
+
+# Standard Feldbreiten falls noch nicht getInitData ausgeführt
+my %dbrep_col = ("DEVICE"  => 64,
+                 "READING" => 64,
+                );
                            
 ###################################################################################
 # DbRep_Initialize
@@ -1218,7 +1224,8 @@ sub DbRep_Attr($$$$) {
         }
 		if ($aName eq "reading" || $aName eq "device") {
             if ($aVal !~ m/,/ && $dbmodel && $dbmodel ne 'SQLITE') {
-				my $mlen = 64;
+                my $attrname = uc($aName);
+				my $mlen = $hash->{HELPER}{DBREPCOL}{$attrname}?$hash->{HELPER}{DBREPCOL}{$attrname}:$dbrep_col{$attrname}; 
 				return "Length of \"$aName\" is too big. Maximum length for database type $dbmodel is $mlen" if(length($aVal) > $mlen);
             }
         }
@@ -6172,7 +6179,7 @@ sub DbRep_optimizeTables($) {
 
  $rt = $rt.",".$brt;
  
- Log3 ($name, 3, "DbRep $name - Optimize tables of database $dbname finished, total time used: ".sprintf("%.0f",$brt)." sec.");
+ Log3 ($name, 3, "DbRep $name - Optimize tables of database $dbname finished - total time used (hh:mm:ss): ".DbRep_sec2hms($brt));
  
 return "$name|$rt|''|$db_MB_start|$db_MB_end";
 }
@@ -6690,7 +6697,7 @@ sub mysql_DoDumpClientSide($) {
     $fsize = encode_base64($fsize,"");
  }
  
- Log3 ($name, 3, "DbRep $name - Finished backup of database $dbname, total time used: ".sprintf("%.0f",$brt)." sec.");
+ Log3 ($name, 3, "DbRep $name - Finished backup of database $dbname - total time used (hh:mm:ss): ".DbRep_sec2hms($brt));
  
 return "$name|$rt|''|$dump_path$backupfile|$drc|$drh|$fsize|$ftp|$bfd|$ffd";
 }
@@ -6831,11 +6838,13 @@ sub mysql_DoDumpServerSide($) {
  $dump_path_loc    = $dump_path_loc."/" unless($dump_path_loc =~ m/\/$/);
  
  my $filesize;
- my $fref = stat($dump_path_loc.$bfile);    
- if ($fref =~ /ARRAY/) {
-     $filesize = (@{stat($dump_path_loc.$bfile)})[7];
- } else {
-     $filesize = (stat($dump_path_loc.$bfile))[7];
+ my $fref = stat($dump_path_loc.$bfile); 
+ if($fref) {
+     if($fref =~ /ARRAY/) {
+         $filesize = (@{stat($dump_path_loc.$bfile)})[7];
+     } else {
+         $filesize = (stat($dump_path_loc.$bfile))[7];
+     }
  }
  
  Log3 ($name, 3, "DbRep $name - Number of exported datasets: $drh");
@@ -6863,7 +6872,7 @@ sub mysql_DoDumpServerSide($) {
 
  $rt = $rt.",".$brt;
  
- Log3 ($name, 3, "DbRep $name - Finished backup of database $dbname - total time used: ".sprintf("%.0f",$brt)." seconds");
+ Log3 ($name, 3, "DbRep $name - Finished backup of database $dbname - total time used (hh:mm:ss): ".DbRep_sec2hms($brt));
  
 return "$name|$rt|''|$dump_path_rem$bfile|n.a.|$drh|$fsize|$ftp|$bfd|$ffd";
 }
@@ -6987,7 +6996,7 @@ sub DbRep_sqliteDoDump($) {
 
  $rt = $rt.",".$brt;
  
- Log3 ($name, 3, "DbRep $name - Finished backup of database $dbname - total time used: ".sprintf("%.0f",$brt)." seconds");
+ Log3 ($name, 3, "DbRep $name - Finished backup of database $dbname - total time used (hh:mm:ss): ".DbRep_sec2hms($brt));
  
 return "$name|$rt|''|$dump_path$bfile|n.a.|n.a.|$fsize|$ftp|$bfd|$ffd";
 }
@@ -7155,7 +7164,7 @@ sub DbRep_RepairDone($) {
   ReadingsBulkUpdateTimeState($hash,undef,undef,$state);
   readingsEndUpdate($hash, 1);
 
-  Log3 ($name, 3, "DbRep $name - Database repair $hash->{DATABASE} finished. - total time used: ".sprintf("%.0f",$brt)." seconds.");
+  Log3 ($name, 3, "DbRep $name - Database repair $hash->{DATABASE} finished - total time used (hh:mm:ss): ".DbRep_sec2hms($brt));
   
 return;
 }
@@ -7233,7 +7242,7 @@ sub DbRep_sqliteRestore ($) {
 
  $rt = $rt.",".$brt;
  
- Log3 ($name, 3, "DbRep $name - Restore of $dump_path$bfile into '$dbname' finished - total time used: ".sprintf("%.0f",$brt)." seconds.");
+ Log3 ($name, 3, "DbRep $name - Restore of $dump_path$bfile into '$dbname' finished - total time used (hh:mm:ss): ".DbRep_sec2hms($brt));
  
 return "$name|$rt|''|$dump_path$bfile|n.a.";
 }
@@ -7307,7 +7316,7 @@ sub mysql_RestoreServerSide($) {
 
  $rt = $rt.",".$brt;
  
- Log3 ($name, 3, "DbRep $name - Restore of $dump_path_rem$bfile into '$dbname', '$table' finished - total time used: ".sprintf("%.0f",$brt)." seconds.");
+ Log3 ($name, 3, "DbRep $name - Restore of $dump_path_rem$bfile into '$dbname', '$table' finished - total time used (hh:mm:ss): ".DbRep_sec2hms($brt));
  
 return "$name|$rt|''|$dump_path_rem$bfile|n.a.";
 }
@@ -8529,6 +8538,20 @@ return ($str);
 }
 
 ####################################################################################################
+#                  Sekunden in Format hh:mm:ss umwandeln         
+####################################################################################################
+sub DbRep_sec2hms ($) {
+ my $s = shift;
+ my $hms;
+ 
+ my $hh = sprintf("%02d", int($s/3600));
+ my $mm = sprintf("%02d", int(($s-($hh*3600))/60));      
+ my $ss = sprintf("%02d", $s-($mm*60)-($hh*3600)); 
+
+return ("$hh:$mm:$ss");
+}
+
+####################################################################################################
 #    Check ob Zeitgrenzen bzw. Aggregation gesetzt sind, evtl. übertseuern (je nach Funktion)
 #    Return "1" wenn Bedingung erfüllt, sonst "0"
 ####################################################################################################
@@ -9217,12 +9240,14 @@ sub DbRep_deldumpfiles ($$) {
   
   my $fref = stat("$dump_path_loc/$bfile"); 
   
-  if ($fref =~ /ARRAY/) {
-      @files = sort { (@{stat("$dump_path_loc/$a")})[9] cmp (@{stat("$dump_path_loc/$b")})[9] } @files
-            if(AttrVal("global", "archivesort", "alphanum") eq "timestamp");
-  } else {
-      @files = sort { (stat("$dump_path_loc/$a"))[9] cmp (stat("$dump_path_loc/$b"))[9] } @files
-            if(AttrVal("global", "archivesort", "alphanum") eq "timestamp");
+  if($fref) {
+      if ($fref =~ /ARRAY/) {
+          @files = sort { (@{stat("$dump_path_loc/$a")})[9] cmp (@{stat("$dump_path_loc/$b")})[9] } @files
+                if(AttrVal("global", "archivesort", "alphanum") eq "timestamp");
+      } else {
+          @files = sort { (stat("$dump_path_loc/$a"))[9] cmp (stat("$dump_path_loc/$b"))[9] } @files
+                if(AttrVal("global", "archivesort", "alphanum") eq "timestamp");
+      }
   }
   
   closedir(DH);
