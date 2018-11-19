@@ -30,6 +30,9 @@
 # 
 # CHANGE LOG
 # 
+# 19.11.2018 1.0.1
+#  bugfix    : fix update multiple readings for the same topic
+# 
 # 17.11.2018 1.0.0
 #  change    : IOWrite Parameter angepasst.
 #
@@ -240,7 +243,7 @@ use warnings;
 
 #my $DEBUG = 1;
 my $cvsid = '$Id$';
-my $VERSION = "version 1.0.0 by hexenmeister\n$cvsid";
+my $VERSION = "version 1.0.1 by hexenmeister\n$cvsid";
 
 my %sets = (
 );
@@ -2352,7 +2355,7 @@ sub doSetUpdate($$$$$) {
 
   my $dhash = $defs{$device};
   return unless defined $dhash;
-  
+  #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE: setUpdate enter: update: $reading = $message");
   my $doForward = isDoForward($hash, $device,$reading);
 
   if($mode eq 'S') {
@@ -2384,6 +2387,7 @@ sub doSetUpdate($$$$$) {
     }
     readingsBulkUpdate($dhash,$reading,$message);
     readingsEndUpdate($dhash,1);
+    #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE: setUpdate: update: $reading = $message");
     # wird in 'notify' entfernt # delete $dhash->{'.mqttGenericBridge_triggeredReading'};
 
     $hash->{+HELPER}->{+HS_PROP_NAME_UPDATE_R_CNT}++; 
@@ -2436,6 +2440,8 @@ sub onmessage($$$) {
 
   my $fMap = searchDeviceForTopic($hash, $topic);
   #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> onmessage: $fMap : ".Dumper($fMap));
+  my $updated = 0;
+  my @updatedList;
   foreach my $deviceKey (keys %{$fMap}) {
         my $device = $fMap->{$deviceKey}->{'device'};
         my $reading = $fMap->{$deviceKey}->{'reading'};
@@ -2485,8 +2491,6 @@ sub onmessage($$$) {
 
         next unless defined $message;
 
-        my $updated = 0;
-        my @updatedList;
         if(defined($redefMap)) {
           foreach my $key (keys %{$redefMap}) {
             my $val = $redefMap->{$key};
@@ -2508,11 +2512,9 @@ sub onmessage($$$) {
         #if($updated) {
           #updateSubTime($device,$reading);
         #}
-
-        return @updatedList if($updated);
-        return undef;
   }
-
+  return @updatedList if($updated);
+  return undef;
 }
 1;
 
