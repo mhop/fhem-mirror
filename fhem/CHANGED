@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  73_AutoShuttersControl: fix many bugs, change window event logic
   - change:  93_DbRep: fix warnings and minor changes
   - change:  93_DbLog: V3.13.0, addLog considers DbLogInclude (Forum:#92854), 
              new attributes traceFlag, traceLevel (only for support !)
