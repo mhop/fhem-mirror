@@ -1,4 +1,4 @@
-REV 17782
+REV 17790
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2018-11-18_09:14:04 266244 ./CHANGED
+UPD 2018-11-19_23:02:21 266322 ./CHANGED
 UPD 2018-11-17_23:59:05 38470 ./MAINTAINER.txt
 UPD 2018-09-09_07:45:03 39688 ./configDB.pm
 UPD 2018-09-17_07:45:03 19987 ./fhem.cfg.demo
@@ -78,10 +78,10 @@ UPD 2016-02-05_07:45:11 4427 FHEM/10_Itach_IR.pm
 UPD 2018-10-08_07:45:02 83806 FHEM/10_KNX.pm
 UPD 2016-12-22_07:45:02 36655 FHEM/10_KOPP_FC.pm
 UPD 2018-06-11_07:45:06 61938 FHEM/10_MAX.pm
-UPD 2018-11-17_07:45:02 16688 FHEM/10_MQTT2_DEVICE.pm
+UPD 2018-11-19_23:02:21 16990 FHEM/10_MQTT2_DEVICE.pm
 UPD 2018-09-18_07:45:02 11022 FHEM/10_MQTT_BRIDGE.pm
 UPD 2018-09-18_07:45:02 13548 FHEM/10_MQTT_DEVICE.pm
-UPD 2018-11-17_23:59:05 145792 FHEM/10_MQTT_GENERIC_BRIDGE.pm
+UPD 2018-11-19_23:02:21 146032 FHEM/10_MQTT_GENERIC_BRIDGE.pm
 UPD 2018-10-25_07:45:03 30481 FHEM/10_MYSENSORS_DEVICE.pm
 UPD 2018-06-12_07:45:06 19100 FHEM/10_NeuronPin.pm
 UPD 2018-03-28_07:45:02 33933 FHEM/10_OWServer.pm
@@ -355,7 +355,7 @@ UPD 2018-10-01_07:45:02 221693 FHEM/72_FRITZBOX.pm
 UPD 2018-11-11_07:45:02 16051 FHEM/72_TA_CMI_JSON.pm
 UPD 2018-11-04_07:45:06 153730 FHEM/72_XiaomiDevice.pm
 UPD 2018-11-16_07:45:03 47410 FHEM/73_AMADCommBridge.pm
-UPD 2018-11-17_07:45:02 136524 FHEM/73_AutoShuttersControl.pm
+UPD 2018-11-19_23:02:21 139953 FHEM/73_AutoShuttersControl.pm
 UPD 2018-04-14_07:45:02 89324 FHEM/73_ElectricityCalculator.pm
 UPD 2018-10-18_07:45:03 34360 FHEM/73_GardenaSmartBridge.pm
 UPD 2018-04-14_07:45:02 81612 FHEM/73_GasCalculator.pm
@@ -447,7 +447,7 @@ UPD 2016-08-19_14:49:02 4984 FHEM/98_CULflash.pm
 UPD 2017-05-10_07:45:02 47704 FHEM/98_ComfoAir.pm
 UPD 2017-09-20_07:45:02 9013 FHEM/98_CustomReadings.pm
 UPD 2018-01-10_07:45:02 60933 FHEM/98_DLNARenderer.pm
-UPD 2018-11-17_07:45:02 266967 FHEM/98_DOIF.pm
+UPD 2018-11-19_23:02:21 266997 FHEM/98_DOIF.pm
 UPD 2018-11-17_07:45:02 112264 FHEM/98_DOIFtools.pm
 UPD 2017-11-06_07:45:02 40228 FHEM/98_Dooya.pm
 UPD 2016-10-29_07:45:14 28678 FHEM/98_EDIPLUG.pm
@@ -596,7 +596,7 @@ UPD 2017-09-10_16:01:38 405 FHEM/holiday/st.holiday
 UPD 2017-09-10_16:01:38 392 FHEM/holiday/th.holiday
 UPD 2018-11-16_07:45:03 333089 FHEM/lib/74_AMADautomagicFlowset_4.2.4.xml
 UPD 2018-11-16_07:45:03 440509 FHEM/lib/74_AMADtaskerset_4.2.4.prj.xml
-UPD 2018-11-17_23:59:05 2062 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2018-11-19_23:02:21 3356 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
 UPD 2018-01-13_07:45:02 21899 FHEM/lib/Device/Firmata/Constants.pm
@@ -690,12 +690,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2018-11-19_07:45:06 3706514 docs/commandref.html
-UPD 2018-11-19_07:45:08 2273485 docs/commandref_DE.html
+UPD 2018-11-19_23:02:25 3706516 docs/commandref.html
+UPD 2018-11-19_23:02:27 2273487 docs/commandref_DE.html
 UPD 2018-11-17_23:59:05 76550 docs/commandref_frame.html
 UPD 2018-11-17_23:59:05 86019 docs/commandref_frame_DE.html
-UPD 2018-11-19_07:45:09 201765 docs/commandref_modular.html
-UPD 2018-11-19_07:45:10 212474 docs/commandref_modular_DE.html
+UPD 2018-11-19_23:02:28 201765 docs/commandref_modular.html
+UPD 2018-11-19_23:02:29 212474 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -1715,7 +1715,7 @@ UPD 2015-07-28_14:05:33 1453 www/images/openautomation/fts_window_roof.svg
 UPD 2015-07-28_14:05:33 1460 www/images/openautomation/fts_window_roof_open_1.svg
 UPD 2015-07-28_14:05:33 1575 www/images/openautomation/fts_window_roof_open_2.svg
 UPD 2015-07-28_14:05:33 2638 www/images/openautomation/fts_window_roof_shutter.svg
-UPD 2015-07-28_14:05:33 948 www/images/openautomation/iconalias.txt
+UPD 2018-11-19_23:02:21 939 www/images/openautomation/iconalias.txt
 UPD 2015-07-28_14:05:33 1469 www/images/openautomation/it_camera.svg
 UPD 2015-07-28_14:05:33 2404 www/images/openautomation/it_fax.svg
 UPD 2015-07-28_14:05:33 3150 www/images/openautomation/it_internet.svg
