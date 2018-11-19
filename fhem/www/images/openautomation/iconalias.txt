@@ -1,3 +1,5 @@
+FS20.off   light_light_dim_00.svg
+FS20.on    light_light_dim_100.svg
 off        light_light_dim_00.svg
 on         light_light_dim_100.svg
 OFF        light_light_dim_00.svg
