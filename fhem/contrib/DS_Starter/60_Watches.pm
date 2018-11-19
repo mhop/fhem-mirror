@@ -72,7 +72,7 @@ sub Watches_Initialize($) {
   $hash->{AttrFn}             = "Watches_Attr";
   $hash->{FW_hideDisplayName} = 1;        # Forum 88667
   # $hash->{FW_addDetailToSummary} = 1;
-  # $hash->{FW_atPageEnd} = 1;            # wenn 1 -> kein Longpoll ohne informid in HTML-Tag
+  $hash->{FW_atPageEnd} = 1;            # wenn 1 -> kein Longpoll ohne informid in HTML-Tag
 }
 
 
