@@ -1607,13 +1607,13 @@ sub wiggle($$) {
     );
 
     if ( $shutters->getShuttersPosCmdValueNegate ) {
-        if ( $shutters->getStatus >= $shutters->getOpenPos / 2 ) {
+        if ( $shutters->getStatus >= $shutters->getClosedPos / 2 ) {
             $shutters->setDriveCmd(
-                $shutters->getStatus + $shutters->getWiggleValue );
+                $shutters->getStatus - $shutters->getWiggleValue );
         }
         else {
             $shutters->setDriveCmd(
-                $shutters->getStatus - $shutters->getWiggleValue );
+                $shutters->getStatus + $shutters->getWiggleValue );
         }
     }
     else {
