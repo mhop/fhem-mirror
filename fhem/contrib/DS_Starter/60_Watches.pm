@@ -714,7 +714,7 @@ sub Watches_digital($) {
     };
 
     var display_$d = new SegmentDisplay_$d('display_$d');
-    display_$d.pattern         = '##:##:##';
+    display_$d.pattern         = '##:##:##       ';
     display_$d.cornerType      = 2;
     display_$d.displayType     = 7;
     display_$d.displayAngle    = 9;
