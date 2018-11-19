@@ -1316,6 +1316,7 @@ sub addDOIF_Readings($$)
   my ($hash,$DOIF_Readings) = @_;
   delete $hash->{DOIF_Readings};
   delete $hash->{Regex}{DOIF_Readings};
+  $DOIF_Readings =~ s/\n/ /g;
   my @list=SplitDoIf(',',$DOIF_Readings);
   my $reading;
   my $readingdef;
