@@ -51,7 +51,13 @@ MQTT2_DEVICE_Define($$)
   return "wrong syntax for $name: define <name> MQTT2_DEVICE [clientid]"
         if(int(@a));
   $hash->{DEVICETOPIC} = $name;
-  $modules{MQTT2_DEVICE}{defptr}{cid}{$hash->{CID}} = $hash if($hash->{CID});
+  if($hash->{CID}) {
+    my $dpc = $modules{MQTT2_DEVICE}{defptr}{cid};
+    if(!$dpc->{$hash->{CID}}) {
+      $dpc->{$hash->{CID}} = [];
+    }
+    push(@{$dpc->{$hash->{CID}}},$hash);
+  }
 
   AssignIoPort($hash);
   return undef;
@@ -147,10 +153,9 @@ MQTT2_DEVICE_Parse($$)
     }
     return if(!$newCid);
 
-    my $cidHash = $modules{MQTT2_DEVICE}{defptr}{cid}{$newCid};
-    my $nn = $cidHash ? $cidHash->{NAME} : "MQTT2_$newCid";
     PrioQueue_add(sub{
-      return if(!$defs{$nn});
+      my $cidArr = $modules{MQTT2_DEVICE}{defptr}{cid}{$newCid};
+      return if(!$cidArr);
       my $add;
       if($value =~ m/^{.*}$/) {
         my $ret = json2nameValue($value);
@@ -160,14 +165,19 @@ MQTT2_DEVICE_Parse($$)
         $topic =~ m,.*/([^/]+),;
         $add = ($1 ? $1 : $topic);
       }
-      my $rl = AttrVal($nn, "readingList", "");
-      $rl .= "\n" if($rl);
-      my $regexpCid = ($cid eq $newCid ? "$cid:" : "");
-      CommandAttr(undef, "$nn readingList $rl${regexpCid}$topic:.* $add");
+
+      for my $ch (@{$cidArr}) {
+        my $nn = $ch->{NAME};
+        my $rl = AttrVal($nn, "readingList", "");
+        $rl .= "\n" if($rl);
+        my $regexpCid = ($cid eq $newCid ? "$cid:" : "");
+        CommandAttr(undef, "$nn readingList $rl${regexpCid}$topic:.* $add");
+      }
       MQTT2_DEVICE_Parse($iodev, $msg);
     }, undef);
 
-    return "UNDEFINED $nn MQTT2_DEVICE $newCid" if(!$cidHash);
+    my $cidArr = $modules{MQTT2_DEVICE}{defptr}{cid}{$newCid};
+    return "UNDEFINED MQTT2_$newCid MQTT2_DEVICE $newCid" if(!$cidArr);
     return "";
   }
 
@@ -385,7 +395,9 @@ MQTT2_DEVICE_Undef($$)
 {
   my ($hash, $arg) = @_;
   MQTT2_DEVICE_delReading($arg);
-  delete $modules{MQTT2_DEVICE}{defptr}{cid}{$hash->{CID}} if($hash->{CID});
+  my $dpc = $modules{MQTT2_DEVICE}{defptr}{cid}{$hash->{CID}};
+  my @nh = grep { $_->{NAME} != $hash->{NAME} } @{$dpc};
+  $modules{MQTT2_DEVICE}{defptr}{cid}{$hash->{CID}} = \@nh;
   return undef;
 }
 

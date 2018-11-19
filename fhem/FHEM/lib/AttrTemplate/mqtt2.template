@@ -5,6 +5,7 @@
 # perl_code returns a value for the parameter, or undef.
 # If undef, the user has to specify them (the comment is shown to the user)
 
+# The zigbee2mqtt bridge device
 name:zigbee2mqtt_bridge
 filter:TYPE=MQTT2_DEVICE
 par:BRIDGENAME;name of the zigbee2mqtt bridge in the topics
@@ -17,6 +18,7 @@ attr DEVICE setList\
   devicelist:noArg zigbee2mqtt/BRIDGENAME/config/devices
 
 
+# A dimmable light connected via zigbee2mqtt
 name:zigbee2mqtt_bulb
 filter:TYPE=MQTT2_DEVICE
 par:NAMEINTHEBRIDGE;name of this device in the bridge;{ AttrVal("DEVICE","readingList","") =~ m,zigbee2mqtt/(.*):, ? $1 : undef }
@@ -27,7 +29,7 @@ attr DEVICE setList \
   off:noArg zigbee2mqtt/NAMEINTHEBRIDGE/set {"state":"OFF"}\
   brightness:colorpicker,BRI,0,15,255 zigbee2mqtt/NAMEINTHEBRIDGE/set {"state":"on","$EVTPART0":"$EVTPART1"}
 
-
+# A dimmable color light connected via zigbee2mqtt
 name:zigbee2mqtt_colorbulb
 filter:TYPE=MQTT2_DEVICE
 par:NAMEINTHEBRIDGE;name of this device in the bridge;{ AttrVal("DEVICE","readingList","") =~ m,zigbee2mqtt/(.*):, ? $1 : undef }
@@ -38,3 +40,34 @@ attr DEVICE setList \
   off:noArg zigbee2mqtt/NAMEINTHEBRIDGE/set {"state":"OFF"}\
   brightness:colorpicker,BRI,0,15,255 zigbee2mqtt/NAMEINTHEBRIDGE/set {"state":"on","$EVTPART0":"$EVTPART1"}\
   color_temp:colorpicker,CT,250,1,454 zigbee2mqtt/NAMEINTHEBRIDGE/set {"$EVTPART0":"$EVTPART1"}
+
+
+# Basic sonoff 1 channel device flashed with Tasmota
+name:sonoff_tasmota_1ch
+filter:TYPE=MQTT2_DEVICE
+par:MQTTNAME;Topic in "Configure MQTT", must be unique;{ AttrVal("DEVICE","readingList","") =~ m,tele/(.*)/LWT:, ? $1 : undef }
+attr DEVICE stateFormat POWER1
+attr DEVICE setList \
+  off:noArg    cmnd/MQTTNAME/POWER1 0\
+  on:noArg     cmnd/MQTTNAME/POWER1 1\
+  toggle:noArg cmnd/MQTTNAME/POWER1 2
+
+
+# sonoff 2 channel device flashed with Tasmota.
+# NOTE: a second device will be created for the second channel
+name:sonoff_tasmota_2ch
+filter:TYPE=MQTT2_DEVICE
+par:MQTTNAME;Topic in "Configure MQTT", must be unique;{ AttrVal("DEVICE","readingList","") =~ m,tele/(.*)/LWT:, ? $1 : undef }
+attr DEVICE stateFormat POWER1
+attr DEVICE setList \
+  off:noArg    cmnd/MQTTNAME/POWER1 0\
+  on:noArg     cmnd/MQTTNAME/POWER1 1\
+  toggle:noArg cmnd/MQTTNAME/POWER1 2
+attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2
+copy DEVICE DEVICE_CH2
+attr DEVICE_CH2 stateFormat POWER2
+attr DEVICE_CH2 comment Channel 2 for DEVICE
+attr DEVICE_CH2 setList \
+  off:noArg    cmnd/MQTTNAME/POWER2 0\
+  on:noArg     cmnd/MQTTNAME/POWER2 1\
+  toggle:noArg cmnd/MQTTNAME/POWER2 2
