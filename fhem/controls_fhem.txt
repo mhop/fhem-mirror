@@ -1,4 +1,4 @@
-REV 17790
+REV 17796
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -68,7 +68,7 @@ UPD 2015-07-28_14:05:31 15566 FHEM/10_CUL_IR.pm
 UPD 2017-04-24_07:45:02 16860 FHEM/10_DUOFERNSTICK.pm
 UPD 2018-03-12_07:45:04 44764 FHEM/10_EIB.pm
 UPD 2018-10-08_07:45:02 30638 FHEM/10_EQ3BT.pm
-UPD 2018-11-06_07:45:05 911300 FHEM/10_EnOcean.pm
+UPD 2018-11-20_07:45:03 906603 FHEM/10_EnOcean.pm
 UPD 2018-05-30_07:45:03 19903 FHEM/10_FBDECT.pm
 UPD 2018-01-21_07:45:02 70159 FHEM/10_FRM.pm
 UPD 2017-08-14_07:45:02 32138 FHEM/10_FS20.pm
@@ -298,7 +298,7 @@ UPD 2016-08-24_07:45:10 20855 FHEM/55_PIFACE.pm
 UPD 2015-07-28_14:05:31 17091 FHEM/56_POKEYS.pm
 UPD 2018-10-24_07:45:03 27668 FHEM/57_CALVIEW.pm
 UPD 2018-10-15_07:45:02 148508 FHEM/57_Calendar.pm
-UPD 2018-10-01_07:45:02 33614 FHEM/59_HCS.pm
+UPD 2018-11-20_07:45:03 33975 FHEM/59_HCS.pm
 UPD 2018-10-17_07:45:02 26685 FHEM/59_LuftdatenInfo.pm
 UPD 2018-03-19_07:45:04 25560 FHEM/59_OPENWEATHER.pm
 UPD 2018-08-03_07:45:03 38886 FHEM/59_PROPLANTA.pm
@@ -690,12 +690,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2018-11-19_23:02:25 3706516 docs/commandref.html
+UPD 2018-11-20_07:45:06 3706777 docs/commandref.html
 UPD 2018-11-19_23:02:27 2273487 docs/commandref_DE.html
 UPD 2018-11-17_23:59:05 76550 docs/commandref_frame.html
 UPD 2018-11-17_23:59:05 86019 docs/commandref_frame_DE.html
-UPD 2018-11-19_23:02:28 201765 docs/commandref_modular.html
-UPD 2018-11-19_23:02:29 212474 docs/commandref_modular_DE.html
+UPD 2018-11-20_07:45:09 201765 docs/commandref_modular.html
+UPD 2018-11-20_07:45:10 212474 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -1715,7 +1715,7 @@ UPD 2015-07-28_14:05:33 1453 www/images/openautomation/fts_window_roof.svg
 UPD 2015-07-28_14:05:33 1460 www/images/openautomation/fts_window_roof_open_1.svg
 UPD 2015-07-28_14:05:33 1575 www/images/openautomation/fts_window_roof_open_2.svg
 UPD 2015-07-28_14:05:33 2638 www/images/openautomation/fts_window_roof_shutter.svg
-UPD 2018-11-19_23:02:21 939 www/images/openautomation/iconalias.txt
+UPD 2018-11-20_07:45:03 1008 www/images/openautomation/iconalias.txt
 UPD 2015-07-28_14:05:33 1469 www/images/openautomation/it_camera.svg
 UPD 2015-07-28_14:05:33 2404 www/images/openautomation/it_fax.svg
 UPD 2015-07-28_14:05:33 3150 www/images/openautomation/it_internet.svg
