@@ -35,6 +35,7 @@ use warnings;
 
 # Versions History intern
 our %Watches_vNotesIntern = (
+  "0.4.0"  => "20.11.2018  text display ",
   "0.3.0"  => "19.11.2018  digital clock added ",
   "0.2.0"  => "14.11.2018  station clock added ",
   "0.1.0"  => "13.11.2018  initial Version with modern analog clock"
@@ -49,6 +50,8 @@ sub Watches_Initialize($) {
   $hash->{DefFn}              = "Watches_Define";
   $hash->{AttrList}           = "digitalColorBackground:colorpicker ".
                                 "digitalColorDigits:colorpicker ".
+                                "digitalDisplayPattern:text,watch ".
+                                "digitalDisplayText ".
                                 "modernColorBackground:colorpicker ".
 								"modernColorHand:colorpicker ".
 								"modernColorFigure:colorpicker ".
@@ -161,7 +164,24 @@ sub Watches_digital($) {
   my $hash   = $defs{$d};
   my $hattr  = AttrVal($d,"htmlattr","width='150' height='50'");
   my $bgc    = AttrVal($d,"digitalColorBackground","C4C4C4");
-  my $dcd    = AttrVal($d,"digitalColorDigits","000000");  
+  my $dcd    = AttrVal($d,"digitalColorDigits","000000"); 
+  my $ddp    = AttrVal($d,"digitalDisplayPattern","watch");  
+  my $ddt    = AttrVal($d,"digitalDisplayText","Play");
+  
+  if($ddp eq "watch") {
+      $ddp = "##:##:##";
+      $ddt = "  "."((hours < 10) ? ' ' : '') + hours
+                    + ':' + ((minutes < 10) ? '0' : '') + minutes
+                    + ':' + ((seconds < 10) ? '0' : '') + seconds";
+  } elsif($ddp eq "text") {
+      $ddp = "##########";
+	  my $txtc = length($ddt);
+	  $ddp = "";
+	  for(my $i = 0; $i <= $txtc; $i++) {
+		  $ddp .= "#";
+      }
+	  $ddt = "' ".$ddt."'";
+  }
  
   # Segmentanzeige aus: http://www.3quarks.com/de/Segmentanzeige/index.html
 
@@ -714,7 +734,7 @@ sub Watches_digital($) {
     };
 
     var display_$d = new SegmentDisplay_$d('display_$d');
-    display_$d.pattern         = '##:##:##       ';
+    display_$d.pattern         = '$ddp       ';
     display_$d.cornerType      = 2;
     display_$d.displayType     = 7;
     display_$d.displayAngle    = 9;
@@ -734,9 +754,7 @@ sub Watches_digital($) {
         var hours   = time.getHours();
         var minutes = time.getMinutes();
         var seconds = time.getSeconds();
-        var value   = ((hours < 10) ? ' ' : '') + hours
-                    + ':' + ((minutes < 10) ? '0' : '') + minutes
-                    + ':' + ((seconds < 10) ? '0' : '') + seconds;
+        var value   = $ddt;
         display_$d.setValue(value);
         window.setTimeout('animate_$d()', 100);
     }
@@ -1371,11 +1389,11 @@ sub Watches_modern($) {
 <h3>Watches</h3>
 
 <br>
-Das Modul Watches stellt eine Modern-, Bahnhofs- oder Digitaluhr als Device zur Verfügung. <br>
+Das Modul Watches stellt eine Modern-, Bahnhofs- oder Digitalanzeige als Device zur Verfügung. <br>
 Die Uhren basieren auf Skripten dieser Seiten: <br>
 <a href='https://www.w3schools.com/graphics/canvas_clock_start.asp'>moderne Uhr</a>, 
 <a href='http://www.3quarks.com/de/Bahnhofsuhr/'>Bahnhofsuhr</a>, 
-<a href='http://www.3quarks.com/de/Segmentanzeige/'>Digitaluhr</a> 
+<a href='http://www.3quarks.com/de/Segmentanzeige/'>Digitalanzeige</a> 
 <br>
 <br>
 
@@ -1391,7 +1409,7 @@ Die Uhren basieren auf Skripten dieser Seiten: <br>
      <colgroup> <col width=5%> <col width=95%> </colgroup>
      <tr><td> <b>Modern</b>     </td><td>: erstellt eine analoge Uhr im modernen Design  </td></tr>
      <tr><td> <b>Station</b>    </td><td>: erstellt eine Bahnhofsuhr </td></tr>
-     <tr><td> <b>Digital</b>    </td><td>: erstellt eine Digitaluhr </td></tr>
+     <tr><td> <b>Digital</b>    </td><td>: erstellt eine Digitalanzeige (Uhr oder Text) </td></tr>
   </table>
   <br>
   <br>
@@ -1545,6 +1563,30 @@ Die Uhren basieren auf Skripten dieser Seiten: <br>
       Farbe der Balkenanzeige in einer Digitaluhr.    
     </li>
     <br>  
+	
+    <a name="digitalDisplayPattern"></a>
+    <li><b>digitalDisplayPattern [text | watch]</b><br>
+      Umschaltung der Digitalanzeige zwischen Uhrenmodus (default) und Textanzeige. Der anzuzeigende Text 
+	  kann mit dem Attribut "digitalDisplayText" definiert werden. <br><br>
+    <ul>
+	<table>  
+       <colgroup> <col width=5%> <col width=95%> </colgroup>
+       <tr><td> <b>watch</b>     </td><td>: Anzeige einer Uhr </td></tr>
+       <tr><td> <b>text</b>      </td><td>: Anzeige eines definierbaren Textes </td></tr>
+    </table>
+	</ul>
+    <br>
+    </li>
+	
+    <a name="digitalDisplayText"></a>
+    <li><b>digitalDisplayText</b><br>
+      Ist das Attribut "digitalDisplayPattern = text" gesetzt, kann mit "digitalDisplayText" der 
+	  anzuzeigende Text eingestellt werden. Im Default wird "Play" anzgezeigt. <br>
+	  Mit der Siebensegmentanzeige können Ziffern, Bindestrich, Unterstrich und die Buchstaben 
+	  A, b, C, d, E, F, H, L, n, o, P, r, t, U und Y angezeigt werden. 
+	  So lassen sich außer Zahlen auch kurze Texte wie „Error“, „HELP“, „run“ oder „PLAY“ anzeigen. 
+    </li>
+    <br> 
   
   </ul>
   
@@ -1559,11 +1601,11 @@ Die Uhren basieren auf Skripten dieser Seiten: <br>
 <h3>Watches</h3>
 
 <br>
-Das Modul Watches stellt eine Modern-, Bahnhofs- oder Digitaluhr als Device zur Verfügung. <br>
+Das Modul Watches stellt eine Modern-, Bahnhofs- oder Digitalanzeige als Device zur Verfügung. <br>
 Die Uhren basieren auf Skripten dieser Seiten: <br>
 <a href='https://www.w3schools.com/graphics/canvas_clock_start.asp'>moderne Uhr</a>, 
 <a href='http://www.3quarks.com/de/Bahnhofsuhr/'>Bahnhofsuhr</a>, 
-<a href='http://www.3quarks.com/de/Segmentanzeige/'>Digitaluhr</a> 
+<a href='http://www.3quarks.com/de/Segmentanzeige/'>Digitalanzeige</a> 
 <br>
 <br>
 
@@ -1579,7 +1621,7 @@ Die Uhren basieren auf Skripten dieser Seiten: <br>
      <colgroup> <col width=5%> <col width=95%> </colgroup>
      <tr><td> <b>Modern</b>     </td><td>: erstellt eine analoge Uhr im modernen Design </td></tr>
      <tr><td> <b>Station</b>    </td><td>: erstellt eine Bahnhofsuhr </td></tr>
-     <tr><td> <b>Digital</b>    </td><td>: erstellt eine Digitaluhr </td></tr>
+     <tr><td> <b>Digital</b>    </td><td>: erstellt eine Digitalanzeige (Uhr oder Text) </td></tr>
   </table>
   <br>
   <br>
@@ -1734,6 +1776,30 @@ Die Uhren basieren auf Skripten dieser Seiten: <br>
     </li>
     <br>  
   
+    <a name="digitalDisplayPattern"></a>
+    <li><b>digitalDisplayPattern [text | watch]</b><br>
+      Umschaltung der Digitalanzeige zwischen Uhrenmodus (default) und Textanzeige. Der anzuzeigende Text 
+	  kann mit dem Attribut "digitalDisplayText" definiert werden. <br><br>
+    <ul>
+	<table>  
+       <colgroup> <col width=5%> <col width=95%> </colgroup>
+       <tr><td> <b>watch</b>     </td><td>: Anzeige einer Uhr </td></tr>
+       <tr><td> <b>text</b>      </td><td>: Anzeige eines definierbaren Textes </td></tr>
+    </table>
+	</ul>
+    <br>
+    </li>
+	
+    <a name="digitalDisplayText"></a>
+    <li><b>digitalDisplayText</b><br>
+      Ist das Attribut "digitalDisplayPattern = text" gesetzt, kann mit "digitalDisplayText" der 
+	  anzuzeigende Text eingestellt werden. Im Default wird "Play" anzgezeigt. <br>
+	  Mit der Siebensegmentanzeige können Ziffern, Bindestrich, Unterstrich und die Buchstaben 
+	  A, b, C, d, E, F, H, L, n, o, P, r, t, U und Y angezeigt werden. 
+	  So lassen sich außer Zahlen auch kurze Texte wie „Error“, „HELP“, „run“ oder „PLAY“ anzeigen. 
+    </li>
+    <br> 
+	
   </ul>
   
   </ul>
