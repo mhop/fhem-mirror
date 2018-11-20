@@ -166,7 +166,7 @@ my %userAttrList = (
     'ASC_WindowRec'                    => 'none',
     'ASC_Ventilate_Window_Open:on,off' => 'on',
     'ASC_LockOut:soft,hard,off'        => 'off',
-    'ASC_LockOut_Cmd:inhibit,blocked'  => 'none',
+    'ASC_LockOut_Cmd:inhibit,blocked,protection'  => 'none',
 
 #     'ASC_Shading_Direction'            => 178,
 #     'ASC_Shading_Pos:10,20,30,40,50,60,70,80,90,100' => [ '', 70,   30 ],
@@ -601,44 +601,6 @@ sub ShuttersDeviceScan($) {
         push( @{ $hash->{helper}{shuttersList} }, $_ )
           ; ## einem Hash wird ein Array zugewiesen welches die Liste der erkannten Rollos beinhaltet
 
-        delFromDevAttrList( $_, 'ASC_Direction' )
-          ;    # temporär muss später gelöscht werden ab Version 0.1.89
-        delFromDevAttrList( $_,
-            'ASC_Shading_Pos:10,20,30,40,50,60,70,80,90,100' )
-          ;    # temporär muss später gelöscht werden ab Version 0.1.89
-        delFromDevAttrList( $_, 'ASC_Rand_Minutes' )
-          ;    # temporär muss später gelöscht werden ab Version 0.1.89
-        delFromDevAttrList( $_, 'ASC_Shading:on,off,delayed,present,absent' )
-          ;    # temporär muss später gelöscht werden ab Version 0.1.89
-        delFromDevAttrList( $_,
-            'ASC_Shading_Pos_after_Shading:-1,0,10,20,30,40,50,60,70,80,90,100'
-        );     # temporär muss später gelöscht werden ab Version 0.1.89
-        delFromDevAttrList( $_,
-'ASC_Shading_Angle_Left:0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90'
-        );     # temporär muss später gelöscht werden ab Version 0.1.89
-        delFromDevAttrList( $_,
-'ASC_Shading_Angle_Right:0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90'
-        );     # temporär muss später gelöscht werden ab Version 0.1.89
-        delFromDevAttrList( $_, 'ASC_Shading_StateChange_Sunny' )
-          ;    # temporär muss später gelöscht werden ab Version 0.1.89
-        delFromDevAttrList( $_, 'ASC_Shading_StateChange_Cloudy' )
-          ;    # temporär muss später gelöscht werden ab Version 0.1.89
-        delFromDevAttrList( $_, 'ASC_Shading_WaitingPeriod' )
-          ;    # temporär muss später gelöscht werden ab Version 0.1.89
-        delFromDevAttrList( $_, 'ASC_Shading_Min_Elevation' )
-          ;    # temporär muss später gelöscht werden ab Version 0.1.89
-        delFromDevAttrList( $_, 'ASC_Shading_Min_OutsideTemperature' )
-          ;    # temporär muss später gelöscht werden ab Version 0.1.89
-        delFromDevAttrList( $_, 'ASC_Shading_BlockingTime_After_Manual' )
-          ;    # temporär muss später gelöscht werden ab Version 0.1.89
-        delFromDevAttrList( $_, 'ASC_Shading_BlockingTime_Twilight' )
-          ;    # temporär muss später gelöscht werden ab Version 0.1.89
-        delFromDevAttrList( $_, 'ASC_Shading_Fast_Open:on,off' )
-          ;    # temporär muss später gelöscht werden ab Version 0.1.89
-        delFromDevAttrList( $_, 'ASC_Shading_Fast_Close:on,off' )
-          ;    # temporär muss später gelöscht werden ab Version 0.1.89
-        delFromDevAttrList( $_, 'ASC_Pos_Cmd' )
-          ;    # temporär muss später gelöscht werden ab Version 0.1.93
         delFromDevAttrList( $_, 'ASC_lock-out:soft,hard' )
           ;    # temporär muss später gelöscht werden ab Version 0.2.0.6
         delFromDevAttrList( $_, 'ASC_lock-outCmd:inhibit,blocked' )
@@ -655,6 +617,10 @@ sub ShuttersDeviceScan($) {
         delFromDevAttrList( $_,
 'ASC_AntifreezePos:5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95,100'
         );     # temporär muss später gelöscht werden ab Version 0.2.0.7
+
+        delFromDevAttrList( $_, 'ASC_LockOut_Cmd:inhibit,blocked' )
+          if ( AttrVal( $_, 'ASC_LockOut_Cmd', 'none' ) eq 'none'
+          ;     # temporär muss später gelöscht werden ab Version 0.2.0.10
 
         $shuttersList = $shuttersList . ',' . $_;
         $shutters->setShuttersDev($_);
@@ -1583,6 +1549,9 @@ sub SetHardewareBlockForShutters($$) {
             CommandSet( undef,
                 $_ . ' ' . ( $cmd eq 'on' ? 'blocked' : 'unblocked' ) )
               if ( $shutters->getLockOutCmd eq 'blocked' );
+            CommandSet( undef,
+                $_ . ' ' . ( $cmd eq 'on' ? 'protectionOn' : 'protectionOff' ) )
+              if ( $shutters->getLockOutCmd eq 'protection' );
         }
     }
 }
@@ -3550,7 +3519,7 @@ sub getRainSensorShuttersClosedPos {
       <li>ASC_WindowRec - name of the window sensor mounted to window</li>
       <li>ASC_WindowRec_subType - type of the used window sensor: twostate (optical oder magnetic) or threestate (rotating handle sensor)</li>
       <li>ASC_LockOut - soft/hard/off sets the lock out mode. With global activated lock out mode (set ASC-Device lockOut soft) and window sensor open, the shutter stays up. This is true only, if commands are given by ASC module. Is global set to hard, the shutter is blocked by hardware if possible. In this case a locally mounted switch can't be used either.</li>
-      <li>ASC_LockOut_Cmd - inhibit/blocked set command for the shutter-device for hardware interlock. Possible if "ASC_LockOut" is set to hard</li>
+      <li>ASC_LockOut_Cmd - inhibit/blocked/protection set command for the shutter-device for hardware interlock. Possible if "ASC_LockOut" is set to hard</li>
       <li>ASC_Self_Defense_Exclude - on/off to exclude this shutter from active Self Defense. Shutter will not be closed if window is open and residents are absent.</li>
       <li>ASC_Shading_Brightness_Sensor - Sensor device used for brightness. ATTENTION! Is used also for ASC_Down - brightness</li>
       <li>ASC_BrightnessMinVal - minimum brightness value to activate check of conditions / if the value -1 is not changed, the value of the module device is used.</li>
@@ -3690,7 +3659,7 @@ sub getRainSensorShuttersClosedPos {
       <li>ASC_WindowRec - Name des Fensterkontaktes, an dessen Fenster der Rollladen angebracht ist</li>
       <li>ASC_WindowRec_subType - Typ des verwendeten Fensterkontaktes: twostate (optisch oder magnetisch) oder threestate (Drehgriffkontakt)</li>
       <li>ASC_LockOut - soft/hard/off - stellt entsprechend den Aussperrschutz ein. Bei global aktivem Aussperrschutz (set ASC-Device lockOut soft) und einem Fensterkontakt open bleibt dann der Rollladen oben. Dies gilt nur bei Steuerbefehle über das ASC Modul. Stellt man global auf hard, wird bei entsprechender M&ouml;glichkeit versucht den Rollladen hardwareseitig zu blockieren. Dann ist auch ein Fahren &uuml;ber die Taster nicht mehr m&ouml;glich.</li>
-      <li>ASC_LockOut_Cmd - inhibit/blocked - set Befehl f&uuml;r das Rollladen-Device zum Hardware sperren. Dieser Befehl wird gesetzt werden, wenn man "ASC_LockOut" auf hard setzt</li>
+      <li>ASC_LockOut_Cmd - inhibit/blocked/protection - set Befehl f&uuml;r das Rollladen-Device zum Hardware sperren. Dieser Befehl wird gesetzt werden, wenn man "ASC_LockOut" auf hard setzt</li>
       <li>ASC_Self_Defense_Exclude - on/off - bei on Wert wird dieser Rollladen bei aktiven Self Defense und offenen Fenster nicht runter gefahren, wenn Residents absent ist.</li>
       <li>ASC_Shading_Brightness_Sensor - Sensor Device, welches f&uuml;r die Lichtwerte verwendet wird. ACHTUNG! Findet auch Verwendung bei ASC_Down - brightness</li>
       <li>ASC_BrightnessMinVal - minimaler Lichtwert, bei dem Schaltbedingungen gepr&uuml;ft werden sollen / wird der Wert von -1 nicht ge&auml;ndert, so wird automatisch der Wert aus dem Moduldevice genommen</li>
