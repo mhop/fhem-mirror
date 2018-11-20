@@ -29,6 +29,9 @@
 ###############################################################################
 # 
 # CHANGE LOG
+#
+# 20.11.2018 1.0.2
+#  feature   : set subscriptions list to mqtt2-IO
 # 
 # 19.11.2018 1.0.1
 #  bugfix    : fix update multiple readings for the same topic
@@ -1496,7 +1499,7 @@ sub UpdateSubscriptions($) {
 
   updateDevCount($hash);
 
-  return unless isIODevMQTT($hash); #if $hash->{+HELPER}->{+IO_DEV_TYPE} eq 'MQTT2_SERVER';
+  #return unless isIODevMQTT($hash); #if $hash->{+HELPER}->{+IO_DEV_TYPE} eq 'MQTT2_SERVER';
   # TODO: MQTT2 subscriptions
 
   my $topicMap = {};
@@ -1535,16 +1538,23 @@ sub UpdateSubscriptions($) {
   #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> UpdateSubscriptions: remove = ".Dumper(@remove));
   #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> UpdateSubscriptions: new = ".Dumper(@new));
 
-  foreach my $topic (@remove) {
-    #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> UpdateSubscriptions: unsubscribe: topic = ".Dumper($topic));
-    client_unsubscribe_topic($hash,$topic);
+  if(isIODevMQTT($hash)) {
+    foreach my $topic (@remove) {
+      #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> UpdateSubscriptions: unsubscribe: topic = ".Dumper($topic));
+      client_unsubscribe_topic($hash,$topic);
+    }
+    foreach my $topic (@new) {
+      my $qos = $topicMap->{$topic}->{'qos'};    # TODO: Default lesen
+      $qos = 0 unless defined $qos;
+      my $retain = 0; # not supported
+      #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> UpdateSubscriptions: subscribe: topic = ".Dumper($topic).", qos = ".Dumper($qos).", retain = ".Dumper($retain));
+      client_subscribe_topic($hash,$topic,$qos,$retain) ;
+    }
   }
-  foreach my $topic (@new) {
-    my $qos = $topicMap->{$topic}->{'qos'};    # TODO: Default lesen
-    $qos = 0 unless defined $qos;
-    my $retain = 0; # not supported
-    #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> UpdateSubscriptions: subscribe: topic = ".Dumper($topic).", qos = ".Dumper($qos).", retain = ".Dumper($retain));
-    client_subscribe_topic($hash,$topic,$qos,$retain) ;
+
+  if(isIODevMQTT2($hash)) {
+    # MQTT2 Subscriptions
+    IOWrite($hash, "subscribe", join(" ", @new));
   }
 }
 
@@ -1552,19 +1562,23 @@ sub UpdateSubscriptions($) {
 sub RemoveAllSubscripton($) {
   my ($hash) = @_;
 
-  return unless isIODevMQTT($hash); #if $hash->{+HELPER}->{+IO_DEV_TYPE} eq 'MQTT2_SERVER';
-  # TODO MQTT2 Subscriptions
-
-  # alle Subscription kuendigen (beim undefine)  
-  if (defined($hash->{subscribe}) and (@{$hash->{subscribe}})) {
-    my $msgid = send_unsubscribe($hash->{IODev},
-      topics => [@{$hash->{subscribe}}],
-    );
-    $hash->{message_ids}->{$msgid}++;
+  if(isIODevMQTT($hash)) {
+    # MQTT2 Subscriptions => per default alles
+    IOWrite($hash, "subscribe", "#");
   }
-  $hash->{subscribe}=[];
-  $hash->{subscribeExpr}=[];
-  $hash->{subscribeQos}={};
+
+  if(isIODevMQTT($hash)) {
+    # alle Subscription kuendigen (beim undefine)  
+    if (defined($hash->{subscribe}) and (@{$hash->{subscribe}})) {
+      my $msgid = send_unsubscribe($hash->{IODev},
+        topics => [@{$hash->{subscribe}}],
+      );
+      $hash->{message_ids}->{$msgid}++;
+    }
+    $hash->{subscribe}=[];
+    $hash->{subscribeExpr}=[];
+    $hash->{subscribeQos}={};
+  }
 }
 
 sub InitializeDevices($) {
