@@ -767,8 +767,8 @@ sub SSCam_Set($@) {
 	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
 	  my $rgdev = $prop?$prop:"RG.SSCam";
       
-      my $rgdef = '<%it_camera>,<Kamera<br>On/Offline>,< >,<Status>,< >,<Bewegungs<br>erkennung>,< >,<letzte Aufnahme>,< >,<bel. Platz<br>(MB)>,< >,<letzte Aktualisierung>,< >,<Modul<br>Deaktivierung>,< >,<Image>'."\n". 
-                  'TYPE=SSCam:FILTER=MODEL!=SVS:Availability,<&nbsp;&nbsp;&nbsp;>,state,<&nbsp;&nbsp;&nbsp;>,CamMotDetSc,<&nbsp;&nbsp;&nbsp;>,CamLastRecTime,<&nbsp;&nbsp;&nbsp;>,UsedSpaceMB,<&nbsp;&nbsp;&nbsp;>,LastUpdateTime,<&nbsp;&nbsp;&nbsp;>,?!disable,<&nbsp;&nbsp;&nbsp;>,<%Start>,<%Stop>'."\n". 
+      my $rgdef = '<%it_camera>,<Kamera<br>On/Offline>,< >,<Status>,< >,<Bewegungs<br>erkennung>,< >,<letzte Aufnahme>,< >,<bel. Platz<br>(MB)>,< >,<letzte Aktualisierung>,< >,<Disable<br>Modul>,< >,<Image>'."\n". 
+                  'TYPE=SSCam:FILTER=MODEL!=SVS:Availability,<&nbsp;&nbsp;&nbsp;>,state,<&nbsp;&nbsp;&nbsp;>,CamMotDetSc,<&nbsp;&nbsp;&nbsp;>,CamLastRecTime,<&nbsp;&nbsp;&nbsp;>,UsedSpaceMB,<&nbsp;&nbsp;&nbsp;>,LastUpdateTime,<&nbsp;&nbsp;&nbsp;>,?!disable,<&nbsp;&nbsp;&nbsp;>,Record,CamLastRec'."\n". 
                   '< >'."\n".
                   '< >'."\n".
                   '< >'."\n".
@@ -798,7 +798,8 @@ sub SSCam_Set($@) {
                      '  "HomeModeState.on"      => "set $DEVICE homeMode off",'."\n".
                      '  "HomeModeState.off"     => "set $DEVICE homeMode on",'."\n".
                      '  "'.$rgdev.'.Start"      => "set %DEVICE runView live_fw",'."\n".
-                     '  "'.$rgdev.'.Stop"       => "set %DEVICE stopView",'."\n".
+                     '  "CamLastRec"            => "set %DEVICE stopView",'."\n".
+                     '  "Record"  => "runView:",'."\n".
                      '  "disable" => "disable:"'."\n".	
                      '}';
       CommandAttr($hash->{CL},"$rgdev commands $commands");
@@ -820,9 +821,8 @@ sub SSCam_Set($@) {
                       '  "Availability.enabled"  => "remotecontrol/black_btn_GREEN",'."\n".
                       '  "Availability.disabled" => "remotecontrol/black_btn_RED",'."\n".
                       '  "HomeModeState.on"      => "status_available",'."\n".
-                      '  "HomeModeState.off"     => "status_away_1\@orange",'."\n".
-                      '  "state.inactive"        => "remotecontrol/black_btn_RED",'."\n".
-                      '  "state.disabled"        => "remotecontrol/black_btn_RED",'."\n".
+                      '  "HomeModeState.off"     => "status_away_1\@orange",'."\n". 
+                      '  "CamLastRec"            => "remotecontrol/black_btn_POWEROFF3",'."\n".                     
                       '  "state.initialized"     => "remotecontrol/black_btn_STOP",'."\n".
                       '  "state"                 => "%devStateIcon"'."\n".
                       '}';
