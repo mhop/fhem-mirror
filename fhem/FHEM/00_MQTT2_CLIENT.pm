@@ -129,7 +129,7 @@ MQTT2_CLIENT_doinit($)
   } elsif($hash->{connecting} == 2) {
     my $s = AttrVal($name, "subscriptions", "#");
     if($s eq "setByTheProgram") {
-      $s = ($hash->{".subscribe"} ? $hash->{".subscribe"} : "#");
+      $s = ($hash->{".subscriptions"} ? $hash->{".subscriptions"} : "#");
     }
     my $msg = 
         pack("n", $hash->{FD}). # packed Identifier
@@ -350,7 +350,7 @@ MQTT2_CLIENT_Read($@)
 }
 
 ######################################
-# send topic to client if its subscription matches the topic
+# send topic to client if its subscriptions matches the topic
 sub
 MQTT2_CLIENT_doPublish($@)
 {
@@ -385,8 +385,8 @@ MQTT2_CLIENT_Write($$$)
     }
     MQTT2_CLIENT_doPublish($hash, $topic, $msg, $retain);
 
-  } elsif($function eq "subscribe") {
-    $hash->{".subscribtion"} = $topicMsg;
+  } elsif($function eq "subscriptions") {
+    $hash->{".subscriptions"} = $topicMsg;
     MQTT2_CLIENT_Disco($hash);
 
   } else {
