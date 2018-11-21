@@ -619,7 +619,7 @@ sub ShuttersDeviceScan($) {
         );     # temporär muss später gelöscht werden ab Version 0.2.0.7
 
         delFromDevAttrList( $_, 'ASC_LockOut_Cmd:inhibit,blocked' )
-          if ( AttrVal( $_, 'ASC_LockOut_Cmd', 'none' ) eq 'none'
+          if ( AttrVal( $_, 'ASC_LockOut_Cmd', 'none' ) eq 'none' )
           ;     # temporär muss später gelöscht werden ab Version 0.2.0.10
 
         $shuttersList = $shuttersList . ',' . $_;
