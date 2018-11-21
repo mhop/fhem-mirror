@@ -57,6 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Versions History intern
 our %DbRep_vNotesIntern = (
+  "8.9.7"  => "21.11.2018  DbRep_firstconnect now uses attribute \"timeout\" ",
   "8.9.6"  => "15.11.2018  fix PERL WARNING: Use of uninitialized value \$fref in pattern match (m//), sub DbRep_sec2hms for hms transforming",
   "8.9.5"  => "09.11.2018  hash %dbrep_col substituted by get data from dblog device in func DbRep_firstconnect, fix importFromFile contains only SPACE ",
   "8.9.0"  => "07.11.2018  command delDoublets added ",
@@ -1349,12 +1350,12 @@ return undef;
 sub DbRep_firstconnect(@) {
   my ($string)     = @_;
   my ($name,$opt,$prop,$fret) = split("\\|", $string);
-  my $hash         = $defs{$name};
-  my $to           = "120";
+  my $hash           = $defs{$name};
+  my $to             = AttrVal($name, "timeout", "86400");
   $hash->{dbloghash} = $defs{$hash->{HELPER}{DBLOGDEVICE}};
-  my $dbloghash    = $hash->{dbloghash};
-  my $dbconn       = $dbloghash->{dbconn};
-  my $dbuser       = $dbloghash->{dbuser};
+  my $dbloghash      = $hash->{dbloghash};
+  my $dbconn         = $dbloghash->{dbconn};
+  my $dbuser         = $dbloghash->{dbuser};
   
   RemoveInternalTimer($hash, "DbRep_firstconnect");
   return if(IsDisabled($name));
@@ -1425,7 +1426,8 @@ sub DbRep_getInitData($) {
  my $brt = tv_interval($bst);
 
  $rt   = $rt.",".$brt;
- no warnings 'uninitialized'; 
+ no warnings 'uninitialized';
+ Log3 ($name, 3, "DbRep $name - Initial data information retrieved successfully - total time used: $brt seconds");
  
 return "$name|$mints|$rt|0|$opt|$prop|$fret";
 }
