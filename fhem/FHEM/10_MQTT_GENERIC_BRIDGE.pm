@@ -30,6 +30,9 @@
 # 
 # CHANGE LOG
 #
+# 21.11.018  1.0.2
+#  change    : techn. func. name changed subscribe => subscriptions
+#
 # 20.11.2018 1.0.2
 #  feature   : set subscriptions list to mqtt2-IO
 # 
@@ -246,7 +249,7 @@ use warnings;
 
 #my $DEBUG = 1;
 my $cvsid = '$Id$';
-my $VERSION = "version 1.0.1 by hexenmeister\n$cvsid";
+my $VERSION = "version 1.0.2 by hexenmeister\n$cvsid";
 
 my %sets = (
 );
@@ -1554,7 +1557,7 @@ sub UpdateSubscriptions($) {
 
   if(isIODevMQTT2($hash)) {
     # MQTT2 Subscriptions
-    IOWrite($hash, "subscribe", join(" ", @new));
+    IOWrite($hash, "subscriptions", join(" ", @new));
   }
 }
 
