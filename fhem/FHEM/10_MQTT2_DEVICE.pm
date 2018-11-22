@@ -395,9 +395,11 @@ MQTT2_DEVICE_Undef($$)
 {
   my ($hash, $arg) = @_;
   MQTT2_DEVICE_delReading($arg);
-  my $dpc = $modules{MQTT2_DEVICE}{defptr}{cid}{$hash->{CID}};
-  my @nh = grep { $_->{NAME} != $hash->{NAME} } @{$dpc};
-  $modules{MQTT2_DEVICE}{defptr}{cid}{$hash->{CID}} = \@nh;
+  if($hash->{CID}) {
+    my $dpc = $modules{MQTT2_DEVICE}{defptr}{cid}{$hash->{CID}};
+    my @nh = grep { $_->{NAME} ne $hash->{NAME} } @{$dpc};
+    $modules{MQTT2_DEVICE}{defptr}{cid}{$hash->{CID}} = \@nh;
+  }
   return undef;
 }
 
