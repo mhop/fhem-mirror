@@ -35,7 +35,7 @@ package main;
 use strict;
 use warnings;
 
-my $version = "2.4.4";
+my $version = "2.4.5";
 
 sub XiaomiBTLESens_Initialize($) {
 
@@ -80,7 +80,7 @@ use strict;
 use warnings;
 use POSIX;
 
-use GPUtils qw(:all)
+use GPUtils qw(GP_Import)
   ;    # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 
 eval "use JSON;1"     or $missingModul .= "JSON ";
@@ -100,7 +100,6 @@ BEGIN {
           modules
           Log3
           CommandAttr
-#           attr
           AttrVal
           ReadingsVal
           IsDisabled
@@ -426,10 +425,11 @@ sub Set($$@) {
 
     }
     else {
-        my $list = "resetBatteryTimestamp:noArg";
+        my $list = "";
+        $list .= "resetBatteryTimestamp:noArg" unless ( AttrVal( $name, 'model', 'none' ) eq 'none' );
         $list .= " devicename"
           if (
-            AttrVal( $name, 'model', 'thermoHygroSens' ) eq 'thermoHygroSens' );
+            AttrVal( $name, 'model', 'thermoHygroSens' ) eq 'thermoHygroSens' and AttrVal( $name, 'model', 'none' ) ne 'none' );
 
         return "Unknown argument $cmd, choose one of $list";
     }
@@ -468,10 +468,11 @@ sub Get($$@) {
 
     }
     else {
-        my $list = "sensorData:noArg firmware:noArg";
+        my $list = "";
+        $list .= "sensorData:noArg firmware:noArg" unless ( AttrVal( $name, 'model', 'none' ) eq 'none' );
         $list .= " devicename:noArg"
           if (
-            AttrVal( $name, 'model', 'thermoHygroSens' ) eq 'thermoHygroSens' );
+            AttrVal( $name, 'model', 'thermoHygroSens' ) eq 'thermoHygroSens' and AttrVal( $name, 'model', 'none' ) ne 'none' );
         return "Unknown argument $cmd, choose one of $list";
     }
 
@@ -887,8 +888,17 @@ sub ThermoHygroSensHandle0x10($$) {
     my @numberOfHex = split( ' ', $notification );
 
     $notification =~ s/\s+//g;
+
+#     print "Temperatur: " . pack( 'H*', substr( $notification, 4, 8 ) ) . "\n";
+# 
+# 
+#     print "Luftfeuchte: " . pack( 'H*', substr( $notification, 16, 8 ) ) . "\n" if ( scalar(@numberOfHex) == 13 and pack( 'H*', substr( $notification, 4, 8 ) ) < 10);
+#     
+#     print "Luftfeuchte: " . pack( 'H*', substr( $notification, 18, 8 ) ) . "\n" if ( scalar(@numberOfHex) == 14 or (scalar(@numberOfHex) == 13 and pack( 'H*', substr( $notification, 4, 8 ) )) > 9);
+
     $readings{'temperature'} = pack( 'H*', substr( $notification, 4, 8 ) );
-    $readings{'humidity'} = pack( 'H*', substr( $notification, 18, 8 ) );
+    $readings{'humidity'} = pack( 'H*', substr( $notification, (scalar(@numberOfHex) == 14 or (scalar(@numberOfHex) == 13 and $readings{'temperature'} > 9) ? 18 : 16), 8 ) );
+    #$readings{'humidity'} = pack( 'H*', substr( $notification, 18, 8 ) );
 
     $hash->{helper}{CallBattery} = 0;
     return \%readings;
@@ -1227,7 +1237,7 @@ sub CometBlueBTLE_CmdlinePreventGrepFalsePositive($) {
       <code>define Weihnachtskaktus XiaomiBTLESens C4:7C:8D:62:42:6F</code><br />
     </ul>
     <br />
-    Der Befehl legt ein Device vom Typ XiaomiBTLESens an mit dem Namen Weihnachtskaktus und der Bluetooth MAC C4:7C:8D:62:42:6F.<br />
+    Der Befehl legt ein Device vom Typ XiaomiBTLESens mit dem Namen Weihnachtskaktus und der Bluetooth MAC C4:7C:8D:62:42:6F an.<br />
     Nach dem Anlegen des Device und setzen des korrekten model Attributes werden umgehend und automatisch die aktuellen Daten vom betroffenen Xiaomi BTLE Sensor gelesen.
   </ul>
   <br /><br />
