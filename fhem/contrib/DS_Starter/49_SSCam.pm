@@ -45,7 +45,7 @@ use HttpUtils;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
-  "7.4.0"  => "20.11.2018  new set command \"createReadingsGroup\" ",
+  "7.4.0"  => "20.11.2018  new set command \"createReadingsGroup\", versionNotes can process lists like \"2,6\" ",
   "7.3.3"  => "18.11.2018  change rights decsption in commandRef ",
   "7.3.2"  => "12.11.2018  fix Warning in line 4954, set COMPATIBILITY to 8.2.2 ",
   "7.3.1"  => "31.10.2018  fix connection lost failure if several SSCamSTRM devices are defined and updated by longpoll from same parent device ",
@@ -94,7 +94,7 @@ our %SSCam_vNotesIntern = (
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
-  "7.4.0"  => "20.11.2018 new command \"createReadingsGroup\". By this command a ReadingsGroup with a name of your choice (or use a default name) can be created. ",
+  "7.4.0"  => "20.11.2018 new command \"createReadingsGroup\". By this command a ReadingsGroup with a name of your choice (or use the default name) can be created. ",
   "7.3.2"  => "12.11.2018 fix Warning if 'livestreamprefix' is set to DEF, COMPATIBILITY set to 8.2.2 ",
   "7.3.0"  => "28.10.2018 In attribute \"livestreamprefix\" can now \"DEF\" be specified to overwrite livestream address by specification from device definition ",
   "7.2.1"  => "23.10.2018 COMPATIBILITY changed to 8.2.1 ",
@@ -1269,11 +1269,14 @@ sub SSCam_Get($@) {
           $ret .= "<tbody>";
           $ret .= "<tr class=\"even\">";  
           if($arg && $arg =~ /[\d]+/) {
-              if(AttrVal("global","language","EN") eq "DE") {
-                  %hs = ( $arg => $SSCam_vHintsExt_de{$arg} ); 
-              } else {
-                  %hs = ( $arg => $SSCam_vHintsExt_en{$arg} ); 
-              }                   
+              my @hints = split(",",$arg);
+              foreach (@hints) {
+                  if(AttrVal("global","language","EN") eq "DE") {
+                      $hs{$_} = $SSCam_vHintsExt_de{$_};
+                  } else {
+                      $hs{$_} = $SSCam_vHintsExt_en{$_};
+                  }
+              }                      
           } else {
               if(AttrVal("global","language","EN") eq "DE") {
                   %hs = %SSCam_vHintsExt_de;
@@ -7686,7 +7689,9 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <a name="ptzPanel_iconPath"></a>  
   <li><b>ptzPanel_iconPath</b><br>
     Path for icons used in PTZ-control panel, default is "www/images/sscam". 
-    The attribute value will be used for all icon-files except *.svg. </li><br> 
+    The attribute value will be used for all icon-files except *.svg. <br>
+    For further information execute "get &lt;name&gt; versionNotes 2,6".
+  </li><br> 
 
   <a name="ptzPanel_iconPrefix"></a>
   <li><b>ptzPanel_iconPrefix</b><br>
@@ -9042,7 +9047,9 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <a name="ptzPanel_iconPath"></a>  
   <li><b>ptzPanel_iconPath</b><br>
     Pfad für Icons im PTZ-Steuerungspaneel, default ist "www/images/sscam". 
-    Der Attribut-Wert wird für alle Icon-Dateien außer *.svg verwendet. </li><br> 
+    Der Attribut-Wert wird für alle Icon-Dateien außer *.svg verwendet. <br>
+    Für weitere Information bitte "get &lt;name&gt; versionNotes 2,6" ausführen.
+  </li><br> 
 
   <a name="ptzPanel_iconPrefix"></a>
   <li><b>ptzPanel_iconPrefix</b><br>
