@@ -363,7 +363,7 @@ sub Get($$@) {
         my $ret = CreateErrorList($hash);
         return $ret;
     }
-    elsif ( $cmd eq 'getDistribution' ) {
+    elsif ( $cmd eq 'distributionInfo' ) {
         return "usage: $cmd" if ( @args != 0 );
 
         $hash->{".fhem"}{aptget}{cmd} = 'getDistribution';
@@ -371,7 +371,7 @@ sub Get($$@) {
     }
     else {
         my $list = "";
-        $list .= " getDistribution:noArg"
+        $list .= " distributionInfo:noArg"
           unless ( ReadingsVal( $name, 'os-release_language', 'none' ) eq 'none' );
         $list .= " showUpgradeList:noArg"
           if ( defined( $hash->{".fhem"}{aptget}{packages} )
