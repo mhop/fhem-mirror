@@ -176,6 +176,9 @@ our %SSCam_vNotesExtern = (
 
 # Hint Hash en
 our %SSCam_vHintsExt_en = (
+  "6" => "There are some Icons in directory www/images/sscam available for SSCam. Thereby the system can use the icons please do: <br>".
+         "- in FHEMWEB device attribute <b>iconPath</b> complete with \"sscam\", e.g.: attr WEB iconPath default:fhemSVG:openautomation:sscam <br>".
+		 "After that execute \"rereadicons\" or restart FHEM. ",
   "5" => "Find more Informations about manage users and the appropriate privilege profiles in ".
          "<a href=\"https://www.synology.com/en-global/knowledgebase/Surveillance/help/SurveillanceStation/user\">Surveillance Station online help</a> ",
   "4" => "The message Meldung \"WARNING - The current/simulated SVS-version ... may be incompatible with SSCam version...\" means that ".
@@ -191,9 +194,11 @@ our %SSCam_vHintsExt_en = (
 
 # Hint Hash de
 our %SSCam_vHintsExt_de = (
+  "6" => "Für SSCam wird ein Satz Icons im Verzeichnis www/images/sscam zur Verfügung gestellt. Damit das System sie findet bitte setzen: <br>".
+         "- im FHEMWEB Device Attribut <b>iconPath</b> um \"sscam\" ergänzen, z.B.: attr WEB iconPath default:fhemSVG:openautomation:sscam <br>".
+		 "Danach ein \"rereadicons\" bzw. einen FHEM restart ausführen. ",
   "5" => "Informationen zum Management von Usern und entsprechenden Rechte-Profilen sind in der ".
          "<a href=\"https://www.synology.com/de-de/knowledgebase/Surveillance/help/SurveillanceStation/user\">Surveillance Station Online-Hilfe</a> zu finden.",
-
   "4" => "Die Meldung \"WARNING - The current/simulated SVS-version ... may be incompatible with SSCam version...\" ist ein Hinweis darauf, dass ".
          "die eingesetzte SSCam Version noch nicht mit der verwendeten Version von Synology Surveillance Station (Reading \"SVSversion\") getestet ".
          "wurde. Die kompatible SVS-Version ist im Internal COMPATIBILITY ersichtlich.\n".
@@ -768,12 +773,12 @@ sub SSCam_Set($@) {
 	  my $rgdev = $prop?$prop:"RG.SSCam";
       
       my $rgdef = '<%it_camera>,<Kamera<br>On/Offline>,< >,<Status>,< >,<Bewegungs<br>erkennung>,< >,<letzte Aufnahme>,< >,<bel. Platz<br>(MB)>,< >,<letzte Aktualisierung>,< >,<Disable<br>Modul>,< >,<Image>'."\n". 
-                  'TYPE=SSCam:FILTER=MODEL!=SVS:Availability,<&nbsp;&nbsp;&nbsp;>,state,<&nbsp;&nbsp;&nbsp;>,CamMotDetSc,<&nbsp;&nbsp;&nbsp;>,CamLastRecTime,<&nbsp;&nbsp;&nbsp;>,UsedSpaceMB,<&nbsp;&nbsp;&nbsp;>,LastUpdateTime,<&nbsp;&nbsp;&nbsp;>,?!disable,<&nbsp;&nbsp;&nbsp;>,Record,CamLastRec'."\n". 
-                  '< >'."\n".
-                  '< >'."\n".
-                  '< >'."\n".
-                  '<%it_server>,<HomeMode<br>On/Off>,<&nbsp;>,<Status>,<&nbsp;>,&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>'."\n".
-                  'TYPE=SSCam:FILTER=MODEL=SVS:HomeModeState,<&nbsp;>,state,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,?!disable,<&nbsp;>,<&nbsp;>,<&nbsp;>'."\n".
+                  'TYPE=SSCam:FILTER=MODEL!=SVS:Availability,<&nbsp;&nbsp;&nbsp;>,state,<&nbsp;&nbsp;&nbsp;>,CamMotDetSc,<&nbsp;&nbsp;&nbsp;>,CamLastRecTime,<&nbsp;&nbsp;&nbsp;>,UsedSpaceMB,<&nbsp;&nbsp;&nbsp;>,LastUpdateTime,<&nbsp;&nbsp;&nbsp;>,?!disable,<&nbsp;&nbsp;&nbsp;>,Record,?!Start,?!Stop'."\n". 
+                  '< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >'."\n".
+                  '< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >'."\n".
+                  '< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >'."\n".
+                  '<%it_server>,<HomeMode<br>On/Off>,<&nbsp;>,<Status>,<&nbsp;>,&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>'."\n".
+                  'TYPE=SSCam:FILTER=MODEL=SVS:HomeModeState,<&nbsp;>,state,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,?!disable,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>'."\n".
                   '';
       
       my $ret     = CommandDefine($hash->{CL},"$rgdev readingsGroup $rgdef");
@@ -785,6 +790,7 @@ sub SSCam_Set($@) {
       CommandAttr($hash->{CL},"$rgdev alias ReadingsGroup Kameras");
       
       my $cellStyle = '{'."\n". 
+	                  '  "c:0" => \'style="text-align:left;font-weight:normal"\','."\n".
                       '  "c:1" => \'style="text-align:left;font-weight:normal"\','."\n".
                       '  "c:4" => \'style="text-align:center;font-weight:bold"\','."\n".
                       '  "c:5" => \'style="text-align:center;color:green;font-weight:normal"\','."\n".
@@ -798,9 +804,10 @@ sub SSCam_Set($@) {
                      '  "HomeModeState.on"      => "set $DEVICE homeMode off",'."\n".
                      '  "HomeModeState.off"     => "set $DEVICE homeMode on",'."\n".
                      '  "'.$rgdev.'.Start"      => "set %DEVICE runView live_fw",'."\n".
-                     '  "CamLastRec"            => "set %DEVICE stopView",'."\n".
-                     '  "Record"  => "runView:",'."\n".
-                     '  "disable" => "disable:"'."\n".	
+					 '  "Start"                 => "set %DEVICE runView live_fw",'."\n".
+                     '  "Stop"                  => "set %DEVICE stopView",'."\n".
+                     '  "Record"                => "runView:",'."\n".
+                     '  "disable"               => "disable:"'."\n".	
                      '}';
       CommandAttr($hash->{CL},"$rgdev commands $commands");
       
@@ -808,7 +815,7 @@ sub SSCam_Set($@) {
 	  CommandAttr($hash->{CL},"$rgdev nameStyle $nameStyle");
       
       my $valueColumns = '{'."\n".
-                         '  \'Image\' => \'colspan="2"\''."\n".	
+                         '  \'Image\' => \'colspan="3"\''."\n".	
                          '}';
       CommandAttr($hash->{CL},"$rgdev valueColumns $valueColumns");
 	
@@ -821,8 +828,9 @@ sub SSCam_Set($@) {
                       '  "Availability.enabled"  => "remotecontrol/black_btn_GREEN",'."\n".
                       '  "Availability.disabled" => "remotecontrol/black_btn_RED",'."\n".
                       '  "HomeModeState.on"      => "status_available",'."\n".
-                      '  "HomeModeState.off"     => "status_away_1\@orange",'."\n". 
-                      '  "CamLastRec"            => "remotecontrol/black_btn_POWEROFF3",'."\n".                     
+                      '  "HomeModeState.off"     => "status_away_1\@orange",'."\n".
+                      '  "Start"                 => "black_btn_MJPEG",'."\n".			  
+                      '  "Stop"                  => "remotecontrol/black_btn_POWEROFF3",'."\n".                     
                       '  "state.initialized"     => "remotecontrol/black_btn_STOP",'."\n".
                       '  "state"                 => "%devStateIcon"'."\n".
                       '}';
