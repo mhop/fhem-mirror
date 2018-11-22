@@ -5,6 +5,8 @@
 # perl_code returns a value for the parameter, or undef.
 # If undef, the user has to specify them (the comment is shown to the user)
 
+###########################################
+# zigbee2mqtt
 # The zigbee2mqtt bridge device
 name:zigbee2mqtt_bridge
 filter:TYPE=MQTT2_DEVICE
@@ -41,7 +43,27 @@ attr DEVICE setList \
   brightness:colorpicker,BRI,0,15,255 zigbee2mqtt/NAMEINTHEBRIDGE/set {"state":"on","$EVTPART0":"$EVTPART1"}\
   color_temp:colorpicker,CT,250,1,454 zigbee2mqtt/NAMEINTHEBRIDGE/set {"$EVTPART0":"$EVTPART1"}
 
+name:zigbee2mqtt_colorbulb_withoutColorTemp
+filter:TYPE=MQTT2_DEVICE
+par:NAMEINTHEBRIDGE;name of this device in the bridge;{ AttrVal("DEVICE","readingList","") =~ m,zigbee2mqtt/(.*):, ? $1 : undef }
+attr DEVICE icon hue_filled_white_and_color_e27_b22
+attr DEVICE stateFormat {sprintf(lc ReadingsVal("$name","state",0))}
+attr DEVICE devStateIcon {devStateIcon255($name)}
+attr DEVICE webCmd toggle:on:off:brightness:color
+attr DEVICE setList \
+  on:noArg zigbee2mqtt/NAMEINTHEBRIDGE/set {"state":"ON"}\
+  off:noArg zigbee2mqtt/NAMEINTHEBRIDGE/set {"state":"OFF"}\
+  brightness:colorpicker,BRI,0,15,255 zigbee2mqtt/NAMEINTHEBRIDGE/set {"state":"on","$EVTPART0":"$EVTPART1"}\
+  color:colorpicker,RGB {"zigbee2mqtt/NAMEINTHEBRIDGE/set " . encode_json(convertRGBtoR_G_B($EVTPART1))}
 
+name:zigbee2mqtt_smoke_detector
+filter:TYPE=MQTT2_DEVICE
+par:NAMEINTHEBRIDGE;name of this device in the bridge;{ AttrVal("DEVICE","readingList","") =~ m,zigbee2mqtt/(.*):, ? $1 : undef }
+attr DEVICE icon secur_smoke_detector
+attr DEVICE stateFormat smoke
+
+###########################################
+# TASMOTA
 # Basic sonoff 1 channel device flashed with Tasmota
 # The regexp must handle
 # - tele/sonoff/LWT: => cmnd/sonoff/
