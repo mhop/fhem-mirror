@@ -35,7 +35,7 @@ package main;
 use strict;
 use warnings;
 
-my $version = "1.4.0";
+my $version = "1.4.1";
 
 sub AptToDate_Initialize($) {
 
@@ -67,7 +67,7 @@ use strict;
 use warnings;
 use POSIX;
 
-use GPUtils qw(:all)
+use GPUtils qw(GP_Import)
   ;    # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 
 use Data::Dumper;    #only for Debugging
@@ -362,10 +362,17 @@ sub Get($$@) {
 
         my $ret = CreateErrorList($hash);
         return $ret;
+    }
+    elsif ( $cmd eq 'getDistribution' ) {
+        return "usage: $cmd" if ( @args != 0 );
 
+        $hash->{".fhem"}{aptget}{cmd} = 'getDistribution';
+        AsynchronousExecuteAptGetCommand($hash);
     }
     else {
         my $list = "";
+        $list .= " getDistribution:noArg"
+          unless ( ReadingsVal( $name, 'os-release_language', 'none' ) eq 'none' );
         $list .= " showUpgradeList:noArg"
           if ( defined( $hash->{".fhem"}{aptget}{packages} )
             and scalar keys %{ $hash->{".fhem"}{aptget}{packages} } > 0 );
@@ -1134,6 +1141,7 @@ sub ToDay() {
     <li>showUpdatedList - Liste aller als letztes aktualisierter Pakete, von der alten Version zur neuen Version</li>
     <li>showWarningList - Liste der letzten Warnings</li>
     <li>showErrorList - Liste der letzten Fehler</li>
+    <li>getDistribution - fetch new distribution information</li>
     <br>
   </ul>
   <br><br>
