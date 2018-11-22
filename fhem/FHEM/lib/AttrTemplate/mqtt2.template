@@ -47,7 +47,7 @@ name:zigbee2mqtt_colorbulb_withoutColorTemp
 filter:TYPE=MQTT2_DEVICE
 par:NAMEINTHEBRIDGE;name of this device in the bridge;{ AttrVal("DEVICE","readingList","") =~ m,zigbee2mqtt/(.*):, ? $1 : undef }
 attr DEVICE icon hue_filled_white_and_color_e27_b22
-attr DEVICE stateFormat {sprintf(lc ReadingsVal("$name","state",0))}
+attr DEVICE stateFormat {lc ReadingsVal("$name","state",0)}
 attr DEVICE devStateIcon {devStateIcon255($name)}
 attr DEVICE webCmd toggle:on:off:brightness:color
 attr DEVICE setList \
@@ -72,6 +72,7 @@ name:sonoff_tasmota_1ch
 filter:TYPE=MQTT2_DEVICE
 par:COMMAND;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\btele(/.*)?/LWT:, ? "${1}cmnd$2" : undef }
 attr DEVICE stateFormat POWER1
+attr DEVICE eventMap { dev=>{ON=>'on',OFF=>'off'} }
 attr DEVICE setList \
   off:noArg    COMMAND/POWER1 0\
   on:noArg     COMMAND/POWER1 1\
@@ -83,6 +84,7 @@ attr DEVICE setList \
 name:sonoff_tasmota_2ch
 filter:TYPE=MQTT2_DEVICE
 par:COMMAND;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\btele(/.*)?/LWT:, ? "${1}cmnd/$2" : undef }
+attr DEVICE eventMap { dev=>{ON=>'on',OFF=>'off'} }
 attr DEVICE stateFormat POWER1
 attr DEVICE setList \
   off:noArg    COMMAND/POWER1 0\
@@ -91,6 +93,7 @@ attr DEVICE setList \
 attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2
 copy DEVICE DEVICE_CH2
 attr DEVICE_CH2 stateFormat POWER2
+attr DEVICE_CH2 eventMap { dev=>{ON=>'on',OFF=>'off'} }
 attr DEVICE_CH2 comment Channel 2 for DEVICE
 attr DEVICE_CH2 setList \
   off:noArg    COMMAND/POWER2 0\
