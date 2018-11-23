@@ -65,8 +65,8 @@ my %sensorMsg = (
     "071F"    => {"name" => "endSmoke",    "chan" => 5, "state" => "off"},      
     "0720"    => {"name" => "startMotion", "chan" => 5, "state" => "on"},
     "0721"    => {"name" => "endMotion",   "chan" => 5, "state" => "off"},
-    "0723"    => {"name" => "closeStart",  "chan" => 5, "state" => "on"},
-    "0724"    => {"name" => "closeEnd",    "chan" => 5, "state" => "off"},
+    "0723"    => {"name" => "opened",      "chan" => 5, "state" => "on"},
+    "0724"    => {"name" => "closed",      "chan" => 5, "state" => "off"},
     "0E01"    => {"name" => "off",         "chan" => 6, "state" => "Btn01"},
     "0E02"    => {"name" => "off",         "chan" => 6, "state" => "Btn02"},
     "0E03"    => {"name" => "on",          "chan" => 6, "state" => "Btn03"},        
@@ -1263,52 +1263,53 @@ DUOFERN_Parse($$)
     
     if (!(exists $sensorMsg{$id})) {
       Log3 $hash, 3, "DUOFERN unknown msg: $msg";
-    }
-    
-    my $chan = substr($msg, $sensorMsg{$id}{chan}*2 + 2 , 2);
-    $chan = "01" if ($code =~ m/^(61|70|71)..../);
-    
-    my @chans;
-    if ($sensorMsg{$id}{chan} == 5) {
-      my $chanCount = 5;
-      $chanCount = 4 if ($code =~ m/^(73)..../);
-      for(my $x=0; $x<$chanCount; $x++)  {
-        if((0x01<<$x) & hex($chan)) {
-          push(@chans, $x+1);
-        }  
-      }
     } else {
-      push(@chans, $chan);
-    }
     
-    if($code =~ m/^(65|69|74).*/) {
-      $def01 = $modules{DUOFERN}{defptr}{$code."00"};
-      if(!$def01) {
-        DoTrigger("global","UNDEFINED DUOFERN_$code"."_sensor DUOFERN $code"."00");
-        $def01 = $modules{DUOFERN}{defptr}{$code."00"};
-      }
-      $hash = $def01 if ($def01);
-    } 
-    
-    foreach (@chans) {
-      $chan = $_;
-      if($id =~ m/..(1A|18|19|01|02|03)/) {
-          if(($id =~ m/..1A/) || ($id =~ m/0E../) || ($code =~ m/^(A0|A2)..../)) {
-              readingsSingleUpdate($hash, "state", $sensorMsg{$id}{state}.".".$chan, 1);
-          } else {
-              readingsSingleUpdate($hash, "state", $sensorMsg{$id}{state}, 1);
-          }
-          readingsSingleUpdate($hash, "channel$chan", $sensorMsg{$id}{name}, 1);
+      my $chan = substr($msg, $sensorMsg{$id}{chan}*2 + 2 , 2);
+      $chan = "01" if ($code =~ m/^(61|70|71)..../);
+      
+      my @chans;
+      if (($sensorMsg{$id}{chan} == 5) && ($chan ne "00")) {
+        my $chanCount = 5;
+        $chanCount = 4 if ($code =~ m/^(73)..../);
+        for(my $x=0; $x<$chanCount; $x++)  {
+          if((0x01<<$x) & hex($chan)) {
+            push(@chans, $x+1);
+          }  
+        }
       } else {
-        if(($code !~ m/^(69|73).*/) || ($id =~ m/..(11|12)/)) {
-          $chan="";
+        push(@chans, $chan);
+      }
+      
+      if($code =~ m/^(65|69|74).*/) {
+        $def01 = $modules{DUOFERN}{defptr}{$code."00"};
+        if(!$def01) {
+          DoTrigger("global","UNDEFINED DUOFERN_$code"."_sensor DUOFERN $code"."00");
+          $def01 = $modules{DUOFERN}{defptr}{$code."00"};
         }
-        if($code =~ m/^(65|A5|AA|AB|AC)..../) {
-          readingsSingleUpdate($hash, "state", $sensorMsg{$id}{state}, 1);
-        }
-        
-        readingsSingleUpdate($hash, "event", $sensorMsg{$id}{name}.$chan, 1);
-      }        
+        $hash = $def01 if ($def01);
+      } 
+      
+      foreach (@chans) {
+        $chan = $_;
+        if($id =~ m/..(1A|18|19|01|02|03)/) {
+            if(($id =~ m/..1A/) || ($id =~ m/0E../) || ($code =~ m/^(A0|A2)..../)) {
+                readingsSingleUpdate($hash, "state", $sensorMsg{$id}{state}.".".$chan, 1);
+            } else {
+                readingsSingleUpdate($hash, "state", $sensorMsg{$id}{state}, 1);
+            }
+            readingsSingleUpdate($hash, "channel$chan", $sensorMsg{$id}{name}, 1);
+        } else {
+          if(($code !~ m/^(69|73).*/) || ($id =~ m/..(11|12)/)) {
+            $chan="";
+          }
+          if($code =~ m/^(65|A5|AA|AB|AC)..../) {
+            readingsSingleUpdate($hash, "state", $sensorMsg{$id}{state}, 1);
+          }
+          
+          readingsSingleUpdate($hash, "event", $sensorMsg{$id}{name}.$chan, 1);
+        }        
+      }
     }
   
   #Umweltsensor Wetter
