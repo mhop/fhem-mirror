@@ -83,7 +83,7 @@ attr DEVICE setList \
 # NOTE: a second device will be created for the second channel
 name:sonoff_tasmota_2ch
 filter:TYPE=MQTT2_DEVICE
-par:COMMAND;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\btele(/.*)?/LWT:, ? "${1}cmnd/$2" : undef }
+par:COMMAND;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\btele(/.*)?/LWT:, ? "${1}cmnd$2" : undef }
 attr DEVICE eventMap { dev=>{ON=>'on',OFF=>'off'} }
 attr DEVICE stateFormat POWER1
 attr DEVICE setList \
