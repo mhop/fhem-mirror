@@ -773,7 +773,7 @@ sub SSCam_Set($@) {
 	  my $rgdev = $prop?$prop:"RG.SSCam";
       
       my $rgdef = '<%it_camera>,<Kamera<br>On/Offline>,< >,<Status>,< >,<Bewegungs<br>erkennung>,< >,<letzte Aufnahme>,< >,<bel. Platz<br>(MB)>,< >,<letzte Aktualisierung>,< >,<Disable<br>Modul>,< >,<Image>'."\n". 
-                  'TYPE=SSCam:FILTER=MODEL!=SVS:Availability,<&nbsp;&nbsp;&nbsp;>,state,<&nbsp;&nbsp;&nbsp;>,CamMotDetSc,<&nbsp;&nbsp;&nbsp;>,CamLastRecTime,<&nbsp;&nbsp;&nbsp;>,UsedSpaceMB,<&nbsp;&nbsp;&nbsp;>,LastUpdateTime,<&nbsp;&nbsp;&nbsp;>,?!disable,<&nbsp;&nbsp;&nbsp;>,Record,?!Start,?!Stop'."\n". 
+                  'TYPE=SSCam:FILTER=MODEL!=SVS:Availability,<&nbsp;>,state,<&nbsp;>,CamMotDetSc,<&nbsp;>,CamLastRecTime,<&nbsp;>,UsedSpaceMB,<&nbsp;>,LastUpdateTime,<&nbsp;>,?!disable,<&nbsp;>,Record,?!Start,?!Stop'."\n". 
                   '< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >'."\n".
                   '< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >'."\n".
                   '< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >'."\n".
