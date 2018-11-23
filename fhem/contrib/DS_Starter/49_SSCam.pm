@@ -45,7 +45,7 @@ use HttpUtils;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
-  "7.4.0"  => "20.11.2018  new set command \"createReadingsGroup\", versionNotes can process lists like \"2,6\" ",
+  "7.4.0"  => "20.11.2018  new set command \"createReadingsGroup\", versionNotes can process lists like \"2,6\", changed compatibility check ",
   "7.3.3"  => "18.11.2018  change rights decsption in commandRef ",
   "7.3.2"  => "12.11.2018  fix Warning in line 4954, set COMPATIBILITY to 8.2.2 ",
   "7.3.1"  => "31.10.2018  fix connection lost failure if several SSCamSTRM devices are defined and updated by longpoll from same parent device ",
@@ -211,7 +211,7 @@ our %SSCam_vHintsExt_de = (
 );
 
 # getestete SVS-Version
-my $compstat     = "8.2.2";
+my $compstat     = "8.2";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -639,6 +639,7 @@ sub SSCam_Set($@) {
       # setlist für SVS Devices
       $setlist = "Unknown argument $opt, choose one of ".
 	             "credentials ".
+				 "createReadingsGroup ".
 				 "extevent:1,2,3,4,5,6,7,8,9,10 ".
 		     	 ($hash->{HELPER}{APIHMMAXVER}?"homeMode:on,off ": "");
   }  
@@ -4979,7 +4980,7 @@ sub SSCam_camop_parse ($) {
                 }
                 
                 # Kompatibilitätscheck
-                my $avsc   = $major.$minor.(($small=~/\d/)?$small:0); 
+                my $avsc   = $major.$minor; 
                 my $avcomp = $hash->{COMPATIBILITY};
                 $avcomp    =~ s/\.//g;
                 
