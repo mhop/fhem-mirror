@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.3.003
+#  Version 4.3.004
 #
 #  (c) 2018 zap (zap01 <at> t-online <dot> de)
 #
@@ -788,7 +788,7 @@ sub HMCCUCHN_Get ($@)
       	<i>dp-list</i>. The result is stored in <i>reading</i>. For datapoints in <i>dp-list</i>
       	also variable notation is supported (for more information on variables see documentation of
       	attribute 'peer').<br/>
-      	The following <i>values</i> are supported:<br/>
+      	The following <i>value-types</i> are supported:<br/>
       	dewpoint = calculate dewpoint, <i>dp-list</i> = &lt;temperature&gt;,&lt;humidity&gt;<br/>
       	abshumidity = calculate absolute humidity, <i>dp-list</i> = &lt;temperature&gt;,&lt;humidity&gt;<br/>
       	equ = compare datapoint values. Result is "n/a" if values are not equal.<br/>

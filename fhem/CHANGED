@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  88_HMCCU: Some minor bugs fixed
   - bugfix:  42_XiaomiBTLESens: bugfix humidity reading
   - feature: 42_AptToDate: add new get command getDistribution to fetch
                            distribution info

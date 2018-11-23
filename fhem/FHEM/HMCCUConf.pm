@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.3
+#  Version 4.4
 #
 #  Configuration parameters for HomeMatic devices.
 #
@@ -58,6 +58,20 @@ use vars qw(%HMCCU_SCRIPTS);
 	statedatapoint   => "STATE",
 	substitute       => "STATE!0:closed,1:tilted,2:open;ERROR!0:no,1:sabotage"
 	},
+	"HmIP-SRH" => {
+	_description     => "Fenster Drehgriffkontakt",
+	_channels        => "1",
+	ccureadingfilter => "STATE",
+	statedatapoint   => "STATE",
+	substitute       => "STATE!0:closed,1:tilted,2:open"
+	},
+	"HmIP-SAM" => {
+	_description     => "Beschleunigungssensor",
+	_channels        => "1",
+	ccureadingfilter => "MOTION",
+	statedatapoint   => "MOTION",
+	substitute       => "MOTION!(0|false):no,(1|true):yes"
+	},
 	"HM-Sec-Key|HM-Sec-Key-S|HM-Sec-Key-O|HM-Sec-Key-Generic" => {
 	_description     => "Funk-Tuerschlossantrieb KeyMatic",
 	_channels        => "1",
@@ -89,7 +103,7 @@ use vars qw(%HMCCU_SCRIPTS);
 	webCmd           => "devstate",
 	widgetOverride   => "devstate:uzsuToggle,off,on"
 	},
-	"HMIP-PS" => {
+	"HmIP-PS" => {
 	_description     => "Steckdose",
 	_channels        => "3",
 	ccureadingfilter => "STATE",
@@ -468,6 +482,18 @@ use vars qw(%HMCCU_SCRIPTS);
 	statedatapoint   => "1.STATE",
 	substitute       => "STATE!0:closed,1:tilted,2:open;ERROR!0:no,1:sabotage"
 	},
+	"HMIP-SRH" => {
+	_description     => "Fenster Drehgriffkontakt",
+	ccureadingfilter => "STATE",
+	statedatapoint   => "1.STATE",
+	substitute       => "STATE!0:closed,1:tilted,2:open"
+	},
+	"HmIP-SAM" => {
+	_description     => "Beschleunigungssensor",
+	ccureadingfilter => "1.MOTION",
+	statedatapoint   => "1.MOTION",
+	substitute       => "MOTION!(0|false):no,(1|true):yes"
+	},
 	"HM-Sec-Key|HM-Sec-Key-S|HM-Sec-Key-O|HM-Sec-Key-Generic" => {
 	_description     => "Funk-Tuerschlossantrieb KeyMatic",
 	ccureadingfilter => "(STATE|INHIBIT)",
@@ -605,6 +631,14 @@ use vars qw(%HMCCU_SCRIPTS);
 	_description     => "Wandtaster 6-fach",
 	ccureadingfilter => "PRESS",
 	substitute       => "PRESS_SHORT,PRESS_LONG!(1|true):pressed,(0|false):released"
+	},
+	"HmIP-BSL" => {
+	_description     => "Schaltaktor mit Signalleuchte",
+	ccureadingfilter => "(LEVEL|STATE|COLOR|PRESS)",
+	ccuscaleval      => "LEVEL:0:1:0:100",
+	statedatapoint   => "4.STATE",
+	statevals        => "on:true,off:false",
+	substitute       => "STATE!(0|false):off,(1|true):on;COLOR!0:black,1:blue,2:green,3:turquoise,4:red,5:purple,6:yellow,7:white"
 	},
 	"HM-SwI-3-FM" => {
 	_description     => "Funk-Schalterschnittstelle",
@@ -980,7 +1014,7 @@ if (oPR) {
 		parameters  => 4,
 		code        => qq(
 object oSV = dom.GetObject("\$name");
-if (!oSV){
+if (!oSV) {
   object oSysVars = dom.GetObject(ID_SYSTEM_VARIABLES);
   oSV = dom.CreateObject(OT_VARDP);
   oSysVars.Add(oSV.ID());
@@ -1005,7 +1039,7 @@ else {
 		parameters  => 6,
 		code        => qq(
 object oSV = dom.GetObject("\$name");
-if (!oSV){   
+if (!oSV) {   
   object oSysVars = dom.GetObject(ID_SYSTEM_VARIABLES);
   oSV = dom.CreateObject(OT_VARDP);
   oSysVars.Add(oSV.ID());
@@ -1032,7 +1066,7 @@ else {
 		parameters  => 6,
 		code        => qq(
 object oSV = dom.GetObject("\$name");
-if (!oSV){   
+if (!oSV) {   
   object oSysVars = dom.GetObject(ID_SYSTEM_VARIABLES);
   oSV = dom.CreateObject(OT_VARDP);
   oSysVars.Add(oSV.ID());
@@ -1095,10 +1129,48 @@ if (oSV) {
 		code        => qq(
 object osysvar;
 string ssysvarid;
-foreach (ssysvarid, dom.GetObject(ID_SYSTEM_VARIABLES).EnumUsedIDs())
-{
+foreach (ssysvarid, dom.GetObject(ID_SYSTEM_VARIABLES).EnumUsedIDs()) {
    osysvar = dom.GetObject(ssysvarid);
-   WriteLine (osysvar.Name() # "=" # osysvar.Variable() # "=" # osysvar.Value());
+   Write(osysvar.Name());
+   if(osysvar.ValueSubType() == 6) {
+     Write ("=" # osysvar.AlType());
+   }
+   else {
+     Write ("=" # osysvar.Variable());
+   }
+   WriteLine ("=" # osysvar.Value());
+}
+		)
+	},
+	"GetVariablesExt" => {
+		description => "Query system variables",
+		syntax      => "",
+		parameters  => 0,
+		code        => qq(
+string sSysVarId;
+foreach (sSysVarId, dom.GetObject(ID_SYSTEM_VARIABLES).EnumUsedIDs()) {
+  object oSysVar = dom.GetObject(sSysVarId);
+  Write(oSysVar.Name());               
+  if (oSysVar.ValueSubType() == 6) {
+    Write(";" # oSysVar.AlType());
+  } else {
+    Write(";" # oSysVar.Variable());
+  }
+  Write(";" # oSysVar.Value() # ";");
+  if (oSysVar.ValueType() == 16) {
+    Write(oSysVar.ValueList());
+  }
+  Write(";" # oSysVar.ValueMin() # ";" # oSysVar.ValueMax());
+  Write(";" # oSysVar.ValueUnit() # ";" # oSysVar.ValueType() # ";" # oSysVar.ValueSubType());
+  Write(";" # oSysVar.DPArchive() # ";" # oSysVar.Visible());
+  Write(";" # oSysVar.Timestamp().ToInteger());
+  if (oSysVar.ValueType() == 2) {
+    Write(";" # oSysVar.ValueName0());
+  }
+  if (oSysVar.ValueType() == 2) {
+    Write(";" # oSysVar.ValueName1());
+  }
+  WriteLine("");
 }
 		)
 	},
@@ -1381,6 +1453,147 @@ lResult = system.Exec(lCommand,&lGetOut,&lGetErr);
 if(lResult == 0) {
   WriteLine(lGetOut);
 }
+		)
+	},
+	"GetServiceMessages" => {
+		description => "Read list of CCU service messages",
+		syntax      => "",
+		parameters  => 0,
+		code        => qq(
+integer c = 0;
+object oTmpArray = dom.GetObject(ID_SERVICES);
+if(oTmpArray) {
+  string sTmp;
+  string sdesc;
+  string stest;
+  foreach(sTmp, oTmpArray.EnumIDs()) {
+    object oTmp = dom.GetObject(sTmp);
+    if (oTmp) {
+      if(oTmp.IsTypeOf(OT_ALARMDP) && (oTmp.AlState() == asOncoming)) {
+        boolean collect = true;
+        object trigDP = dom.GetObject(oTmp.AlTriggerDP());
+        object och = dom.GetObject((trigDP.Channel()));
+        object odev = dom.GetObject((och.Device()));
+        var ival = trigDP.Value();
+        time sftime = oTmp.AlOccurrenceTime();
+        time sltime = oTmp.LastTriggerTime();
+        var sdesc = trigDP.HSSID();
+        var sserial = odev.Address();
+        string sAlarmMessage = web.webKeyFromStringTable(sdesc.Name());
+        if(!sAlarmMessage.Length()) {
+          sAlarmMessage = sdesc;
+        }
+        c = c+1;
+        WriteLine(sftime # ";" # sltime # ";" # sAlarmMessage # ";" # sserial);
+      }
+    }
+  }
+} 
+Write(c);
+		)
+	},
+	"GetAlarms" => {
+		description => "Read list of CCU alarm messages",
+		syntax      => "",
+		parameters  => 0,
+		code        => qq(
+integer c = 0;
+object oTmpArray = dom.GetObject( ID_SYSTEM_VARIABLES );
+if(oTmpArray) {
+  string sTmp;
+  foreach(sTmp,oTmpArray.EnumIDs()) {
+    object oTmp = dom.GetObject(sTmp);
+    if(oTmp) {
+      if(oTmp.IsTypeOf(OT_ALARMDP) && (oTmp.AlState() == asOncoming)) {
+         c = c+1;
+		   object oSV = oTmp;
+	      Write(oSV.AlOccurrenceTime());
+	     	Write(";" # oSV.Timestamp());
+	      object oDestDP = dom.GetObject( oSV.AlDestMapDP() );
+	      string sDestDPName = "";
+	      if(oDestDP) {
+	        sDestDPName = oDestDP.Name();
+	      }
+	      else {
+	        sDestDPName = "none";
+	      }
+	      Write(";" # sDestDPName);
+	      
+	      string sAlarmName = oSV.Name();
+	      if(!sAlarmName.Length()) {
+	        sAlarmName = "none";
+	      }
+	      Write(";" # sAlarmName);
+	      
+	      string sAlarmDescription = oSV.DPInfo();
+	      if(!sAlarmDescription.Length()) {
+	        sAlarmDescription = "none";
+	      }
+	      Write(";" # sAlarmDescription);
+	      
+	      string sRooms = "";
+	      string sLastTriggerName = "";
+	      string sLastTriggerMessage = "";
+	      string sLastTriggerKey = "";
+	      integer iTmpTriggerID = oSV.LastTriggerID();
+	      if(iTmpTriggerID == ID_ERROR) {
+	        iTmpTriggerID = oSV.AlTriggerDP();
+	      }
+	
+	      string sAlarmMessage = "";
+	      string sChannelName = "none";
+	      object oLastTrigger = dom.GetObject(iTmpTriggerID);
+	      if(oLastTrigger) {           
+	        object oLastTriggerChannel = dom.GetObject(oLastTrigger.Channel());
+	        if(oLastTriggerChannel) {
+	          sChannelName = oLastTriggerChannel.Name();
+             string sLastTriggerName = sChannelName;
+             string sRID;
+             foreach(sRID, oLastTriggerChannel.ChnRoom()) {
+               object oRoom = dom.GetObject(sRID);
+               if(oRoom) {
+                 sRooms = sRooms # "," # oRoom.Name();
+               }
+             }
+	          
+	          if(oLastTrigger.IsTypeOf(OT_HSSDP)) {
+	            string sLongKey = oLastTriggerChannel.ChnLabel()#"|"#oLastTrigger.HSSID();
+	            string sShortKey = oLastTrigger.HSSID();
+	            if((oLastTrigger.ValueType() == ivtInteger) && (oLastTrigger.ValueSubType() == istEnum)) {
+	              sLongKey = sLongKey#"="#web.webGetValueFromList( oLastTrigger.ValueList(), oSV.Value() );
+	              sShortKey = sShortKey#"="#web.webGetValueFromList( oLastTrigger.ValueList(), oSV.Value() );
+	            }
+	            sAlarmMessage = web.webKeyFromStringTable(sLongKey);
+	            if(!sAlarmMessage.Length()) {
+	              sAlarmMessage = web.webKeyFromStringTable(sShortKey);
+	              if(!sAlarmMessage.Length()) {
+	                sAlarmMessage = sShortKey;
+	              }
+	            }
+	          }
+	        }
+	      }
+	      else {
+	        if (oSV.IsTypeOf(OT_ALARMDP)) {
+	          if ((oSV.Value() == false) || (oSV.Value() == "")) {
+	            sAlarmMessage = oSV.ValueName0();
+	          }
+	          else {
+	            sAlarmMessage = oSV.ValueName1();
+	          }
+	        }
+	      }
+	      if(sRooms == "") {
+	        sRooms = "none";
+	      }
+	      
+	      Write(";" # sAlarmMessage # ";" # sRooms # ";" # sChannelName);
+	      WriteLine("");
+      }
+    }
+  }
+}
+Write(c);
 		)
 	}
 );

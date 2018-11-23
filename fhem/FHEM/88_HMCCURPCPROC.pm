@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 1.2
+#  Version 1.3
 #
 #  Subprocess based RPC Server module for HMCCU.
 #
@@ -35,7 +35,7 @@ use SetExtensions;
 ######################################################################
 
 # HMCCURPC version
-my $HMCCURPCPROC_VERSION = '1.2';
+my $HMCCURPCPROC_VERSION = '1.3';
 
 # Maximum number of events processed per call of Read()
 my $HMCCURPCPROC_MAX_EVENTS = 100;
@@ -52,16 +52,16 @@ my $HMCCURPCPROC_MAX_QUEUESEND = 70;
 # Time to wait after data processing loop in microseconds
 my $HMCCURPCPROC_TIME_WAIT = 100000;
 
-# Timeout for established CCU connection
+# Timeout for established CCU connection in seconds
 my $HMCCURPCPROC_TIMEOUT_CONNECTION = 1;
 
-# Timeout for TriggerIO()
+# Timeout for TriggerIO() in seconds
 my $HMCCURPCPROC_TIMEOUT_WRITE = 0.001;
 
-# Timeout for accepting incoming connections (0 = default)
+# Timeout for accepting incoming connections in seconds (0 = default)
 my $HMCCURPCPROC_TIMEOUT_ACCEPT = 1;
 
-# Timeout for incoming CCU events
+# Timeout for incoming CCU events in seconds
 my $HMCCURPCPROC_TIMEOUT_EVENT = 600;
 
 # Send statistic information after specified amount of events
@@ -73,13 +73,13 @@ my $HMCCURPCPROC_RPC_PORT_DEFAULT = 2001;
 # Default RPC server base port
 my $HMCCURPCPROC_SERVER_PORT = 5400;
 
-# Delay for RPC server start after FHEM is initialized
+# Delay for RPC server start after FHEM is initialized in seconds
 my $HMCCURPCPROC_INIT_INTERVAL0 = 12;
 
-# Delay for RPC server cleanup after stop
+# Delay for RPC server cleanup after stop in seconds
 my $HMCCURPCPROC_INIT_INTERVAL2 = 30;
 
-# Delay for RPC server functionality check after start
+# Delay for RPC server functionality check after start in seconds
 my $HMCCURPCPROC_INIT_INTERVAL3 = 25;
 
 # BinRPC data types
@@ -117,24 +117,25 @@ sub HMCCURPCPROC_SetState ($$);
 sub HMCCURPCPROC_ProcessEvent ($$);
 
 # RPC server control functions
-sub HMCCURPCPROC_GetRPCServerID ($$);
-sub HMCCURPCPROC_RegisterCallback ($$);
+sub HMCCURPCPROC_CheckProcessState ($$);
+sub HMCCURPCPROC_CleanupIO ($);
+sub HMCCURPCPROC_CleanupProcess ($);
 sub HMCCURPCPROC_DeRegisterCallback ($$);
+sub HMCCURPCPROC_GetRPCServerID ($$);
+sub HMCCURPCPROC_Housekeeping ($);
 sub HMCCURPCPROC_InitRPCServer ($$$$);
-sub HMCCURPCPROC_StartRPCServer ($);
+sub HMCCURPCPROC_IsRPCServerRunning ($);
+sub HMCCURPCPROC_IsRPCStateBlocking ($);
+sub HMCCURPCPROC_RegisterCallback ($$);
+sub HMCCURPCPROC_ResetRPCState ($);
+sub HMCCURPCPROC_RPCPing ($);
 sub HMCCURPCPROC_RPCServerStarted ($);
 sub HMCCURPCPROC_RPCServerStopped ($);
-sub HMCCURPCPROC_CleanupProcess ($);
-sub HMCCURPCPROC_CleanupIO ($);
-sub HMCCURPCPROC_TerminateProcess ($);
-sub HMCCURPCPROC_CheckProcessState ($$);
-sub HMCCURPCPROC_IsRPCServerRunning ($);
-sub HMCCURPCPROC_Housekeeping ($);
-sub HMCCURPCPROC_StopRPCServer ($);
 sub HMCCURPCPROC_SendRequest ($@);
 sub HMCCURPCPROC_SetRPCState ($$$$);
-sub HMCCURPCPROC_ResetRPCState ($);
-sub HMCCURPCPROC_IsRPCStateBlocking ($);
+sub HMCCURPCPROC_StartRPCServer ($);
+sub HMCCURPCPROC_StopRPCServer ($);
+sub HMCCURPCPROC_TerminateProcess ($);
 
 # Helper functions
 sub HMCCURPCPROC_GetAttribute ($$$$);
@@ -199,10 +200,10 @@ sub HMCCURPCPROC_Initialize ($)
 	
 	$hash->{parseParams} = 1;
 
-	$hash->{AttrList} = "ccuflags:multiple-strict,expert,reconnect,logEvents,ccuInit,queueEvents,noEvents".
+	$hash->{AttrList} = "ccuflags:multiple-strict,expert,reconnect,logEvents,ccuInit,queueEvents,noEvents,logPong".
 		" rpcMaxEvents rpcQueueSend rpcQueueSize rpcMaxIOErrors". 
 		" rpcServerAddr rpcServerPort rpcWriteTimeout rpcAcceptTimeout".
-		" rpcConnTimeout rpcStatistics rpcEventTimeout ".
+		" rpcConnTimeout rpcStatistics rpcEventTimeout rpcPingCCU ".
 		$readingFnAttributes;
 }
 
@@ -245,7 +246,7 @@ sub HMCCURPCPROC_Define ($$)
 		$rpcip = HMCCU_ResolveName ($hash->{host}, 'N/A');
 
 		# Find IO device
-		for my $d (keys %defs) {
+		foreach my $d (keys %defs) {
 			my $dh = $defs{$d};
 			next if (!exists ($dh->{TYPE}) || !exists ($dh->{NAME}));
 			next if ($dh->{TYPE} ne 'HMCCU');
@@ -299,7 +300,8 @@ sub HMCCURPCPROC_Define ($$)
 
 ######################################################################
 # Initialization of FHEM device.
-# Called during Define() or by HMCCU after CCU ready.
+# Called during Define() or by HMCCU during delayed initialization
+# after CCU ready.
 # Return 0 on successful initialization or >0 on error:
 # 1 = Invalid port or interface
 # 2 = Cannot assign IO device
@@ -319,7 +321,7 @@ sub HMCCURPCPROC_InitDevice ($$) {
 	return 1 if (!defined ($ifname) || !defined ($ifport));
 
 	# Check if RPC device with same interface already exists
-	for my $d (keys %defs) {
+	foreach my $d (keys %defs) {
 		my $dh = $defs{$d};
 		next if (!exists ($dh->{TYPE}) || !exists ($dh->{NAME}));
 		if ($dh->{TYPE} eq 'HMCCURPCPROC' && $dh->{NAME} ne $name && IsDisabled ($dh->{NAME}) != 1) {
@@ -354,10 +356,11 @@ sub HMCCURPCPROC_InitDevice ($$) {
 	
 	Log3 $name, 1, "HMCCURPCPROC: [$name] Initialized version $HMCCURPCPROC_VERSION for interface $ifname with I/O device $ioname";
 
-	# Set some attributes
+	# Set some attributes and start CCU ping
 	if ($init_done) {
 		$attr{$name}{stateFormat} = "rpcstate/state";
-		$attr{$name}{verbose} = 2;
+		$attr{$name}{verbose} = 2;+
+		HMCCURPCPROC_RPCPing ($dev_hash);
 	}
 
 	HMCCURPCPROC_ResetRPCState ($dev_hash);
@@ -420,10 +423,26 @@ sub HMCCURPCPROC_Attr ($@)
 		elsif ($attrname eq 'rpcServerAddr') {
 			$hash->{hmccu}{localaddr} = $attrval;
 		}
+		elsif ($attrname eq 'rpcPingCCU') {
+			if ($attrval > 0) {
+				if ($hash->{rpcinterface} =~ /^(BidCos-RF|BidCos-Wired|HmIP-RF)$/) {
+					InternalTimer (gettimeofday()+$attrval, "HMCCURPCPROC_RPCPing", $hash, 0);
+				}
+				else {
+					return "HMCCURPCPROC: [$name] RPC Ping not supported by interface ".$hash->{rpcinterface};
+				}
+			}
+			else {
+				RemoveInternalTimer ($hash, "HMCCURPCPROC_RPCPing");
+			}
+		}
 	}
 	elsif ($cmd eq 'del') {
 		if ($attrname eq 'rpcServerAddr') {
 			$hash->{hmccu}{localaddr} = $hash->{hmccu}{defaultaddr};
+		}
+		elsif ($attrname eq 'rpcPingCCU') {
+			RemoveInternalTimer ($hash, "HMCCURPCPROC_RPCPing");
 		}
 	}
 	
@@ -442,7 +461,8 @@ sub HMCCURPCPROC_Set ($@)
 	my $opt = shift @$a;
 
 	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
-	my $options = $ccuflags =~ /expert/ ? "cleanup:noArg deregister:noArg register:noArg rpcrequest rpcserver:on,off" : "";
+	my $options = $ccuflags =~ /expert/ ?
+		"cleanup:noArg deregister:noArg register:noArg rpcrequest rpcserver:on,off" : "";
 	my $busyoptions = $ccuflags =~ /expert/ ? "rpcserver:off" : "";
 
 	return "HMCCURPCPROC: CCU busy, choose one of $busyoptions"
@@ -782,22 +802,18 @@ sub HMCCURPCPROC_ProcessEvent ($$)
 	my $evttimeout = HMCCURPCPROC_GetAttribute ($hash, 'rpcEventTimeout', 'rpcevtimeout',
 		$HMCCURPCPROC_TIMEOUT_EVENT);
 
-	# Parse event
 	return undef if (!defined ($event) || $event eq '');
-	my @t = split (/\|/, $event);
-	my $et = shift @t;
-	my $clkey = shift @t;
-	my $tc = scalar (@t);
 
 	# Log event
 	Log3 $name, 2, "HMCCURPCPROC: [$name] CCUEvent = $event" if ($ccuflags =~ /logEvents/);
 
-	# Check event data
-	if (!defined ($clkey)) {
-		Log3 $name, 2, "HMCCURPCPROC: [$name] Syntax error in RPC event data";
+	# Detect event type and clkey
+	my ($et, $clkey, $evdata) = split (/\|/, $event, 3);
+	if (!defined ($evdata)) {
+		Log3 $name, 2, "HMCCURPCPROC: [$name] Syntax error in RPC event data $event";
 		return undef;
 	}
-	
+
 	# Check for valid server
 	if ($clkey ne $rpcname) {
 		Log3 $name, 2, "HMCCURPCPROC: [$name] Received $et event for unknown RPC server $clkey";
@@ -810,10 +826,14 @@ sub HMCCURPCPROC_ProcessEvent ($$)
 		Log3 $name, 2, "HMCCURPCPROC: [$name] Received unknown event from CCU: ".$et;
 		return undef;
 	}
+
+	# Parse event
+	my @t = split (/\|/, $evdata, $rpceventargs{$et});
+	my $tc = scalar (@t);
 	
 	# Check event parameters
 	if ($tc != $rpceventargs{$et}) {
-		Log3 $name, 2, "HMCCURPCPROC: [$name] Wrong number of parameters in event $event. Expected ". 
+		Log3 $name, 2, "HMCCURPCPROC: [$name] Wrong number of $tc parameters in event $event. Expected ". 
 			$rpceventargs{$et};
 		return undef;
 	}
@@ -832,7 +852,8 @@ sub HMCCURPCPROC_ProcessEvent ($$)
 		$rh->{sumdelay} += $delay;
 		$rh->{avgdelay} = $rh->{sumdelay}/$rh->{rec}{$et};
 		$hash->{ccustate} = 'active' if ($hash->{ccustate} ne 'active');
-		Log3 $name, 3, "HMCCURPCPROC: [$name] Received CENTRAL event. ".$t[2]."=".$t[3] if ($t[1] eq 'CENTRAL');
+		Log3 $name, 3, "HMCCURPCPROC: [$name] Received CENTRAL event from $clkey. ".$t[2]."=".$t[3]
+			if ($t[1] eq 'CENTRAL' && $t[3] eq $rpcname && $ccuflags =~ /logPong/);
 		my ($add, $chn) = split (/:/, $t[1]);
 		return defined ($chn) ? ($et, $clkey, $add, $chn, $t[2], $t[3]) : undef;
 	}
@@ -1474,7 +1495,7 @@ sub HMCCURPCPROC_CheckProcessState ($$)
 
 sub HMCCURPCPROC_IsRPCServerRunning ($)
 {
-	my ($hash, $cleanup) = @_;
+	my ($hash) = @_;
 	my $name = $hash->{NAME};
 	
 	Log3 $name, 2, "HMCCURPCPROC: [$name] Checking if RPC server process is running";
@@ -1562,6 +1583,7 @@ sub HMCCURPCPROC_SendRequest ($@)
 	my $rc;
 	
 	if (HMCCU_IsRPCType ($hmccu_hash, $port, 'A')) {
+		# Use XMLRPC
 		my $clurl = HMCCU_GetRPCServerInfo ($hmccu_hash, $port, 'url');
 		return HMCCU_Log ($hash, 2, "Can't get client URL for port $port", undef)
 			if (!defined ($clurl));
@@ -1572,6 +1594,7 @@ sub HMCCURPCPROC_SendRequest ($@)
 		Log3 $name, 2, "HMCCURPCPROC: [$name] RPC request error ".$RPC::XML::ERROR if (!defined ($rc));
 	}
 	elsif (HMCCU_IsRPCType ($hmccu_hash, $port, 'B')) {
+		# Use BINRPC
 		my $serveraddr = HMCCU_GetRPCServerInfo ($hmccu_hash, $port, 'host');
 		return HMCCU_Log ($hash, 2, "Can't get server address for port $port", undef)
 			if (!defined ($serveraddr));
@@ -1616,6 +1639,25 @@ sub HMCCURPCPROC_SendRequest ($@)
 	}
 	
 	return $rc;
+}
+
+######################################################################
+# Timer function for RPC Ping
+######################################################################
+
+sub HMCCURPCPROC_RPCPing ($)
+{
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+	
+	my $ping = AttrVal ($name, 'rpcPingCCU', 0);
+	if ($ping > 0) {
+		if ($init_done && HMCCURPCPROC_CheckProcessState ($hash, 'running')) {
+			my $clkey = 'CB'.$hash->{rpcport}.$hash->{rpcid};
+			HMCCURPCPROC_SendRequest ($hash, "ping", $clkey);
+		}
+		InternalTimer (gettimeofday()+$ping, "HMCCURPCPROC_RPCPing", $hash, 0);
+	}
 }
 
 ######################################################################
@@ -2690,6 +2732,7 @@ sub HMCCURPCPROC_DecodeResponse ($)
 			This flag is not supported by interfaces CUxD and HVL.<br/>
 			expert - Activate expert mode<br/>
 			logEvents - Events are written into FHEM logfile if verbose is 4<br/>
+			logPong - Write log message when receiving pong event if verbose level is at least 3.<br/>
 			noEvents - Ignore events from CCU, do not update client device readings.<br/>
 			queueEvents - Always write events into queue and send them asynchronously to FHEM.
 			Frequency of event transmission to FHEM depends on attribute rpcConnTimeout.<br/>
@@ -2716,6 +2759,11 @@ sub HMCCURPCPROC_DecodeResponse ($)
 	   	Specifiy maximum number of I/O errors allowed when sending events to FHEM before a 
 	   	message is written into FHEM log file. Default value is 100. Set this attribute to 0
 	   	to disable error counting.
+	   </li><br/>
+	   <li><b>rpcPingCCU &lt;interval&gt;</b><br/>
+	   	Send RPC ping request to CCU every <i>interval</i> seconds. If <i>interval</i> is 0
+	   	sending ping requests is disabled. If attribut ccuflags is set to logPong a log message
+	   	with level 3 is created when receiving a pong event.
 	   </li><br/>
 	   <li><b>rpcQueueSend &lt;events&gt;</b><br/>
 	      Maximum number of events sent to FHEM per accept loop. Default is 70. If set to 0

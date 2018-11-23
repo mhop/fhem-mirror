@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.3.007
+#  Version 4.3.008
 #
 #  Module for communication between FHEM and Homematic CCU2/3.
 #
@@ -108,7 +108,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.3.007';
+my $HMCCU_VERSION = '4.3.008';
 
 # Default RPC port (BidCos-RF)
 my $HMCCU_RPC_PORT_DEFAULT = 2001;
@@ -2883,7 +2883,7 @@ sub HMCCU_CreateDevice ($$$$$)
 	if (!defined ($sourceAddr)) {
 		# Search for type in device table
 		return 1 if (!defined ($newType));
-		for my $da (keys %{$hash->{hmccu}{dev}}) {
+		foreach my $da (keys %{$hash->{hmccu}{dev}}) {
 			if ($hash->{hmccu}{dev}{$da}{type} eq $newType) {
 				$sourceAddr = $da;
 				last;
@@ -4038,7 +4038,7 @@ sub HMCCU_GetDeviceInfo ($$$)
 	
 	$ccuget = HMCCU_GetAttribute ($hmccu_hash, $hash, 'ccuget', 'Value') if ($ccuget eq 'Attr');
 
-	for my $dev (@devlist) {
+	foreach my $dev (@devlist) {
 		my ($int, $add, $chn, $dpt, $nam, $flags) = HMCCU_ParseObject ($hmccu_hash, $dev, 0);
 		if ($flags == $HMCCU_FLAG_ADDRESS) {
 			$devname = HMCCU_GetDeviceName ($hmccu_hash, $add, '');
@@ -5078,12 +5078,12 @@ sub HMCCU_FindClientDevices ($$$$)
 }
 
 ######################################################################
-# Get name of assigned client device of type HMCCURPC or HMCCURPCPROC.
-# Create a RPC device of type HMCCURPC or HMCCURPCPROC if none is
-# found and parameter create is set to 1.
+# Get name of assigned client device of type HMCCURPCPROC.
+# Create a RPC device of type HMCCURPCPROC if none is found and
+# parameter create is set to 1.
 # Return (devname, create).
 # Return empty string for devname if RPC device cannot be identified
-# or created. Return create = 1 if device has been created and
+# or created. Return (devname,1) if device has been created and
 # configuration should be saved.
 ######################################################################
 
@@ -5170,6 +5170,10 @@ sub HMCCU_GetRPCDevice ($$$)
 			my %rpcdevattr = ('room' => 'copy', 'group' => 'copy', 'icon' => 'copy',
 				'stateFormat' => 'rpcstate/state', 'eventMap' => '/rpcserver on:on/rpcserver off:off/',
 				'verbose' => 2, 'alias' => $alias );
+			if ($ifname eq 'BidCos-RF') {
+				$rpcdevattr{'rpcPingCCU'} = 300;
+				$rpcdevattr{'ccuflags'} = 'reconnect';
+			}
 			foreach my $a (keys %rpcdevattr) {
 				my $v = $rpcdevattr{$a} eq 'copy' ? AttrVal ($name, $a, '') : $rpcdevattr{$a};
 				CommandAttr (undef, "$rpcdevname $a $v") if ($v ne '');
@@ -6215,7 +6219,7 @@ sub HMCCU_SetDatapoint ($$$)
 	}
 
 	if ($type eq 'HMCCUDEV' && $hash->{ccuif} eq 'fhem' && $hash->{ccutype} ne 'n/a' && exists ($hash->{ccugroup})) {
-		for my $gaddr (split (',', $hash->{ccugroup})) {
+		foreach my $gaddr (split (',', $hash->{ccugroup})) {
 			$cmd .= '(datapoints.Get("'.$int.'.'.$gaddr.':'.$chn.'.'.$dpt.'")).State('.$value.");\n";
 		}
 	}
@@ -7110,13 +7114,20 @@ sub HMCCU_CalculateReading ($$)
 		elsif ($vt eq 'avg') {
 			# Average value
 			next if ($pc < 1);
-			my $newval = shift @pars;
-			my $cnt = ReadingsVal ($name, $rn."_cnt", 0);
-			my $sum = ReadingsVal ($name, $rn."_sum", 0);
-			$cnt++;
-			$sum += $newval;
-			my $curval = $sum/$cnt;
-			push (@result, $rn."_cnt", $cnt, $rn."_sum", $sum, $rn, $curval);
+			if ($pc == 1) {
+				my $newval = shift @pars;
+				my $cnt = ReadingsVal ($name, $rn."_cnt", 0);
+				my $sum = ReadingsVal ($name, $rn."_sum", 0);
+				$cnt++;
+				$sum += $newval;
+				my $curval = $sum/$cnt;
+				push (@result, $rn."_cnt", $cnt, $rn."_sum", $sum, $rn, $curval);
+			}
+			else {
+				my $sum = 0;
+				foreach my $p (@pars) { $sum += $p; }
+				push (@result, $rn, $sum/scalar(@pars));
+			}
 		}
 		elsif ($vt eq 'sum') {
 			# Sum of values
@@ -7632,7 +7643,7 @@ sub HMCCU_CCURPC_NewDevicesCB ($$$)
 	my $msg = '';
 	
 	Log3 $name, 2, "CCURPC: $cb NewDevice received $devcount device specifications";	
-	for my $dev (@$a) {
+	foreach my $dev (@$a) {
 		my $msg = '';
 		if ($dev->{ADDRESS} =~ /:[0-9]{1,2}$/) {
 			$msg = "C|".$dev->{ADDRESS}."|".$dev->{TYPE}."|".$dev->{VERSION}."|null|null";
@@ -7660,7 +7671,7 @@ sub HMCCU_CCURPC_DeleteDevicesCB ($$$)
 	my $devcount = scalar (@$a);
 	
 	Log3 $name, 2, "CCURPC: $cb DeleteDevice received $devcount device addresses";
-	for my $dev (@$a) {
+	foreach my $dev (@$a) {
 		HMCCU_CCURPC_Write ("DD", $dev);
 	}
 
@@ -7704,7 +7715,7 @@ sub HMCCU_CCURPC_ReaddDevicesCB ($$$)
 	my $devcount = scalar (@$a);
 	
 	Log3 $name, 2, "CCURPC: $cb ReaddDevice received $devcount device addresses";
-	for my $dev (@$a) {
+	foreach my $dev (@$a) {
 		HMCCU_CCURPC_Write ("RA", $dev);
 	}
 
