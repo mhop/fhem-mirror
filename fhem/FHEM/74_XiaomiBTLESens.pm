@@ -35,7 +35,7 @@ package main;
 use strict;
 use warnings;
 
-my $version = "2.4.5";
+my $version = "2.4.6";
 
 sub XiaomiBTLESens_Initialize($) {
 
@@ -889,16 +889,8 @@ sub ThermoHygroSensHandle0x10($$) {
 
     $notification =~ s/\s+//g;
 
-#     print "Temperatur: " . pack( 'H*', substr( $notification, 4, 8 ) ) . "\n";
-# 
-# 
-#     print "Luftfeuchte: " . pack( 'H*', substr( $notification, 16, 8 ) ) . "\n" if ( scalar(@numberOfHex) == 13 and pack( 'H*', substr( $notification, 4, 8 ) ) < 10);
-#     
-#     print "Luftfeuchte: " . pack( 'H*', substr( $notification, 18, 8 ) ) . "\n" if ( scalar(@numberOfHex) == 14 or (scalar(@numberOfHex) == 13 and pack( 'H*', substr( $notification, 4, 8 ) )) > 9);
-
     $readings{'temperature'} = pack( 'H*', substr( $notification, 4, 8 ) );
-    $readings{'humidity'} = pack( 'H*', substr( $notification, (scalar(@numberOfHex) == 14 or (scalar(@numberOfHex) == 13 and $readings{'temperature'} > 9) ? 18 : 16), 8 ) );
-    #$readings{'humidity'} = pack( 'H*', substr( $notification, 18, 8 ) );
+    $readings{'humidity'} = pack( 'H*', substr( $notification, ( (scalar(@numberOfHex) == 14 or (scalar(@numberOfHex) == 13 and $readings{'temperature'} > 9)) ? 18 : 16 ), 8 ) );
 
     $hash->{helper}{CallBattery} = 0;
     return \%readings;
