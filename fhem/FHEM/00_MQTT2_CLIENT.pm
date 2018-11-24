@@ -159,24 +159,20 @@ sub
 MQTT2_CLIENT_Undef($@)
 {
   my ($hash, $arg) = @_;
-  RemoveInternalTimer($hash);
-  my $ond = AttrVal($hash->{NAME}, "msgBeforeDisconnect", "");
-  MQTT2_CLIENT_doPublish($hash, split(" ", $ond, 2), 0, 1) if($ond);
-  DevIo_SimpleWrite($hash, pack("C",0xE0).pack("C",0), 0); # DISCONNECT
-  DevIo_CloseDev($hash);
+  MQTT2_CLIENT_Disco($hash, 1);
   return undef;
 }
 
 sub
-MQTT2_CLIENT_Disco($)
+MQTT2_CLIENT_Disco($;$)
 {
-  my ($hash) = @_;
+  my ($hash, $isUndef) = @_;
   RemoveInternalTimer($hash);
-  $hash->{connecting} = 1;
+  $hash->{connecting} = 1 if(!$isUndef);
   my $ond = AttrVal($hash->{NAME}, "msgBeforeDisconnect", "");
-  MQTT2_CLIENT_doPublish($hash, split(" ", $ond, 2), 0, 0) if($ond);
-  addToWritebuffer($hash, pack("C",0xE0).pack("C",0)); # DISCONNECT
-  DevIo_Disconnected($hash);
+  MQTT2_CLIENT_doPublish($hash, split(" ", $ond, 2), 0, 1) if($ond);
+  DevIo_SimpleWrite($hash, pack("C",0xE0).pack("C",0), 0); # DISCONNECT
+  $isUndef ? DevIo_CloseDev($hash) : DevIo_Disconnected($hash);
 }
 
 
@@ -233,13 +229,14 @@ MQTT2_CLIENT_Set($@)
     my $tp = shift(@a);
     my $val = join(" ", @a);
     MQTT2_CLIENT_doPublish($hash, $tp, $val, $retain);
-  }
 
-  if($a[0] eq "password") {
+  } elsif($a[0] eq "password") {
     return "Usage: set $name password <password>" if(@a < 1);
-    setKeyValue($name, $a[1]);
+    setKeyValue($name, $a[1]); # will delete, if argument is empty
     MQTT2_CLIENT_Disco($hash) if($init_done);
+
   }
+  return undef;
 }
 
 my %cptype = (
@@ -473,6 +470,7 @@ MQTT2_CLIENT_getStr($$)
       </li><br>
     <li>password &lt;password&gt; value<br>
       set the password, which is stored in the FHEM/FhemUtils/uniqueID file.
+      If the argument is empty, the password will be deleted.
       </li>
   </ul>
   <br>
