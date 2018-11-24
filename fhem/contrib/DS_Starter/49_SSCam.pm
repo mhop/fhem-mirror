@@ -45,7 +45,7 @@ use HttpUtils;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
-  "7.4.0"  => "20.11.2018  new set command \"createReadingsGroup\", versionNotes can process lists like \"2,6\", changed compatibility check ",
+  "7.4.0"  => "24.11.2018  new set command \"createReadingsGroup\", versionNotes can process lists like \"2,6\", changed compatibility check, use SnapId when get information after took snapshot and sscam state-event ",
   "7.3.3"  => "18.11.2018  change rights decsption in commandRef ",
   "7.3.2"  => "12.11.2018  fix Warning in line 4954, set COMPATIBILITY to 8.2.2 ",
   "7.3.1"  => "31.10.2018  fix connection lost failure if several SSCamSTRM devices are defined and updated by longpoll from same parent device ",
@@ -3985,9 +3985,15 @@ sub SSCam_camop ($) {
 	  my $limit   = $hash->{HELPER}{SNAPLIMIT};
 	  my $imgsize = $hash->{HELPER}{SNAPIMGSIZE};
 	  my $keyword = $hash->{HELPER}{KEYWORD};
-	  Log3($name,4, "$name - Call getsnapinfo with params: Image numbers => $limit, Image size => $imgsize, Keyword => $keyword");
-      $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&keyword=\"$keyword\"&imgSize=\"$imgsize\"&limit=\"$limit\"&_sid=\"$sid\"";
-   
+      my $snapid  = ReadingsVal("$name", "LastSnapId", " ");
+      if($OpMode eq "getsnapinfo") {
+	      Log3($name,4, "$name - Call getsnapinfo with params: Image numbers => $limit, Image size => $imgsize, Id => $snapid");
+          $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&idList =\"$snapid\"&keyword=\"$keyword\"&imgSize=\"$imgsize\"&limit=\"$limit\"&_sid=\"$sid\"";      
+      } else {
+	      Log3($name,4, "$name - Call getsnapinfo with params: Image numbers => $limit, Image size => $imgsize, Keyword => $keyword");
+          $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&keyword=\"$keyword\"&imgSize=\"$imgsize\"&limit=\"$limit\"&_sid=\"$sid\"";
+      }
+      
    } elsif ($OpMode eq "getsnapfilename") {
       # der Filename der aktuellen Schnappschuß-ID wird ermittelt
       $snapid = ReadingsVal("$name", "LastSnapId", " ");
@@ -4642,9 +4648,10 @@ sub SSCam_camop_parse ($) {
 			} elsif ($OpMode eq "Snap") {
                 # ein Schnapschuß wurde aufgenommen
                 # falls Aufnahme noch läuft -> state = on setzen
-                SSCam_refresh($hash,0,0,0);     # kein Room-Refresh, kein SSCam-state-Event, kein SSCamSTRM-Event
+                SSCam_refresh($hash,0,1,0);     # kein Room-Refresh, SSCam-state-Event, kein SSCamSTRM-Event
                 
                 $snapid = $data->{data}{'id'};
+                readingsSingleUpdate($hash,"LastSnapId",$snapid, 0) if($snapid);
                 
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"Errorcode","none");
