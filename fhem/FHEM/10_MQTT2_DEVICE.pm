@@ -372,6 +372,7 @@ sub
 MQTT2_DEVICE_addReading($$)
 {
   my ($name, $param) = @_;
+  MQTT2_DEVICE_delReading($name);
   foreach my $line (split("\n", $param)) {
     my ($re,$code) = split(" ", $line,2);
     $modules{MQTT2_DEVICE}{defptr}{re}{$re}{$name} = $code if($re && $code);

@@ -378,14 +378,17 @@ HttpUtils_Connect($)
       $hash = $hash->{origHash} if($hash->{origHash});
       if($err) {
         HttpUtils_Close($hash);
+        Log3 $hash, $hash->{loglevel}, "HttpUtils: $err";
         return $hash->{callback}($hash, $err, "") ;
       }
-      Log 5, "IP: $host -> ".ip2str($iaddr);
+      Log3 $hash, $hash->{loglevel}, "IP: $host -> ".ip2str($iaddr);
       $hash->{conn} = length($iaddr) == 4 ?
                       IO::Socket::INET ->new(Proto=>'tcp', Blocking=>0) :
                       IO::Socket::INET6->new(Proto=>'tcp', Blocking=>0);
-      return $hash->{callback}($hash, "Creating socket: $!", "")
-              if(!$hash->{conn});
+      if(!$hash->{conn}) {
+        Log3 $hash, $hash->{loglevel}, "HttpUtils: Creating socket: $!";
+        return $hash->{callback}($hash, "Creating socket: $!", "");
+      }
       my $sa = length($iaddr)==4 ?  sockaddr_in($port, $iaddr) : 
                         Socket6::pack_sockaddr_in6($port, $iaddr);
       my $ret = connect($hash->{conn}, $sa);
@@ -406,11 +409,16 @@ HttpUtils_Connect($)
             my $errno = unpack("I",$packed);
             if($errno) {
               HttpUtils_Close($hash);
-              return $hash->{callback}($hash, "$host: ".strerror($errno), "");
+              my $msg = "$host: ".strerror($errno);
+              Log3 $hash, $hash->{loglevel}, "HttpUtils: $msg";
+              return $hash->{callback}($hash, $msg, "");
             }
 
             my $err = HttpUtils_Connect2($hash);
-            $hash->{callback}($hash, $err, "") if($err);
+            if($err) {
+              Log3 $hash, $hash->{loglevel}, "HttpUtils: $err";
+              $hash->{callback}($hash, $err, "");
+            }
             return $err;
           };
           $hash->{NAME}="" if(!defined($hash->{NAME}));#Delete might check it
@@ -421,7 +429,9 @@ HttpUtils_Connect($)
 
         } else {
           HttpUtils_Close($hash);
-          $hash->{callback}($hash, "connect to $hash->{addr}: $!", "");
+          my $msg = "connect to $hash->{addr}: $!";
+          Log3 $hash, $hash->{loglevel}, "HttpUtils: $msg";
+          $hash->{callback}($hash, $msg, "");
           return undef;
 
         }
@@ -434,8 +444,11 @@ HttpUtils_Connect($)
       IO::Socket::INET6->new(PeerAddr=>"$host:$port",Timeout=>$hash->{timeout}):
       IO::Socket::INET ->new(PeerAddr=>"$host:$port",Timeout=>$hash->{timeout});
 
-    return "$hash->{displayurl}: Can't connect(1) to $hash->{addr}: $@"
-      if(!$hash->{conn});
+    if(!$hash->{conn}) {
+      my $msg = "$hash->{displayurl}: Can't connect(1) to $hash->{addr}: $@";
+      Log3 $hash, $hash->{loglevel}, "HttpUtils: $msg";
+      return $msg;
+    }
   }
 
   return HttpUtils_Connect2($hash);
