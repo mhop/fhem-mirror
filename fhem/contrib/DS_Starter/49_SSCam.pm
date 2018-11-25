@@ -94,7 +94,8 @@ our %SSCam_vNotesIntern = (
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
-  "7.4.0"  => "20.11.2018 new command \"createReadingsGroup\". By this command a ReadingsGroup with a name of your choice (or use the default name) can be created. ",
+  "7.4.0"  => "20.11.2018 new command \"createReadingsGroup\". By this command a ReadingsGroup with a name of your choice (or use the default name) can be created. ".
+              "Procedure changes of taking snapshots avoid inaccuracies if camera names in SVS very similar. ",
   "7.3.2"  => "12.11.2018 fix Warning if 'livestreamprefix' is set to DEF, COMPATIBILITY set to 8.2.2 ",
   "7.3.0"  => "28.10.2018 In attribute \"livestreamprefix\" can now \"DEF\" be specified to overwrite livestream address by specification from device definition ",
   "7.2.1"  => "23.10.2018 COMPATIBILITY changed to 8.2.1 ",
@@ -773,22 +774,21 @@ sub SSCam_Set($@) {
 	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
 	  my $rgdev = $prop?$prop:"RG.SSCam";
       
-      my $rgdef = '<%it_camera>,<Kamera<br>On/Offline>,< >,<Status>,< >,<Bewegungs<br>erkennung>,< >,<letzte Aufnahme>,< >,<bel. Platz<br>(MB)>,< >,<letzte Aktualisierung>,< >,<Disable<br>Modul>,< >,<Image>'."\n". 
-                  'TYPE=SSCam:FILTER=MODEL!=SVS:Availability,<&nbsp;>,state,<&nbsp;>,CamMotDetSc,<&nbsp;>,CamLastRecTime,<&nbsp;>,UsedSpaceMB,<&nbsp;>,LastUpdateTime,<&nbsp;>,?!disable,<&nbsp;>,Record,?!Start,?!Stop'."\n". 
-                  '< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >'."\n".
-                  '< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >'."\n".
-                  '< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >'."\n".
-                  '<%it_server>,<HomeMode<br>On/Off>,<&nbsp;>,<Status>,<&nbsp;>,&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>'."\n".
-                  'TYPE=SSCam:FILTER=MODEL=SVS:HomeModeState,<&nbsp;>,state,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,?!disable,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>'."\n".
+      my $rgdef = '<%it_camera>,<Kamera<br>On/Offline>,< >,<Status>,< >,<Bewegungs<br>erkennung>,< >,<letzte Aufnahme>,< >,<bel. Platz<br>(MB)>,< >,<letzte Aktualisierung>,< >,<Disable<br>Modul>,< >,<Wiedergabe>'."\n". 
+                  'TYPE=SSCam:FILTER=MODEL!=SVS:Availability,<&nbsp;>,state,<&nbsp;>,CamMotDetSc,<&nbsp;>,CamLastRecTime,<&nbsp;>,UsedSpaceMB,<&nbsp;>,LastUpdateTime,<&nbsp;>,?!disable,<&nbsp;>,?!LSnap,?!LRec,?!Start,?!Stop'."\n". 
+                  '< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >'."\n".
+                  '< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >'."\n".
+                  '< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >'."\n".
+                  '<%it_server>,<HomeMode<br>On/Off>,<&nbsp;>,<Status>,<&nbsp;>,&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>'."\n".
+                  'TYPE=SSCam:FILTER=MODEL=SVS:HomeModeState,<&nbsp;>,state,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,?!disable,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>'."\n".
                   '';
       
       my $ret     = CommandDefine($hash->{CL},"$rgdev readingsGroup $rgdef");
 	  return $ret if($ret);
 	  
       my $room    = AttrVal($name,"room","SSCam");
-      
       CommandAttr($hash->{CL},"$rgdev room $room");
-      CommandAttr($hash->{CL},"$rgdev alias ReadingsGroup Kameras");
+      CommandAttr($hash->{CL},"$rgdev alias Überblick Kameras");
       
       my $cellStyle = '{'."\n". 
 	                  '  "c:0" => \'style="text-align:left;font-weight:normal"\','."\n".
@@ -806,6 +806,8 @@ sub SSCam_Set($@) {
                      '  "HomeModeState.off"     => "set $DEVICE homeMode on",'."\n".
                      '  "'.$rgdev.'.Start"      => "set %DEVICE runView live_fw",'."\n".
 					 '  "Start"                 => "set %DEVICE runView live_fw",'."\n".
+                     '  "LRec"                  => "set %DEVICE runView lastrec_fw",'."\n".
+                     '  "LSnap"                 => "set %DEVICE runView lastsnap_fw",'."\n".
                      '  "Stop"                  => "set %DEVICE stopView",'."\n".
                      '  "Record"                => "runView:",'."\n".
                      '  "disable"               => "disable:"'."\n".	
@@ -816,7 +818,7 @@ sub SSCam_Set($@) {
 	  CommandAttr($hash->{CL},"$rgdev nameStyle $nameStyle");
       
       my $valueColumns = '{'."\n".
-                         '  \'Image\' => \'colspan="3"\''."\n".	
+                         '  \'Wiedergabe\' => \'colspan="4"\''."\n".	
                          '}';
       CommandAttr($hash->{CL},"$rgdev valueColumns $valueColumns");
 	
@@ -830,7 +832,9 @@ sub SSCam_Set($@) {
                       '  "Availability.disabled" => "remotecontrol/black_btn_RED",'."\n".
                       '  "HomeModeState.on"      => "status_available",'."\n".
                       '  "HomeModeState.off"     => "status_away_1\@orange",'."\n".
-                      '  "Start"                 => "black_btn_MJPEG",'."\n".			  
+                      '  "Start"                 => "black_btn_MJPEG",'."\n".
+                      '  "LRec"                  => "black_btn_LASTRECIFRAME",'."\n". 
+                      '  "LSnap"                 => "black_btn_LSNAP",'."\n".                      
                       '  "Stop"                  => "remotecontrol/black_btn_POWEROFF3",'."\n".                     
                       '  "state.initialized"     => "remotecontrol/black_btn_STOP",'."\n".
                       '  "state"                 => "%devStateIcon"'."\n".
@@ -6895,7 +6899,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   A snapshot gallery will be created as a separate device (type SSCamSTRM). The device will be provided in 
   room "SnapGallery".
   With the "snapGallery..."-<a href="#SSCamattr">attributes</a> respectively the specific attributes of the SSCamSTRM-device
-  you are able to manipulate the properties of the new snapshot gallery device. <br> 
+  you are able to manipulate the properties of the new snapshot gallery device. 
+  <br><br>
+  
+  <b>Note</b> <br>
+  The camera names in Synology SVS should not be very similar, otherwise the retrieval of snapshots could come to inaccuracies.
+
   <br><br>
   </ul>
   
@@ -7346,6 +7355,11 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   command. <br>
   If you want create a snapgallery output by triggering, e.g. with an "at" or "notify", you should use the 
   <a href="#SSCamget">"get &lt;name&gt; snapGallery"</a> command instead of "set".
+  <br><br>
+  
+  <b>Note</b> <br>
+  The camera names in Synology SVS should not be very similar, otherwise the retrieval of snapshots could come to inaccuracies.
+
   </ul>
   <br><br>
   
@@ -7480,7 +7494,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
         <ul>
 		<b>Note:</b><br>
         Depended from quantity and resolution (quality) of the snapshot images adequate CPU and/or main memory
-		ressources are needed.
+		ressources are needed. The camera names in Synology SVS should not be very similar, otherwise the retrieval of 
+        snapshots could come to inaccuracies.
         </ul>
 		<br><br>
   
@@ -8229,7 +8244,14 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   Es wird eine Schnappschußgallerie als separates Device (Type SSCamSTRM) erzeugt. Das Device wird im Raum 
   "SnapGallery" erstellt.
   Mit den "snapGallery..."-<a href="#SSCamattr">Attributen</a> bzw. den spezifischen Attributen des erzeugten SSCamSTRM-Devices 
-  können die Eigenschaften der Schnappschußgallerie beeinflusst werden. <br> 
+  können die Eigenschaften der Schnappschußgallerie beeinflusst werden. 
+  <br><br>
+
+  <b>Hinweis</b> <br>
+  Die Namen der Kameras in der SVS sollten sich nicht stark ähneln, da es ansonsten zu Ungenauigkeiten beim Abruf der 
+  Schnappschußgallerie kommen kann.
+  <br>
+  
   <br><br>
   </ul>
   
@@ -8685,6 +8707,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   dargestellt. Alle weiteren Funktionen und Attribute entsprechen dem "get &lt;name&gt; snapGallery" Kommando. <br>
   Wenn die Ausgabe einer Schnappschußgalerie, z.B. über ein "at oder "notify", getriggert wird, sollte besser das  
   <a href="#SSCamget">"get &lt;name&gt; snapGallery"</a> Kommando anstatt "set" verwendet werden.
+  <br><br>
+  
+  <b>Hinweis</b> <br>
+  Die Namen der Kameras in der SVS sollten sich nicht stark ähneln, da es ansonsten zu Ungenauigkeiten beim Abruf der 
+  Schnappschußgallerie kommen kann.
+  
   </ul>
   <br><br>
   
@@ -8825,7 +8853,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
         <ul>
 		<b>Hinweis:</b><br>
         Abhängig von der Anzahl und Auflösung (Qualität) der Schnappschuß-Images werden entsprechend ausreichende CPU und/oder
-		RAM-Ressourcen benötigt.
+		RAM-Ressourcen benötigt. Die Namen der Kameras in der SVS sollten sich nicht stark ähneln, da es ansonsten zu 
+        Ungnauigkeiten beim Abruf der Schnappschußgallerie kommen kann.
         </ul>
 		<br><br>
   
