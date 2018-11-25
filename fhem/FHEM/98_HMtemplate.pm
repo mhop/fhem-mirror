@@ -49,6 +49,19 @@ my %HtState =(
                                                                             ]}
 );
 
+my %cmdDesc =(
+  select    =>{param=>["name"         ]  ,desc=>"choose a template for assign "}
+ ,dismiss   =>{param=>["-"            ]  ,desc=>"remove template selection (opposit of select)"}
+ ,defTmpl   =>{param=>["name"         ]  ,desc=>"define a new template"}
+ ,delete    =>{param=>["name"         ]  ,desc=>"delete a template"}
+ ,edit      =>{param=>["name"         ]  ,desc=>"edit a template"}
+ ,importReg =>{param=>["entity"       ]  ,desc=>"import register from a CUL_HM entity to start generatng a template"}
+ ,save      =>{param=>["-"            ]  ,desc=>"save the template"}
+ ,saveAs    =>{param=>["filename"     ]  ,desc=>"save the template under a new name"}
+ ,assign    =>{param=>["-"            ]  ,desc=>"assign the template to a CUL_HM entity defined in attributes"}
+ ,unassign  =>{param=>["entity","peer"]  ,desc=>"remove the template assignment from a CUL_HM entity"}
+);
+
 sub HMtemplate_Initialize($$) {################################################
   my ($hash) = @_;
 
@@ -263,7 +276,7 @@ sub HMtemplate_GetFn($@) {#####################################################
 
   $cmd = "?" if(!$cmd);# by default print options
   #------------ statistics ---------------
-  if($cmd eq "defineCmd"){##print protocol-events-------------------------
+  if   ($cmd eq "defineCmd"){##print protocol-events-------------------------
     my ($tN) = @a;
     return "template not given" if(!defined $tN);
     return "template unknown $tN" if(!defined $culHmTpl->{$tN});
@@ -274,7 +287,7 @@ sub HMtemplate_GetFn($@) {#####################################################
             ." ".join(" ",map{$_.=":".$culHmTpl->{$tN}{reg}{$_}} keys %{$culHmTpl->{$tN}{reg}})
             ;
   }  
-  elsif($cmd eq "regInfo"){##print protocol-events-------------------------
+  elsif($cmd eq "regInfo")  {##print protocol-events-------------------------
     my @regArr = map { $_ =~ s/Reg_//g; $_ } 
               grep /^Reg_/,keys %{$attr{$name}};
     if (InternalVal($name,"tpl_type","") =~ m/peer-(short|long)/){
@@ -282,9 +295,26 @@ sub HMtemplate_GetFn($@) {#####################################################
     }
     return CUL_HM_getRegInfo($name); # 
   }  
+  elsif($cmd eq "cmdList")  {##print protocol-events-------------------------
+    #select : choose a template to assign it to an entity
+    my %cmdInfo;
+    foreach my $s(keys %HtState){
+      foreach(@{$HtState{$s}{cmd}}){
+        $cmdInfo{$_}{state}{$HtState{$s}{name}} = 1;
+      }
+    }
+    my $ret = "under construction\n";
+    foreach(sort keys %cmdInfo){
+      $ret .= "\n  $_: $cmdDesc{$_}{desc}\n";
+      $ret .= "       param: ".join(", ",@{$cmdDesc{$_}{param}})."\n";
+      $ret .= "       available in state: ".join(",",sort keys %{$cmdInfo{$_}{state}});#join(",",sort keys %{$cmdInfo{$_}{state}});
+    }
+    return $ret; 
+  }  
   else{
     my @cmdLst = ( "defineCmd"
                   ,"regInfo"
+                  ,"cmdList"
                  );
 
     my $tList = ":".join(",",sort keys%{$culHmTpl});
@@ -309,7 +339,7 @@ sub HMtemplate_SetFn($@) {#####################################################
     return "$tName is not defined" if (! defined $culHmTpl->{$tName});
     ${$eSt} = "s0";
     if (eval "defined(&HMinfo_templateMark)"){
-      HMinfo_templateDef($tName,"del");
+      return HMinfo_templateDef($tName,"del");
     }
     else{
       return "HMInfo is not defined";
@@ -359,16 +389,10 @@ sub HMtemplate_SetFn($@) {#####################################################
     my @r = keys %{$culHmTpl->{$templ}{reg}};
 
     ################### maybe store type in template hash##########
-    my $tType;
-    foreach my $rN (@r){
-      if ($culHmRegDefLS->{$rN}){# template for short/long
-        $tType = "peer-Long";
-      }
-      elsif ($culHmRegDef->{$rN}){
-        if($culHmRegDef->{$rN}{l} eq 3){$tType = "peer-both"}
-        else{                           $tType = "basic"; }
-      }
-    }
+    # first reg is same as all. check if peer is required or it is used in 
+    my $tType = ($culHmRegDef->{$r[0]}{p} eq "n" ? "basic"
+               :($culHmRegDefLS->{$r[0]}         ? "peer-Long"
+                                                 : "peer-both"));
     ###################
     #### find matching entities ##########
     my @e = HMtemplate_sourceList($tType);
@@ -399,7 +423,7 @@ sub HMtemplate_SetFn($@) {#####################################################
       }
     }
   }
-  elsif ($cmd eq "assign" )    {# 
+  elsif ($cmd eq "assign" )   {# 
     my @p = split(" ",$culHmTpl->{$hash->{tpl_Name}}{p});## get params in correct order
     $_ = $attr{$name}{"tpl_param_$_"} foreach (@p);
     return HMinfo_templateSet( $attr{$name}{tpl_entity}
@@ -409,7 +433,7 @@ sub HMtemplate_SetFn($@) {#####################################################
                        ,@p
                         );
   }
-  elsif ($cmd eq "unassign" ) {# General - still open
+  elsif ($cmd eq "unassign" ) {# 
     my ($entityName,$entityPeer) = split(";",$a[0]);
 
     return HMinfo_templateDel( $entityName
@@ -476,7 +500,7 @@ sub HMtemplate_SetFn($@) {#####################################################
   elsif ($cmd eq "save" )     {#
     my $tName = $hash->{tpl_Name};                               
     if (eval "defined(&HMinfo_templateMark)"){
-      HMinfo_templateDef($tName,"del");# overwrite means: delete and write!
+      HMinfo_templateDef($tName,"delForce");# overwrite means: delete and write!
       return HMtemplate_save($name,$tName);
     }
     else{
@@ -515,14 +539,14 @@ sub HMtemplate_SetFn($@) {#####################################################
   $hash->{"tpl_Info".$i++}= $_ foreach (@{$HtState{${$eSt}}{info}});
   return $ret;
 }
-sub HMtemplate_intersection($$) {#
+sub HMtemplate_intersection($$) {##############################################
     my ($x, $y) = @_;
     my %seen;
     @seen{ @$x } = (1) x @$x;
     return grep { $seen{ $_} } @$y;
 }
 
-sub HMtemplate_import(@){####################################################
+sub HMtemplate_import(@){######################################################
   my ($name,$eName,$tType,$tPeer) = @_;
   my @regReads;
   my ($ty,$match) = ("","");
@@ -584,7 +608,7 @@ sub HMtemplate_init(@)  {#
   delete $attr{$name}{$_} foreach(grep /^tpl_/,keys %{$attr{$name}});#clean the settings  
   $modules{HMtemplate}{AttrList} = $hash->{helper}{attrList};
 }
-sub HMtemplate_noDup(@) {#return list with no duplicates###########################
+sub HMtemplate_noDup(@) {#return list with no duplicates#######################
   my %all;
   return "" if (scalar(@_) == 0);
   $all{$_}=0 foreach (grep {defined($_)} @_);
@@ -595,12 +619,13 @@ sub HMtemplate_noDup(@) {#return list with no duplicates########################
 sub HMtemplate_sourceList($){
   my $type = shift;
   my $match;
-  if   ($type =~ m/peer-(Long|Short|both)/){$match = "RegL_03"}
-  elsif($type eq "basic"                  ){$match = "RegL_(01|00)"}
+  if   ($type =~ m/peer-(Long|Short)/){$match = "RegL_03.*"}
+  elsif($type =~ m/peer/             ){$match = "RegL_..\..*"}
+  elsif($type eq "basic"             ){$match = "RegL_..\."}
   
   my @list;
   foreach my $e (devspec2array("TYPE=CUL_HM:FILTER=subType!=virtual")){
-    my @l1 = grep/$match/,CUL_HM_reglUsed($e);
+    my @l1 = grep/$match$/,CUL_HM_reglUsed($e);
     $_ = $e foreach(@l1);
     push @list,@l1;
   }
