@@ -2492,6 +2492,10 @@ sub HMinfo_templateDef(@){#####################################################
     delete $HMConfig::culHmTpl{$name};
     return;
   }
+  elsif ($param eq "delForce"){# delete unconditional
+    delete $HMConfig::culHmTpl{$name};
+    return;
+  }
   return "$name already defined, delete it first" if($HMConfig::culHmTpl{$name});
   if ($param eq "fromMaster"){#set hm templateDef <tmplName> fromMaster <master> <(peer:long|0)> <descr>
     my ($master,$pl) = ($desc,@regs);
