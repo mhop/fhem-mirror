@@ -678,12 +678,6 @@ sub BRAVIA_Define($$) {
     
     $hash->{helper}{HEADER} = 'X-CERS-DEVICE-ID: fhem_remote';
     
-    $hash->{name} = ReadingsVal($name, "name", "");
-
-    $hash->{model} = ReadingsVal($name, "model", "");
-
-    $hash->{generation} = ReadingsVal($name, "generation", "");
-
     unless ( defined( AttrVal( $name, "webCmd", undef ) ) ) {
         $attr{$name}{webCmd} = 'volume:channelUp:channelDown';
     }
@@ -1318,9 +1312,6 @@ sub BRAVIA_ProcessCommandData ($$) {
           readingsBulkUpdate( $hash, "country", $sysInfo->{region} );
           readingsBulkUpdate( $hash, "model", $sysInfo->{model} );
           readingsBulkUpdate( $hash, "macAddr", $sysInfo->{macAddr} );
-          $hash->{name} = $sysInfo->{name};
-          $hash->{model} = $sysInfo->{model};
-          $hash->{generation} = $sysInfo->{generation};
         } else {
           readingsBulkUpdate( $hash, "name", $return->{name} );
           readingsBulkUpdate( $hash, "generation", $return->{generation} );
@@ -1328,9 +1319,6 @@ sub BRAVIA_ProcessCommandData ($$) {
           readingsBulkUpdate( $hash, "language", $return->{language} );
           readingsBulkUpdate( $hash, "country", $return->{country} );
           readingsBulkUpdate( $hash, "model", $return->{modelName} );
-          $hash->{name} = $return->{name};
-          $hash->{model} = $return->{modelName};
-          $hash->{generation} = $return->{generation};
         }
         readingsEndUpdate( $hash, 1 );
       }

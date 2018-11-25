@@ -1,8 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
-  - feature: 49_SSCam: V7.4.0, new set command createReadingsGroup, change set
-                       snap to avoid insufficiency get snapinfo if camera
-                       are very similar in SVS
+  - bugfix:  70_BRAVIA: removed unnecessary internals name, generation, model
   - bugfix:  74_XiaomiBTLESens: fix humidity bug
   - bugfix:  88_HMCCU: Some minor bugs fixed
   - bugfix:  42_XiaomiBTLESens: bugfix humidity reading
