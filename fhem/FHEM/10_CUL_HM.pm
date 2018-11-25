@@ -516,6 +516,9 @@ sub CUL_HM_updateConfig($){
     CUL_HM_complConfig($name);
   }
   delete $modules{CUL_HM}{helper}{updtCfgLst};
+  
+  # my $ios = ":".join(",",devspec2array("TYPE=(TSCUL|CUL|HMLAN|HMUARTLGW)"));
+  # $modules{CUL_HM}{AttrList}  =~ s/IOList.*? /IOList$ios /;
 }
 sub CUL_HM_Define($$) {##############################
   my ($hash, $def) = @_;
@@ -824,6 +827,8 @@ sub CUL_HM_Attr(@) {#################################
     delete $hash->{helper}{rxType}; # needs new calculation
   }
   elsif($attrName eq "IOList"){
+    # my $ios = ":".join(",",devspec2array("TYPE=(TSCUL|CUL|HMLAN|HMUARTLGW)"));
+    # $modules{CUL_HM}{AttrList}  =~ s/IOList.*? /IOList$ios /;
     return "use $attrName only for vccu device" 
             if (!$hash->{helper}{role}{dev}
                 || AttrVal($name,"model","CCU-FHEM") !~ "CCU-FHEM");
@@ -3328,48 +3333,46 @@ sub CUL_HM_parseCommon(@){#####################################################
         CUL_HM_m_setCh($mhp,$rspWait->{forChn});
         my ($format,$data);
         ($format,$data) = ($1,$2) if ($mhp->{p} =~ m/^(..)(.*)/);
-        my $list = $rspWait->{forList};
-        $list = "00" if (!$list); #use the default
-        if    ($format eq "02"){ # list 2: format aa:dd aa:dd ...
-          $data =~ s/(..)(..)/ $1:$2/g;
-        }
-        elsif ($format eq "03"){ # list 3: format aa:dddd
-          my $addr;
-          my @dataList;
-          ($addr,$data) = (hex($1),$2) if ($data =~ m/(..)(.*)/);
-          if ($addr == 0){
-           $data = "00:00";
-           push @dataList,"00:00";
-          }
-          else{
-            $data =~ s/(..)/$1:/g;
-            foreach my $d1 (split(":",$data)){
-              push (@dataList,sprintf("%02X:%s",$addr++,$d1));
-            }
-            $data = join(" ",@dataList);
-          }
-        }
-        my $lastAddr;
-        $lastAddr = hex($1) if ($data =~ m/.*(..):..$/);
+        my $list = $rspWait->{forList} ? $rspWait->{forList} : "00";#use the default
         my $peer = $rspWait->{forPeer};
         my $regLNp = "RegL_".$list.".".$peer;# pure, no expert
         my $regLN = ($mhp->{cHash}{helper}{expert}{raw}?"":".").$regLNp;
-        if (   defined $lastAddr 
-            && (    $lastAddr > $rspWait->{nAddr}
-                 || $lastAddr == 0)){
-          CUL_HM_UpdtReadSingle($mhp->{cHash},$regLN,ReadingsVal($mhp->{cName},$regLN,"")." $data",0);
-          $rspWait->{nAddr} = $lastAddr;
+        delete $mhp->{cHash}{helper}{regCollect} if (        defined $mhp->{cHash}{helper}{regCollect} 
+                                                      && not defined $mhp->{cHash}{helper}{regCollect}{$regLN});
+
+        if    ($format eq "02"){ # list 2: format aa:dd aa:dd ...
+          $data =~ s/(..)(..)/ $1:$2/g;
+          foreach(split(" ",$data)){
+            my ($a,$d) = split(":",$_);
+            $mhp->{cHash}{helper}{regCollect}{$regLN}{$a} = $d;
+          }
+        }
+        elsif ($format eq "03"){ # list 3: format aa:dddd
+          my $addr;
+          ($addr,$data) = (hex($1),$2) if ($data =~ m/(..)(.*)/);
+          if ($addr == 0){
+           $mhp->{cHash}{helper}{regCollect}{$regLN}{'00'}='00';
+          }
+          else{
+            foreach my $d1 (unpack'(A2)*',$data){
+              $mhp->{cHash}{helper}{regCollect}{$regLN}{sprintf("%02X",$addr++)} = $d1;
+            }
+          }
         }
 
-        if ($data =~ m/00:00$/){ # this was the last message in the block
-          my $peerId = CUL_HM_peerChId($peer,$mhp->{devH}{DEF});
+        if ( defined $mhp->{cHash}{helper}{regCollect}{$regLN}{'00'}
+            &&       $mhp->{cHash}{helper}{regCollect}{$regLN}{'00'} eq "00"){ # this was the last message in the block
+          my $dat;
+          $dat .= " $_:".$mhp->{cHash}{helper}{regCollect}{$regLN}{$_} foreach(sort(keys%{$mhp->{cHash}{helper}{regCollect}{$regLN}}));
+          delete $mhp->{cHash}{helper}{regCollect}{$regLN};
+          CUL_HM_UpdtReadSingle($mhp->{cHash},$regLN,$dat,0);
           if($list eq "00"){
             push @evtEt,[$mhp->{devH},0,"PairedTo:".CUL_HM_getRegFromStore($mhp->{devN},"pairCentral",0,"")];
           }
           CUL_HM_respPendRm($mhp->{devH});
           delete $mhp->{cHash}{helper}{shadowReg}{$regLNp};   #rm shadow
           # peerChannel name from/for user entry. <IDorName> <deviceID> <ioID>
-          CUL_HM_updtRegDisp($mhp->{cHash},$list,$peerId);
+          CUL_HM_updtRegDisp($mhp->{cHash},$list,CUL_HM_peerChId($peer,$mhp->{devH}{DEF}));
         }
         else{
           CUL_HM_respPendToutProlong($mhp->{devH});#wasn't last - reschedule timer
@@ -3841,7 +3844,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
         @peerExe = CUL_HM_noDup(@peerExe);
         foreach my $peer(@peerExe){
           next if($peer eq "");
-          my $regVal= CUL_HM_getRegFromStore($name,$regName,0,$peer);#determine
+          my $regVal= CUL_HM_getRegFromStore($name,$regName,0,CUL_HM_name2Id($peer,$hash));#determine
           my $peerN = CUL_HM_id2Name($peer);
           $peerN = "      " if ($peer  eq "00000000");
           push @regValList,sprintf("   %d:%s\t%-16s :%s\n",
@@ -4423,7 +4426,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     $cHash->{helper}{partyReg} =~ s/(..)(..)/ $1:$2/g;
     if ($cHash->{READINGS}{"RegL_06."}){#remove old settings
       $cHash->{READINGS}{"RegL_06."}{VAL} =~ s/ 61:.*//;
-      $cHash->{READINGS}{"RegL_06."}{VAL} =~ s/ 00:00//;
+      $cHash->{READINGS}{"RegL_06."}{VAL} =~ s/00:00//;
+      $cHash->{READINGS}{"RegL_06."}{VAL} =~ s/ $//;
       $cHash->{READINGS}{"RegL_06."}{VAL} .= $cHash->{helper}{partyReg};
     }
     else{
@@ -4576,6 +4580,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
 
     my (undef,undef,$regName,$data,$peerChnIn) = @a;
+
     $state = "";
     my @regArr = CUL_HM_getRegN($st,$md,($roleD?"00":""),($roleC?$chn:""));
     
@@ -8324,7 +8329,9 @@ sub CUL_HM_getChnList($){ # get reglist assotioted with a channel
   my @mLstA = split(",",$culHmModel->{$devHash->{helper}{mId}}{lst});
   my $chRl = "";
 
-  if ($hash->{helper}{role}{dev}){
+  if    ($hash->{helper}{role}{vrt}){
+  }
+  elsif ($hash->{helper}{role}{dev}){
     $chRl = ",0";
     $chnN = ($hash->{helper}{role}{chn})? 1    # device is added. if we ar channel add this as well. 
                                         : "-";
@@ -8414,7 +8421,7 @@ sub CUL_HM_TCtempReadings($) {# parse TC temperature readings
   my @days = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
   $reg5 =~ s/.* 0B://;     #remove register up to addr 11 from list 5
   my $tempRegs = $reg5.$reg6;  #one row
-  $tempRegs =~ s/ 00:00/ /g;   #remove regline termination
+  $tempRegs =~ s/00:00//g;   #remove regline termination
   $tempRegs =~ s/ ..:/,/g;     #remove addr Info
   $tempRegs =~ s/ //g;         #blank
   my @Tregs = split(",",$tempRegs);
