@@ -28,7 +28,6 @@ package main;
 use strict;
 use warnings;
 use DevIo;
-use Math::Round qw/round/;
 
 my @tankList = undef;
 
@@ -222,7 +221,7 @@ sub HProtocolGateway_ParseMessage($$) {
     if ($sign eq "-") { $probe_offset = int($probe_offset) * -1 };
   
     my $volume_15C = $volume * (1 + 0.00084 * ( 15 - $temperature ));
-    $volume_15C = Math::Round::nearest('0.01',$volume_15C);
+    $volume_15C = sprintf("%.2f", $volume_15C);
     
     # Update all received readings
     HProtocolGateway_UpdateTankDevice($hash, $tankHash->{NAME}, "ullage", $ullage);
@@ -370,7 +369,7 @@ sub HProtocolGateway_Tank($$$) {
   foreach my $level (sort keys %TankChartHash) {
     if ($level ne "level" && $filllevel <= $level) {
       $volume = $volume1 + ($TankChartHash{$level} - $volume1) / ($level - $level1) * ($filllevel-$level1);
-      $volume = Math::Round::nearest('0.01',$volume);
+      $volume = sprintf("%.2f", $volume);
       last;
     }
     $level1 = $level;
