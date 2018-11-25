@@ -65,8 +65,8 @@ my %sensorMsg = (
     "071F"    => {"name" => "endSmoke",    "chan" => 5, "state" => "off"},      
     "0720"    => {"name" => "startMotion", "chan" => 5, "state" => "on"},
     "0721"    => {"name" => "endMotion",   "chan" => 5, "state" => "off"},
-    "0723"    => {"name" => "opened",      "chan" => 5, "state" => "on"},
-    "0724"    => {"name" => "closed",      "chan" => 5, "state" => "off"},
+    "0723"    => {"name" => "opened",      "chan" => 5, "state" => "opened"},
+    "0724"    => {"name" => "closed",      "chan" => 5, "state" => "closed"},
     "0E01"    => {"name" => "off",         "chan" => 6, "state" => "Btn01"},
     "0E02"    => {"name" => "off",         "chan" => 6, "state" => "Btn02"},
     "0E03"    => {"name" => "on",          "chan" => 6, "state" => "Btn03"},        
@@ -1300,14 +1300,19 @@ DUOFERN_Parse($$)
             }
             readingsSingleUpdate($hash, "channel$chan", $sensorMsg{$id}{name}, 1);
         } else {
+          my @state;
           if(($code !~ m/^(69|73).*/) || ($id =~ m/..(11|12)/)) {
             $chan="";
           }
-          if($code =~ m/^(65|A5|AA|AB|AC)..../) {
+          my $state = $sensorMsg{$id}{name}.$chan;
+          if($code =~ m/^(AC)..../ &&  substr($msg, 14, 2) eq "FE") {
+            readingsSingleUpdate($hash, "state", "tilted", 1);
+            $state = "tilted";
+          } elsif($code =~ m/^(65|A5|AA|AB|AC)..../) {
             readingsSingleUpdate($hash, "state", $sensorMsg{$id}{state}, 1);
           }
           
-          readingsSingleUpdate($hash, "event", $sensorMsg{$id}{name}.$chan, 1);
+          readingsSingleUpdate($hash, "event", $state, 1);
         }        
       }
     }
