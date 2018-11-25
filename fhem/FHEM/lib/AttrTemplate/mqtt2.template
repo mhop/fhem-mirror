@@ -43,7 +43,7 @@ attr DEVICE setList \
   brightness:colorpicker,BRI,0,15,255 zigbee2mqtt/NAMEINTHEBRIDGE/set {"state":"on","$EVTPART0":"$EVTPART1"}\
   color_temp:colorpicker,CT,250,1,454 zigbee2mqtt/NAMEINTHEBRIDGE/set {"$EVTPART0":"$EVTPART1"}
 
-name:zigbee2mqtt_colorbulb_withoutColorTemp
+name:zigbee2mqtt_colorbulbWithoutColorTemp
 filter:TYPE=MQTT2_DEVICE
 par:NAMEINTHEBRIDGE;name of this device in the bridge;{ AttrVal("DEVICE","readingList","") =~ m,zigbee2mqtt/(.*):, ? $1 : undef }
 attr DEVICE icon hue_filled_white_and_color_e27_b22
@@ -56,11 +56,17 @@ attr DEVICE setList \
   brightness:colorpicker,BRI,0,15,255 zigbee2mqtt/NAMEINTHEBRIDGE/set {"state":"on","$EVTPART0":"$EVTPART1"}\
   color:colorpicker,RGB {"zigbee2mqtt/NAMEINTHEBRIDGE/set " . encode_json(convertRGBtoR_G_B($EVTPART1))}
 
-name:zigbee2mqtt_smoke_detector
+name:zigbee2mqtt_smokeDetector
 filter:TYPE=MQTT2_DEVICE
 par:NAMEINTHEBRIDGE;name of this device in the bridge;{ AttrVal("DEVICE","readingList","") =~ m,zigbee2mqtt/(.*):, ? $1 : undef }
 attr DEVICE icon secur_smoke_detector
 attr DEVICE stateFormat smoke
+
+name:zigbee2mqtt_hueMotionSensor
+filter:TYPE=MQTT2_DEVICE
+attr DEVICE stateFormat T: temperature_weather B: illuminance L: linkquality
+attr DEVICE userReadings temperature_weather { sprintf("%.1f",ReadingsVal("DEVICE","temperature","")+2.5) }
+
 
 ###########################################
 # TASMOTA
@@ -68,7 +74,7 @@ attr DEVICE stateFormat smoke
 # The regexp must handle
 # - tele/sonoff/LWT: => cmnd/sonoff/
 # - DVES_XXXXXX:/SmartHome/Esszimmer/Stehlampe/tele/LWT: => /SmartHome/Esszimmer/Stehlampe/cmnd/
-name:sonoff_tasmota_1ch
+name:sonoff_tasmota1channel
 filter:TYPE=MQTT2_DEVICE
 par:COMMAND;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\btele(/.*)?/LWT:, ? "${1}cmnd$2" : undef }
 attr DEVICE stateFormat {lc ReadingsVal("$name","POWER1","")}
@@ -80,7 +86,7 @@ attr DEVICE setList \
 
 # sonoff 2 channel device flashed with Tasmota.
 # NOTE: a second device will be created for the second channel
-name:sonoff_tasmota_2ch
+name:sonoff_tasmota2channel
 filter:TYPE=MQTT2_DEVICE
 par:COMMAND;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\btele(/.*)?/LWT:, ? "${1}cmnd$2" : undef }
 attr DEVICE eventMap { dev=>{'^(.*)POWER(.): OFF$'=>'$1POWER$2: off', '^(.*)POWER(.): ON$'=>'$1POWER$2: on'} }
@@ -97,3 +103,4 @@ attr DEVICE_CH2 setList \
   off:noArg    COMMAND/POWER2 0\
   on:noArg     COMMAND/POWER2 1\
   toggle:noArg COMMAND/POWER2 2
+
