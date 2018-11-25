@@ -71,8 +71,7 @@ attr DEVICE stateFormat smoke
 name:sonoff_tasmota_1ch
 filter:TYPE=MQTT2_DEVICE
 par:COMMAND;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\btele(/.*)?/LWT:, ? "${1}cmnd$2" : undef }
-attr DEVICE stateFormat POWER1
-attr DEVICE eventMap { dev=>{ON=>'on',OFF=>'off'} }
+attr DEVICE stateFormat {lc ReadingsVal("$name","POWER1","")}
 attr DEVICE setList \
   off:noArg    COMMAND/POWER1 0\
   on:noArg     COMMAND/POWER1 1\
@@ -84,16 +83,15 @@ attr DEVICE setList \
 name:sonoff_tasmota_2ch
 filter:TYPE=MQTT2_DEVICE
 par:COMMAND;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\btele(/.*)?/LWT:, ? "${1}cmnd$2" : undef }
-attr DEVICE eventMap { dev=>{ON=>'on',OFF=>'off'} }
-attr DEVICE stateFormat POWER1
+attr DEVICE eventMap { dev=>{'^(.*)POWER(.): OFF$'=>'$1POWER$2: off', '^(.*)POWER(.): ON$'=>'$1POWER$2: on'} }
+attr DEVICE stateFormat {lc ReadingsVal("$name","POWER1",0)}
 attr DEVICE setList \
   off:noArg    COMMAND/POWER1 0\
   on:noArg     COMMAND/POWER1 1\
   toggle:noArg COMMAND/POWER1 2
 attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2
 copy DEVICE DEVICE_CH2
-attr DEVICE_CH2 stateFormat POWER2
-attr DEVICE_CH2 eventMap { dev=>{ON=>'on',OFF=>'off'} }
+attr DEVICE_CH2 stateFormat {lc ReadingsVal("$name","POWER2","")}
 attr DEVICE_CH2 comment Channel 2 for DEVICE
 attr DEVICE_CH2 setList \
   off:noArg    COMMAND/POWER2 0\
