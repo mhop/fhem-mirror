@@ -38,7 +38,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "1.5";
+my $version = "1.6";
 
 #-- these we may get on request
 my %gets = (
@@ -54,7 +54,7 @@ my %setssw = (
   "off"           => "F",
   "on-for-timer"  => "T",
   "off-for-timer" => "E",
-  "config"        => "C",
+  "config"        => "K",
   "password"      => "W"
 );
 
@@ -62,6 +62,7 @@ my %setsrol = (
   "closed:noArg"  => "C",
   "open:noArg"    => "O",
   "stop:noArg"    => "S",
+  "config"        => "K",
   "password"      => "W",
   "pct:slider,0,1,100"           => "P" 
 ); 
@@ -70,6 +71,7 @@ my %shelly_models = (
     #(relays,rollers,meters)
     "shelly1" => [1,0,0,],
     "shelly2" => [2,1,1],
+    "shelly2beta" => [2,1,1],
     "shellyplug" => [1,0,1],
     "shelly4" => [4,0,4]
     );
@@ -134,7 +136,7 @@ sub Shelly_Define($$) {
   };
     
   $hash->{DURATION} = 0;
-  $hash->{MOVING} = 0;
+  $hash->{MOVING} = "stopped";
   delete $hash->{BLOCKED};
   $hash->{INTERVAL} = 60;
   
@@ -226,8 +228,8 @@ sub Shelly_Attr(@) {
     #}
   #---------------------------------------  
   }elsif ( ($cmd eq "set") && ($attrName =~ /mode/) ) {
-    if( $model ne "shelly2" ){
-      Log3 $name,1,"[Shelly_Attr] setting the mode attribute only works for model=shelly2";
+    if( $model !~ /shelly2.*/ ){
+      Log3 $name,1,"[Shelly_Attr] setting the mode attribute only works for model=shelly2[xxx]";
       return
     }
     if( $attrVal !~ /((relay)|(roller))/){
@@ -246,16 +248,16 @@ sub Shelly_Attr(@) {
   
   #---------------------------------------  
   }elsif ( ($cmd eq "set") && ($attrName eq "maxtime") ) {
-    if( ($model ne "shelly2") || ($mode ne "roller" ) ){
-      Log3 $name,1,"[Shelly_Attr] setting the maxtime attribute only works for model=shelly2 and mode=roller";
+    if( ($model !~ /shelly2.*/) || ($mode ne "roller" ) ){
+      Log3 $name,1,"[Shelly_Attr] setting the maxtime attribute only works for model=shelly2[xxx] and mode=roller";
       return
     }
     Shelly_configure($hash,"settings?maxtime=".$attrVal);
   
   #---------------------------------------  
   }elsif ( ($cmd eq "set") && ($attrName eq "pct100") ) {
-    if( ($model ne "shelly2") || ($mode ne "roller" ) ){
-      Log3 $name,1,"[Shelly_Attr] setting the pct100 attribute only works for model=shelly2 and mode=roller";
+    if( ($model !~ /shelly2.*/) || ($mode ne "roller" ) ){
+      Log3 $name,1,"[Shelly_Attr] setting the pct100 attribute only works for model=shelly2[xxx] and mode=roller";
       return
     }
     
@@ -302,7 +304,7 @@ sub Shelly_Get ($@) {
   }elsif($a[1] eq "registers") {
     my $txt = "relay";
     $txt = "roller"
-      if( ($model eq "shelly2") && ($mode eq "roller") );
+      if( ($model =~ /shelly2.*/) && ($mode eq "roller") );
     return $shelly_regs{$txt}."\n\nSet/Get these registers by calling set/get $name config &lt;registername&gt; [&lt;channel&gt;] &lt;value&gt;";
   
   #-- configuration register
@@ -321,7 +323,7 @@ sub Shelly_Get ($@) {
       return $msg;
     }
     my $pre = "settings/";
-    if( ($model eq "shelly2") && ($mode eq "roller") ){
+    if( ($model =~ /shelly2.*/) && ($mode eq "roller") ){
       $pre .= "roller/$chan?";
     }else{
       $pre .= "relay/$chan?";
@@ -365,13 +367,11 @@ sub Shelly_Set ($@) {
   
   #-- we have a Shelly 1,4 or ShellyPlug switch type device
   #-- or we have a Shelly 2 switch type device
-  if( ($model eq "shelly1") || ($model eq "shelly4") || ($model eq "shellyplug") || (($model eq "shelly2") && ($mode eq "relay")) ){ 
+  if( ($model eq "shelly1") || ($model eq "shelly4") || ($model eq "shellyplug") || (($model =~ /shelly2.*/) && ($mode eq "relay")) ){ 
     
     #-- WEB asking for command list 
     if( $cmd eq "?" ) {   
       $newkeys = join(" ", sort keys %setssw);
-      #$newkeys =~ s/on\s/on:0,1 /;
-      #$newkeys =~ s/off\s/off:0,1 /;
       return "[Shelly_Set] Unknown argument " . $cmd . ", choose one of ".$newkeys;
     }
     
@@ -410,85 +410,95 @@ sub Shelly_Set ($@) {
     }
     
   #-- we have a Shelly 2 roller type device
-  }elsif( ($model eq "shelly2") && ($mode eq "roller") ){ 
+  }elsif( ($model =~ /shelly2.*/) && ($mode eq "roller") ){ 
     my $channel = $value;
     my $max=AttrVal($name,"maxtime",undef);  
     #-- WEB asking for command list 
     if( $cmd eq "?" ) {   
       $newkeys = join(" ", sort keys %setsrol);
+      if( $model eq "shelly2beta" ){
+        $newkeys .= " zero:noArg";
+      }
       return "[Shelly_Set] Unknown argument " . $cmd . ", choose one of ".$newkeys;
     }
     
-    if( $hash->{MOVING} ){
+    if( $cmd eq "zero" ) {   
+      Shelly_configure($hash,"rc");
+    }
+    
+    if( $hash->{MOVING} ne "stopped" ){
       $msg = "Error: roller blind still moving, wait for some time";
       Log3 $name,1,"[Shelly_Set] ".$msg;
       return $msg
     }
     
-    if( $cmd eq "closed" ){
-      Shelly_updown($hash,"?go=close");
-      $hash->{DURATION} = $max;
-    }elsif( $cmd eq "open" ){
-      Shelly_updown($hash,"?go=open");
-      $hash->{DURATION} = $max;
-    }elsif( $cmd eq "stop" ){
+     #-- open 100% or 0% ?
+     my $pctnormal = (AttrVal($name,"pct100","open") eq "open");
+    
+     if( $cmd eq "stop" ){
       Shelly_updown($hash,"?go=stop");
+      # -- estimate pos here ???
       $hash->{DURATION} = 0;
+    }elsif( $cmd eq "closed" ){
+      $hash->{MOVING} = "moving_down";
+      $hash->{DURATION} = $max;
+      $hash->{TARGETPCT} = $pctnormal ? 0 : 100;
+      Shelly_updown($hash,"?go=close");
+    }elsif( $cmd eq "open" ){
+      $hash->{MOVING} = "moving_up";
+      $hash->{DURATION} = $max;
+      $hash->{TARGETPCT} = $pctnormal ? 100 : 0;
+      Shelly_updown($hash,"?go=open");
     }elsif( $cmd eq "pct" ){
-      my $tpct = $value;
+      my $targetpct = $value;
       my $pos  = ReadingsVal($name,"position","");
-      my $pct  = ReadingsVal($name,"pct",undef); 
-      
-      if( !$max ){
-        $msg = "Error: pct value can be set only if maxtime attribute is set properly";
-        Log3 $name,1,"[Shelly_Set] ".$msg;
-        return $msg
-      }
-      my $normal = (AttrVal($name,"pct100","open") eq "open");
-      if( $pos eq "open" ){
-        #-- 100% = open
-        if($normal){
-          $time = int(($max*(100-$tpct))/10)/10;
-        }else{
-          $time = int(($max*$pct)/10)/10;
-        }
-        $cmd = "?go=close&duration=".$time; 
-      }elsif( $pos eq "closed" ){
-        #-- 100% = open
-        if($normal){
-          $time = int(($max*$tpct)/10)/10;
-        }else{
-          $time = int(($max*(100-$tpct))/10)/10;
-        }
-        $cmd = "?go=open&duration=".$time; 
-      }else{
-        if( !defined($pct) ){
-          $msg = "Error: current pct value unknown. Open or close roller blind before";
+      my $pct  = ReadingsVal($name,"pct",undef);  
+
+      #-- shelly2 cannot memorize position, commands are only "go"
+      if( $model eq "shelly2" ){ 
+        if( !$max ){
+          $msg = "Error: pct value can be set for model=shelly2 only if maxtime attribute is set properly";
           Log3 $name,1,"[Shelly_Set] ".$msg;
-          return $msg;
+          return $msg
         }
-        if( $tpct > $pct ){
-          $time = int(($max*($tpct-$pct))/10)/10;
-          #-- 100% = open
-          if($normal){
-            $cmd = "?go=open&duration=".$time; 
-          }else{ 
-            $cmd = "?go=close&duration=".$time; 
-          }  
+        if( $pos eq "open" ){
+          $time = int( ($pctnormal ? $max*(100-$targetpct) : $max*$targetpct)/10)/10;
+          $cmd  = "?go=close&duration=".$time; 
+          $hash->{MOVING} = "moving_down";
+        }elsif( $pos eq "closed" ){
+          $time = int( ($pctnormal ? $max*$targetpct : $max*(100-$targetpct))/10)/10;
+          $cmd  = "?go=open&duration=".int($time/10)/10; 
+          $hash->{MOVING} = "moving_up";
         }else{
-          $time = int(($max*($pct-$tpct))/10)/10;
-          #-- 100% = open
-          if($normal){
-            $cmd = "?go=close&duration=".$time;       
+          if( !defined($pct) || ($pct !~ /\d\d?\d?/) ){
+            $msg = "Error: current pct value unknown. Open or close roller blind before";
+            Log3 $name,1,"[Shelly_Set] ".$msg;
+            return $msg;
+          }
+          if( $targetpct > $pct ){
+            $time           = int( ($max*($targetpct-$pct))/10 )/10;
+            $cmd            = $pctnormal ? "?go=open&duration=".$time : "?go=close&duration=".$time;
+            $hash->{MOVING} = $pctnormal ? "moving_up" : "moving_down";
           }else{
-            $cmd = "?go=open&duration=".$time; 
-          }   
+            $time = int(($max*($pct-$targetpct))/10)/10;
+            $cmd  = $pctnormal ? "?go=close&duration=".$time : "?go=open&duration=".$time;
+            $hash->{MOVING} = $pctnormal ? "moving_down" : "moving_up";
+          }
         }
+      }else{
+        if( !$max ){
+          Log3 $name,1,"[Shelly_Set] please set the maxtime attribute for proper operation";
+          $max = 20;
+        }
+        $time           = int(abs($targetpct-$pct)/100*$max);
+        $cmd            = "?go=to_pos&roller_pos=".$targetpct;
+        $hash->{MOVING} = $pctnormal ? (($targetpct > $pct) ? "moving_up" : "moving_down") : (($targetpct > $pct) ? "moving_down" : "moving_up");
       }
-      $hash->{MOVING} = 1;
-      $hash->{DURATION} = $time;
+      $hash->{DURATION}  = $time;
+      $hash->{TARGETPCT} = $targetpct;
       Shelly_updown($hash,$cmd);
-    } 
+    }
+      
   }  
   
   #-- configuration register
@@ -570,7 +580,7 @@ sub Shelly_pwd($){
 
   if ( $hash && !$err && !$data ){
      $url    = "http://$creds".$hash->{TCPIP}."/".$cmd;
-     Log3 $name, 5,"[Shelly_configure] called with only hash  => Issue a non-blocking call to $url";  
+     Log3 $name, 5,"[Shelly_configure] Issue a non-blocking call to $url";  
      HttpUtils_NonblockingGet({
         url      => $url,
         callback=>sub($$$){ Shelly_configure($hash,$cmd,$_[1],$_[2]) }
@@ -619,7 +629,7 @@ sub Shelly_pwd($){
     
   if ( $hash && !$err && !$data ){
      $url    = "http://$creds".$hash->{TCPIP}."/status";
-     Log3 $name, 5,"[Shelly_status] called with only hash  => Issue a non-blocking call to $url";  
+     Log3 $name, 5,"[Shelly_status] Issue a non-blocking call to $url";  
      HttpUtils_NonblockingGet({
         url      => $url,
         callback=>sub($$$){ Shelly_status($hash,$_[1],$_[2]) }
@@ -652,14 +662,15 @@ sub Shelly_pwd($){
   my $channels = $shelly_models{$model}[0];
   my $rollers  = $shelly_models{$model}[1];
   my $meters   = $shelly_models{$model}[2];
-  my ($subs,$ison,$overpower,$power,$rstate,$rpower,$rstopreason,$rlastdir);
+  
+  my ($subs,$ison,$overpower,$rpower,$rstate,$power,$rstopreason,$rcurrpos,$position,$rlastdir,$pct,$pctnormal);
   
   readingsBeginUpdate($hash);
   readingsBulkUpdateIfChanged($hash,"state","OK");
   readingsBulkUpdateIfChanged($hash,"network","connected",1);
   
   #-- we have a Shelly 1, Shelly 4, Shelly 2  or ShellyPlug switch type device
-  if( ($model eq "shelly1") || ($model eq "shellyplug") || ($model eq "shelly4") || (($model eq "shelly2") && ($mode eq "relay")) ){
+  if( ($model eq "shelly1") || ($model eq "shellyplug") || ($model eq "shelly4") || (($model =~ /shelly2.*/) && ($mode eq "relay")) ){
     for( my $i=0;$i<$channels;$i++){
       $subs = (($channels == 1) ? "" : "_".$i);
       $ison       = $jhash->{'relays'}[$i]{'ison'};
@@ -671,51 +682,77 @@ sub Shelly_pwd($){
       readingsBulkUpdateIfChanged($hash,"overpower".$subs,$overpower);
     }
     for( my $i=0;$i<$meters;$i++){
-      $subs = ($meters == 1) ? "" : "_".$i;
-      $power       = $jhash->{'meters'}[$i]{'power'};
+      $subs  = ($meters == 1) ? "" : "_".$i;
+      $power = $jhash->{'meters'}[$i]{'power'};
       readingsBulkUpdateIfChanged($hash,"power".$subs,$power);
     }
     
   #-- we have a Shelly 2 roller type device
-  }elsif( ($model eq "shelly2") && ($mode eq "roller") ){ 
-   #-- reset blocking due to existing movement
-    $hash->{MOVING} = 0;
-    $hash->{DURATION} = 0;
+  }elsif( ($model =~ /shelly2.*/) && ($mode eq "roller") ){ 
     for( my $i=0;$i<$rollers;$i++){
       $subs = ($rollers == 1) ? "" : "_".$i;
+      
+      #-- weird data: stop, close or open
       $rstate       = $jhash->{'rollers'}[$i]{'state'};
-      $rstate =~ s/close/closed/;
-      $rpower = $jhash->{'rollers'}[$i]{'power'};
-      $rstopreason = $jhash->{'rollers'}[$i]{'stop_reason'};
+      $rstate =~ s/stop/stopped/;
+      $rstate =~ s/close/moving_down/;
+      $rstate =~ s/open/moving_up/;
+      $hash->{MOVING}   = $rstate;
+      $hash->{DURATION} = 0;
+      
+      #-- weird data: close or open
       $rlastdir = $jhash->{'rollers'}[$i]{'last_direction'};
       $rlastdir =~ s/close/down/;
       $rlastdir =~ s/open/up/;
       
-      my $pct;
-      #-- renormalize position
-      my $normal = (AttrVal($name,"pct100","open") eq "open");
-      if( $rstate eq "open" ){
-        #-- 100% = open in case normal
-        $pct = $normal?100:0;
-      }elsif( $rstate eq "closed" ){
-        #-- 100% = open in case normal
-        $pct = $normal?0:100;
+      $rpower = $jhash->{'rollers'}[$i]{'power'};
+      $rstopreason = $jhash->{'rollers'}[$i]{'stop_reason'};
+      
+      #-- open 100% or 0% ?
+      $pctnormal = (AttrVal($name,"pct100","open") eq "open");
+      
+       #-- possibly no data
+      $rcurrpos = $jhash->{'rollers'}[$i]{'current_pos'};  
+      
+      #-- we have data from the device, take that one 
+      if( defined($rcurrpos) && ($rcurrpos =~ /\d\d?\d?/) ){
+        Log3 $name,1,"[Shelly_status] device $name with model=shelly2 returns a blind position, consider chosing a different model=shelly2[xxx]"
+          if( $model eq "shelly2" );
+        $pct = $pctnormal ? $rcurrpos : 100-$rcurrpos;
+        $position = ($rcurrpos==100) ? "open" : ($rcurrpos==0 ? "closed" : $pct);        
+
+      #-- we have no data from the device 
       }else{
-       $pct = ReadingsVal($name,"pct",undef);
-       $pct = "unknown"
-         if( !defined($pct) );
+        Log3 $name,1,"[Shelly_status] device $name with model=$model returns no blind position, consider chosing a different model=shelly2"
+          if( $model ne "shelly2" ); 
+        $pct = ReadingsVal($name,"pct",undef);
+        #-- we have a reading
+        if( defined($pct) && $pct =~ /\d\d?\d?/ ){    
+          $rcurrpos = $pctnormal ? $pct : 100-$pct;
+          $position = ($rcurrpos==100) ? "open" : ($rcurrpos==0 ? "closed" : $pct);    
+        #-- we have no reading
+        }else{
+          if( $rstate eq "stopped" && $rstopreason eq "normal"){
+            if($rlastdir eq "up" ){
+              $rcurrpos = 100;
+              $pct      = $pctnormal?100:0;
+              $position = "open"
+            }else{
+              $rcurrpos = 0;
+              $pct      = $pctnormal?0:100;
+              $position = "closed";
+            }
+          }
+        }
       }
       
-      #-- just in case we have leftover readings from relay devices
-      #fhem("deletereading ".$name." channel.*");
-      #fhem("deletereading ".$name." overpower.*");
-      
-      readingsBulkUpdateIfChanged($hash,"position".$subs,$rstate);
+      readingsBulkUpdateIfChanged($hash,"state".$subs,$rstate);
+      readingsBulkUpdateIfChanged($hash,"pct".$subs,$pct);
+      readingsBulkUpdateIfChanged($hash,"position".$subs,$position);
       readingsBulkUpdateIfChanged($hash,"power".$subs,$rpower);
       readingsBulkUpdateIfChanged($hash,"stop_reason".$subs,$rstopreason);
       readingsBulkUpdateIfChanged($hash,"last_dir".$subs,$rlastdir);
-      readingsBulkUpdateIfChanged($hash,"pct".$subs,$pct);
-     }
+    }
   }
   #-- common to all Shelly models
   my $hasupdate = $jhash->{'update'}{'has_update'};
@@ -750,7 +787,7 @@ sub Shelly_pwd($){
 
 ########################################################################################
 #
-# Shelly_updown - Move rollere blind
+# Shelly_updown - Move roller blind
 #                 acts as callable program Shelly_updown($hash,$cmd)
 #                 and as callback program  Shelly_updown($hash,$cmd,$err,$data)
 # 
@@ -776,7 +813,7 @@ sub Shelly_pwd($){
     
   if ( $hash && !$err && !$data ){
      $url    = "http://$creds".$hash->{TCPIP}."/roller/0".$cmd;
-     Log3 $name, 5,"[Shelly_updown] called with only hash  => Issue a non-blocking call to $url";  
+     Log3 $name, 1,"[Shelly_updown] Issue a non-blocking call to $url";  
      HttpUtils_NonblockingGet({
         url      => $url,
         callback=>sub($$$){ Shelly_updown($hash,$cmd,$_[1],$_[2]) }
@@ -792,7 +829,7 @@ sub Shelly_pwd($){
   my $json = JSON->new->utf8;
   my $jhash = eval{ $json->decode( $data ) };
   if( !$jhash ){
-    if( ($model eq "shelly2") && ($data =~ /Device mode is not roller!/) ){
+    if( ($model =~ /shelly2.*/) && ($data =~ /Device mode is not roller!/) ){
       Log3 $name,1,"[Shelly_updown] Device $name is not in roller mode";
       readingsSingleUpdate($hash,"state","Error",1);
       return
@@ -803,81 +840,33 @@ sub Shelly_pwd($){
     }
   }
   
-  my ($rstate,$rpower,$rstopreason,$rlastdir,$pct,$normal,$pctopen,$pctclose);
-  
-  #-- immediately after moving blind
+  #-- immediately after starting movement
   if( $cmd ne ""){
-    $rstate  = "moving";
-    $pct     = ReadingsVal($name,"pct",undef);
-    $normal  = (AttrVal($name,"pct100","open") eq "open");
-    $pctopen = ($normal && ($pct == 100)) || (!$normal && ($pct == 0));
-    $pctclose= ($normal && ($pct == 0)) || (!$normal && ($pct == 100));
-    #-- timer command
-    if( index($cmd,"&") ne "-1"){
-      my $max = AttrVal($name,"maxtime",undef);  
-      my $dir = substr($cmd,4,index($cmd,"&")-4);
-      my $dur = substr($cmd,index($cmd,"&")+10);
-      if( (!defined($pct) && ($dir eq "close")) || $pctopen ){
-        #-- 100% = open
-        if( $normal ){
-          $pct = 100-int((100*$dur)/$max);
-        }else{
-          $pct = int((100*$dur)/$max);
-        }
-      }elsif( $dir eq "close" ){
-        #-- 100% = open
-        if( $normal ){
-          $pct = $pct-int((100*$dur)/$max);
-        }else{
-          $pct = $pct+int((100*$dur)/$max);
-        }     
-      }elsif( (!defined($pct) && ($dir eq "open")) || $pctclose ){
-        #-- 100% = open
-        if( $normal ){
-          $pct = int((100*$dur)/$max);
-        }else{
-          $pct = 100-int((100*$dur)/$max);
-        }
-      }elsif( $dir eq "open" ){
-        #-- 100% = open
-        if( $normal ){
-          $pct = $pct+int((100*$dur)/$max);
-        }else{         
-          $pct = $pct-int((100*$dur)/$max);
-        }
-      }     
+    #-- open 100% or 0% ?
+    my $pctnormal = (AttrVal($name,"pct100","open") eq "open");
+    my $targetpct = $hash->{TARGETPCT};
+    my $targetposition =  $targetpct;
+    if( $targetpct == 100 ){
+      $targetposition = $pctnormal ? "open" : "closed";   
+    }elsif( $targetpct == 0 ){
+      $targetposition = $pctnormal ? "closed" : "open";  
     }
-    $pct = 0
-      if( $pct < 0);
-    $pct = 100
-      if( $pct > 100);
-      
     readingsBeginUpdate($hash);
-    readingsBulkUpdate($hash,"state","OK");
-    readingsBulkUpdate($hash,"position",$rstate);
-    readingsBulkUpdate($hash,"pct",$pct);
+    readingsBulkUpdate($hash,"state",$hash->{MOVING}); 
+    readingsBulkUpdate($hash,"pct",$targetpct);
+    readingsBulkUpdate($hash,"position",$targetposition);
     readingsEndUpdate($hash,1);
-    #-- Call us in 1 second again.
-    InternalTimer(gettimeofday()+ 1, "Shelly_updown", $hash,0);
-  #--after 1 second
-  }else{
-    $rstate = "moving";
-    $rpower = $jhash->{'power'};
-    $rstopreason = $jhash->{'stop_reason'};
-    $rlastdir = $jhash->{'last_direction'};
-    $rlastdir =~ s/close/down/;
-    $rlastdir =~ s/open/up/;
-    readingsBeginUpdate($hash);
-    readingsBulkUpdate($hash,"state","OK");
-    readingsBulkUpdate($hash,"position",$rstate);
-    readingsBulkUpdate($hash,"power",$rpower);
-    readingsBulkUpdate($hash,"stop_reason",$rstopreason);
-    readingsBulkUpdate($hash,"last_dir",$rlastdir);
-    readingsEndUpdate($hash,1);
-    #-- Call status after movement.
-    InternalTimer(gettimeofday()+int($hash->{DURATION}+0.5), "Shelly_status", $hash,0);
+    
+    #-- after 1 second call power measurement
+    InternalTimer(gettimeofday()+1, "Shelly_updown2", $hash,1);
   }
   return undef;
+}
+
+sub Shelly_updown2($){
+  my ($hash) =@_;
+  Shelly_meter($hash,0);
+  InternalTimer(gettimeofday()+$hash->{DURATION}, "Shelly_status", $hash,1);
 }
 
 ########################################################################################
@@ -904,7 +893,7 @@ sub Shelly_pwd($){
     
   if ( $hash && !$err && !$data ){
      $url    = "http://$creds".$hash->{TCPIP}."/relay/".$channel.$cmd;
-     Log3 $name, 1,"[Shelly_onoff] called with only hash  => Issue a non-blocking call to $url";  
+     Log3 $name, 5,"[Shelly_onoff] Issue a non-blocking call to $url";  
      HttpUtils_NonblockingGet({
         url      => $url,
         callback=>sub($$$){ Shelly_onoff($hash,$channel,$cmd,$_[1],$_[2]) }
@@ -920,7 +909,7 @@ sub Shelly_pwd($){
   my $json = JSON->new->utf8;
   my $jhash = eval{ $json->decode( $data ) };
   if( !$jhash ){
-    if( ($model eq "shelly2") && ($data =~ /Device mode is not relay!/) ){
+    if( ($model =~ /shelly2.*/) && ($data =~ /Device mode is not relay!/) ){
       Log3 $name,1,"[Shelly_onoff] Device $name is not in relay mode";
       readingsSingleUpdate($hash,"state","Error",1);
       return
@@ -962,8 +951,6 @@ sub Shelly_pwd($){
     if( $shelly_models{$model}[2] > 0);
   readingsEndUpdate($hash,1);
   
-  #InternalTimer(gettimeofday()+ 1, "Shelly_meter", $hash,0)
-  #  if( $shelly_models{$model}[2] > 0);
   #-- Call status after switch.
   InternalTimer(int(gettimeofday()+1.5), "Shelly_status", $hash,0);
 
@@ -990,11 +977,12 @@ sub Shelly_pwd($){
     if( $net ne "connected" );
    
   my $model =  AttrVal($name,"model","");
+    
   my $creds = Shelly_pwd($hash);
     
   if ( $hash && !$err && !$data ){
      $url    = "http://$creds".$hash->{TCPIP}."/meter/".$channel;
-     Log3 $name, 5,"[Shelly_meter] called with only hash  => Issue a non-blocking call to $url";  
+     Log3 $name, 1,"[Shelly_meter] Issue a non-blocking call to $url";  
      HttpUtils_NonblockingGet({
         url      => $url,
         callback=>sub($$$){ Shelly_meter($hash,$channel,$_[1],$_[2]) }
@@ -1005,7 +993,7 @@ sub Shelly_pwd($){
     readingsSingleUpdate($hash,"state","Error",1);
     return;
   }
-  Log3 $name, 5,"[Shelly_meter] has obtained data $data";
+  Log3 $name, 1,"[Shelly_meter] has obtained data $data";
     
   my $json = JSON->new->utf8;
   my $jhash = eval{ $json->decode( $data ) };
@@ -1053,23 +1041,26 @@ sub Shelly_pwd($){
                 <br />set the value of a configuration register</li>
         <li><a name="shelly_password">password &lt;password&gt;</a><br>This is the only way to set the password for the Shelly web interface</li>
         </ul>
-        For Shelly switching devices (mode=relay for model=shelly2, standard for all other models) 
+        For Shelly switching devices (mode=relay for model=shelly2[xxx], standard for all other models) 
         <ul>
             <li><a name="shelly_onoff"></a>
                 <code>set &lt;name&gt; on|off  [&lt;channel&gt;] </code>
-                <br />switches channel &lt;channel&gt; on or off. Only if model=shelly2/4: If the channel parameter is omitted, the module will switch the channel defined in the defchannel attribute.</li>
+                <br />switches channel &lt;channel&gt; on or off. Channel numbers are 0 and 1 for model=shelly2[xxx], 0..3 model=shelly4. If the channel parameter is omitted, the module will switch the channel defined in the defchannel attribute.</li>
             <li><a name="shelly_onofftimer"></a>
                 <code>set &lt;name&gt; on-for-timer|off-for-timer &lt;time&gt; [&lt;channel&gt;] </code>
-                <br />switches &lt;channel&gt; on or off for &lt;time&gt; seconds. Only if model=shelly2/4: If the channel parameter is omitted, the module will switch the channel defined in the defchannel attribute.</li>           
+                <br />switches &lt;channel&gt; on or off for &lt;time&gt; seconds. Channel numbers are 0 and 1 for model=shelly2[xxx], 0..3 model=shelly4.  If the channel parameter is omitted, the module will switch the channel defined in the defchannel attribute.</li>           
         </ul>
-        <br/>For Shelly roller blind devices (mode=roller for model=shelly2)  
+        <br/>For Shelly roller blind devices (mode=roller for model=shelly2[xxx])  
         <ul>
             <li><a name="shelly_updown"></a>
                 <code>set &lt;name&gt; open|closed|stop </code>
                 <br />drives the roller blind open, closed or to a stop.</li>      
             <li><a name="shelly_pct"></a>
                 <code>set &lt;name&gt; pct &lt;integer percent value&gt; </code>
-                <br />drives the roller blind to a partially closed position (100=open, 0=closed)</li>      
+                <br />drives the roller blind to a partially closed position (100=open, 0=closed)</li>    
+            <li><a name="shelly_zero"></a>
+                <code>set &lt;name&gt; zero </code>
+                <br />calibration of roller device (only for model=shelly2beta)</li>      
         </ul>
         <a name="Shellyget"></a>
         <h4>Get</h4>
@@ -1091,20 +1082,20 @@ sub Shelly_pwd($){
         <h4>Attributes</h4>
         <ul>
             <li><a name="shelly_shellyuser"><code>attr &lt;name&gt; shellyuser &lt;shellyuser&gt;</code><br>username for addressing the Shelly web interface</li>
-            <li><a name="shelly_model"><code>attr &lt;name&gt; model shelly1|shelly2|shelly4|shellyplug </code></a>
+            <li><a name="shelly_model"><code>attr &lt;name&gt; model shelly1|shelly2|shelly2beta|shelly4|shellyplug </code></a>
                 <br />type of the Shelly device</li>
-            <li><a name="shelly_mode"><code>attr &lt;name&gt; mode relay|roller (only for model=shelly2)</code></a>
+            <li><a name="shelly_mode"><code>attr &lt;name&gt; mode relay|roller (only for model=shelly2[xxx])</code></a>
                 <br />type of the Shelly device</li>
              <li><a name="shelly_interval">
                 <code>&lt;interval&gt;</code>
                 <br />Update interval for reading in seconds. The default is 60 seconds, a value of 0 disables the automatic update. </li>
         </ul>
-        <br/>For Shelly switching devices (mode=relay for model=shelly2, standard for all other models) 
+        <br/>For Shelly switching devices (mode=relay for model=shelly2[xxx], standard for all other models) 
         <ul>
-        <li><a name="shelly_defchannel"><code>attr &lt;name&gt; defchannel <integer> (only for model=shelly2|shelly4)</code></a>
-                <br />for multi-channel switches: Which channel will be switched, if a command is received without channel number</li>
+        <li><a name="shelly_defchannel"><code>attr &lt;name&gt; defchannel <integer> </code></a>
+                <br />only for model=shelly2[xxx]|shelly4or multi-channel switches: Which channel will be switched, if a command is received without channel number</li>
         </ul>
-        <br/>For Shelly roller blind devices (mode=roller for model=shelly2)
+        <br/>For Shelly roller blind devices (mode=roller for model=shelly2[xxx])
         <ul>
             <li><a name="shelly_maxtime"><code>attr &lt;name&gt; maxtime &lt;float&gt; </code></a>
                 <br />time needed for a complete drive upward or downward</li>
