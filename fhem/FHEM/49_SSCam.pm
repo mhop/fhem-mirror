@@ -45,6 +45,8 @@ use HttpUtils;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "7.4.0"  => "24.11.2018  new set command \"createReadingsGroup\", versionNotes can process lists like \"2,6\", changed compatibility check, use SnapId when get information after took snapshot and sscam state-event ",
+  "7.3.3"  => "18.11.2018  change rights decsption in commandRef ",
   "7.3.2"  => "12.11.2018  fix Warning in line 4954, set COMPATIBILITY to 8.2.2 ",
   "7.3.1"  => "31.10.2018  fix connection lost failure if several SSCamSTRM devices are defined and updated by longpoll from same parent device ",
   "7.3.0"  => "28.10.2018  usage of attribute \"livestreamprefix\" changed, exec SSCam_getStmUrlPath on boot ",
@@ -92,6 +94,8 @@ our %SSCam_vNotesIntern = (
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
+  "7.4.0"  => "20.11.2018 new command \"createReadingsGroup\". By this command a ReadingsGroup with a name of your choice (or use the default name) can be created. ".
+              "Procedure changes of taking snapshots avoid inaccuracies if camera names in SVS very similar. ",
   "7.3.2"  => "12.11.2018 fix Warning if 'livestreamprefix' is set to DEF, COMPATIBILITY set to 8.2.2 ",
   "7.3.0"  => "28.10.2018 In attribute \"livestreamprefix\" can now \"DEF\" be specified to overwrite livestream address by specification from device definition ",
   "7.2.1"  => "23.10.2018 COMPATIBILITY changed to 8.2.1 ",
@@ -173,6 +177,9 @@ our %SSCam_vNotesExtern = (
 
 # Hint Hash en
 our %SSCam_vHintsExt_en = (
+  "6" => "There are some Icons in directory www/images/sscam available for SSCam. Thereby the system can use the icons please do: <br>".
+         "- in FHEMWEB device attribute <b>iconPath</b> complete with \"sscam\", e.g.: attr WEB iconPath default:fhemSVG:openautomation:sscam <br>".
+		 "After that execute \"rereadicons\" or restart FHEM. ",
   "5" => "Find more Informations about manage users and the appropriate privilege profiles in ".
          "<a href=\"https://www.synology.com/en-global/knowledgebase/Surveillance/help/SurveillanceStation/user\">Surveillance Station online help</a> ",
   "4" => "The message Meldung \"WARNING - The current/simulated SVS-version ... may be incompatible with SSCam version...\" means that ".
@@ -188,9 +195,11 @@ our %SSCam_vHintsExt_en = (
 
 # Hint Hash de
 our %SSCam_vHintsExt_de = (
+  "6" => "Für SSCam wird ein Satz Icons im Verzeichnis www/images/sscam zur Verfügung gestellt. Damit das System sie findet bitte setzen: <br>".
+         "- im FHEMWEB Device Attribut <b>iconPath</b> um \"sscam\" ergänzen, z.B.: attr WEB iconPath default:fhemSVG:openautomation:sscam <br>".
+		 "Danach ein \"rereadicons\" bzw. einen FHEM restart ausführen. ",
   "5" => "Informationen zum Management von Usern und entsprechenden Rechte-Profilen sind in der ".
          "<a href=\"https://www.synology.com/de-de/knowledgebase/Surveillance/help/SurveillanceStation/user\">Surveillance Station Online-Hilfe</a> zu finden.",
-
   "4" => "Die Meldung \"WARNING - The current/simulated SVS-version ... may be incompatible with SSCam version...\" ist ein Hinweis darauf, dass ".
          "die eingesetzte SSCam Version noch nicht mit der verwendeten Version von Synology Surveillance Station (Reading \"SVSversion\") getestet ".
          "wurde. Die kompatible SVS-Version ist im Internal COMPATIBILITY ersichtlich.\n".
@@ -203,7 +212,7 @@ our %SSCam_vHintsExt_de = (
 );
 
 # getestete SVS-Version
-my $compstat     = "8.2.2";
+my $compstat     = "8.2";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -615,6 +624,7 @@ sub SSCam_Set($@) {
                  "disable:noArg ".
 				 "optimizeParams ".
                  ((ReadingsVal("$name", "CapPIR", "false") ne "false") ? "pirSensor:activate,deactivate ": "").
+                 "createReadingsGroup ".
                  "runView:live_fw".$hlslfw."live_link,live_open,lastrec_fw,lastrec_fw_MJPEG,lastrec_fw_MPEG4/H.264,lastrec_open,lastsnap_fw ".
                  ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "setPreset ": "").
                  ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "setHome:---currentPosition---,".ReadingsVal("$name","Presets","")." " : "").
@@ -630,6 +640,7 @@ sub SSCam_Set($@) {
       # setlist für SVS Devices
       $setlist = "Unknown argument $opt, choose one of ".
 	             "credentials ".
+				 "createReadingsGroup ".
 				 "extevent:1,2,3,4,5,6,7,8,9,10 ".
 		     	 ($hash->{HELPER}{APIHMMAXVER}?"homeMode:on,off ": "");
   }  
@@ -758,6 +769,89 @@ sub SSCam_Set($@) {
 	  my $room = AttrVal($name,"room","Livestream");
       $attr{$livedev}{room}  = $room;
 	  return "Livestream device \"$livedev\" created and assigned to room \"$room\".";
+  
+  } elsif ($opt eq "createReadingsGroup") {
+	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+	  my $rgdev = $prop?$prop:"RG.SSCam";
+      
+      my $rgdef = '<%it_camera>,<Kamera<br>On/Offline>,< >,<Status>,< >,<Bewegungs<br>erkennung>,< >,<letzte Aufnahme>,< >,<bel. Platz<br>(MB)>,< >,<letzte Aktualisierung>,< >,<Disable<br>Modul>,< >,<Wiedergabe>'."\n". 
+                  'TYPE=SSCam:FILTER=MODEL!=SVS:Availability,<&nbsp;>,state,<&nbsp;>,CamMotDetSc,<&nbsp;>,CamLastRecTime,<&nbsp;>,UsedSpaceMB,<&nbsp;>,LastUpdateTime,<&nbsp;>,?!disable,<&nbsp;>,?!LSnap,?!LRec,?!Start,?!Stop'."\n". 
+                  '< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >'."\n".
+                  '< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >'."\n".
+                  '< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >'."\n".
+                  '<%it_server>,<HomeMode<br>On/Off>,<&nbsp;>,<Status>,<&nbsp;>,&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>'."\n".
+                  'TYPE=SSCam:FILTER=MODEL=SVS:HomeModeState,<&nbsp;>,state,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,?!disable,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>'."\n".
+                  '';
+      
+      my $ret     = CommandDefine($hash->{CL},"$rgdev readingsGroup $rgdef");
+	  return $ret if($ret);
+	  
+      my $room    = AttrVal($name,"room","SSCam");
+      CommandAttr($hash->{CL},"$rgdev room $room");
+      CommandAttr($hash->{CL},"$rgdev alias Überblick Kameras");
+      
+      my $cellStyle = '{'."\n". 
+	                  '  "c:0" => \'style="text-align:left;font-weight:normal"\','."\n".
+                      '  "c:1" => \'style="text-align:left;font-weight:normal"\','."\n".
+                      '  "c:4" => \'style="text-align:center;font-weight:bold"\','."\n".
+                      '  "c:5" => \'style="text-align:center;color:green;font-weight:normal"\','."\n".
+                      '  "c:9" => \'style="text-align:center;font-weight:normal"\''."\n".
+                      '}';
+      CommandAttr($hash->{CL},"$rgdev cellStyle $cellStyle");
+                                 
+      my $commands = '{'."\n".
+                     '  "Availability.enabled"  => "set $DEVICE disable",'."\n".
+                     '  "Availability.disabled" => "set $DEVICE enable",'."\n".
+                     '  "HomeModeState.on"      => "set $DEVICE homeMode off",'."\n".
+                     '  "HomeModeState.off"     => "set $DEVICE homeMode on",'."\n".
+                     '  "'.$rgdev.'.Start"      => "set %DEVICE runView live_fw",'."\n".
+					 '  "Start"                 => "set %DEVICE runView live_fw",'."\n".
+                     '  "LRec"                  => "set %DEVICE runView lastrec_fw",'."\n".
+                     '  "LSnap"                 => "set %DEVICE runView lastsnap_fw",'."\n".
+                     '  "Stop"                  => "set %DEVICE stopView",'."\n".
+                     '  "Record"                => "runView:",'."\n".
+                     '  "disable"               => "disable:"'."\n".	
+                     '}';
+      CommandAttr($hash->{CL},"$rgdev commands $commands");
+      
+      my $nameStyle = 'style = "color:black;font-weight:bold;text-align:center"';
+	  CommandAttr($hash->{CL},"$rgdev nameStyle $nameStyle");
+      
+      my $valueColumns = '{'."\n".
+                         '  \'Wiedergabe\' => \'colspan="4"\''."\n".	
+                         '}';
+      CommandAttr($hash->{CL},"$rgdev valueColumns $valueColumns");
+	
+      my $valueFormat = '{'."\n". 
+                        '  ($READING eq "CamMotDetSc" && $VALUE eq "disabled") ? "external" : $VALUE'."\n".	
+                        '}';	
+      CommandAttr($hash->{CL},"$rgdev valueFormat $valueFormat");
+
+      my $valueIcon = '{'."\n". 
+                      '  "Availability.enabled"  => "remotecontrol/black_btn_GREEN",'."\n".
+                      '  "Availability.disabled" => "remotecontrol/black_btn_RED",'."\n".
+                      '  "HomeModeState.on"      => "status_available",'."\n".
+                      '  "HomeModeState.off"     => "status_away_1\@orange",'."\n".
+                      '  "Start"                 => "black_btn_MJPEG",'."\n".
+                      '  "LRec"                  => "black_btn_LASTRECIFRAME",'."\n". 
+                      '  "LSnap"                 => "black_btn_LSNAP",'."\n".                      
+                      '  "Stop"                  => "remotecontrol/black_btn_POWEROFF3",'."\n".                     
+                      '  "state.initialized"     => "remotecontrol/black_btn_STOP",'."\n".
+                      '  "state"                 => "%devStateIcon"'."\n".
+                      '}';
+      CommandAttr($hash->{CL},"$rgdev valueIcon $valueIcon");
+      
+      my $valueStyle = '{'."\n". 
+                       '  if($READING eq "Availability" && $VALUE eq "enabled"){ \' style="color:green" \' }'."\n".
+                       '  elsif( $READING eq "Availability" && $VALUE eq  "disabled"){ \' style="color:red" \' }'."\n".
+                       '  elsif( $READING eq "CamMotDetSc" && $VALUE =~ /SVS.*/ ){ \' style="color:orange" \' }'."\n".
+                       '  elsif( $READING eq "CamMotDetSc" && $VALUE eq "disabled"){ \' style="color:LimeGreen" \' }'."\n".
+                       '  elsif( $READING eq "CamMotDetSc" && $VALUE =~ /Cam.*/ ){ \' style="color:SandyBrown" \' }'."\n".
+                       '}';     
+      CommandAttr($hash->{CL},"$rgdev valueStyle $valueStyle");
+	      
+	  
+      return "readingsGroup device \"$rgdev\" created and assigned to room \"$room\".";
   
   } elsif ($opt eq "enable" && SSCam_IsModelCam($hash)) {
 	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
@@ -1180,11 +1274,14 @@ sub SSCam_Get($@) {
           $ret .= "<tbody>";
           $ret .= "<tr class=\"even\">";  
           if($arg && $arg =~ /[\d]+/) {
-              if(AttrVal("global","language","EN") eq "DE") {
-                  %hs = ( $arg => $SSCam_vHintsExt_de{$arg} ); 
-              } else {
-                  %hs = ( $arg => $SSCam_vHintsExt_en{$arg} ); 
-              }                   
+              my @hints = split(",",$arg);
+              foreach (@hints) {
+                  if(AttrVal("global","language","EN") eq "DE") {
+                      $hs{$_} = $SSCam_vHintsExt_de{$_};
+                  } else {
+                      $hs{$_} = $SSCam_vHintsExt_en{$_};
+                  }
+              }                      
           } else {
               if(AttrVal("global","language","EN") eq "DE") {
                   %hs = %SSCam_vHintsExt_de;
@@ -3892,9 +3989,15 @@ sub SSCam_camop ($) {
 	  my $limit   = $hash->{HELPER}{SNAPLIMIT};
 	  my $imgsize = $hash->{HELPER}{SNAPIMGSIZE};
 	  my $keyword = $hash->{HELPER}{KEYWORD};
-	  Log3($name,4, "$name - Call getsnapinfo with params: Image numbers => $limit, Image size => $imgsize, Keyword => $keyword");
-      $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&keyword=\"$keyword\"&imgSize=\"$imgsize\"&limit=\"$limit\"&_sid=\"$sid\"";
-   
+      my $snapid  = ReadingsVal("$name", "LastSnapId", " ");
+      if($OpMode eq "getsnapinfo") {
+	      Log3($name,4, "$name - Call getsnapinfo with params: Image numbers => $limit, Image size => $imgsize, Id => $snapid");
+          $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&idList =\"$snapid\"&keyword=\"$keyword\"&imgSize=\"$imgsize\"&limit=\"$limit\"&_sid=\"$sid\"";      
+      } else {
+	      Log3($name,4, "$name - Call getsnapinfo with params: Image numbers => $limit, Image size => $imgsize, Keyword => $keyword");
+          $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&keyword=\"$keyword\"&imgSize=\"$imgsize\"&limit=\"$limit\"&_sid=\"$sid\"";
+      }
+      
    } elsif ($OpMode eq "getsnapfilename") {
       # der Filename der aktuellen Schnappschuß-ID wird ermittelt
       $snapid = ReadingsVal("$name", "LastSnapId", " ");
@@ -4549,9 +4652,10 @@ sub SSCam_camop_parse ($) {
 			} elsif ($OpMode eq "Snap") {
                 # ein Schnapschuß wurde aufgenommen
                 # falls Aufnahme noch läuft -> state = on setzen
-                SSCam_refresh($hash,0,0,0);     # kein Room-Refresh, kein SSCam-state-Event, kein SSCamSTRM-Event
+                SSCam_refresh($hash,0,1,0);     # kein Room-Refresh, SSCam-state-Event, kein SSCamSTRM-Event
                 
                 $snapid = $data->{data}{'id'};
+                readingsSingleUpdate($hash,"LastSnapId",$snapid, 0) if($snapid);
                 
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"Errorcode","none");
@@ -4887,7 +4991,7 @@ sub SSCam_camop_parse ($) {
                 }
                 
                 # Kompatibilitätscheck
-                my $avsc   = $major.$minor.(($small=~/\d/)?$small:0); 
+                my $avsc   = $major.$minor; 
                 my $avcomp = $hash->{COMPATIBILITY};
                 $avcomp    =~ s/\.//g;
                 
@@ -6529,6 +6633,7 @@ sub SSCam_experror {
        <li>provides a panel for camera control (at PTZ-cameras)  </li>
 	   <li>create different types of discrete Streaming-Devices (createStreamDev)  </li>
        <li>Activation / Deactivation of a camera integrated PIR sensor  </li>
+       <li>Creation of a readingsGroup device to display an overview of all defined SSCam devices (createReadingsGroup) </li>
     </ul>
    </ul>
    <br>
@@ -6677,8 +6782,8 @@ sub SSCam_experror {
       <tr><td><li>set ... off                </td><td> session: ServeillanceStation - observer with enhanced privilege "manual recording" </li></td></tr>
       <tr><td><li>set ... snap               </td><td> session: ServeillanceStation - observer    </li></td></tr>
       <tr><td><li>set ... delPreset          </td><td> session: ServeillanceStation - observer    </li></td></tr>
-      <tr><td><li>set ... disable            </td><td> session: ServeillanceStation - manager       </li></td></tr>
-      <tr><td><li>set ... enable             </td><td> session: ServeillanceStation - manager       </li></td></tr>
+      <tr><td><li>set ... disable            </td><td> session: ServeillanceStation - manager with edit camera right      </li></td></tr>
+      <tr><td><li>set ... enable             </td><td> session: ServeillanceStation - manager with edit camera right      </li></td></tr>
       <tr><td><li>set ... expmode            </td><td> session: ServeillanceStation - manager       </li></td></tr>
       <tr><td><li>set ... extevent           </td><td> session: DSM - user as member of admin-group   </li></td></tr>
       <tr><td><li>set ... goPreset           </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
@@ -6779,12 +6884,27 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   </ul>
   
   <ul>
+  <li><b> set &lt;name&gt; createReadingsGroup [&lt;name of readingsGroup&gt;]</b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM/SVS)</li> <br>
+  
+  This command creates a readingsGroup device to display an overview of all defined SSCam devices. 
+  A name for the new readingsGroup device can be specified. Is no own name specified, the readingsGroup device will be 
+  created with name "RG.SSCam".
+  <br> 
+  <br><br>
+  </ul>
+  
+  <ul>
   <li><b> set &lt;name&gt; createSnapGallery </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   A snapshot gallery will be created as a separate device (type SSCamSTRM). The device will be provided in 
   room "SnapGallery".
   With the "snapGallery..."-<a href="#SSCamattr">attributes</a> respectively the specific attributes of the SSCamSTRM-device
-  you are able to manipulate the properties of the new snapshot gallery device. <br> 
+  you are able to manipulate the properties of the new snapshot gallery device. 
+  <br><br>
+  
+  <b>Note</b> <br>
+  The camera names in Synology SVS should not be very similar, otherwise the retrieval of snapshots could come to inaccuracies.
+
   <br><br>
   </ul>
   
@@ -7235,6 +7355,11 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   command. <br>
   If you want create a snapgallery output by triggering, e.g. with an "at" or "notify", you should use the 
   <a href="#SSCamget">"get &lt;name&gt; snapGallery"</a> command instead of "set".
+  <br><br>
+  
+  <b>Note</b> <br>
+  The camera names in Synology SVS should not be very similar, otherwise the retrieval of snapshots could come to inaccuracies.
+
   </ul>
   <br><br>
   
@@ -7369,7 +7494,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
         <ul>
 		<b>Note:</b><br>
         Depended from quantity and resolution (quality) of the snapshot images adequate CPU and/or main memory
-		ressources are needed.
+		ressources are needed. The camera names in Synology SVS should not be very similar, otherwise the retrieval of 
+        snapshots could come to inaccuracies.
         </ul>
 		<br><br>
   
@@ -7586,7 +7712,9 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <a name="ptzPanel_iconPath"></a>  
   <li><b>ptzPanel_iconPath</b><br>
     Path for icons used in PTZ-control panel, default is "www/images/sscam". 
-    The attribute value will be used for all icon-files except *.svg. </li><br> 
+    The attribute value will be used for all icon-files except *.svg. <br>
+    For further information execute "get &lt;name&gt; versionNotes 2,6".
+  </li><br> 
 
   <a name="ptzPanel_iconPrefix"></a>
   <li><b>ptzPanel_iconPrefix</b><br>
@@ -7845,6 +7973,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
       <li>erstellen eines Paneels zur Kamera-Steuerung. (bei PTZ-Kameras)  </li>
 	  <li>erzeugen unterschiedlicher Typen von separaten Streaming-Devices (createStreamDev)  </li>
       <li>Aktivierung / Deaktivierung eines kamerainternen PIR-Sensors </li>
+      <li>Erzeugung einer readingsGroup zur Anzeige aller definierten SSCam-Devices (createReadingsGroup) </li>
      </ul> 
     </ul>
     <br>
@@ -7997,8 +8126,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
       <colgroup> <col width=20%> <col width=80%> </colgroup>
       <tr><td><li>set ... credentials        </td><td> -                                            </li></td></tr>
       <tr><td><li>set ... delPreset          </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
-      <tr><td><li>set ... disable            </td><td> session: ServeillanceStation - Manager       </li></td></tr>
-      <tr><td><li>set ... enable             </td><td> session: ServeillanceStation - Manager       </li></td></tr>
+      <tr><td><li>set ... disable            </td><td> session: ServeillanceStation - Manager mit dem Kamera bearbeiten Recht      </li></td></tr>
+      <tr><td><li>set ... enable             </td><td> session: ServeillanceStation - Manager mit dem Kamera bearbeiten Recht      </li></td></tr>
       <tr><td><li>set ... expmode            </td><td> session: ServeillanceStation - Manager       </li></td></tr>
       <tr><td><li>set ... extevent           </td><td> session: DSM - Nutzer Mitglied von Admin-Gruppe     </li></td></tr>
 	  <tr><td><li>set ... goPreset           </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
@@ -8099,6 +8228,15 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   SSCamSTRM-Devices können die Eigenschaften des PTZ-Paneels beeinflusst werden. <br> 
   <br><br>
   </ul>
+  
+  <ul>
+  <li><b> set &lt;name&gt; createReadingsGroup [&lt;Name der readingsGroup&gt;]</b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM/SVS)</li> <br>
+  
+  Es wird ein readingsGroup-Device zur Übersicht aller vorhandenen SSCam-Devices erstellt. Es kann ein eigener Name angegeben 
+  werden. Ist kein Name angegeben, wird eine readingsGroup mit dem Namen "RG.SSCam" erzeugt.
+  <br> 
+  <br><br>
+  </ul>
     
   <ul>
   <li><b> set &lt;name&gt; createSnapGallery </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
@@ -8106,7 +8244,14 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   Es wird eine Schnappschußgallerie als separates Device (Type SSCamSTRM) erzeugt. Das Device wird im Raum 
   "SnapGallery" erstellt.
   Mit den "snapGallery..."-<a href="#SSCamattr">Attributen</a> bzw. den spezifischen Attributen des erzeugten SSCamSTRM-Devices 
-  können die Eigenschaften der Schnappschußgallerie beeinflusst werden. <br> 
+  können die Eigenschaften der Schnappschußgallerie beeinflusst werden. 
+  <br><br>
+
+  <b>Hinweis</b> <br>
+  Die Namen der Kameras in der SVS sollten sich nicht stark ähneln, da es ansonsten zu Ungenauigkeiten beim Abruf der 
+  Schnappschußgallerie kommen kann.
+  <br>
+  
   <br><br>
   </ul>
   
@@ -8562,6 +8707,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   dargestellt. Alle weiteren Funktionen und Attribute entsprechen dem "get &lt;name&gt; snapGallery" Kommando. <br>
   Wenn die Ausgabe einer Schnappschußgalerie, z.B. über ein "at oder "notify", getriggert wird, sollte besser das  
   <a href="#SSCamget">"get &lt;name&gt; snapGallery"</a> Kommando anstatt "set" verwendet werden.
+  <br><br>
+  
+  <b>Hinweis</b> <br>
+  Die Namen der Kameras in der SVS sollten sich nicht stark ähneln, da es ansonsten zu Ungenauigkeiten beim Abruf der 
+  Schnappschußgallerie kommen kann.
+  
   </ul>
   <br><br>
   
@@ -8702,7 +8853,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
         <ul>
 		<b>Hinweis:</b><br>
         Abhängig von der Anzahl und Auflösung (Qualität) der Schnappschuß-Images werden entsprechend ausreichende CPU und/oder
-		RAM-Ressourcen benötigt.
+		RAM-Ressourcen benötigt. Die Namen der Kameras in der SVS sollten sich nicht stark ähneln, da es ansonsten zu 
+        Ungnauigkeiten beim Abruf der Schnappschußgallerie kommen kann.
         </ul>
 		<br><br>
   
@@ -8932,7 +9084,9 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <a name="ptzPanel_iconPath"></a>  
   <li><b>ptzPanel_iconPath</b><br>
     Pfad für Icons im PTZ-Steuerungspaneel, default ist "www/images/sscam". 
-    Der Attribut-Wert wird für alle Icon-Dateien außer *.svg verwendet. </li><br> 
+    Der Attribut-Wert wird für alle Icon-Dateien außer *.svg verwendet. <br>
+    Für weitere Information bitte "get &lt;name&gt; versionNotes 2,6" ausführen.
+  </li><br> 
 
   <a name="ptzPanel_iconPrefix"></a>
   <li><b>ptzPanel_iconPrefix</b><br>
