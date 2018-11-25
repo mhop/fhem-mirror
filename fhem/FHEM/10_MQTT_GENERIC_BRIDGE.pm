@@ -29,6 +29,9 @@
 ###############################################################################
 # 
 # CHANGE LOG
+# 
+# 25.11.018  1.0.3
+#  bugfix    : Param name for IOWrite (subscribe)
 #
 # 21.11.018  1.0.2
 #  change    : techn. func. name changed subscribe => subscriptions
@@ -249,7 +252,7 @@ use warnings;
 
 #my $DEBUG = 1;
 my $cvsid = '$Id$';
-my $VERSION = "version 1.0.2 by hexenmeister\n$cvsid";
+my $VERSION = "version 1.0.3 by hexenmeister\n$cvsid";
 
 my %sets = (
 );
@@ -1557,7 +1560,7 @@ sub UpdateSubscriptions($) {
 
   if(isIODevMQTT2($hash)) {
     # MQTT2 Subscriptions
-    IOWrite($hash, "subscriptions", join(" ", @new));
+    IOWrite($hash, "subscribe", join(" ", @new));
   }
 }
 
