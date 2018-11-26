@@ -45,6 +45,7 @@ use HttpUtils;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "7.4.1"  => "26.11.2018  sub composegallery deleted, SSCam_composegallery changed to get information for SSCam_refresh ",
   "7.4.0"  => "24.11.2018  new set command \"createReadingsGroup\", versionNotes can process lists like \"2,6\", changed compatibility check, use SnapId when get information after took snapshot and sscam state-event ",
   "7.3.3"  => "18.11.2018  change rights decsption in commandRef ",
   "7.3.2"  => "12.11.2018  fix Warning in line 4954, set COMPATIBILITY to 8.2.2 ",
@@ -6456,18 +6457,6 @@ return $ret;
 ###############################################################################
 #                   Schnappschußgalerie zusammenstellen
 ###############################################################################
-sub composegallery ($;$$) { 
-  my ($name,$strmdev,$model) = @_;
-  
-  Log3($name, 1, "$name - SSCam will change the internal Code soon. Please delete your old Snapgallery-Device and create a new one by \"set $name createSnapGallery\" ");
-  my $htmlCode = SSCam_composegallery($name,$strmdev,$model);
-  				
-return $htmlCode;
-}
-
-###############################################################################
-#                   Schnappschußgalerie zusammenstellen
-###############################################################################
 sub SSCam_composegallery ($;$$) { 
   my ($name,$strmdev,$model) = @_;
   my $hash     = $defs{$name};
@@ -6484,7 +6473,12 @@ sub SSCam_composegallery ($;$$) {
 				 : ReadingsTimestamp($name,"LastUpdateTime"," "));  # letzte Aktualisierung
   $lupt =~ s/ / \/ /;
   
-  my $cmddosnap     = "cmd=set $name snap STRM";                    # Snapshot auslösen mit Kennzeichnung "by STRM-Device"
+  # Kontext des SSCamSTRM-Devices speichern für SSCam_refresh
+  $hash->{HELPER}{STRMDEV}    = $strmdev;                        # Name des aufrufenden SSCamSTRM-Devices
+  $hash->{HELPER}{STRMROOM}   = $FW_room?$FW_room:"";            # Raum aus dem das SSCamSTRM-Device die Funktion aufrief
+  $hash->{HELPER}{STRMDETAIL} = $FW_detail?$FW_detail:"";        # Name des SSCamSTRM-Devices (wenn Detailansicht)
+  
+  my $cmddosnap     = "cmd=set $name snap STRM";                 # Snapshot auslösen mit Kennzeichnung "by STRM-Device"
   my $imgdosnap     = "<img src=\"$FW_ME/www/images/sscam/black_btn_DOSNAP.png\">";
  
   my $ha = AttrVal($name, "snapGalleryHtmlAttr", AttrVal($name, "htmlattr", 'width="500" height="325"'));
