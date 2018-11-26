@@ -119,7 +119,7 @@ MQTT2_CLIENT_doinit($)
         ($usr ? (pack("n", length($usr)).$usr) : "").
         ($pwd ? (pack("n", length($pwd)).$pwd) : "");
     $hash->{connecting} = 2;
-    addToWritebuffer($hash,
+    MQTT2_CLIENT_send($hash,
       pack("C",0x10).
       MQTT2_CLIENT_calcRemainingLength(length($msg)).$msg);
     RemoveInternalTimer($hash);
@@ -135,7 +135,7 @@ MQTT2_CLIENT_doinit($)
         pack("n", $hash->{FD}). # packed Identifier
         join("", map { pack("n", length($_)).$_.pack("C",0) } # QOS:0
                  split(" ", $s));
-    addToWritebuffer($hash,
+    MQTT2_CLIENT_send($hash,
       pack("C",0x80).
       MQTT2_CLIENT_calcRemainingLength(length($msg)).$msg);
     $hash->{connecting} = 3;
@@ -151,7 +151,7 @@ MQTT2_CLIENT_keepalive($)
   my $name = $hash->{NAME};
   return if(ReadingsVal($name, "state", "") ne "opened");
   Log3 $name, 5, "$name: keepalive $keepalive";
-  addToWritebuffer($hash, pack("C",0xC0).pack("C",0)); # PINGREQ
+  MQTT2_CLIENT_send($hash, pack("C",0xC0).pack("C",0)); # PINGREQ
   InternalTimer(gettimeofday()+$keepalive, "MQTT2_CLIENT_keepalive", $hash, 0);
 }
 
@@ -171,7 +171,7 @@ MQTT2_CLIENT_Disco($;$)
   $hash->{connecting} = 1 if(!$isUndef);
   my $ond = AttrVal($hash->{NAME}, "msgBeforeDisconnect", "");
   MQTT2_CLIENT_doPublish($hash, split(" ", $ond, 2), 0, 1) if($ond);
-  DevIo_SimpleWrite($hash, pack("C",0xE0).pack("C",0), 0); # DISCONNECT
+  MQTT2_CLIENT_send($hash, pack("C",0xE0).pack("C",0), 1); # DISCONNECT
   $isUndef ? DevIo_CloseDev($hash) : DevIo_Disconnected($hash);
 }
 
@@ -327,7 +327,7 @@ MQTT2_CLIENT_Read($@)
       $off += 2;
     }
     $val = substr($pl, $off);
-    addToWritebuffer($hash, pack("CCnC*", 0x40, 2, $pid)) if($qos); # PUBACK
+    MQTT2_CLIENT_send($hash, pack("CCnC*", 0x40, 2, $pid)) if($qos); # PUBACK
 
     if(!IsDisabled($name)) {
       $val = "" if(!defined($val));
@@ -355,12 +355,27 @@ MQTT2_CLIENT_doPublish($@)
   my $name = $hash->{NAME};
   return if(IsDisabled($name));
   $val = "" if(!defined($val));
-  Log3 $name, 5, "$name: sending PUBLISH $topic $val";
-
   my $msg = pack("C",0x30).
             MQTT2_CLIENT_calcRemainingLength(2+length($topic)+length($val)).
             pack("n", length($topic)).
             $topic.$val;
+  MQTT2_CLIENT_send($hash, $msg, $immediate)
+}
+
+sub
+MQTT2_CLIENT_send($$;$)
+{
+  my ($hash, $msg, $immediate) = @_;
+
+  # Lowlevel debugging
+  my $name = $hash->{NAME};
+  if(AttrVal($name, "verbose", 1) >= 5) {
+    my $cmd = $cptype{ord($msg)>>4};
+    my $msgTxt = $msg;
+    $msgTxt =~ s/([^ -~])/"(".ord($1).")"/ge;
+    Log3 $name, 5, "$name: sending  $cmd $msgTxt";
+  }
+
   if($immediate) {
     DevIo_SimpleWrite($hash, $msg, 0);
   } else {
