@@ -439,9 +439,9 @@ sub Neuron_ParseAll(@){
 					#$value = $rsetsP{$value} if ($subdev->{dev} eq 'input' || $subdev->{dev} eq 'relay' || $subdev->{dev} eq 'led');	# on,off anstelle von 1,0
 					readingsBulkUpdateIfChanged($hash,$subdev->{dev}."_".$subdev->{circuit},$value) if defined($value);
 					Dispatch($hash, $subdev, (%addvals ? \%addvals : undef)) if index(AttrVal($hash->{NAME}, 'logicalDev', 'relay,input,led,ao'), $subdev->{dev}) != -1;
-					delete $subdev->{value};				
-					readingsBulkUpdateIfChanged($hash,".".$subdev->{dev}."_".$subdev->{circuit},encode_json $subdev,0);
-					Log3 ($hash, 4, "$hash->{TYPE} ($hash->{NAME}) ".$subdev->{dev}."_".$subdev->{circuit} .": ".encode_json $subdev);
+					delete $subdev->{value};
+					readingsBulkUpdateIfChanged($hash,".".$subdev->{dev}."_".$subdev->{circuit},toJSON($subdev),0);
+					Log3 ($hash, 4, "$hash->{TYPE} ($hash->{NAME}) ".$subdev->{dev}."_".$subdev->{circuit} .": ". toJSON($subdev));			
 				}
 			}
 			readingsBulkUpdate($hash,"state",$result->{status}) if ref $result eq 'HASH';
