@@ -1281,7 +1281,7 @@ m/(https?):\/\/([\w\.]+):?(\d+)?([a-zA-Z0-9\~\!\@\#\$\%\^\&\*\(\)_\-\=\+\\\/\?\.
                 'User-Agent' => 'FHEM-HP1000/1.0.0',
             },
             sslargs => {
-                SSL_verify_mode => 'SSL_VERIFY_NONE',
+                SSL_verify_mode => 0,
             },
         }
     );
