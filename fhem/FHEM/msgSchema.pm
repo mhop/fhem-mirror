@@ -377,7 +377,7 @@ my $db = {
             },
         },
 
-        'LaMatric' => {
+        'LaMetric' => {
             'Normal' =>
 'set %DEVICE% msg \'%LaMatric_ICON%\' \'%MSG%\' \'%LaMetric_SOUND%\'',
             'High' =>
