@@ -885,19 +885,19 @@ sub Neuron_wsMasking($$) {
   <a name="RPI_GPIOAttr"></a>
   <b>Attributes</b>
   <ul>
-    <li>connection<br>
+    <li><a name="connection">connection</a><br>
       Set the connection type to the EVOK device<br>
       Default: polling, valid values: websockets, polling<br><br>
     </li>							 
-    <li>poll_interval<br>
+    <li><a name="poll_interval">poll_interval</a><br>
       Set the polling interval in minutes to query all readings (and distribute them to logical devices)<br>
       Default: -, valid values: decimal number<br><br>
     </li>
-    <li>wsFilter<br>
+    <li><a name="wsFilter">wsFilter</a><br>
       Filter to limit the list of devices which should send websocket events<br>
       Default: all, valid values: all, ai, ao, input, led, relay, wd<br><br>
     </li>
-    <li>logicalDev<br>
+    <li><a name="logicalDev">logicalDev</a><br>
       Filter which subdevices should create / communicate with logical device<br>
       Default: ao, input, led, relay, valid values: ai, ao, input, led, relay, wd<br><br>
     </li>
@@ -967,19 +967,19 @@ sub Neuron_wsMasking($$) {
   <a name="RPI_GPIOAttr"></a>
   <b>Attribute</b>
   <ul>
-    <li>connection<br>
+    <li><a name="connection">connection</a><br>
       Verbindungsart zum EVOK Device<br>
       Standard: polling, g&uuml;ltige Werte: websockets, polling<br><br>
     </li>							 
-    <li>poll_interval<br>
+    <li><a name="v">poll_interval</a><br>
       Interval in Minuten in dem alle Werte gelesen (und auch an die log. Devices weitergeleitet) werden.<br>
       Standard: -, g&uuml;ltige Werte: Dezimalzahl<br><br>
     </li>
-    <li>wsFilter<br>
+    <li><a name="wsFilter">v</a>wsFilter<br>
       Filter um die liste der Ger&auml;te zu limitieren welche websocket events generieren sollen<br>
       Standard: all, g&uuml;ltige Werte: all, ai, ao, input, led, relay, wd<br><br>
     </li>
-    <li>logicalDev<br>
+    <li><a name="logicalDev">logicalDev</a><br>
       Filter um Ger&auml;te zu limitieren die logische Devices anlegen und mit ihnen kommunizieren.<br>
       Standard: ao, input, led, relay, g&uuml;ltige Werte: ai, ao, input, led, relay, wd<br><br>
     </li>

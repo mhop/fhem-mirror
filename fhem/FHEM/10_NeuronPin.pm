@@ -427,27 +427,27 @@ sub NeuronPin_Undef($$) {
   <a name="NeuronPinAttr"></a>
   <b>Attributes</b>
   <ul>
-    <li>poll_interval<br>
+    <li><a name="poll_interval">poll_interval</a><br>
       Set the polling interval in minutes to query all readings<br>
       Default: -, valid values: decimal number<br><br>
     </li>
-    <li>restoreOnStartup<br>
+    <li><a name="restoreOnStartup">restoreOnStartup</a><br>
       Restore Readings and sets after reboot<br>
       Default: last, valid values: last, on, off, no<br><br>
     </li>
-    <li>aomax<br>
+    <li><a name="aomax">aomax</a><br>
       Maximum value for the slider from the analog output ports<br>
       Default: 10, valid values: decimal number<br><br>
     </li>
-	<li>skipreadings<br>
+	<li><a name="skipreadings">skipreadings</a><br>
       Values which will be sent from the Device and which shall not be listed as readings<br>
       Default: relay_type,typ,dev,circuit,glob_dev_id,value,pending; valid values: comma separated list<br><br>
     </li>
-	<li>ownsets<br>
+	<li><a name="ownsets">ownsets</a><br>
       Values which will be sent from the Device which can be changed via set. For Values for where the device sends fixed choices, the sets will created automatically<br>
       Default: debounce;counter;interval;pwm_freq;pwm_duty:slider,0,0.1,100 valid values: semicolon separated list<br><br>
     </li>
-	<li>autoalias<br>
+	<li><a name="autoalias">autoalias</a><br>
       If set to 1, reading alias will automatically change the attribute "alias"<br>
       Default: 0, valid values: 0,1<br><br>
     </li>
@@ -519,27 +519,27 @@ sub NeuronPin_Undef($$) {
   <a name="NeuronPinAttr"></a>
   <b>Attribute</b>
   <ul>
-    <li>poll_interval<br>
+    <li><a name="poll_interval">poll_interval</a><br>
       Interval in Minuten in dem alle Werte gelesen werden.<br>
       Standard: -, g&uuml;ltige Werte: Dezimalzahl<br><br>
     </li>
-    <li>restoreOnStartup<br>
+    <li><a name="restoreOnStartup">restoreOnStartup</a><br>
       Readings nach Neustart wiederherstellen<br>
       Standard: last, g&uuml;ltige Werte: last, on, off<br><br>
     </li>
-    <li>aomax<br>
+    <li><a name="aomax">aomax</a><br>
       Maxwert f&uuml;r den Schieberegler beim Analogen Ausgang<br>
       Standard: 10, g&uuml;ltige Werte: Dezimalzahl<br><br>
     </li>
-	<li>skipreadings<br>
+	<li><a name="skipreadings">skipreadings</a><br>
       Werte, die vom Ger&auml;t gesendet, aber nicht als Reading dargestellt werden sollen.<br>
       Standard: relay_type,typ,dev,circuit,glob_dev_id,value,pending; g&uuml;ltige Werte: kommaseparierte Liste<br><br>
     </li>
-	<li>ownsets<br>
+	<li><a name="ownsets">ownsets</a><br>
       Werte, die vom Ger&auml;t gesendet, und &uuml;ber set ver&auml;ndert werden k&ouml;nnen. Schickt das Ger&auml;t feste Auswahllisten f&uuml;r einen Wert dann werden die sets automatisch angelegt.<br>
       Standard: debounce;counter;interval;pwm_freq;pwm_duty:slider,0,0.1,100; g&uuml;ltige Werte: semikolonseparierte Liste<br><br>
     </li>
-	<li>autoalias<br>
+	<li><a name="autoalias">autoalias</a><br>
       Wenn auf 1 wird das reading alias automatisch als Attribut alias gesetzt.<br>
       Standard: 0, g&uuml;ltige Werte: 0,1<br><br>
     </li>
