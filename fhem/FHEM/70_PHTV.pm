@@ -1578,7 +1578,7 @@ sub PHTV_SendCommand($$;$$$) {
                 'Accept-Charset' => 'UTF-8',
             },
             sslargs => {
-                SSL_verify_mode => 'SSL_VERIFY_NONE',
+                SSL_verify_mode => 0,
             },
         }
     );
