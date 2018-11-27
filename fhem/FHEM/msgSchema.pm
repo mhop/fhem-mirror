@@ -377,37 +377,59 @@ my $db = {
             },
         },
 
-        'XBMC' => {
+        'LaMatric' => {
             'Normal' =>
-'{ my $d=\'%DEVICE%\'; my $msg=\'%MSG%\'; my $title=\'%TITLE%\'; my $timeout=%TIMEOUT%*1000; fhem "set $d msg \'$title\' \'$msg\' $timeout %XBMC_ICON%"; }',
+'set %DEVICE% msg \'%LaMatric_ICON%\' \'%MSG%\' \'%LaMetric_SOUND%\'',
             'High' =>
-'{ my $d=\'%DEVICE%\'; my $msg=\'%MSG%\'; my $title=\'%TITLE%\'; my $timeout=%TIMEOUT%*1000; fhem "set $d msg \'$title\' \'$msg\' $timeout %XBMC_ICON%"; }',
+'set %DEVICE% msg \'%LaMatric_ICON%\' \'%MSG%\' \'%LaMetric_SOUND%\'',
             'Low' =>
-'{ my $d=\'%DEVICE%\'; my $msg=\'%MSG%\'; my $title=\'%TITLE%\'; my $timeout=%TIMEOUT%*1000; fhem "set $d msg \'$title\' \'$msg\' $timeout %XBMC_ICON%"; }',
+'set %DEVICE% msg \'%LaMatric_ICON%\' \'%MSG%\' \'%LaMetric_SOUND%\'',
             'defaultValues' => {
                 'Normal' => {
-                    'TIMEOUT'   => 8,
-                    'TITLE'     => 'Info',
-                    'XBMC_ICON' => 'info',
+                    'LaMatric_ICON'  => 'a21844',
+                    'LaMetric_SOUND' => 'notifications:notification',
                 },
                 'High' => {
-                    'TIMEOUT'   => 12,
-                    'TITLE'     => 'Warning',
-                    'XBMC_ICON' => 'warning',
+                    'LaMatric_ICON'  => 'a4787',
+                    'LaMetric_SOUND' => 'alarms:alarm13',
                 },
                 'Low' => {
-                    'TIMEOUT'   => 8,
-                    'TITLE'     => 'Notice',
-                    'XBMC_ICON' => '',
+                    'LaMatric_ICON'  => 'a22098',
+                    'LaMetric_SOUND' => 'notifications:positive5',
                 },
             },
+
+            'XBMC' => {
+                'Normal' =>
+'{ my $d=\'%DEVICE%\'; my $msg=\'%MSG%\'; my $title=\'%TITLE%\'; my $timeout=%TIMEOUT%*1000; fhem "set $d msg \'$title\' \'$msg\' $timeout %XBMC_ICON%"; }',
+                'High' =>
+'{ my $d=\'%DEVICE%\'; my $msg=\'%MSG%\'; my $title=\'%TITLE%\'; my $timeout=%TIMEOUT%*1000; fhem "set $d msg \'$title\' \'$msg\' $timeout %XBMC_ICON%"; }',
+                'Low' =>
+'{ my $d=\'%DEVICE%\'; my $msg=\'%MSG%\'; my $title=\'%TITLE%\'; my $timeout=%TIMEOUT%*1000; fhem "set $d msg \'$title\' \'$msg\' $timeout %XBMC_ICON%"; }',
+                'defaultValues' => {
+                    'Normal' => {
+                        'TIMEOUT'   => 8,
+                        'TITLE'     => 'Info',
+                        'XBMC_ICON' => 'info',
+                    },
+                    'High' => {
+                        'TIMEOUT'   => 12,
+                        'TITLE'     => 'Warning',
+                        'XBMC_ICON' => 'warning',
+                    },
+                    'Low' => {
+                        'TIMEOUT'   => 8,
+                        'TITLE'     => 'Notice',
+                        'XBMC_ICON' => '',
+                    },
+                },
+            },
+
         },
+    };
 
-    },
-};
+    sub get {
+        return $db;
+    }
 
-sub get {
-    return $db;
-}
-
-1;
+    1;
