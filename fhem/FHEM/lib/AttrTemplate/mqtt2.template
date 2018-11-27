@@ -70,26 +70,36 @@ attr DEVICE userReadings temperature_weather { sprintf("%.1f",ReadingsVal("DEVIC
 
 ###########################################
 # TASMOTA
-# Basic sonoff 1 channel device flashed with Tasmota
 # The regexp must handle
 # - tele/sonoff/LWT: => cmnd/sonoff/
 # - DVES_XXXXXX:/SmartHome/Esszimmer/Stehlampe/tele/LWT: => /SmartHome/Esszimmer/Stehlampe/cmnd/
-name:sonoff_tasmota1channel
+name:tasmota_basic
 filter:TYPE=MQTT2_DEVICE
 par:COMMAND;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\btele(/.*)?/LWT:, ? "${1}cmnd$2" : undef }
+attr DEVICE stateFormat {lc ReadingsVal("$name","POWER","") }
+attr DEVICE eventMap { dev=>{'^(.*)POWER: OFF$'=>'$1POWER: off', '^(.*)POWER: ON$'=>'$1POWER: on'} }
+attr DEVICE setList \
+  off:noArg    COMMAND/POWER1 0\
+  on:noArg     COMMAND/POWER1 1\
+  toggle:noArg COMMAND/POWER1 2
+
+# sonoff 1 channel device flashed with Tasmota.
+name:tasmota_1channel
+filter:TYPE=MQTT2_DEVICE
+par:COMMAND;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\btele(/.*)?/LWT:, ? "${1}cmnd$2" : undef }
+attr DEVICE eventMap { dev=>{'^(.*)POWER(.?): OFF$'=>'$1POWER$2: off', '^(.*)POWER(.?): ON$'=>'$1POWER$2: on'} }
 attr DEVICE stateFormat {lc ReadingsVal("$name","POWER1","")}
 attr DEVICE setList \
   off:noArg    COMMAND/POWER1 0\
   on:noArg     COMMAND/POWER1 1\
   toggle:noArg COMMAND/POWER1 2
 
-
 # sonoff 2 channel device flashed with Tasmota.
 # NOTE: a second device will be created for the second channel
-name:sonoff_tasmota2channel
+name:tasmota_2channel
 filter:TYPE=MQTT2_DEVICE
 par:COMMAND;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\btele(/.*)?/LWT:, ? "${1}cmnd$2" : undef }
-attr DEVICE eventMap { dev=>{'^(.*)POWER(.): OFF$'=>'$1POWER$2: off', '^(.*)POWER(.): ON$'=>'$1POWER$2: on'} }
+attr DEVICE eventMap { dev=>{'^(.*)POWER(.?): OFF$'=>'$1POWER$2: off', '^(.*)POWER(.?): ON$'=>'$1POWER$2: on'} }
 attr DEVICE stateFormat {lc ReadingsVal("$name","POWER1",0)}
 attr DEVICE setList \
   off:noArg    COMMAND/POWER1 0\
@@ -103,4 +113,3 @@ attr DEVICE_CH2 setList \
   off:noArg    COMMAND/POWER2 0\
   on:noArg     COMMAND/POWER2 1\
   toggle:noArg COMMAND/POWER2 2
-
