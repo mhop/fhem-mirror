@@ -437,7 +437,7 @@ sub Pushover_SendCommand($$;$\%) {
                 header      => \%header,
 
                 # sslargs => {
-                #     SSL_verify_mode => 'SSL_verify_PEER',
+                #     SSL_verify_mode => 0,
                 # },
             }
         );
@@ -468,6 +468,10 @@ sub Pushover_SendCommand($$;$\%) {
                 httpversion => "1.1",
                 loglevel    => AttrVal( $name, "httpLoglevel", 4 ),
                 header      => \%header,
+
+                # sslargs => {
+                #     SSL_verify_mode => 0,
+                # },
             }
         );
     }
