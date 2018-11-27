@@ -398,38 +398,39 @@ my $db = {
                     'LaMetric_SOUND' => 'notifications:positive5',
                 },
             },
+        },
 
-            'XBMC' => {
-                'Normal' =>
+        'XBMC' => {
+            'Normal' =>
 '{ my $d=\'%DEVICE%\'; my $msg=\'%MSG%\'; my $title=\'%TITLE%\'; my $timeout=%TIMEOUT%*1000; fhem "set $d msg \'$title\' \'$msg\' $timeout %XBMC_ICON%"; }',
-                'High' =>
+            'High' =>
 '{ my $d=\'%DEVICE%\'; my $msg=\'%MSG%\'; my $title=\'%TITLE%\'; my $timeout=%TIMEOUT%*1000; fhem "set $d msg \'$title\' \'$msg\' $timeout %XBMC_ICON%"; }',
-                'Low' =>
+            'Low' =>
 '{ my $d=\'%DEVICE%\'; my $msg=\'%MSG%\'; my $title=\'%TITLE%\'; my $timeout=%TIMEOUT%*1000; fhem "set $d msg \'$title\' \'$msg\' $timeout %XBMC_ICON%"; }',
-                'defaultValues' => {
-                    'Normal' => {
-                        'TIMEOUT'   => 8,
-                        'TITLE'     => 'Info',
-                        'XBMC_ICON' => 'info',
-                    },
-                    'High' => {
-                        'TIMEOUT'   => 12,
-                        'TITLE'     => 'Warning',
-                        'XBMC_ICON' => 'warning',
-                    },
-                    'Low' => {
-                        'TIMEOUT'   => 8,
-                        'TITLE'     => 'Notice',
-                        'XBMC_ICON' => '',
-                    },
+            'defaultValues' => {
+                'Normal' => {
+                    'TIMEOUT'   => 8,
+                    'TITLE'     => 'Info',
+                    'XBMC_ICON' => 'info',
+                },
+                'High' => {
+                    'TIMEOUT'   => 12,
+                    'TITLE'     => 'Warning',
+                    'XBMC_ICON' => 'warning',
+                },
+                'Low' => {
+                    'TIMEOUT'   => 8,
+                    'TITLE'     => 'Notice',
+                    'XBMC_ICON' => '',
                 },
             },
-
         },
-    };
 
-    sub get {
-        return $db;
-    }
+    },
+};
 
-    1;
+sub get {
+    return $db;
+}
+
+1;
