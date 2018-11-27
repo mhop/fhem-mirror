@@ -356,7 +356,8 @@ sub I2C_PCF8574_I2CRec($@) {				# ueber CallFn vom physical aufgerufen
 	<b>Define</b>
 	<ul>
 		<code>define &lt;name&gt; I2C_PCF8574 &lt;I2C Address&gt;</code><br>
-		where <code>&lt;I2C Address&gt;</code> is without direction bit<br>
+		<code>&lt;I2C Address&gt;</code> may be an 2 digit hexadecimal value (0xnn) or an decimal value<br>
+		For example 0x40 (hexadecimal) = 64 (decimal). An I2C address are 7 MSB, the LSB is the R/W bit.<br>
 	</ul>
 
 	<a name="I2C_PCF8574Set"></a>
@@ -393,20 +394,20 @@ sub I2C_PCF8574_I2CRec($@) {				# ueber CallFn vom physical aufgerufen
 	<a name="I2C_PCF8574Attr"></a>
 	<b>Attributes</b>
 	<ul>
-		<li>poll_interval<br>
+		<li><a name="poll_interval">poll_interval</a><br>
 			Set the polling interval in minutes to query the GPIO's level<br>
 			Default: -, valid values: decimal number<br><br>
 		</li>
-		<li>InputPorts<br>
+		<li><a name="InputPorts">InputPorts</a><br>
 			Comma separated list of Portnumers that are used as Inputs<br>
 			Ports in this list can't be written<br>
 			Default: -, valid values: 0 - 7<br><br>
 		</li>
-		<li>InvrtPorts<br>
+		<li><a name="InvrtPorts">InvrtPorts</a><br>
 			Comma separated list of Portnumers that will be inverted<br>
 			Default: -, valid values: 0 - 7<br><br>
 		</li>
-		<li>OnStartup<br>
+		<li><a name="OnStartup">OnStartup</a><br>
 			Comma separated list of output ports and their desired state after start<br>
 			Without this atribut all output ports will set to last state<br>
 			Default: -, valid values: &lt;port&gt;=on|off|last where &lt;port&gt; = 0 - 7<br><br>
@@ -437,7 +438,8 @@ sub I2C_PCF8574_I2CRec($@) {				# ueber CallFn vom physical aufgerufen
 	<b>Define</b>
 	<ul>
 		<code>define &lt;name&gt; I2C_PCF8574 &lt;I2C Address&gt;</code><br>
-		Der Wert <code>&lt;I2C Address&gt;</code> ist ohne das Richtungsbit<br>
+		<code>&lt;I2C Address&gt;</code> kann ein zweistelliger Hex-Wert (0xnn) oder ein Dezimalwert sein<br>
+		Beispielsweise 0x40 (hexadezimal) = 64 (dezimal). Als I2C Adresse verstehen sich die 7 MSB, das LSB ist das R/W Bit.<br>
 	</ul>
 
 	<a name="I2C_PCF8574Set"></a>
@@ -474,20 +476,20 @@ sub I2C_PCF8574_I2CRec($@) {				# ueber CallFn vom physical aufgerufen
 	<a name="I2C_PCF8574Attr"></a>
 	<b>Attribute</b>
 	<ul>
-		<li>poll_interval<br>
+		<li><a name="poll_interval">poll_interval</a><br>
 			Aktualisierungsintervall aller Werte in Minuten.<br>
 			Standard: -, g&uuml;ltige Werte: Dezimalzahl<br><br>
 		</li>
-		<li>InputPorts<br>
+		<li><a name="InputPorts">InputPorts</a><br>
 			Durch Komma getrennte Portnummern die als Inputs genutzt werden.<br>
 			Ports in dieser Liste k&ouml;nnen nicht geschrieben werden.<br>
 			Standard: -, g&uuml;ltige Werte: 0 - 7<br><br>
 		</li>
-		<li>InvrtPorts<br>
+		<li><a name="InvrtPorts">InvrtPorts</a><br>
 			Durch Komma getrennte Portnummern die invertiert werden.<br>
 			Standard: -, g&uuml;ltige Werte: 0 - 7<br><br>
 		</li>
-		<li>OnStartup<br>
+		<li><a name="OnStartup">OnStartup</a><br>
 			Durch Komma getrennte Output Ports und ihr gew&uuml;nschter Status nach dem Start.<br>
 			Ohne dieses Attribut werden alle Ausg&auml;nge nach dem Start auf den letzten Status gesetzt.<br>
 			Standard: -, g&uuml;ltige Werte: &lt;port&gt;=on|off|last wobei &lt;port&gt; = 0 - 7<br><br>

@@ -445,7 +445,8 @@ sub I2C_PCA9532_UpdReadings($$$) {
 	<b>Define</b>
 	<ul>
 		<code>define &lt;name&gt; I2C_PCA9532 &lt;I2C Address&gt;</code><br>
-		where <code>&lt;I2C Address&gt;</code> is an 2 digit hexadecimal value<br>
+		<code>&lt;I2C Address&gt;</code> may be an 2 digit hexadecimal value (0xnn) or an decimal value<br>
+		For example 0x40 (hexadecimal) = 64 (decimal). An I2C address are 7 MSB, the LSB is the R/W bit.<br>
 	</ul>
 
 	<a name="I2C_PCA9532Set"></a>
@@ -486,22 +487,26 @@ sub I2C_PCA9532_UpdReadings($$$) {
 	<a name="I2C_PCA9532Attr"></a>
 	<b>Attributes</b>
 	<ul>
-		<li>poll_interval<br>
+		<li><a name="poll_interval">poll_interval</a><br>
 			Set the polling interval in minutes to query the GPIO's level<br>
 			Default: -, valid values: decimal number<br><br>
 		</li>
-		<li>OutputPorts<br>
+		<li><a name="OutputPorts">OutputPorts</a><br>
 			Comma separated list of Portnumers that are used as Outputs<br>
 			Only ports in this list can be written<br>
 			Default: no, valid values: 0 1 2 .. 15<br><br>
 		</li>
-		<li>OnStartup<br>
+		<li><a name="OnStartup">OnStartup</a><br>
 			Comma separated list of output ports/PWM registers and their desired state after start<br>
 			Without this atribut all output ports will set to last state<br>
 			Default: -, valid values: &lt;port&gt;=on|off|PWM0|PWM1|last or PWM0|PWM1=0..255|last where &lt;port&gt; = 0 - 15<br><br>
 		</li>
-		<li>T0/T1<br>
-			Sets PWM0/PWM1 to another Frequency. The Formula is: Fx = 152/(Tx + 1) The corresponding frequency value is shown under internals.<br>
+		<li><a name="T0">T0</a><br>
+			Sets PWM0 to another Frequency. The Formula is: Fx = 152/(Tx + 1) The corresponding frequency value is shown under internals.<br>
+			Default: 0 (152Hz), valid values: 0-255<br><br>
+		</li>
+		<li><a name="T1">T1</a><br>
+			Sets PWM1 to another Frequency. The Formula is: Fx = 152/(Tx + 1) The corresponding frequency value is shown under internals.<br>
 			Default: 0 (152Hz), valid values: 0-255<br><br>
 		</li>
 		<li><a href="#IODev">IODev</a></li>
@@ -530,7 +535,8 @@ sub I2C_PCA9532_UpdReadings($$$) {
 	<b>Define</b>
 	<ul>
 		<code>define &lt;name&gt; I2C_PCA9532 &lt;I2C Address&gt;</code><br>
-		Der Wert <code>&lt;I2C Address&gt;</code> ist ein zweistelliger Hex-Wert<br>
+		<code>&lt;I2C Address&gt;</code> kann ein zweistelliger Hex-Wert (0xnn) oder ein Dezimalwert sein<br>
+		Beispielsweise 0x40 (hexadezimal) = 64 (dezimal). Als I2C Adresse verstehen sich die 7 MSB, das LSB ist das R/W Bit.<br>
 	</ul>
 
 	<a name="I2C_PCA9532Set"></a>
@@ -571,22 +577,26 @@ sub I2C_PCA9532_UpdReadings($$$) {
 	<a name="I2C_PCA9532Attr"></a>
 	<b>Attribute</b>
 	<ul>
-		<li>poll_interval<br>
+		<li><a name="poll_interval">poll_interval</a><br>
 			Aktualisierungsintervall aller Werte in Minuten.<br>
 			Standard: -, g&uuml;ltige Werte: Dezimalzahl<br><br>
 		</li>
-		<li>OutputPorts<br>
+		<li><a name="OutputPorts">OutputPorts</a><br>
 			Durch Komma getrennte Portnummern die als Outputs genutzt werden.<br>
 			Nur Ports in dieser Liste k&ouml;nnen geschrieben werden.<br>
 			Standard: no, g&uuml;ltige Werte: 0 1 2 .. 15<br><br>
 		</li>
-		<li>OnStartup<br>
+		<li><a name="OnStartup">OnStartup</a><br>
 			Durch Komma getrennte Output Ports/PWM Register und ihr gew&uuml;nschter Status nach dem Start.<br>
 			Ohne dieses Attribut werden alle Ausg&auml;nge nach dem Start auf den letzten Status gesetzt.<br>
 			Standard: -, g&uuml;ltige Werte: &lt;port&gt;=on|off|PWM0|PWM1|last oder PWM0|PWM1=0..255|last wobei &lt;port&gt; = 0 - 15<br><br>
 		</li>
-		<li>T0/T1<br>
-			&Auml;nderung der Frequenzwerte von PWM0/PWM1 nach der Formel: Fx = 152/(Tx + 1). Der entsprechende Frequenzwert wird unter Internals angezeigt.<br>
+		<li><a name="T0">T0</a><br>
+			&Auml;nderung der Frequenzwerte von PWM0 nach der Formel: Fx = 152/(Tx + 1). Der entsprechende Frequenzwert wird unter Internals angezeigt.<br>
+			Standard: 0 (152Hz), g&uuml;ltige Werte: 0-255<br><br>
+		</li>
+		<li><a name="T1">T1</a><br>
+			&Auml;nderung der Frequenzwerte von PWM1 nach der Formel: Fx = 152/(Tx + 1). Der entsprechende Frequenzwert wird unter Internals angezeigt.<br>
 			Standard: 0 (152Hz), g&uuml;ltige Werte: 0-255<br><br>
 		</li>
 		<li><a href="#IODev">IODev</a></li>

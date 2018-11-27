@@ -361,48 +361,6 @@ sub I2C_MCP23008_Set($@) {
 		$msg = "Unknown argument $a[1], choose one of " . $list;
 	}
 	return ($msg) ? $msg : undef;
-	
-###########################################################################################################
-#alte einzelportversion	
-#	my %sendpackage = ( i2caddress => $hash->{I2C_Address}, direction => "i2cwrite" );
-#	if ( $cmd && $cmd =~ m/^Port(A|B)(0|)[0-7]$/i) {
-#    return "wrong value: $val for \"set $name $cmd\" use one of: " . 
-#			join(',', (sort { $setsP{ $a } <=> $setsP{ $b } } keys %setsP) )
-#			unless(exists($setsP{$val}));
-#		my $po = substr $cmd, 4, 1;		# A oder B
-#		my $regaddr = $po eq "A" ? $Registers{GPIOA} : $Registers{GPIOB};				#Adresse fuer GPIO Register
-#    substr($cmd,0,5,"");
-#	  return "$name error: Port$po$cmd is defined as input" unless ( ($po . $cmd) ~~ @outports );		#Pruefen ob entsprechender Port Input ist
-#
-#		my $sbyte = 0;
-#		foreach (reverse 0..7) {
-#			if ( $_ == $cmd ) {		#->wenn aktueller Port dann neuer Wert
-#				$sbyte += $setsP{$val} << ($_);
-#				next;
-#			}
-#			$sbyte += $setsP{ReadingsVal($name,"Port".$po.$_,"off")} << ($_);		#->sonst aus dem Reading holen
-#		}	
-#
-#		$sendpackage{data} = $sbyte;
-#		$sendpackage{reg} = $regaddr;
-#		Log3 $hash, 5, "$name set regaddr: " . sprintf("%.2X",$sendpackage{reg}) . " inhalt: " . sprintf("%.2X",$sendpackage{data});
-#  } else {
-#	  my $list = "";
-#    foreach (0..7) {
-#		  next unless ( ("A" . $_) ~~ @outports );		#Inputs ueberspringen
-#			$list .= "PortA" . $_ . ":" . join(',', (sort { $setsP{ $a } <=> $setsP{ $b } } keys %setsP) ) . " ";
-#    }
-#		foreach (0..7) {
-#		  next unless ( ("B" . $_) ~~ @outports );		#Inputs ueberspringen
-#			$list .= "PortB" . $_ . ":" . join(',', (sort { $setsP{ $a } <=> $setsP{ $b } } keys %setsP) ) . " ";
-#    }
-#    return "Unknown argument $a[1], choose one of " . $list;
-#	}
-#  return "$name: no IO device defined" unless ($hash->{IODev});
-#  my $phash = $hash->{IODev};
-#  my $pname = $phash->{NAME};
-#  CallFn($pname, "I2CWrtFn", $phash, \%sendpackage);
-
 }
 ###############################################################################
 sub I2C_MCP23008_Get($@) {
@@ -511,7 +469,8 @@ sub I2C_MCP23008_UpdReadings($$$) {																						#nach Rueckmeldung read
 	<b>Define</b>
 	<ul>
 		<code>define &lt;name&gt; I2C_MCP23008 &lt;I2C Address&gt;</code><br>
-		where <code>&lt;I2C Address&gt;</code> is without direction bit<br>
+		<code>&lt;I2C Address&gt;</code> may be an 2 digit hexadecimal value (0xnn) or an decimal value<br>
+		For example 0x40 (hexadecimal) = 64 (decimal). An I2C address are 7 MSB, the LSB is the R/W bit.<br>
 	</ul>
 
 	<a name="I2C_MCP23008Set"></a>
@@ -545,33 +504,33 @@ sub I2C_MCP23008_UpdReadings($$$) {																						#nach Rueckmeldung read
 	<a name="I2C_MCP23008Attr"></a>
 	<b>Attributes</b>
 	<ul>
-		<li>poll_interval<br>
+		<li><a name="poll_interval">poll_interval</a><br>
 			Set the polling interval in minutes to query the GPIO's level<br>
 			Default: -, valid values: decimal number<br><br>
 		</li>
-		<li>OutputPorts<br>
+		<li><a name="OutputPorts">OutputPorts</a><br>
 			Comma separated list of ports that are used as Output<br>
 			Ports not in this list can't be written<br>
 			Default: no, valid values: A0-A7<br><br>
 		</li>
-		<li>OnStartup<br>
+		<li><a name="OnStartup">OnStartup</a><br>
 			Comma separated list of output ports and their desired state after start<br>
 			Without this atribut all output ports will set to last state<br>
 			Default: -, valid values: &lt;port&gt;=on|off|last where &lt;port&gt; = A0-A7<br><br>
 		</li>
-		<li>Pullup<br>
+		<li><a name="Pullup">Pullup</a><br>
 			Comma separated list of input ports which switch on their internal 100k pullup<br>
 			Default: -, valid values: A0-A7<br><br>
 		</li>
-		<li>Interrupt<br>
+		<li><a name="Interrupt">Interrupt</a><br>
 			Comma separated list of input ports which will trigger the IntA/B pin<br>
 			Default: -, valid values: A0-A7<br><br>
 		</li>
-		<li>invert_input<br>
+		<li><a name="invert_input">invert_input</a><br>
 			Comma separated list of input ports which use inverted logic<br>
 			Default: -, valid values: A0-A7<br><br>
 		</li>
-		<li>InterruptOut<br>
+		<li><a name="InterruptOut">InterruptOut</a><br>
 			Configuration options for INT output pin<br>
 			Values:<br>
 			<ul>
@@ -613,7 +572,8 @@ sub I2C_MCP23008_UpdReadings($$$) {																						#nach Rueckmeldung read
 	<b>Define</b>
 	<ul>
 		<code>define &lt;name&gt; I2C_MCP23008 &lt;I2C Address&gt;</code><br>
-		Der Wert <code>&lt;I2C Address&gt;</code> ist ohne das Richtungsbit<br>
+		<code>&lt;I2C Address&gt;</code> kann ein zweistelliger Hex-Wert (0xnn) oder ein Dezimalwert sein<br>
+		Beispielsweise 0x40 (hexadezimal) = 64 (dezimal). Als I2C Adresse verstehen sich die 7 MSB, das LSB ist das R/W Bit.<br>
 	</ul>
 
 	<a name="I2C_MCP23008Set"></a>
@@ -647,33 +607,33 @@ sub I2C_MCP23008_UpdReadings($$$) {																						#nach Rueckmeldung read
 	<a name="I2C_MCP23008Attr"></a>
 	<b>Attribute</b>
 	<ul>
-		<li>poll_interval<br>
+		<li><a name="poll_interval">poll_interval</a><br>
 			Aktualisierungsintervall aller Werte in Minuten.<br>
 			Standard: -, g&uuml;ltige Werte: Dezimalzahl<br><br>
 		</li>
-		<li>OutputPorts<br>
+		<li><a name="OutputPorts">OutputPorts</a><br>
 			Durch Komma getrennte Ports die als Ausg&auml;nge genutzt werden sollen.<br>
 			Nur Ports in dieser Liste k&ouml;nnen gesetzt werden.<br>
 			Standard: -, g&uuml;ltige Werte: A0-A7<br><br>
 		</li>
-		<li>OnStartup<br>
+		<li><a name="OnStartup">OnStartup</a><br>
 			Durch Komma getrennte Output Ports und ihr gew&uuml;nschter Status nach dem Start.<br>
 			Ohne dieses Attribut werden alle Ausg&auml;nge nach dem Start auf den letzten Status gesetzt.<br>
 			Standard: -, g&uuml;ltige Werte: &lt;port&gt;=on|off|last wobei &lt;port&gt; = A0-A7<br><br>
 		</li>
-		<li>Pullup<br>
+		<li><a name="Pullup">Pullup</a><br>
 			Durch Komma getrennte Input Ports, bei denen der interne 100k pullup aktiviert werden soll.<br>
 			Standard: -, g&uuml;ltige Werte: A0-A7<br><br>
 		</li>
-		<li>Interrupt<br>
+		<li><a name="Interrupt">Interrupt</a><br>
 			Durch Komma getrennte Input Ports, die einen Interrupt auf IntA/B ausl&ouml;sen.<br>
 			Standard: -, g&uuml;ltige Werte: A0-A7<br><br>
 		</li>
-		<li>invert_input<br>
+		<li><a name="invert_input">invert_input</a><br>
 			Durch Komma getrennte Input Ports, die reverse Logik nutzen.<br>
 			Standard: -, g&uuml;ltige Werte: A0-A7<br><br>
 		</li>
-		<li>InterruptOut<br>
+		<li><a name="InterruptOut">InterruptOut</a><br>
 			Einstellungen f&uuml;r den INT Pin<br>
 			g&uuml;ltige Werte:<br>
 			<ul>

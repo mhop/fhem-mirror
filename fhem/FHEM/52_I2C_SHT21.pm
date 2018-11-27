@@ -330,7 +330,8 @@ sub I2C_SHT21_DbLog_splitFn($) {
 	<b>Define</b>
 	<ul>
 		<code>define &lt;name&gt; I2C_SHT21 [&lt;I2C Address&gt;]</code><br>
-		where <code>&lt;I2C Address&gt;</code> is an 2 digit hexadecimal value<br>
+		<code>&lt;I2C Address&gt;</code> may be an 2 digit hexadecimal value (0xnn) or an decimal value<br>
+		For example 0x40 (hexadecimal) = 64 (decimal). An I2C address are 7 MSB, the LSB is the R/W bit.<br>
 	</ul>
 	<a name="I2C_SHT21Set"></a>
 	<b>Set</b>
@@ -341,12 +342,16 @@ sub I2C_SHT21_DbLog_splitFn($) {
 	<a name="I2C_SHT21Attr"></a>
 	<b>Attributes</b>
 	<ul>
-		<li>poll_interval<br>
+		<li><a name="poll_interval">poll_interval</a><br>
 			Set the polling interval in minutes to query data from sensor<br>
 			Default: 5, valid values: 1,2,5,10,20,30<br><br>
 		</li>
-		<li>roundHumidityDecimal, roundTemperatureDecimal<br>
-			Number of decimal places for humidity or temperature value<br>
+		<li><a name="roundHumidityDecimal">roundHumidityDecimal</a><br>
+			Number of decimal places for humidity value<br>
+			Default: 1, valid values: 0 1 2<br><br>
+		</li>
+		<li><a name="roundTemperatureDecimal">roundTemperatureDecimal</a><br>
+			Number of decimal places for temperature value<br>
 			Default: 1, valid values: 0 1 2<br><br>
 		</li>
 		<li><a href="#IODev">IODev</a></li>
@@ -372,7 +377,8 @@ sub I2C_SHT21_DbLog_splitFn($) {
 	<b>Define</b>
 	<ul>
 		<code>define &lt;name&gt; I2C_SHT21 [&lt;I2C Address&gt;]</code><br>
-		Der Wert <code>&lt;I2C Address&gt;</code> ist ein zweistelliger Hex-Wert<br>
+		<code>&lt;I2C Address&gt;</code> kann ein zweistelliger Hex-Wert (0xnn) oder ein Dezimalwert sein<br>
+		Beispielsweise 0x40 (hexadezimal) = 64 (dezimal). Als I2C Adresse verstehen sich die 7 MSB, das LSB ist das R/W Bit.<br>
 	</ul>
 	<a name="I2C_SHT21Set"></a>
 	<b>Set</b>
@@ -383,12 +389,16 @@ sub I2C_SHT21_DbLog_splitFn($) {
 	<a name="I2C_SHT21Attr"></a>
 	<b>Attribute</b>
 	<ul>
-		<li>poll_interval<br>
+		<li><a name="poll_interval">poll_interval</a><br>
 			Aktualisierungsintervall aller Werte in Minuten.<br>
 			Standard: 5, g&uuml;ltige Werte: 1,2,5,10,20,30<br><br>
 		</li>
-		<li>roundHumidityDecimal, roundTemperatureDecimal<br>
-			Anzahl Dezimalstellen f&uuml;r den Feuchte-, oder Temperaturwert<br>
+		<li><a name="roundHumidityDecimal">roundHumidityDecimal</a><br>
+			Anzahl Dezimalstellen f&uuml;r den Feuchtewert<br>
+			Standard: 1, g&uuml;ltige Werte: 0 1 2<br><br>
+		</li>
+		<li><a name="roundTemperatureDecimal">roundTemperatureDecimal</a><br>
+			Anzahl Dezimalstellen f&uuml;r den Temperaturwert<br>
 			Standard: 1, g&uuml;ltige Werte: 0 1 2<br><br>
 		</li>
 		<li><a href="#IODev">IODev</a></li>

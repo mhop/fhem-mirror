@@ -616,7 +616,8 @@ sub I2C_PCA9685_UpdReadings($$$) {											# vom IODev gesendete Werte in Read
 	<b>Define</b>
 	<ul>
 		<code>define &lt;name&gt; I2C_PCA9685 &lt;I2C Address&gt; [&lt;I2C Buffer Size&gt;]</code><br>
-		where <code>&lt;I2C Address&gt;</code> can be written as decimal value or 0xnn<br>
+		<code>&lt;I2C Address&gt;</code> may be an 2 digit hexadecimal value (0xnn) or an decimal value<br>
+		For example 0x40 (hexadecimal) = 64 (decimal). An I2C address are 7 MSB, the LSB is the R/W bit.<br>
 		<code>&lt;I2C Buffer Size&gt;</code> sets the maximum size of the I2C-Packet. 
 		Without this option the packet size is 30 Bytes (32 incl. Address and Register number). 
 		For RPII2C this option has no influence, cause it can deal with arbitrary packet sizes.<br>
@@ -672,18 +673,18 @@ sub I2C_PCA9685_UpdReadings($$$) {											# vom IODev gesendete Werte in Read
 			Respective flag in modereg1 must be set as well<br>
 			Default: SUBADR1=113,SUBADR2=114,SUBADR3=116,ALLCALLADR=112, valid values: valid I2C Address <br><br>
 		</li>
-		<li>OnStartup<br>
+		<li><a name="OnStartup">OnStartup</a><br>
 			Comma separated list of output ports/PWM registers and their desired state after start<br>
 			Without this atribut all output ports will set to last state<br>
 			Default: -, valid values: &lt;port&gt;=on|off|0..4095|last where &lt;port&gt; = 0 - 15<br><br>
 		</li>
-		<li>prescale<br>
+		<li><a name="prescale">prescale</a><br>
 			Sets PWM Frequency. The Formula is: Fx = 25MHz/(4096 * (prescale + 1)). 
 			The corresponding frequency value is shown under internals. 
 			If provided, attribute extClock will be used for frequency calculation. Otherwise 25MHz<br>
 			Default: 30 (200Hz for 25MHz clock), valid values: 0-255<br><br>
 		</li>
-		<li>modereg1<br>
+		<li><a name="modereg1">modereg1</a><br>
 			Comma separated list of:
 			<ul>
 				<li>EXTCLK<br>
@@ -704,7 +705,7 @@ sub I2C_PCA9685_UpdReadings($$$) {											# vom IODev gesendete Werte in Read
 				</li>
 			</ul>
 		</li>
-		<li>modereg2<br>
+		<li><a name="modereg2">modereg2</a><br>
 			Comma separated list of:
 			<ul>
 				<li>INVRT<br>
@@ -757,7 +758,8 @@ sub I2C_PCA9685_UpdReadings($$$) {											# vom IODev gesendete Werte in Read
 	<b>Define</b>
 	<ul>
 		<code>define &lt;name&gt; I2C_PCA9685 &lt;I2C Address&gt; [&lt;I2C Buffer Size&gt;]</code><br>
-		Der Wert <code>&lt;I2C Address&gt;</code> ist ein zweistelliger Hex-Wert im Format 0xnn oder eine Dezimalzahl<br>
+		<code>&lt;I2C Address&gt;</code> kann ein zweistelliger Hex-Wert (0xnn) oder ein Dezimalwert sein<br>
+		Beispielsweise 0x40 (hexadezimal) = 64 (dezimal). Als I2C Adresse verstehen sich die 7 MSB, das LSB ist das R/W Bit.<br>
 		<code>&lt;I2C Buffer Size&gt;</code> gibt die maximale Anzahl von Datenbytes pro I2C Datenpaket an. Nicht angegeben, wird der Wert 30 verwendet 
 		( entspricht 32 Bytes incl. Adresse und Registernummer). RPII2C kann mit beliebig gro&szlig;en Paketl&auml;ngen umgehen, daher ist diese Option dort inaktiv.<br>
 	</ul>
@@ -814,18 +816,18 @@ sub I2C_PCA9685_UpdReadings($$$) {											# vom IODev gesendete Werte in Read
 			Zus&auml;tzlich zu diesen Registern m&uuml;ssen die Passenden Bits in modereg1 gesetzt werden.<br>
 			Standard: SUBADR1=113,SUBADR2=114,SUBADR3=116,ALLCALLADR=112, g&uuml;ltige Werte: I2C Adresse <br><br>
 		</li>
-		<li>OnStartup<br>
+		<li><a name="OnStartup">OnStartup</a><br>
 			Kommagetrennte Liste der Ports mit den gew&uuml;nschten Startwerten.<br>
 			Nicht gelistete Ports werden auf en letzte state wiederhergestellt.<br>
 			Standard: last, g&uuml;ltige Werte: &lt;port&gt;=on|off|0..4095|last wobei &lt;port&gt; = 0 - 15<br><br>
 		</li>
-		<li>prescale<br>
+		<li><a name="prescale">prescale</a><br>
 			PWM Frequenz setzen. Formel: Fx = 25MHz/(4096 * (prescale + 1)).
 			Die eingestellte Frequenz wird in den Internals angezeigt.
 			Wenn das Attribut extclock angegeben ist, wird dieses zur Frequenzberechnung verwendet. Andernfalls 25MHz.<br>
 			Standard: 30 (200Hz f&uuml;r 25MHz clock), g&uuml;ltige Werte: 0-255<br><br>
 		</li>
-		<li>modereg1<br>
+		<li><a name="modereg1">modereg1</a><br>
 			Durch Komma getrennte Liste von:
 			<ul>
 				<li>EXTCLK<br>
@@ -846,7 +848,7 @@ sub I2C_PCA9685_UpdReadings($$$) {											# vom IODev gesendete Werte in Read
 				</li>
 			</ul>
 		</li>
-		<li>modereg2<br>
+		<li><a name="modereg2">modereg2</a><br>
 			Durch Komma getrennte Liste von:
 			<ul>
 				<li>INVRT<br>

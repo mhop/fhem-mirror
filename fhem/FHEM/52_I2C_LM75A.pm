@@ -300,7 +300,8 @@ sub I2C_LM75A_DbLog_splitFn($) {
 	<b>Define</b>
 	<ul>
 		<code>define &lt;name&gt; I2C_LM75A [&lt;I2C Address&gt;]</code><br>
-		where <code>&lt;I2C Address&gt;</code> is an 2 digit hexadecimal value<br>
+		<code>&lt;I2C Address&gt;</code> may be an 2 digit hexadecimal value (0xnn) or an decimal value<br>
+		Without defined <code>&lt;I2C Address&gt;</code> 0x48 (hexadecimal) = 72 (decimal) will be used.. An I2C address are 7 MSB, the LSB is the R/W bit.<br>
 	</ul>
 	<a name="I2C_LM75ASet"></a>
 	<b>Set</b>
@@ -311,11 +312,11 @@ sub I2C_LM75A_DbLog_splitFn($) {
 	<a name="I2C_LM75AAttr"></a>
 	<b>Attributes</b>
 	<ul>
-		<li>poll_interval<br>
+		<li><a name="poll_interval">poll_interval</a><br>
 			Set the polling interval in minutes to query data from sensor<br>
 			Default: 5, valid values: 1,2,5,10,20,30<br><br>
 		</li>
-		<li>roundTemperatureDecimal<br>
+		<li><a name="roundTemperatureDecimal">roundTemperatureDecimal</a><br>
 			Number of decimal places for temperature value<br>
 			Default: 1, valid values: 0 1 2<br><br>
 		</li>
@@ -342,8 +343,9 @@ sub I2C_LM75A_DbLog_splitFn($) {
 	<b>Define</b>
 	<ul>
 		<code>define &lt;name&gt; I2C_LM75A [&lt;I2C Address&gt;]</code><br>
-		Der Wert <code>&lt;I2C Address&gt;</code> ist ein zweistelliger Hex-Wert<br>
-	</ul>
+		<code>&lt;I2C Address&gt;</code> kann ein zweistelliger Hex-Wert (0xnn) oder ein Dezimalwert sein<br>
+		Fehlt <code>&lt;I2C Address&gt;</code> wird 0x48 (hexadezimal) = 72 (dezimal) verwendet.<br>
+		Als I2C Adresse verstehen sich die 7 MSB, das LSB ist das R/W Bit.<br>	</ul>
 	<a name="I2C_LM75ASet"></a>
 	<b>Set</b>
 	<ul>
@@ -353,11 +355,11 @@ sub I2C_LM75A_DbLog_splitFn($) {
 	<a name="I2C_LM75AAttr"></a>
 	<b>Attribute</b>
 	<ul>
-		<li>poll_interval<br>
+		<li><a name="poll_interval">poll_interval</a><br>
 			Aktualisierungsintervall aller Werte in Minuten.<br>
 			Standard: 5, g&uuml;ltige Werte: 1,2,5,10,20,30<br><br>
 		</li>
-		<li>roundTemperatureDecimal<br>
+		<li><a name="roundTemperatureDecimal">roundTemperatureDecimal</a><br>
 			Anzahl Dezimalstellen f&uuml;r den Temperaturwert<br>
 			Standard: 1, g&uuml;ltige Werte: 0 1 2<br><br>
 		</li>

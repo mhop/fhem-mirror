@@ -515,7 +515,9 @@ sub I2C_BME280_DbLog_splitFn($) {  			# Einheiten
   <b>Define</b>
   <ul>
     <code>define BME280 I2C_BME280 [&lt;I2C Address&gt;]</code><br><br>
-    without defined <code>&lt;I2C Address&gt;</code> 0x76 will be used as address<br>
+    <code>&lt;I2C Address&gt;</code> may be an 2 digit hexadecimal value (0xnn) or an decimal value<br>
+	Without defined <code>&lt;I2C Address&gt;</code> 0x76 (hexadecimal) = 118 (decimal) will be used.<br>
+	An I2C address are 7 MSB, the LSB is the R/W bit.<br>
     <br>
     Examples:
     <pre>
@@ -581,7 +583,9 @@ sub I2C_BME280_DbLog_splitFn($) {  			# Einheiten
 	<b>Define</b>
 	<ul>
 		<code>define BME280 &lt;BME280_name&gt; [&lt;I2C Addresse&gt;]</code><br><br>
-		Fehlt <code>&lt;I2C Address&gt;</code> wird 0x76 verwendet<br>
+		<code>&lt;I2C Address&gt;</code> kann ein zweistelliger Hex-Wert (0xnn) oder ein Dezimalwert sein<br>
+		Fehlt <code>&lt;I2C Address&gt;</code> wird 0x76 (hexadezimal) = 118 (dezimal) verwendet.<br>
+		Als I2C Adresse verstehen sich die 7 MSB, das LSB ist das R/W Bit.<br>
 		<br>
 		Beispiel:
 		<pre>
