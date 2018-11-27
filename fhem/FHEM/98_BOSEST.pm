@@ -7,9 +7,12 @@
 # FHEM module to communicate with BOSE SoundTouch system
 # API as defined in BOSE SoundTouchAPI_WebServices_v1.0.1.pdf
 #
-# Version: 2.2.0
+# Version: 2.2.1
 #
 #############################################################
+#
+# v2.2.1 - 20181127
+# - CHANGE:  add staticIPs documentation in commandref
 #
 # v2.2.0 - 20171211
 # - FEATURE: support new Audio Notification API for TTS (no more minidlna)
@@ -338,7 +341,7 @@ sub BOSEST_Define($$) {
     $hash->{helper}{supportedBassCmds} = "";
     
     if (int(@a) < 3) {
-        Log3 $hash, 3, "BOSEST: BOSE SoundTouch v2.2.0";
+        Log3 $hash, 3, "BOSEST: BOSE SoundTouch v2.2.1";
         #start discovery process 30s delayed
         InternalTimer(gettimeofday()+30, "BOSEST_startDiscoveryProcess", $hash, 0);
         
@@ -2607,6 +2610,13 @@ sub BOSEST_readingsSingleUpdateIfChanged {
 	    <code>n/a</code>
  	 </ul>
  	 <br>
+
+    <a name="BOSESTattr" id="BOSESTattr"></a>
+        <b>Attributes</b>
+        <ul><ul>
+            <li><code><b>staticIPs</b> IPs</code>&nbsp;&nbsp;-&nbsp;&nbsp; IP addresses (comma separated) of your BOSE devices, should be used only if discovery doesn't work in your network</li>
+        </ul></ul>
+    <br>
 
 </ul>
 
