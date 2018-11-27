@@ -57,6 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Versions History intern
 our %DbRep_vNotesIntern = (
+  "8.9.8"  => "27.11.2018  minor fix in deviceRename, commandref revised ",
   "8.9.7"  => "21.11.2018  DbRep_firstconnect now uses attribute \"timeout\" ",
   "8.9.6"  => "15.11.2018  fix PERL WARNING: Use of uninitialized value \$fref in pattern match (m//), sub DbRep_sec2hms for hms transforming",
   "8.9.5"  => "09.11.2018  hash %dbrep_col substituted by get data from dblog device in func DbRep_firstconnect, fix importFromFile contains only SPACE ",
@@ -671,7 +672,6 @@ sub DbRep_Set($@) {
       shift @a;
       shift @a;
       $prop = join(" ",@a);      # Device Name kann Leerzeichen enthalten
-      Log3 ($name, 1, "DbRep $name - a: @a");
       my ($olddev, $newdev) = split(",",$prop);
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";    
       if (!$olddev || !$newdev) {return "Both entries \"old device name\", \"new device name\" are needed. Use \"set $name deviceRename olddevname,newdevname\" ";}
@@ -11697,7 +11697,7 @@ return $ret;
                                 SQL selection will be carried out. <br>
                                 If the the device, list or device specification is prepended by "EXCLUDE=", 
                                 the devices are excluded from database selection.                                
-                                </li> <br>
+                                <br><br>
   
                                 <ul>
 							    <b>Examples:</b> <br>
@@ -11723,6 +11723,7 @@ return $ret;
                                 If you need more information about device specifications, execute 
                                 "get &lt;name&gt; versionNotes 3".
 								<br><br>
+                                </li>
 
   <a name="diffAccept"></a>
   <li><b>diffAccept </b>      - valid for function diffValue. diffAccept determines the threshold,  up to that a calaculated 
@@ -11734,7 +11735,7 @@ return $ret;
                                 generated (&lt;diffLimit&gt; will be substituted with the present prest attribute value). <br>
 								The reading contains a list of relevant pair of values. Using verbose=3 this list will also 
                                 be reported in the FHEM logfile. 								
-								</li><br> 
+								<br><br>
 
                                 <ul>
 							    Example report in logfile if threshold of diffAccept=10 overruns: <br><br>
@@ -11746,6 +11747,7 @@ return $ret;
 							      high difference value. <br>
 							    # Now you have to decide if the (second) dataset should be deleted, ignored of the attribute diffAccept should be adjusted. 
                                 </ul><br> 
+                                </li>
 
 
   <a name="disable"></a>								
@@ -11842,7 +11844,8 @@ sub bdump {
                                 The filename may contain wildcards which are replaced by corresponding values 
                                 (see subsequent table).
                                 Furthermore filename can contain %-wildcards of the POSIX strftime function of the underlying OS (see your 
-                                strftime manual). <br>
+                                strftime manual). 
+                                <br><br>
 
 	                            <ul>
                                   <table>  
@@ -11860,7 +11863,7 @@ sub bdump {
                                       <tr><td> %W    </td><td>: week number of year with Monday as first day of week (00..53) </td></tr>
                                   </table>
 	                            </ul> 
-                                </li> <br>
+                                <br>
                                 
                                 <ul>
 							    <b>Examples:</b> <br>
@@ -11873,6 +11876,7 @@ sub bdump {
                                 About POSIX wildcard usage please see also explanations in 
                                 <a href="https://fhem.de/commandref.html#FileLog">Filelog</a>. <br>
 								<br><br>
+                                </li>
 
   <a name="fastStart"></a>
   <li><b>fastStart </b>       - Usually every DbRep device is making a short connect to its database when FHEM is started to
@@ -11962,7 +11966,7 @@ sub bdump {
 								If SQL wildcard (%) is set in a list, it will be evaluated as a normal ASCII-character. <br>
                                 If the reading or the reading-list is prepended by "EXCLUDE=", those readings are excluded 
                                 from database selection.
-                                </li> <br>  
+                                <br><br>  
 								
                                 <ul>
 							    <b>Examples:</b> <br>
@@ -11973,6 +11977,7 @@ sub bdump {
                                 <code>attr &lt;name&gt; reading etotal,etoday EXCLUDE=Einspeisung%  </code> <br>
 								</ul>
 								<br><br>
+                                </li>
 
   <a name="readingNameMap"></a>
   <li><b>readingNameMap </b>  - the name of the analyzed reading can be overwritten for output  </li> <br>
@@ -11993,7 +11998,8 @@ sub bdump {
   <li><b>seqDoubletsVariance </b> - accepted variance (+/-) for the command "set &lt;name&gt; delSeqDoublets". <br>
                                     The value of this attribute describes the variance up to it consecutive numeric values (VALUE) of
                                     datasets are handled as identical and should be deleted. "seqDoubletsVariance" is an absolut numerical value, 
-                                    which is used as a positive as well as a negative variance. </li> <br>
+                                    which is used as a positive as well as a negative variance.
+                                    <br><br>
 
                                     <ul>
 							        <b>Examples:</b> <br>
@@ -12001,6 +12007,7 @@ sub bdump {
 								    <code>attr &lt;name&gt; seqDoubletsVariance 1.45   </code> <br>
 								    </ul>
 								    <br><br> 
+                                    </li>
 
   <a name="showproctime"></a>
   <li><b>showproctime </b>    - if set, the reading "sql_processing_time" shows the required execution time (in seconds) 
@@ -12008,41 +12015,49 @@ sub bdump {
 								of all sql-statements necessara for within an executed DbRep-function in background. </li> <br>
 
   <a name="showStatus"></a>
-  <li><b>showStatus </b>      - limits the sample space of command "get &lt;name&gt; dbstatus". SQL-Wildcard (%) can be used.    </li> <br>
+  <li><b>showStatus </b>      - limits the sample space of command "get &lt;name&gt; dbstatus". SQL-Wildcard (%) can be used.    
+                                <br><br>
 
                                 <ul>
                                 <b>Example: </b><br>
                                 attr &lt;name&gt; showStatus %uptime%,%qcache%  <br>
                                 # Only readings with containing "uptime" and "qcache" in name will be shown <br>
-                                </ul><br>  
+                                </ul><br>
+                                </li>                                
 
   <a name="showVariables"></a>
-  <li><b>showVariables </b>   - limits the sample space of command "get &lt;name&gt; dbvars". SQL-Wildcard (%) can be used. </li> <br>
+  <li><b>showVariables </b>   - limits the sample space of command "get &lt;name&gt; dbvars". SQL-Wildcard (%) can be used. 
+                                <br><br>
 
                                 <ul>
                                 <b>Example: </b><br>
                                 attr &lt;name&gt; showVariables %version%,%query_cache% <br>
                                 # Only readings with containing "version" and "query_cache" in name will be shown <br>
-                                </ul><br>  
+                                </ul><br>
+                                </li>                                
 
   <a name="showSvrInfo"></a>								
-  <li><b>showSvrInfo </b>     - limits the sample space of command "get &lt;name&gt; svrinfo". SQL-Wildcard (%) can be used.    </li> <br>
+  <li><b>showSvrInfo </b>     - limits the sample space of command "get &lt;name&gt; svrinfo". SQL-Wildcard (%) can be used.  
+                                <br><br>
 
                                 <ul>
                                 <b>Example: </b><br>
                                 attr &lt;name&gt; showSvrInfo %SQL_CATALOG_TERM%,%NAME%  <br>
                                 # Only readings with containing "SQL_CATALOG_TERM" and "NAME" in name will be shown <br>
-                                </ul><br>  
+                                </ul><br>
+                                </li>                                
 
   <a name="showTableInfo"></a>								
   <li><b>showTableInfo </b>   - limits the tablename which is selected by command "get &lt;name&gt; tableinfo". SQL-Wildcard 
-                                (%) can be used.   </li> <br>
+                                (%) can be used.   
+                                <br><br>
 
                                 <ul>
                                 <b>Example: </b><br>
                                 attr &lt;name&gt; showTableInfo current,history  <br>
                                 # Only informations about tables "current" and "history" will be shown <br>
-                                </ul><br>  
+                                </ul><br>
+                                </li>                                
   
   <a name="sqlCmdHistoryLength"></a>								
   <li><b>sqlCmdHistoryLength </b> 
@@ -12053,7 +12068,9 @@ sub bdump {
 
   <a name="sqlResultFormat"></a>
   <li><b>sqlResultFormat </b> - determines the formatting of the "set &lt;name&gt; sqlCmd" command result. 
-                                Possible options are: <br><br>
+                                Possible options are: 
+                                <br><br>
+                                
                                 <ul>
                                 <b>separated </b> - every line of the result will be generated sequentially in a single 
 								                    reading. (default) <br><br>
@@ -12068,7 +12085,8 @@ sub bdump {
                                 <b>json </b>      - creates the Reading SqlResult as a JSON 
 								                    coded hash. 
 								                    Every hash-element consists of the serial number of the dataset (key)
-													and its value. </li> <br><br> 
+													and its value. 
+                                <br><br> 
 													 
    
         To process the result, you may use a userExitFn in 99_myUtils for example: <br>		
@@ -12096,14 +12114,15 @@ sub bdump {
         }
   	    </pre> 
         </ul>
-		<br>  
+		<br>
+        </li>        
         
   <a name="timeYearPeriod"></a>                     
   <li><b>timeYearPeriod </b> - By this attribute an annual time period will be determined for database data selection. 
                                The time limits are calculated dynamically during execution time. Every time an annual period is determined. 
                                Periods of less than a year are not possible to set. <br>
                                This attribute is particularly intended to make reports synchronous to an account period, e.g. of an energy- or gas provider.
-                               </li> <br> 
+                               <br><br> 
                                
                                <ul>
 							   <b>Example:</b> <br><br>
@@ -12115,9 +12134,10 @@ sub bdump {
                                # If the current date >= 01. january und =< 24. june, than AAAA = current year-1 and BBBB = current year
 							   </ul>
 							   <br><br>
+                               </li>
 
   <a name="timestamp_begin"></a>							   
-  <li><b>timestamp_begin </b> - begin of data selection  </li> <br>
+  <li><b>timestamp_begin </b> - begin of data selection  <br>
   
   The format of timestamp is as used with DbLog "YYYY-MM-DD HH:MM:SS". For the attributes "timestamp_begin", "timestamp_end" 
   you can also use one of the following entries. The timestamp-attribute will be dynamically set to: <br><br>
@@ -12144,12 +12164,15 @@ sub bdump {
                               <b>previous_hour_end</b>      : matches "&lt;previous hour&gt;:59:59"                 <br> 
                               </ul>
                               <br><br>
+                              </li>
 
   <a name="timestamp_end"></a>  
-  <li><b>timestamp_end </b>   - end of data selection. If not set the current date/time combination will be used.  </li> <br>
+  <li><b>timestamp_end </b>   - end of data selection. If not set the current date/time combination will be used.  <br>
   
   The format of timestamp is as used with DbLog "YYYY-MM-DD HH:MM:SS". For the attributes "timestamp_begin", "timestamp_end" 
-  you can also use one of the following entries. The timestamp-attribute will be dynamically set to: <br><br>
+  you can also use one of the following entries. The timestamp-attribute will be dynamically set to: 
+                              <br><br>
+                              
                               <ul>
                               <b>current_year_begin</b>     : matches "&lt;current year&gt;-01-01 00:00:00"         <br>
                               <b>current_year_end</b>       : matches "&lt;current year&gt;-12-31 23:59:59"         <br>
@@ -12188,11 +12211,13 @@ sub bdump {
   If the attribute "timeDiffToNow" will be set, the attributes "timestamp_begin" respectively "timestamp_end" will be deleted if they were set before.
   The setting of "timestamp_begin" respectively "timestamp_end" causes the deletion of attribute "timeDiffToNow" if it was set before as well.
   <br><br>
+  </li>
 
   <a name="timeDiffToNow"></a>  
   <li><b>timeDiffToNow </b>   - the <b>begin time </b> of data selection will be set to the timestamp <b>"&lt;current time&gt; - 
                                 &lt;timeDiffToNow&gt;"</b> dynamically (e.g. if set to 86400, the last 24 hours are considered by data 
-								selection). The time period will be calculated dynamically at execution time.     </li> <br> 
+								selection). The time period will be calculated dynamically at execution time.     
+                                <br><br> 
 
                                 <ul>
 							    <b>Examples for input format:</b> <br>
@@ -12213,14 +12238,16 @@ sub bdump {
                                 
                                 If both attributes "timeDiffToNow" and "timeOlderThan" are set, the selection  
                                 period will be calculated between of these timestamps dynamically.
-                                <br><br> 								
+                                <br><br> 
+                                </li>								
 
   <a name="timeOlderThan"></a>
   <li><b>timeOlderThan </b>   - the <b>end time</b> of data selection will be set to the timestamp <b>"&lt;aktuelle Zeit&gt; - 
                                 &lt;timeOlderThan&gt;"</b> dynamically. Always the datasets up to timestamp 
 								"&lt;current time&gt; - &lt;timeOlderThan&gt;" will be considered (e.g. if set to 
 								86400, all datasets older than one day are considered). The time period will be calculated dynamically at 
-								execution time. </li> <br> 
+								execution time. 
+                                <br><br> 
                                 
                                 <ul>
 							    <b>Examples for input format:</b> <br>
@@ -12241,7 +12268,8 @@ sub bdump {
                                 
                                 If both attributes "timeDiffToNow" and "timeOlderThan" are set, the selection  
                                 period will be calculated between of these timestamps dynamically.
-                                <br><br> 
+                                <br><br>
+                                </li>                                
 
   <a name="timeout"></a>
   <li><b>timeout </b>         - set the timeout-value for Blocking-Call Routines in background in seconds (default 86400)  </li> <br>
@@ -12285,8 +12313,8 @@ sub bdump {
                                <li>$value - the value of the reading </li>
 							   
 							   </ul>
-							   </li>
-							   <br><br> 
+							   <br><br>
+                               </li>                               
   
   <a name="valueFilter"></a>  
   <li><b>valueFilter </b>     - Regular expression (REGEXP) to filter datasets within particular functions. The REGEXP is  
@@ -13966,7 +13994,8 @@ return $ret;
   
   <a name="averageCalcForm"></a>
   <li><b>averageCalcForm </b> - legt die Berechnungsvariante für die Ermittlung des Durchschnittswertes mit "averageValue" 
-                                fest.<br><br>
+                                fest.
+                                <br><br>
 
                                 Zur Zeit sind folgende Varianten implementiert: <br><br>
 
@@ -13996,7 +14025,7 @@ return $ret;
 								vorhandenen Devices abgeleitet. <br>
                                 Wird dem Device bzw. der Device-Liste oder Geräte-Spezifikation ein "EXCLUDE=" vorangestellt, 
                                 werden diese Devices von der Selektion ausgeschlossen.                                
-                                </li> <br>
+                                <br><br>
   
                                 <ul>
 							    <b>Beispiele:</b> <br>
@@ -14014,6 +14043,7 @@ return $ret;
                                 Falls weitere Informationen zu Geräte-Spezifikationen benötigt werden, bitte 
                                 "get &lt;name&gt; versionNotes 3" ausführen.
 								<br><br>
+                                </li>
 
   <a name="diffAccept"></a>
   <li><b>diffAccept </b>      - gilt für Funktion diffValue. diffAccept legt fest bis zu welchem Schwellenwert eine berechnete positive Werte-Differenz 
@@ -14022,7 +14052,7 @@ return $ret;
 								verfälschen nicht das Ergebnis. Sollten Schwellenwertüberschreitungen vorkommen, wird das Reading "diff_overrun_limit_&lt;diffLimit&gt;"
 								erstellt. (&lt;diffLimit&gt; wird dabei durch den aktuellen Attributwert ersetzt) 
 								Es enthält eine Liste der relevanten Wertepaare. Mit verbose 3 werden diese Datensätze ebenfalls im Logfile protokolliert.
-								</li> <br> 
+								<br><br>
 
                                   <ul>
 							      Beispiel Ausgabe im Logfile beim Überschreiten von diffAccept=10: <br><br>
@@ -14034,6 +14064,7 @@ return $ret;
 							      Differenzwert. <br>
 							      # Es ist zu entscheiden ob der Datensatz gelöscht, ignoriert, oder das Attribut diffAccept angepasst werden sollte. 
                                   </ul><br> 
+                                  </li>
 
   <a name="disable"></a>								  
   <li><b>disable </b>         - deaktiviert das Modul   </li> <br>
@@ -14144,7 +14175,7 @@ sub bdump {
                                       <tr><td> %W    </td><td>: Wochennummer des Jahres, wobei Wochenbeginn = Montag (00..53) </td></tr>
                                   </table>
 	                            </ul> 
-                                </li> <br>
+                                <br>
                                 
                                 <ul>
 							    <b>Beispiele:</b> <br>
@@ -14156,6 +14187,7 @@ sub bdump {
                                 <a name="DbRep_expimpfile"></a>
                                 Zur POSIX Wildcardverwendung siehe auch die Erläuterungen zu <a href="#FileLog">Filelog</a>. 
 								<br><br>
+                                </li>
 
   <a name="fastStart"></a>
   <li><b>fastStart </b>       - Normalerweise verbindet sich jedes DbRep-Device beim FHEM-Start kurz mit seiner Datenbank um 
@@ -14244,11 +14276,11 @@ sub bdump {
   <a name="reading"></a>
   <li><b>reading </b>         - Abgrenzung der DB-Selektionen auf ein bestimmtes oder mehrere Readings sowie exkludieren von
                                 Readings.
-                                Mehrere Readings werden als Komma separierte Liste angegeben. <br>
+                                Mehrere Readings werden als Komma separierte Liste angegeben. 
 								SQL Wildcard (%) wird in einer Liste als normales ASCII-Zeichen gewertet. <br>
                                 Wird dem Reading bzw. der Reading-Liste ein "EXCLUDE=" vorangestellt, werden diese Readings
                                 von der Selektion ausgeschlossen.
-                                </li> <br>  
+                                <br><br>  
 								
                                 <ul>
 							    <b>Beispiele:</b> <br>
@@ -14259,6 +14291,7 @@ sub bdump {
                                 <code>attr &lt;name&gt; reading etotal,etoday EXCLUDE=Einspeisung%  </code> <br>
 								</ul>
 								<br><br>
+                                </li>
 
   <a name="readingNameMap"></a>								
   <li><b>readingNameMap </b>  - der Name des ausgewerteten Readings wird mit diesem String für die Anzeige überschrieben  </li> <br>
@@ -14280,14 +14313,16 @@ sub bdump {
                                     Der Wert des Attributs beschreibt die Abweichung bis zu der aufeinanderfolgende numerische 
                                     Werte (VALUE) von Datensätze als gleich angesehen und gelöscht werden sollen. 
                                     "seqDoubletsVariance" ist ein absoluter Zahlenwert, 
-                                    der sowohl als positive als auch negative Abweichung verwendet wird. </li> <br>
+                                    der sowohl als positive als auch negative Abweichung verwendet wird. 
+                                    <br><br>
 
                                     <ul>
 							        <b>Beispiele:</b> <br>
 								    <code>attr &lt;name&gt; seqDoubletsVariance 0.0014 </code> <br>
 								    <code>attr &lt;name&gt; seqDoubletsVariance 1.45   </code> <br>
 								    </ul>
-								    <br><br>                                     
+								    <br><br>
+                                    </li>                                    
  
   <a name="showproctime"></a> 
   <li><b>showproctime </b>    - wenn gesetzt, zeigt das Reading "sql_processing_time" die benötigte Abarbeitungszeit (in Sekunden) 
@@ -14296,40 +14331,52 @@ sub bdump {
 								Funktion betrachtet.   </li> <br>
 
   <a name="showStatus"></a>								
-  <li><b>showStatus </b>      - grenzt die Ergebnismenge des Befehls "get &lt;name&gt; dbstatus" ein. Es können SQL-Wildcard (%) verwendet werden.    </li> <br>
+  <li><b>showStatus </b>      - grenzt die Ergebnismenge des Befehls "get &lt;name&gt; dbstatus" ein. Es können 
+                                SQL-Wildcard (%) verwendet werden.   
+                                <br><br>
 
                                 <ul>
                                 <b>Bespiel: </b> <br>  
                                 attr &lt;name&gt; showStatus %uptime%,%qcache%  <br>
                                 # Es werden nur Readings erzeugt die im Namen "uptime" und "qcache" enthalten <br>
-                                </ul><br>  
+                                </ul><br> 
+                                </li>                                
 
   <a name="showVariables"></a>								
-  <li><b>showVariables </b>   - grenzt die Ergebnismenge des Befehls "get &lt;name&gt; dbvars" ein. Es können SQL-Wildcard (%) verwendet werden.    </li> <br>
+  <li><b>showVariables </b>   - grenzt die Ergebnismenge des Befehls "get &lt;name&gt; dbvars" ein. Es können 
+                                SQL-Wildcard (%) verwendet werden.   
+                                <br><br>
 
                                 <ul>
                                 <b>Bespiel: </b> <br>
                                 attr &lt;name&gt; showVariables %version%,%query_cache% <br>
                                 # Es werden nur Readings erzeugt die im Namen "version" und "query_cache" enthalten <br>
-                                </ul><br>  
+                                </ul><br>
+                                </li>                                
 
   <a name="showSvrInfo"></a>                             
-  <li><b>showSvrInfo </b>     - grenzt die Ergebnismenge des Befehls "get &lt;name&gt; svrinfo" ein. Es können SQL-Wildcard (%) verwendet werden.    </li> <br>
+  <li><b>showSvrInfo </b>     - grenzt die Ergebnismenge des Befehls "get &lt;name&gt; svrinfo" ein. Es können 
+                                SQL-Wildcard (%) verwendet werden. 
+                                <br><br>
 
                                 <ul>
                                 <b>Bespiel: </b> <br>
                                 attr &lt;name&gt; showSvrInfo %SQL_CATALOG_TERM%,%NAME%  <br>
                                 # Es werden nur Readings erzeugt die im Namen "SQL_CATALOG_TERM" und "NAME" enthalten <br>
-                                </ul><br>  
+                                </ul><br> 
+                                </li>                                
 
   <a name="showTableInfo"></a>								
-  <li><b>showTableInfo </b>   - grenzt die Ergebnismenge des Befehls "get &lt;name&gt; tableinfo" ein. Es können SQL-Wildcard (%) verwendet werden.    </li> <br>
+  <li><b>showTableInfo </b>   - grenzt die Ergebnismenge des Befehls "get &lt;name&gt; tableinfo" ein. Es können 
+                                SQL-Wildcard (%) verwendet werden.  
+                                <br><br>
 
                                 <ul>
                                 <b>Bespiel: </b> <br>
                                 attr &lt;name&gt; showTableInfo current,history  <br>
                                 # Es werden nur Information der Tabellen "current" und "history" angezeigt <br>
-                                </ul><br>  
+                                </ul><br>
+                                </li>                                
 
   <a name="sqlResultFieldSep"></a>
   <li><b>sqlResultFieldSep </b> - legt den verwendeten Feldseparator (default: "|") im Ergebnis des Kommandos 
@@ -14355,7 +14402,7 @@ sub bdump {
                                 <b>json </b>      - erzeugt das Reading SqlResult als
 								                    JSON-kodierten Hash.
 													Jedes Hash-Element (Ergebnissatz) setzt sich aus der laufenden Nummer
-													des Datensatzes (Key) und dessen Wert zusammen. </li><br><br>
+													des Datensatzes (Key) und dessen Wert zusammen. <br><br>
         
 		Die Weiterverarbeitung des Ergebnisses kann z.B. mit der folgenden userExitFn in 99_myUtils.pm erfolgen: <br>
 		<pre>
@@ -14382,7 +14429,8 @@ sub bdump {
         }
   	    </pre>  	
 													
-                                </ul><br>  
+        </ul><br>
+        </li>        
 
   <a name="timeYearPeriod"></a>                                
   <li><b>timeYearPeriod </b> - Mit Hilfe dieses Attributes wird eine jährliche Zeitperiode für die Datenbankselektion bestimmt. 
@@ -14390,7 +14438,7 @@ sub bdump {
                                bestimmt. Eine unterjährige Angabe ist nicht möglich. <br>
                                Dieses Attribut ist vor allem dazu gedacht Auswertungen synchron zu einer Abrechnungsperiode, z.B. der eines 
                                Energie- oder Gaslieferanten, anzufertigen. 
-                               </li> <br> 
+                               <br><br> 
                                
                                <ul>
 							   <b>Beispiel:</b> <br><br>
@@ -14402,9 +14450,10 @@ sub bdump {
                                # Ist das aktuelle Datum >= 01. Januar und =< 24. Juni, dann ist AAAA = aktuelles Jahr-1 und BBBB = aktuelles Jahr
 							   </ul>
 							   <br><br>
+                               </li>
   
   <a name="timestamp_begin"></a> 
-  <li><b>timestamp_begin </b> - der zeitliche Beginn für die Datenselektion </li> <br>
+  <li><b>timestamp_begin </b> - der zeitliche Beginn für die Datenselektion  <br>
   
   Das Format von Timestamp ist "YYYY-MM-DD HH:MM:SS". Für die Attribute "timestamp_begin", "timestamp_end" 
   kann ebenso eine der folgenden Eingaben verwendet werden. Dabei wird das timestamp-Attribut dynamisch belegt: <br><br>
@@ -14429,11 +14478,13 @@ sub bdump {
                               <b>current_hour_end</b>       : entspricht "&lt;aktuelle Stunde&gt;:59:59"                  <br>
                               <b>previous_hour_begin</b>    : entspricht "&lt;vorherige Stunde&gt;:00:00"                 <br>
                               <b>previous_hour_end</b>      : entspricht "&lt;vorherige Stunde&gt;:59:59"                 <br>
-                              </ul><br>
+                              </ul>
+                              <br>
+                              </li>
 
   <a name="timestamp_end"></a>   
   <li><b>timestamp_end </b>   - das zeitliche Ende für die Datenselektion. Wenn nicht gesetzt wird immer die aktuelle 
-                                Datum/Zeit-Kombi für das Ende der Selektion eingesetzt.  </li> <br>
+                                Datum/Zeit-Kombi für das Ende der Selektion eingesetzt.  <br>
 															
   Das Format von Timestamp ist "YYYY-MM-DD HH:MM:SS". Für die Attribute "timestamp_begin", "timestamp_end" 
   kann ebenso eine der folgenden Eingaben verwendet werden. Dabei wird das timestamp-Attribut dynamisch belegt: <br><br>
@@ -14469,7 +14520,7 @@ sub bdump {
 								
 								# Wertet die Datenbank in den Zeitgrenzen des aktuellen Jahres aus. <br>
 								</ul>
-								<br><br>
+								<br>                                
   
   <b>Hinweis </b> <br>
   
@@ -14478,11 +14529,13 @@ sub bdump {
   Das Setzen von "timestamp_begin" bzw. "timestamp_end" bedingt die Löschung von anderen Zeit-Attribute falls sie vorher 
   gesetzt waren.
   <br><br>
+  </li>
   
   <a name="timeDiffToNow"></a> 
   <li><b>timeDiffToNow </b>   - der <b>Selektionsbeginn</b> wird auf den Zeitpunkt <b>"&lt;aktuelle Zeit&gt; - &lt;timeDiffToNow&gt;"</b> 
                                 gesetzt (z.b. werden die letzten 24 Stunden in die Selektion eingehen wenn das Attribut auf "86400" gesetzt 
-								wurde). Die Timestampermittlung erfolgt dynamisch zum Ausführungszeitpunkt.     </li> <br>
+								wurde). Die Timestampermittlung erfolgt dynamisch zum Ausführungszeitpunkt.   
+                                <br><br>
 								
                                 <ul>
 							    <b>Eingabeformat Beispiel:</b> <br>
@@ -14504,13 +14557,15 @@ sub bdump {
                                 Sind die Attribute "timeDiffToNow" und "timeOlderThan" gleichzeitig gesetzt, wird der 
                                 Selektionszeitraum zwischen diesen Zeitpunkten dynamisch kalkuliert.
                                 <br><br>
+                                </li>
 
   <a name="timeOlderThan"></a> 								
   <li><b>timeOlderThan </b>   - das <b>Selektionsende</b> wird auf den Zeitpunkt <b>"&lt;aktuelle Zeit&gt; - &lt;timeOlderThan&gt;"</b> 
                                 gesetzt. Dadurch werden alle Datensätze bis zu dem Zeitpunkt "&lt;aktuelle 
 								Zeit&gt; - &lt;timeOlderThan&gt;" berücksichtigt (z.b. wenn auf 86400 gesetzt, werden alle
 								Datensätze die älter als ein Tag sind berücksichtigt). Die Timestampermittlung erfolgt 
-								dynamisch zum Ausführungszeitpunkt. </li> <br>
+								dynamisch zum Ausführungszeitpunkt. 
+                                <br><br>
 
                                 <ul>
 							    <b>Eingabeformat Beispiel:</b> <br>
@@ -14531,7 +14586,8 @@ sub bdump {
                                 
                                 Sind die Attribute "timeDiffToNow" und "timeOlderThan" gleichzeitig gesetzt, wird der 
                                 Selektionszeitraum zwischen diesen Zeitpunkten dynamisch kalkuliert.
-                                <br><br>                               
+                                <br><br> 
+                                </li>                                 
 
   <a name="timeout"></a> 								
   <li><b>timeout </b>         - das Attribut setzt den Timeout-Wert für die Blocking-Call Routinen in Sekunden  
