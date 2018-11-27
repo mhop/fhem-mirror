@@ -872,7 +872,7 @@ sub ENIGMA2_SendCommand($$;$$) {
                     'Accept-Charset' => 'UTF-8',
                 },
                 sslargs => {
-                    SSL_verify_mode => 'SSL_VERIFY_NONE',
+                    SSL_verify_mode => 0,
                 },
             }
         );
@@ -909,7 +909,7 @@ sub ENIGMA2_SendCommand($$;$$) {
                     'Accept-Charset' => 'UTF-8',
                 },
                 sslargs => {
-                    SSL_verify_mode => 'SSL_VERIFY_NONE',
+                    SSL_verify_mode => 0,
                 },
             }
         );
