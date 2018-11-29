@@ -1559,10 +1559,12 @@ sub wiggle($$) {
     my ( $hash, $shuttersDev ) = @_;
     $shutters->setShuttersDev($shuttersDev);
     $shutters->setNoOffset(1);
+    $shutters->setLastDrive('wiggle begin drive');
 
     my %h = (
         shuttersDev => $shutters->getShuttersDev,
         posValue    => $shutters->getStatus,
+        lastDrive   => 'wiggle end drive',
     );
 
     if ( $shutters->getShuttersPosCmdValueNegate ) {
@@ -2253,6 +2255,7 @@ sub SetCmdFn($) {
     my $posValue    = $h->{posValue};
 
     $shutters->setShuttersDev($shuttersDev);
+    $shutters->setLastDrive($h->{lastDrive}) if ( defined($h->{lastDrive}) );
 
     return
       unless ( $shutters->getASC != 0 );
@@ -2929,7 +2932,8 @@ use GPUtils qw(GP_Import);
 BEGIN {
     GP_Import(
         qw(
-          ReadingsVal)
+          ReadingsVal
+          ReadingsNum)
     );
 }
 
@@ -2943,7 +2947,7 @@ sub getBrightness {
 sub getStatus {
     my $self = shift;
 
-    return ReadingsVal( $self->{shuttersDev}, $shutters->getPosCmd, 0 );
+    return ReadingsNum( $self->{shuttersDev}, $shutters->getPosCmd, 0 );
 }
 
 sub getDelayCmd {
