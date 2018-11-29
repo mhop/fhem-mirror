@@ -11,8 +11,6 @@ sub MQTT2_CLIENT_Write($$$);
 sub MQTT2_CLIENT_Undef($@);
 sub MQTT2_CLIENT_doPublish($@);
 
-my $keepalive = 30;
-
 # See also:
 # http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html
 
@@ -44,6 +42,7 @@ MQTT2_CLIENT_Initialize($)
     disabledForIntervals
     lwt
     lwtRetain
+    keepaliveTimeout
     msgAfterConnect
     msgBeforeDisconnect
     mqttVersion:3.1.1,3.1
@@ -105,6 +104,8 @@ MQTT2_CLIENT_doinit($)
     my ($lwtt, $lwtm) = split(" ",AttrVal($name, "lwt", ""),2);
     my $lwtr = AttrVal($name, "lwtRetain", 0);
     my $m31 = (AttrVal($name, "mqttVersion", "3.1") eq "3.1");
+    my $keepalive = AttrVal($name, "keepaliveTimeout", 30);
+    $keepalive = 30 if($keepalive !~ m/^[0-9]+$/);
     my $msg = 
         ($m31 ? pack("n",6)."MQIsdp".pack("C",3):
                 pack("n",4)."MQTT"  .pack("C",4)).
@@ -121,9 +122,11 @@ MQTT2_CLIENT_doinit($)
     $hash->{connecting} = 2;
     MQTT2_CLIENT_send($hash,
       pack("C",0x10).
-      MQTT2_CLIENT_calcRemainingLength(length($msg)).$msg);
+      MQTT2_CLIENT_calcRemainingLength(length($msg)).$msg, 0, 1);
     RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+$keepalive, "MQTT2_CLIENT_keepalive",$hash,0);
+    if($keepalive) {
+      InternalTimer(gettimeofday()+$keepalive,"MQTT2_CLIENT_keepalive",$hash,0);
+    }
 
   ############################## SUBSCRIBE
   } elsif($hash->{connecting} == 2) {
@@ -137,7 +140,7 @@ MQTT2_CLIENT_doinit($)
                  split(" ", $s));
     MQTT2_CLIENT_send($hash,
       pack("C",0x80).
-      MQTT2_CLIENT_calcRemainingLength(length($msg)).$msg);
+      MQTT2_CLIENT_calcRemainingLength(length($msg)).$msg, 0, 1);
     $hash->{connecting} = 3;
 
   }
@@ -149,7 +152,9 @@ MQTT2_CLIENT_keepalive($)
 {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  return if(ReadingsVal($name, "state", "") ne "opened");
+  my $keepalive = AttrVal($name, "keepaliveTimeout", 30);
+  $keepalive = 30 if($keepalive !~ m/^[0-9]+$/);
+  return if(ReadingsVal($name, "state", "") ne "opened" || $hash->{connecting});
   Log3 $name, 5, "$name: keepalive $keepalive";
   MQTT2_CLIENT_send($hash, pack("C",0xC0).pack("C",0)); # PINGREQ
   InternalTimer(gettimeofday()+$keepalive, "MQTT2_CLIENT_keepalive", $hash, 0);
@@ -363,18 +368,20 @@ MQTT2_CLIENT_doPublish($@)
 }
 
 sub
-MQTT2_CLIENT_send($$;$)
+MQTT2_CLIENT_send($$;$$)
 {
-  my ($hash, $msg, $immediate) = @_;
+  my ($hash, $msg, $immediate, $doSend) = @_;
 
   # Lowlevel debugging
   my $name = $hash->{NAME};
+  $doSend = 1 if(!$doSend && !$hash->{connecting}); # ignore msgs before CONNECT
   if(AttrVal($name, "verbose", 1) >= 5) {
     my $cmd = $cptype{ord($msg)>>4};
     my $msgTxt = $msg;
     $msgTxt =~ s/([^ -~])/"(".ord($1).")"/ge;
-    Log3 $name, 5, "$name: sending  $cmd $msgTxt";
+    Log3 $name, 5, "$name: ".($doSend ? "sending":"discarding")." $cmd $msgTxt";
   }
+  return if(!$doSend);
 
   if($immediate) {
     DevIo_SimpleWrite($hash, $msg, 0);
@@ -521,6 +528,13 @@ MQTT2_CLIENT_getStr($$)
     <a name="lwt"></a>
     <li>lwt &lt;topic&gt; &lt;message&gt; <br>
       set the LWT (last will and testament) topic and message, default is empty.
+      </li></br>
+
+    <a name="keepaliveTimeout"></a>
+    <li>keepaliveTimeout &lt;seconds;&gt;<br>
+      number of seconds for sending keepalive messages, 0 disables it.
+      The broker will disconnect, if there were no messages for
+      1.5 * keepaliveTimeout seconds.
       </li></br>
 
     <a name="lwtRetain"></a>
