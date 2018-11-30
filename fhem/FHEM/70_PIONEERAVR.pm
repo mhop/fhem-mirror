@@ -274,12 +274,12 @@ sub PIONEERAVR_Define($$) {
 		$inputNr = sprintf '%02d', $i;
 		$inputindex = "PIONEERAVR_InputAlias_".$inputNr;
 		my ($err, $data) = getKeyValue($inputindex);
-		if (!defined $err) {
+		if ((!defined $err) && ($data ne '')) {
 			$hash->{helper}{INPUTNAMES}->{$inputNr}{aliasName} = $data;
 		};
 		$inputindex = "PIONEERAVR_InputEnabled_".$inputNr;
 		my ($err, $data) = getKeyValue($inputindex);
-		if (!defined $err) {
+		if ((!defined $err) && ($data ne '')) {
 			$hash->{helper}{INPUTNAMES}->{$inputNr}{enabled} = $data;
 		};
 		undef $err;
@@ -2318,7 +2318,7 @@ sub PIONEERAVR_Read($)
             # 14char -> name of the input
         } elsif ( $line=~ m/^RGB(\d\d)(\d)(.*)/ ) {
             my $inputNr = $1;
-            my $isAlias = $2; #1: aliasName; 0: Standard (predefined) name
+            my $isAlias = $2; #1: sy; 0: Standard (predefined) name
             Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: Name for InputNr: $inputNr is ".dq( $3 );
             # remove non alnum
             $line =~ s/[^a-zA-Z 0-9]/ /g;
