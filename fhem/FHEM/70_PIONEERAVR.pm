@@ -1615,6 +1615,7 @@ PIONEERAVR_Set($@)
         . " speakers:off,A,B,A+B raw"
         . " mcaccMemory:1,2,3,4,5,6 eq:on,off standingWave:on,off"
         . " renameInputAlias"
+        . " inputSkip"
         . " remoteControl:"
         . join(',', sort keys (%{$hash->{helper}{REMOTECONTROL}}));
 
@@ -2006,6 +2007,25 @@ PIONEERAVR_Set($@)
             Log3 $name, 3, "PIONEERAVR $name: set $cmd for inputName: $arg new name: $arg2 ! write $arg2 1RGB $inputToChange ";
             return undef;
 
+        # Change "skip input"
+        } elsif ( $cmd eq "inputSkip" ) {
+            Log3 $name, 3, "PIONEERAVR $name: set $cmd for inputName: $arg skip: $arg2 !";
+            my $inputToChange = undef;
+			foreach my $key ( keys %{$hash->{helper}{INPUTNAMES}} ) {
+				if ( $hash->{helper}{INPUTNAMES}->{$key}{aliasName} eq $arg ) {
+					$inputToChange = sprintf "%02d", $key;
+				} elsif ( $hash->{helper}{INPUTNAMES}->{$key}{name} eq $arg ) {
+					$inputToChange = sprintf "%02d", $key;
+				}
+			}
+			if (( defined $inputToChange) && ($arg2 eq "0" or $arg2 eq "1")) {PIONEERAVR_Write( $hash, $inputToChange."030".$arg2."SSC")}
+			else {
+				my $err = "Warning: Could not modify inputSkip as the inputName: $arg was not found!";
+				return $err;
+				};
+            Log3 $name, 3, "PIONEERAVR $name: set $cmd for inputName: $arg skip: $arg2 !";
+            return undef;
+			
         # selectScreenPage (player command) 
         } elsif ($cmd  eq "selectScreenPage") {
             Log3 $name, 5, "PIONEERAVR $name: set $cmd for inputNr: $inputNr (player command) argument: $arg !";
@@ -3470,6 +3490,7 @@ sub RC_layout_PioneerAVR() {
     <li><b>input <not on the Pioneer hardware deactivated input></b> The list of possible (i.e. not deactivated)
     inputs is read in during Fhem start and with <code>get <name> statusRequest</code>. Renamed inputs are shown with their new (renamed) name</li>
     <li><b>inputDown</b> - Select the next lower input for the Main Zone</li>
+    <li><b>inputSkip <inputName> [0|1]</b> - Enables/disables the input <inputName> (0: enable <inputName>, 1: disable <inputName>)</li>
     <li><b>inputUp</b> - Select the next higher input for the Main Zone</li>
     <li><b>left</b> - "Arrow key left". Available for the same inputs as "play"</li>
     <li><b>listeningMode</b> - Sets a ListeningMode e.g. autoSourround, direct, action,...</li>
@@ -3743,6 +3764,7 @@ sub RC_layout_PioneerAVR() {
     <li><b>input <nicht am Pioneer AV Receiver deaktivierte Eingangsquelle></b> - Schaltet die Eingangsquelle (z.B. CD, HDMI 1,...) auf die Ausgänge der Main-Zone. Die Liste der verfügbaren (also der nicht deaktivierten)
     Eingangsquellen wird beim Start von Fhem und auch mit <code>get <name> statusRequest</code> eingelesen. Wurden die Eingänge am Pioneer AV Receiver umbenannt, wird der neue Name des Eingangs angezeigt.</li>
     <li><b>inputDown</b> - vorherige Eingangsquelle der Main Zone auswählen</li>
+    <li><b>inputSkip <inputName> [0|1]</b> - Aktiviert/deaktiviert den Input <inputName> (0: aktiviert <inputName>, 1: deaktiviert <inputName>)</li>
     <li><b>inputUp</b> - nächste Eingangsquelle der Main Zone auswählen</li>
     <li><b>left</b> - "Pfeiltaste nach links". Für die gleichen Eingangsquellen wie "play"</li>
     <li><b>listeningMode</b> - Setzt einen ListeningMode, z.B. autoSourround, direct, action,...</li>
