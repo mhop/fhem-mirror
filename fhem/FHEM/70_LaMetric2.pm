@@ -271,10 +271,10 @@ sub LaMetric2_Initialize($$) {
     $hash->{AttrList} =
         'disable:0,1 disabledForIntervals do_not_notify:0,1 model '
       . 'defaultOnStatus:always,illumination defaultScreensaverEndTime:00:00,00:15,00:30,00:45,01:00,01:15,01:30,01:45,02:00,02:15,02:30,02:45,03:00,03:15,03:30,03:45,04:00,04:15,04:30,04:45,05:00,05:15,05:30,05:45,06:00,06:15,06:30,06:45,07:00,07:15,07:30,07:45,08:00,08:15,08:30,08:45,09:00,09:15,09:30,09:45,10:00,10:15,10:30,10:45,11:00,11:15,11:30,11:45,12:00,12:15,12:30,12:45,13:00,13:15,13:30,13:45,14:00,14:15,14:30,14:45,15:00,15:15,15:30,15:45,16:00,16:15,16:30,16:45,17:00,17:15,17:30,17:45,18:00,18:15,18:30,18:45,19:00,19:15,19:30,19:45,20:00,20:15,20:30,20:45,21:00,21:15,21:30,21:45,22:00,22:15,22:30,22:45,23:00,23:15,23:30,23:45 defaultScreensaverStartTime:00:00,00:15,00:30,00:45,01:00,01:15,01:30,01:45,02:00,02:15,02:30,02:45,03:00,03:15,03:30,03:45,04:00,04:15,04:30,04:45,05:00,05:15,05:30,05:45,06:00,06:15,06:30,06:45,07:00,07:15,07:30,07:45,08:00,08:15,08:30,08:45,09:00,09:15,09:30,09:45,10:00,10:15,10:30,10:45,11:00,11:15,11:30,11:45,12:00,12:15,12:30,12:45,13:00,13:15,13:30,13:45,14:00,14:15,14:30,14:45,15:00,15:15,15:30,15:45,16:00,16:15,16:30,16:45,17:00,17:15,17:30,17:45,18:00,18:15,18:30,18:45,19:00,19:15,19:30,19:45,20:00,20:15,20:30,20:45,21:00,21:15,21:30,21:45,22:00,22:15,22:30,22:45,23:00,23:15,23:30,23:45 defaultVolume:slider,1,1,100 https:1,0 '
-      . "notificationIcon:none,i8919,a11893,i22392,a12764 notificationIconType:none,info,alert notificationLifeTime notificationPriority:info,warning,critical notificationSound:off,$notifications,$alarms "
-      . "notificationChartIconType:none,info,alert notificationChartLifeTime notificationChartPriority:info,warning,critical notificationChartSound:off,$notifications,$alarms "
-      . "notificationGoalIcon:none,a11460 notificationGoalIconType:none,info,alert notificationGoalLifeTime notificationGoalPriority:info,warning,critical notificationGoalSound:off,$notifications,$alarms notificationGoalStart notificationGoalEnd notificationGoalUnit "
-      . "notificationMetricIcon:none,i9559 notificationMetricIconType:none,info,alert notificationMetricLang:en,de notificationMetricLifeTime notificationMetricPriority:info,warning,critical notificationMetricSound:off,$notifications,$alarms notificationMetricUnit "
+      . "notificationIcon:none,i8919,a11893,i22392,a12764 notificationIconType:none,info,alert notificationLifetime notificationPriority:info,warning,critical notificationSound:off,$notifications,$alarms "
+      . "notificationChartIconType:none,info,alert notificationChartLifetime notificationChartPriority:info,warning,critical notificationChartSound:off,$notifications,$alarms "
+      . "notificationGoalIcon:none,a11460 notificationGoalIconType:none,info,alert notificationGoalLifetime notificationGoalPriority:info,warning,critical notificationGoalSound:off,$notifications,$alarms notificationGoalStart notificationGoalEnd notificationGoalUnit "
+      . "notificationMetricIcon:none,i9559 notificationMetricIconType:none,info,alert notificationMetricLang:en,de notificationMetricLifetime notificationMetricPriority:info,warning,critical notificationMetricSound:off,$notifications,$alarms notificationMetricUnit "
       . $readingFnAttributes;
 
     #$hash->{parseParams} = 1; # not possible due to legacy msg command schema
@@ -328,12 +328,12 @@ sub LaMetric2_Define($$) {
 
             $attr{$name}{notificationIcon}     = 'i8919';
             $attr{$name}{notificationIconType} = 'info';
-            $attr{$name}{notificationLifeTime} = '120';
+            $attr{$name}{notificationLifetime} = '120';
             $attr{$name}{notificationPriority} = 'info';
 
             $attr{$name}{notificationGoalIcon}     = 'a11460';
             $attr{$name}{notificationGoalIconType} = 'info';
-            $attr{$name}{notificationGoalLifeTime} = '120';
+            $attr{$name}{notificationGoalLifetime} = '120';
             $attr{$name}{notificationGoalPriority} = 'info';
             $attr{$name}{notificationGoalStart}    = 0;
             $attr{$name}{notificationGoalEnd}      = 100;
@@ -342,7 +342,7 @@ sub LaMetric2_Define($$) {
             $attr{$name}{notificationMetricIcon}     = 'i9559';
             $attr{$name}{notificationMetricIconType} = 'info';
             $attr{$name}{notificationMetricLang}     = 'en';
-            $attr{$name}{notificationMetricLifeTime} = '120';
+            $attr{$name}{notificationMetricLifetime} = '120';
             $attr{$name}{notificationMetricPriority} = 'info';
         }
 
@@ -1368,7 +1368,7 @@ sub LaMetric2_SetNotification {
     $values{lifetime} =
         $h->{lifetime}
       ? $h->{lifetime}
-      : AttrVal( $name, "notificationLifeTime", 120 );
+      : AttrVal( $name, "notificationLifetime", 120 );
     $values{priority} =
         $h->{priority}
       ? $h->{priority}
@@ -1432,7 +1432,7 @@ sub LaMetric2_SetNotification {
             $values{lifetime} =
                 $h->{lifetime}
               ? $h->{lifetime}
-              : AttrVal( $name, "notificationChartLifeTime",
+              : AttrVal( $name, "notificationChartLifetime",
                 $values{lifetime} );
 
             $values{priority} =
@@ -1539,7 +1539,7 @@ sub LaMetric2_SetNotification {
                 $values{lifetime} =
                     $h->{lifetime}
                   ? $h->{lifetime}
-                  : AttrVal( $name, "notificationGoalLifeTime",
+                  : AttrVal( $name, "notificationGoalLifetime",
                     $values{lifetime} );
 
                 $values{priority} =
@@ -1666,7 +1666,7 @@ sub LaMetric2_SetNotification {
                 $values{lifetime} =
                     $h->{lifetime}
                   ? $h->{lifetime}
-                  : AttrVal( $name, "notificationMetricLifeTime",
+                  : AttrVal( $name, "notificationMetricLifetime",
                     $values{lifetime} );
 
                 $values{priority} =
@@ -1700,7 +1700,7 @@ sub LaMetric2_SetNotification {
     my %notification = (
         priority  => $values{priority},
         icon_type => $values{icontype},
-        lifeTime  => $values{lifetime} * 1000,
+        lifetime  => $values{lifetime} * 1000,
         model     => {
             cycles => $values{cycles},
         },
@@ -1711,7 +1711,7 @@ sub LaMetric2_SetNotification {
     readingsBulkUpdate( $hash, "lastNotificationType",     $notificationType );
     readingsBulkUpdate( $hash, "lastNotificationPriority", $values{priority} );
     readingsBulkUpdate( $hash, "lastNotificationIconType", $values{icontype} );
-    readingsBulkUpdate( $hash, "lastNotificationLifeTime", $values{lifetime} );
+    readingsBulkUpdate( $hash, "lastNotificationLifetime", $values{lifetime} );
 
     # If a cancelID was provided, send a "sticky" notification
     if ( !looks_like_number( $values{cycles} ) || $values{cycles} == 0 ) {
@@ -2265,7 +2265,7 @@ sub LaMetric2_IsDuringTimeframe($$;$) {
     Fallback value for icontype when sending text notifications. Defaults to 'info'.
   </li>
   <li>
-    <a name="LaMetric2AttrnotificationLifeTime" id="LaMetric2AttrnotificationLifeTime"></a><code>notificationLifeTime</code><br>
+    <a name="LaMetric2AttrnotificationLifetime" id="LaMetric2AttrnotificationLifetime"></a><code>notificationLifetime</code><br>
     Fallback value for lifetype when sending text notifications. Defaults to '120'.
   </li>
   <li>
@@ -2281,7 +2281,7 @@ sub LaMetric2_IsDuringTimeframe($$;$) {
     Fallback value for icontype when sending chart notifications. Defaults to 'info'.
   </li>
   <li>
-    <a name="LaMetric2AttrnotificationChartLifeTime" id="LaMetric2AttrnotificationChartLifeTime"></a><code>notificationChartLifeTime</code><br>
+    <a name="LaMetric2AttrnotificationChartLifetime" id="LaMetric2AttrnotificationChartLifetime"></a><code>notificationChartLifetime</code><br>
     Fallback value for lifetype when sending chart notifications. Defaults to '120'.
   </li>
   <li>
@@ -2301,7 +2301,7 @@ sub LaMetric2_IsDuringTimeframe($$;$) {
     Fallback value for icontype when sending goal notifications. Defaults to 'info'.
   </li>
   <li>
-    <a name="LaMetric2AttrnotificationGoalLifeTime" id="LaMetric2AttrnotificationGoalLifeTime"></a><code>notificationGoalLifeTime</code><br>
+    <a name="LaMetric2AttrnotificationGoalLifetime" id="LaMetric2AttrnotificationGoalLifetime"></a><code>notificationGoalLifetime</code><br>
     Fallback value for lifetype when sending goal notifications. Defaults to '120'.
   </li>
   <li>
@@ -2337,7 +2337,7 @@ sub LaMetric2_IsDuringTimeframe($$;$) {
     Default language when evaluating metric notifications. Defaults to 'en'.
   </li>
   <li>
-    <a name="LaMetric2AttrnotificationMetricLifeTime" id="LaMetric2AttrnotificationMetricLifeTime"></a><code>notificationMetricLifeTime</code><br>
+    <a name="LaMetric2AttrnotificationMetricLifetime" id="LaMetric2AttrnotificationMetricLifetime"></a><code>notificationMetricLifetime</code><br>
     Fallback value for lifetype when sending metric notifications. Defaults to '120'.
   </li>
   <li>
