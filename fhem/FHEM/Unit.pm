@@ -662,7 +662,7 @@ my $rtype_base = {
     25 => {
         base_description => {
             de => 'Zahlen',
-            en => 'Numbering',
+            en => 'numbering',
         },
         format       => '%.1f',
         decimal_mark => {
@@ -675,7 +675,7 @@ my $rtype_base = {
     26 => {
         base_description => {
             de => 'Logische Operatoren',
-            en => 'Logical operators',
+            en => 'logical operators',
         },
         tmpl => '%value%',
     },
@@ -2271,6 +2271,7 @@ my $rtypes = {
         scale_m => '1.0e2',
     },
 
+    # logarithmic scale
     b => {
         ref_base => 19,
         scale_m  => '1.0e0',
@@ -2286,6 +2287,7 @@ my $rtypes = {
         scale_m => '1.0e-1',
     },
 
+    # electric current
     ua => {
         ref     => 'a',
         scale_m => '1.0e-6',
