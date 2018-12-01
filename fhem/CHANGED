@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - new:     70_LaMetric2: add official module for LaMetric Smart Clock
   - feature: 73_AutoShuttersControl: change ReadingsVal to ReadingsNum for
                 read position Reading, add setDriveReading for wiggle
   - bugfix:  73_AutoShuttersControl: Code clean, fix unwanted rollo rides

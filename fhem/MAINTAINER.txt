@@ -307,6 +307,7 @@ FHEM/70_EGPM.pm              alexus               Sonstiges
 FHEM/70_ENIGMA2.pm           loredo               Multimedia
 FHEM/70_Jabber.pm            BioS                 Unterstuetzende Dienste
 FHEM/70_JSONMETER.pm         tupol                Sonstiges (Link als PM an tupol)
+FHEM/70_LaMetric2.pm         loredo               Multimedia
 FHEM/70_MEDIAPORTAL.pm       Reinerlein           Multimedia
 FHEM/70_PHTV.pm              loredo               Multimedia
 FHEM/70_ONKYO_AVR.pm         loredo               Multimedia
