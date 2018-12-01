@@ -274,16 +274,18 @@ sub PIONEERAVR_Define($$) {
 		$inputNr = sprintf '%02d', $i;
 		$inputindex = "PIONEERAVR_InputAlias_".$inputNr;
 		my ($err, $data) = getKeyValue($inputindex);
-		if ((!defined $err) && ($data ne '')) {
+		if ((defined $data) && ($data ne '')) {
 			$hash->{helper}{INPUTNAMES}->{$inputNr}{aliasName} = $data;
 		};
 		$inputindex = "PIONEERAVR_InputEnabled_".$inputNr;
-		my ($err, $data) = getKeyValue($inputindex);
-		if ((!defined $err) && ($data ne '')) {
-			$hash->{helper}{INPUTNAMES}->{$inputNr}{enabled} = $data;
+		my ($err1, $data1) = getKeyValue($inputindex);
+		if ((defined $data1) && ($data1 ne '')) {
+			$hash->{helper}{INPUTNAMES}->{$inputNr}{enabled} = $data1;
 		};
 		undef $err;
 		undef $data;
+		undef $err1;
+		undef $data1;
 	};
 
   # ----------------Human Readable command mapping table for "set" commands-----------------------
