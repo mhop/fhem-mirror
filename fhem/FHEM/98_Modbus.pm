@@ -124,6 +124,7 @@
 #   2018-10-12  smaller bugfixes, new attributes enableQueueLengthReading and retriesAfterTimeout
 #   2018-11-05  use DevIO_IsOpen, check if fc6 can be used or fc16 needs to be used, rework open calls
 #   2018-11-10  fixed setExpr -> setexpr
+#   2018-12-01  fixed bug in startUpdateTimer when interval > timeout of a slave
 #
 #
 #
@@ -305,9 +306,9 @@ sub ModbusLD_Set($@);
 sub ModbusLD_GetUpdate($);
 sub ModbusLD_GetIOHash($);
 sub ModbusLD_DoRequest($$$;$$$);
-sub ModbusLD_StartUpdateTimer($;$);
+sub ModbusLD_StartUpdateTimer($);
 
-my $Modbus_Version = '4.0.17 - 10.11.2018';
+my $Modbus_Version = '4.0.18 - 1.12.2018';
 my $Modbus_PhysAttrs = 
         "queueDelay " .
         "queueMax " .
@@ -584,15 +585,24 @@ sub ModbusLD_Define($$)
         
     $hash->{MODBUSID}        = $id;
     $hash->{MODE}            = $mode;
-    $hash->{PROTOCOL}        = $proto;    
-    $hash->{INTERVAL}        = $interval if ($interval);
-    $hash->{RELAY}           = $relay    if ($relay);
+    $hash->{PROTOCOL}        = $proto;
     $hash->{'.getList'}      = "";
     $hash->{'.setList'}      = "";
     $hash->{".updateSetGet"} = 1;
     $hash->{STATE}           = "disconnected";      # initial value
     $hash->{NOTIFYDEV}       = "global";            # NotifyFn nur aufrufen wenn global events (INITIALIZED etc.)
     $hash->{MODULEVERSION}   = "Modbus $Modbus_Version";
+    
+    if ($interval) {
+        $hash->{INTERVAL}    = $interval;
+    } else {
+        delete $hash->{INTERVAL};
+    }
+    if ($relay) {
+        $hash->{RELAY}       = $relay;
+    } else {
+        delete $hash->{RELAY};
+    }
 
     if ($dest) {                                    # Modbus über TCP mit IP Adresse (TCP oder auch RTU/ASCII über TCP)
         $dest .= ":502" if ($dest !~ /.*:[0-9]/);   # add default port if no port specified
@@ -835,7 +845,7 @@ sub ModbusLD_Attr(@)
                     Log3 $name, 3, "$name: no IODev for communication";
                 }
             }           
-            ModbusLD_StartUpdateTimer($hash, 1);    # first Update in 1 second or aligned if interval is defined
+            ModbusLD_StartUpdateTimer($hash);   # first Update in 1 second or aligned if interval is defined
         }
     }   
     return;
@@ -1479,7 +1489,7 @@ sub Modbus_Notify($$)
     }
     # logical device going through an IO Device
     if ($hash->{TYPE} ne "Modbus" && $hash->{MODE} eq 'master') {        
-        ModbusLD_StartUpdateTimer($hash, 1);        # logical device -> first Update in 1 second or aligned if interval is defined
+        ModbusLD_StartUpdateTimer($hash);               # logical device -> first Update in 1 second or aligned if interval is defined
     
     # relay device to communicate through
     } elsif ($hash->{MODE} && $hash->{MODE} eq 'relay') {    # Mode relay -> find / check relay device
@@ -3551,31 +3561,61 @@ sub Modbus_Send($$$;$)
 # set internal Timer to call GetUpdate if necessary
 # either at next interval 
 # or if start is passed in start seconds (e.g. 2 seconds after Fhem init)
-sub ModbusLD_StartUpdateTimer($;$)
-{
-    my ($hash, $start) = @_;
-    my $nextTrigger;
-    my $name = $hash->{NAME};
-    my $now  = gettimeofday();
-    $start   = 0 if (!$start);
-    
-    #Log3 $name, 5, "$name: StartUpdateTimer called from " . Modbus_Caller();
+# called from attr (disable, alignTime), set (interval, start), openCB, 
+# notify (INITIALIZED|REREADCFG|MODIFIED|DEFINED) and getUpdate
 
-    if ($hash->{INTERVAL} && $hash->{INTERVAL} > 0) {
+# problem: when disconected while waiting for next update cycle, 
+#   StartUpdateTimer gets called after immediate reopen. 
+#   Timer should be set as short as possible (>= lastUpdate + Interval)
+#   or if timeAlign, then 
+
+
+# how to set timer after a new open?
+# if timer is still running, just keep it 
+#    but maybe alignTime was set in the meantime -> timer needs new alignment now or after next update
+# if alignTime didn't change, timer can be kept.
+#
+# if timer is not running and last update was longer ago than interval, schedule update to happen immediately
+#
+
+sub ModbusLD_StartUpdateTimer($)
+{
+    my ($hash) = @_;
+    my $name   = $hash->{NAME};
+    my $now    = gettimeofday();
+    my $action = "updated timer";
+    my $intvl  = ($hash->{INTERVAL} ? $hash->{INTERVAL} : 0);
+    my $delay;
+    my $nextUpdate;
+    
+    Log3 $name, 5, "$name: StartUpdateTimer called from " . Modbus_Caller();
+    if ($intvl > 0) {   # there is an interval -> set timer
         if ($hash->{TimeAlign}) {
-            my $count = int(($now - $hash->{TimeAlign} + $start) / $hash->{INTERVAL});
-            my $curCycle = $hash->{TimeAlign} + $count * $hash->{INTERVAL};
-            $nextTrigger = $curCycle + $hash->{INTERVAL};
+            # it doesn't matter when last update was, or if timer is still set. we can always calculate next update
+            my $start   = ($hash->{lastUpdate} ? 0 : 2);        # first update at least 2 secs from now
+            my $count   = int(($now - $hash->{TimeAlign} + $start) / $intvl);
+            $nextUpdate = $hash->{TimeAlign} + $count * $intvl + $intvl;    
+
+        } elsif ($hash->{TRIGGERTIME} && $hash->{TRIGGERTIME} <= ($now + $intvl)) {
+            # timer is still set and shorter than new calculation -> keep and log
+            $action = "kept existing timer";
+            $nextUpdate = $hash->{TRIGGERTIME};
+        } elsif (!$hash->{lastUpdate}) {
+            # first time timer is set
+            $action = "initialisation";
+            $nextUpdate = $now + 2;
         } else {
-            $nextTrigger = $now + ($start ? $start : $hash->{INTERVAL});
+            $nextUpdate = $hash->{lastUpdate} + $intvl;
+            $nextUpdate = $now if ($nextUpdate < $now );
         }
-        $hash->{TRIGGERTIME}     = $nextTrigger;
-        $hash->{TRIGGERTIME_FMT} = FmtDateTime($nextTrigger);
+        $hash->{TRIGGERTIME}     = $nextUpdate;
+        $hash->{TRIGGERTIME_FMT} = FmtDateTime($nextUpdate);
+        $delay = sprintf ("%.1f", $nextUpdate - $now);
+        Log3 $name, 5, "$name: SetartUpdateTimer $action, will call GetUpdate in $delay sec at $hash->{TRIGGERTIME_FMT}, interval $intvl";
         RemoveInternalTimer("update:$name");
-        InternalTimer($nextTrigger, "ModbusLD_GetUpdate", "update:$name", 0);
-        Log3 $name, 4, "$name: SetUpdateTimer updated timer - will call GetUpdate in " . 
-            sprintf ("%.1f", $nextTrigger - $now) . " seconds at $hash->{TRIGGERTIME_FMT} - Interval $hash->{INTERVAL}";
-    } else {
+        InternalTimer($nextUpdate, "ModbusLD_GetUpdate", "update:$name", 0);
+            
+    } else {    # no interval -> no timer
         ModbusLD_StopUpdateTimer($hash);
     }
     return;
@@ -3593,6 +3633,7 @@ sub ModbusLD_StopUpdateTimer($)
         Log3 $name, 4, "$name: internal update interval timer stopped";
         delete $hash->{TRIGGERTIME};
         delete $hash->{TRIGGERTIME_FMT};
+        $hash->{TRIGGERTIME_SAVED} = $hash->{TRIGGERTIME};
     }
     return;
 }
@@ -3617,7 +3658,10 @@ sub ModbusLD_GetUpdate($) {
     my $now       = gettimeofday();
     
     Log3 $name, 5, "$name: GetUpdate called from " . Modbus_Caller();
+    $hash->{lastUpdate} = $now;
     if ($calltype eq "update") {
+        delete $hash->{TRIGGERTIME};
+        delete $hash->{TRIGGERTIME_FMT};
         ModbusLD_StartUpdateTimer($hash);
     }
     
@@ -3627,7 +3671,7 @@ sub ModbusLD_GetUpdate($) {
         return;
     }
     my $ioHash = ModbusLD_GetIOHash($hash);         # only needed for profiling, availability id checked in CheckDisable    
-    Modbus_Profiler($ioHash, "Fhem");   
+    Modbus_Profiler($ioHash, "Fhem");
     my @ObjList;
     my %readList;
     
