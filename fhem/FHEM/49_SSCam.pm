@@ -45,6 +45,7 @@ use HttpUtils;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "7.5.0"  => "02.12.2018  sub SSCam_StreamDev and SSCam_composegallery changed to use popup window ",
   "7.4.1"  => "26.11.2018  sub composegallery deleted, SSCam_composegallery changed to get information for SSCam_refresh ",
   "7.4.0"  => "24.11.2018  new set command \"createReadingsGroup\", versionNotes can process lists like \"2,6\", changed compatibility check, use SnapId when get information after took snapshot and sscam state-event ",
   "7.3.3"  => "18.11.2018  change rights decsption in commandRef ",
@@ -5067,13 +5068,8 @@ sub SSCam_camop_parse ($) {
                 my $stmkey = $sk[1];
                 $stmkey =~ tr/"//d;
 				# Quotes in StmKey entfernen falls noQuotesForSID gesezt 
-				$mjpegHttp =~ tr/"//d if(AttrVal($name, "noQuotesForSID",0));
-                
-                # Readings löschen falls sie nicht angezeigt werden sollen (showStmInfoFull)
-                #if (!AttrVal($name,"showStmInfoFull",0)) {
-                #    delete($defs{$name}{READINGS}{StmKeymjpegHttp});
-					#delete($defs{$name}{READINGS}{StmKeyUnicstOverHttp});
-                #}
+				# $mjpegHttp =~ tr/"//d if(AttrVal($name, "noQuotesForSID",0));
+                $mjpegHttp =~ tr/"//d;
                 
                 # Streaminginfos in Helper speichern
                 $hash->{HELPER}{STMKEYMJPEGHTTP}      = $mjpegHttp if($mjpegHttp);
@@ -6177,9 +6173,9 @@ return;
 }
 
 ######################################################################################
-#              Stream einer Kamera - Kamera Liveview weblink device
-#              API: SYNO.SurveillanceStation.VideoStreaming
-#              Methode: GetLiveViewPath
+#      Funktion für SSCamSTRM-Devices - Kamera Liveview weblink device
+#      API: SYNO.SurveillanceStation.VideoStreaming
+#      Methode: GetLiveViewPath
 ######################################################################################
 sub SSCam_StreamDev($$$) {
   my ($camname,$strmdev,$fmt) = @_; 
@@ -6235,6 +6231,7 @@ sub SSCam_StreamDev($$$) {
   
   my $ha     = AttrVal($camname, "htmlattr", 'width="500" height="325"');   # HTML Attribute der Cam
   $ha        = AttrVal($strmdev, "htmlattr", $ha);                          # htmlattr mit htmattr Streaming-Device übersteuern 
+  my $pws    = AttrVal($strmdev, "popupWindowSize", '');                    # Größe eines Popups 
   my $StmKey = ReadingsVal($camname,"StmKey",undef);
   
   $ret  = "";
@@ -6264,7 +6261,7 @@ sub SSCam_StreamDev($$$) {
       if($apiaudiostmmaxver) {      # keine API "SYNO.SurveillanceStation.AudioStream" mehr ab API v2.8 
 	      $audiolink = "$proto://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmmaxver&method=Stream&cameraId=$camid&_sid=$sid"; 
       }
-	  $ret .= "<td><img src=$link $ha><br>";
+	  $ret .= "<td><img src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"><br>";
       if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
              # Aufnahmebutton endlos Start
              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\">$imgrecendless </a>";
@@ -6334,7 +6331,7 @@ sub SSCam_StreamDev($$$) {
       
       if($link && $wltype =~ /image|iframe|video|base64img|embed|hls/) {
           if($wltype =~ /image/) {
-              $ret .= "<td><img src=$link $ha><br>";
+              $ret .= "<td><img src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"><br>";
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";
               $ret .= $imgblank;
               if($hash->{HELPER}{RUNVIEW} =~ /live_fw/) {              
@@ -6363,7 +6360,7 @@ sub SSCam_StreamDev($$$) {
               }         
           
           } elsif ($wltype =~ /iframe/) {
-              $ret .= "<td><iframe src=$link $ha controls autoplay>
+              $ret .= "<td><iframe src=$link $ha controls autoplay onClick=\"FW_okDialog('<img src=$link $pws>')\">
                        Iframes disabled
                        </iframe><br>";
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";
@@ -6379,7 +6376,7 @@ sub SSCam_StreamDev($$$) {
               }
           
           } elsif ($wltype =~ /video/) {
-              $ret .= "<td><video $ha controls autoplay> 
+              $ret .= "<td><video $ha controls autoplay>
                        <source src=$link type=\"video/mp4\"> 
                        <source src=$link type=\"video/ogg\">
                        <source src=$link type=\"video/webm\">
@@ -6396,12 +6393,12 @@ sub SSCam_StreamDev($$$) {
                   $ret .= "</td>";
               }
           } elsif($wltype =~ /base64img/) {
-              $ret .= "<td><img src='data:image/jpeg;base64,$link' $ha><br>";
+              $ret .= "<td><img src='data:image/jpeg;base64,$link' $ha onClick=\"FW_okDialog('<img src=data:image/jpeg;base64,$link $pws>')\"><br>";
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";
               $ret .= "</td>";
 		  
           } elsif($wltype =~ /embed/) {
-              $ret .= "<td><embed src=$link $ha></td>";
+              $ret .= "<td><embed src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"></td>";
           
           } elsif($wltype =~ /hls/) {
               $ret .= "<td><video $ha controls autoplay>
@@ -6456,6 +6453,7 @@ return $ret;
 
 ###############################################################################
 #                   Schnappschußgalerie zusammenstellen
+#                   Verwendung durch SSCamSTRM-Devices
 ###############################################################################
 sub SSCam_composegallery ($;$$) { 
   my ($name,$strmdev,$model) = @_;
@@ -6481,13 +6479,14 @@ sub SSCam_composegallery ($;$$) {
   my $cmddosnap     = "cmd=set $name snap STRM";                 # Snapshot auslösen mit Kennzeichnung "by STRM-Device"
   my $imgdosnap     = "<img src=\"$FW_ME/www/images/sscam/black_btn_DOSNAP.png\">";
  
-  my $ha = AttrVal($name, "snapGalleryHtmlAttr", AttrVal($name, "htmlattr", 'width="500" height="325"'));
+  my $ha  = AttrVal($name, "snapGalleryHtmlAttr", AttrVal($name, "htmlattr", 'width="500" height="325"'));
+  my $pws = AttrVal($strmdev, "popupWindowSize", "");            # Größe eines Popups 
   
   # falls "SSCam_composegallery" durch ein SSCamSTRM-Device aufgerufen wird
   my $devWlink = "";
   if ($strmdev) {
       my $wlha = AttrVal($strmdev, "htmlattr", undef); 
-      $ha      = (defined($wlha))?$wlha:$ha;                # htmlattr vom SSCamSTRM-Device übernehmen falls von SSCamSTRM-Device aufgerufen und gesetzt   
+      $ha      = (defined($wlha))?$wlha:$ha;                     # htmlattr vom SSCamSTRM-Device übernehmen falls von SSCamSTRM-Device aufgerufen und gesetzt   
   }
   
   # wenn SSCamSTRM-device genutzt wird und attr "snapGalleryBoost" nicht gesetzt ist -> Warnung in Gallerie ausgeben
@@ -6521,7 +6520,7 @@ sub SSCam_composegallery ($;$$) {
   
   foreach my $key (@as) {
       $ct = $allsnaps->{$key}{createdTm};
-	  my $html = sprintf("<td>$ct<br /> <img $gattr src=\"data:image/jpeg;base64,$allsnaps->{$key}{imageData}\" /> </td>" );
+	  my $html = sprintf("<td>$ct<br> <img src=\"data:image/jpeg;base64,$allsnaps->{$key}{imageData}\" $gattr onClick=\"FW_okDialog('<img src=data:image/jpeg;base64,$allsnaps->{$key}{imageData} $pws>')\"> </td>" );
 
       $cell++;
 

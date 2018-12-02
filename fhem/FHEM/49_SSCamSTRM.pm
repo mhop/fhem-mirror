@@ -34,6 +34,7 @@ use warnings;
 
 # Versions History intern
 our %SSCamSTRM_vNotesIntern = (
+  "1.5.0"  => "02.12.2018  new attribute \"popupWindowSize\" ",
   "1.4.1"  => "31.10.2018  attribute \"autoLoop\" changed to \"autoRefresh\", new attribute \"autoRefreshFW\" ",
   "1.4.0"  => "29.10.2018  readingFnAttributes added ",
   "1.3.0"  => "28.10.2018  direct help for attributes, new attribute \"autoLoop\" ",
@@ -68,6 +69,7 @@ sub SSCamSTRM_Initialize($) {
                                 "forcePageRefresh:1,0 ". 
                                 "htmlattr ".
                                 "hideDisplayName:1,0 ".
+                                "popupWindowSize ".
                                 $readingFnAttributes;
   $hash->{FW_summaryFn}       = "SSCamSTRM_FwFn";
   $hash->{FW_detailFn}        = "SSCamSTRM_FwFn";
@@ -274,12 +276,23 @@ Dependend of the Streaming-Device state, different buttons are provided to start
     
     <a name="htmlattr"></a>
     <li><b>htmlattr</b><br>
-      Additional HTML tags to manipulate the streaming device. <br>
-      <ul>
+      Additional HTML tags to manipulate the streaming device. 
+      <br><br>
       <ul>
         <b>Example: </b><br>
-        attr &lt;name&gt; htmlattr width="480" height="560" <br>
+        attr &lt;name&gt; htmlattr width=480 height=560 <br>
       </ul>
+    </li>
+    <br>
+    
+    <a name="popupWindowSize"></a>
+    <li><b>popupWindowSize</b><br>
+      If the content of playback (Videostream or Snapshot gallery) is suitable, by clicking the content a popup window will appear. 
+      The size of display can be setup by this attribute. 
+      <br><br>
+      <ul>
+        <b>Example: </b><br>
+        attr &lt;name&gt; popupWindowSize width=1000 height=625        <br>
       </ul>
     </li>
   
@@ -378,10 +391,23 @@ Abhängig vom Zustand des Streaming-Devices werden zum Start von Aktionen unters
     
     <a name="htmlattr"></a>
     <li><b>htmlattr</b><br>
-      Zusätzliche HTML Tags zur Darstellungsänderung im Streaming Device. <br>
+      Zusätzliche HTML Tags zur Darstellungsänderung im Streaming Device. 
+      <br><br>
       <ul>
         <b>Beispiel: </b><br>
-        attr &lt;name&gt; htmlattr width="480" height="560" <br>
+        attr &lt;name&gt; htmlattr width=480 height=560        <br>
+      </ul>
+    </li>
+    <br>
+    
+    <a name="popupWindowSize"></a>
+    <li><b>popupWindowSize</b><br>
+      Bei geeigneten Wiedergabeinhalten (Videostream oder Schnappschußgalerie) öffnet ein Klick auf den Bildinhalt ein 
+      Popup-Fenster mit diesem Inhalt. Die Darstellungsgröße kann mit diesem Attribut eingestellt werden. 
+      <br><br>
+      <ul>
+        <b>Beispiel: </b><br>
+        attr &lt;name&gt; popupWindowSize width=1000 height=625        <br>
       </ul>
     </li>
 
