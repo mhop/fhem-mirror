@@ -35,6 +35,7 @@ use strict;
 use warnings;
 
 require "HttpUtils.pm";
+require "DevIo.pm";
 
 my @clients = qw(
 NeuronPin
