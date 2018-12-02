@@ -67,6 +67,14 @@ filter:TYPE=MQTT2_DEVICE
 attr DEVICE stateFormat T: temperature_weather B: illuminance L: linkquality
 attr DEVICE userReadings temperature_weather { sprintf("%.1f",ReadingsVal("DEVICE","temperature","")+2.5) }
 
+name:zigbee2mqtt_smart+plug
+filter:TYPE=MQTT2_DEVICE
+par:NAMEINTHEBRIDGE;name of this device in the bridge;{ AttrVal("DEVICE","readingList","") =~ m,zigbee2mqtt/(.*):, ? $1 : undef }
+attr DEVICE eventMap { dev=>{ON=>'on',OFF=>'off'} }
+attr DEVICE setList \
+  off zigbee2mqtt/NAMEINTHEBRIDGE/set OFF\
+  on zigbee2mqtt/NAMEINTHEBRIDGE/set ON
+
 
 ###########################################
 # TASMOTA

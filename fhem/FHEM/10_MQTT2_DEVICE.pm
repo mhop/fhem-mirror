@@ -181,7 +181,8 @@ MQTT2_DEVICE_Parse($$)
     }, undef);
 
     my $cidArr = $modules{MQTT2_DEVICE}{defptr}{cid}{$newCid};
-    return "UNDEFINED MQTT2_$newCid MQTT2_DEVICE $newCid" if(!$cidArr);
+    return "UNDEFINED MQTT2_$newCid MQTT2_DEVICE $newCid"
+        if(!$cidArr || !int(@{$cidArr}));
     return "";
   }
 
