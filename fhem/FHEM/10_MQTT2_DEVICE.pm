@@ -181,8 +181,11 @@ MQTT2_DEVICE_Parse($$)
     }, undef);
 
     my $cidArr = $modules{MQTT2_DEVICE}{defptr}{cid}{$newCid};
-    return "UNDEFINED MQTT2_$newCid MQTT2_DEVICE $newCid"
-        if(!$cidArr || !int(@{$cidArr}));
+    if(!$cidArr || !int(@{$cidArr})) {
+      my $devName = $newCid;
+      $devName =~ s/[^a-z0-9._]/_/g;
+      return "UNDEFINED MQTT2_$devName MQTT2_DEVICE $newCid";
+    }
     return "";
   }
 
@@ -341,6 +344,13 @@ MQTT2_DEVICE_Attr($$)
   }
 
   if($attrName eq "bridgeRegexp" && $type eq "set") {
+
+    my $old = AttrVal($dev, "bridgeRegexp", "");
+    foreach my $el (split("\n", $old)) {
+      my ($par1, $par2) = split(" ", $el, 2);
+      delete($modules{MQTT2_DEVICE}{defptr}{bridge}{$par1}) if($par1);
+    }
+
     foreach my $el (split("\n", $param)) {
       my ($par1, $par2) = split(" ", $el, 2);
       next if(!$par1);
