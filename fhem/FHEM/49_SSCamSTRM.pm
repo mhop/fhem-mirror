@@ -280,7 +280,7 @@ Dependend of the Streaming-Device state, different buttons are provided to start
       <br><br>
       <ul>
         <b>Example: </b><br>
-        attr &lt;name&gt; htmlattr width=480 height=560 <br>
+        attr &lt;name&gt; htmlattr width="480" height="560" <br>
       </ul>
     </li>
     <br>
@@ -292,7 +292,7 @@ Dependend of the Streaming-Device state, different buttons are provided to start
       <br><br>
       <ul>
         <b>Example: </b><br>
-        attr &lt;name&gt; popupWindowSize width=1000 height=625        <br>
+        attr &lt;name&gt; popupWindowSize width="600" height="425"  <br>
       </ul>
     </li>
   
@@ -395,7 +395,7 @@ Abhängig vom Zustand des Streaming-Devices werden zum Start von Aktionen unters
       <br><br>
       <ul>
         <b>Beispiel: </b><br>
-        attr &lt;name&gt; htmlattr width=480 height=560        <br>
+        attr &lt;name&gt; htmlattr width="480" height="560"  <br>
       </ul>
     </li>
     <br>
@@ -407,7 +407,7 @@ Abhängig vom Zustand des Streaming-Devices werden zum Start von Aktionen unters
       <br><br>
       <ul>
         <b>Beispiel: </b><br>
-        attr &lt;name&gt; popupWindowSize width=1000 height=625        <br>
+        attr &lt;name&gt; popupWindowSize width="600" height="425"  <br>
       </ul>
     </li>
 

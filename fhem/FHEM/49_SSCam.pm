@@ -45,6 +45,7 @@ use HttpUtils;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "7.6.0"  => "02.12.2018  sub SSCam_ptzpanel completed by Preset and Patrol, minor fixes ",
   "7.5.0"  => "02.12.2018  sub SSCam_StreamDev and SSCam_composegallery changed to use popup window ",
   "7.4.1"  => "26.11.2018  sub composegallery deleted, SSCam_composegallery changed to get information for SSCam_refresh ",
   "7.4.0"  => "24.11.2018  new set command \"createReadingsGroup\", versionNotes can process lists like \"2,6\", changed compatibility check, use SnapId when get information after took snapshot and sscam state-event ",
@@ -96,6 +97,9 @@ our %SSCam_vNotesIntern = (
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
+  "7.6.0"  => "02.12.2018 The PTZ panel is completed by \"Preset\" and \"Patrol\" (only for PTZ cameras) ",
+  "7.5.0"  => "02.12.2018 A click on suitable content in a stream- or snapgallery device opens a popup window. ".
+               "The popup size can be adjusted by attribute \"popupWindowSize\". ",
   "7.4.0"  => "20.11.2018 new command \"createReadingsGroup\". By this command a ReadingsGroup with a name of your choice (or use the default name) can be created. ".
               "Procedure changes of taking snapshots avoid inaccuracies if camera names in SVS very similar. ",
   "7.3.2"  => "12.11.2018 fix Warning if 'livestreamprefix' is set to DEF, COMPATIBILITY set to 8.2.2 ",
@@ -268,6 +272,8 @@ use vars qw($FW_ME);      # webname (default is fhem), used by 97_GROUP/weblink
 use vars qw($FW_subdir);  # Sub-path in URL, used by FLOORPLAN/weblink
 use vars qw($FW_room);    # currently selected room
 use vars qw($FW_detail);  # currently selected device for detail view
+use vars qw($FW_wname);   # Web instance
+sub FW_pH(@);             # add href
 
 sub SSCam_Initialize($) {
  my ($hash) = @_;
@@ -6046,6 +6052,8 @@ sub SSCam_ptzpanel($;$$) {
   my $hash       = $defs{$name};
   my $iconpath   = AttrVal("$name","ptzPanel_iconPath","www/images/sscam");
   my $iconprefix = AttrVal("$name","ptzPanel_iconPrefix","black_btn_");
+  my $valPresets = ReadingsVal("$name","Presets","");
+  my $valPatrols = ReadingsVal("$name","Patrols","");
   my $rowisset   = 0;
   my $ptz_ret;
   my $row;
@@ -6100,6 +6108,61 @@ sub SSCam_ptzpanel($;$$) {
   
   $ptz_ret .= "</table>";
   $ptz_ret .= "</div>";
+  
+  ########################
+  # add Preset & Patrols
+  
+  my ($Presets,$Patrols,$fn);
+  my $cmdPreset = "goPreset";
+  my $cmdPatrol = "runPatrol";
+  
+  foreach $fn (sort keys %{$data{webCmdFn}}) {
+      no strict "refs";
+      $Presets = &{$data{webCmdFn}{$fn}}($FW_wname,$name,"",$cmdPreset,$valPresets);
+      use strict "refs";
+      last if(defined($Presets));
+  }
+  if($Presets) {
+      $Presets =~ s,^<td[^>]*>(.*)</td>$,$1,;
+      # Log3($name, 1, "$name - commandArgs: $Presets");
+  } else {
+      $Presets = FW_pH "cmd.$name=set $name $cmdPreset", $cmdPreset, 0, "", 1, 1;
+  }
+
+  foreach $fn (sort keys %{$data{webCmdFn}}) {
+      no strict "refs";
+      $Patrols = &{$data{webCmdFn}{$fn}}($FW_wname,$name,"",$cmdPatrol,$valPatrols);
+      use strict "refs";
+      last if(defined($Patrols));
+  }
+  
+  
+  # Rahmenklasse
+  $ptz_ret .= "<div class=\"ptzpanel\">";
+  $ptz_ret .= "<table class=\"rc_body\">";  
+  $ptz_ret .= "<tr>";
+  $ptz_ret .= '<td class="rc_button">';
+  
+  # Dropdown Klasse
+  $ptz_ret .= "<table class=\"webcmd\">";  
+  $ptz_ret .= "<tr>";
+  $ptz_ret .= "<td style=\"font-size:250%;\">Preset:  </td><td><div class='col3'>$Presets</div></td>";  
+  $ptz_ret .= "</tr>";
+  $ptz_ret .= "</table>";
+  
+  $ptz_ret .= "<table class=\"webcmd\">"; 
+  $ptz_ret .= "<tr>";
+  $ptz_ret .= "<td style=\"font-size:250%;\">Patrol:  </td><td><div class='col3'>$Patrols</div></td>";
+  $ptz_ret .= "</tr>";
+  $ptz_ret .= "</table>";
+  
+  # Rahmenklasse end
+  $ptz_ret .= "</td>";
+  $ptz_ret .= "</tr>";
+  $ptz_ret .= "</table>";
+  $ptz_ret .= "</div>";
+  
+ #####################
   
   if ($rowisset) {
       return $ptz_ret;
@@ -6231,7 +6294,8 @@ sub SSCam_StreamDev($$$) {
   
   my $ha     = AttrVal($camname, "htmlattr", 'width="500" height="325"');   # HTML Attribute der Cam
   $ha        = AttrVal($strmdev, "htmlattr", $ha);                          # htmlattr mit htmattr Streaming-Device übersteuern 
-  my $pws    = AttrVal($strmdev, "popupWindowSize", '');                    # Größe eines Popups 
+  my $pws    = AttrVal($strmdev, "popupWindowSize", "");                    # Größe eines Popups
+  $pws      =~ s/"//g if($pws);
   my $StmKey = ReadingsVal($camname,"StmKey",undef);
   
   $ret  = "";
@@ -6284,6 +6348,7 @@ sub SSCam_StreamDev($$$) {
                        Your browser does not support the audio element.      
                        </audio>";
           $ret .= "</td>";
+          $ret .= "<td></td>" if(AttrVal($camname,"ptzPanel_use",1));
       }      
   
   } elsif($fmt =~ /generic/) {  
@@ -6357,6 +6422,8 @@ sub SSCam_StreamDev($$$) {
                   $ret .= "<td><audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>
                                Your browser does not support the audio element.      
                                </audio>";
+                  $ret .= "</td>";
+                  $ret .= "<td></td>" if(AttrVal($camname,"ptzPanel_use",1));
               }         
           
           } elsif ($wltype =~ /iframe/) {
@@ -6373,6 +6440,7 @@ sub SSCam_StreamDev($$$) {
                                Your browser does not support the audio element.      
                                </audio>";
                   $ret .= "</td>";
+                  $ret .= "<td></td>" if(AttrVal($camname,"ptzPanel_use",1));
               }
           
           } elsif ($wltype =~ /video/) {
@@ -6391,6 +6459,7 @@ sub SSCam_StreamDev($$$) {
                                Your browser does not support the audio element.      
                                </audio>";
                   $ret .= "</td>";
+                  $ret .= "<td></td>" if(AttrVal($camname,"ptzPanel_use",1));
               }
           } elsif($wltype =~ /base64img/) {
               $ret .= "<td><img src='data:image/jpeg;base64,$link' $ha onClick=\"FW_okDialog('<img src=data:image/jpeg;base64,$link $pws>')\"><br>";
@@ -6480,7 +6549,8 @@ sub SSCam_composegallery ($;$$) {
   my $imgdosnap     = "<img src=\"$FW_ME/www/images/sscam/black_btn_DOSNAP.png\">";
  
   my $ha  = AttrVal($name, "snapGalleryHtmlAttr", AttrVal($name, "htmlattr", 'width="500" height="325"'));
-  my $pws = AttrVal($strmdev, "popupWindowSize", "");            # Größe eines Popups 
+  my $pws = AttrVal($strmdev, "popupWindowSize", "");            # Größe eines Popups
+  $pws    =~ s/"//g if($pws);  
   
   # falls "SSCam_composegallery" durch ein SSCamSTRM-Device aufgerufen wird
   my $devWlink = "";
@@ -6637,6 +6707,7 @@ sub SSCam_experror {
    <a href="http://forum.fhem.de/index.php/topic,45671.msg374390.html#msg374390">49_SSCam: Fragen, Hinweise, Neuigkeiten und mehr rund um dieses Modul</a>.<br><br>
   
 <b> Prerequisites </b> <br><br>
+  <ul>
     This module uses the Perl-module JSON. <br>
 	On Debian-Linux based systems this module can be installed by: <br><br>
     
@@ -6652,8 +6723,14 @@ sub SSCam_experror {
     Data::Dumper    <br>                  
     MIME::Base64    <br>
     Time::HiRes     <br>
-    HttpUtils       (FHEM-module) <br><br>
+    HttpUtils       (FHEM-module) 
+    <br><br>
     
+    The PTZ panel (only PTZ cameras) in SSCam use its own icons. 
+    Thereby the system find the icons, in FHEMWEB device the attribute "iconPath" has to be completed by "sscam" 
+    (e.g. "attr WEB iconPath default:fhemSVG:openautomation:sscam").
+    <br><br> 
+  </ul>  
 
   <a name="SSCamdefine"></a>
   <b>Define</b>
@@ -7747,7 +7824,11 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <a name="ptzPanel_use"></a>
   <li><b>ptzPanel_use</b><br>
     Switch the usage of a PTZ-control panel in detail view respectively a created StreamDevice off or on 
-    (default: on). </li><br> 
+    (default: on). <br>
+    The PTZ panel use its own icons. 
+    Thereby the system find the icons, in FHEMWEB device the attribute "iconPath" has to be completed by "sscam" 
+    (e.g. "attr WEB iconPath default:fhemSVG:openautomation:sscam").    
+  </li><br> 
   
   <a name="rectime"></a>
   <li><b>rectime</b><br>
@@ -7999,7 +8080,13 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     Data::Dumper    <br>                  
     MIME::Base64    <br>
     Time::HiRes     <br>
-    HttpUtils       (FHEM-Modul) <br><br>
+    HttpUtils       (FHEM-Modul) 
+    
+    <br><br>
+    Das PTZ-Paneel (nur PTZ Kameras) in SSCam benutzt einen eigenen Satz Icons. 
+    Damit das System sie findet, ist im FHEMWEB Device das Attribut "iconPath" um "sscam" zu ergänzen 
+    (z.B. "attr WEB iconPath default:fhemSVG:openautomation:sscam").
+    <br><br>    
     </ul>
 
 <a name="SSCamdefine"></a>
@@ -9120,7 +9207,11 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <a name="ptzPanel_use"></a>
   <li><b>ptzPanel_use</b><br>
     Die Anzeige des PTZ-Steuerungspaneels in der Detailanzeige bzw. innerhalb eines generierten Streamdevice wird 
-    ein- bzw. ausgeschaltet (default ein). </li><br>    
+    ein- bzw. ausgeschaltet (default ein). <br>
+    Das PTZ-Panel benutzt einen eigenen Satz Icons. 
+    Damit das System sie finden kann, ist im FHEMWEB Device das Attribut "iconPath" um "sscam" zu ergänzen 
+    (z.B. "attr WEB iconPath default:fhemSVG:openautomation:sscam").
+  </li><br>    
   
   <a name="rectime"></a>  
   <li><b>rectime</b><br>
