@@ -161,7 +161,7 @@ MQTT2_DEVICE_Parse($$)
         my $ret = json2nameValue($value);
         if(keys %{$ret}) {
           $topic =~ m,.*/([^/]+),;
-          my $prefix = $1 ? "${1}_" : "";
+          my $prefix = ($1 && $1 !~m/^0x[0-9a-f]+$/) ? "${1}_" : ""; # 91394
           $add = "{ json2nameValue(\$EVENT, '$prefix') }";
         }
       }
