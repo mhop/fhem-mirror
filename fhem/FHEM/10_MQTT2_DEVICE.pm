@@ -469,7 +469,7 @@ MQTT2_DEVICE_Undef($$)
       clientid:topic:message and topic:message. The newClientId is a perl
       expression!. Example:
       <ul>
-        attr zigbee2mqtt bridgeRegexp zigbee2mqtt/0x00158d0001([^:]*):.*
+        attr zigbee2mqtt bridgeRegexp zigbee2mqtt/([A-Za-z0-9]*)[/]?.*:.*
                 "zigbee_$1"
       </ul>
       will create different MQTT2_DEVICE instances for different hex numbers in
