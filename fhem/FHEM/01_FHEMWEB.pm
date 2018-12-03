@@ -2421,7 +2421,7 @@ FW_iconTable($$$$)
   my %icoList = ();
   foreach my $style (@FW_iconDirs) {
     foreach my $imgName (sort keys %{$FW_icons{$style}}) {
-      next if($imgName=~m+^\.+); # Skip dot files
+      next if($imgName =~ m+^\.+ || $imgName =~ m+/\.+); # Skip dot files
       $imgName =~ s/\.[^.]*$//; # Cut extension
       next if(!$FW_icons{$style}{$imgName}); # Dont cut it twice: FS20.on.png
       next if($FW_icons{$style}{$imgName} !~ m/$imgName/); # Skip alias
