@@ -722,7 +722,7 @@ HCS_getValues($$) {
     }
 
   }
-  my $str = sprintf("Found %d Device(s): %d FHT, %d HM-CC-TC, %d MAX, %d ZWave, demand: %d, idle: %d, ignored: %d, excluded: %d, unknown: %d",
+  my $str = sprintf("Found %d Device(s): %d FHT, %d HM-CC-TC, %d PID20, %d MAX, %d ZWave, demand: %d, idle: %d, ignored: %d, excluded: %d, unknown: %d",
                     $sumTotal,$sumFHT,$sumHMCCTC, $sumPID20, $sumMAX, $sumZWave, $sumDemand,$sumIdle,$sumIgnored,$sumExcluded,$sumUnknown);
   Log3 $name, 3, "$type $name $str, eco: $eco overdrive: $overdrive";
 
