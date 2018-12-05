@@ -982,7 +982,8 @@ sub EventProcessingRoommate($@) {
             ShuttersCommandSet( $hash, $shuttersDev, $position );
         }
         elsif ( $shutters->getModeDown eq 'absent'
-            and $1 eq 'absent' )
+            and $1 eq 'absent'
+            and not IsDay( $hash, $shuttersDev ) )
         {
             $shutters->setLastDrive('roommate absent');
             ShuttersCommandSet( $hash, $shuttersDev, $shutters->getClosedPos );
@@ -1612,8 +1613,8 @@ sub SunSetShuttersAfterTimerFn($) {
 
     if (
         $shutters->getModeDown eq $homemode
-        or (  $shutters->getModeDown eq 'absent'
-          and $homemode eq 'gone')
+        or (    $shutters->getModeDown eq 'absent'
+            and $homemode eq 'gone' )
         or $shutters->getModeDown eq 'always'
       )
     {
@@ -1636,8 +1637,8 @@ sub SunRiseShuttersAfterTimerFn($) {
 
     if (
         $shutters->getModeUp eq $homemode
-        or (  $shutters->getModeUp eq 'absent'
-          and $homemode eq 'gone')
+        or (    $shutters->getModeUp eq 'absent'
+            and $homemode eq 'gone' )
         or $shutters->getModeUp eq 'always'
       )
     {
@@ -2255,7 +2256,8 @@ sub SetCmdFn($) {
     my $posValue    = $h->{posValue};
 
     $shutters->setShuttersDev($shuttersDev);
-    $shutters->setLastDrive($h->{lastDrive}) if ( defined($h->{lastDrive}) );
+    $shutters->setLastDrive( $h->{lastDrive} )
+      if ( defined( $h->{lastDrive} ) );
 
     return
       unless ( $shutters->getASC != 0 );
