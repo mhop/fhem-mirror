@@ -1,17 +1,5 @@
 ##############################################
 # $Id$
-# todo:
-# websocket automatischer restart				-> fertsch über devio
-# DevIo_IsOpen() anstelle con hash helper websocket
-# $hash->{DeviceName} global verwenden und devio nutzen
-# ein httprequest?								-> Neuron_GetVal in Neuron_SetVal integriert
-# NotifyFn sets/gets aus Readings				-> fertsch
-#			(polling auch mit rein?)			-> nein
-# set:
-#	websocket open/close 						-> fertsch
-#	otype-port on/off slider 					-> fertsch
-#		(wenn $hash{FD} dann über websocket?)	-> fertsch
-#	type-port -> conf (frei setzbar machen)		-> fertsch (postjson)
 #
 # bug?:  wenn man einen value setzt, dann wird im response der alte zurückgeschickt
 #
@@ -133,7 +121,7 @@ sub Neuron_Set(@) {
 	} elsif ($cmd eq "testdispatch") {
 		Neuron_ParseWsResponse($hash, '{"dev":"temp","time":1527316294.23915,"temp":"23.4375","vis":"0.0002441","circuit":"2620531402000075","vad":"2.58","interval":15,"typ":"DS2438","humidity":51.9139754019274,"lost":false,"vdd":"5.34"}');
 	} else {
-		return "Unknown argument $cmd, choose one of testdispatch clearreadings:noArg websocket:open,close " . ($hash->{HELPER}{SETS} ? $hash->{HELPER}{SETS} : '');
+		return "Unknown argument $cmd, choose one of clearreadings:noArg websocket:open,close " . ($hash->{HELPER}{SETS} ? $hash->{HELPER}{SETS} : '');
 	}
     return undef;
 }
@@ -421,13 +409,25 @@ sub Neuron_ParseAll(@){
 			my ($subdevs) = (ref $result eq 'HASH' ? $result->{data} : $result);
 			readingsBeginUpdate($hash);
 			my $i = 1;
+			my @circuits;
 			foreach (@{$subdevs}){
 				(my $subdev)=$_;
-				if (defined $subdev->{model} && defined $subdev->{glob_dev_id}) {
+				if (defined $subdev->{model} && defined $subdev->{glob_dev_id} && $subdev->{glob_dev_id} == 1) {
 					foreach my $intrnl (keys %{$subdev}) {
 						next if $intrnl eq "glob_dev_id";
 						$hash->{uc($intrnl)} = $subdev->{$intrnl};
 					}
+					if ($subdev->{board_count}) {
+						for my $i (1..$subdev->{board_count}) {
+							push (@circuits,$i);
+						}
+					}
+				} elsif (defined $subdev->{model} && defined $subdev->{glob_dev_id}) {
+					foreach my $intrnl (keys %{$subdev}) {
+						next if $intrnl eq "glob_dev_id";
+						$hash->{$subdev->{glob_dev_id} . "_" . uc($intrnl)} = $subdev->{$intrnl};
+					}
+					push (@circuits, substr($subdev->{circuit}, -1));
 				} elsif (defined $subdev->{model}) {
 					foreach my $intrnl (keys %{$subdev}) {
 						next if $intrnl eq "glob_dev_id";
@@ -445,7 +445,15 @@ sub Neuron_ParseAll(@){
 					Log3 ($hash, 4, "$hash->{TYPE} ($hash->{NAME}) ".$subdev->{dev}."_".$subdev->{circuit} .": ". toJSON($subdev));			
 				}
 			}
-			readingsBulkUpdate($hash,"state",$result->{status}) if ref $result eq 'HASH';
+			
+			@circuits = sort @circuits;
+			my $last;
+			for my $entry (@circuits) {
+				Log3 ($hash, 1, "$hash->{TYPE} ($hash->{NAME}) global_id $entry used twice this may cause malfuntions")
+					if defined $last && $entry eq $last;
+				$last = $entry;
+			}
+			readingsBulkUpdate($hash,"state",(ref $result eq 'HASH' ? $result->{status} : "success") );
 			readingsEndUpdate($hash,1);
 			Neuron_ReadingstoSets($hash);
 #################################################################  
@@ -972,11 +980,11 @@ sub Neuron_wsMasking($$) {
       Verbindungsart zum EVOK Device<br>
       Standard: polling, g&uuml;ltige Werte: websockets, polling<br><br>
     </li>							 
-    <li><a name="v">poll_interval</a><br>
+    <li><a name="poll_interval">poll_interval</a><br>
       Interval in Minuten in dem alle Werte gelesen (und auch an die log. Devices weitergeleitet) werden.<br>
       Standard: -, g&uuml;ltige Werte: Dezimalzahl<br><br>
     </li>
-    <li><a name="wsFilter">v</a>wsFilter<br>
+    <li><a name="wsFilter">wsFilter</a>wsFilter<br>
       Filter um die liste der Ger&auml;te zu limitieren welche websocket events generieren sollen<br>
       Standard: all, g&uuml;ltige Werte: all, ai, ao, input, led, relay, wd<br><br>
     </li>
