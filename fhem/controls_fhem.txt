@@ -1,4 +1,4 @@
-REV 17891
+REV 17894
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -298,7 +298,7 @@ UPD 2016-08-24_07:45:10 20855 FHEM/55_PIFACE.pm
 UPD 2015-07-28_14:05:31 17091 FHEM/56_POKEYS.pm
 UPD 2018-10-24_07:45:03 27668 FHEM/57_CALVIEW.pm
 UPD 2018-10-15_07:45:02 148508 FHEM/57_Calendar.pm
-UPD 2018-11-20_07:45:03 33975 FHEM/59_HCS.pm
+UPD 2018-12-05_07:45:02 33985 FHEM/59_HCS.pm
 UPD 2018-10-17_07:45:02 26685 FHEM/59_LuftdatenInfo.pm
 UPD 2018-03-19_07:45:04 25560 FHEM/59_OPENWEATHER.pm
 UPD 2018-08-03_07:45:03 38886 FHEM/59_PROPLANTA.pm
@@ -695,8 +695,8 @@ UPD 2018-12-04_07:45:06 3736993 docs/commandref.html
 UPD 2018-12-04_07:45:08 2280530 docs/commandref_DE.html
 UPD 2018-11-17_23:59:05 76550 docs/commandref_frame.html
 UPD 2018-11-17_23:59:05 86019 docs/commandref_frame_DE.html
-UPD 2018-12-04_07:45:09 202536 docs/commandref_modular.html
-UPD 2018-12-04_07:45:10 213275 docs/commandref_modular_DE.html
+UPD 2018-12-05_07:45:09 202536 docs/commandref_modular.html
+UPD 2018-12-05_07:45:10 213275 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
