@@ -41,7 +41,7 @@ package main;
 use strict;
 use warnings;
 
-my $version = '0.2.0.11';
+my $version = '0.2.0.12';
 
 sub AutoShuttersControl_Initialize($) {
     my ($hash) = @_;
@@ -1612,8 +1612,8 @@ sub SunSetShuttersAfterTimerFn($) {
 
     if (
         $shutters->getModeDown eq $homemode
-
-        #         or $homemode eq 'none'
+        or (  $shutters->getModeDown eq 'absent'
+          and $homemode eq 'gone')
         or $shutters->getModeDown eq 'always'
       )
     {
@@ -1636,8 +1636,8 @@ sub SunRiseShuttersAfterTimerFn($) {
 
     if (
         $shutters->getModeUp eq $homemode
-
-        #         or $homemode eq 'none'
+        or (  $shutters->getModeUp eq 'absent'
+          and $homemode eq 'gone')
         or $shutters->getModeUp eq 'always'
       )
     {

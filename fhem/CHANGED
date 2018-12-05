@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  73_AutoShuttersControl: fix gone then absent bug
   - feature: 49_SSCam: V7.6.0, The PTZ panel is completed by "Preset" and 
                        "Patrol" dropdown lists (for PTZ cams only)
   - feature: 49_SSCamSTRM: click on content in stream device or snap gallery
