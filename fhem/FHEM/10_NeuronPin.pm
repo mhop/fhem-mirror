@@ -141,7 +141,9 @@ sub NeuronPin_Parse ($$) {
 			} elsif (grep( /^$key/, @skipreadings )) {	# Wer soll nicht als reading angelegt werden
 				readingsDelete($hash, $key);
 			} elsif ($key eq 'alias') {					# al_ am Anfang von alias weg
-				my $alias = (split '_', $message->{$key})[1];
+				# my $alias = (split '_', $message->{$key})[1];
+				my @aliases = (split '_', $message->{$key});
+				my $alias = join(" ",@aliases[1 .. $#aliases]);
 				readingsBulkUpdate($hash,$key,$alias);
 				# autocreate alias attribute
 				if (AttrVal($hash->{NAME}, 'alias', '?') ne $alias && defined AttrVal($hash->{NAME}, 'autoalias', '')) {
