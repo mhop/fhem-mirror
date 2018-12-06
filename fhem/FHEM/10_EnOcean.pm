@@ -4562,6 +4562,8 @@ sub EnOcean_Set($@)
         }
         my $teachInDev = ReadingsVal($name, "teachInDev", "disabled");
         my $teachInDevCmd = ($teachInDev eq "enabled")? 1:0;
+        my $powerFailure = ReadingsVal($name, "powerFailure", "disabled");
+        my $powerFailureCmd = ($powerFailure eq "enabled") ? 1:0;
         my $localCmd = shift(@a);
         my $localCmdVal = shift(@a);
         if ($localCmd eq "dayNight") {
@@ -4648,15 +4650,25 @@ sub EnOcean_Set($@)
           } else {
             return "Usage: $cmd $localCmd <value> wrong, choose disabled enabled.";
           }
+        } elsif ($localCmd eq "powerFailure"){
+          if ($localCmdVal eq "disabled") {
+            $powerFailure = "disabled";
+            $powerFailureCmd = 0;
+          } elsif ($localCmdVal eq "enabled") {
+            $powerFailure = "enabled";
+            $powerFailureCmd = 1;
+          } else {
+            return "Usage: $cmd $localCmd <value> wrong, choose disabled enabled.";
+          }
         } else {
           return "Usage: $cmd <localCmd> wrong, choose dayNight|defaultState|localControl|" .
-          "overCurrentShutdown|overCurrentShutdownReset|rampTime1|rampTime2|rampTime3|teachInDev.";
-        }
+          "overCurrentShutdown|overCurrentShutdownReset|rampTime1|rampTime2|rampTime3|teachInDev|powerFailure.";        }
         readingsSingleUpdate($hash, "dayNight", $dayNight, 1);
         readingsSingleUpdate($hash, "defaultState", $defaultState, 1);
         readingsSingleUpdate($hash, "localControl", $localControl, 1);
         readingsSingleUpdate($hash, "overCurrentShutdown", $overCurrentShutdown, 1);
         readingsSingleUpdate($hash, "overCurrentShutdownReset", $overCurrentShutdownReset, 1);
+        readingsSingleUpdate($hash, "powerFailure", $powerFailure, 1);
         readingsSingleUpdate($hash, "rampTime1", $rampTime1, 1);
         readingsSingleUpdate($hash, "rampTime2", $rampTime2, 1);
         readingsSingleUpdate($hash, "rampTime3", $rampTime3, 1);
@@ -4664,8 +4676,7 @@ sub EnOcean_Set($@)
         $data = sprintf "%02X%02X%02X%02X", $teachInDevCmd << 7 | $cmdID,
                   $overCurrentShutdownCmd << 7 | $overCurrentShutdownResetCmd << 6 | $localControlCmd << 5 | $channel,
                   int($rampTime2Cmd) << 4 | int($rampTime3Cmd),
-                  $dayNightCmd << 7 | $defaultStateCmd << 4 | int($rampTime1Cmd);
-
+                  $dayNightCmd << 7 | $powerFailureCmd << 6 | $defaultStateCmd << 4 | int($rampTime1Cmd);
       } elsif ($cmd eq "measurement") {
         shift(@a);
         $updateState = 0;
@@ -4673,9 +4684,9 @@ sub EnOcean_Set($@)
         # same configuration for all channels
         $channel = 30;
         my $measurementMode = ReadingsVal($name, "measurementMode", "energy");
-        my $measurementModeCmd = ($measurementMode eq "power")? 0:1;
+        my $measurementModeCmd = ($measurementMode eq "power")? 1:0;
         my $measurementReport = ReadingsVal($name, "measurementReport", "query");
-        my $measurementReportCmd = ($measurementReport eq "auto")? 0:1;
+        my $measurementReportCmd = ($measurementReport eq "auto")? 1:0;
         my $measurementReset = "not_active";
         my $measurementResetCmd = 0;
         my $measurementDelta = int(ReadingsVal($name, "measurementDelta", 0));
@@ -4801,7 +4812,7 @@ sub EnOcean_Set($@)
         readingsSingleUpdate($hash, "responseTimeMin", $responseTimeMin, 1);
         $data = sprintf "%02X%02X%02X%02X%02X%02X", $cmdID,
                   $measurementReportCmd << 7 | $measurementResetCmd << 6 | $measurementModeCmd << 5 | $channel,
-                  ($measurementDelta | 0x0F) << 4 | $unitCmd, ($measurementDelta | 0xFF00) >> 8,
+                  ($measurementDelta & 0x000F) << 4 | $unitCmd, ($measurementDelta & 0x0FF0) >> 4,
                   $responseTimeMax, $responseTimeMin;
 
       } elsif ($cmd eq "roomCtrlMode") {
@@ -4983,14 +4994,19 @@ sub EnOcean_Set($@)
         shift(@a);
         $updateState = 0;
         my $repeaterActive = 0;
-        my $repeaterLevel = 0;
+        my $repeaterLevel = ReadingsVal($name, "repeaterLevel", "off");
+        if ($repeaterLevel eq "off") {
+	  $repeaterLevel = 0;
+	} else {
+	  $repeaterActive = 1;
+	}
         my $specialCmd = shift(@a);
         if ($manufID eq "046") {
           if (!defined $specialCmd) {
             return "$cmd <command> wrong, choose repeaterLevel.";
           } elsif ($specialCmd eq "repeaterLevel") {
             $cmdID = 8;
-            my $repeaterLevel = shift(@a);
+            $repeaterLevel = shift(@a);
             if (defined $repeaterLevel && $repeaterLevel =~ m/^off|1|2$/) {
               if ($repeaterLevel eq "off") {
                 $repeaterLevel = 0;
@@ -5004,6 +5020,7 @@ sub EnOcean_Set($@)
             return "$cmd $specialCmd <arg> wrong, choose repeaterLevel off|1|2.";
           }
         }
+        readingsSingleUpdate($hash, "repeaterLevel", $repeaterLevel, 1);
         $data = sprintf "0046%02X%02X%02X", $cmdID, $repeaterActive, $repeaterLevel;
 
       } else {
@@ -17779,6 +17796,8 @@ EnOcean_Delete($$)
         set the behavior after a shutdown due to an overcurrent</li>
       <li>local overCurrentShutdownReset not_active|trigger, not_active is default<br>
         trigger a reset after an overcurrent</li>
+      <li>local powerFailure enabled|disabled, disabled is default<br>
+        enable the power failure detection</li>
       <li>local rampTime&lt;1...3&gt; 0/s, 0.5/s ... 7/s, 7.5/s, 0 is default<br>
         set the dimming time of timer 1 ... 3</li>
       <li>local teachInDev enabled|disabled, disabled is default<br>
