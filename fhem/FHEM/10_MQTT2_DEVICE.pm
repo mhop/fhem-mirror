@@ -499,11 +499,20 @@ zigbee2mqtt_devStateIcon255($)
       the topic. Note: the newClientId is enclosed in "", as it is a perl
       expression, should be unique, and the automatically created device will
       be created also with this name.<br>
-      <br>
-      Multiple tuples of &lt;regexp&gt; newClientId are separated by newline.
-      <br>
-      Note: setting bridgeRegexp will remove th readingList attribute and all
-      readings.
+      Notes:
+      <ul>
+      <li>multiple tuples of &lt;regexp&gt; newClientId are separated by
+        newline</li>
+      <li>setting bridgeRegexp will remove the readingList attribute and all
+        readings.</li>
+      <li>For a zigbee2mqtt device connected via MQTT2_SERVER the following 
+        is probably a better solution:<br>
+        <ul>
+          attr zigbee2mqtt bridgeRegexp zigbee2mqtt/0x........([^/]+):.*
+                  "zigbee_$1"
+        </ul>
+        </li>
+      </ul>
       </li><br>
 
     <a name="devicetopic"></a>
