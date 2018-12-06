@@ -30,7 +30,10 @@
 # 
 # CHANGE LOG
 # 
-# 25.11.018  1.0.3
+# 06.12.2018 1.0.4
+#  bugfix    : Variable $base bei publish leer annehmen falls nicht definiert
+# 
+# 25.11.2018 1.0.3
 #  bugfix    : Param name for IOWrite (subscribe)
 #
 # 21.11.018  1.0.2
@@ -252,7 +255,7 @@ use warnings;
 
 #my $DEBUG = 1;
 my $cvsid = '$Id$';
-my $VERSION = "version 1.0.3 by hexenmeister\n$cvsid";
+my $VERSION = "version 1.0.4 by hexenmeister\n$cvsid";
 
 my %sets = (
 );
@@ -1020,6 +1023,8 @@ sub getDevicePublishRecIntern($$$$$) {
   # compute defaults
   my $combined = computeDefaults($hash, 'pub:', $globalMap, $devMap, {'device'=>$dev,'reading'=>$reading,'name'=>$name,'mode'=>$mode});
   # $topic evaluieren (avialable vars: $device (device name), $reading (oringinal name), $name ($reading oder alias, if defined), defaults)
+  $combined->{'base'} = '' unless defined $combined->{'base'}; # base leer anlegen wenn nicht definiert
+
   if(defined($topic) and ($topic =~ m/^{.*}$/)) {
     $topic = _evalValue2($hash->{NAME},$topic,{'topic'=>$topic,'device'=>$dev,'reading'=>$reading,'name'=>$name,%$combined}) if defined $topic;
   }
