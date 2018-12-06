@@ -48,13 +48,13 @@ filter:TYPE=MQTT2_DEVICE
 par:NAMEINTHEBRIDGE;name of this device in the bridge;{ AttrVal("DEVICE","readingList","") =~ m,zigbee2mqtt/(.*):, ? $1 : undef }
 attr DEVICE icon hue_filled_white_and_color_e27_b22
 attr DEVICE stateFormat {lc ReadingsVal("$name","state",0)}
-attr DEVICE devStateIcon {devStateIcon255($name)}
+attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name)}
 attr DEVICE webCmd toggle:on:off:brightness:color
 attr DEVICE setList \
   on:noArg zigbee2mqtt/NAMEINTHEBRIDGE/set {"state":"ON"}\
   off:noArg zigbee2mqtt/NAMEINTHEBRIDGE/set {"state":"OFF"}\
   brightness:colorpicker,BRI,0,15,255 zigbee2mqtt/NAMEINTHEBRIDGE/set {"state":"on","$EVTPART0":"$EVTPART1"}\
-  color:colorpicker,RGB {"zigbee2mqtt/NAMEINTHEBRIDGE/set " . encode_json(convertRGBtoR_G_B($EVTPART1))}
+  color:colorpicker,RGB {"zigbee2mqtt/NAMEINTHEBRIDGE/set " . zigbee2mqtt_RGB2JSON($EVTPART1))}
 
 name:zigbee2mqtt_smokeDetector
 filter:TYPE=MQTT2_DEVICE

@@ -419,6 +419,29 @@ MQTT2_DEVICE_Undef($$)
   return undef;
 }
 
+#####################################
+# Utility functions for the AttrTemplates
+sub
+zigbee2mqtt_RGB2JSON($)
+{
+  my $rgb = shift(@_);
+  $rgb =~ m/^(..)(..)(..)/;
+  my( $r, $g, $b ) = (hex($1)/255.0, hex($2)/255.0, hex($3)/255.0);
+  my %color_hash = (r => $r, g => $g, b => $b);
+  my %set_hash = ('transition' => 1, 'color' => \%color_hash);
+  return toJSON(\%set_hash);
+}
+
+sub
+zigbee2mqtt_devStateIcon255($)
+{
+  my ($name) = @_;
+  return ".*:off:toggle" if(lc(ReadingsVal($name,"state","ON")) eq "off" );
+  my $pct = ReadingsVal($name,"brightness","255");
+  my $s = $pct > 253 ? "on" : sprintf("dim%02d%%",int((1+int($pct/18))*6.25));
+  return ".*:$s:off";
+}
+
 1;
 
 =pod
