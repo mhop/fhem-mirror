@@ -4533,7 +4533,7 @@ sub EnOcean_Set($@)
         } else {
           $defaultStateCmd = 0;
         }
-        my $localControl = ReadingsVal($name, "localControl", "disabled");
+        my $localControl = ReadingsVal($name, "localControl", "enabled");
         my $localControlCmd = ($localControl eq "enabled")? 1:0;
         my $overCurrentShutdown = ReadingsVal($name, "overCurrentShutdown", "off");
         my $overCurrentShutdownCmd = ($overCurrentShutdown eq "restart")? 1:0;
