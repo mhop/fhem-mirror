@@ -233,7 +233,12 @@ my %SSCam_errauthlist = (
   403 => "One time password not specified",
   404 => "One time password authenticate failed",
   405 => "method not allowd - maybe the password is too long",
-  407 => "Permission denied - make sure FHEM-Server IP won't be blocked in DSM automated blocking list",
+  406 => "OTP code enforced",
+  407 => "Max Tries (if auto blocking is set to true) - make sure FHEM-Server IP won't be blocked in DSM automated blocking list",
+  408 => "Password Expired Can not Change",
+  409 => "Password Expired",
+  410 => "Password must change (when first time use or after reset password by admin)",
+  411 => "Account Locked (when account max try exceed)",
 );
 
 my %SSCam_errlist = (
