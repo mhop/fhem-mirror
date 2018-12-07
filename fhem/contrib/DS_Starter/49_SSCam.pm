@@ -2367,7 +2367,7 @@ sub SSCam_runliveview($) {
         }
         
         # Fehlertext zum Errorcode ermitteln
-        $error = &SSCam_experror($hash,$errorcode);
+        $error = SSCam_experror($hash,$errorcode);
 
         readingsBeginUpdate($hash);
         readingsBulkUpdate($hash,"Errorcode",$errorcode);
@@ -2418,7 +2418,7 @@ sub SSCam_hlsactivate($) {
         }
         
         # Fehlertext zum Errorcode ermitteln
-        $error = &SSCam_experror($hash,$errorcode);
+        $error = SSCam_experror($hash,$errorcode);
 
         readingsBeginUpdate($hash);
         readingsBulkUpdate($hash,"Errorcode",$errorcode);
@@ -2466,7 +2466,7 @@ sub SSCam_setAutocreate($) {
         }
         
         # Fehlertext zum Errorcode ermitteln
-        $error = &SSCam_experror($hash,$errorcode);
+        $error = SSCam_experror($hash,$errorcode);
 
         readingsBeginUpdate($hash);
         readingsBulkUpdate($hash,"Errorcode",$errorcode);
@@ -2514,7 +2514,7 @@ sub SSCam_hlsreactivate($) {
         }
         
         # Fehlertext zum Errorcode ermitteln
-        $error = &SSCam_experror($hash,$errorcode);
+        $error = SSCam_experror($hash,$errorcode);
 
         readingsBeginUpdate($hash);
         readingsBulkUpdate($hash,"Errorcode",$errorcode);
@@ -5881,7 +5881,7 @@ sub SSCam_logout_return ($) {
            $errorcode = $data->{'error'}->{'code'};
 
            # Fehlertext zum Errorcode ermitteln
-           $error = &SSCam_experrorauth($hash,$errorcode);
+           $error = SSCam_experrorauth($hash,$errorcode);
 
            Log3($name, 2, "$name - ERROR - Logout of User $username was not successful, however SID: \"$sid\" has been deleted. Errorcode: $errorcode - $error");
        }
@@ -6763,36 +6763,51 @@ return $htmlCode;
 ##############################################################################
 #              Auflösung Errorcodes bei Login / Logout
 ##############################################################################
-sub SSCam_experrorauth {
+sub SSCam_experrorauth ($$) {
   # Übernahmewerte sind $hash, $errorcode
-  my ($hash,@errorcode) = @_;
+  my ($hash,$errorcode) = @_;
   my $device = $hash->{NAME};
-  my $errorcode = shift @errorcode;
   my $error;
   
   unless (exists($SSCam_errauthlist{"$errorcode"})) {$error = "Message of errorcode \"$errorcode\" not found. Please turn to Synology Web API-Guide."; return ($error);}
 
   # Fehlertext aus Hash-Tabelle %errorauthlist ermitteln
   $error = $SSCam_errauthlist{"$errorcode"};
+
 return ($error);
 }
 
 ##############################################################################
 #  Auflösung Errorcodes SVS API
 
-sub SSCam_experror {
+sub SSCam_experror ($$) {
   # Übernahmewerte sind $hash, $errorcode
-  my ($hash,@errorcode) = @_;
+  my ($hash,$errorcode) = @_;
   my $device = $hash->{NAME};
-  my $errorcode = shift @errorcode;
   my $error;
   
-  unless (exists($SSCam_errlist{"$errorcode"})) {$error = "Message of errorcode $errorcode not found. Please turn to Synology Web API-Guide."; return ($error);}
+  unless (exists($SSCam_errlist{"$errorcode"})) {$error = "Message of errorcode \"$errorcode\" not found. Please turn to Synology Web API-Guide."; return ($error);}
 
   # Fehlertext aus Hash-Tabelle %errorlist ermitteln
   $error = $SSCam_errlist{"$errorcode"};
-  return ($error);
+  
+return ($error);
 }
+
+#############################################################################################
+#                                   Token freigeben
+#############################################################################################
+sub SSCam_ActiveTokenOff ($) { 
+   my ($hash) = @_;
+   my $name = $hash->{NAME};
+               
+   $hash->{HELPER}{ACTIVE} = "off";
+   if (AttrVal($name,"debugactivetoken",0)) {
+       Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
+   }  
+   
+return;
+} 
 
 
 1;
