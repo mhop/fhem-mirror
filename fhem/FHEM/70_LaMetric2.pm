@@ -48,6 +48,7 @@
 # - Add FHEM web frontend widgets to setters
 
 #TODO
+#- implement key pinning to improve security for self-signed certificate
 #- rtype replace of special characters that device cannot display:
 #   0x00A0 -> " " space
 #   0x202F -> " " space
@@ -300,7 +301,7 @@ sub LaMetric2_Define($$) {
 
         $hash->{HOST}       = $host;
         $hash->{".API_KEY"} = $apikey;
-        $hash->{VERSION}    = "2.0.0";
+        $hash->{VERSION}    = "2.0.1";
         $hash->{INTERVAL} =
           $interval && looks_like_number($interval) ? $interval : 60;
         $hash->{PORT} = $port && looks_like_number($port) ? $port : 4343;
@@ -1617,8 +1618,8 @@ sub LaMetric2_SetNotification {
                         $h->{metric} = $value_num ? $value_num : $value;
                     }
                     else {
-                        #FIXME special characters need to be removed to enable this
-                        # $h->{metric} = $h->{metriclong} ? $txt_long : $txt;
+                     #FIXME special characters need to be removed to enable this
+                     # $h->{metric} = $h->{metriclong} ? $txt_long : $txt;
                         $h->{metric} =
                             $h->{metriclong}
                           ? $txt_long
@@ -1700,7 +1701,7 @@ sub LaMetric2_SetNotification {
     my %notification = (
         priority  => $values{priority},
         icon_type => $values{icontype},
-        lifetime  => $values{lifetime} * 1000,
+        lifetime  => round( $values{lifetime} * 1000, 0 ),
         model     => {
             cycles => $values{cycles},
         },
@@ -2302,7 +2303,7 @@ sub LaMetric2_IsDuringTimeframe($$;$) {
   </li>
   <li>
     <a name="LaMetric2AttrnotificationGoalLifetime" id="LaMetric2AttrnotificationGoalLifetime"></a><code>notificationGoalLifetime</code><br>
-    Fallback value for lifetype when sending goal notifications. Defaults to '120'.
+    Fallback value for lifetime when sending goal notifications. Defaults to '120'.
   </li>
   <li>
     <a name="LaMetric2AttrnotificationGoalPriority" id="LaMetric2AttrnotificationGoalPriority"></a><code>notificationGoalPriority</code><br>
@@ -2338,7 +2339,7 @@ sub LaMetric2_IsDuringTimeframe($$;$) {
   </li>
   <li>
     <a name="LaMetric2AttrnotificationMetricLifetime" id="LaMetric2AttrnotificationMetricLifetime"></a><code>notificationMetricLifetime</code><br>
-    Fallback value for lifetype when sending metric notifications. Defaults to '120'.
+    Fallback value for lifetime when sending metric notifications. Defaults to '120'.
   </li>
   <li>
     <a name="LaMetric2AttrnotificationMetricPriority" id="LaMetric2AttrnotificationMetricPriority"></a><code>notificationMetricPriority</code><br>
