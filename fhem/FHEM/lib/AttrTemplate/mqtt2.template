@@ -54,7 +54,7 @@ attr DEVICE setList \
   on:noArg zigbee2mqtt/NAMEINTHEBRIDGE/set {"state":"ON"}\
   off:noArg zigbee2mqtt/NAMEINTHEBRIDGE/set {"state":"OFF"}\
   brightness:colorpicker,BRI,0,15,255 zigbee2mqtt/NAMEINTHEBRIDGE/set {"state":"on","$EVTPART0":"$EVTPART1"}\
-  color:colorpicker,RGB {"zigbee2mqtt/NAMEINTHEBRIDGE/set " . zigbee2mqtt_RGB2JSON($EVTPART1))}
+  color:colorpicker,RGB {"zigbee2mqtt/NAMEINTHEBRIDGE/set ".zigbee2mqtt_RGB2JSON($EVTPART1)}
 
 name:zigbee2mqtt_smokeDetector
 filter:TYPE=MQTT2_DEVICE
