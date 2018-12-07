@@ -379,11 +379,11 @@ my $db = {
 
         'LaMetric2' => {
             'Normal' =>
-'set %DEVICE% title=\'%TITLE%\' lifetime=%EXPIRE% priority=%LaMetric_PRIORITY% sound=%LaMetric_SOUND% repeat=%LaMetric_REPEAT% cycles=%LaMetric_CYCLES% message=\'%MSG%\'',
+'set %DEVICE% msg title=\'%TITLE%\' lifetime=%EXPIRE% priority=%LaMetric_PRIORITY% sound=%LaMetric_SOUND% repeat=%LaMetric_REPEAT% cycles=%LaMetric_CYCLES% message=\'%MSG%\'',
             'High' =>
-'set %DEVICE% title=\'%TITLE%\' lifetime=%EXPIRE% priority=%LaMetric_PRIORITY% sound=%LaMetric_SOUND% repeat=%LaMetric_REPEAT% cycles=%LaMetric_CYCLES% message=\'%MSG%\'',
+'set %DEVICE% msg title=\'%TITLE%\' lifetime=%EXPIRE% priority=%LaMetric_PRIORITY% sound=%LaMetric_SOUND% repeat=%LaMetric_REPEAT% cycles=%LaMetric_CYCLES% message=\'%MSG%\'',
             'Low' =>
-'set %DEVICE% title=\'%TITLE%\' lifetime=%EXPIRE% priority=%LaMetric_PRIORITY% sound=%LaMetric_SOUND% repeat=%LaMetric_REPEAT% cycles=%LaMetric_CYCLES% message=\'%MSG%\'',
+'set %DEVICE% msg title=\'%TITLE%\' lifetime=%EXPIRE% priority=%LaMetric_PRIORITY% sound=%LaMetric_SOUND% repeat=%LaMetric_REPEAT% cycles=%LaMetric_CYCLES% message=\'%MSG%\'',
             'defaultValues' => {
                 'Normal' => {
                     'EXPIRE'            => '120',
