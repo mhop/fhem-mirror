@@ -25,7 +25,7 @@ name:zigbee2mqtt_bulb
 filter:TYPE=MQTT2_DEVICE
 par:NAMEINTHEBRIDGE;name of this device in the bridge;{ AttrVal("DEVICE","readingList","") =~ m,zigbee2mqtt/(.*):, ? $1 : undef }
 attr DEVICE icon light_control
-attr DEVICE webCmd brightness
+attr DEVICE webCmd toggle:on:off:brightness
 attr DEVICE setList \
   on:noArg zigbee2mqtt/NAMEINTHEBRIDGE/set {"state":"ON"}\
   off:noArg zigbee2mqtt/NAMEINTHEBRIDGE/set {"state":"OFF"}\
@@ -36,7 +36,7 @@ name:zigbee2mqtt_colorbulb
 filter:TYPE=MQTT2_DEVICE
 par:NAMEINTHEBRIDGE;name of this device in the bridge;{ AttrVal("DEVICE","readingList","") =~ m,zigbee2mqtt/(.*):, ? $1 : undef }
 attr DEVICE icon light_control
-attr DEVICE webCmd brightness:color_temp
+attr DEVICE webCmd toggle:on:off:brightness:color_temp
 attr DEVICE setList \
   on:noArg zigbee2mqtt/NAMEINTHEBRIDGE/set {"state":"ON"}\
   off:noArg zigbee2mqtt/NAMEINTHEBRIDGE/set {"state":"OFF"}\
