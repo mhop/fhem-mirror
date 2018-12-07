@@ -5936,7 +5936,7 @@ sub SSCam_Autocreate ($$) {
                CommandSet(undef, "$camname credentials $username $password");   
            }
                      
-           InternalTimer(gettimeofday()+1.8, "SSCam_addptzattr", "$name", 0);
+           #InternalTimer(gettimeofday()+1.8, "SSCam_addptzattr", "$name", 0);
            
        }
    } else {
@@ -6839,6 +6839,7 @@ sub SSCam_experror {
 	   <li>create different types of discrete Streaming-Devices (createStreamDev)  </li>
        <li>Activation / Deactivation of a camera integrated PIR sensor  </li>
        <li>Creation of a readingsGroup device to display an overview of all defined SSCam devices (createReadingsGroup) </li>
+       <li>automatized definition of all in SVS available cameras in FHEM (autocreateCams) </li>
     </ul>
    </ul>
    <br>
@@ -6882,7 +6883,9 @@ sub SSCam_experror {
     device, that means the application on the discstation itself. 
     Dependend on the type of defined device the internal MODEL will be set to "&lt;vendor&gt; - &lt;camera type&gt;" 
     or "SVS" and a proper subset of the described set/get-commands are assigned to the device. <br>
-	The scope of application of set/get-commands is denoted to every particular command (valid for CAM, SVS, CAM/SVS).
+	The scope of application of set/get-commands is denoted to every particular command (valid for CAM, SVS, CAM/SVS). <br>
+	The cameras can be defined manually discrete, but alternatively with an automatical procedure by set "autocreateCams" 
+	command in a previously defined SVS device.
 	<br><br>
 	
     A <b>camera</b> is defined by: <br><br>
@@ -6897,7 +6900,10 @@ sub SSCam_experror {
 	  <b><code>define &lt;Name&gt; SSCAM SVS &lt;ServerAddr&gt; [Port] [Protocol] </code></b> <br><br>
     </ul>
 	
-    In that case the term &lt;camera name in SVS&gt; become replaced by <b>SVS</b> only. <br><br>
+    In that case the term &lt;camera name in SVS&gt; become replaced by <b>SVS</b> only. <br>
+	Is the SVS defined and after setting the appropriate creadentials ready for use, all cameras available in SVS can be created 
+	automatically in FHEM with the set command "autocreateCams". 
+	<br><br>
     
     The Modul SSCam ist based on functions of Synology Surveillance Station API. <br><br>
 
@@ -6963,6 +6969,8 @@ sub SSCam_experror {
     Surveillance Station as well. <br>
     If the user is member of admin-group, he has access to all module functions. Without this membership the user can only 
     execute functions with lower need of rights. <br>
+	Is <a href="https://www.synology.com/en-global/knowledgebase/DSM/tutorial/General/How_to_add_extra_security_to_your_Synology_NAS#t5">2-step verification</a>  
+	activated in DSM, the setup to a session with Surveillance Station is necessary (<a href="#SSCamattr">attribute</a> "session = SurveillanceStation"). <br><br>
     The required minimum rights to execute functions are listed in a table further down. <br>
     
     Alternatively to DSM-user a user created in SVS can be used. Also in that case a user of type "manager" has the right to 
@@ -7042,6 +7050,15 @@ sub SSCam_experror {
   <br>
   The specified set-commands are available for CAM/SVS-devices or only valid for CAM-devices or rather for SVS-Devices. 
   They can be selected in the drop-down-menu of the particular device. <br><br>
+  
+  <ul>
+  <li><b> set &lt;name&gt; autocreateCams </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for SVS)</li> <br>
+  
+  If a SVS device is defined, all in SVS integrated cameras are able to be created automatically in FHEM by this command. If the camera is already defined, 
+  it is overleaped. 
+  The new created camera devices are created in the same room as the used SVS device (default SSCam). Further helpful attributes are preset as well. 
+  <br><br>
+  </ul>
   
   <ul>
   <a name="SSCamcreateStreamDev"></a>
@@ -8190,6 +8207,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
 	  <li>erzeugen unterschiedlicher Typen von separaten Streaming-Devices (createStreamDev)  </li>
       <li>Aktivierung / Deaktivierung eines kamerainternen PIR-Sensors </li>
       <li>Erzeugung einer readingsGroup zur Anzeige aller definierten SSCam-Devices (createReadingsGroup) </li>
+	  <li>Automatisiertes Anlegen aller in der SVS vorhandenen Kameras in FHEM (autocreateCams) </li>
      </ul> 
     </ul>
     <br>
@@ -8213,7 +8231,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     <code>sudo apt-get install libjson-perl</code> <br><br>
 	
     Das Modul verwendet für HTTP-Calls die nichtblockierenden Funktionen von HttpUtils bzw. HttpUtils_NonblockingGet. <br> 
-    Im DSM bzw. der Synology Surveillance Station muß ein Nutzer angelegt sein. Die Zugangsdaten werden später über ein Set-Kommando dem angelegten Gerät zugewiesen. <br>
+    Im DSM bzw. der Synology Surveillance Station muß ein Nutzer angelegt sein. Die Zugangsdaten werden später über ein Set-Kommando dem 
+	angelegten Gerät zugewiesen. <br>
     Nähere Informationen dazu unter <a href="#SSCam_Credentials">Credentials</a><br><br>
         
     Überblick über die Perl-Module welche von SSCam genutzt werden: <br><br>
@@ -8239,7 +8258,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     der Applikation selbst auf der Diskstation, unterschieden. 
     Abhängig von der Art des definierten Devices wird das Internal MODEL auf "&lt;Hersteller&gt; - &lt;Kameramodell&gt;" oder 
     SVS gesetzt und eine passende Teilmenge der beschriebenen set/get-Befehle dem Device zugewiesen. <br>
-	Der Gültigkeitsbereich von set/get-Befehlen ist nach dem jeweiligen Befehl angegeben "gilt für CAM, SVS, CAM/SVS".
+	Der Gültigkeitsbereich von set/get-Befehlen ist nach dem jeweiligen Befehl angegeben "gilt für CAM, SVS, CAM/SVS". <br>
+	Die Kameras können einzeln manuell, alternativ auch automatisiert mittels einem vorher definierten SVS-Device angelegt werden.
 	<br><br>
 	
     Eine <b>Kamera</b> wird definiert mit: <br><br>
@@ -8255,7 +8275,9 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
 	  <b><code>define &lt;Name&gt; SSCAM SVS &lt;ServerAddr&gt; [Port] [Protocol]</code></b> <br><br>
 	</ul>
     
-    In diesem Fall wird statt &lt;Kameraname in SVS&gt; nur <b>SVS</b> angegeben. <br><br>
+    In diesem Fall wird statt &lt;Kameraname in SVS&gt; nur <b>SVS</b> angegeben. 
+	Ist das SVS-Device definiert und nach dem Setzen der Credentials einsatzbereit, können alle in der SVS vorhandenen Kameras mit dem Set-Befehl 
+	"autocreateCams" in FHEM automatisiert angelegt werden. <br><br>
 	
 	Das Modul SSCam basiert auf Funktionen der Synology Surveillance Station API. <br><br> 
     
@@ -8316,13 +8338,14 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     
 	Die Passwortlänge beträgt maximal 20 Zeichen. <br> 
     Der Anwender kann in Abhängigkeit der beabsichtigten einzusetzenden Funktionen einen Nutzer im DSM bzw. in der Surveillance 
-    Station einrichten. <br>
+    Station einrichten. Sollte im DSM die <a href="https://www.synology.com/de-de/knowledgebase/DSM/tutorial/General/How_to_add_extra_security_to_your_Synology_NAS#t5">2-Stufen Verifizierung</a>  
+	aktiviert sein, ist die Session mit der Surveillance Station aufzubauen (<a href="#SSCamattr">Attribut</a> "session = SurveillanceStation"). <br><br>
     Ist der DSM-Nutzer der Gruppe Administratoren zugeordnet, hat er auf alle Funktionen Zugriff. Ohne diese Gruppenzugehörigkeit 
     können nur Funktionen mit niedrigeren Rechtebedarf ausgeführt werden. Die benötigten Mindestrechte der Funktionen sind in 
     der Tabelle weiter unten aufgeführt. <br>
     
     Alternativ zum DSM-Nutzer kann ein in der SVS angelegter Nutzer verwendet werden. Auch in diesem Fall hat ein Nutzer vom 
-    Typ Manager das Recht alle Funktionen auszuführen, wobei der Zugriff auf bestimmte Kameras/ im Privilegienprofil beschränkt 
+    Typ Manager das Recht alle Funktionen auszuführen, wobei der Zugriff auf bestimmte Kameras/Funktionen im Privilegienprofil beschränkt 
     werden kann (siehe Hilfefunktion in SVS). <br>
     Als Best Practice wird vorgeschlagen, jeweils einen User im DSM und einen in der SVS anzulegen: <br><br>
     
@@ -8403,10 +8426,10 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <ul>
   <li><b> set &lt;name&gt; autocreateCams </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für SVS)</li> <br>
   
-  Ist ein SVS-Device definiert können mit diesem Befehl alle in der SVS definierten Kameras automatisiert angelegt werden sofern
-  sie noch nicht definiert sind. Bereits definierte Kameradevices werden übersprungen. 
-  Die neu erstellten Kameradevices werden dem gleichen Raum wie das SVS-Device zugewiesen (default SSCam). Es werden ebenfalls 
-  weitere sinnvolle Attribute voreingestellt. 
+  Ist ein SVS-Device definiert, können mit diesem Befehl alle in der SVS integrierten Kameras automatisiert angelegt werden. Bereits definierte 
+  Kameradevices werden übersprungen. 
+  Die neu erstellten Kameradevices werden im gleichen Raum wie das SVS-Device definiert (default SSCam). Weitere sinnvolle Attribute werden ebenfalls 
+  voreingestellt. 
   <br><br>
   </ul>
   
