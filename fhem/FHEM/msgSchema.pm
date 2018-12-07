@@ -379,32 +379,32 @@ my $db = {
 
         'LaMetric2' => {
             'Normal' =>
-'set %DEVICE% msg title=\'%TITLE%\' lifetime=%EXPIRE% priority=%LaMetric_PRIORITY% sound=%LaMetric_SOUND% repeat=%LaMetric_REPEAT% cycles=%LaMetric_CYCLES% message=\'%MSG%\'',
+'set %DEVICE% msg title=\'%TITLE%\' lifetime=%EXPIRE% priority=%LaMetric2_PRIORITY% sound=%LaMetric2_SOUND% repeat=%LaMetric2_REPEAT% cycles=%LaMetric2_CYCLES% message=\'%MSG%\'',
             'High' =>
-'set %DEVICE% msg title=\'%TITLE%\' lifetime=%EXPIRE% priority=%LaMetric_PRIORITY% sound=%LaMetric_SOUND% repeat=%LaMetric_REPEAT% cycles=%LaMetric_CYCLES% message=\'%MSG%\'',
+'set %DEVICE% msg title=\'%TITLE%\' lifetime=%EXPIRE% priority=%LaMetric2_PRIORITY% sound=%LaMetric2_SOUND% repeat=%LaMetric2_REPEAT% cycles=%LaMetric2_CYCLES% message=\'%MSG%\'',
             'Low' =>
-'set %DEVICE% msg title=\'%TITLE%\' lifetime=%EXPIRE% priority=%LaMetric_PRIORITY% sound=%LaMetric_SOUND% repeat=%LaMetric_REPEAT% cycles=%LaMetric_CYCLES% message=\'%MSG%\'',
+'set %DEVICE% msg title=\'%TITLE%\' lifetime=%EXPIRE% priority=%LaMetric2_PRIORITY% sound=%LaMetric2_SOUND% repeat=%LaMetric2_REPEAT% cycles=%LaMetric2_CYCLES% message=\'%MSG%\'',
             'defaultValues' => {
                 'Normal' => {
                     'EXPIRE'            => '120',
-                    'LaMetric_PRIORITY' => 'warning',
-                    'LaMetric_SOUND'    => 'notification',
-                    'LaMetric_REPEAT'   => '1',
-                    'LaMetric_CYCLES'   => '1',
+                    'LaMetric2_PRIORITY' => 'warning',
+                    'LaMetric2_SOUND'    => 'notification',
+                    'LaMetric2_REPEAT'   => '1',
+                    'LaMetric2_CYCLES'   => '1',
                 },
                 'High' => {
                     'EXPIRE'            => '120',
-                    'LaMetric_PRIORITY' => 'critical',
-                    'LaMetric_SOUND'    => 'alarm13',
-                    'LaMetric_REPEAT'   => '3',
-                    'LaMetric_CYCLES'   => '2',
+                    'LaMetric2_PRIORITY' => 'critical',
+                    'LaMetric2_SOUND'    => 'alarm13',
+                    'LaMetric2_REPEAT'   => '3',
+                    'LaMetric2_CYCLES'   => '2',
                 },
                 'Low' => {
                     'EXPIRE'            => '120',
-                    'LaMetric_PRIORITY' => 'info',
-                    'LaMetric_SOUND'    => 'positive5',
-                    'LaMetric_REPEAT'   => '1',
-                    'LaMetric_CYCLES'   => '1',
+                    'LaMetric2_PRIORITY' => 'info',
+                    'LaMetric2_SOUND'    => 'positive5',
+                    'LaMetric2_REPEAT'   => '1',
+                    'LaMetric2_CYCLES'   => '1',
                 },
             },
         },
