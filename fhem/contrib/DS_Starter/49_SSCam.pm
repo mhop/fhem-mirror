@@ -45,7 +45,7 @@ use HttpUtils;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
-  "7.7.0"  => "06.12.2018  SVS-Device: autocreateCams command added, some other fixes and improvements ",
+  "7.7.0"  => "07.12.2018  SVS-Device: autocreateCams command added, some other fixes and improvements ",
   "7.6.0"  => "02.12.2018  sub SSCam_ptzpanel completed by Preset and Patrol, minor fixes ",
   "7.5.0"  => "02.12.2018  sub SSCam_StreamDev and SSCam_composegallery changed to use popup window ",
   "7.4.1"  => "26.11.2018  sub composegallery deleted, SSCam_composegallery changed to get information for SSCam_refresh ",
@@ -98,7 +98,7 @@ our %SSCam_vNotesIntern = (
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
-  "7.7.0"  => "06.12.2018 autocreateCams command added in SVS device. BY this command all cameras installed in SVS can be defined automatically. ",
+  "7.7.0"  => "07.12.2018 autocreateCams command added in SVS device. BY this command all cameras installed in SVS can be defined automatically. ",
   "7.6.0"  => "02.12.2018 The PTZ panel is completed by \"Preset\" and \"Patrol\" (only for PTZ cameras) ",
   "7.5.0"  => "02.12.2018 A click on suitable content in a stream- or snapgallery device opens a popup window. ".
                "The popup size can be adjusted by attribute \"popupWindowSize\". ",
@@ -5909,8 +5909,8 @@ sub SSCam_Autocreate ($$) {
    my $type = $hash->{TYPE};
    
    my ($cmd, $err);
-   my $camname = makeDeviceName($sn);                         # erlaubten Kameranamen für FHEM erzeugen
-   my $camhash = $defs{$camname};  # Test ob SSCam-Device schon definiert ist
+   my $camname = "SSCam.".makeDeviceName($sn);         # erlaubten Kameranamen für FHEM erzeugen
+   my $camhash = $defs{$camname};                      # Test ob SSCam-Device schon definiert ist
 
    if(!$camhash) {
        my $arg = $hash->{SERVERADDR}." ".$hash->{SERVERPORT};
