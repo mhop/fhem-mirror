@@ -377,25 +377,34 @@ my $db = {
             },
         },
 
-        'LaMetric' => {
+        'LaMetric2' => {
             'Normal' =>
-'set %DEVICE% msg \'%LaMatric_ICON%\' \'%MSG%\' \'%LaMetric_SOUND%\'',
+'set %DEVICE% title=\'%TITLE%\' lifetime=%EXPIRE% priority=%LaMetric_PRIORITY% sound=%LaMetric_SOUND% repeat=%LaMetric_REPEAT% cycles=%LaMetric_CYCLES% message=\'%MSG%\'',
             'High' =>
-'set %DEVICE% msg \'%LaMatric_ICON%\' \'%MSG%\' \'%LaMetric_SOUND%\'',
+'set %DEVICE% title=\'%TITLE%\' lifetime=%EXPIRE% priority=%LaMetric_PRIORITY% sound=%LaMetric_SOUND% repeat=%LaMetric_REPEAT% cycles=%LaMetric_CYCLES% message=\'%MSG%\'',
             'Low' =>
-'set %DEVICE% msg \'%LaMatric_ICON%\' \'%MSG%\' \'%LaMetric_SOUND%\'',
+'set %DEVICE% title=\'%TITLE%\' lifetime=%EXPIRE% priority=%LaMetric_PRIORITY% sound=%LaMetric_SOUND% repeat=%LaMetric_REPEAT% cycles=%LaMetric_CYCLES% message=\'%MSG%\'',
             'defaultValues' => {
                 'Normal' => {
-                    'LaMatric_ICON'  => 'a21844',
-                    'LaMetric_SOUND' => 'notifications:notification',
+                    'EXPIRE'            => '120',
+                    'LaMetric_PRIORITY' => 'warning',
+                    'LaMetric_SOUND'    => 'notification',
+                    'LaMetric_REPEAT'   => '1',
+                    'LaMetric_CYCLES'   => '1',
                 },
                 'High' => {
-                    'LaMatric_ICON'  => 'a4787',
-                    'LaMetric_SOUND' => 'alarms:alarm13',
+                    'EXPIRE'            => '120',
+                    'LaMetric_PRIORITY' => 'critical',
+                    'LaMetric_SOUND'    => 'alarm13',
+                    'LaMetric_REPEAT'   => '3',
+                    'LaMetric_CYCLES'   => '2',
                 },
                 'Low' => {
-                    'LaMatric_ICON'  => 'a22098',
-                    'LaMetric_SOUND' => 'notifications:positive5',
+                    'EXPIRE'            => '120',
+                    'LaMetric_PRIORITY' => 'info',
+                    'LaMetric_SOUND'    => 'positive5',
+                    'LaMetric_REPEAT'   => '1',
+                    'LaMetric_CYCLES'   => '1',
                 },
             },
         },
