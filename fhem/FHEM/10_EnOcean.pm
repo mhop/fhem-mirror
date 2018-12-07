@@ -17790,7 +17790,7 @@ EnOcean_Delete($$)
         set the user interface indication</li>
       <li>local defaultState on|off|last, off is default<br>
         set the default setting of the output channels when switch on</li>
-      <li>local localControl enabled|disabled, disabled is default<br>
+      <li>local localControl enabled|disabled, enabled is default<br>
         enable the local control of the device</li>
       <li>local overCurrentShutdown off|restart, off is default<br>
         set the behavior after a shutdown due to an overcurrent</li>
