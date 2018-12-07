@@ -231,11 +231,18 @@ my %fbhttp_readings = (
    present         => '"present:".($val?"yes":"no")',
    productname     => '"FBTYPE:$val"',
    state           => '"state:".($val?"on":"off")',
+   voltage         => 'sprintf("voltage:%.3f V", $val/1000)',
 #  tist => 'sprintf("temperature:%.1f C (measured)", $val/2)', # Forum #57644
    tsoll           => 'sprintf("desired-temp:%s", $val)',
    members         => '"members:$val"',
    devicelock      => '"devicelock:".($val ? "yes":"no")',
    errorcode       => '"errorcode:".($ecTxt{$val} ? $ecTxt{$val} : ">$val<")',
+   windowopenactiv => '"windowopenactiv:".($val ? "yes":"no")',
+   battery         => 'sprintf("battery:%s %%", $val)',
+   endperiod       => 'sprintf("nextPeriodStart:%s", FmtDateTime($val))',
+   tchange         => 'sprintf("nextPeriodTemp:%0.1f C", $val/2)',
+   summeractive    => '"summeractive:".($val ? "yes":"no")',
+   holidayactive   => '"holidayactive:".($val ? "yes":"no")',
 );
 
 sub
