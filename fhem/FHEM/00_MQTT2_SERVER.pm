@@ -445,6 +445,7 @@ MQTT2_SERVER_sendto($$$$)
         pack("n", length($topic)).
         $topic.$val);
     }
+    last;       # send a message only once
   }
 }
 
