@@ -57,11 +57,8 @@
 #   0x0025 -> "%"
 #   0x00B0 -> "°"
 #- notification attributes auf tatsächliche funktion prüfen
-#- app interaction
-#- radio setter einbinden
 #- sticky/cycle message prüfen
-#- msgSchema
-#-notificationIcons may be set to "none" and then send an empty icon
+#- msgSchema (überlappende Parameter wie priority)
 #-mehrere metric/chart/goal/msg frames des gleichen typs (derzeit gehen per msg nur 1x zusätzlich metric,chart,goal) -> reihenfolge?
 
 package main;
@@ -99,6 +96,7 @@ my %LaMetric2_sets = (
     chart          => '',
     goal           => '',
     metric         => '',
+    app            => '',
     on             => ':noArg',
     off            => ':noArg',
     toggle         => ':noArg',
@@ -111,17 +109,21 @@ my %LaMetric2_sets = (
     brightness     => ':slider,1,1,100',
     brightnessMode => ':auto,manual',
     bluetooth      => ':on,off',
-    channelUp      => ':noArg',
-    channelDown    => ':noArg',
+    inputUp        => ':noArg',
+    inputDown      => ':noArg',
     statusRequest  => ':noArg',
     screensaver    => ':off,when_dark,time_based',
 );
 
 my %LaMetric2_setsHidden = (
-    msgCancel => 1,
-    channel   => 1,
-    app       => 1,
-    refresh   => 1,
+    msgCancel   => 1,
+    input       => 1,
+    refresh     => 1,
+    channelUp   => 1,
+    channelDown => 1,
+    play        => 1,
+    pause       => 1,
+    stop        => 1,
 );
 
 my %LaMetric2_metrictype_icons = (
@@ -301,7 +303,7 @@ sub LaMetric2_Define($$) {
 
         $hash->{HOST}       = $host;
         $hash->{".API_KEY"} = $apikey;
-        $hash->{VERSION}    = "2.0.1";
+        $hash->{VERSION}    = "2.1.0";
         $hash->{INTERVAL} =
           $interval && looks_like_number($interval) ? $interval : 60;
         $hash->{PORT} = $port && looks_like_number($port) ? $port : 4343;
@@ -311,12 +313,12 @@ sub LaMetric2_Define($$) {
 
             # presets for FHEMWEB
             $attr{$name}{cmdIcon} =
-              'muteT:rc_MUTE channelUp:rc_RIGHT channelDown:rc_LEFT';
+              'play:rc_PLAY channelDown:rc_PREVIOUS channelUp:rc_NEXT stop:rc_STOP muteT:rc_MUTE inputUp:rc_RIGHT inputDown:rc_LEFT';
             $attr{$name}{devStateIcon} =
 'on:rc_GREEN@green:off off:rc_STOP:on absent:rc_RED playing:rc_PLAY@green:pause paused:rc_PAUSE@green:play muted:rc_MUTE@green:muteT fast-rewind:rc_REW@green:play fast-forward:rc_FF@green:play interrupted:rc_PAUSE@yellow:play';
             $attr{$name}{icon}        = 'time_statistic';
             $attr{$name}{stateFormat} = 'stateAV';
-            $attr{$name}{webCmd} = 'volume:muteT:channelDown:channel:channelUp';
+            $attr{$name}{webCmd}      = 'volume:muteT:channelDown:play:stop:channelUp:inputDown:input:inputUp';
 
             # set those to make it easier for users to see the
             # default values. However, deleting those will
@@ -386,18 +388,25 @@ sub LaMetric2_Set($@) {
           if ( defined( $hash->{helper}{cancelIDs} )
             && keys %{ $hash->{helper}{cancelIDs} } > 0 );
 
-        $usage .= " channel:,";
+        $usage .= " input:,";
         $usage .= join( ',',
-            map $hash->{helper}{channels}{$_}{name},
-            sort keys %{ $hash->{helper}{channels} } )
-          if ( defined( $hash->{helper}{channels} )
-            && keys %{ $hash->{helper}{channels} } > 0 );
+            map $hash->{helper}{inputs}{$_}{name},
+            sort keys %{ $hash->{helper}{inputs} } )
+          if ( defined( $hash->{helper}{inputs} )
+            && keys %{ $hash->{helper}{inputs} } > 0 );
+
+        $usage .=
+          " play:noArg stop:noArg channelUp:noArg channelDown:noArg"
+          if ( defined( $hash->{helper}{apps}{'com.lametric.radio'} )
+            && keys %{ $hash->{helper}{apps}{'com.lametric.radio'} } > 0 );
 
         return $usage;
     }
 
     return "Unable to set $cmd: Device is unreachable"
-      if ( ReadingsVal( $name, 'presence', 'absent' ) eq 'absent' );
+      if ( ReadingsVal( $name, 'presence', 'absent' ) eq 'absent'
+        && lc($cmd) ne 'refresh'
+        && lc($cmd) ne 'statusrequest' );
 
     return "Unable to set $cmd: Device is disabled"
       if ( IsDisabled($name) );
@@ -419,11 +428,16 @@ sub LaMetric2_Set($@) {
     return LaMetric2_SetBrightness( $hash, @args )
       if ( $cmd eq 'brightness' || lc($cmd) eq 'brightnessmode' );
     return LaMetric2_SetBluetooth( $hash, @args ) if ( $cmd eq 'bluetooth' );
-    return LaMetric2_SetApp( $hash, $cmd, @args )
+    return LaMetric2_SetApp( $hash, $cmd, $h, @$a )
       if ( $cmd eq 'app'
-        || $cmd eq 'channel'
         || lc($cmd) eq 'channelup'
-        || lc($cmd) eq 'channeldown' );
+        || lc($cmd) eq 'channeldown'
+        || $cmd eq 'input'
+        || lc($cmd) eq 'inputup'
+        || lc($cmd) eq 'inputdown'
+        || $cmd eq 'play'
+        || $cmd eq 'pause'
+        || $cmd eq 'stop' );
     return LaMetric2_CheckState( $hash, @args )
       if ( $cmd eq 'refresh' || lc($cmd) eq 'statusrequest' );
 
@@ -697,52 +711,60 @@ sub LaMetric2_ReceiveCommand($$$) {
             # API version >= 2.1.0
             elsif ( $service eq "device/apps" && $method eq "GET" ) {
                 $hash->{helper}{apps} = $response;
-                delete $hash->{helper}{channels}
-                  if ( defined( $hash->{helper}{channels} ) );
+                delete $hash->{helper}{inputs}
+                  if ( defined( $hash->{helper}{inputs} ) );
 
                 foreach my $app ( sort keys %{$response} ) {
-                    foreach
-                      my $widget ( sort keys %{ $response->{$app}{widgets} } )
-                    {
-                        my $channelName;
 
-                        if ( $response->{$app}{widgets}{$widget}{settings}
+                    # widgets
+                    foreach
+                      my $widgetId ( sort keys %{ $response->{$app}{widgets} } )
+                    {
+                        my $inputName;
+
+                        if ( $response->{$app}{widgets}{$widgetId}{settings}
                             {_title} )
                         {
-                            $channelName .=
-                              $response->{$app}{widgets}{$widget}{settings}
+                            $inputName .=
+                              $response->{$app}{widgets}{$widgetId}{settings}
                               {_title};
                         }
                         else {
-                            $channelName .= $response->{$app}{title};
+                            $inputName .= $response->{$app}{title};
                         }
-                        $channelName =~ s/\s/_/g;
+                        $inputName =~ s/\s/_/g;
 
-                        my $i            = 1;
-                        my $channelName2 = lc($channelName);
+                        my $i          = 1;
+                        my $inputName2 = lc($inputName);
                         while (
-                            defined( $hash->{helper}{channels}{$channelName2} )
-                          )
+                            defined( $hash->{helper}{inputs}{$inputName2} ) )
                         {
                             $i++;
-                            $channelName2 = lc( $channelName . "_" . $i );
+                            $inputName2 = lc( $inputName . "_" . $i );
                         }
-                        $channelName .= "_" . $i if ( $i > 1 );
+                        $inputName .= "_" . $i if ( $i > 1 );
 
-                        $hash->{helper}{channels}{ lc($channelName) } = (
+                        my $vendorId;
+                        my $appId;
+
+                        if ( $response->{$app}{package} =~ /^(.+)\.([^.]+)$/ ) {
+                            $vendorId = $1;
+                            $appId    = $2;
+                        }
+
+                        $hash->{helper}{inputs}{ lc($inputName) } = (
                             {
-                                'name'    => $channelName,
-                                'package' => $response->{$app}{package},
-                                'widget'  => $widget,
+                                'name'       => $inputName,
+                                'package_id' => $response->{$app}{package},
+                                'vendor_id'  => $vendorId,
+                                'app_id'     => $appId,
+                                'widget_id'  => $widgetId,
                             }
                         );
                     }
                 }
             }
             elsif ( $service =~ /^device\/apps\/.+\/widgets\/.+\/actions/ ) {
-
-            }
-            elsif ( $service =~ /^device\/apps\/.+\/widgets\/.+\/activate/ ) {
 
             }
 
@@ -1246,37 +1268,163 @@ sub LaMetric2_SetMute {
 sub LaMetric2_SetApp {
     my $hash = shift;
     my $cmd  = shift;
+    my $h    = shift;
     my $name = $hash->{NAME};
 
-    my ( $subCommand, $appId ) = @_;
+    my ( $package, $action ) = @_;
+
+    # inject action for Radio app
+    if ( lc($cmd) eq "channeldown" ) {
+        $cmd     = "app";
+        $package = "com.lametric.radio";
+        $action  = "radio.prev";
+    }
+    elsif ( lc($cmd) eq "channelup" ) {
+        $cmd     = "app";
+        $package = "com.lametric.radio";
+        $action  = "radio.next";
+    }
+    elsif ( lc($cmd) eq "play" ) {
+        $cmd     = "app";
+        $package = "com.lametric.radio";
+        $action  = "radio.play";
+    }
+    elsif ( lc($cmd) eq "stop" || lc($cmd) eq "pause" ) {
+        $cmd     = "app";
+        $package = "com.lametric.radio";
+        $action  = "radio.stop";
+    }
 
     Log3 $name, 5,
         "LaMetric2 $name: called function LaMetric2_SetApp() "
       . $cmd . " / "
-      . $subCommand;
+      . $packageId;
 
-    if ( lc($cmd) eq "channelup" || $subCommand eq "next" ) {
+    if ( lc($cmd) eq "inputup" ) {
         LaMetric2_SendCommand( $hash, "device/apps/next", "PUT", "" );
-
-        return;
     }
-    elsif ( lc($cmd) eq "channeldown" || $subCommand eq "prev" ) {
+    elsif ( lc($cmd) eq "inputdown" ) {
         LaMetric2_SendCommand( $hash, "device/apps/prev", "PUT", "" );
-        return;
     }
-    elsif ( $subCommand
-        && defined( $hash->{helper}{channels}{ lc($subCommand) } ) )
+    elsif ( ( $cmd eq "app" || $cmd eq "input" )
+        && $package )
     {
-        $package = $hash->{helper}{channels}{ lc($subCommand) }{package};
-        $widget  = $hash->{helper}{channels}{ lc($subCommand) }{widget};
-        LaMetric2_SendCommand( $hash,
-            "device/apps/$package/widgets/$widget/activate",
-            "PUT", "" );
-        return;
+
+        my $packageId;
+        my $widgetId;
+        my $vendorId;
+        my $appId;
+        my $actionId;
+
+        # user gave widget display name as package name
+        if ( defined( $hash->{helper}{inputs}{ lc($package) } ) ) {
+            $packageId = $hash->{helper}{inputs}{ lc($package) }{package_id};
+            $widgetId  = $hash->{helper}{inputs}{ lc($package) }{widget_id};
+            $vendorId  = $hash->{helper}{inputs}{ lc($package) }{vendor_id};
+            $appId     = $hash->{helper}{inputs}{ lc($package) }{app_id};
+        }
+        else {
+            # user gave packageId as package name
+            if ( defined( $hash->{helper}{apps}{$package} ) ) {
+                $packageId = $package;
+            }
+
+            # find packageId
+            else {
+                foreach my $id ( keys %{ $hash->{helper}{apps} } ) {
+                    if ( $hash->{helper}{apps}{$id}{package} =~ /\.$package$/ )
+                    {
+                        $packageId = $hash->{helper}{apps}{$id}{package};
+                        last;
+                    }
+                }
+            }
+
+            # if we now know the packageId, find widgetId
+            if ($packageId) {
+                my %widgetlist = ();
+                foreach my $id (
+                    keys %{ $hash->{helper}{apps}{$packageId}{widgets} } )
+                {
+                    $widgetlist{ $hash->{helper}{apps}{$packageId}{widgets}
+                          {index} } = $id;
+                }
+
+                # best guess for widgetId:
+                # use ID with lowest index
+                foreach my $id ( sort keys %widgetlist ) {
+                    $widgetId = $widgetlist{$id};
+                    last;
+                }
+            }
+
+            # user gave widgetId as package name
+            unless ($widgetId) {
+                foreach my $id ( keys %{ $hash->{helper}{inputs} } ) {
+                    if ( $hash->{helper}{inputs}{$id}{widget_id} eq $id ) {
+                        $packageId =
+                          $hash->{helper}{inputs}{$id}{package_id};
+                        $widgetId =
+                          $hash->{helper}{inputs}{$id}{widget_id};
+                        last;
+                    }
+                }
+            }
+        }
+
+        # only continue if widget exists
+        unless ( $packageId && $widgetId ) {
+            return "Unable to find widget for $package";
+        }
+
+        # user gave action parameter
+        if ($action) {
+
+            # get vendor and app ID
+            if ( $packageId && ( !$vendorId || !$appId ) ) {
+                if ( $packageId =~ /^(.+)\.([^.]+)$/ ) {
+                    $vendorId = $1;
+                    $appId    = $2;
+                }
+            }
+
+            # find actionId
+            if (
+                defined( $hash->{helper}{apps}{$packageId}{actions}{$action} ) )
+            {
+                $actionId = $action;
+            }
+            elsif (
+                defined(
+                    $hash->{helper}{apps}{$packageId}{actions}
+                      { $appId . "." . $action }
+                )
+              )
+            {
+                $actionId = $appId . "." . $action;
+            }
+
+            return "Unknown action $action" unless ($actionId);
+
+            my %body = ( id => $actionId );
+            $body{params} = $h if ($h);
+
+            LaMetric2_SendCommand( $hash,
+                "device/apps/$packageId/widgets/$widgetId/actions",
+                "POST", encode_json( \%body ) );
+        }
+
+        # user wants to switch to widget
+        else {
+            LaMetric2_SendCommand( $hash,
+                "device/apps/$packageId/widgets/$widgetId/activate",
+                "PUT", "" );
+        }
     }
     else {
         # There was a problem with the arguments
-        return "Syntax: set $name $cmd [app_name]";
+        return
+"Syntax: set $name $cmd <app_name> [<action> [param1=value param2=value ...] ]";
     }
 }
 
@@ -2101,6 +2249,68 @@ sub LaMetric2_IsDuringTimeframe($$;$) {
     </ul>
   </ul><br>
   <ul>
+    <b>app</b>
+    <ul>
+      <code>set &lt;LaMetric2_device&gt; app &lt;app_name&gt; &lt;action_id&gt; [param1=value param2=value]</code><br>
+      <br>
+      Some apps can be controlled by specific actions. Those can be controlled by pre-defined actions and might have optional or mandatory parameters as well.
+      <br>
+      Examples:
+      <ul>
+        <code>set lametric app clock alarm enabled=true time=10:00:00 wake_with_radio=false</code><br>
+        <code>set lametric app clock alarm enabled=false</code><br>
+        <br>
+        <code>set lametric app clock clockface icon='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAOklEQVQYlWNUVFBgwAeYcEncv//gP04FMEmsCmCSiooKjHAFMEF0SRQTsEnCFcAE0SUZGBgYGAl5EwA+6RhuHb9bggAAAABJRU5ErkJggg=='</code><br>
+        <br>
+        <code>set lametric app stopwatch start</code><br>
+        <code>set lametric app stopwatch pause</code><br>
+        <code>set lametric app stopwatch reset</code><br>
+        <br>
+        <code>set lametric app countdown configure duration=1800 start_now=true</code><br>
+        <code>set lametric app countdown start</code><br>
+        <code>set lametric app countdown pause</code><br>
+        <code>set lametric app countdown reset</code><br>
+      </ul><br>
+    </ul>
+  </ul><br>
+  <br>
+  <ul>
+    <b>play</b>
+    <ul>
+      <code>set &lt;LaMetric2_device&gt; play</code><br>
+    </ul>
+    <br>
+    Will switch to the Radio app and start playback.
+  </ul><br>
+  <br>
+  <ul>
+    <b>stop</b>
+    <ul>
+      <code>set &lt;LaMetric2_device&gt; stop</code><br>
+    </ul>
+    <br>
+    Will stop Radio playback.
+  </ul><br>
+  <br>
+  <ul>
+    <b>channelUp</b>
+    <ul>
+      <code>set &lt;LaMetric2_device&gt; channelUp</code><br>
+    </ul>
+    <br>
+    When the Radio app is active, it will switch to the next radio station.
+  </ul><br>
+  <br>
+  <ul>
+    <b>channelUp</b>
+    <ul>
+      <code>set &lt;LaMetric2_device&gt; channelUp</code><br>
+    </ul>
+    <br>
+    When the Radio app is active, it will switch to the next radio station.
+  </ul><br>
+  <br>
+  <ul>
     <b>bluetooth</b>
     <ul>
       <code>set &lt;LaMetric2_device&gt; bluetooth &lt;on|off&gt;</code><br>
@@ -2122,24 +2332,30 @@ sub LaMetric2_IsDuringTimeframe($$;$) {
   </ul><br>
   <br>
   <ul>
-    <b>channel</b>
+    <b>input</b>
     <ul>
-      <code>set &lt;LaMetric2_device&gt; channel &lt;channel_name&gt;</code><br>
+      <code>set &lt;LaMetric2_device&gt; input &lt;input_name&gt;</code><br>
     </ul>
+    <br>
+    Will switch to a specific app. &lt;input_name&gt; may either be a display name, app ID or package ID.
   </ul><br>
   <br>
   <ul>
-    <b>channelDown</b>
+    <b>inputDown</b>
     <ul>
-      <code>set &lt;LaMetric2_device&gt; channelDown</code><br>
+      <code>set &lt;LaMetric2_device&gt; inputDown</code><br>
     </ul>
+    <br>
+    Will switch to the previous app.
   </ul><br>
   <br>
   <ul>
-    <b>channelUp</b>
+    <b>inputUp</b>
     <ul>
-      <code>set &lt;LaMetric2_device&gt; channelUp</code><br>
+      <code>set &lt;LaMetric2_device&gt; inputUp</code><br>
     </ul>
+    <br>
+    Will switch to the next app.
   </ul><br>
   <br>
   <ul>
