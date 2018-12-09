@@ -128,10 +128,13 @@ sub SSCamSTRM_Get($@) {
       my $htmlCode = $hash->{HELPER}{STREAM};
       
       if ($htmlCode) {
+          my $out = "<html>";
+          $out .= $htmlCode;
+          $out .= "</html>";
           for (my $k=1; (defined($hash->{HELPER}{CL}{$k})); $k++ ) {
               if ($hash->{HELPER}{CL}{$k}->{COMP}) {
 		          # CL zusammengestellt (Auslösung durch Notify)
-		          asyncOutput($hash->{HELPER}{CL}{$k}, "$htmlCode");						
+		          asyncOutput($hash->{HELPER}{CL}{$k}, "$out");						
 		      } else {
 			      # Output wurde über FHEMWEB ausgelöst
 		          return $htmlCode;
