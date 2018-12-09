@@ -162,7 +162,7 @@ MQTT2_DEVICE_Parse($$)
         my $ret = json2nameValue($value);
         if(keys %{$ret}) {
           $topic =~ m,.*/([^/]+),;
-          my $prefix = ($1 && $1 !~m/^0x[0-9a-f]+$/) ? "${1}_" : ""; # 91394
+          my $prefix = ($1 && $1 !~m/^0x[0-9a-f]+$/i) ? "${1}_" : ""; # 91394
           $add = "{ json2nameValue(\$EVENT, '$prefix') }";
         }
       }
@@ -184,7 +184,7 @@ MQTT2_DEVICE_Parse($$)
     my $cidArr = $modules{MQTT2_DEVICE}{defptr}{cid}{$newCid};
     if(!$cidArr || !int(@{$cidArr})) {
       my $devName = $newCid;
-      $devName =~ s/[^a-z0-9._]/_/g;
+      $devName =~ makeDeviceName($devName);
       return "UNDEFINED MQTT2_$devName MQTT2_DEVICE $newCid";
     }
     return "";

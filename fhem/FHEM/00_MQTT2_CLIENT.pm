@@ -80,6 +80,7 @@ sub
 MQTT2_CLIENT_connect($)
 {
   my ($hash) = @_;
+  return if($hash->{authError});
   my $disco = (ReadingsVal($hash->{NAME}, "state", "") eq "disconnected");
   $hash->{connecting} = 1 if($disco && !$hash->{connecting});
   $hash->{nextOpenDelay} = 5;
@@ -207,6 +208,7 @@ MQTT2_CLIENT_Attr(@)
 
   my %h = (clientId=>1,lwt=>1,lwtRetain=>1,subscriptions=>1,SSL=>1,username=>1);
   if($init_done && $h{$attrName}) {
+    delete($hash->{authError});
     MQTT2_CLIENT_Disco($hash);
   }
   return undef;
@@ -237,6 +239,7 @@ MQTT2_CLIENT_Set($@)
 
   } elsif($a[0] eq "password") {
     return "Usage: set $name password <password>" if(@a < 1);
+    delete($hash->{authError});
     setKeyValue($name, $a[1]); # will delete, if argument is empty
     MQTT2_CLIENT_Disco($hash) if($init_done);
 
@@ -314,6 +317,7 @@ MQTT2_CLIENT_Read($@)
                   "bad user name or password", "not authorized");
       Log3 $name, 1, "$name: Connection refused, ".
         ($rc <= int(@txt) ? $txt[$rc] : "unknown error $rc");
+      $hash->{authError} = $rc;
       MQTT2_CLIENT_Disco($hash);
       return;
     }
