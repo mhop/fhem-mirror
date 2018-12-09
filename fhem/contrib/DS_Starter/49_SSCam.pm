@@ -45,7 +45,8 @@ use HttpUtils;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
-  "7.7.0"  => "07.12.2018  SVS-Device: autocreateCams command added, some other fixes and improvements, minor code rewrite ",
+  "7.7.0"  => "07.12.2018  SVS-Device: autocreateCams command added, some other fixes and improvements, minor code rewrite, ".
+              "save Stream \$streamHash->{HELPER}{STREAM} for popupStream in SSCamSTRM-Device ",
   "7.6.0"  => "02.12.2018  sub SSCam_ptzpanel completed by Preset and Patrol, minor fixes ",
   "7.5.0"  => "02.12.2018  sub SSCam_StreamDev and SSCam_composegallery changed to use popup window ",
   "7.4.1"  => "26.11.2018  sub composegallery deleted, SSCam_composegallery changed to get information for SSCam_refresh ",
@@ -6228,6 +6229,7 @@ sub SSCam_StreamDev($$$) {
   $hash->{HELPER}{STRMDEV}    = $strmdev;                   # Name des aufrufenden SSCamSTRM-Devices
   $hash->{HELPER}{STRMROOM}   = $FW_room?$FW_room:"";       # Raum aus dem das SSCamSTRM-Device die Funktion aufrief
   $hash->{HELPER}{STRMDETAIL} = $FW_detail?$FW_detail:"";   # Name des SSCamSTRM-Devices (wenn Detailansicht)
+  my $streamHash              = $defs{$strmdev};            # SSCamSTRM-Devices
   
   # Definition Tasten
   my $imgblank      = "<img src=\"$FW_ME/www/images/sscam/black_btn_CAMBLANK.png\">";                   # nicht sichtbare Leertaste
@@ -6281,15 +6283,17 @@ sub SSCam_StreamDev($$$) {
   }
   
   if($fmt =~ /mjpeg/) { 
-      if($apivideostmsmaxver) {     # keine API "SYNO.SurveillanceStation.VideoStream" mehr ab API v2.8
+      if($apivideostmsmaxver) {                                  # keine API "SYNO.SurveillanceStation.VideoStream" mehr ab API v2.8
           $link = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
       } elsif ($hash->{HELPER}{STMKEYMJPEGHTTP}) {
           $link = $hash->{HELPER}{STMKEYMJPEGHTTP};
       }
-      if($apiaudiostmmaxver) {      # keine API "SYNO.SurveillanceStation.AudioStream" mehr ab API v2.8 
+      if($apiaudiostmmaxver) {                                   # keine API "SYNO.SurveillanceStation.AudioStream" mehr ab API v2.8 
 	      $audiolink = "$proto://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmmaxver&method=Stream&cameraId=$camid&_sid=$sid"; 
       }
 	  $ret .= "<td><img src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"><br>";
+      $streamHash->{HELPER}{STREAM} = "<img src=$link $pws>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
+      
       if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
              # Aufnahmebutton endlos Start
              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\">$imgrecendless </a>";
@@ -6312,7 +6316,7 @@ sub SSCam_StreamDev($$$) {
                        Your browser does not support the audio element.      
                        </audio>";
           $ret .= "</td>";
-          $ret .= "<td></td>" if(AttrVal($camname,"ptzPanel_use",1));
+          $ret .= "<td></td>" if(AttrVal($camname,"ptzPanel_use",0));
       }      
   
   } elsif($fmt =~ /generic/) {  
@@ -6334,6 +6338,7 @@ sub SSCam_StreamDev($$$) {
       
       $ret .= "<td>";
       $ret .= "$htag";
+      $streamHash->{HELPER}{STREAM} = "$htag";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
       $ret .= "<br>";
       Log3($strmdev, 4, "$strmdev - generic Stream params:\n$htag");
       $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrefresh')\">$imgrefresh </a>";
@@ -6361,6 +6366,7 @@ sub SSCam_StreamDev($$$) {
       if($link && $wltype =~ /image|iframe|video|base64img|embed|hls/) {
           if($wltype =~ /image/) {
               $ret .= "<td><img src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"><br>";
+              $streamHash->{HELPER}{STREAM} = "<img src=$link $pws>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";
               $ret .= $imgblank;
               if($hash->{HELPER}{RUNVIEW} =~ /live_fw/) {              
@@ -6387,13 +6393,16 @@ sub SSCam_StreamDev($$$) {
                                Your browser does not support the audio element.      
                                </audio>";
                   $ret .= "</td>";
-                  $ret .= "<td></td>" if(AttrVal($camname,"ptzPanel_use",1));
+                  $ret .= "<td></td>" if(AttrVal($camname,"ptzPanel_use",0));
               }         
           
           } elsif ($wltype =~ /iframe/) {
               $ret .= "<td><iframe src=$link $ha controls autoplay onClick=\"FW_okDialog('<img src=$link $pws>')\">
                        Iframes disabled
                        </iframe><br>";
+              $streamHash->{HELPER}{STREAM} = "<iframe src=$link $pws controls autoplay>
+                                              Iframes disabled
+                                              </iframe>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrefresh')\">$imgrefresh </a>";              
               $ret .= "</td>";
@@ -6404,7 +6413,7 @@ sub SSCam_StreamDev($$$) {
                                Your browser does not support the audio element.      
                                </audio>";
                   $ret .= "</td>";
-                  $ret .= "<td></td>" if(AttrVal($camname,"ptzPanel_use",1));
+                  $ret .= "<td></td>" if(AttrVal($camname,"ptzPanel_use",0));
               }
           
           } elsif ($wltype =~ /video/) {
@@ -6414,6 +6423,12 @@ sub SSCam_StreamDev($$$) {
                        <source src=$link type=\"video/webm\">
                        Your browser does not support the video tag
                        </video><br>";
+              $streamHash->{HELPER}{STREAM} = "<video $pws controls autoplay>
+                                               <source src=$link type=\"video/mp4\"> 
+                                               <source src=$link type=\"video/ogg\">
+                                               <source src=$link type=\"video/webm\">
+                                               Your browser does not support the video tag
+                                               </video>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern              
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>"; 
               $ret .= "</td>";
               if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/) {
@@ -6423,15 +6438,17 @@ sub SSCam_StreamDev($$$) {
                                Your browser does not support the audio element.      
                                </audio>";
                   $ret .= "</td>";
-                  $ret .= "<td></td>" if(AttrVal($camname,"ptzPanel_use",1));
+                  $ret .= "<td></td>" if(AttrVal($camname,"ptzPanel_use",0));
               }
           } elsif($wltype =~ /base64img/) {
               $ret .= "<td><img src='data:image/jpeg;base64,$link' $ha onClick=\"FW_okDialog('<img src=data:image/jpeg;base64,$link $pws>')\"><br>";
+              $streamHash->{HELPER}{STREAM} = "<img src='data:image/jpeg;base64,$link' $pws>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";
               $ret .= "</td>";
 		  
           } elsif($wltype =~ /embed/) {
               $ret .= "<td><embed src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"></td>";
+              $streamHash->{HELPER}{STREAM} = "<embed src=$link $pws>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
           
           } elsif($wltype =~ /hls/) {
               $ret .= "<td><video $ha controls autoplay>
@@ -6439,6 +6456,11 @@ sub SSCam_StreamDev($$$) {
                        <source src=$link type=\"video/MP2T\">
                        Your browser does not support the video tag
                        </video><br>";
+              $streamHash->{HELPER}{STREAM} = "<video $pws controls autoplay>
+                                               <source src=$link type=\"application/x-mpegURL\">
+                                               <source src=$link type=\"video/MP2T\">
+                                               Your browser does not support the video tag
+                                               </video>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrefresh')\">$imgrefresh </a>";
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdhlsreact')\">$imghlsreact </a>";
