@@ -6231,6 +6231,7 @@ sub SSCam_StreamDev($$$) {
   $hash->{HELPER}{STRMDETAIL} = $FW_detail?$FW_detail:"";   # Name des SSCamSTRM-Devices (wenn Detailansicht)
   my $streamHash              = $defs{$strmdev};            # Hash des SSCamSTRM-Devices
   delete $streamHash->{HELPER}{STREAM};
+  delete $streamHash->{HELPER}{STREAMACTIVE};               # Statusbit ob ein Stream aktiviert ist
   
   # Definition Tasten
   my $imgblank      = "<img src=\"$FW_ME/www/images/sscam/black_btn_CAMBLANK.png\">";                   # nicht sichtbare Leertaste
@@ -6294,6 +6295,7 @@ sub SSCam_StreamDev($$$) {
       }
 	  $ret .= "<td><img src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"><br>";
       $streamHash->{HELPER}{STREAM} = "<img src=$link $pws>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
+      $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);         # Statusbit wenn ein Stream aktiviert ist
       
       if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
              # Aufnahmebutton endlos Start
@@ -6339,7 +6341,8 @@ sub SSCam_StreamDev($$$) {
       
       $ret .= "<td>";
       $ret .= "$htag";
-      $streamHash->{HELPER}{STREAM} = "$htag";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
+      $streamHash->{HELPER}{STREAM} = "$htag";                   # Stream für "get <SSCamSTRM-Device> popupStream" speichern
+      $streamHash->{HELPER}{STREAMACTIVE} = 1 if($htag);         # Statusbit wenn ein Stream aktiviert ist
       $ret .= "<br>";
       Log3($strmdev, 4, "$strmdev - generic Stream params:\n$htag");
       $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrefresh')\">$imgrefresh </a>";
@@ -6368,6 +6371,7 @@ sub SSCam_StreamDev($$$) {
           if($wltype =~ /image/) {
               $ret .= "<td><img src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"><br>" if($link);
               $streamHash->{HELPER}{STREAM} = "<img src=$link $pws>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
+              $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);         # Statusbit wenn ein Stream aktiviert ist
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";
               $ret .= $imgblank;
               if($hash->{HELPER}{RUNVIEW} =~ /live_fw/) {              
@@ -6403,7 +6407,8 @@ sub SSCam_StreamDev($$$) {
                        </iframe><br>" if($link);
               $streamHash->{HELPER}{STREAM} = "<iframe src=$link $pws controls autoplay>
                                               Iframes disabled
-                                              </iframe>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
+                                              </iframe>";                # Stream für "get <SSCamSTRM-Device> popupStream" speichern
+              $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);         # Statusbit wenn ein Stream aktiviert ist
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrefresh')\">$imgrefresh </a>";              
               $ret .= "</td>";
@@ -6429,7 +6434,8 @@ sub SSCam_StreamDev($$$) {
                                                <source src=$link type=\"video/ogg\">
                                                <source src=$link type=\"video/webm\">
                                                Your browser does not support the video tag
-                                               </video>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern              
+                                               </video>";                # Stream für "get <SSCamSTRM-Device> popupStream" speichern              
+              $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);         # Statusbit wenn ein Stream aktiviert ist
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>"; 
               $ret .= "</td>";
               if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/) {
@@ -6444,13 +6450,15 @@ sub SSCam_StreamDev($$$) {
           } elsif($wltype =~ /base64img/) {
               $ret .= "<td><img src='data:image/jpeg;base64,$link' $ha onClick=\"FW_okDialog('<img src=data:image/jpeg;base64,$link $pws>')\"><br>" if($link);
               $streamHash->{HELPER}{STREAM} = "<img src='data:image/jpeg;base64,$link' $pws>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
+              $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);                                  # Statusbit wenn ein Stream aktiviert ist
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";
               $ret .= "</td>";
 		  
           } elsif($wltype =~ /embed/) {
               $ret .= "<td><embed src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"></td>" if($link);
               $streamHash->{HELPER}{STREAM} = "<embed src=$link $pws>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
-          
+              $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);           # Statusbit wenn ein Stream aktiviert ist
+              
           } elsif($wltype =~ /hls/) {
               $ret .= "<td><video $ha controls autoplay>
                        <source src=$link type=\"application/x-mpegURL\">
@@ -6461,7 +6469,8 @@ sub SSCam_StreamDev($$$) {
                                                <source src=$link type=\"application/x-mpegURL\">
                                                <source src=$link type=\"video/MP2T\">
                                                Your browser does not support the video tag
-                                               </video>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
+                                               </video>";                # Stream für "get <SSCamSTRM-Device> popupStream" speichern
+              $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);         # Statusbit wenn ein Stream aktiviert ist
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrefresh')\">$imgrefresh </a>";
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdhlsreact')\">$imghlsreact </a>";

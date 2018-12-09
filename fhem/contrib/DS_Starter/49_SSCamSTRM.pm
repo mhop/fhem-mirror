@@ -122,12 +122,14 @@ sub SSCamSTRM_Get($@) {
   	  my $txt = SSCam_getclhash($hash);
       return $txt if($txt);
       
+      my $link   = AnalyzePerlCommand(undef, $hash->{LINK}) if($hash->{LINK} =~ m/^{(.*)}$/s);
+      
       my $parent = $hash->{PARENT};
       my $parentHash = $defs{$parent};
       
       my $htmlCode = $hash->{HELPER}{STREAM};
       
-      if ($htmlCode) {
+      if ($hash->{HELPER}{STREAMACTIVE}) {
           my $out = "<html>";
           $out .= $htmlCode;
           $out .= "</html>";
