@@ -123,18 +123,18 @@ FRM_IN_Init($$)
 }
 
 sub
-FRM_IN_observer
+FRM_IN_observer($$$$)
 {
-	my ($pin,$old,$new,$hash) = @_;
+	my ($pin,$last,$new,$hash) = @_;
 	my $name = $hash->{NAME};
-	Log3 $name,5,"onDigitalMessage for pin ".$pin.", old: ".(defined $old ? $old : "--").", new: ".(defined $new ? $new : "--");
+	my $old = ReadingsVal($name, "reading", undef) eq "on" ? PIN_HIGH : PIN_LOW;
 	if (AttrVal($hash->{NAME},"activeLow","no") eq "yes") {
-		$old = $old == PIN_LOW ? PIN_HIGH : PIN_LOW if (defined $old);
 		$new = $new == PIN_LOW ? PIN_HIGH : PIN_LOW;
 	}
-	my $changed = ((!(defined $old)) or ($old != $new));
-	main::readingsBeginUpdate($hash);
+	Log3 $name, 5, "$name observer pin: $pin, old: ".(defined $old ? $old : "--").", new: ".(defined $new ? $new : "--");
+	my $changed = !defined($old) || $old != $new;
 	if ($changed) {
+  	main::readingsBeginUpdate($hash);
   	if (defined (my $mode = main::AttrVal($name,"count-mode",undef))) {
   		if (($mode eq "both")
   		or (($mode eq "rising") and ($new == PIN_HIGH))
@@ -154,18 +154,17 @@ FRM_IN_observer
   	    	main::readingsBulkUpdate($hash,"count",$count,1);
   	    }
   	};
+  	main::readingsBulkUpdate($hash,"reading",$new == PIN_HIGH ? "on" : "off", 1);
+  	main::readingsEndUpdate($hash,1);
 	}
-	main::readingsBulkUpdate($hash,"reading",$new == PIN_HIGH ? "on" : "off", $changed);
-	main::readingsEndUpdate($hash,1);
 }
 
 sub
-FRM_IN_Set
+FRM_IN_Set($@)
 {
   my ($hash, @a) = @_;
-  return "Need at least one parameters" if(@a < 2);
-  return "Unknown argument $a[1], choose one of " . join(" ", sort keys %sets)
-  	if(!defined($sets{$a[1]}));
+  return "set command missing" if(@a < 2 || !defined($a[1]));
+  return "unknown set command '$a[1]', choose one of " . join(" ", sort keys %sets)	if(!defined($sets{$a[1]}));
   my $command = $a[1];
   my $value = $a[2];
   COMMAND_HANDLER: {
@@ -182,23 +181,27 @@ FRM_IN_Set
 }
 
 sub
-FRM_IN_Get($)
+FRM_IN_Get($@)
 {
   my ($hash, @a) = @_;
-  return "Need at least one parameters" if(@a < 2);
-  return "Unknown argument $a[1], choose one of " . join(" ", sort keys %gets)
-  	if(!defined($gets{$a[1]}));
+  return "get command missing" if(@a < 2 || !defined($a[1]));
+  return "unknown get command '$a[1]', choose one of " . join(":noArg ", sort keys %gets) . ":noArg" if(!defined($gets{$a[1]}));
   my $name = shift @a;
   my $cmd = shift @a;
   ARGUMENT_HANDLER: {
-    $cmd eq "reading" and do {
+    ( $cmd eq "reading" ) and do {
+      my $last;
       eval {
-        return FRM_Client_FirmataDevice($hash)->digital_read($hash->{PIN}) == PIN_HIGH ? "on" : "off";
+        $last = FRM_Client_FirmataDevice($hash)->digital_read($hash->{PIN});
+        if (AttrVal($hash->{NAME},"activeLow","no") eq "yes") {
+          $last = $last == PIN_LOW ? PIN_HIGH : PIN_LOW;
+        }
       };
-      return $@;
+      return FRM_Catch($@) if $@;
+      return $last == PIN_HIGH ? "on" : "off";
     };
     ( $cmd eq "count" or $cmd eq "alarm" or $cmd eq "state" ) and do {
-      return main::ReadingsVal($name,"count",$gets{$cmd});
+      return main::ReadingsVal($name,$cmd,$gets{$cmd});
     };
   }
   return undef;
@@ -305,15 +308,34 @@ FRM_IN_Attr($$$$) {
 
   CHANGES
 
+  04.11.2018 jensb
+    o bugfix: get alarm/reading/state
+    o feature: remove unused FHEMWEB input field from all get commands
+    o feature: @see https://forum.fhem.de/index.php/topic,81815.msg842557.html#msg842557
+               - use current FHEM reading instead of perl-firmata "old" value to improve change detection
+               - only update reading on change to filter updates by other pins on same Firmata digital port
+
   03.01.2018 jensb
     o implemented Firmata 2.5 feature PIN_MODE_PULLUP (requires perl-firmata 0.64 or higher)
 
 =cut
 
 =pod
+
+=head1 FHEM COMMANDREF METADATA
+
+=over
+
 =item device
+
 =item summary Firmata: digital input
+
 =item summary_DE Firmata: digitaler Eingang
+
+=back
+
+=head1 INSTALLATION AND CONFIGURATION
+
 =begin html
 
 <a name="FRM_IN"></a>
@@ -323,14 +345,14 @@ FRM_IN_Attr($$$$) {
   that should be configured as a digital input.<br><br>
 
   Requires a defined <a href="#FRM">FRM</a> device to work. The pin must be listed in
-  the internal reading <a href="#FRMinternals">"input_pins" or "pullup_pins"</a><br>
+  the internal reading <a href="#FRMinternals">"input_pins" or "pullup_pins"</a>
   of the FRM device (after connecting to the Firmata device) to be used as digital input with or without pullup.<br><br>
 
   <a name="FRM_INdefine"></a>
   <b>Define</b>
   <ul>
   <code>define &lt;name&gt; FRM_IN &lt;pin&gt;</code> <br>
-  Defines the FRM_IN device. &lt;pin&gt> is the arduino-pin to use.
+  Defines the FRM_IN device. &lt;pin&gt> is the Firmata pin to use.
   </ul>
 
   <br>
@@ -338,21 +360,25 @@ FRM_IN_Attr($$$$) {
   <b>Set</b><br>
   <ul>
     <li>alarm on|off<br>
-    set the alarm to on or off. Used to clear the alarm.<br>
+    set the 'alarm' reading to on or off. Typically used to clear the alarm.
     The alarm is set to 'on' whenever the count reaches the threshold and doesn't clear itself.</li>
+    <li>count <number><br>
+    set the 'count' reading to a specific value.
+    The counter is incremented depending on the attribute 'count-mode'.</li>
   </ul><br>
 
   <a name="FRM_INget"></a>
   <b>Get</b>
   <ul>
     <li>reading<br>
-    returns the logical state of the arduino-pin. Values are 'on' and 'off'.<br></li>
+    returns the logical state of the input pin last received from the Firmata device depending on the attribute 'activeLow'.
+    Values are 'on' and 'off'.<br></li>
     <li>count<br>
-    returns the current count. Contains the number of toggles of the arduino-pin.<br>
+    returns the current counter value. Contains the number of toggles reported by the Fimata device on this input pin. 
     Depending on the attribute 'count-mode' every rising or falling edge (or both) is counted.</li>
     <li>alarm<br>
-    returns the current state of 'alarm'. Values are 'on' and 'off' (Defaults to 'off')<br>
-    'alarm' doesn't clear itself, has to be set to 'off' explicitly.</li>
+    returns the 'alarm' reading. Values are 'on' and 'off' (Defaults to 'off'). 
+    The 'alarm' reading doesn't clear itself, it has to be set to 'off' explicitly.</li>
     <li>state<br>
     returns the 'state' reading</li>
   </ul><br>
@@ -360,22 +386,22 @@ FRM_IN_Attr($$$$) {
   <a name="FRM_INattr"></a>
   <b>Attributes</b><br>
   <ul>
-      <li>activeLow &lt;yes|no&gt;</li>
+      <li>activeLow yes|no<br>
+      inverts the logical state of the pin reading if set to yes (defaults to 'no').</li>
       <li>count-mode none|rising|falling|both<br>
-      Determines whether 'rising' (transitions from 'off' to 'on') of falling (transitions from 'on' to 'off')<br>
-      edges (or 'both') are counted. Defaults to 'none'</li>
+      Determines whether 'rising' (transitions from 'off' to 'on') of falling (transitions from 'on' to 'off')
+      edges (or 'both') are counted (defaults to 'none').</li>
       <li>count-threshold &lt;number&gt;<br>
-      sets the theshold-value for the counter. Whenever 'count' reaches the 'count-threshold' 'alarm' is<br>
-      set to 'on'. Use 'set alarm off' to clear the alarm.</li>
+      sets the threshold-value for the counter - if defined whenever 'count' exceeds the 'count-threshold' the 'alarm' reading is
+      set to 'on' (defaults to undefined). Use 'set alarm off' to clear the alarm.</li>
       <li>reset-on-threshold-reached yes|no<br>
       if set to 'yes' reset the counter to 0 when the threshold is reached (defaults to 'no').
       </li>
       <li>internal-pullup on|off<br>
-      allows to switch the internal pullup resistor of arduino to be en-/disabled. Defaults to off.
+      enables/disables the internal pullup resistor of the Firmata pin (defaults to 'off'). Requires hardware and firmware support.
       </li>
       <li><a href="#IODev">IODev</a><br>
-      Specify which <a href="#FRM">FRM</a> to use. (Optional, only required if there is more
-      than one FRM-device defined.)
+      specify which <a href="#FRM">FRM</a> to use.
       </li>
       <li><a href="#eventMap">eventMap</a><br></li>
       <li><a href="#readingFnAttributes">readingFnAttributes</a><br></li>
@@ -388,8 +414,22 @@ FRM_IN_Attr($$$$) {
       In most cases it is a good idea to assign "reading" to the attribute <i>stateFormat</i>. This will show the state
       of the pin in the web interface.
       </li>
+      <li>attribute <i>count-mode</i><br>
+      The count-mode does not depended on hardware or firmware of the Firmata device because it is implemented in FHEM. The counter will not be updated while the Firmata device is not connected to FHEM. Any changes of the pin state during this time will be lost.
+      </li>
   </ul>
 </ul><br>
 
 =end html
+
+=begin html_DE
+
+<a name="FRM_IN"></a>
+<h3>FRM_IN</h3>
+<ul>
+  Die Modulbeschreibung von FRM_IN gibt es nur auf <a href="commandref.html#FRM_IN">Englisch</a>. <br>
+</ul> <br>
+
+=end html_DE
+
 =cut
