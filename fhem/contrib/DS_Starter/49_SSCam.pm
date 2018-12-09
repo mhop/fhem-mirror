@@ -6229,7 +6229,8 @@ sub SSCam_StreamDev($$$) {
   $hash->{HELPER}{STRMDEV}    = $strmdev;                   # Name des aufrufenden SSCamSTRM-Devices
   $hash->{HELPER}{STRMROOM}   = $FW_room?$FW_room:"";       # Raum aus dem das SSCamSTRM-Device die Funktion aufrief
   $hash->{HELPER}{STRMDETAIL} = $FW_detail?$FW_detail:"";   # Name des SSCamSTRM-Devices (wenn Detailansicht)
-  my $streamHash              = $defs{$strmdev};            # SSCamSTRM-Devices
+  my $streamHash              = $defs{$strmdev};            # Hash des SSCamSTRM-Devices
+  delete $streamHash->{HELPER}{STREAM};
   
   # Definition Tasten
   my $imgblank      = "<img src=\"$FW_ME/www/images/sscam/black_btn_CAMBLANK.png\">";                   # nicht sichtbare Leertaste
@@ -6365,7 +6366,7 @@ sub SSCam_StreamDev($$$) {
       
       if($link && $wltype =~ /image|iframe|video|base64img|embed|hls/) {
           if($wltype =~ /image/) {
-              $ret .= "<td><img src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"><br>";
+              $ret .= "<td><img src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"><br>" if($link);
               $streamHash->{HELPER}{STREAM} = "<img src=$link $pws>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";
               $ret .= $imgblank;
@@ -6399,7 +6400,7 @@ sub SSCam_StreamDev($$$) {
           } elsif ($wltype =~ /iframe/) {
               $ret .= "<td><iframe src=$link $ha controls autoplay onClick=\"FW_okDialog('<img src=$link $pws>')\">
                        Iframes disabled
-                       </iframe><br>";
+                       </iframe><br>" if($link);
               $streamHash->{HELPER}{STREAM} = "<iframe src=$link $pws controls autoplay>
                                               Iframes disabled
                                               </iframe>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
@@ -6441,13 +6442,13 @@ sub SSCam_StreamDev($$$) {
                   $ret .= "<td></td>" if(AttrVal($camname,"ptzPanel_use",0));
               }
           } elsif($wltype =~ /base64img/) {
-              $ret .= "<td><img src='data:image/jpeg;base64,$link' $ha onClick=\"FW_okDialog('<img src=data:image/jpeg;base64,$link $pws>')\"><br>";
+              $ret .= "<td><img src='data:image/jpeg;base64,$link' $ha onClick=\"FW_okDialog('<img src=data:image/jpeg;base64,$link $pws>')\"><br>" if($link);
               $streamHash->{HELPER}{STREAM} = "<img src='data:image/jpeg;base64,$link' $pws>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";
               $ret .= "</td>";
 		  
           } elsif($wltype =~ /embed/) {
-              $ret .= "<td><embed src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"></td>";
+              $ret .= "<td><embed src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"></td>" if($link);
               $streamHash->{HELPER}{STREAM} = "<embed src=$link $pws>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
           
           } elsif($wltype =~ /hls/) {
@@ -6530,6 +6531,8 @@ sub SSCam_composegallery ($;$$) {
   $hash->{HELPER}{STRMDEV}    = $strmdev;                        # Name des aufrufenden SSCamSTRM-Devices
   $hash->{HELPER}{STRMROOM}   = $FW_room?$FW_room:"";            # Raum aus dem das SSCamSTRM-Device die Funktion aufrief
   $hash->{HELPER}{STRMDETAIL} = $FW_detail?$FW_detail:"";        # Name des SSCamSTRM-Devices (wenn Detailansicht)
+  my $streamHash              = $defs{$strmdev};                 # Hash des SSCamSTRM-Devices
+  delete $streamHash->{HELPER}{STREAM};
   
   my $cmddosnap     = "cmd=set $name snap STRM";                 # Snapshot auslösen mit Kennzeichnung "by STRM-Device"
   my $imgdosnap     = "<img src=\"$FW_ME/www/images/sscam/black_btn_DOSNAP.png\">";

@@ -112,7 +112,7 @@ sub SSCamSTRM_Get($@) {
   my $opt     = $a[1];
   my $prop    = $a[2];    
   
-  return if(IsDisabled($name));
+  return if(IsDisabled($name) || $hash->{MODEL} =~ /ptzcontrol|snapgallery/);
   
   my $getlist = "Unknown argument $opt, choose one of ".
 	             "popupStream:noArg "
@@ -127,16 +127,18 @@ sub SSCamSTRM_Get($@) {
       
       my $htmlCode = $hash->{HELPER}{STREAM};
       
-      for (my $k=1; (defined($hash->{HELPER}{CL}{$k})); $k++ ) {
-          if ($hash->{HELPER}{CL}{$k}->{COMP}) {
-		      # CL zusammengestellt (Auslösung durch Notify)
-		      asyncOutput($hash->{HELPER}{CL}{$k}, "$htmlCode");						
-		  } else {
-			  # Output wurde über FHEMWEB ausgelöst
-		      return $htmlCode;
-		  }
-	  }
+      if ($htmlCode) {
+          for (my $k=1; (defined($hash->{HELPER}{CL}{$k})); $k++ ) {
+              if ($hash->{HELPER}{CL}{$k}->{COMP}) {
+		          # CL zusammengestellt (Auslösung durch Notify)
+		          asyncOutput($hash->{HELPER}{CL}{$k}, "$htmlCode");						
+		      } else {
+			      # Output wurde über FHEMWEB ausgelöst
+		          return $htmlCode;
+		      }
+	      }
 	  delete($hash->{HELPER}{CL});
+      }
   
   } else {
       return "$getlist";
