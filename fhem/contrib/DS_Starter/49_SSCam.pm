@@ -45,7 +45,7 @@ use HttpUtils;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
-  "7.7.0"  => "07.12.2018  SVS-Device: autocreateCams command added, some other fixes and improvements ",
+  "7.7.0"  => "07.12.2018  SVS-Device: autocreateCams command added, some other fixes and improvements, minor code rewrite ",
   "7.6.0"  => "02.12.2018  sub SSCam_ptzpanel completed by Preset and Patrol, minor fixes ",
   "7.5.0"  => "02.12.2018  sub SSCam_StreamDev and SSCam_composegallery changed to use popup window ",
   "7.4.1"  => "26.11.2018  sub composegallery deleted, SSCam_composegallery changed to get information for SSCam_refresh ",
@@ -1795,12 +1795,9 @@ sub SSCam_camstartrec ($) {
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         # Aufnahme starten                         
         $hash->{OPMODE} = "Start";
-        $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
         
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
     
 	} else {
@@ -1848,12 +1845,9 @@ sub SSCam_camstoprec ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         $hash->{OPMODE} = "Stop";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }  
+        SSCam_setActiveToken($hash);  
         SSCam_getapisites($hash);
 		
     } else {
@@ -1896,12 +1890,9 @@ sub SSCam_camexpmode($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                           
         $hash->{OPMODE} = "ExpMode";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
 		
     } else {
@@ -1944,12 +1935,9 @@ sub SSCam_cammotdetsc($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {             
         $hash->{OPMODE} = "MotDetSc";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
-		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }    
+	
+        SSCam_setActiveToken($hash);    
         SSCam_getapisites($hash);
 		
     } else {
@@ -1994,13 +1982,9 @@ sub SSCam_camsnap($) {
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         # einen Schnappschuß aufnehmen              
         $hash->{OPMODE} = "Snap";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
-		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
-        
+
+        SSCam_setActiveToken($hash); 
         SSCam_getapisites($hash);
 		
     } else {
@@ -2043,13 +2027,9 @@ sub SSCam_starttrack($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {             
         $hash->{OPMODE} = "startTrack";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
-        
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
 		
     } else {
@@ -2092,13 +2072,9 @@ sub SSCam_stoptrack($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {             
         $hash->{OPMODE} = "stopTrack";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
-        
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
 		
     } else {
@@ -2141,12 +2117,9 @@ sub SSCam_getpresets($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {             
         $hash->{OPMODE} = "getPresets";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         
         SSCam_getapisites($hash);
 		
@@ -2190,12 +2163,9 @@ sub SSCam_setPreset($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {             
         $hash->{OPMODE} = "setPreset";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         
         SSCam_getapisites($hash);
 		
@@ -2239,12 +2209,9 @@ sub SSCam_delPreset($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {             
         $hash->{OPMODE} = "delPreset";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         
         SSCam_getapisites($hash);
 		
@@ -2288,12 +2255,9 @@ sub SSCam_setHome($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {             
         $hash->{OPMODE} = "setHome";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         
         SSCam_getapisites($hash);
 		
@@ -2337,12 +2301,9 @@ sub SSCam_piract($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {             
         $hash->{OPMODE} = "piract";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         
         SSCam_getapisites($hash);
 		
@@ -2386,14 +2347,11 @@ sub SSCam_runliveview($) {
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         # Liveview starten             
         $hash->{OPMODE} = "runliveview";
-        $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0; 
 		# erzwingen die Camid zu ermitteln und bei login-Fehler neue SID zu holen
 		delete $hash->{CAMID};  
         
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         readingsSingleUpdate($hash,"state","runView ".$hash->{HELPER}{RUNVIEW},1); 
         SSCam_getapisites($hash);
     
@@ -2437,12 +2395,9 @@ sub SSCam_hlsactivate($) {
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         # Aktivierung starten             
         $hash->{OPMODE} = "activate_hls";
-        $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0;   
         
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
     
 	} else {
@@ -2482,15 +2437,11 @@ sub SSCam_setAutocreate($) {
         return;
     }
     
-    if ($hash->{HELPER}{ACTIVE} eq "off") {
-        # Aktivierung starten             
+    if ($hash->{HELPER}{ACTIVE} eq "off") {            
         $hash->{OPMODE} = "Autocreate";
-        $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0;   
         
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
     
 	} else {
@@ -2530,15 +2481,11 @@ sub SSCam_hlsreactivate($) {
         return;
     }
     
-    if ($hash->{HELPER}{ACTIVE} eq "off") {
-        # Aktivierung starten             
+    if ($hash->{HELPER}{ACTIVE} eq "off") {             
         $hash->{OPMODE} = "reactivate_hls";
-        $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0;   
         
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
     
 	} else {
@@ -2563,12 +2510,9 @@ sub SSCam_stopliveview ($) {
         
         # Liveview stoppen           
         $hash->{OPMODE} = "stopliveview";
-        $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
         
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         
         # Link aus Helper-hash löschen
         delete $hash->{HELPER}{LINK};
@@ -2587,10 +2531,7 @@ sub SSCam_stopliveview ($) {
         } else {
             # kein HLS Stream
 			SSCam_refresh($hash,0,1,1);    # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
-		    $hash->{HELPER}{ACTIVE} = "off";  
-		    if (AttrVal($name,"debugactivetoken",0)) {
-                Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
-            }
+            SSCam_delActiveToken($hash);
         }
 	
 	} else {
@@ -2610,12 +2551,9 @@ sub SSCam_extevent ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
         $hash->{OPMODE} = "extevent";
-        $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
         
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
 		
     } else {
@@ -2714,14 +2652,11 @@ sub SSCam_doptzaction ($) {
         } elsif ($hash->{HELPER}{PTZACTION} eq "movestart") {
             Log3($name, 4, "$name - Start move Camera $camname to direction \"$hash->{HELPER}{GOMOVEDIR}\" with duration of $hash->{HELPER}{GOMOVETIME} s");
         }
- 
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
-    
+     
         $hash->{OPMODE} = $hash->{HELPER}{PTZACTION};
-        $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
+        
+        SSCam_setActiveToken($hash);
  
         SSCam_getapisites($hash);
  
@@ -2743,12 +2678,9 @@ sub SSCam_movestop ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
         $hash->{OPMODE} = "movestop";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");;
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
    
     } else {
@@ -2772,12 +2704,9 @@ sub SSCam_camenable ($) {
         Log3($name, 4, "$name - Enable Camera $camname");
                         
         $hash->{OPMODE} = "Enable";
-        $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
         
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
     
 	} else {
@@ -2801,12 +2730,9 @@ sub SSCam_camdisable ($) {
         Log3($name, 4, "$name - Disable Camera $camname");
                         
         $hash->{OPMODE} = "Disable";
-        $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
         
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
 		
     } else {
@@ -2904,15 +2830,12 @@ sub SSCam_getsnapinfo ($) {
     if ($hash->{HELPER}{ACTIVE} eq "off") {               
         $hash->{OPMODE} = "getsnapinfo";
 		$hash->{OPMODE} = "getsnapgallery" if(exists($hash->{HELPER}{GETSNAPGALLERY}));
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		$hash->{HELPER}{SNAPLIMIT}    = $slim;   # 0-alle Snapshots werden abgerufen und ausgewertet, sonst $slim
 		$hash->{HELPER}{SNAPIMGSIZE}  = $ssize;  # 0-Do not append image, 1-Icon size, 2-Full size
 		$hash->{HELPER}{KEYWORD}      = $camname;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
 		
     } else {
@@ -2932,12 +2855,9 @@ sub SSCam_getsnapfilename ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {    
         $hash->{OPMODE} = "getsnapfilename";
-        $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
         
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
     
 	} else {
@@ -2958,12 +2878,9 @@ sub SSCam_getsvsinfo ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
         $hash->{OPMODE} = "getsvsinfo";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
 		
     } else {
@@ -2984,12 +2901,9 @@ sub SSCam_sethomemode ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
         $hash->{OPMODE} = "sethomemode";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
 		
     } else {
@@ -3010,12 +2924,9 @@ sub SSCam_setoptpar ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
         $hash->{OPMODE} = "setoptpar";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
 		
     } else {
@@ -3036,12 +2947,9 @@ sub SSCam_gethomemodestate ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
         $hash->{OPMODE} = "gethomemodestate";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
 		
     } else {
@@ -3062,12 +2970,9 @@ sub SSCam_getsvslog ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
         $hash->{OPMODE} = "getsvslog";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
 		
     } else {
@@ -3088,11 +2993,8 @@ sub SSCam_sessionoff ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
         $hash->{OPMODE} = "logout";
-        $hash->{HELPER}{ACTIVE} = "on";
-		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        
+        SSCam_setActiveToken($hash);
         SSCam_logout($hash);
 		
     } else {
@@ -3113,11 +3015,9 @@ sub SSCam_getcaminfo($) {
 
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
         $hash->{OPMODE} = "Getcaminfo";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;	
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        } 
+        
+        SSCam_setActiveToken($hash); 
         SSCam_getapisites($hash);
 		
     } else {
@@ -3145,12 +3045,9 @@ sub SSCam_getstreamformat ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
         $hash->{OPMODE} = "getstreamformat";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        } 
+        SSCam_setActiveToken($hash); 
         SSCam_getapisites($hash);
 		
     } else {
@@ -3172,12 +3069,9 @@ sub SSCam_getStmUrlPath ($) {
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         # Stream-Urls abrufen              
         $hash->{OPMODE} = "getStmUrlPath";
-        $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
         
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
 		
     } else {
@@ -3198,12 +3092,9 @@ sub SSCam_geteventlist ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {      
         $hash->{OPMODE} = "geteventlist";
-        $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
         
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
 		
     } else {
@@ -3224,12 +3115,9 @@ sub SSCam_getmotionenum ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {   
         $hash->{OPMODE} = "getmotionenum";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
 		
     } else {
@@ -3251,12 +3139,9 @@ sub SSCam_getcapabilities ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                       
         $hash->{OPMODE} = "Getcapabilities";
-        $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
         
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
 		
     } else {
@@ -3286,12 +3171,9 @@ sub SSCam_getptzlistpreset ($) {
     
 	if ($hash->{HELPER}{ACTIVE} eq "off") {                       
         $hash->{OPMODE} = "Getptzlistpreset";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
 		
     } else {
@@ -3321,12 +3203,9 @@ sub SSCam_getptzlistpatrol ($) {
 
     if ($hash->{HELPER}{ACTIVE} ne "on") {                        
         $hash->{OPMODE} = "Getptzlistpatrol";
-        $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
         
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
 		
     } else {
@@ -3428,11 +3307,7 @@ sub SSCam_getapisites_parse ($) {
         readingsSingleUpdate($hash, "Error", $err, 1);
 
         # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
-        $hash->{HELPER}{ACTIVE} = "off"; 
-        
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_delActiveToken($hash);
         return;
 		
     } elsif ($myjson ne "") {          
@@ -3440,12 +3315,7 @@ sub SSCam_getapisites_parse ($) {
         ($hash, my $success) = SSCam_evaljson($hash,$myjson);
         
         unless ($success) {
-            Log3($name, 4, "$name - Data returned: $myjson");
-            $hash->{HELPER}{ACTIVE} = "off";
-            
-            if (AttrVal($name,"debugactivetoken",0)) {
-                Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
-            }
+            SSCam_delActiveToken($hash);
             return;
         }
         
@@ -3761,11 +3631,7 @@ sub SSCam_getapisites_parse ($) {
             Log3($name, 2, "$name - ERROR - the API-Query couldn't be executed successfully");                    
                         
             # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
-            $hash->{HELPER}{ACTIVE} = "off"; 
-                        
-            if (AttrVal($name,"debugactivetoken",0)) {
-                Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
-            }
+            SSCam_delActiveToken($hash);
             return;
         }
 	}
@@ -3881,12 +3747,8 @@ sub SSCam_getcamid_parse ($) {
        ($hash, $success) = SSCam_evaljson($hash,$myjson);
         
        unless ($success) {
-           Log3($name, 4, "$name - Data returned: ".$myjson);
-		   
-           $hash->{HELPER}{ACTIVE} = "off";
-           if (AttrVal($name,"debugactivetoken",0)) {
-               Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
-           }
+           Log3($name, 4, "$name - Data returned: ".$myjson);		   
+           SSCam_delActiveToken($hash);
            return; 
        }
         
@@ -3940,11 +3802,7 @@ sub SSCam_getcamid_parse ($) {
                CommandSave(undef, undef) if($errstate eq "none" && $nrcreated && AttrVal("global","autosave", 1));
 
 		       # Freigabe Funktionstoken
-               $hash->{HELPER}{ACTIVE} = "off";
-               if (AttrVal($name,"debugactivetoken",0)) {
-                   Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
-               }
-           
+               SSCam_delActiveToken($hash);
                return;
            }
              
@@ -3966,12 +3824,8 @@ sub SSCam_getcamid_parse ($) {
                readingsEndUpdate($hash, 1);
                                   
                # Logausgabe
-               Log3($name, 2, "$name - ERROR - Cameraname $camname wasn't found in Surveillance Station. Check Userrights, Cameraname and Spelling");
-               			   
-               $hash->{HELPER}{ACTIVE} = "off";
-               if (AttrVal($name,"debugactivetoken",0)) {
-                   Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
-               }
+               Log3($name, 2, "$name - ERROR - Cameraname $camname wasn't found in Surveillance Station. Check Userrights, Cameraname and Spelling");		   
+               SSCam_delActiveToken($hash);
                return;
            }
       
@@ -3994,10 +3848,7 @@ sub SSCam_getcamid_parse ($) {
 		   
 		   } else {
 		       # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
-               $hash->{HELPER}{ACTIVE} = "off";
-               if (AttrVal($name,"debugactivetoken",0)) {
-                   Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
-               }
+               SSCam_delActiveToken($hash);
 			   Log3($name, 2, "$name - ERROR - ID of Camera $camname couldn't be selected. Errorcode: $errorcode - $error");
                return;
 		   }
@@ -4385,10 +4236,7 @@ sub SSCam_camop ($) {
            
 	  SSCam_refresh($hash,0,1,1);    # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
       
-	  $hash->{HELPER}{ACTIVE} = "off";
-      if (AttrVal($name,"debugactivetoken",0)) {
-          Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
-      }
+      SSCam_delActiveToken($hash);
       return;
 	  
    } elsif ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} =~ /snap/) {
@@ -4472,10 +4320,7 @@ sub SSCam_camop_parse ($) {
         readingsSingleUpdate($hash, "Error", $err, 1);                                     	       
         
 		# ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
-		$hash->{HELPER}{ACTIVE} = "off";
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_delActiveToken($hash);
         return;
    
    } elsif ($myjson ne "") {    
@@ -4485,12 +4330,8 @@ sub SSCam_camop_parse ($) {
         
         unless ($success) {
             Log3($name, 4, "$name - Data returned: ".$myjson);
-			
-			# ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
-            $hash->{HELPER}{ACTIVE} = "off";
-            if (AttrVal($name,"debugactivetoken",0)) {
-                Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
-            }
+
+            SSCam_delActiveToken($hash);
             return;
         }
         
@@ -4577,7 +4418,7 @@ sub SSCam_camop_parse ($) {
                 Log3($name, 3, "$name - HomeMode was set to \"$hash->{HELPER}{HOMEMODE}\" ");
 				
 				# Token freigeben vor nächstem Kommando
-                $hash->{HELPER}{ACTIVE} = "off";
+                SSCam_delActiveToken($hash);
   
                 # neuen HomeModeState abrufen	
                 SSCam_gethomemodestate($hash);
@@ -4722,7 +4563,7 @@ sub SSCam_camop_parse ($) {
                 readingsEndUpdate($hash, 1);
 
 				# Token freigeben vor Abruf caminfo
-                $hash->{HELPER}{ACTIVE} = "off";
+                SSCam_delActiveToken($hash);
                 RemoveInternalTimer($hash, "SSCam_getcaminfo");
                 InternalTimer(gettimeofday()+0.5, "SSCam_getcaminfo", $hash, 0);
 				
@@ -4772,7 +4613,7 @@ sub SSCam_camop_parse ($) {
                 Log3($name, 3, "$name - Snapshot of Camera $camname has been done successfully");
                 
 				# Token freigeben vor nächstem Kommando
-                $hash->{HELPER}{ACTIVE} = "off";
+                SSCam_delActiveToken($hash);
   
                 # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps
                 my ($slim,$ssize) = SSCam_snaplimsize($hash);		
@@ -4903,7 +4744,7 @@ sub SSCam_camop_parse ($) {
                 Log3($name, 4, "$name - HLS Streaming of camera \"$name\" deactivated for streaming device");
 
 				# Token freigeben vor hlsactivate
-                $hash->{HELPER}{ACTIVE} = "off";
+                SSCam_delActiveToken($hash);
                 SSCam_hlsactivate($hash);
                 
             } elsif ($OpMode eq "activate_hls") {
@@ -5625,11 +5466,7 @@ sub SSCam_camop_parse ($) {
    }
   
   # Token freigeben   
-  $hash->{HELPER}{ACTIVE} = "off";
-
-  if (AttrVal($name,"debugactivetoken",0)) {
-      Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
-  }
+  SSCam_delActiveToken($hash);
 
 return;
 }
@@ -5663,20 +5500,13 @@ sub SSCam_login ($$) {
   
   unless ($success) {
       Log3($name, 2, "$name - Credentials couldn't be retrieved successfully - make sure you've set it with \"set $name credentials <username> <password>\"");
-      
-      $hash->{HELPER}{ACTIVE} = "off";
-      if (AttrVal($name,"debugactivetoken",0)) {
-          Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
-      }      
+      SSCam_delActiveToken($hash);      
       return;
   }
   
   if($hash->{HELPER}{LOGINRETRIES} >= $lrt) {
       # login wird abgebrochen, Freigabe Funktionstoken
-      $hash->{HELPER}{ACTIVE} = "off"; 
-      if (AttrVal($name,"debugactivetoken",0)) {
-          Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
-      }
+      SSCam_delActiveToken($hash);
 	  Log3($name, 2, "$name - ERROR - Login or privilege of user $username unsuccessful"); 
       return;
   }
@@ -5738,11 +5568,7 @@ sub SSCam_login_return ($) {
         ($hash, $success) = SSCam_evaljson($hash,$myjson);
         unless ($success) {
             Log3($name, 4, "$name - no JSON-Data returned: ".$myjson);
-            $hash->{HELPER}{ACTIVE} = "off";
-            
-            if (AttrVal($name,"debugactivetoken",0)) {
-                Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
-            }
+            SSCam_delActiveToken($hash);
             return;
         }
         
@@ -5847,12 +5673,12 @@ sub SSCam_logout_return ($) {
    my $error;
    my $errorcode;
   
-   if($err ne "") {
+   if ($err ne "") {
        # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
-       Log3($name, 2, "$name - error while requesting ".$param->{url}." - $err");
-        
+       Log3($name, 2, "$name - error while requesting ".$param->{url}." - $err"); 
        readingsSingleUpdate($hash, "Error", $err, 1);                                     	      
-   } elsif($myjson ne "") {
+   
+   } elsif ($myjson ne "") {
        # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
        Log3($name, 4, "$name - URL-Call: ".$param->{url});
         
@@ -5861,12 +5687,7 @@ sub SSCam_logout_return ($) {
         
        unless ($success) {
            Log3($name, 4, "$name - Data returned: ".$myjson);
-            
-           $hash->{HELPER}{ACTIVE} = "off";
-            
-           if (AttrVal($name,"debugactivetoken",0)) {
-               Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
-           }
+           SSCam_delActiveToken($hash);
            return;
        }
         
@@ -5895,11 +5716,7 @@ sub SSCam_logout_return ($) {
    delete $hash->{HELPER}{SID};
    
    # ausgeführte Funktion ist erledigt (auch wenn logout nicht erfolgreich), Freigabe Funktionstoken
-   $hash->{HELPER}{ACTIVE} = "off";  
-   
-   if (AttrVal($name,"debugactivetoken",0)) {
-       Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
-   }
+   SSCam_delActiveToken($hash);
    
 return;
 }
@@ -6800,9 +6617,24 @@ return ($error);
 }
 
 #############################################################################################
+#                                   Token setzen
+#############################################################################################
+sub SSCam_setActiveToken ($) { 
+   my ($hash) = @_;
+   my $name = $hash->{NAME};
+               
+   $hash->{HELPER}{ACTIVE} = "on";
+   if (AttrVal($name,"debugactivetoken",0)) {
+       Log3($name, 3, "$name - Active-Token set by OPMODE: $hash->{OPMODE}");
+   } 
+   
+return;
+}
+
+#############################################################################################
 #                                   Token freigeben
 #############################################################################################
-sub SSCam_ActiveTokenOff ($) { 
+sub SSCam_delActiveToken ($) { 
    my ($hash) = @_;
    my $name = $hash->{NAME};
                
@@ -6812,8 +6644,7 @@ sub SSCam_ActiveTokenOff ($) {
    }  
    
 return;
-} 
-
+}  
 
 1;
 
