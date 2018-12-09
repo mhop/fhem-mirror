@@ -267,7 +267,7 @@ sub LaMetric2_Define($$) {
 
         $hash->{HOST}       = $host;
         $hash->{".API_KEY"} = $apikey;
-        $hash->{VERSION}    = "2.2.0";
+        $hash->{VERSION}    = "2.2.1";
         $hash->{INTERVAL} =
           $interval && looks_like_number($interval) ? $interval : 60;
         $hash->{PORT} = $port && looks_like_number($port) ? $port : 4343;
@@ -1582,8 +1582,7 @@ sub LaMetric2_SetNotification {
         $h->{msg} ? $h->{msg}
         : ( $h->{text} ? $h->{text} : join ' ', @$a )
       );
-
-    Debug "2: " . Dumper . @$a;
+    $values{message} = "" if ( $values{message} eq "none" );
 
     # chart frame
     if ( $h->{chart} ) {
@@ -1876,8 +1875,9 @@ sub LaMetric2_SetNotification {
 
     return
 "Usage: $name msg <text> [ option1=<value> option2='<value with space>' ... ]"
-      unless ( ( defined( $values{message} ) && $values{message} ne "" )
-        || $values{title} ne ""
+      unless ( $values{title} ne ""
+        || ( defined( $values{message} ) && $values{message} ne "" )
+        || ( defined( $values{icon} )    && $values{icon} ne "" )
         || defined( $values{chart} )
         || defined( $values{goal} )
         || defined( $values{metric} ) );
@@ -1960,28 +1960,44 @@ sub LaMetric2_SetNotification {
         readingsBulkUpdate( $hash, "lastNotificationTitle", "" );
     }
 
-    if ( defined( $values{message} ) && $values{message} ne "" ) {
-        foreach my $line ( split /\\n/, $values{message} ) {
-            $line = trim($line);
-            next if ( !$line || $line eq "" );
+    if ( defined( $values{message} ) ) {
 
-            my $ico = $values{icon};
-
-            if ( $notification{model}{frames} ) {
-                $ico = "" unless ( $h->{forceicon} );
-
-                #TODO define icon inline per frame.
-                # Must be compatible with FHEM-msg command
-            }
-
+        # empty frame
+        if ( $values{message} eq "" ) {
             push @{ $notification{model}{frames} },
               (
                 {
-                    icon  => $ico,
-                    text  => $line,
+                    icon  => $values{icon},
+                    text  => "",
                     index => $index++,
                 }
               );
+        }
+
+        # regular frames
+        else {
+            foreach my $line ( split /\\n/, $values{message} ) {
+                $line = trim($line);
+                next if ( !$line || $line eq "" );
+
+                my $ico = $values{icon};
+
+                if ( $notification{model}{frames} ) {
+                    $ico = "" unless ( $h->{forceicon} || $line eq "" );
+
+                    #TODO define icon inline per frame.
+                    # Must be compatible with FHEM-msg command
+                }
+
+                push @{ $notification{model}{frames} },
+                  (
+                    {
+                        icon  => $ico,
+                        text  => $line,
+                        index => $index++,
+                    }
+                  );
+            }
         }
         readingsBulkUpdate( $hash, "lastMessage", $values{message} );
     }
