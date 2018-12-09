@@ -116,7 +116,8 @@ MQTT2_DEVICE_Parse($$)
           readingsBeginUpdate($hash);
           foreach my $k (keys %{$ret}) {
             readingsBulkUpdate($hash, $k, $ret->{$k});
-            push(@retData, "$k $ret->{$k}");
+            my $msg = ($ret->{$k} ? $ret->{$k} : "");
+            push(@retData, "$k $msg");
             checkForGet($hash, $k, $ret->{$k});
           }
           readingsEndUpdate($hash, 1);
