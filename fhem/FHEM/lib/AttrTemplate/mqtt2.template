@@ -10,14 +10,15 @@
 # The zigbee2mqtt bridge device
 name:zigbee2mqtt_bridge
 filter:TYPE=MQTT2_DEVICE
-par:BRIDGENAME;name of the zigbee2mqtt bridge in the topics
+par:bridge;name of the zigbee2mqtt bridge in the topics
+attr DEVICE bridgeRegexp zigbee2mqtt/0x([A-Za-z0-9]*)[/]?.*:.* "zigbee_$1"
 attr DEVICE setList\
-  permit_join:true,false zigbee2mqtt/BRIDGENAME/config/permit_join $EVTPART1\
-  remove:textField zigbee2mqtt/BRIDGENAME/config/remove $EVTPART1\
-  log_level:debug,info,warn,error zigbee2mqtt/BRIDGENAME/config/log_level $EVTPART1\
-  rename:textField zigbee2mqtt/BRIDGENAME/config/rename  {"old":"$EVTPART1","new":"$EVTPART2"}\
-  network_map:raw,graphviz zigbee2mqtt/BRIDGENAME/networkmap  $EVTPART1\
-  devicelist:noArg zigbee2mqtt/BRIDGENAME/config/devices
+  permit_join:true,false zigbee2mqtt/bridge/config/permit_join $EVTPART1\
+  remove:textField zigbee2mqtt/bridge/config/remove $EVTPART1\
+  log_level:debug,info,warn,error zigbee2mqtt/bridge/config/log_level $EVTPART1\
+  rename:textField zigbee2mqtt/bridge/config/rename  {"old":"$EVTPART1","new":"$EVTPART2"}\
+  network_map:raw,graphviz zigbee2mqtt/bridge/networkmap  $EVTPART1\
+  devicelist:noArg zigbee2mqtt/bridge/config/devices
 
 
 # A dimmable light connected via zigbee2mqtt
@@ -25,6 +26,7 @@ name:zigbee2mqtt_bulb
 filter:TYPE=MQTT2_DEVICE
 par:NAMEINTHEBRIDGE;name of this device in the bridge;{ AttrVal("DEVICE","readingList","") =~ m,zigbee2mqtt/(.*):, ? $1 : undef }
 attr DEVICE icon light_control
+attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name)}
 attr DEVICE webCmd toggle:on:off:brightness
 attr DEVICE setList \
   on:noArg zigbee2mqtt/NAMEINTHEBRIDGE/set {"state":"ON"}\
@@ -121,3 +123,47 @@ attr DEVICE_CH2 setList \
   off:noArg    COMMAND/POWER2 0\
   on:noArg     COMMAND/POWER2 1\
   toggle:noArg COMMAND/POWER2 2
+
+
+# shelly4pro using original firmware.
+# NOTE: for each of the second to fourth channel, a new device will be created
+name:shelly4pro
+filter:TYPE=MQTT2_DEVICE
+par:CHIPID;serial number of this ESP chip;{ AttrVal("DEVICE","readingList","") =~ m,shellies/.*_(.*)[/]?:, ? $1 : undef }
+attr DEVICE setList\
+  off:noArg shellies/shelly4pro-CHIPID/relay/0/command off\
+  on:noArg shellies/shelly4pro-CHIPID/relay/0/command on
+attr DEVICE readingList shellies/shellyswitch-CHIPID/relay/0:.* state
+attr DEVICE getList shellies/shelly4pro-CHIPID/relay/0/power power1\
+  shellies/shelly4pro-CHIPID/relay/0/energy energy1
+attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2, DEVICE_CH3 and DEVICE_CH4
+copy DEVICE DEVICE_CH2
+attr DEVICE_CH2 readingList shellies/shelly4pro-CHIPID/relay/1:.* state
+attr DEVICE_CH2 comment Channel 2 for DEVICE
+attr DEVICE_CH2 setList\
+  off:noArg shellies/shelly4pro-CHIPID/relay/1/command off\
+  on:noArg shellies/shelly4pro-CHIPID/relay/1/command on
+attr DEVICE_CH2 readingList shellies/shellyswitch-CHIPID/relay/1:.* state
+attr DEVICE_CH2 getList shellies/shelly4pro-CHIPID/relay/1/power power2\
+  shellies/shelly4pro-CHIPID/relay/1/energy energy2
+attr DEVICE_CH2 comment Channel 2 for DEVICE, see also DEVICE, DEVICE_CH3 and DEVICE_CH4
+copy DEVICE_CH2 DEVICE_CH3
+attr DEVICE_CH3 readingList shellies/shelly4pro-CHIPID/relay/2:.* state
+attr DEVICE_CH3 comment Channel 3 for DEVICE
+attr DEVICE_CH3 setList\
+  off:noArg shellies/shelly4pro-CHIPID/relay/2/command off\
+  on:noArg shellies/shelly4pro-CHIPID/relay/2/command on
+attr DEVICE_CH3 readingList shellies/shellyswitch-CHIPID/relay/2:.* state
+attr DEVICE_CH3 getList shellies/shelly4pro-CHIPID/relay/2/power power3\
+  shellies/shelly4pro-CHIPID/relay/2/energy energy3
+attr DEVICE_CH3 comment Channel 3 for DEVICE, see also DEVICE, DEVICE_CH2 and DEVICE_CH4
+copy DEVICE_CH3 DEVICE_CH4
+attr DEVICE_CH4 readingList shellies/shelly4pro-CHIPID/relay/3:.* state
+attr DEVICE_CH4 comment Channel 4 for DEVICE
+attr DEVICE_CH4 setList\
+  off:noArg shellies/shelly4pro-CHIPID/relay/3/command off\
+  on:noArg shellies/shelly4pro-CHIPID/relay/3/command on
+attr DEVICE_CH4 readingList shellies/shellyswitch-CHIPID/relay/3:.* state
+attr DEVICE_CH4 getList shellies/shelly4pro-CHIPID/relay/3/power power4\
+  shellies/shelly4pro-CHIPID/relay/3/energy energy4
+attr DEVICE_CH4 comment Channel 4 for DEVICE, see also DEVICE, DEVICE_CH2 and DEVICE_CH3
