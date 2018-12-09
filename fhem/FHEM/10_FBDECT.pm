@@ -93,7 +93,7 @@ FBDECT_SetHttp($@)
     $cmd{off} = $cmd{on} = $cmd{toggle} = "noArg";
   }
   if($p =~ m/actuator/) {
-    $cmd{"desired-temp"} = "slider,8,0.5,28,1";
+    $cmd{"desired-temp"} = "slider,7.5,0.5,28.5,1";
     $cmd{open} = $cmd{closed} = "noArg";
   }
   if(!$cmd{$a[1]}) {
@@ -118,9 +118,10 @@ FBDECT_SetHttp($@)
     if($cmd eq "desired-temp") { 
       return "Usage: set $name desired-temp value" if(int(@a) != 3);
       return "desired-temp must be between 8 and 28"
-        if($a[2] !~ m/^[\d.]+$/ || $a[2] < 8 || $a[2] > 28)
+        if($a[2] !~ m/^[\d.]+$/ || $a[2] < 7.5 || $a[2] > 28.5)
     }
-    my $val = ($cmd eq "open" ? 254 : ($cmd eq "closed" ? 253: int(2*$a[2])));
+    my $val = ($cmd eq "open"  || $a[2]== 7.5) ? 254 :
+              ($cmd eq "closed"|| $a[2]==28.5) ? 253: int(2*$a[2]);
     IOWrite($hash, ReadingsVal($name,"AIN",0),"sethkrtsoll&param=$val");
     return undef;
   }
@@ -298,7 +299,7 @@ FBDECT_ParseHttp($$$)
     Log3 $hash, 5, "   $n = $h{$n}";
     next if(!$fbhttp_readings{$n});
     my $val = $h{$n};
-    $val = ($val==254 ? "on": ($val==253 ? "off" : sprintf("%0.1f C",$val/2)))
+    $val = ($val==254 ? 28.5: ($val==253 ? 7.5 : sprintf("%0.1f C",$val/2)))
       if($n eq "tsoll");
     $val = $type if($n eq "productname" && $val eq "");
     my ($ptyp,$pyld) = split(":", eval $fbhttp_readings{$n}, 2);
@@ -561,7 +562,8 @@ FBDECT_Undef($$)
     </li>
 
   <li>desired-temp &lt;value&gt;<br>
-    set the desired temp on a Comet DECT (FBAHAHTTP IOdev only)
+    set the desired temp on a Comet DECT (FBAHAHTTP IOdev only). The value 7.5
+    corresponds to off, and 28.5 to on.
     </li>
 
   <li><a href="#setExtensions">set extensions</a> are supported.
@@ -655,8 +657,8 @@ FBDECT_Undef($$)
   <li>on/off<br>
     Ger&auml;t einschalten bzw. ausschalten.</li>
   <li>desired-temp &lt;value&gt;<br>
-    Gew&uuml;nschte Temperatur beim Comet DECT setzen (nur mit FBAHAHTTP als
-    IODev).
+    Gew&uuml;nschte Temperatur beim Comet DECT setzen. 7.5 entspricht aus, 28.5
+    bedeutet an.
     </li>
   <li>
     Die <a href="#setExtensions">set extensions</a> werden
