@@ -444,8 +444,8 @@ MQTT2_SERVER_sendto($$$$)
         MQTT2_SERVER_calcRemainingLength(2+length($topic)+length($val)).
         pack("n", length($topic)).
         $topic.$val);
+      last;       # send a message only once
     }
-    last;       # send a message only once
   }
 }
 
