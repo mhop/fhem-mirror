@@ -493,10 +493,15 @@ sub LaMetric2_SendCommand {
         Accept           => 'application/json;charset=UTF-8',
         'Accept-Charset' => 'UTF-8',
         'Cache-Control'  => 'no-cache',
-        'Authorization'  => 'Basic ' . encode_base64( 'dev:' . $apiKey, "" ),
     );
 
-    $header{'X-Access-Token'} = $info->{token} if ( defined( $info->{token} ) );
+    if ( defined( $info->{token} ) ) {
+        $header{'X-Access-Token'} = $info->{token};
+    }
+    else {
+        $header{'Authorization'} =
+          'Basic ' . encode_base64( 'dev:' . $apiKey, "" );
+    }
 
     my $url =
         $http_proto . "://"
@@ -1390,8 +1395,15 @@ sub LaMetric2_SetApp {
                 $info->{token} = $h->{token};
                 $body{frames} = $h->{model}{frames};
 
-                LaMetric2_SendCommand( $hash, "dev/widget/update/$packageId",
-                    "POST", encode_json( \%body ), $info );
+                LaMetric2_SendCommand(
+                    $hash,
+                    "dev/widget/update/$packageId/"
+                      . $hash->{helper}{apps}{$packageId}{version_code}
+                      . ( $h->{channels} ? "?channels=" . $h->{channels} : "" ),
+                    "POST",
+                    encode_json( \%body ),
+                    $info
+                );
             }
 
             # first parse it using msg setter
