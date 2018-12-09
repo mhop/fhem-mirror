@@ -11,42 +11,6 @@
 # https://developer.lametric.com/
 # http://lametric-documentation.readthedocs.io/en/latest/reference-docs/device-notifications.html
 
-# Changes for version 2.0.0:
-# - Code refactoring using perltidy
-# - use HTTPS connectivity as default
-# - Evaluate state changes based on command results to avoid additional query
-# - pre-configure device attributes during initial define
-# - add missing HTTP request headers for non-GET methods
-# - new attribute notificationSound
-# - new implementation of msg setter for flexible use of messaging options
-#   (using parseParams); backwards compatible to legacy static setter
-#   - allow better integration with FHEM msg-command
-# - Multi-line support for msg setter when using new format
-#   - introduce message title handling as separate frame
-# - Use an internal notificationIcon if no attribute was set
-# - Allow to overwrite default values from device attributes withing every msg command
-# - Setters to support new features
-#   - screensaver
-#   - metric
-#   - goal
-# - New setters to be FHEM (AV media) standards compliant
-#   - brightness (rename reading displayBrightness to brightness)
-#   - mute (to mute/unmute explicitly)
-#   - muteT (to toggle volume)
-#   - bluetooth (rename reading bluetoothActive to bluetooth)
-#   - volume (rename reading audioVolume to volume)
-#   - volumeUp
-#   - volumeDown
-#   - channel
-#   - channelUp
-#   - channelDown
-# - Harmonize setters and readings to reflect FHEM standards
-#   - brightnessMode (to separate function that from the brightness setter)
-#   - statusRequest (refresh kept for backwards compatibility)
-#   - write model to INTERNAL and attributes to accomodate FHEM device statistics
-#   - presence: present/absent
-# - Add FHEM web frontend widgets to setters
-
 #TODO
 #- implement key pinning to improve security for self-signed certificate
 #- rtype replace of special characters that device cannot display:
@@ -303,7 +267,7 @@ sub LaMetric2_Define($$) {
 
         $hash->{HOST}       = $host;
         $hash->{".API_KEY"} = $apikey;
-        $hash->{VERSION}    = "2.1.0";
+        $hash->{VERSION}    = "2.2.0";
         $hash->{INTERVAL} =
           $interval && looks_like_number($interval) ? $interval : 60;
         $hash->{PORT} = $port && looks_like_number($port) ? $port : 4343;
@@ -313,12 +277,13 @@ sub LaMetric2_Define($$) {
 
             # presets for FHEMWEB
             $attr{$name}{cmdIcon} =
-              'play:rc_PLAY channelDown:rc_PREVIOUS channelUp:rc_NEXT stop:rc_STOP muteT:rc_MUTE inputUp:rc_RIGHT inputDown:rc_LEFT';
+'play:rc_PLAY channelDown:rc_PREVIOUS channelUp:rc_NEXT stop:rc_STOP muteT:rc_MUTE inputUp:rc_RIGHT inputDown:rc_LEFT';
             $attr{$name}{devStateIcon} =
 'on:rc_GREEN@green:off off:rc_STOP:on absent:rc_RED playing:rc_PLAY@green:pause paused:rc_PAUSE@green:play muted:rc_MUTE@green:muteT fast-rewind:rc_REW@green:play fast-forward:rc_FF@green:play interrupted:rc_PAUSE@yellow:play';
             $attr{$name}{icon}        = 'time_statistic';
             $attr{$name}{stateFormat} = 'stateAV';
-            $attr{$name}{webCmd}      = 'volume:muteT:channelDown:play:stop:channelUp:inputDown:input:inputUp';
+            $attr{$name}{webCmd} =
+'volume:muteT:channelDown:play:stop:channelUp:inputDown:input:inputUp';
 
             # set those to make it easier for users to see the
             # default values. However, deleting those will
@@ -395,8 +360,7 @@ sub LaMetric2_Set($@) {
           if ( defined( $hash->{helper}{inputs} )
             && keys %{ $hash->{helper}{inputs} } > 0 );
 
-        $usage .=
-          " play:noArg stop:noArg channelUp:noArg channelDown:noArg"
+        $usage .= " play:noArg stop:noArg channelUp:noArg channelDown:noArg"
           if ( defined( $hash->{helper}{apps}{'com.lametric.radio'} )
             && keys %{ $hash->{helper}{apps}{'com.lametric.radio'} } > 0 );
 
@@ -483,19 +447,34 @@ sub LaMetric2_Set($@) {
 sub LaMetric2_SendCommand {
     my ( $hash, $service, $httpMethod, $data, $info ) = @_;
 
-    my $apiKey         = $hash->{".API_KEY"};
-    my $name           = $hash->{NAME};
-    my $host           = $hash->{HOST};
-    my $port           = $hash->{PORT};
-    my $apiVersion     = "v2";
+    my $apiKey = $hash->{".API_KEY"};
+    my $name   = $hash->{NAME};
+    my $host   = $hash->{HOST};
+    my $port   = $hash->{PORT};
+    my $apiVersion;
     my $httpNoShutdown = ( defined( $attr{$name}{"http-noshutdown"} )
           && $attr{$name}{"http-noshutdown"} eq "0" ) ? 0 : 1;
     my $timeout = 5;
     my $http_proto;
 
-    $data = ( defined($data) ) ? $data : "";
-
     Log3 $name, 5, "LaMetric2 $name: called function LaMetric2_SendCommand()";
+
+    # API version was included to service
+    if ( $service =~ /^v\d+\// ) {
+        $apiVersion = "";
+    }
+
+    # dev options currently only via API v1
+    elsif ( $service =~ /^dev\// ) {
+        $apiVersion = "v1/";
+    }
+
+    # module internal pre-defined version
+    else {
+        $apiVersion = "v2/";
+    }
+
+    $data = ( defined($data) ) ? $data : "";
 
     my $https = AttrVal( $name, "https", 1 );
     if ($https) {
@@ -513,14 +492,17 @@ sub LaMetric2_SendCommand {
         'User-Agent'     => 'FHEM-LaMetric2/' . $hash->{VERSION},
         Accept           => 'application/json;charset=UTF-8',
         'Accept-Charset' => 'UTF-8',
+        'Cache-Control'  => 'no-cache',
         'Authorization'  => 'Basic ' . encode_base64( 'dev:' . $apiKey, "" ),
     );
+
+    $header{'X-Access-Token'} = $info->{token} if ( defined( $info->{token} ) );
 
     my $url =
         $http_proto . "://"
       . $host . ":"
       . $port . "/api/"
-      . $apiVersion . "/"
+      . $apiVersion
       . $service;
 
     $httpMethod = "GET"
@@ -1266,12 +1248,12 @@ sub LaMetric2_SetMute {
 
 #------------------------------------------------------------------------------
 sub LaMetric2_SetApp {
-    my $hash = shift;
-    my $cmd  = shift;
-    my $h    = shift;
-    my $name = $hash->{NAME};
-
-    my ( $package, $action ) = @_;
+    my $hash    = shift;
+    my $cmd     = shift;
+    my $h       = shift;
+    my $package = shift;
+    my $action  = shift;
+    my $name    = $hash->{NAME};
 
     # inject action for Radio app
     if ( lc($cmd) eq "channeldown" ) {
@@ -1298,7 +1280,7 @@ sub LaMetric2_SetApp {
     Log3 $name, 5,
         "LaMetric2 $name: called function LaMetric2_SetApp() "
       . $cmd . " / "
-      . $packageId;
+      . $package;
 
     if ( lc($cmd) eq "inputup" ) {
         LaMetric2_SendCommand( $hash, "device/apps/next", "PUT", "" );
@@ -1346,16 +1328,14 @@ sub LaMetric2_SetApp {
                 foreach my $id (
                     keys %{ $hash->{helper}{apps}{$packageId}{widgets} } )
                 {
-                    $widgetlist{ $hash->{helper}{apps}{$packageId}{widgets}
+                    $widgetlist{ $hash->{helper}{apps}{$packageId}{widgets}{$id}
                           {index} } = $id;
                 }
 
                 # best guess for widgetId:
                 # use ID with lowest index
-                foreach my $id ( sort keys %widgetlist ) {
-                    $widgetId = $widgetlist{$id};
-                    last;
-                }
+                my @widgets = sort keys %widgetlist;
+                $widgetId = $widgetlist{ $widgets[0] };
             }
 
             # user gave widgetId as package name
@@ -1377,16 +1357,52 @@ sub LaMetric2_SetApp {
             return "Unable to find widget for $package";
         }
 
-        # user gave action parameter
-        if ($action) {
-
-            # get vendor and app ID
-            if ( $packageId && ( !$vendorId || !$appId ) ) {
-                if ( $packageId =~ /^(.+)\.([^.]+)$/ ) {
-                    $vendorId = $1;
-                    $appId    = $2;
-                }
+        # get vendor and app ID
+        if ( $packageId && ( !$vendorId || !$appId ) ) {
+            if ( $packageId =~ /^(.+)\.([^.]+)$/ ) {
+                $vendorId = $1;
+                $appId    = $2;
             }
+        }
+
+        # user wants to push data to a non-public indicator app
+        if (
+               $action
+            && ( $action eq "push" || $action eq $appId . ".push" )
+            && !defined( $hash->{helper}{apps}{$packageId}{actions}{$action} )
+            && !defined(
+                $hash->{helper}{apps}{$packageId}{actions}
+                  { $appId . "." . $action }
+            )
+          )
+        {
+
+            # Ready to send to app
+            if ( defined( $h->{model} ) && defined( $h->{model}{frames} ) ) {
+                return "Missing app token"
+                  unless ( defined( $h->{token} ) );
+
+                return "Missing frame data"
+                  unless ( ref( $h->{model}{frames} ) eq "ARRAY" );
+
+                my %body = ();
+                my $info;
+                $info->{token} = $h->{token};
+                $body{frames} = $h->{model}{frames};
+
+                LaMetric2_SendCommand( $hash, "dev/widget/update/$packageId",
+                    "POST", encode_json( \%body ), $info );
+            }
+
+            # first parse it using msg setter
+            else {
+                $h->{app} = $packageId;
+                return LaMetric2_SetNotification( $hash, \@_, $h );
+            }
+        }
+
+        # user gave action parameter for public app
+        elsif ($action) {
 
             # find actionId
             if (
@@ -1554,6 +1570,8 @@ sub LaMetric2_SetNotification {
         $h->{msg} ? $h->{msg}
         : ( $h->{text} ? $h->{text} : join ' ', @$a )
       );
+
+    Debug "2: " . Dumper . @$a;
 
     # chart frame
     if ( $h->{chart} ) {
@@ -1835,6 +1853,15 @@ sub LaMetric2_SetNotification {
         }
     }
 
+    # Push to private/shared indicator app
+    if ( defined( $h->{app} ) ) {
+        $notificationType = "app";
+        $values{priority} = "";
+        $values{icontype} = "";
+        $values{lifetime} = "";
+        $values{sound}    = "";
+    }
+
     return
 "Usage: $name msg <text> [ option1=<value> option2='<value with space>' ... ]"
       unless ( ( defined( $values{message} ) && $values{message} ne "" )
@@ -1904,12 +1931,15 @@ sub LaMetric2_SetNotification {
         readingsBulkUpdate( $hash, "lastNotificationSound", "off" );
     }
 
+    my $index = 0;
+
     if ( $values{title} ne "" ) {
         push @{ $notification{model}{frames} },
           (
             {
-                icon => $values{icon},
-                text => $values{title},
+                icon  => $values{icon},
+                text  => $values{title},
+                index => $index++,
             }
           );
         readingsBulkUpdate( $hash, "lastNotificationTitle", $values{title} );
@@ -1935,8 +1965,9 @@ sub LaMetric2_SetNotification {
             push @{ $notification{model}{frames} },
               (
                 {
-                    icon => $ico,
-                    text => $line,
+                    icon  => $ico,
+                    text  => $line,
+                    index => $index++,
                 }
               );
         }
@@ -1944,11 +1975,13 @@ sub LaMetric2_SetNotification {
     }
 
     if ( $values{metric} ) {
+        $values{metric}{index} = $index++;
         push @{ $notification{model}{frames} }, $values{metric};
         readingsBulkUpdate( $hash, "lastMetric", $values{metric}{text} );
     }
 
     if ( $values{goal} ) {
+        $values{goal}{index} = $index++;
         if ( $notification{model}{frames} ) {
             $values{goal}{icon} = "" unless ( $h->{goalicon} );
         }
@@ -1959,6 +1992,7 @@ sub LaMetric2_SetNotification {
     }
 
     if ( $values{chart} ) {
+        $values{chart}{index} = $index++;
         push @{ $notification{model}{frames} },
           ( { chartData => $values{chart} } );
         readingsBulkUpdate( $hash, "lastChart",
@@ -1967,10 +2001,19 @@ sub LaMetric2_SetNotification {
 
     readingsEndUpdate( $hash, 1 );
 
-    LaMetric2_SendCommand( $hash, "device/notifications", "POST",
-        encode_json( \%notification ), $info );
+    # push frames to private/shared indicator app
+    if ( defined( $h->{app} ) ) {
+        $notification{package} = $h->{app};
+        $notification{token} = $h->{token} if ( defined( $h->{token} ) );
+        return LaMetric2_SetApp( $hash, "app", \%notification, $h->{app},
+            "push" );
+    }
 
-    return;
+    # send frames as notification
+    else {
+        LaMetric2_SendCommand( $hash, "device/notifications", "POST",
+            encode_json( \%notification ), $info );
+    }
 }
 
 #------------------------------------------------------------------------------
@@ -2148,6 +2191,9 @@ sub LaMetric2_IsDuringTimeframe($$;$) {
       <code><b>metric</b>&nbsp;</code>- type: float - The number to be shown.<br>
       <code><b>metric*</b>&nbsp;</code>- type: n/a - All other options described for the metric-setter can be used here by adding the prefix 'metric' to it.<br>
       <br>
+      <code><b>app</b>&nbsp;</code>- type: text - app_name to push this message to that particular app. Requires matching token parameter (see below).<br>
+      <code><b>token</b>&nbsp;</code>- type: text - Private access token to be used when pushing data to an app. Can be retreived from <a href="https://developer.lametric.com/applications/list">developer.lametric.com/applications/app/&lt;app_number&gt;</a> of the corresponding app.<br>
+      <br>
       Examples:
       <ul>
         <code>set lametric msg My first LaMetric message.</code><br>
@@ -2169,6 +2215,11 @@ sub LaMetric2_IsDuringTimeframe($$;$) {
         <code>set lametric msg metric=21.87 title='Temperature' without unit</code><br>
         <code>set lametric msg metric=21.87 metrictype=c title='Temperature' using FHEM RType auto format and symbol</code><br>
         <code>set lametric msg metric=21.87 metricunit='°C' title='Temperature' using manual unit symbol and format</code><br>
+        <br>
+        <code>set lametric msg app=MyPrivateFHEMapp token=ASDFGHJKL23456789 Show this message to my app.</code><br>
+        <code>set lametric msg app=MyPrivateFHEMapp token=ASDFGHJKL23456789 icon=i334 Show this message to my app and use my icon.</code><br>
+        <code>set lametric msg app=MyPrivateFHEMapp token=ASDFGHJKL23456789 Show this message to my app.\nThis is a second frame.</code><br>
+        <code>set lametric msg app=MyPrivateFHEMapp token=ASDFGHJKL23456789 title="This is the head frame" This text goes to the 2nd frame.</code><br>
       </ul><br>
     </ul>
   </ul><br>
@@ -2271,6 +2322,18 @@ sub LaMetric2_IsDuringTimeframe($$;$) {
         <code>set lametric app countdown pause</code><br>
         <code>set lametric app countdown reset</code><br>
       </ul><br>
+      <br><br>
+      So send data to a private/shared app, use 'push' as action_id. It will require the access token as parameter so that the device will accept data for that particular app:<br>
+      <br>
+      <code><b>token</b>&nbsp;</code>- type: text - Private access token to be used when pushing data to an app. Can be retreived from <a href="https://developer.lametric.com/applications/list">developer.lametric.com/applications/app/&lt;app_number&gt;</a> of the corresponding app.<br>
+      <br>
+      Examples:
+      <ul>
+        <code>set lametric app MyPrivateFHEMapp push token=ASDFGHJKL23456789 Show this message to my app.</code><br>
+        <code>set lametric app MyPrivateFHEMapp push token=ASDFGHJKL23456789 icon=i334 Show this message to my app and use my icon.</code><br>
+        <code>set lametric app MyPrivateFHEMapp push token=ASDFGHJKL23456789 Show this message to my app.\nThis is a second frame.</code><br>
+        <code>set lametric app MyPrivateFHEMapp push token=ASDFGHJKL23456789 title="This is the head frame" This text goes to the 2nd frame.</code><br>
+      </ul>
     </ul>
   </ul><br>
   <br>
@@ -2278,36 +2341,36 @@ sub LaMetric2_IsDuringTimeframe($$;$) {
     <b>play</b>
     <ul>
       <code>set &lt;LaMetric2_device&gt; play</code><br>
+      <br>
+      Will switch to the Radio app and start playback.
     </ul>
-    <br>
-    Will switch to the Radio app and start playback.
   </ul><br>
   <br>
   <ul>
     <b>stop</b>
     <ul>
       <code>set &lt;LaMetric2_device&gt; stop</code><br>
+      <br>
+      Will stop Radio playback.
     </ul>
-    <br>
-    Will stop Radio playback.
   </ul><br>
   <br>
   <ul>
     <b>channelUp</b>
     <ul>
       <code>set &lt;LaMetric2_device&gt; channelUp</code><br>
+      <br>
+      When the Radio app is active, it will switch to the next radio station.
     </ul>
-    <br>
-    When the Radio app is active, it will switch to the next radio station.
   </ul><br>
   <br>
   <ul>
     <b>channelUp</b>
     <ul>
       <code>set &lt;LaMetric2_device&gt; channelUp</code><br>
+      <br>
+      When the Radio app is active, it will switch to the next radio station.
     </ul>
-    <br>
-    When the Radio app is active, it will switch to the next radio station.
   </ul><br>
   <br>
   <ul>
@@ -2335,27 +2398,27 @@ sub LaMetric2_IsDuringTimeframe($$;$) {
     <b>input</b>
     <ul>
       <code>set &lt;LaMetric2_device&gt; input &lt;input_name&gt;</code><br>
+      <br>
+      Will switch to a specific app. &lt;input_name&gt; may either be a display name, app ID or package ID.
     </ul>
-    <br>
-    Will switch to a specific app. &lt;input_name&gt; may either be a display name, app ID or package ID.
   </ul><br>
   <br>
   <ul>
     <b>inputDown</b>
     <ul>
       <code>set &lt;LaMetric2_device&gt; inputDown</code><br>
+      <br>
+      Will switch to the previous app.
     </ul>
-    <br>
-    Will switch to the previous app.
   </ul><br>
   <br>
   <ul>
     <b>inputUp</b>
     <ul>
       <code>set &lt;LaMetric2_device&gt; inputUp</code><br>
+      <br>
+      Will switch to the next app.
     </ul>
-    <br>
-    Will switch to the next app.
   </ul><br>
   <br>
   <ul>
