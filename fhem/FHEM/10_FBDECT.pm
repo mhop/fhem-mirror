@@ -117,11 +117,11 @@ FBDECT_SetHttp($@)
   if($cmd =~ m/^(open|closed|desired-temp)$/) {
     if($cmd eq "desired-temp") { 
       return "Usage: set $name desired-temp value" if(int(@a) != 3);
-      return "desired-temp must be between 8 and 28"
+      return "desired-temp must be between 7.5 and 28.5"
         if($a[2] !~ m/^[\d.]+$/ || $a[2] < 7.5 || $a[2] > 28.5)
     }
-    my $val = ($cmd eq "open"  || $a[2]== 7.5) ? 254 :
-              ($cmd eq "closed"|| $a[2]==28.5) ? 253: int(2*$a[2]);
+    my $val = ($cmd eq "open"  || $a[2]==28.5) ? 254 :
+              ($cmd eq "closed"|| $a[2]== 7.5) ? 253: int(2*$a[2]);
     IOWrite($hash, ReadingsVal($name,"AIN",0),"sethkrtsoll&param=$val");
     return undef;
   }
@@ -299,7 +299,8 @@ FBDECT_ParseHttp($$$)
     Log3 $hash, 5, "   $n = $h{$n}";
     next if(!$fbhttp_readings{$n});
     my $val = $h{$n};
-    $val = ($val==254 ? 28.5: ($val==253 ? 7.5 : sprintf("%0.1f C",$val/2)))
+    $val = ($val == 254 ? 28.5:
+            $val == 253 ?  7.5 : sprintf("%0.1f C",$val/2))
       if($n eq "tsoll");
     $val = $type if($n eq "productname" && $val eq "");
     my ($ptyp,$pyld) = split(":", eval $fbhttp_readings{$n}, 2);
