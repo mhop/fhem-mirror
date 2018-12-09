@@ -116,16 +116,21 @@ sub SSCamSTRM_Get($@) {
   return if(IsDisabled($name) || $hash->{MODEL} =~ /ptzcontrol|snapgallery/);
   
   my $getlist = "Unknown argument $opt, choose one of ".
-	             "popupStream:noArg "
+	             "popupStream "
                  ;
   
   if ($opt eq "popupStream") {
   	  my $txt = SSCam_getclhash($hash);
       return $txt if($txt);
       
-      my $link = AnalyzePerlCommand(undef, $hash->{LINK}) if($hash->{LINK} =~ m/^{(.*)}$/s);
-      my $to   = AttrVal($name, "popupStreamTo", 5);
-      $to      = 1000 * $to if($to =~ /\d+/);
+      my $link  = AnalyzePerlCommand(undef, $hash->{LINK}) if($hash->{LINK} =~ m/^{(.*)}$/s);
+      
+      # OK-Dialogbox oder Autoclose
+      my $todef = 5;
+      my $temp  = AttrVal($name, "popupStreamTo", $todef);
+      my $to    = $prop?$prop:$temp;
+      unless ($to =~ /^\d+$/ || lc($to) eq "ok") { $to = $todef; }
+      $to       = ($to =~ /\d+/)?(1000 * $to):$to;
       
       my $parent = $hash->{PARENT};
       my $parentHash = $defs{$parent};
@@ -142,7 +147,6 @@ sub SSCamSTRM_Get($@) {
           } else {
               map {FW_directNotify("#FHEMWEB:$_", "FW_okDialog('$out')", "")} devspec2array("TYPE=FHEMWEB");
           }	
-
       }
   
   } else {
@@ -170,6 +174,12 @@ sub SSCamSTRM_Attr($$$$) {
 		$val = ($do == 1 ? "disabled" : "initialized");
     
         readingsSingleUpdate($hash, "state", $val, 1);
+    }
+    
+    if ($cmd eq "set") {
+        if ($aName =~ m/popupStreamTo/) {
+            unless ($aVal =~ /^\d+$/ || $aVal eq "OK") { $_[3] = 5; }
+        }        
     }
 
 return undef;
@@ -288,7 +298,8 @@ Dependend of the Streaming-Device state, different buttons are provided to start
   The current streaming content is depicted in a popup window. By setting attribute "popupWindowSize" the 
   size of display can be adjusted. The attribute "popupStreamTo" determines the type of the popup window.
   If "OK" is set, an OK-dialog window will be opened. A specified number in seconds closes the popup window after this 
-  time automatically (default 5 seconds).
+  time automatically (default 5 seconds). <br>
+  Optionally you can append "OK" or &lt;Sekunden&gt; directly to override the adjustment by attribute "popupStreamTo".
   </li>
   </ul>
   <br>
@@ -352,7 +363,7 @@ Dependend of the Streaming-Device state, different buttons are provided to start
     <br>
     
     <a name="popupStreamTo"></a>
-    <li><b>popupStreamTo [OK | 1 ... 60]</b><br>
+    <li><b>popupStreamTo [OK | &lt;seconds&gt;]</b><br>
       The attribute "popupStreamTo" determines the type of the popup window which is opend by get-function "popupStream".
       If "OK" is set, an OK-dialog window will be opened. A specified number in seconds closes the popup window after this 
       time automatically (default 5 seconds)..
@@ -428,12 +439,14 @@ Abhängig vom Zustand des Streaming-Devices werden zum Start von Aktionen unters
   <ul>
   
   <ul>
-  <li><b>popupStream</b>  <br>
+  <li><b>popupStream [OK | &lt;Sekunden&gt;]</b>  <br>
   
   Der aktuelle Streaminhalt wird in einem Popup-Fenster dargestellt. Mit dem Attribut "popupWindowSize" kann die 
   Darstellungsgröße eingestellt werden. Das Attribut "popupStreamTo" legt die Art des Popup-Fensters fest.
   Ist "OK" eingestellt, öffnet sich ein OK-Dialogfenster. Die angegebene Zahl in Sekunden schließt das Fenster nach dieser 
-  Zeit automatisch (default 5 Sekunden).
+  Zeit automatisch (default 5 Sekunden). <br>
+  Durch die optionalen Angabe von "OK" oder &lt;Sekunden&gt; kann die Einstellung des Attributes "popupStreamTo" übersteuert 
+  werden.
   </li>
   </ul>
   <br>
@@ -497,7 +510,7 @@ Abhängig vom Zustand des Streaming-Devices werden zum Start von Aktionen unters
     <br>
     
     <a name="popupStreamTo"></a>
-    <li><b>popupStreamTo [OK | 1 ... 60]</b><br>
+    <li><b>popupStreamTo [OK | &lt;Sekunden&gt;]</b><br>
       Das Attribut "popupStreamTo" legt die Art des Popup-Fensters fest welches mit der get-Funktion "popupStream" geöffnet wird.
       Ist "OK" eingestellt, öffnet sich ein OK-Dialogfenster. Die angegebene Zahl in Sekunden schließt das Fenster nach dieser 
       Zeit automatisch (default 5 Sekunden).
