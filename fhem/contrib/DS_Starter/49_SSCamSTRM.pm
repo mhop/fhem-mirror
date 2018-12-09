@@ -73,6 +73,7 @@ sub SSCamSTRM_Initialize($) {
                                 "htmlattr ".
                                 "hideDisplayName:1,0 ".
                                 "popupWindowSize ".
+                                "popupStreamFW:$fwd ".
                                 "popupStreamTo:OK,1,2,3,4,5,6,7,8,9,10,15,20,25,30,40,50,60 ".
                                 $readingFnAttributes;
   $hash->{FW_summaryFn}       = "SSCamSTRM_FwFn";
@@ -132,6 +133,8 @@ sub SSCamSTRM_Get($@) {
       unless ($to =~ /^\d+$/ || lc($to) eq "ok") { $to = $todef; }
       $to       = ($to =~ /\d+/)?(1000 * $to):$to;
       
+      my $pd = AttrVal($name, "popupStreamFW", "TYPE=FHEMWEB");
+      
       my $parent = $hash->{PARENT};
       my $parentHash = $defs{$parent};
       
@@ -143,9 +146,9 @@ sub SSCamSTRM_Get($@) {
           $out .= "</html>";
 		  
           if($to =~ /\d+/) {
-              map {FW_directNotify("#FHEMWEB:$_", "FW_errmsg('$out', $to)", "")} devspec2array("TYPE=FHEMWEB"); 
+              map {FW_directNotify("#FHEMWEB:$_", "FW_errmsg('$out', $to)", "")} devspec2array("$pd"); 
           } else {
-              map {FW_directNotify("#FHEMWEB:$_", "FW_okDialog('$out')", "")} devspec2array("TYPE=FHEMWEB");
+              map {FW_directNotify("#FHEMWEB:$_", "FW_okDialog('$out')", "")} devspec2array("$pd");
           }	
       }
   
@@ -299,7 +302,7 @@ Dependend of the Streaming-Device state, different buttons are provided to start
   size of display can be adjusted. The attribute "popupStreamTo" determines the type of the popup window.
   If "OK" is set, an OK-dialog window will be opened. A specified number in seconds closes the popup window after this 
   time automatically (default 5 seconds). <br>
-  Optionally you can append "OK" or &lt;Sekunden&gt; directly to override the adjustment by attribute "popupStreamTo".
+  Optionally you can append "OK" or &lt;seconds&gt; directly to override the adjustment by attribute "popupStreamTo".
   </li>
   </ul>
   <br>
@@ -359,6 +362,13 @@ Dependend of the Streaming-Device state, different buttons are provided to start
         <b>Example: </b><br>
         attr &lt;name&gt; htmlattr width="480" height="560" <br>
       </ul>
+    </li>
+    <br>
+    
+    <a name="popupStreamFW"></a>
+    <li><b>popupStreamFW</b><br>
+      You can specify a particular FHEMWEB device whose active browser pages should open a popup window by the 
+      "get &lt;name&gt; popupStream" command (default: all active FHEMWEB devices).
     </li>
     <br>
     
@@ -506,6 +516,13 @@ Abhängig vom Zustand des Streaming-Devices werden zum Start von Aktionen unters
         <b>Beispiel: </b><br>
         attr &lt;name&gt; htmlattr width="480" height="560"  <br>
       </ul>
+    </li>
+    <br>
+    
+    <a name="popupStreamFW"></a>
+    <li><b>popupStreamFW</b><br>
+      Es kann mit diesem Attribut das FHEMWEB-Device bestimmt werden, auf dessen Browserseiten sich Popup-Fenster mit 
+      "get &lt;name&gt; popupStream" öffnen sollen (default: alle aktiven FHEMWEB-Devices).
     </li>
     <br>
     
