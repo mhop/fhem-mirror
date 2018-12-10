@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  98_MSwitch.pm, update V2.07
   - change:  20_FRM_IN: only update on change (Forum #81815)
   - bugfix: 73_AutoShuttersControl: fix absent Event and ModeDown absent bug
   - bugfix:  73_AutoShuttersControl: fix gone then absent bug
