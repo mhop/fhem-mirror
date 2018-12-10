@@ -427,10 +427,7 @@ zigbee2mqtt_RGB2JSON($)
 {
   my $rgb = shift(@_);
   $rgb =~ m/^(..)(..)(..)/;
-  my( $r, $g, $b ) = (hex($1)/255.0, hex($2)/255.0, hex($3)/255.0);
-  my %color_hash = (r => $r, g => $g, b => $b);
-  my %set_hash = ('transition' => 1, 'color' => \%color_hash);
-  return toJSON(\%set_hash);
+  return toJSON({'transition'=>1, 'color'=>{r=>hex($1),g=>hex($2),b=>hex($3)}});
 }
 
 sub
