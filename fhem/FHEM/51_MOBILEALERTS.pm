@@ -1041,7 +1041,9 @@ sub MOBILEALERTS_decodeHumidity($) {
 
 sub MOBILEALERTS_decodeHumidityDecimal($) {
     my ($humidity) = @_;
-    return ( $humidity & 0x3FF ) * 0.1;
+    $humidity = $humidity & 0x3FF;
+    return 9999 if ( $humidity == 1023 );
+    return $humidity * 0.1;
 }
 
 sub MOBILEALERTS_humidityToString($) {
