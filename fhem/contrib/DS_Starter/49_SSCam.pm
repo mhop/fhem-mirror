@@ -45,8 +45,8 @@ use HttpUtils;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
-  "7.7.0"  => "07.12.2018  SVS-Device: autocreateCams command added, some other fixes and improvements, minor code rewrite, ".
-              "save Stream \$streamHash->{HELPER}{STREAM} for popupStream in SSCamSTRM-Device ",
+  "7.7.0"  => "10.12.2018  SVS-Device: autocreateCams command added, some other fixes and improvements, minor code rewrite, ".
+              "save Stream in \$streamHash->{HELPER}{STREAM} for popupStream in SSCamSTRM-Device ",
   "7.6.0"  => "02.12.2018  sub SSCam_ptzpanel completed by Preset and Patrol, minor fixes ",
   "7.5.0"  => "02.12.2018  sub SSCam_StreamDev and SSCam_composegallery changed to use popup window ",
   "7.4.1"  => "26.11.2018  sub composegallery deleted, SSCam_composegallery changed to get information for SSCam_refresh ",
@@ -99,7 +99,7 @@ our %SSCam_vNotesIntern = (
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
-  "7.7.0"  => "07.12.2018 autocreateCams command added in SVS device. By this command all cameras installed in SVS can be ".
+  "7.7.0"  => "10.12.2018 autocreateCams command added to SVS device. By this command all cameras installed in SVS can be ".
               "defined automatically. <br>".
               "In SSCamSTRM devices the \"get &lt;name&gt; popupStream\" command is implemented which may open a popup window with the ".
               "active streaming content. ",
@@ -6266,7 +6266,7 @@ sub SSCam_StreamDev($$$) {
   my $ha     = AttrVal($camname, "htmlattr", 'width="500" height="325"');   # HTML Attribute der Cam
   $ha        = AttrVal($strmdev, "htmlattr", $ha);                          # htmlattr mit htmattr Streaming-Device übersteuern 
   my $pws    = AttrVal($strmdev, "popupWindowSize", "");                    # Größe eines Popups
-  $pws      =~ s/"//g if($pws);
+  $pws       =~ s/"//g if($pws);
   my $StmKey = ReadingsVal($camname,"StmKey",undef);
   
   $ret  = "";
@@ -6344,8 +6344,12 @@ sub SSCam_StreamDev($$$) {
       
       $ret .= "<td>";
       $ret .= "$htag";
-      $streamHash->{HELPER}{STREAM} = "$htag";                   # Stream für "get <SSCamSTRM-Device> popupStream" speichern
-      $streamHash->{HELPER}{STREAMACTIVE} = 1 if($htag);         # Statusbit wenn ein Stream aktiviert ist
+      if($htag) {
+          $streamHash->{HELPER}{STREAM}       = "$htag";   # Stream für "get <SSCamSTRM-Device> popupStream" speichern
+          $streamHash->{HELPER}{STREAM}       =~ s/["']//g;
+          $streamHash->{HELPER}{STREAM}       =~ s/\s+/ /g;
+          $streamHash->{HELPER}{STREAMACTIVE} = 1;         # Statusbit wenn ein Stream aktiviert ist
+      }
       $ret .= "<br>";
       Log3($strmdev, 4, "$strmdev - generic Stream params:\n$htag");
       $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrefresh')\">$imgrefresh </a>";

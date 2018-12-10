@@ -34,6 +34,7 @@ use warnings;
 
 # Versions History intern
 our %SSCamSTRM_vNotesIntern = (
+  "2.0.0"  => "09.12.2018  get command \"popupStream\" and attribute \"popupStreamFW\" ",
   "1.5.0"  => "02.12.2018  new attribute \"popupWindowSize\" ",
   "1.4.1"  => "31.10.2018  attribute \"autoLoop\" changed to \"autoRefresh\", new attribute \"autoRefreshFW\" ",
   "1.4.0"  => "29.10.2018  readingFnAttributes added ",
@@ -55,6 +56,7 @@ our %SSCamSTRM_vNotesIntern = (
 # Standardvariablen und Forward-Declaration
 sub SSCam_ptzpanel($;$$);
 sub SSCam_StreamDev($$$);
+sub SSCam_getclhash($;$$);
 
 ################################################################
 sub SSCamSTRM_Initialize($) {
@@ -63,6 +65,7 @@ sub SSCamSTRM_Initialize($) {
   my $fwd = join(",",devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized")); 
   
   $hash->{DefFn}              = "SSCamSTRM_Define";
+  $hash->{GetFn}              = "SSCamSTRM_Get";
   $hash->{AttrList}           = "autoRefresh:selectnumbers,120,0.2,1800,0,log10 ".
                                 "autoRefreshFW:$fwd ".
                                 "disable:1,0 ". 
@@ -70,6 +73,8 @@ sub SSCamSTRM_Initialize($) {
                                 "htmlattr ".
                                 "hideDisplayName:1,0 ".
                                 "popupWindowSize ".
+                                "popupStreamFW:$fwd ".
+                                "popupStreamTo:OK,1,2,3,4,5,6,7,8,9,10,15,20,25,30,40,50,60 ".
                                 $readingFnAttributes;
   $hash->{FW_summaryFn}       = "SSCamSTRM_FwFn";
   $hash->{FW_detailFn}        = "SSCamSTRM_FwFn";
@@ -102,6 +107,59 @@ return undef;
 }
 
 ################################################################
+sub SSCamSTRM_Get($@) {
+  my ($hash, @a) = @_;
+  return "\"set X\" needs at least an argument" if ( @a < 2 );
+  my $name    = $a[0];
+  my $opt     = $a[1];
+  my $prop    = $a[2];    
+  
+  return if(IsDisabled($name) || $hash->{MODEL} =~ /ptzcontrol|snapgallery/);
+  
+  my $getlist = "Unknown argument $opt, choose one of ".
+	             "popupStream "
+                 ;
+  
+  if ($opt eq "popupStream") {
+  	  my $txt = SSCam_getclhash($hash);
+      return $txt if($txt);
+      
+      my $link  = AnalyzePerlCommand(undef, $hash->{LINK}) if($hash->{LINK} =~ m/^{(.*)}$/s);
+      
+      # OK-Dialogbox oder Autoclose
+      my $todef = 5;
+      my $temp  = AttrVal($name, "popupStreamTo", $todef);
+      my $to    = $prop?$prop:$temp;
+      unless ($to =~ /^\d+$/ || lc($to) eq "ok") { $to = $todef; }
+      $to       = ($to =~ /\d+/)?(1000 * $to):$to;
+      
+      my $pd = AttrVal($name, "popupStreamFW", "TYPE=FHEMWEB");
+      
+      my $parent = $hash->{PARENT};
+      my $parentHash = $defs{$parent};
+      
+      my $htmlCode = $hash->{HELPER}{STREAM};
+      
+      if ($hash->{HELPER}{STREAMACTIVE}) {
+          my $out = "<html>";
+          $out .= $htmlCode;
+          $out .= "</html>";
+		  
+          if($to =~ /\d+/) {
+              map {FW_directNotify("#FHEMWEB:$_", "FW_errmsg('$out', $to)", "")} devspec2array("$pd"); 
+          } else {
+              map {FW_directNotify("#FHEMWEB:$_", "FW_okDialog('$out')", "")} devspec2array("$pd");
+          }	
+      }
+  
+  } else {
+      return "$getlist";
+  }
+  
+return;  
+}
+
+################################################################
 sub SSCamSTRM_Attr($$$$) {
     my ($cmd,$name,$aName,$aVal) = @_;
     my $hash = $defs{$name};
@@ -119,6 +177,12 @@ sub SSCamSTRM_Attr($$$$) {
 		$val = ($do == 1 ? "disabled" : "initialized");
     
         readingsSingleUpdate($hash, "state", $val, 1);
+    }
+    
+    if ($cmd eq "set") {
+        if ($aName =~ m/popupStreamTo/) {
+            unless ($aVal =~ /^\d+$/ || $aVal eq "OK") { $_[3] = 5; }
+        }        
     }
 
 return undef;
@@ -228,7 +292,23 @@ Dependend of the Streaming-Device state, different buttons are provided to start
   <b>Set</b> <ul>N/A</ul><br>
 
   <a name="SSCamSTRMget"></a>
-  <b>Get</b> <ul>N/A</ul><br>
+  <b>Get</b> 
+  <ul>
+  
+  <ul>
+  <li><b>popupStream</b>  <br>
+  
+  The current streaming content is depicted in a popup window. By setting attribute "popupWindowSize" the 
+  size of display can be adjusted. The attribute "popupStreamTo" determines the type of the popup window.
+  If "OK" is set, an OK-dialog window will be opened. A specified number in seconds closes the popup window after this 
+  time automatically (default 5 seconds). <br>
+  Optionally you can append "OK" or &lt;seconds&gt; directly to override the adjustment by attribute "popupStreamTo".
+  </li>
+  </ul>
+  <br>
+  
+  </ul>
+  <br>
   
   <a name="SSCamSTRMattr"></a>
   <b>Attributes</b>
@@ -285,10 +365,32 @@ Dependend of the Streaming-Device state, different buttons are provided to start
     </li>
     <br>
     
+    <a name="popupStreamFW"></a>
+    <li><b>popupStreamFW</b><br>
+      You can specify a particular FHEMWEB device whose active browser pages should open a popup window by the 
+      "get &lt;name&gt; popupStream" command (default: all active FHEMWEB devices).
+    </li>
+    <br>
+    
+    <a name="popupStreamTo"></a>
+    <li><b>popupStreamTo [OK | &lt;seconds&gt;]</b><br>
+      The attribute "popupStreamTo" determines the type of the popup window which is opend by get-function "popupStream".
+      If "OK" is set, an OK-dialog window will be opened. A specified number in seconds closes the popup window after this 
+      time automatically (default 5 seconds)..
+      <br><br>
+      <ul>
+        <b>Example: </b><br>
+        attr &lt;name&gt; popupStreamTo 10  <br>
+      </ul>
+      <br>
+    </li>
+    
     <a name="popupWindowSize"></a>
     <li><b>popupWindowSize</b><br>
-      If the content of playback (Videostream or Snapshot gallery) is suitable, by clicking the content a popup window will appear. 
+      If the content of playback (Videostream or Snapshot gallery) is suitable, by clicking the content a popup window will 
+      appear. 
       The size of display can be setup by this attribute. 
+      It is also valid for the get-function "popupStream".
       <br><br>
       <ul>
         <b>Example: </b><br>
@@ -343,10 +445,27 @@ Abhängig vom Zustand des Streaming-Devices werden zum Start von Aktionen unters
   <b>Set</b> <ul>N/A</ul><br>
 
   <a name="SSCamSTRMget"></a>
-  <b>Get</b> <ul>N/A</ul><br>
+  <b>Get</b> 
+  <ul>
+  
+  <ul>
+  <li><b>popupStream [OK | &lt;Sekunden&gt;]</b>  <br>
+  
+  Der aktuelle Streaminhalt wird in einem Popup-Fenster dargestellt. Mit dem Attribut "popupWindowSize" kann die 
+  Darstellungsgröße eingestellt werden. Das Attribut "popupStreamTo" legt die Art des Popup-Fensters fest.
+  Ist "OK" eingestellt, öffnet sich ein OK-Dialogfenster. Die angegebene Zahl in Sekunden schließt das Fenster nach dieser 
+  Zeit automatisch (default 5 Sekunden). <br>
+  Durch die optionalen Angabe von "OK" oder &lt;Sekunden&gt; kann die Einstellung des Attributes "popupStreamTo" übersteuert 
+  werden.
+  </li>
+  </ul>
+  <br>
+  
+  </ul>
+  <br>
 
   <a name="SSCamSTRMattr"></a>
-  <b>Attributes</b>
+  <b>Attribute</b>
   <br><br>
   
   <ul>
@@ -400,10 +519,31 @@ Abhängig vom Zustand des Streaming-Devices werden zum Start von Aktionen unters
     </li>
     <br>
     
+    <a name="popupStreamFW"></a>
+    <li><b>popupStreamFW</b><br>
+      Es kann mit diesem Attribut das FHEMWEB-Device bestimmt werden, auf dessen Browserseiten sich Popup-Fenster mit 
+      "get &lt;name&gt; popupStream" öffnen sollen (default: alle aktiven FHEMWEB-Devices).
+    </li>
+    <br>
+    
+    <a name="popupStreamTo"></a>
+    <li><b>popupStreamTo [OK | &lt;Sekunden&gt;]</b><br>
+      Das Attribut "popupStreamTo" legt die Art des Popup-Fensters fest welches mit der get-Funktion "popupStream" geöffnet wird.
+      Ist "OK" eingestellt, öffnet sich ein OK-Dialogfenster. Die angegebene Zahl in Sekunden schließt das Fenster nach dieser 
+      Zeit automatisch (default 5 Sekunden).
+      <br><br>
+      <ul>
+        <b>Beispiel: </b><br>
+        attr &lt;name&gt; popupStreamTo 10  <br>
+      </ul>
+      <br>
+    </li>
+    
     <a name="popupWindowSize"></a>
     <li><b>popupWindowSize</b><br>
       Bei geeigneten Wiedergabeinhalten (Videostream oder Schnappschußgalerie) öffnet ein Klick auf den Bildinhalt ein 
       Popup-Fenster mit diesem Inhalt. Die Darstellungsgröße kann mit diesem Attribut eingestellt werden. 
+      Das Attribut gilt ebenfalls für die get-Funktion "popupStream".
       <br><br>
       <ul>
         <b>Beispiel: </b><br>

@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 49_SSCam: V7.7.0, autocreateCams command added to SVS device,
+                       SSCamSTRM devices have get popupStream command, pls.
+                       execute "get <SSCam> versionNotes" for further info
   - bugfix:  51_MOBILEALERTS.pm: Offlimit for decodeHumidityDecimal added
   - change:  98_MSwitch.pm, update V2.07
   - change:  20_FRM_IN: only update on change (Forum #81815)

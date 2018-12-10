@@ -45,6 +45,8 @@ use HttpUtils;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "7.7.0"  => "10.12.2018  SVS-Device: autocreateCams command added, some other fixes and improvements, minor code rewrite, ".
+              "save Stream in \$streamHash->{HELPER}{STREAM} for popupStream in SSCamSTRM-Device ",
   "7.6.0"  => "02.12.2018  sub SSCam_ptzpanel completed by Preset and Patrol, minor fixes ",
   "7.5.0"  => "02.12.2018  sub SSCam_StreamDev and SSCam_composegallery changed to use popup window ",
   "7.4.1"  => "26.11.2018  sub composegallery deleted, SSCam_composegallery changed to get information for SSCam_refresh ",
@@ -97,6 +99,10 @@ our %SSCam_vNotesIntern = (
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
+  "7.7.0"  => "10.12.2018 autocreateCams command added to SVS device. By this command all cameras installed in SVS can be ".
+              "defined automatically. <br>".
+              "In SSCamSTRM devices the \"get &lt;name&gt; popupStream\" command is implemented which may open a popup window with the ".
+              "active streaming content. ",
   "7.6.0"  => "02.12.2018 The PTZ panel is completed by \"Preset\" and \"Patrol\" (only for PTZ cameras) ",
   "7.5.0"  => "02.12.2018 A click on suitable content in a stream- or snapgallery device opens a popup window. ".
                "The popup size can be adjusted by attribute \"popupWindowSize\". ",
@@ -231,7 +237,12 @@ my %SSCam_errauthlist = (
   403 => "One time password not specified",
   404 => "One time password authenticate failed",
   405 => "method not allowd - maybe the password is too long",
-  407 => "Permission denied - make sure FHEM-Server IP won't be blocked in DSM automated blocking list",
+  406 => "OTP code enforced",
+  407 => "Max Tries (if auto blocking is set to true) - make sure FHEM-Server IP won't be blocked in DSM automated blocking list",
+  408 => "Password Expired Can not Change",
+  409 => "Password Expired",
+  410 => "Password must change (when first time use or after reset password by admin)",
+  411 => "Account Locked (when account max try exceed)",
 );
 
 my %SSCam_errlist = (
@@ -647,6 +658,7 @@ sub SSCam_Set($@) {
   } else {
       # setlist für SVS Devices
       $setlist = "Unknown argument $opt, choose one of ".
+                 "autocreateCams:noArg ".
 	             "credentials ".
 				 "createReadingsGroup ".
 				 "extevent:1,2,3,4,5,6,7,8,9,10 ".
@@ -783,7 +795,7 @@ sub SSCam_Set($@) {
 	  my $rgdev = $prop?$prop:"RG.SSCam";
       
       my $rgdef = '<%it_camera>,<Kamera<br>On/Offline>,< >,<Status>,< >,<Bewegungs<br>erkennung>,< >,<letzte Aufnahme>,< >,<bel. Platz<br>(MB)>,< >,<letzte Aktualisierung>,< >,<Disable<br>Modul>,< >,<Wiedergabe>'."\n". 
-                  'TYPE=SSCam:FILTER=MODEL!=SVS:Availability,<&nbsp;>,state,<&nbsp;>,CamMotDetSc,<&nbsp;>,CamLastRecTime,<&nbsp;>,UsedSpaceMB,<&nbsp;>,LastUpdateTime,<&nbsp;>,?!disable,<&nbsp;>,?!LSnap,?!LRec,?!Start,?!Stop'."\n". 
+                  'TYPE=SSCam:FILTER=MODEL!=SVS:Availability,<&nbsp;>,state,<&nbsp;>,!CamMotDetSc,<&nbsp;>,!CamLastRecTime,<&nbsp;>,!UsedSpaceMB,<&nbsp;>,!LastUpdateTime,<&nbsp;>,?!disable,<&nbsp;>,?!LSnap,?!LRec,?!Start,?!Stop'."\n". 
                   '< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >'."\n".
                   '< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >'."\n".
                   '< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >'."\n".
@@ -905,6 +917,11 @@ sub SSCam_Set($@) {
             
       $hash->{HELPER}{HOMEMODE} = $prop;
       SSCam_sethomemode($hash);
+        
+  } elsif ($opt eq "autocreateCams" && !SSCam_IsModelCam($hash)) {
+	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+            
+      SSCam_setAutocreate($hash);
         
   } elsif ($opt eq "goPreset" && SSCam_IsModelCam($hash)) {
 	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
@@ -1633,7 +1650,7 @@ sub SSCam_getcredentials ($$) {
     my ($retcode, $credstr);
     my (@key,$len,$i);
     
-    if ($boot eq 1) {
+    if ($boot) {
         # mit $boot=1 Credentials von Platte lesen und als scrambled-String in RAM legen
         $index = $hash->{TYPE}."_".$hash->{NAME}."_credentials";
         ($retcode, $credstr) = getKeyValue($index);
@@ -1672,6 +1689,7 @@ sub SSCam_getcredentials ($$) {
     
         $success = (defined($passwd)) ? 1 : 0;
     }
+
 return ($success, $username, $passwd);        
 }
 
@@ -1781,12 +1799,9 @@ sub SSCam_camstartrec ($) {
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         # Aufnahme starten                         
         $hash->{OPMODE} = "Start";
-        $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
         
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
     
 	} else {
@@ -1834,12 +1849,9 @@ sub SSCam_camstoprec ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         $hash->{OPMODE} = "Stop";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }  
+        SSCam_setActiveToken($hash);  
         SSCam_getapisites($hash);
 		
     } else {
@@ -1882,12 +1894,9 @@ sub SSCam_camexpmode($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                           
         $hash->{OPMODE} = "ExpMode";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
 		
     } else {
@@ -1930,12 +1939,9 @@ sub SSCam_cammotdetsc($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {             
         $hash->{OPMODE} = "MotDetSc";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
-		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }    
+	
+        SSCam_setActiveToken($hash);    
         SSCam_getapisites($hash);
 		
     } else {
@@ -1980,13 +1986,9 @@ sub SSCam_camsnap($) {
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         # einen Schnappschuß aufnehmen              
         $hash->{OPMODE} = "Snap";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
-		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
-        
+
+        SSCam_setActiveToken($hash); 
         SSCam_getapisites($hash);
 		
     } else {
@@ -2029,13 +2031,9 @@ sub SSCam_starttrack($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {             
         $hash->{OPMODE} = "startTrack";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
-        
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
 		
     } else {
@@ -2078,13 +2076,9 @@ sub SSCam_stoptrack($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {             
         $hash->{OPMODE} = "stopTrack";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
-        
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
 		
     } else {
@@ -2127,12 +2121,9 @@ sub SSCam_getpresets($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {             
         $hash->{OPMODE} = "getPresets";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         
         SSCam_getapisites($hash);
 		
@@ -2176,12 +2167,9 @@ sub SSCam_setPreset($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {             
         $hash->{OPMODE} = "setPreset";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         
         SSCam_getapisites($hash);
 		
@@ -2225,12 +2213,9 @@ sub SSCam_delPreset($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {             
         $hash->{OPMODE} = "delPreset";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         
         SSCam_getapisites($hash);
 		
@@ -2274,12 +2259,9 @@ sub SSCam_setHome($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {             
         $hash->{OPMODE} = "setHome";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         
         SSCam_getapisites($hash);
 		
@@ -2323,12 +2305,9 @@ sub SSCam_piract($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {             
         $hash->{OPMODE} = "piract";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         
         SSCam_getapisites($hash);
 		
@@ -2358,7 +2337,7 @@ sub SSCam_runliveview($) {
         }
         
         # Fehlertext zum Errorcode ermitteln
-        $error = &SSCam_experror($hash,$errorcode);
+        $error = SSCam_experror($hash,$errorcode);
 
         readingsBeginUpdate($hash);
         readingsBulkUpdate($hash,"Errorcode",$errorcode);
@@ -2372,14 +2351,11 @@ sub SSCam_runliveview($) {
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         # Liveview starten             
         $hash->{OPMODE} = "runliveview";
-        $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0; 
 		# erzwingen die Camid zu ermitteln und bei login-Fehler neue SID zu holen
 		delete $hash->{CAMID};  
         
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         readingsSingleUpdate($hash,"state","runView ".$hash->{HELPER}{RUNVIEW},1); 
         SSCam_getapisites($hash);
     
@@ -2409,7 +2385,7 @@ sub SSCam_hlsactivate($) {
         }
         
         # Fehlertext zum Errorcode ermitteln
-        $error = &SSCam_experror($hash,$errorcode);
+        $error = SSCam_experror($hash,$errorcode);
 
         readingsBeginUpdate($hash);
         readingsBulkUpdate($hash,"Errorcode",$errorcode);
@@ -2423,16 +2399,57 @@ sub SSCam_hlsactivate($) {
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         # Aktivierung starten             
         $hash->{OPMODE} = "activate_hls";
-        $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0;   
         
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
     
 	} else {
         InternalTimer(gettimeofday()+0.3, "SSCam_hlsactivate", $hash, 0);
+    }    
+}
+
+###############################################################################
+#                         Kameras mit Autocreate erstellen
+###############################################################################
+sub SSCam_setAutocreate($) {
+    my ($hash)   = @_;
+    my $camname  = $hash->{CAMNAME};
+    my $name     = $hash->{NAME};
+    my $errorcode;
+    my $error;
+    
+    RemoveInternalTimer($hash, "SSCam_setAutocreate");
+    return if(IsDisabled($name));
+ 
+    if (ReadingsVal("$name", "state", "") =~ /^dis.*/) {
+        if (ReadingsVal("$name", "state", "") eq "disabled") {
+            $errorcode = "402";
+        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
+            $errorcode = "502";
+        }
+        
+        # Fehlertext zum Errorcode ermitteln
+        $error = SSCam_experror($hash,$errorcode);
+
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash,"Errorcode",$errorcode);
+        readingsBulkUpdate($hash,"Error",$error);
+        readingsEndUpdate($hash, 1);
+    
+        Log3($name, 2, "$name - ERROR - autocreate cameras - $error");
+        return;
+    }
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {            
+        $hash->{OPMODE} = "Autocreate";
+		$hash->{HELPER}{LOGINRETRIES} = 0;   
+        
+        SSCam_setActiveToken($hash);
+        SSCam_getapisites($hash);
+    
+	} else {
+        InternalTimer(gettimeofday()+2.1, "SSCam_setAutocreate", $hash, 0);
     }    
 }
 
@@ -2457,7 +2474,7 @@ sub SSCam_hlsreactivate($) {
         }
         
         # Fehlertext zum Errorcode ermitteln
-        $error = &SSCam_experror($hash,$errorcode);
+        $error = SSCam_experror($hash,$errorcode);
 
         readingsBeginUpdate($hash);
         readingsBulkUpdate($hash,"Errorcode",$errorcode);
@@ -2468,15 +2485,11 @@ sub SSCam_hlsreactivate($) {
         return;
     }
     
-    if ($hash->{HELPER}{ACTIVE} eq "off") {
-        # Aktivierung starten             
+    if ($hash->{HELPER}{ACTIVE} eq "off") {             
         $hash->{OPMODE} = "reactivate_hls";
-        $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0;   
         
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
     
 	} else {
@@ -2501,12 +2514,9 @@ sub SSCam_stopliveview ($) {
         
         # Liveview stoppen           
         $hash->{OPMODE} = "stopliveview";
-        $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
         
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         
         # Link aus Helper-hash löschen
         delete $hash->{HELPER}{LINK};
@@ -2525,10 +2535,7 @@ sub SSCam_stopliveview ($) {
         } else {
             # kein HLS Stream
 			SSCam_refresh($hash,0,1,1);    # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
-		    $hash->{HELPER}{ACTIVE} = "off";  
-		    if (AttrVal($name,"debugactivetoken",0)) {
-                Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
-            }
+            SSCam_delActiveToken($hash);
         }
 	
 	} else {
@@ -2548,12 +2555,9 @@ sub SSCam_extevent ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
         $hash->{OPMODE} = "extevent";
-        $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
         
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
 		
     } else {
@@ -2652,14 +2656,11 @@ sub SSCam_doptzaction ($) {
         } elsif ($hash->{HELPER}{PTZACTION} eq "movestart") {
             Log3($name, 4, "$name - Start move Camera $camname to direction \"$hash->{HELPER}{GOMOVEDIR}\" with duration of $hash->{HELPER}{GOMOVETIME} s");
         }
- 
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
-    
+     
         $hash->{OPMODE} = $hash->{HELPER}{PTZACTION};
-        $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
+        
+        SSCam_setActiveToken($hash);
  
         SSCam_getapisites($hash);
  
@@ -2681,12 +2682,9 @@ sub SSCam_movestop ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
         $hash->{OPMODE} = "movestop";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");;
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
    
     } else {
@@ -2710,12 +2708,9 @@ sub SSCam_camenable ($) {
         Log3($name, 4, "$name - Enable Camera $camname");
                         
         $hash->{OPMODE} = "Enable";
-        $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
         
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
     
 	} else {
@@ -2739,12 +2734,9 @@ sub SSCam_camdisable ($) {
         Log3($name, 4, "$name - Disable Camera $camname");
                         
         $hash->{OPMODE} = "Disable";
-        $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
         
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
 		
     } else {
@@ -2842,15 +2834,12 @@ sub SSCam_getsnapinfo ($) {
     if ($hash->{HELPER}{ACTIVE} eq "off") {               
         $hash->{OPMODE} = "getsnapinfo";
 		$hash->{OPMODE} = "getsnapgallery" if(exists($hash->{HELPER}{GETSNAPGALLERY}));
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		$hash->{HELPER}{SNAPLIMIT}    = $slim;   # 0-alle Snapshots werden abgerufen und ausgewertet, sonst $slim
 		$hash->{HELPER}{SNAPIMGSIZE}  = $ssize;  # 0-Do not append image, 1-Icon size, 2-Full size
 		$hash->{HELPER}{KEYWORD}      = $camname;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
 		
     } else {
@@ -2870,12 +2859,9 @@ sub SSCam_getsnapfilename ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {    
         $hash->{OPMODE} = "getsnapfilename";
-        $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
         
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
     
 	} else {
@@ -2896,12 +2882,9 @@ sub SSCam_getsvsinfo ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
         $hash->{OPMODE} = "getsvsinfo";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
 		
     } else {
@@ -2922,12 +2905,9 @@ sub SSCam_sethomemode ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
         $hash->{OPMODE} = "sethomemode";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
 		
     } else {
@@ -2948,12 +2928,9 @@ sub SSCam_setoptpar ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
         $hash->{OPMODE} = "setoptpar";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
 		
     } else {
@@ -2974,12 +2951,9 @@ sub SSCam_gethomemodestate ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
         $hash->{OPMODE} = "gethomemodestate";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
 		
     } else {
@@ -3000,12 +2974,9 @@ sub SSCam_getsvslog ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
         $hash->{OPMODE} = "getsvslog";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
 		
     } else {
@@ -3026,11 +2997,8 @@ sub SSCam_sessionoff ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
         $hash->{OPMODE} = "logout";
-        $hash->{HELPER}{ACTIVE} = "on";
-		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        
+        SSCam_setActiveToken($hash);
         SSCam_logout($hash);
 		
     } else {
@@ -3051,11 +3019,9 @@ sub SSCam_getcaminfo($) {
 
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
         $hash->{OPMODE} = "Getcaminfo";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;	
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        } 
+        
+        SSCam_setActiveToken($hash); 
         SSCam_getapisites($hash);
 		
     } else {
@@ -3083,12 +3049,9 @@ sub SSCam_getstreamformat ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
         $hash->{OPMODE} = "getstreamformat";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        } 
+        SSCam_setActiveToken($hash); 
         SSCam_getapisites($hash);
 		
     } else {
@@ -3110,12 +3073,9 @@ sub SSCam_getStmUrlPath ($) {
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         # Stream-Urls abrufen              
         $hash->{OPMODE} = "getStmUrlPath";
-        $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
         
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
 		
     } else {
@@ -3136,12 +3096,9 @@ sub SSCam_geteventlist ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {      
         $hash->{OPMODE} = "geteventlist";
-        $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
         
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
 		
     } else {
@@ -3162,12 +3119,9 @@ sub SSCam_getmotionenum ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {   
         $hash->{OPMODE} = "getmotionenum";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
 		
     } else {
@@ -3189,12 +3143,9 @@ sub SSCam_getcapabilities ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                       
         $hash->{OPMODE} = "Getcapabilities";
-        $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
         
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
 		
     } else {
@@ -3224,12 +3175,9 @@ sub SSCam_getptzlistpreset ($) {
     
 	if ($hash->{HELPER}{ACTIVE} eq "off") {                       
         $hash->{OPMODE} = "Getptzlistpreset";
-        $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
 		
     } else {
@@ -3259,12 +3207,9 @@ sub SSCam_getptzlistpatrol ($) {
 
     if ($hash->{HELPER}{ACTIVE} ne "on") {                        
         $hash->{OPMODE} = "Getptzlistpatrol";
-        $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
         
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
 		
     } else {
@@ -3366,11 +3311,7 @@ sub SSCam_getapisites_parse ($) {
         readingsSingleUpdate($hash, "Error", $err, 1);
 
         # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
-        $hash->{HELPER}{ACTIVE} = "off"; 
-        
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_delActiveToken($hash);
         return;
 		
     } elsif ($myjson ne "") {          
@@ -3378,12 +3319,7 @@ sub SSCam_getapisites_parse ($) {
         ($hash, my $success) = SSCam_evaljson($hash,$myjson);
         
         unless ($success) {
-            Log3($name, 4, "$name - Data returned: $myjson");
-            $hash->{HELPER}{ACTIVE} = "off";
-            
-            if (AttrVal($name,"debugactivetoken",0)) {
-                Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
-            }
+            SSCam_delActiveToken($hash);
             return;
         }
         
@@ -3699,11 +3635,7 @@ sub SSCam_getapisites_parse ($) {
             Log3($name, 2, "$name - ERROR - the API-Query couldn't be executed successfully");                    
                         
             # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
-            $hash->{HELPER}{ACTIVE} = "off"; 
-                        
-            if (AttrVal($name,"debugactivetoken",0)) {
-                Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
-            }
+            SSCam_delActiveToken($hash);
             return;
         }
 	}
@@ -3734,8 +3666,8 @@ sub SSCam_checksid ($) {
 	   return;
    }
    
-   if(SSCam_IsModelCam($hash)) {
-       # Normalverarbeitung für Cams
+   if(SSCam_IsModelCam($hash) || $hash->{OPMODE} eq "Autocreate") {
+       # Normalverarbeitung für Cams oder Autocreate Cams
        return SSCam_getcamid($hash);
    } else {
        # Sprung zu SSCam_camop wenn SVS Device
@@ -3799,9 +3731,11 @@ sub SSCam_getcamid_parse ($) {
    my $hash              = $param->{hash};
    my $name              = $hash->{NAME};
    my $camname           = $hash->{CAMNAME};
-   my $apicammaxver      = $hash->{HELPER}{APICAMMAXVER};  
+   my $apicammaxver      = $hash->{HELPER}{APICAMMAXVER}; 
+   my $OpMode            = $hash->{OPMODE};   
    my ($data,$success,$error,$errorcode,$camid);
-   my ($i,$n,$id);
+   my ($i,$n,$id,$errstate,$camdef,$nrcreated);
+   my $cdall = "";
    my %allcams;
   
    if ($err ne "") {
@@ -3817,12 +3751,8 @@ sub SSCam_getcamid_parse ($) {
        ($hash, $success) = SSCam_evaljson($hash,$myjson);
         
        unless ($success) {
-           Log3($name, 4, "$name - Data returned: ".$myjson);
-		   
-           $hash->{HELPER}{ACTIVE} = "off";
-           if (AttrVal($name,"debugactivetoken",0)) {
-               Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
-           }
+           Log3($name, 4, "$name - Data returned: ".$myjson);		   
+           SSCam_delActiveToken($hash);
            return; 
        }
         
@@ -3835,7 +3765,7 @@ sub SSCam_getcamid_parse ($) {
                 
        if ($success) {
            # die Liste aller Kameras konnte ausgelesen werden	   
-           $i = 0;
+           ($i,$nrcreated) = (0,0);
          
            # Namen aller installierten Kameras mit Id's in Assoziatives Array einlesen
            %allcams = ();
@@ -3848,6 +3778,36 @@ sub SSCam_getcamid_parse ($) {
                $id = $data->{'data'}->{'cameras'}->[$i]->{'id'};
                $allcams{"$n"} = "$id";
                $i += 1;
+               
+               if ($OpMode eq "Autocreate") {
+                   # Cam autocreate
+                   ($err,$camdef) = SSCam_Autocreate($hash,$n);
+                   if($camdef) {
+                       $cdall = $cdall.($cdall?", ":"").$camdef;
+                       $nrcreated++;
+                   }
+                   $errstate = $err if($err);  
+               }
+               
+           }
+           
+           if ($OpMode eq "Autocreate") {
+               # Cam autocreate
+               Log3($name, 3, "$name - Cameras defined by autocreate: $cdall") if($cdall);
+               
+               $errstate = $errstate?$errstate:"none";
+               readingsBeginUpdate($hash); 
+               readingsBulkUpdate($hash,"NumberAutocreatedCams",$nrcreated);
+               readingsBulkUpdate($hash,"Errorcode","none");
+               readingsBulkUpdate($hash,"Error",$errstate);
+               readingsBulkUpdate($hash,"state","autocreate finished");
+               readingsEndUpdate($hash, 1);
+           
+               CommandSave(undef, undef) if($errstate eq "none" && $nrcreated && AttrVal("global","autosave", 1));
+
+		       # Freigabe Funktionstoken
+               SSCam_delActiveToken($hash);
+               return;
            }
              
            # Ist der gesuchte Kameraname im Hash enhalten (in SVS eingerichtet ?)
@@ -3868,12 +3828,8 @@ sub SSCam_getcamid_parse ($) {
                readingsEndUpdate($hash, 1);
                                   
                # Logausgabe
-               Log3($name, 2, "$name - ERROR - Cameraname $camname wasn't found in Surveillance Station. Check Userrights, Cameraname and Spelling");
-               			   
-               $hash->{HELPER}{ACTIVE} = "off";
-               if (AttrVal($name,"debugactivetoken",0)) {
-                   Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
-               }
+               Log3($name, 2, "$name - ERROR - Cameraname $camname wasn't found in Surveillance Station. Check Userrights, Cameraname and Spelling");		   
+               SSCam_delActiveToken($hash);
                return;
            }
       
@@ -3896,10 +3852,7 @@ sub SSCam_getcamid_parse ($) {
 		   
 		   } else {
 		       # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
-               $hash->{HELPER}{ACTIVE} = "off";
-               if (AttrVal($name,"debugactivetoken",0)) {
-                   Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
-               }
+               SSCam_delActiveToken($hash);
 			   Log3($name, 2, "$name - ERROR - ID of Camera $camname couldn't be selected. Errorcode: $errorcode - $error");
                return;
 		   }
@@ -4279,18 +4232,15 @@ sub SSCam_camop ($) {
           # öffnen streamwindow für die Instanz die "VIEWOPENROOM" oder Attr "room" aktuell geöffnet hat
           if ($hash->{HELPER}{VIEWOPENROOM}) {
               $room = $hash->{HELPER}{VIEWOPENROOM};
-              map {FW_directNotify("FILTER=room=$room", "#FHEMWEB:$_", "window.open ('$url','$winname','$attr')", "")} devspec2array("WEB.*");
+              map {FW_directNotify("FILTER=room=$room", "#FHEMWEB:$_", "window.open ('$url','$winname','$attr')", "")} devspec2array("TYPE=FHEMWEB");
           } else {
-              map {FW_directNotify("#FHEMWEB:$_", "window.open ('$url','$winname','$attr')", "")} devspec2array("WEB.*");
+              map {FW_directNotify("#FHEMWEB:$_", "window.open ('$url','$winname','$attr')", "")} devspec2array("TYPE=FHEMWEB");
           }
       }
            
 	  SSCam_refresh($hash,0,1,1);    # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
       
-	  $hash->{HELPER}{ACTIVE} = "off";
-      if (AttrVal($name,"debugactivetoken",0)) {
-          Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
-      }
+      SSCam_delActiveToken($hash);
       return;
 	  
    } elsif ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} =~ /snap/) {
@@ -4374,10 +4324,7 @@ sub SSCam_camop_parse ($) {
         readingsSingleUpdate($hash, "Error", $err, 1);                                     	       
         
 		# ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
-		$hash->{HELPER}{ACTIVE} = "off";
-        if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
-        }
+        SSCam_delActiveToken($hash);
         return;
    
    } elsif ($myjson ne "") {    
@@ -4387,12 +4334,8 @@ sub SSCam_camop_parse ($) {
         
         unless ($success) {
             Log3($name, 4, "$name - Data returned: ".$myjson);
-			
-			# ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
-            $hash->{HELPER}{ACTIVE} = "off";
-            if (AttrVal($name,"debugactivetoken",0)) {
-                Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
-            }
+
+            SSCam_delActiveToken($hash);
             return;
         }
         
@@ -4479,7 +4422,7 @@ sub SSCam_camop_parse ($) {
                 Log3($name, 3, "$name - HomeMode was set to \"$hash->{HELPER}{HOMEMODE}\" ");
 				
 				# Token freigeben vor nächstem Kommando
-                $hash->{HELPER}{ACTIVE} = "off";
+                SSCam_delActiveToken($hash);
   
                 # neuen HomeModeState abrufen	
                 SSCam_gethomemodestate($hash);
@@ -4624,7 +4567,7 @@ sub SSCam_camop_parse ($) {
                 readingsEndUpdate($hash, 1);
 
 				# Token freigeben vor Abruf caminfo
-                $hash->{HELPER}{ACTIVE} = "off";
+                SSCam_delActiveToken($hash);
                 RemoveInternalTimer($hash, "SSCam_getcaminfo");
                 InternalTimer(gettimeofday()+0.5, "SSCam_getcaminfo", $hash, 0);
 				
@@ -4674,7 +4617,7 @@ sub SSCam_camop_parse ($) {
                 Log3($name, 3, "$name - Snapshot of Camera $camname has been done successfully");
                 
 				# Token freigeben vor nächstem Kommando
-                $hash->{HELPER}{ACTIVE} = "off";
+                SSCam_delActiveToken($hash);
   
                 # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps
                 my ($slim,$ssize) = SSCam_snaplimsize($hash);		
@@ -4805,7 +4748,7 @@ sub SSCam_camop_parse ($) {
                 Log3($name, 4, "$name - HLS Streaming of camera \"$name\" deactivated for streaming device");
 
 				# Token freigeben vor hlsactivate
-                $hash->{HELPER}{ACTIVE} = "off";
+                SSCam_delActiveToken($hash);
                 SSCam_hlsactivate($hash);
                 
             } elsif ($OpMode eq "activate_hls") {
@@ -5527,11 +5470,7 @@ sub SSCam_camop_parse ($) {
    }
   
   # Token freigeben   
-  $hash->{HELPER}{ACTIVE} = "off";
-
-  if (AttrVal($name,"debugactivetoken",0)) {
-      Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
-  }
+  SSCam_delActiveToken($hash);
 
 return;
 }
@@ -5565,20 +5504,13 @@ sub SSCam_login ($$) {
   
   unless ($success) {
       Log3($name, 2, "$name - Credentials couldn't be retrieved successfully - make sure you've set it with \"set $name credentials <username> <password>\"");
-      
-      $hash->{HELPER}{ACTIVE} = "off";
-      if (AttrVal($name,"debugactivetoken",0)) {
-          Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
-      }      
+      SSCam_delActiveToken($hash);      
       return;
   }
   
   if($hash->{HELPER}{LOGINRETRIES} >= $lrt) {
       # login wird abgebrochen, Freigabe Funktionstoken
-      $hash->{HELPER}{ACTIVE} = "off"; 
-      if (AttrVal($name,"debugactivetoken",0)) {
-          Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
-      }
+      SSCam_delActiveToken($hash);
 	  Log3($name, 2, "$name - ERROR - Login or privilege of user $username unsuccessful"); 
       return;
   }
@@ -5640,11 +5572,7 @@ sub SSCam_login_return ($) {
         ($hash, $success) = SSCam_evaljson($hash,$myjson);
         unless ($success) {
             Log3($name, 4, "$name - no JSON-Data returned: ".$myjson);
-            $hash->{HELPER}{ACTIVE} = "off";
-            
-            if (AttrVal($name,"debugactivetoken",0)) {
-                Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
-            }
+            SSCam_delActiveToken($hash);
             return;
         }
         
@@ -5749,12 +5677,12 @@ sub SSCam_logout_return ($) {
    my $error;
    my $errorcode;
   
-   if($err ne "") {
+   if ($err ne "") {
        # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
-       Log3($name, 2, "$name - error while requesting ".$param->{url}." - $err");
-        
+       Log3($name, 2, "$name - error while requesting ".$param->{url}." - $err"); 
        readingsSingleUpdate($hash, "Error", $err, 1);                                     	      
-   } elsif($myjson ne "") {
+   
+   } elsif ($myjson ne "") {
        # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
        Log3($name, 4, "$name - URL-Call: ".$param->{url});
         
@@ -5763,12 +5691,7 @@ sub SSCam_logout_return ($) {
         
        unless ($success) {
            Log3($name, 4, "$name - Data returned: ".$myjson);
-            
-           $hash->{HELPER}{ACTIVE} = "off";
-            
-           if (AttrVal($name,"debugactivetoken",0)) {
-               Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
-           }
+           SSCam_delActiveToken($hash);
            return;
        }
         
@@ -5788,7 +5711,7 @@ sub SSCam_logout_return ($) {
            $errorcode = $data->{'error'}->{'code'};
 
            # Fehlertext zum Errorcode ermitteln
-           $error = &SSCam_experrorauth($hash,$errorcode);
+           $error = SSCam_experrorauth($hash,$errorcode);
 
            Log3($name, 2, "$name - ERROR - Logout of User $username was not successful, however SID: \"$sid\" has been deleted. Errorcode: $errorcode - $error");
        }
@@ -5797,13 +5720,58 @@ sub SSCam_logout_return ($) {
    delete $hash->{HELPER}{SID};
    
    # ausgeführte Funktion ist erledigt (auch wenn logout nicht erfolgreich), Freigabe Funktionstoken
-   $hash->{HELPER}{ACTIVE} = "off";  
+   SSCam_delActiveToken($hash);
    
-   if (AttrVal($name,"debugactivetoken",0)) {
-       Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
-   }
 return;
 }
+
+#############################################################################################
+#                                   Autocreate für Kameras
+#                                   $sn = Name der Kamera in SVS
+#############################################################################################
+sub SSCam_Autocreate ($$) { 
+   my ($hash,$sn) = @_;
+   my $name = $hash->{NAME};
+   my $type = $hash->{TYPE};
+   
+   my ($cmd, $err);
+   my $camname = "SSCam.".makeDeviceName($sn);         # erlaubten Kameranamen für FHEM erzeugen
+   my $camhash = $defs{$camname};                      # Test ob SSCam-Device schon definiert ist
+
+   if(!$camhash) {
+       my $arg = $hash->{SERVERADDR}." ".$hash->{SERVERPORT};
+       $cmd = "$camname $type $sn $arg";
+       Log3($name, 2, "$name - Autocreate camera: define $cmd");
+       $err = CommandDefine(undef, $cmd);
+       
+       if($err) {
+           Log3($name, 1, "ERROR: $err");
+       } else {
+           my $room = AttrVal($name, "room", "SSCam");
+           my $session =  AttrVal($name, "session", "DSM");
+           CommandAttr(undef,"$camname room $room");
+           CommandAttr(undef,"$camname session $session");
+           CommandAttr(undef,"$camname icon it_camera");
+           CommandAttr(undef,"$camname pollcaminfoall 210");
+           CommandAttr(undef,"$camname pollnologging 1");	
+           CommandAttr(undef,"$camname httptimeout 20");
+
+           # Credentials abrufen und setzen
+           my ($success, $username, $password) = SSCam_getcredentials($hash,0);
+           if($success) {
+               CommandSet(undef, "$camname credentials $username $password");   
+           }
+                     
+           #InternalTimer(gettimeofday()+1.8, "SSCam_addptzattr", "$name", 0);
+           
+       }
+   } else {
+       Log3($name, 4, "$name - Autocreate - camera \"$camname\" already exists");
+       $camname = "";
+   }  
+   
+return ($err,$camname);
+}  
 
 ###############################################################################
 #   Test ob JSON-String empfangen wurde
@@ -6264,6 +6232,9 @@ sub SSCam_StreamDev($$$) {
   $hash->{HELPER}{STRMDEV}    = $strmdev;                   # Name des aufrufenden SSCamSTRM-Devices
   $hash->{HELPER}{STRMROOM}   = $FW_room?$FW_room:"";       # Raum aus dem das SSCamSTRM-Device die Funktion aufrief
   $hash->{HELPER}{STRMDETAIL} = $FW_detail?$FW_detail:"";   # Name des SSCamSTRM-Devices (wenn Detailansicht)
+  my $streamHash              = $defs{$strmdev};            # Hash des SSCamSTRM-Devices
+  delete $streamHash->{HELPER}{STREAM};
+  delete $streamHash->{HELPER}{STREAMACTIVE};               # Statusbit ob ein Stream aktiviert ist
   
   # Definition Tasten
   my $imgblank      = "<img src=\"$FW_ME/www/images/sscam/black_btn_CAMBLANK.png\">";                   # nicht sichtbare Leertaste
@@ -6295,7 +6266,7 @@ sub SSCam_StreamDev($$$) {
   my $ha     = AttrVal($camname, "htmlattr", 'width="500" height="325"');   # HTML Attribute der Cam
   $ha        = AttrVal($strmdev, "htmlattr", $ha);                          # htmlattr mit htmattr Streaming-Device übersteuern 
   my $pws    = AttrVal($strmdev, "popupWindowSize", "");                    # Größe eines Popups
-  $pws      =~ s/"//g if($pws);
+  $pws       =~ s/"//g if($pws);
   my $StmKey = ReadingsVal($camname,"StmKey",undef);
   
   $ret  = "";
@@ -6317,15 +6288,18 @@ sub SSCam_StreamDev($$$) {
   }
   
   if($fmt =~ /mjpeg/) { 
-      if($apivideostmsmaxver) {     # keine API "SYNO.SurveillanceStation.VideoStream" mehr ab API v2.8
+      if($apivideostmsmaxver) {                                  # keine API "SYNO.SurveillanceStation.VideoStream" mehr ab API v2.8
           $link = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
       } elsif ($hash->{HELPER}{STMKEYMJPEGHTTP}) {
           $link = $hash->{HELPER}{STMKEYMJPEGHTTP};
       }
-      if($apiaudiostmmaxver) {      # keine API "SYNO.SurveillanceStation.AudioStream" mehr ab API v2.8 
+      if($apiaudiostmmaxver) {                                   # keine API "SYNO.SurveillanceStation.AudioStream" mehr ab API v2.8 
 	      $audiolink = "$proto://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmmaxver&method=Stream&cameraId=$camid&_sid=$sid"; 
       }
 	  $ret .= "<td><img src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"><br>";
+      $streamHash->{HELPER}{STREAM} = "<img src=$link $pws>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
+      $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);         # Statusbit wenn ein Stream aktiviert ist
+      
       if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
              # Aufnahmebutton endlos Start
              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\">$imgrecendless </a>";
@@ -6348,7 +6322,7 @@ sub SSCam_StreamDev($$$) {
                        Your browser does not support the audio element.      
                        </audio>";
           $ret .= "</td>";
-          $ret .= "<td></td>" if(AttrVal($camname,"ptzPanel_use",1));
+          $ret .= "<td></td>" if(AttrVal($camname,"ptzPanel_use",0));
       }      
   
   } elsif($fmt =~ /generic/) {  
@@ -6370,6 +6344,12 @@ sub SSCam_StreamDev($$$) {
       
       $ret .= "<td>";
       $ret .= "$htag";
+      if($htag) {
+          $streamHash->{HELPER}{STREAM}       = "$htag";   # Stream für "get <SSCamSTRM-Device> popupStream" speichern
+          $streamHash->{HELPER}{STREAM}       =~ s/["']//g;
+          $streamHash->{HELPER}{STREAM}       =~ s/\s+/ /g;
+          $streamHash->{HELPER}{STREAMACTIVE} = 1;         # Statusbit wenn ein Stream aktiviert ist
+      }
       $ret .= "<br>";
       Log3($strmdev, 4, "$strmdev - generic Stream params:\n$htag");
       $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrefresh')\">$imgrefresh </a>";
@@ -6396,7 +6376,9 @@ sub SSCam_StreamDev($$$) {
       
       if($link && $wltype =~ /image|iframe|video|base64img|embed|hls/) {
           if($wltype =~ /image/) {
-              $ret .= "<td><img src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"><br>";
+              $ret .= "<td><img src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"><br>" if($link);
+              $streamHash->{HELPER}{STREAM} = "<img src=$link $pws>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
+              $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);         # Statusbit wenn ein Stream aktiviert ist
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";
               $ret .= $imgblank;
               if($hash->{HELPER}{RUNVIEW} =~ /live_fw/) {              
@@ -6423,13 +6405,17 @@ sub SSCam_StreamDev($$$) {
                                Your browser does not support the audio element.      
                                </audio>";
                   $ret .= "</td>";
-                  $ret .= "<td></td>" if(AttrVal($camname,"ptzPanel_use",1));
+                  $ret .= "<td></td>" if(AttrVal($camname,"ptzPanel_use",0));
               }         
           
           } elsif ($wltype =~ /iframe/) {
               $ret .= "<td><iframe src=$link $ha controls autoplay onClick=\"FW_okDialog('<img src=$link $pws>')\">
                        Iframes disabled
-                       </iframe><br>";
+                       </iframe><br>" if($link);
+              $streamHash->{HELPER}{STREAM} = "<iframe src=$link $pws controls autoplay>".
+                                              "Iframes disabled".
+                                              "</iframe>";                # Stream für "get <SSCamSTRM-Device> popupStream" speichern
+              $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);         # Statusbit wenn ein Stream aktiviert ist
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrefresh')\">$imgrefresh </a>";              
               $ret .= "</td>";
@@ -6440,7 +6426,7 @@ sub SSCam_StreamDev($$$) {
                                Your browser does not support the audio element.      
                                </audio>";
                   $ret .= "</td>";
-                  $ret .= "<td></td>" if(AttrVal($camname,"ptzPanel_use",1));
+                  $ret .= "<td></td>" if(AttrVal($camname,"ptzPanel_use",0));
               }
           
           } elsif ($wltype =~ /video/) {
@@ -6450,6 +6436,13 @@ sub SSCam_StreamDev($$$) {
                        <source src=$link type=\"video/webm\">
                        Your browser does not support the video tag
                        </video><br>";
+              $streamHash->{HELPER}{STREAM} = "<video $pws controls autoplay>".
+                                              "<source src=$link type=\"video/mp4\">". 
+                                              "<source src=$link type=\"video/ogg\">".
+                                              "<source src=$link type=\"video/webm\">".
+                                              "Your browser does not support the video tag".
+                                              "</video>";                # Stream für "get <SSCamSTRM-Device> popupStream" speichern              
+              $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);         # Statusbit wenn ein Stream aktiviert ist
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>"; 
               $ret .= "</td>";
               if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/) {
@@ -6459,22 +6452,32 @@ sub SSCam_StreamDev($$$) {
                                Your browser does not support the audio element.      
                                </audio>";
                   $ret .= "</td>";
-                  $ret .= "<td></td>" if(AttrVal($camname,"ptzPanel_use",1));
+                  $ret .= "<td></td>" if(AttrVal($camname,"ptzPanel_use",0));
               }
           } elsif($wltype =~ /base64img/) {
-              $ret .= "<td><img src='data:image/jpeg;base64,$link' $ha onClick=\"FW_okDialog('<img src=data:image/jpeg;base64,$link $pws>')\"><br>";
+              $ret .= "<td><img src='data:image/jpeg;base64,$link' $ha onClick=\"FW_okDialog('<img src=data:image/jpeg;base64,$link $pws>')\"><br>" if($link);
+              $streamHash->{HELPER}{STREAM} = "<img src=data:image/jpeg;base64,$link $pws>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
+              $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);                                  # Statusbit wenn ein Stream aktiviert ist
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";
               $ret .= "</td>";
 		  
           } elsif($wltype =~ /embed/) {
-              $ret .= "<td><embed src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"></td>";
-          
+              $ret .= "<td><embed src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"></td>" if($link);
+              $streamHash->{HELPER}{STREAM} = "<embed src=$link $pws>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
+              $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);           # Statusbit wenn ein Stream aktiviert ist
+              
           } elsif($wltype =~ /hls/) {
               $ret .= "<td><video $ha controls autoplay>
                        <source src=$link type=\"application/x-mpegURL\">
                        <source src=$link type=\"video/MP2T\">
                        Your browser does not support the video tag
                        </video><br>";
+              $streamHash->{HELPER}{STREAM} = "<video $pws controls autoplay>".
+                                              "<source src=$link type=\"application/x-mpegURL\">".
+                                              "<source src=$link type=\"video/MP2T\">".
+                                              "Your browser does not support the video tag".
+                                              "</video>";                # Stream für "get <SSCamSTRM-Device> popupStream" speichern
+              $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);         # Statusbit wenn ein Stream aktiviert ist
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrefresh')\">$imgrefresh </a>";
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdhlsreact')\">$imghlsreact </a>";
@@ -6544,6 +6547,8 @@ sub SSCam_composegallery ($;$$) {
   $hash->{HELPER}{STRMDEV}    = $strmdev;                        # Name des aufrufenden SSCamSTRM-Devices
   $hash->{HELPER}{STRMROOM}   = $FW_room?$FW_room:"";            # Raum aus dem das SSCamSTRM-Device die Funktion aufrief
   $hash->{HELPER}{STRMDETAIL} = $FW_detail?$FW_detail:"";        # Name des SSCamSTRM-Devices (wenn Detailansicht)
+  my $streamHash              = $defs{$strmdev};                 # Hash des SSCamSTRM-Devices
+  delete $streamHash->{HELPER}{STREAM};
   
   my $cmddosnap     = "cmd=set $name snap STRM";                 # Snapshot auslösen mit Kennzeichnung "by STRM-Device"
   my $imgdosnap     = "<img src=\"$FW_ME/www/images/sscam/black_btn_DOSNAP.png\">";
@@ -6621,37 +6626,66 @@ return $htmlCode;
 ##############################################################################
 #              Auflösung Errorcodes bei Login / Logout
 ##############################################################################
-sub SSCam_experrorauth {
+sub SSCam_experrorauth ($$) {
   # Übernahmewerte sind $hash, $errorcode
-  my ($hash,@errorcode) = @_;
+  my ($hash,$errorcode) = @_;
   my $device = $hash->{NAME};
-  my $errorcode = shift @errorcode;
   my $error;
   
   unless (exists($SSCam_errauthlist{"$errorcode"})) {$error = "Message of errorcode \"$errorcode\" not found. Please turn to Synology Web API-Guide."; return ($error);}
 
   # Fehlertext aus Hash-Tabelle %errorauthlist ermitteln
   $error = $SSCam_errauthlist{"$errorcode"};
+
 return ($error);
 }
 
 ##############################################################################
 #  Auflösung Errorcodes SVS API
 
-sub SSCam_experror {
+sub SSCam_experror ($$) {
   # Übernahmewerte sind $hash, $errorcode
-  my ($hash,@errorcode) = @_;
+  my ($hash,$errorcode) = @_;
   my $device = $hash->{NAME};
-  my $errorcode = shift @errorcode;
   my $error;
   
-  unless (exists($SSCam_errlist{"$errorcode"})) {$error = "Message of errorcode $errorcode not found. Please turn to Synology Web API-Guide."; return ($error);}
+  unless (exists($SSCam_errlist{"$errorcode"})) {$error = "Message of errorcode \"$errorcode\" not found. Please turn to Synology Web API-Guide."; return ($error);}
 
   # Fehlertext aus Hash-Tabelle %errorlist ermitteln
   $error = $SSCam_errlist{"$errorcode"};
-  return ($error);
+  
+return ($error);
 }
 
+#############################################################################################
+#                                   Token setzen
+#############################################################################################
+sub SSCam_setActiveToken ($) { 
+   my ($hash) = @_;
+   my $name = $hash->{NAME};
+               
+   $hash->{HELPER}{ACTIVE} = "on";
+   if (AttrVal($name,"debugactivetoken",0)) {
+       Log3($name, 3, "$name - Active-Token set by OPMODE: $hash->{OPMODE}");
+   } 
+   
+return;
+}
+
+#############################################################################################
+#                                   Token freigeben
+#############################################################################################
+sub SSCam_delActiveToken ($) { 
+   my ($hash) = @_;
+   my $name = $hash->{NAME};
+               
+   $hash->{HELPER}{ACTIVE} = "off";
+   if (AttrVal($name,"debugactivetoken",0)) {
+       Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
+   }  
+   
+return;
+}  
 
 1;
 
@@ -6697,6 +6731,7 @@ sub SSCam_experror {
 	   <li>create different types of discrete Streaming-Devices (createStreamDev)  </li>
        <li>Activation / Deactivation of a camera integrated PIR sensor  </li>
        <li>Creation of a readingsGroup device to display an overview of all defined SSCam devices (createReadingsGroup) </li>
+       <li>automatized definition of all in SVS available cameras in FHEM (autocreateCams) </li>
     </ul>
    </ul>
    <br>
@@ -6740,7 +6775,9 @@ sub SSCam_experror {
     device, that means the application on the discstation itself. 
     Dependend on the type of defined device the internal MODEL will be set to "&lt;vendor&gt; - &lt;camera type&gt;" 
     or "SVS" and a proper subset of the described set/get-commands are assigned to the device. <br>
-	The scope of application of set/get-commands is denoted to every particular command (valid for CAM, SVS, CAM/SVS).
+	The scope of application of set/get-commands is denoted to every particular command (valid for CAM, SVS, CAM/SVS). <br>
+	The cameras can be defined manually discrete, but alternatively with an automatical procedure by set "autocreateCams" 
+	command in a previously defined SVS device.
 	<br><br>
 	
     A <b>camera</b> is defined by: <br><br>
@@ -6755,7 +6792,10 @@ sub SSCam_experror {
 	  <b><code>define &lt;Name&gt; SSCAM SVS &lt;ServerAddr&gt; [Port] [Protocol] </code></b> <br><br>
     </ul>
 	
-    In that case the term &lt;camera name in SVS&gt; become replaced by <b>SVS</b> only. <br><br>
+    In that case the term &lt;camera name in SVS&gt; become replaced by <b>SVS</b> only. <br>
+	Is the SVS defined and after setting the appropriate creadentials ready for use, all cameras available in SVS can be created 
+	automatically in FHEM with the set command "autocreateCams". 
+	<br><br>
     
     The Modul SSCam ist based on functions of Synology Surveillance Station API. <br><br>
 
@@ -6821,6 +6861,8 @@ sub SSCam_experror {
     Surveillance Station as well. <br>
     If the user is member of admin-group, he has access to all module functions. Without this membership the user can only 
     execute functions with lower need of rights. <br>
+	Is <a href="https://www.synology.com/en-global/knowledgebase/DSM/tutorial/General/How_to_add_extra_security_to_your_Synology_NAS#t5">2-step verification</a>  
+	activated in DSM, the setup to a session with Surveillance Station is necessary (<a href="#SSCamattr">attribute</a> "session = SurveillanceStation"). <br><br>
     The required minimum rights to execute functions are listed in a table further down. <br>
     
     Alternatively to DSM-user a user created in SVS can be used. Also in that case a user of type "manager" has the right to 
@@ -6900,6 +6942,15 @@ sub SSCam_experror {
   <br>
   The specified set-commands are available for CAM/SVS-devices or only valid for CAM-devices or rather for SVS-Devices. 
   They can be selected in the drop-down-menu of the particular device. <br><br>
+  
+  <ul>
+  <li><b> set &lt;name&gt; autocreateCams </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for SVS)</li> <br>
+  
+  If a SVS device is defined, all in SVS integrated cameras are able to be created automatically in FHEM by this command. If the camera is already defined, 
+  it is overleaped. 
+  The new created camera devices are created in the same room as the used SVS device (default SSCam). Further helpful attributes are preset as well. 
+  <br><br>
+  </ul>
   
   <ul>
   <a name="SSCamcreateStreamDev"></a>
@@ -8048,6 +8099,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
 	  <li>erzeugen unterschiedlicher Typen von separaten Streaming-Devices (createStreamDev)  </li>
       <li>Aktivierung / Deaktivierung eines kamerainternen PIR-Sensors </li>
       <li>Erzeugung einer readingsGroup zur Anzeige aller definierten SSCam-Devices (createReadingsGroup) </li>
+	  <li>Automatisiertes Anlegen aller in der SVS vorhandenen Kameras in FHEM (autocreateCams) </li>
      </ul> 
     </ul>
     <br>
@@ -8071,7 +8123,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     <code>sudo apt-get install libjson-perl</code> <br><br>
 	
     Das Modul verwendet für HTTP-Calls die nichtblockierenden Funktionen von HttpUtils bzw. HttpUtils_NonblockingGet. <br> 
-    Im DSM bzw. der Synology Surveillance Station muß ein Nutzer angelegt sein. Die Zugangsdaten werden später über ein Set-Kommando dem angelegten Gerät zugewiesen. <br>
+    Im DSM bzw. der Synology Surveillance Station muß ein Nutzer angelegt sein. Die Zugangsdaten werden später über ein Set-Kommando dem 
+	angelegten Gerät zugewiesen. <br>
     Nähere Informationen dazu unter <a href="#SSCam_Credentials">Credentials</a><br><br>
         
     Überblick über die Perl-Module welche von SSCam genutzt werden: <br><br>
@@ -8097,7 +8150,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     der Applikation selbst auf der Diskstation, unterschieden. 
     Abhängig von der Art des definierten Devices wird das Internal MODEL auf "&lt;Hersteller&gt; - &lt;Kameramodell&gt;" oder 
     SVS gesetzt und eine passende Teilmenge der beschriebenen set/get-Befehle dem Device zugewiesen. <br>
-	Der Gültigkeitsbereich von set/get-Befehlen ist nach dem jeweiligen Befehl angegeben "gilt für CAM, SVS, CAM/SVS".
+	Der Gültigkeitsbereich von set/get-Befehlen ist nach dem jeweiligen Befehl angegeben "gilt für CAM, SVS, CAM/SVS". <br>
+	Die Kameras können einzeln manuell, alternativ auch automatisiert mittels einem vorher definierten SVS-Device angelegt werden.
 	<br><br>
 	
     Eine <b>Kamera</b> wird definiert mit: <br><br>
@@ -8113,7 +8167,9 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
 	  <b><code>define &lt;Name&gt; SSCAM SVS &lt;ServerAddr&gt; [Port] [Protocol]</code></b> <br><br>
 	</ul>
     
-    In diesem Fall wird statt &lt;Kameraname in SVS&gt; nur <b>SVS</b> angegeben. <br><br>
+    In diesem Fall wird statt &lt;Kameraname in SVS&gt; nur <b>SVS</b> angegeben. 
+	Ist das SVS-Device definiert und nach dem Setzen der Credentials einsatzbereit, können alle in der SVS vorhandenen Kameras mit dem Set-Befehl 
+	"autocreateCams" in FHEM automatisiert angelegt werden. <br><br>
 	
 	Das Modul SSCam basiert auf Funktionen der Synology Surveillance Station API. <br><br> 
     
@@ -8174,13 +8230,14 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     
 	Die Passwortlänge beträgt maximal 20 Zeichen. <br> 
     Der Anwender kann in Abhängigkeit der beabsichtigten einzusetzenden Funktionen einen Nutzer im DSM bzw. in der Surveillance 
-    Station einrichten. <br>
+    Station einrichten. Sollte im DSM die <a href="https://www.synology.com/de-de/knowledgebase/DSM/tutorial/General/How_to_add_extra_security_to_your_Synology_NAS#t5">2-Stufen Verifizierung</a>  
+	aktiviert sein, ist die Session mit der Surveillance Station aufzubauen (<a href="#SSCamattr">Attribut</a> "session = SurveillanceStation"). <br><br>
     Ist der DSM-Nutzer der Gruppe Administratoren zugeordnet, hat er auf alle Funktionen Zugriff. Ohne diese Gruppenzugehörigkeit 
     können nur Funktionen mit niedrigeren Rechtebedarf ausgeführt werden. Die benötigten Mindestrechte der Funktionen sind in 
     der Tabelle weiter unten aufgeführt. <br>
     
     Alternativ zum DSM-Nutzer kann ein in der SVS angelegter Nutzer verwendet werden. Auch in diesem Fall hat ein Nutzer vom 
-    Typ Manager das Recht alle Funktionen auszuführen, wobei der Zugriff auf bestimmte Kameras/ im Privilegienprofil beschränkt 
+    Typ Manager das Recht alle Funktionen auszuführen, wobei der Zugriff auf bestimmte Kameras/Funktionen im Privilegienprofil beschränkt 
     werden kann (siehe Hilfefunktion in SVS). <br>
     Als Best Practice wird vorgeschlagen, jeweils einen User im DSM und einen in der SVS anzulegen: <br><br>
     
@@ -8257,6 +8314,16 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <br>
   Die aufgeführten set-Befehle sind für CAM/SVS-Devices oder nur für CAM-Devices bzw. nur für SVS-Devices gültig. Sie stehen im 
   Drop-Down-Menü des jeweiligen Devices zur Auswahl zur Verfügung. <br><br>
+  
+  <ul>
+  <li><b> set &lt;name&gt; autocreateCams </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für SVS)</li> <br>
+  
+  Ist ein SVS-Device definiert, können mit diesem Befehl alle in der SVS integrierten Kameras automatisiert angelegt werden. Bereits definierte 
+  Kameradevices werden übersprungen. 
+  Die neu erstellten Kameradevices werden im gleichen Raum wie das SVS-Device definiert (default SSCam). Weitere sinnvolle Attribute werden ebenfalls 
+  voreingestellt. 
+  <br><br>
+  </ul>
   
   <ul>
   <a name="SSCamcreateStreamDev"></a>

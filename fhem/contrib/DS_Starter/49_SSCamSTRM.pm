@@ -34,7 +34,7 @@ use warnings;
 
 # Versions History intern
 our %SSCamSTRM_vNotesIntern = (
-  "2.0.0"  => "09.12.2018  get command \"popupStream\" ",
+  "2.0.0"  => "09.12.2018  get command \"popupStream\" and attribute \"popupStreamFW\" ",
   "1.5.0"  => "02.12.2018  new attribute \"popupWindowSize\" ",
   "1.4.1"  => "31.10.2018  attribute \"autoLoop\" changed to \"autoRefresh\", new attribute \"autoRefreshFW\" ",
   "1.4.0"  => "29.10.2018  readingFnAttributes added ",
