@@ -99,7 +99,10 @@ our %SSCam_vNotesIntern = (
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
-  "7.7.0"  => "07.12.2018 autocreateCams command added in SVS device. BY this command all cameras installed in SVS can be defined automatically. ",
+  "7.7.0"  => "07.12.2018 autocreateCams command added in SVS device. By this command all cameras installed in SVS can be ".
+              "defined automatically. <br>".
+              "In SSCamSTRM devices the \"get &lt;name&gt; popupStream\" command is implemented which may open a popup window with the ".
+              "active streaming content. ",
   "7.6.0"  => "02.12.2018 The PTZ panel is completed by \"Preset\" and \"Patrol\" (only for PTZ cameras) ",
   "7.5.0"  => "02.12.2018 A click on suitable content in a stream- or snapgallery device opens a popup window. ".
                "The popup size can be adjusted by attribute \"popupWindowSize\". ",
@@ -6405,9 +6408,9 @@ sub SSCam_StreamDev($$$) {
               $ret .= "<td><iframe src=$link $ha controls autoplay onClick=\"FW_okDialog('<img src=$link $pws>')\">
                        Iframes disabled
                        </iframe><br>" if($link);
-              $streamHash->{HELPER}{STREAM} = "<iframe src=$link $pws controls autoplay>
-                                              Iframes disabled
-                                              </iframe>";                # Stream für "get <SSCamSTRM-Device> popupStream" speichern
+              $streamHash->{HELPER}{STREAM} = "<iframe src=$link $pws controls autoplay>".
+                                              "Iframes disabled".
+                                              "</iframe>";                # Stream für "get <SSCamSTRM-Device> popupStream" speichern
               $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);         # Statusbit wenn ein Stream aktiviert ist
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrefresh')\">$imgrefresh </a>";              
@@ -6429,12 +6432,12 @@ sub SSCam_StreamDev($$$) {
                        <source src=$link type=\"video/webm\">
                        Your browser does not support the video tag
                        </video><br>";
-              $streamHash->{HELPER}{STREAM} = "<video $pws controls autoplay>
-                                               <source src=$link type=\"video/mp4\"> 
-                                               <source src=$link type=\"video/ogg\">
-                                               <source src=$link type=\"video/webm\">
-                                               Your browser does not support the video tag
-                                               </video>";                # Stream für "get <SSCamSTRM-Device> popupStream" speichern              
+              $streamHash->{HELPER}{STREAM} = "<video $pws controls autoplay>".
+                                              "<source src=$link type=\"video/mp4\">". 
+                                              "<source src=$link type=\"video/ogg\">".
+                                              "<source src=$link type=\"video/webm\">".
+                                              "Your browser does not support the video tag".
+                                              "</video>";                # Stream für "get <SSCamSTRM-Device> popupStream" speichern              
               $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);         # Statusbit wenn ein Stream aktiviert ist
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>"; 
               $ret .= "</td>";
@@ -6449,7 +6452,7 @@ sub SSCam_StreamDev($$$) {
               }
           } elsif($wltype =~ /base64img/) {
               $ret .= "<td><img src='data:image/jpeg;base64,$link' $ha onClick=\"FW_okDialog('<img src=data:image/jpeg;base64,$link $pws>')\"><br>" if($link);
-              $streamHash->{HELPER}{STREAM} = "<img src='data:image/jpeg;base64,$link' $pws>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
+              $streamHash->{HELPER}{STREAM} = "<img src=data:image/jpeg;base64,$link $pws>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
               $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);                                  # Statusbit wenn ein Stream aktiviert ist
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";
               $ret .= "</td>";
@@ -6465,11 +6468,11 @@ sub SSCam_StreamDev($$$) {
                        <source src=$link type=\"video/MP2T\">
                        Your browser does not support the video tag
                        </video><br>";
-              $streamHash->{HELPER}{STREAM} = "<video $pws controls autoplay>
-                                               <source src=$link type=\"application/x-mpegURL\">
-                                               <source src=$link type=\"video/MP2T\">
-                                               Your browser does not support the video tag
-                                               </video>";                # Stream für "get <SSCamSTRM-Device> popupStream" speichern
+              $streamHash->{HELPER}{STREAM} = "<video $pws controls autoplay>".
+                                              "<source src=$link type=\"application/x-mpegURL\">".
+                                              "<source src=$link type=\"video/MP2T\">".
+                                              "Your browser does not support the video tag".
+                                              "</video>";                # Stream für "get <SSCamSTRM-Device> popupStream" speichern
               $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);         # Statusbit wenn ein Stream aktiviert ist
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrefresh')\">$imgrefresh </a>";
