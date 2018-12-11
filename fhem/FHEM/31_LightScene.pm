@@ -402,7 +402,7 @@ LightScene_Load($)
 
     my $decoded;
     if( $LightScene_hasJSON ) {
-      $decoded = decode_json( $encoded );
+      $decoded = eval { decode_json($encoded) };
     } elsif( $LightScene_hasDataDumper ) {
       $decoded = eval $encoded;
     }
