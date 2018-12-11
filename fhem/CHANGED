@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  49_SSCamSTRM: V2.1.0, change get popupStream to set popupStream
   - feature: 49_SSCam: V7.7.0, autocreateCams command added to SVS device,
                        SSCamSTRM devices have get popupStream command, pls.
                        execute "get <SSCam> versionNotes" for further info

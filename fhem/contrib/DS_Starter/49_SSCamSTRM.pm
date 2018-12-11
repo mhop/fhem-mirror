@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 49_SSCamSTRM.pm 17891 2018-12-03 21:52:16Z DS_Starter $
+# $Id: 49_SSCamSTRM.pm 17950 2018-12-10 22:11:29Z DS_Starter $
 #########################################################################################################################
 #       49_SSCamSTRM.pm
 #
@@ -34,6 +34,7 @@ use warnings;
 
 # Versions History intern
 our %SSCamSTRM_vNotesIntern = (
+  "2.1.0"  => "11.12.2018  switch \"popupStream\" from get to set ",
   "2.0.0"  => "09.12.2018  get command \"popupStream\" and attribute \"popupStreamFW\" ",
   "1.5.0"  => "02.12.2018  new attribute \"popupWindowSize\" ",
   "1.4.1"  => "31.10.2018  attribute \"autoLoop\" changed to \"autoRefresh\", new attribute \"autoRefreshFW\" ",
@@ -65,7 +66,7 @@ sub SSCamSTRM_Initialize($) {
   my $fwd = join(",",devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized")); 
   
   $hash->{DefFn}              = "SSCamSTRM_Define";
-  $hash->{GetFn}              = "SSCamSTRM_Get";
+  $hash->{SetFn}              = "SSCamSTRM_Set";
   $hash->{AttrList}           = "autoRefresh:selectnumbers,120,0.2,1800,0,log10 ".
                                 "autoRefreshFW:$fwd ".
                                 "disable:1,0 ". 
@@ -107,7 +108,7 @@ return undef;
 }
 
 ################################################################
-sub SSCamSTRM_Get($@) {
+sub SSCamSTRM_Set($@) {
   my ($hash, @a) = @_;
   return "\"set X\" needs at least an argument" if ( @a < 2 );
   my $name    = $a[0];
@@ -116,7 +117,7 @@ sub SSCamSTRM_Get($@) {
   
   return if(IsDisabled($name) || $hash->{MODEL} =~ /ptzcontrol|snapgallery/);
   
-  my $getlist = "Unknown argument $opt, choose one of ".
+  my $setlist = "Unknown argument $opt, choose one of ".
 	             "popupStream "
                  ;
   
@@ -124,7 +125,7 @@ sub SSCamSTRM_Get($@) {
   	  my $txt = SSCam_getclhash($hash);
       return $txt if($txt);
       
-      my $link  = AnalyzePerlCommand(undef, $hash->{LINK}) if($hash->{LINK} =~ m/^{(.*)}$/s);
+      my $link = AnalyzePerlCommand(undef, $hash->{LINK});
       
       # OK-Dialogbox oder Autoclose
       my $todef = 5;
@@ -144,6 +145,9 @@ sub SSCamSTRM_Get($@) {
           my $out = "<html>";
           $out .= $htmlCode;
           $out .= "</html>";
+          
+          Log3($name, 4, "$name - Stream to display: $htmlCode");
+          Log3($name, 4, "$name - Stream display to webdevice: $pd");
 		  
           if($to =~ /\d+/) {
               map {FW_directNotify("#FHEMWEB:$_", "FW_errmsg('$out', $to)", "")} devspec2array("$pd"); 
@@ -153,7 +157,7 @@ sub SSCamSTRM_Get($@) {
       }
   
   } else {
-      return "$getlist";
+      return "$setlist";
   }
   
 return;  
@@ -281,6 +285,7 @@ Dependend of the Streaming-Device state, different buttons are provided to start
 <ul>
   <a name="SSCamSTRMdefine"></a>
   <b>Define</b>
+  <br><br>
   
   <ul>
     A SSCam Streaming-device is defined by the SSCam "set &lt;name&gt; createStreamDev" command.
@@ -289,10 +294,7 @@ Dependend of the Streaming-Device state, different buttons are provided to start
   </ul>
 
   <a name="SSCamSTRMset"></a>
-  <b>Set</b> <ul>N/A</ul><br>
-
-  <a name="SSCamSTRMget"></a>
-  <b>Get</b> 
+  <b>Set</b> 
   <ul>
   
   <ul>
@@ -309,6 +311,9 @@ Dependend of the Streaming-Device state, different buttons are provided to start
   
   </ul>
   <br>
+  
+  <a name="SSCamSTRMget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
   
   <a name="SSCamSTRMattr"></a>
   <b>Attributes</b>
@@ -434,6 +439,7 @@ Abhängig vom Zustand des Streaming-Devices werden zum Start von Aktionen unters
 <ul>
   <a name="SSCamSTRMdefine"></a>
   <b>Define</b>
+  <br><br>
   
   <ul>
     Ein SSCam Streaming-Device wird durch den SSCam Befehl "set &lt;name&gt; createStreamDev" erstellt.
@@ -442,10 +448,7 @@ Abhängig vom Zustand des Streaming-Devices werden zum Start von Aktionen unters
   </ul>
 
   <a name="SSCamSTRMset"></a>
-  <b>Set</b> <ul>N/A</ul><br>
-
-  <a name="SSCamSTRMget"></a>
-  <b>Get</b> 
+  <b>Set</b> 
   <ul>
   
   <ul>
@@ -463,6 +466,9 @@ Abhängig vom Zustand des Streaming-Devices werden zum Start von Aktionen unters
   
   </ul>
   <br>
+  
+  <a name="SSCamSTRMget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
 
   <a name="SSCamSTRMattr"></a>
   <b>Attribute</b>

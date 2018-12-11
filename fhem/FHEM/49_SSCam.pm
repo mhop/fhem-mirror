@@ -101,7 +101,7 @@ our %SSCam_vNotesIntern = (
 our %SSCam_vNotesExtern = (
   "7.7.0"  => "10.12.2018 autocreateCams command added to SVS device. By this command all cameras installed in SVS can be ".
               "defined automatically. <br>".
-              "In SSCamSTRM devices the \"get &lt;name&gt; popupStream\" command is implemented which may open a popup window with the ".
+              "In SSCamSTRM devices the \"set &lt;name&gt; popupStream\" command is implemented which may open a popup window with the ".
               "active streaming content. ",
   "7.6.0"  => "02.12.2018 The PTZ panel is completed by \"Preset\" and \"Patrol\" (only for PTZ cameras) ",
   "7.5.0"  => "02.12.2018 A click on suitable content in a stream- or snapgallery device opens a popup window. ".
