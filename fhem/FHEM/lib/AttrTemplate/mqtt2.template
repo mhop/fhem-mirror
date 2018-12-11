@@ -131,9 +131,82 @@ attr DEVICE_CH2 setList \
   on:noArg     COMMAND/POWER2 1\
   toggle:noArg COMMAND/POWER2 2
 
+# WemosD1 flashed with tasmota
+name:tasmota_WemosD1
+filter:TYPE=MQTT2_DEVICE
+attr DEVICE readingList \
+  tele/DEVICE/LWT:.* LWT\
+  tele/DEVICE/STATE:.* { json2nameValue($EVENT) }\
+  tele/DEVICE/SENSOR:.* { json2nameValue($EVENT) }\
+  stat/DEVICE/RESULT:.* { json2nameValue($EVENT) }
+deleteReading DEVICE .*
+
+# basic tasmota device with unprefixed readings
+name:tasmota_noprefix_pure_base
+filter:TYPE=MQTT2_DEVICE
+attr DEVICE readingList \
+  tele/DEVICE/LWT:.* LWT\
+  tele/DEVICE/STATE:.* { json2nameValue($EVENT) }\
+  tele/DEVICE/SENSOR:.* { json2nameValue($EVENT) }\
+  tele/DEVICE/INFO1:.* { json2nameValue($EVENT) }\
+  tele/DEVICE/INFO2:.* { json2nameValue($EVENT) }\
+  tele/DEVICE/INFO3:.* { json2nameValue($EVENT) }\
+  stat/DEVICE/RESULT:.* { json2nameValue($EVENT) }
+deleteReading DEVICE .*
+attr DEVICE autocreate 0
+
+# tasmota 4ch as one FHEM device.
+name:tasmota_noprefix_sonoff_4ch
+filter:TYPE=MQTT2_DEVICE
+attr DEVICE readingList \
+  tele/DEVICE/LWT:.* LWT\
+  tele/DEVICE/STATE:.* { json2nameValue($EVENT) }\
+  tele/DEVICE/SENSOR:.* { json2nameValue($EVENT) }\
+  tele/DEVICE/INFO1:.* { json2nameValue($EVENT) }\
+  tele/DEVICE/INFO2:.* { json2nameValue($EVENT) }\
+  tele/DEVICE/INFO3:.* { json2nameValue($EVENT) }\
+  stat/DEVICE/RESULT:.* { json2nameValue($EVENT) }
+attr DEVICE setList \
+  p1on:noArg cmnd/DEVICE/POWER1 on\
+  p1off:noArg cmnd/DEVICE/POWER1 off\
+  p2on:noArg cmnd/DEVICE/POWER2 on\
+  p2off:noArg cmnd/DEVICE/POWER2 off\
+  p3on:noArg cmnd/DEVICE/POWER3 on\
+  p3off:noArg cmnd/DEVICE/POWER3 off\
+  p4on:noArg cmnd/DEVICE/POWER4 on\
+  p4off:noArg cmnd/DEVICE/POWER4 off
+attr DEVICE webCmd p1on:p1off:p2on:p2off:p3on:p3off:p4on:p4off
+attr DEVICE stateFormat {\
+  "<div>P1:" . FW_makeImage(lc ReadingsVal($name, "POWER1", "off"))\
+  . " P2:" . FW_makeImage(lc ReadingsVal($name, "POWER2", "off"))\
+  . " P3:". FW_makeImage(lc ReadingsVal($name, "POWER3", "off"))\
+  . " P4:" . FW_makeImage(lc ReadingsVal($name, "POWER4", "off"))\
+  . "</div>"
+  }
+attr DEVICE webCmd p1on:p1off:p2on:p2off:p3on:p3off:p4on:p4off
+attr DEVICE autocreate 0
+
 ###########################################
 # SHELLY
-# please contribute and add templates for shelly1, shelly2, shelly2 in roller mode (forum: #94060)
+
+# shellybulb using original firmware. Tested with 1.3
+name:shellybulb
+filter:TYPE=MQTT2_DEVICE
+par:DEVNAME;name of this shelly;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]+)/, ? $1 : undef }
+attr DEVICE setList\
+  off:noArg shellies/DEVNAME/color/0/command off\
+  on:noArg shellies/DEVNAME/color/0/command on\
+  brightness:colorpicker,BRI,0,1,100 shellies/DEVNAME/color/0/set {"ison":"true","mode":"white","$EVTPART0":"$EVTPART1"}\
+  temp:colorpicker,CT,3000,10,6500 shellies/DEVNAME/color/0/set {"ison":"true","mode":"white","$EVTPART0":"$EVTPART1"}\
+  rgb:colorpicker,RGB {$EVTPART1=~/(..)(..)(..)/; "shellies/DEVNAME/color/0/set {\"ison\":true,\"mode\":\"color\",\"red\":".hex($1).",\"green\":".hex($2)."\"blue\":".hex($3) }
+deletereading DEVICE status_.*
+attr DEVICE readingList shellies/DEVNAME/color/0/status:.* {json2nameValue($EVENT)}
+attr DEVICE userReadings rgb {sprintf("%02X%02X%02X", ReadingsVal($name,"red",99), ReadingsVal($name,"green",99), ReadingsVal($name,"blue",99))}
+attr DEVICE webCmd on:off:brightness:temp:rgb
+attr DEVICE genericDeviceType light
+attr DEVICE icon light_control
+
+
 #
 # shelly4pro using original firmware.
 # NOTE: for each of the second to fourth channel, a new device will be created
@@ -194,3 +267,4 @@ attr DEVICE userReadings rgb {sprintf("%02X%02X%02X", ReadingsVal($name,"red",99
 attr DEVICE webCmd on:off:brightness:temp:rgb
 attr DEVICE genericDeviceType light
 attr DEVICE icon light_control
+
