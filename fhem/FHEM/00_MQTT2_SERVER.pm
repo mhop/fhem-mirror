@@ -40,7 +40,7 @@ MQTT2_SERVER_Initialize($)
   no warnings 'qw';
   my @attrList = qw(
     SSL:0,1
-    autocreate
+    autocreate:0,1
     disable:0,1
     disabledForIntervals
     keepaliveFactor
@@ -418,7 +418,7 @@ MQTT2_SERVER_doPublish($$$$;$)
   if(defined($src->{cid})) { # "real" MQTT client
     my $cid = $src->{cid};
     $cid =~ s,[^a-z0-9._],_,gi;
-    my $ac = AttrVal($tgt->{NAME}, "autocreate", undef) ? "autocreate:":"";
+    my $ac = AttrVal($tgt->{NAME}, "autocreate", 1) ? "autocreate:":"";
     Dispatch($tgt, "$ac$cid:$tp:$val", undef, !$ac);
     my $re = AttrVal($tgt->{NAME}, "rawEvents", undef);
     DoTrigger($tgt->{NAME}, "$tp:$val") if($re && $tp =~ m/$re/);
@@ -612,8 +612,8 @@ MQTT2_SERVER_getStr($$)
 
     <a name="autocreate"></a>
     <li>autocreate<br>
-      If set, MQTT2_DEVICES will be automatically created upon receiving an
-      unknown message.
+      MQTT2_DEVICES will be automatically created upon receiving an
+      unknown message. Set this value to 0 to disable autocreating.
       </li><br>
 
   </ul>

@@ -22,6 +22,7 @@ MQTT2_DEVICE_Initialize($)
   no warnings 'qw';
   my @attrList = qw(
     IODev
+    autocreate:0,1
     bridgeRegexp:textField-long
     devicetopic
     disable:0,1
@@ -173,6 +174,7 @@ MQTT2_DEVICE_Parse($$)
 
       for my $ch (@{$cidArr}) {
         my $nn = $ch->{NAME};
+        next if(!AttrVal($nn, "autocreate", 1));
         my $rl = AttrVal($nn, "readingList", "");
         $rl .= "\n" if($rl);
         my $regexpCid = ($cid eq $newCid ? "$cid:" : "");
@@ -482,6 +484,13 @@ zigbee2mqtt_devStateIcon255($)
   <a name="MQTT2_DEVICEattr"></a>
   <b>Attributes</b>
   <ul>
+
+    <a name="autocreate"></a>
+    <li>autocreate {0|1}<br>
+      if set to 0, disables extending the readingList, when the IODev
+      autocreate is also set. Default is 1, i.e. new topics will be
+      automatically added to the readingList. 
+      </li>
 
     <a name="bridgeRegexp"></a>
     <li>bridgeRegexp &lt;regexp&gt; newClientId ...<br>

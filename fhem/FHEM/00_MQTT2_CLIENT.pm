@@ -36,9 +36,9 @@ MQTT2_CLIENT_Initialize($)
 
   no warnings 'qw';
   my @attrList = qw(
-    autocreate
+    autocreate:1,0
     clientId
-    disable:0,1
+    disable:1,0
     disabledForIntervals
     lwt
     lwtRetain
