@@ -10,62 +10,62 @@
 # The zigbee2mqtt bridge device
 name:zigbee2mqtt_bridge
 filter:TYPE=MQTT2_DEVICE
-par:BASEID;base ID set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,(^.*)[/].*:, ? $1 : undef }
-attr DEVICE bridgeRegexp BASEID/0x([A-Za-z0-9]*)[/]?.*:.* "zigbee_$1"
+par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
+attr DEVICE bridgeRegexp BASE_TOPIC/0x([A-Za-z0-9]*)[/]?.*:.* "zigbee_$1"
 attr DEVICE setList\
-  permit_join:true,false BASEID/bridge/config/permit_join $EVTPART1\
-  remove:textField BASEID/bridge/config/remove $EVTPART1\
-  log_level:debug,info,warn,error BASEID/bridge/config/log_level $EVTPART1\
-  rename:textField BASEID/bridge/config/rename  {"old":"$EVTPART1","new":"$EVTPART2"}\
-  network_map:raw,graphviz BASEID/bridge/networkmap  $EVTPART1\
-  devicelist:noArg BASEID/bridge/config/devices
-attr DEVICE readingList BASEID/bridge/log:.* { json2nameValue($EVENT) }\
-  BASEID/bridge/state:.* state
+  permit_join:true,false BASE_TOPIC/bridge/config/permit_join $EVTPART1\
+  remove:textField BASE_TOPIC/bridge/config/remove $EVTPART1\
+  log_level:debug,info,warn,error BASE_TOPIC/bridge/config/log_level $EVTPART1\
+  rename:textField BASE_TOPIC/bridge/config/rename  {"old":"$EVTPART1","new":"$EVTPART2"}\
+  network_map:raw,graphviz BASE_TOPIC/bridge/networkmap  $EVTPART1\
+  devicelist:noArg BASE_TOPIC/bridge/config/devices
+attr DEVICE readingList BASE_TOPIC/bridge/log:.* { json2nameValue($EVENT) }\
+  BASE_TOPIC/bridge/state:.* state
 
 
 # A dimmable light connected via zigbee2mqtt
 name:zigbee2mqtt_bulb
 filter:TYPE=MQTT2_DEVICE
-par:BASEID;base ID set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,(^.*)[/].*:, ? $1 : undef }
+par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:NAMEINTHEBRIDGE;name of this device in the bridge;{ AttrVal("DEVICE","readingList","") =~ m,(^.*)[/](.*):, ? $2 : undef }
 attr DEVICE icon light_control
 attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name)}
 attr DEVICE webCmd toggle:on:off:brightness
 attr DEVICE setList \
-  on:noArg BASEID/NAMEINTHEBRIDGE/set {"state":"ON"}\
-  off:noArg BASEID/NAMEINTHEBRIDGE/set {"state":"OFF"}\
-  brightness:colorpicker,BRI,0,15,255 BASEID/NAMEINTHEBRIDGE/set {"state":"on","$EVTPART0":"$EVTPART1"}
+  on:noArg BASE_TOPIC/NAMEINTHEBRIDGE/set {"state":"ON"}\
+  off:noArg BASE_TOPIC/NAMEINTHEBRIDGE/set {"state":"OFF"}\
+  brightness:colorpicker,BRI,0,15,255 BASE_TOPIC/NAMEINTHEBRIDGE/set {"state":"on","$EVTPART0":"$EVTPART1"}
 
 # A dimmable color light connected via zigbee2mqtt
 name:zigbee2mqtt_colorbulb
 filter:TYPE=MQTT2_DEVICE
-par:BASEID;base ID set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,(^.*)[/].*:, ? $1 : undef }
+par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:NAMEINTHEBRIDGE;name of this device in the bridge;{ AttrVal("DEVICE","readingList","") =~ m,(^.*)[/](.*):, ? $2 : undef }
 attr DEVICE icon light_control
 attr DEVICE webCmd toggle:on:off:brightness:color_temp
 attr DEVICE setList \
-  on:noArg BASEID/NAMEINTHEBRIDGE/set {"state":"ON"}\
-  off:noArg BASEID/NAMEINTHEBRIDGE/set {"state":"OFF"}\
-  brightness:colorpicker,BRI,0,15,255 BASEID/NAMEINTHEBRIDGE/set {"state":"on","$EVTPART0":"$EVTPART1"}\
-  color_temp:colorpicker,CT,250,1,454 BASEID/NAMEINTHEBRIDGE/set {"$EVTPART0":"$EVTPART1"}
+  on:noArg BASE_TOPIC/NAMEINTHEBRIDGE/set {"state":"ON"}\
+  off:noArg BASE_TOPIC/NAMEINTHEBRIDGE/set {"state":"OFF"}\
+  brightness:colorpicker,BRI,0,15,255 BASE_TOPIC/NAMEINTHEBRIDGE/set {"state":"on","$EVTPART0":"$EVTPART1"}\
+  color_temp:colorpicker,CT,250,1,454 BASE_TOPIC/NAMEINTHEBRIDGE/set {"$EVTPART0":"$EVTPART1"}
 
 name:zigbee2mqtt_colorbulbWithoutColorTemp
 filter:TYPE=MQTT2_DEVICE
-par:BASEID;base ID set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,(^.*)[/].*:, ? $1 : undef }
+par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:NAMEINTHEBRIDGE;name of this device in the bridge;{ AttrVal("DEVICE","readingList","") =~ m,(^.*)[/](.*):, ? $2 : undef }
 attr DEVICE icon hue_filled_white_and_color_e27_b22
 attr DEVICE stateFormat {lc ReadingsVal("$name","state",0)}
 attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name)}
 attr DEVICE webCmd toggle:on:off:brightness:color
 attr DEVICE setList \
-  on:noArg BASEID/NAMEINTHEBRIDGE/set {"state":"ON"}\
-  off:noArg BASEID/NAMEINTHEBRIDGE/set {"state":"OFF"}\
-  brightness:colorpicker,BRI,0,15,255 BASEID/NAMEINTHEBRIDGE/set {"state":"on","$EVTPART0":"$EVTPART1"}\
-  color:colorpicker,RGB {"BASEID/NAMEINTHEBRIDGE/set ".zigbee2mqtt_RGB2JSON($EVTPART1)}
+  on:noArg BASE_TOPIC/NAMEINTHEBRIDGE/set {"state":"ON"}\
+  off:noArg BASE_TOPIC/NAMEINTHEBRIDGE/set {"state":"OFF"}\
+  brightness:colorpicker,BRI,0,15,255 BASE_TOPIC/NAMEINTHEBRIDGE/set {"state":"on","$EVTPART0":"$EVTPART1"}\
+  color:colorpicker,RGB {"BASE_TOPIC/NAMEINTHEBRIDGE/set ".zigbee2mqtt_RGB2JSON($EVTPART1)}
 
 name:zigbee2mqtt_smokeDetector
 filter:TYPE=MQTT2_DEVICE
-par:BASEID;base ID set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,(^.*)[/].*:, ? $1 : undef }
+par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:NAMEINTHEBRIDGE;name of this device in the bridge;{ AttrVal("DEVICE","readingList","") =~ m,(^.*)[/](.*):, ? $2 : undef }
 attr DEVICE icon secur_smoke_detector
 attr DEVICE stateFormat smoke
@@ -77,12 +77,12 @@ attr DEVICE userReadings temperature_weather { sprintf("%.1f",ReadingsVal("DEVIC
 
 name:zigbee2mqtt_smart+plug
 filter:TYPE=MQTT2_DEVICE
-par:BASEID;base ID set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,(^.*)[/].*:, ? $1 : undef }
+par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:NAMEINTHEBRIDGE;name of this device in the bridge;{ AttrVal("DEVICE","readingList","") =~ m,(^.*)[/](.*):, ? $2 : undef }
 attr DEVICE eventMap { dev=>{ON=>'on',OFF=>'off'} }
 attr DEVICE setList \
-  off BASEID/NAMEINTHEBRIDGE/set OFF\
-  on BASEID/NAMEINTHEBRIDGE/set ON
+  off BASE_TOPIC/NAMEINTHEBRIDGE/set OFF\
+  on BASE_TOPIC/NAMEINTHEBRIDGE/set ON
 
 
 ###########################################
@@ -148,46 +148,100 @@ attr DEVICE readingList \
   tele/DEVICE/LWT:.* LWT\
   tele/DEVICE/STATE:.* { json2nameValue($EVENT) }\
   tele/DEVICE/SENSOR:.* { json2nameValue($EVENT) }\
-  tele/DEVICE/INFO1:.* { json2nameValue($EVENT) }\
-  tele/DEVICE/INFO2:.* { json2nameValue($EVENT) }\
-  tele/DEVICE/INFO3:.* { json2nameValue($EVENT) }\
+  tele/DEVICE/INFO.:.* { json2nameValue($EVENT) }\
   stat/DEVICE/RESULT:.* { json2nameValue($EVENT) }
 deleteReading DEVICE .*
 attr DEVICE autocreate 0
 
+
 # tasmota 4ch as one FHEM device.
 name:tasmota_noprefix_sonoff_4ch
 filter:TYPE=MQTT2_DEVICE
-attr DEVICE readingList \
-  tele/DEVICE/LWT:.* LWT\
-  tele/DEVICE/STATE:.* { json2nameValue($EVENT) }\
-  tele/DEVICE/SENSOR:.* { json2nameValue($EVENT) }\
-  tele/DEVICE/INFO1:.* { json2nameValue($EVENT) }\
-  tele/DEVICE/INFO2:.* { json2nameValue($EVENT) }\
-  tele/DEVICE/INFO3:.* { json2nameValue($EVENT) }\
-  stat/DEVICE/RESULT:.* { json2nameValue($EVENT) }
+set DEVICE attrTemplate tasmota_noprefix_pure_base
 attr DEVICE setList \
-  p1on:noArg cmnd/DEVICE/POWER1 on\
-  p1off:noArg cmnd/DEVICE/POWER1 off\
-  p2on:noArg cmnd/DEVICE/POWER2 on\
-  p2off:noArg cmnd/DEVICE/POWER2 off\
-  p3on:noArg cmnd/DEVICE/POWER3 on\
-  p3off:noArg cmnd/DEVICE/POWER3 off\
-  p4on:noArg cmnd/DEVICE/POWER4 on\
-  p4off:noArg cmnd/DEVICE/POWER4 off
-attr DEVICE webCmd p1on:p1off:p2on:p2off:p3on:p3off:p4on:p4off
+  p1:on,off cmnd/DEVICE/POWER1 $EVTPART1\
+  p2:on,off  cmnd/DEVICE/POWER2 $EVTPART1\
+  p3:on,off  cmnd/DEVICE/POWER3 $EVTPART1\
+  p4:on,off  cmnd/DEVICE/POWER4 $EVTPART1
+attr DEVICE webCmd p1 on:p1 off:p2 on:p2 off:p3 on:p3 off:p4 on:p4 off
 attr DEVICE stateFormat {\
   "<div>P1:" . FW_makeImage(lc ReadingsVal($name, "POWER1", "off"))\
   . " P2:" . FW_makeImage(lc ReadingsVal($name, "POWER2", "off"))\
   . " P3:". FW_makeImage(lc ReadingsVal($name, "POWER3", "off"))\
   . " P4:" . FW_makeImage(lc ReadingsVal($name, "POWER4", "off"))\
-  . "</div>"
+  . "</div>"\
   }
-attr DEVICE webCmd p1on:p1off:p2on:p2off:p3on:p3off:p4on:p4off
 attr DEVICE autocreate 0
 
 ###########################################
 # SHELLY
+#
+# shelly1 using original firmware.
+name:shelly1
+filter:TYPE=MQTT2_DEVICE
+par:DEVNAME;Shelly1 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
+attr DEVICE setList\
+  off:noArg shellies/DEVNAME/relay/0/command off\
+  on:noArg shellies/DEVNAME/relay/0/command on
+attr DEVICE readingList shellies/DEVNAME/relay/0:.* state
+
+# shelly2 using original firmware.
+# NOTE: a second device will be created for the second channel
+name:shelly2
+filter:TYPE=MQTT2_DEVICE
+par:DEVNAME;Shelly2 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
+attr DEVICE setList\
+  off:noArg shellies/DEVNAME/relay/0/command off\
+  on:noArg shellies/DEVNAME/relay/0/command on
+attr DEVICE readingList shellies/DEVNAME/relay/0:.* state
+attr DEVICE getList shellies/DEVNAME/relay/power power
+attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2
+copy DEVICE DEVICE_CH2
+attr DEVICE_CH2 readingList shellies/DEVNAME/relay/1:.* state
+attr DEVICE_CH2 comment Channel 2 for DEVICE
+attr DEVICE_CH2 setList \
+  off:noArg shellies/DEVNAME/relay/1/command off\
+  on:noArg shellies/DEVNAME/relay/1/command on
+
+# shelly4pro using original firmware
+# NOTE: for each of the second to fourth channel, a new device will be created
+name:shelly4pro
+filter:TYPE=MQTT2_DEVICE
+par:DEVNAME;Shelly4Pro name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
+attr DEVICE setList\
+  off:noArg shellies/DEVNAME/relay/0/command off\
+  on:noArg shellies/DEVNAME/relay/0/command on
+attr DEVICE readingList shellies/DEVNAME/relay/0:.* state
+attr DEVICE getList shellies/DEVNAME/relay/0/power power1\
+  shellies/DEVNAME/relay/0/energy energy1
+attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2, DEVICE_CH3 and DEVICE_CH4
+copy DEVICE DEVICE_CH2
+attr DEVICE_CH2 readingList shellies/DEVNAME/relay/1:.* state
+attr DEVICE_CH2 comment Channel 2 for DEVICE
+attr DEVICE_CH2 setList \
+  off:noArg shellies/DEVNAME/relay/1/command off\
+  on:noArg shellies/DEVNAME/relay/1/command on
+attr DEVICE getList shellies/DEVNAME/relay/1/power power2\
+  shellies/DEVNAME/relay/1/energy energy2
+attr DEVICE comment Channel 2 for DEVICE, see also DEVICE, DEVICE_CH3 and DEVICE_CH4
+copy DEVICE DEVICE_CH3
+attr DEVICE_CH3 readingList shellies/DEVNAME/relay/2:.* state
+attr DEVICE_CH3 comment Channel 3 for DEVICE
+attr DEVICE_CH3 setList \
+  off:noArg shellies/DEVNAME/relay/2/command off\
+  on:noArg shellies/DEVNAME/relay/2/command on
+attr DEVICE getList shellies/DEVNAME/relay/2/power power3\
+  shellies/DDEVNAME/relay/2/energy energy3
+attr DEVICE comment Channel 3 for DEVICE, see also DEVICE, DEVICE_CH2 and DEVICE_CH4
+copy DEVICE DEVICE_CH4
+attr DEVICE_CH4 readingList shellies/DEVNAME/relay/3:.* state
+attr DEVICE_CH4 comment Channel 4 for DEVICE
+attr DEVICE_CH4 setList \
+  off:noArg shellies/DEVNAME/relay/3/command off\
+  on:noArg shellies/DEVNAME/relay/3/command on
+attr DEVICE getList shellies/DEVNAME/relay/3/power power4\
+  shellies/DEVNAME/relay/3/energy energy4
+attr DEVICE comment Channel 4 for DEVICE, see also DEVICE, DEVICE_CH2 and DEVICE_CH3
 
 # shellybulb using original firmware. Tested with 1.3
 name:shellybulb
