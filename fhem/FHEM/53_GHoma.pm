@@ -494,13 +494,6 @@ sub GHoma_udpsend{
   }
   Log3 $hash, 1, "$hash->{NAME}: setting server address for GHoma plugs to $ownIP:$hash->{PORT}";
 
-  my @sdata = (
-    "HF-A11ASSISTHREAD",
-	"+ok",
-	"AT+VER\r",
-	"AT+TCPTO\r"
-	);
-
 my @sdata = (
     "HF-A11ASSISTHREAD",
 	"+ok",
