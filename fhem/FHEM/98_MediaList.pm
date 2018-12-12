@@ -237,7 +237,11 @@ sub MediaList_Set($@)
     return "no currentdir_playlist available, please select one" if($json eq "[]");
 
     $json = MediaList_playlist_sort($json, $par, "asc"); 
-    readingsSingleUpdate($hash, "currentdir_playlist", $json, 1);
+    readingsBeginUpdate($hash);
+    readingsBulkUpdate($hash, "currentdir_playlist",  $json);
+    readingsBulkUpdate($hash, "sortby",  $par);
+    readingsEndUpdate($hash, 1);
+
     return undef;
   }
 }
@@ -426,6 +430,11 @@ sub MediaList_PlayListDel($$) {
 ####################################
 sub MediaList_call_playlistinfo($$) {
   my ($hash, $object) = @_; 
+  
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash, "status",  "gathering filelist");
+  readingsEndUpdate($hash, 1);
+
   #Log 3 , "$device: MediaList_call_playlistinfo";
   $hash->{helper}{RUNNING_PID} = BlockingCall("MediaList_CollectID3Tags", $hash->{NAME}."|".$object, "MediaList_done_playlistinfo", 120); #, "MediaList_AbortFn", $hash
   return undef;
@@ -453,6 +462,8 @@ sub MediaList_done_playlistinfo($) {
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash, "currentdir_playlist", $playlist);
   readingsBulkUpdate($hash, "currentdir_playlistduration", $playlistduration);
+  readingsBulkUpdate($hash, "sortby",  "File");
+  readingsBulkUpdate($hash, "status",  "idle");
   readingsEndUpdate($hash, 1);
 
   
@@ -516,26 +527,27 @@ sub MediaList_CollectID3Tags ($) {
     while(my $filename = readdir($dh)) {
       #undef($cover); $cover darf nicht gelöscht werden, das erste gefundene Cover für diesen Folder soll für den Rest weiterverwendet werden
       if($filename !~ m/^[\.]+/) {
-         #Log3 $device, 3, "$device -> Datei: ".$filename; 
-         $content = MediaList_GetMP3Tags($device, $object."/".$filename);
-         if($content) {
-           Log3 $device, 4, "MP3-Tags für \"".$object."/".$filename."\" gefunden: ".$content->{Artist}. " , " .$content->{Album};
-           $cover = $covers{uri_escape($content->{Artist}.$content->{Album})} if($covers{uri_escape($content->{Artist}.$content->{Album})});
-           if (!$cover) {
+        #Log3 $device, 3, "$device -> Datei: ".$filename; 
+        $content = MediaList_GetMP3Tags($device, $object."/".$filename);
+        if($content) {
+          Log3 $device, 4, "MP3-Tags für \"".$object."/".$filename."\" gefunden: ".$content->{Artist}. " , " .$content->{Album};
+          $cover = $covers{uri_escape($content->{Artist}.$content->{Album})} if($covers{uri_escape($content->{Artist}.$content->{Album})});
+          if (!$cover) {
              Log3 $device, 4, "Lade Cover: ".$content->{Artist}. " , " .$content->{Album};
              $cover = MediaList_GetCover($device, $content->{File}, $content->{Artist}, $content->{Album});
              $cover="images/cd-empty.png" if(!$cover);
              $covers{uri_escape($content->{Artist}.$content->{Album})} = $cover;
-           }
-           $content->{Cover}=$cover;
-           Log3  $device, 5, "CollectID3Tags: ".Dumper($content);
-           push(@data, $content);
-		   # informiere Parent, aktualisiere playlist wenn Ausführung > 1sek
-		   if(time() - $time >= 1) {
-		     BlockingInformParent("MediaList_readingsSingleUpdateByName", [$device, "currentdir_playlist", JSON::XS->new->encode(\@data)], 0);
-		     $time = time();
-		   }
-         }
+          }
+          $content->{Cover}=$cover;
+          Log3  $device, 5, "CollectID3Tags: ".Dumper($content);
+          push(@data, $content);
+		      # informiere Parent, aktualisiere playlist wenn Ausführung > 1sek
+		      if(time() - $time >= 1) {
+		        # manchmal wird danach die gesamte Liste nicht nochmal erneuert sodass diese unvollständig bleibt :(
+            #BlockingInformParent("MediaList_readingsSingleUpdateByName", [$device, "currentdir_playlist", JSON::XS->new->encode(\@data)], 0);
+		        $time = time();
+		      }
+        }
       } 
     }
     closedir($dh); # nicht vergessen
