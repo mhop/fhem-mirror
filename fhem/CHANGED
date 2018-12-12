@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  49_SSCam: fix in autocreateCams and take snapshot
   - feature: 98_MediaList.pm: new readings: sortby and status for better 
                 integration in FTUI
   - change:  49_SSCamSTRM: V2.1.0, change get popupStream to set popupStream

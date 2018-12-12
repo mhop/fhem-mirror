@@ -45,6 +45,8 @@ use HttpUtils;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "7.7.1"  => "12.12.2018  change autocreateCams: define new device only if ne device with Internal CAMNAME is defined, ".
+              "fix getsnapinfo function get wrong snapid or none if cam is new defined ",
   "7.7.0"  => "10.12.2018  SVS-Device: autocreateCams command added, some other fixes and improvements, minor code rewrite, ".
               "save Stream in \$streamHash->{HELPER}{STREAM} for popupStream in SSCamSTRM-Device ",
   "7.6.0"  => "02.12.2018  sub SSCam_ptzpanel completed by Preset and Patrol, minor fixes ",
@@ -3951,9 +3953,9 @@ sub SSCam_camop ($) {
 	  my $imgsize = $hash->{HELPER}{SNAPIMGSIZE};
 	  my $keyword = $hash->{HELPER}{KEYWORD};
       my $snapid  = ReadingsVal("$name", "LastSnapId", " ");
-      if($OpMode eq "getsnapinfo") {
+      if($OpMode eq "getsnapinfo" && $snapid =~/\d+/) {
 	      Log3($name,4, "$name - Call getsnapinfo with params: Image numbers => $limit, Image size => $imgsize, Id => $snapid");
-          $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&idList =\"$snapid\"&imgSize=\"$imgsize\"&limit=\"$limit\"&_sid=\"$sid\"";      
+          $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&idList=\"$snapid\"&imgSize=\"$imgsize\"&limit=\"$limit\"&_sid=\"$sid\"";      
       } else {
 	      Log3($name,4, "$name - Call getsnapinfo with params: Image numbers => $limit, Image size => $imgsize, Keyword => $keyword");
           $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&keyword=\"$keyword\"&imgSize=\"$imgsize\"&limit=\"$limit\"&_sid=\"$sid\"";
@@ -5734,11 +5736,13 @@ sub SSCam_Autocreate ($$) {
    my $name = $hash->{NAME};
    my $type = $hash->{TYPE};
    
-   my ($cmd, $err);
-   my $camname = "SSCam.".makeDeviceName($sn);         # erlaubten Kameranamen für FHEM erzeugen
-   my $camhash = $defs{$camname};                      # Test ob SSCam-Device schon definiert ist
+   my ($cmd, $err, $camname, $camhash);
+   
+   my $dcn  = (devspec2array("TYPE=SSCam:FILTER=CAMNAME=$sn"))[0];  # ist das Device aus der SVS bereits angelegt ?
+   $camhash = $defs{$dcn} if($dcn);                                 # existiert ein Hash des Devices ?
 
    if(!$camhash) {
+       $camname = "SSCam.".makeDeviceName($sn);                     # erlaubten Kameranamen für FHEM erzeugen
        my $arg = $hash->{SERVERADDR}." ".$hash->{SERVERPORT};
        $cmd = "$camname $type $sn $arg";
        Log3($name, 2, "$name - Autocreate camera: define $cmd");
@@ -5752,6 +5756,7 @@ sub SSCam_Autocreate ($$) {
            CommandAttr(undef,"$camname room $room");
            CommandAttr(undef,"$camname session $session");
            CommandAttr(undef,"$camname icon it_camera");
+           CommandAttr(undef,"$camname devStateIcon .*isable.*:set_off .*nap:li_wht_on");
            CommandAttr(undef,"$camname pollcaminfoall 210");
            CommandAttr(undef,"$camname pollnologging 1");	
            CommandAttr(undef,"$camname httptimeout 20");
@@ -5763,10 +5768,9 @@ sub SSCam_Autocreate ($$) {
            }
                      
            #InternalTimer(gettimeofday()+1.8, "SSCam_addptzattr", "$name", 0);
-           
        }
    } else {
-       Log3($name, 4, "$name - Autocreate - camera \"$camname\" already exists");
+       Log3($name, 4, "$name - Autocreate - SVS camera \"$sn\" already defined by \"$dcn\" ");
        $camname = "";
    }  
    
