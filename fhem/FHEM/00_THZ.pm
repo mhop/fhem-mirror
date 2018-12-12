@@ -1,8 +1,8 @@
 ﻿##############################################
 # 00_THZ
 # $Id$
-# by immi 9/2018
-my $thzversion = "0.180";  #   
+# by immi 12/2018
+my $thzversion = "0.181";  #   
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -388,12 +388,12 @@ my %sets439technician =(
 
 my %sets439539common = (
   "pOpMode"				        => {cmd2=>"0A0112", type   =>  "2opmode"},  # 1 Standby bereitschaft; 11 in Automatic; 3 DAYmode; SetbackMode; DHWmode; Manual; Emergency 
-  "p01RoomTempDayHC1"			=> {cmd2=>"0B0005", argMin =>  "12", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
-  "p02RoomTempNightHC1"			=> {cmd2=>"0B0008", argMin =>  "12", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
-  "p03RoomTempStandbyHC1"		=> {cmd2=>"0B013D", argMin =>  "12", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
-  "p01RoomTempDayHC1SummerMode"		=> {cmd2=>"0B0569", argMin =>  "12", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
-  "p02RoomTempNightHC1SummerMode"	=> {cmd2=>"0B056B", argMin =>  "12", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
-  "p03RoomTempStandbyHC1SummerMode"	=> {cmd2=>"0B056A", argMin =>  "12", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
+  "p01RoomTempDayHC1"			=> {cmd2=>"0B0005", argMin =>  "12", argMax =>   "30", 	type =>"5temp",  unit =>" °C"},
+  "p02RoomTempNightHC1"			=> {cmd2=>"0B0008", argMin =>  "12", argMax =>   "30", 	type =>"5temp",  unit =>" °C"},
+  "p03RoomTempStandbyHC1"		=> {cmd2=>"0B013D", argMin =>  "12", argMax =>   "30", 	type =>"5temp",  unit =>" °C"},
+  "p01RoomTempDayHC1SummerMode"		=> {cmd2=>"0B0569", argMin =>  "12", argMax =>   "30", 	type =>"5temp",  unit =>" °C"},
+  "p02RoomTempNightHC1SummerMode"	=> {cmd2=>"0B056B", argMin =>  "12", argMax =>   "30", 	type =>"5temp",  unit =>" °C"},
+  "p03RoomTempStandbyHC1SummerMode"	=> {cmd2=>"0B056A", argMin =>  "12", argMax =>   "30", 	type =>"5temp",  unit =>" °C"},
   "p13GradientHC1"			    => {cmd2=>"0B010E", argMin => "0.1", argMax =>    "5", 	type =>"6gradient",  unit =>""}, # 0..5 rappresentato/100
   "p14LowEndHC1"			    => {cmd2=>"0B059E", argMin =>   "0", argMax =>   "10", 	type =>"5temp",  unit =>" K"},   #in °K 0..20°K rappresentato/10
   "p15RoomInfluenceHC1"			=> {cmd2=>"0B010F", argMin =>   "0", argMax =>  "100",	type =>"0clean", unit =>" %"},
@@ -1157,7 +1157,7 @@ sub THZ_Set($@){
       #if (($value->{type} eq "0clean" or $value->{type} eq "1clean") and $value->{unit} eq "") {
       if ($value->{type} =~ /clean/ ) {
         #if (($value->{argMax} - $value->{argMin})<2 ) {$setList .= ":uzsuToggle," . join (",", ($value->{argMin} .. $value->{argMax})) . " ";}
-        if (($value->{argMax} - $value->{argMin})<13 ) {$setList .= ":uzsuSelectRadio," . join (",", ($value->{argMin} .. $value->{argMax})) . " ";}
+        if (($value->{argMax} - $value->{argMin})<5 ) {$setList .= ":uzsuSelectRadio," . join (",", ($value->{argMin} .. $value->{argMax})) . " ";}
         else  					 {$setList .= ":textField ";}
         #else						 {$setList .= ":slider,$value->{argMin},1,$value->{argMax} ";}
         #else						 {$setList .= ":knob,min:$value->{argMin},max:$value->{argMax},step:1 " ;}
