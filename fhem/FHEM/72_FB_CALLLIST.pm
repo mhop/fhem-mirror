@@ -231,21 +231,9 @@ sub FB_CALLLIST_Set($@)
     {
         delete($hash->{helper}{DATA});
 
-        if(AttrVal($name, "create-readings", "0") eq "1")
-        {
-            readingsBeginUpdate($hash);
-
-            readingsBulkUpdate($hash, "numberOfCalls", 0, 1);
-
-            for my $reading (grep { /^\d+-/ } keys %{$hash->{READINGS}})
-            {
-                readingsBulkUpdate($hash, $reading, "");
-                readingsDelete($hash, $reading);
-            }
-
-            readingsEndUpdate($hash, 1);
-        }
-
+        # update readings if neccessary
+        FB_CALLLIST_createReadings($hash);
+        
         # Inform all FHEMWEB clients
         FB_CALLLIST_updateFhemWebClients($hash);
 
@@ -480,14 +468,14 @@ sub FB_CALLLIST_Notify($$)
         Log3 $name, 5, "FB_CALLLIST ($name) - processed connect event for call id $call_id";
     }
 
-    if($event eq "disconnect" )
+    if($event eq "disconnect")
     {
         $data->{call_duration} = ReadingsVal($fb, "call_duration", undef);
         $data->{finished} = gettimeofday();
 
         if($data->{last_event} =~ /^call|ring$/)
         {
-              $data->{missed_call} = 1;
+            $data->{missed_call} = 1;
         }
 
         delete($data->{running_call});
@@ -510,8 +498,6 @@ sub FB_CALLLIST_Notify($$)
 
     # Update readings
     FB_CALLLIST_createReadings($hash);
-
-
 }
 
 ############################################################################################################
@@ -919,7 +905,6 @@ sub FB_CALLLIST_list2html($)
         $ret .= "</td></tr>";
     }
 
-
     $ret .= "<tr><td>";
     $ret .= '<div class="fhemWidget" informId="'.$name.'" cmd="" arg="fbcalllist" dev="'.$name.'">'; # div tag to support inform updates
     $ret .= '<table class="block wide fbcalllist"'.((AttrVal($name, "disable", "0") eq "3") ? ' style="display:none;"' : '').'>';
@@ -990,8 +975,27 @@ sub FB_CALLLIST_createReadings($)
             FB_CALLLIST_createReadingsForItem($hash, $line);
         }
     }
-
+    
     readingsBulkUpdate($hash, "numberOfCalls", scalar @item_list, 1);
+    
+    my %counters = ("all" => 0, "incoming" => 0, "outgoing" => 0, "missed-calls" => 0, "active" => 0, "completed" => 0 ); 
+            
+    foreach my $line (@item_list)
+    {
+        my $item = $hash->{helper}{DATA}{$line->{"index"}};
+        
+        $counters{"all"}++;
+        $counters{"incoming"}++ if($item->{direction} eq "incoming");
+        $counters{"outgoing"}++ if($item->{direction} eq "outgoing");
+        $counters{"missed-calls"}++ if($item->{"missed_call"});
+        $counters{"active"}++ if($item->{running_call});
+        $counters{"completed"}++ unless($item->{running_call});
+    }
+
+    foreach my $counter (keys(%counters))
+    {
+        readingsBulkUpdate($hash, "count-$counter", $counters{$counter});
+    }
 
     # delete old readings
     my @delete_readings;
@@ -999,7 +1003,7 @@ sub FB_CALLLIST_createReadings($)
     for my $reading (grep { /^(\d+)-/ and ($1 > @item_list) } keys %{$hash->{READINGS}})
     {
         readingsBulkUpdate($hash, $reading, "");
-        readingsDelete($hash, $_) ;
+        readingsDelete($hash, $reading) ;
     }
 
     readingsEndUpdate($hash, 1);
@@ -1215,7 +1219,6 @@ sub FB_CALLLIST_createReadingsForItem($$)
     my @order = split(",", AttrVal($name, "visible-columns",$hash->{helper}{DEFAULT_COLUMN_ORDER}));
 
     $line_tmp{state} = FB_CALLLIST_returnCallState($hash, $line->{index}, 0);
-
 
     foreach my $col (@order)
     {
@@ -1678,7 +1681,19 @@ sub FB_CALLLIST_strftime(@)
   <a name="FB_CALLLIST_events"></a>
   <b>Generated Events:</b><br><br>
   <ul>
-  This module generates only readings if the attribute <a href="#FB_CALLLIST_create-readings">create-readings</a> is activated. The number and names of the readings depends on the selected columns (see attribute <a href="#FB_CALLLIST_visible-columns">visible-columns</a>) and the configured number of calls (see attribute <a href="#FB_CALLLIST_number-of-calls">number-of-calls</a>).
+    This module generates only readings if the attribute <a href="#FB_CALLLIST_create-readings">create-readings</a> is activated.
+    The number and names of the readings depends on the selected columns (see attribute <a href="#FB_CALLLIST_visible-columns">visible-columns</a>) and the configured number of calls (see attribute <a href="#FB_CALLLIST_number-of-calls">number-of-calls</a>).
+    <br><br>
+    In general the following readings are always created if attribute <a href="#FB_CALLLIST_create-readings">create-readings</a> is activated:
+    <br><br>
+    <ul>
+    <li><b>count-all</b> - The overall number of displayed calls.</li>
+    <li><b>count-incoming</b> - The number of all displayed <i>incoming</i> calls</li>
+    <li><b>count-outgoing</b> - The number of all displayed <i>outgoing</i> calls</li>
+    <li><b>count-active</b> - The number of running (not yet completed) calls</li>
+    <li><b>count-completed</b> - The number of already completed calls.</li>
+    <li><b>count-missed-calls</b> - The number of missed calls.</li>
+    </ul>
   </ul>
 </ul>
 =end html
@@ -1950,7 +1965,19 @@ sub FB_CALLLIST_strftime(@)
   <a name="FB_CALLLIST_events"></a>
   <b>Generierte Events:</b><br><br>
   <ul>
-  Dieses Modul generiert Readings/Events sofern das Attribut <a href="#FB_CALLLIST_create-readings">create-readings</a> aktiviert ist. Die Anzahl, sowie der Name der Readings ist von den gew&auml;hlten Spalten (Attribut: <a href="#FB_CALLLIST_visible-columns">visible-columns</a>), sowie der Anzahl der anzuzeigenden Anrufe abh&auml;ngig (Attribut: <a href="#FB_CALLLIST_number-of-calls">number-of-calls</a>).
+    Dieses Modul generiert Readings/Events, sofern das Attribut <a href="#FB_CALLLIST_create-readings">create-readings</a> aktiviert ist.
+    Die Anzahl, sowie der Name der Readings ist von den gew&auml;hlten Spalten (Attribut: <a href="#FB_CALLLIST_visible-columns">visible-columns</a>), sowie der Anzahl der anzuzeigenden Anrufe abh&auml;ngig (Attribut: <a href="#FB_CALLLIST_number-of-calls">number-of-calls</a>).
+    <br><br>
+    Generell werden folgende Readings/Events immer erzeugt, sofern das Attribut <a href="#FB_CALLLIST_create-readings">create-readings</a> aktiviert ist:
+    <br><br>
+    <ul>
+    <li><b>count-all</b> - Die Gesamtanzahl aller angezeigten Anrufe</li>
+    <li><b>count-incoming</b> - Die Anzahl aller angezeigten <i>eingehenden</i> Anrufe</li>
+    <li><b>count-outgoing</b> - Die Anzahl aller angezeigten <i>ausgehenden</i> Anrufe</li>
+    <li><b>count-active</b> - Die Anzahl aller laufenden (noch nicht beendeten) Anrufe</li>
+    <li><b>count-completed</b> - Die Anzahl aller bereits abgeschlossenen Anrufe</li>
+    <li><b>count-missed-calls</b> - Die Anzahl aller verpassten Anrufe</li>
+    </ul>
   </ul>
 </ul>
 =end html_DE
