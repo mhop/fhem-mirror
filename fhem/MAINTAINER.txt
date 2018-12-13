@@ -549,6 +549,7 @@ FHEM/lib/SWAP/*              justme1968           Sonstige Systeme
 FHEM/lib/UPnP/*              Reinerlein           Multimedia
 FHEM/lib/*deviceconfig.xml.gz        krikan       ZWave
 FHEM/lib/*manufacturer_specific.xml  krikan       ZWave
+FHEM/lib/AttrTemplate/mqtt2.template Beta-User    MQTT
 FHEM/FhemUtils/*             mfr69bs              Sonstiges
 FHEM/GPUtils.pm              ntruchsess           FHEM Development
 FHEM/holiday                 jeschkec             Sonstiges
