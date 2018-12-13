@@ -267,7 +267,7 @@ sub LaMetric2_Define($$) {
 
         $hash->{HOST}       = $host;
         $hash->{".API_KEY"} = $apikey;
-        $hash->{VERSION}    = "2.2.1";
+        $hash->{VERSION}    = "2.2.2";
         $hash->{INTERVAL} =
           $interval && looks_like_number($interval) ? $interval : 60;
         $hash->{PORT} = $port && looks_like_number($port) ? $port : 4343;
@@ -1589,7 +1589,7 @@ sub LaMetric2_SetNotification {
         my $str = $h->{chart};
         $str =~ s/[^\d,.]//g;
         foreach ( split( /,/, $str ) ) {
-            push @{ $values{chart} }, round( $_, 0 );
+            push @{ $values{chart}{chartData} }, round( $_, 0 );
         }
 
         # take object+model defaults for this frame type
@@ -1971,7 +1971,13 @@ sub LaMetric2_SetNotification {
                     text  => "",
                     index => $index++,
                 }
-              );
+              )
+
+              # only if there is no other
+              # non-text frame afterwards
+              if ( !defined( $values{metric} )
+                && !defined( $values{chart} )
+                && !defined( $values{goal} ) );
         }
 
         # regular frames
@@ -2021,10 +2027,9 @@ sub LaMetric2_SetNotification {
 
     if ( $values{chart} ) {
         $values{chart}{index} = $index++;
-        push @{ $notification{model}{frames} },
-          ( { chartData => $values{chart} } );
+        push @{ $notification{model}{frames} }, $values{chart};
         readingsBulkUpdate( $hash, "lastChart",
-            join( ',', @{ $values{chart} } ) );
+            join( ',', @{ $values{chart}{chartData} } ) );
     }
 
     readingsEndUpdate( $hash, 1 );
@@ -2220,7 +2225,7 @@ sub LaMetric2_IsDuringTimeframe($$;$) {
       <code><b>metric*</b>&nbsp;</code>- type: n/a - All other options described for the metric-setter can be used here by adding the prefix 'metric' to it.<br>
       <br>
       <code><b>app</b>&nbsp;</code>- type: text - app_name to push this message to that particular app. Requires matching token parameter (see below).<br>
-      <code><b>token</b>&nbsp;</code>- type: text - Private access token to be used when pushing data to an app. Can be retreived from <a href="https://developer.lametric.com/applications/list">developer.lametric.com/applications/app/&lt;app_number&gt;</a> of the corresponding app.<br>
+      <code><b>token</b>&nbsp;</code>- type: text - Private access token to be used when pushing data to an app. Can be retrieved from <a href="https://developer.lametric.com/applications/list">developer.lametric.com/applications/app/&lt;app_number&gt;</a> of the corresponding app.<br>
       <br>
       Examples:
       <ul>
@@ -2353,7 +2358,7 @@ sub LaMetric2_IsDuringTimeframe($$;$) {
       <br><br>
       So send data to a private/shared app, use 'push' as action_id. It will require the access token as parameter so that the device will accept data for that particular app:<br>
       <br>
-      <code><b>token</b>&nbsp;</code>- type: text - Private access token to be used when pushing data to an app. Can be retreived from <a href="https://developer.lametric.com/applications/list">developer.lametric.com/applications/app/&lt;app_number&gt;</a> of the corresponding app.<br>
+      <code><b>token</b>&nbsp;</code>- type: text - Private access token to be used when pushing data to an app. Can be retrieved from <a href="https://developer.lametric.com/applications/list">developer.lametric.com/applications/app/&lt;app_number&gt;</a> of the corresponding app.<br>
       <br>
       Examples:
       <ul>
@@ -2384,11 +2389,11 @@ sub LaMetric2_IsDuringTimeframe($$;$) {
   </ul><br>
   <br>
   <ul>
-    <b>channelUp</b>
+    <b>channelDown</b>
     <ul>
-      <code>set &lt;LaMetric2_device&gt; channelUp</code><br>
+      <code>set &lt;LaMetric2_device&gt; channelDown</code><br>
       <br>
-      When the Radio app is active, it will switch to the next radio station.
+      When the Radio app is active, it will switch to the previous radio station.
     </ul>
   </ul><br>
   <br>
