@@ -740,48 +740,9 @@ FB_CALLMONITOR_reverseSearch($$)
                     return $hash->{helper}{CACHE}{$number};
                 }
             }    
-            
-            # Ask klicktel.de
-            if($method eq "klicktel.de")      
-            { 
-                unless(($number =~ /^0?[1-9]/ and $country_code eq "0049") or $number =~ /^0049/)
-                {
-                    Log3 $name, 4, "FB_CALLMONITOR ($name) - skip using klicktel.de for reverse search of $number because of non-german number";
-                }
-                else
-                {      
-                    $number =~ s/^0049/0/; # remove country code
-                    Log3 $name, 1, "FB_CALLMONITOR ($name) - WARNING: using klicktel.de for reverse search is DEPRECATED please use dasoertliche.de instead";
-                    Log3 $name, 4, "FB_CALLMONITOR ($name) - using klicktel.de for reverse search of $number";
-
-                    $result = GetFileFromURL("http://openapi.klicktel.de/searchapi/invers?key=0de6139a49055c37b9b2d7bb3933cb7b&number=".$number, 5, undef, 1);
-                    
-                    if(not defined($result))
-                    {
-                        if(AttrVal($name, "reverse-search-cache", "0") eq "1")
-                        {
-                            $status = "timeout";
-                            undef($result);
-                        }
-                    }
-                    else
-                    {
-                        if($result =~ /"displayname":"([^"]*?)"/)
-                        {
-                            $invert_match = $1;
-                            $invert_match = FB_CALLMONITOR_html2txt($invert_match);
-                            FB_CALLMONITOR_writeToCache($hash, $number, $invert_match);
-                            undef($result);
-                            return $invert_match;
-                        }
-                        
-                        $status = "unknown";
-                    }
-                }
-            }
 
             # Ask dasoertliche.de
-            elsif($method eq "dasoertliche.de")
+            if($method eq "dasoertliche.de")
             {
                 unless(($number =~ /^0?[1-9]/ and $country_code eq "0049") or $number =~ /^0049/)
                 {
@@ -1025,8 +986,6 @@ FB_CALLMONITOR_reverseSearch($$)
                     }
                 }
             }
-            
-            
             else
             {
                 Log3 $name, 3, "FB_CALLMONITOR ($name) - unknown reverse search method $method";

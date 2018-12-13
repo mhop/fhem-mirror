@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  72_FB_CALLMONITOR: removed klicktel.de for reverse search, as 
+                                the service is not available anymore
   - bugfix:  49_SSCam: fix in autocreateCams and take snapshot
   - feature: 98_MediaList.pm: new readings: sortby and status for better 
                 integration in FTUI
