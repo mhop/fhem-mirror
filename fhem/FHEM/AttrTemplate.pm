@@ -26,16 +26,22 @@ AttrTemplate_Initialize()
       Log 1, "$me: cant open $dir/$file: $!";
       next;
     }
-    my ($name, %h);
+    my ($name, %h, $lastComment);
     while(my $line = <fh>) {
       chomp($line);
-      next if($line =~ m/^$/ || $line =~ m/^#/);
+      next if($line =~ m/^$/);
 
-      if($line =~ m/^name:(.*)/) {
+      if($line =~ m/^# *(.*)$/) {       # just a replacement for missing desc
+        $lastComment = $1;
+        next;
+
+      } elsif($line =~ m/^name:(.*)/) {
         $name = $1;
         my (@p,@c);
         $templates{$name}{pars} = \@p;
         $templates{$name}{cmds} = \@c;
+        $templates{$name}{desc} = $lastComment if($lastComment);
+        $lastComment = "";
 
       } elsif($line =~ m/^filter:(.*)=(.*)/) {
         $templates{$name}{filterName} = $1;
@@ -43,6 +49,9 @@ AttrTemplate_Initialize()
 
       } elsif($line =~ m/^par:(.*)/) {
         push(@{$templates{$name}{pars}}, $1);
+
+      } elsif($line =~ m/^desc:(.*)/) {
+        $templates{$name}{desc} = $1;
 
       } else {
         push(@{$templates{$name}{cmds}}, $line);
@@ -63,6 +72,7 @@ AttrTemplate_Set($$@)
 
   AttrTemplate_Initialize() if(!$initialized);
 
+  my $haveDesc;
   if($cmd ne "attrTemplate") {
     if(!$cachedUsage{$name}) {
       my @list;
@@ -70,9 +80,11 @@ AttrTemplate_Set($$@)
         my $h = $templates{$k};
         if(!$h->{filterName} || $hash->{$h->{filterName}} eq $h->{filterVal}) {
           push @list, $k;
+          $haveDesc = 1 if($h->{desc});
         }
       }
-      $cachedUsage{$name} = (@list ? "attrTemplate:".join(",",@list) : "");
+      $cachedUsage{$name} = (@list ?
+                "attrTemplate:".($haveDesc ? "?,":"").join(",",@list) : "");
     }
     $list .= " " if($list ne "");
     return "Unknown argument $cmd, choose one of $list$cachedUsage{$name}";
@@ -80,6 +92,23 @@ AttrTemplate_Set($$@)
 
   return "Missing template_entry_name parameter for attrTemplate" if(@a < 1);
   my $entry = shift(@a);
+
+  if($entry eq "?") {
+    my @hlp;
+    for my $k (sort keys %templates) {
+      my $h = $templates{$k};
+      if(!$h->{filterName} || $hash->{$h->{filterName}} eq $h->{filterVal}) {
+        push @hlp, "$k: $h->{desc}" if($h->{desc});
+      }
+    }
+    return "no help available" if(!@hlp);
+    if($hash->{CL} && $hash->{CL}{TYPE} eq "FHEMWEB") {
+      return "<html><li>".join("</li><li>", map { $_=~s/:/<br>/; $_ } @hlp).
+             "</li></html>";
+    }
+    return join("\n", @hlp);
+  }
+
   my $h = $templates{$entry};
   return "Unknown template_entry_name $entry" if(!$h);
 
