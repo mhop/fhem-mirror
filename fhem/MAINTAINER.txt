@@ -30,7 +30,7 @@ FHEM/00_MAXLAN.pm            rudolfkoenig/orphan  MAX
 FHEM/00_MQTT.pm              hexenmeister         MQTT
 FHEM/00_MQTT2_SERVER.pm      rudolfkoenig         MQTT
 FHEM/00_MQTT2_CLIENT.pm      rudolfkoenig         MQTT
-FHEM/00_MYSENSORS.pm         Hauswart             Sonstige Systeme
+FHEM/00_MYSENSORS.pm         Hauswart/Beta-User   Sonstige Systeme
 FHEM/00_NetzerI2C.pm         klausw               Sonstige Systeme
 FHEM/00_Neuron.pm            klausw               Sonstige Systeme
 FHEM/00_OWX.pm               pahenning            1Wire
@@ -70,7 +70,7 @@ FHEM/10_MQTT_BRIDGE          hexenmeister         MQTT
 FHEM/10_MQTT_DEVICE          hexenmeister         MQTT
 FHEM/10_MQTT_GENERIC_BRIDGE  hexenmeister         MQTT
 FHEM/10_MQTT2_DEVICE.pm      rudolfkoenig         MQTT
-FHEM/10_MYSENSORS_DEVICE     Hauswart             Sonstige Systeme
+FHEM/10_MYSENSORS_DEVICE     Hauswart/Beta-User   Sonstige Systeme
 FHEM/10_NeuronPin.pm         klausw               Sonstige Systeme
 FHEM/10_OWServer.pm          neubert/mfr69bs      1Wire
 FHEM/10_SOMFY.pm             viegener             Sonstige Systeme
@@ -539,7 +539,7 @@ FHEM/UConv.pm                loredo               FHEM Development
 FHEM/Unit.pm                 loredo               FHEM Development
 FHEM/YahooWeatherAPI.pm      neubert              Unterstuetzende Dienste/Wettermodule
 FHEM/lib/Device/Firmata/*    jensb                Sonstige Systeme
-FHEM/lib/Device/MySensors/*  Hauswart             Sonstige Systeme
+FHEM/lib/Device/MySensors/*  Hauswart/Beta-User   Sonstige Systeme
 FHEM/lib/MP3/*               Reinerlein           Multimedia
 FHEM/lib/Net/MQTT.pod        hexenmeister         MQTT
 FHEM/lib/Net/MQTT/*          hexenmeister         MQTT
