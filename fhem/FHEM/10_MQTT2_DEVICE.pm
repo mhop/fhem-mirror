@@ -591,7 +591,7 @@ zigbee2mqtt_devStateIcon255($)
       </li><br>
 
     <a name="getList"></a>
-    <li>getList cmd reading [topic|perl-Expression] ...<br>
+    <li>getList cmd [topic|perl-Expression] ...<br>
       When the FHEM command cmd is issued, publish the topic, wait for the
       answer (the specified reading), and show it in the user interface.
       Multiple triples can be specified, each of them separated by newline, the
