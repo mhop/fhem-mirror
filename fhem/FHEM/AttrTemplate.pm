@@ -103,8 +103,8 @@ AttrTemplate_Set($$@)
     }
     return "no help available" if(!@hlp);
     if($hash->{CL} && $hash->{CL}{TYPE} eq "FHEMWEB") {
-      return "<html><li>".join("</li><li>", map { $_=~s/:/<br>/; $_ } @hlp).
-             "</li></html>";
+      return "<html><ul><li>".join("</li><br><li>", 
+                map { $_=~s/:/<br>/; $_ } @hlp)."</li></ul></html>";
     }
     return join("\n", @hlp);
   }
