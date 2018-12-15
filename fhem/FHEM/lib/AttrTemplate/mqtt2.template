@@ -113,28 +113,36 @@ attr DEVICE setList \
 # - DVES_XXXXXX:/SmartHome/Esszimmer/Stehlampe/tele/LWT: => /SmartHome/Esszimmer/Stehlampe/cmnd/
 name:A_01_tasmota_basic_noprefix
 filter:TYPE=MQTT2_DEVICE
-desc:Applies to Sonoff Basic, S20 using POWER-topic for relay state
+desc:Applies to Sonoff Basic, S20 using POWER1-topic for relay state
 par:COMMAND;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\btele(/.*)?/LWT:, ? "${1}cmnd$2" : undef }
 set DEVICE attrTemplate A_09x_tasmota_pure_base_noprefix
-attr DEVICE stateFormat {lc ReadingsVal("$name","POWER","") }
+attr DEVICE stateFormat {lc ReadingsVal("$name","POWER1","") }
 attr DEVICE eventMap { dev=>{'^(.*)POWER(.?): OFF$'=>'$1POWER$2: off', '^(.*)POWER(.?): ON$'=>'$1POWER$2: on'} }
 attr DEVICE setList \
   off:noArg    COMMAND/POWER1 0\
   on:noArg     COMMAND/POWER1 1\
   toggle:noArg COMMAND/POWER1 2
+attr DEVICE readingList \
+  tele/DEVNAME/LWT:.* LWT\
+  tele/DEVNAME/STATE:.* { json2nameValue($EVENT) }\
+  tele/DEVNAME/SENSOR:.* { json2nameValue($EVENT) }\
+  tele/DEVNAME/INFO.:.* { json2nameValue($EVENT) }\
+  stat/DEVNAME/RESULT:.* { json2nameValue($EVENT) }
+deleteReading DEVICE .*
+attr DEVICE autocreate 0
 
 # sonoff 1 channel device flashed with Tasmota.
-name:A_01x_tasmota_1channel_noprefix
-filter:TYPE=MQTT2_DEVICE
-desc:Applies to Sonoff 1 Channel devices using POWER1-topic for relay state <br>NOTE: This template is intended to configure also channel one of multi-channel tasmota devices
-set DEVICE attrTemplate A_01_tasmota_basic
-attr DEVICE stateFormat {lc ReadingsVal("$name","POWER1","") }
+#name:A_01x_tasmota_1channel_noprefix
+#filter:TYPE=MQTT2_DEVICE
+#desc:Applies to Sonoff 1 Channel devices using POWER1-topic for relay state <br>NOTE: This template is intended to configure also channel one of multi-channel tasmota #devices
+#set DEVICE attrTemplate A_01_tasmota_basic
+#attr DEVICE stateFormat {lc ReadingsVal("$name","POWER1","") }
 
 # tasmota device with one relay, one motion sensor via switch
 name:A_01b_tasmota_1ch+motion+SI7021_noprefix
 desc:tasmota device with one relay, one motion sensor via switch and one SI7021 combined temperature and humidity sensor. <br>Configures a single device including all readings
 filter:TYPE=MQTT2_DEVICE
-set DEVICE attrTemplate A_01x_tasmota_1channel_noprefix
+set DEVICE attrTemplate A_01_tasmota_basic_noprefix
 par:DEVNAME;ESP's name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,tele/([^/]*)/, ? $1 : undef }
 attr DEVICE setList \
   on:noArg cmnd/DEVNAME/POWER1 on\
@@ -159,7 +167,7 @@ name:A_02a_tasmota_2channel_2devices_noprefix
 filter:TYPE=MQTT2_DEVICE
 desc:sonoff 2 channel device flashed with Tasmota. <br>NOTE: a second device will be created for the second channel
 par:COMMAND;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\btele(/.*)?/LWT:, ? "${1}cmnd$2" : undef }
-set DEVICE attrTemplate A_01x_tasmota_1channel_noprefix
+set DEVICE attrTemplate A_01_tasmota_basic_noprefix
 attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2
 copy DEVICE DEVICE_CH2
 attr DEVICE_CH2 stateFormat {lc ReadingsVal("$name","POWER2","")}
@@ -170,17 +178,10 @@ attr DEVICE_CH2 setList \
   toggle:noArg COMMAND/POWER2 2
 
 # basic tasmota device with unprefixed readings
-name:A_09x_tasmota_pure_base_noprefix
-filter:TYPE=MQTT2_DEVICE
-par:DEVNAME;ESP's name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,tele/([^/]*)/, ? $1 : undef }
-attr DEVICE readingList \
-  tele/DEVNAME/LWT:.* LWT\
-  tele/DEVNAME/STATE:.* { json2nameValue($EVENT) }\
-  tele/DEVNAME/SENSOR:.* { json2nameValue($EVENT) }\
-  tele/DEVNAME/INFO.:.* { json2nameValue($EVENT) }\
-  stat/DEVNAME/RESULT:.* { json2nameValue($EVENT) }
-deleteReading DEVICE .*
-attr DEVICE autocreate 0
+#name:A_09x_tasmota_pure_base_noprefix
+#filter:TYPE=MQTT2_DEVICE
+#par:DEVNAME;ESP's name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,tele/([^/]*)/, ? $1 : undef }
+
 
 # tasmota 4ch as one FHEM device.
 name:A_04a_tasmota_sonoff_4ch_noprefix
