@@ -1913,6 +1913,13 @@ sub decodeLinkLayer($$)
     # first contains the header (TL_BLOCK), L field and trailing crc
     # L field is included in crc calculation
     # each following block contains only data and trailing crc
+    if (length($self->{msg}) < $self->{lfield}) {
+      $self->{errormsg} = "message too short, expected " . $self->{lfield} . ", got " . length($self->{msg}) . " bytes";
+      $self->{errorcode} = ERR_MSG_TOO_SHORT;
+      return 0;
+    }    
+    
+    
     my $length = 129;
     if ($self->{lfield} < $length) {
       $length = $self->{lfield};
