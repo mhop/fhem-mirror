@@ -8,10 +8,6 @@
 # perl_code returns a value for the parameter, or undef.
 # If undef, the user has to specify them (the comment is shown to the user)
 
-###########################################
-#
-name:0_mqtt2.attrTemplate
-desc:would be nice to have kind of preamble <br>would allow to start with some first remarks here for usage, conventions, link to issue-thread etc.
 
 ###########################################
 # zigbee2mqtt
@@ -117,7 +113,7 @@ attr DEVICE setList \
 # - DVES_XXXXXX:/SmartHome/Esszimmer/Stehlampe/tele/LWT: => /SmartHome/Esszimmer/Stehlampe/cmnd/
 name:A_01_tasmota_basic_noprefix
 filter:TYPE=MQTT2_DEVICE
-desc:Applies to Sonoff Basic, S20 using POWER1-topic for relay state <br>firmware versions ???
+desc:Applies to Sonoff Basic, S20 using POWER-topic for relay state
 par:COMMAND;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\btele(/.*)?/LWT:, ? "${1}cmnd$2" : undef }
 set DEVICE attrTemplate A_09x_tasmota_pure_base_noprefix
 attr DEVICE stateFormat {lc ReadingsVal("$name","POWER","") }
@@ -128,9 +124,9 @@ attr DEVICE setList \
   toggle:noArg COMMAND/POWER1 2
 
 # sonoff 1 channel device flashed with Tasmota.
-name:A_01a_tasmota_1channel_noprefix
+name:A_01x_tasmota_1channel_noprefix
 filter:TYPE=MQTT2_DEVICE
-desc:Applies to Sonoff 1 Channel devices using POWER1-topic for relay state <br>firmware version ???
+desc:Applies to Sonoff 1 Channel devices using POWER1-topic for relay state <br>NOTE: This template is intended to configure also channel one of multi-channel tasmota devices
 set DEVICE attrTemplate A_01_tasmota_basic
 attr DEVICE stateFormat {lc ReadingsVal("$name","POWER1","") }
 
@@ -138,7 +134,7 @@ attr DEVICE stateFormat {lc ReadingsVal("$name","POWER1","") }
 name:A_01b_tasmota_1ch+motion+SI7021_noprefix
 desc:tasmota device with one relay, one motion sensor via switch and one SI7021 combined temperature and humidity sensor. <br>Configures a single device including all readings
 filter:TYPE=MQTT2_DEVICE
-set DEVICE attrTemplate A_01a_tasmota_1channel_noprefix
+set DEVICE attrTemplate A_01x_tasmota_1channel_noprefix
 par:DEVNAME;ESP's name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,tele/([^/]*)/, ? $1 : undef }
 attr DEVICE setList \
   on:noArg cmnd/DEVNAME/POWER1 on\
@@ -163,7 +159,7 @@ name:A_02a_tasmota_2channel_2devices_noprefix
 filter:TYPE=MQTT2_DEVICE
 desc:sonoff 2 channel device flashed with Tasmota. <br>NOTE: a second device will be created for the second channel
 par:COMMAND;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\btele(/.*)?/LWT:, ? "${1}cmnd$2" : undef }
-set DEVICE attrTemplate A_01a_tasmota_1channel_noprefix
+set DEVICE attrTemplate A_01x_tasmota_1channel_noprefix
 attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2
 copy DEVICE DEVICE_CH2
 attr DEVICE_CH2 stateFormat {lc ReadingsVal("$name","POWER2","")}
@@ -223,7 +219,7 @@ name:A_10a_shellyplug
 filter:TYPE=MQTT2_DEVICE
 par:DEVNAME;ShellyPlug name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
 set DEVICE attrTemplate A_10_shelly1
-attr DEVICE getList shellies/DEVNAME/relay/power power
+attr DEVICE getList power:noArg shellies/DEVNAME/relay/power power
 
 # shelly2 using original firmware.
 # NOTE: a second device will be created for the second channel
@@ -246,7 +242,7 @@ filter:TYPE=MQTT2_DEVICE
 desc:shelly4pro using original firmware <br>NOTE: for each of the second to fourth channel, a new device will be created
 par:DEVNAME;Shelly4Pro name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
 set DEVICE attrTemplate A_10a_shellyplug
-attr DEVICE getList shellies/DEVNAME/relay/0/power power1\
+attr DEVICE getList power1:noArg shellies/DEVNAME/relay/0/power power1\
   shellies/DEVNAME/relay/0/energy energy1
 attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2, DEVICE_CH3 and DEVICE_CH4
 copy DEVICE DEVICE_CH2
@@ -255,7 +251,7 @@ attr DEVICE_CH2 comment Channel 2 for DEVICE
 attr DEVICE_CH2 setList \
   off:noArg shellies/DEVNAME/relay/1/command off\
   on:noArg shellies/DEVNAME/relay/1/command on
-attr DEVICE getList shellies/DEVNAME/relay/1/power power2\
+attr DEVICE getList power2:noArg shellies/DEVNAME/relay/1/power power2\
   shellies/DEVNAME/relay/1/energy energy2
 attr DEVICE comment Channel 2 for DEVICE, see also DEVICE, DEVICE_CH3 and DEVICE_CH4
 copy DEVICE DEVICE_CH3
@@ -264,7 +260,7 @@ attr DEVICE_CH3 comment Channel 3 for DEVICE
 attr DEVICE_CH3 setList \
   off:noArg shellies/DEVNAME/relay/2/command off\
   on:noArg shellies/DEVNAME/relay/2/command on
-attr DEVICE getList shellies/DEVNAME/relay/2/power power3\
+attr DEVICE getList power3:noArg shellies/DEVNAME/relay/2/power power3\
   shellies/DDEVNAME/relay/2/energy energy3
 attr DEVICE comment Channel 3 for DEVICE, see also DEVICE, DEVICE_CH2 and DEVICE_CH4
 copy DEVICE DEVICE_CH4
@@ -273,7 +269,7 @@ attr DEVICE_CH4 comment Channel 4 for DEVICE
 attr DEVICE_CH4 setList \
   off:noArg shellies/DEVNAME/relay/3/command off\
   on:noArg shellies/DEVNAME/relay/3/command on
-attr DEVICE getList shellies/DEVNAME/relay/3/power power4\
+attr DEVICE getList power4:noArg shellies/DEVNAME/relay/3/power power4\
   shellies/DEVNAME/relay/3/energy energy4
 attr DEVICE comment Channel 4 for DEVICE, see also DEVICE, DEVICE_CH2 and DEVICE_CH3
 
