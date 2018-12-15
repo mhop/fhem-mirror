@@ -48,7 +48,7 @@ use File::Temp qw(tempfile);
 use IO::Uncompress::Unzip qw(unzip $UnzipError);
 use POSIX;
 use Storable qw(freeze thaw);
-use Time::HiRes qw(gettimeofday);
+use Time::HiRes qw(gettimeofday usleep);
 use Time::Local;
 use Time::Piece;
 
@@ -63,7 +63,7 @@ use constant UPDATE_COMMUNEUNIONS => -2;
 use constant UPDATE_ALL           => -3;
 
 require Exporter;
-our $VERSION   = 1.010.002;
+our $VERSION   = 1.011.001;
 our @ISA       = qw(Exporter);
 our @EXPORT    = qw(GetForecast GetAlerts UpdateAlerts UPDATE_DISTRICTS UPDATE_COMMUNEUNIONS UPDATE_ALL);
 our @EXPORT_OK = qw(IsCommuneUnionWarncellId);
@@ -80,7 +80,7 @@ my %forecastDefaultProperties = (
                                 );
 
 # 1 = temperature in K, 2 = integer value, 3 = wind speed in m/s, 4 = pressure in Pa
-my %forecastPropertyTypes = ( 
+my %forecastPropertyTypes = (
                              'Tx' => 1, 'Tn' => 1, 'Tg' => 1, 'Tm'=> 1, 'Td'  => 1, 'T5cm'  => 1, 'TTT'   => 1,
                              'DD' => 2, 'Neff' => 2, 'Nh' => 2, 'Nl' => 2, 'Nlm' => 2, 'Nm' => 2, 'Rh00' => 2, 'ww'  => 2, 'ww3' => 2, 'WPc11' => 2, 'WPc31' => 2, 'WPc61' => 2, 'WPch1' => 2, 'WPcd1' => 2,
                              'FF' => 3, 'FX1' => 3, 'FX3' => 3, 'FXh' => 3,
@@ -198,9 +198,10 @@ my @wwdText = ('Bewölkungsentwicklung nicht beobachtet',
                'starkes Gewitter mit Sandsturm',
                'starkes Gewitter mit Graupel oder Hagel');
 
-my @alerts_data     = [ undef, undef ];
-my @alerts_received = [ undef, undef ];
-my @alerts_updating = [ undef, undef ];
+my @alertsData         = [ undef, undef ];
+my @alertsReceived     = [ undef, undef ];
+my @alertsUpdating     = [ undef, undef ];
+my @alertsErrorMessage = [ undef, undef ];
 
 
 =head1 FHEM CALLBACK FUNCTIONS
@@ -257,9 +258,8 @@ FHEM I<UndefFn>
 
 sub Undef($$) {
   my ($hash, $arg) = @_;
-  my $name = $hash->{NAME};
 
-  ::RemoveInternalTimer($hash);
+  Shutdown($hash);
 
   return undef;
 }
@@ -282,14 +282,24 @@ sub Shutdown($) {
 
   ::RemoveInternalTimer($hash);
 
+  my $warncellId = $hash->{".warncellId"};
+  my $communeUnion = IsCommuneUnionWarncellId($warncellId);
   if (defined($hash->{".alertsBlockingCall"})) {
     ::BlockingKill($hash->{".alertsBlockingCall"});
   }
+  if (defined($hash->{".alertsFile".$communeUnion})) {
+    close($hash->{".alertsFileHandle".$communeUnion});
+    unlink($hash->{".alertsFile".$communeUnion});
+    delete($hash->{".alertsFile".$communeUnion});
+  }
 
-  if (defined($hash->{".alertsFile"})) {
-    close($hash->{".alertsFileHandle"});
-    unlink($hash->{".alertsFile"});
-    delete($hash->{".alertsFile"});
+  if (defined($hash->{".forecastBlockingCall"})) {
+    ::BlockingKill($hash->{".forecastBlockingCall"});
+  }
+  if (defined($hash->{".forecastFile"})) {
+    close($hash->{".forecastFileHandle"});
+    unlink($hash->{".forecastFile"});
+    delete($hash->{".forecastFile"});
   }
 
   return undef;
@@ -397,10 +407,10 @@ sub Get($@)
       $warncellId = ::AttrVal($name, 'alertArea', undef) if (!defined($warncellId));
       if (defined($warncellId)) {
         my $communeUnion = IsCommuneUnionWarncellId($warncellId);
-        if (defined($alerts_updating[$communeUnion]) && (time() - $alerts_updating[$communeUnion] < 60)) {
+        if (defined($alertsUpdating[$communeUnion]) && (time() - $alertsUpdating[$communeUnion] < 60)) {
           # abort if update is in progress
           $result = "alerts cache update in progress, please wait and try again";
-        } elsif (defined($alerts_received[$communeUnion]) && (time() - $alerts_received[$communeUnion] < 900)) {
+        } elsif (defined($alertsReceived[$communeUnion]) && (time() - $alertsReceived[$communeUnion] < 900)) {
           # use cache if not older than 15 minutes
           $result = UpdateAlerts($hash, $warncellId);
         } else {
@@ -416,7 +426,13 @@ sub Get($@)
       my $station = $a[2];
       $station = ::AttrVal($name, 'forecastStation', undef) if (!defined($station));
       if (defined($station)) {
-        $result = GetForecast($hash, $station);
+        if (defined($hash->{forecastUpdating}) && (time() - $hash->{forecastUpdating} < 60)) {
+          # abort if update is in progress
+          $result = "forecast update in progress, please wait and try again";
+        } else {
+          delete $hash->{".fetchAlerts"};
+          $result = GetForecast($hash, $station);
+        }
       } else {
         $result = "station code required for $name get $command";
       }
@@ -440,7 +456,7 @@ sub Get($@)
         }
       }
       my $communeUnion = IsCommuneUnionWarncellId($updateMode);
-      if (defined($alerts_updating[$communeUnion]) && (time() - $alerts_updating[$communeUnion] < 60)) {
+      if (defined($alertsUpdating[$communeUnion]) && (time() - $alertsUpdating[$communeUnion] < 60)) {
         # abort if update is in progress
         $result = "alerts cache update in progress, please wait and try again";
       } else {
@@ -463,7 +479,7 @@ FHEM I<InternalTimer> function
 
 =over
 
-=item * param hash: hash of DWD_OpenData device
+=item * param args: hash of DWD_OpenData device
 
 =back
 
@@ -477,34 +493,46 @@ sub Timer($)
   ::Log3 $name, 5, "$name: Timer START";
 
   my $time = time();
-  my ($tSec, $tMin, $tHour, $tMday, $tMon, $tYear, $tWday, $tYday, $tIsdst) = Localtime($hash, $time);
+  my ($tSec, $tMin, $tHour, $tMday, $tMon, $tYear, $tWday, $tYday, $tIsdst) = gmtime($time);
   my $actQuarter = int($tMin/15);
 
-  if ($actQuarter == 0) {
+  if ($actQuarter == 0 && !(defined($hash->{".fetchAlerts"}) && $hash->{".fetchAlerts"})) {
+    # preset: try to fetch alerts immediately
+    $hash->{".fetchAlerts"} = 1;
     my $forecastStation = ::AttrVal($name, 'forecastStation', undef);
     if (defined($forecastStation)) {
-      my $result = GetForecast($hash, $forecastStation);
-      if (defined($result)) {
-        ::Log3 $name, 4, "$name: error retrieving forecast: $result";
+      if (!defined($hash->{forecastUpdating}) || ($time - $hash->{forecastUpdating} >= 60)) {
+        my $result = GetForecast($hash, $forecastStation);
+        if (defined($result)) {
+          ::Log3 $name, 4, "$name: error retrieving forecast: $result";
+        } else {
+          # fetching forecast started: wait for forecast fetch to complete
+          $hash->{".fetchAlerts"} = 0;
+        }
       }
     }
   }
 
-  my $warncellId = ::AttrVal($name, 'alertArea', undef);
-  if (defined($warncellId)) {
-    # skip update if already in progress
-    my $communeUnion = IsCommuneUnionWarncellId($warncellId);
-    if (!defined($alerts_updating[$communeUnion]) || (time() - $alerts_updating[$communeUnion] >= 60)) {
-      my $result = GetAlerts($hash, $warncellId);
-      if (defined($result)) {
-        ::Log3 $name, 4, "$name: error retrieving alerts: $result";
+  if ($actQuarter > 0 || (defined($hash->{".fetchAlerts"}) && $hash->{".fetchAlerts"})) {
+    my $warncellId = ::AttrVal($name, 'alertArea', undef);
+    if (defined($warncellId)) {
+      # skip update if already in progress
+      my $communeUnion = IsCommuneUnionWarncellId($warncellId);
+      if (!defined($alertsUpdating[$communeUnion]) || ($time - $alertsUpdating[$communeUnion] >= 60)) {
+        my $result = GetAlerts($hash, $warncellId);
+        if (defined($result)) {
+          ::Log3 $name, 4, "$name: error retrieving alerts: $result";
+        }
       }
     }
+
+    $hash->{".fetchAlerts"} = $actQuarter < 3;
   }
 
-  # schedule next for 5 seconds past next quarter
-  my $nextQuarterSeconds = Timelocal($hash, 0, $actQuarter*15, $tHour, $tMday, $tMon, $tYear) + 905;
-  ::InternalTimer($nextQuarterSeconds, 'DWD_OpenData::Timer', $hash, 0);
+  # reschedule next run for 5 seconds past next quarter
+  ::RemoveInternalTimer($hash);
+  my $nextTime = timegm(0, $actQuarter*15, $tHour, $tMday, $tMon, $tYear) + 905;
+  ::InternalTimer($nextTime, 'DWD_OpenData::Timer', $hash);
 
   ::Log3 $name, 5, "$name: Timer END";
 }
@@ -762,7 +790,7 @@ sub RotateForecast($$;$)
   while (defined(::ReadingsVal($name, 'fc'.$daysAvailable.'_date', undef))) {
     $daysAvailable++;
   }
-  #::Log3 $name, 5, "$name: A $daysAvailable";
+  ::Log3 $name, 5, "$name: RotateForecast: $daysAvailable days exist with readings";
 
   my $oT = ::ReadingsVal($name, 'fc0_date', undef);
   my $oldToday = defined($oT)? ParseDateLocal($hash, $oT) : undef;
@@ -780,7 +808,8 @@ sub RotateForecast($$;$)
       $today = Timelocal($hash, 0, 0, 0, $tMday, $tMon, $tYear);
     }
 
-    my $daysForward = sprintf("%0.0f", $today - $oldToday);  # round()
+    my $daysForward = sprintf("%0.0f", ($today - $oldToday)/86400.0);  # round() [s] -> [d]
+    ::Log3 $name, 5, "$name: RotateForecast: shifting forward by $daysForward day(s) ($oldToday -> $today)";
     if ($daysForward > 0) {
       # different day
       if ($daysForward < $daysAvailable) {
@@ -848,6 +877,8 @@ sub GetForecast($$)
   my $name = $hash->{NAME};
 
   if (!::IsDisabled($name)) {
+    ::Log3 $name, 5, "$name: GetForecast START (PID $$)";
+
     # test if XML module is available
     eval {
       require XML::LibXML;
@@ -856,26 +887,77 @@ sub GetForecast($$)
       return "$name: Perl module XML::LibXML not found, see commandref for details how to fix";
     }
 
-    # @TODO move RotateForecast
+    # download, unzip and parse using BlockingCall
+    if (defined($hash->{".forecastFile"})) {
+      # delete old temp file
+      close($hash->{".forecastFileHandle"});
+      unlink($hash->{".forecastFile"});
+    }
+    ($hash->{".forecastFileHandle"}, $hash->{".forecastFile"}) = tempfile(UNLINK => 1);
+    $hash->{".station"} = $station;
+    if (defined($hash->{".forecastBlockingCall"})) {
+      # kill old blocking call
+      ::BlockingKill($hash->{".forecastBlockingCall"});
+    }
+    $hash->{".forecastBlockingCall"} = ::BlockingCall("DWD_OpenData::GetForecastStart", $hash, "DWD_OpenData::GetForecastFinish", 30, "DWD_OpenData::GetForecastAbort", $hash);
 
-    # get forecast for station from DWD server
-    ::readingsSingleUpdate($hash, 'state', 'fetching', 0);
-    my $url = 'https://opendata.dwd.de/weather/local_forecasts/mos/MOSMIX_L/single_stations/' . $station . '/kml/MOSMIX_L_LATEST_' . $station . '.kmz ';
-    my $param = {
-                  url        => $url,
-                  method     => "GET",
-                  timeout    => 10,
-                  callback   => \&ProcessForecast,
-                  hash       => $hash,
-                  station    => $station
-                };
-    ::Log3 $name, 5, "$name: GetForecast START (PID $$): $url";
-    ::HttpUtils_NonblockingGet($param);
+    $hash->{forecastUpdating} = time();
+
+    ::readingsSingleUpdate($hash, 'state', 'updating forecasts', 1);
 
     ::Log3 $name, 5, "$name: GetForecast END";
+    return undef;
   } else {
     return "disabled";
   }
+}
+
+=head2 GetForecastStart($)
+
+BlockingCall I<BlockingFn> callback
+
+=over
+
+=item * param hash: hash of DWD_OpenData device
+
+=item * return result required by function L</GetForecastFinish(@)>
+
+=back
+
+ATTENTION: This method is executed in a different process than FHEM.
+           The device hash is from the time of the process initiation.
+           Any changes to the device hash or readings are not visible
+           in FHEM.
+
+=cut
+
+sub GetForecastStart($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  my $station = $hash->{".station"};
+
+  # give main process time to execute
+  usleep(100);
+
+  # get forecast for station from DWD server
+  my $url = 'https://opendata.dwd.de/weather/local_forecasts/mos/MOSMIX_L/single_stations/' . $station . '/kml/MOSMIX_L_LATEST_' . $station . '.kmz ';
+  my $param = {
+                url        => $url,
+                method     => "GET",
+                timeout    => 10,
+                hash       => $hash,
+                station    => $station
+              };
+  ::Log3 $name, 5, "$name: GetForecastStart START (PID $$): $url";
+  my ($httpError, $fileContent) = ::HttpUtils_BlockingGet($param);
+
+  # process retrieved data
+  my $result = ProcessForecast($param, $httpError, $fileContent);
+
+  ::Log3 $name, 5, "$name: GetForecastStart END";
+
+  return $result;
 }
 
 =head2 ProcessForecast($$$)
@@ -892,6 +974,11 @@ sub GetForecast($$)
 
 =back
 
+ATTENTION: This method is executed in a different process than FHEM.
+           The device hash is from the time of the process initiation.
+           Any changes to the device hash or readings are not visible
+           in FHEM.
+
 =cut
 
 sub ProcessForecast($$$)
@@ -905,32 +992,22 @@ sub ProcessForecast($$$)
 
   ::Log3 $name, 5, "$name: ProcessForecast START";
 
-  # preprocess existing readings
-  ::readingsBeginUpdate($hash);
-  my $time = time();
-  my ($tSec, $tMin, $tHour, $tMday, $tMon, $tYear, $tWday, $tYday, $tIsdst) = Localtime($hash, $time);
-  my $today = Timelocal($hash, 0, 0, 0, $tMday, $tMon, $tYear);
-  my $daysAvailable = RotateForecast($hash, $station, $today);
-
+  my %forecast;
   my $relativeDay = 0;
   eval {
     if (defined($httpError) && length($httpError) > 0) {
       die "error retrieving URL '$url': $httpError";
     }
     if (defined($code) && $code != 200) {
-      die "error $code retrieving URL '$url'";
+      die "HTTP error $code retrieving URL '$url'";
     }
     if (!defined($fileContent) || length($fileContent) == 0) {
       die "no data retrieved from URL '$url'";
     }
 
-    ::Log3 $name, 5, "$name: ProcessForecast: data received, $daysAvailable days currently exist with readings";
+    ::Log3 $name, 5, "$name: ProcessForecast: data received, decoding ...";
 
     # prepare processing
-    ::readingsBulkUpdate($hash, 'state', 'processing');
-    my $forecastWW2Text = ::AttrVal($name, 'forecastWW2Text', 0);
-    my $forecastDays = ::AttrVal($name, 'forecastDays', 6);
-    my $forecastResolution = ::AttrVal($name, 'forecastResolution', 6);
     my $forecastProperties = ::AttrVal($name, 'forecastProperties', undef);
     my @properties = split(',', $forecastProperties) if (defined($forecastProperties));
     my %selectedProperties;
@@ -950,7 +1027,8 @@ sub ProcessForecast($$$)
     my @xmlStrings;
     unzip($zipFileHandle => \@xmlStrings, MultiStream => 1) or die "unzip failed: $UnzipError\n";
 
-    ::readingsBulkUpdate($hash, "fc_station", $station);
+    my %header;
+    $header{station} = $station;
 
     # parse XML strings (files from zip)
     foreach my $xmlString (@xmlStrings) {
@@ -968,20 +1046,20 @@ sub ProcessForecast($$$)
 
       ::Log3 $name, 5, "$name: ProcessForecast: extracting data";
 
-      # extract header
+      # extract header data
       my @timestamps;
+      my $issuer = undef;
       my $defaultUndefSign = '-';
       my $productDefinitionNodeList = $dom->getElementsByLocalName('ProductDefinition');
       if ($productDefinitionNodeList->size()) {
         my $productDefinitionNode = $productDefinitionNodeList->get_node(1);
         foreach my $productDefinitionChildNode ($productDefinitionNode->nonBlankChildNodes()) {
           if ($productDefinitionChildNode->nodeName() eq 'dwd:Issuer') {
-            my $issuer = $productDefinitionChildNode->textContent();
-            ::readingsBulkUpdate($hash, "fc_copyright", "Datenbasis: $issuer");
+            $issuer = $productDefinitionChildNode->textContent();
+            $header{copyright} = "Datenbasis: $issuer";
           } elsif ($productDefinitionChildNode->nodeName() eq 'dwd:IssueTime') {
             my $issueTime = $productDefinitionChildNode->textContent();
-            # ignore issue time, use now
-            ::readingsBulkUpdate($hash, "fc_time", FormatDateTimeLocal($hash, $time));
+            $header{time} = FormatDateTimeLocal($hash, ParseKMLTime($issueTime));
           } elsif ($productDefinitionChildNode->nodeName() eq 'dwd:ForecastTimeSteps') {
             foreach my $forecastTimeStepsChildNode ($productDefinitionChildNode->nonBlankChildNodes()) {
               if ($forecastTimeStepsChildNode->nodeName() eq 'dwd:TimeStep') {
@@ -998,16 +1076,22 @@ sub ProcessForecast($$$)
           }
         }
       }
+      $forecast{timestamps} = \@timestamps;
+      $header{defaultUndefSign} = $defaultUndefSign;
 
-      # extract data
-      my %properties;
+      if (!defined($issuer)) {
+        die "error in XML data, forecast issuer not found";
+      }
+
+      # extract time data
+      my %timeProperties;
       my $placemarkNodeList = $dom->getElementsByLocalName('Placemark');
       if ($placemarkNodeList->size()) {
         my $placemarkNode = $placemarkNodeList->get_node(1);
         foreach my $placemarkChildNode ($placemarkNode->nonBlankChildNodes()) {
           if ($placemarkChildNode->nodeName() eq 'kml:description') {
             my $description = $placemarkChildNode->textContent();
-            ::readingsBulkUpdate($hash, "fc_description", encode('UTF-8', $description));
+            $header{description} = encode('UTF-8', $description);
           } elsif ($placemarkChildNode->nodeName() eq 'kml:ExtendedData') {
             foreach my $extendedDataChildNode ($placemarkChildNode->nonBlankChildNodes()) {
               if ($extendedDataChildNode->nodeName() eq 'dwd:Forecast') {
@@ -1021,112 +1105,287 @@ sub ProcessForecast($$$)
                   $textContent =~ s/^\s+|\s+$//g; # trim outside
                   $textContent =~ s/\s+/ /g; # trim inside
                   my @values = split(' ',$textContent);
-                  $properties{$elementName} = \@values;
+                  $timeProperties{$elementName} = \@values;
                 }
               }
             }
           } elsif ($placemarkChildNode->nodeName() eq 'kml:Point') {
             my $coordinates = $placemarkChildNode->nonBlankChildNodes()->get_node(1)->textContent();
-            ::readingsBulkUpdate($hash, "fc_coordinates", $coordinates);
+            $header{coordinates} = $coordinates;
           }
         }
       }
-
-      ::Log3 $name, 5, "$name: ProcessForecast: creating readings";
-
-      # create readings
-      my $lastDayPrefix = '';
-      for my $i (0 .. $#timestamps) {
-        # analyse date relation between forecast and today
-        my $forecastTime = $timestamps[$i];
-        my ($fcSec, $fcMin, $fcHour, $fcMday, $fcMon, $fcYear, $fcWday, $fcYday, $fcIsdst) = Localtime($hash, $forecastTime);
-        my $forecastDate = Timelocal($hash, 0, 0, 0, $fcMday, $fcMon, $fcYear);
-        $relativeDay = sprintf("%.0f", ($forecastDate - $today)/(24*60*60)); # Perl equivalent for round()
-        if ($relativeDay > $forecastDays) {
-          # max. number of days processed, done
-          last;
-        }
-        if ($relativeDay < 0) {
-          # forecast is older than today, skip
-          next;
-        }
-        # write data
-        my $dayPrefix = 'fc'.$relativeDay.'_';
-        if ($dayPrefix ne $lastDayPrefix) {
-          ::readingsBulkUpdate($hash, $dayPrefix.'date', FormatDateLocal($hash, $forecastTime));
-          ::readingsBulkUpdate($hash, $dayPrefix.'weekday', FormatWeekdayLocal($hash, $forecastTime));
-          $lastDayPrefix = $dayPrefix;
-        }
-        # some values are only available every 3, 6 or 12 hours relative to 00:00 UTC
-        my $hourPrefix = undef;
-        my $fcHourUTC = (gmtime($forecastTime))[2];
-        #::Log3 $name, 5, "$name: fcHourUTC $fcHourUTC";
-        if ($fcHourUTC%$forecastResolution == 0) {
-          $hourPrefix = int($fcHour/$forecastResolution).'_';
-          #::Log3 $name, 5, "$name: hourPrefix $hourPrefix";
-          ::readingsBulkUpdate($hash, $dayPrefix.$hourPrefix.'time', FormatTimeLocal($hash, $forecastTime));
-        }
-        while (my($property, $values) = each %properties) {
-          #::Log3 $name, 5, "$name: $property  vs=" . scalar(@$values) . " ts=" . $#timestamps . " -> " . $values->[$i];
-          if (defined($values->[$i])) {
-            my $value = $values->[$i];
-            if ($value ne $defaultUndefSign) {
-              $value =~ s/,/./g; # decimal point
-              my $forecastPropertyType = $forecastPropertyTypes{$property};
-              if (defined($forecastPropertyType)) {
-                if ($forecastPropertyType == 1) {
-                  $value -= 273.15; # K -> °C
-                  if (length($value) > 6) {
-                    $value = sprintf('%0.2f', $value); # round to compensate floating point granularity
-                  }
-                }
-                elsif ($forecastPropertyType == 2) {
-                  $value = sprintf('%0.0f', $value); # round()
-                  if ($forecastWW2Text && ($property eq 'ww') && defined($hourPrefix) && length($value) > 0) {
-                    ::readingsBulkUpdate($hash, $dayPrefix.$hourPrefix.'wwd', $wwdText[$value]);
-                  }
-                }
-                elsif ($forecastPropertyType == 3) {
-                  $value *= 3.6; # m/s -> km/h
-                  $value = sprintf('%0.0f', $value); # round()
-                }
-                elsif ($forecastPropertyType == 4) {
-                  $value /= 100; # Pa -> hPa
-                  $value = sprintf('%0.1f', $value); # round(1)
-                }
-              }
-              #::Log3 $name, 5, "$name: $fcHour $dayPrefix $hourPrefix | $property -> $value | $forecastPropertyType";
-              my $forecastPropertyPeriod = $forecastPropertyPeriods{$property};
-              if ($forecastPropertyPeriod == 24) {
-                # day property
-                ::readingsBulkUpdate($hash, $dayPrefix.$property, $value);
-              } elsif (defined($hourPrefix)) {
-                # hour property
-                ::readingsBulkUpdate($hash, $dayPrefix.$hourPrefix.$property, $value);
-              }
-            }
-          }
-        }
-      }
+      $forecast{timeProperties} = \%timeProperties;
     }
+    $forecast{header} = \%header;
   };
 
-  # abort on exception
+  my $errorMessage = '';
   if ($@) {
-    my @parts = split(' at ', $@);
+    # exception
+    my @parts = split(/ at |\n/, $@); # discard anything after " at " or newline
     if (@parts) {
-      ::readingsBulkUpdate($hash, 'state', "forecast error: $parts[0]");
+      $errorMessage = $parts[0];
       ::Log3 $name, 4, "$name: ProcessForecast error: $parts[0]";
     } else {
-      ::readingsBulkUpdate($hash, 'state', "forecast error: $@");
+      $errorMessage = $@;
       ::Log3 $name, 4, "$name: ProcessForecast error: $@";
     }
-    ::readingsEndUpdate($hash, 1);
-    return @parts? $parts[0] : $@;
+  } else {
+    # forecast parsed successfully
+    if (defined($hash->{".forecastFile"})) {
+      if (open(my $file, ">", $hash->{".forecastFile"})) {
+        # write forecast to temp file
+        binmode($file);
+        my $frozenForecast = freeze(\%forecast);
+        ::Log3 $name, 5, "$name: ProcessForecast temp file " . $hash->{".forecastFile"} . " forecast " . keys(%forecast) . " size " . length($frozenForecast);
+        print($file $frozenForecast);
+        close($file);
+      } else {
+        $errorMessage = $!;
+        ::Log3 $name, 3, "$name: ProcessForecast error opening temp file: $errorMessage";
+      }
+    } else {
+      $errorMessage = 'result file name not defined';
+      ::Log3 $name, 3, "$name: ProcessForecast error: temp file name not defined";
+    }
   }
 
-  # delete existing readings of all days that have not been written
-  if ($daysAvailable > $relativeDay + 1) {
+  # get rid of newlines and commas because of Blocking InformFn parameter restrictions
+  $errorMessage =~ s/\n/; /g;
+  $errorMessage =~ s/,/;/g;
+
+  ::Log3 $name, 5, "$name: ProcessForecast END";
+
+  return [$name, $errorMessage];
+}
+
+=head2 GetForecastFinish(@)
+
+BlockingCall I<FinishFn> callback, expects array returned by function L</GetForecastStart($)> as single parameter
+
+=over
+
+=item * param name: name of DWD_OpenData device
+
+=item * param errorMessage: empty string or processing error message
+
+=back
+
+=cut
+
+sub GetForecastFinish(@)
+{
+  my ($name, $errorMessage) = @_;
+
+  if (defined($name)) {
+    ::Log3 $name, 5, "$name: GetForecastFinish START (PID $$)";
+
+    my $hash = $::defs{$name};
+    delete $hash->{".forecastBlockingCall"};
+    delete $hash->{forecastUpdating};
+
+    if (defined($errorMessage) && length($errorMessage) > 0) {
+      # error, skip further processing
+    } elsif (!defined($hash->{".forecastFile"})) {
+      $errorMessage = "internal temp file name missing";
+      ::Log3 $name, 3, "$name: GetForecastFinish error: $errorMessage";
+    } else {
+      # deserialize forecast
+      my $fh = $hash->{".forecastFileHandle"};
+      my $terminator = $/;
+      $/ = undef;        # enable slurp file read mode
+      my $frozenForecast = <$fh>;
+      $/ = $terminator;  # restore default file read mode
+      close($hash->{".forecastFileHandle"});
+      unlink($hash->{".forecastFile"});
+      my %newForecast = %{thaw($frozenForecast)};
+      ::Log3 $name, 5, "$name: GetForecastFinish temp file " . $hash->{".forecastFile"} . " forecast " . keys(%newForecast) . " size " . length($frozenForecast);
+      delete($hash->{".forecastFile"});
+
+      UpdateForecast($hash, \%newForecast);
+    }
+
+    if (defined($errorMessage) && length($errorMessage) > 0) {
+      ::readingsSingleUpdate($hash, 'state', "forecast error: $errorMessage", 1);
+      ::readingsSingleUpdate($hash, 'fc_state', "error: $errorMessage", 1);
+    } else {
+      ::readingsSingleUpdate($hash, 'fc_state', 'updated', 1);
+    }
+
+    if (defined($hash->{".fetchAlerts"}) && !$hash->{".fetchAlerts"}) {
+      # get forecast was initiated by timer, reschedule to fetch alerts
+      $hash->{".fetchAlerts"} = 1;
+      ::InternalTimer(gettimeofday() + 1, 'DWD_OpenData::Timer', $hash);
+    }
+
+    ::Log3 $name, 5, "$name: GetForecastFinish END";
+  } else {
+    ::Log 3, "GetForecastFinish error: device name missing";
+  }
+}
+
+=head2 GetForecastAbort($)
+
+BlockingCall I<AbortFn> callback
+
+=over
+
+=item * param hash: hash of DWD_OpenData device
+
+=back
+
+=cut
+
+sub GetForecastAbort($)
+{
+  my ($hash, $errorMessage) = @_;
+  my $name = $hash->{NAME};
+  my $station = $hash->{".station"};
+
+  delete $hash->{".forecastBlockingCall"};
+  delete $hash->{forecastUpdating};
+  $errorMessage = "downloading and processing weather forecast data failed ($errorMessage)";
+  ::Log3 $name, 3, "$name: GetForecastAbort error: $errorMessage";
+  ::readingsSingleUpdate($hash, 'state', "forecast error: $errorMessage", 1);
+  ::readingsSingleUpdate($hash, 'fc_state', "error: $errorMessage", 1);
+
+  # rotate forecast anyway
+  ::readingsBeginUpdate($hash);
+  RotateForecast($hash, $station);
+  ::readingsEndUpdate($hash, 1);
+
+  if (defined($hash->{".fetchAlerts"}) && !$hash->{".fetchAlerts"}) {
+    # get forecast was initiated by timer, reschedule to fetch alerts
+    $hash->{".fetchAlerts"} = 1;
+    ::InternalTimer(gettimeofday() + 1, 'DWD_OpenData::Timer', $hash);
+  }
+}
+
+=head2 UpdateForecast($$)
+
+update forecast readings
+
+=over
+
+=item * param hash: hash of DWD_OpenData device
+
+=item * param forecast: hash ref to forecast data
+
+=item * return C<undef> or error message
+
+=back
+
+=cut
+
+sub UpdateForecast($$)
+{
+  my ($hash, $forecast) = @_;
+  my $name = $hash->{NAME};
+
+  ::Log3 $name, 5, "$name: UpdateForecast: START";
+
+  ::readingsBeginUpdate($hash);
+
+  # preprocess existing time readings
+  my $time = time();
+  my ($tSec, $tMin, $tHour, $tMday, $tMon, $tYear, $tWday, $tYday, $tIsdst) = Localtime($hash, $time);
+  my $today = Timelocal($hash, 0, 0, 0, $tMday, $tMon, $tYear);
+  my $station = $forecast->{header}{station};
+  my $daysAvailable = RotateForecast($hash, $station, $today);
+
+  # create header readings
+  my $defaultUndefSign = $forecast->{header}{defaultUndefSign};
+  delete $forecast->{header}{defaultUndefSign};
+  while (my ($property, $value) = each %{$forecast->{header}})
+  {
+    ::readingsBulkUpdate($hash, 'fc_'.$property, $value);
+  }
+
+  # prepare time processing
+  my $forecastWW2Text = ::AttrVal($name, 'forecastWW2Text', 0);
+  my $forecastDays = ::AttrVal($name, 'forecastDays', 6);
+  my $forecastResolution = ::AttrVal($name, 'forecastResolution', 6);
+
+  # create time readings
+  my $lastDayPrefix = '';
+  my $relativeDay = -1;
+  my $timestamps = $forecast->{timestamps};
+  for my $i (0 .. $#$timestamps) {
+    # analyse date relation between forecast and today
+    my $forecastTime = $timestamps->[$i];
+    my ($fcSec, $fcMin, $fcHour, $fcMday, $fcMon, $fcYear, $fcWday, $fcYday, $fcIsdst) = Localtime($hash, $forecastTime);
+    my $forecastDate = Timelocal($hash, 0, 0, 0, $fcMday, $fcMon, $fcYear);
+    $relativeDay = sprintf("%.0f", ($forecastDate - $today)/(24*60*60)); # Perl equivalent for round()
+    if ($relativeDay > $forecastDays) {
+      # max. number of days processed, done
+      last;
+    }
+    if ($relativeDay < 0) {
+      # forecast is older than today, skip
+      next;
+    }
+    # write data
+    my $dayPrefix = 'fc'.$relativeDay.'_';
+    if ($dayPrefix ne $lastDayPrefix) {
+      ::readingsBulkUpdate($hash, $dayPrefix.'date', FormatDateLocal($hash, $forecastTime));
+      ::readingsBulkUpdate($hash, $dayPrefix.'weekday', FormatWeekdayLocal($hash, $forecastTime));
+      $lastDayPrefix = $dayPrefix;
+    }
+    # some values are only available every 3, 6 or 12 hours relative to 00:00 UTC
+    my $hourPrefix = undef;
+    my $fcHourUTC = (gmtime($forecastTime))[2];
+    #::Log3 $name, 5, "$name: fcHourUTC $fcHourUTC";
+    if ($fcHourUTC%$forecastResolution == 0) {
+      $hourPrefix = int($fcHour/$forecastResolution).'_';
+      #::Log3 $name, 5, "$name: hourPrefix $hourPrefix";
+      ::readingsBulkUpdate($hash, $dayPrefix.$hourPrefix.'time', FormatTimeLocal($hash, $forecastTime));
+    }
+    while (my($property, $values) = each %{$forecast->{timeProperties}}) {
+      #::Log3 $name, 5, "$name: $property  vs=" . scalar(@$values) . " ts=" . $#$timestamps . " -> " . $values->[$i];
+      if (defined($values->[$i])) {
+        my $value = $values->[$i];
+        if ($value ne $defaultUndefSign) {
+          $value =~ s/,/./g; # decimal point
+          my $forecastPropertyType = $forecastPropertyTypes{$property};
+          if (defined($forecastPropertyType)) {
+            if ($forecastPropertyType == 1) {
+              $value -= 273.15; # K -> °C
+              if (length($value) > 6) {
+                $value = sprintf('%0.2f', $value); # round to compensate floating point granularity
+              }
+            }
+            elsif ($forecastPropertyType == 2) {
+              $value = sprintf('%0.0f', $value); # round()
+              if ($forecastWW2Text && ($property eq 'ww') && defined($hourPrefix) && length($value) > 0) {
+                ::readingsBulkUpdate($hash, $dayPrefix.$hourPrefix.'wwd', $wwdText[$value]);
+              }
+            }
+            elsif ($forecastPropertyType == 3) {
+              $value *= 3.6; # m/s -> km/h
+              $value = sprintf('%0.0f', $value); # round()
+            }
+            elsif ($forecastPropertyType == 4) {
+              $value /= 100; # Pa -> hPa
+              $value = sprintf('%0.1f', $value); # round(1)
+            }
+          }
+          #::Log3 $name, 5, "$name: $fcHour $dayPrefix $hourPrefix | $property -> $value | $forecastPropertyType";
+          my $forecastPropertyPeriod = $forecastPropertyPeriods{$property};
+          if ($forecastPropertyPeriod == 24) {
+            # day property
+            ::readingsBulkUpdate($hash, $dayPrefix.$property, $value);
+          } elsif (defined($hourPrefix)) {
+            # hour property
+            ::readingsBulkUpdate($hash, $dayPrefix.$hourPrefix.$property, $value);
+          }
+        }
+      }
+    }
+  }
+
+  # delete existing time readings of all days that have not been written
+  if ($relativeDay >= 0 && $daysAvailable > $relativeDay + 1) {
     ::Log3 $name, 5, "$name: deleting days with index " . ($relativeDay + 1) . " to " . ($daysAvailable - 1);
     for (my $d=($relativeDay + 1); $d<$daysAvailable; $d++) {
       ::CommandDeleteReading(undef, "$name fc".$d."_.*");
@@ -1136,7 +1395,7 @@ sub ProcessForecast($$$)
   ::readingsBulkUpdate($hash, 'state', 'forecast updated');
   ::readingsEndUpdate($hash, 1);
 
-  ::Log3 $name, 5, "$name: ProcessForecast END";
+  ::Log3 $name, 5, "$name: UpdateForecast: END";
 
   return undef;
 }
@@ -1169,7 +1428,7 @@ sub GetAlerts($$)
       return "$name: Perl module XML::LibXML not found, see commandref for details how to fix";
     }
 
-    # @TODO delete expired alerts?
+    # @todo delete expired alerts?
 
     # download, unzip and parse using BlockingCall
     my $communeUnion = IsCommuneUnionWarncellId($warncellId);
@@ -1186,7 +1445,7 @@ sub GetAlerts($$)
     }
     $hash->{".alertsBlockingCall".$communeUnion} = ::BlockingCall("DWD_OpenData::GetAlertsStart", $hash, "DWD_OpenData::GetAlertsFinish", 60, "DWD_OpenData::GetAlertsAbort", $hash);
 
-    $alerts_updating[$communeUnion] = time();
+    $alertsUpdating[$communeUnion] = time();
 
     ::readingsSingleUpdate($hash, 'state', 'updating alerts cache', 1);
 
@@ -1223,6 +1482,9 @@ sub GetAlertsStart($)
   my ($hash) = @_;
   my $name = $hash->{NAME};
   my $warncellId = $hash->{".warncellId"};
+
+  # give main process time to execute
+  usleep(100);
 
   # get communion (5, 8) or district (1, 9) alerts for Germany from DWD server
   my $communeUnion = IsCommuneUnionWarncellId($warncellId);
@@ -1281,7 +1543,7 @@ sub ProcessAlerts($$$)
       die "error retrieving URL '$url': $httpError";
     }
     if (defined($code) && $code != 200) {
-      die "error $code retrieving URL '$url'";
+      die "HTTP error $code retrieving URL '$url'";
     }
     if (!defined($fileContent) || length($fileContent) == 0) {
       die "no data retrieved from URL '$url'";
@@ -1292,7 +1554,7 @@ sub ProcessAlerts($$$)
     # create memory mapped file from received data and unzip
     open my $zipFileHandle, '<', \$fileContent;
     my @xmlStrings;
-    unzip($zipFileHandle => \@xmlStrings, MultiStream => 1) or die "unzip failed: $UnzipError\n";
+    unzip($zipFileHandle => \@xmlStrings, MultiStream => 1) or die "error unzipping data: $UnzipError\n";
 
     # parse XML strings
     foreach my $xmlString (@xmlStrings) {
@@ -1304,7 +1566,7 @@ sub ProcessAlerts($$$)
       ::Log3 $name, 5, "$name: ProcessAlerts: parsing XML document";
       my $dom = XML::LibXML->load_xml(string => $xmlString);
       if (!$dom) {
-        die "parsing XML failed";
+        die "error parsing XML data";
       }
       my $xpc = XML::LibXML::XPathContext->new($dom);
       $xpc->registerNs('cap', 'urn:oasis:names:tc:emergency:cap:1.2');
@@ -1386,6 +1648,9 @@ sub ProcessAlerts($$$)
         }
       }
       #::Log3 $name, 5, "$name: ProcessAlerts header: $alert->{identifier}, $alert->{status}, $alert->{msgType}: $alert->{headline}, $alert->{warncellids}[0]";
+      if (!defined($alert->{identifier})) {
+        die "error in XML data, no alert identifier found";
+      }
       if ($alert->{status} ne 'Test' && $alert->{responseType} ne 'Monitor') {
         $alerts{$alert->{identifier}} = $alert;
       }
@@ -1460,11 +1725,14 @@ sub GetAlertsFinish(@)
 
     my $hash = $::defs{$name};
     my $communeUnion = IsCommuneUnionWarncellId($warncellId);
+    delete $hash->{".alertsBlockingCall".$communeUnion};
 
     if (defined($errorMessage) && length($errorMessage) > 0) {
-      $alerts_updating[$communeUnion] = undef;
-      ::readingsSingleUpdate($hash, 'state', "alerts error: $errorMessage", 1);
-    } elsif (defined($hash->{".alertsFile".$communeUnion})) {
+      # error, skip further processing
+    } elsif (!defined($hash->{".alertsFile".$communeUnion})) {
+      $errorMessage = "internal temp file name missing";
+      ::Log3 $name, 3, "$name: GetAlertsFinish error: $errorMessage";
+    } else {
       # deserialize alerts
       my $fh = $hash->{".alertsFileHandle".$communeUnion};
       my $terminator = $/;
@@ -1477,7 +1745,7 @@ sub GetAlertsFinish(@)
       ::Log3 $name, 5, "$name: GetAlertsFinish temp file " . $hash->{".alertsFile".$communeUnion} . " alerts " . keys(%newAlerts) . " size " . length($frozenAlerts);
       delete($hash->{".alertsFile".$communeUnion});
 
-      # @TODO delete global alert list when no differential updates are available
+      # @todo delete global alert list when no differential updates are available?
       my $alerts = {};
 
       # update global alert list
@@ -1502,27 +1770,34 @@ sub GetAlertsFinish(@)
           }
         }
       }
-      $alerts_data[$communeUnion] = $alerts;
-      $alerts_received[$communeUnion] = $time;
-      $alerts_updating[$communeUnion] = undef;
+      $alertsData[$communeUnion] = $alerts;
 
-      if ($warncellId >= 0) {
-        # update alert readings for warncell id
-        UpdateAlerts($hash, $warncellId);
-      } elsif ($warncellId == UPDATE_ALL) {
-        if (!defined($alerts_updating[0]) || (time() - $alerts_updating[0] >= 60)) {
+      if ($warncellId == UPDATE_ALL) {
+        if (!defined($alertsUpdating[0]) || (time() - $alertsUpdating[0] >= 60)) {
           # communeunions cache updated, start district cache update;
           GetAlerts($hash, UPDATE_DISTRICTS);
         }
-      } else {
-        ::readingsSingleUpdate($hash, 'state', "alerts cache updated", 1);
+      } elsif ($warncellId < 0) {
+        ::readingsSingleUpdate($hash, 'state', 'alerts cache updated', 1);
       }
+    }
+    $alertsReceived[$communeUnion] = $time;
+
+    if (defined($errorMessage) && length($errorMessage) > 0) {
+      $alertsErrorMessage[$communeUnion] = $errorMessage;
+      ::readingsSingleUpdate($hash, 'state', "alerts error: $errorMessage", 1);
     } else {
-      ::readingsSingleUpdate($hash, 'state', "alerts error: result file name not defined", 1);
-      ::Log3 $name, 3, "$name: GetAlertsFinish error: temp file name not defined";
+      $alertsErrorMessage[$communeUnion] = undef;
     }
 
-    $hash->{ALERTS_IN_CACHE} = (ref($alerts_data[0]) eq 'HASH'? scalar(keys(%{$alerts_data[0]})) : 0) + (ref($alerts_data[1]) eq 'HASH'? scalar(keys(%{$alerts_data[1]})) : 0);
+    if ($warncellId >= 0) {
+      # update alert readings for warncell id
+      UpdateAlerts($hash, $warncellId);
+    }
+
+    $alertsUpdating[$communeUnion] = undef;
+
+    $hash->{ALERTS_IN_CACHE} = (ref($alertsData[0]) eq 'HASH'? scalar(keys(%{$alertsData[0]})) : 0) + (ref($alertsData[1]) eq 'HASH'? scalar(keys(%{$alertsData[1]})) : 0);
 
     ::Log3 $name, 5, "$name: GetAlertsFinish END";
   } else {
@@ -1546,10 +1821,21 @@ sub GetAlertsAbort($)
 {
   my ($hash, $errorMessage) = @_;
   my $name = $hash->{NAME};
+  my $warncellId = $hash->{".warncellId"};
 
-  ::Log3 $name, 3, "$name: GetAlertsAbort error: retrieving weather alerts failed, $errorMessage";
+  my $communeUnion = IsCommuneUnionWarncellId($warncellId);
+  delete $hash->{".alertsBlockingCall".$communeUnion};
+  $alertsUpdating[$communeUnion] = undef;
+  $errorMessage = "downloading and processing weather alerts data failed ($errorMessage)";
+  ::Log3 $name, 3, "$name: GetAlertsAbort error: $errorMessage";
+  $alertsErrorMessage[$communeUnion] = $errorMessage;
 
-  ::readingsSingleUpdate($hash, 'state', "alerts error: retrieving weather alerts failed, $errorMessage", 1);
+  if ($warncellId >= 0) {
+    # update alert readings for warncell id
+    UpdateAlerts($hash, $warncellId);
+  } else {
+    ::readingsSingleUpdate($hash, 'state', "alerts error: $errorMessage", 1);
+  }
 }
 
 =head2 UpdateAlerts($$)
@@ -1578,11 +1864,39 @@ sub UpdateAlerts($$)
 
   ::readingsBeginUpdate($hash);
 
-  # order alerts by onset
-  my $communeUnion = IsCommuneUnionWarncellId($warncellId);
-  my $alerts = $alerts_data[$communeUnion];
-  my @identifiers = sort { $alerts->{$a}->{onset} <=> $alerts->{$b}->{onset} } keys(%{$alerts});
+  # create alert for next 24 hours, if retrieval failed
   my $index = 0;
+  my $communeUnion = IsCommuneUnionWarncellId($warncellId);
+  if (defined($alertsErrorMessage[$communeUnion]) && length($alertsErrorMessage[$communeUnion]) > 0) {
+    my $prefix = 'a_'.$index.'_';
+    my $time = time();
+    ::readingsBulkUpdate($hash, $prefix.'category',     'Met');
+    ::readingsBulkUpdate($hash, $prefix.'event',        0);
+    ::readingsBulkUpdate($hash, $prefix.'eventDesc',    'STÖRUNG');
+    ::readingsBulkUpdate($hash, $prefix.'eventGroup',   'FHEM');
+    ::readingsBulkUpdate($hash, $prefix.'responseType', 'Prepare');
+    ::readingsBulkUpdate($hash, $prefix.'urgency',      'Immediate');
+    ::readingsBulkUpdate($hash, $prefix.'severity',     'Severe');
+    ::readingsBulkUpdate($hash, $prefix.'areaColor',    '255, 0, 0');
+    ::readingsBulkUpdate($hash, $prefix.'onset',        FormatDateTimeLocal($hash, $time));
+    ::readingsBulkUpdate($hash, $prefix.'expires',      FormatDateTimeLocal($hash, $time+24*60*60));
+    ::readingsBulkUpdate($hash, $prefix.'headline',     'FHEM: Aktualisierung der Wetterwarnungen fehlgeschlagen');
+    ::readingsBulkUpdate($hash, $prefix.'description',  "Fehler: $alertsErrorMessage[$communeUnion]");
+    ::readingsBulkUpdate($hash, $prefix.'instruction',  'ACHTUNG! Aktuell stehen aufgrund einer Störung keine aktuellen Wetterwarnungen zur Verfügung.');
+    ::readingsBulkUpdate($hash, $prefix.'area',         0);
+    ::readingsBulkUpdate($hash, $prefix.'areaDesc',     'DWD Open Data Server');
+    ::readingsBulkUpdate($hash, $prefix.'altitude',     0);
+    ::readingsBulkUpdate($hash, $prefix.'ceiling',      0);
+    $index++;
+
+    ::readingsBulkUpdate($hash, 'a_state', "error: $alertsErrorMessage[$communeUnion]");
+  } else {
+    ::readingsBulkUpdate($hash, 'a_state', 'updated');
+  }
+
+  # order alerts by onset
+  my $alerts = $alertsData[$communeUnion];
+  my @identifiers = sort { $alerts->{$a}->{onset} <=> $alerts->{$b}->{onset} } keys(%{$alerts});
   foreach my $identifier (@identifiers) {
     my $alert = $alerts->{$identifier};
     # find alert for selected warncell
@@ -1622,8 +1936,8 @@ sub UpdateAlerts($$)
 
   # alert count and receive time
   ::readingsBulkUpdate($hash, 'a_count', $index);
-  ::readingsBulkUpdate($hash, "a_time", FormatDateTimeLocal($hash, $alerts_received[$communeUnion]));
-  ::readingsBulkUpdate($hash, 'state', "alerts updated");
+  ::readingsBulkUpdate($hash, "a_time", FormatDateTimeLocal($hash, $alertsReceived[$communeUnion]));
+  ::readingsBulkUpdate($hash, 'state', 'alerts updated');
 
   ::readingsEndUpdate($hash, 1);
 
@@ -1674,6 +1988,17 @@ sub DWD_OpenData_Initialize($) {
 #
 # CHANGES
 #
+# 02.12.2018 (version 1.11.0) jensb
+# feature: async processing of forecast enhanced (HttpUtils_NonblockingGet replaced by BlockingCall) to further unload FHEM process
+# feature: staggered update of forecast and alert to spread load
+# feature: improved cleanup of file descriptors on undef and shutdown
+# feature: alerts and forecast retrieval error detection improved
+# feature: new readings a_state and fc_state
+# feature: create internal alert on retrieval error
+# bugfix: forecast retrieval timout handling
+# bugfix: forecast rotation days calculation
+# bugfix: update scheduling when summertime changes
+#
 # 22.09.2018 jensb
 # feature: forecast rotation for offline update reenabled
 #
@@ -1721,9 +2046,9 @@ sub DWD_OpenData_Initialize($) {
 
 # -----------------------------------------------------------------------------
 #
-# @TODO forecast: if a property is not available for a given hour the value of the previous or next hour is to be used/interpolated
-# @TODO alerts:   queue get commands while cache is updating
-# @TODO history:  https://opendata.dwd.de/weather/weather_reports/poi/
+# @todo forecast: wwd in English
+# @todo forecast: if a property is not available for a given hour the value of the previous or next hour might be used/interpolated?
+# @todo alerts: queue get commands while cache is updating?
 #
 # -----------------------------------------------------------------------------
 
@@ -1776,8 +2101,7 @@ sub DWD_OpenData_Initialize($) {
 
       <li>Verify that your FHEM time is correct by entering <code>{localtime()}</code> into the FHEM command line. If not, check the system time and timezone of your FHEM server and adjust appropriately. It may be necessary to add <code>export TZ=`cat /etc/timezone`</code> or something similar to your FHEM start script <code>/etc/init.d/fhem</code> or your system configuration file <code>/etc/profile</code>. If <code>/etc/timezone</code> does not exists or is undefined execute <code>tzselect</code> to find your timezone and write the result into this file. After making changes restart FHEM and enter <code>{$ENV{TZ}}</code> into the FHEM command line to verify. To fix the timezone temporarily without restarting FHEM enter <code>{$ENV{TZ}='Europe/Berlin'}</code> or something similar into the FHEM command line. Again use <code>tzselect</code> to fine a valid timezone name. </li><br>
 
-      <li>The weekday of the forecast will be in the language of your FHEM system. Enter <code>{$ENV{LANG}}</code> into the FHEM command line to verify.
-      If nothing is displayed or you see an unexpected language setting, add <code>export LANG=de_DE.UTF-8</code> or something similar to your FHEM start script, restart FHEM and check again. If you get a locale warning when starting FHEM the required language pack might be missing. It can be installed depending on your OS and your preferences (e.g. <code>dpkg-reconfigure locales</code>, <code>apt-get install language-pack-de</code> or something similar). </li><br>
+      <li>The weekday of the forecast will be in the language of your FHEM system. Enter <code>{$ENV{LANG}}</code> into the FHEM command line to verify. If nothing is displayed or you see an unexpected language setting, add <code>export LANG=de_DE.UTF-8</code> or something similar to your FHEM start script, restart FHEM and check again. If you get a locale warning when starting FHEM the required language pack might be missing. It can be installed depending on your OS and your preferences (e.g. <code>dpkg-reconfigure locales</code>, <code>apt-get install language-pack-de</code> or something similar). </li><br>
 
       <li>The digits in a warncell id of a communeunion or a district are mostly identical to an <i>Amtliche Gemeindekennziffer</i> if you strip of the 1st digit from the warncell id. You can lookup an Amtliche Gemeindekennziffer using the name of a communeunion or district e.g. at <a href="https://www.statistik-bw.de/Statistik-Portal/gemeindeverz.asp">Statistische &Auml;mter des Bundes und der L&auml;nder</a>. Then add 8 for a communeunion or 1 or 9 for a district at the beginning and try to find an exact or near match in the <a href="https://www.dwd.de/DE/leistungen/opendata/help/warnungen/cap_warncellids_csv.csv">Warncell-IDs for CAP alerts catalogue</a>. This approach is an alternative to <i>guessing</i> the right warncell id by the name of a communeunion or district. </li><br>
 
@@ -1785,7 +2109,7 @@ sub DWD_OpenData_Initialize($) {
 
       <li>The forecast reading names do not contain absolute days or hours to keep them independent of summertime adjustments. Forecast days are counted relative to "today" of the timezone defined by the attribute of the same name or the timezone specified by the Perl TZ environment variable if undefined. </li><br>
 
-      <li>Starting on 17.09.2018 the forecast data is no longer available in CSV format and is based on the KML format instead. While most of the properties of the CSV format are still available in KML format, their names have changed and you will have to adjust your existing installation accordingly. </li><br>
+      <li>Starting on 17.09.2018 the forecast data from the DWD is no longer available in CSV format and is based on the KML format instead. While most of the properties of the CSV format are still available in KML format, their names have changed and you will have to adjust your existing installation accordingly. </li><br>
   </ul><br>
 
   <a name="DWD_OpenDatadefine"></a>
@@ -1814,7 +2138,7 @@ sub DWD_OpenData_Initialize($) {
           This command can be used before querying several warncells in sequence or to force a higher update frequency than the built-in 15 minutes. Note that all DWD_OpenData devices share a single alerts cache so updating the cache via one of the devices is sufficient.
       </li>
   </ul> <br><br>
-  
+
 
   <a name="DWD_OpenDataattr"></a>
   <b>Attributes</b><br>
@@ -1917,14 +2241,16 @@ sub DWD_OpenData_Initialize($) {
   Additionally there are global forecast readings:
   <ul>
     <ul>
+      <li>fc_state       - state of the last forecast update, possible values are 'updated' and 'error: ...'</li>
       <li>fc_station     - forecast station code (WMO or DWD)</li>
       <li>fc_description - station description</li>
       <li>fc_coordinates - world coordinat and height of station</li>
-      <li>fc_time        - time the forecast updated was downloaded based on the timezone attribute</li>
+      <li>fc_time        - time the forecast was issued based on the timezone attribute</li>
       <li>fc_copyright   - legal information, must be displayed with forecast data, see DWD usage conditions</li>
     </ul>
-  </ul> <br><br>
+  </ul> <br>
 
+  Note that depending on your device configuration each forecast consists of quite a lot of readings and each reading update will cause a FHEM event that needs to be processed. Depending on your hardware and your FHEM configuration this will take several hundred milliseconds. If you need to improve overall performance you can limit the number of readings created by setting the attribute <code>forecastProperties</code> and reduce the event processing overhead by setting the attribute <code>event-on-update-reading</code> to a small list of important reading (e.g. <code>to state,fc_time,a_time</code>). <br><br>
 
   The <b>alert</b> readings are ordered by onset and are build like this: <br><br>
 
@@ -1960,7 +2286,8 @@ sub DWD_OpenData_Initialize($) {
 
   <ul>
     <ul>
-      <li>a_time      - time the last alert update was downloaded based on the timezone attribute</li>
+      <li>a_state     - state of the last alerts update, possible values are 'updated' and 'error: ...'</li>
+      <li>a_time      - time the last alerts update was downloaded, based on the timezone attribute</li>
       <li>a_count     - number of alerts available for selected warncell id</li>
       <li>a_copyright - legal information, must be displayed with forecast data, see DWD usage conditions, not available if count is zero</li>
     </ul>
