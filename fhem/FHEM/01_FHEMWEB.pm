@@ -3071,11 +3071,11 @@ FW_devState($$@)
   my $state = $defs{$d}{STATE};
   $state = "" if(!defined($state));
 
-  $hasOnOff = ($allSets =~ m/(^| )on(:[^ ]*)?( |$)/ &&
-               $allSets =~ m/(^| )off(:[^ ]*)?( |$)/);
   my $txt = $state;
   my $dsi = ($attr{$d} && ($attr{$d}{stateFormat} || $attr{$d}{devStateIcon}));
 
+  $hasOnOff = ($allSets =~ m/(^| )on(:[^ ]*)?( |$)/i &&
+               $allSets =~ m/(^| )off(:[^ ]*)?( |$)/i);
   if(AttrVal($d, "showtime", undef)) {
     my $v = $defs{$d}{READINGS}{state}{TIME};
     $txt = $v if(defined($v));
@@ -3128,9 +3128,11 @@ FW_devState($$@)
 
 
   if($hasOnOff) {
+    my $isUpperCase = ($allSets =~ m/(^| )ON(:[^ ]*)?( |$)/ &&
+                       $allSets =~ m/(^| )OFF(:[^ ]*)?( |$)/);
     # Have to cover: "on:An off:Aus", "A0:Aus AI:An Aus:off An:on"
-    my $on  = ReplaceEventMap($d, "on", 1);
-    my $off = ReplaceEventMap($d, "off", 1);
+    my $on  = ReplaceEventMap($d, $isUpperCase ? "ON" :"on" , 1);
+    my $off = ReplaceEventMap($d, $isUpperCase ? "OFF":"off", 1);
     $link = "cmd.$d=set $d " . ($state eq $on ? $off : $on) if(!defined($link));
     $cmdList = "$on:$off" if(!$cmdList);
 
