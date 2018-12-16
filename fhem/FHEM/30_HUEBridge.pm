@@ -958,8 +958,32 @@ HUEBridge_Get($@)
     $ret = sprintf( "%-20s %-20s %-30s %s\n", "CREATE", "LAST USE", "NAME", "KEY" ) .$ret if( $ret );
     return $ret;
 
+ } elsif($cmd eq 'startup' ) {
+    my $result =  HUEBridge_Call($hash, undef, 'lights', undef);
+    return $result->{error}{description} if( $result->{error} );
+    my $ret = "";
+    foreach my $key ( sort {$a<=>$b} keys %{$result} ) {
+      my $code = $name ."-". $key;
+      my $fhem_name ="";
+      $fhem_name = $modules{HUEDevice}{defptr}{$code}->{NAME} if( defined($modules{HUEDevice}{defptr}{$code}) );
+      $ret .= sprintf( "%2i: %-25s %-15s %s", $key, $result->{$key}{name}, $fhem_name );
+      if( !$result->{$key}{config} || !$result->{$key}{config}{startup} ) {
+        $ret .= "not supported";
+      } else {
+        $ret .= sprintf( "%s\t%s", $result->{$key}{config}{startup}{mode}, $result->{$key}{config}{startup}{configured} );
+      }
+      $ret .= "\n";
+    }
+    $ret = sprintf( "%2s  %-25s %-15s %s\t%s\n", "ID", "NAME", "FHEM", "MODE", "CONFIGURED" ) .$ret if( $ret );
+    return $ret;
+
   } else {
-    return "Unknown argument $cmd, choose one of lights:noArg groups:noArg scenes:noArg rule rules:noArg sensors:noArg whitelist:noArg";
+    my $list = "lights:noArg groups:noArg scenes:noArg rule rules:noArg sensors:noArg whitelist:noArg";
+    if( $hash->{helper}{apiversion} && $hash->{helper}{apiversion} >= (1<<16) + (26<<8) ) {
+      $list .= " startup:noArg";
+    }
+
+    return "Unknown argument $cmd, choose one of $list";
   }
 }
 
@@ -1848,6 +1872,8 @@ HUEBridge_Attr($$$)
       list the groups known to the bridge.</li>
     <li>scenes [detail]<br>
       list the scenes known to the bridge.</li>
+    <li>startup<br>
+      show startup behavior of all known lights</li>
     <li>rule &lt;id&gt; <br>
       list the rule with &lt;id&gt;.</li>
     <li>rules [detail] <br>

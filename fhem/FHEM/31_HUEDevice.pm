@@ -988,11 +988,22 @@ HUEDevice_Get($@)
       ($r,$g,$b) = xyYtorgb($x,$y,$Y);
     }
     return sprintf( "%02x%02x%02x", $r+0.5, $g+0.5, $b+0.5 );
+  } elsif ( $cmd eq "startup" ) {
+    my $result = IOWrite($hash,undef,$hash->{NAME},$hash->{ID});
+    return $result->{error}{description} if( $result->{error} );
+    return "not supported" if( !$result->{config} || !$result->{config}{startup} );
+    return "$result->{config}{startup}{mode}\t$result->{config}{startup}{configured}";
+    return Dumper $result->{config}{startup};
+
   } elsif ( $cmd eq "devStateIcon" ) {
     return HUEDevice_devStateIcon($hash);
   }
 
-  return "Unknown argument $cmd, choose one of rgb:noArg RGB:noArg devStateIcon:noArg";
+  my $list = "rgb:noArg RGB:noArg devStateIcon:noArg";
+  if( $defs{$name}->{IODev}->{helper}{apiversion} && $defs{$name}->{IODev}->{helper}{apiversion} >= (1<<16) + (26<<8) ) {
+    $list .= " startup:noArg";
+  }
+  return "Unknown argument $cmd, choose one of $list";
 }
 
 
@@ -1629,6 +1640,8 @@ HUEDevice_Attr($$$;$)
     <ul>
       <li>rgb</li>
       <li>RGB</li>
+      <li>startup<br>
+        show startup behavior.</li>
       <li>devStateIcon<br>
       returns html code that can be used to create an icon that represents the device color in the room overview.</li>
     </ul><br>
