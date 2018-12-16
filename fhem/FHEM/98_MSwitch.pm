@@ -6503,7 +6503,7 @@ sub MSwitch_checkcondition($$$) {
 	  my $x = 0;
 	  my $field ="";
 	  my $SELF = $name;
-	 while ( $condition =~ m/(.*){(.+)}(.*)/ ) {
+	 while ( $condition =~ m/(.*)\{(.+)\}(.*)/ ) {
          my $firstpart  = $1;
          my $secondpart = $2;
          my $lastpart   = $3;
