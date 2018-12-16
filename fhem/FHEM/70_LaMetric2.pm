@@ -354,9 +354,11 @@ sub LaMetric2_Set($@) {
             && keys %{ $hash->{helper}{cancelIDs} } > 0 );
 
         $usage .= " input:,";
-        $usage .= join( ',',
-            map $hash->{helper}{inputs}{$_}{name},
-            sort keys %{ $hash->{helper}{inputs} } )
+        $usage .= encode_utf8(
+            join( ',',
+                map $hash->{helper}{inputs}{$_}{name},
+                sort keys %{ $hash->{helper}{inputs} } )
+          )
           if ( defined( $hash->{helper}{inputs} )
             && keys %{ $hash->{helper}{inputs} } > 0 );
 
@@ -1999,7 +2001,7 @@ sub LaMetric2_SetNotification {
                   (
                     {
                         icon  => $ico,
-                        text  => $line,
+                        text  => decode_utf8($line),
                         index => $index++,
                     }
                   );
