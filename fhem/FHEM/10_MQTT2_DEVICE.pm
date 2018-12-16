@@ -27,10 +27,11 @@ MQTT2_DEVICE_Initialize($)
     devicetopic
     disable:0,1
     disabledForIntervals
+    getList:textField-long
     model
     readingList:textField-long
     setList:textField-long
-    getList:textField-long
+    setStateList
   );
   use warnings 'qw';
   $hash->{AttrList} = join(" ", @attrList)." ".$readingFnAttributes;
@@ -293,7 +294,21 @@ MQTT2_DEVICE_Set($@)
   $cmd = MQTT2_buildCmd($hash, \@a, $cmd);
   return if(!$cmd);
   IOWrite($hash, "publish", $cmd);
-  readingsSingleUpdate($hash, "state", $cmdName, 1);
+  my $ssl = AttrVal($hash->{NAME}, "setStateList", "");
+  if(!$ssl) {
+    readingsSingleUpdate($hash, "state", $cmdName, 1);
+
+  } else {
+    if($ssl =~ m/\b$cmdName\b/) {
+      $hash->{skipStateFormat} = 1;
+      readingsSingleUpdate($hash, "state", "set_$cmdName", 1);
+      delete($hash->{skipStateFormat});
+    } else {
+      shift(@a);
+      unshift(@a, "set");
+      readingsSingleUpdate($hash, $cmdName, join(" ",@a), 1);
+    }
+  }
   return undef;
 }
 
@@ -532,6 +547,36 @@ zigbee2mqtt_devStateIcon255($)
     <li><a href="#disable">disable</a><br>
         <a href="#disabledForIntervals">disabledForIntervals</a></li><br>
 
+    <a name="getList"></a>
+    <li>getList cmd [topic|perl-Expression] ...<br>
+      When the FHEM command cmd is issued, publish the topic, wait for the
+      answer (the specified reading), and show it in the user interface.
+      Multiple triples can be specified, each of them separated by newline, the
+      newline does not have to be entered in the FHEMWEB frontend.<br>
+      Example:<br>
+      <code>
+        &nbsp;&nbsp;attr dev getList\<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;temp temperature myDev/cmd/getstatus\<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;hum  hum  myDev/cmd/getStatus
+      </code><br>
+      This example defines 2 get commands (temp and hum), which both publish
+      the same topic, but wait for different readings to be set.<br>
+      Notes:
+      <ul>
+        <li>the readings must be parsed by a readingList</li>
+        <li>get is asynchron, it is intended for frontends like FHEMWEB or
+          telnet, the result cannot be used in self-written perl expressions.
+          Use a set and a notify/DOIF/etc definition for such a purpose</li>
+        <li>arguments to the get command will be appended to the message
+          published (not for the perl expression)</li>
+        <li>the command arguments are available as $EVENT, $EVTPART0, etc.
+          </li>
+        <li>the perl expression must return a string containing the topic and
+          the message separated by a space.</li>
+      </ul>
+      </li><br>
+
+
     <a name="readingList"></a>
     <li>readingList &lt;regexp&gt; [readingName|perl-Expression] ...
       <br>
@@ -590,33 +635,16 @@ zigbee2mqtt_devStateIcon255($)
       </ul>
       </li><br>
 
-    <a name="getList"></a>
-    <li>getList cmd [topic|perl-Expression] ...<br>
-      When the FHEM command cmd is issued, publish the topic, wait for the
-      answer (the specified reading), and show it in the user interface.
-      Multiple triples can be specified, each of them separated by newline, the
-      newline does not have to be entered in the FHEMWEB frontend.<br>
-      Example:<br>
-      <code>
-        &nbsp;&nbsp;attr dev getList\<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;temp temperature myDev/cmd/getstatus\<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;hum  hum  myDev/cmd/getStatus
-      </code><br>
-      This example defines 2 get commands (temp and hum), which both publish
-      the same topic, but wait for different readings to be set.<br>
-      Notes:
-      <ul>
-        <li>the readings must be parsed by a readingList</li>
-        <li>get is asynchron, it is intended for frontends like FHEMWEB or
-          telnet, the result cannot be used in self-written perl expressions.
-          Use a set and a notify/DOIF/etc definition for such a purpose</li>
-        <li>arguments to the get command will be appended to the message
-          published (not for the perl expression)</li>
-        <li>the command arguments are available as $EVENT, $EVTPART0, etc.
-          </li>
-        <li>the perl expression must return a string containing the topic and
-          the message separated by a space.</li>
-      </ul>
+    <a name="setStateList"></a>
+    <li>setStateList command command ...<br>
+      This attribute is used to get more detailed feedback when switching
+      devices.  I.e. when the command on is contained in the list, state will
+      be first set to set_on, and after the device reports execution, state
+      will be set to on (probably with the help of stateFormat). Commands not
+      in the list will set a reading named after the command, with the word set
+      and the command parameters as its value.<br><br>
+      If this attribute is not defined, then a set command will set the state
+      reading to the name of the command.
       </li><br>
 
   </ul>

@@ -4456,8 +4456,13 @@ evalStateFormat($)
 
   ###########################
   # Set STATE
-  my $sr = AttrVal($name, "stateFormat", undef);
   my $st = $hash->{READINGS}{state};
+  if($hash->{skipStateFormat} && defined($st)) {
+    $hash->{STATE} = ReplaceEventMap($name, $st->{VAL}, 1);
+    return;
+  }
+
+  my $sr = AttrVal($name, "stateFormat", undef);
   if(!$sr) {
     $st = $st->{VAL} if(defined($st));
 
