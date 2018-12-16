@@ -1258,7 +1258,7 @@ sub LaMetric2_SetApp {
     my $hash    = shift;
     my $cmd     = shift;
     my $h       = shift;
-    my $package = shift;
+    my $package = decode_utf8(shift);
     my $action  = shift;
     my $name    = $hash->{NAME};
 
