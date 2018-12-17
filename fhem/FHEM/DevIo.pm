@@ -498,7 +498,11 @@ DevIo_CloseDev($@)
   return if(!$dev);
   
   if($hash->{TCPDev}) {
-    $hash->{TCPDev}->close();
+    if($isFork && $hash->{SSL}) { # Forum #94219
+      $hash->{TCPDev}->close(SSL_no_shutdown => 1);
+    } else {
+      $hash->{TCPDev}->close();
+    }
     delete($hash->{TCPDev});
 
   } elsif($hash->{USBDev}) {
