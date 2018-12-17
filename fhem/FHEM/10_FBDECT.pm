@@ -120,8 +120,9 @@ FBDECT_SetHttp($@)
       return "desired-temp must be between 7.5 and 28.5"
         if($a[2] !~ m/^[\d.]+$/ || $a[2] < 7.5 || $a[2] > 28.5)
     }
-    my $val = ($cmd eq "open"  || $a[2]==28.5) ? 254 :
-              ($cmd eq "closed"|| $a[2]== 7.5) ? 253: int(2*$a[2]);
+    my $a2 = ($a[2] ? $a[2] : 0);
+    my $val = ($cmd eq "open"  || $a2==28.5) ? 254 :
+              ($cmd eq "closed"|| $a2== 7.5) ? 253: int(2*$a2);
     IOWrite($hash, ReadingsVal($name,"AIN",0),"sethkrtsoll&param=$val");
     return undef;
   }
