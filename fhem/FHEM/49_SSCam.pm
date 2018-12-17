@@ -45,6 +45,7 @@ use HttpUtils;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.0.0"  => "13.12.2018  HLS with sscam_hls.js integrated for SSCamSTRM type hls, realize tooltipps in streaming devices, minor fixes",
   "7.7.1"  => "12.12.2018  change autocreateCams: define new device only if ne device with Internal CAMNAME is defined, ".
               "fix getsnapinfo function get wrong snapid or none if cam is new defined ",
   "7.7.0"  => "10.12.2018  SVS-Device: autocreateCams command added, some other fixes and improvements, minor code rewrite, ".
@@ -101,6 +102,8 @@ our %SSCam_vNotesIntern = (
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
+  "8.0.0"  => "18.12.2018 HLS is integrated using sscam_hls.js in Streaming device types \"hls\". HLS streaming is now available ".
+              "for all common used browser types. Tooltipps are added to streaming devices and snapgallery.",
   "7.7.0"  => "10.12.2018 autocreateCams command added to SVS device. By this command all cameras installed in SVS can be ".
               "defined automatically. <br>".
               "In SSCamSTRM devices the \"set &lt;name&gt; popupStream\" command is implemented which may open a popup window with the ".
@@ -277,9 +280,40 @@ my %SSCam_errlist = (
   600 => "Presetname and PresetID not found in Hash",
 );
 
+# Tooltipps Textbausteine (http://www.walterzorn.de/tooltip/tooltip.htm#download), §NAME§ wird durch Kameranamen ersetzt 
+our %SSCam_ttips_en = (
+    ttrefresh   => "The playback of streaming content of camera of &quot;§NAME§&quot; will be restartet.",
+    ttrecstart  => "Start an endless recording of camera &quot;§NAME§&quot;.<br>You have to stop the recording manually.",
+    ttrecstop   => "Stopp the recording of camera &quot;§NAME§&quot;.",
+    ttsnap      => "Take a snapshot of camera &quot;§NAME§&quot;.",
+    ttcmdstop   => "Stopp playback of camera &quot;§NAME§&quot;",
+    tthlsreact  => "Reactivate HTTP Livestreaming Interface of camera &quot;§NAME§&quot;.<br>The camera is enforced to restart HLS transmission.",
+    ttmjpegrun  => "Playback the MJPEG Livestream of camera &quot;§NAME§&quot;.",
+    tthlsrun    => "Playback the native HTTP Livestream of camera &quot;§NAME§&quot;.",
+    ttlrrun     => "Playback of last recording of camera &quot;§NAME§&quot; in an iFrame.<br>Both MJPEG and H.264 recordings are rendered.",
+    tth264run   => "Playback of last H.264 recording of camera &quot;§NAME§&quot;.<br>It only starts if the recording is type H.264",
+    ttlmjpegrun => "Playback of last MJPEG recording of camera &quot;§NAME§&quot;.<br>It only starts if the recording is type MJPEG",
+    ttlsnaprun  => "Playback of last snapshot of camera &quot;§NAME§&quot;.",
+);
+	  
+our %SSCam_ttips_de = (
+    ttrefresh   => "Die Wiedergabe des Streams von Kamera &quot;§NAME§&quot; wird neu gestartet.",
+    ttrecstart  => "Startet eine Endlosaufnahme von Kamera &quot;§NAME§&quot;.<br>Die Aufnahme muß manuell gestoppt werden.",
+    ttrecstop   => "Stoppt die laufende Aufnahme von Kamera &quot;§NAME§&quot;.",
+    ttsnap      => "Ein Schnappschuß von Kamera &quot;§NAME§&quot; wird aufgenommen.", 
+    ttcmdstop   => "Stopp Wiedergabe von Kamera &quot;§NAME§&quot;",
+    tthlsreact  => "Reactiviert das HTTP Livestreaming Interface von camera &quot;§NAME§&quot;.<br>Die Kamera wird aufgefordert die HLS Übertragung zu restarten.",     
+    ttmjpegrun  => "Wiedergabe des MJPEG Livestreams von Kamera &quot;§NAME§&quot;",
+    tthlsrun    => "Wiedergabe des HTTP Livestreams von Kamera &quot;§NAME§&quot;.<br>Es wird die HLS Funktion der Synology Surveillance Station verwendet.",
+    ttlrrun     => "Wiedergabe der letzten Aufnahme von Kamera &quot;§NAME§&quot; in einem iFrame.<br>Es werden sowohl MJPEG als auch H.264 Aufnahmen wiedergegeben.",
+    tth264run   => "Wiedergabe der letzten H.264 Aufnahme von Kamera &quot;§NAME§&quot;.<br>Die Wiedergabe startet nur wenn die Aufnahme vom Typ H.264 ist.",
+    ttlmjpegrun => "Wiedergabe der letzten MJPEG Aufnahme von Kamera &quot;§NAME§&quot;.<br>Die Wiedergabe startet nur wenn die Aufnahme vom Typ MJPEG ist.", 
+    ttlsnaprun  => "Wiedergabe des letzten Schnappschusses von Kamera &quot;§NAME§&quot;.",
+);
+
 # Standardvariablen
 my $SSCam_slim = 3;                          # default Anzahl der abzurufenden Schnappschüsse mit snapGallery
-my $SSCAM_snum = "1,2,3,4,5,6,7,8,9,10";     # mögliche Anzahl der abzurufenden Schnappschüsse mit snapGallery
+my $SSCAM_snum = "1,2,3,4,5,6,7,8,9,10";     # mögliche Anzahl der abzurufenden Schnappschüsse mit snapGallery                
 
 use vars qw($FW_ME);      # webname (default is fhem), used by 97_GROUP/weblink
 use vars qw($FW_subdir);  # Sub-path in URL, used by FLOORPLAN/weblink
@@ -288,6 +322,7 @@ use vars qw($FW_detail);  # currently selected device for detail view
 use vars qw($FW_wname);   # Web instance
 sub FW_pH(@);             # add href
 
+################################################################
 sub SSCam_Initialize($) {
  my ($hash) = @_;
  $hash->{DefFn}        = "SSCam_Define";
@@ -304,6 +339,8 @@ sub SSCam_Initialize($) {
  $hash->{AttrList} =
          "disable:1,0 ".
          "genericStrmHtmlTag ".
+         "hlsNetScript:1,0 ".
+         "hlsStrmObject ".
          "httptimeout ".
          "htmlattr ".
          "livestreamprefix ".
@@ -453,6 +490,10 @@ sub SSCam_Attr($$$$) {
     # $cmd can be "del" or "set"
     # $name is device name
     # aName and aVal are Attribute name and value
+    
+    if ($aName =~ /hlsNetScript/ && SSCam_IsModelCam($hash)) {            
+        return " The attribute \"$aName\" is only valid for devices of type \"SVS\"! Please set this attribute in a device of this type.";
+    }
     
     # dynamisch PTZ-Attribute setzen (wichtig beim Start wenn Reading "DeviceType" nicht gesetzt ist)
     if ($cmd eq "set" && ($aName =~ m/ptzPanel_.*/)) {
@@ -639,7 +680,7 @@ sub SSCam_Set($@) {
                  "snap:noArg ".
 	     		 (AttrVal($name, "snapGalleryBoost",0)?(AttrVal($name,"snapGalleryNumber",undef) || AttrVal($name,"snapGalleryBoost",0))?"snapGallery:noArg ":"snapGallery:$SSCAM_snum ":" ").
 	     		 "createSnapGallery:noArg ".
-                 "createStreamDev:generic,mjpeg,switched ".
+                 "createStreamDev:generic,hls,mjpeg,switched ".
                  ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "createPTZcontrol:noArg ": "").
                  "enable:noArg ".
                  "disable:noArg ".
@@ -754,7 +795,7 @@ sub SSCam_Set($@) {
 	  $sgdev = "SSCamSTRM.$name.snapgallery";
       $ret = CommandDefine($hash->{CL},"$sgdev SSCamSTRM {SSCam_composegallery('$name','$sgdev','snapgallery')}");
 	  return $ret if($ret);
-	  my $room = "SnapGallery";
+	  my $room = "SSCam";
       $attr{$sgdev}{room}  = $room;
 	  return "Snapgallery device \"$sgdev\" created and assigned to room \"$room\".";
       
@@ -763,7 +804,7 @@ sub SSCam_Set($@) {
 	  my $ptzcdev = "SSCamSTRM.$name.PTZcontrol";
       my $ret     = CommandDefine($hash->{CL},"$ptzcdev SSCamSTRM {SSCam_ptzpanel('$name','$ptzcdev','ptzcontrol')}");
 	  return $ret if($ret);
-	  my $room    = AttrVal($name,"room","PTZcontrol");
+	  my $room    = AttrVal($name,"room","SSCam");
       $attr{$ptzcdev}{room}  = $room;
       $attr{$ptzcdev}{group} = $name."_PTZcontrol";
 	  return "PTZ control device \"$ptzcdev\" created and assigned to room \"$room\".";
@@ -781,6 +822,13 @@ sub SSCam_Set($@) {
           $livedev = "SSCamSTRM.$name.generic";
           $ret = CommandDefine($hash->{CL},"$livedev SSCamSTRM {SSCam_StreamDev('$name','$livedev','generic')}");
 	      return $ret if($ret);
+      } 
+      if($prop =~ /hls/) {
+          $livedev = "SSCamSTRM.$name.hls";
+          $ret = CommandDefine($hash->{CL},"$livedev SSCamSTRM {SSCam_StreamDev('$name','$livedev','hls')}");
+	      return $ret if($ret);
+          my $c = "The device needs to set attribute \"hlsStrmObject\" in camera device \"$name\" to a valid HLS videostream";
+          CommandAttr($hash->{CL},"$livedev comment $c");
       }      
       if($prop =~ /switched/) {
           $livedev = "SSCamSTRM.$name.switched";
@@ -788,7 +836,7 @@ sub SSCam_Set($@) {
 	      return $ret if($ret);
       }
       
-	  my $room = AttrVal($name,"room","Livestream");
+	  my $room = AttrVal($name,"room","SSCam");
       $attr{$livedev}{room}  = $room;
 	  return "Livestream device \"$livedev\" created and assigned to room \"$room\".";
   
@@ -802,7 +850,7 @@ sub SSCam_Set($@) {
                   '< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >'."\n".
                   '< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >'."\n".
                   '<%it_server>,<HomeMode<br>On/Off>,<&nbsp;>,<Status>,<&nbsp;>,&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>'."\n".
-                  'TYPE=SSCam:FILTER=MODEL=SVS:HomeModeState,<&nbsp;>,state,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,?!disable,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>'."\n".
+                  'TYPE=SSCam:FILTER=MODEL=SVS:!HomeModeState,<&nbsp;>,state,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,?!disable,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>'."\n".
                   '';
       
       my $ret     = CommandDefine($hash->{CL},"$rgdev readingsGroup $rgdef");
@@ -1423,7 +1471,7 @@ sub SSCam_FWsummaryFn ($$$$) {
     if($hash->{HELPER}{RUNVIEW} =~ /live_fw/) {
       if(ReadingsVal($d, "Record", "Stop") eq "Stop") {
         # Aufnahmebutton endlos Start
-        $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\">$imgrecendless </a>";
+        $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\" >$imgrecendless </a>";
       } else {
         # Aufnahmebutton Stop
         $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecstop')\">$imgrecstop </a>";
@@ -5775,7 +5823,7 @@ sub SSCam_Autocreate ($$) {
    }  
    
 return ($err,$camname);
-}  
+}
 
 ###############################################################################
 #   Test ob JSON-String empfangen wurde
@@ -6211,6 +6259,11 @@ return;
 #      Funktion für SSCamSTRM-Devices - Kamera Liveview weblink device
 #      API: SYNO.SurveillanceStation.VideoStreaming
 #      Methode: GetLiveViewPath
+#
+#      $camname = Name der Kamaera (Parent-Device)
+#      $strmdev = Name des Streaming-Devices
+#      $fmt     = Streaming Format
+#
 ######################################################################################
 sub SSCam_StreamDev($$$) {
   my ($camname,$strmdev,$fmt) = @_; 
@@ -6273,7 +6326,40 @@ sub SSCam_StreamDev($$$) {
   $pws       =~ s/"//g if($pws);
   my $StmKey = ReadingsVal($camname,"StmKey",undef);
   
+  # Javascript Bibliothek für Tooltips (http://www.walterzorn.de/tooltip/tooltip.htm#download) und Texte
+  my $calias = $hash->{CAMNAME};                                            # Alias der Kamera
+  my $ttjs   = "/fhem/pgm2/sscam_tooltip.js"; 
+  my ($ttrefresh, $ttrecstart, $ttrecstop, $ttsnap, $ttcmdstop, $tthlsreact, $ttmjpegrun, $tthlsrun, $ttlrrun, $tth264run, $ttlmjpegrun, $ttlsnaprun);
+  if(AttrVal("global","language","EN") =~ /EN/) {
+	  $ttrefresh  = $SSCam_ttips_en{"ttrefresh"}; $ttrefresh =~ s/§NAME§/$calias/g;
+      $ttrecstart = $SSCam_ttips_en{"ttrecstart"}; $ttrecstart =~ s/§NAME§/$calias/g;
+      $ttrecstop  = $SSCam_ttips_en{"ttrecstop"}; $ttrecstop =~ s/§NAME§/$calias/g;
+      $ttsnap     = $SSCam_ttips_en{"ttsnap"}; $ttsnap =~ s/§NAME§/$calias/g;
+      $ttcmdstop  = $SSCam_ttips_en{"ttcmdstop"}; $ttcmdstop =~ s/§NAME§/$calias/g;
+      $tthlsreact = $SSCam_ttips_en{"tthlsreact"}; $tthlsreact =~ s/§NAME§/$calias/g;
+      $ttmjpegrun = $SSCam_ttips_en{"ttmjpegrun"}; $ttmjpegrun =~ s/§NAME§/$calias/g;
+      $tthlsrun   = $SSCam_ttips_en{"tthlsrun"}; $tthlsrun =~ s/§NAME§/$calias/g;
+      $ttlrrun    = $SSCam_ttips_en{"ttlrrun"}; $ttlrrun =~ s/§NAME§/$calias/g;
+      $tth264run  = $SSCam_ttips_en{"tth264run"}; $tth264run =~ s/§NAME§/$calias/g;	  
+      $ttlmjpegrun= $SSCam_ttips_en{"ttlmjpegrun"}; $ttlmjpegrun =~ s/§NAME§/$calias/g;
+	  $ttlsnaprun = $SSCam_ttips_en{"ttlsnaprun"}; $ttlsnaprun =~ s/§NAME§/$calias/g;
+  } else {
+	  $ttrefresh  = $SSCam_ttips_de{"ttrefresh"}; $ttrefresh =~ s/§NAME§/$calias/g;
+      $ttrecstart = $SSCam_ttips_de{"ttrecstart"}; $ttrecstart =~ s/§NAME§/$calias/g;
+      $ttrecstop  = $SSCam_ttips_de{"ttrecstop"}; $ttrecstop =~ s/§NAME§/$calias/g;
+      $ttsnap     = $SSCam_ttips_de{"ttsnap"}; $ttsnap =~ s/§NAME§/$calias/g;
+      $ttcmdstop  = $SSCam_ttips_de{"ttcmdstop"}; $ttcmdstop =~ s/§NAME§/$calias/g;
+      $tthlsreact = $SSCam_ttips_de{"tthlsreact"}; $tthlsreact =~ s/§NAME§/$calias/g;
+      $ttmjpegrun = $SSCam_ttips_de{"ttmjpegrun"}; $ttmjpegrun =~ s/§NAME§/$calias/g;
+      $tthlsrun   = $SSCam_ttips_de{"tthlsrun"}; $tthlsrun =~ s/§NAME§/$calias/g;
+      $ttlrrun    = $SSCam_ttips_de{"ttlrrun"}; $ttlrrun =~ s/§NAME§/$calias/g;
+      $tth264run  = $SSCam_ttips_de{"tth264run"}; $tth264run =~ s/§NAME§/$calias/g;	  
+      $ttlmjpegrun= $SSCam_ttips_de{"ttlmjpegrun"}; $ttlmjpegrun =~ s/§NAME§/$calias/g;
+	  $ttlsnaprun = $SSCam_ttips_de{"ttlsnaprun"}; $ttlsnaprun =~ s/§NAME§/$calias/g;
+  }
+  
   $ret  = "";
+  $ret .= "<script type=\"text/javascript\" src=\"$ttjs\"></script>";
   $ret .= '<table class="block wide internals">';
   $ret .= '<tbody>';
   $ret .= '<tr class="odd">';  
@@ -6281,8 +6367,8 @@ sub SSCam_StreamDev($$$) {
   if(!$StmKey || ReadingsVal($camname, "Availability", "") ne "enabled" || IsDisabled($camname)) {
       # Ausgabe bei Fehler
       my $cam = AttrVal($camname, "alias", $camname);
-      $cause = !$StmKey?"Cam $cam has no Reading \"StmKey\" set !":"Cam \"$cam\" is disabled";
-      $cause = "Cam \"$cam\" is disabled" if(IsDisabled($camname));
+      $cause = !$StmKey?"Camera $cam has no Reading \"StmKey\" set !":"Cam \"$cam\" is disabled";
+      $cause = "Camera \"$cam\" is disabled" if(IsDisabled($camname));
       $ret .= "<td> <br> <b> $cause </b> <br><br></td>";
       $ret .= '</tr>';
       $ret .= '</tbody>';
@@ -6291,7 +6377,7 @@ sub SSCam_StreamDev($$$) {
       return $ret; 
   }
   
-  if($fmt =~ /mjpeg/) { 
+  if ($fmt =~ /mjpeg/) { 
       if($apivideostmsmaxver) {                                  # keine API "SYNO.SurveillanceStation.VideoStream" mehr ab API v2.8
           $link = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
       } elsif ($hash->{HELPER}{STMKEYMJPEGHTTP}) {
@@ -6306,12 +6392,12 @@ sub SSCam_StreamDev($$$) {
       
       if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
              # Aufnahmebutton endlos Start
-             $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\">$imgrecendless </a>";
+             $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
           }	else {
              # Aufnahmebutton Stop
-             $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecstop')\">$imgrecstop </a>";
+             $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecstop')\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
           }	      
-      $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\">$imgdosnap </a>";               
+      $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";               
       $ret .= "</td>";      
       if(AttrVal($camname,"ptzPanel_use",1)) {
           my $ptz_ret = SSCam_ptzpanel($camname);
@@ -6329,7 +6415,7 @@ sub SSCam_StreamDev($$$) {
           $ret .= "<td></td>" if(AttrVal($camname,"ptzPanel_use",0));
       }      
   
-  } elsif($fmt =~ /generic/) {  
+  } elsif ($fmt =~ /generic/) {  
       my $htag  = AttrVal($camname,"genericStrmHtmlTag","");
       if( $htag =~ m/^\s*(.*)\s*$/s ) {
           $htag = $1;
@@ -6349,23 +6435,23 @@ sub SSCam_StreamDev($$$) {
       $ret .= "<td>";
       $ret .= "$htag";
       if($htag) {
-          $streamHash->{HELPER}{STREAM}       = "$htag";   # Stream für "get <SSCamSTRM-Device> popupStream" speichern
+          $streamHash->{HELPER}{STREAM}       = "$htag";   # Stream für "set <SSCamSTRM-Device> popupStream" speichern
           $streamHash->{HELPER}{STREAM}       =~ s/["']//g;
           $streamHash->{HELPER}{STREAM}       =~ s/\s+/ /g;
           $streamHash->{HELPER}{STREAMACTIVE} = 1;         # Statusbit wenn ein Stream aktiviert ist
       }
       $ret .= "<br>";
       Log3($strmdev, 4, "$strmdev - generic Stream params:\n$htag");
-      $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrefresh')\">$imgrefresh </a>";
+      $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrefresh')\" onmouseover=\"Tip('$ttrefresh')\" onmouseout=\"UnTip()\">$imgrefresh </a>";
       $ret .= $imgblank;
       if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
              # Aufnahmebutton endlos Start
-             $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\">$imgrecendless </a>";
+             $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
           }	else {
              # Aufnahmebutton Stop
-             $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecstop')\">$imgrecstop </a>";
+             $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecstop')\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
           }	      
-      $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\">$imgdosnap </a>";               
+      $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";               
       $ret .= "</td>";      
       if(AttrVal($camname,"ptzPanel_use",1)) {
           my $ptz_ret = SSCam_ptzpanel($camname);
@@ -6374,26 +6460,72 @@ sub SSCam_StreamDev($$$) {
           }
       }    
   
-  } elsif($fmt =~ /switched/) {
+  } elsif ($fmt =~ /hls/) {
+      # es ist ein .m3u8-File bzw. ein Link dorthin zu übergeben
+      my $cam  = AttrVal($camname, "alias", $camname);
+      my $m3u8 = AttrVal($camname, "hlsStrmObject", "");
+
+      if( $m3u8 =~ m/^\s*(.*)\s*$/s ) {
+          $m3u8 = $1;
+          $m3u8 =~ s/\$NAME/$camname/g;
+      }  
+      my $d = $camname;
+      $d =~ s/\./_/;          # Namensableitung zur javascript Codeanpassung
+      
+      if(!$m3u8) {
+          $cause = "You have to specify attribute \"hlsStrmObject\" in Camera $cam !";
+          $ret .= "<td> <br> <b> $cause </b> <br><br></td>";
+          $ret .= '</tr>';
+          $ret .= '</tbody>';
+          $ret .= '</table>';
+          $ret .= '</div>';
+      return $ret; 
+      }      
+      
+      $ret .= "<td><video $ha id=video_$d controls autoplay></video><br>";
+      $ret .= SSCam_bindhlsjs ($camname, $strmdev, $m3u8, $d); 
+      
+      $streamHash->{HELPER}{STREAM} = "<video $pws id=video_$d></video>";  # Stream für "set <SSCamSTRM-Device> popupStream" speichern   
+      $streamHash->{HELPER}{STREAMACTIVE} = 1;                             # Statusbit wenn ein Stream aktiviert ist
+      
+      $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrefresh')\" onmouseover=\"Tip('$ttrefresh')\" onmouseout=\"UnTip()\">$imgrefresh </a>";
+      $ret .= $imgblank;
+      if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
+             # Aufnahmebutton endlos Start
+             $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
+          }	else {
+             # Aufnahmebutton Stop
+             $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecstop')\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
+          }	      
+      $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";               
+      $ret .= "</td>";      
+      if(AttrVal($camname,"ptzPanel_use",1)) {
+          my $ptz_ret = SSCam_ptzpanel($camname);
+          if($ptz_ret) { 
+              $ret .= "<td>$ptz_ret</td>";
+          }
+      }  
+  
+  } elsif ($fmt =~ /switched/) {
       my $wltype = $hash->{HELPER}{WLTYPE};
       $link = $hash->{HELPER}{LINK};
       
       if($link && $wltype =~ /image|iframe|video|base64img|embed|hls/) {
           if($wltype =~ /image/) {
               $ret .= "<td><img src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"><br>" if($link);
-              $streamHash->{HELPER}{STREAM} = "<img src=$link $pws>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
+              $streamHash->{HELPER}{STREAM} = "<img src=$link $pws>";    # Stream für "set <SSCamSTRM-Device> popupStream" speichern
               $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);         # Statusbit wenn ein Stream aktiviert ist
-              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";
+              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
               $ret .= $imgblank;
               if($hash->{HELPER}{RUNVIEW} =~ /live_fw/) {              
                   if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
                       # Aufnahmebutton endlos Start
-                      $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\">$imgrecendless </a>";
+                      $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
                   }	else {
                       # Aufnahmebutton Stop
-                      $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecstop')\">$imgrecstop </a>";
+                      $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecstop')\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
                   }	      
-                  $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\">$imgdosnap </a>";
+                  $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";
               }              
               $ret .= "</td>";
               if(AttrVal($camname,"ptzPanel_use",1) && $hash->{HELPER}{RUNVIEW} =~ /live_fw/) {
@@ -6418,10 +6550,10 @@ sub SSCam_StreamDev($$$) {
                        </iframe><br>" if($link);
               $streamHash->{HELPER}{STREAM} = "<iframe src=$link $pws controls autoplay>".
                                               "Iframes disabled".
-                                              "</iframe>";                # Stream für "get <SSCamSTRM-Device> popupStream" speichern
-              $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);         # Statusbit wenn ein Stream aktiviert ist
-              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";
-              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrefresh')\">$imgrefresh </a>";              
+                                              "</iframe>";                # Stream für "set <SSCamSTRM-Device> popupStream" speichern
+              $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);          # Statusbit wenn ein Stream aktiviert ist
+              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
+              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrefresh')\" onmouseover=\"Tip('$ttrefresh')\" onmouseout=\"UnTip()\">$imgrefresh </a>";              
               $ret .= "</td>";
               if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/) {
                   $ret .= '</tr>';
@@ -6445,9 +6577,9 @@ sub SSCam_StreamDev($$$) {
                                               "<source src=$link type=\"video/ogg\">".
                                               "<source src=$link type=\"video/webm\">".
                                               "Your browser does not support the video tag".
-                                              "</video>";                # Stream für "get <SSCamSTRM-Device> popupStream" speichern              
+                                              "</video>";                # Stream für "set <SSCamSTRM-Device> popupStream" speichern              
               $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);         # Statusbit wenn ein Stream aktiviert ist
-              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>"; 
+              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>"; 
               $ret .= "</td>";
               if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/) {
                   $ret .= '</tr>';
@@ -6460,14 +6592,14 @@ sub SSCam_StreamDev($$$) {
               }
           } elsif($wltype =~ /base64img/) {
               $ret .= "<td><img src='data:image/jpeg;base64,$link' $ha onClick=\"FW_okDialog('<img src=data:image/jpeg;base64,$link $pws>')\"><br>" if($link);
-              $streamHash->{HELPER}{STREAM} = "<img src=data:image/jpeg;base64,$link $pws>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
+              $streamHash->{HELPER}{STREAM} = "<img src=data:image/jpeg;base64,$link $pws>";      # Stream für "get <SSCamSTRM-Device> popupStream" speichern
               $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);                                  # Statusbit wenn ein Stream aktiviert ist
-              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";
+              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
               $ret .= "</td>";
 		  
           } elsif($wltype =~ /embed/) {
               $ret .= "<td><embed src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"></td>" if($link);
-              $streamHash->{HELPER}{STREAM} = "<embed src=$link $pws>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
+              $streamHash->{HELPER}{STREAM} = "<embed src=$link $pws>";    # Stream für "set <SSCamSTRM-Device> popupStream" speichern
               $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);           # Statusbit wenn ein Stream aktiviert ist
               
           } elsif($wltype =~ /hls/) {
@@ -6480,20 +6612,20 @@ sub SSCam_StreamDev($$$) {
                                               "<source src=$link type=\"application/x-mpegURL\">".
                                               "<source src=$link type=\"video/MP2T\">".
                                               "Your browser does not support the video tag".
-                                              "</video>";                # Stream für "get <SSCamSTRM-Device> popupStream" speichern
+                                              "</video>";                # Stream für "set <SSCamSTRM-Device> popupStream" speichern
               $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);         # Statusbit wenn ein Stream aktiviert ist
-              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";
-              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrefresh')\">$imgrefresh </a>";
-              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdhlsreact')\">$imghlsreact </a>";
+              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
+              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrefresh')\" onmouseover=\"Tip('$ttrefresh')\" onmouseout=\"UnTip()\">$imgrefresh </a>";
+              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdhlsreact')\" onmouseover=\"Tip('$tthlsreact')\" onmouseout=\"UnTip()\">$imghlsreact </a>";
               $ret .= $imgblank;
               if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
                   # Aufnahmebutton endlos Start
-                  $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\">$imgrecendless </a>";
+                  $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
               }	else {
                   # Aufnahmebutton Stop
-                  $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecstop')\">$imgrecstop </a>";
+                  $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecstop')\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
               }		
-              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\">$imgdosnap </a>";                   
+              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";                   
               $ret .= "</td>";
               if(AttrVal($camname,"ptzPanel_use",1)) {
                   my $ptz_ret = SSCam_ptzpanel($camname);
@@ -6501,17 +6633,19 @@ sub SSCam_StreamDev($$$) {
                       $ret .= "<td>$ptz_ret</td>";
                   }
               }
+              
           } 
+          
       } else {
           my $cam = AttrVal($camname, "alias", $camname);
           $cause = "Playback cam \"$cam\" switched off";
           $ret .= "<td> <br> <b> $cause </b> <br><br>";
-          $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdmjpegrun')\">$imgmjpegrun </a>";
-          $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdhlsrun')\">$imghlsrun </a>" if(SSCam_IsHLSCap($hash));  
-          $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdlrirun')\">$imglrirun </a>"; 
-          $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdlh264run')\">$imglh264run </a>";
-          $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdlmjpegrun')\">$imglmjpegrun </a>";
-          $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdlsnaprun')\">$imglsnaprun </a>";            
+          $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdmjpegrun')\" onmouseover=\"Tip('$ttmjpegrun')\" onmouseout=\"UnTip()\">$imgmjpegrun </a>";
+          $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdhlsrun')\" onmouseover=\"Tip('$tthlsrun')\" onmouseout=\"UnTip()\">$imghlsrun </a>" if(SSCam_IsHLSCap($hash));  
+          $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdlrirun')\" onmouseover=\"Tip('$ttlrrun')\" onmouseout=\"UnTip()\">$imglrirun </a>"; 
+          $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdlh264run')\" onmouseover=\"Tip('$tth264run')\" onmouseout=\"UnTip()\">$imglh264run </a>";
+          $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdlmjpegrun')\" onmouseover=\"Tip('$ttlmjpegrun')\" onmouseout=\"UnTip()\">$imglmjpegrun </a>";
+          $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdlsnaprun')\" onmouseover=\"Tip('$ttlsnaprun')\" onmouseout=\"UnTip()\">$imglsnaprun </a>";            
           $ret .= "</td>";    
       }
   } else {
@@ -6527,6 +6661,52 @@ sub SSCam_StreamDev($$$) {
 return $ret;
 }
 
+#############################################################################################
+#    hls.js laden für Streamimgdevice Typen HLS, RTSP
+#    $m3u8 - ein .m3u8-File oder ein entsprechender Link
+#    $d    - ein Unique-Name zur Codeableitung (darf keinen . enthalten)
+#############################################################################################
+sub SSCam_bindhlsjs ($$$$) { 
+   my ($camname, $strmdev, $m3u8, $d) = @_;
+   my $hlsjs = "sscam_hls.js";                      # hls.js Release von Projekteite https://github.com/video-dev/hls.js/releases
+   my $ret;
+   
+   $ret .= "<meta charset=\"utf-8\"/>
+            <!--script src=\"https://cdn.jsdelivr.net/npm/hls.js\@latest\"></script-->   
+           ";
+           
+   my $dcs = (devspec2array("TYPE=SSCam:FILTER=MODEL=SVS"))[0];  # ist ein SVS-Device angelegt ?
+   my $uns = AttrVal($dcs,"hlsNetScript",0) if($dcs);            # ist in einem SVS Device die Nutzung hls.js auf Projektseite ausgewählt ?
+            
+   if($uns) {
+       my $lib = "https://cdn.jsdelivr.net/npm/hls.js\@latest";
+       $ret .= "<script src=\"$lib\"></script>";
+       Log3($strmdev, 4, "$strmdev - HLS Streaming use net library \"$lib\" ");
+   } else {
+       $ret .= "<script type=\"text/javascript\" src=\"/fhem/pgm2/$hlsjs\"></script>";
+       Log3($strmdev, 4, "$strmdev - HLS Streaming use local file \"/fhem/pgm2/$hlsjs\" ");
+   }
+      
+   $ret .= "<script>
+            if (Hls.isSupported()) {
+                var video_$d = document.getElementById('video_$d');
+                var hls = new Hls();
+                // bind them together
+                hls.attachMedia(video_$d);
+                hls.on(Hls.Events.MEDIA_ATTACHED, function () {
+                    console.log(\"video and hls.js are now bound together !\");
+                    hls.loadSource(\"$m3u8\");
+                    hls.on(Hls.Events.MANIFEST_PARSED, function (event, data) {
+                        console.log(\"manifest loaded, found \" + data.levels.length + \" quality level\");
+                        video_$d.play();
+                    });
+                });
+            }
+            </script>";
+   
+return $ret;
+}
+
 ###############################################################################
 #                   Schnappschußgalerie zusammenstellen
 #                   Verwendung durch SSCamSTRM-Devices
@@ -6535,7 +6715,7 @@ sub SSCam_composegallery ($;$$) {
   my ($name,$strmdev,$model) = @_;
   my $hash     = $defs{$name};
   my $camname  = $hash->{CAMNAME};
-  my $allsnaps = $hash->{HELPER}{".SNAPHASH"}; # = \%allsnaps
+  my $allsnaps = $hash->{HELPER}{".SNAPHASH"};                   # = \%allsnaps
   my $sgc      = AttrVal($name,"snapGalleryColumns",3);          # Anzahl der Images in einer Tabellenzeile
   my $lss      = ReadingsVal($name, "LastSnapTime", " ");        # Zeitpunkt neueste Aufnahme
   my $lang     = AttrVal("global","language","EN");              # Systemsprache       
@@ -6559,7 +6739,7 @@ sub SSCam_composegallery ($;$$) {
  
   my $ha  = AttrVal($name, "snapGalleryHtmlAttr", AttrVal($name, "htmlattr", 'width="500" height="325"'));
   my $pws = AttrVal($strmdev, "popupWindowSize", "");            # Größe eines Popups
-  $pws    =~ s/"//g if($pws);  
+  $pws    =~ s/"//g if($pws);
   
   # falls "SSCam_composegallery" durch ein SSCamSTRM-Device aufgerufen wird
   my $devWlink = "";
@@ -6575,6 +6755,15 @@ sub SSCam_composegallery ($;$$) {
 	  $sgbnote = "<b>ACHTUNG</b> - Es können keine Schnappschüsse abgerufen werden. Bitte setzen sie das Attribut \"snapGalleryBoost=1\" im Device <a href=\"/fhem?detail=$name\">$name</a>" if ($lang eq "DE");
   }
   
+  # Javascript Bibliothek für Tooltips (http://www.walterzorn.de/tooltip/tooltip.htm#download) und Texte
+  my $ttjs   = "/fhem/pgm2/sscam_tooltip.js"; 
+  my ($ttsnap);
+  if(AttrVal("global","language","EN") =~ /EN/) {
+      $ttsnap     = $SSCam_ttips_en{"ttsnap"}; $ttsnap =~ s/§NAME§/$camname/g;
+  } else {
+      $ttsnap     = $SSCam_ttips_de{"ttsnap"}; $ttsnap =~ s/§NAME§/$camname/g;
+  }
+  
   my $header;
   if ($lang eq "EN") {
       $header  = "Snapshots ($limit/$totalcnt) of camera <b>$camname</b> - newest Snapshot: $lss<br>";
@@ -6586,11 +6775,12 @@ sub SSCam_composegallery ($;$$) {
   $header .= $sgbnote;
   
   my $gattr  = (AttrVal($name,"snapGallerySize","Icon") eq "Full")?$ha:" ";    
-  my @as     = sort{$a <=>$b}keys%{$allsnaps};
+  my @as     = sort{$a<=>$b}keys%{$allsnaps};
   
   # Ausgabetabelle erstellen
   my ($htmlCode,$ct);
   $htmlCode  = "<html>";
+  $htmlCode .= "<script type=\"text/javascript\" src=\"$ttjs\"></script>";
   $htmlCode .= sprintf("$devWlink <div class=\"makeTable wide\"; style=\"text-align:center\"> $header <br>");
   $htmlCode .= "<table class=\"block wide internals\">";
   $htmlCode .= "<tbody>";
@@ -6599,8 +6789,9 @@ sub SSCam_composegallery ($;$$) {
   
   foreach my $key (@as) {
       $ct = $allsnaps->{$key}{createdTm};
-	  my $html = sprintf("<td>$ct<br> <img src=\"data:image/jpeg;base64,$allsnaps->{$key}{imageData}\" $gattr onClick=\"FW_okDialog('<img src=data:image/jpeg;base64,$allsnaps->{$key}{imageData} $pws>')\"> </td>" );
-
+      my $idata = "";
+      $idata = "onClick=\"FW_okDialog('<img src=data:image/jpeg;base64,$allsnaps->{$key}{imageData} $pws>')\"" if(AttrVal($name,"snapGalleryBoost",0));
+	  my $html = sprintf("<td>$ct<br> <img src=\"data:image/jpeg;base64,$allsnaps->{$key}{imageData}\" $gattr $idata> </td>" );
       $cell++;
 
       if ( $cell == $sgc+1 ) {
@@ -6616,14 +6807,14 @@ sub SSCam_composegallery ($;$$) {
   if ( $cell == 2 ) {
     $htmlCode .= "<td> </td>";
   }
-
+  
   $htmlCode .= "</tr>";
   $htmlCode .= "</tbody>";
   $htmlCode .= "</table>";
   $htmlCode .= "</div>";
-  $htmlCode .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\">$imgdosnap </a>" if($strmdev);
+  $htmlCode .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>" if($strmdev);
   $htmlCode .= "</html>";
-  				
+
 return $htmlCode;
 }
 
@@ -7001,8 +7192,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <ul>
   <li><b> set &lt;name&gt; createPTZcontrol </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for PTZ-CAM)</li> <br>
   
-  A separate PTZ-control panel will be created (type SSCamSTRM). The current room of the parent camera device is 
-  assigned if it is set there.  
+  A separate PTZ control panel will be created (type SSCamSTRM). The current room of the parent camera device is 
+  assigned if it is set there (default "SSCam").  
   With the "ptzPanel_.*"-<a href="#SSCamattr">attributes</a> or respectively the specific attributes of the SSCamSTRM-device
   the properties of the control panel can be affected. <br> 
   <br><br>
@@ -7022,7 +7213,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <li><b> set &lt;name&gt; createSnapGallery </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   A snapshot gallery will be created as a separate device (type SSCamSTRM). The device will be provided in 
-  room "SnapGallery".
+  room "SSCam".
   With the "snapGallery..."-<a href="#SSCamattr">attributes</a> respectively the specific attributes of the SSCamSTRM-device
   you are able to manipulate the properties of the new snapshot gallery device. 
   <br><br>
@@ -8331,7 +8522,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   
   <ul>
   <a name="SSCamcreateStreamDev"></a>
-  <li><b> set &lt;name&gt; createStreamDev [generic | mjpeg | switched] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  <li><b> set &lt;name&gt; createStreamDev [generic | hls | mjpeg | switched] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
 
   Es wird ein separates Streaming-Device (Typ SSCamSTRM) erstellt. Dieses Device kann z.B. als separates Device 
   in einem Dashboard genutzt werden.
@@ -8342,6 +8533,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     <table>
     <colgroup> <col width=10%> <col width=90%> </colgroup>
       <tr><td>generic   </td><td>- das Streaming-Device gibt einen durch das Attribut "genericStrmHtmlTag" bestimmten Content wieder </td></tr>
+      <tr><td>hls       </td><td>- das Streaming-Device gibt einen permanenten HLS Datenstrom wieder </td></tr>
       <tr><td>mjpeg     </td><td>- das Streaming-Device gibt einen permanenten MJPEG Kamerastream wieder (Streamkey Methode) </td></tr>
       <tr><td>switched  </td><td>- Wiedergabe unterschiedlicher Streamtypen. Drucktasten zur Steuerung werden angeboten. </td></tr>
     </table>
@@ -8349,12 +8541,29 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     <br><br>
   
   Die Gestaltung kann durch HTML-Tags im <a href="#SSCamattr">Attribut</a> "htmlattr" im Kameradevice oder mit den 
-  spezifischen Attributen im Streaming-Device beeinflusst werden. <br>
-  Soll ein HLS-Stream im Streaming-Device vom Typ "switched" gestartet werden, muss die Kamera in der Synology Surveillance Station 
-  auf das Videoformat H.264 eingestellt und HLS von der eingesetzten SVS-Version unterstützt sein. 
-  Diese Auswahltaste wird deshalb im nur im Streaming-Device angeboten wenn das Reading "CamStreamFormat = HLS" beinhaltet. <br>
-  HLS (HTTP Live Streaming) kann momentan nur auf Mac Safari oder mobilen iOS/Android-Geräten wiedergegeben werden. <br>
-  Im "switched"-Device werden Drucktasten zur Steuerung des zu startenden Medientyps angeboten. <br>
+  spezifischen Attributen im Streaming-Device beeinflusst werden. <br><br>
+  
+  <b>Streaming Device "hls"</b> <br><br>
+  
+  Das Streaming-Device vom Typ "hls" verwendet die Bibliothek hls.js zur Bildverarbeitung und ist auf allen Browsern mit
+  MediaSource extensions (MSE) lauffähig. Mit dem <a href="#SSCamattr">Attribut</a> "hlsNetScript" kann bestimmt werden, ob 
+  die lokal installierte hls.js (./www/pgm2/hls.js) oder immer die aktuellste Bibliotheksversion von der hls.js Projektseite 
+  verwendet werden soll. Dieses Attribut ist zentral in einem Device vom Typ "SVS" zu setzen ! <br>
+  Bei Verwendung dieses Streamingdevices ist zwingend das <a href="#SSCamattr">Attribut</a> "hlsStrmObject" im SSCam Device 
+  mit dem darzustellenden Stream anzugeben.
+  <br><br>
+  
+  <b>Streaming Device "switched hls"</b> <br><br>
+  
+  Dieser Typ nutzt den von der Synology Surveillance Station gelieferten HLS Videostream.
+  Soll ein HLS-Stream im Streaming-Device vom Typ "switched" gestartet werden, muss die Kamera in der Synology Surveillance 
+  Station auf das Videoformat H.264 eingestellt und HLS von der eingesetzten SVS-Version unterstützt sein. 
+  Diese Auswahltaste wird deshalb im nur dann im Streaming-Device angeboten, wenn das Reading "CamStreamFormat = HLS" beinhaltet. <br>
+  HLS (HTTP Live Streaming) kann momentan nur auf Mac Safari oder mobilen iOS/Android-Geräten wiedergegeben werden. 
+  <br><br>
+  
+  <b>Streaming Device "generic"</b> <br><br>
+  
   Ein Streaming-Device vom Typ "generic" benötigt die Angabe von HTML-Tags im Attribut "genericStrmHtmlTag". Diese Tags
   spezifizieren den wiederzugebenden Content. <br><br>
   
@@ -8374,7 +8583,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <li><b> set &lt;name&gt; createPTZcontrol </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für PTZ-CAM)</li> <br>
   
   Es wird ein separates PTZ-Steuerungspaneel (Type SSCamSTRM) erstellt. Es wird der aktuelle Raum des Kameradevice 
-  zugewiesen sofern dort gesetzt.  
+  zugewiesen sofern dort gesetzt (default "SSCam").  
   Mit den "ptzPanel_.*"-<a href="#SSCamattr">Attributen</a> bzw. den spezifischen Attributen des erzeugten 
   SSCamSTRM-Devices können die Eigenschaften des PTZ-Paneels beeinflusst werden. <br> 
   <br><br>
@@ -8393,7 +8602,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <li><b> set &lt;name&gt; createSnapGallery </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Es wird eine Schnappschußgallerie als separates Device (Type SSCamSTRM) erzeugt. Das Device wird im Raum 
-  "SnapGallery" erstellt.
+  "SSCam" erstellt.
   Mit den "snapGallery..."-<a href="#SSCamattr">Attributen</a> bzw. den spezifischen Attributen des erzeugten SSCamSTRM-Devices 
   können die Eigenschaften der Schnappschußgallerie beeinflusst werden. 
   <br><br>
@@ -9177,6 +9386,36 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <li><b>httptimeout</b><br>
     Timeout-Wert für HTTP-Aufrufe zur Synology Surveillance Station, Default: 4 Sekunden (wenn 
     httptimeout = "0" oder nicht gesetzt) </li><br>
+    
+  <a name="hlsNetScript"></a>
+  <li><b>hlsNetScript</b> &nbsp;&nbsp;&nbsp;&nbsp;(setzbar in Device Typ "SVS") <br>
+    Wenn gesetzt, wird die aktuellste hls.js Version von der Projektseite verwendet (Internetverbindung nötig). 
+    <br>
+    Im Standard wird die lokal installierte Version (./www/pgm2/sscam_hls.js) zur Wiedergabe von Daten in allen 
+    Streaming Devices vom Typ "hls" genutzt (siehe set &lt;name&gt; createStreamDev hls").
+    Dieses Attribut wird in einem Device vom Typ "SVS" gesetzt und gilt zentral für alle Streaming Devices !
+  </li><br>
+    
+  <a name="hlsStrmObject"></a>
+  <li><b>hlsStrmObject</b><br>
+  Wurde ein Streaming Device mit "set &lt;name&gt; createStreamDev hls" definiert, muss mit diesem Attribut der Link zum 
+  Wiedergabeobjekt bekannt gemacht werden. <br>
+  Die Angabe muss ein HTTP Live Streaming Objekt mit der Endung ".m3u8" enthalten. <br>
+  Die Variable $NAME kann als Platzhalter genutzt werden und übernimmt den SSCam-Devicenamen.
+  <br><br> 
+  
+        <ul>
+		<b>Beispiele:</b><br>
+        attr &lt;name&gt; hlsStrmObject https://video-dev.github.io/streams/x36xhzz/x36xhzz.m3u8  <br>
+        # ein Beispielstream der zum Test des Streaming Devices verwendet werden kann (Internetverbindung nötig) <br><br>
+        attr &lt;name&gt; hlsStrmObject http://192.168.2.10:32000/CamHE1.m3u8  <br>
+        # Wiedergabe eines Kamera HLS-Streams der z.B. durch ffmpeg bereitgestellt wird  <br><br>
+        attr &lt;name&gt; hlsStrmObject http://192.168.2.10:32000/$NAME.m3u8  <br>
+        # Wie obiges Beispiel mit der Variablennutzung für "CamHE1"     
+        </ul>
+		<br>
+        </li>
+        
   
   <a name="htmlattr"></a>
   <li><b>htmlattr</b><br>

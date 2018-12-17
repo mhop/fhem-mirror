@@ -34,6 +34,7 @@ use warnings;
 
 # Versions History intern
 our %SSCamSTRM_vNotesIntern = (
+  "2.2.0"  => "13.12.2018  load sscam_hls.js, sscam_tooltip.js from pgm2 for HLS Streaming support and tooltips ",
   "2.1.0"  => "11.12.2018  switch \"popupStream\" from get to set ",
   "2.0.0"  => "09.12.2018  get command \"popupStream\" and attribute \"popupStreamFW\" ",
   "1.5.0"  => "02.12.2018  new attribute \"popupWindowSize\" ",
@@ -59,6 +60,8 @@ sub SSCam_ptzpanel($;$$);
 sub SSCam_StreamDev($$$);
 sub SSCam_getclhash($;$$);
 
+# my $hlsjs = "hls.js";      # hls.js Release von Seite https://github.com/video-dev/hls.js/releases
+
 ################################################################
 sub SSCamSTRM_Initialize($) {
   my ($hash) = @_;
@@ -83,8 +86,11 @@ sub SSCamSTRM_Initialize($) {
   $hash->{FW_hideDisplayName} = 1;        # Forum 88667
   # $hash->{FW_addDetailToSummary} = 1;
   # $hash->{FW_atPageEnd} = 1;            # wenn 1 -> kein Longpoll ohne informid in HTML-Tag
-}
 
+  #$data{FWEXT}{SSCAMSTRM}{SCRIPT} = "/pgm2/".$hlsjs if (!$data{FWEXT}{SSCAMSTRM}{SCRIPT});
+ 
+return undef; 
+}
 
 ################################################################
 sub SSCamSTRM_Define($$) {
@@ -200,7 +206,7 @@ sub SSCamSTRM_FwFn($;$$$) {
   
   RemoveInternalTimer($hash);
   $hash->{HELPER}{FW} = $FW_wname;
- 
+       
   $link = AnalyzePerlCommand(undef, $link) if($link =~ m/^{(.*)}$/s);
   my $show = $defs{$hash->{PARENT}}->{HELPER}{ACTSTRM} if($hash->{MODEL} =~ /switched/);
   $show = $show?"($show)":"";
@@ -480,7 +486,7 @@ Abhängig vom Zustand des Streaming-Devices werden zum Start von Aktionen unters
     <a name="autoRefresh"></a>
     <li><b>autoRefresh</b><br>
       Wenn gesetzt, werden aktive Browserseiten des FHEMWEB-Devices welches das SSCamSTRM-Device aufgerufen hat, nach der 
-      eingestellten Zeit (Sekunden) neu geladen. Sollen statt dessen Broserseiten eines bestimmten FHEMWEB-Devices neu 
+      eingestellten Zeit (Sekunden) neu geladen. Sollen statt dessen Browserseiten eines bestimmten FHEMWEB-Devices neu 
       geladen werden, kann dieses Device mit dem Attribut "autoRefreshFW" festgelegt werden.
       Dies kann in manchen Fällen die Wiedergabe innerhalb einer Anwendung stabilisieren.
     </li>

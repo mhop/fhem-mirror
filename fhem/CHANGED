@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 49_SSCam: V8.0.0, new type "hls" of streaming devices, hls 
+                       playback now available for all common browsers, 
+                       tooltip hints in streaming devices, minor fixes
   - feature: 30_HUEBridge, 31_HUEDevice: added get startup command
   - change:  55_DWD_OpenData: maintenance release (forum #83097 msg #869647)
   - change:  mqtt2.template: change name convention + cleanup
