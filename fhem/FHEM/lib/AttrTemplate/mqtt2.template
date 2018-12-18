@@ -171,17 +171,17 @@ attr DEVICE readingList \
   tele/DEVNAME/INFO.:.* { json2nameValue($EVENT) }\
   stat/DEVNAME/RESULT:.* { json2nameValue($EVENT) }
 deleteReading DEVICE .*
-set IO_DEV publish COMMAND/Status
+set IO_DEV publish COMMAND/Status 1
 attr DEVICE autocreate 0
 attr DEVICE model A_01a_tasmota_basic_state_power1
 
 # sonoff 1 channel device flashed with Tasmota.
-name:A_01_tasmota_basic_state_power
+name:A_01_tasmota_basic
 filter:TYPE=MQTT2_DEVICE
 desc:Applies to Sonoff 1 Channel devices using POWER-topic for relay state <br>Use this in case "SetOption26 1" was used as described in tasmota documentation
 set DEVICE attrTemplate A_01a_tasmota_basic_state_power1
 attr DEVICE stateFormat {lc ReadingsVal("$name","POWER","") }
-attr DEVICE model A_01_tasmota_basic_state_power
+attr DEVICE model A_01_tasmota_basic
 
 # tasmota device with one relay, one motion sensor via switch
 name:A_01b_tasmota_1ch+motion+SI7021
@@ -209,7 +209,7 @@ attr DEVICE stateFormat {\
 attr DEVICE model A_01b_tasmota_1ch+motion+SI7021
 
 # tasmota 2ch as one FHEM device.
-name:A_02_tasmota_sonoff_2ch_unified
+name:A_02_tasmota_2ch_unified
 filter:TYPE=MQTT2_DEVICE
 desc:Configures a single device including all readings <br>NOTE: untested!
 set DEVICE attrTemplate A_01a_tasmota_basic_state_power1
@@ -223,7 +223,7 @@ attr DEVICE stateFormat {\
   . " P2:" . FW_makeImage(lc ReadingsVal($name, "POWER2", "off"))\
   . "</div>"\
   }
-attr DEVICE model A_02_tasmota_sonoff_2ch_unified
+attr DEVICE model A_02_tasmota_2ch_unified
 
 # sonoff 2 channel device flashed with Tasmota.
 name:A_02a_tasmota_2channel_split
@@ -243,7 +243,7 @@ attr DEVICE model A_02a_tasmota_2channel_split
 
 
 # tasmota 4ch as one FHEM device.
-name:A_04_tasmota_sonoff_4ch_unified
+name:A_04_tasmota_4ch_unified
 filter:TYPE=MQTT2_DEVICE
 desc:Configures a single device including all readings
 set DEVICE attrTemplate A_01a_tasmota_basic_state_power1
@@ -261,10 +261,10 @@ attr DEVICE stateFormat {\
   . " P4:" . FW_makeImage(lc ReadingsVal($name, "POWER4", "off"))\
   . "</div>"\
   }
-attr DEVICE model A_04_tasmota_sonoff_4ch_unified
+attr DEVICE model A_04_tasmota_4ch_unified
 
 # tasmota 4ch as one FHEM device.
-name:A_04_tasmota_sonoff_4ch_unified_test
+name:A_04_tasmota_4ch_unified_test
 desc:Configures a single device including all readings <br>uses multiline for webCmd <br>NOTE: untested!
 filter:TYPE=MQTT2_DEVICE
 set DEVICE attrTemplate A_01a_tasmota_basic_state_power1
@@ -282,9 +282,9 @@ attr DEVICE stateFormat {\
   . " P4:" . FW_makeImage(lc ReadingsVal($name, "POWER4", "off"))\
   . "</div>"\
   }
-attr DEVICE webCmdLabel Kanal 1:Kanal 2:\
-   Kanal 3:Kanal 4
-attr DEVICE model A_04b_tasmota_sonoff_4ch_unified_test
+attr DEVICE webCmdLabel Kanal 1:Kanal 2\
+   :Kanal 3:Kanal 4
+attr DEVICE model A_04b_tasmota_4ch_unified_test
 
 ###########################################
 # SHELLY
@@ -401,14 +401,14 @@ name:X_01_esp_milight_hub_rgbw_bulb
 filter:TYPE=MQTT2_DEVICE
 desc:For use with X_01_esp_milight_hub_bridge <br>Device could contain more options than your physical device might be able to handle. Just delete, what you don't need...<br>NOTE: Development state is experimental! <br>NOTE: regex not working to extract remote channel... Topic is something like milight/updates/0xABCD/rgbw/0
 par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/]updates/.*:, ? $1 : undef }
-par:GROUP_ID;number from 0 to 4 representing one of the channels of an original bridge or remote;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/](.*)[/](.*)[/](.).*:, ? $4 : undef }
+par:GROUP_ID;number from 0 to 4 representing one of the channels of an original bridge or remote;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/][^/]+[/][^/]+[/]([0-4]):, ? $1 : undef }
 par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/](0x....)[/].*:, ? $2 : undef }
-par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/](.*)[/](.*)[/].*:, ? $3 : undef }
+par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/][^/]+[/][^/]+[/]([^/]+)[/].*:, ? $1 : undef }
 deletereading DEVICE .*_.*
 attr DEVICE icon light_control
-attr DEVICE eventMap /set_white:Weiss/night_mode:Nacht/white_mode:white/on:on/off:off/ON:on/OFF:off/next_mode:Mode/mode_speed_up:Up/mode_speed_down:Down/
+attr DEVICE eventMap /set_white:Weiss/night_mode:Nacht/white_mode:white/on:on/off:off/ON:on/OFF:off/next_mode:Mode/mode_speed_up:Faster/mode_speed_down:Slower/level_up:Up/level_down:Down/
 attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name)}
-attr DEVICE webCmd on:off:brightness:hue:color_temp:saturation:command
+attr DEVICE webCmd on:off:brightness:hue:color_temp:saturation:dim:command:program
 attr DEVICE readingList BASE_ID/states/REMOTE_ID/BULB_TYPE/GROUP_ID:.* { json2nameValue($EVENT) }\
    BASE_ID/states/REMOTE_ID/BULB_TYPE/0:.* { json2nameValue($EVENT) }\
    BASE_ID/updates/REMOTE_ID/BULB_TYPE/GROUP_ID:.* { json2nameValue($EVENT) }\
@@ -419,7 +419,13 @@ attr DEVICE setList\
    brightness:colorpicker,BRI,0,15,255 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
    hue:colorpicker,HUE,0,1,359 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
    color_temp:colorpicker,CT,153,1,370 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
-   command:uzsuSelectRadio,Weiss,Nacht,Mode,Up,Down BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}
+   saturation:colorpicker,sat,0,1,255 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
+   command:uzsuSelectRadio,Weiss,Nacht BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
+   program:uzsuSelectRadio,Mode,Faster,Slower BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
+   dim:uzsuSelectRadio,Up,Down BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}
 attr DEVICE userReadings rgb {sprintf("%02X%02X%02X", ReadingsVal($name,"color_r",255), ReadingsVal($name,"color_g",255), ReadingsVal($name,"color_b",255))}
+attr DEVICE webCmdLabel on:off:brightness:hue\
+   :color_temp:saturation\
+   :dim:command:program
 # computed_color will send RGB = 255,255,255 when in white mode. This is useful for HomeAssistant where it always expects the color to be set.
 attr DEVICE model X_01_esp_milight_hub_rgbw_bulb
