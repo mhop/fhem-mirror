@@ -33,6 +33,7 @@ sub WMBUS_Initialize($) {
                        " AESkey".
                        " ignore:0,1".
                        " rawmsg_as_reading:0,1".
+                       " ignoreUnknownDataBlocks:0,1".
                        " $readingFnAttributes";
 }
 
@@ -333,6 +334,7 @@ sub WMBUS_SetReadings($$$)
 		my $dataBlock;
 		
 		for $dataBlock ( @$dataBlocks ) {
+      next if AttrVal($name, "ignoreUnknownDataBlocks", 0) && $dataBlock->{type} eq 'MANUFACTURER SPECIFIC'; #WMBus::VIF_TYPE_MANUFACTURER_SPECIFIC
 			readingsBulkUpdate($hash, "$dataBlock->{number}_storage_no", $dataBlock->{storageNo});
 			readingsBulkUpdate($hash, "$dataBlock->{number}_type", $dataBlock->{type}); 
 			readingsBulkUpdate($hash, "$dataBlock->{number}_value", $dataBlock->{value}); 
@@ -359,7 +361,7 @@ sub WMBUS_SetReadings($$$)
 	}
 	
 	if (AttrVal($name, "rawmsg_as_reading", 0)) {
-    readingsBulkUpdate($hash, "rawmsg", unpack("H*",$mb->{msg}));
+    readingsBulkUpdate($hash, "rawmsg", $mb->getFrameType() eq WMBus::FRAME_TYPE_B ? "Y" : "" . unpack("H*",$mb->{msg}));
   }
 	
 	readingsEndUpdate($hash,1);
@@ -526,6 +528,11 @@ WMBUS_Attr(@)
   <li>rawmsg_as_reading<br>
      If set to 1, received raw messages will be stored in the reading rawmsg. This can be used to log raw messages to help with debugging.
   </li>
+  <li>ignoreUnknownDataBlocks<br>
+     If set to 1, datablocks containing unknown/manufacturer specific data will be ignored. This is useful if a meter sends data in different
+     formats of which some can be interpreted and some not. This prevents the unknown data overwriting the readings of the data that can be
+     interpreted.
+  </li>
   </ul>
 	<br>
   <a name="WMBUSreadings"></a>
@@ -636,6 +643,10 @@ WMBUS_Attr(@)
   <li>rawmsg_as_reading<br>
      Wenn auf 1 gesetzt so werden empfangene Nachrichten im Reading rawmsg gespeichert. Das kann verwendet werden um Rohnachrichten zu loggen und beim Debugging zu helfen.
   </li>
+  <li>ignoreUnknownDataBlocks<br>
+     Wenn auf 1 gesetzt so werden Datenblocks die unbekannte/herstellerspezifische Daten enthalten ignoriert. Das ist hilfreich wenn ein Z&auml;hler Daten in unterschiedlichen
+     Formaten sendet von denen einige nicht interpretiert werden k&ouml;nnen. Es verhindert, dass die unbekannten Daten die Readings der interpretierbaren Daten &uuml;berschreiben.
+  </li>  
   </ul>
 	<br>
   <a name="WMBUSreadings"></a>

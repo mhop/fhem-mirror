@@ -13,7 +13,7 @@ my $hasCTR = ($@)?0:1;
 
 require Exporter;
 my @ISA = qw(Exporter);
-my @EXPORT = qw(new parse parseLinkLayer parseApplicationLayer manId2ascii type2string);
+my @EXPORT = qw(new parse parseLinkLayer parseApplicationLayer manId2ascii type2string setFrameType getFrameType VIF_TYPE_MANUFACTURER_SPECIFIC);
 
 sub manId2ascii($$);
 
@@ -97,10 +97,13 @@ use constant {
   ERR_CIPHER_NOT_INSTALLED => 16,
   ERR_LINK_LAYER_INVALID => 17,
   
+  VIF_TYPE_MANUFACTURER_SPECIFIC => 'MANUFACTURER SPECIFIC',
+ 
   # TYPE C transmission uses two different frame types
   # see http://www.st.com/content/ccc/resource/technical/document/application_note/3f/fb/35/5a/25/4e/41/ba/DM00233038.pdf/files/DM00233038.pdf/jcr:content/translations/en.DM00233038.pdf
   FRAME_TYPE_A => 'A',
   FRAME_TYPE_B => 'B',
+  
 };
 
 sub valueCalcNumeric($$) {
@@ -1175,7 +1178,7 @@ sub decodeValueInformationBlock($$$) {
       } else {
         # manufacturer specific data, can't be interpreted
         
-        $dataBlockRef->{type} = "MANUFACTURER SPECIFIC";
+        $dataBlockRef->{type} = VIF_TYPE_MANUFACTURER_SPECIFIC;
         $dataBlockRef->{unit} = "";
         $analyzeVIF = 0;
       }
@@ -1968,10 +1971,16 @@ sub decodeLinkLayer($$)
   return 1;
 }
 
-sub setFrameType($)
+sub setFrameType($$)
 {
   my $self = shift;
   $self->{frame_type} = shift;
+}
+
+sub getFrameType($)
+{
+  my $self = shift;
+  return $self->{frame_type};
 }
 
 sub parse($$)
