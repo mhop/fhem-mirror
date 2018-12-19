@@ -28,6 +28,7 @@ MQTT2_DEVICE_Initialize($)
     disable:0,1
     disabledForIntervals
     getList:textField-long
+    jsonMap:textField-long
     model
     readingList:textField-long
     setList:textField-long
@@ -112,7 +113,8 @@ MQTT2_DEVICE_Parse($$)
 
       if($code =~ m/^{.*}$/s) {
         $code = EvalSpecials($code, ("%TOPIC"=>$topic, "%EVENT"=>$value,
-                 "%DEVICETOPIC"=>$hash->{DEVICETOPIC}, "%NAME"=>$hash->{NAME}));
+                 "%DEVICETOPIC"=>$hash->{DEVICETOPIC}, "%NAME"=>$hash->{NAME},
+                 "%JSONMAP","\$defs{$dev}{JSONMAP}"));
         my $ret = AnalyzePerlCommand(undef, $code);
         if($ret && ref $ret eq "HASH") {
           readingsBeginUpdate($hash);
@@ -165,7 +167,7 @@ MQTT2_DEVICE_Parse($$)
         if(keys %{$ret}) {
           $topic =~ m,.*/([^/]+),;
           my $prefix = ($1 && $1 !~m/^0x[0-9a-f]+$/i) ? "${1}_" : ""; # 91394
-          $add = "{ json2nameValue(\$EVENT, '$prefix') }";
+          $add = "{ json2nameValue(\$EVENT, '$prefix', \$JSONMAP) }";
         }
       }
       if(!$add) {
@@ -345,7 +347,8 @@ MQTT2_DEVICE_Attr($$)
         if($par2 =~ m/^{.*}$/) {
           my $ret = perlSyntaxCheck($par2, 
                 ("%TOPIC"=>1, "%EVENT"=>"0 1 2 3 4 5 6 7 8 9",
-                 "%NAME"=>$dev, "%DEVICETOPIC"=>$hash->{DEVICETOPIC}));
+                 "%NAME"=>$dev, "%DEVICETOPIC"=>$hash->{DEVICETOPIC},
+                 "%JSONMAP"=>""));
           return $ret if($ret);
         } else {
           return "unsupported character in readingname $par2"
@@ -382,6 +385,17 @@ MQTT2_DEVICE_Attr($$)
       my $name = $hash->{NAME};
       AnalyzeCommandChain(undef,
                       "deleteattr $name readingList; deletereading $name .*");
+    }
+  }
+
+  if($attrName eq "jsonMap") {
+    if($type eq "set") {
+      my @ret = split(/[: \r\n]/, $param);
+      return "jsonMap: Odd number of elements" if(int(@ret) % 2);
+      my %ret = @ret;
+      $hash->{JSONMAP} = \%ret;
+    } else {
+      delete $hash->{JSONMAP};
     }
   }
 
@@ -577,6 +591,21 @@ zigbee2mqtt_devStateIcon255($)
       </li><br>
 
 
+    <a name="jsonMap"></a>
+    <li>jsonMap oldReading1:newReading1 oldReading2:newReading2...<br>
+      space or newline separated list of oldReading:newReading pairs.<br>
+      Used in the automatically generated readingList json2nameValue function
+      to map the generated reading name to a better one. E.g.
+      <ul><code>
+      attr m2d jsonMap SENSOR_AM2301_Humidity:Humidity<br>
+      attr m2d readingList tele/sonoff/SENSOR:.* { json2nameValue($EVENT, 'SENSOR_', $JSONMAP) }
+      </code></ul>
+      The special newReading value of 0 will prevent creating a reading for
+      oldReading.
+
+      <br>
+      </li><br>
+
     <a name="readingList"></a>
     <li>readingList &lt;regexp&gt; [readingName|perl-Expression] ...
       <br>
@@ -596,9 +625,9 @@ zigbee2mqtt_devStateIcon255($)
       Notes:
       <ul>
         <li>in the perl expression the variables $TOPIC, $NAME, $DEVICETOPIC 
-          and $EVENT are available (the letter containing the whole message),
-          as well as $EVTPART0, $EVTPART1, ... each containing a single word of
-          the message.</li>
+          $JSONMAP and $EVENT are available (the letter containing the whole
+          message), as well as $EVTPART0, $EVTPART1, ... each containing a
+          single word of the message.</li>
         <li>the helper function json2nameValue($EVENT) can be used to parse a
           json encoded value. Importing all values from a Sonoff device with a
           Tasmota firmware can be done with:

@@ -132,7 +132,8 @@ sub getAllGets($;$);
 sub getAllSets($;$);
 sub getPawList($);
 sub getUniqueId();
-sub json2nameValue($;$);
+sub json2nameValue($;$$);
+sub json2reading($$;$$);
 sub latin1ToUtf8($);
 sub myrename($$$);
 sub notifyRegexpChanged($$);
@@ -4918,13 +4919,15 @@ toJSON($)
 }
 
 #############################
-# will return a hash of name:value pairs.
-# Note: doesnt know arrays, just objects and simple types
+# will return a hash of name:value pairs.  in is a json_string, prefix will be
+# prepended to each name, map is a hash for mapping the names
 sub
-json2nameValue($;$)
+json2nameValue($;$$)
 {
-  my ($in,$prefix) = @_;
+  my ($in, $prefix, $map) = @_;
   $prefix = "" if(!defined($prefix));
+  $map = eval $map if($map && !ref($map)); # passing hash through AnalyzeCommand
+  $map = {} if(!$map);
   my %ret;
 
   sub
@@ -4974,22 +4977,34 @@ json2nameValue($;$)
     return ($t, "");    # error
   }
 
-  sub eObj($$$$$);
   sub
-  eObj($$$$$)
+  setVal($$$$$)
   {
-    my ($ret,$name,$val,$in,$prefix) = @_;
+    my ($ret,$map,$prefix,$name,$val) = @_;
+    $name = "$prefix$name";
+    if(defined($map->{$name})) {
+      return if(!$map->{$name});
+      $name = $map->{$name};
+    }
+    $ret->{$name} = $val;
+  };
+
+  sub eObj($$$$$$);
+  sub
+  eObj($$$$$$)
+  {
+    my ($ret,$map,$name,$val,$in,$prefix) = @_;
 
     if($val =~ m/^"/) {
       ($val, $in) = lStr($val);
       $val =~ s/\\u([0-9A-F]{4})/chr(hex($1))/gsie; # toJSON reverse
-      $ret->{"$prefix$name"} = $val;
+      setVal($ret, $map, $prefix, $name, $val);
 
     } elsif($val =~ m/^{/) { # }
       ($val, $in) = lObj($val, '{', '}');
       my $r2 = json2nameValue($val);
       foreach my $k (keys %{$r2}) {
-        $ret->{"$prefix${name}_$k"} = $r2->{$k};
+        setVal($ret, $map, $prefix, "${name}_$k", $r2->{$k});
       }
 
     } elsif($val =~ m/^\[/) { 
@@ -4997,21 +5012,22 @@ json2nameValue($;$)
       my $idx = 1;
       $val =~ s/^\s*//;
       while($val) {
-        $val = eObj($ret, $name."_$idx", $val, $val, $prefix);
+        $val = eObj($ret, $map, $name."_$idx", $val, $val, $prefix);
         $val =~ s/^\s*,\s*//;
         $val =~ s/\s*$//;
         $idx++;
       }
+
     } elsif($val =~ m/^([0-9.-]+)(.*)$/s) {
-      $ret->{"$prefix$name"} = $1;
+      setVal($ret, $map, $prefix, $name, $1);
       $in = $2;
 
     } elsif($val =~ m/^(true|false)(.*)$/s) {
-      $ret->{"$prefix$name"} = $1;
+      setVal($ret, $map, $prefix, $name, $1);
       $in = $2;
 
     } elsif($val =~ m/^(null)(.*)$/s) {
-      $ret->{"$prefix$name"} = undef;
+      setVal($ret, $map, $prefix, $name, undef);
       $in = $2;
 
     } else {
@@ -5026,7 +5042,7 @@ json2nameValue($;$)
   while($in =~ m/^\s*"([^"]+)"\s*:\s*(.*)$/s) {
     my ($name,$val) = ($1,$2);
     $name =~ s/[^a-z0-9._\-\/]/_/gsi;
-    $in = eObj(\%ret, $name, $val, $in, $prefix);
+    $in = eObj(\%ret, $map, $name, $val, $in, $prefix);
     $in =~ s/^\s*,\s*//;
   }
   return \%ret;
@@ -5034,15 +5050,15 @@ json2nameValue($;$)
 
 # generate readings from the json string (parsed by json2reading) for $hash
 sub
-json2reading($$)
+json2reading($$;$$)
 {
-  my ($hash, $json) = @_;
+  my ($hash, $json, $prefix, $map) = @_;
 
   $hash = $defs{$hash} if(ref($hash) ne "HASH");
   return "json2reading: first arg is not a FHEM device"
         if(!$hash || ref $hash ne "HASH" || !$hash->{TYPE});
 
-  my $ret = json2nameValue($json);
+  my $ret = json2nameValue($json, $prefix, $map);
   if($ret && ref $ret eq "HASH") {
     readingsBeginUpdate($hash);
     foreach my $k (keys %{$ret}) {
