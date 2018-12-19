@@ -61,6 +61,8 @@ zw_nl(fhemFn)
         var el = fnRet.el[eName];
         if(el.pos[0] != el.x || el.pos[1] != el.y) {
           log("SavePos:"+eName);
+          el.x = Math.round(el.x*100)/100;
+          el.y = Math.round(el.y*100)/100;
           el.pos[0] = el.x; el.pos[1] = el.y;
           var cmd = sprintf(fnRet.saveFn, eName, el.x+","+el.y);
           FW_cmd(FW_root+"?cmd="+cmd+"&XHR=1");

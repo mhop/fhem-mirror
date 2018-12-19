@@ -26,9 +26,11 @@ MQTT2_DEVICE_Initialize($)
     autocreate:0,1
     bridgeRegexp:textField-long
     devicetopic
+    devPos
     disable:0,1
     disabledForIntervals
     getList:textField-long
+    imageLink
     jsonMap:textField-long
     model
     readingList:textField-long
@@ -290,6 +292,7 @@ MQTT2_DEVICE_Set($@)
 
   my ($sets,$cmdList) = MQTT2_getCmdHash(AttrVal($hash->{NAME}, "setList", ""));
   my $cmdName = $a[1];
+  return MQTT2_DEVICE_addPos($hash,@a) if($cmdName eq "addPos"); # hidden cmd
   my $cmd = $sets->{$cmdName};
   return SetExtensions($hash, $cmdList, @a) if(!$cmd);
   return undef if(IsDisabled($hash->{NAME}));
@@ -459,24 +462,37 @@ MQTT2_DEVICE_fhemwebFn($$$$)
 {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
 
-  return if(!ReadingsVal($d, ".graphviz", ReadingsVal($d, "graphviz", "")));
-
-  my $js = "$FW_ME/pgm2/zwave_neighborlist.js";
-
-  return
-  "<div id='ZWDongleNr'><a id='zw_snm' href='#'>Show neighbor map</a></div>".
-  "<div id='ZWDongleNrSVG'></div>".
-  "<script type='text/javascript' src='$js'></script>".
-  '<script type="text/javascript">'.<<"JSEND"
-    \$(document).ready(function() {
-      \$("div#ZWDongleNr a#zw_snm")
-        .click(function(e){
-          e.preventDefault();
-          zw_nl('MQTT2_DEVICE_nlData("$d")');
-        });
-    });
-  </script>
+  if(ReadingsVal($d, ".graphviz", ReadingsVal($d, "graphviz", ""))) {
+    my $js = "$FW_ME/pgm2/zwave_neighborlist.js";
+    return
+    "<div id='ZWDongleNr'><a id='zw_snm' href='#'>Show neighbor map</a></div>".
+    "<div id='ZWDongleNrSVG'></div>".
+    "<script type='text/javascript' src='$js'></script>".
+    '<script type="text/javascript">'.<<"JSEND"
+      \$(document).ready(function() {
+        \$("div#ZWDongleNr a#zw_snm")
+          .click(function(e){
+            e.preventDefault();
+            zw_nl('MQTT2_DEVICE_nlData("$d")');
+          });
+      });
+    </script>
 JSEND
+  }
+
+  my $img = AttrVal($d, "imageLink", "");
+  if($img) {
+    return
+      "<div id='m2dimage' class='img' style='float:right'>".
+        "<img style='max-width:96;max-height:96px;' src='$img'>".
+      "</div>".
+      '<script type="text/javascript">'.<<'JSEND'
+        $(document).ready(function() {
+          $("div#m2dimage").insertBefore("div.makeTable.internals"); // Move
+        });
+      </script>
+JSEND
+  }
 }
 
 sub
@@ -484,17 +500,54 @@ MQTT2_DEVICE_nlData($)
 {
   my ($d) = @_;
 
-  my %h;
+  my (%dv,%h,%n2n);
   my $fo="";
+  my $pref = "https://koenkk.github.io/zigbee2mqtt/images/devices/";
+
+  # Needed for the image links
+  my $dv = ReadingsVal($d, ".devices", ReadingsVal($d, "devices", ""));
+  for my $l (split(/[\r\n]/, $dv)) {
+    next if($l !~ m/ieeeAddr":"([^"]+)".*model":"([^"]+)"/);
+    $dv{$1} = $2;
+  }
+
+  # Name translation
+  for my $n (devspec2array("TYPE=MQTT2_DEVICE")) {
+    my $cid = $defs{$n}{CID};
+    next if(!$cid);
+    $cid =~ s/zigbee_//;
+    $n2n{$cid} = $n;
+  }
+
   my $gv = ReadingsVal($d, ".graphviz", ReadingsVal($d, "graphviz", ""));
   for my $l (split(/[\r\n]/, $gv)) {
+
     if($l =~ m/^\s*"([^"]+)"\s*\[label="([^"]+)"\]/) {
       my ($n,$v) = ($1,$2);
-      $v =~ s/[{}]//;
-      $v =~ s/\|/<br>/g;
       my $nv = $n;
       $nv =~ s/^0x0*//;
+      $h{$n}{img} = '';
+
+      if($v =~ m/{(.*)\|(.*)\|(.*)\|(.*)}/) {
+        my ($x1,$x2,$x3,$x4) = ($1,$2,$3,$4);
+        $nv = $n2n{$x1} if($n2n{$x1});
+        $h{$n}{img} = $pref.$dv{$n}.".jpg" if($dv{$n});
+        if($dv{$n} && $n2n{$x1} && !AttrVal($n2n{$x1}, "imageLink", "")) {
+          CommandAttr(undef, "$nv imageLink $h{$n}{img}");
+        }
+        $h{$n}{class} = ($x2 =~ m/Coordinator|Router/ ? "zwDongle":"zwBox");
+        if($x2 =~ m/Coordinator/) {
+          $nv = $d;
+          $fo = $n;
+        }
+      } else {
+        $h{$n}{class}="zwBox";
+      }
+
+      $v =~ s/[{}]//;
+      $v =~ s/\|/<br>/g;
       $h{$n}{txt} = $nv;
+
       $h{$n}{title} = $v;
       $fo = $n if(!$fo);
       my @a;
@@ -504,19 +557,38 @@ MQTT2_DEVICE_nlData($)
       push @{$h{$1}{neighbors}}, $2;
     }
   }
+
   my @ret;
+  my @dp = split(" ", AttrVal($d, "devPos", ""));
+  my %dp = @dp;
+
   for my $k (keys %h) {
     my $n = $h{$k}{neighbors};
     push @ret, '"'.$k.'":{'.
-        '"class":"zwBox col_link col_oddrow",'.
+        '"class":"'.$h{$k}{class}.' col_link col_oddrow",'.
+        '"img":"'.$h{$k}{img}.'",'.
         '"txt":"'.$h{$k}{txt}.'",'.
         '"title":"'.$h{$k}{title}.'",'.
-        '"pos":[],'.
+        '"pos":['.($dp{$k} ? $dp{$k} : '').'],'.
         '"neighbors":['. (@{$n} ? ('"'.join('","',@{$n}).'"'):'').']}';
   }
 
-  return '{"firstObj":"'.$fo.'","el":{'.join(",",@ret).'} }';
+  my $r = '{"firstObj":"'.$fo.'","el":{'.join(",",@ret).'},'.
+           '"saveFn":"set '.$d.' addPos {1} {2}" }';
+  return $r;
 }
+
+sub
+MQTT2_DEVICE_addPos($@)
+{
+  my ($hash, @a) = @_;
+  my @d = split(" ", AttrVal($a[0], "devPos", ""));
+  my %d = @d;
+  $d{$a[2]} = $a[3];
+  CommandAttr(undef,"$a[0] devPos ".join(" ", map {"$_ $d{$_}"} sort keys %d));
+}
+# graphvis end
+#####################################
 
 #####################################
 # Utility functions for the AttrTemplates
@@ -625,6 +697,13 @@ zigbee2mqtt_devStateIcon255($)
       name of the device.
       </li><br>
 
+    <a name="devPos"></a>
+    <li>devPos value<br>
+      used internally by the "Show neighbor map" visualizer in FHEMWEB.
+      This function is active if the graphviz and devices readings are set,
+      usually in the zigbee2mqtt bridge device.
+      </li><br>
+
     <li><a href="#disable">disable</a><br>
         <a href="#disabledForIntervals">disabledForIntervals</a></li><br>
 
@@ -657,6 +736,12 @@ zigbee2mqtt_devStateIcon255($)
       </ul>
       </li><br>
 
+
+    <a name="imageLink"></a>
+    <li>imageLink href<br>
+      sets the image to be shown. The "Show neighbor map" function initializes
+      the value automatically.
+      </li>
 
     <a name="jsonMap"></a>
     <li>jsonMap oldReading1:newReading1 oldReading2:newReading2...<br>
