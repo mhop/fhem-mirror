@@ -1,4 +1,4 @@
-REV 17997
+REV 18001
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2018-12-18_07:45:03 269222 ./CHANGED
+UPD 2018-12-19_07:45:02 269283 ./CHANGED
 UPD 2018-12-14_07:45:02 38586 ./MAINTAINER.txt
 UPD 2018-09-09_07:45:03 39688 ./configDB.pm
 UPD 2018-09-17_07:45:03 19987 ./fhem.cfg.demo
@@ -213,7 +213,7 @@ UPD 2016-08-23_07:45:12 9997 FHEM/36_PCA301.pm
 UPD 2017-11-03_07:45:02 17579 FHEM/36_PrecipitationSensor.pm
 UPD 2018-11-26_07:45:02 39859 FHEM/36_Shelly.pm
 UPD 2018-08-20_07:45:03 71356 FHEM/36_Vallox.pm
-UPD 2018-07-06_07:45:03 22937 FHEM/36_WMBUS.pm
+UPD 2018-12-19_07:45:02 23939 FHEM/36_WMBUS.pm
 UPD 2018-02-10_07:45:02 10932 FHEM/37_NotifyAndroidTV.pm
 UPD 2015-07-28_14:05:31 10162 FHEM/37_SHC.pm
 UPD 2015-07-28_14:05:31 31303 FHEM/37_SHCdev.pm
@@ -365,7 +365,7 @@ UPD 2018-07-12_07:45:02 30806 FHEM/73_NUKIBridge.pm
 UPD 2018-02-15_07:45:02 88225 FHEM/73_PRESENCE.pm
 UPD 2017-11-06_07:45:02 81399 FHEM/73_UpsPico.pm
 UPD 2018-04-14_07:45:02 84632 FHEM/73_WaterCalculator.pm
-UPD 2017-05-09_07:45:02 118318 FHEM/73_km200.pm
+UPD 2018-12-19_07:45:02 118391 FHEM/73_km200.pm
 UPD 2018-11-16_07:45:03 67193 FHEM/74_AMADDevice.pm
 UPD 2018-10-18_07:45:03 41415 FHEM/74_GardenaSmartDevice.pm
 UPD 2018-03-22_07:45:04 41340 FHEM/74_HOMBOT.pm
@@ -559,7 +559,7 @@ UPD 2018-10-15_07:45:02 7861 FHEM/TcpServerUtils.pm
 UPD 2016-02-22_07:45:12 27613 FHEM/TimeSeries.pm
 UPD 2018-10-23_07:45:03 50211 FHEM/UConv.pm
 UPD 2018-12-02_07:45:02 138262 FHEM/Unit.pm
-UPD 2018-12-16_07:45:03 64444 FHEM/WMBus.pm
+UPD 2018-12-19_07:45:02 64650 FHEM/WMBus.pm
 UPD 2015-07-28_14:05:31 8525 FHEM/WinService.pm
 UPD 2018-04-22_07:45:04 13981 FHEM/YahooWeatherAPI.pm
 UPD 2018-08-21_07:45:03 8767 FHEM/ZWLib.pm
@@ -597,7 +597,7 @@ UPD 2017-09-10_16:01:38 405 FHEM/holiday/st.holiday
 UPD 2017-09-10_16:01:38 392 FHEM/holiday/th.holiday
 UPD 2018-11-16_07:45:03 333089 FHEM/lib/74_AMADautomagicFlowset_4.2.4.xml
 UPD 2018-11-16_07:45:03 440509 FHEM/lib/74_AMADtaskerset_4.2.4.prj.xml
-UPD 2018-12-18_07:45:03 23860 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2018-12-19_07:45:02 24247 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
 UPD 2018-01-13_07:45:02 21899 FHEM/lib/Device/Firmata/Constants.pm
@@ -691,12 +691,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2018-12-18_07:45:06 3747826 docs/commandref.html
-UPD 2018-12-18_07:45:08 2286726 docs/commandref_DE.html
+UPD 2018-12-19_07:45:06 3748168 docs/commandref.html
+UPD 2018-12-19_07:45:08 2287127 docs/commandref_DE.html
 UPD 2018-11-17_23:59:05 76550 docs/commandref_frame.html
 UPD 2018-11-17_23:59:05 86019 docs/commandref_frame_DE.html
-UPD 2018-12-18_07:45:09 202613 docs/commandref_modular.html
-UPD 2018-12-18_07:45:10 213352 docs/commandref_modular_DE.html
+UPD 2018-12-19_07:45:08 202613 docs/commandref_modular.html
+UPD 2018-12-19_07:45:09 213352 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
