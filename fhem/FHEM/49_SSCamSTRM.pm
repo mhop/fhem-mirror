@@ -34,6 +34,7 @@ use warnings;
 
 # Versions History intern
 our %SSCamSTRM_vNotesIntern = (
+  "2.2.1"  => "19.12.2018  commandref revised ",
   "2.2.0"  => "13.12.2018  load sscam_hls.js, sscam_tooltip.js from pgm2 for HLS Streaming support and tooltips ",
   "2.1.0"  => "11.12.2018  switch \"popupStream\" from get to set ",
   "2.0.0"  => "09.12.2018  get command \"popupStream\" and attribute \"popupStreamFW\" ",
@@ -379,13 +380,13 @@ Dependend of the Streaming-Device state, different buttons are provided to start
     <a name="popupStreamFW"></a>
     <li><b>popupStreamFW</b><br>
       You can specify a particular FHEMWEB device whose active browser pages should open a popup window by the 
-      "get &lt;name&gt; popupStream" command (default: all active FHEMWEB devices).
+      "set &lt;name&gt; popupStream" command (default: all active FHEMWEB devices).
     </li>
     <br>
     
     <a name="popupStreamTo"></a>
     <li><b>popupStreamTo [OK | &lt;seconds&gt;]</b><br>
-      The attribute "popupStreamTo" determines the type of the popup window which is opend by get-function "popupStream".
+      The attribute "popupStreamTo" determines the type of the popup window which is opend by set-function "popupStream".
       If "OK" is set, an OK-dialog window will be opened. A specified number in seconds closes the popup window after this 
       time automatically (default 5 seconds)..
       <br><br>
@@ -534,13 +535,13 @@ Abhängig vom Zustand des Streaming-Devices werden zum Start von Aktionen unters
     <a name="popupStreamFW"></a>
     <li><b>popupStreamFW</b><br>
       Es kann mit diesem Attribut das FHEMWEB-Device bestimmt werden, auf dessen Browserseiten sich Popup-Fenster mit 
-      "get &lt;name&gt; popupStream" öffnen sollen (default: alle aktiven FHEMWEB-Devices).
+      "set &lt;name&gt; popupStream" öffnen sollen (default: alle aktiven FHEMWEB-Devices).
     </li>
     <br>
     
     <a name="popupStreamTo"></a>
     <li><b>popupStreamTo [OK | &lt;Sekunden&gt;]</b><br>
-      Das Attribut "popupStreamTo" legt die Art des Popup-Fensters fest welches mit der get-Funktion "popupStream" geöffnet wird.
+      Das Attribut "popupStreamTo" legt die Art des Popup-Fensters fest welches mit der set-Funktion "popupStream" geöffnet wird.
       Ist "OK" eingestellt, öffnet sich ein OK-Dialogfenster. Die angegebene Zahl in Sekunden schließt das Fenster nach dieser 
       Zeit automatisch (default 5 Sekunden).
       <br><br>
@@ -555,7 +556,7 @@ Abhängig vom Zustand des Streaming-Devices werden zum Start von Aktionen unters
     <li><b>popupWindowSize</b><br>
       Bei geeigneten Wiedergabeinhalten (Videostream oder Schnappschußgalerie) öffnet ein Klick auf den Bildinhalt ein 
       Popup-Fenster mit diesem Inhalt. Die Darstellungsgröße kann mit diesem Attribut eingestellt werden. 
-      Das Attribut gilt ebenfalls für die get-Funktion "popupStream".
+      Das Attribut gilt ebenfalls für die set-Funktion "popupStream".
       <br><br>
       <ul>
         <b>Beispiel: </b><br>
