@@ -45,6 +45,7 @@ use HttpUtils;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.1.0"  => "19.12.2018  tooltipps in camera device for control buttons, commandref revised ",
   "8.0.0"  => "13.12.2018  HLS with sscam_hls.js integrated for SSCamSTRM type hls, realize tooltipps in streaming devices, minor fixes",
   "7.7.1"  => "12.12.2018  change autocreateCams: define new device only if ne device with Internal CAMNAME is defined, ".
               "fix getsnapinfo function get wrong snapid or none if cam is new defined ",
@@ -102,6 +103,7 @@ our %SSCam_vNotesIntern = (
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
+  "8.1.0"  => "19.12.2018 Tooltipps added to camera device control buttons.",
   "8.0.0"  => "18.12.2018 HLS is integrated using sscam_hls.js in Streaming device types \"hls\". HLS streaming is now available ".
               "for all common used browser types. Tooltipps are added to streaming devices and snapgallery.",
   "7.7.0"  => "10.12.2018 autocreateCams command added to SVS device. By this command all cameras installed in SVS can be ".
@@ -302,7 +304,7 @@ our %SSCam_ttips_de = (
     ttrecstop   => "Stoppt die laufende Aufnahme von Kamera &quot;§NAME§&quot;.",
     ttsnap      => "Ein Schnappschuß von Kamera &quot;§NAME§&quot; wird aufgenommen.", 
     ttcmdstop   => "Stopp Wiedergabe von Kamera &quot;§NAME§&quot;",
-    tthlsreact  => "Reactiviert das HTTP Livestreaming Interface von camera &quot;§NAME§&quot;.<br>Die Kamera wird aufgefordert die HLS Übertragung zu restarten.",     
+    tthlsreact  => "Reaktiviert das HTTP Livestreaming Interface von Kamera &quot;§NAME§&quot;.<br>Die Kamera wird aufgefordert die HLS Übertragung zu restarten.",     
     ttmjpegrun  => "Wiedergabe des MJPEG Livestreams von Kamera &quot;§NAME§&quot;",
     tthlsrun    => "Wiedergabe des HTTP Livestreams von Kamera &quot;§NAME§&quot;.<br>Es wird die HLS Funktion der Synology Surveillance Station verwendet.",
     ttlrrun     => "Wiedergabe der letzten Aufnahme von Kamera &quot;§NAME§&quot; in einem iFrame.<br>Es werden sowohl MJPEG als auch H.264 Aufnahmen wiedergegeben.",
@@ -1430,7 +1432,7 @@ sub SSCam_FWsummaryFn ($$$$) {
   my $name   = $hash->{NAME};
   my $link   = $hash->{HELPER}{LINK};
   my $wltype = $hash->{HELPER}{WLTYPE};
-  my $ret;
+  my $ret    = "";
   my $alias;
     
   return if(!$hash->{HELPER}{LINK} || ReadingsVal($d, "state", "") =~ /^dis.*/ || IsDisabled($name));
@@ -1459,24 +1461,43 @@ sub SSCam_FWsummaryFn ($$$$) {
   my $imgrecstop    = "<img src=\"$FW_ME/www/images/sscam/black_btn_RECSTOP.png\">";
   my $cmddosnap     = "cmd=set $d snap STRM";                                                     # Snapshot auslösen mit Kennzeichnung "by STRM-Device"
   my $imgdosnap     = "<img src=\"$FW_ME/www/images/sscam/black_btn_DOSNAP.png\">";
-      
-  
+ 
   my $attr = AttrVal($d, "htmlattr", " ");
   Log3($name, 4, "$name - SSCam_FWsummaryFn called - FW_wname: $FW_wname, device: $d, room: $room, attributes: $attr");
   
+  # Javascript Bibliothek für Tooltips (http://www.walterzorn.de/tooltip/tooltip.htm#download) und Texte
+  my $calias = $hash->{CAMNAME};                                            # Alias der Kamera
+  my $ttjs   = "/fhem/pgm2/sscam_tooltip.js"; 
+  my ($ttrefresh, $ttrecstart, $ttrecstop, $ttsnap, $ttcmdstop, $tthlsreact, $ttmjpegrun, $tthlsrun, $ttlrrun, $tth264run, $ttlmjpegrun, $ttlsnaprun);
+  if(AttrVal("global","language","EN") =~ /EN/) {
+      $ttrecstart = $SSCam_ttips_en{"ttrecstart"}; $ttrecstart =~ s/§NAME§/$calias/g;
+      $ttrecstop  = $SSCam_ttips_en{"ttrecstop"}; $ttrecstop =~ s/§NAME§/$calias/g;
+      $ttsnap     = $SSCam_ttips_en{"ttsnap"}; $ttsnap =~ s/§NAME§/$calias/g;
+      $ttcmdstop  = $SSCam_ttips_en{"ttcmdstop"}; $ttcmdstop =~ s/§NAME§/$calias/g;
+      $tthlsreact = $SSCam_ttips_en{"tthlsreact"}; $tthlsreact =~ s/§NAME§/$calias/g;
+  } else {
+      $ttrecstart = $SSCam_ttips_de{"ttrecstart"}; $ttrecstart =~ s/§NAME§/$calias/g;
+      $ttrecstop  = $SSCam_ttips_de{"ttrecstop"}; $ttrecstop =~ s/§NAME§/$calias/g;
+      $ttsnap     = $SSCam_ttips_de{"ttsnap"}; $ttsnap =~ s/§NAME§/$calias/g;
+      $ttcmdstop  = $SSCam_ttips_de{"ttcmdstop"}; $ttcmdstop =~ s/§NAME§/$calias/g;
+      $tthlsreact = $SSCam_ttips_de{"tthlsreact"}; $tthlsreact =~ s/§NAME§/$calias/g;
+  }
+  
+  $ret .= "<script type=\"text/javascript\" src=\"$ttjs\"></script>";
+  
   if($wltype eq "image") {
-    $ret = "<img src=$link $attr><br>";
-    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";
+    $ret .= "<img src=$link $attr><br>";
+    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
     $ret .= $imgblank;  
     if($hash->{HELPER}{RUNVIEW} =~ /live_fw/) {
       if(ReadingsVal($d, "Record", "Stop") eq "Stop") {
         # Aufnahmebutton endlos Start
-        $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\" >$imgrecendless </a>";
+        $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
       } else {
         # Aufnahmebutton Stop
-        $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecstop')\">$imgrecstop </a>";
+        $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecstop')\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
       }	      
-    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\">$imgdosnap </a>"; 
+    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>"; 
     }      
     $ret .= "<br>";
     if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($d, "CamAudioType", "Unknown") !~ /Unknown/) {
@@ -1486,11 +1507,11 @@ sub SSCam_FWsummaryFn ($$$$) {
     }
     
   } elsif($wltype eq "iframe") {
-    $ret  = "<iframe src=$link $attr controls autoplay>
+    $ret .= "<iframe src=$link $attr controls autoplay>
              Iframes disabled
              </iframe>";
     $ret .= "<br>";
-    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";
+    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
     if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($d, "CamAudioType", "Unknown") !~ /Unknown/) {
         $ret .= "<audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>
                  Your browser does not support the audio element.      
@@ -1498,7 +1519,7 @@ sub SSCam_FWsummaryFn ($$$$) {
     }
            
   } elsif($wltype eq "embed") {
-    $ret = "<embed src=$link $attr>";
+    $ret .= "<embed src=$link $attr>";
     if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($d, "CamAudioType", "Unknown") !~ /Unknown/) {
         $ret .= "<audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>
                  Your browser does not support the audio element.      
@@ -1507,42 +1528,42 @@ sub SSCam_FWsummaryFn ($$$$) {
            
   } elsif($wltype eq "link") {
     $alias = $hash->{HELPER}{ALIAS};
-    $ret = "<a href=$link $attr>$alias</a><br>";     
+    $ret .= "<a href=$link $attr>$alias</a><br>";     
 
   } elsif($wltype eq "base64img") {
     $alias = $hash->{HELPER}{ALIAS};
-    $ret = "<img $attr alt='$alias' src='data:image/jpeg;base64,$link'><br>";
-    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";
+    $ret .= "<img $attr alt='$alias' src='data:image/jpeg;base64,$link'><br>";
+    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
   
   } elsif($wltype eq "hls") {
     $alias = $hash->{HELPER}{ALIAS};
-    $ret  = "<video $attr controls autoplay>
+    $ret  .= "<video $attr controls autoplay>
              <source src=$link type=\"application/x-mpegURL\">
              <source src=$link type=\"video/MP2T\">
              Your browser does not support the video tag
              </video>";
     $ret .= "<br>";
-    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";
-    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdhlsreact')\">$imghlsreact </a>";
+    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
+    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdhlsreact')\" onmouseover=\"Tip('$tthlsreact')\" onmouseout=\"UnTip()\">$imghlsreact </a>";
     $ret .= $imgblank;
     if(ReadingsVal($d, "Record", "Stop") eq "Stop") {
         # Aufnahmebutton endlos Start
-        $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\">$imgrecendless </a>";
+        $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
     } else {
         # Aufnahmebutton Stop
-        $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecstop')\">$imgrecstop </a>";
+        $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecstop')\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
     }		
-    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\">$imgdosnap </a>";                 
+    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";                 
   
   } elsif($wltype eq "video") {
-    $ret  = "<video $attr controls autoplay> 
+    $ret .= "<video $attr controls autoplay> 
              <source src=$link type=\"video/mp4\"> 
              <source src=$link type=\"video/ogg\">
              <source src=$link type=\"video/webm\">
              Your browser does not support the video tag.
              </video>"; 
     $ret .= "<br>";
-    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";
+    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
     $ret .= "<br>";
     if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($d, "CamAudioType", "Unknown") !~ /Unknown/) {
         $ret .= "<audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>
@@ -7151,7 +7172,8 @@ return;
   <a name="SSCamcreateStreamDev"></a>
   <li><b> set &lt;name&gt; createStreamDev [generic | mjpeg | switched] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
-  A separate Streaming-Device (type SSCamSTRM) will be created. This device can be used as a discrete device in a dashboard for example.
+  A separate Streaming-Device (type SSCamSTRM) will be created. This device can be used as a discrete device in a dashboard 
+  for example.
   The current room of the parent camera device is assigned to the new device if it is set there.
   <br><br>
   
@@ -7159,22 +7181,39 @@ return;
     <table>
     <colgroup> <col width=10%> <col width=90%> </colgroup>
       <tr><td>generic   </td><td>- the streaming device playback a content determined by attribute "genericStrmHtmlTag" </td></tr>
+      <tr><td>hls       </td><td>- the streaming device playback a permanent HLS video stream </td></tr>
       <tr><td>mjpeg     </td><td>- the streaming device playback a permanent MJPEG video stream (Streamkey method) </td></tr>
       <tr><td>switched  </td><td>- playback of different streaming types. Buttons for mode control are provided. </td></tr>
     </table>
     </ul>
     <br><br>  
  
-  You can control the design with HTML tags in <a href="#SSCamattr">attribute</a> "htmlattr" of the camera device or by the 
-  specific attributes of the SSCamSTRM-device itself. <br>
-  In "switched"-Devices are buttons provided for mode control. <br>
+  You can control the design with HTML tags in <a href="#SSCamattr">attribute</a> "htmlattr" of the camera device or by 
+  specific attributes of the SSCamSTRM-device itself. <br><br>
+  
+  <b>Streaming device "hls"</b> <br><br>
+ 
+  The Streaming-device of type "hls" uses the library hls.js to playback the video stream and is executable on most current
+  browsers with MediaSource extensions (MSE). With <a href="#SSCamattr">attribuet</a> "hlsNetScript" can be specified, whether 
+  the local installed version of hls.js (./www/pgm2/sscam_hls.js) or the newest online library version from the hls.js 
+  project site should be used. This attribute has to be set centrally in a device of type "SVS" ! <br>
+  If this kind of streaming device is used, the <a href="#SSCamattr">attribute</a> "hlsStrmObject" must be set in the parent 
+  camera device (see Internal PARENT).
+  <br><br>
+  
+  <b>Streaming device "switched hls"</b> <br><br>
+  
+  This type of streaming device uses the HLS video stream native delivered by Synology Surveillance Station.
   If HLS (HTTP Live Streaming) is used in Streaming-Device of type "switched", then the camera has to be set to video format
   H.264 in the Synology Surveillance Station and the SVS-Version has to support the HLS format. 
   Therefore the selection button of HLS is only provided by the Streaming-Device if the Reading "CamStreamFormat" contains 
   "HLS". <br>
-  HTTP Live Streaming is currently only available on Mac Safari or modern mobile iOS/Android devices. <br>
-  In devices of type "switched" buttons for controlling the media type to start are provided. <br>
-  A Streaming-Device of type "generic" needs the complete definition of HTML-Tags by the attribute "genericStrmHtmlTag". 
+  HTTP Live Streaming is currently only available on Mac Safari or modern mobile iOS/Android devices. 
+  <br><br>
+
+  <b>Streaming device "generic"</b> <br><br>
+  
+  A streaming device of type "generic" needs the complete definition of HTML-Tags by the attribute "genericStrmHtmlTag". 
   These tags specify the content to playback. <br><br>
 
     <ul>
@@ -7969,6 +8008,35 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     </ul>
     <br><br>
     </li>
+    
+  <a name="hlsNetScript"></a>
+  <li><b>hlsNetScript</b> &nbsp;&nbsp;&nbsp;&nbsp;(settable in device model "SVS") <br>
+    If set, the latest hls.js library version from the project site is used (internet connection is needed). 
+    <br>
+    In default the local installed library version (./www/pgm2/sscam_hls.js) is uses for playback in all streaming devices  
+    of type "hls" (please see also "set &lt;name&gt; createStreamDev hls").
+    This attribute has to be set in a device model "SVS" and applies to all streaming devices !
+  </li><br>
+    
+  <a name="hlsStrmObject"></a>
+  <li><b>hlsStrmObject</b><br>
+  If a streaming device was defined by "set &lt;name&gt; createStreamDev hls", this attribute has to be set and must contain the 
+  link to the video object to play back. <br>
+  The attribute must specify a HTTP Live Streaming object with the extension ".m3u8". <br>
+  The variable $NAME can be used as a placeholder and will be replaced by the camera device name.
+  <br><br> 
+  
+        <ul>
+		<b>Examples:</b><br>
+        attr &lt;name&gt; hlsStrmObject https://video-dev.github.io/streams/x36xhzz/x36xhzz.m3u8  <br>
+        # a video stream used for testing the streaming device function (internet connection is needed) <br><br>
+        attr &lt;name&gt; hlsStrmObject http://192.168.2.10:32000/CamHE1.m3u8  <br>
+        # playback a HLS video stream of a camera witch is delivered by e.g. a ffmpeg conversion process   <br><br>
+        attr &lt;name&gt; hlsStrmObject http://192.168.2.10:32000/$NAME.m3u8  <br>
+        # Same as example above, but use the replacement with variable $NAME for "CamHE1"     
+        </ul>
+		<br>
+  </li>
   
   <a name="httptimeout"></a>
   <li><b>httptimeout</b><br>
@@ -8547,10 +8615,10 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   
   Das Streaming-Device vom Typ "hls" verwendet die Bibliothek hls.js zur Bildverarbeitung und ist auf allen Browsern mit
   MediaSource extensions (MSE) lauffähig. Mit dem <a href="#SSCamattr">Attribut</a> "hlsNetScript" kann bestimmt werden, ob 
-  die lokal installierte hls.js (./www/pgm2/hls.js) oder immer die aktuellste Bibliotheksversion von der hls.js Projektseite 
+  die lokal installierte hls.js (./www/pgm2/sscam_hls.js) oder immer die aktuellste Bibliotheksversion von der hls.js Projektseite 
   verwendet werden soll. Dieses Attribut ist zentral in einem Device vom Typ "SVS" zu setzen ! <br>
-  Bei Verwendung dieses Streamingdevices ist zwingend das <a href="#SSCamattr">Attribut</a> "hlsStrmObject" im SSCam Device 
-  mit dem darzustellenden Stream anzugeben.
+  Bei Verwendung dieses Streamingdevices ist zwingend das <a href="#SSCamattr">Attribut</a> "hlsStrmObject" im verbundenen 
+  Kamera-Device (siehe Internal PARENT) anzugeben.
   <br><br>
   
   <b>Streaming Device "switched hls"</b> <br><br>
@@ -9388,12 +9456,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     httptimeout = "0" oder nicht gesetzt) </li><br>
     
   <a name="hlsNetScript"></a>
-  <li><b>hlsNetScript</b> &nbsp;&nbsp;&nbsp;&nbsp;(setzbar in Device Typ "SVS") <br>
+  <li><b>hlsNetScript</b> &nbsp;&nbsp;&nbsp;&nbsp;(setzbar in Device Model "SVS") <br>
     Wenn gesetzt, wird die aktuellste hls.js Version von der Projektseite verwendet (Internetverbindung nötig). 
     <br>
-    Im Standard wird die lokal installierte Version (./www/pgm2/sscam_hls.js) zur Wiedergabe von Daten in allen 
-    Streaming Devices vom Typ "hls" genutzt (siehe set &lt;name&gt; createStreamDev hls").
-    Dieses Attribut wird in einem Device vom Typ "SVS" gesetzt und gilt zentral für alle Streaming Devices !
+    Im Standard wird die lokal installierte Version (./fhem/www/pgm2/sscam_hls.js) zur Wiedergabe von Daten in allen 
+    Streaming Devices vom Typ "hls" genutzt (siehe "set &lt;name&gt; createStreamDev hls").
+    Dieses Attribut wird in einem Device vom Model "SVS" gesetzt und gilt zentral für alle Streaming Devices !
   </li><br>
     
   <a name="hlsStrmObject"></a>
