@@ -28,6 +28,7 @@ zw_nl(fhemFn)
 
   FW_cmd(FW_root+"?cmd={"+fhemFn+"}&XHR=1", function(r){
     var xpos=20, ypos=20, fnRet = JSON.parse(r);
+    $("#zw_save").toggle(fnRet.saveFn ? true : false);
 
     var cnt=0;
     for(var elName in fnRet.el) {
@@ -56,8 +57,6 @@ zw_nl(fhemFn)
     $('#ZWDongleNr a#zw_al').click(function(){ zw_al(fnRet, width, height); });
 
     $('#ZWDongleNr a#zw_save').click(function(){
-      if(!fnRet.saveFn)
-        return;
       for(var eName in fnRet.el) {
         var el = fnRet.el[eName];
         if(el.pos[0] != el.x || el.pos[1] != el.y) {

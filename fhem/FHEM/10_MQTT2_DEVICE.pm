@@ -18,6 +18,7 @@ MQTT2_DEVICE_Initialize($)
   $hash->{AttrFn}   = "MQTT2_DEVICE_Attr";
   $hash->{ParseFn}  = "MQTT2_DEVICE_Parse";
   $hash->{RenameFn} = "MQTT2_DEVICE_Rename";
+  $hash->{FW_detailFn} = "MQTT2_DEVICE_fhemwebFn";
 
   no warnings 'qw';
   my @attrList = qw(
@@ -86,7 +87,7 @@ MQTT2_DEVICE_Parse($$)
   }
 
   my $autocreate;
-  if($msg =~ m/^autocreate:(.*)/) {
+  if($msg =~ m/^autocreate:(.*)$/s) {
     $msg = $1;
     $autocreate = 1;
   }
@@ -449,6 +450,72 @@ MQTT2_DEVICE_Undef($$)
     $modules{MQTT2_DEVICE}{defptr}{cid}{$hash->{CID}} = \@nh;
   }
   return undef;
+}
+
+#####################################
+# Reuse the ZWDongle map for graphvis visualisation. Forum #91394
+sub
+MQTT2_DEVICE_fhemwebFn($$$$)
+{
+  my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
+
+  return if(!ReadingsVal($d, ".graphviz", ReadingsVal($d, "graphviz", "")));
+
+  my $js = "$FW_ME/pgm2/zwave_neighborlist.js";
+
+  return
+  "<div id='ZWDongleNr'><a id='zw_snm' href='#'>Show neighbor map</a></div>".
+  "<div id='ZWDongleNrSVG'></div>".
+  "<script type='text/javascript' src='$js'></script>".
+  '<script type="text/javascript">'.<<"JSEND"
+    \$(document).ready(function() {
+      \$("div#ZWDongleNr a#zw_snm")
+        .click(function(e){
+          e.preventDefault();
+          zw_nl('MQTT2_DEVICE_nlData("$d")');
+        });
+    });
+  </script>
+JSEND
+}
+
+sub
+MQTT2_DEVICE_nlData($)
+{
+  my ($d) = @_;
+
+  my %h;
+  my $fo="";
+  my $gv = ReadingsVal($d, ".graphviz", ReadingsVal($d, "graphviz", ""));
+  for my $l (split(/[\r\n]/, $gv)) {
+    if($l =~ m/^\s*"([^"]+)"\s*\[label="([^"]+)"\]/) {
+      my ($n,$v) = ($1,$2);
+      $v =~ s/[{}]//;
+      $v =~ s/\|/<br>/g;
+      my $nv = $n;
+      $nv =~ s/^0x0*//;
+      $h{$n}{txt} = $nv;
+      $h{$n}{title} = $v;
+      $fo = $n if(!$fo);
+      my @a;
+      $h{$n}{neighbors} = \@a;
+
+    } elsif($l =~ m/^\s*"([^"]+)"\s*->\s*"([^"]+)"/) {
+      push @{$h{$1}{neighbors}}, $2;
+    }
+  }
+  my @ret;
+  for my $k (keys %h) {
+    my $n = $h{$k}{neighbors};
+    push @ret, '"'.$k.'":{'.
+        '"class":"zwBox col_link col_oddrow",'.
+        '"txt":"'.$h{$k}{txt}.'",'.
+        '"title":"'.$h{$k}{title}.'",'.
+        '"pos":[],'.
+        '"neighbors":['. (@{$n} ? ('"'.join('","',@{$n}).'"'):'').']}';
+  }
+
+  return '{"firstObj":"'.$fo.'","el":{'.join(",",@ret).'} }';
 }
 
 #####################################
