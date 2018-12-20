@@ -26,7 +26,7 @@
 package MyTrashCalParser;
 use base qw(HTML::Parser);
 our %dates = ();
-my $lookupTag = "td";
+my $lookupTag = "div";
 my $curTag    = "";
 my $category = "--";
 
