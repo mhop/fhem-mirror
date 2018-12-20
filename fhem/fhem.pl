@@ -4940,12 +4940,12 @@ json2nameValue($;$$)
       if($s eq '\\') { 
         $esc = !$esc;
       } elsif($s eq '"' && !$esc) {
-        return (substr($t,1,$off-1), substr($t,$off+1));
+        return (undef,substr($t,1,$off-1), substr($t,$off+1));
       } else {
         $esc = 0;
       }
     }
-    return ($t, "");
+    return ('json2nameValue: no closing " found', "","");
   }
 
   sub
@@ -4955,11 +4955,12 @@ json2nameValue($;$$)
     my $depth=1;
     my ($esc, $inquote);
 
+    $inquote = 0;
     for(my $off = 1; $off < length($t); $off++){
       my $s = substr($t,$off,1);
       if($s eq $cc && !$inquote) { # close character
         $depth--;
-        return (substr($t,1,$off-1), substr($t,$off+1)) if(!$depth);
+        return ("", substr($t,1,$off-1), substr($t,$off+1)) if(!$depth);
 
       } elsif($s eq $oc && !$inquote) { # open character
         $depth++;
@@ -4974,7 +4975,7 @@ json2nameValue($;$$)
         $esc = 0;
       }
     }
-    return ($t, "");    # error
+    return ("json2nameValue: no closing $cc found", "", "");
   }
 
   sub
@@ -4994,25 +4995,30 @@ json2nameValue($;$$)
   eObj($$$$$$)
   {
     my ($ret,$map,$name,$val,$in,$prefix) = @_;
+    my $err; 
 
     if($val =~ m/^"/) {
-      ($val, $in) = lStr($val);
+      ($err, $val, $in) = lStr($val);
+      return ($err,undef) if($err);
       $val =~ s/\\u([0-9A-F]{4})/chr(hex($1))/gsie; # toJSON reverse
       setVal($ret, $map, $prefix, $name, $val);
 
     } elsif($val =~ m/^{/) { # }
-      ($val, $in) = lObj($val, '{', '}');
+      ($err, $val, $in) = lObj($val, '{', '}');
+      return ($err,undef) if($err);
       my $r2 = json2nameValue($val);
       foreach my $k (keys %{$r2}) {
         setVal($ret, $map, $prefix, "${name}_$k", $r2->{$k});
       }
 
     } elsif($val =~ m/^\[/) { 
-      ($val, $in) = lObj($val, '[', ']');
+      ($err, $val, $in) = lObj($val, '[', ']');
+      return ($err,undef) if($err);
       my $idx = 1;
       $val =~ s/^\s*//;
       while($val) {
-        $val = eObj($ret, $map, $name."_$idx", $val, $val, $prefix);
+        ($err,$val) = eObj($ret, $map, $name."_$idx", $val, $val, $prefix);
+        return ($err,undef) if($err);
         $val =~ s/^\s*,\s*//;
         $val =~ s/\s*$//;
         $idx++;
@@ -5034,15 +5040,21 @@ json2nameValue($;$$)
       Log 1, "Error parsing >$val< for $prefix$name";
       $in = "";
     }
-    return $in;
+    return (undef, $in);
   }
 
   $in = $1 if($in =~ m/^{(.*)}$/s);
 
+  my $err;
   while($in =~ m/^\s*"([^"]+)"\s*:\s*(.*)$/s) {
     my ($name,$val) = ($1,$2);
     $name =~ s/[^a-z0-9._\-\/]/_/gsi;
-    $in = eObj(\%ret, $map, $name, $val, $in, $prefix);
+    ($err,$in) = eObj(\%ret, $map, $name, $val, $in, $prefix);
+    if($err) {
+      Log 4, $err;
+      %ret = ();
+      return \%ret;
+    }
     $in =~ s/^\s*,\s*//;
   }
   return \%ret;
