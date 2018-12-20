@@ -500,7 +500,7 @@ MQTT2_DEVICE_nlData($)
 {
   my ($d) = @_;
 
-  my (%dv,%h,%n2n);
+  my (%img,%h,%n2n);
   my $fo="";
   my $pref = "https://koenkk.github.io/zigbee2mqtt/images/devices/";
 
@@ -508,15 +508,21 @@ MQTT2_DEVICE_nlData($)
   my $dv = ReadingsVal($d, ".devices", ReadingsVal($d, "devices", ""));
   for my $l (split(/[\r\n]/, $dv)) {
     next if($l !~ m/ieeeAddr":"([^"]+)".*model":"([^"]+)"/);
-    $dv{$1} = $2;
+    my $img = $2;
+    $img =~ s,[/: ],-,g; # Forum #91394, supported-devices.js
+    $img{$1} = "$pref$img.jpg";
   }
 
   # Name translation
   for my $n (devspec2array("TYPE=MQTT2_DEVICE")) {
     my $cid = $defs{$n}{CID};
-    next if(!$cid);
-    $cid =~ s/zigbee_//;
-    $n2n{$cid} = $n;
+    if($cid) {
+      $cid =~ s/zigbee_//;
+      $n2n{$cid} = $n;
+    }
+    if(AttrVal($n, "readingList","") =~ m,zigbee2mqtt/(.*):,) {
+      $n2n{$1} = $n;
+    }
   }
 
   my $gv = ReadingsVal($d, ".graphviz", ReadingsVal($d, "graphviz", ""));
@@ -531,8 +537,8 @@ MQTT2_DEVICE_nlData($)
       if($v =~ m/{(.*)\|(.*)\|(.*)\|(.*)}/) {
         my ($x1,$x2,$x3,$x4) = ($1,$2,$3,$4);
         $nv = $n2n{$x1} if($n2n{$x1});
-        $h{$n}{img} = $pref.$dv{$n}.".jpg" if($dv{$n});
-        if($dv{$n} && $n2n{$x1} && !AttrVal($n2n{$x1}, "imageLink", "")) {
+        $h{$n}{img} = $img{$n} if($img{$n});
+        if($img{$n} && $n2n{$x1} && !AttrVal($n2n{$x1}, "imageLink", "")) {
           CommandAttr(undef, "$nv imageLink $h{$n}{img}");
         }
         $h{$n}{class} = ($x2 =~ m/Coordinator|Router/ ? "zwDongle":"zwBox");
