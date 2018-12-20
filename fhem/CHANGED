@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  42_AptToDate: fix state reading after getDistribution
   - feature: 49_SSCam: tooltip hints in camera devices, commandref revised
   - feature: 36_WMBUS: new attribute ignoreUnknownDataBlocks
   - feature: 49_SSCam: V8.0.0, new type "hls" of streaming devices, hls 
