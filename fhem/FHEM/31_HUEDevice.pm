@@ -38,6 +38,8 @@ my %hueModels = (
                                                  gamut => 'C', },
   LCT014 => {name => 'Hue Bulb V3'              ,type => 'Extended color light'    ,subType => 'extcolordimmer',
                                                  gamut => 'C',                      icon => 'hue_filled_white_and_color_e27_b22', },
+  LCT024 => {name => 'Hue Play'                 ,type => 'Extended color light'    ,subType => 'extcolordimmer',
+                                                 gamut => 'C',                      icon => 'hue_filled_play', },
   LLC001 => {name => 'Living Colors G2'         ,type => 'Color light'             ,subType => 'colordimmer',
                                                  gamut => 'A',                      icon => 'hue_filled_iris', },
   LLC005 => {name => 'Living Colors Bloom'      ,type => 'Color light'             ,subType => 'colordimmer',
@@ -1509,6 +1511,8 @@ HUEDevice_Attr($$$;$)
 1;
 
 =pod
+=item cloudfree
+=item openapi
 =item summary    devices connected to a phillips hue bridge or a osram lightify gateway
 =item summary_DE Geräte an einer Philips HUE Bridge oder einem Osram LIGHTIFY Gateway
 =begin html
