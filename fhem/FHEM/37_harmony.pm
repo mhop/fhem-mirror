@@ -47,7 +47,7 @@ harmony_Initialize($)
   $hash->{SetFn}    = "harmony_Set";
   $hash->{GetFn}    = "harmony_Get";
   $hash->{AttrFn}   = "harmony_Attr";
-  $hash->{AttrList} = "disable:1 nossl:1 $readingFnAttributes";
+  $hash->{AttrList} = "disable:1 nossl:1 forceWebSocket:1 $readingFnAttributes";
 
   $hash->{FW_detailFn}  = "harmony_detailFn";
 
@@ -56,12 +56,69 @@ harmony_Initialize($)
 
 #####################################
 
+
+sub
+harmony_startDiscovery()
+{
+  return if( $modules{harmony}{defptr}{'harmony:discovery'} );
+  Log3 undef, 3, "harmony: starting discovery" ;
+
+  if( my $send_socket = new IO::Socket::INET ( Proto => 'udp', Broadcast => 1, ReuseAddr=>1, ReusePort=>defined(&SO_REUSEPORT)?1:0) ) {
+    if( my $socket = IO::Socket::INET->new( Listen=>10, Blocking=>1, ReuseAddr=>1) ) {
+      my $chash = {
+               TYPE => 'harmony',
+                 NR => $devcount++,
+               NAME => 'harmony:discovery',
+              STATE => 'discovering',
+         sendSocket => $send_socket,
+          TEMPORARY => 1,
+                 CD => $socket,
+                 FD => $socket->fileno(),
+               PORT => $socket->sockport,
+      };
+
+      $attr{$chash->{NAME}}{room} = 'hidden';
+
+      $modules{harmony}{defptr}{'harmony:discovery'} = $chash;
+
+      $defs{$chash->{NAME}}       = $chash;
+      $selectlist{$chash->{NAME}} = $chash;
+
+      my $sin = sockaddr_in(5224, inet_aton('255.255.255.255'));
+      $chash->{sendSocket}->send( "_logitech-reverse-bonjour._tcp.local.\n$chash->{PORT}", 0, $sin );
+
+    } else {
+      Log3 undef, 2, "harmony: failed to start discovery" ;
+    }
+  } else {
+    Log3 undef, 2, "harmony: failed to start discovery" ;
+  }
+
+}
+sub
+harmony_stopDiscovery()
+{
+  my $chash = $modules{harmony}{defptr}{'harmony:discovery'};
+  return if( !$chash );
+  Log3 undef, 3, "harmony: stopping discovery" ;
+
+  close( $chash->{sendSocket} );
+  close( $chash->{socket} );
+
+  delete $selectlist{$chash->{NAME}};
+  delete $defs{$chash->{NAME}};
+  delete $modules{$chash->{TYPE}}{defptr}{'harmony:discovery'};
+}
+
+
 sub
 harmony_Define($$)
 {
   my ($hash, $def) = @_;
 
   my @a = split("[ \t][ \t]*", $def);
+  my ($param_a, $param_h) = parseParams(\@a);
+  @a = @{$param_a};
 
   return "Usage: define <name> harmony [username password] ip"  if(@a < 3 || @a > 5);
   return "Usage: define <name> harmony [username password] ip"  if(@a == 4 && $a[2] ne "DEVICE" );
@@ -73,21 +130,26 @@ harmony_Define($$)
 
   if( @a == 3 ) {
     my $ip = $a[2];
+    return "$name: harmony device for '$ip' already defined" if( defined($modules{$hash->{TYPE}}{defptr}{$ip}) && $name ne $modules{$hash->{TYPE}}{defptr}{$ip}{NAME} );
 
     $hash->{ip} = $ip;
+
+    $modules{$hash->{TYPE}}{defptr}{$ip} = $hash;
 
   } elsif( @a == 4 ) {
     my $id = $a[3];
 
-    return "$name: device '$id' already defined" if( defined($modules{$hash->{TYPE}}{defptr}{$id}) );
+    return "$name: harmony device for '$id' already defined" if( defined($modules{$hash->{TYPE}}{defptr}{$id}) && $name ne $modules{$hash->{TYPE}}{defptr}{$id}{NAME} );
 
     $hash->{id} = $id;
     $modules{$hash->{TYPE}}{defptr}{$id} = $hash;
 
   } elsif( @a == 5 ) {
+    my $ip = $a[4];
+    return "$name: harmony device for '$ip' already defined" if( defined($modules{$hash->{TYPE}}{defptr}{$ip}) && $name ne $modules{$hash->{TYPE}}{defptr}{$ip}{NAME} );
+
     my $username = harmony_encrypt($a[2]);
     my $password = harmony_encrypt($a[3]);
-    my $ip = $a[4];
 
     $hash->{DEF} = "$username $password $ip";
 
@@ -95,9 +157,13 @@ harmony_Define($$)
     $hash->{helper}{password} = $password;
     $hash->{ip} = $ip;
 
+    $modules{$hash->{TYPE}}{defptr}{$ip} = $hash;
   }
 
   $hash->{NAME} = $name;
+
+  #$hash->{remoteId} = '6779631';
+  $hash->{remoteId} = $param_h->{remoteId};
 
   $hash->{STATE} = "Initialized";
   $hash->{ConnectionState} = "Initialized";
@@ -106,8 +172,12 @@ harmony_Define($$)
 
   $hash->{NOTIFYDEV} = "global";
 
-  if( $init_done ) {
-    harmony_connect($hash) if( !defined($hash->{id}) );
+  if( $init_done && !defined($hash->{id}) ) {
+    if( !$hash->{remoteId} ) {
+      harmony_startDiscovery();
+    } else {
+      harmony_connect($hash);
+    }
   }
 
   return undef;
@@ -121,7 +191,11 @@ harmony_Notify($$)
   return if($dev->{NAME} ne "global");
   return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
 
-  harmony_connect($hash) if( !defined($hash->{id}) );
+  if( !$hash->{remoteId} && !defined($hash->{id}) ) {
+    harmony_startDiscovery();
+  } else {
+    harmony_connect($hash);
+  }
 
   return undef;
 }
@@ -135,6 +209,8 @@ harmony_Undefine($$)
     delete( $modules{$hash->{TYPE}}{defptr}{$hash->{id}} );
     return undef;
   }
+
+  delete( $modules{$hash->{TYPE}}{defptr}{$hash->{ip}} );
 
 
   RemoveInternalTimer($hash);
@@ -292,6 +368,18 @@ harmony_Set($$@)
   my ($param, $param2) = @{$param_a};
   #$cmd = lc( $cmd );
 
+  if( $hash->{sendSocket} ) {
+    my $list = "discover:noArg";
+
+    if( $cmd eq "discover" ) {
+      my $sin = sockaddr_in(5224, inet_aton('255.255.255.255'));
+      $hash->{sendSocket}->send( "_logitech-reverse-bonjour._tcp.local.\n$hash->{PORT}", 0, $sin );
+      return;
+    }
+
+    return "Unknown argument $cmd, choose one of $list";
+  }
+
   my $list = "";
   if( defined($hash->{id}) ) {
     if( !$hash->{hub} ) {
@@ -360,7 +448,7 @@ harmony_Set($$@)
     $param = harmony_idOfActivity($hash, $param) if( $param && $param !~ m/^([\d-])+$/ );
     return "unknown activity" if( !$param );
 
-    harmony_sendEngineGet($hash, "startactivity", "activityId=$param:timestamp=0");
+    harmony_sendEngineGet($hash, "startActivity", "activityId=$param:timestamp=0");
 
     delete $hash->{channelAfterStart};
     $hash->{channelAfterStart} = $param2 if( $param2 );
@@ -540,6 +628,7 @@ harmony_Set($$@)
   } elsif( $cmd eq "active" ) {
     return "can't activate disabled hub." if(AttrVal($name, "disable", undef));
 
+    delete $hash->{protocol};
     $hash->{ConnectionState} = "Disconnected";
     readingsSingleUpdate( $hash, "state", $hash->{ConnectionState}, 1 );
     harmony_connect($hash);
@@ -897,13 +986,276 @@ harmony_updateActivity($$;$)
 }
 
 sub
+harmony_Parse($$$)
+{
+  my ($hash, $content, $decoded) = @_;
+  my $name = $hash->{NAME};
+  my $ignored = 0;
+  #Log 1, "harmony_Parse: >>>$content<<<";
+  #Log 1, Dumper $decoded;
+
+  if( !$decoded ) {
+    #Log 1, "harmony_Parse: unhandled data >>>$content<<<";
+  } elsif( $content =~ m/discoveryinfo\?get/ ) {
+    Log3 $name, 4, "$name: discoveryinfo ";
+    #Log3 $name, 4, "$name: ". Dumper $decoded;
+
+    $hash->{discoveryinfo} = $decoded;
+
+    #$hash->{current_fw_version} = $decoded->{current_fw_version} if( defined($decoded->{current_fw_version}) );
+
+    harmony_sendEngineGet($hash, "config");
+
+  } elsif( $content =~ m/\?config$/ ) {
+    Log3 $name, 3, "$name: new config ";
+
+    $hash->{config} = $decoded;
+
+    harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logitech.connect/vnd.logitech.statedigest?get' token=''>format=json</oa>");
+
+  } elsif( $content =~ m/statedigest\?get$/
+           || $content =~ m/stateDigest\?notify$/ ) {
+    Log3 $name, 4, "$name: statedigest ";
+
+    if( $decoded ) {
+      if( defined($decoded->{syncStatus}) ) {
+        harmony_sendEngineGet($hash, "config") if( $hash->{syncStatus} && !$decoded->{syncStatus} );
+
+        $hash->{syncStatus} = $decoded->{syncStatus};
+      }
+
+      if( defined($decoded->{hubUpdate}) && $decoded->{hubUpdate} eq "true" && !$hash->{hubUpdate} ) {
+        harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logtech.setup/vnd.logitech.firmware?check' token=''>format=json</oa>");
+      }
+
+      $hash->{activityStatus} = $decoded->{activityStatus} if( defined($decoded->{activityStatus}) );
+
+      $hash->{hubSwVersion} = $decoded->{hubSwVersion} if( defined($decoded->{hubSwVersion}) );
+      $hash->{hubUpdate} = ($decoded->{hubUpdate} eq 'true'?1:0) if( defined($decoded->{hubUpdate}) );
+
+      my $modifier = "";
+      $modifier = "starting " if( $hash->{activityStatus} == 1 );
+      $modifier = "stopping " if( $hash->{activityStatus} == 3 );
+
+      harmony_updateActivity($hash, $decoded->{activityId}, $modifier) if( defined($decoded->{activityId}) );
+
+      if( defined($decoded->{sleepTimerId}) ) {
+        if( $decoded->{sleepTimerId} == -1 ) {
+          delete $hash->{sleeptimer};
+          DoTrigger( $name, "sleeptimer: expired" );
+        } else {
+          harmony_sendEngineGet($hash, "gettimerinterval", "timerId=$decoded->{sleepTimerId}");
+        }
+      }
+    }
+
+  } elsif( $content =~ m/harmony.engine\?startActivity$/ ) {
+    Log3 $name, 4, "$name: startActivity ";
+
+    my $done = $decoded->{done};
+    my $total = $decoded->{total};
+    my $id = $decoded->{deviceId};
+
+    $id = "<unknown>" if( !defined($id) );
+
+    my $label = harmony_labelOfDevice($hash,$id,$id);
+    $label = "<unknown>" if( !defined($label) );
+
+    if( $done == $total ) {
+      Log3 $name, 4, "$name: done starting/stopping device: $label";
+    } elsif( $done == 1  ) {
+      Log3 $name, 4, "$name: starting/stopping device: $label";
+    } else {
+      Log3 $name, 4, "$name: starting/stopping device ($done/$total): $label";
+    }
+
+  } elsif( $content =~ m/harmony.engine\?startActivityFinished$/ ) {
+    Log3 $name, 4, "$name: startActivityFinished ";
+
+    if( my $id = $decoded->{activityId} ) {
+     if( harmony_activityOfId($hash, $id) ) {
+       if( $id == -1 && $hash->{helper}{ignorePowerOff} ) {
+         delete $hash->{helper}{ignorePowerOff};
+
+       } else {
+         harmony_updateActivity($hash, $id);
+       }
+
+     } else {
+       $hash->{helper}{ignorePowerOff} = 1;
+
+     }
+   }
+
+  } elsif( $content =~ m/engine\?gettimerinterval$/ ) {
+    $hash->{sleeptimer} = FmtDateTime( gettimeofday() + $decoded->{interval} );
+    DoTrigger( $name, "sleeptimer: $hash->{sleeptimer}" );
+
+  } elsif( $content =~ m/engine\?holdAction$/ ) {
+     $ignored = 1;
+     
+  } elsif( $content =~ m/engine\?setsleeptimer$/ ) {
+     $ignored = 1;
+
+  } elsif( $content =~ m/automation.state/ ) {
+     $ignored = 1;
+
+  } else {
+    Log3 $name, 4, "harmony_Parse: unhandled data >>>$content<<<";
+    Log3 $name, 5, Dumper $decoded;
+  }
+
+  if( $ignored ) {
+    Log3 $name, 4, "harmony_Parse: ignored data >>>$content<<<";
+    Log3 $name, 5, Dumper $decoded;
+  }
+}
+
+sub
 harmony_Read($)
 {
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
+  if( $hash->{sendSocket} ) {
+    my @clientinfo = $hash->{CD}->accept();
+    if( !@clientinfo ) {
+      Log3 $name, 1, "Accept failed ($name: $!)" if($! != EAGAIN);
+      return undef;
+    }
+    $hash->{CONNECTS}++;
+
+    my ($port, $iaddr) = sockaddr_in($clientinfo[1]);
+    my $caddr = inet_ntoa($iaddr);
+    Log3 $name, 3, "$name: new discovery response from $caddr";
+
+    my $len;
+    my $buf;
+
+    $len = sysread( $clientinfo[0], $buf, 10240 );
+    close $clientinfo[0];
+    return if( !defined($len) || !$len );
+
+    Log3 $name, 5, "$name: $buf";
+
+    my @args = split(';', $buf);
+
+    my %params = ();
+    while( @args ) {
+      my $arg = shift(@args);
+
+      my ($name,$value) = split(":", $arg,2);
+      $params{$name} = $value;
+    }
+    Log3 $name, 4, Dumper \%params;
+
+    foreach my $chash ( values %{$modules{$hash->{TYPE}}{defptr}} ) {
+      next if( $chash->{NAME} eq 'harmony:discovery' );
+      next if( !defined($chash->{ip}) );
+      next if( $chash->{remoteId} );
+      if( $chash->{ip} eq $params{ip} ) {
+        $chash->{remoteId} = $params{remoteId};
+        $chash->{discoveryinfo} = \%params;
+
+        Log3 $name, 4, Dumper  $chash->{discoveryinfo}{protocolVersion};
+        if( $chash->{discoveryinfo}{protocolVersion} =~ m/XMPP/ ) {
+          delete $chash->{remoteId} if( !AttrVal( $chash->{NAME}, 'forceWebSocket', 0 ) );
+        }
+
+        harmony_connect( $chash );
+      }
+    }
+
+    return;
+  }
+
+  if( $hash->{remoteId} ) {
+#Log 1, "harmony_Read";
+    my $len;
+    my $buf;
+
+    $len = sysread( $hash->{CD}, $buf, 10240 );
+#Log 1, $buf;
+
+    my $close = 0;
+    if( !defined($len) || !$len ) {
+      $close = 1;
+
+    } elsif( $hash->{websocket} ) {
+      $hash->{buf} .= $buf;
+
+      do {
+        my $fin  = (ord(substr($hash->{buf},0,1)) & 0x80)?1:0;
+        my $op   = (ord(substr($hash->{buf},0,1)) & 0x0F);
+        my $mask = (ord(substr($hash->{buf},1,1)) & 0x80)?1:0;
+        my $len  = (ord(substr($hash->{buf},1,1)) & 0x7F);
+        my $i = 2;
+
+#Log 1, $len;
+        if( $len == 126 ) {
+          $len = unpack( 'n', substr($hash->{buf},$i,2) );
+          $i += 2;
+        } elsif( $len == 127 ) {
+          $len = unpack( 'N', substr($hash->{buf},$i+4,6) );
+          $i += 8;
+        }
+
+        if( $mask ) {
+          $mask = substr($hash->{buf},$i,4);
+          $i += 4;
+        }
+#Log 1, "$fin $op $mask $len";
+        return if( $len > length($hash->{buf})-$i );
+
+        my $data = substr($hash->{buf}, $i, $len);
+        $hash->{buf} = substr($hash->{buf},$i+$len);
+
+        if( $op == 0x01 ) {
+          my $json = harmony_decode_json($data);
+          my $decoded = $json;
+
+          if( $json->{type} ) {
+            harmony_Parse( $hash, $json->{type}, $json->{data} );
+
+          } else {
+            Log3 $name, 3, "no type: >>>$data<<<";
+
+          }
+        } elsif( $op == 0x0a ) {
+          #ignore pong
+        } else {
+          Log3 $name, 4, "unhandled websocket payload type $op";
+        }
+
+
+      } while( $hash->{buf} && !$close );
+
+    } elsif( $buf =~ m'^HTTP/1.1 101 Switching Protocols'i )  {
+      $hash->{websocket} = 1;
+      #buf = harmony_msg2hash($buf, 1);
+
+      Log3 $name, 3, "$name: notification websocket: Switching Protocols ok";
+
+      harmony_sendEngineGet($hash, "config");
+      harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='connect.discoveryinfo?get'>format=json</oa>");
+
+      RemoveInternalTimer($hash);
+      InternalTimer(gettimeofday()+50, "harmony_ping", $hash, 0);
+
+    } else {
+      $close = 1;
+      Log3 $name, 2, "$name: notification websocket: Switching Protocols failed";
+    }
+
+    if( $close ) {
+      harmony_disconnect( $hash );
+    }
+
+    return;
+  }
+
   my $buf;
-  my $ret = sysread($hash->{CD}, $buf, 1024*1024);
+  my $ret = sysread( $hash->{CD}, $buf, 1024*1024 );
 
   if(!defined($ret) || $ret <= 0) {
     harmony_disconnect( $hash );
@@ -1093,7 +1445,7 @@ harmony_Read($)
             }
 
           } elsif( $content =~ m/discoveryinfo\?get/ && $decoded ) {
-            Log3 $name, 4, "$name: ". Dumper $decoded;
+            #Log3 $name, 4, "$name: ". Dumper $decoded;
 
             $hash->{discoveryinfo} = $decoded;
 
@@ -1211,6 +1563,22 @@ Log 3, Dumper harmony_decode_json($decoded->{resource}) if( !$json && $decoded->
 }
 
 sub
+harmony_hash2header($)
+{
+  my ($hash) = @_;
+
+  return $hash if( ref($hash) ne 'HASH' );
+
+  my $header;
+  foreach my $key (keys %{$hash}) {
+    #$header .= "\r\n" if( $header );
+    $header .= "$key: $hash->{$key}\r\n";
+  }
+
+  return $header;
+}
+
+sub
 harmony_disconnect($)
 {
   my ($hash) = @_;
@@ -1238,10 +1606,55 @@ harmony_connect($)
   my $name = $hash->{NAME};
 
   return if( IsDisabled($name) );
+  return if( !defined($hash->{ip}) );
 
   harmony_disconnect($hash);
 
   Log3 $name, 4, "$name: connect";
+  if( $hash->{remoteId} ) {
+    my $timeout = $hash->{TIMEOUT} ? $hash->{TIMEOUT} : 2;
+    if( my $socket = IO::Socket::INET->new(PeerAddr=>"$hash->{ip}:8088", Timeout=>$timeout) ) {
+      Log3 $name, 3, "$name: connected";
+      $hash->{protocol} = "WEBSOCKET";
+      $hash->{ConnectionState} = "Connected";
+      readingsSingleUpdate( $hash, "state", $hash->{ConnectionState}, 1 ) if( $hash->{ConnectionState} ne ReadingsVal($name, "state", "" ) );
+      $hash->{LAST_CONNECT} = FmtDateTime( gettimeofday() );
+
+      $hash->{FD}    = $socket->fileno();
+      $hash->{CD}    = $socket;         # sysread / close won't work on fileno
+      $hash->{CONNECTS}++;
+      $selectlist{$name} = $hash;
+
+      $hash->{helper}{PARTIAL} = "";
+      $hash->{buf} = "";
+      delete $hash->{websocket};
+
+      my $domain = "svcs.myharmony.com";
+      if( $hash->{discoveryinfo}{discoveryServerUri} =~ m'https://([^/]+)' ) {
+        $domain = $1;
+      }
+      my $ret = "GET /?domain=$domain&hubId=$hash->{remoteId} HTTP/1.1\r\n";
+      $ret .= harmony_hash2header( {                    'Host' => "$hash->{ip}:8088",
+                                                     'Upgrade' => 'websocket',
+                                                  'Connection' => 'Upgrade',
+                                                      'Pragma' => 'no-cache',
+                                               'Cache-Control' => 'no-cache',
+                                           'Sec-WebSocket-Key' => 'RkhFTQ==',
+                                       'Sec-WebSocket-Version' => '13',
+                                  } );
+
+      $ret .= "\r\n";
+      Log3 $name, 5, "$name: $ret";
+
+      syswrite($hash->{CD}, $ret );
+
+    } else {
+      harmony_disconnect( $hash );
+
+      InternalTimer(gettimeofday()+10, "harmony_connect", $hash, 0);
+    }
+    return;
+  }
 
   harmony_getLoginToken($hash);
 
@@ -1251,6 +1664,7 @@ harmony_connect($)
 
     if( $conn ) {
       Log3 $name, 3, "$name: connected";
+      $hash->{protocol} = "XMPP";
       $hash->{ConnectionState} = "Connected";
       readingsSingleUpdate( $hash, "state", $hash->{ConnectionState}, 1 ) if( $hash->{ConnectionState} ne ReadingsVal($name, "state", "" ) );
       $hash->{LAST_CONNECT} = FmtDateTime( gettimeofday() );
@@ -1293,6 +1707,47 @@ harmony_send($$)
   return undef if( !$hash->{CD} );
 
   Log3 $name, 4, "$name: send: $data";
+
+  if( $hash->{websocket} ) {
+    if( $data =~ m/mime='([^']*)'/ ) {
+      my $cmd = $1;
+      my $params;
+      if( $data =~ m/>([^<]+)/ ) {
+       $params = harmony_CDATA2hash($1);
+       if( $params && defined($params->{action}) ) {
+          Log3 $name, 5, Dumper $params->{action};
+          $params->{action} =~ s/'/"/g;
+          $params->{action} =~ s/::/:/g;
+          $params->{verb} =  "render";
+          Log3 $name, 5, Dumper $params->{action};
+       }
+       $params = encode_json( $params );
+       Log3 $name, 4, "cmd: $params";
+      }
+      Log3 $name, 4, "cmd: $cmd";
+
+      my $txt = '{ "hbus": { "cmd": "'. $cmd .'" } }';
+      if( $params ) {
+        $txt = '{ "hbus": { "cmd": "'. $cmd .'","params":'. $params .' } }';
+      }
+      Log3 $name, 4, "txt: $txt";
+
+      my $len = length($txt);
+      if( $len < 126 ) {
+        $txt = chr(0x81) . chr($len) . $txt;
+      } else {
+        if ( $len < 65536 ) {
+          $txt = chr(0x81) . chr(0x7E) . pack('n', $len) . $txt;
+        } else {
+          $txt = chr(0x81) . chr(0x7F) . chr(0x00) . chr(0x00) .
+                 chr(0x00) . chr(0x00) . pack('N', $len) . $txt;
+        }
+      }
+
+      syswrite($hash->{CD}, $txt );
+    }
+    return;
+  }
 
   syswrite $hash->{CD}, $data;
 }
@@ -1371,6 +1826,15 @@ harmony_ping($)
 
   return if( $hash->{ConnectionState} eq "Disconnected" );
 
+  if( $hash->{remoteId} ) {
+    my $txt = chr(0x89) . chr(0);
+    syswrite($hash->{CD}, $txt );
+
+    RemoveInternalTimer($hash);
+    InternalTimer(gettimeofday()+50, "harmony_ping", $hash, 0);
+    return;
+  }
+
   ++$id;
   harmony_send($hash, "<iq type='get' id='ping-$id'><ping xmlns='urn:xmpp:ping'/></iq>");
 
@@ -1430,7 +1894,7 @@ harmony_autocreate($;$)
     next if( $id && $device->{id} != $id );
 
     if( defined($modules{$hash->{TYPE}}{defptr}{$device->{id}}) ) {
-      Log3 $name, 4, "$name: device '$device->{id}' already defined";
+      Log3 $name, 4, "$name: hramony device for '$device->{id}' already defined";
       next;
     }
 
@@ -1529,6 +1993,16 @@ harmony_Get($$@)
   #$cmd = lc( $cmd );
 
   my $list = "";
+
+  if( $hash->{sendSocket} ) {
+    my $list = "discovered:noArg";
+
+    if( $cmd eq "discovered" ) {
+      return;
+    }
+
+    return "Unknown argument $cmd, choose one of $list";
+  }
 
   if( defined($hash->{id}) ) {
     if( !$hash->{hub} ) {
@@ -1900,7 +2374,7 @@ harmony_decrypt($)
     <li>update<br>
       triggers a firmware update. only available if a new firmware is available.</li>
     <li>inactive<br>
-      inactivates the current device. note the slight difference to the 
+      inactivates the current device. note the slight difference to the
       disable attribute: using set inactive the state is automatically saved
       to the statefile on shutdown, there is no explicit save necesary.<br>
       this command is intended to be used by scripts to temporarily
@@ -1937,6 +2411,8 @@ harmony_decrypt($)
   <a name="harmony_Attr"></a>
   <b>Attributes</b>
   <ul>
+    <li>forceWebSocket<br>
+      1 -> use websocket interface even if xmpp availability is dicovered</li>
     <li>disable<br>
       1 -> disconnect from the hub</li>
   </ul>
