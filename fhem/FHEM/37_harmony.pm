@@ -60,6 +60,10 @@ harmony_Initialize($)
 sub
 harmony_startDiscovery()
 {
+  if( defined($modules{harmony}{defptr}{'harmony:discovery'}) ) {
+    fhem( "set harmony:discovery discover" );
+  }
+
   return if( $modules{harmony}{defptr}{'harmony:discovery'} );
   Log3 undef, 3, "harmony: starting discovery" ;
 
@@ -1093,7 +1097,7 @@ harmony_Parse($$$)
 
   } elsif( $content =~ m/engine\?holdAction$/ ) {
      $ignored = 1;
-     
+
   } elsif( $content =~ m/engine\?setsleeptimer$/ ) {
      $ignored = 1;
 
