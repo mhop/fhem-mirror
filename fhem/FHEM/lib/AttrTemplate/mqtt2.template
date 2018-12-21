@@ -155,7 +155,6 @@ filter:TYPE=MQTT2_DEVICE
 desc:Applies to Sonoff Basic, S20 using POWER1-topic for relay state <br>Use this in case "SetOption26 1" was used as described in tasmota documentation <br>NOTE: This template is intended to configure also channel one of multi-channel tasmota devices
 par:COMMAND;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\btele(/.*)?/LWT:, ? "${1}cmnd$2" : undef }
 par:DEVNAME;ESP's name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,tele/([^/]*)/, ? $1 : undef }
-par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev","")}
 attr DEVICE stateFormat {lc ReadingsVal("$name","POWER1","") }
 attr DEVICE eventMap { dev=>{'^(.*)POWER(.?): OFF$'=>'$1POWER$2: off', '^(.*)POWER(.?): ON$'=>'$1POWER$2: on'} }
 attr DEVICE setList \
@@ -170,12 +169,15 @@ attr DEVICE readingList \
   tele/DEVNAME/SENSOR:.* { json2nameValue($EVENT) }\
   tele/DEVNAME/INFO.:.* { json2nameValue($EVENT) }\
   stat/DEVNAME/RESULT:.* { json2nameValue($EVENT) }
-deleteReading DEVICE .*
-set IO_DEV publish COMMAND/Status 1
+deletereading DEVICE .*
 attr DEVICE autocreate 0
 attr DEVICE model A_01a_tasmota_basic_state_power1
+attr DEVICE setList \
+  off:noArg    COMMAND/POWER 0\
+  on:noArg     COMMAND/POWER 1\
+  toggle:noArg COMMAND/POWER 2
 
-# sonoff 1 channel device flashed with Tasmota.
+  # sonoff 1 channel device flashed with Tasmota.
 name:A_01_tasmota_basic
 filter:TYPE=MQTT2_DEVICE
 desc:Applies to Sonoff 1 Channel devices using POWER-topic for relay state <br>Use this in case "SetOption26 1" was used as described in tasmota documentation
@@ -185,7 +187,7 @@ attr DEVICE model A_01_tasmota_basic
 
 name:A_01x_tasmota_sensors_only
 filter:TYPE=MQTT2_DEVICE
-desc:Applies to all tasmota devices without switch
+desc:Applies to all tasmota devices without relay
 par:DEVNAME;ESP's name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,tele/([^/]*)/, ? $1 : undef }
 attr DEVICE readingList \
   tele/DEVNAME/LWT:.* LWT\
@@ -193,26 +195,20 @@ attr DEVICE readingList \
   tele/DEVNAME/SENSOR:.* { json2nameValue($EVENT) }\
   tele/DEVNAME/INFO.:.* { json2nameValue($EVENT) }\
   stat/DEVNAME/RESULT:.* { json2nameValue($EVENT) }
-deleteReading DEVICE .*_.*
+deleteReading DEVICE .*
 
-name:A_01x_tasmota_prefix_clearing
+name:A_01x_tasmota_prefix_clearing_and_reboot
 filter:TYPE=MQTT2_DEVICE
-desc:Applies to all tasmota devices <br>NOTE: This template will delete some readings and clear the readingList from prefix use when expanding json
+desc:Applies to all tasmota devices <br>NOTE: This template will delete some readings and clear the readingList from prefix use when expanding json. <br>When applying the template the tasmota device is rebooted to get all readings
 par:COMMAND;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\btele(/.*)?/LWT:, ? "${1}cmnd$2" : undef }
 par:DEVNAME;ESP's name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,tele/([^/]*)/, ? $1 : undef }
 par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev","")}
 par:READINGLISTCLEARED;cleared from prefixes;{ AttrVal("DEVICE","readingList","") =~ s/, '[^_]+[_]'/, ''/g, ? $1 : undef }
 attr DEVICE readingList READINGLISTCLEARED
-deletereading DEVICE .*_.*
+deletereading DEVICE .*
+set IO_DEV publish COMMAND/Reboot 1
 attr DEVICE autocreate 0
 
-name:A_01x_tasmota_set_mqttretry_and_reboot
-filter:TYPE=MQTT2_DEVICE
-desc:Applies to all tasmota devices <br>Use this to set mqttRetry value to 120. <br>NOTE: device will reboot
-par:COMMAND;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\btele(/.*)?/LWT:, ? "${1}cmnd$2" : undef }
-par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev","")}
-set IO_DEV publish COMMAND/MqttRetry 120
-set IO_DEV publish COMMAND/Reboot 1
 
 # tasmota device with one relay, one motion sensor via switch
 name:A_01b_tasmota_1ch+motion+SI7021
@@ -478,8 +474,8 @@ attr DEVICE setList\
    color_temp:colorpicker,CT,153,1,370 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
    saturation:colorpicker,sat,0,1,255 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
    command:uzsuSelectRadio,Weiss,Nacht BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
-   program:uzsuSelectRadio,Mode,Faster,Slower BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
-   dim:uzsuSelectRadio,Up,Down BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}
+   program:uzsuSelectRadio,Mode,Faster,Slower BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"command":"$EVTPART1"}\
+   dim:uzsuSelectRadio,Up,Down milight/0xBE59/rgbw/1 {"command":"level_$EVTPART1"}
 attr DEVICE userReadings rgb {sprintf("%02X%02X%02X", ReadingsVal($name,"color_r",255), ReadingsVal($name,"color_g",255), ReadingsVal($name,"color_b",255))}
 attr DEVICE webCmdLabel on:off:brightness:hue\
    :color_temp:saturation\
