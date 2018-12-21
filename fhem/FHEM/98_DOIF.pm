@@ -1568,12 +1568,10 @@ ParseCommandsDoIf($$$)
 sub DOIF_weekdays($$)
 {
   my ($hash,$weekdays)=@_;
-  my @days=split(',',AttrVal($hash->{NAME},"weekdays","So,Mo,Di,Mi,Do,Fr,Sa,WE,AT,MWE"));
-  my @edays=split(',',"Su,Mo,Tu,We,Th,Fr,Sa,WE,WD,TWE");
-  for (my $i=0;$i<@days;$i++)
+  my @days=split(',',AttrVal($hash->{NAME},"weekdays","So|Su,Mo,Di|Tu,Mi|We,Do|Th,Fr,Sa,WE,AT|WD,MWE|TWE"));
+  for (my $i=@days-1;$i>=0;$i--)
   {
     $weekdays =~ s/$days[$i]/$i/;
-    $weekdays =~ s/$edays[$i]/$i/;
   }
   return($weekdays);
 }
