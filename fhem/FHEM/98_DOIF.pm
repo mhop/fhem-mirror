@@ -1568,10 +1568,12 @@ ParseCommandsDoIf($$$)
 sub DOIF_weekdays($$)
 {
   my ($hash,$weekdays)=@_;
-  my @days=split(',',AttrVal($hash->{NAME},"weekdays","So,Mo,Di,Mi,Do,Fr,Sa,WE,AT"));
+  my @days=split(',',AttrVal($hash->{NAME},"weekdays","So,Mo,Di,Mi,Do,Fr,Sa,WE,AT,MWE"));
+  my @edays=split(',',"Su,Mo,Tu,We,Th,Fr,Sa,WE,WD,TWE");
   for (my $i=0;$i<@days;$i++)
   {
     $weekdays =~ s/$days[$i]/$i/;
+    $weekdays =~ s/$edays[$i]/$i/;
   }
   return($weekdays);
 }
@@ -1684,6 +1686,7 @@ sub DOIF_time {
   }
   $days=DOIF_weekdays($hash,$days);
   my $we=DOIF_we($wday);
+  my $twe=DOIF_tomorrow_we($wday);
   if ($end gt $begin) {
     if ($hms ge $begin and $hms lt $end) {
       $ret=1;
@@ -1698,7 +1701,7 @@ sub DOIF_time {
     }
   }
   if ($ret == 1) {
-    return 1 if ($days eq "" or $days =~ /$wday/ or ($days =~ /7/ and $we) or ($days =~ /8/ and !$we));
+    return 1 if ($days eq "" or $days =~ /$wday/ or ($days =~ /7/ and $we) or ($days =~ /8/ and !$we) or ($days =~ /9/ and $twe));
   }
   return 0;
 }
@@ -1717,8 +1720,9 @@ sub DOIF_time_once {
   }
   $days=DOIF_weekdays($hash,$days);
   my $we=DOIF_we($wday);
+  my $twe=DOIF_tomorrow_we($wday);
   if ($flag) {
-    return 1 if ($days eq "" or $days =~ /$wday/ or ($days =~ /7/ and $we) or ($days =~ /8/ and !$we));
+    return 1 if ($days eq "" or $days =~ /$wday/ or ($days =~ /7/ and $we) or ($days =~ /8/ and !$we) or ($days =~ /9/ and $twe));
   }
   return 0;
 }
@@ -1806,6 +1810,19 @@ sub DOIF_we($) {
   return $we;
 }
 
+sub DOIF_tomorrow_we($) {
+  my ($wday)=@_;
+  my $we = (($wday==5 || $wday==6) ? 1 : 0);
+  if(!$we) {
+    my $h2we = $attr{global}{holiday2we};
+    if($h2we && ReadingsVal($h2we,"tomorrow",0)) {
+      my ($a, $b) = ReplaceEventMap($h2we, [$h2we, ReadingsVal($h2we,"tomorrow",0)], 0);
+      $we = 1 if($b ne "none");
+    }
+  }
+  return $we;
+}
+
 sub DOIF_CheckCond($$) {
   my ($hash,$condition) = @_;
   my $err="";
@@ -1822,6 +1839,7 @@ sub DOIF_CheckCond($$) {
   my $reading;
   my $internal;
   my $we=DOIF_we($wday);
+  my $twe=DOIF_tomorrow_we($wday);
   my $eventa=$hash->{helper}{triggerEvents};
   my $device=$hash->{helper}{triggerDev};
   my $event=$hash->{helper}{event};
@@ -3551,7 +3569,7 @@ The commands are always processed from left to right. There is only one command 
 + time calculation on the condition: <code>[(&lt;time calculation in Perl with time syntax specified above&gt;)]</code><br>
 + time intervals: <code>[&lt;begin&gt;-&lt;end&gt;]</code> for <code>&lt;begin&gt;</code> and <code>&lt;end&gt;</code>, the above time format can be selected.<br>
 + relative times preceded by a plus sign <code>[+&lt;time&gt;]</code> or <code>[+&lt;begin&gt;-+&lt;end&gt;]</code> combined with Perl functions<br>
-+ weekday control: <code>[&lt;time&gt;|012345678]</code> or <code>[&lt;begin&gt;-&lt;end&gt;|012345678]</code> (0-6 corresponds to Sunday through Saturday) such as 7 for $we and 8 for !$we<br>
++ weekday control: <code>[&lt;time&gt;|0123456789]</code> or <code>[&lt;begin&gt;-&lt;end&gt;|0123456789]</code> (0-6 corresponds to Sunday through Saturday) such as 7 for $we, 8 for !$we, 9 for $we tomorrow ($twe) <br>
 + statuses, readings, internals und time intervals for only queries without trigger with [?...]<br>
 + DOELSEIF cases and DOELSE at the end are optional<br>
 + delay specification with resetting is possible (watchdog function)<br>
@@ -4195,30 +4213,33 @@ attr di_gong do always</code><br>
 <br>
 Hinter der Zeitangabe kann ein oder mehrere Wochentage getrennt mit einem Pipezeichen | angegeben werden. Die Syntax lautet:<br>
 <br>
-<code>[&lt;time&gt;|012345678]</code> 0-8 entspricht: 0-Sonntag, 1-Montag, ... bis 6-Samstag sowie 7 für Wochenende und Feiertage (entspricht $we) und 8 für Arbeitstage (entspricht !$we)<br>
+<code>[&lt;time&gt;|0123456789]</code> 0-9 entspricht: 0-Sonntag, 1-Montag, ... bis 6-Samstag sowie 7 für Wochenende und Feiertage (entspricht $we), 8 für Arbeitstage (entspricht !$we) und 9 für Wochenende oder Feiertag morgen (entspricht intern $twe)<br>
 <br>
 alternativ mit Buchstaben-Kürzeln:<br>
 <br>
-<code>[&lt;time&gt;|So Mo Di Mi Do Fr Sa WE AT]</code> WE entspricht der Ziffer 7 und AT der Ziffer 8<br>
+<code>[&lt;time&gt;|So Mo Di Mi Do Fr Sa WE AT MWE]</code> WE entspricht der Ziffer 7, AT der Ziffer 8 und MWE der Ziffer 9<br>
+<br>
+oder entsprechend mit englischen Bezeichnern:<br>
+<br>
+<code>[&lt;time&gt;|Su Mo Tu We Th Fr Sa WE WD TWE]</code><br>
 <br>
 <li><a name="DOIF_weekdays"></a>
 <a name="weekdays"></a>
 Mit Hilfe des Attributes <code>weekdays</code> können beliebige Wochentagbezeichnungen definiert werden. Die Syntax lautet:<br>
 <br>
-<code>weekdays &lt;Bezeichnung für Sonntag&gt;,&lt;Bezeichnung für Montag&gt;,...,&lt;Bezeichnung für Wochenende&gt;,&lt;Bezeichnung für Arbeitstage&gt;</code><br>
+<code>weekdays &lt;Bezeichnung für Sonntag&gt;,&lt;Bezeichnung für Montag&gt;,...,&lt;Bezeichnung für Wochenende oder Feiertag&gt;,&lt;Bezeichnung für Arbeitstage&gt;,&lt;Bezeichnung für Wochenende oder Feiertag morgen&gt;</code><br>
 <br>
-Beispiel: <code>di_mydoif attr weekdays Son,Mon,Die,Mit,Don,Fre,Sam,Wochenende,Arbeitstag</code><br>
+Beispiel: <code>di_mydoif attr weekdays Son,Mon,Die,Mit,Don,Fre,Sam,Wochenende,Arbeitstag,WochenendeMorgen</code><br>
 <br>
 <u>Anwendungsbeispiel</u>: Radio soll am Wochenende und an Feiertagen um 08:30 Uhr eingeschaltet und um 09:30 Uhr ausgeschaltet werden. Am Montag und Mittwoch soll das Radio um 06:30 Uhr eingeschaltet und um 07:30 Uhr ausgeschaltet werden. Hier mit englischen Bezeichnern:<br>
 <br>
-<code>define di_radio DOIF ([06:30|Mo We] or [08:30|WE]) (set radio on) DOELSEIF ([07:30|Mo We] or [09:30|WE]) (set radio off)</code><br>
-<code>attr di_radio weekdays Su,Mo,Tu,We,Th,Fr,Sa,WE,WD</code><br>
+<code>define di_radio DOIF ([06:30|Mon Wochenende] or [08:30|Wochenende]) (set radio on) DOELSEIF ([07:30|Mon Wochenende] or [09:30|Wochenende]) (set radio off)</code><br>
+<code>attr di_radio weekdays Son,Mon,Die,Mit,Don,Fre,Sam,Wochenende,Arbeitstag,WochenendeMorgen</code><br>
 <br>
 <a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
 <code>define di_radio DOIF<br>
 {if ([06:30|Mo We] or [08:30|WE]) {fhem_set"radio on"}}<br>
 {if ([07:30|Mo We] or [09:30|WE]) {fhem_set"radio off"}}</code><br>
-<code>attr di_radio weekdays Su,Mo,Tu,We,Th,Fr,Sa,WE,WD</code><br>
 <br>
 Bemerkung: Es ist unerheblich wie die definierten Wochenttagbezeichner beim Timer angegeben werden. Sie können mit beliebigen Trennzeichen oder ohne Trennzeichen direkt aneinander angegeben werden.<br>
 <br>
@@ -4230,13 +4251,13 @@ Anstatt einer direkten Wochentagangabe, kann ein Status oder Reading in eckigen 
 set myweekday monday wednesday thursday weekend<br>
 <br>
 define di_radio DOIF ([06:30|[myweekday]]) (set radio on) DOELSEIF ([07:30|[myweekday]]) (set radio off)<br>
-attr di_radio weekdays sunday,monday,thuesday,wednesday,thursday,friday,saturday,weekend,workdays</code><br>
+attr di_radio weekdays sunday,monday,thuesday,wednesday,thursday,friday,saturday,weekend,workdays,weekendtomorrow</code><br>
 <br>
 <a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
 <code>define di_radio DOIF<br>
 {[06:30|[myweekday]];fhem_set"radio on"}<br>
 {[07:30|[myweekday]];fhem_set"radio off"}<br><br>
-attr di_radio weekdays sunday,monday,thuesday,wednesday,thursday,friday,saturday,weekend,workdays</code><br>
+attr di_radio weekdays sunday,monday,thuesday,wednesday,thursday,friday,saturday,weekend,workdays,weekendtomorrow</code><br>
 <br>
 </li><a name="DOIF_Zeitsteuerung_mit_Zeitintervallen"></a>
 <b>Zeitsteuerung mit Zeitintervallen</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
@@ -5506,8 +5527,8 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
         <dt><a href="#DOIF_Zeitangaben_nach_Zeitraster_ausgerichtet_alle_X_Stunden">rel. Zeitraster ausgerichtet alle X Stunden</a> <code><b>[+[h]:MM]</b></code></dt>
                 <dd><b>MM</b> in Minuten zwischen 1 und 59, <b>h</b> in Stunden zwischen 2 und 23</dd>
 <br>
-        <dt><a href="#DOIF_Wochentagsteuerung">Wochentagsteuerung</a> <code><b>[</b>&lt;time&gt;<b>|012345678]</b></code>, <code><b>[</b>&lt;begin&gt;<b>-</b>&lt;end&gt;<b>]</b><b>|012345678]</b></code></dt>
-                <dd>Pipe, gefolgt von ein o. mehreren Ziffern. Bedeutung: 0 bis 6 f&uuml;r So. bis Sa., 7 f&uuml;r $we, Wochenende oder Feiertag, 8 f&uuml;r !$we, Werktags.</dd>
+        <dt><a href="#DOIF_Wochentagsteuerung">Wochentagsteuerung</a> <code><b>[</b>&lt;time&gt;<b>|0123456789]</b></code>, <code><b>[</b>&lt;begin&gt;<b>-</b>&lt;end&gt;<b>]</b><b>|0123456789]</b></code></dt>
+                <dd>Pipe, gefolgt von ein o. mehreren Ziffern. Bedeutung: 0 bis 6 f&uuml;r So. bis Sa., 7 f&uuml;r $we, Wochenende oder Feiertag, 8 f&uuml;r !$we, Werktags, 9 f&uuml;r $twe, Wochenende oder Feiertag morgen.</dd>
 <br>
         <dt><a href="#DOIF_Zeitsteuerung_mit_Zeitberechnung">berechnete Zeitangaben</a> <code><b>[(</b>&lt;Berechnung, gibt Zeit in Sekunden zur&uuml;ck, im Sinne von <a target=blank href="http://perldoc.perl.org/functions/time.html">time</a>&gt;<b>)]</b></code></dt>
                 <dd>Berechnungen sind mit runden Klammern einzuschliessen. Perlfunktionen, die HH:MM zur&uuml;ckgeben sind mit geschweiften Klammern einzuschliessen.</dd>
@@ -5525,7 +5546,7 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
                 <dd>Perl-Variablen mit der Bedeutung [$SELF:cmd]</dd>
 <br>
         <dt>&lt;Perl-Zeitvariablen&gt;</dt>
-                <dd>Variablen f&uuml;r Zeit- und Datumsangaben, $sec, $min, $hour, $mday, $month, $year, $wday, $yday, $isdst, $week, $hms, $hm, $md, $ymd</dd>
+                <dd>Variablen f&uuml;r Zeit- und Datumsangaben, $sec, $min, $hour, $mday, $month, $year, $wday, $yday, $isdst, $week, $hms, $hm, $md, $ymd, $we, $twe</dd>
 </dl>
 <br>
 </ul>
