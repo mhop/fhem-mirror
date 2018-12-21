@@ -1172,6 +1172,14 @@ sub EventProcessingBrightness($@) {
         else {
             $brightnessMinVal = $ascDev->getBrightnessMinVal;
         }
+        
+        my $brightnessMaxVal;
+        if ( $shutters->getBrightnessMaxVal > -1 ) {
+            $brightnessMaxVal = $shutters->getBrightnessMaxVal;
+        }
+        else {
+            $brightnessMaxVal = $ascDev->getBrightnessMaxVal;
+        }
 
         if (
             int( gettimeofday() / 86400 ) != int(
@@ -1180,7 +1188,7 @@ sub EventProcessingBrightness($@) {
             and int( gettimeofday() / 86400 ) == int(
                 computeAlignTime( '24:00', $shutters->getTimeUpLate ) / 86400
             )
-            and $1 > $brightnessMinVal
+            and $1 > $brightnessMaxVal
             and $shutters->getUp eq 'brightness'
           )
         {
@@ -1190,7 +1198,7 @@ sub EventProcessingBrightness($@) {
             my $homemode = $shutters->getRoommatesStatus;
             $homemode = $ascDev->getResidentsStatus
               if ( $homemode eq 'none' );
-            $shutters->setLastDrive('minimum brightness threshold exceeded');
+            $shutters->setLastDrive('maximum brightness threshold exceeded');
 
             if (   $shutters->getModeUp eq $homemode
                 or $homemode eq 'none'
