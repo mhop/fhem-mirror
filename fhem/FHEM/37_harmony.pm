@@ -1234,7 +1234,7 @@ harmony_Read($)
       $hash->{websocket} = 1;
       #buf = harmony_msg2hash($buf, 1);
 
-      Log3 $name, 3, "$name: notification websocket: Switching Protocols ok";
+      Log3 $name, 3, "$name: websocket: Switching Protocols ok";
 
       harmony_sendEngineGet($hash, "config");
       harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='connect.discoveryinfo?get'>format=json</oa>");
@@ -1244,11 +1244,15 @@ harmony_Read($)
 
     } else {
       $close = 1;
-      Log3 $name, 2, "$name: notification websocket: Switching Protocols failed";
+      Log3 $name, 2, "$name: websocket: Switching Protocols failed";
     }
 
     if( $close ) {
       harmony_disconnect( $hash );
+
+      if( defined($hash->{discoveryinfo}) ) {
+        InternalTimer(gettimeofday()+2, "harmony_connect", $hash, 0);
+      }
     }
 
     return;
