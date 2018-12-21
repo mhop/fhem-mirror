@@ -19,6 +19,7 @@ MQTT2_DEVICE_Initialize($)
   $hash->{ParseFn}  = "MQTT2_DEVICE_Parse";
   $hash->{RenameFn} = "MQTT2_DEVICE_Rename";
   $hash->{FW_detailFn} = "MQTT2_DEVICE_fhemwebFn";
+  $hash->{FW_deviceOverview} = 1;
 
   no warnings 'qw';
   my @attrList = qw(
