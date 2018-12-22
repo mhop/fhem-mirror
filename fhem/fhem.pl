@@ -2573,6 +2573,12 @@ CommandRename($$)
   delete($oldvalue{$old});
 
   CallFn($new, "RenameFn", $new,$old);# ignore replies
+  for my $d (keys %defs) {
+    my $aw = ReadingsVal($d, "associatedWith", "");
+    next if($aw !~ m/\b$old\b/);
+    $aw =~ s/\b$old\b/$new/;
+    setReadingsVal($defs{$d}, "associatedWith", $aw, TimeNow());
+  }
 
   addStructChange("rename", $new, $param);
   DoTrigger("global", "RENAMED $old $new", 1);
@@ -5575,6 +5581,8 @@ getPawList($)
       push(@dob, $dn);
     }
   }
+  my $aw = ReadingsVal($d, "associatedWith", ""); # Explicit link
+  push(@dob, split("[ ,]",$aw)) if($aw);
   return @dob;
 }
 
