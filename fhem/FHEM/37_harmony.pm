@@ -61,7 +61,7 @@ sub
 harmony_startDiscovery()
 {
   if( defined($modules{harmony}{defptr}{'harmony:discovery'}) ) {
-    fhem( "set harmony:discovery discover" );
+    harmony_sendDiscovery();
   }
 
   return if( $modules{harmony}{defptr}{'harmony:discovery'} );
@@ -88,8 +88,7 @@ harmony_startDiscovery()
       $defs{$chash->{NAME}}       = $chash;
       $selectlist{$chash->{NAME}} = $chash;
 
-      my $sin = sockaddr_in(5224, inet_aton('255.255.255.255'));
-      $chash->{sendSocket}->send( "_logitech-reverse-bonjour._tcp.local.\n$chash->{PORT}", 0, $sin );
+      harmony_sendDiscovery();
 
     } else {
       Log3 undef, 2, "harmony: failed to start discovery" ;
@@ -98,6 +97,35 @@ harmony_startDiscovery()
     Log3 undef, 2, "harmony: failed to start discovery" ;
   }
 
+}
+sub
+harmony_sendDiscovery()
+{
+  my $chash = $modules{harmony}{defptr}{'harmony:discovery'};
+  return if( !$chash );
+  Log3 undef, 3, "harmony: sending discovery" ;
+
+  my $sin = sockaddr_in(5224, inet_aton('255.255.255.255'));
+  $chash->{sendSocket}->send( "_logitech-reverse-bonjour._tcp.local.\n$chash->{PORT}", 0, $sin );
+
+  foreach my $chash ( values %{$modules{'harmony'}{defptr}} ) {
+    next if( $chash->{NAME} eq 'harmony:discovery' );
+    next if( $chash->{ConnectionState} eq 'Connected' );
+    next if( !defined($chash->{ip}) );
+    next if( $chash->{remoteId} );
+
+    RemoveInternalTimer($chash);
+    InternalTimer(gettimeofday()+10, "harmony_tryXMPP", $chash, 0);
+  }
+}
+sub
+harmony_tryXMPP($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  Log3 $name, 3, "$name no discovery response received, trying fallback to xmpp" ;
+
+  harmony_connect($hash);
 }
 sub
 harmony_stopDiscovery()
@@ -376,8 +404,7 @@ harmony_Set($$@)
     my $list = "discover:noArg";
 
     if( $cmd eq "discover" ) {
-      my $sin = sockaddr_in(5224, inet_aton('255.255.255.255'));
-      $hash->{sendSocket}->send( "_logitech-reverse-bonjour._tcp.local.\n$hash->{PORT}", 0, $sin );
+      harmony_sendDiscovery();
       return;
     }
 
