@@ -1,4 +1,4 @@
-REV 18015
+REV 18025
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2018-12-21_07:45:03 269474 ./CHANGED
+UPD 2018-12-22_07:45:02 269739 ./CHANGED
 UPD 2018-12-14_07:45:02 38586 ./MAINTAINER.txt
 UPD 2018-09-09_07:45:03 39688 ./configDB.pm
 UPD 2018-09-17_07:45:03 19987 ./fhem.cfg.demo
@@ -78,7 +78,7 @@ UPD 2016-02-05_07:45:11 4427 FHEM/10_Itach_IR.pm
 UPD 2018-10-08_07:45:02 83806 FHEM/10_KNX.pm
 UPD 2016-12-22_07:45:02 36655 FHEM/10_KOPP_FC.pm
 UPD 2018-06-11_07:45:06 61938 FHEM/10_MAX.pm
-UPD 2018-12-21_07:45:02 25315 FHEM/10_MQTT2_DEVICE.pm
+UPD 2018-12-22_07:45:02 25349 FHEM/10_MQTT2_DEVICE.pm
 UPD 2018-09-18_07:45:02 11022 FHEM/10_MQTT_BRIDGE.pm
 UPD 2018-09-18_07:45:02 13548 FHEM/10_MQTT_DEVICE.pm
 UPD 2018-12-07_07:45:02 146678 FHEM/10_MQTT_GENERIC_BRIDGE.pm
@@ -176,7 +176,7 @@ UPD 2016-04-25_07:45:10 5350 FHEM/30_pilight_switch.pm
 UPD 2016-01-15_07:45:16 6136 FHEM/30_pilight_temp.pm
 UPD 2018-07-28_07:45:02 28156 FHEM/31_Aurora.pm
 UPD 2015-07-28_14:05:31 4627 FHEM/31_ENECSYSINV.pm
-UPD 2018-12-17_07:45:02 63189 FHEM/31_HUEDevice.pm
+UPD 2018-12-22_07:45:02 63446 FHEM/31_HUEDevice.pm
 UPD 2018-12-12_07:45:03 35653 FHEM/31_LightScene.pm
 UPD 2018-02-05_07:45:02 98839 FHEM/31_MilightDevice.pm
 UPD 2017-11-20_07:45:02 22207 FHEM/31_Nello.pm
@@ -220,7 +220,7 @@ UPD 2015-07-28_14:05:31 31303 FHEM/37_SHCdev.pm
 UPD 2018-07-10_07:45:14 56428 FHEM/37_Spotify.pm
 UPD 2017-01-02_07:45:02 7617 FHEM/37_dash_dhcp.pm
 UPD 2018-03-12_07:45:04 22167 FHEM/37_fakeRoku.pm
-UPD 2018-03-02_07:47:09 59934 FHEM/37_harmony.pm
+UPD 2018-12-22_07:45:02 74751 FHEM/37_harmony.pm
 UPD 2017-07-01_07:45:02 152744 FHEM/37_plex.pm
 UPD 2017-12-10_07:45:03 31453 FHEM/38_Broadlink.pm
 UPD 2017-05-31_07:45:02 28640 FHEM/38_CO20.pm
@@ -356,7 +356,7 @@ UPD 2018-10-01_07:45:02 221693 FHEM/72_FRITZBOX.pm
 UPD 2018-11-11_07:45:02 16051 FHEM/72_TA_CMI_JSON.pm
 UPD 2018-11-04_07:45:06 153730 FHEM/72_XiaomiDevice.pm
 UPD 2018-11-16_07:45:03 47410 FHEM/73_AMADCommBridge.pm
-UPD 2018-12-06_07:45:03 139163 FHEM/73_AutoShuttersControl.pm
+UPD 2018-12-22_07:45:02 149923 FHEM/73_AutoShuttersControl.pm
 UPD 2018-04-14_07:45:02 89324 FHEM/73_ElectricityCalculator.pm
 UPD 2018-10-18_07:45:03 34360 FHEM/73_GardenaSmartBridge.pm
 UPD 2018-04-14_07:45:02 81612 FHEM/73_GasCalculator.pm
@@ -448,7 +448,7 @@ UPD 2016-08-19_14:49:02 4984 FHEM/98_CULflash.pm
 UPD 2017-05-10_07:45:02 47704 FHEM/98_ComfoAir.pm
 UPD 2017-09-20_07:45:02 9013 FHEM/98_CustomReadings.pm
 UPD 2018-01-10_07:45:02 60933 FHEM/98_DLNARenderer.pm
-UPD 2018-11-19_23:02:21 266997 FHEM/98_DOIF.pm
+UPD 2018-12-22_07:45:02 267952 FHEM/98_DOIF.pm
 UPD 2018-11-17_07:45:02 112264 FHEM/98_DOIFtools.pm
 UPD 2017-11-06_07:45:02 40228 FHEM/98_Dooya.pm
 UPD 2016-10-29_07:45:14 28678 FHEM/98_EDIPLUG.pm
@@ -691,12 +691,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2018-12-20_07:45:06 3751763 docs/commandref.html
-UPD 2018-12-20_07:45:08 2287149 docs/commandref_DE.html
+UPD 2018-12-22_07:45:05 3752002 docs/commandref.html
+UPD 2018-12-22_07:45:07 2289560 docs/commandref_DE.html
 UPD 2018-11-17_23:59:05 76550 docs/commandref_frame.html
 UPD 2018-11-17_23:59:05 86019 docs/commandref_frame_DE.html
-UPD 2018-12-21_07:45:09 202638 docs/commandref_modular.html
-UPD 2018-12-21_07:45:10 213377 docs/commandref_modular_DE.html
+UPD 2018-12-22_07:45:08 202638 docs/commandref_modular.html
+UPD 2018-12-22_07:45:09 213377 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -1332,6 +1332,7 @@ UPD 2017-11-14_07:45:02 2466 www/images/fhemSVG/hue_filled_living_whites.svg
 UPD 2017-11-14_07:45:02 3048 www/images/fhemSVG/hue_filled_outlet.svg
 UPD 2016-04-27_07:45:12 518 www/images/fhemSVG/hue_filled_phoenix_ceiling_pendant_table_wall.svg
 UPD 2016-04-27_07:45:12 691 www/images/fhemSVG/hue_filled_phoenix_recessed_spot.svg
+UPD 2018-12-22_07:45:02 996 www/images/fhemSVG/hue_filled_play.svg
 UPD 2016-04-27_07:45:12 1662 www/images/fhemSVG/hue_filled_storylight.svg
 UPD 2017-11-14_07:45:02 841 www/images/fhemSVG/hue_filled_tap.svg
 UPD 2017-11-14_07:45:02 899 www/images/fhemSVG/hue_filled_white_and_color_e27_b22.svg
