@@ -149,15 +149,17 @@ MQTT2_DEVICE_Parse($$)
     ################## bridge stuff
     my $newCid = $cid;
     my $bp = $modules{MQTT2_DEVICE}{defptr}{bridge};
+    my $parentBridge;
     foreach my $re (keys %{$bp}) {
       next if(!("$topic:$value" =~ m/^$re$/s ||
                 "$cid:$topic:$value" =~ m/^$re$/s));
-      my $cidExpr = $bp->{$re};
+      my $cidExpr = $bp->{$re}{name};
       $newCid = eval $cidExpr;
       if($@) {
         Log 1, "MQTT2_DEVICE: Error evaluating $cidExpr: $@";
         return "";
       }
+      $parentBridge = $bp->{$re}{parent};
       last;
     }
     return if(!$newCid);
@@ -186,6 +188,8 @@ MQTT2_DEVICE_Parse($$)
         $rl .= "\n" if($rl);
         my $regexpCid = ($cid eq $newCid ? "$cid:" : "");
         CommandAttr(undef, "$nn readingList $rl${regexpCid}$topic:.* $add");
+        setReadingsVal($defs{$nn}, "associatedWith", $parentBridge, TimeNow())
+                if($parentBridge);
       }
       MQTT2_DEVICE_Parse($iodev, $msg);
     }, undef);
@@ -383,7 +387,7 @@ MQTT2_DEVICE_Attr($$)
       return "$dev attr $attrName: more parameters needed" if(!$par2);
       eval { "Hallo" =~ m/^$par1$/ };
       return "$dev $attrName regexp error: $@" if($@);
-      $modules{MQTT2_DEVICE}{defptr}{bridge}{$par1} = $par2;
+      $modules{MQTT2_DEVICE}{defptr}{bridge}{$par1}= {name=>$par2,parent=>$dev};
     }
 
     if($init_done) {
