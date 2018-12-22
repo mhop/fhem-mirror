@@ -135,7 +135,7 @@ harmony_stopDiscovery()
   Log3 undef, 3, "harmony: stopping discovery" ;
 
   close( $chash->{sendSocket} );
-  close( $chash->{socket} );
+  close( $chash->{CD} );
 
   delete $selectlist{$chash->{NAME}};
   delete $defs{$chash->{NAME}};
@@ -236,6 +236,12 @@ sub
 harmony_Undefine($$)
 {
   my ($hash, $arg) = @_;
+
+  if( $hash->{NAME} eq 'harmony:discovery' ) {
+    harmony_stopDiscovery();
+    $defs{$hash->{NAME}} = $hash;
+    return;
+  }
 
   if( defined($hash->{id}) ) {
     delete( $modules{$hash->{TYPE}}{defptr}{$hash->{id}} );
