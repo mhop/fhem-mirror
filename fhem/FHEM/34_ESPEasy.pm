@@ -37,7 +37,7 @@ use HttpUtils;
 use Color;
 use SetExtensions;
 
-my $module_version      = "2.01";     # Version of this module
+my $module_version      = "2.1";     # Version of this module
 
 # ------------------------------------------------------------------------------
 # modul version and required ESP Easy firmware / JSON lib version
@@ -59,6 +59,8 @@ my $d_displayTextEncode = 1;          # urlEncode Text for Displays
 my $d_displayTextWidth  = 0;          # display width, 0 => disable formating
 my $d_bridgePort        = 8383;       # bridge port if none specified
 my $d_disableLogin      = 0;          # Disable login if HTTP Code 302
+my $d_maxCmdDuration    = 3;          # max cmd exec time, subtracted from awake time
+my $d_sleepReading      = 'sleepState'; # Reading used for Indication of deep sleep
 
 # ------------------------------------------------------------------------------
 # defaults for user defined cmds
@@ -158,12 +160,14 @@ my %ee_attr = (
   },
   device => {
     adjustValue            => { widget => "" },
+    deepsleep              => { widget => "0,1" },
     disableRiskyCmds       => { widget => "" },
     displayTextEncode      => { widget => "1,0" },
     displayTextWidth       => { widget => "" },
     IODev                  => { widget => "" },
     Interval               => { widget => "" },
     mapLightCmds           => { widget => "lights,nfx" },
+    maxCmdDuration         => { widget => "slider,0,0.25,15,1" },
     parseCmdResponse       => { widget => "" },
     pollGPIOs              => { widget => "" },
     presenceCheck          => { widget => "1,0" },
@@ -263,6 +267,7 @@ sub ESPEasy_initDevSets($)
       sendto           => { args => 2, url => $d_urlSys, widget => "",      usage => "<unit nr> <command>" },
       sendtohttp       => { args => 3, url => $d_urlSys, widget => "",      usage => "<ip> <port> <url>" },
       sendtoudp        => { args => 3, url => $d_urlSys, widget => "",      usage => "<ip> <port> <url>" },
+      nosleep          => { args => 0, url => $d_urlSys, widget => "",      usage => "<awake time>" },
       taskvalueset     => { args => 3, url => $d_urlSys, widget => "",      usage => "<task/device nr> <value nr> <value/formula>" },
       taskvaluesetandrun => {args=> 3, url => $d_urlSys, widget => "",      usage => "<task/device nr> <value nr> <value/formula>" },
       taskrun          => { args => 1, url => $d_urlSys, widget => "",      usage => "<task/device nr>" },
@@ -568,6 +573,7 @@ sub ESPEasy_Define($$)  # only called when defined, not on reload.
       use constant HAS_AF_INET6 => defined eval { Socket::AF_INET6() };
       Log3 $name, 2, "$type $name: WARNING: Your system seems to have no IPv6 support." if !HAS_AF_INET6;
     }
+    $hash->{MODEL} = 'Bridge v'.$module_version;
   }
 
   #--- DEVICE -------------------------------------------------
@@ -710,7 +716,7 @@ sub ESPEasy_Get_queuesize(@)
 sub ESPEasy_Get_queuecontent(@)
 {
   my ($hash, $name, $cmd, @args) = @_;
-  my $host = $args[0];
+  my $host = defined $args[0] ? $args[0] : "";
   my $ret; my $i = 0; my $j = 0;
   my $mseclog = AttrVal("global","mseclog",0);
 
@@ -745,7 +751,7 @@ sub ESPEasy_Set($$@)
   my ($type, $subtype) = ($hash->{TYPE}, $hash->{SUBTYPE});
 
   # case insensitive
-  $cmd = lc($cmd) if $cmd;
+  $cmd = lc($cmd) if $cmd && $cmd !~ m/^(attrTemplate)$/;
 
   # get current cmd list if cmd is __unknown__
   my $clist = ESPEasy_isCmdAvailable($hash,$cmd);
@@ -900,11 +906,9 @@ sub ESPEasy_Set($$@)
   Log3 $name, 5, "$type $name: set $name $cmd ".join(" ",@params). " (mappings done)"
     if $cmd !~  m/^(\?|user|pass|help)$/;
   Log3 $name, 5, "$type $name: IOWrite ( \$defs{$name}, \$defs{$name}, $cmd, (\"".join("\",\"",@params)."\") )";
-  Log3 $name, 2, "$type $name: Device seems to be in sleep mode, sending command nevertheless."
-    if (defined $hash->{SLEEP} && $hash->{SLEEP} ne "0");
 
   # send cmd with required args to IO Device
-  my $parseCmd = ESPEasy_isParseCmd($hash,$cmd); # should response be parsed and dispatched
+  my $parseCmd = ESPEasy_isParseCmd($hash,$cmd); # should response be parsed and dispatched?
   IOWrite($hash, $hash, $parseCmd, $cmd, @params);
   return undef;
 }
@@ -1077,6 +1081,10 @@ sub ESPEasy_Read($) {
       push(@values,"i||".$intVal."||".$json->{data}{ESP}{$intVal}."||0");
     }
 
+    # if ESP is awaked then yield dequeuing
+    my $s = defined $json->{data}{ESP}{sleep} ? $json->{data}{ESP}{sleep} : undef;
+    ESPEasy_httpReqDequeue_onAwake($bhash, $peer, $s, $espName, $ident);
+
     # push sensor value in @values
     foreach my $vKey (keys %{$json->{data}{SENSOR}}) {
       if(ref $json->{data}{SENSOR}{$vKey} eq ref {}
@@ -1138,7 +1146,11 @@ sub ESPEasy_Write($$$@) #called from logical's IOWrite (end of SetFn)
     ESPEasy_statusRequest($hash);
     return undef;
   }
-  my $retry = 0;
+
+  $hash->{helper}{maxCmdDuration}{$dhash->{HOST}}
+    = defined $dhash->{MAX_CMD_DURATION}
+    ? $dhash->{MAX_CMD_DURATION}
+    : $d_maxCmdDuration;
 
   # a hash is more easy to handle in the following subs...
   my $cmdHash = {
@@ -1153,6 +1165,7 @@ sub ESPEasy_Write($$$@) #called from logical's IOWrite (end of SetFn)
     ts        => ESPEasy_timeStamp(),
     authRetry => 0,
     admpwd    => $dhash->{sec}{admpwd},
+    sleep     => defined $dhash->{ESP_SLEEP} ? $dhash->{ESP_SLEEP} : undef,
   };
 
   ESPEasy_httpReq($hash, $cmdHash);
@@ -1246,6 +1259,18 @@ sub ESPEasy_Notify($$)
         ESPEasy_initDevSets($hash);
       }
 
+      elsif ($3 eq "deepsleep") {
+        my $ds = defined $1 || (defined $4 && $4 == 0) ? 0 : 1;
+        $hash->{ESP_SLEEP} = $ds;
+        InternalTimer(0, sub() {
+          readingsSingleUpdate($hash, $d_sleepReading, ($ds eq "1" ? "sleeping" : "awaked"), 1)}, $name)
+      }
+
+      elsif ($3 eq "maxCmdDuration") {
+        $hash->{MAX_CMD_DURATION} = defined $1 ? $d_maxCmdDuration : $4;
+      }
+
+
       else {
         #Log 5, "$type $name: Attribute $3 not handeled by NotifyFn ";
       }
@@ -1255,7 +1280,17 @@ sub ESPEasy_Notify($$)
     elsif (m/^(INITIALIZED|REREADCFG|DEFINED $name)$/) {
       ESPEasy_initDevSets($hash);
       ESPEasy_initDevAttrs($hash);
-      ESPEasy_TcpServer_Open($hash) if $hash->{SUBTYPE} eq "bridge";
+      if ($hash->{SUBTYPE} eq "bridge") {
+        ESPEasy_TcpServer_Open($hash);
+      }
+      else {
+        $hash->{MAX_CMD_DURATION} = AttrVal($name, "maxCmdDuration", $d_maxCmdDuration);
+        my $ds = AttrVal($name, "deepsleep", undef);
+        if (defined $ds) {
+          $hash->{ESP_SLEEP} = $ds;
+          InternalTimer(0, sub(){readingsSingleUpdate($hash, $d_sleepReading, ($ds eq "1" ? "sleeping" : "awaked"), 1)}, $name);
+        }
+      }
     }
 
     else { #should never be reached
@@ -1344,7 +1379,7 @@ sub ESPEasy_Attr(@)
     $ret = "0,1,2" if ($cmd eq "set" && not $aVal =~ m/^(0|1|2)$/)
   }
 
-  elsif ($aName =~ m/^(autosave|autocreate|authentication|disable|deepSleep)$/
+  elsif ($aName =~ m/^(autosave|autocreate|authentication|disable|deepsleep)$/
       || $aName =~ m/^(presenceCheck|displayTextEncode|resendFailedCmd)$/) {
   $ret = "0,1" if ($cmd eq "set" && not $aVal =~ m/^(0|1)$/)}
 
@@ -1424,6 +1459,11 @@ sub ESPEasy_Attr(@)
       : ($hash->{INTERVAL} = $aVal)
   }
 
+  elsif ($aName eq "maxCmdDuration") {
+    $ret = "decimal or floating point"
+      if ($cmd eq "set" && $aVal !~ m/^\d+(\.\d)*$/);
+  }
+
   elsif ($aName eq "userSetCmds") {
     $ret = ESPEasy_Attr_userSetCmds($hash, $cmd, $aName, $aVal);
     $ret = "a perl hash. See command reference for details.\n\n"
@@ -1436,7 +1476,7 @@ sub ESPEasy_Attr(@)
            ."  ct  => { args => 1, url => \"/myUrl\", widget => \"colorpicker,CT,2000,100,4500\", usage => \"<colortemp>\" }\n"
         ." }\n"
         .")\n"
-    if $ret;
+    if defined $ret;
   }
 
   if (!$init_done) {
@@ -1490,7 +1530,7 @@ sub ESPEasy_Attr_userSetCmds(@) {
 
   # Delete Attribute, afterwards notifyFn will build new cmdhash in $data{ESPEasy}{$name}{sets}...
   else {
-    # do nothing
+    return undef;
   }
 
   # eval() above accepts single string expressions...
@@ -1568,6 +1608,18 @@ sub ESPEasy_Delete($$)
 
 
 # ------------------------------------------------------------------------------
+sub ESPEasy_State($$$$)
+{
+  my ($hash, $time, $reading, $val) = @_;
+
+  if($reading eq "state" && $val eq "inactive") {
+    readingsSingleUpdate($hash, "state", "inactive", 1);
+  }
+  return undef;
+}
+
+
+# ------------------------------------------------------------------------------
 sub ESPEasy_dispatch($$$@) #called by bridge -> send to logical devices
 {
   my($hash,$ident,$host,@values) = @_;
@@ -1587,18 +1639,6 @@ sub ESPEasy_dispatch($$$@) #called by bridge -> send to logical devices
 #  Log3 $bname, 5, "$type $name: Dispatch: $msg";
   Dispatch($bhash, $msg, undef);
 
-  return undef;
-}
-
-
-# ------------------------------------------------------------------------------
-sub ESPEasy_State($$$$)
-{
-  my ($hash, $time, $reading, $val) = @_;
-
-  if($reading eq "state" && $val eq "inactive") {
-    readingsSingleUpdate($hash, "state", "inactive", 1);
-  }
   return undef;
 }
 
@@ -1651,6 +1691,9 @@ sub ESPEasy_dispatchParse($$$) # called by logical device (defined by
   Log3 $name, 5, "$type $name: Received: $msg";
 
   if (defined $hash && $hash->{TYPE} eq "ESPEasy" && $hash->{SUBTYPE} eq "device") {
+
+    readingsBeginUpdate($hash);
+
     my @logInternals;
     foreach (@v) {
       my ($cmd,$reading,$value,$vType) = split("\\|\\|",$_);
@@ -1695,19 +1738,23 @@ sub ESPEasy_dispatchParse($$$) # called by logical device (defined by
           $value = $orgVal;
         }
 
-        readingsSingleUpdate($hash, $reading, $value, 1);
+        my $genEvent = $reading ne "sleepState"
+          ? 1
+          : ( AttrVal($name, "deepsleep", 0) eq 1 ? 1 : 0 );
+
+        readingsBulkUpdate($hash, $reading, $value, $genEvent);
         my $adj = ($orgVal ne $value) ? " [adjusted]" : "";
         Log3 $name, 4, "$type $name: $reading: $value".$adj
           if defined $value && $reading !~ m/^\./; #no leading dot
 
         # used for presence detection
-        $hash->{helper}{received}{$reading} = time();
+        $hash->{helper}{received}{$reading} = time() if $reading ne $d_sleepReading;
 
         # recalc RGB reading if a PWM channel has changed
         if (AttrVal($name,"rgbGPIOs",0) && $reading =~ m/\d$/i) {
           my ($r,$g,$b) = ESPEasy_gpio2RGB($hash);
           if (($r ne "" && uc ReadingsVal($name,"rgb","") ne uc $r.$g.$b)  ) {
-            readingsSingleUpdate($hash, "rgb", $r.$g.$b, 1);
+            readingsBulkUpdate($hash, "rgb", $r.$g.$b, 1);
           }
         }
 
@@ -1716,10 +1763,7 @@ sub ESPEasy_dispatchParse($$$) # called by logical device (defined by
       # --- Internals -----------------------------------------------
       elsif ($cmd eq "i") {
         # add human readable text to node_type_id
-        $value .= defined $ee_map{build}{$value}{type}
-          ? ": " . $ee_map{build}{$value}{type}
-          : ": unknown node type id"
-            if $reading eq "node_type_id";
+        $value = defined $ee_map{build}{$value}{type} ? $ee_map{build}{$value}{type} : $value;# if $reading eq "node_type_id";
 
         # no value given
         $value = "<undefined>" if !defined $value || $value eq "";
@@ -1738,7 +1782,7 @@ sub ESPEasy_dispatchParse($$$) # called by logical device (defined by
           $hash->{"WARNING"} = $value;
           # CommandTrigger(undef, "$name ....");
         }
-        #readingsSingleUpdate($hash, $reading, $value, 1);
+        #readingsBulkUpdate($hash, $reading, $value, 1);
       }
 
       # --- Notice (just log) ---------------------------------------
@@ -1760,9 +1804,33 @@ sub ESPEasy_dispatchParse($$$) # called by logical device (defined by
     Log3 $name, 5, "$type $name: Internals: ".join(" ",@logInternals)
       if scalar @logInternals > 0;
 
-    ESPEasy_checkPresence($hash) if ReadingsVal($name,"presence","") ne "present";
-    ESPEasy_setState($hash);
+    if (defined $hash->{ESP_BUILD}) {
+      my $model = defined $hash->{ESP_NODE_TYPE_ID} ? $hash->{ESP_NODE_TYPE_ID} . " - Build " : "ESP Easy - Build ";
+      $model .= $hash->{ESP_BUILD};
+      $hash->{MODEL} = $model;
+#      readingsBulkUpdate($hash, "model", $model, 0);
+    }
 
+    # Remove sleepState Reading if device does not use deep sleep
+    CommandDeleteReading(undef, "$name $d_sleepReading")
+      if (ReadingsVal($name, $d_sleepReading, undef)
+          && defined $hash->{ESP_SLEEP} && $hash->{ESP_SLEEP} eq "0"
+      );
+
+    readingsEndUpdate($hash, 1);
+
+#    ESPEasy_checkPresence($hash) if ReadingsVal($name,"presence","") ne "present";
+#    ESPEasy_setState($hash);
+
+    # yield presenceCheck and setState
+    InternalTimer(
+      gettimeofday(),
+      sub() {
+        ESPEasy_checkPresence($hash) if ReadingsVal($name,"presence","") ne "present";
+        ESPEasy_setState($hash);
+      },
+      "$name.checkPresence.setState"
+    );
   }
 
   else { #autocreate failed
@@ -1821,6 +1889,7 @@ sub ESPEasy_httpReq(@)
   my $url;
 
   # queue http requests or continue if there are no queued cmds
+  # command will also be queued if ESP is in deepsleep mode
   return undef if ESPEasy_httpReqQueue($hash, $cmdHash);
 
   $cmdHash->{retry}++;
@@ -2031,16 +2100,25 @@ sub ESPEasy_httpReqQueue(@)
   $hash->{helper}{sessions}{$host} = 0 if !defined $hash->{helper}{sessions}{$host};
   # is queueing enabled?
   if ($hash->{MAX_HTTP_SESSIONS}) {
-    # do queueing if max sessions are already in use
-    if ($hash->{helper}{sessions}{$host} >= $hash->{MAX_HTTP_SESSIONS} ) {
+    # queue if max sessions are already in use or if ESP is deepsleep mode
+    if ($hash->{helper}{sessions}{$host} >= $hash->{MAX_HTTP_SESSIONS}
+         # ESP already send data, so we know if and wheen it goes to sleep
+         || ( defined $hash->{helper}{awaked} && defined $hash->{helper}{awaked}{$host} && $hash->{helper}{awaked}{$host} - gettimeofday() < $hash->{helper}{maxCmdDuration}{$host} )
+         # ESP did not send any data right now, but device has defined $hash->{ESP_SLEEP}
+         || ( !(defined $hash->{helper}{awaked} && defined $hash->{helper}{awaked}{$host}) && defined $cmdHash->{sleep} && $cmdHash->{sleep} > 0 )
+       ) {
       # max queue size reached
       if ($queueSize < $hash->{MAX_QUEUE_SIZE}) {
         push(@{$hash->{helper}{queue}{$host}}, $cmdHash);
-        Log3 $name, 4, "$type $name: Queuing: $host $cmdHash->{ident} '$cmd $cmdArgs' ($queueSize)";
+        Log3 $name, 4, "$type $name: Queuing: $host $cmdHash->{ident} cmd:"
+                     . "'$cmd $cmdArgs' queueSize:".($queueSize +1)." reason:"
+                     . ($hash->{helper}{sessions}{$host} >= $hash->{MAX_HTTP_SESSIONS}
+                     ? "maxSessions"
+                     : "deepsleep");
         return 1;
       }
       else {
-        Log3 $name, 2, "$type $name: set $cmd $cmdArgs (skipped due to queue size exceeded: $hash->{MAX_QUEUE_SIZE})";
+        Log3 $name, 2, "$type $name: set $cmd $cmdArgs (skipped due to max queue size exceeded: $hash->{MAX_QUEUE_SIZE})";
         return 1;
       }
     }
@@ -2062,11 +2140,20 @@ sub ESPEasy_httpReqDequeue($$)
   &&   defined $hash->{helper}{queue}{$host}
   &&   scalar @{$hash->{helper}{queue}{$host}} ) {
 
-    my $cmdHash = shift @{ $hash->{helper}{queue}{$host} };
+    # ESP will be go into deep sleep soon. stop queueing.
+    if (defined $hash->{helper}{awaked} && defined $hash->{helper}{awaked}{$host}
+    && ($hash->{helper}{awaked}{$host} - gettimeofday()) < $hash->{helper}{maxCmdDuration}{$host}
+    ) {
+      Log3 $name, 4, "$type $name: $host is going into deep sleep in <= "
+        . $hash->{helper}{maxCmdDuration}{$host} . "s. De-queueing stopped. "
+        . scalar @{$hash->{helper}{queue}{$host}}. " outstanding commands left.";
+      return undef;
+    }
 
+    my $cmdHash = shift @{ $hash->{helper}{queue}{$host} };
     Log3 $name, 4, "$type $name: Dequeuing: $host $cmdHash->{ident} "
                  . "'$cmdHash->{cmd} " . join(",",@{$cmdHash->{cmdArgs}})."'"
-                 . " (".scalar @{$hash->{helper}{queue}{$host}}.")";
+                 . " queuesize:".scalar @{$hash->{helper}{queue}{$host}};
 
     # delete queue if empty
     delete $hash->{helper}{queue}{$host} if defined $hash->{helper}{queue} && defined $hash->{helper}{queue}{$host} && scalar @{$hash->{helper}{queue}{$host}} == 0;
@@ -2076,6 +2163,72 @@ sub ESPEasy_httpReqDequeue($$)
   }
 
   return undef;
+}
+
+
+# ------------------------------------------------------------------------------
+# Mark a peer as being in deep sleep or in awaked state and de-queue.
+# called within ReadFn.
+# ------------------------------------------------------------------------------
+# $hash->{helper}{awaked}{$host} > 0       : awaked, value is next sleep time
+# $hash->{helper}{awaked}{$host} = 0       : sleeping
+# $hash->{helper}{awaked}{$host} = -1      : sleep awaited
+# $hash->{helper}{awaked}{$host} ! defined : no sleep mode used by peer
+# ------------------------------------------------------------------------------
+sub ESPEasy_httpReqDequeue_onAwake($$$$$) {
+  my ($hash, $host, $sleep, $espName, $ident) = @_;
+  my ($name, $type) = ($hash->{NAME}, $hash->{TYPE});
+
+  if (defined $sleep && $sleep > 0) {
+
+    if ( ( !defined $hash->{helper}{awaked} || !defined $hash->{helper}{awaked}{$host} )
+      || ( defined $hash->{helper}{awaked} && defined $hash->{helper}{awaked}{$host} && $hash->{helper}{awaked}{$host} == 0 ) ) {
+
+      $hash->{helper}{awaked}{$host} = gettimeofday() + $sleep;
+
+      # --- schedule dispatch "sleeping" ------------------------------------
+      InternalTimer( $hash->{helper}{awaked}{$host}, sub() {
+          $hash->{helper}{awaked}{$host} = 0;
+          my @value = ("r||$d_sleepReading||sleeping||0");
+          ESPEasy_dispatch($hash,$ident,$host,@value);
+        }, "$type.$name.$host.sleepStarted"
+      );
+
+      # --- schedule dispatch "sleep awaited" -------------------------------
+      my $mcd
+        =  defined $hash->{helper}{maxCmdDuration}
+        && defined $hash->{helper}{maxCmdDuration}{$host}
+          ?  $hash->{helper}{maxCmdDuration}{$host}
+          :  $d_maxCmdDuration;
+      my $awaited = $hash->{helper}{awaked}{$host} - $mcd;
+      my @dpsa = ("r||$d_sleepReading||sleep awaited in ".$mcd."s: $hash->{helper}{awaked}{$host}||0");
+      InternalTimer( $awaited, sub() {
+          ESPEasy_dispatch($hash, $ident, $host, @dpsa);
+          $hash->{helper}{awaked}{$host} = -1;
+        }, "$type.$name.$host.sleepAwaited"
+      );
+
+      # --- dispatch "awaked" -----------------------------------------------
+      # eg. 2018.12.21 10:35:03.479 4: ESPEasy em1: sleepState: awaked for 25s (-5s): [2018-12-21 10:35:23]
+      my @dpa = ("r||$d_sleepReading||awaked for ".$sleep."s (-".$mcd."s): ".$awaited."||0");
+			ESPEasy_dispatch($hash, $ident, $host, @dpa);
+
+      # --- yield dequeuing -------------------------------------------------
+      InternalTimer( gettimeofday(), sub() {
+          ESPEasy_httpReqDequeue($hash, $host);
+        }, "$type.$name.$host.dequeue"
+      );
+
+      return 1;
+    } # if !defined...
+  } # if (defined $sleep
+
+  # Peer did not send $sleep or $sleep == 0
+  elsif (!$sleep) {
+    delete $hash->{helper}{awaked}{$host} if defined $hash->{helper}{awaked} && $hash->{helper}{awaked}{$host};
+  }
+#Debug "End";
+  return 0;
 }
 
 
@@ -2397,6 +2550,15 @@ sub ESPEasy_isParseCmd($$) #called by device
 
 
 # ------------------------------------------------------------------------------
+sub ESPEasy_IsPeerAwaked($$) {
+  my ($hash, $host) = @_;
+  return undef if !defined defined $hash->{awaked}{$host};
+  return 0 if ($hash->{awaked}{$host} == 0);
+  return 1 if ($hash->{awaked}{$host} > 0);
+}
+
+
+# ------------------------------------------------------------------------------
 sub ESPEasy_sendHttpClose($$$) {
   my ($hash,$code,$response) = @_;
   my ($name,$type,$con) = ($hash->{NAME},$hash->{TYPE},$hash->{CD});
@@ -2541,7 +2703,7 @@ sub ESPEasy_setState($)
     my $addTime = 3;
     my @ret;
     foreach my $reading (sort keys %{$hash->{helper}{received}}) {
-      next if $reading =~ m/^(\.ignored_.*|state|presence|_lastAction|_lastError|\w+_mode)$/;
+      next if $reading =~ m/^(\.ignored_.*|state|presence|_lastAction|_lastError|\w+_mode|$d_sleepReading)$/;
       next if $interval && ReadingsAge($name,$reading,1) > $interval+$addTime;
       push(@ret, substr($reading,0,AttrVal($name,"setState",3))
                 .": ".ReadingsVal($name,$reading,""));
@@ -3212,10 +3374,14 @@ sub ESPEasy_dumpSingleLine($)
       target="_new">R128</a> (self compiled) or an ESPEasy precompiled image
       &gt;= <a href="http://www.letscontrolit.com/wiki/index.php/ESPEasy#Loading_firmware" target="_new">R140_RC3</a><br>
     </li>
-    <li>perl module JSON<br>
-      Use "cpan install JSON" or operating system's package manager to install
-      Perl JSON Modul. Depending on your os the required package is named:
-      libjson-perl or perl-JSON.
+    <li>
+      ESPEasy Mega with option to set sleep awake time (Config -&gt; Sleep Mode
+      -&gt; Sleep awake time) is required to control ESP Easy nodes in deep
+      sleep. Receiving sensor values works with all other supported versions.<br>
+    </li>
+    <li>Perl module JSON. Use "cpan install JSON" or operating system's package
+      manager to install Perl JSON Modul. Depending on your os the required
+      package is named: libjson-perl or perl-JSON.
     </li>
   </ul>
 
@@ -3564,6 +3730,12 @@ sub ESPEasy_dumpSingleLine($)
       feature works quite slow on your ESP Easy nodes.
     </li><br>
 
+    <li><a name="ESPEasy_device_set_attrTemplate">attrTemplate</a><br>
+      See global <a href="#attrTemplate">attrTemplate</a>. Attribute
+      <a href="#ESPEasy_device_attr_useSetExtensions">useSetExtensions</a>
+      must be activated or the command is unavailable.
+    </li><br>
+
     <li><a name="ESPEasy_device_set_clearreadings">clearReadings</a><br>
       Delete all readings that are auto created by received sensor values
       since last FHEM restart.<br>
@@ -3865,7 +4037,7 @@ sub ESPEasy_dumpSingleLine($)
           <tr><td>rainbow</td>     <td>[speed +/- 0-50]</td></tr>
           <tr><td>rgb</td>         <td>&lt;rrggbb&gt; [fadetime] [delay +/-ms]</td></tr>
           <tr><td>scan</td>        <td>&lt;rrggbb&gt; [rrggbb background] [speed 0-50]</td></tr>
-          <tr><td>simpleclock</td> <td>[bigtickcolor] [smalltickcolor] [hourcolor] [minutecolor] [secondcolor]</td></tr>
+          <tr><td>simpleclock</td> <td>[bigtickcolor] [smalltickcolor] [hourcolor] [minutecolor] [secondcolor] [backgroundcolor]</td></tr>
           <tr><td>sparkle</td>     <td>&lt;rrggbb&gt; [rrggbb background] [speed 0-50]</td></tr>
           <tr><td>speed</td>       <td>&lt;value 0-50&gt;</td></tr>
           <tr><td>stop</td>        <td></td></tr>
@@ -4225,6 +4397,20 @@ sub ESPEasy_dumpSingleLine($)
       Default: 0
     </li><br>
 
+    <li><a name="ESPEasy_device_attr_deepsleep">deepsleep</a><br>
+      This attribut defines the default deep sleep state that is assumed if the
+      ESP has not sent its status to FHEM. Eg. directly after a FHEM restart.
+      If the ESP has sent its status, this value is ignored. Useful if you want
+      to be sure that a set command would be queued and sent when the ESP awakes
+      after a restart/rereadcfg of FHEM.<br>
+      Furthermore events for reading sleepState are generated if enabled.
+      ESPEasy Mega with option to set sleep awake time (Config -&gt; Sleep Mode
+      -&gt; Sleep awake time) is required to use this feature.
+      <br>
+      Possible values: 0,1<br>
+      Default: 0
+    </li><br>
+
     <li><a name="ESPEasy_device_attr_disableRiskyCmds">disableRiskyCmds</a><br>
       Used to disable supposed dangerous set cmds: erase, reset, resetflashwritecounter<br>
       Possible values: 0,1<br>
@@ -4270,6 +4456,19 @@ sub ESPEasy_dumpSingleLine($)
       rgb/ct/effect/... plugin.<br>
       required values: <code>a valid set command</code><br>
       eg. <code>attr &lt;esp&gt; mapLightCmds Lights</code>
+    </li><br>
+
+    <li><a name="ESPEasy_device_attr_maxCmdDuration">maxCmdDuration</a><br>
+      Only used if an ESP Easy node works in deep sleep mode. This attribut defines
+      the amount of seconds your ESP node needs to work off a single command.
+      In other words: This value defines how much awake time must be left to
+      send a command to your ESP node before it goes into deep sleep mode.
+      Commands that are not send will be queued und worked off when the node
+      awakes again.<br>
+      ESPEasy Mega with option to set sleep awake time (Config -&gt; Sleep Mode
+      -&gt; Sleep awake time) is required to use this feature.<br>
+      Possible values: secs &gt;= 0, but < awake time<br>
+      Default: 3
     </li><br>
 
     <li><a name="ESPEasy_device_attr_presencecheck">presenceCheck</a><br>
