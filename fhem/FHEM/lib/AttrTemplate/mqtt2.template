@@ -189,7 +189,7 @@ par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev","")}
 par:READINGLISTCLEARED;cleared from prefixes;{ AttrVal("DEVICE","readingList","") =~ s/, '[^_]+[_]'/, ''/g, ? $1 : undef }
 attr DEVICE readingList READINGLISTCLEARED
 deletereading DEVICE .*
-set IO_DEV publish COMMAND/Reboot 1
+set IO_DEV publish COMMAND/Restart 1
 attr DEVICE autocreate 0
 
 
