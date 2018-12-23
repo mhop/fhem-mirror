@@ -59,22 +59,38 @@ SetExtensions($$@)
     "toggle"            => 0
   );
 
-  my $hasOn  = ($list =~ m/(^| )on\b/);
-  my $hasOff = ($list =~ m/(^| )off\b/);
-  my $eventMap = AttrVal($name, "eventMap", undef);
-
-  if((!$hasOn || !$hasOff) && $eventMap) {
-    if(!$hasOn) {
-      my (undef,$value) = ReplaceEventMap($name, [$name, "on"], 0);
-      $hasOn = ($value ne "on");
-    }
-    if(!$hasOff) {
-      my (undef,$value) = ReplaceEventMap($name, [$name, "off"], 0);
-      $hasOff = ($value ne "off");
-    }
+  sub
+  getCmd($$)
+  {
+    my ($list, $lCmd) = @_;
+    my $uCmd = uc($lCmd);
+    return ($list =~ m/(^| )$lCmd\b/ ? $lCmd :
+           ($list =~ m/(^| )$uCmd\b/ ? $uCmd : ""));
   }
 
-  if(!$hasOn || !$hasOff) { # No extension
+  sub
+  getReplCmd($$)
+  {
+    my ($name, $cmd);
+    my (undef,$value) = ReplaceEventMap($name, [$name, $cmd], 0);
+    return $cmd if($value ne $cmd);
+
+    $cmd = uc($cmd);
+    (undef,$value) = ReplaceEventMap($name, [$name, $cmd], 0);
+    return $cmd if($value ne $cmd);
+    return "";
+  }
+
+  my $onCmd  = getCmd($list, "on");
+  my $offCmd = getCmd($list, "off");
+
+  my $eventMap = AttrVal($name, "eventMap", undef);
+  if((!$onCmd || !$offCmd) && $eventMap) {
+    $onCmd  = getReplCmd($name, "on")  if(!$onCmd);
+    $offCmd = getReplCmd($name, "off") if(!$offCmd && $onCmd);
+  }
+
+  if(!$onCmd || !$offCmd) { # No extension
     return AttrTemplate_Set($hash, $list, $name, $cmd, @a);
   }
 
@@ -88,8 +104,8 @@ SetExtensions($$@)
   }
 
   SetExtensionsCancel($hash);
-  my $cmd1 = ($cmd =~ m/^on.*/ ? "on" : "off");
-  my $cmd2 = ($cmd =~ m/^on.*/ ? "off" : "on");
+  my $cmd1 = ($cmd =~ m/^on.*/i ? $onCmd : $offCmd);
+  my $cmd2 = ($cmd =~ m/^on.*/i ? $offCmd : $onCmd);
   my $param = $a[0];
 
 
@@ -132,7 +148,7 @@ SetExtensions($$@)
         if($param !~ m/^\d+$/ || $p2 !~ m/^\d*\.?\d*$/);
 
     if($param) {
-      SE_DoSet($name, $a[2] ? "off" : "on");
+      SE_DoSet($name, $a[2] ? $offCmd : $onCmd);
       $param-- if($a[2]);
       if($param) {
         $hash->{TIMED_OnOff} = {
@@ -176,8 +192,8 @@ SetExtensions($$@)
     my $value = Value($name);
     (undef,$value) = ReplaceEventMap($name, [$name, $value], 0) if($eventMap);
 
-    $value = ($1==0 ? "off" : "on") if($value =~ m/dim (\d+)/); # Forum #49391
-    SE_DoSet($name, $value =~ m/^on/ ? "off" : "on");
+    $value = ($1==0 ? $offCmd:$onCmd) if($value =~ m/dim (\d+)/); # Forum #49391
+    SE_DoSet($name, $value =~ m/^on/i ? $offCmd : $onCmd);
 
   }
 
