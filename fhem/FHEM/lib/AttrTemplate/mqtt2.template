@@ -245,6 +245,7 @@ attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2
 copy DEVICE DEVICE_CH2
 attr DEVICE_CH2 stateFormat {lc ReadingsVal("$name","POWER2","")}
 attr DEVICE_CH2 comment Channel 2 for DEVICE
+setreading DEVICE_CH2 associatedWith DEVICE
 attr DEVICE_CH2 setList \
   off:noArg    COMMAND/POWER2 0\
   on:noArg     COMMAND/POWER2 1\
@@ -327,6 +328,7 @@ attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2
 copy DEVICE DEVICE_CH2
 attr DEVICE_CH2 readingList shellies/DEVNAME/relay/1:.* state
 attr DEVICE_CH2 comment Channel 2 for DEVICE
+setreading DEVICE_CH2 associatedWith DEVICE
 attr DEVICE_CH2 setList \
   off:noArg shellies/DEVNAME/relay/1/command off\
   on:noArg shellies/DEVNAME/relay/1/command on
@@ -344,6 +346,7 @@ attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2, DEVICE_CH3 and DE
 copy DEVICE DEVICE_CH2
 attr DEVICE_CH2 readingList shellies/DEVNAME/relay/1:.* state
 attr DEVICE_CH2 comment Channel 2 for DEVICE
+setreading DEVICE_CH2 associatedWith DEVICE,DEVICE_CH3,DEVICE_CH4
 attr DEVICE_CH2 setList \
   off:noArg shellies/DEVNAME/relay/1/command off\
   on:noArg shellies/DEVNAME/relay/1/command on
@@ -353,6 +356,7 @@ attr DEVICE comment Channel 2 for DEVICE, see also DEVICE, DEVICE_CH3 and DEVICE
 copy DEVICE DEVICE_CH3
 attr DEVICE_CH3 readingList shellies/DEVNAME/relay/2:.* state
 attr DEVICE_CH3 comment Channel 3 for DEVICE
+setreading DEVICE_CH3 associatedWith DEVICE,DEVICE_CH2,DEVICE_CH4
 attr DEVICE_CH3 setList \
   off:noArg shellies/DEVNAME/relay/2/command off\
   on:noArg shellies/DEVNAME/relay/2/command on
@@ -362,6 +366,7 @@ attr DEVICE comment Channel 3 for DEVICE, see also DEVICE, DEVICE_CH2 and DEVICE
 copy DEVICE DEVICE_CH4
 attr DEVICE_CH4 readingList shellies/DEVNAME/relay/3:.* state
 attr DEVICE_CH4 comment Channel 4 for DEVICE
+setreading DEVICE_CH4 associatedWith DEVICE,DEVICE_CH2,DEVICE_CH3
 attr DEVICE_CH4 setList \
   off:noArg shellies/DEVNAME/relay/3/command off\
   on:noArg shellies/DEVNAME/relay/3/command on
