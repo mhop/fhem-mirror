@@ -46,7 +46,7 @@ sub DOIFtools_logWrapper($);
 sub DOIFtoolsCounterReset($);
 sub DOIFtoolsDeleteStatReadings;
 
-my @DOIFtools_we = (0,0,0,0,0,0,0,0);
+my @DOIFtools_we = (0,0,0,0,0,0,0,0,0);
 my $DOIFtoolsJSfuncEM = <<'EOF';
 <script type="text/javascript">
 //functions
@@ -579,12 +579,12 @@ sub DOIFtools_Notify($$) {
   return if( !$events );
   # \@DOIFtools_we aktualisieren
   if ((",".AttrVal("global","holiday2we","").",") =~ /\,$sn\,/) {
-    @DOIFtools_we = (0,0,0,0,0,0,0,0);
+    @DOIFtools_we = (0,0,0,0,0,0,0,0,0);
     foreach my $item (split(",",AttrVal("global","holiday2we",""))) {
       my $val;
       my $a;
       my $b;
-      for (my $i = 0; $i < 8; $i++) { 
+      for (my $i = 0; $i < 9; $i++) { 
         $val = CommandGet(undef,"$item days $i");
         if($val) {
           ($a, $b) = ReplaceEventMap($item, [$item, $val], 0);
@@ -789,17 +789,24 @@ sub DOIFtoolsNextTimer {
   }
   my $tdays = "";
   $tdays = $tn ? DOIF_weekdays($defs{$tn},$weekd) : $weekd;
-  $tdays =~/([0-8])/;
+  Log 1, "$tn $tdays";
+  Log 1, "$tn ".join("",@DOIFtools_we);
+  $tdays =~/([0-9])/;
   return $tstr if (length($1) == 0); 
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($timer);
   my $ilook = 0;
   my $we;
+  my $twe;
   for (my $iday = $wday; $iday < 7; $iday++) { 
     $we = (($iday==0 || $iday==6) ? 1 : 0);
     if(!$we) {
       $we = $DOIFtools_we[$ilook + 1];
     }
-    if ($tdays =~ /$iday/ or ($tdays =~ /7/ and $we) or ($tdays =~ /8/ and !$we)) {
+    $twe = (($iday==5 || $iday==6) ? 1 : 0);
+    if(!$twe) {
+      $twe = $DOIFtools_we[$ilook + 2];
+    }
+    if ($tdays =~ /$iday/ or ($tdays =~ /7/ and $we) or ($tdays =~ /8/ and !$we) or ($tdays =~ /9/ and $twe)) {
       return strftime("%d.%m.%Y %H:%M:%S",localtime($timer + $ilook * 86400));
     }
     $ilook++;
@@ -809,7 +816,11 @@ sub DOIFtoolsNextTimer {
     if(!$we) {
       $we = $DOIFtools_we[$ilook + 1];
     }
-    if ($tdays =~ /$iday/ or ($tdays =~ /7/ and $we) or ($tdays =~ /8/ and !$we)) {
+    $twe = (($iday==5 || $iday==6) ? 1 : 0);
+    if(!$twe) {
+      $twe = $DOIFtools_we[$ilook + 2];
+    }
+    if ($tdays =~ /$iday/ or ($tdays =~ /7/ and $we) or ($tdays =~ /8/ and !$we) or ($tdays =~ /9/ and $twe)) {
       return strftime("%d.%m.%Y %H:%M:%S",localtime($timer + $ilook * 86400));
     }
     $ilook++;
