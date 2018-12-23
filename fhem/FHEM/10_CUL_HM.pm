@@ -1623,7 +1623,7 @@ sub CUL_HM_Parse($$) {#########################################################
     }
     elsif( $mh{mTp} eq "3F" && $ioId eq $mh{dst}) {     # Timestamp request
       my $s2000 = sprintf("%02X", CUL_HM_secSince2000());
-      push @ack,$mh{shash},"$mh{mNo}803F$ioId$mh{src}0204$s2000";
+      push @ack,$mh{shash},"$mh{mNo}803F$ioId$mh{src}0202$s2000";
       push @evtEt,[$mh{shash},1,"time-request"];
     }
   }
@@ -1774,7 +1774,7 @@ sub CUL_HM_Parse($$) {#########################################################
     }
     elsif($mh{mTp} eq "3F" && $ioId eq $mh{dst}) { # Timestamp request
       my $s2000 = sprintf("%02X", CUL_HM_secSince2000());
-      push @ack,$mh{shash},"$mh{mNo}803F$ioId$mh{src}0204$s2000";
+      push @ack,$mh{shash},"$mh{mNo}803F$ioId$mh{src}0202$s2000";
       push @evtEt,[$mh{shash},1,"time-request"];
       # schedule desired-temp just to get an AckInfo for battery state
       $mh{shash}->{helper}{getBatState} = 1;
@@ -1887,7 +1887,7 @@ sub CUL_HM_Parse($$) {#########################################################
     }
     elsif($mh{mTp} eq "3F" && $ioId eq $mh{dst}) { # Timestamp request
       my $s2000 = sprintf("%02X", CUL_HM_secSince2000());
-      push @ack,$mh{shash},"$mh{mNo}803F$ioId$mh{src}0204$s2000";
+      push @ack,$mh{shash},"$mh{mNo}803F$ioId$mh{src}0202$s2000";
       push @evtEt,[$mh{shash},1,"time-request"];
     }
   }
@@ -4032,6 +4032,9 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   $h = $culHmChanSets->{$md.$chn}{$cmd} if(!defined($h) && $culHmChanSets->{$md.$chn} && $roleC); 
   $h = $culHmFunctSets->{$fkt}{$cmd}    if(!defined($h) && $culHmFunctSets->{$fkt});
 
+  $h = "parameter" if ($cmd =~ m/^tplPara..._/);
+  $h = "template"  if ($cmd =~ m/^tplSet_/);
+  
   if( !defined($h) && $hash->{helper}{regLst}){
     foreach my $rl(grep /./,split(",",$hash->{helper}{regLst})){        
       next if (!defined $culHmReglSets->{$rl});
@@ -4046,7 +4049,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   @h = split(" ", $h) if($h);
   my @postCmds=(); #Commands to be appended after regSet (ugly...)
 
-  if(!defined($h) && defined($culHmSubTypeSets->{$st}{pct}) && $cmd =~ m/^\d+/) {
+  if   (!defined($h) && defined($culHmSubTypeSets->{$st}{pct}) && $cmd =~ m/^\d+/) {
     splice @a, 1, 0,"pct";#insert the actual command
   }
   elsif(!defined($h)) { ### unknown - return the commandlist
@@ -4095,6 +4098,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
     @arr1 = ("--") if (!scalar @arr1);
     my $usg = "Unknown argument $cmd, choose one of ".join(" ",sort @arr1);
+
+
     $usg =~ s/ pct/ pct:slider,0,1,100/;
     $usg =~ s/ pctSlat/ pctSlat:slider,0,1,100/;
     $usg =~ s/ virtual/ virtual:slider,1,1,50/;
@@ -4105,15 +4110,17 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
 	  $tl = $ok?$tl:"";
       $usg =~ s/ tempTmplSet/ tempTmplSet$tl/;
 	}
-	if (   $usg =~ m/ templateDel/ 
+
+    $usg .= CUL_HMTmplSetParam($name);   
+    $usg .= CUL_HMTmplSetCmd($name);
+	if (   $usg =~ m/ tplDel/ 
         && eval "defined(&HMinfo_templateDel)"
         && keys %{$hash->{helper}{tmpl}}){
       my $tl = join(",",(sort keys %{$hash->{helper}{tmpl}}));
-#      $tl =~ s/:/>/;
-      $usg =~ s/ templateDel/ templateDel:$tl/;
+      $usg =~ s/ tplDel/ tplDel:$tl/;
 	}
     else{
-      $usg =~ s/ templateDel//;#not an option
+      $usg =~ s/ tplDel//;#not an option
     }
 	if ( $usg =~ m/ (press|event|trgPress|trgEvent)/){
       my $peers = join",",grep/./,split",",InternalVal($name,"peerList","");
@@ -4310,7 +4317,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
     CUL_HM_tempListTmpl($name,"restore",$template);
   }
-  elsif($cmd eq "templateDel") { ##############################################
+  elsif($cmd eq "tplDel") { ###################################################
 	return "template missing" if (!defined $a[2]);
     my ($p,$t) = split(">",$a[2]);
     HMinfo_templateDel($name,$t,$p) if (eval "defined(&HMinfo_templateDel)");
@@ -4401,7 +4408,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   elsif($cmd =~ m/^(displayMode|displayTemp|displayTempUnit|controlMode)/) { ##
     if ($md =~ m/^(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/){#controlMode different for RT
       splice @a,1,3, ("regSet",$a[1],$a[2]);
-      push @postCmds,"++803F$id${dst}0204".sprintf("%02X",CUL_HM_secSince2000());
+      push @postCmds,"++803F$id${dst}0202".sprintf("%02X",CUL_HM_secSince2000());
     }
   }
   elsif($cmd eq "partyMode") { ################################################
@@ -4437,7 +4444,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                       sprintf("61%02X62%02X",$eH,$days),$prep);
     splice @a,1,3, ("regSet","controlMode","party");
     splice @a,2,0, ($prep) if ($prep);
-    push @postCmds,"++803F$id${dst}0204".sprintf("%02X",CUL_HM_secSince2000());
+    push @postCmds,"++803F$id${dst}0202".sprintf("%02X",CUL_HM_secSince2000());
   }
 
   $cmd = $a[1];# get converted command
@@ -5557,7 +5564,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   elsif($cmd eq "sysTime") { ##################################################
     $state = "";
     my $s2000 = sprintf("%02X", CUL_HM_secSince2000());
-    CUL_HM_PushCmdStack($hash,"++803F$id${dst}0204$s2000");
+    CUL_HM_PushCmdStack($hash,"++803F$id${dst}0202$s2000");
   }
   elsif($cmd =~ m/^(valvePos|virtTemp|virtHum)$/) { ###########################
     my $valu = $a[2];
@@ -6278,7 +6285,57 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     CUL_HM_PushCmdStack($hash,'++'.$flag.'04'.$id.$dst.$key2);
 
   }
- 
+  elsif($cmd =~ m/tplSet_(.*)/) { #############################################
+    $state = "";
+    my ($tPeer,$tpl,$tTyp) = ($1,$a[2],0);
+    if ($tpl =~ m/^(.*)_(short|long)/){
+      ($tpl,$tTyp)  = ($1,$2);
+    }
+    
+    my %params;
+    if ($HMConfig::culHmTpl{$tpl}{p} ne ""){# template with parameter
+      my $tTypPre  = ($tTyp  eq "short" ? "sh":$tTyp  eq "long" ? "lg":"");
+      my $tPeerPre = ($tPeer eq "0"     ? ""  :$tPeer."-");
+      foreach (keys%{$HMConfig::culHmTpl{$tpl}{reg}}){
+        next if ($HMConfig::culHmTpl{$tpl}{reg}{$_} !~ m/^p([0-9])/);
+        my ($curVal) = split(" ",ReadingsVal($name,"R-$tPeerPre$tTypPre$_",ReadingsVal($name,".R-$tPeerPre$tTypPre$_","whereAreYou")));
+        return "template cannot be set - register default R-$tPeerPre$tTypPre$_  not available. Issue getConfig" 
+               if($curVal eq "whereAreYou");
+        $params{$1} = $curVal;
+        
+      }
+    }
+    $tTyp =   ($tPeer eq "0" ? "" 
+            : ($tTyp  eq "0" ? ":both"
+            :  ":".$tTyp)); 
+            
+    my ($hm) = devspec2array("TYPE=HMinfo");
+    return "no HMinfo defined" if (!defined $defs{$hm});
+
+    my @par =  map{$params{$_}} sort keys%params;
+    my $ret = HMinfo_SetFn($defs{hm},$hm,"templateSet",$name,$tpl,"$tPeer$tTyp",@par);
+    return $ret;
+  }
+  elsif($cmd =~ m/tplPara(..)(.)_.*/) { #####################################
+    $state = "";
+    my ($tNo,$pNo) = ($1,$2);
+    my ($hm) = devspec2array("TYPE=HMinfo");
+    return "no HMinfo defined" if (!defined $defs{$hm});
+    my @tCmd;
+    my @t = sort keys%{$hash->{helper}{tmpl}};
+    
+    my @pv;
+    my($p,$tn);
+    if ($hash->{helper}{tmpl}{$t[$tNo]}){# we have a parameter
+      ($p,$tn) = split(">",$t[$tNo]);
+      @pv = split(" ",$hash->{helper}{tmpl}{$t[$tNo]});
+      $pv[$pNo] = $a[2];
+    }
+
+    my $ret = HMinfo_SetFn($defs{hm},$hm,"templateSet",$name,$tn,$p,@pv);
+    return $ret;
+  }
+
   else{
     return "$cmd not implemented - contact sysop";
   }
@@ -7957,6 +8014,66 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
   }     
   return $convFlg.$data.$unit;
 }
+sub CUL_HMTmplSetCmd($){
+  my $name = shift;
+  return if(not scalar devspec2array("TYPE=HMinfo"));
+  my %a;
+  foreach my $peer(split(",",InternalVal($name,"peerList","")),"0"){
+    my $ps = $peer eq "0" ? "R-" : "R-$peer-";
+    my %b = map { $_ => 1 }map {(my $foo = $_) =~ s/.?$ps//; $foo;} grep/.?$ps/,keys%{$defs{$name}{READINGS}};
+    foreach my $t(keys %HMConfig::culHmTpl){
+      next if (not scalar (keys %{$HMConfig::culHmTpl{$t}{reg}}));
+      my $f = 0;
+      my $typShLg=0;
+      foreach my $r(keys %{$HMConfig::culHmTpl{$t}{reg}}){
+        if(!defined $b{$r} && !defined $b{"sh".$r}){$f = 1;last;}
+        $typShLg = defined $b{"sh".$r} ? 1 : 0;
+      }
+      if($f == 0){
+        if($typShLg){
+          $a{$peer}{$t."_short"} = 1;
+          $a{$peer}{$t."_long"} = 1;
+        }
+        else{
+          $a{$peer}{$t} = 1;
+        }
+      }
+    }
+  }
+  return (scalar keys %a ? " tplSet_".join(" tplSet_",map{"$_:".join(",",sort keys%{$a{$_}})} keys %a)
+                         : "")#no template
+         ;
+}
+sub CUL_HMTmplSetParam($){
+  my $name = shift;
+  return if(not scalar devspec2array("TYPE=HMinfo"));
+  my @tCmd;
+  my $tCnt = 0; # template count
+  foreach my $t(sort keys%{$defs{$name}{helper}{tmpl}}){
+    if ($defs{$name}{helper}{tmpl}{$t}){# we have a parameter
+      my($p,$tn) = split(">",$t);
+      my @pv = split(" ",$defs{$name}{helper}{tmpl}{$t});
+      my $pCnt = 0;     #parameter count
+      $t =~ s/[:>]/_/g; # replace illegal chars for command
+      for my $pm (split(" ",$HMConfig::culHmTpl{$tn}{p})){
+        my $pvi = $pm.":".$pv[$pCnt];# current value
+        my ($reg1) = map{(my $foo = $_) =~ s/:.*//; $foo;}
+                     grep/p$pCnt/,
+                     map{$_.":".$HMConfig::culHmTpl{$tn}{reg}{$_}}
+                     keys%{$HMConfig::culHmTpl{$tn}{reg}}
+                     ;
+                     #c eq "lit"
+        my $literals = "";
+        if($culHmRegDefine->{$reg1}{c} eq "lit"){
+          $literals = ":".join(",",keys%{$culHmRegDefine->{$reg1}{lit}})
+        }
+        push @tCmd,"tplPara".sprintf("%02d%d_",$tCnt,$pCnt++).join("_",$t,$pm).$literals;
+      }
+    }
+    $tCnt++;
+  }
+  return " ".join(" ",@tCmd);
+}    
 
 sub CUL_HM_chgExpLvl($){# update visibility and set internal values for expert 
   my $tHash = shift;
@@ -8185,7 +8302,7 @@ sub CUL_HM_secSince2000() {#####################
   my $t2 = $t + 60*(($l[2]-$g[2] + ((($l[5]<<9)|$l[7]) <=> (($g[5]<<9)|$g[7])) * 24) * 60 + $l[1]-$g[1])
                            # timezone and daylight saving...
         - 946684800        # seconds between 01.01.2000, 00:00 and THE EPOCH (1970)
-        - 7200;            # HM Special
+        - 3600;            # HM Special
   return $t2;
 }
 sub CUL_HM_getChnLvl($){# in: name out: vit or phys level
@@ -8743,7 +8860,6 @@ sub CUL_HM_ActCheck($) {# perform supervision
       delete $actHash->{READINGS}{"status_".$devName};
       next;
     }
-    
     if(!$devName || !defined($attr{$devName}{actCycle})){
       CUL_HM_ActDel($devId);
       next;
@@ -10404,8 +10520,16 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
             <li><B>tempTmplSet   =>"[[ &lt;file&gt; :]templateName]</B><br>
               Set the attribut and apply the change to the device
             </li>
-            <li><B>templateDel   =>" &lt;template&gt; </B><br>
-              Delete templateentry for this entity
+            <li><B>tplDel   =>" &lt;template&gt; </B><br>
+              Delete template entry for this entity
+            </li>
+            <li><B>tplSet_&lt;peer&gt;   =>" &lt;template&gt; </B><br>
+              Set a template for a peer of the entity. Possible parameter will be set to the current register value of the device - i.e. no  change to the register. Parameter may be changed after assigning the template by using the tplPara command.<br>
+              The command is avalilable if HMinfo is defined and a tamplate fitting the combination is available. Note that the register of the device need to be available (see getConfig command).<br>
+              In case of dedicated template for long and short trigger separat commands will be available.
+            </li>
+            <li><B>tplParaxxx_&lt;peer&gt;_&lt;tpl&gt;_&lt;param&gt;   =>" &lt;template&gt; </B><br>
+              A parameter of an assigned template can be modified. A command s available for each parameter of each assigned template. 
             </li>
             <li><B>partyMode &lt;HH:MM&gt;&lt;durationDays&gt;</B><br>
               set control mode to party and device ending time. Add the time it ends
@@ -11845,8 +11969,16 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
             <li><B>tempTmplSet   =>"[[ &lt;file&gt; :]templateName]</B><br>
               Setzt das Attribut und sendet die Änderungen an das Device.
             </li>
-            <li><B>templateDel   =>" &lt;template&gt; </B><br>
-              Löscht eine Templateeintrag an dieser entity.
+            <li><B>tplDel   =>" &lt;template&gt; </B><br>
+              Löscht eine Template Eintrag dieser entity.
+            </li>
+            <li><B>tplSet_&lt;peer&gt;   =>" &lt;template&gt; </B><br>
+              setzt ein Template für einen Peer der Entity. Mögliche Parameter des Templates werde auf den aktuellen Wert der Register gesetzt. Die Parameter können danach mit dem Kommando tplPara* geaendert werden.<br>
+              Das Kommando steht nur zu Verfügung wenn HMinfo definiert ist und ein passendes Template erstellt ist.<br>
+              Sollte das Template dediziert einem langen (long) oder kurzen (short) Trigger zugeordnet werden wird je ein Kommando zu Verfügung gestellt - siehe long oder short am Ende des Kommandos.
+            </li>
+            <li><B>tplParaxxx_&lt;peer&gt;_&lt;tpl&gt;_&lt;param&gt;   =>" &lt;template&gt; </B><br>
+              Ein Parameter eines zugewiesenen Templates kann geaendert werden. Das Kommando bezieht sich auf genau einen Parameter eines Templates. 
             </li>
 
           </ul><br>
