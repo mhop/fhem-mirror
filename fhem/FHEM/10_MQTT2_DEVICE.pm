@@ -511,12 +511,11 @@ MQTT2_DEVICE_nlData($)
 
   # Needed for the image links
   my $dv = ReadingsVal($d, ".devices", ReadingsVal($d, "devices", ""));
-  for my $l (split(/[\r\n]/, $dv)) {
-    next if($l !~ m/ieeeAddr":"([^"]+)".*model":"([^"]+)"/);
-    my $img = $2;
-    $img =~ s,[/: ],-,g; # Forum #91394, supported-devices.js
-    $img{$1} = "$pref$img.jpg";
-  }
+  $dv =~ s@ieeeAddr":"([^"]+)"[^}]+model":"([^"]+)"@
+            my $img = $2;
+            $img =~ s+[/: ]+-+g; # Forum #91394: supported-devices.js
+            $img{$1} = "$pref$img.jpg";
+          @xeg;
 
   # Name translation
   for my $n (devspec2array("TYPE=MQTT2_DEVICE")) {
