@@ -530,6 +530,7 @@ MQTT2_DEVICE_nlData($)
     }
   }
 
+  my $div = ($FW_userAgent =~ m/WebKit/ ? "<br>" : " ");
   my $gv = ReadingsVal($d, ".graphviz", ReadingsVal($d, "graphviz", ""));
   for my $l (split(/[\r\n]/, $gv)) {
 
@@ -555,8 +556,8 @@ MQTT2_DEVICE_nlData($)
         $h{$n}{class}="zwBox";
       }
 
-      $v =~ s/[{}]//;
-      $v =~ s/\|/<br>/g;
+      $v =~ s/[{}]//g;
+      $v =~ s/\|/$div/g;
       $h{$n}{txt} = $nv;
 
       $h{$n}{title} = $v;
@@ -564,8 +565,9 @@ MQTT2_DEVICE_nlData($)
       my @a;
       $h{$n}{neighbors} = \@a;
 
-    } elsif($l =~ m/^\s*"([^"]+)"\s*->\s*"([^"]+)"/) {
+    } elsif($l =~ m/^\s*"([^"]+)"\s*->\s*"([^"]+)"\s\[label="([^"]*)"/) {
       push @{$h{$1}{neighbors}}, $2;
+      $h{$1}{title} .= "${div}lqi:$3";
     }
   }
 

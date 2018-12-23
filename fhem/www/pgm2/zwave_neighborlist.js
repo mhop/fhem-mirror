@@ -147,6 +147,9 @@ zw_draw(fnRet, width, height)
     }
     zw_adjustLines(h, o.name);
   });
+  $("svg.zw_nr g text").click(function(){
+    location.href = FW_root+"?detail="+$(this).text();
+  });
 }
 
 function
