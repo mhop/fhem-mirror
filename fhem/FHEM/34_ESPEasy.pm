@@ -37,7 +37,7 @@ use HttpUtils;
 use Color;
 use SetExtensions;
 
-my $module_version      = "2.1";     # Version of this module
+my $module_version      = "2.11";     # Version of this module
 
 # ------------------------------------------------------------------------------
 # modul version and required ESP Easy firmware / JSON lib version
@@ -573,7 +573,7 @@ sub ESPEasy_Define($$)  # only called when defined, not on reload.
       use constant HAS_AF_INET6 => defined eval { Socket::AF_INET6() };
       Log3 $name, 2, "$type $name: WARNING: Your system seems to have no IPv6 support." if !HAS_AF_INET6;
     }
-    $hash->{MODEL} = 'Bridge v'.$module_version;
+#    $hash->{MODEL} = 'Bridge v'.$module_version;
   }
 
   #--- DEVICE -------------------------------------------------
@@ -1807,7 +1807,7 @@ sub ESPEasy_dispatchParse($$$) # called by logical device (defined by
     if (defined $hash->{ESP_BUILD}) {
       my $model = defined $hash->{ESP_NODE_TYPE_ID} ? $hash->{ESP_NODE_TYPE_ID} . " - Build " : "ESP Easy - Build ";
       $model .= $hash->{ESP_BUILD};
-      $hash->{MODEL} = $model;
+#      $hash->{MODEL} = $model;
 #      readingsBulkUpdate($hash, "model", $model, 0);
     }
 
