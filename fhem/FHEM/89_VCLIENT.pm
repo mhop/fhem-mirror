@@ -50,6 +50,7 @@
 #
 # Version History
 #
+# 2018-12-24 version 0.2.11g: minor bugfix, more comments with verbose 5
 # 2018-12-08 version 0.2.11f: Integritaetscheck der Rueckgabewerte, Bugs entfernt, Rueckgabe Datum moeglich, offizielles FHEM-Modul
 # 2018-09-14 version 0.2.10: Fehler, wenn vcontrold nicht erreichbar, behoben
 # 2018-03-14 version 0.2.9: Fehler beim senden von mehreren set-Kommandos behoben
@@ -70,7 +71,7 @@ use Scalar::Util qw(looks_like_number);
 use Blocking;
 use Data::Dumper;
 
-my $VCLIENT_version = "0.2.11f";
+my $VCLIENT_version = "0.2.11g";
 my $internal_update_interval  = 0.1; #internal update interval for Write (time between two different write_to_Viessmann commands)
 my $daily_commands_last_day_with_execution = strftime('%d', localtime)-1; #last day when daily commands (commands with type 'daily' ) were executed; set to today
 
@@ -262,7 +263,7 @@ sub VCLIENT_Get($@)
   my $name = $a[0];
 
   if(@a < 2) {
-	my $msg = "@a: get needs at least one parameter";
+	my $msg = "@a: get needs at least one parameter, aborting";
 	Log3 $name, 1, $name.": ".$msg;
     return $msg;
   }
@@ -434,7 +435,7 @@ sub VCLIENT_ParseBuf_And_WriteReading($$){
 		}
 		Log3 $name, 3,  $name.": Received ".$value." for ".$reading;
    	}
-	if (VCLIENT_integrity_check($value))
+	if (($value eq "OK") or VCLIENT_integrity_check($value))
 	{
 		readingsSingleUpdate($hash, $reading, $value, 1);	
 	}
@@ -487,7 +488,7 @@ sub VCLIENT_Read_Config($)
   my $filename = $hash->{FILE};
   my $no_lines = 0;
   
-  Log3 $name, 5, "$name: opening command file $filename";
+  Log3 $name, 5, "$name: opening cfg-command file $filename";
   open(CMDDATEI,"<$filename") || die "VCLIENT: problem opening $filename\n" ; #darf hier eigentlich nicht passieren
   
   %get_hash = (); 
@@ -501,7 +502,7 @@ sub VCLIENT_Read_Config($)
         my $zeile=trim($_);
         if ( length($zeile) > 0 && substr($zeile,0,1) ne "#")
         {
-	       Log3 $name, 5, "$name: reading command line $zeile";
+	       Log3 $name, 5, "$name: reading cfg-command line $zeile";
            my @cfgarray = split(" ",$zeile);
            foreach(@cfgarray) {
               $_ = trim($_);
@@ -511,7 +512,7 @@ sub VCLIENT_Read_Config($)
 		   my $readingname = "";
 
 		   if (scalar(@cfgarray) < 2){
- 	        	Log3 $name, 1, $name.": every nonempty line in the command file (if it does not have a leading #) must at least contain two words. Line no. $no_lines does not and will be ignored"; 
+ 	        	Log3 $name, 1, $name.": every nonempty line in the cfg-command file (if it does not have a leading #) must at least contain two words. Line no. $no_lines does not and will be ignored"; 
 		   } else {
 		       $vcontrold_command = $cfgarray[0];
 			   $readingname = $cfgarray[1];
@@ -525,14 +526,20 @@ sub VCLIENT_Read_Config($)
 		   if (substr($vcontrold_command, 0, 3) eq "get"){
 				if (scalar(@cfgarray) >= 3) {
 					if ($cfgarray[2] eq "manually"){
-						$get_manually_hash{$vcontrold_command}=$readingname; #timer command will receive several lines, must be handled differently			
+						#timer command will receive several lines, must be handled differently			
+						$get_manually_hash{$vcontrold_command}=$readingname; 
+						Log3 $name, 5, $name.": manual get-command ".$vcontrold_command." with reading ".$readingname. " added";
 					} elsif ($cfgarray[2] eq "daily"){
-						$get_daily_hash{$vcontrold_command}=$readingname; #daily commands that will be executed only once a day			
+						#daily commands that will be executed only once a day			
+						$get_daily_hash{$vcontrold_command}=$readingname; 
+						Log3 $name, 5, $name.": daily get-command ".$vcontrold_command." with reading ".$readingname. " added";
 					} else {
-			 	        Log3 $name, 1, $name.": command type string ".$cfgarray[2]." in file ".$filename." not recognized. Must be either 'daily' or 'manually'. Command $vcontrold_command will be ignored."; 
+			 	        Log3 $name, 1, $name.": command type string ".$cfgarray[2]." in cfg-file ".$filename." not recognized. Must be either 'daily' or 'manually'. Command $vcontrold_command will be ignored."; 
 					}
 				} else {
-					$get_hash{$vcontrold_command}=$readingname; #get command will read a simple number (like 14 degree Celsius)
+					#get command will read a simple number (like 14 degree Celsius)
+					$get_hash{$vcontrold_command}=$readingname; 
+					Log3 $name, 5, $name.": get-command ".$vcontrold_command." with reading ".$readingname. " as '".$vcontrold_command."' added";
 				}
 			########################################################
 	 		# jetzt kommen die vcontrold-set-Kommandos, mit denen die Heizung gesteuert werden kann,
@@ -546,7 +553,7 @@ sub VCLIENT_Read_Config($)
 		} elsif (substr($vcontrold_command, 0, 3) eq "set") {
 				# typischer Eintrag in der cfg: setTempRaumRedSollM2 RaumsollWohnzReduz 22,21
 				if (scalar(@cfgarray) < 3) {
-		 	        Log3 $name, 1, $name.": command type string ".$vcontrold_command." in file ".$filename." must have three entries (<vcontrold-command> <FHEM-set command> <values>). Command $vcontrold_command will be ignored."; 
+		 	        Log3 $name, 1, $name.": command type string ".$vcontrold_command." in cfg-file ".$filename." must have three entries (<vcontrold-command> <FHEM-set command> <values>). Command $vcontrold_command will be ignored."; 
 				} else {
 					# Achtung: Abweichendes Handling fuer timer-Befehle noetig - dort werden spaeter die Argumente naemlich nicht
 					# aus der Webmaske FHEMWEB geholt, sondern muessen bereits in der cfg-Datei stehen, bei allen anderen
@@ -572,18 +579,19 @@ sub VCLIENT_Read_Config($)
 					if ($msg eq ""){
 						# %set_hash ist ein HashOfArray mit $FHEM_set_command => [$vcontrold_command,$options]
 						$set_hash{$FHEM_set_command} = [$vcontrold_command, $options] ;
+						Log3 $name, 5, $name.": set-command ".$vcontrold_command." with options '".$options."' as '".$FHEM_set_command."' added";
 					} else {
-			 	        Log3 $name, 1, $name.": command type string ".$vcontrold_command." in file ".$filename." does not contain valid format: ".$msg." Entry will be ignored."; 
+			 	        Log3 $name, 1, $name.": command type string ".$vcontrold_command." in cfg-file ".$filename." does not contain valid format: '".$msg."' Entry will be ignored."; 
 					}
 				}
 			} else {
-	 	        Log3 $name, 1, $name.": command string ".$vcontrold_command." in file ".$filename." not recognized. Must be either 'getXXXX' or 'setXXX' with additional arg = 'timer' or 'daily'. This command string will be ignored."; 
+	 	        Log3 $name, 1, $name.": command string ".$vcontrold_command." in cfg-file ".$filename." not recognized. Must be either 'getXXXX' or 'setXXX' with additional arg = 'timer' or 'daily'. This command string will be ignored."; 
 			}
         }
   };
 
   close (CMDDATEI);
-  Log3 $name, 5, "$name: command file '$filename' closed ($no_lines lines read)";
+  Log3 $name, 5, "$name: cfg-command file '$filename' closed ($no_lines lines read)";
   return undef;
 }
 
@@ -596,6 +604,7 @@ sub VCLIENT_Set($@)
 {
   my ($hash, @a) = @_;
   my $name = $hash->{NAME};
+  Log3 $name, 5, "$name: try to execute set command @a";
 
   if(@a < 2) {
 	my $msg = "@a: set needs at least one parameter";
@@ -606,18 +615,17 @@ sub VCLIENT_Set($@)
   #Hier steht jetzt der set-Befehl und, wenn es kein timer ist, das argument ($a[0] enthaelt $name)
   my $cmd = $a[1];
   
-  my $arg = 0;
+  my $arg = "";
   if (@a > 2){
   	$arg = $a[2];
   }
 
   #wenn nur die cfg-Datei neu geladen werden soll:
   if($cmd eq "reload_command_file") {
-	if(@a<3){
+	if (($arg eq "") and ($hash->{FILE} ne "")){
 		my $msg = $name.": filename empty, reloading the default file: ".$hash->{FILE};
 		Log3 $name, 1, $msg;  	
 		$arg = $hash->{FILE};
-		#return $msg;
 	} 	
 	if (!(-f $arg)) {
 		my $msg = $name.": file ".$arg." not found, aborting reloading";
@@ -626,23 +634,22 @@ sub VCLIENT_Set($@)
 	} 
 	$hash->{FILE}  = $arg;  	
 	VCLIENT_Read_Config($hash);
-	Log3 $name, 5, "$name: execute set command @a";  	
 	return undef;
   }
 
   #wenn kein reload, dann muss hier ein vcontrold-Kommando aus der cfg-Datei stehen:
-  #set_hash war so aufgebaut: $set_hash{$FHEM_set_command} = [$vcontrold_command, $options] ;  
+  #set_hash ist so aufgebaut: $set_hash{$FHEM_set_command} = [$vcontrold_command, $options] ;  
   my $vcontrold = $set_hash{$cmd}[0];
   #zuerst schauen, ob $cmd in set_hash zu finden ist
   if($vcontrold) {
-	  #Wenn es sich bei dem vcontrold-Kommando um einen
-	  #timer handelt, muss das Argument angepasst werden, weil das ja in FHEM
-	  #gerade nicht uebergeben wurde (Temperaturen dagegen wurden uebergeben!)
+	  #Es gab zwei Arten von vcontrold-Kommandos. Einmal gab es ein Argument wie die
+	  #Temperatur. Dort ist $arg nicht leer. Bei timern dagegen wurden aus der Webseite keine
+	  #Argumente uebergeben, sondern die muessen aus dem Hash geholt werden. Das geschieht nun.
 	  # Details zu den Hash siehe VCLIENT_Read_Config($)
-	  if ( ($arg eq "0") && ($arg != 0) ) {
+	  if ($arg eq "") {
 		  	$arg = $set_hash{$cmd}[1]; #Argument holen und fuer vcontrold umwandeln 
-			while ($arg =~ m/0(\d:\d\d)/){		#Uhrzeiten vor 10:00 muessen die fuehrende Null entfernt bekommen, 
-				$arg =~ s/0(\d:\d\d)/$1/; #(Fehler in vcontrold, habe ich durch Zufall entdeckt) 
+			while ($arg =~ m/0(\d:\d\d)/){	#Uhrzeiten vor 10:00 muessen die fuehrende Null entfernt bekommen, 
+				$arg =~ s/0(\d:\d\d)/$1/; 	#(Fehler in vcontrold, habe ich durch Zufall entdeckt) 
 			}
 			$arg =~ s/[-\|]/ /g; 			# Zeitabstandszeichen - und senkrechten Strich | durch Leerzeichen ersetzen 
 	  }
