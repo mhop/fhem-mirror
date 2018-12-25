@@ -184,6 +184,7 @@ harmony_Define($$)
     my $password = harmony_encrypt($a[3]);
 
     $hash->{DEF} = "$username $password $ip";
+    $hash->{DEF} .= " remoteId=$param_h->{remoteId}" if( $param_h->{remoteId} );
 
     $hash->{helper}{username} = $username;
     $hash->{helper}{password} = $password;
@@ -194,7 +195,6 @@ harmony_Define($$)
 
   $hash->{NAME} = $name;
 
-  #$hash->{remoteId} = '6779631';
   $hash->{remoteId} = $param_h->{remoteId};
 
   $hash->{STATE} = "Initialized";
