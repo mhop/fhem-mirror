@@ -6560,7 +6560,7 @@ sub MSwitch_checkcondition($$$) {
         my $lastpart   = $3;
         my $exec       = "\$field = " . $2;
 
-        # MSwitch_LOG( $name, 0,"$name:   secondpart  -> " .$secondpart );
+         #MSwitch_LOG( $name, 0,"$name:   secondpart  -> " .$secondpart );
 
         if ( $secondpart =~ m/(!\$.*|\$.*)/ ) {
 
@@ -6572,7 +6572,7 @@ sub MSwitch_checkcondition($$$) {
         }
 
         #MSwitch_LOG( $name, 0,"$name:   exec  -> " .$exec );
-
+        # MSwitch_LOG( $name, 0,"$name:   field  -> " .$field );
         #
 
         #if ($field eq "!\$we" || $field eq "\$we"  )
@@ -6590,7 +6590,7 @@ sub MSwitch_checkcondition($$$) {
         last if $x > 10;    #notausstieg
     }
 
-    #MSwitch_LOG( $name, 0,"$name:   searchstring erreicht  -> " .$condition );
+ #   MSwitch_LOG( $name, 0,"$name:   searchstring erreicht  -> " .$condition );
 
     if ( $attrrandomnumber ne '' ) {
         MSwitch_Createnumber($hash);
@@ -6931,64 +6931,103 @@ sub MSwitch_Checkcond_time($$) {
     ############ timecondition 1
     my $timecondtest;
     my $timecond1;
-
-    #MSwitch_LOG( $name, 0, "$name: hour1-> " . $hour1 );
-    #MSwitch_LOG( $name, 0, "$name: hour2-> " . $hour2 );
+    my $timecond2;
+	
+   # MSwitch_LOG( $name, 0, "$name: hour1-> " . $hour1 );
+   # MSwitch_LOG( $name, 0, "$name: hour2-> " . $hour2 );
+	#MSwitch_LOG( $name, 0, "$name: akthour-> " . $akthour );
 
     #my $time1;
     my ( $tday, $tmonth, $tdate, $tn );   #my ($tday,$tmonth,$tdate,$tn,$time1);
-    if ( ( $akthour < $hour1 && $akthour <= $hour2 ) && $hour2 < $hour1 )   # und
-    {
-        use constant SECONDS_PER_DAY => 60 * 60 * 24;
-        $timecondtest = localtime( time - SECONDS_PER_DAY );
+	
+	
+	$timecondtest = localtime;
         $timecondtest =~ s/\s+/ /g;
         ( $tday, $tmonth, $tdate, $tn, $time1 ) = split( / /, $timecondtest );
         $timecond1 = timelocal( '00', $min1, $hour1, $tdate, $tmonth, $time1 );
-        $adday = 1;
-    }
-    else {
-        $timecondtest = localtime;
-        $timecondtest =~ s/\s+/ /g;
-        ( $tday, $tmonth, $tdate, $tn, $time1 ) = split( / /, $timecondtest );
-        $timecond1 = timelocal( '00', $min1, $hour1, $tdate, $tmonth, $time1 );
-    }
-
+	    $timecond2 = timelocal( '00', $min2, $hour2, $tdate, $tmonth, $time1 );
+	    my $timeaktuell =timelocal( '00', $aktmin, $akthour, $date, $month, $time1 );
+	
+	#MSwitch_LOG( $name, 0, "$name: timecond1-> " . $timecond1 );
+    #MSwitch_LOG( $name, 0, "$name: timecond2-> " . $timecond2 );
+	#MSwitch_LOG( $name, 0, "$name: timeaktuell-> " . $timeaktuell );
+	
+	### new
+	if (  $timeaktuell < $timecond2 && $timecond2 < $timecond1 )
+	{
+	use constant SECONDS_PER_DAY => 60 * 60 * 24;
+	$timecond1 = $timecond1 - SECONDS_PER_DAY;
+	$adday = 1
+	}
+	
+	
+######## old
+   # if ( ( $akthour < $hour1 && $akthour <= $hour2 ) && $hour2 < $hour1 )   # und
+   # {
+   #     use constant SECONDS_PER_DAY => 60 * 60 * 24;
+   #     $timecondtest = localtime( time - SECONDS_PER_DAY );
+   #     $timecondtest =~ s/\s+/ /g;
+   #     ( $tday, $tmonth, $tdate, $tn, $time1 ) = split( / /, $timecondtest );
+   #     $timecond1 = timelocal( '00', $min1, $hour1, $tdate, $tmonth, $time1 );
+   #     $adday = 1;
+   # }
+   # else {
+       # $timecondtest = localtime;
+       # $timecondtest =~ s/\s+/ /g;
+       # ( $tday, $tmonth, $tdate, $tn, $time1 ) = split( / /, $timecondtest );
+       # $timecond1 = timelocal( '00', $min1, $hour1, $tdate, $tmonth, $time1 );
+	
+   # }
+  ##################
+	
+	
     ############# timecondition 2
-    my $timecond2;
-    $timecondtest = localtime;
-    if ( $hour2 < $hour1 ) {
-        if ( $akthour < $hour1 && $akthour < $hour2 ) {
-            $timecondtest = localtime;
-            $timecondtest =~ s/\s+/ /g;
-            ( $tday, $tmonth, $tdate, $tn, $time1 ) =
-              split( / /, $timecondtest );
-            $timecond2 =
-              timelocal( '00', $min2, $hour2, $tdate, $tmonth, $time1 );
-        }
-        else {
-            use constant SECONDS_PER_DAY => 60 * 60 * 24;
-            $timecondtest = localtime( time + SECONDS_PER_DAY );
-            $timecondtest =~ s/\s+/ /g;
-            my ( $tday, $tmonth, $tdate, $tn, $time1 ) =
-              split( / /, $timecondtest );
-            $timecond2 =
-              timelocal( '00', $min2, $hour2, $tdate, $tmonth, $time1 );
-            $adday = 1;
-        }
-    }
-    else {
-        $timecondtest = localtime;
-        $timecondtest =~ s/\s+/ /g;
-        ( $tday, $tmonth, $tdate, $tn, $time1 ) = split( / /, $timecondtest );
-        $timecond2 = timelocal( '00', $min2, $hour2, $tdate, $tmonth, $time1 );
-    }
-    my $timeaktuell =
-      timelocal( '00', $aktmin, $akthour, $date, $month, $time1 );
+    # my $timecond2;
+    # $timecondtest = localtime;
+    # if ( $hour2 < $hour1 ) {
+        # if ( $akthour < $hour1 && $akthour < $hour2 ) {
+            # $timecondtest = localtime;
+            # $timecondtest =~ s/\s+/ /g;
+            # ( $tday, $tmonth, $tdate, $tn, $time1 ) =
+              # split( / /, $timecondtest );
+            # $timecond2 =
+              # timelocal( '00', $min2, $hour2, $tdate, $tmonth, $time1 );
+        # }
+        # else {
+            # use constant SECONDS_PER_DAY => 60 * 60 * 24;
+            # $timecondtest = localtime( time + SECONDS_PER_DAY );
+            # $timecondtest =~ s/\s+/ /g;
+            # my ( $tday, $tmonth, $tdate, $tn, $time1 ) =
+              # split( / /, $timecondtest );
+            # $timecond2 =
+              # timelocal( '00', $min2, $hour2, $tdate, $tmonth, $time1 );
+            # $adday = 1;
+        # }
+    # }
+    # else {
+        # $timecondtest = localtime;
+        # $timecondtest =~ s/\s+/ /g;
+        # ( $tday, $tmonth, $tdate, $tn, $time1 ) = split( / /, $timecondtest );
+        # $timecond2 = timelocal( '00', $min2, $hour2, $tdate, $tmonth, $time1 );
+    # }
+	
+	
+	
+   # my $timeaktuell =
+   #   timelocal( '00', $aktmin, $akthour, $date, $month, $time1 );
+	  
+	  
+	  
+	  
+	  
     my $return = "($timecond1 < $timeaktuell && $timeaktuell < $timecond2)";
     if ( $days ne '' ) {
         $daycondition = MSwitch_Checkcond_day( $days, $name, $adday, $day );
         $return = "($return $daycondition)";
     }
+	
+	#MSwitch_LOG( $name, 0, "$name: return-> " . $return);
+	
     return $return;
 }
 ####################
