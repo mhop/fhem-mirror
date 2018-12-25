@@ -6580,7 +6580,7 @@ sub MSwitch_checkcondition($$$) {
         if ( $field =~ m/([0-9]{2}):([0-9]{2}):([0-9]{2})/ ) {
             my $hh = $1;
             if ( $hh > 23 ) { $hh = $hh - 24 }
-            if ( $hh < 10 ) { $hh = "0" . $hh }
+            #if ( $hh < 10 ) { $hh = "0" . $hh }
             $field = $hh . ":" . $2;
         }
 
@@ -6937,7 +6937,7 @@ sub MSwitch_Checkcond_time($$) {
 
     #my $time1;
     my ( $tday, $tmonth, $tdate, $tn );   #my ($tday,$tmonth,$tdate,$tn,$time1);
-    if ( ( $akthour < $hour1 && $akthour < $hour2 ) && $hour2 < $hour1 )   # und
+    if ( ( $akthour < $hour1 && $akthour <= $hour2 ) && $hour2 < $hour1 )   # und
     {
         use constant SECONDS_PER_DAY => 60 * 60 * 24;
         $timecondtest = localtime( time - SECONDS_PER_DAY );
