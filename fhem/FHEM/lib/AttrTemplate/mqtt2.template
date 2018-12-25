@@ -154,6 +154,7 @@ attr DEVICE readingList \
   tele/DEVNAME/INFO.:.* { json2nameValue($EVENT) }\
   stat/DEVNAME/RESULT:.* { json2nameValue($EVENT) }
 deletereading DEVICE .*
+attr DEVICE setStateList on off toggle
 attr DEVICE autocreate 0
 attr DEVICE model A_01a_tasmota_basic_state_power1
 
@@ -253,22 +254,24 @@ attr DEVICE model A_02_tasmota_2channel_split
 # tasmota 4ch as one FHEM device.
 name:A_04b_tasmota_4ch_unified_icon
 filter:TYPE=MQTT2_DEVICE
-desc:Configures a single device including all readings
+desc:Configures a single device including all readings <br>NOTE: Clicking on icons will issue a corresponding toggle command
 set DEVICE attrTemplate A_01a_tasmota_basic_state_power1
 par:DEVNAME;ESP's name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,tele/([^/]*)/, ? $1 : undef }
 attr DEVICE setList \
-  p1:on,off cmnd/DEVNAME/POWER1 $EVTPART1\
-  p2:on,off  cmnd/DEVNAME/POWER2 $EVTPART1\
-  p3:on,off  cmnd/DEVNAME/POWER3 $EVTPART1\
-  p4:on,off  cmnd/DEVNAME/POWER4 $EVTPART1
-attr DEVICE webCmd p1 on:p1 off:p2 on:p2 off:p3 on:p3 off:p4 on:p4 off
+  p1:on,off,toggle cmnd/DEVNAME/POWER1 $EVTPART1\
+  p2:on,off,toggle cmnd/DEVNAME/POWER2 $EVTPART1\
+  p3:on,off,toggle cmnd/DEVNAME/POWER3 $EVTPART1\
+  p4:on,off,toggle cmnd/DEVNAME/POWER4 $EVTPART1
 attr DEVICE stateFormat {\
-  "<div>P1:" . FW_makeImage(lc ReadingsVal($name, "POWER1", "off"))\
-  . " P2:" . FW_makeImage(lc ReadingsVal($name, "POWER2", "off"))\
-  . " P3:". FW_makeImage(lc ReadingsVal($name, "POWER3", "off"))\
-  . " P4:" . FW_makeImage(lc ReadingsVal($name, "POWER4", "off"))\
-  . "</div>"\
-  }
+	"<div><a href=\"/fhem?cmd.dummy=set ".$name." p1 toggle&XHR=1\">POWER1:"\
+	. FW_makeImage(lc ReadingsVal($name, "POWER1", "off"))\
+	. "</a> <a href=\"/fhem?cmd.dummy=set ".$name." p2 toggle&XHR=1\">POWER2:"\
+	. FW_makeImage(lc ReadingsVal($name, "POWER2", "off")) . "</a></div>"\
+	. "</a> <a href=\"/fhem?cmd.dummy=set ".$name." p3 toggle&XHR=1\">POWER3:"\
+	. FW_makeImage(lc ReadingsVal($name, "POWER3", "off")) . "</a></div>"\
+	. "</a> <a href=\"/fhem?cmd.dummy=set ".$name." p4 toggle&XHR=1\">POWER4:"\
+	. FW_makeImage(lc ReadingsVal($name, "POWER4", "off")) . "</a></div>"\
+	}
 attr DEVICE model A_04b_tasmota_4ch_unified_icon
 
 # tasmota 4ch as one FHEM device.
