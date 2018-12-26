@@ -262,7 +262,7 @@ attr DEVICE setList \
   p2:on,off,toggle cmnd/DEVNAME/POWER2 $EVTPART1\
   p3:on,off,toggle cmnd/DEVNAME/POWER3 $EVTPART1\
   p4:on,off,toggle cmnd/DEVNAME/POWER4 $EVTPART1
-attr DEVICE stateFormat {\
+attr DEVICE devStateIcon {\
 	"<div><a href=\"/fhem?cmd.dummy=set ".$name." p1 toggle&XHR=1\">POWER1:"\
 	. FW_makeImage(lc ReadingsVal($name, "POWER1", "off"))\
 	. "</a> <a href=\"/fhem?cmd.dummy=set ".$name." p2 toggle&XHR=1\">POWER2:"\
@@ -272,6 +272,7 @@ attr DEVICE stateFormat {\
 	. "</a> <a href=\"/fhem?cmd.dummy=set ".$name." p4 toggle&XHR=1\">POWER4:"\
 	. FW_makeImage(lc ReadingsVal($name, "POWER4", "off")) . "</a></div>"\
 	}
+attr DEVICE webCmd :
 attr DEVICE model A_04b_tasmota_4ch_unified_icon
 
 # tasmota 4ch as one FHEM device.
