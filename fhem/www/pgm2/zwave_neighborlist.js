@@ -104,7 +104,7 @@ zw_draw(fnRet, width, height)
 
   svg += '</svg>';
 
-  var ox, oy, o;
+  var ox, oy, o, dragged;
   $("#ZWDongleNrSVG")
     .css({width:width, height:height})
     .html(svg);
@@ -134,8 +134,10 @@ zw_draw(fnRet, width, height)
   .bind('mousedown', function(e) {
     o = h[$(e.target).parent().attr("data-name")];
     ox = o.x; oy = o.y;
+    dragged = false;
   })
   .bind('drag', function(e, ui) {
+    dragged = true;
     var p = ui.position, op = ui.originalPosition;
     o.x = ox + (p.left-op.left);
     o.y = oy + (p.top -op.top);
@@ -148,7 +150,8 @@ zw_draw(fnRet, width, height)
     zw_adjustLines(h, o.name);
   });
   $("svg.zw_nr g text").click(function(){
-    location.href = FW_root+"?detail="+$(this).text();
+    if(!dragged)
+      location.href = FW_root+"?detail="+$(this).text();
   });
 }
 
