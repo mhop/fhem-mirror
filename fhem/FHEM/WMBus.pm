@@ -1453,12 +1453,14 @@ sub decrypt($) {
   for (1..8) {
     $initVector .= pack('C',$self->{access_no});
   }
+  
   if (length($encrypted)%16 == 0) {
     # no padding if data length is multiple of blocksize
     $padding = 0;
   } else {
     $padding = 2;
   }
+  #printf("length encrypted %d padding %d\n", length($encrypted), $padding);
   my $cipher = Crypt::Mode::CBC->new('AES', $padding);
   return $cipher->decrypt($encrypted, $self->{aeskey}, $initVector);
 }
@@ -1827,8 +1829,18 @@ sub decodeApplicationLayer($) {
 
     if ($self->{aeskey}) { 
       if ($hasCBC) {
-        #printf("encrypted payload %s\n", unpack("H*", substr($applicationlayer,$offset)));
-        $payload = $self->decrypt(substr($applicationlayer,$offset));
+        my $encrypted_length = $self->{cw_parts}{encrypted_blocks} * 16;
+        #printf("encrypted payload %s\n", unpack("H*", substr($applicationlayer,$offset, $encrypted_length)));
+        eval {
+          $payload = $self->decrypt(substr($applicationlayer, $offset, $encrypted_length)) 
+            . substr($applicationlayer, $offset+$encrypted_length);
+        };
+        if ($@) {
+          #fatal decryption error occurred
+          $self->{errormsg} = "fatal decryption error: $@";
+          $self->{errorcode} = ERR_DECRYPTION_FAILED;
+          return 0;
+        }
         #printf("decrypted payload %s\n", unpack("H*", $payload));
         if (unpack('n', $payload) == 0x2f2f) {
           $self->{decrypted} = 1;
