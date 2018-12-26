@@ -151,7 +151,7 @@ zw_draw(fnRet, width, height)
   });
   $("svg.zw_nr g text").click(function(){
     if(!dragged)
-      location.href = FW_root+"?detail="+$(this).text();
+      window.open(FW_root+"?detail="+$(this).text(), '_blank');
   });
 }
 
