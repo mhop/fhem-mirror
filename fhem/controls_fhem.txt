@@ -1,4 +1,4 @@
-REV 18049
+REV 18053
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -220,7 +220,7 @@ UPD 2015-07-28_14:05:31 31303 FHEM/37_SHCdev.pm
 UPD 2018-07-10_07:45:14 56428 FHEM/37_Spotify.pm
 UPD 2017-01-02_07:45:02 7617 FHEM/37_dash_dhcp.pm
 UPD 2018-03-12_07:45:04 22167 FHEM/37_fakeRoku.pm
-UPD 2018-12-23_07:45:02 75453 FHEM/37_harmony.pm
+UPD 2018-12-26_07:45:02 75500 FHEM/37_harmony.pm
 UPD 2017-07-01_07:45:02 152744 FHEM/37_plex.pm
 UPD 2017-12-10_07:45:03 31453 FHEM/38_Broadlink.pm
 UPD 2017-05-31_07:45:02 28640 FHEM/38_CO20.pm
@@ -466,7 +466,7 @@ UPD 2016-04-26_07:45:11 33223 FHEM/98_HourCounter.pm
 UPD 2017-12-02_07:45:02 66644 FHEM/98_Hyperion.pm
 UPD 2017-01-04_07:45:02 21573 FHEM/98_IF.pm
 UPD 2018-08-31_07:45:03 4884 FHEM/98_JsonList2.pm
-UPD 2018-12-25_07:45:02 313181 FHEM/98_MSwitch.pm
+UPD 2018-12-26_07:45:02 314293 FHEM/98_MSwitch.pm
 UPD 2016-03-12_07:45:14 49251 FHEM/98_MaxScanner.pm
 UPD 2018-12-13_07:45:03 34556 FHEM/98_MediaList.pm
 UPD 2018-12-03_07:45:02 225671 FHEM/98_Modbus.pm
@@ -598,7 +598,7 @@ UPD 2017-09-10_16:01:38 405 FHEM/holiday/st.holiday
 UPD 2017-09-10_16:01:38 392 FHEM/holiday/th.holiday
 UPD 2018-11-16_07:45:03 333089 FHEM/lib/74_AMADautomagicFlowset_4.2.4.xml
 UPD 2018-11-16_07:45:03 440509 FHEM/lib/74_AMADtaskerset_4.2.4.prj.xml
-UPD 2018-12-25_07:45:02 26562 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2018-12-26_07:45:02 26920 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
 UPD 2018-01-13_07:45:02 21899 FHEM/lib/Device/Firmata/Constants.pm
@@ -696,8 +696,8 @@ UPD 2018-12-24_07:45:05 3762860 docs/commandref.html
 UPD 2018-12-24_07:45:07 2300410 docs/commandref_DE.html
 UPD 2018-11-17_23:59:05 76550 docs/commandref_frame.html
 UPD 2018-11-17_23:59:05 86019 docs/commandref_frame_DE.html
-UPD 2018-12-25_07:45:09 202879 docs/commandref_modular.html
-UPD 2018-12-25_07:45:10 213627 docs/commandref_modular_DE.html
+UPD 2018-12-26_07:45:08 202879 docs/commandref_modular.html
+UPD 2018-12-26_07:45:09 213627 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
