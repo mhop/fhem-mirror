@@ -38,7 +38,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "1.6";
+my $version = "1.7";
 
 #-- these we may get on request
 my %gets = (
@@ -64,14 +64,14 @@ my %setsrol = (
   "stop:noArg"    => "S",
   "config"        => "K",
   "password"      => "W",
-  "pct:slider,0,1,100"           => "P" 
+  "pct:slider,0,1,100"  => "P",
+  "zero:noArg"    => "Z"
 ); 
 
 my %shelly_models = (
     #(relays,rollers,meters)
     "shelly1" => [1,0,0,],
     "shelly2" => [2,1,1],
-    "shelly2beta" => [2,1,1],
     "shellyplug" => [1,0,1],
     "shelly4" => [4,0,4]
     );
@@ -198,6 +198,8 @@ sub Shelly_Attr(@) {
   
   #---------------------------------------  
   if ( ($cmd eq "set") && ($attrName =~ /model/) ) {
+    Log 1,"[Shelly_Attr] =====> Attribute model=shelly2beta deprecated, please replace by model=shelly2"
+      if( $model eq "shelly2beta" );
     my $regex = "((".join(")|(",(keys %shelly_models))."))";
     if( $attrVal !~ /$regex/){
       Log3 $name,1,"[Shelly_Attr] wrong value of model attribute, see documentation for possible values";
@@ -229,7 +231,7 @@ sub Shelly_Attr(@) {
   #---------------------------------------  
   }elsif ( ($cmd eq "set") && ($attrName =~ /mode/) ) {
     if( $model !~ /shelly2.*/ ){
-      Log3 $name,1,"[Shelly_Attr] setting the mode attribute only works for model=shelly2[xxx]";
+      Log3 $name,1,"[Shelly_Attr] setting the mode attribute only works for model=shelly2";
       return
     }
     if( $attrVal !~ /((relay)|(roller))/){
@@ -249,7 +251,7 @@ sub Shelly_Attr(@) {
   #---------------------------------------  
   }elsif ( ($cmd eq "set") && ($attrName eq "maxtime") ) {
     if( ($model !~ /shelly2.*/) || ($mode ne "roller" ) ){
-      Log3 $name,1,"[Shelly_Attr] setting the maxtime attribute only works for model=shelly2[xxx] and mode=roller";
+      Log3 $name,1,"[Shelly_Attr] setting the maxtime attribute only works for model=shelly2 and mode=roller";
       return
     }
     Shelly_configure($hash,"settings?maxtime=".$attrVal);
@@ -257,7 +259,7 @@ sub Shelly_Attr(@) {
   #---------------------------------------  
   }elsif ( ($cmd eq "set") && ($attrName eq "pct100") ) {
     if( ($model !~ /shelly2.*/) || ($mode ne "roller" ) ){
-      Log3 $name,1,"[Shelly_Attr] setting the pct100 attribute only works for model=shelly2[xxx] and mode=roller";
+      Log3 $name,1,"[Shelly_Attr] setting the pct100 attribute only works for model=shelly2 and mode=roller";
       return
     }
     
@@ -416,9 +418,6 @@ sub Shelly_Set ($@) {
     #-- WEB asking for command list 
     if( $cmd eq "?" ) {   
       $newkeys = join(" ", sort keys %setsrol);
-      if( $model eq "shelly2beta" ){
-        $newkeys .= " zero:noArg";
-      }
       return "[Shelly_Set] Unknown argument " . $cmd . ", choose one of ".$newkeys;
     }
     
@@ -454,46 +453,14 @@ sub Shelly_Set ($@) {
       my $pos  = ReadingsVal($name,"position","");
       my $pct  = ReadingsVal($name,"pct",undef);  
 
-      #-- shelly2 cannot memorize position, commands are only "go"
-      if( $model eq "shelly2" ){ 
-        if( !$max ){
-          $msg = "Error: pct value can be set for model=shelly2 only if maxtime attribute is set properly";
-          Log3 $name,1,"[Shelly_Set] ".$msg;
-          return $msg
-        }
-        if( $pos eq "open" ){
-          $time = int( ($pctnormal ? $max*(100-$targetpct) : $max*$targetpct)/10)/10;
-          $cmd  = "?go=close&duration=".$time; 
-          $hash->{MOVING} = "moving_down";
-        }elsif( $pos eq "closed" ){
-          $time = int( ($pctnormal ? $max*$targetpct : $max*(100-$targetpct))/10)/10;
-          $cmd  = "?go=open&duration=".int($time/10)/10; 
-          $hash->{MOVING} = "moving_up";
-        }else{
-          if( !defined($pct) || ($pct !~ /\d\d?\d?/) ){
-            $msg = "Error: current pct value unknown. Open or close roller blind before";
-            Log3 $name,1,"[Shelly_Set] ".$msg;
-            return $msg;
-          }
-          if( $targetpct > $pct ){
-            $time           = int( ($max*($targetpct-$pct))/10 )/10;
-            $cmd            = $pctnormal ? "?go=open&duration=".$time : "?go=close&duration=".$time;
-            $hash->{MOVING} = $pctnormal ? "moving_up" : "moving_down";
-          }else{
-            $time = int(($max*($pct-$targetpct))/10)/10;
-            $cmd  = $pctnormal ? "?go=close&duration=".$time : "?go=open&duration=".$time;
-            $hash->{MOVING} = $pctnormal ? "moving_down" : "moving_up";
-          }
-        }
-      }else{
-        if( !$max ){
-          Log3 $name,1,"[Shelly_Set] please set the maxtime attribute for proper operation";
-          $max = 20;
-        }
-        $time           = int(abs($targetpct-$pct)/100*$max);
-        $cmd            = "?go=to_pos&roller_pos=".$targetpct;
-        $hash->{MOVING} = $pctnormal ? (($targetpct > $pct) ? "moving_up" : "moving_down") : (($targetpct > $pct) ? "moving_down" : "moving_up");
+      if( !$max ){
+        Log3 $name,1,"[Shelly_Set] please set the maxtime attribute for proper operation";
+        $max = 20;
       }
+      $time           = int(abs($targetpct-$pct)/100*$max);
+      $cmd            = "?go=to_pos&roller_pos=".$targetpct;
+      $hash->{MOVING} = $pctnormal ? (($targetpct > $pct) ? "moving_up" : "moving_down") : (($targetpct > $pct) ? "moving_down" : "moving_up");
+
       $hash->{DURATION}  = $time;
       $hash->{TARGETPCT} = $targetpct;
       Shelly_updown($hash,$cmd);
@@ -604,6 +571,8 @@ sub Shelly_pwd($){
   #-- isolate register name
   my $reg = substr($cmd,index($cmd,"?")+1);
   my $val = $jhash->{$reg};
+  $val = ""
+    if(!defined($val));
   readingsSingleUpdate($hash,"config",$reg."=".$val,1);
   
   return undef;
@@ -716,7 +685,7 @@ sub Shelly_pwd($){
       
       #-- we have data from the device, take that one 
       if( defined($rcurrpos) && ($rcurrpos =~ /\d\d?\d?/) ){
-        Log3 $name,1,"[Shelly_status] device $name with model=shelly2 returns a blind position, consider chosing a different model=shelly2[xxx]"
+        Log3 $name,1,"[Shelly_status] device $name with model=shelly2 returns a blind position, consider chosing a different model=shelly2"
           if( $model eq "shelly2" );
         $pct = $pctnormal ? $rcurrpos : 100-$rcurrpos;
         $position = ($rcurrpos==100) ? "open" : ($rcurrpos==0 ? "closed" : $pct);        
@@ -1041,16 +1010,16 @@ sub Shelly_updown2($){
                 <br />set the value of a configuration register</li>
         <li><a name="shelly_password">password &lt;password&gt;</a><br>This is the only way to set the password for the Shelly web interface</li>
         </ul>
-        For Shelly switching devices (mode=relay for model=shelly2[xxx], standard for all other models) 
+        For Shelly switching devices (mode=relay for model=shelly2, standard for all other models) 
         <ul>
             <li><a name="shelly_onoff"></a>
                 <code>set &lt;name&gt; on|off  [&lt;channel&gt;] </code>
-                <br />switches channel &lt;channel&gt; on or off. Channel numbers are 0 and 1 for model=shelly2[xxx], 0..3 model=shelly4. If the channel parameter is omitted, the module will switch the channel defined in the defchannel attribute.</li>
+                <br />switches channel &lt;channel&gt; on or off. Channel numbers are 0 and 1 for model=shelly2, 0..3 model=shelly4. If the channel parameter is omitted, the module will switch the channel defined in the defchannel attribute.</li>
             <li><a name="shelly_onofftimer"></a>
                 <code>set &lt;name&gt; on-for-timer|off-for-timer &lt;time&gt; [&lt;channel&gt;] </code>
-                <br />switches &lt;channel&gt; on or off for &lt;time&gt; seconds. Channel numbers are 0 and 1 for model=shelly2[xxx], 0..3 model=shelly4.  If the channel parameter is omitted, the module will switch the channel defined in the defchannel attribute.</li>           
+                <br />switches &lt;channel&gt; on or off for &lt;time&gt; seconds. Channel numbers are 0 and 1 for model=shelly2, 0..3 model=shelly4.  If the channel parameter is omitted, the module will switch the channel defined in the defchannel attribute.</li>           
         </ul>
-        <br/>For Shelly roller blind devices (mode=roller for model=shelly2[xxx])  
+        <br/>For Shelly roller blind devices (mode=roller for model=shelly2)  
         <ul>
             <li><a name="shelly_updown"></a>
                 <code>set &lt;name&gt; open|closed|stop </code>
@@ -1060,7 +1029,7 @@ sub Shelly_updown2($){
                 <br />drives the roller blind to a partially closed position (100=open, 0=closed)</li>    
             <li><a name="shelly_zero"></a>
                 <code>set &lt;name&gt; zero </code>
-                <br />calibration of roller device (only for model=shelly2beta)</li>      
+                <br />calibration of roller device (only for model=shelly2)</li>      
         </ul>
         <a name="Shellyget"></a>
         <h4>Get</h4>
@@ -1082,20 +1051,20 @@ sub Shelly_updown2($){
         <h4>Attributes</h4>
         <ul>
             <li><a name="shelly_shellyuser"><code>attr &lt;name&gt; shellyuser &lt;shellyuser&gt;</code><br>username for addressing the Shelly web interface</li>
-            <li><a name="shelly_model"><code>attr &lt;name&gt; model shelly1|shelly2|shelly2beta|shelly4|shellyplug </code></a>
+            <li><a name="shelly_model"><code>attr &lt;name&gt; model shelly1|shelly2|shelly4|shellyplug </code></a>
                 <br />type of the Shelly device</li>
-            <li><a name="shelly_mode"><code>attr &lt;name&gt; mode relay|roller (only for model=shelly2[xxx])</code></a>
+            <li><a name="shelly_mode"><code>attr &lt;name&gt; mode relay|roller (only for model=shelly2)</code></a>
                 <br />type of the Shelly device</li>
              <li><a name="shelly_interval">
                 <code>&lt;interval&gt;</code>
                 <br />Update interval for reading in seconds. The default is 60 seconds, a value of 0 disables the automatic update. </li>
         </ul>
-        <br/>For Shelly switching devices (mode=relay for model=shelly2[xxx], standard for all other models) 
+        <br/>For Shelly switching devices (mode=relay for model=shelly2, standard for all other models) 
         <ul>
         <li><a name="shelly_defchannel"><code>attr &lt;name&gt; defchannel <integer> </code></a>
-                <br />only for model=shelly2[xxx]|shelly4or multi-channel switches: Which channel will be switched, if a command is received without channel number</li>
+                <br />only for model=shelly2|shelly4 or multi-channel switches: Which channel will be switched, if a command is received without channel number</li>
         </ul>
-        <br/>For Shelly roller blind devices (mode=roller for model=shelly2[xxx])
+        <br/>For Shelly roller blind devices (mode=roller for model=shelly2)
         <ul>
             <li><a name="shelly_maxtime"><code>attr &lt;name&gt; maxtime &lt;float&gt; </code></a>
                 <br />time needed for a complete drive upward or downward</li>
