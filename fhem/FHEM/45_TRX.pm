@@ -28,7 +28,10 @@
 ##############################################################################
 #
 #	CHANGELOG
-#
+#	
+#	26.12.2018	RfxMgr-like functionality to enable/disable protocols
+#				Support for Cuveo devices
+#	15.12.2018	added more readings and additional RFX-models
 #	23.04.2018	added readings for Settings (firmware, frequency, protocols)
 #	02.04.2018	support for vair CO2 sensors (forum #67734) -Thanks to vbs
 #	29.03.2018	Summary for Commandref
@@ -51,7 +54,48 @@ sub TRX_Read($@);
 sub TRX_Ready($);
 sub TRX_Parse($$$$);
 
-my %sets = ( "reopen" => "" );
+my %m3 = (
+    0x01 => "AE/Blyss/Cuveo",
+    0x02 => "Rubicson",
+    0x04 => "FineOffset/Viking",
+    0x08 => "Lighting4",
+    0x10 => "RSL",
+    0x20 => "ByronSX",
+    0x40 => "Imagintronix/Opus",
+    0x80 => "undecoded"
+);
+my %m4 = (
+    0x01 => "Mertik",
+    0x02 => "AD/LightwaveRF",
+    0x04 => "Hideki/TFA/Cresta/UPM",
+    0x08 => "LaCrosse",
+    0x10 => "Legrand/CAD",
+    0x40 => "BlindsT0",
+    0x80 => "BlindsT1/T2/T3/T4"
+);
+my %m5 = (
+    0x01 => "X10",
+    0x02 => "ARC",
+    0x04 => "AC",
+    0x08 => "HomeEasyEU",
+    0x10 => "Meiantech/Atlantic",
+    0x20 => "Oregon",
+    0x40 => "ATI/cartelectronic",
+    0x80 => "Visonic"
+);
+my %m6 = (
+    0x01 => "Keeloq",
+    0x02 => "HomeConfort",
+    0x40 => "MCZ",
+    0x80 => "FunkBus"
+);
+
+my $modes = join( ",", values %m3 );
+$modes .= "," . join( ",", values %m4 );
+$modes .= "," . join( ",", values %m5 );
+$modes .= "," . join( ",", values %m6 );
+
+my $sets = "reopen:noArg protocols:multiple-strict," . $modes . " save:noArg";
 
 sub TRX_Initialize($) {
     my ($hash) = @_;
@@ -189,8 +233,7 @@ sub TRX_Set($@) {
     my ( $hash, @a ) = @_;
 
     return "\"set TRX\" needs at least one parameter" if ( @a < 1 );
-    return "Unknown argument $a[1], choose one of " . join( " ", sort keys %sets )
-      if ( !defined( $sets{ $a[1] } ) );
+    my $usage = "Unknown argument $a[1], choose one of " . $sets;
 
     my $name = shift @a;
     my $type = shift @a;
@@ -198,8 +241,64 @@ sub TRX_Set($@) {
     if ( $type eq "reopen" ) {    ####################################
         TRX_Reopen($hash);
     }
+    elsif ( $type eq "protocols" ) {
+        return TRX_SetModes( $hash, @a );
+    }
+    elsif ( $type eq "save" ) {
+        return TRX_Save($hash);
+    }
 
+    else {
+        return $usage;
+    }
+}
+#####################################
+sub TRX_Save($) {
+    my ($hash) = @_;
+    my $cmd = "0D0000000600000000000000";
+    DevIo_SimpleWrite( $hash, $cmd, 1 );
+}
+
+#####################################
+sub TRX_SetModes($@) {
+    my ( $hash, $values ) = @_;
+    my $name      = $hash->{NAME};
+    my @vals      = split( ",", $values );
+    my $ret       = undef;
+    my $protocols = "";
+
+    my ( $b3, $b4, $b5, $b6 ) = "00";
+
+    Log3 $name, 5, "[$name] Setting protocols " . Dumper(@vals);
+    foreach my $key ( keys %m3 ) {
+        if ( grep ( /$m3{$key}/, @vals ) ) {
+            $b3 += $key;
+            $protocols .= $m3{$key} . ",";
+        }
+    }
+    foreach my $key ( keys %m4 ) {
+        if ( grep ( /$m4{$key}/, @vals ) ) {
+            $b4 += $key;
+            $protocols .= $m4{$key} . ",";
+        }
+    }
+    foreach my $key ( keys %m5 ) {
+        if ( grep ( /$m5{$key}/, @vals ) ) {
+            $b5 += $key;
+            $protocols .= $m5{$key} . ",";
+        }
+    }
+    foreach my $key ( keys %m6 ) {
+        if ( grep ( /$m6{$key}/, @vals ) ) {
+            $b6 += $key;
+            $protocols .= $m6{$key} . ",";
+        }
+    }
+    my $hex = sprintf( "0D000000035308%02x%02x%02x%02x000000", $b3, $b4, $b5, $b6 );
+    DevIo_SimpleWrite( $hash, $hex, 1 );
+    
     return undef;
+
 }
 
 #####################################
@@ -237,8 +336,10 @@ sub TRX_DoInit($) {
     else {
         # Reset
         my $init = pack( 'H*', "0D00000000000000000000000000" );
-        DevIo_SimpleWrite( $hash, $init, 0 );
-        DevIo_TimeoutRead( $hash, 0.5 );
+
+        #DevIo_SimpleWrite( $hash, $init, 0 );
+        #DevIo_TimeoutRead( $hash, 0.5 );
+        DevIo_Expect( $hash, $init, 0.5 );
         sleep(1);
 
         TRX_Clear($hash);
@@ -262,93 +363,7 @@ sub TRX_DoInit($) {
         }
         else {
             Log3 $name, 1, "TRX: Init OK";
-
-            my $fw = undef;
-            if ( $buf =~ m/0d0100(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)/ ) {
-                $fw = 1;
-            }
-            elsif ( $buf =~ m/140100(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)/ ) {
-                $fw = 2;
-            }
-            if ($fw) {
-
-                # Analyse result and display it:
-                my $status = "";
-
-                my $seqnbr = $1;
-                my $cmnd   = $2;
-                my $msg1   = $3;
-                my $msg2   = ord( pack( 'H*', $4 ) );
-                my $msg3   = ord( pack( 'H*', $5 ) );
-                my $msg4   = ord( pack( 'H*', $6 ) );
-                my $msg5   = ord( pack( 'H*', $7 ) );
-                my $msg6   = "";
-                $msg6 = ord( pack( 'H*', $8 ) ) if $fw == 2;
-                my $freq = {
-                    '50' => '310MHz',
-                    '51' => '315MHz',
-                    '52' => '433.92MHz receiver only',
-                    '53' => '433.92MHz transceiver',
-                    '55' => '868.00MHz',
-                    '56' => '868.00MHz FSK',
-                    '57' => '868.30MHz',
-                    '58' => '868.30MHz FSK',
-                    '59' => '868.35MHz',
-                    '5a' => '868.35MHz FSK',
-                    '5b' => '868.95MHz'
-                }->{$msg1}
-                  || 'unknown Mhz';
-                $status .= $freq;
-                my $firmware = "";
-
-                if ( $fw == 2 ) {
-                    $firmware = $msg2 + 1000;
-                }
-                else {
-                    $firmware = $msg2;
-                }
-
-                $status .= ", " . sprintf "firmware=%d", $firmware;
-                my $protocols = "";
-                $status    .= ", protocols enabled: ";
-                $protocols .= "undecoded " if ( $msg3 & 0x80 );
-                $protocols .= "RFU " if ( $msg3 & 0x40 );
-                $protocols .= "ByronSX " if ( $msg3 & 0x20 );
-                $protocols .= "RSL " if ( $msg3 & 0x10 );
-                $protocols .= "Lighting4 " if ( $msg3 & 0x08 );
-                $protocols .= "FineOffset/Viking " if ( $msg3 & 0x04 );
-                $protocols .= "Rubicson " if ( $msg3 & 0x02 );
-                $protocols .= "AE/Blyss " if ( $msg3 & 0x01 );
-                $protocols .= "BlindsT1/T2/T3/T4 " if ( $msg4 & 0x80 );
-                $protocols .= "BlindsT0  " if ( $msg4 & 0x40 );
-                $protocols .= "ProGuard " if ( $msg4 & 0x20 );
-                $protocols .= "FS20 " if ( $msg4 & 0x10 );
-                $protocols .= "LaCrosse " if ( $msg4 & 0x08 );
-                $protocols .= "Hideki " if ( $msg4 & 0x04 );
-                $protocols .= "LightwaveRF " if ( $msg4 & 0x02 );
-                $protocols .= "Mertik " if ( $msg4 & 0x01 );
-                $protocols .= "Visonic " if ( $msg5 & 0x80 );
-                $protocols .= "ATI " if ( $msg5 & 0x40 );
-                $protocols .= "OREGON " if ( $msg5 & 0x20 );
-                $protocols .= "KOPPLA " if ( $msg5 & 0x10 );
-                $protocols .= "HOMEEASY " if ( $msg5 & 0x08 );
-                $protocols .= "AC " if ( $msg5 & 0x04 );
-                $protocols .= "ARC " if ( $msg5 & 0x02 );
-                $protocols .= "X10 " if ( $msg5 & 0x01 );
-                $protocols .= "HomeComfort " if ( $msg6 & 0x02 and $fw == 2 );
-                $protocols .= "KEELOQ " if ( $msg6 & 0x01 and $fw == 2 );
-                $status    .= $protocols;
-                my $hexline = unpack( 'H*', $buf );
-                Log3 $name, 4, "TRX: Init status hexline='$hexline'";
-                Log3 $name, 1, "TRX: Init status: '$status'";
-                readingsBeginUpdate($hash);
-                readingsBulkUpdate( $hash, "frequency", $freq );
-                readingsBulkUpdate( $hash, "firmware",  $firmware );
-                readingsBulkUpdate( $hash, "protocols", $protocols );
-                readingsEndUpdate( $hash, 1 );
-
-            }
-
+            TRX_evaluateResponse( $hash, $buf );
         }
     }
 
@@ -359,6 +374,151 @@ sub TRX_DoInit($) {
     readingsSingleUpdate( $hash, "state", "Initialized", 1 );
 
     return undef;
+}
+
+sub TRX_evaluateResponse($$) {
+    my ($hash, $buf ) = @_;
+	my $name = $hash->{NAME};
+
+    my $fw = undef;
+    if ( $buf =~ m/0d0100(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)/ ) {
+        $fw = 1;
+    }
+
+    #                 140100 04  03  53  21  00  00  27  00  01  03  1C  05  5F  46  58  43  4F  4D
+    elsif ( $buf =~ m/140100(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)/ ) {
+        $fw = 2;
+    }
+    if ($fw) {
+
+        # Analyse result and display it:
+        my $status = "";
+
+        my $seqnbr = $1;
+        my $cmnd   = $2;
+        my $msg1   = $3;
+        my $msg2   = ord( pack( 'H*', $4 ) );
+        my $msg3   = ord( pack( 'H*', $5 ) );
+        my $msg4   = ord( pack( 'H*', $6 ) );
+        my $msg5   = ord( pack( 'H*', $7 ) );
+        my $msg6   = "";
+
+        $msg6 = ord( pack( 'H*', $8 ) ) if $fw == 2;
+        my $freq = {
+            '50' => 'RFXtrx315 310MHz',
+            '51' => 'RFXtrx315 315MHz',
+            '52' => 'RFXrec433 433.92MHz receiver only',
+            '53' => 'RFXrec433 433.92MHz transceiver',
+            '54' => 'RFXrec433 433.42MHz transceiver',
+            '55' => 'RFXtrx868X 868.00MHz',
+            '56' => 'RFXtrx868X 868.00MHz FSK',
+            '57' => 'RFXtrx868X 868.30MHz',
+            '58' => 'RFXtrx868X 868.30MHz FSK',
+            '59' => 'RFXtrx868X 868.35MHz',
+            '5a' => 'RFXtrx868X 868.35MHz FSK',
+            '5b' => 'RFXtrx868X 868.95MHz',
+            '5c' => 'RFXtrxIOT 433.92MHz',
+            '5d' => 'RFXtrxIOT 868MHz',
+            '5f' => 'RFXtrx433 434.50MHz'
+        }->{$msg1}
+          || 'unknown Mhz';
+        $status .= $freq;
+
+        #Firmware Type
+        my $msg10 = ord( pack( 'H*', $12 ) );
+        my $fwt = {
+            '0'  => 'Type1 RFXrec receive only firmware',
+            '1'  => 'Type1',
+            '2'  => 'Type2',
+            '3'  => 'Ext',
+            '4'  => 'Ext2',
+            '5'  => 'Pro1',
+            '6'  => 'Pro2',
+            '10' => 'ProXL1',
+        }->{$msg10}
+          || 'unknown FW Type ' . $msg10;
+
+        #Firmware
+        my $firmware = "";
+
+        if ( $fw == 2 ) {
+            $firmware = $msg2 + 1000;
+        }
+        else {
+            $firmware = $msg2;
+        }
+
+        #Hardware version
+        my $hw_major = ord( pack( 'H*', $9 ) );
+        my $hw_minor = ord( pack( 'H*', $10 ) );
+        my $hw       = $hw_major . "." . $hw_minor;
+        $status .= ", " . "hardware=$hw";
+
+        #Output Power
+        my $output = ( ord( pack( 'H*', $11 ) ) - 18 ) . "dBm";
+        $status .= ", " . "output power=$output";
+
+        $status .= ", " . sprintf "firmware=%d", $firmware;
+        my $protocols = "";
+        $status .= ", protocols enabled: ";
+        foreach my $key ( keys %m3 ) {
+            $protocols .= $m3{$key} . "," if ( $msg3 & $key );
+        }
+        foreach my $key ( keys %m4 ) {
+            $protocols .= $m4{$key} . "," if ( $msg4 & $key );
+        }
+        foreach my $key ( keys %m5 ) {
+            $protocols .= $m5{$key} . "," if ( $msg5 & $key );
+        }
+        foreach my $key ( keys %m6 ) {
+            $protocols .= $m6{$key} . "," if ( $msg6 & $key );
+        }
+
+        #$protocols .= "undecoded " if ( $msg3 & 0x80 );
+        #$protocols .= "Imagintronix/Opus " if ( $msg3 & 0x40 );
+        #$protocols .= "ByronSX " if ( $msg3 & 0x20 );
+        #$protocols .= "RSL " if ( $msg3 & 0x10 );
+        #$protocols .= "Lighting4 " if ( $msg3 & 0x08 );
+        #$protocols .= "FineOffset/Viking " if ( $msg3 & 0x04 );
+        #$protocols .= "Rubicson " if ( $msg3 & 0x02 );
+        #$protocols .= "AE/Blyss " if ( $msg3 & 0x01 );
+        #$protocols .= "BlindsT1/T2/T3/T4 " if ( $msg4 & 0x80 );
+        #$protocols .= "BlindsT0  " if ( $msg4 & 0x40 );
+        #$protocols .= "ProGuard " if ( $msg4 & 0x20 );
+        #$protocols .= "FS20 " if ( $msg4 & 0x10 );
+        #$protocols .= "LaCrosse " if ( $msg4 & 0x08 );
+        #$protocols .= "Hideki " if ( $msg4 & 0x04 );
+        #$protocols .= "LightwaveRF " if ( $msg4 & 0x02 );
+        #$protocols .= "Mertik " if ( $msg4 & 0x01 );
+        #$protocols .= "Visonic " if ( $msg5 & 0x80 );
+        #$protocols .= "ATI " if ( $msg5 & 0x40 );
+        #$protocols .= "OREGON " if ( $msg5 & 0x20 );
+        #$protocols .= "Meiantech/Atlantic " if ( $msg5 & 0x10 );
+        #$protocols .= "HOMEEASY " if ( $msg5 & 0x08 );
+        #$protocols .= "AC " if ( $msg5 & 0x04 );
+        #$protocols .= "ARC " if ( $msg5 & 0x02 );
+        #$protocols .= "X10 " if ( $msg5 & 0x01 );
+        #$protocols .= "HomeComfort " if ( $msg6 & 0x02 and $fw == 2 );
+        #$protocols .= "KEELOQ " if ( $msg6 & 0x01 and $fw == 2 );
+        #$protocols .= "FunkBus " if ( $msg6 & 0x80 );
+        #$protocols .= "MCZ " if ( $msg6 & 0x40 );
+
+        $status .= $protocols;
+
+        my $hexline = unpack( 'H*', $buf );
+        Log3 $name, 4, "TRX: Init status hexline='$hexline'";
+        Log3 $name, 1, "TRX: Init status: '$status'";
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate( $hash, "frequency",     $freq );
+        readingsBulkUpdate( $hash, "firmware",      $firmware );
+        readingsBulkUpdate( $hash, "protocols",     $protocols );
+        readingsBulkUpdate( $hash, "output_power",  $output );
+        readingsBulkUpdate( $hash, "firmware_type", $fwt );
+        readingsBulkUpdate( $hash, "hardware",      $hw );
+        readingsEndUpdate( $hash, 1 );
+
+    }
+
 }
 
 #####################################
@@ -419,7 +579,7 @@ sub TRX_ReadAnswer($$) {
         }
     }
 }
-
+ 
 #####################################
 # called from the global loop, when the select for hash->{FD} reports data
 sub TRX_Read($@) {
@@ -476,12 +636,18 @@ sub TRX_Parse($$$$) {
     # (some Oregon sensors always sends the message twice, X10 security sensors even sends the message five times)
     if ( ( "$last_rmsg" ne "$rmsg" ) || ( time() - $last_time ) > 1 ) {
         Log3 $hash, 5, "TRX_Parse() '$rmsg'";
-        %addvals = ( RAWMSG => $rmsg );
-        Dispatch( $hash, $rmsg, \%addvals );
-        $hash->{"${name}_MSGCNT"}++;
-        $hash->{"${name}_TIME"} = TimeNow();
-        $hash->{RAWMSG} = $rmsg;
-        readingsSingleUpdate( $hash, "state", $hash->{READINGS}{state}{VAL}, 0 );
+        if ( $rmsg =~ m/0d0100....................../ || $rmsg =~ m/140100..................................../ ) {
+            Log3 $hash, 5, "TRX_Parse() retrieved a command response - no dispatch";
+            TRX_evaluateResponse( $hash, $rmsg );
+        }
+        else {
+            %addvals = ( RAWMSG => $rmsg );
+            Dispatch( $hash, $rmsg, \%addvals );
+            $hash->{"${name}_MSGCNT"}++;
+            $hash->{"${name}_TIME"} = TimeNow();
+            $hash->{RAWMSG} = $rmsg;
+            readingsSingleUpdate( $hash, "state", $hash->{READINGS}{state}{VAL}, 0 );
+        }
     }
     else {
         Log3 $hash, 5, "TRX_Parse() '$rmsg' dup";
@@ -572,6 +738,16 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK.</li>
     </ul>
     <br>
   </table>
+  <a name="TRXSet"></a>
+  <b>Set</b>
+  <ul>
+	<ul>
+		<li>protocols: allows to enable and disable protocols similar to RfxMngr. Please check the manual which protocols are supported by your model/firmware</li>
+		<li>save: Save the protocol selection to non-volatile storage</li>
+		<li>reopen: reset the connection to the RFXDevice</li>
+	</ul>
+  </ul>
+		
   <a name="TRXReadings"></a>
   <b>Readings</b>
   <ul>
