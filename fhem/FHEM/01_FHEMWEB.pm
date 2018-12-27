@@ -207,8 +207,17 @@ FHEMWEB_Initialize($)
 
   ###############
   # Initialize internal structures
-  map { addToAttrList($_) } ( "webCmd", "webCmdLabel:textField-long", "icon",
-      "cmdIcon", "devStateIcon", "widgetOverride",  "sortby", "devStateStyle");
+  map { addToAttrList($_) } (
+    "cmdIcon",
+    "devStateIcon:textField-long",
+    "devStateStyle",
+    "icon",
+    "sortby",
+    "webCmd",
+    "webCmdLabel:textField-long",
+    "widgetOverride"
+  );
+
   InternalTimer(time()+60, "FW_closeInactiveClients", 0, 0);
 
   $FW_dir      = "$attr{global}{modpath}/www";
