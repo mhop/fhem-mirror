@@ -1302,27 +1302,29 @@ sub freezemon_getLogPath($) {
 			</ul>
 		</ul>
 
-<a name="freezemonAttributes"></a>
+<a name="freezemonattr"></a>
   <b>Attributes</b>
 		<ul>
 			<ul>
-				<li>fm_catchCallFn: if enabled FHEM internal function calls are monitored additionally, in some cases this might give additional hints on who's causing the freeze </li>
-				<li>fm_catchCmds: if enabled FHEM commands are monitored additionally, in some cases this might give additional hints on who's causing the freeze </li>
-				<li>fm_extDetail: provides in some cases extended details for recognized freezes. In some cases it was reported that FHEM crashes, so please be careful.</li>
-				<li>fm_freezeThreshold: Value in seconds (Default: 1) - Only freezes longer than fm_freezeThreshold will be considered as a freeze</li>
-				<li>fm_forceApptime: When FREEZEMON is active, apptime will automatically be started (if not yet active)</li>
-				<li>fm_ignoreDev: list of comma separated Device names. If all devices possibly causing a freeze are in the list, the freeze will be ignored (not logged)</li>
-				<li>fm_ignoreMode: takes the values off,single or all. If you have added devices to fm_ignoreDev then ignoreMode acts as follows: <br>
+				<li><a name="fm_CatchFnCalls">fm_CatchFnCalls</a>: if enabled FHEM internal function calls are monitored additionally, 
+				in some cases this might give additional hints on who's causing the freeze </li>
+				<li><a name="fm_CatchCmds">fm_CatchCmds</a>: if enabled FHEM commands are monitored additionally, 
+				in some cases this might give additional hints on who's causing the freeze </li>
+				<li><a name="fm_extDetail">fm_extDetail</a>: provides in some cases extended details for recognized freezes. In some cases it was reported that FHEM crashes, so please be careful.</li>
+				<li><a name="fm_freezeThreshold">fm_freezeThreshold</a>: Value in seconds (Default: 1) - Only freezes longer than fm_freezeThreshold will be considered as a freeze</li>
+				<li><a name="fm_forceApptime">fm_forceApptime</a>: When FREEZEMON is active, apptime will automatically be started (if not yet active)</li>
+				<li><a name="fm_ignoreDev">fm_ignoreDev</a>: list of comma separated Device names. If all devices possibly causing a freeze are in the list, the freeze will be ignored (not logged)</li>
+				<li><a name="fm_ignoreMode">fm_ignoreMode</a>: takes the values off,single or all. If you have added devices to fm_ignoreDev then ignoreMode acts as follows: <br>
 				all: A freeze will only be ignored, if all devices probably causing the freeze are part of the ignore list. This might result in more freezes being logged than expected.<br>
 				single: A freeze will be ignored as soon as one device possibly causing the freeze is listed in the ignore list. With this setting you might miss freezes.<br>
 				off: All freezes will be logged.<br>
 				If the attribute is not set, while the ignore list is maintained, mode "all" will be used.</li>
-				<li>fm_log: dynamic loglevel, takes a string like 10:1 5:2 1:3 , which means: freezes > 10 seconds will be logged with loglevel 1 , >5 seconds with loglevel 2 etc...</li>
-				<li>fm_logFile: takes a valid file name (like e.g. ./log/freeze-%Y%m%d-%H%M%S.log). If set, logs messages of loglevel 5 (even if global loglevel is < 5) before a freeze in separate file.</li>
-				<li>fm_logExtraSeconds: obsolete attribute, not used anymore and should be deleted.</li>
-				<li>fm_logKeep: A number that defines how many logFiles should be kept. If set all logfiles except the latest n freezemon logfiles will be deleted regularly.</li>
-				<li>fm_whitelistSub: Comma-separated list of subroutines that you're sure that don't cause a freeze. Whitelisted Subs do not appear in the  "possibly caused by" list. Typically you would list subroutines here that frequently appear in the "possibly caused by" list, but you're really sure they are NOT the issue. Note: The subroutine is the initial part (before the devicename in brackets) in freezemon log messages.  </li>
-				<li>disable: activate/deactivate freeze detection</li>
+				<li><a name="fm_log">fm_log</a>: dynamic loglevel, takes a string like 10:1 5:2 1:3 , which means: freezes > 10 seconds will be logged with loglevel 1 , >5 seconds with loglevel 2 etc...</li>
+				<li><a name="fm_logFile">fm_logFile</a>: takes a valid file name (like e.g. ./log/freeze-%Y%m%d-%H%M%S.log). If set, logs messages of loglevel 5 (even if global loglevel is < 5) before a freeze in separate file.</li>
+				<li><a name="fm_logExtraSeconds">fm_logExtraSeconds</a>: obsolete attribute, not used anymore and should be deleted.</li>
+				<li><a name="fm_logKeep">fm_logKeep</a>: A number that defines how many logFiles should be kept. If set all logfiles except the latest n freezemon logfiles will be deleted regularly.</li>
+				<li><a name="fm_whitelistSub">fm_whitelistSub</a>: Comma-separated list of subroutines that you're sure that don't cause a freeze. Whitelisted Subs do not appear in the  "possibly caused by" list. Typically you would list subroutines here that frequently appear in the "possibly caused by" list, but you're really sure they are NOT the issue. Note: The subroutine is the initial part (before the devicename in brackets) in freezemon log messages.  </li>
+				<li><a name="disable">disable</a>: activate/deactivate freeze detection</li>
 			</ul>
 		</ul>
 
@@ -1390,27 +1392,27 @@ sub freezemon_getLogPath($) {
 		</ul>
   </ul>
  
-<a name="freezemonAttributes"></a>
+<a name="freezemonattr"></a>
   <b>Attribute</b>
   <ul>
 		<ul>
-			<li>fm_catchCallFn: wenn aktiviert, werden zusätzlich FHEM-interne Funktionsaufrufe überwacht, in einigen Fällen kann das zusätzliche Hinweise auf den Freeze-Verursacher geben</li>
-			<li>fm_catchCmds: wenn aktiviert, werden zusätzlich FHEM-Kommandos überwacht, in einigen Fällen kann das zusätzliche Hinweise auf den Freeze-Verursacher geben</li>
-			<li>fm_extDetail: stellt in einigen Fällen zusätzliche Details bei erkannten Freezes zur Verfügung. In wenigen Fällen wurde berichtet, dass FHEM crasht, also vorsichtig verwenden.</li>
-			<li>fm_freezeThreshold: Wert in Sekunden (Default: 1) - Nur Freezes länger als fm_freezeThreshold werden als Freeze betrachtet </li>
-			<li>fm_forceApptime: Wenn FREEZEMON aktiv ist wird automatisch apptime gestartet (falls nicht aktiv)</li>
-			<li>fm_ignoreDev: Liste von Komma-getrennten Devices. Wenn einzelne möglicherweise einen Freeze verursachenden Device in dieser Liste sind, wird der Freeze ignoriert (nicht geloggt). Bitte das Attribut fm_ignoreMode beachten</li>
-			<li>fm_ignoreMode: Kann die Werte off,single oder all annehmen. Wenn in fm_ignoreDev Devices angegeben sind wirken sich der ignoreMode wie folgt aus: <br>
+			<li><a name="fm_CatchFnCalls">fm_CatchFnCalls</a>fm_CatchFnCalls: wenn aktiviert, werden zusätzlich FHEM-interne Funktionsaufrufe überwacht, in einigen Fällen kann das zusätzliche Hinweise auf den Freeze-Verursacher geben</li>
+			<li><a name="fm_CatchCmds">fm_CatchCmds</a>: wenn aktiviert, werden zusätzlich FHEM-Kommandos überwacht, in einigen Fällen kann das zusätzliche Hinweise auf den Freeze-Verursacher geben</li>
+			<li><a name="fm_extDetail">fm_extDetail</a>: stellt in einigen Fällen zusätzliche Details bei erkannten Freezes zur Verfügung. In wenigen Fällen wurde berichtet, dass FHEM crasht, also vorsichtig verwenden.</li>
+			<li><a name="fm_freezeThreshold">fm_freezeThreshold</a>: Wert in Sekunden (Default: 1) - Nur Freezes länger als fm_freezeThreshold werden als Freeze betrachtet </li>
+			<li><a name="fm_forceApptime">fm_forceApptime</a>: Wenn FREEZEMON aktiv ist wird automatisch apptime gestartet (falls nicht aktiv)</li>
+			<li><a name="fm_ignoreDev">fm_ignoreDev</a>: Liste von Komma-getrennten Devices. Wenn einzelne möglicherweise einen Freeze verursachenden Device in dieser Liste sind, wird der Freeze ignoriert (nicht geloggt). Bitte das Attribut fm_ignoreMode beachten</li>
+			<li><a name="fm_ignoreMode">fm_ignoreMode</a>: Kann die Werte off,single oder all annehmen. Wenn in fm_ignoreDev Devices angegeben sind wirken sich der ignoreMode wie folgt aus: <br>
 					all: Ein Freeze wird nur dann ignoriert, wenn alle möglicherweise den Freeze verursachenden Devices in der Ignore-Liste enthalten sind. Dies führt unter Umständen dazu, dass mehr Freezes geloggt werden als erwartet.<br>
 					single: Ein Freeze wird ignoriert, sobald ein möglicher Verursacher in der Ignorierliste enthalten ist. Dies führt möglicherweise dazu, dass Freezes übersehen werden.<br>
 					off: Alle Freezes werden geloggt.<br>
 					Sofern das Attribut nicht gesetzt ist, aber Ignore-Devices angegeben sind, wird im Modus "all" ignoriert.</li>
-			<li>fm_log: dynamischer Loglevel, nimmt einen String der Form 10:1 5:2 1:3 entgegen, was bedeutet: Freezes > 10 Sekunden werden mit Loglevel 1 geloggt, >5 Sekunden mit Loglevel 2 usw...</li>
-			<li>fm_logFile: ist ein gültiger Filename (wie z.B. ./log/freeze-%Y%m%d-%H%M%S.log). Wenn gesetzt, werdn Meldungen auf Loglevel 5 (auch wenn global Loglevel < 5 ist) vor einem Freeze in einem seperaten File geloggt.</li>
-			<li>fm_logExtraSeconds: dobsoletes Attribut, wird nicht mehr genutzt und sollte gelöscht werden</li>
-			<li>fm_logKeep: Eine Zahl, die angibt wieviele Logfiles behalten werden sollen. Wenn gesetzt, werden alle Logfiles ausser den letzten n Freezemon Logfiles regelmäßig gelöscht.</li>
-			<li>fm_whitelistSub: Komma-getrennte Liste von Subroutinen wo du sicher bist, dass sie keinen Freeze verursachen. Whitelisted Subs erscheinen nicht in der "possibly caused by" Liste. Typischerweise listet man hier Subroutinen,  die regelmäßig in der "possibly caused by" Liste auftauchen, wo du aber wirklich sicher bist, dass sie nicht die Ursache sind. Anmerkung: Die Subroutine ist der initiale Teil (vor dem devicename in Klammern) in Freezemon Logmeldungen.</li>
-			<li>disable: aktivieren/deaktivieren der Freeze-Erkennung</li>
+			<li><a name="fm_log">fm_log</a>: dynamischer Loglevel, nimmt einen String der Form 10:1 5:2 1:3 entgegen, was bedeutet: Freezes > 10 Sekunden werden mit Loglevel 1 geloggt, >5 Sekunden mit Loglevel 2 usw...</li>
+			<li><a name="fm_logFile">fm_logFile</a>: ist ein gültiger Filename (wie z.B. ./log/freeze-%Y%m%d-%H%M%S.log). Wenn gesetzt, werdn Meldungen auf Loglevel 5 (auch wenn global Loglevel < 5 ist) vor einem Freeze in einem seperaten File geloggt.</li>
+			<li><a name="fm_logExtraSeconds">fm_logExtraSeconds</a>: dobsoletes Attribut, wird nicht mehr genutzt und sollte gelöscht werden</li>
+			<li><a name="fm_logKeep">fm_logKeep</a>: Eine Zahl, die angibt wieviele Logfiles behalten werden sollen. Wenn gesetzt, werden alle Logfiles ausser den letzten n Freezemon Logfiles regelmäßig gelöscht.</li>
+			<li><a name="fm_whitelistSub">fm_whitelistSub</a>: Komma-getrennte Liste von Subroutinen wo du sicher bist, dass sie keinen Freeze verursachen. Whitelisted Subs erscheinen nicht in der "possibly caused by" Liste. Typischerweise listet man hier Subroutinen,  die regelmäßig in der "possibly caused by" Liste auftauchen, wo du aber wirklich sicher bist, dass sie nicht die Ursache sind. Anmerkung: Die Subroutine ist der initiale Teil (vor dem devicename in Klammern) in Freezemon Logmeldungen.</li>
+			<li><a name="disable">disable</a>: aktivieren/deaktivieren der Freeze-Erkennung</li>
 		</ul>
   </ul>
 
