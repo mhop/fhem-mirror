@@ -555,6 +555,7 @@ FHT_Parse($$)
 
     # set additional warnings and trigger notify
     readingsBulkUpdate($def, "battery", $valBattery);
+    readingsBulkUpdate($def, "batteryState", $valBattery);
     Log3 $name, 4, "FHT $name battery: $valBattery";
 
     readingsBulkUpdate($def, "lowtemp", $valLowTemp);
