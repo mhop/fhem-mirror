@@ -22,6 +22,7 @@
 #
 ##############################################################################
 # 	  Changelog:
+#		0.0.21: Added direct help for set, get and attr commands
 #		0.0.20: Internal changes
 #				improved handling of blocking calls
 #				fm_extraSeconds not used anymore
@@ -95,7 +96,7 @@ use B qw(svref_2object);
 use Blocking;
 use vars qw($FW_CSRF);    
 
-my $version = "0.0.20";
+my $version = "0.0.21";
 
 my @logqueue = ();
 my @fmCmd    = ();
@@ -1274,17 +1275,17 @@ sub freezemon_getLogPath($) {
   <b>Set</b>
   <ul>
 	<ul>
-		<li>inactive: disables the device (similar to attribute "disable", however without the need to save</li>
-		<li>active: reactivates the device after it was set inactive</li>
-		<li>clear: clears all readings (including the list of the last 20 freezes.)</li>
+		<li><a name="inactive">inactive</a>: disables the device (similar to attribute "disable", however without the need to save</li>
+		<li><a name="active">active</a>: reactivates the device after it was set inactive</li>
+		<li><a name="clear">clear</a>: clears all readings (including the list of the last 20 freezes.)</li>
 	</ul>
   </ul>	
 <a name="freezemonGet"></a>
   <b>Get</b>
   <ul>
 	<ul>
-		<li>freeze: returns the last 20 (in compact view, like in state) - This is for a quick overview. For detailed analysis the data should be logged.</li>
-		<li>log: provides direct access to the logfiles written when fm_logFile is active</li>
+		<li><a name="freeze">freeze</a>: returns the last 20 freezes (in compact view, like in state) - This is for a quick overview. For detailed analysis the data should be logged.</li>
+		<li><a name="log">log</a>: provides direct access to the logfiles written when fm_logFile is active</li>
 	</ul>
   </ul>
   
@@ -1363,9 +1364,9 @@ sub freezemon_getLogPath($) {
   <b>Set</b>
 	<ul>
 		<ul>
-		<li>inactive: deaktiviert das Device (identisch zum Attribut "disable", aber ohne die Notwendigkeit su "saven".</li>
-		<li>active: reaktiviert das Device nachdem es auf inactive gesetzt wurde</li>
-		<li>clear: Löscht alle readings (inklusive der Liste der letzten 20 Freezes).</li>
+		<li><a name="inactive">inactive</a>: deaktiviert das Device (identisch zum Attribut "disable", aber ohne die Notwendigkeit su "saven".</li>
+		<li><a name="active">active</a>: reaktiviert das Device nachdem es auf inactive gesetzt wurde</li>
+		<li><a name="clear">clear</a>: Löscht alle readings (inklusive der Liste der letzten 20 Freezes).</li>
 	</ul>
 
   </ul>	
@@ -1373,8 +1374,8 @@ sub freezemon_getLogPath($) {
   <b>Get</b>
   <ul>
 	<ul>
-		<li>freeze: gibt die letzten 20 freezes zurück (in Kompakter Darstellung, wie im state) - Dies dient einem schnellen Überblick, für detailliertere Auswertungen empfehle ich die Daten zu loggen.</li>
-		<li>log: gibt Zugriff auf die Logfiles die geschrieben werden, wenn fm_logFile aktiv ist</li>
+		<li><a name="freeze">freeze</a>: gibt die letzten 20 freezes zurück (in Kompakter Darstellung, wie im state) - Dies dient einem schnellen Überblick, für detailliertere Auswertungen empfehle ich die Daten zu loggen.</li>
+		<li><a name="log">log</a>: gibt Zugriff auf die Logfiles die geschrieben werden, wenn fm_logFile aktiv ist</li>
 	</ul>
   </ul>
   
