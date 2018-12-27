@@ -564,8 +564,9 @@ FW_finishRead($$$)
   }
 
   my $length = length($FW_RET);
-  my $expires = ($cacheable?
-        ("Expires: ".FmtDateTimeRFC1123($hash->{LASTACCESS}+900)."\r\n") : "");
+  my $expires = ($cacheable ?
+         "Expires: ".FmtDateTimeRFC1123($hash->{LASTACCESS}+900)."\r\n" : 
+         "Cache-Control: no-cache, no-store, must-revalidate\r\n");
   Log3 $FW_wname, 4,
         "$FW_wname: $arg / RL:$length / $FW_RETTYPE / $compressed / $expires";
   if( ! FW_addToWritebuffer($hash,
