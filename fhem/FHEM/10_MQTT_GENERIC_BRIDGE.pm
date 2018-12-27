@@ -30,10 +30,13 @@
 # 
 # CHANGE LOG
 # 
+# 27.12.2018 1.0.7
+# implement  : alias bei subscribe
+# 
 # 27.12.2018 1.0.6
 # bugfix     : inkorrekte Verarbeitung von 'mqttDefaults' mit 
 #              Prefixen 'pub:'/'sub:'.
-#            : Sonderlocken fuer $base, $name, $reading, $device, 
+# improvement: Sonderlocken fuer $base, $name, $reading, $device, 
 #              damit auch xxx:topic={$base} geht (sonst koente nur {"$base"} verwendet werden)
 #
 # 16.12.2018 1.0.5
@@ -267,7 +270,7 @@ use warnings;
 
 #my $DEBUG = 1;
 my $cvsid = '$Id$';
-my $VERSION = "version 1.0.6 by hexenmeister\n$cvsid";
+my $VERSION = "version 1.0.7 by hexenmeister\n$cvsid";
 
 my %sets = (
 );
@@ -1193,9 +1196,9 @@ sub _evalValue2($$;$$) {
         } elsif ($pname eq '$name') {
           $name = $val;
         } else {
-          Log3('xxx',1,"MQTT_GENERIC_BRIDGE:DEBUG:> replace2: $ret : $pname => $val");
+          #Log3('xxx',1,"MQTT_GENERIC_BRIDGE:DEBUG:> replace2: $ret : $pname => $val");
         $ret =~ s/\Q$pname\E/$val/g;
-          Log3('xxx',1,"MQTT_GENERIC_BRIDGE:DEBUG:> replace2 done: $ret");
+          #Log3('xxx',1,"MQTT_GENERIC_BRIDGE:DEBUG:> replace2 done: $ret");
       }
     }
     }
@@ -1237,6 +1240,7 @@ sub searchDeviceForTopic($$) {
   
   my $ret = {};
   my $map = $hash->{+HS_TAB_NAME_DEVICES};
+  my $globalMap = $map->{':global'};
   if(defined ($map)) {
     foreach my $dname (keys %{$map}) {
       my $dmap = $map->{$dname}->{':subscribe'};
@@ -1249,7 +1253,19 @@ sub searchDeviceForTopic($$) {
           # Check named groups: $+{reading},..
           my $reading = undef;
           my $oReading = $rmap->{'reading'};
-          my $nReading = $+{name}; # TODO ummappen ueber 'alias'
+          my $nReading = undef;
+          #my $nReading = $+{name}; # TODO ummappen ueber 'alias'
+          # map name
+          my $fname = $+{name};
+          if(defined($fname)) {
+            if (defined($map->{$dname}->{':alias'})) {
+              $nReading = $map->{$dname}->{':alias'}->{'sub:'.$fname};
+            }
+            if (!defined($nReading) and defined($globalMap) and defined($globalMap->{':alias'})) {
+              $nReading = $globalMap->{':alias'}->{'sub:'.$fname};
+            }
+            $nReading = $fname unless defined $nReading;
+          }
           $nReading = $+{reading} unless defined $nReading;
           if((!defined($nReading)) or ($oReading eq $nReading)) {
             $reading = $oReading;
