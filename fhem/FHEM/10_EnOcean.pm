@@ -7116,9 +7116,11 @@ sub EnOcean_Parse($$)
         push @event, "3:$event:$msg";
         $hash->{helper}{lastEvent} = $db[0];
       }
-      RemoveInternalTimer($hash->{helper}{timer}{alarm}) if(exists $hash->{helper}{timer}{alarm});
-      @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
-      InternalTimer(gettimeofday() + 1440, 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
+      if (AttrVal($name, "signOfLife", 'on') eq 'on') {
+        RemoveInternalTimer($hash->{helper}{timer}{alarm}) if(exists $hash->{helper}{timer}{alarm});
+        @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
+        InternalTimer(gettimeofday() + AttrVal($name, "signOfLifeInterval", 1440), 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
+      }
 
     } elsif ($st eq "windSpeed.00") {
       # wind speed threshold detector
@@ -10385,7 +10387,7 @@ sub EnOcean_Parse($$)
 
       } elsif ($cmd == 10) {
         # pilot wire mode response
-        my $roomCtrlMode = $db[0] & 3;
+        my $roomCtrlMode = $db[0] & 7;
         my %roomCtrlMode = (
           0 => "off",
           1 => "comfort",
@@ -19177,6 +19179,10 @@ EnOcean_Delete($$)
          <li>state: smoke-alarm|off</li>
      </ul><br>
         Set attr subType to smokeDetector.02 manually.
+        A monitoring period can be set for signOfLife telegrams of the sensor, see
+        <a href="#EnOcean_signOfLife">signOfLife</a> and <a href="#EnOcean_signOfLifeInterval">signOfLifeInterval</a>.
+        Default is "on" and an interval of 1440 sec.
+
      </li>
      <br><br>
 
