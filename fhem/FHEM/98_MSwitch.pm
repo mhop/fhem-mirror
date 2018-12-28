@@ -173,6 +173,7 @@ my %sets = (
     "confchange"     => "noArg",
     "clearlog"       => "noArg",
     "set_trigger"    => "noArg",
+	"reset_cmd_count"    => "",
     "change_renamed" => ""
 );
 
@@ -1032,7 +1033,7 @@ sub MSwitch_Set($@) {
 
         if ( $devicemode eq "Notify" ) {
             return
-"Unknown argument $cmd, choose one of active:noArg inactive:noArg del_delays:noArg backup_MSwitch:all_devices fakeevent exec_cmd_1 exec_cmd_2 wait reload_timer:noArg change_renamed $setList $special";
+"Unknown argument $cmd, choose one of active:noArg inactive:noArg del_delays:noArg backup_MSwitch:all_devices fakeevent exec_cmd_1 exec_cmd_2 wait reload_timer:noArg change_renamed reset_cmd_count:1,2 $setList $special";
         }
         elsif ( $devicemode eq "Toggle" ) {
             return
@@ -1047,7 +1048,7 @@ sub MSwitch_Set($@) {
         else {
             #full
             return
-"Unknown argument $cmd, choose one of active:noArg inactive:noArg on off  del_delays:noArg backup_MSwitch:all_devices fakeevent exec_cmd_1 exec_cmd_2 wait reload_timer:noArg change_renamed $setList $special";
+"Unknown argument $cmd, choose one of active:noArg inactive:noArg on off  del_delays:noArg backup_MSwitch:all_devices fakeevent exec_cmd_1 exec_cmd_2 wait reload_timer:noArg change_renamed reset_cmd_count:1,2 $setList $special";
 
         }
     }
@@ -1079,6 +1080,27 @@ sub MSwitch_Set($@) {
         MSwitch_confchange( $hash, $changestring );
         return;
     }
+	
+################################## 
+	
+	
+	 if ( $cmd eq 'reset_cmd_count' ) {
+        if ($args[0] eq "1")
+		{
+		delete( $hash->{READINGS}{EVT_CMD1_COUNT} );
+		}
+		if ($args[0] eq "2")
+		{
+		delete( $hash->{READINGS}{EVT_CMD2_COUNT} );
+		}
+		
+        return;
+    }
+	
+	
+	
+	
+	
 #######################################
     if ( $cmd eq 'reload_timer' ) {
         MSwitch_Clear_timer($hash);
@@ -2100,27 +2122,13 @@ sub MSwitch_Attr(@) {
     }
 
     if ( $cmd eq "set" && $aName eq "MSwitch_Read_Log" ) {
-
-        # MSwitch_LOG( 'test', 0, "writelog".$test );
-
-        #if(!defined($aVal) || $aVal)
         if ( defined($aVal) && $aVal eq "1" ) {
 
             $logInform{$name} = sub($$) {
                 my ( $me, $msg ) = @_;
-
-                #my $test = $hash->{helper}{writelog};
-                #return if(defined($hash->{CHANGED}));
                 return if ( defined( $hash->{helper}{writelog} ) );
-
-                #my $test1 = $dev;
-
-                #$hash->{CHANGED}[0] = $msg;
                 $hash->{helper}{writelog} = $msg;
-
                 MSwitch_Log_Event( $hash, $msg, $me );
-
-                #delete($hash->{CHANGED});
               }
 
         }
@@ -2130,7 +2138,6 @@ sub MSwitch_Attr(@) {
             delete $logInform{$name};
         }
 
-        #return;
     }
 
     if ( $cmd eq 'set' && $aName eq 'disable' && $aVal == 1 ) {
