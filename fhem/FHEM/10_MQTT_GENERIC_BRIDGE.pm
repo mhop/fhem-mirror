@@ -30,6 +30,10 @@
 # 
 # CHANGE LOG
 # 
+# 28.12.2018 1.0.8
+# change     : fuer MQTT2_CLIENT (IOWrite): func. name change "subscribe" -> "subscriptions"
+#              kein Befehl "subscribtions" an eine MQTT2_SERVER-Instanz senden
+#
 # 27.12.2018 1.0.7
 # implement  : alias bei subscribe
 # 
@@ -270,7 +274,7 @@ use warnings;
 
 #my $DEBUG = 1;
 my $cvsid = '$Id$';
-my $VERSION = "version 1.0.7 by hexenmeister\n$cvsid";
+my $VERSION = "version 1.0.8 by hexenmeister\n$cvsid";
 
 my %sets = (
 );
@@ -447,6 +451,7 @@ sub ioDevDisconnect($);
 sub updateDevCount($);
 sub retrieveIODev($);
 sub isIODevMQTT2($);
+sub isIODevMQTT2_CLIENT($);
 sub isIODevMQTT($);
 sub initUserAttr($);
 sub createRegexpForTopic($);
@@ -575,15 +580,25 @@ sub checkIODevMQTT2($) {
   return 0;
 }
 
+sub checkIODevMQTT2_CLIENT($) {
+  my ($iodt) = @_;
+  return 0 unless defined $iodt;
+  return 1 if $iodt eq 'MQTT2_CLIENT';
+  return 0;
+}
+
 # prueft, ob IODev MQTT2-Instanz ist
 sub isIODevMQTT2($) {
   my ($hash) = @_;
   my ($iodt, $iodn) = retrieveIODev($hash);
-  # return 0 unless defined $iodt;
-  # return 1 if $iodt eq 'MQTT2_SERVER';
-  # return 1 if $iodt eq 'MQTT2_CLIENT';
-  # return 0;
   return checkIODevMQTT2($iodt);
+}
+
+# prueft, ob IODev MQTT2_CLIENT-Instanz ist
+sub isIODevMQTT2_CLIENT($) {
+  my ($hash) = @_;
+  my ($iodt, $iodn) = retrieveIODev($hash);
+  return checkIODevMQTT2_CLIENT($iodt);
 }
 
 # Fuegt notwendige UserAttr hinzu
@@ -1615,9 +1630,10 @@ sub UpdateSubscriptions($) {
     }
   }
 
-  if(isIODevMQTT2($hash)) {
+  #if(isIODevMQTT2($hash)) {
+  if(isIODevMQTT2_CLIENT($hash)) {
     # MQTT2 Subscriptions
-    IOWrite($hash, "subscribe", join(" ", @new));
+    IOWrite($hash, "subscriptions", join(" ", @new));
   }
 }
 
@@ -1625,9 +1641,10 @@ sub UpdateSubscriptions($) {
 sub RemoveAllSubscripton($) {
   my ($hash) = @_;
 
-  if(isIODevMQTT($hash)) {
+  #if(isIODevMQTT($hash)) {
+  if(isIODevMQTT2_CLIENT($hash)) {
     # MQTT2 Subscriptions => per default alles
-    IOWrite($hash, "subscribe", "#");
+    IOWrite($hash, "subscriptions", "#");
   }
 
   if(isIODevMQTT($hash)) {
@@ -2607,7 +2624,8 @@ sub onmessage($$$) {
         This module is a MQTT bridge, which simultaneously collects data from several FHEM devices
         and passes their readings via MQTT or set readings from the incoming MQTT messages or executes them
         as a 'set' command on the configured FHEM device.
-    <br/>An <a href="#MQTT">MQTT</a> device is needed as IODev.
+     <br/>One fo the device types could serve as IODev: <a href="#MQTT">MQTT</a>, 
+     <a href="#MQTT2_CLIENT">MQTT2_CLIENT</a> or <a href="#MQTT2_SERVER">MQTT2_SERVER</a>.
  </p>
  <p>The (minimal) configuration of the bridge itself is basically very simple.</p>
  <a name="MQTT_GENERIC_BRIDGEdefine"></a>
@@ -2998,7 +3016,8 @@ sub onmessage($$$) {
     Dieses Modul ist eine MQTT-Bridge, die gleichzeitig mehrere FHEM-Devices erfasst und deren Readings 
     per MQTT weiter gibt bzw. aus den eintreffenden MQTT-Nachrichten befuellt oder diese als 'set'-Befehl 
     an dem konfigurierten FHEM-Geraet ausfuert.
-    <br/>Es wird ein <a href="#MQTT">MQTT</a>-Geraet als IODev benoetigt.
+     <br/>Es wird eines der folgenden Geraete als IODev benoetigt: <a href="#MQTT">MQTT</a>, 
+     <a href="#MQTT2_CLIENT">MQTT2_CLIENT</a> oder <a href="#MQTT2_SERVER">MQTT2_SERVER</a>.
  </p>
  <p>Die (minimale) Konfiguration der Bridge selbst ist grundsaetzlich sehr einfach.</p>
  <a name="MQTT_GENERIC_BRIDGEdefine"></a>
