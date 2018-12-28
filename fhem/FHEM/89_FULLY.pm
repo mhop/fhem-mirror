@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#  89_FULLY.pm 0.9.001
+#  89_FULLY.pm 0.9.002
 #
 #  $Id$
 #
@@ -35,10 +35,21 @@ sub FULLY_Abort ($);
 sub FULLY_UpdateReadings ($$);
 sub FULLY_Ping ($$);
 
-my $FULLY_VERSION = "0.9.001";
+my $FULLY_VERSION = "0.9.002";
+
+# Timeout for Fully requests
 my $FULLY_TIMEOUT = 4;
+
+# Polling interval
 my $FULLY_POLL_INTERVAL = 3600;
+my @FULLY_POLL_RANGE = (10, 86400);
+
+# Minimum version of Fully app
 my $FULLY_REQUIRED_VERSION = 1.27;
+
+# Default protocol and port for Fully requests
+my $FULLY_DEFAULT_PROT = 'http';
+my $FULLY_DEFAULT_PORT = '2323';
 
 my $FULLY_FHEM_COMMAND = qq(
 function SendRequest(FHEM_Address, Devicename, Command) {
@@ -76,9 +87,9 @@ sub FULLY_Initialize ($)
 		$readingFnAttributes;
 }
 
-##################################################
+######################################################################
 # Define device
-##################################################
+######################################################################
 
 sub FULLY_Define ($$)
 {
@@ -86,12 +97,21 @@ sub FULLY_Define ($$)
 	my $name = $hash->{NAME};
 	my $rc = 0;
 	
-	return "Usage: define devname FULLY IP_or_Hostname password [poll-interval]"
+	return "Usage: define devname [http|https]://IP_or_Hostname password [poll-interval]"
 		if (@$a < 4);
 	return "FULLY: polling interval must be in range 10 - 86400"
-		if (@$a == 5 && ($$a[4] !~ /^[1-9][0-9]+$/ || $$a[4] < 10 || $$a[4] > 86400));
+		if (@$a == 5 &&
+		   ($$a[4] !~ /^[1-9][0-9]+$/ || $$a[4] < $FULLY_POLL_RANGE[0] || $$a[4] > $FULLY_POLL_RANGE[1]));
 
-	$hash->{host} = $$a[2];
+	if ($$a[2] =~ /^(https?):\/\/(.+)/) {
+		$hash->{prot} = $1;
+		$hash->{host} = $2;
+	}
+	else {
+		$hash->{prot} = $FULLY_DEFAULT_PROT;
+		$hash->{host} = $$a[2];
+	}
+	$hash->{port} = $FULLY_DEFAULT_PORT;
 	$hash->{version} = $FULLY_VERSION;
 	$hash->{onForTimer} = 'off';
 	$hash->{fully}{password} = $$a[3];
@@ -116,9 +136,9 @@ sub FULLY_Define ($$)
 	return undef;
 }
 
-#####################################
+######################################################################
 # Set or delete attribute
-#####################################
+######################################################################
 
 sub FULLY_Attr ($@)
 {
@@ -200,7 +220,7 @@ sub FULLY_Detail ($@)
 	<table class="block wide">
 	<tr class="odd">
 	<td><div class="col1">
-	<a target="_blank" href="http://$hash->{host}:2323">Remote Admin</a>
+	<a target="_blank" href="$hash->{prot}://$hash->{host}:$hash->{port}">Remote Admin</a>
 	</div></td>
 	</tr>
 	</table>
@@ -432,7 +452,7 @@ sub FULLY_Execute ($$$$)
 	my $ping = min (AttrVal ($name, 'pingBeforeCmd', 0), 2);
 	
 	my $response = '';
-	my $url = "http://".$hash->{host}.":2323/?cmd=$command";
+	my $url = $hash->{prot}.'://'.$hash->{host}.':'.$hash->{port}."/?cmd=$command";
 	
 	if (defined ($param)) {
 		foreach my $parname (keys %$param) {
