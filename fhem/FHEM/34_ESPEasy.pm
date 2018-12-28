@@ -37,7 +37,7 @@ use HttpUtils;
 use Color;
 use SetExtensions;
 
-my $module_version      = "2.11";     # Version of this module
+my $module_version      = "2.12";     # Version of this module
 
 # ------------------------------------------------------------------------------
 # modul version and required ESP Easy firmware / JSON lib version
@@ -59,7 +59,7 @@ my $d_displayTextEncode = 1;          # urlEncode Text for Displays
 my $d_displayTextWidth  = 0;          # display width, 0 => disable formating
 my $d_bridgePort        = 8383;       # bridge port if none specified
 my $d_disableLogin      = 0;          # Disable login if HTTP Code 302
-my $d_maxCmdDuration    = 3;          # max cmd exec time, subtracted from awake time
+my $d_maxCmdDuration    = 1;          # max cmd exec time, subtracted from awake time
 my $d_sleepReading      = 'sleepState'; # Reading used for Indication of deep sleep
 
 # ------------------------------------------------------------------------------
@@ -2105,7 +2105,7 @@ sub ESPEasy_httpReqQueue(@)
          # ESP already send data, so we know if and wheen it goes to sleep
          || ( defined $hash->{helper}{awaked} && defined $hash->{helper}{awaked}{$host} && $hash->{helper}{awaked}{$host} - gettimeofday() < $hash->{helper}{maxCmdDuration}{$host} )
          # ESP did not send any data right now, but device has defined $hash->{ESP_SLEEP}
-         || ( !(defined $hash->{helper}{awaked} && defined $hash->{helper}{awaked}{$host}) && defined $cmdHash->{sleep} && $cmdHash->{sleep} > 0 )
+         || ( !(defined $hash->{helper}{awaked} && defined $hash->{helper}{awaked}{$host}) && defined $cmdHash->{sleep} && $cmdHash->{sleep} > 1 )
        ) {
       # max queue size reached
       if ($queueSize < $hash->{MAX_QUEUE_SIZE}) {
@@ -2179,7 +2179,7 @@ sub ESPEasy_httpReqDequeue_onAwake($$$$$) {
   my ($hash, $host, $sleep, $espName, $ident) = @_;
   my ($name, $type) = ($hash->{NAME}, $hash->{TYPE});
 
-  if (defined $sleep && $sleep > 0) {
+  if (defined $sleep && $sleep > 1) {
 
     if ( ( !defined $hash->{helper}{awaked} || !defined $hash->{helper}{awaked}{$host} )
       || ( defined $hash->{helper}{awaked} && defined $hash->{helper}{awaked}{$host} && $hash->{helper}{awaked}{$host} == 0 ) ) {
@@ -2227,7 +2227,6 @@ sub ESPEasy_httpReqDequeue_onAwake($$$$$) {
   elsif (!$sleep) {
     delete $hash->{helper}{awaked}{$host} if defined $hash->{helper}{awaked} && $hash->{helper}{awaked}{$host};
   }
-#Debug "End";
   return 0;
 }
 
