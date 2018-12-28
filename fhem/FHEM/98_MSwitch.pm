@@ -27,6 +27,8 @@
 #################################################################
 # Todo's:
 # reading las_cmd fehlerhaft bei befehlen mit delay
+# evtcount einführen
+# del delays kontrollieren
 #---------------------------------------------------------------
 #
 # info sonderreadings
@@ -83,7 +85,7 @@ if ( $preconf && $preconf ne "" ) {
 }
 
 my $autoupdate = 'off';         #off/on
-my $version    = '2.08';
+my $version    = '2.09';
 my $vupdate    = 'V2.00'
   ; # versionsnummer der datenstruktur . änderung der nummer löst MSwitch_VUpdate aus .
 my $savecount = 30
@@ -218,7 +220,9 @@ sub MSwitch_Initialize($) {
       . "  MSwitch_Activate_MSwitchcmds:0,1"
       . "  MSwitch_Lock_Quickedit:0,1"
       . "  MSwitch_Ignore_Types:textField-long "
-      . "  MSwitch_Trigger_Filter"
+      . "  MSwitch_Reset_EVT_CMD1_COUNT"
+	  . "  MSwitch_Reset_EVT_CMD2_COUNT"
+	  . "  MSwitch_Trigger_Filter"
       . "  MSwitch_Extensions:0,1"
       . "  MSwitch_Inforoom"
       . "  MSwitch_Mode:Full,Notify,Toggle,Dummy"
@@ -234,7 +238,7 @@ sub MSwitch_Initialize($) {
 
     $hash->{FW_addDetailToSummary} = 0;
 }
-####################
+#################### EVT_CMD1_COUNT
 sub MSwitch_Rename($) {
 
     # routine nicht in funktion
@@ -949,7 +953,9 @@ sub MSwitch_Set($@) {
     $setList =~ s/\n/ /g;
 
     my $devicemode = AttrVal( $name, 'MSwitch_Mode', 'Full' );
- 
+   my $delaymode      = AttrVal( $name, 'MSwitch_Delete_Delays', '0' );
+   
+   
     if ( !exists( $sets{$cmd} ) ) {
         my @cList;
 
@@ -1542,6 +1548,12 @@ sub MSwitch_Set($@) {
     #neu ausführung on/off
     if ( $cmd eq "off" || $cmd eq "on" ) {
 
+	### neu
+	 if ( $delaymode eq '1' ) {
+            MSwitch_Delete_Delay( $hash, $name );
+        }
+	############
+	
         # ausführen des off befehls
         my $zweig = 'nicht definiert';
         $zweig = "cmd1" if $cmd eq "on";
@@ -2216,6 +2228,19 @@ sub MSwitch_Attr(@) {
             delete( $hash->{helper}{savemodeblock} );
             delete( $hash->{READINGS}{Safemode} );
         }
+		
+		if ( $testarg eq 'MSwitch_Reset_EVT_CMD1_COUNT' ) {
+		delete( $hash->{READINGS}{EVT_CMD1_COUNT} );
+		
+		}
+		
+		if ( $testarg eq 'MSwitch_Reset_EVT_CMD2_COUNT' ) {
+		delete( $hash->{READINGS}{EVT_CMD2_COUNT} );
+		
+		}
+		
+		
+		
     }
     return undef;
 }
@@ -2253,8 +2278,31 @@ sub MSwitch_Notify($$) {
     my $trigevent = '';
     my $eventset  = '0';
     my $execids   = "0";
+	
+		my $foundcmd1        = 0;
+			my $foundcmd2        = 0;
 
     my $showevents = AttrVal( $ownName, "MSwitch_generate_Events", 1 );
+	
+	my $resetcmd1 = AttrVal( $ownName, "MSwitch_Reset_EVT_CMD1_COUNT", 0 );
+	my $resetcmd2 = AttrVal( $ownName, "MSwitch_Reset_EVT_CMD2_COUNT", 0 );
+	
+	
+if ($resetcmd1 > 0 && ReadingsVal( $ownName, 'EVT_CMD1_COUNT', '0' ) >= $resetcmd1)
+	{
+	
+	readingsSingleUpdate( $own_hash, "EVT_CMD1_COUNT", 0, $showevents );	
+	}
+	
+if ($resetcmd2 > 0 && ReadingsVal( $ownName, 'EVT_CMD2_COUNT', '0' ) >= $resetcmd1)
+	{
+	
+	readingsSingleUpdate( $own_hash, "EVT_CMD2_COUNT", 0, $showevents );	
+	}
+	
+	
+	
+	
 
 #readingsSingleUpdate( $own_hash, "trigdev0", 'anfang ', 1 );  # nur zu testzwecken
 
@@ -2434,6 +2482,11 @@ sub MSwitch_Notify($$) {
         my $activecount = 0;
         my $anzahl;
       EVENT: foreach my $event (@eventscopy) {
+	  
+	  #MSwitch_LOG( $ownName, 0, "$ownName:     event -> $event  " );
+	  
+	  
+	  
             $own_hash->{eventsave} = 'unsaved';
             MSwitch_LOG( $ownName, 5,
                     "$ownName: eingehendes Event  -> "
@@ -2547,6 +2600,7 @@ sub MSwitch_Notify($$) {
             my $eventstellen = @eventsplit;
             my $testvar      = '';
             my $check        = 0;
+		
 
             #test auf zweige cmd1/2 and switch MSwitch on/off
             if ( $triggeron ne 'no_trigger' ) {
@@ -2560,6 +2614,7 @@ sub MSwitch_Notify($$) {
                 if ( $testvar ne 'undef' ) {
                     $set       = $testvar;
                     $check     = 1;
+					$foundcmd1        = 1;
                     $trigevent = $eventcopy;
 
                  #readingsSingleUpdate( $own_hash, "incomming", $eventcopy, 0 );
@@ -2579,6 +2634,7 @@ sub MSwitch_Notify($$) {
                 if ( $testvar ne 'undef' ) {
                     $set       = $testvar;
                     $check     = 1;
+					$foundcmd2        = 1;
                     $trigevent = $eventcopy;
 
                  #readingsSingleUpdate( $own_hash, "incomming", $eventcopy, 0 );
@@ -2587,6 +2643,10 @@ sub MSwitch_Notify($$) {
                     "$ownName: checktrigger ergebniss -> " . $testvar );
             }
 
+			
+			
+			
+			
             #test auf zweige cmd1/2 and switch MSwitch on/off ENDE
 
             #test auf zweige cmd1/2 only
@@ -2601,7 +2661,7 @@ sub MSwitch_Notify($$) {
                 if ( $testvar ne 'undef' ) {
                     push @cmdarray, $own_hash . ',off,check,' . $eventcopy1;
                     $check = 1;
-
+$foundcmd2        = 1;
                 }
                 MSwitch_LOG( $ownName, 6,
                     "$ownName: checktrigger ergebniss -> " . $testvar );
@@ -2617,6 +2677,7 @@ sub MSwitch_Notify($$) {
                 if ( $testvar ne 'undef' ) {
                     push @cmdarray, $own_hash . ',on,check,' . $eventcopy1;
                     $check = 1;
+					$foundcmd1        = 1;
                 }
                 MSwitch_LOG( $ownName, 6,
                     "$ownName: checktrigger ergebniss -> " . $testvar );
@@ -2675,6 +2736,51 @@ sub MSwitch_Notify($$) {
             }
         }
 
+		
+	#foundcmd1/2	
+	
+	if( $foundcmd1 eq "1"  &&  AttrVal( $ownName, "MSwitch_Reset_EVT_CMD1_COUNT" ,'undef') ne 'undef')
+	{
+	my $inhalt = ReadingsVal( $ownName, 'EVT_CMD1_COUNT', '0' );
+	if ($resetcmd1 == 0 )
+	{
+	$inhalt++;
+	readingsSingleUpdate( $own_hash, "EVT_CMD1_COUNT", $inhalt, $showevents );	
+	}
+	elsif ($resetcmd1 > 0 && $inhalt < $resetcmd1)
+	{
+	$inhalt++;
+	readingsSingleUpdate( $own_hash, "EVT_CMD1_COUNT", $inhalt, $showevents );	
+	}
+	
+	
+	
+	}
+	
+	
+	
+	#MSwitch_LOG( $ownName, 0, "$ownName:     cmdcount erreicht -> $foundcmd1 - $foundcmd2  " );
+	
+	if( $foundcmd2 eq "1"  &&  AttrVal( $ownName, "MSwitch_Reset_EVT_CMD2_COUNT" ,'undef') ne 'undef')
+	{
+	my $inhalt = ReadingsVal( $ownName, 'EVT_CMD2_COUNT', '0' );
+	if ($resetcmd2 == 0 )
+	{
+	$inhalt++;
+	readingsSingleUpdate( $own_hash, "EVT_CMD2_COUNT", $inhalt, $showevents );	
+	}
+	elsif ($resetcmd2 > 0 && $inhalt < $resetcmd2)
+	{
+	$inhalt++;
+	readingsSingleUpdate( $own_hash, "EVT_CMD2_COUNT", $inhalt, $showevents );	
+	}
+	}
+	
+		
+		
+		
+		
+		
      #ausführen aller cmds in @cmdarray nach triggertest aber vor conditiontest
      #my @cmdarray1;	#enthält auszuführende befehle nach conditiontest
      #schaltet zweig 3 und 4
@@ -5975,6 +6081,10 @@ sub MSwitch_Exec_Notif($$$$$) {
             $out  = $devicedetails{$ekey};
         }
 
+		
+		# MSwitch_LOG( $name, 0,"$name:     delaymode -> " . $delaymode ." - ".$device  );
+		
+		
         if ( $delaymode eq '1' ) {
             MSwitch_Delete_Delay( $hash, $device );
         }
@@ -6536,6 +6646,12 @@ sub MSwitch_checkcondition($$$) {
     $condition =~ s/\[\$EVTPART1\]/"\$EVTPART1"/g;
     $condition =~ s/\[\$EVTPART2\]/"\$EVTPART2"/g;
     $condition =~ s/\[\$EVTPART3\]/"\$EVTPART3"/g;
+	
+	$condition =~ s/\[\$EVT_CMD1_COUNT\]/"\$EVT_CMD1_COUNT"/g;
+	$condition =~ s/\[\$EVT_CMD2_COUNT\]/"\$EVT_CMD2_COUNT"/g;
+	
+	
+	
 
     MSwitch_LOG( $name, 6,
         "$name:     Checkcondition - Parameter condition -> " . $condition );
@@ -6666,6 +6782,15 @@ sub MSwitch_checkcondition($$$) {
     $condition =~ s/\$EVTPART2/$evtparts[1]/ig;
     $condition =~ s/\$EVTPART3/$evtparts[2]/ig;
 
+	
+	my $evtcmd1 = ReadingsVal( $name, 'EVT_CMD1_COUNT', '0' );
+	my $evtcmd2 = ReadingsVal( $name, 'EVT_CMD2_COUNT', '0' );
+	
+	$condition =~ s/\$EVT_CMD1_COUNT/$evtcmd1/ig;
+	
+	$condition =~ s/\$EVT_CMD2_COUNT/$evtcmd2/ig;
+	
+	
     MSwitch_LOG( $name, 5, "condition: " . $condition );
     ######################################
     $condition =~ s/{!\$we}/ !\$we /ig;
