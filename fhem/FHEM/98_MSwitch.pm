@@ -7092,6 +7092,15 @@ sub MSwitch_Checkcond_time($$) {
 	$adday = 1
 	}
 	
+	if (  $timeaktuell > $timecond1 && $timecond2 < $timecond1 )
+	
+	{
+	use constant SECONDS_PER_DAY => 60 * 60 * 24;
+	$timecond2 = $timecond2 + SECONDS_PER_DAY;
+	$adday = 1
+	
+	
+	}
 	
 ######## old
    # if ( ( $akthour < $hour1 && $akthour <= $hour2 ) && $hour2 < $hour1 )   # und
