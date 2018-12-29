@@ -37,7 +37,7 @@ use HttpUtils;
 use Color;
 use SetExtensions;
 
-my $module_version      = "2.12";     # Version of this module
+my $module_version      = "2.13";     # Version of this module
 
 # ------------------------------------------------------------------------------
 # modul version and required ESP Easy firmware / JSON lib version
@@ -759,9 +759,8 @@ sub ESPEasy_Set($$@)
     if (AttrVal($name,"useSetExtensions",0)) {
       Log3 $name, 3, "$type $name: set $name $cmd ".join(" ",@params)." (use set extensions)"
         if $cmd =~ m/^(o(n|ff)-(for-timer|till(-overnight)?)|blink|intervals|toggle)$/ ;
-      return SetExtensions($hash, $clist, $name, $cmd, @params);
+      return SetExtensions($hash, $clist, [$name, $cmd, @params]);
     }
-    my $err = "Unknown argument $cmd, choose one of $clist";
     return "Unknown argument $cmd, choose one of $clist";
   }
 
@@ -4467,7 +4466,7 @@ sub ESPEasy_dumpSingleLine($)
       ESPEasy Mega with option to set sleep awake time (Config -&gt; Sleep Mode
       -&gt; Sleep awake time) is required to use this feature.<br>
       Possible values: secs &gt;= 0, but < awake time<br>
-      Default: 3
+      Default: 1
     </li><br>
 
     <li><a name="ESPEasy_device_attr_presencecheck">presenceCheck</a><br>
