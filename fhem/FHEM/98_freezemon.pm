@@ -22,6 +22,7 @@
 #
 ##############################################################################
 # 	  Changelog:
+#		0.0.22: Fixed a weird bug when CatchFnCalls was enabled
 #		0.0.21: Added direct help for set, get and attr commands
 #		0.0.20: Internal changes
 #				improved handling of blocking calls
@@ -96,7 +97,7 @@ use B qw(svref_2object);
 use Blocking;
 use vars qw($FW_CSRF);    
 
-my $version = "0.0.21";
+my $version = "0.0.22";
 
 my @logqueue = ();
 my @fmCmd    = ();
@@ -160,7 +161,7 @@ sub freezemon_Define($$) {
         $hash->{STATE} = "inactive";
         $hash->{helper}{DISABLED} = 1;
     }
-    $hash->{VERSION} = $version;
+    
 
     return undef;
 }
@@ -542,7 +543,7 @@ sub freezemon_Set($@) {
     my $usage = "Unknown argument $cmd, choose one of active:noArg inactive:noArg clear:noArg";
 
     return "\"set $name\" needs at least one argument" unless ( defined($cmd) );
-
+	Log3 $name,5, "$name Coming with command $cmd";
     if ( $cmd eq "inactive" ) {
         RemoveInternalTimer($hash);
         readingsSingleUpdate( $hash, "state", "inactive", 1 );
@@ -550,7 +551,7 @@ sub freezemon_Set($@) {
         freezemon_unwrap_all($hash);
     }
     elsif ( $cmd eq "active" ) {
-        if ( IsDisabled($name) && !AttrVal( $name, "disable", undef ) ) {
+        if ( IsDisabled($name) ) { #&& !AttrVal( $name, "disable", undef ) ) {
             freezemon_start($hash);
         }
         else {
@@ -573,6 +574,7 @@ sub freezemon_Set($@) {
         readingsEndUpdate( $hash, 1 );
     }
     else {
+		Log3 $name,5, "$name leaving with $usage";
         return $usage;
     }
     return undef;
@@ -587,7 +589,7 @@ sub freezemon_Get($@) {
     my $usage = 'Unknown argument $a[1], choose one of freeze:noArg log:';
 
     return "\"get $name\" needs at least one argument" unless ( defined( $a[1] ) );
-
+	Log3 $name,5, "$name GET Coming with command $a[1]";
     #get the logfiles
     my @fl = freezemon_getLogFiles($name);
 
@@ -650,6 +652,7 @@ sub freezemon_Get($@) {
 
     # return usage hint
     else {
+		Log3 $name,5, "GET $name leaving with $usage";
         return $usage;
     }
     return undef;
@@ -941,7 +944,7 @@ sub freezemon_callFn($@) {
 
     # take current time, then immediately call the original  function
     my $t0     = [gettimeofday];
-    my $result = $lfn->(@args);
+    my ($result,$p) = $lfn->(@args);
     my $ms     = tv_interval($t0);
     my $d      = $args[0];
     my $n      = $args[1];
@@ -952,7 +955,8 @@ sub freezemon_callFn($@) {
         #$fm_fn .= "$n:$d ";
         Log3 undef, 3, "[Freezemon] Long function call detected $n:$d - $ms seconds";
     }
-    return $result;
+	return ($result,$p) if ($p) ;
+	return $result;
 }
 ###################################
 sub freezemon_analyzeCommand($$$;$) {
@@ -1293,7 +1297,7 @@ sub freezemon_getLogPath($) {
   <b>Readings</b>
 		<ul>
 			<ul>
-				<li>freezeTime: Duration of the freeze</li>
+				<li><a name="freezeTime">freezeTime</a>: Duration of the freeze</li>
 				<li>freezeDevice: List of functions(Devices) that possibly caused the freeze</li>
 				<li>fcDay: cumulated no. of freezes per day</li>
 				<li>ftDay: cumulated duration of freezes per day</li>
