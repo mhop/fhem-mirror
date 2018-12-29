@@ -80,6 +80,7 @@ harmony_startDiscovery()
                  FD => $socket->fileno(),
                PORT => $socket->sockport,
       };
+      $chash->{helper}{discovered} = {};
 
       $attr{$chash->{NAME}}{room} = 'hidden';
 
@@ -101,12 +102,16 @@ harmony_startDiscovery()
 sub
 harmony_sendDiscovery()
 {
-  my $chash = $modules{harmony}{defptr}{'harmony:discovery'};
-  return if( !$chash );
-  Log3 undef, 3, "harmony: sending discovery" ;
+  if( my $chash = $modules{harmony}{defptr}{'harmony:discovery'} ) {
+    Log3 undef, 3, "harmony: sending discovery" ;
 
-  my $sin = sockaddr_in(5224, inet_aton('255.255.255.255'));
-  $chash->{sendSocket}->send( "_logitech-reverse-bonjour._tcp.local.\n$chash->{PORT}", 0, $sin );
+    my $sin = sockaddr_in(5224, inet_aton('255.255.255.255'));
+    $chash->{sendSocket}->send( "_logitech-reverse-bonjour._tcp.local.\n$chash->{PORT}", 0, $sin );
+
+  } else {
+    Log3 undef, 2, "harmony: can't send or receive discovery" ;
+
+  }
 
   foreach my $chash ( values %{$modules{'harmony'}{defptr}} ) {
     next if( $chash->{NAME} eq 'harmony:discovery' );
@@ -115,14 +120,60 @@ harmony_sendDiscovery()
     next if( $chash->{remoteId} );
 
     RemoveInternalTimer($chash);
-    InternalTimer(gettimeofday()+10, "harmony_tryXMPP", $chash, 0);
+    InternalTimer(gettimeofday()+10, "harmony_tryFakeOrigin", $chash, 0);
   }
 }
+sub
+harmony_tryFakeOrigin($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  Log3 $name, 3, "$name no discovery response received, trying fake origin" ;
+  my $timeout = $hash->{TIMEOUT} ? $hash->{TIMEOUT} : 2;
+  if( my $socket = IO::Socket::INET->new(PeerAddr=>"$hash->{ip}:8088", Timeout=>$timeout) ) {
+    Log3 $name, 3, "$name: connected";
+    $hash->{protocol} = "WEBSOCKET";
+    $hash->{ConnectionState} = "Connected";
+    readingsSingleUpdate( $hash, "state", $hash->{ConnectionState}, 1 ) if( $hash->{ConnectionState} ne ReadingsVal($name, "state", "" ) );
+    $hash->{LAST_CONNECT} = FmtDateTime( gettimeofday() );
+
+    $hash->{FD}    = $socket->fileno();
+    $hash->{CD}    = $socket;         # sysread / close won't work on fileno
+    $hash->{CONNECTS}++;
+    $selectlist{$name} = $hash;
+
+    $hash->{fakeOrigin} = 1;
+
+    my $ret = "POST / HTTP/1.1\r\n";
+    $ret .= harmony_hash2header( {                    'Host' => "$hash->{ip}:8088",
+                                                    'Origin' => 'http://localhost.nebula.myharmony.com',
+                                              'Content-Type' => 'application/json',
+                                            'Content-Length' => 35,
+                                } );
+
+    $ret .= "\r\n";
+    $ret .= '{"cmd":"connect.discoveryinfo?get"}';
+    Log3 $name, 5, "$name: $ret";
+
+    syswrite( $hash->{CD}, $ret );
+
+    return;
+
+  } else {
+    Log3 $name, 2, "$name failed to connect to websocket port" ;
+
+  }
+
+  harmony_tryXMPP($hash);
+}
+
 sub
 harmony_tryXMPP($)
 {
   my ($hash) = @_;
   my $name = $hash->{NAME};
+
   Log3 $name, 3, "$name no discovery response received, trying fallback to xmpp" ;
 
   harmony_connect($hash);
@@ -1186,13 +1237,15 @@ harmony_Read($)
     }
     Log3 $name, 4, Dumper \%params;
 
+    $hash->{helper}{discovered}{$params{remoteId}} = \%params;
+
     foreach my $chash ( values %{$modules{$hash->{TYPE}}{defptr}} ) {
       next if( $chash->{NAME} eq 'harmony:discovery' );
       next if( !defined($chash->{ip}) );
       next if( $chash->{remoteId} );
       if( $chash->{ip} eq $params{ip} ) {
-        $chash->{remoteId} = $params{remoteId};
         $chash->{discoveryinfo} = \%params;
+        $chash->{remoteId} = $chash->{discoveryinfo}{remoteId};
 
         Log3 $name, 4, Dumper  $chash->{discoveryinfo}{protocolVersion};
         if( $chash->{discoveryinfo}{protocolVersion} =~ m/XMPP/ ) {
@@ -1219,33 +1272,33 @@ harmony_Read($)
       $close = 1;
 
     } elsif( $hash->{websocket} ) {
-      $hash->{buf} .= $buf;
+      $hash->{helper}{PARTIAL} .= $buf;
 
       do {
-        my $fin  = (ord(substr($hash->{buf},0,1)) & 0x80)?1:0;
-        my $op   = (ord(substr($hash->{buf},0,1)) & 0x0F);
-        my $mask = (ord(substr($hash->{buf},1,1)) & 0x80)?1:0;
-        my $len  = (ord(substr($hash->{buf},1,1)) & 0x7F);
+        my $fin  = (ord(substr($hash->{helper}{PARTIAL},0,1)) & 0x80)?1:0;
+        my $op   = (ord(substr($hash->{helper}{PARTIAL},0,1)) & 0x0F);
+        my $mask = (ord(substr($hash->{helper}{PARTIAL},1,1)) & 0x80)?1:0;
+        my $len  = (ord(substr($hash->{helper}{PARTIAL},1,1)) & 0x7F);
         my $i = 2;
 
 #Log 1, $len;
         if( $len == 126 ) {
-          $len = unpack( 'n', substr($hash->{buf},$i,2) );
+          $len = unpack( 'n', substr($hash->{helper}{PARTIAL},$i,2) );
           $i += 2;
         } elsif( $len == 127 ) {
-          $len = unpack( 'N', substr($hash->{buf},$i+4,6) );
+          $len = unpack( 'N', substr($hash->{helper}{PARTIAL},$i+4,6) );
           $i += 8;
         }
 
         if( $mask ) {
-          $mask = substr($hash->{buf},$i,4);
+          $mask = substr($hash->{helper}{PARTIAL},$i,4);
           $i += 4;
         }
 #Log 1, "$fin $op $mask $len";
-        return if( $len > length($hash->{buf})-$i );
+        return if( $len > length($hash->{helper}{PARTIAL})-$i );
 
-        my $data = substr($hash->{buf}, $i, $len);
-        $hash->{buf} = substr($hash->{buf},$i+$len);
+        my $data = substr($hash->{helper}{PARTIAL}, $i, $len);
+        $hash->{helper}{PARTIAL} = substr($hash->{helper}{PARTIAL},$i+$len);
 
         if( $op == 0x01 ) {
           my $json = harmony_decode_json($data);
@@ -1265,7 +1318,7 @@ harmony_Read($)
         }
 
 
-      } while( $hash->{buf} && !$close );
+      } while( $hash->{helper}{PARTIAL} && !$close );
 
     } elsif( $buf =~ m'^HTTP/1.1 101 Switching Protocols'i )  {
       $hash->{websocket} = 1;
@@ -1305,8 +1358,40 @@ harmony_Read($)
     return;
   }
 
+
   my $data = $hash->{helper}{PARTIAL};
   $data .= $buf;
+
+  if( $hash->{fakeOrigin} ) {
+    if( $data =~ m/200 OK/ ) {
+      if( $data =~ m/^(.*?)\r?\n\r?\n(.*)$/s ) {
+        my $header = $1;
+        my $body = $2;
+
+        if( my $json = harmony_decode_json($body) ) {
+          Log3 $name, 3, "$name: answer for fake origin query received";
+          $hash->{discoveryinfo} = $json->{data};
+          $hash->{remoteId} = $hash->{discoveryinfo}{remoteId};
+
+          Log3 $name, 4, Dumper  $hash->{discoveryinfo}{protocolVersion};
+          if( $hash->{discoveryinfo}{protocolVersion} =~ m/XMPP/ ) {
+            delete $hash->{remoteId} if( !AttrVal( $hash->{NAME}, 'forceWebSocket', 0 ) );
+          }
+
+          harmony_connect( $hash );
+        }
+
+      } else {
+        $hash->{helper}{PARTIAL} = $data;
+      }
+
+    } else {
+      harmony_tryXMPP($hash);
+
+    }
+
+    return;
+  }
 
   #FIXME: should use real xmpp/xml parser
   # see forum https://forum.fhem.de/index.php/topic,14163.msg575033.html#msg575033
@@ -1629,6 +1714,10 @@ harmony_disconnect($)
   $hash->{ConnectionState} = "Disconnected";
   readingsSingleUpdate( $hash, "state", $hash->{ConnectionState}, 1 ) if( $hash->{ConnectionState} ne ReadingsVal($name, "state", "" ) );
 
+  delete $hash->{websocket};
+  delete $hash->{fakeOrigin};
+  $hash->{helper}{PARTIAL} = "";
+
   return if( !$hash->{CD} );
   Log3 $name, 2, "$name: disconnect";
 
@@ -1666,10 +1755,6 @@ harmony_connect($)
       $hash->{CONNECTS}++;
       $selectlist{$name} = $hash;
 
-      $hash->{helper}{PARTIAL} = "";
-      $hash->{buf} = "";
-      delete $hash->{websocket};
-
       my $domain = "svcs.myharmony.com";
       if( $hash->{discoveryinfo}{discoveryServerUri} =~ m'https://([^/]+)' ) {
         $domain = $1;
@@ -1687,7 +1772,7 @@ harmony_connect($)
       $ret .= "\r\n";
       Log3 $name, 5, "$name: $ret";
 
-      syswrite($hash->{CD}, $ret );
+      syswrite( $hash->{CD}, $ret );
 
     } else {
       harmony_disconnect( $hash );
@@ -1714,8 +1799,6 @@ harmony_connect($)
       $hash->{CD}    = $conn;         # sysread / close won't work on fileno
       $hash->{CONNECTS}++;
       $selectlist{$name} = $hash;
-
-      $hash->{helper}{PARTIAL} = "";
 
       harmony_send($hash, "<stream:stream to='connect.logitech.com' xmlns:stream='http://etherx.jabber.org/streams' xmlns='jabber:client' xml:lang='en' version='1.0'>");
 
@@ -1785,7 +1868,7 @@ harmony_send($$)
         }
       }
 
-      syswrite($hash->{CD}, $txt );
+      syswrite( $hash->{CD}, $txt );
     }
     return;
   }
@@ -1869,7 +1952,7 @@ harmony_ping($)
 
   if( $hash->{remoteId} ) {
     my $txt = chr(0x89) . chr(0);
-    syswrite($hash->{CD}, $txt );
+    syswrite( $hash->{CD}, $txt );
 
     RemoveInternalTimer($hash);
     InternalTimer(gettimeofday()+50, "harmony_ping", $hash, 0);
@@ -2039,7 +2122,16 @@ harmony_Get($$@)
     my $list = "discovered:noArg";
 
     if( $cmd eq "discovered" ) {
-      return;
+      my $ret;
+      foreach my $remoteId ( sort keys %{$hash->{helper}{discovered}}) {
+        my $discoveryinfo = $hash->{helper}{discovered}{$remoteId};
+        $ret .= "\n" if( $ret );
+        $ret .= sprintf( "%-8s %-15s %-20s %-9s %s", $discoveryinfo->{remoteId}, $discoveryinfo->{ip}, $discoveryinfo->{friendlyName}, $discoveryinfo->{current_fw_version}, $discoveryinfo->{protocolVersion} );
+      }
+      $ret = sprintf( "%-8s %-15s %-20s %-9s %s\n", "remoteId", "ip", "friendlyName", "fw_vers", "protocolVersion" ).$ret if( $ret );
+      $ret .= "\n" if( $ret );
+
+      return $ret;
     }
 
     return "Unknown argument $cmd, choose one of $list";
