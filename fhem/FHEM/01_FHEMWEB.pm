@@ -171,6 +171,7 @@ FHEMWEB_Initialize($)
     hiddengroupRegexp
     hiddenroom
     hiddenroomRegexp
+    httpHeader
     iconPath
     longpoll:0,1,websocket
     longpollSVG:1,0
@@ -421,6 +422,9 @@ FW_Read($$)
    $FW_headerlines .= "X-FHEM-csrfToken: $defs{$FW_wname}{CSRFTOKEN}\r\n"
         if(defined($defs{$FW_wname}{CSRFTOKEN}) &&
            AttrVal($FW_wname, "csrfTokenHTTPHeader", 1));
+
+   my $hh = AttrVal($FW_wname, "httpHeader", undef);
+   $FW_headerlines .= "$hh\r\n" if($hh);
 
   #########################
   # Return 200 for OPTIONS or 405 for unsupported method
@@ -3694,6 +3698,15 @@ FW_widgetOverride($$)
         </li>
         <br>
 
+    <a name="httpHeader"></a>
+    <li>httpHeader<br>
+        One or more HTTP header lines to be sent out with each answer. Example:
+        <ul><code>
+          attr WEB httpHeader X-Clacks-Overhead: GNU Terry Pratchett
+        </code></ul>
+        </li>
+        <br>
+
 
     <a name="HTTPS"></a>
     <li>HTTPS<br>
@@ -4403,6 +4416,16 @@ FW_widgetOverride($$)
         </ul>
         Achtung: die besonderen Werte input, detail und save m&uuml;ssen mit
         hiddenroom spezifiziert werden.
+        </li>
+        <br>
+
+    <a name="httpHeader"></a>
+    <li>httpHeader<br>
+        Eine oder mehrere HTTP-Header Zeile, die in jede Antwort eingebettet
+        wird. Beispiel:
+        <ul><code>
+          attr WEB httpHeader X-Clacks-Overhead: GNU Terry Pratchett
+        </code></ul>
         </li>
         <br>
 
