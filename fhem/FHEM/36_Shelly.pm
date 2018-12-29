@@ -38,7 +38,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "1.7";
+my $version = "1.8";
 
 #-- these we may get on request
 my %gets = (
@@ -635,7 +635,6 @@ sub Shelly_pwd($){
   my ($subs,$ison,$overpower,$rpower,$rstate,$power,$rstopreason,$rcurrpos,$position,$rlastdir,$pct,$pctnormal);
   
   readingsBeginUpdate($hash);
-  readingsBulkUpdateIfChanged($hash,"state","OK");
   readingsBulkUpdateIfChanged($hash,"network","connected",1);
   
   #-- we have a Shelly 1, Shelly 4, Shelly 2  or ShellyPlug switch type device
@@ -649,6 +648,11 @@ sub Shelly_pwd($){
       
       readingsBulkUpdateIfChanged($hash,"relay".$subs,$ison);
       readingsBulkUpdateIfChanged($hash,"overpower".$subs,$overpower);
+      if($model eq "shelly1"){
+        readingsBulkUpdateIfChanged($hash,"state",$ison)
+      }else{
+        readingsBulkUpdateIfChanged($hash,"state","OK");
+      } 
     }
     for( my $i=0;$i<$meters;$i++){
       $subs  = ($meters == 1) ? "" : "_".$i;
@@ -685,8 +689,6 @@ sub Shelly_pwd($){
       
       #-- we have data from the device, take that one 
       if( defined($rcurrpos) && ($rcurrpos =~ /\d\d?\d?/) ){
-        Log3 $name,1,"[Shelly_status] device $name with model=shelly2 returns a blind position, consider chosing a different model=shelly2"
-          if( $model eq "shelly2" );
         $pct = $pctnormal ? $rcurrpos : 100-$rcurrpos;
         $position = ($rcurrpos==100) ? "open" : ($rcurrpos==0 ? "closed" : $pct);        
 
@@ -714,7 +716,7 @@ sub Shelly_pwd($){
           }
         }
       }
-      
+     
       readingsBulkUpdateIfChanged($hash,"state".$subs,$rstate);
       readingsBulkUpdateIfChanged($hash,"pct".$subs,$pct);
       readingsBulkUpdateIfChanged($hash,"position".$subs,$position);
@@ -914,7 +916,11 @@ sub Shelly_updown2($){
   my $subs = ($shelly_models{$model}[0] ==1) ? "" : "_".$channel;
 
   readingsBeginUpdate($hash);
-  readingsBulkUpdate($hash,"state","OK");
+  if($model eq "shelly1"){
+    readingsBulkUpdateIfChanged($hash,"state",$ison)
+  }else{
+    readingsBulkUpdate($hash,"state","OK");      
+  }
   readingsBulkUpdate($hash,"relay".$subs,$ison);
   readingsBulkUpdate($hash,"overpower".$subs,$overpower)
     if( $shelly_models{$model}[2] > 0);
