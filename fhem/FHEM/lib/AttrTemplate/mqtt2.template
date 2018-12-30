@@ -447,6 +447,32 @@ attr DEVICE setStateList on off
 #attr DEVICE userReadings rgb {sprintf("%02X%02X%02X", ReadingsVal($name,"color_r",255), ReadingsVal($name,"color_g",255), ReadingsVal($name,"color_b",255))}
 attr DEVICE model X_01_esp_milight_hub_rgbw_bulb
 
+#rgbw-group
+name:X_01a_esp_milight_hub_make_rgbw_group
+filter:TYPE=MQTT2_DEVICE
+desc:For use with X_01_esp_milight_hub_bridge <br>Defines a new device based on the one the template is applied to. <br>Only basic elements to control a group of rgbw bulbs will be available. 
+par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*tes/.*:, ? $1 : undef }
+par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/](0x....)[/].*:, ? $2 : undef }
+par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/][^/]+[/][^/]+[/]([^/]+)[/].*:, ? $1 : undef }
+copy DEVICE milight_REMOTE_ID_0
+deletereading milight_REMOTE_ID_0 .*_.*
+attr milight_REMOTE_ID_0 icon light_control
+attr milight_REMOTE_ID_0 eventMap /set_white:Weiss/night_mode:Nacht/white_mode:white/
+attr milight_REMOTE_ID_0 devStateIcon {zigbee2mqtt_devStateIcon255($name)}
+attr milight_REMOTE_ID_0 webCmd brightness:hue:command
+attr milight_REMOTE_ID_0 readingList BASE_ID/states/REMOTE_ID/BULB_TYPE/0:.* { json2nameValue($EVENT) }\
+   BASE_ID/updates/REMOTE_ID/BULB_TYPE/0:.* { json2nameValue($EVENT) }
+attr milight_REMOTE_ID_0 setList\
+   on BASE_ID/REMOTE_ID/BULB_TYPE/0 {"status":"ON"}\
+   off BASE_ID/REMOTE_ID/BULB_TYPE/0_ID {"status":"OFF"}\
+   brightness:colorpicker,BRI,0,15,255 BASE_ID/REMOTE_ID/BULB_TYPE/0 {"$EVTPART0":"$EVTPART1"}\
+   hue:colorpicker,HUE,0,1,359 BASE_ID/REMOTE_ID/BULB_TYPE/0 {"$EVTPART0":"$EVTPART1"}\
+   command:uzsuSelectRadio,Weiss,Nacht BASE_ID/REMOTE_ID/BULB_TYPE/0 {"$EVTPART0":"$EVTPART1"}
+attr milight_REMOTE_ID_0 setStateList on off
+#attr milight_REMOTE_ID_0 userReadings rgb {sprintf("%02X%02X%02X", ReadingsVal($name,"color_r",255), ReadingsVal($name,"color_g",255), ReadingsVal($name,"color_b",255))}
+modify milight_REMOTE_ID_0 milight_REMOTE_ID_0
+attr milight_REMOTE_ID_0 model X_01a_esp_milight_hub_make_rgbw_group
+
 #rgbw_cct-bulb
 name:X_01a_esp_milight_hub_rgb_cct_bulb
 filter:TYPE=MQTT2_DEVICE
