@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 49_SSCamSTRM.pm 17950 2018-12-10 22:11:29Z DS_Starter $
+# $Id: 49_SSCamSTRM.pm 18007 2018-12-19 21:29:11Z DS_Starter $
 #########################################################################################################################
 #       49_SSCamSTRM.pm
 #
@@ -34,6 +34,8 @@ use warnings;
 
 # Versions History intern
 our %SSCamSTRM_vNotesIntern = (
+  "2.2.1"  => "19.12.2018  commandref revised ",
+  "2.2.0"  => "13.12.2018  load sscam_hls.js, sscam_tooltip.js from pgm2 for HLS Streaming support and tooltips ",
   "2.1.0"  => "11.12.2018  switch \"popupStream\" from get to set ",
   "2.0.0"  => "09.12.2018  get command \"popupStream\" and attribute \"popupStreamFW\" ",
   "1.5.0"  => "02.12.2018  new attribute \"popupWindowSize\" ",
@@ -59,6 +61,8 @@ sub SSCam_ptzpanel($;$$);
 sub SSCam_StreamDev($$$);
 sub SSCam_getclhash($;$$);
 
+# my $hlsjs = "hls.js";      # hls.js Release von Seite https://github.com/video-dev/hls.js/releases
+
 ################################################################
 sub SSCamSTRM_Initialize($) {
   my ($hash) = @_;
@@ -83,8 +87,11 @@ sub SSCamSTRM_Initialize($) {
   $hash->{FW_hideDisplayName} = 1;        # Forum 88667
   # $hash->{FW_addDetailToSummary} = 1;
   # $hash->{FW_atPageEnd} = 1;            # wenn 1 -> kein Longpoll ohne informid in HTML-Tag
-}
 
+  #$data{FWEXT}{SSCAMSTRM}{SCRIPT} = "/pgm2/".$hlsjs if (!$data{FWEXT}{SSCAMSTRM}{SCRIPT});
+ 
+return undef; 
+}
 
 ################################################################
 sub SSCamSTRM_Define($$) {
@@ -200,7 +207,7 @@ sub SSCamSTRM_FwFn($;$$$) {
   
   RemoveInternalTimer($hash);
   $hash->{HELPER}{FW} = $FW_wname;
- 
+       
   $link = AnalyzePerlCommand(undef, $link) if($link =~ m/^{(.*)}$/s);
   my $show = $defs{$hash->{PARENT}}->{HELPER}{ACTSTRM} if($hash->{MODEL} =~ /switched/);
   $show = $show?"($show)":"";
@@ -373,13 +380,13 @@ Dependend of the Streaming-Device state, different buttons are provided to start
     <a name="popupStreamFW"></a>
     <li><b>popupStreamFW</b><br>
       You can specify a particular FHEMWEB device whose active browser pages should open a popup window by the 
-      "get &lt;name&gt; popupStream" command (default: all active FHEMWEB devices).
+      "set &lt;name&gt; popupStream" command (default: all active FHEMWEB devices).
     </li>
     <br>
     
     <a name="popupStreamTo"></a>
     <li><b>popupStreamTo [OK | &lt;seconds&gt;]</b><br>
-      The attribute "popupStreamTo" determines the type of the popup window which is opend by get-function "popupStream".
+      The attribute "popupStreamTo" determines the type of the popup window which is opend by set-function "popupStream".
       If "OK" is set, an OK-dialog window will be opened. A specified number in seconds closes the popup window after this 
       time automatically (default 5 seconds)..
       <br><br>
@@ -480,7 +487,7 @@ Abhängig vom Zustand des Streaming-Devices werden zum Start von Aktionen unters
     <a name="autoRefresh"></a>
     <li><b>autoRefresh</b><br>
       Wenn gesetzt, werden aktive Browserseiten des FHEMWEB-Devices welches das SSCamSTRM-Device aufgerufen hat, nach der 
-      eingestellten Zeit (Sekunden) neu geladen. Sollen statt dessen Broserseiten eines bestimmten FHEMWEB-Devices neu 
+      eingestellten Zeit (Sekunden) neu geladen. Sollen statt dessen Browserseiten eines bestimmten FHEMWEB-Devices neu 
       geladen werden, kann dieses Device mit dem Attribut "autoRefreshFW" festgelegt werden.
       Dies kann in manchen Fällen die Wiedergabe innerhalb einer Anwendung stabilisieren.
     </li>
@@ -528,13 +535,13 @@ Abhängig vom Zustand des Streaming-Devices werden zum Start von Aktionen unters
     <a name="popupStreamFW"></a>
     <li><b>popupStreamFW</b><br>
       Es kann mit diesem Attribut das FHEMWEB-Device bestimmt werden, auf dessen Browserseiten sich Popup-Fenster mit 
-      "get &lt;name&gt; popupStream" öffnen sollen (default: alle aktiven FHEMWEB-Devices).
+      "set &lt;name&gt; popupStream" öffnen sollen (default: alle aktiven FHEMWEB-Devices).
     </li>
     <br>
     
     <a name="popupStreamTo"></a>
     <li><b>popupStreamTo [OK | &lt;Sekunden&gt;]</b><br>
-      Das Attribut "popupStreamTo" legt die Art des Popup-Fensters fest welches mit der get-Funktion "popupStream" geöffnet wird.
+      Das Attribut "popupStreamTo" legt die Art des Popup-Fensters fest welches mit der set-Funktion "popupStream" geöffnet wird.
       Ist "OK" eingestellt, öffnet sich ein OK-Dialogfenster. Die angegebene Zahl in Sekunden schließt das Fenster nach dieser 
       Zeit automatisch (default 5 Sekunden).
       <br><br>
@@ -549,7 +556,7 @@ Abhängig vom Zustand des Streaming-Devices werden zum Start von Aktionen unters
     <li><b>popupWindowSize</b><br>
       Bei geeigneten Wiedergabeinhalten (Videostream oder Schnappschußgalerie) öffnet ein Klick auf den Bildinhalt ein 
       Popup-Fenster mit diesem Inhalt. Die Darstellungsgröße kann mit diesem Attribut eingestellt werden. 
-      Das Attribut gilt ebenfalls für die get-Funktion "popupStream".
+      Das Attribut gilt ebenfalls für die set-Funktion "popupStream".
       <br><br>
       <ul>
         <b>Beispiel: </b><br>
