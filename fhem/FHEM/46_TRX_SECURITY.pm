@@ -32,6 +32,7 @@
 #
 #	CHANGELOG
 #	
+#	30.12.2018	Added standardized Reading batteryState	
 #	29.03.2018	Summary for Commandref
 #		
 #		
@@ -201,9 +202,10 @@ TRX_SECURITY_Set($@)
 		if ($sensor ne "none") { readingsBulkUpdate($hash, $sensor, $command); }
 
 		# Set battery
-	  	$sensor = "battery";
-		readingsBulkUpdate($hash, $sensor, "ok");
-
+	  	#$sensor = "battery";
+		readingsBulkUpdate($hash, "battery", "ok");
+		readingsBulkUpdate($hash, "batteryState", "ok");
+		
   		readingsEndUpdate($hash, 1);
 	}
 
@@ -507,7 +509,8 @@ sub TRX_SECURITY_parse_X10Sec($$) {
 	$current = "Error";
 	$current = "ok" if ($battery eq "batt_ok");
 	$current = "low" if ($battery eq "batt_low");
-	readingsBulkUpdate($def, $sensor, $current);
+	readingsBulkUpdate($def, "battery", $current);
+	readingsBulkUpdate($def, "batteryState", $current);
   }
 
   if ($rssi ne "") {
