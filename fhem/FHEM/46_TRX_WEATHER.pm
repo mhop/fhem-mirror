@@ -1677,8 +1677,9 @@ TRX_WEATHER_Parse($$)
 			my @words = split(/\s+/,$i->{current});
 			$val .= "BAT: ".$words[0]." "; #use only first word
 
-			$sensor = "battery";			
-			readingsBulkUpdate($def, $sensor, $i->{current});
+			#$sensor = "battery";			
+			readingsBulkUpdate($def, "battery", $i->{current});
+			readingsBulkUpdate($def, "batteryState", $i->{current});
 	}
 	elsif ($i->{type} eq "pressure") { 
 			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name Luftdruck ".$i->{current}." ".$i->{units}." Vorhersage=".$i->{forecast};
