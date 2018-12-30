@@ -16,7 +16,6 @@ attr DEVICE reading02Regex SpritsortenController[^0-9]+([0-9,]+)[^0-9]+Super E10
 attr DEVICE reading03Name SuperE5
 attr DEVICE reading03Regex SpritsortenController[^0-9]+([0-9,]+)[^0-9]+Super E5
 attr DEVICE readingOExpr $val =~ tr/,/./;;$val
-attr DEVICE room 2_6_Spritpreise
 attr DEVICE stateFormat E5: SuperE5 € / E10: SuperE10 € / D: Diesel €
 attr DEVICE timeout 10
 attr DEVICE verbose 2
@@ -31,10 +30,10 @@ desc: Get prices for one product as environment search.<br>Define a HTTPMOD devi
 attr DEVICE reading01Name Tankstellenname
 attr DEVICE reading01Regex <div class=\"row fuel-station-location-name\">(.*)<\/div>
 attr DEVICE reading01RegOpt g
-attr DEVICE reading02Name Preis ;
+attr DEVICE reading02Name Preis
 attr DEVICE reading02Regex <div class=\"price\">(.*)<sup>
 attr DEVICE reading02RegOpt g
-attr DEVICE reading03Name Strasse ;
+attr DEVICE reading03Name Strasse
 attr DEVICE reading03Regex <div id=\"fuel-station-location-street\">(.*)<\/div>
 attr DEVICE reading03RegOpt g
 attr DEVICE reading04Name Ort
