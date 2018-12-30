@@ -504,6 +504,7 @@ FHEM/98_MSwitch.pm           Byte09	              Automatisierung
 FHEM/98_telnet.pm            rudolfkoenig         Automatisierung
 FHEM/98_update.pm            rudolfkoenig         Sonstiges
 FHEM/98_version.pm           markusbloch          Sonstiges
+FHEM/98_vitoconnect.pm       andreas13            Heizungssteuerung/Raumklima
 FHEM/98_weblink.pm           rudolfkoenig         Frontends/FHEMWEB
 FHME/98_weekprofile.pm       risiko               Frontends
 FHEM/98_STOCKQUOTES.pm       vbs                  Unterstuetzende Dienste
