@@ -9597,7 +9597,17 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   Readings der Kamera gespeichert. <br><br>
   
   <b>Email-Versand</b> <br><br>
-  Der Schnappschuß kann nach der Erstellung per <b>Email</b> versendet werden. Dazu enthält das Modul einen eigenen Email-Client.
+  Der Schnappschuß kann nach der Erstellung per <b>Email</b> versendet werden. Dazu enthält das Modul einen eigenen 
+  Email-Client. Zur Verwendung dieser Funktion muss das Perl-Modul <b>MIME::Lite</b> installiert sein. Auf Debian-System kann 
+  es mit <br><br>
+   
+   <ul>
+    sudo apt-get install libmime-lite-perl
+   </ul>
+   <br>
+   
+  installiert werden. <br><br>
+  
   Der Email-Versand wird durch das Setzen des <a href="#SSCamattr">Attributs</a> "snapEmailTxt" eingeschaltet. 
   Weitere Attribute müssen gesetzt oder können optional verwendet werden. <br>
   Die Credentials für den Zugang zum Email-Server müssen mit dem Befehl <b>"set &lt;name&gt; smtpcredentials &lt;user&gt; &lt;password&gt;"</b>
