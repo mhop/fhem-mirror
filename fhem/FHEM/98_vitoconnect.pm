@@ -45,6 +45,11 @@
 #  2018-12-30     initial offical release
 #                 remove special characters from readings
 #                 some internal improvements suggested by CoolTux
+#  2019-??-??     "disabled" implemented
+#                 "set update implemented
+#						renamed "WW-onTimeCharge_aktiv" into "WW-einmaliges_Aufladen_aktiv"
+#						Attribute vitoconnect_raw_readings:0,1 " and  ."vitoconnect_actions_active:0,1 " implemented
+#						"set clearReadings" implemented
 #          
 #
 #   ToDo:
@@ -60,8 +65,6 @@
 #
 
 
-
-
 package main;
 use strict;
 use warnings;
@@ -69,6 +72,7 @@ use Time::HiRes qw(gettimeofday);
 use JSON;
 use HttpUtils;
 #use Data::Dumper;
+#use Path::Tiny;
 
 my $client_id = '79742319e39245de5f91d15ff4cac2a8';
 my $client_secret = '8ad97aceb92c5892e102b093c7c083fa';
@@ -163,7 +167,7 @@ my %RequestList = (
     "heating.device.time.offset.value" 										=> "Device_Time_Offset",
     "heating.dhw.active" 															=> "WW-aktiv",
     "heating.dhw.charging.active"                                      => "WW-Aufladung",
-    "heating.dhw.oneTimeCharge.active" 										=> "WW-onTimeCharge_aktiv",
+    "heating.dhw.oneTimeCharge.active" 										=> "WW-einmaliges_Aufladen_aktiv",
   	 "heating.dhw.pumps.circulation.schedule.active"                    	=> "WW-Zirklationspumpe_Zeitsteuerung_aktiv",
   	 "heating.dhw.pumps.circulation.schedule.entries"                   	=> "WW-Zirkulationspumpe_Zeitplan",
   	 "heating.dhw.pumps.circulation.status"                             	=> "WW-Zirkulationspumpe_Status",
@@ -208,7 +212,10 @@ sub vitoconnect_Initialize($) {
     $hash->{GetFn}      = 'vitoconnect_Get';
     $hash->{AttrFn}     = 'vitoconnect_Attr';
     $hash->{ReadFn}     = 'vitoconnect_Read';
-    $hash->{AttrList} =  "disable:0,1".$readingFnAttributes;
+    $hash->{AttrList} =  "disable:0,1 "
+    ."vitoconnect_raw_readings:0,1 "
+    ."vitoconnect_actions_active:0,1 "
+    .$readingFnAttributes;
 }
 
 sub vitoconnect_Define($$) {
@@ -223,7 +230,7 @@ sub vitoconnect_Define($$) {
     $hash->{intervall} = $param[4];
     $hash->{counter} = 0;
     
-	 InternalTimer(gettimeofday()+2, "$name - _GetUpdate", $hash);   
+	 InternalTimer(gettimeofday()+2, "vitoconnect_GetUpdate", $hash);   
     return undef;
 }
 
@@ -244,17 +251,25 @@ sub vitoconnect_Set($@) {
 	my ($hash, $name, $opt, @args) = @_;
 	
 	return "set $name needs at least one argument" unless (defined($opt));
-	if ($opt eq "update"){ vitoconnect_GetUpdate($hash); }
-	return undef;
+	if ($opt eq "update"){ vitoconnect_GetUpdate($hash); return undef; }
+	elsif ($opt eq "clearReadings") {
+		AnalyzeCommand ($hash, "deletereading $name .*");
+		return undef;
+	}
+	return "unknown value $opt, choose one of update:noArg clearReadings:noArg";
 }	
 sub vitoconnect_Attr(@) {
 	my ($cmd,$name,$attr_name,$attr_value) = @_;
 	if($cmd eq "set") {
-        if($attr_name eq "formal") {
-			if($attr_value !~ /^yes|no$/) {
-			    my $err = "Invalid argument $attr_value to $attr_name. Must be yes or no.";
-			    Log 3, "$name: ".$err;
-			    return $err;
+   	if($attr_name eq "vitoconnect_raw_readings") {
+			if($attr_value !~ /^0|1$/) {
+			   my $err = "Invalid argument $attr_value to $attr_name. Must be 0 or 1.";
+			   Log 1, "$name: ".$err; return $err;
+			}
+		} elsif($attr_name eq "vitoconnect_actions_active") {
+			if($attr_value !~ /^0|1$/) {
+				my $err = "Invalid argument $attr_value to $attr_name. Must be 0 or 1.";
+			   Log 1, "$name: ".$err; return $err;
 			}
 		} elsif($attr_name eq "disable") {
 		
@@ -271,9 +286,9 @@ sub vitoconnect_Attr(@) {
 sub vitoconnect_GetUpdate($) {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
-	Log3 $name, 4, "$name: GetUpdate called ...";
-
-	vitoconnect_getCode($hash);
+	Log3 $name, 3, "$name: GetUpdate called ...";
+	if ( IsDisabled($name) ) { Log3 $name, 3, "$name: device disabled"; 
+	} else {	vitoconnect_getCode($hash); } 	
 	return undef;
 }
 
@@ -453,7 +468,7 @@ sub vitoconnect_getResourceCallback($) {
 	my $hash = $param->{hash};
 	my $name = $hash->{NAME};
 	
-	readingsBeginUpdate($hash);
+
 	if ($err eq "") {	
 		Log3 $name, 3, "$name - getResourceCallback went ok";
    	Log3 $name, 5, "Received response: $response_body\n";
@@ -463,16 +478,30 @@ sub vitoconnect_getResourceCallback($) {
         return;
       } 
       my $items = $decode_json;
+      
+ 		###########################################      
+      # my $dir = path("log"); 
+		# my $file = $dir->child("dumper.json"); 
+		# my $file_handle = $file->openw_utf8();
+		# $file_handle->print(Dumper($items));
+		
+		#my $dir = path("log"); 
+		#my $file = $dir->child("actions.json");
+		#unlink($file);
+		#my $file_handle = $file->opena_utf8();
+		###########################################
+					
+		readingsBeginUpdate($hash);		
 		for my $item( @{$items->{entities}} ) {
 			my $FieldName = $item->{class}[0];
 			Log3 $name, 5, "FieldName $FieldName";
 			my %Properties = %{$item->{properties}};
 			my @Keys = keys( %Properties );
 			for my $Key ( @Keys ) {
-				#readingsBulkUpdate($hash, $FieldName.".".$Key, $RequestList{$FieldName.".".$Key});
 				my $Reading = $RequestList{$FieldName.".".$Key};
-				if ( !defined($Reading) ) { $Reading = $FieldName.".".$Key; }
-				Log3 $name, 5, "Property: $FieldName $Key";
+				if ( !defined($Reading) || AttrVal($name,'vitoconnect_raw_readings',undef) eq "1" )  {
+					$Reading = $FieldName.".".$Key; }
+				# Log3 $name, 5, "Property: $FieldName $Key";
 				my $Type = $Properties{$Key}{type};
 				my $Value = $Properties{$Key}{value};
 				if ( $Type eq "string" ) {
@@ -514,14 +543,29 @@ sub vitoconnect_getResourceCallback($) {
 					Log3 $name, 5, "$FieldName".".$Key: $Value ($Type)";
 				}	
 			};
+			
+			###########################################
+			if (AttrVal($name,'vitoconnect_actions_active',undef) eq "1" )  {
+				my @actions =  @{$item->{actions}};
+				if (@actions) {
+					# $file_handle->print($FieldName."\n");
+					# $file_handle->print(Dumper(@actions));
+					#Log3 $name, 1, Dumper(@actions)
+					for my $action (@actions) {
+						readingsBulkUpdate($hash, $FieldName.".".$action->{"name"}, "action");
+					}	
+				}
+			}
+			###########################################
 		};
+		
 		readingsBulkUpdate($hash, "counter", $hash->{counter} );
 		$hash->{counter} = $hash->{counter} + 1;
 		readingsBulkUpdate($hash, "state", "ok");             
    }   else {
 		# Error code, type of error, error message
 		readingsBulkUpdate($hash, "state", "An error happened: $err");
-      Log3 $name, 1, "An error happened: $err";
+      Log3 $name, 1, "$name - An error happened: $err";
    }
 	readingsEndUpdate($hash, 1);
 	# neuen Timer starten in einem konfigurierten Interval.
@@ -562,7 +606,10 @@ sub vitoconnect_getResourceCallback($) {
     <a name="vitoconnectset"></a>
     <b>Set</b><br>
     <ul>
-        nothing to set here
+    	<li>update<br>
+        update readings immeadiatlely</li>
+      <li>clearReadings<br>
+        clear all readings immeadiatlely</li> 
     </ul>
     <br>
 
@@ -583,8 +630,11 @@ sub vitoconnect_getResourceCallback($) {
         <br><br>
         Attributes:
         <ul>
-            <li><i>not implemented yet</i> <br>
-                You can use al lot of standard attributes like verbose, userReadings, DBLogInclude ....
+            <li><i>vitoconnect_raw_readings</i>:<br>         
+                create readings with plain JSON names like 'heating.circuits.0.heating.curve.value' instead of german identifiers  
+            </li>
+            <li><i>vitoconnect_actions_active</i>:<br>
+            	create readings for actions e.g. 'heating.circuits.0.heating.curve.setCurve'
             </li>
         </ul>
     </ul>
