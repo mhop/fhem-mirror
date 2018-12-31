@@ -2452,8 +2452,28 @@ sub MSwitch_Notify($$) {
         my $anzahl;
       EVENT: foreach my $event (@eventscopy) {
 
-            #MSwitch_LOG( $ownName, 0, "$ownName:     event -> $event  " );
+            MSwitch_LOG( $ownName, 5, "$ownName:     event -> $event  " );
 
+			
+			 if( $event =~ m/(.*)(\{.*\})(.*)/ ) 
+			 {
+			 
+			 MSwitch_LOG( $ownName, 5, "$ownName:     changedevent1 -> $1  " );
+			 MSwitch_LOG( $ownName, 5, "$ownName:     changedevent2 -> $2  " );
+			 MSwitch_LOG( $ownName, 5, "$ownName:     changedevent3 -> $3  " );
+			 my $p1 = $1;
+			 my $json = $2;
+			 my $p3 = $3;
+			$json  =~ s/:/[dp]/g;
+			$json  =~ s/\"/[dst]/g;
+			
+			 $event = $p1.$json.$p3;
+			MSwitch_LOG( $ownName, 5, "$ownName:     changedevent -> $event  " );
+			 #next EVENT;
+			 }
+			
+			
+			
             $own_hash->{eventsave} = 'unsaved';
             MSwitch_LOG( $ownName, 5,
                     "$ownName: eingehendes Event  -> "
@@ -4610,7 +4630,7 @@ sub MSwitch_fhemwebFn($$$$) {
     $ret = $ret . "Trigger Device Global Whitelist: 
 	</td>
 	<td></td>
-	<td><input type='text' id ='triggerwhite' name='triggerwhitelist' size='30' value ='"
+	<td><input type='text' id ='triggerwhite' name='triggerwhitelist' size='60' value ='"
       . ReadingsVal( $Name, '.Trigger_Whitelist', '' )
       . "' onClick=\"javascript:bigwindow(this.id);\" >";
 
@@ -6886,11 +6906,16 @@ m/(.*?)(\[\[[a-zA-Z][a-zA-Z0-9_]{0,30}:[a-zA-Z0-9_]{0,30}\]-\[[a-zA-Z][a-zA-Z0-9
     MSwitch_LOG( $name, 6,
         "$name:     Checkcondition - finalstring -> " . $finalstring );
 
+		
+		#MSwitch_LOG( $name, 0,"name   $name ");
+		
+		
+		
     my $ret = eval $finalstring;
     MSwitch_LOG( $name, 6, "$name:     Checkcondition - return -> " . $ret );
     if ($@) {
-        MSwitch_LOG( $name, 1, "ERROR: $@ " . __LINE__ );
-        MSwitch_LOG( $name, 1, "$finalstring " . __LINE__ );
+        MSwitch_LOG( $name, 1, "$name ERROR: $@ " . __LINE__ );
+        MSwitch_LOG( $name, 1, "$name $finalstring " . __LINE__ );
         $hash->{helper}{conditionerror} = $@;
 
         return 'false';
@@ -8529,6 +8554,19 @@ sub MSwitch_EventBulk($$$$) {
     my $evtfull = join( ':', @evtparts );
     $evtparts[2] = '' if !defined $evtparts[2];
 
+	
+	
+	$event =~ s/\[dp\]/:/g;
+    $evtfull =~ s/\[dp\]/:/g;
+    $evtparts[1] =~ s/\[dp\]/:/g if $evtparts[1];
+    $evtparts[2] =~ s/\[dp\]/:/g if $evtparts[2];
+	
+	$event =~ s/\[dst\]/"/g;
+    $evtfull =~ s/\[dst\]/"/g;
+    $evtparts[1] =~ s/\[dst\]/"/g if $evtparts[1];
+    $evtparts[2] =~ s/\[dst\]/"/g if $evtparts[2];
+	
+	
     $event =~ s/\[#dp\]/:/g;
     $evtfull =~ s/\[#dp\]/:/g;
     $evtparts[1] =~ s/\[#dp\]/:/g if $evtparts[1];
