@@ -9888,7 +9888,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <ul>
     <b>Beispiel:</b> <br><br>
     get &lt;name&gt; saveRecording /opt/fhem/log
-  <ul>
+  </ul>
   
   </ul>
   <br><br> 
