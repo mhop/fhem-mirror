@@ -47,6 +47,8 @@ use Encode;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.3.0"  => "02.01.2019  CAMLASTRECID replaced by Reading CamLastRecId, \"SYNO.SurveillanceStation.Recording\" added, ".
+                           "new get command \"saveRecording\"",
   "8.2.0"  => "02.01.2019  store SMTP credentials with \"smtpcredentials\", SMTP Email integrated ",
   "8.1.0"  => "19.12.2018  tooltipps in camera device for control buttons, commandref revised ",
   "8.0.0"  => "13.12.2018  HLS with sscam_hls.js integrated for SSCamSTRM type hls, realize tooltipps in streaming devices, minor fixes",
@@ -106,6 +108,8 @@ our %SSCam_vNotesIntern = (
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
+  "8.2.0"  => "02.01.2019 SMTP Email delivery of snapshots implemented. You can send snapshots after it is created subsequentely ".
+                          "with the integrated Email client. You have to store SMTP credentials with \"smtpcredentials\" before. ",
   "8.1.0"  => "19.12.2018 Tooltipps added to camera device control buttons.",
   "8.0.0"  => "18.12.2018 HLS is integrated using sscam_hls.js in Streaming device types \"hls\". HLS streaming is now available ".
               "for all common used browser types. Tooltipps are added to streaming devices and snapgallery.",
@@ -419,7 +423,7 @@ sub SSCam_Define($@) {
   $hash->{HELPER}{APIEXTREC}      = "SYNO.SurveillanceStation.ExternalRecording"; 
   $hash->{HELPER}{APIEXTEVT}      = "SYNO.SurveillanceStation.ExternalEvent";
   $hash->{HELPER}{APICAM}         = "SYNO.SurveillanceStation.Camera";           # stark geändert ab API v2.8
-  $hash->{HELPER}{APISNAPSHOT}    = "SYNO.SurveillanceStation.SnapShot";
+  $hash->{HELPER}{APISNAPSHOT}    = "SYNO.SurveillanceStation.SnapShot";         # This API provides functions on snapshot, including taking, editing and deleting snapshots.
   $hash->{HELPER}{APIPTZ}         = "SYNO.SurveillanceStation.PTZ";
   $hash->{HELPER}{APIPRESET}      = "SYNO.SurveillanceStation.PTZ.Preset";
   $hash->{HELPER}{APICAMEVENT}    = "SYNO.SurveillanceStation.Camera.Event";
@@ -428,8 +432,9 @@ sub SSCam_Define($@) {
   $hash->{HELPER}{APISTM}         = "SYNO.SurveillanceStation.Stream";           # Beschreibung ist falsch und entspricht "SYNO.SurveillanceStation.Streaming" auch noch ab v2.8
   $hash->{HELPER}{APIHM}          = "SYNO.SurveillanceStation.HomeMode";
   $hash->{HELPER}{APILOG}         = "SYNO.SurveillanceStation.Log";
-  $hash->{HELPER}{APIAUDIOSTM}    = "SYNO.SurveillanceStation.AudioStream";      # Audiostream mit SID, removed in API v2.8
-  $hash->{HELPER}{APIVIDEOSTMS}   = "SYNO.SurveillanceStation.VideoStream";      # Videostream mit SID, removed in API v2.8
+  $hash->{HELPER}{APIAUDIOSTM}    = "SYNO.SurveillanceStation.AudioStream";      # Audiostream mit SID, removed in API v2.8 (noch undokumentiert verfügbar)
+  $hash->{HELPER}{APIVIDEOSTMS}   = "SYNO.SurveillanceStation.VideoStream";      # Videostream mit SID, removed in API v2.8 (noch undokumentiert verfügbar)
+  $hash->{HELPER}{APIREC}         = "SYNO.SurveillanceStation.Recording";        # This API provides method to query recording information.
   
   # Startwerte setzen
   if(SSCam_IsModelCam($hash)) {
@@ -1241,6 +1246,7 @@ sub SSCam_Get($@) {
                    ((ReadingsVal("$name", "CapPTZPresetNumber", 0) != 0) ? "listPresets:noArg " : "").
 				   "snapinfo:noArg ".
                    "svsinfo:noArg ".
+                   "saveRecording ".
                    "snapfileinfo:noArg ".
                    "eventlist:noArg ".
 	        	   "stmUrlPath:noArg ".
@@ -1292,6 +1298,11 @@ sub SSCam_Get($@) {
         # übergebenen CL-Hash (FHEMWEB) in Helper eintragen 
 	    SSCam_getclhash($hash,1);
 		SSCam_getpresets($hash);
+                
+    } elsif ($opt eq "saveRecording") {
+	    if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+        $hash->{HELPER}{RECSAVEPATH} = $arg if($arg);
+        SSCam_getsaverec($hash);
                 
     } elsif ($opt eq "svsinfo") {
 	    if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
@@ -2136,6 +2147,53 @@ sub SSCam_camsnap($) {
 		
     } else {
         InternalTimer(gettimeofday()+0.3, "SSCam_camsnap", $hash, 0);
+    }    
+}
+
+###############################################################################
+#                     Kamera gemachte Aufnahme lokal speichern
+###############################################################################
+sub SSCam_getsaverec($) {
+    my ($hash)   = @_;
+    my $camname  = $hash->{CAMNAME};
+    my $name     = $hash->{NAME};
+    my $errorcode;
+    my $error;
+    
+    RemoveInternalTimer($hash, "SSCam_getsaverec");
+    return if(IsDisabled($name));
+    
+    if (ReadingsVal("$name", "state", "") =~ /^dis.*/) {
+        if (ReadingsVal("$name", "state", "") eq "disabled") {
+            $errorcode = "402";
+        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
+            $errorcode = "502";
+        }
+        
+        # Fehlertext zum Errorcode ermitteln
+        $error = SSCam_experror($hash,$errorcode);
+
+        # Setreading 
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash,"Errorcode",$errorcode);
+        readingsBulkUpdate($hash,"Error",$error);
+        readingsEndUpdate($hash, 1);
+    
+        Log3($name, 2, "$name - ERROR - Save Recording of Camera $camname in local file can't be executed - $error");
+        
+        return;
+    }
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {
+        # einen Schnappschuß aufnehmen              
+        $hash->{OPMODE} = "SaveRec";
+        $hash->{HELPER}{LOGINRETRIES} = 0;
+
+        SSCam_setActiveToken($hash); 
+        SSCam_getapisites($hash);
+		
+    } else {
+        InternalTimer(gettimeofday()+0.3, "SSCam_getsaverec", $hash, 0);
     }    
 }
 
@@ -3385,6 +3443,7 @@ sub SSCam_getapisites($) {
    my $apistm      = $hash->{HELPER}{APISTM};
    my $apihm       = $hash->{HELPER}{APIHM};
    my $apilog      = $hash->{HELPER}{APILOG};
+   my $apirec      = $hash->{HELPER}{APIREC};
    my $proto       = $hash->{PROTOCOL};   
    my $url;
    my $param;
@@ -3405,7 +3464,7 @@ sub SSCam_getapisites($) {
    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
 
    # URL zur Abfrage der Eigenschaften der  API's
-   $url = "$proto://$serveraddr:$serverport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$apiauth,$apiextrec,$apicam,$apitakesnap,$apiptz,$apipreset,$apisvsinfo,$apicamevent,$apievent,$apivideostm,$apiextevt,$apistm,$apihm,$apilog,$apiaudiostm,$apivideostms";
+   $url = "$proto://$serveraddr:$serverport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$apiauth,$apiextrec,$apicam,$apitakesnap,$apiptz,$apipreset,$apisvsinfo,$apicamevent,$apievent,$apivideostm,$apiextevt,$apistm,$apihm,$apilog,$apiaudiostm,$apivideostms,$apirec";
 
    Log3($name, 4, "$name - Call-Out now: $url");
    
@@ -3445,6 +3504,7 @@ sub SSCam_getapisites_parse ($) {
    my $apistm      = $hash->{HELPER}{APISTM};
    my $apihm       = $hash->{HELPER}{APIHM};
    my $apilog      = $hash->{HELPER}{APILOG};
+   my $apirec      = $hash->{HELPER}{APIREC};
    my ($apicammaxver,$apicampath);
   
     if ($err ne "") {
@@ -3635,6 +3695,16 @@ sub SSCam_getapisites_parse ($) {
             Log3($name, 4, "$name - $logstr");
             $logstr = defined($apivideostmsmaxver) ? "MaxVersion of $apivideostms selected: $apivideostmsmaxver" : "MaxVersion of $apivideostms undefined - Surveillance Station may be stopped";
             Log3($name, 4, "$name - $logstr");
+            
+          # Pfad und Maxversion von "SYNO.SurveillanceStation.Recording" ermitteln
+            my $apirecpath = $data->{'data'}->{$apirec}->{'path'};
+            $apirecpath =~ tr/_//d if (defined($apirecpath));
+            my $apirecmaxver = $data->{'data'}->{$apirec}->{'maxVersion'}; 
+       
+   	        $logstr = defined($apirecpath) ? "Path of $apirec selected: $apirecpath" : "Path of $apirec undefined - Surveillance Station may be stopped";
+            Log3($name, 4, "$name - $logstr");
+            $logstr = defined($apirecmaxver) ? "MaxVersion of $apirec selected: $apirecmaxver" : "MaxVersion of $apirec undefined - Surveillance Station may be stopped";
+            Log3($name, 4, "$name - $logstr");
 		
             # aktuelle oder simulierte SVS-Version für Fallentscheidung setzen
             no warnings 'uninitialized'; 
@@ -3757,6 +3827,8 @@ sub SSCam_getapisites_parse ($) {
             $hash->{HELPER}{APILOGMAXVER}       = $apilogmaxver;
             $hash->{HELPER}{APIVIDEOSTMSPATH}   = $apivideostmspath?$apivideostmspath:"undefinded";
             $hash->{HELPER}{APIVIDEOSTMSMAXVER} = $apivideostmsmaxver?$apivideostmsmaxver:0;
+            $hash->{HELPER}{APIRECPATH}         = $apirecpath;
+            $hash->{HELPER}{APIRECMAXVER}       = $apirecmaxver;
             
        
             readingsBeginUpdate($hash);
@@ -4055,6 +4127,9 @@ sub SSCam_camop ($) {
    my $apivideostms       = $hash->{HELPER}{APIVIDEOSTMS};
    my $apivideostmspath   = $hash->{HELPER}{APIVIDEOSTMSPATH};
    my $apivideostmsmaxver = $hash->{HELPER}{APIVIDEOSTMSMAXVER};
+   my $apirec             = $hash->{HELPER}{APIREC};
+   my $apirecpath         = $hash->{HELPER}{APIRECPATH};
+   my $apirecmaxver       = $hash->{HELPER}{APIRECMAXVER};   
    my $sid                = $hash->{HELPER}{SID};
    my $OpMode             = $hash->{OPMODE};
    my $camid              = $hash->{CAMID};
@@ -4088,6 +4163,17 @@ sub SSCam_camop ($) {
       readingsSingleUpdate($hash,"state", "snap", 1); 
       readingsSingleUpdate($hash, "LastSnapId", "", 0);
    
+   } elsif ($OpMode eq "SaveRec") {
+      # eine Aufnahme soll in lokalem File (.mp4) gespeichert werden
+      my $recid = ReadingsVal("$name", "CamLastRecId", 0);
+      if($recid) {
+          $url = "$proto://$serveraddr:$serverport/webapi/$apirecpath?api=\"$apirec\"&id=$recid&mountId=0&version=\"$apirecmaxver\"&method=\"Download\"&_sid=\"$sid\"";
+      } else {
+          Log3($name, 2, "$name - WARNING - Can't save recording in local file due to no recording available.");
+          SSCam_delActiveToken($hash);
+          return;      
+      }
+      
    } elsif ($OpMode eq "getsnapinfo" || $OpMode eq "getsnapgallery") {
       # Informationen über den letzten oder mehrere Schnappschüsse ermitteln
 	  my $limit   = $hash->{HELPER}{SNAPLIMIT};
@@ -4353,13 +4439,14 @@ sub SSCam_camop ($) {
       
       } else {
           # Abspielen der letzten Aufnahme (EventId)
-          # externe URL in Reading setzen
-          $exturl .= "/webapi/$apistmpath?api=$apistm&version=$apistmmaxver&method=EventStream&eventId=$hash->{HELPER}{CAMLASTRECID}&timestamp=1&_sid=$sid"; 
-              
-          # interne URL          
-          $url = "$proto://$serveraddr:$serverport/webapi/$apistmpath?api=$apistm&version=$apistmmaxver&method=EventStream&eventId=$hash->{HELPER}{CAMLASTRECID}&timestamp=1&_sid=$sid";   
-
-          readingsSingleUpdate($hash,"LiveStreamUrl", $exturl, 1) if(AttrVal($name, "showStmInfoFull", undef));
+          my $lrecid = ReadingsVal("$name", "CamLastRecId", 0);
+          if($lrecid) {
+              # externe URL in Reading setzen
+              $exturl .= "/webapi/$apistmpath?api=$apistm&version=$apistmmaxver&method=EventStream&eventId=$lrecid&timestamp=1&_sid=$sid"; 
+              # interne URL          
+              $url = "$proto://$serveraddr:$serverport/webapi/$apistmpath?api=$apistm&version=$apistmmaxver&method=EventStream&eventId=$lrecid&timestamp=1&_sid=$sid";   
+              readingsSingleUpdate($hash,"LiveStreamUrl", $exturl, 1) if(AttrVal($name, "showStmInfoFull", 0));
+          }
       }
        
       # Liveview-Link in Hash speichern
@@ -4472,22 +4559,25 @@ sub SSCam_camop_parse ($) {
    
    } elsif ($myjson ne "") {    
         # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
-        # Evaluiere ob Daten im JSON-Format empfangen wurden
-        ($hash,$success,$myjson) = SSCam_evaljson($hash,$myjson);
-        
-        unless ($success) {
-            Log3($name, 4, "$name - Data returned: ".$myjson);
+        # Evaluiere ob Daten im JSON-Format empfangen wurden 
+        if($OpMode !~ /SaveRec/) {        # "SaveRec" liefert MP4-Daten und kein JSON   
+            ($hash,$success,$myjson) = SSCam_evaljson($hash,$myjson);        
+            unless ($success) {
+                Log3($name, 4, "$name - Data returned: ".$myjson);
 
-            SSCam_delActiveToken($hash);
-            return;
+                SSCam_delActiveToken($hash);
+                return;
+            }
+            
+            $data = decode_json($myjson);
+            
+            # Logausgabe decodierte JSON Daten
+            Log3($name, 5, "$name - JSON returned: ". Dumper $data);
+       
+            $success = $data->{'success'};
+        } else {
+            $success = 1; 
         }
-        
-        $data = decode_json($myjson);
-        
-        # Logausgabe decodierte JSON Daten
-        Log3($name, 5, "$name - JSON returned: ". Dumper $data);
-   
-        $success = $data->{'success'};
 
         if ($success) {       
             # Kameraoperation entsprechend "OpMode" war erfolgreich                
@@ -4554,6 +4644,32 @@ sub SSCam_camop_parse ($) {
        
                 # Logausgabe
                 Log3($name, 3, "$name - Camera $camname exposure mode was set to \"$hash->{HELPER}{EXPMODE}\"");
+            
+			} elsif ($OpMode eq "SaveRec") {              
+
+                my $recid = ReadingsVal("$name", "CamLastRecId", 0);
+                my $lrec  = ReadingsVal("$name", "CamLastRec", "");
+                $lrec     = (split("/",$lrec))[1];
+                
+                my $sp   = $hash->{HELPER}{RECSAVEPATH}?$hash->{HELPER}{RECSAVEPATH}:$attr{global}{modpath};
+                my $file = $sp."/$lrec";
+                
+                if(open (FH, '>', $file)) {            # in-memory IO Handle
+                    binmode FH;
+                    print FH $myjson;
+                    close(FH);
+                    $err = "none";
+                    Log3($name, 3, "$name - Recording was saved to local file \"$file\"");
+                } else {
+                    $err = "Can't open file \"$file\": $!";
+                    Log3($name, 2, "$name - $err");
+                }
+                
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate($hash,"Errorcode","none");
+                readingsBulkUpdate($hash,"Error",$err);
+                readingsEndUpdate($hash, 1);
+       
             
 			} elsif ($OpMode eq "sethomemode") {              
 
@@ -5342,9 +5458,9 @@ sub SSCam_camop_parse ($) {
                 Log3($name, $verbose, "$name - Informations of camera $camname retrieved");
             
 			} elsif ($OpMode eq "geteventlist") {              
-                my $eventnum    = $data->{'data'}{'total'};
-                my $lastrecord  = $data->{'data'}{'events'}[0]{name};
-                $hash->{HELPER}{CAMLASTRECID} = $data->{'data'}{'events'}[0]{'eventId'}; 
+                my $eventnum  = $data->{'data'}{'total'};
+                my $lrec      = $data->{'data'}{'events'}[0]{name};
+                my $lrecid    = $data->{'data'}{'events'}[0]{'eventId'}; 
                 
                 my ($lastrecstarttime,$lastrecstoptime);
                 
@@ -5360,8 +5476,9 @@ sub SSCam_camop_parse ($) {
                 
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"CamEventNum",$eventnum);
-                readingsBulkUpdate($hash,"CamLastRec",$lastrecord);               
-                if ($lastrecstarttime) {readingsBulkUpdate($hash,"CamLastRecTime",$lastrecstarttime." - ". $lastrecstoptime);}                
+                readingsBulkUpdate($hash,"CamLastRec",$lrec) if($lrec); 
+                readingsBulkUpdate($hash,"CamLastRecId",$lrecid) if($lrecid);                 
+                readingsBulkUpdate($hash,"CamLastRecTime",$lastrecstarttime." - ". $lastrecstoptime) if($lastrecstarttime);                
                 readingsBulkUpdate($hash,"Errorcode","none");
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
@@ -5938,7 +6055,7 @@ sub SSCam_evaljson($$) {
   
   eval {decode_json($myjson)} or do 
   {
-      if($hash->{HELPER}{RUNVIEW} =~ m/^live_.*hls$/ || $OpMode =~ m/^.*_hls$/) {
+      if( ($hash->{HELPER}{RUNVIEW} && $hash->{HELPER}{RUNVIEW} =~ m/^live_.*hls$/) || $OpMode =~ m/^.*_hls$/ ) {
           # HLS aktivate/deaktivate bringt kein JSON wenn bereits aktiviert/deaktiviert
           Log3($name, 5, "$name - HLS-activation data return: $myjson");
           if ($myjson =~ m/{"success":true}/) {
@@ -8730,7 +8847,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     <tr><td><li>CamExposureMode</li>    </td><td>- current exposure mode (Day, Night, Auto, Schedule, Unknown)  </td></tr>
     <tr><td><li>CamForceEnableMulticast</li>  </td><td>- Is the camera forced to enable multicast.  </td></tr>
     <tr><td><li>CamIP</li>              </td><td>- IP-Address of Camera  </td></tr>
-    <tr><td><li>CamLastRec</li>         </td><td>- Path / name of the last recording   </td></tr>
+    <tr><td><li>CamLastRec</li>         </td><td>- Path / name of last recording   </td></tr>
+    <tr><td><li>CamLastRecId</li>       </td><td>- the ID of last recording   </td></tr>
     <tr><td><li>CamLastRecTime</li>     </td><td>- date / starttime / endtime of the last recording   </td></tr>
     <tr><td><li>CamLiveFps</li>         </td><td>- Frames per second of Live-Stream  </td></tr>
     <tr><td><li>CamLiveMode</li>        </td><td>- Source of Live-View (DS, Camera)  </td></tr>
@@ -9611,7 +9729,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   Der Email-Versand wird durch das Setzen des <a href="#SSCamattr">Attributs</a> "snapEmailTxt" eingeschaltet. 
   Weitere Attribute müssen gesetzt oder können optional verwendet werden. <br>
   Die Credentials für den Zugang zum Email-Server müssen mit dem Befehl <b>"set &lt;name&gt; smtpcredentials &lt;user&gt; &lt;password&gt;"</b>
-  gesetzt werden. Der Verbindungsaufbau zum Postausgangsserver erfolgt initial unverschüsselt und wechselt zu einer verschlüsslten
+  gesetzt werden. Der Verbindungsaufbau zum Postausgangsserver erfolgt initial unverschüsselt und wechselt zu einer verschlüsselten
   Verbindung wenn SSL zur Verfügung steht. In diesem Fall erfolgt auch die Übermittlung von User/Password verschlüsselt.
   Optionale Attribute sind gekennzeichnet: <br><br>
   
@@ -9760,6 +9878,21 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   </ul>
   <br><br> 
   
+  <ul>
+  <li><b> get &lt;name&gt; saveRecording [&lt;Pfad&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  
+  Die aktuell im Reading "CamLastRec" angegebene Aufnahme wird lokal als MP4-File gespeichert. Optional kann der Pfad zur 
+  Speicherung des Files im Befehl angegeben werden (default: modpath im global Device). <br>
+  Das File erhält lokal den gleichen Namen wie im Reading "CamLastRec" angegeben. <br><br>
+  
+  <ul>
+    <b>Beispiel:</b> <br><br>
+    get &lt;name&gt; saveRecording /opt/fhem/log
+  <ul>
+  
+  </ul>
+  <br><br> 
+
   <ul>
   <li><b> get &lt;name&gt; scanVirgin </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM/SVS)</li> <br>
   
@@ -10271,6 +10404,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     <tr><td><li>CamForceEnableMulticast</li> </td><td>- sagt aus ob die Kamera verpflichet ist Multicast einzuschalten.  </td></tr>
     <tr><td><li>CamIP</li>              </td><td>- IP-Adresse der Kamera  </td></tr>
     <tr><td><li>CamLastRec</li>         </td><td>- Pfad / Name der letzten Aufnahme   </td></tr>
+    <tr><td><li>CamLastRecId</li>       </td><td>- die ID der letzten Aufnahme   </td></tr>
     <tr><td><li>CamLastRecTime</li>     </td><td>- Datum / Startzeit - Stopzeit der letzten Aufnahme   </td></tr>
     <tr><td><li>CamLiveFps</li>         </td><td>- Frames pro Sekunde des Live-Streams  </td></tr>    
     <tr><td><li>CamLiveMode</li>        </td><td>- Quelle für Live-Ansicht (DS, Camera)  </td></tr>
