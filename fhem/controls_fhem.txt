@@ -1,4 +1,4 @@
-REV 18100
+REV 18106
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -466,7 +466,7 @@ UPD 2016-04-26_07:45:11 33223 FHEM/98_HourCounter.pm
 UPD 2017-12-02_07:45:02 66644 FHEM/98_Hyperion.pm
 UPD 2017-01-04_07:45:02 21573 FHEM/98_IF.pm
 UPD 2018-08-31_07:45:03 4884 FHEM/98_JsonList2.pm
-UPD 2018-12-30_07:45:02 315443 FHEM/98_MSwitch.pm
+UPD 2019-01-01_07:45:02 316347 FHEM/98_MSwitch.pm
 UPD 2016-03-12_07:45:14 49251 FHEM/98_MaxScanner.pm
 UPD 2018-12-13_07:45:03 34556 FHEM/98_MediaList.pm
 UPD 2018-12-03_07:45:02 225671 FHEM/98_Modbus.pm
@@ -527,7 +527,7 @@ UPD 2017-03-13_07:45:02 7818 FHEM/98_template.pm
 UPD 2018-04-05_07:45:03 22580 FHEM/98_update.pm
 UPD 2017-07-14_07:45:02 1921 FHEM/98_uptime.pm
 UPD 2017-09-27_07:45:02 7883 FHEM/98_version.pm
-UPD 2018-12-31_07:45:03 27154 FHEM/98_vitoconnect.pm
+UPD 2019-01-01_07:45:02 29232 FHEM/98_vitoconnect.pm
 UPD 2018-03-01_07:45:03 5808 FHEM/98_weblink.pm
 UPD 2018-03-17_07:45:07 54100 FHEM/98_weekprofile.pm
 UPD 2018-04-18_07:45:03 26187 FHEM/99_SUNRISE_EL.pm
@@ -600,7 +600,7 @@ UPD 2017-09-10_16:01:38 392 FHEM/holiday/th.holiday
 UPD 2018-11-16_07:45:03 333089 FHEM/lib/74_AMADautomagicFlowset_4.2.4.xml
 UPD 2018-11-16_07:45:03 440509 FHEM/lib/74_AMADtaskerset_4.2.4.prj.xml
 UPD 2018-12-31_07:45:03 6943 FHEM/lib/AttrTemplate/httpmod.template
-UPD 2018-12-31_07:45:03 32521 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2019-01-01_07:45:02 34652 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
 UPD 2018-01-13_07:45:02 21899 FHEM/lib/Device/Firmata/Constants.pm
@@ -694,12 +694,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2018-12-31_07:45:06 3767295 docs/commandref.html
+UPD 2019-01-01_07:45:06 3767610 docs/commandref.html
 UPD 2018-12-31_07:45:08 2302082 docs/commandref_DE.html
 UPD 2018-11-17_23:59:05 76550 docs/commandref_frame.html
 UPD 2018-11-17_23:59:05 86019 docs/commandref_frame_DE.html
-UPD 2018-12-31_07:45:09 203326 docs/commandref_modular.html
-UPD 2018-12-31_07:45:10 214103 docs/commandref_modular_DE.html
+UPD 2019-01-01_07:45:09 203326 docs/commandref_modular.html
+UPD 2019-01-01_07:45:10 214103 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
