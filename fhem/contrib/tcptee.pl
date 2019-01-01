@@ -13,14 +13,25 @@ my $myPort;
 my $ssl;
 my $serverHost;
 my $serverPort;
-my $usage = "Usage: tcptee.pl [--bidi] [--loop] [--ssl] " .
+my $IPV6;
+my $usage = "Usage: tcptee.pl [--IPV6] [--bidi] [--loop] [--ssl] " .
             "[myIp:]myPort[:serverHost:serverPort]\n";
+sub tPrint($);
 
 while(@ARGV) {
   my $opt = shift @ARGV;
 
   if($opt =~ m/^--bidi$/i) {
     $bidi = 1;
+
+  } elsif($opt =~ m/^--IPV6$/i) {
+    eval "require IO::Socket::INET6; use Socket6;";
+    if($@) {
+      tPrint $@;
+      tPrint "Can't load INET6, falling back to IPV4";
+    } else {
+      $IPV6 = 1;
+    }
 
   } elsif($opt =~ m/^--loop$/i) {
     $loop = 1
@@ -80,12 +91,16 @@ for(;;) {
 
 
   # Now open our listener
-  $myfd = IO::Socket::INET->new(
-              LocalHost => $myIp,
-              LocalPort => $myPort,
-              Listen    => 10,
-              ReuseAddr => 1
-          );
+  my @opts = (
+    Domain    => $IPV6 ? AF_INET6() : AF_UNSPEC,
+    LocalHost => $myIp,
+    LocalPort => $myPort,
+    Listen    => 10,
+    ReuseAddr => 1
+  );
+  $myfd = $IPV6 ? 
+          IO::Socket::INET6->new(@opts) :
+          IO::Socket::INET->new(@opts);
   die "Opening port $myPort: $!\n" if(!$myfd);
   tPrint "Port $myPort opened";
 
@@ -113,10 +128,12 @@ for(;;) {
         tPrint "Accept failed: $!";
         next;
       }
-      my ($port, $iaddr) = sockaddr_in($clientinfo[1]);
+      my ($port, $iaddr) = ($IPV6 ? sockaddr_in6($clientinfo[1]) :
+                                    sockaddr_in($clientinfo[1]));
       my $fd = $clientinfo[0];
       $clients{$fd}{fd} = $fd;
-      $clients{$fd}{addr} = inet_ntoa($iaddr) . ":$port";
+      $clients{$fd}{addr} = ($IPV6 ? inet_ntop(AF_INET6(), $iaddr) :
+                                     inet_ntoa($iaddr)) . ":$port";
       tPrint "Connection accepted from $clients{$fd}{addr}";
 
       if($ssl) {

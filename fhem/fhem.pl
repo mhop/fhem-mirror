@@ -4,7 +4,7 @@
 #
 #  Copyright notice
 #
-#  (c) 2005-2018
+#  (c) 2005-2019
 #  Copyright: Rudolf Koenig (r dot koenig at koeniglich dot de)
 #  All rights reserved
 #
@@ -2643,7 +2643,7 @@ GlobalAttr($$$$)
   my ($type, $me, $name, $val) = @_;
 
   if($type eq "del") {
-    my %noDel = ( modpath=>1, verbose=>1, logfile=>1 );
+    my %noDel = ( modpath=>1, verbose=>1, logfile=>1, configfile=>1 );
     return "The global attribute $name cannot be deleted" if($noDel{$name});
     $featurelevel = 5.9 if($name eq "featurelevel");
     $haveInet6    = 0   if($name eq "useInet6"); # IPv6
