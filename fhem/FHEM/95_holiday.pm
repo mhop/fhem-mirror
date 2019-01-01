@@ -103,7 +103,7 @@ holiday_refresh($;$$)
     my $found;
 
     if($l =~ m/^1/) {               # Exact date: 1 MM-DD Holiday
-      my @args = split(" +", $l, 3);
+      my @args = split(" ", $l, 3);
       if($args[1] eq $fordate) {
         $found = $args[2];
       }
@@ -133,7 +133,7 @@ holiday_refresh($;$$)
       Log 4, "$name: Match day: $a[2]\n";
 
     } elsif($l =~ m/^3/) {          # Relative date: 3 -1 Mon 03 Holiday
-      my @a = split(" +", $l, 5);
+      my @a = split(" ", $l, 5);
       my %wd = ("Sun"=>0, "Mon"=>1, "Tue"=>2, "Wed"=>3,
                 "Thu"=>4, "Fri"=>5, "Sat"=>6);
       my @md = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31);
@@ -157,13 +157,13 @@ holiday_refresh($;$$)
       $found = $a[4];
 
     } elsif($l =~ m/^4/) {          # Interval: 4 MM-DD MM-DD Holiday
-      my @args = split(" +", $l, 4);
+      my @args = split(" ", $l, 4);
       if($args[1] le $fordate && $args[2] ge $fordate) {
         $found = $args[3];
       }
 
     } elsif($l =~ m/^5/) { # nth weekday since MM-DD / before MM-DD
-      my @a = split(" +", $l, 6);
+      my @a = split(" ", $l, 6);
       # arguments: 5 <distance> <weekday> <month> <day> <name>
       my %wd = ("Sun"=>0, "Mon"=>1, "Tue"=>2, "Wed"=>3,
                 "Thu"=>4, "Fri"=>5, "Sat"=>6);
@@ -200,7 +200,7 @@ holiday_refresh($;$$)
         next;
       }
     } elsif($l =~ m/^6/) { # own calculation
-        my @args = split(" +", $l, 4);
+        my @args = split(" ", $l, 4);
         my $res = "?";
         no strict "refs";
         eval { $res = &{$args[1]}($args[2]); };
