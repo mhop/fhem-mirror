@@ -399,6 +399,15 @@ attr DEVICE genericDeviceType light
 attr DEVICE icon light_control
 attr DEVICE model A_15_shellybulb
 
+# shellyht using original firmware
+name:A_16_shellyht
+filter:TYPE=MQTT2_DEVICE
+desc:shellyht using original firmware <br>Just adds stateFormat and icon
+attr DEVICE icon temperature_humidity
+attr DEVICE stateFormat T: temperature °C H: humidity % B: battery %
+attr DEVICE model A_16_shellyht
+
+
 ###############
 #ESP Milight Hub
 #use this with Chris Mullins ESP-Milight-Hub. for further details visit https://github.com/sidoh/esp8266_milight_hub
