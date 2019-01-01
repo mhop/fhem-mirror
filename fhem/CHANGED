@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 49_SSCam: integrated Email shipping of snapshots, save recordings
+                       locally with get saveRecoring command
   - new:     98_vitoconnect: initial release
   - feature: 14_CUL_TCM97001: Add Ventus W155, bugfixing
   - feature: 89_FULLY: Support for HTTPS added
