@@ -2787,7 +2787,7 @@ FW_dev2image($;$)
   my (undef, $rstate) = ReplaceEventMap($name, [undef, $state], 0);
 
   my ($icon, $rlink);
-  if(defined($devStateIcon) && $devStateIcon =~ m/^{.*}$/) {
+  if(defined($devStateIcon) && $devStateIcon =~ m/^{.*}$/s) {
     my ($html, $link) = eval $devStateIcon;
     Log3 $FW_wname, 1, "devStateIcon $name: $@" if($@);
     return ($html, $link, 1) if(defined($html) && $html =~ m/^<.*>$/s);

@@ -2853,7 +2853,7 @@ CommandAttr($$)
     if($ra{$attrName}) {
       my ($lval,$rp,$cache) = ($attrVal, $ra{$attrName}{p}, $ra{$attrName}{c});
 
-      if($rp && $lval =~ m/$rp/) {
+      if($rp && $lval =~ m/$rp/s) {
         my $err = perlSyntaxCheck($attrVal, %{$ra{$attrName}{pv}});
         return "attr $sdev $attrName: $err" if($err);
 
