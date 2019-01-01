@@ -169,6 +169,7 @@ sub CUL_HM_Initialize($) {
                        ."rssiLog:1,0 "         # enable writing RSSI to Readings (device only)
                        ."actCycle "            # also for action detector    
                        ."hmKey hmKey2 hmKey3 "                       
+                       ."readingOnDead:multiple,noChange,state,periodValues,periodString,channels "
                        ;
   $hash->{Attr}{devPhy} =    # -- physical device only attributes
                         "serialNr firmware .stc .devInfo "
@@ -1776,7 +1777,7 @@ sub CUL_HM_Parse($$) {#########################################################
       my $s2000 = sprintf("%02X", CUL_HM_secSince2000());
       push @ack,$mh{shash},"$mh{mNo}803F$ioId$mh{src}0202$s2000";
       push @evtEt,[$mh{shash},1,"time-request"];
-      # schedule desired-temp just to get an AckInfo for battery state
+      # schedule desired-temp just to get an AckInfo for battery
       $mh{shash}->{helper}{getBatState} = 1;
     }
   }
@@ -2809,13 +2810,15 @@ sub CUL_HM_Parse($$) {#########################################################
         push @evtEt,[$mh{shash},1,"direction:" .$dir{$dat4}];
         push @evtEt,[$mh{shash},1,"level:"     .($lvlS ? "0"      : $lvl)      ] if($dat4 == 0);
         push @evtEt,[$mh{shash},1,"lock:"      .($lvlS ? "locked" : "unlocked")];
+        push @evtEt,[$mh{shash},1,"state:"     .($lvlS ? "locked" : $lvl)      ];
       }
       else{ #should be akku
         my %statF = (0=>"trickleCharge",1=>"charge",2=>"discharge",3=>"unknown");
         push @evtEt,[$mh{shash},1,"charge:"    .$statF{$dat4}];
-      }
+        push @evtEt,[$mh{shash},1,"batteryPercent:".($lvl)];
+        push @evtEt,[$mh{shash},1,"battery:"   .($lvl>20 ? "ok" : "low")];
+     }
       # stateflag meaning unknown
-      push @evtEt,[$mh{shash},1,"state:".($lvlS ? "locked" : $lvl)      ];
     }
   }
   elsif($mh{st} eq "keyMatic") {  #############################################
@@ -7168,7 +7171,7 @@ sub CUL_HM_respPendTout($) {
     $pHash->{awake} = 0 if (defined $pHash->{awake});# set to asleep
     return if(!$pHash->{rspWait}{reSent});      # Double timer?
     my $rxt = CUL_HM_getRxType($hash);
-    if ($pHash->{rspWait}{brstWu}){#burst-wakeup try failed (conditionalBurst)
+    if    ($pHash->{rspWait}{brstWu}){#burst-wakeup try failed (conditionalBurst)
       CUL_HM_respPendRm($hash);# don't count problems, was just a try
       $hash->{protCondBurst} = "off" if (!$hash->{protCondBurst}||
                                           $hash->{protCondBurst} !~ m/forced/);;
@@ -7227,7 +7230,7 @@ sub CUL_HM_respPendTout($) {
         my $wuReSent = $pHash->{rspWait}{reSent};# save 'invalid' count
         CUL_HM_respPendRm($hash);#clear
         CUL_HM_protState($hash,"CMDs_pending");
-        $pHash->{wuReSent} = $wuReSent;# save 'invalid' count
+        $pHash->{wuReSent} = $wuReSent;# restore'invalid' count after general delete
       }
       else{# normal device resend
         if ($rxt & 0x02){# type = burst - need to set burst-Bit for retry
@@ -8016,7 +8019,7 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
 }
 sub CUL_HMTmplSetCmd($){
   my $name = shift;
-  return if(not scalar devspec2array("TYPE=HMinfo"));
+  return "" if(not scalar devspec2array("TYPE=HMinfo"));
   my %a;
   foreach my $peer(split(",",InternalVal($name,"peerList","")),"0"){
     my $ps = $peer eq "0" ? "R-" : "R-$peer-";
@@ -8046,7 +8049,7 @@ sub CUL_HMTmplSetCmd($){
 }
 sub CUL_HMTmplSetParam($){
   my $name = shift;
-  return if(not scalar devspec2array("TYPE=HMinfo"));
+  return "" if(not scalar devspec2array("TYPE=HMinfo"));
   my @tCmd;
   my $tCnt = 0; # template count
   foreach my $t(sort keys%{$defs{$name}{helper}{tmpl}}){
@@ -8916,8 +8919,7 @@ sub CUL_HM_ActCheck($) {# perform supervision
       }
     }
     if ($oldState ne $state){
-      CUL_HM_UpdtReadSingle($defs{$devName},"Activity",$state,1);
-      $attr{$devName}{actStatus} = $state;
+      CUL_HM_ActDepRead($devName,$state,$oldState);
       Log3 $actHash,4,"Device ".$devName." is ".$state;
     }
     if    ($state eq "unknown")    {$cntUnkn++;} 
@@ -8999,6 +9001,59 @@ sub CUL_HM_ActInfo() {# print detailed status information
                                               ,"next     h:mm:ss"
                                               ,"name").
          join("\n", sort @info);
+}
+sub CUL_HM_ActDepRead($$$){# Action detector update dependant readings
+  #readings may be changed if the device is dead. This is controlled by an 
+  # device dependant attribute
+  my ($name,$state,$oldState) = @_;
+  my $deadAction = AttrVal($name,"readingOnDead","noChange");#state|periodValues|periodString|channels
+  if ($deadAction eq "noChange" || ($state !~ m/(dead)/ && $oldState ne "dead" )){#no change to dependant readings
+    CUL_HM_UpdtReadSingle($defs{$name},"Activity",$state,1);
+  }
+  else{
+    my %deadH = map{$_ =>1}split(",",$deadAction);
+    $defs{$name}{READINGS}{Activity}{VAL} = $oldState if (not defined $defs{$name}{READINGS}{Activity});
+    my $deadVal       = $state   eq "dead" ? "dead" : "notDead";
+    my $deadValsearch = $deadVal eq "notDead" ? "^dead\$" : ".*";
+    my @nullReads;
+    my @deadReads;
+    push @nullReads,( "measured-temp"
+                     ,"humidity"
+                     ,"ValvePosition"
+                     ,"temperature"
+                     ,"pressure"
+                     ,"current"
+                     ,"power"
+                     ,"frequency"
+                     ,"voltage"
+                     ,"luminosity"
+                     ,"batteryLevel"
+                     ,"brightness"
+                     ,"level"
+                     ,"phyLevel"
+                     ,"mLevel"
+                    )         if ($deadH{periodValues} && $state eq "dead" );
+    push @deadReads,  "state" if ($deadH{state});
+    push @deadReads,( "eState"
+                     ,"motion"
+                     ,"battery"
+                    )         if ($deadH{periodString});
+    push @deadReads,grep!/^(state|periodValues|periodString|channels)$/,keys %deadH;# add customer readings to be updated
+    
+    my $grepNull = "^(" .join("|",@nullReads) .")\$";
+    my $grepDead = "^(" .join("|",@deadReads) .")\$";
+
+    my @entities;
+    if($deadH{channels}){@entities = CUL_HM_getAssChnNames($name)}
+    else                {@entities = ($name)}
+    foreach my $e (@entities){
+      my @readNull = map{"$_:0"}        grep/$grepNull/,keys %{$defs{$e}{READINGS}};
+      my @readDead = map{"$_:$deadVal"} grep/$grepDead/,map{$defs{$e}{READINGS}{$_}{VAL} =~ m/$deadValsearch/ ? $_:"no"} keys %{$defs{$e}{READINGS}};
+      push @readDead,"Activity:$state" if ($e eq $name);
+      CUL_HM_UpdtReadBulk($defs{$e},1,@readNull,@readDead);
+    }
+  }
+  $attr{$name}{actStatus} = $state;
 }
 
 #+++++++++++++++++ helper +++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -9182,23 +9237,27 @@ sub CUL_HM_UpdtCentralState($){
   foreach my $e (split",",$defs{$name}{assignedIOs}){
     $state .= "$e:UAS," if (!grep /$e/,@IOl);
   }
+  my $xo = 0; # there is still an io(xmit) open
+  my @ioState;
   foreach my $ioN (@IOl){
     next if (!defined($defs{$ioN})); # remove undefined IO devices
-    my $cnd = ReadingsVal($ioN,"cond","");
-    if ($cnd){ # covering all HMLAN/USB
-      $state .= "$ioN:$cnd,";
-    }
-    else{ # handling CUL
-      my $st = ReadingsVal($ioN,"state","unknown");
-      $state .= "$ioN:".($st ne "Initialized"?$st:"ok").",";
-    }
-    if (AttrVal($ioN,"hmId","") ne $defs{$name}{DEF}){
+
+    (my $x = ReadingsVal($ioN,"cond"                   # covering all HMLAN/USB
+            ,ReadingsVal($ioN,"state","unknown")))     # handling CUL
+            =~ s/Initialized/ok/;
+    push @ioState,"$ioN:$x";
+    $xo++ if (InternalVal($ioN,"XmitOpen",($x eq "ok" ? 1 : 0)));# if xmitOpen is not supported use state (e.g.CUL)
+
+    if (AttrVal($ioN,"hmId","") ne $defs{$name}{DEF}){ # update HMid of io devices
       Log 1,"CUL_HM correct hmId for assigned IO $ioN";
       $attr{$ioN}{hmId} = $defs{$name}{DEF};
     }
   };
+  $state .= join(",",@ioState);
   $state = "IOs_ok" if (!$state);
-  CUL_HM_UpdtReadSingle($defs{$name},"state",$state,1);
+  CUL_HM_UpdtReadBulk($defs{$name},1,"state:$state"
+                                    ,"IOopen:$xo");
+  return "$xo : $state";
 }
 sub CUL_HM_assignIO($){ #check and assign IO, returns 1 if IO changed
   # assign IO device
@@ -10901,6 +10960,28 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
       <li><a href="#dummy">dummy</a></li>
       <li><a href="#showtime">showtime</a></li>
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+      <li><a href="#readingOnDead">readingOnDead</a>
+          defines how readings shall be treated upon device is marked 'dead'.<br>
+          The attribute is applicable for devices only. It will modify the readings upon entering dead of the device. 
+          Upon leaving state 'dead' the selected readings will be set to 'notDead'. It is expected that useful values will be filled by the normally operating device.<br>
+          Options are:<br>
+          noChange: no readings will be changed upon entering 'dead' except Actvity. Other valvues will be ignored<br>
+          state: set the entites 'state' readings to dead<br>
+          periodValues: set periodic numeric readings of the device to '0'<br>
+          periodString: set periodic string readings of the device to 'dead'<br>
+          channels: if set the device's channels will be effected identical to the device entity<br>
+          custom readings: customer may add a list of other readings that will be set to 'dead'<br>
+          <br>
+          Example:<br>
+          <ul><code>
+            attr myDevice readingOnDead noChange,state # no dead marking - noChange has priority <br>
+            attr myDevice readingOnDead state,periodValues,channels # Recommended. reading state of the device and all its channels will be set to 'dead'. 
+            Periodic numerical readings will be set to 0 which influences graphics<br>
+            attr myDevice readingOnDead state,channels # reading state of the device and all its channels will be set to 'dead'.<br>
+            attr myDevice readingOnDead periodValues,channels # numeric periodic readings of device and channels will be set to '0' <br>
+            attr myDevice readingOnDead state,deviceMsg,CommandAccepted # upon entering dead state,deviceMsg and CommandAccepted of the device will be set to 'dead' if available.<br>
+          </code></ul>           
+          </li>
       <li><a name="CUL_HMaesCommReq">aesCommReq</a>
            if set IO is forced to request AES signature before sending ACK to the device.<br>
           </li>
@@ -12289,6 +12370,28 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
       <li><a href="#dummy">dummy</a></li>
       <li><a href="#showtime">showtime</a></li> 
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+      <li><a href="#readingOnDead">readingOnDead</a>
+          definiert wie readings behandelt werden sollten wenn das Device als 'dead' mariert wird.<br>
+          Das Attribut ist nur auf Devices anwendbar. Es ändert die Readings wenn das Device nach dead geht. 
+          Beim Verlasen des Zustandes 'dead' werden die ausgewählten Readings nach 'notDead' geändert. Es kann erwartet werden, dass sinnvolle Werte vom Device eingetragen werden.<br>          Upon leaving state 'dead' the selected readings will be set to 'notDead'. It is expected that useful values will be filled by the normally operating device.<br>
+          Optionen sind:<br>
+          noChange: keine Readings ausser Actvity werden geändert. Andere Einträge werden ignoriert.<br>
+          state: das Reading 'state' wird auf 'dead' gesetzt.<br>
+          periodValues: periodische numerische Readings des Device werden auf '0' gesetzt.<br>
+          periodString: periodische string Readings des Device werden auf 'dead' gesetzt.<br>
+          channels: die Readings der Kanäle werden ebenso wie die des Device behandelt und auch geaendert.<br>
+          custom readings: der Anwender kann weitere Readingnamen eintragen, welche ggf. auf 'dead' zu setzen sind.<br>
+          <br>
+          Beispiel:<br>
+          <ul><code>
+            attr myDevice readingOnDead noChange,state # kein dead marking - noChange hat Prioritaet <br>
+            attr myDevice readingOnDead state,periodValues,channels # Empfohlen. Reading state des device und aller seiner Kanäle werden auf 'dead' gesetzt.
+            Periodische nummerische werden werden auf 0 gesetzt was Auswirkungen auf die Grafiken hat.<br>
+            attr myDevice readingOnDead state,channels # Reading state des device und aller seiner Kanäle werden auf 'dead' gesetzt.<br>
+            attr myDevice readingOnDead periodValues,channels # Numerische periodische Readings des Device und der Kanaele werden auf '0' gesetzt<br>
+            attr myDevice readingOnDead state,deviceMsg,CommandAccepted # beim Eintreten in dead state,deviceMsg und CommandAccepted des Device werden, wenn verfuegbar, auf 'dead' gesetzt.<br>
+          </code></ul>           
+          </li>
       <li><a name="CUL_HMaesCommReq">aesCommReq</a>
            wenn gesetzt wird IO AES signature anfordern bevor ACK zum Device gesendet wird.<br>
       </li>
