@@ -4653,6 +4653,7 @@ sub SSCam_camop_parse ($) {
                 
                 my $sp   = $hash->{HELPER}{RECSAVEPATH}?$hash->{HELPER}{RECSAVEPATH}:$attr{global}{modpath};
                 my $file = $sp."/$lrec";
+                delete $hash->{HELPER}{RECSAVEPATH};
                 
                 if(open (FH, '>', $file)) {            # in-memory IO Handle
                     binmode FH;
