@@ -114,7 +114,9 @@ harmony_sendDiscovery()
   }
 
   foreach my $chash ( values %{$modules{'harmony'}{defptr}} ) {
-    next if( $chash->{NAME} eq 'harmony:discovery' );
+    my $cname = $chash->{NAME};;
+    next if( $cname eq 'harmony:discovery' );
+    next if( IsDisabled($cname) );
     next if( $chash->{ConnectionState} eq 'Connected' );
     next if( !defined($chash->{ip}) );
     next if( $chash->{remoteId} );
