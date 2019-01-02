@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 49_SSCam.pm 18006 2018-12-19 20:52:15Z DS_Starter $
+# $Id: 49_SSCam.pm 18114 2019-01-01 20:16:21Z DS_Starter $
 #########################################################################################################################
 #       49_SSCam.pm
 #
@@ -47,6 +47,7 @@ use Encode;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.3.1"  => "02.01.2019  fix SMTP usage for older Net::SMTP, new attribute \"smtpSSLPort\"",
   "8.3.0"  => "02.01.2019  CAMLASTRECID replaced by Reading CamLastRecId, \"SYNO.SurveillanceStation.Recording\" added, ".
                            "new get command \"saveRecording\"",
   "8.2.0"  => "02.01.2019  store SMTP credentials with \"smtpcredentials\", SMTP Email integrated ",
@@ -108,6 +109,7 @@ our %SSCam_vNotesIntern = (
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
+  "8.3.0"  => "02.01.2019 new get command \"saveRecording\"",
   "8.2.0"  => "02.01.2019 SMTP Email delivery of snapshots implemented. You can send snapshots after it is created subsequentely ".
                           "with the integrated Email client. You have to store SMTP credentials with \"smtpcredentials\" before. ",
   "8.1.0"  => "19.12.2018 Tooltipps added to camera device control buttons.",
@@ -361,6 +363,7 @@ sub SSCam_Initialize($) {
 		 "smtpFrom ".
 		 "smtpHost ".
          "smtpPort ".
+         "smtpSSLPort ".
 		 "smtpTo ".
 		 "smtpNoUseSSL:1,0 ".
          "snapEmailTxt ".
@@ -775,7 +778,7 @@ sub SSCam_Set($@) {
         
   } elsif ($opt eq "snap" && SSCam_IsModelCam($hash)) {
 	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-      $hash->{HELPER}{SNAPBYSTRMDEV} = 1 if ($prop =~ /STRM/);          # $prop wird mitgegeben durch Snap by SSCamSTRM-Device
+      $hash->{HELPER}{SNAPBYSTRMDEV} = 1 if ($prop && $prop =~ /STRM/);   # $prop wird mitgegeben durch Snap by SSCamSTRM-Device
       
       if (AttrVal($name, "snapEmailTxt", "")) {
           # Snap soll nach Erstellung per Email versendet werden
@@ -7111,6 +7114,13 @@ sub SSCam_prepareSendEmail ($$;$) {
        $lsnaptime = ReadingsVal($name,"LastSnapTime","");
        $sdat      = $data;
    }
+   
+   my $sslfrominit = 0;
+   my $smtpsslport = 465;
+   if(AttrVal($name,"smtpSSLPort",0)) {
+       $sslfrominit = 1;
+       $smtpsslport = AttrVal($name,"smtpSSLPort",0);
+   }
       
    $ret = SSCam_sendEmail($hash, {'subject'      => $smtpmsg{subject},   
                                   'part1txt'     => $smtpmsg{body}, 
@@ -7121,6 +7131,8 @@ sub SSCam_prepareSendEmail ($$;$) {
                                   'lsnaptime'    => $lsnaptime,
                                   'opmode'       => $OpMode,
                                   'smtpnousessl' => $nousessl,
+                                  'sslfrominit'  => $sslfrominit,
+                                  'smtpsslport'  => $smtpsslport,                                  
                                  }
                          );
 return $ret;
@@ -7141,19 +7153,34 @@ sub SSCam_sendEmail ($$) {
    
    my $m1 = "Net::SMTP"; 
    my $m2 = "MIME::Lite"; 
+   my $m3 = "Net::SMTP::SSL";
+   my $sslfb = 0;                # Flag für Verwendung altes Net::SMTP::SSL
    
-   my ($vm1,$vm2);
-   eval { require Net::SMTP;              # libnet-3.06 has SSL included, so we need to check the version
+   my ($vm1,$vm2,$vm3);
+   eval { require Net::SMTP;              
           Net::SMTP->import; 
 		  $vm1 = $Net::SMTP::VERSION;
+          
+          # Version von Net::SMTP prüfen, wenn < 3.00 dann Net::SMTP::SSL verwenden 
+          # (libnet-3.06 hat SSL inkludiert)
+          my $sv = $vm1;
+          $sv =~ s/[^0-9.].*$//;
+          if($sv < 3.00) {
+             require Net::SMTP::SSL;
+             Net::SMTP::SSL->import;
+             $vm3 = $Net::SMTP::SSL::VERSION;
+             $sslfb = 1;
+          }
+          
 		  require MIME::Lite; 
 		  MIME::Lite->import; 
 		  $vm2 = $MIME::Lite::VERSION;
 		};
    
-   if(!$vm1 || !$vm2) {
+   if(!$vm1 || !$vm2 || ($sslfb && !$vm3)) {
        my $nl = !$vm2?$m2." ":"";
-       $nl   .= !$vm1?$m1:"";
+       $nl   .= !$vm1?$m1." ":"";
+       $nl   .= ($sslfb && !$vm3)?$m3:"";
        $ret = "required module for sending Email couldn't be loaded. You have to install: $nl";
        Log3($name, 1, "$name - $ret");
        
@@ -7164,8 +7191,9 @@ sub SSCam_sendEmail ($$) {
        return $ret;
    }
    
-   Log3($name, 4, "$name - sendEmail version of \"$m1\" is \"$vm1\"");
-   Log3($name, 4, "$name - sendEmail version of \"$m2\" is \"$vm2\"");
+   Log3($name, 4, "$name - version of loaded module \"$m1\" is \"$vm1\"");
+   Log3($name, 4, "$name - version of \"$m1\" is too old. Use SSL-fallback module \"$m3\" with version \"$vm3\"") if($sslfb && $vm3);
+   Log3($name, 4, "$name - version of loaded module \"$m2\" is \"$vm2\"");
    
    my %SSCam_mailparams = (
        'smtpFrom'     => {'attr'=>'smtpFrom',    'default'=>'',                          'required'=>1, 'set'=>1},
@@ -7177,6 +7205,7 @@ sub SSCam_sendEmail ($$) {
        'part2type'    => {                       'default'=>'',                          'required'=>0, 'set'=>1},
        'smtphost'     => {'attr'=>'smtpHost',    'default'=>'',                          'required'=>1, 'set'=>0},
        'smtpport'     => {'attr'=>'smtpPort',    'default'=>'25',                        'required'=>1, 'set'=>0},
+       'smtpsslport'  => {'attr'=>'smtpSSLPort', 'default'=>'',                          'required'=>0, 'set'=>1},  # SSL-Port, verwendet bei direktem SSL-Aufbau
 	   'smtpnousessl' => {'attr'=>'smtpNoUseSSL','default'=>'0',                         'required'=>0, 'set'=>1},
 	   'smtpdebug'    => {'attr'=>'smtpDebug',   'default'=>'0',                         'required'=>0, 'set'=>0},
        'sdat'         => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # Daten base64 codiert, wenn gesetzt muss 'part2' auf 'image/jpeg' gesetzt werden
@@ -7184,6 +7213,8 @@ sub SSCam_sendEmail ($$) {
        'fname'        => {                       'default'=>'image.jpg',                 'required'=>0, 'set'=>1},  # Filename für "image" oder "sdat"
        'lsnaptime'    => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # Zeitstempel des letzten Schnappschusses
        'opmode'       => {                       'default'=>'',                          'required'=>1, 'set'=>1},  # OpMode muss gesetzt sein
+       'sslfb'        => {                       'default'=>$sslfb,                      'required'=>0, 'set'=>1},  # Flag für Verwendung altes Net::SMTP::SSL   
+       'sslfrominit'  => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # SSL soll sofort ! aufgebaut werden  
    );   
    
    my %params = (); 
@@ -7232,7 +7263,8 @@ sub SSCam_sendEmailblocking($) {
   my $part2type    = $paref->{part2type};
   my $smtphost     = $paref->{smtphost};
   my $smtpport     = $paref->{smtpport};
-  my $smtpnousessl = $paref->{smtpnousessl};             # SSL Verschlüsselung soll genutzt werden
+  my $smtpsslport  = $paref->{smtpsslport};
+  my $smtpnousessl = $paref->{smtpnousessl};             # SSL Verschlüsselung soll NICHT genutzt werden
   my $subject      = $paref->{subject};
   my $to           = $paref->{smtpTo};
   my $msgtext      = $paref->{msgtext}; 
@@ -7242,10 +7274,12 @@ sub SSCam_sendEmailblocking($) {
   my $fname        = $paref->{fname};                    # Filename von "image"
   my $lsnaptime    = $paref->{lsnaptime};                # Zeit des letzten Schnappschusses wenn gesetzt
   my $opmode       = $paref->{opmode};                   # aktueller Operation Mode
+  my $sslfb        = $paref->{sslfb};                    # Flag für Verwendung altes Net::SMTP::SSL
+  my $sslfrominit  = $paref->{sslfrominit};              # SSL soll sofort ! aufgebaut werden
   
   my $hash   = $defs{$name};
   my $sslver = "";
-  my ($err,$fh);
+  my ($err,$fh,$smtp);
   
   # Credentials abrufen
   my ($success, $username, $password) = SSCam_getcredentials($hash,0,"smtp");
@@ -7309,29 +7343,50 @@ sub SSCam_sendEmailblocking($) {
   
   $mailmsg->attr('content-type.charset' => 'UTF-8');
 
-  # login to SMTP Host 	
-  my $smtp = Net::SMTP->new(Host => $smtphost, Port => $smtpport, SSL => 0, Debug => $smtpdebug);
+  #####  SMTP-Connection #####
+  # login to SMTP Host
+  if($sslfb) {
+      # Verwendung altes Net::SMTP::SSL <= 3.00 -> immer direkter SSL-Aufbau, Attribut "smtpNoUseSSL" wird ignoriert
+      Log3($name, 3, "$name - Attribute \"smtpNoUseSSL\" will be ignored due to usage of Net::SMTP::SSL") if(AttrVal($name,"smtpNoUseSSL",0));
+      $smtp = Net::SMTP::SSL->new(Host => $smtphost, Port => $smtpsslport, Debug => $smtpdebug);
+  } else {
+      # Verwendung neues Net::SMTP::SSL > 3.00
+      if($sslfrominit) {
+          # sofortiger SSL connect
+          $smtp = Net::SMTP->new(Host => $smtphost, Port => $smtpsslport, SSL => 1, Debug => $smtpdebug);
+      } else {
+          # erst unverschlüsselt, danach switch zu encrypted
+          $smtp = Net::SMTP->new(Host => $smtphost, Port => $smtpport, SSL => 0, Debug => $smtpdebug);
+      }
+  }
+      
   if(!$smtp) {
       $err = "SMTP Error: Can't connect to host $smtphost";
       Log3($name, 2, "$name - $err");
-	  $err = encode_base64($err,"");
+      $err = encode_base64($err,"");
       return "$name|$err|''";   
   }
-
-  if($smtp->can_ssl() && !$smtpnousessl) {                      
-      unless( $smtp->starttls ( SSL_verify_mode => 0, 
-                                SSL_version => "TLSv1_2:!TLSv1_1:!SSLv3:!SSLv23:!SSLv2", 
-						      ) ) {
-          $err = "SMTP Error while switch to SSL: ".$smtp->message();
-          Log3($name, 2, "$name - $err");
-	      $err = encode_base64($err,"");
-          return "$name|$err|''";  
-      }  
       
-	  $sslver = $smtp->get_sslversion();
-      Log3($name, 3, "$name - SMTP-Host $smtphost connection switched to SSL version: $sslver");
+  if(!$sslfb && !$sslfrominit) {  
+      # Aufbau unverschlüsselt -> switch zu verschlüsselt wenn nicht untersagt  
+      if($smtp->can_ssl() && !$smtpnousessl) {                      
+          unless( $smtp->starttls ( SSL_verify_mode => 0, 
+                                    SSL_version => "TLSv1_2:!TLSv1_1:!SSLv3:!SSLv23:!SSLv2", 
+                                  ) ) {
+              $err = "SMTP Error while switch to SSL: ".$smtp->message();
+              Log3($name, 2, "$name - $err");
+              $err = encode_base64($err,"");
+              return "$name|$err|''";  
+          }  
+          
+          $sslver = $smtp->get_sslversion();
+          Log3($name, 3, "$name - SMTP-Host $smtphost switched to encrypted connection with SSL version: $sslver");
+      } else {
+          Log3($name, 3, "$name - SMTP-Host $smtphost use unencrypted connection !");
+      }
   } else {
-      Log3($name, 3, "$name - don't use SSL connection to SMTP-Host $smtphost !");
+      $sslver = $smtp->get_sslversion();
+      Log3($name, 3, "$name - SMTP-Host $smtphost use immediately encrypted connection with SSL version: $sslver");      
   }
 
   unless( $smtp->auth($username, $password) ) {
@@ -7536,6 +7591,7 @@ return ($str);
        <li>Creation of a readingsGroup device to display an overview of all defined SSCam devices (createReadingsGroup) </li>
        <li>automatized definition of all in SVS available cameras in FHEM (autocreateCams) </li>
 	   <li>integrated send Email of snapshots </li>
+       <li>save the last recording of camera locally </li>
     </ul>
    </ul>
    <br>
@@ -8268,29 +8324,47 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <ul>
   <li><b> set &lt;name&gt; snap </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
-  A snapshot can be triggered with:
-  <pre> 
-     set &lt;name&gt; snap 
-  </pre>
-
-  Subsequent some Examples for <b>taking snapshots</b>: <br><br>
+  A snapshot will be triggered.
+  The ID and the filename of the last snapshot will be displayed in Reading "LastSnapId" respectively "LastSnapFilename" of the
+  device. <br><br>
   
-  If a serial of snapshots should be released, it can be done using the following notify command.
-  For the example a serial of snapshots are to be triggerd if the recording of a camera starts. <br>
-  When the recording of camera "CamHE1" starts (Attribut event-on-change-reading -> "Record" has to be set), then 3 snapshots at intervals of 2 seconds are triggered.
-
-  <pre>
-     define he1_snap_3 notify CamHE1:Record.*on define h3 at +*{3}00:00:02 set CamHE1 snap 
-  </pre>
-
-  Release of 2 Snapshots of camera "CamHE1" at intervals of 6 seconds after the motion sensor "MelderHE1" has sent an event, <br>
-  can be done e.g. with following notify-command:
-
-  <pre>
-     define he1_snap_2 notify MelderHE1:on.* define h2 at +*{2}00:00:06 set CamHE1 snap 
-  </pre>
-
-  The ID and the filename of the last snapshot will be displayed as value of variable "LastSnapId" respectively "LastSnapFilename" in the device-Readings. <br><br>
+  <b>Email shipping</b> <br><br>
+  The snapshot can be sent after creation with <b>Email</b>. For this purpose the module contains its own Email client. 
+  Before you can use this function you have to install the Perl-module <b>MIME::Lite</b>. On debian systems it can be 
+  installed with command: <br><br>
+   
+   <ul>
+    sudo apt-get install libmime-lite-perl
+   </ul>
+   <br>
+  
+  The Email shipping is activated by setting the <a href="#SSCamattr">attribute</a> "snapEmailTxt". 
+  There are more attributes must be set or can be used optionally. <br>
+  At first the Credentials for access the Email outgoing server must be set by command <b>"set &lt;name&gt; smtpcredentials &lt;user&gt; &lt;password&gt;"</b>.
+  The connection establishment to the server is initially done unencrypted and switches to an encrypted connection if SSL 
+  encryption is available. In that case the transmission of User/Password takes place encrypted too.
+  Attributes which are optional are marked: <br><br>
+  
+  <ul>   
+    <table>  
+    <colgroup> <col width=12%> <col width=88%> </colgroup>
+      <tr><td style="vertical-align:top"> <b>snapEmailTxt</b> <td>- Activates the Email shipping. Has the form: <br>
+                                                                  <code>subject => &lt;subject text&gt;, body => &lt;message text&gt; </code><br> 
+                                                                  The placeholder variable $NAME can be used. $NAME is 
+                                                                  replaced by the device alias or the name of camera in SVS if alias is not 
+                                                                  defined. </td></tr>
+      <tr><td>                            <b>smtpHost</b>     </td><td>- Hostname of outgoing Email server (e.g. securesmtp.t-online.de) </td></tr>
+      <tr><td>                            <b>smtpFrom</b>     </td><td>- Return address (&lt;name&gt@&lt;domain&gt) </td></tr>
+      <tr><td>                            <b>smtpTo</b>       </td><td>- Receiving address(es) (&lt;name&gt@&lt;domain&gt) </td></tr>
+      <tr><td>                            <b>smtpPort</b>     </td><td>- (optional) Port of outgoing Email server (default: 25) </td></tr>
+	  <tr><td>                            <b>smtpCc</b>       </td><td>- (optional) carbon-copy receiving address(es) (&lt;name&gt@&lt;domain&gt) </td></tr>
+	  <tr><td>                            <b>smtpNoUseSSL</b> </td><td>- (optional) "1" if no SSL encryption should be used for Email shipping (default: 0) </td></tr>
+	  <tr><td>                            <b>smtpDebug</b>    </td><td>- (optional) switch on the debugging of SMTP connection </td></tr>
+    </table>
+   </ul>     
+   <br>
+   
+  For further information please see description of the <a href="#SSCamattr">attributes</a>. <br>
   </ul>
   <br><br>
   
@@ -8406,6 +8480,21 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <li><b> get &lt;name&gt; listPresets </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for PTZ-CAM)</li> <br>
   
   Get a popup with a lists of presets saved for the camera.
+  </ul>
+  <br><br>
+
+  <ul>
+  <li><b> get &lt;name&gt; saveRecording [&lt;path&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
+  
+  The current recording present in Reading "CamLastRec" is saved lcally as a MP4 file. Optionally you can specify the path 
+  for the file to save (default: modpath in global device). <br>
+  The name of the saved local file is the same as displayed in Reading "CamLastRec". <br><br>
+  
+  <ul>
+    <b>Beispiel:</b> <br><br>
+    get &lt;name&gt; saveRecording /opt/fhem/log
+  </ul>
+  
   </ul>
   <br><br>   
   
@@ -8759,6 +8848,62 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <li><b>simu_SVSversion</b><br>
     simulates another SVS version. (only a lower version than the installed one is possible !)  </li><br>
     
+  <a name="smtpHost"></a>
+  <li><b>smtpHost &lt;Hostname&gt; </b><br>
+    The name or IP-address of outgoing email server (e.g. securesmtp.t-online.de).
+  </li>
+  <br>
+
+  <a name="smtpCc"></a>
+  <li><b>smtpCc &lt;name&gt;@&lt;domain&gt;[, &lt;name&gt;@&lt;domain&gt;][, &lt;name&gt;@&lt;domain&gt;]... </b><br>
+    Optional you can enter a carbon-copy receiving address. Several receiving addresses are separated by ",".
+  </li>
+  <br>
+  
+  <a name="smtpDebug"></a>
+  <li><b>smtpDebug </b><br>
+    Switch the debugging mode for SMTP connection on (if Email shipping is used).
+  </li>
+  <br>
+  
+  <a name="smtpFrom"></a>
+  <li><b>smtpFrom &lt;name&gt;@&lt;domain&gt; </b><br>
+    Return address if Email shipping is used.
+  </li>
+  <br>
+  
+  <a name="smtpPort"></a>
+  <li><b>smtpPort &lt;Port&gt; </b><br>
+    Optional setting of default SMTP port of outgoing email server (default: 25).
+  </li>
+  <br>
+  
+  <a name="smtpTo"></a>
+  <li><b>smtpTo &lt;name&gt;@&lt;domain&gt;[, &lt;name&gt;@&lt;domain&gt;][, &lt;name&gt;@&lt;domain&gt;]... </b><br>
+    Receiving address for emal shipping. Several receiving addresses are separated by ",".
+  </li>
+  <br>
+  
+  <a name="smtpNoUseSSL"></a>
+  <li><b>smtpNoUseSSL </b><br>
+    If no Email SSL encryption should be used, set this attribute to "1" (default: 0).
+  </li>
+  <br>
+  
+  <a name="snapEmailTxt"></a>
+  <li><b>snapEmailTxt subject => &lt;subject text&gt;, body => &lt;message text&gt; </b><br>
+    Activates the Email shipping of snapshots after its creation. <br>
+    The attribute has to be definied in the form as described. You can use the placeholder variable $NAME. 
+    The variable $NAME is replaced by the device alias or the name of the camera in SVS if the device alias isn't available. 
+    <br><br>
+    
+       <ul>
+		<b>Example:</b><br>
+        snapEmailTxt subject => Motion alarm $NAME, body => A motion was recognized on $NAME.
+      </ul>
+      <br>
+  </li>    
+    
   <a name="snapGalleryBoost"></a>
   <li><b>snapGalleryBoost</b><br>
     If set, the last snapshots (default 3) will be retrieved by Polling, will be stored in the FHEM-servers main memory
@@ -8959,6 +9104,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
       <li>Erzeugung einer readingsGroup zur Anzeige aller definierten SSCam-Devices (createReadingsGroup) </li>
 	  <li>Automatisiertes Anlegen aller in der SVS vorhandenen Kameras in FHEM (autocreateCams) </li>
 	  <li>integrierter Email-Versand von Schnappschüssen </li>
+      <li>lokales Abspeichern der letzten Kamera-Aufnahme </li>
      </ul> 
     </ul>
     <br>
@@ -9737,18 +9883,18 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <ul>   
     <table>  
     <colgroup> <col width=12%> <col width=88%> </colgroup>
-      <tr><td style="vertical-align:top"> <b>snapEmailTxt</b> </td><td>- setzt den Nachrichtentext in der Form: 
-                                                                  subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;. 
+      <tr><td style="vertical-align:top"> <b>snapEmailTxt</b> <td>- Aktiviert den Email-Versand. Die Eingabe hat die Form: <br>
+                                                                  <code>subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;</code><br>
                                                                   Es kann der Platzhalter $NAME verwendet werden. $NAME wird 
                                                                   durch den Device-Alias bzw. den Namen der Kamera in der SVS
                                                                   ersetzt falls der Device-Alias nicht gesetzt ist. </td></tr>
-      <tr><td>                            <b>smtpHost</b>     </td><td>- Hostname Postausgangsserver </td></tr>
+      <tr><td>                            <b>smtpHost</b>     </td><td>- Hostname oder IP-Adresse des Postausgangsservers (z.B. securesmtp.t-online.de) </td></tr>
       <tr><td>                            <b>smtpFrom</b>     </td><td>- Absenderadresse (&lt;name&gt@&lt;domain&gt) </td></tr>
       <tr><td>                            <b>smtpTo</b>       </td><td>- Empfängeradresse(n) (&lt;name&gt@&lt;domain&gt) </td></tr>
       <tr><td>                            <b>smtpPort</b>     </td><td>- (optional) Port des Postausgangsservers (default: 25) </td></tr>
 	  <tr><td>                            <b>smtpCc</b>       </td><td>- (optional) Carbon-Copy Empfängeradresse(n) (&lt;name&gt@&lt;domain&gt) </td></tr>
-	  <tr><td>                            <b>smtpNoUseSSL</b> </td><td>- (optional) auf 1 setzen wenn kein SSL beim Email-Versand verwendet werden soll (default: 0) </td></tr>
-	  <tr><td>                            <b>smtpDebug</b>    </td><td>- (optional) zur Fehlerermittlung beim SMTP-Versand setzen </td></tr>
+	  <tr><td>                            <b>smtpNoUseSSL</b> </td><td>- (optional) "1" wenn kein SSL beim Email-Versand verwendet werden soll (default: 0) </td></tr>
+	  <tr><td>                            <b>smtpDebug</b>    </td><td>- (optional) zum Debugging der SMTP-Verbindung setzen </td></tr>
     </table>
    </ul>     
    <br>
@@ -10259,24 +10405,10 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <li><b>simu_SVSversion</b><br>
     Simuliert eine andere SVS-Version. (es ist nur eine niedrigere als die installierte SVS 
     Version möglich !) </li><br>
-    
-  <a name="snapEmailTxt"></a>
-  <li><b>snapEmailTxt subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt; </b><br>
-    Aktiviert den Emailversand von Schnappschüssen nach deren Erstellung. <br>
-    Es muss der Nachrichtentext in der angegebenen Form gesetzt werden. Es kann der Platzhalter $NAME verwendet werden. 
-    $NAME wird durch den Device-Alias bzw. den Namen der Kamera in der SVS ersetzt falls der Device-Alias nicht vorhanden 
-    ist. <br><br>
-    
-       <ul>
-		<b>Beispiel:</b><br>
-        snapEmailTxt subject => Bewegungsalarm $NAME, body => Eine Bewegung wurde an der $NAME registriert.
-      </ul>
-      <br>
-  </li>
   
   <a name="smtpHost"></a>
   <li><b>smtpHost &lt;Hostname&gt; </b><br>
-    Gibt den Hostnamen oder die IP-Adresse des Postausgangsservers für den Emailversand an.
+    Gibt den Hostnamen oder die IP-Adresse des Postausgangsservers für den Emailversand an (z.B. securesmtp.t-online.de).
   </li>
   <br>
   
@@ -10288,7 +10420,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   
   <a name="smtpDebug"></a>
   <li><b>smtpDebug </b><br>
-    Schaltet den Debugging-Modus der Verbindung zum Email-Server ein.
+    Schaltet den Debugging-Modus der Verbindung zum Email-Server ein (wenn Email Versand verwendet wird).
   </li>
   <br>
   
@@ -10315,6 +10447,20 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     Soll keine Email SSL-Verschlüsselung genutzt werden, ist dieses Attribut auf "1" zu setzen (default: 0).
   </li>
   <br>
+  
+  <a name="snapEmailTxt"></a>
+  <li><b>snapEmailTxt subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt; </b><br>
+    Aktiviert den Emailversand von Schnappschüssen nach deren Erstellung. <br>
+    Das Attribut muß in der angegebenen Form definiert werden. Es kann der Platzhalter $NAME verwendet werden. 
+    $NAME wird durch den Device-Alias bzw. den Namen der Kamera in der SVS ersetzt falls der Device-Alias nicht vorhanden 
+    ist. <br><br>
+    
+       <ul>
+		<b>Beispiel:</b><br>
+        snapEmailTxt subject => Bewegungsalarm $NAME, body => Eine Bewegung wurde an der $NAME registriert.
+      </ul>
+      <br>
+  </li>
     
   <a name="snapGalleryBoost"></a>
   <li><b>snapGalleryBoost</b><br>
