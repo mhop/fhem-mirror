@@ -47,6 +47,7 @@ use Encode;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.3.1"  => "02.01.2019  fix SMTP usage for older Net::SMTP, new attribute \"smtpSSLPort\"",
   "8.3.0"  => "02.01.2019  CAMLASTRECID replaced by Reading CamLastRecId, \"SYNO.SurveillanceStation.Recording\" added, ".
                            "new get command \"saveRecording\"",
   "8.2.0"  => "02.01.2019  store SMTP credentials with \"smtpcredentials\", SMTP Email integrated ",
@@ -362,6 +363,7 @@ sub SSCam_Initialize($) {
 		 "smtpFrom ".
 		 "smtpHost ".
          "smtpPort ".
+         "smtpSSLPort ".
 		 "smtpTo ".
 		 "smtpNoUseSSL:1,0 ".
          "snapEmailTxt ".
@@ -776,7 +778,7 @@ sub SSCam_Set($@) {
         
   } elsif ($opt eq "snap" && SSCam_IsModelCam($hash)) {
 	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-      $hash->{HELPER}{SNAPBYSTRMDEV} = 1 if ($prop =~ /STRM/);          # $prop wird mitgegeben durch Snap by SSCamSTRM-Device
+      $hash->{HELPER}{SNAPBYSTRMDEV} = 1 if ($prop && $prop =~ /STRM/);   # $prop wird mitgegeben durch Snap by SSCamSTRM-Device
       
       if (AttrVal($name, "snapEmailTxt", "")) {
           # Snap soll nach Erstellung per Email versendet werden
@@ -7112,6 +7114,13 @@ sub SSCam_prepareSendEmail ($$;$) {
        $lsnaptime = ReadingsVal($name,"LastSnapTime","");
        $sdat      = $data;
    }
+   
+   my $sslfrominit = 0;
+   my $smtpsslport = 465;
+   if(AttrVal($name,"smtpSSLPort",0)) {
+       $sslfrominit = 1;
+       $smtpsslport = AttrVal($name,"smtpSSLPort",0);
+   }
       
    $ret = SSCam_sendEmail($hash, {'subject'      => $smtpmsg{subject},   
                                   'part1txt'     => $smtpmsg{body}, 
@@ -7122,6 +7131,8 @@ sub SSCam_prepareSendEmail ($$;$) {
                                   'lsnaptime'    => $lsnaptime,
                                   'opmode'       => $OpMode,
                                   'smtpnousessl' => $nousessl,
+                                  'sslfrominit'  => $sslfrominit,
+                                  'smtpsslport'  => $smtpsslport,                                  
                                  }
                          );
 return $ret;
@@ -7142,19 +7153,34 @@ sub SSCam_sendEmail ($$) {
    
    my $m1 = "Net::SMTP"; 
    my $m2 = "MIME::Lite"; 
+   my $m3 = "Net::SMTP::SSL";
+   my $sslfb = 0;                # Flag für Verwendung altes Net::SMTP::SSL
    
-   my ($vm1,$vm2);
-   eval { require Net::SMTP;              # libnet-3.06 has SSL included, so we need to check the version
+   my ($vm1,$vm2,$vm3);
+   eval { require Net::SMTP;              
           Net::SMTP->import; 
 		  $vm1 = $Net::SMTP::VERSION;
+          
+          # Version von Net::SMTP prüfen, wenn < 3.00 dann Net::SMTP::SSL verwenden 
+          # (libnet-3.06 hat SSL inkludiert)
+          my $sv = $vm1;
+          $sv =~ s/[^0-9.].*$//;
+          if($sv < 3.00) {
+             require Net::SMTP::SSL;
+             Net::SMTP::SSL->import;
+             $vm3 = $Net::SMTP::SSL::VERSION;
+             $sslfb = 1;
+          }
+          
 		  require MIME::Lite; 
 		  MIME::Lite->import; 
 		  $vm2 = $MIME::Lite::VERSION;
 		};
    
-   if(!$vm1 || !$vm2) {
+   if(!$vm1 || !$vm2 || ($sslfb && !$vm3)) {
        my $nl = !$vm2?$m2." ":"";
-       $nl   .= !$vm1?$m1:"";
+       $nl   .= !$vm1?$m1." ":"";
+       $nl   .= ($sslfb && !$vm3)?$m3:"";
        $ret = "required module for sending Email couldn't be loaded. You have to install: $nl";
        Log3($name, 1, "$name - $ret");
        
@@ -7165,8 +7191,9 @@ sub SSCam_sendEmail ($$) {
        return $ret;
    }
    
-   Log3($name, 4, "$name - sendEmail version of \"$m1\" is \"$vm1\"");
-   Log3($name, 4, "$name - sendEmail version of \"$m2\" is \"$vm2\"");
+   Log3($name, 4, "$name - version of loaded module \"$m1\" is \"$vm1\"");
+   Log3($name, 4, "$name - version of \"$m1\" is too old. Use SSL-fallback module \"$m3\" with version \"$vm3\"") if($sslfb && $vm3);
+   Log3($name, 4, "$name - version of loaded module \"$m2\" is \"$vm2\"");
    
    my %SSCam_mailparams = (
        'smtpFrom'     => {'attr'=>'smtpFrom',    'default'=>'',                          'required'=>1, 'set'=>1},
@@ -7178,6 +7205,7 @@ sub SSCam_sendEmail ($$) {
        'part2type'    => {                       'default'=>'',                          'required'=>0, 'set'=>1},
        'smtphost'     => {'attr'=>'smtpHost',    'default'=>'',                          'required'=>1, 'set'=>0},
        'smtpport'     => {'attr'=>'smtpPort',    'default'=>'25',                        'required'=>1, 'set'=>0},
+       'smtpsslport'  => {'attr'=>'smtpSSLPort', 'default'=>'',                          'required'=>0, 'set'=>1},  # SSL-Port, verwendet bei direktem SSL-Aufbau
 	   'smtpnousessl' => {'attr'=>'smtpNoUseSSL','default'=>'0',                         'required'=>0, 'set'=>1},
 	   'smtpdebug'    => {'attr'=>'smtpDebug',   'default'=>'0',                         'required'=>0, 'set'=>0},
        'sdat'         => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # Daten base64 codiert, wenn gesetzt muss 'part2' auf 'image/jpeg' gesetzt werden
@@ -7185,6 +7213,8 @@ sub SSCam_sendEmail ($$) {
        'fname'        => {                       'default'=>'image.jpg',                 'required'=>0, 'set'=>1},  # Filename für "image" oder "sdat"
        'lsnaptime'    => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # Zeitstempel des letzten Schnappschusses
        'opmode'       => {                       'default'=>'',                          'required'=>1, 'set'=>1},  # OpMode muss gesetzt sein
+       'sslfb'        => {                       'default'=>$sslfb,                      'required'=>0, 'set'=>1},  # Flag für Verwendung altes Net::SMTP::SSL   
+       'sslfrominit'  => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # SSL soll sofort ! aufgebaut werden  
    );   
    
    my %params = (); 
@@ -7233,7 +7263,8 @@ sub SSCam_sendEmailblocking($) {
   my $part2type    = $paref->{part2type};
   my $smtphost     = $paref->{smtphost};
   my $smtpport     = $paref->{smtpport};
-  my $smtpnousessl = $paref->{smtpnousessl};             # SSL Verschlüsselung soll genutzt werden
+  my $smtpsslport  = $paref->{smtpsslport};
+  my $smtpnousessl = $paref->{smtpnousessl};             # SSL Verschlüsselung soll NICHT genutzt werden
   my $subject      = $paref->{subject};
   my $to           = $paref->{smtpTo};
   my $msgtext      = $paref->{msgtext}; 
@@ -7243,10 +7274,12 @@ sub SSCam_sendEmailblocking($) {
   my $fname        = $paref->{fname};                    # Filename von "image"
   my $lsnaptime    = $paref->{lsnaptime};                # Zeit des letzten Schnappschusses wenn gesetzt
   my $opmode       = $paref->{opmode};                   # aktueller Operation Mode
+  my $sslfb        = $paref->{sslfb};                    # Flag für Verwendung altes Net::SMTP::SSL
+  my $sslfrominit  = $paref->{sslfrominit};              # SSL soll sofort ! aufgebaut werden
   
   my $hash   = $defs{$name};
   my $sslver = "";
-  my ($err,$fh);
+  my ($err,$fh,$smtp);
   
   # Credentials abrufen
   my ($success, $username, $password) = SSCam_getcredentials($hash,0,"smtp");
@@ -7310,29 +7343,50 @@ sub SSCam_sendEmailblocking($) {
   
   $mailmsg->attr('content-type.charset' => 'UTF-8');
 
-  # login to SMTP Host 	
-  my $smtp = Net::SMTP->new(Host => $smtphost, Port => $smtpport, SSL => 0, Debug => $smtpdebug);
+  #####  SMTP-Connection #####
+  # login to SMTP Host
+  if($sslfb) {
+      # Verwendung altes Net::SMTP::SSL <= 3.00 -> immer direkter SSL-Aufbau, Attribut "smtpNoUseSSL" wird ignoriert
+      Log3($name, 3, "$name - Attribute \"smtpNoUseSSL\" will be ignored due to usage of Net::SMTP::SSL") if(AttrVal($name,"smtpNoUseSSL",0));
+      $smtp = Net::SMTP::SSL->new(Host => $smtphost, Port => $smtpsslport, Debug => $smtpdebug);
+  } else {
+      # Verwendung neues Net::SMTP::SSL > 3.00
+      if($sslfrominit) {
+          # sofortiger SSL connect
+          $smtp = Net::SMTP->new(Host => $smtphost, Port => $smtpsslport, SSL => 1, Debug => $smtpdebug);
+      } else {
+          # erst unverschlüsselt, danach switch zu encrypted
+          $smtp = Net::SMTP->new(Host => $smtphost, Port => $smtpport, SSL => 0, Debug => $smtpdebug);
+      }
+  }
+      
   if(!$smtp) {
       $err = "SMTP Error: Can't connect to host $smtphost";
       Log3($name, 2, "$name - $err");
-	  $err = encode_base64($err,"");
+      $err = encode_base64($err,"");
       return "$name|$err|''";   
   }
-
-  if($smtp->can_ssl() && !$smtpnousessl) {                      
-      unless( $smtp->starttls ( SSL_verify_mode => 0, 
-                                SSL_version => "TLSv1_2:!TLSv1_1:!SSLv3:!SSLv23:!SSLv2", 
-						      ) ) {
-          $err = "SMTP Error while switch to SSL: ".$smtp->message();
-          Log3($name, 2, "$name - $err");
-	      $err = encode_base64($err,"");
-          return "$name|$err|''";  
-      }  
       
-	  $sslver = $smtp->get_sslversion();
-      Log3($name, 3, "$name - SMTP-Host $smtphost connection switched to SSL version: $sslver");
+  if(!$sslfb && !$sslfrominit) {  
+      # Aufbau unverschlüsselt -> switch zu verschlüsselt wenn nicht untersagt  
+      if($smtp->can_ssl() && !$smtpnousessl) {                      
+          unless( $smtp->starttls ( SSL_verify_mode => 0, 
+                                    SSL_version => "TLSv1_2:!TLSv1_1:!SSLv3:!SSLv23:!SSLv2", 
+                                  ) ) {
+              $err = "SMTP Error while switch to SSL: ".$smtp->message();
+              Log3($name, 2, "$name - $err");
+              $err = encode_base64($err,"");
+              return "$name|$err|''";  
+          }  
+          
+          $sslver = $smtp->get_sslversion();
+          Log3($name, 3, "$name - SMTP-Host $smtphost switched to encrypted connection with SSL version: $sslver");
+      } else {
+          Log3($name, 3, "$name - SMTP-Host $smtphost use unencrypted connection !");
+      }
   } else {
-      Log3($name, 3, "$name - don't use SSL connection to SMTP-Host $smtphost !");
+      $sslver = $smtp->get_sslversion();
+      Log3($name, 3, "$name - SMTP-Host $smtphost use immediately encrypted connection with SSL version: $sslver");      
   }
 
   unless( $smtp->auth($username, $password) ) {
@@ -8288,7 +8342,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   There are more attributes must be set or can be used optionally. <br>
   At first the Credentials for access the Email outgoing server must be set by command <b>"set &lt;name&gt; smtpcredentials &lt;user&gt; &lt;password&gt;"</b>.
   The connection establishment to the server is initially done unencrypted and switches to an encrypted connection if SSL 
-  encryption is available. In that case the transmission of User/Password takes place encrypted too.
+  encryption is available. In that case the transmission of User/Password takes place encrypted too. 
+  If attribute "smtpSSLPort" is defined, the established connection to the Email server will be encrypted immediately.
   Attributes which are optional are marked: <br><br>
   
   <ul>   
@@ -8305,6 +8360,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
       <tr><td>                            <b>smtpPort</b>     </td><td>- (optional) Port of outgoing Email server (default: 25) </td></tr>
 	  <tr><td>                            <b>smtpCc</b>       </td><td>- (optional) carbon-copy receiving address(es) (&lt;name&gt@&lt;domain&gt) </td></tr>
 	  <tr><td>                            <b>smtpNoUseSSL</b> </td><td>- (optional) "1" if no SSL encryption should be used for Email shipping (default: 0) </td></tr>
+      <tr><td>                            <b>smtpSSLPort</b>  </td><td>- (optional) Port for SSL encrypted connection (default: 465) </td></tr>
 	  <tr><td>                            <b>smtpDebug</b>    </td><td>- (optional) switch on the debugging of SMTP connection </td></tr>
     </table>
    </ul>     
@@ -8821,6 +8877,13 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <a name="smtpPort"></a>
   <li><b>smtpPort &lt;Port&gt; </b><br>
     Optional setting of default SMTP port of outgoing email server (default: 25).
+  </li>
+  <br>
+  
+  <a name="smtpSSLPort"></a>
+  <li><b>smtpSSLPort &lt;Port&gt; </b><br>
+    Optional setting of SSL port of outgoing email server (default: 465). If set, the established connection to the Email 
+    server will be encrypted immediately.
   </li>
   <br>
   
@@ -9824,6 +9887,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   Die Credentials für den Zugang zum Email-Server müssen mit dem Befehl <b>"set &lt;name&gt; smtpcredentials &lt;user&gt; &lt;password&gt;"</b>
   gesetzt werden. Der Verbindungsaufbau zum Postausgangsserver erfolgt initial unverschüsselt und wechselt zu einer verschlüsselten
   Verbindung wenn SSL zur Verfügung steht. In diesem Fall erfolgt auch die Übermittlung von User/Password verschlüsselt.
+  Ist das Attribut "smtpSSLPort" definiert, erfolgt der Verbindungsaufbau zum Email-Server sofort verschlüsselt.
   Optionale Attribute sind gekennzeichnet: <br><br>
   
   <ul>   
@@ -9840,6 +9904,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
       <tr><td>                            <b>smtpPort</b>     </td><td>- (optional) Port des Postausgangsservers (default: 25) </td></tr>
 	  <tr><td>                            <b>smtpCc</b>       </td><td>- (optional) Carbon-Copy Empfängeradresse(n) (&lt;name&gt@&lt;domain&gt) </td></tr>
 	  <tr><td>                            <b>smtpNoUseSSL</b> </td><td>- (optional) "1" wenn kein SSL beim Email-Versand verwendet werden soll (default: 0) </td></tr>
+	  <tr><td>                            <b>smtpSSLPort</b>  </td><td>- (optional) SSL-Port des Postausgangsservers (default: 465) </td></tr>
 	  <tr><td>                            <b>smtpDebug</b>    </td><td>- (optional) zum Debugging der SMTP-Verbindung setzen </td></tr>
     </table>
    </ul>     
@@ -10381,6 +10446,13 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     Optionale Angabe Standard-SMTP-Port des Postausgangsservers (default: 25).
   </li>
   <br>
+  
+  <a name="smtpSSLPort"></a>
+  <li><b>smtpSSLPort &lt;Port&gt; </b><br>
+    Optionale Angabe SSL Port des Postausgangsservers (default: 465). Ist dieses Attribut gesetzt, erfolgt die Verbindung zum
+    Email-Server sofort verschlüsselt.
+  </li>
+  <br> 
   
   <a name="smtpTo"></a>
   <li><b>smtpTo &lt;name&gt;@&lt;domain&gt;[, &lt;name&gt;@&lt;domain&gt;][, &lt;name&gt;@&lt;domain&gt;]... </b><br>

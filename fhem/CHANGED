@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  49_SSCam: V8.3.1, change usage of older SMTP versions when Email
+                       shipping is used
   - feature: 73_AutoShuttersControl: add support blockingAfterManual at
              Brightness, Bugfixes
   - feature: 49_SSCam: integrated Email shipping of snapshots, save recordings
