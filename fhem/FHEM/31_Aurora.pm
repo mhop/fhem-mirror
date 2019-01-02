@@ -942,11 +942,7 @@ Aurora_Attr($$$;$)
     <br>
     Notes:
       <ul>
-      <li>with current bridge firware versions groups have <code>all_on</code> and <code>any_on</code> readings,
-          with older firmware versions groups have no readings.</li>
       <li>not all readings show the actual device state. all readings not related to the current colormode have to be ignored.</li>
-      <li>the actual state of a device controlled by a living colors or living whites remote can be different and will
-          be updated after some time.</li>
       </ul><br>
   </ul><br>
 
