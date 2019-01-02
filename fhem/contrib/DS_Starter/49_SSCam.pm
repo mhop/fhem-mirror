@@ -8342,7 +8342,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   There are more attributes must be set or can be used optionally. <br>
   At first the Credentials for access the Email outgoing server must be set by command <b>"set &lt;name&gt; smtpcredentials &lt;user&gt; &lt;password&gt;"</b>.
   The connection establishment to the server is initially done unencrypted and switches to an encrypted connection if SSL 
-  encryption is available. In that case the transmission of User/Password takes place encrypted too.
+  encryption is available. In that case the transmission of User/Password takes place encrypted too. 
+  If attribute "smtpSSLPort" is defined, the established connection to the Email server will be encrypted immediately.
   Attributes which are optional are marked: <br><br>
   
   <ul>   
@@ -8359,6 +8360,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
       <tr><td>                            <b>smtpPort</b>     </td><td>- (optional) Port of outgoing Email server (default: 25) </td></tr>
 	  <tr><td>                            <b>smtpCc</b>       </td><td>- (optional) carbon-copy receiving address(es) (&lt;name&gt@&lt;domain&gt) </td></tr>
 	  <tr><td>                            <b>smtpNoUseSSL</b> </td><td>- (optional) "1" if no SSL encryption should be used for Email shipping (default: 0) </td></tr>
+      <tr><td>                            <b>smtpSSLPort</b>  </td><td>- (optional) Port for SSL encrypted connection (default: 465) </td></tr>
 	  <tr><td>                            <b>smtpDebug</b>    </td><td>- (optional) switch on the debugging of SMTP connection </td></tr>
     </table>
    </ul>     
@@ -8875,6 +8877,13 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <a name="smtpPort"></a>
   <li><b>smtpPort &lt;Port&gt; </b><br>
     Optional setting of default SMTP port of outgoing email server (default: 25).
+  </li>
+  <br>
+  
+  <a name="smtpSSLPort"></a>
+  <li><b>smtpSSLPort &lt;Port&gt; </b><br>
+    Optional setting of SSL port of outgoing email server (default: 465). If set, the established connection to the Email 
+    server will be encrypted immediately.
   </li>
   <br>
   
@@ -9878,6 +9887,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   Die Credentials für den Zugang zum Email-Server müssen mit dem Befehl <b>"set &lt;name&gt; smtpcredentials &lt;user&gt; &lt;password&gt;"</b>
   gesetzt werden. Der Verbindungsaufbau zum Postausgangsserver erfolgt initial unverschüsselt und wechselt zu einer verschlüsselten
   Verbindung wenn SSL zur Verfügung steht. In diesem Fall erfolgt auch die Übermittlung von User/Password verschlüsselt.
+  Ist das Attribut "smtpSSLPort" definiert, erfolgt der Verbindungsaufbau zum Email-Server sofort verschlüsselt.
   Optionale Attribute sind gekennzeichnet: <br><br>
   
   <ul>   
@@ -9894,6 +9904,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
       <tr><td>                            <b>smtpPort</b>     </td><td>- (optional) Port des Postausgangsservers (default: 25) </td></tr>
 	  <tr><td>                            <b>smtpCc</b>       </td><td>- (optional) Carbon-Copy Empfängeradresse(n) (&lt;name&gt@&lt;domain&gt) </td></tr>
 	  <tr><td>                            <b>smtpNoUseSSL</b> </td><td>- (optional) "1" wenn kein SSL beim Email-Versand verwendet werden soll (default: 0) </td></tr>
+	  <tr><td>                            <b>smtpSSLPort</b>  </td><td>- (optional) SSL-Port des Postausgangsservers (default: 465) </td></tr>
 	  <tr><td>                            <b>smtpDebug</b>    </td><td>- (optional) zum Debugging der SMTP-Verbindung setzen </td></tr>
     </table>
    </ul>     
@@ -10435,6 +10446,13 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     Optionale Angabe Standard-SMTP-Port des Postausgangsservers (default: 25).
   </li>
   <br>
+  
+  <a name="smtpSSLPort"></a>
+  <li><b>smtpSSLPort &lt;Port&gt; </b><br>
+    Optionale Angabe SSL Port des Postausgangsservers (default: 465). Ist dieses Attribut gesetzt, erfolgt die Verbindung zum
+    Email-Server sofort verschlüsselt.
+  </li>
+  <br> 
   
   <a name="smtpTo"></a>
   <li><b>smtpTo &lt;name&gt;@&lt;domain&gt;[, &lt;name&gt;@&lt;domain&gt;][, &lt;name&gt;@&lt;domain&gt;]... </b><br>
