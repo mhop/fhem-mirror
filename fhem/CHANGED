@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  49_SSCam: fix problem with some older SMTP SSL module
   - bugfix:  73_AutoShuttersControl: fix typo in commandref
   - change:  49_SSCam: V8.3.1, change usage of older SMTP versions when Email
                        shipping is used
