@@ -123,7 +123,7 @@ MQTT2_CLIENT_doinit($)
     $hash->{connecting} = 2;
     MQTT2_CLIENT_send($hash,
       pack("C",0x10).
-      MQTT2_CLIENT_calcRemainingLength(length($msg)).$msg, 0, 1);
+      MQTT2_CLIENT_calcRemainingLength(length($msg)).$msg, 1, 1); # Forum #92946
     RemoveInternalTimer($hash);
     if($keepalive) {
       InternalTimer(gettimeofday()+$keepalive,"MQTT2_CLIENT_keepalive",$hash,0);
