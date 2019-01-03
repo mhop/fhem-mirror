@@ -117,6 +117,11 @@ CUL_WS_Parse($$)
   my $def = $modules{CUL_WS}{defptr}{$hash->{NAME} . "." . $cde};
   $def = $modules{CUL_WS}{defptr}{$cde} if(!$def);
   if(!$def) {
+    my @ac = grep { $defs{$_}{TYPE} eq "autocreate" } keys %defs;
+    if(@ac) {
+      my $acit = AttrVal($ac[0], "ignoreTypes", "");
+      return "" if("CUL_WS_$cde" =~ m/$acit/);
+    }
     Log3 $hash, 1, "CUL_WS UNDEFINED $type sensor detected, code $cde";
     return "UNDEFINED CUL_WS_$cde CUL_WS $cde";
   }
