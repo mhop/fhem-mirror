@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 49_SSCam.pm 18114 2019-01-01 20:16:21Z DS_Starter $
+# $Id: 49_SSCam.pm 18122 2019-01-02 21:56:15Z DS_Starter $
 #########################################################################################################################
 #       49_SSCam.pm
 #
@@ -47,6 +47,7 @@ use Encode;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.3.2"  => "03.01.2019  fix Process died prematurely if Can't locate object method \"get_sslversion\" via package \"Net::SMTP::SSL\" ",
   "8.3.1"  => "02.01.2019  fix SMTP usage for older Net::SMTP, new attribute \"smtpSSLPort\"",
   "8.3.0"  => "02.01.2019  CAMLASTRECID replaced by Reading CamLastRecId, \"SYNO.SurveillanceStation.Recording\" added, ".
                            "new get command \"saveRecording\"",
@@ -7385,7 +7386,8 @@ sub SSCam_sendEmailblocking($) {
           Log3($name, 3, "$name - SMTP-Host $smtphost use unencrypted connection !");
       }
   } else {
-      $sslver = $smtp->get_sslversion();
+      eval { $sslver = $smtp->get_sslversion(); };   # Forum: https://forum.fhem.de/index.php/topic,45671.msg880602.html#msg880602
+      $sslver = $sslver?$sslver:"n.a.";
       Log3($name, 3, "$name - SMTP-Host $smtphost use immediately encrypted connection with SSL version: $sslver");      
   }
 
