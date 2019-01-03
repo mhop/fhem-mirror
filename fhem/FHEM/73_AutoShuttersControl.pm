@@ -41,7 +41,7 @@ package main;
 use strict;
 use warnings;
 
-my $version = '0.2.3';
+my $version = '0.2.3.1';
 
 sub AutoShuttersControl_Initialize($) {
     my ($hash) = @_;
@@ -3759,7 +3759,7 @@ sub getRainSensorShuttersClosedPos {
       <li>ASC_Time_Down_Late - Sunset latest time to travel down</li>
       <li>ASC_Time_Up_Early - Sunrise earliest time to travel up</li>
       <li>ASC_Time_Up_Late - Sunrise latest time to travel up</li>
-      <li>ASC_Time_Up_WE_Holiday - Sunrise earliest time to travel up at weekend and/or holiday (we2holiday is respected). Attention should not be bigger than ASC_Time_Up_Late otherwise ASC_Time_Up_Late will be used.</li>
+      <li>ASC_Time_Up_WE_Holiday - Sunrise earliest time to travel up at weekend and/or holiday (holiday2we is respected).</li>
       <li>ASC_Up - astro/time/brightness with astro sunrise is calculated, with time the value of ASC_Time_Up_Early is used and with brightness ASC_Time_Up_Early and ASC_Time_Up_Late has to be set correctly. The Timer starts after ASC_Time_Up_Late, but during this time ASC_Time_Up_Early and ASC_Time_Up_Late are used, in combination with the attribute ASC_brightnessMinVal reached, if yes the shutter will travel down</li>
       <li>ASC_Ventilate_Pos -  in 10th steps from 0 bis 100, default value is pending from attribute ASC</li>
       <li>ASC_Ventilate_Window_Open - drive to airing position if the window is tilted or opened and actual position is below airing position</li>
@@ -3898,7 +3898,7 @@ sub getRainSensorShuttersClosedPos {
       <li>ASC_Time_Down_Late - Sunset sp&auml;teste Zeit zum Runterfahren</li>
       <li>ASC_Time_Up_Early - Sunrise fr&uuml;hste Zeit zum Hochfahren</li>
       <li>ASC_Time_Up_Late - Sunrise sp&auml;teste Zeit zum Hochfahren</li>
-      <li>ASC_Time_Up_WE_Holiday - Sunrise fr&uuml;hste Zeit zum Hochfahren am Wochenende und/oder Urlaub (we2holiday wird beachtet). Achtung: Sollte nicht gr&ouml;&szlig;er sein als ASC_Time_Up_Late, sonst wird ASC_Time_Up_Late verwendet</li>
+      <li>ASC_Time_Up_WE_Holiday - Sunrise fr&uuml;hste Zeit zum Hochfahren am Wochenende und/oder Urlaub (holiday2we wird beachtet).</li>
       <li>ASC_Up - astro/time/brightness - bei astro wird Sonnenaufgang berechnet, bei time wird der Wert aus ASC_Time_Up_Early als Fahrzeit verwendet und bei brightness muss ASC_Time_Up_Early und ASC_Time_Up_Late korrekt gesetzt werden. Der Timer l&auml;uft dann nach ASC_Time_Up_Late Zeit, es wird aber in der Zeit zwischen ASC_Time_Up_Early und ASC_Time_Up_Late geschaut, ob die als Attribut im Moduldevice hinterlegte ASC_brightnessMinVal erreicht wurde. Wenn ja, wird der Rollladen runtergefahren</li>
       <li>ASC_Ventilate_Pos -  in 10 Schritten von 0 bis 100, Default ist abh&auml;ngig vom Attribut ASC</li>
       <li>ASC_Ventilate_Window_Open - auf l&uuml;ften, wenn das Fenster gekippt/ge&ouml;ffnet wird und aktuelle Position unterhalb der L&uuml;ften-Position ist</li>
