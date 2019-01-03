@@ -95,7 +95,8 @@ my $eventset = '0';
 # standartlist ignorierter Devices . kann durch attribut überschrieben werden .
 my @doignore =
   qw(notify allowed at watchdog doif fhem2fhem telnet FileLog readingsGroup FHEMWEB autocreate eventtypes readingsproxy svg cul);
-
+my $startmode = "Notify";
+# Startmodus des Devices nach Define
 ##################### ############################################
 
 sub MSwitch_Checkcond_time($$);
@@ -472,6 +473,7 @@ sub MSwitch_LoadHelper($) {
     my $devhash    = undef;
     my $cdev       = '';
     my $ctrigg     = '';
+
     if ( defined $hash->{DEF} ) {
 
         $devhash = $hash->{DEF};
@@ -484,15 +486,20 @@ sub MSwitch_LoadHelper($) {
         else {
             $ctrigg = '';
         }
-        if ( defined $devhash ) {
+        if ( defined $devhash ) 
+		{
             $hash->{NOTIFYDEV} = $cdev; # stand aug global ... änderung auf ...
-            readingsSingleUpdate( $hash, "Trigger_device", $cdev, 0 );
-            if ( defined $cdev && $cdev ne '' ) {
+            #readingsSingleUpdate( $hash, "Trigger_device", $cdev, 0 );
+            if ( defined $cdev && $cdev ne '' ) 
+			{
+			    #MSwitch_LOG( $Name, 0, "$Name Triggerdevice  cdev - $cdev " . __LINE__ );
                 readingsSingleUpdate( $hash, "Trigger_device", $cdev, 0 );
             }
         }
-        else {
+        else 
+		{
             $hash->{NOTIFYDEV} = 'no_trigger';
+			#MSwitch_LOG( $Name, 0, "$Name update Triggerdevice " . __LINE__ );
             readingsSingleUpdate( $hash, "Trigger_device", 'no_trigger', 0 );
         }
     }
@@ -506,6 +513,7 @@ sub MSwitch_LoadHelper($) {
 
     if ( $oldtrigger ne 'undef' ) {
         $hash->{NOTIFYDEV} = $oldtrigger;
+		#MSwitch_LOG( $Name, 0, "$Name update oldtrigger - $oldtrigger " . __LINE__ );
         readingsSingleUpdate( $hash, "Trigger_device", $oldtrigger, 0 );
     }
 
@@ -570,7 +578,7 @@ sub MSwitch_LoadHelper($) {
         $attr{$Name}{MSwitch_Include_MSwitchcmds} = '0';
         $attr{$Name}{MSwitch_Lock_Quickedit}      = '1';
         $attr{$Name}{MSwitch_Extensions}          = '0';
-        $attr{$Name}{MSwitch_Mode}                = 'Full';
+        $attr{$Name}{MSwitch_Mode}                = $startmode;
     }
 
     # NEU; ZUVOR IN SET
@@ -600,7 +608,7 @@ sub MSwitch_Define($$) {
     $hash->{Version_Modul}                 = $version;
     $hash->{Version_Datenstruktur}         = $vupdate;
     $hash->{Version_autoupdate}            = $autoupdate;
-    $hash->{MODEL}                          = 'Full';
+    $hash->{MODEL}                          = $startmode;
 
     if ( $init_done && !defined( $hash->{OLDDEF} ) ) {
         my $timecond = gettimeofday() + 5;
