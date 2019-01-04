@@ -47,7 +47,7 @@ use Encode;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
-  "8.4.0"  => "03.01.2019  command snap extended to \"snap [number] [lag]\" ",
+  "8.4.0"  => "05.01.2019  command snap extended to \"snap [number] [lag]\", SID-hash is deleted if attr \"session\" is set ",
   "8.3.2"  => "03.01.2019  fix Process died prematurely if Can't locate object method \"get_sslversion\" via package \"Net::SMTP::SSL\" ",
   "8.3.1"  => "02.01.2019  fix SMTP usage for older Net::SMTP, new attribute \"smtpSSLPort\"",
   "8.3.0"  => "02.01.2019  CAMLASTRECID replaced by Reading CamLastRecId, \"SYNO.SurveillanceStation.Recording\" added, ".
@@ -111,6 +111,8 @@ our %SSCam_vNotesIntern = (
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
+  "8.4.0"  => "05.01.2019 Command snap is extended to syntax \"snap [number] [lag]\". Now you are able to trigger several number of ".
+              " snapshots by only one snap-command. The triggered snapshots can be shipped alltogether with the internal email client. ",
   "8.3.0"  => "02.01.2019 new get command \"saveRecording\"",
   "8.2.0"  => "02.01.2019 SMTP Email delivery of snapshots implemented. You can send snapshots after it is created subsequentely ".
                           "with the integrated Email client. You have to store SMTP credentials with \"smtpcredentials\" before. ",
@@ -516,6 +518,10 @@ sub SSCam_Attr($$$$) {
     # $name is device name
     # aName and aVal are Attribute name and value
     
+    if ($aName eq "session") {
+	    delete $hash->{HELPER}{SID};
+    }
+    
     if ($aName =~ /hlsNetScript/ && SSCam_IsModelCam($hash)) {            
         return " The attribute \"$aName\" is only valid for devices of type \"SVS\"! Please set this attribute in a device of this type.";
     }
@@ -737,7 +743,7 @@ sub SSCam_Set($@) {
   if ($opt eq "credentials") {
       return "Credentials are incomplete, use username password" if (!$prop || !$prop1);
 	  return "Password is too long. It is limited up to and including 20 characters." if (length $prop1 > 20);
-      delete $hash->{HELPER}{SID} if($hash->{HELPER}{SID});          
+      delete $hash->{HELPER}{SID};          
       ($success) = SSCam_setcredentials($hash,"svs",$prop,$prop1);
       $hash->{HELPER}{ACTIVE} = "off";  
 	  
@@ -783,6 +789,10 @@ sub SSCam_Set($@) {
       my $num = $prop?$prop:1;          # Anzahl der Schnappschüsse zu triggern (default: 1)
       my $lag = $prop1?$prop1:2;        # Zeit zwischen zwei Schnappschüssen (default: 2 Sekunden)
       $hash->{HELPER}{SNAPBYSTRMDEV} = 1 if ($prop2 && $prop2 =~ /STRM/);   # $prop wird mitgegeben durch Snap by SSCamSTRM-Device
+      
+      if($num =~ /[^\d+]/ || $lag=~ /[^\d+]/ ) {
+          return "The number of snapshots and/or the lag between each snapshot must be a figure.";
+      }
       
       if (AttrVal($name, "snapEmailTxt", "")) {
           # Snap soll nach Erstellung per Email versendet werden
@@ -5811,7 +5821,7 @@ sub SSCam_login ($$) {
   my $lrt = AttrVal($name,"loginRetries",3);
   my ($url,$param);
   
-  delete $hash->{HELPER}{SID} if($hash->{HELPER}{SID});
+  delete $hash->{HELPER}{SID};
     
   # Login und SID ermitteln
   Log3($name, 4, "$name - --- Begin Function SSCam_login ---");
