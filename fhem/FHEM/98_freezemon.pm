@@ -707,13 +707,16 @@ sub freezemon_Attr($) {
             if ( $aVal ne 0 ) {
                 freezemon_install_callFn_wrapper($hash);
             }
-            else {
+            elsif ( exists ($hash->{helper}{mycallFn} ) ) {
                 Log3( "", 0, "[Freezemon] $name: Unwrapping CallFn" );
                 {
                     no warnings;
                     *main::CallFn = $hash->{helper}{mycallFn};
                 }
             }
+			else {
+				Log3( "", 0, "[Freezemon] $name: Unwrapping CallFn - nothing to do" );
+			}
         }
         elsif ( $aName eq "fm_CatchCmds" ) {
             if ( $aVal ne 0 ) {
@@ -953,7 +956,7 @@ sub freezemon_callFn($@) {
         push @fmFn, [ $n, $d ];
 
         #$fm_fn .= "$n:$d ";
-        Log3 undef, 3, "[Freezemon] Long function call detected $n:$d - $ms seconds";
+        Log3 undef, 5, "[Freezemon] Long function call detected $n:$d - $ms seconds";
     }
 	return ($result,$p) if ($p) ;
 	return $result;
@@ -979,7 +982,7 @@ sub freezemon_analyzeCommand($$$;$) {
         push @fmCmd, [ $n, $d ];
 
         #$fm_fn .= "$n:$d ";
-        Log3 undef, 3, "[Freezemon] Long running Command detected $n:$d - $ms seconds";
+        Log3 undef, 5, "[Freezemon] Long running Command detected $n:$d - $ms seconds";
     }
     return $result;
 }
