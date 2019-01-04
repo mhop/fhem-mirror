@@ -47,6 +47,7 @@ use Encode;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.4.0"  => "03.01.2019  command snap extended to \"snap [number] [lag]\" ",
   "8.3.2"  => "03.01.2019  fix Process died prematurely if Can't locate object method \"get_sslversion\" via package \"Net::SMTP::SSL\" ",
   "8.3.1"  => "02.01.2019  fix SMTP usage for older Net::SMTP, new attribute \"smtpSSLPort\"",
   "8.3.0"  => "02.01.2019  CAMLASTRECID replaced by Reading CamLastRecId, \"SYNO.SurveillanceStation.Recording\" added, ".
@@ -702,7 +703,7 @@ sub SSCam_Set($@) {
                  "on ".
                  "off:noArg ".
                  "motdetsc:disable,camera,SVS ".
-                 "snap:noArg ".
+                 "snap ".
 	     		 (AttrVal($name, "snapGalleryBoost",0)?(AttrVal($name,"snapGalleryNumber",undef) || AttrVal($name,"snapGalleryBoost",0))?"snapGallery:noArg ":"snapGallery:$SSCAM_snum ":" ").
 	     		 "createSnapGallery:noArg ".
                  "createStreamDev:generic,hls,mjpeg,switched ".
@@ -779,18 +780,16 @@ sub SSCam_Set($@) {
         
   } elsif ($opt eq "snap" && SSCam_IsModelCam($hash)) {
 	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-      $hash->{HELPER}{SNAPBYSTRMDEV} = 1 if ($prop && $prop =~ /STRM/);   # $prop wird mitgegeben durch Snap by SSCamSTRM-Device
+      my $num = $prop?$prop:1;          # Anzahl der Schnappschüsse zu triggern (default: 1)
+      my $lag = $prop1?$prop1:2;        # Zeit zwischen zwei Schnappschüssen (default: 2 Sekunden)
+      $hash->{HELPER}{SNAPBYSTRMDEV} = 1 if ($prop2 && $prop2 =~ /STRM/);   # $prop wird mitgegeben durch Snap by SSCamSTRM-Device
       
       if (AttrVal($name, "snapEmailTxt", "")) {
           # Snap soll nach Erstellung per Email versendet werden
           # snapEmailTxt muss sein:  subject => <Subject-Text>, body => <Body-Text>
-	      if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-          if (!$hash->{SMTPCREDENTIALS}) {
-	          return "Due to attribute \"snapEmailTxt\" is set, you want to send snapshots by email but SMTP credentials are not set - make sure you've set credentials with \"set $name smtpcredentials username password\"";
-	      }
+          if (!$hash->{SMTPCREDENTIALS}) {return "Due to attribute \"snapEmailTxt\" is set, you want to send snapshots by email but SMTP credentials are not set - make sure you've set credentials with \"set $name smtpcredentials username password\"";}
       }
-      
-      SSCam_camsnap($hash);
+      SSCam_camsnap("$name:$num:$lag");
               
   } elsif ($opt eq "startTracking" && SSCam_IsModelCam($hash)) {
 	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
@@ -2108,11 +2107,14 @@ sub SSCam_cammotdetsc($) {
 
 ###############################################################################
 #                       Kamera Schappschuß aufnehmen
+#   $num = <Anzahl der Schnappschüsse>
+#   $lag = <Zeit zwischen zwei Schnappschüssen>
 ###############################################################################
 sub SSCam_camsnap($) {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
+    my ($str)            = @_;
+	my ($name,$num,$lag) = split(":",$str);
+	my $hash             = $defs{$name};
+    my $camname          = $hash->{CAMNAME};
     my $errorcode;
     my $error;
     
@@ -2144,13 +2146,15 @@ sub SSCam_camsnap($) {
         # einen Schnappschuß aufnehmen              
         $hash->{OPMODE} = "Snap";
         $hash->{HELPER}{LOGINRETRIES} = 0;
-        $hash->{HELPER}{CANSENDSNAP}  = 1;   # Versand Schnappschuß darf erfolgen falls gewünscht
+        $hash->{HELPER}{CANSENDSNAP}  = $num if($num);  # Versand Schnappschuß darf erfolgen falls gewünscht, enthält die Anzahl der zu versendenden Schnapschüsse im Bulk
+        $hash->{HELPER}{SNAPNUM}      = $num if($num);  # Anzahl der auszulösenden Schnappschüsse (wird runtergezählt)
+        $hash->{HELPER}{SNAPLAG}      = $lag if($lag);  # Zeitverzögerung zwischen zwei Schnappschüssen
 
         SSCam_setActiveToken($hash); 
         SSCam_getapisites($hash);
 		
     } else {
-        InternalTimer(gettimeofday()+0.3, "SSCam_camsnap", $hash, 0);
+        InternalTimer(gettimeofday()+0.3, "SSCam_camsnap", "$name,$num,$lag", 0);
     }    
 }
 
@@ -4880,8 +4884,16 @@ sub SSCam_camop_parse ($) {
                 # Logausgabe
                 Log3($name, 3, "$name - Snapshot of Camera $camname has been done successfully");
                 
+                
 				# Token freigeben vor nächstem Kommando
                 SSCam_delActiveToken($hash);
+                
+                $hash->{HELPER}{SNAPNUM}--;                  # Anzahl der auszulösenden Schnappschüsse, wird vermindert je Snap
+                my $lag = $hash->{HELPER}{SNAPLAG};          # Zeitverzögerung zwischen zwei Schnappschüssen
+                if($hash->{HELPER}{SNAPNUM}) {
+                    InternalTimer(gettimeofday()+$lag, "SSCam_camsnap", "$name", 0);
+                    return;
+                }
   
                 # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps
                 my ($slim,$ssize) = SSCam_snaplimsize($hash);		
@@ -4906,7 +4918,8 @@ sub SSCam_camop_parse ($) {
 				    $lstime = "n.a.";	
 				}
 				
-				Log3($name,4, "$name - Snap [0]: ID => $lsid, File => $lfname, Created => $lstime");
+				Log3($name, $verbose, "$name - Snapinfos of camera $camname retrieved");
+	            Log3($name,4, "$name - Snap [0]: ID => $lsid, File => $lfname, Created => $lstime");
 				 
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"Errorcode","none");
@@ -4916,7 +4929,7 @@ sub SSCam_camop_parse ($) {
 				readingsBulkUpdate($hash,"LastSnapTime", $lstime);
                 readingsEndUpdate($hash, 1);
 					
-				# Schnapschuss soll als liveView angezeigt werden (mindestens 1 Bild vorhanden)
+				#####  ein Schnapschuss soll als liveView angezeigt werden  #####
 				Log3($name, 3, "$name - There is no snapshot of camera $camname to display ! Take one snapshot before.") 
 				   if(exists($hash->{HELPER}{RUNVIEW}) && $hash->{HELPER}{RUNVIEW} =~ /snap/ && !exists($data->{'data'}{'data'}[0]{imageData}));
 			    
@@ -4925,53 +4938,91 @@ sub SSCam_camop_parse ($) {
 					$hash->{HELPER}{LINK} = $data->{data}{data}[0]{imageData};					
 				}
 
+				#####  eine Schnapschussgalerie soll angezeigt oder als Bulk versendet werden  #####
                 if($OpMode eq "getsnapgallery") {
-				    # es soll eine Schnappschußgallerie bereitgestellt (Attr snapGalleryBoost=1) bzw. gleich angezeigt werden (Attr snapGalleryBoost=0)
-				    my $i = 0;
-				    my $sn = 0;
-                    my %allsnaps = ();  # Schnappschuss Hash wird leer erstellt
-                     
-					$hash->{HELPER}{TOTALCNT} = $data->{data}{total};  # total Anzahl Schnappschüsse
-					
-					while ($data->{'data'}{'data'}[$i]) {
-		                if($data->{'data'}{'data'}[$i]{'camName'} ne $camname) {
-			                $i += 1;
-				            next;
-			            }
-			            $snapid = $data->{data}{data}[$i]{id};
-			            my $createdTm = $data->{data}{data}[$i]{createdTm};
-                        my $fileName  = $data->{data}{data}[$i]{fileName};
-					    my $imageData = $data->{data}{data}[$i]{imageData};  # Image data of snapshot in base64 format 
-			        
-			            $allsnaps{$sn}{snapid} = $snapid;
-					    my @t = split(" ", FmtDateTime($createdTm));
-					    my @d = split("-", $t[0]);
-					    $createdTm = "$d[2].$d[1].$d[0] / $t[1]";
-                        $allsnaps{$sn}{createdTm}  = $createdTm;
-			            $allsnaps{$sn}{fileName}   = $fileName;
-					    $allsnaps{$sn}{imageData}  = $imageData;
-						Log3($name,4, "$name - Snap '$sn' added to gallery hash: ID => $allsnaps{$sn}{snapid}, File => $allsnaps{$sn}{fileName}, Created => $allsnaps{$sn}{createdTm}");
-                        $sn += 1;
-					    $i += 1;
-                    }
-	                
-					# Hash der Schnapschüsse erstellen
-					$hash->{HELPER}{".SNAPHASH"} = \%allsnaps;
-                    
-					# Direktausgabe Snaphash wenn nicht gepollt wird
-					if(!AttrVal($name, "snapGalleryBoost",0)) {		    
-						my $htmlCode = SSCam_composegallery($name);
-                        
-					    for (my $k=1; (defined($hash->{HELPER}{CL}{$k})); $k++ ) {
-                            asyncOutput($hash->{HELPER}{CL}{$k},"$htmlCode");						
-		                }
-						delete($hash->{HELPER}{".SNAPHASH"});               # Snaphash löschen wenn nicht gepollt wird
-						delete($hash->{HELPER}{CL});
-					}
+				    if($hash->{HELPER}{CANSENDSNAP}) {
+					    # es sollen die Anzahl "$hash->{HELPER}{CANSENDSNAP}" Schnappschüsse versendet werden
+						my $i = 0;
+						my $sn = 0;
+						my %sendsnaps = ();  # Schnappschuss Hash zum Versand wird leer erstellt
+						
+						while ($data->{'data'}{'data'}[$i]) {
+							if($data->{'data'}{'data'}[$i]{'camName'} ne $camname) {
+								$i += 1;
+								next;
+							}
+							$snapid = $data->{data}{data}[$i]{id};
+							my $createdTm = $data->{data}{data}[$i]{createdTm};
+							my $fileName  = $data->{data}{data}[$i]{fileName};
+							my $imageData = $data->{data}{data}[$i]{imageData};  # Image data of snapshot in base64 format 
+						
+							$sendsnaps{$sn}{snapid} = $snapid;
+							my @t = split(" ", FmtDateTime($createdTm));
+							my @d = split("-", $t[0]);
+							$createdTm = "$d[2].$d[1].$d[0] / $t[1]";
+							$sendsnaps{$sn}{createdTm}  = $createdTm;
+							$sendsnaps{$sn}{fileName}   = $fileName;
+							$sendsnaps{$sn}{imageData}  = $imageData;
+							Log3($name,4, "$name - Snap '$sn' added to send gallery hash: ID => $sendsnaps{$sn}{snapid}, File => $sendsnaps{$sn}{fileName}, Created => $sendsnaps{$sn}{createdTm}");
+							$sn += 1;
+							$i += 1;
+						}						
 
-					delete($hash->{HELPER}{GETSNAPGALLERY}); # Steuerbit getsnapgallery statt getsnapinfo
-				}                
+					    # Schnappschuß soll als Email versendet werden
+						if(AttrVal($name, "snapEmailTxt", "")) {
+							SSCam_prepareSendEmail ($hash, $OpMode, \%sendsnaps);
+						}
+						
+					} else {
+				        # es soll eine Schnappschußgalerie bereitgestellt (Attr snapGalleryBoost=1) bzw. gleich angezeigt 
+						# werden (Attr snapGalleryBoost=0)
+						my $i = 0;
+						my $sn = 0;
+						my %allsnaps = ();  # Schnappschuss Hash wird leer erstellt
+						 
+						$hash->{HELPER}{TOTALCNT} = $data->{data}{total};  # total Anzahl Schnappschüsse
+						
+						while ($data->{'data'}{'data'}[$i]) {
+							if($data->{'data'}{'data'}[$i]{'camName'} ne $camname) {
+								$i += 1;
+								next;
+							}
+							$snapid = $data->{data}{data}[$i]{id};
+							my $createdTm = $data->{data}{data}[$i]{createdTm};
+							my $fileName  = $data->{data}{data}[$i]{fileName};
+							my $imageData = $data->{data}{data}[$i]{imageData};  # Image data of snapshot in base64 format 
+						
+							$allsnaps{$sn}{snapid} = $snapid;
+							my @t = split(" ", FmtDateTime($createdTm));
+							my @d = split("-", $t[0]);
+							$createdTm = "$d[2].$d[1].$d[0] / $t[1]";
+							$allsnaps{$sn}{createdTm}  = $createdTm;
+							$allsnaps{$sn}{fileName}   = $fileName;
+							$allsnaps{$sn}{imageData}  = $imageData;
+							Log3($name,4, "$name - Snap '$sn' added to gallery hash: ID => $allsnaps{$sn}{snapid}, File => $allsnaps{$sn}{fileName}, Created => $allsnaps{$sn}{createdTm}");
+							$sn += 1;
+							$i += 1;
+						}
+						
+						# Hash der Schnapschüsse erstellen
+						$hash->{HELPER}{".SNAPHASH"} = \%allsnaps;
+						
+						# Direktausgabe Snaphash wenn nicht gepollt wird
+						if(!AttrVal($name, "snapGalleryBoost",0)) {		    
+							my $htmlCode = SSCam_composegallery($name);
+							
+							for (my $k=1; (defined($hash->{HELPER}{CL}{$k})); $k++ ) {
+								asyncOutput($hash->{HELPER}{CL}{$k},"$htmlCode");						
+							}
+							delete($hash->{HELPER}{".SNAPHASH"});               # Snaphash löschen wenn nicht gepollt wird
+							delete($hash->{HELPER}{CL});
+						}
+				    } 
+                }
+                
+				delete($hash->{HELPER}{GETSNAPGALLERY});                        # Steuerbit getsnapgallery statt getsnapinfo				
 
+				#####  Fall abhängige Eventgenerierung  #####
                 if ($hash->{HELPER}{SNAPBYSTRMDEV} || $hash->{HELPER}{LSNAPBYSTRMDEV}) {
                     # Snap durch SSCamSTRM-Device ausgelöst
                     SSCam_refresh($hash,0,0,1);     # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event
@@ -4983,14 +5034,6 @@ sub SSCam_camop_parse ($) {
                 } else {
                     SSCam_refresh($hash,0,0,0);     # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
                 } 
-                
-                Log3($name, $verbose, "$name - Snapinfos of camera $camname retrieved");
-                
-                # Schnappschuß soll als Email versendet werden
-                if(AttrVal($name, "snapEmailTxt", "") && $hash->{HELPER}{CANSENDSNAP}) {
-                    SSCam_prepareSendEmail ($hash, $OpMode, $data->{data}{data}[0]{imageData});
-                    delete $hash->{HELPER}{CANSENDSNAP};
-                }
             
 			} elsif ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} =~ m/^live_.*hls$/) {
                 # HLS Streaming wurde aktiviert
@@ -6179,13 +6222,21 @@ sub SSCam_snaplimsize ($) {
   if(!AttrVal($name,"snapGalleryBoost",0)) {
       $slim  = 1;
       $ssize = 0;
-      $ssize = 2 if(AttrVal($name,"snapEmailTxt",""));	 # Full Size für EMail-Versand, wird durch "snapGallerySize" überschrieben
   } else {
       $hash->{HELPER}{GETSNAPGALLERY} = 1;
 	  $slim = AttrVal($name,"snapGalleryNumber",$SSCam_slim);    # Anzahl der abzurufenden Snaps
 	  my $sg = AttrVal($name,"snapGallerySize","Icon");          # Auflösung Image
 	  $ssize = ($sg eq "Icon")?1:2;
-  }	
+  }
+
+  if($hash->{HELPER}{CANSENDSNAP}) {
+      # Versand Schnappschuß darf erfolgen falls gewünscht und es sollen diese Anzahl Schnappschüsse versendet werden
+      # Galerie über "$hash->{HELPER}{CANSENDSNAP}" Snaps zum Versand abrufen 
+      $hash->{HELPER}{GETSNAPGALLERY} = 1;                       # Steuerbit für Snap-Galerie
+	  $slim  = $hash->{HELPER}{CANSENDSNAP};                     # enthält die Anzahl der zu versendenden Images
+      $ssize = 2;                                                # Full Size für EMail-Versand
+  }
+
 return ($slim,$ssize);
 }
 
@@ -6540,7 +6591,7 @@ sub SSCam_StreamDev($$$) {
   my $imgrecendless = "<img src=\"$FW_ME/www/images/sscam/black_btn_RECSTART.png\">";
   my $cmdrecstop    = "cmd=set $camname off";                                                           # Aufnahme Stop  
   my $imgrecstop    = "<img src=\"$FW_ME/www/images/sscam/black_btn_RECSTOP.png\">";
-  my $cmddosnap     = "cmd=set $camname snap STRM";                                                     # Snapshot auslösen mit Kennzeichnung "by STRM-Device"
+  my $cmddosnap     = "cmd=set $camname snap 1 2 STRM";                                                 # Snapshot auslösen mit Kennzeichnung "by STRM-Device"
   my $imgdosnap     = "<img src=\"$FW_ME/www/images/sscam/black_btn_DOSNAP.png\">";
   my $cmdrefresh    = "cmd=set $camname refresh STRM";                                                  # Refresh in SSCamSTRM-Devices
   my $imgrefresh    = "<img src=\"$FW_ME/www/images/default/Restart.png\">";
@@ -7087,6 +7138,7 @@ sub SSCam_prepareSendEmail ($$;$) {
    my $name   = $hash->{NAME};
    my $calias = AttrVal($name,"alias",$hash->{CAMNAME});           # Alias der Kamera wenn gesetzt oder Originalname aus SVS
    my ($ret,$sdat,$fname,$snapid,$lsnaptime) = ('','','','','');
+   my $snapnum = 1;
      
    my $sp       = AttrVal($name, "smtpPort", 25); 
    my $nousessl = AttrVal($name, "smtpNoUseSSL", 0);   
@@ -7109,20 +7161,20 @@ sub SSCam_prepareSendEmail ($$;$) {
    $smtpmsg{$subjk} = "$subjt";
    $smtpmsg{$bodyk} = "$bodyt";
    
-   if($OpMode =~ /^getsnap/) {
-       $fname     = ReadingsVal($name,"LastSnapFilename","");
-       $snapid    = ReadingsVal($name,"LastSnapId","");
-       $lsnaptime = ReadingsVal($name,"LastSnapTime","");
-       $sdat      = $data;
-   }
-   
    my $sslfrominit = 0;
    my $smtpsslport = 465;
    if(AttrVal($name,"smtpSSLPort",0)) {
        $sslfrominit = 1;
        $smtpsslport = AttrVal($name,"smtpSSLPort",0);
    }
-      
+   
+   if($OpMode =~ /^getsnap/) {
+       $fname     = ReadingsVal($name,"LastSnapFilename","");
+       $snapid    = ReadingsVal($name,"LastSnapId","");
+       $lsnaptime = ReadingsVal($name,"LastSnapTime","");
+       $sdat      = $data;
+       delete $hash->{HELPER}{CANSENDSNAP};
+    
    $ret = SSCam_sendEmail($hash, {'subject'      => $smtpmsg{subject},   
                                   'part1txt'     => $smtpmsg{body}, 
                                   'part2type'    => 'image/jpeg', 
@@ -7136,6 +7188,8 @@ sub SSCam_prepareSendEmail ($$;$) {
                                   'smtpsslport'  => $smtpsslport,                                  
                                  }
                          );
+   }
+                         
 return $ret;
 }
 
@@ -7209,14 +7263,14 @@ sub SSCam_sendEmail ($$) {
        'smtpsslport'  => {'attr'=>'smtpSSLPort', 'default'=>'',                          'required'=>0, 'set'=>1},  # SSL-Port, verwendet bei direktem SSL-Aufbau
 	   'smtpnousessl' => {'attr'=>'smtpNoUseSSL','default'=>'0',                         'required'=>0, 'set'=>1},
 	   'smtpdebug'    => {'attr'=>'smtpDebug',   'default'=>'0',                         'required'=>0, 'set'=>0},
-       'sdat'         => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # Daten base64 codiert, wenn gesetzt muss 'part2' auf 'image/jpeg' gesetzt werden
+       'sdat'         => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # (Hash)Daten base64 codiert, wenn gesetzt muss 'part2' auf 'image/jpeg' gesetzt werden
        'image'        => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # Daten als File, wenn gesetzt muss 'part2' auf 'image/jpeg' gesetzt werden
        'fname'        => {                       'default'=>'image.jpg',                 'required'=>0, 'set'=>1},  # Filename für "image" oder "sdat"
        'lsnaptime'    => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # Zeitstempel des letzten Schnappschusses
        'opmode'       => {                       'default'=>'',                          'required'=>1, 'set'=>1},  # OpMode muss gesetzt sein
        'sslfb'        => {                       'default'=>$sslfb,                      'required'=>0, 'set'=>1},  # Flag für Verwendung altes Net::SMTP::SSL   
        'sslfrominit'  => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # SSL soll sofort ! aufgebaut werden  
-   );   
+       );   
    
    my %params = (); 
    foreach my $key (keys %SSCam_mailparams) {
@@ -7270,8 +7324,8 @@ sub SSCam_sendEmailblocking($) {
   my $to           = $paref->{smtpTo};
   my $msgtext      = $paref->{msgtext}; 
   my $smtpdebug    = $paref->{smtpdebug}; 
-  my $sdat         = $paref->{sdat};                     # base64 kodierte Schnappschußdaten
-  my $image        = $paref->{image};                    # image, wenn gesetzt muss 'part2' auf 'image/jpeg' gesetzt sein
+  my $sdat         = $paref->{sdat};                     # Image Daten als Hash base64 codiert 
+  my $image        = $paref->{image};                    # Image, wenn gesetzt muss 'part2' auf 'image/jpeg' gesetzt sein
   my $fname        = $paref->{fname};                    # Filename von "image"
   my $lsnaptime    = $paref->{lsnaptime};                # Zeit des letzten Schnappschusses wenn gesetzt
   my $opmode       = $paref->{opmode};                   # aktueller Operation Mode
@@ -7280,7 +7334,7 @@ sub SSCam_sendEmailblocking($) {
   
   my $hash   = $defs{$name};
   my $sslver = "";
-  my ($err,$fh,$smtp);
+  my ($err,$fh,$smtp,@as);
   
   # Credentials abrufen
   my ($success, $username, $password) = SSCam_getcredentials($hash,0,"smtp");
@@ -7318,28 +7372,37 @@ sub SSCam_sendEmailblocking($) {
       );
   }
   
-  ### Add image, Das Image liegt base64-codiert vor und wird dekodiert in ein "in-memory IO" gespeichert (snap)
+  no strict "refs";
   if($sdat) {
-      my $decoded = MIME::Base64::decode_base64($sdat);
-      my $mh = '';
-      if(open ($fh, '>', \$mh)) {            # in-memory IO Handle
-          binmode $fh;
-          print $fh $decoded;
-          close($fh);
-          open ($fh, '<', \$mh);
-          Log3($name, 4, "$name - image data were saved to memory handle for smtp prepare");
-      } else {
-          $err = "Can't open memory handle: $!";
-          Log3($name, 2, "$name - $err");
-	      $err = encode_base64($err,"");
-          return "$name|$err|''";
+      ### Images liegen in einem Hash (Ref in $sdat) base64-codiert vor und werden dekodiert in ein "in-memory IO" gespeichert (snap)
+      my ($ct,$img,$decoded);
+      @as = sort{$a<=>$b}keys%{$sdat};
+      foreach my $key (@as) {
+		  $ct      = $sdat->{$key}{createdTm};
+		  $img     = $sdat->{$key}{imageData};
+		  $fname   = $sdat->{$key}{fileName};
+		  $fh      = '$fh'.$key;
+		  $decoded = MIME::Base64::decode_base64($img); 
+		  my $mh   = '';
+		  if(open ($fh, '>', \$mh)) {            # in-memory IO Handle
+			  binmode $fh;
+			  print $fh $decoded;
+			  close $fh;
+			  open ($fh, '<', \$mh);
+			  Log3($name, 4, "$name - image data were saved to memory handle for smtp prepare");
+		  } else {
+			  $err = "Can't open memory handle: $!";
+			  Log3($name, 2, "$name - $err");
+			  $err = encode_base64($err,"");
+			  return "$name|$err|''";
+		  }
+		  $mailmsg->attach(
+			  Type        => $part2type,
+			  FH          => $fh,
+			  Filename    => $fname,
+			  Disposition => 'attachment',
+		  );
       }
-      $mailmsg->attach(
-          Type        => $part2type,
-          FH          => $fh,
-          Filename    => $fname,
-          Disposition => 'attachment',
-      );
   }
   
   $mailmsg->attr('content-type.charset' => 'UTF-8');
@@ -7454,7 +7517,14 @@ sub SSCam_sendEmailblocking($) {
   my $ret = "Email successfully sent ".( $sslver?"encoded by $sslver":""  ); 
   Log3($name, 3, "$name - $ret To: $to".(($cc)?", CC: $cc":"") );
   
-  close($fh) if($fh);
+  if($sdat) {
+      # handles schließen
+      foreach my $key (@as) {
+          close '$fh'.$key;
+      }
+  }
+  
+  use strict "refs";
   
   # Daten müssen als Einzeiler zurückgegeben werden
   $ret = encode_base64($ret,"");
@@ -8324,14 +8394,15 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; snap </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
+  <li><b> set &lt;name&gt; snap [&lt;number&gt;] [&lt;time difference&gt;]</b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
-  A snapshot will be triggered.
+  One or multiple snapshots are triggered. The number of snapshots to trigger and the time difference (in seconds) between
+  each snapshots can be optionally specified. Without any specification only one snapshot is triggered.
   The ID and the filename of the last snapshot will be displayed in Reading "LastSnapId" respectively "LastSnapFilename" of the
   device. <br><br>
   
   <b>Email shipping</b> <br><br>
-  The snapshot can be sent after creation with <b>Email</b>. For this purpose the module contains its own Email client. 
+  The snapshots can be sent by <b>Email</b> alltogether after creation. For this purpose the module contains its own Email client. 
   Before you can use this function you have to install the Perl-module <b>MIME::Lite</b>. On debian systems it can be 
   installed with command: <br><br>
    
@@ -9866,15 +9937,17 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; snap </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  <li><b> set &lt;name&gt; snap [&lt;Anzahl&gt;] [&lt;Zeitabstand&gt;]</b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
-  Ein Schnappschuß wird ausgelöst.
+  Ein oder mehrere Schnappschüsse werden ausgelöst. Es kann die Anzahl der auszulösenden Schnappschüsse und deren zeitlicher
+  Abstand in Sekunden optional angegeben werden. Ohne Angabe wird ein Schnappschuß getriggert.
   Es wird die ID und der Filename des letzten Snapshots als Wert der Variable "LastSnapId" bzw. "LastSnapFilename" in den 
   Readings der Kamera gespeichert. <br><br>
   
   <b>Email-Versand</b> <br><br>
-  Der Schnappschuß kann nach der Erstellung per <b>Email</b> versendet werden. Dazu enthält das Modul einen eigenen 
-  Email-Client. Zur Verwendung dieser Funktion muss das Perl-Modul <b>MIME::Lite</b> installiert sein. Auf Debian-System kann 
+  Die Schnappschüsse können nach der Erstellung per <b>Email</b> gemeinsam versendet werden. Dazu enthält das Modul einen 
+  eigenen Email-Client. 
+  Zur Verwendung dieser Funktion muss das Perl-Modul <b>MIME::Lite</b> installiert sein. Auf Debian-System kann 
   es mit <br><br>
    
    <ul>
