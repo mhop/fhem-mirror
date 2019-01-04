@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.3.008
+#  Version 4.3.009
 #
 #  Module for communication between FHEM and Homematic CCU2/3.
 #
@@ -12,74 +12,17 @@
 #  CCU group devices, HomeGear, CUxD, Osram Lightify, Homematic Virtual Layer
 #  and Philips Hue (not tested)
 #
-#  (c) 2018 by zap (zap01 <at> t-online <dot> de)
+#  (c) 2019 by zap (zap01 <at> t-online <dot> de)
 #
 ##############################################################################
 #
-#  define <name> HMCCU <hostname_or_ip_of_ccu> [ccunumber] [waitforccu=<seconds>]
-#
-#  set <name> ackmessages
-#  set <name> cleardefaults
-#  set <name> defaults
-#  set <name> delete <name> [{ OT_VARDP | OT_DEVICE }]
-#  set <name> execute <ccu_program>
-#  set <name> importdefaults <filename>
-#  set <name> hmscript {<scriptfile>|!<function>|'['<code>']'} [dump] [<parname>=<value> [...]]
-#  set <name> rpcregister [{all|<interface>}]
-#  set <name> rpcserver {on|off|restart}
-#  set <name> var [<type>] <name> <value> [<parameter>=<value> [...]]
-#
-#  get <name> aggregation {<rule>|all}
-#  get <name> configdesc {<device>|<channel>}
-#  get <name> defaults
-#  get <name> deviceinfo <device>
-#  get <name> devicelist [dump]
-#  get <name> devicelist create <devexp> [t={chn|dev|all}] [s=<suffix>] [p=<prefix>] [f=<format>]
-#                                        [defattr] [duplicates] [save] [<attr>=<val> [...]]}]
-#  get <name> dump {devtypes|datapoints} [<filter>]
-#  get <name> dutycycle
-#  get <name> exportdefaults {filename} [csv] [all]
-#  get <name> firmware [{type-expr}|full]
-#  get <name> parfile [<parfile>]
-#  get <name> rpcevents
-#  get <name> rpcstate
-#  get <name> update [<fhemdevexp> [{ State | Value }]]
-#  get <name> updateccu [<devexp> [{ State | Value }]]
-#  get <name> vars <regexp>
-#
-#  attr <name> ccuaggregate <rules>
-#  attr <name> ccudef-hmstatevals <subst_rules>
-#  attr <name> ccudef-readingfilter <filter_rule>
-#  attr <name> ccudef-readingname <rules>
-#  attr <name> ccudef-substitute <subst_rule>
-#  attr <name> ccudefaults <filename>
-#  attr <name> ccuflags { intrpc,extrpc,procrpc,dptnocheck,noagg,logEvents,noReadings,nonBlocking }
-#  attr <name> ccuget { State | Value }
-#  attr <name> ccuReqTimeout <seconds>
-#  attr <name> ccuGetVars <seconds>[:<pattern>]
-#  attr <name> parfile <parfile>
-#  attr <name> rpcevtimeout <seconds>
-#  attr <name> rpcinterfaces { BidCos-Wired, BidCos-RF, HmIP-RF, VirtualDevices, Homegear, HVL }
-#  attr <name> rpcinterval <seconds>
-#  attr <name> rpcport <ccu_rpc_port>
-#  attr <name> rpcqueue <file>
-#  attr <name> rpcserver { on | off }
-#  attr <name> rpcserveraddr <ip-or-name>
-#  attr <name> rpcserverport <base_port>
-#  attr <name> rpctimeout <read>[,<write>]
-#  attr <name> stripchar <character>
-#  attr <name> stripnumber [<datapoint-expr!]{-<digits>|0|1|2}[;...]
-#  attr <name> substitute <subst_rule>
-#
-#  filter_rule := channel-regexp!datapoint-regexp[;...]
-#  subst_rule := [[channel.]datapoint[,...]!]<regexp>:<subtext>[,...][;...]
-##############################################################################
 #  Verbose levels:
 #
 #  0 = Log start/stop and initialization messages
 #  1 = Log errors
 #  2 = Log counters and warnings
 #  3 = Log events and runtime information
+#
 ##############################################################################
 
 package main;
@@ -108,7 +51,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.3.008';
+my $HMCCU_VERSION = '4.3.009';
 
 # Default RPC port (BidCos-RF)
 my $HMCCU_RPC_PORT_DEFAULT = 2001;
@@ -119,6 +62,10 @@ my $HMCCU_MAX_IOERRORS = 100;
 my $HMCCU_MAX_QUEUESIZE = 500;
 my $HMCCU_TIME_WAIT = 100000;
 my $HMCCU_TIME_TRIGGER = 10;
+
+# RPC ping interval for interface BidCos-RF, should be smaller than HMCCU_TIMEOUT_EVENT
+my $HMCCU_TIME_PING = 300;
+
 my $HMCCU_TIMEOUT_CONNECTION = 10;
 my $HMCCU_TIMEOUT_WRITE = 0.001;
 my $HMCCU_TIMEOUT_ACCEPT = 1;
@@ -280,6 +227,7 @@ sub HMCCU_UpdateSingleDatapoint ($$$$);
 sub HMCCU_UpdateSingleDevice ($$$$);
 
 # RPC functions
+sub HMCCU_EventsTimedOut ($);
 sub HMCCU_GetRPCCallbackURL ($$$$$);
 sub HMCCU_GetRPCDevice ($$$);
 sub HMCCU_GetRPCInterfaceList ($);
@@ -424,8 +372,9 @@ sub HMCCU_Initialize ($)
 		" ccudef-hmstatevals:textField-long ccudef-substitute:textField-long".
 		" ccudef-readingname:textField-long ccudef-readingfilter:textField-long".
 		" ccudef-readingformat:name,namelc,address,addresslc,datapoint,datapointlc".
-		" ccuflags:multiple-strict,extrpc,intrpc,procrpc,dptnocheck,noagg,nohmstate,logEvents,noEvents,noReadings,nonBlocking".
-		" ccuReqTimeout ccuGetVars rpcinterval:2,3,5,7,10 rpcqueue".
+		" ccuflags:multiple-strict,extrpc,intrpc,procrpc,dptnocheck,noagg,nohmstate,".
+		"logEvents,noEvents,noReadings,nonBlocking,reconnect,logPong,trace".
+		" ccuReqTimeout ccuGetVars rpcinterval:2,3,5,7,10 rpcqueue rpcPingCCU".
 		" rpcport:multiple-strict,".join(',',sort keys %HMCCU_RPC_NUMPORT).
 		" rpcserver:on,off rpcserveraddr rpcserverport rpctimeout rpcevtimeout parfile substitute".
 		" ccuget:Value,State ".
@@ -1431,7 +1380,7 @@ sub HMCCU_Set ($@)
 	my @ifList = HMCCU_GetRPCInterfaceList ($hash);
 	if (scalar (@ifList) > 0) {
 		my $ifStr = join (',', @ifList);
-		$options =~ s/register:all/rpcregister:all,$ifStr/;
+		$options =~ s/rpcregister:all/rpcregister:all,$ifStr/;
 	}
 	my $usage = "HMCCU: Unknown argument $opt, choose one of $options";
 	my $host = $hash->{host};
@@ -1498,13 +1447,14 @@ sub HMCCU_Set ($@)
 	}
 	elsif ($opt eq 'execute') {
 		my $program = shift @$a;
+		$program .= ' '.join(' ', @$a) if (scalar (@$a) > 0);
 		my $response;
 		$usage = "Usage: set $name $opt program-name";
 
 		return HMCCU_SetError ($hash, $usage) if (!defined ($program));
 
 		my $cmd = qq(dom.GetObject("$program").ProgramExecute());
-		my $value = HMCCU_HMCommand ($hash, $cmd, 0);
+		my $value = HMCCU_HMCommand ($hash, $cmd, 1);
 		
 		return HMCCU_SetState ($hash, "OK") if (defined ($value));
 		return HMCCU_SetError ($hash, "Program execution error");
@@ -3511,6 +3461,48 @@ sub HMCCU_GetRPCPortList ($)
 }
 
 ######################################################################
+# Called by HMCCURPCPROC device of interface BidCos-RF when no events
+# from CCU were received for a specified time span.
+# Return 1 if all RPC servers have been registered successfully.
+# Return 0 if at least one RPC server failed to register or the
+# corresponding HMCCURPCPROC device was not found.
+######################################################################
+
+sub HMCCU_EventsTimedOut ($)
+{
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+	
+	return 1 if (!HMCCU_IsFlag ($name, 'reconnect'));
+	
+	HMCCU_Log ($hash, 2, "Reconnecting to CCU", 0);
+	
+	# Register callback for each interface
+	my $rc = 1;
+	my @iflist = HMCCU_GetRPCInterfaceList ($hash);
+	foreach my $ifname (@iflist) {
+		my ($rpcdev, $save) = HMCCU_GetRPCDevice ($hash, 0, $ifname);
+		if ($rpcdev eq '') {
+			HMCCU_Log ($hash, 0, "Can't find RPC device for interface $ifname", 0);
+			$rc = 0;
+			next;
+		}
+		my $cl_hash = $defs{$rpcdev};
+		# Check if CCU interface is reachable before registering callback
+		my ($nrc, $msg) = HMCCURPCPROC_RegisterCallback ($cl_hash, 2);
+		$rc &= $nrc;
+		if ($nrc) {
+			$cl_hash->{ccustate} = 'active';
+		}
+		else {
+			HMCCU_Log ($cl_hash, 1, $msg, 0);
+		}
+	}
+	
+	return $rc;
+}
+
+######################################################################
 # Build RPC callback URL
 # Parameter hash might be a HMCCU or a HMCCURPC hash.
 ######################################################################
@@ -4409,7 +4401,7 @@ sub HMCCU_GetDeviceList ($)
 ######################################################################
 # Read list of datapoints for all or one CCU device type(s).
 # Function must not be called before GetDeviceList.
-# Return number of datapoints.
+# Return number of datapoints read.
 ######################################################################
 
 sub HMCCU_GetDatapointList ($$$)
@@ -5170,10 +5162,6 @@ sub HMCCU_GetRPCDevice ($$$)
 			my %rpcdevattr = ('room' => 'copy', 'group' => 'copy', 'icon' => 'copy',
 				'stateFormat' => 'rpcstate/state', 'eventMap' => '/rpcserver on:on/rpcserver off:off/',
 				'verbose' => 2, 'alias' => $alias );
-			if ($ifname eq 'BidCos-RF') {
-				$rpcdevattr{'rpcPingCCU'} = 300;
-				$rpcdevattr{'ccuflags'} = 'reconnect';
-			}
 			foreach my $a (keys %rpcdevattr) {
 				my $v = $rpcdevattr{$a} eq 'copy' ? AttrVal ($name, $a, '') : $rpcdevattr{$a};
 				CommandAttr (undef, "$rpcdevname $a $v") if ($v ne '');
@@ -6011,7 +5999,7 @@ sub HMCCU_BulkUpdate ($$$$)
 }
 
 ######################################################################
-# Get datapoint value from CCU and update reading.
+# Get datapoint value from CCU and optionally update reading.
 # If parameter noupd is defined and > 0 no readings will be updated.
 ######################################################################
 
@@ -8049,12 +8037,14 @@ sub HMCCU_CCURPC_ListDevicesCB ($$)
       	intrpc - Use internal RPC server. This is the default.<br/>
       	extrpc - Same as procrpc (see below)<br/>
       	logEvents - Write events from CCU into FHEM logfile<br/>
+			logPong - Write log message when receiving pong event if verbose level is at least 3.<br/>
       	noEvents - Ignore events / device updates sent by CCU. No readings will be updated!<br/>
       	nonBlocking - Use non blocking (asynchronous) CCU requests<br/>
       	noReadings - Do not create or update readings<br/>
       	procrpc - Use external RPC server provided by module HMCCPRPCPROC. During first RPC
       	server start HMCCU will create a HMCCURPCPROC device for each interface confiugured
       	in attribute 'rpcinterface'<br/>
+      	reconnect - Automatically reconnect to CCU when events timeout occurred.
       	Flags intrpc, extrpc and procrpc cannot be combined.
       </li><br/>
       <li><b>ccuget {State | <u>Value</u>}</b><br/>
@@ -8097,6 +8087,11 @@ sub HMCCU_CCURPC_ListDevicesCB ($$)
          Specifiy how often RPC queue is read. Default is 5 seconds. Only relevant if internal
          RPC server is used (deprecated).
       </li><br/>
+	   <li><b>rpcPingCCU &lt;interval&gt;</b><br/>
+	   	Send RPC ping request to CCU every <i>interval</i> seconds. If <i>interval</i> is 0
+	   	ping requests are disabled. Default value is 300 seconds. If attribut ccuflags is set
+	   	to logPong a log message with level 3 is created when receiving a pong event.
+	   </li><br/>
       <li><b>rpcport &lt;value[,...]&gt;</b><br/>
          Deprecated, use attribute 'rpcinterfaces' instead. Specify list of RPC ports on CCU.
          Default is 2001. Valid RPC ports are:<br/><br/>

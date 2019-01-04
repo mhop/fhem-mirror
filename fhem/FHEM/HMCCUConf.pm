@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.4
+#  Version 4.5
 #
 #  Configuration parameters for HomeMatic devices.
 #
@@ -765,7 +765,7 @@ use vars qw(%HMCCU_SCRIPTS);
 	webCmd           => "control:Auto:Manu:Boost:on:off",
 	widgetOverride   => "control:slider,4.5,0.5,30.5,1"
 	},
-	"HmIP-eTRV|HmIP-eTRV-2" => {
+	"HmIP-eTRV|HmIP-eTRV-2|HmIP-eTRV-B1" => {
 	_description     => "Heizkoerperthermostat HM-IP",
 	ccureadingfilter => "^ACTUAL_TEMPERATURE|^BOOST_MODE|^SET_POINT_MODE|^SET_POINT_TEMPERATURE|^LEVEL|^WINDOW_STATE",
 	ccureadingname   => "1.LEVEL:valve_position",
@@ -782,6 +782,7 @@ use vars qw(%HMCCU_SCRIPTS);
 	},
 	"HmIP-WTH|HmIP-WTH-2|HmIP-BWTH" => {
 	_description     => "Wandthermostat HM-IP",
+	ccureadingfilter => ".*",
 	controldatapoint => "1.SET_POINT_TEMPERATURE",
 	eventMap         => "/datapoint 1.BOOST_MODE true:Boost/datapoint 1.CONTROL_MODE 0:Auto/datapoint 1.CONTROL_MODE 1:Manual/datapoint 1.CONTROL_MODE 2:Holiday/datapoint 1.SET_POINT_TEMPERATURE 4.5:off/datapoint 1.SET_POINT_TEMPERATURE 30.5:on/",
 	genericDeviceType => "thermostat",
@@ -1002,7 +1003,7 @@ use vars qw(%HMCCU_SCRIPTS);
 		syntax      => "name, mode",
 		parameters  => 2,
 		code        => qq(
-object oPR = dom.GetObject("\$name");
+object oPR = (dom.GetObject(ID_PROGRAMS)).Get("\$name");
 if (oPR) {
   oPR.Active(\$mode);
 }
@@ -1026,7 +1027,7 @@ if (!oSV) {
   oSV.State("\$init");
   oSV.Internal(false);
   oSV.Visible(true);
-  dom.RTUpdate(false);
+  dom.RTUpdate(0);
 }
 else {
   oSV.State("\$init");
@@ -1053,7 +1054,7 @@ if (!oSV) {
   oSV.State("\$init");
   oSV.Internal(false);
   oSV.Visible(true);
-  dom.RTUpdate(false);
+  dom.RTUpdate(0);
 }
 else {
   oSV.State("\$init");
@@ -1078,7 +1079,7 @@ if (!oSV) {
   oSV.DPInfo("\$desc");
   oSV.ValueUnit("\$unit");
   oSV.State("\$init");
-  dom.RTUpdate(false);
+  dom.RTUpdate(0);
 }
 else {
   oSV.State("\$init");
@@ -1102,7 +1103,7 @@ if (!oSV){
   oSV.DPInfo("\$desc");
   oSV.ValueUnit("\$unit");
   oSV.State("\$init");
-  dom.RTUpdate(false);
+  dom.RTUpdate(0);
 }
 else {
   oSV.State("\$init");
@@ -1129,16 +1130,16 @@ if (oSV) {
 		code        => qq(
 object osysvar;
 string ssysvarid;
-foreach (ssysvarid, dom.GetObject(ID_SYSTEM_VARIABLES).EnumUsedIDs()) {
-   osysvar = dom.GetObject(ssysvarid);
-   Write(osysvar.Name());
-   if(osysvar.ValueSubType() == 6) {
-     Write ("=" # osysvar.AlType());
-   }
-   else {
-     Write ("=" # osysvar.Variable());
-   }
-   WriteLine ("=" # osysvar.Value());
+foreach (ssysvarid, (dom.GetObject(ID_SYSTEM_VARIABLES)).EnumUsedIDs()) {
+  osysvar = dom.GetObject(ssysvarid);
+  Write(osysvar.Name());
+  if(osysvar.ValueSubType() == 6) {
+    Write ("=" # osysvar.AlType());
+  }
+  else {
+    Write ("=" # osysvar.Variable());
+  }
+  WriteLine ("=" # osysvar.Value());
 }
 		)
 	},
@@ -1148,7 +1149,7 @@ foreach (ssysvarid, dom.GetObject(ID_SYSTEM_VARIABLES).EnumUsedIDs()) {
 		parameters  => 0,
 		code        => qq(
 string sSysVarId;
-foreach (sSysVarId, dom.GetObject(ID_SYSTEM_VARIABLES).EnumUsedIDs()) {
+foreach (sSysVarId, (dom.GetObject(ID_SYSTEM_VARIABLES)).EnumUsedIDs()) {
   object oSysVar = dom.GetObject(sSysVarId);
   Write(oSysVar.Name());               
   if (oSysVar.ValueSubType() == 6) {
@@ -1181,7 +1182,7 @@ foreach (sSysVarId, dom.GetObject(ID_SYSTEM_VARIABLES).EnumUsedIDs()) {
 		code        => qq(
 string chnid;
 string sDPId;
-object odev = dom.GetObject ("\$devname");
+object odev = (dom.GetObject(ID_DEVICES)).Get("\$devname");
 if (odev) {
   foreach (chnid, odev.Channels()) {
     object ochn = dom.GetObject(chnid);
@@ -1210,13 +1211,15 @@ else {
 		syntax      => "name",
 		parameters  => 1,
 		code        => qq(
-object odev=dom.GetObject("\$name");
-if (odev) {
-  if (odev.IsTypeOf (OT_CHANNEL)) {
-    string devid = odev.Device();
+object odev = (dom.GetObject(ID_DEVICES)).Get("\$name");
+if (!odev) {
+  object ochn = (dom.GetObject(ID_CHANNELS)).Get("\$name");
+  if(ochn) {
+    string devid = ochn.Device();
     odev = dom.GetObject (devid);
   }
-
+}
+if(odev) {
   string intid=odev.Interface();
   string intna=dom.GetObject(intid).Name();
   string chnid;
@@ -1313,7 +1316,7 @@ string sDevName;
 string sDevList = "\$list";
 integer c = 0;
 foreach (sDevName, sDevList.Split(",")) {
-  object odev = dom.GetObject (sDevName);
+  object odev = (dom.GetObject(ID_DEVICES)).Get(sDevName);
   if (odev) {
     foreach (chnid, odev.Channels()) {
 	   object ochn = dom.GetObject(chnid);
@@ -1349,7 +1352,7 @@ string sDPId;
 string sDevice;
 string sDevList = "\$list";
 foreach (sDevice, sDevList.Split(",")) {
-  object odev = dom.GetObject (sDevice);
+  object odev = (dom.GetObject(ID_DEVICES)).Get(sDevice);
   if (odev) {
     string intid = odev.Interface();
     string intna = dom.GetObject(intid).Name();
@@ -1384,7 +1387,7 @@ string sDPId;
 string sChannel;
 string sChnList = "\$list";
 foreach (sChannel, sChnList.Split(",")) {
-  object oChannel = dom.GetObject (sChannel);
+  object oChannel = (dom.GetObject(ID_CHANNELS)).Get(sChannel);
   if (oChannel) {
     foreach(sDPId, oChannel.DPs()) {
       object oDP = dom.GetObject(sDPId);

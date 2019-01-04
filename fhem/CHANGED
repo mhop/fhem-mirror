@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  88_HMCCU: Bug fixes
   - change:  10_MYSENSORS_DEVICE: make OTA feature available,
                                   change battery name convention,
                                   support MySensors API 2.0 features like 

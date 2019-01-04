@@ -4,11 +4,11 @@
 #
 #  $Id$
 #
-#  Version 1.3
+#  Version 1.4
 #
 #  Subprocess based RPC Server module for HMCCU.
 #
-#  (c) 2018 by zap (zap01 <at> t-online <dot> de)
+#  (c) 2019 by zap (zap01 <at> t-online <dot> de)
 #
 ##############################################################################
 #
@@ -35,7 +35,7 @@ use SetExtensions;
 ######################################################################
 
 # HMCCURPC version
-my $HMCCURPCPROC_VERSION = '1.3';
+my $HMCCURPCPROC_VERSION = '1.4';
 
 # Maximum number of events processed per call of Read()
 my $HMCCURPCPROC_MAX_EVENTS = 100;
@@ -52,6 +52,9 @@ my $HMCCURPCPROC_MAX_QUEUESEND = 70;
 # Time to wait after data processing loop in microseconds
 my $HMCCURPCPROC_TIME_WAIT = 100000;
 
+# RPC ping interval for interface BidCos-RF, should be smaller than HMCCURPCPROC_TIMEOUT_EVENT
+my $HMCCURPCPROC_TIME_PING = 300;
+
 # Timeout for established CCU connection in seconds
 my $HMCCURPCPROC_TIMEOUT_CONNECTION = 1;
 
@@ -61,8 +64,8 @@ my $HMCCURPCPROC_TIMEOUT_WRITE = 0.001;
 # Timeout for accepting incoming connections in seconds (0 = default)
 my $HMCCURPCPROC_TIMEOUT_ACCEPT = 1;
 
-# Timeout for incoming CCU events in seconds
-my $HMCCURPCPROC_TIMEOUT_EVENT = 600;
+# Timeout for incoming CCU events in seconds (0 = ignore timeout)
+my $HMCCURPCPROC_TIMEOUT_EVENT = 0;
 
 # Send statistic information after specified amount of events
 my $HMCCURPCPROC_STATISTICS = 500;
@@ -200,7 +203,7 @@ sub HMCCURPCPROC_Initialize ($)
 	
 	$hash->{parseParams} = 1;
 
-	$hash->{AttrList} = "ccuflags:multiple-strict,expert,reconnect,logEvents,ccuInit,queueEvents,noEvents,logPong".
+	$hash->{AttrList} = "ccuflags:multiple-strict,expert,logEvents,ccuInit,queueEvents,noEvents".
 		" rpcMaxEvents rpcQueueSend rpcQueueSize rpcMaxIOErrors". 
 		" rpcServerAddr rpcServerPort rpcWriteTimeout rpcAcceptTimeout".
 		" rpcConnTimeout rpcStatistics rpcEventTimeout rpcPingCCU ".
@@ -356,11 +359,10 @@ sub HMCCURPCPROC_InitDevice ($$) {
 	
 	Log3 $name, 1, "HMCCURPCPROC: [$name] Initialized version $HMCCURPCPROC_VERSION for interface $ifname with I/O device $ioname";
 
-	# Set some attributes and start CCU ping
+	# Set some attributes
 	if ($init_done) {
 		$attr{$name}{stateFormat} = "rpcstate/state";
-		$attr{$name}{verbose} = 2;+
-		HMCCURPCPROC_RPCPing ($dev_hash);
+		$attr{$name}{verbose} = 2;
 	}
 
 	HMCCURPCPROC_ResetRPCState ($dev_hash);
@@ -424,25 +426,18 @@ sub HMCCURPCPROC_Attr ($@)
 			$hash->{hmccu}{localaddr} = $attrval;
 		}
 		elsif ($attrname eq 'rpcPingCCU') {
-			if ($attrval > 0) {
-				if ($hash->{rpcinterface} =~ /^(BidCos-RF|BidCos-Wired|HmIP-RF)$/) {
-					InternalTimer (gettimeofday()+$attrval, "HMCCURPCPROC_RPCPing", $hash, 0);
-				}
-				else {
-					return "HMCCURPCPROC: [$name] RPC Ping not supported by interface ".$hash->{rpcinterface};
-				}
-			}
-			else {
-				RemoveInternalTimer ($hash, "HMCCURPCPROC_RPCPing");
-			}
+			Log3 $name, 1, "HMCCURPCPROC: [$name] Attribute rpcPingCCU ignored. Please set it in I/O device"
+		}
+		elsif ($attrname eq 'ccuflags' && $attrval =~ /reconnect/) {
+			Log3 $name, 1, "HMCCURPCPROC: [$name] Flag reconnect ignored. Please set it in I/O device"
+		}
+		elsif ($attrname eq 'ccuflags' && $attrval =~ /logPong/) {
+			Log3 $name, 1, "HMCCURPCPROC: [$name] Flag logPong ignored. Please set it in I/O device"
 		}
 	}
 	elsif ($cmd eq 'del') {
 		if ($attrname eq 'rpcServerAddr') {
 			$hash->{hmccu}{localaddr} = $hash->{hmccu}{defaultaddr};
-		}
-		elsif ($attrname eq 'rpcPingCCU') {
-			RemoveInternalTimer ($hash, "HMCCURPCPROC_RPCPing");
 		}
 	}
 	
@@ -799,9 +794,10 @@ sub HMCCURPCPROC_ProcessEvent ($$)
 	);
 
 	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
-	my $evttimeout = HMCCURPCPROC_GetAttribute ($hash, 'rpcEventTimeout', 'rpcevtimeout',
-		$HMCCURPCPROC_TIMEOUT_EVENT);
-
+	my $ping = AttrVal ($hmccu_hash->{NAME}, 'rpcPingCCU', $HMCCURPCPROC_TIME_PING);
+	my $evttimeout = ($ping > 0 && $hash->{rpcinterface} eq 'BidCos-RF') ? $ping*2 :
+	   HMCCURPCPROC_GetAttribute ($hash, 'rpcEventTimeout', 'rpcevtimeout', $HMCCURPCPROC_TIMEOUT_EVENT);
+	                    
 	return undef if (!defined ($event) || $event eq '');
 
 	# Log event
@@ -853,7 +849,7 @@ sub HMCCURPCPROC_ProcessEvent ($$)
 		$rh->{avgdelay} = $rh->{sumdelay}/$rh->{rec}{$et};
 		$hash->{ccustate} = 'active' if ($hash->{ccustate} ne 'active');
 		Log3 $name, 3, "HMCCURPCPROC: [$name] Received CENTRAL event from $clkey. ".$t[2]."=".$t[3]
-			if ($t[1] eq 'CENTRAL' && $t[3] eq $rpcname && $ccuflags =~ /logPong/);
+			if ($t[1] eq 'CENTRAL' && $t[3] eq $rpcname && HMCCU_IsFlag ($hmccu_hash->{NAME}, 'logPong'));
 		my ($add, $chn) = split (/:/, $t[1]);
 		return defined ($chn) ? ($et, $clkey, $add, $chn, $t[2], $t[3]) : undef;
 	}
@@ -953,21 +949,15 @@ sub HMCCURPCPROC_ProcessEvent ($$)
 	elsif ($et eq 'TO') {
 		#
 		# Event timeout
-		# Input:  TO|clkey|Time
-		# Output: TO, clkey, Port, Time
+		# Input:  TO|clkey|DiffTime
+		# Output: TO, clkey, Port, DiffTime
 		#
-		if ($evttimeout > 0 && $evttimeout >= $t[0]) {
+		if ($evttimeout > 0 && $t[0] > $evttimeout) {
 			Log3 $name, 2, "HMCCURPCPROC: [$name] Received no events from interface $clkey for ".$t[0]." seconds";
 			$hash->{ccustate} = 'timeout';
-			if ($hash->{RPCState} eq 'running' && $ccuflags =~ /reconnect/) {
-				Log3 $name, 2, "HMCCURPCPROC: [$name] Reconnecting to CCU interface ".$hash->{rpcinterface};
-				my ($rc, $rcmsg) = HMCCURPCPROC_RegisterCallback ($hash, 2);
-				if ($rc) {
-					$hash->{ccustate} = 'active';
-				}
-				else {
-					Log3 $name, 1, "HMCCURPCPROC: [$name] $rcmsg";
-				}
+			if ($hash->{RPCState} eq 'running' && $hash->{rpcport} == 2001) {
+				# If interface is BidCos-RF inform IO device about timeout
+				HMCCU_EventsTimedOut ($hmccu_hash)
 			}
 			DoTrigger ($name, "No events from interface $clkey for ".$t[0]." seconds");
 		}
@@ -1227,10 +1217,12 @@ sub HMCCURPCPROC_StartRPCServer ($)
 	return (0, "RPC server already running") if (HMCCURPCPROC_CheckProcessState ($hash, 'running'));
 	
 	# Get parameters and attributes
-	my %procpar;
+	my $ping          = AttrVal ($hmccu_hash->{NAME}, 'rpcPingCCU', $HMCCURPCPROC_TIME_PING);
 	my $localaddr     = HMCCURPCPROC_GetAttribute ($hash, undef, 'rpcserveraddr', $hash->{hmccu}{localaddr});
 	my $rpcserverport = HMCCURPCPROC_GetAttribute ($hash, 'rpcServerPort', 'rpcserverport', $HMCCURPCPROC_SERVER_PORT);
-	my $evttimeout    = HMCCURPCPROC_GetAttribute ($hash, 'rpcEventTimeout', 'rpcevtimeout', $HMCCURPCPROC_TIMEOUT_EVENT);
+	my $evttimeout    = ($ping > 0 && $hash->{rpcinterface} eq 'BidCos-RF') ?
+	                    $ping*2 :
+	                    HMCCURPCPROC_GetAttribute ($hash, 'rpcEventTimeout', 'rpcevtimeout', $HMCCURPCPROC_TIMEOUT_EVENT);
 	my $ccunum        = $hash->{CCUNum};
 	my $rpcport       = $hash->{rpcport};
 	my $serveraddr    = HMCCU_GetRPCServerInfo ($hmccu_hash, $rpcport, 'host');
@@ -1239,16 +1231,16 @@ sub HMCCURPCPROC_StartRPCServer ($)
 	$hash->{hmccu}{localaddr} = $localaddr;
 
 	# Store parameters for child process
+	my %procpar;
 	$procpar{socktimeout} = AttrVal ($name, 'rpcWriteTimeout',  $HMCCURPCPROC_TIMEOUT_WRITE);
 	$procpar{conntimeout} = AttrVal ($name, 'rpcConnTimeout',   $HMCCURPCPROC_TIMEOUT_CONNECTION);
 	$procpar{acctimeout}  = AttrVal ($name, 'rpcAcceptTimeout', $HMCCURPCPROC_TIMEOUT_ACCEPT);
-	$procpar{evttimeout}  = AttrVal ($name, 'rpcEventTimeout',  $HMCCURPCPROC_TIMEOUT_EVENT);
 	$procpar{queuesize}   = AttrVal ($name, 'rpcQueueSize',     $HMCCURPCPROC_MAX_QUEUESIZE);
 	$procpar{queuesend}   = AttrVal ($name, 'rpcQueueSend',     $HMCCURPCPROC_MAX_QUEUESEND);
 	$procpar{statistics}  = AttrVal ($name, 'rpcStatistics',    $HMCCURPCPROC_STATISTICS);
 	$procpar{maxioerrors} = AttrVal ($name, 'rpcMaxIOErrors',   $HMCCURPCPROC_MAX_IOERRORS);
-	$procpar{evttimeout}  = AttrVal ($name, 'rpcEventTimeout',  $HMCCURPCPROC_TIMEOUT_EVENT);
 	$procpar{ccuflags}    = AttrVal ($name, 'ccuflags',         'null');
+	$procpar{evttimeout}  = $evttimeout;
 	$procpar{interface}   = $interface;
 	$procpar{flags}       = HMCCU_GetRPCServerInfo ($hmccu_hash, $rpcport, 'flags');
 	$procpar{type}        = HMCCU_GetRPCServerInfo ($hmccu_hash, $rpcport, 'type');
@@ -1290,7 +1282,8 @@ sub HMCCURPCPROC_StartRPCServer ($)
 	if (!$rpcpid) {
 		# Child process, only needs parent socket
 		HMCCURPCPROC_HandleConnection ($rpcport, $callbackport, $sockparent, \%procpar);
-		# Exit child process
+		
+		# Connection loop ended. Close sockets and exit child process
 		close ($sockparent);
 		close ($sockchild);
 		exit (0);
@@ -1338,18 +1331,28 @@ sub HMCCURPCPROC_RPCServerStarted ($)
 	my $hmccu_hash = $hash->{IODev};
 	my $clkey = 'CB'.$hash->{rpcport}.$hash->{rpcid};
 	my $ifname = $hash->{rpcinterface};
+	my $ping = AttrVal ($hmccu_hash->{NAME}, 'rpcPingCCU', $HMCCURPCPROC_TIME_PING);
 	
 	# Check if RPC servers are running. Set overall status
 	if (HMCCURPCPROC_CheckProcessState ($hash, 'running')) {
 		$hash->{hmccu}{rpcstarttime} = time ();
 		HMCCURPCPROC_SetState ($hash, "OK");
 
+		# Update client devices if interface is managed by HMCCURPCPROC device.
+		# Normally interfaces are managed by HMCCU device.
 		if ($hmccu_hash->{hmccu}{interfaces}{$ifname}{manager} eq 'HMCCURPCPROC') {
 			my ($c_ok, $c_err) = HMCCU_UpdateClients ($hmccu_hash, '.*', 'Attr', 0, $ifname);
 			Log3 $name, 2, "HMCCURPCPROC: [$name] Updated devices. Success=$c_ok Failed=$c_err";
 		}
+
+		RemoveInternalTimer ($hash, "HMCCURPCPROC_IsRPCServerRunning");
 		
-		RemoveInternalTimer ($hash);
+		# Activate heartbeat if interface is BidCos-RF and rpcPingCCU > 0
+		if ($ping > 0 && $ifname eq "BidCos-RF") {
+			Log3 $name, 1, "HMCCURPCPROC: [$name] Scheduled CCU ping every $ping seconds";
+			InternalTimer (gettimeofday()+$ping, "HMCCURPCPROC_RPCPing", $hash, 0);
+		}
+		
 		DoTrigger ($name, "RPC server $clkey running");
 		return 1;
 	}
@@ -1649,14 +1652,20 @@ sub HMCCURPCPROC_RPCPing ($)
 {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
+	my $hmccu_hash = $hash->{IODev};
+	my $ping = AttrVal ($hmccu_hash->{NAME}, 'rpcPingCCU', $HMCCURPCPROC_TIME_PING);
 	
-	my $ping = AttrVal ($name, 'rpcPingCCU', 0);
-	if ($ping > 0) {
-		if ($init_done && HMCCURPCPROC_CheckProcessState ($hash, 'running')) {
-			my $clkey = 'CB'.$hash->{rpcport}.$hash->{rpcid};
-			HMCCURPCPROC_SendRequest ($hash, "ping", $clkey);
+	if ($hash->{rpcinterface} eq 'BidCos-RF') {
+		if ($ping > 0) {
+			if ($init_done && HMCCURPCPROC_CheckProcessState ($hash, 'running')) {
+				my $clkey = 'CB'.$hash->{rpcport}.$hash->{rpcid};
+				HMCCURPCPROC_SendRequest ($hash, "ping", $clkey);
+			}
+			InternalTimer (gettimeofday()+$ping, "HMCCURPCPROC_RPCPing", $hash, 0);
 		}
-		InternalTimer (gettimeofday()+$ping, "HMCCURPCPROC_RPCPing", $hash, 0);
+		else {
+			Log3 $name, 1, "HMCCURPCPROC: [$name] CCU ping disabled";
+		}
 	}
 }
 
@@ -2732,11 +2741,9 @@ sub HMCCURPCPROC_DecodeResponse ($)
 			This flag is not supported by interfaces CUxD and HVL.<br/>
 			expert - Activate expert mode<br/>
 			logEvents - Events are written into FHEM logfile if verbose is 4<br/>
-			logPong - Write log message when receiving pong event if verbose level is at least 3.<br/>
 			noEvents - Ignore events from CCU, do not update client device readings.<br/>
 			queueEvents - Always write events into queue and send them asynchronously to FHEM.
 			Frequency of event transmission to FHEM depends on attribute rpcConnTimeout.<br/>
-			reconnect - Try to re-register at CCU if no events received for rpcEventTimeout seconds<br/>
 		</li><br/>
 		<li><b>rpcAcceptTimeout &lt;seconds&gt;</b><br/>
 			Specify timeout for accepting incoming connections. Default is 1 second. Increase this 
@@ -2746,9 +2753,9 @@ sub HMCCURPCPROC_DecodeResponse ($)
 	   	Specify timeout of incoming CCU connections. Default is 1 second. Value must be greater than 0.
 	   </li><br/>
 	   <li><b>rpcEventTimeout &lt;seconds&gt;</b><br/>
-	   	Specify timeout for CCU events. Default is 600 seconds. If timeout occurs an event
-	   	is triggered. If set to 0 the timeout is ignored. If ccuflag reconnect is set the
-	   	RPC device tries to establish a new connection to the CCU.
+	   	Specify timeout for CCU events. Default is 0, timeout is ignored. If timeout occurs an event
+	   	is triggered. If ccuflag reconnect is set in I/O device the RPC device tries to establish a new
+	   	connection to the CCU.
 	   </li><br/>
 	   <li><b>rpcMaxEvents &lt;count&gt;</b><br/>
 	   	Specify maximum number of events read by FHEM during one I/O loop. If FHEM performance
@@ -2761,9 +2768,7 @@ sub HMCCURPCPROC_DecodeResponse ($)
 	   	to disable error counting.
 	   </li><br/>
 	   <li><b>rpcPingCCU &lt;interval&gt;</b><br/>
-	   	Send RPC ping request to CCU every <i>interval</i> seconds. If <i>interval</i> is 0
-	   	sending ping requests is disabled. If attribut ccuflags is set to logPong a log message
-	   	with level 3 is created when receiving a pong event.
+	   	Ignored. Should be set in I/O device.
 	   </li><br/>
 	   <li><b>rpcQueueSend &lt;events&gt;</b><br/>
 	      Maximum number of events sent to FHEM per accept loop. Default is 70. If set to 0

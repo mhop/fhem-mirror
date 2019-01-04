@@ -4,55 +4,12 @@
 #
 #  $Id$
 #
-#  Version 4.3.005
+#  Version 4.3.006
 #
 #  (c) 2018 zap (zap01 <at> t-online <dot> de)
 #
 ######################################################################
-#
-#  define <name> HMCCUDEV {<ccudev>|virtual} [<statechannel>] [readonly] [defaults]
-#     [{group={<device>|<channel>}[,...]|groupexp=<regexp>}] [iodev=<iodevname>]
-#
-#  set <name> clear [<regexp>]
-#  set <name> config [<channel-number>] <parameter>=<value> [...]
-#  set <name> control <value>
-#  set <name> datapoint [<channel-number>.]<datapoint> <value> [...]
-#  set <name> defaults
-#  set <name> devstate <value>
-#  set <name> on-till <timestamp>
-#  set <name> on-for-timer <ontime>
-#  set <name> pct <level> [{<ontime>|0} [<ramptime>]]
-#  set <name> <stateval_cmds>
-#  set <name> toggle
-#
-#  get <name> config [<channel-number>] [<filter-expr>]
-#  get <name> configdesc [<channel-number>]
-#  get <name> configlist [<channel-number>]
-#  get <name> datapoint [<channel-number>.]<datapoint>
-#  get <name> defaults
-#  get <name> devstate
-#  get <name> update
-#
-#  attr <name> ccucalculate <value>:<reading>[:<dp-list>][...]
-#  attr <name> ccuflags { ackState, nochn0, trace }
-#  attr <name> ccuget { State | Value }
-#  attr <name> ccureadings { 0 | 1 }
-#  attr <name> ccureadingformat { address[lc] | name[lc] | datapoint[lc] }
-#  attr <name> ccureadingfilter <filter-rule>[,...]
-#  attr <name> ccureadingname <oldname>:<newname>[,...]
-#  attr <name> ccuscaleval <datapoint>:<factor>[:<min>:<max>][,...]
-#  attr <name> ccuverify { 0 | 1 | 2}
-#  attr <name> controldatapoint <channel-number>.<datapoint>
-#  attr <name> disable { 0 | 1 }
-#  attr <name> peer datapoints:condition:{hmccu:object=value|ccu:object=value|fhem:command}
-#  attr <name> hmstatevals <subst-rule>[;...]
-#  attr <name> statechannel <channel>
-#  attr <name> statedatapoint [<channel-number>.]<datapoint>
-#  attr <name> statevals <text1>:<subtext1>[,...]
-#  attr <name> substexcl <reading-expr>
-#  attr <name> substitute <subst-rule>[;...]
-#
-######################################################################
+#  Client device for Homematic devices.
 #  Requires modules 88_HMCCU.pm, HMCCUConf.pm
 ######################################################################
 
@@ -61,9 +18,6 @@ package main;
 use strict;
 use warnings;
 use SetExtensions;
-# use Data::Dumper;
-
-# use Time::HiRes qw( gettimeofday usleep );
 
 sub HMCCUDEV_Initialize ($);
 sub HMCCUDEV_Define ($@);
@@ -73,9 +27,9 @@ sub HMCCUDEV_Set ($@);
 sub HMCCUDEV_Get ($@);
 sub HMCCUDEV_Attr ($@);
 
-#####################################
+######################################################################
 # Initialize module
-#####################################
+######################################################################
 
 sub HMCCUDEV_Initialize ($)
 {
@@ -98,9 +52,9 @@ sub HMCCUDEV_Initialize ($)
 		$readingFnAttributes;
 }
 
-#####################################
+######################################################################
 # Define device
-#####################################
+######################################################################
 
 sub HMCCUDEV_Define ($@)
 {
@@ -537,7 +491,7 @@ sub HMCCUDEV_Set ($@)
 
 		return HMCCU_SetState ($hash, "OK");
 	}
-	elsif ($opt eq 'pct') {
+	elsif ($opt eq 'pct' || $opt eq 'up' || $opt eq 'down') {
 		return HMCCU_SetError ($hash, -11) if ($sc eq '' && $cc eq '');
 		my $chn;
 		if (HMCCU_IsValidDatapoint ($hash, $ccutype, $cc, "LEVEL", 2)) {
@@ -550,35 +504,52 @@ sub HMCCUDEV_Set ($@)
 			return HMCCU_SetError ($hash, "Can't find LEVEL datapoint for device type $ccutype")
 		}
 		
-		my $objname = '';
-		my $objvalue = shift @$a;
-		return HMCCU_SetError ($hash, "Usage: set $name pct {value} [{ontime} [{ramptime}]]")
-			if (!defined ($objvalue));
+		if ($opt eq 'pct') {
+			my $objname = '';
+			my $objvalue = shift @$a;
+			return HMCCU_SetError ($hash, "Usage: set $name pct {value} [{ontime} [{ramptime}]]")
+				if (!defined ($objvalue));
 		
-		my $timespec = shift @$a;
-		my $ramptime = shift @$a;
-		my %dpval;
+			my $timespec = shift @$a;
+			my $ramptime = shift @$a;
+			my %dpval;
 		
-		# Set on time
-		if (defined ($timespec)) {
-			return HMCCU_SetError ($hash, "Can't find ON_TIME datapoint for device type $ccutype")
-				if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $chn, "ON_TIME", 2));
+			# Set on time
+			if (defined ($timespec)) {
+				return HMCCU_SetError ($hash, "Can't find ON_TIME datapoint for device type $ccutype")
+					if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $chn, "ON_TIME", 2));
 				
-			if ($timespec =~ /^[0-9]{2}:[0-9]{2}/) {
-				$timespec = HMCCU_GetTimeSpec ($timespec);
-				return HMCCU_SetError ($hash, "Wrong time format. Use HH:MM[:SS]") if ($timespec < 0);
+				if ($timespec =~ /^[0-9]{2}:[0-9]{2}/) {
+					$timespec = HMCCU_GetTimeSpec ($timespec);
+					return HMCCU_SetError ($hash, "Wrong time format. Use HH:MM[:SS]") if ($timespec < 0);
+				}
+				$dpval{"001.$ccuif.$ccuaddr:$chn.ON_TIME"} = $timespec if ($timespec > 0);
 			}
-			$dpval{"001.$ccuif.$ccuaddr:$chn.ON_TIME"} = $timespec if ($timespec > 0);
-		}
-		
-		# Set ramp time
-		$dpval{"002.$ccuif.$ccuaddr:$chn.RAMP_TIME"} = $ramptime if (defined ($ramptime));
 
-		# Set level	
-		$dpval{"003.$ccuif.$ccuaddr:$chn.LEVEL"} = $objvalue;
-		$rc = HMCCU_SetMultipleDatapoints ($hash, \%dpval);
+			# Set ramp time
+			$dpval{"002.$ccuif.$ccuaddr:$chn.RAMP_TIME"} = $ramptime if (defined ($ramptime));
+
+			# Set level	
+			$dpval{"003.$ccuif.$ccuaddr:$chn.LEVEL"} = $objvalue;
+			$rc = HMCCU_SetMultipleDatapoints ($hash, \%dpval);
+		}
+		else {
+			my $delta = shift @$a;
+			$delta = 10 if (!defined ($delta));
+			$delta = -$delta if ($opt eq 'down');
+			my $objname = "$ccuif.$ccuaddr:$chn.LEVEL";
+
+			($rc, $result) = HMCCU_GetDatapoint ($hash, $objname, 1);
+			Log3 $name, 2, "HMCCU: set $opt: GetDatapoint returned $rc, $result"
+				if ($ccuflags =~ /trace/);
+			return HMCCU_SetError ($hash, $rc, $result) if ($rc < 0);
+			
+			# Set level
+			my $objvalue = min(max($result+$delta,0),100);
+			$rc = HMCCU_SetMultipleDatapoints ($hash, { "001.$objname" => $objvalue });
+		}
+				
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
-		
 		return HMCCU_SetState ($hash, "OK");
 	}
 	elsif ($opt eq 'on-for-timer' || $opt eq 'on-till') {
@@ -653,7 +624,7 @@ sub HMCCUDEV_Set ($@)
 				$retmsg .= " toggle:noArg";
 				$retmsg .= " on-for-timer on-till"
 					if (HMCCU_IsValidDatapoint ($hash, $hash->{ccutype}, $sc, "ON_TIME", 2));
-				$retmsg .= " pct"
+				$retmsg .= " pct up down"
 					if (HMCCU_IsValidDatapoint ($hash, $hash->{ccutype}, $sc, "LEVEL", 2) ||
 						HMCCU_IsValidDatapoint ($hash, $hash->{ccutype}, $cc, "LEVEL", 2));
 			}
@@ -923,6 +894,9 @@ sub HMCCUDEV_Get ($@)
          Set state of a CCU device channel. Channel and state datapoint must be defined as
          attribute 'statedatapoint'. If <i>value</i> contains string \_ it is substituted by blank.
       </li><br/>
+      <li><b>set &lt;name&gt; down [&lt;value&gt;]</b><br/>
+      	<a href="#HMCCUCHNset">see HMCCUCHN</a>
+      </li><br/>
       <li><b>set &lt;name&gt; on-for-timer &lt;ontime&gt;</b><br/>
       	<a href="#HMCCUCHNset">see HMCCUCHN</a>
       </li><br/>
@@ -945,6 +919,9 @@ sub HMCCUDEV_Get ($@)
          </code>
       </li><br/>
       <li><b>set &lt;name&gt; toggle</b><br/>
+      	<a href="#HMCCUCHNset">see HMCCUCHN</a>
+      </li><br/>
+      <li><b>set &lt;name&gt; up [&lt;value&gt;]</b><br/>
       	<a href="#HMCCUCHNset">see HMCCUCHN</a>
       </li><br/>
       <li><b>ePaper Display</b><br/><br/>
