@@ -321,7 +321,7 @@ sub freezemon_ProcessTimer($) {
         }
 
         # prioQueues are not unique, so we are using the old way...
-        if ( $hash->{helper}{apptime} ne "" ) {
+        if ( $hash->{helper}{apptime} && $hash->{helper}{apptime} ne "" ) {
             my @olddev = split( " ", $hash->{helper}{apptime} );
             my @newdev = split( " ", freezemon_apptime($hash) );
 
@@ -707,7 +707,7 @@ sub freezemon_Attr($) {
             if ( $aVal ne 0 ) {
                 freezemon_install_callFn_wrapper($hash);
             }
-            elsif ( exists ($hash->{helper}{mycallFn} ) ) {
+            elsif ( defined ($hash->{helper}{mycallFn} ) ) {
                 Log3( "", 0, "[Freezemon] $name: Unwrapping CallFn" );
                 {
                     no warnings;
@@ -722,7 +722,7 @@ sub freezemon_Attr($) {
             if ( $aVal ne 0 ) {
                 freezemon_install_analyzeCommand_wrapper($hash);
             }
-            elsif ( exists( $hash->{helper}{analyzeCommand} ) ) {
+            elsif ( defined ( $hash->{helper}{analyzeCommand} ) ) {
                 Log3( "", 0, "[Freezemon] $name: Unwrapping analyzeCommand" );
                 {
                     #no warnings;
@@ -1047,7 +1047,7 @@ sub freezemon_install_analyzeCommand_wrapper($;$) {
     $name = "FreezeMon" unless defined($name);
     my $status = AnalyzeCommand( "freezemon", "" );
     if ( !defined($status) || $status ne "already wrapped" ) {
-        $hash->{helper}{mycallFn} = \&AnalyzeCommand;
+        $hash->{helper}{AnalyzeCommand} = \&AnalyzeCommand;
         Log3( "", 3, "[Freezemon] $name: Wrapping AnalyzeCommand" );
         {
             no warnings;
