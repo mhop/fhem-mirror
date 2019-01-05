@@ -2164,7 +2164,7 @@ sub SSCam_camsnap($) {
         SSCam_getapisites($hash);
 		
     } else {
-        InternalTimer(gettimeofday()+0.3, "SSCam_camsnap", "$name,$num,$lag", 0);
+        InternalTimer(gettimeofday()+0.3, "SSCam_camsnap", "$name:$num:$lag", 0);
     }    
 }
 
