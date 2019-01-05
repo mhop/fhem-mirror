@@ -269,6 +269,8 @@ FileLog_Set($@)
   my ($hash, @a) = @_;
   my $me = $hash->{NAME};
 
+  return undef if( $hash->{REGEXP} eq 'fakelog' );
+
   return "no set argument specified" if(int(@a) < 2);
   my %sets = (reopen=>0, clear=>0, absorb=>1, addRegexpPart=>2, 
               removeRegexpPart=>1);
@@ -409,6 +411,7 @@ FileLog_fhemwebFn($$$$)
   }
   $ret .= "</table>";
   return $ret if($pageHash);
+  return $ret if( $defs{$d}{REGEXP} eq 'fakelog' );
 
   # DETAIL only from here on
   my $hash = $defs{$d};
