@@ -436,8 +436,8 @@ sub HMLAN_Set($@) {############################################################
     my $id = InternalVal($hash->{NAME}, "owner", "123456");
     $hash->{HM_CMDNR} = $hash->{HM_CMDNR} ? ($hash->{HM_CMDNR}+1)%256 : 1;
 
-    HMLAN_Write($hash, undef, sprintf("As15%02X8401%s000000010A%s",
-                    $hash->{HM_CMDNR}, $id, unpack('H*', $arg)));
+    HMLAN_Write($hash, undef, sprintf("As15%02XC401%s000000010A%s",
+                    $hash->{HM_CMDNR}, $id, uc unpack('H*', $arg)));
     HMLAN_RemoveHMPair("hmPairForSec:$name");
     $hash->{hmPair} = 1;
     $hash->{hmPairSerial} = $arg;
