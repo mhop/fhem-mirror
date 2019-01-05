@@ -28,7 +28,8 @@
 ##############################################################################
 #
 #	CHANGELOG
-#	
+#
+#	ß4.12.2ß10	Added NotifyDn to catch DISCONNECTED Events	
 #	26.12.2018	RfxMgr-like functionality to enable/disable protocols
 #				Support for Cuveo devices
 #	15.12.2018	added more readings and additional RFX-models
@@ -44,6 +45,7 @@ package main;
 use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday usleep);
+
 
 my $last_rmsg = "abcd";
 my $last_time = 1;
@@ -126,6 +128,8 @@ sub TRX_Initialize($) {
     $hash->{StateFn}    = "TRX_SetState";
     $hash->{AttrList}   = "do_not_notify:1,0 dummy:1,0 do_not_init:1,0 addvaltrigger:1,0 longids rssi:1,0";
     $hash->{ShutdownFn} = "TRX_Shutdown";
+	$hash->{NotifyFn} 	= "TRX_Notify";
+
 }
 
 #####################################
@@ -164,6 +168,27 @@ sub TRX_Define($$) {
     $hash->{DeviceName} = $dev;
     my $ret = DevIo_OpenDev( $hash, 0, "TRX_DoInit" );
     return $ret;
+}
+
+sub TRX_Notify ($$) {
+  my ($own_hash, $dev_hash) = @_;
+  my $ownName = $own_hash->{NAME}; # own name / hash
+
+  return "" if(IsDisabled($ownName)); # Return without any further action if the module is disabled
+
+  my $devName = $dev_hash->{NAME}; # Device that created the events
+
+  return "" if ($devName ne $ownName); # we just want to treat Devio events for own device
+  
+  my $events = deviceEvents($dev_hash,1);
+  return if( !$events );
+
+  foreach my $event (@{$events}) {
+	#Log3 $ownName, 1, "TRX received $event";
+    if ($event eq "DISCONNECTED") {
+		readingsSingleUpdate( $own_hash, "state", "disconnected", 1 );
+	}
+  }
 }
 
 #####################################
@@ -337,11 +362,13 @@ sub TRX_DoInit($) {
         # Reset
         my $init = pack( 'H*', "0D00000000000000000000000000" );
 
-        #DevIo_SimpleWrite( $hash, $init, 0 );
+        DevIo_SimpleWrite( $hash, $init, 0 );
+		usleep(50000);    # wait 50 ms
+		
         #DevIo_TimeoutRead( $hash, 0.5 );
-        DevIo_Expect( $hash, $init, 0.5 );
+        #$buf = DevIo_Expect( $hash, $init, 1 );
         sleep(1);
-
+		#Log3 $name,1,"TRX Expect received $buf";
         TRX_Clear($hash);
 
         sleep(1);
@@ -350,15 +377,18 @@ sub TRX_DoInit($) {
         # Get Status
         $init = pack( 'H*', "0D00000102000000000000000000" );
         DevIo_SimpleWrite( $hash, $init, 0 );
-        usleep(50000);    # wait 50 ms
-        $buf = unpack( 'H*', DevIo_TimeoutRead( $hash, 0.2 ) );
-
+        #usleep(50000);    # wait 50 ms
+        $buf = unpack( 'H*', DevIo_TimeoutRead( $hash, 1 ) );
+		#$buf = DevIo_Expect( $hash, $init, 1 );
+		
         if ( !$buf ) {
             Log3 $name, 1, "TRX: Initialization Error: No character read";
+			readingsSingleUpdate( $hash, "state", "Error", 1 );
             return "TRX: Initialization Error $name: no char read";
         }
         elsif ( $buf !~ m/0d0100....................../ && $buf !~ m/140100..................................../ ) {
             Log3 $name, 1, "TRX: Initialization Error hexline='$buf', expected 0d0100......................";
+			readingsSingleUpdate( $hash, "state", "Error", 1 );
             return "TRX: Initialization Error %name expected 0D010, but buf=$buf received.";
         }
         else {
