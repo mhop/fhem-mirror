@@ -4314,6 +4314,7 @@ sub MSwitch_fhemwebFn($$$$) {
 			delay2 = \$(\"[name=timeseton$_]\").val();
 			devices += delay2+'#[NF]';
 			devices1 = \$(\"[name=conditionon$_]\").val();
+			devices1 = devices1.replace(/\\|/g,'(DAYS)');
 			devices2 = \$(\"[name=conditionoff$_]\").val();
 			devices2 = devices2.replace(/\\|/g,'(DAYS)');
 			devices += devices1+'#[NF]';
