@@ -161,6 +161,7 @@ name:A_01_tasmota_basic
 filter:TYPE=MQTT2_DEVICE
 desc:Applies to Sonoff 1 Channel devices using POWER-topic for relay state 
 set DEVICE attrTemplate A_01a_tasmota_basic_state_power1
+par:DEVNAME;ESP's name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,tele/([^/]*)/, ? $1 : undef }
 #par:COMMAND;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\btele(/.*)?/LWT:, ? "${1}cmnd$2" : undef }
 attr DEVICE stateFormat POWER
 attr DEVICE setList \
