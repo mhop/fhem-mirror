@@ -13,7 +13,7 @@ use warnings;
 
 use JSON;         #libjson-perl
 use Data::Dumper;
-
+use Time::HiRes qw(gettimeofday);
 use Storable qw(dclone);
 
 use vars qw(%defs);
@@ -23,6 +23,8 @@ use vars qw($FW_subdir);
 use vars qw($init_done);
 
 my @shortDays = ("Mon","Tue","Wed","Thu","Fri","Sat","Sun");
+
+my %LAST_SEND;
 
 my @DEVLIST_SEND = ("MAX","CUL_HM","HMCCUDEV","weekprofile","dummy");
 
@@ -402,10 +404,44 @@ sub weekprofile_sendDevProfile(@)
   }
   my $ret = undef;
   if ($cmd) {
-    $cmd =~ s/^\s+|\s+$//g; 
-    Log3 $me, 4, "$me(sendDevProfile): $cmd";
-    $ret = fhem($cmd,1);
-    DoTrigger($me,"PROFILE_TRANSFERED $device",1);
+    $cmd =~ s/^\s+|\s+$//g;
+
+    #transfer profil data delayed e.q. to avoid messages like "queue is full, dropping packet" by HM devices
+    my $snd_delay = AttrVal($me,"send_delay",0);
+    if ($snd_delay>0) {
+
+      my $datetimenow = gettimeofday();      
+
+      my $last_profile_send = $LAST_SEND{$type};
+      if (!($last_profile_send)) {
+        $last_profile_send = $datetimenow - $snd_delay; 
+      } else {
+        my $last_profile_send_fmt = FmtDateTime($last_profile_send);
+        Log3 $me, 4, "$me(sendDevProfile): last profile to device type $type wars or will be at ($last_profile_send_fmt)";
+      }
+
+      if ($last_profile_send <= $datetimenow - $snd_delay) {
+        $last_profile_send = $datetimenow - $snd_delay;
+      }
+
+      $last_profile_send = $last_profile_send + $snd_delay;
+
+      my $last_profile_send_fmt = FmtDateTime($last_profile_send);
+      my $sleepTime = $last_profile_send - $datetimenow;
+      
+      Log3 $me, 4, "$me(sendDevProfile): profile data to $device ($type) will be sent $sleepTime seconds delayed at ($last_profile_send_fmt)";      
+    
+      $LAST_SEND{$type} = $last_profile_send;
+
+      $cmd=$cmd.";trigger $me PROFILE_TRANSFERED $device";
+      Log3 $me, 4, "$me(sendDevProfile): sleep $sleepTime; $cmd";
+      $ret = fhem("sleep $sleepTime; $cmd",1);
+    }
+    else {
+      Log3 $me, 4, "$me(sendDevProfile): $cmd";
+      $ret = fhem($cmd,1);
+      DoTrigger($me,"PROFILE_TRANSFERED $device",1);
+    }
   }
   return $ret;
 }
@@ -531,7 +567,8 @@ sub weekprofile_Initialize($)
   $hash->{StateFn}  = "weekprofile_State";
   $hash->{NotifyFn} = "weekprofile_Notify";
   $hash->{AttrFn}   = "weekprofile_Attr";
-  $hash->{AttrList} = "useTopics:0,1 widgetTranslations widgetWeekdays widgetEditOnNewPage:0,1 widgetEditDaysInRow:1,2,3,4,5,6,7 tempON tempOFF configFile ".$readingFnAttributes;
+  $hash->{AttrList} = "useTopics:0,1 widgetTranslations widgetWeekdays widgetEditOnNewPage:0,1 widgetEditDaysInRow:1,2,3,4,5,6,7 \
+                       send_delay tempON tempOFF configFile ".$readingFnAttributes;
   
   $hash->{FW_summaryFn}  = "weekprofile_SummaryFn";
 
@@ -562,6 +599,7 @@ sub weekprofile_Define($$)
   my @profiles = ();
   my @sendDevList = ();
   my @topics = ();
+  
    
   $hash->{PROFILES}   = \@profiles;
   $hash->{SNDDEVLIST} = \@sendDevList;
@@ -1498,6 +1536,10 @@ sub weekprofile_getEditLNK_MasterDev($$)
     <li>tempOFF<br>
       Temperature for 'off'. e.g. 4
     </li>
+    <li>send_delay<br>
+    Delay in seconds between sending profile data the same type of device.
+    This is usefull to avoid messages like "queue is full, dropping packet" by HM devices
+    </li>
   </ul>
   
 </ul>
@@ -1656,6 +1698,10 @@ sub weekprofile_getEditLNK_MasterDev($$)
     </li>
     <li>tempOFF<br>
       Temperature für 'off'. z.B. 4
+    </li>
+    <li>send_delay<br>
+    Verzögerungszweit in Sekunden zwischen dem Senden von Profildaten an ein Thermostat gleichen Typs.
+    Hilfreich zur Vermeidung von Meldungen wie "queue is full, dropping packet".
     </li>
   </ul>
   
