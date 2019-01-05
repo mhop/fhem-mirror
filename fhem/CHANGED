@@ -1,7 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 98_weekprofile: Force to send complete week profile
+                             Attr forceCompleteProfile
   - feature: 98_weekprofile: delay between sending profile data to the
-                             same type of device. Attr send_delay
+                             same type of device. Attr sendDelay
   - bugfix:  88_HMCCU: Bug fixes
   - change:  10_MYSENSORS_DEVICE: make OTA feature available,
                                   change battery name convention,

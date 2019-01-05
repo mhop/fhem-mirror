@@ -305,7 +305,7 @@ sub weekprofile_sendDevProfile(@)
 
   my $devPrf = weekprofile_readDevProfile($device,$type,$me);
   
-  
+  my $force = AttrVal($me,"forceCompleteProfile",0);
   
   # only send changed days
   my @dayToTransfer = ();
@@ -327,7 +327,7 @@ sub weekprofile_sendDevProfile(@)
       }
     }
     
-    if ($equal == 0) {
+    if ($equal == 0 || $force > 0) {
       push @dayToTransfer , $day;
       next;
     }
@@ -407,7 +407,7 @@ sub weekprofile_sendDevProfile(@)
     $cmd =~ s/^\s+|\s+$//g;
 
     #transfer profil data delayed e.q. to avoid messages like "queue is full, dropping packet" by HM devices
-    my $snd_delay = AttrVal($me,"send_delay",0);
+    my $snd_delay = AttrVal($me,"sendDelay",0);
     if ($snd_delay>0) {
 
       my $datetimenow = gettimeofday();      
@@ -568,7 +568,7 @@ sub weekprofile_Initialize($)
   $hash->{NotifyFn} = "weekprofile_Notify";
   $hash->{AttrFn}   = "weekprofile_Attr";
   $hash->{AttrList} = "useTopics:0,1 widgetTranslations widgetWeekdays widgetEditOnNewPage:0,1 widgetEditDaysInRow:1,2,3,4,5,6,7 \
-                       send_delay tempON tempOFF configFile ".$readingFnAttributes;
+                       sendDelay tempON tempOFF configFile forceCompleteProfile:0,1 ".$readingFnAttributes;
   
   $hash->{FW_summaryFn}  = "weekprofile_SummaryFn";
 
@@ -1536,9 +1536,15 @@ sub weekprofile_getEditLNK_MasterDev($$)
     <li>tempOFF<br>
       Temperature for 'off'. e.g. 4
     </li>
-    <li>send_delay<br>
+    <li>sendDelay<br>
+    Default: 0
     Delay in seconds between sending profile data the same type of device.
     This is usefull to avoid messages like "queue is full, dropping packet" by HM devices
+    </li>
+    <li>forceCompleteProfile<br>
+    Default: 0
+    Force to send the complete profile to the device instead of only the changes.
+    Possibility to resend a complete week profile
     </li>
   </ul>
   
@@ -1699,9 +1705,15 @@ sub weekprofile_getEditLNK_MasterDev($$)
     <li>tempOFF<br>
       Temperature für 'off'. z.B. 4
     </li>
-    <li>send_delay<br>
+    <li>sendDelay<br>
+    Default: 0
     Verzögerungszweit in Sekunden zwischen dem Senden von Profildaten an ein Thermostat gleichen Typs.
     Hilfreich zur Vermeidung von Meldungen wie "queue is full, dropping packet".
+    </li>
+    <li>forceCompleteProfile<br>
+    Default: 0
+    Ezwingt das Senden eines komplettes Wochenprofiles anstatt der Änderungen
+    Es besteht somit die Möglichkeit eines erneuten Senden der Daten an das Thermostats
     </li>
   </ul>
   
