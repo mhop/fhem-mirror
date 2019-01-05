@@ -89,7 +89,7 @@ sub LaCrosseGateway_Define($$) {my ($hash, $def) = @_;
   $hash->{TIMEOUT} = 0.5;
 
   if( !defined( $attr{$name}{usbFlashCommand} ) ) {
-    $attr{$name}{usbFlashCommand} = "./FHEM/firmware/esptool.py -b 921600 -p [PORT] write_flash -ff 80m -fm dio -fs 4MB-c1 0x00000 [BINFILE] > [LOGFILE]"
+    $attr{$name}{usbFlashCommand} = "./FHEM/firmware/esptool.py -b 921600 -p [PORT] write_flash -ff 80m -fm dio -fs 4MB-c1 0x00000 [BINFILE] > [LOGFILE] 2>&1"
   }
   if($dev eq "none") {
     Log3 $name, 1, "$name device is none, commands will be echoed only";
@@ -213,7 +213,12 @@ sub LaCrosseGateway_StartUpload($) {
       $command =~ s/\Q[PORT]\E/$port/g;
       $command =~ s/\Q[BINFILE]\E/$hexFile/g;
       $command =~ s/\Q[LOGFILE]\E/$logFile/g;
-
+  
+      if (-e $logFile) {
+        unlink($logFile);
+      }
+  
+      LaCrosseGateway_LogOTA("Command: $command");
       LaCrosseGateway_LogOTA("");
       LaCrosseGateway_LogOTA("Upload started, please wait a minute or two ...");
       `$command`;
@@ -414,9 +419,7 @@ sub LaCrosseGateway_DoInit($) {
   my $enabled = AttrVal($name, "disable", "0") != "1" && !defined($hash->{helper}{FLASHING});
   if($enabled) {
     readingsSingleUpdate($hash, "state", "opened", 1);
-    if(AttrVal($name, "mode", "") ne "USB") {
-      InternalTimer(gettimeofday() +3, "LaCrosseGateway_OnInitTimer", $hash, 1);
-    }
+    InternalTimer(gettimeofday() +3, "LaCrosseGateway_OnInitTimer", $hash, 1);
   }
   else {
     readingsSingleUpdate($hash, "state", "disabled", 1);
@@ -553,9 +556,10 @@ sub LaCrosseGateway_HandleOwnSensors($$) {
   my $humidity = undef;
   my $pressure = undef;
   my $gas = undef;
+  my $illuminance = undef;
   my $debug = undef;
 
-  if($bytes[2] != 0xFF) {
+  if(!($bytes[2] == 0xFF && $bytes[3] == 0xFF)) {
     $temperature = ($bytes[2]*256 + $bytes[3] - 1000)/10;
     readingsBulkUpdate($hash, "temperature", $temperature);
   }
@@ -565,22 +569,27 @@ sub LaCrosseGateway_HandleOwnSensors($$) {
     readingsBulkUpdate($hash, "humidity", $humidity);
   }
   
-  if(@bytes >= 16 && $bytes[14] != 0xFF) {
+  if(@bytes > 15 && !($bytes[14] == 0xFF && $bytes[15] == 0xFF)) {
     $pressure = $bytes[14] * 256 + $bytes[15];
     $pressure /= 10.0 if $pressure > 5000;
     readingsBulkUpdate($hash, "pressure", $pressure);
   }
   
-  if(@bytes >= 19 && $bytes[16] != 0xFF) {
+  if(@bytes > 18 && !($bytes[16] == 0xFF && $bytes[17] == 0xFF && $bytes[18] == 0xFF)) {
     $gas = $bytes[16] * 65536 + $bytes[17] * 256 + $bytes[18];
     readingsBulkUpdate($hash, "gas", $gas);
   }
   
-  if(@bytes >= 22 && $bytes[19] != 0xFF) {
+  if(@bytes > 21 && !($bytes[19] == 0xFF && $bytes[20] == 0xFF && $bytes[21] == 0xFF)) {
     $debug = $bytes[19] * 65536 + $bytes[20] * 256 + $bytes[21];
     readingsBulkUpdate($hash, "debug", $debug);
   }
-
+  
+  if(@bytes > 24 && !($bytes[22] == 0xFF && $bytes[23] == 0xFF && $bytes[24] == 0xFF)) {
+    $illuminance = $bytes[22] * 65536 + $bytes[23] * 256 + $bytes[24];
+    readingsBulkUpdate($hash, "illuminance", $illuminance);
+  }
+  
   readingsEndUpdate($hash, 1);
 
   delete $hash->{READINGS}{"temperature"} if(!defined($temperature));
@@ -588,6 +597,7 @@ sub LaCrosseGateway_HandleOwnSensors($$) {
   delete $hash->{READINGS}{"pressure"} if(!defined($pressure));
   delete $hash->{READINGS}{"gas"} if(!defined($gas));
   delete $hash->{READINGS}{"debug"} if(!defined($debug));
+  delete $hash->{READINGS}{"illuminance"} if(!defined($illuminance));
 }
 
 #=======================================================================================
