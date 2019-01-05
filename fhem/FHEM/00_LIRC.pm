@@ -43,13 +43,17 @@ LIRC_Define($$)
   my $config = $a[2];
 
   Log3 $name, 3, "LIRC opening $name device $config";
-  my $lirc = Lirc::Client->new({
+  my $lirc;
+  eval {
+    $lirc = Lirc::Client->new({
         prog    => 'fhem',
         rcfile  => "$config", 
         debug   => 0,
         fake    => 0,
     });
-  return "Can't open $config: $!\n" if(!$lirc);
+  };
+  return "Error initializing Lirc::Client: $@" if($@);
+  return "Can't open $config: $!" if(!$lirc);
   Log3 $name, 3, "LIRC opened $name device $config";
 
   my $select = IO::Select->new();
