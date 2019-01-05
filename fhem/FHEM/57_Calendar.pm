@@ -3790,7 +3790,7 @@ sub CalendarEventsAsHtml($;$) {
   in <code>get &lt;name&gt; events &lt;parameters&gt;</code>.
   <br><br>
   Example: <code>define MyCalendarWeblink weblink htmlCode
-  { CalendarEventsAsHtml('F','format:custom="$T1 $D $S" timeFormat="%d.%m" series:next=3') }</code>
+  { CalendarEventsAsHtml('F','format:custom="$T1 $D $S" timeFormat:"%d.%m" series:next=3') }</code>
   <br><br>
   Tip: use single quotes as outer quotes.
 
