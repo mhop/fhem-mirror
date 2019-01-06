@@ -3,7 +3,7 @@
 ##########################################################################################################
 #       93_DbRep.pm
 #
-#       (c) 2016-2018 by Heiko Maaz
+#       (c) 2016-2019 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module can be used to select and report content of databases written by 93_DbLog module
@@ -57,6 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Versions History intern
 our %DbRep_vNotesIntern = (
+  "8.9.9"  => "06.01.2019  diffval_DoParse: 'ORDER BY TIMESTAMP' added to statements Forum:https://forum.fhem.de/index.php/topic,53584.msg882082.html#msg882082",
   "8.9.8"  => "27.11.2018  minor fix in deviceRename, commandref revised ",
   "8.9.7"  => "21.11.2018  DbRep_firstconnect now uses attribute \"timeout\" ",
   "8.9.6"  => "15.11.2018  fix PERL WARNING: Use of uninitialized value \$fref in pattern match (m//), sub DbRep_sec2hms for hms transforming",
@@ -3318,9 +3319,9 @@ sub diffval_DoParse($) {
      }
 	 
      if ($IsTimeSet || $IsAggrSet) {
-         $sql = DbRep_createSelectSql($hash,"history",$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",'');
+         $sql = DbRep_createSelectSql($hash,"history",$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",'ORDER BY TIMESTAMP');
 	 } else {
-	     $sql = DbRep_createSelectSql($hash,"history",$selspec,$device,$reading,undef,undef,''); 
+	     $sql = DbRep_createSelectSql($hash,"history",$selspec,$device,$reading,undef,undef,'ORDER BY TIMESTAMP'); 
 	 }
      Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
      
