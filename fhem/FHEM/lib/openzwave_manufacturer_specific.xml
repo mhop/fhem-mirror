@@ -954,6 +954,7 @@
 	<Manufacturer id="0040" name="Novar EDS">
 	</Manufacturer>
 	<Manufacturer id="016a" name="Oomi">
+                <Product type="0002" id="0064" name="FT100-C MultiSensor 6" config="oomi/ft100.xml" forumNr="95312"/>
 		<Product type="0102" id="0064" name="FT100 MultiSensor 6" config="oomi/ft100.xml" />
 		<Product type="0202" id="0064" name="FT100 MultiSensor 6" config="oomi/ft100.xml" />
 		<Product type="1D02" id="0064" name="FT100 MultiSensor 6" config="oomi/ft100.xml" />
