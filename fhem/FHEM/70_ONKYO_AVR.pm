@@ -1387,9 +1387,6 @@ sub ONKYO_AVR_Get($$$) {
 sub ONKYO_AVR_Read($) {
     my ($hash) = @_;
     my $name = $hash->{NAME};
-    my $state        = ReadingsVal( $name, "power", "off" );
-    my $zone         = 0;
-    my $definedZones = scalar keys %{ $modules{ONKYO_AVR_ZONE}{defptr}{$name} };
 
     # read from serial device
     my $buf = DevIo_SimpleRead($hash);
@@ -1417,6 +1414,24 @@ sub ONKYO_AVR_Read($) {
     else {
         $hash->{PARTIAL} = "";
     }
+
+    my @cmds = split( 'ISCP', $buf );
+
+    for my $el (@cmds) {
+        if ( $el ne '' ) {
+            ONKYO_AVR_Read2( $hash, $name, "ISCP$el" );
+        }
+    }
+
+    return;
+}
+
+sub ONKYO_AVR_Read2($$$) {
+    my ( $hash, $name, $buf ) = @_;
+
+    my $state        = ReadingsVal( $name, "power", "off" );
+    my $zone         = 0;
+    my $definedZones = scalar keys %{ $modules{ONKYO_AVR_ZONE}{defptr}{$name} };
 
     my $length = length $buf;
     return unless ( $length >= 16 );
@@ -1945,22 +1960,28 @@ sub ONKYO_AVR_Read($) {
         && $value ne "on"
         && $value ne "off" )
     {
-        if ( $value =~ /^([012])([012])(.*)$/ ) {
+        if ( $value =~ /^([012])([012\-])(.*)$/ ) {
             my $type = "bmp";
             $type = "jpg"  if ( $1 eq "1" );
             $type = "link" if ( $1 eq "2" );
 
-            $hash->{helper}{cover}{$type}{parts} = "1" if ( "$2" eq "0" );
-            $hash->{helper}{cover}{$type}{parts}++ if ( "$2" ne "0" );
-            $hash->{helper}{cover}{$type}{data} = "" if ( "$2" eq "0" );
-            $hash->{helper}{cover}{$type}{data} .= "$3"
-              if ( "$2" eq "0" || $hash->{helper}{cover}{$type}{data} ne "" );
+            if ( $2 eq "-" ) {
+                $hash->{helper}{cover}{$type}{data} = "$3";
+            }
+            else {
+                $hash->{helper}{cover}{$type}{parts} = "1" if ( "$2" eq "0" );
+                $hash->{helper}{cover}{$type}{parts}++ if ( "$2" ne "0" );
+                $hash->{helper}{cover}{$type}{data} = "" if ( "$2" eq "0" );
+                $hash->{helper}{cover}{$type}{data} .= "$3"
+                  if ( "$2" eq "0"
+                    || $hash->{helper}{cover}{$type}{data} ne "" );
+            }
 
             Log3 $name, 4, "ONKYO_AVR $name: rcv $cmd($type) in progress, part "
               . $hash->{helper}{cover}{$type}{parts};
 
             # complete album art received
-            if (   $2 eq "2"
+            if (   ( $2 eq "2" || $2 eq "-" )
                 && $type eq "link"
                 && $hash->{helper}{cover}{$type}{data} ne "" )
             {
