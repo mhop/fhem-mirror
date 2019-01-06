@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  98_weekprofile: fix f18 style
   - feature: 98_weekprofile: Force to send complete week profile
                              Attr forceCompleteProfile
   - feature: 98_weekprofile: delay between sending profile data to the

@@ -1292,16 +1292,18 @@ sub weekprofile_SummaryFn()
   }
   
   $html .= "<table>";
-  $html .= "<tr><td>";
-  $html .= "<div class=\"devType\" id=\"weekprofile.$d.header\">";
-  $html .= "<table style=\"padding:0\"><tr><td style=\"padding-right:0;padding-bottom:0\"><div id=\"weekprofile.menu.base\">";
+  $html .= "<tr><td><div class=\"devType\">$d</div></td></tr>";
+  $html .= "<tr><td><table><tr><td>";
+  $html .= "<div id=\"weekprofile.$d.header\">";
+  $html .= "<table style=\"padding:0\">";
+  $html .= "<tr><td style=\"padding-right:0;padding-bottom:0\"><div id=\"weekprofile.menu.base\">";
   $html .= $editIcon."&nbsp;".$lnkDetails;
-  $html .= "</div></td></tr></table></div></td></tr>";
-  $html .= "<tr><td>";
+  $html .= "</div></td></tr></table></div>";
   $html .= "<div class=\"fhemWidget\" informId=\"$d\" cmd=\"\" arg=\"$args\" current=\"$curr\" dev=\"$d\">"; # div tag to support inform updates
   $html .= "</div>";
   $html .= "</td></tr>";
   $html .= "</table>";
+  $html .= "</td></tr></table>";
   return $html;
 }
 ############################################## 

@@ -226,7 +226,7 @@ function FW_weekprofileSendToDev(devName,bnt)
       var selected = [];
       if (widget.MASTERDEV)
         selected.push(widget.MASTERDEV);
-      FW_weekprofileMultiSelDialog("<span>Device(s):</span>",devicesNames,devicesAlias,selected,1,bnt, 
+      FW_weekprofileMultiSelDialog("Device(s):",devicesNames,devicesAlias,selected,1,bnt, 
         function(sndDevs) {
           if (!sndDevs || sndDevs.length==0)
             return;
@@ -512,7 +512,7 @@ function FW_weekprofileTransDay(devName,day,bnt)
     }
   }
   var selected = [];  
-  FW_weekprofileMultiSelDialog("<span>Days(s):</span>",dayNames,dayAlias,selected,0,bnt, 
+  FW_weekprofileMultiSelDialog("Days(s):",dayNames,dayAlias,selected,0,bnt, 
       function(selDays) {
         if (!selDays || selDays.length==0)
           return;
@@ -627,11 +627,11 @@ function FW_weekprofileEditWeek(widget)
     }
   }
   
-  tr.append("<td><table><tr>");
+  tr.append("<td valign=\"bottom\"><table><tr>");
   tr = tr.find("tr:last");
   
-  tr.append("<td><input type=\"button\" value=\""+FW_GetTranslation(widget,'Speichern')+"\" onclick=\"FW_weekprofilePrepAndSendProf('"+widget.DEVICE+"')\">");
-  tr.append("<td><input type=\"button\" value=\""+FW_GetTranslation(widget,'Abbrechen')+"\" onclick=\"FW_weekprofileEditAbort('"+widget.DEVICE+"')\">");
+  tr.append("<td><input style=\"margin:2px\" type=\"button\" value=\""+FW_GetTranslation(widget,'Speichern')+"\" onclick=\"FW_weekprofilePrepAndSendProf('"+widget.DEVICE+"')\">");
+  tr.append("<td><input style=\"margin:2px\" type=\"button\" value=\""+FW_GetTranslation(widget,'Abbrechen')+"\" onclick=\"FW_weekprofileEditAbort('"+widget.DEVICE+"')\">");
 }
 
 function FW_weekprofileSendCallback(devName, data)
@@ -833,7 +833,7 @@ FW_weekprofileCreate(elName, devName, vArr, currVal, set, params, cmd)
   widget.MENU = new Object();
   widget.MENU.BASE = $(widget.HEADER).find('div[id*="menu.base"]').get(0);  
   
-  var menuContent = '<td style="display:inline;padding:0px;margin:0px;"><div id="weekprofile.menu.content"></td>';
+  var menuContent = '<td style="padding:0px;margin:0px;"><div id="weekprofile.menu.content"></td>';
   $(widget.MENU.BASE.parentElement.parentElement).append(menuContent);
   widget.MENU.CONTENT = $(widget.HEADER).find('div[id*="menu.content"]').get(0);
   
