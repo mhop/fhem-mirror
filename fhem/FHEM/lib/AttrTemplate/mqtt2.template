@@ -139,7 +139,8 @@ filter:TYPE=MQTT2_DEVICE
 desc:Applies to Sonoff Basic, S20 using POWER1-topic for relay state <br>Use this in case "SetOption26 1" was used as described in tasmota documentation <br>NOTE: This template is intended to configure also channel one of multi-channel tasmota devices
 #par:COMMAND;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\btele(/.*)?/LWT:, ? "${1}cmnd$2" : undef }
 par:DEVNAME;ESP's name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,tele/([^/]*)/, ? $1 : undef }
-attr DEVICE stateFormat POWER1
+#attr DEVICE stateFormat POWER1
+attr DEVICE userReadings state:POWER1:.* { lc(ReadingsVal("DEVICE","POWER1","")) }
 attr DEVICE eventMap { dev=>{'^(.*)POWER(.?): OFF$'=>'$1POWER$2: off', '^(.*)POWER(.?): ON$'=>'$1POWER$2: on'} }
 attr DEVICE setList \
   off:noArg    cmnd/DEVNAME/POWER1 0\
@@ -163,7 +164,8 @@ desc:Applies to Sonoff 1 Channel devices using POWER-topic for relay state
 set DEVICE attrTemplate A_01a_tasmota_basic_state_power1
 par:DEVNAME;ESP's name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,tele/([^/]*)/, ? $1 : undef }
 #par:COMMAND;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\btele(/.*)?/LWT:, ? "${1}cmnd$2" : undef }
-attr DEVICE stateFormat POWER
+#attr DEVICE stateFormat POWER
+attr DEVICE userReadings state:POWER:.* { lc(ReadingsVal("DEVICE","POWER","")) }
 attr DEVICE setList \
   off:noArg    cmnd/DEVNAME/POWER 0\
   on:noArg     cmnd/DEVNAME/POWER 1\
@@ -250,7 +252,8 @@ set DEVICE attrTemplate A_01a_tasmota_basic_state_power1
 #par:COMMAND;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\btele(/.*)?/LWT:, ? "${1}cmnd$2" : undef }
 attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2
 copy DEVICE DEVICE_CH2
-attr DEVICE_CH2 stateFormat POWER2
+#attr DEVICE_CH2 stateFormat POWER2
+attr DEVICE_CH2 userReadings state:POWER2:.* { lc(ReadingsVal("DEVICE_CH2","POWER2","")) }
 attr DEVICE_CH2 comment Channel 2 for DEVICE
 setreading DEVICE_CH2 associatedWith DEVICE
 attr DEVICE_CH2 setList \
