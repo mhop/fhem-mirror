@@ -45,20 +45,20 @@
 #  2018-12-30     initial offical release
 #                 remove special characters from readings
 #                 some internal improvements suggested by CoolTux
-#  2019-??-??     "disabled" implemented
+#  2019-01-01     "disabled" implemented
 #                 "set update implemented
 #						renamed "WW-onTimeCharge_aktiv" into "WW-einmaliges_Aufladen_aktiv"
 #						Attribute vitoconnect_raw_readings:0,1 " and  ."vitoconnect_actions_active:0,1 " implemented
 #						"set clearReadings" implemented
+#  2019-01-05		Passwort wird im KeyValue gespeichert statt im Klartext
+#                 Action "oneTime
 #          
 #
-#   ToDo:
-# 						Passwort im KeyValue speichern statt im Klartext
-#                 "set"s zum Steuern der Heizung
+#   ToDo:         "set"s zum Steuern der Heizung
 #                 Dokumentation (auch auf Deutsch)
 #                 Nicht bei jedem Lesen neu einloggen
 #                 Fehlerbehandlung verbessern
-#						Attribute implementieren und dokumentieren (disable, ....)
+#						Attribute implementieren und dokumentieren 
 #						"sinnvolle" Readings statt 1:1 aus der API übernommene
 #		  				ErrorListChanges implementieren
 #                 mapping der Readings optional machen
@@ -71,6 +71,7 @@ use warnings;
 use Time::HiRes qw(gettimeofday);
 use JSON;
 use HttpUtils;
+use Encode qw(decode encode);
 #use Data::Dumper;
 #use Path::Tiny;
 
@@ -226,9 +227,11 @@ sub vitoconnect_Define($$) {
     if(int(@param) < 5) { return "too few parameters: define <name> vitoconnect <user> <passwd> <intervall>"; }
     
     $hash->{user} = $param[2];
-    $hash->{passwd} = $param[3];
     $hash->{intervall} = $param[4];
     $hash->{counter} = 0;
+    
+    my $err = vitoconnect_StoreKeyValue($hash, "passwd", $param[3]);
+    return $err if ($err);
     
 	 InternalTimer(gettimeofday()+2, "vitoconnect_GetUpdate", $hash);   
     return undef;
@@ -242,21 +245,49 @@ sub vitoconnect_Undef($$) {
 
 sub vitoconnect_Get($@) {
 	my ($hash, $name, $opt, @args) = @_;
-	
 	return "get $name needs at least one argument" unless (defined($opt));
 	return undef;
 }
 
 sub vitoconnect_Set($@) {
 	my ($hash, $name, $opt, @args) = @_;
+	my $access_token = $hash->{access_token};
+	my $installation = $hash->{installation};
+	my $gw = $hash->{gw};
 	
 	return "set $name needs at least one argument" unless (defined($opt));
-	if ($opt eq "update"){ vitoconnect_GetUpdate($hash); return undef; }
-	elsif ($opt eq "clearReadings") {
+	if ($opt eq "update"){ 
+		vitoconnect_GetUpdate($hash); return undef;
+	} elsif ($opt eq "clearReadings") {
 		AnalyzeCommand ($hash, "deletereading $name .*");
 		return undef;
+	} elsif ($opt eq "password") {
+		my $err = vitoconnect_StoreKeyValue($hash, "passwd", $args[0]); return $err if ($err);
+		return undef;	
+	} elsif ($opt eq "setMode") {
+		my $param = {
+			url        => "https://api.viessmann-platform.io/operational-data/installations/$installation/gateways/$gw/devices/0/features/heating.circuits.0.operating.modes.active/setMode",
+			hash       => $hash,
+			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
+			data       => '{"mode":"$args[0]"}',
+			method     => "POST",
+			timeout    => 10,
+			sslargs    => {SSL_verify_mode => 0},
+      };
+      # Log5 $name, 3, Dumper($param);
+  		(my $err, my $data) = HttpUtils_BlockingGet($param);
+  		if ($err ne "" || $data ne "") {
+  			Log3 $name, 1, "$name: Fehler während der Befehlsausführung: err = $err data=$data";
+  		} else {
+  			Log3 $name, 4, "$name: Befehlsausführung ok";
+  		}
+		return undef;
+	} elsif ($opt eq "oneTimeCharge") {
+		vitoconnect_action($hash);
+		return undef;	
 	}
-	return "unknown value $opt, choose one of update:noArg clearReadings:noArg";
+	#return "unknown value $opt, choose one of update:noArg clearReadings:noArg setMode:standby,dhw,dhwAndHeating,forcedReduced,forcedNormal oneTimeCharge:noArg password";
+	return "unknown value $opt, choose one of update:noArg clearReadings:noArg oneTimeCharge:noArg password";
 }	
 sub vitoconnect_Attr(@) {
 	my ($cmd,$name,$attr_name,$attr_value) = @_;
@@ -286,8 +317,8 @@ sub vitoconnect_Attr(@) {
 sub vitoconnect_GetUpdate($) {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
-	Log3 $name, 3, "$name: GetUpdate called ...";
-	if ( IsDisabled($name) ) { Log3 $name, 3, "$name: device disabled"; 
+	Log3 $name, 4, "$name: GetUpdate called ...";
+	if ( IsDisabled($name) ) { Log3 $name, 4, "$name: device disabled"; 
 	} else {	vitoconnect_getCode($hash); } 	
 	return undef;
 }
@@ -295,16 +326,11 @@ sub vitoconnect_GetUpdate($) {
 sub vitoconnect_getCode($) {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
-	
-	my $url = "$authorizeURL?client_id=$client_id&scope=openid&redirect_uri=$callback_uri&response_type=code";  
-	my @header = ("Content-Type: application/x-www-form-urlencoded");
 	my $isiwebuserid = $hash->{user};
-	my $isiwebpasswd = $hash->{passwd};	
-	Log3 $name, 3, "$name - getCode went ok";
-	Log3 $name, 5, "getCode: $url"; 
-        
+	my $isiwebpasswd = vitoconnect_ReadKeyValue($hash, "passwd");
+		        
    my $param = {
-		url        => $url,
+		url        => "$authorizeURL?client_id=$client_id&scope=openid&redirect_uri=$callback_uri&response_type=code",
 		hash       => $hash,
 		header     => "Content-Type: application/x-www-form-urlencoded",
 		ignoreredirects => 1,
@@ -315,7 +341,7 @@ sub vitoconnect_getCode($) {
       callback   => \&vitoconnect_getCodeCallback     
       };
    
-   # Log3 $name, 3, Dumper($hash);
+   # Log3 $name, 5, Dumper($hash);
    HttpUtils_NonblockingGet($param);
    return undef;
 }
@@ -326,11 +352,11 @@ sub vitoconnect_getCodeCallback ($) {
 	my $name = $hash->{NAME};
 	
 	if ($err eq "") {
-   	Log3 $name, 3, "$name - getCodeCallback went ok";
-      Log3 $name, 5, "Received response: $response_body";
+   	Log3 $name, 4, "$name - getCodeCallback went ok";
+      Log3 $name, 5, "$name: Received response: $response_body";
       $response_body =~ /code=(.*)"/;
       $hash->{code} = $1;
-      Log3 $name, 5, "code = $hash->{code}";
+      Log3 $name, 5, "$name: code = $hash->{code}";
       if ($hash->{code}) {
       	$hash->{login} = "ok";
       } else {
@@ -338,7 +364,7 @@ sub vitoconnect_getCodeCallback ($) {
       }
    } else {
    	# Error code, type of error, error message
-      Log3 $name, 1, "An error happened: $err";
+      Log3 $name, 1, "$name: An error happened: $err";
       $hash->{login} = "failure";
    }
 	if ($hash->{login} eq "ok") {
@@ -375,8 +401,8 @@ sub vitoconnect_getAccessTokenCallback($) {
 	my $name = $hash->{NAME};
 	
 	if ($err eq "") {
-   	Log3 $name, 3, "$name - getAccessTokenCallback went ok";
-      Log3 $name, 5, "Received response: $response_body\n";
+   	Log3 $name, 4, "$name - getAccessTokenCallback went ok";
+      Log3 $name, 5, "$name: Received response: $response_body\n";
       my $decode_json = eval{decode_json($response_body)};
       if($@) {
         Log3 $name, 1, "$name - JSON error while request: $@";
@@ -385,14 +411,14 @@ sub vitoconnect_getAccessTokenCallback($) {
       my $access_token = $decode_json->{"access_token"};
       if ($access_token ne "") {
 			$hash->{access_token} =  $access_token;          
-         Log3 $name, 5, "Access Token: $access_token";
+         Log3 $name, 5, "$name: Access Token: $access_token";
          vitoconnect_getGw($hash);
       } else {
-      	Log3 $name, 1, "Access Token: undef";
+      	Log3 $name, 1, "$name: Access Token: undef";
       	InternalTimer(gettimeofday()+$hash->{intervall}, "vitoconnect_GetUpdate", $hash);
       } 
     } else {
-    	Log3 $name, 1, "getAccessToken: An error happened: $err";
+    	Log3 $name, 1, "$name: getAccessToken: An error happened: $err";
       InternalTimer(gettimeofday()+$hash->{intervall}, "vitoconnect_GetUpdate", $hash);
     }
 	return undef;
@@ -419,27 +445,19 @@ sub vitoconnect_getGwCallback($) {
 	my $name = $hash->{NAME};
 	
 	if ($err eq "") {	
-   	Log3 $name, 3, "$name - getGwCallback went ok";
-      Log3 $name, 5, "Received response: $response_body\n";
+   	Log3 $name, 4, "$name - getGwCallback went ok";
+      Log3 $name, 5, "$name: Received response: $response_body\n";
       my $decode_json = eval{decode_json($response_body)};
-      if($@) {
-        Log3 $name, 1, "$name - JSON error while request: $@";
-        return;
-      } 
+      if($@) { Log3 $name, 1, "$name - JSON error while request: $@"; return; } 
       my $installation = $decode_json->{entities}[0]->{properties}->{id};
-      Log3 $name, 5, "installation: $installation";
+      Log3 $name, 5, "$name: installation: $installation";
       $hash->{installation} = $installation;
-      $decode_json = eval{decode_json($response_body)};
-      if($@) {
-        Log3 $name, 1, "$name - JSON error while request: $@";
-        return;
-      } 
       my $gw = $decode_json->{entities}[0]->{entities}[0]->{properties}->{serial};
-      Log3 $name, 5, "gw: $gw";
+      Log3 $name, 5, "$name gw: $gw";
       $hash->{gw} = $gw;
       vitoconnect_getResource($hash);
    } else {
-   	Log3 $name, 1, "An error happened: $err";
+   	Log3 $name, 1, "$name: An error happened: $err";
       InternalTimer(gettimeofday()+$hash->{intervall}, "vitoconnect_GetUpdate", $hash);
    }	
 	return undef;
@@ -467,10 +485,9 @@ sub vitoconnect_getResourceCallback($) {
 	my ($param, $err, $response_body) = @_;
 	my $hash = $param->{hash};
 	my $name = $hash->{NAME};
-	
 
 	if ($err eq "") {	
-		Log3 $name, 3, "$name - getResourceCallback went ok";
+		Log3 $name, 4, "$name - getResourceCallback went ok";
    	Log3 $name, 5, "Received response: $response_body\n";
    	my $decode_json = eval{decode_json($response_body)};
       if($@) {
@@ -550,9 +567,14 @@ sub vitoconnect_getResourceCallback($) {
 				if (@actions) {
 					# $file_handle->print($FieldName."\n");
 					# $file_handle->print(Dumper(@actions));
-					#Log3 $name, 1, Dumper(@actions)
+					#Log3 $name, 5, Dumper(@actions)
 					for my $action (@actions) {
-						readingsBulkUpdate($hash, $FieldName.".".$action->{"name"}, "action");
+						my @fields = @{$action->{fields}};
+						my $Result = "action: ";
+						for my $field (@fields) {
+							$Result .= $field->{name}." ";
+						}
+						readingsBulkUpdate($hash, $FieldName.".".$action->{"name"}, $Result);
 					}	
 				}
 			}
@@ -572,6 +594,148 @@ sub vitoconnect_getResourceCallback($) {
 	InternalTimer(gettimeofday()+$hash->{intervall}, "vitoconnect_GetUpdate", $hash);
 	return undef;
 }
+
+sub vitoconnect_action($) {
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+	my $isiwebuserid = $hash->{user};
+	my $isiwebpasswd = vitoconnect_ReadKeyValue($hash, "passwd"); 	
+	my $err = "";
+	my $response_body = "";
+	my $code = "";	
+	my $access_token = "";
+	my $installation = "";
+	my $gw = "";
+	
+	my $param = {
+		url        => "$authorizeURL?client_id=$client_id&scope=openid&redirect_uri=$callback_uri&response_type=code",
+		hash       => $hash,
+		header     => "Content-Type: application/x-www-form-urlencoded",
+		ignoreredirects => 1,
+      user		  => $isiwebuserid,
+      pwd		  => $isiwebpasswd,
+      sslargs    => {SSL_verify_mode => 0},
+      method     => "POST" };
+   ($err, $response_body) = HttpUtils_BlockingGet($param);
+	if ($err eq "") {
+   	$response_body =~ /code=(.*)"/;
+      $code = $1;
+      Log3 $name, 5, "$name - response_body: $response_body";
+      Log3 $name, 5, "$name - code: $code";
+   } else { Log3 $name, 1, "$name An error happened: $err"; }
+   
+   $param = {
+		url        => $token_url,
+		hash       => $hash,
+		header     => "Content-Type: application/x-www-form-urlencoded;charset=utf-8",
+		data       => "client_id=$client_id&client_secret=$client_secret&code=$code&redirect_uri=$callback_uri&grant_type=authorization_code",
+      sslargs    => {SSL_verify_mode => 0},
+      method     => "POST" };
+      
+	($err, $response_body) = HttpUtils_BlockingGet($param);
+	
+	if ($err eq "") {
+   	my $decode_json = eval{decode_json($response_body)};
+      if($@) { Log3 $name, 1, "$name - JSON error while request: $@"; return; }  
+      $access_token = $decode_json->{access_token}; 
+      Log3 $name, 5, "$name - access_token: $access_token"; 
+    } else { Log3 $name, 1, "$name: getAccessToken: An error happened: $err"; }
+    
+    $param = {
+		url        => "$apiURLBase$general",
+		hash       => $hash,
+		header     => "Authorization: Bearer $access_token",
+		sslargs    => {SSL_verify_mode => 0}    
+      };
+	($err, $response_body) = HttpUtils_BlockingGet($param);
+   if ($err eq "") {
+		Log3 $name, 5, "$name - action (installation and gw): $response_body";   	
+      my $decode_json = eval{decode_json($response_body)};
+      if($@) { Log3 $name, 1, "$name - JSON error while request: $@"; return; } 
+      $installation = $decode_json->{entities}[0]->{properties}->{id};
+      $gw = $decode_json->{entities}[0]->{entities}[0]->{properties}->{serial};
+      Log3 $name, 4, "$name: installation: $installation :: gw: $gw"
+   } else { Log3 $name, 1, "$name: An error happened: $err"; }	 
+   
+	$param = {
+			url        => "https://api.viessmann-platform.io/operational-data/installations/$installation/gateways/$gw/devices/0/features/heating.dhw.oneTimeCharge/activate",
+			hash       => $hash,
+			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
+			data       => '{"mode":"activate"}',
+			data       => '{}',
+			method     => "POST",
+			timeout    => 10,
+			sslargs    => {SSL_verify_mode => 0},
+   };
+   # Log3 $name, 5, Dumper($param);
+  	($err, $response_body) = HttpUtils_BlockingGet($param);
+  	if ($err ne "" || $response_body ne "") { Log3 $name, 1, "$name: Fehler während der Befehlsausführung: $err :: $response_body";
+  	} else { Log3 $name, 5, "$name : Befehlsausführung ok"; }   
+    
+	return undef;
+}
+
+###################################################
+# checks and stores obfuscated keys like passwords 
+# based on / copied from FRITZBOX_storePassword
+sub vitoconnect_StoreKeyValue($$$) {
+    my ($hash, $kName, $value) = @_;
+    my $index = $hash->{TYPE}."_".$hash->{NAME}."_".$kName;
+    my $key   = getUniqueId().$index;    
+    my $enc   = "";
+    
+    if(eval "use Digest::MD5;1") {
+        $key = Digest::MD5::md5_hex(unpack "H*", $key);
+        $key .= Digest::MD5::md5_hex($key);
+    }    
+    for my $char (split //, $value) {
+        my $encode=chop($key);
+        $enc.=sprintf("%.2x",ord($char)^ord($encode));
+        $key=$encode.$key;
+    }    
+    my $err = setKeyValue($index, $enc);
+    return "error while saving the value - $err" if(defined($err));
+    return undef;
+} 
+   
+   
+#####################################################
+# reads obfuscated value 
+sub vitoconnect_ReadKeyValue($$) {
+   my ($hash, $kName) = @_;
+   my $name = $hash->{NAME};
+
+   my $index = $hash->{TYPE}."_".$hash->{NAME}."_".$kName;
+   my $key = getUniqueId().$index;
+
+   my ($value, $err);
+
+   Log3 $name, 5, "$name: ReadKeyValue tries to read value for $kName from file";
+   ($err, $value) = getKeyValue($index);
+
+   if ( defined($err) ) {
+      Log3 $name, 1, "$name: ReadKeyValue is unable to read value from file: $err";
+      return undef;
+   }  
+    
+   if ( defined($value) ) {
+      if ( eval "use Digest::MD5;1" ) {
+         $key = Digest::MD5::md5_hex(unpack "H*", $key);
+         $key .= Digest::MD5::md5_hex($key);
+      }
+      my $dec = '';
+      for my $char (map { pack('C', hex($_)) } ($value =~ /(..)/g)) {
+         my $decode=chop($key);
+         $dec.=chr(ord($char)^ord($decode));
+         $key=$decode.$key;
+      }
+      return $dec;
+   } else {
+      Log3 $name, 1, "$name: ReadKeyValue could not find key $kName in file";
+      return undef;
+   }
+   return;
+} 
 
 1;
 
@@ -610,6 +774,11 @@ sub vitoconnect_getResourceCallback($) {
         update readings immeadiatlely</li>
       <li>clearReadings<br>
         clear all readings immeadiatlely</li> 
+      <li>password <passwd><br>
+        store password in key store</li>
+      <li>oneTimeCharge><br>
+        store password in key store</li>
+            
     </ul>
     <br>
 
@@ -630,8 +799,14 @@ sub vitoconnect_getResourceCallback($) {
         <br><br>
         Attributes:
         <ul>
+				<li><i>disable</i>:<br>         
+                xxxx  
+            </li>
+            <li><i>verbose</i>:<br>         
+                xxxx  
+            </li>
             <li><i>vitoconnect_raw_readings</i>:<br>         
-                create readings with plain JSON names like 'heating.circuits.0.heating.curve.value' instead of german identifiers  
+                create readings with plain JSON names like 'heating.circuits.0.heating.curve.slope' instead of german identifiers  
             </li>
             <li><i>vitoconnect_actions_active</i>:<br>
             	create readings for actions e.g. 'heating.circuits.0.heating.curve.setCurve'
