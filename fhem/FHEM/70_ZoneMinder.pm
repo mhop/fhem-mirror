@@ -586,7 +586,7 @@ sub ZoneMinder_Read {
     ($msg, $buffer) = split("\n", $buffer, 2);
     chomp $msg;
     $msg = "event:$msg";
-#    Log3 $name, 3, "ZoneMinder ($name) incoming message $msg.";
+    Log3 $name, 5, "ZoneMinder ($name) incoming message $msg.";
     my $dispatchResult = Dispatch($hash, $msg, undef);
   }
   $hash->{PARTIAL} = $buffer;
