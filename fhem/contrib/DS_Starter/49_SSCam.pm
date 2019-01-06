@@ -786,12 +786,23 @@ sub SSCam_Set($@) {
         
   } elsif ($opt eq "snap" && SSCam_IsModelCam($hash)) {
 	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-      my $num = $prop?$prop:1;          # Anzahl der Schnappschüsse zu triggern (default: 1)
-      my $lag = $prop1?$prop1:2;        # Zeit zwischen zwei Schnappschüssen (default: 2 Sekunden)
+      
+      my ($num,$lag) = (1,2);      
+      if($prop && $prop =~ /[\d+]/) {                                  # Anzahl der Schnappschüsse zu triggern (default: 1)
+          $num = $prop;
+      }
+      if($prop1 && $prop1 =~ /[\d+]/) {                                # Zeit zwischen zwei Schnappschüssen (default: 2 Sekunden)
+          $lag = $prop1;
+      }
+                                          
       $hash->{HELPER}{SNAPBYSTRMDEV} = 1 if ($prop2 && $prop2 =~ /STRM/);   # $prop wird mitgegeben durch Snap by SSCamSTRM-Device
       
-      if($num =~ /[^\d+]/ || $lag=~ /[^\d+]/ ) {
-          return "The number of snapshots and/or the lag between each snapshot must be a figure.";
+      my $at = join(" ",@a);
+      if($at =~ /snapEmailTxt:/) {
+          $at =~ m/.*snapEmailTxt:"(.*)".*/i;
+          # my $t = $1;
+          $hash->{HELPER}{SMTPMSG} = $1;
+          # Log3($name, 2, "$name - MT: $t");
       }
       
       if (AttrVal($name, "snapEmailTxt", "")) {
@@ -7154,9 +7165,11 @@ sub SSCam_prepareSendEmail ($$;$) {
    my $nousessl = AttrVal($name, "smtpNoUseSSL", 0);   
      
    # Extraktion EMail-Texte
+   # Attribut snapEmailTxt kann übersteuert werden mit: $hash->{HELPER}{SMTPMSG}
    # Format in $hash->{HELPER}{SMTPMSG} muss sein: subject => <Betreff-Text>, body => <Mitteilung-Text>
-   my $mt = AttrVal($name, "snapEmailTxt", "");
-   $mt    =~ s/['"]//g;   
+   my $mth = delete $hash->{HELPER}{SMTPMSG};
+   my $mt  = $mth?$mth:AttrVal($name, "snapEmailTxt", "");
+   $mt     =~ s/['"]//g;   
    
    my($subj,$body)   = split(",", $mt);
    my($subjk,$subjt) = split("=>", $subj);
@@ -8404,14 +8417,17 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; snap [&lt;number&gt;] [&lt;time difference&gt;]</b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
+  <li><b> set &lt;name&gt; snap [&lt;number&gt;] [&lt;time difference&gt;] [snapEmailTxt:"subject => &lt;subject text&gt;, body => &lt;message text&gt;"]</b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   One or multiple snapshots are triggered. The number of snapshots to trigger and the time difference (in seconds) between
   each snapshots can be optionally specified. Without any specification only one snapshot is triggered.
   The ID and the filename of the last snapshot will be displayed in Reading "LastSnapId" respectively "LastSnapFilename" of the
-  device. <br><br>
+  device. <br>
+  The snapshot Email shipping is activated by setting the <a href="#SSCamattr">attribute</a> "snapEmailTxt". If you want 
+  temporary overwrite the message text set in "snapEmailTxt", you can optionally specify the "snapEmailTxt:"-tag as shown
+  above. <br><br>
   
-  <b>Email shipping</b> <br><br>
+  <b>Email shipping preparation</b> <br><br>
   The snapshots can be sent by <b>Email</b> alltogether after creation. For this purpose the module contains its own Email client. 
   Before you can use this function you have to install the Perl-module <b>MIME::Lite</b>. On debian systems it can be 
   installed with command: <br><br>
@@ -8421,8 +8437,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
    </ul>
    <br>
   
-  The Email shipping is activated by setting the <a href="#SSCamattr">attribute</a> "snapEmailTxt". 
-  There are more attributes must be set or can be used optionally. <br>
+  There are some attributes must be set or can be used optionally. <br>
   At first the Credentials for access the Email outgoing server must be set by command <b>"set &lt;name&gt; smtpcredentials &lt;user&gt; &lt;password&gt;"</b>.
   The connection establishment to the server is initially done unencrypted and switches to an encrypted connection if SSL 
   encryption is available. In that case the transmission of User/Password takes place encrypted too. 
@@ -9947,14 +9962,17 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; snap [&lt;Anzahl&gt;] [&lt;Zeitabstand&gt;]</b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  <li><b> set &lt;name&gt; snap [&lt;Anzahl&gt;] [&lt;Zeitabstand&gt;] [snapEmailTxt:"subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;"]</b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Ein oder mehrere Schnappschüsse werden ausgelöst. Es kann die Anzahl der auszulösenden Schnappschüsse und deren zeitlicher
   Abstand in Sekunden optional angegeben werden. Ohne Angabe wird ein Schnappschuß getriggert.
   Es wird die ID und der Filename des letzten Snapshots als Wert der Variable "LastSnapId" bzw. "LastSnapFilename" in den 
-  Readings der Kamera gespeichert. <br><br>
+  Readings der Kamera gespeichert. <br>
+  Der Email-Versand wird durch das Setzen des <a href="#SSCamattr">Attributs</a> "snapEmailTxt" eingeschaltet. Der Text
+  im Attribut "snapEmailTxt" kann durch die Spezifikation des optionalen "snapEmailTxt:"-Tags, wie oben gezeigt, temporär
+  überschrieben bzw. geändert werden. <br><br>
   
-  <b>Email-Versand</b> <br><br>
+  <b>Email-Versand </b> <br><br>
   Die Schnappschüsse können nach der Erstellung per <b>Email</b> gemeinsam versendet werden. Dazu enthält das Modul einen 
   eigenen Email-Client. 
   Zur Verwendung dieser Funktion muss das Perl-Modul <b>MIME::Lite</b> installiert sein. Auf Debian-System kann 
@@ -9967,8 +9985,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
    
   installiert werden. <br><br>
   
-  Der Email-Versand wird durch das Setzen des <a href="#SSCamattr">Attributs</a> "snapEmailTxt" eingeschaltet. 
-  Weitere Attribute müssen gesetzt oder können optional verwendet werden. <br>
+  Für die Verwendung des Email-Versands müssen einige Attribute gesetzt oder können optional genutzt werden. <br>
   Die Credentials für den Zugang zum Email-Server müssen mit dem Befehl <b>"set &lt;name&gt; smtpcredentials &lt;user&gt; &lt;password&gt;"</b>
   gesetzt werden. Der Verbindungsaufbau zum Postausgangsserver erfolgt initial unverschüsselt und wechselt zu einer verschlüsselten
   Verbindung wenn SSL zur Verfügung steht. In diesem Fall erfolgt auch die Übermittlung von User/Password verschlüsselt.
