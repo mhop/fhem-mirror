@@ -47,6 +47,7 @@ use Encode;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.4.1"  => "07.01.2019  Transaction of snap and getsnapinfo implemented ",
   "8.4.0"  => "07.01.2019  command snap extended to \"snap [number] [lag] [snapEmailTxt:\"subject => <Betreff-Text>, body => ".
               "<Mitteilung-Text>\"]\", SID-hash is deleted if attr \"session\" is set ",
   "8.3.2"  => "03.01.2019  fix Process died prematurely if Can't locate object method \"get_sslversion\" via package \"Net::SMTP::SSL\" ",
@@ -2170,11 +2171,11 @@ sub SSCam_camsnap($) {
         # einen Schnappschuß aufnehmen              
         $hash->{OPMODE} = "Snap";
         $hash->{HELPER}{LOGINRETRIES} = 0;
-        $hash->{HELPER}{CANSENDSNAP}  = 1;                    # Versand Schnappschuß darf erfolgen falls gewünscht
-        $hash->{HELPER}{SNAPNUM}      = $num if($num);        # Gesamtzahl der auszulösenden Schnappschüsse
-        $hash->{HELPER}{SNAPLAG}      = $lag if($lag);        # Zeitverzögerung zwischen zwei Schnappschüssen
-        $hash->{HELPER}{SNAPNUMCOUNT} = $ncount if($ncount);  # Restzahl der auszulösenden Schnappschüsse  (wird runtergezählt)
-        $hash->{HELPER}{SMTPMSG}      = $emtxt if($emtxt);    # alternativer Text für Email-Versand
+        $hash->{HELPER}{CANSENDSNAP}  = 1 if(AttrVal($name, "snapEmailTxt", ""));  # Versand Schnappschüsse soll erfolgen
+        $hash->{HELPER}{SNAPNUM}      = $num if($num);                             # Gesamtzahl der auszulösenden Schnappschüsse
+        $hash->{HELPER}{SNAPLAG}      = $lag if($lag);                             # Zeitverzögerung zwischen zwei Schnappschüssen
+        $hash->{HELPER}{SNAPNUMCOUNT} = $ncount if($ncount);                       # Restzahl der auszulösenden Schnappschüsse  (wird runtergezählt)
+        $hash->{HELPER}{SMTPMSG}      = $emtxt if($emtxt);                         # alternativer Text für Email-Versand
         
         SSCam_setActiveToken($hash); 
         SSCam_getapisites($hash);
@@ -3059,14 +3060,15 @@ return;
 ###########################################################################
 sub SSCam_getsnapinfo ($) {
     my ($str)   = @_;
-	my ($name,$slim,$ssize) = split(":",$str);
+	my ($name,$slim,$ssize,$tac) = split(":",$str);
 	my $hash = $defs{$name};
     my $camname  = $hash->{CAMNAME};
+    $tac = (defined $tac)?$tac:5000;
     
     RemoveInternalTimer("SSCam_getsnapinfo"); 
     return if(IsDisabled($name));
     
-    if ($hash->{HELPER}{ACTIVE} eq "off") {               
+    if ($hash->{HELPER}{ACTIVE} eq "off" || ($hash->{HELPER}{TRANSACTION} && $hash->{HELPER}{TRANSACTION} == $tac)) {               
         $hash->{OPMODE} = "getsnapinfo";
 		$hash->{OPMODE} = "getsnapgallery" if(exists($hash->{HELPER}{GETSNAPGALLERY}));
         $hash->{HELPER}{LOGINRETRIES} = 0;
@@ -4926,11 +4928,18 @@ sub SSCam_camop_parse ($) {
                 # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps
                 my ($slim,$ssize) = SSCam_snaplimsize($hash);
 
-                # Token freigeben vor nächstem Kommando
-                SSCam_delActiveToken($hash);
+                my $tac = "";
+                if($hash->{HELPER}{CANSENDSNAP}) {
+                    $tac = int(rand(4500));                   # Transaktionscode (snap und getsnapinfo als Einheit ausführen)
+                    $hash->{HELPER}{TRANSACTION} = $tac;
+                } else {
+                    # Token freigeben vor nächstem Kommando
+                    SSCam_delActiveToken($hash);                
+                }
                 
-                RemoveInternalTimer("SSCam_getsnapinfo"); 
-                InternalTimer(gettimeofday()+0.6, "SSCam_getsnapinfo", "$name:$slim:$ssize", 0);
+                RemoveInternalTimer("SSCam_getsnapinfo");                
+                InternalTimer(gettimeofday()+0.6, "SSCam_getsnapinfo", "$name:$slim:$ssize:$tac", 0);
+                return;
             
 			} elsif ($OpMode eq "getsnapinfo" || 
                      $OpMode eq "getsnapgallery" || 
@@ -5051,7 +5060,7 @@ sub SSCam_camop_parse ($) {
 						}
 				    } 
                 }
-                
+                delete($hash->{HELPER}{TRANSACTION});                           # delete Transaktion
 				delete($hash->{HELPER}{GETSNAPGALLERY});                        # Steuerbit getsnapgallery statt getsnapinfo				
 
 				#####  Fall abhängige Eventgenerierung  #####
@@ -5098,6 +5107,7 @@ sub SSCam_camop_parse ($) {
 				# Token freigeben vor hlsactivate
                 SSCam_delActiveToken($hash);
                 SSCam_hlsactivate($hash);
+                return;
                 
             } elsif ($OpMode eq "activate_hls") {
                 # HLS Streaming wurde aktiviert, Aktivitätsstatus speichern
