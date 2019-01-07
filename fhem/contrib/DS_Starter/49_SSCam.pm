@@ -4911,9 +4911,6 @@ sub SSCam_camop_parse ($) {
                 Log3($name, 3, "$name - Snapshot of Camera $camname has been done successfully");
                 
                 
-				# Token freigeben vor nächstem Kommando
-                SSCam_delActiveToken($hash);
-                
                 my $num = $hash->{HELPER}{SNAPNUM};          # Gesamtzahl der auszulösenden Schnappschüsse
                 my $ncount = $hash->{HELPER}{SNAPNUMCOUNT};  # Restzahl der auszulösenden Schnappschüsse 
                 $ncount--;                                   # wird vermindert je Snap
@@ -4921,11 +4918,17 @@ sub SSCam_camop_parse ($) {
                 my $emtxt = $hash->{HELPER}{SMTPMSG};        # alternativer Text für Email-Versand
                 if($ncount > 0) {
                     InternalTimer(gettimeofday()+$lag, "SSCam_camsnap", "$name:$num:$lag:$ncount:$emtxt", 0);
+                    # Token freigeben für nächstes Kommando
+                    SSCam_delActiveToken($hash);
                     return;
                 }
   
                 # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps
-                my ($slim,$ssize) = SSCam_snaplimsize($hash);		
+                my ($slim,$ssize) = SSCam_snaplimsize($hash);
+
+                # Token freigeben vor nächstem Kommando
+                SSCam_delActiveToken($hash);
+                
                 RemoveInternalTimer("SSCam_getsnapinfo"); 
                 InternalTimer(gettimeofday()+0.6, "SSCam_getsnapinfo", "$name:$slim:$ssize", 0);
             
@@ -7175,7 +7178,7 @@ sub SSCam_prepareSendEmail ($$;$) {
    # Extraktion EMail-Texte
    # Attribut snapEmailTxt kann übersteuert werden mit: $hash->{HELPER}{SMTPMSG}
    # Format in $hash->{HELPER}{SMTPMSG} muss sein: subject => <Betreff-Text>, body => <Mitteilung-Text>
-   my $mth = delete $hash->{HELPER}{SMTPMSG};
+   my $mth = $hash->{HELPER}{SMTPMSG};
    my $mt  = $mth?$mth:AttrVal($name, "snapEmailTxt", "");
    $mt     =~ s/['"]//g;   
    
@@ -7205,6 +7208,7 @@ sub SSCam_prepareSendEmail ($$;$) {
        $lsnaptime = ReadingsVal($name,"LastSnapTime","");
        $sdat      = $data;
        delete $hash->{HELPER}{CANSENDSNAP};
+       delete $hash->{HELPER}{SMTPMSG};
     
    $ret = SSCam_sendEmail($hash, {'subject'      => $smtpmsg{subject},   
                                   'part1txt'     => $smtpmsg{body}, 
