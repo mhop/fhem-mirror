@@ -4911,11 +4911,11 @@ sub SSCam_camop_parse ($) {
                 Log3($name, 3, "$name - Snapshot of Camera $camname has been done successfully");
                 
                 
-                my $num = $hash->{HELPER}{SNAPNUM};          # Gesamtzahl der auszulösenden Schnappschüsse
-                my $ncount = $hash->{HELPER}{SNAPNUMCOUNT};  # Restzahl der auszulösenden Schnappschüsse 
-                $ncount--;                                   # wird vermindert je Snap
-                my $lag   = $hash->{HELPER}{SNAPLAG};        # Zeitverzögerung zwischen zwei Schnappschüssen
-                my $emtxt = $hash->{HELPER}{SMTPMSG};        # alternativer Text für Email-Versand
+                my $num = $hash->{HELPER}{SNAPNUM};                                # Gesamtzahl der auszulösenden Schnappschüsse
+                my $ncount = $hash->{HELPER}{SNAPNUMCOUNT};                        # Restzahl der auszulösenden Schnappschüsse 
+                $ncount--;                                                         # wird vermindert je Snap
+                my $lag   = $hash->{HELPER}{SNAPLAG};                              # Zeitverzögerung zwischen zwei Schnappschüssen
+                my $emtxt = $hash->{HELPER}{SMTPMSG}?$hash->{HELPER}{SMTPMSG}:"";  # alternativer Text für Email-Versand
                 if($ncount > 0) {
                     InternalTimer(gettimeofday()+$lag, "SSCam_camsnap", "$name:$num:$lag:$ncount:$emtxt", 0);
                     # Token freigeben für nächstes Kommando
