@@ -789,9 +789,10 @@ sub SSCam_Set($@) {
   } elsif ($opt eq "snap" && SSCam_IsModelCam($hash)) {
 	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
       
-      my ($num,$lag) = (1,2);      
+      my ($num,$lag,$ncount) = (1,2,1);      
       if($prop && $prop =~ /[\d+]/) {                                  # Anzahl der Schnappschüsse zu triggern (default: 1)
-          $num = $prop;
+          $num    = $prop;
+          $ncount = $prop;
       }
       if($prop1 && $prop1 =~ /[\d+]/) {                                # Zeit zwischen zwei Schnappschüssen (default: 2 Sekunden)
           $lag = $prop1;
@@ -812,7 +813,7 @@ sub SSCam_Set($@) {
           # snapEmailTxt muss sein:  subject => <Subject-Text>, body => <Body-Text>
           if (!$hash->{SMTPCREDENTIALS}) {return "Due to attribute \"snapEmailTxt\" is set, you want to send snapshots by email but SMTP credentials are not set - make sure you've set credentials with \"set $name smtpcredentials username password\"";}
       }
-      SSCam_camsnap("$name:$num:$lag");
+      SSCam_camsnap("$name:$num:$lag:$ncount");
               
   } elsif ($opt eq "startTracking" && SSCam_IsModelCam($hash)) {
 	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
@@ -2130,12 +2131,13 @@ sub SSCam_cammotdetsc($) {
 
 ###############################################################################
 #                       Kamera Schappschuß aufnehmen
-#   $num = <Anzahl der Schnappschüsse>
-#   $lag = <Zeit zwischen zwei Schnappschüssen>
+#   $num    = Anzahl der Schnappschüsse
+#   $lag    = Zeit zwischen zwei Schnappschüssen
+#   $ncount = Anzahl der Schnappschüsse zum rnterzählen
 ###############################################################################
 sub SSCam_camsnap($) {
     my ($str)            = @_;
-	my ($name,$num,$lag) = split(":",$str);
+	my ($name,$num,$lag,$ncount) = split(":",$str);
 	my $hash             = $defs{$name};
     my $camname          = $hash->{CAMNAME};
     my $errorcode;
@@ -2169,16 +2171,16 @@ sub SSCam_camsnap($) {
         # einen Schnappschuß aufnehmen              
         $hash->{OPMODE} = "Snap";
         $hash->{HELPER}{LOGINRETRIES} = 0;
-        $hash->{HELPER}{CANSENDSNAP}  = $num if($num);  # Versand Schnappschuß darf erfolgen falls gewünscht, enthält die Anzahl der zu versendenden Schnapschüsse im Bulk
-        $hash->{HELPER}{SNAPNUM}      = $num if($num);  # Anzahl der auszulösenden Schnappschüsse (wird runtergezählt)
-        $hash->{HELPER}{SNAPLAG}      = $lag if($lag);  # Zeitverzögerung zwischen zwei Schnappschüssen
+        $hash->{HELPER}{CANSENDSNAP}  = 1;                    # Versand Schnappschuß darf erfolgen falls gewünscht
+        $hash->{HELPER}{SNAPNUM}      = $num if($num);        # Gesamtzahl der auszulösenden Schnappschüsse
+        $hash->{HELPER}{SNAPLAG}      = $lag if($lag);        # Zeitverzögerung zwischen zwei Schnappschüssen
+        $hash->{HELPER}{SNAPNUMCOUNT} = $ncount if($ncount);  # Restzahl der auszulösenden Schnappschüsse  (wird runtergezählt)
 
         SSCam_setActiveToken($hash); 
         SSCam_getapisites($hash);
 		
     } else {
-        ($num,$lag) = (0,0);                            # nur beim ersten Aufruf von SSCam_camsnap werden Sollwerte gespeichert
-        InternalTimer(gettimeofday()+0.3, "SSCam_camsnap", "$name:$num:$lag", 0);
+        InternalTimer(gettimeofday()+0.3, "SSCam_camsnap", "$name:$num:$lag:$ncount", 0);
     }    
 }
 
@@ -4912,10 +4914,12 @@ sub SSCam_camop_parse ($) {
 				# Token freigeben vor nächstem Kommando
                 SSCam_delActiveToken($hash);
                 
-                $hash->{HELPER}{SNAPNUM}--;                  # Anzahl der auszulösenden Schnappschüsse, wird vermindert je Snap
+                my $num = $hash->{HELPER}{SNAPNUM};          # Gesamtzahl der auszulösenden Schnappschüsse
+                my $ncount = $hash->{HELPER}{SNAPNUMCOUNT};  # Restzahl der auszulösenden Schnappschüsse 
+                $ncount--;                                   # wird vermindert je Snap
                 my $lag = $hash->{HELPER}{SNAPLAG};          # Zeitverzögerung zwischen zwei Schnappschüssen
-                if($hash->{HELPER}{SNAPNUM}) {
-                    InternalTimer(gettimeofday()+$lag, "SSCam_camsnap", "$name", 0);
+                if($ncount > 0) {
+                    InternalTimer(gettimeofday()+$lag, "SSCam_camsnap", "$name:$num:$lag:$ncount", 0);
                     return;
                 }
   
@@ -4965,7 +4969,7 @@ sub SSCam_camop_parse ($) {
 				#####  eine Schnapschussgalerie soll angezeigt oder als Bulk versendet werden  #####
                 if($OpMode eq "getsnapgallery") {
 				    if($hash->{HELPER}{CANSENDSNAP}) {
-					    # es sollen die Anzahl "$hash->{HELPER}{CANSENDSNAP}" Schnappschüsse versendet werden
+					    # es sollen die Anzahl "$hash->{HELPER}{SNAPNUM}" Schnappschüsse versendet werden
 						my $i = 0;
 						my $sn = 0;
 						my %sendsnaps = ();  # Schnappschuss Hash zum Versand wird leer erstellt
@@ -6254,10 +6258,10 @@ sub SSCam_snaplimsize ($) {
   }
 
   if($hash->{HELPER}{CANSENDSNAP}) {
-      # Versand Schnappschuß darf erfolgen falls gewünscht und es sollen diese Anzahl Schnappschüsse versendet werden
-      # Galerie über "$hash->{HELPER}{CANSENDSNAP}" Snaps zum Versand abrufen 
+      # Versand Schnappschuß darf erfolgen falls gewünscht
+      # Galerie über "$hash->{HELPER}{SNAPNUM}" Snaps zum Versand abrufen 
       $hash->{HELPER}{GETSNAPGALLERY} = 1;                       # Steuerbit für Snap-Galerie
-	  $slim  = $hash->{HELPER}{CANSENDSNAP};                     # enthält die Anzahl der zu versendenden Images
+	  $slim  = $hash->{HELPER}{SNAPNUM};                         # enthält die Anzahl der zu versendenden Images
       $ssize = 2;                                                # Full Size für EMail-Versand
   }
 
