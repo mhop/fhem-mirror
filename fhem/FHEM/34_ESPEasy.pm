@@ -37,7 +37,7 @@ use HttpUtils;
 use Color;
 use SetExtensions;
 
-my $module_version      = "2.14";     # Version of this module
+my $module_version      = "2.15";     # Version of this module
 
 # ------------------------------------------------------------------------------
 # modul version and required ESP Easy firmware / JSON lib version
@@ -88,6 +88,7 @@ my $d_localIPs   = "^(127|192.168|172.(1[6-9]|2[0-9]|3[01])|10|169.254)\\.|"
 my %ee_map = (
   build => { # ESP Easy build versions
     1  => { type => "ESP Easy",      ver => "STD" },
+    5  => { type => "RPI Easy",      ver => "STD" }, # https://github.com/enesbcs/rpieasy
     17 => { type => "ESP Easy Mega", ver => "STD" },
     33 => { type => "ESP Easy 32",   ver => "STD" },
     65 => { type => "ARDUINO Easy",  ver => "STD" },
