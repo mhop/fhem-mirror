@@ -89,7 +89,7 @@ package main;
 
 use strict;
 use warnings;
-use Data::Dumper;
+#use Data::Dumper;
 use POSIX;
 use Time::HiRes qw(gettimeofday);
 use Time::HiRes qw(tv_interval);
@@ -102,6 +102,9 @@ my $version = "0.0.22";
 my @logqueue = ();
 my @fmCmd    = ();
 my @fmFn     = ();
+my $fmName;
+my $fmCmdLog;
+my $fmFnLog;
 
 ###################################
 sub freezemon_Initialize($) {
@@ -111,7 +114,7 @@ sub freezemon_Initialize($) {
     # Module specific attributes
     my @freezemon_attr =
       (
-"fm_forceApptime:0,1 fm_freezeThreshold disable:0,1 fm_log fm_ignoreDev fm_ignoreMode:off,single,all fm_extDetail:0,1 fm_logExtraSeconds fm_logFile fm_logKeep fm_whitelistSub fm_CatchFnCalls:0,1 fm_CatchCmds:0,1"
+"fm_forceApptime:0,1 fm_freezeThreshold disable:0,1 fm_log fm_ignoreDev fm_ignoreMode:off,single,all fm_extDetail:0,1 fm_logExtraSeconds fm_logFile fm_logKeep fm_whitelistSub fm_CatchFnCalls:0,1,2,3,4,5 fm_CatchCmds:0,1,2,3,4,5"
       );
 
     $hash->{GetFn}             = "freezemon_Get";
@@ -706,6 +709,7 @@ sub freezemon_Attr($) {
         elsif ( $aName eq "fm_CatchFnCalls" ) {
             if ( $aVal ne 0 ) {
                 freezemon_install_callFn_wrapper($hash);
+				$fmFnLog = $aVal;
             }
             elsif ( defined ($hash->{helper}{mycallFn} ) ) {
                 Log3( "", 0, "[Freezemon] $name: Unwrapping CallFn" );
@@ -721,6 +725,7 @@ sub freezemon_Attr($) {
         elsif ( $aName eq "fm_CatchCmds" ) {
             if ( $aVal ne 0 ) {
                 freezemon_install_analyzeCommand_wrapper($hash);
+				$fmCmdLog = $aVal;
             }
             elsif ( defined ( $hash->{helper}{analyzeCommand} ) ) {
                 Log3( "", 0, "[Freezemon] $name: Unwrapping analyzeCommand" );
@@ -791,9 +796,13 @@ sub freezemon_start($) {
     {
         readingsSingleUpdate( $hash, "state", "initialized", 0 );
         freezemon_install_log_wrapper($hash)            if AttrVal( $name, "fm_logFile",      "" ) ne "";
-        freezemon_install_callFn_wrapper($hash)         if AttrVal( $name, "fm_CatchFnCalls", 0 ) == 1;
-        freezemon_install_analyzeCommand_wrapper($hash) if AttrVal( $name, "fm_CatchCmds",    0 ) == 1;
+        freezemon_install_callFn_wrapper($hash)         if AttrVal( $name, "fm_CatchFnCalls", 0 ) > 0;
+        freezemon_install_analyzeCommand_wrapper($hash) if AttrVal( $name, "fm_CatchCmds",    0 ) > 0;
+		
     }
+	$fmName = $name;
+	$fmCmdLog = AttrVal( $name, "fm_CatchCmds",    0 );
+	$fmFnLog = AttrVal( $name, "fm_CatchFnCalls", 0 );
 
     $hash->{helper}{DISABLED} = 0;
     my $next = int( gettimeofday() ) + 1;
@@ -956,7 +965,7 @@ sub freezemon_callFn($@) {
         push @fmFn, [ $n, $d ];
 
         #$fm_fn .= "$n:$d ";
-        Log3 undef, 5, "[Freezemon] Long function call detected $n:$d - $ms seconds";
+        Log3 $fmName, $fmFnLog, "[Freezemon] $fmName: Long function call detected $n:$d - $ms seconds";
     }
 	return ($result,$p) if ($p) ;
 	return $result;
@@ -982,7 +991,7 @@ sub freezemon_analyzeCommand($$$;$) {
         push @fmCmd, [ $n, $d ];
 
         #$fm_fn .= "$n:$d ";
-        Log3 undef, 5, "[Freezemon] Long running Command detected $n:$d - $ms seconds";
+        Log3 $fmName, $fmCmdLog, "[Freezemon] $fmName: Long running Command detected $n:$d - $ms seconds";
     }
     return $result;
 }
@@ -1023,8 +1032,6 @@ sub freezemon_wrap_analyzeCommand($) {
     return sub($$;$) {
         my ( $cl, $cmd, $cfc ) = @_;
         return "already wrapped" if ( defined($cl) && $cl eq "freezemon" );
-
-        #return $fn if ( $b == 100 );
         return freezemon_analyzeCommand( $fn, $cl, $cmd, $cfc );
       }
 }
@@ -1315,9 +1322,9 @@ sub freezemon_getLogPath($) {
 		<ul>
 			<ul>
 				<li><a name="fm_CatchFnCalls">fm_CatchFnCalls</a>: if enabled FHEM internal function calls are monitored additionally, 
-				in some cases this might give additional hints on who's causing the freeze </li>
+				in some cases this might give additional hints on who's causing the freeze. 0 means disabled, numbers >= 1 describe the loglevel for logging long running function calls.</li>
 				<li><a name="fm_CatchCmds">fm_CatchCmds</a>: if enabled FHEM commands are monitored additionally, 
-				in some cases this might give additional hints on who's causing the freeze </li>
+				in some cases this might give additional hints on who's causing the freeze, 0 means disabled, numbers >= 1 describe the loglevel for logging long running commands. </li>
 				<li><a name="fm_extDetail">fm_extDetail</a>: provides in some cases extended details for recognized freezes. In some cases it was reported that FHEM crashes, so please be careful.</li>
 				<li><a name="fm_freezeThreshold">fm_freezeThreshold</a>: Value in seconds (Default: 1) - Only freezes longer than fm_freezeThreshold will be considered as a freeze</li>
 				<li><a name="fm_forceApptime">fm_forceApptime</a>: When FREEZEMON is active, apptime will automatically be started (if not yet active)</li>
@@ -1404,8 +1411,8 @@ sub freezemon_getLogPath($) {
   <b>Attribute</b>
   <ul>
 		<ul>
-			<li><a name="fm_CatchFnCalls">fm_CatchFnCalls</a>fm_CatchFnCalls: wenn aktiviert, werden zusätzlich FHEM-interne Funktionsaufrufe überwacht, in einigen Fällen kann das zusätzliche Hinweise auf den Freeze-Verursacher geben</li>
-			<li><a name="fm_CatchCmds">fm_CatchCmds</a>: wenn aktiviert, werden zusätzlich FHEM-Kommandos überwacht, in einigen Fällen kann das zusätzliche Hinweise auf den Freeze-Verursacher geben</li>
+			<li><a name="fm_CatchFnCalls">fm_CatchFnCalls</a>fm_CatchFnCalls: wenn aktiviert, werden zusätzlich FHEM-interne Funktionsaufrufe überwacht, in einigen Fällen kann das zusätzliche Hinweise auf den Freeze-Verursacher geben, 0 bedeuted disabled, Zahlen >= 1 geben den Loglevel für des logging lang laufender Funktionsaufrufe an.</li>
+			<li><a name="fm_CatchCmds">fm_CatchCmds</a>: wenn aktiviert, werden zusätzlich FHEM-Kommandos überwacht, in einigen Fällen kann das zusätzliche Hinweise auf den Freeze-Verursacher geben,  0 bedeuted disabled, Zahlen >= 1 geben den Loglevel für des logging lang laufender Kommandos an.</li>
 			<li><a name="fm_extDetail">fm_extDetail</a>: stellt in einigen Fällen zusätzliche Details bei erkannten Freezes zur Verfügung. In wenigen Fällen wurde berichtet, dass FHEM crasht, also vorsichtig verwenden.</li>
 			<li><a name="fm_freezeThreshold">fm_freezeThreshold</a>: Wert in Sekunden (Default: 1) - Nur Freezes länger als fm_freezeThreshold werden als Freeze betrachtet </li>
 			<li><a name="fm_forceApptime">fm_forceApptime</a>: Wenn FREEZEMON aktiv ist wird automatisch apptime gestartet (falls nicht aktiv)</li>
