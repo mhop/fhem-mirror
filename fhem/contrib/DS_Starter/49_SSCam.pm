@@ -789,7 +789,8 @@ sub SSCam_Set($@) {
   } elsif ($opt eq "snap" && SSCam_IsModelCam($hash)) {
 	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
       
-      my ($num,$lag,$ncount) = (1,2,1);      
+      my ($num,$lag,$ncount) = (1,2,1);
+      my $emtxt = "";      
       if($prop && $prop =~ /[\d+]/) {                                  # Anzahl der Schnappschüsse zu triggern (default: 1)
           $num    = $prop;
           $ncount = $prop;
@@ -803,9 +804,7 @@ sub SSCam_Set($@) {
       my $at = join(" ",@a);
       if($at =~ /snapEmailTxt:/) {
           $at =~ m/.*snapEmailTxt:"(.*)".*/i;
-          # my $t = $1;
-          $hash->{HELPER}{SMTPMSG} = $1;
-          # Log3($name, 2, "$name - MT: $t");
+          $emtxt = $1;
       }
       
       if (AttrVal($name, "snapEmailTxt", "")) {
@@ -813,7 +812,7 @@ sub SSCam_Set($@) {
           # snapEmailTxt muss sein:  subject => <Subject-Text>, body => <Body-Text>
           if (!$hash->{SMTPCREDENTIALS}) {return "Due to attribute \"snapEmailTxt\" is set, you want to send snapshots by email but SMTP credentials are not set - make sure you've set credentials with \"set $name smtpcredentials username password\"";}
       }
-      SSCam_camsnap("$name:$num:$lag:$ncount");
+      SSCam_camsnap("$name:$num:$lag:$ncount:$emtxt");
               
   } elsif ($opt eq "startTracking" && SSCam_IsModelCam($hash)) {
 	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
@@ -2137,7 +2136,7 @@ sub SSCam_cammotdetsc($) {
 ###############################################################################
 sub SSCam_camsnap($) {
     my ($str)            = @_;
-	my ($name,$num,$lag,$ncount) = split(":",$str);
+	my ($name,$num,$lag,$ncount,$emtxt) = split(":",$str);
 	my $hash             = $defs{$name};
     my $camname          = $hash->{CAMNAME};
     my $errorcode;
@@ -2175,12 +2174,13 @@ sub SSCam_camsnap($) {
         $hash->{HELPER}{SNAPNUM}      = $num if($num);        # Gesamtzahl der auszulösenden Schnappschüsse
         $hash->{HELPER}{SNAPLAG}      = $lag if($lag);        # Zeitverzögerung zwischen zwei Schnappschüssen
         $hash->{HELPER}{SNAPNUMCOUNT} = $ncount if($ncount);  # Restzahl der auszulösenden Schnappschüsse  (wird runtergezählt)
-
+        $hash->{HELPER}{SMTPMSG}      = $emtxt if($emtxt);    # alternativer Text für Email-Versand
+        
         SSCam_setActiveToken($hash); 
         SSCam_getapisites($hash);
 		
     } else {
-        InternalTimer(gettimeofday()+0.3, "SSCam_camsnap", "$name:$num:$lag:$ncount", 0);
+        InternalTimer(gettimeofday()+0.3, "SSCam_camsnap", "$name:$num:$lag:$ncount:$emtxt", 0);
     }    
 }
 
@@ -4917,9 +4917,10 @@ sub SSCam_camop_parse ($) {
                 my $num = $hash->{HELPER}{SNAPNUM};          # Gesamtzahl der auszulösenden Schnappschüsse
                 my $ncount = $hash->{HELPER}{SNAPNUMCOUNT};  # Restzahl der auszulösenden Schnappschüsse 
                 $ncount--;                                   # wird vermindert je Snap
-                my $lag = $hash->{HELPER}{SNAPLAG};          # Zeitverzögerung zwischen zwei Schnappschüssen
+                my $lag   = $hash->{HELPER}{SNAPLAG};        # Zeitverzögerung zwischen zwei Schnappschüssen
+                my $emtxt = $hash->{HELPER}{SMTPMSG};        # alternativer Text für Email-Versand
                 if($ncount > 0) {
-                    InternalTimer(gettimeofday()+$lag, "SSCam_camsnap", "$name:$num:$lag:$ncount", 0);
+                    InternalTimer(gettimeofday()+$lag, "SSCam_camsnap", "$name:$num:$lag:$ncount:$emtxt", 0);
                     return;
                 }
   
@@ -7159,7 +7160,7 @@ return ($error);
 #############################################################################################
 #                              Vorbereitung  SMTP EMail-Versand
 #       $OpMode = aktueller Operation Mode zur Unterscheidung was versendet werden soll
-#       $data   = zu versendende Daten, evtl. anders bereitgestellt (ReadingsVal)
+#       $data   = zu versendende Daten, evtl. als Hash Referenz
 #############################################################################################
 sub SSCam_prepareSendEmail ($$;$) { 
    my ($hash, $OpMode, $data) = @_;
