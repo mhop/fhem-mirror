@@ -47,7 +47,8 @@ use Encode;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
-  "8.4.0"  => "05.01.2019  command snap extended to \"snap [number] [lag]\", SID-hash is deleted if attr \"session\" is set ",
+  "8.4.0"  => "07.01.2019  command snap extended to \"snap [number] [lag] [snapEmailTxt:\"subject => <Betreff-Text>, body => ".
+              "<Mitteilung-Text>\"]\", SID-hash is deleted if attr \"session\" is set ",
   "8.3.2"  => "03.01.2019  fix Process died prematurely if Can't locate object method \"get_sslversion\" via package \"Net::SMTP::SSL\" ",
   "8.3.1"  => "02.01.2019  fix SMTP usage for older Net::SMTP, new attribute \"smtpSSLPort\"",
   "8.3.0"  => "02.01.2019  CAMLASTRECID replaced by Reading CamLastRecId, \"SYNO.SurveillanceStation.Recording\" added, ".
@@ -111,8 +112,9 @@ our %SSCam_vNotesIntern = (
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
-  "8.4.0"  => "05.01.2019 Command snap is extended to syntax \"snap [number] [lag]\". Now you are able to trigger several number of ".
-              " snapshots by only one snap-command. The triggered snapshots can be shipped alltogether with the internal email client. ",
+  "8.4.0"  => "07.01.2019 Command snap is extended to syntax \"snap [number] [lag] [snapEmailTxt:\"subject => &lt;Betreff-Text&gt;, body => ".
+              "&lt;Mitteilung-Text&gt;\"]\". Now you are able to trigger several number of ".
+              "snapshots by only one snap-command. The triggered snapshots can be shipped alltogether with the internal email client. ",
   "8.3.0"  => "02.01.2019 new get command \"saveRecording\"",
   "8.2.0"  => "02.01.2019 SMTP Email delivery of snapshots implemented. You can send snapshots after it is created subsequentely ".
                           "with the integrated Email client. You have to store SMTP credentials with \"smtpcredentials\" before. ",
@@ -2175,6 +2177,7 @@ sub SSCam_camsnap($) {
         SSCam_getapisites($hash);
 		
     } else {
+        ($num,$lag) = (0,0);                            # nur beim ersten Aufruf von SSCam_camsnap werden Sollwerte gespeichert
         InternalTimer(gettimeofday()+0.3, "SSCam_camsnap", "$name:$num:$lag", 0);
     }    
 }
