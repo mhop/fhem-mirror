@@ -364,7 +364,7 @@ MQTT2_CLIENT_doPublish($@)
   my $name = $hash->{NAME};
   return if(IsDisabled($name));
   $val = "" if(!defined($val));
-  my $msg = pack("C",0x30).
+  my $msg = pack("C", $retain ? 0x31:0x30).
             MQTT2_CLIENT_calcRemainingLength(2+length($topic)+length($val)).
             pack("n", length($topic)).
             $topic.$val;
