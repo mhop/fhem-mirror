@@ -310,7 +310,7 @@ FHEM/70_JSONMETER.pm         tupol                Sonstiges (Link als PM an tupo
 FHEM/70_LaMetric2.pm         loredo               Multimedia
 FHEM/70_MEDIAPORTAL.pm       Reinerlein           Multimedia
 FHEM/70_PHTV.pm              loredo               Multimedia
-FHEM/70_ONKYO_AVR.pm         loredo               Multimedia
+FHEM/70_ONKYO_AVR.pm         delmar               Multimedia
 FHEM/70_PIONEERAVR.pm        50watt               Multimedia
 FHEM/70_SCIVT.pm             rudolfkoenig/orphan  Sonstiges
 FHEM/70_SISPM.pm             real-wusel           Sonstiges

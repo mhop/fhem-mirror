@@ -2401,8 +2401,9 @@ sub ONKYO_AVR_Read2($$$) {
 
             }
 
-            # curser information
-            else {
+            #Cursor Position (Update)
+            elsif ( $1 eq "C" ) {
+
                 foreach my $item (
                     keys %{ $hash->{SCREEN}{ $hash->{SCREENLAYER} }{list} } )
                 {
@@ -2412,9 +2413,18 @@ sub ONKYO_AVR_Read2($$$) {
 
                 $hash->{SCREEN}{ $hash->{SCREENLAYER} }{list}{$item}{curser} = 1
                   if ( $item ne "-" );
-
+                
                 readingsBulkUpdate( $hash, "screenCurser", $2 )
                   if ( ReadingsVal( $name, "screenCurser", "" ) ne $2 );
+
+                if ( $3 eq "P" ) { #Page Information Update (Page Clear or Disable List Info)
+                    Log3 $name, 4, "ONKYO_AVR $name: page clear";
+
+                    for ( my $idx=0; $idx < 10; $idx++ ) {
+                        readingsBulkUpdate( $hash, "screenItemC000" . $idx, '' );
+                    }
+                }
+
             }
 
         }
