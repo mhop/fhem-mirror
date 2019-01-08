@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 72_FB_CALLLIST: support for contact images (new attributes
+                             contactImageDirectory and contactImageDirectory)
   - change:  70_ONKYO_AVR: clearing screenItemCxxx readings on page update
   - bugfix:  93_DbRep: sort problem in diffValue Forum:#msg882082
   - bugfix:  98_weekprofile: fix f18 style

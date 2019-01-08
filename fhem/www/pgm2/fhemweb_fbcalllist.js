@@ -75,7 +75,14 @@ function FW_processCallListUpdate(data)
             $.each(json_data.item, function (key, val) {
                 if(key == "line")
                 { return true; }
-                new_tr += '<td name="'+key+'" '+style+'>'+val+'</td>';
+                else if(key == "image")
+                {
+                    new_tr += '<td name="'+key+'" '+style+'><img style="max-height:3em;" src="'+val+'"></td>';
+                }
+                else
+                {
+                    new_tr += '<td name="'+key+'" '+style+'>'+val+'</td>';
+                }
              });
 
             new_tr += "</tr>";
@@ -114,9 +121,16 @@ function FW_FbCalllistUpdateRowNumbers(table)
 
 function FW_setCallListValue(table,index,key,val)
 {
-    table.find("tr[index='"+index+"'] td[name="+key+"]").each(function(index, obj) {
-       $(obj).html(val);
-    });
+    var el = table.find("tr[index='"+index+"'] td[name="+key+"]");
+    
+    if(key == "image")
+    {
+        el.children("img").attr("src", val);
+    }
+    else
+    {
+        el.html(val);
+    }
 }
 
 function FW_FbCalllistCreate(elName, devName, vArr, currVal, set, params, cmd)

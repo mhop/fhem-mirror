@@ -52,7 +52,7 @@ FB_CALLLIST_Initialize($)
                           "connection-mapping:textField-long ".
                           "external-mapping:textField-long ".
                           "create-readings:0,1 ".
-                          "visible-columns:sortable-strict,row,state,timestamp,name,number,internal,external,connection,duration ".
+                          "visible-columns:sortable-strict,row,state,timestamp,image,name,number,internal,external,connection,duration ".
                           "show-icons:1,0 ".
                           "list-type:all,incoming,outgoing,missed-calls,completed,active " .
                           "time-format-string ".
@@ -67,6 +67,8 @@ FB_CALLLIST_Initialize($)
                           "expire-calls-after ".
                           "no-heading:0,1 ".
                           "no-table-header:0,1 ".
+                          "contactImageDirectory ".
+                          "contactDefaultImage ".
                           $readingFnAttributes;
 
     $hash->{FW_detailFn}  = "FB_CALLLIST_makeTable";
@@ -814,11 +816,12 @@ sub FB_CALLLIST_index2line($$)
                         state =>  FB_CALLLIST_returnCallState($hash, $index),
                         timestamp => FB_CALLLIST_strftime(AttrVal($name, "time-format-string", "%a, %d %b %Y %H:%M:%S"), localtime($index)),
                         name => ($data->{external_name} eq "unknown" ? "-" : $data->{external_name}),
-                        number =>  $data->{external_number},
+                        number =>  ($data->{external_number} eq "unknown" ? "-" : $data->{external_number}),
                         external => ($data->{external_connection} ? ((exists($hash->{helper}{EXTERNAL_MAP}) and exists($hash->{helper}{EXTERNAL_MAP}{$data->{external_connection}})) ? $hash->{helper}{EXTERNAL_MAP}{$data->{external_connection}} : $data->{external_connection} ) : "-"),
                         internal => ((exists($hash->{helper}{INTERNAL_FILTER}) and exists($hash->{helper}{INTERNAL_FILTER}{$data->{internal_number}})) ? $hash->{helper}{INTERNAL_FILTER}{$data->{internal_number}} : $data->{internal_number} ),
                         connection => ($data->{internal_connection} ? ((exists($hash->{helper}{CONNECTION_MAP}) and exists($hash->{helper}{CONNECTION_MAP}{$data->{internal_connection}})) ? $hash->{helper}{CONNECTION_MAP}{$data->{internal_connection}} : $data->{internal_connection} ) : "-"),
-                        duration => FB_CALLLIST_formatDuration($hash, $index)
+                        duration => FB_CALLLIST_formatDuration($hash, $index),
+                        image => (FB_CALLLIST_getImagePathForNumber($hash, $data->{external_number}) or "-")
                    };
 
         setlocale(LC_ALL, $old_locale);
@@ -909,7 +912,7 @@ sub FB_CALLLIST_list2html($)
     $ret .= '<div class="fhemWidget" informId="'.$name.'" cmd="" arg="fbcalllist" dev="'.$name.'">'; # div tag to support inform updates
     $ret .= '<table class="block wide fbcalllist"'.((AttrVal($name, "disable", "0") eq "3") ? ' style="display:none;"' : '').'>';
 
-    $ret .= FB_CALLLIST_returnOrderedHTMLOutput($hash, FB_CALLLIST_returnTableHeader($hash), 'class="fbcalllist header"'.((AttrVal($name, "no-table-header", "0") eq "1") ? ' style="display:none;"' : ''),'');
+    $ret .= FB_CALLLIST_returnOrderedHTMLOutput($hash, FB_CALLLIST_returnTableHeader($hash), 'class="fbcalllist header"'.((AttrVal($name, "no-table-header", "0") eq "1") ? ' style="display:none;"' : ''),'', 1);
 
     if(AttrVal($name,'disable',"0") eq "2")
     {
@@ -1144,10 +1147,10 @@ sub FB_CALLLIST_loadList($)
 
 #####################################
 # produce a HTML <tr>-Output for a specific data set depending on visible-columns setting
-sub FB_CALLLIST_returnOrderedHTMLOutput($$$$)
+sub FB_CALLLIST_returnOrderedHTMLOutput($$$$;$)
 {
 
-    my ($hash, $line, $tr_additions, $td_additions) = @_;
+    my ($hash, $line, $tr_additions, $td_additions,$is_header) = @_;
 
     my $name = $hash->{NAME};
 
@@ -1161,11 +1164,30 @@ sub FB_CALLLIST_returnOrderedHTMLOutput($$$$)
 
         $line->{number} = '<a href=\'#\' onclick="FW_cmd(FW_root+\'?XHR=1&cmd='.urlEncode($cmd).'\');return false;">'.$line->{number}."</a>";
     }
+    
 
     push @ret, '<tr align="center" '.$tr_additions.'>';
 
     foreach my $col (@order)
     {
+        if($col eq "image")
+        {
+            my $content;
+            
+            if($is_header)
+            {   
+                $content = $line->{$col};
+            }
+            else
+            {
+                my $url = FB_CALLLIST_generateImageUrl($hash, $line->{$col});
+                $content = (defined($url) ? '<img style="max-height:3em;margin:0.2em;" src="'.$url.'">' : "-" );
+            }
+            
+            push @ret, '<td name="'.$col.'" '.$td_additions.'>'.$content.'</td>';
+            next;
+        }
+            
         push @ret, '<td name="'.$col.'" '.$td_additions.'>'.$line->{$col}.'</td>' if(defined($line->{$col}));
     }
 
@@ -1190,6 +1212,8 @@ sub FB_CALLLIST_returnOrderedJSONOutput($$)
 
         $line->{number} = '<a href=\'#\' onclick="FW_cmd(FW_root+\'?XHR=1&cmd='.urlEncode($cmd).'\');return false;">'.$line->{number}."</a>";
     }
+    
+    $line->{image} = FB_CALLLIST_generateImageUrl($hash, $line->{image});
 
     push @ret, '"line":"'.$line->{line}.'"';
 
@@ -1350,6 +1374,68 @@ sub FB_CALLLIST_updateOneItemInFHEMWEB($$)
     return undef;
 }
 
+#####################################
+# returns the filename of a corresponding contact image if exist.
+sub FB_CALLLIST_getImagePathForNumber($$)
+{
+    my ($hash, $number) = @_;
+    my $name = $hash->{NAME};
+ 
+    my $local_path = AttrVal($name,"contactImageDirectory", undef);
+    
+    return undef unless(defined($local_path));
+    return undef if($number eq "-");
+    
+    $local_path =~ s,/+$,,;
+    
+    opendir(DIR, $local_path) or return undef;
+
+    while (my $file = readdir(DIR))
+    {
+        next if($file =~ /^\./);
+        next unless(-f "$local_path/$file");
+        next unless($file =~ /\.(?:gif|jpg|jpe|jpeg|png|bmp)$/i);
+        next unless($file =~ /^$number\./);
+
+        return $file;
+    }
+    
+    return AttrVal($name, "contactDefaultImage", undef);
+}
+
+#####################################
+# generates a data URL for a specific image file
+sub FB_CALLLIST_generateImageUrl($$)
+{
+    my ($hash, $file) = @_;
+    my $name = $hash->{NAME};
+    
+    return undef unless(defined($file));
+    
+    my $local_path = AttrVal($name,"contactImageDirectory", undef);
+    
+    return undef unless(defined($local_path));
+    return undef if ($file eq "-");
+    
+    my $suffix = lc((split(/\./, $file))[-1]);
+    
+    $suffix = "jpeg" if($suffix =~ /^(?:jpg|jpe)$/);
+    
+    $local_path =~ s,/+$,,;    
+    
+    my ($err, @content) = FileRead({FileName => $local_path."/".$file, ForceType=> "file"});
+    
+    if($err)
+    {
+        Log3 $name, 3 , "FB_CALLIST ($name) - unable to load contact image: $err";
+        return undef;
+    }
+    
+    my $base64 = encode_base64(join("\n", @content), "");
+    
+    return "data:image/$suffix;base64,$base64";
+}
+
 
 #####################################
 # returns the table header in the configured language
@@ -1366,6 +1452,7 @@ sub FB_CALLLIST_returnTableHeader($)
             state => "Status",
             timestamp => "Zeitpunkt",
             name => "Name",
+            image => "Bild",
             number => "Rufnummer",
             internal => "Intern",
             external => "Extern",
@@ -1380,6 +1467,7 @@ sub FB_CALLLIST_returnTableHeader($)
             state => "State",
             timestamp => "Timestamp",
             name => "Name",
+            image => "Image",
             number => "Number",
             internal => "Internal",
             external => "External",
@@ -1507,8 +1595,27 @@ sub FB_CALLLIST_strftime(@)
     <li><a name="FB_CALLLIST_create-readings">create-readings</a> 0,1</li>
     If enabled, for all visible calls in the list, readings and events will be created. It is recommended to set the attribute <a href="#event-on-change-reading">event-on-change-reading</a> to <code>.*</code> (all readings), to reduce the amount of generated readings for certain call events.<br><br>
     Possible values: 0 =&gt; no readings will be created, 1 =&gt; readings and events will be created.<br>
-    Default Value is 0 (no readings will be created)<br><br>
+    Default Value is 0 (no readings will be created)
+    <br><br>
 
+    <li><a name="FB_CALLLIST_contactImageDirectory">contactImageDirectory</a> &lt;directory&gt;</li>
+    If set, FB_CALLLIST will use this directory to display a contact image for each call.
+    This image will be shown in the column "image", which needs to be explicit configured via attribute <a href="#FB_CALLLIST_visible-columns">visible-columns</a>.
+    If this directory contains a file with the external number as filename (e.g. "0123456789.jpg" or "0345678901.gif"), it will be displayed in the call list.
+    <br><br>
+    Supported formats are: JPEG, GIF, PNG, BMP
+    <br><br>
+    By default, no directory is set and therefore no images will be displayed
+    <br><br>
+    
+    <li><a name="FB_CALLLIST_contactImageDirectory">contactDefaultImage</a> &lt;filename&gt;</li>
+    If contact images are configured (via attribute <a href="#FB_CALLLIST_contactImageDirectory">contactImageDirectory</a>) and there is no image file available or the external number is unknown,
+    FB_CALLLIST will use this file (e.g. <code>unkown.jpg</code>) as contact image in case there is no image for the external number available or the external number is unknown.
+    The file must be located in the directory configured via attribute <a href="#FB_CALLLIST_contactImageDirectory">contactImageDirectory</a>.
+    <br><br>
+    If not configured, no images will be shown for such calls.
+    <br><br>
+    
     <li><a name="FB_CALLLIST_disable">disable</a> 0,1,2,3</li>
     Optional attribute to disable the call list. When disabled, call events will not be processed and the list wouldn't be updated accordingly. Depending on the value, the call list can
     <br><br>
@@ -1534,9 +1641,9 @@ sub FB_CALLLIST_strftime(@)
     Possible values: 0 =&gt; no event processing when FB_CALLIST is disabled, 1 =&gt; events are still processed, even FB_CALLLIST is disabled<br>
     Default Value is 0 (no event processing when disabled)<br><br>
 
-    <li><a name="FB_CALLLIST_expire-calls-after">expire-calls-after</a> &lt;time frame&gt;</li>
-    Optional attribute to automatically delete finished calls which are older than a given time frame. If a finished call is older than this time frame, it will be deleted from the list.
-    <br><br>A time frame can be specified as follows:
+    <li><a name="FB_CALLLIST_expire-calls-after">expire-calls-after</a> &lt;timeframe&gt;</li>
+    Optional attribute to automatically delete finished calls which are older than a given timeframe. If a finished call is older than this timeframe, it will be deleted from the list.
+    <br><br>A timeframe can be specified as follows:
     <ul>
     <li>as minutes: <code>1 minute</code> or <code>30 minutes</code></li>
     <li>as hours: <code>1 hour</code> or <code>12 hours</code></li>
@@ -1667,15 +1774,15 @@ sub FB_CALLLIST_strftime(@)
     <br><br>
     Default value is "%a, %d %b %Y %H:%M:%S" ( = "Sun, 07 Jun 2015 12:50:09")<br><br>
 
-    <li><a name="FB_CALLLIST_visible-columns">visible-columns</a> row,state,timestamp,name,number,internal,external,connection,duration</li>
+    <li><a name="FB_CALLLIST_visible-columns">visible-columns</a> row,state,timestamp,image,name,number,internal,external,connection,duration</li>
     Defines the visible columns, as well as the order in which these columns are displayed in the call list (from left to right).
     Not all columns must be displayed, you can select only a subset of columns which will be displayed.
     <br><br>
     The possible values represents the corresponding column.
     The column "row" represents the row number within the current list.
     <br><br>
-    Possible values: a combination of <code>row,state,timestamp,name,number,internal,external,connection,duration</code><br>
-    Default Value is "row,state,timestamp,name,number,internal,external,connection,duration" (show all columns)<br><br>
+    Possible values: a combination of <code>row,state,timestamp,image,name,number,internal,external,connection,duration</code><br>
+    Default Value is "row,state,timestamp,name,number,internal,external,connection,duration" (show all columns, except "image" as it needs to be configured first)<br><br>
   </ul>
   <br>
   <a name="FB_CALLLIST_events"></a>
@@ -1785,6 +1892,24 @@ sub FB_CALLLIST_strftime(@)
     Standardwert ist  <i>nicht gesetzt</i> (Keine Zuordnung, es werden die Originalwerte verwendet)
     <br><br>
 
+    <li><a name="FB_CALLLIST_contactImageDirectory">contactImageDirectory</a> &lt;Verzeichnis&gt;</li>
+    Sofern gesetzt, nutzt FB_CALLLIST dieses Verzeichnis um Kontaktbilder f&uuml;r jeden Anruf anzuzeigen.
+    Diese Bilder werden in der Spalte "image" dargestellt, welche dazu explizit in dem Attribut <a href="#FB_CALLLIST_visible-columns">visible-columns</a> konfiguriert sein muss.
+    Wenn in diesem Verzeichnis eine Bilddatei mit der externen Nummer als Dateiname (z.B. <code>0123456789.jpg</code> oder <code>0345678901.gif</code>) enthalten ist, wird diese als Kontaktbild in der Anrufliste verwendet.
+    <br><br>
+    Unterst&uuml;tzte Dateiformate: JPEG, GIF, PNG, BMP
+    <br><br>
+    Standardm&auml;&szlig;ig ist kein Verzeichnis vorkonfiguriert. Daher werden standardm&auml;&szlig;ig keine Kontaktbilder angezeigt.
+    <br><br>
+    
+    <li><a name="FB_CALLLIST_contactImageDirectory">contactDefaultImage</a> &lt;Dateiname&gt;</li>
+    Sofern Kontaktbilder verwendet werden (via Attribut <a href="#FB_CALLLIST_contactImageDirectory">contactImageDirectory</a>) und kein zugeh&ouml;riges Kontaktbild existiert oder die externe Rufnummer unbekannt ist,
+    wird die konfigurierte Datei (z.B. <code>unknown.jpg</code>) als Kontaktbild verwendet.
+    Die Datei muss sich dabei in dem Verzeichnis befinden, welches via Attribut <a href="#FB_CALLLIST_contactImageDirectory">contactImageDirectory</a> konfiguriert ist. 
+    <br><br>
+    Wenn nicht konfiguriert, werden keine Kontaktbilder in solchen F&auml;llen angezeigt.
+    <br><br>
+    
     <li><a name="FB_CALLLIST_disable">disable</a> 0,1,2,3</li>
     Optionales Attribut zur Deaktivierung der Anrufliste. Sofern aktiviert, werden keine Anruf-Events mehr verarbeitet und die Liste nicht weiter aktualisiert. Je nach gesetztem Wert verh&auml;lt sich FB_CALLLIST unterschiedlich.
     <br><br>
@@ -1830,7 +1955,7 @@ sub FB_CALLLIST_strftime(@)
     Der Wert <code>0</code> bedeutet, das keine Gespr&auml;che nach einem gewissen Zeitfenster gel&ouml;scht werden.<br><br>
     Standardwert ist 0 (keine Gespr&auml;che werden nach einem Zeitfenster gel&ouml;scht)<br><br>
 
-    <li><a name="FB_CALLLIST_external-mapping">external-mapping</a> &lt;hash&gt;</li>
+    <li><a name="FB_CALLLIST_external-mapping">external-mapping</a> &lt;Hash&gt;</li>
     Definiert eine eigene Zuordnung der externen Anschlussbezeichnung (Reading: external_connection) zu eigenen Bezeichnungen. Die Zuordnung erfolgt &uuml;ber eine Hash-Struktur.<br><br>
     z.B.<br>
     <ul>
@@ -1930,7 +2055,7 @@ sub FB_CALLLIST_strftime(@)
     M&ouml;gliche Werte: 0 =&gt; keine Icons , 1 =&gt; benutze Icons<br>
     Standardwert ist 1 (benutze Icons)<br><br>
 
-    <li><a name="FB_CALLLIST_time-format-string">time-format-string</a> &lt;string&gt;</li>
+    <li><a name="FB_CALLLIST_time-format-string">time-format-string</a> &lt;String&gt;</li>
     Definiert einen Formatierungs-String welcher benutzt wird um die Zeitangaben in der Anrufliste nach eigenen W&uuml;nschen anzupassen. Es stehen hier eine ganze Reihe an Platzhaltern zur Verf&uuml;gung um die einzelnen Elemente einer Datums-/Zeitangabe einzeln zu setzen. Die m&ouml;glichen Werte sind alle Standard POSIX strftime() Platzhalter. G&auml;ngige Platzhalter sind:<br><br>
     <ul>
     <li><code>%a</code> - Der abgek&uuml;rzte Wochentagname</li>
@@ -1950,7 +2075,7 @@ sub FB_CALLLIST_strftime(@)
     M&ouml;gliche Werte: en =&gt; Englisch , de =&gt; Deutsch<br>
     Standardwert ist en (Englisch)<br><br>
 
-    <li><a name="FB_CALLLIST_visible-columns">visible-columns</a> row,state,timestamp,name,number,internal,external,connection,duration</li>
+    <li><a name="FB_CALLLIST_visible-columns">visible-columns</a> row,state,timestamp,image,name,number,internal,external,connection,duration</li>
     Legt fest, welche Spalten in welcher Reihenfolge (von links nach rechts) in der Anrufliste angezeigt werden sollen.
     Es m&uuml;ssen nicht alle verf&uuml;gbaren Spalten angezeigt werden.
     Es kann auch eine Auswahl von einzelnen Spalten angezeigt werden.
@@ -1958,8 +2083,8 @@ sub FB_CALLLIST_strftime(@)
     Die m&ouml;glichen Werte repr&auml;sentieren die jeweilige Spalte.
     Der Wert "row" steht f&uuml;r die Zeilennummer innerhalb der Liste.
     <br><br>
-    M&ouml;gliche Werte: Eine Kombination der folgenden Werte in der gew&uuml;nschten Reihenfolge: <code>row,state,timestamp,name,number,internal,external,connection,duration</code><br>
-    Standardwert ist "row,state,timestamp,name,number,internal,external,connection,duration" (Anzeige aller Spalten)<br><br>
+    M&ouml;gliche Werte: Eine Kombination der folgenden Werte in der gew&uuml;nschten Reihenfolge: <code>row,state,timestamp,image,name,number,internal,external,connection,duration</code><br>
+    Standardwert ist "row,state,timestamp,name,number,internal,external,connection,duration" (Anzeige aller Spalten bis auf "image", da diese erst konfiguriert werden muss)<br><br>
   </ul>
   <br>
   <a name="FB_CALLLIST_events"></a>
