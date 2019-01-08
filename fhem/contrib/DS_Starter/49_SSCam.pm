@@ -2137,11 +2137,14 @@ sub SSCam_cammotdetsc($) {
 ###############################################################################
 sub SSCam_camsnap($) {
     my ($str)            = @_;
-	my ($name,$num,$lag,$ncount,$emtxt) = split(":",$str);
+	my ($name,$num,$lag,$ncount,$emtxt,$tac) = split(":",$str);
 	my $hash             = $defs{$name};
     my $camname          = $hash->{CAMNAME};
     my $errorcode;
     my $error;
+    
+    $tac   = (defined $tac)?$tac:5000;
+    my $ta = $hash->{HELPER}{TRANSACTION};
     
     RemoveInternalTimer($hash, "SSCam_camsnap");
     return if(IsDisabled($name));
@@ -2167,7 +2170,7 @@ sub SSCam_camsnap($) {
         return;
     }
     
-    if ($hash->{HELPER}{ACTIVE} eq "off") {
+    if ($hash->{HELPER}{ACTIVE} eq "off" || ((defined $ta) && $ta == $tac)) { 
         # einen Schnappschuß aufnehmen              
         $hash->{OPMODE} = "Snap";
         $hash->{HELPER}{LOGINRETRIES} = 0;
@@ -2181,7 +2184,8 @@ sub SSCam_camsnap($) {
         SSCam_getapisites($hash);
 		
     } else {
-        InternalTimer(gettimeofday()+0.3, "SSCam_camsnap", "$name:$num:$lag:$ncount:$emtxt", 0);
+        $tac = (defined $tac)?$tac:"";
+        InternalTimer(gettimeofday()+0.3, "SSCam_camsnap", "$name:$num:$lag:$ncount:$emtxt:$tac", 0);
     }    
 }
 
@@ -3063,12 +3067,14 @@ sub SSCam_getsnapinfo ($) {
 	my ($name,$slim,$ssize,$tac) = split(":",$str);
 	my $hash = $defs{$name};
     my $camname  = $hash->{CAMNAME};
-    $tac = (defined $tac)?$tac:5000;
+    
+    $tac   = (defined $tac)?$tac:5000;
+    my $ta = $hash->{HELPER}{TRANSACTION};
     
     RemoveInternalTimer("SSCam_getsnapinfo"); 
     return if(IsDisabled($name));
     
-    if ($hash->{HELPER}{ACTIVE} eq "off" || ($hash->{HELPER}{TRANSACTION} && $hash->{HELPER}{TRANSACTION} == $tac)) {               
+    if ($hash->{HELPER}{ACTIVE} eq "off" || ((defined $ta) && $ta == $tac)) {               
         $hash->{OPMODE} = "getsnapinfo";
 		$hash->{OPMODE} = "getsnapgallery" if(exists($hash->{HELPER}{GETSNAPGALLERY}));
         $hash->{HELPER}{LOGINRETRIES} = 0;
@@ -3080,6 +3086,7 @@ sub SSCam_getsnapinfo ($) {
         SSCam_getapisites($hash);
 		
     } else {
+        $tac = (defined $tac)?$tac:"";
         InternalTimer(gettimeofday()+1.7, "SSCam_getsnapinfo", "$name:$slim:$ssize", 0);
     }
 }
@@ -4900,6 +4907,15 @@ sub SSCam_camop_parse ($) {
                 # ein Schnapschuß wurde aufgenommen
                 # falls Aufnahme noch läuft -> state = on setzen
                 SSCam_refresh($hash,0,1,0);     # kein Room-Refresh, SSCam-state-Event, kein SSCamSTRM-Event
+
+                my $tac = "";
+                if($hash->{HELPER}{CANSENDSNAP}) { 
+                    if(!$hash->{HELPER}{TRANSACTION}) {                
+                        $tac = SSCam_startTrans($hash);                            # Transaktion starten
+                    } else {
+                        $tac = $hash->{HELPER}{TRANSACTION};
+                    }
+                }
                 
                 $snapid = $data->{data}{'id'};
                 readingsSingleUpdate($hash,"LastSnapId",$snapid, 0) if($snapid);
@@ -4919,22 +4935,18 @@ sub SSCam_camop_parse ($) {
                 my $lag   = $hash->{HELPER}{SNAPLAG};                              # Zeitverzögerung zwischen zwei Schnappschüssen
                 my $emtxt = $hash->{HELPER}{SMTPMSG}?$hash->{HELPER}{SMTPMSG}:"";  # alternativer Text für Email-Versand
                 if($ncount > 0) {
-                    InternalTimer(gettimeofday()+$lag, "SSCam_camsnap", "$name:$num:$lag:$ncount:$emtxt", 0);
+                    InternalTimer(gettimeofday()+$lag, "SSCam_camsnap", "$name:$num:$lag:$ncount:$emtxt:$tac", 0);
                     # Token freigeben für nächstes Kommando
-                    SSCam_delActiveToken($hash);
+                    # SSCam_delActiveToken($hash);
                     return;
                 }
   
                 # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps
                 my ($slim,$ssize) = SSCam_snaplimsize($hash);
 
-                my $tac = "";
-                if($hash->{HELPER}{CANSENDSNAP}) {
-                    $tac = int(rand(4500));                   # Transaktionscode (snap und getsnapinfo als Einheit ausführen)
-                    $hash->{HELPER}{TRANSACTION} = $tac;
-                } else {
+                if(!$hash->{HELPER}{CANSENDSNAP}) {                  
                     # Token freigeben vor nächstem Kommando
-                    SSCam_delActiveToken($hash);                
+                    SSCam_delActiveToken($hash);                        
                 }
                 
                 RemoveInternalTimer("SSCam_getsnapinfo");                
@@ -5060,7 +5072,7 @@ sub SSCam_camop_parse ($) {
 						}
 				    } 
                 }
-                delete($hash->{HELPER}{TRANSACTION});                           # delete Transaktion
+                SSCam_stopTrans($hash);                                         # Transaktion beenden
 				delete($hash->{HELPER}{GETSNAPGALLERY});                        # Steuerbit getsnapgallery statt getsnapinfo				
 
 				#####  Fall abhängige Eventgenerierung  #####
@@ -7188,7 +7200,7 @@ sub SSCam_prepareSendEmail ($$;$) {
    # Extraktion EMail-Texte
    # Attribut snapEmailTxt kann übersteuert werden mit: $hash->{HELPER}{SMTPMSG}
    # Format in $hash->{HELPER}{SMTPMSG} muss sein: subject => <Betreff-Text>, body => <Mitteilung-Text>
-   my $mth = $hash->{HELPER}{SMTPMSG};
+   my $mth = delete $hash->{HELPER}{SMTPMSG};
    my $mt  = $mth?$mth:AttrVal($name, "snapEmailTxt", "");
    $mt     =~ s/['"]//g;   
    
@@ -7632,7 +7644,7 @@ sub SSCam_setActiveToken ($) {
                
    $hash->{HELPER}{ACTIVE} = "on";
    if (AttrVal($name,"debugactivetoken",0)) {
-       Log3($name, 3, "$name - Active-Token set by OPMODE: $hash->{OPMODE}");
+       Log3($name, 1, "$name - Active-Token set by OPMODE: $hash->{OPMODE}");
    } 
    
 return;
@@ -7647,11 +7659,43 @@ sub SSCam_delActiveToken ($) {
                
    $hash->{HELPER}{ACTIVE} = "off";
    if (AttrVal($name,"debugactivetoken",0)) {
-       Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
+       Log3($name, 1, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
    }  
    
 return;
 }  
+
+#############################################################################################
+#                                  Transaktion starten
+#############################################################################################
+sub SSCam_startTrans ($) { 
+   my ($hash) = @_;
+   my $name = $hash->{NAME};
+               
+   my $tac = int(rand(4500));                   # Transaktionscode erzeugen und speichern
+   $hash->{HELPER}{TRANSACTION} = $tac;
+   if (AttrVal($name,"debugactivetoken",0)) {
+       Log3($name, 1, "$name - Transaction started, TA-code: $tac");
+   } 
+   
+return $tac;
+}
+
+#############################################################################################
+#                                 Transaktion freigeben
+#############################################################################################
+sub SSCam_stopTrans ($) { 
+   my ($hash) = @_;
+   my $name = $hash->{NAME};
+   
+   return if(!defined $hash->{HELPER}{TRANSACTION});   
+   my $tac = delete $hash->{HELPER}{TRANSACTION};   # Transaktion beenden
+   if (AttrVal($name,"debugactivetoken",0)) {
+       Log3($name, 1, "$name - Transaction \"$tac\" stopped");
+   }  
+   
+return;
+}
 
 #############################################################################################
 #             Leerzeichen am Anfang / Ende eines strings entfernen           
