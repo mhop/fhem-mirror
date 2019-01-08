@@ -236,7 +236,7 @@ structure_Notify($$)
   my $devstate;
 
   foreach my $d (sort keys %{ $hash->{".memberHash"} }) {
-    next if(!$defs{$d});
+    next if(!$defs{$d} || IsDisabled($d));
 
     if($attr{$d} && $attr{$d}{$devmap}) {
       my @gruppe = attrSplit($attr{$d}{$devmap});
