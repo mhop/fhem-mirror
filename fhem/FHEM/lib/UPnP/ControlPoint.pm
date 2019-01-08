@@ -52,6 +52,7 @@ our @IGNOREIP;
 our @USEDONLYIP;
 our $LogLevel;
 our $EnvPrefix;
+our $EnvNamespace;
 
 sub isIgnoreIP($) {
 	my($ip) = @_;
@@ -104,6 +105,7 @@ sub new {
 	@USEDONLYIP = @{$args{UsedOnlyIP}};
 	$LogLevel = $args{LogLevel} || 0;
 	$EnvPrefix = $args{EnvPrefix} || $SOAP::Constants::PREFIX_ENV;
+	$EnvNamespace = $args{EnvNamespace} || 'u';
 	
 	my $reuseport = $args{ReusePort};
 	$reuseport = 0 if (!defined($reuseport));
@@ -710,15 +712,26 @@ sub queryStateVariable {
 
         my $result;
         if ($SOAP::Lite::VERSION >= 0.67) {
-            $result = SOAP::Lite
-                    ->envprefix($EnvPrefix)
-                    ->ns("u")
-                    ->uri('urn:schemas-upnp-org:control-1-0')
-                    ->proxy($self->controlURL)
-                    ->call('QueryStateVariable' => 
-                               SOAP::Data->name('varName')
-                                               ->uri('urn:schemas-upnp-org:control-1-0')
-                                               ->value($name));
+        	if ($EnvNamespace eq '<undef>') {
+	            $result = SOAP::Lite
+	                    ->envprefix($EnvPrefix)
+	                    ->uri('urn:schemas-upnp-org:control-1-0')
+	                    ->proxy($self->controlURL)
+	                    ->call('QueryStateVariable' => 
+	                               SOAP::Data->name('varName')
+	                                               ->uri('urn:schemas-upnp-org:control-1-0')
+	                                               ->value($name));
+	        } else {
+	            $result = SOAP::Lite
+	                    ->envprefix($EnvPrefix)
+	                    ->ns($EnvNamespace)
+	                    ->uri('urn:schemas-upnp-org:control-1-0')
+	                    ->proxy($self->controlURL)
+	                    ->call('QueryStateVariable' => 
+	                               SOAP::Data->name('varName')
+	                                               ->uri('urn:schemas-upnp-org:control-1-0')
+	                                               ->value($name));
+	        }
         } else {
             $result = SOAP::Lite
                     ->envprefix($EnvPrefix)
@@ -882,10 +895,20 @@ sub new {
     my($class, $service) = @_;
 
         if ($SOAP::Lite::VERSION >= 0.67) {
-            return bless {
-                    _service => $service,
-                    _proxy => SOAP::Lite->envprefix($EnvPrefix)->ns("u")->uri($service->serviceType)->proxy($service->controlURL),
-            }, $class;
+        	if ($EnvNamespace eq '<undef>') {
+            	return bless {
+	                    _service => $service,
+	                    _proxy => SOAP::Lite->envprefix($EnvPrefix)
+	                 					   ->uri($service->serviceType)->proxy($service->controlURL),
+	            }, $class;
+        	} else {
+	            return bless {
+	                    _service => $service,
+	                    _proxy => SOAP::Lite->envprefix($EnvPrefix)
+	                 					   ->ns($EnvNamespace)
+	                 					   ->uri($service->serviceType)->proxy($service->controlURL),
+	            }, $class;
+	        }
         } else {
             return bless {
                     _service => $service,
