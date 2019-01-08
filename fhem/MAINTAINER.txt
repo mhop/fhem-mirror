@@ -288,7 +288,7 @@ FHEM/57_CALVIEW.pm           chris1284            Unterstuetzende Dienste/Kalend
 FHEM/59_HCS.pm               hjr                  Automatisierung (oder auch PM)
 FHEM/59_LuftdatenInfo        igami                Bastelecke
 FHEM/59_OPENWEATHER.pm       tupol                Unterstuetzende Dienste/Wettermodule (Link als PM an tupol)
-FHEM/59_Twilight.pm          igami                Unterstuetzende Dienste/Wettermodule
+FHEM/59_Twilight.pm          jeschkec             Unterstuetzende Dienste/Wettermodule
 FHEM/59_PROPLANTA.pm         tupol                Unterstuetzende Dienste/Wettermodule (Link als PM an tupol)
 FHEM/59_WWO.pm               baumrasen            Unterstuetzende Dienste/Wettermodule
 FHEM/59_Weather.pm           neubert              Unterstuetzende Dienste/Wettermodule
