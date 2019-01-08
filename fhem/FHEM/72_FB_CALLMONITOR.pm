@@ -76,6 +76,9 @@ FB_CALLMONITOR_Initialize($)
                          "fritzbox-user ".
                          "apiKeySearchCh ".
                          "sendKeepAlives:none,5m,10m,15m,30m,1h ".
+                         "contactImageViaTR064:0,1 ".
+                         "contactImageDirectory ".
+                         "contactDefaultImage ".
                          $readingFnAttributes;
 }
 
@@ -473,7 +476,7 @@ FB_CALLMONITOR_Read($)
         
         if($array[1] =~ /^CALL|RING$/)
         {
-            delete($hash->{helper}{TEMP}{$array[2]}) if(exists($hash->{helper}{TEMP}{$array[2]}));
+            delete($hash->{helper}{TEMP}{$array[2]});
             
             if(AttrVal($name, "unique-call-ids", "0") eq "1")
             {
@@ -487,6 +490,11 @@ FB_CALLMONITOR_Read($)
             $hash->{helper}{TEMP}{$array[2]}{external_number} = (defined($external_number) ? $external_number : "unknown");
             $hash->{helper}{TEMP}{$array[2]}{external_name} = (defined($reverse_search) ? $reverse_search : "unknown");
             $hash->{helper}{TEMP}{$array[2]}{internal_number} = $array[4];
+            
+            if(my $contact_image = FB_CALLMONITOR_getContactImage($hash, $hash->{helper}{TEMP}{$array[2]}{external_number}))
+            {
+                $hash->{helper}{TEMP}{$array[2]}{contact_image} = $contact_image;
+            }            
         }
         
         if($array[1] eq "CALL")
@@ -542,7 +550,7 @@ FB_CALLMONITOR_Read($)
         
         if($array[1] eq "DISCONNECT")
         {
-            delete($hash->{helper}{TEMP}{$array[2]}) if(exists($hash->{helper}{TEMP}{$array[2]}));
+            delete($hash->{helper}{TEMP}{$array[2]});
         } 
     }
 }
@@ -1107,6 +1115,7 @@ sub FB_CALLMONITOR_readPhonebook($;$)
     
     delete($hash->{helper}{PHONEBOOK});
     delete($hash->{helper}{PHONEBOOKS});
+    delete($hash->{helper}{IMAGE_URLS});
     
 	if(AttrVal($name, "fritzbox-remote-phonebook", "0") eq "1")
     {
@@ -1189,7 +1198,9 @@ sub FB_CALLMONITOR_readPhonebook($;$)
                 }
             }
             
-            delete($hash->{helper}{PHONEBOOK_URL}) if(exists($hash->{helper}{PHONEBOOK_URL}))
+            delete($hash->{helper}{PHONEBOOK_URL});
+            
+            FB_CALLMONITOR_downloadImageURLs($hash, $testPassword);
         }
     }
     else
@@ -1254,6 +1265,15 @@ sub FB_CALLMONITOR_parsePhonebook($$)
             {
                 $contact = $1;
                  
+                my $imageURL;
+                
+                if($contact =~ m,<imageURL>([^<>]+)</imageURL>,)
+                {
+                    $imageURL = $1;
+                    
+                    $hash->{helper}{IMAGE_URLS}{$imageURL} = [] unless(exists($hash->{helper}{IMAGE_URLS}{$imageURL}));
+                }
+                 
                 if($contact =~ m,<realName>(.+?)</realName>,) 
                 {
                     $contact_name = $1; 
@@ -1267,11 +1287,20 @@ sub FB_CALLMONITOR_parsePhonebook($$)
                             $count_contacts++;
                             Log3 $name, 4, "FB_CALLMONITOR ($name) - found $contact_name with number $number";
                             $out->{$number} = FB_CALLMONITOR_html2txt($contact_name);
+                            
+                            if($imageURL)
+                            {
+                                Log3 $name, 5, "FB_CALLMONITOR ($name) - found image for $contact_name with number $number";
+                                push @{$hash->{helper}{IMAGE_URLS}{$imageURL}}, $number;
+                            }
+                            
                             undef $number;
                         }
                     }
                     undef $contact_name;
                 }
+                
+               
             }
         }
  
@@ -1298,7 +1327,7 @@ sub FB_CALLMONITOR_loadCacheFile($;$)
 
     if($file ne "" and -r $file)
     { 
-        delete($hash->{helper}{CACHE}) if(defined($hash->{helper}{CACHE}));
+        delete($hash->{helper}{CACHE});
   
         Log3 $hash->{NAME}, 3, "FB_CALLMONITOR ($name) - loading cache file $file";
         
@@ -1349,7 +1378,7 @@ sub FB_CALLMONITOR_loadTextFile($;$)
     
     if($file ne "" and -r $file)
     { 
-        delete($hash->{helper}{TEXTFILE}) if(defined($hash->{helper}{TEXTFILE}));
+        delete($hash->{helper}{TEXTFILE});
   
         Log3 $hash->{NAME}, 3, "FB_CALLMONITOR ($name) - loading textfile $file";
         
@@ -1431,7 +1460,7 @@ sub FB_CALLMONITOR_readRemotePhonebookViaTelnet($;$)
     my $fb_user = AttrVal($name, "fritzbox-user", undef);
     my $fb_pw = FB_CALLMONITOR_readPassword($hash, $testPassword);
     
-    delete($hash->{helper}{READ_PWD}) if(exists($hash->{helper}{READ_PWD}));
+    delete($hash->{helper}{READ_PWD});
     return "no password available to access FritzBox. Please set your FRITZ!Box password via 'set ".$hash->{NAME}." password <your password>'" unless(defined($fb_pw));
     
     my $telnet = Net::Telnet->new(Timeout => 10, Errmode => 'return');
@@ -1504,36 +1533,39 @@ sub FB_CALLMONITOR_readRemotePhonebookViaTelnet($;$)
     $telnet->print('exit');
     $telnet->close;
     
-    delete($hash->{helper}{PWD_NEEDED}) if(exists($hash->{helper}{PWD_NEEDED}));
+    delete($hash->{helper}{PWD_NEEDED});
     
     return (undef, join('', @FBPhoneBook));
 }
 
 #####################################
-# execute TR-064 methods via HTTP/SOAP request
-sub FB_CALLMONITOR_requestTR064($$$$;$$)
+# performs a HTTP based request via TR-064 port with authentication
+sub FB_CALLMONITOR_requestHTTPviaTR064($$$$;$$)
 {
-    my ($hash, $path, $command, $type, $command_arg, $testPassword) = @_;
+    my ($hash, $url, $data, $header, $auth, $testPassword) = @_;
     my $name = $hash->{NAME};
-
+    
     my ($fb_ip,undef) = split(/:/, ($hash->{DeviceName}), 2);
 
+    my ($fb_user, $fb_pw);
     my $param;
-    my ($err, $data);
+    my ($err, $response);
     
-    my $fb_user = AttrVal($name, "fritzbox-user", "admin");
-    
-    $hash->{helper}{READ_PWD} = 1;
-    my $fb_pw = FB_CALLMONITOR_readPassword($hash, $testPassword);
-    delete($hash->{helper}{READ_PWD});
-
-    unless(defined($fb_pw))
+    if($auth)
     {
-        $hash->{helper}{PWD_NEEDED} = 1;
-        return "no password available to access FritzBox. Please set your FRITZ!Box password via 'set ".$hash->{NAME}." password <your password>'";
+        $fb_user = AttrVal($name, "fritzbox-user", "admin");
+        
+        $hash->{helper}{READ_PWD} = 1;
+        $fb_pw = FB_CALLMONITOR_readPassword($hash, $testPassword);
+        delete($hash->{helper}{READ_PWD});
+
+        unless(defined($fb_pw))
+        {
+            $hash->{helper}{PWD_NEEDED} = 1;
+            return "no password available to access FritzBox. Please set your FRITZ!Box password via 'set ".$hash->{NAME}." password <your password>'";
+        }
     }
-    
-    my $tr064_base_url = "http://".urlEncode($fb_user).":".urlEncode($fb_pw)."\@$fb_ip:49000";
+    my $tr064_base_url = "http://".($auth ? urlEncode($fb_user).":".urlEncode($fb_pw)."\@" : "") ."$fb_ip:49000";
     
     $param->{noshutdown} = 1;
     $param->{timeout}    = AttrVal($name, "fritzbox-remote-timeout", 5);
@@ -1556,7 +1588,7 @@ sub FB_CALLMONITOR_requestTR064($$$$;$$)
         $param->{data}   = $get_security_port;        
 
         Log3 $name, 4, "FB_CALLMONITOR ($name) - request SSL port for TR-064 access via method GetSecurityPort:\n$get_security_port";
-        my ($err, $data)    = HttpUtils_BlockingGet($param);        
+        my ($err, $response)    = HttpUtils_BlockingGet($param);        
         
         if($err ne "")
         {
@@ -1564,41 +1596,41 @@ sub FB_CALLMONITOR_requestTR064($$$$;$$)
             return "error while requesting phonebooks: $err";
         }
 
-        if($data eq "" and exists($param->{code}))
+        if($response eq "" and exists($param->{code}))
         {
             Log3 $name, 3, "FB_CALLMONITOR ($name) - received http code ".$param->{code}." without any data after requesting security port via TR-064";
             return  "received no data after requesting security port via TR-064";
         }
         
-        Log3 $name, 5, "FB_CALLMONITOR ($name) - received TR-064 method GetSecurityPort response:\n$data";
+        Log3 $name, 5, "FB_CALLMONITOR ($name) - received TR-064 method GetSecurityPort response:\n$response";
         
-        if($data =~ /<NewSecurityPort>(\d+)<\/NewSecurityPort>/)
+        if($response =~ /<NewSecurityPort>(\d+)<\/NewSecurityPort>/)
         {
-            $tr064_base_url = "https://".urlEncode($fb_user).":".urlEncode($fb_pw)."\@$fb_ip:$1";
+            $tr064_base_url = "https://".($auth ? urlEncode($fb_user).":".urlEncode($fb_pw)."\@" : "")."$fb_ip:$1";
             $hash->{helper}{TR064}{SECURITY_PORT} = $1;
         }
     }
     else
     {
-        $tr064_base_url = "https://".urlEncode($fb_user).":".urlEncode($fb_pw)."\@$fb_ip:".$hash->{helper}{TR064}{SECURITY_PORT};
+        $tr064_base_url = "https://".($auth ? urlEncode($fb_user).":".urlEncode($fb_pw)."\@" : "")."$fb_ip:".$hash->{helper}{TR064}{SECURITY_PORT};
     }
         
-    # éxecute the TR-064 request 
-    my $soap_request = '<?xml version="1.0" encoding="utf-8"?>'.
-                       '<s:Envelope s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" >'.
-                         '<s:Body>'.
-                           "<u:$command xmlns:u=\"$type\">".($command_arg ? $command_arg : "")."</u:$command>".
-                         '</s:Body>'.
-                       '</s:Envelope>';
+    $param->{url}    = "$tr064_base_url$url";
+    $param->{header} = $header if($header);
     
-    $param->{url}    = "$tr064_base_url$path";
-    $param->{header} = "SOAPACTION: $type#$command\r\nContent-Type: text/xml; charset=utf-8";
-    $param->{data}   = $soap_request;
 
-    Log3 $name, 5, "FB_CALLMONITOR ($name) - requesting TR-064 method $command:\n$soap_request";
+    if($data)
+    {
+        $param->{data}   = $data if($data);
+        Log3 $name, 4, "FB_CALLMONITOR ($name) - sending TR-064 request:\n$data";
+    }
+    else
+    {
+        Log3 $name, 4, "FB_CALLMONITOR ($name) - requesting TR-064 URL: $url";
+    }
     
-    ($err, $data) = HttpUtils_BlockingGet($param);
-
+    ($err, $response) = HttpUtils_BlockingGet($param);
+    
     if($err ne "")
     {
         if(exists($param->{code}) and $param->{code} eq "401")
@@ -1609,20 +1641,50 @@ sub FB_CALLMONITOR_requestTR064($$$$;$$)
         }
         else
         {
-            Log3 $name, 3, "FB_CALLMONITOR ($name) - error while requesting TR-064 method $command: $err";
-            return "error while requesting TR-064 TR-064 method $command: $err";
+            Log3 $name, 3, "FB_CALLMONITOR ($name) - error while requesting TR-064 URL $url: $err";
+            return "error while requesting TR-064 URL $url: $err";
         }
     }
 
-    if($data eq "" and exists($param->{code}))
+    if($response eq "" and exists($param->{code}))
     {
-        Log3 $name, 3, "FB_CALLMONITOR ($name) - received http code ".$param->{code}." without any data after requesting TR-064 method $command";
-        return  "received no data after requesting TR-064 method $command";
+        Log3 $name, 3, "FB_CALLMONITOR ($name) - received http code ".$param->{code}." without any data after requesting TR-064 URL $url";
+        return  "received no data after requesting TR-064 URL $url";
     }
 
-    Log3 $name, 5, "FB_CALLMONITOR ($name) - received TR-064 method $command response:\n$data";
+    if($param->{httpheader} =~ m,^Content-Type:\s*text,mi)
+    {
+        Log3 $name, 5, "FB_CALLMONITOR ($name) - received TR-064 response for URL $url:\n$response";
+    }
+    else
+    {
+        Log3 $name, 5, "FB_CALLMONITOR ($name) - received TR-064 response for URL $url";
+    }
+    
+    return (undef, $response, $param);
 
-    return (undef, $data);
+}
+
+#####################################
+# execute TR-064 methods via HTTP/SOAP request
+sub FB_CALLMONITOR_requestTR064($$$$;$$)
+{
+    my ($hash, $path, $command, $type, $command_arg, $testPassword) = @_;
+    
+    my $name = $hash->{NAME};
+
+       # éxecute the TR-064 request 
+    my $soap_request = '<?xml version="1.0" encoding="utf-8"?>'.
+                       '<s:Envelope s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" >'.
+                         '<s:Body>'.
+                           "<u:$command xmlns:u=\"$type\">".($command_arg ? $command_arg : "")."</u:$command>".
+                         '</s:Body>'.
+                       '</s:Envelope>';
+    
+
+    my $header = "SOAPACTION: $type#$command\r\nContent-Type: text/xml; charset=utf-8";
+    
+    return FB_CALLMONITOR_requestHTTPviaTR064($hash, $path, $soap_request, $header, 1,  $testPassword);
 }
 
 #####################################
@@ -1656,19 +1718,21 @@ sub FB_CALLMONITOR_identifyPhoneBooksViaTR064($;$)
     # request name and FritzBox phone id for each list item
     foreach (@phonebooks) 
     {
+        my $item_id = $_;
+        
         my $phb_id;
         
-        Log3 $name, 5, "FB_CALLMONITOR ($name) - requesting phonebook description for id $_";
+        Log3 $name, 5, "FB_CALLMONITOR ($name) - requesting phonebook description for id $item_id";
         
-        ($err, $data) = FB_CALLMONITOR_requestTR064($hash, "/upnp/control/x_contact", "GetPhonebook", "urn:dslforum-org:service:X_AVM-DE_OnTel:1", "<NewPhonebookID>$_</NewPhonebookID>", $testPassword);
+        ($err, $data) = FB_CALLMONITOR_requestTR064($hash, "/upnp/control/x_contact", "GetPhonebook", "urn:dslforum-org:service:X_AVM-DE_OnTel:1", "<NewPhonebookID>$item_id</NewPhonebookID>", $testPassword);
     
         if ($err)
         {
-            Log3 $name, 3, "FB_CALLMONITOR ($name) - error while requesting phonebook description for id $_: $err";
-            return "error while requesting phonebook description for id $_: $err";
+            Log3 $name, 3, "FB_CALLMONITOR ($name) - error while requesting phonebook description for id $item_id: $err";
+            return "error while requesting phonebook description for id $item_id: $err";
         }
 
-        Log3 $name, 5, "FB_CALLMONITOR ($name) - received response with phonebook description for id $_:\n$data";
+        Log3 $name, 5, "FB_CALLMONITOR ($name) - received response with phonebook description for id $item_id:\n$data";
 
         if($data =~ m,<NewPhonebookName>(.+?)</NewPhonebookName>.*?<NewPhonebookURL>.*?pbid=(\d+)\D*?</NewPhonebookURL>,si)
         {
@@ -1766,6 +1830,125 @@ sub FB_CALLMONITOR_readRemotePhonebookViaTR064($$;$)
 }
 
 #####################################
+# retrieves a session id to download files via TR-064 (phonebook contact images)
+sub FB_CALLMONITOR_getSIDviaTR064($) 
+{
+
+
+    my ($hash, $testPassword) = @_;
+    my $name = $hash->{NAME};
+
+    my ($err, $response) = FB_CALLMONITOR_requestTR064($hash, "/upnp/control/deviceconfig", "X_AVM-DE_CreateUrlSID", "urn:dslforum-org:service:DeviceConfig:1", undef, $testPassword);
+
+    if($err)
+    {
+        Log3 $name, 3, "FB_CALLMONITOR ($name) - error while requesting session id via TR064: $err";
+        return undef;
+    }
+
+    if($response =~ m,<NewX_AVM-DE_UrlSID>(.+?)</NewX_AVM-DE_UrlSID>,)
+    {
+        return $1;
+    }
+        
+    return undef;
+            
+}
+
+#####################################
+# downloads all available image URL's via TR-064
+sub FB_CALLMONITOR_downloadImageURLs($$)
+{
+    my ($hash, $testPassword) = @_;
+    my $name = $hash->{NAME};
+    
+    if($hash->{helper}{IMAGE_URLS} and AttrVal($name,"contactImageViaTR064", "1") eq "1")
+    {
+        my $sid = FB_CALLMONITOR_getSIDviaTR064($hash);
+        my $local_path = AttrVal($name,"contactImageDirectory", undef);
+        
+        return unless(defined($sid) and defined($local_path));
+            
+        if(! -d $local_path)
+        {
+            eval { use File::Path };
+            if($@)
+            {
+                Log3 $name, 3, "FB_CALLMONITOR ($name) - unable to load File::Path perl module to create contact images directory '$local_path'. Please create it by yourself";
+                return undef;
+            }
+            
+            eval {File::Path::make_path($local_path) };
+            if($@)
+            {
+                Log3 $name, 3, "FB_CALLMONITOR ($name) - unable to create contact images directory '$local_path': $@";
+                return undef;
+            }
+        }
+                
+        foreach my $url (keys %{$hash->{helper}{IMAGE_URLS}})
+        {  
+            my ($err, $file, $param) = FB_CALLMONITOR_requestHTTPviaTR064($hash, $url."&".$sid, undef, undef, 0,  $testPassword);
+            
+            if($err)
+            {
+                Log3 $name, 3, "FB_CALLMONITOR ($name) - error while requesting image URL $url via TR064: $err";
+                continue;
+            }
+
+            if($param->{httpheader} =~ /Content-Disposition: attachment; filename="[^"\s]+(\.\w+)"$/m)
+            {
+                my $suffix = $1;
+                
+                foreach my $number (@{$hash->{helper}{IMAGE_URLS}{$url}})
+                {
+            
+                    my $filename = $local_path."/".$number.$suffix;
+                    my $result = FileWrite({FileName => $local_path."/".$number.$suffix, ForceType=> "file", NoNL=> 1}, $file);
+                    
+                    if($result)
+                    {
+                        Log3 $name, 3, "FB_CALLMONITOR ($name) - error while writing image $filename: $result";
+                    }
+                }
+            }
+        }
+        
+        Log3 $name, 2, "FB_CALLMONITOR ($name) - downloaded ".(scalar keys %{$hash->{helper}{IMAGE_URLS}})." contact images from all phonebooks";
+    
+    }
+}
+
+#####################################
+# returns the filename of a corresponding contact image if exist.
+sub FB_CALLMONITOR_getContactImage($$)
+{
+
+    my ($hash, $number) = @_;
+    
+    my $name = $hash->{NAME};
+    
+    my $local_path = AttrVal($name,"contactImageDirectory", undef);
+    
+    return undef unless(defined($local_path));
+    
+    $local_path =~ s,/+$,,;
+    
+    opendir(DIR, $local_path) or return undef;
+
+    while (my $file = readdir(DIR)) {
+
+        next if($file =~ /^\./);
+        next if(-d "$local_path/$file");
+        next unless($file =~ /^$number\./);
+
+        return $file;
+    }
+    
+    return AttrVal($name,"contactDefaultImage", "none");
+}
+
+#####################################
 # identifys the phonebooks defined on the FritzBox via web interface (http)
 sub FB_CALLMONITOR_identifyPhoneBooksViaWeb($;$)
 {
@@ -1779,7 +1962,7 @@ sub FB_CALLMONITOR_identifyPhoneBooksViaWeb($;$)
 
     $hash->{helper}{READ_PWD} = 1;
     $fb_pw = FB_CALLMONITOR_readPassword($hash, $testPassword);
-    delete($hash->{helper}{READ_PWD}) if(exists($hash->{helper}{READ_PWD}));
+    delete($hash->{helper}{READ_PWD});
 
     return "no password available to access FritzBox. Please set your FRITZ!Box password via 'set ".$hash->{NAME}." password <your password>'" unless(defined($fb_pw));
 
@@ -1820,7 +2003,7 @@ sub FB_CALLMONITOR_identifyPhoneBooksViaWeb($;$)
         $data = $1;
     }
 
-    delete($hash->{helper}{PHONEBOOK_NAMES}) if(exists($hash->{helper}{PHONEBOOK_NAMES}));
+    delete($hash->{helper}{PHONEBOOK_NAMES});
     
     while($data =~ m,<label[^>]*for="uiBookid:(\d+)"[^>]*>\s*(.+?)\s*</label>,gcs)
     {
@@ -1830,7 +2013,7 @@ sub FB_CALLMONITOR_identifyPhoneBooksViaWeb($;$)
     
     Log3 $name, 3, "FB_CALLMONITOR ($name) - phonebooks found: ".join(", ", map { $hash->{helper}{PHONEBOOK_NAMES}{$_}." (id: $_)" } sort keys %{$hash->{helper}{PHONEBOOK_NAMES}}) if(exists($hash->{helper}{PHONEBOOK_NAMES}));
 
-    delete($hash->{helper}{PWD_NEEDED}) if(exists($hash->{helper}{PWD_NEEDED}));
+    delete($hash->{helper}{PWD_NEEDED});
 
     return undef;
 }
@@ -1852,7 +2035,7 @@ sub FB_CALLMONITOR_readRemotePhonebookViaWeb($$;$)
     $hash->{helper}{READ_PWD} = 1;
 
     $fb_pw = FB_CALLMONITOR_readPassword($hash, $testPassword);
-    delete($hash->{helper}{READ_PWD}) if(exists($hash->{helper}{READ_PWD}));
+    delete($hash->{helper}{READ_PWD});
     
     return "no password available to access FritzBox. Please set your FRITZ!Box password via 'set ".$hash->{NAME}." password <your password>'" unless(defined($fb_pw));
    
@@ -1908,7 +2091,7 @@ sub FB_CALLMONITOR_readRemotePhonebookViaWeb($$;$)
         return  "received http code ".$param->{code}." without any data";
     }
 
-    delete($hash->{helper}{PWD_NEEDED}) if(exists($hash->{helper}{PWD_NEEDED}));
+    delete($hash->{helper}{PWD_NEEDED});
 
     return (undef, $phonebook); 
 }
@@ -2271,10 +2454,25 @@ sub FB_CALLMONITOR_sendKeepAlive($)
     <li><a name="FB_CALLMONITOR_sendKeepAlives">sendKeepAlives</a> (none,5m,10m,15m,30m,1h)</li>
     If activated, FB_CALLMONITOR sends a keep-alive on a regularly basis depending on the configured value. This ensures a working connection when the connected FritzBox is operating behind another NAT-based router (e.g. another FritzBox) so the connection will not be detected as "dead" and therefore blocked.<br><br>
     Possible values: none,5m,10m,15m,30m,1h<br>
-    Default value: none (no keep-alives will be sent)<br>
+    Default value: none (no keep-alives will be sent)<br><br>
+    
+    <li><a name="FB_CALLMONITOR_contactImageDirectory">contactImageDirectory</a> &lt;directory&gt;</li>
+    If set, FB_CALLMONITOR generates the reading "contact_image" if a file with the external number as filename is found in this directory (e.g. "0123456567.jpg").
+    If no matching file exist in this directory or the external number is unknown, the reading "contact_image" is set to "none" (can be override by attribute <a href="#FB_CALLMONITOR_contactDefaultImage">contactDefaultImage</a>).
+    <br><br>
+    
+    <li><a name="FB_CALLMONITOR_contactDefaultImage">contactDefaultImage</a> &lt;filename&gt;</li>
+    If set, FB_CALLMONITOR uses the given filename instead of "none" in case no image exists in the configured contact image directory or the external number is unknown.
+    <br><br>
+    <li><a name="FB_CALLMONITOR_contactImageViaTR064">contactImageViaTR064</a> 0,1</li>
+    If this attribute is activated, FB_CALLMONITOR will download all available contact images from the FritzBox phonebook(s) via TR-064 (if attribute <a href="#FB_CALLMONITOR_fritzbox-remote-phonebook-via">fritzbox-remote-phonebook-via</a> is set to <code>tr064</code>) and will store them in the directory configured by attribute <a href="#FB_CALLMONITOR_contactImageDirectory">contactImageDirectory</a>.
+    The downloaded images will then be used as contact images for the reading "contact_image".
+    <br><br>
+    Possible values: 0 =&gt; off , 1 =&gt; on<br>
+    Default value is 1 (contact images will be downloaded via TR-064 from FritzBox)    
  </ul>
   <br>
- 
+  <br>
   <a name="FB_CALLMONITOR_events"></a>
   <b>Generated Events:</b><br><br>
   <ul>
@@ -2288,6 +2486,7 @@ sub FB_CALLMONITOR_sendKeepAlive($)
   <li><b>call_duration</b> - The call duration in seconds. Is only generated at a disconnect event. The value 0 means, the call was not taken by anybody.</li>
   <li><b>call_id</b> - The call identification number to separate events of two or more different calls at the same time. This id number is equal for all events relating to one specific call.</li>
   <li><b>missed_call</b> - This event will be raised in case of a incoming call, which is not answered. If available, also the name of the calling number will be displayed.</li>
+  <li><b>contact_image</b> - This event will be raised if attribute <a href="#FB_CALLMONITOR_contactImageDirectory">contactImageDirectory</a> is configured. It contains the filename of the corresponding contact image filename or "none" if no file exist or external number is unknown.</li>
   </ul>
 </ul>
 
@@ -2439,10 +2638,26 @@ sub FB_CALLMONITOR_sendKeepAlive($)
     <li><a name="FB_CALLMONITOR_sendKeepAlives">sendKeepAlives</a> (none,5m,10m,15m,30m,1h)</li>
     Wenn dieses Attribut gesetzt ist, wird ein zyklisches Keep-Alive im konfigurierten Zeitabstand an die FritzBox gesendet um die Verbindung aktiv zu halten. Dadurch bleibt die Verbindung bestehen, insbesondere wenn die verbundene FritzBox sich hinter einem weiteren NAT-Router befindet (z.B. einer weiteren FritzBox). Dadurch wird die Verbindung in so einem Fall nicht f&auml;lschlicherweise als "tot" erkannt und geblockt.<br><br>
     M&ouml;gliche Werte: none,5m,10m,15m,30m,1h<br>
-    Standardwert ist "none" (es werden keine Keep-Alives gesendet)<br>
+    Standardwert ist "none" (es werden keine Keep-Alives gesendet)<br><br>
+    
+    <li><a name="FB_CALLMONITOR_contactImageDirectory">contactImageDirectory</a> &lt;Verzeichnis&gt;</li>
+    Sofern gesetzt, generiert FB_CALLMONITOR das Reading "contact_image" sofern eine Datei mit der externen Rufnummer als Dateinamen (z.B. "012323456.jpg") in diesem Verzeichnis existiert.
+    Wenn keine passende Datei in dem Verzeichnis existiert oder die externe Rufnummer unterdr&uuml;ckt ist, wird das Reading "contact_image" auf den Wert "none" gesetzt (kann mit dem Attribut <a href="#FB_CALLMONITOR_contactDefaultImage">contactDefaultImage</a> ge&auml;ndert werden)
+    <br><br>
+    
+    <li><a name="FB_CALLMONITOR_contactDefaultImage">contactDefaultImage</a> &lt;Dateiname&gt;</li>
+    Sofern gesetzt, verwendet FB_CALLMONITOR den gesetzten Dateinamen anstelle von "none", sollte keine passende Datei zu einer Rufnummer existieren oder die Rufnummer unterdr&uuml;ckt sein.
+    <br><br>
+    
+    <li><a name="FB_CALLMONITOR_contactImageViaTR064">contactImageViaTR064</a> 0,1</li>
+    Wenn dieses Attribut aktiviert ist, l&auml;dt FB_CALLMONITOR alle verf&uuml;gbaren Kontaktbilder aus dem FritzBox Telefonb&uuml;chern via TR-064 (if attribute <a href="#FB_CALLMONITOR_fritzbox-remote-phonebook-via">fritzbox-remote-phonebook-via</a> is set to <code>tr064</code>) und speichert diese in dem Verzeichnis <a href="#FB_CALLMONITOR_contactImageDirectory">contactImageDirectory</a>.
+    Die heruntergeladenen Kontaktbilder werden dann automatisch f&uuml;r das Reading "contact_image" verwendet.
+    <br><br>
+    M&ouml;gliche Werte: 0 =&gt; deaktiviert , 1 =&gt; aktiviert<br>
+    Standardwert ist 1 (aktiviert)<br><br> 
     </ul>
   <br>
- 
+  <br>
   <a name="FB_CALLMONITOR_events"></a>
   <b>Generierte Events:</b><br><br>
   <ul>
@@ -2456,7 +2671,9 @@ sub FB_CALLMONITOR_sendKeepAlive($)
   <li><b>call_duration</b> - Die Gespr&auml;chsdauer in Sekunden. Dieser Wert wird nur bei einem disconnect-Event erzeugt. Ist der Wert 0, so wurde das Gespr&auml;ch von niemandem angenommen.</li>
   <li><b>call_id</b> - Die Identifizierungsnummer eines einzelnen Gespr&auml;chs. Dient der Zuordnung bei zwei oder mehr parallelen Gespr&auml;chen, damit alle Events eindeutig einem Gespr&auml;ch zugeordnet werden k&ouml;nnen</li>
   <li><b>missed_call</b> - Dieses Event wird nur generiert, wenn ein eingehender Anruf nicht beantwortet wird. Sofern der Name dazu bekannt ist, wird dieser ebenfalls mit angezeigt.</li>
-  </ul>
+  <li><b>contact_image</b> - Dieses Event wird nur generiert, wenn das Attribut <a href="#FB_CALLMONITOR_contactImageDirectory">contactImageDirectory</a> gesetzt ist. Es enth&auml;lt das zugeh&ouml;rige Kontaktfoto als Dateiname oder "none", falls kein entsprechendes Kontaktfoto existiert, oder die Rufnummer unterdr&uuml;ckt ist.</li>
+ 
+ </ul>
 </ul>
 
 
