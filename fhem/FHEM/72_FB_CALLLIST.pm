@@ -821,7 +821,7 @@ sub FB_CALLLIST_index2line($$)
                         internal => ((exists($hash->{helper}{INTERNAL_FILTER}) and exists($hash->{helper}{INTERNAL_FILTER}{$data->{internal_number}})) ? $hash->{helper}{INTERNAL_FILTER}{$data->{internal_number}} : $data->{internal_number} ),
                         connection => ($data->{internal_connection} ? ((exists($hash->{helper}{CONNECTION_MAP}) and exists($hash->{helper}{CONNECTION_MAP}{$data->{internal_connection}})) ? $hash->{helper}{CONNECTION_MAP}{$data->{internal_connection}} : $data->{internal_connection} ) : "-"),
                         duration => FB_CALLLIST_formatDuration($hash, $index),
-                        image => (FB_CALLLIST_getImagePathForNumber($hash, $data->{external_number}) or "-")
+                        image => FB_CALLLIST_getImagePathForNumber($hash, $data->{external_number})
                    };
 
         setlocale(LC_ALL, $old_locale);
