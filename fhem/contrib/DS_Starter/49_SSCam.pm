@@ -47,7 +47,7 @@ use Encode;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
-  "8.4.1"  => "07.01.2019  Transaction of snap and getsnapinfo implemented ",
+  "8.4.1"  => "07.01.2019  Transaction of snap and getsnapinfo implemented, debugactive token verbose level changed ",
   "8.4.0"  => "07.01.2019  command snap extended to \"snap [number] [lag] [snapEmailTxt:\"subject => <Betreff-Text>, body => ".
               "<Mitteilung-Text>\"]\", SID-hash is deleted if attr \"session\" is set ",
   "8.3.2"  => "03.01.2019  fix Process died prematurely if Can't locate object method \"get_sslversion\" via package \"Net::SMTP::SSL\" ",
