@@ -1852,7 +1852,6 @@ sub FB_CALLMONITOR_getSIDviaTR064($)
     }
         
     return undef;
-            
 }
 
 #####################################
@@ -1887,13 +1886,13 @@ sub FB_CALLMONITOR_downloadImageURLs($$)
         }
                 
         foreach my $url (keys %{$hash->{helper}{IMAGE_URLS}})
-        {  
+        {
             my ($err, $file, $param) = FB_CALLMONITOR_requestHTTPviaTR064($hash, $url."&".$sid, undef, undef, 0,  $testPassword);
             
             if($err)
             {
                 Log3 $name, 3, "FB_CALLMONITOR ($name) - error while requesting image URL $url via TR064: $err";
-                continue;
+                next;
             }
 
             if($param->{httpheader} =~ /Content-Disposition: attachment; filename="[^"\s]+(\.\w+)"$/m)
