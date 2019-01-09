@@ -9644,9 +9644,11 @@ sub EnOcean_Parse($$)
         $hash->{helper}{lastEvent} = $data;
       }
       CommandDeleteReading(undef, "$name alarm");
-      RemoveInternalTimer($hash->{helper}{timer}{alarm}) if(exists $hash->{helper}{timer}{alarm});
-      @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
-      InternalTimer(gettimeofday() + 66, 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
+      if (AttrVal($name, "signOfLife", 'on') eq 'on') {
+        RemoveInternalTimer($hash->{helper}{timer}{alarm}) if(exists $hash->{helper}{timer}{alarm});
+        @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
+        InternalTimer(gettimeofday() + AttrVal($name, "signOfLifeInterval", 66), 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
+      }
 
     } elsif ($st eq "windowContact") {
       # window contact (EEP A5-14-09, A5-14-0A)
@@ -9662,9 +9664,11 @@ sub EnOcean_Parse($$)
         $hash->{helper}{lastEvent} = $data;
       }
       CommandDeleteReading(undef, "$name alarm");
-      RemoveInternalTimer($hash->{helper}{timer}{alarm})  if(exists $hash->{helper}{timer}{alarm});
-      @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
-      InternalTimer(gettimeofday() + 66, 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
+      if (AttrVal($name, "signOfLife", 'on') eq 'on') {
+        RemoveInternalTimer($hash->{helper}{timer}{alarm})  if(exists $hash->{helper}{timer}{alarm});
+        @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
+        InternalTimer(gettimeofday() + AttrVal($name, "signOfLifeInterval", 990), 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
+      }
 
     } elsif ($st =~ m/^digitalInput\.0[12]$/) {
       # Digital Input (EEP A5-30-01, A5-30-02)
@@ -20076,7 +20080,10 @@ EnOcean_Delete($$)
        <li>state: C: open|closed B: unlocked|locked V: on|off U: U/V</li>
      </ul><br>
         The attr subType must be doorContact. This is done if the device was
-        created by autocreate.
+        created by autocreate.<br>
+        A monitoring period can be set for signOfLife telegrams of the sensor, see
+        <a href="#EnOcean_signOfLife">signOfLife</a> and <a href="#EnOcean_signOfLifeInterval">signOfLifeInterval</a>.
+        Default is "on" and an interval of 66 sec.
      </li>
      <br><br>
 
@@ -20091,7 +20098,10 @@ EnOcean_Delete($$)
        <li>state: W: open|tilt|closed V: on|off U: U/V</li>
      </ul><br>
         The attr subType must be windowContact. This is done if the device was
-        created by autocreate.
+        created by autocreate.<br>
+        A monitoring period can be set for signOfLife telegrams of the sensor, see
+        <a href="#EnOcean_signOfLife">signOfLife</a> and <a href="#EnOcean_signOfLifeInterval">signOfLifeInterval</a>.
+        Default is "on" and an interval of 990 sec.
      </li>
      <br><br>
 
