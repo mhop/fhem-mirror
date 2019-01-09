@@ -324,7 +324,7 @@ sub freezemon_ProcessTimer($) {
         }
 
         # prioQueues are not unique, so we are using the old way...
-        if ( $hash->{helper}{apptime} && $hash->{helper}{apptime} ne "" ) {
+        if ( exists ($hash->{helper}{apptime}) && $hash->{helper}{apptime} ne "" ) {
             my @olddev = split( " ", $hash->{helper}{apptime} );
             my @newdev = split( " ", freezemon_apptime($hash) );
 
@@ -590,7 +590,7 @@ sub freezemon_Get($@) {
     my $state = $hash->{STATE};
     my $ret   = "";
     my $usage = 'Unknown argument $a[1], choose one of freeze:noArg log:';
-
+		
     return "\"get $name\" needs at least one argument" unless ( defined( $a[1] ) );
 	Log3 $name,5, "$name GET Coming with command $a[1]";
     #get the logfiles
@@ -710,6 +710,9 @@ sub freezemon_Attr($) {
             if ( $aVal ne 0 ) {
                 freezemon_install_callFn_wrapper($hash);
 				$fmFnLog = $aVal;
+				$fmName = $name;
+				$fmFnLog = AttrVal( $name, "fm_CatchFnCalls", 0 );
+
             }
             elsif ( defined ($hash->{helper}{mycallFn} ) ) {
                 Log3( "", 0, "[Freezemon] $name: Unwrapping CallFn" );
@@ -726,7 +729,9 @@ sub freezemon_Attr($) {
             if ( $aVal ne 0 ) {
                 freezemon_install_analyzeCommand_wrapper($hash);
 				$fmCmdLog = $aVal;
-            }
+				$fmName = $name;
+				$fmCmdLog = AttrVal( $name, "fm_CatchCmds",    0 );
+	        }
             elsif ( defined ( $hash->{helper}{analyzeCommand} ) ) {
                 Log3( "", 0, "[Freezemon] $name: Unwrapping analyzeCommand" );
                 {
