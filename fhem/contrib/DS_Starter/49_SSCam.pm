@@ -47,7 +47,7 @@ use Encode;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
-  "8.4.1"  => "07.01.2019  Transaction of snap and getsnapinfo implemented, debugactive token verbose level changed ",
+  "8.4.1"  => "09.01.2019  Transaction of snap and getsnapinfo implemented, debugactive token verbose level changed ",
   "8.4.0"  => "07.01.2019  command snap extended to \"snap [number] [lag] [snapEmailTxt:\"subject => <Betreff-Text>, body => ".
               "<Mitteilung-Text>\"]\", SID-hash is deleted if attr \"session\" is set ",
   "8.3.2"  => "03.01.2019  fix Process died prematurely if Can't locate object method \"get_sslversion\" via package \"Net::SMTP::SSL\" ",
@@ -4932,16 +4932,14 @@ sub SSCam_camop_parse ($) {
                 my $emtxt = $hash->{HELPER}{SMTPMSG}?$hash->{HELPER}{SMTPMSG}:"";  # alternativer Text für Email-Versand
                 if($ncount > 0) {
                     InternalTimer(gettimeofday()+$lag, "SSCam_camsnap", "$name:$num:$lag:$ncount:$emtxt:$tac", 0);
-                    # Token freigeben für nächstes Kommando
-                    # SSCam_delActiveToken($hash);
                     return;
                 }
   
-                # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps
+                # Anzahl und Size für Schnappschußabruf bestimmen
                 my ($slim,$ssize) = SSCam_snaplimsize($hash);
 
-                if(!$hash->{HELPER}{CANSENDSNAP}) {                  
-                    # Token freigeben vor nächstem Kommando
+                if(!$hash->{HELPER}{TRANSACTION}) {                  
+                    # Token freigeben vor nächstem Kommando wenn keine Transaktion läuft
                     SSCam_delActiveToken($hash);                        
                 }
                 
@@ -5068,7 +5066,8 @@ sub SSCam_camop_parse ($) {
 						}
 				    } 
                 }
-                SSCam_closeTrans($hash);                                         # Transaktion beenden
+                
+                SSCam_closeTrans($hash);                                        # Transaktion beenden
 				delete($hash->{HELPER}{GETSNAPGALLERY});                        # Steuerbit getsnapgallery statt getsnapinfo				
 
 				#####  Fall abhängige Eventgenerierung  #####
@@ -7220,6 +7219,8 @@ sub SSCam_prepareSendEmail ($$;$) {
        $smtpsslport = AttrVal($name,"smtpSSLPort",0);
    }
    
+   my $tac = $hash->{HELPER}{TRANSACTION};               # Code der laufenden Transaktion
+   
    if($OpMode =~ /^getsnap/) {
        $fname     = ReadingsVal($name,"LastSnapFilename","");
        $snapid    = ReadingsVal($name,"LastSnapId","");
@@ -7238,7 +7239,8 @@ sub SSCam_prepareSendEmail ($$;$) {
                                   'opmode'       => $OpMode,
                                   'smtpnousessl' => $nousessl,
                                   'sslfrominit'  => $sslfrominit,
-                                  'smtpsslport'  => $smtpsslport,                                  
+                                  'smtpsslport'  => $smtpsslport, 
+                                  'tac'          => $tac,                                  
                                  }
                          );
    }
@@ -7323,6 +7325,7 @@ sub SSCam_sendEmail ($$) {
        'opmode'       => {                       'default'=>'',                          'required'=>1, 'set'=>1},  # OpMode muss gesetzt sein
        'sslfb'        => {                       'default'=>$sslfb,                      'required'=>0, 'set'=>1},  # Flag für Verwendung altes Net::SMTP::SSL   
        'sslfrominit'  => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # SSL soll sofort ! aufgebaut werden  
+       'tac'          => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # übermittelter Transaktionscode der ausgewerteten Transaktion
        );   
    
    my %params = (); 
@@ -7377,13 +7380,14 @@ sub SSCam_sendEmailblocking($) {
   my $to           = $paref->{smtpTo};
   my $msgtext      = $paref->{msgtext}; 
   my $smtpdebug    = $paref->{smtpdebug}; 
-  my $sdat         = $paref->{sdat};                     # Image Daten als Hash base64 codiert 
+  my $sdat         = $paref->{sdat};                     # Image Daten als Hash base64 codiert
   my $image        = $paref->{image};                    # Image, wenn gesetzt muss 'part2' auf 'image/jpeg' gesetzt sein
   my $fname        = $paref->{fname};                    # Filename von "image"
   my $lsnaptime    = $paref->{lsnaptime};                # Zeit des letzten Schnappschusses wenn gesetzt
   my $opmode       = $paref->{opmode};                   # aktueller Operation Mode
   my $sslfb        = $paref->{sslfb};                    # Flag für Verwendung altes Net::SMTP::SSL
   my $sslfrominit  = $paref->{sslfrominit};              # SSL soll sofort ! aufgebaut werden
+  my $tac          = $paref->{tac};                      # übermittelter Transaktionscode der ausgewerteten Transaktion
   
   my $hash   = $defs{$name};
   my $sslver = "";
@@ -7567,7 +7571,7 @@ sub SSCam_sendEmailblocking($) {
       return "$name|$err|''";  
   }   
   
-  my $ret = "Email successfully sent ".( $sslver?"encoded by $sslver":""  ); 
+  my $ret = "Email transaction \"$tac\" successfully sent ".( $sslver?"encoded by $sslver":""  ); 
   Log3($name, 3, "$name - $ret To: $to".(($cc)?", CC: $cc":"") );
   
   if($sdat) {
