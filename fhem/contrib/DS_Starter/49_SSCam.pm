@@ -47,6 +47,7 @@ use Encode;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.4.1"  => "10.01.2019  snapEmailTxt can use placeholders \$DATE, \$TIME ",
   "8.4.1"  => "09.01.2019  Transaction of snap and getsnapinfo implemented, debugactive token verbose level changed ",
   "8.4.0"  => "07.01.2019  command snap extended to \"snap [number] [lag] [snapEmailTxt:\"subject => <Betreff-Text>, body => ".
               "<Mitteilung-Text>\"]\", SID-hash is deleted if attr \"session\" is set ",
@@ -7190,7 +7191,10 @@ sub SSCam_prepareSendEmail ($$;$) {
    my $snapnum = 1;
      
    my $sp       = AttrVal($name, "smtpPort", 25); 
-   my $nousessl = AttrVal($name, "smtpNoUseSSL", 0);   
+   my $nousessl = AttrVal($name, "smtpNoUseSSL", 0); 
+   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime;
+   my $date = sprintf "%02d.%02d.%04d" , $mday , $mon+=1 ,$year+=1900; 
+   my $time = sprintf "%02d:%02d:%02d" , $hour , $min , $sec;   
      
    # Extraktion EMail-Texte
    # Attribut snapEmailTxt kann übersteuert werden mit: $hash->{HELPER}{SMTPMSG}
@@ -7199,15 +7203,19 @@ sub SSCam_prepareSendEmail ($$;$) {
    my $mt  = $mth?$mth:AttrVal($name, "snapEmailTxt", "");
    $mt     =~ s/['"]//g;   
    
-   my($subj,$body)   = split(",", $mt);
+   my($subj,$body)   = split(",", $mt, 2);
    my($subjk,$subjt) = split("=>", $subj);
    my($bodyk,$bodyt) = split("=>", $body);
    $subjk = SSCam_trim($subjk);
    $subjt = SSCam_trim($subjt);
    $subjt =~ s/\$NAME/$calias/g;
+   $subjt =~ s/\$DATE/$date/g;
+   $subjt =~ s/\$TIME/$time/g;
    $bodyk = SSCam_trim($bodyk);
    $bodyt = SSCam_trim($bodyt);
    $bodyt =~ s/\$NAME/$calias/g;
+   $bodyt =~ s/\$DATE/$date/g;
+   $bodyt =~ s/\$TIME/$time/g;
    my %smtpmsg = ();
    $smtpmsg{$subjk} = "$subjt";
    $smtpmsg{$bodyk} = "$bodyt";
@@ -8499,6 +8507,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   above. <br><br>
   
   <b>Email shipping preparation</b> <br><br>
+  
   The snapshots can be sent by <b>Email</b> alltogether after creation. For this purpose the module contains its own Email client. 
   Before you can use this function you have to install the Perl-module <b>MIME::Lite</b>. On debian systems it can be 
   installed with command: <br><br>
@@ -8520,9 +8529,9 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     <colgroup> <col width=12%> <col width=88%> </colgroup>
       <tr><td style="vertical-align:top"> <b>snapEmailTxt</b> <td>- Activates the Email shipping. Has the form: <br>
                                                                   <code>subject => &lt;subject text&gt;, body => &lt;message text&gt; </code><br> 
-                                                                  The placeholder variable $NAME can be used. $NAME is 
+                                                                  The placeholder variables $NAME, $DATE and $TIME can be used. $NAME is 
                                                                   replaced by the device alias or the name of camera in SVS if alias is not 
-                                                                  defined. </td></tr>
+                                                                  defined. $DATE and $TIME are replaced with the current date and time. </td></tr>
       <tr><td>                            <b>smtpHost</b>     </td><td>- Hostname of outgoing Email server (e.g. securesmtp.t-online.de) </td></tr>
       <tr><td>                            <b>smtpFrom</b>     </td><td>- Return address (&lt;name&gt@&lt;domain&gt) </td></tr>
       <tr><td>                            <b>smtpTo</b>       </td><td>- Receiving address(es) (&lt;name&gt@&lt;domain&gt) </td></tr>
@@ -9071,8 +9080,9 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <a name="snapEmailTxt"></a>
   <li><b>snapEmailTxt subject => &lt;subject text&gt;, body => &lt;message text&gt; </b><br>
     Activates the Email shipping of snapshots after its creation. <br>
-    The attribute has to be definied in the form as described. You can use the placeholder variable $NAME. 
-    The variable $NAME is replaced by the device alias or the name of the camera in SVS if the device alias isn't available. 
+    The attribute has to be definied in the form as described. You can use the placeholder variables $NAME, $DATE and $TIME. 
+    The variable $NAME is replaced by the device alias or the name of the camera in SVS if the device alias isn't available.
+    $DATE and $TIME are replaced with the current date and time.    
     <br><br>
     
        <ul>
@@ -10068,9 +10078,10 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     <colgroup> <col width=12%> <col width=88%> </colgroup>
       <tr><td style="vertical-align:top"> <b>snapEmailTxt</b> <td>- Aktiviert den Email-Versand. Die Eingabe hat die Form: <br>
                                                                   <code>subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;</code><br>
-                                                                  Es kann der Platzhalter $NAME verwendet werden. $NAME wird 
+                                                                  Es können die Platzhalter $NAME, $DATE und $TIME verwendet werden. $NAME wird 
                                                                   durch den Device-Alias bzw. den Namen der Kamera in der SVS
-                                                                  ersetzt falls der Device-Alias nicht gesetzt ist. </td></tr>
+                                                                  ersetzt falls der Device-Alias nicht gesetzt ist. 
+                                                                  $DATE und $TIME werden durch das aktuelle Datum und Zeit ersetzt.</td></tr>
       <tr><td>                            <b>smtpHost</b>     </td><td>- Hostname oder IP-Adresse des Postausgangsservers (z.B. securesmtp.t-online.de) </td></tr>
       <tr><td>                            <b>smtpFrom</b>     </td><td>- Absenderadresse (&lt;name&gt@&lt;domain&gt) </td></tr>
       <tr><td>                            <b>smtpTo</b>       </td><td>- Empfängeradresse(n) (&lt;name&gt@&lt;domain&gt) </td></tr>
@@ -10642,9 +10653,9 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <a name="snapEmailTxt"></a>
   <li><b>snapEmailTxt subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt; </b><br>
     Aktiviert den Emailversand von Schnappschüssen nach deren Erstellung. <br>
-    Das Attribut muß in der angegebenen Form definiert werden. Es kann der Platzhalter $NAME verwendet werden. 
+    Das Attribut muß in der angegebenen Form definiert werden. Es können die Platzhalter $NAME, $DATE und $TIME verwendet werden. 
     $NAME wird durch den Device-Alias bzw. den Namen der Kamera in der SVS ersetzt falls der Device-Alias nicht vorhanden 
-    ist. <br><br>
+    ist. $DATE und $TIME werden durch das aktuelle Datum und Zeit ersetzt. <br><br>
     
        <ul>
 		<b>Beispiel:</b><br>
