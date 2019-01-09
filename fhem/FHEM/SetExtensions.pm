@@ -68,10 +68,11 @@ SetExtensions($$@)
            ($list =~ m/(^| )$uCmd\b/ ? $uCmd : ""));
   }
 
+  # Must work with EnOceans "attr x eventMap BI:off B0:on"
   sub
   getReplCmd($$)
   {
-    my ($name, $cmd);
+    my ($name, $cmd) = @_;
     my (undef,$value) = ReplaceEventMap($name, [$name, $cmd], 0);
     return $cmd if($value ne $cmd);
 
@@ -85,14 +86,18 @@ SetExtensions($$@)
   my $offCmd = getCmd($list, "off");
 
   my $eventMap = AttrVal($name, "eventMap", undef);
+  my $fixedIt;
   if((!$onCmd || !$offCmd) && $eventMap) {
     $onCmd  = getReplCmd($name, "on")  if(!$onCmd);
     $offCmd = getReplCmd($name, "off") if(!$offCmd && $onCmd);
+    $fixedIt = 1;
   }
 
   if(!$onCmd || !$offCmd) { # No extension
     return AttrTemplate_Set($hash, $list, $name, $cmd, @a);
   }
+
+  $cmd = ReplaceEventMap($name, $cmd, 1) if($fixedIt);
 
   if(!defined($se_list{$cmd})) {
     # Add only "new" commands
