@@ -328,6 +328,22 @@ set DEVICE attrTemplate A_10_shelly1
 attr DEVICE getList power:noArg shellies/DEVNAME/relay/power power
 attr DEVICE model A_10a_shellyplug
 
+# shelly2 using original firmware in roller mode.
+name:A_11b_shelly2_roller
+filter:TYPE=MQTT2_DEVICE
+desc:shelly2 using original firmware. <br>NOTE: shelly2 roller operated, change settings first!
+par:DEVNAME;Shelly2 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
+attr DEVICE comment shelly2 roller operated
+attr DEVICE setList \
+  open:noArg shellies/DEVNAME/roller/0/command open\
+  close:noArg shellies/DEVNAME/roller/0/command close\
+  stop:noArg shellies/DEVNAME/roller/0/command stop\
+  pos:slider,0,1,100 shellies/DEVNAME/roller/0/command/pos $EVTPART1
+attr DEVICE readingList shellies/DEVNAME/roller/0/pos:.* state\
+  shellies/DEVNAME/status/0/rollers:.* power
+attr DEVICE devStateIcon 0:fts_shutter_100 100:fts_shutter_10 9\d.*:fts_shutter_10 8\d.*:fts_shutter_20 7\d.*:fts_shutter_30 6\d.*:fts_shutter_40 5\d.*:fts_shutter_50 4\d.*:fts_shutter_60 3\d.*:fts_shutter_70 2\d.*:fts_shutter_80 1\d.*:fts_shutter_90 0\d.*:fts_shutter_100
+attr DEVICE model A_11b_shelly2_roller
+
 # shelly2 using original firmware.
 # NOTE: a second device will be created for the second channel
 name:A_11a_shelly2_split
