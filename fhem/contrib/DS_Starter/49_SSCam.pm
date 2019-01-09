@@ -47,7 +47,7 @@ use Encode;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
-  "8.4.1"  => "10.01.2019  snapEmailTxt can use placeholders \$DATE, \$TIME ",
+  "8.4.2"  => "10.01.2019  snapEmailTxt can use placeholders \$DATE, \$TIME ",
   "8.4.1"  => "09.01.2019  Transaction of snap and getsnapinfo implemented, debugactive token verbose level changed ",
   "8.4.0"  => "07.01.2019  command snap extended to \"snap [number] [lag] [snapEmailTxt:\"subject => <Betreff-Text>, body => ".
               "<Mitteilung-Text>\"]\", SID-hash is deleted if attr \"session\" is set ",
