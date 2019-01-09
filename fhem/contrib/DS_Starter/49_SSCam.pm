@@ -4910,11 +4910,7 @@ sub SSCam_camop_parse ($) {
 
                 my $tac = "";
                 if($hash->{HELPER}{CANSENDSNAP}) { 
-                    if(!$hash->{HELPER}{TRANSACTION}) {                
-                        $tac = SSCam_startTrans($hash);                            # Transaktion starten
-                    } else {
-                        $tac = $hash->{HELPER}{TRANSACTION};
-                    }
+                    $tac = SSCam_openOrgetTrans($hash);                           # Transaktion starten oder vorhandenen Code holen
                 }
                 
                 $snapid = $data->{data}{'id'};
@@ -5072,7 +5068,7 @@ sub SSCam_camop_parse ($) {
 						}
 				    } 
                 }
-                SSCam_stopTrans($hash);                                         # Transaktion beenden
+                SSCam_closeTrans($hash);                                         # Transaktion beenden
 				delete($hash->{HELPER}{GETSNAPGALLERY});                        # Steuerbit getsnapgallery statt getsnapinfo				
 
 				#####  Fall abhängige Eventgenerierung  #####
@@ -7666,17 +7662,22 @@ return;
 }  
 
 #############################################################################################
-#                                  Transaktion starten
+#              Transaktion starten oder vorhandenen TA Code zurück liefern
 #############################################################################################
-sub SSCam_startTrans ($) { 
+sub SSCam_openOrgetTrans ($) { 
    my ($hash) = @_;
    my $name = $hash->{NAME};
-               
-   my $tac = int(rand(4500));                   # Transaktionscode erzeugen und speichern
-   $hash->{HELPER}{TRANSACTION} = $tac;
-   if (AttrVal($name,"debugactivetoken",0)) {
-       Log3($name, 1, "$name - Transaction started, TA-code: $tac");
-   } 
+   my $tac  = ""; 
+   
+   if(!$hash->{HELPER}{TRANSACTION}) {                
+       $tac = int(rand(4500));                      # Transaktionscode erzeugen und speichern
+       $hash->{HELPER}{TRANSACTION} = $tac;
+       if (AttrVal($name,"debugactivetoken",0)) {
+           Log3($name, 1, "$name - Transaction opened, TA-code: $tac");
+       } 
+   } else {
+       $tac = $hash->{HELPER}{TRANSACTION};         # vorhandenen Transaktionscode zurück liefern
+   }
    
 return $tac;
 }
@@ -7684,14 +7685,14 @@ return $tac;
 #############################################################################################
 #                                 Transaktion freigeben
 #############################################################################################
-sub SSCam_stopTrans ($) { 
+sub SSCam_closeTrans ($) { 
    my ($hash) = @_;
    my $name = $hash->{NAME};
    
    return if(!defined $hash->{HELPER}{TRANSACTION});   
    my $tac = delete $hash->{HELPER}{TRANSACTION};   # Transaktion beenden
    if (AttrVal($name,"debugactivetoken",0)) {
-       Log3($name, 1, "$name - Transaction \"$tac\" stopped");
+       Log3($name, 1, "$name - Transaction \"$tac\" closed");
    }  
    
 return;
