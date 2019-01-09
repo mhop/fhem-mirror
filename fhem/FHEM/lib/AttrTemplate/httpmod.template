@@ -1,4 +1,4 @@
-#$id$
+#$id:$
 
 #################################
 #Clever Tanken
@@ -71,6 +71,19 @@ attr DEVICE stateFormat weather bei temperature°C
 attr DEVICE model A_02m_ORF_weather
 
 
+#Geschwindigkeitsüberwachung, Forum: https://forum.fhem.de/index.php/topic,90014.msg824805.html#msg824805
+name:A_03a_blitzer
+filter:TYPE=HTTPMOD
+desc: Get austrian weather.<br>Define a HTTPMOD device like <br>defmod DEVICE HTTPMOD https://cdn2.atudo.net/api/1.0/vl.php?type=0,1,2,3,4,5,6&box=52.xxxxxx,8.xxxxxx,53.xxxxxx,9.xxxxxx 0 <br>Change city to your needs <br><a href="https://forum.fhem.de/index.php/topic,90014.msg824805.html#msg824805">Source: Forum</a>
+attr DEVICE userattr getData getHeader1 getHeader2 getURL reading01DeleteIfUnmatched reading01JSON reading01Name reading01Regex reading02Name reading02RegOpt reading02Regex reading03JSON reading03Name readingEncode requestHeader1 requestHeader2 setParseResponse:0,1
+attr DEVICE enableControlSet 1
+attr DEVICE extractAllJSON 1
+attr DEVICE getHeader1 Content-Type: application/json
+attr DEVICE getHeader2 Accept: */*
+attr DEVICE readingEncode utf8
+attr DEVICE model A_03a_blitzer
+
+
 #homebridge-videodoorbell, Forum: https://forum.fhem.de/index.php/topic,94291.msg870289.html#msg870289
 name:A_02c_homebridge_videodoorbell
 filter:TYPE=HTTPMOD
@@ -90,6 +103,106 @@ attr DEVICE set01Header04 Accept: */*
 attr DEVICE set01Header06 Content-Type: application/x-www-form-urlencoded
 attr DEVICE set01NoArg 1
 attr DEVICE model A_02c_homebridge_videodoorbell
+
+#################################
+#HP Printers
+#
+# Forum: https://forum.fhem.de/index.php/topic,90601.msg874683.html#msg874683
+#
+# Printer config
+name:B_01a_hp_printer_config
+filter:TYPE=HTTPMOD
+desc: Get configuration of your hp printer.<br>Define a HTTPMOD device like <br>defmod DEVICE HTTPMOD http://192.168.5.43/DevMgmt/ProductConfigDyn.xml 3600 <br>Change IP to your needs <br><a href="https://forum.fhem.de/index.php/topic,90601.msg874683.html#msg874683">Source: Forum</a>
+attr DEVICE userattr reading01Name reading01XPath-Strict reading02Name reading02XPath-Strict reading03Name reading03XPath-Strict reading04Name reading04XPath-Strict reading05Name reading05XPath-Strict
+attr DEVICE httpVersion 1.1
+attr DEVICE reading01Name Model
+attr DEVICE reading01XPath-Strict //dd:MakeAndModel/text()
+attr DEVICE reading02Name Serial_Number
+attr DEVICE reading02XPath-Strict //dd:SerialNumber/text()
+attr DEVICE reading03Name Firmware_Date
+attr DEVICE reading03XPath-Strict //dd:Date/text()
+attr DEVICE reading04Name Total_Memory
+attr DEVICE reading04XPath-Strict //dd:TotalMemory/text()
+attr DEVICE reading05Name Available_Memory
+attr DEVICE reading05XPath-Strict //dd:AvailableMemory/text()
+attr DEVICE stateFormat Modell: Model SN: Serial_Number
+attr DEVICE userReadings Memory_Usage {100-(ReadingsNum("DEVICE","Available_Memory","")/2.56)}
+attr DEVICE model B_01a_hp_printer_config
+
+# Printer cartridge states
+name:B_01a_hp_printer_cartridge_status
+filter:TYPE=HTTPMOD
+desc: Get cartridge states of your hp printer.<br>Define a HTTPMOD device like <br>defmod DEVICE HTTPMOD http://192.168.5.43/DevMgmt/ProductConfigDyn.xml 3600 <br>Change IP to your needs <br><a href="https://forum.fhem.de/index.php/topic,90601.msg874683.html#msg874683">Source: Forum</a>
+attr DEVICE userattr reading01Name reading01XPath-Strict reading02Name reading02XPath-Strict reading03Name reading03XPath-Strict reading04Name reading04XPath-Strict
+attr DEVICE httpVersion 1.1
+attr DEVICE reading01Name Cyan
+attr DEVICE reading01XPath-Strict //ccdyn:ConsumableInfo[2]/dd:ConsumablePercentageLevelRemaining/text()
+attr DEVICE reading02Name Magenta
+attr DEVICE reading02XPath-Strict //ccdyn:ConsumableInfo[3]/dd:ConsumablePercentageLevelRemaining/text()
+attr DEVICE reading03Name Yellow
+attr DEVICE reading03XPath-Strict //ccdyn:ConsumableInfo[4]/dd:ConsumablePercentageLevelRemaining/text()
+attr DEVICE reading04Name Black
+attr DEVICE reading04XPath-Strict //ccdyn:ConsumableInfo[1]/dd:ConsumablePercentageLevelRemaining/text()
+attr DEVICE stateFormat C: Cyan% M: Magenta% Y: Yellow% B: Black%
+attr DEVICE model B_01a_hp_printer_cartridge_status
+
+# Printer statistics
+name:B_01a_hp_printer_statistics
+filter:TYPE=HTTPMOD
+desc: Get cartridge states of your hp printer.<br>Define a HTTPMOD device like <br>defmod DEVICE HTTPMOD http://192.168.5.43/DevMgmt/ProductUsageDyn.xml 3600<br>Change IP to your needs <br><a href="https://forum.fhem.de/index.php/topic,90601.msg874683.html#msg874683">Source: Forum</a>
+attr DEVICE userattr reading01Name reading01XPath-Strict reading02Name reading02XPath-Strict reading03Name reading03XPath-Strict reading04Name reading04XPath-Strict reading05Name reading05XPath-Strict reading06Name reading06XPath-Strict reading07Name reading07XPath-Strict reading08Name reading08XPath-Strict
+attr DEVICE httpVersion 1.1
+attr DEVICE reading01Name Pages_Total
+attr DEVICE reading01XPath-Strict //pudyn:PrinterSubunit/dd:TotalImpressions/text()
+attr DEVICE reading02Name Pages_Monochrome
+attr DEVICE reading02XPath-Strict //pudyn:PrinterSubunit/dd:MonochromeImpressions/text()
+attr DEVICE reading03Name Pages_Color
+attr DEVICE reading03XPath-Strict //pudyn:PrinterSubunit/dd:ColorImpressions/text()
+attr DEVICE reading04Name Pages_Duplex
+attr DEVICE reading04XPath-Strict //pudyn:PrinterSubunit/dd:DuplexSheets/text()
+attr DEVICE reading05Name Jam_Events
+attr DEVICE reading05XPath-Strict //pudyn:PrinterSubunit/dd:JamEvents/text()
+attr DEVICE reading06Name Mispick_Events
+attr DEVICE reading06XPath-Strict //pudyn:PrinterSubunit/dd:MispickEvents/text()
+attr DEVICE reading07Name ADF_Image_Scans
+attr DEVICE reading07XPath-Strict //pudyn:ScannerEngineSubunit/dd:AdfImages/text()
+attr DEVICE reading08Name Flatbed_Image_Scans
+attr DEVICE reading08XPath-Strict //pudyn:ScannerEngineSubunit/dd:FlatbedImages/text()
+attr DEVICE stateFormat Total: Pages_Total Monochrome: Pages_Monochrome Color: Pages_Color
+attr DEVICE model B_01a_hp_printer_statistics
+
+# Printer status
+name:B_01a_hp_printer_status
+filter:TYPE=HTTPMOD
+desc: Get status of your hp printer.<br>Define a HTTPMOD device like <br>defmod DEVICE HTTPMOD http://192.168.5.43/DevMgmt/ProductStatusDyn.xml 60 <br>Change IP to your needs <br><a href="https://forum.fhem.de/index.php/topic,90601.msg874683.html#msg874683">Source: Forum</a>
+attr DEVICE userattr reading01Name reading01XPath-Strict
+attr DEVICE httpVersion 1.1
+attr DEVICE reading01Name Status
+attr DEVICE reading01XPath-Strict //psdyn:LocString[@lang='de']/text()
+attr DEVICE stateFormat Status
+attr DEVICE model B_01a_hp_printer_status
+
+
+#################################
+#Epson Printers
+#
+# Forum: https://forum.fhem.de/index.php/topic,90601.msg872234.html#msg872234
+
+# Printer cartridge states
+name:B_01b_epson_printer_cartridge_status
+filter:TYPE=HTTPMOD
+desc: Get cartridge states of your Epson printer.<br>Define a HTTPMOD device like <br>defmod DEVICE HTTPMOD http://192.168.188.25/PRESENTATION/HTML/TOP/PRTINFO.HTML 3600<br>Change IP to your needs <br><a href="https://forum.fhem.de/index.php/topic,90601.msg874683.html#msg874683">Source: Forum</a>
+attr DEVICE reading01Name Yellow
+attr DEVICE reading01Regex Ink_Y.*?='([\d]+)'
+attr DEVICE reading02Name Cyan
+attr DEVICE reading02Regex Ink_C.*?='([\d]+)'
+attr DEVICE reading03Name Magenta
+attr DEVICE reading03Regex Ink_M.*?='([\d]+)'
+attr DEVICE reading04Name Black
+attr DEVICE reading04Regex Ink_B.*?='([\d]+)'
+attr DEVICE stateFormat C: Cyan% M: Magenta% Y: Yellow% B: Black%
+attr DEVICE model B_01b_epson_printer_cartridge_status
+
 
 #RESOL Solaranlage, Forum: https://forum.fhem.de/index.php/topic,86678.0.html
 name:C_01a_resol_solar
@@ -113,3 +226,4 @@ attr DEVICE room 01 Heizungsraum
 attr DEVICE stateFormat Dachtemperatur: Temperatur_Sensor1 Drehzahl Pumpe: Drehzahl_Pumpe Laufzeit Heute: Tageslaufzeit
 attr DEVICE timeout 5ercent="([\d\.]+)
 attr DEVICE model C_01a_resol_solar
+
