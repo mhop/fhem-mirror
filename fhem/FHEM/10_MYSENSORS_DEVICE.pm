@@ -244,7 +244,7 @@ sub Set($@) {
     my ($hash,$name,$command,@values) = @_;
     return "Need at least one parameters" unless defined $command;
     if(!defined($hash->{sets}->{$command})) {
-      $hash->{sets}->{fwType} = join(",", getFirmwareTypes($hash->{IODev}));
+      $hash->{sets}->{fwType} = join(",", MYSENSORS::getFirmwareTypes($hash->{IODev}));
       my $list = join(" ", map {$hash->{sets}->{$_} ne "" ? "$_:$hash->{sets}->{$_}" : $_} sort keys %{$hash->{sets}});
       $hash->{sets}->{fwType} = "";
       return grep (/(^on$)|(^off$)/,keys %{$hash->{sets}}) == 2 ? SetExtensions($hash, $list, $name, $command, @values) : "Unknown argument $command, choose one of $list";
