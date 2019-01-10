@@ -659,6 +659,16 @@ sub SSCam_Attr($$$$) {
         RemoveInternalTimer($hash, "SSCam_wdpollcaminfo");
         InternalTimer(gettimeofday()+1.0, "SSCam_wdpollcaminfo", $hash, 0);
     } 
+    
+	if( $aName eq 'snapEmailTxt' ) {
+	    my %specials= (
+            "%CAM" => $name,
+            "%DATE" => $name,
+			"%TIME" => $name,
+        );
+        my $err = perlSyntaxCheck($aVal, %specials);
+        return $err if($err);
+    }
                          
     if ($cmd eq "set") {
         if ($aName =~ m/httptimeout|snapGalleryColumns|rectime|pollcaminfoall/) {
