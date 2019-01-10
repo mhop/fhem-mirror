@@ -7208,12 +7208,12 @@ sub SSCam_prepareSendEmail ($$;$) {
    my($bodyk,$bodyt) = split("=>", $body);
    $subjk = SSCam_trim($subjk);
    $subjt = SSCam_trim($subjt);
-   $subjt =~ s/\$NAME/$calias/g;
+   $subjt =~ s/\$CAM/$calias/g;
    $subjt =~ s/\$DATE/$date/g;
    $subjt =~ s/\$TIME/$time/g;
    $bodyk = SSCam_trim($bodyk);
    $bodyt = SSCam_trim($bodyt);
-   $bodyt =~ s/\$NAME/$calias/g;
+   $bodyt =~ s/\$CAM/$calias/g;
    $bodyt =~ s/\$DATE/$date/g;
    $bodyt =~ s/\$TIME/$time/g;
    my %smtpmsg = ();
@@ -7737,7 +7737,7 @@ return ($str);
     <ul>
        <li>Start a Recording</li>
        <li>Stop a Recording (using command or automatically after the &lt;RecordTime&gt; period</li>
-       <li>Trigger a Snapshot </li>
+       <li>Trigger of snapshots and optionally send them alltogether by Email using the integrated Email client </li>
        <li>Deaktivate a Camera in Synology Surveillance Station</li>
        <li>Activate a Camera in Synology Surveillance Station</li>
        <li>Control of the exposure modes day, night and automatic </li>
@@ -8529,7 +8529,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     <colgroup> <col width=12%> <col width=88%> </colgroup>
       <tr><td style="vertical-align:top"> <b>snapEmailTxt</b> <td>- Activates the Email shipping. Has the form: <br>
                                                                   <code>subject => &lt;subject text&gt;, body => &lt;message text&gt; </code><br> 
-                                                                  The placeholder variables $NAME, $DATE and $TIME can be used. $NAME is 
+                                                                  The placeholder variables $CAM, $DATE and $TIME can be used. $CAM is 
                                                                   replaced by the device alias or the name of camera in SVS if alias is not 
                                                                   defined. $DATE and $TIME are replaced with the current date and time. </td></tr>
       <tr><td>                            <b>smtpHost</b>     </td><td>- Hostname of outgoing Email server (e.g. securesmtp.t-online.de) </td></tr>
@@ -9080,14 +9080,14 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <a name="snapEmailTxt"></a>
   <li><b>snapEmailTxt subject => &lt;subject text&gt;, body => &lt;message text&gt; </b><br>
     Activates the Email shipping of snapshots after its creation. <br>
-    The attribute has to be definied in the form as described. You can use the placeholder variables $NAME, $DATE and $TIME. 
-    The variable $NAME is replaced by the device alias or the name of the camera in SVS if the device alias isn't available.
+    The attribute has to be definied in the form as described. You can use the placeholder variables $CAM, $DATE and $TIME. 
+    The variable $CAM is replaced by the device alias or the name of the camera in SVS if the device alias isn't available.
     $DATE and $TIME are replaced with the current date and time.    
     <br><br>
     
        <ul>
 		<b>Example:</b><br>
-        snapEmailTxt subject => Motion alarm $NAME, body => A motion was recognized on $NAME.
+        snapEmailTxt subject => Motion alarm $CAM, body => A motion was recognized at $CAM.
       </ul>
       <br>
   </li>    
@@ -9264,7 +9264,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
      <ul>
       <li>Start einer Aufnahme</li>
       <li>Stop einer Aufnahme (per Befehl bzw. automatisch nach Ablauf der Aufnahmedauer) </li>
-      <li>Aufnehmen eines Schnappschusses und Ablage in der Synology Surveillance Station </li>
+      <li>Auslösen von Schnappschnüssen und optionaler Email-Versand mittels integrierten Email-Client </li>
       <li>Deaktivieren einer Kamera in Synology Surveillance Station</li>
       <li>Aktivieren einer Kamera in Synology Surveillance Station</li>
       <li>Steuerung der Belichtungsmodi Tag, Nacht bzw. Automatisch </li>
@@ -10078,7 +10078,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     <colgroup> <col width=12%> <col width=88%> </colgroup>
       <tr><td style="vertical-align:top"> <b>snapEmailTxt</b> <td>- Aktiviert den Email-Versand. Die Eingabe hat die Form: <br>
                                                                   <code>subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;</code><br>
-                                                                  Es können die Platzhalter $NAME, $DATE und $TIME verwendet werden. $NAME wird 
+                                                                  Es können die Platzhalter $CAM, $DATE und $TIME verwendet werden. $CAM wird 
                                                                   durch den Device-Alias bzw. den Namen der Kamera in der SVS
                                                                   ersetzt falls der Device-Alias nicht gesetzt ist. 
                                                                   $DATE und $TIME werden durch das aktuelle Datum und Zeit ersetzt.</td></tr>
@@ -10653,13 +10653,13 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <a name="snapEmailTxt"></a>
   <li><b>snapEmailTxt subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt; </b><br>
     Aktiviert den Emailversand von Schnappschüssen nach deren Erstellung. <br>
-    Das Attribut muß in der angegebenen Form definiert werden. Es können die Platzhalter $NAME, $DATE und $TIME verwendet werden. 
-    $NAME wird durch den Device-Alias bzw. den Namen der Kamera in der SVS ersetzt falls der Device-Alias nicht vorhanden 
+    Das Attribut muß in der angegebenen Form definiert werden. Es können die Platzhalter $CAM, $DATE und $TIME verwendet werden. 
+    $CAM wird durch den Device-Alias bzw. den Namen der Kamera in der SVS ersetzt falls der Device-Alias nicht vorhanden 
     ist. $DATE und $TIME werden durch das aktuelle Datum und Zeit ersetzt. <br><br>
     
        <ul>
 		<b>Beispiel:</b><br>
-        snapEmailTxt subject => Bewegungsalarm $NAME, body => Eine Bewegung wurde an der $NAME registriert.
+        snapEmailTxt subject => Bewegungsalarm $CAM, body => Eine Bewegung wurde an der $CAM registriert.
       </ul>
       <br>
   </li>
