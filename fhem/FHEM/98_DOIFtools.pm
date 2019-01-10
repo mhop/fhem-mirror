@@ -405,8 +405,8 @@ sub DOIFtools_logWrapper($) {
 
     FW_pO "<div id=\"content\">";
     FW_pO "<div class=\"tiny\">" if($FW_ss);
-    FW_pO "<pre class=\"log\"><b>jump to: <a name='top'></a><a href=\"#end_of_file\">the end</a> <a href=\"#listing\">top listing</a></b><br>";
-    my $suffix = "<br/><b>jump to: <a name='end_of_file'></a><a href='#top'>the top</a> <a href=\"#listing\">top listing</a></b><br/></pre>".($FW_ss ? "</div>" : "")."</div>";
+    FW_pO "<pre class=\"log\"><b>jump to: <a name='top'></a><a href=\"#end_of_file\">the end</a>&emsp;<a href=\"#listing\">top listing</a></b><br>";
+    my $suffix = "<br/><b>jump to: <a name='end_of_file'></a><a href='#top'>the top</a>&emsp;<a href=\"#listing\">top listing</a></b><br/></pre>".($FW_ss ? "</div>" : "")."</div>";
 
     my $reverseLogs = AttrVal($FW_wname, "reverseLogs", 0);
     if(!$reverseLogs) {
@@ -605,7 +605,9 @@ sub DOIFtools_Notify($$) {
       my $next = $hash->{helper}{counter}{0} + 1;
       $trig .= $prev ? "<b>jump to: <a href=\"#list$prev\">prev</a>&nbsp;&nbsp;<a href=\"#list$next\">next</a> Listing</b><br>" : "<b>jump to: prev&nbsp;&nbsp;<a href=\"#list$next\">next</a> Listing</b><br>";
       $trig .= "DOIF-Version: ".ReadingsVal($pn,"DOIF_version","n/a")."<br>";
-      $trig .= CommandList(undef,$sn);
+      my $trigtmp = CommandList(undef,$sn);
+      $trigtmp =~ s/\n|\r/<br>/g;
+      $trig .= $trigtmp;
       foreach my $itm (keys %defs) {
         $trig =~ s,([\[\" ])$itm([\"\:\] ]),$1<a href="$FW_ME?detail=$itm">$itm</a>$2,g;
       }

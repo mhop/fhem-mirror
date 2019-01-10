@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  98_DOIFtools: fixed line break in DOIFtoolsLog
   - feature: 72_FB_CALLMONITOR: support for contact images and download of
                                 all available contact images from FritzBox
                                 phonebooks via TR-064 API.
