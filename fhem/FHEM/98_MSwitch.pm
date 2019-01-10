@@ -824,7 +824,7 @@ sub MSwitch_Get($$@) {
                 $ret .=
                     "<div nowrap>"
                   . $time
-                  . " execute 'cmd1+cmd2' commands from ID "
+                  . " execute 'cmd1+cmd2' commands with ID "
                   . $id
                   . " only</div>";
             }
@@ -840,7 +840,7 @@ sub MSwitch_Get($$@) {
                 $ret .=
                     "<div nowrap>"
                   . $time
-                  . " execute 'cmd1' commands from ID "
+                  . " execute 'cmd1' commands with ID "
                   . $id
                   . " only</div>";
             }
@@ -6044,9 +6044,17 @@ sub MSwitch_Exec_Notif($$$$$) {
     MSwitch_LOG( $name, 6,
         "$name:     zu schaltende devices -> " . @devices . " @devices" );
 
+		
+		#Log3( $name, 0, "devices 1: ".@devices." @devices" );
+		
     # liste nach priorität ändern , falls expert
     @devices = MSwitch_priority( $hash, $execids, @devices );
 
+	
+	#Log3( $name, 0, "devices 2: ".@devices." @devices" );
+	
+	
+	
     my $lastdevice;
 
   LOOP45: foreach my $device (@devices) {
@@ -7292,10 +7300,22 @@ m/(.*?)([0-9]{2}):([0-9]{2})\*([0-9]{2}:[0-9]{2})-([0-9]{2}:[0-9]{2})\|?([0-9]{0
       LOOP3: foreach my $option1 (@optionarray) {
             $id = "";
 
+			
+		#Log3( $Name, 0, "option: $option1" );	
+			
+			
+			
             if ( $option1 =~ m/(.*)\|(ID.*)$/ ) {
+			
+			
+			
                 $id = $2;
 
                 $option1 = $1;
+				#Log3( $Name, 0, "id: $id" );
+				#Log3( $Name, 0, "option1: $option1" );
+				
+				
             }
 
             if ( $option1 =~
@@ -7348,15 +7368,30 @@ m/(.*?)([0-9]{2}):([0-9]{2})\*([0-9]{2}:[0-9]{2})-([0-9]{2}:[0-9]{2})\|?([0-9]{0
             if ( $timecond > $jetzt ) {
 
                 my $number = $i;
-                if ( $id ne "" && $i == 3 || $i == 4 ) {
+				
+				#Log3( $Name, 0, "i: $i" );
+				
+				
+                if ( $id ne "" && ($i == 3 || $i == 4 )) 
+				{
                     $number = $number + 3;
                 }
+				
                 if ( $i == 5 ) { $number = 9; }
+				
                 if ( $id ne "" && $number == 9 ) { $number = 10; }
 
                 my $inhalt = $timecond . "-" . $number . $id;
                 $hash->{helper}{timer}{$inhalt} = "$inhalt";
                 my $msg = $Name . " " . $timecond . " " . $number . $id;
+				
+				#Log3( $Name, 0, "number: $number" );
+				#Log3( $Name, 0, "id: $id" );
+				
+								#Log3( $Name, 0, "msg: $msg" );
+
+				
+				
                 InternalTimer( $timecond, "MSwitch_Execute_Timer", $msg );
             }
         }
@@ -7509,6 +7544,8 @@ sub MSwitch_Execute_Timer($) {
     }
 
     if ( $param eq '6' ) {
+	
+	
         MSwitch_Exec_Notif( $hash, 'on', 'nocheck', '', $execid );
         return;
     }
@@ -8629,17 +8666,22 @@ sub MSwitch_priority(@) {
 
         # $execids beinhaltet auszuführende ids gesetzt bei init
         my $key1 = $device . "_id";
-        MSwitch_LOG( $name, 6,
-            "$name:     device hat die ID $device - $devicedetails{$key1}" );
+        MSwitch_LOG( $name, 6, "$name:     device hat die ID $device - $devicedetails{$key1}" );
 
-        MSwitch_LOG( $name, 6, "$name:     zulässige IDS - @execids " );
+        MSwitch_LOG( $name, 6, "$name:     zulaessige IDS - @execids " );
 
-        next if !( grep { $_ eq $devicedetails{$key1} } @execids );
+        if (! grep { $_ eq $devicedetails{$key1} } @execids )
+		{
+		MSwitch_LOG( $name, 6, "$name:  abbruch -> unzulaessige ID " );
+		next;
+		
+		}
 
         my $key  = $device . "_priority";
         my $prio = $devicedetails{$key};
-        MSwitch_LOG( $name, 6,
-            "$name:     device hat die priority $device - $prio" );
+		
+        MSwitch_LOG( $name, 6, "$name:     device hat die priority $device - $prio" );
+		
         $new{$device} = $prio;
 
         $hash->{helper}{priorityids}{$device} = $prio;
@@ -8658,6 +8700,8 @@ sub MSwitch_priority(@) {
     my $anzahl = @newlist;
     MSwitch_LOG( $name, 5, "$name:   anzahl $anzahl" );
     @devices = @newlist if $anzahl > 0;
+	@devices = () if $anzahl == 0;
+	
 
     return @devices;
 }
