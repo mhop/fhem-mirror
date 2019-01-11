@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  32_withings: improve Aura handling
   - bugfix:  49_SSCam: fix blocking sscam operation if snap was executed with 
                        arguments and aatribute snapEmailTxt is not set, 
                        (Forum:#45671 #msg885475)

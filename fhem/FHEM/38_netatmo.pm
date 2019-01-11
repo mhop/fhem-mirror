@@ -3,7 +3,7 @@
 #
 #  38_netatmo.pm
 #
-#  2018 Markus Moises < vorname at nachname . de >
+#  2019 Markus Moises < vorname at nachname . de >
 #
 #  Based on original code by justme1968
 #
@@ -11,7 +11,7 @@
 #
 #
 ##############################################################################
-# Release 23 / 2018-11-03
+# Release 24 / 2019-01-05
 
 package main;
 
@@ -592,6 +592,7 @@ netatmo_Set($$@)
   $list = "clear:noArg webhook:add,drop" if ($hash->{SUBTYPE} eq "WEBHOOK");
 
   return undef if( $list eq "" );
+  $cmd = "(undefined)" if(!defined($cmd));
 
   if( $cmd eq "autocreate" ) {
     return netatmo_autocreate($hash, 1 );
@@ -6486,8 +6487,8 @@ sub netatmo_weatherIcon()
   <a name="netatmo_Webhook"></a>
   <b>Webhook</b><br>
   <ul>
-    <code>define netatmo netatmo WEBHOOK</code><br><br>
-    Set your URL in attribute webhookURL, events from cameras will be received insantly
+    <code>define &lt;name&gt; netatmo WEBHOOK</code><br><br>
+    Set your URL in attribute webhookURL, events from cameras will be received instantly
   </ul><br>
 
   <a name="netatmo_Readings"></a>
@@ -6563,21 +6564,21 @@ sub netatmo_weatherIcon()
   <a name="netatmo_Attr"></a>
   <b>Attributes</b>
   <ul>
-    <li>interval<br>
-      the interval in seconds used to check for new values.</li>
-    <li>disable<br>
+    <li><a name="interval">interval</a><br>
+      the interval in seconds used to check for new data</li>
+    <li><a name="disable">disable</a><br>
       1 -> stop polling</li>
-    <li>addresslimit<br>
+    <li><a name="addresslimit">addresslimit</a><br>
       maximum number of addresses to resolve in public station searches (ACCOUNT - default: 10)</li>
-    <li>setpoint_duration<br>
+    <li><a name="setpoint_duration">setpoint_duration</a><br>
       setpoint duration in minutes (THERMOSTAT - default: 60)</li>
-    <li>videoquality<br>
+    <li><a name="videoquality">videoquality</a><br>
       video quality for playlists (HOME - default: medium)</li>
-    <li>webhookURL<br>
+    <li><a name="webhookURL">webhookURL</a><br>
       webhook URL - can include basic auth and ports: http://user:pass@your.url:8080/fhem/netatmo (WEBHOOK)</li>
-    <li>webhookPoll<br>
+    <li><a name="webhookPoll">webhookPoll</a><br>
       poll home after event from webhook (WEBHOOK - default: 0)</li>
-    <li>ignored_device_ids<br>
+    <li><a name="ignored_device_ids">ignored_device_ids</a><br>
       ids of devices/persons ignored on autocrate (ACCOUNT - comma separated)</li>
   </ul>
 </ul>

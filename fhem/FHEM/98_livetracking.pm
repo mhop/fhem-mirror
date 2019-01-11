@@ -3,14 +3,14 @@
 #
 #  98_livetracking.pm
 #
-#  2018 Markus Moises < vorname at nachname . de >
+#  2019 Markus Moises < vorname at nachname . de >
 #
-#  This module provides livetracking data from OwnTracks, OpenPaths and Swarm (FourSquare)
+#  This module provides livetracking data from OwnTracks, OpenPaths, Life360 and Swarm (FourSquare)
 #
 #
 ##############################################################################
 #
-# define <name> livetracking <openpaths_key> <openpaths_secret> <swarm_token>
+# define <name> livetracking <life360_user> <life360_pass> <openpaths_key> <openpaths_secret> <swarm_token>
 #
 ##############################################################################
 
@@ -84,6 +84,8 @@ sub livetracking_Initialize($) {
                                 "addressReading:0,1 ".
                                 "osmandServer:0,1 ".
                                 "osmandId ".
+                                "life360_userid ".
+                                "life360_circle ".
                                 $readingFnAttributes;
 
 
@@ -93,22 +95,39 @@ sub livetracking_Define($$$) {
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
 
-  return "syntax: define <name> livetracking <openpaths_key> <openpaths_secret> <swarm_token>" if(int(@a) < 2 || int(@a) > 7 );
+  return "syntax: define <name> livetracking <life360_user> <life360_pass> <openpaths_key> <openpaths_secret> <swarm_token>" if(int(@a) < 2 || int(@a) > 7 );
   my $name = $hash->{NAME};
 
   #$hash->{OAuth_exists} = $libcheck_hasOAuth if($libcheck_hasOAuth);
 
   if(int(@a) == 4 ) {
-    $hash->{helper}{openpaths_key} = $a[2];# if($hash->{OAuth_exists});
-    $hash->{helper}{openpaths_secret} = $a[3];# if($hash->{OAuth_exists});
+    if ($a[2] =~ /@/) {
+      $hash->{helper}{life360_user} = $a[2];
+      $hash->{helper}{life360_pass} = $a[3];
+    } else {
+      $hash->{helper}{openpaths_key} = $a[2];# if($hash->{OAuth_exists});
+      $hash->{helper}{openpaths_secret} = $a[3];# if($hash->{OAuth_exists});
+    }
   }
   elsif(int(@a) == 3 ) {
     $hash->{helper}{swarm_token} = $a[2];
   }
   elsif(int(@a) == 5 ) {
-    $hash->{helper}{openpaths_key} = $a[2];# if($hash->{OAuth_exists});
-    $hash->{helper}{openpaths_secret} = $a[3];# if($hash->{OAuth_exists});
+    if ($a[2] =~ /@/) {
+      $hash->{helper}{life360_user} = $a[2];
+      $hash->{helper}{life360_pass} = $a[3];
+    } else {
+      $hash->{helper}{openpaths_key} = $a[2];# if($hash->{OAuth_exists});
+      $hash->{helper}{openpaths_secret} = $a[3];# if($hash->{OAuth_exists});
+    }
     $hash->{helper}{swarm_token} = $a[4];
+  }
+  elsif(int(@a) == 7 ) {
+    $hash->{helper}{life360_user} = $a[2];
+    $hash->{helper}{life360_pass} = $a[3];
+    $hash->{helper}{openpaths_key} = $a[4];# if($hash->{OAuth_exists});
+    $hash->{helper}{openpaths_secret} = $a[5];# if($hash->{OAuth_exists});
+    $hash->{helper}{swarm_token} = $a[6];
   }
 
 
@@ -157,6 +176,11 @@ sub livetracking_Define($$$) {
     $attr{$name}{stateFormat} = 'location';
   }
 
+  livetracking_BootstrapLife360($hash) if(defined($hash->{helper}{life360_user}));
+
+
+  livetracking_addExtension($hash) if(AttrVal($name, "osmandServer", 0) == 1);
+
   #$hash->{STATE} = "Initialized";
 
   return undef;
@@ -164,7 +188,9 @@ sub livetracking_Define($$$) {
 
 sub livetracking_Undefine($$) {
   my ($hash, $arg) = @_;
+  my $name = $hash->{NAME};
   RemoveInternalTimer($hash);
+  livetracking_removeExtension($hash) if(AttrVal($name, "osmandServer", 0) == 1);
   return undef;
 }
 
@@ -177,7 +203,13 @@ sub livetracking_Set($$@) {
   {
     $usage .= " owntracksMessage";
   }
-  else{
+  if(defined($hash->{helper}{life360_user}))
+  {
+    $usage .= "  BootstrapLife360:noArg";
+  }
+
+  if(!defined($hash->{helper}{life360_user}) && !defined($attr{$name}{owntracksDevice}))
+  {
     $usage = undef;
   }
 
@@ -201,6 +233,13 @@ sub livetracking_Set($$@) {
     fhem('set '.$devname.' cmd {"_type":"cmd","action":"action",'.$messagetext.$notifytext.'"tst":'.time().'}');
     #fhem('set '.$devname.' msg {"_type":"cmd","action":"notify", "content":"'.$notifytext.'","tst":'.time().'}') if($notifytext ne "");
   }
+  elsif($command eq "BootstrapLife360")
+  {
+    $hash->{helper}{life360_script} = "";
+    $hash->{helper}{life360_secret} = "";
+    $hash->{helper}{life360_token} = "";
+    livetracking_BootstrapLife360($hash);
+  }
 
   return undef;
 }
@@ -212,9 +251,12 @@ sub livetracking_Get($@) {
   my $name = $hash->{NAME};
 
 
-  my $usage = "Unknown argument $command, choose one of All:noArg OpenPaths:noArg Swarm:noArg";
+  my $usage = "Unknown argument $command, choose one of All:noArg";
+  $usage .= " OpenPaths:noArg" if(defined($hash->{helper}{openpaths_key}));
+  $usage .= " Swarm:noArg" if(defined($hash->{helper}{swarm_token}));
   $usage .= " owntracksLocation:noArg owntracksSteps:noArg" if(defined($attr{$name}{owntracksDevice}));
   $usage .= " address";
+  $usage .= " Life360:noArg" if(defined($hash->{helper}{life360_user}));
 
   return $usage if $command eq '?';
 
@@ -269,29 +311,40 @@ sub livetracking_Get($@) {
          if($parameter eq "long"){
            $addr .= $json->{address}->{housename}."\n" if(defined($json->{address}->{housename}));
            $addr .= $json->{address}->{parking}."\n" if(defined($json->{address}->{parking}));
+           $addr .= $json->{address}->{locality}."\n" if(defined($json->{address}->{locality}));
          }
          $addr .= $json->{address}->{road}." " if(defined($json->{address}->{road}));
          $addr .= $json->{address}->{path}." " if(defined($json->{address}->{path}) && !defined($json->{address}->{road}));
          $addr .= $json->{address}->{bridleway}." " if(defined($json->{address}->{bridleway}) && !defined($json->{address}->{road}) && !defined($json->{address}->{path}));
          $addr .= $json->{address}->{footway}." " if(defined($json->{address}->{footway}) && !defined($json->{address}->{road}) && !defined($json->{address}->{path}) && !defined($json->{address}->{bridleway}));
-         $addr .= $json->{address}->{neighbourhood}." " if(defined($json->{address}->{neighbourhood}) && !defined($json->{address}->{road}) && !defined($json->{address}->{path}) && !defined($json->{address}->{bridleway}) && !defined($json->{address}->{footway}));
+         $addr .= $json->{address}->{square}." " if(defined($json->{address}->{square}) && !defined($json->{address}->{road}) && !defined($json->{address}->{path}) && !defined($json->{address}->{bridleway}) && !defined($json->{address}->{footway}));
+         $addr .= $json->{address}->{neighbourhood}." " if(defined($json->{address}->{neighbourhood}) && !defined($json->{address}->{road}) && !defined($json->{address}->{path}) && !defined($json->{address}->{bridleway}) && !defined($json->{address}->{footway}) && !defined($json->{address}->{square}));
+         $addr .= $json->{address}->{city_block}." " if(defined($json->{address}->{city_block}) && !defined($json->{address}->{road}) && !defined($json->{address}->{path}) && !defined($json->{address}->{bridleway}) && !defined($json->{address}->{footway}) && !defined($json->{address}->{square}) && !defined($json->{address}->{neighbourhood}));
+         $addr .= $json->{address}->{hamlet}." " if(defined($json->{address}->{hamlet}) && !defined($json->{address}->{road}) && !defined($json->{address}->{path}) && !defined($json->{address}->{bridleway}) && !defined($json->{address}->{footway}) && !defined($json->{address}->{square}) && !defined($json->{address}->{neighbourhood}) && !defined($json->{address}->{city_block}));
+         $addr .= $json->{address}->{isolated_dwelling}." " if(defined($json->{address}->{isolated_dwelling}) && !defined($json->{address}->{road}) && !defined($json->{address}->{path}) && !defined($json->{address}->{bridleway}) && !defined($json->{address}->{footway}) && !defined($json->{address}->{square}) && !defined($json->{address}->{neighbourhood}) && !defined($json->{address}->{city_block}) && !defined($json->{address}->{hamlet}));
+         $addr .= $json->{address}->{farm}." " if(defined($json->{address}->{farm}) && !defined($json->{address}->{road}) && !defined($json->{address}->{path}) && !defined($json->{address}->{bridleway}) && !defined($json->{address}->{footway}) && !defined($json->{address}->{square}) && !defined($json->{address}->{neighbourhood}) && !defined($json->{address}->{city_block}) && !defined($json->{address}->{hamlet}) && !defined($json->{address}->{isolated_dwelling}));
          $addr .= $json->{address}->{house_number} if(defined($json->{address}->{house_number}));
          #$addr .= "\n".$json->{address}->{neighbourhood} if(defined($json->{address}->{neighbourhood}) && $parameter eq "long");
-         if($parameter eq "long"){
-           $addr .= "\n".$json->{address}->{suburb} if(defined($json->{address}->{suburb}));
-         }
-         $addr .= "\n" if(defined($json->{address}->{postcode}) || defined($json->{address}->{city}) || defined($json->{address}->{town}) || defined($json->{address}->{village}));
+         #if($parameter eq "long"){
+         #  $addr .= "\n".$json->{address}->{suburb} if(defined($json->{address}->{suburb}));
+         #}
+         $addr .= (($parameter eq "singleline")?", ":"\n") if(defined($json->{address}->{postcode}) || defined($json->{address}->{city}) || defined($json->{address}->{town}) || defined($json->{address}->{village}) || defined($json->{address}->{hamlet}) || defined($json->{address}->{suburb}));
          $addr .= $json->{address}->{postcode}." " if(defined($json->{address}->{postcode}));
          $addr .= $json->{address}->{city} if(defined($json->{address}->{city}));
          $addr .= $json->{address}->{town}." " if(defined($json->{address}->{town}) && !defined($json->{address}->{city}));
          $addr .= $json->{address}->{village}." " if(defined($json->{address}->{village}) && !defined($json->{address}->{city}) && !defined($json->{address}->{town}));
+         $addr .= $json->{address}->{borough}." " if(defined($json->{address}->{borough}) && !defined($json->{address}->{city}) && !defined($json->{address}->{town}) && !defined($json->{address}->{village}));
+         $addr .= $json->{address}->{suburb}." " if(defined($json->{address}->{suburb}) && !defined($json->{address}->{city}) && !defined($json->{address}->{town}) && !defined($json->{address}->{village}) && !defined($json->{address}->{borough}));
+         $addr .= $json->{address}->{quarter}." " if(defined($json->{address}->{quarter}) && !defined($json->{address}->{city}) && !defined($json->{address}->{town}) && !defined($json->{address}->{village}) && !defined($json->{address}->{borough}) && !defined($json->{address}->{suburb}));
+         $addr .= $json->{address}->{municipality}." " if(defined($json->{address}->{municipality}) && !defined($json->{address}->{city}) && !defined($json->{address}->{town}) && !defined($json->{address}->{village}) && !defined($json->{address}->{borough}) && !defined($json->{address}->{suburb}) && !defined($json->{address}->{quarter}));
+         $addr .= $json->{address}->{hamlet}." " if(defined($json->{address}->{hamlet}) && !defined($json->{address}->{city}) && !defined($json->{address}->{town}) && !defined($json->{address}->{village}) && !defined($json->{address}->{borough}) && !defined($json->{address}->{suburb}) && !defined($json->{address}->{quarter}) && !defined($json->{address}->{municipality}));
          if($parameter eq "long"){
            $addr .= "\n".$json->{address}->{county} if(defined($json->{address}->{county}));
            $addr .= "\n" if((defined($json->{address}->{state_district}) || defined($json->{address}->{state})));
            $addr .= $json->{address}->{state_district}." " if(defined($json->{address}->{state_district}));
            $addr .= $json->{address}->{state} if(defined($json->{address}->{state}));
          }
-         $addr .= "\n".$json->{address}->{country} if(defined($json->{address}->{country}));
+         $addr .= (($parameter eq "singleline")?", ":"\n").$json->{address}->{country} if(defined($json->{address}->{country}));
          Log3 ($name, 4, "$name: address received\n".Dumper($json));
          readingsSingleUpdate($hash,"address",livetracking_utf8clean($addr),1) if(AttrVal($name,"addressReading",0));
          return livetracking_utf8clean($addr);
@@ -305,6 +358,12 @@ sub livetracking_Get($@) {
        return "invalid coordinates";
      }
      return undef;
+  }
+
+
+  elsif($command eq "Life360")
+  {
+    livetracking_GetLife360($hash);
   }
 
 
@@ -373,6 +432,60 @@ sub livetracking_GetAll($) {
   # }
 
   InternalTimer( gettimeofday() + 10, "livetracking_GetOpenPaths", $hash, 0) if(defined($hash->{helper}{openpaths_key}));
+
+
+  InternalTimer( gettimeofday() + 20, "livetracking_GetLife360", $hash, 0) if(defined($hash->{helper}{life360_user}));
+
+  return undef;
+}
+
+
+
+sub livetracking_GetLife360($) {
+
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  RemoveInternalTimer($hash, "livetracking_GetLife360");
+
+  if(IsDisabled($name))
+  {
+    Log3 ($name, 4, "livetracking $name is disabled, data update cancelled.");
+    return undef;
+  }
+
+  if(!defined($hash->{helper}{life360_user}))
+  {
+    return undef;
+  }
+
+  if(!defined($hash->{helper}{life360_token}) or $hash->{helper}{life360_token} eq "")
+  {
+    livetracking_BootstrapLife360($hash);
+    return undef;
+  }
+
+  my $lastupdate = ReadingsVal($name,".lastLife360",time()-3600);
+  $lastupdate = (time()-3600*6) if($lastupdate < (time()-3600*6));
+  my $circle = $attr{$name}{life360_circle};
+  my $userid = $attr{$name}{life360_userid};
+
+  my $url = "https://www.life360.com/v3/circles/".$circle."/members/".$userid."/history?time=".int($lastupdate);
+
+    HttpUtils_NonblockingGet({
+      url => $url,
+      header => "Authorization: Bearer ".$hash->{helper}{life360_token},
+      noshutdown => 1,
+      hash => $hash,
+      type => 'life360data',
+      callback => \&livetracking_dispatch,
+    });
+
+
+  my $interval = AttrVal($hash->{NAME}, "interval", 1800);
+  #RemoveInternalTimer($hash);
+  InternalTimer( gettimeofday() + $interval, "livetracking_GetLife360", $hash, 0);
+  $hash->{UPDATED} = FmtDateTime(time());
 
   return undef;
 }
@@ -476,7 +589,7 @@ sub livetracking_GetSwarm($) {
     });
 
 
-  my $interval = AttrVal($hash->{NAME}, "interval", 1800);
+  my $interval = AttrVal($hash->{NAME}, "interval", 900);
   #RemoveInternalTimer($hash);
   InternalTimer( gettimeofday() + $interval, "livetracking_GetSwarm", $hash, 0);
   $hash->{UPDATED} = FmtDateTime(time());
@@ -484,6 +597,127 @@ sub livetracking_GetSwarm($) {
   return undef;
 }
 
+
+
+sub livetracking_ParseLife360($$) {
+  my ($hash,$json) = @_;
+  my $name = $hash->{NAME};
+
+  my $updated = 0;
+
+  my $lastreading = ReadingsVal($name,".lastLife360",time()-300);
+
+  Log3 ($name, 5, "$name Life360 data: /n".Dumper($json));
+
+  my $battery = -1;
+  my $charge = -1;
+  my $tst = int(time);
+
+  foreach my $dataset (reverse(@{$json->{locations}}))
+  {
+    next if(!defined($dataset->{latitude}));
+
+    if(defined($dataset->{battery}) && defined($dataset->{endTimestamp}))
+    {
+      $battery = $dataset->{battery};
+      $charge = $dataset->{charge};
+      $tst = $dataset->{endTimestamp};
+    }
+
+    next if($lastreading > $dataset->{startTimestamp});
+
+    Log3 ($name, 2, "$name new l360 data: /n".Dumper($dataset));
+
+    my $accurate = 1;
+    $accurate = 0 if(defined($attr{$name}{filterAccuracy}) and defined($dataset->{accuracy}) and $attr{$name}{filterAccuracy} < $dataset->{accuracy});
+
+    Log3 ($name, 5, "$name Life360: ".$dataset->{latitude}.",".$dataset->{longitude});
+
+    $lastreading = $dataset->{endTimestamp}+1;
+
+    readingsBeginUpdate($hash); # Begin update readings
+    $hash->{".updateTimestamp"} = FmtDateTime($dataset->{endTimestamp});
+    my $changeindex = 0;
+
+
+    if($accurate){
+      readingsBulkUpdate($hash, "latitude", $dataset->{latitude});
+      $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{endTimestamp});
+      readingsBulkUpdate($hash, "longitude", $dataset->{longitude});
+      $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{endTimestamp});
+      readingsBulkUpdate($hash, "location", $dataset->{latitude}.",".$dataset->{longitude});
+      $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{endTimestamp});
+    }
+
+    if(defined($dataset->{speed}) and $dataset->{speed} >= 0 and $accurate)
+    {
+      readingsBulkUpdate($hash, "velocity", $dataset->{speed});
+      $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{endTimestamp});
+    }
+
+    readingsBulkUpdate($hash, "accuracy", $dataset->{accuracy});
+    $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{endTimestamp});
+
+
+    if(defined($dataset->{name}) and $dataset->{name} ne "")
+    {
+      readingsBulkUpdate($hash, "place", $dataset->{name});
+      $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{endTimestamp});
+    }
+    elsif(defined($dataset->{shortAddress}) and $dataset->{shortAddress} ne "")
+    {
+      readingsBulkUpdate($hash, "place", $dataset->{shortAddress});
+      $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{endTimestamp});
+    }
+    elsif(defined($dataset->{address1}) and $dataset->{address1} ne "")
+    {
+      readingsBulkUpdate($hash, "place", $dataset->{address1});
+      $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{endTimestamp});
+    }
+
+    if(defined($attr{$name}{home}) && $accurate)
+    {
+      readingsBulkUpdate($hash, "distance", livetracking_distance($hash,$dataset->{latitude}.",".$dataset->{longitude},$attr{$name}{home}));
+      $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{endTimestamp});
+    }
+
+    if(defined($dataset->{battery}))
+    {
+      readingsBulkUpdate($hash, "batteryPercent", $dataset->{battery});
+      $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{endTimestamp});
+      readingsBulkUpdate($hash, "batteryState", (int($dataset->{battery}) <= int(AttrVal($name, "batteryWarning" , "20")))?"low":"ok");
+      $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{endTimestamp});
+      readingsBulkUpdate($hash, "batteryCharge", ($charge == -1)?"unknown":($charge == 1)?"charge":"discharge");
+      $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{endTimestamp});
+    }
+
+    $updated = 1;
+
+    readingsEndUpdate($hash, 1);
+
+  }
+
+  if($battery >= 0 && $updated == 0)
+  {
+    readingsBeginUpdate($hash);
+    $hash->{".updateTimestamp"} = FmtDateTime($tst);
+    readingsBulkUpdate($hash, "batteryPercent", $battery);
+    $hash->{CHANGETIME}[0] = FmtDateTime($tst);
+    readingsBulkUpdate($hash, "batteryState", (int($battery) <= int(AttrVal($name, "batteryWarning" , "20")))?"low":"ok");
+    $hash->{CHANGETIME}[1] = FmtDateTime($tst);
+    readingsBulkUpdate($hash, "batteryCharge", ($charge == -1)?"unknown":($charge == 1)?"charge":"discharge");
+    $hash->{CHANGETIME}[0] = FmtDateTime($tst);
+    readingsEndUpdate($hash, 1);
+  }
+
+  if($updated == 1)
+  {
+    readingsSingleUpdate($hash,".lastLife360",$lastreading,1);
+    $hash->{helper}{lastLife360} = $lastreading;
+  }
+
+  return undef;
+}
 
 
 sub livetracking_ParseOpenPaths($$) {
@@ -513,13 +747,12 @@ sub livetracking_ParseOpenPaths($$) {
     my $changeindex = 0;
 
 
-    #$hash->{".updateTimestamp"} = FmtDateTime($dataset->{t});
-    #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{t}));
+    readingsBulkUpdate($hash, "latitude", $dataset->{lat});
+    $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{t});
+    readingsBulkUpdate($hash, "longitude", $dataset->{lon});
+    $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{t});
     readingsBulkUpdate($hash, "location", $dataset->{lat}.",".$dataset->{lon});
     $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{t});
-    #setReadingsVal($hash, "location", $dataset->{lat}.",".$dataset->{lon}, FmtDateTime($dataset->{t}));
-    #push(@{$hash->{CHANGED}}, "location: ".$dataset->{lat}.",".$dataset->{lon});
-    #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{t}));
 
 
     if(defined($dataset->{alt}) && $dataset->{alt} ne '0')
@@ -529,59 +762,33 @@ sub livetracking_ParseOpenPaths($$) {
 
       if($altitude ne $newaltitude)
       {
-        #$hash->{".updateTimestamp"} = FmtDateTime($dataset->{t});
-        #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{t}));
         readingsBulkUpdate($hash, "altitude", $newaltitude);
         $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{t});
-        #setReadingsVal($hash, "altitude", $newaltitude." m", FmtDateTime($dataset->{t}));
-        #push(@{$hash->{CHANGED}}, "altitude: ".$newaltitude." m");
-        #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{t}));
         $altitude = $newaltitude;
       }
     }
     if(defined($dataset->{device}) && $dataset->{device} ne $device)
     {
-      #$hash->{".updateTimestamp"} = FmtDateTime($dataset->{t});
-      #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{t}));
       readingsBulkUpdate($hash, "deviceOpenPaths", $dataset->{device});
       $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{t});
-      #setReadingsVal($hash, "deviceOpenPaths", $dataset->{device}, FmtDateTime($dataset->{t}));
-      #push(@{$hash->{CHANGED}}, "deviceOpenPaths: ".$dataset->{device});
-      #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{t}));
     }
     if(defined($dataset->{os}) && $dataset->{os} ne $os)
     {
-      #$hash->{".updateTimestamp"} = FmtDateTime($dataset->{t});
-      #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{t}));
       readingsBulkUpdate($hash, "osOpenPaths", $dataset->{os});
       $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{t});
-      #setReadingsVal($hash, "osOpenPaths", $dataset->{os}, FmtDateTime($dataset->{t}));
-      #push(@{$hash->{CHANGED}}, "osOpenPaths: ".$dataset->{os});
-      #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{t}));
     }
     if(defined($dataset->{version}) && $dataset->{version} ne $version)
     {
-      #$hash->{".updateTimestamp"} = FmtDateTime($dataset->{t});
-      #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{t}));
       readingsBulkUpdate($hash, "versionOpenPaths", $dataset->{version});
       $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{t});
-      #setReadingsVal($hash, "versionOpenPaths", $dataset->{version}, FmtDateTime($dataset->{t}));
-      #push(@{$hash->{CHANGED}}, "versionOpenPaths: ".$dataset->{version});
-      #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{t}));
     }
     if(defined($attr{$name}{home}))
     {
-      #$hash->{".updateTimestamp"} = FmtDateTime($dataset->{t});
-      #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{t}));
       readingsBulkUpdate($hash, "distance", livetracking_distance($hash,$dataset->{lat}.",".$dataset->{lon},$attr{$name}{home}));
       $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{t});
-      #setReadingsVal($hash, "distance", livetracking_distance($hash,$dataset->{lat}.",".$dataset->{lon},$attr{$name}{home})." km", FmtDateTime($dataset->{t}));
-      #push(@{$hash->{CHANGED}}, "distance: ".livetracking_distance($hash,$dataset->{lat}.",".$dataset->{lon},$attr{$name}{home})." km");
-      #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{t}));
     }
     $updated = 1;
 
-    #$hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{t});
     readingsEndUpdate($hash, 1); # End update readings
   }
 
@@ -589,9 +796,6 @@ sub livetracking_ParseOpenPaths($$) {
 
   if($updated == 1)
   {
-    #readingsSingleUpdate($hash,"lastOpenPaths",$lastreading,1);
-    #$hash->{CHANGED} = ();
-    #$hash->{CHANGETIME} = ();
     readingsSingleUpdate($hash,".lastOpenPaths",$lastreading,1);
     $hash->{helper}{lastOpenPaths} = $lastreading;
   }
@@ -638,42 +842,25 @@ sub livetracking_ParseSwarm($$) {
       $loc =~ s/$shl/$home/g;
     }
 
-    #$hash->{".updateTimestamp"} = FmtDateTime($dataset->{createdAt});
-    #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{createdAt}));
+    readingsBulkUpdate($hash, "latitude", $dataset->{venue}->{location}->{lat});
+    $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{createdAt});
+    readingsBulkUpdate($hash, "longitude", $dataset->{venue}->{location}->{lng});
+    $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{createdAt});
     readingsBulkUpdate($hash, "location", $loc);
     $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{createdAt});
-    #setReadingsVal($hash, "location", $loc, FmtDateTime($dataset->{createdAt}));
-    #push(@{$hash->{CHANGED}}, "location: ".$loc);
-    #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{createdAt}));
 
-    #$hash->{".updateTimestamp"} = FmtDateTime($dataset->{createdAt});
-    #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{createdAt}));
     readingsBulkUpdate($hash, "place", $place);
     $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{createdAt});
-    #setReadingsVal($hash, "place", $dataset->{venue}->{name}, FmtDateTime($dataset->{createdAt}));
-    #push(@{$hash->{CHANGED}}, "place: ".$dataset->{venue}->{name});
-    #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{createdAt}));
-
 
     if(defined($dataset->{source}->{name}) && $dataset->{source}->{name} ne $device)
     {
-      #$hash->{".updateTimestamp"} = FmtDateTime($dataset->{createdAt});
-      #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{createdAt}));
       readingsBulkUpdate($hash, "deviceSwarm", $dataset->{source}->{name});
       $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{createdAt});
-      #setReadingsVal($hash, "deviceSwarm", $dataset->{source}->{name}, FmtDateTime($dataset->{createdAt}));
-      #push(@{$hash->{CHANGED}}, "deviceSwarm: ".$dataset->{source}->{name});
-      #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{createdAt}));
     }
     if(defined($attr{$name}{home}))
     {
-      #$hash->{".updateTimestamp"} = FmtDateTime($dataset->{createdAt});
-      #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{createdAt}));
       readingsBulkUpdate($hash, "distance", livetracking_distance($hash,$loc,$attr{$name}{home})." km");
       $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{createdAt});
-      #setReadingsVal($hash, "distance", livetracking_distance($hash,$loc,$attr{$name}{home})." km", FmtDateTime($dataset->{createdAt}));
-      #push(@{$hash->{CHANGED}}, "distance: ".livetracking_distance($hash,$loc,$attr{$name}{home})." km");
-      #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{createdAt}));
     }
     $updated = 1;
 
@@ -695,46 +882,21 @@ sub livetracking_ParseSwarm($$) {
 }
 
 
-sub livetracking_Notify($$)
+sub livetracking_ParseOwnTracks
 {
-  my ($hash, $dev) = @_;
+  my ($hash,$data) = @_;
   my $name = $hash->{NAME};
-  my $devName = $dev->{NAME};
 
-  my $dataset = "";
-  my $data = "";
-
-  # Ignore wrong notifications
-  if($devName eq AttrVal($name, "owntracksDevice" , "owntracks"))
-  {
-    Log3 ($name, 6, "$name OwnTracks data: /n".Dumper($dev));
-
-    my $invaliddata = 1;
-    if(($dev->{CHANGED}[0] =~ m/_type":[ ]?"location/ || $dev->{CHANGED}[0] =~ m/_type":[ ]?"position/ || $dev->{CHANGED}[0] =~ m/_type":[ ]?"transition/ || $dev->{CHANGED}[0] =~ m/_type":[ ]?"steps/ || $dev->{CHANGED}[0] =~ m/_type":[ ]?"beacon/ ))
+  my $dataset = eval { JSON->new->utf8(0)->decode($data) };
+  if($@)
     {
-      $invaliddata = 0;#owntracks
-    }
-    elsif(($dev->{CHANGED}[0] =~ m/position":[ ]?{/))
-    {
-      $invaliddata = 0;#traccar
-    }
-    if($invaliddata == 1){
-      Log3 ($name, 5, "WRONG MQTT TYPE ".Dumper($dev->{CHANGED}[0]));
-      return undef;
-    }
-
-    $data= substr($dev->{CHANGED}[0],index($dev->{CHANGED}[0], ": {")+2);
-    $dataset = JSON->new->utf8(0)->decode($data);
-
-  } else {
-    Log3 ($name, 5, "livetracks: Notify ignored from ".$devName);
+    Log3 $name, 2, "$name: invalid json evaluation on ParseOwnTracks".Dumper($data);
+    #Log3 $name, 2, "$name: ".$param->{url}." / ".Dumper($data) if( $param->{type} eq 'life360data' );
     return undef;
   }
 
 
-
-
-  if($dev->{CHANGED}[0] =~ m/_type":[ ]?"steps/)
+    if($data =~ m/_type":[ ]?"steps/)
   {
     readingsBeginUpdate($hash); # Start update readings
     $hash->{".updateTimestamp"} = FmtDateTime($dataset->{to});
@@ -752,7 +914,7 @@ sub livetracking_Notify($$)
     return undef;
   }
 
-  if($dev->{CHANGED}[0] =~ m/_type":[ ]?"beacon/)
+    if($data =~ m/_type":[ ]?"beacon/)
   {
     my $beaconid = $dataset->{uuid}.",".$dataset->{major}.",".$dataset->{minor};
 
@@ -784,6 +946,10 @@ sub livetracking_Notify($$)
   }
 
 
+
+  #{"position":{"id":566,"attributes":{"batteryLevel":66,"distance":25.79,"totalDistance":20665.79,"motion":false},"deviceId":1,"type":null,"protocol":"osmand","serverTime":"2019-01-06T11:39:41.279+0000","deviceTime":"2019-01-06T11:39:41.000+0000","fixTime":"2019-01-06T11:39:41.000+0000","outdated":false,"valid":true,"latitude":53.xxxxx,"longitude":8.xxxxx,"altitude":0,"speed":0,"course":0,"address":null,"accuracy":24.04000091552734,"network":null},"device":{"id":1,"attributes":{},"groupId":0,"name":"SomeName","uniqueId":"SomeID,"status":"online","lastUpdate":"2019-01-06T11:39:41.279+0000","positionId":565,"geofenceIds":[],"phone":"","model":"","contact":"","category":null,"disabled":false}}
+
+
   my $accurate = 1;
   $accurate = 0 if(defined($attr{$name}{filterAccuracy}) and defined($dataset->{acc}) and $attr{$name}{filterAccuracy} < $dataset->{acc});
 
@@ -793,10 +959,12 @@ sub livetracking_Notify($$)
 
   Log3 ($name, 4, "$name OwnTracks: ".FmtDateTime($dataset->{tst})."  ".$data);
 
-  #$hash->{".updateTimestamp"} = FmtDateTime($dataset->{tst});
-  #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{tst}));
   if($accurate)
   {
+      readingsBulkUpdate($hash, "latitude", $dataset->{lat});
+      $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{tst});
+      readingsBulkUpdate($hash, "longitude", $dataset->{lon});
+      $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{tst});
     readingsBulkUpdate($hash, "location", $dataset->{lat}.",".$dataset->{lon});
     $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{tst});
   }
@@ -804,9 +972,6 @@ sub livetracking_Notify($$)
   {
     Log3 ($name, 3, "$name OwnTracks: Inaccurate reading ignored: ".$dataset->{lat}.",".$dataset->{lon}." (".$dataset->{acc}.")");
   }
-  #setReadingsVal($hash, "location", $dataset->{lat}.",".$dataset->{lon}, FmtDateTime($dataset->{tst}));
-  #push(@{$hash->{CHANGED}}, "location: ".$dataset->{lat}.",".$dataset->{lon});
-  #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{tst}));
 
 
   if(defined($dataset->{alt}) and $dataset->{alt} != 0 and $accurate)
@@ -814,84 +979,52 @@ sub livetracking_Notify($$)
     my $altitudeRound = AttrVal($hash->{NAME}, "roundAltitude", 1);
     my $newaltitude = livetracking_roundfunc($dataset->{alt}/$altitudeRound)*$altitudeRound;
     #Log3 ($name, 0, "$name OTRound: ".$dataset->{alt}."/".$altitudeRound." = ".livetracking_roundfunc($dataset->{alt}/$altitudeRound)."*".$altitudeRound);
-
-    #$hash->{".updateTimestamp"} = FmtDateTime($dataset->{tst});
-    #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{tst}));
     readingsBulkUpdate($hash, "altitude", $newaltitude);
     $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{tst});
-    #setReadingsVal($hash, "altitude", $newaltitude." m", FmtDateTime($dataset->{tst}));
-    #push(@{$hash->{CHANGED}}, "altitude: ".$newaltitude." m");
-    #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{tst}));
   }
   if(defined($dataset->{tid}) and $dataset->{tid} ne "")
   {
-    #$hash->{".updateTimestamp"} = FmtDateTime($dataset->{tst});
-    #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{tst}));
     readingsBulkUpdate($hash, "id", $dataset->{tid});
     $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{tst});
-    #setReadingsVal($hash, "id", $dataset->{tid}, FmtDateTime($dataset->{tst}));
-    #push(@{$hash->{CHANGED}}, "id: "$dataset->{tid});
-    #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{tst}));
   }
   if(defined($dataset->{doze}) and $dataset->{doze} ne "")
   {
-    #$hash->{".updateTimestamp"} = FmtDateTime($dataset->{tst});
-    #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{tst}));
     readingsBulkUpdate($hash, "doze", $dataset->{doze});
     $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{tst});
-    #setReadingsVal($hash, "doze", $dataset->{doze}, FmtDateTime($dataset->{tst}));
-    #push(@{$hash->{CHANGED}}, "doze: "$dataset->{doze});
-    #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{tst}));
   }
   if(defined($dataset->{acc}) and $dataset->{acc} > 0)# and $accurate)
   {
-    #$hash->{".updateTimestamp"} = FmtDateTime($dataset->{tst});
-    #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{tst}));
     readingsBulkUpdate($hash, "accuracy", $dataset->{acc});
     $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{tst});
-    #setReadingsVal($hash, "accuracy", $dataset->{acc}." m", FmtDateTime($dataset->{tst}));
-    #push(@{$hash->{CHANGED}}, "accuracy: ".$dataset->{acc}." m");
-    #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{tst}));
   }
   if(defined($dataset->{vel}) and $dataset->{vel} >= 0 and $accurate)
   {
-    #$hash->{".updateTimestamp"} = FmtDateTime($dataset->{tst});
-    #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{tst}));
     readingsBulkUpdate($hash, "velocity", $dataset->{vel});
     $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{tst});
-    #setReadingsVal($hash, "velocity", $dataset->{vel}." km/h", FmtDateTime($dataset->{tst}));
-    #push(@{$hash->{CHANGED}}, "velocity: ".$dataset->{vel}." km/h");
-    #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{tst}));
   }
   #else
   #{
   #  fhem( "deletereading $name velocity" );
+    #  readingsBulkUpdate($hash, "velocity", 0);
+    #  $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{tst});
   #}
   if(defined($dataset->{cog}) and $dataset->{cog} >= 0 and $accurate)
   {
-    #$hash->{".updateTimestamp"} = FmtDateTime($dataset->{tst});
-    #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{tst}));
     readingsBulkUpdate($hash, "heading", $dataset->{cog});
     $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{tst});
-    #setReadingsVal($hash, "heading", $dataset->{cog}." deg", FmtDateTime($dataset->{tst}));
-    #push(@{$hash->{CHANGED}}, "heading: ".$dataset->{cog}." deg");
-    #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{tst}));
   }
   #else
   #{
   #  fhem( "deletereading $name heading" );
+    #  readingsBulkUpdate($hash, "heading", 0);
+    #  $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{tst});
   #}
   if(defined($dataset->{batt}))
   {
-    #$hash->{".updateTimestamp"} = FmtDateTime($dataset->{tst});
-    #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{tst}));
     readingsBulkUpdate($hash, "batteryPercent", $dataset->{batt});
     $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{tst});
     readingsBulkUpdate($hash, "batteryState", (int($dataset->{batt}) <= int(AttrVal($name, "batteryWarning" , "20")))?"low":"ok");
     $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{tst});
-    #setReadingsVal($hash, "battery", $dataset->{batt}." %", FmtDateTime($dataset->{tst}));
-    #push(@{$hash->{CHANGED}}, "battery: ".$dataset->{batt}." %");
-    #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{tst}));
   }
   if(defined($dataset->{conn}))
   {
@@ -900,7 +1033,7 @@ sub livetracking_Notify($$)
   }
   if(defined($dataset->{p}) and $dataset->{p} > 0)
   {
-    readingsBulkUpdate($hash, "pressure", $dataset->{p}*10);
+    readingsBulkUpdate($hash, "pressure", sprintf("%.2f", $dataset->{p}*10));
     $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{tst});
   }
   if(defined($dataset->{desc}) and defined($dataset->{event}))
@@ -918,20 +1051,12 @@ sub livetracking_Notify($$)
 
     if($dataset->{event} eq "enter")
     {
-      #$hash->{".updateTimestamp"} = FmtDateTime($dataset->{tst});
-      #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{tst}));
       readingsBulkUpdate($hash, "place", $place);
       $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{tst});
-      #setReadingsVal($hash, "place", $dataset->{desc}, FmtDateTime($dataset->{tst}));
-      #push(@{$hash->{CHANGED}}, "place: ".$dataset->{desc});
-      #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{tst}));
       foreach my $placenumber (@placenumbers)
       {
-        #$hash->{".updateTimestamp"} = FmtDateTime($dataset->{tst});
-        #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{tst}));
         readingsBulkUpdate($hash, "zone_".$placenumber,"active");
         $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{tst});
-        #readingsSingleUpdate($hash,"zone_".$placenumber,"active",1);
       }
     }
       else
@@ -939,11 +1064,8 @@ sub livetracking_Notify($$)
       #fhem( "deletereading $name place" ) if(ReadingsVal($name,"place","undefined") eq $dataset->{desc});
       foreach my $placenumber (@placenumbers)
       {
-        #$hash->{".updateTimestamp"} = FmtDateTime($dataset->{tst});
-        #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{tst}));
         readingsBulkUpdate($hash, "zone_".$placenumber,"inactive");
         $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{tst});
-        #readingsSingleUpdate($hash,"zone_".$placenumber,"inactive",1);
       }
     }
   }
@@ -1002,16 +1124,10 @@ sub livetracking_Notify($$)
 
   if(defined($attr{$name}{home}) and $accurate)
   {
-    #$hash->{".updateTimestamp"} = FmtDateTime($dataset->{tst});
-    #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{tst}));
     readingsBulkUpdate($hash, "distance", livetracking_distance($hash,$dataset->{lat}.",".$dataset->{lon},$attr{$name}{home}));
     $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{tst});
-    #setReadingsVal($hash, "distance", livetracking_distance($hash,$dataset->{lat}.",".$dataset->{lon},$attr{$name}{home})." km", FmtDateTime($dataset->{tst}));
-    #push(@{$hash->{CHANGED}}, "distance: ".livetracking_distance($hash,$dataset->{lat}.",".$dataset->{lon},$attr{$name}{home})." km");
-    #push(@{$hash->{CHANGETIME}}, FmtDateTime($dataset->{tst}));
   }
 
-  #$hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{tst});
   readingsEndUpdate($hash, 1);
 
   readingsSingleUpdate($hash,".lastOwnTracks",$dataset->{tst},1);
@@ -1019,7 +1135,52 @@ sub livetracking_Notify($$)
   $hash->{helper}{lastOwnTracks} = $dataset->{tst};
 
   return undef;
+}
 
+sub livetracking_Notify($$)
+{
+  my ($hash, $dev) = @_;
+  my $name = $hash->{NAME};
+  my $devName = $dev->{NAME};
+
+  my $dataset = "";
+  my $data = "";
+
+  # Ignore wrong notifications
+  if($devName eq AttrVal($name, "owntracksDevice" , "owntracks"))
+  {
+    Log3 ($name, 6, "$name OwnTracks data: /n".Dumper($dev));
+
+    my $invaliddata = 1;
+    if(($dev->{CHANGED}[0] =~ m/_type":[ ]?"location/ || $dev->{CHANGED}[0] =~ m/_type":[ ]?"position/ || $dev->{CHANGED}[0] =~ m/_type":[ ]?"transition/ || $dev->{CHANGED}[0] =~ m/_type":[ ]?"steps/ || $dev->{CHANGED}[0] =~ m/_type":[ ]?"beacon/ ))
+    {
+      $invaliddata = 0;#owntracks
+      Log3 ($name, 4, "$name Detected OwnTracks data from MQTT device notify");
+    }
+    elsif(($dev->{CHANGED}[0] =~ m/position":[ ]?{/))
+    {
+      #{"position":{"id":14935,"attributes":{"batteryLevel":61,"distance":0.06,"totalDistance":4132002.73,"motion":false},"deviceId":1,"type":null,"protocol":"osmand","serverTime":"2018-10-31T22:14:10.290+0000","deviceTime":"2018-10-31T22:14:07.000+0000","fixTime":"2018-10-31T22:14:07.000+0000","outdated":false,"valid":true,"latitude":12.3456789,"longitude":12.3456789,"altitude":0,"speed":0,"course":0,"address":null,"accuracy":19.23500061035156,"network":null},"device":{"id":1,"attributes":{},"groupId":0,"name":"XXX","uniqueId":"YYY","status":"online","lastUpdate":"2018-10-31T22:14:10.290+0000","positionId":14935,"geofenceIds":[2],"phone":"","model":"","contact":"","category":"person","disabled":false}}
+      #{"position":{"id":566,"attributes":{"batteryLevel":66,"distance":25.79,"totalDistance":20665.79,"motion":false},"deviceId":1,"type":null,"protocol":"osmand","serverTime":"2019-01-06T11:39:41.279+0000","deviceTime":"2019-01-06T11:39:41.000+0000","fixTime":"2019-01-06T11:39:41.000+0000","outdated":false,"valid":true,"latitude":53.xxxxx,"longitude":8.xxxxx,"altitude":0,"speed":0,"course":0,"address":null,"accuracy":24.04000091552734,"network":null},"device":{"id":1,"attributes":{},"groupId":0,"name":"SomeName","uniqueId":"SomeID,"status":"online","lastUpdate":"2019-01-06T11:39:41.279+0000","positionId":565,"geofenceIds":[],"phone":"","model":"","contact":"","category":null,"disabled":false}}
+      $invaliddata = 0;#traccar
+      Log3 ($name, 4, "$name Detected Traccar data from MQTT device notify");
+    }
+    if($invaliddata == 1){
+      Log3 ($name, 4, "WRONG MQTT TYPE ".Dumper($dev->{CHANGED}[0]));
+      return undef;
+    }
+
+  #Log3 ($name, 1, "MQTT ".Dumper($dev->{CHANGED}[0]));
+
+    $data = substr($dev->{CHANGED}[0],index($dev->{CHANGED}[0], ": {")+2);
+
+  } else {
+    Log3 ($name, 5, "livetracks: Notify ignored from ".$devName);
+    return undef;
+  }
+
+  livetracking_ParseOwnTracks($hash,$data);
+
+  return undef;
 
 }
 
@@ -1046,14 +1207,22 @@ sub livetracking_dispatch($$$)
     if( $data !~ /{.*}/ )
     {
       Log3 $name, 3, "$name: invalid json detected: >>$data<< " . $param->{type} if($data ne "[]");
+      #$hash->{helper}{life360_token} = "" if( $param->{type} eq 'life360data' );
       return undef;
     }
 
-    my $json;
-    $json = JSON->new->utf8(0)->decode($data);
+    my $json = eval { JSON->new->utf8(0)->decode($data) };
+    if($@)
+    {
+      Log3 $name, 2, "$name: invalid json evaluation on dispatch type ".$param->{type}." ".$@;
+      #Log3 $name, 2, "$name: ".$param->{url}." / ".Dumper($data) if( $param->{type} eq 'life360data' );
+      return undef;
+    }
 
 
-    if( $param->{type} eq 'openpathsdata' ) {
+    if( $param->{type} eq 'life360data' ) {
+      livetracking_ParseLife360($hash,$json);
+    } elsif( $param->{type} eq 'openpathsdata' ) {
       livetracking_ParseOpenPaths($hash,$json);
     } elsif( $param->{type} eq 'swarmdata' ) {
       livetracking_ParseSwarm($hash,$json);
@@ -1061,6 +1230,192 @@ sub livetracking_dispatch($$$)
   }
 }
 
+##############################
+
+sub livetracking_BootstrapLife360($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  if(!defined($hash->{helper}{life360_user}))
+  {
+    return undef;
+  }
+
+  if(!defined($hash->{helper}{life360_script}) or $hash->{helper}{life360_script} eq "")
+  {
+    my $url = "https://www.life360.com/circles/#/";
+
+    HttpUtils_NonblockingGet({
+      url => $url,
+      noshutdown => 1,
+      hash => $hash,
+      type => 'scriptdata',
+      callback => \&livetracking_bootstrap,
+    });
+    return undef;
+  }
+
+  if(!defined($hash->{helper}{life360_secret}) or $hash->{helper}{life360_secret} eq "")
+  {
+    my $url = "https://www.life360.com/circles/scripts/".$hash->{helper}{life360_script}.".scripts.js";
+    Log3 $name, 1, "$name: $url";
+
+    HttpUtils_NonblockingGet({
+      url => $url,
+      noshutdown => 1,
+      hash => $hash,
+      type => 'secretdata',
+      callback => \&livetracking_bootstrap,
+    });
+    return undef;
+  }
+
+  if(!defined($hash->{helper}{life360_token}) or !defined($attr{$name}{life360_userid}) or $hash->{helper}{life360_token} eq "" or $attr{$name}{life360_userid} eq "")
+  {
+    my $url = "https://www.life360.com/v3/oauth2/token.json";
+
+    HttpUtils_NonblockingGet({
+      url => $url,
+      method => "POST",
+      header => "Content-Type: application/x-www-form-urlencoded\r\nAuthorization: Basic ".$hash->{helper}{life360_secret},
+      data => "countryCode=1&password=".uri_escape($hash->{helper}{life360_pass})."&username=".uri_escape($hash->{helper}{life360_user})."&persist=true&grant_type=password",
+      noshutdown => 1,
+      hash => $hash,
+      type => 'tokendata',
+      callback => \&livetracking_bootstrap,
+    });
+    Log3 $name, 1, "$name: "."countryCode=1&password=".uri_escape($hash->{helper}{life360_pass})."&username=".uri_escape($hash->{helper}{life360_user})."&persist=true&grant_type=password";
+
+    return undef;
+  }
+
+  if(!defined($attr{$name}{life360_circle}) or $attr{$name}{life360_circle} eq "")
+  {
+    my $url = "https://www.life360.com/v3/circles";
+
+    HttpUtils_NonblockingGet({
+      url => $url,
+      header => "Authorization: Bearer ".$hash->{helper}{life360_token},
+      noshutdown => 1,
+      hash => $hash,
+      type => 'circledata',
+      callback => \&livetracking_bootstrap,
+    });
+    return undef;
+  }
+
+
+  livetracking_GetLife360($hash);
+
+}
+
+sub livetracking_bootstrap($$$)
+{
+  my ($param, $err, $data) = @_;
+  my $hash = $param->{hash};
+  my $name = $hash->{NAME};
+
+
+  if( $err ) {
+    Log3 $name, 2, "$name: http request failed: $err";
+    return undef;
+  } elsif( $data ) {
+    Log3 $name, 5, "$name: $data";
+
+
+    if( $param->{type} eq 'scriptdata' )
+    {
+      if ($data =~ /\bscripts\/\b(.*?)\b.scripts.js\b/)
+      {
+        $hash->{helper}{life360_script} = $1;
+        Log3 $name, 4, "$name: life360 script ".$hash->{helper}{life360_script};
+        InternalTimer( gettimeofday() + 1, "livetracking_BootstrapLife360", $hash, 0);
+      }
+      return undef;
+    }
+    elsif( $param->{type} eq 'secretdata' )
+    {
+      if ($data =~ /CLIENT_SECRET = "(.*?)";/)
+      {
+        $hash->{helper}{life360_secret} = $1;
+        Log3 $name, 4, "$name: life360 secret ".$hash->{helper}{life360_secret};
+        InternalTimer( gettimeofday() + 1, "livetracking_BootstrapLife360", $hash, 0);
+      }
+      return undef;
+    }
+    elsif( $param->{type} eq 'tokendata' )
+    {
+      my $json = eval { JSON->new->utf8(0)->decode($data) };
+      if($@)
+      {
+        Log3 $name, 2, "$name: invalid json evaluation on dispatch type ".$param->{type}." ".$@;
+        return undef;
+      }
+
+      $hash->{helper}{life360_token} = $json->{access_token};
+      $attr{$name}{life360_userid} = $json->{user}->{id};
+
+      Log3 $name, 3, "$name: life360 token ".$json->{access_token};
+      InternalTimer( gettimeofday() + 1, "livetracking_BootstrapLife360", $hash, 0);
+      return undef;
+    }
+    elsif( $param->{type} eq 'circledata' )
+    {
+      my $json = eval { JSON->new->utf8(0)->decode($data) };
+      if($@)
+      {
+        Log3 $name, 2, "$name: invalid json evaluation on dispatch type ".$param->{type}." ".$@;
+        return undef;
+      }
+      $attr{$name}{life360_circle} = $json->{circles}[0]->{id} if($json->{circles}[0]->{id} ne "");
+      InternalTimer( gettimeofday() + 1, "livetracking_BootstrapLife360", $hash, 0);
+
+      foreach my $dataset (@{$json->{circles}})
+      {
+        Log3 $name, 5, "$name: Life360 Circle: ".$dataset->{name}.", ID: ".$dataset->{id};
+        my $url = "https://www.life360.com/v3/circles/".$dataset->{id};
+
+        HttpUtils_NonblockingGet({
+          url => $url,
+          header => "Authorization: Bearer ".$hash->{helper}{life360_token},
+          noshutdown => 1,
+          hash => $hash,
+          type => 'familydata',
+          callback => \&livetracking_bootstrap,
+        });
+
+
+      }
+      #Log3 $name, 2, "$name: Life360 : ".Dumper($data);
+      return undef;
+    }
+    elsif( $param->{type} eq 'familydata' )
+    {
+      my $json = eval { JSON->new->utf8(0)->decode($data) };
+      if($@)
+      {
+        Log3 $name, 2, "$name: invalid json evaluation on dispatch type ".$param->{type}." ".$@;
+        return undef;
+      }
+      InternalTimer( gettimeofday() + 1, "livetracking_GetLife360", $hash, 0);
+
+      foreach my $dataset (@{$json->{members}})
+      {
+        Log3 $name, 2, "$name: Life360 User: ".$dataset->{loginEmail}.", ID: ".$dataset->{id};
+      }
+      #Log3 $name, 5, "$name: Life360 : ".Dumper($data);
+
+    }
+
+
+    return undef;
+
+
+  }
+}
+
+##########################
 
 sub livetracking_getHistory($$$$$)
 {
@@ -1129,7 +1484,7 @@ sub livetracking_addExtension($) {
   my $url = "/osmand";
   delete $data{FWEXT}{$url} if($data{FWEXT}{$url});
 
-  Log3 $name, 1, "Enabling livetracking url for $name";
+  Log3 $name, 2, "Enabling livetracking url for $name ".AttrVal($name, "osmandId", "");
   $data{FWEXT}{$url}{deviceName} = $name;
   $data{FWEXT}{$url}{FUNC}       = "livetracking_Webcall";
   $data{FWEXT}{$url}{LINK}       = "livetracking";
@@ -1145,7 +1500,7 @@ sub livetracking_removeExtension($) {
   my $url  = "/osmand";
   my $name = $data{FWEXT}{$url}{deviceName};
   $name = $hash->{NAME} if(!defined($name));
-  Log3 $name, 3, "Disabling livetracking url for $name";
+  Log3 $name, 2, "Disabling livetracking url for $name ".AttrVal($name, "osmandId", "");
   delete $data{FWEXT}{$url};
   delete $modules{"livetracking"}{defptr}{"webcall".AttrVal($name, "osmandId", "")};
 }
@@ -1154,9 +1509,22 @@ sub livetracking_removeExtension($) {
 sub livetracking_Webcall() {
   my ($request) = @_;
 
-  my ($id) = $request =~ /id=(.*?)(&|$)/ || "";
+  $request =~ /id=(.*?)(&|$)/;
+  my $id = $1 || "";
+
+  if($id eq ""){
+    $request =~ /"tid":"(.*?)"/;
+    $id = $1 || "";
+  }
+  Log3 "livetracking", 5, "OsmAnd id incoming: ".$id;
+
   my $hash = $modules{"livetracking"}{defptr}{"webcall".$id};
-  $hash = $modules{"livetracking"}{defptr}{"webcall"} if(!defined($hash));
+  if(!defined($hash)){
+    $hash = $modules{"livetracking"}{defptr}{"webcall"} ;
+    Log3 "livetracking", 4, "OsmAnd webcall generic" if(defined($hash));
+  } else {
+    Log3 "livetracking", 4, "OsmAnd webcall for specific id";
+  }
 
   if(!defined($hash)){
     Log3 "livetracking", 1, "OsmAnd webcall hash not defined!";
@@ -1166,7 +1534,19 @@ sub livetracking_Webcall() {
   my $name = $hash->{NAME};
 
   my $osmandid = AttrVal($name, "osmandId", undef);
-  return undef if(defined($osmandid) && $osmandid ne $id);
+  if($id ne"" && defined($osmandid) && $osmandid ne $id){
+    Log3 "livetracking", 4, "OsmAnd webcall for wrong id";
+    return undef;
+  }
+
+
+  if($request =~ /"_type"/){
+    $request =~ s/\/osmand&//g;
+    $request =~ s/\/osmand\/&//g;
+    Log3 $name, 4, "OwnTracks HTTP request:\n".$request;
+    livetracking_ParseOwnTracks($hash,$request) if(($request =~ /_type":[ ]?"location/ || $request =~ /_type":[ ]?"position/ || $request =~ /_type":[ ]?"transition/ || $request =~ /_type":[ ]?"steps/ || $request =~ /_type":[ ]?"beacon/ ));
+    return undef;
+  }
 
 
   Log3 $name, 5, "OsmAnd webcall request:\n".$request;
@@ -1196,6 +1576,10 @@ sub livetracking_Webcall() {
 
   if($accurate && defined($lat) && defined($lon))
   {
+    readingsBulkUpdate($hash, "latitude", $lat);
+    $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($tst);
+    readingsBulkUpdate($hash, "longitude", $lon);
+    $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($tst);
     readingsBulkUpdate($hash, "location", $lat.",".$lon);
     $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($tst);
   }
@@ -1246,8 +1630,8 @@ sub livetracking_Webcall() {
 
   if(defined($lat) && defined($lon))
   {
-    return ( "text/plain; charset=utf-8",
-        "OK" );
+    return ( "application/json; charset=UTF-8",
+        "[]" );
   } else {
     return ( "text/plain; charset=utf-8",
         "no data" );
@@ -1497,12 +1881,13 @@ sub livetracking_utf8clean($) {
 
 =pod
 =item device
-=item summary Position tracking via OwnTracks, OpenPaths and Swarm
+=item summary Position tracking via OwnTracks, Life360 and Swarm
 =begin html
 
 <a name="livetracking"></a><h3>livetracking</h3>
 <ul>
-  This modul provides livetracking data from OpenPaths and Swarm (FourSquare).<br/>
+  This modul pulls livetracking data from Life360 and Swarm (FourSquare).<br/>
+  Data can also be pushed from OwnTracks or Traccar (iOS).<br/>
   Swarm Token: https://foursquare.com/oauth2/authenticate?client_id=EFWJ0DNVIREJ2CY1WDIFQ4MAL0ZGZAZUYCNE0NE0XZC3NCPX&response_type=token&redirect_uri=http://localhost&display=wap
   <br/><br/>
 
@@ -1510,8 +1895,8 @@ sub livetracking_utf8clean($) {
   <ul>
     <code>define &lt;name&gt; livetracking &lt;...&gt;</code>
     <br>
-    Example: <code>define livetrackingdata livetracking [openpaths_key] [openpaths_secret] [swarm_token]</code><br/>
-    Either both, just OpenPaths, just Swarm or none of them can be defined.
+    Example: <code>define livetrackingdata livetracking [life360_email] [life360_pass] [openpaths_key] [openpaths_secret] [swarm_token]</code><br/>
+    Any combination of these services can be defined as long as their order is correct.
     <br>&nbsp;
     <li><code>...</code>
       <br>
@@ -1529,6 +1914,10 @@ sub livetracking_utf8clean($) {
       <li><a name="#OpenPaths">OpenPaths</a>
       <br/>
       Manually trigger a data update for OpenPaths
+      </li><br>
+      <li><a name="#Life360">Life360</a>
+      <br/>
+      Manually trigger a data update for Life360
       </li><br>
       <li><a name="#Swarm">Swarm</a>
       <br/>
@@ -1555,6 +1944,10 @@ sub livetracking_utf8clean($) {
       <br>
       Send a message to OwnTracks
       </li><br>
+   <li><a name="#bootstrapLife360">bootstrapLife360</a>
+   <br>
+   Re-initialize Life360 login data
+   </li><br>
   </ul>
 
   <br>
@@ -1563,6 +1956,14 @@ sub livetracking_utf8clean($) {
       <li><code>location</code>
       <br>
       GPS position
+      </li><br>
+      <li><code>latitude</code>
+      <br>
+      GPS position - latitude
+      </li><br>
+      <li><code>longitude</code>
+      <br>
+      GPS position - longitude
       </li><br>
       <li><code>distance</code> (km)
       <br>
@@ -1681,12 +2082,15 @@ sub livetracking_utf8clean($) {
       </li><br>
       <li><a name="osmandServer">osmandServer</a> (0/1)
          <br>
-         Starts an OsmAnd compatible listener on FHEM which can be entered into traccar-client directly:<br/>
-         <code>https://user:pass@your.fhem.ip/fhem/osmand</code> (The Android client does not support user:pass authentication)
+         Starts an OsmAnd compatible listener on FHEM which can be entered into traccar-client directly.<br/>
+         This is also compatible with OwnTracks HTTP mode.<br/>
+         Traccar for Android supports no authentication, OwnTracks may need separate fields instead of <i>user:pass</i> in the address<br/>
+         <code>https://user:pass@your.fhem.ip/fhem/osmand</code> (address to be entered in the client)
       </li><br>
-      <li><a name="osmandId">osmandId</a>
+      <li><a name="osmandId">osmandId</a> (if more than one instance is used)
          <br>
-         The device identifier that is set in the OsmAnd client and transmitted in the request as <i>id</i>
+         The device identifier that is set in the OsmAnd client and transmitted in the request as <i>id</i><br/>
+         If OwnTracks HTTP mode is used, this can be the TrackerID
       </li><br>
 
   </ul>

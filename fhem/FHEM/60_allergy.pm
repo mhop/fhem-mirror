@@ -122,7 +122,7 @@ sub allergy_Define($$$) {
     return undef;
   }
 
-  $hash->{STATE} = "Initialized";
+  #$hash->{STATE} = "Initialized";
 
   return undef;
 }
