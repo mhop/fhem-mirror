@@ -198,5 +198,6 @@ See <a href="#PW_Scan">PW_Scan</a>.
 </ul>
 
 =end html
+=end html_DE
 =cut
 

@@ -243,5 +243,6 @@ Siehe <a href="#PW_Switch">PW_Switch</a>.
 </ul>
 
 =end html
+=end html_DE
 =cut
 

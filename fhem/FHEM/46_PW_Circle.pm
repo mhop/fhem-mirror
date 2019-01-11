@@ -412,5 +412,6 @@ See <a href="#Plugwise">Plugwise</a>.
 </ul>
 
 =end html
+=end html_DE
 =cut
 
