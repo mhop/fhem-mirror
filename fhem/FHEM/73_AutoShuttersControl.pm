@@ -41,7 +41,7 @@ package main;
 use strict;
 use warnings;
 
-my $version = '0.2.3.1';
+my $version = '0.2.3.2';
 
 sub AutoShuttersControl_Initialize($) {
     my ($hash) = @_;
@@ -3911,7 +3911,7 @@ sub getRainSensorShuttersClosedPos {
       <li>ASC_Brightness_Reading - passendes Reading welcher den Helligkeitswert von ASC_Brightness_Sensor anth&auml;lt</li>
       <li>ASC_BrightnessMinVal - minimaler Lichtwert, bei dem Schaltbedingungen gepr&uuml;ft werden sollen / wird der Wert von -1 nicht ge&auml;ndert, so wird automatisch der Wert aus dem Moduldevice genommen</li>
       <li>ASC_BrightnessMaxVal - maximaler Lichtwert, bei dem  Schaltbedingungen gepr&uuml;ft werden sollen / wird der Wert von -1 nicht ge&auml;ndert, so wird automatisch der Wert aus dem Moduldevice genommen</li>
-      <li>ASC_ShuttersPlace - window/terrace - Wenn dieses Attribut auf terrace gesetzt ist, das Residence Device in den Status "done" geht und SelfDefence aktiv ist, wird das Rollo geschlossen</li>
+      <li>ASC_ShuttersPlace - window/terrace - Wenn dieses Attribut auf terrace gesetzt ist, das Residence Device in den Status "gone" geht und SelfDefence aktiv ist (ohne das das Reading selfDefense gesetzt sein muss), wird das Rollo geschlossen</li>
       <li>ASC_WiggleValue - Wert um welchen sich die Position des Rollladens &auml;ndern soll</li>
       <li>ASC_BlockingTime_afterManual - wie viel Sekunden soll die Automatik nach einer manuellen Fahrt aus setzen.</li>
       <li>ASC_BlockingTime_beforNightClose - wie viel Sekunden vor dem n&auml;chtlichen schlie&zlig;en soll keine &ouml;ffnen Fahrt mehr statt finden.</li>
