@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  49_SSCam: fix blocking sscam operation if snap was executed with 
+                       arguments and aatribute snapEmailTxt is not set, 
+                       (Forum:#45671 #msg885475)
   - feature: 89_FULLY: Non blocking commands, expert mode
   - bugfix:  73_AutoShuttersControl: little fixes in commandref
   - feature: 49_SSCam: trigger several number of snapshots with alternative
