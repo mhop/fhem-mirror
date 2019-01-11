@@ -550,7 +550,7 @@ FHEM/lib/SWAP/*              justme1968           Sonstige Systeme
 FHEM/lib/UPnP/*              Reinerlein           Multimedia
 FHEM/lib/*deviceconfig.xml.gz        krikan       ZWave
 FHEM/lib/*manufacturer_specific.xml  krikan       ZWave
-FHEM/lib/AttrTemplate/mqtt2.template Beta-User    MQTT
+FHEM/lib/AttrTemplate/mqtt2.template Beta-User    https://forum.fhem.de/index.php/topic,94494.0.html
 FHEM/lib/AttrTemplate/httpmod.template Beta-User  Sonstiges
 FHEM/FhemUtils/*             mfr69bs              Sonstiges
 FHEM/GPUtils.pm              ntruchsess           FHEM Development
