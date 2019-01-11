@@ -70,7 +70,8 @@ use Device::MySensors::Message qw(:all);
 use SetExtensions qw/ :all /;
 
 BEGIN {
-  MYSENSORS->import(qw(:all));
+    main::LoadModule("MYSENSORS");
+    MYSENSORS->import(qw(:all));
 
   GP_Import(qw(
     AttrVal
