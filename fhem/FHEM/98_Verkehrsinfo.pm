@@ -25,6 +25,10 @@
 ############################################################################
 #
 # Changelog:
+# 2019-01-12, v2.4
+# Bugfix: Attribut disable InternalTimer parameter 4 = 0, nonblocking
+# Bugfix: Verkehrsinfo_GetUpdate, skip InternalTimer start if the Attribut disable != 0
+#
 # 2018-10-21, v2.3
 # Feature: Attribut disable added
 #
@@ -566,7 +570,9 @@ sub Verkehrsinfo_GetUpdate($) {
 	if ( $hash->{Interval}) {
         RemoveInternalTimer ($hash);
 	}
-	InternalTimer(gettimeofday()+$hash->{Interval}, "Verkehrsinfo_GetUpdate", $hash, 1);
+	if (AttrVal($name,"disable","0") == "0"){
+		InternalTimer(gettimeofday()+$hash->{Interval}, "Verkehrsinfo_GetUpdate", $hash, 0);
+	}
 	Log3 $hash, 4, "Verkehrsinfo: ($name) internal interval timer set to call GetUpdate again in " . int($hash->{Interval}). " seconds";
 	
 	my $param = {
