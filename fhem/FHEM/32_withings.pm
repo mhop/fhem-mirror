@@ -2850,8 +2850,6 @@ sub withings_readAuraAlarm($) {
   withings_Write($hash, $data);
 
 
-  $data="010100050101250000"; #new alarmdata
-  withings_Write($hash, $data);
   $data="010100050109070000"; #getstate
   withings_Write($hash, $data);
   $data="010100050109100000"; #sensordata clock
@@ -2861,7 +2859,22 @@ sub withings_readAuraAlarm($) {
   $data="0101000b0109060006090800020200"; #napdata
   withings_Write($hash, $data);
 
+  #$data="0101000a01090a0005090a000100"; #ping
+  #withings_Write($hash, $data);
+
+  $data = "000100010100050101010000"; #hello
+  withings_Write($hash, $data);
+  $data="010100050101110000"; #hello2
+  withings_Write($hash, $data);
   $data="0101000a01090a0005090a000100"; #ping
+  withings_Write($hash, $data);
+  $data="010100050101250000"; #new alarmdata
+  withings_Write($hash, $data);
+  $data="0101000a01090a0005090a000100"; #ping
+  withings_Write($hash, $data);
+  $data="010100050101250000"; #new alarmdata
+  withings_Write($hash, $data);
+  $data="010100050101250000"; #new alarmdata
   withings_Write($hash, $data);
 
   #$data="0101000b0109060006090800020000"; #unknown
@@ -2903,7 +2916,7 @@ sub withings_parseAuraData($$) {
     #set/ping/init return
     return undef;
   }
-  elsif($data =~ /x0101004a01010100450101/){
+  elsif($data =~ /0101004a01010100450101/){
     #init info
     return undef;
   }
