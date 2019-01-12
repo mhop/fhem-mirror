@@ -618,7 +618,7 @@ FileLog_Get($@)
   }
 
   my $reformatFn = AttrVal($name, "reformatFn", "");
-  my $tempread;
+  my $tempfileName;
 
   if($inf eq "-") {
     # In case now is after midnight, before the first event is logged.
@@ -628,38 +628,43 @@ FileLog_Get($@)
   } else {
     my $linf;
     if($inf eq "CURRENT") {
-      # Try to guess
-      if($from =~ m/^(....)-(..)-(..)/) {
-        $linf = $hash->{logfile};
-        my ($Y,$m,$d) = ($1,$2,$3);
-        sub expandFileWildcards($$$$) {
-           my ($f,$Y,$m,$d)=@_;
-           return ResolveDateWildcards($f,
-                        localtime(time_str2num("$Y-$m-$d 00:00:00")));
-        };
-        $linf=expandFileWildcards($linf,$Y,$m,$d);
+      if($from =~ m/^(....)-(..)-(..)/) {       # compute the log filename
+        my ($fy,$fm,$fd) = ($1,$2,$3);
+        $linf = ResolveDateWildcards($hash->{logfile},
+                        localtime(time_str2num("$fy-$fm-$fd 00:00:00")));
+
         if(AttrVal($name, "createGluedFile", 0)) {
           if($to =~ m/^(....)-(..)-(..)/) {
-            my $linf_to = $hash->{logfile};
-            my ($Y,$m,$d) = ($1,$2,$3);
-            $linf_to=expandFileWildcards($linf_to,$Y,$m,$d);
-            if($linf ne $linf_to){  # use to log files
-              $tempread=$linf_to.".transit.temp.log";
-              if(open(my $temp,'>',$tempread)){
-                if(open(my $i,'<',$linf)){
-                  print $temp join("",<$i>);
-                  close($i);
+            my ($ty,$tm,$td) = ($1,$2,$3);
+            my $linf_to = ResolveDateWildcards($hash->{logfile},
+                            localtime(time_str2num("$ty-$tm-$td 00:00:00")));
+            if($linf ne $linf_to){  # append each file into a temporary one
+              $tempfileName = $linf.".transit.temp.log";
+              unlink($tempfileName);
+              my $lf = $linf;
+
+              if(open(my $out,'>',$tempfileName)){
+                my $sec   = time_str2num("$fy-$fm-$fd 00:00:00");
+                my $secTo = time_str2num("$ty-$tm-$td 00:00:00");
+                my $lastFile = "";
+                while($sec <= $secTo) { # Loop over each day
+                  $linf=ResolveDateWildcards($hash->{logfile},localtime($sec));
+                  $sec += 86400;
+                  if($linf ne $lastFile) {
+                    $lastFile = $linf;
+                    if(open(my $i,'<',$linf)){
+                      print $out join("",<$i>);
+                      close($i);
+                    }
+                  }
                 }
-                if(open(my $i,'<',$linf_to)){
-                  print $temp join("",<$i>);
-                  close($i);
-                }
-                $linf=$tempread;
-                close($temp);
+                $linf = $tempfileName;
+                close($out);
               }
             }
           }
         }
+
         $linf = $hash->{currentlogfile} if($linf =~ m/%/ || ! -f $linf);
       } else {
         $linf = $hash->{currentlogfile};
@@ -772,7 +777,6 @@ RESCAN:
       next if($rescan && $h->{ret});
       my @missingvals;
       next if($h->{re} && $l !~ m/$h->{re}/);      # 20% CPU
-
       my $col = $h->{col};
       my $t = $h->{type};
 
@@ -884,7 +888,7 @@ RESCAN:
   }
 
   $ifh->close() if($ifh);
-  unlink($tempread) if($tempread);
+  unlink($tempfileName) if($tempfileName);
 
   my $ret = "";
   for(my $i = 0; $i < int(@a); $i++) {
@@ -1314,8 +1318,8 @@ FileLog_regexpFn($$)
     <a name="createGluedFile"></a>
     <li>createGluedFile<br>
         If set (to 1), and the SVG-Plot requests a time-range wich is stored
-        in two files, a temporary file with the content of both files will be
-        created, in order to satisfy the request.
+        in multiple files, a temporary file with the content of all files will
+        be created, in order to satisfy the request. Note: this may be slow.
         </li><br>
 
     <li><a href="#disable">disable</a></li>
@@ -1607,8 +1611,8 @@ FileLog_regexpFn($$)
     <a name="createGluedFile"></a>
     <li>createGluedFile<br>
         Falls gesetzt (1), und im SVG-Plot ein Zeitbereich abgefragt wird, was
-        in zwei Logdateien gespeichert ist, dann wird f&uuml;r die Anfrage eine
-        tempor&auml;re Datei mit dem Inhalt der beiden Dateien erzeugt.
+        in mehreren Logdateien gespeichert ist, dann wird f&uuml;r die Anfrage
+        eine tempor&auml;re Datei mit dem Inhalt aller Dateien erzeugt.
         </li><br>
 
     <li><a href="#disable">disable</a></li>
