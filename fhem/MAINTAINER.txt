@@ -480,7 +480,7 @@ FHEM/98_expandJSON.pm        dev0                 Unterstuetzende Dienste
 FHEM/98_feels_like.pm        hotbso               Wettermodule
 FHEM/98_fheminfo.pm          betateilchen         Sonstiges
 FHEM/98_fhemdebug.pm         rudolfkoenig         Sonstiges
-FHEM/98_freezemon            KernSani             Unterstuetzende Dienste 	
+FHEM/98_freezemon            KernSani             Unterstuetzende Dienste
 FHEM/98_GoogleAuth.pm        betateilchen         Unterstuetzende Dienste
 FHEM/98_GOOGLECAST.pm        dominikkarall        Multimedia
 FHEM/98_help.pm              betateilchen         Sonstiges
@@ -538,7 +538,9 @@ FHEM/TimeSeries.pm           neubert     /jensb   FHEM Development
 FHEM/TR064Utils.pm           rudolfkoenig         Automatisierung
 FHEM/UConv.pm                loredo               FHEM Development
 FHEM/Unit.pm                 loredo               FHEM Development
-FHEM/YahooWeatherAPI.pm      neubert              Unterstuetzende Dienste/Wettermodule
+FHEM/DarkSkyAPI.pm           CoolTux              Unterstuetzende Dienste/Wettermodule
+FHEM/OpenWeatherAPI.pm       CoolTux              Unterstuetzende Dienste/Wettermodule
+FHEM/YahooWeatherAPI.pm      neubert              (deprecated)
 FHEM/lib/Device/Firmata/*    jensb                Sonstige Systeme
 FHEM/lib/Device/MySensors/*  Hauswart/Beta-User   Bastelecke/MySensors
 FHEM/lib/MP3/*               Reinerlein           Multimedia

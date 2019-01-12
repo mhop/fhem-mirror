@@ -31,6 +31,8 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use vars qw($FW_ss);
 
+# use Data::Dumper;    # for Debug only
+
 my %pressure_trend_txt_en = ( 0 => "steady", 1 => "rising", 2 => "falling" );
 my %pressure_trend_txt_de = ( 0 => "gleichbleibend", 1 => "steigend", 2 => "fallend" );
 my %pressure_trend_txt_nl = ( 0 => "stabiel", 1 => "stijgend", 2 => "dalend" );
@@ -136,7 +138,7 @@ sub Weather_Initialize($) {
   $hash->{UndefFn} = "Weather_Undef";
   $hash->{GetFn}   = "Weather_Get";
   $hash->{SetFn}   = "Weather_Set";
-  $hash->{AttrList}= "disable " . $readingFnAttributes;
+  $hash->{AttrList}= "disable:0,1 " . $readingFnAttributes;
   $hash->{NotifyFn}= "Weather_Notify";
 
   #Weather_DebugCodes('de');
@@ -150,43 +152,19 @@ sub degrees_to_direction($@) {
    return $directions_txt_i18n[$mod];
 }
 
-###################################
-sub Weather_RetrieveData($$) {
-    my ($name, $blocking) = @_;
-    my $hash = $defs{$name};
 
-    # WOEID [WHERE-ON-EARTH-ID], go to http://weather.yahoo.com to find out
-    my $location= $hash->{LOCATION};
-    my $units= $hash->{UNITS};
-
-    my %args= (
-        woeid => $location,
-        format => "json",
-        blocking => $blocking,
-        callbackFnRef => \&Weather_RetrieveDataFinished,
-        hash => $hash,
-    );
-
-    # this needs to be finalized to use the APIOPTIONS
-    my $maxage= $hash->{fhem}{allowCache} ? 600 : 0; # use cached data if allowed
-    $hash->{fhem}{allowCache}= 1;
-    YahooWeatherAPI_RetrieveDataWithCache($maxage, \%args);
-}
-
-
-sub Weather_ReturnWithError($$$$$) {
-    my ($hash, $doTrigger, $err, $pubDate, $pubDateComment)= @_;
+sub Weather_ReturnWithError($$) {
+    my ($hash, $responseRef)= @_;
     my $name= $hash->{NAME};
 
-    $hash->{fhem}{allowCache}= 0; # do not use cache on next try
-
-    Log3 $hash, 3, "$name: $err";
     readingsBeginUpdate($hash);
-    readingsBulkUpdate($hash, "lastError", $err);
-    readingsBulkUpdate($hash, "pubDateComment", $pubDateComment) if(defined($pubDateComment));
-    readingsBulkUpdate($hash, "pubDateRemote", $pubDate) if(defined($pubDate));
-    readingsBulkUpdate($hash, "validity", "stale");
-    readingsEndUpdate($hash, $doTrigger);
+    readingsBulkUpdate($hash, 'lastError', $responseRef->{status});
+
+    foreach my $r (keys %{$responseRef} ) {
+        readingsBulkUpdate($hash, $r, $responseRef->{$r}) if ( ref($responseRef->{$r}) ne 'HASH' );
+    }
+    readingsBulkUpdate($hash, 'state', 'API Maintainer: ' . $responseRef->{apiMaintainer} .  ' ErrorMsg: ' . $responseRef->{status});
+    readingsEndUpdate($hash, 1);
 
     my $next= 60; # $next= $hash->{INTERVAL};
     Weather_RearmTimer($hash, gettimeofday()+$next);
@@ -194,126 +172,129 @@ sub Weather_ReturnWithError($$$$$) {
     return;
 }
 
-sub Weather_RetrieveDataFinished($$$) {
+sub Weather_RetrieveCallbackFn($) {
 
-    my ($argsRef, $err, $response)= @_;
+    my $name = shift;
+    my $hash = $defs{$name};
+    my $responseRef = $hash->{fhem}->{api}->getWeather;
 
-    my $hash= $argsRef->{hash};
-    my $name= $hash->{NAME};
-    my $doTrigger= $argsRef->{blocking} ? 0 : 1;
+    if ( $responseRef->{status} eq 'ok' ) {
+        Weather_WriteReadings($hash,$responseRef);
+    }
+    else {
+        Weather_ReturnWithError($hash,$responseRef);
+    }
+}
 
-    # check for error from retrieving data
-    return Weather_ReturnWithError($hash, $doTrigger, $err, undef, undef) if($err);
-
-    # decode JSON data from Weather Channel
-    my $data;
-    ($err, $data)= YahooWeatherAPI_JSONReturnChannelData($response);
-    return Weather_ReturnWithError($hash, $doTrigger, $err, undef, undef) if($err);
-
-    # check if up-to-date
-    my ($pubDateComment, $pubDate, $pubDateTs)= YahooWeatherAPI_pubDate($data);
-    return Weather_ReturnWithError($hash, $doTrigger, $pubDateComment, $pubDate, $pubDateComment)
-        unless(defined($pubDateTs));
-    my $ts= defined($hash->{READINGS}{pubDateTs}) ? $hash->{READINGS}{pubDateTs}{VAL} : 0;
-    return Weather_ReturnWithError($hash, $doTrigger, "stale data received", $pubDate, $pubDateComment)
-        if($ts> $pubDateTs);
-
-
-    #
-    # from here on we assume that $data is complete and correct
-    #
-    my $lang= $hash->{LANG};
-
-    my @YahooCodes_i18n= YahooWeatherAPI_getYahooCodes($lang);
-
-    my $item= $data->{item};
-
+sub Weather_WriteReadings($$) {
+    my ($hash,$dataRef) = @_;
+    my $name = $hash->{NAME};
     readingsBeginUpdate($hash);
 
     # delete some unused readings
-    delete($hash->{READINGS}{temp_f}) if(defined($hash->{READINGS}{temp_f}));
-    delete($hash->{READINGS}{unit_distance}) if(defined($hash->{READINGS}{unit_distance}));
-    delete($hash->{READINGS}{unit_speed}) if(defined($hash->{READINGS}{unit_speed}));
-    delete($hash->{READINGS}{unit_pressuree}) if(defined($hash->{READINGS}{unit_pressuree}));
-    delete($hash->{READINGS}{unit_temperature}) if(defined($hash->{READINGS}{unit_temperature}));
-
-    # convert to metric units as far as required
-    my $isConverted= YahooWeatherAPI_ConvertChannelData($data);
+    delete($hash->{READINGS}->{temp_f}) if(defined($hash->{READINGS}->{temp_f}));
+    delete($hash->{READINGS}->{unit_distance}) if(defined($hash->{READINGS}->{unit_distance}));
+    delete($hash->{READINGS}->{unit_speed}) if(defined($hash->{READINGS}->{unit_speed}));
+    delete($hash->{READINGS}->{unit_pressuree}) if(defined($hash->{READINGS}->{unit_pressuree}));
+    delete($hash->{READINGS}->{unit_temperature}) if(defined($hash->{READINGS}->{unit_temperature}));
 
     # housekeeping information
-    readingsBulkUpdate($hash, "lastError", "");
-    readingsBulkUpdate($hash, "pubDateComment", $pubDateComment);
-    readingsBulkUpdate($hash, "pubDate", $pubDate);
-    readingsBulkUpdate($hash, "pubDateRemote", $pubDate);
-    readingsBulkUpdate($hash, "pubDateTs", $pubDateTs);
-    readingsBulkUpdate($hash, "isConverted", $isConverted);
-    readingsBulkUpdate($hash, "validity", "up-to-date");
-
-    # description
-    readingsBulkUpdate($hash, "description", $data->{description});
-
-    # location
-    readingsBulkUpdate($hash, "city", $data->{location}{city});
-    readingsBulkUpdate($hash, "region", $data->{location}{region});
-    readingsBulkUpdate($hash, "country", $data->{location}{country});
-    readingsBulkUpdate($hash, "lat", $item->{lat});
-    readingsBulkUpdate($hash, "long", $item->{long});
-
-    # wind
-    my $windspeed= int($data->{wind}{speed}+0.5);
-    readingsBulkUpdate($hash, "wind", $windspeed);
-    readingsBulkUpdate($hash, "wind_speed", $windspeed);
-    readingsBulkUpdate($hash, "wind_chill", $data->{wind}{chill});
-    my $winddir= $data->{wind}{direction};
-    readingsBulkUpdate($hash, "wind_direction", $winddir);
-    my $wdir= degrees_to_direction($winddir, @directions_txt_i18n);
-    readingsBulkUpdate($hash, "wind_condition", "Wind: $wdir $windspeed km/h");
-
-    # atmosphere
-    my $humidity= $data->{atmosphere}{humidity};
-    readingsBulkUpdate($hash, "humidity", $humidity);
-    my $pressure= $data->{atmosphere}{pressure};
-    readingsBulkUpdate($hash, "pressure", $pressure);
-    readingsBulkUpdate($hash, "visibility", int($data->{atmosphere}{visibility}+0.5));
-    my $pressure_trend= $data->{atmosphere}{rising};
-    readingsBulkUpdate($hash, "pressure_trend", $pressure_trend);
-    readingsBulkUpdate($hash, "pressure_trend_txt", $pressure_trend_txt_i18n{$pressure_trend});
-    readingsBulkUpdate($hash, "pressure_trend_sym", $pressure_trend_sym{$pressure_trend});
-
-    # condition
-    my $date= $item->{condition}{date};
-    readingsBulkUpdate($hash, "current_date_time", $date);
-    readingsBulkUpdate($hash, "day_of_week", $wdays_txt_i18n{substr($date,0,3)});
-    my $code= $item->{condition}{code};
-    readingsBulkUpdate($hash, "code", $code);
-    readingsBulkUpdate($hash, "condition", $YahooCodes_i18n[$code]);
-    readingsBulkUpdate($hash, "icon",  $iconlist[$code]);
-    my $temp= $item->{condition}{temp};
-    readingsBulkUpdate($hash, "temp_c", $temp);
-    readingsBulkUpdate($hash, "temperature", $temp);
-
-    # forecast
-    my $forecast= $item->{forecast};
-    my $i= 0;
-    foreach my $fc (@{$forecast}) {
-        $i++;
-        my $f= "fc" . $i ."_";
-        readingsBulkUpdate($hash, $f . "day_of_week", $wdays_txt_i18n{$fc->{day}});
-        readingsBulkUpdate($hash, $f . "date", $fc->{date});
-        readingsBulkUpdate($hash, $f . "low_c", $fc->{low});
-        readingsBulkUpdate($hash, $f . "high_c", $fc->{high});
-        my $fccode= $fc->{code};
-        readingsBulkUpdate($hash, $f . "code", $fccode);
-        readingsBulkUpdate($hash, $f . "condition",  $YahooCodes_i18n[$fccode]);
-        readingsBulkUpdate($hash, $f . "icon",  $iconlist[$fccode]);
+    readingsBulkUpdate($hash, 'lastError', '');
+    foreach my $r (keys %{$dataRef} ) {
+        readingsBulkUpdate($hash, $r, $dataRef->{$r})
+          if ( ref($dataRef->{$r}) ne 'HASH' and ref($dataRef->{$r}) ne 'ARRAY' );
+        readingsBulkUpdate($hash, '.license', $dataRef->{license}->{text});
     }
 
-    #my $val= "T:$temp°C  " . substr($status_items_txt_i18n{1}, 0, 1) .":$humidity%  " . substr($status_items_txt_i18n{0}, 0, 1) . ":$windspeed km/h  P:$pressure mbar";
-    my $val= "T: $temp  H: $humidity  W: $windspeed  P: $pressure";
-    Log3 $hash, 4, "$name: $val";
-    readingsBulkUpdate($hash, "state", $val);
+    readingsBulkUpdate($hash, "validity", "up-to-date");
 
-    readingsEndUpdate($hash, $doTrigger);
+
+    ### current
+    if ( defined($dataRef->{current}) and ref( $dataRef->{current} ) eq 'HASH' ) {
+        while( my ($r,$v) = each %{$dataRef->{current}} ) {
+            readingsBulkUpdate($hash, $r, $v)
+              if ( ref($dataRef->{$r}) ne 'HASH' and ref($dataRef->{$r}) ne 'ARRAY' );
+        }
+
+        readingsBulkUpdate($hash, 'icon',  $iconlist[$dataRef->{current}->{code}]);
+        if (  defined($dataRef->{current}->{wind_direction})
+          and $dataRef->{current}->{wind_direction}
+          and defined($dataRef->{current}->{wind_speed})
+          and $dataRef->{current}->{wind_speed}
+          )
+        {
+            my $wdir= degrees_to_direction($dataRef->{current}->{wind_direction}, @directions_txt_i18n);
+            readingsBulkUpdate($hash, 'wind_condition', 'Wind: ' . $wdir . ' ' . $dataRef->{current}->{wind_speed} . ' km/h');
+        }
+    }
+
+    ### forecast
+    if ( ref( $dataRef->{forecast} ) eq 'HASH' ) {
+        ## hourly
+        if (  defined($dataRef->{forecast}->{hourly})
+          and ref( $dataRef->{forecast}->{hourly} ) eq 'ARRAY'
+          and scalar( @{ $dataRef->{forecast}->{hourly} } ) > 0 )
+        {
+            my $i= 0;
+            foreach my $fc (@{$dataRef->{forecast}->{hourly}}) {
+                $i++;
+                my $f= "hfc" . $i ."_";
+
+                while( my ($r,$v) = each %{$fc} ) {
+                    readingsBulkUpdate($hash, $f.$r, $v)
+                    if ( ref($dataRef->{$r}) ne 'HASH' and ref($dataRef->{$r}) ne 'ARRAY' );
+                }
+                readingsBulkUpdate($hash, $f . 'icon',  $iconlist[$dataRef->{forecast}->{hourly}[$i-1]{code}]);
+
+                if (  defined($dataRef->{forecast}->{hourly}[$i-1]{wind_direction})
+                  and $dataRef->{forecast}->{hourly}[$i-1]{wind_direction}
+                  and defined($dataRef->{forecast}->{hourly}[$i-1]{wind_speed})
+                  and $dataRef->{forecast}->{hourly}[$i-1]{wind_speed}
+                  )
+                {
+                    my $wdir= degrees_to_direction($dataRef->{forecast}->{hourly}[$i-1]{wind_direction}, @directions_txt_i18n);
+                    readingsBulkUpdate($hash, $f . 'wind_condition', 'Wind: ' . $wdir . ' ' . $dataRef->{forecast}->{hourly}[$i-1]{wind_speed} . ' km/h');
+                }
+            }
+        }
+
+        ## daily
+        if (  defined($dataRef->{forecast}->{daily}) and ref( $dataRef->{forecast}->{daily} ) eq 'ARRAY'
+          and scalar( @{ $dataRef->{forecast}->{daily} } ) > 0 )
+        {
+            my $i= 0;
+            foreach my $fc (@{$dataRef->{forecast}->{daily}}) {
+                $i++;
+                my $f= "fc" . $i ."_";
+
+                while( my ($r,$v) = each %{$fc} ) {
+                    readingsBulkUpdate($hash, $f.$r, $v)
+                    if ( ref($dataRef->{$r}) ne 'HASH' and ref($dataRef->{$r}) ne 'ARRAY' );
+                }
+                readingsBulkUpdate($hash, $f . 'icon',  $iconlist[$dataRef->{forecast}->{daily}[$i-1]{code}]);
+
+                if (  defined($dataRef->{forecast}->{daily}[$i-1]{wind_direction})
+                  and $dataRef->{forecast}->{daily}[$i-1]{wind_direction}
+                  and defined($dataRef->{forecast}->{daily}[$i-1]{wind_speed})
+                  and $dataRef->{forecast}->{daily}[$i-1]{wind_speed}
+                  )
+                {
+                    my $wdir= degrees_to_direction($dataRef->{forecast}->{daily}[$i-1]{wind_direction}, @directions_txt_i18n);
+                    readingsBulkUpdate($hash, $f . 'wind_condition', 'Wind: ' . $wdir . ' ' . $dataRef->{forecast}->{daily}[$i-1]{wind_speed} . ' km/h');
+                }
+            }
+        }
+    }
+
+    my $val= 'T:' . $dataRef->{current}->{temperature} . '°C'
+            .' ' . substr($status_items_txt_i18n{1}, 0, 1) . ':' . $dataRef->{current}->{humidity} . '%'
+            .' ' . substr($status_items_txt_i18n{0}, 0, 1) . ':' . $dataRef->{current}->{wind} . 'km/h'
+            .' P:' . $dataRef->{current}->{pressure} . 'mbar';
+
+    Log3 $hash, 4, "$name: $val";
+    readingsBulkUpdate($hash, 'state', $val);
+
+    readingsEndUpdate($hash, 1);
 
     Weather_RearmTimer($hash, gettimeofday()+$hash->{INTERVAL});
     return;
@@ -326,7 +307,7 @@ sub Weather_GetUpdate($) {
     my ($hash) = @_;
     my $name = $hash->{NAME};
 
-    if($attr{$name} && $attr{$name}{disable}) {
+    if($attr{$name} && $attr{$name}->{disable}) {
       Log3 $hash, 5, "Weather $name: retrieval of weather data is disabled by attribute.";
       readingsBeginUpdate($hash);
       readingsBulkUpdate($hash, "pubDateComment", "disabled by attribute");
@@ -334,7 +315,8 @@ sub Weather_GetUpdate($) {
       readingsEndUpdate($hash, 1);
       Weather_RearmTimer($hash, gettimeofday()+$hash->{INTERVAL});
     } else {
-      Weather_RetrieveData($name, 0);
+#       Weather_RetrieveData($name, 0);
+      $hash->{fhem}->{api}->setRetrieveData;
     }
 
     return 1;
@@ -350,13 +332,14 @@ sub Weather_Get($@) {
   my $reading= $a[1];
   my $value;
 
-  if(defined($hash->{READINGS}{$reading})) {
-        $value= $hash->{READINGS}{$reading}{VAL};
+  if(defined($hash->{READINGS}->{$reading})) {
+        $value = $hash->{READINGS}->{$reading}->{VAL};
   } else {
-        my $rt= "";
+        my $rt = '';
         if(defined($hash->{READINGS})) {
-                $rt= join(" ", sort keys %{$hash->{READINGS}});
+                $rt = join(":noArg ", sort keys %{$hash->{READINGS}});
         }
+
         return "Unknown reading $reading, choose one of " . $rt;
   }
 
@@ -375,7 +358,7 @@ sub Weather_Set($@) {
     Weather_GetUpdate($hash);
     return undef;
   } else {
-    return "Unknown argument $cmd, choose one of update";
+    return "Unknown argument $cmd, choose one of update:noArg";
   }
 }
 
@@ -401,7 +384,7 @@ sub Weather_Notify($$) {
   return if($dev->{NAME} ne "global");
   return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
 
-  # return if($attr{$name} && $attr{$name}{disable});
+  # return if($attr{$name} && $attr{$name}->{disable});
 
   # update weather after initialization or change of configuration
   # wait 10 to 29 seconds to avoid congestion due to concurrent activities
@@ -421,47 +404,29 @@ sub Weather_Define($$) {
 
   my ($hash, $def) = @_;
 
-  # define <name> Weather <location> [interval]
-  # define MyWeather Weather "Maintal,HE" 3600
+  my $usage= "syntax: define <name> Weather [API=<API>] [apikey=<apikey>] [location=<location>] [interval=<interval>] [lang=<lang>]";
 
-  # define <name> Weather location=<location> [API=<API>] [interval=<interval>] [lang=<lang>]
-
-  my $name;
-  my $API="YahooWeatherAPI,transport:https,cachemaxage:600";
-  my $location;
+  # defaults
+  my $API="DarkSkyAPI,cachemaxage:600";
   my $interval  = 3600;
-  my $lang      = "en";
 
-  if($def =~ /=/) {
+  # parse parameters
+  my ($arrayref, $hashref)= parseParams($def);
+  my @a= @{$arrayref};
+  my %h= %{$hashref};
 
-    my $usage= "syntax: define <name> Weather location=<location> [API=<API>] [lang=<lang>]";
+  # check minimum syntax
+  return $usage unless(scalar @a == 2);
+  my $name= $a[0];
 
-    my ($arrayref, $hashref)= parseParams($def);
-    my @a= @{$arrayref};
-    my %h= %{$hashref};
 
-    return $usage unless(scalar @a == 2);
-    $name= $a[0];
+  my $location= $h{location} if exists $h{location};
+  my $apikey = $h{apikey} if exists $h{apikey};
+  my $lang= $h{lang} if exists $h{lang};
+  $interval= $h{interval} if exists $h{interval};
+  $API = $h{API} if exists $h{API};
 
-    return $usage unless exists $h{location};
-    $location= $h{location};
-    $lang= $h{lang} if exists $h{lang};
-    $interval= $h{interval} if exists $h{interval};
-    $API= $h{API} if exists $h{API};
-
-  } else {
-    my @a = split("[ \t][ \t]*", $def);
-
-    return "syntax: define <name> Weather <location> [interval [en|de|nl|fr|pl|it]]"
-        if(int(@a) < 3 && int(@a) > 5);
-
-    $name      = $a[0];
-    $location  = $a[2];
-    if(int(@a)>=4) { $interval= $a[3]; }
-    if(int(@a)==5) { $lang= $a[4]; }
-
-  }
-
+  # evaluate API options
   my ($api,$apioptions)= split(',', $API, 2);
   $apioptions= "" unless(defined($apioptions));
   eval {
@@ -470,21 +435,24 @@ sub Weather_Define($$) {
   return "$name: cannot load API $api: $@" if($@);
 
   $hash->{NOTIFYDEV} = "global";
-  $hash->{STATE} = "Initialized";
-  $hash->{fhem}{interfaces}= "temperature;humidity;wind";
-
-  $hash->{LOCATION}     = $location;
+  $hash->{fhem}->{interfaces}= "temperature;humidity;wind";
+  $hash->{LOCATION}     = ( (defined($location) and $location) ? $location : AttrVal( 'global', 'latitude',  'error' ).','.AttrVal( 'global', 'longitude', 'error' ) );
   $hash->{INTERVAL}     = $interval;
-  $hash->{LANG}         = $lang;
+  $hash->{LANG}         = ( (defined($lang) and $lang) ? $lang : lc(AttrVal('global','language','de')) );
   $hash->{API}          = $api;
+  $hash->{APIKEY}       = $apikey;
   $hash->{APIOPTIONS}   = $apioptions;
-  $hash->{UNITS}        = "c"; # hardcoded to use degrees centigrade (Celsius)
-  $hash->{READINGS}{current_date_time}{TIME}= TimeNow();
-  $hash->{READINGS}{current_date_time}{VAL}= "none";
+  #$hash->{UNITS}        = "c"; # hardcoded to use degrees centigrade (Celsius)
+  $hash->{READINGS}->{current_date_time}->{TIME}= TimeNow();
+  $hash->{READINGS}->{current_date_time}->{VAL}= "none";
 
-  $hash->{fhem}{allowCache}= 1;
+  $hash->{fhem}->{allowCache}= 1;
 
-  Weather_LanguageInitialize($lang);
+  readingsSingleUpdate($hash,'state','Initialized',1);
+  Weather_LanguageInitialize($hash->{LANG});
+
+  my $apistring = $api . '::Weather';
+  $hash->{fhem}->{api} = $apistring->new( { devName => $hash->{NAME}, apikey => $hash->{APIKEY}, location => $hash->{LOCATION}, apioptions => $hash->{APIOPTIONS}, language => $hash->{LANG} } );
 
   Weather_GetUpdate($hash) if($init_done);
 
@@ -510,8 +478,7 @@ use constant ICONSCALE => 0.5;
 
 #####################################
 
-sub
-WeatherIconIMGTag($) {
+sub WeatherIconIMGTag($) {
 
   my $width= int(ICONSCALE*ICONWIDTH);
   my ($icon)= @_;
@@ -523,16 +490,16 @@ WeatherIconIMGTag($) {
 
 #####################################
 
-sub
-WeatherAsHtmlV($;$)
+sub WeatherAsHtmlV($;$)
 {
 
   my ($d,$items) = @_;
   $d = "<none>" if(!$d);
-  $items = 10 if( !$items );
+  $items = 9 if( !$items );
   return "$d is not a Weather instance<br>"
-        if(!$defs{$d} || $defs{$d}{TYPE} ne "Weather");
+        if(!$defs{$d} || $defs{$d}->{TYPE} ne "Weather");
 
+  my $h = $defs{$d};
   my $width= int(ICONSCALE*ICONWIDTH);
 
   my $ret = '<table class="weather">';
@@ -543,36 +510,36 @@ WeatherAsHtmlV($;$)
         ReadingsVal($d, "temp_c", ""), ReadingsVal($d, "humidity", ""),
         ReadingsVal($d, "wind_condition", ""));
 
+  my $fc = ( (defined($h->{READINGS}->{fc1_day_of_week}) and $h->{READINGS}->{fc1_day_of_week}) ? 'fc' : 'hfc' );
   for(my $i=1; $i<$items; $i++) {
     $ret .= sprintf('<tr><td class="weatherIcon" width=%d>%s</td><td class="weatherValue"><span class="weatherDay">%s: %s</span><br><span class="weatherMin">min %s°C</span> <span class="weatherMax">max %s°C</span></td></tr>',
         $width,
-        WeatherIconIMGTag(ReadingsVal($d, "fc${i}_icon", "")),
-        ReadingsVal($d, "fc${i}_day_of_week", ""),
-        ReadingsVal($d, "fc${i}_condition", ""),
-        ReadingsVal($d, "fc${i}_low_c", ""), ReadingsVal($d, "fc${i}_high_c", ""));
+        WeatherIconIMGTag(ReadingsVal($d, "${fc}${i}_icon", "")),
+        ReadingsVal($d, "${fc}${i}_day_of_week", ""),
+        ReadingsVal($d, "${fc}${i}_condition", ""),
+        ReadingsVal($d, "${fc}${i}_low_c", ""), ReadingsVal($d, "${fc}${i}_high_c", ""));
   }
 
   $ret .= "</table>";
   return $ret;
 }
 
-sub
-WeatherAsHtml($;$)
+sub WeatherAsHtml($;$)
 {
   my ($d,$i) = @_;
   WeatherAsHtmlV($d,$i);
 }
 
-sub
-WeatherAsHtmlH($;$)
+sub WeatherAsHtmlH($;$)
 {
 
   my ($d,$items) = @_;
   $d = "<none>" if(!$d);
-  $items = 10 if( !$items );
+  $items = 9 if( !$items );
   return "$d is not a Weather instance<br>"
-        if(!$defs{$d} || $defs{$d}{TYPE} ne "Weather");
+        if(!$defs{$d} || $defs{$d}->{TYPE} ne "Weather");
 
+  my $h = $defs{$d};
   my $width= int(ICONSCALE*ICONWIDTH);
 
 
@@ -580,41 +547,41 @@ WeatherAsHtmlH($;$)
   my $format= '<td><table border=1><tr><td class="weatherIcon" width=%d>%s</td></tr><tr><td class="weatherValue">%s</td></tr><tr><td class="weatherValue">%s°C %s%%</td></tr><tr><td class="weatherValue">%s</td></tr></table></td>';
 
   my $ret = '<table class="weather">';
+  my $fc = ( (defined($h->{READINGS}->{fc1_day_of_week}) and $h->{READINGS}->{fc1_day_of_week}) ? 'fc' : 'hfc' );
 
   # icons
   $ret .= sprintf('<tr><td class="weatherIcon" width=%d>%s</td>', $width, WeatherIconIMGTag(ReadingsVal($d, "icon", "")));
   for(my $i=1; $i<$items; $i++) {
-    $ret .= sprintf('<td class="weatherIcon" width=%d>%s</td>', $width, WeatherIconIMGTag(ReadingsVal($d, "fc${i}_icon", "")));
+    $ret .= sprintf('<td class="weatherIcon" width=%d>%s</td>', $width, WeatherIconIMGTag(ReadingsVal($d, "${fc}${i}_icon", "")));
   }
   $ret .= '</tr>';
 
   # condition
   $ret .= sprintf('<tr><td class="weatherDay">%s</td>', ReadingsVal($d, "condition", ""));
   for(my $i=1; $i<$items; $i++) {
-    $ret .= sprintf('<td class="weatherDay">%s: %s</td>', ReadingsVal($d, "fc${i}_day_of_week", ""),
-        ReadingsVal($d, "fc${i}_condition", ""));
+    $ret .= sprintf('<td class="weatherDay">%s: %s</td>', ReadingsVal($d, "${fc}${i}_day_of_week", ""),
+        ReadingsVal($d, "${fc}${i}_condition", ""));
   }
   $ret .= '</tr>';
 
   # temp/hum | min
   $ret .= sprintf('<tr><td class="weatherMin">%s°C %s%%</td>', ReadingsVal($d, "temp_c", ""), ReadingsVal($d, "humidity", ""));
   for(my $i=1; $i<$items; $i++) {
-    $ret .= sprintf('<td class="weatherMin">min %s°C</td>', ReadingsVal($d, "fc${i}_low_c", ""));
+    $ret .= sprintf('<td class="weatherMin">min %s°C</td>', ReadingsVal($d, "${fc}${i}_low_c", ""));
   }
   $ret .= '</tr>';
 
   # wind | max
   $ret .= sprintf('<tr><td class="weatherMax">%s</td>', ReadingsVal($d, "wind_condition", ""));
   for(my $i=1; $i<$items; $i++) {
-    $ret .= sprintf('<td class="weatherMax">max %s°C</td>', ReadingsVal($d, "fc${i}_high_c", ""));
+    $ret .= sprintf('<td class="weatherMax">max %s°C</td>', ReadingsVal($d, "${fc}${i}_high_c", ""));
   }
   $ret .= "</tr></table>";
 
   return $ret;
 }
 
-sub
-WeatherAsHtmlD($;$)
+sub WeatherAsHtmlD($;$)
 {
   my ($d,$i) = @_;
   if($FW_ss) {
@@ -631,52 +598,95 @@ WeatherAsHtmlD($;$)
 
 =pod
 =item device
-=item summary provides current weather condition and forecast (source: Yahoo Weather API)
-=item summary_DE stellt Wetterbericht und -vorhersage bereit (Quelle: Yahoo Weather API)
+=item summary provides current weather condition and forecast
+=item summary_DE stellt Wetterbericht und -vorhersage bereit
 =begin html
 
 <a name="Weather"></a>
 <h3>Weather</h3>
 <ul>
-  You need the JSON perl module. Use <code>apt-get install libjson-perl</code> on Debian and derivatives.<br><br>
+  Note: you need the JSON perl module. Use <code>apt-get install
+  libjson-perl</code> on Debian and derivatives.<p><p>
+
+  The Weather module works with various weather APIs:
+  <ul>
+    <li>DarkSky (<a href="https://darksky.net">web site</a>, standard)</li>
+    <li>OpenWeatherMap (<a href="https://openweathermap.org/">web site)</a></li>
+  </ul>
+  <br>
+  Such a virtual Weather device periodically gathers current and forecast
+  weather conditions from the chosen weather API.<br><br>
 
   <a name="Weatherdefine"></a>
-  <b>Define</b>
-  <ul>
-    <code>define &lt;name&gt; Weather &lt;location&gt; [&lt;interval&gt; [&lt;language&gt;]]</code><br>
-    <br>
-    Defines a virtual device for weather forecasts.<br><br>
+  <b>Define</b><br><br>
+    <ul>
+      <code>define &lt;name&gt; Weather [API=&lt;API&gt;[,&lt;apiotions&gt;]] [apikey=&lt;apikey&gt;]
+       [location=&lt;location&gt;] [interval=&lt;interval&gt;] [lang=&lt;lang&gt;]</code><br><br>
 
-    A Weather device periodically gathers current and forecast weather conditions
-    from the Yahoo Weather API.<br><br>
 
-    The parameter <code>location</code> is the WOEID (WHERE-ON-EARTH-ID), go to
-    <a href="http://weather.yahoo.com">http://weather.yahoo.com</a> to find it out for your location.<br><br>
+       The parameters have the following meanings:<br>
 
-    The optional parameter <code>interval</code> is the time between subsequent updates
-    in seconds. It defaults to 3600 (1 hour).<br><br>
+       <table border="1">
+       <tr><td><code>API</code></td><td>name of the weather API, e.g. <code>DarkSkyAPI</code></td></tr>
+       <tr><td><code>apioptions</code></td><td>indivual options for the chosen API</td></tr>
+       <tr><td><code>apikey</code></td><td>key for the chosen API</td></tr>
+       <tr><td><code>location</code></td><td>location for the weather forecast;
+         e.g. coordinates, a town name or an ID, depending on the chosen API</td></tr>
+       <tr><td><code>interval</code></td><td>duration in seconds between updates</td></tr>
+       <tr><td><code>lang</code></td><td>language of the forecast: <code>de</code>,
+         <code>en</code>, <code>pl</code>, <code>fr</code>, <code>it</code> or <code>nl</code></td></tr>
+       </ table>
+       <p>
 
-    The optional language parameter may be one of
-    <code>de</code>,
-    <code>en</code>,
-    <code>pl</code>,
-    <code>fr</code>,
-    <code>nl</code>,
-    <code>it</code>,
-
-    It determines the natural language in which the forecast information appears.
-    It defaults to <code>en</code>. If you want to set the language you also have to set the interval.<br><br>
+    A very simple definition is:<br><br>
+    <code>define &lt;name&gt; Weather apikey=&lt;DarkSkyAPISecretKey&gt;</code><br><br>
+    This uses the Dark Sky API with an individual key that you need to
+    retrieve from the Dark Sky web site.<p><p>
 
     Examples:
     <pre>
-      define MyWeather Weather 673513
-      define Forecast Weather 673513 1800
-     </pre>
+      define Forecast Weather apikey=987498ghjgf864
+      define MyWeather Weather api=OpenWeatherMapAPI,cachemaxage:600 apikey=09878945fdskv876 location=52.4545,13.4545 interval=3600 language=de
+    </pre>
 
-    The module provides four additional functions <code>WeatherAsHtml</code>, <code>WeatherAsHtmlV</code>, <code>WeatherAsHtmlH</code> and
-    <code>WeatherAsHtmlD</code>. The former two functions are identical: they return the HTML code for a
-    vertically arranged weather forecast. The third function returns the HTML code for a horizontally arranged weather forecast. The
-    latter function dynamically picks the orientation depending on wether a smallscreen style is set (vertical layout) or not (horizontal layout). Each version accepts an additional paramter to limit the numer of icons to display.<br><br>
+
+    API-specific documentation follows.<p>
+
+        <b>Dark Sky</b><p>
+
+        <table border="1">
+        <tr><td>API</td><td><code>DarkSkyAPI</code></td></tr>
+        <tr><td>apioptions</td><td><code>cachemaxage=&lt;cachemaxage&gt;</code><br>duration
+          in seconds to retrieve the forecast from the cache instead from the API</td></tr>
+        <tr><td>location</td><td><code>&lt;latitude,longitude&gt;</code><br>
+          geographic coordinates in degrees of the location for which the
+          weather is forecast; if missing, the values of the attributes
+          of the <code>global</code> device are taken, if these exist.</td></tr>
+        </ table>
+        <p><p>
+
+        <b>OpenWeatherMap</b><p>
+
+        <table border="1">
+        <tr><td>API</td><td><code>OpenWeatherMapAPI</code></td></tr>
+        <tr><td>apioptions</td><td><code>cachemaxage=&lt;cachemaxage&gt;</code><br>duration
+          in seconds to retrieve the forecast from the cache instead from the API</td></tr>
+        <tr><td>location</td><td><code>&lt;latitude,longitude&gt;</code><br>
+          geographic coordinates in degrees of the location for which the
+          weather is forecast; if missing, the values of the attributes
+          of the <code>global</code> device are taken, if these exist.</td></tr>
+        </ table>
+        <p><p>
+
+    The module provides four additional functions <code>WeatherAsHtml</code>,
+    <code>WeatherAsHtmlV</code>, <code>WeatherAsHtmlH</code> and
+    <code>WeatherAsHtmlD</code>. The former two functions are identical:
+    they return the HTML code for a vertically arranged weather forecast.
+    The third function returns the HTML code for a horizontally arranged
+    weather forecast. The latter function dynamically picks the orientation
+    depending on wether a smallscreen style is set (vertical layout) or not
+    (horizontal layout). Each version accepts an additional paramter
+    to limit the numer of icons to display.<br><br>
     Example:
     <pre>
       define MyWeatherWeblink weblink htmlCode { WeatherAsHtmlH("MyWeather") }
@@ -704,6 +714,7 @@ WeatherAsHtmlD($;$)
     Valid readings and their meaning (? can be one of 1, 2, 3, 4, 5 and stands
     for today, tomorrow, etc.):<br>
     <table>
+    <tr><td>.locense</td><td>license of the API provider, if available</td></tr>
     <tr><td>city</td><td>name of town returned for location</td></tr>
     <tr><td>code</td><td>current condition code</td></tr>
     <tr><td>condition</td><td>current condition</td></tr>
@@ -731,13 +742,9 @@ WeatherAsHtmlD($;$)
     <tr><td>wind_speed</td><td>same as wind</td></tr>
     </table>
     <br>
-    The following readings help to identify whether a workaround has kicked in to avoid the retrieval of
-    stale data from the remote server:
-    <table>
-    <tr><td>pubDate</td><td>publication time of forecast for current set of readings</td></tr>
-    <tr><td>pubDateRemote</td><td>publication time of forecast as seen on remote server</td></tr>
-    <tr><td>validity</td><td>stale, if publication time as seen on remote server is before that of current set of readings</td></tr>
-    </table>
+    Depending on the chosen API, other readings can be shown as well.
+    The meaning of these readings can be determined from the API provider's
+    documentation.
 
   </ul>
   <br>
@@ -759,36 +766,100 @@ WeatherAsHtmlD($;$)
 <a name="Weather"></a>
 <h3>Weather</h3>
 <ul>
-    Es wird das Perl-Modul JSON ben&ouml;tigt. Mit <code>apt-get install libjson-perl</code> kann es unter Debian und Derivaten installiert werden.<br><br>
+    Hinweis: es wird das Perl-Modul JSON ben&ouml;tigt. Mit <code>apt-get install
+    libjson-perl</code> kann es unter Debian und Derivaten installiert
+    werden.<p><p>
+
+    Das Weather-Modul arbeitet mit verschiedenen Wetter-APIs zusammen:
+    <ul>
+      <li>DarkSky (<a href="https://darksky.net">Webseite</a>, Standard)</li>
+      <li>OpenWeatherMap (<a href="https://openweathermap.org/">Webseite)</a></li>
+    </ul>
+    <br>
+    Eine solche virtuelle Wetterstation sammelt periodisch aktuelle Wetterdaten
+    und Wettervorhersagen aus dem verwendeten API.<br><br>
+
 
   <a name="Weatherdefine"></a>
-  <b>Define</b>
+  <b>Define</b><br><br>
   <ul>
-    <code>define &lt;name&gt; Weather &lt;location&gt; [&lt;interval&gt; [&lt;language&gt;]]</code><br>
-    <br>
-    Bezechnet ein virtuelles Gerät für Wettervorhersagen.<br><br>
+    <code>define &lt;name&gt; Weather [API=&lt;API&gt;[,&lt;apiotions&gt;]] [apikey=&lt;apikey&gt;]
+     [location=&lt;location&gt;] [interval=&lt;interval&gt;] [lang=&lt;lang&gt;]</code><br><br>
 
-    Eine solche virtuelle Wetterstation sammelt periodisch aktuelle und zukünftige Wetterdaten aus der Yahoo-Wetter-API.<br><br>
+    Die Parameter haben die folgende Bedeutung:<br>
 
-    Der Parameter <code>location</code> entspricht der sechsstelligen WOEID (WHERE-ON-EARTH-ID). Die WOEID für den eigenen Standort kann auf <a href="http://weather.yahoo.com">http://weather.yahoo.com</a> gefunden werden.<br><br>
+    <table border="1">
+    <tr><td><code>API</code></td><td>Name des Wetter-APIs, z.B. <code>DarkSkyAPI</code></td></tr>
+    <tr><td><code>apioptions</code></td><td>Individuelle Optionen f&uuml;r das gew&auml;hlte API</td></tr>
+    <tr><td><code>apikey</code></td><td>Schl&uuml;ssel f&uuml;r das gew&auml;hlte API</td></tr>
+    <tr><td><code>location</code></td><td>Ort, f&uuml;r den das Wetter vorhergesagt wird.
+      Abh&auml;ngig vom API z.B. die Koordinaten, ein Ortsname oder eine ID.</td></tr>
+    <tr><td><code>interval</code></td><td>Dauer in Sekunden zwischen den einzelnen
+      Aktualisierungen der Wetterdaten</td></tr>
+    <tr><td><code>lang</code></td><td>Sprache der Wettervorhersage: <code>de</code>,
+      <code>en</code>, <code>pl</code>, <code>fr</code>, <code>it</code> oder <code>nl</code></td></tr>
+    </ table>
+    <p>
 
-    Der optionale Parameter  <code>interval</code> gibt die Dauer in Sekunden zwischen den einzelnen Aktualisierungen der Wetterdaten an. Der Standardwert ist 3600 (1 Stunde). Wird kein Wert angegeben, gilt der Standardwert.<br><br>
+    Eine ganz einfache Definition ist:<br><br>
+    <code>define &lt;name&gt; Weather apikey=&lt;DarkSkyAPISecretKey&gt;</code><br><br>
 
-    Der optionale Parameter für die möglichen Sprachen darf einen der folgende Werte annehmen: <code>de</code>, <code>en</code>, <code>pl</code>, <code>fr</code> oder <code>nl</code>. Er bezeichnet die natürliche Sprache, in der die Wetterinformationen dargestellt werden. Der Standardwert ist <code>en</code>. Wird für die Sprache kein Wert angegeben, gilt der Standardwert. Wird allerdings der Parameter für die Sprache gesetzt, muss ebenfalls ein Wert für das Abfrageintervall gesetzt werden.<br><br>
-
+    Bei dieser Definition wird die API von Dark Sky verwendet mit einem
+    individuellen Schl&uuml;ssel, den man sich auf der Webseite von Dark Sky
+     beschaffen muss.<p><p>
 
     Beispiele:
     <pre>
-      define MyWeather Weather 673513
-      define Forecast Weather 673513 1800
-     </pre>
+      define Forecast Weather apikey=987498ghjgf864
+      define MyWeather Weather api=OpenWeatherMapAPI,cachemaxage:600 apikey=09878945fdskv876 location=52.4545,13.4545 interval=3600 language=de
+    </pre>
 
-    Das Modul unterstützt zusätzlich vier verschiedene Funktionen <code>WeatherAsHtml</code>, <code>WeatherAsHtmlV</code>, <code>WeatherAsHtmlH</code> und <code>WeatherAsHtmlD</code>. Die ersten beiden Funktionen sind identisch: sie erzeugen den HTML-Code für eine vertikale Darstellung des Wetterberichtes. Die dritte Funktion liefert den HTML-Code für eine horizontale Darstellung des Wetterberichtes. Die letztgenannte Funktion wählt automatisch eine Ausrichtung, die abhängig davon ist, ob ein Smallcreen Style ausgewählt ist (vertikale Darstellung) oder nicht (horizontale Darstellung). Alle vier Funnktionen akzeptieren einen zusätzlichen optionalen Paramter um die Anzahl der darzustellenden Icons anzugeben.<br><br>
+    Es folgt die API-spezifische Dokumentation.<p>
+
+    <b>Dark Sky</b><p>
+
+    <table border="1">
+    <tr><td>API</td><td><code>DarkSkyAPI</code></td></tr>
+    <tr><td>apioptions</td><td><code>cachemaxage=&lt;cachemaxage&gt;</code><br>Zeitdauer in
+      Sekunden, innerhalb derer die Wettervorhersage nicht neu abgerufen
+      sondern aus dem Cache zur&uuml;ck geliefert wird.</td></tr>
+    <tr><td>location</td><td><code>&lt;latitude,longitude&gt;</code><br> Geographische Breite
+      und L&auml;nge des Ortes in Grad, f&uuml;r den das Wetter vorhergesagt wird.
+      Bei fehlender Angabe werden die Werte aus den gleichnamigen Attributen
+      des <code>global</code>-Device genommen, sofern vorhanden.</td></tr>
+    </ table>
+    <p><p>
+
+    <b>OpenWeatherMap</b><p>
+
+    <table border="1">
+    <tr><td>API</td><td><code>OpenWeatherMapAPI</code></td></tr>
+    <tr><td>apioptions</td><td><code>cachemaxage=&lt;cachemaxage&gt;</code> Zeitdauer in
+      Sekunden, innerhalb derer die Wettervorhersage nicht neu abgerufen
+      sondern aus dem Cache zur&uuml;ck geliefert wird.</td></tr>
+    <tr><td>location</td><td><code>&lt;latitude,longitude&gt;</code> Geographische Breite
+      und L&auml;nge des Ortes in Grad, f&uuml;r den das Wetter vorhergesagt wird.
+      Bei fehlender Angabe werden die Werte aus den gleichnamigen Attributen
+      des <code>global</code>-Device genommen, sofern vorhanden.</td></tr>
+    </ table>
+    <p><p>
+
+    Das Modul unterst&uuml;tzt zus&auml;tzlich vier verschiedene Funktionen
+    <code>WeatherAsHtml</code>, <code>WeatherAsHtmlV</code>,
+    <code>WeatherAsHtmlH</code> und <code>WeatherAsHtmlD</code>.
+    Die ersten beiden Funktionen sind identisch: sie erzeugen
+    den HTML-Kode f&uuml;r eine vertikale Darstellung des Wetterberichtes.
+    Die dritte Funktion liefert den HTML-Code f&uuml;r eine horizontale
+    Darstellung des Wetterberichtes. Die letztgenannte Funktion w&auml;hlt
+    automatisch eine Ausrichtung, die abh&auml;ngig davon ist, ob ein
+    Smallcreen Style ausgew&auml;hlt ist (vertikale Darstellung) oder
+    nicht (horizontale Darstellung). Alle vier Funnktionen akzeptieren
+    einen zus&auml;tzlichen optionalen Paramter um die Anzahl der
+    darzustellenden Icons anzugeben.<br><br>
     Beispiel:
     <pre>
       define MyWeatherWeblink weblink htmlCode { WeatherAsHtmlH("MyWeather") }
     </pre>
-
 
   </ul>
   <br>
@@ -798,7 +869,9 @@ WeatherAsHtmlD($;$)
   <ul>
     <code>set &lt;name&gt; update</code><br><br>
 
-    Erzwingt eine Abfrage der Wetterdaten. Die darauffolgende Abfrage wird gemäß dem eingestellten Intervall <code>interval</code> Sekunden später durchgeführt.<br><br>
+    Erzwingt eine Abfrage der Wetterdaten. Die darauffolgende Abfrage
+    wird gem&auml;&szlig; dem eingestellten
+    Intervall <code>interval</code> Sekunden sp&auml;ter durchgef&uuml;hrt.<br><br>
   </ul>
   <br>
 
@@ -807,50 +880,44 @@ WeatherAsHtmlD($;$)
   <ul>
     <code>get &lt;name&gt; &lt;reading&gt;</code><br><br>
 
-    Gültige ausgelesene Daten (readings) und ihre Bedeutung (das ? kann einen der Werte 1, 2, 3 , 4 oder 5 annehmen und steht für heute, morgen, übermorgen etc.):<br><br>
+    G&uuml;ltige ausgelesene Daten (readings) und ihre Bedeutung (das ? kann einen der Werte 1, 2, 3 , 4 oder 5 annehmen und steht f&uuml;r heute, morgen, &uuml;bermorgen etc.):<br><br>
     <table>
-    <tr><td>city</td><td>Name der Stadt, der aufgrund der WOEID übermittelt wird</td></tr>
-    <tr><td>code</td><td>Code für die aktuellen Wetterverhältnisse</td></tr>
-    <tr><td>condition</td><td>aktuelle Wetterverhältnisse</td></tr>
+    <tr><td>.license</td><td>Lizenz des jeweiligen API-Anbieters, sofern vorhanden</td></tr>
+    <tr><td>city</td><td>Name der Stadt, der f&uuml;r die location &uuml;bermittelt wird</td></tr>
+    <tr><td>code</td><td>Code f&uuml;r die aktuellen Wetterverh&auml;ltnisse</td></tr>
+    <tr><td>condition</td><td>aktuelle Wetterverh&auml;ltnisse</td></tr>
     <tr><td>current_date_time</td><td>Zeitstempel der letzten Aktualisierung der Wetterdaten vom Server</td></tr>
-    <tr><td>fc?_code</td><td>Code für die vorhergesagten Wetterverhältnisse</td></tr>
-    <tr><td>fc?_condition</td><td>vorhergesagte Wetterverhältnisse</td></tr>
+    <tr><td>fc?_code</td><td>Code f&uuml;r die vorhergesagten Wetterverh&auml;ltnisse</td></tr>
+    <tr><td>fc?_condition</td><td>vorhergesagte Wetterverh&auml;ltnisse</td></tr>
     <tr><td>fc?_day_of_week</td><td>Wochentag des Tages, der durch ? dargestellt wird</td></tr>
     <tr><td>fc?_high_c</td><td>vorhergesagte maximale Tagestemperatur in Grad Celsius</td></tr>
-    <tr><td>fc?_icon</td><td>Icon für Vorhersage</td></tr>
+    <tr><td>fc?_icon</td><td>Icon f&uuml;r Vorhersage</td></tr>
     <tr><td>fc?_low_c</td><td>vorhergesagte niedrigste Tagestemperatur in Grad Celsius</td></tr>
-    <tr><td>humidity</td><td>gegenwärtige Luftfeuchtgkeit in %</td></tr>
-    <tr><td>icon</td><td>relativer Pfad für das aktuelle Icon</td></tr>
+    <tr><td>humidity</td><td>gegenw&auml;rtige Luftfeuchtgkeit in %</td></tr>
+    <tr><td>icon</td><td>relativer Pfad f&uuml;r das aktuelle Icon</td></tr>
     <tr><td>pressure</td><td>Luftdruck in hPa</td></tr>
-    <tr><td>pressure_trend</td><td>Luftdrucktendenz (0= gleichbleibend, 1= steigend, 2= fallend)</td></tr>
-    <tr><td>pressure_trend_txt</td><td>textliche Darstellung der Luftdrucktendenz</td></tr>
-    <tr><td>pressure_trend_sym</td><td>symbolische Darstellung der Luftdrucktendenz</td></tr>
-    <tr><td>temperature</td><td>gegenwärtige Temperatur in Grad Celsius</td></tr>
-    <tr><td>temp_c</td><td>gegenwärtige Temperatur in Grad Celsius</td></tr>
-    <tr><td>temp_f</td><td>gegenwärtige Temperatur in Grad Celsius</td></tr>
+    <tr><td>temperature</td><td>gegenw&auml;rtige Temperatur in Grad Celsius</td></tr>
+    <tr><td>temp_c</td><td>gegenw&auml;rtige Temperatur in Grad Celsius</td></tr>
+    <tr><td>temp_f</td><td>gegenw&auml;rtige Temperatur in Grad Celsius</td></tr>
     <tr><td>visibility</td><td>Sichtweite in km</td></tr>
     <tr><td>wind</td><td>Windgeschwindigkeit in km/h</td></tr>
-    <tr><td>wind_chill</td><td>gefühlte Temperatur in Grad Celsius</td></tr>
     <tr><td>wind_condition</td><td>Windrichtung und -geschwindigkeit</td></tr>
     <tr><td>wind_direction</td><td>Gradangabe der Windrichtung (0 = Nordwind)</td></tr>
     <tr><td>wind_speed</td><td>Windgeschwindigkeit in km/h (mit wind identisch)</td></tr>
-    </table>
-    <br>
-    Die folgenden Daten helfen zu identifizieren, ob ein Workaround angeschlagen hat, der die Verwendung von
-    veralteten Daten auf dem entfernten Server verhindert:
-    <table>
-    <tr><td>pubDate</td><td>Ver&ouml;ffentlichungszeitpunkt der Wettervorhersage in den aktuellen Daten (readings)</td></tr>
-    <tr><td>pubDateRemote</td><td>Ver&ouml;ffentlichungszeitpunkt der Wettervorhersage auf dem entfernten Server</td></tr>
     <tr><td>validity</td><td>stale, wenn der Ver&ouml;ffentlichungszeitpunkt auf dem entfernten Server vor dem Zeitpunkt der aktuellen Daten (readings) liegt</td></tr>
     </table>
-
+    <br>
+    Je nach verwendeter API ist es durchaus m&ouml;glich, dass weitere
+    Readings geschrieben werden. Die Bedeutung dieser Readings kann man
+    der API-Beschreibung des Anbieters entnehmen.
   </ul>
   <br>
 
   <a name="Weatherattr"></a>
   <b>Attribute</b>
   <ul>
-    <li>disable: stellt die Abfrage der Wetterdaten ab - der Timer l&auml;ft gem&auml;&szlig Plan doch es werden keine Daten vom
+    <li>disable: stellt die Abfrage der Wetterdaten ab - der Timer l&auml;ft
+    gem&auml;&szlig Plan doch es werden keine Daten vom
     API angefordert.</li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
