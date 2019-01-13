@@ -133,7 +133,10 @@ alexa_Define($$)
 
   #CommandAttr(undef, "$name alexaFHEM-filter alexaName=..*") if( !AttrVal($name, 'alexaFHEM-filter', undef ) );
 
-  CommandAttr(undef, "$name devStateIcon stopped:control_home\@red:start stopping:control_on_off\@orange running.*:control_on_off\@green:stop") if( !AttrVal($name, 'devStateIcon', undef ) );
+  if( !AttrVal($name, 'devStateIcon', undef ) ) {
+    CommandAttr(undef, "$name stateFormat alexaFHEM");
+    CommandAttr(undef, "$name devStateIcon stopped:control_home\@red:start stopping:control_on_off\@orange running.*:control_on_off\@green:stop")
+  }
 
 
   if( $init_done ) {
@@ -161,8 +164,7 @@ alexa_Notify($$)
 sub
 alexa_Undefine($$)
 {
-  my ($hash, $arg) = @_;
-  my $name = $hash->{NAME};
+  my ($hash, $name) = @_;
 
   if( $hash->{PID} ) {
     $hash->{undefine} = 1;
@@ -176,9 +178,9 @@ alexa_Undefine($$)
   return undef;
 }
 sub
-alexa_Shutdown($$)
+alexa_Shutdown($)
 {
-  my ($hash, $arg) = @_;
+  my ($hash) = @_;
 
   alexa_stoppedAlexaFHEM($hash);
 
@@ -671,7 +673,7 @@ alexa_stoppedAlexaFHEM($)
   if( $hash->{undefine} ) {
     delete $hash->{undefine};
     CommandDelete(undef, $name);
-    Log3 $name, 3, "$name: alexaFHEM deleted";
+    Log3 $name, 2, "$name: alexaFHEM deleted";
 
    } elsif( $hash->{start} ) {
     alexa_startAlexaFHEM($hash)
@@ -886,7 +888,6 @@ alexa_Get($$@)
         }
       }
     }
-Log 1, Dumper \%types;
 
     my $verbsOfIntent = {};
     my $intentsOfVerb = {};
@@ -1258,16 +1259,16 @@ alexa_Attr($$$)
     my $hash = $defs{$name};
     if( $cmd eq "set" && $attrVal ne "0" ) {
       $attrVal = 1;
-      alexa_stopAlexaFHEM($hash);
+      alexa_stopAlexaFHEM($hash) if( $init_done );
 
     } else {
       $attr{$name}{$attrName} = 0;
-      alexa_startAlexaFHEM($hash);
+      alexa_startAlexaFHEM($hash) if( $init_done );
 
     }
 
   } elsif( $attrName eq 'disabledForIntervals' ) {
-    alexa_startAlexaFHEM($hash);
+    alexa_startAlexaFHEM($hash) if( $init_done );
 
   } elsif( $attrName eq 'skillId' ) {
     if( $cmd eq "set" && $attrVal ) {
@@ -1296,7 +1297,7 @@ alexa_Attr($$$)
 
     $attr{$name}{$attrName} = $attrVal;
 
-    alexa_startAlexaFHEM($hash);
+    alexa_startAlexaFHEM($hash) if( $init_done );
 
   } elsif( $attrName eq 'alexaFHEM-auth' ) {
     if( $cmd eq "set" && $attrVal ) {
@@ -1304,7 +1305,7 @@ alexa_Attr($$$)
     }
     $attr{$name}{$attrName} = $attrVal;
 
-    alexa_startAlexaFHEM($hash);
+    alexa_startAlexaFHEM($hash) if( $init_done );
 
     if( $cmd eq "set" && $orig ne $attrVal ) {
       $attr{$name}{$attrName} = $attrVal;
@@ -1314,12 +1315,12 @@ alexa_Attr($$$)
   } elsif( $attrName eq 'alexaFHEM-host' ) {
     $attr{$name}{$attrName} = $attrVal;
 
-    alexa_startAlexaFHEM($hash);
+    alexa_startAlexaFHEM($hash) if( $init_done );
 
   } elsif( $attrName eq 'alexaFHEM-sshUser' ) {
     $attr{$name}{$attrName} = $attrVal;
 
-    alexa_startAlexaFHEM($hash);
+    alexa_startAlexaFHEM($hash) if( $init_done );
 
   }
 
