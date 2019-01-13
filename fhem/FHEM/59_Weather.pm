@@ -635,7 +635,7 @@ sub WeatherAsHtmlD($;$)
        <tr><td><code>interval</code></td><td>duration in seconds between updates</td></tr>
        <tr><td><code>lang</code></td><td>language of the forecast: <code>de</code>,
          <code>en</code>, <code>pl</code>, <code>fr</code>, <code>it</code> or <code>nl</code></td></tr>
-       </ table>
+       <table/>
        <p>
 
     A very simple definition is:<br><br>
@@ -662,7 +662,7 @@ sub WeatherAsHtmlD($;$)
           geographic coordinates in degrees of the location for which the
           weather is forecast; if missing, the values of the attributes
           of the <code>global</code> device are taken, if these exist.</td></tr>
-        </ table>
+        <table/>
         <p><p>
 
         <b>OpenWeatherMap</b><p>
@@ -675,7 +675,7 @@ sub WeatherAsHtmlD($;$)
           geographic coordinates in degrees of the location for which the
           weather is forecast; if missing, the values of the attributes
           of the <code>global</code> device are taken, if these exist.</td></tr>
-        </ table>
+        <table/>
         <p><p>
 
     The module provides four additional functions <code>WeatherAsHtml</code>,
@@ -798,7 +798,7 @@ sub WeatherAsHtmlD($;$)
       Aktualisierungen der Wetterdaten</td></tr>
     <tr><td><code>lang</code></td><td>Sprache der Wettervorhersage: <code>de</code>,
       <code>en</code>, <code>pl</code>, <code>fr</code>, <code>it</code> oder <code>nl</code></td></tr>
-    </ table>
+    <table/>
     <p>
 
     Eine ganz einfache Definition ist:<br><br>
@@ -827,7 +827,7 @@ sub WeatherAsHtmlD($;$)
       und L&auml;nge des Ortes in Grad, f&uuml;r den das Wetter vorhergesagt wird.
       Bei fehlender Angabe werden die Werte aus den gleichnamigen Attributen
       des <code>global</code>-Device genommen, sofern vorhanden.</td></tr>
-    </ table>
+    <table/>
     <p><p>
 
     <b>OpenWeatherMap</b><p>
@@ -841,7 +841,7 @@ sub WeatherAsHtmlD($;$)
       und L&auml;nge des Ortes in Grad, f&uuml;r den das Wetter vorhergesagt wird.
       Bei fehlender Angabe werden die Werte aus den gleichnamigen Attributen
       des <code>global</code>-Device genommen, sofern vorhanden.</td></tr>
-    </ table>
+    <table/>
     <p><p>
 
     Das Modul unterst&uuml;tzt zus&auml;tzlich vier verschiedene Funktionen
