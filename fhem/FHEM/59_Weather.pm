@@ -646,7 +646,7 @@ sub WeatherAsHtmlD($;$)
     Examples:
     <pre>
       define Forecast Weather apikey=987498ghjgf864
-      define MyWeather Weather api=OpenWeatherMapAPI,cachemaxage:600 apikey=09878945fdskv876 location=52.4545,13.4545 interval=3600 language=de
+      define MyWeather Weather api=OpenWeatherMapAPI,cachemaxage:600 apikey=09878945fdskv876 location=52.4545,13.4545 interval=3600 lang=de
     </pre>
 
 
@@ -811,7 +811,7 @@ sub WeatherAsHtmlD($;$)
     Beispiele:
     <pre>
       define Forecast Weather apikey=987498ghjgf864
-      define MyWeather Weather API=OpenWeatherMapAPI,cachemaxage:600 apikey=09878945fdskv876 location=52.4545,13.4545 interval=3600 language=de
+      define MyWeather Weather API=OpenWeatherMapAPI,cachemaxage:600 apikey=09878945fdskv876 location=52.4545,13.4545 interval=3600 lang=de
     </pre>
 
     Es folgt die API-spezifische Dokumentation.<p>
