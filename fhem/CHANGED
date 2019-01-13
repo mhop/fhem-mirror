@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  73_AutoShuttersControl: Fix shutters drive then window open and
+                                     shutter in brightness rage.
   - feature: 82_LGTV_WebOS: Support for SkyOnline App
   - bugfix:  59_Weather: fix table bug in commandref
   - bugfix:  59_Weather: fix mor typo in Commandref

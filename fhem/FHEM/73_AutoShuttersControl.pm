@@ -1214,7 +1214,13 @@ sub EventProcessingBrightness($@) {
             );
 
             my $posValue;
-            if ( CheckIfShuttersWindowRecOpen($shuttersDev) == 0
+            if ( CheckIfShuttersWindowRecOpen($shuttersDev) == 2
+                and $shutters->getSubTyp eq 'threestate'
+                and $ascDev->getAutoShuttersControlComfort eq 'on' )
+            {
+                $posValue = $shutters->getComfortOpenPos;
+            }
+            elsif ( CheckIfShuttersWindowRecOpen($shuttersDev) == 0
                 or $shutters->getVentilateOpen eq 'off' )
             {
                 $posValue = $shutters->getClosedPos;
