@@ -1213,10 +1213,11 @@ alexa_encrypt($)
 {
   my ($decoded) = @_;
   my $key = getUniqueId();
-  my $encoded;
 
+  return "" if( !$decoded );
   return $decoded if( $decoded =~ /^crypt:(.*)/ );
 
+  my $encoded;
   for my $char (split //, $decoded) {
     my $encode = chop($key);
     $encoded .= sprintf("%.2x",ord($char)^ord($encode));
@@ -1230,10 +1231,12 @@ alexa_decrypt($)
 {
   my ($encoded) = @_;
   my $key = getUniqueId();
-  my $decoded;
+
+  return "" if( !$encoded );
 
   $encoded = $1 if( $encoded =~ /^crypt:(.*)/ );
 
+  my $decoded;
   for my $char (map { pack('C', hex($_)) } ($encoded =~ /(..)/g)) {
     my $decode = chop($key);
     $decoded .= chr(ord($char)^ord($decode));
