@@ -891,7 +891,6 @@ sub livetracking_ParseOwnTracks
   if($@)
     {
     Log3 $name, 2, "$name: invalid json evaluation on ParseOwnTracks".Dumper($data);
-    #Log3 $name, 2, "$name: ".$param->{url}." / ".Dumper($data) if( $param->{type} eq 'life360data' );
     return undef;
   }
 
@@ -1259,7 +1258,6 @@ sub livetracking_BootstrapLife360($)
   if(!defined($hash->{helper}{life360_secret}) or $hash->{helper}{life360_secret} eq "")
   {
     my $url = "https://www.life360.com/circles/scripts/".$hash->{helper}{life360_script}.".scripts.js";
-    Log3 $name, 1, "$name: $url";
 
     HttpUtils_NonblockingGet({
       url => $url,
@@ -1285,7 +1283,6 @@ sub livetracking_BootstrapLife360($)
       type => 'tokendata',
       callback => \&livetracking_bootstrap,
     });
-    Log3 $name, 1, "$name: "."countryCode=1&password=".uri_escape($hash->{helper}{life360_pass})."&username=".uri_escape($hash->{helper}{life360_user})."&persist=true&grant_type=password";
 
     return undef;
   }
