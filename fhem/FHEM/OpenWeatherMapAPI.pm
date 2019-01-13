@@ -243,200 +243,203 @@ sub _ProcessingRetrieveData($$) {
         and defined($response)
         and $response )
     {
-        my $data = eval { decode_json($response) };
+        if ( $response =~ m/^{.*}$/ ) {
+            my $data = eval { decode_json($response) };
 
-        if ($@) {
-            _ErrorHandling( $self,
-                'OpenWeatherMap Weather decode JSON err ' . $@ );
-        }
-        elsif ( defined( $data->{cod} )
-            and $data->{cod}
-            and $data->{cod} != 200
-            and defined( $data->{message} )
-            and $data->{message} )
-        {
-            _ErrorHandling( $self, $data->{cod} . ': ' . $data->{message} );
-        }
-        else {
-
-            ###### Ab hier wird die ResponseHash Referenze für die Rückgabe zusammen gestellt
-            $self->{cached}->{current_date_time} =
-              strftime( "%a, %e %b %Y %H:%M %p",
-                localtime( $self->{fetchTime} ) );
-
-            if ( $self->{endpoint} eq 'weather' ) {
-                $self->{cached}->{country}       = $data->{sys}->{country};
-                $self->{cached}->{city}          = $data->{name};
-                $self->{cached}->{license}{text} = 'none';
-                $self->{cached}->{current}       = {
-                    'temperature' => int(
-                        sprintf( "%.1f", ( $data->{main}->{temp} - 273.15 ) ) +
-                          0.5
-                    ),
-                    'temp_c' => int(
-                        sprintf( "%.1f", ( $data->{main}->{temp} - 273.15 ) ) +
-                          0.5
-                    ),
-                    'low_c' => int(
-                        sprintf( "%.1f",
-                            ( $data->{main}->{temp_min} - 273.15 ) ) + 0.5
-                    ),
-                    'high_c' => int(
-                        sprintf( "%.1f",
-                            ( $data->{main}->{temp_max} - 273.15 ) ) + 0.5
-                    ),
-                    'tempLow' => int(
-                        sprintf( "%.1f",
-                            ( $data->{main}->{temp_min} - 273.15 ) ) + 0.5
-                    ),
-                    'tempHigh' => int(
-                        sprintf( "%.1f",
-                            ( $data->{main}->{temp_max} - 273.15 ) ) + 0.5
-                    ),
-                    'humidity' => $data->{main}->{humidity},
-                    'condition' =>
-                      encode_utf8( $data->{weather}->[0]->{description} ),
-                    'pressure' =>
-                      int( sprintf( "%.1f", $data->{main}->{pressure} ) + 0.5 ),
-                    'wind' =>
-                      int( sprintf( "%.1f", $data->{wind}->{speed} ) + 0.5 ),
-                    'wind_speed' =>
-                      int( sprintf( "%.1f", $data->{wind}->{speed} ) + 0.5 ),
-                    'wind_direction' => $data->{wind}->{deg},
-                    'cloudCover'     => $data->{clouds}->{all},
-                    'visibility' =>
-                      int( sprintf( "%.1f", $data->{visibility} ) + 0.5 ),
-                    'code'       => $codes{ $data->{weather}->[0]->{id} },
-                    'iconAPI'    => $data->{weather}->[0]->{icon},
-                    'sunsetTime' => strftime(
-                        "%a, %e %b %Y %H:%M %p",
-                        localtime( $data->{sys}->{sunset} )
-                    ),
-                    'sunriseTime' => strftime(
-                        "%a, %e %b %Y %H:%M %p",
-                        localtime( $data->{sys}->{sunrise} )
-                    ),
-                    'pubDate' => strftime(
-                        "%a, %e %b %Y %H:%M %p",
-                        localtime( $data->{dt} )
-                    ),
-                };
+            if ($@) {
+                _ErrorHandling( $self,
+                    'OpenWeatherMap Weather decode JSON err ' . $@ );
             }
+            elsif ( defined( $data->{cod} )
+                and $data->{cod}
+                and $data->{cod} != 200
+                and defined( $data->{message} )
+                and $data->{message} )
+            {
+                _ErrorHandling( $self, $data->{cod} . ': ' . $data->{message} );
+            }
+            else {
 
-            if ( $self->{endpoint} eq 'forecast' ) {
-                if ( ref( $data->{list} ) eq "ARRAY"
-                    and scalar( @{ $data->{list} } ) > 0 )
-                {
-                    ## löschen des alten Datensatzes
-                    delete $self->{cached}->{forecast};
+                ###### Ab hier wird die ResponseHash Referenze für die Rückgabe zusammen gestellt
+                $self->{cached}->{current_date_time} =
+                strftime( "%a, %e %b %Y %H:%M %p",
+                    localtime( $self->{fetchTime} ) );
 
-                    my $i = 0;
-                    foreach ( @{ $data->{list} } ) {
-                        push(
-                            @{ $self->{cached}->{forecast}->{hourly} },
-                            {
-                                'pubDate' => strftime(
-                                    "%a, %e %b %Y %H:%M %p",
-                                    localtime(
-                                        ( $data->{list}->[$i]->{dt} ) - 3600
-                                    )
-                                ),
-                                'day_of_week' => strftime(
-                                    "%a",
-                                    localtime(
-                                        ( $data->{list}->[$i]->{dt} ) - 3600
-                                    )
-                                ),
-                                'temperature' => int(
-                                    sprintf(
-                                        "%.1f",
-                                        (
-                                            $data->{list}->[$i]->{main}->{temp}
-                                              - 273.15
-                                        )
-                                    ) + 0.5
-                                ),
-                                'temp_c' => int(
-                                    sprintf(
-                                        "%.1f",
-                                        (
-                                            $data->{list}->[$i]->{main}->{temp}
-                                              - 273.15
-                                        )
-                                    ) + 0.5
-                                ),
-                                'low_c' => int(
-                                    sprintf(
-                                        "%.1f",
-                                        (
-                                            $data->{list}->[$i]->{main}
-                                              ->{temp_min} - 273.15
-                                        )
-                                    ) + 0.5
-                                ),
-                                'high_c' => int(
-                                    sprintf(
-                                        "%.1f",
-                                        (
-                                            $data->{list}->[$i]->{main}
-                                              ->{temp_max} - 273.15
-                                        )
-                                    ) + 0.5
-                                ),
-                                'tempLow' => int(
-                                    sprintf(
-                                        "%.1f",
-                                        (
-                                            $data->{list}->[$i]->{main}
-                                              ->{temp_min} - 273.15
-                                        )
-                                    ) + 0.5
-                                ),
-                                'tempHigh' => int(
-                                    sprintf(
-                                        "%.1f",
-                                        (
-                                            $data->{list}->[$i]->{main}
-                                              ->{temp_max} - 273.15
-                                        )
-                                    ) + 0.5
-                                ),
-                                'humidity' =>
-                                  $data->{list}->[$i]->{main}->{humidity},
-                                'condition' => encode_utf8(
-                                    $data->{list}->[$i]->{weather}->[0]
-                                      ->{description}
-                                ),
-                                'pressure' => int(
-                                    sprintf( "%.1f",
-                                        $data->{list}->[$i]->{main}->{pressure}
-                                    ) + 0.5
-                                ),
-                                'wind' => int(
-                                    sprintf( "%.1f",
-                                        $data->{list}->[$i]->{wind}->{speed} )
-                                      + 0.5
-                                ),
-                                'wind_speed' => int(
-                                    sprintf( "%.1f",
-                                        $data->{list}->[$i]->{wind}->{speed} )
-                                      + 0.5
-                                ),
-                                'cloudCover' =>
-                                  $data->{list}->[$i]->{clouds}->{all},
-                                'code' =>
-                                  $codes{ $data->{list}->[$i]->{weather}->[0]
-                                      ->{id} },
-                                'iconAPI' =>
-                                  $data->{list}->[$i]->{weather}->[0]->{icon},
-                            },
-                        );
+                if ( $self->{endpoint} eq 'weather' ) {
+                    $self->{cached}->{country}       = $data->{sys}->{country};
+                    $self->{cached}->{city}          = $data->{name};
+                    $self->{cached}->{license}{text} = 'none';
+                    $self->{cached}->{current}       = {
+                        'temperature' => int(
+                            sprintf( "%.1f", ( $data->{main}->{temp} - 273.15 ) ) +
+                            0.5
+                        ),
+                        'temp_c' => int(
+                            sprintf( "%.1f", ( $data->{main}->{temp} - 273.15 ) ) +
+                            0.5
+                        ),
+                        'low_c' => int(
+                            sprintf( "%.1f",
+                                ( $data->{main}->{temp_min} - 273.15 ) ) + 0.5
+                        ),
+                        'high_c' => int(
+                            sprintf( "%.1f",
+                                ( $data->{main}->{temp_max} - 273.15 ) ) + 0.5
+                        ),
+                        'tempLow' => int(
+                            sprintf( "%.1f",
+                                ( $data->{main}->{temp_min} - 273.15 ) ) + 0.5
+                        ),
+                        'tempHigh' => int(
+                            sprintf( "%.1f",
+                                ( $data->{main}->{temp_max} - 273.15 ) ) + 0.5
+                        ),
+                        'humidity' => $data->{main}->{humidity},
+                        'condition' =>
+                        encode_utf8( $data->{weather}->[0]->{description} ),
+                        'pressure' =>
+                        int( sprintf( "%.1f", $data->{main}->{pressure} ) + 0.5 ),
+                        'wind' =>
+                        int( sprintf( "%.1f", $data->{wind}->{speed} ) + 0.5 ),
+                        'wind_speed' =>
+                        int( sprintf( "%.1f", $data->{wind}->{speed} ) + 0.5 ),
+                        'wind_direction' => $data->{wind}->{deg},
+                        'cloudCover'     => $data->{clouds}->{all},
+                        'visibility' =>
+                        int( sprintf( "%.1f", $data->{visibility} ) + 0.5 ),
+                        'code'       => $codes{ $data->{weather}->[0]->{id} },
+                        'iconAPI'    => $data->{weather}->[0]->{icon},
+                        'sunsetTime' => strftime(
+                            "%a, %e %b %Y %H:%M %p",
+                            localtime( $data->{sys}->{sunset} )
+                        ),
+                        'sunriseTime' => strftime(
+                            "%a, %e %b %Y %H:%M %p",
+                            localtime( $data->{sys}->{sunrise} )
+                        ),
+                        'pubDate' => strftime(
+                            "%a, %e %b %Y %H:%M %p",
+                            localtime( $data->{dt} )
+                        ),
+                    };
+                }
 
-                        $i++;
+                if ( $self->{endpoint} eq 'forecast' ) {
+                    if ( ref( $data->{list} ) eq "ARRAY"
+                        and scalar( @{ $data->{list} } ) > 0 )
+                    {
+                        ## löschen des alten Datensatzes
+                        delete $self->{cached}->{forecast};
+
+                        my $i = 0;
+                        foreach ( @{ $data->{list} } ) {
+                            push(
+                                @{ $self->{cached}->{forecast}->{hourly} },
+                                {
+                                    'pubDate' => strftime(
+                                        "%a, %e %b %Y %H:%M %p",
+                                        localtime(
+                                            ( $data->{list}->[$i]->{dt} ) - 3600
+                                        )
+                                    ),
+                                    'day_of_week' => strftime(
+                                        "%a",
+                                        localtime(
+                                            ( $data->{list}->[$i]->{dt} ) - 3600
+                                        )
+                                    ),
+                                    'temperature' => int(
+                                        sprintf(
+                                            "%.1f",
+                                            (
+                                                $data->{list}->[$i]->{main}->{temp}
+                                                - 273.15
+                                            )
+                                        ) + 0.5
+                                    ),
+                                    'temp_c' => int(
+                                        sprintf(
+                                            "%.1f",
+                                            (
+                                                $data->{list}->[$i]->{main}->{temp}
+                                                - 273.15
+                                            )
+                                        ) + 0.5
+                                    ),
+                                    'low_c' => int(
+                                        sprintf(
+                                            "%.1f",
+                                            (
+                                                $data->{list}->[$i]->{main}
+                                                ->{temp_min} - 273.15
+                                            )
+                                        ) + 0.5
+                                    ),
+                                    'high_c' => int(
+                                        sprintf(
+                                            "%.1f",
+                                            (
+                                                $data->{list}->[$i]->{main}
+                                                ->{temp_max} - 273.15
+                                            )
+                                        ) + 0.5
+                                    ),
+                                    'tempLow' => int(
+                                        sprintf(
+                                            "%.1f",
+                                            (
+                                                $data->{list}->[$i]->{main}
+                                                ->{temp_min} - 273.15
+                                            )
+                                        ) + 0.5
+                                    ),
+                                    'tempHigh' => int(
+                                        sprintf(
+                                            "%.1f",
+                                            (
+                                                $data->{list}->[$i]->{main}
+                                                ->{temp_max} - 273.15
+                                            )
+                                        ) + 0.5
+                                    ),
+                                    'humidity' =>
+                                    $data->{list}->[$i]->{main}->{humidity},
+                                    'condition' => encode_utf8(
+                                        $data->{list}->[$i]->{weather}->[0]
+                                        ->{description}
+                                    ),
+                                    'pressure' => int(
+                                        sprintf( "%.1f",
+                                            $data->{list}->[$i]->{main}->{pressure}
+                                        ) + 0.5
+                                    ),
+                                    'wind' => int(
+                                        sprintf( "%.1f",
+                                            $data->{list}->[$i]->{wind}->{speed} )
+                                        + 0.5
+                                    ),
+                                    'wind_speed' => int(
+                                        sprintf( "%.1f",
+                                            $data->{list}->[$i]->{wind}->{speed} )
+                                        + 0.5
+                                    ),
+                                    'cloudCover' =>
+                                    $data->{list}->[$i]->{clouds}->{all},
+                                    'code' =>
+                                    $codes{ $data->{list}->[$i]->{weather}->[0]
+                                        ->{id} },
+                                    'iconAPI' =>
+                                    $data->{list}->[$i]->{weather}->[0]->{icon},
+                                },
+                            );
+
+                            $i++;
+                        }
                     }
                 }
             }
         }
+        else { _ErrorHandling( $self, 'OpenWeatherMap ' . $response ); }
     }
 
     $self->{endpoint} = 'none' if ( $self->{endpoint} eq 'forecast' );
