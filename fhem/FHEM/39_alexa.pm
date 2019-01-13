@@ -28,7 +28,7 @@ alexa_Initialize($)
   $hash->{DefFn}    = "alexa_Define";
   $hash->{NotifyFn} = "alexa_Notify";
   $hash->{UndefFn}  = "alexa_Undefine";
-  $hash->{ShutdownFn} = "alexa_Undefine";
+  $hash->{ShutdownFn} = "alexa_Shutdown";
   $hash->{SetFn}    = "alexa_Set";
   $hash->{GetFn}    = "alexa_Get";
   $hash->{AttrFn}   = "alexa_Attr";
@@ -162,8 +162,25 @@ sub
 alexa_Undefine($$)
 {
   my ($hash, $arg) = @_;
+  my $name = $hash->{NAME};
 
-  alexa_stopAlexaFHEM($hash);
+  if( $hash->{PID} ) {
+    $hash->{undefine} = 1;
+    alexa_stopAlexaFHEM($hash);
+
+    return "$name will be deleted after alexa-fhem has stopped or after 5 seconds. whatever comes first.";
+  }
+
+  delete $modules{$hash->{TYPE}}{defptr};
+
+  return undef;
+}
+sub
+alexa_Shutdown($$)
+{
+  my ($hash, $arg) = @_;
+
+  alexa_stoppedAlexaFHEM($hash);
 
   delete $modules{$hash->{TYPE}}{defptr};
 
@@ -651,7 +668,12 @@ alexa_stoppedAlexaFHEM($)
   $hash->{LAST_STOP} = FmtDateTime( gettimeofday() );
   readingsSingleUpdate($hash, 'alexaFHEM', 'stopped', 1 );
 
-  if( $hash->{start} ) {
+  if( $hash->{undefine} ) {
+    delete $hash->{undefine};
+    CommandDelete(undef, $name);
+    Log3 $name, 3, "$name: alexaFHEM deleted";
+
+   } elsif( $hash->{start} ) {
     alexa_startAlexaFHEM($hash)
   }
 }
