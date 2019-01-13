@@ -7,6 +7,7 @@
 #  All rights reserved
 #
 #   Special thanks goes to:
+#       - Lippie hourly forecast code
 #
 #
 #  This script is free software; you can redistribute it and/or modify
@@ -228,10 +229,10 @@ sub _ProcessingRetrieveData($$) {
                         sprintf( "%.1f", $data->{currently}->{pressure} ) + 0.5
                     ),
                     'wind' => int(
-                        sprintf( "%.1f", $data->{currently}->{windSpeed} ) + 0.5
+                        sprintf( "%.1f", ($data->{currently}->{windSpeed} * 3.6) ) + 0.5
                     ),
                     'wind_speed' => int(
-                        sprintf( "%.1f", $data->{currently}->{windSpeed} ) + 0.5
+                        sprintf( "%.1f", ($data->{currently}->{windSpeed} * 3.6) ) + 0.5
                     ),
                     'wind_direction' => $data->{currently}->{windBearing},
                     'windGust'       => int(
@@ -430,12 +431,12 @@ sub _ProcessingRetrieveData($$) {
                                 $data->{daily}->{data}->[$i]->{windBearing},
                                 'wind' => int(
                                     sprintf( "%.1f",
-                                        $data->{daily}->{data}->[$i]->{windSpeed} )
+                                        ($data->{daily}->{data}->[$i]->{windSpeed} * 3.6) )
                                     + 0.5
                                 ),
                                 'wind_speed' => int(
                                     sprintf( "%.1f",
-                                        $data->{daily}->{data}->[$i]->{windSpeed} )
+                                        ($data->{daily}->{data}->[$i]->{windSpeed} * 3.6) )
                                     + 0.5
                                 ),
                                 'windGust' => int(
@@ -480,6 +481,71 @@ sub _ProcessingRetrieveData($$) {
                         );
 
                         $i++;
+                    }
+
+                    if ( ref( $data->{hourly}->{data} ) eq "ARRAY"
+                        and scalar( @{ $data->{hourly}->{data} } ) > 0 )
+                    {
+                        ### löschen des alten Datensatzes
+                        delete $self->{cached}->{forecast}->{hourly};
+
+                        my $i = 0;
+                        foreach ( @{ $data->{hourly}->{data} } ) {
+                            push(
+                                @{ $self->{cached}->{forecast}->{hourly} },
+                                {
+                                    'pubDate' => strftime(
+                                        "%a, %e %b %Y %H:%M %p",
+                                        localtime(
+                                            $data->{hourly}->{data}->[$i]->{'time'}
+                                        )
+                                    ),
+                                    'day_of_week' => strftime(
+                                        "%a",
+                                        localtime(
+                                            $data->{hourly}->{data}->[$i]->{'time'}
+                                        )
+                                    ),
+                                    'temperature' => sprintf( "%.1f", $data->{hourly}->{data}->[$i]->{temperature} ),
+                                    'code' =>
+                                    $codes{ $data->{hourly}->{data}->[$i]->{icon} },
+                                    'iconAPI'   => $data->{hourly}->{data}->[$i]->{icon},
+                                    'condition' => encode_utf8(
+                                        $data->{hourly}->{data}->[$i]->{summary}
+                                    ),
+                                    'ozone' => $data->{hourly}->{data}->[$i]->{ozone},
+                                    'uvIndex' =>
+                                    $data->{hourly}->{data}->[$i]->{uvIndex},
+                                    'precipIntensity' =>
+                                    $data->{hourly}->{data}->[$i]->{precipIntensity},
+                                    'dewPoint' => sprintf( "%.1f",
+                                            $data->{hourly}->{data}->[$i]->{dewPoint} ),
+                                    'humidity' =>
+                                    $data->{hourly}->{data}->[$i]->{humidity} * 100,
+                                    'cloudCover' =>
+                                    $data->{hourly}->{data}->[$i]->{cloudCover} * 100,
+                                    'precipType' =>
+                                    $data->{hourly}->{data}->[$i]->{precipType},
+
+                                    'wind_direction' =>
+                                    $data->{hourly}->{data}->[$i]->{windBearing},
+                                    'wind' => sprintf( "%.1f",
+                                            $data->{hourly}->{data}->[$i]->{windSpeed} ),
+                                    'wind_speed' => sprintf( "%.1f",
+                                            $data->{hourly}->{data}->[$i]->{windSpeed} ),
+                                    'windGust' => sprintf( "%.1f",
+                                            $data->{hourly}->{data}->[$i]->{windGust} ),
+                                    'precipProbability' =>
+                                    $data->{hourly}->{data}->[$i]->{precipProbability},
+                                    'pressure' => sprintf( "%.1f",
+                                            $data->{hourly}->{data}->[$i]->{pressure} ),
+                                    'visibility' => sprintf( "%.1f",
+                                            $data->{hourly}->{data}->[$i]->{visibility} ),
+                                }
+                            );
+
+                            $i++;
+                        }
                     }
                 }
             }

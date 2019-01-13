@@ -286,10 +286,10 @@ sub Weather_WriteReadings($$) {
         }
     }
 
-    my $val= 'T:' . $dataRef->{current}->{temperature} . '°C'
-            .' ' . substr($status_items_txt_i18n{1}, 0, 1) . ':' . $dataRef->{current}->{humidity} . '%'
-            .' ' . substr($status_items_txt_i18n{0}, 0, 1) . ':' . $dataRef->{current}->{wind} . 'km/h'
-            .' P:' . $dataRef->{current}->{pressure} . 'mbar';
+    my $val= 'T: ' . $dataRef->{current}->{temperature} . '°C'
+            .' ' . substr($status_items_txt_i18n{1}, 0, 1) . ': ' . $dataRef->{current}->{humidity} . '%'
+            .' ' . substr($status_items_txt_i18n{0}, 0, 1) . ': ' . $dataRef->{current}->{wind} . 'km/h'
+            .' P: ' . $dataRef->{current}->{pressure} . 'hPa';
 
     Log3 $hash, 4, "$name: $val";
     readingsBulkUpdate($hash, 'state', $val);
@@ -620,7 +620,7 @@ sub WeatherAsHtmlD($;$)
   <a name="Weatherdefine"></a>
   <b>Define</b><br><br>
     <ul>
-      <code>define &lt;name&gt; Weather [API=&lt;API&gt;[,&lt;apiotions&gt;]] [apikey=&lt;apikey&gt;]
+      <code>define &lt;name&gt; Weather [API=&lt;API&gt;[,&lt;apioptions&gt;]] [apikey=&lt;apikey&gt;]
        [location=&lt;location&gt;] [interval=&lt;interval&gt;] [lang=&lt;lang&gt;]</code><br><br>
 
 
@@ -783,7 +783,7 @@ sub WeatherAsHtmlD($;$)
   <a name="Weatherdefine"></a>
   <b>Define</b><br><br>
   <ul>
-    <code>define &lt;name&gt; Weather [API=&lt;API&gt;[,&lt;apiotions&gt;]] [apikey=&lt;apikey&gt;]
+    <code>define &lt;name&gt; Weather [API=&lt;API&gt;[,&lt;apioptions&gt;]] [apikey=&lt;apikey&gt;]
      [location=&lt;location&gt;] [interval=&lt;interval&gt;] [lang=&lt;lang&gt;]</code><br><br>
 
     Die Parameter haben die folgende Bedeutung:<br>

@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  59_Weather: DarkSky and OpenWeatherMapAPI change formated output,
+             add hourly support for DarkSky - thanks to Lippie,
+             multiple factor to wind speed and many bugfix
   - bugfix:  73_AutoShuttersControl: Fix shutters drive then window open and
                                      shutter in brightness rage.
   - feature: 82_LGTV_WebOS: Support for SkyOnline App

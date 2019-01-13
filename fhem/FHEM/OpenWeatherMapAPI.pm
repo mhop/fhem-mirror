@@ -300,9 +300,9 @@ sub _ProcessingRetrieveData($$) {
                         'pressure' =>
                         int( sprintf( "%.1f", $data->{main}->{pressure} ) + 0.5 ),
                         'wind' =>
-                        int( sprintf( "%.1f", $data->{wind}->{speed} ) + 0.5 ),
+                        int( sprintf( "%.1f", ($data->{wind}->{speed} * 3.6) ) + 0.5 ),
                         'wind_speed' =>
-                        int( sprintf( "%.1f", $data->{wind}->{speed} ) + 0.5 ),
+                        int( sprintf( "%.1f", ($data->{wind}->{speed} * 3.6) ) + 0.5 ),
                         'wind_direction' => $data->{wind}->{deg},
                         'cloudCover'     => $data->{clouds}->{all},
                         'visibility' =>
@@ -415,12 +415,12 @@ sub _ProcessingRetrieveData($$) {
                                     ),
                                     'wind' => int(
                                         sprintf( "%.1f",
-                                            $data->{list}->[$i]->{wind}->{speed} )
+                                            ($data->{list}->[$i]->{wind}->{speed} * 3.6) )
                                         + 0.5
                                     ),
                                     'wind_speed' => int(
                                         sprintf( "%.1f",
-                                            $data->{list}->[$i]->{wind}->{speed} )
+                                            ($data->{list}->[$i]->{wind}->{speed} * 3.6) )
                                         + 0.5
                                     ),
                                     'cloudCover' =>
