@@ -1281,6 +1281,11 @@ alexa_Attr($$$)
 
     alexa_startAlexaFHEM($hash);
 
+    if( $cmd eq "set" && $orig ne $attrVal ) {
+      $attr{$name}{$attrName} = $attrVal;
+      return "stored obfuscated auth data";
+    }
+
   } elsif( $attrName eq 'alexaFHEM-host' ) {
     $attr{$name}{$attrName} = $attrVal;
 
@@ -1295,6 +1300,10 @@ alexa_Attr($$$)
 
 
   if( $cmd eq 'set' ) {
+    if( $orig ne $attrVal ) {
+      $attr{$name}{$attrName} = $attrVal;
+      return "stored modified value";
+    }
 
   } else {
     delete $attr{$name}{$attrName};
