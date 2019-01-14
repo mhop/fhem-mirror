@@ -2179,16 +2179,20 @@ CommandDelete($$)
       next;
     }
 
+    $defs{$sdev}->{CL} = $cl;
     my $ret = CallFn($sdev, "UndefFn", $defs{$sdev}, $sdev);
     if($ret) {
       push @rets, $ret;
+      delete $defs{$sdev}->{CL};
       next;
     }
     $ret = CallFn($sdev, "DeleteFn", $defs{$sdev}, $sdev);
     if($ret) {
       push @rets, $ret;
+      delete $defs{$sdev}->{CL};
       next;
     }
+    delete $defs{$sdev}->{CL};
 
 
     # Delete releated hashes
