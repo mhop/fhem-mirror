@@ -283,6 +283,21 @@ alexa_Read($)
     Log3 $name, 3, "$name: $buf";
   }
 
+  if( $buf =~ m/^\*\*\* ([^\s]+) (.+)/ ) {
+    my $service = $1;
+    my $message = $2;
+
+    if( $service eq 'FHEM:' ) {
+      if( $message =~ m/^connection failed(: (.*))?/ ) {
+        my $code = $2;
+
+        $hash->{reason} = 'failed to connect to fhem';
+        $hash->{reason} .= ": $code" if( $code );
+        alexa_stopAlexaFHEM($hash);
+      }
+    }
+  }
+
   return undef;
 }
 
@@ -469,6 +484,8 @@ alexa_startAlexaFHEM($)
 {
   my ($hash) = @_;
   my $name = $hash->{NAME};
+
+  return undef if( !$init_done );
 
   my $key = ReadingsVal($name, 'alexaFHEM.skillRegKey', undef);
   if( !$key ) {
@@ -668,7 +685,13 @@ alexa_stoppedAlexaFHEM($)
 
   Log3 $name, 3, "$name: alexaFHEM stopped";
   $hash->{LAST_STOP} = FmtDateTime( gettimeofday() );
-  readingsSingleUpdate($hash, 'alexaFHEM', 'stopped', 1 );
+
+  if( $hash->{reason} ) {
+    readingsSingleUpdate($hash, 'alexaFHEM', "stopped: $hash->{reason}", 1 );
+    delete $hash->{reason};
+  } else {
+    readingsSingleUpdate($hash, 'alexaFHEM', 'stopped', 1 );
+  }
 
   if( $hash->{undefine} ) {
     delete $hash->{undefine};
