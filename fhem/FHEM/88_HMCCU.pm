@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.3.009
+#  Version 4.3.010
 #
 #  Module for communication between FHEM and Homematic CCU2/3.
 #
@@ -51,9 +51,9 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.3.009';
+my $HMCCU_VERSION = '4.3.010';
 
-# Default RPC port (BidCos-RF)
+# Default RPC interface and port (BidCos-RF)
 my $HMCCU_RPC_PORT_DEFAULT = 2001;
 my $HMCCU_RPC_INTERFACE_DEFAULT = 'BidCos-RF';
 
@@ -63,7 +63,7 @@ my $HMCCU_MAX_QUEUESIZE = 500;
 my $HMCCU_TIME_WAIT = 100000;
 my $HMCCU_TIME_TRIGGER = 10;
 
-# RPC ping interval for interface BidCos-RF, should be smaller than HMCCU_TIMEOUT_EVENT
+# RPC ping interval for default interface, should be smaller than HMCCU_TIMEOUT_EVENT
 my $HMCCU_TIME_PING = 300;
 
 my $HMCCU_TIMEOUT_CONNECTION = 10;
@@ -272,6 +272,7 @@ sub HMCCU_GetAddress ($$$$);
 sub HMCCU_GetAffectedAddresses ($);
 sub HMCCU_GetCCUDeviceParam ($$);
 sub HMCCU_GetChannelName ($$$);
+sub HMCCU_GetDefaultInterface ($);
 sub HMCCU_GetDeviceChannels ($$$);
 sub HMCCU_GetDeviceInfo ($$$);
 sub HMCCU_GetDeviceInterface ($$$);
@@ -463,6 +464,8 @@ sub HMCCU_Define ($$)
 	$hash->{hmccu}{updatetime} = 0;
 	$hash->{hmccu}{rpccount} = 0;
 	$hash->{hmccu}{rpcports} = $HMCCU_RPC_PORT_DEFAULT;
+	$hash->{hmccu}{defInterface} = $HMCCU_RPC_INTERFACE_DEFAULT;
+	$hash->{hmccu}{defPort} = $HMCCU_RPC_PORT_DEFAULT;
 
 	readingsBeginUpdate ($hash);
 	readingsBulkUpdate ($hash, "state", "Initialized");
@@ -622,7 +625,8 @@ sub HMCCU_Attr ($@)
 			delete $hash->{RPCDEV} if (exists ($hash->{RPCDEV}));
 		}
 		elsif ($attrname eq 'rpcport' || $attrname eq 'rpcinterfaces') {
-			$hash->{hmccu}{rpcports} = $HMCCU_RPC_PORT_DEFAULT;
+			my ($defInterface, $defPort) = HMCCU_GetDefaultInterface ($hash);
+			$hash->{hmccu}{rpcports} = $defPort;
 		}
 	}
 	
@@ -1504,9 +1508,7 @@ sub HMCCU_Set ($@)
 			else {
 				# If output is not related to a channel store reading in I/O device
 				my $Value = HMCCU_Substitute ($tokens[1], $substitute, 0, undef, $tokens[0]);
-				my $rn = $tokens[0];
-				$rn =~ s/\:/\./g;
-				$rn =~ s/[^A-Za-z\d_\.-]+/_/g;
+				my $rn = HMCCU_CorrectName ($tokens[0]);
 				readingsSingleUpdate ($hash, $rn, $Value, 1);
 			}
 		}
@@ -2039,6 +2041,8 @@ sub HMCCU_ParseObject ($$$)
 	my ($i, $a, $c, $d, $n, $f) = ('', '', '', '', '', '', 0);
 	my $extaddr;
 	
+	my ($defInterface, $defPort) = HMCCU_GetDefaultInterface ($hash);
+	
 	# "ccu:" is default. Remove it.
 	$object =~ s/^ccu://g;
 	
@@ -2145,7 +2149,7 @@ sub HMCCU_ParseObject ($$$)
 			$f = $f | $HMCCU_FLAG_CHANNEL;
 		}
 		if ($flags & $HMCCU_FLAG_FULLADDR) {
-			($i, $a, $c) = (HMCCU_GetDeviceInterface ($hash, $add, 'BidCos-RF'), $add, $chn);
+			($i, $a, $c) = (HMCCU_GetDeviceInterface ($hash, $add, $defInterface), $add, $chn);
 			$f |= $HMCCU_FLAG_INTERFACE;
 			$f |= $HMCCU_FLAG_ADDRESS if ($add ne '');
 			$f |= $HMCCU_FLAG_CHANNEL if ($chn ne '');
@@ -2153,7 +2157,7 @@ sub HMCCU_ParseObject ($$$)
 	}
 	elsif ($f & $HMCCU_FLAG_ADDRESS && $i eq '' &&
 	   ($flags & $HMCCU_FLAG_FULLADDR || $flags & $HMCCU_FLAG_INTERFACE)) {
-		$i = HMCCU_GetDeviceInterface ($hash, $a, 'BidCos-RF');
+		$i = HMCCU_GetDeviceInterface ($hash, $a, $defInterface);
 		$f |= $HMCCU_FLAG_INTERFACE;
 	}
 
@@ -2270,7 +2274,8 @@ sub HMCCU_FilterReading ($$$)
 #   Address,Datapoint
 #   Address,ChannelNo,Datapoint
 #
-# Reading names can be modified by setting attribut ccureadingname.
+# Reading names can be modified or new readings can be added by
+# setting attribut ccureadingname.
 # Returns list of readings names.
 ######################################################################
 
@@ -2304,9 +2309,6 @@ sub HMCCU_GetReadingName ($$$$$$$)
 			elsif ($a ne '' && $c eq '') { $n = HMCCU_GetDeviceName ($hmccu_hash, $a, ''); }
 			else                         { return ''; }
 		}
-
-		# Substitue unsupported characters in reading name
-		$n = HMCCU_CorrectName ($n);
 
 		return '' if ($n eq '');
 		$rn = $n.'.'.$d;
@@ -2350,7 +2352,8 @@ sub HMCCU_GetReadingName ($$$$$$$)
 	# Convert to lowercase
 	$rnlist[0] = lc($rnlist[0]) if ($rf =~ /lc$/);
 
-	return @rnlist;
+	# Return array of corrected reading names
+	return map { HMCCU_CorrectName ($_) } @rnlist;
 }
 
 ######################################################################
@@ -3405,14 +3408,15 @@ sub HMCCU_UpdatePeers ($$$$)
 ######################################################################
 # Get list of valid RPC interfaces.
 # Binary interfaces are ignored if internal RPC server is used.
-# Default interface is BidCos-RF.
+# Default interface is BidCos-RF or HmIP-RF.
 ######################################################################
 
 sub HMCCU_GetRPCInterfaceList ($)
 {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
-	my @interfaces = ($HMCCU_RPC_INTERFACE_DEFAULT);
+	my ($defInterface, $defPort) = HMCCU_GetDefaultInterface ($hash);
+	my @interfaces = ($defInterface);
 	
 	my $ccuflags = HMCCU_GetFlags ($name);
 	
@@ -3421,7 +3425,7 @@ sub HMCCU_GetRPCInterfaceList ($)
 			my $ifname = HMCCU_GetRPCServerInfo ($hash, $p, 'name');
 			next if (!defined ($ifname));
 			my $iftype = HMCCU_GetRPCServerInfo ($hash, $ifname, 'type');
-			next if ($ifname eq $HMCCU_RPC_INTERFACE_DEFAULT ||
+			next if ($ifname eq $defInterface ||
 				($iftype eq 'B' && $ccuflags !~ /(extrpc|procrpc)/) ||
 				!exists ($hash->{hmccu}{interfaces}{$ifname}));
 			push (@interfaces, $ifname);
@@ -3441,7 +3445,8 @@ sub HMCCU_GetRPCPortList ($)
 {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
-	my @ports = ($HMCCU_RPC_PORT_DEFAULT);
+	my ($defInterface, $defPort) = HMCCU_GetDefaultInterface ($hash);
+	my @ports = ($defPort);
 	
 	my $ccuflags = HMCCU_GetFlags ($name);
 	
@@ -3450,7 +3455,7 @@ sub HMCCU_GetRPCPortList ($)
 			my $ifname = HMCCU_GetRPCServerInfo ($hash, $p, 'name');
 			next if (!defined ($ifname));
 			my $iftype = HMCCU_GetRPCServerInfo ($hash, $ifname, 'type');
-			next if ($p == $HMCCU_RPC_PORT_DEFAULT ||
+			next if ($p == $defPort ||
 				($iftype eq 'B' && $ccuflags !~ /(extrpc|procrpc)/) ||
 				!exists ($hash->{hmccu}{interfaces}{$ifname}));
 			push (@ports, $p);
@@ -3461,8 +3466,8 @@ sub HMCCU_GetRPCPortList ($)
 }
 
 ######################################################################
-# Called by HMCCURPCPROC device of interface BidCos-RF when no events
-# from CCU were received for a specified time span.
+# Called by HMCCURPCPROC device of default interface 
+# when no events from CCU were received for a specified time span.
 # Return 1 if all RPC servers have been registered successfully.
 # Return 0 if at least one RPC server failed to register or the
 # corresponding HMCCURPCPROC device was not found.
@@ -4353,9 +4358,25 @@ sub HMCCU_GetDeviceList ($)
 	}
 
 	if (scalar (keys %objects) > 0) {
-		# Update some CCU I/O device information
-		$hash->{ccuinterfaces} = join (',', keys %{$hash->{hmccu}{interfaces}});
-	
+		if ($ifcount > 0) {
+			$hash->{ccuinterfaces} = join (',', keys %{$hash->{hmccu}{interfaces}});
+			if (!exists ($hash->{hmccu}{interfaces}{'BidCos-RF'})) {
+				if (exists ($hash->{hmccu}{interfaces}{'HmIP-RF'})) {
+					$hash->{hmccu}{defInterface} = 'HmIP-RF';
+					$hash->{hmccu}{defPort} = 2010;
+					HMCCU_Log ($hash, 1, "Changed default interface from BidCos-RF to HmIP-RF", 0);
+				}
+				else {
+					HMCCU_Log ($hash, 1, "Neither interface BidCos-RF nor HmIP-RF does exist on CCU", 0);
+					return (-1, -1, -1, -1, -1);
+				}
+			}
+		}
+		else {
+			HMCCU_Log ($hash, 1, "Found no interfaces on CCU", 0);
+			return (-1, -1, -1, -1, -1);
+		}
+			
 		# Update HMCCU device tables
 		($devcount, $chncount) = HMCCU_UpdateDeviceTable ($hash, \%objects);
 
@@ -4870,6 +4891,20 @@ sub HMCCU_GetDeviceChannels ($$$)
 	}
 
 	return 0;
+}
+
+######################################################################
+# Get default RPC interface and port
+######################################################################
+
+sub HMCCU_GetDefaultInterface ($)
+{
+	my ($hash) = @_;
+	
+	my $ifname = exists ($hash->{hmccu}{defInterface}) ? $hash->{hmccu}{defInterface} : $HMCCU_RPC_INTERFACE_DEFAULT;
+	my $ifport = exists ($hash->{hmccu}{defPort}) ? $hash->{hmccu}{defPort} : $HMCCU_RPC_PORT_DEFAULT;
+	
+	return ($ifname, $ifport);
 }
 
 ######################################################################
@@ -8072,7 +8107,7 @@ sub HMCCU_CCURPC_ListDevicesCB ($$)
       </li><br/>
       <li><b>rpcinterfaces &lt;interface&gt;[,...]</b><br/>
    		Specify list of CCU RPC interfaces. HMCCU will register a RPC server for each interface.
-   		Interface BidCos-RF is default and always active. Valid interfaces are:<br/><br/>
+   		Either interface BidCos-RF or HmIP-RF (HmIP only) is default. Valid interfaces are:<br/><br/>
    		<ul>
    		<li>BidCos-Wired (Port 2000)</li>
    		<li>BidCos-RF (Port 2001)</li>
@@ -8094,7 +8129,7 @@ sub HMCCU_CCURPC_ListDevicesCB ($$)
 	   </li><br/>
       <li><b>rpcport &lt;value[,...]&gt;</b><br/>
          Deprecated, use attribute 'rpcinterfaces' instead. Specify list of RPC ports on CCU.
-         Default is 2001. Valid RPC ports are:<br/><br/>
+         Either port 2001 or 2010 (HmIP only) is default. Valid RPC ports are:<br/><br/>
          <ul>
          <li>2000 = Wired components</li>
          <li>2001 = BidCos-RF (wireless 868 MHz components with BidCos protocol)</li>

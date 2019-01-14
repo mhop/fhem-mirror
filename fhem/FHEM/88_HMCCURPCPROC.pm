@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 1.4
+#  Version 1.5
 #
 #  Subprocess based RPC Server module for HMCCU.
 #
@@ -35,7 +35,7 @@ use SetExtensions;
 ######################################################################
 
 # HMCCURPC version
-my $HMCCURPCPROC_VERSION = '1.4';
+my $HMCCURPCPROC_VERSION = '1.5';
 
 # Maximum number of events processed per call of Read()
 my $HMCCURPCPROC_MAX_EVENTS = 100;
@@ -52,7 +52,7 @@ my $HMCCURPCPROC_MAX_QUEUESEND = 70;
 # Time to wait after data processing loop in microseconds
 my $HMCCURPCPROC_TIME_WAIT = 100000;
 
-# RPC ping interval for interface BidCos-RF, should be smaller than HMCCURPCPROC_TIMEOUT_EVENT
+# RPC ping interval for default interface, should be smaller than HMCCURPCPROC_TIMEOUT_EVENT
 my $HMCCURPCPROC_TIME_PING = 300;
 
 # Timeout for established CCU connection in seconds
@@ -69,9 +69,6 @@ my $HMCCURPCPROC_TIMEOUT_EVENT = 0;
 
 # Send statistic information after specified amount of events
 my $HMCCURPCPROC_STATISTICS = 500;
-
-# Default RPC Port = BidCos-RF
-my $HMCCURPCPROC_RPC_PORT_DEFAULT = 2001;
 
 # Default RPC server base port
 my $HMCCURPCPROC_SERVER_PORT = 5400;
@@ -777,6 +774,7 @@ sub HMCCURPCPROC_ProcessEvent ($$)
 	my $rpcname = 'CB'.$hash->{rpcport}.$hash->{rpcid};
 	my $rh = \%{$hash->{hmccu}{rpc}};	# Just for code simplification
 	my $hmccu_hash = $hash->{IODev};
+	my ($defInterface, $defPort) = HMCCU_GetDefaultInterface ($hmccu_hash);
 
 	# Number of arguments in RPC events (without event type and clkey)
 	my %rpceventargs = (
@@ -795,7 +793,7 @@ sub HMCCURPCPROC_ProcessEvent ($$)
 
 	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
 	my $ping = AttrVal ($hmccu_hash->{NAME}, 'rpcPingCCU', $HMCCURPCPROC_TIME_PING);
-	my $evttimeout = ($ping > 0 && $hash->{rpcinterface} eq 'BidCos-RF') ? $ping*2 :
+	my $evttimeout = ($ping > 0 && $hash->{rpcinterface} eq $defInterface) ? $ping*2 :
 	   HMCCURPCPROC_GetAttribute ($hash, 'rpcEventTimeout', 'rpcevtimeout', $HMCCURPCPROC_TIMEOUT_EVENT);
 	                    
 	return undef if (!defined ($event) || $event eq '');
@@ -955,8 +953,8 @@ sub HMCCURPCPROC_ProcessEvent ($$)
 		if ($evttimeout > 0 && $t[0] > $evttimeout) {
 			Log3 $name, 2, "HMCCURPCPROC: [$name] Received no events from interface $clkey for ".$t[0]." seconds";
 			$hash->{ccustate} = 'timeout';
-			if ($hash->{RPCState} eq 'running' && $hash->{rpcport} == 2001) {
-				# If interface is BidCos-RF inform IO device about timeout
+			if ($hash->{RPCState} eq 'running' && $hash->{rpcport} == $defPort) {
+				# If interface is default interface inform IO device about timeout
 				HMCCU_EventsTimedOut ($hmccu_hash)
 			}
 			DoTrigger ($name, "No events from interface $clkey for ".$t[0]." seconds");
@@ -1208,6 +1206,7 @@ sub HMCCURPCPROC_StartRPCServer ($)
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
 	my $hmccu_hash = $hash->{IODev};
+	my ($defInterface, $defPort) = HMCCU_GetDefaultInterface ($hmccu_hash);
 
 	# Local IP address and callback ID should be set during device definition
 	return (0, "Local address and/or callback ID not defined")
@@ -1220,7 +1219,7 @@ sub HMCCURPCPROC_StartRPCServer ($)
 	my $ping          = AttrVal ($hmccu_hash->{NAME}, 'rpcPingCCU', $HMCCURPCPROC_TIME_PING);
 	my $localaddr     = HMCCURPCPROC_GetAttribute ($hash, undef, 'rpcserveraddr', $hash->{hmccu}{localaddr});
 	my $rpcserverport = HMCCURPCPROC_GetAttribute ($hash, 'rpcServerPort', 'rpcserverport', $HMCCURPCPROC_SERVER_PORT);
-	my $evttimeout    = ($ping > 0 && $hash->{rpcinterface} eq 'BidCos-RF') ?
+	my $evttimeout    = ($ping > 0 && $hash->{rpcinterface} eq $defInterface) ?
 	                    $ping*2 :
 	                    HMCCURPCPROC_GetAttribute ($hash, 'rpcEventTimeout', 'rpcevtimeout', $HMCCURPCPROC_TIMEOUT_EVENT);
 	my $ccunum        = $hash->{CCUNum};
@@ -1332,6 +1331,7 @@ sub HMCCURPCPROC_RPCServerStarted ($)
 	my $clkey = 'CB'.$hash->{rpcport}.$hash->{rpcid};
 	my $ifname = $hash->{rpcinterface};
 	my $ping = AttrVal ($hmccu_hash->{NAME}, 'rpcPingCCU', $HMCCURPCPROC_TIME_PING);
+	my ($defInterface, $defPort) = HMCCU_GetDefaultInterface ($hmccu_hash);
 	
 	# Check if RPC servers are running. Set overall status
 	if (HMCCURPCPROC_CheckProcessState ($hash, 'running')) {
@@ -1347,8 +1347,8 @@ sub HMCCURPCPROC_RPCServerStarted ($)
 
 		RemoveInternalTimer ($hash, "HMCCURPCPROC_IsRPCServerRunning");
 		
-		# Activate heartbeat if interface is BidCos-RF and rpcPingCCU > 0
-		if ($ping > 0 && $ifname eq "BidCos-RF") {
+		# Activate heartbeat if interface is default interface and rpcPingCCU > 0
+		if ($ping > 0 && $ifname eq $defInterface) {
 			Log3 $name, 1, "HMCCURPCPROC: [$name] Scheduled CCU ping every $ping seconds";
 			InternalTimer (gettimeofday()+$ping, "HMCCURPCPROC_RPCPing", $hash, 0);
 		}
@@ -1654,8 +1654,9 @@ sub HMCCURPCPROC_RPCPing ($)
 	my $name = $hash->{NAME};
 	my $hmccu_hash = $hash->{IODev};
 	my $ping = AttrVal ($hmccu_hash->{NAME}, 'rpcPingCCU', $HMCCURPCPROC_TIME_PING);
+	my ($defInterface, $defPort) = HMCCU_GetDefaultInterface ($hmccu_hash);
 	
-	if ($hash->{rpcinterface} eq 'BidCos-RF') {
+	if ($hash->{rpcinterface} eq $defInterface) {
 		if ($ping > 0) {
 			if ($init_done && HMCCURPCPROC_CheckProcessState ($hash, 'running')) {
 				my $clkey = 'CB'.$hash->{rpcport}.$hash->{rpcid};
