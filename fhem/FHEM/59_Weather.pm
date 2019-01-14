@@ -286,10 +286,10 @@ sub Weather_WriteReadings($$) {
         }
     }
 
-    my $val= 'T: ' . $dataRef->{current}->{temperature} . '°C'
-            .' ' . substr($status_items_txt_i18n{1}, 0, 1) . ': ' . $dataRef->{current}->{humidity} . '%'
-            .' ' . substr($status_items_txt_i18n{0}, 0, 1) . ': ' . $dataRef->{current}->{wind} . 'km/h'
-            .' P: ' . $dataRef->{current}->{pressure} . 'hPa';
+    my $val= 'T: ' . $dataRef->{current}->{temperature} . ' °C'
+            .' ' . substr($status_items_txt_i18n{1}, 0, 1) . ': ' . $dataRef->{current}->{humidity} . ' %'
+            .' ' . substr($status_items_txt_i18n{0}, 0, 1) . ': ' . $dataRef->{current}->{wind} . ' km/h'
+            .' P: ' . $dataRef->{current}->{pressure} . ' hPa';
 
     Log3 $hash, 4, "$name: $val";
     readingsBulkUpdate($hash, 'state', $val);
