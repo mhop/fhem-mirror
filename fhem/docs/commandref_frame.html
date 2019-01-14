@@ -1540,6 +1540,13 @@ The following local attributes are used by a wider range of devices:
         <code>{ $currlogfile }</code>.
     </li><br>
 
+    <a name="maxShutdownDelay"></a>
+    <li>maxShutdownDelay<br>
+        Some modules need some time at shutdown to finish the cleanup, but FHEM
+        restricts the delay to 10 seconds. Use this attribute to modify the
+        maximum delay.
+    </li><br>
+
     <a name="modpath"></a>
     <li>modpath<br>
         Specify the path to the modules directory <code>FHEM</code>. The path

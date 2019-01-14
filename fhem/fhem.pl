@@ -180,7 +180,7 @@ sub CommandSave($$);
 sub CommandSet($$);
 sub CommandSetReading($$);
 sub CommandSetstate($$);
-sub CommandShutdown($$);
+sub CommandShutdown($$;$$);
 sub CommandSleep($$);
 sub CommandTrigger($$);
 
@@ -209,9 +209,10 @@ sub cfgDB_WriteFile($@);
 # ParseFn  - Interpret a raw message
 # ReadFn   - Reading from a Device (see FHZ/WS300)
 # ReadyFn  - check for available data, if no FD
-# RenameFn - inform the device about its renameing
+# RenameFn - inform the device about its renaming
 # SetFn    - set/activate this device
-# ShutdownFn-called before shutdown
+# DelayedShutdownFn - used to delay shutdown for some seconds
+# ShutdownFn-called before shutdown, if DelayedShutdownFn is "over"
 # StateFn  - set local info for this device, do not activate anything
 # UndefFn  - clean up (delete timer, close fd), called by delete and rereadcfg
 
@@ -227,21 +228,25 @@ sub cfgDB_WriteFile($@);
 # VOLATILE- Set if the definition should be saved to the "statefile"
 # NOTIFYDEV - if set, the notifyFn will only be called for this device
 
+use vars qw($addTimerStacktrace);# set to 1 by fhemdebug
 use vars qw($auth_refresh);
 use vars qw($cmdFromAnalyze);   # used by the warnings-sub
-use vars qw($lastWarningMsg);   # set by the warnings-sub
 use vars qw($cvsid);            # used in 98_version.pm
 use vars qw($devcount);         # Maximum device number, used for storing
 use vars qw($featurelevel); 
+use vars qw($fhemForked);       # 1 in a fhemFork()'ed process, else undef
 use vars qw($fhem_started);     # used for uptime calculation
+use vars qw($haveInet6);        # Using INET6
 use vars qw($init_done);        #
 use vars qw($internal_data);    # FileLog/DbLog -> SVG data transport
 use vars qw($lastDefChange);    # number of last def/attr change
+use vars qw($lastWarningMsg);   # set by the warnings-sub
 use vars qw($nextat);           # Time when next timer will be triggered.
 use vars qw($readytimeout);     # Polling interval. UNIX: device search only
 use vars qw($reread_active);
 use vars qw($selectTimestamp);  # used to check last select exit timestamp
 use vars qw($winService);       # the Windows Service object
+
 use vars qw(%attr);             # Attributes
 use vars qw(%cmds);             # Global command name hash.
 use vars qw(%data);             # Hash for user data
@@ -249,21 +254,20 @@ use vars qw(%defaultattr);      # Default attributes, used by FHEM2FHEM
 use vars qw(%defs);             # FHEM device/button definitions
 use vars qw(%inform);           # Used by telnet_ActivateInform
 use vars qw(%intAt);            # Internal timer hash, used by apptime
-use vars qw(@intAtA);           # Internal timer array
 use vars qw(%logInform);        # Used by FHEMWEB/Event-Monitor
 use vars qw(%modules);          # List of loaded modules (device/log/etc)
 use vars qw(%ntfyHash);         # hash of devices needed to be notified.
 use vars qw(%oldvalue);         # Old values, see commandref.html
+use vars qw(%prioQueues);       #
 use vars qw(%readyfnlist);      # devices which want a "readyfn"
 use vars qw(%selectlist);       # devices which want a "select"
 use vars qw(%value);            # Current values, see commandref.html
+
 use vars qw(@authenticate);     # List of authentication devices
 use vars qw(@authorize);        # List of authorization devices
+use vars qw(@intAtA);           # Internal timer array
 use vars qw(@structChangeHist); # Contains the last 10 structural changes
-use vars qw($haveInet6);        # Using INET6
-use vars qw(%prioQueues);       #
-use vars qw($fhemForked);       # 1 in a fhemFork()'ed process, else undef
-use vars qw($addTimerStacktrace);# set to 1 by fhemdebug
+
 
 $selectTimestamp = gettimeofday();
 $cvsid = '$Id$';
@@ -287,6 +291,7 @@ my %comments;                   # Comments from the include files
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my @cmdList;                    # Remaining commands in a chain. Used by sleep
 my %sleepers;                   # list of sleepers
+my %delayedShutdowns;           # definitions needing delayed shutdown
 
 $init_done = 0;
 $lastDefChange = 0;
@@ -328,6 +333,7 @@ my @globalAttrList = qw(
   logdir
   logfile
   longitude
+  maxShutdownDelay
   modpath
   motd
   mseclog:1,0
@@ -1703,9 +1709,45 @@ CommandSave($$)
 
 #####################################
 sub
-CommandShutdown($$)
+CancelDelayedShutdown($)
+{
+  my ($d) = @_;
+  delete($delayedShutdowns{$d});
+}
+
+sub
+DelayedShutdown($$)
 {
   my ($cl, $param) = @_;
+
+  %delayedShutdowns = ();
+  foreach my $d (sort keys %defs) {
+    $delayedShutdowns{$d} = 1 if(CallFn($d, "DelayedShutdownFn", $defs{$d}));
+  }
+  return 0 if(!keys %delayedShutdowns);
+  
+  my $waitingFor = 0;
+  my $maxShutdownDelay = AttrVal("global", "maxShutdownDelay", 10);
+  my $checkList;
+
+  Log 1, "Server shutdown delayed due to ".join(",", keys %delayedShutdowns).
+                " for max $maxShutdownDelay sec";
+  DoTrigger("global", "DELAYEDSHUTDOWN", 1);
+
+  $checkList = sub()
+  {
+     return CommandShutdown($cl, $param, undef, 1)
+             if(!keys %delayedShutdowns || $waitingFor++ >= $maxShutdownDelay);
+     InternalTimer(gettimeofday()+1, $checkList, undef, 0);
+  };
+  $checkList->();
+  return 1;
+}
+
+sub
+CommandShutdown($$;$$)
+{
+  my ($cl, $param, $cmdName, $final) = @_;
   my $exitValue = 0;
   if($param && $param =~ m/^(\d+)$/) {
     $exitValue = $1;
@@ -1713,6 +1755,7 @@ CommandShutdown($$)
   }
   return "Usage: shutdown [restart|exitvalue]"
         if($param && $param ne "restart");
+  return if(!$final && DelayedShutdown($cl, $param));
 
   DoTrigger("global", "SHUTDOWN", 1);
   Log 0, "Server shutdown";
