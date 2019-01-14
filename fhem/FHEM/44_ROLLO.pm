@@ -31,7 +31,7 @@ package main;
 use strict;
 use warnings;
 
-my $version = "1.401";
+my $version = "1.402";
 
 my %sets = (
     "open"      => "noArg",
@@ -217,7 +217,7 @@ sub ROLLO_Set($@) {
         Log3 $name, 1,
           "ROLLO ($name) Set command \"position\" is deprecated. Please change your definitions to \"pct\"";
     }
-
+	my $desiredPos;
     my $arg = "";
     $arg = $a[2] if defined $a[2];
     my $arg2 = "";
@@ -302,7 +302,7 @@ sub ROLLO_Set($@) {
 
     ##### now do the real drive stuff
 
-    my $desiredPos = $cmd;
+    $desiredPos = $cmd;
     Log3 $name, 5, "ROLLO ($name) DesiredPos set to $desiredPos, ($arg) ";
     my $typ = AttrVal( $name, "rl_type", "normal" );
 
@@ -348,7 +348,10 @@ sub ROLLO_Set($@) {
 # Ich verstehe nicht wann nachfolgender Zustand eintreten kann, das Coding führt aber dazu, dass pct 0 (open) auf "none" gesetzt wird
 #$desiredPos = "none" if !$desiredPos || $desiredPos eq "";
     }
-    Log3 $name, 5, "ROLLO ($name) DesiredPos now $desiredPos, $cmd";
+	#set desiredPos to avoid "uninitialized" message later (happens with "blocked" - KernSani 14.01.2019
+	$desiredPos = ReadingsNum($name,"desired_pct",0) unless defined($desiredPos);
+
+	Log3 $name, 5, "ROLLO ($name) DesiredPos now $desiredPos, $cmd";
 
     #wenn ich gerade am fahren bin und eine neue Zielposition angefahren werden soll,
     # muss ich jetzt erst mal meine aktuelle Position berechnen und updaten
@@ -568,7 +571,7 @@ sub ROLLO_Stop($) {
     Log3 $name, 4, "ROLLO ($name) stops from $state at pct $pct";
 
     #wenn autostop=1 und pct <> 0+100 und rollo fährt, dann kein stopbefehl ausführen...
-    if ( ( $state =~ /drive-/ && $pct >= 0 && $pct <= 100 ) || AttrVal( $name, "rl_autoStop", 0 ) ne 1 ) {
+    if ( ( $state =~ /drive-/ && $pct > 0 && $pct < 100 ) || AttrVal( $name, "rl_autoStop", 0 ) ne 1 ) {
         my $command = AttrVal( $name, 'rl_commandStop', "" );
         $command = AttrVal( $name, 'rl_commandStopUp', "" ) if ( AttrVal( $name, 'rl_commandStopUp', "" ) ne "" );
         $command = AttrVal( $name, 'rl_commandStopDown', "" )
