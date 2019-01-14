@@ -51,17 +51,33 @@
 #						Attribute vitoconnect_raw_readings:0,1 " and  ."vitoconnect_actions_active:0,1 " implemented
 #						"set clearReadings" implemented
 #  2019-01-05		Passwort wird im KeyValue gespeichert statt im Klartext
-#                 Action "oneTime
+#                 Action "oneTimeCharge" implemented
+#  2019-01-14		installation, code and gw in den Internals unsichtbar gemacht
+#                 Reading "counter" entfernt (ist weiterhin in Internals sichtbar)
+#						Reading WW-einmaliges_Aufladen_active umbenannt in WW-einmaliges_Aufladen
+#                 Befehle zum setzen von 
+#                 		HK1-Betriebsart
+#                 		HK2-Betriebsart
+#                 		HK1-Solltemperatur_normal
+#                 		HK2-Solltemperatur_normal
+#                 		HK1-Solltemperatur_reduziert
+#                 		HK2-Solltemperatur_reduziert
+#                 		WW-einmaliges_Aufladen
+#                 Bedienfehler (z.B. Ausführung einer Befehls für HK2, wenn die Hezung nur einen Heizkreis hat) 
+#						führen zu einem "Bad Gateway" Fehlermeldung in Logfile
+#						Achtung: Keine Prüfung ob Befehle sinnvoll und oder erlaubt sind! Nutzung auf eigene Gefahr!
 #          
 #
-#   ToDo:         "set"s zum Steuern der Heizung
+#   ToDo:         weitere "set"s zum Steuern der Heizung
 #                 Dokumentation (auch auf Deutsch)
-#                 Nicht bei jedem Lesen neu einloggen
+#                 Nicht bei jedem Lesen neu einloggen (wenn möglich)
 #                 Fehlerbehandlung verbessern
 #						Attribute implementieren und dokumentieren 
 #						"sinnvolle" Readings statt 1:1 aus der API übernommene
 #		  				ErrorListChanges implementieren
 #                 mapping der Readings optional machen
+#						Mehrsprachigkeite
+#                 Auswerten der Reading in getCode usw.
 #
 
 
@@ -78,7 +94,7 @@ use Encode qw(decode encode);
 my $client_id = '79742319e39245de5f91d15ff4cac2a8';
 my $client_secret = '8ad97aceb92c5892e102b093c7c083fa';
 my $authorizeURL = 'https://iam.viessmann.com/idp/v1/authorize';
-my $token_url = 'https://iam.viessmann.com/idp/v1/token';
+# my $token_url = 'https://iam.viessmann.com/idp/v1/token';
 my $apiURLBase = 'https://api.viessmann-platform.io';
 my $general = '/general-management/installations?expanded=true&';
 my $callback_uri = "vicare://oauth-callback/everest"; 
@@ -168,12 +184,13 @@ my %RequestList = (
     "heating.device.time.offset.value" 										=> "Device_Time_Offset",
     "heating.dhw.active" 															=> "WW-aktiv",
     "heating.dhw.charging.active"                                      => "WW-Aufladung",
-    "heating.dhw.oneTimeCharge.active" 										=> "WW-einmaliges_Aufladen_aktiv",
+    "heating.dhw.oneTimeCharge.active" 										=> "WW-einmaliges_Aufladen",
   	 "heating.dhw.pumps.circulation.schedule.active"                    	=> "WW-Zirklationspumpe_Zeitsteuerung_aktiv",
   	 "heating.dhw.pumps.circulation.schedule.entries"                   	=> "WW-Zirkulationspumpe_Zeitplan",
   	 "heating.dhw.pumps.circulation.status"                             	=> "WW-Zirkulationspumpe_Status",
   	 "heating.dhw.pumps.primary.status"                                 	=> "WW-Zirkulationspumpe_primaer",
   	 "heating.dhw.sensors.temperature.outlet.status"                    	=> "WW-Sensoren_Auslauf_Status",
+  	 "heating.dhw.sensors.temperature.outlet.value"                    	=> "WW-Sensoren_Auslauf_Wert",
   	 "heating.dhw.temperature.main.value"                              	=> "WW-Haupttemperatur",
     "heating.dhw.sensors.temperature.hotWaterStorage.status" 			=> "WW-Temperatur_aktiv",
     "heating.dhw.sensors.temperature.hotWaterStorage.value" 			=> "WW-Isttemperatur",
@@ -233,7 +250,7 @@ sub vitoconnect_Define($$) {
     my $err = vitoconnect_StoreKeyValue($hash, "passwd", $param[3]);
     return $err if ($err);
     
-	 InternalTimer(gettimeofday()+2, "vitoconnect_GetUpdate", $hash);   
+	 InternalTimer(gettimeofday()+10, "vitoconnect_GetUpdate", $hash);   
     return undef;
 }
 
@@ -251,9 +268,9 @@ sub vitoconnect_Get($@) {
 
 sub vitoconnect_Set($@) {
 	my ($hash, $name, $opt, @args) = @_;
-	my $access_token = $hash->{access_token};
-	my $installation = $hash->{installation};
-	my $gw = $hash->{gw};
+	my $access_token = $hash->{".access_token"};
+	my $installation = $hash->{".installation"};
+	my $gw = $hash->{".gw"};
 	
 	return "set $name needs at least one argument" unless (defined($opt));
 	if ($opt eq "update"){ 
@@ -264,30 +281,164 @@ sub vitoconnect_Set($@) {
 	} elsif ($opt eq "password") {
 		my $err = vitoconnect_StoreKeyValue($hash, "passwd", $args[0]); return $err if ($err);
 		return undef;	
-	} elsif ($opt eq "setMode") {
+	} elsif ($opt eq "HK1-Heizkurve-Niveau") {
+		return "not implemented";	
+	} elsif ($opt eq "HK1-Heizkurve-Steigung") {
+		return "not implemented";		
+	} elsif ($opt eq "HeatingSchedule") {
+		return "not implemented";	
+	} elsif ($opt eq "HK1-Betriebsart") {
+		vitoconnect_action($hash);
 		my $param = {
 			url        => "https://api.viessmann-platform.io/operational-data/installations/$installation/gateways/$gw/devices/0/features/heating.circuits.0.operating.modes.active/setMode",
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
-			data       => '{"mode":"$args[0]"}',
+			data       => "{\"mode\":\"$args[0]\"}",
 			method     => "POST",
 			timeout    => 10,
 			sslargs    => {SSL_verify_mode => 0},
       };
-      # Log5 $name, 3, Dumper($param);
-  		(my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err ne "" || $data ne "") {
-  			Log3 $name, 1, "$name: Fehler während der Befehlsausführung: err = $err data=$data";
-  		} else {
-  			Log3 $name, 4, "$name: Befehlsausführung ok";
-  		}
+      (my $err, my $data) = HttpUtils_BlockingGet($param);
+  		if ($err ne "" || defined($data)) {
+  			Log3 $name, 1, "$name: Fehler während der Befehlsausführung: err= $err data=$data";
+  		} else {	Log3 $name, 4, "$name: Befehlsausführung ok"; }
 		return undef;
-	} elsif ($opt eq "oneTimeCharge") {
+	} elsif ($opt eq "HK2-Betriebsart") {
 		vitoconnect_action($hash);
+		my $param = {
+			url        => "https://api.viessmann-platform.io/operational-data/installations/$installation/gateways/$gw/devices/0/features/heating.circuits.1.operating.modes.active/setMode",
+			hash       => $hash,
+			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
+			data       => "{\"mode\":\"$args[0]\"}",
+			method     => "POST",
+			timeout    => 10,
+			sslargs    => {SSL_verify_mode => 0},
+      };
+      (my $err, my $data) = HttpUtils_BlockingGet($param);
+  		if ($err ne "" || defined($data)) {
+  			Log3 $name, 1, "$name: Fehler während der Befehlsausführung: err= $err data=$data";
+  		} else {	Log3 $name, 4, "$name: Befehlsausführung ok"; }
+		return undef;
+	} elsif ($opt eq "HeadingModeComfort") {
+		return "not implemented";	
+	} elsif ($opt eq "TemperatureComfort") {
+		return "not implemented";	
+	} elsif ($opt eq "HeatingModeEco") {
+		return "not implemented";	
+	} elsif ($opt eq "HeatingHolidaySchedule") {
+		return "not implemented";	
+	} elsif ($opt eq "HeatingHolidayUnschedule") {
+		return "not implemented";	
+	} elsif ($opt eq "HK1-Solltemperatur_normal") {
+		vitoconnect_action($hash);
+		my $param = {
+			url        => "https://api.viessmann-platform.io/operational-data/v1/installations/129846/gateways/7571381616514108/devices/0/features/heating.circuits.0.operating.programs.normal/setTemperature", 
+			hash       => $hash,
+			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
+			data       => "{\"targetTemperature\":$args[0]}",
+			method     => "POST",
+			timeout    => 10,
+			sslargs    => {SSL_verify_mode => 0},
+      };
+      #Log3 $name, 3, "$name: $param->{data}"; 
+      (my $err, my $data) = HttpUtils_BlockingGet($param);
+  		if ($err ne "" || defined($data)) {
+  			Log3 $name, 1, "$name: Fehler während der Befehlsausführung: err= $err data= $data";
+  		} else {	Log3 $name, 4, "$name: Befehlsausführung ok"; }
+		return undef;
+	} elsif ($opt eq "HK2-Solltemperatur_normal") {
+		vitoconnect_action($hash);
+		my $param = {
+			url        => "https://api.viessmann-platform.io/operational-data/v1/installations/129846/gateways/7571381616514108/devices/0/features/heating.circuits.1.operating.programs.normal/setTemperature", 
+			hash       => $hash,
+			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
+			data       => "{\"targetTemperature\":$args[0]}",
+			method     => "POST",
+			timeout    => 10,
+			sslargs    => {SSL_verify_mode => 0},
+      };
+      #Log3 $name, 3, "$name: $param->{data}"; 
+      (my $err, my $data) = HttpUtils_BlockingGet($param);
+  		if ($err ne "" || defined($data)) {
+  			Log3 $name, 1, "$name: Fehler während der Befehlsausführung: err= $err data= $data";
+  		} else {	Log3 $name, 4, "$name: Befehlsausführung ok"; }
 		return undef;	
+	} elsif ($opt eq "HK1-Solltemperatur_reduziert") {
+		vitoconnect_action($hash);
+		my $param = {
+			url        => "https://api.viessmann-platform.io/operational-data/v1/installations/129846/gateways/7571381616514108/devices/0/features/heating.circuits.0.operating.programs.reduced/setTemperature", 
+			hash       => $hash,
+			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
+			data       => "{\"targetTemperature\":$args[0]}",
+			method     => "POST",
+			timeout    => 10,
+			sslargs    => {SSL_verify_mode => 0},
+      };
+      (my $err, my $data) = HttpUtils_BlockingGet($param);
+  		if ($err ne ""|| defined($data)) {
+  			Log3 $name, 1, "$name: Fehler während der Befehlsausführung: err= $err data=$data";
+  		} else {	Log3 $name, 4, "$name: Befehlsausführung ok"; }
+		return undef;	
+	} elsif ($opt eq "HK2-Solltemperatur_reduziert") {
+		vitoconnect_action($hash);
+		my $param = {
+			url        => "https://api.viessmann-platform.io/operational-data/v1/installations/129846/gateways/7571381616514108/devices/0/features/heating.circuits.1.operating.programs.reduced/setTemperature", 
+			hash       => $hash,
+			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
+			data       => "{\"targetTemperature\":$args[0]}",
+			method     => "POST",
+			timeout    => 10,
+			sslargs    => {SSL_verify_mode => 0},
+      };
+      (my $err, my $data) = HttpUtils_BlockingGet($param);
+  		if ($err ne ""|| defined($data)) {
+  			Log3 $name, 1, "$name: Fehler während der Befehlsausführung: err= $err data=$data";
+  		} else {	Log3 $name, 4, "$name: Befehlsausführung ok"; }
+		return undef;	
+	} elsif ($opt eq "WW-einmaliges_Aufladen") {
+		vitoconnect_action($hash);
+		my $param = {
+			url        => "https://api.viessmann-platform.io/operational-data/installations/$installation/gateways/$gw/devices/0/features/heating.dhw.oneTimeCharge/$args[0]",
+			hash       => $hash,
+			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
+			data       => '{}',
+			method     => "POST",
+			timeout    => 10,
+			sslargs    => {SSL_verify_mode => 0},
+   	};
+   	(my $err, my $data) = HttpUtils_BlockingGet($param);
+  		if ($err  ne ""|| defined($data)) { Log3 $name, 1, "$name: Fehler während der Befehlsausführung: $err :: $data";
+  		} else { Log3 $name, 5, "$name : Befehlsausführung ok"; }   
+		return undef;
+	} elsif ($opt eq "WW-Zirkulationspumpe_Zeitplan") {
+		return "not implemented";	
+	} elsif ($opt eq "WW-ZeitplanDhwSchedule") {
+		return "not implemented";	
+	} elsif ($opt eq "WW-Haupttemperatur") {
+		return "not implemented";	
+	} elsif ($opt eq "WW-Solltemperatur") {
+		return "not implemented";	
 	}
-	#return "unknown value $opt, choose one of update:noArg clearReadings:noArg setMode:standby,dhw,dhwAndHeating,forcedReduced,forcedNormal oneTimeCharge:noArg password";
-	return "unknown value $opt, choose one of update:noArg clearReadings:noArg oneTimeCharge:noArg password";
+	return "unknown value $opt, choose one of update:noArg clearReadings:noArg password " .
+		# "HK1-Heizkurve-Niveau:slider,-13,1,40 ".
+		# "HK1-Heizkurve-Steigung:slider,0.2,0.1,3.5,1 ".
+		# "HeatingSchedule " .
+		"HK1-Betriebsart:standby,dhw,dhwAndHeating,forcedReduced,forcedNormal " .
+		"HK2-Betriebsart:standby,dhw,dhwAndHeating,forcedReduced,forcedNormal " .
+		# "HeadingModeComfort:activate,deactivate " .
+		# "TemperatureComfort:slider,4,1,37 " .
+		# "HeatingModeEco:activate,deactivate " .
+		# "HeatingHolidaySchedule " .
+		# "HeatingHolidayUnschedule:NoArg " .
+		"HK1-Solltemperatur_normal:slider,3,1,37 " .
+		"HK2-Solltemperatur_normal:slider,3,1,37 " .
+		"HK1-Solltemperatur_reduziert:slider,3,1,37 " .
+		"HK2-Solltemperatur_reduziert:slider,3,1,37 " .
+		"WW-einmaliges_Aufladen:activate,deactivate "; # .
+		# "WW-Zirkulationspumpe_Zeitplan " .
+		# "WW-Zeitplan " .
+		#"WW-Haupttemperatur:slider,10,1,60 " .
+		#"WW-Solltemperatur:slider,10,1,60 ";
 }	
 sub vitoconnect_Attr(@) {
 	my ($cmd,$name,$attr_name,$attr_value) = @_;
@@ -318,7 +469,9 @@ sub vitoconnect_GetUpdate($) {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
 	Log3 $name, 4, "$name: GetUpdate called ...";
-	if ( IsDisabled($name) ) { Log3 $name, 4, "$name: device disabled"; 
+	if ( IsDisabled($name) ) { 
+		Log3 $name, 4, "$name: device disabled";
+		InternalTimer(gettimeofday()+$hash->{intervall}, "vitoconnect_GetUpdate", $hash); 
 	} else {	vitoconnect_getCode($hash); } 	
 	return undef;
 }
@@ -326,7 +479,7 @@ sub vitoconnect_GetUpdate($) {
 sub vitoconnect_getCode($) {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
-	my $isiwebuserid = $hash->{user};
+
 	my $isiwebpasswd = vitoconnect_ReadKeyValue($hash, "passwd");
 		        
    my $param = {
@@ -334,7 +487,7 @@ sub vitoconnect_getCode($) {
 		hash       => $hash,
 		header     => "Content-Type: application/x-www-form-urlencoded",
 		ignoreredirects => 1,
-      user		  => $isiwebuserid,
+      user		  => $hash->{user},
       pwd		  => $isiwebpasswd,
       sslargs    => {SSL_verify_mode => 0},
       method     => "POST",
@@ -355,9 +508,9 @@ sub vitoconnect_getCodeCallback ($) {
    	Log3 $name, 4, "$name - getCodeCallback went ok";
       Log3 $name, 5, "$name: Received response: $response_body";
       $response_body =~ /code=(.*)"/;
-      $hash->{code} = $1;
-      Log3 $name, 5, "$name: code = $hash->{code}";
-      if ($hash->{code}) {
+      $hash->{".code"} = $1;
+      Log3 $name, 5, "$name: code = " . $hash->{".code"};
+      if ($hash->{".code"}) {
       	$hash->{login} = "ok";
       } else {
       	$hash->{login} = "failure";
@@ -383,10 +536,10 @@ sub vitoconnect_getAccessToken($) {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
 	my $param = {
-		url        => $token_url,
+		url        => 'https://iam.viessmann.com/idp/v1/token',
 		hash       => $hash,
 		header     => "Content-Type: application/x-www-form-urlencoded;charset=utf-8",
-		data       => "client_id=$client_id&client_secret=$client_secret&code=$hash->{code}&redirect_uri=$callback_uri&grant_type=authorization_code",
+		data       => "client_id=$client_id&client_secret=$client_secret&code=" . $hash->{".code"} ."&redirect_uri=$callback_uri&grant_type=authorization_code",
       sslargs    => {SSL_verify_mode => 0},
       method     => "POST",      
       callback   => \&vitoconnect_getAccessTokenCallback     
@@ -410,7 +563,7 @@ sub vitoconnect_getAccessTokenCallback($) {
       }  
       my $access_token = $decode_json->{"access_token"};
       if ($access_token ne "") {
-			$hash->{access_token} =  $access_token;          
+			$hash->{".access_token"} =  $access_token;          
          Log3 $name, 5, "$name: Access Token: $access_token";
          vitoconnect_getGw($hash);
       } else {
@@ -427,7 +580,7 @@ sub vitoconnect_getAccessTokenCallback($) {
 sub vitoconnect_getGw($) {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
-	my $access_token = $hash->{access_token};
+	my $access_token = $hash->{".access_token"};
 	my $param = {
 		url        => "$apiURLBase$general",
 		hash       => $hash,
@@ -451,10 +604,10 @@ sub vitoconnect_getGwCallback($) {
       if($@) { Log3 $name, 1, "$name - JSON error while request: $@"; return; } 
       my $installation = $decode_json->{entities}[0]->{properties}->{id};
       Log3 $name, 5, "$name: installation: $installation";
-      $hash->{installation} = $installation;
+      $hash->{".installation"} = $installation;
       my $gw = $decode_json->{entities}[0]->{entities}[0]->{properties}->{serial};
       Log3 $name, 5, "$name gw: $gw";
-      $hash->{gw} = $gw;
+      $hash->{".gw"} = $gw;
       vitoconnect_getResource($hash);
    } else {
    	Log3 $name, 1, "$name: An error happened: $err";
@@ -466,9 +619,9 @@ sub vitoconnect_getGwCallback($) {
 sub vitoconnect_getResource($) {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
-	my $access_token = $hash->{access_token};
-	my $installation = $hash->{installation};
-	my $gw = $hash->{gw};
+	my $access_token = $hash->{".access_token"};
+	my $installation = $hash->{".installation"};
+	my $gw = $hash->{".gw"};
 	my $param = {
 		url        => "https://api.viessmann-platform.io/operational-data/installations/$installation/gateways/$gw/devices/0/features/",
 		hash       => $hash,
@@ -581,16 +734,14 @@ sub vitoconnect_getResourceCallback($) {
 			###########################################
 		};
 		
-		readingsBulkUpdate($hash, "counter", $hash->{counter} );
+		#readingsBulkUpdate($hash, "counter", $hash->{".counter"} );
 		$hash->{counter} = $hash->{counter} + 1;
 		readingsBulkUpdate($hash, "state", "ok");             
    }   else {
-		# Error code, type of error, error message
 		readingsBulkUpdate($hash, "state", "An error happened: $err");
       Log3 $name, 1, "$name - An error happened: $err";
    }
 	readingsEndUpdate($hash, 1);
-	# neuen Timer starten in einem konfigurierten Interval.
 	InternalTimer(gettimeofday()+$hash->{intervall}, "vitoconnect_GetUpdate", $hash);
 	return undef;
 }
@@ -625,7 +776,7 @@ sub vitoconnect_action($) {
    } else { Log3 $name, 1, "$name An error happened: $err"; }
    
    $param = {
-		url        => $token_url,
+		url        => 'https://iam.viessmann.com/idp/v1/token',
 		hash       => $hash,
 		header     => "Content-Type: application/x-www-form-urlencoded;charset=utf-8",
 		data       => "client_id=$client_id&client_secret=$client_secret&code=$code&redirect_uri=$callback_uri&grant_type=authorization_code",
@@ -657,20 +808,7 @@ sub vitoconnect_action($) {
       Log3 $name, 4, "$name: installation: $installation :: gw: $gw"
    } else { Log3 $name, 1, "$name: An error happened: $err"; }	 
    
-	$param = {
-			url        => "https://api.viessmann-platform.io/operational-data/installations/$installation/gateways/$gw/devices/0/features/heating.dhw.oneTimeCharge/activate",
-			hash       => $hash,
-			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
-			data       => '{"mode":"activate"}',
-			data       => '{}',
-			method     => "POST",
-			timeout    => 10,
-			sslargs    => {SSL_verify_mode => 0},
-   };
-   # Log3 $name, 5, Dumper($param);
-  	($err, $response_body) = HttpUtils_BlockingGet($param);
-  	if ($err ne "" || $response_body ne "") { Log3 $name, 1, "$name: Fehler während der Befehlsausführung: $err :: $response_body";
-  	} else { Log3 $name, 5, "$name : Befehlsausführung ok"; }   
+	
     
 	return undef;
 }
@@ -697,8 +835,7 @@ sub vitoconnect_StoreKeyValue($$$) {
     return "error while saving the value - $err" if(defined($err));
     return undef;
 } 
-   
-   
+    
 #####################################################
 # reads obfuscated value 
 sub vitoconnect_ReadKeyValue($$) {
@@ -759,9 +896,12 @@ sub vitoconnect_ReadKeyValue($$) {
     <a name="vitoconnectdefine"></a>
     <b>Define</b>
     <ul>
-        <code>define &lt;name&gt; vitoconnect &lt;user&gt; &lt;password&gt; &lt;interval&gt;</code>
+        <code>define &lt;name&gt; vitoconnect &lt;user&gt; &lt;password&gt; &lt;interval&gt;</code><br>
+        It is a good idea to use a fake password here an set the correct one later because it is readable in the detail view of the device
         <br><br>
-        Example: <code>define vitoconnect vitoconnect user@mail.xx geheim 60</code>
+        Example:<br>
+        <code>define vitoconnect vitoconnect user@mail.xx fakePassword 60</code><br>
+        <code>set vitoconnect password correctPassword 60</code>
         <br><br>
                 
     </ul>
@@ -770,15 +910,53 @@ sub vitoconnect_ReadKeyValue($$) {
     <a name="vitoconnectset"></a>
     <b>Set</b><br>
     <ul>
-    	<li>update<br>
+    	<li><code>update</code><br>
         update readings immeadiatlely</li>
-      <li>clearReadings<br>
+      <li><code>clearReadings</code><br>
         clear all readings immeadiatlely</li> 
-      <li>password <passwd><br>
+      <li><code>password <passwd></code><br>
         store password in key store</li>
-      <li>oneTimeCharge><br>
-        store password in key store</li>
-            
+    
+      <li><code>HK1-Heizkurve-Niveau shift</code><br>
+      not implemented</li>
+      <li><code>HK1-Heizkurve-Steigung slope</code><br>
+      not implemented</li>
+      
+		<li><code>HeatingSchedule</code><br>
+		not implemented </li>
+		
+		<li><code>HK1-Betriebsart standby,dhw,dhwAndHeating,forcedReduced,forcedNormal</code> <br>
+		set HK1-Betriebsart to standby,dhw,dhwAndHeating,forcedReduced or forcedNormal</li>
+		
+		<li><code>HeadingModeComfort activate,deactivate</code> <br>
+       not implemented </li>
+		<li><code>TemperatureComfort targetTemperature</code><br>
+       not implemented </li>
+		<li><code>HeatingModeEco activate,deactivate </code><br>
+       not implemented </li>
+		<li><code>HeatingHolidaySchedule start end</code><br>
+       not implemented </li>
+		<li><code>HeatingHolidayUnschedule</code> <br>
+       not implemented </li>
+       
+		<li><code>HK1-Solltemperatur_normal targetTemperature</code><br>
+       sets the normale target temperature where targetTemperature is an integer between 3 and 37</li>
+		<li><code>HK1-Solltemperatur_reduziert targetTemperature</code><br>
+       sets the reduced target temperature where targetTemperature is an integer between 3 and 37 </li>
+       
+		<li><code>WW-einmaliges_Aufladen activate,deactivate</code><br>
+       activate or deactivate one time charge for hot water </li>
+       
+		<li><code>WW-Zirkulationspumpe_Zeitplan  schedule</code><br>
+       not implemented </li>
+		<li><code>WW-Zeitplan schedule</code> <br>
+       not implemented </li>
+		<li><code>WW-Haupttemperatur targetTemperature</code><br>
+       targetTemperature is an integer between 10 and 60<br>
+       not implemented </li>
+		<li><code>WW-Solltemperatur targetTemperature</code><br>
+       targetTemperature is an integer between 10 and 60<br>
+       not implemented </li>     
     </ul>
     <br>
 
@@ -800,10 +978,10 @@ sub vitoconnect_ReadKeyValue($$) {
         Attributes:
         <ul>
 				<li><i>disable</i>:<br>         
-                xxxx  
+                stop communication with Vissmann server  
             </li>
             <li><i>verbose</i>:<br>         
-                xxxx  
+                set the verbosity level  
             </li>
             <li><i>vitoconnect_raw_readings</i>:<br>         
                 create readings with plain JSON names like 'heating.circuits.0.heating.curve.slope' instead of german identifiers  
