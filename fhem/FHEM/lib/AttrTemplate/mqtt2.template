@@ -363,7 +363,7 @@ attr DEVICE setList \
   close:noArg shellies/DEVNAME/roller/0/command close\
   stop:noArg shellies/DEVNAME/roller/0/command stop\
   pct:slider,0,1,100 shellies/DEVNAME/roller/0/command/pos $EVTPART1\
-  DoRecalibration:noArg shellies/DEVNAME/roller/0/command rc\
+  DoRecalibration:noArg shellies/DEVNAME/roller/0/command rc
 attr DEVICE readingList shellies/DEVNAME/roller/0/pos:.* pct\
   shellies/DEVNAME/status/0/rollers:.* power\
   shellies/DEVNAME/online:.* online\
