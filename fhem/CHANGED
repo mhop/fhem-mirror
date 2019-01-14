@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  49_SSCam: generate event of every LastSnapFilename,LastSnapId,
+                       LastSnapTime if snap was called with arguments,
+                       Forum:#45671 #msg887484
   - bugfix:  DarkSkyAPI: OpenWeatherMapAPI, Weather - fix bugs, change
              day_of_week formated, delete deprecated readings
   - bugfixe: DarkSkyAPI: fix hourly wind at factor 3.6

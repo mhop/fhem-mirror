@@ -47,6 +47,7 @@ use Encode;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.4.4"  => "14.01.2019  change: generate event of every snapfile,id etc. if snap was called with arguments, Forum:#45671 #msg887484 ",
   "8.4.3"  => "11.01.2019  fix blocking Active-Token if snap was done with arguments and snapEmailTxt not set, Forum:#45671 #msg885475 ",
   "8.4.2"  => "10.01.2019  snapEmailTxt can use placeholders \$DATE, \$TIME ",
   "8.4.1"  => "09.01.2019  Transaction of snap and getsnapinfo implemented, debugactive token verbose level changed ",
@@ -845,6 +846,7 @@ sub SSCam_Set($@) {
 		
       } else {
 		  # Snaphash ist vorhanden und wird zur Ausgabe aufbereitet (Polling ist aktiv)
+          $hash->{HELPER}{SNAPLIMIT} = AttrVal($name,"snapGalleryNumber",$SSCam_slim);
 		  my $htmlCode = SSCam_composegallery($name);
 		  for (my $k=1; (defined($hash->{HELPER}{CL}{$k})); $k++ ) {
 		      if ($hash->{HELPER}{CL}{$k}->{COMP}) {
@@ -1376,6 +1378,7 @@ sub SSCam_Get($@) {
 		
 		} else {
 		    # Snaphash ist vorhanden und wird zur Ausgabe aufbereitet
+            $hash->{HELPER}{SNAPLIMIT} = AttrVal($name,"snapGalleryNumber",$SSCam_slim);
 			my $htmlCode = SSCam_composegallery($name);
 		    for (my $k=1; (defined($hash->{HELPER}{CL}{$k})); $k++ ) {
 		        if ($hash->{HELPER}{CL}{$k}->{COMP}) {
@@ -4956,30 +4959,37 @@ sub SSCam_camop_parse ($) {
                      $OpMode eq "getsnapgallery" || 
                      ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} =~ /snap/)
                     ) {
-                # Informationen zu einem oder mehreren Schnapschüssen wurde abgerufen bzw. Lifeanzeige Schappschuß              			
-				my $lsid   = exists($data->{data}{data}[0]{id})?$data->{data}{data}[0]{id}:"n.a.";
-				my $lfname = exists($data->{data}{data}[0]{fileName})?$data->{data}{data}[0]{fileName}:"n.a.";
 				
-				my $lstime;
-				if(exists($data->{data}{data}[0]{createdTm})) {
-				    $lstime = $data->{data}{data}[0]{createdTm};
-				    my @t = split(" ", FmtDateTime($lstime));
-					my @d = split("-", $t[0]);
-					$lstime = "$d[2].$d[1].$d[0] / $t[1]";
-				} else {
-				    $lstime = "n.a.";	
-				}
-				
-				Log3($name, $verbose, "$name - Snapinfos of camera $camname retrieved");
-	            Log3($name,4, "$name - Snap [0]: ID => $lsid, File => $lfname, Created => $lstime");
-				 
-                readingsBeginUpdate($hash);
-                readingsBulkUpdate($hash,"Errorcode","none");
-                readingsBulkUpdate($hash,"Error","none");
-                readingsBulkUpdate($hash,"LastSnapId",$lsid);
-				readingsBulkUpdate($hash,"LastSnapFilename", $lfname);
-				readingsBulkUpdate($hash,"LastSnapTime", $lstime);
-                readingsEndUpdate($hash, 1);
+	            Log3($name, $verbose, "$name - Snapinfos of camera $camname retrieved");
+                
+                my %snaps = ( 0 => {'createdTm' => 'n.a.', 'fileName' => 'n.a.','snapid' => 'n.a.'} );  # Hilfshash 
+                my ($k,$l) = (0,0);                 
+				if(exists($data->{data}{data}[0]{createdTm})) {       
+                    while ($data->{'data'}{'data'}[$k]) {
+                        if($data->{'data'}{'data'}[$k]{'camName'} ne $camname) {
+                            $k += 1;
+                            next;
+                        }
+                        my @t         = split(" ", FmtDateTime($data->{data}{data}[$k]{createdTm}));
+                        my @d         = split("-", $t[0]);
+                        my $createdTm = "$d[2].$d[1].$d[0] / $t[1]";
+                        $snaps{$l}{createdTm} = $createdTm;
+                        $snaps{$l}{fileName}  = $data->{data}{data}[$k]{fileName};
+                        $snaps{$l}{snapid}    = $data->{data}{data}[$k]{id};
+                        Log3($name,4, "$name - Snap [$l]: ID => $data->{data}{data}[$k]{id}, File => $data->{data}{data}[$k]{fileName}, Created => $createdTm");
+                        $l += 1;
+                        $k += 1;
+                    }
+                }
+                
+                my @as = sort{$b<=>$a}keys%snaps;
+                foreach my $key (@as) {
+                    readingsBeginUpdate($hash);
+                    readingsBulkUpdate($hash,"LastSnapId", $snaps{$key}{snapid});
+                    readingsBulkUpdate($hash,"LastSnapFilename", $snaps{$key}{fileName});
+                    readingsBulkUpdate($hash,"LastSnapTime", $snaps{$key}{createdTm});
+                    readingsEndUpdate($hash, 1);                    
+                }
 					
 				#####  ein Schnapschuss soll als liveView angezeigt werden  #####
 				Log3($name, 3, "$name - There is no snapshot of camera $camname to display ! Take one snapshot before.") 
@@ -4993,7 +5003,7 @@ sub SSCam_camop_parse ($) {
 				#####  eine Schnapschussgalerie soll angezeigt oder als Bulk versendet werden  #####
                 if($OpMode eq "getsnapgallery") {
 				    if($hash->{HELPER}{CANSENDSNAP}) {
-					    # es sollen die Anzahl "$hash->{HELPER}{SNAPNUM}" Schnappschüsse versendet werden
+					    # es sollen Schnappschüsse versendet werden
 						my $i = 0;
 						my $sn = 0;
 						my %sendsnaps = ();  # Schnappschuss Hash zum Versand wird leer erstellt
@@ -5071,6 +5081,11 @@ sub SSCam_camop_parse ($) {
 						}
 				    } 
                 }
+                
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate($hash,"Errorcode","none");
+                readingsBulkUpdate($hash,"Error","none");
+                readingsEndUpdate($hash, 1);
                 
                 SSCam_closeTrans($hash);                                        # Transaktion beenden
 				delete($hash->{HELPER}{GETSNAPGALLERY});                        # Steuerbit getsnapgallery statt getsnapinfo				
@@ -6278,18 +6293,18 @@ sub SSCam_snaplimsize ($) {
       $ssize = 0;
   } else {
       $hash->{HELPER}{GETSNAPGALLERY} = 1;
-	  $slim = AttrVal($name,"snapGalleryNumber",$SSCam_slim);    # Anzahl der abzurufenden Snaps
-	  my $sg = AttrVal($name,"snapGallerySize","Icon");          # Auflösung Image
+	  $slim = AttrVal($name,"snapGalleryNumber",$SSCam_slim);               # Anzahl der abzurufenden Snaps
+	  my $sg = AttrVal($name,"snapGallerySize","Icon");                     # Auflösung Image
 	  $ssize = ($sg eq "Icon")?1:2;
   }
 
   if($hash->{HELPER}{CANSENDSNAP}) {
-      # Versand Schnappschuß darf erfolgen falls gewünscht
-      # Galerie über "$hash->{HELPER}{SNAPNUM}" Snaps zum Versand abrufen 
-      $hash->{HELPER}{GETSNAPGALLERY} = 1;                       # Steuerbit für Snap-Galerie
-	  $slim  = $hash->{HELPER}{SNAPNUM};                         # enthält die Anzahl der zu versendenden Images
-      $ssize = 2;                                                # Full Size für EMail-Versand
+      # Versand Schnappschuß darf erfolgen falls gewünscht 
+      $hash->{HELPER}{GETSNAPGALLERY} = 1;                                  # Steuerbit für Snap-Galerie
+      $ssize = 2;                                                           # Full Size für EMail-Versand
   }
+  
+  $slim = delete $hash->{HELPER}{SNAPNUM} if($hash->{HELPER}{SNAPNUM});     # enthält die Anzahl der ausgelösten Schnappschüsse
 
 return ($slim,$ssize);
 }
