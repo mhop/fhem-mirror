@@ -687,7 +687,7 @@ alexa_stoppedAlexaFHEM($)
   $hash->{LAST_STOP} = FmtDateTime( gettimeofday() );
 
   if( $hash->{reason} ) {
-    readingsSingleUpdate($hash, 'alexaFHEM', "stopped: $hash->{reason}", 1 );
+    readingsSingleUpdate($hash, 'alexaFHEM', "stopped; $hash->{reason}", 1 );
     delete $hash->{reason};
   } else {
     readingsSingleUpdate($hash, 'alexaFHEM', 'stopped', 1 );
