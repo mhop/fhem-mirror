@@ -790,6 +790,8 @@ alexa_Set($$@)
     return "usage: set $name $cmd <key>" if( !@args );
     my $key = $args[0];
 
+    $hash->{".triggerUsed"} = 1;
+
     $key = alexa_encrypt($key);
     setKeyValue('alexaFHEM.skillRegKey', $key );
     readingsSingleUpdate($hash, 'alexaFHEM.skillRegKey', $key, 1 );
@@ -802,11 +804,28 @@ alexa_Set($$@)
     return "usage: set $name $cmd <key>" if( !@args );
     my $token = $args[0];
 
+    $hash->{".triggerUsed"} = 1;
+
     $token = alexa_encrypt($token);
     setKeyValue('alexaFHEM.bearerToken', $token );
     readingsSingleUpdate($hash, 'alexaFHEM.bearerToken', $token, 1 );
 
     CommandSave(undef,undef) if( AttrVal( "autocreate", "autosave", 1 ) );
+
+    return undef;
+
+  } elsif( $cmd eq 'clearProxyCredentials' ) {
+    setKeyValue('alexaFHEM.skillRegKey', undef );
+    setKeyValue('alexaFHEM.bearerToken', undef );
+
+    readingsBeginUpdate($hash);
+    readingsBulkUpdate($hash, 'alexaFHEM.skillRegKey', '', 1 );
+    readingsBulkUpdate($hash, 'alexaFHEM.bearerToken', '', 1 );
+    readingsEndUpdate($hash,1);
+
+    CommandSave(undef,undef) if( AttrVal( "autocreate", "autosave", 1 ) );
+
+    FW_directNotify($name, 'clearProxyCredentials');
 
     return undef;
   }
@@ -1402,6 +1421,9 @@ alexa_Attr($$$)
     <li>createDefaultConfig<br>
     adds the default config for the sshproxy to the existing config file or creates a new config file. sets the
     alexaFHEM-config attribut if not already set.</li>
+
+    <li>clearProxyCredentials<br>
+    clears all stored sshproxy credentials</li>
     <br>
   </ul>
 
