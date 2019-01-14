@@ -169,6 +169,7 @@ alexa_Undefine($$)
 
   if( $hash->{PID} ) {
     $hash->{undefine} = 1;
+    #$hash->{undefine} = $hash->{CL};
     alexa_stopAlexaFHEM($hash);
 
     return "$name will be deleted after alexa-fhem has stopped or after 5 seconds. whatever comes first.";
@@ -467,9 +468,22 @@ alexa_configDefault($;$)
     $conf->{connections}[0]->{filter} = 'alexaName=..*' if( !$conf->{connections}[0]->{filter} );
     $conf->{connections}[0]->{uid} = $< if( $conf->{sshproxy} );
 
-    if( my $web = $defs{WEB} ) {
-      $conf->{connections}[0]->{port} = $web->{PORT};
-      $conf->{connections}[0]->{webname} = AttrVal( 'WEB', 'webname', 'fhem' );
+    my $web = $defs{WEB};
+    if( !$web ) {
+      if( my @names = devspec2array('TYPE=FHEMWEB:FILTER=TEMPORARY!=1') ) {
+        $web = $defs{$names[0]} if( defined($defs{$names[0]}) );
+
+        Log3 $name, 4, "$name: using $names[0] as FHEMWEB device." if( $web );
+      }
+    } else {
+      Log3 $name, 4, "$name: using WEB as FHEMWEB device." if( $web );
+    }
+
+    if( $web ) {
+      $conf->{connections}[0]->{port} = $web->{PORT} if( !$conf->{connections}[0]->{port} );
+      $conf->{connections}[0]->{webname} = AttrVal( 'WEB', 'webname', 'fhem' ) if( !$conf->{connections}[0]->{webname} );
+    } else {
+      Log3 $name, 2, "$name: no FHEMWEB device found. please adjust config file manualy.";
     }
 
     $json = JSON->new->pretty->utf8->encode($conf);
@@ -709,9 +723,15 @@ alexa_stoppedAlexaFHEM($)
   }
 
   if( $hash->{undefine} ) {
+    my $cl = $hash->{undefine};
+
     delete $hash->{undefine};
     CommandDelete(undef, $name);
     Log3 $name, 2, "$name: alexaFHEM deleted";
+
+    if( ref($cl) eq 'HASH' && $cl->{canAsyncOutput} ) {
+      asyncOutput( $cl, "$name: alexaFHEM deleted\n" );
+    }
 
   } elsif( $hash->{shutdown} ) {
     delete $hash->{shutdown};
