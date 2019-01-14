@@ -28,6 +28,7 @@ alexa_Initialize($)
   $hash->{DefFn}    = "alexa_Define";
   $hash->{NotifyFn} = "alexa_Notify";
   $hash->{UndefFn}  = "alexa_Undefine";
+  $hash->{DelayedShutdownFn} = "alexa_DelayedShutdownFn";
   $hash->{ShutdownFn} = "alexa_Shutdown";
   $hash->{SetFn}    = "alexa_Set";
   $hash->{GetFn}    = "alexa_Get";
@@ -174,6 +175,20 @@ alexa_Undefine($$)
   }
 
   delete $modules{$hash->{TYPE}}{defptr};
+
+  return undef;
+}
+sub
+alexa_DelayedShutdownFn($)
+{
+  my ($hash) = @_;
+
+  if( $hash->{PID} ) {
+    $hash->{shutdown} = 1;
+    alexa_stopAlexaFHEM($hash);
+
+    return 1;
+  }
 
   return undef;
 }
@@ -698,8 +713,13 @@ alexa_stoppedAlexaFHEM($)
     CommandDelete(undef, $name);
     Log3 $name, 2, "$name: alexaFHEM deleted";
 
-   } elsif( $hash->{start} ) {
+  } elsif( $hash->{shutdown} ) {
+    delete $hash->{shutdown};
+    CancelDelayedShutdown($name);
+
+  } elsif( $hash->{start} ) {
     alexa_startAlexaFHEM($hash)
+
   }
 }
 
