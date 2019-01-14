@@ -708,7 +708,7 @@ alexa_Set($$@)
 {
   my ($hash, $name, $cmd, @args) = @_;
 
-  my $list = "add:noArg createDefaultConfig:noArg reload:noArg restart:noArg skillId start:noArg stop:noArg";
+  my $list = "add createDefaultConfig:noArg reload:noArg restart:noArg skillId start:noArg stop:noArg";
 
   if( $cmd eq 'reload' ) {
     $hash->{".triggerUsed"} = 1;
