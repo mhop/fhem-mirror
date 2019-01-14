@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfixe: DarkSkyAPI: fix hourly wind at factor 3.6
   - new:     44_ROLLO: Universal module to precisely control shutters/blinds 
              which support only open/close/stop
   - bugfix:  59_Weather: DarkSky and OpenWeatherMapAPI change formated output,

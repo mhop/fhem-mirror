@@ -530,9 +530,9 @@ sub _ProcessingRetrieveData($$) {
                                     'wind_direction' =>
                                     $data->{hourly}->{data}->[$i]->{windBearing},
                                     'wind' => sprintf( "%.1f",
-                                            $data->{hourly}->{data}->[$i]->{windSpeed} ),
+                                            ($data->{hourly}->{data}->[$i]->{windSpeed} * 3.6) ),
                                     'wind_speed' => sprintf( "%.1f",
-                                            $data->{hourly}->{data}->[$i]->{windSpeed} ),
+                                            ($data->{hourly}->{data}->[$i]->{windSpeed} * 3.6) ),
                                     'windGust' => sprintf( "%.1f",
                                             $data->{hourly}->{data}->[$i]->{windGust} ),
                                     'precipProbability' =>
