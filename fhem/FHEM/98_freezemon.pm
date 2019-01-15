@@ -89,13 +89,14 @@ package main;
 
 use strict;
 use warnings;
+
 #use Data::Dumper;
 use POSIX;
 use Time::HiRes qw(gettimeofday);
 use Time::HiRes qw(tv_interval);
 use B qw(svref_2object);
 use Blocking;
-use vars qw($FW_CSRF);    
+use vars qw($FW_CSRF);
 
 my $version = "0.0.22";
 
@@ -161,10 +162,9 @@ sub freezemon_Define($$) {
         freezemon_start($hash);
     }
     elsif ( IsDisabled($name) ) {
-        $hash->{STATE} = "inactive";
+        readingsSingleUpdate( $hash, "state", "inactive", 1 );
         $hash->{helper}{DISABLED} = 1;
     }
-    
 
     return undef;
 }
@@ -324,7 +324,7 @@ sub freezemon_ProcessTimer($) {
         }
 
         # prioQueues are not unique, so we are using the old way...
-        if ( exists ($hash->{helper}{apptime}) && $hash->{helper}{apptime} ne "" ) {
+        if ( exists( $hash->{helper}{apptime} ) && $hash->{helper}{apptime} ne "" ) {
             my @olddev = split( " ", $hash->{helper}{apptime} );
             my @newdev = split( " ", freezemon_apptime($hash) );
 
@@ -422,7 +422,7 @@ sub freezemon_ProcessTimer($) {
 
             # Build hash with 20 last freezes
             my @freezes = ();
-			my $dev2 = $dev =~ s/,/#&%/rg;
+            my $dev2    = $dev =~ s/,/#&%/rg;
             push @freezes, split( ",", ReadingsVal( $name, ".fm_freezes", "" ) );
             push @freezes,
                 strftime( "%Y-%m-%d", localtime )
@@ -546,7 +546,7 @@ sub freezemon_Set($@) {
     my $usage = "Unknown argument $cmd, choose one of active:noArg inactive:noArg clear:noArg";
 
     return "\"set $name\" needs at least one argument" unless ( defined($cmd) );
-	Log3 $name,5, "$name Coming with command $cmd";
+    Log3 $name, 5, "$name Coming with command $cmd";
     if ( $cmd eq "inactive" ) {
         RemoveInternalTimer($hash);
         readingsSingleUpdate( $hash, "state", "inactive", 1 );
@@ -554,7 +554,7 @@ sub freezemon_Set($@) {
         freezemon_unwrap_all($hash);
     }
     elsif ( $cmd eq "active" ) {
-        if ( IsDisabled($name) ) { #&& !AttrVal( $name, "disable", undef ) ) {
+        if ( IsDisabled($name) ) {    #&& !AttrVal( $name, "disable", undef ) ) {
             freezemon_start($hash);
         }
         else {
@@ -577,7 +577,7 @@ sub freezemon_Set($@) {
         readingsEndUpdate( $hash, 1 );
     }
     else {
-		Log3 $name,5, "$name leaving with $usage";
+        Log3 $name, 5, "$name leaving with $usage";
         return $usage;
     }
     return undef;
@@ -590,9 +590,10 @@ sub freezemon_Get($@) {
     my $state = $hash->{STATE};
     my $ret   = "";
     my $usage = 'Unknown argument $a[1], choose one of freeze:noArg log:';
-		
+
     return "\"get $name\" needs at least one argument" unless ( defined( $a[1] ) );
-	Log3 $name,5, "$name GET Coming with command $a[1]";
+    Log3 $name, 5, "$name GET Coming with command $a[1]";
+
     #get the logfiles
     my @fl = freezemon_getLogFiles($name);
 
@@ -619,7 +620,7 @@ sub freezemon_Get($@) {
             }
             $_ =~ s/(?<=.{240}).{1,}$/.../;
             $_ =~ s/&%%CSRF%%/$FW_CSRF/;
-			$_ =~ s/#&%/,/g;
+            $_ =~ s/#&%/,/g;
             $ret .= "<font color='$colors[$loglevel-1]'><b>" . $loglevel . "</b></font> - " . $_ . "<br>";
 
         }
@@ -655,7 +656,7 @@ sub freezemon_Get($@) {
 
     # return usage hint
     else {
-		Log3 $name,5, "GET $name leaving with $usage";
+        Log3 $name, 5, "GET $name leaving with $usage";
         return $usage;
     }
     return undef;
@@ -690,7 +691,7 @@ sub freezemon_Attr($) {
 
         }
         elsif ( $aName eq "fm_logFile" ) {
-			
+
             if ( $aVal ne "" ) {
                 $aVal =~ m,^(.*)/([^/]*)$,;
                 my $path = $1;
@@ -708,40 +709,40 @@ sub freezemon_Attr($) {
             }
         }
         elsif ( $aName eq "fm_CatchFnCalls" ) {
-			
+
             if ( $aVal ne 0 ) {
                 freezemon_install_callFn_wrapper($hash);
-				$fmFnLog = $aVal;
-				$fmName = $name;
-				$fmFnLog = AttrVal( $name, "fm_CatchFnCalls", 0 );
+                $fmFnLog = $aVal;
+                $fmName  = $name;
+                $fmFnLog = AttrVal( $name, "fm_CatchFnCalls", 0 );
 
             }
-            elsif ( defined ($hash->{helper}{mycallFn} ) ) {
+            elsif ( defined( $hash->{helper}{mycallFn} ) ) {
                 Log3( "", 0, "[Freezemon] $name: Unwrapping CallFn" );
                 {
                     no warnings;
                     *main::CallFn = $hash->{helper}{mycallFn};
-					$hash->{helper}{mycallFn} = undef;
+                    $hash->{helper}{mycallFn} = undef;
                 }
             }
-			else {
-				Log3( "", 0, "[Freezemon] $name: Unwrapping CallFn - nothing to do" );
-			}
+            else {
+                Log3( "", 0, "[Freezemon] $name: Unwrapping CallFn - nothing to do" );
+            }
         }
         elsif ( $aName eq "fm_CatchCmds" ) {
-			
+
             if ( $aVal ne 0 ) {
                 freezemon_install_AnalyzeCommand_wrapper($hash);
-				$fmCmdLog = $aVal;
-				$fmName = $name;
-				$fmCmdLog = AttrVal( $name, "fm_CatchCmds",    0 );
-	        }
-            elsif ( defined ( $hash->{helper}{AnalyzeCommand} ) ) {
+                $fmCmdLog = $aVal;
+                $fmName   = $name;
+                $fmCmdLog = AttrVal( $name, "fm_CatchCmds", 0 );
+            }
+            elsif ( defined( $hash->{helper}{AnalyzeCommand} ) ) {
                 Log3( "", 0, "[Freezemon] $name: Unwrapping AnalyzeCommand" );
                 {
                     no warnings;
                     *main::AnalyzeCommand = $hash->{helper}{AnalyzeCommand};
-					$hash->{helper}{AnalyzeCommand} = undef;
+                    $hash->{helper}{AnalyzeCommand} = undef;
                 }
             }
             else {
@@ -770,14 +771,14 @@ sub freezemon_Attr($) {
             my $status = Log3( "", 100, "" );
             Log3( "", 0, "[Freezemon] $name: Unwrapping Log3" );
             *main::Log3 = $hash->{helper}{Log3};
-			$hash->{helper}{Log3} = undef;
+            $hash->{helper}{Log3} = undef;
         }
         elsif ( $aName eq "fm_CatchFnCalls" ) {
             Log3( "", 0, "[Freezemon] $name: Unwrapping CallFn" );
             {
                 no warnings;
                 *main::CallFn = $hash->{helper}{mycallFn};
-				$hash->{helper}{mycallFn} = undef;
+                $hash->{helper}{mycallFn} = undef;
             }
         }
         elsif ( $aName eq "fm_CatchCmds" ) {
@@ -785,7 +786,7 @@ sub freezemon_Attr($) {
             {
                 no warnings;
                 *main::AnalyzeCommand = $hash->{helper}{AnalyzeCommand};
-				$hash->{helper}{AnalyzeCommand} = undef;
+                $hash->{helper}{AnalyzeCommand} = undef;
             }
         }
 
@@ -811,11 +812,11 @@ sub freezemon_start($) {
         freezemon_install_log_wrapper($hash)            if AttrVal( $name, "fm_logFile",      "" ) ne "";
         freezemon_install_callFn_wrapper($hash)         if AttrVal( $name, "fm_CatchFnCalls", 0 ) > 0;
         freezemon_install_AnalyzeCommand_wrapper($hash) if AttrVal( $name, "fm_CatchCmds",    0 ) > 0;
-		
+
     }
-	$fmName = $name;
-	$fmCmdLog = AttrVal( $name, "fm_CatchCmds",    0 );
-	$fmFnLog = AttrVal( $name, "fm_CatchFnCalls", 0 );
+    $fmName   = $name;
+    $fmCmdLog = AttrVal( $name, "fm_CatchCmds", 0 );
+    $fmFnLog  = AttrVal( $name, "fm_CatchFnCalls", 0 );
 
     $hash->{helper}{DISABLED} = 0;
     my $next = int( gettimeofday() ) + 1;
@@ -848,23 +849,27 @@ sub freezemon_apptime($) {
                 $fnname = $cv->GV->NAME;
                 $ret .= $fnname;
 
-                $shortarg = ( defined( $entry->{arg} ) ? $entry->{arg} : "" );
-
-                #Log3 $name, 5, "Freezemon: found a prioQueue arg ".ref($shortarg);
-                if ( ref($shortarg) eq "HASH" ) {
-                    if ( !defined( $shortarg->{NAME} ) ) {
-                        $shortarg = "N/A";
-                    }
-                    else {
-                        $shortarg = $shortarg->{NAME};
-                    }
-                }
-                elsif ( ref($shortarg) eq "ARRAY" ) {
+                #$shortarg = ( defined( $entry->{arg} ) ? $entry->{arg} : "" );
+                if ( defined( $entry->{arg} ) ) {
                     $shortarg = $entry->{arg};
+
+                    #Log3 $name, 5, "Freezemon: found a prioQueue arg ".ref($shortarg);
+                    if ( ref($shortarg) eq "HASH" ) {
+                        if ( !defined( $shortarg->{NAME} ) ) {
+                            $shortarg = "N/A";
+                        }
+                        else {
+                            $shortarg = $shortarg->{NAME};
+                        }
+                    }
+                    elsif ( ref($shortarg) eq "ARRAY" ) {
+                        $shortarg = $entry->{arg};
+                    }
+
+                    ( $shortarg, undef ) = split( /:|;/, $shortarg, 2 );
                 }
 
-                ( $shortarg, undef ) = split( /:|;/, $shortarg, 2 );
-				$shortarg = ""  unless defined($shortarg); 
+                $shortarg = "" unless defined($shortarg);
                 $ret .= ":" . $shortarg . " ";
 
                 #Log3 $name, 5, "Freezemon: found a prioQueue, returning $ret";
@@ -950,20 +955,20 @@ sub freezemon_unwrap_all($) {
     {
         no warnings;
         *main::CallFn = $hash->{helper}{mycallFn} if defined( $hash->{helper}{mycallFn} );
-		$hash->{helper}{mycallFn} = undef;
+        $hash->{helper}{mycallFn} = undef;
     }
     Log3( "", 0, "[Freezemon] $name: Unwrapping AnalyzeCommand" );
     {
         no warnings;
         *main::AnalyzeCommand = $hash->{helper}{AnalyzeCommand} if defined( $hash->{helper}{AnalyzeCommand} );
-		$hash->{helper}{AnalyzeCommand} = undef;
+        $hash->{helper}{AnalyzeCommand} = undef;
     }
     my $status = Log3( "", 100, "" );
     Log3( "", 0, "[Freezemon] $name: Unwrapping Log3" );
     {
         no warnings;
         *main::Log3 = $hash->{helper}{Log3} if defined( $hash->{helper}{Log3} );
-		$hash->{helper}{Log3} = undef;
+        $hash->{helper}{Log3} = undef;
     }
 }
 
@@ -972,11 +977,11 @@ sub freezemon_callFn($@) {
     my ( $lfn, @args ) = @_;
 
     # take current time, then immediately call the original  function
-    my $t0     = [gettimeofday];
-    my ($result,$p) = $lfn->(@args);
-    my $ms     = tv_interval($t0);
-    my $d      = $args[0];
-    my $n      = $args[1];
+    my $t0 = [gettimeofday];
+    my ( $result, $p ) = $lfn->(@args);
+    my $ms = tv_interval($t0);
+    my $d  = $args[0];
+    my $n  = $args[1];
 
     if ( $ms >= 0.5 ) {
         push @fmFn, [ $n, $d ];
@@ -984,8 +989,8 @@ sub freezemon_callFn($@) {
         #$fm_fn .= "$n:$d ";
         Log3 $fmName, $fmFnLog, "[Freezemon] $fmName: Long function call detected $n:$d - $ms seconds";
     }
-	return ($result,$p) if ($p) ;
-	return $result;
+    return ( $result, $p ) if ($p);
+    return $result;
 }
 ###################################
 sub freezemon_AnalyzeCommand($$$;$) {
@@ -993,7 +998,7 @@ sub freezemon_AnalyzeCommand($$$;$) {
 
     # take current time, then immediately call the original  function
     my $t0     = [gettimeofday];
-    my ($result,$p) = $lfn->( $cl, $cmd, $cfc );
+    my $result = $lfn->( $cl, $cmd, $cfc );
     my $ms     = tv_interval($t0);
     my $d      = "";
     my $n      = $cmd;
@@ -1010,7 +1015,8 @@ sub freezemon_AnalyzeCommand($$$;$) {
         #$fm_fn .= "$n:$d ";
         Log3 $fmName, $fmCmdLog, "[Freezemon] $fmName: Long running Command detected $n:$d - $ms seconds";
     }
-	return ($result,$p) if ($p) ;
+
+    #return ($result,$p) if ($p) ;
     return $result;
 }
 
@@ -1236,7 +1242,15 @@ sub freezemon_dump_log($$$) {
 sub freezemon_logLink($$) {
     my ( $name, $link ) = @_;
     return "" if !$link;
-    my $ret = "<a href='$FW_ME?cmd=" . urlEncode("get $name log $link") . "&%%CSRF%%'> [Log]</a>";
+    my $me;
+    if ( defined($FW_ME) ) {
+        $me = $FW_ME;
+    }
+    else {
+        $me = "fhem";
+    }
+
+    my $ret = "<a href='$me?cmd=" . urlEncode("get $name log $link") . "&%%CSRF%%'> [Log]</a>";
     return $ret;
 }
 ###################################
