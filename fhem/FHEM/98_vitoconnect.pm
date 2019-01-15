@@ -66,6 +66,7 @@
 #                 Bedienfehler (z.B. Ausführung einer Befehls für HK2, wenn die Hezung nur einen Heizkreis hat) 
 #						führen zu einem "Bad Gateway" Fehlermeldung in Logfile
 #						Achtung: Keine Prüfung ob Befehle sinnvoll und oder erlaubt sind! Nutzung auf eigene Gefahr!
+# 2019-01-15	   Fehler bei der Befehlsausführung gefixt
 #          
 #
 #   ToDo:         weitere "set"s zum Steuern der Heizung
@@ -332,7 +333,7 @@ sub vitoconnect_Set($@) {
 	} elsif ($opt eq "HK1-Solltemperatur_normal") {
 		vitoconnect_action($hash);
 		my $param = {
-			url        => "https://api.viessmann-platform.io/operational-data/v1/installations/129846/gateways/7571381616514108/devices/0/features/heating.circuits.0.operating.programs.normal/setTemperature", 
+			url        => "https://api.viessmann-platform.io/operational-data/v1/installations/$installation/gateways/$gw/devices/0/features/heating.circuits.0.operating.programs.normal/setTemperature", 
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
 			data       => "{\"targetTemperature\":$args[0]}",
@@ -349,7 +350,7 @@ sub vitoconnect_Set($@) {
 	} elsif ($opt eq "HK2-Solltemperatur_normal") {
 		vitoconnect_action($hash);
 		my $param = {
-			url        => "https://api.viessmann-platform.io/operational-data/v1/installations/129846/gateways/7571381616514108/devices/0/features/heating.circuits.1.operating.programs.normal/setTemperature", 
+			url        => "https://api.viessmann-platform.io/operational-data/v1/installations/$installation/gateways/$gw/devices/0/features/heating.circuits.1.operating.programs.normal/setTemperature", 
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
 			data       => "{\"targetTemperature\":$args[0]}",
@@ -366,7 +367,7 @@ sub vitoconnect_Set($@) {
 	} elsif ($opt eq "HK1-Solltemperatur_reduziert") {
 		vitoconnect_action($hash);
 		my $param = {
-			url        => "https://api.viessmann-platform.io/operational-data/v1/installations/129846/gateways/7571381616514108/devices/0/features/heating.circuits.0.operating.programs.reduced/setTemperature", 
+			url        => "https://api.viessmann-platform.io/operational-data/v1/installations/$installation/gateways/$gw/devices/0/features/heating.circuits.0.operating.programs.reduced/setTemperature", 
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
 			data       => "{\"targetTemperature\":$args[0]}",
@@ -382,7 +383,7 @@ sub vitoconnect_Set($@) {
 	} elsif ($opt eq "HK2-Solltemperatur_reduziert") {
 		vitoconnect_action($hash);
 		my $param = {
-			url        => "https://api.viessmann-platform.io/operational-data/v1/installations/129846/gateways/7571381616514108/devices/0/features/heating.circuits.1.operating.programs.reduced/setTemperature", 
+			url        => "https://api.viessmann-platform.io/operational-data/v1/installations/$installation/gateways/$gw/devices/0/features/heating.circuits.1.operating.programs.reduced/setTemperature", 
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
 			data       => "{\"targetTemperature\":$args[0]}",
