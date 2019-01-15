@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - new:     98_todoist: initial release
   - change:  49_SSCam: generate event of every LastSnapFilename,LastSnapId,
                        LastSnapTime if snap was called with arguments,
                        Forum:#45671 #msg887484

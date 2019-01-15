@@ -503,6 +503,7 @@ FHEM/98_structure.pm         rudolfkoenig         Automatisierung
 FHEM/98_Siro.pm              Byte09 / Dr. Smag    Sonstige Systeme
 FHEM/98_MSwitch.pm           Byte09	              Automatisierung
 FHEM/98_telnet.pm            rudolfkoenig         Automatisierung
+FHEM/98_todoist.pm           marvin78							Unterstuetzende Dienste
 FHEM/98_update.pm            rudolfkoenig         Sonstiges
 FHEM/98_version.pm           markusbloch          Sonstiges
 FHEM/98_vitoconnect.pm       andreas13            Heizungssteuerung/Raumklima
