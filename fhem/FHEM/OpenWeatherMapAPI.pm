@@ -259,7 +259,8 @@ sub _ProcessingRetrieveData($$) {
                 _ErrorHandling( $self, $data->{cod} . ': ' . $data->{message} );
             }
             else {
-
+                ### Debug
+#                 print 'Response: ' . Dumper $data;
                 ###### Ab hier wird die ResponseHash Referenze für die Rückgabe zusammen gestellt
                 $self->{cached}->{current_date_time} =
                 strftime( "%a, %e %b %Y %H:%M",
@@ -403,7 +404,7 @@ sub _ProcessingRetrieveData($$) {
                                         ) + 0.5
                                     ),
                                     'humidity' =>
-                                    $data->{list}->[$i]->{main}->{humidity},
+                                        $data->{list}->[$i]->{main}->{humidity},
                                     'condition' => encode_utf8(
                                         $data->{list}->[$i]->{weather}->[0]
                                         ->{description}
@@ -424,12 +425,20 @@ sub _ProcessingRetrieveData($$) {
                                         + 0.5
                                     ),
                                     'cloudCover' =>
-                                    $data->{list}->[$i]->{clouds}->{all},
+                                        $data->{list}->[$i]->{clouds}->{all},
                                     'code' =>
-                                    $codes{ $data->{list}->[$i]->{weather}->[0]
+                                        $codes{ $data->{list}->[$i]->{weather}->[0]
                                         ->{id} },
                                     'iconAPI' =>
-                                    $data->{list}->[$i]->{weather}->[0]->{icon},
+                                        $data->{list}->[$i]->{weather}->[0]->{icon},
+                                    'rain1h' =>
+                                        $data->{list}->[$i]->{rain}->{'1h'},
+                                    'rain3h' =>
+                                        $data->{list}->[$i]->{rain}->{'3h'},
+                                    'snow1h' =>
+                                        $data->{list}->[$i]->{snow}->{'1h'},
+                                    'snow3h' =>
+                                        $data->{list}->[$i]->{snow}->{'3h'},
                                 },
                             );
 

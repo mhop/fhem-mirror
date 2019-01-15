@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  59_Weather: fix reading double value
+  - feature: OpenWeatherMapAPI: add snow and rain in forecast
   - new:     98_todoist: initial release
   - change:  49_SSCam: generate event of every LastSnapFilename,LastSnapId,
                        LastSnapTime if snap was called with arguments,

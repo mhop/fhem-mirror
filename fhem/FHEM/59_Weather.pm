@@ -206,9 +206,6 @@ sub Weather_WriteReadings($$) {
         readingsBulkUpdate($hash, '.license', $dataRef->{license}->{text});
     }
 
-    readingsBulkUpdate($hash, "validity", "up-to-date");
-
-
     ### current
     if ( defined($dataRef->{current}) and ref( $dataRef->{current} ) eq 'HASH' ) {
         while( my ($r,$v) = each %{$dataRef->{current}} ) {
