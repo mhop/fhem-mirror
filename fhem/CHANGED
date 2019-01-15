@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  49_SSCam: fix event generation after snapshots created
   - bugfix:  59_Weather: fix reading double value
   - feature: OpenWeatherMapAPI: add snow and rain in forecast
   - new:     98_todoist: initial release

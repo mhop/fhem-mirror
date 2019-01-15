@@ -47,6 +47,7 @@ use Encode;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.4.5"  => "15.01.2019  fix event generation after request snapshots ",
   "8.4.4"  => "14.01.2019  change: generate event of every snapfile,id etc. if snap was called with arguments, Forum:#45671 #msg887484 ",
   "8.4.3"  => "11.01.2019  fix blocking Active-Token if snap was done with arguments and snapEmailTxt not set, Forum:#45671 #msg885475 ",
   "8.4.2"  => "10.01.2019  snapEmailTxt can use placeholders \$DATE, \$TIME ",
@@ -6300,12 +6301,14 @@ sub SSCam_snaplimsize ($) {
 
   if($hash->{HELPER}{CANSENDSNAP}) {
       # Versand Schnappschuß darf erfolgen falls gewünscht 
-      $hash->{HELPER}{GETSNAPGALLERY} = 1;                                  # Steuerbit für Snap-Galerie
       $ssize = 2;                                                           # Full Size für EMail-Versand
   }
   
-  $slim = delete $hash->{HELPER}{SNAPNUM} if($hash->{HELPER}{SNAPNUM});     # enthält die Anzahl der ausgelösten Schnappschüsse
-
+  if($hash->{HELPER}{SNAPNUM}) {
+      $slim = delete $hash->{HELPER}{SNAPNUM};                              # enthält die Anzahl der ausgelösten Schnappschüsse
+      $hash->{HELPER}{GETSNAPGALLERY} = 1;                                  # Steuerbit für Snap-Galerie bzw. Daten mehrerer Schnappschüsse abrufen
+  }
+  
 return ($slim,$ssize);
 }
 
