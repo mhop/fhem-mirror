@@ -367,9 +367,10 @@ attr DEVICE setList \
 attr DEVICE readingList shellies/DEVNAME/roller/0/pos:.* pct\
   shellies/DEVNAME/status/0/rollers:.* power\
   shellies/DEVNAME/online:.* online\
-  shellies/DEVNAME/announce:.* { json2nameValue($EVENT, '', $JSONMAP) }
-attr DEVICE devStateIcon 0:fts_shutter_100 100:fts_shutter_10 9\d.*:fts_shutter_10 8\d.*:fts_shutter_20 7\d.*:fts_shutter_30 6\d.*:fts_shutter_40 5\d.*:fts_shutter_50 4\d.*:fts_shutter_60 3\d.*:fts_shutter_70 2\d.*:fts_shutter_80 1\d.*:fts_shutter_90 0\d.*:fts_shutter_100
+  shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }
+attr DEVICE devStateIcon 0:fts_shutter_100 100:fts_shutter_10 9\d.*:fts_shutter_10 8\d.*:fts_shutter_20 7\d.*:fts_shutter_30 6\d.*:fts_shutter_40 5\d.*:fts_shutter_50 4\d.*:fts_shutter_60 3\d.*:fts_shutter_70 2\d.*:fts_shutter_80 1\d.*:fts_shutter_90 0\d.*:fts_shutter_100 set_.*:fts_shutter_updown
 attr DEVICE stateFormat pct
+deleteReading DEVICE .*
 attr DEVICE setStateList open close stop
 attr DEVICE model A_11b_shelly2_roller
 
