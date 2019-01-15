@@ -48,6 +48,7 @@ use Encode;
 # Versions History intern
 our %SSCam_vNotesIntern = (
   "8.5.0"  => "20.01.2019  SVS device set snapAllCams ",
+  "8.4.5"  => "15.01.2019  fix event generation after request snapshots ",
   "8.4.4"  => "14.01.2019  change: generate event of every snapfile,id etc. if snap was called with arguments, Forum:#45671 #msg887484  ",
   "8.4.3"  => "11.01.2019  fix blocking Active-Token if snap was done with arguments and snapEmailTxt not set, Forum:#45671 #msg885475 ",
   "8.4.2"  => "10.01.2019  snapEmailTxt can use placeholders \$DATE, \$TIME ",
@@ -214,42 +215,6 @@ our %SSCam_vNotesExtern = (
   "1.0.0"  => "12.12.2015 initial, changed completly to HttpUtils_NonblockingGet "
 );
 
-# Hint Hash en
-our %SSCam_vHintsExt_en = (
-  "6" => "There are some Icons in directory www/images/sscam available for SSCam. Thereby the system can use the icons please do: <br>".
-         "- in FHEMWEB device attribute <b>iconPath</b> complete with \"sscam\", e.g.: attr WEB iconPath default:fhemSVG:openautomation:sscam <br>".
-		 "After that execute \"rereadicons\" or restart FHEM. ",
-  "5" => "Find more Informations about manage users and the appropriate privilege profiles in ".
-         "<a href=\"https://www.synology.com/en-global/knowledgebase/Surveillance/help/SurveillanceStation/user\">Surveillance Station online help</a> ",
-  "4" => "The message Meldung \"WARNING - The current/simulated SVS-version ... may be incompatible with SSCam version...\" means that ".
-         "the used SSCam version was currently not tested with the installed version of Synology Surveillance Station (Reading \"SVSversion\"). ".
-         "The compatible SVS-Version is printed out in the Internal COMPATIBILITY.\n".
-         "<b>Actions:</b> At first please update your SSCam version. If the message does appear furthermore, please inform the SSCam Maintainer. ".
-         "To ignore this message temporary, you may reduce the verbose level of your SSCam device. ",
-  "3" => "Link to SSCam <a href=\"https://fhem.de/commandref.html#SSCam\">english commandRef</a> ",
-  "2" => "You can create own PTZ-control icons with a template available in SVN which can be downloaded here: <a href=\"https://svn.fhem.de/trac/browser/trunk/fhem/contrib/sscam\">contrib/sscam/black_btn_CAM_Template.pdn</a>.\n". 
-         "This template can be edited with Paint.Net for example. ",
-  "1" => "Some helpful <a href=\"https://wiki.fhem.de/wiki/SSCAM_-_Steuerung_von_Kameras_in_Synology_Surveillance_Station\">FHEM-Wiki</a> notes"
-);
-
-# Hint Hash de
-our %SSCam_vHintsExt_de = (
-  "6" => "Für SSCam wird ein Satz Icons im Verzeichnis www/images/sscam zur Verfügung gestellt. Damit das System sie findet bitte setzen: <br>".
-         "- im FHEMWEB Device Attribut <b>iconPath</b> um \"sscam\" ergänzen, z.B.: attr WEB iconPath default:fhemSVG:openautomation:sscam <br>".
-		 "Danach ein \"rereadicons\" bzw. einen FHEM restart ausführen. ",
-  "5" => "Informationen zum Management von Usern und entsprechenden Rechte-Profilen sind in der ".
-         "<a href=\"https://www.synology.com/de-de/knowledgebase/Surveillance/help/SurveillanceStation/user\">Surveillance Station Online-Hilfe</a> zu finden.",
-  "4" => "Die Meldung \"WARNING - The current/simulated SVS-version ... may be incompatible with SSCam version...\" ist ein Hinweis darauf, dass ".
-         "die eingesetzte SSCam Version noch nicht mit der verwendeten Version von Synology Surveillance Station (Reading \"SVSversion\") getestet ".
-         "wurde. Die kompatible SVS-Version ist im Internal COMPATIBILITY ersichtlich.\n".
-         "<b>Maßnahmen:</b> Bitte SSCam zunächst updaten. Sollte die Meldung weiterhin auftreten, bitte den SSCam Maintainer informieren. Zur ".
-         "vorübergehenden Ignorierung kann der verbose Level des SSCam-Devices entsprechend reduziert werden. ",
-  "3" => "Link zur deutschen SSCam <a href=\"https://fhem.de/commandref_DE.html#SSCam\">commandRef</a> ",
-  "2" => "Zur Erstellung eigener PTZ-Steuericons gibt es eine Vorlage im SVN die hier <a href=\"https://svn.fhem.de/trac/browser/trunk/fhem/contrib/sscam\">contrib/sscam/black_btn_CAM_Template.pdn</a> heruntergeladen werden kann.\n".
-          "Diese Vorlage kann zum Beispiel mit Paint.Net bearbeitet werden. ",
-  "1" => "Hilfreiche Hinweise zu SSCam im <a href=\"https://wiki.fhem.de/wiki/SSCAM_-_Steuerung_von_Kameras_in_Synology_Surveillance_Station\">FHEM-Wiki</a>"
-);
-
 # getestete SVS-Version
 my $compstat     = "8.2";
 
@@ -333,7 +298,7 @@ our %SSCam_ttips_de = (
     ttlsnaprun  => "Wiedergabe des letzten Schnappschusses von Kamera &quot;§NAME§&quot;.",
 );
 
-# Standardvariablen
+# Standardvariablen und Forward-Deklaration
 my $SSCam_slim = 3;                          # default Anzahl der abzurufenden Schnappschüsse mit snapGallery
 my $SSCAM_snum = "1,2,3,4,5,6,7,8,9,10";     # mögliche Anzahl der abzurufenden Schnappschüsse mit snapGallery                
 
@@ -343,6 +308,8 @@ use vars qw($FW_room);    # currently selected room
 use vars qw($FW_detail);  # currently selected device for detail view
 use vars qw($FW_wname);   # Web instance
 sub FW_pH(@);             # add href
+our %SSCam_vHintsExt_en;
+our %SSCam_vHintsExt_de;
 
 ################################################################
 sub SSCam_Initialize($) {
@@ -6316,7 +6283,7 @@ return($m);
 }
 
 ###############################################################################
-#               JSON Boolean Test und Mapping
+#                       JSON Boolean Test und Mapping
 ###############################################################################
 sub SSCam_jboolmap($){ 
   my ($bool)= @_;
@@ -6329,7 +6296,7 @@ return $bool;
 }
 
 ###############################################################################
-# Schnappschußgalerie abrufen (snapGalleryBoost) o. nur Info des letzten Snaps
+#      Ermittlung Anzahl und Größe der abzurufenden Schnappschußdaten
 ###############################################################################
 sub SSCam_snaplimsize ($) {      
   my ($hash)= @_;
@@ -6348,12 +6315,14 @@ sub SSCam_snaplimsize ($) {
 
   if($hash->{HELPER}{CANSENDSNAP}) {
       # Versand Schnappschuß darf erfolgen falls gewünscht 
-      $hash->{HELPER}{GETSNAPGALLERY} = 1;                                  # Steuerbit für Snap-Galerie
       $ssize = 2;                                                           # Full Size für EMail-Versand
   }
   
-  $slim = delete $hash->{HELPER}{SNAPNUM} if($hash->{HELPER}{SNAPNUM});     # enthält die Anzahl der ausgelösten Schnappschüsse
-
+  if($hash->{HELPER}{SNAPNUM}) {
+      $slim = delete $hash->{HELPER}{SNAPNUM};                              # enthält die Anzahl der ausgelösten Schnappschüsse
+      $hash->{HELPER}{GETSNAPGALLERY} = 1;                                  # Steuerbit für Snap-Galerie bzw. Daten mehrerer Schnappschüsse abrufen
+  }
+  
 return ($slim,$ssize);
 }
 
@@ -7823,6 +7792,92 @@ sub SSCam_trim ($) {
  $str =~ s/^\s+|\s+$//g;
 return ($str);
 }
+
+#############################################################################################
+#                                       Hint Hash EN           
+#############################################################################################
+%SSCam_vHintsExt_en = (
+  "6" => "There are some Icons in directory www/images/sscam available for SSCam. Thereby the system can use the icons please do: <br>".
+         "- in FHEMWEB device attribute <b>iconPath</b> complete with \"sscam\", e.g.: attr WEB iconPath default:fhemSVG:openautomation:sscam <br>".
+		 "After that execute \"rereadicons\" or restart FHEM. ".
+         "<br><br>",
+  "5" => "Find more Informations about manage users and the appropriate privilege profiles in ".
+         "<a href=\"https://www.synology.com/en-global/knowledgebase/Surveillance/help/SurveillanceStation/user\">Surveillance Station online help</a> ".
+         "<br><br>",
+  "4" => "The message Meldung \"WARNING - The current/simulated SVS-version ... may be incompatible with SSCam version...\" means that ".
+         "the used SSCam version was currently not tested with the installed version of Synology Surveillance Station (Reading \"SVSversion\"). ".
+         "The compatible SVS-Version is printed out in the Internal COMPATIBILITY.\n".
+         "<b>Actions:</b> At first please update your SSCam version. If the message does appear furthermore, please inform the SSCam Maintainer. ".
+         "To ignore this message temporary, you may reduce the verbose level of your SSCam device. ".
+         "<br><br>",
+  "3" => "Link to SSCam <a href=\"https://fhem.de/commandref.html#SSCam\">english commandRef</a> ".
+         "<br><br>",
+  "2" => "You can create own PTZ-control icons with a template available in SVN which can be downloaded here: <a href=\"https://svn.fhem.de/trac/browser/trunk/fhem/contrib/sscam\">contrib/sscam/black_btn_CAM_Template.pdn</a>.\n". 
+         "This template can be edited with Paint.Net for example. ".
+         "<br><br>",
+  "1" => "Some helpful <a href=\"https://wiki.fhem.de/wiki/SSCAM_-_Steuerung_von_Kameras_in_Synology_Surveillance_Station\">FHEM-Wiki</a> notes".
+         "<br><br>",
+);
+
+#############################################################################################
+#                                       Hint Hash DE           
+#############################################################################################
+%SSCam_vHintsExt_de = (
+  "7" => "<b>Einstellung Email-Versand <br>".
+         "========================= </b> <br><br>".
+         "Schnappschüsse können nach der Erstellung per <b>Email</b> gemeinsam versendet werden. Dazu enthält das Modul einen<br>". 
+         "eigenen Email-Client.<br>". 
+         "Zur Verwendung dieser Funktion muss das Perl-Modul <b>MIME::Lite</b> installiert sein. Auf Debian-Systemen kann ". 
+         "es mit".  
+         "<ul>". 
+         "<b>sudo apt-get install libmime-lite-perl</b>". 
+         "</ul>". 
+         "installiert werden. <br><br>". 
+         "Für die Verwendung des Email-Versands müssen einige Attribute gesetzt oder können optional genutzt werden.<br>". 
+         "Die Credentials für den Zugang zum Email-Server müssen mit dem Befehl <b>\"set &lt;name&gt; smtpcredentials &lt;user&gt; &lt;password&gt;\"</b><br>". 
+         "gesetzt werden. Der Verbindungsaufbau zum Postausgangsserver erfolgt initial unverschüsselt und wechselt zu einer verschlüsselten<br>". 
+         "Verbindung wenn SSL zur Verfügung steht. In diesem Fall erfolgt auch die Übermittlung von User/Password verschlüsselt.<br>". 
+         "Ist das Attribut \"smtpSSLPort\" definiert, erfolgt der Verbindungsaufbau zum Email-Server sofort verschlüsselt.<br><br>". 
+         "Optionale Attribute sind gekennzeichnet: <br><br>".
+         "<ul>".         
+		 "<li><b>snapEmailTxt</b> - <b>Aktiviert den Email-Versand</b>. Das Attribut hat das Format:<br>". 
+		 "<ul><b>subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;</b></ul>". 
+		 "Es können die Platzhalter \$CAM, \$DATE und \$TIME verwendet werden. <br>".  
+		 "\$CAM wird durch den Device-Alias bzw. den Namen der Kamera in der SVS ersetzt falls der<br>". 
+		 "Device-Alias nicht gesetzt ist. <br>".  
+		 "\$DATE und \$TIME werden durch das aktuelle Datum und Zeit ersetzt.</li>". 
+		 "<li><b>smtpHost</b> - Hostname oder IP-Adresse des Postausgangsservers (z.B. securesmtp.t-online.de)</li>". 
+		 "<li><b>smtpFrom</b> - Absenderadresse (&lt;name&gt\@&lt;domain&gt)</li>". 
+		 "<li><b>smtpTo</b> - Empfängeradresse(n) (&lt;name&gt\@&lt;domain&gt)</li>". 
+		 "<li><b>smtpPort</b> - (optional) Port des Postausgangsservers (default: 25)</li>". 
+		 "<li><b>smtpCc</b> - (optional) Carbon-Copy Empfängeradresse(n) (&lt;name&gt\@&lt;domain&gt)</li>". 
+		 "<li><b>smtpNoUseSSL</b> - (optional) \"1\" wenn kein SSL beim Email-Versand verwendet werden soll (default: 0)</li>". 
+		 "<li><b>smtpSSLPort</b> - (optional) SSL-Port des Postausgangsservers (default: 465)</li>". 
+		 "<li><b>smtpDebug</b> - (optional) zum Debugging der SMTP-Verbindung setzen</li>". 
+         "</ul>".          
+         "Zur näheren Erläuterung siehe Beschreibung der <a href=\"https://fhem.de/commandref_DE.html#SSCamattr\">Attribute</a>.".
+         "<br><br>",
+  "6" => "Für SSCam wird ein Satz Icons im Verzeichnis www/images/sscam zur Verfügung gestellt. Damit das System sie findet bitte setzen: <br>".
+         "- im FHEMWEB Device Attribut <b>iconPath</b> um \"sscam\" ergänzen, z.B.: attr WEB iconPath default:fhemSVG:openautomation:sscam <br>".
+		 "Danach ein \"rereadicons\" bzw. einen FHEM restart ausführen.".
+         "<br><br>",
+  "5" => "Informationen zum Management von Usern und entsprechenden Rechte-Profilen sind in der ".
+         "<a href=\"https://www.synology.com/de-de/knowledgebase/Surveillance/help/SurveillanceStation/user\">Surveillance Station Online-Hilfe</a> zu finden.".
+         "<br><br>",
+  "4" => "Die Meldung \"WARNING - The current/simulated SVS-version ... may be incompatible with SSCam version...\" ist ein Hinweis darauf, dass ".
+         "die eingesetzte SSCam Version noch nicht mit der verwendeten Version von Synology Surveillance Station (Reading \"SVSversion\") getestet ".
+         "wurde. Die kompatible SVS-Version ist im Internal COMPATIBILITY ersichtlich.\n".
+         "<b>Maßnahmen:</b> Bitte SSCam zunächst updaten. Sollte die Meldung weiterhin auftreten, bitte den SSCam Maintainer informieren. Zur ".
+         "vorübergehenden Ignorierung kann der verbose Level des SSCam-Devices entsprechend reduziert werden. ".
+         "<br><br>",
+  "3" => "Link zur deutschen SSCam <a href=\"https://fhem.de/commandref_DE.html#SSCam\">commandRef</a> ".
+         "<br><br>",
+  "2" => "Zur Erstellung eigener PTZ-Steuericons gibt es eine Vorlage im SVN die hier <a href=\"https://svn.fhem.de/trac/browser/trunk/fhem/contrib/sscam\">contrib/sscam/black_btn_CAM_Template.pdn</a> heruntergeladen werden kann.\n".
+         "Diese Vorlage kann zum Beispiel mit Paint.Net bearbeitet werden. ".
+         "<br><br>",
+  "1" => "Hilfreiche Hinweise zu SSCam im <a href=\"https://wiki.fhem.de/wiki/SSCAM_-_Steuerung_von_Kameras_in_Synology_Surveillance_Station\">FHEM-Wiki</a>".
+         "<br><br>",
+);
 
 1;
 
@@ -9951,7 +10006,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; [on [&lt;rectime&gt;] | off] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li><br>
+  <li><b> set &lt;name&gt; [ on [&lt;rectime&gt;] | off ] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li><br>
 
   Der Befehl "set &lt;name&gt; on" startet eine Aufnahme. Die Standardaufnahmedauer beträgt 15 Sekunden. Sie kann mit dem 
   Attribut "rectime" individuell festgelegt werden. 
@@ -10153,55 +10208,15 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <li><b> set &lt;name&gt; snap [&lt;Anzahl&gt;] [&lt;Zeitabstand&gt;] [snapEmailTxt:"subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;"]</b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Ein oder mehrere Schnappschüsse werden ausgelöst. Es kann die Anzahl der auszulösenden Schnappschüsse und deren zeitlicher
-  Abstand in Sekunden optional angegeben werden. Ohne Angabe wird ein Schnappschuß getriggert.
-  Es wird die ID und der Filename des letzten Snapshots als Wert der Variable "LastSnapId" bzw. "LastSnapFilename" in den 
-  Readings der Kamera gespeichert. <br>
-  Der Email-Versand wird durch das Setzen des <a href="#SSCamattr">Attributs</a> "snapEmailTxt" eingeschaltet. Der Text
-  im Attribut "snapEmailTxt" kann durch die Spezifikation des optionalen "snapEmailTxt:"-Tags, wie oben gezeigt, temporär
-  überschrieben bzw. geändert werden. <br><br>
-  
-  <b>Email-Versand </b> <br><br>
-  Die Schnappschüsse können nach der Erstellung per <b>Email</b> gemeinsam versendet werden. Dazu enthält das Modul einen 
-  eigenen Email-Client. 
-  Zur Verwendung dieser Funktion muss das Perl-Modul <b>MIME::Lite</b> installiert sein. Auf Debian-System kann 
-  es mit <br><br>
-   
-   <ul>
-    sudo apt-get install libmime-lite-perl
-   </ul>
-   <br>
-   
-  installiert werden. <br><br>
-  
-  Für die Verwendung des Email-Versands müssen einige Attribute gesetzt oder können optional genutzt werden. <br>
-  Die Credentials für den Zugang zum Email-Server müssen mit dem Befehl <b>"set &lt;name&gt; smtpcredentials &lt;user&gt; &lt;password&gt;"</b>
-  gesetzt werden. Der Verbindungsaufbau zum Postausgangsserver erfolgt initial unverschüsselt und wechselt zu einer verschlüsselten
-  Verbindung wenn SSL zur Verfügung steht. In diesem Fall erfolgt auch die Übermittlung von User/Password verschlüsselt.
-  Ist das Attribut "smtpSSLPort" definiert, erfolgt der Verbindungsaufbau zum Email-Server sofort verschlüsselt.
-  Optionale Attribute sind gekennzeichnet: <br><br>
-  
-  <ul>   
-    <table>  
-    <colgroup> <col width=12%> <col width=88%> </colgroup>
-      <tr><td style="vertical-align:top"> <b>snapEmailTxt</b> <td>- Aktiviert den Email-Versand. Die Eingabe hat die Form: <br>
-                                                                  <code>subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;</code><br>
-                                                                  Es können die Platzhalter $CAM, $DATE und $TIME verwendet werden. $CAM wird 
-                                                                  durch den Device-Alias bzw. den Namen der Kamera in der SVS
-                                                                  ersetzt falls der Device-Alias nicht gesetzt ist. 
-                                                                  $DATE und $TIME werden durch das aktuelle Datum und Zeit ersetzt.</td></tr>
-      <tr><td>                            <b>smtpHost</b>     </td><td>- Hostname oder IP-Adresse des Postausgangsservers (z.B. securesmtp.t-online.de) </td></tr>
-      <tr><td>                            <b>smtpFrom</b>     </td><td>- Absenderadresse (&lt;name&gt@&lt;domain&gt) </td></tr>
-      <tr><td>                            <b>smtpTo</b>       </td><td>- Empfängeradresse(n) (&lt;name&gt@&lt;domain&gt) </td></tr>
-      <tr><td>                            <b>smtpPort</b>     </td><td>- (optional) Port des Postausgangsservers (default: 25) </td></tr>
-	  <tr><td>                            <b>smtpCc</b>       </td><td>- (optional) Carbon-Copy Empfängeradresse(n) (&lt;name&gt@&lt;domain&gt) </td></tr>
-	  <tr><td>                            <b>smtpNoUseSSL</b> </td><td>- (optional) "1" wenn kein SSL beim Email-Versand verwendet werden soll (default: 0) </td></tr>
-	  <tr><td>                            <b>smtpSSLPort</b>  </td><td>- (optional) SSL-Port des Postausgangsservers (default: 465) </td></tr>
-	  <tr><td>                            <b>smtpDebug</b>    </td><td>- (optional) zum Debugging der SMTP-Verbindung setzen </td></tr>
-    </table>
-   </ul>     
-   <br>
-   
-  Zur näheren Erläuterung siehe Beschreibung der <a href="#SSCamattr">Attribute</a>. <br>
+  Abstand in Sekunden optional angegeben werden. Ohne Angabe wird ein Schnappschuß getriggert. <br>
+  Es wird die ID und der Filename des letzten Snapshots als Wert der Readings "LastSnapId" bzw. "LastSnapFilename" in  
+  der Kamera gespeichert. <br><br>
+  Ein <b>Email-Versand</b> der Schnappschüsse kann durch Setzen des <a href="#SSCamattr">Attributs</a> "snapEmailTxt" aktiviert
+  werden. Zuvor ist der Email-Versand, wie im Abschnitt <a href="#SSCamEmail">Einstellung Email-Versand</a> beschrieben,
+  einzustellen. (Für weitere Informationen "<b>get &lt;name&gt; versionNotes 7</b>" ausführen) <br>
+  Der Text im Attribut "snapEmailTxt" kann durch die Spezifikation des optionalen "snapEmailTxt:"-Tags, wie oben 
+  gezeigt, temporär überschrieben bzw. geändert werden.
+
   </ul>
   <br><br>
   
@@ -10210,56 +10225,16 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   
   Ein oder mehrere Schnappschüsse der angegebenen Kamera-Devices werden ausgelöst. Sind keine Kamera-Devices angegeben, 
   werden die Schnappschüsse bei allen in FHEM definierten Kamera-Devices getriggert.  
-  Es kann die Anzahl der auszulösenden Schnappschüsse und deren zeitlicher Abstand in Sekunden optional angegeben werden. 
-  Ohne Angabe wird ein Schnappschuß getriggert.
-  Es wird die ID und der Filename des letzten Snapshots als Wert der Variable "LastSnapId" bzw. "LastSnapFilename" in den 
-  Readings der jeweiligen Kamera gespeichert. <br>
-  Der Email-Versand wird durch das Setzen des <a href="#SSCamattr">Attributs</a> <b>"snapEmailTxt"</b> im SVS-Device <b>UND</b> 
-  in den Kamera-Devices, deren Schnappschüsse versendet werden sollen, aktiviert. Es wird ausschließlich der im Attribut 
-  "snapEmailTxt" des SVS-Devices hinterlegte Email-Text verwendet. Der Text im Attribut "snapEmailTxt" der einzelnen 
-  Kameras wird ignoriert !! <br><br>
-  
-  <b>Email-Versand </b> <br><br>
-  Die getriggerten Schnappschüsse aller Kameras können nach der Erstellung per <b>Email</b> gemeinsam versendet werden. 
-  Dazu enthält das Modul einen eigenen Email-Client. 
-  Zur Verwendung dieser Funktion muss das Perl-Modul <b>MIME::Lite</b> installiert sein. Auf Debian-System kann 
-  es mit <br><br>
-   
-   <ul>
-    sudo apt-get install libmime-lite-perl
-   </ul>
-   <br>
-   
-  installiert werden. <br><br>
-  
-  Für die Verwendung des globalen Email-Versands müssen einige Attribute im <b>SVS-Device</b> gesetzt oder können optional genutzt werden. <br>
-  Die Credentials für den Zugang zum Email-Server müssen mit dem Befehl <b>"set &lt;name&gt; smtpcredentials &lt;user&gt; &lt;password&gt;"</b>
-  gesetzt werden. Der Verbindungsaufbau zum Postausgangsserver erfolgt initial unverschüsselt und wechselt zu einer verschlüsselten
-  Verbindung wenn SSL zur Verfügung steht. In diesem Fall erfolgt auch die Übermittlung von User/Password verschlüsselt.
-  Ist das Attribut "smtpSSLPort" definiert, erfolgt der Verbindungsaufbau zum Email-Server sofort verschlüsselt.
-  Optionale Attribute sind gekennzeichnet: <br><br>
-  
-  <ul>   
-    <table>  
-    <colgroup> <col width=12%> <col width=88%> </colgroup>
-      <tr><td style="vertical-align:top"> <b>snapEmailTxt</b> <td>- Aktiviert den Email-Versand. Die Eingabe hat die Form: <br>
-                                                                  <code>subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;</code><br>
-                                                                  Es können die Platzhalter $CAM, $DATE und $TIME verwendet werden. $CAM wird 
-                                                                  durch den Device-Alias bzw. den Device-Namen des SVS-Devices ersetzt. 
-                                                                  $DATE und $TIME werden durch das aktuelle Datum und Zeit ersetzt. </td></tr>
-      <tr><td>                            <b>smtpHost</b>     </td><td>- Hostname oder IP-Adresse des Postausgangsservers (z.B. securesmtp.t-online.de) </td></tr>
-      <tr><td>                            <b>smtpFrom</b>     </td><td>- Absenderadresse (&lt;name&gt@&lt;domain&gt) </td></tr>
-      <tr><td>                            <b>smtpTo</b>       </td><td>- Empfängeradresse(n) (&lt;name&gt@&lt;domain&gt) </td></tr>
-      <tr><td>                            <b>smtpPort</b>     </td><td>- (optional) Port des Postausgangsservers (default: 25) </td></tr>
-	  <tr><td>                            <b>smtpCc</b>       </td><td>- (optional) Carbon-Copy Empfängeradresse(n) (&lt;name&gt@&lt;domain&gt) </td></tr>
-	  <tr><td>                            <b>smtpNoUseSSL</b> </td><td>- (optional) "1" wenn kein SSL beim Email-Versand verwendet werden soll (default: 0) </td></tr>
-	  <tr><td>                            <b>smtpSSLPort</b>  </td><td>- (optional) SSL-Port des Postausgangsservers (default: 465) </td></tr>
-	  <tr><td>                            <b>smtpDebug</b>    </td><td>- (optional) zum Debugging der SMTP-Verbindung setzen </td></tr>
-    </table>
-   </ul>     
-   <br>
-   
-  Zur näheren Erläuterung siehe Beschreibung der <a href="#SSCamattr">Attribute</a>. <br>
+  Optional kann die Anzahl der auszulösenden Schnappschüsse (default: 1) und deren zeitlicher Abstand in Sekunden
+  (default: 2) angegeben werden. <br>
+  Es wird die ID und der Filename des letzten Snapshots als Wert der Readings "LastSnapId" bzw. "LastSnapFilename"  
+  der entsprechenden Kamera gespeichert. <br><br>
+  Ein <b>Email-Versand</b> der Schnappschüsse kann durch Setzen des <a href="#SSCamattr">Attributs</a> <b>"snapEmailTxt"</b> im 
+  SVS-Device <b>UND</b> in den Kamera-Devices, deren Schnappschüsse versendet werden sollen, aktiviert werden. 
+  Zuvor ist der Email-Versand, wie im Abschnitt <a href="#SSCamEmail">Einstellung Email-Versand</a> beschrieben,
+  einzustellen. (Für weitere Informationen "<b>get &lt;name&gt; versionNotes 7</b>" ausführen) <br>
+  Es wird ausschließlich der im Attribut "snapEmailTxt" des SVS-Devices hinterlegte Email-Text verwendet. Der Text im 
+  Attribut "snapEmailTxt" der einzelnen Kameras wird ignoriert !! 
   </ul>
   <br><br>
   
@@ -10510,10 +10485,61 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   
   </ul>
   <br><br>
-
+  
+  <a name="SSCamEmail"></a>
+  <b>Einstellung Email-Versand </b> <br><br>
+  <ul>
+  Schnappschüsse können nach der Erstellung per <b>Email</b> gemeinsam versendet werden. Dazu enthält das Modul einen 
+  eigenen Email-Client. 
+  Zur Verwendung dieser Funktion muss das Perl-Modul <b>MIME::Lite</b> installiert sein. Auf Debian-Systemen kann 
+  es mit <br><br>
+   
+   <ul>
+    sudo apt-get install libmime-lite-perl
+   </ul>
+   <br>
+   
+  installiert werden. <br><br>
+  
+  Für die Verwendung des Email-Versands müssen einige Attribute gesetzt oder können optional genutzt werden. <br>
+  Die Credentials für den Zugang zum Email-Server müssen mit dem Befehl <b>"set &lt;name&gt; smtpcredentials &lt;user&gt; &lt;password&gt;"</b>
+  hinterlegt werden. Der Verbindungsaufbau zum Postausgangsserver erfolgt initial unverschüsselt und wechselt zu einer verschlüsselten
+  Verbindung wenn SSL zur Verfügung steht. In diesem Fall erfolgt auch die Übermittlung von User/Password verschlüsselt.
+  Ist das Attribut "smtpSSLPort" definiert, erfolgt der Verbindungsaufbau zum Email-Server sofort verschlüsselt. 
+  <br><br>
+  
+  Optionale Attribute sind gekennzeichnet: <br><br>
+  
+  <ul>   
+    <table>  
+    <colgroup> <col width=12%> <col width=88%> </colgroup>
+      <tr><td style="vertical-align:top"> <b>snapEmailTxt</b> <td>- <b>Aktiviert den Email-Versand</b>. Das Attribut hat das Format: <br>
+                                                                  <ul>
+                                                                  <code>subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;</code><br>
+                                                                  </ul>
+                                                                  Es können die Platzhalter $CAM, $DATE und $TIME verwendet werden. $CAM wird 
+                                                                  durch den Device-Alias bzw. den Namen der Kamera in der SVS
+                                                                  ersetzt falls der Device-Alias nicht gesetzt ist. 
+                                                                  $DATE und $TIME werden durch das aktuelle Datum und Zeit ersetzt.</td></tr>
+      <tr><td>                            <b>smtpHost</b>     </td><td>- Hostname oder IP-Adresse des Postausgangsservers (z.B. securesmtp.t-online.de) </td></tr>
+      <tr><td>                            <b>smtpFrom</b>     </td><td>- Absenderadresse (&lt;name&gt@&lt;domain&gt) </td></tr>
+      <tr><td>                            <b>smtpTo</b>       </td><td>- Empfängeradresse(n) (&lt;name&gt@&lt;domain&gt) </td></tr>
+      <tr><td>                            <b>smtpPort</b>     </td><td>- (optional) Port des Postausgangsservers (default: 25) </td></tr>
+	  <tr><td>                            <b>smtpCc</b>       </td><td>- (optional) Carbon-Copy Empfängeradresse(n) (&lt;name&gt@&lt;domain&gt) </td></tr>
+	  <tr><td>                            <b>smtpNoUseSSL</b> </td><td>- (optional) "1" wenn kein SSL beim Email-Versand verwendet werden soll (default: 0) </td></tr>
+	  <tr><td>                            <b>smtpSSLPort</b>  </td><td>- (optional) SSL-Port des Postausgangsservers (default: 465) </td></tr>
+	  <tr><td>                            <b>smtpDebug</b>    </td><td>- (optional) zum Debugging der SMTP-Verbindung setzen </td></tr>
+    </table>
+   </ul>     
+   <br>
+   
+  Zur näheren Erläuterung siehe Beschreibung der <a href="#SSCamattr">Attribute</a>. <br>
+  </ul>
+  <br><br>
+  
   <a name="SSCamPolling"></a>
   <b>Polling der Kamera/SVS-Eigenschaften:</b><br><br>
-
+  <ul>
   Die Abfrage der Kameraeigenschaften erfolgt automatisch, wenn das Attribut "pollcaminfoall" (siehe Attribute) mit einem Wert &gt; 10 gesetzt wird. <br>
   Per Default ist das Attribut "pollcaminfoall" nicht gesetzt und das automatische Polling nicht aktiv. <br>
   Der Wert dieses Attributes legt das Intervall der Abfrage in Sekunden fest. Ist das Attribut nicht gesetzt oder &lt; 10 wird kein automatisches Polling <br>
@@ -10547,8 +10573,9 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
 
   Sind mehrere Kameras in SSCam definiert, sollte "pollcaminfoall" nicht bei allen Kameras auf exakt den gleichen Wert gesetzt werden um Verarbeitungsengpässe <br>
   und dadurch versursachte potentielle Fehlerquellen bei der Abfrage der Synology Surveillance Station zu vermeiden. <br>
-  Ein geringfügiger Unterschied zwischen den Pollingintervallen der definierten Kameras von z.B. 1s kann bereits als ausreichend angesehen werden. <br><br> 
-
+  Ein geringfügiger Unterschied zwischen den Pollingintervallen der definierten Kameras von z.B. 1s kann bereits als ausreichend angesehen werden. 
+  </ul>
+  <br><br> 
 
 <a name="SSCaminternals"></a>
 <b>Internals</b> <br><br>
