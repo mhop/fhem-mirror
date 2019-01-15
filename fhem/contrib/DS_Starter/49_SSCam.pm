@@ -308,8 +308,9 @@ use vars qw($FW_room);    # currently selected room
 use vars qw($FW_detail);  # currently selected device for detail view
 use vars qw($FW_wname);   # Web instance
 sub FW_pH(@);             # add href
-our %SSCam_vHintsExt_en;
-our %SSCam_vHintsExt_de;
+use vars qw(%SSCam_vHintsExt_en);
+use vars qw(%SSCam_vHintsExt_de);
+
 
 ################################################################
 sub SSCam_Initialize($) {
@@ -7843,7 +7844,7 @@ return ($str);
 		 "<li><b>snapEmailTxt</b> - <b>Aktiviert den Email-Versand</b>. Das Attribut hat das Format:<br>". 
 		 "<ul><b>subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;</b></ul>". 
 		 "Es können die Platzhalter \$CAM, \$DATE und \$TIME verwendet werden. <br>".  
-		 "\$CAM wird durch den Device-Alias bzw. den Namen der Kamera in der SVS ersetzt falls der<br>". 
+		 "\$CAM wird durch den Device-Namen, Device-Alias bzw. den Namen der Kamera in der SVS ersetzt falls der<br>". 
 		 "Device-Alias nicht gesetzt ist. <br>".  
 		 "\$DATE und \$TIME werden durch das aktuelle Datum und Zeit ersetzt.</li>". 
 		 "<li><b>smtpHost</b> - Hostname oder IP-Adresse des Postausgangsservers (z.B. securesmtp.t-online.de)</li>". 
@@ -10518,7 +10519,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
                                                                   <code>subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;</code><br>
                                                                   </ul>
                                                                   Es können die Platzhalter $CAM, $DATE und $TIME verwendet werden. $CAM wird 
-                                                                  durch den Device-Alias bzw. den Namen der Kamera in der SVS
+                                                                  durch den Device-Namen, Device-Alias bzw. den Namen der Kamera in der SVS
                                                                   ersetzt falls der Device-Alias nicht gesetzt ist. 
                                                                   $DATE und $TIME werden durch das aktuelle Datum und Zeit ersetzt.</td></tr>
       <tr><td>                            <b>smtpHost</b>     </td><td>- Hostname oder IP-Adresse des Postausgangsservers (z.B. securesmtp.t-online.de) </td></tr>
