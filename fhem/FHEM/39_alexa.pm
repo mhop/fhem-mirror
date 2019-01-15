@@ -1439,8 +1439,8 @@ alexa_Attr($$$)
   Notes:
   <ul>
     <li>JSON has to be installed on the FHEM host.</li>
-    <li>HOWTO for public FHEM Connector skill: <a href='https://wiki.fhem.de/wiki/FHEM_Connector'>FHEM_Connector</li>
-    <li>HOWTO for privte skills: <a href='https://wiki.fhem.de/wiki/Alexa-Fhem'>alexa-fhem</li>
+    <li>HOWTO for public FHEM Connector skill: <a href='https://wiki.fhem.de/wiki/FHEM_Connector'>FHEM_Connector</a></li>
+    <li>HOWTO for privte skills: <a href='https://wiki.fhem.de/wiki/Alexa-Fhem'>alexa-fhem</a></li>
   </ul>
 
   <a name="alexa_Set"></a>
