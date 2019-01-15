@@ -1542,7 +1542,8 @@ sub livetracking_Webcall() {
     $request =~ s/\/osmand\/&//g;
     Log3 $name, 4, "OwnTracks HTTP request:\n".$request;
     livetracking_ParseOwnTracks($hash,$request) if(($request =~ /_type":[ ]?"location/ || $request =~ /_type":[ ]?"position/ || $request =~ /_type":[ ]?"transition/ || $request =~ /_type":[ ]?"steps/ || $request =~ /_type":[ ]?"beacon/ ));
-    return undef;
+    return ( "text/plain; charset=utf-8",
+        "[]" );
   }
 
 
@@ -1634,7 +1635,8 @@ sub livetracking_Webcall() {
         "no data" );
   }
 
-  return undef;
+  return ( "text/plain; charset=utf-8",
+      "undefined" );
 }
 
 
