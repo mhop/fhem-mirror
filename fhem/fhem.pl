@@ -1720,7 +1720,7 @@ DelayedShutdown($$)
 {
   my ($cl, $param) = @_;
 
-  %delayedShutdowns = ();
+  return 1 if(keys %delayedShutdowns);
   foreach my $d (sort keys %defs) {
     $delayedShutdowns{$d} = 1 if(CallFn($d, "DelayedShutdownFn", $defs{$d}));
   }
