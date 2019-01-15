@@ -217,7 +217,7 @@ sub ROLLO_Set($@) {
         Log3 $name, 1,
           "ROLLO ($name) Set command \"position\" is deprecated. Please change your definitions to \"pct\"";
     }
-	my $desiredPos;
+    my $desiredPos;
     my $arg = "";
     $arg = $a[2] if defined $a[2];
     my $arg2 = "";
@@ -249,6 +249,7 @@ sub ROLLO_Set($@) {
     if ( $cmd eq "extern" ) {
         readingsSingleUpdate( $hash, "drive-type", "extern", 1 );
         $cmd = $arg;
+        $arg = "";
     }
     elsif ( $cmd eq "reset" ) {
         my $reset_pct = $pcts{$arg};
@@ -348,10 +349,11 @@ sub ROLLO_Set($@) {
 # Ich verstehe nicht wann nachfolgender Zustand eintreten kann, das Coding führt aber dazu, dass pct 0 (open) auf "none" gesetzt wird
 #$desiredPos = "none" if !$desiredPos || $desiredPos eq "";
     }
-	#set desiredPos to avoid "uninitialized" message later (happens with "blocked" - KernSani 14.01.2019
-	$desiredPos = ReadingsNum($name,"desired_pct",0) unless defined($desiredPos);
 
-	Log3 $name, 5, "ROLLO ($name) DesiredPos now $desiredPos, $cmd";
+    #set desiredPos to avoid "uninitialized" message later (happens with "blocked" - KernSani 14.01.2019
+    $desiredPos = ReadingsNum( $name, "desired_pct", 0 ) unless defined($desiredPos);
+
+    Log3 $name, 5, "ROLLO ($name) DesiredPos now $desiredPos, $cmd";
 
     #wenn ich gerade am fahren bin und eine neue Zielposition angefahren werden soll,
     # muss ich jetzt erst mal meine aktuelle Position berechnen und updaten
