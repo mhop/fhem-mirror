@@ -169,7 +169,7 @@ alexa_Undefine($$)
 
   if( $hash->{PID} ) {
     $hash->{undefine} = 1;
-    #$hash->{undefine} = $hash->{CL};
+    $hash->{undefine} = $hash->{CL} if( $hash->{CL} );
     alexa_stopAlexaFHEM($hash);
 
     return "$name will be deleted after alexa-fhem has stopped or after 5 seconds. whatever comes first.";
