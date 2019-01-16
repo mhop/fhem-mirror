@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#  89_FULLY.pm 1.0
+#  89_FULLY.pm 1.1
 #
 #  $Id$
 #
@@ -36,7 +36,7 @@ sub FULLY_ProcessDeviceInfo ($$);
 sub FULLY_UpdateReadings ($$);
 sub FULLY_Ping ($$);
 
-my $FULLY_VERSION = "1.0";
+my $FULLY_VERSION = "1.1";
 
 # Timeout for Fully requests
 my $FULLY_TIMEOUT = 5;
@@ -362,7 +362,13 @@ sub FULLY_Set ($@)
 	}
 	elsif ($opt eq 'url') {
 		my $url = shift @$a;
-		push (@c, defined ($url) ? "loadURL" : "loadStartURL");
+		if (defined ($url)) {
+			push (@c, "loadURL");
+			push (@p, { "url" => "$url" });
+		}
+		else {
+			push (@c, "loadStartURL");
+		}
 	}
 	elsif ($opt eq 'setStringSetting' || $opt eq 'setBooleanSetting') {
 		return "FULLY: Command $opt only available in expert mode" if ($expert == 0);
@@ -769,8 +775,8 @@ sub FULLY_Ping ($$)
 <h3>FULLY</h3>
 <ul>
    Module for controlling of Fully browser on Android tablets. Requires a Plus license
-   of Fully browser app. Remote device management must be enabled in Fully app. Requires
-   Fully app version 1.27 or later.
+   of Fully browser app. Remote device management and remote admin in local network
+   must be enabled in Fully app. Requires Fully app version 1.27 or later.
    </br></br>
    
    <a name="HMCCUdefine"></a>
