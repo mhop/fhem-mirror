@@ -499,6 +499,7 @@ FW_Read($$)
        "Upgrade: websocket\r\n" .
        "Connection: Upgrade\r\n" .
        "Sec-WebSocket-Accept:$shastr=\r\n".
+      $FW_headerlines.
        "\r\n" );
     $FW_chash->{websocket} = 1;
 
