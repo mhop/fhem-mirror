@@ -138,7 +138,7 @@ sub Weather_Initialize($) {
   $hash->{UndefFn} = "Weather_Undef";
   $hash->{GetFn}   = "Weather_Get";
   $hash->{SetFn}   = "Weather_Set";
-  $hash->{AttrList}= "disable:0,1 " . $readingFnAttributes;
+  $hash->{AttrList}= "disable:0,1 pubDateFormat " . $readingFnAttributes;
   $hash->{NotifyFn}= "Weather_Notify";
 
   #Weather_DebugCodes('de');
@@ -223,6 +223,14 @@ sub Weather_WriteReadings($$) {
             my $wdir= degrees_to_direction($dataRef->{current}->{wind_direction}, @directions_txt_i18n);
             readingsBulkUpdate($hash, 'wind_condition', 'Wind: ' . $wdir . ' ' . $dataRef->{current}->{wind_speed} . ' km/h');
         }
+	 if (  defined($dataRef->{current}->{TimeStamp}) and $attr{$name}->{pubDateFormat}){
+	 #	"%m/%d/%Y %H:%M:%S"
+		readingsBulkUpdate($hash, 'pubDate', strftime($attr{$name}->{pubDateFormat},localtime($dataRef->{current}->{TimeStamp})) );
+	 }
+	 # day_of_week %wdays_txt_i18n
+	 if (  defined($dataRef->{current}->{day_of_week}) ){
+		readingsBulkUpdate($hash, 'day_of_week', $wdays_txt_i18n{ $dataRef->{current}->{day_of_week} } );
+	 }
     }
 
     ### forecast
@@ -252,6 +260,14 @@ sub Weather_WriteReadings($$) {
                     my $wdir= degrees_to_direction($dataRef->{forecast}->{hourly}[$i-1]{wind_direction}, @directions_txt_i18n);
                     readingsBulkUpdate($hash, $f . 'wind_condition', 'Wind: ' . $wdir . ' ' . $dataRef->{forecast}->{hourly}[$i-1]{wind_speed} . ' km/h');
                 }
+		  if (  defined($dataRef->{forecast}->{hourly}[$i-1]{TimeStamp}) and $attr{$name}->{pubDateFormat}){
+			#	"%m/%d/%Y %H:%M:%S"
+			readingsBulkUpdate($hash, $f . 'pubDate', strftime($attr{$name}->{pubDateFormat},localtime( $dataRef->{forecast}->{hourly}[$i-1]{TimeStamp} )) );
+		  }
+			# day_of_week %wdays_txt_i18n
+		  if (  defined($dataRef->{forecast}->{hourly}[$i-1]{day_of_week}) ){
+			readingsBulkUpdate($hash, $f . 'day_of_week', $wdays_txt_i18n{ $dataRef->{forecast}->{hourly}[$i-1]{day_of_week} } );
+		  }
             }
         }
 
@@ -279,6 +295,14 @@ sub Weather_WriteReadings($$) {
                     my $wdir= degrees_to_direction($dataRef->{forecast}->{daily}[$i-1]{wind_direction}, @directions_txt_i18n);
                     readingsBulkUpdate($hash, $f . 'wind_condition', 'Wind: ' . $wdir . ' ' . $dataRef->{forecast}->{daily}[$i-1]{wind_speed} . ' km/h');
                 }
+		  if (  defined($dataRef->{forecast}->{daily}[$i-1]{TimeStamp}) and $attr{$name}->{pubDateFormat}){
+			#	"%m/%d/%Y %H:%M:%S"
+			readingsBulkUpdate($hash, $f . 'pubDate', strftime($attr{$name}->{pubDateFormat},localtime( $dataRef->{forecast}->{daily}[$i-1]{TimeStamp} )) );
+		  }
+			# day_of_week %wdays_txt_i18n
+		  if (  defined($dataRef->{forecast}->{hourly}[$i-1]{day_of_week}) ){
+			readingsBulkUpdate($hash, $f . 'day_of_week', $wdays_txt_i18n{ $dataRef->{forecast}->{hourly}[$i-1]{day_of_week} } );
+		  }
             }
         }
     }
@@ -406,6 +430,7 @@ sub Weather_Define($$) {
   # defaults
   my $API="DarkSkyAPI,cachemaxage:600";
   my $interval  = 3600;
+  my $pubDateFormat = "%a, %e %b %Y %H:%M %p";
 
   # parse parameters
   my ($arrayref, $hashref)= parseParams($def);
@@ -487,11 +512,12 @@ sub WeatherIconIMGTag($) {
 
 #####################################
 
-sub WeatherAsHtmlV($;$)
+sub WeatherAsHtmlV($;$;$)
 {
 
-  my ($d,$items) = @_;
+  my ($d,$f,$items) = @_;
   $d = "<none>" if(!$d);
+  $f = "daily" if(!$f);
   $items = 9 if( !$items );
   return "$d is not a Weather instance<br>"
         if(!$defs{$d} || $defs{$d}->{TYPE} ne "Weather");
@@ -499,6 +525,10 @@ sub WeatherAsHtmlV($;$)
   my $h = $defs{$d};
   my $width= int(ICONSCALE*ICONWIDTH);
 
+  my $test_reading = ($f eq "daily" ? "fc1_day_of_week" : "hfc1_day_of_week");
+  my $fc1 = ($f eq "daily" ? "fc" : "hfc");
+  my $fc2 = ($f eq "daily" ? "hfc" : "fc");
+  
   my $ret = '<table class="weather">';
   $ret .= sprintf('<tr><td class="weatherIcon" width=%d>%s</td><td class="weatherValue">%s<br>%s°C  %s%%<br>%s</td></tr>',
         $width,
@@ -507,31 +537,45 @@ sub WeatherAsHtmlV($;$)
         ReadingsVal($d, "temp_c", ""), ReadingsVal($d, "humidity", ""),
         ReadingsVal($d, "wind_condition", ""));
 
-  my $fc = ( (defined($h->{READINGS}->{fc1_day_of_week}) and $h->{READINGS}->{fc1_day_of_week}) ? 'fc' : 'hfc' );
+  my $fc = ( (defined($h->{READINGS}->{$test_reading}) and $h->{READINGS}->{$test_reading}) ? $fc1 : $fc2 );
+  my $DayHour = ($fc eq 'fc' ? '_day_of_week' : '_pubDate' );
+  
   for(my $i=1; $i<$items; $i++) {
-    $ret .= sprintf('<tr><td class="weatherIcon" width=%d>%s</td><td class="weatherValue"><span class="weatherDay">%s: %s</span><br><span class="weatherMin">min %s°C</span> <span class="weatherMax">max %s°C</span></td></tr>',
-        $width,
-        WeatherIconIMGTag(ReadingsVal($d, "${fc}${i}_icon", "")),
-        ReadingsVal($d, "${fc}${i}_day_of_week", ""),
-        ReadingsVal($d, "${fc}${i}_condition", ""),
-        ReadingsVal($d, "${fc}${i}_low_c", ""), ReadingsVal($d, "${fc}${i}_high_c", ""));
+    if(defined($h->{READINGS}->{"${fc}${i}_icon"}) and $h->{READINGS}->{"${fc}${i}_icon"}){
+       if(defined($h->{READINGS}->{"${fc}${i}_low_c"}) and $h->{READINGS}->{"${fc}${i}_low_c"}){
+          $ret .= sprintf('<tr><td class="weatherIcon" width=%d>%s</td><td class="weatherValue"><span class="weatherDay">%s: %s</span><br><span class="weatherMin">min %s°C</span> <span class="weatherMax">max %s°C</span></td></tr>',
+             $width,
+             WeatherIconIMGTag(ReadingsVal($d, "${fc}${i}_icon", "")),
+             ReadingsVal($d, "${fc}${i}$DayHour", ""),
+             ReadingsVal($d, "${fc}${i}_condition", ""),
+             ReadingsVal($d, "${fc}${i}_low_c", ""), ReadingsVal($d, "${fc}${i}_high_c", ""));
+       }else{
+          $ret .= sprintf('<tr><td class="weatherIcon" width=%d>%s</td><td class="weatherValue"><span class="weatherDay">%s: %s</span><br><span class="weatherT">%s°C</span> </td></tr>',
+             $width,
+             WeatherIconIMGTag(ReadingsVal($d, "${fc}${i}_icon", "")),
+             ReadingsVal($d, "${fc}${i}$DayHour", ""),
+             ReadingsVal($d, "${fc}${i}_condition", ""),
+             ReadingsVal($d, "${fc}${i}_temperature", ""));
+       }
+     }
   }
 
   $ret .= "</table>";
   return $ret;
 }
 
-sub WeatherAsHtml($;$)
+sub WeatherAsHtml($;$;$)
 {
-  my ($d,$i) = @_;
-  WeatherAsHtmlV($d,$i);
+  my ($d,$f,$i) = @_;
+  WeatherAsHtmlV($d,$f,$i);
 }
 
-sub WeatherAsHtmlH($;$)
+sub WeatherAsHtmlH($;$;$)
 {
 
-  my ($d,$items) = @_;
+  my ($d,$f,$items) = @_;
   $d = "<none>" if(!$d);
+  $f = "daily" if(!$f);
   $items = 9 if( !$items );
   return "$d is not a Weather instance<br>"
         if(!$defs{$d} || $defs{$d}->{TYPE} ne "Weather");
@@ -539,24 +583,31 @@ sub WeatherAsHtmlH($;$)
   my $h = $defs{$d};
   my $width= int(ICONSCALE*ICONWIDTH);
 
-
+  my $test_reading = ($f eq "daily" ? "fc1_day_of_week" : "hfc1_day_of_week");
+  my $fc1 = ($f eq "daily" ? "fc" : "hfc");
+  my $fc2 = ($f eq "daily" ? "hfc" : "fc");
 
   my $format= '<td><table border=1><tr><td class="weatherIcon" width=%d>%s</td></tr><tr><td class="weatherValue">%s</td></tr><tr><td class="weatherValue">%s°C %s%%</td></tr><tr><td class="weatherValue">%s</td></tr></table></td>';
 
   my $ret = '<table class="weather">';
-  my $fc = ( (defined($h->{READINGS}->{fc1_day_of_week}) and $h->{READINGS}->{fc1_day_of_week}) ? 'fc' : 'hfc' );
+  my $fc = ( (defined($h->{READINGS}->{$test_reading}) and $h->{READINGS}->{$test_reading}) ? $fc1 : $fc2 );
+  my $DayHour = ($fc eq 'fc' ? '_day_of_week' : '_pubDate' );
 
   # icons
   $ret .= sprintf('<tr><td class="weatherIcon" width=%d>%s</td>', $width, WeatherIconIMGTag(ReadingsVal($d, "icon", "")));
   for(my $i=1; $i<$items; $i++) {
-    $ret .= sprintf('<td class="weatherIcon" width=%d>%s</td>', $width, WeatherIconIMGTag(ReadingsVal($d, "${fc}${i}_icon", "")));
+     if(defined($h->{READINGS}->{"${fc}${i}_icon"}) and $h->{READINGS}->{"${fc}${i}_icon"}){
+        $ret .= sprintf('<td class="weatherIcon" width=%d>%s</td>', $width, WeatherIconIMGTag(ReadingsVal($d, "${fc}${i}_icon", "")));
+     }else{
+	 $items = $i;
+     }
   }
   $ret .= '</tr>';
 
   # condition
   $ret .= sprintf('<tr><td class="weatherDay">%s</td>', ReadingsVal($d, "condition", ""));
   for(my $i=1; $i<$items; $i++) {
-    $ret .= sprintf('<td class="weatherDay">%s: %s</td>', ReadingsVal($d, "${fc}${i}_day_of_week", ""),
+    $ret .= sprintf('<td class="weatherDay">%s: %s</td>', ReadingsVal($d, "${fc}${i}$DayHour", ""),
         ReadingsVal($d, "${fc}${i}_condition", ""));
   }
   $ret .= '</tr>';
@@ -564,23 +615,29 @@ sub WeatherAsHtmlH($;$)
   # temp/hum | min
   $ret .= sprintf('<tr><td class="weatherMin">%s°C %s%%</td>', ReadingsVal($d, "temp_c", ""), ReadingsVal($d, "humidity", ""));
   for(my $i=1; $i<$items; $i++) {
-    $ret .= sprintf('<td class="weatherMin">min %s°C</td>', ReadingsVal($d, "${fc}${i}_low_c", ""));
+    if(defined($h->{READINGS}->{"${fc}${i}_low_c"}) and $h->{READINGS}->{"${fc}${i}_low_c"}){
+        $ret .= sprintf('<td class="weatherMin">min %s°C</td>', ReadingsVal($d, "${fc}${i}_low_c", ""));
+    }else{
+        $ret .= sprintf('<td class="weatherT"> %s°C</td>', ReadingsVal($d, "${fc}${i}_temperature", ""));
+    }
   }
   $ret .= '</tr>';
 
   # wind | max
   $ret .= sprintf('<tr><td class="weatherMax">%s</td>', ReadingsVal($d, "wind_condition", ""));
   for(my $i=1; $i<$items; $i++) {
-    $ret .= sprintf('<td class="weatherMax">max %s°C</td>', ReadingsVal($d, "${fc}${i}_high_c", ""));
+    if(defined($h->{READINGS}->{"${fc}${i}_high_c"}) and $h->{READINGS}->{"${fc}${i}_high_c"}){
+       $ret .= sprintf('<td class="weatherMax">max %s°C</td>', ReadingsVal($d, "${fc}${i}_high_c", ""));
+    }
   }
   $ret .= "</tr></table>";
 
   return $ret;
 }
 
-sub WeatherAsHtmlD($;$)
+sub WeatherAsHtmlD($;$;$)
 {
-  my ($d,$i) = @_;
+  my ($d,$f,$i) = @_;
   if($FW_ss) {
     WeatherAsHtmlV($d,$i);
   } else {
@@ -643,7 +700,7 @@ sub WeatherAsHtmlD($;$)
     Examples:
     <pre>
       define Forecast Weather apikey=987498ghjgf864
-      define MyWeather Weather api=OpenWeatherMapAPI,cachemaxage:600 apikey=09878945fdskv876 location=52.4545,13.4545 interval=3600 lang=de
+      define MyWeather Weather API=OpenWeatherMapAPI,cachemaxage:600 apikey=09878945fdskv876 location=52.4545,13.4545 interval=3600 lang=de
     </pre>
 
 
@@ -686,7 +743,7 @@ sub WeatherAsHtmlD($;$)
     to limit the numer of icons to display.<br><br>
     Example:
     <pre>
-      define MyWeatherWeblink weblink htmlCode { WeatherAsHtmlH("MyWeather") }
+      define MyWeatherWeblink weblink htmlCode { WeatherAsHtmlH("MyWeather"[,"daily"|"hourly",number of forecasts]) }
     </pre>
 
 
