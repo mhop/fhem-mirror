@@ -9,8 +9,10 @@ use warnings;
 use JSON;
 use Data::Dumper;
 
-use POSIX ":sys_wait_h";
+use POSIX;
+use Socket;
 
+use vars qw(%selectlist);
 use vars qw(%modules);
 use vars qw(%defs);
 use vars qw(%attr);
@@ -290,7 +292,7 @@ alexa_Read($)
 
   if( $hash->{log} ) {
     my @t = localtime(gettimeofday());
-    my $logfile = ResolveDateWildcards(AttrVal($name, 'alexaFHEM-log', 'FHEM' ), @t);
+    my $logfile = ResolveDateWildcards($hash->{logfile}, @t);
     alexa_openLogfile($hash, $logfile) if( $hash->{currentlogfile} ne $logfile );
    }
 
@@ -541,11 +543,11 @@ alexa_startAlexaFHEM($)
   #return undef if( ReadingsVal($name, 'alexaFHEM', 'unknown') =~ m/^running/ );
 
   if( $hash->{PID} ) {
-    $hash->{start} = 1;
+    $hash->{restart} = 1;
     alexa_stopAlexaFHEM($hash);
     return undef;
   }
-  delete $hash->{start};
+  delete $hash->{restart};
 
   my $ssh_cmd;
   if( my $host = AttrVal($name, 'alexaFHEM-host', undef ) ) {
@@ -584,9 +586,8 @@ alexa_startAlexaFHEM($)
       close $parent;
       close $child;
 
-      my $msg = "$name: Cannot fork: $!";
-      Log 1, $msg;
-      return $msg;
+      Log3 $name, 1, "$name: Cannot fork: $!";
+      return;
     }
 
     if( $pid ) {
@@ -720,6 +721,8 @@ alexa_stoppedAlexaFHEM($)
   delete($hash->{FD});
   delete($selectlist{$name});
 
+  alexa_closeLogfile($hash) if( $hash->{log} );
+
   Log3 $name, 3, "$name: alexaFHEM stopped";
   $hash->{LAST_STOP} = FmtDateTime( gettimeofday() );
 
@@ -745,7 +748,7 @@ alexa_stoppedAlexaFHEM($)
     delete $hash->{shutdown};
     CancelDelayedShutdown($name);
 
-  } elsif( $hash->{start} ) {
+  } elsif( $hash->{restart} ) {
     alexa_startAlexaFHEM($hash)
 
   }
@@ -1381,7 +1384,7 @@ alexa_Attr($$$)
   } elsif( $attrName eq 'alexaFHEM-log' ) {
     if( $cmd eq "set" && $attrVal && $attrVal ne 'FHEM' ) {
       fhem( "defmod -temporary alexaFHEMlog FileLog $attrVal fakelog" );
-      CommandAttr( undef, "alexaFHEMlog room hidden" );
+      CommandAttr( undef, 'alexaFHEMlog room hidden' );
       #if( my $room = AttrVal($name, "room", undef ) ) {
       #  CommandAttr( undef,"alexaFHEMlog room $room" );
       #}
