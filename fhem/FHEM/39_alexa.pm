@@ -1381,6 +1381,10 @@ alexa_Attr($$$)
   } elsif( $attrName eq 'alexaFHEM-log' ) {
     if( $cmd eq "set" && $attrVal && $attrVal ne 'FHEM' ) {
       fhem( "defmod -temporary alexaFHEMlog FileLog $attrVal fakelog" );
+      CommandAttr( undef, "alexaFHEMlog room hidden" );
+      #if( my $room = AttrVal($name, "room", undef ) ) {
+      #  CommandAttr( undef,"alexaFHEMlog room $room" );
+      #}
     } else {
       fhem( "delete alexaFHEMlog" );
     }
