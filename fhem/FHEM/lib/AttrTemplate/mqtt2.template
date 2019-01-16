@@ -128,6 +128,18 @@ attr DEVICE setList \
   on BASE_TOPIC/DEV_ID/set ON
 attr DEVICE model L_05_zigbee2mqtt_smart+plug
 
+name:L_06_zigbee2mqtt_ContactSensor
+desc: Contact sensor via zigbee2mqtt <br>Tested with: Xiaomi models Aquara and Mijia
+filter:TYPE=MQTT2_DEVICE
+par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/](.*):, ? $1 : undef }
+attr DEVICE stateFormat contact
+attr DEVICE devStateIcon open:fts_window_1w_open@red close:fts_window_1w@green
+#attr DEVICE genericDeviceType contact
+attr DEVICE eventMap true:close false:open
+attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+deletereading DEVICE .*
+attr DEVICE model L_06_zigbee2mqtt_ContactSensor
 
 ###########################################
 # TASMOTA
@@ -367,7 +379,10 @@ attr DEVICE setList \
 attr DEVICE readingList shellies/DEVNAME/roller/0/pos:.* pct\
   shellies/DEVNAME/status/0/rollers:.* power\
   shellies/DEVNAME/online:.* online\
-  shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }
+  shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
+  shellies/DEVNAME/roller/0:.* state\
+  shellies/DEVNAME/input/1:.* input1\
+  shellies/DEVNAME/input/0:.* input0
 attr DEVICE devStateIcon 0:fts_shutter_100 100:fts_shutter_10 9\d.*:fts_shutter_10 8\d.*:fts_shutter_20 7\d.*:fts_shutter_30 6\d.*:fts_shutter_40 5\d.*:fts_shutter_50 4\d.*:fts_shutter_60 3\d.*:fts_shutter_70 2\d.*:fts_shutter_80 1\d.*:fts_shutter_90 0\d.*:fts_shutter_100 set_.*:fts_shutter_updown
 attr DEVICE stateFormat pct
 deleteReading DEVICE .*
