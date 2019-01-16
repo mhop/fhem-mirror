@@ -47,7 +47,7 @@ use Encode;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
-  "8.5.0"  => "20.01.2019  SVS device set snapAllCams ",
+  "8.5.0"  => "17.01.2019  SVS device set snapAllCams ",
   "8.4.5"  => "15.01.2019  fix event generation after request snapshots ",
   "8.4.4"  => "14.01.2019  change: generate event of every snapfile,id etc. if snap was called with arguments, Forum:#45671 #msg887484  ",
   "8.4.3"  => "11.01.2019  fix blocking Active-Token if snap was done with arguments and snapEmailTxt not set, Forum:#45671 #msg885475 ",
@@ -766,14 +766,15 @@ sub SSCam_Set($@) {
       
       my ($num,$lag,$ncount) = (1,2,1);
       my $emtxt = "";      
-      if($prop && $prop =~ /[\d+]/) {                                  # Anzahl der Schnappschüsse zu triggern (default: 1)
+      if($prop && $prop =~ /^\d+$/) {                                  # Anzahl der Schnappschüsse zu triggern (default: 1)
           $num    = $prop;
           $ncount = $prop;
       }
-      if($prop1 && $prop1 =~ /[\d+]/) {                                # Zeit zwischen zwei Schnappschüssen (default: 2 Sekunden)
+      if($prop1 && $prop1 =~ /^\d+$/) {                                # Zeit zwischen zwei Schnappschüssen (default: 2 Sekunden)
           $lag = $prop1;
       }
-                                          
+      
+      Log3($name, 4, "$name - Trigger snapshots - Number: $num, Lag: $lag");      
       $hash->{HELPER}{SNAPBYSTRMDEV} = 1 if ($prop2 && $prop2 =~ /STRM/);   # $prop wird mitgegeben durch Snap by SSCamSTRM-Device
       
       my $at = join(" ",@a);
@@ -795,11 +796,11 @@ sub SSCam_Set($@) {
       my ($num,$lag,$ncount) = (1,2,1);
       my $cams  = "all";
       my $emtxt = '';
-      if($prop && $prop =~ /[\d+]/) {                                  # Anzahl der Schnappschüsse zu triggern (default: 1)
+      if($prop && $prop =~ /^\d+$/) {                                  # Anzahl der Schnappschüsse zu triggern (default: 1)
           $num    = $prop;
           $ncount = $prop;
       }
-      if($prop1 && $prop1 =~ /[\d+]/) {                                # Zeit zwischen zwei Schnappschüssen (default: 2 Sekunden)
+      if($prop1 && $prop1 =~ /^\d+$/) {                                # Zeit zwischen zwei Schnappschüssen (default: 2 Sekunden)
           $lag = $prop1;
       }      
       
@@ -811,30 +812,39 @@ sub SSCam_Set($@) {
       }
       
       my @camdvs;
-      my %snapac = ();                                                      # Schnappschuss Hash für alle Cams -> Schnappschudaten sollen hinein
-     
+      my %snapac = ();                                                      # Schnappschuss Hash für alle Cams -> Schnappschudaten sollen hinein  
       if($cams eq "all") {                                                  # alle nicht disabled Kameras auslösen, sonst nur die gewählten
           @camdvs = devspec2array("TYPE=SSCam:FILTER=MODEL!=SVS");
           foreach (@camdvs) {
-              if(!IsDisabled($_)) {           
+              if($defs{$_} && !IsDisabled($_)) {           
                   $snapac{$_} = "";
               }
           }
       } else {
           @camdvs = split(",",$cams);
           foreach (@camdvs) {
-              if(!IsDisabled($_)) {           
+              if($defs{$_} && !IsDisabled($_)) {           
                   $snapac{$_} = "";
               }              
           }
       }
       
+      return "No valid camera devices are specified for trigger snapshots" if(!%snapac);
+      
       my $asref = \%snapac;
       $hash->{HELPER}{ALLSNAPREF} = $asref;
+      my ($csnap,$cmail) = ("","");
       foreach my $key (keys%{$asref}) {
-            delete $asref->{$key} if(!AttrVal($key, "snapEmailTxt", ""));   # Snap dieser Kamera auslösen aber nicht senden
-            SSCam_camsnap("$key:$num:$lag:$ncount:$emtxt");
+          if(!AttrVal($key, "snapEmailTxt", "")) {
+              delete $asref->{$key};                                       # Snap dieser Kamera auslösen aber nicht senden
+              $csnap .= $csnap?", $key":$key;
+          } else {
+              $cmail .= $cmail?", $key":$key;
+          }
+          SSCam_camsnap("$key:$num:$lag:$ncount:$emtxt");
       }
+      Log3($name, 4, "$name - Trigger snapshots by SVS - Number: $num, Lag: $lag, Snap only: \"$csnap\", Snap and send: \"$cmail\" ");
+      
               
   } elsif ($opt eq "startTracking" && SSCam_IsModelCam($hash)) {
 	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
@@ -7798,8 +7808,40 @@ return ($str);
 #                                       Hint Hash EN           
 #############################################################################################
 %SSCam_vHintsExt_en = (
+  "7" => "<b>Setup Email Shipping <br>".
+         "==================== </b> <br><br>".
+         "Snapshots can be sent by <b>Email</b> alltogether after creation. For this purpose the module contains<br>". 
+         "its own Email client.<br>". 
+         "Before you can use this function you have to install the Perl-module <b>MIME::Lite</b>. On debian systems it can be ". 
+         "installed with command:".  
+         "<ul>". 
+         "<b>sudo apt-get install libmime-lite-perl</b>". 
+         "</ul>". 
+         "There are some attributes must be set or can be used optionally.<br>". 
+         "At first the Credentials for access the Email outgoing server must be set by command <b>\"set &lt;name&gt; smtpcredentials &lt;user&gt; &lt;password&gt;\"</b><br>". 
+         "The connection to the server is initially established unencrypted and switches to an encrypted connection if SSL<br>". 
+         "encryption is available. In that case the transmission of User/Password takes place encrypted too.<br>". 
+         "If attribute \"smtpSSLPort\" is defined, the established connection to the Email server will be encrypted immediately.<br><br>". 
+         "Attributes which are optional are marked: <br><br>".
+         "<ul>".         
+		 "<li><b>snapEmailTxt</b> - <b>Activates the Email shipping.</b> This attribute has the format: <br>". 
+		 "<ul><b>subject => &lt;subject text&gt;, body => &lt;message text&gt;</b></ul>". 
+		 "The placeholder \$CAM, \$DATE and \$TIME can be used. <br>".  
+		 "\$CAM is replaced by the device name, device alias or the name of camera in SVS if alias is not defined.<br>".  
+		 "\$DATE and \$TIME are replaced with the current date and time.</li>". 
+		 "<li><b>smtpHost</b> - Hostname or IP-address of outgoing Email server (e.g. securesmtp.t-online.de)</li>". 
+		 "<li><b>smtpFrom</b> - Return address (&lt;name&gt@&lt;domain&gt)</li>". 
+		 "<li><b>smtpTo</b> - Receiving address(es) (&lt;name&gt@&lt;domain&gt)</li>". 
+		 "<li><b>smtpPort</b> - (optional) Port of outgoing Email server (default: 25)</li>". 
+		 "<li><b>smtpCc</b> - (optional) carbon-copy receiving address(es) (&lt;name&gt@&lt;domain&gt)</li>". 
+		 "<li><b>smtpNoUseSSL</b> - (optional) \"1\" if no SSL encryption should be used for Email shipping (default: 0)</li>". 
+		 "<li><b>smtpSSLPort</b> - (optional) Port for SSL encrypted connection (default: 465)</li>". 
+		 "<li><b>smtpDebug</b> - (optional) switch on the debugging of SMTP connection</li>". 
+         "</ul>".          
+         "For further information please see description of the <a href=\"https://fhem.de/commandref.html#SSCamattr\">attributes</a>.".
+         "<br><br>",
   "6" => "There are some Icons in directory www/images/sscam available for SSCam. Thereby the system can use the icons please do: <br>".
-         "- in FHEMWEB device attribute <b>iconPath</b> complete with \"sscam\", e.g.: attr WEB iconPath default:fhemSVG:openautomation:sscam <br>".
+         "<ul><li> in FHEMWEB device attribute <b>iconPath</b> complete with \"sscam\". e.g.: attr WEB iconPath default:fhemSVG:openautomation:sscam </li></ul>".
 		 "After that execute \"rereadicons\" or restart FHEM. ".
          "<br><br>",
   "5" => "Find more Informations about manage users and the appropriate privilege profiles in ".
@@ -7859,7 +7901,7 @@ return ($str);
          "Zur näheren Erläuterung siehe Beschreibung der <a href=\"https://fhem.de/commandref_DE.html#SSCamattr\">Attribute</a>.".
          "<br><br>",
   "6" => "Für SSCam wird ein Satz Icons im Verzeichnis www/images/sscam zur Verfügung gestellt. Damit das System sie findet bitte setzen: <br>".
-         "- im FHEMWEB Device Attribut <b>iconPath</b> um \"sscam\" ergänzen, z.B.: attr WEB iconPath default:fhemSVG:openautomation:sscam <br>".
+         "<ul><li> im FHEMWEB Device Attribut <b>iconPath</b> um \"sscam\" ergänzen. z.B.: attr WEB iconPath default:fhemSVG:openautomation:sscam </li></ul>".
 		 "Danach ein \"rereadicons\" bzw. einen FHEM restart ausführen.".
          "<br><br>",
   "5" => "Informationen zum Management von Usern und entsprechenden Rechte-Profilen sind in der ".
@@ -8661,52 +8703,46 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <li><b> set &lt;name&gt; snap [&lt;number&gt;] [&lt;time difference&gt;] [snapEmailTxt:"subject => &lt;subject text&gt;, body => &lt;message text&gt;"]</b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   One or multiple snapshots are triggered. The number of snapshots to trigger and the time difference (in seconds) between
-  each snapshots can be optionally specified. Without any specification only one snapshot is triggered.
-  The ID and the filename of the last snapshot will be displayed in Reading "LastSnapId" respectively "LastSnapFilename" of the
-  device. <br>
-  The snapshot Email shipping is activated by setting the <a href="#SSCamattr">attribute</a> "snapEmailTxt". If you want 
-  temporary overwrite the message text set in "snapEmailTxt", you can optionally specify the "snapEmailTxt:"-tag as shown
-  above. <br><br>
+  each snapshot can be optionally specified. Without any specification only one snapshot is triggered. <br>
+  The ID and the filename of the last snapshot will be displayed in Reading "LastSnapId" respectively "LastSnapFilename". 
+  <br><br>
   
-  <b>Email shipping preparation</b> <br><br>
+  The snapshot <b>Email shipping</b> can be activated by setting <a href="#SSCamattr">attribute</a> "snapEmailTxt". 
+  Before you have to prepare the Email shipping as described in section <a href="#SSCamEmail">Setup Email shipping</a>. 
+  (for further information execute "<b>get &lt;name&gt; versionNotes 7</b>") <br>
+  If you want temporary overwrite the message text set in attribute "snapEmailTxt", you can optionally specify the 
+  "snapEmailTxt:"-tag as shown above. <br><br>
   
-  The snapshots can be sent by <b>Email</b> alltogether after creation. For this purpose the module contains its own Email client. 
-  Before you can use this function you have to install the Perl-module <b>MIME::Lite</b>. On debian systems it can be 
-  installed with command: <br><br>
-   
-   <ul>
-    sudo apt-get install libmime-lite-perl
-   </ul>
-   <br>
+  <b>Examples:</b>
+  <pre>
+    set &lt;name&gt; snap 4 
+    set &lt;name&gt; snap 3 3 snapEmailTxt:"subject => Movement alarm $CAM, body => A movement was recognised at Carport"
+  </pre>
+  </ul>
+  <br><br>
   
-  There are some attributes must be set or can be used optionally. <br>
-  At first the Credentials for access the Email outgoing server must be set by command <b>"set &lt;name&gt; smtpcredentials &lt;user&gt; &lt;password&gt;"</b>.
-  The connection establishment to the server is initially done unencrypted and switches to an encrypted connection if SSL 
-  encryption is available. In that case the transmission of User/Password takes place encrypted too. 
-  If attribute "smtpSSLPort" is defined, the established connection to the Email server will be encrypted immediately.
-  Attributes which are optional are marked: <br><br>
+  <ul>
+  <li><b> set &lt;name&gt; snapCams [&lt;number&gt;] [&lt;time difference&gt;] [CAM:"&lt;camera&gt;, &lt;camera&gt, ..."]</b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for SVS)</li> <br>
   
-  <ul>   
-    <table>  
-    <colgroup> <col width=12%> <col width=88%> </colgroup>
-      <tr><td style="vertical-align:top"> <b>snapEmailTxt</b> <td>- Activates the Email shipping. Has the form: <br>
-                                                                  <code>subject => &lt;subject text&gt;, body => &lt;message text&gt; </code><br> 
-                                                                  The placeholder variables $CAM, $DATE and $TIME can be used. $CAM is 
-                                                                  replaced by the device alias or the name of camera in SVS if alias is not 
-                                                                  defined. $DATE and $TIME are replaced with the current date and time. </td></tr>
-      <tr><td>                            <b>smtpHost</b>     </td><td>- Hostname of outgoing Email server (e.g. securesmtp.t-online.de) </td></tr>
-      <tr><td>                            <b>smtpFrom</b>     </td><td>- Return address (&lt;name&gt@&lt;domain&gt) </td></tr>
-      <tr><td>                            <b>smtpTo</b>       </td><td>- Receiving address(es) (&lt;name&gt@&lt;domain&gt) </td></tr>
-      <tr><td>                            <b>smtpPort</b>     </td><td>- (optional) Port of outgoing Email server (default: 25) </td></tr>
-	  <tr><td>                            <b>smtpCc</b>       </td><td>- (optional) carbon-copy receiving address(es) (&lt;name&gt@&lt;domain&gt) </td></tr>
-	  <tr><td>                            <b>smtpNoUseSSL</b> </td><td>- (optional) "1" if no SSL encryption should be used for Email shipping (default: 0) </td></tr>
-      <tr><td>                            <b>smtpSSLPort</b>  </td><td>- (optional) Port for SSL encrypted connection (default: 465) </td></tr>
-	  <tr><td>                            <b>smtpDebug</b>    </td><td>- (optional) switch on the debugging of SMTP connection </td></tr>
-    </table>
-   </ul>     
-   <br>
-   
-  For further information please see description of the <a href="#SSCamattr">attributes</a>. <br>
+  One or multiple snapshots of denoted cameras are triggered. If no cameras are denoted, the snapshots are triggered in all 
+  of the defined cameras in FHEM.
+  Optionally the number of snapshots to trigger (default: 1) and the time difference (in seconds) between
+  each snapshot (default: 2) can be specified. <br>
+  The ID and the filename of the last snapshot will be displayed in Reading "LastSnapId" respectively "LastSnapFilename" of
+  the appropriate camera device. <br><br>
+  
+  The snapshot <b>Email shipping</b> can be activated by setting <a href="#SSCamattr">attribute</a> "snapEmailTxt" in the 
+  SVS device <b>AND</b> in the camera devices whose snapshots should be shipped. 
+  Before you have to prepare the Email shipping as described in section <a href="#SSCamEmail">Setup Email shipping</a>. 
+  (for further information execute "<b>get &lt;name&gt; versionNotes 7</b>") <br>
+  Only the message text set in attribute "snapEmailTxt" of the SVS device is used in the created Email. The settings of 
+  those attribute in the camera devices is ignored !! <br><br>
+  
+  <b>Examples:</b>
+  <pre>
+    set &lt;name&gt; snapCams 4 
+    set &lt;name&gt; snapCams 3 3 CAM:"CamHE1, CamCarport"
+  </pre>
   </ul>
   <br><br>
   
@@ -8941,7 +8977,51 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   If no options are specified, both release informations and hints will be shown. "rel" shows only release informations and
   "hints" shows only hints. By the &lt;key&gt;-specification only the hint with the specified number is shown.
   </ul>
-  <br><br>   
+  <br><br> 
+
+  <a name="SSCamEmail"></a>
+  <b>Setup Email shipping</b> <br><br>
+  
+  <ul>
+  Snapshots can be sent by <b>Email</b> alltogether after creation. For this purpose the module contains its own Email client. 
+  Before you can use this function you have to install the Perl-module <b>MIME::Lite</b>. On debian systems it can be 
+  installed with command: <br><br>
+   
+   <ul>
+    sudo apt-get install libmime-lite-perl
+   </ul>
+   <br>
+  
+  There are some attributes must be set or can be used optionally. <br>
+  At first the Credentials for access the Email outgoing server must be set by command <b>"set &lt;name&gt; smtpcredentials &lt;user&gt; &lt;password&gt;"</b>.
+  The connection establishment to the server is initially done unencrypted and switches to an encrypted connection if SSL 
+  encryption is available. In that case the transmission of User/Password takes place encrypted too. 
+  If attribute "smtpSSLPort" is defined, the established connection to the Email server will be encrypted immediately.
+  Attributes which are optional are marked: <br><br>
+  
+  <ul>   
+    <table>  
+    <colgroup> <col width=12%> <col width=88%> </colgroup>
+      <tr><td style="vertical-align:top"> <b>snapEmailTxt</b> <td>- <b>Activates the Email shipping.</b> This attribute has the format: <br>
+                                                                  <b>subject => &lt;subject text&gt;, body => &lt;message text&gt; </b><br> 
+                                                                  The placeholder $CAM, $DATE and $TIME can be used. $CAM is 
+                                                                  replaced by the device name, device alias or the name of camera in SVS if alias is not 
+                                                                  defined. $DATE and $TIME are replaced with the current date and time. </td></tr>
+      <tr><td>                            <b>smtpHost</b>     </td><td>- Hostname of outgoing Email server (e.g. securesmtp.t-online.de) </td></tr>
+      <tr><td>                            <b>smtpFrom</b>     </td><td>- Return address (&lt;name&gt@&lt;domain&gt) </td></tr>
+      <tr><td>                            <b>smtpTo</b>       </td><td>- Receiving address(es) (&lt;name&gt@&lt;domain&gt) </td></tr>
+      <tr><td>                            <b>smtpPort</b>     </td><td>- (optional) Port of outgoing Email server (default: 25) </td></tr>
+	  <tr><td>                            <b>smtpCc</b>       </td><td>- (optional) carbon-copy receiving address(es) (&lt;name&gt@&lt;domain&gt) </td></tr>
+	  <tr><td>                            <b>smtpNoUseSSL</b> </td><td>- (optional) "1" if no SSL encryption should be used for Email shipping (default: 0) </td></tr>
+      <tr><td>                            <b>smtpSSLPort</b>  </td><td>- (optional) Port for SSL encrypted connection (default: 465) </td></tr>
+	  <tr><td>                            <b>smtpDebug</b>    </td><td>- (optional) switch on the debugging of SMTP connection </td></tr>
+    </table>
+   </ul>     
+   <br>
+   
+  For further information please see description of the <a href="#SSCamattr">attributes</a>. <br>
+  </ul>
+  <br><br>  
   
   
   <a name="SSCamPolling"></a>
@@ -10216,8 +10296,13 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   werden. Zuvor ist der Email-Versand, wie im Abschnitt <a href="#SSCamEmail">Einstellung Email-Versand</a> beschrieben,
   einzustellen. (Für weitere Informationen "<b>get &lt;name&gt; versionNotes 7</b>" ausführen) <br>
   Der Text im Attribut "snapEmailTxt" kann durch die Spezifikation des optionalen "snapEmailTxt:"-Tags, wie oben 
-  gezeigt, temporär überschrieben bzw. geändert werden.
-
+  gezeigt, temporär überschrieben bzw. geändert werden. <br><br>
+  
+  <b>Beispiele:</b>
+  <pre>
+    set &lt;name&gt; snap 4 
+    set &lt;name&gt; snap 3 3 snapEmailTxt:"subject => Bewegungsalarm $CAM, body => Eine Bewegung wurde am Carport registriert"
+  </pre>
   </ul>
   <br><br>
   
@@ -10232,10 +10317,18 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   der entsprechenden Kamera gespeichert. <br><br>
   Ein <b>Email-Versand</b> der Schnappschüsse kann durch Setzen des <a href="#SSCamattr">Attributs</a> <b>"snapEmailTxt"</b> im 
   SVS-Device <b>UND</b> in den Kamera-Devices, deren Schnappschüsse versendet werden sollen, aktiviert werden. 
+  Bei Kamera-Devices die kein Attribut "snapEmailTxt" gesetzt haben, werden die Schnappschüsse ausgelöst, aber nicht versendet.
   Zuvor ist der Email-Versand, wie im Abschnitt <a href="#SSCamEmail">Einstellung Email-Versand</a> beschrieben,
   einzustellen. (Für weitere Informationen "<b>get &lt;name&gt; versionNotes 7</b>" ausführen) <br>
-  Es wird ausschließlich der im Attribut "snapEmailTxt" des SVS-Devices hinterlegte Email-Text verwendet. Der Text im 
-  Attribut "snapEmailTxt" der einzelnen Kameras wird ignoriert !! 
+  Es wird ausschließlich der im Attribut "snapEmailTxt" des SVS-Devices hinterlegte Email-Text in der erstellten Email 
+  verwendet. Der Text im Attribut "snapEmailTxt" der einzelnen Kameras wird ignoriert !! <br><br>
+  
+  <b>Beispiele:</b>
+  <pre>
+    set &lt;name&gt; snapCams 4 
+    set &lt;name&gt; snapCams 3 3 CAM:"CamHE1, CamCarport"
+  </pre>
+  
   </ul>
   <br><br>
   
