@@ -879,6 +879,17 @@ alexa_Set($$@)
     FW_directNotify($name, 'clearProxyCredentials');
 
     return undef;
+
+  } elsif( $cmd eq 'unregister' ) {
+    FW_directNotify($name, 'unregister');
+
+    fhem( "set $name clearProxyCredentials" );
+
+    CommandAttr( undef, '$name disable 1' );
+
+    CommandSave(undef,undef) if( AttrVal( "autocreate", "autosave", 1 ) );
+
+    return undef;
   }
 
   return "Unknown argument $cmd, choose one of $list";
