@@ -348,23 +348,11 @@ sub _ProcessingRetrieveData($$) {
                                 ),
                                 'ozone' => $data->{daily}->{data}->[$i]->{ozone},
                                 'uvIndex' =>
-                                $data->{daily}->{data}->[$i]->{uvIndex},
+                                    $data->{daily}->{data}->[$i]->{uvIndex},
                                 'uvIndexTime' => strftime(
                                     "%a, %e %b %Y %H:%M",
                                     localtime(
                                         $data->{daily}->{data}->[$i]->{uvIndexTime}
-                                    )
-                                ),
-                                'precipIntensity' =>
-                                $data->{daily}->{data}->[$i]->{precipIntensity},
-                                'precipIntensityMax' =>
-                                $data->{daily}->{data}->[$i]
-                                ->{precipIntensityMax},
-                                'precipIntensityMaxTime' => strftime(
-                                    "%a, %e %b %Y %H:%M",
-                                    localtime(
-                                        $data->{daily}->{data}->[$i]
-                                        ->{precipIntensityMaxTime}
                                     )
                                 ),
                                 'dewPoint' => int(
@@ -373,14 +361,11 @@ sub _ProcessingRetrieveData($$) {
                                     + 0.5
                                 ),
                                 'humidity' =>
-                                $data->{daily}->{data}->[$i]->{humidity} * 100,
+                                    $data->{daily}->{data}->[$i]->{humidity} * 100,
                                 'cloudCover' =>
-                                $data->{daily}->{data}->[$i]->{cloudCover} * 100,
-                                'precipType' =>
-                                $data->{daily}->{data}->[$i]->{precipType},
-
+                                    $data->{daily}->{data}->[$i]->{cloudCover} * 100,
                                 'wind_direction' =>
-                                $data->{daily}->{data}->[$i]->{windBearing},
+                                    $data->{daily}->{data}->[$i]->{windBearing},
                                 'wind' => int(
                                     sprintf( "%.1f",
                                         ($data->{daily}->{data}->[$i]->{windSpeed} * 3.6) )
@@ -403,7 +388,7 @@ sub _ProcessingRetrieveData($$) {
                                     )
                                 ),
                                 'moonPhase' =>
-                                $data->{daily}->{data}->[$i]->{moonPhase},
+                                    $data->{daily}->{data}->[$i]->{moonPhase},
                                 'sunsetTime' => strftime(
                                     "%a, %e %b %Y %H:%M",
                                     localtime(
@@ -416,9 +401,6 @@ sub _ProcessingRetrieveData($$) {
                                         $data->{daily}->{data}->[$i]->{sunriseTime}
                                     )
                                 ),
-
-                                'precipProbability' =>
-                                $data->{daily}->{data}->[$i]->{precipProbability},
                                 'pressure' => int(
                                     sprintf( "%.1f",
                                         $data->{daily}->{data}->[$i]->{pressure} )
@@ -431,6 +413,12 @@ sub _ProcessingRetrieveData($$) {
                                 ),
                             }
                         );
+
+                        $self->{cached}->{forecast}->{daily}[$i]{precipIntensityMax} = $data->{daily}->{data}->[$i]->{precipIntensityMax} if ( defined($data->{daily}->{data}->[$i]->{precipIntensityMax}) );       
+                        $self->{cached}->{forecast}->{daily}[$i]{precipIntensity} = $data->{daily}->{data}->[$i]->{precipIntensity} if ( defined($data->{daily}->{data}->[$i]->{precipIntensity}) );  
+                        $self->{cached}->{forecast}->{daily}[$i]{precipProbability} = $data->{daily}->{data}->[$i]->{precipProbability} if ( defined($data->{daily}->{data}->[$i]->{precipProbability}) );
+                        $self->{cached}->{forecast}->{daily}[$i]{precipType} = $data->{daily}->{data}->[$i]->{precipType} if ( defined($data->{daily}->{data}->[$i]->{precipType}) );
+                        $self->{cached}->{forecast}->{daily}[$i]{precipIntensityMaxTime} = strftime("%a, %e %b %Y %H:%M",localtime($data->{daily}->{data}->[$i]->{precipIntensityMaxTime}) ) if ( defined($data->{daily}->{data}->[$i]->{precipIntensityMaxTime}) );
 
                         $i++;
                     }
