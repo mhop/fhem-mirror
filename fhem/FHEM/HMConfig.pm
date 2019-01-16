@@ -336,7 +336,6 @@ my $K_actDetID = '000000'; # id of actionDetector
 );
 
 # generate a reverse search hash
-%culHmModel2Id;
 $culHmModel2Id{$culHmModel{$_}{name}} = $_ foreach (keys %culHmModel);
 
 foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
