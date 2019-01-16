@@ -9,6 +9,8 @@ use warnings;
 use JSON;
 use Data::Dumper;
 
+use POSIX ":sys_wait_h";
+
 use vars qw(%modules);
 use vars qw(%defs);
 use vars qw(%attr);
@@ -652,7 +654,13 @@ alexa_startAlexaFHEM($)
         $cmd .= " $params";
       }
 
-      Log3 $name, 2, "$name: starting alexa-fhem: $cmd";
+      if( AttrVal( $name, 'verbose', 3 ) == 5 ) {
+        Log3 $name, 2, "$name: starting alexa-fhem: $cmd";
+      } else {
+        my $msg = $cmd;
+        $msg =~ s/-a\s+[^:]+:[^\s]+/-a xx:xx/g;
+        Log3 $name, 2, "$name: starting alexa-fhem: $msg";
+      }
 
       exec split( ' ', $cmd ) or Log3 $name, 1, "exec failed";
 
