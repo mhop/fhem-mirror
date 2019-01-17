@@ -212,8 +212,9 @@ my ($err,@config);
 
 return 0 if ($err);
 
-map { $_ =~ s/^\s+|\s+$//g; } @config;
-map { $_ =~ s/;$/;;/;} @config;
+map { $_ =~ s/^\s+|\s+$//g; }        @config;
+map { $_ =~ s/;$/;;/;}               @config;
+map { $_ = undef unless length($_) } @config;
 
 use Data::Dumper;
 print Dumper @config;
