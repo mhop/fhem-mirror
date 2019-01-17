@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  73_AutoShuttersControl: fix drive up then roommate asleep
   - bugfix:  DarkSkyAPI: fix uninitialized value in localtime at line 430
   - bugfix:  89_FULLY: fixed command set url
   - bugfix:  98_livetracking: fixed HTTP return

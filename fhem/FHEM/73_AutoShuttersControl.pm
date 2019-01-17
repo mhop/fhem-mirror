@@ -41,7 +41,7 @@ package main;
 use strict;
 use warnings;
 
-my $version = '0.2.3.2';
+my $version = '0.2.3.3';
 
 sub AutoShuttersControl_Initialize($) {
     my ($hash) = @_;
@@ -1214,7 +1214,7 @@ sub EventProcessingBrightness($@) {
             );
 
             my $posValue;
-            if ( CheckIfShuttersWindowRecOpen($shuttersDev) == 2
+            if (    CheckIfShuttersWindowRecOpen($shuttersDev) == 2
                 and $shutters->getSubTyp eq 'threestate'
                 and $ascDev->getAutoShuttersControlComfort eq 'on' )
             {
@@ -1767,9 +1767,11 @@ sub SunRiseShuttersAfterTimerFn($) {
                 or $shutters->getRoommatesStatus eq 'gone'
                 or $shutters->getRoommatesStatus eq 'none'
             )
-            and $ascDev->getSelfDefense eq 'off'
-            or ( $ascDev->getSelfDefense eq 'on'
-                and CheckIfShuttersWindowRecOpen($shuttersDev) == 0 )
+            and (
+                $ascDev->getSelfDefense eq 'off'
+                or ( $ascDev->getSelfDefense eq 'on'
+                    and CheckIfShuttersWindowRecOpen($shuttersDev) == 0 )
+            )
           )
         {
             $shutters->setLastDrive('day open');
