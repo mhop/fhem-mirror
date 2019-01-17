@@ -212,8 +212,12 @@ my ($err,@config);
 
 return 0 if ($err);
 
+map { $_ =~ s/^\s+|\s+$//g; } @config;
+map { $_ =~ s/;$/;;/;} @config;
+
 use Data::Dumper;
 print Dumper @config;
+
 return 0;
 
 while (<CONFIG>){
