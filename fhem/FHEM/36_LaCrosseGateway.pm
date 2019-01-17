@@ -70,8 +70,7 @@ sub LaCrosseGateway_Notify($$) {
 }
 
 #=======================================================================================
-sub LaCrosseGateway_Define($$) {
-  my ($hash, $def) = @_;
+sub LaCrosseGateway_Define($$) {my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
   
   if(@a != 3) {
@@ -87,8 +86,7 @@ sub LaCrosseGateway_Define($$) {
 
   $hash->{Clients} = $clients;
   $hash->{MatchList} = \%matchList;
-  $hash->{TIMEOUT} = 1.0;
-  $hash->{devioLoglevel} = 4;
+  $hash->{TIMEOUT} = 0.5;
 
   if( !defined( $attr{$name}{usbFlashCommand} ) ) {
     $attr{$name}{usbFlashCommand} = "./FHEM/firmware/esptool.py -b 921600 -p [PORT] write_flash -ff 80m -fm dio -fs 4MB-c1 0x00000 [BINFILE] > [LOGFILE] 2>&1"
@@ -435,7 +433,15 @@ sub LaCrosseGateway_Ready($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
-  return LaCrosseGateway_Connect($hash, 1);
+  LaCrosseGateway_Connect($hash, 1);
+
+  # This is relevant for windows/USB only
+  my $po = $hash->{USBDev};
+  my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags);
+  if($po) {
+    ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
+  }
+  return ($InBytes && $InBytes>0);
 }
 
 #=======================================================================================
@@ -734,18 +740,13 @@ sub LaCrosseGateway_Connect($;$) {
   my ($hash, $mode) = @_;
   my $name = $hash->{NAME};
   
-  if(DevIo_IsOpen($hash)) {
-    DevIo_CloseDev($hash);
-  }
+  DevIo_CloseDev($hash);
   
   $mode = 0 if!($mode);
   my $enabled = AttrVal($name, "disable", "0") != "1" && !defined($hash->{helper}{FLASHING});
   if($enabled) {
     $hash->{nextOpenDelay} = 2;
-    my $ret = DevIo_OpenDev($hash, $mode, "LaCrosseGateway_DoInit", sub($$){
-        my ($hash, $error) = @_;
-        ####Log 3, "LGW: " . $hash->{NAME} . " " . $error;
-      });
+    my $ret = DevIo_OpenDev($hash, $mode, "LaCrosseGateway_DoInit");
     return $ret;
   }
   
@@ -780,7 +781,7 @@ sub LaCrosseGateway_OnConnectTimer($) {
     my ($timeout, $interval) = split(',', $attrVal);
     my $useOldMethod = $interval;
     $interval = $timeout if !$interval;
-    
+
     InternalTimer(gettimeofday() + $interval, "LaCrosseGateway_OnConnectTimer", $hash, 0);
 
     if(AttrVal($name, "disable", "0") != "1" && !defined($hash->{helper}{FLASHING})) {
