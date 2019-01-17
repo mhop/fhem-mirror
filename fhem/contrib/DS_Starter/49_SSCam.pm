@@ -47,7 +47,7 @@ use Encode;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
-  "8.5.0"  => "17.01.2019  SVS device set snapAllCams ",
+  "8.5.0"  => "17.01.2019  SVS device has \"snapCams\" command ",
   "8.4.5"  => "15.01.2019  fix event generation after request snapshots ",
   "8.4.4"  => "14.01.2019  change: generate event of every snapfile,id etc. if snap was called with arguments, Forum:#45671 #msg887484  ",
   "8.4.3"  => "11.01.2019  fix blocking Active-Token if snap was done with arguments and snapEmailTxt not set, Forum:#45671 #msg885475 ",
@@ -118,6 +118,8 @@ our %SSCam_vNotesIntern = (
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
+  "8.5.0"  => "17.01.2019 SVS device has \"snapCams\" command. Now are able to take snapshots of all defined cameras and may ".
+              "optionally send them alltogether by Email.",
   "8.4.0"  => "07.01.2019 Command snap is extended to syntax \"snap [number] [lag] [snapEmailTxt:\"subject => &lt;Betreff-Text&gt;, body => ".
               "&lt;Mitteilung-Text&gt;\"]\". Now you are able to trigger several number of ".
               "snapshots by only one snap-command. The triggered snapshots can be shipped alltogether with the internal email client. ",
