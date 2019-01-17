@@ -218,18 +218,13 @@ foreach my $line (@c) {
 }
 
 
-use Data::Dumper;
-print Dumper @config;
-
-return 0;
-
-while (<CONFIG>){
-   my $line = $_;
-   $line =~ s/^\s+|\s+$//g; # remove whitespaces etc.
-   $line =~ s/;$/;;/;       # duplicate ; at end-of-line
-   push (@config,$line) if($line !~ m/^#/ && length($line) > 0);
-}
-close CONFIG;
+#while (<CONFIG>){
+#   my $line = $_;
+#   $line =~ s/^\s+|\s+$//g; # remove whitespaces etc.
+#   $line =~ s/;$/;;/;       # duplicate ; at end-of-line
+#   push (@config,$line) if($line !~ m/^#/ && length($line) > 0);
+#}
+#close CONFIG;
 
 use vars qw(%configDB);
 
