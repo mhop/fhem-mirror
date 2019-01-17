@@ -37,7 +37,7 @@ use HttpUtils;
 use Color;
 use SetExtensions;
 
-my $module_version      = "2.15";     # Version of this module
+my $module_version      = "2.16";     # Version of this module
 
 # ------------------------------------------------------------------------------
 # modul version and required ESP Easy firmware / JSON lib version
@@ -1952,12 +1952,14 @@ sub ESPEasy_httpReqParse($$$)
   $hash->{helper}{sessions}{$host}--;
 
   if ($err ne "") {
-    push(@values, "e||_lastError||$err||0"); # dispatch $err to logical device
+    push(@values, "e||_lastError||$err||0") # dispatch $err to logical device
+      if $cmd ne "deepsleep";               # but not if cmd == deepsleep or logical loglevel below 4.
     $hash->{"WARNING_$host"} = $err;        # keep in helper for support reason
 
     #Log3 $name, 2, "$type $name: httpReq failed: $host $ident '$cmd $plist' ";
     #Log3 $name, 2, "$type $name: set $dname $cmd". ($plist ne "" ?" $plist": "")." failed: $err" ;
-    Log3 $name, 2, "$type $name: $err [set $dname $cmd". ($plist ne ""?" $plist":"") ."]";
+    my $ll = $cmd eq "deepsleep" ? 4 : 2;
+    Log3 $name, $ll, "$type $name: $err [set $dname $cmd". ($plist ne ""?" $plist":"") ."]";
 
     # unshift command back to queue (resend) if retry not reached
     my $maxRetry = AttrVal($name,"resendFailedCmd",$d_resendFailedCmd);
