@@ -79,77 +79,74 @@ my @iconlist = (
 
 ###################################
 sub Weather_LanguageInitialize($) {
+    my ($lang) = @_;
 
-  my ($lang) = @_;
-
-  if($lang eq "de") {
-      %wdays_txt_i18n= %wdays_txt_de;
-      @directions_txt_i18n= @directions_txt_de;
-      %pressure_trend_txt_i18n= %pressure_trend_txt_de;
-      %status_items_txt_i18n= %status_items_txt_de;
-  } elsif($lang eq "nl") {
-      %wdays_txt_i18n= %wdays_txt_nl;
-      @directions_txt_i18n= @directions_txt_nl;
-      %pressure_trend_txt_i18n= %pressure_trend_txt_nl;
-      %status_items_txt_i18n= %status_items_txt_nl;
-  } elsif($lang eq "fr") {
-      %wdays_txt_i18n= %wdays_txt_fr;
-      @directions_txt_i18n= @directions_txt_fr;
-      %pressure_trend_txt_i18n= %pressure_trend_txt_fr;
-      %status_items_txt_i18n= %status_items_txt_fr;
-  } elsif($lang eq "pl") {
-      %wdays_txt_i18n= %wdays_txt_pl;
-      @directions_txt_i18n= @directions_txt_pl;
-      %pressure_trend_txt_i18n= %pressure_trend_txt_pl;
-      %status_items_txt_i18n= %status_items_txt_pl;
-  } elsif($lang eq "it") {
-      %wdays_txt_i18n= %wdays_txt_it;
-      @directions_txt_i18n= @directions_txt_it;
-      %pressure_trend_txt_i18n= %pressure_trend_txt_it;
-      %status_items_txt_i18n= %status_items_txt_it;
-  } else {
-      %wdays_txt_i18n= %wdays_txt_en;
-      @directions_txt_i18n= @directions_txt_en;
-      %pressure_trend_txt_i18n= %pressure_trend_txt_en;
-      %status_items_txt_i18n= %status_items_txt_en;
-  }
+    if($lang eq "de") {
+        %wdays_txt_i18n= %wdays_txt_de;
+        @directions_txt_i18n= @directions_txt_de;
+        %pressure_trend_txt_i18n= %pressure_trend_txt_de;
+        %status_items_txt_i18n= %status_items_txt_de;
+    } elsif($lang eq "nl") {
+        %wdays_txt_i18n= %wdays_txt_nl;
+        @directions_txt_i18n= @directions_txt_nl;
+        %pressure_trend_txt_i18n= %pressure_trend_txt_nl;
+        %status_items_txt_i18n= %status_items_txt_nl;
+    } elsif($lang eq "fr") {
+        %wdays_txt_i18n= %wdays_txt_fr;
+        @directions_txt_i18n= @directions_txt_fr;
+        %pressure_trend_txt_i18n= %pressure_trend_txt_fr;
+        %status_items_txt_i18n= %status_items_txt_fr;
+    } elsif($lang eq "pl") {
+        %wdays_txt_i18n= %wdays_txt_pl;
+        @directions_txt_i18n= @directions_txt_pl;
+        %pressure_trend_txt_i18n= %pressure_trend_txt_pl;
+        %status_items_txt_i18n= %status_items_txt_pl;
+    } elsif($lang eq "it") {
+        %wdays_txt_i18n= %wdays_txt_it;
+        @directions_txt_i18n= @directions_txt_it;
+        %pressure_trend_txt_i18n= %pressure_trend_txt_it;
+        %status_items_txt_i18n= %status_items_txt_it;
+    } else {
+        %wdays_txt_i18n= %wdays_txt_en;
+        @directions_txt_i18n= @directions_txt_en;
+        %pressure_trend_txt_i18n= %pressure_trend_txt_en;
+        %status_items_txt_i18n= %status_items_txt_en;
+    }
 }
 
 ###################################
 sub Weather_DebugCodes($) {
+    my ($lang)= @_;
+    my @YahooCodes_i18n= YahooWeatherAPI_getYahooCodes($lang);
 
-  my ($lang)= @_;
-  my @YahooCodes_i18n= YahooWeatherAPI_getYahooCodes($lang);
-
-  Debug "Weather Code List, see http://developer.yahoo.com/weather/#codes";
-  for(my $c= 0; $c<= 47; $c++) {
-    Debug sprintf("%2d %30s %30s", $c, $iconlist[$c], $YahooCodes_i18n[$c]);
-  }
+    Debug "Weather Code List, see http://developer.yahoo.com/weather/#codes";
+    for(my $c= 0; $c<= 47; $c++) {
+        Debug sprintf("%2d %30s %30s", $c, $iconlist[$c], $YahooCodes_i18n[$c]);
+    }
 
 }
 
 
 #####################################
 sub Weather_Initialize($) {
+    my ($hash) = @_;
 
-  my ($hash) = @_;
+    $hash->{DefFn}   = "Weather_Define";
+    $hash->{UndefFn} = "Weather_Undef";
+    $hash->{GetFn}   = "Weather_Get";
+    $hash->{SetFn}   = "Weather_Set";
+    $hash->{AttrList}= "disable:0,1 " . $readingFnAttributes;
+    $hash->{NotifyFn}= "Weather_Notify";
 
-  $hash->{DefFn}   = "Weather_Define";
-  $hash->{UndefFn} = "Weather_Undef";
-  $hash->{GetFn}   = "Weather_Get";
-  $hash->{SetFn}   = "Weather_Set";
-  $hash->{AttrList}= "disable:0,1 " . $readingFnAttributes;
-  $hash->{NotifyFn}= "Weather_Notify";
-
-  #Weather_DebugCodes('de');
+    #Weather_DebugCodes('de');
 }
 
 ###################################
 
 sub degrees_to_direction($@) {
-   my ($degrees,@directions_txt_i18n) = @_;
-   my $mod = int((($degrees + 11.25) % 360) / 22.5);
-   return $directions_txt_i18n[$mod];
+    my ($degrees,@directions_txt_i18n) = @_;
+    my $mod = int((($degrees + 11.25) % 360) / 22.5);
+    return $directions_txt_i18n[$mod];
 }
 
 
@@ -173,7 +170,6 @@ sub Weather_ReturnWithError($$) {
 }
 
 sub Weather_RetrieveCallbackFn($) {
-
     my $name = shift;
     my $hash = $defs{$name};
     my $responseRef = $hash->{fhem}->{api}->getWeather;
@@ -300,7 +296,6 @@ sub Weather_WriteReadings($$) {
 
 ###################################
 sub Weather_GetUpdate($) {
-
     my ($hash) = @_;
     my $name = $hash->{NAME};
 
@@ -321,148 +316,146 @@ sub Weather_GetUpdate($) {
 
 ###################################
 sub Weather_Get($@) {
+    my ($hash, @a) = @_;
 
-  my ($hash, @a) = @_;
+    return "argument is missing" if(int(@a) != 2);
 
-  return "argument is missing" if(int(@a) != 2);
+    my $reading= $a[1];
+    my $value;
 
-  my $reading= $a[1];
-  my $value;
+    if(defined($hash->{READINGS}->{$reading})) {
+            $value = $hash->{READINGS}->{$reading}->{VAL};
+    } else {
+            my $rt = '';
+            if(defined($hash->{READINGS})) {
+                    $rt = join(":noArg ", sort keys %{$hash->{READINGS}});
+            }
 
-  if(defined($hash->{READINGS}->{$reading})) {
-        $value = $hash->{READINGS}->{$reading}->{VAL};
-  } else {
-        my $rt = '';
-        if(defined($hash->{READINGS})) {
-                $rt = join(":noArg ", sort keys %{$hash->{READINGS}});
-        }
+            return "Unknown reading $reading, choose one of " . $rt;
+    }
 
-        return "Unknown reading $reading, choose one of " . $rt;
-  }
-
-  return "$a[0] $reading => $value";
+    return "$a[0] $reading => $value";
 }
 
 ###################################
 sub Weather_Set($@) {
-  my ($hash, @a) = @_;
+    my ($hash, @a) = @_;
 
-  my $cmd= $a[1];
+    my $cmd= $a[1];
 
-  # usage check
-  if((@a == 2) && ($a[1] eq "update")) {
-    Weather_DisarmTimer($hash);
-    Weather_GetUpdate($hash);
-    return undef;
-  } else {
-    return "Unknown argument $cmd, choose one of update:noArg";
-  }
+    # usage check
+    if((@a == 2) && ($a[1] eq "update")) {
+        Weather_DisarmTimer($hash);
+        Weather_GetUpdate($hash);
+        return undef;
+    } else {
+        return "Unknown argument $cmd, choose one of update:noArg";
+    }
 }
 
 ###################################
 sub Weather_RearmTimer($$) {
-
-  my ($hash, $t) = @_;
-  InternalTimer($t, "Weather_GetUpdate", $hash, 0) ;
+    my ($hash, $t) = @_;
+    
+    InternalTimer($t, "Weather_GetUpdate", $hash, 0) ;
 
 }
 
 sub Weather_DisarmTimer($) {
-
     my ($hash)= @_;
+    
     RemoveInternalTimer($hash);
 }
 
 sub Weather_Notify($$) {
-  my ($hash,$dev) = @_;
-  my $name  = $hash->{NAME};
-  my $type  = $hash->{TYPE};
+    my ($hash,$dev) = @_;
+    my $name  = $hash->{NAME};
+    my $type  = $hash->{TYPE};
 
-  return if($dev->{NAME} ne "global");
-  return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
+    return if($dev->{NAME} ne "global");
+    return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
 
-  # return if($attr{$name} && $attr{$name}->{disable});
+    # return if($attr{$name} && $attr{$name}->{disable});
 
-  # update weather after initialization or change of configuration
-  # wait 10 to 29 seconds to avoid congestion due to concurrent activities
-  Weather_DisarmTimer($hash);
-  my $delay= 10+int(rand(20));
+    # update weather after initialization or change of configuration
+    # wait 10 to 29 seconds to avoid congestion due to concurrent activities
+    Weather_DisarmTimer($hash);
+    my $delay= 10+int(rand(20));
 
-  #$delay= 3; # delay removed until further notice
+    #$delay= 3; # delay removed until further notice
 
-  Log3 $hash, 5, "Weather $name: FHEM initialization or rereadcfg triggered update, delay $delay seconds.";
-  Weather_RearmTimer($hash, gettimeofday()+$delay) ;
+    Log3 $hash, 5, "Weather $name: FHEM initialization or rereadcfg triggered update, delay $delay seconds.";
+    Weather_RearmTimer($hash, gettimeofday()+$delay) ;
 
-  return undef;
+    return undef;
 }
 
 #####################################
 sub Weather_Define($$) {
+    my ($hash, $def) = @_;
 
-  my ($hash, $def) = @_;
+    my $usage= "syntax: define <name> Weather [API=<API>] [apikey=<apikey>] [location=<location>] [interval=<interval>] [lang=<lang>]";
 
-  my $usage= "syntax: define <name> Weather [API=<API>] [apikey=<apikey>] [location=<location>] [interval=<interval>] [lang=<lang>]";
+    # defaults
+    my $API="DarkSkyAPI,cachemaxage:600";
+    my $interval  = 3600;
 
-  # defaults
-  my $API="DarkSkyAPI,cachemaxage:600";
-  my $interval  = 3600;
+    # parse parameters
+    my ($arrayref, $hashref)= parseParams($def);
+    my @a= @{$arrayref};
+    my %h= %{$hashref};
 
-  # parse parameters
-  my ($arrayref, $hashref)= parseParams($def);
-  my @a= @{$arrayref};
-  my %h= %{$hashref};
-
-  # check minimum syntax
-  return $usage unless(scalar @a == 2);
-  my $name= $a[0];
+    # check minimum syntax
+    return $usage unless(scalar @a == 2);
+    my $name= $a[0];
 
 
-  my $location= $h{location} if exists $h{location};
-  my $apikey = $h{apikey} if exists $h{apikey};
-  my $lang= $h{lang} if exists $h{lang};
-  $interval= $h{interval} if exists $h{interval};
-  $API = $h{API} if exists $h{API};
+    my $location= $h{location} if exists $h{location};
+    my $apikey = $h{apikey} if exists $h{apikey};
+    my $lang= $h{lang} if exists $h{lang};
+    $interval= $h{interval} if exists $h{interval};
+    $API = $h{API} if exists $h{API};
 
-  # evaluate API options
-  my ($api,$apioptions)= split(',', $API, 2);
-  $apioptions= "" unless(defined($apioptions));
-  eval {
+    # evaluate API options
+    my ($api,$apioptions)= split(',', $API, 2);
+    $apioptions= "" unless(defined($apioptions));
+    eval {
     require "$api.pm";
-  };
-  return "$name: cannot load API $api: $@" if($@);
+    };
+    return "$name: cannot load API $api: $@" if($@);
 
-  $hash->{NOTIFYDEV} = "global";
-  $hash->{fhem}->{interfaces}= "temperature;humidity;wind";
-  $hash->{LOCATION}     = ( (defined($location) and $location) ? $location : AttrVal( 'global', 'latitude',  'error' ).','.AttrVal( 'global', 'longitude', 'error' ) );
-  $hash->{INTERVAL}     = $interval;
-  $hash->{LANG}         = ( (defined($lang) and $lang) ? $lang : lc(AttrVal('global','language','de')) );
-  $hash->{API}          = $api;
-  $hash->{APIKEY}       = $apikey;
-  $hash->{APIOPTIONS}   = $apioptions;
-  #$hash->{UNITS}        = "c"; # hardcoded to use degrees centigrade (Celsius)
-  $hash->{READINGS}->{current_date_time}->{TIME}= TimeNow();
-  $hash->{READINGS}->{current_date_time}->{VAL}= "none";
+    $hash->{NOTIFYDEV} = "global";
+    $hash->{fhem}->{interfaces}= "temperature;humidity;wind";
+    $hash->{LOCATION}     = ( (defined($location) and $location) ? $location : AttrVal( 'global', 'latitude',  'error' ).','.AttrVal( 'global', 'longitude', 'error' ) );
+    $hash->{INTERVAL}     = $interval;
+    $hash->{LANG}         = ( (defined($lang) and $lang) ? $lang : lc(AttrVal('global','language','de')) );
+    $hash->{API}          = $api;
+    $hash->{APIKEY}       = $apikey;
+    $hash->{APIOPTIONS}   = $apioptions;
+    $attr{$name}->{model} = $api;
+    #$hash->{UNITS}        = "c"; # hardcoded to use degrees centigrade (Celsius)
+    $hash->{READINGS}->{current_date_time}->{TIME}= TimeNow();
+    $hash->{READINGS}->{current_date_time}->{VAL}= "none";
 
-  $hash->{fhem}->{allowCache}= 1;
+    $hash->{fhem}->{allowCache}= 1;
 
-  readingsSingleUpdate($hash,'state','Initialized',1);
-  Weather_LanguageInitialize($hash->{LANG});
+    readingsSingleUpdate($hash,'state','Initialized',1);
+    Weather_LanguageInitialize($hash->{LANG});
 
-  my $apistring = $api . '::Weather';
-  $hash->{fhem}->{api} = $apistring->new( { devName => $hash->{NAME}, apikey => $hash->{APIKEY}, location => $hash->{LOCATION}, apioptions => $hash->{APIOPTIONS}, language => $hash->{LANG} } );
+    my $apistring = $api . '::Weather';
+    $hash->{fhem}->{api} = $apistring->new( { devName => $hash->{NAME}, apikey => $hash->{APIKEY}, location => $hash->{LOCATION}, apioptions => $hash->{APIOPTIONS}, language => $hash->{LANG} } );
 
-  Weather_GetUpdate($hash) if($init_done);
+    Weather_GetUpdate($hash) if($init_done);
 
-  return undef;
+    return undef;
 }
 
 #####################################
 sub Weather_Undef($$) {
+    my ($hash, $arg) = @_;
 
-  my ($hash, $arg) = @_;
-
-  RemoveInternalTimer($hash);
-  return undef;
+    RemoveInternalTimer($hash);
+    return undef;
 }
 
 #####################################
@@ -476,116 +469,112 @@ use constant ICONSCALE => 0.5;
 #####################################
 
 sub WeatherIconIMGTag($) {
-
-  my $width= int(ICONSCALE*ICONWIDTH);
-  my ($icon)= @_;
-  my $url= FW_IconURL("weather/$icon");
-  my $style= " width=$width";
-  return "<img src=\"$url\"$style alt=\"$icon\">";
-
+    my $width= int(ICONSCALE*ICONWIDTH);
+    my ($icon)= @_;
+    my $url= FW_IconURL("weather/$icon");
+    my $style= " width=$width";
+    return "<img src=\"$url\"$style alt=\"$icon\">";
 }
 
 #####################################
 
-sub WeatherAsHtmlV($;$)
-{
+sub WeatherAsHtmlV($;$) {
+    my ($d,$items) = @_;
 
-  my ($d,$items) = @_;
-  $d = "<none>" if(!$d);
-  $items = 9 if( !$items );
-  return "$d is not a Weather instance<br>"
+    $d = "<none>" if(!$d);
+    $items = 9 if( !$items );
+    return "$d is not a Weather instance<br>"
         if(!$defs{$d} || $defs{$d}->{TYPE} ne "Weather");
 
-  my $h = $defs{$d};
-  my $width= int(ICONSCALE*ICONWIDTH);
+    my $h = $defs{$d};
+    my $width= int(ICONSCALE*ICONWIDTH);
 
-  my $ret = '<table class="weather">';
-  $ret .= sprintf('<tr><td class="weatherIcon" width=%d>%s</td><td class="weatherValue">%s<br>%s°C  %s%%<br>%s</td></tr>',
+    my $ret = '<table class="weather">';
+    $ret .= sprintf('<tr><td class="weatherIcon" width=%d>%s</td><td class="weatherValue">%s<br>%s°C  %s%%<br>%s</td></tr>',
         $width,
         WeatherIconIMGTag(ReadingsVal($d, "icon", "")),
         ReadingsVal($d, "condition", ""),
         ReadingsVal($d, "temp_c", ""), ReadingsVal($d, "humidity", ""),
         ReadingsVal($d, "wind_condition", ""));
 
-  my $fc = ( (defined($h->{READINGS}->{fc1_day_of_week}) and $h->{READINGS}->{fc1_day_of_week}) ? 'fc' : 'hfc' );
-  for(my $i=1; $i<$items; $i++) {
+    my $fc = ( (defined($h->{READINGS}->{fc1_day_of_week}) and $h->{READINGS}->{fc1_day_of_week}) ? 'fc' : 'hfc' );
+    for(my $i=1; $i<$items; $i++) {
     $ret .= sprintf('<tr><td class="weatherIcon" width=%d>%s</td><td class="weatherValue"><span class="weatherDay">%s: %s</span><br><span class="weatherMin">min %s°C</span> <span class="weatherMax">max %s°C</span></td></tr>',
         $width,
         WeatherIconIMGTag(ReadingsVal($d, "${fc}${i}_icon", "")),
         ReadingsVal($d, "${fc}${i}_day_of_week", ""),
         ReadingsVal($d, "${fc}${i}_condition", ""),
         ReadingsVal($d, "${fc}${i}_low_c", ""), ReadingsVal($d, "${fc}${i}_high_c", ""));
-  }
+    }
 
-  $ret .= "</table>";
-  return $ret;
+    $ret .= "</table>";
+    return $ret;
 }
 
-sub WeatherAsHtml($;$)
-{
-  my ($d,$i) = @_;
-  WeatherAsHtmlV($d,$i);
+sub WeatherAsHtml($;$) {
+    my ($d,$i) = @_;
+
+    WeatherAsHtmlV($d,$i);
 }
 
-sub WeatherAsHtmlH($;$)
-{
+sub WeatherAsHtmlH($;$) {
+    my ($d,$items) = @_;
 
-  my ($d,$items) = @_;
-  $d = "<none>" if(!$d);
-  $items = 9 if( !$items );
-  return "$d is not a Weather instance<br>"
+    $d = "<none>" if(!$d);
+    $items = 9 if( !$items );
+    return "$d is not a Weather instance<br>"
         if(!$defs{$d} || $defs{$d}->{TYPE} ne "Weather");
 
-  my $h = $defs{$d};
-  my $width= int(ICONSCALE*ICONWIDTH);
+    my $h = $defs{$d};
+    my $width= int(ICONSCALE*ICONWIDTH);
 
 
 
-  my $format= '<td><table border=1><tr><td class="weatherIcon" width=%d>%s</td></tr><tr><td class="weatherValue">%s</td></tr><tr><td class="weatherValue">%s°C %s%%</td></tr><tr><td class="weatherValue">%s</td></tr></table></td>';
+    my $format= '<td><table border=1><tr><td class="weatherIcon" width=%d>%s</td></tr><tr><td class="weatherValue">%s</td></tr><tr><td class="weatherValue">%s°C %s%%</td></tr><tr><td class="weatherValue">%s</td></tr></table></td>';
 
-  my $ret = '<table class="weather">';
-  my $fc = ( (defined($h->{READINGS}->{fc1_day_of_week}) and $h->{READINGS}->{fc1_day_of_week}) ? 'fc' : 'hfc' );
+    my $ret = '<table class="weather">';
+    my $fc = ( (defined($h->{READINGS}->{fc1_day_of_week}) and $h->{READINGS}->{fc1_day_of_week}) ? 'fc' : 'hfc' );
 
-  # icons
-  $ret .= sprintf('<tr><td class="weatherIcon" width=%d>%s</td>', $width, WeatherIconIMGTag(ReadingsVal($d, "icon", "")));
-  for(my $i=1; $i<$items; $i++) {
+    # icons
+    $ret .= sprintf('<tr><td class="weatherIcon" width=%d>%s</td>', $width, WeatherIconIMGTag(ReadingsVal($d, "icon", "")));
+    for(my $i=1; $i<$items; $i++) {
     $ret .= sprintf('<td class="weatherIcon" width=%d>%s</td>', $width, WeatherIconIMGTag(ReadingsVal($d, "${fc}${i}_icon", "")));
-  }
-  $ret .= '</tr>';
+    }
+    $ret .= '</tr>';
 
-  # condition
-  $ret .= sprintf('<tr><td class="weatherDay">%s</td>', ReadingsVal($d, "condition", ""));
-  for(my $i=1; $i<$items; $i++) {
+    # condition
+    $ret .= sprintf('<tr><td class="weatherDay">%s</td>', ReadingsVal($d, "condition", ""));
+    for(my $i=1; $i<$items; $i++) {
     $ret .= sprintf('<td class="weatherDay">%s: %s</td>', ReadingsVal($d, "${fc}${i}_day_of_week", ""),
         ReadingsVal($d, "${fc}${i}_condition", ""));
-  }
-  $ret .= '</tr>';
+    }
+    $ret .= '</tr>';
 
-  # temp/hum | min
-  $ret .= sprintf('<tr><td class="weatherMin">%s°C %s%%</td>', ReadingsVal($d, "temp_c", ""), ReadingsVal($d, "humidity", ""));
-  for(my $i=1; $i<$items; $i++) {
+    # temp/hum | min
+    $ret .= sprintf('<tr><td class="weatherMin">%s°C %s%%</td>', ReadingsVal($d, "temp_c", ""), ReadingsVal($d, "humidity", ""));
+    for(my $i=1; $i<$items; $i++) {
     $ret .= sprintf('<td class="weatherMin">min %s°C</td>', ReadingsVal($d, "${fc}${i}_low_c", ""));
-  }
-  $ret .= '</tr>';
+    }
+    $ret .= '</tr>';
 
-  # wind | max
-  $ret .= sprintf('<tr><td class="weatherMax">%s</td>', ReadingsVal($d, "wind_condition", ""));
-  for(my $i=1; $i<$items; $i++) {
+    # wind | max
+    $ret .= sprintf('<tr><td class="weatherMax">%s</td>', ReadingsVal($d, "wind_condition", ""));
+    for(my $i=1; $i<$items; $i++) {
     $ret .= sprintf('<td class="weatherMax">max %s°C</td>', ReadingsVal($d, "${fc}${i}_high_c", ""));
-  }
-  $ret .= "</tr></table>";
+    }
+    $ret .= "</tr></table>";
 
-  return $ret;
+    return $ret;
 }
 
-sub WeatherAsHtmlD($;$)
-{
-  my ($d,$i) = @_;
-  if($FW_ss) {
+sub WeatherAsHtmlD($;$) {
+    my ($d,$i) = @_;
+  
+    if($FW_ss) {
     WeatherAsHtmlV($d,$i);
-  } else {
+    } else {
     WeatherAsHtmlH($d,$i);
-  }
+    }
 }
 
 #####################################
