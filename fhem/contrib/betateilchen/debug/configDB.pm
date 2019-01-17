@@ -205,16 +205,18 @@ sub _cfgDB_dump($);
 #
 
 
-my ($err,@config);
-
-($err,@config) = FileRead({FileName  => 'configDB.conf', 
+my ($err,@c) = FileRead({FileName  => 'configDB.conf', 
                            ForceType => "file"}); 
-
 return 0 if ($err);
 
-@config = map { $_ =~ s/^\s+|\s+$//g; } @config;
-@config = map { $_ =~ s/;$/;;/;} @config;
-@config = map { $_ ? $_ : (); } @config;
+my @config;
+
+foreach my $line (@c) {
+   $line =~ s/^\s+|\s+$//g; # remove whitespaces etc.
+   $line =~ s/;$/;;/;       # duplicate ; at end-of-line
+   push (@config,$line) if($line !~ m/^#/ && length($line) > 0);
+}
+
 
 use Data::Dumper;
 print Dumper @config;
