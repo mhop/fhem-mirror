@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  82_LGTV_WebOS: add SkyOnline at set commands
   - feature: 49_SSCam: 8.5.0, SVS device has "snapCams" command to take
                        snapshots of all cameras and optionally send them 
                        alltogether by Email
