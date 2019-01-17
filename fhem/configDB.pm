@@ -142,6 +142,8 @@
 #
 # 2018-09-08 - change    remove base64 migration functions
 #
+# 2019-01-17 - added     support for device specific uuid (setuuid)
+#
 ##############################################################################
 =cut
 
@@ -202,19 +204,27 @@ sub _cfgDB_dump($);
 # Read configuration file for DB connection
 #
 
-if(!open(CONFIG, 'configDB.conf')) {
-	Log3('configDB', 1, 'Cannot open database configuration file configDB.conf');
-	return 0;
-}
+
+my ($err,@c) = FileRead({FileName  => 'configDB.conf', 
+                           ForceType => "file"}); 
+return 0 if ($err);
 
 my @config;
-while (<CONFIG>){
-   my $line = $_;
+
+foreach my $line (@c) {
    $line =~ s/^\s+|\s+$//g; # remove whitespaces etc.
    $line =~ s/;$/;;/;       # duplicate ; at end-of-line
    push (@config,$line) if($line !~ m/^#/ && length($line) > 0);
 }
-close CONFIG;
+
+
+#while (<CONFIG>){
+#   my $line = $_;
+#   $line =~ s/^\s+|\s+$//g; # remove whitespaces etc.
+#   $line =~ s/;$/;;/;       # duplicate ; at end-of-line
+#   push (@config,$line) if($line !~ m/^#/ && length($line) > 0);
+#}
+#close CONFIG;
 
 use vars qw(%configDB);
 
@@ -461,6 +471,7 @@ sub cfgDB_SaveCfg(;$) {
 				$def = "";
 			}
 			push @rowList, "define $d $defs{$d}{TYPE} $def";
+			push @rowList, "setuuid $d $defs{$d}{FUUID}" if (defined($defs{$d}{FUUID}) && $defs{$d}{FUUID});
 		}
 
 		foreach my $a (sort {
@@ -1029,7 +1040,8 @@ sub _cfgDB_Search($$;$) {
 	push @result, "--------------------------------------------------------------------------------";
 	while (@line = $sth->fetchrow_array()) {
 		$row = "$line[0] $line[1] $line[2] $line[3]";
-		push @result, "$row";
+		Log 5,"configDB: $row";
+		push @result, "$row" unless ($line[0] eq 'setuuid');
 	}
 	$fhem_dbh->disconnect();
 	$ret = join("\n", @result);
