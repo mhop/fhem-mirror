@@ -209,9 +209,8 @@ my ($err,@config);
 
 ($err,@config) = FileRead({FileName  => 'configDB.conf', 
                            ForceType => "file"}); 
-if $err {
-   return 0;
-}
+
+return 0 if ($err);
 
 use Data::Dumper;
 print Dumper @config;
