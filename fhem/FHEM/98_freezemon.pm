@@ -330,10 +330,10 @@ sub freezemon_ProcessTimer($) {
 
             my %nd = map { $_ => 1 } @newdev;
             foreach my $d (@olddev) {
-                if ( !exists( $nd{$d} ) ) {
+                if (!exists( $nd{$d} ) ) {
 
                     my @a = split( ":", $d );
-                    if ( exists( $id{ $a[1] } ) ) {
+                    if ( exists( $id{ $a[1] } ) ) 	{
                         $idevFlag = $a[1];
                     }
                     else {
@@ -869,7 +869,7 @@ sub freezemon_apptime($) {
                     ( $shortarg, undef ) = split( /:|;/, $shortarg, 2 );
                 }
 
-                $shortarg = "" unless defined($shortarg);
+                $shortarg = "N/A" unless defined($shortarg);
                 $ret .= ":" . $shortarg . " ";
 
                 #Log3 $name, 5, "Freezemon: found a prioQueue, returning $ret";
