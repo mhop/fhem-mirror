@@ -212,9 +212,9 @@ my ($err,@config);
 
 return 0 if ($err);
 
-@config = map { $_ =~ s/^\s+|\s+$//g; }        @config;
-@config = map { $_ =~ s/;$/;;/;}               @config;
-@config = map { $_ ? $_ : () } @config;
+@config = map { $_ =~ s/^\s+|\s+$//g; } @config;
+@config = map { $_ =~ s/;$/;;/;} @config;
+@config = map { $_ ? $_ : (); } @config;
 
 use Data::Dumper;
 print Dumper @config;
