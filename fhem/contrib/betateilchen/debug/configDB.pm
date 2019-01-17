@@ -469,7 +469,7 @@ sub cfgDB_SaveCfg(;$) {
 				$def = "";
 			}
 			push @rowList, "define $d $defs{$d}{TYPE} $def";
-			push @rowList, "setuuid $d $defs{$d}{uuid}" if (defined($defs{$d}{uuid}) && $defs{$d}{uuid});
+			push @rowList, "setuuid $d $defs{$d}{FUUID}" if (defined($defs{$d}{FUUID}) && $defs{$d}{FUUID});
 		}
 
 		foreach my $a (sort {
