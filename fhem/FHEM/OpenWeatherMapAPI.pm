@@ -48,6 +48,7 @@ eval "use Encode qw(encode_utf8);1" or $missingModul .= "Encode ";
 # use Data::Dumper;    # for Debug only
 ## API URL
 use constant URL => 'https://api.openweathermap.org/data/2.5/';
+use constant VERSION => '0.2.2';
 ## URL . 'weather?' for current data
 ## URL . 'forecast?' for forecast data
 
@@ -297,17 +298,17 @@ sub _ProcessingRetrieveData($$) {
                         ),
                         'humidity' => $data->{main}->{humidity},
                         'condition' =>
-                        encode_utf8( $data->{weather}->[0]->{description} ),
+                            encode_utf8( $data->{weather}->[0]->{description} ),
                         'pressure' =>
-                        int( sprintf( "%.1f", $data->{main}->{pressure} ) + 0.5 ),
+                            int( sprintf( "%.1f", $data->{main}->{pressure} ) + 0.5 ),
                         'wind' =>
-                        int( sprintf( "%.1f", ($data->{wind}->{speed} * 3.6) ) + 0.5 ),
+                            int( sprintf( "%.1f", ($data->{wind}->{speed} * 3.6) ) + 0.5 ),
                         'wind_speed' =>
-                        int( sprintf( "%.1f", ($data->{wind}->{speed} * 3.6) ) + 0.5 ),
+                            int( sprintf( "%.1f", ($data->{wind}->{speed} * 3.6) ) + 0.5 ),
                         'wind_direction' => $data->{wind}->{deg},
                         'cloudCover'     => $data->{clouds}->{all},
                         'visibility' =>
-                        int( sprintf( "%.1f", $data->{visibility} ) + 0.5 ),
+                            int( sprintf( "%.1f", $data->{visibility} ) + 0.5 ),
                         'code'       => $codes{ $data->{weather}->[0]->{id} },
                         'iconAPI'    => $data->{weather}->[0]->{icon},
                         'sunsetTime' => strftime(
@@ -485,6 +486,7 @@ sub _CreateForecastRef($) {
             long => $self->{long},
             apiMaintainer =>
 'Leon Gaultier (<a href=https://forum.fhem.de/index.php?action=profile;u=13684>CoolTux</a>)',
+            apiVersion => VERSION,
         }
     );
 

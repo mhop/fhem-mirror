@@ -44,6 +44,7 @@ eval "use Encode qw(encode_utf8);1" or $missingModul .= "Encode ";
 # use Data::Dumper;    # for Debug only
 ## API URL
 use constant URL => 'https://api.darksky.net/forecast/';
+use constant VERSION => '0.2.4';
 
 my %codes = (
     'clear-day'           => 32,
@@ -250,7 +251,7 @@ sub _ProcessingRetrieveData($$) {
                         "%a, %e %b %Y %H:%M",
                         localtime( $data->{currently}->{'time'} )
                     ),
-                    'precipProbability' => $data->{currently}->{precipProbability},
+                    'precipProbability' => $data->{currently}->{precipProbability} * 100,
                     'apparentTemperature' => int(
                         sprintf(
                             "%.1f", $data->{currently}->{apparentTemperature}
@@ -414,11 +415,11 @@ sub _ProcessingRetrieveData($$) {
                             }
                         );
 
-                        $self->{cached}->{forecast}->{daily}[$i]{precipIntensityMax} = $data->{daily}->{data}->[$i]->{precipIntensityMax} if ( defined($data->{daily}->{data}->[$i]->{precipIntensityMax}) );       
-                        $self->{cached}->{forecast}->{daily}[$i]{precipIntensity} = $data->{daily}->{data}->[$i]->{precipIntensity} if ( defined($data->{daily}->{data}->[$i]->{precipIntensity}) );  
-                        $self->{cached}->{forecast}->{daily}[$i]{precipProbability} = $data->{daily}->{data}->[$i]->{precipProbability} if ( defined($data->{daily}->{data}->[$i]->{precipProbability}) );
-                        $self->{cached}->{forecast}->{daily}[$i]{precipType} = $data->{daily}->{data}->[$i]->{precipType} if ( defined($data->{daily}->{data}->[$i]->{precipType}) );
-                        $self->{cached}->{forecast}->{daily}[$i]{precipIntensityMaxTime} = strftime("%a, %e %b %Y %H:%M",localtime($data->{daily}->{data}->[$i]->{precipIntensityMaxTime}) ) if ( defined($data->{daily}->{data}->[$i]->{precipIntensityMaxTime}) );
+                        $self->{cached}->{forecast}->{daily}[$i]{precipIntensityMax} = ( defined($data->{daily}->{data}->[$i]->{precipIntensityMax}) ? $data->{daily}->{data}->[$i]->{precipIntensityMax} : '-' );
+                        $self->{cached}->{forecast}->{daily}[$i]{precipIntensity} = ( defined($data->{daily}->{data}->[$i]->{precipIntensity}) ? $data->{daily}->{data}->[$i]->{precipIntensity} : '-' );  
+                        $self->{cached}->{forecast}->{daily}[$i]{precipProbability} = ( defined($data->{daily}->{data}->[$i]->{precipProbability}) ? $data->{daily}->{data}->[$i]->{precipProbability} * 100 : '-' );
+                        $self->{cached}->{forecast}->{daily}[$i]{precipType} = ( defined($data->{daily}->{data}->[$i]->{precipType}) ? $data->{daily}->{data}->[$i]->{precipType} : '-' );
+                        $self->{cached}->{forecast}->{daily}[$i]{precipIntensityMaxTime} = ( defined($data->{daily}->{data}->[$i]->{precipIntensityMaxTime}) ? strftime("%a, %e %b %Y %H:%M",localtime($data->{daily}->{data}->[$i]->{precipIntensityMaxTime}) ) : '-' );
 
                         $i++;
                     }
@@ -456,16 +457,12 @@ sub _ProcessingRetrieveData($$) {
                                     'ozone' => $data->{hourly}->{data}->[$i]->{ozone},
                                     'uvIndex' =>
                                     $data->{hourly}->{data}->[$i]->{uvIndex},
-                                    'precipIntensity' =>
-                                    $data->{hourly}->{data}->[$i]->{precipIntensity},
                                     'dewPoint' => sprintf( "%.1f",
                                             $data->{hourly}->{data}->[$i]->{dewPoint} ),
                                     'humidity' =>
                                     $data->{hourly}->{data}->[$i]->{humidity} * 100,
                                     'cloudCover' =>
                                     $data->{hourly}->{data}->[$i]->{cloudCover} * 100,
-                                    'precipType' =>
-                                    $data->{hourly}->{data}->[$i]->{precipType},
                                     'wind_direction' =>
                                     $data->{hourly}->{data}->[$i]->{windBearing},
                                     'wind' => int(
@@ -483,14 +480,17 @@ sub _ProcessingRetrieveData($$) {
                                             ($data->{hourly}->{data}->[$i]->{windGust} * 3.6) )
                                         + 0.5
                                     ),
-                                    'precipProbability' =>
-                                    $data->{hourly}->{data}->[$i]->{precipProbability},
+                                    
                                     'pressure' => sprintf( "%.1f",
                                             $data->{hourly}->{data}->[$i]->{pressure} ),
                                     'visibility' => sprintf( "%.1f",
                                             $data->{hourly}->{data}->[$i]->{visibility} ),
                                 }
                             );
+
+                            $self->{cached}->{forecast}->{hourly}[$i]{precipIntensity} = ( defined($data->{hourly}->{data}->[$i]->{precipIntensity}) ? $data->{hourly}->{data}->[$i]->{precipIntensity} : '-' );  
+                            $self->{cached}->{forecast}->{hourly}[$i]{precipProbability} = ( defined($data->{hourly}->{data}->[$i]->{precipProbability}) ? $data->{hourly}->{data}->[$i]->{precipProbability} * 100 : '-' );
+                            $self->{cached}->{forecast}->{hourly}[$i]{precipType} = ( defined($data->{hourly}->{data}->[$i]->{precipType}) ? $data->{hourly}->{data}->[$i]->{precipType} : '-' );
 
                             $i++;
                         }
@@ -530,6 +530,7 @@ sub _CreateForecastRef($) {
             long => $self->{long},
             apiMaintainer =>
 'Leon Gaultier (<a href=https://forum.fhem.de/index.php?action=profile;u=13684>CoolTux</a>)',
+            apiVersion => VERSION,
         }
     );
 
