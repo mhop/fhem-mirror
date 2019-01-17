@@ -500,27 +500,8 @@ isday</pre>
 
   <b>Attributes</b><br>
   <ul>
-    <a name="latitude"></a>
-    <li>latitude<br>
-      If set, this latitude is used to calculate sunset/sunrise<br>
-      Notation need to be in decimal format (for example Berlin = 52.666)
-      As default Frankfurt/Main, Germany (50.112) is used.
-      </li><br>
-    <a name="longitude"></a>
-    <li>longitude<br>
-        If set, this longitude is used to calculate sunset/sunrise<br>
-        Notation need to be in decimal format (for example Berlin = 13.400)
-        As default Frankfurt/Main, Germany (8.686) is used.
-        </li><br>
-    <a name="altitude"></a>
-    <li>altitude<br>
-        Used by other modules.
-        </li><br>
-    Note: these are global attributes, e.g.<br>
-    <ul>
-      attr global latitude 50.112<br>
-      attr global longitude 8.686<br>
-    </ul>
+    <li><a href="#latitude">latitude</a></li>
+    <li><a href="#longitude">longitude</a></li>
   </ul><br>
 
 </ul>
@@ -532,10 +513,8 @@ isday</pre>
 <a name="SUNRISE_EL"></a>
 <h3>SUNRISE_EL</h3>
 <ul>
-    <p>
-        <strong>SUNRISE_EL</strong> definiert eine Reihe von Perl-Subroutinen (<abbr>z.B.</abbr> zur Nutzung mit <a href="#at">at</a>):
-    </p>
-
+    SUNRISE_EL definiert eine Reihe von Perl-Subroutinen (z.B. zur Nutzung mit
+    <a href="#at">at</a>):
     <ul>
         <li><code>sunrise()</code> - absolute Zeit des n&auml;chsten
         Sonnenaufgangs (+ 24 h, wenn am n&auml;chsten Tag)</li>
@@ -565,305 +544,155 @@ isday</pre>
     </ul>
 
     <h4>Breite, L&auml;nge und H&ouml;henwinkel</h4>
-    <p>
-        Bevor du <strong>SUNRISE_EL</strong> verwendest, solltest du im <a href="#global">global-Device</a> die
-        Werte f&uuml;r <span>latitude</span> (geographische Breite) und <span>longitude</span> (geographische L&auml;nge) entsprechend
+        Bevor du SUNRISE_EL verwendest, solltest du im <a href="#global">global-Device</a> die
+        Werte f&uuml;r latitude (geographische Breite) und longitude (geographische L&auml;nge) entsprechend
         deines Standorts setzen.
-    </p>
+    
     <div>
-        <h4>Exkurs: <span>latitude</span> &amp; <span>longitude</span> ermitteln</h4>
-        <p>
-            Deine geopgragischen Koordinaten kannst du <abbr>z.B.</abbr> mit <a href="https://maps.google.com">Google Maps</a> bestimmen.
-            Dazu setzt du einen Punkt auf der Karte und findest dann im unteren Bereich der Karte die Angabe f&uuml;r beide Werte.
-            Der erste Wert ist die geographische Breite (<span>latitude</span>); der zweite Wert die geographische L&auml;nge
-            (<span>longitude</span>).
-        </p>
-        <p>
-            Der <span>Default</span>-Wert ist 50.112, 8.686 (<a href="https://goo.gl/maps/vkyedDL1DJp">Frankfurt am Main</a>).
-        </p>
+        Die Voreinstellung ist 50.112, 8.686, Frankfurt am Main).
     </div>
-    <p>
-        <strong>SUNRISE_EL</strong> geht von einem H&ouml;henwinkel der Sonne bezogen zum Horizont, <var>h</var>, von -6&deg; aus. Dieser Wert bedeutet,
-        dass die Sonne 6&deg; <strong>unter</strong> dem Horizont steht und Lesen im Freien ohne k&uuml;nstliche Beleuchtung nicht
-        mehr m&ouml;glich ist (<span>civil twilight</span>, b&uuml;rgerliche D&auml;mmerung).
-        <strong>SUNRISE_EL</strong> speichert diesen Wert in <var><code>$defaultaltit</code></var>.
-    </p>
-    <p>
-        Siehe auch <a href="http://search.cpan.org/~jforget/DateTime-Event-Sunrise-0.0505/lib/DateTime/Event/Sunrise.pm">perldoc DateTime::Event::Sunrise</a> f&uuml;r
-        weitere Hinweise.
-    </p>
+    
+    SUNRISE_EL geht von einem H&ouml;henwinkel der Sonne bezogen zum Horizont,
+    h, von -6&deg; aus. Dieser Wert bedeutet, dass die Sonne 6&deg; unter dem
+    Horizont steht und Lesen im Freien ohne k&uuml;nstliche Beleuchtung nicht
+    mehr m&ouml;glich ist (civil twilight, b&uuml;rgerliche D&auml;mmerung).
+    SUNRISE_EL speichert diesen Wert in <code>$defaultaltit</code>.
 
-    <h4>Befehlsreferenz</h4>
+    Siehe auch <a href="http://search.cpan.org/~jforget/DateTime-Event-Sunrise-0.0505/lib/DateTime/Event/Sunrise.pm">perldoc DateTime::Event::Sunrise</a> f&uuml;r
+    weitere Hinweise.
+
+
     <h5>Parameter</h5>
-    <p>
-        Jede der folgenden Funktionen akzeptiert bis zu vier (<abbr>bzw.</abbr> f&uuml;nf) Parameter in der angegebenen Reihenfolge:
-    </p>
-    <dl>
-        <dt>
-            <var>unix timestamp</var>
-        </dt>
-        <dd>
-            <p>
-                <strong>Ausschlie&szlig;lich</strong> <code>sunrise_abs_dat()</code> &amp; <code>sunset_abs_dat()</code>
-                erwarten als ersten Parameter  einen Unix-Timestamp (Unix-Epoche) in Sekunden, der ein Datum spezifiziert. Andere Subroutinen
-                erwarten diesen Parameter nicht!
-            </p>
-        </dd>
-        <dt>
-            <var>altitude</var>
-        </dt>
-        <dd>
-            <p>
-                Eine der folgenden Zeichenketten, die unterschiedliche H&ouml;henwinkel <var>h</var> definieren und den Wert
-                von <code><var>$defaultaltit</var></code> ver&auml;ndern.
-            </p>
-            <p>
-                Erlaubte Werte sind:
-            </p>
-            <ul>
-                <li>
-                    <code><var>REAL</var></code>, <var>h</var> = 0&deg;,
-                </li>
-                <li>
-                    <code><var>CIVIL</var></code>, <var>h</var> = -6&deg;,
-                </li>
-                <li>
-                    <code><var>NAUTIC</var></code>, <var>h</var> = -12&deg;,
-                </li>
-                <li>
-                    <code><var>ASTRONOMIC</var></code>, <var>h</var> = -18&deg;,
-                </li>
-                <li>
-                    oder <code><var>HORIZON=</var></code>, gefolgt von einer positiven oder negativen Zahl ohn Gradzeichen, die einen H&ouml;henwinkel
-                    angibt.
-                </li>
-            </ul>
-        </dd>
-        <dt>
-            <var>offset</var>
-        </dt>
-        <dd>
-            <p>
-                <span>Offset</span> in Sekunden, der zu dem R&uuml;ckgabewert der Funktion addiert wird.
-            </p>
-            <p>
-                <code>isday()</code>
-                ignoriert diesen Wert.
-            </p>
-        </dd>
-        <dt>
-            <var>min</var>
-        </dt>
-        <dd>
+    Jede der folgenden Funktionen akzeptiert bis zu vier (bzw. f&uuml;nf)
+    Parameter in der angegebenen Reihenfolge:
+    <ul>
+      <li>unix timestamp<br>
+        Ausschlie&szlig;lich <code>sunrise_abs_dat()</code> &amp;
+        <code>sunset_abs_dat()</code> erwarten als ersten Parameter  einen
+        Unix-Timestamp (Unix-Epoche) in Sekunden, der ein Datum spezifiziert.
+        Andere Subroutinen erwarten diesen Parameter nicht!
+        </li></br>
 
-            <p>
-                Einen Zeitstempel im Format <var>hh:mm</var>, vor dem keine Aktion ausgef&uuml;hrt werden soll.
-            </p>
-            <p>
-                <code>isday()</code> wird <var>(int) 0</var> zur&uuml;ckliefern, wenn <var>min</var> gesetzt
-                und der aktuelle Zeitstempel kleiner ist.
-            </p>
-        </dd>
-        <dt>
-            <var>max</var>
-        </dt>
-        <dd>
-            <p>
-                Einen Zeitstempel im Format <var>hh:mm</var>, nach dem keine Aktion ausgef&uuml;hrt werden soll.
-            </p>
-            <p>
-                <code>isday()</code> wird <var>(int) 0</var> zur&uuml;ckliefern, wenn <var>max</var> gesetzt
-                und der aktuelle Zeitstempel gr&ouml;&szlig;er ist.
-            </p>
-        </dd>
-    </dl>
+      <li>altitude<br>
+        Eine der folgenden Zeichenketten, die unterschiedliche H&ouml;henwinkel h definieren und den Wert
+        von <code>$defaultaltit</code> ver&auml;ndern.<br>
+        Erlaubte Werte sind:<br>
+        <ul>
+           <li><code>REAL</code>, h = 0&deg;,
+             </li>
+           <li><code>CIVIL</code>, h = -6&deg;,
+             </li>
+           <li><code>NAUTIC</code>, h = -12&deg;,
+             </li>
+           <li><code>ASTRONOMIC</code>, h = -18&deg;,
+             </li>
+           <li>oder <code>HORIZON=</code>, gefolgt von einer positiven oder
+             negativen Zahl ohn Gradzeichen, die einen H&ouml;henwinkel angibt.
+             </li>
+        </ul>
+        </li></br>
+
+      <li>offset<br>
+        Offset in Sekunden, der zu dem R&uuml;ckgabewert der Funktion addiert
+        wird.<br>
+        <code>isday()</code> ignoriert diesen Wert.
+        </li></br>
+
+      <li>min<br>
+        Einen Zeitstempel im Format hh:mm, vor dem keine Aktion ausgef&uuml;hrt
+        werden soll.  <code>isday()</code> wird (int) 0 zur&uuml;ckliefern,
+        wenn min gesetzt und der aktuelle Zeitstempel kleiner ist.
+        </li><br>
+
+      <li>max<br>
+        Einen Zeitstempel im Format hh:mm, nach dem keine Aktion
+        ausgef&uuml;hrt werden soll.  <code>isday()</code> wird (int) 0
+        zur&uuml;ckliefern, wenn max gesetzt und der aktuelle Zeitstempel
+        gr&ouml;&szlig;er ist.
+        </li>
+    </ul>
 
     <h5>Subroutinen</h5>
-    <dl>
+    <ul>
+      <li><code>sunrise(), sunset()</code><br>
+        liefern den absoluten Wert des n&auml;chsten Sonnenauf- bzw.
+        -untergangs zur&uuml;ck, wobei 24 Stunden zu diesem Wert addiert
+        werden, wenn der Zeitpunkt am n&auml;chsten Tag sein wird, im Format
+        hh:mm:ss.
+        </li><br>
 
-        <dt>
-            <p><code>sunrise(), sunset()</code></p>
-        </dt>
-        <dd>
-            liefern den absoluten Wert des n&auml;chsten Sonnenauf- <abbr>bzw.</abbr> -untergangs zur&uuml;ck, wobei 24 Stunden zu
-            diesem Wert addiert werden,
-            wenn der Zeitpunkt am n&auml;chsten Tag sein wird, im Format <var>hh:mm:ss</var>.
-        </dd>
+      <li><code>sunrise_rel(), sunset_rel()</code><br>
+        liefern die relative Zeit bis zum n&auml;chsten Sonnenauf- bzw.
+        -untergang im Format hh:mm:ss.
+        </li><br>
+        
+      <li><code>sunrise_abs(), sunset_abs()</code><br>
+        liefern den n&auml;chsten absoluten Zeitpunkt des n&auml;chsten
+        Sonnenauf- bzw. -untergangs ohne 24 Stunden zu addieren im Format
+        hh:mm:ss.
+        </li><br>
+        
+      <li><code>sunrise_abs_dat(), sunset_abs()_dat</code><br>
+        liefern den n&auml;chsten absoluten Zeitpunkt des n&auml;chsten
+        Sonnenauf- bzw. -untergangs ohne 24 Stunden zu addieren im Format
+        hh:mm:ss zu einem als ersten Parameter angegebenen Datum.
+        </li><br>
 
-        <dt>
-            <p><code>sunrise_rel(), sunset_rel()</code></p>
-        </dt>
-        <dd>
-            liefern die relative Zeit bis zum n&auml;chsten Sonnenauf- <abbr>bzw.</abbr> -untergang im Format
-            <var>hh:mm:ss</var>.
-        </dd>
+      <li><code>isday()</code><br>
+        liefert (int) 1 wenn Tag ist, (int) 0 wenn Nacht ist.
+        </li><br>
+    </ul>
 
-        <dt>
-            <p><code>sunrise_abs(), sunset_abs()</code></p>
-        </dt>
-        <dd>
-            liefern den n&auml;chsten absoluten Zeitpunkt des n&auml;chsten Sonnenauf- <abbr>bzw.</abbr> -untergangs
-            <strong>ohne</strong> 24 Stunden
-            zu addieren im Format <var>hh:mm:ss</var>.
-        </dd>
-
-        <dt>
-            <p><code>sunrise_abs_dat(), sunset_abs()_dat</code></p>
-        </dt>
-        <dd>
-            liefern den n&auml;chsten absoluten Zeitpunkt des n&auml;chsten Sonnenauf- <abbr>bzw.</abbr> -untergangs
-            <strong>ohne</strong> 24 Stunden zu addieren im Format <var>hh:mm:ss</var> zu einem als ersten Parameter angegebenen Datum.
-        </dd>
-
-
-        <dt>
-            <p><code>isday()</code></p>
-        </dt>
-        <dd>
-            liefert <var>(int) 1</var> wenn Tag ist, <var>(int) 0</var> wenn Nacht ist.
-        </dd>
-    </dl>
     <h5>Beispiele</h5>
-    <dl>
-        <dt>
-            <p>
-                <code>sunrise("CIVIL");</code>
-            </p>
-        </dt>
-        <dd>
-            <p>
-                Zeitpunkt des Sonnenaufgangs bei einem H&ouml;henwinkel der Sonne von -6&deg; unter dem Horizont (identisch zu <code>sunrise()</code>).
-            </p>
+    <ul>
+        <li><code>sunrise("CIVIL");</code><br>
+          Zeitpunkt des Sonnenaufgangs bei einem H&ouml;henwinkel der Sonne von
+          -6&deg; unter dem Horizont (identisch zu <code>sunrise()</code>).
+          </li><br>
+            
+        <li><code>sunset("HORIZON=-3");</code><br>
+          Zeitpunkt des Sonnenuntergangs bei einem H&ouml;henwinkel der Sonne
+          von 3&deg; unter dem Horizont (zwischen <code>REAL</code> und
+          <code>CIVIL</code>).
+          </li><br>
+      
+        <li><code>sunset("HORIZON=1");</code><br>
+          Zeitpunkt des Sonnenaufgangs bei einem H&ouml;henwinkel der Sonne von
+          1&deg; &uuml;ber dem Horizont.
+          </li><br>
+            
+        <li><code>defmod a15 at *{sunset("REAL",0,"18:00","21:00")} set lamp1 on</code><br>
+          Schalte lamp1 an, sobald die Sonne unter den Horizont sinkt (h &le;
+          0), jedoch nicht vor 18:00 und nicht nach 21:00.
+          </li><br>
 
-        </dd>
-
-        <dt>
-            <p>
-                <code>sunset("HORIZON=-3");</code>
-            </p>
-        </dt>
-        <dd>
-            <p>
-                Zeitpunkt des Sonnenuntergangs bei einem H&ouml;henwinkel der Sonne von 3&deg; unter dem Horizont
-                (zwischen <code><var>REAL</var></code> und <code><var>CIVIL</var></code>).
-            </p>
-
-        </dd>
-
-        <dt>
-            <p>
-                <code>sunset("HORIZON=1");</code>
-            </p>
-        </dt>
-        <dd>
-            <p>
-                Zeitpunkt des Sonnenaufgangs bei einem H&ouml;henwinkel der Sonne von 1&deg; &uuml;ber dem Horizont.
-            </p>
-        </dd>
-
-        <dt>
-            <p>
-                <code>defmod a15 at *{sunset("REAL",0,"18:00","21:00")} set lamp1 on</code>
-            </p>
-        </dt>
-        <dd>
-            <p>
-                Schalte <var>lamp1</var> an, sobald die Sonne unter den Horizont sinkt (<var>h &le; 0</var>), jedoch nicht vor 18:00 und nicht nach 21:00.
-            </p>
-        </dd>
-
-        <dt>
-            <p>
-                <code>
-                    my $date = time() + 7*86400;<br />
-                    sunrise_abs_dat($date);
-                </code>
-            </p>
-        </dt>
-        <dd>
-            <p>
-                Berechne den Sonnenaufgang von heute + sieben Tage.
-            </p>
-        </dd>
-
-        <dt>
-            <p>
-                <code>
-                    my $date = time() + 7*86400;<br />
-                    sunrise_abs_dat($date, "CIVIL");
-                </code>
-            </p>
-        </dt>
-        <dd>
-            <p>
-                Berechne den Sonnenaufgang von heute + sieben Tage mit einem H&ouml;henwinkel <var>h = -6&deg;</var>.
-            </p>
-        </dd>
-    </dl>
+        <li><code>sunrise_abs_dat(time() + 7*86400);</code><br>
+          Berechne den Sonnenaufgang von heute + sieben Tage.
+          </li></br>
+            
+        <li><code>sunrise_abs_dat(time() + 7*86400, "CIVIL");</code><br>
+          Berechne den Sonnenaufgang von heute + sieben Tage mit einem
+          H&ouml;henwinkel h = -6&deg;.
+          </li></br>
+    </ul>
 
     <h4>Define</h4>
-    <blockquote>
-        <strong>SUNRISE_EL</strong> kann nicht explizit als <span>Device</span> definiert werden,
+        SUNRISE_EL kann nicht explizit als Device definiert werden,
         sondern bietet die oben genannten Subroutinen.
-    </blockquote>
-
+    
     <h4>Set</h4>
-    <blockquote>
-        <strong>SUNRISE_EL</strong> unterst&uuml;tzt <var>set</var> nicht.
-    </blockquote>
-
+        SUNRISE_EL unterst&uuml;tzt set nicht.
+    
     <h4>Get</h4>
-    <blockquote>
-        <strong>SUNRISE_EL</strong> unterst&uuml;tzt <var>get</var> nicht.
-    </blockquote>
+        SUNRISE_EL unterst&uuml;tzt get nicht.
 
     <h4>Attribute</h4>
-    <p>
-        Diese Attribute m&uuml;ssen im <span><a href="#global">global</a>-Device</span> gesetzt werden!
-    </p>
-    <dl>
-        <dt>
-            <p>
-                <var>latitude</var>
-            </p>
-        </dt>
-        <dd>
-            <blockquote>
-                Geographische Breite in Dezimalgrad in Form eines <code>float</code>, <abbr>z.B</abbr> <code><var>49.872471</var></code>.
-            </blockquote>
-            <blockquote>
-                <span>Default</span>-Wert ist <code><var>50.112</var></code>.
-            </blockquote>
-        </dd>
-
-        <dt>
-            <p>
-                <var>longitude</var>
-            </p>
-        </dt>
-        <dd>
-            <blockquote>
-                Geographische L&auml;nge in Dezimalgrad in Form eines <code>float</code>, <abbr>z.B</abbr> <code><var>8.650991</var></code>.
-            </blockquote>
-            <blockquote>
-                <span>Default</span>-Wert ist <code><var>8.686</var></code>.
-            </blockquote>
-        </dd>
-
-        <dt>
-            <p>
-                <var>altitude</var>
-            </p>
-        </dt>
-        <dd>
-            <blockquote>
-                H&ouml;henwinkel <var>h</var> der Sonne bezogen auf den Horizont in Grad in Form einer Zahl ohne Gradzeichen.
-            </blockquote>
-            <blockquote>
-                <span>Default</span>-Wert ist <code><var>-6</var></code>.
-            </blockquote>
-        </dd>
-    </dl>
+        Diese Attribute m&uuml;ssen im <a href="#global">global</a>-Device
+        gesetzt werden!
+      <ul>
+        <li><a href="#latitude">latitude</a></li>
+        <li><a href="#longitude">longitude</a></li>
+      </ul>
 </ul>
 
 =end html_DE
