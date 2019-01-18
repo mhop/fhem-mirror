@@ -1,0 +1,35 @@
+##############################################
+# $Id$
+
+# Display the measured temp and the setpoint (valve position).
+# FileLog definition: 
+# define FileLog_device FileLog ./log/device-%Y.log device
+#
+# Logfile record example:
+# 2015-10-17_08:38:08 device temperature: 17.4
+# 2015-10-17_08:38:08 device setpoint: 45
+
+# Attribute 'small' is useful for gnuplot/-scroll only,
+# if plotsize is less than 800,400
+#set terminal png transparent small size <SIZE> crop
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set ytics
+set title '<TL>'
+set grid xtics ytics
+set ylabel "t/C"
+set y2label "setpoint/%"
+set y2range [0:100]
+
+#FileLog 4:temperature\x3a:0:
+#FileLog 4:setpointTemp\x3a:0:
+#FileLog 4:feedTemp\x3a:0:
+#FileLog 4:setpoint\x3a:0:
+
+plot "<IN>" using 1:2 ls l3 axes x1y1 title 'Temperature' with lines,\
+     "<IN>" using 1:2 ls l0 axes x1y1 title 'Setpoint Temperature' with steps,\     
+     "<IN>" using 1:2 ls l1 axes x1y1 title 'Feed Temperature' with lines,\
+     "<IN>" using 1:2 ls l2fill axes x1y2 title 'Setpoint' with steps
