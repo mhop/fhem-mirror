@@ -432,6 +432,7 @@ sub Weather_Define($$) {
     $hash->{INTERVAL}     = $interval;
     $hash->{LANG}         = ( (defined($lang) and $lang) ? $lang : lc(AttrVal('global','language','de')) );
     $hash->{API}          = $api;
+    $hash->{MODEL}        = $api;
     $hash->{APIKEY}       = $apikey;
     $hash->{APIOPTIONS}   = $apioptions;
     $hash->{READINGS}->{current_date_time}->{TIME}= TimeNow();

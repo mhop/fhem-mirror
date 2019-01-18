@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  59_Weather: add Internal MODEL for statistic
   - feature: 70_BRAVIA: new set command openUrl
   - bugfix:  59_Weather: fix change attribut model
   - bugfix:  98_livetracking: fixed initial Life360 data availability
