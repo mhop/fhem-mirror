@@ -65,6 +65,7 @@ sub FileRead($);
 sub FileWrite($@);
 sub FmtDateTime($);
 sub FmtTime($);
+sub GetDefAndAttr($;$);
 sub GetLogLevel(@);
 sub GetTimeSpec($);
 sub GetType($;$);
@@ -1619,13 +1620,15 @@ GetDefAndAttr($;$)
   push @ret, "setuuid $d $defs{$d}{FUUID}"
         if($dumpFUUID && defined($defs{$d}{FUUID}) && $defs{$d}{FUUID});
 
+# exclude attributes, format <deviceName>:<attrName>, space separated list
+  my @dontSave = qw(configdb:rescue configdb:nostate configdb:loadversion 
+                    global:configfile global:version);
   foreach my $a (sort {
                    return -1 if($a eq "userattr"); # userattr must be first
                    return  1 if($b eq "userattr");
                    return $a cmp $b;
                  } keys %{$attr{$d}}) {
-    next if($d eq "global" &&
-            ($a eq "configfile" || $a eq "version"));
+    next if (grep { $_ eq "$d:$a" } @dontSave);
     my $val = $attr{$d}{$a};
     $val =~ s/;/;;/g;
     $val =~ s/\n/\\\n/g;
