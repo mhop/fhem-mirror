@@ -57,6 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Versions History intern
 our %DbRep_vNotesIntern = (
+  "8.9.10" => "18.01.2019  fix warnings Malformed UTF-8 character during importFromFile, Forum:#96056 ",
   "8.9.9"  => "06.01.2019  diffval_DoParse: 'ORDER BY TIMESTAMP' added to statements Forum:https://forum.fhem.de/index.php/topic,53584.msg882082.html#msg882082",
   "8.9.8"  => "27.11.2018  minor fix in deviceRename, commandref revised ",
   "8.9.7"  => "21.11.2018  DbRep_firstconnect now uses attribute \"timeout\" ",
@@ -5362,8 +5363,8 @@ sub impfile_Push($) {
  $infile    =~ s/%TSB/$rsf/g;
  my @t = localtime;
  $infile = ResolveDateWildcards($infile, @t);
- if (open(FH, "<:utf8", "$infile")) {
-     binmode (FH) if(!$utf8);
+ if (open(FH, "<", "$infile")) {
+     binmode (FH);
  } else {
      $err = encode_base64("could not open ".$infile.": ".$!,"");
      return "$name|''|''|$err|''";
