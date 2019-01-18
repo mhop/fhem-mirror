@@ -1704,6 +1704,10 @@ netatmo_getDeviceDetail($$)
     return $device if( $device->{_id} eq $id );
   }
 
+  Log3 $name, 4, "$name getDeviceDetail not found";
+  netatmo_getDevices($hash,1);
+  netatmo_getHomecoachs($hash,1);
+
   return undef;
 }
 sub
@@ -5489,7 +5493,7 @@ netatmo_parseAddress($$)
   Log3 $name, 4, "$name: parseAddress";
   
   if( $json ) {
-    Log3 $name, 2, "$name: ".Dumper($json);
+    Log3 $name, 5, "$name: ".Dumper($json);
     #$hash->{status} = $json->{status};
     #$hash->{status} = $json->{error}{message} if( $json->{error} );
     if( defined($json) ) {
