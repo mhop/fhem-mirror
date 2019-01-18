@@ -143,6 +143,7 @@
 # 2018-09-08 - change    remove base64 migration functions
 #
 # 2019-01-17 - added     support for device specific uuid (setuuid)
+# 2019-01-18 - changed   use GetDefAndAttr()
 #
 ##############################################################################
 =cut
@@ -158,6 +159,7 @@ use MIME::Base64;
 # Forward declarations for functions in fhem.pl
 #
 sub AnalyzeCommandChain($$;$);
+sub GetDefAndAttr($;$);
 sub Log($$);
 sub Log3($$$);
 sub createUniqueId();
@@ -462,28 +464,7 @@ sub cfgDB_SaveCfg(;$) {
 			next;
 		}
 
-		if($d ne "global") {
-			my $def = $defs{$d}{DEF};
-			if(defined($def)) {
-				$def =~ s/;/;;/g;
-				$def =~ s/\n/\\\n/g;
-			} else {
-				$def = "";
-			}
-			push @rowList, "define $d $defs{$d}{TYPE} $def";
-			push @rowList, "setuuid $d $defs{$d}{FUUID}" if (defined($defs{$d}{FUUID}) && $defs{$d}{FUUID});
-		}
-
-		foreach my $a (sort {
-			return -1 if($a eq "userattr"); # userattr must be first
-			return  1 if($b eq "userattr");
-			return $a cmp $b;
-			} keys %{$attr{$d}}) {
-			next if (grep { $_ eq "$d:$a" } @dontSave);
-			my $val = $attr{$d}{$a};
-			$val =~ s/;/;;/g;
-			push @rowList, "attr $d $a $val";
-		}
+		push (@rowList, GetDefAndAttr($d,1));
 
 	}
 
