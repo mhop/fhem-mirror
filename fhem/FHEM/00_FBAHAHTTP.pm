@@ -282,6 +282,7 @@ FBAHAHTTP_Write($$$)
     return $ret if($ret);
     $sid = $hash->{".SID"};
   }
+  $fn =~ s/ //g;
   push(@{$hash->{CmdStack}}, "ain=$fn&switchcmd=$msg");
   FBAHAHTTP_ProcessStack($hash) if(@{$hash->{CmdStack}} == 1);
 }
