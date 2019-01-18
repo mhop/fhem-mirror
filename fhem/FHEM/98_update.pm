@@ -335,8 +335,10 @@ doUpdate($$$$)
     } else {
    
       my $isExcl;
-      foreach my $ex (@excl) {
-        $isExcl = 1 if($fName =~ m/$ex/ || "$src:$fName" =~ m/$ex/);
+      if(!$isCheck) { # Forum #95944
+        foreach my $ex (@excl) {
+          $isExcl = 1 if($fName =~ m/$ex/ || "$src:$fName" =~ m/$ex/);
+        }
       }
       my $fPath = "$root/$fName";
       $fPath = $0 if($fPath =~ m/$mainPgm/);
