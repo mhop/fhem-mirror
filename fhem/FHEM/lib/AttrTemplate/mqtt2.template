@@ -141,6 +141,16 @@ attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
 deletereading DEVICE .*
 attr DEVICE model L_06_zigbee2mqtt_ContactSensor
 
+name:L_07_zigbee2mqtt_TempHumHpaSensor
+desc: Temp/hum/hpa sensor via zigbee2mqtt <br>Tested with: Xiaomi Aquara WSDCGQ11LM Temperature Humidity Sensor
+filter:TYPE=MQTT2_DEVICE
+par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/](.*):, ? $1 : undef }
+attr DEVICE stateFormat {sprintf ("Temperature: %.1f°C Humidity: %.1f%% Pressure: %.1fhpa", ReadingsVal($name,"temperature",0), ReadingsVal($name,"humidity",0), ReadingsVal($name,"pressure",0)) }
+attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+deletereading DEVICE .*
+attr DEVICE model L_07_TempHumHpa_TempSensor
+
 ###########################################
 # TASMOTA
 # The regexp must handle
