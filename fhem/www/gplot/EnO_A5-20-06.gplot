@@ -27,9 +27,11 @@ set y2range [0:100]
 #FileLog 4:temperature\x3a:0:
 #FileLog 4:setpointTemp\x3a:0:
 #FileLog 4:feedTemp\x3a:0:
+#FileLog 4:roomTemp\x3a:0:
 #FileLog 4:setpoint\x3a:0:
 
 plot "<IN>" using 1:2 ls l3 axes x1y1 title 'Temperature' with lines,\
      "<IN>" using 1:2 ls l0 axes x1y1 title 'Setpoint Temperature' with steps,\     
      "<IN>" using 1:2 ls l1 axes x1y1 title 'Feed Temperature' with lines,\
+     "<IN>" using 1:2 ls l4 axes x1y1 title 'Room Temperature' with lines,\
      "<IN>" using 1:2 ls l2fill axes x1y2 title 'Setpoint' with steps
