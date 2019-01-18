@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 73_PRESENCE: new set command active/inactive to temporarily
+                          disable presence checks
   - bugfix:  DarkSkyAPI: fix reading values, add API Version
   - bugfix:  82_LGTV_WebOS: add SkyOnline at set commands
   - feature: 49_SSCam: 8.5.0, SVS device has "snapCams" command to take

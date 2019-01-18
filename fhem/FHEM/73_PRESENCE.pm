@@ -58,7 +58,7 @@ PRESENCE_Initialize($)
                         "presenceTimeout ".
                         "powerCmd ".
                         $readingFnAttributes;
-                        
+
     $hash->{AttrRenameMap} = { "ping_count" => "pingCount",
                                "bluetooth_hci_device" => "bluetoothHciDevice",
                                "fritzbox_speed" => "fritzboxCheckSpeed"
@@ -342,6 +342,7 @@ PRESENCE_Set($@)
 
     $usage .= " overrideInterval" if($hash->{MODE} !~ /^event|lan-bluetooth$/);
     $usage .= " clearOverride:noArg" if($hash->{INTERVAL_OVERRIDED});
+    $usage .= " inactive:noArg active:noArg";
 
     if($a[1] eq "statusRequest")
     {
@@ -403,6 +404,40 @@ PRESENCE_Set($@)
     {
         delete($hash->{INTERVAL_OVERRIDED});
     }
+    elsif($a[1] eq "inactive")
+    {
+        if(defined($hash->{FD}))
+        {
+            DevIo_SimpleWrite($hash, "stop\n", 2);
+        }
+        RemoveInternalTimer($hash);
+        $hash->{helper}{DISABLED} = 1;
+        readingsSingleUpdate($hash, "state", "disabled",1);
+    }
+    elsif($a[1] eq "active")
+    {
+        readingsSingleUpdate($hash, "state", "defined",0) if(exists($hash->{helper}{DISABLED}) and $hash->{helper}{DISABLED} == 1);
+
+        if(defined($hash->{DeviceName}))
+        {
+            $hash->{helper}{DISABLED} = 0;
+
+            if(defined($hash->{FD}))
+            {
+                PRESENCE_DoInit($hash) if(exists($hash->{helper}{DISABLED}));
+            }
+            else
+            {
+                DevIo_OpenDev($hash, 0, "PRESENCE_DoInit");
+            }
+        }
+        else
+        {
+            $hash->{helper}{DISABLED} = 0;
+            PRESENCE_StartLocalScan($hash);
+        }
+
+    }
     else
     {
         return $usage;
@@ -427,14 +462,15 @@ PRESENCE_Attr(@)
 
             if(defined($hash->{DeviceName}))
             {
+                $hash->{helper}{DISABLED} = 0;
+
                 if(defined($hash->{FD}))
                 {
                     PRESENCE_DoInit($hash) if(exists($hash->{helper}{DISABLED}));
-                    $hash->{helper}{DISABLED} = 0;
+
                 }
                 else
                 {
-                    $hash->{helper}{DISABLED} = 0;
                     DevIo_OpenDev($hash, 0, "PRESENCE_DoInit");
                 }
             }
