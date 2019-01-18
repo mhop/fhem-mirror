@@ -208,7 +208,7 @@ sub BRAVIA_Set($@) {
     $usage .= " mute:" . $mutes;
     $usage .= " input:" . $inputs if ( $inputs ne "" );
     $usage .= " channel:$channels" if ( $channels ne "" );
-    $usage .= " application:" . $apps if ( $apps ne "" );
+    $usage .= " openUrl application:" . $apps if ( $apps ne "" );
     $usage .= " text" if (ReadingsVal($name, "requestFormat", "") eq "json");
 
     my $cmd = '';
@@ -440,10 +440,10 @@ sub BRAVIA_Set($@) {
               }
             }
             if ( $channelName =~ /^(\d)(\d?)(\d?)(\d?).*$/ ) {
-              BRAVIA_SendCommand( $hash, "ircc", $1, "blocking" );
-              BRAVIA_SendCommand( $hash, "ircc", $2, "blocking" ) if (defined($2));
-              BRAVIA_SendCommand( $hash, "ircc", $3, "blocking" ) if (defined($3));
-              BRAVIA_SendCommand( $hash, "ircc", $4, "blocking" ) if (defined($4));
+              BRAVIA_SendCommand( $hash, "ircc", $1, undef, "blocking" );
+              BRAVIA_SendCommand( $hash, "ircc", $2, undef, "blocking" ) if (defined($2));
+              BRAVIA_SendCommand( $hash, "ircc", $3, undef, "blocking" ) if (defined($3));
+              BRAVIA_SendCommand( $hash, "ircc", $4, undef, "blocking" ) if (defined($4));
               return;
             }
             return "Argument " . $channelName . " is not a valid channel name";
@@ -514,20 +514,58 @@ sub BRAVIA_Set($@) {
 
         return "No 2nd argument given" if ( !defined( $a[2] ) );
 
-		shift(@a); shift(@a);
-		my $appStr = join("#", @a);
-        Log3 $name, 2, "BRAVIA set $name " . $a[1] . " " . $appStr;
+		    shift(@a); shift(@a);
+		    my $appStr;
 
-        # Resolve app uri
+        # Resolve app uri + data
+        my $app_name;
         my $app_uri;
-        if ( defined( $hash->{helper}{device}{appPreset}{ $appStr } ) ) {
-            $app_uri = $hash->{helper}{device}{appPreset}{ $appStr }{uri};
-        } else {
-            return "Unknown app '" . $appStr . "' on that device.";
-        }
+		    my $app_data;
+		    while (@a) {
+		        my $arg = shift(@a);
+            if (defined($appStr)) {
+                $appStr .= "#";
+                $appStr .= $arg;
+            } else {
+                $appStr = $arg;
+            }
+            if ( defined( $hash->{helper}{device}{appPreset}{ $appStr } ) ) {
+                $app_name = $appStr;
+                $app_uri  = $hash->{helper}{device}{appPreset}{ $appStr }{uri};
+                $app_data = join(" ", @a);
+            }
+		    }
+
+        return "Unknown app '" . $appStr . "' on that device." unless defined($app_uri);
 
         if ( $presence eq "present" ) {
-            BRAVIA_SendCommand( $hash, "setActiveApp", $app_uri );
+            Log3 $name, 2, "BRAVIA set $name " . $app_name . ($app_data ? " " . $app_data : "");
+            BRAVIA_SendCommand( $hash, "setActiveApp", $app_uri, $app_data );
+        }
+        else {
+            return "Device needs to be reachable to start an app.";
+        }
+    }
+
+    # openUrl
+    elsif ( $a[1] eq "openUrl") {
+        if (defined($a[2]) && $presence eq "present" && $power ne "on" ) {
+            Log3 $name, 4, "BRAVIA $name: indirect switching request to ON";
+            BRAVIA_Set( $hash, $name, "on" );
+        }
+
+        return "No 2nd argument given" if ( !defined( $a[2] ) );
+
+        if ( $presence eq "present" ) {
+            Log3 $name, 2, "BRAVIA set $name " . $a[1] . " " . $a[2];
+            my $url = lc($a[2]);
+            if ($url !~ /^https?:\/\/.*/) {
+                $url = "http://$url";
+            }
+            $url =~ s/([\x2F \x3A])/sprintf("%%%02X",ord($1))/eg;
+            $url = "localapp://webappruntime?url=$url";
+            Log3 $name, 2, "BRAVIA set $name " . $a[1] . " " . $url;
+            BRAVIA_SendCommand( $hash, "setActiveApp", $url );
         }
         else {
             return "Device needs to be reachable to start an app.";
@@ -703,8 +741,8 @@ sub BRAVIA_Define($$) {
 ############################################################################################################
 
 ###################################
-sub BRAVIA_SendCommand($$;$$) {
-    my ( $hash, $service, $cmd, $type ) = @_;
+sub BRAVIA_SendCommand($$;$$$) {
+    my ( $hash, $service, $cmd, $param, $type ) = @_;
     my $name        = $hash->{NAME};
     my $address     = $hash->{helper}{ADDRESS};
     my $port        = $hash->{helper}{PORT};
@@ -861,7 +899,9 @@ sub BRAVIA_SendCommand($$;$$) {
       $URL .= $port->{SERVICE};
       if ($requestFormat eq "json") {
         $URL .= "/sony/appControl";
-        $data = "{\"id\":2,\"method\":\"setActiveApp\",\"version\":\"1.0\",\"params\":[{\"uri\":\"".$cmd."\"}]}";
+        $data = "{\"id\":2,\"method\":\"setActiveApp\",\"version\":\"1.0\",\"params\":[{\"uri\":\"".$cmd."\"";
+        $data .= ",\"data\":\"".$param."\"" if (defined($param));
+        $data .= "}]}";
       }
     } elsif ($service eq "text") {
       $URL .= $port->{SERVICE};
@@ -2120,10 +2160,10 @@ sub BRAVIA_GetNormalizedName($) {
     <ul>
       <li><i>application</i><br>
         List of applications.
-        Applications are available with modells from 2013 and newer.</li>
+        Applications are available with models from 2013 and newer.</li>
       <li><i>channel</i><br>
         List of all known channels. The module collects all visited channels.
-        Channels can be loaded automtically with modells from 2013 and newer.
+        Channels can be loaded automtically with models from 2013 and newer.
         (number of channels, see <a href=#BRAVIAchannelsMax>channelsMax</a>).</li>
       <li><i>channelDown</i><br>
         Switches a channel back.</li>
@@ -2131,13 +2171,16 @@ sub BRAVIA_GetNormalizedName($) {
         Switches a channel forward.</li>
       <li><i>input</i><br>
         List of input channels.
-        Imputs are available with modells from 2013 and newer.</li>
+        Imputs are available with models from 2013 and newer.</li>
       <li><i>mute</i><br>
         Set mute if <a href=#BRAVIAupnp>Upnp</a> is activated.</li>
       <li><i>off</i><br>
         Switches TV to off. State of device will have been set to "set_off" for 60 seconds or until off-status is pulled from TV.</li>
       <li><a name="BRAVIAon"></a><i>on</i><br>
-        Switches TV to on, with modells from 2013 using WOL. State of device will have been set to "set_on" for 60 seconds or until on-status is pulled from TV.</li>
+        Switches TV to on, with models from 2013 using WOL. State of device will have been set to "set_on" for 60 seconds or until on-status is pulled from TV.</li>
+      <li><i>openUrl</i><br>
+        Opens an URL on the screen.
+        This Feature is available on models from 2013 and newer.</li>
       <li><i>pause</i><br>
         Pauses a playing of a recording, of an internal App, etc.</li>
       <li><i>play</i><br>
@@ -2153,8 +2196,8 @@ sub BRAVIA_GetNormalizedName($) {
           <li>Call with empty input. A PIN for registration has to be shown on the TV.</li>
           <li>Insert PIN into input field and register again.</li></ol></li>
       <li><a name="BRAVIArequestFormat"></a><i>requestFormat</i><br>
-        "xml" for xml based communication (modells from 2011 and 2012)<br>
-        "json" for communication with modells from 2013 and newer</li>
+        "xml" for xml based communication (models from 2011 and 2012)<br>
+        "json" for communication with models from 2013 and newer</li>
       <li><i>remoteControl</i><br>
         Sends command directly to TV.</li>
       <li><i>statusRequest</i><br>
@@ -2252,6 +2295,9 @@ sub BRAVIA_GetNormalizedName($) {
         Schaltet den TV aus. Der State des Gerätes wird auf "set_off" gesetzt. Dieser Wert wird nach 60 Sekunden wieder überschrieben oder sobald der TV entsprechend "off" meldet.</li>
       <li><a name="BRAVIAon"></a><i>on</i><br>
         Einschalten des TV, ab Modelljahr 2013 per WOL. Der State des Gerätes wird auf "set_on" gesetzt. Dieser Wert wird nach 60 Sekunden wieder überschrieben oder sobald der TV entsprechend "on" meldet.</li>
+      <li><i>openUrl</i><br>
+        Öffnet eine URL auf dem Bildschirm.
+        Diese Funktion ist ab Modelljahr 2013 verfügbar.</li>
       <li><i>pause</i><br>
         Pausiert die Wiedergabe einer Aufnahme, einer internen App, etc.</li>
       <li><i>play</i><br>
