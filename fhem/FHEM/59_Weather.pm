@@ -131,12 +131,15 @@ sub Weather_DebugCodes($) {
 sub Weather_Initialize($) {
     my ($hash) = @_;
 
-    $hash->{DefFn}   = "Weather_Define";
-    $hash->{UndefFn} = "Weather_Undef";
-    $hash->{GetFn}   = "Weather_Get";
-    $hash->{SetFn}   = "Weather_Set";
-    $hash->{AttrList}= "disable:0,1 " . $readingFnAttributes;
-    $hash->{NotifyFn}= "Weather_Notify";
+    $hash->{DefFn}   = 'Weather_Define';
+    $hash->{UndefFn} = 'Weather_Undef';
+    $hash->{GetFn}   = 'Weather_Get';
+    $hash->{SetFn}   = 'Weather_Set';
+    $hash->{AttrList}= 
+          'disable:0,1 '
+        . 'model '
+        . $readingFnAttributes;
+    $hash->{NotifyFn}= 'Weather_Notify';
 
     #Weather_DebugCodes('de');
 }
@@ -432,12 +435,11 @@ sub Weather_Define($$) {
     $hash->{API}          = $api;
     $hash->{APIKEY}       = $apikey;
     $hash->{APIOPTIONS}   = $apioptions;
-    $attr{$name}->{model} = $api;
-    #$hash->{UNITS}        = "c"; # hardcoded to use degrees centigrade (Celsius)
     $hash->{READINGS}->{current_date_time}->{TIME}= TimeNow();
     $hash->{READINGS}->{current_date_time}->{VAL}= "none";
-
     $hash->{fhem}->{allowCache}= 1;
+
+    CommandAttr(undef,$name . ' model ' . $api) if ( AttrVal($name,'model','none') ne $api );
 
     readingsSingleUpdate($hash,'state','Initialized',1);
     Weather_LanguageInitialize($hash->{LANG});
@@ -700,7 +702,7 @@ sub WeatherAsHtmlD($;$) {
     Valid readings and their meaning (? can be one of 1, 2, 3, 4, 5 and stands
     for today, tomorrow, etc.):<br>
     <table>
-    <tr><td>.locense</td><td>license of the API provider, if available</td></tr>
+    <tr><td>.license</td><td>license of the API provider, if available</td></tr>
     <tr><td>city</td><td>name of town returned for location</td></tr>
     <tr><td>code</td><td>current condition code</td></tr>
     <tr><td>condition</td><td>current condition</td></tr>
@@ -727,6 +729,8 @@ sub WeatherAsHtmlD($;$) {
     <tr><td>wind_direction</td><td>direction wind comes from in degrees (0 = north wind)</td></tr>
     <tr><td>wind_speed</td><td>same as wind</td></tr>
     </table>
+    <br>
+    The weekday of the forecast will be in the language of your FHEM system. Enter {$ENV{LANG}} into the FHEM command line to verify. If nothing is displayed or you see an unexpected language setting, add export LANG=de_DE.UTF-8 or something similar to your FHEM start script, restart FHEM and check again. If you get a locale warning when starting FHEM the required language pack might be missing. It can be installed depending on your OS and your preferences (e.g. dpkg-reconfigure locales, apt-get install language-pack-de or something similar).
     <br>
     Depending on the chosen API, other readings can be shown as well.
     The meaning of these readings can be determined from the API provider's
@@ -892,6 +896,8 @@ sub WeatherAsHtmlD($;$) {
     <tr><td>wind_speed</td><td>Windgeschwindigkeit in km/h (mit wind identisch)</td></tr>
     <tr><td>validity</td><td>stale, wenn der Ver&ouml;ffentlichungszeitpunkt auf dem entfernten Server vor dem Zeitpunkt der aktuellen Daten (readings) liegt</td></tr>
     </table>
+    <br>
+    Der Wochentag der Prognose wird in der Sprache Ihres FHEM-Systems angezeigt. Geben Sie zur Überprüfung {$ ENV {LANG}} in die Befehlszeile von FHEM ein. Wenn nichts angezeigt wird oder eine unerwartete Spracheinstellung angezeigt wird, fügen Sie export LANG = de_DE.UTF-8 oder etwas Ähnliches zu Ihrem FHEM-Startskript hinzu. Starten Sie FHEM erneut und überprüfen Sie es erneut. Wenn Sie beim Starten von FHEM eine Ländereinstellung erhalten, fehlt möglicherweise das erforderliche Sprachpaket. Sie kann abhängig von Ihrem Betriebssystem und Ihren Präferenzen installiert werden (z. B. Gebietsschemas dpkg-reconfigure, apt-get install language-pack-de oder ähnliches).
     <br>
     Je nach verwendeter API ist es durchaus m&ouml;glich, dass weitere
     Readings geschrieben werden. Die Bedeutung dieser Readings kann man
