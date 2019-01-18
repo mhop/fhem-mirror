@@ -131,13 +131,12 @@ sub Weather_DebugCodes($) {
 sub Weather_Initialize($) {
     my ($hash) = @_;
 
-    $hash->{DefFn}   = 'Weather_Define';
-    $hash->{UndefFn} = 'Weather_Undef';
-    $hash->{GetFn}   = 'Weather_Get';
-    $hash->{SetFn}   = 'Weather_Set';
-    $hash->{AttrList}= 
+    $hash->{DefFn}      = 'Weather_Define';
+    $hash->{UndefFn}    = 'Weather_Undef';
+    $hash->{GetFn}      = 'Weather_Get';
+    $hash->{SetFn}      = 'Weather_Set';
+    $hash->{AttrList}   = 
           'disable:0,1 '
-        . 'model '
         . $readingFnAttributes;
     $hash->{NotifyFn}= 'Weather_Notify';
 
@@ -438,8 +437,6 @@ sub Weather_Define($$) {
     $hash->{READINGS}->{current_date_time}->{TIME}= TimeNow();
     $hash->{READINGS}->{current_date_time}->{VAL}= "none";
     $hash->{fhem}->{allowCache}= 1;
-
-    CommandAttr(undef,$name . ' model ' . $api) if ( AttrVal($name,'model','none') ne $api );
 
     readingsSingleUpdate($hash,'state','Initialized',1);
     Weather_LanguageInitialize($hash->{LANG});
