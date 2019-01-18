@@ -363,6 +363,11 @@ FW_Read($$)
     my $len  = (ord(substr($hash->{BUF},1,1)) & 0x7F);
     my $i = 2;
 
+    if($op == 8) {
+      TcpServer_Close($hash, 1);
+      return;
+    }
+
     if( $len == 126 ) {
       $len = unpack( 'n', substr($hash->{BUF},$i,2) );
       $i += 2;

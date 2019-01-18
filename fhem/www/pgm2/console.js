@@ -84,8 +84,12 @@ consFill()
 
   var loc = (""+location).replace(/\?.*/,"");
   if($("body").attr("longpoll") == "websocket") {
-    if(consConn)
+    if(consConn) {
+      consConn.onclose = 
+      consConn.onerror = 
+      consConn.onmessage = undefined;
       consConn.close();
+    }
     consConn = new WebSocket(loc.replace(/[&?].*/,'')
                                 .replace(/^http/i, "ws")+query);
     consConn.onclose = 
