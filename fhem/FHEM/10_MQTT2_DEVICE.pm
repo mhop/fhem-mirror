@@ -203,7 +203,9 @@ MQTT2_DEVICE_Parse($$)
     return "";
   }
 
-  return keys %fnd;
+  my @ret = keys %fnd;
+  unshift(@ret, "[NEXT]"); # for MQTT_GENERIC_BRIDGE
+  return @ret;
 }
 
 # compatibility: the first version was implemented as MQTT2_JSON and published.

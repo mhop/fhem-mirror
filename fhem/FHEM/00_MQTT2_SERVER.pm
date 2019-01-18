@@ -476,6 +476,7 @@ MQTT2_SERVER_Write($$$)
   } else {
     Log3 $name, 1, "$name: ERROR: Ignoring function $function";
   }
+  return undef;
 }
 
 sub

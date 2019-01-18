@@ -399,6 +399,9 @@ MQTT2_CLIENT_Write($$$)
 {
   my ($hash, $function, $topicMsg) = @_;
 
+  return "Ignoring the message as $hash->{NAME} is not yet connected"
+        if($hash->{connecting});
+
   if($function eq "publish") {
     my ($topic, $msg) = split(" ", $topicMsg, 2);
     my $retain;
@@ -416,6 +419,7 @@ MQTT2_CLIENT_Write($$$)
     my $name = $hash->{NAME};
     Log3 $name, 1, "$name: ERROR: Ignoring function $function";
   }
+  return undef;
 }
 
 sub
