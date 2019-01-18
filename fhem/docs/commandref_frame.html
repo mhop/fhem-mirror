@@ -67,6 +67,7 @@
       <a href="#setdefaultattr">setdefaultattr</a> &nbsp; <!-- define a default attribute -->
       <a href="#setreading">setreading</a> &nbsp; <!-- set a reading for a FHEM device -->
       <a href="#setstate">setstate</a> &nbsp; <!-- set the main state of a FHEM device -->
+      <a href="#setuuid">setuuid</a> &nbsp;         <!-- set the FUUID internal -->
       <a href="#shutdown">shutdown</a> &nbsp; <!-- shut down (terminate) FHEM -->
       <a href="#sleep">sleep</a> &nbsp;     <!-- sleep (delay execution) for a while -->
       <a href="#trigger">trigger</a> &nbsp; <!-- generate a FHEM event -->
@@ -1296,6 +1297,17 @@ The following local attributes are used by a wider range of devices:
   </ul>
 </ul>
 <!-- setstate end -->
+
+<a name="setuuid"></a>
+<h3>setuuid</h3>
+<ul>
+  <code>setuuid &lt;device&gt; &lt;uuid&gt;</code>
+  <br><br>
+  System command, used to set the FUUID internal value.
+  Not intended to be used by an end user.
+</ul>
+<!-- setstate end -->
+
 
 <a name="shutdown"></a>
 <h3>shutdown</h3>

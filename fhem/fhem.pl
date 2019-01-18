@@ -180,6 +180,7 @@ sub CommandSave($$);
 sub CommandSet($$);
 sub CommandSetReading($$);
 sub CommandSetstate($$);
+sub CommandSetuuid($$);
 sub CommandShutdown($$;$$);
 sub CommandSleep($$);
 sub CommandTrigger($$);
@@ -438,6 +439,7 @@ my %ra = (
             Hlp=>"<devspec> <reading> <value>,set reading for <devspec>" },
   "setstate"=> { Fn=>"CommandSetstate",
             Hlp=>"<devspec> <state>,set the state shown in the command list" },
+  "setuuid" => { Fn=>"CommandSetuuid", Hlp=>"" },
   "setdefaultattr" => { Fn=>"CommandDefaultAttr",
             Hlp=>"<attrname> <attrvalue>,set attr for following definitions" },
   "shutdown"=> { Fn=>"CommandShutdown",
@@ -1583,9 +1585,21 @@ WriteStatefile()
 }
 
 sub
-GetDefAndAttr($)
+CommandSetuuid($$)
 {
-  my ($d) = @_;
+  my ($cl, $param) = @_;
+  return "setuuid cannot be used after FHEM is initialized" if($init_done);
+  my @a = split(" ", $param);
+  return "Please define $param first" if(!defined($defs{$a[0]}));
+  $defs{$a[0]}{FUUID} = $a[1];
+  return undef;
+}
+
+
+sub
+GetDefAndAttr($;$)
+{
+  my ($d, $dumpFUUID) = @_;
   my @ret;
 
   if($d ne "global") {
@@ -1598,6 +1612,9 @@ GetDefAndAttr($)
       push @ret,"define $d $defs{$d}{TYPE}";
     }
   }
+
+  push @ret, "setuuid $d $defs{$d}{FUUID}"
+        if($dumpFUUID && defined($defs{$d}{FUUID}) && $defs{$d}{FUUID});
 
   foreach my $a (sort {
                    return -1 if($a eq "userattr"); # userattr must be first
@@ -1691,7 +1708,7 @@ CommandSave($$)
       next;
     }
 
-    my @arr = GetDefAndAttr($d);
+    my @arr = GetDefAndAttr($d, 1);
     print $fh join("\n", @arr)."\n" if(@arr);
 
   }
@@ -2017,6 +2034,7 @@ CommandDefine($$)
   my %hash;
 
   $hash{NAME}  = $name;
+  $hash{FUUID} = genUUID();
   $hash{TYPE}  = $m;
   $hash{STATE} = "???";
   $hash{DEF}   = $a[2] if(int(@a) > 2);
@@ -5830,4 +5848,13 @@ SecurityCheck()
   }
 }
 
+# 
+sub genUUID()
+{
+  srand(gettimeofday()) if(!$srandUsed);
+  $srandUsed = 1;
+  return sprintf("%08x-f33f-%s-%s-%s", time(), substr(getUniqueId(),-4), 
+    join("",map { unpack "H*", chr(rand(256)) } 1..2),
+    join("",map { unpack "H*", chr(rand(256)) } 1..8));
+}
 1;
