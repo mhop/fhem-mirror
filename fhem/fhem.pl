@@ -293,6 +293,7 @@ my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my @cmdList;                    # Remaining commands in a chain. Used by sleep
 my %sleepers;                   # list of sleepers
 my %delayedShutdowns;           # definitions needing delayed shutdown
+my %fuuidHash;                  # for duplicate checking
 
 $init_done = 0;
 $lastDefChange = 0;
@@ -1591,6 +1592,8 @@ CommandSetuuid($$)
   return "setuuid cannot be used after FHEM is initialized" if($init_done);
   my @a = split(" ", $param);
   return "Please define $param first" if(!defined($defs{$a[0]}));
+  return "setuuid $a[0]: duplicate value, ignoring it" if($fuuidHash{$a[1]});
+  $fuuidHash{$a[1]} = $a[1];
   $defs{$a[0]}{FUUID} = $a[1];
   return undef;
 }
@@ -5853,8 +5856,10 @@ sub genUUID()
 {
   srand(gettimeofday()) if(!$srandUsed);
   $srandUsed = 1;
-  return sprintf("%08x-f33f-%s-%s-%s", time(), substr(getUniqueId(),-4), 
+  my $uuid = sprintf("%08x-f33f-%s-%s-%s", time(), substr(getUniqueId(),-4), 
     join("",map { unpack "H*", chr(rand(256)) } 1..2),
     join("",map { unpack "H*", chr(rand(256)) } 1..8));
+  $fuuidHash{$uuid} = 1;
+  return $uuid;
 }
 1;
