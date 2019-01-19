@@ -186,10 +186,11 @@ sub CommandConfigdb($$) {
 		}
 
 		when ('reorg') {
-#			$param1 = $param1 ? $param1 : 3;
-			$param1 //= 3;
+			$param1 = 3 unless $param1;
+			return "Invalid paramaeter '$param1' for reorg. Must be a number."
+				unless looks_like_number($param1);
 			Log3('configdb', 4, "configdb: reorg requested with keep: $param1.");
-			$ret = _cfgDB_Reorg($a[1]);
+			$ret = _cfgDB_Reorg($param1);
 		}
 
 		when ('search') {
