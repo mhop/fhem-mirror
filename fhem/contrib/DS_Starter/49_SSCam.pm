@@ -47,6 +47,7 @@ use Encode;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.6.0"  => "20.01.2019  new attribute snapReadingRotate ",
   "8.5.0"  => "17.01.2019  SVS device has \"snapCams\" command ",
   "8.4.5"  => "15.01.2019  fix event generation after request snapshots ",
   "8.4.4"  => "14.01.2019  change: generate event of every snapfile,id etc. if snap was called with arguments, Forum:#45671 #msg887484  ",
@@ -353,6 +354,7 @@ sub SSCam_Initialize($) {
 		 "snapGalleryNumber:$SSCAM_snum ".
 		 "snapGalleryColumns ".
 		 "snapGalleryHtmlAttr ".
+         "snapReadingRotate:0,1,2,3,4,5,6,7,8,9,10 ".
          "pollnologging:1,0 ".
          "debugactivetoken:1,0 ".
          "rectime ".
@@ -4239,7 +4241,7 @@ sub SSCam_camop ($) {
       # ein Schnappschuß wird ausgelöst
       $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&dsId=\"0\"&method=\"TakeSnapshot\"&version=\"$apitakesnapmaxver\"&camId=\"$camid\"&blSave=\"true\"&_sid=\"$sid\"";
       readingsSingleUpdate($hash,"state", "snap", 1); 
-      readingsSingleUpdate($hash, "LastSnapId", "", 0);
+      #readingsSingleUpdate($hash, "LastSnapId", "", 0);
    
    } elsif ($OpMode eq "SaveRec") {
       # eine Aufnahme soll in lokalem File (.mp4) gespeichert werden
@@ -4268,7 +4270,7 @@ sub SSCam_camop ($) {
       
    } elsif ($OpMode eq "getsnapfilename") {
       # der Filename der aktuellen Schnappschuß-ID wird ermittelt
-      $snapid = ReadingsVal("$name", "LastSnapId", " ");
+      $snapid = ReadingsVal("$name", "LastSnapId", "");
       Log3($name, 4, "$name - Get filename of present Snap-ID $snapid");
       $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&imgSize=\"0\"&idList=\"$snapid\"&_sid=\"$sid\"";
    
@@ -4949,7 +4951,9 @@ sub SSCam_camop_parse ($) {
                 }
                 
                 $snapid = $data->{data}{'id'};
-                readingsSingleUpdate($hash,"LastSnapId",$snapid, 0) if($snapid);
+                # readingsSingleUpdate($hash,"LastSnapId",$snapid, 0) if($snapid);
+                my $rotnum = AttrVal($name,"snapReadingRotate",0);
+                SSCam_rotateReading($hash,"LastSnapId",$snapid,$rotnum,0);
                 
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"Errorcode","none");
@@ -5013,12 +5017,11 @@ sub SSCam_camop_parse ($) {
                 }
                 
                 my @as = sort{$b<=>$a}keys%snaps;
+                my $rotnum = AttrVal($name,"snapReadingRotate",0);
                 foreach my $key (@as) {
-                    readingsBeginUpdate($hash);
-                    readingsBulkUpdate($hash,"LastSnapId", $snaps{$key}{snapid});
-                    readingsBulkUpdate($hash,"LastSnapFilename", $snaps{$key}{fileName});
-                    readingsBulkUpdate($hash,"LastSnapTime", $snaps{$key}{createdTm});
-                    readingsEndUpdate($hash, 1);                    
+                    SSCam_rotateReading($hash,"LastSnapId",$snaps{$key}{snapid},$rotnum,1);
+                    SSCam_rotateReading($hash,"LastSnapFilename",$snaps{$key}{fileName},$rotnum,1);
+                    SSCam_rotateReading($hash,"LastSnapTime",$snaps{$key}{createdTm},$rotnum,1);                    
                 }
 					
 				#####  ein Schnapschuss soll als liveView angezeigt werden  #####
@@ -5173,8 +5176,13 @@ sub SSCam_camop_parse ($) {
                                 
             } elsif ($OpMode eq "getsnapfilename") {
                 # den Filenamen eines Schnapschusses ermitteln
-                $snapid = ReadingsVal("$name", "LastSnapId", " ");
-                           
+                $snapid = ReadingsVal("$name", "LastSnapId", "");
+
+                if(!$snapid) {
+                   Log3($name, 2, "$name - Snap-ID \"LastSnapId\" isn't set. Filename can't be retrieved"); 
+                   return;
+                }               
+                
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"Errorcode","none");
                 readingsBulkUpdate($hash,"Error","none");
@@ -7212,7 +7220,7 @@ return ($error);
 
 ##############################################################################
 #  Auflösung Errorcodes SVS API
-
+##############################################################################
 sub SSCam_experror ($$) {
   # Übernahmewerte sind $hash, $errorcode
   my ($hash,$errorcode) = @_;
@@ -7225,6 +7233,41 @@ sub SSCam_experror ($$) {
   $error = $SSCam_errlist{"$errorcode"};
   
 return ($error);
+}
+
+##############################################################################
+# Zusätzliche Redings in Rotation erstellen
+# Sub ($hash,<readingName>,<Wert>,<Rotationszahl>,<Trigger[0|1]>)
+##############################################################################
+sub SSCam_rotateReading ($$$$$) {
+  my ($hash,$readingName,$val,$rotnum,$do_trigger) = @_;
+  my $name = $hash->{NAME};
+
+  readingsBeginUpdate($hash);
+  
+  my $o = ReadingsVal($name,$readingName,"n.a."); 
+  if($val ne "n.a." && $rotnum >= 1) {
+      if("$o" ne "$val") {     
+          for (my $i=$rotnum;$i>0;$i--) {
+              my $l = $i-1;
+              my $g = ReadingsVal($name,$readingName.$i,"n.a.");
+              if($l) {
+                  $l = ReadingsVal($name,$readingName.$l,"n.a.");
+              } else {
+                  $l = ReadingsVal($name,$readingName,"n.a.");
+              }
+              if("$l" ne "$g") {
+                  readingsBulkUpdate($hash,$readingName.$i,$l);
+                  Log3($name, 4, "$name - Rotate \"$readingName.$i\" to value: $l");
+              }
+          }
+      }      
+  
+  }
+  readingsBulkUpdate($hash,$readingName,$val);
+  readingsEndUpdate($hash, $do_trigger);
+  
+return;
 }
 
 #############################################################################################
