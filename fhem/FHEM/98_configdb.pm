@@ -65,6 +65,10 @@ sub CommandConfigdb($$) {
 
 		when ('diff') {
 			return "\n Syntax: configdb diff <device> <version>" if @a != 3;
+			return "Invalid paramaeter '$param1' for diff. Must be a number."
+				unless looks_like_number($param1);
+			return "Invalid paramaeter '$param2' for diff. Must be a number."
+				unless looks_like_number($param2);
 			Log3('configdb', 4, "configdb: diff requested for device: $param1 in version $param2.");
 			$ret = _cfgDB_Diff($param1, $param2);
 		}
@@ -166,7 +170,7 @@ sub CommandConfigdb($$) {
 
 		when ('list') {
 			$param1 = $param1 ? $param1 : '%';
-			$param2 = $param2 ? $param2 : 0;
+			$param2 = looks_like_number($param2) ? $param2 : 0;
 			$ret = "list not allowed for configDB itself.";
 			break if($param1 =~ m/configdb/i);
 			Log3('configdb', 4, "configdb: list requested for device: $param1 in version $param2.");
@@ -181,6 +185,8 @@ sub CommandConfigdb($$) {
 
 		when ('recover') {
 			return "\n Syntax: configdb recover <version>" if @a != 2;
+			return "Invalid paramaeter '$param1' for recover. Must be a number."
+				unless looks_like_number($param1);
 			Log3('configdb', 4, "configdb: recover for version $param1 requested.");
 			$ret = _cfgDB_Recover($param1);
 		}
@@ -196,7 +202,7 @@ sub CommandConfigdb($$) {
 		when ('search') {
 			return "\n Syntax: configdb search <searchTerm> [searchVersion]" if @a < 2;
 			$param1 = $param1 ? $param1 : '%';
-			$param2 = $param2 ? $param2 : 0;
+			$param2 = looks_like_number($param2) ? $param2 : 0;
 			Log3('configdb', 4, "configdb: list requested for device: $param1 in version $param2.");
 			$ret = _cfgDB_Search($param1,$param2);
 		}
