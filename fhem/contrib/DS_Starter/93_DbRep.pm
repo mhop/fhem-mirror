@@ -946,7 +946,7 @@ sub DbRep_Get($@) {
               }
           }           
           $i = 0;
-          foreach my $key (reverse sort(keys %hs)) {
+          foreach my $key (sort{$b<=>$a}(keys %hs)) {
               $val0 = $hs{$key};
               $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0</td>" );
               $ret .= "</tr>";
@@ -971,7 +971,7 @@ sub DbRep_Get($@) {
           $ret .= "<tbody>";
           $ret .= "<tr class=\"even\">";
           $i = 0;
-          foreach my $key (reverse sort(keys %DbRep_vNotesExtern)) {
+          foreach my $key (sort{$b<=>$a}(keys %DbRep_vNotesExtern)) {
               ($val0,$val1) = split(/\s/,$DbRep_vNotesExtern{$key},2);
               $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0  </td><td>$val1</td>" );
               $ret .= "</tr>";
