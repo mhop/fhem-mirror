@@ -57,7 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Versions History intern
 our %DbRep_vNotesIntern = (
-  "8.10.0" => "19.01.2019  sqlCmd may input SQL session variables, Forum:#96082",
+  "8.10.0" => "19.01.2019  sqlCmd, dbValue may input SQL session variables, Forum:#96082 ",
   "8.9.10" => "18.01.2019  fix warnings Malformed UTF-8 character during importFromFile, Forum:#96056 ",
   "8.9.9"  => "06.01.2019  diffval_DoParse: 'ORDER BY TIMESTAMP' added to statements Forum:https://forum.fhem.de/index.php/topic,53584.msg882082.html#msg882082",
   "8.9.8"  => "27.11.2018  minor fix in deviceRename, commandref revised ",
@@ -131,7 +131,7 @@ our %DbRep_vNotesIntern = (
 
 # Versions History extern:
 our %DbRep_vNotesExtern = (
-  "8.10.0" => "19.01.2019 In sqlCmd you may now take over SQL session variables like \"SET \@open:=NULL,\@closed:=NULL; SELECT ...\", Forum:#96082",
+  "8.10.0" => "19.01.2019 In commands sqlCmd, dbValue you may now use SQL session variables like \"SET \@open:=NULL,\@closed:=NULL; SELECT ...\", Forum:#96082",
   "8.9.0"  => "07.11.2018 new command set delDoublets added. This command allows to delete multiple occuring identical records. ",
   "8.8.0"  => "06.11.2018 new attribute 'fastStart'. Usually every DbRep-device is making a short connect to its database when "
               ."FHEM is restarted. When this attribute is set, the initial connect is done when the DbRep-device is doing its "
@@ -5649,7 +5649,7 @@ sub sqlCmd_DoParse($) {
 
   $rt = $rt.",".$brt;
  
-  return "$name|$rowstring|$opt|$sql|$nrows|$rt|$err";
+  return "$name|$rowstring|$opt|$cmd|$nrows|$rt|$err";
 }
 
 ####################################################################################################
@@ -9973,6 +9973,27 @@ sub DbRep_dbValue($$) {
   Log3 ($name, 4, "DbRep $name - -------- New selection --------- "); 
   Log3 ($name, 4, "DbRep $name - Command: dbValue");  
   Log3 ($name, 4, "DbRep $name - SQL execute: $sql"); 
+  
+  # split SQL-Parameter Statement falls mitgegeben
+  # z.B. SET  @open:=NULL, @closed:=NULL; Select ...
+  my $set;
+  if($cmd =~ /^SET.*;/i) {
+      $cmd =~ m/^(SET.*?;)(.*)/i;
+      $set = $1;
+      $sql = $2;
+  }
+  
+  if($set) {
+      Log3($name, 4, "DbRep $name - Set SQL session variables: $set");    
+      eval {$dbh->do($set);};   # @\RB = Resetbit wenn neues Selektionsintervall beginnt
+  }
+  if ($@) {
+     $err = $@;
+     Log3 ($name, 2, "DbRep $name - $err");
+     ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
+     ReadingsSingleUpdateValue ($hash, "state", "error", 1);
+     return ($err);  
+  } 
 
   # SQL-Startzeit
   my $st = [gettimeofday];  
@@ -11314,6 +11335,8 @@ return;
 								 "allowDeletion" has to be set for security reason. <br>
                                  The statement doesn't consider limitations by attributes "device", "reading", "time.*" 
                                  respectively "aggregation". <br>
+                                 This command also accept the setting of SQL session variables like "SET @open:=NULL, 
+                                 @closed:=NULL;". <br>
 								 If the <a href="#DbRepattr">attribute</a> "timestamp_begin" respectively "timestamp_end" 
 								 is assumed in the statement, it is possible to use placeholder "<b>§timestamp_begin§</b>" respectively
 								 "<b>§timestamp_end§</b>" on suitable place. <br><br>
@@ -11336,6 +11359,25 @@ return;
                                  <li>set &lt;name&gt; sqlCmd update history set TIMESTAMP=TIMESTAMP,VALUE='Val' WHERE VALUE='TestValue' </li>
                                  <li>set &lt;name&gt; sqlCmd select * from history where DEVICE = "Test" </li>
                                  <li>set &lt;name&gt; sqlCmd insert into history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES ('2017-05-09 17:00:14','Test','manuell','manuell','Tes§e','TestValue','°C') </li>    
+                                 </ul>
+                                 <br>
+                                 
+                                 Here you can see an example of a more complex statement (MySQL) with setting SQL session 
+                                 variables: <br><br>
+                                 
+                                 <ul>
+                                 <li>set &lt;name&gt; sqlCmd SET @open:=NULL, @closed:=NULL;
+                                        SELECT
+                                            TIMESTAMP, VALUE,DEVICE,
+                                            @open AS open,
+                                            @open := IF(VALUE = 'open', TIMESTAMP, NULL) AS curr_open,
+                                            @closed  := IF(VALUE = 'closed',  TIMESTAMP, NULL) AS closed
+                                        FROM history WHERE
+                                           DATE(TIMESTAMP) = CURDATE() AND
+                                           DEVICE = "HT_Fensterkontakt" AND
+                                           READING = "state" AND
+                                           (VALUE = "open" OR VALUE = "closed")
+                                           ORDER BY  TIMESTAMP; </li>
                                  </ul>
 								 <br>
 								 
@@ -11551,6 +11593,8 @@ return;
                             Executes the specified SQL-statement in <b>blocking</b> manner. Because of its mode of operation
                             this function is particular convenient for user own perl scripts.  <br>
                             The input accepts multi line commands and delivers multi line results as well. 
+                            This command also accept the setting of SQL session variables like "SET @open:=NULL, 
+                            @closed:=NULL;". <br>
                             If several fields are selected and passed back, the fieds are separated by the separator defined  
                             by <a href="#DbRepattr">attribute</a> "sqlResultFieldSep" (default "|"). Several result lines 
                             are separated by newline ("\n"). <br>
@@ -13624,6 +13668,8 @@ sub bdump {
 								 <a href="#DbRepattr">Attribut</a> "allowDeletion" gesetzt sein. <br>
                                  Bei der Ausführung dieses Kommandos werden keine Einschränkungen durch gesetzte Attribute
                                  "device", "reading", "time.*" bzw. "aggregation" berücksichtigt. <br>
+                                 Dieses Kommando akzeptiert ebenfalls das Setzen von SQL Session Variablen wie z.B.
+                                 "SET @open:=NULL, @closed:=NULL;". <br>
 								 Sollen die im Modul gesetzten <a href="#DbRepattr">Attribute</a> "timestamp_begin" bzw. 
 								 "timestamp_end" im Statement berücksichtigt werden, können die Platzhalter 
 								 "<b>§timestamp_begin§</b>" bzw. "<b>§timestamp_end§</b>" dafür verwendet werden. <br><br>
@@ -13647,7 +13693,26 @@ sub bdump {
                                  <li>set &lt;name&gt; sqlCmd select * from history where DEVICE = "Test" </li>
                                  <li>set &lt;name&gt; sqlCmd insert into history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES ('2017-05-09 17:00:14','Test','manuell','manuell','Tes§e','TestValue','°C') </li>    
                                  </ul>
-								 <br>
+                                 <br>
+                                 
+                                 Nachfolgend noch ein Beispiel für ein komplexeres Statement (MySQL) unter Mitgabe von
+                                 SQL Session Variablen: <br><br>
+                                 
+                                 <ul>
+                                 <li>set &lt;name&gt; sqlCmd SET @open:=NULL, @closed:=NULL;
+                                        SELECT
+                                            TIMESTAMP, VALUE,DEVICE,
+                                            @open AS open,
+                                            @open := IF(VALUE = 'open', TIMESTAMP, NULL) AS curr_open,
+                                            @closed  := IF(VALUE = 'closed',  TIMESTAMP, NULL) AS closed
+                                        FROM history WHERE
+                                           DATE(TIMESTAMP) = CURDATE() AND
+                                           DEVICE = "HT_Fensterkontakt" AND
+                                           READING = "state" AND
+                                           (VALUE = "open" OR VALUE = "closed")
+                                           ORDER BY  TIMESTAMP; </li>
+                                 </ul>
+								 <br>                                 
 								 
 								 Das Ergebnis des Statements wird im <a href="#DbRepReadings">Reading</a> "SqlResult" dargestellt.
 								 Die Ergebnis-Formatierung kann durch das <a href="#DbRepattr">Attribut</a> "sqlResultFormat" ausgewählt, sowie der verwendete
@@ -13868,7 +13933,9 @@ sub bdump {
     <li><b> dbValue &lt;SQL-Statement&gt;</b> - 
                             Führt das angegebene SQL-Statement <b>blockierend</b> aus. Diese Funktion ist durch ihre Arbeitsweise 
                             speziell für den Einsatz in benutzerspezifischen Scripten geeignet. <br>
-                            Die Eingabe akzeptiert Mehrzeiler und gibt ebenso mehrzeilige Ergebisse zurück. 
+                            Die Eingabe akzeptiert Mehrzeiler und gibt ebenso mehrzeilige Ergebisse zurück.
+                            Dieses Kommando akzeptiert ebenfalls das Setzen von SQL Session Variablen wie z.B.
+                            "SET @open:=NULL, @closed:=NULL;". <br>                            
                             Werden mehrere Felder selektiert und zurückgegeben, erfolgt die Feldtrennung mit dem Trenner 
                             des <a href="#DbRepattr">Attributes</a> "sqlResultFieldSep" (default "|"). Mehrere Ergebniszeilen 
                             werden mit Newline ("\n") separiert. <br>
