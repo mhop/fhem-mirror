@@ -791,8 +791,6 @@ sub DOIFtoolsNextTimer {
   }
   my $tdays = "";
   $tdays = $tn ? DOIF_weekdays($defs{$tn},$weekd) : $weekd;
-  Log 1, "$tn $tdays";
-  Log 1, "$tn ".join("",@DOIFtools_we);
   $tdays =~/([0-9])/;
   return $tstr if (length($1) == 0); 
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($timer);
