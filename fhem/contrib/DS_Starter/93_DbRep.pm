@@ -1,5 +1,5 @@
 ﻿##########################################################################################################
-# $Id: 93_DbRep.pm 17862 2018-11-27 22:10:21Z DS_Starter $
+# $Id: 93_DbRep.pm 18163 2019-01-06 17:13:00Z DS_Starter $
 ##########################################################################################################
 #       93_DbRep.pm
 #
@@ -57,6 +57,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Versions History intern
 our %DbRep_vNotesIntern = (
+  "8.10.0" => "19.01.2019  sqlCmd may input SQL session variables, Forum:#96082",
+  "8.9.10" => "18.01.2019  fix warnings Malformed UTF-8 character during importFromFile, Forum:#96056 ",
   "8.9.9"  => "06.01.2019  diffval_DoParse: 'ORDER BY TIMESTAMP' added to statements Forum:https://forum.fhem.de/index.php/topic,53584.msg882082.html#msg882082",
   "8.9.8"  => "27.11.2018  minor fix in deviceRename, commandref revised ",
   "8.9.7"  => "21.11.2018  DbRep_firstconnect now uses attribute \"timeout\" ",
@@ -129,6 +131,7 @@ our %DbRep_vNotesIntern = (
 
 # Versions History extern:
 our %DbRep_vNotesExtern = (
+  "8.10.0" => "19.01.2019 In sqlCmd you may now take over SQL session variables like \"SET \@open:=NULL,\@closed:=NULL; SELECT ...\", Forum:#96082",
   "8.9.0"  => "07.11.2018 new command set delDoublets added. This command allows to delete multiple occuring identical records. ",
   "8.8.0"  => "06.11.2018 new attribute 'fastStart'. Usually every DbRep-device is making a short connect to its database when "
               ."FHEM is restarted. When this attribute is set, the initial connect is done when the DbRep-device is doing its "
@@ -5362,8 +5365,8 @@ sub impfile_Push($) {
  $infile    =~ s/%TSB/$rsf/g;
  my @t = localtime;
  $infile = ResolveDateWildcards($infile, @t);
- if (open(FH, "<:utf8", "$infile")) {
-     binmode (FH) if(!$utf8);
+ if (open(FH, "<", "$infile")) {
+     binmode (FH);
  } else {
      $err = encode_base64("could not open ".$infile.": ".$!,"");
      return "$name|''|''|$err|''";
@@ -5558,11 +5561,30 @@ sub sqlCmd_DoParse($) {
   no warnings 'uninitialized'; 
 
   my $sql = ($cmd =~ m/\;$/)?$cmd:$cmd.";"; 
+  
+  # split SQL-Parameter Statement falls mitgegeben
+  # z.B. SET  @open:=NULL, @closed:=NULL; Select ...
+  my $set;
+  if($cmd =~ /^SET.*;/i) {
+      $cmd =~ m/^(SET.*?;)(.*)/i;
+      $set = $1;
+      $sql = $2;
+  }
+  
+  if($set) {
+      Log3($name, 4, "DbRep $name - Set SQL session variables: $set");    
+      eval {$dbh->do($set);};   # @\RB = Resetbit wenn neues Selektionsintervall beginnt
+  }
+  if ($@) {
+     $err = encode_base64($@,"");
+     Log3 ($name, 2, "DbRep $name - ERROR - $@");
+     $dbh->disconnect;
+     return "$name|''|$opt|$set|''|''|$err"; 
+  }
+  
   # Allow inplace replacement of keywords for timings (use time attribute syntax)
   $sql =~ s/§timestamp_begin§/'$runtime_string_first'/g;
   $sql =~ s/§timestamp_end§/'$runtime_string_next'/g;
-
-#  Debug "SQL :".$sql.":";
   
   Log3($name, 4, "DbRep $name - SQL execute: $sql");        
 
@@ -5576,7 +5598,6 @@ sub sqlCmd_DoParse($) {
        }; 
   
   if ($@) {
-     # error bei sql-execute
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - ERROR - $@");
      $dbh->disconnect;
