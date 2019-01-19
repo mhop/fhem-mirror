@@ -37,26 +37,26 @@ sub CommandHelp {
 
     $mod = lc($mod);
     my $modPath = AttrVal('global','modpath','.');
-    my $output = '';
+	my $output = '';
     
     my $outputInfo = cref_findInfo($modPath,$mod);
 
-    if($cmds{help}{InternalCmds} !~ m/$mod\,/) {
+	if($cmds{help}{InternalCmds} !~ m/$mod\,/) {
       my %mods;
-      my @modDir = ("$modPath/FHEM");
+	  my @modDir = ("$modPath/FHEM");
 
       $mod = $cmds{$mod}{ModuleName} if defined($cmds{$mod}) && defined($cmds{$mod}{ModuleName});
 
-      foreach my $modDir (@modDir) {
-        eval { opendir(DH, $modDir); }; # || die "Cant open $modDir: $!\n";
-        while(my $l = readdir DH) {
-          next if($l !~ m/^\d\d_.*\.pm$/);
-          my $of = $l;
-          $l =~ s/.pm$//;
-          $l =~ s/^[0-9][0-9]_//;
-          $mods{lc($l)} = "$modDir/$of";
-        }
-      }
+	  foreach my $modDir (@modDir) {
+	    eval { opendir(DH, $modDir); }; # || die "Cant open $modDir: $!\n";
+	    while(my $l = readdir DH) {
+	      next if($l !~ m/^\d\d_.*\.pm$/);
+	      my $of = $l;
+	      $l =~ s/.pm$//;
+	      $l =~ s/^[0-9][0-9]_//;
+	      $mods{lc($l)} = "$modDir/$of";
+	    }
+	  }
 
       return "Module $mod not found" unless defined($mods{$mod});
 
@@ -73,13 +73,13 @@ sub CommandHelp {
 
     } else {
       $output = "<br/><b>Internal command:</b> $mod";
-      my $i;
-      my $f = "$modPath/docs/commandref_frame$lang.html";
+	  my $i;
+	  my $f = "$modPath/docs/commandref_frame$lang.html";
       my $skip = 1;
-      my ($err,@text) = FileRead({FileName => $f, ForceType => 'file'});
-      return $err if $err;
+	  my ($err,@text) = FileRead({FileName => $f, ForceType => 'file'});
+	  return $err if $err;
 
-      foreach my $l (@text) {
+	  foreach my $l (@text) {
         if($l =~ m/^<a name=\"$mod\"/) { 
            $skip = 0;
         } elsif($l =~ m/^<!-- $mod.end/) {
@@ -87,9 +87,9 @@ sub CommandHelp {
         } elsif (!$skip) {
            $output .= $l;
         }
-      }   
+	  }   
 
-    }
+	}
 
     if( $cl  && $cl->{TYPE} eq 'telnet' ) { # telnet output      
     $output =~ s/<br\s*\?>/\n/ig;
@@ -134,9 +134,9 @@ sub CommandHelp {
 #    cref_search_cmd(undef);
 
     my $str = "Possible commands:\n\n" .
-        "Command        Parameter\n" .
-        "               Description\n" .
-        "----------------------------------------------------------------------\n";
+		"Command        Parameter\n" .
+		"               Description\n" .
+	    "----------------------------------------------------------------------\n";
 
     for my $cmd (sort keys %cmds) {
       next if($cmd =~ m/header:command/);
@@ -179,7 +179,7 @@ sub cref_search {
    return $err if $err;
    foreach my $l (@text) {
      if($l =~ m/^=begin html$lang$/) {
-        $skip = 0;
+	    $skip = 0;
      } elsif($l =~ m/^=end html$lang$/) {
         $skip = 1;
      } elsif(!$skip) {
@@ -205,7 +205,7 @@ sub cref_search_cmd {
    return $err if $err;
    foreach my $l (@text) {
      if($l =~ m/<b>Fhem commands<\/b>/) {
-        $skip = 0;
+	    $skip = 0;
      } elsif($l =~ m/<\/ul>/) {
         $skip = 1;
      } elsif(!$skip && $l !~ m/<ul>/) {
@@ -254,8 +254,8 @@ sub cref_fill_list(){
 
   foreach my $mod (sort keys %mods) {
     my %h = (  Fn => undef,
-        Hlp => "Command $mod not loaded. Use \"help $mod\" for more help" );
-    $cmds{$mod} = \%h if ( ($modIdx{$mod} eq "command") && !(defined($cmds{$mod})) );
+		      Hlp => "Command $mod not loaded. Use \"help $mod\" for more help" );
+    $cmds{lc($mod)} = \%h if ( ($modIdx{$mod} eq "command") && !(defined($cmds{lc($mod)})) );
   }
 }
 
@@ -264,8 +264,8 @@ sub cref_findInfo {
   my ($l,@line,$found,$text);
   my ($err,@text) = FileRead({FileName => "$modPath/MAINTAINER.txt", ForceType => 'file'});
   foreach $l (@text) {
-    @line = split(" ", $l,3);
-    $found = ($l =~ m/^([0-9][0-9])_$mod\.pm$/i);
+    @line = split("[ \t][ \t]*", $l,3);
+    $found = ($l =~ m/_$mod/i);
     last if ($found);
   }
   if($found) {
