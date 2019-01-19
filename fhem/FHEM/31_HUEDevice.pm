@@ -1400,6 +1400,10 @@ HUEDevice_Parse($$)
   my $alert = $state->{alert};
   my $effect = $state->{effect};
 
+  my $rgb       = undef;
+     $rgb       = $state->{rgb} if( defined($state->{rgb}) );
+
+
   if( defined($colormode) && $colormode ne $hash->{helper}{colormode} ) {readingsBulkUpdate($hash,"colormode",$colormode);}
   if( defined($bri) && $bri != $hash->{helper}{bri} ) {readingsBulkUpdate($hash,"bri",$bri);}
   if( defined($ct) && $ct != $hash->{helper}{ct} ) {
@@ -1416,6 +1420,8 @@ HUEDevice_Parse($$)
   if( !defined($hash->{helper}{reachable}) || $reachable != $hash->{helper}{reachable} ) {readingsBulkUpdate($hash,"reachable",$reachable?1:0);}
   if( defined($alert) && $alert ne $hash->{helper}{alert} ) {readingsBulkUpdate($hash,"alert",$alert);}
   if( defined($effect) && $effect ne $hash->{helper}{effect} ) {readingsBulkUpdate($hash,"effect",$effect);}
+
+  if( defined($rgb) && $rgb ne $hash->{helper}{rgb} ) {readingsBulkUpdate($hash,"rgb",$rgb);}
 
   my $s = '';
   my $pct = -1;
@@ -1461,6 +1467,8 @@ HUEDevice_Parse($$)
   $hash->{helper}{alert} = $alert if( defined($alert) );
   $hash->{helper}{effect} = $effect if( defined($effect) );
 
+  $hash->{helper}{rgb} = $rgb if( defined($rgb) );
+
   $hash->{helper}{pct} = $pct;
 
   my $changed = $hash->{CHANGED}?1:0;
@@ -1469,7 +1477,7 @@ HUEDevice_Parse($$)
 
   readingsEndUpdate($hash,1);
 
-  if( defined($colormode) ) {
+  if( defined($colormode) && !defined($rgb) ) {
     my $rgb = CommandGet("","$name rgb");
     if( $rgb ne $hash->{helper}{rgb} ) { readingsSingleUpdate($hash,"rgb", $rgb,1); };
     $hash->{helper}{rgb} = $rgb;
