@@ -177,6 +177,7 @@ my %EnO_manuf = (
   "045" => "Holter",
   "046" => "ID-RF",
   "049" => "Micropelt GmbH",
+  "05F" => "EFP GmbH",
   "7FF" => "Multi user Manufacturer ID",
 );
 
@@ -300,6 +301,7 @@ my %EnO_eepConfig = (
  #"A5.20.02" => {attr => {subType => "hvac.02"}},
  #"A5.20.03" => {attr => {subType => "hvac.03"}},
   "A5.20.04" => {attr => {subType => "hvac.04", webCmd => "setpointTemp"}, GPLOT => "EnO_A5-20-04:Temp/FeedTemp,EnO_A5-20-04_2:SetpointTemp/Setpoint,EnO_A5-20-04_3:PID,"},
+  "A5.20.06" => {attr => {subType => "hvac.06", webCmd => "setpointTemp"}, GPLOT => "EnO_A5-20-06:Temp/SetpointTemp/FeetTemp/RoomTemp/Setpoint,EnO_A5-20-06_2:PID,"},
   "A5.20.10" => {attr => {subType => "hvac.10", comMode => "biDir", destinationID => "unicast", subDef => "getNextID"}, GPLOT => "EnO_A5-20-10:FanSpeed,"},
   "A5.20.11" => {attr => {subType => "hvac.11", comMode => "biDir", destinationID => "unicast", subDef => "getNextID"}},
  #"A5.20.12" => {attr => {subType => "hvac.12"}},
@@ -443,6 +445,7 @@ my %EnO_models = (
 my @EnO_defaultChannel = ("all", "input", 0..29);
 
 my %wakeUpCycle = (
+  'auto' => 0x40,
       10 => 0,
       60 => 1,
       90 => 2,
@@ -493,8 +496,12 @@ my %wakeUpCycle = (
     1440 => 47,
     1470 => 48,
     1500 => 49,
+    1800 => 0x45,
+    3600 => 0x46,
+    7200 => 0x47,
    10800 => 50,
    21600 => 51,
+   28800 => 0x48,
    32400 => 52,
    43200 => 53,
    54000 => 54,
@@ -722,7 +729,7 @@ EnOcean_Initialize($)
                       "temperatureScale:C,F,default,no_change timeNotation:12,24,default,no_change " .
                       "timeProgram1 timeProgram2 timeProgram3 timeProgram4 trackerWakeUpCycle:10,20,30,40,60,120,180,240,3600,86400 updateState:default,yes,no " .
                       "uteResponseRequest:yes,no " .
-                      "wakeUpCycle:" . join(",", keys %wakeUpCycle) . " " .
+                      "wakeUpCycle:" . join(",", sort keys %wakeUpCycle) . " windowOpenCtrl:disable,enable " .
                       $readingFnAttributes;
 
   for (my $i = 0; $i < @EnO_ptm200btn; $i++) {
@@ -1033,7 +1040,7 @@ sub EnOcean_Define($$) {
   }
 
   # device specific actions
-  if (exists($attr{$name}{subType}) && $attr{$name}{subType} =~ m/^hvac\.0(1|4)$/) {
+  if (exists($attr{$name}{subType}) && $attr{$name}{subType} =~ m/^hvac\.0(1|4|6)$/) {
     # pid parameter
     @{$hash->{helper}{calcPID}} = (undef, $hash, 'defined');
     $hash->{helper}{stopped} = 0;
@@ -2706,7 +2713,7 @@ sub EnOcean_Set($@)
         $updateState = 2;
 
       } elsif ($cmd =~ m/^desired-temp|setpointTemp$/) {
-        if (defined $a[1] && $a[1] =~ m/^\d+(\.\d)?$/ && $a[1] >= 10 && $a[1] <= 30) {
+        if (defined $a[1] && $a[1] =~ m/^\d+(\.\d)?$/ && $a[1] >= 0 && $a[1] <= 40) {
           $cmd = "setpointTemp";
           $setpointTemp = $a[1];
           readingsBeginUpdate($hash);
@@ -2797,6 +2804,66 @@ sub EnOcean_Set($@)
         $cmdList .= "setpointTemp:slider,10,1,30 " if (AttrVal($name, "pidCtrl", 'on') eq 'on' || AttrVal($name, "model", '') eq 'Holter_OEM');
         $cmdList .= "setpoint:slider,0,5,100 " if (AttrVal($name, "pidCtrl", 'on') eq 'off' && AttrVal($name, "model", '') ne 'Holter_OEM');
         $cmdList .= "runInit:noArg valveCloses:noArg valveOpens:noArg";
+        return "Unknown command " . $cmd . ", choose one of " . $cmdList;
+      }
+
+    } elsif ($st eq "hvac.06") {
+      # Battery Powered Actuator (EEP A5-20-06)
+      # [Micropelt iTRV MVA-005, OPUS Micropelt HOME]
+      $rorg = "A5";
+      my $setpointTemp = ReadingsVal($name, "setpointTemp", 20);
+      my $temperature = ReadingsVal($name, "temperature", 20);
+      if ($cmd eq "setpoint") {
+        if (defined $a[1] && $a[1] =~ m/^\d+$/ && $a[1] >= 0 && $a[1] <= 100) {
+          readingsBeginUpdate($hash);
+          readingsBulkUpdate($hash, "setpointSet", $a[1]);
+          readingsBulkUpdate($hash, "waitingCmds", $cmd);
+          readingsEndUpdate($hash, 0);
+          # stop PID regulator
+          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+          CommandDeleteReading(undef, "$name setpointTempSet");
+          Log3 $name, 3, "EnOcean set $name $cmd $a[1]";
+          shift(@a);
+        } else {
+          return "Usage: $cmd value wrong.";
+        }
+        $updateState = 2;
+
+      } elsif ($cmd =~ m/^desired-temp|setpointTemp$/) {
+        if (defined $a[1] && $a[1] =~ m/^\d+(\.\d)?$/ && $a[1] >= 0 && $a[1] <= 40) {
+          $cmd = "setpointTemp";
+          $setpointTemp = $a[1];
+          readingsBeginUpdate($hash);
+          readingsBulkUpdate($hash, "setpointTempSet", sprintf("%0.1f", $setpointTemp));
+          readingsBulkUpdate($hash, "waitingCmds", "setpointTemp");
+          readingsEndUpdate($hash, 0);
+          # PID regulator active
+          my $activatePID = AttrVal($name, 'pidCtrl', 'off') eq 'on' ? 'start' : 'stop';
+          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, $activatePID, '');
+          CommandDeleteReading(undef, "$name setpointSet");
+          Log3 $name, 3, "EnOcean set $name $cmd $setpointTemp";
+          shift(@a);
+        } else {
+          return "Usage: $cmd value wrong.";
+        }
+        $updateState = 2;
+
+      } elsif ($cmd =~ m/^runInit|standby$/) {
+        # unattended?
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash, "waitingCmds", $cmd);
+        readingsEndUpdate($hash, 0);
+        # stop PID regulator
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        CommandDeleteReading(undef, "$name setpointSet");
+        CommandDeleteReading(undef, "$name setpointTempSet");
+        CommandDeleteReading(undef, "$name alarm");
+        RemoveInternalTimer($hash->{helper}{timer}{alarm}) if(exists $hash->{helper}{timer}{alarm});
+        Log3 $name, 3, "EnOcean set $name $cmd";
+        $updateState = 2;
+
+      } else {
+        $cmdList .= "setpointTemp:slider,0,1,40 setpoint:slider,0,5,100 desired-temp runInit:noArg standby:noArg";
         return "Unknown command " . $cmd . ", choose one of " . $cmdList;
       }
 
@@ -7421,8 +7488,9 @@ sub EnOcean_Parse($$)
                 EnOcean_SndRadio(undef, $hash, $packetType, $rorg, $data, "00000000", "00", $hash->{DEF});
                 Log3 $name, 2, "EnOcean $name 4BS teach-in response sent to " . $hash->{DEF};
 
-              } elsif ($st eq "hvac.04") {
+              } elsif ($st eq "hvac.04" || "hvac.06") {
                 # heating radiator valve actuating drive (EEP A5-20-04)
+                # Battery Powered Actuator (EEP A5-20-06)
                 $attr{$name}{comMode} = "biDir";
                 $attr{$name}{destinationID} = "unicast";
                 ($err, $subDef) = EnOcean_AssignSenderID(undef, $hash, "subDef", "biDir");
@@ -7525,12 +7593,14 @@ sub EnOcean_Parse($$)
 #        $maintenanceMode = 'off';
 #      }
       push @event, "3:cover:" . (($db[2] & 8) ? "open" : "closed");
-      push @event, "3:window:" . (($db[2] & 2) ? "open" : "closed");
+      my $window = ($db[2] & 2) ? "open" : "closed";
+      push @event, "3:window:$window";
       push @event, "3:actuatorState:". (($db[2] & 1) ? "obstructed" : "ok");
       push @event, "3:selfCtrl:" . (($db[0] & 4) ? "on" : "off");
       my $functionSelect = 0;
       my $setpointSelect = 0;
-      my $setpointSet = ReadingsVal($name, "setpointSet", $setpoint);
+      my $setpointSet = ReadingsVal($name, "setpointSetRestore", ReadingsVal($name, "setpointSet", $setpoint));
+      CommandDeleteReading(undef, "$name setpointSetRestore");
       my $setpointTemp = ReadingsVal($name, "setpointTemp", 20);
       my $setpointTempSet = ReadingsVal($name, "setpointTempSet", $setpointTemp);
       my $temperature = ReadingsVal($name, 'temperature', $roomTemp);
@@ -7554,7 +7624,7 @@ sub EnOcean_Parse($$)
       # calc wakeup cycle
       if ($summerMode eq 'off') {
         $summerMode = 0;
-        if ($timeDiff == 0) {
+        if ($timeDiff == 0  || $window eq 'open') {
           $wakeUpCycle = 1200;
         } elsif ($timeDiff < 120) {
           $wakeUpCycle = 120;
@@ -7613,9 +7683,29 @@ sub EnOcean_Parse($$)
           $waitingCmds = ReadingsVal($name, "waitingCmds", "no_change");
       }
 
-      if ($waitingCmds eq "valveOpens") {
+      if (AttrVal($name, 'windowOpenCtrl', 'disable') eq 'enable' && $window eq 'open') {
+        # valve will be closed if the window is open
         # deactivate PID regulator
         ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        if ($operationMode eq 'setpoint') {
+          readingsSingleUpdate($hash, 'setpointSetRestore', $setpointSet, 1);
+        }
+        $setpointSet = 0;
+        $db[2] = (40 - $temperature) * 255 / 40;
+        readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
+        push @event, "3:maintenanceMode:off";
+        push @event, "3:operationMode:windowOpen";
+        if ($operationMode ne 'windowOpen') {
+          push @event, "3:waitingCmds:$operationMode";
+        }
+        $waitingCmds = 0;
+
+      } elsif ($waitingCmds eq "valveOpens") {
+        # deactivate PID regulator
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        if ($operationMode eq 'setpoint') {
+          readingsSingleUpdate($hash, 'setpointSetRestore', $setpointSet, 1);
+        }
         $setpointSet = 100;
         $db[2] = 0x20;
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
@@ -7629,6 +7719,9 @@ sub EnOcean_Parse($$)
         $waitingCmds = 0x20;
 
       } elsif ($waitingCmds eq "valveCloses") {
+        if ($operationMode eq 'setpoint') {
+          readingsSingleUpdate($hash, 'setpointSetRestore', $setpointSet, 1);
+        }
         if ($maintenanceMode eq "valveOpend:runInit") {
           $setpointSet = 100;
           $db[2] = 0x20;
@@ -7656,6 +7749,9 @@ sub EnOcean_Parse($$)
       } elsif ($waitingCmds eq "runInit") {
         # deactivate PID regulator
         ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        if ($operationMode eq 'setpoint') {
+          readingsSingleUpdate($hash, 'setpointSetRestore', $setpointSet, 1);
+        }
         $setpointSet = 0;
         $db[2] = 0x20;
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
@@ -7672,6 +7768,9 @@ sub EnOcean_Parse($$)
       } elsif ($waitingCmds eq "liftSet") {
         # deactivate PID regulator
         ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        if ($operationMode eq 'setpoint') {
+          readingsSingleUpdate($hash, 'setpointSetRestore', $setpointSet, 1);
+        }
         $setpointSet = 0;
         $db[2] = 0x20;
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
@@ -7741,6 +7840,9 @@ sub EnOcean_Parse($$)
       } elsif ($waitingCmds eq "summerMode") {
         # deactivate PID regulator
         ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        if ($operationMode eq 'setpoint') {
+          readingsSingleUpdate($hash, 'setpointSetRestore', $setpointSet, 1);
+        }
         $setpointSet = $setpointSummerMode;
         $db[2] = (40 - $temperature) * 255 / 40;
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
@@ -8154,6 +8256,302 @@ sub EnOcean_Parse($$)
                                           ($setpointTempSet - 10) / 20 * 255,
                                           (AttrVal($name, 'pidCtrl', 'on') eq 'on' ? 0 : 0x80) | $measurementCtrl | $wakeUpCycle,
                                           $displayOrientation | 8 | $blockKey | $waitingCmds;
+      EnOcean_SndRadio(undef, $hash, $packetType, "A5", $data, $subDef, "00", $hash->{DEF});
+
+    } elsif ($st eq "hvac.06") {
+      # Battery Powered Actuator (EEP A5-20-06)
+      # [Micropelt iTRV MVA-005, OPUS Micropelt HOME]
+      my $maintenanceMode = ReadingsVal($name, "maintenanceMode", 'off');
+      push @event, "3:energyInput:" . (($db[0] & 0x40) ? "enabled" : "disabled");
+      my $battery;
+      my $energyStorage;
+      if ($db[0] & 0x20) {
+        $energyStorage = 'charged';
+        $battery = 'ok';
+      } else {
+        $energyStorage = 'empty';
+        $battery = 'low';
+      }
+      if (!exists($hash->{helper}{battery}) || $hash->{helper}{battery} ne $battery) {
+        push @event, "3:battery:$battery";
+        $hash->{helper}{battery} = $battery;
+      }
+      push @event, "3:energyStorage:$energyStorage";
+      my $feedTemp = ReadingsVal($name, "feedTemp", 20);
+      my $roomTemp = ReadingsVal($name, "roomTemp", 20);
+      if ($db[0] & 0x80) {
+        $feedTemp = $db[1] / 2;
+        push @event, "3:feedTemp:" . sprintf "%0.1f", $db[1] / 2;
+        CommandDeleteReading(undef, "$name roomTemp");
+      } else {
+        $roomTemp = $db[1] / 2;
+        push @event, "3:roomTemp:" . sprintf "%0.1f", $db[1] / 2;
+        CommandDeleteReading(undef, "$name feedTemp");
+      }
+      my $setpoint = $db[3];
+      push @event, "3:setpoint:$setpoint";
+      my $window = ($db[0] & 0x10) ? "open" : "closed";
+      push @event, "3:window:$window";
+      push @event, "3:radioComErr:" . (($db[0] & 4) ? "on" : "off");
+      push @event, "3:radioSignalStrength:" . (($db[0] & 2) ? "weak" : "strong");
+      push @event, "3:actuatorState:". (($db[0] & 1) ? "obstructed" : "ok");
+      my $functionSelect = 0;
+      my $setpointSelect = 0;
+      my $setpointSet = ReadingsVal($name, "setpointSetRestore", ReadingsVal($name, "setpointSet", $setpoint));
+      CommandDeleteReading(undef, "$name setpointSetRestore");
+      my $setpointTemp = ReadingsVal($name, "setpointTemp", 20);
+      my $setpointTempSet = ReadingsVal($name, "setpointTempSet", $setpointTemp);
+      my %setpointTempOffset = (0 => 0, 1 => 1, 2 => 2, 3 => 3, 4 => 4, 5 => 5, 0x7B => -5, 0x7C => -4, 0x7D => -3, 0x7E => -2, 0x7F => -1);
+      my $setpointTempLocal = $db[2] & 0x7F;
+      if ($db[2] & 0x80) {
+        $setpointTempLocal = $setpointTempLocal / 2;
+      } else {
+        $setpointTempLocal = $setpointTempSet + $setpointTempOffset{$setpointTempLocal};
+      }
+      if (AttrVal($name, "blockKey", 'no') eq 'no') {
+        $setpointTempSet = $setpointTempLocal;
+        readingsSingleUpdate($hash, 'setpointTempSet', $setpointTempSet, 1);
+      }
+      my $temperature = ReadingsVal($name, 'temperature', $roomTemp);
+      if (!defined(AttrVal($name, "temperatureRefDev", undef))) {
+        if ($db[0] & 0x80) {
+          CommandDeleteReading(undef, "$name temperature");
+        } else {
+          $temperature = $roomTemp;
+          readingsSingleUpdate($hash, 'temperature', sprintf("%0.1f", $temperature), 1);
+        }
+      }
+
+      Log3 $name, 5, "EnOcean $name EnOcean_parse SPT: $setpointTemp SPTS: $setpointTempSet";
+
+      my $operationMode = ReadingsVal($name, "operationMode", 'setpointTemp');
+      my $setpointSummerMode = AttrVal($name, "setpointSummerMode", 0);
+      my $summerMode = AttrVal($name, "summerMode", "off");
+      my $timeDiff = EnOcean_TimeDiff(ReadingsTimestamp($name, 'wakeUpCycle', undef));
+      my $waitingCmds = ReadingsVal($name, "waitingCmds", "no_change");
+      my $wakeUpCycle = 600;
+      # calc wakeup cycle
+      if ($summerMode eq 'off') {
+        $summerMode = 0;
+        if ($timeDiff == 0 || $window eq 'open') {
+          $wakeUpCycle = 600;
+        } elsif ($timeDiff < 120) {
+          $wakeUpCycle = 120;
+        } elsif ($timeDiff > 7200) {
+          $wakeUpCycle = 7200;
+        } else {
+          $wakeUpCycle = int($timeDiff);
+        }
+      } else {
+        $summerMode = 8;
+        # ignore all commands
+        if ($waitingCmds ne "summerMode") {
+          $waitingCmds = "no_change";
+          CommandDeleteReading(undef, "$name waitingCmds");
+        }
+        $wakeUpCycle = 28800;
+      }
+      readingsSingleUpdate($hash, 'wakeUpCycle', $wakeUpCycle, 1);
+      # set alarm timer
+      CommandDeleteReading(undef, "$name alarm");
+      if ($waitingCmds ne "standby") {
+        RemoveInternalTimer($hash->{helper}{timer}{alarm}) if(exists $hash->{helper}{timer}{alarm});
+        @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'no_response_from_actuator', 1, 3);
+        InternalTimer(gettimeofday() + ($wakeUpCycle < 600 ? 600 : $wakeUpCycle) * 1.1, "EnOcean_readingsSingleUpdate", $hash->{helper}{timer}{alarm}, 0);
+      }
+      my $actionCmd = AttrVal($name, "rcvRespAction", undef);
+      if (defined $actionCmd) {
+        my %specials = ("%ACTUATORSTATE" => (($db[0] & 1) ? "obstructed" : "ok"),
+                        "%BATTERY" => $battery,
+                        "%ENERGYINPUT" => (($db[0] & 0x40) ? "enabled" : "disabled"),
+                        "%ENERGYSTORAGE" => $energyStorage,
+                        "%FEEDTEMP" => $feedTemp,
+                        "%MAINTENANCEMODE" => $maintenanceMode,
+                        "%NAME" => $name,
+                        "%OPERATIONMODE" => $operationMode,
+                        "%RADIOCOMERR" => (($db[0] & 4) ? "on" : "off"),
+                        "%RADIOSIGNALSTRENGTH" => (($db[0] & 2) ? "weak" : "strong"),
+                        "%ROOMTEMP" => $roomTemp,
+                        "%SETPOINT" => $setpoint,
+                        "%SETPOINTTEMP" => $setpointTemp,
+                        "%SETPOINTTEMPLOCAL" => $setpointTempLocal,
+                        "%SUMMERMODE" => $summerMode,
+                        "%TEMPERATURE" => $temperature,
+                        "%WINDOW" => (($db[0] & 0x10) ? "open" : "closed"),
+                       );
+          # action exec
+          $actionCmd = EvalSpecials($actionCmd, %specials);
+          my $ret = AnalyzeCommandChain(undef, $actionCmd);
+          Log3 $name, 2, "Encean $name rcvRespAction ERROR: $ret" if($ret);
+          $maintenanceMode = ReadingsVal($name, "maintenanceMode", ($db[2] & 0x80) ? 'on' : 'off');
+          $operationMode = ReadingsVal($name, "operationMode", 'setpointTemp');
+          $setpointSet = ReadingsVal($name, "setpointSet", $setpoint);
+          $setpointTempSet = ReadingsVal($name, "setpointTempSet", $setpointTemp);
+          $temperature = ReadingsVal($name, 'temperature', $roomTemp);
+          $waitingCmds = ReadingsVal($name, "waitingCmds", "no_change");
+      }
+
+      if (AttrVal($name, 'windowOpenCtrl', 'disable') eq 'enable' && $window eq 'open') {
+        # valve will be closed if the window is open
+        # deactivate PID regulator
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        if ($operationMode eq 'setpoint') {
+          readingsSingleUpdate($hash, 'setpointSetRestore', $setpointSet, 1);
+        }
+        $setpointSet = 0;
+        readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
+        push @event, "3:maintenanceMode:off";
+        push @event, "3:operationMode:windowOpen";
+        if ($operationMode ne 'windowOpen') {
+          push @event, "3:waitingCmds:$operationMode";
+        }
+        $waitingCmds = 0;
+
+      } elsif ($waitingCmds eq "runInit") {
+        # deactivate PID regulator
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        if ($operationMode eq 'setpoint') {
+          readingsSingleUpdate($hash, 'setpointSetRestore', $setpointSet, 1);
+        }
+        $setpointSet = 0;
+        readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
+        push @event, "3:maintenanceMode:runInit";
+        push @event, "3:operationMode:off";
+        push @event, "3:waitingCmds:$operationMode";
+        $waitingCmds = 0x80;
+
+      } elsif ($waitingCmds eq "standby") {
+        # deactivate PID regulator
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        if ($operationMode eq 'setpoint') {
+          readingsSingleUpdate($hash, 'setpointSetRestore', $setpointSet, 1);
+        }
+        $setpointSet = 0;
+        readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
+        push @event, "3:maintenanceMode:off";
+        push @event, "3:operationMode:standby";
+        push @event, "3:waitingCmds:$operationMode";
+        $functionSelect = 1;
+        $waitingCmds = 0;
+
+      } elsif ($waitingCmds eq "setpoint") {
+        # deactivate PID regulator
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        push @event, "3:maintenanceMode:off";
+        push @event, "3:operationMode:setpoint";
+        CommandDeleteReading(undef, "$name setpointTemp");
+        CommandDeleteReading(undef, "$name setpointTempSet");
+        CommandDeleteReading(undef, "$name waitingCmds");
+        $waitingCmds = 0;
+
+      } elsif ($waitingCmds eq "setpointTemp") {
+        if (AttrVal($name, "pidCtrl", 'on') eq 'on') {
+          # activate PID regulator
+          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'actuator', '');
+          $setpointSet = ReadingsVal($name, "setpointSet", $setpoint);
+        } else {
+          # deactivate PID regulator
+          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+          # setpoint temperature
+          $setpointSet = int($setpointTempSet * 2);
+          $setpointSelect = 4;
+        }
+        $setpointTemp = $setpointTempSet;
+        push @event, "3:setpointTemp:" . sprintf("%0.1f", $setpointTemp);
+        push @event, "3:maintenanceMode:off";
+        push @event, "3:operationMode:setpointTemp";
+        CommandDeleteReading(undef, "$name waitingCmds");
+        $waitingCmds = 0;
+
+      } elsif ($waitingCmds eq "summerMode") {
+        # deactivate PID regulator
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        if ($operationMode eq 'setpoint') {
+          readingsSingleUpdate($hash, 'setpointSetRestore', $setpointSet, 1);
+        }
+        $setpointSet = $setpointSummerMode;
+        readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
+        push @event, "3:maintenanceMode:off";
+        push @event, "3:operationMode:summerMode";
+        #CommandDeleteReading(undef, "$name setpointSet");
+        CommandDeleteReading(undef, "$name setpointTemp");
+        CommandDeleteReading(undef, "$name setpointTempSet");
+        CommandDeleteReading(undef, "$name waitingCmds");
+        $waitingCmds = 0;
+
+      } elsif ($operationMode eq "setpoint") {
+        # deactivate PID regulator
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        push @event, "3:maintenanceMode:off";
+        push @event, "3:operationMode:setpoint";
+        $waitingCmds = 0;
+
+      } elsif ($operationMode eq "setpointTemp") {
+        if (AttrVal($name, "pidCtrl", 'on') eq 'on') {
+          # activate PID regulator
+          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'actuator', '');
+          $setpointSet = ReadingsVal($name, "setpointSet", $setpointSet);
+        } else {
+          # deactivate PID regulator
+          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+          # setpoint temperature
+          $setpointSet = int($setpointTempSet * 2);
+          $setpointSelect = 4;
+        }
+        $setpointTemp = $setpointTempSet;
+        push @event, "3:setpointTemp:" . sprintf("%.1f", $setpointTemp);
+        push @event, "3:maintenanceMode:off";
+        push @event, "3:operationMode:setpointTemp";
+        $waitingCmds = 0;
+
+      } elsif ($operationMode eq "summerMode") {
+        # deactivate PID regulator
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        $setpointSet = $setpointSummerMode;
+        readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
+        push @event, "3:maintenanceMode:off";
+        push @event, "3:operationMode:summerMode";
+        $waitingCmds = 0;
+
+      } else {
+        $waitingCmds = 0;
+      }
+
+      if (defined(ReadingsVal($name, "temperature", undef))) {
+        $db[2] = int($temperature * 4);
+      } else {
+        # use actuator-internal temperature sensor
+        $db[2] = 0xFF;
+      }
+      $wakeUpCycle = AttrVal($name, "wakeUpCycle", "auto");
+      if (lc($wakeUpCycle) eq 'auto') {
+        $wakeUpCycle = 0;
+      } elsif ($wakeUpCycle <= 120) {
+        $wakeUpCycle = 0x10;
+      } elsif ($wakeUpCycle <= 300) {
+        $wakeUpCycle = 0x20;
+      } elsif ($wakeUpCycle <= 600) {
+        $wakeUpCycle = 0x30;
+      } elsif ($wakeUpCycle <= 1200) {
+        $wakeUpCycle = 0x40;
+      } elsif ($wakeUpCycle <= 1800) {
+        $wakeUpCycle = 0x50;
+      } elsif ($wakeUpCycle <= 3600) {
+        $wakeUpCycle = 0x60;
+      } else {
+        $wakeUpCycle = 0x70;
+      }
+      my $measurementCtrl = 0;
+      if (AttrVal($name, "measurementCtrl", "enable") eq 'disable') {
+        if (AttrVal($name, "pidCtrl", 'on') eq 'on' && defined AttrVal($name, "temperatureRefDev", undef)) {
+          $measurementCtrl = 2;
+        } elsif (AttrVal($name, "pidCtrl", 'on') eq 'off') {
+          $measurementCtrl = 2;
+        }
+      }
+      push @event, "3:state:T: " . sprintf("%0.1f", $temperature) . " SPT: " . sprintf("%.1f", $setpointTemp) . " SP: $setpoint";
+      # sent message to the actuator
+      $data = sprintf "%02X%02X%02X08", $setpointSet, $db[2], $waitingCmds | $wakeUpCycle | $summerMode | $setpointSelect | $measurementCtrl | $functionSelect;
       EnOcean_SndRadio(undef, $hash, $packetType, "A5", $data, $subDef, "00", $hash->{DEF});
 
     } elsif ($st eq "hvac.10") {
@@ -12819,6 +13217,26 @@ sub EnOcean_Attr(@)
                       "%TEMPERATURE" => ''
                      );
       $err = perlSyntaxCheck($attrVal, %specials);
+    } elsif (AttrVal($name, "subType", "") eq "hvac.06") {
+      my %specials = ("%ACTUATORSTATE" => '',
+                      "%BATTERY" => '',
+                      "%ENERGYINPUT" => '',
+                      "%ENERGYSTORAGE" => '',
+                      "%FEEDTEMP" => '',
+                      "%MAINTENANCEMODE" => '',
+                      "%NAME" => $name,
+                      "%OPERATIONMODE" => '',
+                      "%RADIOCOMERR" => '',
+                      "%RADIOSIGNALSTRENGTH" => '',
+                      "%ROOMTEMP" => '',
+                      "%SETPOINT" => '',
+                      "%SETPOINTTEMP" => '',
+                      "%SETPOINTTEMPLOCAL" => '',
+                      "%SUMMERMODE" => '',
+                      "%TEMPERATURE" => '',
+                      "%WINDOW" => '',
+                     );
+      $err = perlSyntaxCheck($attrVal, %specials);
     }
 
   } elsif ($attrName eq "remoteID") {
@@ -12995,7 +13413,7 @@ sub EnOcean_Attr(@)
     if (!defined $attrVal){
 
     } elsif ($attrVal eq 'on') {
-      if (AttrVal($name, 'subType', '') =~ m/^hvac\.0(1|4)$/ && AttrVal($name, 'summerMode', 'off') eq 'off') {
+      if (AttrVal($name, 'subType', '') =~ m/^hvac\.0(1|4|6)$/ && AttrVal($name, 'summerMode', 'off') eq 'off') {
         readingsBeginUpdate($hash);
         readingsBulkUpdate($hash, 'waitingCmds', 'summerMode');
         readingsBulkUpdate($hash, 'operationModeRestore', ReadingsVal($name, 'operationMode', 'setpoint'));
@@ -13008,7 +13426,7 @@ sub EnOcean_Attr(@)
 
       }
     } elsif ($attrVal eq 'off') {
-      if (AttrVal($name, 'subType', '') =~ m/^hvac\.0(1|4)$/ && AttrVal($name, 'summerMode', 'off') eq 'on') {
+      if (AttrVal($name, 'subType', '') =~ m/^hvac\.0(1|4|6)$/ && AttrVal($name, 'summerMode', 'off') eq 'on') {
         readingsBeginUpdate($hash);
         readingsBulkUpdate($hash, 'waitingCmds', 'runInit');
         readingsBulkUpdate($hash, 'operationMode', ReadingsVal($name, 'operationModeRestore', 'setpoint'));
@@ -13046,7 +13464,7 @@ sub EnOcean_Attr(@)
   } elsif ($attrName eq "teachMethod") {
     if (!defined $attrVal){
 
-    } elsif ($attrVal !~ m/^1BS|4BS|confirm|GP|RPS|smartAck|STE|UTE$$/) {
+    } elsif ($attrVal !~ m/^1BS|4BS|confirm|GP|RPS|smartAck|STE|UTE$/) {
       $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
@@ -13119,7 +13537,7 @@ sub EnOcean_Attr(@)
     my $wakeUpCycle = join("|", keys %wakeUpCycle);
     if (!defined $attrVal){
 
-    } elsif ($attrVal =~ m/^$wakeUpCycle$/) {
+    } elsif (AttrVal($name, "subType", "") eq "hvac.04" && $attrVal =~ m/^$wakeUpCycle$/ && $wakeUpCycle{$attrVal} <= 63) {
       if ($attrVal >= 1500 && AttrVal($name, 'wakeUpCycle', 300) < 1500) {
         # switch to summer mode
         $attr{$name}{summerMode} = 'on';
@@ -13129,7 +13547,26 @@ sub EnOcean_Attr(@)
         $attr{$name}{summerMode} = 'off';
         readingsSingleUpdate($hash, 'waitingCmds', 'runInit', 0);
       }
+    } elsif (AttrVal($name, "subType", "") eq "hvac.06" && $attrVal =~ m/^$wakeUpCycle$/) {
+      if (lc($attrVal) eq 'auto') {
+
+      } elsif ($attrVal > 7200 && AttrVal($name, 'wakeUpCycle', 300) <= 7200) {
+        # switch to summer mode
+        $attr{$name}{summerMode} = 'on';
+        readingsSingleUpdate($hash, 'waitingCmds', 'summerMode', 0);
+      } elsif ($attrVal <= 7200 && AttrVal($name, 'wakeUpCycle', 300) > 7200) {
+        # runInit necessary before switch to operation mode
+        $attr{$name}{summerMode} = 'off';
+        readingsSingleUpdate($hash, 'waitingCmds', 'runInit', 0);
+      }
     } else {
+      $err = "attribute-value [$attrName] = $attrVal wrong";
+    }
+
+  } elsif ($attrName eq "windowOpenCtrl") {
+    if (!defined $attrVal){
+
+    } elsif ($attrVal !~ m/^disable|enable$/) {
       $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
@@ -13237,7 +13674,7 @@ sub EnOcean_Notify(@)
     } elsif ($devName eq "global" && $s =~ m/^DEFINED ([^ ]*)$/) {
       my $definedName = $1;
       if ($name eq $definedName) {
-        if (exists($attr{$name}{subType}) && $attr{$name}{subType} =~ m/^hvac\.0(1|4)$/) {
+        if (exists($attr{$name}{subType}) && $attr{$name}{subType} =~ m/^hvac\.0(1|4|6)$/) {
           # control PID regulatior
           if (AttrVal($name, 'pidCtrl', 'on') eq 'on' && ReadingsVal($name, 'maintenanceMode', 'off') eq 'off') {
             EnOcean_setPID(undef, $hash, 'start', ReadingsVal($name, "setpoint", ''));
@@ -13258,7 +13695,7 @@ sub EnOcean_Notify(@)
       if (AttrVal($name ,"subType", "") eq "roomCtrlPanel.00") {
         CommandDeleteReading(undef, "$name waitingCmds");
       }
-      if (exists($attr{$name}{subType}) && $attr{$name}{subType} =~ m/^hvac\.0(1|4)$/) {
+      if (exists($attr{$name}{subType}) && $attr{$name}{subType} =~ m/^hvac\.0(1|4|6)$/) {
         # control PID regulatior
         if (AttrVal($name, 'pidCtrl', 'on') eq 'on' && ReadingsVal($name, 'maintenanceMode', 'off') eq 'off') {
           EnOcean_setPID(undef, $hash, 'start', ReadingsVal($name, "setpoint", ''));
@@ -13281,7 +13718,7 @@ sub EnOcean_Notify(@)
       if (AttrVal($name ,"subType", "") eq "roomCtrlPanel.00") {
         CommandDeleteReading(undef, "$name waitingCmds");
       }
-      if (exists($attr{$name}{subType}) && $attr{$name}{subType} =~ m/^hvac\.0(1|4)$/) {
+      if (exists($attr{$name}{subType}) && $attr{$name}{subType} =~ m/^hvac\.0(1|4|6)$/) {
         # control PID regulatior
         if (AttrVal($name, 'pidCtrl', 'on') eq 'on' && ReadingsVal($name, 'maintenanceMode', 'off') eq 'off') {
           EnOcean_setPID(undef, $hash, 'start', ReadingsVal($name, "setpoint", ''));
@@ -13480,7 +13917,7 @@ sub EnOcean_Notify(@)
           readingsSingleUpdate($hash, "temperature", $parts[1], 1);
           #Log3 $name, 2, "EnOcean $name <notify> $devName $s";
         }
-        if (AttrVal($name, "subType", "") eq "hvac.04" && AttrVal($name, "measurementCtrl", "enable") eq 'disable') {
+        if (AttrVal($name, "subType", "") =~ m/^hvac\.0(4|6)$/ && AttrVal($name, "measurementCtrl", "enable") eq 'disable') {
           readingsSingleUpdate($hash, "temperature", $parts[1], 1);
           #Log3 $name, 2, "EnOcean $name <notify> $devName $s";
         }
@@ -13489,7 +13926,7 @@ sub EnOcean_Notify(@)
       if (defined(AttrVal($name, "setpointRefDev", undef)) &&
           $devName eq AttrVal($name, "setpointRefDev", "") &&
           $parts[0] eq "setpoint") {
-        if (AttrVal($name, "subType", '') =~ m/^hvac\.0(1|4)$/) {
+        if (AttrVal($name, "subType", '') =~ m/^hvac\.0(1|4|6)$/) {
           my @setCmd = ($name, "setpoint", $parts[1]);
           EnOcean_Set($hash, @setCmd);
           #Log3 $name, 2, "EnOcean $name <notify> $devName $s";
@@ -13499,7 +13936,7 @@ sub EnOcean_Notify(@)
       if (defined(AttrVal($name, "setpointTempRefDev", undef)) &&
           $devName eq AttrVal($name, "setpointTempRefDev", "") &&
           $parts[0] eq "setpointTemp") {
-        if (AttrVal($name, "subType", '') =~ m/^hvac\.0(1|4)$/) {
+        if (AttrVal($name, "subType", '') =~ m/^hvac\.0(1|4|6)$/) {
           if (ReadingsVal($name, "setpointTemp", 0) != $parts[1]) {
             my @setCmd = ($name, "setpointTemp", $parts[1]);
             EnOcean_Set($hash, @setCmd);
@@ -17305,12 +17742,12 @@ EnOcean_Delete($$)
          <li><a href="#EnOcean_setpointRefDev">setpointRefDev</a></li>
          <li><a href="#EnOcean_setpointSummerMode">setpointSummerMode</a></li>
          <li><a href="#EnOcean_setpointTempRefDev">setpointTempRefDev</a></li>
-         <li><a href="#temperatureRefDev">temperatureRefDev</a></li>
          <li><a href="#EnOcean_summerMode">summerMode</a></li>
+         <li><a href="#temperatureRefDev">temperatureRefDev</a></li>
        </ul>
     The actual temperature will be reported by the Heating Radiator Actuating Drive or by the
     <a href="#temperatureRefDev">temperatureRefDev</a> if it is set. The internal temperature sensor
-    of the Micropelt iTRV is not suitable as an actual temperature value for the PID controller.
+    of the Micropelt iTRV MVA-002 is not suitable as an actual temperature value for the PID controller.
     An external room thermostat is required.<br>
     The attr event-on-change-reading .* shut not by set. The PID controller expects periodic events.
     If these are missing, a communication alarm is signaled.<br>
@@ -17364,10 +17801,12 @@ EnOcean_Delete($$)
          <li><a href="#EnOcean_pidFactor_D">pidFactor_D</a></li>
          <li><a href="#EnOcean_pidIPortionCallBeforeSetting">pidIPortionCallBeforeSetting</a></li>
          <li><a href="#EnOcean_pidSensorTimeout">pidSensorTimeout</a></li>
+         <li><a href="#EnOcean_rcvRespAction">rcvRespAction</a></li>
          <li><a href="#EnOcean_setpointRefDev">setpointRefDev</a></li>
+         <li><a href="#EnOcean_setpointSummerMode">setpointSummerMode</a></li>
          <li><a href="#EnOcean_setpointTempRefDev">setpointTempRefDev</a></li>
-         <li><a href="#temperatureRefDev">temperatureRefDev</a></li>
          <li><a href="#EnOcean_summerMode">summerMode</a></li>
+         <li><a href="#temperatureRefDev">temperatureRefDev</a></li>
          <li><a href="#EnOcean_wakeUpCycle">wakeUpCycle</a></li>
        </ul>
     The actual temperature will be reported by the Heating Radiator Actuating Drive or by the
@@ -17381,6 +17820,66 @@ EnOcean_Delete($$)
     attr <device> model Holter_OEM and attr <device> pidCtrl off.<br>
     The command is not sent until the device wakes up and sends a message, usually
     every 5 minutes.
+    </li>
+    <br><br>
+
+    <li>Heating Radiator Actuating Drive (EEP A5-20-06)<br>
+        [Micropelt iTRV MVA-005, OPUS Micropelt HOME]<br>
+    <ul>
+    <code>set &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is
+      <li>runInit<br>
+          Maintenance Mode: Run init sequence</li>
+      <li>setpoint setpoint/%<br>
+          Set the actuator to the specifed setpoint (0...100). The setpoint can also be set by the
+          <a href="#EnOcean_setpointRefDev">setpointRefDev</a> device if it is set.</li>
+      <li>setpointTemp t/&#176C<br>
+          Set the actuator to the specifed temperature setpoint. The temperature setpoint can also be set by the
+          <a href="#EnOcean_setpointTempRefDev">setpointTempRefDev</a> device if it is set.<br>
+          The FHEM PID controller calculates the actuator setpoint based on the temperature setpoint. The controller's
+          operation can be set via the PID parameters <a href="#EnOcean_pidFactor_P">pidFactor_P</a>,
+          <a href="#EnOcean_pidFactor_I">pidFactor_I</a> and <a href="#EnOcean_pidFactor_D">pidFactor_D</a>.</li>
+      <li>standby<br>
+          enter standby mode<br>
+          After the standby command, the valve remains closed permanently and can no longer be controlled by Fhem.
+          By pressing the button on the device itself, the actuator is returned to its normal operating state.</li>
+    </ul><br>
+       The Heating Radiator Actuating Drive is configured using the following attributes:<br>
+       <ul>
+         <li><a href="#EnOcean_blockKey">blockKey</a></li>
+         <li><a href="#EnOcean_measurementCtrl">measurementCtrl</a></li>
+         <li><a href="#model">model</a></li>
+         <li><a href="#EnOcean_pidActorCallBeforeSetting">pidActorCallBeforeSetting</a></li>
+         <li><a href="#EnOcean_pidActorErrorAction">pidActorErrorAction</a></li>
+         <li><a href="#EnOcean_pidActorErrorPos">pidActorErrorPos</a></li>
+         <li><a href="#EnOcean_pidActorLimitLower">pidActorLimitLower</a></li>
+         <li><a href="#EnOcean_pidActorLimitUpper">pidActorLimitUpper</a></li>
+         <li><a href="#EnOcean_pidCtrl">pidCtrl</a></li>
+         <li><a href="#EnOcean_pidDeltaTreshold">pidDeltaTreshold</a></li>
+         <li><a href="#EnOcean_pidFactor_P">pidFactor_P</a></li>
+         <li><a href="#EnOcean_pidFactor_I">pidFactor_I</a></li>
+         <li><a href="#EnOcean_pidFactor_D">pidFactor_D</a></li>
+         <li><a href="#EnOcean_pidIPortionCallBeforeSetting">pidIPortionCallBeforeSetting</a></li>
+         <li><a href="#EnOcean_pidSensorTimeout">pidSensorTimeout</a></li>
+         <li><a href="#EnOcean_rcvRespAction">rcvRespAction</a></li>
+         <li><a href="#EnOcean_setpointRefDev">setpointRefDev</a></li>
+         <li><a href="#EnOcean_setpointSummerMode">setpointSummerMode</a></li>
+         <li><a href="#EnOcean_setpointTempRefDev">setpointTempRefDev</a></li>
+         <li><a href="#temperatureRefDev">temperatureRefDev</a></li>
+         <li><a href="#EnOcean_summerMode">summerMode</a></li>
+         <li><a href="#EnOcean_wakeUpCycle">wakeUpCycle</a></li>
+         <li><a href="#EnOcean_windowOpenCtrl">windowOpenCtrl</a></li>
+       </ul>
+    The actual temperature will be reported by the Heating Radiator Actuating Drive or by the
+    <a href="#temperatureRefDev">temperatureRefDev</a> if it is set.<br>
+    The attr event-on-change-reading .* shut not by set. The PID controller expects periodic events.
+    If these are missing, a communication alarm is signaled.<br>
+    The attr subType must be hvac.06. This is done if the device was
+    created by autocreate. To control the device, it must be bidirectional paired,
+    see <a href="#EnOcean_teach-in">Teach-In / Teach-Out</a>.<br>
+    The command is not sent until the device wakes up and sends a message, usually
+    every 2 to 10 minutes.
     </li>
     <br><br>
 
@@ -18591,8 +19090,8 @@ EnOcean_Delete($$)
       Manufacturer ID number
     </li>
     <li><a name="EnOcean_measurementCtrl">measurementCtrl</a> enable|disable<br>
-      Enable or disable the temperature measurements (room and feed temperature) of the actuator. If the temperature
-      measurements are turned off, an external temperature sensor must be exists, see attribute
+      Enable or disable the temperature measurements (room temperature) of the actuator. If the temperature
+      measurements are turned off, the foot temperature may be displayed and an external temperature sensor must be exists, see attribute
       <a href="#temperatureRefDev">temperatureRefDev</a>.
     </li>
     <li><a href="#model">model</a></li>
@@ -18685,9 +19184,11 @@ EnOcean_Delete($$)
       If &lt;command&gt; is enclosed in {}, then it is a perl expression, if it is enclosed in "", then it is a shell command,
       else it is a "plain" fhem.pl command (chain). In the &lt;command&gt; you can access the name of the device by using $NAME
       and the current readings $ACTUATORSTATE, $BATTERY, $COVER, $ENERGYINPUT, $ENERGYSTORAGE, $MAINTENANCEMODE, $OPERATIONMODE,
-      $ROOMTEMP, $SELFCTRL, $SETPOINT, $SETPOINTTEMP, $SUMMERMODE, $TEMPERATURE, $WINDOW for the subType hvac.01 and $NAME,
+      $ROOMTEMP, $SELFCTRL, $SETPOINT, $SETPOINTTEMP, $SUMMERMODE, $TEMPERATURE, $WINDOW for the subType hvac.01, $NAME,
       $BATTERY, $FEEDTEMP, $MAINTENANCEMODE, $OPERATIONMODE, $ROOMTEMP, $SETPOINT, $SETPOINTTEMP, $SUMMERMODE, $TEMPERATURE
-      for the subType hvac.04.
+      for the subType hvac.04 and $ACTUATORSTATE, $BATTERY, $ENERGYINPUT, $ENERGYSTORAGE, $FEEDTEMP, $MAINTENANCEMODE, $OPERATIONMODE,
+      $RADIOCOMERR, $RADIOSIGNALSTRENGTH, $ROOMTEMP, $SETPOINT, $SETPOINTTEMP, $SETPOINTTEMPLOCAL, $SUMMERMODE, $TEMPERATURE, $WINDOW
+      for the subType hvac.06.
       This data is available as a local variable in perl, as environment variable for shell
       scripts, and will be textually replaced for Fhem commands.
     </li>
@@ -18907,7 +19408,7 @@ EnOcean_Delete($$)
     </li>
     <li><a name="EnOcean_summerMode">summerMode</a> off|on,
       [summerMode] = off is default.<br>
-      Put Battery Powered Actuator (hvac.01) or Heating Radiator Actuating Drive (hvac.04) in summer operation
+      Put Battery Powered Actuator (hvac.01/hvac.06) or Heating Radiator Actuating Drive (hvac.04) in summer operation
       to reduce energy consumption. If [summerMode] = on, the set commands are not executed.
     </li>
     <li><a name="EnOcean_switchHysteresis">switchHysteresis</a> &lt;value&gt;,
@@ -18976,10 +19477,13 @@ EnOcean_Delete($$)
       request UTE teach-in/teach-out response message, the standard value depends on the EEP profil
       </li>
     <li><a href="#verbose">verbose</a></li>
-    <li><a name="EnOcean_wakeUpCycle">wakeUpCycle</a> t/s, [wakeUpCycle] = 10 s ... 151200 s, 300 s is default.<br>
+    <li><a name="EnOcean_wakeUpCycle">wakeUpCycle</a> t/s, [wakeUpCycle] = auto|10 s ... 151200 s, 300 s is default for hvac.04 and auto for hvac.06.<br>
       Transmission cycle of the actuator.
     </li>
     <li><a href="#webCmd">webCmd</a></li>
+    <li><a name="EnOcean_windowOpenCtrl">windowOpenCtrl</a> disable|enable, disable s is default.<br>
+      Window open detection. Valve will be closed if the window is open.
+    </li>
     </ul>
   </ul>
   <br>
@@ -20148,8 +20652,8 @@ EnOcean_Delete($$)
         [Holter SmartDrive MX]<br>
      <ul>
        <li>T: t/&#176C SPT: t/&#176C SP: setpoint/%</li>
-       <li>alarm: measurement_error|battery_empty|frost_protection|blocked_valve|end_point_detection_error|no_valve|not_taught_in|no_response_from_controller|teach-in_error</li>
-       <li>battery: ok|empty</li>
+       <li>alarm: no_response_from_actuator|measurement_error|battery_empty|frost_protection|blocked_valve|end_point_detection_error|no_valve|not_taught_in|no_response_from_controller|teach-in_error</li>
+       <li>battery: ok|low</li>
        <li>blockKey: yes|no</li>
        <li>delta: &lt;floating-point number&gt;</li>
        <li>feedTemp: t/&#176C</li>
@@ -20170,9 +20674,47 @@ EnOcean_Delete($$)
        <li>teach: &lt;result of teach procedure&gt;</li>
        <li>temperature: t/&#176C</li>
        <li>waitingCmds: no_change|runInit|setpoint|setpointTemp|valveCloses|valveOpens</li>
+       <li>wakeUpCycle: t/s</li>
        <li>state: T: t/&#176C SPT: t/&#176C SP: setpoint/%</li>
      </ul><br>
         The attr subType must be hvac.04. This is done if the device was created by
+        autocreate.
+     </li>
+     <br><br>
+
+     <li>Heating Radiator Actuating Drive (EEP A5-20-06)<br>
+        [Micropelt iTRV MVA-005, OPUS Micropelt HOME]<br>
+     <ul>
+       <li>T: t/&#176C SPT: t/&#176C SP: setpoint/%</li>
+       <li>alarm: no_response_from_actuator</li>
+       <li>battery: ok|low</li>
+       <li>blockKey: yes|no</li>
+       <li>delta: &lt;floating-point number&gt;</li>
+       <li>feedTemp: t/&#176C</li>
+       <li>maintenanceMode: off|runInit|valveClosed|valveOpend:runInit</li>
+       <li>measurementState: active|inactive</li>
+       <li>operationMode: off|setpoint|setpointTemp</li>
+       <li>p_d: &lt;floating-point number&gt;</li>
+       <li>p_i: &lt;floating-point number&gt;</li>
+       <li>p_p: &lt;floating-point number&gt;</li>
+       <li>pidAlarm: actuator_in_errorPos|dead_sensor|no_temperature_value|setpoint_device_missing</li>
+       <li>pidState: alarm|idle|processing|start|stop|</li>
+       <li>radioComErr: off|on</li>
+       <li>radioSignalStrength: obstructed|ok</li>
+       <li>roomTemp: t/&#176C</li>
+       <li>setpoint: setpoint/%</li>
+       <li>setpointSet: setpoint/%</li>
+       <li>setpointCalc: setpoint/%</li>
+       <li>setpointTemp: t/&#176C</li>
+       <li>setpointTempSet: t/&#176C</li>
+       <li>teach: &lt;result of teach procedure&gt;</li>
+       <li>temperature: t/&#176C</li>
+       <li>waitingCmds: no_change|runInit|setpoint|setpointTemp|standby</li>
+       <li>wakeUpCycle: auto|t/s</li>
+       <li>window: open|closed</li>
+       <li>state: T: t/&#176C SPT: t/&#176C SP: setpoint/%</li>
+     </ul><br>
+        The attr subType must be hvac.06. This is done if the device was created by
         autocreate.
      </li>
      <br><br>
