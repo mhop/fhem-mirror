@@ -47,7 +47,7 @@ use Encode;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
-  "8.6.1"  => "20.01.2019  time format in readings and galleries depends from global language attribute ",
+  "8.6.1"  => "20.01.2019  time format in readings and galleries depends from global language attribute, minor bug fixes ",
   "8.6.0"  => "20.01.2019  new attribute snapReadingRotate ",
   "8.5.0"  => "17.01.2019  SVS device has \"snapCams\" command ",
   "8.4.5"  => "15.01.2019  fix event generation after request snapshots ",
@@ -4797,10 +4797,18 @@ sub SSCam_camop_parse ($) {
             
 			} elsif ($OpMode eq "gethomemodestate") {  
                 my $hmst = $data->{'data'}{'on'}; 
-                my $hmststr = ($hmst == 1)?"on":"off";				
+                my $hmststr = ($hmst == 1)?"on":"off";
+
+                ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime;
+                if($lang eq "DE") {
+                    $update_time = sprintf "%02d.%02d.%04d / %02d:%02d:%02d" , $mday , $mon+=1 ,$year+=1900 , $hour , $min , $sec ;
+                } else {
+                    $update_time = sprintf "%04d-%02d-%02d / %02d:%02d:%02d" , $year+=1900 , $mon+=1 , $mday , $hour , $min , $sec ;
+                }				
 
                 readingsBeginUpdate($hash);
 				readingsBulkUpdate($hash,"HomeModeState",$hmststr);
+                readingsBulkUpdate($hash,"LastUpdateTime",$update_time);
                 readingsBulkUpdate($hash,"Errorcode","none");
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
