@@ -505,6 +505,10 @@ sub SSCam_Attr($$$$) {
         return " The attribute \"$aName\" is only valid for devices of type \"SVS\"! Please set this attribute in a device of this type.";
     }
     
+    if ($aName =~ /snapReadingRotate/ && !SSCam_IsModelCam($hash)) {            
+        return " The attribute \"$aName\" is not valid for devices of type \"SVS\"!.";
+    }
+    
     # dynamisch PTZ-Attribute setzen (wichtig beim Start wenn Reading "DeviceType" nicht gesetzt ist)
     if ($cmd eq "set" && ($aName =~ m/ptzPanel_.*/)) {
         foreach my $n (0..9) { 
@@ -614,6 +618,21 @@ sub SSCam_Attr($$$$) {
 		RemoveInternalTimer("SSCam_getsnapinfo"); 
 		InternalTimer(gettimeofday()+0.7, "SSCam_getsnapinfo", "$name:$slim:$ssize", 0);
 	}
+    
+    if ($aName eq "snapReadingRotate") {
+        if($cmd eq "set") {
+            $do = ($aVal) ? 1 : 0;
+        }
+        $do = 0 if($cmd eq "del");
+        if(!$do) {$aVal = 0}
+        for my $i (1..10) { 
+            if($i>$aVal) {
+                readingsDelete($hash, "LastSnapFilename$i");
+                readingsDelete($hash, "LastSnapId$i");
+                readingsDelete($hash, "LastSnapTime$i");  
+            }
+        }
+    }
     
     if ($aName eq "simu_SVSversion") {
 	    delete $hash->{HELPER}{APIPARSET};
@@ -4951,9 +4970,9 @@ sub SSCam_camop_parse ($) {
                 }
                 
                 $snapid = $data->{data}{'id'};
-                # readingsSingleUpdate($hash,"LastSnapId",$snapid, 0) if($snapid);
-                my $rotnum = AttrVal($name,"snapReadingRotate",0);
-                SSCam_rotateReading($hash,"LastSnapId",$snapid,$rotnum,0);
+                #readingsSingleUpdate($hash,"LastSnapId",$snapid, 0) if($snapid);
+                #my $rotnum = AttrVal($name,"snapReadingRotate",0);
+                #SSCam_rotateReading($hash,"LastSnapId",$snapid,$rotnum,0);
                 
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"Errorcode","none");
@@ -7242,7 +7261,7 @@ return ($error);
 sub SSCam_rotateReading ($$$$$) {
   my ($hash,$readingName,$val,$rotnum,$do_trigger) = @_;
   my $name = $hash->{NAME};
-
+  #Log3 ($name, 1, "$name -> Rotate \"$readingName\" VAL: $val"); 
   readingsBeginUpdate($hash);
   
   my $o = ReadingsVal($name,$readingName,"n.a."); 
