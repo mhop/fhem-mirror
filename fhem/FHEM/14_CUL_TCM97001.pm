@@ -152,7 +152,7 @@ sub checksum_W174 {
   my $msg = shift;
   Log3 "CUL_TCM97001 ", 4 , "CUL_TCM97001 W174 checksum calc for: $msg";
   my @a = split("", $msg);
-  my $bitReverse = undef;
+  my $bitReverse = "";
   my $x = undef;
   foreach $x (@a) {
      my $bin3=sprintf("%04b",hex($x));
@@ -177,7 +177,7 @@ sub checksum_W155 {
   my $msg = shift;
   Log3 "CUL_TCM97001 ", 5 , "CUL_TCM97001 W155 checksum calc for: $msg";
   my @a = split("", $msg);
-  my $bitReverse = undef;
+  my $bitReverse = "";
   my $x = undef;
   foreach $x (@a) {
      my $bin3=sprintf("%04b",hex($x));
@@ -201,7 +201,7 @@ sub checksum_W155 {
 sub checkCRC {
   my $msg = shift;
   my @a = split("", $msg);
-  my $bitReverse = undef;
+  my $bitReverse = "";
   my $x = undef;
   foreach $x (@a) {
      my $bin3=sprintf("%04b",hex($x));
@@ -269,7 +269,7 @@ sub checkCRCKW9010 {
   my $msg = shift;
   Log3 "CUL_TCM97001", 5 , "CUL_TCM97001 checkCRCKW9010 crc calc for: $msg";
   my @a = split("", $msg);
-  my $bitReverse = undef;
+  my $bitReverse = "";
   my $x = undef;
   foreach $x (@a) {
      my $bin3=sprintf("%04b",hex($x));
@@ -867,11 +867,11 @@ CUL_TCM97001_Parse($$)
    	   # *   E = Checksum
    	   # *   F = 0000 0000 (W174!!!)
 			my @a = split("", $msg);
-         my $bitReverse = undef;
-         my $bitUnreverse = undef;
+         my $bitReverse = "";
+         my $bitUnreverse = "";
          my $x = undef;
          my $bin3;
-			foreach $x (@a) {
+         foreach $x (@a) {
             $bin3=sprintf("%024b",hex($x));
             $bitReverse = $bitReverse . substr(reverse($bin3),0,4); 
             $bitUnreverse = $bitUnreverse . sprintf( "%b", hex( substr($bin3,0,4) ) );
@@ -961,8 +961,8 @@ CUL_TCM97001_Parse($$)
       	# *   E = Checksum
 
         my @a = split("", $msg);
-        my $bitReverse = undef;
-        my $bitUnreverse = undef;
+        my $bitReverse = "";
+        my $bitUnreverse = "";
         my $x = undef;
         my $bin3;
         my $hlen = length($msg);
@@ -1515,7 +1515,7 @@ CUL_TCM97001_Parse($$)
         #                   000011010100 11011110
         #                      212       222-156=66
         my @a = split("", $msg);
-        my $bitReverse = undef;
+        my $bitReverse = "";
         my $x = undef;
         foreach $x (@a) {
 		    $bitReverse = $bitReverse . reverse(sprintf("%04b",hex($x))); 

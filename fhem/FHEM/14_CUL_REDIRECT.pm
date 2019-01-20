@@ -20,6 +20,8 @@
 # Free Software Foundation, Inc., 
 # 51 Franklin St, Fifth Floor, Boston, MA 02110, USA
 #
+# $Id$
+#
 ##############################################
 
 package main;
@@ -189,7 +191,7 @@ sub	decode_Hideki
 		return (-1,"message is to long") if ($message_length > $length_max );
 
 		
-		my $hidekihex;
+		my $hidekihex = "";
 		my $idx;
 		
 		for ($idx=$message_start; $idx<$message_end; $idx=$idx+9)
@@ -313,6 +315,8 @@ CUL_REDIRECT_Parse($$)
 1;
 
 
+=item summary    This module redirects recived messages from CUL to submodules.
+=item summary_DE Module leitet Nachrichrichten vom CUL an Submodule weiter.
 =pod
 =begin html
 

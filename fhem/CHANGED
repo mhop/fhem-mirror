@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  14_CUL_TCM97001: Fix uninitialized value warning
+  - bugfix:  14_CUL_REDIRECT: Fix uninitialized value warning 
   - feature: 93_DbRep: sqlCmd can handle SQL session variables, Forum:#96082
   - bugfix:  98_DOIFtools: remove Log in DOIFtoolsNextTimer
   - bugfix:  93_DbRep: V8.9.10, fix warnings Malformed UTF-8 character during 
