@@ -4970,16 +4970,12 @@ sub SSCam_camop_parse ($) {
                 }
                 
                 $snapid = $data->{data}{'id'};
-                #readingsSingleUpdate($hash,"LastSnapId",$snapid, 0) if($snapid);
-                #my $rotnum = AttrVal($name,"snapReadingRotate",0);
-                #SSCam_rotateReading($hash,"LastSnapId",$snapid,$rotnum,0);
                 
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"Errorcode","none");
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
                                 
-                # Logausgabe
                 if ($snapid) {
                     Log3($name, 3, "$name - Snapshot of Camera $camname created. ID: $snapid");
                 } else {
@@ -8772,7 +8768,10 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   
   One or multiple snapshots are triggered. The number of snapshots to trigger and the time difference (in seconds) between
   each snapshot can be optionally specified. Without any specification only one snapshot is triggered. <br>
-  The ID and the filename of the last snapshot will be displayed in Reading "LastSnapId" respectively "LastSnapFilename". 
+  The ID and the filename of the last snapshot will be displayed in Reading "LastSnapId" respectively 
+  "LastSnapFilename". <br>
+  To get data of the last 1-10 snapshots in various versions, the <a href="#SSCamattr">attribute</a> "snapReadingRotate"
+  can be used.
   <br><br>
   
   The snapshot <b>Email shipping</b> can be activated by setting <a href="#SSCamattr">attribute</a> "snapEmailTxt". 
@@ -9437,6 +9436,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
 	 If mode "Full" is set, the images are retrieved with their original available resolution. That requires more ressources 
 	 and may slow down the display. By setting attribute "snapGalleryBoost=1" the display may accelerated, because in that case
 	 the images will be retrieved by continuous polling and need only bring to display. </li><br>
+     
+  <a name="snapReadingRotate"></a>
+  <li><b>snapReadingRotate 0...10</b><br>
+    Activates the version control of snapshot readings (default: 0). A consecutive number of readings "LastSnapFilename", 
+    "LastSnapId" and "LastSnapTime" until to the specified value of snapReadingRotate will be created and contain the data
+    of the last X snapshots. </li><br>
   
   <a name="showStmInfoFull"></a>
   <li><b>showStmInfoFull</b><br>
@@ -10359,7 +10364,10 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   Ein oder mehrere Schnappschüsse werden ausgelöst. Es kann die Anzahl der auszulösenden Schnappschüsse und deren zeitlicher
   Abstand in Sekunden optional angegeben werden. Ohne Angabe wird ein Schnappschuß getriggert. <br>
   Es wird die ID und der Filename des letzten Snapshots als Wert der Readings "LastSnapId" bzw. "LastSnapFilename" in  
-  der Kamera gespeichert. <br><br>
+  der Kamera gespeichert. <br>
+  Um die Daten der letzen 1-10 Schnappschüsse zu versionieren, kann das <a href="#SSCamattr">Attribut</a> "snapReadingRotate"
+  verwendet werden.
+  <br><br>
   Ein <b>Email-Versand</b> der Schnappschüsse kann durch Setzen des <a href="#SSCamattr">Attributs</a> "snapEmailTxt" aktiviert
   werden. Zuvor ist der Email-Versand, wie im Abschnitt <a href="#SSCamEmail">Einstellung Email-Versand</a> beschrieben,
   einzustellen. (Für weitere Informationen "<b>get &lt;name&gt; versionNotes 7</b>" ausführen) <br>
@@ -11052,7 +11060,13 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
 	 Im Modus "Full" wird die original vorhandene Auflösung der Images abgerufen. Dies erfordert mehr Ressourcen und kann die 
 	 Anzeige verlangsamen. Mit "snapGalleryBoost=1" kann die Ausgabe beschleunigt werden, da in diesem Fall die Aufnahmen über 
 	 Polling abgerufen und nur noch zur Anzeige gebracht werden. </li><br>
-	
+
+  <a name="snapReadingRotate"></a>
+  <li><b>snapReadingRotate 0...10</b><br>
+    Aktiviert die Versionierung von Schnappschußreadings (default: 0). Es wird eine fortlaufende Nummer der Readings 
+    "LastSnapFilename", "LastSnapId" und "LastSnapTime" bis zum eingestellten Wert von snapReadingRotate erzeugt und enthält 
+    die Daten der letzten X Schnappschüsse. </li><br>
+    
   <a name="showStmInfoFull"></a>
   <li><b>showStmInfoFull</b><br>
     zusaätzliche Streaminformationen wie LiveStreamUrl, StmKeyUnicst, StmKeymjpegHttp werden 
