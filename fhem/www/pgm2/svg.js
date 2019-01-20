@@ -62,6 +62,7 @@ svg_prepareHash(el)
   return obj;
 }
 
+// Called directly from the SVG.pm generated SVG.
 function
 svg_click(evt)
 {
@@ -123,6 +124,7 @@ sv_menu(evt, embed)
   showValOff() {
     $(svg).find("[id]").each(function(){delete($(this).get(0).showVal)});
     $(svg).off("mousemove");
+    $(svg).off("mousedown");
 
     if(par && par.circle) {
       $(par.circle).remove();
@@ -133,16 +135,22 @@ sv_menu(evt, embed)
   var sn = selNode.nodeName,
       pn = (sn=="path" ? "d" : "points"),
       arrName = (sn=="path" ? "pathSegList" : "points");
-  FW_menu(evt, label,
+  var textArr =
     ["Copy", "Paste",
       selNode.isHidden ? "Show line" : "Hide line",
       "Hide other lines",
       "Show all lines",
-      selNode.showVal ? "Stop displaying values" : "Display plot values" ],
+      selNode.showVal ? "Stop displaying values" : "Display plot values" ];
+   if(!selNode.showVal &&
+      $(selNode).attr("title").indexOf("/hr")> 0) // e.g. l/hr
+     textArr.push("Integrate");
+
+  FW_menu(evt, label, textArr,
     [undefined, svg_pastedata == undefined,
       !selNode.isHidden && (lines.length - hidden.length) == 1,
       !selNode.isHidden && (lines.length - hidden.length) == 1,
       hidden.length==0,
+      selNode.isHidden || (sn!="polyline" && sn!="path"),
       selNode.isHidden || (sn!="polyline" && sn!="path") ],
     function(arg) {
 
@@ -216,15 +224,25 @@ sv_menu(evt, embed)
         } );
       }
 
-      //////////////////////////////////// value display
-      if(arg == 5) {
+      //////////////////////////////////
+      if(arg == 5 ||   // value display
+         arg == 6) {   // Integrate. Only for "per hour", title must contain /hr
 
+        selNode.isInt = (arg == 6 ? true : false);
         var hadShowVal = selNode.showVal;
         showValOff();
 
         if(!hadShowVal) {
           selNode.showVal = true;
           $(svg).mousemove(mousemove);
+          if(arg == 6) {
+            selNode.clicked = false;
+            $(svg).mousedown(function(e) {
+              selNode.clicked = !selNode.clicked; 
+              selNode.clickedOffset = 0;
+              mousemove(e)
+            });
+          }
           svgNode.par = par = svg_prepareHash(selNode);
 
           par.circle =
@@ -291,11 +309,33 @@ sv_menu(evt, embed)
 
     y = y.toFixed(par.decimals);
 
+    if(selNode.isInt) {
+      if(selNode.clicked) {
+        if(!selNode.clickedOffset)
+          selNode.clickedOffset = i1-1;
+        var sum = 0;
+        var pn = pl.getItem(selNode.clickedOffset);
+        var oy = ((par.y_h-pn.y)/par.y_mul)+par.y_min;
+        var ox = (pn.x-par.x_min)/par.t_mul;
+        for(var i2=selNode.clickedOffset+1; i2<i1; i2++) {
+          pn = pl.getItem(i2);
+          var ny = ((par.y_h-pn.y)/par.y_mul)+par.y_min;
+          var nx = (pn.x-par.x_min)/par.t_mul;
+          sum += (ny+oy)/2 * (nx-ox)/3600;
+          oy = ny; ox = nx;
+        }
+        y = "Sum:"+sum.toFixed(par.decimals);
+      } else {
+        y = 'Click to start';
+      }
+    }
+
+    var ts;
     if( par.x_mul ) {
       ts = (((xRaw-par.x_min)/par.x_mul)+par.x_off).toFixed(par.decimals);
 
     } else {
-      var d = new Date((((xRaw-par.x_min)/par.t_mul)+par.x_off) * 1000), ts;
+      var d = new Date((((xRaw-par.x_min)/par.t_mul)+par.x_off) * 1000);
       if(par.t_mul < 0.0001) {           // Year
         ts =(pad0(d.getMonth()+1))+"."+pad0(d.getDate()+"."+(d.getYear()+1900));
       } else if(par.t_mul < 0.001) {     // Month
