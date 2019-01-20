@@ -1461,6 +1461,7 @@ CommandRereadCfg($$)
   %readyfnlist = ();
   my $informMe = $inform{$name};
   %inform = ();
+  %fuuidHash = ();
 
   doGlobalDef($cfgfile);
   my $ret;
