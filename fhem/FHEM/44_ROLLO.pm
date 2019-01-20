@@ -26,6 +26,7 @@
 #  GNU General Public License for more details.
 #
 #  CHANGELOG:
+#		1.404:		Hint in Commandref regarding position->pct
 # 		1.403: 		Loglevel from 3 to 5 for few messages
 #					Rollo should only drive 10 steps in "force" mode for up/down
 ########################################################################################
@@ -864,6 +865,8 @@ sub ROLLO_Attr(@) {
 <div>
 	<ul>The module ROLLO offers an easy away to control shutters with one or two relays and to stop them exactly. <br>
 	The current position (in %) will be displayed in fhem. It doesn't matter which hardware is used to control the shutters as long as they are working with FHEM. <br />
+	<h4>Note</h4>
+	If you had installed ROLLO before it became part of FHEM and you didn't update it for a long time, you might miss the "position" readings and the corresponding set command. "position" was replaced with "pct" to ensure compatibility with other modules (like <a href="https://fhem.de/commandref.html#AutoShuttersControl">Automatic shutter control - ASC</a>). Please adjust your notifies/DOIFs accordingly. 
 	<h4>Example</h4>
 		<code>define TestRollo ROLLO</code>
 		
@@ -992,10 +995,16 @@ sub ROLLO_Attr(@) {
 <div>
 	<ul>
 			<p>Das Modul ROLLO bietet eine einfache Moeglichkeit, mit ein bis zwei Relais den Hoch-/Runterlauf eines Rolladen zu steuern und punktgenau anzuhalten.<br>
-			Ausserdem wird die aktuelle Position in FHEM dargestellt. Ueber welche Hardware/Module die Ausgaenge angesprochen werden ist dabei egal.<br /><h4>Example</h4>
+			Ausserdem wird die aktuelle Position in FHEM dargestellt. Ueber welche Hardware/Module die Ausgaenge angesprochen werden ist dabei egal.<br />
+			<h4>Anmerkung</h4>
+			Wenn ROLLO installiert wurde, bevor es Bestandteil von FHEM wurde und lange kein Update gemacht wurde, wirst du die "position" readings und das entsprechende set Kommando vermissen. "position" wurde durch "pct" ersetzt, um Kompatibilität mit anderen Modulen (wie <a href="https://fhem.de/commandref_DE.html#AutoShuttersControl">Automatic shutter control - ASC</a>) sicher zu stellen. Bitte passe deine notifies/DOIFs entsprechend an.
+			
+			<h4>Example</h4>
 			<p>
 				<code>define TestRollo ROLLO</code>
 				<br />
+				
+			
 			</p><a name="ROLLO_Define"></a>
 			<h4>Define</h4>
 			<p>
