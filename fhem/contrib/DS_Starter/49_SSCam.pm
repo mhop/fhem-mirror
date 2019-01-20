@@ -4980,7 +4980,11 @@ sub SSCam_camop_parse ($) {
                 readingsEndUpdate($hash, 1);
                                 
                 # Logausgabe
-                Log3($name, 3, "$name - Snapshot of Camera $camname has been done successfully");
+                if ($snapid) {
+                    Log3($name, 3, "$name - Snapshot of Camera $camname created. ID: $snapid");
+                } else {
+                    Log3($name, 1, "$name - Snapshot of Camera $camname probably not created. No ID was delivered.");
+                }
                 
                 
                 my $num = $hash->{HELPER}{SNAPNUM};                                # Gesamtzahl der auszulösenden Schnappschüsse
@@ -7261,7 +7265,7 @@ return ($error);
 sub SSCam_rotateReading ($$$$$) {
   my ($hash,$readingName,$val,$rotnum,$do_trigger) = @_;
   my $name = $hash->{NAME};
-  #Log3 ($name, 1, "$name -> Rotate \"$readingName\" VAL: $val"); 
+
   readingsBeginUpdate($hash);
   
   my $o = ReadingsVal($name,$readingName,"n.a."); 
