@@ -2015,7 +2015,7 @@ sub CheckiTimerDoIf($$$) {
   my $found;
   return 1 if ($itimer =~ /\[$device(\]|,.+\])/);
   for (my $j = 0; $j < $max; $j++) {
-    if ($eventa->[$j] =~ "^(.+): ") {
+    if ($eventa->[$j] =~ "^([^:]+): ") {
       $found = ($itimer =~ /\[$device:$1(\]|:.+\]|,.+\])/);
       if ($found) {
         return 1;
