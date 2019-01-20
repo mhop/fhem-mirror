@@ -120,6 +120,8 @@ our %SSCam_vNotesIntern = (
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
+  "8.6.1"  => "20.01.2019 new attribute \"snapReadingRotate\" to activate versioning of snap data, ".
+              "time format in readings and galleries depends from global language attribute ",
   "8.5.0"  => "17.01.2019 SVS device has \"snapCams\" command. Now are able to take snapshots of all defined cameras and may ".
               "optionally send them alltogether by Email.",
   "8.4.0"  => "07.01.2019 Command snap is extended to syntax \"snap [number] [lag] [snapEmailTxt:\"subject => &lt;Betreff-Text&gt;, body => ".
