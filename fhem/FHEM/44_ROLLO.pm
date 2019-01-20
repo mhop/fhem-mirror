@@ -25,13 +25,16 @@
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU General Public License for more details.
 #
+#  CHANGELOG:
+# 		1.403: 		Loglevel from 3 to 5 for few messages
+#					Rollo should only drive 10 steps in "force" mode for up/down
 ########################################################################################
 package main;
 
 use strict;
 use warnings;
 
-my $version = "1.402";
+my $version = "1.403";
 
 my %sets = (
     "open"      => "noArg",
@@ -391,7 +394,7 @@ sub ROLLO_isAllowed($$$) {
     my $pct = ReadingsVal( $name, "pct", undef );
     $pct = 100 - $pct if ( AttrVal( $name, "rl_type", "normal" ) eq "HomeKit" );    # KernSani 30.12.2018
     my $blockmode = AttrVal( $name, "rl_blockMode", "none" );
-    Log3 $name, 3, "ROLLO ($name) >> Blockmode:$blockmode $pct-->$desired_pct";
+    Log3 $name, 5, "ROLLO ($name) >> Blockmode:$blockmode $pct-->$desired_pct";
     if (   $blockmode eq "blocked"
         || ( $blockmode eq "only-up"   && $pct <= $desired_pct )
         || ( $blockmode eq "only-down" && $pct >= $desired_pct ) )
@@ -737,7 +740,13 @@ sub ROLLO_calculateDriveTime(@) {
         # Wenn force-Drive gesetzt ist fahren wir immer 100% (wenn "open" oder "closed")
         if ( AttrVal( $name, "rl_forceDrive", 0 ) == 1 && ( $oldpos == 0 || $oldpos == 100 ) ) {
             Log3 $name, 4, "ROLLO ($name): forceDrive set, driving $direction";
-            $steps = 100;
+            my $cmd = ReadingsVal( $name, "command", "stop" );
+            if ( $cmd eq "up" or $cmd eq "down" ) {
+                $steps = 10;
+            }
+            else {
+                $steps = 100;
+            }
         }
     }
 
@@ -747,6 +756,7 @@ sub ROLLO_calculateDriveTime(@) {
     }
 
     my $drivetime = $time * $steps / 100;
+    Log3 $name, 5, "ROLLO ($name) netto drive time = $drivetime";
 
     # reactionTime etc... sollten nur hinzugefügt werden, wenn auch gefahren wird...
     if ( $drivetime > 0 ) {
