@@ -1462,6 +1462,8 @@ CommandRereadCfg($$)
   my $informMe = $inform{$name};
   %inform = ();
   %fuuidHash = ();
+  %intAt = ();
+  @intAtA = ();
 
   doGlobalDef($cfgfile);
   my $ret;

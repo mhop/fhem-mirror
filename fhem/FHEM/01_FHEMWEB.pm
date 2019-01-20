@@ -219,8 +219,6 @@ FHEMWEB_Initialize($)
     "widgetOverride"
   );
 
-  InternalTimer(time()+60, "FW_closeInactiveClients", 0, 0);
-
   $FW_dir      = "$attr{global}{modpath}/www";
   $FW_icondir  = "$FW_dir/images";
   $FW_cssdir   = "$FW_dir/pgm2";
@@ -268,6 +266,10 @@ FW_Define($$)
         if($port !~ m/^(IPV6:)?\d+$/);
 
   FW_Undef($hash, undef) if($hash->{OLDDEF}); # modify
+
+  RemoveInternalTimer(0, "FW_closeInactiveClients");
+  InternalTimer(time()+60, "FW_closeInactiveClients", 0, 0);
+
 
   foreach my $pe ("fhemSVG", "openautomation", "default") {
     FW_readIcons($pe);
