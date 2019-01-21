@@ -5032,16 +5032,16 @@ sub SSCam_camop_parse ($) {
 				
 	            Log3($name, $verbose, "$name - Snapinfos of camera $camname retrieved");
                 
-                my %snaps = ( 0 => {'createdTm' => 'n.a.', 'fileName' => 'n.a.','snapid' => 'n.a.'} );  # Hilfshash 
-                my ($k,$l) = (0,0);                 
-				if(exists($data->{data}{data}[0]{createdTm})) {       
+                my %snaps  = ( 0 => {'createdTm' => 'n.a.', 'fileName' => 'n.a.','snapid' => 'n.a.'} );  # Hilfshash 
+                my ($k,$l) = (0,0);              
+				if(exists($data->{data}{data}[0]{createdTm})) {                    
                     while ($data->{'data'}{'data'}[$k]) {
                         if($data->{'data'}{'data'}[$k]{'camName'} ne $camname) {
                             $k += 1;
                             next;
                         }
-                        my @t         = split(" ", FmtDateTime($data->{data}{data}[$k]{createdTm}));
-                        my @d         = split("-", $t[0]);
+                        my @t = split(" ", FmtDateTime($data->{data}{data}[$k]{createdTm}));
+                        my @d = split("-", $t[0]);
                         my $createdTm;
                         if($lang eq "DE") {
                             $createdTm = "$d[2].$d[1].$d[0] / $t[1]";
@@ -5057,12 +5057,21 @@ sub SSCam_camop_parse ($) {
                     }
                 }
                 
-                my @as = sort{$b<=>$a}keys%snaps;
+                my @as;
                 my $rotnum = AttrVal($name,"snapReadingRotate",0);
-                foreach my $key (@as) {
-                    SSCam_rotateReading($hash,"LastSnapId",$snaps{$key}{snapid},$rotnum,1);
-                    SSCam_rotateReading($hash,"LastSnapFilename",$snaps{$key}{fileName},$rotnum,1);
-                    SSCam_rotateReading($hash,"LastSnapTime",$snaps{$key}{createdTm},$rotnum,1);                    
+                my $o      = ReadingsVal($name,"LastSnapId","n.a."); 
+                if($rotnum && "$o" ne "$snaps{0}{snapid}") {
+                    @as = sort{$b<=>$a}keys%snaps;
+                    foreach my $key (@as) {
+                        SSCam_rotateReading($hash,"LastSnapId",$snaps{$key}{snapid},$rotnum,1);
+                        SSCam_rotateReading($hash,"LastSnapFilename",$snaps{$key}{fileName},$rotnum,1);
+                        SSCam_rotateReading($hash,"LastSnapTime",$snaps{$key}{createdTm},$rotnum,1);                    
+                    }
+                } else {
+                    @as = sort{$a<=>$b}keys%snaps;
+                    SSCam_rotateReading($hash,"LastSnapId",$snaps{$as[0]}{snapid},$rotnum,1);
+                    SSCam_rotateReading($hash,"LastSnapFilename",$snaps{$as[0]}{fileName},$rotnum,1);
+                    SSCam_rotateReading($hash,"LastSnapTime",$snaps{$as[0]}{createdTm},$rotnum,1);                  
                 }
 					
 				#####  ein Schnapschuss soll als liveView angezeigt werden  #####
