@@ -625,7 +625,7 @@ zigbee2mqtt_devStateIcon255($)
 {
   my ($name) = @_;
   return ".*:off:toggle" if(lc(ReadingsVal($name,"state","ON")) eq "off" );
-  my $pct = ReadingsVal($name,"brightness","255");
+  my $pct = ReadingsNum($name,"brightness","255");
   my $s = $pct > 253 ? "on" : sprintf("dim%02d%%",int((1+int($pct/18))*6.25));
   return ".*:$s:off";
 }
