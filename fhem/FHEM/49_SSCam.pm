@@ -47,6 +47,8 @@ use Encode;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.6.1"  => "21.01.2019  time format in readings and galleries depends from global language attribute, minor bug fixes ",
+  "8.6.0"  => "20.01.2019  new attribute snapReadingRotate ",
   "8.5.0"  => "17.01.2019  SVS device has \"snapCams\" command ",
   "8.4.5"  => "15.01.2019  fix event generation after request snapshots ",
   "8.4.4"  => "14.01.2019  change: generate event of every snapfile,id etc. if snap was called with arguments, Forum:#45671 #msg887484  ",
@@ -118,6 +120,8 @@ our %SSCam_vNotesIntern = (
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
+  "8.6.1"  => "21.01.2019 new attribute \"snapReadingRotate\" to activate versioning of snap data, ".
+              "time format in readings and galleries depends from global language attribute ",
   "8.5.0"  => "17.01.2019 SVS device has \"snapCams\" command. Now are able to take snapshots of all defined cameras and may ".
               "optionally send them alltogether by Email.",
   "8.4.0"  => "07.01.2019 Command snap is extended to syntax \"snap [number] [lag] [snapEmailTxt:\"subject => &lt;Betreff-Text&gt;, body => ".
@@ -353,6 +357,7 @@ sub SSCam_Initialize($) {
 		 "snapGalleryNumber:$SSCAM_snum ".
 		 "snapGalleryColumns ".
 		 "snapGalleryHtmlAttr ".
+         "snapReadingRotate:0,1,2,3,4,5,6,7,8,9,10 ".
          "pollnologging:1,0 ".
          "debugactivetoken:1,0 ".
          "rectime ".
@@ -503,6 +508,10 @@ sub SSCam_Attr($$$$) {
         return " The attribute \"$aName\" is only valid for devices of type \"SVS\"! Please set this attribute in a device of this type.";
     }
     
+    if ($aName =~ /snapReadingRotate/ && !SSCam_IsModelCam($hash)) {            
+        return " The attribute \"$aName\" is not valid for devices of type \"SVS\"!.";
+    }
+    
     # dynamisch PTZ-Attribute setzen (wichtig beim Start wenn Reading "DeviceType" nicht gesetzt ist)
     if ($cmd eq "set" && ($aName =~ m/ptzPanel_.*/)) {
         foreach my $n (0..9) { 
@@ -612,6 +621,21 @@ sub SSCam_Attr($$$$) {
 		RemoveInternalTimer("SSCam_getsnapinfo"); 
 		InternalTimer(gettimeofday()+0.7, "SSCam_getsnapinfo", "$name:$slim:$ssize", 0);
 	}
+    
+    if ($aName eq "snapReadingRotate") {
+        if($cmd eq "set") {
+            $do = ($aVal) ? 1 : 0;
+        }
+        $do = 0 if($cmd eq "del");
+        if(!$do) {$aVal = 0}
+        for my $i (1..10) { 
+            if($i>$aVal) {
+                readingsDelete($hash, "LastSnapFilename$i");
+                readingsDelete($hash, "LastSnapId$i");
+                readingsDelete($hash, "LastSnapTime$i");  
+            }
+        }
+    }
     
     if ($aName eq "simu_SVSversion") {
 	    delete $hash->{HELPER}{APIPARSET};
@@ -1920,6 +1944,7 @@ sub SSCam_wdpollcaminfo ($) {
     my $pcia     = AttrVal($name,"pollcaminfoall",0); 
     my $pnl      = AttrVal($name,"pollnologging",0); 
     my $watchdogtimer = 90;
+    my $lang     = AttrVal("global","language","EN");
     
     RemoveInternalTimer($hash, "SSCam_wdpollcaminfo");
 
@@ -1943,12 +1968,15 @@ sub SSCam_wdpollcaminfo ($) {
             SSCam_getcaminfoall($hash,0);  
         }
         
-        my $lupd = ReadingsVal($name, "LastUpdateTime", 0);
-        if ($lupd) {
-            my ($year, $month, $mday, $hour, $min, $sec) = ($lupd =~ /(\d+)\.(\d+)\.(\d+) \/ (\d+):(\d+):(\d+)/);
-            $lupd = fhemTimeGm($sec, $min, $hour, $mday, $month, $year);
+        my $lupd = ReadingsVal($name, "LastUpdateTime", "1970-01-01 / 01:00:00");
+        my ($year,$month,$mday,$hour,$min,$sec);
+        if ($lupd =~ /(\d+)\.(\d+)\.(\d+).*/) {
+            ($mday, $month, $year, $hour, $min, $sec) = ($lupd =~ /(\d+)\.(\d+)\.(\d+) \/ (\d+):(\d+):(\d+)/);
+        } else {
+            ($year, $month, $mday, $hour, $min, $sec) = ($lupd =~ /(\d+)-(\d+)-(\d+) \/ (\d+):(\d+):(\d+)/);        
         }
-        if( gettimeofday() < ($lupd + $pcia + 20) ) {
+        $lupd = fhemTimeLocal($sec, $min, $hour, $mday, $month-=1, $year-=1900);
+        if( gettimeofday() > ($lupd + $pcia + 20) ) {
             SSCam_getcaminfoall($hash,0);  
         }
         
@@ -4239,7 +4267,7 @@ sub SSCam_camop ($) {
       # ein Schnappschuß wird ausgelöst
       $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&dsId=\"0\"&method=\"TakeSnapshot\"&version=\"$apitakesnapmaxver\"&camId=\"$camid\"&blSave=\"true\"&_sid=\"$sid\"";
       readingsSingleUpdate($hash,"state", "snap", 1); 
-      readingsSingleUpdate($hash, "LastSnapId", "", 0);
+      #readingsSingleUpdate($hash, "LastSnapId", "", 0);
    
    } elsif ($OpMode eq "SaveRec") {
       # eine Aufnahme soll in lokalem File (.mp4) gespeichert werden
@@ -4268,7 +4296,7 @@ sub SSCam_camop ($) {
       
    } elsif ($OpMode eq "getsnapfilename") {
       # der Filename der aktuellen Schnappschuß-ID wird ermittelt
-      $snapid = ReadingsVal("$name", "LastSnapId", " ");
+      $snapid = ReadingsVal("$name", "LastSnapId", "");
       Log3($name, 4, "$name - Get filename of present Snap-ID $snapid");
       $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&imgSize=\"0\"&idList=\"$snapid\"&_sid=\"$sid\"";
    
@@ -4617,6 +4645,8 @@ sub SSCam_camop_parse ($) {
    my ($percentage_camCap,$percentage_value,$percentage_ssCap);
    my ($objectSize_camCap,$objectSize_value,$objectSize_ssCap);
    
+   my $lang = AttrVal("global","language","EN");
+   
    # Einstellung für Logausgabe Pollinginfos
    # wenn "pollnologging" = 1 -> logging nur bei Verbose=4, sonst 3 
    if (AttrVal($name, "pollnologging", 0) == 1) {
@@ -4767,10 +4797,18 @@ sub SSCam_camop_parse ($) {
             
 			} elsif ($OpMode eq "gethomemodestate") {  
                 my $hmst = $data->{'data'}{'on'}; 
-                my $hmststr = ($hmst == 1)?"on":"off";				
+                my $hmststr = ($hmst == 1)?"on":"off";
+
+                ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime;
+                if($lang eq "DE") {
+                    $update_time = sprintf "%02d.%02d.%04d / %02d:%02d:%02d" , $mday , $mon+=1 ,$year+=1900 , $hour , $min , $sec ;
+                } else {
+                    $update_time = sprintf "%04d-%02d-%02d / %02d:%02d:%02d" , $year+=1900 , $mon+=1 , $mday , $hour , $min , $sec ;
+                }				
 
                 readingsBeginUpdate($hash);
 				readingsBulkUpdate($hash,"HomeModeState",$hmststr);
+                readingsBulkUpdate($hash,"LastUpdateTime",$update_time);
                 readingsBulkUpdate($hash,"Errorcode","none");
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
@@ -4949,15 +4987,17 @@ sub SSCam_camop_parse ($) {
                 }
                 
                 $snapid = $data->{data}{'id'};
-                readingsSingleUpdate($hash,"LastSnapId",$snapid, 0) if($snapid);
                 
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"Errorcode","none");
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
                                 
-                # Logausgabe
-                Log3($name, 3, "$name - Snapshot of Camera $camname has been done successfully");
+                if ($snapid) {
+                    Log3($name, 3, "$name - Snapshot of Camera $camname created. ID: $snapid");
+                } else {
+                    Log3($name, 1, "$name - Snapshot of Camera $camname probably not created. No ID was delivered.");
+                }
                 
                 
                 my $num = $hash->{HELPER}{SNAPNUM};                                # Gesamtzahl der auszulösenden Schnappschüsse
@@ -4992,17 +5032,22 @@ sub SSCam_camop_parse ($) {
 				
 	            Log3($name, $verbose, "$name - Snapinfos of camera $camname retrieved");
                 
-                my %snaps = ( 0 => {'createdTm' => 'n.a.', 'fileName' => 'n.a.','snapid' => 'n.a.'} );  # Hilfshash 
-                my ($k,$l) = (0,0);                 
-				if(exists($data->{data}{data}[0]{createdTm})) {       
+                my %snaps  = ( 0 => {'createdTm' => 'n.a.', 'fileName' => 'n.a.','snapid' => 'n.a.'} );  # Hilfshash 
+                my ($k,$l) = (0,0);              
+				if(exists($data->{data}{data}[0]{createdTm})) {                    
                     while ($data->{'data'}{'data'}[$k]) {
                         if($data->{'data'}{'data'}[$k]{'camName'} ne $camname) {
                             $k += 1;
                             next;
                         }
-                        my @t         = split(" ", FmtDateTime($data->{data}{data}[$k]{createdTm}));
-                        my @d         = split("-", $t[0]);
-                        my $createdTm = "$d[2].$d[1].$d[0] / $t[1]";
+                        my @t = split(" ", FmtDateTime($data->{data}{data}[$k]{createdTm}));
+                        my @d = split("-", $t[0]);
+                        my $createdTm;
+                        if($lang eq "DE") {
+                            $createdTm = "$d[2].$d[1].$d[0] / $t[1]";
+                        } else {
+                            $createdTm = "$d[0]-$d[1]-$d[2] / $t[1]";
+                        }
                         $snaps{$l}{createdTm} = $createdTm;
                         $snaps{$l}{fileName}  = $data->{data}{data}[$k]{fileName};
                         $snaps{$l}{snapid}    = $data->{data}{data}[$k]{id};
@@ -5012,13 +5057,21 @@ sub SSCam_camop_parse ($) {
                     }
                 }
                 
-                my @as = sort{$b<=>$a}keys%snaps;
-                foreach my $key (@as) {
-                    readingsBeginUpdate($hash);
-                    readingsBulkUpdate($hash,"LastSnapId", $snaps{$key}{snapid});
-                    readingsBulkUpdate($hash,"LastSnapFilename", $snaps{$key}{fileName});
-                    readingsBulkUpdate($hash,"LastSnapTime", $snaps{$key}{createdTm});
-                    readingsEndUpdate($hash, 1);                    
+                my @as;
+                my $rotnum = AttrVal($name,"snapReadingRotate",0);
+                my $o      = ReadingsVal($name,"LastSnapId","n.a."); 
+                if($rotnum && "$o" ne "$snaps{0}{snapid}") {
+                    @as = sort{$b<=>$a}keys%snaps;
+                    foreach my $key (@as) {
+                        SSCam_rotateReading($hash,"LastSnapId",$snaps{$key}{snapid},$rotnum,1);
+                        SSCam_rotateReading($hash,"LastSnapFilename",$snaps{$key}{fileName},$rotnum,1);
+                        SSCam_rotateReading($hash,"LastSnapTime",$snaps{$key}{createdTm},$rotnum,1);                    
+                    }
+                } else {
+                    @as = sort{$a<=>$b}keys%snaps;
+                    SSCam_rotateReading($hash,"LastSnapId",$snaps{$as[0]}{snapid},$rotnum,1);
+                    SSCam_rotateReading($hash,"LastSnapFilename",$snaps{$as[0]}{fileName},$rotnum,1);
+                    SSCam_rotateReading($hash,"LastSnapTime",$snaps{$as[0]}{createdTm},$rotnum,1);                  
                 }
 					
 				#####  ein Schnapschuss soll als liveView angezeigt werden  #####
@@ -5044,14 +5097,18 @@ sub SSCam_camop_parse ($) {
 								next;
 							}
 							$snapid = $data->{data}{data}[$i]{id};
-							my $createdTm = $data->{data}{data}[$i]{createdTm};
+                            my @t = split(" ", FmtDateTime($data->{data}{data}[$i]{createdTm}));
+                            my @d = split("-", $t[0]);
+                            my $createdTm;
+                            if($lang eq "DE") {
+                                $createdTm = "$d[2].$d[1].$d[0] / $t[1]";
+                            } else {
+                                $createdTm = "$d[0]-$d[1]-$d[2] / $t[1]";
+                            }
 							my $fileName  = $data->{data}{data}[$i]{fileName};
 							my $imageData = $data->{data}{data}[$i]{imageData};  # Image data of snapshot in base64 format 
 						
-							$sendsnaps{$sn}{snapid} = $snapid;
-							my @t = split(" ", FmtDateTime($createdTm));
-							my @d = split("-", $t[0]);
-							$createdTm = "$d[2].$d[1].$d[0] / $t[1]";
+							$sendsnaps{$sn}{snapid}       = $snapid;
 							$sendsnaps{$sn}{createdTm}    = $createdTm;
 							$sendsnaps{$sn}{fileName}     = $fileName;
 							$sendsnaps{$sn}{".imageData"} = $imageData;
@@ -5083,9 +5140,13 @@ sub SSCam_camop_parse ($) {
 							my $imageData = $data->{data}{data}[$i]{imageData};  # Image data of snapshot in base64 format 
 						
 							$allsnaps{$sn}{snapid} = $snapid;
-							my @t = split(" ", FmtDateTime($createdTm));
-							my @d = split("-", $t[0]);
-							$createdTm = "$d[2].$d[1].$d[0] / $t[1]";
+                            my @t = split(" ", FmtDateTime($data->{data}{data}[$i]{createdTm}));
+                            my @d = split("-", $t[0]);
+                            if($lang eq "DE") {
+                                $createdTm = "$d[2].$d[1].$d[0] / $t[1]";
+                            } else {
+                                $createdTm = "$d[0]-$d[1]-$d[2] / $t[1]";
+                            }
 							$allsnaps{$sn}{createdTm}  = $createdTm;
 							$allsnaps{$sn}{fileName}   = $fileName;
 							$allsnaps{$sn}{imageData}  = $imageData;
@@ -5173,8 +5234,13 @@ sub SSCam_camop_parse ($) {
                                 
             } elsif ($OpMode eq "getsnapfilename") {
                 # den Filenamen eines Schnapschusses ermitteln
-                $snapid = ReadingsVal("$name", "LastSnapId", " ");
-                           
+                $snapid = ReadingsVal("$name", "LastSnapId", "");
+
+                if(!$snapid) {
+                   Log3($name, 2, "$name - Snap-ID \"LastSnapId\" isn't set. Filename can't be retrieved"); 
+                   return;
+                }               
+                
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"Errorcode","none");
                 readingsBulkUpdate($hash,"Error","none");
@@ -5459,7 +5525,11 @@ sub SSCam_camop_parse ($) {
                 if ($camLiveMode eq "0") {$camLiveMode = "Liveview from DS";}elsif ($camLiveMode eq "1") {$camLiveMode = "Liveview from Camera";}
                 
                 ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime;
-                $update_time = sprintf "%02d.%02d.%04d / %02d:%02d:%02d" , $mday , $mon+=1 ,$year+=1900 , $hour , $min , $sec ;
+                if($lang eq "DE") {
+                    $update_time = sprintf "%02d.%02d.%04d / %02d:%02d:%02d" , $mday , $mon+=1 ,$year+=1900 , $hour , $min , $sec ;
+                } else {
+                    $update_time = sprintf "%04d-%02d-%02d / %02d:%02d:%02d" , $year+=1900 , $mon+=1 , $mday , $hour , $min , $sec ;
+                }
                 
                 $deviceType = $data->{'data'}->{'cameras'}->[0]->{'deviceType'};
                 if ($deviceType eq "1") {
@@ -5612,8 +5682,11 @@ sub SSCam_camop_parse ($) {
                 if ($eventnum > 0) {
                     $lastrecstarttime = $data->{'data'}{'events'}[0]{startTime};
                     ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($lastrecstarttime);
-                    $lastrecstarttime = sprintf "%02d.%02d.%04d / %02d:%02d:%02d" , $mday , $mon+=1 ,$year+=1900 , $hour , $min , $sec ;
-                
+                    if($lang eq "DE") {
+                        $lastrecstarttime = sprintf "%02d.%02d.%04d / %02d:%02d:%02d" , $mday , $mon+=1 ,$year+=1900 , $hour , $min , $sec ;
+                    } else {
+                        $lastrecstarttime = sprintf "%04d-%02d-%02d / %02d:%02d:%02d" , $year+=1900 , $mon+=1 , $mday , $hour , $min , $sec ;
+                    }
                     $lastrecstoptime = $data->{'data'}{'events'}[0]{stopTime};
                     ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($lastrecstoptime);
                     $lastrecstoptime = sprintf "%02d:%02d:%02d" , $hour , $min , $sec ;
@@ -7092,7 +7165,7 @@ sub SSCam_composegallery ($;$$) {
   my $camname  = $hash->{CAMNAME};
   my $allsnaps = $hash->{HELPER}{".SNAPHASH"};                   # = \%allsnaps
   my $sgc      = AttrVal($name,"snapGalleryColumns",3);          # Anzahl der Images in einer Tabellenzeile
-  my $lss      = ReadingsVal($name, "LastSnapTime", " ");        # Zeitpunkt neueste Aufnahme
+  my $lss      = ReadingsVal($name, "LastSnapTime", "");         # Zeitpunkt neueste Aufnahme
   my $lang     = AttrVal("global","language","EN");              # Systemsprache       
   my $limit    = $hash->{HELPER}{SNAPLIMIT};                     # abgerufene Anzahl Snaps
   my $totalcnt = $hash->{HELPER}{TOTALCNT};                      # totale Anzahl Snaps
@@ -7212,7 +7285,7 @@ return ($error);
 
 ##############################################################################
 #  Auflösung Errorcodes SVS API
-
+##############################################################################
 sub SSCam_experror ($$) {
   # Übernahmewerte sind $hash, $errorcode
   my ($hash,$errorcode) = @_;
@@ -7225,6 +7298,41 @@ sub SSCam_experror ($$) {
   $error = $SSCam_errlist{"$errorcode"};
   
 return ($error);
+}
+
+##############################################################################
+# Zusätzliche Redings in Rotation erstellen
+# Sub ($hash,<readingName>,<Wert>,<Rotationszahl>,<Trigger[0|1]>)
+##############################################################################
+sub SSCam_rotateReading ($$$$$) {
+  my ($hash,$readingName,$val,$rotnum,$do_trigger) = @_;
+  my $name = $hash->{NAME};
+
+  readingsBeginUpdate($hash);
+  
+  my $o = ReadingsVal($name,$readingName,"n.a."); 
+  if($val ne "n.a." && $rotnum >= 1) {
+      if("$o" ne "$val") {     
+          for (my $i=$rotnum;$i>0;$i--) {
+              my $l = $i-1;
+              my $g = ReadingsVal($name,$readingName.$i,"n.a.");
+              if($l) {
+                  $l = ReadingsVal($name,$readingName.$l,"n.a.");
+              } else {
+                  $l = ReadingsVal($name,$readingName,"n.a.");
+              }
+              if("$l" ne "$g") {
+                  readingsBulkUpdate($hash,$readingName.$i,$l);
+                  Log3($name, 4, "$name - Rotate \"$readingName.$i\" to value: $l");
+              }
+          }
+      }      
+  
+  }
+  readingsBulkUpdate($hash,$readingName,$val);
+  readingsEndUpdate($hash, $do_trigger);
+  
+return;
 }
 
 #############################################################################################
@@ -8706,7 +8814,10 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   
   One or multiple snapshots are triggered. The number of snapshots to trigger and the time difference (in seconds) between
   each snapshot can be optionally specified. Without any specification only one snapshot is triggered. <br>
-  The ID and the filename of the last snapshot will be displayed in Reading "LastSnapId" respectively "LastSnapFilename". 
+  The ID and the filename of the last snapshot will be displayed in Reading "LastSnapId" respectively 
+  "LastSnapFilename". <br>
+  To get data of the last 1-10 snapshots in various versions, the <a href="#SSCamattr">attribute</a> "snapReadingRotate"
+  can be used.
   <br><br>
   
   The snapshot <b>Email shipping</b> can be activated by setting <a href="#SSCamattr">attribute</a> "snapEmailTxt". 
@@ -9371,6 +9482,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
 	 If mode "Full" is set, the images are retrieved with their original available resolution. That requires more ressources 
 	 and may slow down the display. By setting attribute "snapGalleryBoost=1" the display may accelerated, because in that case
 	 the images will be retrieved by continuous polling and need only bring to display. </li><br>
+     
+  <a name="snapReadingRotate"></a>
+  <li><b>snapReadingRotate 0...10</b><br>
+    Activates the version control of snapshot readings (default: 0). A consecutive number of readings "LastSnapFilename", 
+    "LastSnapId" and "LastSnapTime" until to the specified value of snapReadingRotate will be created and contain the data
+    of the last X snapshots. </li><br>
   
   <a name="showStmInfoFull"></a>
   <li><b>showStmInfoFull</b><br>
@@ -9427,7 +9544,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     <tr><td><li>CamIP</li>              </td><td>- IP-Address of Camera  </td></tr>
     <tr><td><li>CamLastRec</li>         </td><td>- Path / name of last recording   </td></tr>
     <tr><td><li>CamLastRecId</li>       </td><td>- the ID of last recording   </td></tr>
-    <tr><td><li>CamLastRecTime</li>     </td><td>- date / starttime / endtime of the last recording   </td></tr>
+    <tr><td><li>CamLastRecTime</li>     </td><td>- date / starttime - endtime of the last recording (format depends of global attribute "language")  </td></tr>
     <tr><td><li>CamLiveFps</li>         </td><td>- Frames per second of Live-Stream  </td></tr>
     <tr><td><li>CamLiveMode</li>        </td><td>- Source of Live-View (DS, Camera)  </td></tr>
     <tr><td><li>camLiveQuality</li>     </td><td>- Live-Stream quality set in SVS  </td></tr>
@@ -9466,10 +9583,10 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     <tr><td><li>Errorcode</li>          </td><td>- error code of last error  </td></tr>
 	<tr><td><li>HomeModeState</li>      </td><td>- HomeMode-state (SVS-version 8.1.0 and above)   </td></tr>
 	<tr><td><li>LastLogEntry</li>       </td><td>- the neweset entry of Surveillance Station Log (only if SVS-device and if attribute pollcaminfoall is set)   </td></tr>
-    <tr><td><li>LastSnapFilename</li>   </td><td>- the filename of the last snapshot   </td></tr>
-    <tr><td><li>LastSnapId</li>         </td><td>- the ID of the last snapshot   </td></tr>    
-    <tr><td><li>LastSnapTime</li>       </td><td>- timestamp of the last snapshot   </td></tr> 
-    <tr><td><li>LastUpdateTime</li>     </td><td>- date / time the last update of readings by "caminfoall"  </td></tr> 
+    <tr><td><li>LastSnapFilename[x]</li></td><td>- the filename of the last snapshot or snapshots   </td></tr>
+    <tr><td><li>LastSnapId[x]</li>      </td><td>- the ID of the last snapshot or snapshots   </td></tr>    
+    <tr><td><li>LastSnapTime[x]</li>    </td><td>- timestamp of the last snapshot or snapshots (format depends of global attribute "language")  </td></tr> 
+    <tr><td><li>LastUpdateTime</li>     </td><td>- date / time the last update of readings by "caminfoall" (format depends of global attribute "language") </td></tr> 
     <tr><td><li>LiveStreamUrl </li>     </td><td>- the livestream URL if stream is started (is shown if <a href="#SSCamattr">attribute</a> "showStmInfoFull" is set) </td></tr> 
     <tr><td><li>Patrols</li>            </td><td>- in Synology Surveillance Station predefined patrols (at PTZ-Cameras)  </td></tr>
     <tr><td><li>PollState</li>          </td><td>- shows the state of automatic polling  </td></tr>    
@@ -10293,7 +10410,10 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   Ein oder mehrere Schnappschüsse werden ausgelöst. Es kann die Anzahl der auszulösenden Schnappschüsse und deren zeitlicher
   Abstand in Sekunden optional angegeben werden. Ohne Angabe wird ein Schnappschuß getriggert. <br>
   Es wird die ID und der Filename des letzten Snapshots als Wert der Readings "LastSnapId" bzw. "LastSnapFilename" in  
-  der Kamera gespeichert. <br><br>
+  der Kamera gespeichert. <br>
+  Um die Daten der letzen 1-10 Schnappschüsse zu versionieren, kann das <a href="#SSCamattr">Attribut</a> "snapReadingRotate"
+  verwendet werden.
+  <br><br>
   Ein <b>Email-Versand</b> der Schnappschüsse kann durch Setzen des <a href="#SSCamattr">Attributs</a> "snapEmailTxt" aktiviert
   werden. Zuvor ist der Email-Versand, wie im Abschnitt <a href="#SSCamEmail">Einstellung Email-Versand</a> beschrieben,
   einzustellen. (Für weitere Informationen "<b>get &lt;name&gt; versionNotes 7</b>" ausführen) <br>
@@ -10986,7 +11106,13 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
 	 Im Modus "Full" wird die original vorhandene Auflösung der Images abgerufen. Dies erfordert mehr Ressourcen und kann die 
 	 Anzeige verlangsamen. Mit "snapGalleryBoost=1" kann die Ausgabe beschleunigt werden, da in diesem Fall die Aufnahmen über 
 	 Polling abgerufen und nur noch zur Anzeige gebracht werden. </li><br>
-	
+
+  <a name="snapReadingRotate"></a>
+  <li><b>snapReadingRotate 0...10</b><br>
+    Aktiviert die Versionierung von Schnappschußreadings (default: 0). Es wird eine fortlaufende Nummer der Readings 
+    "LastSnapFilename", "LastSnapId" und "LastSnapTime" bis zum eingestellten Wert von snapReadingRotate erzeugt und enthält 
+    die Daten der letzten X Schnappschüsse. </li><br>
+    
   <a name="showStmInfoFull"></a>
   <li><b>showStmInfoFull</b><br>
     zusaätzliche Streaminformationen wie LiveStreamUrl, StmKeyUnicst, StmKeymjpegHttp werden 
@@ -11042,7 +11168,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     <tr><td><li>CamIP</li>              </td><td>- IP-Adresse der Kamera  </td></tr>
     <tr><td><li>CamLastRec</li>         </td><td>- Pfad / Name der letzten Aufnahme   </td></tr>
     <tr><td><li>CamLastRecId</li>       </td><td>- die ID der letzten Aufnahme   </td></tr>
-    <tr><td><li>CamLastRecTime</li>     </td><td>- Datum / Startzeit - Stopzeit der letzten Aufnahme   </td></tr>
+    <tr><td><li>CamLastRecTime</li>     </td><td>- Datum / Startzeit - Stopzeit der letzten Aufnahme (Format abhängig vom global Attribut "language")  </td></tr>
     <tr><td><li>CamLiveFps</li>         </td><td>- Frames pro Sekunde des Live-Streams  </td></tr>    
     <tr><td><li>CamLiveMode</li>        </td><td>- Quelle für Live-Ansicht (DS, Camera)  </td></tr>
     <tr><td><li>camLiveQuality</li>     </td><td>- in SVS eingestellte Live-Stream Qualität  </td></tr>
@@ -11081,10 +11207,10 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     <tr><td><li>Errorcode</li>          </td><td>- Fehlercode des letzten Fehlers   </td></tr>
 	<tr><td><li>HomeModeState</li>      </td><td>- HomeMode-Status (ab SVS-Version 8.1.0)   </td></tr>
 	<tr><td><li>LastLogEntry</li>       </td><td>- der neueste Eintrag des Surveillance Station Logs (nur SVS-Device und wenn Attribut pollcaminfoall gesetzt)   </td></tr>
-    <tr><td><li>LastSnapFilename</li>   </td><td>- der Filename des letzten Schnapschusses   </td></tr>
-    <tr><td><li>LastSnapId</li>         </td><td>- die ID des letzten Schnapschusses   </td></tr>
-	<tr><td><li>LastSnapTime</li>       </td><td>- Zeitstempel des letzten Schnapschusses   </td></tr>
-    <tr><td><li>LastUpdateTime</li>     </td><td>- Datum / Zeit der letzten Aktualisierung durch "caminfoall" </td></tr> 
+    <tr><td><li>LastSnapFilename[x]</li></td><td>- der Filename des/der letzten Schnapschüsse   </td></tr>
+    <tr><td><li>LastSnapId[x]</li>      </td><td>- die ID des/der letzten Schnapschüsse   </td></tr>
+	<tr><td><li>LastSnapTime[x]</li>    </td><td>- Zeitstempel des/der letzten Schnapschüsse (Format abhängig vom global Attribut "language") </td></tr>
+    <tr><td><li>LastUpdateTime</li>     </td><td>- Datum / Zeit der letzten Aktualisierung durch "caminfoall" (Format abhängig vom global Attribut "language")</td></tr> 
     <tr><td><li>LiveStreamUrl </li>     </td><td>- die LiveStream-Url wenn der Stream gestartet ist. (<a href="#SSCamattr">Attribut</a> "showStmInfoFull" muss gesetzt sein) </td></tr> 
     <tr><td><li>Patrols</li>            </td><td>- in Surveillance Station voreingestellte Überwachungstouren (bei PTZ-Kameras)  </td></tr>
     <tr><td><li>PollState</li>          </td><td>- zeigt den Status des automatischen Pollings an  </td></tr>

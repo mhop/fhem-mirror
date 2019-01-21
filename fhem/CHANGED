@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 49_SSCam: V8.6.1, new attribute snapReadingRotate, time format in 
+                       readings and galleries depends from global language 
+                       attribute, minor bug fixes
   - feature: 98_freezemon: New freeze statistics 
   - bugfix:  14_CUL_TCM97001: Fix uninitialized value warning
   - bugfix:  14_CUL_REDIRECT: Fix uninitialized value warning 
