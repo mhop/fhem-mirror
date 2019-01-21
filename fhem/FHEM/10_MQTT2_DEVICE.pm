@@ -181,13 +181,17 @@ MQTT2_DEVICE_Parse($$)
         $add = ($1 ? $1 : $topic);
       }
 
+      $add = makeReadingName($add); # Convert non-valid characters to _
+      $topic =~ s,([\^\$\[\]()\.\\]),\\$1,g;
+
       for my $ch (@{$cidArr}) {
         my $nn = $ch->{NAME};
         next if(!AttrVal($nn, "autocreate", 1));
         my $rl = AttrVal($nn, "readingList", "");
         $rl .= "\n" if($rl);
-        my $regexpCid = ($cid eq $newCid ? "$cid:" : "");
-        CommandAttr(undef, "$nn readingList $rl${regexpCid}$topic:.* $add");
+        my $regex = ($cid eq $newCid ? "$cid:" : "").$topic.":.*";
+        CommandAttr(undef, "$nn readingList $rl$regex $add")
+                if(index($rl, $regex) == -1);   # Forum #84372
         setReadingsVal($defs{$nn}, "associatedWith", $parentBridge, TimeNow())
                 if($parentBridge);
       }
@@ -502,6 +506,8 @@ JSEND
   }
 }
 
+#########################
+# Used for the graphical representation in Bridge devices. See Fn above.
 sub
 MQTT2_DEVICE_nlData($)
 {
