@@ -56,6 +56,7 @@ use vars qw($FW_dir);     # base directory for web server
 use vars qw($FW_icondir); # icon base directory
 use vars qw($FW_cssdir);  # css directory
 use vars qw($FW_gplotdir);# gplot directory
+use vars qw($FW_confdir); # conf dir
 use vars qw($MW_dir);     # moddir (./FHEM), needed by edit Files in new
                           # structure
 
@@ -87,6 +88,7 @@ use vars qw(%FW_visibleDeviceHash);
 use vars qw(@FW_httpheader); # HTTP header, line by line
 use vars qw(%FW_httpheader); # HTTP header, as hash
 use vars qw($FW_userAgent); # user agent string
+use vars qw(%FW_customConfFiles); 
 
 $FW_formmethod = "post";
 
@@ -219,6 +221,7 @@ FHEMWEB_Initialize($)
     "widgetOverride"
   );
 
+  $FW_confdir  = "$attr{global}{modpath}/conf";
   $FW_dir      = "$attr{global}{modpath}/www";
   $FW_icondir  = "$FW_dir/images";
   $FW_cssdir   = "$FW_dir/pgm2";
@@ -2216,6 +2219,7 @@ sub
 FW_displayFileList($@)
 {
   my ($heading,@files)= @_;
+  return if(!@files);
   my $hid = lc($heading);
   $hid =~ s/[^A-Za-z]/_/g;
   FW_pO "<div class=\"fileList $hid\">$heading</div>";
@@ -2240,6 +2244,9 @@ FW_fileNameToPath($)
 {
   my $name = shift;
 
+  my @f = sort keys %FW_customConfFiles;
+  return "$FW_confdir/$name" if ( map { $name =~ $_ } @f );
+
   $attr{global}{configfile} =~ m,([^/]*)$,;
   my $cfgFileName = $1;
   if($name eq $cfgFileName) {
@@ -2259,8 +2266,13 @@ FW_fileNameToPath($)
   }
 }
 
+sub FW_confFiles() {
+   # create and return regexp for editFileList
+   return "(".join ( "|" , sort keys %FW_customConfFiles ).")";
+}
+
 ##################
-# List/Edit/Save css and gnuplot files
+# List/Edit/Save files
 sub
 FW_style($$)
 {
@@ -2284,6 +2296,7 @@ FW_style($$)
     my $efl = AttrVal($FW_wname, 'editFileList',
       "Own modules and helper files:\$MW_dir:^(.*sh|[0-9][0-9].*Util.*pm|".
                         ".*cfg|.*\.holiday|myUtilsTemplate.pm|.*layout)\$\n".
+      "Config files for external Programs:\$FW_confdir:^".FW_confFiles."\$\n".
       "Gplot files:\$FW_gplotdir:^.*gplot\$\n".
       "Style files:\$FW_cssdir:^.*(css|svg)\$");
     foreach my $l (split(/[\r\n]/, $efl)) {
