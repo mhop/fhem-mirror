@@ -8,6 +8,16 @@
 # perl_code returns a value for the parameter, or undef.
 # If undef, the user has to specify them (the comment is shown to the user)
 
+###############
+#MQTT2_CLIENT_Bridge
+#
+name:A_00_MQTT2_CLIENT_general_bridge
+filter:TYPE=MQTT2_DEVICE
+desc:recommended to use this as general bridgeing device when using MQTT2_CLIENT as IO to get around missing CID info for distinguishing different devices
+attr DEVICE bridgeRegexp [^:]+:([^/]+)/([^/]+)[/]?.*:.* "$1_$2"
+attr DEVICE autocreate 1
+attr DEVICE setStateList on off
+attr DEVICE model A_00_MQTT2_CLIENT_general_bridge
 
 ###########################################
 # zigbee2mqtt
