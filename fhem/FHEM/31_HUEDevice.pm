@@ -15,6 +15,7 @@ use Color;
 use POSIX;
 use JSON;
 use SetExtensions;
+use Time::Local;
 
 #require "30_HUEBridge.pm";
 #require "$attr{global}{modpath}/FHEM/30_HUEBridge.pm";
@@ -1234,6 +1235,7 @@ HUEDevice_Parse($$)
     }
 
     my $lastupdated;
+    my $lastupdated_local;    
     if( my $state = $result->{state} ) {
       $lastupdated = $state->{lastupdated};
 
@@ -1247,21 +1249,34 @@ HUEDevice_Parse($$)
         substr( $lastupdated, 10, 1, '_' );
         my $sec = SVG_time_to_sec($lastupdated);
 
-        if( my $offset = $iohash->{helper}{offsetUTC} ) {
-          $sec += $offset;
-          Log3 $name, 4, "$name: offsetUTC: $offset";
+        $lastupdated = FmtDateTime($sec);
+        
+        if( my $offset_bridge = $iohash->{helper}{offsetUTC} ) {
+          $offset = $offset_bridge;
+          Log3 $name, 4, "$name: use offsetUTC $offset from bridge";
+        }else{
+          #we do not have received the offsetUTC from the bridge, use the system offsetUTC until we received it
+          my @t = localtime(time);
+          $offset = timegm(@t) - timelocal(@t);        
+          Log3 $name, 4, "$name: use offsetUTC $offset from system";        
         }
 
-        $lastupdated = FmtDateTime($sec);
+        #add offset to UTC for displaying in fhem
+        $sec += $offset;
+        $lastupdated_local = FmtDateTime($sec);
+      }else{
+        $lastupdated_local = $lastupdated;
       }
 
       $hash->{lastupdated} = ReadingsVal( $name, '.lastupdated', undef ) if( !$hash->{lastupdated} );
+      $hash->{lastupdated_local} = ReadingsVal( $name, '.lastupdated_local', undef ) if( !$hash->{lastupdated_local} );      
       return undef if( $hash->{lastupdated} && $hash->{lastupdated} eq $lastupdated );
 
-      Log3 $name, 4, "$name: lastupdated: $lastupdated, hash->{lastupdated}:  $hash->{lastupdated}";
+      Log3 $name, 4, "$name: lastupdated: $lastupdated, hash->{lastupdated}:  $hash->{lastupdated}, lastupdated_local: $lastupdated_local, offsetUTC: $offset";
       Log3 $name, 5, "$name: ". Dumper $result if($HUEDevice_hasDataDumper);
 
       $hash->{lastupdated} = $lastupdated;
+      $hash->{lastupdated_local} = $lastupdated_local;
 
       $readings{state} = $state->{status} if( defined($state->{status}) );
       $readings{state} = $state->{flag}?'1':'0' if( defined($state->{flag}) );
@@ -1290,9 +1305,9 @@ HUEDevice_Parse($$)
        my $i = 0;
        foreach my $key ( keys %readings ) {
          if( defined($readings{$key}) ) {
-           if( $lastupdated ) {
-             $hash->{'.updateTimestamp'} = $lastupdated;
-             $hash->{CHANGETIME}[$i] = $lastupdated;
+           if( $lastupdated_local) {
+             $hash->{'.updateTimestamp'} = $lastupdated_local;
+             $hash->{CHANGETIME}[$i] = $lastupdated_local;
            }
 
            readingsBulkUpdate($hash, $key, $readings{$key}, 1);
@@ -1301,9 +1316,13 @@ HUEDevice_Parse($$)
          }
        }
 
+       if( $lastupdated_local ) {
+         $hash->{'.updateTimestamp'} = $lastupdated_local;
+         $hash->{CHANGETIME}[$i] = $lastupdated_local;
+         readingsBulkUpdate($hash, '.lastupdated_local', $lastupdated_local, 0);         
+       }
+       
        if( $lastupdated ) {
-         $hash->{'.updateTimestamp'} = $lastupdated;
-         $hash->{CHANGETIME}[$i] = $lastupdated;
          readingsBulkUpdate($hash, '.lastupdated', $lastupdated, 0);
        }
 
