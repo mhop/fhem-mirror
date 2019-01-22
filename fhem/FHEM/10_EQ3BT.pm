@@ -8,6 +8,9 @@
 #
 #############################################################
 #
+# v2.0.6 - 20190122
+# - BUGFIX:  fix wrong time on thermostats
+#
 # v2.0.5 - 20181007
 # - BUGFIX:  ssh bugfixes by CoolTux
 #
@@ -535,6 +538,11 @@ sub EQ3BT_execGatttool($) {
             }
         }
         
+        if($value eq "03") {
+            my ($sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst) = localtime(time);
+            my $currentDate = sprintf("%02X%02X%02X%02X%02X", $year+1900-2000, $mon+1, $mday, $hour, $min);
+            $value .= $currentDate;
+        }
         
         $cmd .= "ssh $sshHost '" if($sshHost ne 'none');
         $cmd .= "timeout " . AttrVal($name, "timeout", 15) . " " if($listen);
@@ -543,16 +551,6 @@ sub EQ3BT_execGatttool($) {
         $cmd .= " --listen" if($listen);
         $cmd .= " 2>&1 /dev/null";
         $cmd .= "'" if($sshHost ne 'none');
-        
-        
-        
-
-        if($value eq "03") {
-            my ($sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst) = localtime(time);
-            my $currentDate = sprintf("%02X%02X%02X%02X%02X", $year+1900-2000, $mon+1, $mday, $hour, $min);
-            $value .= $currentDate;
-        }
-
         
         #my $cmd = "gatttool -b $mac -i $hciDevice --char-write-req --handle=$handle --value=$value";
 #         if( $sshHost ne 'none' ) {
