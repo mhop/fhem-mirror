@@ -2268,7 +2268,7 @@ FW_fileNameToPath($)
 sub FW_confFiles($) {
    my ($param) = @_;
    # create and return regexp for editFileList
-   return "(".join ( "|" , sort keys %FW_customConfFiles ).")" if $param == 1;
+   return "(".join ( "|" , sort keys %{$data{confFiles}} ).")" if $param == 1;
    # create and return array with filenames
    return sort keys %{$data{confFiles}} if $param == 2;
 }
