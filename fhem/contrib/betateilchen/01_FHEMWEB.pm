@@ -2219,7 +2219,7 @@ sub
 FW_displayFileList($@)
 {
   my ($heading,@files)= @_;
-#  return if(!@files);
+  return if(!@files);
   my $hid = lc($heading);
   $hid =~ s/[^A-Za-z]/_/g;
   FW_pO "<div class=\"fileList $hid\">$heading</div>";
@@ -2269,10 +2269,8 @@ FW_fileNameToPath($)
 sub FW_confFiles($) {
    my ($param) = @_;
    # create and return regexp for editFileList
-   Debug  "(".join ( "|" , sort keys %{$data{confFiles}} ).")" if $param == 1;
    return "(".join ( "|" , sort keys %{$data{confFiles}} ).")" if $param == 1;
    # create and return array with filenames
-   Debug  sort keys %{$data{confFiles}} if $param == 2;
    return sort keys %{$data{confFiles}} if $param == 2;
 }
 
