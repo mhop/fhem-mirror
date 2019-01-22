@@ -2651,7 +2651,7 @@ CommandRename($$)
     my $aw = ReadingsVal($d, "associatedWith", "");
     next if($aw !~ m/\b$old\b/);
     $aw =~ s/\b$old\b/$new/;
-    setReadingsVal($defs{$d}, "associatedWith", $aw, TimeNow());
+    setReadingsVal($defs{$d}, "associatedWith", $aw, TimeNow()) if($defs{$d});
   }
 
   addStructChange("rename", $new, $param);
@@ -5664,7 +5664,7 @@ getPawList($)
     }
   }
   my $aw = ReadingsVal($d, "associatedWith", ""); # Explicit link
-  push(@dob, split("[ ,]",$aw)) if($aw);
+  push(@dob, grep { $defs{$_} } split("[ ,]",$aw)) if($aw);
   return @dob;
 }
 

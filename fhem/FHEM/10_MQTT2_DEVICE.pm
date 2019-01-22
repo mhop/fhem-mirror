@@ -179,9 +179,9 @@ MQTT2_DEVICE_Parse($$)
       if(!$add) {
         $topic =~ m,.*/([^/]+),;
         $add = ($1 ? $1 : $topic);
+        $add = makeReadingName($add); # Convert non-valid characters to _
       }
 
-      $add = makeReadingName($add); # Convert non-valid characters to _
       $topic =~ s,([\^\$\[\]()\.\\]),\\$1,g;
 
       for my $ch (@{$cidArr}) {
@@ -193,7 +193,7 @@ MQTT2_DEVICE_Parse($$)
         CommandAttr(undef, "$nn readingList $rl$regex $add")
                 if(index($rl, $regex) == -1);   # Forum #84372
         setReadingsVal($defs{$nn}, "associatedWith", $parentBridge, TimeNow())
-                if($parentBridge);
+                if($parentBridge && $defs{$nn});
       }
       MQTT2_DEVICE_Parse($iodev, $msg);
     }, undef);
