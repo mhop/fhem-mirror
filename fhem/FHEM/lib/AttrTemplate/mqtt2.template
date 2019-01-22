@@ -78,6 +78,7 @@ par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","read
 attr DEVICE icon light_control
 attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name)}
 attr DEVICE webCmd toggle:on:off:brightness
+attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
 attr DEVICE setList \
   on:noArg BASE_TOPIC/DEV_ID/set {"state":"ON"}\
   off:noArg BASE_TOPIC/DEV_ID/set {"state":"OFF"}\
@@ -92,6 +93,7 @@ par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/](.*):, ? $1 : undef }
 attr DEVICE icon light_control
 attr DEVICE webCmd toggle:on:off:brightness:color_temp
+attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
 attr DEVICE setList \
   on:noArg BASE_TOPIC/DEV_ID/set {"state":"ON"}\
   off:noArg BASE_TOPIC/DEV_ID/set {"state":"OFF"}\
@@ -107,6 +109,7 @@ attr DEVICE icon hue_filled_white_and_color_e27_b22
 attr DEVICE stateFormat {lc ReadingsVal("$name","state",0)}
 attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name)}
 attr DEVICE webCmd toggle:on:off:brightness:color
+attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
 attr DEVICE setList \
   on:noArg BASE_TOPIC/DEV_ID/set {"state":"ON"}\
   off:noArg BASE_TOPIC/DEV_ID/set {"state":"OFF"}\
@@ -118,6 +121,7 @@ name:L_03_zigbee2mqtt_smokeDetector
 filter:TYPE=MQTT2_DEVICE
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/](.*):, ? $1 : undef }
+attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
 attr DEVICE icon secur_smoke_detector
 attr DEVICE stateFormat smoke
 attr DEVICE model L_03_zigbee2mqtt_smokeDetector
@@ -125,7 +129,8 @@ attr DEVICE model L_03_zigbee2mqtt_smokeDetector
 name:L_04_zigbee2mqtt_hueMotionSensor
 filter:TYPE=MQTT2_DEVICE
 attr DEVICE stateFormat T: temperature_weather B: illuminance L: linkquality
-attr DEVICE userReadings temperature_weather { sprintf("%.1f",ReadingsVal("DEVICE","temperature","")+2.5) }
+attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+attr DEVICE userReadings temperature_weather { sprintf("%.1f",ReadingsVal($name,"temperature","")+2.5) }
 attr DEVICE model L_04_zigbee2mqtt_hueMotionSensor
 
 name:L_05_zigbee2mqtt_smart+plug
@@ -133,6 +138,7 @@ filter:TYPE=MQTT2_DEVICE
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/](.*):, ? $1 : undef }
 attr DEVICE eventMap { dev=>{ON=>'on',OFF=>'off'} }
+attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
 attr DEVICE setList \
   off BASE_TOPIC/DEV_ID/set OFF\
   on BASE_TOPIC/DEV_ID/set ON
@@ -315,12 +321,14 @@ filter:TYPE=MQTT2_DEVICE
 set DEVICE attrTemplate A_01a_tasmota_basic_state_power1
 par:DEVNAME;ESP's name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,tele/([^/]*)/, ? $1 : undef }
 #attr DEVICE userReadings state:POWER.*:.* { lc(ReadingsVal($name,"POWER1","") . " " . ReadingsVal($name,"POWER2","") . " " . ReadingsVal($name,"POWER3","") . " " . ReadingsVal($name,"POWER4","")) }
-attr DEVICE readingList tele/DEVNAME/LWT:.* LWT\
+attr DEVICE readingList \
+  tele/DEVNAME/LWT:.* LWT\
   tele/DEVNAME/STATE:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   tele/DEVNAME/SENSOR:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   tele/DEVNAME/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   stat/DEVNAME/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }
-attr DEVICE setList POWER1:on,off,toggle cmnd/DEVNAME/POWER1 $EVTPART1\
+attr DEVICE setList \
+  POWER1:on,off,toggle cmnd/DEVNAME/POWER1 $EVTPART1\
   POWER2:on,off,toggle cmnd/DEVNAME/POWER2 $EVTPART1\
   POWER3:on,off,toggle cmnd/DEVNAME/POWER3 $EVTPART1\
   POWER4:on,off,toggle cmnd/DEVNAME/POWER4 $EVTPART1
@@ -368,7 +376,8 @@ par:DEVNAME;Shelly1 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,
 attr DEVICE setList\
   off:noArg shellies/DEVNAME/relay/0/command off\
   on:noArg shellies/DEVNAME/relay/0/command on
-attr DEVICE readingList shellies/DEVNAME/relay/0:.* state\
+attr DEVICE readingList \
+  shellies/DEVNAME/relay/0:.* state\
   shellies/DEVNAME/relay/0:.* relay0\
   shellies/DEVNAME/input/0:.* input0\
   shellies/DEVNAME/online:.* online\
@@ -396,7 +405,8 @@ attr DEVICE setList \
   stop:noArg shellies/DEVNAME/roller/0/command stop\
   pct:slider,0,1,100 shellies/DEVNAME/roller/0/command/pos $EVTPART1\
   DoRecalibration:noArg shellies/DEVNAME/roller/0/command rc
-attr DEVICE readingList shellies/DEVNAME/roller/0/pos:.* pct\
+attr DEVICE readingList \
+  shellies/DEVNAME/roller/0/pos:.* pct\
   shellies/DEVNAME/status/0/rollers:.* power\
   shellies/DEVNAME/online:.* online\
   shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
@@ -432,8 +442,9 @@ filter:TYPE=MQTT2_DEVICE
 desc:shelly4pro using original firmware <br>NOTE: for each of the second to fourth channel, a new device will be created
 par:DEVNAME;Shelly4Pro name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
 set DEVICE attrTemplate A_10a_shellyplug
-attr DEVICE getList power1:noArg shellies/DEVNAME/relay/0/power power1\
-  shellies/DEVNAME/relay/0/energy energy1
+attr DEVICE getList \
+  power1:noArg shellies/DEVNAME/relay/0/power power1\
+  energy1:noArg shellies/DEVNAME/relay/0/energy energy1
 attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2, DEVICE_CH3 and DEVICE_CH4
 copy DEVICE DEVICE_CH2
 attr DEVICE_CH2 readingList shellies/DEVNAME/relay/1:.* state
@@ -442,8 +453,9 @@ setreading DEVICE_CH2 associatedWith DEVICE,DEVICE_CH3,DEVICE_CH4
 attr DEVICE_CH2 setList \
   off:noArg shellies/DEVNAME/relay/1/command off\
   on:noArg shellies/DEVNAME/relay/1/command on
-attr DEVICE getList power2:noArg shellies/DEVNAME/relay/1/power power2\
-  shellies/DEVNAME/relay/1/energy energy2
+attr DEVICE getList \
+  power2:noArg shellies/DEVNAME/relay/1/power power2\
+  energy2:noArg shellies/DEVNAME/relay/1/energy energy2
 attr DEVICE comment Channel 2 for DEVICE, see also DEVICE, DEVICE_CH3 and DEVICE_CH4
 copy DEVICE DEVICE_CH3
 attr DEVICE_CH3 readingList shellies/DEVNAME/relay/2:.* state
@@ -452,8 +464,9 @@ setreading DEVICE_CH3 associatedWith DEVICE,DEVICE_CH2,DEVICE_CH4
 attr DEVICE_CH3 setList \
   off:noArg shellies/DEVNAME/relay/2/command off\
   on:noArg shellies/DEVNAME/relay/2/command on
-attr DEVICE getList power3:noArg shellies/DEVNAME/relay/2/power power3\
-  shellies/DDEVNAME/relay/2/energy energy3
+attr DEVICE getList \
+  power3:noArg shellies/DEVNAME/relay/2/power power3\
+  energy3:noArg shellies/DDEVNAME/relay/2/energy energy3
 attr DEVICE comment Channel 3 for DEVICE, see also DEVICE, DEVICE_CH2 and DEVICE_CH4
 copy DEVICE DEVICE_CH4
 attr DEVICE_CH4 readingList shellies/DEVNAME/relay/3:.* state
@@ -462,8 +475,9 @@ setreading DEVICE_CH4 associatedWith DEVICE,DEVICE_CH2,DEVICE_CH3
 attr DEVICE_CH4 setList \
   off:noArg shellies/DEVNAME/relay/3/command off\
   on:noArg shellies/DEVNAME/relay/3/command on
-attr DEVICE_CH4 getList power4:noArg shellies/DEVNAME/relay/3/power power4\
-  shellies/DEVNAME/relay/3/energy energy4
+attr DEVICE_CH4 getList \
+  power4:noArg shellies/DEVNAME/relay/3/power power4\
+  energy4:noArg shellies/DEVNAME/relay/3/energy energy4
 attr DEVICE_CH4 comment Channel 4 for DEVICE, see also DEVICE, DEVICE_CH2 and DEVICE_CH3
 attr DEVICE model A_14a_shelly4pro_split
 
@@ -525,16 +539,17 @@ attr DEVICE icon light_control
 attr DEVICE eventMap /set_white:Weiss/night_mode:Nacht/white_mode:white/
 attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name)}
 attr DEVICE webCmd brightness:hue:command
-attr DEVICE readingList BASE_ID/states/REMOTE_ID/BULB_TYPE/GROUP_ID:.* { json2nameValue($EVENT) }\
-   BASE_ID/states/REMOTE_ID/BULB_TYPE/0:.* { json2nameValue($EVENT) }\
-   BASE_ID/updates/REMOTE_ID/BULB_TYPE/GROUP_ID:.* { json2nameValue($EVENT) }\
-   BASE_ID/updates/REMOTE_ID/BULB_TYPE/0:.* { json2nameValue($EVENT) }
+attr DEVICE readingList \
+  BASE_ID/states/REMOTE_ID/BULB_TYPE/GROUP_ID:.* { json2nameValue($EVENT) }\
+  BASE_ID/states/REMOTE_ID/BULB_TYPE/0:.* { json2nameValue($EVENT) }\
+  BASE_ID/updates/REMOTE_ID/BULB_TYPE/GROUP_ID:.* { json2nameValue($EVENT) }\
+  BASE_ID/updates/REMOTE_ID/BULB_TYPE/0:.* { json2nameValue($EVENT) }
 attr DEVICE setList\
-   on BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"status":"ON"}\
-   off BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"status":"OFF"}\
-   brightness:colorpicker,BRI,0,15,255 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
-   hue:colorpicker,HUE,0,1,359 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
-   command:uzsuSelectRadio,Weiss,Nacht BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}
+  on BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"status":"ON"}\
+  off BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"status":"OFF"}\
+  brightness:colorpicker,BRI,0,15,255 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
+  hue:colorpicker,HUE,0,1,359 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
+  command:uzsuSelectRadio,Weiss,Nacht BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}
 attr DEVICE setStateList on off
 #attr DEVICE userReadings rgb {sprintf("%02X%02X%02X", ReadingsVal($name,"color_r",255), ReadingsVal($name,"color_g",255), ReadingsVal($name,"color_b",255))}
 attr DEVICE model X_01_esp_milight_hub_rgbw_bulb
@@ -552,14 +567,15 @@ attr milight_REMOTE_ID_0 icon light_control
 attr milight_REMOTE_ID_0 eventMap /set_white:Weiss/night_mode:Nacht/white_mode:white/
 attr milight_REMOTE_ID_0 devStateIcon {zigbee2mqtt_devStateIcon255($name)}
 attr milight_REMOTE_ID_0 webCmd brightness:hue:command
-attr milight_REMOTE_ID_0 readingList BASE_ID/states/REMOTE_ID/BULB_TYPE/0:.* { json2nameValue($EVENT) }\
-   BASE_ID/updates/REMOTE_ID/BULB_TYPE/0:.* { json2nameValue($EVENT) }
+attr milight_REMOTE_ID_0 readingList \
+  BASE_ID/states/REMOTE_ID/BULB_TYPE/0:.* { json2nameValue($EVENT) }\
+  BASE_ID/updates/REMOTE_ID/BULB_TYPE/0:.* { json2nameValue($EVENT) }
 attr milight_REMOTE_ID_0 setList\
-   on BASE_ID/REMOTE_ID/BULB_TYPE/0 {"status":"ON"}\
-   off BASE_ID/REMOTE_ID/BULB_TYPE/0_ID {"status":"OFF"}\
-   brightness:colorpicker,BRI,0,15,255 BASE_ID/REMOTE_ID/BULB_TYPE/0 {"$EVTPART0":"$EVTPART1"}\
-   hue:colorpicker,HUE,0,1,359 BASE_ID/REMOTE_ID/BULB_TYPE/0 {"$EVTPART0":"$EVTPART1"}\
-   command:uzsuSelectRadio,Weiss,Nacht BASE_ID/REMOTE_ID/BULB_TYPE/0 {"$EVTPART0":"$EVTPART1"}
+  on BASE_ID/REMOTE_ID/BULB_TYPE/0 {"status":"ON"}\
+  off BASE_ID/REMOTE_ID/BULB_TYPE/0_ID {"status":"OFF"}\
+  brightness:colorpicker,BRI,0,15,255 BASE_ID/REMOTE_ID/BULB_TYPE/0 {"$EVTPART0":"$EVTPART1"}\
+  hue:colorpicker,HUE,0,1,359 BASE_ID/REMOTE_ID/BULB_TYPE/0 {"$EVTPART0":"$EVTPART1"}\
+  command:uzsuSelectRadio,Weiss,Nacht BASE_ID/REMOTE_ID/BULB_TYPE/0 {"$EVTPART0":"$EVTPART1"}
 attr milight_REMOTE_ID_0 setStateList on off
 #attr milight_REMOTE_ID_0 userReadings rgb {sprintf("%02X%02X%02X", ReadingsVal($name,"color_r",255), ReadingsVal($name,"color_g",255), ReadingsVal($name,"color_b",255))}
 modify milight_REMOTE_ID_0 milight_REMOTE_ID_0
@@ -577,27 +593,28 @@ deletereading DEVICE .*_.*
 attr DEVICE icon light_control
 attr DEVICE eventMap /set_white:Weiss/night_mode:Nacht/white_mode:white/on:on/off:off/ON:on/OFF:off/next_mode:Mode/mode_speed_up:Faster/mode_speed_down:Slower/level_up:Up/level_down:Down/
 attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name)}
-attr DEVICE readingList BASE_ID/states/REMOTE_ID/BULB_TYPE/GROUP_ID:.* { json2nameValue($EVENT) }\
-   BASE_ID/states/REMOTE_ID/BULB_TYPE/0:.* { json2nameValue($EVENT) }\
-   BASE_ID/updates/REMOTE_ID/BULB_TYPE/GROUP_ID:.* { json2nameValue($EVENT) }\
-   BASE_ID/updates/REMOTE_ID/BULB_TYPE/0:.* { json2nameValue($EVENT) }
+attr DEVICE readingList \
+  BASE_ID/states/REMOTE_ID/BULB_TYPE/GROUP_ID:.* { json2nameValue($EVENT) }\
+  BASE_ID/states/REMOTE_ID/BULB_TYPE/0:.* { json2nameValue($EVENT) }\
+  BASE_ID/updates/REMOTE_ID/BULB_TYPE/GROUP_ID:.* { json2nameValue($EVENT) }\
+  BASE_ID/updates/REMOTE_ID/BULB_TYPE/0:.* { json2nameValue($EVENT) }
 attr DEVICE setList\
-   on BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"status":"ON"}\
-   off BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"status":"OFF"}\
-   brightness:colorpicker,BRI,0,15,255 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
-   hue:colorpicker,HUE,0,1,359 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
-   color_temp:colorpicker,CT,153,1,370 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
-   saturation:colorpicker,BRI,0,1,100 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
-   command:uzsuSelectRadio,Weiss,Nacht BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
-   program:uzsuSelectRadio,Mode,Faster,Slower BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"command":"$EVTPART1"}\
-   mode:select,0,1,2,3,4,5,6,7,8 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
-   dim:uzsuSelectRadio,Up,Down BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"command":"$EVTPART1"}
+  on BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"status":"ON"}\
+  off BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"status":"OFF"}\
+  brightness:colorpicker,BRI,0,15,255 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
+  hue:colorpicker,HUE,0,1,359 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
+  color_temp:colorpicker,CT,153,1,370 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
+  saturation:colorpicker,BRI,0,1,100 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
+  command:uzsuSelectRadio,Weiss,Nacht BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
+  program:uzsuSelectRadio,Mode,Faster,Slower BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"command":"$EVTPART1"}\
+  mode:select,0,1,2,3,4,5,6,7,8 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
+  dim:uzsuSelectRadio,Up,Down BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"command":"$EVTPART1"}
 #attr DEVICE userReadings rgb {sprintf("%02X%02X%02X", ReadingsVal($name,"color_r",255), ReadingsVal($name,"color_g",255), ReadingsVal($name,"color_b",255))}
 attr DEVICE webCmd brightness:dim:hue:command:color_temp:program:saturation:mode
-attr DEVICE webCmdLabel brightness:dim\
-   :hue:command\
-   :color_temp:program\
-   :saturation:mode
+attr DEVICE webCmdLabel   brightness:dim\
+  :hue:command\
+  :color_temp:program\
+  :saturation:mode
 attr DEVICE setStateList on off
 # computed_color will send RGB = 255,255,255 when in white mode. This is useful for HomeAssistant where it always expects the color to be set.
 attr DEVICE model X_01a_esp_milight_hub_rgb_cct_bulb
@@ -614,21 +631,22 @@ deletereading DEVICE .*_.*
 attr DEVICE icon light_control
 attr DEVICE eventMap /set_white:Weiss/night_mode:Nacht/white_mode:white/on:on/off:off/ON:on/OFF:off/next_mode:Mode/mode_speed_up:Faster/mode_speed_down:Slower/level_up:Up/level_down:Down/
 attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name)}
-attr DEVICE readingList BASE_ID/states/REMOTE_ID/BULB_TYPE/GROUP_ID:.* { json2nameValue($EVENT) }\
-   BASE_ID/states/REMOTE_ID/BULB_TYPE/0:.* { json2nameValue($EVENT) }\
-   BASE_ID/updates/REMOTE_ID/BULB_TYPE/GROUP_ID:.* { json2nameValue($EVENT) }\
-   BASE_ID/updates/REMOTE_ID/BULB_TYPE/0:.* { json2nameValue($EVENT) }
+attr DEVICE readingList \
+  BASE_ID/states/REMOTE_ID/BULB_TYPE/GROUP_ID:.* { json2nameValue($EVENT) }\
+  BASE_ID/states/REMOTE_ID/BULB_TYPE/0:.* { json2nameValue($EVENT) }\
+  BASE_ID/updates/REMOTE_ID/BULB_TYPE/GROUP_ID:.* { json2nameValue($EVENT) }\
+  BASE_ID/updates/REMOTE_ID/BULB_TYPE/0:.* { json2nameValue($EVENT) }
 attr DEVICE setList\
-   on BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"status":"ON"}\
-   off BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"status":"OFF"}\
-   brightness:colorpicker,BRI,0,15,255 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
-   command:uzsuSelectRadio,Weiss,Nacht BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
-   program:uzsuSelectRadio,Mode,Faster,Slower BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"command":"$EVTPART1"}\
-   mode:select,0,1,2,3,4,5,6,7,8 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
-   dim:uzsuSelectRadio,Up,Down BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"command":"$EVTPART1"}
+  on BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"status":"ON"}\
+  off BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"status":"OFF"}\
+  brightness:colorpicker,BRI,0,15,255 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
+  command:uzsuSelectRadio,Weiss,Nacht BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
+  program:uzsuSelectRadio,Mode,Faster,Slower BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"command":"$EVTPART1"}\
+  mode:select,0,1,2,3,4,5,6,7,8 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
+  dim:uzsuSelectRadio,Up,Down BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"command":"$EVTPART1"}
 attr DEVICE webCmd brightness:dim:command:program:mode
 attr DEVICE webCmdLabel :dim\
-   :::
+  :::
 attr DEVICE setStateList on off
 attr DEVICE model X_01b_esp_milight_hub_cct_only_bulb
 
@@ -644,28 +662,27 @@ deletereading DEVICE .*_.*
 attr DEVICE icon light_control
 attr DEVICE eventMap /set_white:Weiss/night_mode:Nacht/white_mode:white/on:on/off:off/ON:on/OFF:off/next_mode:Mode/mode_speed_up:Faster/mode_speed_down:Slower/level_up:Up/level_down:Down/
 attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name)}
-attr DEVICE readingList BASE_ID/states/REMOTE_ID/BULB_TYPE/GROUP_ID:.* { json2nameValue($EVENT) }\
-   BASE_ID/states/REMOTE_ID/BULB_TYPE/0:.* { json2nameValue($EVENT) }\
-   BASE_ID/updates/REMOTE_ID/BULB_TYPE/GROUP_ID:.* { json2nameValue($EVENT) }\
-   BASE_ID/updates/REMOTE_ID/BULB_TYPE/0:.* { json2nameValue($EVENT) }
+attr DEVICE readingList \
+  BASE_ID/states/REMOTE_ID/BULB_TYPE/GROUP_ID:.* { json2nameValue($EVENT) }\
+  BASE_ID/states/REMOTE_ID/BULB_TYPE/0:.* { json2nameValue($EVENT) }\
+  BASE_ID/updates/REMOTE_ID/BULB_TYPE/GROUP_ID:.* { json2nameValue($EVENT) }\
+  BASE_ID/updates/REMOTE_ID/BULB_TYPE/0:.* { json2nameValue($EVENT) }
 attr DEVICE setList\
-   on BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"status":"ON"}\
-   off BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"status":"OFF"}\
-   brightness:colorpicker,BRI,0,15,255 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
-   hue:colorpicker,HUE,0,1,359 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
-   color_temp:colorpicker,CT,153,1,370 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
-   saturation:colorpicker,BRI,0,1,100 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
-   command:uzsuSelectRadio,Weiss,Nacht BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
-   program:uzsuSelectRadio,Mode,Faster,Slower BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"command":"$EVTPART1"}\
-   mode:select,0,1,2,3,4,5,6,7,8 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
-   dim:uzsuSelectRadio,Up,Down BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"command":"$EVTPART1"}
-#attr DEVICE userReadings rgb {sprintf("%02X%02X%02X", ReadingsVal($name,"color_r",255), ReadingsVal($name,"color_g",255), ReadingsVal($name,"color_b",255))}
+  on BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"status":"ON"}\
+  off BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"status":"OFF"}\
+  brightness:colorpicker,BRI,0,15,255 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
+  hue:colorpicker,HUE,0,1,359 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
+  color_temp:colorpicker,CT,153,1,370 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
+  saturation:colorpicker,BRI,0,1,100 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
+  command:uzsuSelectRadio,Weiss,Nacht BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
+  program:uzsuSelectRadio,Mode,Faster,Slower BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"command":"$EVTPART1"}\
+  mode:select,0,1,2,3,4,5,6,7,8 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
+  dim:uzsuSelectRadio,Up,Down BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"command":"$EVTPART1"}
 attr DEVICE webCmd on:off:brightness:dim:hue:command:color_temp:program:saturation:mode
-attr DEVICE webCmdLabel An:Aus\
-   :Helligkeit:Dimmen\
-   :HUE:Command\
-   :Farb-Temp:Programm\
-   :Sättigung:Modus
+attr DEVICE webCmdLabel    An:Aus\
+  :Helligkeit:Dimmen\
+  :HUE:Command\
+  :Farb-Temp:Programm\
+  :Sättigung:Modus
 attr DEVICE setStateList on off
-# computed_color will send RGB = 255,255,255 when in white mode. This is useful for HomeAssistant where it always expects the color to be set.
 attr DEVICE model X_01x_esp_milight_hub_max_features_bulb
