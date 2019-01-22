@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 01_FHEMWEB.pm 18326 2019-01-18 22:09:42Z rudolfkoenig $
+# $Id: 01_FHEMWEB.pm 18366 2019-01-21 21:23:08Z rudolfkoenig $
 package main;
 
 use strict;
@@ -88,7 +88,6 @@ use vars qw(%FW_visibleDeviceHash);
 use vars qw(@FW_httpheader); # HTTP header, line by line
 use vars qw(%FW_httpheader); # HTTP header, as hash
 use vars qw($FW_userAgent); # user agent string
-use vars qw(%FW_customConfFiles); 
 
 $FW_formmethod = "post";
 
@@ -221,8 +220,6 @@ FHEMWEB_Initialize($)
     "widgetOverride"
   );
 
-  InternalTimer(time()+60, "FW_closeInactiveClients", 0, 0);
-
   $FW_confdir  = "$attr{global}{modpath}/conf";
   $FW_dir      = "$attr{global}{modpath}/www";
   $FW_icondir  = "$FW_dir/images";
@@ -271,6 +268,10 @@ FW_Define($$)
         if($port !~ m/^(IPV6:)?\d+$/);
 
   FW_Undef($hash, undef) if($hash->{OLDDEF}); # modify
+
+  RemoveInternalTimer(0, "FW_closeInactiveClients");
+  InternalTimer(time()+60, "FW_closeInactiveClients", 0, 0);
+
 
   foreach my $pe ("fhemSVG", "openautomation", "default") {
     FW_readIcons($pe);
@@ -2217,6 +2218,7 @@ sub
 FW_displayFileList($@)
 {
   my ($heading,@files)= @_;
+  return if(!@files);
   my $hid = lc($heading);
   $hid =~ s/[^A-Za-z]/_/g;
   FW_pO "<div class=\"fileList $hid\">$heading</div>";
@@ -2241,7 +2243,7 @@ FW_fileNameToPath($)
 {
   my $name = shift;
 
-  my @f = sort keys %FW_customConfFiles;
+  my @f = FW_confFiles(2);
   return "$FW_confdir/$name" if ( map { $name =~ $_ } @f );
 
   $attr{global}{configfile} =~ m,([^/]*)$,;
@@ -2263,9 +2265,12 @@ FW_fileNameToPath($)
   }
 }
 
-sub FW_confFiles() {
+sub FW_confFiles($) {
+   my ($param) = @_;
    # create and return regexp for editFileList
-   return "(".join ( "|" , sort keys %FW_customConfFiles ).")";
+   return "(".join ( "|" , sort keys %FW_customConfFiles ).")" if $param == 1;
+   # create and return array with filenames
+   return sort keys $data{confFiles} if $param == 2;
 }
 
 ##################
@@ -2293,7 +2298,7 @@ FW_style($$)
     my $efl = AttrVal($FW_wname, 'editFileList',
       "Own modules and helper files:\$MW_dir:^(.*sh|[0-9][0-9].*Util.*pm|".
                         ".*cfg|.*\.holiday|myUtilsTemplate.pm|.*layout)\$\n".
-      "Config files:\$FW_confdir:^".FW_confFiles."\$\n".
+      "Config files for external Programs:\$FW_confdir:^".FW_confFiles(1)."\$\n".
       "Gplot files:\$FW_gplotdir:^.*gplot\$\n".
       "Style files:\$FW_cssdir:^.*(css|svg)\$");
     foreach my $l (split(/[\r\n]/, $efl)) {
