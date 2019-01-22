@@ -15,6 +15,7 @@ sub FW_IconURL($);
 sub FW_addContent(;$);
 sub FW_addToWritebuffer($$@);
 sub FW_answerCall($);
+sub FW_confFiles($);
 sub FW_dev2image($;$);
 sub FW_devState($$@);
 sub FW_digestCgi($);
@@ -2268,8 +2269,10 @@ FW_fileNameToPath($)
 sub FW_confFiles($) {
    my ($param) = @_;
    # create and return regexp for editFileList
+   Debug  "(".join ( "|" , sort keys %{$data{confFiles}} ).")" if $param == 1;
    return "(".join ( "|" , sort keys %{$data{confFiles}} ).")" if $param == 1;
    # create and return array with filenames
+   Debug  sort keys %{$data{confFiles}} if $param == 2;
    return sort keys %{$data{confFiles}} if $param == 2;
 }
 
