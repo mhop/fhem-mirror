@@ -15,6 +15,7 @@ sub FW_IconURL($);
 sub FW_addContent(;$);
 sub FW_addToWritebuffer($$@);
 sub FW_answerCall($);
+sub FW_confFiles($);
 sub FW_dev2image($;$);
 sub FW_devState($$@);
 sub FW_digestCgi($);
@@ -88,7 +89,6 @@ use vars qw(%FW_visibleDeviceHash);
 use vars qw(@FW_httpheader); # HTTP header, line by line
 use vars qw(%FW_httpheader); # HTTP header, as hash
 use vars qw($FW_userAgent); # user agent string
-use vars qw(%FW_customConfFiles); 
 
 $FW_formmethod = "post";
 
@@ -2244,7 +2244,7 @@ FW_fileNameToPath($)
 {
   my $name = shift;
 
-  my @f = sort keys %FW_customConfFiles;
+  my @f = FW_confFiles(2);
   return "$FW_confdir/$name" if ( map { $name =~ $_ } @f );
 
   $attr{global}{configfile} =~ m,([^/]*)$,;
@@ -2266,9 +2266,12 @@ FW_fileNameToPath($)
   }
 }
 
-sub FW_confFiles() {
+sub FW_confFiles($) {
+   my ($param) = @_;
    # create and return regexp for editFileList
-   return "(".join ( "|" , sort keys %FW_customConfFiles ).")";
+   return "(".join ( "|" , sort keys %{$data{confFiles}} ).")" if $param == 1;
+   # create and return array with filenames
+   return sort keys %{$data{confFiles}} if $param == 2;
 }
 
 ##################
@@ -2296,7 +2299,7 @@ FW_style($$)
     my $efl = AttrVal($FW_wname, 'editFileList',
       "Own modules and helper files:\$MW_dir:^(.*sh|[0-9][0-9].*Util.*pm|".
                         ".*cfg|.*\.holiday|myUtilsTemplate.pm|.*layout)\$\n".
-      "Config files for external Programs:\$FW_confdir:^".FW_confFiles."\$\n".
+      "Config files for external programs:\$FW_confdir:^".FW_confFiles(1)."\$\n".
       "Gplot files:\$FW_gplotdir:^.*gplot\$\n".
       "Style files:\$FW_cssdir:^.*(css|svg)\$");
     foreach my $l (split(/[\r\n]/, $efl)) {
