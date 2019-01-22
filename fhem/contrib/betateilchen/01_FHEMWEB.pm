@@ -2218,7 +2218,7 @@ sub
 FW_displayFileList($@)
 {
   my ($heading,@files)= @_;
-  return if(!@files);
+#  return if(!@files);
   my $hid = lc($heading);
   $hid =~ s/[^A-Za-z]/_/g;
   FW_pO "<div class=\"fileList $hid\">$heading</div>";
