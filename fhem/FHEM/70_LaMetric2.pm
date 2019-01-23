@@ -289,7 +289,7 @@ sub LaMetric2_Define($$) {
             # set those to make it easier for users to see the
             # default values. However, deleting those will
             # still use the same defaults in the code below.
-            $attr{$name}{defaultOnStatus}             = "always";
+            $attr{$name}{defaultOnStatus}             = "illumination";
             $attr{$name}{defaultScreensaverEndTime}   = "06:00";
             $attr{$name}{defaultScreensaverStartTime} = "00:00";
             $attr{$name}{defaultVolume}               = "50";
@@ -687,15 +687,6 @@ sub LaMetric2_ReceiveCommand($$$) {
                 # mode should not be time_based
                 return LaMetric2_SetScreensaver( $hash, $info->{caller} )
                   if ( defined( $info->{caller} ) );
-
-                #FIXME there is a bug in the current firmware that will set
-                # start_time to the same value as end_time when changing
-                # from mode time_based to when_dark. It will not happen when
-                # changing from time_based to off. I opened a ticket with the
-                # manufacturer on 2018-11-30.
-                # As a result, the original start_time value cannot be kept
-                # correctly when switching between the modes, especially when
-                # using the on/off setter.
             }
 
             # API version >= 2.1.0
@@ -1153,7 +1144,7 @@ sub LaMetric2_SetOnOff {
     }
     elsif ( $cmd eq "on" ) {
         my $screensaver = "when_dark";
-        my $onStatus = AttrVal( $name, "defaultOnStatus", "always" );
+        my $onStatus = AttrVal( $name, "defaultOnStatus", "illumination" );
         $screensaver = "off" if ( $onStatus eq "always" );
 
         my $ret = LaMetric2_SetScreensaver(
@@ -1193,25 +1184,17 @@ sub LaMetric2_SetVolume {
     my ($volume)   = @_;
     my $currVolume = ReadingsVal( $name, "volume", 0 );
 
-    #FIXME Due to a bug in the firmware, we need to increase
-    # the desired volume by one if it is between 1 and 99 ...
-    # Although the resulting volume will be +1 sometimes, but
-    # that happens less often than the other way around ...
-    # Opened a ticket with the manufacturer on 2018-11-30
     if ( looks_like_number($volume) ) {
-        $volume++ if ( $volume > 0 && $volume < 100 );    #FIXME
         $body{volume} = $volume;
     }
     elsif ( lc($cmd) eq "volumeup" ) {
         $currVolume = $currVolume + 10;
         $currVolume = 100 if ( $currVolume > 100 );
-        $currVolume++ if ( $currVolume > 0 && $currVolume < 100 );    #FIXME
         $body{volume} = $currVolume;
     }
     elsif ( lc($cmd) eq "volumedown" ) {
         $currVolume = $currVolume - 10;
         $currVolume = 0 if ( $currVolume < 0 );
-        $currVolume++ if ( $currVolume > 0 && $currVolume < 100 );    #FIXME
         $body{volume} = $currVolume;
     }
     else {
@@ -1242,7 +1225,6 @@ sub LaMetric2_SetMute {
             $hash->{helper}{lastVolume}
           ? $hash->{helper}{lastVolume}
           : AttrVal( $name, "defaultVolume", 50 );
-        $volume++ if ( $volume > 0 && $volume < 100 );    #FIXME
         $body{volume} = $volume;
     }
     else {
@@ -2554,7 +2536,7 @@ sub LaMetric2_IsDuringTimeframe($$;$) {
 <ul>
   <li>
     <a name="LaMetric2AttrdefaultOnStatus" id="LaMetric2AttrdefaultOnStatus"></a><code>defaultOnStatus</code><br>
-    When the device is turned on, this will be the screensaver status to put it in to. Defaults to 'off'.
+    When the device is turned on, this will be the screensaver status to put it in to. Defaults to 'illumination'.
   </li>
   <li>
     <a name="LaMetric2AttrdefaultScreensaverStartTime" id="LaMetric2AttrdefaultScreensaverStartTime"></a><code>defaultScreensaverStartTime</code><br>
