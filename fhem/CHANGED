@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 59_Weather: add limit forecast, selection between daily and hourly
+                         forecast
   - feature: 49_SSCam: V8.6.1, new attribute snapReadingRotate, time format in 
                        readings and galleries depends from global language 
                        attribute, minor bug fixes
