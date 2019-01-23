@@ -20,8 +20,6 @@
 #   0x00B3 -> "3" m3
 #   0x0025 -> "%"
 #   0x00B0 -> "°"
-#- notification attributes auf tatsächliche funktion prüfen
-#- sticky/cycle message prüfen
 #- msgSchema (überlappende Parameter wie priority)
 #-mehrere metric/chart/goal/msg frames des gleichen typs (derzeit gehen per msg nur 1x zusätzlich metric,chart,goal) -> reihenfolge?
 
@@ -31,6 +29,7 @@ use Data::Dumper;
 use JSON qw(decode_json encode_json);
 use Time::HiRes qw(gettimeofday time);
 use Time::Local;
+use IO::Socket::SSL;
 
 use Encode;
 use HttpUtils;
@@ -1563,11 +1562,11 @@ sub LaMetric2_SetNotification {
     $values{sound} = ""
       if ( $values{sound} eq "none" || $values{sound} eq "off" );
     $values{repeat} =
-      h->{repeat}
+        $h->{repeat}
       ? $h->{repeat}
       : 1;
     $values{cycles} =
-      h->{cycles}
+      defined( $h->{cycles} )
       ? $h->{cycles}
       : 1;
 
@@ -1886,6 +1885,16 @@ sub LaMetric2_SetNotification {
         || defined( $values{goal} )
         || defined( $values{metric} ) );
 
+    # If a cancelID was provided, send a "sticky" notification
+    if ( !looks_like_number( $values{cycles} ) || $values{cycles} == 0 ) {
+        $info->{cancelID} = $values{cycles};
+        $values{cycles} = 0;
+
+        # start Validation Timer
+        RemoveInternalTimer( $hash, "LaMetric2_CycleMessage" );
+        InternalTimer( gettimeofday() + 5, "LaMetric2_CycleMessage", $hash, 0 );
+    }
+
     # Building notification
     #
 
@@ -1904,16 +1913,6 @@ sub LaMetric2_SetNotification {
     readingsBulkUpdate( $hash, "lastNotificationPriority", $values{priority} );
     readingsBulkUpdate( $hash, "lastNotificationIconType", $values{icontype} );
     readingsBulkUpdate( $hash, "lastNotificationLifetime", $values{lifetime} );
-
-    # If a cancelID was provided, send a "sticky" notification
-    if ( !looks_like_number( $values{cycles} ) || $values{cycles} == 0 ) {
-        $info->{cancelID} = $values{cycles};
-        $values{cycles} = 0;
-
-        # start Validation Timer
-        RemoveInternalTimer( $hash, "LaMetric2_CycleMessage" );
-        InternalTimer( gettimeofday() + 5, "LaMetric2_CycleMessage", $hash, 0 );
-    }
 
     my $sound;
     if ( $values{sound} ne "" ) {
