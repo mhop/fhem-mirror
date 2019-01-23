@@ -3880,7 +3880,7 @@ Dispatch($$;$$)
     my @tfound = &{$modules{$m}{ParseFn}}($hash,$dmsg);
     use strict "refs"; $readingsUpdateDelayTrigger = 0;
     $parserMod = $m;
-    if(@tfound && $tfound[0]) {
+    if(int(@tfound) && defined($tfound[0])) {
       if($tfound[0] && $tfound[0] eq "[NEXT]") { # not a goodDeviceName, #95446
         shift(@tfound);
         push @found, @tfound;                   # continue feeding other modules

@@ -100,7 +100,7 @@ for(;;) {
         push @msg, $stars.$cmd;
 
       } elsif($cmd eq "?") {
-        push @msg, $stars."? (? is unknown) Use one of t u x";
+        push @msg, $stars."? (? is unknown) Use one of A B b C E e F f G h i K l M m N R T t U u V W X x Y Z";
 
       } elsif($cmd eq "t") {
         push @msg, $stars.sprintf("%08X", (time()%86400)*125);
