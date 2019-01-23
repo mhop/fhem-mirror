@@ -57,6 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Versions History intern
 our %DbRep_vNotesIntern = (
+  "8.11.0" => "24.01.2019  command exportToFile or attribute \"expimpfile\" accepts option \"MAXLINES=\" ",
   "8.10.1" => "23.01.2019  change DbRep_charfilter to eliminate \xc2",
   "8.10.0" => "19.01.2019  sqlCmd, dbValue may input SQL session variables, Forum:#96082 ",
   "8.9.10" => "18.01.2019  fix warnings Malformed UTF-8 character during importFromFile, Forum:#96056 ",
@@ -132,6 +133,7 @@ our %DbRep_vNotesIntern = (
 
 # Versions History extern:
 our %DbRep_vNotesExtern = (
+  "8.11.0" => "24.01.2019 command exportToFile or attribute \"expimpfile\" accepts option \"MAXLINES=\" ",
   "8.10.0" => "19.01.2019 In commands sqlCmd, dbValue you may now use SQL session variables like \"SET \@open:=NULL,\@closed:=NULL; SELECT ...\", Forum:#96082",
   "8.9.0"  => "07.11.2018 new command set delDoublets added. This command allows to delete multiple occuring identical records. ",
   "8.8.0"  => "06.11.2018 new attribute 'fastStart'. Usually every DbRep-device is making a short connect to its database when "
@@ -412,6 +414,7 @@ sub DbRep_Set($@) {
   my $name           = $a[0];
   my $opt            = $a[1];
   my $prop           = $a[2];
+  my $prop1          = $a[3];
   my $dbh            = $hash->{DBH};
   my $dblogdevice    = $hash->{HELPER}{DBLOGDEVICE};
   $hash->{dbloghash} = $defs{$dblogdevice};
@@ -747,11 +750,12 @@ sub DbRep_Set($@) {
       
   } elsif ($opt eq "exportToFile" && $hash->{ROLE} ne "Agent") {
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
-      my $f = $prop if($prop);
-      if (!AttrVal($hash->{NAME}, "expimpfile", "") && !$f) {
-          return "\"$opt\" needs a file as an argument or the attribute \"expimpfile\" (path and filename) to be set !";
+      my $f = ($prop && $prop !~ /MAXLINES=/)?$prop:AttrVal($name,"expimpfile","");
+      my $e = $prop1?" $prop1":"";
+      if (!$f) {
+          return "\"$opt\" needs a file as argument or the attribute \"expimpfile\" (path and filename) to be set !";
       }
-      DbRep_Main($hash,$opt,$f);
+      DbRep_Main($hash,$opt,$f.$e);
       
   } elsif ($opt eq "importFromFile" && $hash->{ROLE} ne "Agent") {
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
@@ -5204,12 +5208,37 @@ sub expfile_DoParse($) {
      return "$name|''|''|$err|''|''|''";
  }
  
- $rsf        =~ s/[:\s]/_/g; 
- my $outfile =  $file?$file:AttrVal($name, "expimpfile", undef);
- $outfile    =~ s/%TSB/$rsf/g;
+ 
+ my $ml;
+ my $part = ".";
+ if($file =~ /MAXLINES=/) {
+     my ($arrayref, $hashref) = parseParams($file);
+     my @a = @{$arrayref};
+     my %h = %{$hashref};
+     $file = $a[0];
+     if(!$file) {
+         ($arrayref, undef) = parseParams(AttrVal($name,"expimpfile","")); 
+         @a = @{$arrayref};
+         $file = $a[0];       
+     }
+     $ml = $h{MAXLINES};
+     if($ml !~ /^\d+$/) {
+         undef $ml;
+     } else {
+         $part = "_part1.";
+     }
+ }
+ 
+ Log3 ($name, 4, "DbRep $name - Export data to file: $file ".($ml?"splitted to parts of $ml lines":"")  );
+ 
+ $rsf =~ s/[:\s]/_/g; 
+ my ($f,$e) = split(/\./,$file);
+ $e    = $e?$e:"";
+ $f    =~ s/%TSB/$rsf/g;
  my @t = localtime;
- $outfile = ResolveDateWildcards($outfile, @t);
- if (open(FH, ">", "$outfile")) {
+ $f    = ResolveDateWildcards($f, @t);
+ my $outfile = $f.$part.$e;
+ if (open(FH, ">", $outfile)) {
      binmode (FH);
  } else {
      $err = encode_base64("could not open ".$outfile.": ".$!,"");
@@ -5229,7 +5258,8 @@ sub expfile_DoParse($) {
  
  # DB-Abfrage zeilenweise für jeden Array-Eintrag
  my $arrstr;
- my $nrows = 0;
+ my ($nrows,$frows) = (0,0);
+ my $p = 2;
  my $addon = "ORDER BY TIMESTAMP";
  no warnings 'uninitialized'; 
  foreach my $row (@ts) {
@@ -5260,10 +5290,24 @@ sub expfile_DoParse($) {
          Log3 ($name, 5, "DbRep $name -> write row:  @$row");
          # Anzahl der Datensätze
          $nrows++;
-     }
- 
+         $frows++;
+         if($ml && $frows >= $ml) {
+             Log3 ($name, 3, "DbRep $name - Number of exported datasets from $hash->{DATABASE} to file $outfile: ".$frows);
+             close(FH);
+             $outfile = $f."_part$p.".$e;
+             if (open(FH, ">", $outfile)) {
+                 binmode (FH);
+             } else {
+                 $err = encode_base64("could not open ".$outfile.": ".$!,"");
+                 return "$name|''|''|$err|''|''|''";
+             }
+             $p++;
+             $frows = 0;
+         }
+     } 
  }     
  close(FH);
+ Log3 ($name, 3, "DbRep $name - Number of exported datasets from $hash->{DATABASE} to file $outfile: ".$frows);
 
  # SQL-Laufzeit ermitteln
  my $rt = tv_interval($st);
@@ -5313,16 +5357,13 @@ sub expfile_ParseDone($) {
   
   my $ds   = $device." -- " if ($device);
   my $rds  = $reading." -- " if ($reading);
-  my $export_string = $ds.$rds." -- ROWS EXPORTED TO FILE -- ";
+  my $export_string = $ds.$rds." -- ROWS EXPORTED TO FILE(S) -- ";
   
   my $state = $erread?$erread:"done";
   readingsBeginUpdate($hash);
   ReadingsBulkUpdateValue ($hash, $export_string, $nrows); 
   ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);
   readingsEndUpdate($hash, 1);
-  
-  my $rows = $ds.$rds.$nrows;
-  Log3 ($name, 3, "DbRep $name - Number of exported datasets from $hash->{DATABASE} to file $outfile: ".$rows);
 
   delete($hash->{HELPER}{RUNNING_PID});
   
@@ -10936,13 +10977,18 @@ return;
                                  contained in exception list defined by attribute "readingPreventFromDel".                                
                                  </li><br>
 								 
-    <li><b> exportToFile [&lt;file&gt;] </b> 
-                                 -  exports DB-entries to a file in CSV-format of time period specified by time attributes. <br>
-                                 Limitation of selections can be done by <a href="#DbRepattr">attributes</a> device and/or 
-                                 reading. 
+    <li><b> exportToFile [&lt;/path/file&gt;] [MAXLINES=&lt;lines&gt;]</b> 
+                                 -  exports DB-entries to a file in CSV-format of time period specified by time attributes. <br><br>
+                                 
                                  The filename can be defined by <a href="#DbRepattr">attribute</a> "expimpfile". <br>
                                  Optionally a file can be specified as a command option (/path/file) and overloads a possibly  
-                                 defined attribute "expimpfile". The filename may contain wildcards as described
+                                 defined attribute "expimpfile".
+                                 The maximum number of datasets which are exported into one file can be specified 
+                                 with the optional parameter "MAXLINES". In this case several files with extensions
+                                 "_part1", "_part2", "_part3" and so on are created (pls. remember it when you import the files !). <br>
+                                 Limitation of selections can be done by <a href="#DbRepattr">attributes</a> device and/or 
+                                 reading. 
+                                 The filename may contain wildcards as described
                                  in attribute section of "expimpfile".
                                  <br>
                                  By setting attribute "aggregation" the export of datasets will be splitted into time slices 
@@ -11909,8 +11955,12 @@ sub bdump {
 </li>
 
   <a name="expimpfile"></a>
-  <li><b>expimpfile </b>      - Path/filename for data export/import. <br><br>
+  <li><b>expimpfile &lt;/path/file&gt; [MAXLINES=&lt;lines&gt;] </b>      
+                                - Path/filename for data export/import. <br><br>
    
+                                The maximum number of datasets which are exported into one file can be specified 
+                                with the optional parameter "MAXLINES". In this case several files with extensions
+                                "_part1", "_part2", "_part3" and so on are created. <br>
                                 The filename may contain wildcards which are replaced by corresponding values 
                                 (see subsequent table).
                                 Furthermore filename can contain %-wildcards of the POSIX strftime function of the underlying OS (see your 
@@ -13251,12 +13301,17 @@ sub bdump {
                                  Ausnahmeliste definiert mit Attribut "readingPreventFromDel" enthalten sind.                                
                                  </li><br>
                                  
-    <li><b> exportToFile [&lt;File&gt;] </b> 
-                                 -  exportiert DB-Einträge im CSV-Format in den gegebenen Zeitgrenzen. <br>
+    <li><b> exportToFile [&lt;/Pfad/File&gt;] [MAXLINES=&lt;lines&gt;] </b> 
+                                 -  exportiert DB-Einträge im CSV-Format in den gegebenen Zeitgrenzen. <br><br>
+                                 
+                                 Der Dateiname wird durch das <a href="#DbRepattr">Attribut</a> "expimpfile" bestimmt. 
+                                 Alternativ kann "/Pfad/File" als Kommando-Option angegeben werden und übersteuert ein 
+                                 eventuell gesetztes Attribut "expimpfile". Optional kann über den Parameter "MAXLINES" die 
+                                 maximale Anzahl von Datensätzen angegeben werden, die in ein File exportiert werden. 
+                                 In diesem Fall werden mehrere Files mit den Extensions "_part1", "_part2", "_part3" usw. 
+                                 erstellt (beim Import berücksichtigen !). <br><br>
                                  Einschränkungen durch die <a href="#DbRepattr">Attribute</a> "device" bzw. "reading" gehen in die Selektion mit ein.
-                                 Der Dateiname wird durch das <a href="#DbRepattr">Attribut</a> "expimpfile" bestimmt. <br>
-                                 Alternativ kann die Datei (/Pfad/Datei) als Kommando-Option angegeben werden und übersteuert ein 
-                                 eventuell gesetztes Attribut "expimpfile". Der Dateiname kann Wildcards enthalten (siehe Attribut "expimpfile").
+                                 Der Dateiname kann Wildcards enthalten (siehe Attribut "expimpfile").
                                  <br>
                                  Durch das Attribut "aggregation" wird der Export der Datensätze in Zeitscheiben der angegebenen Aggregation 
                                  vorgenommen. Ist z.B. "aggregation = month" gesetzt, werden die Daten in monatlichen Paketen selektiert und in
@@ -14245,8 +14300,12 @@ sub bdump {
 </li>
   
   <a name="expimpfile"></a>
-  <li><b>expimpfile </b>      - Pfad/Dateiname für Export/Import in/aus einem File.  <br><br>
-  
+  <li><b>expimpfile &lt;/Pfad/Filename&gt; [MAXLINES=&lt;lines&gt;]</b>      
+                                - Pfad/Dateiname für Export/Import in/aus einem File.  <br><br>
+                                
+                                Optional kann über den Parameter "MAXLINES" die maximale Anzahl von Datensätzen angegeben
+                                werden, die in ein File exportiert werden. In diesem Fall werden mehrere Files mit den
+                                Extensions "_part1", "_part2", "_part3" usw. erstellt. <br>
                                 Der Dateiname kann Platzhalter enthalten die gemäß der nachfolgenden Tabelle ersetzt werden.
                                 Weiterhin können %-wildcards der POSIX strftime-Funktion des darunterliegenden OS enthalten 
                                 sein (siehe auch strftime Beschreibung). <br>
