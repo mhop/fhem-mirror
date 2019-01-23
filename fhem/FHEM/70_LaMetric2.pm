@@ -27,14 +27,16 @@
 
 package main;
 
-use HttpUtils;
-use utf8;
 use Data::Dumper;
+use JSON qw(decode_json encode_json);
+use Time::HiRes qw(gettimeofday time);
+use Time::Local;
+
+use Encode;
 use HttpUtils;
 use SetExtensions;
-use Encode;
 use Unit;
-use JSON qw(decode_json encode_json);
+use utf8;
 
 my %LaMetric2_sounds = (
     notifications => [
