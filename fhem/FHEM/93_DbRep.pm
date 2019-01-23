@@ -57,6 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Versions History intern
 our %DbRep_vNotesIntern = (
+  "8.10.1" => "23.01.2019  change DbRep_charfilter to eliminate \xc2",
   "8.10.0" => "19.01.2019  sqlCmd, dbValue may input SQL session variables, Forum:#96082 ",
   "8.9.10" => "18.01.2019  fix warnings Malformed UTF-8 character during importFromFile, Forum:#96056 ",
   "8.9.9"  => "06.01.2019  diffval_DoParse: 'ORDER BY TIMESTAMP' added to statements Forum:https://forum.fhem.de/index.php/topic,53584.msg882082.html#msg882082",
@@ -5208,8 +5209,8 @@ sub expfile_DoParse($) {
  $outfile    =~ s/%TSB/$rsf/g;
  my @t = localtime;
  $outfile = ResolveDateWildcards($outfile, @t);
- if (open(FH, ">:utf8", "$outfile")) {
-     binmode (FH) if(!$utf8);
+ if (open(FH, ">", "$outfile")) {
+     binmode (FH);
  } else {
      $err = encode_base64("could not open ".$outfile.": ".$!,"");
      return "$name|''|''|$err|''|''|''";
@@ -8894,7 +8895,10 @@ sub DbRep_charfilter($) {
   my ($txt) = @_;
   
   # nur erwünschte Zeichen, Filtern von Steuerzeichen
-  $txt =~ tr/ A-Za-z0-9!"#$§%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€//cd;      
+  $txt =~ s/\xb0/1degree1/g;
+  $txt =~ s/\xC2//g;
+  $txt =~ tr/ A-Za-z0-9!"#$§%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€//cd; 
+  $txt =~ s/1degree1/°/g;  
   
 return($txt);
 }
