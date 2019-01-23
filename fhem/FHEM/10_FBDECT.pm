@@ -309,7 +309,7 @@ FBDECT_ParseHttp($$$)
     readingsBulkUpdate($hash, $ptyp, $pyld);
     readingsBulkUpdate($hash, "batteryState", $pyld ? "low" : "ok")
         if($ptyp eq "batterylow");
-    readingsBulkUpdate($hash, "batteryPercent", $pyld) # 87575/96302
+    readingsBulkUpdate($hash, "batteryPercent", $val) # 87575/96302
         if($ptyp eq "battery");
   }
   readingsEndUpdate($hash, 1);
