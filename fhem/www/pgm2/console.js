@@ -205,6 +205,7 @@ consAddRegexpPart()
                 createArg: "./log/modDev.log evtDev:event" },
     "watchdog":{createArg: "evtDev:event 00:15 SAME {}" },
     "sequence":{createArg: "evtDev:event 00:15 evtDev:event" },
+    "average":{createArg: "evtDev:event" },
     "DOIF":{createArg: "([evtDev:\"^event$\"]) ()" }
   };
 
