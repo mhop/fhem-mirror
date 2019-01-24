@@ -172,13 +172,25 @@ MQTT2_DEVICE_Parse($$)
         my $ret = json2nameValue($value);
         if(keys %{$ret}) {
           $topic =~ m,.*/([^/]+),;
-          my $prefix = ($1 && $1 !~m/^0x[0-9a-f]+$/i) ? "${1}_" : ""; # 91394
-          $add = "{ json2nameValue(\$EVENT, '$prefix', \$JSONMAP) }";
+          $add = "{ json2nameValue(\$EVENT) }";
         }
       }
       if(!$add) {
-        $topic =~ m,.*/([^/]+),;
-        $add = ($1 ? $1 : $topic);
+        my @tEl = split("/",$topic);
+        if(@tEl == 1) {
+          $add = $tEl[0];
+
+        } elsif($tEl[-1] =~ m/^\d+$/) { # relay_0
+          $add = $tEl[-2]."_".$tEl[-1];
+
+        } elsif($tEl[-2] =~ m/^\d+$/) { # relay_0_power
+          $add = $tEl[-2]."_".$tEl[-1];
+          $add = $tEl[-3]."_".$add if(@tEl > 2);
+
+        } else {
+          $add = $tEl[-1];
+
+        }
         $add = makeReadingName($add); # Convert non-valid characters to _
       }
 
@@ -761,7 +773,7 @@ zigbee2mqtt_devStateIcon255($)
     <li>imageLink href<br>
       sets the image to be shown. The "Show neighbor map" function initializes
       the value automatically.
-      </li>
+      </li><br>
 
     <a name="jsonMap"></a>
     <li>jsonMap oldReading1:newReading1 oldReading2:newReading2...<br>
@@ -774,8 +786,6 @@ zigbee2mqtt_devStateIcon255($)
       </code></ul>
       The special newReading value of 0 will prevent creating a reading for
       oldReading.
-
-      <br>
       </li><br>
 
     <a name="readingList"></a>
@@ -806,7 +816,12 @@ zigbee2mqtt_devStateIcon255($)
           <ul><code>
             attr sonoff_th10 readingList tele/sonoff/S.* {
                 json2nameValue($EVENT) }
-          </code></ul></li>
+          </code></ul>
+          A second (optional) parameter to json2nameValue is treated as prefix,
+          and will be prepended to each reading name.<br>
+          The third (optional) parameter is $JSONMAP, see the jsonMap attribute
+          above.
+          </li>
       </ul>
       </li><br>
 
