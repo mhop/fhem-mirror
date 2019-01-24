@@ -103,7 +103,8 @@ FBAHAHTTP_connect($$)
   $hash->{".SID"} = $sid;
   $hash->{STATE} = "connected";
   Log3 $name, 4, "FBAHAHTTP_connect $name: got SID $sid";
-  FBAHAHTTP_ProcessStack($hash) if($doProcess && int(@{$hash->{CmdStack}}));
+  FBAHAHTTP_ProcessStack($hash)
+        if($doProcess && $hash->{CmdStack} && int(@{$hash->{CmdStack}}));
   return undef;
 }
 
