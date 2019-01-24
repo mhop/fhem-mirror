@@ -257,7 +257,7 @@ sub ESPEasy_initDevSets($)
       serialsend       => { args => 1, url => $d_urlPlg, widget => "",      usage => "<string>" },  #_P020_Ser2Net.ino
       buzzer           => { args => 0, url => $d_urlPlg, widget => "",      usage => "" },
       inputswitchstate => { args => 0, url => $d_urlPlg, widget => "",      usage => "" },
-      nfx              => { args => 1, url => $d_urlPlg, widget => "",      usage => "<off|on|dim|line|one|all|rgb|fade|colorfade|rainbow|kitt|comet|theatre|scan|dualscan|twinkle|twinklefade|sparkle|wipe|fire|stop> <parameter>" },
+      nfx              => { args => 1, url => $d_urlPlg, widget => "",      usage => "<off|on|dim|line|one|all|rgb|fade|colorfade|rainbow|kitt|comet|theatre|scan|dualscan|twinkle|twinklefade|sparkle|wipe|dualwipe|fire|fireflicker|stop> <parameter>" },
       event            => { args => 1, url => $d_urlPlg, widget => "",      usage => "<string>" },  #changed url to sys-url;
       # rules related commands
       deepsleep        => { args => 1, url => $d_urlSys, widget => "",      usage => "<duration in s>" },
@@ -325,6 +325,7 @@ sub ESPEasy_initDevSets($)
       dualscan         => { args => 1, url => $d_urlPlg, widget => $cp_rgb, usage => "<rrggbb> [rrggbb background] [speed 0-50]" },
       fade             => { args => 1, url => $d_urlPlg, widget => $cp_rgb, usage => "<rrggbb> [fadetime ms] [delay +/-ms]" },
       fire             => { args => 0, url => $d_urlPlg, widget => "",      usage => "[fps] [brightness 0-255] [cooling 20-100] [sparking 50-200]" },
+      fireflicker      => { args => 0, url => $d_urlPlg, widget => "",      usage => "[intensity 0-255] [speed 0-50]" },
       kitt             => { args => 1, url => $d_urlPlg, widget => "",      usage => "<rrggbb> [speed 0-50]" },
       line             => { args => 3, url => $d_urlPlg, widget => "",      usage => "<startpixel> <endpixel> <rrggbb>" },
       one              => { args => 2, url => $d_urlPlg, widget => "",      usage => "<pixel> <rrggbb>" },
@@ -335,6 +336,7 @@ sub ESPEasy_initDevSets($)
       twinkle          => { args => 1, url => $d_urlPlg, widget => $cp_rgb, usage => "<rrggbb> [rrggbb background] [speed 0-50]" },
       twinklefade      => { args => 1, url => $d_urlPlg, widget => $cp_rgb, usage => "<rrggbb> [number of pixels] [speed 0-50]" },
       wipe             => { args => 1, url => $d_urlPlg, widget => $cp_rgb, usage => "<rrggbb> [rrggbb dot] [speed +/- 0-50]" },
+      dualwipe         => { args => 1, url => $d_urlPlg, widget => $cp_rgb, usage => "<rrggbb> [rrggbb dot] [speed +/- 0-50]" },
       faketv           => { args => 0, url => $d_urlPlg, widget => "",      usage => "[startpixel] [endpixel]" },
       simpleclock      => { args => 0, url => $d_urlPlg, widget => "",      usage => "[bigtickcolor] [smalltickcolor] [hourcolor] [minutecolor] [secondcolor]" },
       count            => { args => 1, url => $d_urlPlg, widget => "slider,1,1,50",        usage => "<value>" },
@@ -4024,11 +4026,13 @@ sub ESPEasy_dumpSingleLine($)
           <tr><td>count</td>       <td>&lt;value&gt;</td></tr>
           <tr><td>dim</td>         <td>&lt;value 0-255&gt;</td></tr>
           <tr><td>dualscan</td>    <td>&lt;rrggbb&gt; [rrggbb background] [speed 0-50]</td></tr>
+          <tr><td>dualwipe</td>    <td>&lt;rrggbb&gt; [rrggbb dot] [speed +/- 0-50]</td></tr>
           <tr><td>fade</td>        <td>&lt;rrggbb&gt; [fadetime ms] [delay +/-ms]</td></tr>
           <tr><td>fadedelay</td>   <td>&lt;value in +/-ms&gt;</td></tr>
           <tr><td>fadetime</td>    <td>&lt;value in ms&gt;</td></tr>
           <tr><td>faketv</td>      <td>[startpixel] [endpixel]</td></tr>
           <tr><td>fire</td>        <td>[fps] [brightness 0-255] [cooling 20-100] [sparking 50-200]</td></tr>
+          <tr><td>fireflicker</td> <td>[intensity 0-255] [speed 0-50]</td></tr>
           <tr><td>kitt</td>        <td>&lt;rrggbb&gt; [speed 0-50]</td></tr>
           <tr><td>line</td>        <td>&lt;startpixel&gt; &lt;endpixel&gt; &lt;rrggbb&gt;</td></tr>
           <tr><td>off</td>         <td>[fadetime] [delay +/-ms]</td></tr>
