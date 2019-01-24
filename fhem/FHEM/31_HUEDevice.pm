@@ -1284,6 +1284,7 @@ HUEDevice_Parse($$)
       $readings{state} = $state->{lightlevel} if( defined($state->{lightlevel}) && !defined($state->{lux}) );
       $readings{state} = $state->{buttonevent} if( defined($state->{buttonevent}) );
       $readings{state} = $state->{presence}?'motion':'nomotion' if( defined($state->{presence}) );
+      $readings{state} = $state->{fire}?'fire':'nofire' if( defined($state->{fire}) );
 
       $readings{dark} = $state->{dark}?'1':'0' if( defined($state->{dark}) );
       $readings{humidity} = $state->{humidity} * 0.01 if( defined($state->{humidity}) );
@@ -1297,6 +1298,9 @@ HUEDevice_Parse($$)
       $readings{current} = $state->{current} if( defined($state->{current}) );
       $readings{consumption} = $state->{consumption} if( defined($state->{consumption}) );
       $readings{water} = $state->{water} if( defined($state->{water}) );
+      $readings{fire} = $state->{fire} if( defined($state->{fire}) );
+      $readings{tampered} = $state->{tampered} if( defined($state->{tampered}) );
+      $readings{battery} = $state->{lowbattery}?'low':'OK' if( defined($state->{lowbattery}) );
     }
 
     if( scalar keys %readings ) {
