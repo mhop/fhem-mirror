@@ -268,7 +268,7 @@ sub LaMetric2_Define($$) {
 
         $hash->{HOST}       = $host;
         $hash->{".API_KEY"} = $apikey;
-        $hash->{VERSION}    = "2.2.2";
+        $hash->{VERSION}    = "2.3.0";
         $hash->{INTERVAL} =
           $interval && looks_like_number($interval) ? $interval : 60;
         $hash->{PORT} = $port && looks_like_number($port) ? $port : 4343;
