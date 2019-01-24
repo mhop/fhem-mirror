@@ -301,7 +301,7 @@ my %EnO_eepConfig = (
  #"A5.20.02" => {attr => {subType => "hvac.02"}},
  #"A5.20.03" => {attr => {subType => "hvac.03"}},
   "A5.20.04" => {attr => {subType => "hvac.04", webCmd => "setpointTemp"}, GPLOT => "EnO_A5-20-04:Temp/FeedTemp,EnO_A5-20-04_2:SetpointTemp/Setpoint,EnO_A5-20-04_3:PID,"},
-  "A5.20.06" => {attr => {subType => "hvac.06", webCmd => "setpointTemp"}, GPLOT => "EnO_A5-20-06:Temp/SetpointTemp/FeetTemp/RoomTemp/Setpoint,EnO_A5-20-06_2:PID,"},
+  "A5.20.06" => {attr => {subType => "hvac.06", webCmd => "setpointTemp"}, GPLOT => "EnO_A5-20-06:Temp/SetpointTemp/FeedTemp/RoomTemp/Setpoint,EnO_A5-20-06_2:PID,"},
   "A5.20.10" => {attr => {subType => "hvac.10", comMode => "biDir", destinationID => "unicast", subDef => "getNextID"}, GPLOT => "EnO_A5-20-10:FanSpeed,"},
   "A5.20.11" => {attr => {subType => "hvac.11", comMode => "biDir", destinationID => "unicast", subDef => "getNextID"}},
  #"A5.20.12" => {attr => {subType => "hvac.12"}},
@@ -705,7 +705,7 @@ EnOcean_Initialize($)
                       "displayContent:default,humidity,off,setpointTemp,tempertureExtern,temperatureIntern,time,no_change " .
                       "displayOrientation:0,90,180,270 " .
                       "eep gpDef gwCmd:" . join(",", sort @EnO_gwCmd) . " humitity humidityRefDev " .
-                      "keyRcv keySnd macAlgo:no,3,4 measurementCtrl:disable,enable " .
+                      "keyRcv keySnd macAlgo:no,3,4 measurementCtrl:disable,enable measurementTypeSelect:feed,room " .
                       "manufID:" . join(",", sort keys %EnO_manuf) . " " .
                       "model:" . join(",", sort keys %EnO_models) . " " .
                       "observe:on,off observeCmdRepetition:1,2,3,4,5 observeErrorAction observeInterval observeLogic:and,or " .
@@ -8303,15 +8303,19 @@ sub EnOcean_Parse($$)
       my $setpointTempSet = ReadingsVal($name, "setpointTempSet", $setpointTemp);
       my %setpointTempOffset = (0 => 0, 1 => 1, 2 => 2, 3 => 3, 4 => 4, 5 => 5, 0x7B => -5, 0x7C => -4, 0x7D => -3, 0x7E => -2, 0x7F => -1);
       my $setpointTempLocal = $db[2] & 0x7F;
-      if ($db[2] & 0x80) {
-        $setpointTempLocal = $setpointTempLocal / 2;
-      } else {
-        $setpointTempLocal = $setpointTempSet + $setpointTempOffset{$setpointTempLocal};
+      if ($setpointTempSet == $setpointTemp) {
+        # setpointTempSet has not been changed by Fhem
+        if ($db[2] & 0x80) {
+          $setpointTempLocal = $setpointTempLocal / 2;
+        } else {
+          $setpointTempLocal = $setpointTempSet + $setpointTempOffset{$setpointTempLocal};
+        }
+        if (AttrVal($name, "blockKey", 'no') eq 'no') {
+          $setpointTempSet = $setpointTempLocal;
+          readingsSingleUpdate($hash, 'setpointTempSet', $setpointTempSet, 1);
+        }
       }
-      if (AttrVal($name, "blockKey", 'no') eq 'no') {
-        $setpointTempSet = $setpointTempLocal;
-        readingsSingleUpdate($hash, 'setpointTempSet', $setpointTempSet, 1);
-      }
+
       my $temperature = ReadingsVal($name, 'temperature', $roomTemp);
       if (!defined(AttrVal($name, "temperatureRefDev", undef))) {
         if ($db[0] & 0x80) {
@@ -8460,6 +8464,7 @@ sub EnOcean_Parse($$)
         push @event, "3:setpointTemp:" . sprintf("%0.1f", $setpointTemp);
         push @event, "3:maintenanceMode:off";
         push @event, "3:operationMode:setpointTemp";
+        #CommandDeleteReading(undef, "$name setpointTempSet");
         CommandDeleteReading(undef, "$name waitingCmds");
         $waitingCmds = 0;
 
@@ -8541,17 +8546,17 @@ sub EnOcean_Parse($$)
       } else {
         $wakeUpCycle = 0x70;
       }
-      my $measurementCtrl = 0;
-      if (AttrVal($name, "measurementCtrl", "enable") eq 'disable') {
-        if (AttrVal($name, "pidCtrl", 'on') eq 'on' && defined AttrVal($name, "temperatureRefDev", undef)) {
-          $measurementCtrl = 2;
+      my $measurementTypeSelect = 0;
+      if (AttrVal($name, "measurementTypeSelect", "room") eq 'feed') {
+        if (AttrVal($name, "pidCtrl", 'on') eq 'on' && defined(AttrVal($name, "temperatureRefDev", undef))) {
+          $measurementTypeSelect = 2;
         } elsif (AttrVal($name, "pidCtrl", 'on') eq 'off') {
-          $measurementCtrl = 2;
+          $measurementTypeSelect = 2;
         }
       }
       push @event, "3:state:T: " . sprintf("%0.1f", $temperature) . " SPT: " . sprintf("%.1f", $setpointTemp) . " SP: $setpoint";
       # sent message to the actuator
-      $data = sprintf "%02X%02X%02X08", $setpointSet, $db[2], $waitingCmds | $wakeUpCycle | $summerMode | $setpointSelect | $measurementCtrl | $functionSelect;
+      $data = sprintf "%02X%02X%02X08", $setpointSet, $db[2], $waitingCmds | $wakeUpCycle | $summerMode | $setpointSelect | $measurementTypeSelect | $functionSelect;
       EnOcean_SndRadio(undef, $hash, $packetType, "A5", $data, $subDef, "00", $hash->{DEF});
 
     } elsif ($st eq "hvac.10") {
@@ -13042,6 +13047,13 @@ sub EnOcean_Attr(@)
       $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
+  } elsif ($attrName eq "measurementTypeSelect") {
+    if (!defined $attrVal){
+
+    } elsif ($attrVal !~ m/^feed|room$/) {
+      $err = "attribute-value [$attrName] = $attrVal wrong";
+    }
+
   } elsif ($attrName eq "observe") {
     if (!defined $attrVal){
 
@@ -13913,11 +13925,11 @@ sub EnOcean_Notify(@)
       if (defined(AttrVal($name, "temperatureRefDev", undef)) &&
           $devName eq AttrVal($name, "temperatureRefDev", "") &&
           $parts[0] eq "temperature") {
-        if (AttrVal($name, "subType", "") eq "hvac.01") {
+        if (AttrVal($name, "subType", "") =~ m/^hvac\.0(1|6)$/) {
           readingsSingleUpdate($hash, "temperature", $parts[1], 1);
           #Log3 $name, 2, "EnOcean $name <notify> $devName $s";
         }
-        if (AttrVal($name, "subType", "") =~ m/^hvac\.0(4|6)$/ && AttrVal($name, "measurementCtrl", "enable") eq 'disable') {
+        if (AttrVal($name, "subType", "") eq "hvac.04" && AttrVal($name, "measurementCtrl", "enable") eq 'disable') {
           readingsSingleUpdate($hash, "temperature", $parts[1], 1);
           #Log3 $name, 2, "EnOcean $name <notify> $devName $s";
         }
@@ -17848,7 +17860,7 @@ EnOcean_Delete($$)
        The Heating Radiator Actuating Drive is configured using the following attributes:<br>
        <ul>
          <li><a href="#EnOcean_blockKey">blockKey</a></li>
-         <li><a href="#EnOcean_measurementCtrl">measurementCtrl</a></li>
+         <li><a href="#EnOcean_measurementTypeSelect">measurementTypeSelect</a></li>
          <li><a href="#model">model</a></li>
          <li><a href="#EnOcean_pidActorCallBeforeSetting">pidActorCallBeforeSetting</a></li>
          <li><a href="#EnOcean_pidActorErrorAction">pidActorErrorAction</a></li>
@@ -17878,6 +17890,8 @@ EnOcean_Delete($$)
     The attr subType must be hvac.06. This is done if the device was
     created by autocreate. To control the device, it must be bidirectional paired,
     see <a href="#EnOcean_teach-in">Teach-In / Teach-Out</a>.<br>
+    The actuator has an internal PID controller. This function is activated by
+    attr <device> pidCtrl off.<br>
     The command is not sent until the device wakes up and sends a message, usually
     every 2 to 10 minutes.
     </li>
@@ -19090,9 +19104,14 @@ EnOcean_Delete($$)
       Manufacturer ID number
     </li>
     <li><a name="EnOcean_measurementCtrl">measurementCtrl</a> enable|disable<br>
-      Enable or disable the temperature measurements (room temperature) of the actuator. If the temperature
+      Enable or disable the temperature measurements of the actuator. If the temperature
       measurements are turned off, the foot temperature may be displayed and an external temperature sensor must be exists, see attribute
       <a href="#temperatureRefDev">temperatureRefDev</a>.
+    </li>
+    <li><a name="EnOcean_measurementTypeSelect">measurementTypeSelect</a> foot|room<br>
+      Select the temperature measurements type displayed by the actuator. If the temperature
+      measurements are turned to foot, the foot temperature may be displayed and an external
+      temperature sensor must be exists, see attribute <a href="#temperatureRefDev">temperatureRefDev</a>.
     </li>
     <li><a href="#model">model</a></li>
     <li><a name="EnOcean_observe">observe</a> off|on, [observe] = off is default.<br>
