@@ -83,7 +83,7 @@ if ( $preconf && $preconf ne "" ) {
 }
 
 my $autoupdate = 'off';    #off/on
-my $version    = '2.10_test';
+my $version    = '2.10';
 my $vupdate    = 'V2.00'
   ; # versionsnummer der datenstruktur . änderung der nummer löst MSwitch_VUpdate aus .
 my $savecount = 30
@@ -7398,10 +7398,14 @@ sub MSwitch_Createtimer($) {
         $key = '\]';
         $option =~ s/$key//ig;
 
-        if ( $option =~
-m/(.*?)([0-9]{2}):([0-9]{2})\*([0-9]{2}:[0-9]{2})-([0-9]{2}:[0-9]{2})\|?([0-9]{0,7})(.*)?/
-          )
+      
+		
+		my $y =0;
+        while ( $option =~ m/(.*?)([0-9]{2}):([0-9]{2})\*([0-9]{2}:[0-9]{2})-([0-9]{2}:[0-9]{2})\|?([0-9]{0,7})(.*)?/)
         {
+		$y++;
+		last if $y > 20;
+	
             my $part1 = '';
             $part1 = $1 . ' ' if defined $1;
             my $part6 = '';
