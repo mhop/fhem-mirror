@@ -289,7 +289,7 @@ FW_jqueryReadyFn()
 
   $("select[id^=sel_attr],select[id^=sel_set],select[id^=sel_get]")
   .change(function(){ // online help
-    var val =$(this).val().replace(/[.\/(){}\[\]]/g,function(a){return "\\"+a});
+    var val=$(this).val().replace(/[.\/(){}\[\]*]/g,function(a){return "\\"+a});
     var m = $(this).attr("name").match(/arg.(set|get|attr)(.*)/);
     if(!m)
       return;
