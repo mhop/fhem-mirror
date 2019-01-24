@@ -626,12 +626,12 @@ sub livetracking_ParseLife360($$) {
 
     next if($lastreading > $dataset->{startTimestamp});
 
-    Log3 ($name, 2, "$name new l360 data: /n".Dumper($dataset));
+    Log3 ($name, 6, "$name new l360 data: /n".Dumper($dataset));
 
     my $accurate = 1;
     $accurate = 0 if(defined($attr{$name}{filterAccuracy}) and defined($dataset->{accuracy}) and $attr{$name}{filterAccuracy} < $dataset->{accuracy});
 
-    Log3 ($name, 5, "$name Life360: ".$dataset->{latitude}.",".$dataset->{longitude});
+    Log3 ($name, 4, "$name Life360: ".$dataset->{latitude}.",".$dataset->{longitude});
 
     $lastreading = $dataset->{endTimestamp}+1;
 
@@ -928,9 +928,9 @@ sub livetracking_ParseOwnTracks
       next if(!defined($attr{$name}{"beacon_$i"}));
       if($beaconid eq $attr{$name}{"beacon_$i"})
       {
-        readingsBulkUpdate($hash, "beacon_".$i."_proximity", $dataset->{prox});
+        readingsBulkUpdate($hash, "beacon_".$i."_proximity", int($dataset->{prox}));
         $hash->{CHANGETIME}[1] = FmtDateTime($dataset->{tst});
-        readingsBulkUpdate($hash, "beacon_".$i."_accuracy", $dataset->{acc});
+        readingsBulkUpdate($hash, "beacon_".$i."_accuracy", sprintf("%.2f", $dataset->{acc}));
         $hash->{CHANGETIME}[2] = FmtDateTime($dataset->{tst});
         readingsBulkUpdate($hash, "beacon_".$i."_rssi", $dataset->{rssi});
         $hash->{CHANGETIME}[3] = FmtDateTime($dataset->{tst});
@@ -1037,7 +1037,8 @@ sub livetracking_ParseOwnTracks
   }
   if(defined($dataset->{desc}) and defined($dataset->{event}))
   {
-    Log3 ($name, 3, "$name OwnTracks Zone Event: ".$dataset->{event}." ".$dataset->{desc});
+    DoTrigger($name, $dataset->{event}.": ".$dataset->{desc});
+    Log3 ($name, 4, "$name OwnTracks Zone Event: ".$dataset->{event}." ".$dataset->{desc});
 
     my $place = livetracking_utf8clean($dataset->{desc});
 
@@ -2075,7 +2076,7 @@ sub livetracking_utf8clean($) {
          <br>
          Preferred language used to return reverse geocoding results
       </li><br>
-      <li><a name="addressReading">createAddressReading</a> (0/1)
+      <li><a name="addressReading">addressReading</a> (0/1)
          <br>
          Write reverse geocoding results to address reading
       </li><br>

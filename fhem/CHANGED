@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 98_livetracking: added events for OwnTrack zones
   - feature: 93_DbRep: command exportToFile or attribute "expimpfile" accept 
                        option "MAXLINES="
   - bugfix: 09_CUL_FHTTK: removed low batt information from state, moved to

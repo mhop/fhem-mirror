@@ -24,8 +24,6 @@ use Time::Local;
 use Encode;
 
 use XML::Simple;
-use LWP::UserAgent;
-use HTTP::Request;
 
 use utf8;
 

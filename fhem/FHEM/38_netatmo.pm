@@ -6469,7 +6469,7 @@ sub netatmo_weatherIcon()
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; netatmo [ACCOUNT] &lt;username&gt; &lt;password&gt; &lt;client_id&gt; &lt;client_secret&gt;</code><br>
-    <code>define &lt;name&gt; netatmo &lt;device&gt;</code><br>
+    <code>define &lt;name&gt; netatmo &lt;device&gt;</code> (you should use autocreate from the account device!)<br>
     <br>
 
     Defines a netatmo device.<br><br>
@@ -6480,11 +6480,18 @@ sub netatmo_weatherIcon()
     Examples:
     <ul>
       <code>define netatmo netatmo ACCOUNT abc@test.com myPassword 2134123412399119d4123134 AkqcOIHqrasfdaLKcYgZasd987123asd</code><br>
-      <code>define netatmo netatmo 2f:13:2b:93:12:31</code><br>
-      <code>define netatmo netatmo MODULE  2f:13:2b:93:12:31 f1:32:b9:31:23:11</code><br>
-      <code>define netatmo netatmo HOME 1234567890abcdef12345678</code><br>
-      <code>define netatmo netatmo CAMERA 1234567890abcdef12345678 70:ee:12:34:56:78</code><br>
-      <code>define netatmo netatmo PERSON 1234567890abcdef12345678 01234567-89ab-cdef-0123-456789abcdef</code><br>
+      <code>define netatmo_station netatmo 2f:13:2b:93:12:31</code><br>
+      <code>define netatmo_module netatmo MODULE  2f:13:2b:93:12:31 f1:32:b9:31:23:11</code><br>
+      <code>define netatmo_publicstation netatmo PUBLIC 70:ee:50:27:2c:9c 02:00:00:27:4a:a6 temperature,humidity 70:ee:50:27:2c:9c pressure 05:00:00:04:cc:42 rain 06:00:00:01:ae:94 windstrength,windangle,guststrength,gustangle</code><br>
+      <code>define netatmo_maparea netatmo PUBLIC 47.8941876,16.64446 0.08</code><br>
+      <code>define netatmo_forecast netatmo FORECAST 2f:13:2b:93:12:31</code><br>
+      <code>define netatmo_relay netatmo RELAY 70:ee:50:00:12:34</code><br>
+      <code>define netatmo_thermostat netatmo THERMOSTAT 70:ee:50:00:12:34 04:00:00:0a:00:11</code><br>
+      <code>define netatmo_home netatmo HOME 1234567890abcdef12345678</code><br>
+      <code>define netatmo_camera netatmo CAMERA 1234567890abcdef12345678 70:ee:12:34:56:78</code><br>
+      <code>define netatmo_tag netatmo TAG 70:ee:12:34:56:78 70:ee:50:11:22:33</code><br>
+      <code>define netatmo_person netatmo PERSON 1234567890abcdef12345678 01234567-89ab-cdef-0123-456789abcdef</code><br>
+      <code>define netatmo_webhook netatmo WEBHOOK</code><br>
     </ul>
   </ul><br>
 
@@ -6498,6 +6505,18 @@ sub netatmo_weatherIcon()
   <a name="netatmo_Readings"></a>
   <b>Readings</b>
   <ul>
+  <li>temperature</li>
+  <li>humidity</li>
+  <li>pressure</li>
+  <li>co2</li>
+  <li>noise</li>
+  <li>rain</li>
+  <li>rain_hour</li>
+  <li>rain_day</li>
+  <li>windstrength</li>
+  <li>windangle</li>
+  <li>guststrength</li>
+  <li>gustangle</li>
   </ul><br>
 
   <a name="netatmo_Set"></a>
