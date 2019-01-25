@@ -2168,7 +2168,7 @@ my @test = split(/\n/,$aVal);
 #my %setid =();
 
  foreach my $testdevices (@test ) {
-           Log3( $name, 0, $testdevices );
+         #  Log3( $name, 0, $testdevices );
 		 
 
  if ( $testdevices !~ m/(.*:)?.*:.*=\>cmd(1|2)[\s]ID[\s](\d)(,\d){0,5}$/ ) {
@@ -2177,11 +2177,11 @@ return "wrong syntax. The syntax must be: \n\n[DEVICE:]READING:STATE=>cmd<1|2> I
 }
 
 	 foreach my $testdevices (@test ) {
-           Log3( $name, 0, $testdevices );
+           #Log3( $name, 0, $testdevices );
 		 	 
 		my ( $key,$val) = split(/=>/,$testdevices);
-		Log3( $name, 0, $key );
-		Log3( $name, 0, $val );
+		#Log3( $name, 0, $key );
+		#Log3( $name, 0, $val );
 		   
 		#$setid{$key} = $val;   
 		$hash->{helper}{eventtoid}{$key} = $val;
