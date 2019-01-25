@@ -16,7 +16,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use vars qw{%attr %defs %modules $FW_CSRF};
 
-my $HOMEMODE_version = "1.4.5";
+my $HOMEMODE_version = "1.4.6";
 my $HOMEMODE_Daytimes = "05:00|morning 10:00|day 14:00|afternoon 18:00|evening 23:00|night";
 my $HOMEMODE_Seasons = "03.01|spring 06.01|summer 09.01|autumn 12.01|winter";
 my $HOMEMODE_UserModes = "gotosleep,awoken,asleep";
@@ -2677,6 +2677,7 @@ sub HOMEMODE_TriggerState($;$$$)
   my $contacts = $hash->{SENSORSCONTACT};
   my $motions = $hash->{SENSORSMOTION};
   my $tampered = ReadingsVal($name,"sensorsTampered","");
+  my $alarm = ReadingsVal($name,"alarmTriggered","");
   my @contactsOpen;
   my @sensorsTampered;
   my @doorsOOpen;
@@ -2790,7 +2791,7 @@ sub HOMEMODE_TriggerState($;$$$)
       }
     }
   }
-  HOMEMODE_alarmTriggered($hash,@alarmSensors);
+  HOMEMODE_alarmTriggered($hash,@alarmSensors) if (join(",",@alarmSensors) ne $alarm);
   my $open    = @contactsOpen ? join(",",@contactsOpen) : "";
   my $opendo  = @doorsOOpen ? join(",",@doorsOOpen) : "";
   my $opendm  = @doorsMOpen ? join(",",@doorsMOpen) : "";
@@ -2919,11 +2920,9 @@ sub HOMEMODE_ContactOpenCheck($$;$$)
         $divider = $divs[$count] if ($season eq $text);
         $count++;
       }
-      if ($divider)
-      {
-        $waittime = $waittime / $divider;
-        $waittime = sprintf("%.2f",$waittime) * 1;
-      }
+      return if ($divider == 0);
+      $waittime = $waittime / $divider;
+      $waittime = sprintf("%.2f",$waittime) * 1;
     }
     $waittime = $mintime if ($mintime && $waittime < $mintime);
     $retrigger++;
