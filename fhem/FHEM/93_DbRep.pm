@@ -57,6 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Versions History intern
 our %DbRep_vNotesIntern = (
+  "8.11.1" => "25.01.2019  fix sort of versionNotes ",
   "8.11.0" => "24.01.2019  command exportToFile or attribute \"expimpfile\" accepts option \"MAXLINES=\" ",
   "8.10.1" => "23.01.2019  change DbRep_charfilter to eliminate \xc2",
   "8.10.0" => "19.01.2019  sqlCmd, dbValue may input SQL session variables, Forum:#96082 ",
@@ -384,7 +385,7 @@ sub DbRep_Define($@) {
   $hash->{MODEL}               = $hash->{ROLE};
   $hash->{HELPER}{DBLOGDEVICE} = $a[2];
   $hash->{HELPER}{IDRETRIES}   = 3;                                            # Anzahl wie oft versucht wird initiale Daten zu holen
-  $hash->{VERSION}             = (reverse sort(keys %DbRep_vNotesIntern))[0];
+  $hash->{VERSION}             = (DbRep_sortVersion("desc",keys %DbRep_vNotesIntern))[0];
   $hash->{NOTIFYDEV}           = "global,".$name;                              # nur Events dieser Devices an DbRep_Notify weiterleiten 
   my $dbconn                   = $defs{$a[2]}{dbconn};
   $hash->{DATABASE}            = (split(/;|=/, $dbconn))[1];
@@ -951,7 +952,7 @@ sub DbRep_Get($@) {
               }
           }           
           $i = 0;
-          foreach my $key (sort{$b<=>$a}(keys %hs)) {
+          foreach my $key (DbRep_sortVersion("desc",keys %hs)) {
               $val0 = $hs{$key};
               $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0</td>" );
               $ret .= "</tr>";
@@ -976,7 +977,7 @@ sub DbRep_Get($@) {
           $ret .= "<tbody>";
           $ret .= "<tr class=\"even\">";
           $i = 0;
-          foreach my $key (sort{$b<=>$a}(keys %DbRep_vNotesExtern)) {
+          foreach my $key (DbRep_sortVersion("desc",keys %DbRep_vNotesExtern)) {
               ($val0,$val1) = split(/\s/,$DbRep_vNotesExtern{$key},2);
               $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0  </td><td>$val1</td>" );
               $ret .= "</tr>";
@@ -9981,6 +9982,29 @@ sub DbRep_numval ($){
   $val = ($val =~ /(-?\d+(\.\d+)?)/ ? $1 : "");
   
 return $val;
+}
+
+################################################################
+# sortiert eine Liste von Versionsnummern x.x.x
+# Schwartzian Transform and the GRT transform
+# Übergabe: "asc | desc",<Liste von Versionsnummern>
+################################################################
+sub DbRep_sortVersion (@){
+  my ($sseq,@versions) = @_;
+
+  my @sorted = map {$_->[0]}
+			   sort {$a->[1] cmp $b->[1]}
+			   map {[$_, pack "C*", split /\./]} @versions;
+			 
+  @sorted = map {join ".", unpack "C*", $_}
+            sort
+            map {pack "C*", split /\./} @versions;
+  
+  if($sseq eq "desc") {
+      @sorted = reverse @sorted;
+  }
+  
+return @sorted;
 }
 
 ####################################################################################################
