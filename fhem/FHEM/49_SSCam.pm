@@ -47,6 +47,7 @@ use Encode;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.6.2"  => "25.01.2019  fix version numbering ",
   "8.6.1"  => "21.01.2019  time format in readings and galleries depends from global language attribute, minor bug fixes ",
   "8.6.0"  => "20.01.2019  new attribute snapReadingRotate ",
   "8.5.0"  => "17.01.2019  SVS device has \"snapCams\" command ",
@@ -120,6 +121,7 @@ our %SSCam_vNotesIntern = (
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
+  "8.6.2"  => "25.01.2019 fix version numbering ",
   "8.6.1"  => "21.01.2019 new attribute \"snapReadingRotate\" to activate versioning of snap data, ".
               "time format in readings and galleries depends from global language attribute ",
   "8.5.0"  => "17.01.2019 SVS device has \"snapCams\" command. Now are able to take snapshots of all defined cameras and may ".
@@ -399,7 +401,7 @@ sub SSCam_Define($@) {
   $hash->{SERVERADDR}    = $serveraddr;
   $hash->{SERVERPORT}    = $serverport;
   $hash->{CAMNAME}       = $camname;
-  $hash->{VERSION}       = (reverse sort(keys %SSCam_vNotesIntern))[0];
+  $hash->{VERSION}       = (SSCam_sortVersion("desc",keys %SSCam_vNotesIntern))[0];
   $hash->{MODEL}         = ($camname =~ m/^SVS$/i)?"SVS":"CAM";                  # initial, CAM wird später ersetzt durch CamModel
   $hash->{PROTOCOL}      = $proto;
   $hash->{COMPATIBILITY} = $compstat;                                            # getestete SVS-version Kompatibilität 
@@ -1513,7 +1515,7 @@ sub SSCam_Get($@) {
               }
           }          
           $i = 0;
-          foreach my $key (reverse sort(keys %hs)) {
+          foreach my $key (SSCam_sortVersion("desc",keys %hs)) {
               $val0 = $hs{$key};
               $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0</td>" );
               $ret .= "</tr>";
@@ -1538,7 +1540,7 @@ sub SSCam_Get($@) {
           $ret .= "<tbody>";
           $ret .= "<tr class=\"even\">";
           $i = 0;
-          foreach my $key (reverse sort(keys %SSCam_vNotesExtern)) {
+          foreach my $key (SSCam_sortVersion("desc",keys %SSCam_vNotesExtern)) {
               ($val0,$val1) = split(/\s/,$SSCam_vNotesExtern{$key},2);
               $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0  </td><td>$val1</td>" );
               $ret .= "</tr>";
@@ -7298,6 +7300,29 @@ sub SSCam_experror ($$) {
   $error = $SSCam_errlist{"$errorcode"};
   
 return ($error);
+}
+
+################################################################
+# sortiert eine Liste von Versionsnummern x.x.x
+# Schwartzian Transform and the GRT transform
+# Übergabe: "asc | desc",<Liste von Versionsnummern>
+################################################################
+sub SSCam_sortVersion (@){
+  my ($sseq,@versions) = @_;
+
+  my @sorted = map {$_->[0]}
+			   sort {$a->[1] cmp $b->[1]}
+			   map {[$_, pack "C*", split /\./]} @versions;
+			 
+  @sorted = map {join ".", unpack "C*", $_}
+            sort
+            map {pack "C*", split /\./} @versions;
+  
+  if($sseq eq "desc") {
+      @sorted = reverse @sorted;
+  }
+  
+return @sorted;
 }
 
 ##############################################################################
