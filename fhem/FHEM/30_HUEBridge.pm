@@ -1075,6 +1075,8 @@ HUEBridge_updateGroups($$)
     foreach my $light ( split(',', $chash->{lights}) ) {
       next if( !$light );
       my $current = $modules{HUEDevice}{defptr}{"$name-$light"}{helper};
+      next if( !$current );
+      next if( $current->{helper}{devtype} );
 
       $readings{ct} += $current->{ct};
       $readings{bri} += $current->{bri};
