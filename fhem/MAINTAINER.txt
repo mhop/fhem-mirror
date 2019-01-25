@@ -209,6 +209,7 @@ FHEM/37_dash_dhcp.pm         justme1968           Sonstige Systeme
 FHEM/37_fakeRoku.pm          justme1968           Multimedia
 FHEM/37_harmony.pm           justme1968           Multimedia
 FHEM/37_plex.pm              justme1968           Multimedia
+FHEM/38_BEOK.pm		     Wzut                 Heizungssteuerung/Raumklima
 FHEM/38_Broadlink.pm         daniel2311           http://forum.fhem.de/index.php/topic,71972.0.html
 FHEM/38_netatmo.pm           markus-m             http://forum.fhem.de/index.php/topic,53500.0.html
 FHEM/38_CO20.pm              markus-m             Sonstiges
