@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 98_Hyperion: add set active/inactive
   - bugfix:  22_HOMEMODE: fix zero devider in HOMEMODE_ContactOpenCheck
                           fix trigger alarm only if alarm triggers have changed
   - bugfix:  49_SSCam: fix version numbering

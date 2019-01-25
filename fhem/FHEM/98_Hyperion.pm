@@ -21,17 +21,19 @@ use Blocking;
 
 my %Hyperion_sets =
 (
+  "active"            => "noArg",
   "addEffect"         => "textField",
+  "clear"             => "textField",
+  "clearall"          => "noArg",
   "dim"               => "slider,0,1,100",
   "dimDown"           => "textField",
   "dimUp"             => "textField",
-  "clear"             => "textField",
-  "clearall"          => "noArg",
+  "inactive"          => "noArg",
   "mode"              => "clearall,effect,off,rgb",
   "off"               => "noArg",
   "on"                => "noArg",
-  "reopen"            => "noArg",
   "rgb"               => "colorpicker,RGB",
+  "reopen"            => "noArg",
   "toggle"            => "noArg",
   "toggleMode"        => "noArg",
   "valueGainDown"     => "textField",
@@ -575,7 +577,7 @@ sub Hyperion_Set($@)
 {
   my ($hash,$name,@aa) = @_;
   my ($cmd,@args) = @aa;
-  return if (IsDisabled($name) && $cmd ne "?");
+  return if (IsDisabled($name) && $cmd !~ /^(active|\?)$/);
   my $value = (defined($args[0])) ? $args[0] : undef;
   return "\"set $name\" needs at least one argument and maximum five arguments" if (@aa < 1 || @aa > 5);
   my $duration = defined $args[1] ? int $args[1] : AttrNum($name,"hyperionDefaultDuration",0);
@@ -886,6 +888,20 @@ sub Hyperion_Set($@)
     Hyperion_OpenDev($hash);
     return;
   }
+  elsif ($cmd eq "active")
+  {
+    readingsSingleUpdate($hash,"state","active",1);
+    Hyperion_OpenDev($hash);
+    return;
+  }
+  elsif ($cmd eq "inactive")
+  {
+    BlockingKill($hash->{helper}{RUNNING_PID}) if ($hash->{helper}{RUNNING_PID});
+    RemoveInternalTimer($hash);
+    DevIo_Disconnected($hash);
+    readingsSingleUpdate($hash,"state","inactive",1);
+    return;
+  }
   if (keys %obj)
   {
     Log3 $name,5,"$name: $cmd obj json: ".encode_json(\%obj);
@@ -1001,6 +1017,7 @@ sub Hyperion_Attr(@)
         BlockingKill($hash->{helper}{RUNNING_PID}) if ($hash->{helper}{RUNNING_PID});
         RemoveInternalTimer($hash);
         DevIo_Disconnected($hash);
+        readingsSingleUpdate($hash,"state","disabled",1);
       }
       else
       {
@@ -1100,6 +1117,10 @@ sub Hyperion_devStateIcon($;$)
   <p><b>set &lt;required&gt; [optional]</b></p>
   <ul>
     <li>
+      <i>active</i><br>
+      activates the device (similar to attr disable but without the need of saving)
+    </li>
+    <li>
       <i>addEffect &lt;custom_name&gt;</i><br>
       add the current effect with the given name to the custom effects<br>
       can be altered after adding in attribute hyperionCustomEffects<br>
@@ -1175,6 +1196,10 @@ sub Hyperion_devStateIcon($;$)
       <i>gamma &lt;1.90,1.90,1.90&gt;</i><br>
       adjust gamma of each color separately (comma separated) (R,G,B)<br>
       values from 0.00 to 5.00 in steps of 0.01
+    </li>
+    <li>
+      <i>inactive</i><br>
+      deactivates the device (similar to attr disable but without the need of saving)
     </li>
     <li>
       <i>luminanceGain &lt;1.00&gt;</i><br>
@@ -1492,8 +1517,12 @@ sub Hyperion_devStateIcon($;$)
   <p><b>set &lt;ben&ouml;tigt&gt; [optional]</b></p>
   <ul>
     <li>
+      <i>active</i><br>
+      Aktiviert das Gerät (ahnlich wie attr disable aber ohne speichern zu m&uuml;ssen)
+    </li>
+    <li>
       <i>addEffect &lt;eigener_name&gt;</i><br>
-      f&uuml;gt den aktuellen Effekt mit dem &uuml;bergebenen Namen den eigenen Effekten hinzu<br>
+      F&uuml;gt den aktuellen Effekt mit dem &uuml;bergebenen Namen den eigenen Effekten hinzu<br>
       kann nachtr&auml;glich im Attribut hyperionCustomEffects ge&auml;ndert werden<br>
       Ger&auml;t muss dazu im Effekt Modus in einen nicht-eigenen Effekt sein und der &uuml;bergebene Name muss ein einmaliger Effektname sein
     </li>
@@ -1504,7 +1533,7 @@ sub Hyperion_devStateIcon($;$)
     </li>
     <li>
       <i>adjustGreen &lt;0,255,0&gt;</i><br>
-      Justiere jede Farbe von Gr&uuml;n separat (Komma separiert) (R,G,B)<br>
+      Justiert jede Farbe von Gr&uuml;n separat (Komma separiert) (R,G,B)<br>
       Werte von 0 bis 255 in Schritten von 1
     </li>
     <li>
@@ -1519,11 +1548,11 @@ sub Hyperion_devStateIcon($;$)
     </li>
     <li>
       <i>clear &lt;1000&gt;</i><br>
-      einen bestimmten Priorit&auml;tskanal l&ouml;schen
+      Einen bestimmten Priorit&auml;tskanal l&ouml;schen
     </li>
     <li>
       <i>clearall</i><br>
-      alle Priorit&auml;tskan&auml;le l&ouml;schen / Umschaltung auf Ambilight
+      Alle Priorit&auml;tskan&auml;le l&ouml;schen / Umschaltung auf Ambilight
     </li>
     <li>
       <i>colorTemperature &lt;255,255,255&gt;</i><br>
@@ -1562,6 +1591,10 @@ sub Hyperion_devStateIcon($;$)
       <i>gamma &lt;1.90,1.90,1.90&gt;</i><br>
       Justiert Gamma von jeder Farbe separat (Komma separiert) (R,G,B)<br>
       Werte von 0.00 bis 5.00 in Schritten von 0.01
+    </li>
+    <li>
+      <i>inactive</i><br>
+      Deaktiviert das Gerät (ahnlich wie attr disable aber ohne speichern zu m&uuml;ssen)
     </li>
     <li>
       <i>luminanceGain &lt;1.00&gt;</i><br>
