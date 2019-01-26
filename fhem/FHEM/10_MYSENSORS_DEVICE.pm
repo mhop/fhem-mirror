@@ -765,11 +765,10 @@ sub onInternalMessage($$) {
         last;
     };
     $type == I_SKETCH_NAME and do {
-        #$hash->{$typeStr} = $msg->{payload};
         readingsSingleUpdate($hash, "state", "received presentation", 1) unless ($hash->{STATE} eq "received presentation");
         readingsSingleUpdate($hash, "SKETCH_NAME", $msg->{payload}, 1);
-        #undef $hash->{FW_DATA}; # enable this to free memory?
         delete $hash->{FW_DATA} if (defined $hash->{FW_DATA});
+        $hash->{nowSleeping} = 0 if $hash->{nowSleeping};
         if (defined $hash->{getCommentReadings}){
           if ($hash->{getCommentReadings} eq "1") {
             $hash->{getCommentReadings} = 2 ;
@@ -777,6 +776,7 @@ sub onInternalMessage($$) {
             delete $hash->{getCommentReadings};
           }
         }
+        Log3 $name, 3, "leaving Sketch Name update";
         last;
     };
     $type == I_SKETCH_VERSION and do {
@@ -896,7 +896,6 @@ sub onInternalMessage($$) {
         #$hash->{$typeStr} = $msg->{payload};
         refreshInternalMySTimer($hash,"Asleep");
         refreshInternalMySTimer($hash,"Alive") if $hash->{timeoutAlive};
-        #here we send out retained and outstanding messages
         MYSENSORS::Timer($hash);
         my $retainedMsg;
         while (ref ($retainedMsg = shift @{$hash->{retainedMessagesForRadioId}->{messages}}) eq 'HASH') {
@@ -1070,7 +1069,7 @@ sub flashFirmware($$) {
     } else {
         return "Nothing todo - latest firmware already installed";
     }
-    }
+  }
 }
 
 sub refreshInternalMySTimer($$) {
@@ -1089,7 +1088,7 @@ sub refreshInternalMySTimer($$) {
       RemoveInternalTimer("timeoutAck:$name");
       my $nextTrigger = main::gettimeofday() + $hash->{timeoutAck};
       InternalTimer($nextTrigger, "MYSENSORS::DEVICE::timeoutMySTimer", "timeoutAck:$name", 0);
-      Log3 $name, 4, "$name: Ack timeout timer set at $nextTrigger";
+      Log3 $name, 5, "$name: Ack timeout timer set at $nextTrigger";
     } elsif ($calltype eq "Asleep") {
       RemoveInternalTimer("timeoutAwake:$name");
       #0.5 is default; could be dynamized by attribute if needed
