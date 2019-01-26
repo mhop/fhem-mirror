@@ -647,6 +647,7 @@ tradfri_Attr($$$)
   Notes:
   <ul>
     <li>JSON has to be installed on the FHEM host.</li>
+    <li>tradfri-fhem node executable hast do be installed with <code>sudo npm install -g tradfri-fhem</code></li>
   </ul>
 
   <a name="tradfri_Set"></a>
