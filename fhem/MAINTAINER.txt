@@ -146,9 +146,9 @@ FHEM/23_KOSTALPIKO.pm        john                 CodeSchnipsel
 FHEM/23_LUXTRONIK2.pm        tupol                Heizungssteuerung/Raumklima (link als PM an tupol)
 FHEM/23_WEBIO.pm             sachag               Sonstiges
 FHEM/23_WEBIO_12DIGITAL.pm   sachag               Sonstiges
-FHEM/24_Iluminize.pm	     VolkerKettenbach     Sonstige Systeme
+FHEM/24_Iluminize.pm         VolkerKettenbach     Sonstige Systeme
 FHEM/24_NetIO230B.pm         rudolfkoenig/orphan  Sonstiges
-FHEM/24_TPLinkHS110.pm	     VolkerKettenbach     Sonstige Systeme
+FHEM/24_TPLinkHS110.pm       VolkerKettenbach     Sonstige Systeme
 FHEM/26_tahoma.pm            mike3436             Sonstige Systeme
 FHEM/30_DUOFERN              telekatz             Sonstige Systeme
 FHEM/30_ENECSYSGW.pm         akw                  Sonstige Systeme
@@ -210,7 +210,7 @@ FHEM/37_plex.pm              justme1968           Multimedia
 FHEM/37_SHC.pm               rr2000               Sonstige Systeme
 FHEM/37_SHCdev.pm            rr2000               Sonstige Systeme
 FHEM/37_Spotify.pm           neumann              Multimedia
-FHEM/38_BEOK.pm		           Wzut                 Heizungssteuerung/Raumklima
+FHEM/38_BEOK.pm              Wzut                 Heizungssteuerung/Raumklima
 FHEM/38_Broadlink.pm         daniel2311           http://forum.fhem.de/index.php/topic,71972.0.html
 FHEM/38_CO20.pm              markus-m             Sonstiges
 FHEM/38_JawboneUp.pm         domschl              Sonstiges
@@ -396,7 +396,7 @@ FHEM/88_LINDY_HDMI_SWITCH.pm sachag               Multimedia
 FHEM/88_VantagePro2.pm       sachag               Sonstiges
 FHEM/88_WEBCOUNT.pm          sachag               Sonstiges
 FHEM/88_xs1Bridge.pm         HomeAuto_User        Sonstige Systeme
-FHEM/88_xs1Dev.pm         	 HomeAuto_User        Sonstige Systeme
+FHEM/88_xs1Dev.pm            HomeAuto_User        Sonstige Systeme
 FHEM/89_FULLY.pm             zap                  Frontends
 FHEM/89_HEATRONIC.pm         heikoranft           Sonstige Systeme
 FHEM/89_VCONTROL.pm          adamwit              Heizungssteuerung/Raumklima
@@ -477,7 +477,7 @@ FHEM/98_ModbusAttr.pm        stefanstrobel        Sonstiges
 FHEM/98_ModbusSET.pm         stefanstrobel        Sonstiges
 FHEM/98_ModbusTrovis5576.pm  Reinerlein           Heizungssteuerung/Raumklima
 FHEM/98_monitoring.pm        igami                Automatisierung
-FHEM/98_MSwitch.pm           Byte09	              Automatisierung
+FHEM/98_MSwitch.pm           Byte09               Automatisierung
 FHEM/98_notice.pm            mfr69bs              Sonstiges
 FHEM/98_PHC.pm               stefanstrobel        Sonstiges
 FHEM/98_PID20.pm             John                 Automatisierung
@@ -500,7 +500,7 @@ FHEM/98_systemd_watchdog.pm  hexenmeister         Unterstuetzende Dienste
 FHEM/98_telnet.pm            rudolfkoenig         Automatisierung
 FHEM/98_Text2Speech.pm       Tobias               Unterstuetzende Dienste
 FHEM/98_THRESHOLD.pm         damian-s             Automatisierung
-FHEM/98_todoist.pm           marvin78							Unterstuetzende Dienste
+FHEM/98_todoist.pm           marvin78             Unterstuetzende Dienste
 FHEM/98_TRAFFIC.pm           jmike                Unterstuetzende Dienste
 FHEM/98_UbiquitiOut.pm       Wzut                 Sonstige Systeme
 FHEM/98_UbiquitiPM.pm        Wzut                 Sonstige Systeme
