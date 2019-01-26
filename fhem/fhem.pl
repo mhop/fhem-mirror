@@ -5354,7 +5354,10 @@ sub
 getUniqueId()
 {
   my ($err, $uniqueID) = getKeyValue("uniqueID");
-  return $uniqueID if(defined($uniqueID));
+  if(defined($uniqueID)) {
+    $uniqueID =~ s/[^0-9a-f]//g;
+    return $uniqueID if($uniqueID && length($uniqueID) == 32);
+  }
   $uniqueID = createUniqueId();
   setKeyValue("uniqueID", $uniqueID);
   return $uniqueID;
