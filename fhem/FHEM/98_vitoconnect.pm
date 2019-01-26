@@ -67,7 +67,7 @@
 #						führen zu einem "Bad Gateway" Fehlermeldung in Logfile
 #						Achtung: Keine Prüfung ob Befehle sinnvoll und oder erlaubt sind! Nutzung auf eigene Gefahr!
 # 2019-01-15	   Fehler bei der Befehlsausführung gefixt
-# 2019-01-22      Klartext für Readings für HK2 und heating.dhw.charging.level.* hinzugefügt
+# 2019-01-22      Klartext für Readings für HK3 und heating.dhw.charging.level.* hinzugefügt
 #						set's für HK2 implementiert
 #					   set für Slope und Shift implementiert
 #						set WW-Haupttemperatur und WW-Solltemperatur implementiert 
@@ -75,6 +75,7 @@
 #						set  HK1-Solltemperatur_eco implementiert (set HK1-Solltemperatur_eco_aktiv scheint es nicht zu geben?!)
 #						vor einem set vitoconnect update den alten Timer löschen
 #						set vitoconnect logResponseOnce implementiert (eventuell werden zusätzliche perl Pakete benötigt?)
+# 2019-01-26		Fehler, dass HK3 Readings auf HK2 gemappt wurden gefixt
 #          
 #
 #   ToDo:         "set"s für Schedules zum Steuern der Heizung implementieren
@@ -194,39 +195,39 @@ my $RequestList = {
     "heating.circuits.1.sensors.temperature.supply.status"				=> "HK2-Vorlauftemperatur_aktiv",
     "heating.circuits.1.sensors.temperature.supply.value" 				=> "HK2-Vorlauftemperatur",
     
-    "heating.circuits.2.active" 													=> "HK2-aktiv",
-    "heating.circuits.2.circulation.pump.status"                     => "HK2-Zirkulationspumpe",
-    "heating.circuits.2.circulation.schedule.active" 						=> "HK2-Zeitsteuerung_Zirkulation_aktiv",
-    "heating.circuits.2.circulation.schedule.entries" 					=> "HK2-Zeitsteuerung_Zirkulation",
-    "heating.circuits.2.frostprotection.status" 							=> "HK2-Frostschutz_Status",
-    "heating.circuits.2.heating.curve.shift" 								=> "HK2-Heizkurve-Niveau",
-    "heating.circuits.2.heating.curve.slope" 								=> "HK2-Heizkurve-Steigung",
-    "heating.circuits.2.heating.schedule.active" 							=> "HK2-Zeitsteuerung_Heizung_aktiv",
-    "heating.circuits.2.heating.schedule.entries" 							=> "HK2-Zeitsteuerung_Heizung",
-    "heating.circuits.2.operating.modes.active.value" 					=> "HK2-Betriebsart",
-    "heating.circuits.2.operating.modes.dhw.active" 						=> "HK2-WW_aktiv",
-    "heating.circuits.2.operating.modes.dhwAndHeating.active" 			=> "HK2-WW_und_Heizen_aktiv",
-    "heating.circuits.2.operating.modes.forcedNormal.active" 			=> "HK2-Solltemperatur_erzwungen",
-    "heating.circuits.2.operating.modes.forcedReduced.active" 			=> "HK2-Reduzierte_Temperatur_erzwungen",
-    "heating.circuits.2.operating.modes.standby.active" 					=> "HK2-Standby_aktiv",
-    "heating.circuits.2.operating.programs.active.value" 				=> "HK2-Programmstatus",
-    "heating.circuits.2.operating.programs.comfort.active" 				=> "HK2-Solltemperatur_comfort_aktiv",
-    "heating.circuits.2.operating.programs.comfort.temperature" 		=> "HK2-Solltemperatur_comfort",
-    "heating.circuits.2.operating.programs.eco.active" 					=> "HK2-Solltemperatur_eco_aktiv",
-    "heating.circuits.2.operating.programs.eco.temperature" 			=> "HK2-Solltemperatur_eco",
-    "heating.circuits.2.operating.programs.external.active" 			=> "HK2-External_aktiv",
-    "heating.circuits.2.operating.programs.external.temperature" 		=> "HK2-External_Temperatur",
-    "heating.circuits.2.operating.programs.holiday.active" 				=> "HK2-Urlaub_aktiv",
-    "heating.circuits.2.operating.programs.holiday.start" 				=> "HK2-Urlaub_Start",
-    "heating.circuits.2.operating.programs.holiday.end" 					=> "HK2-Urlaub_Ende",
-    "heating.circuits.2.operating.programs.normal.active" 				=> "HK2-Solltemperatur_aktiv",
-    "heating.circuits.2.operating.programs.normal.temperature" 		=> "HK2-Solltemperatur_normal",
-    "heating.circuits.2.operating.programs.reduced.active"				=> "HK2-Solltemperatur_reduziert_aktiv",
-    "heating.circuits.2.operating.programs.reduced.temperature" 		=> "HK2-Solltemperatur_reduziert",
-    "heating.circuits.2.operating.programs.standby.active" 				=> "HK2-Standby_aktiv",
-    "heating.circuits.2.sensors.temperature.room.status" 				=> "HK2-Raum_Status",
-    "heating.circuits.2.sensors.temperature.supply.status"				=> "HK2-Vorlauftemperatur_aktiv",
-    "heating.circuits.2.sensors.temperature.supply.value" 				=> "HK2-Vorlauftemperatur",
+    "heating.circuits.2.active" 													=> "HK3-aktiv",
+    "heating.circuits.2.circulation.pump.status"                     => "HK3-Zirkulationspumpe",
+    "heating.circuits.2.circulation.schedule.active" 						=> "HK3-Zeitsteuerung_Zirkulation_aktiv",
+    "heating.circuits.2.circulation.schedule.entries" 					=> "HK3-Zeitsteuerung_Zirkulation",
+    "heating.circuits.2.frostprotection.status" 							=> "HK3-Frostschutz_Status",
+    "heating.circuits.2.heating.curve.shift" 								=> "HK3-Heizkurve-Niveau",
+    "heating.circuits.2.heating.curve.slope" 								=> "HK3-Heizkurve-Steigung",
+    "heating.circuits.2.heating.schedule.active" 							=> "HK3-Zeitsteuerung_Heizung_aktiv",
+    "heating.circuits.2.heating.schedule.entries" 							=> "HK3-Zeitsteuerung_Heizung",
+    "heating.circuits.2.operating.modes.active.value" 					=> "HK3-Betriebsart",
+    "heating.circuits.2.operating.modes.dhw.active" 						=> "HK3-WW_aktiv",
+    "heating.circuits.2.operating.modes.dhwAndHeating.active" 			=> "HK3-WW_und_Heizen_aktiv",
+    "heating.circuits.2.operating.modes.forcedNormal.active" 			=> "HK3-Solltemperatur_erzwungen",
+    "heating.circuits.2.operating.modes.forcedReduced.active" 			=> "HK3-Reduzierte_Temperatur_erzwungen",
+    "heating.circuits.2.operating.modes.standby.active" 					=> "HK3-Standby_aktiv",
+    "heating.circuits.2.operating.programs.active.value" 				=> "HK3-Programmstatus",
+    "heating.circuits.2.operating.programs.comfort.active" 				=> "HK3-Solltemperatur_comfort_aktiv",
+    "heating.circuits.2.operating.programs.comfort.temperature" 		=> "HK3-Solltemperatur_comfort",
+    "heating.circuits.2.operating.programs.eco.active" 					=> "HK3-Solltemperatur_eco_aktiv",
+    "heating.circuits.2.operating.programs.eco.temperature" 			=> "HK3-Solltemperatur_eco",
+    "heating.circuits.2.operating.programs.external.active" 			=> "HK3-External_aktiv",
+    "heating.circuits.2.operating.programs.external.temperature" 		=> "HK3-External_Temperatur",
+    "heating.circuits.2.operating.programs.holiday.active" 				=> "HK3-Urlaub_aktiv",
+    "heating.circuits.2.operating.programs.holiday.start" 				=> "HK3-Urlaub_Start",
+    "heating.circuits.2.operating.programs.holiday.end" 					=> "HK3-Urlaub_Ende",
+    "heating.circuits.2.operating.programs.normal.active" 				=> "HK3-Solltemperatur_aktiv",
+    "heating.circuits.2.operating.programs.normal.temperature" 		=> "HK3-Solltemperatur_normal",
+    "heating.circuits.2.operating.programs.reduced.active"				=> "HK3-Solltemperatur_reduziert_aktiv",
+    "heating.circuits.2.operating.programs.reduced.temperature" 		=> "HK3-Solltemperatur_reduziert",
+    "heating.circuits.2.operating.programs.standby.active" 				=> "HK3-Standby_aktiv",
+    "heating.circuits.2.sensors.temperature.room.status" 				=> "HK3-Raum_Status",
+    "heating.circuits.2.sensors.temperature.supply.status"				=> "HK3-Vorlauftemperatur_aktiv",
+    "heating.circuits.2.sensors.temperature.supply.value" 				=> "HK3-Vorlauftemperatur",
     
     "heating.configuration.multiFamilyHouse.active" 						=> "Mehrfamilenhaus_aktiv",
     "heating.controller.serial.value" 											=> "Controller_Seriennummer",
@@ -354,6 +355,7 @@ sub vitoconnect_Set($@) {
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
 			data       => "{\"shift\":$args[0],\"slope\":$slope}",
+			timeout    => 10,
 			method     => "POST",
 			sslargs    => {SSL_verify_mode => 0},
       };
@@ -370,6 +372,7 @@ sub vitoconnect_Set($@) {
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
 			data       => "{\"shift\":$args[0],\"slope\":$slope}",
+			timeout    => 10,
 			method     => "POST",
 			sslargs    => {SSL_verify_mode => 0},
       };
@@ -386,6 +389,7 @@ sub vitoconnect_Set($@) {
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
 			data       => "{\"shift\":$args[0],\"slope\":$slope}",
+			timeout    => 10,
 			method     => "POST",
 			sslargs    => {SSL_verify_mode => 0},
       };
@@ -402,6 +406,7 @@ sub vitoconnect_Set($@) {
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
 			data       => "{\"shift\":$shift,\"slope\":$args[0]}",
+			timeout    => 10,
 			method     => "POST",
 			sslargs    => {SSL_verify_mode => 0},
       };
@@ -418,6 +423,7 @@ sub vitoconnect_Set($@) {
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
 			data       => "{\"shift\":$shift,\"slope\":$args[0]}",
+			timeout    => 10,
 			method     => "POST",
 			sslargs    => {SSL_verify_mode => 0},
       };
@@ -434,6 +440,7 @@ sub vitoconnect_Set($@) {
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
 			data       => "{\"shift\":$shift,\"slope\":$args[0]}",
+			timeout    => 10,
 			method     => "POST",
 			sslargs    => {SSL_verify_mode => 0},
       };
@@ -450,6 +457,7 @@ sub vitoconnect_Set($@) {
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
 			data       => "{\"start\":\"$args[0]\",\"end\":\"$end\"}",
+			timeout    => 10,
 			method     => "POST",
 			sslargs    => {SSL_verify_mode => 0},
       };
@@ -466,6 +474,7 @@ sub vitoconnect_Set($@) {
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
 			data       => "{\"start\":\"$args[0]\",\"end\":\"$end\"}",
+			timeout    => 10,
 			method     => "POST",
 			sslargs    => {SSL_verify_mode => 0},
       };
@@ -482,6 +491,7 @@ sub vitoconnect_Set($@) {
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
 			data       => "{\"start\":\"$args[0]\",\"end\":\"$end\"}",
+			timeout    => 10,
 			method     => "POST",
 			sslargs    => {SSL_verify_mode => 0},
       };
@@ -498,6 +508,7 @@ sub vitoconnect_Set($@) {
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
 			data       => "{\"start\":\"$start\",\"end\":\"$args[0]\"}",
+			timeout    => 10,
 			method     => "POST",
 			sslargs    => {SSL_verify_mode => 0},
       };
@@ -514,6 +525,7 @@ sub vitoconnect_Set($@) {
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
 			data       => "{\"start\":\"$start\",\"end\":\"$args[0]\"}",
+			timeout    => 10,
 			method     => "POST",
 			sslargs    => {SSL_verify_mode => 0},
       };
@@ -530,6 +542,7 @@ sub vitoconnect_Set($@) {
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
 			data       => "{\"start\":\"$start\",\"end\":\"$args[0]\"}",
+			timeout    => 10,
 			method     => "POST",
 			sslargs    => {SSL_verify_mode => 0},
       };
@@ -545,6 +558,7 @@ sub vitoconnect_Set($@) {
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
 			data       => "{}",
+			timeout    => 10,
 			method     => "POST",
 			sslargs    => {SSL_verify_mode => 0},
       };
@@ -560,6 +574,7 @@ sub vitoconnect_Set($@) {
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
 			data       => "{}",
+			timeout    => 10,
 			method     => "POST",
 			sslargs    => {SSL_verify_mode => 0},
       };
@@ -575,6 +590,7 @@ sub vitoconnect_Set($@) {
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
 			data       => "{}",
+			timeout    => 10,
 			method     => "POST",
 			sslargs    => {SSL_verify_mode => 0},
       };
@@ -590,6 +606,7 @@ sub vitoconnect_Set($@) {
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
 			data       => "{\"mode\":\"$args[0]\"}",
+			timeout    => 10,
 			method     => "POST",
 			sslargs    => {SSL_verify_mode => 0},
       };
@@ -618,6 +635,7 @@ sub vitoconnect_Set($@) {
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
 			data       => "{\"mode\":\"$args[0]\"}",
+			timeout    => 10,
 			method     => "POST",
 			sslargs    => {SSL_verify_mode => 0},
       };
@@ -646,6 +664,7 @@ sub vitoconnect_Set($@) {
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
 			data       => '{}',
+			timeout    => 10,
 			method     => "POST",
 			sslargs    => {SSL_verify_mode => 0},
    	};
@@ -674,10 +693,10 @@ sub vitoconnect_Set($@) {
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
 			data       => "{\"targetTemperature\":$args[0]}",
+			timeout    => 10,
 			method     => "POST",
 			sslargs    => {SSL_verify_mode => 0},
       };
-      #Log3 $name, 3, "$name: $param->{data}"; 
       (my $err, my $data) = HttpUtils_BlockingGet($param);
   		if ($err ne "" || defined($data)) {	Log3 $name, 1, "$name: Fehler während der Befehlsausführung: err= $err data= $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
@@ -689,10 +708,10 @@ sub vitoconnect_Set($@) {
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
 			data       => "{\"targetTemperature\":$args[0]}",
+			timeout    => 10,
 			method     => "POST",
 			sslargs    => {SSL_verify_mode => 0},
       };
-      #Log3 $name, 3, "$name: $param->{data}"; 
       (my $err, my $data) = HttpUtils_BlockingGet($param);
   		if ($err ne "" || defined($data)) {	Log3 $name, 1, "$name: Fehler während der Befehlsausführung: err= $err data= $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
@@ -704,6 +723,7 @@ sub vitoconnect_Set($@) {
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
 			data       => "{\"targetTemperature\":$args[0]}",
+			timeout    => 10,
 			method     => "POST",
 			sslargs    => {SSL_verify_mode => 0},
       };
@@ -719,6 +739,7 @@ sub vitoconnect_Set($@) {
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
 			data       => '{}',
+			timeout    => 10,
 			method     => "POST",
 			sslargs    => {SSL_verify_mode => 0},
    	};
@@ -733,6 +754,7 @@ sub vitoconnect_Set($@) {
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
 			data       => '{}',
+			timeout    => 10,
 			method     => "POST",
 			sslargs    => {SSL_verify_mode => 0},
    	};
@@ -747,6 +769,7 @@ sub vitoconnect_Set($@) {
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
 			data       => '{}',
+			timeout    => 10,
 			method     => "POST",
 			sslargs    => {SSL_verify_mode => 0},
    	};
@@ -761,6 +784,7 @@ sub vitoconnect_Set($@) {
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
 			data       => "{\"targetTemperature\":$args[0]}",
+			timeout    => 10,
 			method     => "POST",
 			sslargs    => {SSL_verify_mode => 0},
       };
@@ -808,6 +832,7 @@ sub vitoconnect_Set($@) {
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
 			data       => "{\"targetTemperature\":$args[0]}",
+			timeout    => 10,
 			method     => "POST",
 			sslargs    => {SSL_verify_mode => 0},
       };
@@ -822,6 +847,7 @@ sub vitoconnect_Set($@) {
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
 			data       => "{\"targetTemperature\":$args[0]}",
+			timeout    => 10,
 			method     => "POST",
 			sslargs    => {SSL_verify_mode => 0},
       };
@@ -836,6 +862,7 @@ sub vitoconnect_Set($@) {
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
 			data       => "{\"targetTemperature\":$args[0]}",
+			timeout    => 10,
 			method     => "POST",
 			sslargs    => {SSL_verify_mode => 0},
       };
@@ -850,6 +877,7 @@ sub vitoconnect_Set($@) {
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
 			data       => '{}',
+			timeout    => 10,
 			method     => "POST",
 			sslargs    => {SSL_verify_mode => 0},
    	};
@@ -868,6 +896,7 @@ sub vitoconnect_Set($@) {
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
 			data       => "{\"temperature\":$args[0]}",
+			timeout    => 10,
 			method     => "POST",
 			sslargs    => {SSL_verify_mode => 0},
       };
@@ -882,6 +911,7 @@ sub vitoconnect_Set($@) {
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
 			data       => "{\"temperature\":$args[0]}",
+			timeout    => 10,
 			method     => "POST",
 			sslargs    => {SSL_verify_mode => 0},
       };
@@ -931,6 +961,8 @@ sub vitoconnect_Set($@) {
 		"WW-Haupttemperatur:slider,10,1,60 " .
 		"WW-Solltemperatur:slider,10,1,60 ";
 }	
+
+
 sub vitoconnect_Attr(@) {
 	my ($cmd,$name,$attr_name,$attr_value) = @_;
 	if($cmd eq "set") {
@@ -972,7 +1004,7 @@ sub vitoconnect_getCode($) {
 	my $name = $hash->{NAME};
 
 	my $isiwebpasswd = vitoconnect_ReadKeyValue($hash, "passwd");
-		        
+			        
    my $param = {
 		url        => "$authorizeURL?client_id=$client_id&scope=openid&redirect_uri=$callback_uri&response_type=code",
 		hash       => $hash,
@@ -981,6 +1013,7 @@ sub vitoconnect_getCode($) {
       user		  => $hash->{user},
       pwd		  => $isiwebpasswd,
       sslargs    => {SSL_verify_mode => 0},
+		timeout    => 10,
       method     => "POST",
       callback   => \&vitoconnect_getCodeCallback     
       };
@@ -1008,7 +1041,7 @@ sub vitoconnect_getCodeCallback ($) {
       }
    } else {
    	# Error code, type of error, error message
-      Log3 $name, 1, "$name: An error happened: $err";
+      Log3 $name, 1, "$name: An error occured: $err";
       $hash->{login} = "failure";
    }
 	if ($hash->{login} eq "ok") {
@@ -1017,6 +1050,7 @@ sub vitoconnect_getCodeCallback ($) {
 		readingsBeginUpdate($hash);
 		readingsBulkUpdate($hash, "state", "login failure" );
 		readingsEndUpdate($hash, 1);
+		Log3 $name, 1, "$name: Login failure";
 		# neuen Timer starten in einem konfigurierten Interval.
 		InternalTimer(gettimeofday()+$hash->{intervall}, "vitoconnect_GetUpdate", $hash);
 	}
@@ -1033,6 +1067,7 @@ sub vitoconnect_getAccessToken($) {
 		data       => "client_id=$client_id&client_secret=$client_secret&code=" . $hash->{".code"} ."&redirect_uri=$callback_uri&grant_type=authorization_code",
       sslargs    => {SSL_verify_mode => 0},
       method     => "POST",      
+		timeout    => 10,
       callback   => \&vitoconnect_getAccessTokenCallback     
       };
 	HttpUtils_NonblockingGet($param);
@@ -1062,7 +1097,7 @@ sub vitoconnect_getAccessTokenCallback($) {
       	InternalTimer(gettimeofday()+$hash->{intervall}, "vitoconnect_GetUpdate", $hash);
       } 
     } else {
-    	Log3 $name, 1, "$name: getAccessToken: An error happened: $err";
+    	Log3 $name, 1, "$name: getAccessToken: An error occured: $err";
       InternalTimer(gettimeofday()+$hash->{intervall}, "vitoconnect_GetUpdate", $hash);
     }
 	return undef;
@@ -1076,6 +1111,7 @@ sub vitoconnect_getGw($) {
 		url        => "$apiURLBase$general",
 		hash       => $hash,
 		header     => "Authorization: Bearer $access_token",
+		timeout    => 10,
 		sslargs    => {SSL_verify_mode => 0},
       callback   => \&vitoconnect_getGwCallback     
       };
@@ -1110,7 +1146,7 @@ sub vitoconnect_getGwCallback($) {
       $hash->{".gw"} = $gw;
       vitoconnect_getResource($hash);
    } else {
-   	Log3 $name, 1, "$name: An error happened: $err";
+   	Log3 $name, 1, "$name: An error occured: $err";
       InternalTimer(gettimeofday()+$hash->{intervall}, "vitoconnect_GetUpdate", $hash);
    }	
 	return undef;
@@ -1226,15 +1262,13 @@ sub vitoconnect_getResourceCallback($) {
 				}
 			}
 			###########################################
-			
-			
 		};
 		
 		$hash->{counter} = $hash->{counter} + 1;
 		readingsBulkUpdate($hash, "state", "ok");             
    }   else {
-		readingsBulkUpdate($hash, "state", "An error happened: $err");
-      Log3 $name, 1, "$name - An error happened: $err";
+		readingsBulkUpdate($hash, "state", "An error occured: $err");
+      Log3 $name, 1, "$name - An error occured: $err";
    }
 	readingsEndUpdate($hash, 1);
 	InternalTimer(gettimeofday()+$hash->{intervall}, "vitoconnect_GetUpdate", $hash);
@@ -1262,6 +1296,7 @@ sub vitoconnect_action($) {
       user		  => $isiwebuserid,
       pwd		  => $isiwebpasswd,
       sslargs    => {SSL_verify_mode => 0},
+		timeout    => 10,
       method     => "POST" };
    ($err, $response_body) = HttpUtils_BlockingGet($param);
 	if ($err eq "") {
@@ -1269,7 +1304,7 @@ sub vitoconnect_action($) {
       $code = $1;
       Log3 $name, 5, "$name - response_body: $response_body";
       Log3 $name, 5, "$name - code: $code";
-   } else { Log3 $name, 1, "$name An error happened: $err"; }
+   } else { Log3 $name, 1, "$name An error occured: $err"; }
    
    $param = {
 		url        => 'https://iam.viessmann.com/idp/v1/token',
@@ -1277,6 +1312,7 @@ sub vitoconnect_action($) {
 		header     => "Content-Type: application/x-www-form-urlencoded;charset=utf-8",
 		data       => "client_id=$client_id&client_secret=$client_secret&code=$code&redirect_uri=$callback_uri&grant_type=authorization_code",
       sslargs    => {SSL_verify_mode => 0},
+ 		timeout    => 10,
       method     => "POST" };
       
 	($err, $response_body) = HttpUtils_BlockingGet($param);
@@ -1286,12 +1322,13 @@ sub vitoconnect_action($) {
       if($@) { Log3 $name, 1, "$name - JSON error while request: $@"; return; }  
       $access_token = $decode_json->{access_token}; 
       Log3 $name, 5, "$name - access_token: $access_token"; 
-    } else { Log3 $name, 1, "$name: getAccessToken: An error happened: $err"; }
+    } else { Log3 $name, 1, "$name: getAccessToken: An error occured: $err"; }
     
     $param = {
 		url        => "$apiURLBase$general",
 		hash       => $hash,
 		header     => "Authorization: Bearer $access_token",
+		timeout    => 10,
 		sslargs    => {SSL_verify_mode => 0}    
       };
 	($err, $response_body) = HttpUtils_BlockingGet($param);
@@ -1302,9 +1339,9 @@ sub vitoconnect_action($) {
       $installation = $decode_json->{entities}[0]->{properties}->{id};
       $gw = $decode_json->{entities}[0]->{entities}[0]->{properties}->{serial};
       Log3 $name, 4, "$name: installation: $installation :: gw: $gw"
-   } else { Log3 $name, 1, "$name: An error happened: $err"; }	 
+   } else { Log3 $name, 1, "$name: An error occured: $err"; }	
    
-	
+	   
     
 	return undef;
 }
@@ -1387,6 +1424,11 @@ sub vitoconnect_ReadKeyValue($$) {
 	 You need the user and password from the ViCare App account.  
 	 
 	 For details see: <a href="https://wiki.fhem.de/wiki/Vitoconnect">FHEM Wiki (german)</a>
+	 
+	 viconnect needs the following libraries: libtypes-path-tiny-perl<br>	 
+	 Use sudo apt install libtypes-path-tiny-perl or install path::tiny via cpan
+	 
+	 sudo apt-get install
 
     <br><br>
     <a name="vitoconnectdefine"></a>
@@ -1413,7 +1455,7 @@ sub vitoconnect_ReadKeyValue($$) {
       <li><code>password <passwd></code><br>
         store password in key store</li>
     	<li><code>logResponseOnce</code><br>
-        dumps the json response of Vissmann server to entities.json, entities.json, actions.json in FHEM log directory</li>
+        dumps the json response of Vissmann server to entities.json, gw.json, actions.json in FHEM log directory</li>
         
       <li><code>HK1-Heizkurve-Niveau shift</code><br>
       set shift of heating curve</li>
