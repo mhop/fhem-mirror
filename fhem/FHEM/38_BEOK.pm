@@ -5,7 +5,7 @@
 #  (c) 2019 Copyright: Wzut
 #  All rights reserved
 #
-#  FHEM Forum : http://forum.fhem.de/index.php/
+#  FHEM Forum : https://forum.fhem.de/index.php/topic,80703.msg891666.html#msg891666
 #
 #  This code is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -22,8 +22,7 @@
 ################################################################
 
 # based on Broadlink Python script at https://github.com/ralphm2004/broadlink-thermostat
-# Perl Broadlink protocol parts are stolen from 38_Broadlink :) 
-# CRC-16-CCITT from https://gist.github.com/oysstu/68072c44c02879a2abf94ef350d1c7c6#gistcomment-2352552
+# Broadlink protocol parts are stolen from 38_Broadlink.pm :) , THX to daniel2311
 
 package main;
 use strict;
@@ -34,7 +33,7 @@ use Time::Local;
 use IO::Socket::INET;
 use IO::Select;
 
-my $version = 'V1.0 / 26.01.19';
+my $version = 'V1.1 / 26.01.19';
 
 my %gets = ('status:noArg' => '', 'auth:noArg' =>'' , 'temperature:noArg' => '');
 
@@ -212,7 +211,7 @@ sub BEOK_Get($@)
   {
    # Get current external temperature in degrees celsius
    # [0x01,0x03,0x00,0x00,0x00,0x08]
-   # return payload[0x05] / 2.0
+   # return payload[5] / 2.0
    # return payload[18] / 2.0
 
    my @payload = (1,3,0,0,0,8);
@@ -251,13 +250,13 @@ sub BEOK_Set(@)
  return 'no set commands allowed, auth key and device id are missing ! ( need run get auth first )' if (!$hash->{isAuth});
 
  if (($cmd eq 'inactive') && !IsDisabled($name)) 
- { 
+ {
   Log3 $name,4,"BEOK set $name $cmd $subcmd";
   readingsSingleUpdate($hash,'state','inactive',1); 
-  BEOK_Undef($hash,undef);   
+  BEOK_Undef($hash,undef);
  }
  elsif (($cmd eq 'active') && IsDisabled($name)) 
- { 
+ {
   Log3 $name,4,"BEOK set $name $cmd $subcmd";
   readingsSingleUpdate($hash,'state','active',1); 
   BEOK_Update($hash); 
@@ -388,7 +387,7 @@ sub BEOK_Set(@)
  
    readingsBeginUpdate($hash);
     readingsBulkUpdate($hash,'time',"set_$hour:$min:$sec",0);
-    readingsBulkUpdate($hash,'weekday','set_'.$wday,0);
+    readingsBulkUpdate($hash,'dayofweek','set_'.$wday,0);
    readingsEndUpdate($hash,0);
 
    $hash->{lastCMD} = 'set '.$cmd;
@@ -406,7 +405,7 @@ sub BEOK_Set(@)
 
   @payload =  (1,6,0,1,0,$temp);  # setzt angeblich auch mode manu
 
-  readingsSingleUpdate($hash,'desired-temp','set_'.$subcmd,0);
+  #readingsSingleUpdate($hash,'desired-temp','set_'.$subcmd,0);
 
   $hash->{lastCMD} = "set $cmd $subcmd";
   $ret = BEOK_send_packet($hash, 0x6a, @payload);
@@ -433,7 +432,7 @@ sub BEOK_Set(@)
    Log3 $name,4,"BEOK set $name $cmd $subcmd";
 
    my $temp = int($subcmd*2);
-   return "Temperature must be between 5 and 25" if (($temp < 10) || ($temp > 50));
+   return "Temperature must be between 5 and 99" if (($temp < 10) || ($temp > 198));
 
    my $day = $cmd;
    $day =~ s/(day|we)-profile//;
@@ -624,7 +623,6 @@ sub BEOK_NBDone($)
   return undef;
 }
 
-
 sub BEOK_UpdateTemp(@)
 {
   my ($hash,@data) = @_;
@@ -647,7 +645,6 @@ sub BEOK_UpdateTemp(@)
 
   return undef;
 }
-
 
 sub BEOK_UpdateStatus(@) 
 {
@@ -688,7 +685,7 @@ sub BEOK_UpdateStatus(@)
 
      $val = ($data[7] >> 4) & 15;
      $hash->{helper}{loop_mode} = $val;
-     
+
      my $loop = "???";
      if    ($val == 0) {$loop = "12345.67";}
      elsif ($val == 1) {$loop = "123456.7";}
@@ -785,7 +782,7 @@ sub BEOK_UpdateStatus(@)
   return undef;
 }
 
-sub BEOK_getCipher(@) 
+sub BEOK_getCipher(@)
 {
   my ($hash) = @_;
   return Crypt::CBC->new(
@@ -905,7 +902,7 @@ sub BEOK_send_packet(@)
   {
    $hash->{ERRORCOUNT}++;
    my $error = 'can`t start BlockingCall ['.$hash->{ERRORCOUNT}.']';
-   Log3 $name, 2, "BEOK $name $error";
+   Log3 $name, 3, "BEOK $name $error" if ($hash->{ERRORCOUNT} <20);
    readingsBeginUpdate($hash);
     readingsBulkUpdate ($hash, 'error', $error);
     readingsBulkUpdate ($hash, 'state', 'error');
@@ -935,7 +932,6 @@ sub BEOK_CRC16(@)
     return @a;
 }
 
-
 sub BEOK_set_timer_schedule($)
 {
  my ($hash) = @_;
@@ -959,7 +955,7 @@ sub BEOK_set_timer_schedule($)
       push @payload,int($h); push @payload,int($m);
     }
 
-    for ($i=0;$i<8;$i++) # temperatures
+    for ($i=0;$i<8;$i++)
     {
      push @payload, $hash->{helper}{$i}{temp}; # temperatures
     }
@@ -985,9 +981,9 @@ sub BEOK_Attr (@)
  {
    if ($attrName eq 'interval')
    {
-     $_[3] = $attrVal;    
+     $_[3] = $attrVal;
     RemoveInternalTimer($hash);
-   } 
+   }
  }
 }
 
@@ -1188,7 +1184,7 @@ return $html;
         sudo apt-get install libcrypt-cbc-perl<br>
 	sudo apt-get install libcrypt-rijndael-perl<br>
         sudo apt-get install libssl-dev<br>
-	>sudo cpan Crypt/OpenSSL/AES.pm</code><br>
+	sudo cpan Crypt/OpenSSL/AES.pm</code><br>
     <br><br>
     <a name="BEOKdefine"></a>
     <b>Define</b>
