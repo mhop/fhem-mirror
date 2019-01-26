@@ -6,13 +6,14 @@ package main;
 use strict;
 use warnings;
 
+use CoProcess;
+
 use JSON;
 use Data::Dumper;
 
 use POSIX;
 use Socket;
 
-use vars qw(%selectlist);
 use vars qw(%modules);
 use vars qw(%defs);
 use vars qw(%attr);
@@ -143,9 +144,12 @@ alexa_Define($$)
     CommandAttr(undef, "$name devStateIcon stopped:control_home\@red:start stopping:control_on_off\@orange running.*:control_on_off\@green:stop")
   }
 
+  $hash->{CoProcess} = {  name => 'alexaFHEM',
+                         cmdFn => 'alexa_getCMD',
+                       };
 
   if( $init_done ) {
-    alexa_startAlexaFHEM($hash);
+    CoProcess::start($hash);
   } else {
     $hash->{STATE} = 'active';
   }
@@ -161,7 +165,7 @@ alexa_Notify($$)
   return if($dev->{NAME} ne "global");
   return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
 
-  alexa_startAlexaFHEM($hash);
+  CoProcess::start($hash);
 
   return undef;
 }
@@ -174,7 +178,9 @@ alexa_Undefine($$)
   if( $hash->{PID} ) {
     $hash->{undefine} = 1;
     $hash->{undefine} = $hash->{CL} if( $hash->{CL} );
-    alexa_stopAlexaFHEM($hash);
+
+    $hash->{reason} = 'delete';
+    CoProcess::stop($hash);
 
     return "$name will be deleted after alexa-fhem has stopped or after 5 seconds. whatever comes first.";
   }
@@ -190,7 +196,10 @@ alexa_DelayedShutdownFn($)
 
   if( $hash->{PID} ) {
     $hash->{shutdown} = 1;
-    alexa_stopAlexaFHEM($hash);
+    $hash->{shutdown} = $hash->{CL} if( $hash->{CL} );
+
+    $hash->{reason} = 'shutdown';
+    CoProcess::stop($hash);
 
     return 1;
   }
@@ -202,7 +211,7 @@ alexa_Shutdown($)
 {
   my ($hash) = @_;
 
-  alexa_stoppedAlexaFHEM($hash);
+  CoProcess::terminate($hash);
 
   delete $modules{$hash->{TYPE}}{defptr};
 
@@ -216,9 +225,6 @@ alexa_detailFn($$$$)
   my $hash = $defs{$d};
   my $name = $hash->{NAME};
 
-  #return "<div id=\"$d\" align=\"center\" class=\"FileLog col2\">".
-  #              "$defs{$d}{STATE}</div>" if($FW_ss && $pageHash);
-
   my $ret;
 
   my $logfile = AttrVal($name, 'alexaFHEM-log', 'FHEM' );
@@ -226,29 +232,6 @@ alexa_detailFn($$$$)
     my $name = 'alexaFHEMlog';
     $ret .= "<a href=\"$FW_ME?detail=$name\">". AttrVal($name, "alias", "Logfile") ."</a><br>";
   }
-
-  return $ret;
-
-
-  my $row = 0;
-  $ret = sprintf("<table class=\"FileLog %swide\">", $pageHash ? "" : "block ");
-  foreach my $f (FW_fileList($logfile)) {
-    my $class = (!$pageHash ? (($row++&1)?"odd":"even") : "");
-    $ret .= "<tr class=\"$class\">";
-    $ret .= "<td><div class=\"dname\">$f</div></td>";
-    my $idx = 0;
-    foreach my $ln (split(",", AttrVal($d, "logtype", "text"))) {
-      if($FW_ss && $idx++) {
-        $ret .= "</tr><tr class=\"".(($row++&1)?"odd":"even")."\"><td>";
-      }
-      my ($lt, $name) = split(":", $ln);
-      $name = $lt if(!$name);
-      $ret .= FW_pH("$FW_ME/FileLog_logWrapper&dev=$d&type=$lt&file=$f",
-                    "<div class=\"dval\">$name</div>", 1, "dval", 1);
-    }
-    $ret .= "</tr>";
-  }
-  $ret .= "</table>";
 
   return $ret;
 }
@@ -259,49 +242,8 @@ alexa_Read($)
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
-  my $buf;
-  my $ret = sysread($hash->{FH}, $buf, 65536 );
-
-  if(!defined($ret) || $ret <= 0) {
-    Log3 $name, 3, "$name: read: error during sysread: $!" if(!defined($ret));
-    Log3 $name, 3, "$name: read: end of file reached while sysread" if( $ret <= 0);
-
-    my $oldstate = ReadingsVal($name, 'alexaFHEM', 'unknown');
-
-    alexa_stoppedAlexaFHEM($hash);
-
-    return undef if( $oldstate !~ m/^running/ );
-
-    my $delay = 20;
-    if( $hash->{'LAST_START'} && $hash->{'LAST_STOP'} ) {
-      my $diff = time_str2num($hash->{'LAST_STOP'}) - time_str2num($hash->{'LAST_START'});
-
-      if( $diff > 60 ) {
-        $delay = 0;
-        Log3 $name, 4, "$name: last run duration $diff sec, restarting imediately";
-      } else {
-        Log3 $name, 4, "$name: last run duration was only $diff sec, restarting with delay";
-      }
-    } else {
-      Log3 $name, 4, "$name: last run duration unknown, restarting with delay";
-    }
-    InternalTimer(gettimeofday()+$delay, "alexa_startAlexaFHEM", $hash, 0);
-
-    return undef;
-  }
-
-  if( $hash->{log} ) {
-    my @t = localtime(gettimeofday());
-    my $logfile = ResolveDateWildcards($hash->{logfile}, @t);
-    alexa_openLogfile($hash, $logfile) if( $hash->{currentlogfile} ne $logfile );
-   }
-
-  if( $hash->{log} ) {
-    print {$hash->{log}} "$buf";
-  } else {
-    $buf =~ s/\n$//s;
-    Log3 $name, 3, "$name: $buf";
-  }
+  my $buf = CoProcess::readFn($hash);
+  return undef if( !$buf );
 
   if( $buf =~ m/^\*\*\* ([^\s]+) (.+)/ ) {
     my $service = $1;
@@ -309,66 +251,17 @@ alexa_Read($)
 
     if( $service eq 'FHEM:' ) {
       if( $message =~ m/^connection failed(: (.*))?/ ) {
-        my $code = $2;
+        my $reason = $2;
 
         $hash->{reason} = 'failed to connect to fhem';
-        $hash->{reason} .= ": $code" if( $code );
-        alexa_stopAlexaFHEM($hash);
+        $hash->{reason} .= ": $reason" if( $reason );
+        CoProcess::stop($hash);
       }
     }
   }
 
   return undef;
 }
-
-sub
-alexa_openLogfile($;$)
-{
-  my ($hash,$logfile) = @_;
-  my $name = $hash->{NAME};
-
-  alexa_closeLogfile($hash) if( $hash->{log} );
-
-  if( !$logfile ) {
-    $logfile = AttrVal($name, 'alexaFHEM-log', 'FHEM' );
-
-    if( $logfile ne 'FHEM' ) {
-      $hash->{logfile} = $logfile;
-      my @t = localtime(gettimeofday());
-      $logfile = ResolveDateWildcards($logfile, @t);
-    }
-  }
-
-  if( $logfile ne 'FHEM' ) {
-    $hash->{currentlogfile} = $logfile;
-
-    HandleArchiving($hash);
-
-    if( open( my $fh, ">>$logfile") ) {
-      $fh->autoflush(1);
-
-      $hash->{log} = $fh;
-
-      Log3 $name, 3, "$name: using logfile: $logfile";
-
-    } else {
-      Log3 $name, 2, "$name: failed to open logile: $logfile: $!";
-    }
-  }
-  Log3 $name, 3, "$name: using FHEM logfile" if( !$hash->{log} );
-}
-sub
-alexa_closeLogfile($)
-{
-  my ($hash) = @_;
-
-  close($hash->{log}) if( $hash->{log} );
-  delete $hash->{log};
-
-  delete $hash->{logfile};
-  delete $hash->{currentlogfile};
-}
-
 
 sub
 alexa_getLocalIP()
@@ -513,7 +406,7 @@ alexa_configDefault($;$)
 }
 
 sub
-alexa_startAlexaFHEM($)
+alexa_getCMD($)
 {
   my ($hash) = @_;
   my $name = $hash->{NAME};
@@ -542,12 +435,6 @@ alexa_startAlexaFHEM($)
   return undef if( IsDisabled($name) );
   #return undef if( ReadingsVal($name, 'alexaFHEM', 'unknown') =~ m/^running/ );
 
-  if( $hash->{PID} ) {
-    $hash->{restart} = 1;
-    alexa_stopAlexaFHEM($hash);
-    return undef;
-  }
-  delete $hash->{restart};
 
   my $ssh_cmd;
   if( my $host = AttrVal($name, 'alexaFHEM-host', undef ) ) {
@@ -570,188 +457,47 @@ alexa_startAlexaFHEM($)
   chomp( $cmd );
 
   if( !$ssh_cmd && !(-X $cmd) ) {
-    readingsSingleUpdate($hash, 'alexaFHEM', "stopped; $cmd does not exist", 1 );
-    Log3 $name, 2, "$name: alexa-fhem does not exist: $cmd";
-    return undef;
+    my $msg = "alexa-fhem not installed. install with 'sudo npm install -g alexa-fhem'.";
+    $msg = "$cmd does not exist" if( $cmd );
+    return (undef, $msg);
   }
 
-  my ($child, $parent);
-  if( socketpair($child, $parent, AF_UNIX, SOCK_STREAM, PF_UNSPEC) ) {
-    $child->autoflush(1);
-    $parent->autoflush(1);
+  $cmd = "$ssh_cmd $cmd" if( $ssh_cmd );
 
-    my $pid = fhemFork();
-
-    if(!defined($pid)) {
-      close $parent;
-      close $child;
-
-      Log3 $name, 1, "$name: Cannot fork: $!";
-      return;
-    }
-
-    if( $pid ) {
-      close $parent;
-
-      $hash->{STARTS}++;
-
-      $hash->{FH} = $child;
-      $hash->{FD} = fileno($child);
-      $hash->{PID} = $pid;
-
-      $selectlist{$name} = $hash;
-
-      Log3 $name, 3, "$name: alexaFHEM starting";
-      $hash->{LAST_START} = FmtDateTime( gettimeofday() );
-      readingsSingleUpdate($hash, 'alexaFHEM', "running $cmd", 1 );
-
-      alexa_openLogfile($hash);
-
+  if( my $home = AttrVal($name, 'alexaFHEM-home', undef ) ) {
+    $home = $ENV{'PWD'} if( $home eq 'PWD' );
+    $ENV{'HOME'} = $home;
+    Log3 $name, 2, "$name: setting \$HOME to $home";
+  }
+  if( my $config = AttrVal($name, 'alexaFHEM-config', undef ) ) {
+    if( $ssh_cmd ) {
+      qx( $ssh_cmd "cat > /tmp/alexa-fhem.cfg" < $config );
+      $cmd .= " -c /tmp/alexa-fhem.cfg";
     } else {
-      close $child;
-
-      close STDIN;
-      close STDOUT;
-      close STDERR;
-
-      my $fn = $parent->fileno();
-      open(STDIN, "<&$fn") or die "can't redirect STDIN $!";
-      open(STDOUT, ">&$fn") or die "can't redirect STDOUT $!";
-      open(STDERR, ">&$fn") or die "can't redirect STDERR $!";
-
-      #select STDIN; $| = 1;
-      #select STDOUT; $| = 1;
-      #select STDERR; $| = 1;
-
-      #STDIN->autoflush(1);
-      STDOUT->autoflush(1);
-      STDERR->autoflush(1);
-
-      close $parent;
-
-      $cmd = "$ssh_cmd $cmd" if( $ssh_cmd );
-
-      if( my $home = AttrVal($name, 'alexaFHEM-home', undef ) ) {
-        $home = $ENV{'PWD'} if( $home eq 'PWD' );
-        $ENV{'HOME'} = $home;
-        Log3 $name, 2, "$name: setting \$HOME to $home";
-      }
-      if( my $config = AttrVal($name, 'alexaFHEM-config', undef ) ) {
-        if( $ssh_cmd ) {
-          qx( $ssh_cmd "cat > /tmp/alexa-fhem.cfg" < $config );
-          $cmd .= " -c /tmp/alexa-fhem.cfg";
-        } else {
-          $cmd .= " -c $config";
-        }
-      }
-      if( my $auth = AttrVal($name, 'alexaFHEM-auth', undef ) ) {
-        $auth = alexa_decrypt( $auth );
-        $cmd .= " -a $auth";
-      }
-      if( my $ssl = AttrVal('WEB', "HTTPS", undef ) ) {
-        $cmd .= " -s";
-      }
-      if( my $params = AttrVal($name, 'alexaFHEM-params', undef ) ) {
-        $cmd .= " $params";
-      }
-
-      if( AttrVal( $name, 'verbose', 3 ) == 5 ) {
-        Log3 $name, 2, "$name: starting alexa-fhem: $cmd";
-      } else {
-        my $msg = $cmd;
-        $msg =~ s/-a\s+[^:]+:[^\s]+/-a xx:xx/g;
-        Log3 $name, 2, "$name: starting alexa-fhem: $msg";
-      }
-
-      exec split( ' ', $cmd ) or Log3 $name, 1, "exec failed";
-
-      Log3 $name, 1, "set the alexaFHEM-cmd attribut to: <path>/alexa-fhem";
-
-      POSIX::_exit(0);;
+      $cmd .= " -c $config";
     }
+  }
+  if( my $auth = AttrVal($name, 'alexaFHEM-auth', undef ) ) {
+    $auth = alexa_decrypt( $auth );
+    $cmd .= " -a $auth";
+  }
+  if( my $ssl = AttrVal('WEB', "HTTPS", undef ) ) {
+    $cmd .= " -s";
+  }
+  if( my $params = AttrVal($name, 'alexaFHEM-params', undef ) ) {
+    $cmd .= " $params";
+  }
 
+  if( AttrVal( $name, 'verbose', 3 ) == 5 ) {
+    Log3 $name, 2, "$name: starting alexa-fhem: $cmd";
   } else {
-    Log3 $name, 3, "$name: socketpair failed";
-    InternalTimer(gettimeofday()+20, "alexa_startAlexaFHEM", $hash, 0);
-  }
-}
-sub
-alexa_stopAlexaFHEM($)
-{
-  my ($hash) = @_;
-  my $name = $hash->{NAME};
-
-  #return undef if( ReadingsVal($name, 'alexaFHEM', 'unknown') =~ m/^stopped/ );
-
-  RemoveInternalTimer($hash);
-
-  return undef if( !$hash->{PID} );
-
-  #alexa_closeLogfile($hash);
-
-  if( $hash->{PID} ) {
-    kill( SIGTERM, $hash->{PID} );
-    #kill( SIGkILL, $hash->{PID} );
-    #  waitpid($hash->{PID}, 0);
-    #  delete $hash->{PID};
+    my $msg = $cmd;
+    $msg =~ s/-a\s+[^:]+:[^\s]+/-a xx:xx/g;
+    Log3 $name, 2, "$name: starting alexa-fhem: $msg";
   }
 
-  readingsSingleUpdate($hash, 'alexaFHEM', "stopping", 1 );
+  return $cmd;
 
-  InternalTimer(gettimeofday()+5, "alexa_stoppedAlexaFHEM", $hash, 0);
-}
-
-sub
-alexa_stoppedAlexaFHEM($)
-{
-  my ($hash) = @_;
-  my $name = $hash->{NAME};
-
-  RemoveInternalTimer($hash);
-
-  return undef if( !$hash->{PID} );
-  return undef if( !$hash->{FD} );
-
-  kill( SIGKILL, $hash->{PID} );
-  waitpid($hash->{PID}, 0);
-  delete $hash->{PID};
-
-  close($hash->{FH}) if($hash->{FH});
-  delete($hash->{FH});
-  delete($hash->{FD});
-  delete($selectlist{$name});
-
-  alexa_closeLogfile($hash) if( $hash->{log} );
-
-  Log3 $name, 3, "$name: alexaFHEM stopped";
-  $hash->{LAST_STOP} = FmtDateTime( gettimeofday() );
-
-  if( $hash->{reason} ) {
-    readingsSingleUpdate($hash, 'alexaFHEM', "stopped; $hash->{reason}", 1 );
-    delete $hash->{reason};
-  } else {
-    readingsSingleUpdate($hash, 'alexaFHEM', 'stopped', 1 );
-  }
-
-  if( $hash->{undefine} ) {
-    my $cl = $hash->{undefine};
-
-    delete $hash->{undefine};
-    CommandDelete(undef, $name);
-    Log3 $name, 2, "$name: alexaFHEM deleted";
-
-    if( ref($cl) eq 'HASH' && $cl->{canAsyncOutput} ) {
-      asyncOutput( $cl, "$name: alexaFHEM deleted\n" );
-    }
-
-  } elsif( $hash->{shutdown} ) {
-    delete $hash->{shutdown};
-    CancelDelayedShutdown($name);
-
-  } elsif( $hash->{restart} ) {
-    alexa_startAlexaFHEM($hash)
-
-  }
 }
 
 sub
@@ -759,7 +505,7 @@ alexa_Set($$@)
 {
   my ($hash, $name, $cmd, @args) = @_;
 
-  my $list = "add createDefaultConfig:noArg reload:noArg restart:noArg skillId start:noArg stop:noArg";
+  my $list = "add createDefaultConfig:noArg reload:noArg skillId";
 
   if( $cmd eq 'reload' ) {
     $hash->{".triggerUsed"} = 1;
@@ -813,22 +559,6 @@ alexa_Set($$@)
   } elsif( $cmd eq 'skillId' ) {
 
     return CommandAttr(undef,"$name skillId $args[0]" );
-
-  } elsif( $cmd eq 'start' ) {
-    alexa_startAlexaFHEM($hash);
-
-    return undef;
-
-  } elsif( $cmd eq 'stop' ) {
-    alexa_stopAlexaFHEM($hash);
-
-    return undef;
-
-  } elsif( $cmd eq 'restart' ) {
-    alexa_stopAlexaFHEM($hash);
-    alexa_startAlexaFHEM($hash);
-
-    return undef;
 
   } elsif( $cmd eq 'createDefaultConfig' ) {
     my $force = 0;
@@ -891,6 +621,8 @@ alexa_Set($$@)
 
     return undef;
   }
+
+  return CoProcess::setCommands($hash, $list, $cmd, @args);
 
   return "Unknown argument $cmd, choose one of $list";
 }
@@ -1363,16 +1095,18 @@ alexa_Attr($$$)
     my $hash = $defs{$name};
     if( $cmd eq "set" && $attrVal ne "0" ) {
       $attrVal = 1;
-      alexa_stopAlexaFHEM($hash) if( $init_done );
+      CoProcess::stop($hash);
 
     } else {
       $attr{$name}{$attrName} = 0;
-      alexa_startAlexaFHEM($hash) if( $init_done );
+      CoProcess::start($hash);
 
     }
 
   } elsif( $attrName eq 'disabledForIntervals' ) {
-    alexa_startAlexaFHEM($hash) if( $init_done );
+    $attr{$name}{$attrName} = $attrVal;
+
+    CoProcess::start($hash);
 
   } elsif( $attrName eq 'skillId' ) {
     if( $cmd eq "set" && $attrVal ) {
@@ -1399,13 +1133,14 @@ alexa_Attr($$$)
       #if( my $room = AttrVal($name, "room", undef ) ) {
       #  CommandAttr( undef,"alexaFHEMlog room $room" );
       #}
+      $hash->{logfile} = $attrVal;
     } else {
       fhem( "delete alexaFHEMlog" );
     }
 
     $attr{$name}{$attrName} = $attrVal;
 
-    alexa_startAlexaFHEM($hash) if( $init_done );
+    CoProcess::start($hash);
 
   } elsif( $attrName eq 'alexaFHEM-auth' ) {
     if( $cmd eq "set" && $attrVal ) {
@@ -1413,22 +1148,27 @@ alexa_Attr($$$)
     }
     $attr{$name}{$attrName} = $attrVal;
 
-    alexa_startAlexaFHEM($hash) if( $init_done );
+    CoProcess::start($hash);
 
     if( $cmd eq "set" && $orig ne $attrVal ) {
       $attr{$name}{$attrName} = $attrVal;
       return "stored obfuscated auth data";
     }
 
+  } elsif( $attrName eq 'alexaFHEM-params' ) {
+    $attr{$name}{$attrName} = $attrVal;
+
+    CoProcess::start($hash);
+
   } elsif( $attrName eq 'alexaFHEM-host' ) {
     $attr{$name}{$attrName} = $attrVal;
 
-    alexa_startAlexaFHEM($hash) if( $init_done );
+    CoProcess::start($hash);
 
   } elsif( $attrName eq 'alexaFHEM-sshUser' ) {
     $attr{$name}{$attrName} = $attrVal;
 
-    alexa_startAlexaFHEM($hash) if( $init_done );
+    CoProcess::start($hash);
 
   }
 
@@ -1516,9 +1256,9 @@ alexa_Attr($$$)
     <li>alexaFHEM-config<br>
       The config file to use for alexa-fhem.</li>
     <li>alexaFHEM-log<br>
-      The log file to use for alexa-fhem. For possible %-wildcards see <a href="#telnet">FileLog</a>.</li>.
+      The log file to use for alexa-fhem. For possible %-wildcards see <a href="#FileLog">FileLog</a>.</li>.
     <li>nrarchive<br>
-      see <a href="#telnet">FileLog</a></li>.
+      see <a href="#FileLog">FileLog</a></li>.
     <li>alexaFHEM-params<br>
       Additional alexa-fhem cmdline params.</li>
 
