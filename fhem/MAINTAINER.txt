@@ -152,8 +152,8 @@ FHEM/24_TPLinkHS110.pm       VolkerKettenbach     Sonstige Systeme
 FHEM/26_tahoma.pm            mike3436             Sonstige Systeme
 FHEM/30_DUOFERN              telekatz             Sonstige Systeme
 FHEM/30_ENECSYSGW.pm         akw                  Sonstige Systeme
-FHEM/30_HUEBridge.pm         justme1968           Beleuchtung
-FHEM/30_LIGHTIFY.pm          justme1968           Beleuchtung
+FHEM/30_HUEBridge.pm         justme1968           Zigbee
+FHEM/30_LIGHTIFY.pm          justme1968           Zigbee
 FHEM/30_MilightBridge.pm     mattwire             Beleuchtung
 FHEM/30_pilight_contact.pm   risiko               Sonstige Systeme
 FHEM/30_pilight_dimmer.pm    risiko               Sonstige Systeme
@@ -161,9 +161,10 @@ FHEM/30_pilight_raw.pm       risiko               Sonstige Systeme
 FHEM/30_pilight_smoke.pm     risiko               Sonstige Systeme
 FHEM/30_pilight_switch.pm    risiko               Sonstige Systeme
 FHEM/30_pilight_temp.pm      risiko               Sonstige Systeme
+FHEM/30_tradfri.pm           justme1968           Zigbee
 FHEM/31_Aurora.pm            justme1968           Beleuchtung
 FHEM/31_ENECSYSINV.pm        akw                  Sonstige Systeme
-FHEM/31_HUEDevice.pm         justme1968           Beleuchtung
+FHEM/31_HUEDevice.pm         justme1968           Zigbee
 FHEM/31_LightScene.pm        justme1968           Automatisierung
 FHEM/31_MilightDevice.pm     mattwire             Beleuchtung
 FHEM/31_Nello.pm             neumann              Sonstige Systeme
@@ -521,6 +522,8 @@ FHEM/Blocking.pm             rudolfkoenig         Automatisierung
 FHEM/Color.pm                justme1968           Sonstiges
 FHEM/DarkSkyAPI.pm           CoolTux              Unterstuetzende Dienste/Wettermodule
 FHEM/DevIo.pm                rudolfkoenig         Sonstiges
+FHEM/CoProcess.pm            justme1968           Sonstiges
+FHEM/Color.pm                justme1968           Sonstiges
 FHEM/FritzBoxUtils.pm        rudolfkoenig         FRITZ!Box
 FHEM/GPUtils.pm              ntruchsess           FHEM Development
 FHEM/HMCCUConf.pm            zap                  HomeMatic
