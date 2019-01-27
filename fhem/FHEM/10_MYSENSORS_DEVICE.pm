@@ -776,7 +776,7 @@ sub onInternalMessage($$) {
             delete $hash->{getCommentReadings};
           }
         }
-        Log3 $name, 3, "leaving Sketch Name update";
+        Log3 $name, 5, "leaving Sketch Name update";
         last;
     };
     $type == I_SKETCH_VERSION and do {
