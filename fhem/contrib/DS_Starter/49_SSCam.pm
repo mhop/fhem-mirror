@@ -10488,7 +10488,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <code> set &lt;name&gt; on 0  </code><br>
   # startet eine Daueraufnahme die mit "off" gestoppt werden muss. <br>
   <code> set &lt;name&gt; on recEmailTxt:"subject => Neue Aufnahme $CAM, body => Die aktuelle Aufnahme von $CAM ist angehängt."  </code><br>
-  # startet eine Aufnahme und vesendet sie nach Beendigung per Email. <br>
+  # startet eine Aufnahme und versendet sie nach Beendigung per Email. <br>
 
   </ul>
   <br><br>
