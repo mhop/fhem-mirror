@@ -26,6 +26,7 @@
 #  GNU General Public License for more details.
 #
 #  CHANGELOG:
+#		1.405:		Fixed an issue with external driving (when already at position)
 #		1.404:		Hint in Commandref regarding position->pct
 # 		1.403: 		Loglevel from 3 to 5 for few messages
 #					Rollo should only drive 10 steps in "force" mode for up/down
@@ -541,7 +542,12 @@ sub ROLLO_Start($) {
     if ( $time > 0 ) {
         ROLLO_Drive( $hash, $time, $direction, $command );
     }
+	# Wenn drivetype "extern" müssen wir drive_type wieder zurücksetzen - KernSani 27.01.2019
+	elsif ( ReadingsVal( $name, "drive-type", "undef" ) eq "extern" ) {
+        readingsSingleUpdate( $hash, "drive-type", "na", 1 );
+    }
 
+	
     return undef;
 }
 
@@ -612,15 +618,14 @@ sub ROLLO_Stop($) {
         my %rhash = reverse %pcts;
 
         if ( defined( $rhash{$newpos} ) ) {
-
-            #ich kenne keinen Text für die pct, also als pct-nn anzeigen
             $state = $rhash{$newpos};
         }
         else {
+			#ich kenne keinen Text für die pct, also als pct-nn anzeigen
             $newpos = 100 - $newpos if ( AttrVal( $name, "rl_type", "normal" ) eq "HomeKit" );
             $state = "pct-$newpos";
         }
-
+		Log3 $name, 4, "ROLLO ($name) updating state to $state";
         readingsSingleUpdate( $hash, "state", $state, 1 );
     }
 
