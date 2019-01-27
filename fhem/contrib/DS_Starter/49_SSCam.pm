@@ -7977,6 +7977,7 @@ sub SSCam_sendEmailblocking($) {
   }
   
   use strict "refs";
+  %{$paref} = ();        # erstellten Versandhash löschen
   
   # Daten müssen als Einzeiler zurückgegeben werden
   $ret = encode_base64($ret,"");
