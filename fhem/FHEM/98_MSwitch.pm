@@ -167,6 +167,7 @@ my %sets = (
     "fakeevent"       => "noArg",
     "exec_cmd_1"      => "noArg",
     "exec_cmd_2"      => "noArg",
+	"del_repeats"      => "noArg",
     "wait"            => "noArg",
     "VUpdate"         => "noArg",
     "confchange"      => "noArg",
@@ -1034,11 +1035,11 @@ sub MSwitch_Set($@) {
 
         if ( $devicemode eq "Notify" ) {
             return
-"Unknown argument $cmd, choose one of active:noArg inactive:noArg del_delays:noArg backup_MSwitch:all_devices fakeevent exec_cmd_1 exec_cmd_2 wait reload_timer:noArg change_renamed reset_cmd_count:1,2 $setList $special";
+"Unknown argument $cmd, choose one of active:noArg inactive:noArg del_delays:noArg backup_MSwitch:all_devices fakeevent exec_cmd_1 exec_cmd_2 wait reload_timer:noArg del_repeats:noArg change_renamed reset_cmd_count:1,2 $setList $special";
         }
         elsif ( $devicemode eq "Toggle" ) {
             return
-"Unknown argument $cmd, choose one of active:noArg inactive:noArg on off del_delays:noArg backup_MSwitch:all_devices fakeevent wait reload_timer:noArg change_renamed $setList $special";
+"Unknown argument $cmd, choose one of active:noArg inactive:noArg on off del_delays:noArg backup_MSwitch:all_devices fakeevent wait reload_timer:noArg del_repeats:noArg change_renamed $setList $special";
         }
 
         elsif ( $devicemode eq "Dummy" ) {
@@ -1049,7 +1050,7 @@ sub MSwitch_Set($@) {
         else {
             #full
             return
-"Unknown argument $cmd, choose one of active:noArg inactive:noArg on off  del_delays:noArg backup_MSwitch:all_devices fakeevent exec_cmd_1 exec_cmd_2 wait reload_timer:noArg change_renamed reset_cmd_count:1,2 $setList $special";
+"Unknown argument $cmd, choose one of active:noArg inactive:noArg on off  del_delays:noArg backup_MSwitch:all_devices fakeevent exec_cmd_1 exec_cmd_2 wait del_repeats:noArg reload_timer:noArg change_renamed reset_cmd_count:1,2 $setList $special";
 
         }
     }
@@ -1060,6 +1061,29 @@ sub MSwitch_Set($@) {
         MSwitch_Createnumber1($hash);
     }
 
+	
+	
+	##############################
+
+    if ( $cmd eq 'del_repeats' ) {
+
+       
+		 my $inhalt = $hash->{helper}{repeats};
+        foreach my $a ( sort keys %{$inhalt} ) {
+		
+		#Log3( "test", 0, "key ".$a  );
+		
+		my $key = $hash->{helper}{repeats}{$a};
+		#Log3( "test", 0, "key ".$key  );
+		RemoveInternalTimer($key);
+		
+		}
+		
+		delete( $hash->{helper}{repeats} );
+        return;
+    }
+	
+	
 ##############################
 
     if ( $cmd eq 'inactive' ) {
@@ -1146,9 +1170,19 @@ sub MSwitch_Set($@) {
             $execids = $args[1];
             $args[0] = 'ID';
         }
-if ( $args[0] ne 'ID' || $args[0] ne '' ){
+		
+	if ($args[0] eq "") 
+{
+MSwitch_Exec_Notif( $hash, 'on', 'nocheck', '', 0 );
+        return;
 
-if ( $args[1] !~ m/.\d/ )
+
+}	
+		
+if ( $args[0] ne 'ID' || $args[0] ne '' )
+{
+
+if ( $args[1] !~ m/\d/ )
 		
 		{
 		Log3( $name, 1, "error at id call $args[1]: format must be exec_cmd_1 <ID x,z,y>" );
@@ -1168,10 +1202,22 @@ if ( $args[1] !~ m/.\d/ )
             $execids = $args[1];
             $args[0] = 'ID';
         }
+		
+		
+			if ($args[0] eq "") 
+{
+MSwitch_Exec_Notif( $hash, 'on', 'nocheck', '', 0 );
+        return;
+
+
+}	
+
+
+
 		if ( $args[0] ne '' || $args[0] ne "ID" ){
 		
 		
-		if ( $args[1] !~ m/.\d/ )
+		if ( $args[1] !~ m/\d/ )
 		
 		{
 		Log3( $name, 1, "error at id call $args[1]: format must be exec_cmd_2 <ID x,z,y>" );
