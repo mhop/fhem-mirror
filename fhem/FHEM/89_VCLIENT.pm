@@ -50,6 +50,8 @@
 #
 # Version History
 #
+# 2019-01-28 version 0.2.11i: update starts now if device initiated (for example, via FHEM restart) 
+# 2018-12-26 version 0.2.11h: warnings removed
 # 2018-12-24 version 0.2.11g: minor bugfix, more comments with verbose 5
 # 2018-12-08 version 0.2.11f: Integritaetscheck der Rueckgabewerte, Bugs entfernt, Rueckgabe Datum moeglich, offizielles FHEM-Modul
 # 2018-09-14 version 0.2.10: Fehler, wenn vcontrold nicht erreichbar, behoben
@@ -71,7 +73,7 @@ use Scalar::Util qw(looks_like_number);
 use Blocking;
 use Data::Dumper;
 
-my $VCLIENT_version = "0.2.11g";
+my $VCLIENT_version = "0.2.11i";
 my $internal_update_interval  = 0.1; #internal update interval for Write (time between two different write_to_Viessmann commands)
 my $daily_commands_last_day_with_execution = strftime('%d', localtime)-1; #last day when daily commands (commands with type 'daily' ) were executed; set to today
 
@@ -229,11 +231,11 @@ sub VCLIENT_Define($$)
 	if (-f $filename) {
 		$hash->{FILE} = $filename;  	
 	} else {
-		return "VCLIENT: Cannot find file $filename, device $name not defined"
+		return "VCLIENT: Cannot find file $filename, device $name not defined";
 	} 
 
 	if (!looks_like_number($interval)) {
-		return "VCLIENT: Interval must be a number, ".$interval." does not seem to be (zero would be possible!)"
+		return "VCLIENT: Interval must be a number, ".$interval." does not seem to be (zero would be possible!)";
 	}	
 	$hash->{INTERVAL} = $interval;
 	
@@ -310,6 +312,10 @@ sub VCLIENT_Initialize($)
 	  my $hash = $modules{VCLIENT}{defprt}{$d};
 	  $hash->{VERSION} = $VCLIENT_version;
   }
+  
+  if ($hash->{INTERVAL}) {
+  	VCLIENT_Set_New_Update_Interval($hash); 
+  }
 }
 
 
@@ -321,13 +327,13 @@ sub VCLIENT_integrity_check($)
 {
 	my $value = shift;
 	my $integrity = 1;
-	#Temperaturen muessen unter 110 Grad Celsius sein
-	if ($last_cmd =~ /(T|t)emp/) 
+	#Temperaturen muessen unter 110 Grad Celsius sein (vorher testen ob value Zahl ist - vermeidet warnings bei 'Unkown buffer')
+	if (($last_cmd =~ /(T|t)emp/) and ($value =~ /^\d+.\d*$/))
 	{
 		$integrity &&= ($value < 110);
 	}
 	#Status darf nur 0 oder 1 sein
-	if ($last_cmd =~ /(S|s)tatus/)
+	if (($last_cmd =~ /(S|s)tatus/) and ($value =~ /^\d$/))
 	{
 		$integrity &&= ($value =~ /(0|1)/);
 	}
@@ -713,7 +719,6 @@ sub VCLIENT_Set_New_Write_Interval($)
 	#set up timer for writing next signal (fixed at $internal_update_interval seconds after opening connection)
 	my $my_internal_timer = AttrVal( $name, 'internal_update_interval', $internal_update_interval);
 	InternalTimer(gettimeofday()+ $my_internal_timer, "VCLIENT_Write", $hash); 
-	#InternalTimer($my_internal_timer, "VCLIENT_Write", $hash); 
 }
 
 
