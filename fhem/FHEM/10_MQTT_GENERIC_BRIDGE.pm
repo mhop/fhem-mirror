@@ -30,7 +30,19 @@
 # 
 # CHANGE LOG
 # 
-# 12.01.2018 1.0.9
+# 19.01.2019 1.1.2
+# change     : in 'Parse' wird als erstes Element '[NEXT]' zurueckgegeben,
+#              damit ggf. weitere Geraete-Module aufgerufen werden
+#              (falls sich diese dafuer interessieren)
+#
+# 16.01.2019 1.1.1
+# improvement: per mqtt erhaltene readingswerte nicht weiterleiten, wenn 
+# fix          dadurch der selbe Wert gesendet waere (Endloskreise verhindern)
+#
+# 14.01.2019 1.1.0
+# change/fix : eval jetzt rekursiv, damit mehrere {}-Bloecke moeglich sind
+# 
+# 12.01.2019 1.0.9
 # change     : Doku angepasst, Log-Ausgaben-Format
 # fix        : stack trace in log bei subscribe mit undefinierten Variablen
 #
@@ -226,6 +238,12 @@
 ###############################################################################
 
 # TODO: globalForwardTypeExclude (default: dummy) Leer/Komma separiert?
+# TODO: Pruefung, ob mqtt2-io connected:
+# rudolfkoenig (https://forum.fhem.de/index.php/topic,95446.msg890607.html#msg890607):
+# [quote]Ich habe nur kurz mit MQTT2_GENERIC_BRIDGE getestet, aber es faellt mir auf, 
+# das MQTT_GENERIC_BRIDGE schafft subscribe abzusetzen _bevor_ die Verbindung zum MQTT Server steht. 
+# Da ich keine Lust habe die Verantwortung fuer die Zwischenspeicherung (vulgo queuen) zu uebernehmen, 
+# liefert in diesem Fall IOWrite einen Fehler zurueck: bitte pruefen.[/quote]
 
 # Ideen:
 #
@@ -278,7 +296,7 @@ use warnings;
 
 #my $DEBUG = 1;
 my $cvsid = '$Id$';
-my $VERSION = "version 1.0.9 by hexenmeister\n$cvsid";
+my $VERSION = "version 1.1.1 by hexenmeister\n$cvsid";
 
 my %sets = (
 );
@@ -462,6 +480,7 @@ sub createRegexpForTopic($);
 sub isDebug($);
 sub checkPublishDeviceReadingsUpdates($$);
 sub RefreshGlobalTableAll($);
+sub _evalValue2($$;$$);
 
 ###############################################################################
 # prueft, ob debug Attribute auf 1 gesetzt ist (Debugmode)
@@ -1193,7 +1212,13 @@ sub _evalValue2($$;$$) {
   $noEval = 0 unless defined $noEval;
   #Log3('xxx',1,"MQTT_GENERIC_BRIDGE:DEBUG:> eval2: str: $str; map: ".Dumper($map));
   my$ret = $str;
-  if($str =~ m/^{.*}$/) {
+  # TODO : umbauen $str =~ m/^(.*)({.*})(.*)$/;; $1.$2.$3 - ok
+  # TODO : Maskierte Klammern unterstuetzen? $str =~ m/^(.*)(\\{.*\\})(.*)({.*})(.*)$/;; $1.$2.$3.$4.$5 - irgendwie so
+  #if($str =~ m/^{.*}$/) {
+  if($str =~ m/^(.*)({.*})(.*)$/) {
+    my $s1=$1; $s1='' unless defined $s1;
+    my $s2=$2; $s2='' unless defined $s2;
+    my $s3=$3; $s3='' unless defined $s3;
     no strict "refs";
     local $@;
     my $base = '';
@@ -1222,11 +1247,16 @@ sub _evalValue2($$;$$) {
     }
     }
     #Log3('xxx',1,"MQTT_GENERIC_BRIDGE:DEBUG:> eval2 expr: $ret");
-    $ret = eval($ret) unless $noEval;
+    #$ret = eval($ret) unless $noEval;
+    $s2 = eval($s2) unless $noEval;
     #Log3('xxx',1,"MQTT_GENERIC_BRIDGE:DEBUG:> eval2 done: $ret");
     if ($@) {
       Log3($mod,2,"MQTT_GENERIC_BRIDGE: evalValue: user value ('".$str."'') eval error: ".$@);
+      $ret=$s1.''.$s3;
+    } else {
+      $ret = $s1.$s2.$s3;
     }
+    $ret = _evalValue2($mod, $ret, $map, $noEval) unless $noEval;
   }
   return $ret;
 }
@@ -1902,15 +1932,15 @@ sub Notify() {
 sub checkPublishDeviceReadingsUpdates($$) {
   my ($hash, $dev) = @_;
 
-  # pruefen, ob die Aenderung von der Bridge selbst getriggert wurde
-  # es ist der Readingsname drin, die Pruefung ist jedoch derzeit nicht nietig, da nur ein Reading in CHANGE drin sein kann
-  # ansonsten muesste readings in CHANGE mit dem Wert vergliechen werden und nur fuer gleiche nicht weiter senden
-  my $triggeredReading = $dev->{'.mqttGenericBridge_triggeredReading'};
-  if(defined $triggeredReading) {
-    delete $dev->{'.mqttGenericBridge_triggeredReading'};
-    #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] Notify [mqttGenericBridge_triggeredReading]=>".$triggeredReading);
-    return;
-  }
+  # # pruefen, ob die Aenderung von der Bridge selbst getriggert wurde
+  # # es ist der Readingsname drin, die Pruefung wird jedoch derzeit nicht vorgenommen, da nur ein Reading in CHANGE drin sein kann
+  # # ansonsten muesste readings in CHANGE mit dem Wert vergliechen werden und nur fuer gleiche nicht weiter senden => TODO
+  # my $triggeredReading = $dev->{'.mqttGenericBridge_triggeredReading'};
+  # if(defined $triggeredReading) {
+  #   delete $dev->{'.mqttGenericBridge_triggeredReading'};
+  #   #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] Notify [mqttGenericBridge_triggeredReading]=>".$triggeredReading);
+  #   return;
+  # }
 
   # nicht waehrend FHEM startet
   return if( !$main::init_done );
@@ -1944,7 +1974,26 @@ sub checkPublishDeviceReadingsUpdates($$) {
     my $devval = $3;
     if(defined $devreading and defined $devval) {
       # wenn ueberwachtes device and reading
+      # pruefen, ob die Aenderung von der Bridge selbst getriggert wurde   TODO TEST
+      my $triggeredReading = $dev->{'.mqttGenericBridge_triggeredReading'};
+      my $triggeredReadingVal = $dev->{'.mqttGenericBridge_triggeredReading_val'};
+      #if(defined($triggeredReading)) {
+        #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] Notify [mqttGenericBridge_triggeredReading]=>".$triggeredReading."=".$triggeredReadingVal." changed reading: ".$devreading);
+      #}
+      # Auch Wert vergleichen
+      if(!defined($triggeredReading) or ($devreading ne $triggeredReading) or ($devval ne $triggeredReadingVal)) {
+        if(defined($triggeredReading) and ($devreading eq $triggeredReading)) {
+          # Wenn Name passt, aber der Wert veraendert wurde, dann einmal senden und den gesendeten Wert merken
+          # TODO: Besser in einer Tabelle (name=value) fuehren (fuer jedes einzelne Reading) und bei match enizeln entfernen 
+          #       => damit verhindert, dass wert verloren geht, wenn eine endere REading dazwischenkommt
+          $dev->{'.mqttGenericBridge_triggeredReading_val'} = $devval;
+        }
       publishDeviceUpdate($hash, $dev, 'R', $devreading, $devval);
+      } else {
+        delete $dev->{'.mqttGenericBridge_triggeredReading'};
+        delete $dev->{'.mqttGenericBridge_triggeredReading_val'};
+        #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] Notify [mqttGenericBridge_triggeredReading]=>".$triggeredReading." (ignore/delete)");
+      }
     }
   }
 }
@@ -2466,10 +2515,12 @@ sub doSetUpdate($$$$$) {
     #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] mqttGenericBridge_triggeredReading=".Dumper($dhash->{'.mqttGenericBridge_triggeredReading'}));
     if(($reading eq '') or ($reading eq 'state')) {
       $dhash->{'.mqttGenericBridge_triggeredReading'}="state" unless $doForward;
+      $dhash->{'.mqttGenericBridge_triggeredReading_val'}=$message unless $doForward;
       #$err = DoSet($device,$message);
       $err = DoSet($device,@args);
     } else {
       $dhash->{'.mqttGenericBridge_triggeredReading'}=$reading unless $doForward;
+      $dhash->{'.mqttGenericBridge_triggeredReading_val'}=$message unless $doForward;
       #$err = DoSet($device,$reading,$message);
       $err = DoSet($device,$reading,@args);
     }
@@ -2486,6 +2537,7 @@ sub doSetUpdate($$$$$) {
     readingsBeginUpdate($dhash);
     if ($mode eq 'R') {
       $dhash->{'.mqttGenericBridge_triggeredReading'}=$reading unless $doForward;
+      $dhash->{'.mqttGenericBridge_triggeredReading_val'}=$message unless $doForward;
     }
     readingsBulkUpdate($dhash,$reading,$message);
     readingsEndUpdate($dhash,1);
@@ -2527,7 +2579,10 @@ sub Parse($$) {
 
     Log3($hash->{NAME},5,"MQTT_GENERIC_BRIDGE: [$hash->{NAME}] Parse ($iiodt : '$ioname'): Msg: $topic => $value");
 
-    return onmessage($hash, $topic, $value);
+    #return onmessage($hash, $topic, $value);
+    my @ret = onmessage($hash, $topic, $value);
+    unshift(@ret, "[NEXT]"); # damit weitere Geraetemodule ggf. aufgerufen werden
+    return @ret;
   }
 }
 
