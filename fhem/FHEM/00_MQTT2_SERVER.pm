@@ -419,6 +419,7 @@ MQTT2_SERVER_doPublish($$$$;$)
 
   my $serverName = $server->{NAME};
   my $cid = $src->{cid};
+  $tp =~ s/:/_/g; # 96608
   if(defined($cid) ||                    # "real" MQTT client
      AttrVal($serverName, "rePublish", undef)) {
     $cid = $src->{NAME} if(!defined($cid));

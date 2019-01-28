@@ -342,6 +342,7 @@ MQTT2_CLIENT_Read($@)
       $val = "" if(!defined($val));
       my $ac = AttrVal($name, "autocreate", undef) ? "autocreate:":"";
       my $cid = $hash->{clientId};
+      $tp =~ s/:/_/g; # 96608
       Dispatch($hash, "$ac$cid:$tp:$val", undef, !$ac);
 
       my $re = AttrVal($name, "rawEvents", undef);
