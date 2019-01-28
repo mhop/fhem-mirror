@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - new:     98_inotify: initial release
   - new:     30_tradfri: initial release
   - new:     42_npmjs: Module to update Node.js modules via NPM package manager
   - feature: 98_Hyperion: add set active/inactive

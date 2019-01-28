@@ -468,6 +468,7 @@ FHEM/98_HourCounter.pm       john                 MAX
 FHEM/98_HTTPMOD.pm           stefanstrobel        Sonstiges
 FHEM/98_Hyperion.pm          DeeSPe               Beleuchtung
 FHEM/98_IF.pm                damian-s             Automatisierung
+FHEM/98_inotify.pm           marvin78             Automatisierung
 FHEM/98_JsonList2.pm         rudolfkoenig         Automatisierung
 FHEM/98_logProxy.pm          justme1968           Frontends/SVG Plots logProxy
 FHEM/98_mark.pm              betateilchen         Sonstiges
