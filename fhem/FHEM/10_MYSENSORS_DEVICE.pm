@@ -415,6 +415,7 @@ sub onStreamMessage($$) {
           if (defined $hash->{OTA_Chan76_IODev}) {
             sendMessage($hash->{OTA_Chan76_IODev}, radioId => $hash->{radioId}, childId => 255, ack => 0, cmd => C_STREAM, subType => ST_FIRMWARE_RESPONSE, payload => $payload);
           } else {
+            $hash->{nowSleeping} = 0 if $hash->{nowSleeping};
             sendClientMessage($hash, childId => 255, cmd => C_STREAM, ack => 0, subType => ST_FIRMWARE_RESPONSE, payload => $payload);
           }
           readingsSingleUpdate($hash, "state", "updating", 1) unless ($hash->{STATE} eq "updating");
@@ -687,6 +688,7 @@ sub onRequestMessage($$) {
     my ($hash,$msg) = @_;
     eval {
       my ($readingname,$val) = rawToMappedReading($hash, $msg->{subType}, $msg->{childId}, $msg->{payload});
+      $hash->{nowSleeping} = 0 if $hash->{nowSleeping};
       sendClientMessage($hash,
         childId => $msg->{childId},
         cmd => C_SET,
@@ -716,6 +718,7 @@ sub onInternalMessage($$) {
         if ($msg->{ack}) {
           Log3 ($name, 4, "MYSENSORS_DEVICE $name: response to time-request acknowledged");
         } else {
+          $hash->{nowSleeping} = 0 if $hash->{nowSleeping};
           sendClientMessage($hash,cmd => C_INTERNAL, childId => 255, subType => I_TIME, payload => time);
           Log3 ($name, 4, "MYSENSORS_DEVICE $name: update of time requested");
         }
@@ -742,6 +745,7 @@ sub onInternalMessage($$) {
           Log3 ($name, 4, "MYSENSORS_DEVICE $name: response to config-request acknowledged");
         } else {
           readingsSingleUpdate($hash, "parentId", $msg->{payload}, 1);
+          $hash->{nowSleeping} = 0 if $hash->{nowSleeping};
           sendClientMessage($hash,cmd => C_INTERNAL, ack => 0, childId => 255, subType => I_CONFIG, payload => AttrVal($name,"config","M"));
           Log3 ($name, 4, "MYSENSORS_DEVICE $name: respond to config-request, node parentId = " . $msg->{payload});
         }
@@ -925,7 +929,7 @@ sub sendClientMessage($%) {
       Log3 ($name,5,"$name is not sleeping, sending message!");
       $hash->{retainedMessages}=scalar(@$messages) if (defined $hash->{retainedMessages});
     } else {
-      Log3 ($name,5,"$name is sleeping, enqueueing message! ");
+      Log3 ($name,5,"$name is sleeping, enqueing message! ");
       #write to queue if node is asleep
       unless (defined $hash->{retainedMessages}) {
         $messages = {messages => [%msg]};
