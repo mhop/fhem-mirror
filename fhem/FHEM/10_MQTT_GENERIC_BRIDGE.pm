@@ -30,6 +30,10 @@
 # 
 # CHANGE LOG
 # 
+# 29.01.2019 1.1.3
+# bugfix     : Parse liefert [NEXT] nur, wenn onmessage wirklich ein array
+#              geliefert hat, sonst ""
+#
 # 19.01.2019 1.1.2
 # change     : in 'Parse' wird als erstes Element '[NEXT]' zurueckgegeben,
 #              damit ggf. weitere Geraete-Module aufgerufen werden
@@ -296,7 +300,7 @@ use warnings;
 
 #my $DEBUG = 1;
 my $cvsid = '$Id$';
-my $VERSION = "version 1.1.1 by hexenmeister\n$cvsid";
+my $VERSION = "version 1.1.3 by hexenmeister\n$cvsid";
 
 my %sets = (
 );
@@ -2580,9 +2584,18 @@ sub Parse($$) {
     Log3($hash->{NAME},5,"MQTT_GENERIC_BRIDGE: [$hash->{NAME}] Parse ($iiodt : '$ioname'): Msg: $topic => $value");
 
     #return onmessage($hash, $topic, $value);
-    my @ret = onmessage($hash, $topic, $value);
+    # my @ret = onmessage($hash, $topic, $value);
+    # unshift(@ret, "[NEXT]"); # damit weitere Geraetemodule ggf. aufgerufen werden
+    # return @ret;
+    my $fret = onmessage($hash, $topic, $value);
+    return "" unless defined $fret;
+    if( ref($fret) eq 'ARRAY' ) {
+      my @ret=@{$fret};
     unshift(@ret, "[NEXT]"); # damit weitere Geraetemodule ggf. aufgerufen werden
     return @ret;
+  }
+    Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE: [$hash->{NAME}] Parse ($iiodt : '$ioname'): internal error:  onmessage returned an unexpected value: ".$fret);
+    return "";
   }
 }
 
@@ -2670,7 +2683,7 @@ sub onmessage($$$) {
           #updateSubTime($device,$reading);
         #}
   }
-  return @updatedList if($updated);
+  return \@updatedList if($updated);
   return undef;
 }
 1;
