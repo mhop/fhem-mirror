@@ -817,7 +817,7 @@ FB_CALLMONITOR_reverseSearch($$)
                     else
                     {
                         #Debug($result);
-                        if($result =~ m,<h1 [^>]*itemprop="name"[^>]*>([^<]+)</h1>,)
+                        if($result =~ m,<li\s+[^>]*class="search-result-list-item"\s+[^>]*data-name="([^"]+)",s or $result =~ m,<h\d [^>]*itemprop="name"[^>]*>([^<]+)</h\d>,)
                         {
                             $invert_match = $1;
                             $invert_match = FB_CALLMONITOR_html2txt($invert_match);
