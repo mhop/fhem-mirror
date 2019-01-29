@@ -14,12 +14,12 @@ sub npmjs_Initialize($) {
 
     my ($hash) = @_;
 
-    $hash->{SetFn}    = "FHEM::npmjs::Set";
-    $hash->{GetFn}    = "FHEM::npmjs::Get";
-    $hash->{DefFn}    = "FHEM::npmjs::Define";
-    $hash->{NotifyFn} = "FHEM::npmjs::Notify";
-    $hash->{UndefFn}  = "FHEM::npmjs::Undef";
-    $hash->{AttrFn}   = "FHEM::npmjs::Attr";
+    $hash->{SetFn}    = "npmjs::Set";
+    $hash->{GetFn}    = "npmjs::Get";
+    $hash->{DefFn}    = "npmjs::Define";
+    $hash->{NotifyFn} = "npmjs::Notify";
+    $hash->{UndefFn}  = "npmjs::Undef";
+    $hash->{AttrFn}   = "npmjs::Attr";
     $hash->{AttrList} =
         "disable:1,0 "
       . "disabledForIntervals "
@@ -34,7 +34,7 @@ sub npmjs_Initialize($) {
 }
 
 # define package
-package FHEM::npmjs;
+package npmjs;
 
 use strict;
 use warnings;
@@ -323,7 +323,7 @@ sub ProcessUpdateTimer($) {
     RemoveInternalTimer($hash);
     InternalTimer(
         gettimeofday() + 14400,
-        "FHEM::npmjs::ProcessUpdateTimer",
+        "npmjs::ProcessUpdateTimer",
         $hash, 0
     );
     Log3 $name, 4, "npmjs ($name) - stateRequestTimer: Call Request Timer";
@@ -399,7 +399,7 @@ sub AsynchronousExecuteNpmCommand($) {
     $hash->{".fhem"}{subprocess} = $subprocess;
 
     InternalTimer( gettimeofday() + POLLINTERVAL,
-        "FHEM::npmjs::PollChild", $hash, 0 );
+        "npmjs::PollChild", $hash, 0 );
     Log3 $hash, 4, "npmjs ($name) - control passed back to main loop.";
 }
 
@@ -415,7 +415,7 @@ sub PollChild($) {
         Log3 $name, 5,
           "npmjs ($name) - still waiting (" . $subprocess->{lasterror} . ").";
         InternalTimer( gettimeofday() + POLLINTERVAL,
-            "FHEM::npmjs::PollChild", $hash, 0 );
+            "npmjs::PollChild", $hash, 0 );
         return;
     }
     else {
