@@ -47,6 +47,7 @@ use Encode;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.7.0"  => "27.01.2019  send recording by email ",
   "8.6.2"  => "25.01.2019  fix version numbering ",
   "8.6.1"  => "21.01.2019  time format in readings and galleries depends from global language attribute, minor bug fixes ",
   "8.6.0"  => "20.01.2019  new attribute snapReadingRotate ",
@@ -121,6 +122,8 @@ our %SSCam_vNotesIntern = (
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
+  "8.7.0"  => "27.01.2019 SMTP Email delivery of recordings implemented. You can send a recording after it was created subsequentely ".
+                          "with the integrated Email client. You have to store SMTP credentials with \"smtpcredentials\" before. ",
   "8.6.2"  => "25.01.2019 fix version numbering ",
   "8.6.1"  => "21.01.2019 new attribute \"snapReadingRotate\" to activate versioning of snap data, ".
               "time format in readings and galleries depends from global language attribute ",
@@ -130,7 +133,7 @@ our %SSCam_vNotesExtern = (
               "&lt;Mitteilung-Text&gt;\"]\". Now you are able to trigger several number of ".
               "snapshots by only one snap-command. The triggered snapshots can be shipped alltogether with the internal email client. ",
   "8.3.0"  => "02.01.2019 new get command \"saveRecording\"",
-  "8.2.0"  => "02.01.2019 SMTP Email delivery of snapshots implemented. You can send snapshots after it is created subsequentely ".
+  "8.2.0"  => "02.01.2019 SMTP Email delivery of snapshots implemented. You can send snapshots after it was created subsequentely ".
                           "with the integrated Email client. You have to store SMTP credentials with \"smtpcredentials\" before. ",
   "8.1.0"  => "19.12.2018 Tooltipps added to camera device control buttons.",
   "8.0.0"  => "18.12.2018 HLS is integrated using sscam_hls.js in Streaming device types \"hls\". HLS streaming is now available ".
@@ -362,6 +365,7 @@ sub SSCam_Initialize($) {
          "snapReadingRotate:0,1,2,3,4,5,6,7,8,9,10 ".
          "pollnologging:1,0 ".
          "debugactivetoken:1,0 ".
+         "recEmailTxt ".
          "rectime ".
          "recextend:1,0 ".
          "noQuotesForSID:1,0 ".
@@ -779,15 +783,30 @@ sub SSCam_Set($@) {
   
   if ($opt eq "on" && SSCam_IsModelCam($hash)) {            
 	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-      if (defined($prop)) {
-          unless ($prop =~ /^\d+$/) { return " The Value for \"$opt\" is not valid. Use only figures 0-9 without decimal places !";}
+      if (defined($prop) && $prop =~ /^\d+$/) {
           $hash->{HELPER}{RECTIME_TEMP} = $prop;
       }
+      
+      my $emtxt = AttrVal($name, "recEmailTxt", "");
+      my $at = join(" ",@a);
+      if($at =~ /recEmailTxt:/) {
+          $at =~ m/.*recEmailTxt:"(.*)".*/i;
+          $emtxt = $1;
+      }
+      
+      if($emtxt) {
+          # Recording soll nach Erstellung per Email versendet werden
+          # recEmailTxt muss sein:  subject => <Subject-Text>, body => <Body-Text>
+          if (!$hash->{SMTPCREDENTIALS}) {return "Due to \"recEmailTxt\" is set, you want to send recordings by email but SMTP credentials are not set - make sure you've set credentials with \"set $name smtpcredentials username password\"";}
+          $hash->{HELPER}{SMTPRECMSG} = $emtxt;
+      }
+      
       SSCam_camstartrec($hash);
  
   } elsif ($opt eq "off" && SSCam_IsModelCam($hash)) {
 	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-      SSCam_camstoprec($hash);
+      my $emtxt = $hash->{HELPER}{SMTPRECMSG}?delete $hash->{HELPER}{SMTPRECMSG}:"";
+      SSCam_camstoprec("$name:$emtxt");
         
   } elsif ($opt eq "snap" && SSCam_IsModelCam($hash)) {
 	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
@@ -1757,7 +1776,8 @@ sub SSCam_initonboot ($) {
      # check ob alle Recordings = "Stop" nach Reboot -> sonst stoppen
      if (ReadingsVal($hash->{NAME}, "Record", "Stop") eq "Start") {
          Log3($name, 2, "$name - Recording of $hash->{CAMNAME} seems to be still active after FHEM restart - try to stop it now");
-         SSCam_camstoprec($hash);
+         my $emtxt = "";
+         SSCam_camstoprec("$name:$emtxt");
      }
          
      # Konfiguration der Synology Surveillance Station abrufen
@@ -2058,9 +2078,10 @@ sub SSCam_camstartrec ($) {
 #                           Kamera Aufnahme stoppen
 ###############################################################################
 sub SSCam_camstoprec ($) {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
+    my ($str)         = @_;
+	my ($name,$emtxt) = split(":",$str);
+	my $hash          = $defs{$name};
+    my $camname       = $hash->{CAMNAME};
     my $errorcode;
     my $error;
     
@@ -2095,12 +2116,16 @@ sub SSCam_camstoprec ($) {
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         $hash->{OPMODE} = "Stop";
         $hash->{HELPER}{LOGINRETRIES} = 0;
-		
+		if($emtxt) {
+            $hash->{HELPER}{CANSENDREC}   = 1;                             # Versand Aufnahme soll erfolgen
+            $hash->{HELPER}{SMTPRECMSG}   = $emtxt;                        # Text für Email-Versand
+        }
+                
         SSCam_setActiveToken($hash);  
         SSCam_getapisites($hash);
 		
     } else {
-        InternalTimer(gettimeofday()+0.3, "SSCam_camstoprec", $hash, 0);
+        InternalTimer(gettimeofday()+0.3, "SSCam_camstoprec", "$name:$emtxt", 0);
     }
 }
 
@@ -2243,7 +2268,7 @@ sub SSCam_camsnap($) {
         $hash->{HELPER}{SNAPNUM}      = $num if($num);                             # Gesamtzahl der auszulösenden Schnappschüsse
         $hash->{HELPER}{SNAPLAG}      = $lag if($lag);                             # Zeitverzögerung zwischen zwei Schnappschüssen
         $hash->{HELPER}{SNAPNUMCOUNT} = $ncount if($ncount);                       # Restzahl der auszulösenden Schnappschüsse  (wird runtergezählt)
-        $hash->{HELPER}{SMTPMSG}      = $emtxt if($emtxt);                         # alternativer Text für Email-Versand
+        $hash->{HELPER}{SMTPMSG}      = $emtxt if($emtxt);                         # Text für Email-Versand
         
         SSCam_setActiveToken($hash); 
         SSCam_getapisites($hash);
@@ -2251,6 +2276,52 @@ sub SSCam_camsnap($) {
     } else {
         $tac = (defined $tac)?$tac:"";
         InternalTimer(gettimeofday()+0.3, "SSCam_camsnap", "$name:$num:$lag:$ncount:$emtxt:$tac", 0);
+    }    
+}
+
+###############################################################################
+#                     Kamera gemachte Aufnahme abrufen
+###############################################################################
+sub SSCam_getrec($) {
+    my ($hash)   = @_;
+    my $camname  = $hash->{CAMNAME};
+    my $name     = $hash->{NAME};
+    my $errorcode;
+    my $error;
+    
+    RemoveInternalTimer($hash, "SSCam_getrec");
+    return if(IsDisabled($name));
+    
+    if (ReadingsVal("$name", "state", "") =~ /^dis.*/) {
+        if (ReadingsVal("$name", "state", "") eq "disabled") {
+            $errorcode = "402";
+        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
+            $errorcode = "502";
+        }
+        
+        # Fehlertext zum Errorcode ermitteln
+        $error = SSCam_experror($hash,$errorcode);
+
+        # Setreading 
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash,"Errorcode",$errorcode);
+        readingsBulkUpdate($hash,"Error",$error);
+        readingsEndUpdate($hash, 1);
+    
+        Log3($name, 2, "$name - ERROR - Save Recording of Camera $camname in local file can't be executed - $error");
+        
+        return;
+    }
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {              
+        $hash->{OPMODE} = "GetRec";
+        $hash->{HELPER}{LOGINRETRIES} = 0;
+
+        SSCam_setActiveToken($hash); 
+        SSCam_getapisites($hash);
+		
+    } else {
+        InternalTimer(gettimeofday()+0.3, "SSCam_getrec", $hash, 0);
     }    
 }
 
@@ -2288,8 +2359,7 @@ sub SSCam_getsaverec($) {
         return;
     }
     
-    if ($hash->{HELPER}{ACTIVE} eq "off") {
-        # einen Schnappschuß aufnehmen              
+    if ($hash->{HELPER}{ACTIVE} eq "off") {              
         $hash->{OPMODE} = "SaveRec";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 
@@ -4271,13 +4341,13 @@ sub SSCam_camop ($) {
       readingsSingleUpdate($hash,"state", "snap", 1); 
       #readingsSingleUpdate($hash, "LastSnapId", "", 0);
    
-   } elsif ($OpMode eq "SaveRec") {
+   } elsif ($OpMode eq "SaveRec" || $OpMode eq "GetRec") {
       # eine Aufnahme soll in lokalem File (.mp4) gespeichert werden
       my $recid = ReadingsVal("$name", "CamLastRecId", 0);
       if($recid) {
           $url = "$proto://$serveraddr:$serverport/webapi/$apirecpath?api=\"$apirec\"&id=$recid&mountId=0&version=\"$apirecmaxver\"&method=\"Download\"&_sid=\"$sid\"";
       } else {
-          Log3($name, 2, "$name - WARNING - Can't save recording in local file due to no recording available.");
+          Log3($name, 2, "$name - WARNING - Can't fetch recording due to no recording available.");
           SSCam_delActiveToken($hash);
           return;      
       }
@@ -4670,7 +4740,7 @@ sub SSCam_camop_parse ($) {
    } elsif ($myjson ne "") {    
         # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
         # Evaluiere ob Daten im JSON-Format empfangen wurden 
-        if($OpMode !~ /SaveRec/) {        # "SaveRec" liefert MP4-Daten und kein JSON   
+        if($OpMode !~ /SaveRec|GetRec/) {                                # "SaveRec/GetRec" liefern MP4-Daten und kein JSON   
             ($hash,$success,$myjson) = SSCam_evaljson($hash,$myjson);        
             unless ($success) {
                 Log3($name, 4, "$name - Data returned: ".$myjson);
@@ -4709,7 +4779,7 @@ sub SSCam_camop_parse ($) {
                         # Aufnahme läuft schon und wird verlängert
                         Log3($name, 3, "$name - running recording renewed to $rectime s");
                     } else {
-                        Log3($name, 3, "$name - Camera $camname Recording with Recordtime $rectime s started");
+                        Log3($name, 3, "$name - Camera $camname recording with recording time $rectime s started");
                     }
                 }
                        
@@ -4722,8 +4792,9 @@ sub SSCam_camop_parse ($) {
                 
                 if ($rectime != 0) {
                     # Stop der Aufnahme nach Ablauf $rectime, wenn rectime = 0 -> endlose Aufnahme
+                    my $emtxt = $hash->{HELPER}{SMTPRECMSG}?$hash->{HELPER}{SMTPRECMSG}:"";
                     RemoveInternalTimer($hash, "SSCam_camstoprec");
-                    InternalTimer(gettimeofday()+$rectime, "SSCam_camstoprec", $hash);
+                    InternalTimer(gettimeofday()+$rectime, "SSCam_camstoprec", "$name:$emtxt");
                 }      
                 
                 SSCam_refresh($hash,0,0,1);    # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event
@@ -4755,17 +4826,39 @@ sub SSCam_camop_parse ($) {
                 # Logausgabe
                 Log3($name, 3, "$name - Camera $camname exposure mode was set to \"$hash->{HELPER}{EXPMODE}\"");
             
+			} elsif ($OpMode eq "GetRec") {              
+
+                my $recid     = ReadingsVal("$name", "CamLastRecId", "");
+                my $createdTm = ReadingsVal("$name", "CamLastRecTime", "");
+                my $lrec      = ReadingsVal("$name", "CamLastRec", "");
+                my $fileName  = (split("/",$lrec))[1];
+                
+                my %sendrecs = ();                  # Recording Hash zum Versand wird leer erstellt
+                my $sn       = 0;
+                $sendrecs{$sn}{recid}        = $recid;
+                $sendrecs{$sn}{createdTm}    = $createdTm;
+				$sendrecs{$sn}{fileName}     = $fileName;
+				$sendrecs{$sn}{".imageData"} = $myjson;
+				Log3($name,4, "$name - Snap '$sn' added to send recording hash: ID => $sendrecs{$sn}{recid}, File => $sendrecs{$sn}{fileName}, Created => $sendrecs{$sn}{createdTm}");
+                
+                # prüfen ob Recording als Email versendet werden soll
+				SSCam_prepareSendEmail ($hash, $OpMode, \%sendrecs);
+                        
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate($hash,"Errorcode","none");
+                readingsBulkUpdate($hash,"Error",$err);
+                readingsEndUpdate($hash, 1);
+       
+            
 			} elsif ($OpMode eq "SaveRec") {              
 
-                my $recid = ReadingsVal("$name", "CamLastRecId", 0);
-                my $lrec  = ReadingsVal("$name", "CamLastRec", "");
-                $lrec     = (split("/",$lrec))[1];
-                
+                my $lrec = ReadingsVal("$name", "CamLastRec", "");
+                $lrec    = (split("/",$lrec))[1]; 
                 my $sp   = $hash->{HELPER}{RECSAVEPATH}?$hash->{HELPER}{RECSAVEPATH}:$attr{global}{modpath};
                 my $file = $sp."/$lrec";
                 delete $hash->{HELPER}{RECSAVEPATH};
                 
-                if(open (FH, '>', $file)) {            # in-memory IO Handle
+                if(open (FH, '>', $file)) {           
                     binmode FH;
                     print FH $myjson;
                     close(FH);
@@ -4981,11 +5074,11 @@ sub SSCam_camop_parse ($) {
 			} elsif ($OpMode eq "Snap") {
                 # ein Schnapschuß wurde aufgenommen
                 # falls Aufnahme noch läuft -> state = on setzen
-                SSCam_refresh($hash,0,1,0);     # kein Room-Refresh, SSCam-state-Event, kein SSCamSTRM-Event
+                SSCam_refresh($hash,0,1,0);                   # kein Room-Refresh, SSCam-state-Event, kein SSCamSTRM-Event
 
                 my $tac = "";
                 if($hash->{HELPER}{CANSENDSNAP}) { 
-                    $tac = SSCam_openOrgetTrans($hash);                           # Transaktion starten oder vorhandenen Code holen
+                    $tac = SSCam_openOrgetTrans($hash);       # Transaktion starten oder vorhandenen Code holen
                 }
                 
                 $snapid = $data->{data}{'id'};
@@ -5705,6 +5798,11 @@ sub SSCam_camop_parse ($) {
        
                 # Logausgabe
                 Log3($name, $verbose, "$name - Query eventlist of camera $camname retrieved");
+                
+                # Versand Aufnahme initiieren
+                if($hash->{HELPER}{CANSENDREC}) {
+                    SSCam_getrec($hash);
+                }
             
 			} elsif ($OpMode eq "getmotionenum") {              
                 
@@ -7369,7 +7467,7 @@ sub SSCam_prepareSendEmail ($$;$) {
    my ($hash, $OpMode, $data) = @_;
    my $name   = $hash->{NAME};
    my $calias = AttrVal($name,"alias",$hash->{CAMNAME});              # Alias der Kamera wenn gesetzt oder Originalname aus SVS
-   my ($ret,$sdat,$fname,$snapid,$lsnaptime,$tac) = ('','','','','','');
+   my ($ret,$sdat,$vdat,$fname,$snapid,$lsnaptime,$tac) = ('','','','','','');
    
    ### prüfen ob Schnappschnüsse aller Kameras durch ein SVS-Device angefordert wurde,
    ### Bilddaten werden erst zum Versand weitergeleitet wenn Schnappshußhash komplett gefüllt ist
@@ -7410,19 +7508,71 @@ sub SSCam_prepareSendEmail ($$;$) {
        }
    }
    
+   my $sp       = AttrVal($name, "smtpPort", 25); 
+   my $nousessl = AttrVal($name, "smtpNoUseSSL", 0); 
+   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime;
+   my $date = sprintf "%02d.%02d.%04d" , $mday , $mon+=1 ,$year+=1900; 
+   my $time = sprintf "%02d:%02d:%02d" , $hour , $min , $sec;   
+   
+   my $sslfrominit = 0;
+   my $smtpsslport = 465;
+   if(AttrVal($name,"smtpSSLPort",0)) {
+       $sslfrominit = 1;
+       $smtpsslport = AttrVal($name,"smtpSSLPort",0);
+   }
+   
    ### Bilddaten als Email versenden wenn Attribut "snapEmailTxt" definiert ist
-   if(AttrVal($name, "snapEmailTxt", "")) { 
-       my $sp       = AttrVal($name, "smtpPort", 25); 
-       my $nousessl = AttrVal($name, "smtpNoUseSSL", 0); 
-       my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime;
-       my $date = sprintf "%02d.%02d.%04d" , $mday , $mon+=1 ,$year+=1900; 
-       my $time = sprintf "%02d:%02d:%02d" , $hour , $min , $sec;   
-         
-       # Extraktion EMail-Texte
+   if($OpMode =~ /^getsnap/ && AttrVal($name, "snapEmailTxt", "")) {     
        # Attribut snapEmailTxt kann übersteuert werden mit: $hash->{HELPER}{SMTPMSG}
+       # Extraktion EMail-Texte
        # Format in $hash->{HELPER}{SMTPMSG} muss sein: subject => <Betreff-Text>, body => <Mitteilung-Text>
        my $mth = delete $hash->{HELPER}{SMTPMSG};
-       my $mt  = $mth?$mth:AttrVal($name, "snapEmailTxt", "");
+       my $mt = $mth?$mth:AttrVal($name, "snapEmailTxt", "");
+       $mt    =~ s/['"]//g;   
+       
+       my($subj,$body)   = split(",", $mt, 2);
+       my($subjk,$subjt) = split("=>", $subj);
+       my($bodyk,$bodyt) = split("=>", $body);
+       $subjk = SSCam_trim($subjk);
+       $subjt = SSCam_trim($subjt);
+       $subjt =~ s/\$CAM/$calias/g;
+       $subjt =~ s/\$DATE/$date/g;
+       $subjt =~ s/\$TIME/$time/g;
+       $bodyk = SSCam_trim($bodyk);
+       $bodyt = SSCam_trim($bodyt);
+       $bodyt =~ s/\$CAM/$calias/g;
+       $bodyt =~ s/\$DATE/$date/g;
+       $bodyt =~ s/\$TIME/$time/g;
+       my %smtpmsg = ();
+       $smtpmsg{$subjk} = "$subjt";
+       $smtpmsg{$bodyk} = "$bodyt";
+       
+       $tac = $hash->{HELPER}{TRANSACTION};               # Code der laufenden Transaktion
+       
+       $sdat = $data;
+       delete $hash->{HELPER}{CANSENDSNAP};
+        
+       $ret = SSCam_sendEmail($hash, {'subject'      => $smtpmsg{subject},   
+                                      'part1txt'     => $smtpmsg{body}, 
+                                      'part2type'    => 'image/jpeg',
+                                      'smtpport'     => $sp,
+                                      'sdat'         => $sdat,
+                                      'opmode'       => $OpMode,
+                                      'smtpnousessl' => $nousessl,
+                                      'sslfrominit'  => $sslfrominit,
+                                      'smtpsslport'  => $smtpsslport, 
+                                      'tac'          => $tac,                                  
+                                     }
+                             );
+                             
+       return $ret;
+   }
+   
+   ### Recordings als Email versenden wenn Attribut "recEmailTxt" definiert ist
+   if($OpMode =~ /^GetRec/ && $hash->{HELPER}{CANSENDREC}) {     
+       # recEmailTxt aus $hash->{HELPER}{SMTPRECMSG}
+       delete $hash->{HELPER}{CANSENDREC};
+       my $mt  = delete $hash->{HELPER}{SMTPRECMSG};
        $mt     =~ s/['"]//g;   
        
        my($subj,$body)   = split(",", $mt, 2);
@@ -7442,34 +7592,18 @@ sub SSCam_prepareSendEmail ($$;$) {
        $smtpmsg{$subjk} = "$subjt";
        $smtpmsg{$bodyk} = "$bodyt";
        
-       my $sslfrominit = 0;
-       my $smtpsslport = 465;
-       if(AttrVal($name,"smtpSSLPort",0)) {
-           $sslfrominit = 1;
-           $smtpsslport = AttrVal($name,"smtpSSLPort",0);
-       }
-       
-       $tac = $hash->{HELPER}{TRANSACTION};               # Code der laufenden Transaktion
-       
-       if($OpMode =~ /^getsnap/) {
-           $sdat      = $data;
-           delete $hash->{HELPER}{CANSENDSNAP};
-           delete $hash->{HELPER}{SMTPMSG};
-        
+       $vdat = $data;        
        $ret = SSCam_sendEmail($hash, {'subject'      => $smtpmsg{subject},   
                                       'part1txt'     => $smtpmsg{body}, 
-                                      'part2type'    => 'image/jpeg',
+                                      'part2type'    => 'video/mpeg',
                                       'smtpport'     => $sp,
-                                      'sdat'         => $sdat,
+                                      'vdat'         => $vdat,
                                       'opmode'       => $OpMode,
                                       'smtpnousessl' => $nousessl,
                                       'sslfrominit'  => $sslfrominit,
-                                      'smtpsslport'  => $smtpsslport, 
-                                      'tac'          => $tac,                                  
+                                      'smtpsslport'  => $smtpsslport,                                  
                                      }
-                             );
-       }
-                             
+                             );                        
        return $ret;
    }
 
@@ -7486,7 +7620,7 @@ sub SSCam_sendEmail ($$) {
    my $ret;
    
    Log3($name, 4, "$name - ####################################################"); 
-   Log3($name, 4, "$name - ###         start send snapshot by email            "); 
+   Log3($name, 4, "$name - ###   start send snapshot or recording by email     "); 
    Log3($name, 4, "$name - ####################################################");
    
    my $m1 = "Net::SMTP"; 
@@ -7546,14 +7680,15 @@ sub SSCam_sendEmail ($$) {
        'smtpsslport'  => {'attr'=>'smtpSSLPort', 'default'=>'',                          'required'=>0, 'set'=>1},  # SSL-Port, verwendet bei direktem SSL-Aufbau
 	   'smtpnousessl' => {'attr'=>'smtpNoUseSSL','default'=>'0',                         'required'=>0, 'set'=>1},
 	   'smtpdebug'    => {'attr'=>'smtpDebug',   'default'=>'0',                         'required'=>0, 'set'=>0},
-       'sdat'         => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # (Hash)Daten base64 codiert, wenn gesetzt muss 'part2' auf 'image/jpeg' gesetzt werden
-       'image'        => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # Daten als File, wenn gesetzt muss 'part2' auf 'image/jpeg' gesetzt werden
-       'fname'        => {                       'default'=>'image.jpg',                 'required'=>0, 'set'=>1},  # Filename für "image" oder "sdat"
+       'sdat'         => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # (Hash)Daten base64 codiert, wenn gesetzt muss 'part2type' auf 'image/jpeg' gesetzt sein
+       'image'        => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # Daten als File, wenn gesetzt muss 'part2type' auf 'image/jpeg' gesetzt sein
+       'fname'        => {                       'default'=>'image.jpg',                 'required'=>0, 'set'=>1},  # Filename für "image"
        'lsnaptime'    => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # Zeitstempel der Bilddaten
        'opmode'       => {                       'default'=>'',                          'required'=>1, 'set'=>1},  # OpMode muss gesetzt sein
        'sslfb'        => {                       'default'=>$sslfb,                      'required'=>0, 'set'=>1},  # Flag für Verwendung altes Net::SMTP::SSL   
        'sslfrominit'  => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # SSL soll sofort ! aufgebaut werden  
        'tac'          => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # übermittelter Transaktionscode der ausgewerteten Transaktion
+       'vdat'         => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # Videodaten, wenn gesetzt muss 'part2type' auf 'video/mpeg' gesetzt sein
        );   
    
    my %params = (); 
@@ -7609,13 +7744,14 @@ sub SSCam_sendEmailblocking($) {
   my $msgtext      = $paref->{msgtext}; 
   my $smtpdebug    = $paref->{smtpdebug}; 
   my $sdat         = $paref->{sdat};                     # Hash von Imagedaten base64 codiert
-  my $image        = $paref->{image};                    # Image, wenn gesetzt muss 'part2' auf 'image/jpeg' gesetzt sein
+  my $image        = $paref->{image};                    # Image, wenn gesetzt muss 'part2type' auf 'image/jpeg' gesetzt sein
   my $fname        = $paref->{fname};                    # Filename -> verwendet wenn $image ist gesetzt
   my $lsnaptime    = $paref->{lsnaptime};                # Zeit des letzten Schnappschusses wenn gesetzt
   my $opmode       = $paref->{opmode};                   # aktueller Operation Mode
   my $sslfb        = $paref->{sslfb};                    # Flag für Verwendung altes Net::SMTP::SSL
   my $sslfrominit  = $paref->{sslfrominit};              # SSL soll sofort ! aufgebaut werden
   my $tac          = $paref->{tac};                      # übermittelter Transaktionscode der ausgewerteten Transaktion
+  my $vdat         = $paref->{vdat};                     # Videodaten, wenn gesetzt muss 'part2type' auf 'video/mpeg' gesetzt sein
   
   my $hash   = $defs{$name};
   my $sslver = "";
@@ -7674,7 +7810,38 @@ sub SSCam_sendEmailblocking($) {
 			  print $fh $decoded;
 			  close $fh;
 			  open ($fh, '<', \$mh);
-			  Log3($name, 4, "$name - image data were saved to memory handle for smtp prepare");
+			  Log3($name, 4, "$name - image data were saved into memory handle for smtp prepare");
+		  } else {
+			  $err = "Can't open memory handle: $!";
+			  Log3($name, 2, "$name - $err");
+			  $err = encode_base64($err,"");
+			  return "$name|$err|''";
+		  }
+		  $mailmsg->attach(
+			  Type        => $part2type,
+			  FH          => $fh,
+			  Filename    => $fname,
+			  Disposition => 'attachment',
+		  );
+      }
+  }
+  
+  if($vdat) {
+      ### Videodaten (mp4) wurden geliefert und werden in ein "in-memory IO" gespeichert
+      my ($ct,$video);
+      @as = sort{$a<=>$b}keys%{$vdat};
+      foreach my $key (@as) {
+		  $ct      = $vdat->{$key}{createdTm};
+		  $video   = $vdat->{$key}{".imageData"};
+		  $fname   = $vdat->{$key}{fileName};
+		  $fh      = '$fh'.$key;
+		  my $mh   = '';
+		  if(open ($fh, '>', \$mh)) {            # in-memory IO Handle
+			  binmode $fh;
+			  print $fh $video;
+			  close $fh;
+			  open ($fh, '<', \$mh);
+			  Log3($name, 4, "$name - video data were saved into memory handle for smtp prepare");
 		  } else {
 			  $err = "Can't open memory handle: $!";
 			  Log3($name, 2, "$name - $err");
@@ -7802,7 +7969,7 @@ sub SSCam_sendEmailblocking($) {
   my $ret = "Email transaction \"$tac\" successfully sent ".( $sslver?"encoded by $sslver":""  ); 
   Log3($name, 3, "$name - $ret To: $to".(($cc)?", CC: $cc":"") );
   
-  if($sdat) {
+  if($sdat || $vdat) {
       # handles schließen
       foreach my $key (@as) {
           close '$fh'.$key;
@@ -7810,6 +7977,7 @@ sub SSCam_sendEmailblocking($) {
   }
   
   use strict "refs";
+  %{$paref} = ();        # erstellten Versandhash löschen
   
   # Daten müssen als Einzeiler zurückgegeben werden
   $ret = encode_base64($ret,"");
@@ -8073,8 +8241,8 @@ return ($str);
   At present the following functions are available: <br><br>
    <ul>
     <ul>
-       <li>Start a Recording</li>
-       <li>Stop a Recording (using command or automatically after the &lt;RecordTime&gt; period</li>
+       <li>Start a recording and send it optionally by Email </li>
+       <li>Stop a recording by command or automatically after an adjustable period </li>
        <li>Trigger of snapshots and optionally send them alltogether by Email using the integrated Email client </li>
        <li>Trigger snapshots of all defined cams and optionally send them alltogether by Email using the integrated Email client </li>
        <li>Deaktivate a Camera in Synology Surveillance Station</li>
@@ -8647,30 +8815,37 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     set &lt;name&gt; move dir_20 0.7  : moves PTZ 1,5 Sek. (plus processing time) to left-bottom ("CapPTZDirections = 32)"
   </pre>
   </ul>
+  <br>
+  
+  <ul>
+  <li><b> set &lt;name&gt; off  </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li><br>
+
+  Stops the current recording. 
+  </ul>
   <br><br>
   
   <ul>
-  <li><b>set &lt;name&gt; [on [&lt;rectime&gt;] | off] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
+  <li><b>set &lt;name&gt; on [&lt;rectime&gt;] [recEmailTxt:"subject => &lt;subject text&gt;, body => &lt;message text&gt;"]  </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
    
-  The command "set &lt;name&gt; on" starts a recording. The default recording time takes 15 seconds. It can be changed by 
-  the <a href="#SSCamattr">attribute</a> "rectime" individualy. 
-  With the <a href="#SSCamattr">attribute</a> (respectively the default value) provided recording time can be overwritten 
-  once by "set &lt;name&gt; on &lt;rectime&gt;".
+  A recording will be started. The default recording time is 15 seconds. It can be individually changed by 
+  the <a href="#SSCamattr">attribute</a> "rectime". 
+  The recording time can be overwritten on-time by "set &lt;name&gt; on &lt;rectime&gt;" for the current recording.
   The recording will be stopped after processing time "rectime"automatically.<br>
 
-  A special case is start recording by "set &lt;name&gt; on 0" respectively the attribute value "rectime = 0". In that case 
-  a endless-recording will be started. One have to stop this recording by command "set &lt;name&gt; off" explicitely.<br>
+  A special case is start recording by "set &lt;name&gt; on 0" respectively the attribute value "rectime = 0". In this case 
+  an endless-recording will be started. One have to explicitely stop this recording with command "set &lt;name&gt; off".<br>
 
-  The recording behavior can be impacted with <a href="#SSCamattr">attribute</a> "recextend" furthermore as explained as follows.<br><br>
+  Furthermore the recording behavior can be impacted with <a href="#SSCamattr">attribute</a> "recextend" as explained as 
+  follows.<br><br>
 
-  <b>Attribute "recextend = 0" or not set (default):</b><br><br>
+  <b>Attribute "recextend = 0" or not set (default):</b><br>
   <ul>
   <li> if, for example, a recording with rectimeme=22 is started, no other startcommand (for a recording) will be accepted until this started recording is finished.
   A hint will be logged in case of verboselevel = 3. </li>
   </ul>
   <br>
 
-  <b>Attribute "recextend = 1" is set:</b><br><br>
+  <b>Attribute "recextend = 1" is set:</b><br>
   <ul>
   <li> a before started recording will be extend by the recording time "rectime" if a new start command is received. That means, the timer for the automatic stop-command will be
   renewed to "rectime" given bei the command, attribute or default value. This procedure will be repeated every time a new start command for recording is received. 
@@ -8681,13 +8856,20 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   </ul>
   <br>
   
-  Examples for simple <b>Start/Stop a Recording</b>: <br><br>
-
-  <table>
-  <colgroup> <col width=20%> <col width=80%> </colgroup>
-      <tr><td>set &lt;name&gt; on [rectime]  </td><td>starts a recording of camera &lt;name&gt;, stops automatically after [rectime] (default 15s or defined by <a href="#SSCamattr">attribute</a>) </td></tr>
-      <tr><td>set &lt;name&gt; off           </td><td>stops the recording of camera &lt;name&gt;</td></tr>
-  </table>
+  The <b>Email shipping</b> of recordings can be activated by setting <a href="#SSCamattr">attribute</a> "recEmailTxt". 
+  Before you have to prepare the Email shipping as described in section <a href="#SSCamEmail">Setup Email shipping</a>. 
+  (for further information execute "<b>get &lt;name&gt; versionNotes 7</b>") <br>
+  Alternatively you can activate the Email-shipping one-time when you specify the "recEmailTxt:"-tag in the "on"-command.
+  In this case the tag-text is used for creating the Email instead the text specified in "recEmailTxt"-attribute.
+  <br><br>
+  
+  <b>Examples: </b> <br><br>
+  set &lt;name&gt; on [rectime]  <br>
+  # starts a recording, stops automatically after [rectime] <br>
+  <code> set &lt;name&gt; on 0  </code><br>
+  # starts a permanent record which must be stopped with the "off"-command. <br>
+  <code> set &lt;name&gt; on recEmailTxt:"subject => New recording for $CAM created, body => The last recording of $CAM is atteched."  </code><br>
+  # starts a recording and send it after completion by Email. <br>
   </ul>
   <br><br>
   
@@ -9121,9 +9303,9 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   <b>Setup Email shipping</b> <br><br>
   
   <ul>
-  Snapshots can be sent by <b>Email</b> alltogether after creation. For this purpose the module contains its own Email client. 
-  Before you can use this function you have to install the Perl-module <b>MIME::Lite</b>. On debian systems it can be 
-  installed with command: <br><br>
+  Snapshots and recordings can be sent by <b>Email</b> after creation. For this purpose the module contains its 
+  own Email client. Before you can use this function you have to install the Perl-module <b>MIME::Lite</b>. On debian 
+  systems it can be installed with command: <br><br>
    
    <ul>
     sudo apt-get install libmime-lite-perl
@@ -9140,11 +9322,19 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   <ul>   
     <table>  
     <colgroup> <col width=12%> <col width=88%> </colgroup>
-      <tr><td style="vertical-align:top"> <b>snapEmailTxt</b> <td>- <b>Activates the Email shipping.</b> This attribute has the format: <br>
+      <tr><td style="vertical-align:top"> <b>snapEmailTxt</b> <td>- <b>Activates the Email shipping of snapshots.</b> This attribute has the format: <br>
                                                                   <b>subject => &lt;subject text&gt;, body => &lt;message text&gt; </b><br> 
                                                                   The placeholder $CAM, $DATE and $TIME can be used. $CAM is 
                                                                   replaced by the device name, device alias or the name of camera in SVS if alias is not 
                                                                   defined. $DATE and $TIME are replaced with the current date and time. </td></tr>
+      <tr><td style="vertical-align:top"> <b>recEmailTxt</b> <td>- <b>Activates the Email shipping of recordings.</b> This attribute has the format: <br>
+                                                                  <b>subject => &lt;subject text&gt;, body => &lt;message text&gt; </b><br> 
+                                                                  The placeholder $CAM, $DATE and $TIME can be used. $CAM is 
+                                                                  replaced by the device name, device alias or the name of camera in SVS if alias is not 
+                                                                  defined. $DATE and $TIME are replaced with the current date and time. 
+                                                                  Alternatively you can specify the "recEmailTxt:"-tag when start recording with the "On"-command.
+                                                                  In this case the Email shipping is temporaray activated for the started recording and the tag-text 
+                                                                  is used instead of the text defined in the "recEmailTxt"-attribute.</td></tr>
       <tr><td>                            <b>smtpHost</b>     </td><td>- Hostname of outgoing Email server (e.g. securesmtp.t-online.de) </td></tr>
       <tr><td>                            <b>smtpFrom</b>     </td><td>- Return address (&lt;name&gt@&lt;domain&gt) </td></tr>
       <tr><td>                            <b>smtpTo</b>       </td><td>- Receiving address(es) (&lt;name&gt@&lt;domain&gt) </td></tr>
@@ -9387,6 +9577,21 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     (e.g. "attr WEB iconPath default:fhemSVG:openautomation:sscam").    
   </li><br> 
   
+  <a name="recEmailTxt"></a>
+  <li><b>recEmailTxt subject => &lt;subject text&gt;, body => &lt;message text&gt; </b><br>
+    Activates the Email shipping of recordings after whose creation. <br>
+    The attribute has to be definied in the form as described. You can use the placeholder variables $CAM, $DATE and $TIME. 
+    The variable $CAM is replaced by the device alias or the name of the camera in SVS if the device alias isn't available.
+    $DATE and $TIME are replaced with the current date and time.    
+    <br><br>
+    
+       <ul>
+		<b>Example:</b><br>
+        recEmailTxt subject => New recording $CAM, body => A new recording of $CAM is created and atteched.
+      </ul>
+      <br>
+  </li>
+  
   <a name="rectime"></a>
   <li><b>rectime</b><br>
    determines the recordtime when a recording starts. If rectime = 0 an endless recording will be started. If 
@@ -9459,7 +9664,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   
   <a name="snapEmailTxt"></a>
   <li><b>snapEmailTxt subject => &lt;subject text&gt;, body => &lt;message text&gt; </b><br>
-    Activates the Email shipping of snapshots after its creation. <br>
+    Activates the Email shipping of snapshots after whose creation. <br>
     The attribute has to be definied in the form as described. You can use the placeholder variables $CAM, $DATE and $TIME. 
     The variable $CAM is replaced by the device alias or the name of the camera in SVS if the device alias isn't available.
     $DATE and $TIME are replaced with the current date and time.    
@@ -9648,8 +9853,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     Zur Zeit werden folgende Funktionen unterstützt: <br><br>
     <ul>
      <ul>
-      <li>Start einer Aufnahme</li>
-      <li>Stop einer Aufnahme (per Befehl bzw. automatisch nach Ablauf der Aufnahmedauer) </li>
+      <li>Start einer Aufnahme und optionaler Versand per Email </li>
+      <li>Stop einer Aufnahme per Befehl bzw. automatisch nach Ablauf einer einstellbaren Dauer </li>
       <li>Auslösen von Schnappschnüssen und optionaler Email-Versand mittels integrierten Email-Client </li>
       <li>Auslösen von Schnappschnüssen aller definierten Kameras und optionaler gemeinsamer Email-Versand mittels integrierten Email-Client </li>
       <li>Deaktivieren einer Kamera in Synology Surveillance Station</li>
@@ -10228,12 +10433,19 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     set &lt;name&gt; move dir_20 0.7  : bewegt PTZ 1,5 Sek. (zzgl. Prozesszeit) nach links-unten ("CapPTZDirections = 32)"
   </pre>
   </ul>
+  <br>
+  
+  <ul>
+  <li><b> set &lt;name&gt; off  </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li><br>
+
+  Stoppt eine laufende Aufnahme. 
+  </ul>
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; [ on [&lt;rectime&gt;] | off ] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li><br>
+  <li><b> set &lt;name&gt; on [&lt;rectime&gt;] [recEmailTxt:"subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;"] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li><br>
 
-  Der Befehl "set &lt;name&gt; on" startet eine Aufnahme. Die Standardaufnahmedauer beträgt 15 Sekunden. Sie kann mit dem 
+  Startet eine Aufnahme. Die Standardaufnahmedauer beträgt 15 Sekunden. Sie kann mit dem 
   Attribut "rectime" individuell festgelegt werden. 
   Die im Attribut (bzw. im Standard) hinterlegte Aufnahmedauer kann einmalig mit "set &lt;name&gt; on &lt;rectime&gt;" 
   überschrieben werden.
@@ -10245,16 +10457,16 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
 
   Das Aufnahmeverhalten kann weiterhin mit dem Attribut "recextend" beeinflusst werden.<br><br>
 
-  <b>Attribut "recextend = 0" bzw. nicht gesetzt (Standard):</b><br><br>
+  <b>Attribut "recextend = 0" bzw. nicht gesetzt (Standard):</b><br>
   <ul>
-  <li> wird eine Aufnahme mit z.B. rectime=22 gestartet, wird kein weiterer Startbefehl für eine Aufnahme akzeptiert bis diese gestartete Aufnahme nach 22 Sekunden
+  <li> Wird eine Aufnahme mit z.B. rectime=22 gestartet, wird kein weiterer Startbefehl für eine Aufnahme akzeptiert bis diese gestartete Aufnahme nach 22 Sekunden
   beendet ist. Ein Hinweis wird bei verbose=3 im Logfile protokolliert. </li>
   </ul>
   <br>
 
   <b>Attribut "recextend = 1" gesetzt:</b><br>
   <ul>
-  <li> eine zuvor gestartete Aufnahme wird bei einem erneuten "set <name> on" -Befehl um die Aufnahmezeit "rectime" verlängert. Das bedeutet, dass der Timer für 
+  <li> Eine zuvor gestartete Aufnahme wird bei einem erneuten "set <name> on" -Befehl um die Aufnahmezeit "rectime" verlängert. Das bedeutet, dass der Timer für 
   den automatischen Stop auf den Wert "rectime" neu gesetzt wird. Dieser Vorgang wiederholt sich mit jedem Start-Befehl. Dadurch verlängert sich eine laufende 
   Aufnahme bis kein Start-Inpuls mehr registriert wird. </li>
 
@@ -10263,13 +10475,22 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   </ul>
   <br>
   
-  Beispiele für einfachen <b>Start/Stop einer Aufnahme</b>: <br><br>
+  Ein <b>Email-Versand</b> der letzten Aufnahme kann durch Setzen des <a href="#SSCamattr">Attributs</a> "recEmailTxt" 
+  aktiviert werden. Zuvor ist der Email-Versand, wie im Abschnitt <a href="#SSCamEmail">Einstellung Email-Versand</a> beschrieben,
+  einzustellen. (Für weitere Informationen "<b>get &lt;name&gt; versionNotes 7</b>" ausführen) <br>
+  Alternativ kann durch Verwendung des optionalen "snapEmailTxt:"-Tags der Email-Versand der gestarteten Aufnahme nach deren
+  Beendigung aktiviert werden. Sollte das Attribut "recEmailTxt" bereits gesetzt sein, wird der Text des "snapEmailTxt:"-Tags  
+  anstatt des Attribut-Textes verwendet. <br><br>
+  
+  <b>Beispiele </b>: <br><br>
+  <code> set &lt;name&gt; on [rectime] </code><br>
+  # startet die Aufnahme der Kamera &lt;name&gt;, automatischer Stop der Aufnahme nach Ablauf der Zeit [rectime] 
+  (default 15s oder wie im <a href="#SSCamattr">Attribut</a> "rectime" angegeben) <br>
+  <code> set &lt;name&gt; on 0  </code><br>
+  # startet eine Daueraufnahme die mit "off" gestoppt werden muss. <br>
+  <code> set &lt;name&gt; on recEmailTxt:"subject => Neue Aufnahme $CAM, body => Die aktuelle Aufnahme von $CAM ist angehängt."  </code><br>
+  # startet eine Aufnahme und versendet sie nach Beendigung per Email. <br>
 
-  <table>
-  <colgroup> <col width=20%> <col width=80%> </colgroup>
-      <tr><td>set &lt;name&gt; on [rectime]  </td><td>startet die Aufnahme der Kamera &lt;name&gt;, automatischer Stop der Aufnahme nach Ablauf der Zeit [rectime] (default 15s oder wie im <a href="#SSCamattr">Attribut</a> "rectime" angegeben)</td></tr>
-      <tr><td>set &lt;name&gt; off   </td><td>stoppt die Aufnahme der Kamera &lt;name&gt;</td></tr>
-  </table>
   </ul>
   <br><br>
   
@@ -10730,8 +10951,8 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   <a name="SSCamEmail"></a>
   <b>Einstellung Email-Versand </b> <br><br>
   <ul>
-  Schnappschüsse können nach der Erstellung per <b>Email</b> gemeinsam versendet werden. Dazu enthält das Modul einen 
-  eigenen Email-Client. 
+  Schnappschüsse und Aufnahmen können nach der Erstellung per <b>Email</b> versendet werden. Dazu enthält das 
+  Modul einen eigenen Email-Client. 
   Zur Verwendung dieser Funktion muss das Perl-Modul <b>MIME::Lite</b> installiert sein. Auf Debian-Systemen kann 
   es mit <br><br>
    
@@ -10754,7 +10975,8 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   <ul>   
     <table>  
     <colgroup> <col width=12%> <col width=88%> </colgroup>
-      <tr><td style="vertical-align:top"> <b>snapEmailTxt</b> <td>- <b>Aktiviert den Email-Versand</b>. Das Attribut hat das Format: <br>
+      <tr><td style="vertical-align:top"> <b>snapEmailTxt</b> <td>- <b>Aktiviert den Email-Versand von Schnappschüssen</b>. 
+                                                                  Das Attribut hat das Format: <br>
                                                                   <ul>
                                                                   <code>subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;</code><br>
                                                                   </ul>
@@ -10762,6 +10984,18 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
                                                                   durch den Device-Namen, Device-Alias bzw. den Namen der Kamera in der SVS
                                                                   ersetzt falls der Device-Alias nicht gesetzt ist. 
                                                                   $DATE und $TIME werden durch das aktuelle Datum und Zeit ersetzt.</td></tr>
+      
+      <tr><td style="vertical-align:top"> <b>recEmailTxt</b> <td>- <b>Aktiviert den Email-Versand von Aufnahmen</b>. 
+                                                                  Das Attribut hat das Format: <br>
+                                                                  <ul>
+                                                                  <code>subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;</code><br>
+                                                                  </ul>
+                                                                  Es können die Platzhalter $CAM, $DATE und $TIME verwendet werden. $CAM wird 
+                                                                  durch den Device-Namen, Device-Alias bzw. den Namen der Kamera in der SVS
+                                                                  ersetzt falls der Device-Alias nicht gesetzt ist. 
+                                                                  $DATE und $TIME werden durch das aktuelle Datum und Zeit ersetzt. <br>
+                                                                  Der Email-Versand der letzten Aufnahme wird temporär aktiviert falls der "recEmailTxt:"-Tag beim 
+                                                                  On-Kommando verwendet wird. </td></tr>      
       <tr><td>                            <b>smtpHost</b>     </td><td>- Hostname oder IP-Adresse des Postausgangsservers (z.B. securesmtp.t-online.de) </td></tr>
       <tr><td>                            <b>smtpFrom</b>     </td><td>- Absenderadresse (&lt;name&gt@&lt;domain&gt) </td></tr>
       <tr><td>                            <b>smtpTo</b>       </td><td>- Empfängeradresse(n) (&lt;name&gt@&lt;domain&gt) </td></tr>
@@ -11009,7 +11243,21 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     Das PTZ-Panel benutzt einen eigenen Satz Icons. 
     Damit das System sie finden kann, ist im FHEMWEB Device das Attribut "iconPath" um "sscam" zu ergänzen 
     (z.B. "attr WEB iconPath default:fhemSVG:openautomation:sscam").
-  </li><br>    
+  </li><br>  
+
+  <a name="recEmailTxt"></a>
+  <li><b>recEmailTxt subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt; </b><br>
+    Aktiviert den Emailversand von Aufnahmen nach deren Erstellung. <br>
+    Das Attribut muß in der angegebenen Form definiert werden. Es können die Platzhalter $CAM, $DATE und $TIME verwendet werden. 
+    $CAM wird durch den Device-Alias bzw. den Namen der Kamera in der SVS ersetzt falls der Device-Alias nicht vorhanden 
+    ist. $DATE und $TIME werden durch das aktuelle Datum und Zeit ersetzt. <br><br>
+    
+       <ul>
+		<b>Beispiel:</b><br>
+        recEmailTxt subject => Neue Aufnahme $CAM, body => Die aktuelle Aufnahme von $CAM ist angehängt.
+      </ul>
+      <br>
+  </li>  
   
   <a name="rectime"></a>  
   <li><b>rectime</b><br>
