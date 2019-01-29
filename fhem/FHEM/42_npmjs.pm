@@ -249,13 +249,13 @@ sub Set($$@) {
     my ( $cmd, @args ) = @aa;
 
     if ( $cmd eq 'outdated' ) {
-        return "usage: $cmd" if ( @args != 0 );
+        # return "usage: $cmd" if ( @args != 0 );
 
         $hash->{".fhem"}{npm}{cmd} = $cmd;
 
     }
     elsif ( $cmd eq 'update' ) {
-        return "usage: $cmd" if ( @args != 0 );
+        # return "usage: $cmd" if ( @args != 0 );
 
         $hash->{".fhem"}{npm}{cmd} = $cmd;
 
