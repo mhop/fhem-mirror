@@ -8,7 +8,7 @@ package main;
 use strict;
 use warnings;
 
-my $version = "0.9.0";
+my $version = "0.9.1";
 
 sub npmjs_Initialize($) {
 
@@ -234,6 +234,11 @@ sub Notify($$) {
         }
     }
 
+    if ( $devname eq $name and grep /^update:.successful$/, @{$events} ) {
+        $hash->{".fhem"}{npm}{cmd} = 'outdated';
+        AsynchronousExecuteNpmCommand($hash);
+    }
+
     return;
 }
 
@@ -323,7 +328,7 @@ sub ProcessUpdateTimer($) {
     );
     Log3 $name, 4, "npmjs ($name) - stateRequestTimer: Call Request Timer";
 
-    if ( !IsDisabled($name) ) {
+    unless ( IsDisabled($name) ) {
         if ( exists( $hash->{".fhem"}{subprocess} ) ) {
             Log3 $name, 2,
               "npmjs ($name) - update in progress, process aborted.";
@@ -340,6 +345,7 @@ sub ProcessUpdateTimer($) {
                     ' ', ReadingsTimestamp( $name, 'outdated', '1970-01-01' )
                 )
             )[0]
+            or ReadingsVal( $name, 'state', '' ) eq 'disabled'
           )
         {
             $hash->{".fhem"}{npm}{cmd} = 'outdated';
@@ -492,7 +498,7 @@ sub GetNodeVersion($) {
     my $update = {};
     my $v      = `$cmd->{nodejsversion} 2>/dev/null`;
 
-    if ( defined($v) && $v =~ /^v(\d+\.\d+\.\d+)/ ) {
+    if ( defined($v) and $v =~ /^v(\d+\.\d+\.\d+)/ ) {
         $update->{nodejsversion} = $1;
     }
     else {
