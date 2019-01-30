@@ -3968,6 +3968,10 @@ Dispatch($$;$$)
         }
         delete($defs{$found}{".noDispatchVars"});
         DoTrigger($found, undef);
+
+      } elsif(defined($found) && ($found eq "" || $found eq "[NEXT]")) {
+        return undef;
+
       } else {
         Log 1, "ERROR: >$found< returned by the $parserMod ParseFn is invalid,".
                " notify the module maintainer";
