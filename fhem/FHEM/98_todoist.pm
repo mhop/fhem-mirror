@@ -17,7 +17,7 @@ eval "use Date::Parse;1" or $missingModule .= "Date::Parse ";
 
 #######################
 # Global variables
-my $version = "1.2.0.6";
+my $version = "1.2.0.7";
 
 my $srandUsed;
 
@@ -158,7 +158,6 @@ sub todoist_Define($$) {
     
   $hash->{NOTIFYDEV}= "global";
   
-  ## start polling
   if ($init_done) {
     ## at first, we delete old readings. List could have changed
     CommandDeleteReading(undef, "$hash->{NAME} (T|t)ask_.*");
@@ -168,8 +167,10 @@ sub todoist_Define($$) {
     readingsSingleUpdate($hash,"state","inactive",1) if ($hash->{helper}{PWD_NEEDED} || ReadingsVal($name,"state","-") eq "-");
     ## remove timers
     RemoveInternalTimer($hash,"todoist_GetTasks");
-    todoist_GetTasks($hash) if (!IsDisabled($name) && !$hash->{helper}{PWD_NEEDED});
   }
+  
+  ## start polling  
+  todoist_GetTasks($hash) if (!IsDisabled($name) && !$hash->{helper}{PWD_NEEDED});
   
   return undef;
 }
