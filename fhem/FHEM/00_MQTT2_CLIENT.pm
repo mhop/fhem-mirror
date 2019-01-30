@@ -340,10 +340,10 @@ MQTT2_CLIENT_Read($@)
 
     if(!IsDisabled($name)) {
       $val = "" if(!defined($val));
-      my $ac = AttrVal($name, "autocreate", undef) ? "autocreate:":"";
+      my $ac = AttrVal($name, "autocreate", undef) ? "autocreate\0":"";
       my $cid = $hash->{clientId};
       $tp =~ s/:/_/g; # 96608
-      Dispatch($hash, "$ac$cid:$tp:$val", undef, !$ac);
+      Dispatch($hash, "$ac$cid\0$tp\0$val", undef, !$ac);
 
       my $re = AttrVal($name, "rawEvents", undef);
       DoTrigger($name, "$tp:$val") if($re && $tp =~ m/$re/);

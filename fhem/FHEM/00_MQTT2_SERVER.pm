@@ -419,8 +419,8 @@ MQTT2_SERVER_doPublish($$$$;$)
      AttrVal($serverName, "rePublish", undef)) {
     $cid = $src->{NAME} if(!defined($cid));
     $cid =~ s,[^a-z0-9._],_,gi;
-    my $ac = AttrVal($serverName, "autocreate", 1) ? "autocreate:":"";
-    Dispatch($server, "$ac$cid:$tp:$val", undef, !$ac);
+    my $ac = AttrVal($serverName, "autocreate", 1) ? "autocreate\0":"";
+    Dispatch($server, "$ac$cid\0$tp\0$val", undef, !$ac);
     my $re = AttrVal($serverName, "rawEvents", undef);
     DoTrigger($server->{NAME}, "$tp:$val") if($re && $tp =~ m/$re/);
   }

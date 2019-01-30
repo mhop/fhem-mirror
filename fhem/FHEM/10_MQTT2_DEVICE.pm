@@ -90,12 +90,12 @@ MQTT2_DEVICE_Parse($$)
   }
 
   my $autocreate;
-  if($msg =~ m/^autocreate:(.*)$/s) {
+  if($msg =~ m/^autocreate\0(.*)$/s) {
     $msg = $1;
     $autocreate = 1;
   }
 
-  my ($cid, $topic, $value) = split(":", $msg, 3);
+  my ($cid, $topic, $value) = split("\0", $msg, 3);
   my $dp = $modules{MQTT2_DEVICE}{defptr}{re};
   foreach my $re (keys %{$dp}) {
     my $reAll = $re;
