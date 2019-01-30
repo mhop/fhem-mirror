@@ -30,6 +30,11 @@
 # 
 # CHANGE LOG
 # 
+# 30.0ß1.2019 1.1.4
+# change     : Umstellung der Zeichentrenner bei 'Parse' von ':' auf '\0'
+#              wg. Problemen mit ':' in Topics (MQTT2*)
+#              https://forum.fhem.de/index.php?topic=96608
+#
 # 29.01.2019 1.1.3
 # bugfix     : Parse liefert [NEXT] nur, wenn onmessage wirklich ein array
 #              geliefert hat, sonst ""
@@ -300,7 +305,7 @@ use warnings;
 
 #my $DEBUG = 1;
 my $cvsid = '$Id$';
-my $VERSION = "version 1.1.3 by hexenmeister\n$cvsid";
+my $VERSION = "version 1.1.4 by hexenmeister\n$cvsid";
 
 my %sets = (
 );
@@ -2569,7 +2574,8 @@ sub Parse($$) {
   #Log3($iodev->{NAME},1,"MQTT_GENERIC_BRIDGE: Parse: IODev: $ioname");
   #Log3("XXX",1,"MQTT_GENERIC_BRIDGE: Parse: $msg");
 
-  my ($cid, $topic, $value) = split(":", $msg, 3);
+  #my ($cid, $topic, $value) = split(":", $msg, 3);
+  my ($cid, $topic, $value) = split("\0", $msg, 3);
   
   my @instances = devspec2array("TYPE=MQTT_GENERIC_BRIDGE");
   foreach my $dev (@instances) {
