@@ -12,11 +12,12 @@ my $missingModule = "";
 eval "use Data::Dumper;1" or $missingModule .= "Data::Dumper ";
 eval "use JSON;1" or $missingModule .= "JSON ";
 eval "use Encode;1" or $missingModule .= "Encode ";
+eval "use Date::Parse;1" or $missingModule .= "Date::Parse ";
 
 
 #######################
 # Global variables
-my $version = "1.2.0.5";
+my $version = "1.2.0.6";
 
 my $srandUsed;
 
@@ -2196,7 +2197,7 @@ sub todoist_genUUID() {
     <br /><br />
     Notes:<br />
     <ul>
-        <li>JSON, Data::Dumper, Digest::MD5, have to be installed on the FHEM host.</li>
+        <li>JSON, Data::Dumper, Date::Parse, Digest::MD5, have to be installed on the FHEM host.</li>
     </ul>
     <br /><br />
     <a name="todoist_Define"></a>
