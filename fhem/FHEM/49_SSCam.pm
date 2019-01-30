@@ -47,6 +47,7 @@ use Encode;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.7.1"  => "30.01.2019  fix refresh snapgallery device if snap was done by itself",
   "8.7.0"  => "27.01.2019  send recording by email ",
   "8.6.2"  => "25.01.2019  fix version numbering ",
   "8.6.1"  => "21.01.2019  time format in readings and galleries depends from global language attribute, minor bug fixes ",
@@ -1626,7 +1627,7 @@ sub SSCam_FWsummaryFn ($$$$) {
   my $imgrecendless = "<img src=\"$FW_ME/www/images/sscam/black_btn_RECSTART.png\">";
   my $cmdrecstop    = "cmd=set $d off";                                                           # Aufnahme Stop  
   my $imgrecstop    = "<img src=\"$FW_ME/www/images/sscam/black_btn_RECSTOP.png\">";
-  my $cmddosnap     = "cmd=set $d snap STRM";                                                     # Snapshot auslösen mit Kennzeichnung "by STRM-Device"
+  my $cmddosnap     = "cmd=set $d snap 1 2 STRM";                                                 # Snapshot auslösen mit Kennzeichnung "by STRM-Device"
   my $imgdosnap     = "<img src=\"$FW_ME/www/images/sscam/black_btn_DOSNAP.png\">";
  
   my $attr = AttrVal($d, "htmlattr", " ");
@@ -5208,33 +5209,42 @@ sub SSCam_camop_parse ($) {
 							$sendsnaps{$sn}{fileName}     = $fileName;
 							$sendsnaps{$sn}{".imageData"} = $imageData;
 							Log3($name,4, "$name - Snap '$sn' added to send gallery hash: ID => $sendsnaps{$sn}{snapid}, File => $sendsnaps{$sn}{fileName}, Created => $sendsnaps{$sn}{createdTm}");
-							$sn += 1;
+                        
+                            # Snaphash um die neuen Snaps ergänzen wenn existent
+                            if($hash->{HELPER}{".SNAPHASH"}{$sn}) {
+                                $hash->{HELPER}{".SNAPHASH"}{$sn}{snapid}     = $snapid;
+                                $hash->{HELPER}{".SNAPHASH"}{$sn}{createdTm}  = $createdTm;
+                                $hash->{HELPER}{".SNAPHASH"}{$sn}{fileName}   = $fileName;
+                                $hash->{HELPER}{".SNAPHASH"}{$sn}{imageData}  = $imageData;
+                                Log3($name,4, "$name - Snap '$sn' added to gallery hash: ID => $snapid, File => $fileName, Created => $createdTm");                        						
+                            }							
+                            
+                            $sn += 1;
 							$i += 1;
-						}						
-
+						}
+                        
 					    # prüfen ob Schnappschuß als Email versendet werden soll
 				        SSCam_prepareSendEmail ($hash, $OpMode, \%sendsnaps);
 						
 					} else {
-				        # es soll eine Schnappschußgalerie bereitgestellt (Attr snapGalleryBoost=1) bzw. gleich angezeigt 
-						# werden (Attr snapGalleryBoost=0)
-						my $i = 0;
-						my $sn = 0;
-						my %allsnaps = ();  # Schnappschuss Hash wird leer erstellt
-						 
-						$hash->{HELPER}{TOTALCNT} = $data->{data}{total};  # total Anzahl Schnappschüsse
-						
-						while ($data->{'data'}{'data'}[$i]) {
-							if($data->{'data'}{'data'}[$i]{'camName'} ne $camname) {
-								$i += 1;
-								next;
-							}
-							$snapid = $data->{data}{data}[$i]{id};
-							my $createdTm = $data->{data}{data}[$i]{createdTm};
-							my $fileName  = $data->{data}{data}[$i]{fileName};
-							my $imageData = $data->{data}{data}[$i]{imageData};  # Image data of snapshot in base64 format 
-						
-							$allsnaps{$sn}{snapid} = $snapid;
+                        # es soll eine Schnappschußgalerie bereitgestellt (Attr snapGalleryBoost=1) bzw. gleich angezeigt 
+                        # werden (Attr snapGalleryBoost=0)
+                        my $i = 0;
+                        my $sn = 0;
+                        my %allsnaps = ();  # Schnappschuss Hash wird leer erstellt
+                         
+                        $hash->{HELPER}{TOTALCNT} = $data->{data}{total};  # total Anzahl Schnappschüsse
+                        
+                        while ($data->{'data'}{'data'}[$i]) {
+                            if($data->{'data'}{'data'}[$i]{'camName'} ne $camname) {
+                                $i += 1;
+                                next;
+                            }
+                            $snapid = $data->{data}{data}[$i]{id};
+                            my $createdTm = $data->{data}{data}[$i]{createdTm};
+                            my $fileName  = $data->{data}{data}[$i]{fileName};
+                            my $imageData = $data->{data}{data}[$i]{imageData};  # Image data of snapshot in base64 format 
+                        
                             my @t = split(" ", FmtDateTime($data->{data}{data}[$i]{createdTm}));
                             my @d = split("-", $t[0]);
                             if($lang eq "DE") {
@@ -5242,28 +5252,29 @@ sub SSCam_camop_parse ($) {
                             } else {
                                 $createdTm = "$d[0]-$d[1]-$d[2] / $t[1]";
                             }
-							$allsnaps{$sn}{createdTm}  = $createdTm;
-							$allsnaps{$sn}{fileName}   = $fileName;
-							$allsnaps{$sn}{imageData}  = $imageData;
-							Log3($name,4, "$name - Snap '$sn' added to gallery hash: ID => $allsnaps{$sn}{snapid}, File => $allsnaps{$sn}{fileName}, Created => $allsnaps{$sn}{createdTm}");
-							$sn += 1;
-							$i += 1;
-						}
-						
-						# Hash der Schnapschüsse erstellen
-						$hash->{HELPER}{".SNAPHASH"} = \%allsnaps;
-						
-						# Direktausgabe Snaphash wenn nicht gepollt wird
-						if(!AttrVal($name, "snapGalleryBoost",0)) {		    
-							my $htmlCode = SSCam_composegallery($name);
-							
-							for (my $k=1; (defined($hash->{HELPER}{CL}{$k})); $k++ ) {
-								asyncOutput($hash->{HELPER}{CL}{$k},"$htmlCode");						
-							}
-							delete($hash->{HELPER}{".SNAPHASH"});               # Snaphash löschen wenn nicht gepollt wird
-							delete($hash->{HELPER}{CL});
-						}
-				    } 
+                            $allsnaps{$sn}{snapid}     = $snapid;
+                            $allsnaps{$sn}{createdTm}  = $createdTm;
+                            $allsnaps{$sn}{fileName}   = $fileName;
+                            $allsnaps{$sn}{imageData}  = $imageData;
+                            Log3($name,4, "$name - Snap '$sn' added to gallery hash: ID => $allsnaps{$sn}{snapid}, File => $allsnaps{$sn}{fileName}, Created => $allsnaps{$sn}{createdTm}");
+                            $sn += 1;
+                            $i += 1;
+                        }
+                        
+                        # Hash der Schnapschüsse erstellen
+                        $hash->{HELPER}{".SNAPHASH"} = \%allsnaps;
+                        
+                        # Direktausgabe Snaphash wenn nicht gepollt wird
+                        if(!AttrVal($name, "snapGalleryBoost",0)) {		    
+                            my $htmlCode = SSCam_composegallery($name);
+                            
+                            for (my $k=1; (defined($hash->{HELPER}{CL}{$k})); $k++ ) {
+                                asyncOutput($hash->{HELPER}{CL}{$k},"$htmlCode");						
+                            }
+                            delete($hash->{HELPER}{".SNAPHASH"});               # Snaphash löschen wenn nicht gepollt wird
+                            delete($hash->{HELPER}{CL});
+                        }
+                    }
                 }
                 
                 readingsBeginUpdate($hash);
@@ -7282,7 +7293,7 @@ sub SSCam_composegallery ($;$$) {
   my $streamHash              = $defs{$strmdev} if($strmdev);    # Hash des SSCamSTRM-Devices
   delete $streamHash->{HELPER}{STREAM};
   
-  my $cmddosnap     = "cmd=set $name snap STRM";                 # Snapshot auslösen mit Kennzeichnung "by STRM-Device"
+  my $cmddosnap     = "cmd=set $name snap 1 2 STRM";             # Snapshot auslösen mit Kennzeichnung "by STRM-Device"
   my $imgdosnap     = "<img src=\"$FW_ME/www/images/sscam/black_btn_DOSNAP.png\">";
  
   my $ha  = AttrVal($name, "snapGalleryHtmlAttr", AttrVal($name, "htmlattr", 'width="500" height="325"'));

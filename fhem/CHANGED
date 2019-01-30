@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  49_SSCam: refresh snapgallery device if snap was done by itself
   - feature: 49_SSCam: V8.7.0, send recordings by email is possible now
   - bugfix:  10_MYSENSORS_DEVICE: fix enqueing method, Forum:#96518
   - new:     98_inotify: initial release
