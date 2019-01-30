@@ -4,14 +4,17 @@ package main;
 
 use strict;
 use warnings;
-use Data::Dumper; 
-use Linux::Inotify2;
-use File::Find;
+
+my $missingModule = "";
+
+eval "use Data::Dumper;1" or $missingModule .= "Data::Dumper ";
+eval "use Linux::Inotify2;1" or $missingModule .= "Linux::Inotify2 ";
+eval "use File::Find;1" or $missingModule .= "File::Find ";
 
 
 #######################
 # Global variables
-my $version = "0.5.5";
+my $version = "0.5.7";
 our $inotify;
 our @watch;
 
@@ -86,11 +89,17 @@ sub inotify_Define($$) {
     return $msg;
   }
   
+  return "Cannot define a inotify device. Perl module(s) $missingModule is/are missing." if ( $missingModule );
+  
   $hash->{PATH}=$a[2];
   $hash->{FILES}=$a[3]?$a[3]:undef;
   
-  $hash->{VERSION} = $version;
-  $hash->{MID}     = 'da39a3ee5e6dfdss434436657657bdbfef95601890afd80709'; # 
+  $hash->{VERSION}  = $version;
+  
+  #$hash->{MID}     = 'da39a3ee5e6dfdss434436657657bdbfef95601890afd80709'; # 
+  my $mid           = "inotify_".$a[2].$a[3];
+  $mid              =~ s/[^A-Za-z0-9\-_]//g;
+  $hash->{MID}      = $mid;
   
   $hash->{NOTIFYDEV}= "global";
   
