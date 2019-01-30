@@ -280,11 +280,6 @@ MQTT2_SERVER_Read($@)
     $hash->{keepalive} = unpack('n', substr($pl, $off, 2)); $off += 2;
     ($hash->{cid}, $off) = MQTT2_SERVER_getStr($pl, $off);
 
-    if(!($hash->{cflags} & 0x02)) {
-      Log3 $sname, 2, "$cname wants unclean session, disconnecting";
-      return MQTT2_SERVER_terminate($hash, pack("C*", 0x20, 2, 0, 1));
-    }
-
     my $desc = "keepAlive:$hash->{keepalive}";
     if($hash->{cflags} & 0x04) { # Last Will & Testament
       my ($wt, $wm);
