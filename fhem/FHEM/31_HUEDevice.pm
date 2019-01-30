@@ -233,6 +233,7 @@ HUEDevice_devStateIcon($)
 
   return ".*:$s:toggle" if( AttrVal($name, "model", "") eq "LWL001" );
   return ".*:$s:toggle" if( AttrVal($name, "subType", "") eq "dimmer" );
+  return ".*:$s:toggle" if( AttrVal($name, "subType", "") eq "switch" );
 
   #return ".*:$s:toggle" if( AttrVal($name, "model", "") eq "LWB001" );
   #return ".*:$s:toggle" if( AttrVal($name, "model", "") eq "LWB003" );
