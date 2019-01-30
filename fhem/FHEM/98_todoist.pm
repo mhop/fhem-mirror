@@ -6,15 +6,19 @@ package main;
 
 use strict;
 use warnings;
-use Data::Dumper; 
-use JSON;
-use Encode;
-use Date::Parse;
-use Data::UUID;
+
+my $missingModule = "";
+
+eval "use Data::Dumper;1" or $missingModule .= "Data::Dumper ";
+eval "use JSON;1" or $missingModule .= "JSON ";
+eval "use Encode;1" or $missingModule .= "Encode ";
+
 
 #######################
 # Global variables
-my $version = "1.2.0.1";
+my $version = "1.2.0.5";
+
+my $srandUsed;
 
 my %gets = (
   "version:noArg"     => "",
@@ -88,30 +92,23 @@ sub todoist_Initialize($) {
                           "hideListIfEmpty:1,0 ".
                           "delDeletedLists:1,0 ".
                           "language:EN,DE ".
+                          "sslVersion ".
                           $readingFnAttributes;
     
   $hash->{NotifyOrderPrefix} = "64-";                      
                           
-  ## renew version in reload
+  ## renew version and language in reload
   foreach my $d ( sort keys %{ $modules{todoist}{defptr} } ) {
       my $hash = $modules{todoist}{defptr}{$d};
       $hash->{VERSION} = $version;
-  }
-                      
-  if( !defined($todoist_tt) ){
-    my @devs = devspec2array("TYPE=todoist");
-    if (@devs) {   
-      if ($devs[0]) {
-        # in any attribute redefinition readjust language
-        my $lang = AttrVal($devs[0],"language", AttrVal("global","language","EN"));
-        if( $lang eq "DE") {
-          $todoist_tt = \%todoist_transtable_DE;
-        }
-        else{
-          $todoist_tt = \%todoist_transtable_EN;
-        }
+      
+      my $lang = AttrVal($hash->{NAME},"language", AttrVal("global","language","EN"));
+      if( $lang eq "DE") {
+        $todoist_tt = \%todoist_transtable_DE;
       }
-    }
+      else{
+        $todoist_tt = \%todoist_transtable_EN;
+      }
   }
   
   return undef;
@@ -141,12 +138,14 @@ sub todoist_Define($$) {
     Log3 $name, 4, $msg;
     return $msg;
   }
+  
+  return "Cannot define a todoist device. Perl module(s) $missingModule is/are missing." if ( $missingModule );
 
   ## set internal variables
   $hash->{PID}=$a[2];
   $hash->{INTERVAL}=AttrVal($name,"pollInterval",undef)?AttrVal($name,"pollInterval",undef):1800;
   $hash->{VERSION}=$version;
-  $hash->{MID}     = 'da39a3ee5e634fdss43434bf3457bdbfef95601890afd80709'; # 
+  $hash->{MID}     = 'todoist_'.$a[2]; # 
   
   $modules{todoist}{defptr}{ $hash->{MID} } = $hash; #MID for internal purposes
   
@@ -300,8 +299,7 @@ sub todoist_UpdateTask($$$) {
   }
   
   # some random string for UUID
-  my $uuidO=Data::UUID->new;
-  my $uuid=$uuidO->create_str();
+  my $uuid = todoist_genUUID();
   
   # JSON String start- and endpoint
   my $commandsStart="[{";
@@ -1912,6 +1910,8 @@ sub todoist_Html(;$$$) {
   my $ret="";
   my $rot="";
   
+  my $eo;
+  
   my $r=0;
   
   my $count = @devs;
@@ -2068,7 +2068,7 @@ sub todoist_Html(;$$$) {
       }
       
       my $i=1;
-      my $eo;
+   
       my $cs=3;
       
       # show data
@@ -2168,6 +2168,15 @@ sub todoist_inArray {
   return 0;
 }
 
+sub todoist_genUUID() {
+  srand(gettimeofday()) if(!$srandUsed);
+  $srandUsed = 1;
+  my $uuid = sprintf("%08x-f33f-%s-%s-%s", time(), substr(getUniqueId(),-4), 
+    join("",map { unpack "H*", chr(rand(256)) } 1..2),
+    join("",map { unpack "H*", chr(rand(256)) } 1..8));
+  return $uuid;
+}
+
 1;
 
 =pod
@@ -2187,7 +2196,7 @@ sub todoist_inArray {
     <br /><br />
     Notes:<br />
     <ul>
-        <li>JSON, Data::Dumper, Digest::MD5, Date::Parse and Data::UUID have to be installed on the FHEM host.</li>
+        <li>JSON, Data::Dumper, Digest::MD5, have to be installed on the FHEM host.</li>
     </ul>
     <br /><br />
     <a name="todoist_Define"></a>
