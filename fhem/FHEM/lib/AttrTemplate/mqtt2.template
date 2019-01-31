@@ -167,6 +167,50 @@ attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
 deletereading DEVICE .*
 attr DEVICE model L_07_TempHumHpa_TempSensor
 
+#source post: https://forum.fhem.de/index.php/topic,94495.msg898198.html#msg898198
+name:L_08_zigbee2mqtt_Human_Motion_Sensor
+desc: Temp/hum/hpa sensor via zigbee2mqtt <br>Tested with: Xiaomi Aquara RTCGQ11LM Human Motion Sensor
+filter:TYPE=MQTT2_DEVICE
+par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/](.*):, ? $1 : undef }
+attr DEVICE stateFormat Motion: occupancy Luminance: illuminance
+attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+deletereading DEVICE .*
+attr DEVICE model L_08_Human_Motion_TempSensor
+
+#source post: https://forum.fhem.de/index.php/topic,94495.msg898198.html#msg898198
+name:L_09_zigbee2mqtt_Motion_Sensor
+desc: Temp/hum/hpa sensor via zigbee2mqtt <br>Tested with: Xiaomi Aquara DJT11LM Smart Motion Sensor
+filter:TYPE=MQTT2_DEVICE
+par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/](.*):, ? $1 : undef }
+attr DEVICE stateFormat Motion: action X: angle_x Y: angle_y Z: angle_z
+attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+deletereading DEVICE .*
+attr DEVICE model L_09_Motion_Sensor
+
+#source post: https://forum.fhem.de/index.php/topic,94495.msg898198.html#msg898198
+name:L_10_zigbee2mqtt_Water_Leak_Sensor
+desc: Temp/hum/hpa sensor via zigbee2mqtt <br>Tested with: Xiaomi Aquara SJCGQ11LM Water Leak Sensor
+filter:TYPE=MQTT2_DEVICE
+par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/](.*):, ? $1 : undef }
+attr DEVICE stateFormat Leak: water_leak
+attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+deletereading DEVICE .*
+attr DEVICE model L_10_Water_Leak_Sensor
+
+#source post: https://forum.fhem.de/index.php/topic,94495.msg898198.html#msg898198
+name:L_11_zigbee2mqtt_Light_Switch
+desc: Temp/hum/hpa sensor via zigbee2mqtt <br>Tested with: Xiaomi Aquara WXKG02LM 2btn Smart Light Switch
+filter:TYPE=MQTT2_DEVICE
+par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/](.*):, ? $1 : undef }
+attr DEVICE stateFormat click
+attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+deletereading DEVICE .*
+attr DEVICE model L_11_Light_Switch
+
 ###########################################
 # TASMOTA
 # The regexp must handle
