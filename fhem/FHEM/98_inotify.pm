@@ -4,10 +4,29 @@ package main;
 
 use strict;
 use warnings;
-use Linux::Inotify2;
 use Data::Dumper;
 
 my $missingModule = "";
+
+eval { use Linux::Inotify2; };
+
+unless($@) {
+  Log 4, "inotify - found Linux::Inotify2";
+}
+else {
+  Log 1, "inotify - unable to load Linux::Inotify2 module: $@. Please install with sudo apt-get install liblinux-inotify2-perl"; 
+  $missingModule = "Linux::Inotify2 ";
+}
+
+eval { use File::Find; };
+
+unless($@) {
+  Log 4, "inotify - found File::Find";
+}
+else {
+  Log 1, "inotify - unable to load File::Find module: $@. Please install it."; 
+  $missingModule = "File::Find ";
+}
 
 
 eval "use File::Find;1" or $missingModule .= "File::Find ";
@@ -15,7 +34,7 @@ eval "use File::Find;1" or $missingModule .= "File::Find ";
 
 #######################
 # Global variables
-my $version = "0.5.8";
+my $version = "0.6.1";
 our $inotify;
 our @watch;
 
