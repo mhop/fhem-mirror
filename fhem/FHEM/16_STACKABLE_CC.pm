@@ -27,9 +27,9 @@ STACKABLE_CC_Initialize($)
   $hash->{noRawInform} = 1;     # Our message was already sent as raw.
   $hash->{noAutocreatedFilelog} = 1;
 
-  $hash->{IOOpenFn}  = "STACKABLE_IOOpenFn";
-  $hash->{IOReadFn}  = "STACKABLE_IOReadFn";
-  $hash->{IOWriteFn} = "STACKABLE_IOWriteFn";
+  $hash->{IOOpenFn}  = "STACKABLE_CC_IOOpenFn";
+  $hash->{IOReadFn}  = "STACKABLE_CC_IOReadFn";
+  $hash->{IOWriteFn} = "STACKABLE_CC_IOWriteFn";
 }
 
 #####################################
@@ -135,7 +135,7 @@ STACKABLE_CC_Parse($$)
       delete $th->{IOReadFn};
       $th->{IODevRxBuffer} = pack("H*", $msg);
       CallFn($th->{NAME}, "ReadFn", $th);
-      $th->{IOReadFn} = "STACKABLE_IOReadFn";
+      $th->{IOReadFn} = "STACKABLE_CC_IOReadFn";
     } else {
       Log 1, "$name: no TCM device assigned";
     }
@@ -171,17 +171,17 @@ STACKABLE_CC_Undef($$)
 }
 
 sub
-STACKABLE_IOOpenFn($)
+STACKABLE_CC_IOOpenFn($)
 {
   my ($hash) = @_;
   $hash->{FD} = $hash->{IODev}{IODev}{FD};     # Lets fool the TCM
   $hash->{IODev}{TCMHash} = $hash;
-  $hash->{IOReadFn} = "STACKABLE_IOReadFn";
+  $hash->{IOReadFn} = "STACKABLE_CC_IOReadFn";
   return 1;
 }
 
 sub
-STACKABLE_IOReadFn($)
+STACKABLE_CC_IOReadFn($)
 {
   my ($hash) = @_;
   my $me = $hash->{IODev};
@@ -195,7 +195,7 @@ STACKABLE_IOReadFn($)
 }
 
 sub
-STACKABLE_IOWriteFn($$)
+STACKABLE_CC_IOWriteFn($$)
 {
   my ($hash, $msg) = @_;
   return IOWrite($hash, "", unpack("H*",$msg));
