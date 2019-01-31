@@ -515,6 +515,7 @@
 		<Product type="0203" id="1000" name="FGS223 Double Relay" config="fibaro/fgs223.xml"/>
 		<Product type="0203" id="2000" name="FGS223 Double Relay" config="fibaro/fgs223.xml"/>
 		<Product type="0203" id="3000" name="FGS223 Double Relay" config="fibaro/fgs223.xml"/>
+		<Product type="0303" id="1000" name="FGR223 Roller Shutter Controller 3" config="fibaro/fgr223.xml"/>
 		<Product type="0600" id="1000" name="FGWPE/F Wall Plug" config="fibaro/fgwpe.xml" />
 		<Product type="0200" id="1000" name="FGWPE/F Wall Plug" config="fibaro/fgwpe.xml"/>
 		<Product type="0602" id="1001" name="FGWPE/F Wall Plug Gen5" config="fibaro/fgwpfzw5.xml" />
@@ -935,6 +936,7 @@
 		<Product type="0003" id="108b" name="Wall Switch (2 channels)" config="shenzen_neo/ls02ch.xml"/>
 		<Product type="0003" id="008c" name="Wall Switch (1 channel)" config="shenzen_neo/ls01ch.xml"/>
 		<Product type="0003" id="108c" name="Wall Switch (1 channel)" config="shenzen_neo/ls01ch.xml"/>
+		<Product type="0200" id="1027" name="Power plug 12A" config="shenzen_neo/nas-wr01z.xml" forumNr="96406"/>
 	</Manufacturer>
 	<Manufacturer id="0178" name="Nexia">
 		<Product type="4442" id="3130" name="DB100Z Doorbell Sensor" config="nexia/db100z.xml"/>
@@ -1127,7 +1129,7 @@
 	</Manufacturer>
 	<Manufacturer id="019a" name="Sensative">
 		<Product type="0003" id="0003" name="Strips" config="sensative/strips.xml" />
-		<Product type="0003" id="000a" name="Strips Comfort" config="sensative/stripsconfort.xml" />
+		<Product type="0003" id="000a" name="Strips Comfort" config="sensative/stripscomfort.xml" />
 	</Manufacturer>
 	<Manufacturer id="0044" name="Sequoia Tech">
 	</Manufacturer>
