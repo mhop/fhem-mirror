@@ -307,6 +307,7 @@ FHEM/63_EMGZ.pm              rudolfkoenig         SlowRF
 FHEM/64_ESA2000.pm           stromer-12           SlowRF
 FHEM/66_ECMD.pm              neubert              Sonstige Systeme
 FHEM/67_ECMDDevice.pm        neubert              Sonstige Systeme
+FHEM/70_BOTVAC.pm            vuffiraa             Sonstige Systeme
 FHEM/70_BRAVIA.pm            vuffiraa             Multimedia
 FHEM/70_DoorPi.pm            pahenning            Automatisierung
 FHEM/70_EGPM.pm              alexus               Sonstiges
