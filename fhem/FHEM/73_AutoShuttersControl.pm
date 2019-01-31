@@ -2,7 +2,7 @@
 #
 # Developed with Kate
 #
-#  (c) 2018 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
+#  (c) 2018-2019 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
 #  All rights reserved
 #
 #   Special thanks goes to:
@@ -41,7 +41,7 @@ package main;
 use strict;
 use warnings;
 
-my $version = '0.2.3.3';
+my $version = '0.4.0.2';
 
 sub AutoShuttersControl_Initialize($) {
     my ($hash) = @_;
@@ -159,6 +159,8 @@ my %userAttrList = (
     'ASC_Time_Up_WE_Holiday'                     => '08:30',
     'ASC_Time_Down_Early'                        => '15:30',
     'ASC_Time_Down_Late'                         => '22:30',
+    'ASC_PrivacyDownTime_beforNightClose'        => -1,
+    'ASC_PrivacyDown_Pos'                        => 50,
     'ASC_WindowRec'                              => 'none',
     'ASC_Ventilate_Window_Open:on,off'           => 'on',
     'ASC_LockOut:soft,hard,off'                  => 'off',
@@ -182,6 +184,7 @@ my %userAttrList = (
     #     'ASC_Shading_Fast_Open:on,off'                     => 'none',
     #     'ASC_Shading_Fast_Close:on,off'                    => 'none',
     'ASC_Drive_Offset'                                     => -1,
+    'ASC_Drive_OffsetStart'                                => -1,
     'ASC_WindowRec_subType:twostate,threestate'            => 'twostate',
     'ASC_ShuttersPlace:window,terrace'                     => 'window',
     'ASC_Ventilate_Pos:10,20,30,40,50,60,70,80,90,100'     => [ '', 70, 30 ],
@@ -382,7 +385,7 @@ sub Notify($$) {
         }
         elsif (
             grep
-/^(ATTR|DELETEATTR)\s(.*ASC_Time_Up_WE_Holiday|.*ASC_Up|.*ASC_Down|.*ASC_AutoAstroModeMorning|.*ASC_AutoAstroModeMorningHorizon|.*ASC_AutoAstroModeEvening|.*ASC_AutoAstroModeEveningHorizon|.*ASC_Time_Up_Early|.*ASC_Time_Up_Late|.*ASC_Time_Down_Early|.*ASC_Time_Down_Late|.*ASC_autoAstroModeMorning|.*ASC_autoAstroModeMorningHorizon|.*ASC_autoAstroModeEvening|.*ASC_autoAstroModeEveningHorizon)(\s.*|$)/,
+/^(ATTR|DELETEATTR)\s(.*ASC_Time_Up_WE_Holiday|.*ASC_Up|.*ASC_Down|.*ASC_AutoAstroModeMorning|.*ASC_AutoAstroModeMorningHorizon|.*ASC_AutoAstroModeEvening|.*ASC_AutoAstroModeEveningHorizon|.*ASC_Time_Up_Early|.*ASC_Time_Up_Late|.*ASC_Time_Down_Early|.*ASC_Time_Down_Late|.*ASC_autoAstroModeMorning|.*ASC_autoAstroModeMorningHorizon|.*ASC_PrivacyDownTime_beforNightClose|.*ASC_autoAstroModeEvening|.*ASC_autoAstroModeEveningHorizon)(\s.*|$)/,
             @{$events}
           )
         {
@@ -455,7 +458,7 @@ m#^DELETEATTR\s(.*)\s(ASC_Roommate_Device|ASC_WindowRec|ASC_residentsDevice|ASC_
             DeleteNotifyDev( $hash, $1, $2 );
         }
         elsif ( $events =~
-m#^ATTR\s(.*)\s(ASC_Time_Up_WE_Holiday|ASC_Up|ASC_Down|ASC_AutoAstroModeMorning|ASC_AutoAstroModeMorningHorizon|ASC_AutoAstroModeEvening|ASC_AutoAstroModeEveningHorizon|ASC_Time_Up_Early|ASC_Time_Up_Late|ASC_Time_Down_Early|ASC_Time_Down_Late)\s(.*)$#
+m#^ATTR\s(.*)\s(ASC_Time_Up_WE_Holiday|ASC_Up|ASC_Down|ASC_AutoAstroModeMorning|ASC_AutoAstroModeMorningHorizon|ASC_PrivacyDownTime_beforNightClose|ASC_AutoAstroModeEvening|ASC_AutoAstroModeEveningHorizon|ASC_Time_Up_Early|ASC_Time_Up_Late|ASC_Time_Down_Early|ASC_Time_Down_Late)\s(.*)$#
           )
         {
             CreateSunRiseSetShuttersTimer( $hash, $1 )
@@ -766,7 +769,9 @@ sub EventProcessingWindowRec($@) {
     my ( $hash, $shuttersDev, $events ) = @_;
     my $name = $hash->{NAME};
 
-    if ( $events =~ m#state:\s(open|closed|tilted)# ) {
+    if ( $events =~ m#state:\s(open|closed|tilted)#
+        and IsAfterShuttersManualBlocking($shuttersDev) )
+    {
         $shutters->setShuttersDev($shuttersDev);
 
         #### Hardware Lock der Rollläden
@@ -788,17 +793,18 @@ sub EventProcessingWindowRec($@) {
             : $shutters->getStatus < $shutters->getComfortOpenPos
         );
 
-        if ( $shutters->getDelayCmd ne 'none' and $1 eq 'closed' )
-        { # Es wird geschaut ob wärend der Fenster offen Phase ein Fahrbefehl über das Modul kam,wenn ja wird dieser aus geführt
-            $shutters->setLastDrive('delayed drive - window closed');
-            ShuttersCommandSet( $hash, $shuttersDev, $shutters->getDelayCmd );
-        }
-        elsif ( $1 eq 'closed'
-            and IsAfterShuttersTimeBlocking( $hash, $shuttersDev )
-          ) # wenn nicht dann wird entsprechend dem Fensterkontakt Event der Rolladen geschlossen
+#         ## Wird erstmal deaktiviert da es Sinnlos ist in meinen Augen
+#         if ( $shutters->getDelayCmd ne 'none' and $1 eq 'closed' )
+#         { # Es wird geschaut ob wärend der Fenster offen Phase ein Fahrbefehl über das Modul kam,wenn ja wird dieser aus geführt
+#             $shutters->setLastDrive('delayed drive - window closed');
+#             ShuttersCommandSet( $hash, $shuttersDev, $shutters->getDelayCmd );
+#         }
+        if (  $1 eq 'closed'
+          and IsAfterShuttersTimeBlocking( $hash, $shuttersDev ) )
         {
             if (   $shutters->getStatus == $shutters->getVentilatePos
-                or $shutters->getStatus == $shutters->getComfortOpenPos )
+                or $shutters->getStatus == $shutters->getComfortOpenPos
+                or $shutters->getStatus == $shutters->getOpenPos )
             {
                 my $homemode = $shutters->getRoommatesStatus;
                 $homemode = $ascDev->getResidentsStatus
@@ -1340,7 +1346,7 @@ sub ShadingProcessing($@) {
       if ( not IsDay( $hash, $shuttersDev )
         and $shutters->getShading ne 'out' );
 
-    Log3( $name, 3,
+    Log3( $name, 4,
             "AutoShuttersControl ($name) - Shading Processing, Rollladen: "
           . $shuttersDev
           . " Azimuth: "
@@ -1523,19 +1529,29 @@ sub ShuttersCommandSet($$$) {
     );
 
     if (
-        $posValue != $shutters->getShadingPos
-        and (   $shutters->getPartyMode eq 'on'
-            and $ascDev->getPartyMode eq 'on' )
-        or (    CheckIfShuttersWindowRecOpen($shuttersDev) == 2
-            and $shutters->getSubTyp eq 'threestate'
-            and $ascDev->getAutoShuttersControlComfort eq 'off'
-            and $shutters->getVentilateOpen eq 'on' )
-        or (
-            CheckIfShuttersWindowRecOpen($shuttersDev) == 2
-            and (  $shutters->getLockOut eq 'soft'
-                or $shutters->getLockOut eq 'hard' )
-            and $ascDev->getHardLockOut eq 'on'
-            and not $queryShuttersPosValue
+        (
+               $posValue != $shutters->getShadingPos
+            or $shutters->getShuttersPlace eq 'terrace'
+        )
+        and (
+            (
+                    $shutters->getPartyMode eq 'on'
+                and $ascDev->getPartyMode eq 'on'
+            )
+            or (
+                    CheckIfShuttersWindowRecOpen($shuttersDev) == 2
+                and $shutters->getSubTyp eq 'threestate'
+                and (  $ascDev->getAutoShuttersControlComfort eq 'off'
+                    or $shutters->getComfortOpenPos != $posValue )
+                and $shutters->getVentilateOpen eq 'on'
+            )
+            or (
+                CheckIfShuttersWindowRecOpen($shuttersDev) == 2
+                and (  $shutters->getLockOut eq 'soft'
+                    or $shutters->getLockOut eq 'hard' )
+                and $ascDev->getHardLockOut eq 'on'
+                and not $queryShuttersPosValue
+            )
         )
       )
     {
@@ -1622,12 +1638,33 @@ sub CreateSunRiseSetShuttersTimer($$) {
     my %funcHash = (
         hash           => $hash,
         shuttersdevice => $shuttersDev,
+        privacyMode    => 0,
         sunsettime     => $shuttersSunsetUnixtime,
         sunrisetime    => $shuttersSunriseUnixtime
     );
 
     ## Ich brauche beim löschen des InternalTimer den Hash welchen ich mitgegeben habe,dieser muss gesichert werden
     $shutters->setInTimerFuncHash( \%funcHash );
+
+    ## Abfrage für die Sichtschutzfahrt am Abend vor dem eigentlichen kompletten schließen
+    if ( $shutters->getPrivacyDownTime > 0 ) {
+        if ( ( $shuttersSunsetUnixtime - $shutters->getPrivacyDownTime ) >
+            ( gettimeofday() + 1 ) )
+        {
+            $shuttersSunsetUnixtime =
+              $shuttersSunsetUnixtime - $shutters->getPrivacyDownTime;
+            readingsSingleUpdate(
+                $shuttersDevHash,
+                'ASC_Time_PrivacyDriveUp',
+                strftime(
+                    "%e.%m.%Y - %H:%M",
+                    localtime($shuttersSunsetUnixtime)
+                ),
+                0
+            );
+            $funcHash{privacyMode} = 1;
+        }
+    }
 
     InternalTimer( $shuttersSunsetUnixtime,
         'AutoShuttersControl::SunSetShuttersAfterTimerFn', \%funcHash )
@@ -1735,8 +1772,22 @@ sub SunSetShuttersAfterTimerFn($) {
         and IsAfterShuttersManualBlocking($shuttersDev)
       )
     {
-        $shutters->setLastDrive('night close');
-        ShuttersCommandSet( $hash, $shuttersDev, $posValue );
+        $shutters->setLastDrive(
+            (
+                $funcHash->{privacyMode} == 1
+                ? 'privacy position'
+                : 'night close'
+            )
+        );
+        ShuttersCommandSet(
+            $hash,
+            $shuttersDev,
+            (
+                  $funcHash->{privacyMode} == 1
+                ? $shutters->getPrivacyDownPos
+                : $posValue
+            )
+        );
     }
 
     CreateSunRiseSetShuttersTimer( $hash, $shuttersDev );
@@ -2536,7 +2587,8 @@ sub setDriveCmd {
     $offSet = $shutters->getOffset       if ( $shutters->getOffset > 0 );
     $offSet = $ascDev->getShuttersOffset if ( $shutters->getOffset == -1 );
 
-    InternalTimer( gettimeofday() + int( rand($offSet) + 3 ),
+    InternalTimer(
+        gettimeofday() + int( rand($offSet) + $shutters->getOffsetStart ),
         'AutoShuttersControl::SetCmdFn', \%h )
       if ( $offSet > 0 and not $shutters->getNoOffset );
     AutoShuttersControl::SetCmdFn( \%h )
@@ -2863,6 +2915,19 @@ sub getShuttersPlace {
     return AttrVal( $self->{shuttersDev}, 'ASC_ShuttersPlace', 'window' );
 }
 
+sub getPrivacyDownTime {
+    my $self = shift;
+
+    return AttrVal( $self->{shuttersDev},
+        'ASC_PrivacyDownTime_beforNightClose', -1 );
+}
+
+sub getPrivacyDownPos {
+    my $self = shift;
+
+    return AttrVal( $self->{shuttersDev}, 'ASC_PrivacyDown_Pos', 50 );
+}
+
 sub getSelfDefenseExclude {
     my $self = shift;
 
@@ -2964,6 +3029,16 @@ sub getOffset {
     my $self = shift;
 
     return AttrVal( $self->{shuttersDev}, 'ASC_Drive_Offset', 0 );
+}
+
+sub getOffsetStart {
+    my $self = shift;
+
+    return (
+          AttrVal( $self->{shuttersDev}, 'ASC_Drive_OffsetStart', 3 ) > 2
+        ? AttrVal( $self->{shuttersDev}, 'ASC_Drive_OffsetStart', 3 )
+        : 3
+    );
 }
 
 sub getBlockingTimeAfterManual {
@@ -3895,7 +3970,8 @@ sub getRainSensorShuttersClosedPos {
       <li>ASC_Down - astro/time/brightness - bei astro wird Sonnenuntergang berechnet, bei time wird der Wert aus ASC_Time_Down_Early als Fahrzeit verwendet und bei brightness muss ASC_Time_Down_Early und ASC_Time_Down_Late korrekt gesetzt werden. Der Timer l&auml;uft dann nach ASC_Time_Down_Late Zeit, es wird aber in der Zeit zwischen ASC_Time_Down_Early und ASC_Time_Down_Late geschaut, ob die als Attribut im Moduldevice hinterlegte ASC_brightnessMinVal erreicht wurde. Wenn ja, wird der Rollladen runter gefahren</li>
       <li>ASC_Mode_Down - always/home/absent/off - Wann darf die Automatik steuern. immer, niemals, bei Abwesenheit des Roommate (ist kein Roommate und absent eingestellt, wird gar nicht gesteuert)</li>
       <li>ASC_Mode_Up - always/home/absent/off - Wann darf die Automatik steuern. immer, niemals, bei Abwesenheit des Roommate (ist kein Roommate und absent eingestellt, wird gar nicht gesteuert)</li>
-      <li>ASC_Drive_Offset - maximale zuf&auml;llige Verz&ouml;gerung in Sekunden bei der Berechnung der Fahrzeiten, 0 bedeutet keine Verz&ouml;gerung, -1 bedeutet, dass das gleichwertige Attribut aus dem ASC Device ausgewertet werden soll.</li>
+      <li>ASC_Drive_Offset - maximaler Wert f&uuml;r einen zuf&auml;llig ermittelte Verz&ouml;gerungswert in Sekunden bei der Berechnung der Fahrzeiten, 0 bedeutet keine Verz&ouml;gerung, -1 bedeutet, dass das gleichwertige Attribut aus dem ASC Device ausgewertet werden soll.</li>
+      <li>ASC_Drive_OffsetStart - in Sekunden verz&ouml;gerter Wert ab welchen dann erst das Offset startet und dazu addiert wird. Funktioniert nur wenn gleichzeitig ein Drive_Offset gesetzt wird.</li>
       <li>ASC_Open_Pos -  in 10 Schritten von 0 bis 100, Default ist abh&auml;ngig vom Attribut ASC</li>
       <li>ASC_Partymode -  on/off - schaltet den Partymodus an oder aus. Wird  am ASC Device set ASC-DEVICE partyMode on geschalten, werden alle Fahrbefehle an den Rolll&auml;den, welche das Attribut auf on haben, zwischengespeichert und sp&auml;ter erst ausgef&uuml;hrt</li>
       <li>ASC_Pos_Reading - Name des Readings, welches die Position des Rollladen in Prozent an gibt; wird bei unbekannten Device Typen auch als set Befehl zum fahren verwendet</li>
@@ -3933,7 +4009,9 @@ sub getRainSensorShuttersClosedPos {
       <li>ASC_Shading_StateChange_Cloudy - Brightness Wert ab welchen die Beschattung aufgehoben werden soll, immer in Abh&auml;ngikkeit der anderen einbezogenden Sensorwerte</li>
       <li>ASC_Shading_Min_Elevation - ab welcher Höhe des Sonnenstandes soll beschattet werden, immer in Abh&auml;ngikkeit der anderen einbezogenden Sensorwerte</li>
       <li>ASC_Shading_Min_OutsideTemperature - ab welcher Temperatur soll Beschattet werden, immer in Abh&auml;ngikkeit der anderen einbezogenden Sensorwerte</li>
-      <li>ASC_Shading_WaitingPeriod - wie viele Sekunden soll gewartet werden bevor eine weitere Auswertung der Sensordaten für die Beschattung statt finden soll</li> 
+      <li>ASC_Shading_WaitingPeriod - wie viele Sekunden soll gewartet werden bevor eine weitere Auswertung der Sensordaten für die Beschattung statt finden soll</li>
+      <li>ASC_PrivacyDownTime_beforNightClose - wie viele Sekunden vor dem abendlichen schlie&zlig;en soll der Rollladen in die Sichtschutzposition fahren, -1 bedeutet das diese Funktion unbeachtet bleiben soll</li>
+      <li>ASC_PrivacyDown_Pos - Position den Rollladens f&uuml;r den Sichtschutz</li>
     </ul>
   </ul>
 </ul>
