@@ -114,6 +114,7 @@ FW_uzsuSelectCreate(elName, devName, vArr, currVal, set, params, cmd)
 
   var buttons = [];
   for( var i = 1; i < vArr.length; ++i ) {
+    vArr[i] = vArr[i].replace(/#/g," ");
     var button = $('<input type="checkbox">').uniqueId();
     var label = $('<label for="'+button.attr("id")+'">'+vArr[i]+'</label>');
     buttons.push(button);
