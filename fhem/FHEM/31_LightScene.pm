@@ -599,7 +599,7 @@ LightScene_Set($@)
 
   my @sorted = sort keys %{$hash->{SCENES}};
 
-  if( $cmd eq "?" ){ return "Unknown argument ?, choose one of remove:".join(",", @sorted) ." rename save set setcmd scene:".join(",", @sorted) ." all nextScene:noArg previousScene:noArg"};
+  if( $cmd eq "?" ){ return "Unknown argument ?, choose one of clear remove:".join(",", @sorted) ." rename save set setcmd scene:".join(",", @sorted) ." all nextScene:noArg previousScene:noArg"};
 
   if( $cmd eq "all" && !defined( $scene ) ) { return "Usage: set $name all <command>" };
   if( $cmd eq "save" && !defined( $scene ) ) { return "Usage: set $name save <scene_name>" };
@@ -607,7 +607,14 @@ LightScene_Set($@)
   if( $cmd eq "remove" && !defined( $scene ) ) { return "Usage: set $name remove <scene_name>" };
   if( $cmd eq "rename" && !defined( $scene ) ) { return "Usage: set $name rename <scene_alt> <scene_neu>" };
 
-  if( $cmd eq "remove" ) {
+  if( $cmd eq "clear" ) {
+    foreach my $s (keys %{ $hash->{SCENES} }) {
+      next if( $scene && $s !~ m/^$scene$/ );
+      delete  $hash->{SCENES}{$s};
+    }
+    return undef;
+
+  } elsif( $cmd eq "remove" ) {
     return "no such scene: $scene" if( !defined $hash->{SCENES}{$scene} );
     delete( $hash->{SCENES}{$scene} );
     return undef;
@@ -1063,6 +1070,8 @@ LightScene_editTable($) {
         <li>set kino_group setcmd allOff LampeDecke sleep 30 ;; set LampeDecke off</li>
         <li>set light_group setcmd test Lampe1 sleep 10 ;; set Lampe1 on ;; sleep 5 ;; set Lampe1 off</li>
       </ul></li>
+      <li>clear [&lt;regex&gt;]<br>
+        clears all scenes or all scenes matching &lt;regex&gt; from list of saved scenes</li>
       <li>remove &lt;scene_name&gt;<br>
         remove &lt;scene_name&gt; from list of saved scenes</li>
       <li>rename &lt;scene_old_name&gt; &lt;scene_new_name&gt;<br>
