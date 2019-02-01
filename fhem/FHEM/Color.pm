@@ -6,7 +6,9 @@ package main;
 use strict;
 use warnings;
 
+use vars qw(%defs);
 use vars qw($FW_ME);
+sub Log3($$$);
 
 sub
 Color_Initialize()
@@ -358,6 +360,70 @@ ct2rgb($)
   $b = 255 if( $b > 255 );
 
   return( $r, $g, $b );
+}
+
+
+# COLOR SPACE: xyY & RGB(dec)
+# xyY > h=float(0, 1), s=float(0, 1), v=float(0, 1)
+# RGB > r=float(0, 1), g=float(0, 1), b=float(0, 1)
+#
+
+sub
+xyY2rgb($$$)
+{
+  # calculation from http://www.brucelindbloom.com/index.html
+  my ($x,$y,$Y) = @_;
+#Log 3, "xyY:". $x . " " . $y ." ". $Y;
+
+  my $r = 0;
+  my $g = 0;
+  my $b = 0;
+
+  if( $y > 0 ) {
+    my $X = $x * $Y / $y;
+    my $Z = (1 - $x - $y)*$Y / $y;
+
+    if( $X > 1
+        || $Y > 1
+        || $Z > 1 ) {
+      my $f = maxNum($X,$Y,$Z);
+      $X /= $f;
+      $Y /= $f;
+      $Z /= $f;
+    }
+#Log 3, "XYZ: ". $X . " " . $Y ." ". $Y;
+
+    $r =  0.7982 * $X + 0.3389 * $Y - 0.1371 * $Z;
+    $g = -0.5918 * $X + 1.5512 * $Y + 0.0406 * $Z;
+    $b =  0.0008 * $X + 0.0239 * $Y + 0.9753 * $Z;
+
+    if( $r > 1
+        || $g > 1
+        || $b > 1 ) {
+      my $f = main::maxNum($r,$g,$b);
+      $r /= $f;
+      $g /= $f;
+      $b /= $f;
+    }
+#Log 3, "rgb: ". $r . " " . $g ." ". $b;
+
+    #$r *= 255;
+    #$g *= 255;
+    #$b *= 255;
+  }
+
+  return( $r, $g, $b );
+}
+
+# COLOR SPACE: xyY & RGB(hex)
+# xyY > h=float(0, 1), s=float(0, 1), v=float(0, 1)
+# RGB > r=hex(00, FF), g=hex(00, FF), b=hex(00, FF)
+sub
+xyY2hex($$$) {
+  my ($x,$y,$Y) = @_;
+    my ($r,$g,$b) = Color::xyY2rgb( $x, $y, $Y );
+
+    return Color::rgb2hex( $r*255, $g*255, $b*255 );
 }
 
 
