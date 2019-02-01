@@ -38,7 +38,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "1.8";
+my $version = "1.81";
 
 #-- these we may get on request
 my %gets = (
@@ -425,7 +425,7 @@ sub Shelly_Set ($@) {
       Shelly_configure($hash,"rc");
     }
     
-    if( $hash->{MOVING} ne "stopped" ){
+    if( ($hash->{MOVING} ne "stopped") && ($cmd ne "stop") ){
       $msg = "Error: roller blind still moving, wait for some time";
       Log3 $name,1,"[Shelly_Set] ".$msg;
       return $msg
@@ -1091,7 +1091,7 @@ sub Shelly_updown2($){
 
 <h3>Shelly</h3>
 <ul>
-Absichtlich keine deutsche Dokumentation vorhanden, die englische Version gibt es hier: <a href="/fhem/docs/commandref.html#Shelly">Shelly</a> 
+Absichtlich keine deutsche Dokumentation vorhanden, die englische Version gibt es hier: <a href="commandref.html#Shelly">Shelly</a> 
 </ul>
 =end html_DE
 
