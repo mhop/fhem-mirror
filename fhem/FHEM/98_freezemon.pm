@@ -22,6 +22,8 @@
 #
 ##############################################################################
 # 	  Changelog:
+#		0.0.26:	Get command for Statistics
+#				remove trailing/leading whitespace for ignored devices
 #		0.0.25:	Further improved statistics function and clear statistics
 #		0.0.24:	Optimized statistics function
 #				Added clear statistics command
@@ -104,7 +106,7 @@ use B qw(svref_2object);
 use Blocking;
 use vars qw($FW_CSRF);
 
-my $version = "0.0.25";
+my $version = "0.0.26";
 
 my @logqueue = ();
 my @fmCmd    = ();
@@ -276,6 +278,9 @@ sub freezemon_ProcessTimer($) {
 
         #Build a hash of devices to ignore
         my @idevs = split( ",", AttrVal( $name, "fm_ignoreDev", "" ) );
+        @idevs = grep( s/\s*$//g, @idevs )
+          ;    #remove leading/trailing whitespace https://forum.fhem.de/index.php/topic,83909.msg898431.html#msg898431
+
         my %id = map { $_ => 1 } @idevs;
 
         my %blacklist = map { $_ => 1 } split( ",", AttrVal( $name, "fm_whitelistSub", "" ) );
@@ -645,7 +650,7 @@ sub freezemon_Get($@) {
     my $name  = $hash->{NAME};
     my $state = $hash->{STATE};
     my $ret   = "";
-    my $usage = 'Unknown argument $a[1], choose one of freeze:noArg log:';
+    my $usage = 'Unknown argument $a[1], choose one of statistic:noArg freeze:noArg log:';
 
     return "\"get $name\" needs at least one argument" unless ( defined( $a[1] ) );
 
@@ -681,6 +686,33 @@ sub freezemon_Get($@) {
         }
 
         return "<html>" . $ret . "</html>";
+    }
+    elsif ( $a[1] eq "statistic" ) {
+        my %stats;
+        foreach my $r ( keys %{ $hash->{READINGS} } ) {
+            next unless ( $r =~ /fs_(.*)_c/ );
+            my $dev = $1;
+            my $rc  = ReadingsNum( $name, $r, 0 );
+            my $t   = $r =~ s/_c/_t/r;
+            my $rt  = ReadingsNum( $name, $t, 0 );
+
+            $stats{"$dev"}{cnt}  = $rc;
+            $stats{"$dev"}{time} = $rt;
+        }
+
+        my @positioned =
+          sort { $stats{$b}{cnt} <=> $stats{$a}{cnt} or $stats{$b}{time} <=> $stats{$a}{time} } keys %stats;
+        my $ret = "<html>";
+        $ret .= "<table><tr><th>Device</th><th>Count</th><th>Time</th></tr>";
+        my $i;
+        foreach my $p (@positioned) {
+            last if $i > 20;
+            $i++;
+            $ret .= "<tr><td>$p</td><td>" . $stats{"$p"}{cnt} . "</td><td>" . $stats{"$p"}{time} . "</td></tr>";
+        }
+        $ret .= "</table></html>";
+        return $ret;
+
     }
     elsif ( $a[1] eq "log" ) {
         return "No Filename given" if ( !defined( $a[2] ) );
@@ -1406,6 +1438,7 @@ sub freezemon_getLogPath($) {
 	<ul>
 		<li><a name="freeze">freeze</a>: returns the last 20 freezes (in compact view, like in state) - This is for a quick overview. For detailed analysis the data should be logged.</li>
 		<li><a name="log">log</a>: provides direct access to the logfiles written when fm_logFile is active</li>
+		<li><a name="statistic">statistic</a>: Provides a nicer formatted overview of the top 20 devices from freeze statistics</li>
 	</ul>
   </ul>
   
@@ -1507,6 +1540,7 @@ sub freezemon_getLogPath($) {
 	<ul>
 		<li><a name="freeze">freeze</a>: gibt die letzten 20 freezes zurück (in Kompakter Darstellung, wie im state) - Dies dient einem schnellen Überblick, für detailliertere Auswertungen empfehle ich die Daten zu loggen.</li>
 		<li><a name="log">log</a>: gibt Zugriff auf die Logfiles die geschrieben werden, wenn fm_logFile aktiv ist</li>
+		<li><a name="statistic">statistic</a>: Stellt eine schöner formatierte Übersicht der top 20 Freeze Devices aus der Freeze Statistik zur Verfügung</li>
 	</ul>
   </ul>
   
