@@ -245,6 +245,7 @@ my %fbhttp_readings = (
    tchange         => 'sprintf("nextPeriodTemp:%0.1f C", $val/2)',
    summeractive    => '"summeractive:".($val ? "yes":"no")',
    holidayactive   => '"holidayactive:".($val ? "yes":"no")',
+   lastpressedtimestamp => '"lastpressedtimestamp:".($val=~m/^\d{10}$/ ? FmtDateTime($val) : "N/A")',
 );
 
 sub
@@ -260,12 +261,17 @@ FBDECT_ParseHttp($$$)
   my $ain = $h{identifier};
   $ain =~ s/[-: ]/_/g;
 
-  my %ll = (4=>"alarmSensor",
-            6=>"actuator",
-            7=>"powerMeter",
-            8=>"tempSensor",
-            9=>"switch",
-           10=>"repeater");
+  my %ll = (
+    0 => "HANFUN",
+    4 => "alarmSensor",
+    6 => "actuator",
+    7 => "powerMeter",
+    8 => "tempSensor",
+    9 => "switch",
+   10 => "repeater",
+   11 => "microphone",
+   13 => "HANFUN2"
+  );
   my %ecTxt = (0 => "noError (0)",
                1 => "notMounted (1)",
                2 => "valveShortOrBatteryEmpty (2)",
