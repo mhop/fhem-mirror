@@ -386,7 +386,7 @@ xyY2rgb($$$)
     if( $X > 1
         || $Y > 1
         || $Z > 1 ) {
-      my $f = maxNum($X,$Y,$Z);
+      my $f = main::maxNum($X,$Y,$Z);
       $X /= $f;
       $Y /= $f;
       $Z /= $f;
