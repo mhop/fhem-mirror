@@ -9068,6 +9068,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   (for further information execute "<b>get &lt;name&gt; versionNotes 7</b>") <br>
   Alternatively you can activate the Email-shipping one-time when you specify the "recEmailTxt:"-tag in the "on"-command.
   In this case the tag-text is used for creating the Email instead the text specified in "recEmailTxt"-attribute.
+  (the tag syntax is identical to the "recEmailTxt" attribute)
   <br><br>
   
   <b>Examples: </b> <br><br>
@@ -9530,18 +9531,14 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
     <table>  
     <colgroup> <col width=12%> <col width=88%> </colgroup>
       <tr><td style="vertical-align:top"> <b>snapEmailTxt</b> <td>- <b>Activates the Email shipping of snapshots.</b> This attribute has the format: <br>
-                                                                  <b>subject => &lt;subject text&gt;, body => &lt;message text&gt; </b><br> 
-                                                                  The placeholder $CAM, $DATE and $TIME can be used. $CAM is 
-                                                                  replaced by the device name, device alias or the name of camera in SVS if alias is not 
-                                                                  defined. $DATE and $TIME are replaced with the current date and time. 
+                                                                  <code>subject => &lt;subject text&gt;, body => &lt;message text&gt; </code><br> 
+                                                                  The placeholder $CAM, $DATE and $TIME can be used. <br> 
 																  Optionally you can specify the "snapEmailTxt:"-tag when trigger snap shot with the "snap"-command.
                                                                   In this case the Email shipping is activated one-time for the snapshot or the tag-text 
                                                                   is used instead of the text defined in the "snapEmailTxt"-attribute. </td></tr>
       <tr><td style="vertical-align:top"> <b>recEmailTxt</b> <td>- <b>Activates the Email shipping of recordings.</b> This attribute has the format: <br>
-                                                                  <b>subject => &lt;subject text&gt;, body => &lt;message text&gt; </b><br> 
-                                                                  The placeholder $CAM, $DATE and $TIME can be used. $CAM is 
-                                                                  replaced by the device name, device alias or the name of camera in SVS if alias is not 
-                                                                  defined. $DATE and $TIME are replaced with the current date and time. 
+                                                                  <code>subject => &lt;subject text&gt;, body => &lt;message text&gt; </code><br> 
+                                                                  The placeholder $CAM, $DATE and $TIME can be used. <br> 
                                                                   Optionally you can specify the "recEmailTxt:"-tag when start recording with the "on"-command.
                                                                   In this case the Email shipping is activated one-time for the started recording or the tag-text 
                                                                   is used instead of the text defined in the "recEmailTxt"-attribute. </td></tr>
@@ -9557,10 +9554,22 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
    </ul>     
    <br>
    
-  For further information please see description of the <a href="#SSCamattr">attributes</a>. <br>
-  </ul>
-  <br><br>  
+   For further information please see description of the <a href="#SSCamattr">attributes</a>. <br><br>
   
+   Description of the placeholders: <br><br>
+	
+   <ul>   
+   <table>  
+   <colgroup> <col width=10%> <col width=90%> </colgroup>
+     <tr><td> $CAM   </td><td>- Device alias respectively the name of the camera in SVS if the device alias isn't set </td></tr>
+	 <tr><td> $DATE  </td><td>- current date </td></tr>
+	 <tr><td> $TIME  </td><td>- current time </td></tr>
+     <tr><td> $FILE  </td><td>- name of the snapshot file </td></tr>
+     <tr><td> $CTIME </td><td>- creation time of the snapshot </td></tr>
+   </table>
+   </ul>     
+   <br>  
+  <br><br> 
   
   <a name="SSCamPolling"></a>
   <b>Polling of Camera/SVS-Properties</b><br><br>
@@ -9790,10 +9799,18 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <a name="recEmailTxt"></a>
   <li><b>recEmailTxt subject => &lt;subject text&gt;, body => &lt;message text&gt; </b><br>
     Activates the Email shipping of recordings after whose creation. <br>
-    The attribute has to be definied in the form as described. You can use the placeholder variables $CAM, $DATE and $TIME. 
-    The variable $CAM is replaced by the device alias or the name of the camera in SVS if the device alias isn't available.
-    $DATE and $TIME are replaced with the current date and time.    
-    <br><br>
+    The attribute has to be definied in the form as described. <br>    
+    You can use the placeholder in "subject" and "body". <br><br>
+	
+		<ul>   
+		<table>  
+		<colgroup> <col width=10%> <col width=90%> </colgroup>
+		  <tr><td> $CAM   </td><td>- Device alias respectively the name of the camera in SVS if the device alias isn't set </td></tr>
+		  <tr><td> $DATE  </td><td>- current date </td></tr>
+		  <tr><td> $TIME  </td><td>- aktuelle time </td></tr>
+		</table>
+		</ul>     
+		<br>
     
        <ul>
 		<b>Example:</b><br>
@@ -9875,14 +9892,15 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <a name="snapEmailTxt"></a>
   <li><b>snapEmailTxt subject => &lt;subject text&gt;, body => &lt;message text&gt; </b><br>
     Activates the Email shipping of snapshots after whose creation. <br>
-    The attribute has to be definied in the form as described. You can use the placeholder in "subject" and "body". <br><br>
+    The attribute has to be definied in the form as described. <br>
+    You can use the placeholder in "subject" and "body". <br><br>
 	
 		<ul>   
 		<table>  
 		<colgroup> <col width=10%> <col width=90%> </colgroup>
 		  <tr><td> $CAM   </td><td>- Device alias respectively the name of the camera in SVS if the device alias isn't set </td></tr>
 		  <tr><td> $DATE  </td><td>- current date </td></tr>
-		  <tr><td> $TIME  </td><td>- aktuelle time </td></tr>
+		  <tr><td> $TIME  </td><td>- current time </td></tr>
 		</table>
 		</ul>     
 		<br>
@@ -9891,8 +9909,41 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
 		<b>Example:</b><br>
         snapEmailTxt subject => Motion alarm $CAM, body => A motion was recognized at $CAM.
       </ul>
+      <br><br>
+  </li>  
+
+  <a name="snapTelegramTxt"></a>
+  <li><b>snapTelegramTxt tbot => &lt;TelegramBot device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;subject text&gt;]  </b><br>
+    Activates the permanent shipping of snapshots by TelegramBot after their creation. If several snapshots were triggert, 
+	they will be sequentially delivered.<br>
+    The attribute has to be definied in the form as described. With key "tbot" the TelegramBot device is specified, which is 
+	used for shipping the data. Of course, the <a href="http://fhem.de/commandref.html#TelegramBot">TelegramBot device</a> 
+    must be available and has to be running well. <br>
+	The setting of "peers" and "subject" is optional, but the keys must (empty) specified. 
+	If "peer" is empty, teh default peer of the TelegramBot is used. <br>
+	You can use the placeholder in "subject". <br><br>
+	
+		<ul>   
+		<table>  
+		<colgroup> <col width=10%> <col width=90%> </colgroup>
+		  <tr><td> $CAM   </td><td>- Device alias respectively the name of the camera in SVS if the device alias isn't set </td></tr>
+		  <tr><td> $DATE  </td><td>- current date </td></tr>
+		  <tr><td> $TIME  </td><td>- current time </td></tr>
+		  <tr><td> $FILE  </td><td>- Name of snapshot file </td></tr>
+		  <tr><td> $CTIME </td><td>- creation time of the snapshot </td></tr>
+		</table>
+		</ul>     
+		<br>	
+    
+       <ul>
+		<b>Examples:</b><br>
+        snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Motion alarm ($FILE)  <br>
+		snapTelegramTxt tbot =&gt; teleBot, peers =&gt; @nabuko @foo @bar, subject =&gt;  <br>
+		snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt;  <br>
+		snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Motion alarm from $CAM. At $CTIME the snapshot $FILE was created <br>
+      </ul>
       <br>
-  </li>    
+  </li><br>	  
     
   <a name="snapGalleryBoost"></a>
   <li><b>snapGalleryBoost</b><br>
@@ -10694,8 +10745,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   Ein <b>Email-Versand</b> der letzten Aufnahme kann durch Setzen des <a href="#SSCamattr">Attributs</a> "recEmailTxt" 
   aktiviert werden. Zuvor ist der Email-Versand, wie im Abschnitt <a href="#SSCamEmail">Einstellung Email-Versand</a> beschrieben,
   einzustellen. (Für weitere Informationen "<b>get &lt;name&gt; versionNotes 7</b>" ausführen) <br>
-  Alternativ kann durch Verwendung des optionalen "snapEmailTxt:"-Tags der Email-Versand der gestarteten Aufnahme nach deren
-  Beendigung aktiviert werden. Sollte das Attribut "recEmailTxt" bereits gesetzt sein, wird der Text des "snapEmailTxt:"-Tags  
+  Alternativ kann durch Verwendung des optionalen "recEmailTxt:"-Tags der Email-Versand der gestarteten Aufnahme nach deren
+  Beendigung aktiviert werden. Sollte das Attribut "recEmailTxt" bereits gesetzt sein, wird der Text des "recEmailTxt:"-Tags  
   anstatt des Attribut-Textes verwendet. <br><br>
   
   <b>Beispiele </b>: <br><br>
@@ -10867,7 +10918,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; snap [&lt;Anzahl&gt;] [&lt;Zeitabstand&gt;] [snapEmailTxt:"subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;"]</b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  <li><b> set &lt;name&gt; snap [&lt;Anzahl&gt;] [&lt;Zeitabstand&gt;] [snapEmailTxt:"subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;"] [snapTelegramTxt:"tbot => &lt;TelegramBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;]"]   </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Ein oder mehrere Schnappschüsse werden ausgelöst. Es kann die Anzahl der auszulösenden Schnappschüsse und deren zeitlicher
   Abstand in Sekunden optional angegeben werden. Ohne Angabe wird ein Schnappschuß getriggert. <br>
@@ -10876,17 +10927,26 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   Um die Daten der letzen 1-10 Schnappschüsse zu versionieren, kann das <a href="#SSCamattr">Attribut</a> "snapReadingRotate"
   verwendet werden.
   <br><br>
+  
   Ein <b>Email-Versand</b> der Schnappschüsse kann durch Setzen des <a href="#SSCamattr">Attributs</a> "snapEmailTxt" permanent aktiviert
   werden. Zuvor ist der Email-Versand, wie im Abschnitt <a href="#SSCamEmail">Einstellung Email-Versand</a> beschrieben,
   einzustellen. (Für weitere Informationen "<b>get &lt;name&gt; versionNotes 7</b>" ausführen) <br>
   Der Text im Attribut "snapEmailTxt" kann durch die Spezifikation des optionalen "snapEmailTxt:"-Tags, wie oben 
   gezeigt, temporär überschrieben bzw. geändert werden. Sollte das Attribut "snapEmailTxt" nicht gesetzt sein, wird durch Angabe dieses Tags
-  der Email-Versand einmalig aktiviert. <br><br>
+  der Email-Versand einmalig aktiviert. (Tag-Syntax entspricht dem "snapEmailTxt"-Attribut) <br><br>
+  
+  Ein <b>Telegram-Versand</b> der Schnappschüsse kann durch Setzen des <a href="#SSCamattr">Attributs</a> "snapTelegramTxt" permanent aktiviert
+  werden. Zuvor ist der Email-Versand wie bereits erwähnt einzustellen. <br>
+  Der Text im Attribut "snapTelegramTxt" kann durch die Spezifikation des optionalen "snapTelegramTxt:"-Tags, wie oben 
+  gezeigt, temporär überschrieben bzw. geändert werden. Sollte das Attribut "snapTelegramTxt" nicht gesetzt sein, wird durch Angabe dieses Tags
+  der Telegram-Versand einmalig aktiviert. (Tag-Syntax entspricht dem "snapTelegramTxt"-Attribut) <br><br>
   
   <b>Beispiele:</b>
   <pre>
+    set &lt;name&gt; snap
     set &lt;name&gt; snap 4 
     set &lt;name&gt; snap 3 3 snapEmailTxt:"subject => Bewegungsalarm $CAM, body => Eine Bewegung wurde am Carport registriert"
+    set &lt;name&gt; snap 2 snapTelegramTxt:"tbot => teleBot, peers => , subject => Bewegungsalarm bei $CAM. Es wurde $CTIME der Schnappschuss $FILE erstellt"
   </pre>
   </ul>
   <br><br>
@@ -11197,10 +11257,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
                                                                   <ul>
                                                                   <code>subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;</code><br>
                                                                   </ul>
-                                                                  Es können die Platzhalter $CAM, $DATE und $TIME verwendet werden. $CAM wird 
-                                                                  durch den Device-Namen, Device-Alias bzw. den Namen der Kamera in der SVS
-                                                                  ersetzt falls der Device-Alias nicht gesetzt ist. 
-                                                                  $DATE und $TIME werden durch das aktuelle Datum und Zeit ersetzt. <br>
+                                                                  Es können die Platzhalter $CAM, $DATE und $TIME verwendet werden. <br>
 																  Der Email-Versand des letzten Schnappschusses wird einmalig aktiviert falls der "recEmailTxt:"-Tag 
 																  beim "snap"-Kommando verwendet wird bzw. der in diesem Tag definierte Text statt des Textes im 
 																  Attribut "recEmailTxt" verwendet. </td></tr>
@@ -11210,10 +11267,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
                                                                   <ul>
                                                                   <code>subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;</code><br>
                                                                   </ul>
-                                                                  Es können die Platzhalter $CAM, $DATE und $TIME verwendet werden. $CAM wird 
-                                                                  durch den Device-Namen, Device-Alias bzw. den Namen der Kamera in der SVS
-                                                                  ersetzt falls der Device-Alias nicht gesetzt ist. 
-                                                                  $DATE und $TIME werden durch das aktuelle Datum und Zeit ersetzt. <br>
+                                                                  Es können die Platzhalter $CAM, $DATE und $TIME verwendet werden. <br>
                                                                   Der Email-Versand der letzten Aufnahme wird einamlig aktiviert falls der "recEmailTxt:"-Tag beim 
                                                                   "on"-Kommando verwendet wird bzw. der in diesem Tag definierte Text statt des Textes im 
 																  Attribut "recEmailTxt" verwendet. </td></tr>
@@ -11230,8 +11284,21 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
    </ul>     
    <br>
    
-  Zur näheren Erläuterung siehe Beschreibung der <a href="#SSCamattr">Attribute</a>. <br>
-  </ul>
+   Zur näheren Erläuterung siehe Beschreibung der <a href="#SSCamattr">Attribute</a>. <br><br>
+
+   Erläuterung der Platzhalter: <br><br>
+	
+   <ul>   
+   <table>  
+   <colgroup> <col width=10%> <col width=90%> </colgroup>
+     <tr><td> $CAM   </td><td>- Device-Alias bzw. den Namen der Kamera in der SVS ersetzt falls der Device-Alias nicht vorhanden ist </td></tr>
+     <tr><td> $DATE  </td><td>- aktuelles Datum </td></tr>
+     <tr><td> $TIME  </td><td>- aktuelle Zeit </td></tr>
+     <tr><td> $FILE  </td><td>- Filename des Schnappschusses </td></tr>
+     <tr><td> $CTIME </td><td>- Erstellungszeit des Schnappschusses </td></tr>
+   </table>
+   </ul>     
+   <br>  
   <br><br>
   
   <a name="SSCamPolling"></a>
@@ -11470,9 +11537,18 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <a name="recEmailTxt"></a>
   <li><b>recEmailTxt subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt; </b><br>
     Aktiviert den Emailversand von Aufnahmen nach deren Erstellung. <br>
-    Das Attribut muß in der angegebenen Form definiert werden. Es können die Platzhalter $CAM, $DATE und $TIME verwendet werden. 
-    $CAM wird durch den Device-Alias bzw. den Namen der Kamera in der SVS ersetzt falls der Device-Alias nicht vorhanden 
-    ist. $DATE und $TIME werden durch das aktuelle Datum und Zeit ersetzt. <br><br>
+    Das Attribut muß in der angegebenen Form definiert werden. <br>
+    Es können die Platzhalter im subject und body verwendet werden. <br><br>
+	
+		<ul>   
+		<table>  
+		<colgroup> <col width=10%> <col width=90%> </colgroup>
+		  <tr><td> $CAM   </td><td>- Device-Alias bzw. der Name der Kamera in der SVS falls der Device-Alias nicht vorhanden ist </td></tr>
+		  <tr><td> $DATE  </td><td>- aktuelles Datum </td></tr>
+		  <tr><td> $TIME  </td><td>- aktuelle Zeit </td></tr>
+		</table>
+		</ul>     
+		<br>
     
        <ul>
 		<b>Beispiel:</b><br>
@@ -11558,7 +11634,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     Aktiviert den Emailversand von Schnappschüssen nach deren Erstellung. Wurden mehrere Schnappschüsse ausgelöst, 
 	werden sie gemeinsam in einer Mail versendet. <br>
     Das Attribut muß in der angegebenen Form definiert werden. <br>
-    Es können die Platzhalter im subject verwendet werden. <br><br>
+    Es können die Platzhalter im subject und body verwendet werden. <br><br>
 	
 		<ul>   
 		<table>  
@@ -11585,7 +11661,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
 	den Versand der Daten verwendet werden soll. Das <a href="http://fhem.de/commandref_DE.html#TelegramBot">TelegramBot-Device</a> muss natürlich
 	vorhanden und funktionstüchtig sein. <br>
 	Die Angabe von "peers" und "subject" ist optional, jedoch muß der Schlüssel (leer) angegeben werden. 
-	Wurde "peer" nicht angegeben, wird der Default-Peer des TelegramBot verwendet. <br>
+	Wurde "peer" leer gelassen, wird der Default-Peer des TelegramBot verwendet. <br>
 	Es können die Platzhalter im subject verwendet werden. <br><br>
 	
 		<ul>   
