@@ -256,7 +256,10 @@ MQTT2_buildCmd($$$)
 
   shift @{$a};
   if($cmd =~ m/^{.*}$/) {
-    $cmd = EvalSpecials($cmd, ("%EVENT"=>join(" ",@{$a}), "%NAME"=>$hash->{NAME}));
+    $cmd = EvalSpecials($cmd,
+      ("%EVENT"       => join(" ",@{$a}),
+       "%NAME"        => $hash->{NAME},
+       "%DEVICETOPIC" => $hash->{DEVICETOPIC}));
     $cmd = AnalyzeCommandChain($hash->{CL}, $cmd);
     return if(!$cmd);
 
@@ -272,9 +275,10 @@ MQTT2_buildCmd($$$)
       shift @{$a};
       $cmd .= " ".join(" ",@{$a}) if(@{$a});
     }
+    $cmd =~ s/\$NAME/$hash->{NAME}/g;
+    $cmd =~ s/\$DEVICETOPIC/$hash->{DEVICETOPIC}/g;
   }
 
-  $cmd =~ s/\$DEVICETOPIC/$hash->{DEVICETOPIC}/g;
   return $cmd;
 }
 
@@ -374,7 +378,8 @@ MQTT2_DEVICE_Attr($$)
         if($par2 =~ m/^{.*}$/) {
           my $ret = perlSyntaxCheck($par2, 
                 ("%TOPIC"=>1, "%EVENT"=>"0 1 2 3 4 5 6 7 8 9",
-                 "%NAME"=>$dev, "%DEVICETOPIC"=>$hash->{DEVICETOPIC},
+                 "%NAME"=>$dev,
+                 "%DEVICETOPIC"=>$hash->{DEVICETOPIC},
                  "%JSONMAP"=>""));
           return $ret if($ret);
         } else {
@@ -383,7 +388,10 @@ MQTT2_DEVICE_Attr($$)
         }
 
       } else {
-        my $ret = perlSyntaxCheck($par2, ("%EVENT"=>"0 1 2 3 4 5 6 7 8 9"));
+        my $ret = perlSyntaxCheck($par2,
+                ("%NAME"=>$dev,
+                 "%EVENT"=>"0 1 2 3 4 5 6 7 8 9",
+                 "%DEVICETOPIC"=>$dev));
         return $ret if($ret);
 
       }
@@ -842,8 +850,9 @@ zigbee2mqtt_devStateIcon255($)
       <ul>
         <li>arguments to the set command will be appended to the message
           published (not for the perl expression)</li>
-        <li>the command arguments are available as $EVENT, $EVTPART0, etc.,
-          bot in the perl expression and the "normal" topic variant.</li>
+        <li>the command arguments are available as $EVENT, $EVTPART0, etc., 
+          the name of the device as $NAME, both in the perl expression and the
+          "normal" topic variant.</li>
         <li>the perl expression must return a string containing the topic and
           the message separated by a space.</li>
         <li>SetExtensions is activated</li>
