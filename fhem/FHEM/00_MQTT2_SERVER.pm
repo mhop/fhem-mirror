@@ -204,9 +204,9 @@ my %cptype = (
 sub
 MQTT2_SERVER_Read($@)
 {
-  my ($hash, $reread) = @_;
+  my ($hash, $reread, $debug) = @_;
 
-  if($hash->{SERVERSOCKET}) {   # Accept and create a child
+  if(!$debug && $hash->{SERVERSOCKET}) {   # Accept and create a child
     my $nhash = TcpServer_Accept($hash, "MQTT2_SERVER");
     return if(!$nhash);
     $nhash->{CD}->blocking(0);
@@ -215,8 +215,9 @@ MQTT2_SERVER_Read($@)
     return;
   }
 
-  my $sname = $hash->{SNAME};
+  my $sname = ($debug ? $hash->{NAME} : $hash->{SNAME});
   my $cname = $hash->{NAME};
+  $hash->{cid} = "debug" if($debug);
   my $c = $hash->{CD};
 
   if(!$reread) {
@@ -247,13 +248,12 @@ MQTT2_SERVER_Read($@)
   my ($tlen, $off) = MQTT2_SERVER_getRemainingLength($hash);
   if($tlen < 0) {
     Log3 $sname, 1, "Bogus data from $cname, closing connection";
-    CommandDelete(undef, $cname);
+    return CommandDelete(undef, $cname);
   }
   return if(length($hash->{BUF}) < $tlen+$off);
 
   my $fb = substr($hash->{BUF}, 0, 1);
   my $pl = substr($hash->{BUF}, $off, $tlen); # payload
-  $hash->{BUF} = substr($hash->{BUF}, $tlen+$off);
 
   my $cp = ord(substr($fb,0,1)) >> 4;
   my $cpt = $cptype{$cp};
@@ -261,43 +261,45 @@ MQTT2_SERVER_Read($@)
 
   # Lowlevel debugging
   if(AttrVal($sname, "verbose", 1) >= 5) {
-    my $pltxt = $pl;
-    $pltxt =~ s/([^ -~])/"(".ord($1).")"/ge;
-    Log3 $sname, 5, "$cpt: $pltxt";
+    my $msg = substr($hash->{BUF}, 0, $tlen);
+    $msg =~ s/([^ -~])/"(".ord($1).")"/ge;
+    Log3 $sname, 5, "$cpt: $msg";
   }
+
+  $hash->{BUF} = substr($hash->{BUF}, $tlen+$off);
 
   if(!defined($hash->{cid}) && $cpt ne "CONNECT") {
     Log3 $sname, 2, "$cname $cpt before CONNECT, disconnecting";
-    CommandDelete(undef, $cname);
-    return MQTT2_SERVER_Read($hash, 1);
+    return CommandDelete(undef, $cname);
   }
 
   ####################################
   if($cpt eq "CONNECT") {
-    ($hash->{protoTxt}, $off) = MQTT2_SERVER_getStr($pl, 0); # V3:MQIsdb V4:MQTT
+    # V3:MQIsdb V4:MQTT
+    ($hash->{protoTxt}, $off) = MQTT2_SERVER_getStr($hash, $pl, 0);
     $hash->{protoNum}  = unpack('C*', substr($pl,$off++,1)); # 3 or 4
     $hash->{cflags}    = unpack('C*', substr($pl,$off++,1));
     $hash->{keepalive} = unpack('n', substr($pl, $off, 2)); $off += 2;
-    ($hash->{cid}, $off) = MQTT2_SERVER_getStr($pl, $off);
+    ($hash->{cid}, $off) = MQTT2_SERVER_getStr($hash, $pl, $off);
 
     my $desc = "keepAlive:$hash->{keepalive}";
     if($hash->{cflags} & 0x04) { # Last Will & Testament
       my ($wt, $wm);
-      ($wt, $off) = MQTT2_SERVER_getStr($pl, $off);
-      ($wm, $off) = MQTT2_SERVER_getStr($pl, $off);
+      ($wt, $off) = MQTT2_SERVER_getStr($hash, $pl, $off);
+      ($wm, $off) = MQTT2_SERVER_getStr($hash, $pl, $off);
       $hash->{lwt} = "$wt:$wm";
       $desc .= " LWT:$wt:$wm";
     }
 
     my ($pwd, $usr) = ("","");
     if($hash->{cflags} & 0x80) {
-      ($usr,$off) = MQTT2_SERVER_getStr($pl,$off);
+      ($usr,$off) = MQTT2_SERVER_getStr($hash, $pl,$off);
       $hash->{usr} = $usr;
       $desc .= " usr:$hash->{usr}";
     }
 
     if($hash->{cflags} & 0x40) {
-      ($pwd, $off) = MQTT2_SERVER_getStr($pl,$off);
+      ($pwd, $off) = MQTT2_SERVER_getStr($hash, $pl,$off);
     }
 
     my $ret = Authenticate($hash, "basicAuth:".encode_base64("$usr:$pwd"));
@@ -314,12 +316,12 @@ MQTT2_SERVER_Read($@)
     my $cf = ord(substr($fb,0,1)) & 0xf;
     my $qos = ($cf & 0x06) >> 1;
     my ($tp, $val, $pid);
-    ($tp, $off) = MQTT2_SERVER_getStr($pl, 0);
-    if($qos) {
+    ($tp, $off) = MQTT2_SERVER_getStr($hash, $pl, 0);
+    if($qos && length($pl) >= $off+2) {
       $pid = unpack('n', substr($pl, $off, 2));
       $off += 2;
     }
-    $val = substr($pl, $off);
+    $val = (length($pl)>$off ? substr($pl, $off) : "");
     Log3 $sname, 4, "$cname $hash->{cid} $cpt $tp:$val";
     addToWritebuffer($hash, pack("CCnC*", 0x40, 2, $pid)) if($qos); # PUBACK
     MQTT2_SERVER_doPublish($hash, $defs{$sname}, $tp, $val, $cf & 0x01);
@@ -334,7 +336,7 @@ MQTT2_SERVER_Read($@)
     my ($subscr, @ret);
     $off = 2;
     while($off < $tlen) {
-      ($subscr, $off) = MQTT2_SERVER_getStr($pl, $off);
+      ($subscr, $off) = MQTT2_SERVER_getStr($hash, $pl, $off);
       my $qos = unpack("C*", substr($pl, $off++, 1));
       $hash->{subscriptions}{$subscr} = $hash->{lastMsgTime};
       Log3 $sname, 4, "  topic:$subscr qos:$qos";
@@ -360,7 +362,7 @@ MQTT2_SERVER_Read($@)
     my ($subscr, @ret);
     $off = 2;
     while($off < $tlen) {
-      ($subscr, $off) = MQTT2_SERVER_getStr($pl, $off);
+      ($subscr, $off) = MQTT2_SERVER_getStr($hash, $pl, $off);
       delete $hash->{subscriptions}{$subscr};
       Log3 $sname, 4, "  topic:$subscr";
     }
@@ -375,14 +377,20 @@ MQTT2_SERVER_Read($@)
   } elsif($cpt eq "DISCONNECT") {
     Log3 $sname, 4, "$cname $hash->{cid} $cpt";
     delete($hash->{lwt}); # no LWT on disconnect, see doc, chapter 3.14
-    CommandDelete(undef, $cname);
+    return CommandDelete(undef, $cname);
 
   ####################################
   } else {
-    Log 1, "M2: Unhandled packet $cpt, disconneting $cname";
-    CommandDelete(undef, $cname);
+    Log 1, "ERROR: Unhandled packet $cpt, disconneting $cname";
+    return CommandDelete(undef, $cname);
 
   }
+  if($hash->{stringError}) {
+    Log3 $sname, 2,
+        "ERROR: $cname $hash->{cid} received bogus data, disconnecting";
+    return CommandDelete(undef, $cname);
+  }
+
   return MQTT2_SERVER_Read($hash, 1);
 }
 
@@ -512,11 +520,24 @@ MQTT2_SERVER_getRemainingLength($)
 }
 
 sub
-MQTT2_SERVER_getStr($$)
+MQTT2_SERVER_getStr($$$)
 {
-  my ($in, $off) = @_;
+  my ($hash, $in, $off) = @_;
   my $l = unpack("n", substr($in, $off, 2));
-  return (substr($in, $off+2, $l), $off+2+$l);
+  my $r = substr($in, $off+2, $l);
+  $hash->{stringError} = 1 if(index($r, "\0") >= 0);
+  return ($r, $off+2+$l);
+}
+
+#{MQTT2_SERVER_ReadDebug($defs{m2s}, '(162)(50)(164)(252)(0).7c:2f:80:97:b0:98/GenericAc(130)(26)(212)4(0)(21)BLE2MQTT/OTA/')}
+sub
+MQTT2_SERVER_ReadDebug($$)
+{
+  my ($hash, $s) = @_;
+  $s =~ s/\((\d{1,3})\)/chr($1)/ge;
+  $hash->{BUF} = $s;
+  Log 1, "Debug len:".length($s);
+  MQTT2_SERVER_Read($hash, 1, 1);
 }
 
 1;
