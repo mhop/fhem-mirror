@@ -2943,7 +2943,7 @@ sub ENIGMA2_RClayout_VUplusDuo2() {
             <b>statusRequest</b> &nbsp;&nbsp;-&nbsp;&nbsp; requests the current status of the device
           </li>
           <li>
-            <b>remoteControl</b> UP,DOWN,... &nbsp;&nbsp;-&nbsp;&nbsp; sends remote control commands; see remoteControl help for full command list<br />
+            <b>remoteControl</b> UP,DOWN,... &nbsp;&nbsp;-&nbsp;&nbsp; sends remote control commands; see 'remoteControl ?' for full command list<br />
             Note: You may add the word "long" after the command to simulate a long key press.
           </li>
           <li>
