@@ -47,7 +47,9 @@ use Encode;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
-  "8.7.1"  => "30.01.2019  fix refresh snapgallery device if snap was done by itself",
+  "8.8.0"  => "03.02.2019  send snapshots integrated by telegram ",
+  "8.7.2"  => "30.01.2019  code change for snapCams (SVS) ",
+  "8.7.1"  => "30.01.2019  fix refresh snapgallery device if snap was done by itself ",
   "8.7.0"  => "27.01.2019  send recording by email ",
   "8.6.2"  => "25.01.2019  fix version numbering ",
   "8.6.1"  => "21.01.2019  time format in readings and galleries depends from global language attribute, minor bug fixes ",
@@ -123,6 +125,7 @@ our %SSCam_vNotesIntern = (
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
+  "8.8.0"  => "01.02.2019 Snapshots can now be sent by telegramBot ",
   "8.7.0"  => "27.01.2019 SMTP Email delivery of recordings implemented. You can send a recording after it was created subsequentely ".
                           "with the integrated Email client. You have to store SMTP credentials with \"smtpcredentials\" before. ",
   "8.6.2"  => "25.01.2019 fix version numbering ",
@@ -358,6 +361,7 @@ sub SSCam_Initialize($) {
 		 "smtpTo ".
 		 "smtpNoUseSSL:1,0 ".
          "snapEmailTxt ".
+         "snapTelegramTxt ".
 		 "snapGalleryBoost:0,1 ".
 		 "snapGallerySize:Icon,Full ".
 		 "snapGalleryNumber:$SSCAM_snum ".
@@ -812,8 +816,7 @@ sub SSCam_Set($@) {
   } elsif ($opt eq "snap" && SSCam_IsModelCam($hash)) {
 	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
       
-      my ($num,$lag,$ncount) = (1,2,1);
-      my $emtxt = "";      
+      my ($num,$lag,$ncount) = (1,2,1);     
       if($prop && $prop =~ /^\d+$/) {                                  # Anzahl der Schnappschüsse zu triggern (default: 1)
           $num    = $prop;
           $ncount = $prop;
@@ -825,25 +828,40 @@ sub SSCam_Set($@) {
       Log3($name, 4, "$name - Trigger snapshots - Number: $num, Lag: $lag");      
       $hash->{HELPER}{SNAPBYSTRMDEV} = 1 if ($prop2 && $prop2 =~ /STRM/);   # $prop wird mitgegeben durch Snap by SSCamSTRM-Device
       
+      my $emtxt = AttrVal($name, "snapEmailTxt", "");
       my $at = join(" ",@a);
       if($at =~ /snapEmailTxt:/) {
           $at =~ m/.*snapEmailTxt:"(.*)".*/i;
           $emtxt = $1;
       }
       
-      if (AttrVal($name, "snapEmailTxt", "")) {
+      if ($emtxt) {
           # Snap soll nach Erstellung per Email versendet werden
-          # snapEmailTxt muss sein:  subject => <Subject-Text>, body => <Body-Text>
-          if (!$hash->{SMTPCREDENTIALS}) {return "Due to attribute \"snapEmailTxt\" is set, you want to send snapshots by email but SMTP credentials are not set - make sure you've set credentials with \"set $name smtpcredentials username password\"";}
+          # Format $emtxt muss sein: snapEmailTxt:"subject => <Subject-Text>, body => <Body-Text>"
+          if (!$hash->{SMTPCREDENTIALS}) {return "It seems you want to send snapshots by email but SMTP credentials are not set - make sure you've set credentials with \"set $name smtpcredentials username password\"";}
+          $hash->{HELPER}{SMTPMSG} = $emtxt;
       }
-      SSCam_camsnap("$name:$num:$lag:$ncount:$emtxt");
+	  
+      my $teletxt = AttrVal($name, "snapTelegramTxt", "");
+      my $bt = join(" ",@a);
+      if($bt =~ /snapTelegramTxt:/) {
+          $bt =~ m/.*snapTelegramTxt:"(.*)".*/i;
+          $teletxt = $1;
+      }
+      
+      if ($teletxt) {
+	      # Snap soll nach Erstellung per TelegramBot versendet werden
+		  # Format $teletxt muss sein: snapTelegramTxt:"tbot => <teleBot Device>, peers => <peer1 peer2 ..>, subject => <Beschreibungstext>"
+          $hash->{HELPER}{TELEMSG} = $teletxt;
+      }
+	  
+      SSCam_camsnap("$name:$num:$lag:$ncount:$emtxt:$teletxt");
               
   } elsif ($opt eq "snapCams" && !SSCam_IsModelCam($hash)) {
 	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
       
       my ($num,$lag,$ncount) = (1,2,1);
       my $cams  = "all";
-      my $emtxt = '';
       if($prop && $prop =~ /^\d+$/) {                                  # Anzahl der Schnappschüsse zu triggern (default: 1)
           $num    = $prop;
           $ncount = $prop;
@@ -879,6 +897,19 @@ sub SSCam_Set($@) {
       
       return "No valid camera devices are specified for trigger snapshots" if(!%snapac);
       
+      my $emtxt;
+	  my $teletxt = "";
+      my $rawet = AttrVal($name, "snapEmailTxt", "");
+      my $bt = join(" ",@a);
+      if($bt =~ /snapEmailTxt:/) {
+          $bt =~ m/.*snapEmailTxt:"(.*)".*/i;
+          $rawet = $1;
+      }
+      if($rawet) {
+          $hash->{HELPER}{CANSENDSNAP} = 1;                                # zentraler Schnappschußversand wird aktiviert
+          $hash->{HELPER}{SMTPMSG} = $rawet;   
+      }
+      
       my $asref = \%snapac;
       $hash->{HELPER}{ALLSNAPREF} = $asref;
       my ($csnap,$cmail) = ("","");
@@ -886,10 +917,12 @@ sub SSCam_Set($@) {
           if(!AttrVal($key, "snapEmailTxt", "")) {
               delete $asref->{$key};                                       # Snap dieser Kamera auslösen aber nicht senden
               $csnap .= $csnap?", $key":$key;
+              $emtxt  = "";
           } else {
               $cmail .= $cmail?", $key":$key;
+              $emtxt  = $rawet;
           }
-          SSCam_camsnap("$key:$num:$lag:$ncount:$emtxt");
+          SSCam_camsnap("$key:$num:$lag:$ncount:$emtxt:$teletxt");
       }
       Log3($name, 4, "$name - Trigger snapshots by SVS - Number: $num, Lag: $lag, Snap only: \"$csnap\", Snap and send: \"$cmail\" ");
       
@@ -1702,7 +1735,9 @@ sub SSCam_FWsummaryFn ($$$$) {
     $alias = $hash->{HELPER}{ALIAS};
     $ret .= "<img $attr alt='$alias' src='data:image/jpeg;base64,$link'><br>";
     $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
-  
+    $ret .= $imgblank;
+    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>"; 
+    
   } elsif($wltype eq "hls") {
     $alias = $hash->{HELPER}{ALIAS};
     $ret  .= "<video $attr controls autoplay>
@@ -2228,7 +2263,7 @@ sub SSCam_cammotdetsc($) {
 ###############################################################################
 sub SSCam_camsnap($) {
     my ($str)            = @_;
-	my ($name,$num,$lag,$ncount,$emtxt,$tac) = split(":",$str);
+	my ($name,$num,$lag,$ncount,$emtxt,$teletxt,$tac) = split(":",$str);
 	my $hash             = $defs{$name};
     my $camname          = $hash->{CAMNAME};
     my $errorcode;
@@ -2265,7 +2300,8 @@ sub SSCam_camsnap($) {
         # einen Schnappschuß aufnehmen              
         $hash->{OPMODE} = "Snap";
         $hash->{HELPER}{LOGINRETRIES} = 0;
-        $hash->{HELPER}{CANSENDSNAP}  = 1 if(AttrVal($name, "snapEmailTxt", ""));  # Versand Schnappschüsse soll erfolgen
+        $hash->{HELPER}{CANSENDSNAP}  = 1 if($emtxt);                              # Versand Schnappschüsse soll per Email erfolgen
+		$hash->{HELPER}{CANTELESNAP}  = 1 if($teletxt);                            # Versand Schnappschüsse soll per TelegramBot erfolgen
         $hash->{HELPER}{SNAPNUM}      = $num if($num);                             # Gesamtzahl der auszulösenden Schnappschüsse
         $hash->{HELPER}{SNAPLAG}      = $lag if($lag);                             # Zeitverzögerung zwischen zwei Schnappschüssen
         $hash->{HELPER}{SNAPNUMCOUNT} = $ncount if($ncount);                       # Restzahl der auszulösenden Schnappschüsse  (wird runtergezählt)
@@ -2276,7 +2312,7 @@ sub SSCam_camsnap($) {
 		
     } else {
         $tac = (defined $tac)?$tac:"";
-        InternalTimer(gettimeofday()+0.3, "SSCam_camsnap", "$name:$num:$lag:$ncount:$emtxt:$tac", 0);
+        InternalTimer(gettimeofday()+0.3, "SSCam_camsnap", "$name:$num:$lag:$ncount:$emtxt:$teletxt:$tac", 0);
     }    
 }
 
@@ -4843,7 +4879,7 @@ sub SSCam_camop_parse ($) {
 				Log3($name,4, "$name - Snap '$sn' added to send recording hash: ID => $sendrecs{$sn}{recid}, File => $sendrecs{$sn}{fileName}, Created => $sendrecs{$sn}{createdTm}");
                 
                 # prüfen ob Recording als Email versendet werden soll
-				SSCam_prepareSendEmail ($hash, $OpMode, \%sendrecs);
+				SSCam_prepareSendData ($hash, $OpMode, \%sendrecs);
                         
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"Errorcode","none");
@@ -5096,13 +5132,14 @@ sub SSCam_camop_parse ($) {
                 }
                 
                 
-                my $num = $hash->{HELPER}{SNAPNUM};                                # Gesamtzahl der auszulösenden Schnappschüsse
-                my $ncount = $hash->{HELPER}{SNAPNUMCOUNT};                        # Restzahl der auszulösenden Schnappschüsse 
-                $ncount--;                                                         # wird vermindert je Snap
-                my $lag   = $hash->{HELPER}{SNAPLAG};                              # Zeitverzögerung zwischen zwei Schnappschüssen
-                my $emtxt = $hash->{HELPER}{SMTPMSG}?$hash->{HELPER}{SMTPMSG}:"";  # alternativer Text für Email-Versand
+                my $num     = $hash->{HELPER}{SNAPNUM};                              # Gesamtzahl der auszulösenden Schnappschüsse
+                my $ncount  = $hash->{HELPER}{SNAPNUMCOUNT};                         # Restzahl der auszulösenden Schnappschüsse 
+                $ncount--;                                                           # wird vermindert je Snap
+                my $lag     = $hash->{HELPER}{SNAPLAG};                              # Zeitverzögerung zwischen zwei Schnappschüssen
+                my $emtxt   = $hash->{HELPER}{SMTPMSG}?$hash->{HELPER}{SMTPMSG}:"";  # Text für Email-Versand
+				my $teletxt = $hash->{HELPER}{TELEMSG}?$hash->{HELPER}{TELEMSG}:"";  # Text für TelegramBot-Versand
                 if($ncount > 0) {
-                    InternalTimer(gettimeofday()+$lag, "SSCam_camsnap", "$name:$num:$lag:$ncount:$emtxt:$tac", 0);
+                    InternalTimer(gettimeofday()+$lag, "SSCam_camsnap", "$name:$num:$lag:$ncount:$emtxt:$teletxt:$tac", 0);
                     if(!$tac) {
 					    SSCam_delActiveToken($hash);                               # Token freigeben wenn keine Transaktion läuft
 					}
@@ -5181,7 +5218,7 @@ sub SSCam_camop_parse ($) {
 
 				#####  eine Schnapschussgalerie soll angezeigt oder als Bulk versendet werden  #####
                 if($OpMode eq "getsnapgallery") {
-				    if($hash->{HELPER}{CANSENDSNAP}) {
+				    if($hash->{HELPER}{CANSENDSNAP} || $hash->{HELPER}{CANTELESNAP}) {
 					    # es sollen die Anzahl "$hash->{HELPER}{SNAPNUM}" Schnappschüsse versendet werden
 						my $i = 0;
 						my $sn = 0;
@@ -5223,8 +5260,8 @@ sub SSCam_camop_parse ($) {
 							$i += 1;
 						}
                         
-					    # prüfen ob Schnappschuß als Email versendet werden soll
-				        SSCam_prepareSendEmail ($hash, $OpMode, \%sendsnaps);
+					    # prüfen ob Schnappschuß versendet werden soll
+				        SSCam_prepareSendData ($hash, $OpMode, \%sendsnaps);
 						
 					} else {
                         # es soll eine Schnappschußgalerie bereitgestellt (Attr snapGalleryBoost=1) bzw. gleich angezeigt 
@@ -7154,6 +7191,8 @@ sub SSCam_StreamDev($$$) {
               $streamHash->{HELPER}{STREAM} = "<img src=data:image/jpeg;base64,$link $pws>";      # Stream für "get <SSCamSTRM-Device> popupStream" speichern
               $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);                                  # Statusbit wenn ein Stream aktiviert ist
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
+              $ret .= $imgblank;
+              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";
               $ret .= "</td>";
 		  
           } elsif($wltype =~ /embed/) {
@@ -7474,7 +7513,7 @@ return;
 #       $OpMode = aktueller Operation Mode zur Unterscheidung was versendet werden soll
 #       $data   = zu versendende Daten, evtl. als Hash Referenz
 #############################################################################################
-sub SSCam_prepareSendEmail ($$;$) { 
+sub SSCam_prepareSendData ($$;$) { 
    my ($hash, $OpMode, $data) = @_;
    my $name   = $hash->{NAME};
    my $calias = AttrVal($name,"alias",$hash->{CAMNAME});              # Alias der Kamera wenn gesetzt oder Originalname aus SVS
@@ -7532,13 +7571,10 @@ sub SSCam_prepareSendEmail ($$;$) {
        $smtpsslport = AttrVal($name,"smtpSSLPort",0);
    }
    
-   ### Bilddaten als Email versenden wenn Attribut "snapEmailTxt" definiert ist
-   if($OpMode =~ /^getsnap/ && AttrVal($name, "snapEmailTxt", "")) {     
-       # Attribut snapEmailTxt kann übersteuert werden mit: $hash->{HELPER}{SMTPMSG}
-       # Extraktion EMail-Texte
-       # Format in $hash->{HELPER}{SMTPMSG} muss sein: subject => <Betreff-Text>, body => <Mitteilung-Text>
-       my $mth = delete $hash->{HELPER}{SMTPMSG};
-       my $mt = $mth?$mth:AttrVal($name, "snapEmailTxt", "");
+   ### Bilddaten als Email versenden wenn $hash->{HELPER}{CANSENDSNAP} definiert ist
+   if($OpMode =~ /^getsnap/ && $hash->{HELPER}{CANSENDSNAP}) {     
+       delete $hash->{HELPER}{CANSENDSNAP};
+       my $mt = delete $hash->{HELPER}{SMTPMSG};
        $mt    =~ s/['"]//g;   
        
        my($subj,$body)   = split(",", $mt, 2);
@@ -7560,9 +7596,7 @@ sub SSCam_prepareSendEmail ($$;$) {
        
        $tac = $hash->{HELPER}{TRANSACTION};               # Code der laufenden Transaktion
        
-       $sdat = $data;
-       delete $hash->{HELPER}{CANSENDSNAP};
-        
+       $sdat = $data;       
        $ret = SSCam_sendEmail($hash, {'subject'      => $smtpmsg{subject},   
                                       'part1txt'     => $smtpmsg{body}, 
                                       'part2type'    => 'image/jpeg',
@@ -7575,13 +7609,10 @@ sub SSCam_prepareSendEmail ($$;$) {
                                       'tac'          => $tac,                                  
                                      }
                              );
-                             
-       return $ret;
    }
    
-   ### Recordings als Email versenden wenn Attribut "recEmailTxt" definiert ist
+   ### Recordings als Email versenden wenn $hash->{HELPER}{CANSENDREC} definiert ist
    if($OpMode =~ /^GetRec/ && $hash->{HELPER}{CANSENDREC}) {     
-       # recEmailTxt aus $hash->{HELPER}{SMTPRECMSG}
        delete $hash->{HELPER}{CANSENDREC};
        my $mt  = delete $hash->{HELPER}{SMTPRECMSG};
        $mt     =~ s/['"]//g;   
@@ -7614,11 +7645,181 @@ sub SSCam_prepareSendEmail ($$;$) {
                                       'sslfrominit'  => $sslfrominit,
                                       'smtpsslport'  => $smtpsslport,                                  
                                      }
-                             );                        
-       return $ret;
+                             );
    }
 
+   ### Bilddaten mit Telegram versenden
+   if($OpMode =~ /^getsnap/ && $hash->{HELPER}{CANTELESNAP}) {     
+       # snapTelegramTxt aus $hash->{HELPER}{TELEMSG}
+       # Format in $hash->{HELPER}{TELEMSG} muss sein: tbot => <teleBot Device>, peers => <peer1 peer2 ..>, subject => <Beschreibungstext>
+       delete $hash->{HELPER}{CANTELESNAP};
+       my $mt = delete $hash->{HELPER}{TELEMSG};
+       $mt    =~ s/['"]//g;
+             
+       my($telebot,$peers,$subj) = split(",", $mt, 3);
+       my($tbotk,$tbott)   = split("=>", $telebot) if($telebot);
+       my($peerk,$peert)   = split("=>", $peers) if($peers);
+       my($subjk,$subjt)   = split("=>", $subj) if($subj);
+
+       $tbotk = SSCam_trim($tbotk) if($tbotk);
+       $tbott = SSCam_trim($tbott) if($tbott);
+       $peerk = SSCam_trim($peerk) if($peerk);
+       $peert = SSCam_trim($peert) if($peert);
+       $subjk = SSCam_trim($subjk) if($subjk);
+       if($subjt) {
+           $subjt = SSCam_trim($subjt);
+           $subjt =~ s/\$CAM/$calias/g;
+           $subjt =~ s/\$DATE/$date/g;
+           $subjt =~ s/\$TIME/$time/g;
+       }       
+       
+       my %telemsg = ();
+	   $telemsg{$tbotk} = "$tbott" if($tbott);
+	   $telemsg{$peerk} = "$peert" if($peert);
+       $telemsg{$subjk} = "$subjt" if($subjt);
+       
+       $tac = $hash->{HELPER}{TRANSACTION};               # Code der laufenden Transaktion
+       
+       $sdat = $data;  
+       $ret = SSCam_sendTelegram($hash, {'subject'      => $telemsg{subject},
+                                         'part2type'    => 'image/jpeg',
+                                         'sdat'         => $sdat,
+                                         'opmode'       => $OpMode,
+                                         'tac'          => $tac, 
+                                         'telebot'      => $telemsg{$tbotk}, 
+                                         'peers'        => $telemsg{$peerk},                                      
+                                        }
+                                );                   
+   }
+   
 return;
+}
+
+#############################################################################################
+#                                   Telegram-Versand
+#############################################################################################
+sub SSCam_sendTelegram ($$) { 
+   my ($hash, $extparamref) = @_;
+   my $name = $hash->{NAME};
+   my $ret;
+   
+   Log3($name, 4, "$name - ####################################################"); 
+   Log3($name, 4, "$name - ###      start send snapshot by TelegramBot         "); 
+   Log3($name, 4, "$name - ####################################################");
+   
+   my %SSCam_teleparams = (
+       'subject'      => {                       'default'=>'',                          'required'=>0, 'set'=>1},
+       'part1type'    => {                       'default'=>'text/plain; charset=UTF-8', 'required'=>1, 'set'=>1},
+       'part1txt'     => {                       'default'=>'',                          'required'=>0, 'set'=>1},
+       'part2type'    => {                       'default'=>'',                          'required'=>0, 'set'=>1},
+       'sdat'         => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # (Hash)Daten base64 codiert, wenn gesetzt muss 'part2type' auf 'image/jpeg' gesetzt sein
+       'image'        => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # Daten als File, wenn gesetzt muss 'part2type' auf 'image/jpeg' gesetzt sein
+       'fname'        => {                       'default'=>'image.jpg',                 'required'=>0, 'set'=>1},  # Filename für "image"
+       'lsnaptime'    => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # Zeitstempel der Bilddaten
+       'opmode'       => {                       'default'=>'',                          'required'=>1, 'set'=>1},  # OpMode muss gesetzt sein
+       'tac'          => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # übermittelter Transaktionscode der ausgewerteten Transaktion
+       'vdat'         => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # Videodaten, wenn gesetzt muss 'part2type' auf 'video/mpeg' gesetzt sein
+       'telebot'      => {                       'default'=>'',                          'required'=>1, 'set'=>1},  # TelegramBot-Device welches zum Senden verwendet werden soll
+       'peers'        => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # TelegramBot Peers
+       );   
+   
+   my %params = (); 
+   foreach my $key (keys %SSCam_teleparams) {
+       $params{$key} = AttrVal($name, $SSCam_teleparams{$key}->{attr}, $SSCam_teleparams{$key}->{default}) 
+                                                                if(exists $SSCam_teleparams{$key}->{attr}); 
+	   if($SSCam_teleparams{$key}->{set}) {       
+           $params{$key} = $extparamref->{$key} if (exists $extparamref->{$key});
+           $params{$key} = $SSCam_teleparams{$key}->{default} if (!$extparamref->{$key} && !$SSCam_teleparams{$key}->{attr});
+	   }
+       Log3($name, 4, "$name - param $key is now \"".$params{$key}."\" ") if($key !~ /sdat/);
+       Log3($name, 4, "$name - param $key is set") if($key =~ /sdat/ && $params{$key} ne '');
+   }
+   
+   $params{name} = $name;
+   
+   my @err = ();
+   foreach my $key (keys(%SSCam_teleparams)) {
+       push(@err, $key) if ($SSCam_teleparams{$key}->{required} && !$params{$key});
+   }
+   if ($#err >= 0) {
+       $ret = "Missing at least one required parameter or attribute: ".join(', ',@err);
+       Log3($name, 2, "$name - $ret");
+       readingsBeginUpdate($hash);
+       readingsBulkUpdate($hash,"sendTeleState",$ret);
+       readingsEndUpdate($hash, 1);
+       return $ret;
+   }
+   
+   my $telebot            = $params{telebot};
+   my $peers              = $params{peers}; 
+   my $sdat               = $params{sdat};                     # Hash von Imagedaten base64 codiert 
+   
+   if(!$defs{$telebot}) {
+       $ret = "No TelegramBot device \"$telebot\" available";
+       readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
+       Log3($name, 2, "$name - $ret");
+       return;
+   }
+   
+   $hash->{HELPER}{PAREF} = \%params;
+  
+   if(!$peers) {
+       $peers = AttrVal($telebot,"defaultPeer", "");
+       if(!$peers) {
+           $ret = "No peers of TelegramBot device \"$telebot\" found";
+           readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
+           Log3($name, 2, "$name - $ret");
+           return;       
+       }
+   }   
+   
+   
+                                        
+  no strict "refs";
+  my ($msg,$subject);
+  if($sdat) {
+      ### Images liegen in einem Hash (Ref in $sdat) base64-codiert vor
+      my @as = sort{$b<=>$a}keys%{$sdat};
+      foreach my $key (@as) {
+           ($msg,$subject) = SSCam_cmdSendTelegram($name,$key);
+		   my $isMediaStream  = 0;
+		   ( $isMediaStream ) = TelegramBot_IdentifyStream( $defs{$telebot}, $msg ) if ( defined( $msg ) );
+		   $ret = TelegramBot_SendIt( $defs{$telebot}, $peers, $msg, $subject, $isMediaStream, undef, "" );
+		   if($ret) {
+			   readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
+			   Log3($name, 2, "$name - ERROR: $ret");
+		   } else {
+			   $ret = "Telegram message successfully sent to \"$peers\" by \"$telebot\" ";
+			   readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
+			   Log3($name, 3, "$name - $ret");
+		   }
+	  }
+  }
+  use strict "refs";
+  %params = ();        # erstellten Versandhash löschen
+   
+return;
+}
+
+####################################################################################################
+#                                Bilddaten extrahieren für Telegram Versand
+####################################################################################################
+sub SSCam_cmdSendTelegram($$) {
+  my ($name,$key)  = @_;
+  my $hash         = $defs{$name};
+  my $paref        = $hash->{HELPER}{PAREF};
+  my $subject      = $paref->{subject};
+  
+  my $ct      = $paref->{sdat}{$key}{createdTm};
+  my $img     = $paref->{sdat}{$key}{".imageData"};
+  my $fname   = SSCam_trim($paref->{sdat}{$key}{fileName});
+  my $decoded = MIME::Base64::decode_base64($img); 
+  Log3($name, 4, "$name - image data were decoded for TelegramBot prepare");
+  
+  $subject =~ s/\$FILE/$fname/g;
+  $subject =~ s/\$CTIME/$ct/g;
+ 
+return ($decoded,$subject);
 }
 
 #############################################################################################
@@ -8254,7 +8455,7 @@ return ($str);
     <ul>
        <li>Start a recording and send it optionally by Email </li>
        <li>Stop a recording by command or automatically after an adjustable period </li>
-       <li>Trigger of snapshots and optionally send them alltogether by Email using the integrated Email client </li>
+       <li>Trigger of snapshots and optionally send them alltogether by Email/TelegramBot using the integrated Email client </li>
        <li>Trigger snapshots of all defined cams and optionally send them alltogether by Email using the integrated Email client </li>
        <li>Deaktivate a Camera in Synology Surveillance Station</li>
        <li>Activate a Camera in Synology Surveillance Station</li>
@@ -8282,7 +8483,6 @@ return ($str);
        <li>Activation / Deactivation of a camera integrated PIR sensor  </li>
        <li>Creation of a readingsGroup device to display an overview of all defined SSCam devices (createReadingsGroup) </li>
        <li>automatized definition of all in SVS available cameras in FHEM (autocreateCams) </li>
-	   <li>integrated send Email of snapshots </li>
        <li>save the last recording of camera locally </li>
     </ul>
    </ul>
@@ -8481,7 +8681,7 @@ return ($str);
       </table>
     </ul>
     <br><br>
-    </ul>
+  </ul>
     
 <a name="SSCam_HTTPTimeout"></a>
 <b>HTTP-Timeout Settings</b><br><br>
@@ -8872,6 +9072,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   (for further information execute "<b>get &lt;name&gt; versionNotes 7</b>") <br>
   Alternatively you can activate the Email-shipping one-time when you specify the "recEmailTxt:"-tag in the "on"-command.
   In this case the tag-text is used for creating the Email instead the text specified in "recEmailTxt"-attribute.
+  (the tag syntax is identical to the "recEmailTxt" attribute)
   <br><br>
   
   <b>Examples: </b> <br><br>
@@ -9028,7 +9229,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; snap [&lt;number&gt;] [&lt;time difference&gt;] [snapEmailTxt:"subject => &lt;subject text&gt;, body => &lt;message text&gt;"]</b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
+  <li><b> set &lt;name&gt; snap [&lt;number&gt;] [&lt;time difference&gt;] [snapEmailTxt:"subject => &lt;subject text&gt;, body => &lt;message text&gt;"] [snapTelegramTxt:"tbot => &lt;TelegramBot device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;subject text&gt;]"] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   One or multiple snapshots are triggered. The number of snapshots to trigger and the time difference (in seconds) between
   each snapshot can be optionally specified. Without any specification only one snapshot is triggered. <br>
@@ -9042,12 +9243,22 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   Before you have to prepare the Email shipping as described in section <a href="#SSCamEmail">Setup Email shipping</a>. 
   (for further information execute "<b>get &lt;name&gt; versionNotes 7</b>") <br>
   If you want temporary overwrite the message text set in attribute "snapEmailTxt", you can optionally specify the 
-  "snapEmailTxt:"-tag as shown above. <br><br>
+  "snapEmailTxt:"-tag as shown above. If the attribute "snapEmailTxt" is not set, the Email shipping is
+  activated one-time. (the tag-syntax is equivalent to the "snapEmailTxt" attribut) <br><br>
+  
+  A snapshot shipping by <b>Telegram</b> can be permanntly activated by setting <a href="#SSCamattr">attribute</a> 
+  "snapTelegramTxt". Of course, the <a href="http://fhem.de/commandref.html#TelegramBot">TelegramBot device</a> which is 
+  used must be defined and fully functional before. <br>
+  If you want temporary overwrite the message text set in attribute "snapTelegramTxt", you can optionally specify the 
+  "snapTelegramTxt:"-tag as shown above. If the attribute "snapTelegramTxt" is not set, the shipping by Telegram is
+  activated one-time. (the tag-syntax is equivalent to the "snapTelegramTxt" attribut) <br><br>
   
   <b>Examples:</b>
   <pre>
+    set &lt;name&gt; snap
     set &lt;name&gt; snap 4 
     set &lt;name&gt; snap 3 3 snapEmailTxt:"subject => Movement alarm $CAM, body => A movement was recognised at Carport"
+    set &lt;name&gt; snap 2 snapTelegramTxt:"tbot => teleBot, peers => , subject => Movement alarm by $CAM. The snapshot $FILE was created at $CTIME"
   </pre>
   </ul>
   <br><br>
@@ -9334,18 +9545,17 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
     <table>  
     <colgroup> <col width=12%> <col width=88%> </colgroup>
       <tr><td style="vertical-align:top"> <b>snapEmailTxt</b> <td>- <b>Activates the Email shipping of snapshots.</b> This attribute has the format: <br>
-                                                                  <b>subject => &lt;subject text&gt;, body => &lt;message text&gt; </b><br> 
-                                                                  The placeholder $CAM, $DATE and $TIME can be used. $CAM is 
-                                                                  replaced by the device name, device alias or the name of camera in SVS if alias is not 
-                                                                  defined. $DATE and $TIME are replaced with the current date and time. </td></tr>
+                                                                  <code>subject => &lt;subject text&gt;, body => &lt;message text&gt; </code><br> 
+                                                                  The placeholder $CAM, $DATE and $TIME can be used. <br> 
+																  Optionally you can specify the "snapEmailTxt:"-tag when trigger snap shot with the "snap"-command.
+                                                                  In this case the Email shipping is activated one-time for the snapshot or the tag-text 
+                                                                  is used instead of the text defined in the "snapEmailTxt"-attribute. </td></tr>
       <tr><td style="vertical-align:top"> <b>recEmailTxt</b> <td>- <b>Activates the Email shipping of recordings.</b> This attribute has the format: <br>
-                                                                  <b>subject => &lt;subject text&gt;, body => &lt;message text&gt; </b><br> 
-                                                                  The placeholder $CAM, $DATE and $TIME can be used. $CAM is 
-                                                                  replaced by the device name, device alias or the name of camera in SVS if alias is not 
-                                                                  defined. $DATE and $TIME are replaced with the current date and time. 
-                                                                  Alternatively you can specify the "recEmailTxt:"-tag when start recording with the "On"-command.
-                                                                  In this case the Email shipping is temporaray activated for the started recording and the tag-text 
-                                                                  is used instead of the text defined in the "recEmailTxt"-attribute.</td></tr>
+                                                                  <code>subject => &lt;subject text&gt;, body => &lt;message text&gt; </code><br> 
+                                                                  The placeholder $CAM, $DATE and $TIME can be used. <br> 
+                                                                  Optionally you can specify the "recEmailTxt:"-tag when start recording with the "on"-command.
+                                                                  In this case the Email shipping is activated one-time for the started recording or the tag-text 
+                                                                  is used instead of the text defined in the "recEmailTxt"-attribute. </td></tr>
       <tr><td>                            <b>smtpHost</b>     </td><td>- Hostname of outgoing Email server (e.g. securesmtp.t-online.de) </td></tr>
       <tr><td>                            <b>smtpFrom</b>     </td><td>- Return address (&lt;name&gt@&lt;domain&gt) </td></tr>
       <tr><td>                            <b>smtpTo</b>       </td><td>- Receiving address(es) (&lt;name&gt@&lt;domain&gt) </td></tr>
@@ -9358,10 +9568,23 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
    </ul>     
    <br>
    
-  For further information please see description of the <a href="#SSCamattr">attributes</a>. <br>
-  </ul>
-  <br><br>  
+   For further information please see description of the <a href="#SSCamattr">attributes</a>. <br><br>
   
+   Description of the placeholders: <br><br>
+	
+   <ul>   
+   <table>  
+   <colgroup> <col width=10%> <col width=90%> </colgroup>
+     <tr><td> $CAM   </td><td>- Device alias respectively the name of the camera in SVS if the device alias isn't set </td></tr>
+	 <tr><td> $DATE  </td><td>- current date </td></tr>
+	 <tr><td> $TIME  </td><td>- current time </td></tr>
+     <tr><td> $FILE  </td><td>- name of the snapshot file </td></tr>
+     <tr><td> $CTIME </td><td>- creation time of the snapshot </td></tr>
+   </table>
+   </ul>     
+   <br> 
+  </ul>    
+  <br><br> 
   
   <a name="SSCamPolling"></a>
   <b>Polling of Camera/SVS-Properties</b><br><br>
@@ -9591,10 +9814,18 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <a name="recEmailTxt"></a>
   <li><b>recEmailTxt subject => &lt;subject text&gt;, body => &lt;message text&gt; </b><br>
     Activates the Email shipping of recordings after whose creation. <br>
-    The attribute has to be definied in the form as described. You can use the placeholder variables $CAM, $DATE and $TIME. 
-    The variable $CAM is replaced by the device alias or the name of the camera in SVS if the device alias isn't available.
-    $DATE and $TIME are replaced with the current date and time.    
-    <br><br>
+    The attribute has to be definied in the form as described. <br>    
+    You can use the placeholder in "subject" and "body". <br><br>
+	
+		<ul>   
+		<table>  
+		<colgroup> <col width=10%> <col width=90%> </colgroup>
+		  <tr><td> $CAM   </td><td>- Device alias respectively the name of the camera in SVS if the device alias isn't set </td></tr>
+		  <tr><td> $DATE  </td><td>- current date </td></tr>
+		  <tr><td> $TIME  </td><td>- aktuelle time </td></tr>
+		</table>
+		</ul>     
+		<br>
     
        <ul>
 		<b>Example:</b><br>
@@ -9676,17 +9907,58 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <a name="snapEmailTxt"></a>
   <li><b>snapEmailTxt subject => &lt;subject text&gt;, body => &lt;message text&gt; </b><br>
     Activates the Email shipping of snapshots after whose creation. <br>
-    The attribute has to be definied in the form as described. You can use the placeholder variables $CAM, $DATE and $TIME. 
-    The variable $CAM is replaced by the device alias or the name of the camera in SVS if the device alias isn't available.
-    $DATE and $TIME are replaced with the current date and time.    
-    <br><br>
+    The attribute has to be definied in the form as described. <br>
+    You can use the placeholder in "subject" and "body". <br><br>
+	
+		<ul>   
+		<table>  
+		<colgroup> <col width=10%> <col width=90%> </colgroup>
+		  <tr><td> $CAM   </td><td>- Device alias respectively the name of the camera in SVS if the device alias isn't set </td></tr>
+		  <tr><td> $DATE  </td><td>- current date </td></tr>
+		  <tr><td> $TIME  </td><td>- current time </td></tr>
+		</table>
+		</ul>     
+		<br>
     
        <ul>
 		<b>Example:</b><br>
         snapEmailTxt subject => Motion alarm $CAM, body => A motion was recognized at $CAM.
       </ul>
+      <br><br>
+  </li>  
+
+  <a name="snapTelegramTxt"></a>
+  <li><b>snapTelegramTxt tbot => &lt;TelegramBot device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;subject text&gt;]  </b><br>
+    Activates the permanent shipping of snapshots by TelegramBot after their creation. If several snapshots were triggert, 
+	they will be sequentially delivered.<br>
+    The attribute has to be definied in the form as described. With key "tbot" the TelegramBot device is specified, which is 
+	used for shipping the data. Of course, the <a href="http://fhem.de/commandref.html#TelegramBot">TelegramBot device</a> 
+    must be available and has to be running well. <br>
+	The setting of "peers" and "subject" is optional, but the keys must (empty) specified. 
+	If "peer" is empty, teh default peer of the TelegramBot is used. <br>
+	You can use the placeholder in "subject". <br><br>
+	
+		<ul>   
+		<table>  
+		<colgroup> <col width=10%> <col width=90%> </colgroup>
+		  <tr><td> $CAM   </td><td>- Device alias respectively the name of the camera in SVS if the device alias isn't set </td></tr>
+		  <tr><td> $DATE  </td><td>- current date </td></tr>
+		  <tr><td> $TIME  </td><td>- current time </td></tr>
+		  <tr><td> $FILE  </td><td>- Name of snapshot file </td></tr>
+		  <tr><td> $CTIME </td><td>- creation time of the snapshot </td></tr>
+		</table>
+		</ul>     
+		<br>	
+    
+       <ul>
+		<b>Examples:</b><br>
+        snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Motion alarm ($FILE)  <br>
+		snapTelegramTxt tbot =&gt; teleBot, peers =&gt; @nabuko @foo @bar, subject =&gt;  <br>
+		snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt;  <br>
+		snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Motion alarm from $CAM. At $CTIME the snapshot $FILE was created <br>
+      </ul>
       <br>
-  </li>    
+  </li><br>	  
     
   <a name="snapGalleryBoost"></a>
   <li><b>snapGalleryBoost</b><br>
@@ -9866,7 +10138,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
      <ul>
       <li>Start einer Aufnahme und optionaler Versand per Email </li>
       <li>Stop einer Aufnahme per Befehl bzw. automatisch nach Ablauf einer einstellbaren Dauer </li>
-      <li>Auslösen von Schnappschnüssen und optionaler Email-Versand mittels integrierten Email-Client </li>
+      <li>Auslösen von Schnappschnüssen und optional gemeinsamer Email/TelegramBot-Versand mittels integrierten Email-Client </li>
       <li>Auslösen von Schnappschnüssen aller definierten Kameras und optionaler gemeinsamer Email-Versand mittels integrierten Email-Client </li>
       <li>Deaktivieren einer Kamera in Synology Surveillance Station</li>
       <li>Aktivieren einer Kamera in Synology Surveillance Station</li>
@@ -9894,7 +10166,6 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
       <li>Aktivierung / Deaktivierung eines kamerainternen PIR-Sensors </li>
       <li>Erzeugung einer readingsGroup zur Anzeige aller definierten SSCam-Devices (createReadingsGroup) </li>
 	  <li>Automatisiertes Anlegen aller in der SVS vorhandenen Kameras in FHEM (autocreateCams) </li>
-	  <li>integrierter Email-Versand von Schnappschüssen </li>
       <li>lokales Abspeichern der letzten Kamera-Aufnahme </li>
      </ul> 
     </ul>
@@ -10489,8 +10760,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   Ein <b>Email-Versand</b> der letzten Aufnahme kann durch Setzen des <a href="#SSCamattr">Attributs</a> "recEmailTxt" 
   aktiviert werden. Zuvor ist der Email-Versand, wie im Abschnitt <a href="#SSCamEmail">Einstellung Email-Versand</a> beschrieben,
   einzustellen. (Für weitere Informationen "<b>get &lt;name&gt; versionNotes 7</b>" ausführen) <br>
-  Alternativ kann durch Verwendung des optionalen "snapEmailTxt:"-Tags der Email-Versand der gestarteten Aufnahme nach deren
-  Beendigung aktiviert werden. Sollte das Attribut "recEmailTxt" bereits gesetzt sein, wird der Text des "snapEmailTxt:"-Tags  
+  Alternativ kann durch Verwendung des optionalen "recEmailTxt:"-Tags der Email-Versand der gestarteten Aufnahme nach deren
+  Beendigung aktiviert werden. Sollte das Attribut "recEmailTxt" bereits gesetzt sein, wird der Text des "recEmailTxt:"-Tags  
   anstatt des Attribut-Textes verwendet. <br><br>
   
   <b>Beispiele </b>: <br><br>
@@ -10662,7 +10933,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; snap [&lt;Anzahl&gt;] [&lt;Zeitabstand&gt;] [snapEmailTxt:"subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;"]</b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  <li><b> set &lt;name&gt; snap [&lt;Anzahl&gt;] [&lt;Zeitabstand&gt;] [snapEmailTxt:"subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;"] [snapTelegramTxt:"tbot => &lt;TelegramBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;]"]   </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Ein oder mehrere Schnappschüsse werden ausgelöst. Es kann die Anzahl der auszulösenden Schnappschüsse und deren zeitlicher
   Abstand in Sekunden optional angegeben werden. Ohne Angabe wird ein Schnappschuß getriggert. <br>
@@ -10671,16 +10942,27 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   Um die Daten der letzen 1-10 Schnappschüsse zu versionieren, kann das <a href="#SSCamattr">Attribut</a> "snapReadingRotate"
   verwendet werden.
   <br><br>
-  Ein <b>Email-Versand</b> der Schnappschüsse kann durch Setzen des <a href="#SSCamattr">Attributs</a> "snapEmailTxt" aktiviert
+  
+  Ein <b>Email-Versand</b> der Schnappschüsse kann durch Setzen des <a href="#SSCamattr">Attributs</a> "snapEmailTxt" permanent aktiviert
   werden. Zuvor ist der Email-Versand, wie im Abschnitt <a href="#SSCamEmail">Einstellung Email-Versand</a> beschrieben,
   einzustellen. (Für weitere Informationen "<b>get &lt;name&gt; versionNotes 7</b>" ausführen) <br>
   Der Text im Attribut "snapEmailTxt" kann durch die Spezifikation des optionalen "snapEmailTxt:"-Tags, wie oben 
-  gezeigt, temporär überschrieben bzw. geändert werden. <br><br>
+  gezeigt, temporär überschrieben bzw. geändert werden. Sollte das Attribut "snapEmailTxt" nicht gesetzt sein, wird durch Angabe dieses Tags
+  der Email-Versand einmalig aktiviert. (die Tag-Syntax entspricht dem "snapEmailTxt"-Attribut) <br><br>
+  
+  Ein <b>Telegram-Versand</b> der Schnappschüsse kann durch Setzen des <a href="#SSCamattr">Attributs</a> "snapTelegramTxt" permanent aktiviert
+  werden. Das zu verwendende <a href="http://fhem.de/commandref_DE.html#TelegramBot">TelegramBot-Device</a> muss natürlich 
+  funktionstüchtig eingerichtet sein. <br>
+  Der Text im Attribut "snapTelegramTxt" kann durch die Spezifikation des optionalen "snapTelegramTxt:"-Tags, wie oben 
+  gezeigt, temporär überschrieben bzw. geändert werden. Sollte das Attribut "snapTelegramTxt" nicht gesetzt sein, wird durch Angabe dieses Tags
+  der Telegram-Versand einmalig aktiviert. (die Tag-Syntax entspricht dem "snapTelegramTxt"-Attribut) <br><br>
   
   <b>Beispiele:</b>
   <pre>
+    set &lt;name&gt; snap
     set &lt;name&gt; snap 4 
     set &lt;name&gt; snap 3 3 snapEmailTxt:"subject => Bewegungsalarm $CAM, body => Eine Bewegung wurde am Carport registriert"
+    set &lt;name&gt; snap 2 snapTelegramTxt:"tbot => teleBot, peers => , subject => Bewegungsalarm bei $CAM. Es wurde $CTIME der Schnappschuss $FILE erstellt"
   </pre>
   </ul>
   <br><br>
@@ -10991,22 +11273,21 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
                                                                   <ul>
                                                                   <code>subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;</code><br>
                                                                   </ul>
-                                                                  Es können die Platzhalter $CAM, $DATE und $TIME verwendet werden. $CAM wird 
-                                                                  durch den Device-Namen, Device-Alias bzw. den Namen der Kamera in der SVS
-                                                                  ersetzt falls der Device-Alias nicht gesetzt ist. 
-                                                                  $DATE und $TIME werden durch das aktuelle Datum und Zeit ersetzt.</td></tr>
+                                                                  Es können die Platzhalter $CAM, $DATE und $TIME verwendet werden. <br>
+																  Der Email-Versand des letzten Schnappschusses wird einmalig aktiviert falls der "recEmailTxt:"-Tag 
+																  beim "snap"-Kommando verwendet wird bzw. der in diesem Tag definierte Text statt des Textes im 
+																  Attribut "recEmailTxt" verwendet. </td></tr>
       
       <tr><td style="vertical-align:top"> <b>recEmailTxt</b> <td>- <b>Aktiviert den Email-Versand von Aufnahmen</b>. 
                                                                   Das Attribut hat das Format: <br>
                                                                   <ul>
                                                                   <code>subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;</code><br>
                                                                   </ul>
-                                                                  Es können die Platzhalter $CAM, $DATE und $TIME verwendet werden. $CAM wird 
-                                                                  durch den Device-Namen, Device-Alias bzw. den Namen der Kamera in der SVS
-                                                                  ersetzt falls der Device-Alias nicht gesetzt ist. 
-                                                                  $DATE und $TIME werden durch das aktuelle Datum und Zeit ersetzt. <br>
-                                                                  Der Email-Versand der letzten Aufnahme wird temporär aktiviert falls der "recEmailTxt:"-Tag beim 
-                                                                  On-Kommando verwendet wird. </td></tr>      
+                                                                  Es können die Platzhalter $CAM, $DATE und $TIME verwendet werden. <br>
+                                                                  Der Email-Versand der letzten Aufnahme wird einamlig aktiviert falls der "recEmailTxt:"-Tag beim 
+                                                                  "on"-Kommando verwendet wird bzw. der in diesem Tag definierte Text statt des Textes im 
+																  Attribut "recEmailTxt" verwendet. </td></tr>
+																  
       <tr><td>                            <b>smtpHost</b>     </td><td>- Hostname oder IP-Adresse des Postausgangsservers (z.B. securesmtp.t-online.de) </td></tr>
       <tr><td>                            <b>smtpFrom</b>     </td><td>- Absenderadresse (&lt;name&gt@&lt;domain&gt) </td></tr>
       <tr><td>                            <b>smtpTo</b>       </td><td>- Empfängeradresse(n) (&lt;name&gt@&lt;domain&gt) </td></tr>
@@ -11019,8 +11300,22 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
    </ul>     
    <br>
    
-  Zur näheren Erläuterung siehe Beschreibung der <a href="#SSCamattr">Attribute</a>. <br>
-  </ul>
+   Zur näheren Erläuterung siehe Beschreibung der <a href="#SSCamattr">Attribute</a>. <br><br>
+
+   Erläuterung der Platzhalter: <br><br>
+	
+   <ul>   
+   <table>  
+   <colgroup> <col width=10%> <col width=90%> </colgroup>
+     <tr><td> $CAM   </td><td>- Device-Alias bzw. den Namen der Kamera in der SVS ersetzt falls der Device-Alias nicht vorhanden ist </td></tr>
+     <tr><td> $DATE  </td><td>- aktuelles Datum </td></tr>
+     <tr><td> $TIME  </td><td>- aktuelle Zeit </td></tr>
+     <tr><td> $FILE  </td><td>- Filename des Schnappschusses </td></tr>
+     <tr><td> $CTIME </td><td>- Erstellungszeit des Schnappschusses </td></tr>
+   </table>
+   </ul>     
+   <br>
+  </ul>   
   <br><br>
   
   <a name="SSCamPolling"></a>
@@ -11259,9 +11554,18 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <a name="recEmailTxt"></a>
   <li><b>recEmailTxt subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt; </b><br>
     Aktiviert den Emailversand von Aufnahmen nach deren Erstellung. <br>
-    Das Attribut muß in der angegebenen Form definiert werden. Es können die Platzhalter $CAM, $DATE und $TIME verwendet werden. 
-    $CAM wird durch den Device-Alias bzw. den Namen der Kamera in der SVS ersetzt falls der Device-Alias nicht vorhanden 
-    ist. $DATE und $TIME werden durch das aktuelle Datum und Zeit ersetzt. <br><br>
+    Das Attribut muß in der angegebenen Form definiert werden. <br>
+    Es können die Platzhalter im subject und body verwendet werden. <br><br>
+	
+		<ul>   
+		<table>  
+		<colgroup> <col width=10%> <col width=90%> </colgroup>
+		  <tr><td> $CAM   </td><td>- Device-Alias bzw. der Name der Kamera in der SVS falls der Device-Alias nicht vorhanden ist </td></tr>
+		  <tr><td> $DATE  </td><td>- aktuelles Datum </td></tr>
+		  <tr><td> $TIME  </td><td>- aktuelle Zeit </td></tr>
+		</table>
+		</ul>     
+		<br>
     
        <ul>
 		<b>Beispiel:</b><br>
@@ -11344,10 +11648,20 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   
   <a name="snapEmailTxt"></a>
   <li><b>snapEmailTxt subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt; </b><br>
-    Aktiviert den Emailversand von Schnappschüssen nach deren Erstellung. <br>
-    Das Attribut muß in der angegebenen Form definiert werden. Es können die Platzhalter $CAM, $DATE und $TIME verwendet werden. 
-    $CAM wird durch den Device-Alias bzw. den Namen der Kamera in der SVS ersetzt falls der Device-Alias nicht vorhanden 
-    ist. $DATE und $TIME werden durch das aktuelle Datum und Zeit ersetzt. <br><br>
+    Aktiviert den Emailversand von Schnappschüssen nach deren Erstellung. Wurden mehrere Schnappschüsse ausgelöst, 
+	werden sie gemeinsam in einer Mail versendet. <br>
+    Das Attribut muß in der angegebenen Form definiert werden. <br>
+    Es können die Platzhalter im subject und body verwendet werden. <br><br>
+	
+		<ul>   
+		<table>  
+		<colgroup> <col width=10%> <col width=90%> </colgroup>
+		  <tr><td> $CAM   </td><td>- Device-Alias bzw. der Name der Kamera in der SVS falls der Device-Alias nicht vorhanden ist </td></tr>
+		  <tr><td> $DATE  </td><td>- aktuelles Datum </td></tr>
+		  <tr><td> $TIME  </td><td>- aktuelle Zeit </td></tr>
+		</table>
+		</ul>     
+		<br>	
     
        <ul>
 		<b>Beispiel:</b><br>
@@ -11355,6 +11669,39 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
       </ul>
       <br>
   </li>
+  
+  <a name="snapTelegramTxt"></a>
+  <li><b>snapTelegramTxt tbot => &lt;TelegramBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;]  </b><br>
+    Aktiviert den permanenten Versand von Schnappschüssen nach deren Erstellung per TelegramBot. Wurden mehrere Schnappschüsse ausgelöst, 
+	werden sie sequentiell versendet.<br>
+    Das Attribut muß in der angegebenen Form definiert werden. Im Schlüssel "tbot" ist das TelegramBot-Device anzugeben, welches für 
+	den Versand der Daten verwendet werden soll. Das <a href="http://fhem.de/commandref_DE.html#TelegramBot">TelegramBot-Device</a> muss natürlich
+	vorhanden und funktionstüchtig sein. <br>
+	Die Angabe von "peers" und "subject" ist optional, jedoch muß der Schlüssel (leer) angegeben werden. 
+	Wurde "peer" leer gelassen, wird der Default-Peer des TelegramBot verwendet. <br>
+	Es können die Platzhalter im subject verwendet werden. <br><br>
+	
+		<ul>   
+		<table>  
+		<colgroup> <col width=10%> <col width=90%> </colgroup>
+		  <tr><td> $CAM   </td><td>- Device-Alias bzw. den Namen der Kamera in der SVS ersetzt falls der Device-Alias nicht vorhanden ist </td></tr>
+		  <tr><td> $DATE  </td><td>- aktuelles Datum </td></tr>
+		  <tr><td> $TIME  </td><td>- aktuelle Zeit </td></tr>
+		  <tr><td> $FILE  </td><td>- Filename des Schnappschusses </td></tr>
+		  <tr><td> $CTIME </td><td>- Erstellungszeit des Schnappschusses </td></tr>
+		</table>
+		</ul>     
+		<br>	
+    
+       <ul>
+		<b>Beispiele:</b><br>
+        snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Bewegungsalarm ($FILE)  <br>
+		snapTelegramTxt tbot =&gt; teleBot, peers =&gt; @nabuko @foo @bar, subject =&gt;  <br>
+		snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt;  <br>
+		snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Bewegungsalarm bei $CAM. Es wurde $CTIME der Schnappschuss $FILE erstellt <br>
+      </ul>
+      <br>
+  </li><br>
     
   <a name="snapGalleryBoost"></a>
   <li><b>snapGalleryBoost</b><br>
