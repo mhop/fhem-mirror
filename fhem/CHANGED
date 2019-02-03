@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  70_BOTVAC: vendor name is no longer case sensitive
   - feature: 49_SSCam: V8.8.0, send snapshots integrated by telegram
   - change:  93_DbRep: running though tableCurrentFillup if database is closed
   - new:     70_BOTVAC: initial release

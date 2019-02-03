@@ -125,19 +125,19 @@ sub Define($$) {
     my $interval = 85;
 
     if (defined($a[3])) {
-      if ($a[3] =~ /^(neato|vorwerk)$/) {
-        $vendor = $a[3];
+      if (lc($a[3]) =~ /^(neato|vorwerk)$/) {
+        $vendor = $1;
         $interval = $a[4] if (defined($a[4]));
       } elsif ($a[3] =~ /^[0-9]+$/ and not defined($a[4])) {
         $interval = $a[3];
       } else {
         StorePassword($hash, $a[3]);
         if (defined($a[4])) {
-          if ($a[4] =~ /^(neato|vorwerk)$/) {
-            $vendor = $a[4];
+          if (lc($a[4]) =~ /^(neato|vorwerk)$/) {
+            $vendor = $1;
             $interval = $a[5] if (defined($a[5]));
           } else {
-            $interval = $a[5];
+            $interval = $a[4];
           }
         }
       }
