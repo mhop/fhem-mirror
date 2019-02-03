@@ -47,7 +47,7 @@ use Encode;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
-  "8.8.0"  => "01.02.2019  send snapshots by telegram ",
+  "8.8.0"  => "03.02.2019  send snapshots by telegram ",
   "8.7.2"  => "30.01.2019  code change for snapCams (SVS) ",
   "8.7.1"  => "30.01.2019  fix refresh snapgallery device if snap was done by itself ",
   "8.7.0"  => "27.01.2019  send recording by email ",
@@ -838,7 +838,7 @@ sub SSCam_Set($@) {
       if ($emtxt) {
           # Snap soll nach Erstellung per Email versendet werden
           # Format $emtxt muss sein: snapEmailTxt:"subject => <Subject-Text>, body => <Body-Text>"
-          if (!$hash->{SMTPCREDENTIALS}) {return "Due to attribute \"snapEmailTxt\" is set, you want to send snapshots by email but SMTP credentials are not set - make sure you've set credentials with \"set $name smtpcredentials username password\"";}
+          if (!$hash->{SMTPCREDENTIALS}) {return "It seems you want to send snapshots by email but SMTP credentials are not set - make sure you've set credentials with \"set $name smtpcredentials username password\"";}
           $hash->{HELPER}{SMTPMSG} = $emtxt;
       }
 	  
@@ -8677,7 +8677,7 @@ return ($str);
       </table>
     </ul>
     <br><br>
-    </ul>
+  </ul>
     
 <a name="SSCam_HTTPTimeout"></a>
 <b>HTTP-Timeout Settings</b><br><br>
@@ -9225,7 +9225,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; snap [&lt;number&gt;] [&lt;time difference&gt;] [snapEmailTxt:"subject => &lt;subject text&gt;, body => &lt;message text&gt;"]</b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
+  <li><b> set &lt;name&gt; snap [&lt;number&gt;] [&lt;time difference&gt;] [snapEmailTxt:"subject => &lt;subject text&gt;, body => &lt;message text&gt;"] [snapTelegramTxt:"tbot => &lt;TelegramBot device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;subject text&gt;]"] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   One or multiple snapshots are triggered. The number of snapshots to trigger and the time difference (in seconds) between
   each snapshot can be optionally specified. Without any specification only one snapshot is triggered. <br>
@@ -9239,12 +9239,21 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   Before you have to prepare the Email shipping as described in section <a href="#SSCamEmail">Setup Email shipping</a>. 
   (for further information execute "<b>get &lt;name&gt; versionNotes 7</b>") <br>
   If you want temporary overwrite the message text set in attribute "snapEmailTxt", you can optionally specify the 
-  "snapEmailTxt:"-tag as shown above. <br><br>
+  "snapEmailTxt:"-tag as shown above. If the attribute "snapEmailTxt" is not set, the Email shipping is
+  activated one-time. (the tag-syntax is equivalent to the "snapEmailTxt" attribut) <br><br>
+  
+  A snapshot shipping by <b>Telegram</b> can be permanntly activated by setting <a href="#SSCamattr">attribute</a> 
+  "snapTelegramTxt". Before you have to prepare the Email shipping as mentioned before. <br>
+  If you want temporary overwrite the message text set in attribute "snapTelegramTxt", you can optionally specify the 
+  "snapTelegramTxt:"-tag as shown above. If the attribute "snapTelegramTxt" is not set, the shipping by Telegram is
+  activated one-time. (the tag-syntax is equivalent to the "snapTelegramTxt" attribut) <br><br>
   
   <b>Examples:</b>
   <pre>
+    set &lt;name&gt; snap
     set &lt;name&gt; snap 4 
     set &lt;name&gt; snap 3 3 snapEmailTxt:"subject => Movement alarm $CAM, body => A movement was recognised at Carport"
+    set &lt;name&gt; snap 2 snapTelegramTxt:"tbot => teleBot, peers => , subject => Movement alarm by $CAM. The snapshot $FILE was created at $CTIME"
   </pre>
   </ul>
   <br><br>
@@ -9568,7 +9577,8 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
      <tr><td> $CTIME </td><td>- creation time of the snapshot </td></tr>
    </table>
    </ul>     
-   <br>  
+   <br> 
+  </ul>    
   <br><br> 
   
   <a name="SSCamPolling"></a>
@@ -11298,7 +11308,8 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
      <tr><td> $CTIME </td><td>- Erstellungszeit des Schnappschusses </td></tr>
    </table>
    </ul>     
-   <br>  
+   <br>
+  </ul>   
   <br><br>
   
   <a name="SSCamPolling"></a>
