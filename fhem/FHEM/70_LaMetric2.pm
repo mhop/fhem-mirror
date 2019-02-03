@@ -2341,7 +2341,7 @@ sub LaMetric2_IsDuringTimeframe($$;$) {
         <code>set lametric app countdown reset</code><br>
       </ul><br>
       <br><br>
-      So send data to a private/shared app, use 'push' as action_id. It will require the access token as parameter so that the device will accept data for that particular app:<br>
+      To send data to a private/shared app, use 'push' as action_id. It will require the access token as parameter so that the device will accept data for that particular app:<br>
       <br>
       <code><b>token</b>&nbsp;</code>- type: text - Private access token to be used when pushing data to an app. Can be retrieved from <a href="https://developer.lametric.com/applications/list">developer.lametric.com/applications/app/&lt;app_number&gt;</a> of the corresponding app.<br>
       <br>
