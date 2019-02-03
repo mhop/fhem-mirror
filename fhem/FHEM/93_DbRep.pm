@@ -57,6 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Versions History intern
 our %DbRep_vNotesIntern = (
+  "8.11.2" => "03.02.2019  fix no running tableCurrentFillup if database is closed ",
   "8.11.1" => "25.01.2019  fix sort of versionNotes ",
   "8.11.0" => "24.01.2019  command exportToFile or attribute \"expimpfile\" accepts option \"MAXLINES=\" ",
   "8.10.1" => "23.01.2019  change DbRep_charfilter to eliminate \xc2",
@@ -628,7 +629,13 @@ sub DbRep_Set($@) {
 	  Log3 ($name, 3, "DbRep $name -> running Restore has been canceled");
 	  ReadingsSingleUpdateValue ($hash, "state", "Restore canceled", 1);
       return undef;
-  } 
+  }
+  
+  if ($opt =~ m/tableCurrentFillup/ && $hash->{ROLE} ne "Agent") {   
+      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";  
+      DbRep_Main($hash,$opt);
+      return undef;
+  }  
   
   #######################################################################################################
   ##        keine Aktionen außer die über diesem Eintrag solange Reopen xxxx im DbLog-Device läuft
@@ -671,10 +678,6 @@ sub DbRep_Set($@) {
           return " Set attribute 'allowDeletion' if you want to allow deletion of any database entries. Use it with care !";
       }      
       DbRep_beforeproc($hash, "delEntries");      
-      DbRep_Main($hash,$opt);
-      
-  } elsif ($opt =~ m/tableCurrentFillup/ && $hash->{ROLE} ne "Agent") {   
-      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";  
       DbRep_Main($hash,$opt);
       
   } elsif ($opt eq "deviceRename") {
