@@ -47,7 +47,8 @@ use Encode;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
-  "8.8.0"  => "03.02.2019  send snapshots by telegram ",
+  "8.8.1"  => "04.02.2019  fix need attr snapGalleryBoost / snapGallerySize for ending a snap by telegramBot ",
+  "8.8.0"  => "03.02.2019  send snapshots integrated by telegram ",
   "8.7.2"  => "30.01.2019  code change for snapCams (SVS) ",
   "8.7.1"  => "30.01.2019  fix refresh snapgallery device if snap was done by itself ",
   "8.7.0"  => "27.01.2019  send recording by email ",
@@ -1735,7 +1736,9 @@ sub SSCam_FWsummaryFn ($$$$) {
     $alias = $hash->{HELPER}{ALIAS};
     $ret .= "<img $attr alt='$alias' src='data:image/jpeg;base64,$link'><br>";
     $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
-  
+    $ret .= $imgblank;
+    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>"; 
+    
   } elsif($wltype eq "hls") {
     $alias = $hash->{HELPER}{ALIAS};
     $ret  .= "<video $attr controls autoplay>
@@ -6545,9 +6548,9 @@ sub SSCam_snaplimsize ($) {
 	  $ssize = ($sg eq "Icon")?1:2;
   }
 
-  if($hash->{HELPER}{CANSENDSNAP}) {
+  if($hash->{HELPER}{CANSENDSNAP} || $hash->{HELPER}{CANTELESNAP}) {
       # Versand Schnappschuß darf erfolgen falls gewünscht 
-      $ssize = 2;                                                           # Full Size für EMail-Versand
+      $ssize = 2;                                                           # Full Size für EMail/Telegram -Versand
   }
   
   if($hash->{HELPER}{SNAPNUM}) {
@@ -7189,6 +7192,8 @@ sub SSCam_StreamDev($$$) {
               $streamHash->{HELPER}{STREAM} = "<img src=data:image/jpeg;base64,$link $pws>";      # Stream für "get <SSCamSTRM-Device> popupStream" speichern
               $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);                                  # Statusbit wenn ein Stream aktiviert ist
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
+              $ret .= $imgblank;
+              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";
               $ret .= "</td>";
 		  
           } elsif($wltype =~ /embed/) {
@@ -9243,7 +9248,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   activated one-time. (the tag-syntax is equivalent to the "snapEmailTxt" attribut) <br><br>
   
   A snapshot shipping by <b>Telegram</b> can be permanntly activated by setting <a href="#SSCamattr">attribute</a> 
-  "snapTelegramTxt". Before you have to prepare the Email shipping as mentioned before. <br>
+  "snapTelegramTxt". Of course, the <a href="http://fhem.de/commandref.html#TelegramBot">TelegramBot device</a> which is 
+  used must be defined and fully functional before. <br>
   If you want temporary overwrite the message text set in attribute "snapTelegramTxt", you can optionally specify the 
   "snapTelegramTxt:"-tag as shown above. If the attribute "snapTelegramTxt" is not set, the shipping by Telegram is
   activated one-time. (the tag-syntax is equivalent to the "snapTelegramTxt" attribut) <br><br>
@@ -10943,13 +10949,14 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   einzustellen. (Für weitere Informationen "<b>get &lt;name&gt; versionNotes 7</b>" ausführen) <br>
   Der Text im Attribut "snapEmailTxt" kann durch die Spezifikation des optionalen "snapEmailTxt:"-Tags, wie oben 
   gezeigt, temporär überschrieben bzw. geändert werden. Sollte das Attribut "snapEmailTxt" nicht gesetzt sein, wird durch Angabe dieses Tags
-  der Email-Versand einmalig aktiviert. (Tag-Syntax entspricht dem "snapEmailTxt"-Attribut) <br><br>
+  der Email-Versand einmalig aktiviert. (die Tag-Syntax entspricht dem "snapEmailTxt"-Attribut) <br><br>
   
   Ein <b>Telegram-Versand</b> der Schnappschüsse kann durch Setzen des <a href="#SSCamattr">Attributs</a> "snapTelegramTxt" permanent aktiviert
-  werden. Zuvor ist der Email-Versand wie bereits erwähnt einzustellen. <br>
+  werden. Das zu verwendende <a href="http://fhem.de/commandref_DE.html#TelegramBot">TelegramBot-Device</a> muss natürlich 
+  funktionstüchtig eingerichtet sein. <br>
   Der Text im Attribut "snapTelegramTxt" kann durch die Spezifikation des optionalen "snapTelegramTxt:"-Tags, wie oben 
   gezeigt, temporär überschrieben bzw. geändert werden. Sollte das Attribut "snapTelegramTxt" nicht gesetzt sein, wird durch Angabe dieses Tags
-  der Telegram-Versand einmalig aktiviert. (Tag-Syntax entspricht dem "snapTelegramTxt"-Attribut) <br><br>
+  der Telegram-Versand einmalig aktiviert. (die Tag-Syntax entspricht dem "snapTelegramTxt"-Attribut) <br><br>
   
   <b>Beispiele:</b>
   <pre>

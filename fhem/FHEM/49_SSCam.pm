@@ -47,6 +47,7 @@ use Encode;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.8.1"  => "04.02.2019  fix need attr snapGalleryBoost / snapGallerySize for ending a snap by telegramBot ",
   "8.8.0"  => "03.02.2019  send snapshots integrated by telegram ",
   "8.7.2"  => "30.01.2019  code change for snapCams (SVS) ",
   "8.7.1"  => "30.01.2019  fix refresh snapgallery device if snap was done by itself ",
@@ -6547,9 +6548,9 @@ sub SSCam_snaplimsize ($) {
 	  $ssize = ($sg eq "Icon")?1:2;
   }
 
-  if($hash->{HELPER}{CANSENDSNAP}) {
+  if($hash->{HELPER}{CANSENDSNAP} || $hash->{HELPER}{CANTELESNAP}) {
       # Versand Schnappschuß darf erfolgen falls gewünscht 
-      $ssize = 2;                                                           # Full Size für EMail-Versand
+      $ssize = 2;                                                           # Full Size für EMail/Telegram -Versand
   }
   
   if($hash->{HELPER}{SNAPNUM}) {

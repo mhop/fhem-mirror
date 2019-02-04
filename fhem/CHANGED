@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  49_SSCam: V8.8.1, fix need attr snapGalleryBoost when sending a 
+                       snapshot by telegram
   - new:     39_gassistant: Google Assistant support
   - bugfix:  70_BOTVAC: vendor name is no longer case sensitive
   - feature: 49_SSCam: V8.8.0, send snapshots integrated by telegram
