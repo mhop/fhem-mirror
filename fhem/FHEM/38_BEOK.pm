@@ -33,7 +33,7 @@ use Time::Local;
 use IO::Socket::INET;
 use IO::Select;
 
-my $version = 'V1.1 / 26.01.19';
+my $version = 'V1.11 / 05.02.19';
 
 my %gets = ('status:noArg' => '', 'auth:noArg' =>'' , 'temperature:noArg' => '');
 
@@ -71,12 +71,15 @@ sub BEOK_Define($$) {
     $hash->{'.iv'}  = pack('C*', 0x56, 0x2e, 0x17, 0x99, 0x6d, 0x09, 0x3d, 0x28, 0xdd, 0xb3, 0xba, 0x69, 0x5a, 0x2e, 0x6f, 0x58);
     $hash->{'.id'}  = pack('C*', 0, 0, 0, 0);
 
-    $hash->{'counter'} = 1;
-    $hash->{'isAuth'}  = 0;
-    $hash->{'lastCMD'} = '';
-    $hash->{'TIME'}    = gettimeofday();
-    $hash->{VERSION}   = $version;
-    $hash->{ERRORCOUNT}= 0;
+    $hash->{'counter'}   = 1;
+    $hash->{'isAuth'}    = 0;
+    $hash->{'lastCMD'}   = '';
+    $hash->{'TIME'}      = gettimeofday();
+    $hash->{VERSION}     = $version;
+    $hash->{ERRORCOUNT}  = 0;
+    $hash->{weekprofile} = "none";
+    $hash->{CmdStack}    = ();
+    $hash->{'.CmdStack'} = 0;
 
     # wird mit dem ersten Full Status ueberschrieben
     $hash->{helper}{power}       = 0;
@@ -161,7 +164,9 @@ sub BEOK_Get($@)
 
  return 'get '.$name.' needs at least one argument' if(int(@a) < 2);
  return $name.' get with unknown argument '.$cmd.', choose one of ' . join(' ', sort keys %gets) if (($cmd ne 'status') && ($cmd ne 'auth') && ($cmd ne 'temperature')); 
- 
+
+ $hash->{'.CmdStack'}  = 0;
+
  if ($cmd eq 'auth') 
  {
    return 'device auth key already stored' if ($hash->{isAuth});
@@ -234,38 +239,41 @@ sub BEOK_Set(@)
   my @payload;
   my $len;
 
+  Log3 $name,4,"BEOK set $name $cmd $subcmd" if (($cmd ne '?') && $subcmd);
+
   my $cmdList  = "desired-temp off:noArg on:noArg mode:auto,manual loop:12345.67,123456.7,1234567 ";
   $cmdList    .= " sensor:external,internal,both time:noArg active:noArg inactive:noArg lock:on,off";
   $cmdList    .= " power-on-memory:on,off fre:open,close room-temp-adj:";
 
   for (my $i=-10;$i<9;$i++) {$cmdList .= sprintf('%.1f',$i/2).',';}
 
-  $cmdList .= "4.5,5.0 osv svh svl dif:1,2,3,4,5,6,7,8,9";
+  $cmdList .= "4.5,5.0 osv svh svl dif:1,2,3,4,5,6,7,8,9 weekprofile";
 
   for (my $i=1;$i<7;$i++) {$cmdList .= " day-profile".$i."-temp day-profile".$i."-time";}
   for (my $i=7;$i<9;$i++) {$cmdList .= " we-profile".$i."-temp we-profile".$i."-time";}
 
+
  if ($cmd eq '?') { return SetExtensions($hash,$cmdList,$name,@a); }
+
+ if ($subcmd) { Log3 $name,5,"BEOK set $name $cmd $subcmd"; }
+ else  { Log3 $name,5,"BEOK set $name $cmd"; }
 
  return 'no set commands allowed, auth key and device id are missing ! ( need run get auth first )' if (!$hash->{isAuth});
 
+ $hash->{'.CmdStack'} = 0;
+
  if (($cmd eq 'inactive') && !IsDisabled($name)) 
  {
-  Log3 $name,4,"BEOK set $name $cmd $subcmd";
   readingsSingleUpdate($hash,'state','inactive',1); 
   BEOK_Undef($hash,undef);
  }
  elsif (($cmd eq 'active') && IsDisabled($name)) 
  {
-  Log3 $name,4,"BEOK set $name $cmd $subcmd";
   readingsSingleUpdate($hash,'state','active',1); 
   BEOK_Update($hash); 
  }
  elsif (($cmd eq 'on') || ($cmd eq 'off') || ($cmd eq 'lock'))
  {
-
-  Log3 $name,4,"BEOK set $name $cmd $subcmd";
-
   # Set device on(1) or off(0), does not deactivate Wifi connectivity
   #[0x01,0x06,0x00,0x00,remote_lock,power]
 
@@ -284,8 +292,6 @@ sub BEOK_Set(@)
  }
  elsif (($cmd eq "mode") || ($cmd eq "sensor") || ($cmd eq "loop"))
  {
-  Log3 $name,4,"BEOK set $name $cmd $subcmd";
-
   # mode_byte = ( (loop_mode + 1) << 4) + auto_mode
   # [0x01,0x06,0x00,0x02,mode_byte,sensor
 
@@ -323,8 +329,6 @@ sub BEOK_Set(@)
  elsif (($cmd eq "power-on-memory") || ($cmd eq "fre") || ($cmd eq "room-temp-adj") 
      || ($cmd eq "osv") || ($cmd eq "svh") || ($cmd eq "svl") || ($cmd eq "dif"))
  {
-  Log3 $name,4,"BEOK set $name $cmd $subcmd";
-
   # 1 | SEN | Sensor control option | 0:internal sensor 1:external sensor 2:internal control temperature, external limit temperature 
   # 2 | OSV | Limit temperature value of external sensor | 5-99C 
   # 3 | dIF | Return difference of limit temperature value of external sensor | 1-9C 
@@ -395,26 +399,18 @@ sub BEOK_Set(@)
  }
  elsif ($cmd eq "desired-temp")
  {
-
-  Log3 $name,4,"BEOK set $name $cmd $subcmd";
-
   return undef if (!$subcmd);
 
   my $temp = int($subcmd*2);
   return "Temperature must be between 5 and 99" if (($temp < 10) || ($temp > 198));
 
-  @payload =  (1,6,0,1,0,$temp);  # setzt angeblich auch mode manu
-
-  #readingsSingleUpdate($hash,'desired-temp','set_'.$subcmd,0);
-
-  $hash->{lastCMD} = "set $cmd $subcmd";
+  @payload             =  (1,6,0,1,0,$temp);  # setzt angeblich auch mode manu
+  $hash->{lastCMD}     = "set $cmd $subcmd";
+  $hash->{'.CmdStack'} = 1;
   $ret = BEOK_send_packet($hash, 0x6a, @payload);
-
  }
  elsif ( $cmd =~ /^(day|we)-profile[1-8]-time$/ )
  {
-   Log3 $name,4,"BEOK set $name $cmd $subcmd";
- 
    return "Time must be between 0:00 and 23:59" if $subcmd !~ /^([0-9]|0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$/; #Uhrzeit
    my $day = $cmd;
    $day =~ s/(day|we)-profile//;
@@ -425,12 +421,11 @@ sub BEOK_Set(@)
    @payload = BEOK_set_timer_schedule($hash);
 
    $hash->{lastCMD} = "set $cmd $subcmd";
+   $hash->{weekprofile} = "???";
    $ret = BEOK_send_packet($hash, 0x6a, @payload);
  }
  elsif ( $cmd =~ /^(day|we)-profile[1-8]-temp$/ )
  {
-   Log3 $name,4,"BEOK set $name $cmd $subcmd";
-
    my $temp = int($subcmd*2);
    return "Temperature must be between 5 and 99" if (($temp < 10) || ($temp > 198));
 
@@ -444,8 +439,84 @@ sub BEOK_Set(@)
    readingsSingleUpdate($hash,$cmd,$subcmd,0);
 
    $hash->{lastCMD} = "set $cmd $subcmd";
+   $hash->{weekprofile} = "???";
    $ret = BEOK_send_packet($hash, 0x6a, @payload);
  }
+ elsif ($cmd eq 'weekprofile')
+ {
+    my ($wpd,$wpp,$wpday) = split(":",$subcmd);
+    return "use set $name weekprofile <weekday_device_name:profile_name[:day]>" if ((!$wpd) || (!$wpp));
+    $wpday= ' ' if(!$wpday);
+
+    eval "use JSON";
+    return "please install JSON first"  if ($@);
+
+    my $json = CommandGet(undef,"$wpd profile_data $wpp");
+    if (substr($json,0,2) ne "{\"") #} kein JSON , Fehlermeldung FHEM Device nicht vorhanden oder Fehler von weekprofile
+    {
+     Log3 $name, 2, "BEOK $name, $json";
+     readingsSingleUpdate($hash,"error",$json,1);
+     return $json;
+    }
+
+    my @days = ('Mon','Tue','Wed','Thu','Fri','Sat','Sun');
+
+    my $today = ($wpday eq ' ') ? $days[ (localtime(time))[6] -1 ] : $wpday;
+    return "$today is not a valid weekprofile day, please use on of ".join(",",@days) if  !grep {/$today/} @days;
+
+    my $j;
+
+    eval { $j = decode_json($json); 1; } or do 
+           {
+             $ret = $@;
+             Log3 $name, 2, "BEOK $name, $ret";
+             readingsSingleUpdate($hash,"error",$ret,1);
+             return $ret;
+           };
+
+    for (my $i=0;$i<6;$i++)
+    {
+      if (!defined($j->{$today}{time}[$i]))
+      {
+       $ret = "Day $today time #".($i+1)." is missing in weekprofile $wpd profile_data $wpp";
+       Log3 $name, 2, "BEOK $name, $ret";
+       readingsSingleUpdate($hash,"error",$ret,1);
+       return $ret;
+      }
+      else
+      {
+        if (int(substr($j->{$today}{time}[$i],0,2)) > 23)
+        {
+          $ret = "Day $today time #".($i+1)." hour ".substr($j->{$today}{time}[$i],0,2)." is invalid";
+          Log3 $name, 2, "BEOK $name, $ret";
+          readingsSingleUpdate($hash,"error",$ret,1);
+          return $ret;
+        }
+      }
+
+      if (!defined($j->{$today}{temp}[$i])) # eigentlich überflüssig 
+      {
+       $ret = "Day $today temperature #".($i+1)." is missing in weekprofile $wpd profile_data $wpp";
+       Log3 $name, 2, "BEOK $name, $ret";
+       readingsSingleUpdate($hash,"error",$ret,1);
+       return $ret;
+      }
+
+    }
+
+    for (my $i=0;$i<6;$i++)
+    {
+      $hash->{helper}{$i}{time} = $j->{$today}{time}[$i];
+      $hash->{helper}{$i}{temp} = int($j->{$today}{temp}[$i]*2);
+    }
+
+   @payload = BEOK_set_timer_schedule($hash);
+   $hash->{lastCMD}     = "set $cmd $subcmd";
+   $hash->{weekprofile} = "$wpd:$wpp:$today";
+   $hash->{'.CmdStack'} = 1;
+   $ret = BEOK_send_packet($hash, 0x6a, @payload);
+ }
+
     return $ret;
 }
 
@@ -460,11 +531,7 @@ sub BEOK_NBStart($)
   my $timeout           = AttrVal($name, 'timeout', 3);
   my $data;
   Log3 $name,5,'BEOK '.$logname.' NBStart '.$cmd;
-
- eval
- {
-   local $SIG{ALRM} = sub { die 'Timeout'; };
-    alarm $timeout;
+  my $error = 'no data from device';
 
    my $sock = IO::Socket::INET->new(
             PeerAddr  => $hash->{'.ip'},
@@ -486,12 +553,17 @@ sub BEOK_NBStart($)
   }
   else
   {
-   Log3 $name, 2, 'BEOK '.$logname.' no data from device';
-   return $name.'|1|no data from device';
+   Log3 $name, 2, 'BEOK '.$logname.' '.$error;
+   return "$name|1|$error";
   }
   $sock->close();
- };
- alarm 0;
+
+ if (!$data)
+{ 
+  Log3 $name, 2, 'BEOK '.$logname.' '.$error." 2";
+  return "$name|1|$error 2";
+}
+
 
  return $name.'|1|Timeout' if ( $@ && $@ =~ /Timeout/ );
  return $name.'|1|Error: eval corrupted '.$@ if ($@);
@@ -615,6 +687,8 @@ sub BEOK_NBDone($)
 
      $hash->{ERRORCOUNT} = 0;
      $hash->{TIME}       = time();
+
+     #shift @{$hash->{CmdStack}} if ($hash->{'.CmdStack'}); # war das letzte Kommando ein Stack Kommando ?
 
      return BEOK_UpdateTemp($hash,@payload)   if ($hash->{lastCMD} eq 'get temperature'); 
      return CommandGet(undef, "$name status") if ($hash->{lastCMD} ne 'get status');
@@ -890,6 +964,8 @@ sub BEOK_send_packet(@)
   Log3 $name,5,"BEOK $name send_packet ". join(' ', @packet);
   my $arg = encode_base64(pack('C*',@packet));
 
+  #push(@{$hash->{CmdStack}}, $arg) if $hash->{'.CmdStack'};
+
   $arg = $name.'|'.$arg;
 
   if(defined($hash->{helper}{RUNNING_PID}))
@@ -1129,6 +1205,12 @@ return $html;
     </li><br>
     <li><code>we-profile[7-8]-time &lt;00:00 - 23:59&gt;</code>
     </li><br>
+    <li><code>weekprofile</code><br>
+    Set all weekday setpoints and temperatures with values from a weekprofile day.<br>
+    Syntax : set <name> weekprofile  &lt;weekprofile_device:profil_name[:weekday]&gt;<br>
+    see also <a href='https://forum.fhem.de/index.php/topic,80703.msg901303.html#msg901303'>https://forum.fhem.de/index.php/topic,80703.msg901303.html#msg901303</a>
+    </li><br>
+
     </ul>
     <a name="BEOKattr"></a>
     <b>Attributes</b>
@@ -1247,6 +1329,11 @@ return $html;
     </li><br>
     <li><code>we-profile[7-8]-time &lt;00:00 - 23:59&gt;</code><br>
     Wochenendprofil Zeit
+    </li><br>
+    <li><code>weekprofile</code><br>
+    Setzt alle Wochentag Schaltzeiten und Temperaturen mit Werten aus einem Profil des Moduls weekprofile.<br>
+    Syntax : set <name> weekprofile &lt;weekprofile_device:profil_name[:Wochentag]&gt;<br>
+    siehe auch Erkl&auml;rung im Forum : <a href='https://forum.fhem.de/index.php/topic,80703.msg901303.html#msg901303'>https://forum.fhem.de/index.php/topic,80703.msg901303.html#msg901303</a>
     </li><br>
   </ul>
     <a name="BEOKattr"></a>
