@@ -270,6 +270,11 @@ use vars qw(@authorize);        # List of authorization devices
 use vars qw(@intAtA);           # Internal timer array
 use vars qw(@structChangeHist); # Contains the last 10 structural changes
 
+use constant {
+  DAYSECONDS    => 86400,
+  HOURSECONDS   =>  3600,
+  MINUTESECONDS =>    60
+};
 
 $selectTimestamp = gettimeofday();
 $cvsid = '$Id$';
