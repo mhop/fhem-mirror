@@ -1,4 +1,4 @@
-REV 18493
+REV 18495
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2019-02-04_07:45:02 277013 ./CHANGED
+UPD 2019-02-05_07:45:02 277135 ./CHANGED
 UPD 2019-02-04_07:45:02 39599 ./MAINTAINER.txt
 UPD 2019-01-19_07:45:03 39621 ./configDB.pm
 UPD 2018-09-17_07:45:03 19987 ./fhem.cfg.demo
@@ -266,7 +266,7 @@ UPD 2018-12-31_07:45:03 58001 FHEM/46_TRX_WEATHER.pm
 UPD 2018-01-24_07:45:02 18229 FHEM/46_TeslaPowerwall2AC.pm
 UPD 2018-02-14_07:45:02 37065 FHEM/47_OBIS.pm
 UPD 2015-07-28_14:05:31 26441 FHEM/49_IPCAM.pm
-UPD 2019-02-04_07:45:02 614653 FHEM/49_SSCam.pm
+UPD 2019-02-05_07:45:02 614807 FHEM/49_SSCam.pm
 UPD 2018-12-20_07:45:03 20983 FHEM/49_SSCamSTRM.pm
 UPD 2018-03-12_07:45:04 46280 FHEM/49_TBot_List.pm
 UPD 2018-11-28_07:45:02 62505 FHEM/50_HP1000.pm
@@ -709,8 +709,8 @@ UPD 2019-02-04_07:45:06 3857024 docs/commandref.html
 UPD 2019-02-04_07:45:08 2346549 docs/commandref_DE.html
 UPD 2019-01-19_07:45:03 77621 docs/commandref_frame.html
 UPD 2019-01-19_07:45:03 87066 docs/commandref_frame_DE.html
-UPD 2019-02-04_07:45:09 206848 docs/commandref_modular.html
-UPD 2019-02-04_07:45:10 217593 docs/commandref_modular_DE.html
+UPD 2019-02-05_07:45:09 206848 docs/commandref_modular.html
+UPD 2019-02-05_07:45:10 217593 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
