@@ -238,6 +238,8 @@ sub ZoneMinder_SimpleGet {
     $apiParam->{header} .= "Cookie: " . $hash->{HTTPCookies};
   }
 
+  Log3 $name, 4, "ZoneMinder ($name) SimpleGet calling $url with callback $callback";
+
   HttpUtils_NonblockingGet($apiParam);
 }
 
@@ -336,13 +338,13 @@ sub ZoneMinder_GetFromJson {
 #  Log3 $name, 5, "json: $config";
   my $searchLength = length($searchString);
   my $startIdx = index($config, $searchString);
-  Log3 $name, 5, "$searchString found at $startIdx";
+  Log3 $name, 5, "ZoneMinder ($name) - $searchString found at $startIdx";
   $startIdx += $searchLength;
   my $endIdx = index($config, $endChar, $startIdx);
   my $frame = $endIdx - $startIdx;
   my $searchResult = substr $config, $startIdx, $frame;
 
-  Log3 $name, 5, "looking for $searchString - length: $searchLength. start: $startIdx. end: $endIdx. result: $searchResult";
+  Log3 $name, 5, "ZoneMinder ($name) - looking for $searchString - length: $searchLength. start: $startIdx. end: $endIdx. result: $searchResult";
   
   return $searchResult;
 }
@@ -360,7 +362,7 @@ sub ZoneMinder_API_UpdateMonitors_Callback {
     if ( $monitorId =~ /^[0-9]+$/ ) {
       ZoneMinder_UpdateMonitorAttributes($hash, $monitorData, $monitorId);
     } else {
-      Log3 $name, 0, "Invalid monitorId: $monitorId" unless ('itors' eq $monitorId);
+      Log3 $name, 0, "ZoneMinder ($name) - Invalid monitorId: $monitorId" unless ('itors' eq $monitorId);
     }
   }
 
@@ -413,35 +415,49 @@ sub ZoneMinder_GetCookies {
 
 sub ZoneMinder_Write {
   my ( $hash, $arguments) = @_;
+  my $name = $hash->{NAME};
   my $method = $arguments->{method};
 
   if ($method eq 'changeMonitorFunction') {
 
     my $zmMonitorId = $arguments->{zmMonitorId};
     my $zmFunction = $arguments->{zmFunction};
-    Log3 $hash->{NAME}, 4, "method: $method, monitorId:$zmMonitorId, Function:$zmFunction";
+    Log3 $name, 4, "ZoneMinder ($name) method: $method, monitorId:$zmMonitorId, Function:$zmFunction";
     return ZoneMinder_API_ChangeMonitorState($hash, $zmMonitorId, $zmFunction, undef);
 
   } elsif ($method eq 'changeMonitorEnabled') {
 
     my $zmMonitorId = $arguments->{zmMonitorId};
     my $zmEnabled = $arguments->{zmEnabled};
-    Log3 $hash->{NAME}, 4, "method: $method, monitorId:$zmMonitorId, Enabled:$zmEnabled";
+    Log3 $name, 4, "ZoneMinder ($name) method: $method, monitorId:$zmMonitorId, Enabled:$zmEnabled";
     return ZoneMinder_API_ChangeMonitorState($hash, $zmMonitorId, undef, $zmEnabled);
 
   } elsif ($method eq 'changeMonitorAlarm') {
 
     my $zmMonitorId = $arguments->{zmMonitorId};
     my $zmAlarm = $arguments->{zmAlarm};
-    Log3 $hash->{NAME}, 4, "method: $method, monitorId:$zmMonitorId, Alarm:$zmAlarm";
+    Log3 $name, 4, "ZoneMinder ($name) method: $method, monitorId:$zmMonitorId, Alarm:$zmAlarm";
     return ZoneMinder_Trigger_ChangeAlarmState($hash, $zmMonitorId, $zmAlarm);
 
   } elsif ($method eq 'changeMonitorText') {
 
     my $zmMonitorId = $arguments->{zmMonitorId};
     my $zmText = $arguments->{text};
-    Log3 $hash->{NAME}, 4, "method: $method, monitorId:$zmMonitorId, Text:$zmText";
+    Log3 $name, 4, "ZoneMinder ($name) method: $method, monitorId:$zmMonitorId, Text:$zmText";
     return ZoneMinder_Trigger_ChangeText($hash, $zmMonitorId, $zmText);
+
+  } elsif ($method eq 'queryEventDetails') {
+
+    my $zmApiUrl = ZoneMinder_getZmApiUrl($hash);
+    if ( not defined($zmApiUrl) ) {
+      return undef;
+    }
+
+    my $zmMonitorId = $arguments->{zmMonitorId};
+    my $zmEventId = $arguments->{zmEventId};
+    Log3 $name, 4, "ZoneMinder ($name) method: $method, monitorId:$zmMonitorId, EventId:$zmEventId";
+    ZoneMinder_SimpleGet($hash, "$zmApiUrl/events/$zmEventId.json", \&ZoneMinder_API_QueryEventDetails_Callback);
+    return undef;
 
   }
 
@@ -502,6 +518,35 @@ sub ZoneMinder_API_ChangeMonitorState_Callback {
   
   return undef;
 }
+
+sub ZoneMinder_API_QueryEventDetails_Callback {
+  my ($param, $err, $data) = @_;
+  my $hash = $param->{hash};
+  my $name = $hash->{NAME};
+
+  my $zmMonitorId = ZoneMinder_GetConfigValueByKey($hash, $data, 'MonitorId');
+  my $zmEventId = ZoneMinder_GetConfigValueByKey($hash, $data, 'Id');
+  my $zmNotes = ZoneMinder_GetConfigValueByKey($hash, $data, 'Notes');
+
+#  my $logDevHash = $modules{ZM_Monitor}{defptr}{$name.'_'.$zmMonitorId};
+  
+  Log3 $name, 4, "ZoneMinder ($name) - QueryEventDetails_Callback zmMonitorId: $zmMonitorId, zmEventId: $zmEventId, zmNotes: $zmNotes";
+
+  Dispatch($hash, "eventDetails:$zmMonitorId|$zmEventId|$zmNotes", undef);
+
+#  foreach my $monitorData (@monitors) {
+#    my $monitorId = ZoneMinder_GetConfigValueByKey($hash, $monitorData, 'Id');
+
+#    if ( $monitorId =~ /^[0-9]+$/ ) {
+#      my $dispatchResult = Dispatch($hash, "createMonitor:$monitorId", undef);
+#    }
+#  }
+#  my $zmApiUrl = ZoneMinder_getZmApiUrl($hash);
+#  ZoneMinder_SimpleGet($hash, "$zmApiUrl/monitors.json", \&ZoneMinder_API_UpdateMonitors_Callback);
+
+  return undef;
+}
+
 
 sub ZoneMinder_Trigger_ChangeAlarmState {
   my ( $hash, $zmMonitorId, $zmAlarm ) = @_;

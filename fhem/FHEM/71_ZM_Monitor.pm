@@ -255,6 +255,8 @@ sub ZM_Monitor_Parse {
   my $msgType = $msg[0];
   if ($msgType eq 'event') {
     return ZM_Monitor_handleEvent($io_hash, $msg[1]);
+  } elsif ($msgType eq 'eventDetails') {
+    return ZM_Monitor_handleZoneUpdate($io_hash, $msg[1]);
   } elsif ($msgType eq 'createMonitor') {
     return ZM_Monitor_handleMonitorCreation($io_hash, $msg[1]);
   } elsif ($msgType eq 'monitor') {
@@ -277,10 +279,13 @@ sub ZM_Monitor_handleEvent {
   my $eventId = $msgTokens[3];
 
   my $logDevAddress = $ioName.'_'.$zmMonitorId;
-  Log3 $io_hash, 5, "Handling event for logical device $logDevAddress";
+  Log3 $io_hash, 5, "ZM_Monitor Handling event for logical device $logDevAddress";
   # wenn bereits eine Gerätedefinition existiert (via Definition Pointer aus Define-Funktion)
   if(my $hash = $modules{ZM_Monitor}{defptr}{$logDevAddress}) {
-    Log3 $hash, 5, "Logical device $logDevAddress found. Writing readings";
+    my $name = $hash->{NAME};
+    Log3 $hash, 5, "ZM_Monitor ($name) Logical device $logDevAddress found. Writing readings";
+
+    ZM_Monitor_queryEventDetails($hash, $eventId);
 
     readingsBeginUpdate($hash);
     ZM_Monitor_createEventStreamUrl($hash, $eventId);
@@ -294,17 +299,52 @@ sub ZM_Monitor_handleEvent {
     readingsBulkUpdate($hash, "alert", $alertState, 1);
     readingsBulkUpdate($hash, "lastEventTimestamp", $eventTs);
     readingsBulkUpdate($hash, "lastEventId", $eventId);
+    readingsBulkUpdate($hash, "lastEventNotes", '');
     readingsEndUpdate($hash, 1);
 
-    Log3 $hash, 5, "Writing readings done. Now returning log dev name: $hash->{NAME}";
+    Log3 $hash, 5, "ZM_Monitor ($name) Writing readings done. Now returning log dev name: $hash->{NAME}";
     # Rückgabe des Gerätenamens, für welches die Nachricht bestimmt ist.
     return $hash->{NAME};
   } else {
     # Keine Gerätedefinition verfügbar. Daher Vorschlag define-Befehl: <NAME> <MODULNAME> <ADDRESSE>
     my $autocreate = "UNDEFINED ZM_Monitor_$logDevAddress ZM_Monitor $zmMonitorId";
-    Log3 $io_hash, 5, "logical device with address $logDevAddress not found. returning autocreate: $autocreate";
+    Log3 $io_hash, 5, "ZM_Monitor logical device with address $logDevAddress not found. returning autocreate: $autocreate";
     return $autocreate;
   }
+}
+
+sub ZM_Monitor_queryEventDetails {
+  my ( $hash, $eventId ) = @_;
+
+  my $arguments = {
+    method => 'queryEventDetails',
+    zmMonitorId => $hash->{helper}{ZM_MONITOR_ID},
+    zmEventId => $eventId
+  };
+  my $result = IOWrite($hash, $arguments);
+}
+
+sub ZM_Monitor_handleZoneUpdate {
+  my ( $io_hash, $message ) = @_;
+
+  my $ioName = $io_hash->{NAME};
+  my @msgTokens = split(/\|/, $message);
+  my $zmMonitorId = $msgTokens[0];
+  my $zmEventId = $msgTokens[1];
+  my $zmNotes = $msgTokens[2];
+  my $logDevAddress = $ioName.'_'.$zmMonitorId;
+
+  if(my $hash = $modules{ZM_Monitor}{defptr}{$logDevAddress}) {
+    readingsSingleUpdate($hash, 'lastEventNotes', $zmNotes, 1);
+
+    return $hash->{NAME}
+  } else {
+    # Keine Gerätedefinition verfügbar. Daher Vorschlag define-Befehl: <NAME> <MODULNAME> <ADDRESSE>
+    my $autocreate = "UNDEFINED ZM_Monitor_$logDevAddress ZM_Monitor $zmMonitorId";
+    Log3 $io_hash, 5, "ZM_Monitor logical device with address $logDevAddress not found. returning autocreate: $autocreate";
+    return $autocreate;
+  }
+
 }
 
 #for now, this is nearly a duplicate of writing the streamUrl reading.
