@@ -8,8 +8,6 @@ package main;
 use strict;
 use warnings;
 
-my $version = "0.9.1";
-
 sub npmjs_Initialize($) {
 
     my ($hash) = @_;
@@ -27,9 +25,9 @@ sub npmjs_Initialize($) {
       . "npmglobal:1,0 "
       . $readingFnAttributes;
 
-    foreach my $d ( sort keys %{ $modules{npmjs}{defptr} } ) {
-        my $hash = $modules{npmjs}{defptr}{$d};
-        $hash->{VERSION} = $version;
+    # update INTERNAL after module reload
+    foreach my $d ( devspec2array("TYPE=npmjs") ) {
+        $defs{$d}{VERSION} = $npmjs::VERSION;
     }
 }
 
@@ -40,13 +38,16 @@ use strict;
 use warnings;
 use POSIX;
 
+# our @EXPORT  = qw(get_time_suffix);
+our $VERSION = "0.9.2";
+
 # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 use GPUtils qw(GP_Import);
 
 use Data::Dumper;    #only for Debugging
 
-my $missingModul = "";
-eval "use JSON;1" or $missingModul .= "JSON ";
+my $missingModule = "";
+eval "use JSON;1" or $missingModule .= "JSON ";
 
 ## Import der FHEM Funktionen
 BEGIN {
@@ -82,28 +83,38 @@ sub Define($$) {
     my ( $hash, $def ) = @_;
     my @a = split( "[ \t][ \t]*", $def );
 
-    return "too few parameters: define <name> npmjs <HOST>"
-      if ( @a != 3 );
-    return "Cannot define npmjs device. Perl modul ${missingModul}is missing."
-      if ($missingModul);
+    return "too few parameters: define <name> npmjs [<HOST>]"
+      if ( @a != 2 );
+    return
+      "Cannot define npmjs device. Perl module ${missingModule} is missing."
+      if ($missingModule);
 
     my $name = $a[0];
-    my $host = $a[2];
+    my $host = $a[2] ? $a[2] : 'localhost';
 
-    $hash->{VERSION}   = $version;
+    $hash->{VERSION}   = $VERSION;
     $hash->{HOST}      = $host;
     $hash->{NOTIFYDEV} = "global,$name";
 
+    return "Existing instance for host $hash->{HOST}: "
+      . $modules{ $hash->{TYPE} }{defptr}{ $hash->{HOST} }{NAME}
+      if ( defined( $modules{ $hash->{TYPE} }{defptr}{ $hash->{HOST} } ) );
+
+    $modules{ $hash->{TYPE} }{defptr}{ $hash->{HOST} } = $hash;
+
+    if ( $init_done && !defined( $hash->{OLDDEF} ) ) {
+
+        # presets for FHEMWEB
+        $attr{$name}{alias} = 'Node.js Update Status';
+        $attr{$name}{devStateIcon} =
+'npm.updates.available:security@red npm.is.up.to.date:security@green .*in.progress:system_fhem_reboot@orange errors:message_attention@red';
+        $attr{$name}{group} = 'System';
+        $attr{$name}{icon}  = 'it_server';
+        $attr{$name}{room}  = 'System';
+    }
+
     readingsSingleUpdate( $hash, "state", "initialized", 1 )
       if ( ReadingsVal( $name, 'state', 'none' ) ne 'none' );
-    CommandAttr( undef,
-        $name
-          . ' devStateIcon npm.updates.available:security@red npm.is.up.to.date:security@green .*in.progress:system_fhem_reboot@orange errors:message_attention@red'
-    ) if ( AttrVal( $name, 'devStateIcon', 'none' ) eq 'none' );
-
-    Log3 $name, 3, "npmjs ($name) - defined";
-
-    $modules{npmjs}{defptr}{ $hash->{HOST} } = $hash;
 
     return undef;
 }
@@ -249,12 +260,14 @@ sub Set($$@) {
     my ( $cmd, @args ) = @aa;
 
     if ( $cmd eq 'outdated' ) {
+
         # return "usage: $cmd" if ( @args != 0 );
 
         $hash->{".fhem"}{npm}{cmd} = $cmd;
 
     }
     elsif ( $cmd eq 'update' ) {
+
         # return "usage: $cmd" if ( @args != 0 );
 
         $hash->{".fhem"}{npm}{cmd} = $cmd;
@@ -321,11 +334,8 @@ sub ProcessUpdateTimer($) {
     my $name = $hash->{NAME};
 
     RemoveInternalTimer($hash);
-    InternalTimer(
-        gettimeofday() + 14400,
-        "npmjs::ProcessUpdateTimer",
-        $hash, 0
-    );
+    InternalTimer( gettimeofday() + 14400,
+        "npmjs::ProcessUpdateTimer", $hash, 0 );
     Log3 $name, 4, "npmjs ($name) - stateRequestTimer: Call Request Timer";
 
     unless ( IsDisabled($name) ) {
@@ -681,7 +691,7 @@ sub CreateUpgradeList($$) {
     if ( ref($packages) eq "HASH" ) {
 
         my $linecount = 1;
-        foreach my $package ( keys( %{$packages} ) ) {
+        foreach my $package ( sort keys( %{$packages} ) ) {
             if ( $linecount % 2 == 0 ) {
                 $ret .= '<tr class="even">';
             }
