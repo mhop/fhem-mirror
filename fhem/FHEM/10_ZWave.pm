@@ -87,8 +87,7 @@ my %zwave_class = (
                                ($1 eq "ff" ? "state:on" :
                                              "state:dim ".hex($1)))',
                "052603(..)(..)(..)" => 'sprintf("swmStatus:%s target %s '.
-                                          'duration %s", hex($1), hex($2),
-                                          ZWave_time2byte($hash,hex($3)))', # V4
+                    'duration %s", hex($1), hex($2), ZWave_byte2time($3))', # V4
                "..260100.."=> "state:setOff",
                "..2601ff.."=> "state:setOn",
                "..260420"  => "state:swmBeginUp",
