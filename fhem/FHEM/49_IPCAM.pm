@@ -28,6 +28,7 @@ use warnings;
 
 sub IPCAM_getSnapshot($);
 sub IPCAM_guessFileFormat($);
+sub IPCAM_getScheme($);
 
 my %gets = (
   "image"     => "",
@@ -59,7 +60,7 @@ IPCAM_Initialize($$)
                       "cmdPos09 cmdPos10 cmdPos11 cmdPos12 cmdPos13 cmdPos14 cmdPos15 cmdPosHome ".
                       "cmd01 cmd02 cmd03 cmd04 cmd05 cmd06 cmd07 cmd08 ".
                       "cmd09 cmd10 cmd11 cmd12 cmd13 cmd14 cmd15 ".
-                      "do_not_notify:1,0 showtime:1,0 ".
+                      "do_not_notify:1,0 showtime:1,0 scheme:http,https ".
                       "loglevel:0,1,2,3,4,5,6 disable:0,1 ".
                       $readingFnAttributes;
 }
@@ -202,10 +203,12 @@ IPCAM_Set($@) {
     return "Missing a path value for camURI. Please set attribute 'path', 'pathCmd' and/or 'pathPanTilt' first."
       if(!$camPath && $cmd ne "raw");
 
+    my $scheme = IPCAM_getScheme($hash);
+
     if($basicauth) {
-      $camURI  = "http://$basicauth" . "@" . "$camAuth/$camPath";
+      $camURI  = "$scheme://$basicauth" . "@" . "$camAuth/$camPath";
     } else {
-      $camURI  = "http://$camAuth/$camPath";
+      $camURI  = "$scheme://$camAuth/$camPath";
     }
 
     if($cmd eq "cmd" && defined($attr{$name}{pathCmd})) {
@@ -348,10 +351,11 @@ IPCAM_getSnapshot($) {
   $camQuery = $attr{$name}{query}
     if(defined($attr{$name}{query}) && $attr{$name}{query} ne "");
 
+  my $scheme = IPCAM_getScheme($hash);
   if($basicauth) {
-    $camURI  = "http://$basicauth" . "@" . "$camAuth/$camPath";
+    $camURI  = "$scheme://$basicauth" . "@" . "$camAuth/$camPath";
   } else {
-    $camURI  = "http://$camAuth/$camPath";
+    $camURI  = "$scheme://$camAuth/$camPath";
   }
   $camURI .= "?$camQuery" if($camQuery);
 
@@ -441,6 +445,15 @@ IPCAM_getSnapshot($) {
 
 #####################################
 sub
+IPCAM_getScheme($) {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  return AttrVal($name, 'scheme', 'http');
+}
+
+#####################################
+sub
 IPCAM_guessFileFormat($) {
   my ($src) = shift;
   my $header;
@@ -472,6 +485,8 @@ IPCAM_guessFileFormat($) {
 1;
 
 =pod
+=item summary    network camera device to trigger snapshots on events
+=item summary_DE Anbindung von Netzwerkkameras um snapshots auszul&ouml;sen
 =begin html
 
 <a name="IPCAM"></a>
@@ -729,6 +744,14 @@ IPCAM_guessFileFormat($) {
       <code>attr ipcam3 pathPanTilt decoder_control.cgi?user={USERNAME}&amp;pwd={PASSWORD}</code>
     </li>
     <li><a href="#showtime">showtime</a></li>
+    <li>
+      scheme<br>
+      Defines the URI-Scheme for generating the download path.<br>
+      If this attribute is not defined, then the default value is http.
+      Default: <code>http</code><br>
+      Example:<br>
+      <code>attr ipcam3 scheme https</code>
+    </li>
     <li>
       snapshots<br>
       Defines the total number of snapshots to be taken with the <code>get &lt;name&gt; image</code> command.
