@@ -392,7 +392,7 @@ attr DEVICE setList\
   off:noArg cmnd/DEVNAME/POWER1 0\
   on:noArg cmnd/DEVNAME/POWER1 1\
   toggle:noArg cmnd/DEVNAME/POWER1 2\
-  rgb:colorpicker,RGB cmnd/DEVNAME/COLOR
+  Color:colorpicker,RGB cmnd/DEVNAME/COLOR
 attr DEVICE readingList \
   tele/DEVNAME/LWT:.* LWT\
   stat/DEVNAME/POWER:.* POWER\
@@ -401,11 +401,10 @@ attr DEVICE readingList \
   tele/DEVNAME/INFO.:.* { json2nameValue($EVENT) }
 deletereading DEVICE .*
 attr DEVICE autocreate 0
-attr DEVICE devStateIcon {Color::devStateIcon($name,"color","color","state")}
-attr DEVICE webCmd on:off:rgb
+attr DEVICE devStateIcon {Color::devStateIcon($name,"rgb","Color","state")}
 attr DEVICE icon light_control
 attr DEVICE stateFormat POWER1
-attr DEVICE webCmd rgb:rgb ff0000:rgb 00ff00:rgb 0000ff:toggle:on:off
+attr DEVICE webCmd Color:Color ff0000:Color 00ff00:Color 0000ff:toggle:on:off
 attr DEVICE model A_05a_tasmota_rgb_led_controller
 
 name:A_01z_tasmota_set_lowercase_texts_and_state1
