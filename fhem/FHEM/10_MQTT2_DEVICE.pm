@@ -561,7 +561,7 @@ MQTT2_DEVICE_nlData($)
   my $gv = ReadingsVal($d, ".graphviz", ReadingsVal($d, "graphviz", ""));
   for my $l (split(/[\r\n]/, $gv)) {
 
-    if($l =~ m/^\s*"([^"]+)"\s*\[label="([^"]+)"\]/) {
+    if($l =~ m/^\s*"([^"]+)"\s*\[.*label="([^"]+)"\]/) {
       my ($n,$v) = ($1,$2);
       my $nv = $n;
       $nv =~ s/^0x0*//;
