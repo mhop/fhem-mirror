@@ -1016,7 +1016,7 @@ sub _cfgDB_Search($$;$) {
 	$sth = $fhem_dbh->prepare( $sql);
 	Log 5,"configDB: $sql";
 	$sth->execute();
-	$text = " device" if($dsearch);
+	$text = $dsearch ? " device" : "";
 	push @result, "search result for$text: $search in version: $searchversion";
 	push @result, "--------------------------------------------------------------------------------";
 	while (@line = $sth->fetchrow_array()) {
