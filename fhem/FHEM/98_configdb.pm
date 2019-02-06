@@ -204,7 +204,7 @@ sub CommandConfigdb($$) {
 			$param1 = $param1 ? $param1 : '%';
 			$param2 = looks_like_number($param2) ? $param2 : 0;
 			Log3('configdb', 4, "configdb: list requested for device: $param1 in version $param2.");
-			$ret = _cfgDB_Search($param1,$param2);
+			$ret = _cfgDB_Search($param1,$param2,0);
 		}
 
 		when ('uuid') {
