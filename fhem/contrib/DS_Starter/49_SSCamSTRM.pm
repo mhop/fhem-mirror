@@ -1,9 +1,9 @@
 ########################################################################################################################
-# $Id: 49_SSCamSTRM.pm 18007 2018-12-19 21:29:11Z DS_Starter $
+# $Id: 49_SSCamSTRM.pm 17997 2018-12-17 23:40:00Z DS_Starter $
 #########################################################################################################################
 #       49_SSCamSTRM.pm
 #
-#       (c) 2018 by Heiko Maaz
+#       (c) 2018-2019 by Heiko Maaz
 #       forked from 98_weblink.pm by Rudolf König
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
@@ -34,6 +34,7 @@ use warnings;
 
 # Versions History intern
 our %SSCamSTRM_vNotesIntern = (
+  "2.3.0"  => "04.02.2019  SSCamSTRM_Rename / SSCamSTRM_Copy added, Streaming device can now be renamed or copied ",
   "2.2.1"  => "19.12.2018  commandref revised ",
   "2.2.0"  => "13.12.2018  load sscam_hls.js, sscam_tooltip.js from pgm2 for HLS Streaming support and tooltips ",
   "2.1.0"  => "11.12.2018  switch \"popupStream\" from get to set ",
@@ -81,6 +82,8 @@ sub SSCamSTRM_Initialize($) {
                                 "popupStreamFW:$fwd ".
                                 "popupStreamTo:OK,1,2,3,4,5,6,7,8,9,10,15,20,25,30,40,50,60 ".
                                 $readingFnAttributes;
+  $hash->{RenameFn}           = "SSCamSTRM_Rename";
+  $hash->{CopyFn}             = "SSCamSTRM_Copy";
   $hash->{FW_summaryFn}       = "SSCamSTRM_FwFn";
   $hash->{FW_detailFn}        = "SSCamSTRM_FwFn";
   $hash->{AttrFn}             = "SSCamSTRM_Attr";
@@ -112,6 +115,28 @@ sub SSCamSTRM_Define($$) {
   readingsSingleUpdate($hash,"state", "initialized", 1);      # Init für "state" 
   
 return undef;
+}
+
+################################################################
+sub SSCamSTRM_Rename($$) {
+	my ($new_name,$old_name) = @_;
+    my $hash = $defs{$new_name};
+    
+    $hash->{DEF}  =~ s/$old_name/$new_name/g;
+    $hash->{LINK} =~ s/$old_name/$new_name/g;
+
+return;
+}
+
+################################################################
+sub SSCamSTRM_Copy($$) {
+	my ($old_name,$new_name) = @_;
+    my $hash = $defs{$new_name};
+    
+    $hash->{DEF}  =~ s/$old_name/$new_name/g;
+    $hash->{LINK} =~ s/$old_name/$new_name/g;
+
+return;
 }
 
 ################################################################
