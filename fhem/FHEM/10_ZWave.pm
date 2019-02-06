@@ -5186,25 +5186,27 @@ sub
 ZWave_time2byte($$)
 {
   my ($hash, $txt) = @_;
+  my $n = ($hash ? $hash->{NAME} : "unknown");
+
   if($txt !~ m/^[0-9]+$/) {
-    Log 1, "ZWave_time2byte: wrong duration $txt, replacing it with 0";
+    Log 1, "$n: wrong duration $txt specified, replacing it with 0";
     return "00";
   }
   my $b = ($txt <= 0x7f ? $txt : int($txt/60)+0x7f);
   $b = 0xfe if($b > 0xfe);
   my $b2 = $b > 0x7f ? ($b - 0x7f) * 60 : $b;
-  my $n = ($hash ? $hash->{NAME} : "unknown");
   Log3 $n, 2, "$n: changing *for-timeout to $b2 from $txt" if($b2 != $txt);
   return sprintf("%02x", $b);
 }
 
 sub
-ZWave_byte2time($)
+ZWave_byte2time($) # Table 8 in SDS13781
 {
   my ($duration) = @_;
   my $time = hex($duration);
-  $time = ($time - 0x7f) * 60 if($time>0x7f && $time<0xff);
-  return (lc($duration) eq "ff" ? "factoryDefault" : "$time seconds");
+  $time = ($time - 0x7f) * 60 if($time>0x7f && $time<0xfe);
+  return (lc($duration) eq "fe" ? "unknown" :
+         (lc($duration) eq "ff" ? "reservedValue" : "$time seconds"));
 }
 
 #####################################
