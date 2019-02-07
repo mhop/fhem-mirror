@@ -58,7 +58,7 @@ TCM_Initialize($)
   $hash->{NotifyFn} = "TCM_Notify";
   $hash->{AttrFn}   = "TCM_Attr";
   $hash->{AttrList} = "baseID blockSenderID:own,no comModeUTE:auto,biDir,uniDir comType:TCM,RS485 do_not_notify:1,0 " .
-                      "dummy:1,0 fingerprint:off,on learningMode:always,demand,nearfield " .
+                      "dummy:1,0 fingerprint:off,on learningDev:all,teachMsg learningMode:always,demand,nearfield " .
                       "sendInterval:0,25,40,50,100,150,200,250 smartAckMailboxMax:slider,0,1,20 " .
                       "smartAckLearnMode:simple,advance,advanceSelectRep";
 }
@@ -1291,6 +1291,14 @@ sub TCM_Attr(@) {
       CommandDeleteAttr(undef, "$name $attrName");
     }
 
+  } elsif ($attrName eq "learningDev") {
+    if (!defined $attrVal){
+
+    } elsif ($attrVal !~ m/^all|teachMsg$/) {
+      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
+      CommandDeleteAttr(undef, "$name $attrName");
+    }
+
   } elsif ($attrName eq "learningMode") {
     if (!defined $attrVal){
 
@@ -1436,17 +1444,17 @@ TCM_Undef($$)
       Deactivates TCM modem functionality</li>
     <li>modem_on [0000 ... FFFF]<br>
       Activates TCM modem functionality and sets the modem ID</li>
-    <li>teach &lt;t/s&gt;<br>
-      Set Fhem in learning mode, see <a href="#TCM_learningMode">learningMode</a>.<br>
-      The command is always required for UTE and to teach-in bidirectional actuators
-      e. g. EEP 4BS (RORG A5-20-XX),
-      see <a href="#EnOcean_teach-in">Teach-In / Teach-Out</a>.</li>
     <li>reset<br>
       Reset the device</li>
     <li>sensitivity [00|01]<br>
       Set the TCM radio sensitivity: low = 00, high = 01</li>
     <li>sleep<br>
       Enter the energy saving mode</li>
+    <li>teach &lt;t/s&gt;<br>
+      Set Fhem in learning mode, see <a href="#TCM_learningMode">learningMode</a> and <a href="#TCM_learningDev">learningDev</a>.<br>
+      The command is always required for UTE and to teach-in bidirectional actuators
+      e. g. EEP 4BS (RORG A5-20-XX),
+      see <a href="#EnOcean_teach-in">Teach-In / Teach-Out</a>.</li>
     <li>wake<br>
       Wakes up from sleep mode</li>
     <br>
@@ -1520,19 +1528,15 @@ TCM_Undef($$)
     <li>smartAckMailboxMax 0..20<br>
       Enable the post master fuctionality and set amount of mailboxes available, 0 = disable post master functionality.
       Maximum 28 mailboxes can be created. This upper limit is for each firmware restricted and may be smaller.</li>
-    <li>teach &lt;t/s&gt;<br>
-      Set Fhem in learning mode for RBS, 1BS, 4BS, GP, STE and UTE teach-in / teach-out, see <a href="#TCM_learningMode">learningMode</a>.<br>
-      The command is always required for STE, GB, UTE and to teach-in bidirectional actuators
-      e. g. EEP 4BS (RORG A5-20-XX)</li>
     <li>startupDelay [00-FF]<br>
       Sets the startup delay [10ms]: the time before the system initializes.</li>
     <li>subtel [00|01]<br>
       Transmitting additional subtelegram info: Enable = 01, Disable = 00</li>
     <li>teach &lt;t/s&gt;<br>
-      Set Fhem in learning mode, see <a href="#TCM_learningMode">learningMode</a>.<br>
-      The command is always required for UTE and to teach-in bidirectional actuators
-      e. g. EEP 4BS (RORG A5-20-XX),
-      see <a href="#EnOcean_teach-in">Teach-In / Teach-Out</a>.</li>
+      Set Fhem in learning mode for RBS, 1BS, 4BS, GP, STE and UTE teach-in / teach-out, see <a href="#TCM_learningMode">learningMode</a>
+      and <a href="#TCM_learningDev">learningDev</a>.<br>
+      The command is always required for STE, GB, UTE and to teach-in bidirectional actuators
+      e. g. EEP 4BS (RORG A5-20-XX), see <a href="#EnOcean_teach-in">Teach-In / Teach-Out</a>.</li>
     <br>
     For details see the EnOcean Serial Protocol 3 (ESP3) available from
     <a href="http://www.enocean.com">www.enocean.com</a>.
@@ -1619,6 +1623,12 @@ TCM_Undef($$)
       Type of communication device
     </li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a name="TCM_learningDev">learningDev</a> &lt;all|teachMsg&gt;,
+      [learningDev] = teachMsg is default.<br>
+      Learning method for automatic setup of EnOcean devices:<br>
+      [learningDev] = all: All incoming telegrams generate device definitions<br>
+      [learningDev] = teachMsg: Only incoming learning telegrams generate device definitions. RPS telegrams always create new devices due to principle.<br>
+    </li>
     <li><a name="TCM_learningMode">learningMode</a> &lt;always|demand|nearfield&gt;,
       [learningMode] = demand is default.<br>
       Learning method for automatic setup of EnOcean devices:<br>
