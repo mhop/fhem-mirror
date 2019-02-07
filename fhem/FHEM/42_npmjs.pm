@@ -83,8 +83,6 @@ sub Define($$) {
     my ( $hash, $def ) = @_;
     my @a = split( "[ \t][ \t]*", $def );
 
-    return "too few parameters: define <name> npmjs [<HOST>]"
-      if ( @a != 2 );
     return
       "Cannot define npmjs device. Perl module ${missingModule} is missing."
       if ($missingModule);
