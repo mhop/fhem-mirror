@@ -50,7 +50,8 @@ sub HProtocolGateway_Initialize($) {
                       "databitsLength:5,6,7,8 " .
                       "stopBit:0,1 " .
                       "pollIntervalMins " .
-                      "path";
+                      "path " .
+                      "sensorSystem:Hectronic,Unitronics,PMS-IB";
 }
 
 sub HProtocolGateway_Define($$) {
@@ -114,6 +115,12 @@ sub HProtocolGateway_GetUpdate($) {
     } elsif ($mode eq "Ullage") {
       $command = "\$C";
     }
+    
+    my $sensorSystem = AttrVal($name, 'sensorSystem', ""); 
+    if ( $sensorSystem eq "PMS-IB") {
+      $command = "H";
+    }
+
     my $hID = AttrVal($tankHash->{NAME},"hID","");
     my $msg = $command . $hID . "\r\n";
     DevIo_SimpleWrite($hash, $msg , 2);
@@ -180,24 +187,47 @@ sub HProtocolGateway_Read($@) {
 sub HProtocolGateway_ParseMessage($$) {
     my ($hash, $data, $tankHash) = @_;
     my $name = $hash->{NAME};
-    
-    $data =~ s/^.//; # remove # 
-    
-    my ($tankdata,$water,$temperature,$probe_offset,$version,$error,$checksum)=split(/@/,$data);
-    my $test = "#".$tankdata.$water.$temperature.$probe_offset.$version.$error; 
 
-    # calculate XOR CRC
-    my $check = 0;
-    $check ^= $_ for unpack 'C*', $test;
-    # convert to HEX
-    $check = sprintf '%02X', $check;
+    my $sensorSystem = AttrVal($name, 'sensorSystem', ""); 
     
-    # Unitronics
-    if ($version == 0 && $error == 0 && $checksum == 0) {
-      $check = 0;
-    }
+    my ($tanknumber,$error,$temperature,$tankdata,$water,$checksum,$version,$probe_offset);
 
-    return if($check ne $checksum);
+    # PMS-IB
+    if ( $sensorSystem eq "PMS-IB") {
+      ($tanknumber,$error,$temperature,$tankdata,$water,$checksum)=split(/=/,$data);
+     
+      # checksum
+      my @ascii = unpack("C*", $data);
+      my $sum = 0;
+      foreach my $val (@ascii) {
+        $sum = $sum + $val;
+      }
+      if ($sum > 255) {
+        $sum = $sum - 255;
+      }
+
+      return if($sum ne $checksum);
+
+    } else {
+    
+      $data =~ s/^.//; # remove # 
+    
+      ($tankdata,$water,$temperature,$probe_offset,$version,$error,$checksum)=split(/@/,$data);
+      my $test = "#".$tankdata.$water.$temperature.$probe_offset.$version.$error; 
+
+      # calculate XOR CRC
+      my $check = 0;
+      $check ^= $_ for unpack 'C*', $test;
+      # convert to HEX
+      $check = sprintf '%02X', $check;
+    
+      # Unitronics
+      if ($version == 0 && $error == 0 && $checksum == 0) {
+        $check = 0;
+      }
+
+      return if($check ne $checksum);
+    } 
 
     my ($filllevel,$volume,$ullage) = (0,0,0); 
     my $mode = AttrVal($tankHash->{NAME},"mode","");
@@ -220,19 +250,25 @@ sub HProtocolGateway_ParseMessage($$) {
     $probe_offset  =~ s/^.//; 
     if ($sign eq "-") { $probe_offset = int($probe_offset) * -1 };
   
-    my $volume_15C = $volume * (1 + 0.00084 * ( 15 - $temperature ));
+    my $product = AttrVal($tankHash->{NAME},"product","");
+    my $fac = 0.00084;
+    if ($product eq "Petrol" ) {
+      $fac = 0.00106;
+    }
+
+    my $volume_15C = $volume * (1 + $fac * ( 15 - $temperature ));
     $volume_15C = sprintf("%.2f", $volume_15C);
     
     # Update all received readings
-    HProtocolGateway_UpdateTankDevice($hash, $tankHash->{NAME}, "ullage", $ullage);
-    HProtocolGateway_UpdateTankDevice($hash, $tankHash->{NAME}, "filllevel", $filllevel);
-    HProtocolGateway_UpdateTankDevice($hash, $tankHash->{NAME}, "volume", $volume);
-    HProtocolGateway_UpdateTankDevice($hash, $tankHash->{NAME}, "volume_15C", $volume_15C);
-    HProtocolGateway_UpdateTankDevice($hash, $tankHash->{NAME}, "temperature", $temperature);
-    HProtocolGateway_UpdateTankDevice($hash, $tankHash->{NAME}, "waterlevel", $water);
-    HProtocolGateway_UpdateTankDevice($hash, $tankHash->{NAME}, "probe_offset", $probe_offset);
-    HProtocolGateway_UpdateTankDevice($hash, $tankHash->{NAME}, "version", $version);
-    HProtocolGateway_UpdateTankDevice($hash, $tankHash->{NAME}, "error", $error);
+    if (defined $ullage) { HProtocolGateway_UpdateTankDevice($hash, $tankHash->{NAME}, "ullage", $ullage); }
+    if (defined $filllevel) { HProtocolGateway_UpdateTankDevice($hash, $tankHash->{NAME}, "filllevel", $filllevel); }
+    if (defined $volume) { HProtocolGateway_UpdateTankDevice($hash, $tankHash->{NAME}, "volume", $volume); }
+    if (defined $volume_15C) { HProtocolGateway_UpdateTankDevice($hash, $tankHash->{NAME}, "volume_15C", $volume_15C); }
+    if (defined $temperature) { HProtocolGateway_UpdateTankDevice($hash, $tankHash->{NAME}, "temperature", $temperature); }
+    if (defined $water) { HProtocolGateway_UpdateTankDevice($hash, $tankHash->{NAME}, "waterlevel", $water); }
+    if (defined $probe_offset) { HProtocolGateway_UpdateTankDevice($hash, $tankHash->{NAME}, "probe_offset", $probe_offset); }
+    if (defined $version) { HProtocolGateway_UpdateTankDevice($hash, $tankHash->{NAME}, "version", $version); }
+    if (defined $error) { HProtocolGateway_UpdateTankDevice($hash, $tankHash->{NAME}, "error", $error); }
 }
 
 sub HProtocolGateway_UpdateTankDevice($$$$) {
@@ -382,13 +418,13 @@ sub HProtocolGateway_Tank($$$) {
 
 
 =pod
-=item summary    support for the HLS 6010 Probes
+=item summary    support for HProtocol
 =begin html
 
 <a name="HProtocolGateway"></a>
 <h3>HProtocolGateway</h3>
 <ul>
-    The HProtocolGateway is a fhem module for the RS232 standard interface for HLS 6010 Probes connected to a Hectronic OPTILEVEL Supply.
+    The HProtocolGateway is a fhem module for the RS232 standard interface for example for HLS 6010 Probes connected to a Hectronic OPTILEVEL Supply.
 
   <br /><br /><br />
 
@@ -396,6 +432,7 @@ sub HProtocolGateway_Tank($$$) {
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; HProtocolGateway /dev/tty???<br />
+    attr &lt;name&gt; sensorSystem Hectronic<br />
     attr &lt;name&gt; pollIntervalMins 2<br />
     attr &lt;name&gt; path /opt/fhem/<br />
     attr &lt;name&gt; baudrate 1200<br />
@@ -423,12 +460,13 @@ sub HProtocolGateway_Tank($$$) {
     2430,58275<br />
     </code> 
 
-  
-    <br /><br /> 
+  </ul><br />
 
   <a name="HProtocolGateway"></a>
   <b>Attributes</b>
   <ul>
+    <li>sensorSystem<br />
+    Sensor System / Hectronic, Unitronics, PMS-IB</li>
     <li>pollIntervalMins<br />
     poll Interval in Mins</li>
     <li>path<br />
@@ -441,8 +479,6 @@ sub HProtocolGateway_Tank($$$) {
     Parity Bit / N, E, O</li>
     <li>stopBit<br />
     Stop Bit / 0, 1</li>
-  </ul><br />
-
   </ul><br />
 
 </ul><br />

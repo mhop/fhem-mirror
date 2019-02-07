@@ -36,6 +36,7 @@ sub HProtocolTank_Initialize($) {
   $hash->{AttrList}       = "hID " .
                             "mode:FillLevel,Volume,Ullage " .
                             "type " .
+                            "product:Diesel,FuelOil,Petrol " .
                             $readingFnAttributes;
 }
 
@@ -125,7 +126,10 @@ sub HProtocolTank_Attr (@) {
   <a name="HProtocolTank"></a>
   <b>Define</b>
   <ul>
-    <code>define tank01 HProtocolTank HProtocolGateway<br />
+
+    <code>define &lt;name&gt; HProtocolTank HProtocolGateway<br />
+    attr &lt;name&gt; hID 01<br />
+    attr &lt;name&gt; product FuelOil<br />
     </code>
     <br />
 
@@ -162,9 +166,11 @@ sub HProtocolTank_Attr (@) {
     <li>hID<br />
     01 - 32 Tank Number / Tank Address (99 for testing only)</li>
     <li>mode<br />
-    FillLevel, Volume, Ullage</li>
+    Mode / FillLevel, Volume, Ullage</li>
     <li>type<br />
     Strapping Table csv file / tank01.csv</li>
+    <li>product<br />
+    Product / Diesel, FuelOil, Petrol</li>
   </ul><br />
 
 

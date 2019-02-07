@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 12_HProtocolGateway: added 843 protocol for PMS-IB P20
+  - feature: 12_HProtocolTank: added Product to calculate 15 degrees volume
   - new:     70_ZoneMinder: fetching Event-Details via API after event received
   - new:     71_ZM_Monitor: fetching Event-Details via API after event received
   - bugfix:  49_SSCam: V8.8.1, fix need attr snapGalleryBoost when sending a 
