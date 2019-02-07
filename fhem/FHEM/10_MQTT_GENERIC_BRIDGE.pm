@@ -30,7 +30,13 @@
 # 
 # CHANGE LOG
 # 
-# 30.0ß1.2019 1.1.4
+# 07.02.2019 1.1.5
+# feature    : get refreshUserAttr implementiert 
+#              (erstellt notwendige user-attr Attribute an den Geraeten neu,
+#               nuetzlich nach dem Hinzufügen neuer Geraete bei angegebenen
+#               devspec)
+#
+# 30.01.2019 1.1.4
 # change     : Umstellung der Zeichentrenner bei 'Parse' von ':' auf '\0'
 #              wg. Problemen mit ':' in Topics (MQTT2*)
 #              https://forum.fhem.de/index.php?topic=96608
@@ -305,7 +311,7 @@ use warnings;
 
 #my $DEBUG = 1;
 my $cvsid = '$Id$';
-my $VERSION = "version 1.1.4 by hexenmeister\n$cvsid";
+my $VERSION = "version 1.1.5 by hexenmeister\n$cvsid";
 
 my %sets = (
 );
@@ -313,7 +319,8 @@ my %sets = (
 my %gets = (
   "version"   => "noArg",
   "devlist"   => "",
-  "devinfo"   => ""
+  "devinfo"   => "",
+  "refreshUserAttr" => "noArg"
   #"report"=>"noArg",
 );
 
@@ -581,6 +588,15 @@ sub Undefine() {
   RemoveInternalTimer($hash);
   MQTT::client_stop($hash) if isIODevMQTT($hash); #if defined($hash->{+HELPER}->{+IO_DEV_TYPE}) and $hash->{+HELPER}->{+IO_DEV_TYPE} eq 'MQTT';
   removeOldUserAttr($hash);
+}
+
+# erstellt / loescht die notwendigen userattr-Werte (die Bridge-Steuerattribute an den Geraeten laut devspec)
+sub refreshUserAttr($) {
+  my ($hash) = @_;
+  my $oldprefix = $hash->{+HS_PROP_NAME_PREFIX};
+  my $olddevspec = $hash->{+HS_PROP_NAME_DEVSPEC};
+  my $newdevspec = initUserAttr($hash);
+  removeOldUserAttr($hash,$oldprefix,$olddevspec,$newdevspec) if (defined ($olddevspec));
 }
 
 # liefert TYPE des IODev, wenn definiert (MQTT; MQTT2,..)
@@ -1867,6 +1883,10 @@ sub Get($$$@) {
       return $res;
       #last;
     };
+    $command eq "refreshUserAttr" and do {
+      refreshUserAttr($hash);
+    }
+
     # $command eq "YYY" and do {
     #   #  
     #   last;
