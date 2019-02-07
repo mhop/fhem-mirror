@@ -6682,9 +6682,9 @@ sub EnOcean_Parse($$)
     $rorgname = $EnO_rorgname{$rorg};
     if (!$rorgname) {
       if($hash) {
-        Log3 $hash->{NAME}, 2, "EnOcean $hash->{NAME} RORG $rorg unknown.";
+        Log3 $hash->{NAME}, 4, "EnOcean $hash->{NAME} RORG $rorg unknown.";
       } else {
-        Log3 undef, 2, "EnOcean RORG $rorg received from $senderID unknown.";
+        Log3 undef, 4, "EnOcean $senderID RORG $rorg unknown.";
       }
       return "";
     }
@@ -6725,7 +6725,7 @@ sub EnOcean_Parse($$)
         $msg = join(':', @msg);
         $rorgname = $EnO_rorgname{$rorg};
         if (!$rorgname) {
-          Log3 undef, 2, "EnOcean RORG $rorg received from $senderID unknown.";
+          Log3 undef, 4, "EnOcean $senderID RORG $rorg unknown.";
           return "";
         }
         delete $iohash->{helper}{cdm};
@@ -6789,9 +6789,14 @@ sub EnOcean_Parse($$)
       # SenderID unknown, created new device
       Log3 undef, 5, "EnOcean received PacketType: $packetType RORG: $rorg DATA: $data SenderID: $senderID STATUS: $status";
       my $learningMode = AttrVal($IODev, "learningMode", "demand");
+      my $learningDev = AttrVal($IODev, "learningDev", "teachMsg");
       my $ret = "UNDEFINED EnO_$senderID EnOcean $senderID $msg";
 
       if ($rorgname =~ m/^GPCD|GPSD|SMLRNANS|SMREC|SIGNAL$/) {
+        Log3 undef, 4, "EnOcean Received $rorgname telegram to the unknown device with SenderID $senderID.";
+        return '';
+
+      } elsif ($learningDev eq 'teachMsg' && ($rorgname =~ m/^VLD|MSC|SEC|ENC$/ || $rorgname eq '4BS' && (hex(substr($data, 6, 2))) & 8)) {
         Log3 undef, 4, "EnOcean Received $rorgname telegram to the unknown device with SenderID $senderID.";
         return '';
 
@@ -7132,7 +7137,7 @@ sub EnOcean_Parse($$)
     ($rorg, $data) = ($1, $2);
     $rorgname = $EnO_rorgname{$rorg};
     if (!$rorgname) {
-      Log3 undef, 1, "EnOcean RORG $rorg received from $senderID unknown.";
+      Log3 undef, 4, "EnOcean $senderID RORG $rorg unknown.";
       return "";
     }
     if ($destinationID ne $3) {
@@ -7488,7 +7493,7 @@ sub EnOcean_Parse($$)
                 EnOcean_SndRadio(undef, $hash, $packetType, $rorg, $data, "00000000", "00", $hash->{DEF});
                 Log3 $name, 2, "EnOcean $name 4BS teach-in response sent to " . $hash->{DEF};
 
-              } elsif ($st eq "hvac.04" || "hvac.06") {
+              } elsif ($st eq "hvac.04" || $st eq "hvac.06") {
                 # heating radiator valve actuating drive (EEP A5-20-04)
                 # Battery Powered Actuator (EEP A5-20-06)
                 $attr{$name}{comMode} = "biDir";
@@ -10020,22 +10025,30 @@ sub EnOcean_Parse($$)
       # $db[2] is the illuminance where min 0x00 = 0 lx, max 0xFA = 1000 lx
       # $db[0]_bit_1 is Vibration where 0 = off, 1 = on
       # $db[0]_bit_0 is Contact where 0 = closed, 1 = open
-      my $lux = $db[2] << 2;
-      if ($db[2] == 251) {$lux = "over range";}
-      my $voltage = sprintf "%0.1f", $db[3] * 0.02;
-      if ($db[3] > 250) {push @event, "3:errorCode:$db[3]";}
-      my $vibration = $db[0] & 2 ? "on" : "off";
-      my $contact = $db[0] & 1 ? "open" : "closed";
-      push @event, "3:brightness:$lux";
-      push @event, "3:contact:$contact";
-      push @event, "3:vibration:$vibration";
-      push @event, "3:voltage:$voltage";
-      push @event, "3:state:C: $contact V: $vibration E: $lux U: $voltage";
-
+      if (!exists($hash->{helper}{lastEvent}) || $hash->{helper}{lastEvent} ne $data) {
+        my $lux = $db[2] << 2;
+        if ($db[2] == 251) {$lux = "over range";}
+        my $voltage = sprintf "%0.2f", $db[3] * 0.02;
+        if ($db[3] > 250) {push @event, "3:errorCode:$db[3]";}
+        my $vibration = $db[0] & 2 ? "on" : "off";
+        my $contact = $db[0] & 1 ? "open" : "closed";
+        push @event, "3:brightness:$lux";
+        push @event, "3:contact:$contact";
+        push @event, "3:vibration:$vibration";
+        push @event, "3:voltage:$voltage";
+        push @event, "3:state:C: $contact V: $vibration E: $lux U: $voltage";
+        $hash->{helper}{lastEvent} = $data;
+      }
+      CommandDeleteReading(undef, "$name alarm");
+      if (AttrVal($name, "signOfLife", 'on') eq 'on') {
+        RemoveInternalTimer($hash->{helper}{timer}{alarm}) if(exists $hash->{helper}{timer}{alarm});
+        @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
+        InternalTimer(gettimeofday() + AttrVal($name, "signOfLifeInterval", 132), 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
+      }
     } elsif ($st eq "doorContact") {
       # dual door contact (EEP A5-14-07, A5-14-08)
       if (!exists($hash->{helper}{lastEvent}) || $hash->{helper}{lastEvent} ne $data) {
-        my $voltage = sprintf "%0.1f", $db[3] * 0.02;
+        my $voltage = sprintf "%0.2f", $db[3] * 0.02;
         my $doorContact = $db[0] & 4 ? 'open' : 'closed';
         my $lockContact = $db[0] & 2 ? 'unlocked' : 'locked';
         my $vibration = $db[0] & 1 ? 'on' : 'off';
@@ -10050,13 +10063,13 @@ sub EnOcean_Parse($$)
       if (AttrVal($name, "signOfLife", 'on') eq 'on') {
         RemoveInternalTimer($hash->{helper}{timer}{alarm}) if(exists $hash->{helper}{timer}{alarm});
         @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
-        InternalTimer(gettimeofday() + AttrVal($name, "signOfLifeInterval", 66), 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
+        InternalTimer(gettimeofday() + AttrVal($name, "signOfLifeInterval", 132), 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
       }
 
     } elsif ($st eq "windowContact") {
       # window contact (EEP A5-14-09, A5-14-0A)
       if (!exists($hash->{helper}{lastEvent}) || $hash->{helper}{lastEvent} ne $data) {
-        my $voltage = sprintf "%0.1f", $db[3] * 0.02;
+        my $voltage = sprintf "%0.2f", $db[3] * 0.02;
         my %window = (0 => 'closed', 1 => 'tilt', 2 => 'reserved', 3 => 'open');
         my $window = $window{(($db[0] & 6) >> 1)};
         my $vibration = $db[0] & 1 ? 'on' : 'off';
@@ -10070,7 +10083,7 @@ sub EnOcean_Parse($$)
       if (AttrVal($name, "signOfLife", 'on') eq 'on') {
         RemoveInternalTimer($hash->{helper}{timer}{alarm})  if(exists $hash->{helper}{timer}{alarm});
         @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
-        InternalTimer(gettimeofday() + AttrVal($name, "signOfLifeInterval", 990), 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
+        InternalTimer(gettimeofday() + AttrVal($name, "signOfLifeInterval", 132), 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
       }
 
     } elsif ($st =~ m/^digitalInput\.0[12]$/) {
@@ -13925,11 +13938,7 @@ sub EnOcean_Notify(@)
       if (defined(AttrVal($name, "temperatureRefDev", undef)) &&
           $devName eq AttrVal($name, "temperatureRefDev", "") &&
           $parts[0] eq "temperature") {
-        if (AttrVal($name, "subType", "") =~ m/^hvac\.0(1|6)$/) {
-          readingsSingleUpdate($hash, "temperature", $parts[1], 1);
-          #Log3 $name, 2, "EnOcean $name <notify> $devName $s";
-        }
-        if (AttrVal($name, "subType", "") eq "hvac.04" && AttrVal($name, "measurementCtrl", "enable") eq 'disable') {
+        if (AttrVal($name, "subType", "") =~ m/^hvac\.0(1|4|6)$/) {
           readingsSingleUpdate($hash, "temperature", $parts[1], 1);
           #Log3 $name, 2, "EnOcean $name <notify> $devName $s";
         }
@@ -16383,15 +16392,19 @@ sub EnOcean_sec_decodeVAES($$$) {
 #
 # Returns: RLC in hexadecimal format
 #
-sub EnOcean_sec_getRLC($$) {
+sub EnOcean_sec_getRLC($$$$) {
 	my $hash = $_[0];
 	my $rlcVar = $_[1];
+	my $expectRlc = $_[2];
+	my $rlc = $_[3];
         my $name = $hash->{NAME};
-
+	my $old_rlc = $rlc;
 	# Fetch newest RLC from receiver hash
-	my $old_rlc = ReadingsVal($name, "." . $rlcVar, $attr{$name}{$rlcVar});
-	if (hex($old_rlc) < hex($attr{$name}{$rlcVar})) {
-	  $old_rlc = $attr{$name}{$rlcVar};
+	if ($expectRlc == 0) {
+	  $old_rlc = ReadingsVal($name, "." . $rlcVar, $attr{$name}{$rlcVar});
+	  if (hex($old_rlc) < hex($attr{$name}{$rlcVar})) {
+	    $old_rlc = $attr{$name}{$rlcVar};
+	  }
 	}
 	Log3 $name, 5, "EnOcean $name EnOcean_sec_getRLC RLC old: $old_rlc " . hex($old_rlc);
 
@@ -16593,17 +16606,11 @@ sub EnOcean_sec_convertToNonsecure($$$) {
   };
   Log3 $name, 5, "EnOcean $name EnOcean_sec_convertToNonsecure MAC: $mac";
 
-  # TODO RLC could be transmitted with data, could not test this
-  #if(!defined($rlc)) {
-  #	print "No RLC in message, using stored value\n";
-  #	$rlc = getRLC($senderID);
-  #}
-
   # Maximum RLC search window is 128
   foreach my $rlc_window (0..128) {
     #print "Trying RLC offset $rlc_window\n";
     # Fetch stored RLC
-    $rlc = EnOcean_sec_getRLC($hash, "rlcRcv");
+    $rlc = EnOcean_sec_getRLC($hash, "rlcRcv", $expect_rlc, $rlc);
     # Fetch private Key for VAES
     if ($attr{$name}{keyRcv} =~ /[\dA-F]{32}/) {
       $private_key = pack('H32',$attr{$name}{keyRcv});
@@ -16640,6 +16647,8 @@ sub EnOcean_sec_convertToNonsecure($$$) {
         Log3 $name, 5, "EnOcean $name EnOcean_sec_convertToNonsecure RORG: " . uc($1) . " DATA: " . uc($2);
         return (undef, uc($1), uc($2));
       }
+      # Couldn't verify or decrypt message, only one calculation if rlcTX = true
+      return ("Can't verify or decrypt telegram", undef, undef) if ($expect_rlc == 1);
     }
   }
   # Couldn't verify or decrypt message in RLC window
@@ -16738,7 +16747,7 @@ sub EnOcean_sec_convertToSecure($$$$)
   }
 
   #Get and update RLC
-  my $rlc = EnOcean_sec_getRLC($hash, "rlcSnd");
+  my $rlc = EnOcean_sec_getRLC($hash, "rlcSnd", 0, undef);
   #Log3 $hash->{NAME}, 5, "EnOcean_sec_convertToSecure: Got actual RLC: $rlc";
 
   #Get key of device
@@ -20588,11 +20597,14 @@ EnOcean_Delete($$)
      </ul><br>
         The attr subType must be multiFuncSensor. This is done if the device was
         created by autocreate.
+        A monitoring period can be set for signOfLife telegrams of the sensor, see
+        <a href="#EnOcean_signOfLife">signOfLife</a> and <a href="#EnOcean_signOfLifeInterval">signOfLifeInterval</a>.
+        Default is "on" and an interval of 132 sec.
      </li>
      <br><br>
 
      <li>Dual Door Contact (EEP A5-14-07, A5-14-08)<br>
-         [untested]<br>
+         [Eimsig EM-FSGE-00 sensor]<br>
      <ul>
        <li>C: open|closed B: unlocked|locked V: on|off U: U/V</li>
        <li>alarm: dead_sensor</li>
@@ -20606,12 +20618,12 @@ EnOcean_Delete($$)
         created by autocreate.<br>
         A monitoring period can be set for signOfLife telegrams of the sensor, see
         <a href="#EnOcean_signOfLife">signOfLife</a> and <a href="#EnOcean_signOfLifeInterval">signOfLifeInterval</a>.
-        Default is "on" and an interval of 66 sec.
+        Default is "on" and an interval of 132 sec.
      </li>
      <br><br>
 
      <li>Window/Door Contact (EEP A5-14-09, A5-14-0A)<br>
-         [untested]<br>
+         [Eimsig EM-FSGE-00 sensor]<br>
      <ul>
        <li>W: open|tilt|closed B: unlocked|locked V: on|off U: U/V</li>
        <li>alarm: dead_sensor</li>
@@ -20624,7 +20636,7 @@ EnOcean_Delete($$)
         created by autocreate.<br>
         A monitoring period can be set for signOfLife telegrams of the sensor, see
         <a href="#EnOcean_signOfLife">signOfLife</a> and <a href="#EnOcean_signOfLifeInterval">signOfLifeInterval</a>.
-        Default is "on" and an interval of 990 sec.
+        Default is "on" and an interval of 132 sec.
      </li>
      <br><br>
 
