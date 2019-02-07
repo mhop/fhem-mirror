@@ -1450,8 +1450,8 @@ sub freezemon_getLogPath($) {
 				<li>freezeDevice: List of functions(Devices) that possibly caused the freeze</li>
 				<li>fcDay: cumulated no. of freezes per day</li>
 				<li>ftDay: cumulated duration of freezes per day</li>
-				<li>fcDayLast: stores cumulated no. of freezes of the last day (for daily plots)</li>
-				<li>fcDayLast: stores cumulated duration of freezes of the last day (for daily plots)</li>
+				<li>fcDayLast: stores cumulated no. of freezes of the last day (for daily plots). Due to technical reasons, freezes that occur shortly after midnight might still be taken into account  for previous day.</li>
+				<li>ftDayLast: stores cumulated duration of freezes of the last day (for daily plots). Due to technical reasons, freezes that occur shortly after midnight might still be taken into account  for previous day.</li>
 				<li>fs_.*_c: freeze statistics - count of freezes where the device was probably involved</li>
 				<li>fs_.*_t: freeze statistics - cumulated time of freezes where the device was probably involved</li>
 				<li>state: s:&lt;startTime&gt; e:&lt;endTime&gt; f:&lt;Duration&gt; d:&lt;Devices&gt;</li>;
@@ -1552,8 +1552,8 @@ sub freezemon_getLogPath($) {
 			<li>freezeDevice: Liste von möglicherweise den Freeze auslösenden Funktionen(Devices)</li>
 			<li>fcDay: kumulierte Anzahl der Freezes pro Tag</li>
 			<li>ftDay: kumulierte Dauer der Freezes pro Tag </li>
-			<li>fcDayLast: speichert die kumulierte Anzahl der Freezes des vergangenen Tages (um tageweise plots zu erstellen)</li>
-			<li>fcDayLast: speichert die kumulierte Dauer der Freezes des vergangenen Tages (um tageweise plots zu erstellen)</li>
+			<li>fcDayLast: speichert die kumulierte Anzahl der Freezes des vergangenen Tages (um tageweise plots zu erstellen). Aus technischen gründen werden Freezes, die sehr kurz nach Mitternacht auftreten möglicherweise noch zum Vortag gezählt.</li>
+			<li>ftDayLast: speichert die kumulierte Dauer der Freezes des vergangenen Tages (um tageweise plots zu erstellen). Aus technischen gründen werden Freezes, die sehr kurz nach Mitternacht auftreten möglicherweise noch zum Vortag gezählt.</li>
 			<li>fs_.*_c: freeze Statistik - Anzahl der freezes bei denen das Device möglicherweise beteiligt war</li>
 			<li>fs_.*_t: freeze Statistik - kumulierte Dauer der freezes bei denen das Device möglicherweise beteiligt war</li>
 
