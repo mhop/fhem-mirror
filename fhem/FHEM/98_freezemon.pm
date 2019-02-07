@@ -1042,7 +1042,7 @@ sub freezemon_getDevice($$) {
     if ( !defined($shortarg) ) {
 
         #Log3 $name, 5, "Freezemon: something went wrong $fn " . Dumper($arg);
-        $shortarg = "";
+        $shortarg = "N/A";
     }
     else {
         ( $shortarg, undef ) = split( /:|;/, $shortarg, 2 );
