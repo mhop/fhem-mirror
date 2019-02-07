@@ -25,6 +25,9 @@
 ############################################################################
 #
 # Changelog:
+# 2019-02-07, v2.5
+# Feature: Attribut timeout added
+# 
 # 2019-01-12, v2.4
 # Bugfix: Attribut disable InternalTimer parameter 4 = 0, nonblocking
 # Bugfix: Verkehrsinfo_GetUpdate, skip InternalTimer start if the Attribut disable != 0
@@ -126,7 +129,7 @@ sub Verkehrsinfo_Initialize($) {
     $hash->{AttrList} =
          "filter_exclude filter_include orderby "
 		. "msg_format:road,head,both "
-		. "disable:1,0 "
+		. "disable:1,0 timeout "
         . $readingFnAttributes;
 }
 
@@ -162,7 +165,7 @@ sub Verkehrsinfo_Define($$) {
 	if ($hash->{url} =~ /verkehrsinfo.de/i){
 		my $param = {
                     url        => "https://www.verkehrsinfo.de/httpsmobil/index.php?c=1&lat=&lon=",
-                    timeout    => 5,
+                    timeout    => AttrVal($hash->{name},"timeout","5"),
                     hash       => $hash,
                     callback   =>  \&Verkehrsinfo_HttpNbDefineZone
                 };
@@ -300,6 +303,11 @@ sub Verkehrsinfo_Attr(@) {
             }
 
         }
+		elsif($attr_name eq "timeout" && ($attr_value !~ /\d+/ || $attr_value eq "0")) {
+			my $err = "Verkehrsinfo: Ungültiger timeout in attr $name $attr_name $attr_value: $@";
+			Log3 $name, 3, $err;
+			return $err;
+		}
 	}
 	elsif ( $cmd eq "del" ) {
         if ( $attr_name eq "disable" ) {
@@ -577,7 +585,7 @@ sub Verkehrsinfo_GetUpdate($) {
 	
 	my $param = {
                     url        => $hash->{url},
-                    timeout    => 5,
+                    timeout    => AttrVal($name,"timeout","5"),
                     hash       => $hash,
                     callback   =>  \&Verkehrsinfo_HttpNbUpdateData
                 };
@@ -733,6 +741,8 @@ sub Verkehrsinfo_hf_orderby ($@) {
 				Using this parameter you can format the output, regarding streets, direction or both.<br><br></li>
 			<li><i>disable</i><br>
 				1 = inactive and 0 = active<br><br></li>
+			<li><i>timeout</i><br>
+				Timeout for web request<br><br></li>
 			<li><i><a href="#readingFnAttributes">readingFnAttributes</a></i><br><br></li>
         </ul>
     </ul>
@@ -864,6 +874,8 @@ sub Verkehrsinfo_hf_orderby ($@) {
 				Über diesen Parameter kann die Meldung formatiert werden nach Strasse, Richtung oder beides<br><br></li>
 			<li><i>disable</i><br>
 				1 = inactive and 0 = active<br><br></li>
+			<li><i>timeout</i><br>
+				Timeout für Webabfrage<br><br></li>
 			<li><i><a href="#readingFnAttributes">readingFnAttributes</a></i><br><br></li>
         </ul>
     </ul>
