@@ -261,7 +261,7 @@ MQTT2_SERVER_Read($@)
 
   # Lowlevel debugging
   if(AttrVal($sname, "verbose", 1) >= 5) {
-    my $msg = substr($hash->{BUF}, 0, $tlen);
+    my $msg = substr($hash->{BUF}, 0, $off+$tlen);
     $msg =~ s/([^ -~])/"(".ord($1).")"/ge;
     Log3 $sname, 5, "$cpt: $msg";
   }
