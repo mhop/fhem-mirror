@@ -3,7 +3,7 @@
 ##########################################################################################################################
 #       93_Log2Syslog.pm
 #
-#       (c) 2017-2018 by Heiko Maaz
+#       (c) 2017-2019 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This script is part of fhem.
@@ -40,6 +40,7 @@ eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $Mis
 
 # Versions History intern:
 our %Log2Syslog_vNotesIntern = (
+  "5.3.2"  => "08.02.2019  fix version numbering ",
   "5.3.1"  => "21.10.2018  get of FQDN changed ",
   "5.3.0"  => "16.10.2018  attribute sslCertPrefix added (Forum:#92030), module hints & release info order switched ",
   "5.2.1"  => "08.10.2018  setpayload of BSD-format changed, commandref revised ",
@@ -92,6 +93,7 @@ our %Log2Syslog_vNotesIntern = (
 
 # Versions History extern:
 our %Log2Syslog_vNotesExtern = (
+  "5.3.2"  => "08.02.2019 fix version numbering ",
   "5.3.0"  => "16.10.2018 attribute sslCertPrefix added to support multiple SSL-keys (Forum:#92030)",
   "5.2.1"  => "08.10.2018 Send format of BSD changed. The TAG-field was changed to \"IDENT[PID]: \" ",
   "5.2.0"  => "02.10.2018 direct help for attributes added",
@@ -130,13 +132,6 @@ our %Log2Syslog_vNotesExtern = (
   "2.0.0"  => "16.08.2017 create syslog without perl module SYS::SYSLOG ",
   "1.1.0"  => "26.07.2017 add regex search to sub Log2Syslog_fhemlog ",
   "1.0.0"  => "25.07.2017 initial version "
-);
-
-# Hint Hash
-our %Log2Syslog_vHintsExt = (
-  "3" => "The <a href=\"https://tools.ietf.org/pdf/rfc5425.pdf\">RFC5425</a> TLS Transport Protocol",
-  "2" => "The basics of <a href=\"https://tools.ietf.org/html/rfc3164\">RFC3164 (BSD)</a> protocol",
-  "1" => "Informations about <a href=\"https://tools.ietf.org/html/rfc5424\">RFC5424 (IETF)</a> syslog protocol"
 );
 
 # Mappinghash BSD-Formatierung Monat
@@ -232,6 +227,8 @@ my %RFC5425len = ("DL"  => 8192,          # max. Lange Message insgesamt mit TLS
 # Forward declarations
 #
 sub Log2Syslog_Log3slog($$$);
+use vars qw(%Log2Syslog_vHintsExt_en);
+use vars qw(%Log2Syslog_vHintsExt_de);
 
 ###############################################################################
 sub Log2Syslog_Initialize($) {
@@ -1096,7 +1093,7 @@ sub Log2Syslog_Get($@) {
   my $st;
   my $getlist = "Unknown argument $opt, choose one of ".
                 (($hash->{MODEL} !~ /Collector/)?"certInfo:noArg ":"").
-                "versionNotes:noArg "				
+                "versionNotes "				
                 ;
   
   return if(AttrVal($name, "disable", "") eq "1");
@@ -1114,62 +1111,85 @@ sub Log2Syslog_Get($@) {
 	  return "no SSL session has been created";
 	  
   } elsif ($opt =~ /versionNotes/) {
-	  my $header  = "<b>Module release information table</b><br>";
+      my $header  = "<b>Module release information</b><br>";
       my $header1 = "<b>Helpful hints</b><br>";
-      my $i;
-	  
-	  # Ausgabetabelle erstellen
-	  my ($ret,$val0,$val1);
-	  $ret  = "<html>";
-      
-	  $ret .= sprintf("<div class=\"makeTable wide\"; style=\"text-align:left\">$header1 <br>");
-	  $ret .= "<table class=\"block wide internals\">";
-	  $ret .= "<tbody>";
-	  $ret .= "<tr class=\"even\">";          
-	  $i = 0;
-	  foreach my $key (reverse sort(keys %Log2Syslog_vHintsExt)) {
-		  $val0 = $Log2Syslog_vHintsExt{$key};
-		  $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0</td>" );
-		  $ret .= "</tr>";
-          $i++;
-          if ($i & 1) {
-              # $i ist ungerade
-		      $ret .= "<tr class=\"odd\">";
+      my %hs;
+  
+      # Ausgabetabelle erstellen
+      my ($ret,$val0,$val1);
+      my $i = 0;
+  
+      $ret  = "<html>";
+  
+      # Hints
+      if(!$prop || $prop =~ /hints/i || $prop =~ /[\d]+/) {
+          $ret .= sprintf("<div class=\"makeTable wide\"; style=\"text-align:left\">$header1 <br>");
+          $ret .= "<table class=\"block wide internals\">";
+          $ret .= "<tbody>";
+          $ret .= "<tr class=\"even\">";  
+          if($prop && $prop =~ /[\d]+/) {
+              my @hints = split(",",$prop);
+              foreach (@hints) {
+                  if(AttrVal("global","language","EN") eq "DE") {
+                      $hs{$_} = $Log2Syslog_vHintsExt_de{$_};
+                  } else {
+                      $hs{$_} = $Log2Syslog_vHintsExt_en{$_};
+                  }
+              }                      
           } else {
-              $ret .= "<tr class=\"even\">";
+              if(AttrVal("global","language","EN") eq "DE") {
+                  %hs = %Log2Syslog_vHintsExt_de;
+              } else {
+                  %hs = %Log2Syslog_vHintsExt_en; 
+              }
+          }          
+          $i = 0;
+          foreach my $key (Log2Syslog_sortVersion("desc",keys %hs)) {
+              $val0 = $hs{$key};
+              $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0</td>" );
+              $ret .= "</tr>";
+              $i++;
+              if ($i & 1) {
+                  # $i ist ungerade
+                  $ret .= "<tr class=\"odd\">";
+              } else {
+                  $ret .= "<tr class=\"even\">";
+              }
           }
-	  }
-
-	  $ret .= "</tr>";
-	  $ret .= "</tbody>";
-	  $ret .= "</table>";
-	  $ret .= "</div>";
-
-	  $ret .= sprintf("<div class=\"makeTable wide\"; style=\"text-align:left\">$header <br>");
-	  $ret .= "<table class=\"block wide internals\">";
-	  $ret .= "<tbody>";
-	  $ret .= "<tr class=\"even\">";
-	  $i = 0;
-	  foreach my $key (reverse sort(keys %Log2Syslog_vNotesExtern)) {
-		  ($val0,$val1) = split(/\s/,$Log2Syslog_vNotesExtern{$key},2);
-		  $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0  </td><td>$val1</td>" );
-		  $ret .= "</tr>";
-          $i++;
-          if ($i & 1) {
-              # $i ist ungerade
-		      $ret .= "<tr class=\"odd\">";
-          } else {
-              $ret .= "<tr class=\"even\">";
+          $ret .= "</tr>";
+          $ret .= "</tbody>";
+          $ret .= "</table>";
+          $ret .= "</div>";
+      }
+  
+      # Notes
+      if(!$prop || $prop =~ /rel/i) {
+          $ret .= sprintf("<div class=\"makeTable wide\"; style=\"text-align:left\">$header <br>");
+          $ret .= "<table class=\"block wide internals\">";
+          $ret .= "<tbody>";
+          $ret .= "<tr class=\"even\">";
+          $i = 0;
+          foreach my $key (Log2Syslog_sortVersion("desc",keys %Log2Syslog_vNotesExtern)) {
+              ($val0,$val1) = split(/\s/,$Log2Syslog_vNotesExtern{$key},2);
+              $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0  </td><td>$val1</td>" );
+              $ret .= "</tr>";
+              $i++;
+              if ($i & 1) {
+                  # $i ist ungerade
+                  $ret .= "<tr class=\"odd\">";
+              } else {
+                  $ret .= "<tr class=\"even\">";
+              }
           }
-	  }
-	  $ret .= "</tr>";
-	  $ret .= "</tbody>";
-	  $ret .= "</table>";
-	  $ret .= "</div>";
-          	  
+          $ret .= "</tr>";
+          $ret .= "</tbody>";
+          $ret .= "</table>";
+          $ret .= "</div>";
+      }
+  
       $ret .= "</html>";
-					
-	return $ret;
+                
+      return $ret;
   
   } else {
       return "$getlist";
@@ -1934,6 +1954,47 @@ sub Log2Syslog_deleteMemLock($) {
 return; 
 }
 
+################################################################
+# sortiert eine Liste von Versionsnummern x.x.x
+# Schwartzian Transform and the GRT transform
+# Übergabe: "asc | desc",<Liste von Versionsnummern>
+################################################################
+sub Log2Syslog_sortVersion (@){
+  my ($sseq,@versions) = @_;
+
+  my @sorted = map {$_->[0]}
+			   sort {$a->[1] cmp $b->[1]}
+			   map {[$_, pack "C*", split /\./]} @versions;
+			 
+  @sorted = map {join ".", unpack "C*", $_}
+            sort
+            map {pack "C*", split /\./} @versions;
+  
+  if($sseq eq "desc") {
+      @sorted = reverse @sorted;
+  }
+  
+return @sorted;
+}
+
+#############################################################################################
+#                                       Hint Hash EN           
+#############################################################################################
+our %Log2Syslog_vHintsExt_en = (
+  "3" => "The <a href=\"https://tools.ietf.org/pdf/rfc5425.pdf\">RFC5425</a> TLS Transport Protocol",
+  "2" => "The basics of <a href=\"https://tools.ietf.org/html/rfc3164\">RFC3164 (BSD)</a> protocol",
+  "1" => "Informations about <a href=\"https://tools.ietf.org/html/rfc5424\">RFC5424 (IETF)</a> syslog protocol"
+);
+
+#############################################################################################
+#                                       Hint Hash DE         
+#############################################################################################
+our %Log2Syslog_vHintsExt_de = (
+  "3" => "Die Beschreibung des <a href=\"https://tools.ietf.org/pdf/rfc5425.pdf\">RFC5425</a> TLS Transport Protokoll",
+  "2" => "Die Grundlagen des <a href=\"https://tools.ietf.org/html/rfc3164\">RFC3164 (BSD)</a> Protokolls",
+  "1" => "Informationen über das <a href=\"https://tools.ietf.org/html/rfc5424\">RFC5424 (IETF)</a> Syslog Protokoll"
+);
+
 1;
 
 =pod
@@ -2209,9 +2270,11 @@ Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.095 fhemtest.myds.me Test
     <br>
     
     <ul>
-    <li><b>versionNotes </b><br>
+    <li><b>versionNotes [hints | rel | &lt;key&gt;] </b><br>
         <br>
-        Shows release informations and hints about the module. Contains only main informations for module users.
+       Shows realease informations and/or hints about the module. It contains only main release informations for module users. <br>
+       If no options are specified, both release informations and hints will be shown. "rel" shows only release informations and
+       "hints" shows only hints. By the &lt;key&gt;-specification only the hint with the specified number is shown.
     </li>
     </ul>
     <br>
@@ -2885,10 +2948,14 @@ Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.095 fhemtest.myds.me Test
     <br>
     
     <ul>
-    <li><b>versionNotes </b><br>
+    <li><b>versionNotes [hints | rel | &lt;key&gt;]</b> <br>
         <br>
-        Zeigt Release Informationen und Hinweise zum Modul an. Es sind nur Informationen mit Bedeutung für den Modulnutzer 
-        enthalten.
+        Zeigt Release Informationen und/oder Hinweise zum Modul an. Es sind nur Release Informationen mit Bedeutung für den 
+        Modulnutzer enthalten. <br>
+        Sind keine Optionen angegben, werden sowohl Release Informationen als auch Hinweise angezeigt. "rel" zeigt nur Release
+        Informationen und "hints" nur Hinweise an. Mit der &lt;key&gt;-Angabe wird der Hinweis mit der angegebenen Nummer 
+        angezeigt.
+        Ist das Attribut "language = DE" im global Device gesetzt, erfolgt die Ausgabe der Hinweise in deutscher Sprache.
     </li>
     </ul>
     <br>
