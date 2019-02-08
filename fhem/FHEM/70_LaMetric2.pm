@@ -1188,13 +1188,13 @@ sub LaMetric2_SetVolume {
         $body{volume} = $volume;
     }
     elsif ( lc($cmd) eq "volumeup" ) {
-        $currVolume = $currVolume + 10;
-        $currVolume = 100 if ( $currVolume > 100 );
+        $currVolume   = $currVolume + 10;
+        $currVolume   = 100 if ( $currVolume > 100 );
         $body{volume} = $currVolume;
     }
     elsif ( lc($cmd) eq "volumedown" ) {
-        $currVolume = $currVolume - 10;
-        $currVolume = 0 if ( $currVolume < 0 );
+        $currVolume   = $currVolume - 10;
+        $currVolume   = 0 if ( $currVolume < 0 );
         $body{volume} = $currVolume;
     }
     else {
@@ -2021,8 +2021,10 @@ sub LaMetric2_SetNotification {
 
     # push frames to private/shared indicator app
     if ( defined( $h->{app} ) ) {
-        $notification{package} = $h->{app};
-        $notification{token} = $h->{token} if ( defined( $h->{token} ) );
+        $notification{package}  = $h->{app};
+        $notification{token}    = $h->{token} if ( defined( $h->{token} ) );
+        $notification{channels} = $h->{channels}
+          if ( defined( $h->{channels} ) );
         return LaMetric2_SetApp( $hash, "app", \%notification, $h->{app},
             "push" );
     }
