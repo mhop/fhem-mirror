@@ -754,12 +754,7 @@ sub LaMetric2_ReceiveCommand($$$) {
 
             # If we received a response to a write command,
             # make that data available
-            if (   $method ne "GET"
-                && ref($response) eq "HASH"
-                && defined( $response->{success} )
-                && ref( $response->{success} ) eq "HASH"
-                && defined( $response->{success}->{path} ) )
-            {
+            if ( $method ne "GET" && $method ne "DELETE" ) {
                 my $endpoint = $response->{success}->{path};
                 $endpoint =~ s/^(.*[\\\/])//;
                 $response->{$endpoint} = $response->{success}{data};
