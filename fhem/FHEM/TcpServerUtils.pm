@@ -293,7 +293,13 @@ TcpServer_WriteBlocking($$)
       return undef;
     }
 
-    my $ret = syswrite($sock, $txt, $len-$off, $off);
+    my $ret;
+    eval { $ret = syswrite($sock, $txt, $len-$off, $off); }; # Wide character
+    if($@) {
+      Log 1, $@;
+      Log 1, "txt:".join(":",unpack("C*",$txt)).",len:$len,off:$off";
+      stacktrace();
+    }
 
     if( defined $ret ){
       $off += $ret;
