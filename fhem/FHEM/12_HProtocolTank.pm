@@ -37,6 +37,7 @@ sub HProtocolTank_Initialize($) {
                             "mode:FillLevel,Volume,Ullage " .
                             "type " .
                             "product:Diesel,FuelOil,Petrol " .
+                            "sensorSystem:Hectronic,Unitronics,PMS-IB " .
                             $readingFnAttributes;
 }
 
@@ -129,6 +130,7 @@ sub HProtocolTank_Attr (@) {
 
     <code>define &lt;name&gt; HProtocolTank HProtocolGateway<br />
     attr &lt;name&gt; hID 01<br />
+    attr &lt;name&gt; sensorSystem Hectronic<br />
     attr &lt;name&gt; product FuelOil<br />
     </code>
     <br />
@@ -165,6 +167,8 @@ sub HProtocolTank_Attr (@) {
   <ul>
     <li>hID<br />
     01 - 32 Tank Number / Tank Address (99 for testing only)</li>
+    <li>sensorSystem<br />
+    Sensor System / Hectronic, Unitronics, PMS-IB</li>
     <li>mode<br />
     Mode / FillLevel, Volume, Ullage</li>
     <li>type<br />

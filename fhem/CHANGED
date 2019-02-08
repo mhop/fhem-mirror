@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  12_HProtocolGateway: move sensorSystem attribute to HProtocolTank
   - feature: 98_Verkehrsinfo.pm: add attribut timeout
   - feature: 12_HProtocolGateway: added 843 protocol for PMS-IB P20
   - feature: 12_HProtocolTank: added Product to calculate 15 degrees volume

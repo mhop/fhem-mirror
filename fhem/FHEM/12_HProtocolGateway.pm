@@ -50,8 +50,7 @@ sub HProtocolGateway_Initialize($) {
                       "databitsLength:5,6,7,8 " .
                       "stopBit:0,1 " .
                       "pollIntervalMins " .
-                      "path " .
-                      "sensorSystem:Hectronic,Unitronics,PMS-IB";
+                      "path";
 }
 
 sub HProtocolGateway_Define($$) {
@@ -116,7 +115,7 @@ sub HProtocolGateway_GetUpdate($) {
       $command = "\$C";
     }
     
-    my $sensorSystem = AttrVal($name, 'sensorSystem', ""); 
+    my $sensorSystem = AttrVal($tankHash->{NAME}, 'sensorSystem', ""); 
     if ( $sensorSystem eq "PMS-IB") {
       $command = "H";
     }
@@ -188,7 +187,7 @@ sub HProtocolGateway_ParseMessage($$) {
     my ($hash, $data, $tankHash) = @_;
     my $name = $hash->{NAME};
 
-    my $sensorSystem = AttrVal($name, 'sensorSystem', ""); 
+    my $sensorSystem = AttrVal($tankHash->{NAME}, 'sensorSystem', ""); 
     
     my ($tanknumber,$error,$temperature,$tankdata,$water,$checksum,$version,$probe_offset);
 
@@ -432,7 +431,6 @@ sub HProtocolGateway_Tank($$$) {
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; HProtocolGateway /dev/tty???<br />
-    attr &lt;name&gt; sensorSystem Hectronic<br />
     attr &lt;name&gt; pollIntervalMins 2<br />
     attr &lt;name&gt; path /opt/fhem/<br />
     attr &lt;name&gt; baudrate 1200<br />
@@ -465,8 +463,6 @@ sub HProtocolGateway_Tank($$$) {
   <a name="HProtocolGateway"></a>
   <b>Attributes</b>
   <ul>
-    <li>sensorSystem<br />
-    Sensor System / Hectronic, Unitronics, PMS-IB</li>
     <li>pollIntervalMins<br />
     poll Interval in Mins</li>
     <li>path<br />
