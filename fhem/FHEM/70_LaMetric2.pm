@@ -268,7 +268,7 @@ sub LaMetric2_Define($$) {
 
         $hash->{HOST}       = $host;
         $hash->{".API_KEY"} = $apikey;
-        $hash->{VERSION}    = "2.3.0";
+        $hash->{VERSION}    = "2.3.1";
         $hash->{INTERVAL} =
           $interval && looks_like_number($interval) ? $interval : 60;
         $hash->{PORT} = $port && looks_like_number($port) ? $port : 4343;
@@ -2351,6 +2351,11 @@ sub LaMetric2_IsDuringTimeframe($$;$) {
         <code>set lametric app MyPrivateFHEMapp push token=ASDFGHJKL23456789 icon=i334 Show this message to my app and use my icon.</code><br>
         <code>set lametric app MyPrivateFHEMapp push token=ASDFGHJKL23456789 Show this message to my app.\nThis is a second frame.</code><br>
         <code>set lametric app MyPrivateFHEMapp push token=ASDFGHJKL23456789 title="This is the head frame" This text goes to the 2nd frame.</code><br>
+      </ul><br>
+      <br>
+      If you have configured channels for your app and would like to address a specific one, you may add the parameter 'channels' accordingly:
+      <ul>
+        <code>set lametric app MyPrivateFHEMapp push token=ASDFGHJKL23456789 channels=ch1,ch3 Show this message in 2 of 3 channels in my app.</code><br>
       </ul>
     </ul>
   </ul><br>
