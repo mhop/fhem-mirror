@@ -1995,6 +1995,18 @@ sub Calendar_Get($@) {
         for my $limit (@limits) {
           if($limit =~ /count=([1-9]+\d*)/) {
             $count= $1;
+          } elsif($limit =~ /when=(today|tomorrow)/i) {
+            my ($from,$to);
+            if (lc($1) eq 'today') {
+              $from  = Calendar_GetSecondsFromMidnight();
+              $to    = DAYSECONDS - $from;
+              $from *= -1;
+            } else {
+              $from  = DAYSECONDS - Calendar_GetSecondsFromMidnight();
+              $to    = $from + DAYSECONDS;
+            }
+            push @filters, { ref => \&filter_endafter, param => $t+$from };
+            push @filters, { ref => \&filter_startbefore, param => $t+$to };
           } elsif($limit =~ /from=([+-]?)(.+)/ ) {
             my $sign= $1 eq "-" ? -1 : 1;
             my ($error, $from)= Calendar_GetSecondsFromTimeSpec($2);
@@ -2225,6 +2237,12 @@ sub Calendar_DisarmTimer($) {
     RemoveInternalTimer($hash);
 }
 #
+
+###################################
+sub Calendar_GetSecondsFromMidnight(){
+  my @time = localtime();
+  return (($time[2] * HOURSECONDS) + ($time[1] * MINUTESECONDS) + $time[0]);
+}
 
 ###################################
 sub Calendar_GetSecondsFromTimeSpec($) {
@@ -3370,11 +3388,13 @@ sub CalendarEventsAsHtml($;$) {
     <tr><td><code>to=[+|-]&lt;timespec&gt;</code></td><td>shows only events that start before
       a timespan &lt;timespec&gt; from now; use a minus sign for events in the
       past; &lt;timespec&gt; is described below in the Attributes section</td></tr>
+    <tr><td><code>when=today|tomorrow</code></td><td>shows events for today or tomorrow</td></tr>
     </table><br>
 
     Examples:<br>
     <code>get MyCalendar events limit:count=10</code><br>
     <code>get MyCalendar events limit:from=-2d</code><br>
+    <code>get MyCalendar events limit:when=today</code><br>
     <code>get MyCalendar events limit:count=10,from=0,to=+10d</code><br>
     <br><br>
 
