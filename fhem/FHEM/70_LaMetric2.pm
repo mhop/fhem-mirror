@@ -754,7 +754,12 @@ sub LaMetric2_ReceiveCommand($$$) {
 
             # If we received a response to a write command,
             # make that data available
-            if ( $method ne "GET" ) {
+            if (   $method ne "GET"
+                && ref($response) eq "HASH"
+                && defined( $response->{success} )
+                && ref( $response->{success} ) eq "HASH"
+                && defined( $response->{success}->{path} ) )
+            {
                 my $endpoint = $response->{success}->{path};
                 $endpoint =~ s/^(.*[\\\/])//;
                 $response->{$endpoint} = $response->{success}{data};
@@ -783,122 +788,127 @@ sub LaMetric2_ReceiveCommand($$$) {
                 LaMetric2_SendCommand( $hash, "device/display", "GET", "" );
             }
 
-            if ( defined( $response->{audio} ) ) {
+            if ( ref($response) eq "HASH" ) {
 
-                # audio is muted
-                if ( $response->{audio}{volume} == 0 ) {
-                    readingsBulkUpdateIfChanged( $hash, "mute", "on" );
+                if ( defined( $response->{audio} ) ) {
 
-                    my $currVolume = ReadingsVal( $name, "volume", 50 );
-                    $hash->{helper}{lastVolume} = $currVolume
-                      if ( $currVolume > 0 );
+                    # audio is muted
+                    if ( $response->{audio}{volume} == 0 ) {
+                        readingsBulkUpdateIfChanged( $hash, "mute", "on" );
+
+                        my $currVolume = ReadingsVal( $name, "volume", 50 );
+                        $hash->{helper}{lastVolume} = $currVolume
+                          if ( $currVolume > 0 );
+                    }
+
+                    # audio is not muted
+                    else {
+                        readingsBulkUpdateIfChanged( $hash, "mute", "off" );
+                        delete $hash->{helper}{lastVolume}
+                          if ( defined( $hash->{helper}{lastVolume} ) );
+                    }
+
+                    readingsBulkUpdateIfChanged( $hash, "volume",
+                        $response->{audio}{volume} );
                 }
 
-                # audio is not muted
-                else {
-                    readingsBulkUpdateIfChanged( $hash, "mute", "off" );
-                    delete $hash->{helper}{lastVolume}
-                      if ( defined( $hash->{helper}{lastVolume} ) );
+                if ( defined( $response->{bluetooth} ) ) {
+                    if ( $response->{bluetooth}{active} == 1 ) {
+                        readingsBulkUpdateIfChanged( $hash, "bluetooth", "on" );
+                    }
+                    else {
+                        readingsBulkUpdateIfChanged( $hash, "bluetooth",
+                            "off" );
+                    }
+
+                    readingsBulkUpdateIfChanged( $hash, "bluetoothAvailable",
+                        $response->{bluetooth}{available} );
+                    readingsBulkUpdateIfChanged( $hash, "bluetoothName",
+                        $response->{bluetooth}{name} );
+                    readingsBulkUpdateIfChanged( $hash, "bluetoothDiscoverable",
+                        $response->{bluetooth}{discoverable} );
+                    readingsBulkUpdateIfChanged( $hash, "bluetoothPairable",
+                        $response->{bluetooth}{pairable} );
+                    readingsBulkUpdateIfChanged( $hash, "bluetoothAddress",
+                        $response->{bluetooth}{address} );
                 }
 
-                readingsBulkUpdateIfChanged( $hash, "volume",
-                    $response->{audio}{volume} );
-            }
+                if ( defined( $response->{display} ) ) {
+                    readingsBulkUpdateIfChanged( $hash, "brightness",
+                        $response->{display}{brightness} );
+                    readingsBulkUpdateIfChanged( $hash, "brightnessMode",
+                        $response->{display}{brightness_mode} );
 
-            if ( defined( $response->{bluetooth} ) ) {
-                if ( $response->{bluetooth}{active} == 1 ) {
-                    readingsBulkUpdateIfChanged( $hash, "bluetooth", "on" );
-                }
-                else {
-                    readingsBulkUpdateIfChanged( $hash, "bluetooth", "off" );
-                }
+                    $state = "on";
+                    $power = "on";
 
-                readingsBulkUpdateIfChanged( $hash, "bluetoothAvailable",
-                    $response->{bluetooth}{available} );
-                readingsBulkUpdateIfChanged( $hash, "bluetoothName",
-                    $response->{bluetooth}{name} );
-                readingsBulkUpdateIfChanged( $hash, "bluetoothDiscoverable",
-                    $response->{bluetooth}{discoverable} );
-                readingsBulkUpdateIfChanged( $hash, "bluetoothPairable",
-                    $response->{bluetooth}{pairable} );
-                readingsBulkUpdateIfChanged( $hash, "bluetoothAddress",
-                    $response->{bluetooth}{address} );
-            }
+                    # only API version >= 2.1.0
+                    if ( defined( $response->{display}{screensaver} ) ) {
+                        my $screensaver = "off";
 
-            if ( defined( $response->{display} ) ) {
-                readingsBulkUpdateIfChanged( $hash, "brightness",
-                    $response->{display}{brightness} );
-                readingsBulkUpdateIfChanged( $hash, "brightnessMode",
-                    $response->{display}{brightness_mode} );
-
-                $state = "on";
-                $power = "on";
-
-                # only API version >= 2.1.0
-                if ( defined( $response->{display}{screensaver} ) ) {
-                    my $screensaver = "off";
-
-                    if ( $response->{display}{screensaver}{enabled} == 1 ) {
-                        foreach (
-                            keys %{ $response->{display}{screensaver}{modes} } )
-                        {
-                            if ( $response->{display}{screensaver}{modes}
-                                {$_}{enabled} == 1 )
+                        if ( $response->{display}{screensaver}{enabled} == 1 ) {
+                            foreach (
+                                keys
+                                %{ $response->{display}{screensaver}{modes} } )
                             {
-                                $screensaver = $_;
-                                last;
+                                if ( $response->{display}{screensaver}{modes}
+                                    {$_}{enabled} == 1 )
+                                {
+                                    $screensaver = $_;
+                                    last;
+                                }
                             }
                         }
-                    }
-                    my $screensaverStartTime = LaMetric2_gmtime_str2local(
-                        $response->{display}{screensaver}{modes}{time_based}
-                          {start_time} );
-                    my $screensaverEndTime = LaMetric2_gmtime_str2local(
-                        $response->{display}{screensaver}{modes}{time_based}
-                          {end_time} );
+                        my $screensaverStartTime = LaMetric2_gmtime_str2local(
+                            $response->{display}{screensaver}{modes}{time_based}
+                              {start_time} );
+                        my $screensaverEndTime = LaMetric2_gmtime_str2local(
+                            $response->{display}{screensaver}{modes}{time_based}
+                              {end_time} );
 
-                    readingsBulkUpdateIfChanged( $hash, "screensaver",
-                        $screensaver );
-                    readingsBulkUpdateIfChanged( $hash, "screensaverStartTime",
-                        $screensaverStartTime );
-                    readingsBulkUpdateIfChanged( $hash, "screensaverEndTime",
-                        $screensaverEndTime );
+                        readingsBulkUpdateIfChanged( $hash, "screensaver",
+                            $screensaver );
+                        readingsBulkUpdateIfChanged( $hash,
+                            "screensaverStartTime", $screensaverStartTime );
+                        readingsBulkUpdateIfChanged( $hash,
+                            "screensaverEndTime", $screensaverEndTime );
 
-                    if (
-                        $screensaver eq "time_based"
-                        && LaMetric2_IsDuringTimeframe(
-                            $screensaverStartTime, $screensaverEndTime
-                        )
-                      )
-                    {
-                        $state = "off";
-                        $power = "off";
+                        if (
+                            $screensaver eq "time_based"
+                            && LaMetric2_IsDuringTimeframe(
+                                $screensaverStartTime, $screensaverEndTime
+                            )
+                          )
+                        {
+                            $state = "off";
+                            $power = "off";
+                        }
                     }
                 }
-            }
 
-            if ( defined( $response->{wifi} ) ) {
-                readingsBulkUpdateIfChanged( $hash, "wifiActive",
-                    $response->{wifi}{active} );
-                readingsBulkUpdateIfChanged( $hash, "wifiAddress",
-                    $response->{wifi}{address} );
-                readingsBulkUpdateIfChanged( $hash, "wifiAvailable",
-                    $response->{wifi}{available} );
-                readingsBulkUpdateIfChanged( $hash, "wifiEncryption",
-                    $response->{wifi}{encryption} );
-                readingsBulkUpdateIfChanged( $hash, "wifiEssid",
-                    $response->{wifi}{essid} );
-                readingsBulkUpdateIfChanged( $hash, "wifiIp",
-                    $response->{wifi}{ip} );
-                readingsBulkUpdateIfChanged( $hash, "wifiMode",
-                    $response->{wifi}{mode} );
-                readingsBulkUpdateIfChanged( $hash, "wifiNetmask",
-                    $response->{wifi}{netmask} );
+                if ( defined( $response->{wifi} ) ) {
+                    readingsBulkUpdateIfChanged( $hash, "wifiActive",
+                        $response->{wifi}{active} );
+                    readingsBulkUpdateIfChanged( $hash, "wifiAddress",
+                        $response->{wifi}{address} );
+                    readingsBulkUpdateIfChanged( $hash, "wifiAvailable",
+                        $response->{wifi}{available} );
+                    readingsBulkUpdateIfChanged( $hash, "wifiEncryption",
+                        $response->{wifi}{encryption} );
+                    readingsBulkUpdateIfChanged( $hash, "wifiEssid",
+                        $response->{wifi}{essid} );
+                    readingsBulkUpdateIfChanged( $hash, "wifiIp",
+                        $response->{wifi}{ip} );
+                    readingsBulkUpdateIfChanged( $hash, "wifiMode",
+                        $response->{wifi}{mode} );
+                    readingsBulkUpdateIfChanged( $hash, "wifiNetmask",
+                        $response->{wifi}{netmask} );
 
-                # Always trigger notification to allow
-                # plotting of this value
-                readingsBulkUpdate( $hash, "wifiStrength",
-                    $response->{wifi}{strength} );
+                    # Always trigger notification to allow
+                    # plotting of this value
+                    readingsBulkUpdate( $hash, "wifiStrength",
+                        $response->{wifi}{strength} );
+                }
             }
 
         }
@@ -2201,7 +2211,8 @@ sub LaMetric2_IsDuringTimeframe($$;$) {
       <code><b>priority</b>&nbsp;&nbsp;</code>- type: info,warning,critical - Priority of the message +++ [info] This priority means that notification will be displayed on the same “level” as all other notifications on the device that come from apps (for example facebook app). This notification will not be shown when screensaver is active. By default message is sent with “info” priority. This level of notification should be used for notifications like news, weather, temperature, etc. +++ [warning] Notifications with this priority will interrupt ones sent with lower priority (“info”). Should be used to notify the user about something important but not critical. For example, events like “someone is coming home” should use this priority when sending notifications from smart home. +++ [critical] The most important notifications. Interrupts notification with priority info or warning and is displayed even if screensaver is active. Use with care as these notifications can pop in the middle of the night. Must be used only for really important notifications like notifications from smoke detectors, water leak sensors, etc. Use it for events that require human interaction immediately.<br>
       <code><b>sound</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code>- type: text - Name of the sound to play. See attribute notificationSound for full list.<br>
       <code><b>repeat</b>&nbsp;&nbsp;&nbsp;&nbsp;</code>- type: integer - Defines the number of times sound must be played. If set to 0 sound will be played until notification is dismissed. Defaults to 1.<br>
-      <code><b>cycles</b>&nbsp;</code>- type: integer - The number of times message should be displayed. If cycles is set to 0, notification will stay on the screen until user dismisses it manually or a 'set msgCancel' command was sent. By default it is set to 1.<br>
+      <code><b>cycles</b>&nbsp;</code>- type: integer - The number of times message should be displayed. If cycles is set to 0, notification will stay on the screen until user dismisses it manually at the device.<br>
+If cycles is set to a text string, a sticky notification is created that may also be dismissed using 'set msgCancel' command (find its description below). By default it is set to 1.<br>
       <br>
       <code><b>chart</b>&nbsp;</code>- type: integer-array - Adds a frame to display a chart. Must contain a comma separated list of numbers.<br>
       <br>
@@ -2252,7 +2263,9 @@ sub LaMetric2_IsDuringTimeframe($$;$) {
       <br>
       <ul>
         <code>set LaMetric21 msgCancel 'cancelID'</code><br>
-      </ul>
+      </ul><br>
+      <br>
+      Note: Setter will only appear when a notification was sent using the cycles parameter like cycles=&lt;cancelID&gt; while candelID may be any custom string you would like to use for cancellation afterwards.
     </ul>
   </ul><br>
   <br>
