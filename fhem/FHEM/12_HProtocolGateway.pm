@@ -189,19 +189,20 @@ sub HProtocolGateway_ParseMessage($$) {
 
     my $sensorSystem = AttrVal($tankHash->{NAME}, 'sensorSystem', ""); 
     
-    my ($tanknumber,$error,$temperature,$tankdata,$water,$checksum,$version,$probe_offset);
+    my ($tanknumber,$error,$temperature,$tankdata,$water,$checksum,$version,$probe_offset,$test);
 
     # PMS-IB
     if ( $sensorSystem eq "PMS-IB") {
       ($tanknumber,$error,$temperature,$tankdata,$water,$checksum)=split(/=/,$data);
+      $test = substr($data, 0, length($data)-3);
      
       # checksum
-      my @ascii = unpack("C*", $data);
+      my @ascii = unpack("C*", $test);
       my $sum = 0;
       foreach my $val (@ascii) {
         $sum = $sum + $val;
       }
-      if ($sum > 255) {
+      while ($sum > 255) {
         $sum = $sum - 255;
       }
 
@@ -212,7 +213,7 @@ sub HProtocolGateway_ParseMessage($$) {
       $data =~ s/^.//; # remove # 
     
       ($tankdata,$water,$temperature,$probe_offset,$version,$error,$checksum)=split(/@/,$data);
-      my $test = "#".$tankdata.$water.$temperature.$probe_offset.$version.$error; 
+      $test = "#".$tankdata.$water.$temperature.$probe_offset.$version.$error; 
 
       # calculate XOR CRC
       my $check = 0;
