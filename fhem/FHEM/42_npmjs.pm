@@ -105,7 +105,7 @@ sub Define($$) {
         # presets for FHEMWEB
         $attr{$name}{alias} = 'Node.js Update Status';
         $attr{$name}{devStateIcon} =
-'npm.updates.available:security@red npm.is.up.to.date:security@green .*in.progress:system_fhem_reboot@orange errors:message_attention@red';
+'npm.updates.available:security@red:outdated npm.is.up.to.date:security@green:outdated .*in.progress:system_fhem_reboot@orange errors:message_attention@red';
         $attr{$name}{group} = 'System';
         $attr{$name}{icon}  = 'nodejs';
         $attr{$name}{room}  = 'System';
