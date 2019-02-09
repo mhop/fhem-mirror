@@ -41,6 +41,8 @@
 #   2017-07-25  documentation for data type attributes
 #   2018-08-24  started documenting the new features of the base Modbus module version 4
 #   2018-11-10  fixed doku for defSetexpr
+#   2019-01-29  added doku for defSet and defHint
+#   2019-01-30  added once as option for pollDelay in doku
 #
 
 package main;
@@ -552,6 +554,7 @@ ModbusAttr_Initialize($)
             Please note that this does not create an additional interval timer. 
             Instead the normal interval timer defined by the interval of the define command will check if this reading is due or not yet. 
             So the effective interval will always be a multiple of the interval of the define.<br>
+            If this attribute is set to "once" then the object will only be requested once after a restart.
             <br>
             
         <li><b>dev-([cdih]-)*read</b></li> 
@@ -606,6 +609,10 @@ ModbusAttr_Initialize($)
             if set to 1 then all objects of this type will be included in the cyclic update by default. <br>
         <li><b>dev-([cdih]-)*defShowGet</b></li> 
             if set to 1 then all objects of this type will have a visible get by default. <br>
+        <li><b>dev-([cdih]-)*defHint</b></li> 
+            defines a default hint for all objects of this type
+        <li><b>dev-([cdih]-)*defSet</b></li> 
+            defines a default for allowing set commands to all objects of this type
         <li><b>dev-type-XYZ-unpack, -len, -encode, -decode, -revRegs, -bswapRegs, -format, -expr, -map</b></li> 
             define the unpack code, length and other details of a user defined data type. XYZ has to be replaced with the name of a user defined data type.
             use obj-h123-type XYZ to assign this type to an object.<br>
