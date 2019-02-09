@@ -30,6 +30,10 @@
 # 
 # CHANGE LOG
 # 
+# 09.02.2019 1.1.6
+# bugfix     : Unterstuetzung von Variablen ($device, $reading, $name, $topic)
+#              in publish-expression
+#
 # 07.02.2019 1.1.5
 # feature    : get refreshUserAttr implementiert 
 #              (erstellt notwendige user-attr Attribute an den Geraeten neu,
@@ -311,7 +315,7 @@ use warnings;
 
 #my $DEBUG = 1;
 my $cvsid = '$Id$';
-my $VERSION = "version 1.1.5 by hexenmeister\n$cvsid";
+my $VERSION = "version 1.1.6 by hexenmeister\n$cvsid";
 
 my %sets = (
 );
@@ -1041,11 +1045,16 @@ sub getDevicePublishRec($$$) {
 # parameter: $hash, map, globalMap, device-name, reading-name
 sub getDevicePublishRecIntern($$$$$) {
   my($hash, $devMap, $globalMap, $dev, $reading) = @_;
+  #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] getDevicePublishRec> params> devmap: ".Dumper($devMap));
+  #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] getDevicePublishRec> params> globalmap: ".Dumper($globalMap));
+  #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] getDevicePublishRec> params> dev: ".Dumper($dev));
+  #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] getDevicePublishRec> params> reading: ".Dumper($reading));
 
   # publish map
   my $publishMap = $devMap->{':publish'};
-  my $globalPublishMap = $globalMap->{':publish'};
+  #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] getDevicePublishRec> publishMap ".Dumper($publishMap));
   #return undef unless defined $publishMap;
+  my $globalPublishMap = $globalMap->{':publish'};
 
   # reading map
   my $readingMap = $publishMap->{$reading} if defined $publishMap;
@@ -2352,7 +2361,12 @@ sub publishDeviceUpdate($$$$$) {
       # Bei einem Hash werden Paare als Topic-Message Paare verwendet und mehrere Nachrichten gesendet
       no strict "refs";
       local $@;
-      my $ret = _evalValue2($hash->{NAME},$expression,$defMap,1);
+      # $device, $reading, $name (und fuer alle Faelle $topic) in $defMap packen, so zur Verfügung stellen (für eval)reicht wegen _evalValue2 wohl nicht
+      my $name = $reading; # TODO: Name-Mapping
+      my $device = $devn;
+      #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> DEBUG: >>> expression: $expression");
+      my $ret = _evalValue2($hash->{NAME},$expression,{'topic'=>$topic,'device'=>$devn,'reading'=>$reading,'name'=>$name,%$defMap},1);
+      #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> DEBUG: <<< expression: ".Dumper($ret));
       $ret = eval($ret);
       if(ref($ret) eq 'HASH') {
         $redefMap = $ret;
@@ -2374,6 +2388,7 @@ sub publishDeviceUpdate($$$$$) {
 
     my $updated = 0;
     if(defined($redefMap)) {
+      #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> DEBUG: redefMap: ".Dumper($redefMap));
       foreach my $key (keys %{$redefMap}) {
         my $val = $redefMap->{$key};
         my $r = doPublish($hash,$devn,$reading,$key,$val,$qos,$retain,$resendOnConnect);
