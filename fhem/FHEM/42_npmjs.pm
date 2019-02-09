@@ -39,7 +39,7 @@ use warnings;
 use POSIX;
 
 # our @EXPORT  = qw(get_time_suffix);
-our $VERSION = "0.9.2";
+our $VERSION = "0.9.3";
 
 # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 use GPUtils qw(GP_Import);
@@ -235,7 +235,6 @@ sub Notify($$) {
 
         if ( ReadingsVal( $name, 'nodejsVersion', 'none' ) ne 'none' ) {
             ProcessUpdateTimer($hash);
-
         }
         else {
             $hash->{".fhem"}{npm}{cmd} = 'getNodeVersion';
@@ -475,13 +474,17 @@ sub ExecuteNpmCommand($) {
         $npm->{npmupdate} =
           $cmdPrefix . 'echo n | npm update --unsafe-perm' . $cmdSuffix;
         $npm->{npmoutdated} =
-          $cmdPrefix . 'echo n | npm outdated --parseable' . $cmdSuffix;
+            $cmdPrefix
+          . 'echo n | node --version; npm outdated --parseable'
+          . $cmdSuffix;
     }
     else {
         $npm->{npmupdate} =
           $cmdPrefix . 'echo n | sudo npm update -g --unsafe-perm' . $cmdSuffix;
         $npm->{npmoutdated} =
-          $cmdPrefix . 'echo n | sudo npm outdated -g --parseable' . $cmdSuffix;
+            $cmdPrefix
+          . 'echo n | node --version; sudo npm outdated -g --parseable'
+          . $cmdSuffix;
     }
 
     my $response;
@@ -544,6 +547,9 @@ sub NpmOutdated($) {
             $update->{current}               = $6;
             $update->{new}                   = $9;
             $updates->{packages}->{$package} = $update;
+        }
+        elsif ( $line =~ m/^v(\d+\.\d+\.\d+)$/ ) {
+            $updates->{nodejsversion} = $1;
         }
     }
 
@@ -632,7 +638,7 @@ sub WriteReadings($$) {
         and not defined( $hash->{".fhem"}{npm}{'warnings'} ) );
     readingsBulkUpdateIfChanged( $hash, "nodejsVersion",
         $decode_json->{'nodejsversion'} )
-      if ( $hash->{".fhem"}{npm}{cmd} eq 'getNodeVersion' );
+      if ( defined( $decode_json->{'nodejsversion'} ) );
 
     if ( defined( $decode_json->{error} ) ) {
         readingsBulkUpdate( $hash, 'state',
