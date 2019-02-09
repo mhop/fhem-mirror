@@ -2517,109 +2517,255 @@ sub BOSEST_readingsSingleUpdateIfChanged {
 
 =pod
 =item device
-=item summary Easily autodiscover and control your BOSE SoundTouch devices
-=item summary_DE Autodiscover und einfache Steuerung deiner BOSE SoundTouch Geräte
+=item summary Control your BOSE SoundTouch devices
+=item summary_DE Steuerung deiner BOSE SoundTouch Lautsprecher
 =begin html
 
 <a name="BOSEST"></a>
 <h3>BOSEST</h3>
-<ul>
-  BOSEST is used to control a BOSE SoundTouch system (one or more SoundTouch 10, 20 or 30 devices)<br><br>
-	<b>Note:</b> The followig libraries  are required for this module:
-		<ul><li>libwww-perl</li> <li>libmojolicious-perl</li> <li>libxml-simple-perl</li> <li>libnet-bonjour-perl</li> <li>libev-perl</li><li>liburi-escape-xs-perl</li><li>sox</li><li>libsox-fmt-mp3</li><br>
-		Use <b>sudo apt-get install libwww-perl libmojolicious-perl libxml-simple-perl libnet-bonjour-perl libev-perl</b> to install this libraries.<br>Please note:
-		libmojolicious-perl must be >=5.54, but under wheezy is only 2.x avaible.<br>
-		Use <b>sudo apt-get install cpanminus</b> and <b>sudo cpanm Mojolicious</b> to update to the newest version<br>
-		TTS can be configured as described in the following thread: <a href=https://forum.fhem.de/index.php/topic,46838.0.html>Link</a><br>
-		<br>
-		Questions and/or feedback can be posted on the FHEM forum: <a https://forum.fhem.de/index.php/topic,46838.msg533050.html#new>Link</a><br>
-    </ul><br>
-		
-  <a name="BOSESTdefine" id="BOSESTdefine"></a>
-    <b>Define</b>
-  <ul>
-    <code>define &lt;name&gt; BOSEST</code><br>
-    <br>
-    Example:
-    <ul>
-      <code>define bosesystem BOSEST</code><br>
-      Defines BOSE SoundTouch system. All devices/speakers will show up after 60s under "Unsorted" in FHEM.<br/>
-    </ul>
-  </ul>
-  
-  <br>
 
-  <a name="BOSESTset" id="BOSESTset"></a>
-  <b>Set</b>
+<ul>BOSEST is used to control a BOSE SoundTouch system (one or more SoundTouch 10, 20 30, 300 or Portable devices)<br><br> 
+	<b>Note:</b> The following libraries  are required for this module:
+	<ul>
+		<li>libwww-perl</li> <li>libmojolicious-perl</li> <li>libxml-simple-perl</li> <li>libnet-bonjour-perl</li> <li>libev-perl</li><li>liburi-escape-xs-perl</li>
+	  <li>sox</li>
+	  <li>libsox-fmt-mp3</li><br>
+	  Use <b>sudo apt-get install libwww-perl libmojolicious-perl libxml-simple-perl libnet-bonjour-perl libev-perl liburi-escape-xs-perl</b> to install this libraries.<br>
+	  Please note: libmojolicious-perl must be >=5.54<br>
+	  Use <b>sudo apt-get install cpanminus</b> and <b>sudo cpanm Mojolicious</b> to update to the newest version.<br><br>
+	  TextToSpeach (TTS) can be configured as described in the following thread: <a target= "_blank" href="https://forum.fhem.de/index.php/topic,46838.0.html">Link</a><br>
+	  Questions and/or feedback can be posted on the FHEM forum: <a target= "_blank" href="https://forum.fhem.de/index.php/topic,46838.msg533050.html#new">Link</a>
+	</ul><br><br>
+	
+<a name="BOSESTdefine" id="BOSESTdefine"></a>
+  <b>Define</b>
   <ul>
-    <code>set &lt;name&gt; &lt;command&gt; [&lt;parameter&gt;]</code><br>
-               The following commands are defined for the devices/speakers (execpt <b>autoAddDLNAServers</b> is for the "main" BOSEST) :<br><br>
-        <ul><u>General commands</u>
-          <li><code><b>on</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; power on the device</li>
-          <li><code><b>off</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; turn the device off</li>
-          <li><code><b>power</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; toggle on/off</li>
-          <li><code><b>volume</b> [0...100] [+x|-x]</code> &nbsp;&nbsp;-&nbsp;&nbsp; set the volume level in percentage or change volume by ±x from current level</li>
-          <li><code><b>channel</b> 0...20</code> &nbsp;&nbsp;-&nbsp;&nbsp; select present to play</li>
-          <li><code><b>saveChannel</b> 07...20</code> &nbsp;&nbsp;-&nbsp;&nbsp; save current channel to channel 07 to 20</li>
-          <li><code><b>play</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; start/resume to play </li>
-          <li><code><b>pause</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; pause the playback</li>
-          <li><code><b>stop</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; stop playback</li>
-          <li><code><b>nextTrack</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; play next track</li>
-          <li><code><b>prevTrack</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; play previous track</li>
-          <li><code><b>mute</b> on|off|toggle</code> &nbsp;&nbsp;-&nbsp;&nbsp; control volume mute</li>
-          <li><code><b>shuffle</b> on|off</code> &nbsp;&nbsp;-&nbsp;&nbsp; control shuffle mode</li>
-          <li><code><b>repeat</b> all|one|off</code> &nbsp;&nbsp;-&nbsp;&nbsp; control repeat mode</li>
-          <li><code><b>bass</b> 0...10</code> &nbsp;&nbsp;-&nbsp;&nbsp; set the bass level</li>
-          <li><code><b>recent</b> 0...15</code> &nbsp;&nbsp;-&nbsp;&nbsp; set number of names in the recent list in readings</li>
-          <li><code><b>source</b> bluetooth,bt-discover,aux mode, airplay</code> &nbsp;&nbsp;-&nbsp;&nbsp; select a local source</li><br>
-          <li><code><b>addDLNAServer</b> Name1 [Name2] [Namex]</code> &nbsp;&nbsp;-&nbsp;&nbsp; add DLNA servers Name1 (and Name2 to Namex) to the BOSE library</li>
-          <li><code><b>removeDLNAServer</b> Name1 [Name2] [Namex]</code> &nbsp;&nbsp;-&nbsp;&nbsp; remove DLNA servers Name1 (and Name2 to Namex) to the BOSE library</li>
-         </ul><br>Example: <code>set BOSE_1234567890AB volume 25</code>&nbsp;&nbsp;Set volume on device with the name BOSE_1234567890AB <br><br><br>
-         	
-         <ul><u>Timer commands:</u>
-          <li><code><b>on-for-timer</b> 1...x</code> &nbsp;&nbsp;-&nbsp;&nbsp; power on the device for x seconds</li>
-          <li><code><b>off-for-timer</b> 1...x</code> &nbsp;&nbsp;-&nbsp;&nbsp; turn the device off and power on again after x seconds</li>
-          <li><code><b>on-till</b> hh:mm:ss</code> &nbsp;&nbsp;-&nbsp;&nbsp; power on the device until defined time</li>
-          <li><code><b>off-till</b> hh:mm:ss</code> &nbsp;&nbsp;-&nbsp;&nbsp; turn the device off and power on again at defined time</li>
-          <li><code><b>on-till-overneight</b> hh:mm:ss</code> &nbsp;&nbsp;-&nbsp;&nbsp; power on the device until defined time on the next day</li>
-          <li><code><b>off-till-overneight</b> hh:mm:ss</code> &nbsp;&nbsp;-&nbsp;&nbsp; turn the device off at defined time on the next day</li>
-         </ul><br>Example: <code>set BOSE_1234567890AB on-till 23:00:00</code>&nbsp;&nbsp;Switches device with the name BOSE_1234567890AB now on and at 23:00:00 off<br><br><br>
-         	
-         <ul><u>Multiroom commands:</u>
-          <li><code><b>createZone</b> deviceID</code> &nbsp;&nbsp;-&nbsp;&nbsp; create multiroom zone (defines <code>&lt;name&gt;</code> as zoneMaster) </li>
-          <li><code><b>addToZone</b> deviceID</code> &nbsp;&nbsp;-&nbsp;&nbsp; add device <code>&lt;name&gt;</code> to multiroom zone</li>
-          <li><code><b>removeFromZone</b> deviceID</code> &nbsp;&nbsp;-&nbsp;&nbsp; remove device <code>&lt;name&gt;</code> from multiroom zone</li>
-          <li><code><b>playEverywhere</b></code>  &nbsp;&nbsp;-&nbsp;&nbsp; play sound of  device <code>&lt;name&gt;</code> on all others devices</li>
-          <li><code><b>stopPlayEverywhere</b></code>  &nbsp;&nbsp;-&nbsp;&nbsp; stop playing sound on all devices</li>
-        </ul><br>Example: <code>set BOSE_1234567890AB playEverywhere</code>&nbsp;&nbsp;Starts Multiroom with device with the name BOSE_1234567890AB as master <br><br><br>
-        	
-        <ul><u>TextToSpeach commands (needs Google Translate):</u>
-         <li><code><b>speak</b> "message" [0...100] [+x|-x] [en|de|xx]</code> &nbsp;&nbsp;-&nbsp;&nbsp; Text to speak, optional with volume adjustment and language to use. The message to speak may have up to 100 letters</li>
-         <li><code><b>speakOff</b> "message" [0...100] [+x|-x] [en|de|xx]</code> &nbsp;&nbsp;-&nbsp;&nbsp; Text to speak, optional with volume adjustment and language to use. The message to speak may have up to 100 letters. Device is switched off after speak</li>
-         <li><code><b>ttsVolume</b> [0...100] [+x|-x]</code> &nbsp;&nbsp;-&nbsp;&nbsp; set the TTS volume level in percentage or change volume by ±x from current level</li>
-         <li><code><b>ttsDirectory</b> "directory"</code> &nbsp;&nbsp;-&nbsp;&nbsp; set DLNA TTS directory. FHEM user needs permissions to write to that directory. </li>
-         <li><code><b>ttsLanguage </b> en|de|xx</code> &nbsp;&nbsp;-&nbsp;&nbsp; set default TTS language (default: en)</li>
-         <li><code><b>ttsSpeakOnError</b> 0|1</code> &nbsp;&nbsp;-&nbsp;&nbsp; 0=disable to speak "not available" text</li>
-         <li><code><b>autoAddDLNAServers</b> 0|1</code> &nbsp;&nbsp;-&nbsp;&nbsp; 1=automatically add all DLNA servers to BOSE library. This command is only for "main" BOSEST, not for devices/speakers!</li> <br>
-        </ul><br> Example: <code>set BOSE_1234567890AB speakOff "Music is going to switch off now. Good night." 30 en</code>&nbsp;&nbsp;Speaks message at volume 30 and then switches off device.<br><br> <br>
+  	<code>define &lt;name&gt; BOSEST</code><br><br>
+  Example:
+  	<ul>
+   	 <code>define bosesystem BOSEST</code><br>
+    	Defines BOSE SoundTouch system. All devices/speakers will show up after 60s under "Unsorted" in FHEM.<br>
+  	</ul>
+  </ul><br>
+
+<a name="BOSESTset" id="BOSESTset"></a>
+<b>Set</b>
+		<ul><code>set &lt;name&gt; &lt;command&gt; [&lt;parameter&gt;]</code><br><br>
+             The following commands are defined for the devices/speakers (except <b>autoAddDLNAServers</b> is for the "main" BOSEST) :<br><br>
+      <ul><u>General commands</u>
+        <li><code><b>on</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; power on the device</li>
+        <li><code><b>off</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; turn the device off</li>
+        <li><code><b>power</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; toggle on/off</li>
+        <li><code><b>volume</b> [0...100] [+x|-x]</code> &nbsp;&nbsp;-&nbsp;&nbsp; set the volume level in percentage or change volume by &plusmn;x from current level</li>
+        <li><code><b>channel</b> 0...20</code> &nbsp;&nbsp;-&nbsp;&nbsp; select present to play</li>
+        <li><code><b>saveChannel</b> 07...20</code> &nbsp;&nbsp;-&nbsp;&nbsp; save current channel to channel 07 to 20</li>
+        <li><code><b>play</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; start to play </li>
+        <li><code><b>pause</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; pause the playback</li>
+
+        <li><code><b>playpause</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; toggle play/pause</li>
+        <li><code><b>stop</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; stop playback</li><li><code><b>nextTrack</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; play next track</li>
+        <li><code><b>prevTrack</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; play previous track</li>
+        <li><code><b>playTrack </b> name|location|source[|sourceAccount]</code> &nbsp;&nbsp;-&nbsp;&nbsp; searches per DNLA for the track title and plays it <br>
+      	     <font size=-1>additional information:
+		         <ol> 
+		        		<li>You can search for trackTitle, trackAlbum, trackArtist (<a target= "_blank" href="https://forum.fhem.de/index.php?topic=46838.msg594029#msg594029">german FHEM forum post</a>) </li>
+		        	   <li>You can test it in the SoundTouch APP: Use the search in the APP to see if a playlist is found and played. It yes it will work with playTrack too. (<a target= "_blank" href="https://forum.fhem.de/index.php/topic,46838.msg594693.html#msg594693">german FHEM forum post</a>) </li>
+		        </ol>
+		        </font></li>
+        <li><code><b>mute</b> on|off|toggle</code> &nbsp;&nbsp;-&nbsp;&nbsp; control volume mute</li>
+        <li><code><b>shuffle</b> on|off</code> &nbsp;&nbsp;-&nbsp;&nbsp; control shuffle mode</li>
+        <li><code><b>repeat</b> all|one|off</code> &nbsp;&nbsp;-&nbsp;&nbsp; control repeat mode</li>
+        <li><code><b>bass</b> 0...10</code> &nbsp;&nbsp;-&nbsp;&nbsp; set the bass level</li>
+        <li><code><b>recent</b> 0...15</code> &nbsp;&nbsp;-&nbsp;&nbsp; set number of names in the recent list in readings</li>
+        <li><code><b>source</b> bluetooth,bt-discover,aux mode, airplay</code> &nbsp;&nbsp;-&nbsp;&nbsp; select a local source</li><br>
+        <li><code><b>addDLNAServer</b> Name1 [Name2] [Namex]</code> &nbsp;&nbsp;-&nbsp;&nbsp; add DLNA servers Name1 (and Name2 to Namex) to the BOSE library</li>
+        <li><code><b>removeDLNAServer</b> Name1 [Name2] [Namex]</code> &nbsp;&nbsp;-&nbsp;&nbsp; remove DLNA servers Name1 (and Name2 to Namex) to the BOSE library</li>
       </ul><br>
-  
-    <a name="BOSESTget" id="BOSESTget"></a>
-  	<b>Get</b>
-	  <ul>
-	    <code>n/a</code>
- 	 </ul>
- 	 <br>
+      Example: <code>set BOSE_1234567890AB volume 25</code>&nbsp;&nbsp;Set volume on device with the name BOSE_1234567890AB <br><br><br>
+       	
+      <ul><u>Timer commands:</u>
+        <li><code><b>on-for-timer</b> 1...x</code> &nbsp;&nbsp;-&nbsp;&nbsp; power on the device for x seconds</li>
+        <li><code><b>off-for-timer</b> 1...x</code> &nbsp;&nbsp;-&nbsp;&nbsp; turn the device off and power on again after x seconds</li>
+        <li><code><b>on-till</b> hh:mm:ss</code> &nbsp;&nbsp;-&nbsp;&nbsp; power on the device until defined time</li>
+        <li><code><b>off-till</b> hh:mm:ss</code> &nbsp;&nbsp;-&nbsp;&nbsp; turn the device off and power on again at defined time</li>
+        <li><code><b>on-till-overneight</b> hh:mm:ss</code> &nbsp;&nbsp;-&nbsp;&nbsp; power on the device until defined time on the next day</li>
+        <li><code><b>off-till-overneight</b> hh:mm:ss</code> &nbsp;&nbsp;-&nbsp;&nbsp; turn the device off at defined time on the next day</li>
+      </ul><br>
+      Example: <code>set BOSE_1234567890AB on-till 23:00:00</code>&nbsp;&nbsp;Switches device with the name BOSE_1234567890AB now on and at 23:00:00 off<br><br><br>
+       	
+      <ul><u>Multiroom commands:</u>
+        <li><code><b>createZone</b> deviceID[,deviceID]</code> &nbsp;&nbsp;-&nbsp;&nbsp; create multiroom zone and adds device(s) to the multiroom zone </li>
+        <li><code><b>addToZone</b> deviceID</code> &nbsp;&nbsp;-&nbsp;&nbsp; add device to multiroom zone </li>
+        <li><code><b>removeFromZone</b> deviceID</code> &nbsp;&nbsp;-&nbsp;&nbsp; remove device from multiroom zone</li>
+        <li><code><b>playEverywhere</b></code>  &nbsp;&nbsp;-&nbsp;&nbsp; play sound of a device on all others devices</li>
+        <li><code><b>stopPlayEverywhere</b></code>  &nbsp;&nbsp;-&nbsp;&nbsp; stop playing sound on all devices</li>
+      </ul><br>
+      Example1: <code>set BOSE_1234567890AB playEverywhere</code>&nbsp;&nbsp;Starts playing the sound of the device BOSE_1234567890AB on allother devices<br><br>        
+      Example2: <code>set BOSE_1234567890AB createZone AB1234567890,12AB34567890</code>&nbsp;&nbsp;Defines BOSE_1234567890AB as multiroom master 
+      and adds BOSE_AB1234567890 and BOSE_12AB34567890 to the multiroom zone <br><br>
+      
+      <b>Note:</b>   A "double-tap" (<1s) on a preset button (device or remote control) will toggle playEverywhere/stopPlayEverywhere<br><br><br>     
+      	   
+      <ul><u>Show clock command (only for ST20/30):</u>       
+      	<li><code><b>clock</b> enable/disable</code> &nbsp;&nbsp;-&nbsp;&nbsp; show or hide clock </li>
+			</ul><br>
+			Example: <code>set BOSE_1234567890AB clock enable</code>&nbsp;&nbsp;Show time in the ST20/30 display.<br><br><br>
+      	
+      <ul><u>TextToSpeach commands (needs Google Translate):</u>
+       <li><code><b>speak</b> "message" [0...100] [+x|-x] [en|de|xx]</code> &nbsp;&nbsp;-&nbsp;&nbsp; Text to speak, optional with volume adjustment and language to use.</li>
+       <li><code><b>speakOff</b> "message" [0...100] [+x|-x] [en|de|xx]</code> &nbsp;&nbsp;-&nbsp;&nbsp; Text to speak, optional with volume adjustment and language to use. Device is switched off after speak.</li>
+       </ul><br> 
+      Example: <code>set BOSE_1234567890AB speakOff "Music is going to switch off now. Good night." 30 en</code>&nbsp;&nbsp;Speaks message at volume 30 and then switches off device.<br><br><br>
 
-    <a name="BOSESTattr" id="BOSESTattr"></a>
-        <b>Attributes</b>
-        <ul><ul>
-            <li><code><b>staticIPs</b> IPs</code>&nbsp;&nbsp;-&nbsp;&nbsp; IP addresses (comma separated) of your BOSE devices, should be used only if discovery doesn't work in your network</li>
-        </ul></ul>
-    <br>
+    	<ul><u>DNLA Server command:</u> 
+    		<li><code><b>autoAddDLNAServers</b> 0|1</code> &nbsp;&nbsp;-&nbsp;&nbsp; 1=automatically add all DLNA servers to BOSE library. This command is only for "main" BOSEST, not for devices/speakers!</li>
+    	</ul><br>
+   </ul>
 
+  <a name="BOSESTget" id="BOSESTget"></a>
+	<b>Get</b>
+  <ul>
+    <code>n/a</code>
+  </ul><br>
+
+  <a name="BOSESTattr" id="BOSESTattr"></a>
+  <b>Attributes</b>
+  <ul>
+  	<ul>
+      <li><code><b>staticIPs</b> IP-Address [,IP-Address]</code>&nbsp;&nbsp;-&nbsp;&nbsp; Manually define the used IP address(es) (comma separated) of your BOSE devices. Should be used only, if BOSEST device detection doesn't work in your network (e.g. several subnets on server, subnet not directly connected, ...) <br>Example: <code>attr bosesystem staticIPs 192.168.1.52,192.168.1.53</code></li>
+      <li><code><b>speakChannel</b> channel(s)</code>&nbsp;&nbsp;-&nbsp;&nbsp; speaks channel/present name bevor starting a playback, useful for SoundTouch without display (comma separated or range: e.g.&nbsp;<code>2,3,5,6 </code> or <code>1-6</code> ). TTS must be installed.</li>
+      <li><code><b>auto-zone</b> on|off</code>  &nbsp;&nbsp;-&nbsp;&nbsp; automatic start  multiroom zone play, if speakers are playing the same, according to "contentItemLocation"; (default: off)</li>
+      <li><code><b>ttsDirectory</b> "directory"</code> &nbsp;&nbsp;-&nbsp;&nbsp; set DLNA TTS directory. FHEM user needs permissions to write to that directory. </li>
+      <li><code><b>ttsLanguage </b> en|de|xx</code> &nbsp;&nbsp;-&nbsp;&nbsp; set default TTS language (default: en)</li>
+      <li><code><b>ttsSpeakOnError</b> 0|1</code> &nbsp;&nbsp;-&nbsp;&nbsp; 0=disable to speak "not available" text</li>
+      <li><code><b>ttsVolume</b> [0...100] [+x|-x]</code> &nbsp;&nbsp;-&nbsp;&nbsp; set the TTS volume level in percentage or change volume by ±x from current level</li>         
+      <li><code><b>Channel_07</b> to <b>Channel_20</b> name|location|source|[sourceAccount]</code> &nbsp;&nbsp;-&nbsp;&nbsp; define present 07 to 20 <br>When you play something, you can find  ContentItemLocationName, ContentItemLocation,  etc. in the readings. These data can be used here to define the present. </li>
+    </ul>
+  </ul><br>
+</ul>
+=end html
+
+=begin html_DE
+
+<a name="BOSEST"></a>
+<h3>BOSEST</h3>
+
+<ul>BOSEST ist ein Modul um ein BOSE SoundTouch System zu steuern, (ein oder mehrere SoundTouch 10, 20 30, 300 oder Portable Ger&auml;te)<br><br>  
+
+<b>Hinweis:</b> F&uuml;r das BOEST Modul sind folgende Bibliotheken erforderlich:
+	<ul>
+		<li>libwww-perl</li> <li>libmojolicious-perl</li> <li>libxml-simple-perl</li> <li>libnet-bonjour-perl</li> <li>libev-perl</li><li>liburi-escape-xs-perl</li><li>sox</li><li>libsox-fmt-mp3</li><br>
+		Rufe <b>sudo apt-get install libwww-perl libmojolicious-perl libxml-simple-perl libnet-bonjour-perl libev-perl liburi-escape-xs-perl</b> auf, um diese Bibliotheken zu installieren.<br>
+		Hinweis:libmojolicious-perl muss mindestens die Version 5.54 haben.<br>
+		Rufe <b>sudo apt-get install cpanminus</b> and <b>sudo cpanm Mojolicious</b> auf, um auf die aktuelle Version zu updaten.<br><br>
+		Die Konfiguration von TTS (TextToSpeech) ist in diesem FHEM Forum Beitrag beschrieben: <a target= "_blank" href="https://forum.fhem.de/index.php/topic,46838.0.html">Link</a><br>
+		Fragen und Feedback bitte &uuml;ber das FHEM Forum: <a target= "_blank" href="https://forum.fhem.de/index.php/topic,46838.msg533050.html#new">Link</a><br>
+  </ul><br>
+	
+<a name="BOSESTdefine" id="BOSESTdefine"></a>
+  <b>Define</b>
+<ul>
+  <code>define &lt;name&gt; BOSEST</code><br><br>
+  Beispiel:
+  <ul>
+    <code>define bosesystem BOSEST</code><br>
+    Definiert das BOSE SoundTouch System. Alle Lautsprecher erscheinen innerhalb von ca. 60 s unter "Unsorted" in FHEM.<br/>
+  </ul>
 </ul>
 
-=end html
+<br>
+
+<a name="BOSESTset" id="BOSESTset"></a>
+<b>Set</b>
+		<ul><code>set &lt;name&gt; &lt;command&gt; [&lt;parameter&gt;]</code><br><br>
+      Die folgenden SET-Kommandos gelten f&uuml;r Lautsprecher (Ausnahme: <b>autoAddDLNAServers</b> ist nur f&uuml;r das Hauptmodul BOSEST) :<br><br>
+      <ul><u>Allgemein</u>
+        <li><code><b>on</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; Lautsprecher einschalten</li>
+        <li><code><b>off</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; Lautsprecher ausschalten</li>
+        <li><code><b>power</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; Wechselt zw. on und off</li>
+        <li><code><b>volume</b> [0...100] [+x|-x]</code> &nbsp;&nbsp;-&nbsp;&nbsp; Lautst&auml;rke setzen (direkt oder als &plusmn;x Differenz zur aktuellen Lautst&auml;rke) </li>
+        <li><code><b>channel</b> 0...20</code> &nbsp;&nbsp;-&nbsp;&nbsp; Present ausw&auml;hlen</li>
+        <li><code><b>saveChannel</b> 07...20</code> &nbsp;&nbsp;-&nbsp;&nbsp; Aktuelle Wiedergabe als Present 07 bis 20 speichern</li>
+        <li><code><b>play</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; Startet die Wiedergabe </li>
+        <li><code><b>pause</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; Pausiert die Wiedergabe</li>
+        <li><code><b>playpause</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; Wechselt zw. play und pause</li>
+        <li><code><b>stop</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; Stoppt die Wiedergabe</li><li><code><b>nextTrack</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; N&auml;chsten Titel spielen</li>
+        <li><code><b>prevTrack</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; Vorherigen Titel spielen</li>
+      	<li><code><b>playTrack </b> name|location|source[|sourceAccount]</code> &nbsp;&nbsp;-&nbsp;&nbsp; Sucht per DNLA nach dem Titel und spielt ihn ab <br>
+      		<font size=-1>Weitere Informationen:
+      		<ol> 
+      			<li>"Es ist immer nur eine Suche und die ist nach trackTitle, trackAlbum, trackArtist m&ouml;glich, so wie in der SoundTouch App" (<a target= "_blank" href="https://forum.fhem.de/index.php?topic=46838.msg594029#msg594029">FHEM Forum Beitrag</a>) </li>
+      			<li>"Einfach in der SoundTouch APP auf die Suche klicken und schauen, ob Playlists gefunden und abgespielt werden k&ouml;nnen." (<a target= "_blank" href="https://forum.fhem.de/index.php/topic,46838.msg594693.html#msg594693">FHEM Forum Beitrag</a>) </li>
+      		</ol>
+      		</font></li>
+        <li><code><b>mute</b> on|off|toggle</code> &nbsp;&nbsp;-&nbsp;&nbsp; Stummschaltung</li>
+        <li><code><b>shuffle</b> on|off</code> &nbsp;&nbsp;-&nbsp;&nbsp; Zufallswiedergabe</li>
+        <li><code><b>repeat</b> all|one|off</code> &nbsp;&nbsp;-&nbsp;&nbsp; Wiederholung</li>
+        <li><code><b>bass</b> 0...10</code> &nbsp;&nbsp;-&nbsp;&nbsp; Basseinstellung</li>
+        <li><code><b>recent</b> 0...15</code> &nbsp;&nbsp;-&nbsp;&nbsp; Anzahl der Namen, die in der recent list in readings aufgef&uuml;hrt werden</li>
+        <li><code><b>source</b> bluetooth,bt-discover,aux mode, airplay</code> &nbsp;&nbsp;-&nbsp;&nbsp; lokale Quelle ausw&auml;hlen</li><br>
+        <li><code><b>addDLNAServer</b> Name1 [Name2] [Namex]</code> &nbsp;&nbsp;-&nbsp;&nbsp; DLNA server Name1 (und Name2 bis Namex) zur BOSE Bibliothek hinzuf&uuml;gen</li>
+        <li><code><b>removeDLNAServer</b> Name1 [Name2] [Namex]</code> &nbsp;&nbsp;-&nbsp;&nbsp; DLNA server Name1 (und Name2 bis Namex) aus der BOSE Bibliothek entfernen</li>
+       </ul><br>
+       Beispiel: <code>set BOSE_1234567890AB volume 25</code>&nbsp;&nbsp;Setzt die Lautst&auml;rke des Lautsprechers BOSE_1234567890AB auf 25.<br><br><br>
+       	
+       <ul><u>Zeiten:</u>
+        <li><code><b>on-for-timer</b> 1...x</code> &nbsp;&nbsp;-&nbsp;&nbsp; Schaltet den Lautsprecher f&uuml;r x Sekunden ein</li>
+        <li><code><b>off-for-timer</b> 1...x</code> &nbsp;&nbsp;-&nbsp;&nbsp; Schaltet den Lautsprecher f&uuml;r x Sekunden aus</li>
+        <li><code><b>on-till</b> hh:mm:ss</code> &nbsp;&nbsp;-&nbsp;&nbsp; Schaltet den Lautsprecher bis zur angegebenen Zeit ein</li>
+        <li><code><b>off-till</b> hh:mm:ss</code> &nbsp;&nbsp;-&nbsp;&nbsp; Schaltet den Lautsprecher bis und zur angegebenen Zeit aus</li>
+        <li><code><b>on-till-overneight</b> hh:mm:ss</code> &nbsp;&nbsp;-&nbsp;&nbsp; Schaltet den Lautsprecher bis zur angegebenen Zeit am n&auml;chsten Tag ein</li>
+        <li><code><b>off-till-overneight</b> hh:mm:ss</code> &nbsp;&nbsp;-&nbsp;&nbsp; Schaltet den Lautsprecher bis zur angegebenen Zeit am n&auml;chsten Tag aus</li>
+       </ul><br>
+       Beispiel: <code>set BOSE_1234567890AB on-till 23:00:00</code>&nbsp;&nbsp;Schaltet den Lautsprecher BOSE_1234567890AB ein und um 23:00:00 Uhr aus.<br><br><br>
+       	
+       <ul><u>Multiroom:</u>
+        <li><code><b>createZone</b> deviceID[,deviceID]</code> &nbsp;&nbsp;-&nbsp;&nbsp; Legt eine Wiedergabe-Zone an und f&uuml;gt einen oder mehrere Lautsprecher der Wiedergabezone hinzu </li>
+        <li><code><b>addToZone</b> deviceID</code> &nbsp;&nbsp;-&nbsp;&nbsp; F&uuml;gt einen Lautsprecher einer bestehenden Wiedergabe-Zone zu </li>
+        <li><code><b>removeFromZone</b> deviceID</code> &nbsp;&nbsp;-&nbsp;&nbsp; Entfernt einen Lautsprecher aus einer Wiedergabe-Zone</li>
+        <li><code><b>playEverywhere</b></code>  &nbsp;&nbsp;-&nbsp;&nbsp; Startet "&Uuml;berall wiedergeben"</li>
+        <li><code><b>stopPlayEverywhere</b></code>  &nbsp;&nbsp;-&nbsp;&nbsp; Beendet "&Uuml;berall wiedergeben"</li>
+      </ul><br>
+      Beispiel 1: <code>set BOSE_1234567890AB playEverywhere</code>&nbsp;&nbsp;Startet die &Uuml;berall-Wiedergabe (Mit dem Lautsprecher BOSE_1234567890AB als Master-Lautsprecher). <br><br>
+      Beispiel 2: <code>set BOSE_1234567890AB createZone AB1234567890,12AB34567890</code>&nbsp;&nbsp;Definiert BOSE_1234567890AB als Master-Lautsprecher und f&uuml;gt BOSE_AB1234567890 und BOSE_12AB34567890 der Wiedergabe-Zone hinzu<br><br>
+      <b>Hinweis:</b> Dr&uuml;cken Sie 2x  ein Present (innerhalb einer Sekunde) am Lautsprecher oder auf der Fernbedienung, wird "&Uuml;berall Wiedergeben" ein oder ausgeschaltet.<br><br><br>
+      
+      <ul><u>Uhr Anzeige (nur f&uuml;r ST20/30):</u>       
+      	<li><code><b>clock</b> enable/disable</code> &nbsp;&nbsp;-&nbsp;&nbsp; Schaltet die Uhrenanzeige im Standby um</li>
+			</ul><br>
+			Beispiel: <code>set BOSE_1234567890AB clock enable</code>&nbsp;&nbsp;Zeigt die Uhr im Standby auf dem Display des ST20/30 an.<br><br><br>
+      	
+      <ul><u>TextToSpeach (ben&ouml;tigt Google Translate):</u>
+       	<li><code><b>speak</b> "message" [0...100] [+x|-x] [en|de|xx]</code> &nbsp;&nbsp;-&nbsp;&nbsp; Text den der Lautsprecher sagen soll, ggf. mit Lautst&auml;rkeangabe, die f&uuml;r diese Ansage verwendet werden soll. Nach der Ansage setzt der Lautsprecher die Wiedergabe fort.</li>
+       	<li><code><b>speakOff</b> "message" [0...100] [+x|-x] [en|de|xx]</code> &nbsp;&nbsp;-&nbsp;&nbsp; Text den der Lautsprecher sagen soll, ggf. mit Lautst&auml;rkeangabe, die f&uuml;r diese Ansage verwendet werden soll. Nach der Ansage schaltet der Lautsprecher ab.</li>
+      </ul><br> 
+      Beispiel: <code>set BOSE_1234567890AB speakOff "Ab isn Bett." 30 en</code>&nbsp;&nbsp;Spricht die Meldung mit Lautst&auml;rke 30 und schaltet den Lautsprecher dann aus.<br><br><br>
+
+    	<ul><u>DNLA Server:</u> 
+    		<li><code><b>autoAddDLNAServers</b> 0|1</code> &nbsp;&nbsp;-&nbsp;&nbsp; 1=automatisch alle DLNA servers zur BOSE Bibliothek hinzuf&uuml;gen. Dieser Parameter ist nur f&uuml;r das Hauptmodul BOSEST, nicht f&uuml;r die Lautsprecher!</li></ul><br>
+    	</ul>
+
+  <a name="BOSESTget" id="BOSESTget"></a>
+	<b>Get</b>
+  <ul>
+    <code>n/a</code>
+ </ul><br>
+
+  <a name="BOSESTattr" id="BOSESTattr"></a>
+  <b>Attribute</b>
+      <ul>
+      	<ul>
+      		<li><code><b>staticIPs</b> IP-Address [,IP-Address]</code>&nbsp;&nbsp;-&nbsp;&nbsp; Manuelle Angabe der IP Adresse(n). Sollte nur verwendet werden, wenn die automatiche Erkennung nicht funktioniert. (z.B. bei mehreren Sub-Netzwerken oder wenn Teile des Netzwerks manuell verbunden werden, ...) <br>Beispiel: <code>attr bosesystem staticIPs 192.168.1.52,192.168.1.53</code></li>
+      		<li><code><b>speakChannel</b> channel(s) </code>&nbsp;&nbsp;-&nbsp;&nbsp; Ansage des aktuellen Present vor der Wiedergabe, sinnvoll f&uuml;r SoundTouch Lautsprecher ohne Display (Angabe komma-separiert oder als Bereich: z.B.&nbsp;<code>2,3,5,6 </code> oder <code>1-6</code> ). TTS muss eingerichtet sein.</li>
+      		<li><code><b>auto-zone</b> on|off</code>  &nbsp;&nbsp;-&nbsp;&nbsp; "&Uuml;berall Wiedergabe" automatisch starten, wenn Lautsprecher das gleiche wiedergeben ("contentItemLocation" ist identisch); (Standardwert: off)</li>
+      		<li><code><b>ttsDirectory</b> "directory"</code> &nbsp;&nbsp;-&nbsp;&nbsp; Angabe des DLNA TTS Verzeichnisses. Der FHEM user muss Schreibrechte in diesem Verzeichnis haben.</li>
+       		<li><code><b>ttsLanguage </b> en|de|xx</code> &nbsp;&nbsp;-&nbsp;&nbsp; Standardsprache f&uuml;r TTS setzen (default: en)</li>
+       		<li><code><b>ttsSpeakOnError</b> 0|1</code> &nbsp;&nbsp;-&nbsp;&nbsp; 0= Ansage "not available" unterdr&uuml;cken</li>
+       		<li><code><b>ttsVolume</b> [0...100] [+x|-x]</code> &nbsp;&nbsp;-&nbsp;&nbsp; Lautst&auml;rke setzen (direkt oder als &plusmn;x Differnez zur aktuellen Lautst&auml;rke)</li>
+       		<li><code><b>Channel_07</b> to <b>Channel_20</b> name|location|source|[sourceAccount]</code> &nbsp;&nbsp;-&nbsp;&nbsp; Festlegen der Present 07 bis 20 <br>Bei Wiedergabe kann in den readings "ContentItemLocationName, ContentItemLocation,  etc. " ausgelesen werden. Dies Daten k&ouml;nnen dann verwendet werden, um die Presents zu belegen.</li>
+      	</ul>
+      </ul><br>
+</ul>
+=end html_DE
 =cut
 
