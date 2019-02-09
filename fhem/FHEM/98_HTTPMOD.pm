@@ -156,6 +156,10 @@
 #   2018-08-11  put userAttr handling in a subroutine
 #   2018-08-30  put map nandling in subroutines
 #   2018-11-09  changed regex to parse set-cookie
+#   2018-27-12  setExtensions (including attrTemplates) testweise eingebaut
+#   2019-01-09  useSetExtensions attribute to be able to disable setExtensions (by default they are now integrated)
+#   2019-01-12  special handling when extractAllJSON is set to 2
+#   2019-01-13  check for featurelevl > 5.9
 #
 #
 
@@ -164,8 +168,6 @@
 #               get after set um readings zu aktualisieren
 #               definierbarer prefix oder Suffix für Readingsnamen wenn sie von unterschiedlichen gets über readingXY erzeugt werden
 #
-#               set clearCookies
-#               
 #               reading mit Status je get (error, no match, ...) oder reading zum nachverfolgen der schritte, fehler, auth etc.
 #
 #               In _Attr bei Prüfungen auf get auch set berücksichtigen wo nötig, ebenso in der Attr Liste (oft fehlt set)
@@ -182,6 +184,9 @@
 #
 # Merkliste fürs nächste Fhem Release
 #   - enforceGoodReadingNames 1 als Default
+#   - enableCookies
+#   - handleRedirects
+#   - enableControlSet
 #
 #
 #
@@ -211,6 +216,7 @@ use warnings;
 use Time::HiRes qw(gettimeofday);    
 use Encode qw(decode encode);
 use HttpUtils;
+use SetExtensions qw/ :all /;
 
 sub HTTPMOD_Initialize($);
 sub HTTPMOD_Define($$);
@@ -224,7 +230,7 @@ sub HTTPMOD_AddToQueue($$$$$;$$$$);
 sub HTTPMOD_JsonFlatter($$;$);
 sub HTTPMOD_ExtractReading($$$$$);
 
-my $HTTPMOD_Version = '3.5.4 - 9.11.2018';
+my $HTTPMOD_Version = '3.5.8 - 12.1.2019';
 
 #
 # FHEM module intitialisation
@@ -234,11 +240,12 @@ sub HTTPMOD_Initialize($)
 {
     my ($hash) = @_;
 
-    $hash->{DefFn}   = "HTTPMOD_Define";
-    $hash->{UndefFn} = "HTTPMOD_Undef";
-    $hash->{SetFn}   = "HTTPMOD_Set";
-    $hash->{GetFn}   = "HTTPMOD_Get";
-    $hash->{AttrFn}  = "HTTPMOD_Attr";
+    $hash->{DefFn}    = "HTTPMOD_Define";
+    $hash->{UndefFn}  = "HTTPMOD_Undef";
+    $hash->{SetFn}    = "HTTPMOD_Set";
+    $hash->{GetFn}    = "HTTPMOD_Get";
+    $hash->{AttrFn}   = "HTTPMOD_Attr";
+    $hash->{NotifyFn} = "HTTPMOD_Notify";
     $hash->{AttrList} =
       "(reading|get|set)[0-9]+(-[0-9]+)?Name " . 
       
@@ -267,7 +274,7 @@ sub HTTPMOD_Initialize($)
       "(reading|get|set)[0-9]*AlwaysNum " .
       "(reading|get|set)[0-9]*DeleteIfUnmatched " .
       "(reading|get|set)[0-9]*DeleteOnError " .
-      "extractAllJSON " .
+      "extractAllJSON:0,1,2 " .
       
       "readingsName.* " .               # old 
       "readingsRegex.* " .              # old 
@@ -299,7 +306,7 @@ sub HTTPMOD_Initialize($)
       "[gs]et[0-9]*NoData.* " .         # make sure it is an HTTP GET without data - even if a more generic data is defined
       "[gs]et[0-9]*Header.* " .
       "[gs]et[0-9]*CheckAllReadings:0,1 " .
-      "[gs]et[0-9]*ExtractAllJSON:0,1 " .
+      "[gs]et[0-9]*ExtractAllJSON:0,1,2 " .
       
       "[gs]et[0-9]*URLExpr " .          # old
       "[gs]et[0-9]*DatExpr " .          # old
@@ -355,11 +362,13 @@ sub HTTPMOD_Initialize($)
       "disable:0,1 " .
       "enableControlSet:0,1 " .
       "enableCookies:0,1 " .
+      "useSetExtensions:1,0 ".
       "handleRedirects:0,1 " .                  # own redirect handling outside HttpUtils
       "enableXPath:0,1 " .                      # old 
       "enableXPath-Strict:0,1 " .               # old
       "enforceGoodReadingNames " .
       "dontRequeueAfterAuth " .
+      "model " .                                # for attr templates
       $readingFnAttributes;  
 }
 
@@ -438,10 +447,12 @@ sub HTTPMOD_Define($$)
 
     Log3 $name, 3, "$name: Defined " .
         ($hash->{MainURL}  ? "with URL $hash->{MainURL}" : "without URL") .
-        ($hash->{Interval} ? " and interval $hash->{Interval}" : "");
+        ($hash->{Interval} ? " and interval $hash->{Interval}" : "") .
+        " featurelevel $featurelevel";
 
     HTTPMOD_SetTimer($hash, 2);     # first Update in 2 seconds or aligned
     
+    $hash->{NOTIFYDEV}     = "global";                  # NotifyFn nur aufrufen wenn global events (INITIALIZED)
     $hash->{ModuleVersion} = $HTTPMOD_Version;
     $hash->{".getList"}    = "";
     $hash->{".setList"}    = "";
@@ -465,6 +476,31 @@ sub HTTPMOD_Undef($$)
     RemoveInternalTimer ("update:$name"); 
     return undef;                  
 }    
+
+
+########################################################
+# Notify 
+sub HTTPMOD_Notify($$)
+{
+    my ($hash, $source) = @_;
+    return if($source->{NAME} ne "global");
+
+    my $events = deviceEvents($source, 1);
+    return if(!$events);
+
+    my $name = $hash->{NAME};
+    #Log3 $name, 5, "$name: Notify called for source $source->{NAME} with events: @{$events}";
+  
+    foreach my $event (@{$events}) {
+        #Log3 $name, 5, "$name: event $event";
+        if ($event =~ /ATTR global featurelevel/) {
+            $hash->{".updateHintList"} = 1;
+        }
+    }  
+    #return if (!grep(m/^INITIALIZED|REREADCFG|(MODIFIED $name)|(DEFINED $name)$/, @{$source->{CHANGED}}));
+	# DEFINED is not triggered if init is not done.
+    return;
+}
 
 
 #########################################################################
@@ -688,7 +724,6 @@ sub HTTPMOD_Attr(@)
             HTTPMOD_SetTimer($hash, 2);     # change timer for alignment but at least 2 secs from now 
 
         } elsif ($aName =~ /^(reading|get)([0-9]+)(-[0-9]+)?Name$/) {
-            # todo: validate good reading name if enforceGoodReadingNames is set to 1 / by default in next fhem version
             $hash->{".updateRequestHash"} = 1;
         }
         
@@ -1185,10 +1220,12 @@ sub HTTPMOD_UpdateHintList($)
 
     Log3 $name, 5, "$name: UpdateHintList called";
     $hash->{".getList"} = "";
-    if (AttrVal($name, "enableControlSet", undef)) {        # spezielle Sets freigeschaltet?
-        #$hash->{".setList"} = "interval reread:noArg stop:noArg start:noArg ";
-        $hash->{".setList"} = "interval reread:noArg stop:noArg start:noArg upgradeAttributes:noArg storeKeyValue ";
+    my $fDefault = ($featurelevel > 5.9 ? 1 : 0);
+    if (AttrVal($name, "enableControlSet", $fDefault)) {                        # spezielle Sets freigeschaltet?
+        $hash->{".setList"} = "interval reread:noArg stop:noArg start:noArg clearCookies:noArg upgradeAttributes:noArg storeKeyValue ";
+        #Log3 $name, 5, "$name: UpdateHintList added control sets";
     } else {
+        #Log3 $name, 5, "$name: UpdateHintList ignored control sets ($featurelevel, $fDefault)";
         $hash->{".setList"} = "";
     }
     
@@ -1349,6 +1386,9 @@ sub HTTPMOD_ControlSet($$$)
     } elsif ($setName eq 'start') {
         HTTPMOD_SetTimer($hash);
         return "0";
+    } elsif ($setName eq 'clearCookies') {
+        delete $hash->{HTTPCookieHash};
+        return "0";
     } elsif ($setName eq 'upgradeAttributes') {
         HTTPMOD_UpgradeAttributes($hash);
         return "0";
@@ -1382,27 +1422,21 @@ sub HTTPMOD_Set($@)
    
     Log3 $name, 5, "$name: set called with $setName " . ($setVal ? $setVal : "")
         if ($setName ne "?");
-
-    if (AttrVal($name, "enableControlSet", undef)) {        # spezielle Sets freigeschaltet?
+    my $fDefault = ($featurelevel > 5.9 ? 1 : 0);
+    if (AttrVal($name, "enableControlSet", $fDefault)) {    # spezielle Sets freigeschaltet?
         my $error = HTTPMOD_ControlSet($hash, $setName, $setVal);
-        return undef if (defined($error) && $error eq "0");    # control set found and done.
+        return undef if (defined($error) && $error eq "0"); # control set found and done.
         return $error if ($error);          # error
         # continue if function returned undef
     }
 
-    if (AttrVal($name, "disable", undef)) {
-        Log3 $name, 4, "$name: set called with $setName but device is disabled"
-            if ($setName ne "?");
-        return undef;
-    }   
-  
     # Vorbereitung:
     # suche den übergebenen setName in den Attributen und setze setNum
     
     foreach my $aName (keys %{$attr{$name}}) {
-        if ($aName =~ /^set([0-9]+)Name$/) {            # ist das Attribut ein "setXName" ?
-            if ($setName eq $attr{$name}{$aName}) {     # ist es der im konkreten Set verwendete setName?
-                $setNum = $1;                           # gefunden -> merke Nummer X im Attribut
+        if ($aName =~ /^set([0-9]+)Name$/) {                # ist das Attribut ein "setXName" ?
+            if ($setName eq $attr{$name}{$aName}) {         # ist es der im konkreten Set verwendete setName?
+                $setNum = $1;                               # gefunden -> merke Nummer X im Attribut
             }            
         }
     }
@@ -1410,10 +1444,21 @@ sub HTTPMOD_Set($@)
     # gültiger set Aufruf? ($setNum oben schon gesetzt?)
     if(!defined ($setNum)) {
         HTTPMOD_UpdateHintList($hash) if ($hash->{".updateHintList"});
-        return "Unknown argument $setName, choose one of " . $hash->{".setList"};
+        #return "Unknown argument $setName, choose one of " . $hash->{".setList"};
+        if (AttrVal($name, "useSetExtensions", 1)) {
+            #Log3 $name, 5, "$name: set is passing to setExtensions";
+            return SetExtensions($hash, $hash->{".setList"}, $name, $setName, @setValArr);
+        } else {
+            return "Unknown argument $setName, choose one of " . $hash->{".setList"};
+        }
     } 
     Log3 $name, 5, "$name: set found option $setName in attribute set${setNum}Name";
 
+    if (AttrVal($name, "disable", undef)) {                 # check for disabled device
+        Log3 $name, 4, "$name: set called with $setName but device is disabled" if ($setName ne "?");
+        return undef;
+    }       
+    
     if (!AttrVal($name, "set${setNum}NoArg", undef)) {      # soll überhaupt ein Wert übergeben werden?
         if (!defined($setVal)) {                            # Ist ein Wert übergeben?
             Log3 $name, 3, "$name: set without value given for $setName";
@@ -2494,6 +2539,11 @@ sub HTTPMOD_CheckRedirects($$)
     my $type    = $request->{type};
     my $url     = $request->{url};
     
+    if (!$hash->{httpheader}) {
+        Log3 $name, 4, "$name: no header to look for redirects";
+        return;
+    }
+    
     my @header= split("\r\n", $hash->{httpheader});
     my @header0= split(" ", shift @header);
     my $code= $header0[1];
@@ -2558,7 +2608,7 @@ sub HTTPMOD_Read($$$)
         " retry $request->{retryCount}" .
          #($header ? ",\r\nHeader: $header" : ", no headers") . 
          ($body ? ",\r\nBody: $body" : ", body empty");
-    
+    	
     $body = "" if (!$body);
     
     my $ppr = AttrVal($name, "preProcessRegex", "");
@@ -2581,11 +2631,11 @@ sub HTTPMOD_Read($$$)
         $hash->{httpbody} = $body;
     }
     
-    HTTPMOD_InitParsers($hash, $body);   
-    HTTPMOD_GetCookies($hash, $header) if (AttrVal($name, "enableCookies", 0));   
+    my $fDefault = ($featurelevel > 5.9 ? 1 : 0);
+    HTTPMOD_InitParsers($hash, $body);
+    HTTPMOD_GetCookies($hash, $header) if (AttrVal($name, "enableCookies", $fDefault));   
     HTTPMOD_ExtractSid($hash, $buffer, $context, $num); 
-    
-    return if (AttrVal($name, "handleRedirects", 0) && HTTPMOD_CheckRedirects($hash, $header));
+    return if (AttrVal($name, "handleRedirects", $fDefault) && HTTPMOD_CheckRedirects($hash, $header));
     delete $hash->{HTTPMOD_Redirects};
     
     readingsBeginUpdate($hash);
@@ -2630,21 +2680,58 @@ sub HTTPMOD_Read($$$)
     
     if (AttrVal($name, "extractAllJSON", "") || HTTPMOD_GetFAttr($name, $context, $num, "ExtractAllJSON")) {
         # create a reading for each JSON object and use formatting options if a correspondig reading name / formatting is defined 
+        if ((AttrVal($name, "extractAllJSON", 0) == 2 || HTTPMOD_GetFAttr($name, $context, $num, "ExtractAllJSON") == 2) 
+            && ($context =~/get|set/) 
+            && (AttrVal($name, "${context}${num}CheckAllReadings", "u") eq "u")) {
+            # ExtractAllJSON mode 2 will create attributes, also CheckAllReadings to 1 for get/set unless already defined as 0
+            CommandAttr(undef, "$name ${context}${num}CheckAllReadings 1");  
+        }
+        my $rNum = 100;                     # start value for extractAllJSON mode 2
         if (ref $hash->{ParserData}{JSON} eq "HASH") {
             foreach my $object (keys %{$hash->{ParserData}{JSON}}) {
-                # todo: create good reading name with makeReadingName instead of using the potentially illegal object name
-                my $rName = $object;                
-                $rName = makeReadingName($object) if (AttrVal($name, "enforceGoodReadingNames", 0));    # todo: should become default with next fhem version
-                my $value = $hash->{ParserData}{JSON}{$object};
-                Log3 $name, 5, "$name: Read set JSON $object as reading $rName to value " . $value;
-                $value = HTTPMOD_FormatReading($hash, $context, $num, $value, $rName);
-                readingsBulkUpdate($hash, $rName, $value);
-                push @matched, $rName;     # unmatched is not filled for "ExtractAllJSON"
-                delete $hash->{defptr}{readingOutdated}{$rName};
-                
-                $hash->{defptr}{readingBase}{$rName} = $context;
-                $hash->{defptr}{readingNum}{$rName}  = $num;
-                $hash->{defptr}{requestReadings}{$type}{$rName} = "$context $num";
+                my $rName = $object;
+                #my $fDefault = ($featurelevel > 5.9 ? 1 : 0);
+                $rName = makeReadingName($object) if (AttrVal($name, "enforceGoodReadingNames", $fDefault));
+                if (AttrVal($name, "extractAllJSON", 0) == 2 || 
+                   (HTTPMOD_GetFAttr($name, $context, $num, "ExtractAllJSON") &&
+                    HTTPMOD_GetFAttr($name, $context, $num, "ExtractAllJSON") == 2)) {
+                    $rName = makeReadingName($object);  # at least for this mode!
+                    my $existing = 0;       # check if there already is an attribute reading[0-9]+JSON $object
+                    foreach my $a (grep (/reading[0-9]+JSON/, keys %{$attr{$name}})) {
+                        if ($attr{$name}{$a} eq $object) {
+                            $existing = $a;
+                        }
+                    }
+                    if ($existing) {        
+                        Log3 $name, 5, "$name: Read with extractAllJSON mode 2 doesn't set a new attr for $object because $existing already exists with $object";
+                    } else {                # find free reading num 
+                        while (AttrVal($name, "reading${rNum}Name", "u") ne "u" 
+                            || AttrVal($name, "reading${rNum}JSON", "u") ne "u") {
+                            $rNum++;        # skip until a number is unused
+                        }
+                        Log3 $name, 5, "$name: Read with extractAllJSON mode 2 is defining attribute reading${rNum}Name and reading${rNum}JSON for object $object";
+                        CommandAttr(undef, "$name reading${rNum}Name $rName");
+                        CommandAttr(undef, "$name reading${rNum}JSON $object");
+                    }
+                } else {                
+                    my $value = HTTPMOD_FormatReading($hash, $context, $num, $hash->{ParserData}{JSON}{$object}, $rName);
+                    Log3 $name, 5, "$name: Read sets reading $rName to value $value of JSON $object";
+                    readingsBulkUpdate($hash, $rName, $value);
+                    push @matched, $rName;      # unmatched is not filled for "ExtractAllJSON"
+                    delete $hash->{defptr}{readingOutdated}{$rName};
+                    
+                    $hash->{defptr}{readingBase}{$rName} = $context;
+                    $hash->{defptr}{readingNum}{$rName}  = $num;
+                    $hash->{defptr}{requestReadings}{$type}{$rName} = "$context $num";
+                }
+            }
+            if ((AttrVal($name, "extractAllJSON", 0) == 2) && $context eq "reading") {
+                Log3 $name, 5, "$name: Read is done with JSON extractAllJSON mode 2 and now removes this attribute";
+                CommandDeleteAttr(undef, "$name extractAllJSON");
+            } elsif ((HTTPMOD_GetFAttr($name, $context, $num, "ExtractAllJSON") && 
+                      HTTPMOD_GetFAttr($name, $context, $num, "ExtractAllJSON") == 2) && $context =~/get|set/) {
+                Log3 $name, 5, "$name: Read is done with JSON ${context}${num}ExtractAllJSON mode 2 and now removes this attribute";
+                CommandDeleteAttr(undef, "$name ${context}${num}ExtractAllJSON");
             }
         } else {
             Log3 $name, 3, "$name: no parsed JSON structure available";
@@ -2757,7 +2844,8 @@ HTTPMOD_HandleSendQueue($)
         $hash->{value}           = $hash->{REQUEST}{value}; 
         $hash->{timeout}         = AttrVal($name, "timeout", 2);
         $hash->{httpversion}     = AttrVal($name, "httpVersion", "1.0");
-        if (AttrVal($name, "handleRedirects", 0)) {
+        my $fDefault = ($featurelevel > 5.9 ? 1 : 0);
+        if (AttrVal($name, "handleRedirects", $fDefault)) {
             $hash->{ignoreredirects} = 1;           # HttpUtils should not follow redirects if we do it in HTTPMOD
         } else {
             $hash->{ignoreredirects} = $hash->{REQUEST}{ignoreredirects};   # as defined in queue / set when adding to queue
@@ -2797,8 +2885,8 @@ HTTPMOD_HandleSendQueue($)
             $hash->{url}    =~ s/\$sid/$hash->{sid}/g;
         }
         
-                
-        if (AttrVal($name, "enableCookies", 0)) {       
+        #my $fDefault = ($featurelevel > 5.9 ? 1 : 0);        
+        if (AttrVal($name, "enableCookies", $fDefault)) {       
             my $uriPath = "";
             if($hash->{url} =~ /
                 ^(http|https):\/\/                # $1: proto
@@ -3311,7 +3399,7 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
         
         If you don't care about the naming of your readings, you can simply extract all JSON data with 
         <ul><code>
-            attr test2 extractAllJSON
+            attr test2 extractAllJSON 1
         </ul></code>
         which would apply to all data read from this device and create the following readings out of the HTTP response shown above:<br>
         
@@ -3324,10 +3412,11 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
         
         or you can specify
         <ul><code>
-            attr test2 get01ExtractAllJSON
+            attr test2 get01ExtractAllJSON 1
         </ul></code>
         which would only apply to all data read as response to the get command defined as get01.        
-
+        <br>
+        Another option is setting extractAllJSON or get01ExtractAllJSON to 2. In this case the module analyzes the JSON date when it is first read, creates readingXXName and readingXXJSON attributes for you and then removes the extractAllJSON attribute.
     </ul>
     <br>
 
@@ -3488,6 +3577,8 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
     <b>Set-Commands</b><br>
     <ul>
         As defined by the attributes set.*Name<br>
+        HTTPMOD also supports setExtensions so if you define sets named on and off, setExtensions will provide their usual sets like on-for-timer.<br>
+        Since setExtensions include AttrTemplate, HTTPMOD also supports these templates.<br>
         If you set the attribute enableControlSet to 1, the following additional built in set commands are available:<br>
         <ul>
             <li><b>interval</b></li>
@@ -3499,6 +3590,8 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
                 stop interval timer.<br>
             <li><b>start</b></li>
                 restart interval timer to call GetUpdate after interval seconds<br>
+            <li><b>clearCookies</b></li>
+                delete all saved cookies<br>
             <li><b>upgradeAttributes</b></li>
                 convert the attributes for this device from the old syntax to the new one.<br>
                 atributes with the description "this attribute should not be used anymore" or similar will be translated to the new syntax, e.g. readingsName1 to reading01Name.
@@ -3741,10 +3834,16 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
         <li><b>disable</b></li>
             stop communication with the Web_Server with HTTP requests while this attribute is set to 1
         <li><b>enableControlSet</b></li>
-            enables the built in set commands interval, stop, start, reread, upgradeAttributes, storeKeyValue.
+            enables the built in set commands like interval, stop, start, reread, upgradeAttributes, storeKeyValue.
+            <br>
+            starting with featurelevel > 5.9 HTTPMOD will use this feature by default. So you don't need to set it to 1, but you can disable it by setting it to 0.
+            
         <li><b>enableCookies</b></li>
             enables the built cookie handling if set to 1. With cookie handling each HTTPMOD device will remember cookies that the server sets and send them back to the server in the following requests. 
             This simplifies session magamenet in cases where the server uses a session ID in a cookie. In such cases enabling Cookies should be sufficient and no sidRegex and no manual definition of a Cookie Header should be necessary.
+            <br>
+            starting with featurelevel > 5.9 HTTPMOD will use this feature by default. So you don't need to set it to 1, but you can disable it by setting it to 0.
+
         <li><b>showMatched</b></li>
             if set to 1 then HTTPMOD will create a reading with the name MATCHED_READINGS 
             that contains the names of all readings that could be matched in the last request.
@@ -3776,10 +3875,17 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
             This attribute should no longer be used. Please specify an XML XPath in the dedicated attributes shown above.
             
         <li><b>enforceGoodReadingNames</b></li>
-            makes sure that reading names are valid and especially that extractAllJSON creates valid reading names.         
+            makes sure that reading names are valid and especially that extractAllJSON creates valid reading names.
+            <br>
+            starting with featurelevel > 5.9 HTTPMOD will use this feature by default. So you don't need to set it to 1, but you can disable it by setting it to 0.
             
         <li><b>handleRedirects</b></li>
             enables redirect handling inside HTTPMOD. This makes complex session establishment where the HTTP responses contain a series of redirects much easier. If enableCookies is set as well, cookies will be tracked during the redirects.
+            <br>
+            starting with featurelevel > 5.9 HTTPMOD will use this feature by default. So you don't need to set it to 1, but you can disable it by setting it to 0.
+            
+        <li><b>useSetExtensions</b></li>
+            enables or disables the integration of setExtensions in HTTPMOD. By default this is enabled, but setting this attribute to 0 will disable setExtensions in HTTPMOD.
             
         <li><b>dontRequeueAfterAuth</b></li>
             prevents the original HTTP request to be added to the send queue again after the authentication steps. This might be necessary if the authentication steps will automatically get redirects to the URL originally requested. This option will likely need to be combined with sidXXParseResponse.
