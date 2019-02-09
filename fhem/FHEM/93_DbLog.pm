@@ -10,12 +10,13 @@
 #
 # reduceLog() created by Claudiu Schuster (rapster)
 #
-# redesigned 2016-2018 by DS_Starter with credits by
-# JoeAllb, DeeSpe
+# redesigned 2016-2019 by DS_Starter with credits by: JoeAllb, DeeSpe
 #
 ############################################################################################################################################
 #  Versions History done by DS_Starter:
 #
+# 3.13.2     09.02.2019       Commandref revised
+# 3.13.1     27.11.2018       DbLog_ExecSQL log output changed
 # 3.13.0     12.11.2018       adding attributes traceFlag, traceLevel
 # 3.12.7     10.11.2018       addLog considers DbLogInclude (Forum:#92854)
 # 3.12.6     22.10.2018       fix timer not deleted if reopen after reopen xxx (Forum: https://forum.fhem.de/index.php/topic,91869.msg848433.html#msg848433)
@@ -217,7 +218,7 @@ use Time::Local;
 use Encode qw(encode_utf8);
 no if $] >= 5.017011, warnings => 'experimental::smartmatch'; 
 
-my $DbLogVersion = "3.13.0";
+my $DbLogVersion = "3.13.1";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -2488,12 +2489,15 @@ sub DbLog_ConnectNewDBH($) {
 #
 # param1: DbLog-hash
 # param2: SQL-Statement
+#
 ##########################################################################
-sub DbLog_ExecSQL($$)
-{
+sub DbLog_ExecSQL($$) {
   my ($hash,$sql)= @_;
-  Log3 $hash->{NAME}, 4, "Executing $sql";
-  my $dbh = DbLog_ConnectNewDBH($hash);
+  my $name = $hash->{NAME};
+  my $dbh  = DbLog_ConnectNewDBH($hash);
+  
+  Log3($name, 4, "DbLog $name - Backdoor executing: $sql");
+  
   return if(!$dbh);
   my $sth = DbLog_ExecSQL1($hash,$dbh,$sql);
   if(!$sth) {
@@ -2501,31 +2505,37 @@ sub DbLog_ExecSQL($$)
     $dbh->disconnect();
     $dbh = DbLog_ConnectNewDBH($hash);
     return if(!$dbh);
+    
+    Log3($name, 2, "DbLog $name - Backdoor retry: $sql");
     $sth = DbLog_ExecSQL1($hash,$dbh,$sql);
     if(!$sth) {
-      Log3 $hash->{NAME}, 2, "DBLog retry failed.";
+      Log3($name, 2, "DbLog $name - Backdoor retry failed");
 	  $dbh->disconnect();
       return 0;
     }
-    Log3 $hash->{NAME}, 2, "DBLog retry ok.";
+    Log3($name, 2, "DbLog $name - Backdoor retry ok");
   }
   eval {$dbh->commit() if(!$dbh->{AutoCommit});};
   $dbh->disconnect();
-  return $sth;
+
+return $sth;
 }
 
-sub DbLog_ExecSQL1($$$)
-{
+sub DbLog_ExecSQL1($$$) {
   my ($hash,$dbh,$sql)= @_;
+  my $name = $hash->{NAME};
+  
   $dbh->{RaiseError} = 1; 
   $dbh->{PrintError} = 0;
+  
   my $sth;
   eval { $sth = $dbh->do($sql); };
   if($@) {
-    Log3 $hash->{NAME}, 2, "DBLog error: $@";
+    Log3($name, 2, "DbLog $name - ERROR: $@");
     return 0;
   }
-  return $sth;
+  
+return $sth;
 }
 
 ################################################################
@@ -5997,8 +6007,10 @@ sub DbLog_dbReadings($@) {
 	  
       A new Attribute DbLogInclude will be propagated to all Devices if DBLog is used. 
       DbLogInclude works just like DbLogExclude but to include matching readings.
-      See also DbLogSelectionMode-Attribute of DbLog-Device which takes influence on 
-      on how DbLogExclude and DbLogInclude are handled. <br>
+      If a MinInterval is set, the logentry is dropped if the defined interval is not reached <b>and</b> the value vs. 
+      lastvalue is equal.
+      See also DbLogSelectionMode-Attribute of DbLog device which takes influence on how DbLogExclude and DbLogInclude 
+      are handled. <br><br>
 	
 	  <b>Example</b> <br>
       <code>attr MyDevice1 DbLogInclude .*</code> <br>
@@ -6013,9 +6025,11 @@ sub DbLog_dbReadings($@) {
       attr &lt;device&gt; DbLogExclude regex:MinInterval,[regex:MinInterval] ...
       </code><br>
 	  
-      A new Attribute DbLogExclude will be propagated to all Devices if DBLog is used. 
-	  DbLogExclude will work as regexp to exclude defined readings to log. Each individual regexp-group are separated by comma. 
-      If a MinInterval is set, the logentry is dropped if the defined interval is not reached and value vs. lastvalue is eqal. 
+      A new Attribute DbLogExclude will be propagated to all devices if DBLog is used. 
+	  DbLogExclude will work as regexp to exclude defined readings to log. Each individual regexp-group are separated by 
+      comma. 
+      If a MinInterval is set, the logentry is dropped if the defined interval is not reached <b>and</b> the value vs. 
+      lastvalue is equal. 
       <br><br>
     
 	  <b>Example</b> <br>
@@ -7136,9 +7150,9 @@ sub DbLog_dbReadings($@) {
 	  attr &lt;device&gt; DbLogSelectionMode [Exclude|Include|Exclude/Include]
 	  </code><br>
       
-	  Dieses, fuer DbLog-Devices spezifische Attribut beeinflußt, wie die Device-spezifischen Attributes
+	  Dieses fuer DbLog-Devices spezifische Attribut beeinflußt, wie die Device-spezifischen Attribute
       DbLogExclude und DbLogInclude (s.u.) ausgewertet werden.<br>
-      Fehlt dieses Attribut, wird dafuer "Exclude" als Default angenommen. <br>
+      Fehlt dieses Attribut, wird "Exclude" als Default angenommen. <br>
    
       <ul>
         <li>Exclude: DbLog verhaelt sich wie bisher auch, alles was ueber die RegExp im DEF angegeben ist, wird geloggt, bis auf das,
@@ -7161,11 +7175,13 @@ sub DbLog_dbReadings($@) {
       attr &lt;device&gt; DbLogInclude regex:MinInterval,[regex:MinInterval] ...
       </code><br>
       
-	  Wenn DbLog genutzt wird, wird in allen Devices das Attribut <i>DbLogInclude</i> propagiert. 
-	  DbLogInclude funktioniert im Endeffekt genau wie DbLogExclude, ausser dass eben readings mit diesen RegExp 
-	  in das Logging eingeschlossen werden koennen, statt ausgeschlossen.
-      Siehe dazu auch das DbLog-Device-Spezifische Attribut DbLogSelectionMode, das beeinflußt wie
-      DbLogExclude und DbLogInclude ausgewertet werden. <br>
+	  Wird DbLog genutzt, wird in allen Devices das Attribut <i>DbLogInclude</i> propagiert. 
+	  DbLogInclude funktioniert im Endeffekt genau wie DbLogExclude, ausser dass Readings mit diesen RegExp 
+	  in das Logging eingeschlossen statt ausgeschlossen werden koennen. Ist MinIntervall angegeben, so wird der Logeintrag 
+      nur dann nicht geloggt, wenn das Intervall noch nicht erreicht <b>und</b> der Wert des Readings sich nicht verändert 
+      hat. <br>
+      Siehe auch das DbLog Attribut DbLogSelectionMode. Es beeinflußt wie DbLogExclude und DbLogInclude ausgewertet 
+      werden. <br><br>
 
 	  <b>Beispiel</b> <br>
       <code>attr MyDevice1 DbLogInclude .*</code> <br>
@@ -7180,10 +7196,11 @@ sub DbLog_dbReadings($@) {
       attr &lt;device&gt; DbLogExclude regex:MinInterval,[regex:MinInterval] ...
       </code><br>
     
-      Wenn DbLog genutzt wird, wird in alle Devices das Attribut <i>DbLogExclude</i> propagiert. 
+      Wird DbLog genutzt, wird in allen Devices das Attribut <i>DbLogExclude</i> propagiert. 
 	  Der Wert des Attributes wird als Regexp ausgewertet und schliesst die damit matchenden Readings von einem Logging aus. 
-	  Einzelne Regexp werden durch Kommata getrennt. Ist MinIntervall angegeben, so wird der Logeintrag nur
-      dann nicht geloggt, wenn das Intervall noch nicht erreicht und der Wert des Readings sich nicht verändert hat. <br><br>
+	  Einzelne Regexp werden durch Komma getrennt. Ist MinIntervall angegeben, so wird der Logeintrag nur
+      dann nicht geloggt, wenn das Intervall noch nicht erreicht <b>und</b> der Wert des Readings sich nicht verändert 
+      hat. <br><br>
     
 	  <b>Beispiel</b> <br>
       <code>attr MyDevice1 DbLogExclude .*</code> <br>
