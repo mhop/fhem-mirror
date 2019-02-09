@@ -480,10 +480,10 @@ sub ExecuteNpmCommand($) {
     }
     else {
         $npm->{npmupdate} =
-          $cmdPrefix . 'echo n | sudo npm update -g --unsafe-perm' . $cmdSuffix;
+          $cmdPrefix . 'echo n | sudo -n npm update -g --unsafe-perm' . $cmdSuffix;
         $npm->{npmoutdated} =
             $cmdPrefix
-          . 'echo n | node --version; sudo npm outdated -g --parseable'
+          . 'echo n | node --version; sudo -n npm outdated -g --parseable'
           . $cmdSuffix;
     }
 
