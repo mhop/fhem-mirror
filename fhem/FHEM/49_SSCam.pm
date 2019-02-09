@@ -47,6 +47,9 @@ use Encode;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.9.2"  => "05.02.2019  sub SSCam_sendTelegram changed ",
+  "8.9.1"  => "05.02.2019  sub SSCam_snaplimsize changed ",
+  "8.9.0"  => "05.02.2019  new streaming device type \"lastsnap\" ",
   "8.8.1"  => "04.02.2019  fix need attr snapGalleryBoost / snapGallerySize for ending a snap by telegramBot ",
   "8.8.0"  => "03.02.2019  send snapshots integrated by telegram ",
   "8.7.2"  => "30.01.2019  code change for snapCams (SVS) ",
@@ -126,6 +129,8 @@ our %SSCam_vNotesIntern = (
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
+  "8.9.0"  => "05.02.2019 A new streaming device type \"lastsnap\" was implemented. You can create such device with \"set ... createStreamDev lastsnap\". ".
+                          "This streaming device shows the newest snapshot which was taken. ",
   "8.8.0"  => "01.02.2019 Snapshots can now be sent by telegramBot ",
   "8.7.0"  => "27.01.2019 SMTP Email delivery of recordings implemented. You can send a recording after it was created subsequentely ".
                           "with the integrated Email client. You have to store SMTP credentials with \"smtpcredentials\" before. ",
@@ -573,7 +578,7 @@ sub SSCam_Attr($$$$) {
         if($cmd eq "set") {
             $do = ($aVal eq "Icon")?1:2;
         }
-        $do = 0 if($cmd eq "del");
+        $do = 0 if($cmd eq "del");                  
 
         if ($do == 0) {
             delete($hash->{HELPER}{".SNAPHASH"}) if(AttrVal($name,"snapGalleryBoost",0));  # Snaphash nur löschen wenn Snaps gepollt werden   
@@ -726,7 +731,7 @@ sub SSCam_Set($@) {
 	     		 (AttrVal($name, "snapGalleryBoost",0)?(AttrVal($name,"snapGalleryNumber",undef) || AttrVal($name,"snapGalleryBoost",0))?"snapGallery:noArg ":"snapGallery:$SSCAM_snum ":" ").
 	     		 "createReadingsGroup ".
                  "createSnapGallery:noArg ".
-                 "createStreamDev:generic,hls,mjpeg,switched ".
+                 "createStreamDev:generic,hls,lastsnap,mjpeg,switched ".
                  ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "createPTZcontrol:noArg ": "").
                  "enable:noArg ".
                  "disable:noArg ".
@@ -828,7 +833,7 @@ sub SSCam_Set($@) {
       
       Log3($name, 4, "$name - Trigger snapshots - Number: $num, Lag: $lag");      
       $hash->{HELPER}{SNAPBYSTRMDEV} = 1 if ($prop2 && $prop2 =~ /STRM/);   # $prop wird mitgegeben durch Snap by SSCamSTRM-Device
-      
+       
       my $emtxt = AttrVal($name, "snapEmailTxt", "");
       my $at = join(" ",@a);
       if($at =~ /snapEmailTxt:/) {
@@ -1011,6 +1016,15 @@ sub SSCam_Set($@) {
           $ret = CommandDefine($hash->{CL},"$livedev SSCamSTRM {SSCam_StreamDev('$name','$livedev','hls')}");
 	      return $ret if($ret);
           my $c = "The device needs to set attribute \"hlsStrmObject\" in camera device \"$name\" to a valid HLS videostream";
+          CommandAttr($hash->{CL},"$livedev comment $c");
+      }  
+      if($prop =~ /lastsnap/) {
+          $livedev = "SSCamSTRM.$name.lastsnap";
+          $ret = CommandDefine($hash->{CL},"$livedev SSCamSTRM {SSCam_StreamDev('$name','$livedev','lastsnap')}");
+	      return $ret if($ret);
+          my $c = "The device shows the last snapshot of camera device \"$name\". \n".
+                  "If you always want to see the newest snapshot, please set attribute \"pollcaminfoall\" in camera device \"$name\".\n".
+                  "Set also attribute \"snapGallerySize = Full\" in camera device \"$name\" to retrieve snapshots in original resolution.";
           CommandAttr($hash->{CL},"$livedev comment $c");
       }      
       if($prop =~ /switched/) {
@@ -5165,10 +5179,11 @@ sub SSCam_camop_parse ($) {
                     ) {
 				
 	            Log3($name, $verbose, "$name - Snapinfos of camera $camname retrieved");
-                
+                $hash->{HELPER}{".LASTSNAP"} = $data->{data}{data}[0]{imageData};         # aktuellster Snap zur Anzeige im StreamDev "lastsnap"
+        
                 my %snaps  = ( 0 => {'createdTm' => 'n.a.', 'fileName' => 'n.a.','snapid' => 'n.a.'} );  # Hilfshash 
                 my ($k,$l) = (0,0);              
-				if(exists($data->{data}{data}[0]{createdTm})) {                    
+				if(exists($data->{data}{data}[0]{createdTm})) {
                     while ($data->{'data'}{'data'}[$k]) {
                         if($data->{'data'}{'data'}[$k]{'camName'} ne $camname) {
                             $k += 1;
@@ -5188,7 +5203,7 @@ sub SSCam_camop_parse ($) {
                         Log3($name,4, "$name - Snap [$l]: ID => $data->{data}{data}[$k]{id}, File => $data->{data}{data}[$k]{fileName}, Created => $createdTm");
                         $l += 1;
                         $k += 1;
-                    }
+                    }   
                 }
                 
                 my @as;
@@ -5323,7 +5338,7 @@ sub SSCam_camop_parse ($) {
                 SSCam_closeTrans($hash);                                        # Transaktion beenden
 				delete($hash->{HELPER}{GETSNAPGALLERY});                        # Steuerbit getsnapgallery statt getsnapinfo				
 
-				#####  Fall abhängige Eventgenerierung  #####
+				########  fallabhängige Eventgenerierung  ########
                 if ($hash->{HELPER}{SNAPBYSTRMDEV} || $hash->{HELPER}{LSNAPBYSTRMDEV}) {
                     # Snap durch SSCamSTRM-Device ausgelöst
                     SSCam_refresh($hash,0,0,1);     # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event
@@ -5335,6 +5350,26 @@ sub SSCam_camop_parse ($) {
                 } else {
                     SSCam_refresh($hash,0,0,0);     # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
                 } 
+                # longpoll für alle Streamingdevices v. Typ "lastsnap"
+                my @lsnapstrms = devspec2array("TYPE=SSCamSTRM:FILTER=PARENT=$name:FILTER=MODEL=lastsnap");
+                if(scalar(@lsnapstrms) >= 1) {
+                    foreach (@lsnapstrms) {
+                        if($defs{$_}) {
+                            $hash->{HELPER}{STRMDEV} = $_;
+                            SSCam_refresh($hash,0,0,1);     # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event
+                        }
+                    }
+                }
+                # longpoll für alle Streamingdevices v. Typ "snapgallery"
+                @lsnapstrms = devspec2array("TYPE=SSCamSTRM:FILTER=PARENT=$name:FILTER=MODEL=snapgallery");
+                if(scalar(@lsnapstrms) >= 1) {
+                    foreach (@lsnapstrms) {
+                        if($defs{$_}) {
+                            $hash->{HELPER}{STRMDEV} = $_;
+                            SSCam_refresh($hash,0,0,1);     # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event
+                        }
+                    }
+                }
             
 			} elsif ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} =~ m/^live_.*hls$/) {
                 # HLS Streaming wurde aktiviert
@@ -6465,7 +6500,7 @@ sub SSCam_refresh($$$$) {
   my $sr  = $hash->{HELPER}{STRMROOM}?$hash->{HELPER}{STRMROOM}:"\"n.a.\"";     # Raum aus dem das SSCamSTRM-Device die Funktion aufrief
   my $sl  = $hash->{HELPER}{STRMDETAIL}?$hash->{HELPER}{STRMDETAIL}:"\"n.a.\""; # Name des SSCamSTRM-Devices (wenn Detailansicht)
   $fpr    = AttrVal($hash->{HELPER}{STRMDEV},"forcePageRefresh",0) if($hash->{HELPER}{STRMDEV});
-  Log3($name, 4, "$name - SSCam_refresh - caller: $sd, callerroom: $sr, detail: $sl, pload: $pload, forcePageRefresh: $fpr");
+  Log3($name, 4, "$name - SSCam_refresh - caller: $sd, callerroom: $sr, detail: $sl, pload: $pload, forcePageRefresh: $fpr, event_STRMdev: $lpoll_strm");
   
   # Page-Reload
   if($pload && $hash->{HELPER}{STRMROOM} && $hash->{HELPER}{STRMDETAIL}) {
@@ -6544,8 +6579,12 @@ sub SSCam_snaplimsize ($) {
   } else {
       $hash->{HELPER}{GETSNAPGALLERY} = 1;
 	  $slim = AttrVal($name,"snapGalleryNumber",$SSCam_slim);               # Anzahl der abzurufenden Snaps
-	  my $sg = AttrVal($name,"snapGallerySize","Icon");                     # Auflösung Image
-	  $ssize = ($sg eq "Icon")?1:2;
+  }
+  
+  if(AttrVal($name,"snapGallerySize","Icon") eq "Full") {
+      $ssize = 2;                                                           # Full Size
+  } else {
+      $ssize = 1;                                                           # Icon Size
   }
 
   if($hash->{HELPER}{CANSENDSNAP} || $hash->{HELPER}{CANTELESNAP}) {
@@ -6556,6 +6595,11 @@ sub SSCam_snaplimsize ($) {
   if($hash->{HELPER}{SNAPNUM}) {
       $slim = delete $hash->{HELPER}{SNAPNUM};                              # enthält die Anzahl der ausgelösten Schnappschüsse
       $hash->{HELPER}{GETSNAPGALLERY} = 1;                                  # Steuerbit für Snap-Galerie bzw. Daten mehrerer Schnappschüsse abrufen
+  }
+  
+  my @strmdevs = devspec2array("TYPE=SSCamSTRM:FILTER=PARENT=$name:FILTER=MODEL=lastsnap");
+  if(scalar(@strmdevs) >= 1) {
+      Log3($name, 4, "$name - Streaming devs of type \"lastsnap\": @strmdevs");
   }
   
 return ($slim,$ssize);
@@ -7012,6 +7056,21 @@ sub SSCam_StreamDev($$$) {
           $ret .= "<td></td>" if(AttrVal($camname,"ptzPanel_use",0));
       }      
   
+  } elsif ($fmt =~ /lastsnap/) { 
+      $link     = $hash->{HELPER}{".LASTSNAP"};
+      my $gattr = (AttrVal($camname,"snapGallerySize","Icon") eq "Full")?$ha:""; 
+      if($link) {
+          $ret .= "<td><img src='data:image/jpeg;base64,$link' $gattr onClick=\"FW_okDialog('<img src=data:image/jpeg;base64,$link $pws>')\"><br>";
+          $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";
+          $ret .= "</td>";
+          $streamHash->{HELPER}{STREAM} = "<img src=data:image/jpeg;base64,$link $pws>";      # Stream für "get <SSCamSTRM-Device> popupStream" speichern
+          $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);                                  # Statusbit wenn ein Stream aktiviert ist
+      } else {
+          $cause = "no snapshot available to display";
+          $cause = "kein Schnappschuss zur Anzeige vorhanden" if(AttrVal("global","language","EN") =~ /DE/i);
+          $ret .= "<td> <br> <b> $cause </b> <br><br></td>";       
+      }
+  
   } elsif ($fmt =~ /generic/) {  
       my $htag  = AttrVal($camname,"genericStrmHtmlTag","");
       if( $htag =~ m/^\s*(.*)\s*$/s ) {
@@ -7373,7 +7432,7 @@ sub SSCam_composegallery ($;$$) {
   }
   $header .= $sgbnote;
   
-  my $gattr  = (AttrVal($name,"snapGallerySize","Icon") eq "Full")?$ha:" ";    
+  my $gattr  = (AttrVal($name,"snapGallerySize","Icon") eq "Full")?$ha:"";    
   my @as     = sort{$a<=>$b}keys%{$allsnaps};
   
   # Ausgabetabelle erstellen
@@ -7689,6 +7748,7 @@ sub SSCam_prepareSendData ($$;$) {
                                          'tac'          => $tac, 
                                          'telebot'      => $telemsg{$tbotk}, 
                                          'peers'        => $telemsg{$peerk},                                      
+                                         'MediaStream'  => '-1',                       # Code für MediaStream im TelegramBot (png/jpg = -1)
                                         }
                                 );                   
    }
@@ -7722,6 +7782,7 @@ sub SSCam_sendTelegram ($$) {
        'vdat'         => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # Videodaten, wenn gesetzt muss 'part2type' auf 'video/mpeg' gesetzt sein
        'telebot'      => {                       'default'=>'',                          'required'=>1, 'set'=>1},  # TelegramBot-Device welches zum Senden verwendet werden soll
        'peers'        => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # TelegramBot Peers
+       'MediaStream'  => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # Code für MediaStream im TelegramBot (png/jpg = -1)
        );   
    
    my %params = (); 
@@ -7777,15 +7838,13 @@ sub SSCam_sendTelegram ($$) {
    
                                         
   no strict "refs";
-  my ($msg,$subject);
+  my ($msg,$subject,$MediaStream);
   if($sdat) {
       ### Images liegen in einem Hash (Ref in $sdat) base64-codiert vor
       my @as = sort{$b<=>$a}keys%{$sdat};
       foreach my $key (@as) {
-           ($msg,$subject) = SSCam_cmdSendTelegram($name,$key);
-		   my $isMediaStream  = 0;
-		   ( $isMediaStream ) = TelegramBot_IdentifyStream( $defs{$telebot}, $msg ) if ( defined( $msg ) );
-		   $ret = TelegramBot_SendIt( $defs{$telebot}, $peers, $msg, $subject, $isMediaStream, undef, "" );
+           ($msg,$subject,$MediaStream) = SSCam_cmdSendTelegram($name,$key);
+		   $ret = TelegramBot_SendIt( $defs{$telebot}, $peers, $msg, $subject, $MediaStream, undef, "" );
 		   if($ret) {
 			   readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
 			   Log3($name, 2, "$name - ERROR: $ret");
@@ -7810,6 +7869,7 @@ sub SSCam_cmdSendTelegram($$) {
   my $hash         = $defs{$name};
   my $paref        = $hash->{HELPER}{PAREF};
   my $subject      = $paref->{subject};
+  my $MediaStream  = $paref->{MediaStream};
   
   my $ct      = $paref->{sdat}{$key}{createdTm};
   my $img     = $paref->{sdat}{$key}{".imageData"};
@@ -7820,7 +7880,7 @@ sub SSCam_cmdSendTelegram($$) {
   $subject =~ s/\$FILE/$fname/g;
   $subject =~ s/\$CTIME/$ct/g;
  
-return ($decoded,$subject);
+return ($decoded,$subject,$MediaStream);
 }
 
 #############################################################################################
@@ -8713,7 +8773,7 @@ return ($str);
   
   <ul>
   <a name="SSCamcreateStreamDev"></a>
-  <li><b> set &lt;name&gt; createStreamDev [generic | mjpeg | switched] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
+  <li><b> set &lt;name&gt; createStreamDev [generic | hls | lastsnap | mjpeg | switched] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   A separate Streaming-Device (type SSCamSTRM) will be created. This device can be used as a discrete device in a dashboard 
   for example.
@@ -8725,6 +8785,7 @@ return ($str);
     <colgroup> <col width=10%> <col width=90%> </colgroup>
       <tr><td>generic   </td><td>- the streaming device playback a content determined by attribute "genericStrmHtmlTag" </td></tr>
       <tr><td>hls       </td><td>- the streaming device playback a permanent HLS video stream </td></tr>
+      <tr><td>lastsnap  </td><td>- the streaming device playback the newest snapshot </td></tr>
       <tr><td>mjpeg     </td><td>- the streaming device playback a permanent MJPEG video stream (Streamkey method) </td></tr>
       <tr><td>switched  </td><td>- playback of different streaming types. Buttons for mode control are provided. </td></tr>
     </table>
@@ -8768,6 +8829,15 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
       </pre>
       The variables $HTMLATTR, $NAME are placeholder and absorb the attribute "htmlattr" (if set) respectively the SSCam-Devicename.
     </ul>
+  <br><br>
+    
+  <b>Streaming device "lastsnap"</b> <br><br>
+  
+  This type of streaming device playback the last (newest) snapshot. 
+  As default the snapshot is retrieved in a reduced resolution. In order to use the original resolution, the attribute 
+  <b>"snapGallerySize = Full"</b> has to be set in the associated camera device (compare Internal PARENT).  
+  There also the attribute "pollcaminfoall" should be set to retrieve the newest snapshot regularly.  
+  <br>
   </ul>
   <br><br>   
   
@@ -10401,7 +10471,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   
   <ul>
   <a name="SSCamcreateStreamDev"></a>
-  <li><b> set &lt;name&gt; createStreamDev [generic | hls | mjpeg | switched] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  <li><b> set &lt;name&gt; createStreamDev [generic | hls | lastsnap | mjpeg | switched] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
 
   Es wird ein separates Streaming-Device (Typ SSCamSTRM) erstellt. Dieses Device kann z.B. als separates Device 
   in einem Dashboard genutzt werden.
@@ -10413,6 +10483,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     <colgroup> <col width=10%> <col width=90%> </colgroup>
       <tr><td>generic   </td><td>- das Streaming-Device gibt einen durch das Attribut "genericStrmHtmlTag" bestimmten Content wieder </td></tr>
       <tr><td>hls       </td><td>- das Streaming-Device gibt einen permanenten HLS Datenstrom wieder </td></tr>
+      <tr><td>lastsnap  </td><td>- das Streaming-Device zeigt den neuesten Schnappschuß an </td></tr>
       <tr><td>mjpeg     </td><td>- das Streaming-Device gibt einen permanenten MJPEG Kamerastream wieder (Streamkey Methode) </td></tr>
       <tr><td>switched  </td><td>- Wiedergabe unterschiedlicher Streamtypen. Drucktasten zur Steuerung werden angeboten. </td></tr>
     </table>
@@ -10455,8 +10526,17 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
       </pre>
       Die Variablen $HTMLATTR, $NAME sind Platzhalter und übernehmen ein gesetztes Attribut "htmlattr" bzw. den SSCam-Devicenamen.
     </ul>
-  </ul>
   <br><br>
+  
+  <b>Streaming Device "lastsnap"</b> <br><br>
+  
+  Dieser Typ gibt den neuesten Schnappschuß wieder. Der Schnappschuss wird per default als Icon, d.h. in einer verminderten
+  Auflösung abgerufen. Um die Originalauflösung zu verwenden, ist im zugehörigen Kameradevice (Internal PARENT) das Attribut 
+  <b>"snapGallerySize = Full"</b> zu setzen.  
+  Dort sollte ebenfalls das Attribut "pollcaminfoall" gesetzt sein, um regelmäßig die neuesten Schnappschußdaten abzurufen.
+  <br>
+  <br><br>
+  </ul>
   
   <ul>
   <li><b> set &lt;name&gt; createPTZcontrol </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für PTZ-CAM)</li> <br>

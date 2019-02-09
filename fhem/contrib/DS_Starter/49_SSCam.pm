@@ -47,6 +47,7 @@ use Encode;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.9.2"  => "05.02.2019  sub SSCam_sendTelegram changed ",
   "8.9.1"  => "05.02.2019  sub SSCam_snaplimsize changed ",
   "8.9.0"  => "05.02.2019  new streaming device type \"lastsnap\" ",
   "8.8.1"  => "04.02.2019  fix need attr snapGalleryBoost / snapGallerySize for ending a snap by telegramBot ",
@@ -6578,8 +6579,6 @@ sub SSCam_snaplimsize ($) {
   } else {
       $hash->{HELPER}{GETSNAPGALLERY} = 1;
 	  $slim = AttrVal($name,"snapGalleryNumber",$SSCam_slim);               # Anzahl der abzurufenden Snaps
-	  # my $sg = AttrVal($name,"snapGallerySize","Icon");                     # Auflösung Image
-	  # $ssize = ($sg eq "Icon")?1:2;
   }
   
   if(AttrVal($name,"snapGallerySize","Icon") eq "Full") {
@@ -6601,7 +6600,6 @@ sub SSCam_snaplimsize ($) {
   my @strmdevs = devspec2array("TYPE=SSCamSTRM:FILTER=PARENT=$name:FILTER=MODEL=lastsnap");
   if(scalar(@strmdevs) >= 1) {
       Log3($name, 4, "$name - Streaming devs of type \"lastsnap\": @strmdevs");
-      # $ssize = 2;                                                           # Full Size für Darstellung in SSCamSTRM Typ "lastsnap"
   }
   
 return ($slim,$ssize);
@@ -7750,6 +7748,7 @@ sub SSCam_prepareSendData ($$;$) {
                                          'tac'          => $tac, 
                                          'telebot'      => $telemsg{$tbotk}, 
                                          'peers'        => $telemsg{$peerk},                                      
+                                         'MediaStream'  => '-1',                       # Code für MediaStream im TelegramBot (png/jpg = -1)
                                         }
                                 );                   
    }
@@ -7783,6 +7782,7 @@ sub SSCam_sendTelegram ($$) {
        'vdat'         => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # Videodaten, wenn gesetzt muss 'part2type' auf 'video/mpeg' gesetzt sein
        'telebot'      => {                       'default'=>'',                          'required'=>1, 'set'=>1},  # TelegramBot-Device welches zum Senden verwendet werden soll
        'peers'        => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # TelegramBot Peers
+       'MediaStream'  => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # Code für MediaStream im TelegramBot (png/jpg = -1)
        );   
    
    my %params = (); 
@@ -7838,15 +7838,13 @@ sub SSCam_sendTelegram ($$) {
    
                                         
   no strict "refs";
-  my ($msg,$subject);
+  my ($msg,$subject,$MediaStream);
   if($sdat) {
       ### Images liegen in einem Hash (Ref in $sdat) base64-codiert vor
       my @as = sort{$b<=>$a}keys%{$sdat};
       foreach my $key (@as) {
-           ($msg,$subject) = SSCam_cmdSendTelegram($name,$key);
-		   my $isMediaStream  = 0;
-		   ( $isMediaStream ) = TelegramBot_IdentifyStream( $defs{$telebot}, $msg ) if ( defined( $msg ) );
-		   $ret = TelegramBot_SendIt( $defs{$telebot}, $peers, $msg, $subject, $isMediaStream, undef, "" );
+           ($msg,$subject,$MediaStream) = SSCam_cmdSendTelegram($name,$key);
+		   $ret = TelegramBot_SendIt( $defs{$telebot}, $peers, $msg, $subject, $MediaStream, undef, "" );
 		   if($ret) {
 			   readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
 			   Log3($name, 2, "$name - ERROR: $ret");
@@ -7871,6 +7869,7 @@ sub SSCam_cmdSendTelegram($$) {
   my $hash         = $defs{$name};
   my $paref        = $hash->{HELPER}{PAREF};
   my $subject      = $paref->{subject};
+  my $MediaStream  = $paref->{MediaStream};
   
   my $ct      = $paref->{sdat}{$key}{createdTm};
   my $img     = $paref->{sdat}{$key}{".imageData"};
@@ -7881,7 +7880,7 @@ sub SSCam_cmdSendTelegram($$) {
   $subject =~ s/\$FILE/$fname/g;
   $subject =~ s/\$CTIME/$ct/g;
  
-return ($decoded,$subject);
+return ($decoded,$subject,$MediaStream);
 }
 
 #############################################################################################
