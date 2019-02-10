@@ -1,5 +1,5 @@
 ﻿##########################################################################################################
-# $Id: 93_DbRep.pm 18163 2019-01-06 17:13:00Z DS_Starter $
+# $Id: 93_DbRep.pm 18488 2019-02-03 07:38:03Z DS_Starter $
 ##########################################################################################################
 #       93_DbRep.pm
 #
@@ -57,6 +57,11 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Versions History intern
 our %DbRep_vNotesIntern = (
+  "8.12.0" => "10.02.2019  executeBeforeProc / executeAfterProc for sqlCmd ",
+  "8.11.2" => "03.02.2019  fix no running tableCurrentFillup if database is closed ",
+  "8.11.1" => "25.01.2019  fix sort of versionNotes ",
+  "8.11.0" => "24.01.2019  command exportToFile or attribute \"expimpfile\" accepts option \"MAXLINES=\" ",
+  "8.10.1" => "23.01.2019  change DbRep_charfilter to eliminate \xc2",
   "8.10.0" => "19.01.2019  sqlCmd, dbValue may input SQL session variables, Forum:#96082 ",
   "8.9.10" => "18.01.2019  fix warnings Malformed UTF-8 character during importFromFile, Forum:#96056 ",
   "8.9.9"  => "06.01.2019  diffval_DoParse: 'ORDER BY TIMESTAMP' added to statements Forum:https://forum.fhem.de/index.php/topic,53584.msg882082.html#msg882082",
@@ -131,6 +136,8 @@ our %DbRep_vNotesIntern = (
 
 # Versions History extern:
 our %DbRep_vNotesExtern = (
+  "8.12.0" => "10.02.2019 executeBeforeProc / executeAfterProc is now available for sqlCmd ",
+  "8.11.0" => "24.01.2019 command exportToFile or attribute \"expimpfile\" accepts option \"MAXLINES=\" ",
   "8.10.0" => "19.01.2019 In commands sqlCmd, dbValue you may now use SQL session variables like \"SET \@open:=NULL,\@closed:=NULL; SELECT ...\", Forum:#96082",
   "8.9.0"  => "07.11.2018 new command set delDoublets added. This command allows to delete multiple occuring identical records. ",
   "8.8.0"  => "06.11.2018 new attribute 'fastStart'. Usually every DbRep-device is making a short connect to its database when "
@@ -381,7 +388,7 @@ sub DbRep_Define($@) {
   $hash->{MODEL}               = $hash->{ROLE};
   $hash->{HELPER}{DBLOGDEVICE} = $a[2];
   $hash->{HELPER}{IDRETRIES}   = 3;                                            # Anzahl wie oft versucht wird initiale Daten zu holen
-  $hash->{VERSION}             = (reverse sort(keys %DbRep_vNotesIntern))[0];
+  $hash->{VERSION}             = (DbRep_sortVersion("desc",keys %DbRep_vNotesIntern))[0];
   $hash->{NOTIFYDEV}           = "global,".$name;                              # nur Events dieser Devices an DbRep_Notify weiterleiten 
   my $dbconn                   = $defs{$a[2]}{dbconn};
   $hash->{DATABASE}            = (split(/;|=/, $dbconn))[1];
@@ -411,6 +418,7 @@ sub DbRep_Set($@) {
   my $name           = $a[0];
   my $opt            = $a[1];
   my $prop           = $a[2];
+  my $prop1          = $a[3];
   my $dbh            = $hash->{DBH};
   my $dblogdevice    = $hash->{HELPER}{DBLOGDEVICE};
   $hash->{dbloghash} = $defs{$dblogdevice};
@@ -623,7 +631,13 @@ sub DbRep_Set($@) {
 	  Log3 ($name, 3, "DbRep $name -> running Restore has been canceled");
 	  ReadingsSingleUpdateValue ($hash, "state", "Restore canceled", 1);
       return undef;
-  } 
+  }
+  
+  if ($opt =~ m/tableCurrentFillup/ && $hash->{ROLE} ne "Agent") {   
+      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";  
+      DbRep_Main($hash,$opt);
+      return undef;
+  }  
   
   #######################################################################################################
   ##        keine Aktionen außer die über diesem Eintrag solange Reopen xxxx im DbLog-Device läuft
@@ -666,10 +680,6 @@ sub DbRep_Set($@) {
           return " Set attribute 'allowDeletion' if you want to allow deletion of any database entries. Use it with care !";
       }      
       DbRep_beforeproc($hash, "delEntries");      
-      DbRep_Main($hash,$opt);
-      
-  } elsif ($opt =~ m/tableCurrentFillup/ && $hash->{ROLE} ne "Agent") {   
-      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";  
       DbRep_Main($hash,$opt);
       
   } elsif ($opt eq "deviceRename") {
@@ -746,11 +756,12 @@ sub DbRep_Set($@) {
       
   } elsif ($opt eq "exportToFile" && $hash->{ROLE} ne "Agent") {
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
-      my $f = $prop if($prop);
-      if (!AttrVal($hash->{NAME}, "expimpfile", "") && !$f) {
-          return "\"$opt\" needs a file as an argument or the attribute \"expimpfile\" (path and filename) to be set !";
+      my $f = ($prop && $prop !~ /MAXLINES=/)?$prop:AttrVal($name,"expimpfile","");
+      my $e = $prop1?" $prop1":"";
+      if (!$f) {
+          return "\"$opt\" needs a file as argument or the attribute \"expimpfile\" (path and filename) to be set !";
       }
-      DbRep_Main($hash,$opt,$f);
+      DbRep_Main($hash,$opt,$f.$e);
       
   } elsif ($opt eq "importFromFile" && $hash->{ROLE} ne "Agent") {
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
@@ -787,6 +798,7 @@ sub DbRep_Set($@) {
 	  if ($sqlcmd =~ m/^\s*delete/is && !AttrVal($hash->{NAME}, "allowDeletion", undef)) {
           return "Attribute 'allowDeletion = 1' is needed for command '$sqlcmd'. Use it with care !";
       }  
+      DbRep_beforeproc($hash, "sqlCmd");
       DbRep_Main($hash,$opt,$sqlcmd);
 	 
   } elsif ($opt =~ /changeValue/) {
@@ -946,7 +958,7 @@ sub DbRep_Get($@) {
               }
           }           
           $i = 0;
-          foreach my $key (sort{$b<=>$a}(keys %hs)) {
+          foreach my $key (DbRep_sortVersion("desc",keys %hs)) {
               $val0 = $hs{$key};
               $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0</td>" );
               $ret .= "</tr>";
@@ -971,7 +983,7 @@ sub DbRep_Get($@) {
           $ret .= "<tbody>";
           $ret .= "<tr class=\"even\">";
           $i = 0;
-          foreach my $key (sort{$b<=>$a}(keys %DbRep_vNotesExtern)) {
+          foreach my $key (DbRep_sortVersion("desc",keys %DbRep_vNotesExtern)) {
               ($val0,$val1) = split(/\s/,$DbRep_vNotesExtern{$key},2);
               $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0  </td><td>$val1</td>" );
               $ret .= "</tr>";
@@ -5203,13 +5215,38 @@ sub expfile_DoParse($) {
      return "$name|''|''|$err|''|''|''";
  }
  
- $rsf        =~ s/[:\s]/_/g; 
- my $outfile =  $file?$file:AttrVal($name, "expimpfile", undef);
- $outfile    =~ s/%TSB/$rsf/g;
+ 
+ my $ml;
+ my $part = ".";
+ if($file =~ /MAXLINES=/) {
+     my ($arrayref, $hashref) = parseParams($file);
+     my @a = @{$arrayref};
+     my %h = %{$hashref};
+     $file = $a[0];
+     if(!$file) {
+         ($arrayref, undef) = parseParams(AttrVal($name,"expimpfile","")); 
+         @a = @{$arrayref};
+         $file = $a[0];       
+     }
+     $ml = $h{MAXLINES};
+     if($ml !~ /^\d+$/) {
+         undef $ml;
+     } else {
+         $part = "_part1.";
+     }
+ }
+ 
+ Log3 ($name, 4, "DbRep $name - Export data to file: $file ".($ml?"splitted to parts of $ml lines":"")  );
+ 
+ $rsf =~ s/[:\s]/_/g; 
+ my ($f,$e) = split(/\./,$file);
+ $e    = $e?$e:"";
+ $f    =~ s/%TSB/$rsf/g;
  my @t = localtime;
- $outfile = ResolveDateWildcards($outfile, @t);
- if (open(FH, ">:utf8", "$outfile")) {
-     binmode (FH) if(!$utf8);
+ $f    = ResolveDateWildcards($f, @t);
+ my $outfile = $f.$part.$e;
+ if (open(FH, ">", $outfile)) {
+     binmode (FH);
  } else {
      $err = encode_base64("could not open ".$outfile.": ".$!,"");
      return "$name|''|''|$err|''|''|''";
@@ -5228,7 +5265,8 @@ sub expfile_DoParse($) {
  
  # DB-Abfrage zeilenweise für jeden Array-Eintrag
  my $arrstr;
- my $nrows = 0;
+ my ($nrows,$frows) = (0,0);
+ my $p = 2;
  my $addon = "ORDER BY TIMESTAMP";
  no warnings 'uninitialized'; 
  foreach my $row (@ts) {
@@ -5259,10 +5297,24 @@ sub expfile_DoParse($) {
          Log3 ($name, 5, "DbRep $name -> write row:  @$row");
          # Anzahl der Datensätze
          $nrows++;
-     }
- 
+         $frows++;
+         if($ml && $frows >= $ml) {
+             Log3 ($name, 3, "DbRep $name - Number of exported datasets from $hash->{DATABASE} to file $outfile: ".$frows);
+             close(FH);
+             $outfile = $f."_part$p.".$e;
+             if (open(FH, ">", $outfile)) {
+                 binmode (FH);
+             } else {
+                 $err = encode_base64("could not open ".$outfile.": ".$!,"");
+                 return "$name|''|''|$err|''|''|''";
+             }
+             $p++;
+             $frows = 0;
+         }
+     } 
  }     
  close(FH);
+ Log3 ($name, 3, "DbRep $name - Number of exported datasets from $hash->{DATABASE} to file $outfile: ".$frows);
 
  # SQL-Laufzeit ermitteln
  my $rt = tv_interval($st);
@@ -5312,16 +5364,13 @@ sub expfile_ParseDone($) {
   
   my $ds   = $device." -- " if ($device);
   my $rds  = $reading." -- " if ($reading);
-  my $export_string = $ds.$rds." -- ROWS EXPORTED TO FILE -- ";
+  my $export_string = $ds.$rds." -- ROWS EXPORTED TO FILE(S) -- ";
   
   my $state = $erread?$erread:"done";
   readingsBeginUpdate($hash);
   ReadingsBulkUpdateValue ($hash, $export_string, $nrows); 
   ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);
   readingsEndUpdate($hash, 1);
-  
-  my $rows = $ds.$rds.$nrows;
-  Log3 ($name, 3, "DbRep $name - Number of exported datasets from $hash->{DATABASE} to file $outfile: ".$rows);
 
   delete($hash->{HELPER}{RUNNING_PID});
   
@@ -5669,6 +5718,10 @@ sub sqlCmd_ParseDone($) {
   my $err        = $a[6]?decode_base64($a[6]):undef;
   my $srf        = AttrVal($name, "sqlResultFormat", "separated");
   my $srs        = AttrVal($name, "sqlResultFieldSep", "|");
+  my $erread;
+  
+  # Befehl nach Procedure ausführen
+  $erread = DbRep_afterproc($hash, "sqlCmd");
   
   if ($err) {
     ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
@@ -5682,6 +5735,7 @@ sub sqlCmd_ParseDone($) {
   no warnings 'uninitialized'; 
   
   # Readingaufbereitung
+  my $state = $erread?$erread:"done";
   readingsBeginUpdate($hash);
 
   ReadingsBulkUpdateValue ($hash, "sqlCmd", $cmd); 
@@ -5761,7 +5815,7 @@ sub sqlCmd_ParseDone($) {
 	  ReadingsBulkUpdateValue ($hash, "SqlResult", $json);
   }
 
-  ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
+  ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);
   readingsEndUpdate($hash, 1);
   
   delete($hash->{HELPER}{RUNNING_PID});
@@ -8894,7 +8948,10 @@ sub DbRep_charfilter($) {
   my ($txt) = @_;
   
   # nur erwünschte Zeichen, Filtern von Steuerzeichen
-  $txt =~ tr/ A-Za-z0-9!"#$§%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€//cd;      
+  $txt =~ s/\xb0/1degree1/g;
+  $txt =~ s/\xC2//g;
+  $txt =~ tr/ A-Za-z0-9!"#$§%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€//cd; 
+  $txt =~ s/1degree1/°/g;  
   
 return($txt);
 }
@@ -9938,6 +9995,29 @@ sub DbRep_numval ($){
 return $val;
 }
 
+################################################################
+# sortiert eine Liste von Versionsnummern x.x.x
+# Schwartzian Transform and the GRT transform
+# Übergabe: "asc | desc",<Liste von Versionsnummern>
+################################################################
+sub DbRep_sortVersion (@){
+  my ($sseq,@versions) = @_;
+
+  my @sorted = map {$_->[0]}
+			   sort {$a->[1] cmp $b->[1]}
+			   map {[$_, pack "C*", split /\./]} @versions;
+			 
+  @sorted = map {join ".", unpack "C*", $_}
+            sort
+            map {pack "C*", split /\./} @versions;
+  
+  if($sseq eq "desc") {
+      @sorted = reverse @sorted;
+  }
+  
+return @sorted;
+}
+
 ####################################################################################################
 #     blockierende DB-Abfrage 
 #     liefert Ergebnis sofort zurück, setzt keine Readings
@@ -10932,13 +11012,18 @@ return;
                                  contained in exception list defined by attribute "readingPreventFromDel".                                
                                  </li><br>
 								 
-    <li><b> exportToFile [&lt;file&gt;] </b> 
-                                 -  exports DB-entries to a file in CSV-format of time period specified by time attributes. <br>
-                                 Limitation of selections can be done by <a href="#DbRepattr">attributes</a> device and/or 
-                                 reading. 
+    <li><b> exportToFile [&lt;/path/file&gt;] [MAXLINES=&lt;lines&gt;]</b> 
+                                 -  exports DB-entries to a file in CSV-format of time period specified by time attributes. <br><br>
+                                 
                                  The filename can be defined by <a href="#DbRepattr">attribute</a> "expimpfile". <br>
                                  Optionally a file can be specified as a command option (/path/file) and overloads a possibly  
-                                 defined attribute "expimpfile". The filename may contain wildcards as described
+                                 defined attribute "expimpfile".
+                                 The maximum number of datasets which are exported into one file can be specified 
+                                 with the optional parameter "MAXLINES". In this case several files with extensions
+                                 "_part1", "_part2", "_part3" and so on are created (pls. remember it when you import the files !). <br>
+                                 Limitation of selections can be done by <a href="#DbRepattr">attributes</a> device and/or 
+                                 reading. 
+                                 The filename may contain wildcards as described
                                  in attribute section of "expimpfile".
                                  <br>
                                  By setting attribute "aggregation" the export of datasets will be splitted into time slices 
@@ -11394,6 +11479,8 @@ return;
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
                                       <tr><td> <b>allowDeletion</b>       </td><td>: activates capabilty to delete datasets </td></tr>
+	                                  <tr><td> <b>executeBeforeProc</b>   </td><td>: execution of FHEM command (or perl-routine) before operation </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>    </td><td>: execution of FHEM command (or perl-routine) after operation </td></tr>
                                       <tr><td> <b>sqlResultFormat</b>     </td><td>: determines presentation style of command result </td></tr>
                                       <tr><td> <b>sqlResultFieldSep</b>   </td><td>: choice of a useful field separator for result </td></tr>
                                       <tr><td> <b>sqlCmdHistoryLength</b> </td><td>: activates command history and length </td></tr>
@@ -11415,7 +11502,22 @@ return;
                                    successfully executed sqlCmd-command can be repeated from a drop-down list. <br>
                                    By execution of the last list entry, "__purge_historylist__", the list itself can be deleted. <br>
 								   If the statement contains "," this character is displayed as "&lt;c&gt;" in the history 
-                                   list due to technical restrictions. <br>
+                                   list due to technical restrictions. <br><br>
+                             
+                                   For a better overview the relevant attributes for this command are listed in a table: <br><br>
+
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> <b>allowDeletion</b>       </td><td>: activates capabilty to delete datasets </td></tr>
+	                                  <tr><td> <b>executeBeforeProc</b>   </td><td>: execution of FHEM command (or perl-routine) before operation </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>    </td><td>: execution of FHEM command (or perl-routine) after operation </td></tr>
+                                      <tr><td> <b>sqlResultFormat</b>     </td><td>: determines presentation style of command result </td></tr>
+                                      <tr><td> <b>sqlResultFieldSep</b>   </td><td>: choice of a useful field separator for result </td></tr>
+                                   </table>
+	                               </ul>
+	                               <br>
+	                               <br>
                                    </li><br>	
 
     <li><b> sqlSpecial </b>    - This function provides a drop-down list with a selection of prepared reportings. <br>
@@ -11428,6 +11530,8 @@ return;
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
+	                                  <tr><td> <b>executeBeforeProc</b>  </td><td>: execution of FHEM command (or perl-routine) before operation </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>   </td><td>: execution of FHEM command (or perl-routine) after operation </td></tr>
                                       <tr><td> <b>sqlResultFormat</b>    </td><td>: determines the formatting of the result </td></tr>
                                       <tr><td> <b>sqlResultFieldSep</b>  </td><td>: determines the used field separator in statement result </td></tr>
                                    </table>
@@ -11905,8 +12009,12 @@ sub bdump {
 </li>
 
   <a name="expimpfile"></a>
-  <li><b>expimpfile </b>      - Path/filename for data export/import. <br><br>
+  <li><b>expimpfile &lt;/path/file&gt; [MAXLINES=&lt;lines&gt;] </b>      
+                                - Path/filename for data export/import. <br><br>
    
+                                The maximum number of datasets which are exported into one file can be specified 
+                                with the optional parameter "MAXLINES". In this case several files with extensions
+                                "_part1", "_part2", "_part3" and so on are created. <br>
                                 The filename may contain wildcards which are replaced by corresponding values 
                                 (see subsequent table).
                                 Furthermore filename can contain %-wildcards of the POSIX strftime function of the underlying OS (see your 
@@ -13247,12 +13355,17 @@ sub bdump {
                                  Ausnahmeliste definiert mit Attribut "readingPreventFromDel" enthalten sind.                                
                                  </li><br>
                                  
-    <li><b> exportToFile [&lt;File&gt;] </b> 
-                                 -  exportiert DB-Einträge im CSV-Format in den gegebenen Zeitgrenzen. <br>
+    <li><b> exportToFile [&lt;/Pfad/File&gt;] [MAXLINES=&lt;lines&gt;] </b> 
+                                 -  exportiert DB-Einträge im CSV-Format in den gegebenen Zeitgrenzen. <br><br>
+                                 
+                                 Der Dateiname wird durch das <a href="#DbRepattr">Attribut</a> "expimpfile" bestimmt. 
+                                 Alternativ kann "/Pfad/File" als Kommando-Option angegeben werden und übersteuert ein 
+                                 eventuell gesetztes Attribut "expimpfile". Optional kann über den Parameter "MAXLINES" die 
+                                 maximale Anzahl von Datensätzen angegeben werden, die in ein File exportiert werden. 
+                                 In diesem Fall werden mehrere Files mit den Extensions "_part1", "_part2", "_part3" usw. 
+                                 erstellt (beim Import berücksichtigen !). <br><br>
                                  Einschränkungen durch die <a href="#DbRepattr">Attribute</a> "device" bzw. "reading" gehen in die Selektion mit ein.
-                                 Der Dateiname wird durch das <a href="#DbRepattr">Attribut</a> "expimpfile" bestimmt. <br>
-                                 Alternativ kann die Datei (/Pfad/Datei) als Kommando-Option angegeben werden und übersteuert ein 
-                                 eventuell gesetztes Attribut "expimpfile". Der Dateiname kann Wildcards enthalten (siehe Attribut "expimpfile").
+                                 Der Dateiname kann Wildcards enthalten (siehe Attribut "expimpfile").
                                  <br>
                                  Durch das Attribut "aggregation" wird der Export der Datensätze in Zeitscheiben der angegebenen Aggregation 
                                  vorgenommen. Ist z.B. "aggregation = month" gesetzt, werden die Daten in monatlichen Paketen selektiert und in
@@ -13729,6 +13842,8 @@ sub bdump {
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
+	                                  <tr><td> <b>executeBeforeProc</b>   </td><td>: FHEM Kommando (oder perl-Routine) vor der Operation ausführen </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>    </td><td>: FHEM Kommando (oder perl-Routine) nach der Operation ausführen </td></tr>
                                       <tr><td> <b>allowDeletion</b>       </td><td>: aktiviert Löschmöglichkeit </td></tr>
                                       <tr><td> <b>sqlResultFormat</b>     </td><td>: legt die Darstellung des Kommandoergebnis fest  </td></tr>
                                       <tr><td> <b>sqlResultFieldSep</b>   </td><td>: Auswahl Feldtrenner im Ergebnis </td></tr>
@@ -13751,7 +13866,24 @@ sub bdump {
                                    Mit Ausführung des letzten Eintrags der Liste, "__purge_historylist__", kann die Liste gelöscht 
                                    werden. <br>
                                    Falls das Statement "," enthält, wird dieses Zeichen aus technischen Gründen in der 
-                                   History-Liste als "&lt;c&gt;" dargestellt. <br>
+                                   History-Liste als "&lt;c&gt;" dargestellt. <br><br>
+                                   
+                                   Zur besseren Übersicht sind die zur Steuerung dieser Funktion von relevanten Attribute 
+                                   hier noch einmal zusammenstellt: <br><br>
+
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+	                                  <tr><td> <b>executeBeforeProc</b>   </td><td>: FHEM Kommando (oder perl-Routine) vor der Operation ausführen </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>    </td><td>: FHEM Kommando (oder perl-Routine) nach der Operation ausführen </td></tr>
+                                      <tr><td> <b>allowDeletion</b>       </td><td>: aktiviert Löschmöglichkeit </td></tr>
+                                      <tr><td> <b>sqlResultFormat</b>     </td><td>: legt die Darstellung des Kommandoergebnis fest  </td></tr>
+                                      <tr><td> <b>sqlResultFieldSep</b>   </td><td>: Auswahl Feldtrenner im Ergebnis </td></tr>
+                                   </table>
+	                               </ul>
+	                               <br>
+	                               <br>
+                                   
 								   </li><br>
                                    
     <li><b> sqlSpecial </b>    - Die Funktion bietet eine Drop-Downliste mit einer Auswahl vorbereiter Auswertungen
@@ -13765,6 +13897,8 @@ sub bdump {
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
+	                                  <tr><td> <b>executeBeforeProc</b>  </td><td>: FHEM Kommando (oder perl-Routine) vor der Operation ausführen </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>   </td><td>: FHEM Kommando (oder perl-Routine) nach der Operation ausführen </td></tr>
                                       <tr><td> <b>sqlResultFormat</b>    </td><td>: Optionen der Ergebnisformatierung </td></tr>
                                       <tr><td> <b>sqlResultFieldSep</b>  </td><td>: Auswahl des Trennzeichens zwischen Ergebnisfeldern </td></tr>
                                    </table>
@@ -14241,8 +14375,12 @@ sub bdump {
 </li>
   
   <a name="expimpfile"></a>
-  <li><b>expimpfile </b>      - Pfad/Dateiname für Export/Import in/aus einem File.  <br><br>
-  
+  <li><b>expimpfile &lt;/Pfad/Filename&gt; [MAXLINES=&lt;lines&gt;]</b>      
+                                - Pfad/Dateiname für Export/Import in/aus einem File.  <br><br>
+                                
+                                Optional kann über den Parameter "MAXLINES" die maximale Anzahl von Datensätzen angegeben
+                                werden, die in ein File exportiert werden. In diesem Fall werden mehrere Files mit den
+                                Extensions "_part1", "_part2", "_part3" usw. erstellt. <br>
                                 Der Dateiname kann Platzhalter enthalten die gemäß der nachfolgenden Tabelle ersetzt werden.
                                 Weiterhin können %-wildcards der POSIX strftime-Funktion des darunterliegenden OS enthalten 
                                 sein (siehe auch strftime Beschreibung). <br>
