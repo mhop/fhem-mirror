@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
-###############################################
+##############################################
 
 
 package main;
@@ -75,10 +75,13 @@ sub DOIF_delAll($)
   delete ($hash->{intervalfunc});
   delete ($hash->{perlblock});
   delete ($hash->{var});
+  delete ($hash->{accu});
+  delete ($hash->{Regex});
+  
 
-  foreach my $key (keys %{$hash->{Regex}}) {
-    delete $hash->{Regex}{$key} if ($key !~ "STATE|DOIF_Readings|uiTable");
-  }
+  #foreach my $key (keys %{$hash->{Regex}}) {
+  #  delete $hash->{Regex}{$key} if ($key !~ "STATE|DOIF_Readings|uiTable");
+  #}
   
   my $readings = ($hash->{MODEL} eq "Perl") ? "^(Device|error|warning|cmd|e_|timer_|wait_|matched_|last_cmd|mode|block_)":"^(Device|state|error|warning|cmd|e_|timer_|wait_|matched_|last_cmd|mode|block_)";
   foreach my $key (keys %{$defs{$hash->{NAME}}{READINGS}}) {
@@ -104,7 +107,7 @@ sub DOIF_Initialize($)
 
   $data{FWEXT}{DOIF}{SCRIPT} = "doif.js";
 
-  $hash->{AttrList} = "disable:0,1 loglevel:0,1,2,3,4,5,6 wait do:always,resetwait cmdState startup state initialize repeatsame repeatcmd waitsame waitdel cmdpause timerWithWait:1,0 notexist selftrigger:wait,all timerevent:1,0 checkReadingEvent:0,1 addStateEvent:1,0 checkall:event,timer,all weekdays setList:textField-long readingList DOIF_Readings:textField-long uiTable:textField-long ".$readingFnAttributes;
+  $hash->{AttrList} = "disable:0,1 loglevel:0,1,2,3,4,5,6 wait:textField-long do:always,resetwait cmdState startup:textField-long state:textField-long initialize repeatsame repeatcmd waitsame waitdel cmdpause timerWithWait:1,0 notexist selftrigger:wait,all timerevent:1,0 checkReadingEvent:0,1 addStateEvent:1,0 checkall:event,timer,all weekdays setList:textField-long readingList DOIF_Readings:textField-long event_Readings:textField-long uiTable:textField-long ".$readingFnAttributes;
 }
 
 # uiTable
@@ -1029,7 +1032,41 @@ sub ReadingValDoIf
     $r=$defs{$name}{READINGS}{$reading}{VAL};
     $r="" if (!defined($r));
     if ($regExp) {
-      if ($regExp =~ /^d(\d)?/) {
+      if ($regExp =~ /^(avg|med|diff|inc)(\d*)/) {
+        my @a=@{$hash->{accu}{"$name $reading"}{value}};
+        my $func=$1;      
+        my $dim=$2;
+        $dim=2 if (!defined $dim or !$dim);
+        my $num=@a < $dim ? @a : $dim;
+        @a=splice (@a, -$num,$num);
+        if ($func eq "avg" or $func eq "med") {
+          return ($r) if (!@a);
+        } elsif ($func eq "diff" or $func eq "inc") {
+          return (0) if (@a <= 1);
+        }
+        if ($func eq "avg") {
+          my $sum=0;
+          foreach (@a) {
+            $sum += $_;
+          }
+          return ($sum/$num);
+        } elsif ($func eq "med") {
+            my @vals = sort{$a <=> $b} @a;
+            if ($num % 2) {
+              return $vals[int($num/2)] if ($num % 2)
+            } else {
+              return ($vals[int($num/2) - 1] + $vals[int($num/2)])/2;
+            }
+        } elsif ($func eq "diff") {
+          return (($a[-1]-$a[0]));
+        } elsif  ($func eq "inc") {
+          if ($a[0] == 0) {
+            return(0);
+          } else {
+            return (($a[-1]-$a[0])/$a[0]);
+          }
+        }
+      } elsif ($regExp =~ /^d(\d)?/) {
         my $round=$1;
         $r = ($r =~ /(-?\d+(\.\d+)?)/ ? $1 : 0);
         $r = round ($r,$round) if (defined $round); 
@@ -1050,6 +1087,23 @@ sub ReadingValDoIf
     }
     return($element);
 }
+
+sub accu_setValue
+{
+  
+  my ($hash,$name,$reading)=@_;
+  if (defined $hash->{accu}{"$name $reading"}) {
+    my @a=@{$hash->{accu}{"$name $reading"}{value}};
+    my $dim=$hash->{accu}{"$name $reading"}{dim};
+    shift (@a) if (@a >= $dim);
+    my $r=ReadingsVal($name,$reading,0);
+    $r = ($r =~ /(-?\d+(\.\d+)?)/ ? $1 : 0);
+    push (@a,$r);
+    @{$hash->{accu}{"$name $reading"}{value}}=@a;
+  }
+}
+
+
 
 sub EvalAllDoIf($$)
 {
@@ -1234,11 +1288,21 @@ sub ReplaceReadingDoIf($)
           $regExp=$1;
           $output=$2;
           return ($regExp,"no round brackets in regular expression") if ($regExp !~ /.*\(.*\)/);
+        } elsif ($format =~ /^((avg|med|diff|inc)(\d*))/) {
+           AddRegexpTriggerDoIf($hs,"accu","","accu",$name,$reading);
+           $regExp =$1;
+           my $dim=$3;
+           $dim=2 if (!defined $dim or !$dim);
+           if (defined $hs->{accu}{"$name $reading"}{dim}) {
+             $hs->{accu}{"$name $reading"}{dim}=$hs->{accu}{"$name $reading"}{dim} < $dim ? $dim : $hs->{accu}{"$name $reading"}{dim};
+           } else {
+             $hs->{accu}{"$name $reading"}{dim}=$dim;
+             @{$hs->{accu}{"$name $reading"}{value}}=();
+           }
         } elsif ($format =~ /^(d[^:]*)(?::(.*))?/) {
           $regExp =$1;
           $output=$2;
-        }
-          else {
+        }else {
           return($format,"unknown expression format");
         }
       }
@@ -1311,11 +1375,11 @@ sub AddRegexpTriggerDoIf
   $hash->{Regex}{$type}{$dev}{$element}{$regexpid}=$regexp;
 }
 
-sub addDOIF_Readings($$)
+sub addDOIF_Readings
 {
-  my ($hash,$DOIF_Readings) = @_;
-  delete $hash->{DOIF_Readings};
-  delete $hash->{Regex}{DOIF_Readings};
+  my ($hash,$DOIF_Readings,$ReadingType) = @_;
+  delete $hash->{$ReadingType};
+  delete $hash->{Regex}{$ReadingType};
   $DOIF_Readings =~ s/\n/ /g;
   my @list=SplitDoIf(',',$DOIF_Readings);
   my $reading;
@@ -1328,9 +1392,9 @@ sub addDOIF_Readings($$)
       return ($DOIF_Readings,"no reading definiton: $list[$i]");
     }
     if ($reading =~ /^\s*([a-z0-9._-]*[a-z._-]+[a-z0-9._-]*)\s*$/i) {
-      my ($def,$err)=ReplaceAllReadingsDoIf($hash,$readingdef,-4,0,$1);
+      my ($def,$err)=ReplaceAllReadingsDoIf($hash,$readingdef,($ReadingType eq "event_Readings" ? -7 : -4),0,$1);
       return ($def,$err) if ($err);
-      $hash->{DOIF_Readings}{$1}=$def;
+      $hash->{$ReadingType}{$1}=$def;
     } else {
       return ($list [$i],"wrong reading specification for: $reading");
     }
@@ -1340,22 +1404,24 @@ sub addDOIF_Readings($$)
 
 sub setDOIF_Reading
 {
-  my ($hash,$DOIF_Reading,$reading) = @_;
+  my ($hash,$DOIF_Reading,$reading,$ReadingType) = @_;
   $lastWarningMsg="";
-  my $ret = eval $hash->{DOIF_Readings}{$DOIF_Reading};
+  my $ret = eval $hash->{$ReadingType}{$DOIF_Reading};
   if ($@) {
     $@ =~ s/^(.*) at \(eval.*\)(.*)$/$1,$2/;
-    $ret="error in DOIF_Readings: ".$@;
+    $ret="error in $ReadingType: ".$@;
   }
   if ($lastWarningMsg) {
     $lastWarningMsg =~ s/^(.*) at \(eval.*$/$1/;
-    Log3 ($hash->{NAME},3 , "$hash->{NAME}: warning in DOIF_Readings: $DOIF_Reading");
+    Log3 ($hash->{NAME},3 , "$hash->{NAME}: warning in $ReadingType: $DOIF_Reading");
   } 
   $lastWarningMsg="";
-  if ($ret ne ReadingsVal($hash->{NAME},$DOIF_Reading,"") or !defined $defs{$hash->{NAME}}{READINGS}{$DOIF_Reading}) {
-    push (@{$hash->{helper}{DOIF_Readings_events}},"$DOIF_Reading: $ret");
-    readingsSingleUpdate ($hash,$DOIF_Reading,$ret,0);
-  }
+  if ($ReadingType eq "event_Readings") {
+    readingsSingleUpdate ($hash,$DOIF_Reading,$ret,1);
+  } elsif ($ret ne ReadingsVal($hash->{NAME},$DOIF_Reading,"") or !defined $defs{$hash->{NAME}}{READINGS}{$DOIF_Reading}) {
+      push (@{$hash->{helper}{DOIF_Readings_events}},"$DOIF_Reading: $ret");
+      readingsSingleUpdate ($hash,$DOIF_Reading,$ret,0);
+    }
 }
 
 sub ReplaceAllReadingsDoIf
@@ -1403,7 +1469,9 @@ sub ReplaceAllReadingsDoIf
             AddRegexpTriggerDoIf($hash,"uiTable",$1,$id);
           }  elsif ($condition == -6) {
             AddRegexpTriggerDoIf($hash,"uiState",$1,$id);
-          } 
+          } elsif ($condition == -7) {
+            AddRegexpTriggerDoIf($hash,"event_Readings",$1,$id);
+          }
         }
       } elsif ($block =~ /^"([^"]*)"/) {
         ($block,$err)=ReplaceEventDoIf($block);
@@ -1414,6 +1482,8 @@ sub ReplaceAllReadingsDoIf
             $event=1;
           } elsif ($condition == -4) {
             AddRegexpTriggerDoIf($hash,"DOIF_Readings",$1,$id);
+          } elsif ($condition == -7) {
+            AddRegexpTriggerDoIf($hash,"event_Readings",$1,$id);
           } else {
             $block="[".$block."]";
           }
@@ -1461,6 +1531,11 @@ sub ReplaceAllReadingsDoIf
               AddRegexpTriggerDoIf($hash,"uiState","",$id,$device,((defined $reading) ? $reading : "&STATE"));
               $hash->{uiState}{dev}=$device;
               $hash->{uiState}{reading}=((defined $reading) ? $reading : "&STATE");
+              $event=1;
+            }
+          } elsif ($condition == -7) {
+            if ($trigger) {
+              AddRegexpTriggerDoIf($hash,"event_Readings","",$id,$device,((defined $reading) ? $reading :"&STATE"));
               $event=1;
             }
           }
@@ -2015,7 +2090,7 @@ sub CheckiTimerDoIf($$$) {
   my $found;
   return 1 if ($itimer =~ /\[$device(\]|,.+\])/);
   for (my $j = 0; $j < $max; $j++) {
-    if ($eventa->[$j] =~ "^([^:]+): ") {
+    if ($eventa->[$j] =~ "^(.+): ") {
       $found = ($itimer =~ /\[$device:$1(\]|:.+\]|,.+\])/);
       if ($found) {
         return 1;
@@ -2168,7 +2243,7 @@ sub DOIF_Perl_Trigger
     }
     if (($ret,$err)=DOIF_CheckCond($hash,$i)) {
       if ($err) {
-        Log3 $hash->{Name},4,"$hash->{NAME}: $err in perl block ".($i+1) if ($ret != -1);
+        Log3 $hash->{NAME},4,"$hash->{NAME}: $err in perl block ".($i+1) if ($ret != -1);
         if ($hash->{perlblock}{$i}) {
           readingsSingleUpdate ($hash, "block_$hash->{perlblock}{$i}", $err,1);
         } else {
@@ -2237,7 +2312,7 @@ sub DOIF_Trigger
     }
     if (($ret,$err)=DOIF_CheckCond($hash,$i)) {
       if ($err) {
-        Log3 $hash->{Name},4,"$hash->{NAME}: $err" if ($ret != -1);
+        Log3 $hash->{NAME},4,"$hash->{NAME}: $err" if ($ret != -1);
         readingsSingleUpdate ($hash, "error", $err,1);
         return undef;
       }
@@ -2315,7 +2390,7 @@ DOIF_Notify($$)
     if (defined $hash->{perlblock}{init}) {
       if (($ret,$err)=DOIF_CheckCond($hash,$hash->{perlblock}{init})) {
         if ($err) {
-          Log3 $hash->{Name},4,"$hash->{NAME}: $err in perl block init" if ($ret != -1);
+          Log3 $hash->{NAME},4,"$hash->{NAME}: $err in perl block init" if ($ret != -1);
           readingsSingleUpdate ($hash, "block_init", $err,0);
         } else {
           readingsSingleUpdate ($hash, "block_init", "executed",0);
@@ -2362,6 +2437,14 @@ DOIF_Notify($$)
   
   $ret=0;
   
+  if (defined $hash->{Regex}{"accu"}{"$dev->{NAME}"}) {
+    my $device=$dev->{NAME};
+    my $reading=CheckRegexpDoIf($hash,"accu",$dev->{NAME},"accu",$eventas,0);
+    if (defined $reading) {
+      accu_setValue($hash,$device,$reading);
+    }
+  }
+  
   if ((($hash->{devices}{all}) and $hash->{devices}{all} =~ / $dev->{NAME} /) or defined CheckRegexpDoIf($hash,"cond",$dev->{NAME},"",$eventa,0)){
     $hash->{helper}{cur_cmd_nr}="Trigger  $dev->{NAME}" if (AttrVal($hash->{NAME},"selftrigger","") ne "all");
     $hash->{helper}{triggerEvents}=$eventa;
@@ -2390,7 +2473,7 @@ DOIF_Notify($$)
         readingsSingleUpdate ($hash, "e_".$dev->{NAME}."_events",join(",",@{$eventa}),0);
       }
     }
-    readingsSingleUpdate ($hash, "Device",$dev->{NAME},0);
+    readingsSingleUpdate ($hash, "Device",$dev->{NAME},0) if ($dev->{NAME} ne $hash->{NAME});
     $ret=$hash->{MODEL} eq "Perl" ? DOIF_Perl_Trigger($hash,$dev->{NAME}) : DOIF_Trigger($hash,$dev->{NAME});
   }
   
@@ -2402,6 +2485,7 @@ DOIF_Notify($$)
     DOIF_SetState($hash,"",0,"","");
   }
   
+  
   delete $hash->{helper}{cur_cmd_nr};
   
   if (defined $hash->{Regex}{"DOIF_Readings"}) {
@@ -2410,7 +2494,7 @@ DOIF_Notify($$)
         #readingsBeginUpdate($hash);
         foreach my $reading (keys %{$hash->{Regex}{"DOIF_Readings"}{$device}}) {
           my $readingregex=CheckRegexpDoIf($hash,"DOIF_Readings",$dev->{NAME},$reading,$eventas,0);
-          setDOIF_Reading($hash,$reading,$readingregex) if (defined($readingregex));
+          setDOIF_Reading($hash,$reading,$readingregex,"DOIF_Readings") if (defined($readingregex));
         }
         #readingsEndUpdate($hash, 1);
       }
@@ -2418,7 +2502,7 @@ DOIF_Notify($$)
     if (defined ($hash->{helper}{DOIF_eventas})) { #$SELF events
       foreach my $reading (keys %{$hash->{Regex}{"DOIF_Readings"}{$hash->{NAME}}}) {
         my $readingregex=CheckRegexpDoIf($hash,"DOIF_Readings",$hash->{NAME},$reading,$hash->{helper}{DOIF_eventas},0);
-        setDOIF_Reading($hash,$reading,$readingregex) if (defined($readingregex));
+        setDOIF_Reading($hash,$reading,$readingregex,"DOIF_Readings") if (defined($readingregex));
       }
     }
   }
@@ -2441,7 +2525,26 @@ DOIF_Notify($$)
       }
     }
   }
- 
+  
+  if (defined $hash->{Regex}{"event_Readings"}) {
+    foreach $device ("$dev->{NAME}","") {
+      if (defined $hash->{Regex}{"event_Readings"}{$device}) {
+        #readingsBeginUpdate($hash);
+        foreach my $reading (keys %{$hash->{Regex}{"event_Readings"}{$device}}) {
+          my $readingregex=CheckRegexpDoIf($hash,"event_Readings",$dev->{NAME},$reading,$eventas,0);
+          setDOIF_Reading($hash,$reading,$readingregex,"event_Readings") if (defined($readingregex));
+        }
+        #readingsEndUpdate($hash,1);
+      }
+    }
+    if (defined ($hash->{helper}{DOIF_eventas})) { #$SELF events
+      foreach my $reading (keys %{$hash->{Regex}{"event_Readings"}{$hash->{NAME}}}) {
+        my $readingregex=CheckRegexpDoIf($hash,"event_Readings",$hash->{NAME},$reading,$hash->{helper}{DOIF_eventas},0);
+        setDOIF_Reading($hash,$reading,$readingregex,"event_Readings") if (defined($readingregex));
+      }
+    }
+  }
+
   if (defined $hash->{helper}{DOIF_Readings_events}) {
     if ($dev->{NAME} ne $hash->{NAME}) {
       @{$hash->{CHANGED}}=@{$hash->{helper}{DOIF_Readings_events}};
@@ -2865,6 +2968,12 @@ CmdDoIfPerl($$)
     readingsBulkUpdate ($hash,"mode","enabled");
     readingsEndUpdate($hash, 1);
     $hash->{helper}{globalinit}=1;
+    foreach my $key (keys %{$attr{$hash->{NAME}}}) {
+      if (AttrVal($hash->{NAME},$key,"")) {
+        DOIF_Attr ("set",$hash->{NAME},$key,AttrVal($hash->{NAME},$key,""));
+      }
+    }
+
   }
   
   $hash->{helper}{last_timer}=0;
@@ -2902,7 +3011,7 @@ CmdDoIfPerl($$)
     if ($init_done) {
       if (($ret,$err)=DOIF_CheckCond($hash,$hash->{perlblock}{init})) {
         if ($err) {
-          Log3 $hash->{Name},4,"$hash->{NAME}: $err in perl block init" if ($ret != -1);
+          Log3 $hash->{NAME},4,"$hash->{NAME}: $err in perl block init" if ($ret != -1);
           readingsSingleUpdate ($hash, "block_init", $err,0);
         } else {
           readingsSingleUpdate ($hash, "block_init", "executed",0);
@@ -2943,6 +3052,11 @@ CmdDoIf($$)
     readingsBulkUpdate ($hash,"mode","enabled");
     readingsEndUpdate($hash, 1);
     $hash->{helper}{globalinit}=1;
+    foreach my $key (keys %{$attr{$hash->{NAME}}}) {
+      if (AttrVal($hash->{NAME},$key,"")) {
+        DOIF_Attr ("set",$hash->{NAME},$key,AttrVal($hash->{NAME},$key,""));
+      }
+    }
   }
 
   $hash->{helper}{last_timer}=0;
@@ -3024,6 +3138,7 @@ DOIF_Define($$$)
   return undef if (AttrVal($hash->{NAME},"disable",""));
   my $err;
   my $msg;
+  $hs=$hash;
 
   if (!$cmd) {
     $cmd="";
@@ -3041,7 +3156,7 @@ DOIF_Define($$$)
   } else {
     $hash->{MODEL}="Perl";
     #$defs{$hash->{NAME}}{".AttrList"}  = "disable:0,1 loglevel:0,1,2,3,4,5,6 startup state initialize notexist checkReadingEvent:1,0 addStateEvent:1,0 weekdays setList:textField-long readingList DOIF_Readings:textField-long uiTable:textField-long ".$readingFnAttributes;
-    setDevAttrList($hash->{NAME},"disable:0,1 loglevel:0,1,2,3,4,5,6 notexist checkReadingEvent:0,1 addStateEvent:1,0 weekdays setList:textField-long readingList DOIF_Readings:textField-long uiTable:textField-long ".$readingFnAttributes);
+    setDevAttrList($hash->{NAME},"disable:0,1 loglevel:0,1,2,3,4,5,6 notexist checkReadingEvent:0,1 addStateEvent:1,0 weekdays setList:textField-long readingList DOIF_Readings:textField-long event_Readings:textField-long uiTable:textField-long ".$readingFnAttributes);
     ($msg,$err)=CmdDoIfPerl($hash,$cmd);
   }  
   if ($err ne "") {
@@ -3062,6 +3177,7 @@ DOIF_Attr(@)
   my $hash = $defs{$a[1]};
   my $pn=$hash->{NAME};
   my $ret="";
+  $hs=$hash;
   if (($a[0] eq "set" and $a[2] eq "disable" and ($a[3] eq "0")) or (($a[0] eq "del" and $a[2] eq "disable")))
   {
     my $cmd = $defs{$hash->{NAME}}{DEF};
@@ -3140,20 +3256,20 @@ DOIF_Attr(@)
   } elsif($a[0] =~ "set|del" && $a[2] eq "waitsame") {
     delete ($defs{$hash->{NAME}}{READINGS}{waitsame});
     @{$hash->{attr}{waitsame}}=SplitDoIf(':',$a[3]);
-  } elsif($a[0] eq "set" && $a[2] eq "DOIF_Readings") {
-    my ($def,$err)=addDOIF_Readings($hash,$a[3]);
+  } elsif($a[0] eq "set" && ($a[2] eq "DOIF_Readings" or $a[2] eq "event_Readings")) {
+    my ($def,$err)=addDOIF_Readings($hash,$a[3],$a[2]);
     if ($err) {
-      return ("error in DOIF_Readings $def, $err");
+      return ("error in $a[2] $def, $err");
     } else {
       if ($init_done) {
-        foreach my $reading (keys %{$hash->{"DOIF_Readings"}}) {
-          setDOIF_Reading ($hash,$reading,"");
+        foreach my $reading (keys %{$hash->{$a[2]}}) {
+          setDOIF_Reading ($hash,$reading,"",$a[2]);
         }
       }
     }
-  } elsif($a[0] eq "del" && ($a[2] eq "DOIF_Readings")) {
-    delete ($hash->{DOIF_Readings});
-    delete $hash->{Regex}{"DOIF_Readings"}
+  } elsif($a[0] eq "del" && ($a[2] eq "DOIF_Readings" or $a[2] eq "event_Readings")) {
+    delete ($hash->{$a[2]});
+    delete $hash->{Regex}{$a[2]};
   } elsif($a[0] eq "set" && ($a[2] eq "uiTable" || $a[2] eq "uiState")) {
     if ($init_done) {
       my $err=DOIF_uiTable_def($hash,$a[3],$a[2]);
@@ -3197,6 +3313,7 @@ DOIF_Set($@)
   my $arg = $a[1];
   my $value = (defined $a[2]) ? $a[2] : "";
   my $ret="";
+  $hs=$hash;
 
   if ($arg eq "disable" or  $arg eq "initialize" or  $arg eq "enable") {
     if (AttrVal($hash->{NAME},"disable","")) {
@@ -3637,6 +3754,7 @@ Eine ausführliche Erläuterung der obigen Anwendungsbeispiele kann hier nachgel
   <a href="#DOIF_Ereignissteuerung_ueber_Auswertung_von_Events">Ereignissteuerung über Auswertung von Events</a><br>
   <a href="#DOIF_Angaben_im_Ausfuehrungsteil">Angaben im Ausführungsteil</a><br>
   <a href="#DOIF_Filtern_nach_Zahlen">Filtern nach Ausdrücken mit Ausgabeformatierung</a><br>
+  <a href="#DOIF_Reading_Funktionen">Durchschnitt, Median, Differenz, anteiliger Anstieg</a><br>
   <a href="#DOIF_aggregation">Aggregieren von Werten</a><br>
   <a href="#DOIF_Zeitsteuerung">Zeitsteuerung</a><br>
   <a href="#DOIF_Relative_Zeitangaben">Relative Zeitangaben</a><br>
@@ -3699,6 +3817,7 @@ Eine ausführliche Erläuterung der obigen Anwendungsbeispiele kann hier nachgel
   <a href="#DOIF_disable">disable</a> &nbsp;
   <a href="#DOIF_do_always">do always</a> &nbsp;
   <a href="#DOIF_do_resetwait">do resetwait</a> &nbsp;
+  <a href="#DOIF_event_Readings">event_Readings</a> &nbsp;
   <a href="#DOIF_initialize">initialize</a> &nbsp;
   <a href="#DOIF_notexist">notexist</a> &nbsp;
   <a href="#DOIF_repeatcmd">repeatcmd</a> &nbsp;
@@ -3945,6 +4064,71 @@ Der Inhalt des Dummys Alarm soll in einem Text eingebunden werden:<br>
 <code>[alarm:state:"(.*)":"state of alarm is $1"]</code><br>
 <br>
 Die Definition von regulären Ausdrücken mit Nutzung der Perl-Variablen $1, $2 usw. kann in der Perldokumentation nachgeschlagen werden.<br>
+<br>
+<a name="DOIF_Reading_Funktionen"></a>
+<b>Durchschnitt, Median, Differenz, anteiliger Anstieg</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
+<br>
+Die folgenden Funktionen werden auf die letzten gesendeten Werte eines Readings angewendet. Das angegebene Reading muss Events liefern, damit seine Werte intern im Modul gesammelt und die Berechnung der angegenen Funktion erfolgen kann.<br>
+<br>
+Syntax<br>
+<br>
+<code>[&lt;device&gt;:&lt;reading&gt;:&lt;function&gt;&lt;number of last values&gt;]</code><br>
+<br>
+&lt;number of last values&gt; ist optional. Wird sie nicht angegeben, so werden bei Durchschnitt/Differenz/Anstieg die letzten beiden Werte, bei Median die letzten drei Werte, ausgewertet.<br>
+<br>
+<u>Durchschnitt</u><br>
+<br>
+Funktion: <b>avg</b><br>
+<br>
+Bsp.:<br>
+<br>
+<code>define di_cold DOIF ([outdoor:temperature:avg5] &lt; 10)(set cold on)</code><br>
+<br>
+Wenn der Durchschnitt der letzten fünf Werte unter 10 Grad ist, dann wird die Anweisung ausgeführt.<br>
+<br>
+<u>Median</u><br>
+<br>
+Mit Hilfe des Medians können punktuell auftretende Ausreißer eliminiert werden.<br>
+<br>
+Funktion: <b>med</b><br>
+<br>
+Bsp.:<br>
+<br>
+<code>define di_frost DOIF ([$SELF:outTempMed] &lt; 0) (set warning frost)<br>
+attr di_frost event_Readings outTempMed:[outdoor:temperature:med]</code><br>
+<br>
+Die Definition über das Attribut event_Readings hat den Vorteil, dass der bereinigte Wert im definierten Reading visualisiert und geloggt werden kann (med entspricht med3).<br>
+<br>
+<u>Differenz</u><br>
+<br>
+Es wird die Differenz zwischen dem letzten und dem x-ten zurückliegenden Wert berechnet.<br>
+<br>
+Funktion: <b>diff</b><br>
+<br>
+Bsp.:<br>
+<br>
+<code>define temp_abfall ([outdoor:temperature:diff5] &gt; 3) (set temp fall in temperature)</code><br>
+<br>
+Wenn die Temperaturdifferenz zwischen dem letzten und dem fünftletzten Wert um drei Grad fällt, dann Anweisung ausführen.<br>
+<br>
+<u>anteiliger Anstieg</u><br>
+<br>
+Funktion: <b>inc</b><br>
+<br>
+Berechnung:<br>
+<br>
+(letzter Wert - zurückliegender Wert)/zurückliegender Wert<br>
+<br>
+Bsp.:<br>
+<br>
+<code>define humidity_warning DOIF ([bathroom:humidiy:inc] &gt; 0.1) (set bath speak open window)</code><br>
+<br>
+Wenn die Feuchtigkeit im Bad der letzten beiden Werte um über zehn Prozent ansteigt, dann Anweisung ausführen (inc entspricht inc2).<br>
+<br>
+Zu beachten:<br>
+<br>
+Der Durchschnitt/Median/Differenz/Anstieg werden bereits gebildet, sobald die ersten Werte eintreffen. Beim ersten Wert ist der Durchschnitt bzw. Median logischerweise der Wert selbst,
+Differenz und der Anstieg ist in diesem Fall 0. Die intern gesammelten Werte werden nicht dauerhaft gespeichert, nach einem Neustart sind sie gelöscht. Die angegebenen Readings werden intern automatisch für die Auswertung nach Zahlen gefiltert.<br> 
 <br>
 <a name="DOIF_Angaben_im_Ausfuehrungsteil"></a>
 <b>Angaben im Ausführungsteil (gilt nur für FHEM-Modus)</b>:&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
@@ -5160,12 +5344,11 @@ Da man beliebige Perl-Ausdrücke verwenden kann, lässt sich z. B. der Mittelwer
 <code>attr di_average state Average of the two rooms is {(sprintf("%.1f",([room1:temperature]+[room2:temperature])/2))}</code><br>
 <br>
 </li><li><a name="DOIF_DOIF_Readings"></a>
-<b>Erzeugen berechneter Readings</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
+<b>Erzeugen berechneter Readings ohne Events</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
-<a name="DOIF_Readings"></a>
 Mit Hilfe des Attributes DOIF_Readings können eigene Readings innerhalb des DOIF definiert werden, auf die man im selben DOIF-Device zugreifen kann.
 Die Nutzung ist insbesondere dann sinnvoll, wenn zyklisch sendende Sensoren, im Perl-Modus oder mit dem Attribut do always, abgefragt werden.
-DOIF_Readings-Berechnungen funktionieren ressourcenschonend ohne Erzeugung FHEM-Events nach außen. Änderungen dieser Readings triggern allerdings das eigene DOIF-Modul, allerdings nur, wenn sich deren Inhalt ändert.<br>
+DOIF_Readings-Berechnungen funktionieren ressourcenschonend ohne Erzeugung FHEM-Events nach außen. Änderungen dieser Readings triggern intern das eigene DOIF-Modul, allerdings nur, wenn sich deren Inhalt ändert.<br>
 <br>
 Syntax<br>
 <br>
@@ -5188,6 +5371,28 @@ Beispiel: Push-Mitteilung über die durchschnittliche Temperatur aller Zimmer<br
 attr di_temp DOIF_Readings temperature:[#average:d2:":temperature":temperature]<br></code>
 <br>
 Hierbei wird der aufwändig berechnete Durchschnittswert nur einmal berechnet, statt zwei mal, wenn man die Aggregationsfunktion direkt in der Bedingung und im Ausführungsteil angeben würde.<br>
+<br>
+</li><li>
+<a name="DOIF_event_Readings"></a>
+<b>Erzeugen berechneter Readings mit Events</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
+<br>
+Dieses Atrribut hat die gleiche Syntax wie DOIF_Readings. Der Unterschied besteht darin, dass event_Readings im Gegensatz zu DOIF_Readings beim Setzen der definierten Readings jedes mal Events produziert.
+Die Nutzung von event_Readings ist insb. dann sinnvoll, wenn man eventgesteuert außerhalb des Moduls auf die definierten Readings zugreifen möchte.<br>
+<br>
+Bsp.:<br>
+<br>
+<code>define outdoor DOIF ##<br>
+<br>
+attr outdoor event_Readings\<br>
+median:[outdoor:temperature:med],\<br>
+average:[outdoor:temperature:avg10],\<br>
+diff: [outdoor:temperature:diff],\<br>
+increase: [outdoor:temperature:inc]</code><br>
+<br>
+Auf die definierten Readings des Moduls outdoor (hier: median, average, diff und increase) kann in anderenen Modulen eventgesteuert zugegriffen werden.<br>
+<br>
+Bemerkung: Sind Events des definierten Readings nicht erforderlich und nur die interne Triggerung des eigenen DOIF-Moduls interessant,
+dann sollte man das Attribut <a href="#DOIF_DOIF_Readings">DOIF_Readings</a> nutzen, da es durch die interne Triggerung des Moduls weniger das System belastet als event_Readings.<br>
 <br>
 </li><li><a name="DOIF_initialize"></a>
 <b>Vorbelegung des Status mit Initialisierung nach dem Neustart</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
@@ -5812,6 +6017,7 @@ Bemerkung: Innerhalb eines Ereignisblocks muss mindestens ein Trigger definiert 
   <a href="#DOIF_Ereignissteuerung_ueber_Auswertung_von_Events">Ereignissteuerung über Auswertung von Events</a><br>
   <a href="#DOIF_Angaben_im_Ausfuehrungsteil">Angaben im Ausführungsteil</a><br>
   <a href="#DOIF_Filtern_nach_Zahlen">Filtern nach Ausdrücken mit Ausgabeformatierung</a><br>
+  <a href="#DOIF_Reading_Funktionen">Durchschnitt, Median, Differenz, anteiliger Anstieg</a><br>
   <a href="#DOIF_aggregation">Aggregieren von Werten</a><br>
   <a href="#DOIF_Zeitsteuerung">Zeitsteuerung</a><br>
   <a href="#DOIF_Relative_Zeitangaben">Relative Zeitangaben</a><br>
@@ -6023,6 +6229,7 @@ Wenn <i>&lt;blocking function&gt;</i>, <i>&lt;finish function&gt;</i> und <i>&lt
   <a href="#DOIF_checkReadingEvent">checkReadingEvent</a> &nbsp;
   <a href="#DOIF_DOIF_Readings">DOIF_Readings</a> &nbsp;
   <a href="#DOIF_disable">disable</a> &nbsp;
+  <a href="#DOIF_event_Readings">event_Readings</a> &nbsp;
   <a href="#DOIF_notexist">notexist</a> &nbsp;
   <a href="#DOIF_setList__readingList">readingList</a> &nbsp;
   <a href="#DOIF_setList__readingList">setList</a> &nbsp;
