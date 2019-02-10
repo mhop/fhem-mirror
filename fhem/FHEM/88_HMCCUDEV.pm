@@ -4,9 +4,9 @@
 #
 #  $Id$
 #
-#  Version 4.3.006
+#  Version 4.3.008
 #
-#  (c) 2018 zap (zap01 <at> t-online <dot> de)
+#  (c) 2019 zap (zap01 <at> t-online <dot> de)
 #
 ######################################################################
 #  Client device for Homematic devices.
@@ -239,7 +239,6 @@ sub HMCCUDEV_InitDevice ($$)
 			# Group specified by CCU virtual group name
 			@devlist = HMCCU_GetGroupMembers ($hmccu_hash, $gdname);
 			$gdcount = scalar (@devlist);
-			return 5 if ($gdcount == 0);
 		}
 
 		return 3 if ($gdcount == 0);
@@ -345,8 +344,8 @@ sub HMCCUDEV_Set ($@)
 	my $rocmds = "clear config defaults:noArg";
 
 	# Get I/O device, check device state
-	return HMCCU_SetError ($hash, -19) if (!defined ($hash->{ccudevstate}) || $hash->{ccudevstate} eq 'pending');
-	return HMCCU_SetError ($hash, -3) if (!defined ($hash->{IODev}));
+	return undef if (!defined ($hash->{ccudevstate}) || $hash->{ccudevstate} eq 'pending' ||
+		!defined ($hash->{IODev}));
 	my $hmccu_hash = $hash->{IODev};
 	my $hmccu_name = $hmccu_hash->{NAME};
 
@@ -580,11 +579,8 @@ sub HMCCUDEV_Set ($@)
 	}
 	elsif ($opt eq 'clear') {
 		my $rnexp = shift @$a;
-		$rnexp = '.*' if (!defined ($rnexp));
-		my @readlist = keys %{$hash->{READINGS}};
-		foreach my $rd (@readlist) {
-			delete ($hash->{READINGS}{$rd}) if ($rd ne 'state' && $rd ne 'control' && $rd =~ /$rnexp/);
-		}
+		HMCCU_DeleteReadings ($hash, $rnexp);
+		return HMCCU_SetState ($hash, "OK");
 	}
 	elsif ($opt eq 'config') {
 		return HMCCU_SetError ($hash, "Usage: set $name config [{channel-number}] {parameter}={value} [...]")
@@ -645,7 +641,8 @@ sub HMCCUDEV_Get ($@)
 	my $opt = shift @$a;
 
 	# Get I/O device
-	return HMCCU_SetError ($hash, -3) if (!defined ($hash->{IODev}));
+	return undef if (!defined ($hash->{ccudevstate}) || $hash->{ccudevstate} eq 'pending' ||
+		!defined ($hash->{IODev}));
 	my $hmccu_hash = $hash->{IODev};
 	my $hmccu_name = $hmccu_hash->{NAME};
 

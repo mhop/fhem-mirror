@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 1.5
+#  Version 1.6
 #
 #  Subprocess based RPC Server module for HMCCU.
 #
@@ -35,7 +35,7 @@ use SetExtensions;
 ######################################################################
 
 # HMCCURPC version
-my $HMCCURPCPROC_VERSION = '1.5';
+my $HMCCURPCPROC_VERSION = '1.6';
 
 # Maximum number of events processed per call of Read()
 my $HMCCURPCPROC_MAX_EVENTS = 100;
@@ -107,6 +107,7 @@ sub HMCCURPCPROC_Initialize ($);
 sub HMCCURPCPROC_Define ($$);
 sub HMCCURPCPROC_InitDevice ($$);
 sub HMCCURPCPROC_Undef ($$);
+sub HMCCURPCPROC_DelayedShutdown ($);
 sub HMCCURPCPROC_Shutdown ($);
 sub HMCCURPCPROC_Attr ($@);
 sub HMCCURPCPROC_Set ($@);
@@ -134,7 +135,7 @@ sub HMCCURPCPROC_RPCServerStopped ($);
 sub HMCCURPCPROC_SendRequest ($@);
 sub HMCCURPCPROC_SetRPCState ($$$$);
 sub HMCCURPCPROC_StartRPCServer ($);
-sub HMCCURPCPROC_StopRPCServer ($);
+sub HMCCURPCPROC_StopRPCServer ($$);
 sub HMCCURPCPROC_TerminateProcess ($);
 
 # Helper functions
@@ -197,6 +198,7 @@ sub HMCCURPCPROC_Initialize ($)
 	$hash->{ReadFn}     = "HMCCURPCPROC_Read";
 	$hash->{AttrFn}     = "HMCCURPCPROC_Attr";
 	$hash->{ShutdownFn} = "HMCCURPCPROC_Shutdown";
+	$hash->{DelayedShutdownFn} = "HMCCURPCPROC_DelayedShutdown";
 	
 	$hash->{parseParams} = 1;
 
@@ -231,17 +233,32 @@ sub HMCCURPCPROC_Define ($$)
 		$hmccu_hash = $defs{$ioname};
 		if (scalar (@$a) < 4) {
 			$hash->{host} = $hmccu_hash->{host};
+			$hash->{prot} = $hmccu_hash->{prot};
 			$iface = $$a[2];
 		}
 		else {
-			$hash->{host} = $$a[2];
+			if ($$a[2] =~ /^(https?):\/\/(.+)/) {
+				$hash->{prot} = $1;
+				$hash->{host} = $2;
+			}
+			else {
+				$hash->{prot} = 'http';
+				$hash->{host} = $$a[2];
+			}
 			$iface = $$a[3];
 		}
 		$rpcip = HMCCU_ResolveName ($hash->{host}, 'N/A');
 	}
 	else {
 		return $usage if (scalar (@$a) < 4);
-		$hash->{host} = $$a[2];
+		if ($$a[2] =~ /^(https?):\/\/(.+)/) {
+			$hash->{prot} = $1;
+			$hash->{host} = $2;
+		}
+		else {
+			$hash->{prot} = 'http';
+			$hash->{host} = $$a[2];
+		}
 		$iface = $$a[3];	
 		$rpcip = HMCCU_ResolveName ($hash->{host}, 'N/A');
 
@@ -250,12 +267,8 @@ sub HMCCURPCPROC_Define ($$)
 			my $dh = $defs{$d};
 			next if (!exists ($dh->{TYPE}) || !exists ($dh->{NAME}));
 			next if ($dh->{TYPE} ne 'HMCCU');
-	
-			# The following call will fail during FHEM start if CCU is not ready
-			my $ifhost = HMCCU_GetRPCServerInfo ($dh, $iface, 'host');
-			next if (!defined ($ifhost));
-			if ($dh->{host} eq $hash->{host} || $ifhost eq $hash->{host} || $ifhost eq $rpcip) {
-				$hmccu_hash = $dh;
+			if ($dh->{ccuip} eq $rpcip) {
+				$hmccu_hash = $dh;	
 				last;
 			}
 		}
@@ -338,10 +351,11 @@ sub HMCCURPCPROC_InitDevice ($$) {
 
 	# Get unique ID for RPC server: last 2 segments of local IP address
 	# Do not append random digits because of https://forum.fhem.de/index.php/topic,83544.msg797146.html#msg797146
-	my @ipseg = split (/\./, $dev_hash->{hmccu}{localaddr});
-	return 3 if (scalar (@ipseg) != 4);
-	$dev_hash->{rpcid} = sprintf ("%03d%03d", $ipseg[2], $ipseg[3]);
-
+	my $id1 = HMCCU_GetIdFromIP ($dev_hash->{hmccu}{localaddr}, '');
+	my $id2 = HMCCU_GetIdFromIP ($hmccu_hash->{ccuip}, '');
+	return 3 if ($id1 eq '' || $id2 eq '');
+	$dev_hash->{rpcid} = $id1.$id2;
+	
 	# Set I/O device and store reference for RPC device in I/O device
 	my $ioname = $hmccu_hash->{NAME};
 	return 2 if (!HMCCU_AssignIODevice ($dev_hash, $ioname, $ifname));
@@ -380,15 +394,40 @@ sub HMCCURPCPROC_Undef ($$)
 	my $ifname = $hash->{rpcinterface};
 
 	# Shutdown RPC server
-	HMCCURPCPROC_Shutdown ($hash);
+	HMCCURPCPROC_StopRPCServer ($hash, $HMCCURPCPROC_INIT_INTERVAL2);
 
 	# Delete RPC device name in I/O device
-	if (exists ($hmccu_hash->{hmccu}{interfaces}{$ifname}{device}) &&
+	if (exists ($hmccu_hash->{hmccu}{interfaces}{$ifname}) &&
+		exists ($hmccu_hash->{hmccu}{interfaces}{$ifname}{device}) &&
 		$hmccu_hash->{hmccu}{interfaces}{$ifname}{device} eq $name) {
 		delete $hmccu_hash->{hmccu}{interfaces}{$ifname}{device};
 	}
 	
 	return undef;
+}
+
+######################################################################
+# Delayed shutdown FHEM
+######################################################################
+
+sub HMCCURPCPROC_DelayedShutdown ($)
+{
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+	
+	my $delay = max (AttrVal ("global", "maxShutdownDelay", 10)-2, 0);
+
+	# Shutdown RPC server
+	if (!exists ($hash->{hmccu}{delayedShutdown})) {
+		$hash->{hmccu}{delayedShutdown} = 1;
+		Log3 $name, 1, "HMCCURPCPROC: [$name] Graceful shutdown";
+		HMCCURPCPROC_StopRPCServer ($hash, $delay);
+	}
+	else {
+		Log3 $name, 1, "HMCCURPCPROC: [$name] Shutdown already in progress";
+	}
+	
+	return 1;
 }
 
 ######################################################################
@@ -398,9 +437,15 @@ sub HMCCURPCPROC_Undef ($$)
 sub HMCCURPCPROC_Shutdown ($)
 {
 	my ($hash) = @_;
+	my $name = $hash->{NAME};
 
 	# Shutdown RPC server
-	HMCCURPCPROC_StopRPCServer ($hash);
+	if (!exists ($hash->{hmccu}{delayedShutdown})) {
+		Log3 $name, 1, "HMCCURPCPROC: [$name] Immediate shutdown";
+		HMCCURPCPROC_StopRPCServer ($hash, 0);
+	}
+	
+	# Remove all internal timers
 	RemoveInternalTimer ($hash);
 
 	return undef;
@@ -511,7 +556,7 @@ sub HMCCURPCPROC_Set ($@)
 		}
 		elsif ($action eq 'off') {
 			$hmccu_hash->{hmccu}{interfaces}{$hash->{rpcinterface}}{manager} = 'HMCCURPCPROC';
-			HMCCURPCPROC_StopRPCServer ($hash);
+			HMCCURPCPROC_StopRPCServer ($hash, $HMCCURPCPROC_INIT_INTERVAL2);
 		}
 		
 		return undef;
@@ -565,7 +610,11 @@ sub HMCCURPCPROC_Get ($@)
 		$result .= "--------------------------\n";
 		my $sid = defined ($hash->{hmccu}{rpc}{pid}) ? sprintf ("%5d", $hash->{hmccu}{rpc}{pid}) : "N/A  ";
 		my $sname = sprintf ("%-10s", $clkey);
-		$result .= $sid." ".$sname."      ".$hash->{hmccu}{rpc}{state}."\n";
+		my $cbport = defined ($hash->{hmccu}{rpc}{cbport}) ? $hash->{hmccu}{rpc}{cbport} : "N/A";
+		my $addr = defined ($hash->{hmccu}{localaddr}) ? $hash->{hmccu}{localaddr} : "N/A";
+		$result .= $sid." ".$sname."      ".$hash->{hmccu}{rpc}{state}."\n\n";
+		$result .= "Local address = $addr\n";
+		$result .= "Callback port = $cbport\n";
 		return $result;
 	}
 	else {
@@ -760,7 +809,8 @@ sub HMCCURPCPROC_IsRPCStateBlocking ($)
 {
 	my ($hash) = @_;
 
-	return ($hash->{RPCState} eq "running" || $hash->{RPCState} eq "inactive") ? 0 : 1;
+	return (exists ($hash->{RPCState}) &&
+		($hash->{RPCState} eq "running" || $hash->{RPCState} eq "inactive")) ? 0 : 1;
 }
 
 ######################################################################
@@ -950,7 +1000,7 @@ sub HMCCURPCPROC_ProcessEvent ($$)
 		# Input:  TO|clkey|DiffTime
 		# Output: TO, clkey, Port, DiffTime
 		#
-		if ($evttimeout > 0 && $t[0] > $evttimeout) {
+		if ($evttimeout > 0) {
 			Log3 $name, 2, "HMCCURPCPROC: [$name] Received no events from interface $clkey for ".$t[0]." seconds";
 			$hash->{ccustate} = 'timeout';
 			if ($hash->{RPCState} eq 'running' && $hash->{rpcport} == $defPort) {
@@ -1021,7 +1071,8 @@ sub HMCCURPCPROC_RegisterCallback ($$)
 	}
 
 	my $cburl = HMCCU_GetRPCCallbackURL ($hmccu_hash, $localaddr, $hash->{hmccu}{rpc}{cbport}, $clkey, $port);
-	my $clurl = HMCCU_GetRPCServerInfo ($hmccu_hash, $port, 'url');
+#	my $clurl = HMCCU_GetRPCServerInfo ($hmccu_hash, $port, 'url');
+	my $clurl = HMCCU_BuildURL ($hmccu_hash, $port);
 	my $rpctype = HMCCU_GetRPCServerInfo ($hmccu_hash, $port, 'type');
 	return (0, "Can't get RPC parameters for ID $clkey") if (!defined ($cburl) || !defined ($clurl) || !defined ($rpctype));
 	
@@ -1069,7 +1120,8 @@ sub HMCCURPCPROC_DeRegisterCallback ($$)
 	$cburl = $rpchash->{cburl} if (exists ($rpchash->{cburl}));
 	$clurl = $rpchash->{clurl} if (exists ($rpchash->{clurl}));
 	$cburl = HMCCU_GetRPCCallbackURL ($hmccu_hash, $localaddr, $rpchash->{cbport}, $clkey, $port) if ($cburl eq '');
-	$clurl = HMCCU_GetRPCServerInfo ($hmccu_hash, $port, 'url') if ($clurl eq '');
+#	$clurl = HMCCU_GetRPCServerInfo ($hmccu_hash, $port, 'url') if ($clurl eq '');
+	$clurl = HMCCU_BuildURL ($hmccu_hash, $port) if ($clurl eq '');
 	return (0, "Can't get RPC parameters for ID $clkey") if ($cburl eq '' || $clurl eq '');
 
 	Log3 $name, 1, "HMCCURPCPROC: [$name] Deregistering RPC server $cburl with ID $clkey at $clurl";
@@ -1378,6 +1430,9 @@ sub HMCCURPCPROC_RPCServerStopped ($)
 	
 	RemoveInternalTimer ($hash);
 	DoTrigger ($name, "RPC server $clkey stopped");
+
+	# Inform FHEM that instance can be shut down
+	CancelDelayedShutdown ($name) if (exists ($hash->{hmccu}{delayedShutdown}));
 }
 
 ######################################################################
@@ -1535,13 +1590,16 @@ sub HMCCURPCPROC_Housekeeping ($)
 
 ######################################################################
 # Stop RPC server processes.
+# If function is called by Shutdown, parameter wait must be 0
 ######################################################################
 
-sub HMCCURPCPROC_StopRPCServer ($)
+sub HMCCURPCPROC_StopRPCServer ($$)
 {
-	my ($hash) = @_;
+	my ($hash, $wait) = @_;
 	my $name = $hash->{NAME};
 	my $clkey = 'CB'.$hash->{rpcport}.$hash->{rpcid};
+	
+	$wait = $HMCCURPCPROC_INIT_INTERVAL2 if (!defined ($wait));
 
 	if (HMCCURPCPROC_CheckProcessState ($hash, 'running')) {
 		Log3 $name, 1, "HMCCURPCPROC: [$name] Stopping RPC server $clkey";
@@ -1556,8 +1614,14 @@ sub HMCCURPCPROC_StopRPCServer ($)
 
 		# Trigger timer function for checking successful RPC stop
 		# Timer will be removed wenn receiving EX event from RPC server process
-		InternalTimer (gettimeofday()+$HMCCURPCPROC_INIT_INTERVAL2, "HMCCURPCPROC_Housekeeping",
-			$hash, 0);
+		if ($wait > 0) {
+			Log3 $name, 2, "HMCCURPCPROC: [$name] Scheduling cleanup in $wait seconds";
+			InternalTimer (gettimeofday()+$wait, "HMCCURPCPROC_Housekeeping", $hash, 0);
+		}
+		else {
+			Log3 $name, 2, "HMCCURPCPROC: [$name] Cleaning up immediately";
+			HMCCURPCPROC_Housekeeping ($hash);
+		}
 		
 		# Give process the chance to terminate
 		sleep (1);
@@ -1587,12 +1651,14 @@ sub HMCCURPCPROC_SendRequest ($@)
 	
 	if (HMCCU_IsRPCType ($hmccu_hash, $port, 'A')) {
 		# Use XMLRPC
-		my $clurl = HMCCU_GetRPCServerInfo ($hmccu_hash, $port, 'url');
+#		my $clurl = HMCCU_GetRPCServerInfo ($hmccu_hash, $port, 'url');
+		my $clurl = HMCCU_BuildURL ($hmccu_hash, $port);
 		return HMCCU_Log ($hash, 2, "Can't get client URL for port $port", undef)
 			if (!defined ($clurl));
 		
 		Log3 $name, 4, "HMCCURPCPROC: [$name] Send ASCII RPC request $request to $clurl";
-		my $rpcclient = RPC::XML::Client->new ($clurl);
+		my $rpcclient = RPC::XML::Client->new ($clurl, useragent => [
+			ssl_opts => { verify_hostname => 0, SSL_verify_mode => 0 } ]);
 		$rc = $rpcclient->simple_request ($request, @param);
 		Log3 $name, 2, "HMCCURPCPROC: [$name] RPC request error ".$RPC::XML::ERROR if (!defined ($rc));
 	}

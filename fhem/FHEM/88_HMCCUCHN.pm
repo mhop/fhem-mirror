@@ -4,9 +4,9 @@
 #
 #  $Id$
 #
-#  Version 4.3.005
+#  Version 4.3.006
 #
-#  (c) 2018 zap (zap01 <at> t-online <dot> de)
+#  (c) 2019 zap (zap01 <at> t-online <dot> de)
 #
 ######################################################################
 #  Client device for Homematic channels.
@@ -208,8 +208,8 @@ sub HMCCUCHN_Set ($@)
 	my $rocmds = "clear config defaults:noArg";
 	
 	# Get I/O device, check device state
-	return HMCCU_SetError ($hash, -19) if (!defined ($hash->{ccudevstate}) || $hash->{ccudevstate} eq 'pending');
-	return HMCCU_SetError ($hash, -3) if (!defined ($hash->{IODev}));
+	return undef if (!defined ($hash->{ccudevstate}) || $hash->{ccudevstate} eq 'pending' ||
+		!defined ($hash->{IODev}));
 	return undef if ($hash->{statevals} eq 'readonly' && $opt ne '?' &&
 		$opt !~ /^(clear|config|defaults)$/);
 
@@ -403,11 +403,8 @@ sub HMCCUCHN_Set ($@)
 	}
 	elsif ($opt eq 'clear') {
 		my $rnexp = shift @$a;
-		$rnexp = '.*' if (!defined ($rnexp));
-		my @readlist = keys %{$hash->{READINGS}};
-		foreach my $rd (@readlist) {
-			delete ($hash->{READINGS}{$rd}) if ($rd ne 'state' && $rd ne 'control' && $rd =~ /$rnexp/);
-		}
+		HMCCU_DeleteReadings ($hash, $rnexp);
+		return HMCCU_SetState ($hash, "OK");
 	}
 	elsif ($opt eq 'config') {
 		return HMCCU_SetError ($hash, "Usage: set $name config [device] {parameter}={value} [...]")
@@ -460,7 +457,8 @@ sub HMCCUCHN_Get ($@)
 	my $name = shift @$a;
 	my $opt = shift @$a;
 
-	return HMCCU_SetError ($hash, -3) if (!defined ($hash->{IODev}));
+	return undef if (!defined ($hash->{ccudevstate}) || $hash->{ccudevstate} eq 'pending' ||
+		!defined ($hash->{IODev}));
 
 	my $disable = AttrVal ($name, "disable", 0);
 	return undef if ($disable == 1);	
@@ -794,16 +792,33 @@ sub HMCCUCHN_Get ($@)
          If set to 1 values read from CCU will be stored as readings. Default is 1.
       </li><br/>
       <li><b>ccureadingfilter &lt;filter-rule[;...]&gt;</b><br/>
-         Only datapoints matching specified expression are stored as readings.<br/>
+         Only datapoints matching specified expression <i>RegExp</i> are stored as readings.<br/>
          Syntax for <i>filter-rule</i> is either:<br/>
-         [N:]{&lt;channel-name&gt;|&lt;channel-number&gt;}!&lt;RegExp&gt; or:<br/>
+         [N:]{&lt;channel-name&gt;}!RegExp&gt; or:<br/>
          [N:][&lt;channel-number&gt;.]&lt;RegExp&gt;<br/>
          If <i>channel-name</i> or <i>channel-number</i> is specified the following rule 
-         applies only to this channel.
-         By default all datapoints will be stored as readings. Attribute ccudef-readingfilter
-         of I/O device will be checked before this attribute.<br/>
+         applies only to this channel.<br/>
          If a rule starts with 'N:' the filter is negated which means that a reading is 
-         stored if rule doesn't match.
+         stored if rule doesn't match.<br/>
+         The following table describes the dependencies between this attribute and attribute
+         ccudef-readingfilter in I/O device. The filtering of readings depends on which attribute
+         is set.<br/>
+         <table>
+         <tr><th>ccureadingfilter<br/>Device</th><th>ccudef-readingfilter<br/>I/O Device</th><th>Update Readings/Datapoints</th></tr>
+         <tr><td>not set</td><td>not set</td><td>all readings</td></tr>
+         <tr><td>not set</td><td>set</td><td>only readings from ccudef-readingfilter</td></tr>
+         <tr><td>set</td><td>not set</td><td>only readings from ccureadingfilter</td></tr>
+         <tr><td>set</td><td>set</td><td>both readings from ccureadingfilter and ccudef-readingfilter</td></tr>
+         </table>
+         So if ccudef-readingfilter is set in I/O device one must also set ccureadingfilter to
+         get updates for additional, device specific readings. Please keep in mind, that readings updates
+         are also affected by attributes event-on-change-reading and event-on-update-reading.<br/><br/>
+         Examples:<br/>
+         <code>
+         attr mydev ccureadingfilter .*<br/>
+         attr mydev ccureadingfilter 1.(^ACTUAL|CONTROL|^SET_TEMP);(^WINDOW_OPEN|^VALVE)<br/>
+         attr mydev ccureadingfilter MyBlindChannel!^LEVEL$<br/>
+         </code>
       </li><br/>
       <li><b>ccureadingformat {address[lc] | name[lc] | datapoint[lc]}</b><br/>
          Set format of reading names. Default for virtual device groups is 'name'. The default for all

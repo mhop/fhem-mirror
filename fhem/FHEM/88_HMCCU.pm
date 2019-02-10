@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.3.010
+#  Version 4.3.011
 #
 #  Module for communication between FHEM and Homematic CCU2/3.
 #
@@ -51,7 +51,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.3.010';
+my $HMCCU_VERSION = '4.3.011';
 
 # Default RPC interface and port (BidCos-RF)
 my $HMCCU_RPC_PORT_DEFAULT = 2001;
@@ -73,6 +73,11 @@ my $HMCCU_TIMEOUT_EVENT = 600;
 my $HMCCU_STATISTICS = 500;
 my $HMCCU_TIMEOUT_REQUEST = 4;
 
+# ReGa Ports
+my %HMCCU_REGA_PORT = (
+	'http' => 8181, 'https' => '48181'
+);
+
 # RPC port name by port number
 my %HMCCU_RPC_NUMPORT = (
 	2000 => 'BidCos-Wired', 2001 => 'BidCos-RF', 2010 => 'HmIP-RF', 9292 => 'VirtualDevices',
@@ -87,8 +92,13 @@ my %HMCCU_RPC_PORT = (
 
 # RPC flags
 my %HMCCU_RPC_FLAG = (
-	2000 => 'forceASCII', 2001 => 'forceASCII', 2003 => '_', 2010 => '_',
+	2000 => 'forceASCII', 2001 => 'forceASCII', 2003 => '_', 2010 => 'forceASCII',
 	7000 => 'forceInit', 8701 => 'forceInit', 9292 => '_'
+);
+
+my %HMCCU_RPC_SSL = (
+	2000 => 1, 2001 => 1, 2010 => 1, 9292 => 1,
+	'BidCos-Wired' => 1, 'BidCos-RF' => 1, 'HmIP-RF' => 1, 'VirtualDevices' => 1
 );
 
 # Initial intervals for registration of RPC callbacks and reading RPC queue
@@ -323,14 +333,19 @@ sub HMCCU_QueueEnq ($$);
 sub HMCCU_QueueDeq ($);
 
 # Helper functions
+sub HMCCU_BuildURL ($$);
 sub HMCCU_CalculateReading ($$);
+sub HMCCU_CorrectName ($);
+sub HMCCU_Encrypt ($);
+sub HMCCU_Decrypt ($);
+sub HMCCU_DeleteReadings ($$);
 sub HMCCU_EncodeEPDisplay ($);
 sub HMCCU_ExprMatch ($$$);
 sub HMCCU_ExprNotMatch ($$$);
 sub HMCCU_GetDutyCycle ($);
 sub HMCCU_GetHMState ($$$);
+sub HMCCU_GetIdFromIP ($$);
 sub HMCCU_GetTimeSpec ($);
-sub HMCCU_CorrectName ($);
 sub HMCCU_RefToString ($);
 sub HMCCU_ResolveName ($$);
 sub HMCCU_TCPConnect ($$);
@@ -392,8 +407,17 @@ sub HMCCU_Define ($$)
 	my $name = $hash->{NAME};
 
 	return "Specify CCU hostname or IP address as a parameter" if (scalar (@$a) < 3);
-	
-	$hash->{host} = $$a[2];
+
+	# Setup http or ssl connection	
+	if ($$a[2] =~ /^(https?):\/\/(.+)/) {
+		$hash->{prot} = $1;
+		$hash->{host} = $2;
+	}
+	else {
+		$hash->{prot} = 'http';
+		$hash->{host} = $$a[2];
+	}
+
 	$hash->{Clients} = ':HMCCUDEV:HMCCUCHN:HMCCURPC:HMCCURPCPROC:';
 	$hash->{hmccu}{ccu}{delay} = exists ($h->{ccudelay}) ? $h->{ccudelay} : $HMCCU_CCU_BOOT_DELAY;
 	$hash->{hmccu}{ccu}{timeout} = exists ($h->{waitforccu}) ? $h->{waitforccu} : $HMCCU_CCU_PING_TIMEOUT;
@@ -408,12 +432,12 @@ sub HMCCU_Define ($$)
 		HMCCU_Log ($hash, 1, "Forced delayed initialization", 0);
 	}
 	else {
-		if (HMCCU_TCPPing ($hash->{host}, 8181, $hash->{hmccu}{ccu}{timeout})) {
+		if (HMCCU_TCPPing ($hash->{host}, $HMCCU_REGA_PORT{$hash->{prot}}, $hash->{hmccu}{ccu}{timeout})) {
 			$hash->{ccustate} = 'active';
 		}
 		else {
 			$hash->{ccustate} = 'unreachable';
-			HMCCU_Log ($hash, 1, "CCU port 8181 is not reachable", 0);
+			HMCCU_Log ($hash, 1, "CCU port ".$HMCCU_REGA_PORT{$hash->{prot}}." is not reachable", 0);
 		}
 	}
 
@@ -481,7 +505,7 @@ sub HMCCU_Define ($$)
 # Initialization of FHEM device.
 # Called during Define() or by HMCCU after CCU ready.
 # Return 0 on successful initialization or >0 on error:
-# 1 = CCU port 8181 is not reachable.
+# 1 = CCU port 8181 or 48181 is not reachable.
 # 2 = Error while reading device list from CCU.
 ######################################################################
 
@@ -492,9 +516,9 @@ sub HMCCU_InitDevice ($)
 
 	if ($hash->{hmccu}{ccu}{delayed} == 1) {
 		HMCCU_Log ($hash, 1, "HMCCU: Initializing devices", 0);
-		if (!HMCCU_TCPPing ($hash->{host}, 8181, $hash->{hmccu}{ccu}{timeout})) {
+		if (!HMCCU_TCPPing ($hash->{host}, $HMCCU_REGA_PORT{$hash->{prot}}, $hash->{hmccu}{ccu}{timeout})) {
 			$hash->{ccustate} = 'unreachable';
-			HMCCU_Log ($hash, 1, "HMCCU: CCU port 8181 is not reachable", 0);
+			HMCCU_Log ($hash, 1, "HMCCU: CCU port ".$HMCCU_REGA_PORT{$hash->{prot}}." is not reachable", 0);
 			return 1;
 		}
 	}
@@ -1169,12 +1193,12 @@ sub HMCCU_Detail ($$$$)
 	<table class="block wide">
 	<tr class="odd">
 	<td><div class="col1">
-	&gt; <a target="_blank" href="http://$hash->{host}">CCU WebUI</a>
+	&gt; <a target="_blank" href="$hash->{prot}://$hash->{host}">CCU WebUI</a>
 	</div></td>
 	</tr>
 	<tr class="odd">
 	<td><div class="col1">
-	&gt; <a target="_blank" href="http://$hash->{host}/addons/cuxd/index.ccc">CUxD Config</a>
+	&gt; <a target="_blank" href="$hash->{prot}://$hash->{host}/addons/cuxd/index.ccc">CUxD Config</a>
 	</div></td>
 	</tr>
 	</table>
@@ -1379,8 +1403,8 @@ sub HMCCU_Set ($@)
 	my ($hash, $a, $h) = @_;
 	my $name = shift @$a;
 	my $opt = shift @$a;
-	my $options = "var delete execute hmscript cleardefaults:noArg defaults:noArg ".
-		"importdefaults rpcregister:all rpcserver:on,off,restart ackmessages:noArg";
+	my $options = "var clear delete execute hmscript cleardefaults:noArg defaults:noArg ".
+		"importdefaults rpcregister:all rpcserver:on,off,restart ackmessages:noArg authentication";
 	my @ifList = HMCCU_GetRPCInterfaceList ($hash);
 	if (scalar (@ifList) > 0) {
 		my $ifStr = join (',', @ifList);
@@ -1389,7 +1413,9 @@ sub HMCCU_Set ($@)
 	my $usage = "HMCCU: Unknown argument $opt, choose one of $options";
 	my $host = $hash->{host};
 
-	return "HMCCU: I/O device not initialized. Try again later." if ($hash->{hmccu}{ccu}{delayed});
+	return undef if ($hash->{hmccu}{ccu}{delayed});
+	return "HMCCU: CCU is unreachable, choose one of initialize:noArg" if ($hash->{ccustate} eq 'unreachable');
+	return undef if ($hash->{ccustate} ne 'active');
 	return "HMCCU: CCU busy, choose one of rpcserver:off"
 		if ($opt ne 'rpcserver' && HMCCU_IsRPCStateBlocking ($hash));
 
@@ -1419,7 +1445,7 @@ sub HMCCU_Set ($@)
 		$vartype = shift @$a if (scalar (@$a) == 3);
 		my $objname = shift @$a;
 		my $objvalue = shift @$a;
-		$usage = "set $name $opt [{'bool'|'list'|'number'|'test'}] variable value [param=value [...]]";
+		$usage = "set $name $opt [{'bool'|'list'|'number'|'text'}] variable value [param=value [...]]";
 		
 		return HMCCU_SetError ($hash, $usage) if (!defined ($objvalue));
 
@@ -1430,6 +1456,48 @@ sub HMCCU_Set ($@)
 		$result = HMCCU_SetVariable ($hash, $objname, $objvalue, $vartype, $h);
 
 		return HMCCU_SetError ($hash, $result) if ($result < 0);
+		return HMCCU_SetState ($hash, "OK");
+	}
+# 	elsif ($opt eq 'test') {
+# 		my $backend = shift @$a;
+# 		my $url = defined ($backend) ? HMCCU_BuildURL ($hash, $backend) : '';
+# 		return "URL=$url";
+# 	}
+	elsif ($opt eq 'initialize') {
+		return HMCCU_SetError ($hash, "State of CCU must be unreachable")
+			if ($hash->{ccustate} ne 'unreachable');
+		my $err = HMCCU_InitDevice ($hash);
+		return HMCCU_SetError ($hash, "CCU not reachable") if ($err == 1);
+		return HMCCU_SetError ($hash, "Can't read device list from CCU") if ($err == 2);
+		return HMCCU_SetState ($hash, "OK");
+	}
+	elsif ($opt eq 'authentication') {
+		my $username = shift @$a;
+		my $password = shift @$a;
+		$usage = "set $name $opt username password";
+
+		if (!defined ($username)) {
+			setKeyValue ($name."_username", undef);
+			setKeyValue ($name."_password", undef);
+			return "Credentials for CCU authentication deleted";
+		}
+		
+		return HMCCU_SetError ($hash, $usage) if (!defined ($password));
+
+		my $encuser = HMCCU_Encrypt ($username);
+		my $encpass = HMCCU_Encrypt ($password);
+		return HMCCU_SetError ($hash, "Encryption of credentials failed") if ($encuser eq '' || $encpass eq '');
+		
+		my $err = setKeyValue ($name."_username", $encuser);
+		return HMCCU_SetError ($hash, "Can't store credentials. $err") if (defined ($err));
+		$err = setKeyValue ($name."_password", $encpass);
+		return HMCCU_SetError ($hash, "Can't store credentials. $err") if (defined ($err));
+		
+		return "Credentials for CCU authentication stored";			
+	}
+	elsif ($opt eq 'clear') {
+		my $rnexp = shift @$a;
+		HMCCU_DeleteReadings ($hash, $rnexp);
 		return HMCCU_SetState ($hash, "OK");
 	}
 	elsif ($opt eq 'datapoint') {
@@ -1626,11 +1694,12 @@ sub HMCCU_Get ($@)
 	my $opt = shift @$a;
 	
 	my $options = "defaults:noArg exportdefaults devicelist dump dutycycle:noArg vars update".
-		" updateccu parfile configdesc firmware rpcevents:noArg rpcstate:noArg deviceinfo";
+		" updateccu parfile configdesc firmware rpcevents:noArg rpcstate:noArg deviceinfo".
+		" ccumsg:alarm,service";
 	my $usage = "HMCCU: Unknown argument $opt, choose one of $options";
 	my $host = $hash->{host};
 
-	return "HMCCU: I/O device not initialized. Try again later." if ($hash->{hmccu}{ccu}{delayed});
+	return undef if ($hash->{hmccu}{ccu}{delayed} || $hash->{ccustate} ne 'active');
 	return "HMCCU: CCU busy, choose one of rpcstate:noArg"
 		if ($opt ne 'rpcstate' && HMCCU_IsRPCStateBlocking ($hash));
 
@@ -1876,7 +1945,7 @@ sub HMCCU_Get ($@)
 					# Define new client device
 					my $ret = CommandDefine (undef, $devname." $defmod ".$add);
 					if ($ret) {
-						Log3 $name, 2, "HMCCU: Define command failed $devname $defmod $ccuname";
+						Log3 $name, 2, "HMCCU: [$name] Define command failed $devname $defmod $ccuname";
 						Log3 $name, 2, "$defmod: $ret";
 						$result .= "\nCan't create device $devname. $ret";
 						next;
@@ -1994,6 +2063,24 @@ sub HMCCU_Get ($@)
 
 		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "getParamsetDescription", undef);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
+		return HMCCU_SetState ($hash, "OK", $res);
+	}
+	elsif ($opt eq 'ccumsg') {
+		my $msgtype = shift @$a;
+		$usage = "Usage: get $name $opt {service|alarm}";
+		return HMCCU_SetError ($hash, $usage) if (!defined ($msgtype));
+
+		my $script = ($msgtype eq 'service') ? "!GetServiceMessages" : "!GetAlarms";
+		my $res = HMCCU_HMScriptExt ($hash, $script, undef);
+		
+		return HMCCU_SetError ($hash, "Error") if ($res eq '' || $res =~ /^ERROR:.*/);
+		
+		# Generate event for each message
+		foreach my $msg (split /\n/, $res) {
+			next if ($msg =~ /^[0-9]+$/);
+			DoTrigger ($name, $msg);
+		}
+		
 		return HMCCU_SetState ($hash, "OK", $res);
 	}
 	else {
@@ -2186,9 +2273,7 @@ sub HMCCU_FilterReading ($$$)
 	return 1 if (!defined ($hmccu_hash));
 
 	my $grf = AttrVal ($hmccu_hash->{NAME}, 'ccudef-readingfilter', '.*');
-#	$grf = '.*' if ($grf eq '');
 	my $rf = AttrVal ($name, 'ccureadingfilter', $grf);
-#	$rf = $grf.";".$rf if ($rf ne $grf && $grf ne '.*' && $grf ne '');
 	$rf = $grf.";".$rf if ($rf ne $grf && $grf ne '.*');
 
 	my $chnnam = '';
@@ -3525,9 +3610,12 @@ sub HMCCU_GetRPCCallbackURL ($$$$$)
 	
 	my $ifname = $iface =~ /^[0-9]+$/ ? $hmccu_hash->{hmccu}{ifports}{$iface} : $iface;
 	return undef if (!exists ($hmccu_hash->{hmccu}{interfaces}{$ifname}));
-	
-	return $hmccu_hash->{hmccu}{interfaces}{$ifname}{prot}."://$localaddr:$cbport/fh".
+
+	my $url = $hmccu_hash->{hmccu}{interfaces}{$ifname}{prot}."://$localaddr:$cbport/fh".
 		$hmccu_hash->{hmccu}{interfaces}{$ifname}{port};
+	$url =~ s/^https/http/;
+	
+	return $url;
 }
 
 ######################################################################
@@ -3535,6 +3623,7 @@ sub HMCCU_GetRPCCallbackURL ($$$$$)
 # Parameter iface can be a port number or an interface name.
 # Valid values for info are:
 # url, port, prot, host, type, name, flags, device.
+# Return undef for invalid interface or info token.
 ######################################################################
 
 sub HMCCU_GetRPCServerInfo ($$$)
@@ -3760,7 +3849,7 @@ sub HMCCU_StopExtRPCServer ($)
 				next;
 			}
 			$hash->{hmccu}{interfaces}{$ifname}{manager} = 'HMCCU';
-			$rc &= HMCCURPCPROC_StopRPCServer ($defs{$rpcdev});
+			$rc &= HMCCURPCPROC_StopRPCServer ($defs{$rpcdev}, undef);
 		}
 		
 		return $rc;
@@ -3867,7 +3956,7 @@ sub HMCCU_StartIntRPCServer ($)
 		# Initialize statistic counters
 		HMCCU_ResetCounters ($hash);
 	
-		Log3 $name, 0, "RPC server(s) starting";
+		Log3 $name, 0, "HMCCU: [$name] RPC server(s) starting";
 		DoTrigger ($name, "RPC server starting");
 
 		InternalTimer (gettimeofday()+$rpcinterval, 'HMCCU_ReadRPCQueue', $hash, 0);
@@ -4252,6 +4341,7 @@ sub HMCCU_GetDeviceList ($)
 	# Delete old entries
 	%{$hash->{hmccu}{dev}} = ();
 	%{$hash->{hmccu}{adr}} = ();
+	%{$hash->{hmccu}{interfaces}} = ();
 	%{$hash->{hmccu}{grp}} = ();
 	%{$hash->{hmccu}{prg}} = ();
 	$hash->{hmccu}{updatetime} = time ();
@@ -4319,6 +4409,10 @@ sub HMCCU_GetDeviceList ($)
 					$port -= 30000;
 					$ifurl =~ s/:3$port/:$port/;
 				}
+# 				if ($hash->{prot} eq 'https') {
+# 					# For secure connections add 40000 to port
+# 					$ifurl =~ s/:$port/:4$port/;
+# 				}
 				if ($hash->{ccuip} ne 'N/A') {
 					$ifurl =~ s/127\.0\.0\.1/$hash->{ccuip}/;
 					$ipaddr =~ s/127\.0\.0\.1/$hash->{ccuip}/;					
@@ -5121,6 +5215,7 @@ sub HMCCU_GetRPCDevice ($$$)
 	my $rpcdevname;
 	my $rpcdevtype = 'HMCCURPCPROC';
 	my $rpchost = $hash->{host};
+	my $rpcprot = $hash->{prot};
 	
 	my $ccuflags = HMCCU_GetFlags ($name);
 
@@ -5156,8 +5251,12 @@ sub HMCCU_GetRPCDevice ($$$)
 		my $devhash = $defs{$dev};
 		next if ($devhash->{TYPE} ne $rpcdevtype);
 		my $ip = 'null';
-		my $addrnum = inet_aton ($devhash->{host});
-		$ip = inet_ntoa ($addrnum) if (defined ($addrnum)); 
+		if (!exists ($devhash->{rpcip})) {
+			$ip = HMCCU_Resolve ($devhash->{host}, 'null');
+		}
+		else {
+			$ip = $devhash->{rpcip};
+		}
 		next if ($devhash->{host} ne $rpchost && $ip ne $rpchost);
 #		next if ($rpcdevtype eq 'HMCCURPCPROC' && $devhash->{rpcinterface} ne $ifname);
 		next if ($devhash->{rpcinterface} ne $ifname);
@@ -5181,15 +5280,20 @@ sub HMCCU_GetRPCDevice ($$$)
 	
 	# Create RPC device
 	if ($create) {
-		my $alias = "CCU RPC";
-		my $rpccreate = "d_rpc $rpcdevtype ".$hash->{host};
+		my $alias = "CCU RPC $ifname";
+		my $rpccreate = '';
 		$rpcdevname = "d_rpc";
-		if (defined ($ifname)) {
-			$rpcdevname = makeDeviceName ("d_rpc".$ifname);
-			$alias .= " $ifname";
-			$rpccreate = "$rpcdevname $rpcdevtype $rpchost $ifname";
-		}
 
+		# Ensure unique device name by appending last 2 digits of CCU IP address
+		$rpcdevname .= HMCCU_GetIdFromIP ($hash->{ccuip}, '') if (exists ($hash->{ccuip}));
+
+		# Build device name and define command
+		$rpcdevname = makeDeviceName ($rpcdevname.$ifname);
+		$rpccreate = "$rpcdevname $rpcdevtype $rpcprot://$rpchost $ifname";
+		return (HMCCU_Log ($hash, 2, "Device $rpcdevname already exists. Please delete or rename it.", ''), 0)
+			if (exists ($defs{"$rpcdevname"}));
+
+		# Create RPC device
 		HMCCU_Log ($hash, 1, "Creating new RPC device $rpcdevname", undef);
 		my $ret = CommandDefine (undef, $rpccreate);
 		if (!defined ($ret)) {
@@ -5237,7 +5341,7 @@ sub HMCCU_AssignIODevice ($$$)
 		return 0;
 	}
 	
-	if ($type eq 'HMCCURPCPROC' && defined ($ifname)) {
+	if ($type eq 'HMCCURPCPROC' && defined ($ifname) && exists ($hmccu_hash->{hmccu}{interfaces}{$ifname})) {
 		# Register RPC device
 		$hmccu_hash->{hmccu}{interfaces}{$ifname}{device} = $name;
 	}
@@ -5794,7 +5898,7 @@ sub HMCCU_ReadRPCQueue ($)
 	if ($hash->{hmccu}{evtime} > 0 && time()-$hash->{hmccu}{evtime} > $rpcevtimeout &&
 	   $hash->{hmccu}{evtimeout} == 0) {
 	   $hash->{hmccu}{evtimeout} = 1;
-		$hash->{ccustate} = HMCCU_TCPConnect ($hash->{host}, 8181) ne '' ? 'timeout' : 'unreachable';
+		$hash->{ccustate} = HMCCU_TCPConnect ($hash->{host}, $HMCCU_REGA_PORT{$hash->{prot}}) ne '' ? 'timeout' : 'unreachable';
 		Log3 $name, 2, "HMCCU: Received no events from CCU since $rpcevtimeout seconds";
 		DoTrigger ($name, "No events from CCU since $rpcevtimeout seconds");
 	}
@@ -5858,6 +5962,7 @@ sub HMCCU_ReadRPCQueue ($)
 ######################################################################
 # Execute Homematic command on CCU.
 # If parameter mode is 1 an empty string is a valid result.
+# Return undef on error.
 ######################################################################
 
 sub HMCCU_HMCommand ($$$)
@@ -5868,20 +5973,26 @@ sub HMCCU_HMCommand ($$$)
 	
 	my $io_hash = HMCCU_GetHash ($cl_hash);
 	my $ccureqtimeout = AttrVal ($io_hash->{NAME}, "ccuReqTimeout", $HMCCU_TIMEOUT_REQUEST);
-	my $url = "http://".$io_hash->{host}.":8181/tclrega.exe";
+	my $url = HMCCU_BuildURL ($io_hash, 'rega');
 	my $value;
 
 	HMCCU_Trace ($cl_hash, 2, $fnc, "URL=$url, cmd=$cmd");
 
-	my $response = GetFileFromURL ($url, $ccureqtimeout, $cmd);
-	if (defined ($response)) {
+	my $param = { url => $url, timeout => $ccureqtimeout, data => $cmd, method => "POST" };
+	$param->{sslargs} = { SSL_verify_mode => 0 };
+	my ($err, $response) = HttpUtils_BlockingGet ($param);
+	
+#	my $response = GetFileFromURL ($url, $ccureqtimeout, $cmd);
+	if ($err eq '') {
 		$value = $response;
 		$value =~ s/<xml>(.*)<\/xml>//;
 		$value =~ s/\r//g;
 		HMCCU_Trace ($cl_hash, 2, $fnc, "Response=$response, Value=".(defined ($value) ? $value : "undef"));
 	}
 	else {
-		HMCCU_Trace ($cl_hash, 2, $fnc, "Response=undef");
+		HMCCU_Log ($io_hash, 2, "Error during HTTP request: $err", undef);
+		HMCCU_Trace ($cl_hash, 2, $fnc, "Response=$response");
+		return undef;
 	}
 
 	if ($mode == 1) {
@@ -5904,18 +6015,20 @@ sub HMCCU_HMCommandNB ($$$)
 
 	my $io_hash = HMCCU_GetHash ($cl_hash);
 	my $ccureqtimeout = AttrVal ($io_hash->{NAME}, "ccuReqTimeout", $HMCCU_TIMEOUT_REQUEST);
-	my $url = "http://".$io_hash->{host}.":8181/tclrega.exe";
+	my $url = HMCCU_BuildURL ($io_hash, 'rega');
 
 	HMCCU_Trace ($cl_hash, 2, $fnc, "URL=$url");
 
 	if (defined ($cbfunc)) {
 		my $param = { url => $url, timeout => $ccureqtimeout, data => $cmd, method => "POST",
 			callback => $cbfunc, devhash => $cl_hash };
+		$param->{sslargs} = { SSL_verify_mode => 0 };
 		HttpUtils_NonblockingGet ($param);
 	}
 	else {
 		my $param = { url => $url, timeout => $ccureqtimeout, data => $cmd, method => "POST",
 			callback => \&HMCCU_HMCommandCB, devhash => $cl_hash };
+		$param->{sslargs} = { SSL_verify_mode => 0 };
 		HttpUtils_NonblockingGet ($param);
 	}
 }
@@ -5956,6 +6069,8 @@ sub HMCCU_HMScriptExt ($$$)
 	
 	return HMCCU_LogError ($hash, 2, "CCU host name not defined") if (!exists ($hash->{host}));
 	my $host = $hash->{host};
+
+	my $ccureqtimeout = AttrVal ($hash->{NAME}, "ccuReqTimeout", $HMCCU_TIMEOUT_REQUEST);
 
 	if ($hmscript =~ /^!(.*)$/) {
 		# Internal script
@@ -6004,19 +6119,25 @@ sub HMCCU_HMScriptExt ($$$)
 	}
  
 	# Execute script on CCU
-	my $url = "http://".$host.":8181/tclrega.exe";
-	my $ua = new LWP::UserAgent ();
-	my $response = $ua->post($url, Content => $code);
-	if ($response->is_success ()) {
-		my $output = $response->content;
+	my $url = HMCCU_BuildURL ($hash, 'rega');
+	my $param = { url => $url, timeout => $ccureqtimeout, data => $code, method => "POST" };
+	$param->{sslargs} = { SSL_verify_mode => 0 };
+	my ($err, $response) = HttpUtils_BlockingGet ($param);
+	
+#	my $ua = new LWP::UserAgent ();
+#	my $response = $ua->post($url, Content => $code);
+#	if ($response->is_success ()) {
+#		my $output = $response->content;
+	if ($err eq '') {
+		my $output = $response;
 		$output =~ s/<xml>.*<\/xml>//;
 		$output =~ s/\r//g;
 		return $output;
 	}
 	else {
-		my $msg = $response->status_line();
-		Log3 $name, 2, "HMCCU: HMScript failed. $msg";
- 		return "ERROR: HMScript failed. $msg";
+#		my $msg = $response->status_line();
+		HMCCU_Log ($hash, 2, "HMScript failed. $err", undef);
+ 		return "ERROR: HMScript failed. $err";
 	}
 }
 
@@ -6027,9 +6148,28 @@ sub HMCCU_HMScriptExt ($$$)
 sub HMCCU_BulkUpdate ($$$$)
 {
 	my ($hash, $reading, $orgval, $subval) = @_;
-
-	my $excl = AttrVal ($hash->{NAME}, 'substexcl', '');
+	my $name = $hash->{NAME};
 	
+	my $excl = AttrVal ($name, 'substexcl', '');
+#
+# For later use: Suppress reading update 
+#
+# 	my $suppress = AttrVal ($name, 'ccusuppress', '');
+# 
+# 	if ($suppress ne '') {
+# 		my $ct = time();
+# 		my @srules = split (";", $suppress);
+# 	
+# 		foreach my $sr (@srules) {
+# 			my ($rnexp, $to) = split (":", $sr);
+# 			next if (!defined ($to));
+# 			if ($reading =~ /$rnexp/) {
+# 				my $rt = ReadingsTimestamp ($name, $reading, '');
+# 				return if ($rt ne '' && $ct-time_str2num($rt) < $to);
+# 			}
+# 		}
+# 	}
+
 	readingsBulkUpdate ($hash, $reading, ($excl ne '' && $reading =~ /$excl/ ? $orgval : $subval));
 }
 
@@ -6664,7 +6804,8 @@ sub HMCCU_RPCGetConfig ($$$$)
 		}
 	}
 	else {	
-		my $url = HMCCU_GetRPCServerInfo ($hmccu_hash, $int, 'url');
+#		my $url = HMCCU_GetRPCServerInfo ($hmccu_hash, $int, 'url');
+		my $url = HMCCU_BuildURL ($hmccu_hash, $int);
 		return (-9, '') if (!defined ($url));
 		HMCCU_Trace ($hash, 2, $fnc, "Method=$method Addr=$addr Port=$port");
 		my $client = RPC::XML::Client->new ($url);
@@ -6793,7 +6934,8 @@ sub HMCCU_RPCSetConfig ($$$)
 		}
 	}
 	else {
-		my $url = HMCCU_GetRPCServerInfo ($hmccu_hash, $int, 'url');
+#		my $url = HMCCU_GetRPCServerInfo ($hmccu_hash, $int, 'url');
+		my $url = HMCCU_BuildURL ($hmccu_hash, $int);
 		return -9 if (!defined ($url));
 		my $client = RPC::XML::Client->new ($url);
 		$res = $client->simple_request ("putParamset", $addr, "MASTER", $parref);
@@ -7024,6 +7166,51 @@ sub HMCCU_GetTimeSpec ($)
 }
 
 ######################################################################
+# Build ReGa or RPC client URL
+# Parameter backend specifies type of URL, 'rega' or name or port of
+# RPC interface.
+# Return empty string on error.
+######################################################################
+
+sub HMCCU_BuildURL ($$)
+{
+	my ($hash, $backend) = @_;
+	my $name = $hash->{NAME};
+	
+	my $url = '';
+	my $username = '';
+	my $password = '';
+	my ($erruser, $encuser) = getKeyValue ($name."_username");
+	my ($errpass, $encpass) = getKeyValue ($name."_password");	
+	if (!defined ($erruser) && !defined ($errpass) && defined ($encuser) && defined ($encpass)) {
+		$username = HMCCU_Decrypt ($encuser);
+		$password = HMCCU_Decrypt ($encpass);
+	}
+	my $auth = ($username ne '' && $password ne '') ? "$username:$password".'@' : '';
+		
+	if ($backend eq 'rega') {
+		$url = $hash->{prot}."://$auth".$hash->{host}.":".
+			$HMCCU_REGA_PORT{$hash->{prot}}."/tclrega.exe";
+	}
+	else {
+		$url = HMCCU_GetRPCServerInfo ($hash, $backend, 'url');
+		if (defined ($url)) {
+			if (exists ($HMCCU_RPC_SSL{$backend})) {
+				my $p = $hash->{prot} eq 'https' ? '4' : '';
+ 				$url =~ s/^http:\/\//$hash->{prot}:\/\/$auth/;
+				$url =~ s/:([0-9]+)/:$p$1/;
+			}
+		}
+		else {
+			$url = '';
+		}
+	}
+	
+	HMCCU_Log ($hash, 4, "Build URL = $url", undef);
+	return $url;
+}
+
+######################################################################
 # Calculate special readings. Requires hash of client device, channel
 # number and datapoint. Supported functions:
 #  dewpoint, absolute humidity, increasing/decreasing counters,
@@ -7182,6 +7369,73 @@ sub HMCCU_CalculateReading ($$)
 	}
 	
 	return @result;
+}
+
+######################################################################
+# Encrypt string with FHEM unique ID
+######################################################################
+
+sub HMCCU_Encrypt ($)
+{
+	my ($istr) = @_;
+	my $ostr = '';
+	
+	my $id = getUniqueId();
+	return '' if (!defined ($id) || $id eq '');
+	
+	my $key = $id;
+	foreach my $c (split //, $istr) {
+		my $k = chop($key);
+		if ($k eq '') {
+			$key = $id;
+			$k = chop($key);
+		}
+		$ostr .= sprintf ("%.2x",ord($c)^ord($k));
+	}
+
+	return $ostr;	
+}
+
+######################################################################
+# Decrypt string with FHEM unique ID
+######################################################################
+
+sub HMCCU_Decrypt ($)
+{
+	my ($istr) = @_;
+	my $ostr = '';
+
+	my $id = getUniqueId();
+	return '' if (!defined ($id) || $id eq '');
+
+	my $key = $id;
+	for my $c (map { pack('C', hex($_)) } ($istr =~ /(..)/g)) {
+		my $k = chop($key);
+		if ($k eq '') {
+			$key = $id;
+			$k = chop($key);
+		}
+		$ostr .= chr(ord($c)^ord($k));
+	}
+
+	return $ostr;
+}
+
+######################################################################
+# Delete readings matching regular expression.
+# Default for rnexp is .*
+# Readings 'state' and 'control' are ignored.
+######################################################################
+
+sub HMCCU_DeleteReadings ($$)
+{
+	my ($hash, $rnexp) = @_;
+
+	$rnexp = '.*' if (!defined ($rnexp));
+	my @readlist = keys %{$hash->{READINGS}};
+	foreach my $rd (@readlist) {
+		delete ($hash->{READINGS}{$rd}) if ($rd ne 'state' && $rd ne 'control' && $rd =~ /$rnexp/);
+	}
 }
 
 ######################################################################
@@ -7380,7 +7634,8 @@ sub HMCCU_GetDutyCycle ($)
 	
 	foreach my $port (@rpcports) {
 		next if ($port != 2001 && $port != 2010);
-		my $url = HMCCU_GetRPCServerInfo ($hash, $port, 'url');
+#		my $url = HMCCU_GetRPCServerInfo ($hash, $port, 'url');
+		my $url = HMCCU_BuildURL ($hash, $port);
 		next if (!defined ($url));
 		my $rpcclient = RPC::XML::Client->new ($url);
 		my $response = $rpcclient->simple_request ("listBidcosInterfaces");
@@ -7445,6 +7700,23 @@ sub HMCCU_TCPConnect ($$)
 	return '';
 }
 
+######################################################################
+# Generate a 6 digit Id from last 2 segments of IP address
+######################################################################
+
+sub HMCCU_GetIdFromIP ($$)
+{
+	my ($ip, $default) = @_;
+
+	my @ipseg = split (/\./, $ip);
+	if (scalar (@ipseg) == 4) {
+		return sprintf ("%03d%03d", $ipseg[2], $ipseg[3]);
+	}
+	else {
+		return $default;
+	}
+}
+	
 ######################################################################
 # Resolve hostname.
 # Return value defip if hostname can't be resolved.
@@ -7806,15 +8078,16 @@ sub HMCCU_CCURPC_ListDevicesCB ($$)
    <a name="HMCCUdefine"></a>
    <b>Define</b><br/><br/>
    <ul>
-      <code>define &lt;name&gt; HMCCU &lt;HostOrIP&gt; [&lt;ccu-number&gt;] [waitforccu=&lt;timeout&gt;]
+      <code>define &lt;name&gt; HMCCU [&lt;Protocol&gt;://]&lt;HostOrIP&gt; [&lt;ccu-number&gt;] [waitforccu=&lt;timeout&gt;]
       [ccudelay=&lt;delay&gt;] [delayedinit=&lt;delay&gt;]</code>
       <br/><br/>
       Example:<br/>
-      <code>define myccu HMCCU 192.168.1.10 ccudelay=180</code>
+      <code>define myccu HMCCU https://192.168.1.10 ccudelay=180</code>
       <br/><br/>
-      The parameter <i>HostOrIP</i> is the hostname or IP address of a Homematic CCU2 or CCU3. If you have
-      more than one CCU you can specifiy a unique CCU number with parameter <i>ccu-number</i>. With
-      option <i>waitforccu</i> HMCCU will wait for the specified time if CCU is not reachable.
+      The parameter <i>HostOrIP</i> is the hostname or IP address of a Homematic CCU2 or CCU3. Optionally
+      the <i>protocol</i> 'http' or 'https' can be specified. Default protocol is 'http'.<br/>
+      If you have more than one CCU you can specifiy a unique CCU number with parameter <i>ccu-number</i>.
+      With option <i>waitforccu</i> HMCCU will wait for the specified time if CCU is not reachable.
       Parameter <i>timeout</i> should be a multiple of 20 in seconds. Warning: This option will 
       block the start of FHEM for <i>timeout</i> seconds.<br/>
       The option <i>ccudelay</i> specifies the time for delayed initialization of CCU environment if
@@ -7847,6 +8120,15 @@ sub HMCCU_CCURPC_ListDevicesCB ($$)
       <li><b>set &lt;name&gt; ackmessages</b><br/>
       	Acknowledge device was unreachable messages in CCU.
       </li><br/>
+      <li><b>set &lt;name&gt; authentication [&lt;username&gt; &lt;password&gt;]</b><br/>
+      	Set credentials for CCU authentication. Authentication must be activated by setting 
+      	attribute ccuflags to 'authenticate'.<br/>
+      	When executing this command without arguments credentials are deleted.
+      </li><br/>
+      <li><b>set &lt;name&gt; clear [&lt;reading-exp&gt;]</b><br/>
+         Delete readings matching specified reading name expression. Default expression is '.*'.
+         Readings 'state' and 'control' are not deleted.
+      </li><br/>
 		<li><b>set &lt;name&gt; cleardefaults</b><br/>
 			Clear default attributes imported from file.
 		</li><br/>
@@ -7877,6 +8159,9 @@ sub HMCCU_CCURPC_ListDevicesCB ($$)
       <li><b>set &lt;name&gt; importdefaults &lt;filename&gt;</b><br/>
       	Import default attributes from file.
       </li><br/>
+      <li><b>set &lt;name&gt; initialize</b><br/>
+      	Initialize I/O device if state of CCU is unreachable.
+      </li><br/>
       <li><b>set &lt;name&gt; rpcregister [{all | &lt;interface&gt;}]</b><br/>
       	Register RPC servers at CCU.
       </li><br/>
@@ -7898,6 +8183,9 @@ sub HMCCU_CCURPC_ListDevicesCB ($$)
    <ul>
       <li><b>get &lt;name&gt; aggregation {&lt;rule&gt;|all}</b><br/>
       	Process aggregation rule defined with attribute ccuaggregate.
+      </li><br/>
+      <li><b>get &lt;name&gt; ccumsg {service|alarm}</b><br/>
+      	Query active service or alarm messages from CCU. Generate FHEM event for each message.
       </li><br/>
       <li><b>get &lt;name&gt; configdesc {&lt;device&gt;|&lt;channel&gt;}</b><br/>
          Get configuration parameter description of CCU device or channel (similar

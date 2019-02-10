@@ -4,19 +4,11 @@
 #
 #  $Id$
 #
-#  Version 4.5
+#  Version 4.6
 #
 #  Configuration parameters for HomeMatic devices.
 #
-#  (c) 2018 by zap (zap01 <at> t-online <dot> de)
-#
-#  Datapoints LOWBAT, LOW_BAT, UNREACH, ERROR.*, SABOTAGE and FAULT.*
-#  must not be specified in attribute ccureadingfilter. They are always
-#  stored as readings.
-#  Datapoints LOWBAT, LOW_BAT and UNREACH must not be specified in
-#  attribute substitute because they are substituted by default.
-#  See also documentation of attributes ccudef-readingname and
-#  ccudef-substitute in module HMCCU.
+#  (c) 2019 by zap (zap01 <at> t-online <dot> de)
 #
 #########################################################################
 
@@ -554,7 +546,7 @@ use vars qw(%HMCCU_SCRIPTS);
 	},
 	"HMIP-PSM" => {
 	_description     => "Steckdose mit Energiemessung IP",
-	ccureadingfilter => "(STATE|CURRENT|^ENERGY_COUNTER\$|POWER)",
+	ccureadingfilter => "3.STATE;6.(CURRENT|^ENERGY_COUNTER\$|POWER)",
 	controldatapoint => "3.STATE",
 	statedatapoint   => "3.STATE",
 	statevals        => "on:true,off:false",
@@ -1473,25 +1465,21 @@ if(oTmpArray) {
     object oTmp = dom.GetObject(sTmp);
     if (oTmp) {
       if(oTmp.IsTypeOf(OT_ALARMDP) && (oTmp.AlState() == asOncoming)) {
-        boolean collect = true;
         object trigDP = dom.GetObject(oTmp.AlTriggerDP());
         object och = dom.GetObject((trigDP.Channel()));
         object odev = dom.GetObject((och.Device()));
         var ival = trigDP.Value();
-        time sftime = oTmp.AlOccurrenceTime();
-        time sltime = oTmp.LastTriggerTime();
-        var sdesc = trigDP.HSSID();
+        time sftime = oTmp.AlOccurrenceTime(); ! erste Meldezeit
+        time sltime = oTmp.LastTriggerTime();!letze Meldezeit
+        var sdesc = trigDP.HssType();
         var sserial = odev.Address();
-        string sAlarmMessage = web.webKeyFromStringTable(sdesc.Name());
-        if(!sAlarmMessage.Length()) {
-          sAlarmMessage = sdesc;
-        }
+        var sname = odev.Name();
+        WriteLine(sftime.Format("%d.%m.%y %H:%M") # ";" # sltime.Format("%d.%m.%y %H:%M") # ";" # sserial # ";" # sname # ";" # sdesc);
         c = c+1;
-        WriteLine(sftime # ";" # sltime # ";" # sAlarmMessage # ";" # sserial);
       }
     }
   }
-} 
+}
 Write(c);
 		)
 	},
