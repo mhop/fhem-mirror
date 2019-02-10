@@ -118,6 +118,24 @@ attr DEVICE setList \
   color:colorpicker,RGB {"BASE_TOPIC/DEV_ID/set ".zigbee2mqtt_RGB2JSON($EVTPART1)}
 attr DEVICE model L_02b_zigbee2mqtt_colorbulbWithoutColorTemp
 
+#source post: https://forum.fhem.de/index.php/topic,96985.msg902627.html#msg902627
+name:L_02c_zigbee2mqtt_colorbulb_rgb
+filter:TYPE=MQTT2_DEVICE
+par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+attr DEVICE icon hue_filled_white_and_color_e27_b22
+attr DEVICE stateFormat {lc ReadingsVal("$name","state",0)}
+attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name)}
+attr DEVICE webCmd toggle:on:off:brightness:color_temp:hex
+attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+attr DEVICE setList \
+  on:noArg BASE_TOPIC/DEV_ID/set {"state":"ON"}\
+  off:noArg BASE_TOPIC/DEV_ID/set {"state":"OFF"}\
+  brightness:colorpicker,BRI,0,15,255 BASE_TOPIC/DEV_ID/set {"state":"on","$EVTPART0":"$EVTPART1"}\
+  color_temp:colorpicker,CT,250,1,454 BASE_TOPIC/DEV_ID/set {"$EVTPART0":"$EVTPART1"}\
+  hex:colorpicker,HEX,0,15,255 BASE_TOPIC/DEV_ID/set {"color":{"$EVTPART0":"#$EVTPART1"}}
+attr DEVICE model L_02c_zigbee2mqtt_colorbulb_rgb
+
 name:L_03_zigbee2mqtt_smokeDetector
 filter:TYPE=MQTT2_DEVICE
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
@@ -302,6 +320,13 @@ attr DEVICE devStateIcon {\
     ) . "</div>"\
   }
 attr DEVICE model A_01b_tasmota_1ch+motion+SI7021
+
+name:A_01c_tasmota_POW
+filter:TYPE=MQTT2_DEVICE
+desc:Applies to Sonoff POW devices<br>NOTE: Power topic will be set to POWER1; the format the device is sending data will also be changed to lowercase!
+set DEVICE attrTemplate A_01a_tasmota_basic_state_power1
+attr DEVICE stateFormat {sprintf("aktuell: %.1f W Tag: %.2f Kw/h Gestern: %.3f Kw/h Gesamt: %.4f Kw/h", ReadingsVal($name,"ENERGY_Power",undef), ReadingsVal($name,"ENERGY_Today",undef), ReadingsVal($name,"ENERGY_Yesterday",undef), ReadingsVal($name,"ENERGY_Total",undef))}
+attr DEVICE model A_01c_tasmota_POW
 
 # tasmota 2ch as one FHEM device.
 name:A_02a_tasmota_2ch_unified
@@ -513,8 +538,8 @@ desc:shelly4pro using original firmware <br>NOTE: for each of the second to four
 par:DEVNAME;Shelly4Pro name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
 set DEVICE attrTemplate A_10a_shellyplug
 attr DEVICE getList \
-  power1:noArg shellies/DEVNAME/relay/0/power power1\
-  energy1:noArg shellies/DEVNAME/relay/0/energy energy1
+  power0:noArg shellies/DEVNAME/relay/0/power power0\
+  energy0:noArg shellies/DEVNAME/relay/0/energy energy0
 attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2, DEVICE_CH3 and DEVICE_CH4
 copy DEVICE DEVICE_CH2
 attr DEVICE_CH2 readingList shellies/DEVNAME/relay/1:.* state
@@ -524,8 +549,8 @@ attr DEVICE_CH2 setList \
   off:noArg shellies/DEVNAME/relay/1/command off\
   on:noArg shellies/DEVNAME/relay/1/command on
 attr DEVICE getList \
-  power2:noArg shellies/DEVNAME/relay/1/power power2\
-  energy2:noArg shellies/DEVNAME/relay/1/energy energy2
+  power1:noArg shellies/DEVNAME/relay/1/power power1\
+  energy1:noArg shellies/DEVNAME/relay/1/energy energy1
 attr DEVICE comment Channel 2 for DEVICE, see also DEVICE, DEVICE_CH3 and DEVICE_CH4
 copy DEVICE DEVICE_CH3
 attr DEVICE_CH3 readingList shellies/DEVNAME/relay/2:.* state
@@ -535,8 +560,8 @@ attr DEVICE_CH3 setList \
   off:noArg shellies/DEVNAME/relay/2/command off\
   on:noArg shellies/DEVNAME/relay/2/command on
 attr DEVICE getList \
-  power3:noArg shellies/DEVNAME/relay/2/power power3\
-  energy3:noArg shellies/DDEVNAME/relay/2/energy energy3
+  power2:noArg shellies/DEVNAME/relay/2/power power2\
+  energy2:noArg shellies/DDEVNAME/relay/2/energy energy2
 attr DEVICE comment Channel 3 for DEVICE, see also DEVICE, DEVICE_CH2 and DEVICE_CH4
 copy DEVICE DEVICE_CH4
 attr DEVICE_CH4 readingList shellies/DEVNAME/relay/3:.* state
@@ -546,8 +571,8 @@ attr DEVICE_CH4 setList \
   off:noArg shellies/DEVNAME/relay/3/command off\
   on:noArg shellies/DEVNAME/relay/3/command on
 attr DEVICE_CH4 getList \
-  power4:noArg shellies/DEVNAME/relay/3/power power4\
-  energy4:noArg shellies/DEVNAME/relay/3/energy energy4
+  power3:noArg shellies/DEVNAME/relay/3/power power3\
+  energy3:noArg shellies/DEVNAME/relay/3/energy energy3
 attr DEVICE_CH4 comment Channel 4 for DEVICE, see also DEVICE, DEVICE_CH2 and DEVICE_CH3
 attr DEVICE model A_14a_shelly4pro_split
 
