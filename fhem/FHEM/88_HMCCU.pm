@@ -1413,8 +1413,10 @@ sub HMCCU_Set ($@)
 	my $usage = "HMCCU: Unknown argument $opt, choose one of $options";
 	my $host = $hash->{host};
 
-	return undef if ($hash->{hmccu}{ccu}{delayed});
-	return "HMCCU: CCU is unreachable, choose one of initialize:noArg" if ($hash->{ccustate} eq 'unreachable');
+	if ($hash->{hmccu}{ccu}{delayed}) {
+		return $hash->{ccustate} eq 'unreachable' ?
+			"HMCCU: CCU is unreachable, choose one of initialize:noArg" : undef;
+	}
 	return undef if ($hash->{ccustate} ne 'active');
 	return "HMCCU: CCU busy, choose one of rpcserver:off"
 		if ($opt ne 'rpcserver' && HMCCU_IsRPCStateBlocking ($hash));
