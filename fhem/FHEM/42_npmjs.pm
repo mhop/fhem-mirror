@@ -39,7 +39,7 @@ use warnings;
 use POSIX;
 
 # our @EXPORT  = qw(get_time_suffix);
-our $VERSION = "0.9.3";
+our $VERSION = "v0.10.0";
 
 # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 use GPUtils qw(GP_Import);
@@ -304,11 +304,18 @@ sub Get($$@) {
         return $ret;
 
     }
-    elsif ( $cmd eq 'nodejsVersion' ) {
+    elsif ( $cmd eq 'showWarningList' ) {
         return "usage: $cmd" if ( @args != 0 );
 
-        $hash->{".fhem"}{npm}{cmd} = 'getNodeVersion';
-        AsynchronousExecuteNpmCommand($hash);
+        my $ret = CreateWarningList($hash);
+        return $ret;
+
+    }
+    elsif ( $cmd eq 'showErrorList' ) {
+        return "usage: $cmd" if ( @args != 0 );
+
+        my $ret = CreateErrorList($hash);
+        return $ret;
     }
     else {
         my $list = "";
@@ -318,6 +325,12 @@ sub Get($$@) {
         $list .= " showUpdatedList:noArg"
           if ( defined( $hash->{".fhem"}{npm}{updatedpackages} )
             and scalar keys %{ $hash->{".fhem"}{npm}{updatedpackages} } > 0 );
+        $list .= " showWarningList:noArg"
+          if ( defined( $hash->{".fhem"}{npm}{'warnings'} )
+            and scalar @{ $hash->{".fhem"}{npm}{'warnings'} } > 0 );
+        $list .= " showErrorList:noArg"
+          if ( defined( $hash->{".fhem"}{npm}{'errors'} )
+            and scalar @{ $hash->{".fhem"}{npm}{'errors'} } > 0 );
 
         return "Unknown argument $cmd, choose one of $list";
     }
@@ -464,26 +477,45 @@ sub ExecuteNpmCommand($) {
     my $cmdPrefix = "";
     my $cmdSuffix = "";
 
-    if ( $cmd->{host} ne 'localhost' ) {
-        $cmdPrefix = 'ssh ' . $cmd->{host} . ' \'';
-        $cmdSuffix = '\'';
+    if ( $cmd->{host} =~ /^(?:(.*)@)?(.+)$/ && lc($2) ne "localhost" ) {
+
+        # One-time action to add remote hosts key.
+        # If key changes, user will need to intervene
+        #  and cleanup known_hosts file manually for security reasons
+        $cmdPrefix =
+            'KEY=$(ssh-keyscan -t ed25519 '
+          . $2
+          . ' 2>/dev/null); '
+          . 'grep -q -E "^${KEY% *}" ${HOME}/.ssh/known_hosts || echo "${KEY}" >> ${HOME}/.ssh/known_hosts; ';
+        $cmdPrefix .=
+            'KEY=$(ssh-keyscan -t rsa '
+          . $2
+          . ' 2>/dev/null); '
+          . 'grep -q -E "^${KEY% *}" ${HOME}/.ssh/known_hosts || echo "${KEY}" >> ${HOME}/.ssh/known_hosts; ';
+
+        # wrap SSH command
+        $cmdPrefix .= 'ssh -oBatchMode=yes ' . $cmd->{host} . ' \'';
+        $cmdSuffix = '\' 2>&1';
     }
 
-    $npm->{nodejsversion} = $cmdPrefix . 'echo n | node --version' . $cmdSuffix;
+    $npm->{nodejsversion} =
+      $cmdPrefix . 'echo n | node --version 2>&1' . $cmdSuffix;
     if ( $cmd->{npmglobal} == 0 ) {
         $npm->{npmupdate} =
-          $cmdPrefix . 'echo n | npm update --unsafe-perm' . $cmdSuffix;
+          $cmdPrefix . 'echo n | npm update --unsafe-perm 2>&1' . $cmdSuffix;
         $npm->{npmoutdated} =
             $cmdPrefix
-          . 'echo n | node --version; npm outdated --parseable'
+          . 'echo n | node --version && npm outdated --parseable 2>&1'
           . $cmdSuffix;
     }
     else {
         $npm->{npmupdate} =
-          $cmdPrefix . 'echo n | sudo -n npm update -g --unsafe-perm' . $cmdSuffix;
+            $cmdPrefix
+          . 'echo n | sudo -n npm update -g --unsafe-perm 2>&1'
+          . $cmdSuffix;
         $npm->{npmoutdated} =
             $cmdPrefix
-          . 'echo n | node --version; sudo -n npm outdated -g --parseable'
+          . 'echo n | node --version && sudo -n npm outdated -g --parseable 2>&1'
           . $cmdSuffix;
     }
 
@@ -507,13 +539,13 @@ sub GetNodeVersion($) {
     my $cmd = shift;
 
     my $update = {};
-    my $v      = `$cmd->{nodejsversion} 2>/dev/null`;
+    my $v      = `$cmd->{nodejsversion}`;
 
     if ( defined($v) and $v =~ /^v(\d+\.\d+\.\d+)/ ) {
         $update->{nodejsversion} = $1;
     }
     else {
-        $update->{error} = 'Node.js not installed';
+        push @{ $update->{error} }, {message => $v};
     }
 
     return $update;
@@ -668,7 +700,82 @@ sub WriteReadings($$) {
     readingsEndUpdate( $hash, 1 );
 
     ProcessUpdateTimer($hash)
-      if ( $hash->{".fhem"}{npm}{cmd} eq 'getNodeVersion' );
+      if ( $hash->{".fhem"}{npm}{cmd} eq 'getNodeVersion'
+        && !defined( $decode_json->{error} ) );
+}
+
+sub CreateWarningList($) {
+
+    my $hash = shift;
+
+    my $warnings = $hash->{".fhem"}{npm}{'warnings'};
+
+    my $ret = '<html><table><tr><td>';
+    $ret .= '<table class="block wide">';
+    $ret .= '<tr class="even">';
+    $ret .= "<td><b>Warning List</b></td>";
+    $ret .= "<td></td>";
+    $ret .= '</tr>';
+
+    if ( ref($warnings) eq "ARRAY" ) {
+
+        my $linecount = 1;
+        foreach my $warning ( @{$warnings} ) {
+            if ( $linecount % 2 == 0 ) {
+                $ret .= '<tr class="even">';
+            }
+            else {
+                $ret .= '<tr class="odd">';
+            }
+
+            $ret .= "<td>$warning->{message}</td>";
+
+            $ret .= '</tr>';
+            $linecount++;
+        }
+    }
+
+    $ret .= '</table></td></tr>';
+    $ret .= '</table></html>';
+
+    return $ret;
+}
+
+sub CreateErrorList($) {
+
+    my $hash = shift;
+
+    my $errors = $hash->{".fhem"}{npm}{'errors'};
+
+    my $ret = '<html><table><tr><td>';
+    $ret .= '<table class="block wide">';
+    $ret .= '<tr class="even">';
+    $ret .= "<td><b>Error List</b></td>";
+    $ret .= "<td></td>";
+    $ret .= '</tr>';
+
+    if ( ref($errors) eq "ARRAY" ) {
+
+        my $linecount = 1;
+        foreach my $error ( @{$errors} ) {
+            if ( $linecount % 2 == 0 ) {
+                $ret .= '<tr class="even">';
+            }
+            else {
+                $ret .= '<tr class="odd">';
+            }
+
+            $ret .= "<td>$error->{message}</td>";
+
+            $ret .= '</tr>';
+            $linecount++;
+        }
+    }
+
+    $ret .= '</table></td></tr>';
+    $ret .= '</table></html>';
+
+    return $ret;
 }
 
 sub CreateUpgradeList($$) {
