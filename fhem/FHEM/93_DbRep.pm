@@ -57,6 +57,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Versions History intern
 our %DbRep_vNotesIntern = (
+  "8.13.0" => "11.02.2019  executeBeforeProc / executeAfterProc for sumValue, maxValue, minValue, diffValue, averageValue ",
+  "8.12.0" => "10.02.2019  executeBeforeProc / executeAfterProc for sqlCmd ",
   "8.11.2" => "03.02.2019  fix no running tableCurrentFillup if database is closed ",
   "8.11.1" => "25.01.2019  fix sort of versionNotes ",
   "8.11.0" => "24.01.2019  command exportToFile or attribute \"expimpfile\" accepts option \"MAXLINES=\" ",
@@ -135,6 +137,7 @@ our %DbRep_vNotesIntern = (
 
 # Versions History extern:
 our %DbRep_vNotesExtern = (
+  "8.13.0" => "11.02.2019 executeBeforeProc / executeAfterProc is now available for sqlCmd,sumValue, maxValue, minValue, diffValue, averageValue ",
   "8.11.0" => "24.01.2019 command exportToFile or attribute \"expimpfile\" accepts option \"MAXLINES=\" ",
   "8.10.0" => "19.01.2019 In commands sqlCmd, dbValue you may now use SQL session variables like \"SET \@open:=NULL,\@closed:=NULL; SELECT ...\", Forum:#96082",
   "8.9.0"  => "07.11.2018 new command set delDoublets added. This command allows to delete multiple occuring identical records. ",
@@ -670,6 +673,7 @@ sub DbRep_Set($@) {
                       The \"reading\" to evaluate has to be a single reading and no list.</html>";
           }
       }
+      DbRep_beforeproc($hash, "$hash->{LASTCMD}"); 
       DbRep_Main($hash,$opt,$prop);
       
   } elsif ($opt =~ m/delEntries|tableCurrentPurge/ && $hash->{ROLE} ne "Agent") {
@@ -796,6 +800,7 @@ sub DbRep_Set($@) {
 	  if ($sqlcmd =~ m/^\s*delete/is && !AttrVal($hash->{NAME}, "allowDeletion", undef)) {
           return "Attribute 'allowDeletion = 1' is needed for command '$sqlcmd'. Use it with care !";
       }  
+      DbRep_beforeproc($hash, "sqlCmd");
       DbRep_Main($hash,$opt,$sqlcmd);
 	 
   } elsif ($opt =~ /changeValue/) {
@@ -2580,6 +2585,10 @@ sub averval_ParseDone($) {
   my $err        = $a[5]?decode_base64($a[5]):undef;
   my $irowdone   = $a[6];
   my $reading_runtime_string;
+  my $erread;
+  
+  # Befehl nach Procedure ausführen
+  $erread = DbRep_afterproc($hash, "$hash->{LASTCMD}");
   
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
@@ -2601,6 +2610,7 @@ sub averval_ParseDone($) {
   }
   
   # Readingaufbereitung
+  my $state = $erread?$erread:"done";
   readingsBeginUpdate($hash);
   
   my @arr = split("\\|", $arrstr);
@@ -2625,7 +2635,7 @@ sub averval_ParseDone($) {
   }
 
   ReadingsBulkUpdateValue ($hash, "db_lines_processed", $irowdone) if($hash->{LASTCMD} =~ /writeToDB/);
-  ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");  
+  ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);  
   readingsEndUpdate($hash, 1);
   
   delete($hash->{HELPER}{RUNNING_PID});
@@ -2987,6 +2997,10 @@ sub maxval_ParseDone($) {
   my $err       = $a[5]?decode_base64($a[5]):undef;
   my $irowdone  = $a[6];
   my $reading_runtime_string;
+  my $erread;
+  
+  # Befehl nach Procedure ausführen
+  $erread = DbRep_afterproc($hash, "$hash->{LASTCMD}");
   
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
@@ -3003,6 +3017,7 @@ sub maxval_ParseDone($) {
   }
   
   # Readingaufbereitung
+  my $state = $erread?$erread:"done";
   readingsBeginUpdate($hash);
   
   # only for this block because of warnings if details of readings are not set
@@ -3025,7 +3040,7 @@ sub maxval_ParseDone($) {
   }
   
   ReadingsBulkUpdateValue ($hash, "db_lines_processed", $irowdone) if($hash->{LASTCMD} =~ /writeToDB/);
-  ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
+  ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);
   readingsEndUpdate($hash, 1);
 
   delete($hash->{HELPER}{RUNNING_PID});
@@ -3216,6 +3231,10 @@ sub minval_ParseDone($) {
   my $err       = $a[5]?decode_base64($a[5]):undef;
   my $irowdone  = $a[6];
   my $reading_runtime_string;
+  my $erread;
+  
+  # Befehl nach Procedure ausführen
+  $erread = DbRep_afterproc($hash, "$hash->{LASTCMD}");
   
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
@@ -3232,6 +3251,7 @@ sub minval_ParseDone($) {
   }
   
   # Readingaufbereitung
+  my $state = $erread?$erread:"done";
   readingsBeginUpdate($hash);
   
   # only for this block because of warnings if details of readings are not set
@@ -3254,7 +3274,7 @@ sub minval_ParseDone($) {
   }
   
   ReadingsBulkUpdateValue ($hash, "db_lines_processed", $irowdone) if($hash->{LASTCMD} =~ /writeToDB/);
-  ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
+  ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);
   readingsEndUpdate($hash, 1);
 
   delete($hash->{HELPER}{RUNNING_PID});
@@ -3552,8 +3572,12 @@ sub diffval_ParseDone($) {
   my $irowdone   = $a[8];
   my $reading_runtime_string;
   my $difflimit  = AttrVal($name, "diffAccept", "20");   # legt fest, bis zu welchem Wert Differenzen akzeptoert werden (Ausreißer eliminieren)AttrVal($name, "diffAccept", "20");
+  my $erread;
   
-   if ($err) {
+  # Befehl nach Procedure ausführen
+  $erread = DbRep_afterproc($hash, "$hash->{LASTCMD}");
+  
+  if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
       delete($hash->{HELPER}{RUNNING_PID});
@@ -3585,6 +3609,7 @@ sub diffval_ParseDone($) {
      Log3 ($name, 4, "DbRep $name - runtimestring Key: $key, value: ".$rh{$key}); 
  }
   
+ my $state = $erread?$erread:"done";
  readingsBeginUpdate($hash);
  
   foreach my $key (sort(keys(%rh))) {
@@ -3608,7 +3633,7 @@ sub diffval_ParseDone($) {
   ReadingsBulkUpdateValue ($hash, "db_lines_processed", $irowdone) if($hash->{LASTCMD} =~ /writeToDB/);
   ReadingsBulkUpdateValue ($hash, "diff_overrun_limit_".$difflimit, $rowsrej) if($rowsrej);
   ReadingsBulkUpdateValue ($hash, "less_data_in_period", $ncpstr) if($ncpstr);
-  ReadingsBulkUpdateTimeState($hash,$brt,$rt,($ncpstr||$rowsrej)?"Warning":"done");
+  ReadingsBulkUpdateTimeState($hash,$brt,$rt,($ncpstr||$rowsrej)?"Warning":$state);
   
   readingsEndUpdate($hash, 1);
 
@@ -3752,6 +3777,10 @@ sub sumval_ParseDone($) {
   my $err        = $a[5]?decode_base64($a[5]):undef;
   my $irowdone   = $a[6];
   my $reading_runtime_string;
+  my $erread;
+  
+  # Befehl nach Procedure ausführen
+  $erread = DbRep_afterproc($hash, "$hash->{LASTCMD}");
   
    if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
@@ -3764,6 +3793,7 @@ sub sumval_ParseDone($) {
   no warnings 'uninitialized'; 
   
   # Readingaufbereitung
+  my $state = $erread?$erread:"done";
   readingsBeginUpdate($hash);
 
   my @arr = split("\\|", $arrstr);
@@ -3785,7 +3815,7 @@ sub sumval_ParseDone($) {
   }
   
   ReadingsBulkUpdateValue ($hash, "db_lines_processed", $irowdone) if($hash->{LASTCMD} =~ /writeToDB/);
-  ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
+  ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);
   readingsEndUpdate($hash, 1);
   
   delete($hash->{HELPER}{RUNNING_PID});  
@@ -5715,6 +5745,10 @@ sub sqlCmd_ParseDone($) {
   my $err        = $a[6]?decode_base64($a[6]):undef;
   my $srf        = AttrVal($name, "sqlResultFormat", "separated");
   my $srs        = AttrVal($name, "sqlResultFieldSep", "|");
+  my $erread;
+  
+  # Befehl nach Procedure ausführen
+  $erread = DbRep_afterproc($hash, "sqlCmd");
   
   if ($err) {
     ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
@@ -5728,6 +5762,7 @@ sub sqlCmd_ParseDone($) {
   no warnings 'uninitialized'; 
   
   # Readingaufbereitung
+  my $state = $erread?$erread:"done";
   readingsBeginUpdate($hash);
 
   ReadingsBulkUpdateValue ($hash, "sqlCmd", $cmd); 
@@ -5807,7 +5842,7 @@ sub sqlCmd_ParseDone($) {
 	  ReadingsBulkUpdateValue ($hash, "SqlResult", $json);
   }
 
-  ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
+  ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);
   readingsEndUpdate($hash, 1);
   
   delete($hash->{HELPER}{RUNNING_PID});
@@ -10425,6 +10460,8 @@ return;
                                  <colgroup> <col width=5%> <col width=95%> </colgroup>
                                     <tr><td> <b>averageCalcForm</b>                        </td><td>: choose the calculation variant for average determination </td></tr>
                                     <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
+                                    <tr><td> <b>executeBeforeProc</b>                      </td><td>: execution of FHEM command (or perl-routine) before operation </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: execution of FHEM command (or perl-routine) after operation </td></tr>
                                     <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>                                      
                                     <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time </td></tr>
                                     <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
@@ -10778,6 +10815,8 @@ return;
 								    <tr><td> <b>aggregation</b>                            </td><td>: choose the aggregation period </td></tr>
 								    <tr><td> <b>diffAccept</b>                             </td><td>: the maximum accepted difference between sequential records </td></tr>
                                     <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
+	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: execution of FHEM command (or perl-routine) before operation </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: execution of FHEM command (or perl-routine) after operation </td></tr>
                                     <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>                                      
  	                                <tr><td> <b>readingNameMap</b>                         </td><td>: rename the resulted reading name </td></tr>
  								    <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time </td></tr>
@@ -11185,6 +11224,8 @@ return;
                                  <colgroup> <col width=5%> <col width=95%> </colgroup>
 								    <tr><td> <b>aggregation</b>                            </td><td>: choose the aggregation period </td></tr>
                                     <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
+                                    <tr><td> <b>executeBeforeProc</b>                      </td><td>: execution of FHEM command (or perl-routine) before operation </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: execution of FHEM command (or perl-routine) after operation </td></tr> 
                                     <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; from selection </td></tr> 
                                     <tr><td> <b>readingNameMap</b>                         </td><td>: rename the resulted readings </td></tr>									
 								    <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time </td></tr>
@@ -11225,6 +11266,8 @@ return;
                                  <colgroup> <col width=5%> <col width=95%> </colgroup>
 								    <tr><td> <b>aggregation</b>                            </td><td>: choose the aggregation period </td></tr>
                                     <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
+                                    <tr><td> <b>executeBeforeProc</b>                      </td><td>: execution of FHEM command (or perl-routine) before operation </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: execution of FHEM command (or perl-routine) after operation </td></tr> 
                                     <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; from selection </td></tr> 
                                     <tr><td> <b>readingNameMap</b>                         </td><td>: rename the resulted readings </td></tr>									
 								    <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time </td></tr>
@@ -11471,6 +11514,8 @@ return;
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
                                       <tr><td> <b>allowDeletion</b>       </td><td>: activates capabilty to delete datasets </td></tr>
+	                                  <tr><td> <b>executeBeforeProc</b>   </td><td>: execution of FHEM command (or perl-routine) before operation </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>    </td><td>: execution of FHEM command (or perl-routine) after operation </td></tr>
                                       <tr><td> <b>sqlResultFormat</b>     </td><td>: determines presentation style of command result </td></tr>
                                       <tr><td> <b>sqlResultFieldSep</b>   </td><td>: choice of a useful field separator for result </td></tr>
                                       <tr><td> <b>sqlCmdHistoryLength</b> </td><td>: activates command history and length </td></tr>
@@ -11492,7 +11537,22 @@ return;
                                    successfully executed sqlCmd-command can be repeated from a drop-down list. <br>
                                    By execution of the last list entry, "__purge_historylist__", the list itself can be deleted. <br>
 								   If the statement contains "," this character is displayed as "&lt;c&gt;" in the history 
-                                   list due to technical restrictions. <br>
+                                   list due to technical restrictions. <br><br>
+                             
+                                   For a better overview the relevant attributes for this command are listed in a table: <br><br>
+
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> <b>allowDeletion</b>       </td><td>: activates capabilty to delete datasets </td></tr>
+	                                  <tr><td> <b>executeBeforeProc</b>   </td><td>: execution of FHEM command (or perl-routine) before operation </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>    </td><td>: execution of FHEM command (or perl-routine) after operation </td></tr>
+                                      <tr><td> <b>sqlResultFormat</b>     </td><td>: determines presentation style of command result </td></tr>
+                                      <tr><td> <b>sqlResultFieldSep</b>   </td><td>: choice of a useful field separator for result </td></tr>
+                                   </table>
+	                               </ul>
+	                               <br>
+	                               <br>
                                    </li><br>	
 
     <li><b> sqlSpecial </b>    - This function provides a drop-down list with a selection of prepared reportings. <br>
@@ -11505,6 +11565,8 @@ return;
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
+	                                  <tr><td> <b>executeBeforeProc</b>  </td><td>: execution of FHEM command (or perl-routine) before operation </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>   </td><td>: execution of FHEM command (or perl-routine) after operation </td></tr>
                                       <tr><td> <b>sqlResultFormat</b>    </td><td>: determines the formatting of the result </td></tr>
                                       <tr><td> <b>sqlResultFieldSep</b>  </td><td>: determines the used field separator in statement result </td></tr>
                                    </table>
@@ -11554,6 +11616,8 @@ return;
                                  <colgroup> <col width=5%> <col width=95%> </colgroup>
 								    <tr><td> <b>aggregation</b>                            </td><td>: choose the aggregation period </td></tr>
                                     <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
+                                    <tr><td> <b>executeBeforeProc</b>                      </td><td>: execution of FHEM command (or perl-routine) before operation </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: execution of FHEM command (or perl-routine) after operation </td></tr> 
                                     <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; from selection </td></tr> 
                                     <tr><td> <b>readingNameMap</b>                         </td><td>: rename the resulted readings </td></tr>									
 								    <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time </td></tr>
@@ -12747,6 +12811,8 @@ sub bdump {
            					          <tr><td> <b>aggregation</b>                            </td><td>: Auswahl einer Aggregationsperiode </td></tr>
                                       <tr><td> <b>averageCalcForm</b>                        </td><td>: Auswahl der Berechnungsvariante für den Durchschnitt</td></tr>
                                       <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
+	                                  <tr><td> <b>executeBeforeProc</b>                      </td><td>: ausführen FHEM Kommando (oder perl-Routine) vor Start Operation </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>                       </td><td>: ausführen FHEM Kommando (oder perl-Routine) nach Ende Operation </td></tr>
                                       <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
                                       <tr><td> <b>readingNameMap</b>                         </td><td>: die entstehenden Ergebnisreadings werden partiell umbenannt </td></tr>									
 								      <tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
@@ -13104,6 +13170,8 @@ sub bdump {
                                  <colgroup> <col width=5%> <col width=95%> </colgroup>
            					        <tr><td> <b>aggregation</b>                            </td><td>: Auswahl einer Aggregationsperiode </td></tr>
                                     <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
+	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: ausführen FHEM Kommando (oder perl-Routine) vor Start Operation </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: ausführen FHEM Kommando (oder perl-Routine) nach Ende Operation </td></tr>
                                     <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
                                     <tr><td> <b>readingNameMap</b>                         </td><td>: die entstehenden Ergebnisreadings werden partiell umbenannt </td></tr>									
 									<tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
@@ -13514,8 +13582,9 @@ sub bdump {
                                  <table>  
                                  <colgroup> <col width=5%> <col width=95%> </colgroup>
            					        <tr><td> <b>aggregation</b>                            </td><td>: Auswahl einer Aggregationsperiode </td></tr>
-								    <tr><td> <b>limit</b>                                  </td><td>: die Anzahl der ANZUZEIGENDEN Datensätz wird beschränkt </td></tr>
                                     <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
+	                                <tr><td> <b>executeBeforeProc</b>                       </td><td>: ausführen FHEM Kommando (oder perl-Routine) vor Start Operation </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                        </td><td>: ausführen FHEM Kommando (oder perl-Routine) nach Ende Operation </td></tr>
                                     <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
                                     <tr><td> <b>readingNameMap</b>                         </td><td>: die entstehenden Ergebnisreadings werden partiell umbenannt </td></tr>									
 									<tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
@@ -13560,8 +13629,9 @@ sub bdump {
                                  <table>  
                                  <colgroup> <col width=5%> <col width=95%> </colgroup>
            					        <tr><td> <b>aggregation</b>                            </td><td>: Auswahl einer Aggregationsperiode </td></tr>
-								    <tr><td> <b>limit</b>                                  </td><td>: die Anzahl der ANZUZEIGENDEN Datensätz wird beschränkt </td></tr>
                                     <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
+	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: ausführen FHEM Kommando (oder perl-Routine) vor Start Operation </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: ausführen FHEM Kommando (oder perl-Routine) nach Ende Operation </td></tr>
                                     <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
                                     <tr><td> <b>readingNameMap</b>                         </td><td>: die entstehenden Ergebnisreadings werden partiell umbenannt </td></tr>									
 									<tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
@@ -13815,6 +13885,8 @@ sub bdump {
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
+	                                  <tr><td> <b>executeBeforeProc</b>   </td><td>: FHEM Kommando (oder perl-Routine) vor der Operation ausführen </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>    </td><td>: FHEM Kommando (oder perl-Routine) nach der Operation ausführen </td></tr>
                                       <tr><td> <b>allowDeletion</b>       </td><td>: aktiviert Löschmöglichkeit </td></tr>
                                       <tr><td> <b>sqlResultFormat</b>     </td><td>: legt die Darstellung des Kommandoergebnis fest  </td></tr>
                                       <tr><td> <b>sqlResultFieldSep</b>   </td><td>: Auswahl Feldtrenner im Ergebnis </td></tr>
@@ -13837,7 +13909,24 @@ sub bdump {
                                    Mit Ausführung des letzten Eintrags der Liste, "__purge_historylist__", kann die Liste gelöscht 
                                    werden. <br>
                                    Falls das Statement "," enthält, wird dieses Zeichen aus technischen Gründen in der 
-                                   History-Liste als "&lt;c&gt;" dargestellt. <br>
+                                   History-Liste als "&lt;c&gt;" dargestellt. <br><br>
+                                   
+                                   Zur besseren Übersicht sind die zur Steuerung dieser Funktion von relevanten Attribute 
+                                   hier noch einmal zusammenstellt: <br><br>
+
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+	                                  <tr><td> <b>executeBeforeProc</b>   </td><td>: FHEM Kommando (oder perl-Routine) vor der Operation ausführen </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>    </td><td>: FHEM Kommando (oder perl-Routine) nach der Operation ausführen </td></tr>
+                                      <tr><td> <b>allowDeletion</b>       </td><td>: aktiviert Löschmöglichkeit </td></tr>
+                                      <tr><td> <b>sqlResultFormat</b>     </td><td>: legt die Darstellung des Kommandoergebnis fest  </td></tr>
+                                      <tr><td> <b>sqlResultFieldSep</b>   </td><td>: Auswahl Feldtrenner im Ergebnis </td></tr>
+                                   </table>
+	                               </ul>
+	                               <br>
+	                               <br>
+                                   
 								   </li><br>
                                    
     <li><b> sqlSpecial </b>    - Die Funktion bietet eine Drop-Downliste mit einer Auswahl vorbereiter Auswertungen
@@ -13851,6 +13940,8 @@ sub bdump {
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
+	                                  <tr><td> <b>executeBeforeProc</b>  </td><td>: FHEM Kommando (oder perl-Routine) vor der Operation ausführen </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>   </td><td>: FHEM Kommando (oder perl-Routine) nach der Operation ausführen </td></tr>
                                       <tr><td> <b>sqlResultFormat</b>    </td><td>: Optionen der Ergebnisformatierung </td></tr>
                                       <tr><td> <b>sqlResultFieldSep</b>  </td><td>: Auswahl des Trennzeichens zwischen Ergebnisfeldern </td></tr>
                                    </table>
@@ -13899,8 +13990,9 @@ sub bdump {
                                  <table>  
                                  <colgroup> <col width=5%> <col width=95%> </colgroup>
            					        <tr><td> <b>aggregation</b>                            </td><td>: Auswahl einer Aggregationsperiode </td></tr>
-								    <tr><td> <b>limit</b>                                  </td><td>: die Anzahl der ANZUZEIGENDEN Datensätz wird beschränkt </td></tr>
                                     <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
+	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: ausführen FHEM Kommando (oder perl-Routine) vor Start Operation </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: ausführen FHEM Kommando (oder perl-Routine) nach Ende Operation </td></tr>
                                     <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
                                     <tr><td> <b>readingNameMap</b>                         </td><td>: die entstehenden Ergebnisreadings werden partiell umbenannt </td></tr>									
 									<tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
