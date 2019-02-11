@@ -1,10 +1,11 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - changed: 98_WeekdayTimer: remove Twilight dependency
   - feature: 74_AMADautomagicflowset: add support for Android 9 Pie
   - feature: 88_HMCCU: New commands and bug fixes
   - changed: 93_DbLog: CommandRef revised
-  - feature: 98_HTTPMOD: starting with featurelevel >5.9 enableCookies, 
-                         enableControlSet, handleRedirects and 
+  - feature: 98_HTTPMOD: starting with featurelevel >5.9 enableCookies,
+                         enableControlSet, handleRedirects and
                          enforceGoodReadingNames will default to 1
   - feature: 49_SSCam: new streaming device type "lastsnap", minor fixes
   - change:  93_Log2Syslog: version numbering
@@ -15,7 +16,7 @@
   - feature: 12_HProtocolTank: added Product to calculate 15 degrees volume
   - new:     70_ZoneMinder: fetching Event-Details via API after event received
   - new:     71_ZM_Monitor: fetching Event-Details via API after event received
-  - bugfix:  49_SSCam: V8.8.1, fix need attr snapGalleryBoost when sending a 
+  - bugfix:  49_SSCam: V8.8.1, fix need attr snapGalleryBoost when sending a
                        snapshot by telegram
   - new:     39_gassistant: Google Assistant support
   - bugfix:  70_BOTVAC: vendor name is no longer case sensitive
@@ -35,21 +36,21 @@
   - bugfix:  49_SSCam: fix version numbering
   - bugfix:  93_DbRep: fix version numbering
   - feature: 98_livetracking: added events for OwnTrack zones
-  - feature: 93_DbRep: command exportToFile or attribute "expimpfile" accept 
+  - feature: 93_DbRep: command exportToFile or attribute "expimpfile" accept
                        option "MAXLINES="
   - bugfix: 09_CUL_FHTTK: removed low batt information from state, moved to
                           reading batteryState
   - feature: 59_Weather: add limit forecast, selection between daily and hourly
                          forecast
-  - feature: 49_SSCam: V8.6.1, new attribute snapReadingRotate, time format in 
-                       readings and galleries depends from global language 
+  - feature: 49_SSCam: V8.6.1, new attribute snapReadingRotate, time format in
+                       readings and galleries depends from global language
                        attribute, minor bug fixes
-  - feature: 98_freezemon: New freeze statistics 
+  - feature: 98_freezemon: New freeze statistics
   - bugfix:  14_CUL_TCM97001: Fix uninitialized value warning
-  - bugfix:  14_CUL_REDIRECT: Fix uninitialized value warning 
+  - bugfix:  14_CUL_REDIRECT: Fix uninitialized value warning
   - feature: 93_DbRep: sqlCmd can handle SQL session variables, Forum:#96082
   - bugfix:  98_DOIFtools: remove Log in DOIFtoolsNextTimer
-  - bugfix:  93_DbRep: V8.9.10, fix warnings Malformed UTF-8 character during 
+  - bugfix:  93_DbRep: V8.9.10, fix warnings Malformed UTF-8 character during
                        importFromFile, Forum:#96056
   - change:  59_Weather: add Internal MODEL for statistic
   - feature: 70_BRAVIA: new set command openUrl
@@ -60,7 +61,7 @@
   - bugfix:  DarkSkyAPI: fix reading values, add API Version
   - bugfix:  82_LGTV_WebOS: add SkyOnline at set commands
   - feature: 49_SSCam: 8.5.0, SVS device has "snapCams" command to take
-                       snapshots of all cameras and optionally send them 
+                       snapshots of all cameras and optionally send them
                        alltogether by Email
   - change:  59_Weather: Codestyle, add attribut model to API
   - bugfix:  73_AutoShuttersControl: fix drive up then roommate asleep
@@ -77,7 +78,7 @@
   - bugfix:  DarkSkyAPI: OpenWeatherMapAPI, Weather - fix bugs, change
              day_of_week formated, delete deprecated readings
   - bugfixe: DarkSkyAPI: fix hourly wind at factor 3.6
-  - new:     44_ROLLO: Universal module to precisely control shutters/blinds 
+  - new:     44_ROLLO: Universal module to precisely control shutters/blinds
              which support only open/close/stop
   - bugfix:  59_Weather: DarkSky and OpenWeatherMapAPI change formated output,
              add hourly support for DarkSky - thanks to Lippie,
