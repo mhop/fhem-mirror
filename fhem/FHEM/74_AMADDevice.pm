@@ -2,7 +2,7 @@
 # 
 # Developed with Kate
 #
-#  (c) 2015-2018 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
+#  (c) 2015-2019 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
 #  All rights reserved
 #
 #   Special thanks goes to comitters:
@@ -60,8 +60,8 @@ eval "use JSON;1" or $missingModul .= "JSON ";
 
 
 
-my $modulversion = "4.2.6";
-my $flowsetversion = "4.2.4";
+my $modulversion = "4.2.7";
+my $flowsetversion = "4.2.5";
 
 
 
@@ -163,6 +163,8 @@ sub AMADDevice_Define($$) {
     $hash->{PORT}                               = 1817 if($remoteServer eq 'Autoremote');
     $hash->{PORT}                               = 8765 if($remoteServer eq 'TNES');
     $hash->{PORT}                               = 1111 if($remoteServer eq 'other');        # Dummy Port for other
+    return 'typo in <remoteServer> field. please use Automagic, Autoremote, TNES or other'
+      unless ( defined($hash->{PORT}) and $hash->{PORT} );
     
     $hash->{helper}{infoErrorCounter}           = 0;
     $hash->{helper}{setCmdErrorCounter}         = 0;
