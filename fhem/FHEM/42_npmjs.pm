@@ -76,8 +76,12 @@ BEGIN {
     );
 }
 
-my @fhem_modules =
-  ( 'alexa-fhem', 'gassistant-fhem', 'homebridge-fhem', 'tradfri-fhem', );
+my %fhem_npm_modules = (
+    'alexa-fhem'      => { fhem_module => 'alexa', },
+    'gassistant-fhem' => { fhem_module => 'gassistant', },
+    'homebridge-fhem' => { fhem_module => 'siri', },
+    'tradfri-fhem'    => { fhem_module => 'tradfri', },
+);
 
 sub Define($$) {
 
@@ -284,7 +288,7 @@ sub Set($$@) {
               unless ( defined( $hash->{".fhem"}{npm}{outdatedpackages} ) );
 
             my $update;
-            foreach (@fhem_modules) {
+            foreach ( keys %fhem_npm_modules ) {
                 next
                   unless (
                     defined( $hash->{".fhem"}{npm}{outdatedpackages}{$_} ) );
@@ -308,7 +312,7 @@ sub Set($$@) {
             and ( lc( $args[0] ) eq "all" or lc( $args[0] ) eq "fhem-all" ) )
         {
             my $install;
-            foreach (@fhem_modules) {
+            foreach ( keys %fhem_npm_modules ) {
                 next
                   if (
                     defined(
@@ -330,7 +334,7 @@ sub Set($$@) {
         return "usage: $cmd <package>" if ( @args < 1 );
         if ( defined( $args[0] ) and lc( $args[0] ) eq "fhem-all" ) {
             my $uninstall;
-            foreach (@fhem_modules) {
+            foreach ( keys %fhem_npm_modules ) {
                 next
                   unless (
                     defined(
@@ -382,7 +386,7 @@ sub Set($$@) {
                     $hash->{".fhem"}{npm}{listedpackages}{dependencies} ) )
             {
                 my $install;
-                foreach (@fhem_modules) {
+                foreach ( keys %fhem_npm_modules ) {
                     next
                       if (
                         defined(
@@ -440,6 +444,7 @@ sub Set($$@) {
         return "Unknown argument $cmd, choose one of $list";
     }
 
+    FhemTrigger($hash);
     AsynchronousExecuteNpmCommand($hash);
 
     return undef;
@@ -533,11 +538,28 @@ sub Get($$@) {
     }
 }
 
+sub FhemTrigger ($) {
+    my $hash = shift;
+    my $name = $hash->{NAME};
+    return
+      unless ( defined( $hash->{".fhem"}{npm}{cmd} )
+        && $hash->{".fhem"}{npm}{cmd} =~
+        m/^(install|uninstall|update)(?: (.+))/i );
+
+  # my $cmd      = $1;
+  # my $packages = $2;
+  #
+  # foreach my $package ( split / /, $1 ) {
+  #     next
+  #       unless ( $package =~ /^(?:@([\w-]+)\/)?([\w-]+)(?:@([\d\.=<>]+))?$/ );
+  #
+  #     DoTrigger( $name, "UPDATESTART package", 1 );
+  # }
+}
+
 ###################################
 sub ProcessUpdateTimer($) {
-
     my $hash = shift;
-
     my $name = $hash->{NAME};
 
     RemoveInternalTimer($hash);
@@ -762,9 +784,11 @@ sub ExecuteNpmCommand($) {
             elsif ( $1 =~ /^nodejs-v(\d+)/ ) {
                 $npm->{npminstall} =
                     $cmdPrefix
-                  . "echo n | curl -sSL https://deb.nodesource.com/setup_$1.x | DEBIAN_FRONTEND=noninteractive sudo -n -E sh -c \"bash - >/dev/null 2>&1\" 2>&1"
-                  . ' && DEBIAN_FRONTEND=noninteractive sudo -n -E sh -c "apt-get install -qqy nodejs >/dev/null 2>&1" 2>&1;'
-                  . ' node -e "console.log(JSON.stringify(process.versions));" 2>&1'
+                  . "echo n | if [ -z \"\$(node --version 2>/dev/null)\" ]; then"
+                  . " curl -sSL https://deb.nodesource.com/setup_$1.x | DEBIAN_FRONTEND=noninteractive sudo -n -E sh -c \"bash - >/dev/null 2>&1\" 2>&1 &&"
+                  . ' DEBIAN_FRONTEND=noninteractive sudo -n -E sh -c "apt-get install -qqy nodejs >/dev/null 2>&1" 2>&1; '
+                  . 'fi; '
+                  . 'node -e "console.log(JSON.stringify(process.versions));" 2>&1'
                   . $cmdSuffix;
             }
         }
@@ -775,7 +799,6 @@ sub ExecuteNpmCommand($) {
                   unless ( $package =~
                     /^(?:@([\w-]+)\/)?([\w-]+)(?:@([\d\.=<>]+))?$/ );
 
-                Debug Dumper $cmd;
                 push @packages,
                   "homebridge"
                   if (
