@@ -372,8 +372,7 @@ sub Set($$@) {
 
         if ( !defined( $hash->{".fhem"}{npm}{nodejsversions} ) ) {
             $list =
-              "install:nodejs-v11,nodejs-v10,nodejs-v8,nodejs-v6,statusRequest"
-              unless ( exists( $hash->{".fhem"}{subprocess} ) );
+              "install:nodejs-v11,nodejs-v10,nodejs-v8,nodejs-v6,statusRequest";
         }
         else {
             $list = "outdated:noArg";
@@ -718,9 +717,9 @@ sub ExecuteNpmCommand($) {
           . '\"versions\": "; '
           . 'node -e "console.log(JSON.stringify(process.versions));"; '
           . 'L1=$(npm list --json --silent --depth=0 2>/dev/null); '
-          . '[[ "$L1" != "" && "$L1" != "\n" ]] && echo ", \"listed\": $L1"; '
+          . '[ "$L1" != "" ] && [ "$L1" != "\n" ] && echo ", \"listed\": $L1"; '
           . 'L2=$(npm outdated --json 2>&1); '
-          . '[[ "$L2" != "" && "$L2" != "\n" ]] && echo ", \"outdated\": $L2"; '
+          . '[ "$L2" != "" ] && [ "$L2" != "\n" ] && echo ", \"outdated\": $L2"; '
           . 'echo "}"'
           . $cmdSuffix;
     }
@@ -744,9 +743,9 @@ sub ExecuteNpmCommand($) {
           . '\"versions\": "; '
           . 'node -e "console.log(JSON.stringify(process.versions));"; '
           . 'L1=$(npm list -g --json --silent --depth=0 2>/dev/null); '
-          . '[[ "$L1" != "" && "$L1" != "\n" ]] && echo ", \"listed\": $L1"; '
+          . '[ "$L1" != "" ] && [ "$L1" != "\n" ] && echo ", \"listed\": $L1"; '
           . 'L2=$(npm outdated -g --json 2>&1); '
-          . '[[ "$L2" != "" && "$L2" != "\n" ]] && echo ", \"outdated\": $L2"; '
+          . '[ "$L2" != "" ] && [ "$L2" != "\n" ] && echo ", \"outdated\": $L2"; '
           . 'echo "}"'
           . $cmdSuffix;
     }
@@ -1067,6 +1066,8 @@ sub WriteReadings($$) {
                 : 'check failed'
             )
         );
+        delete $hash->{".fhem"}{npm}{nodejsversions}
+          unless ( $decode_json->{versions} );
         $hash->{helper}{lastSync} = ToDay();
     }
 
