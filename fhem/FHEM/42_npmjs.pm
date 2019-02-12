@@ -21,7 +21,7 @@ sub npmjs_Initialize($) {
     $hash->{AttrList} =
         "disable:1,0 "
       . "disabledForIntervals "
-      . "upgradeListReading:1,0 "
+      . "updateListReading:1,0 "
       . "npmglobal:1,0 "
       . $readingFnAttributes;
 
@@ -39,7 +39,7 @@ use warnings;
 use POSIX;
 
 # our @EXPORT  = qw(get_time_suffix);
-our $VERSION = "v0.10.0";
+our $VERSION = "0.10.0";
 
 # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 use GPUtils qw(GP_Import);
@@ -76,7 +76,8 @@ BEGIN {
     );
 }
 
-my @fhem_modules = ( "alexa-fhem", "tradfri-fhem" );
+my @fhem_modules =
+  ( 'alexa-fhem', 'gassistant-fhem', 'homebridge-fhem', 'tradfri-fhem', );
 
 sub Define($$) {
 
@@ -89,6 +90,8 @@ sub Define($$) {
 
     my $name = $a[0];
     my $host = $a[2] ? $a[2] : 'localhost';
+
+    Undef( $hash, undef ) if ( $hash->{OLDDEF} );    # modify
 
     $hash->{VERSION}   = $VERSION;
     $hash->{HOST}      = $host;
@@ -105,7 +108,7 @@ sub Define($$) {
         # presets for FHEMWEB
         $attr{$name}{alias} = 'Node.js Update Status';
         $attr{$name}{devStateIcon} =
-'npm.updates.available:security@red:outdated npm.is.up.to.date:security@green:outdated .*in.progress:system_fhem_reboot@orange errors:message_attention@red';
+'npm.updates.available:security@red:outdated npm.is.up.to.date:security@green:outdated .*in.progress:system_fhem_reboot@orange warning.*:message_attention@orange error.*:message_attention@red';
         $attr{$name}{group} = 'System';
         $attr{$name}{icon}  = 'nodejs';
         $attr{$name}{room}  = 'System';
@@ -132,7 +135,6 @@ sub Undef($$) {
     RemoveInternalTimer($hash);
 
     delete( $modules{npmjs}{defptr}{ $hash->{HOST} } );
-    Log3 $name, 3, "Sub npmjs ($name) - delete device $name";
     return undef;
 }
 
@@ -183,56 +185,67 @@ sub Notify($$) {
     my $events  = deviceEvents( $dev, 1 );
     return if ( !$events );
 
-    Log3 $name, 5, "npmjs ($name) - Notify: " . Dumper $events;    # mit Dumper
+    Log3 $name, 5, "npmjs ($name) - Notify: " . Dumper $events;
 
     if (
         (
             (
-                grep /^DEFINED.$name$/,
-                @{$events}
-                or grep /^DELETEATTR.$name.disable$/,
-                @{$events}
-                or grep /^ATTR.$name.disable.0$/,
-                @{$events}
+                   grep ( /^DEFINED.$name$/, @{$events} )
+                or grep ( /^DELETEATTR.$name.disable$/, @{$events} )
+                or grep ( /^ATTR.$name.disable.0$/,     @{$events} )
             )
             and $devname eq 'global'
             and $init_done
         )
         or (
             (
-                grep /^INITIALIZED$/,
-                @{$events}
-                or grep /^REREADCFG$/,
-                @{$events}
-                or grep /^MODIFIED.$name$/,
-                @{$events}
+                   grep ( /^INITIALIZED$/, @{$events} )
+                or grep ( /^REREADCFG$/,      @{$events} )
+                or grep ( /^MODIFIED.$name$/, @{$events} )
             )
             and $devname eq 'global'
         )
       )
     {
 
-        if (
-            ref(
-                eval { decode_json( ReadingsVal( $name, '.upgradeList', '' ) ) }
-            ) eq "HASH"
-          )
-        {
-            $hash->{".fhem"}{npm}{packages} =
-              eval { decode_json( ReadingsVal( $name, '.upgradeList', '' ) ) }
-              ->{packages};
+        # restore from packageList
+        my $decode_json =
+          eval { decode_json( ReadingsVal( $name, '.packageList', '' ) ) };
+        unless ($@) {
+            $hash->{".fhem"}{npm}{nodejsversions} = $decode_json->{versions}
+              if ( defined( $decode_json->{versions} ) );
+            $hash->{".fhem"}{npm}{listedpackages} = $decode_json->{listed}
+              if ( defined( $decode_json->{listed} ) );
+            $hash->{".fhem"}{npm}{outdatedpackages} = $decode_json->{outdated}
+              if ( defined( $decode_json->{outdated} ) );
         }
-        elsif (
-            ref(
-                eval { decode_json( ReadingsVal( $name, '.updatedList', '' ) ) }
-            ) eq "HASH"
-          )
-        {
-            $hash->{".fhem"}{npm}{updatedpackages} =
-              eval { decode_json( ReadingsVal( $name, '.updatedList', '' ) ) }
-              ->{packages};
-        }
+        $decode_json = undef;
 
+        # restore from installedList
+        $decode_json =
+          eval { decode_json( ReadingsVal( $name, '.installedList', '' ) ) };
+        unless ($@) {
+            $hash->{".fhem"}{npm}{installedpackages} = $decode_json;
+        }
+        $decode_json = undef;
+
+        # restore from uninstalledList
+        $decode_json =
+          eval { decode_json( ReadingsVal( $name, '.uninstalledList', '' ) ) };
+        unless ($@) {
+            $hash->{".fhem"}{npm}{uninstalledpackages} = $decode_json;
+        }
+        $decode_json = undef;
+
+        # restore from updatedList
+        $decode_json =
+          eval { decode_json( ReadingsVal( $name, '.updatedList', '' ) ) };
+        unless ($@) {
+            $hash->{".fhem"}{npm}{updatedpackages} = $decode_json;
+        }
+        $decode_json = undef;
+
+        # Trigger update
         if ( ReadingsVal( $name, 'nodejsVersion', 'none' ) ne 'none' ) {
             ProcessUpdateTimer($hash);
         }
@@ -242,7 +255,13 @@ sub Notify($$) {
         }
     }
 
-    if ( $devname eq $name and grep /^update:.successful$/, @{$events} ) {
+    if (
+        $devname eq $name
+        and (  grep ( /^installed:.successful$/, @{$events} )
+            or grep ( /^uninstalled:.successful$/, @{$events} )
+            or grep ( /^updated:.successful$/,     @{$events} ) )
+      )
+    {
         $hash->{".fhem"}{npm}{cmd} = 'outdated';
         AsynchronousExecuteNpmCommand($hash);
     }
@@ -257,24 +276,166 @@ sub Set($$@) {
     my ( $cmd, @args ) = @aa;
 
     if ( $cmd eq 'outdated' ) {
-
-        # return "usage: $cmd" if ( @args != 0 );
-
         $hash->{".fhem"}{npm}{cmd} = $cmd;
-
     }
     elsif ( $cmd eq 'update' ) {
+        if ( defined( $args[0] ) and ( lc( $args[0] ) eq "fhem-all" ) ) {
+            return "Please run outdated check first"
+              unless ( defined( $hash->{".fhem"}{npm}{outdatedpackages} ) );
 
-        # return "usage: $cmd" if ( @args != 0 );
+            my $update;
+            foreach (@fhem_modules) {
+                next
+                  unless (
+                    defined( $hash->{".fhem"}{npm}{outdatedpackages}{$_} ) );
+                $update .= " " if ($update);
+                $update .= $_;
+            }
+            return "No FHEM specific NPM modules left to update"
+              unless ($update);
+            $hash->{".fhem"}{npm}{cmd} = $cmd . " " . $update;
+        }
+        elsif ( defined( $args[0] ) and $args[0] eq "all" ) {
+            $hash->{".fhem"}{npm}{cmd} = $cmd;
+        }
+        else {
+            $hash->{".fhem"}{npm}{cmd} = $cmd . " " . join( " ", @args );
+        }
+    }
+    elsif ( $cmd eq 'install' ) {
+        return "usage: $cmd <package>" if ( @args < 1 );
+        if ( defined( $args[0] )
+            and ( lc( $args[0] ) eq "all" or lc( $args[0] ) eq "fhem-all" ) )
+        {
+            my $install;
+            foreach (@fhem_modules) {
+                next
+                  if (
+                    defined(
+                        $hash->{".fhem"}{npm}{listedpackages}{dependencies}{$_}
+                    )
+                  );
+                $install .= " " if ($install);
+                $install .= $_;
+            }
+            return "No FHEM specific NPM modules left to install"
+              unless ($install);
+            $hash->{".fhem"}{npm}{cmd} = $cmd . " " . $install;
+        }
+        else {
+            $hash->{".fhem"}{npm}{cmd} = $cmd . " " . join( " ", @args );
+        }
+    }
+    elsif ( $cmd eq 'uninstall' ) {
+        return "usage: $cmd <package>" if ( @args < 1 );
+        if ( defined( $args[0] ) and lc( $args[0] ) eq "fhem-all" ) {
+            my $uninstall;
+            foreach (@fhem_modules) {
+                next
+                  unless (
+                    defined(
+                        $hash->{".fhem"}{npm}{listedpackages}{dependencies}{$_}
+                    )
+                  );
+                $uninstall .= " " if ($uninstall);
+                $uninstall .= $_;
+            }
+            return "No FHEM specific NPM modules left to uninstall"
+              unless ($uninstall);
+            $hash->{".fhem"}{npm}{cmd} = $cmd . " " . $uninstall;
+        }
+        elsif ( defined( $args[0] ) and lc( $args[0] ) eq "all" ) {
+            return "Please run outdated check first"
+              unless ( defined( $hash->{".fhem"}{npm}{listedpackages} ) );
 
-        $hash->{".fhem"}{npm}{cmd} = $cmd;
-
+            my $uninstall;
+            foreach (
+                keys %{ $hash->{".fhem"}{npm}{listedpackages}{dependencies} } )
+            {
+                next if ( $_ eq "npm" );
+                $uninstall .= " " if ($uninstall);
+                $uninstall .= $_;
+            }
+            return "There is nothing to uninstall"
+              unless ($uninstall);
+            $hash->{".fhem"}{npm}{cmd} = $cmd . " " . $uninstall;
+        }
+        else {
+            return "NPM cannot be uninstalled from here"
+              if (
+                grep ( m/^(?:@([\w-]+)\/)?(npm)(?:@([\d\.=<>]+))?$/i, @args ) );
+            $hash->{".fhem"}{npm}{cmd} = $cmd . " " . join( " ", @args );
+        }
     }
     else {
-        my $list = "outdated:noArg";
-        $list .= " update:noArg"
-          if ( defined( $hash->{".fhem"}{npm}{packages} )
-            and scalar keys %{ $hash->{".fhem"}{npm}{packages} } > 0 );
+        my $list = "";
+
+        if ( !defined( $hash->{".fhem"}{npm}{nodejsversions} ) ) {
+            $list = "install:v11,v10,v8,v6"
+              unless ( exists( $hash->{".fhem"}{subprocess} ) );
+        }
+        else {
+            $list = "outdated:noArg";
+
+            if ( defined( $hash->{".fhem"}{npm}{listedpackages} )
+                && defined(
+                    $hash->{".fhem"}{npm}{listedpackages}{dependencies} ) )
+            {
+                my $install;
+                foreach (@fhem_modules) {
+                    next
+                      if (
+                        defined(
+                            $hash->{".fhem"}{npm}{listedpackages}{dependencies}
+                              {$_}
+                        )
+                      );
+                    $install .= "," if ($install);
+                    $install = "install:fhem-all," unless ($install);
+                    $install .= $_;
+                }
+                $install = "install" unless ($install);
+                $list .= " $install";
+
+                if (
+                    scalar
+                    keys %{ $hash->{".fhem"}{npm}{listedpackages}{dependencies}
+                    } > 1 )
+                {
+                    my $uninstall;
+                    foreach (
+                        sort
+                        keys
+                        %{ $hash->{".fhem"}{npm}{listedpackages}{dependencies} }
+                      )
+                    {
+                        next if ( $_ eq "npm" or $_ eq "undefined" );
+                        $uninstall .= "," if ($uninstall);
+                        $uninstall = "uninstall:all,fhem-all,"
+                          unless ($uninstall);
+                        $uninstall .= $_;
+                    }
+                    $list .= " $uninstall";
+                }
+            }
+
+            if ( defined( $hash->{".fhem"}{npm}{outdatedpackages} )
+                and scalar
+                keys %{ $hash->{".fhem"}{npm}{outdatedpackages} } > 0 )
+            {
+                my $update;
+                foreach (
+                    sort
+                    keys %{ $hash->{".fhem"}{npm}{outdatedpackages} }
+                  )
+                {
+                    $update .= "," if ($update);
+                    $update = "update:all,fhem-all," unless ($update);
+                    $update .= $_;
+                }
+                $list .= " $update";
+            }
+        }
 
         return "Unknown argument $cmd, choose one of $list";
     }
@@ -290,27 +451,49 @@ sub Get($$@) {
 
     my ( $cmd, @args ) = @aa;
 
-    if ( $cmd eq 'showUpgradeList' ) {
+    if ( $cmd eq 'showOutdatedList' ) {
         return "usage: $cmd" if ( @args != 0 );
 
-        my $ret = CreateUpgradeList( $hash, $cmd );
+        my $ret = CreateOutdatedList( $hash, $cmd );
         return $ret;
 
     }
-    elsif ( $cmd eq 'showUpdatedList' ) {
+    elsif ( $cmd eq 'showInstalledList' ) {
         return "usage: $cmd" if ( @args != 0 );
 
-        my $ret = CreateUpgradeList( $hash, $cmd );
+        my $ret = CreateInstalledList( $hash, $cmd );
         return $ret;
 
     }
-    elsif ( $cmd eq 'showWarningList' ) {
-        return "usage: $cmd" if ( @args != 0 );
 
-        my $ret = CreateWarningList($hash);
-        return $ret;
-
-    }
+    # elsif ( $cmd eq 'showInstallResultList' ) {
+    #     return "usage: $cmd" if ( @args != 0 );
+    #
+    #     my $ret = CreateInstallResultList( $hash, $cmd );
+    #     return $ret;
+    #
+    # }
+    # elsif ( $cmd eq 'showUninstallResultList' ) {
+    #     return "usage: $cmd" if ( @args != 0 );
+    #
+    #     my $ret = CreateUninstallResultList( $hash, $cmd );
+    #     return $ret;
+    #
+    # }
+    # elsif ( $cmd eq 'showUpdateResultList' ) {
+    #     return "usage: $cmd" if ( @args != 0 );
+    #
+    #     my $ret = CreateUpdateResultList( $hash, $cmd );
+    #     return $ret;
+    #
+    # }
+    # elsif ( $cmd eq 'showWarningList' ) {
+    #     return "usage: $cmd" if ( @args != 0 );
+    #
+    #     my $ret = CreateWarningList($hash);
+    #     return $ret;
+    #
+    # }
     elsif ( $cmd eq 'showErrorList' ) {
         return "usage: $cmd" if ( @args != 0 );
 
@@ -319,18 +502,32 @@ sub Get($$@) {
     }
     else {
         my $list = "";
-        $list .= " showUpgradeList:noArg"
-          if ( defined( $hash->{".fhem"}{npm}{packages} )
-            and scalar keys %{ $hash->{".fhem"}{npm}{packages} } > 0 );
-        $list .= " showUpdatedList:noArg"
-          if ( defined( $hash->{".fhem"}{npm}{updatedpackages} )
-            and scalar keys %{ $hash->{".fhem"}{npm}{updatedpackages} } > 0 );
-        $list .= " showWarningList:noArg"
-          if ( defined( $hash->{".fhem"}{npm}{'warnings'} )
-            and scalar @{ $hash->{".fhem"}{npm}{'warnings'} } > 0 );
+        $list .= " showOutdatedList:noArg"
+          if ( defined( $hash->{".fhem"}{npm}{outdatedpackages} )
+            and scalar keys %{ $hash->{".fhem"}{npm}{outdatedpackages} } > 0 );
+        $list .= " showInstalledList:noArg"
+          if (  defined( $hash->{".fhem"}{npm}{listedpackages} )
+            and defined( $hash->{".fhem"}{npm}{listedpackages}{dependencies} )
+            and scalar
+            keys %{ $hash->{".fhem"}{npm}{listedpackages}{dependencies} } > 0 );
+
+      # $list .= " showInstallResultList:noArg"
+      #   if ( defined( $hash->{".fhem"}{npm}{installedpackages} )
+      #     and scalar keys %{ $hash->{".fhem"}{npm}{installedpackages} } > 0 );
+      # $list .= " showUninstallResultList:noArg"
+      #   if ( defined( $hash->{".fhem"}{npm}{uninstalledpackages} )
+      #     and scalar
+      #     keys %{ $hash->{".fhem"}{npm}{uninstalledpackages} } > 0 );
+      # $list .= " showUpdateResultList:noArg"
+      #   if ( defined( $hash->{".fhem"}{npm}{updatedpackages} )
+      #     and scalar keys %{ $hash->{".fhem"}{npm}{updatedpackages} } > 0 );
+      # $list .= " showWarningList:noArg"
+      #   if ( defined( $hash->{".fhem"}{npm}{'warnings'} )
+      #     and scalar keys %{ $hash->{".fhem"}{npm}{'warnings'} } > 0 );
+
         $list .= " showErrorList:noArg"
-          if ( defined( $hash->{".fhem"}{npm}{'errors'} )
-            and scalar @{ $hash->{".fhem"}{npm}{'errors'} } > 0 );
+          if ( defined( $hash->{".fhem"}{npm}{errors} )
+            and scalar keys %{ $hash->{".fhem"}{npm}{errors} } > 0 );
 
         return "Unknown argument $cmd, choose one of $list";
     }
@@ -453,10 +650,8 @@ sub PollChild($) {
 ######################################
 
 sub OnRun() {
-
     my $subprocess = shift;
-
-    my $response = ExecuteNpmCommand( $subprocess->{npm} );
+    my $response   = ExecuteNpmCommand( $subprocess->{npm} );
 
     my $json = eval { encode_json($response) };
     if ($@) {
@@ -494,99 +689,280 @@ sub ExecuteNpmCommand($) {
           . 'grep -q -E "^${KEY% *}" ${HOME}/.ssh/known_hosts || echo "${KEY}" >> ${HOME}/.ssh/known_hosts; ';
 
         # wrap SSH command
-        $cmdPrefix .= 'ssh -oBatchMode=yes ' . $cmd->{host} . ' \'';
+        $cmdPrefix .= 'ssh -oBatchMode=yes ' . ( $1 ? "$1@" : "" ) . $2 . ' \'';
         $cmdSuffix = '\' 2>&1';
     }
 
-    $npm->{nodejsversion} =
-      $cmdPrefix . 'echo n | node --version 2>&1' . $cmdSuffix;
+    $npm->{nodejsversions} =
+        $cmdPrefix
+      . 'echo n | node -e "console.log(JSON.stringify(process.versions));" 2>&1'
+      . $cmdSuffix;
     if ( $cmd->{npmglobal} == 0 ) {
+        $npm->{npminstall} =
+            $cmdPrefix
+          . 'echo n | npm install --json --silent --unsafe-perm %PACKAGES% 2>/dev/null'
+          . $cmdSuffix;
+        $npm->{npmuninstall} =
+            $cmdPrefix
+          . 'echo n | npm uninstall --json --silent %PACKAGES% 2>/dev/null'
+          . $cmdSuffix;
         $npm->{npmupdate} =
-          $cmdPrefix . 'echo n | npm update --unsafe-perm 2>&1' . $cmdSuffix;
+            $cmdPrefix
+          . 'echo n | npm update --json --silent --unsafe-perm %PACKAGES% 2>/dev/null'
+          . $cmdSuffix;
         $npm->{npmoutdated} =
             $cmdPrefix
-          . 'echo n | node --version && npm outdated --parseable 2>&1'
+          . 'echo n | '
+          . 'echo "{' . "\n"
+          . '\"versions\": "; '
+          . 'node -e "console.log(JSON.stringify(process.versions));"; '
+          . 'L1=$(npm list --json --silent --depth=0 2>/dev/null); '
+          . '[[ "$L1" != "" && "$L1" != "\n" ]] && echo ", \"listed\": $L1"; '
+          . 'L2=$(npm outdated --json 2>&1); '
+          . '[[ "$L2" != "" && "$L2" != "\n" ]] && echo ", \"outdated\": $L2"; '
+          . 'echo "}"'
           . $cmdSuffix;
     }
     else {
+        $npm->{npminstall} =
+            $cmdPrefix
+          . 'echo n | sudo -n -E sh -c "npm install -g --json --silent --unsafe-perm %PACKAGES% 2>/dev/null" 2>&1'
+          . $cmdSuffix;
+        $npm->{npmuninstall} =
+            $cmdPrefix
+          . 'echo n | sudo -n -E sh -c "npm uninstall -g --json --silent %PACKAGES% 2>/dev/null" 2>&1'
+          . $cmdSuffix;
         $npm->{npmupdate} =
             $cmdPrefix
-          . 'echo n | sudo -n npm update -g --unsafe-perm 2>&1'
+          . 'echo n | sudo -n -E sh -c "npm update -g --json --silent --unsafe-perm %PACKAGES% 2>/dev/null" 2>&1'
           . $cmdSuffix;
         $npm->{npmoutdated} =
             $cmdPrefix
-          . 'echo n | node --version && sudo -n npm outdated -g --parseable 2>&1'
+          . 'echo n | '
+          . 'echo "{' . "\n"
+          . '\"versions\": "; '
+          . 'node -e "console.log(JSON.stringify(process.versions));"; '
+          . 'L1=$(npm list -g --json --silent --depth=0 2>/dev/null); '
+          . '[[ "$L1" != "" && "$L1" != "\n" ]] && echo ", \"listed\": $L1"; '
+          . 'L2=$(npm outdated -g --json 2>&1); '
+          . '[[ "$L2" != "" && "$L2" != "\n" ]] && echo ", \"outdated\": $L2"; '
+          . 'echo "}"'
           . $cmdSuffix;
     }
 
     my $response;
 
-    if ( $cmd->{cmd} eq 'outdated' ) {
+    if ( $cmd->{cmd} =~ /^install (.+)/ ) {
+        if (   not defined( $cmd->{nodejsversions} )
+            or not defined( $cmd->{nodejsversions}{node} ) )
+        {
+            return unless ( $1 =~ /^v(\d+)/ );
+            $npm->{npminstall} =
+                $cmdPrefix
+              . "echo n | curl -sSL https://deb.nodesource.com/setup_$1.x | DEBIAN_FRONTEND=noninteractive sudo -n -E sh -c \"bash - >/dev/null 2>&1\" 2>&1"
+              . ' && DEBIAN_FRONTEND=noninteractive sudo -n -E sh -c "apt-get install -qqy nodejs >/dev/null 2>&1" 2>&1'
+              . ' && node -e "console.log(JSON.stringify(process.versions));" 2>&1'
+              . $cmdSuffix;
+        }
+        else {
+            my @packages;
+            foreach my $package ( split / /, $1 ) {
+                next
+                  unless ( $package =~
+                    /^(?:@([\w-]+)\/)?([\w-]+)(?:@([\d\.=<>]+))?$/ );
+
+                Debug Dumper $cmd;
+                push @packages,
+                  "homebridge"
+                  if (
+                    $package =~ m/^homebridge-/i
+                    && (
+                            defined( $cmd->{listedpackages} )
+                        and defined( $cmd->{listedpackages}{dependencies} )
+                        and !defined(
+                            $cmd->{listedpackages}{dependencies}{homebridge}
+                        )
+                    )
+                  );
+
+                push @packages, $package;
+            }
+            my $pkglist = join( ' ', @packages );
+            return unless ($pkglist);
+            $npm->{npminstall} =~ s/%PACKAGES%/$pkglist/gi;
+        }
+        print qq($npm->{npminstall}\n) if ( $npm->{debug} == 1 );
+        $response = NpmInstall($npm);
+    }
+    elsif ( $cmd->{cmd} =~ /^uninstall (.+)/ ) {
+        my @packages;
+        foreach my $package ( split / /, $1 ) {
+            next
+              unless (
+                $package =~ /^(?:@([\w-]+)\/)?([\w-]+)(?:@([\d\.=<>]+))?$/ );
+            push @packages, $package;
+        }
+        my $pkglist = join( ' ', @packages );
+        return unless ($pkglist);
+        $npm->{npmuninstall} =~ s/%PACKAGES%/$pkglist/gi;
+        print qq($npm->{npmuninstall}\n) if ( $npm->{debug} == 1 );
+        $response = NpmUninstall($npm);
+    }
+    elsif ( $cmd->{cmd} =~ /^update(?: (.+))?/ ) {
+        my $pkglist;
+        if ( defined($1) ) {
+            my @packages;
+            foreach my $package ( split / /, $1 ) {
+                next
+                  unless ( $package =~
+                    /^(?:@([\w-]+)\/)?([\w-]+)(?:@([\d\.=<>]+))?$/ );
+                push @packages, $package;
+            }
+            $pkglist = join( ' ', @packages );
+        }
+        $npm->{npmupdate} =~ s/%PACKAGES%/$pkglist/gi;
+        print qq($npm->{npmupdate}\n) if ( $npm->{debug} == 1 );
+        $response = NpmUpdate($npm);
+    }
+    elsif ( $cmd->{cmd} eq 'outdated' ) {
+        print qq($npm->{npmoutdated}\n) if ( $npm->{debug} == 1 );
         $response = NpmOutdated($npm);
     }
     elsif ( $cmd->{cmd} eq 'getNodeVersion' ) {
+        print qq($npm->{nodejsversions}\n) if ( $npm->{debug} == 1 );
         $response = GetNodeVersion($npm);
-    }
-    elsif ( $cmd->{cmd} eq 'update' ) {
-        $response = NpmUpdate($npm);
     }
 
     return $response;
 }
 
 sub GetNodeVersion($) {
-
     my $cmd = shift;
+    my $p   = `$cmd->{nodejsversions}`;
+    my $ret = RetrieveNpmOutput( $cmd, $p );
 
-    my $update = {};
-    my $v      = `$cmd->{nodejsversion}`;
+    return { versions => $ret }
+      if ( scalar keys %{$ret} > 0 && !defined( $ret->{error} ) );
+    return $ret;
+}
 
-    if ( defined($v) and $v =~ /^v(\d+\.\d+\.\d+)/ ) {
-        $update->{nodejsversion} = $1;
-    }
-    else {
-        push @{ $update->{error} }, {message => $v};
-    }
+sub NpmUninstall($) {
+    my $cmd = shift;
+    my $p   = `$cmd->{npmuninstall}`;
+    my $ret = RetrieveNpmOutput( $cmd, $p );
 
-    return $update;
+    return $ret;
 }
 
 sub NpmUpdate($) {
-
     my $cmd = shift;
+    my $p   = `$cmd->{npmupdate}`;
+    my $ret = RetrieveNpmOutput( $cmd, $p );
 
-    my $update = {};
-    my $p      = `$cmd->{npmupdate}`;
+    return $ret;
+}
 
-    $update->{'state'} = 'done';
-    return $update;
+sub NpmInstall($) {
+    my $cmd = shift;
+    my $p   = `$cmd->{npminstall}`;
+    my $ret = RetrieveNpmOutput( $cmd, $p );
+
+    # this will come back only after
+    #  nodejs installation
+    return { versions => $ret }
+      if ( scalar keys %{$ret} > 0
+        && defined( $ret->{node} ) );
+    return $ret;
 }
 
 sub NpmOutdated($) {
-
     my $cmd = shift;
+    my $p   = `$cmd->{npmoutdated}`;
+    my $ret = RetrieveNpmOutput( $cmd, $p );
 
-    my $updates = {};
-    my $p       = `$cmd->{npmoutdated}`;
+    return $ret;
+}
 
-    foreach my $line ( split /\n/, $p ) {
-        chomp($line);
-        print qq($line\n) if ( $cmd->{debug} == 1 );
+sub RetrieveNpmOutput($$) {
+    my $cmd = shift;
+    my $p   = shift;
+    my $h   = {};
 
-        if ( $line =~ m/^.*:((.*)@(.*)):((.*)@(.*)):((.*)@(.*))$/ ) {
-            my $update  = {};
-            my $package = $2;
-            $update->{current}               = $6;
-            $update->{new}                   = $9;
-            $updates->{packages}->{$package} = $update;
+    # first try to interprete text as JSON directly
+    my $decode_json = eval { decode_json($p) };
+    if ( not $@ ) {
+        $h = $decode_json;
+    }
+
+    # if this was not successful,
+    #   we'll disassamble the text
+    else {
+        my $o;
+        my $json;
+        my $skip = 0;
+
+        foreach my $line ( split /\n/, $p ) {
+            chomp($line);
+            print qq($line\n) if ( $cmd->{debug} == 1 );
+
+            # JSON output
+            if ($skip) {
+                $json .= $line;
+            }
+
+            # reached JSON
+            elsif ( $line =~ /^\{$/ ) {
+                $json = $line;
+                $skip = 1;
+            }
+
+            # other output before JSON
+            else {
+                $o .= $line;
+            }
         }
-        elsif ( $line =~ m/^v(\d+\.\d+\.\d+)$/ ) {
-            $updates->{nodejsversion} = $1;
+
+        $decode_json = eval { decode_json($json) };
+
+        # Found valid JSON output
+        if ( not $@ ) {
+            $h = $decode_json;
+        }
+
+        # Final parsing error
+        else {
+            if ( $o =~ m/Permission.denied.\(publickey\)\.?\r?\n?$/i ) {
+                $h->{error}{code} = "E403";
+                $h->{error}{summary} =
+                    "Forbidden - None of the SSH keys from ~/.ssh/ "
+                  . "were authorized to access remote host";
+                $h->{error}{detail} = $o;
+            }
+            elsif ( $o =~ m/^sudo: /i ) {
+                $h->{error}{code} = "E403";
+                $h->{error}{summary} =
+                    "Forbidden - "
+                  . "passwordless sudo permissions required "
+                  . "(fhem ALL=NOPASSWD: ALL)";
+                $h->{error}{detail} = $o;
+            }
+            elsif ($o =~ m/(?:(\w+?): )?(\w+?): [^:]*?not.found$/i
+                or $o =~
+                m/(?:(\w+?): )?(\w+?): [^:]*?No.such.file.or.directory$/i )
+            {
+                $h->{error}{code}    = "E404";
+                $h->{error}{summary} = "Not Found - $2 is not installed";
+                $h->{error}{detail}  = $o;
+            }
+            else {
+                $h->{error}{code}    = "E500";
+                $h->{error}{summary} = "Parsing error - " . $@;
+                $h->{error}{detail}  = $p;
+            }
         }
     }
 
-    $updates->{'state'} = 'done';
-    return $updates;
+    return $h;
 }
 
 ####################################################
@@ -607,12 +983,36 @@ sub PreProcessing($$) {
 
     Log3 $hash, 4, "npmjs ($name) - JSON: $json";
 
-    if ( $hash->{".fhem"}{npm}{cmd} eq 'outdated' ) {
-        $hash->{".fhem"}{npm}{packages} = $decode_json->{packages};
-        readingsSingleUpdate( $hash, '.upgradeList', $json, 0 );
+    if (   defined( $decode_json->{versions} )
+        && defined( $decode_json->{versions}{node} ) )
+    {
+        $hash->{".fhem"}{npm}{nodejsversions} = $decode_json->{versions};
     }
-    elsif ( $hash->{".fhem"}{npm}{cmd} eq 'update' ) {
-        $hash->{".fhem"}{npm}{updatedpackages} = $decode_json->{packages};
+
+    # safe result in hidden reading
+    #   to restore module state after reboot
+    if ( $hash->{".fhem"}{npm}{cmd} eq 'outdated' ) {
+        delete $hash->{".fhem"}{npm}{outdatedpackages};
+        $hash->{".fhem"}{npm}{outdatedpackages} = $decode_json->{outdated}
+          if ( defined( $decode_json->{outdated} ) );
+        delete $hash->{".fhem"}{npm}{listedpackages};
+        $hash->{".fhem"}{npm}{listedpackages} = $decode_json->{listed}
+          if ( defined( $decode_json->{listed} ) );
+        readingsSingleUpdate( $hash, '.packageList', $json, 0 );
+    }
+    elsif ( $hash->{".fhem"}{npm}{cmd} =~ /^install/ ) {
+        delete $hash->{".fhem"}{npm}{installedpackages};
+        $hash->{".fhem"}{npm}{installedpackages} = $decode_json;
+        readingsSingleUpdate( $hash, '.installedList', $json, 0 );
+    }
+    elsif ( $hash->{".fhem"}{npm}{cmd} =~ /^uninstall/ ) {
+        delete $hash->{".fhem"}{npm}{uninstalledpackages};
+        $hash->{".fhem"}{npm}{uninstalledpackages} = $decode_json;
+        readingsSingleUpdate( $hash, '.uninstalledList', $json, 0 );
+    }
+    elsif ( $hash->{".fhem"}{npm}{cmd} =~ /^update/ ) {
+        delete $hash->{".fhem"}{npm}{updatedpackages};
+        $hash->{".fhem"}{npm}{updatedpackages} = $decode_json;
         readingsSingleUpdate( $hash, '.updatedList', $json, 0 );
     }
 
@@ -640,8 +1040,6 @@ sub WriteReadings($$) {
 
     Log3 $hash, 4, "npmjs ($name) - Write Readings";
     Log3 $hash, 5, "npmjs ($name) - " . Dumper $decode_json;
-    Log3 $hash, 5,
-      "npmjs ($name) - Packages: " . scalar keys %{ $decode_json->{packages} };
 
     readingsBeginUpdate($hash);
 
@@ -650,37 +1048,44 @@ sub WriteReadings($$) {
             $hash,
             'outdated',
             (
-                defined( $decode_json->{'state'} )
-                ? 'fetched ' . $decode_json->{'state'}
-                : 'fetched error'
+                defined( $decode_json->{listed} )
+                ? 'check completed'
+                : 'check failed'
             )
         );
         $hash->{helper}{lastSync} = ToDay();
     }
 
     readingsBulkUpdateIfChanged( $hash, 'updatesAvailable',
-        scalar keys %{ $decode_json->{packages} } )
+        scalar keys %{ $decode_json->{outdated} } )
       if ( $hash->{".fhem"}{npm}{cmd} eq 'outdated' );
-    readingsBulkUpdateIfChanged( $hash, 'upgradeListAsJSON',
-        eval { encode_json( $hash->{".fhem"}{npm}{packages} ) } )
-      if ( AttrVal( $name, 'upgradeListReading', 'none' ) ne 'none' );
-    readingsBulkUpdate( $hash, 'update', 'successful' )
-      if (  $hash->{".fhem"}{npm}{cmd} eq 'update'
-        and not defined( $hash->{".fhem"}{npm}{'errors'} )
-        and not defined( $hash->{".fhem"}{npm}{'warnings'} ) );
+    readingsBulkUpdateIfChanged( $hash, 'updateListAsJSON',
+        eval { encode_json( $hash->{".fhem"}{npm}{outdatedpackages} ) } )
+      if ( AttrVal( $name, 'updateListReading', 'none' ) ne 'none' );
+
+    my $result = 'successful';
+    $result = 'error'   if ( defined( $hash->{".fhem"}{npm}{errors} ) );
+    $result = 'warning' if ( defined( $hash->{".fhem"}{npm}{'warnings'} ) );
+
+    readingsBulkUpdate( $hash, 'installed', $result )
+      if ( $hash->{".fhem"}{npm}{cmd} =~ /^install/ );
+    readingsBulkUpdate( $hash, 'uninstalled', $result )
+      if ( $hash->{".fhem"}{npm}{cmd} =~ /^uninstall/ );
+    readingsBulkUpdate( $hash, 'updated', $result )
+      if ( $hash->{".fhem"}{npm}{cmd} =~ /^update/ );
+
     readingsBulkUpdateIfChanged( $hash, "nodejsVersion",
-        $decode_json->{'nodejsversion'} )
-      if ( defined( $decode_json->{'nodejsversion'} ) );
+        $decode_json->{versions}{node} )
+      if ( defined( $decode_json->{versions} )
+        && defined( $decode_json->{versions}{node} ) );
 
     if ( defined( $decode_json->{error} ) ) {
         readingsBulkUpdate( $hash, 'state',
-            $hash->{".fhem"}{npm}{cmd} . ' Errors (get showErrorList)' );
-        readingsBulkUpdate( $hash, 'state', 'errors' );
+            'error \'' . $hash->{".fhem"}{npm}{cmd} . '\'' );
     }
     elsif ( defined( $decode_json->{warning} ) ) {
         readingsBulkUpdate( $hash, 'state',
-            $hash->{".fhem"}{npm}{cmd} . ' Warnings (get showWarningList)' );
-        readingsBulkUpdate( $hash, 'state', 'warnings' );
+            'warning \'' . $hash->{".fhem"}{npm}{cmd} . '\'' );
     }
     else {
 
@@ -688,8 +1093,9 @@ sub WriteReadings($$) {
             $hash, 'state',
             (
                 (
-                         scalar keys %{ $decode_json->{packages} } > 0
-                      or scalar keys %{ $hash->{".fhem"}{npm}{packages} } > 0
+                         scalar keys %{ $decode_json->{outdated} } > 0
+                      or scalar
+                      keys %{ $hash->{".fhem"}{npm}{outdatedpackages} } > 0
                 )
                 ? 'npm updates available'
                 : 'npm is up to date'
@@ -742,22 +1148,55 @@ sub CreateWarningList($) {
 }
 
 sub CreateErrorList($) {
+    my $hash  = shift;
+    my $error = $hash->{".fhem"}{npm}{errors};
 
-    my $hash = shift;
+    my $ret = '<html><table style="min-width: 450px;"><tr><td>';
+    $ret .= '<table class="block wide">';
 
-    my $errors = $hash->{".fhem"}{npm}{'errors'};
+    if ( ref($error) eq "HASH" ) {
+        $ret .= '<tr class="even">';
+        $ret .= "<td><b>Error code $error->{code}</b></td>";
+        $ret .= "<td></td>";
+        $ret .= '</tr>';
+        $ret .= '<tr class="odd">';
+        $ret .= "<td>Summary:\n$error->{summary}\n\n</td>";
+        $ret .= '</tr>';
+        $ret .= '<tr class="even">';
+        $ret .= "<td>Detail:\n$error->{detail}</td>";
+        $ret .= '</tr>';
+    }
+    else {
+        $ret .= '<tr class="even">';
+        $ret .= "<td><b>Error List</b></td>";
+        $ret .= "<td></td>";
+        $ret .= '</tr>';
+    }
 
-    my $ret = '<html><table><tr><td>';
+    $ret .= '</table></td></tr>';
+    $ret .= '</table></html>';
+
+    return $ret;
+}
+
+sub CreateInstalledList($$) {
+    my ( $hash, $getCmd ) = @_;
+    my $packages;
+    $packages = $hash->{".fhem"}{npm}{listedpackages}{dependencies};
+
+    my $ret = '<html><table style="min-width: 450px;"><tr><td>';
     $ret .= '<table class="block wide">';
     $ret .= '<tr class="even">';
-    $ret .= "<td><b>Error List</b></td>";
+    $ret .= "<td><b>Package Name</b></td>";
+    $ret .= "<td><b>Current Version</b></td>";
     $ret .= "<td></td>";
     $ret .= '</tr>';
 
-    if ( ref($errors) eq "ARRAY" ) {
+    if ( ref($packages) eq "HASH" ) {
 
         my $linecount = 1;
-        foreach my $error ( @{$errors} ) {
+        foreach my $package ( sort keys( %{$packages} ) ) {
+            next if ( $package eq "undefined" );
             if ( $linecount % 2 == 0 ) {
                 $ret .= '<tr class="even">';
             }
@@ -765,7 +1204,13 @@ sub CreateErrorList($) {
                 $ret .= '<tr class="odd">';
             }
 
-            $ret .= "<td>$error->{message}</td>";
+            $ret .= "<td>$package</td>";
+            if ( defined( $packages->{$package}{version} ) ) {
+                $ret .= "<td>$packages->{$package}{version}</td>";
+            }
+            else {
+                $ret .= "<td>?</td>";
+            }
 
             $ret .= '</tr>';
             $linecount++;
@@ -778,22 +1223,20 @@ sub CreateErrorList($) {
     return $ret;
 }
 
-sub CreateUpgradeList($$) {
-
+sub CreateOutdatedList($$) {
     my ( $hash, $getCmd ) = @_;
-
     my $packages;
-    $packages = $hash->{".fhem"}{npm}{packages}
-      if ( $getCmd eq 'showUpgradeList' );
+    $packages = $hash->{".fhem"}{npm}{outdatedpackages}
+      if ( $getCmd eq 'showUpdateList' );
     $packages = $hash->{".fhem"}{npm}{updatedpackages}
       if ( $getCmd eq 'showUpdatedList' );
 
-    my $ret = '<html><table><tr><td>';
+    my $ret = '<html><table style="min-width: 450px;"><tr><td>';
     $ret .= '<table class="block wide">';
     $ret .= '<tr class="even">';
-    $ret .= "<td><b>Packagename</b></td>";
+    $ret .= "<td><b>Package Name</b></td>";
     $ret .= "<td><b>Current Version</b></td>"
-      if ( $getCmd eq 'showUpgradeList' );
+      if ( $getCmd eq 'showUpdateList' );
     $ret .= "<td><b>Over Version</b></td>" if ( $getCmd eq 'showUpdatedList' );
     $ret .= "<td><b>New Version</b></td>";
     $ret .= "<td></td>";
@@ -811,8 +1254,18 @@ sub CreateUpgradeList($$) {
             }
 
             $ret .= "<td>$package</td>";
-            $ret .= "<td>$packages->{$package}{current}</td>";
-            $ret .= "<td>$packages->{$package}{new}</td>";
+            if ( defined( $packages->{$package}{current} ) ) {
+                $ret .= "<td>$packages->{$package}{current}</td>";
+            }
+            else {
+                $ret .= "<td>?</td>";
+            }
+            if ( defined( $packages->{$package}{latest} ) ) {
+                $ret .= "<td>$packages->{$package}{latest}</td>";
+            }
+            else {
+                $ret .= "<td>?</td>";
+            }
 
             $ret .= '</tr>';
             $linecount++;
@@ -854,22 +1307,23 @@ sub ToDay() {
 </h3>
 <ul>
   <u><b>npmjs - controls Node.js installation and updates</b></u><br>
-  This module informs about outdated Node.js packages using NPM package manager.<br>
-  Global installations will be controlled by default and require sudo permissions like this:<br>
-  <li>fhem ALL=NOPASSWD: /usr/bin/npm
-  </li><br>
-  <a name="npmjsdefine" id="npmjsdefine"></a><b>Define</b>
+  This module allows to install, uninstall and update outdated Node.js packages using NPM package manager.<br>
+  Global installations will be controlled by default and running update/install/uninstall require sudo permissions like this:<br>
+  <br>
+  <code>fhem ALL=NOPASSWD: ALL</code><br>
+  <br>
+  <br>
+  <a name="npmjsdefine" id="npmjsdefine"></a><b>Define</b><br>
   <ul>
+    <code>define &lt;name&gt; npmjs [&lt;HOST&gt;]</code><br>
     <br>
-    <code>define &lt;name&gt; npmjs &lt;HOST&gt;</code><br>
-    <br>
-    Example:
+    Example:<br>
     <ul>
-      <br>
-      <code>define fhemServerNpm npmjs localhost</code><br>
+      <code>define fhemServerNpm npmjs</code><br>
     </ul><br>
     This command creates an npmjs instance named 'fhemServerNpm' to run commands on host 'localhost'.<br>
-    Afterwards all information about installation and update state will be fetched. This will take a moment.
+    Afterwards all information about installation and update state will be fetched. This will take a moment.<br>
+    If you would like to connect to a remote host, use user@hostname as HOST parameter.
   </ul><br>
   <br>
   <a name="npmjsreadings" id="npmjsreadings"></a><b>Readings</b>
@@ -880,7 +1334,11 @@ sub ToDay() {
     </li>
     <li>outdated - status about last update status sync
     </li>
-    <li>update - status about last upgrade
+    <li>updated - status about last update command
+    </li>
+    <li>installed - status about last install command
+    </li>
+    <li>uninstalled - status about last uninstall command
     </li>
     <li>updatesAvailable - number of available updates
     </li>
@@ -890,16 +1348,20 @@ sub ToDay() {
   <ul>
     <li>outdated - fetch information about update state
     </li>
-    <li>update - trigger update process. this will take a moment
-    </li><br>
+    <li>update - trigger complete or selected update process. this will take a moment
+    </li>
+    <li>install - Install one or more NPM packages
+    </li>
+    <li>uninstall - Uninstall one or more NPM packages
+    </li>
   </ul><br>
   <br>
   <a name="npmjsget" id="npmjsget"></a><b>Get</b>
   <ul>
-    <li>showUpgradeList - list about available updates
+    <li>showOutdatedList - list about available updates
     </li>
-    <li>getNodeVersion - fetch Node.js version information
-    </li><br>
+    <li>showErrorList - list errors that occured for the last command
+    </li>
   </ul><br>
   <br>
   <a name="npmjsattribut" id="npmjsattribut"></a><b>Attributes</b>
@@ -925,33 +1387,38 @@ sub ToDay() {
 </h3>
 <ul>
   <u><b>npmjs - Bedienung der Node.js Installation und Updates</b></u><br>
-  Das Modul prüft die zu aktualisierenden Node.js Pakete über den NPM Paket Manager.<br>
-  Standardmäßig werden globale Installationen bedient und erfordern sudo Berechtigungen wie diese:<br>
-  <li>fhem ALL=NOPASSWD: /usr/bin/npm update
-  </li><br>
-  <a name="npmjsdefine" id="npmjsdefine"></a><b>Define</b>
+  Das Modul erlaubt es Node.js Pakete über den NPM Paket Manager zu installieren, zu deinstallieren und zu aktualisieren.<br>
+  Standardmäßig werden globale Installationen bedient und das Ausf&uuml;hren von update/install/uninstall erfordert sudo Berechtigungen wie diese:<br>
+  <br>
+  <code>fhem ALL=NOPASSWD: ALL</code><br>
+  <br>
+  <br>
+  <a name="npmjsdefine" id="npmjsdefine"></a><b>Define</b><br>
   <ul>
+    <code>define &lt;name&gt; npmjs [&lt;HOST&gt;]</code><br>
     <br>
-    <code>define &lt;name&gt; npmjs &lt;HOST&gt;</code><br>
-    <br>
-    Beispiel:
+    Beispiel:<br>
     <ul>
-      <br>
       <code>define fhemServer npmjs localhost</code><br>
     </ul><br>
     Der Befehl erstellt eine npmjs Instanz mit dem Namen 'fhemServerNpm', um Kommandos auf dem Host 'localhost' auszuf&uuml;hren.<br>
-    Anschließend werden die alle Informationen über den Installations- und Update Status geholt. Dies kann einen Moment dauern.
+    Anschließend werden die alle Informationen über den Installations- und Update Status geholt. Dies kann einen Moment dauern.<br>
+    Wenn man sich zu einem entfernten Rechner verbinden m&ouml;chte, kann man den HOST Parameter im Format user@hostname verwenden.
   </ul><br>
   <br>
   <a name="npmjsreadings" id="npmjsreadings"></a><b>Readings</b>
   <ul>
-    <li>state - update Status des Servers, liegen neue Updates an oder nicht
+    <li>state - update Status des Servers
     </li>
     <li>nodejsVersion - installierte Node.js Version
     </li>
-    <li>outdated - status des letzten update sync.
+    <li>outdated - Status des letzten Update sync.
     </li>
-    <li>update - status des letzten update Befehles
+    <li>updated - Status des letzten update Befehles
+    </li>
+    <li>installed - Status des letzten install Befehles
+    </li>
+    <li>uninstalled - Status des letzten uninstall Befehles
     </li>
     <li>updatesAvailable - Anzahl der verfügbaren Paketupdates
     </li>
@@ -961,16 +1428,20 @@ sub ToDay() {
   <ul>
     <li>outdated - holt aktuelle Informationen über den Updatestatus
     </li>
-    <li>update - führt den upgrade Prozess aus
-    </li><br>
+    <li>update - führt ein komplettes oder selektives Update aus
+    </li>
+    <li>install - installiert ein oder mehrere NPM Pakete
+    </li>
+    <li>uninstall - deinstalliert ein oder mehrere NPM Pakete
+    </li>
   </ul><br>
   <br>
   <a name="npmjsget" id="npmjsget"></a><b>Get</b>
   <ul>
-    <li>showUpgradeList - Paketiste aller zur Verfügung stehender Updates
+    <li>showOutdatedList - Paketiste aller zur Verfügung stehender Updates
     </li>
-    <li>getNodeVersion - Hole die NodeJS Versions-Information
-    </li><br>
+    <li>showErrorList - Liste aller aufgetretenden Fehler f&uuml;r das letzte Kommando
+    </li>
   </ul><br>
   <br>
   <a name="npmjsattribut" id="npmjsattribut"></a><b>Attributes</b>
