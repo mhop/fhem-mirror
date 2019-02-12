@@ -39,7 +39,7 @@ use warnings;
 use POSIX;
 
 # our @EXPORT  = qw(get_time_suffix);
-our $VERSION = "0.10.0";
+our $VERSION = "0.10.2";
 
 # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 use GPUtils qw(GP_Import);
@@ -371,7 +371,8 @@ sub Set($$@) {
         my $list = "";
 
         if ( !defined( $hash->{".fhem"}{npm}{nodejsversions} ) ) {
-            $list = "install:v11,v10,v8,v6"
+            $list =
+              "install:nodejs-v11,nodejs-v10,nodejs-v8,nodejs-v6,statusRequest"
               unless ( exists( $hash->{".fhem"}{subprocess} ) );
         }
         else {
@@ -756,13 +757,17 @@ sub ExecuteNpmCommand($) {
         if (   not defined( $cmd->{nodejsversions} )
             or not defined( $cmd->{nodejsversions}{node} ) )
         {
-            return unless ( $1 =~ /^v(\d+)/ );
-            $npm->{npminstall} =
-                $cmdPrefix
-              . "echo n | curl -sSL https://deb.nodesource.com/setup_$1.x | DEBIAN_FRONTEND=noninteractive sudo -n -E sh -c \"bash - >/dev/null 2>&1\" 2>&1"
-              . ' && DEBIAN_FRONTEND=noninteractive sudo -n -E sh -c "apt-get install -qqy nodejs >/dev/null 2>&1" 2>&1'
-              . ' && node -e "console.log(JSON.stringify(process.versions));" 2>&1'
-              . $cmdSuffix;
+            if ( lc($1) eq "statusrequest" ) {
+                $npm->{npminstall} = $npm->{nodejsversions};
+            }
+            elsif ( $1 =~ /^nodejs-v(\d+)/ ) {
+                $npm->{npminstall} =
+                    $cmdPrefix
+                  . "echo n | curl -sSL https://deb.nodesource.com/setup_$1.x | DEBIAN_FRONTEND=noninteractive sudo -n -E sh -c \"bash - >/dev/null 2>&1\" 2>&1"
+                  . ' && DEBIAN_FRONTEND=noninteractive sudo -n -E sh -c "apt-get install -qqy nodejs >/dev/null 2>&1" 2>&1;'
+                  . ' node -e "console.log(JSON.stringify(process.versions));" 2>&1'
+                  . $cmdSuffix;
+            }
         }
         else {
             my @packages;
@@ -931,28 +936,37 @@ sub RetrieveNpmOutput($$) {
 
         # Final parsing error
         else {
-            if ( $o =~ m/Permission.denied.\(publickey\)\.?\r?\n?$/i ) {
-                $h->{error}{code} = "E403";
-                $h->{error}{summary} =
-                    "Forbidden - None of the SSH keys from ~/.ssh/ "
-                  . "were authorized to access remote host";
-                $h->{error}{detail} = $o;
-            }
-            elsif ( $o =~ m/^sudo: /i ) {
-                $h->{error}{code} = "E403";
-                $h->{error}{summary} =
-                    "Forbidden - "
-                  . "passwordless sudo permissions required "
-                  . "(fhem ALL=NOPASSWD: ALL)";
-                $h->{error}{detail} = $o;
-            }
-            elsif ($o =~ m/(?:(\w+?): )?(\w+?): [^:]*?not.found$/i
-                or $o =~
-                m/(?:(\w+?): )?(\w+?): [^:]*?No.such.file.or.directory$/i )
-            {
-                $h->{error}{code}    = "E404";
-                $h->{error}{summary} = "Not Found - $2 is not installed";
-                $h->{error}{detail}  = $o;
+            if ($o) {
+                if ( $o =~ m/Permission.denied.\(publickey\)\.?\r?\n?$/i ) {
+                    $h->{error}{code} = "E403";
+                    $h->{error}{summary} =
+                        "Forbidden - None of the SSH keys from ~/.ssh/ "
+                      . "were authorized to access remote host";
+                    $h->{error}{detail} = $o;
+                }
+                elsif ( $o =~ m/^sudo: /i ) {
+                    $h->{error}{code} = "E403";
+                    $h->{error}{summary} =
+                        "Forbidden - "
+                      . "passwordless sudo permissions required "
+                      . "(fhem ALL=NOPASSWD: ALL)";
+                    $h->{error}{detail} = $o;
+                }
+                elsif ( $o =~
+                    m/(?:(\w+?): )?(?:(\w+? \d+): )?(\w+?): [^:]*?not.found$/i
+                    or $o =~
+m/(?:(\w+?): )?(?:(\w+? \d+): )?(\w+?): [^:]*?No.such.file.or.directory$/i
+                  )
+                {
+                    $h->{error}{code}    = "E404";
+                    $h->{error}{summary} = "Not Found - $3 is not installed";
+                    $h->{error}{detail}  = $o;
+                }
+                else {
+                    $h->{error}{code}    = "E501";
+                    $h->{error}{summary} = "Parsing error - " . $@;
+                    $h->{error}{detail}  = $p;
+                }
             }
             else {
                 $h->{error}{code}    = "E500";
