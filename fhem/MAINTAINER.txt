@@ -515,7 +515,7 @@ FHEM/98_vitoconnect.pm       andreas13            Heizungssteuerung/Raumklima
 FHEM/98_weblink.pm           rudolfkoenig         Frontends/FHEMWEB
 FHEM/98_WeekdayTimer.pm      igami                Unterstuetzende Dienste
 FHEM/98_weekprofile.pm       risiko               Frontends
-FHEM/98_WOL.pm               dietmar63            Unterstuetzende Dienste
+FHEM/98_WOL.pm               KernSani             Unterstuetzende Dienste
 FHEM/98_XmlList.pm           rudolfkoenig         Automatisierung
 FHEM/99_SUNRISE_EL.pm        rudolfkoenig         Automatisierung
 FHEM/99_Utils.pm             rudolfkoenig         Automatisierung
