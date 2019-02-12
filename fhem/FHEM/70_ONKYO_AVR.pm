@@ -1849,8 +1849,8 @@ sub ONKYO_AVR_Read2($$$) {
                     || $attr{$name}{model} ne
                     $hash->{helper}{receiver}{device}{$reading} )
                 {
-                    $attr{$name}{model} =
-                      $hash->{helper}{receiver}{device}{$reading};
+                    readingsBulkUpdate( $hash, $reading, 
+                      $hash->{helper}{receiver}{device}{$reading} );
                 }
             }
 
