@@ -1226,18 +1226,13 @@ sub CreateInstalledList($$) {
 sub CreateOutdatedList($$) {
     my ( $hash, $getCmd ) = @_;
     my $packages;
-    $packages = $hash->{".fhem"}{npm}{outdatedpackages}
-      if ( $getCmd eq 'showUpdateList' );
-    $packages = $hash->{".fhem"}{npm}{updatedpackages}
-      if ( $getCmd eq 'showUpdatedList' );
+    $packages = $hash->{".fhem"}{npm}{outdatedpackages};
 
     my $ret = '<html><table style="min-width: 450px;"><tr><td>';
     $ret .= '<table class="block wide">';
     $ret .= '<tr class="even">';
     $ret .= "<td><b>Package Name</b></td>";
-    $ret .= "<td><b>Current Version</b></td>"
-      if ( $getCmd eq 'showUpdateList' );
-    $ret .= "<td><b>Over Version</b></td>" if ( $getCmd eq 'showUpdatedList' );
+    $ret .= "<td><b>Current Version</b></td>";
     $ret .= "<td><b>New Version</b></td>";
     $ret .= "<td></td>";
     $ret .= '</tr>';
