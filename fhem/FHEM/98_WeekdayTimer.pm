@@ -662,7 +662,7 @@ sub WeekdayTimer_gatherSwitchingTimes {
     #pruefen auf Angabe eines Schaltpunktes
     my $element = "";
     my @restoreElements = ();
-    while (@$a > 0) {
+E:  while (@$a > 0) {
 
        my $actualElement = shift @$a;
        push @restoreElements, $actualElement;
