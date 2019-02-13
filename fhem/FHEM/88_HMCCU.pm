@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.3.011
+#  Version 4.3.012
 #
 #  Module for communication between FHEM and Homematic CCU2/3.
 #
@@ -37,6 +37,7 @@ use IO::File;
 use Fcntl 'SEEK_END', 'SEEK_SET', 'O_CREAT', 'O_RDWR';
 use RPC::XML::Client;
 use RPC::XML::Server;
+use HttpUtils;
 use SetExtensions;
 use SubProcess;
 use HMCCUConf;
@@ -51,7 +52,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.3.011';
+my $HMCCU_VERSION = '4.3.012';
 
 # Default RPC interface and port (BidCos-RF)
 my $HMCCU_RPC_PORT_DEFAULT = 2001;

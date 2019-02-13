@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  88_HMCCU: Module HttpUtils included
   - changed. 98_WOL: remove dependency on Twilight + German COmmandref
   - bugfix:  98_WeekdayTimer: Label not found for "next E"
   - bugfix:  70_ONKYO_AVR: model Reading not written correctly
