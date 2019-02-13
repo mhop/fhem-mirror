@@ -189,7 +189,7 @@ dewpoint_Notify($$)
     } elsif ($cmd_type eq "alarm") {
         if (!defined($hash->{DEVNAME_REF}) || !defined($hash->{DIFF_TEMP})) {
             # should never happen!
-            Log3($hashName, 1, "Error dewpoint: DEVNAME_REF || DIFF_TEMP undefined");
+            Log3($hashName, 1, "dewpoint_notify: error: DEVNAME_REF || DIFF_TEMP undefined");
             return "";
         }
         $devname_ref = $hash->{DEVNAME_REF};
@@ -198,7 +198,7 @@ dewpoint_Notify($$)
                            . "dev_regex=$re, devname_ref=$devname_ref, diff_temp=$diff_temp");
     } else {
         # should never happen:
-        Log3($hashName, 1, "Error notify_dewpoint: <1> unknown cmd_type ".$cmd_type);
+        Log3($hashName, 1, "dewpoint_notify: error: unknown cmd_type ".$cmd_type);
         return "";
     }
 
@@ -231,13 +231,13 @@ dewpoint_Notify($$)
             if ($s =~ /H: [-+]?([0-9]*\.[0-9]+|[0-9]+)/) {	
                 $humidity = $1;
             }
-            Log3($hashName, 5, "dewpoint_notify T: H:, temp=$temperature hum=$humidity");
+            Log3($hashName, 5, "dewpoint_notify: T: H:, temp=$temperature hum=$humidity");
         } elsif ($evName eq $temp_name.":") {
             $temperature = $val;
-            Log3($hashName, 5, "dewpoint_notify temperature! dev=$devName, temp_name=$temp_name, temp=$temperature");
+            Log3($hashName, 5, "dewpoint_notify: temperature! dev=$devName, temp_name=$temp_name, temp=$temperature");
         } elsif ($evName eq $hum_name.":") {
             $humidity = $val;
-            Log3($hashName, 5, "dewpoint_notify humidity! dev=$devName, hum_name=$hum_name, hum=$humidity");
+            Log3($hashName, 5, "dewpoint_notify: humidity! dev=$devName, hum_name=$hum_name, hum=$humidity");
         }
 
     }
@@ -246,7 +246,7 @@ dewpoint_Notify($$)
 
     # Check if Attribute timeout is set
     my $timeout = AttrVal($hash->{NAME}, "max_timediff", $dewpoint_time_diff_default);
-    Log3($hashName, 5,"dewpoint max_timediff=$timeout");
+    Log3($hashName, 5,"dewpoint_notify: max_timediff=$timeout");
 
     if (($humidity eq "") && (($temperature eq ""))) {
         return undef;  # no way to calculate dewpoint!
@@ -276,7 +276,7 @@ dewpoint_Notify($$)
     # We found temperature and humidity. so we can calculate dewpoint first
     # Prüfen, ob humidity im erlaubten Bereich ist
     if (($humidity <= 0) || ($humidity >= 110)){
-        Log3($hashName, 1, "Error dewpoint: humidity invalid: $humidity");
+        Log3($hashName, 1, "dewpoint_notify: humidity invalid: $humidity");
         return undef;
     }
 
@@ -300,27 +300,27 @@ dewpoint_Notify($$)
         readingsBeginUpdate($dev);
         my $rval;
         my $rname;
-        my $abs_hunidity = dewpoint_absFeuchte($temperature, $humidity);
+        my $abs_humidity = dewpoint_absFeuchte($temperature, $humidity);
         my $aFeuchte = AttrVal($hashName, "absFeuchte", undef);
         if (defined($aFeuchte)) {
             $rname = "absFeuchte";
-            readingsBulkUpdate($dev, $rname, $abs_hunidity);
-            Log3($hashName, 5, "dewpoint absFeuchte= $abs_hunidity");
-            $aFeuchte = "A: " . $abs_hunidity;
+            readingsBulkUpdate($dev, $rname, $abs_humidity);
+            Log3($hashName, 5, "dewpoint_notify: absFeuchte= $abs_humidity");
+            $aFeuchte = "A: " . $abs_humidity;
     	}
 
         my $ah_rname = AttrVal($hashName, "absoluteHumidity", undef);
         if (defined($ah_rname)) {
-            readingsBulkUpdate($dev, $ah_rname, $abs_hunidity);
-            Log3($hashName, 5, "dewpoint $ah_rname= $abs_hunidity");
-            $aFeuchte = "A: " . $abs_hunidity if !defined($aFeuchte);
+            readingsBulkUpdate($dev, $ah_rname, $abs_humidity);
+            Log3($hashName, 5, "dewpoint_notify: $ah_rname= $abs_humidity");
+            $aFeuchte = "A: " . $abs_humidity if !defined($aFeuchte);
         }	
 
         my $vp_rname = AttrVal($hashName, "vapourPressure", undef);
         if (defined($vp_rname)) {
             my $vp = round(10 * dewpoint_vp($temperature, $humidity), 1);
             readingsBulkUpdate($dev, $vp_rname, $vp);
-            Log3($hashName, 5, "dewpoint $vp_rname= $vp");
+            Log3($hashName, 5, "dewpoint_notify: $vp_rname= $vp");
         }	
 
         $rname = $new_name;
@@ -444,7 +444,7 @@ dewpoint_Notify($$)
 
     } else {
         # should never happen:
-        Log3($hashName, 1, "Error notify_dewpoint: <2> unknown cmd_type ".$cmd_type);
+        Log3($hashName, 1, "dewpoint_notify: unknown cmd_type ".$cmd_type);
         return "";
     }
 
@@ -544,11 +544,11 @@ dewpoint_absFeuchte ($$)
   Dewpoint calculations. Offers three different ways to use dewpoint: <br>
   <ul>
     <li><b>dewpoint</b><br>
-        Compute additional event dewpoint from a sensor offering temperature and humidity.</li>
+        Compute additional reading dewpoint from a sensor offering temperature and humidity.</li>
     <li><b>fan</b><br>
         Generate a event to turn a fan on if the outside air has less water than the inside.</li>
     <li><b>alarm</b><br>
-        Generate a mold alarm if a reference temperature is lower that the current dewpoint.</li>
+        Generate a mold alarm if a reference temperature is lower than the current dewpoint.</li>
   <br>
   </ul>
 
@@ -566,8 +566,7 @@ dewpoint_absFeuchte ($$)
         <b>Obsolete, avoid for new definitions</b><br>
 	&nbsp;&nbsp;If &lt;temp_name&gt; is T then use temperature from state T: H:, add &lt;new_name&gt; to the STATE.
         The addition to STATE only occurs if the target device does not define attribute "stateFormat".<br>
-        If the obsolete behaviour of STATE is mandatory set attribute <code>legacyStateHandling</code>
-        should be set.
+        If the obsolete behaviour of STATE is mandatory set attribute <code>legacyStateHandling</code>.
     </ul>
     <br><br>
 
@@ -630,7 +629,7 @@ dewpoint_absFeuchte ($$)
     <code>define &lt;name&gt; dewpoint alarm &lt;devicename-regex&gt; &lt;devicename-reference&gt; &lt;diff-temp&gt;</code><br>
     <br>
     <ul>
-        Generate a mold alarm if a reference temperature is lower that the current dewpoint.
+        Generate a mold alarm if a reference temperature is lower than the current dewpoint.
 	<ul>
         <li>
 	Generate reading/event "alarm: on" if temperature of &lt;devicename-reference&gt; - &lt;diff-temp&gt; is lower
