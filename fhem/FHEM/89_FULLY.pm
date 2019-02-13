@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#  89_FULLY.pm 1.1
+#  89_FULLY.pm 1.2
 #
 #  $Id$
 #
@@ -15,6 +15,7 @@ package main;
 
 use strict;
 use warnings;
+use HttpUtils;
 use SetExtensions;
 
 # Declare functions
@@ -36,7 +37,7 @@ sub FULLY_ProcessDeviceInfo ($$);
 sub FULLY_UpdateReadings ($$);
 sub FULLY_Ping ($$);
 
-my $FULLY_VERSION = "1.1";
+my $FULLY_VERSION = "1.2";
 
 # Timeout for Fully requests
 my $FULLY_TIMEOUT = 5;
