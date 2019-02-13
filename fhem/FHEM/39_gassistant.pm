@@ -395,7 +395,7 @@ gassistant_getCMD($)
   if( my $host = AttrVal($name, 'gassistantFHEM-sshHost', undef ) ) {
     my $ssh = qx( which ssh ); chomp( $ssh );
     if( my $user = AttrVal($name, 'gassistantFHEM-sshUser', undef ) ) {
-      $ssh_cmd = "$ssh $host -u $user";
+      $ssh_cmd = "$ssh $user \@$host";
     } else {
       $ssh_cmd = "$ssh $host";
     }
