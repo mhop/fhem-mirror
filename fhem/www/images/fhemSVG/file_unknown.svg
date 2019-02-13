@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="384px" height="448px" viewBox="0 0 384 448" version="1.1">
+  <defs/>
+  <g fill="#000000" id="layer1">
+    <path d="M288,0 L0,0 L0,448 L384,448 L384,96 L288,0 Z M352,416 L32,416 L32,32 L256,32 L352,128 L352,416 Z" id="Shape"/>
+  </g>
+</svg>
