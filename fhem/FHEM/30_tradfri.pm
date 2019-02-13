@@ -370,7 +370,7 @@ tradfri_getCmd($) {
   if( my $host = AttrVal($name, 'tradfriFHEM-sshHost', undef ) ) {
     my $ssh = qx( which ssh ); chomp( $ssh );
     if( my $user = AttrVal($name, 'tradfriFHEM-sshUser', undef ) ) {
-      $ssh_cmd = "$ssh $host -u $user";
+      $ssh_cmd = "$ssh $user\@$host";
     } else {
       $ssh_cmd = "$ssh $host";
     }

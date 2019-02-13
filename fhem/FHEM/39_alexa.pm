@@ -440,7 +440,7 @@ alexa_getCMD($)
   if( my $host = AttrVal($name, 'alexaFHEM-host', undef ) ) {
     my $ssh = qx( which ssh ); chomp( $ssh );
     if( my $user = AttrVal($name, 'alexaFHEM-sshUser', undef ) ) {
-      $ssh_cmd = "$ssh $host -u $user";
+      $ssh_cmd = "$ssh $user\@$host";
     } else {
       $ssh_cmd = "$ssh $host";
     }
