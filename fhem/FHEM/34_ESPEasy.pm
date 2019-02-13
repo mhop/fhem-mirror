@@ -37,7 +37,7 @@ use HttpUtils;
 use Color;
 use SetExtensions;
 
-my $module_version      = "2.16";     # Version of this module
+my $module_version      = "2.17";     # Version of this module
 
 # ------------------------------------------------------------------------------
 # modul version and required ESP Easy firmware / JSON lib version
@@ -1382,7 +1382,7 @@ sub ESPEasy_Attr(@)
   }
 
   elsif ($aName =~ m/^(autosave|autocreate|authentication|disable|deepsleep)$/
-      || $aName =~ m/^(presenceCheck|displayTextEncode|resendFailedCmd)$/) {
+      || $aName =~ m/^(presenceCheck|displayTextEncode)$/) {
   $ret = "0,1" if ($cmd eq "set" && not $aVal =~ m/^(0|1)$/)}
 
   elsif ($aName eq "combineDevices") {
