@@ -77,6 +77,7 @@ gassistant_Define($$)
   my $name = $a[0];
   $hash->{NAME} = $name;
 
+
   my $d = $modules{$hash->{TYPE}}{defptr};
   return "$hash->{TYPE} device already defined as $d->{NAME}." if( defined($d) && $name ne $d->{NAME} );
   $modules{$hash->{TYPE}}{defptr} = $hash;
@@ -103,6 +104,8 @@ gassistant_Define($$)
                        };
 
   if( $init_done ) {
+    setKeyValue('gassistantFHEM.loginURL', '' );
+    readingsSingleUpdate($hash, 'gassistantFHEM.loginURL', 'Waiting for login url from gassistant-fhem', 1 );
     CoProcess::start($hash);
   } else {
     $hash->{STATE} = 'active';
@@ -187,7 +190,6 @@ gassistant_detailFn($$$$)
     $ret .= "<a href=\"$FW_ME?detail=$name\">". AttrVal($name, "alias", "Logfile") ."</a><br>";
   }
 
-  #if( my $url = ReadingsVal($name, 'gassistantFHEM.loginURL', undef ) )  {
   #  $ret .= "<a href=\"$url\">Login</a><br>";
   #}
 
@@ -482,7 +484,7 @@ gassistant_Set($$@)
     return "usage: set $name $cmd <url>" if( !@args );
     my $url = $args[0];
  
-    $url = "<html><a href=\"$url\">$url</a><br></html>";
+    $url = "<html><a href=\"$url\">Click here to login</a><br></html>";
     
     $hash->{".triggerUsed"} = 1;
 
@@ -543,6 +545,9 @@ gassistant_Set($$@)
     CommandSave(undef,undef) if( AttrVal( "autocreate", "autosave", 1 ) );
 
     return undef;
+  } elsif( $cmd eq 'start' || $cmd eq 'stop' || $cmd eq 'restart' ) {
+    setKeyValue('gassistantFHEM.loginURL', '' );
+    readingsSingleUpdate($hash, 'gassistantFHEM.loginURL', 'Waiting for login url from gassistant-fhem', 1 );
   }
 
   return CoProcess::setCommands($hash, $list, $cmd, @args);
