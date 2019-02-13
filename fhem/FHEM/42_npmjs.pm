@@ -111,11 +111,11 @@ sub Define($$) {
     if ( $init_done && !defined( $hash->{OLDDEF} ) ) {
 
         # presets for FHEMWEB
-        $attr{$name}{alias} = 'Node.js Update Status';
+        $attr{$name}{alias} = 'Node.js Package Update Status';
         $attr{$name}{devStateIcon} =
 'npm.updates.available:security@red:outdated npm.is.up.to.date:security@green:outdated .*in.progress:system_fhem_reboot@orange warning.*:message_attention@orange error.*:message_attention@red';
         $attr{$name}{group} = 'System';
-        $attr{$name}{icon}  = 'nodejs';
+        $attr{$name}{icon}  = 'npm-old';
         $attr{$name}{room}  = 'System';
     }
 
@@ -368,7 +368,8 @@ sub Set($$@) {
         else {
             return "NPM cannot be uninstalled from here"
               if (
-                grep ( m/^(?:@([\w-]+)\/)?(npm)(?:@([\d\.=<>]+))?$/i, @args ) );
+                grep ( m/^(?:@([\w-]+)\/)?(npm)(?:@([\d\.=<>]+|latest))?$/i,
+                    @args ) );
             $hash->{".fhem"}{npm}{cmd} = $cmd . " " . join( " ", @args );
         }
     }
@@ -552,7 +553,8 @@ sub FhemTrigger ($$) {
 
     foreach my $package ( split / /, $packages ) {
         next
-          unless ( $package =~ /^(?:@([\w-]+)\/)?([\w-]+)(?:@([\d\.=<>]+))?$/ );
+          unless (
+            $package =~ /^(?:@([\w-]+)\/)?([\w-]+)(?:@([\d\.=<>]+|latest))?$/ );
         DoTrigger( $name, uc($trigger) . uc($cmd) . " $2", 1 );
     }
 }
@@ -695,7 +697,13 @@ sub ExecuteNpmCommand($) {
     my $cmdPrefix = "";
     my $cmdSuffix = "";
 
-    if ( $cmd->{host} =~ /^(?:(.*)@)?(.+)$/ && lc($2) ne "localhost" ) {
+    if ( $cmd->{host} =~ /^(?:(.*)@)?([^:]+)(?::(\d+))?$/
+        && lc($2) ne "localhost" )
+    {
+        my $port = "";
+        if ($3) {
+            $port = "-p $3 ";
+        }
 
         # One-time action to add remote hosts key.
         # If key changes, user will need to intervene
@@ -712,7 +720,8 @@ sub ExecuteNpmCommand($) {
           . 'grep -q -E "^${KEY% *}" ${HOME}/.ssh/known_hosts || echo "${KEY}" >> ${HOME}/.ssh/known_hosts; ';
 
         # wrap SSH command
-        $cmdPrefix .= 'ssh -oBatchMode=yes ' . ( $1 ? "$1@" : "" ) . $2 . ' \'';
+        $cmdPrefix .=
+          'ssh -oBatchMode=yes ' . $port . ( $1 ? "$1@" : "" ) . $2 . ' \'';
         $cmdSuffix = '\' 2>&1';
     }
 
@@ -798,7 +807,7 @@ sub ExecuteNpmCommand($) {
             foreach my $package ( split / /, $1 ) {
                 next
                   unless ( $package =~
-                    /^(?:@([\w-]+)\/)?([\w-]+)(?:@([\d\.=<>]+))?$/ );
+                    /^(?:@([\w-]+)\/)?([\w-]+)(?:@([\d\.=<>]+|latest))?$/ );
 
                 push @packages,
                   "homebridge"
@@ -826,8 +835,8 @@ sub ExecuteNpmCommand($) {
         my @packages = "";
         foreach my $package ( split / /, $1 ) {
             next
-              unless (
-                $package =~ /^(?:@([\w-]+)\/)?([\w-]+)(?:@([\d\.=<>]+))?$/ );
+              unless ( $package =~
+                /^(?:@([\w-]+)\/)?([\w-]+)(?:@([\d\.=<>]+|latest))?$/ );
             push @packages, $package;
         }
         my $pkglist = join( ' ', @packages );
@@ -843,7 +852,7 @@ sub ExecuteNpmCommand($) {
             foreach my $package ( split / /, $1 ) {
                 next
                   unless ( $package =~
-                    /^(?:@([\w-]+)\/)?([\w-]+)(?:@([\d\.=<>]+))?$/ );
+                    /^(?:@([\w-]+)\/)?([\w-]+)(?:@([\d\.=<>]+|latest))?$/ );
                 push @packages, $package;
             }
             $pkglist = join( ' ', @packages );
@@ -1347,18 +1356,24 @@ sub ToDay() {
   <br>
   <code>fhem ALL=NOPASSWD: ALL</code><br>
   <br>
+  This line may easily be added to a new file in /etc/sudoers.d/fhem and will automatically included to /etc/sudoers from there.<br>
+  More restricted sudo settings are currently not supported.<br>
+  Only checking for outdated packages does not require any privileged access at all!<br>
+  <br>
   <br>
   <a name="npmjsdefine" id="npmjsdefine"></a><b>Define</b><br>
   <ul>
-    <code>define &lt;name&gt; npmjs [&lt;HOST&gt;]</code><br>
+    <code>define &lt;name&gt; npmjs [&lt;[user@]HOSTNAME[:port]&gt;]</code><br>
     <br>
     Example:<br>
     <ul>
       <code>define fhemServerNpm npmjs</code><br>
     </ul><br>
-    This command creates an npmjs instance named 'fhemServerNpm' to run commands on host 'localhost'.<br>
+    This command creates an npmjs instance named 'fhemServerNpm' to run commands on the local host machine.
     Afterwards all information about installation and update state will be fetched. This will take a moment.<br>
-    If you would like to connect to a remote host, use user@hostname as HOST parameter.
+    <br>
+    If you would like to connect to a remote host, set the optional HOSTNAME to something different than 'localhost'.
+    In that case, make sure that SSH keys between the FHEM running user and remote server are setup appropriately.
   </ul><br>
   <br>
   <a name="npmjsreadings" id="npmjsreadings"></a><b>Readings</b>
@@ -1431,18 +1446,24 @@ sub ToDay() {
   <br>
   <code>fhem ALL=NOPASSWD: ALL</code><br>
   <br>
+  Diese Zeile kann einfach in einer neuen Datei unter /etc/sudoers.d/fhem hinzugef&uuml;gt werden und wird von dort automatisch in /etc/sudoers inkludiert.<br>
+  Restriktiviere sudo Einstellungen sind derzeit nicht m&ouml;glich.<br>
+  Um nur die zu aktualisierenden Pakete zu &uuml;berpr&uuml;fen wird &uuml;berhaupt kein priviligierter Zugriff ben&ouml;tigt!<br>
+  <br>
   <br>
   <a name="npmjsdefine" id="npmjsdefine"></a><b>Define</b><br>
   <ul>
-    <code>define &lt;name&gt; npmjs [&lt;HOST&gt;]</code><br>
+    <code>define &lt;name&gt; npmjs [&lt;[user@]HOSTNAME[:port]&gt;]</code><br>
     <br>
     Beispiel:<br>
     <ul>
-      <code>define fhemServer npmjs localhost</code><br>
+      <code>define fhemServer npmjs</code><br>
     </ul><br>
-    Der Befehl erstellt eine npmjs Instanz mit dem Namen 'fhemServerNpm', um Kommandos auf dem Host 'localhost' auszuf&uuml;hren.<br>
+    Der Befehl erstellt eine npmjs Instanz mit dem Namen 'fhemServerNpm', um Kommandos auf der lokalen Host Maschine auszuf&uuml;hren.
     Anschlie&szlig;end werden die alle Informationen &uuml;ber den Installations- und Update Status geholt. Dies kann einen Moment dauern.<br>
-    Wenn man sich zu einem entfernten Rechner verbinden m&ouml;chte, kann man den HOST Parameter im Format user@hostname verwenden.
+    <br>
+    Wenn man sich zu einem entfernten Rechner verbinden m&ouml;chte, kann man den optionalen HOSTNAME Parameter zu etwas anderem als 'localhost' setzen.
+    In diesem Fall muss auch sichergestellt sein, dass die SSH Schl&uuml;ssel zwischen dem laufenden FHEM Benutzer und dem entfernten Server entsprechend konfiguriert sind.
   </ul><br>
   <br>
   <a name="npmjsreadings" id="npmjsreadings"></a><b>Readings</b>
