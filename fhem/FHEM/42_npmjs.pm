@@ -41,7 +41,7 @@ use POSIX;
 # our @EXPORT  = qw(get_time_suffix);
 our $VERSION = "0.10.2";
 
-# wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
+# supports to import main functions from fhem.pl
 use GPUtils qw(GP_Import);
 
 use Data::Dumper;    #only for Debugging
@@ -1383,7 +1383,11 @@ sub ToDay() {
     </li>
     <li>update - trigger complete or selected update process. this will take a moment
     </li>
-    <li>install - Install one or more NPM packages
+    <li>install - Install one or more NPM packages. If Node.js is not installed on the server, it will offer to
+        initially install Node.js (APT compatible Linux distributions only). You may still install Node.js and
+        NPM manually and trigger to re-detect the installation by using any of the provided options. Existing
+        Node.js installations will never be overwritten and it will not be possible to upgrade Node.js using
+        this FHEM module!
     </li>
     <li>uninstall - Uninstall one or more NPM packages
     </li>
@@ -1420,8 +1424,8 @@ sub ToDay() {
 </h3>
 <ul>
   <u><b>npmjs - Bedienung der Node.js Installation und Updates</b></u><br>
-  Das Modul erlaubt es Node.js Pakete über den NPM Paket Manager zu installieren, zu deinstallieren und zu aktualisieren.<br>
-  Standardmäßig werden globale Installationen bedient und das Ausf&uuml;hren von update/install/uninstall erfordert sudo Berechtigungen wie diese:<br>
+  Das Modul erlaubt es Node.js Pakete &uuml;ber den NPM Paket Manager zu installieren, zu deinstallieren und zu aktualisieren.<br>
+  Standardm&auml;&szlig;ig werden globale Installationen bedient und das Ausf&uuml;hren von update/install/uninstall erfordert sudo Berechtigungen wie diese:<br>
   <br>
   <code>fhem ALL=NOPASSWD: ALL</code><br>
   <br>
@@ -1435,7 +1439,7 @@ sub ToDay() {
       <code>define fhemServer npmjs localhost</code><br>
     </ul><br>
     Der Befehl erstellt eine npmjs Instanz mit dem Namen 'fhemServerNpm', um Kommandos auf dem Host 'localhost' auszuf&uuml;hren.<br>
-    Anschließend werden die alle Informationen über den Installations- und Update Status geholt. Dies kann einen Moment dauern.<br>
+    Anschlie&szlig;end werden die alle Informationen &uuml;ber den Installations- und Update Status geholt. Dies kann einen Moment dauern.<br>
     Wenn man sich zu einem entfernten Rechner verbinden m&ouml;chte, kann man den HOST Parameter im Format user@hostname verwenden.
   </ul><br>
   <br>
@@ -1453,17 +1457,23 @@ sub ToDay() {
     </li>
     <li>uninstalled - Status des letzten uninstall Befehles
     </li>
-    <li>updatesAvailable - Anzahl der verfügbaren Paketupdates
+    <li>updatesAvailable - Anzahl der verf&uuml;gbaren Paketupdates
     </li>
   </ul><br>
   <br>
   <a name="npmjsset" id="npmjsset"></a><b>Set</b>
   <ul>
-    <li>outdated - holt aktuelle Informationen über den Updatestatus
+    <li>outdated - Holt aktuelle Informationen &uuml;ber den Updatestatus
     </li>
-    <li>update - führt ein komplettes oder selektives Update aus
+    <li>update - F&uuml;hrt ein komplettes oder selektives Update aus
     </li>
     <li>install - installiert ein oder mehrere NPM Pakete
+    </li>
+    <li>install - Installiert ein oder mehrere NPM Pakete. Wenn Node.js nicht installiert ist, wird die erstmalige
+        Installation von Node.js angeboten (nur für APT kompatible Linux Distributionen). Node.js kann weiterhin
+        manuell installiert werden. &Uuml;ber jede der angebotenen Optionen kann eine erneute Pr&uuml;fung veranlasst
+        werden. Bestehende Node.js Installationen werden niemals &uuml;berschrieben und es ist nicht m&ouml;glich ein
+        Upgrade von Node.js &uuml;ber dieses FHEM Modul durchzuf&uuml;hren!
     </li>
     <li>uninstall - deinstalliert ein oder mehrere NPM Pakete
     </li>
@@ -1471,7 +1481,7 @@ sub ToDay() {
   <br>
   <a name="npmjsget" id="npmjsget"></a><b>Get</b>
   <ul>
-    <li>showOutdatedList - Paketiste aller zur Verfügung stehender Updates
+    <li>showOutdatedList - Paketiste aller zur Verf&uuml;gung stehender Updates
     </li>
     <li>showErrorList - Liste aller aufgetretenden Fehler f&uuml;r das letzte Kommando
     </li>
@@ -1481,11 +1491,11 @@ sub ToDay() {
   <ul>
     <li>disable - Deaktiviert das Device
     </li>
-    <li>upgradeListReading - fügt die Upgrade Liste als ein zusäiches Reading im JSON Format ein.
+    <li>upgradeListReading - f&uuml;gt die Upgrade Liste als ein zus&auml;iches Reading im JSON Format ein.
     </li>
     <li>npmglobal - wechselt zwischen Global- und Benutzer-Installation. Standard ist 1=global
     </li>
-    <li>disabledForIntervals - Deaktiviert das Device für eine bestimmte Zeit (13:00-18:30 or 13:00-18:30 22:00-23:00)
+    <li>disabledForIntervals - Deaktiviert das Device f&uuml;r eine bestimmte Zeit (13:00-18:30 or 13:00-18:30 22:00-23:00)
     </li>
   </ul>
 </ul>
