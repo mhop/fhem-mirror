@@ -257,6 +257,12 @@ FHEMWEB_Initialize($)
       $FW_use{$mod} = 1;
     }
   }
+
+  $cmds{show} = { 
+    Fn=>"FW_show", ClientFilter=>"FHEMWEB",
+    Hlp=>"<devspec>, show temporary room with devices from <devspec>"
+  };
+
 }
 
 #####################################
@@ -1862,8 +1868,16 @@ FW_showRoom()
 
   # array of all device names in the room (exception weblinks without group
   # attribute)
-  my @devs= grep { (($FW_rooms{$FW_room} && $FW_rooms{$FW_room}{$_}) ||
-                    $FW_room eq "all") && !IsIgnored($_) } keys %defs;
+  my @devs;
+  if( $FW_room =~ m/^#devspec=(.*)$/ ) {
+    @devs = devspec2array($1) if( $1 );
+    @devs = () if( int(@devs) == 1 && !defined($defs{$devs[0]}) );
+
+  } else {
+    @devs= grep { (($FW_rooms{$FW_room} && $FW_rooms{$FW_room}{$_}) ||
+                   $FW_room eq "all") && !IsIgnored($_) } keys %defs;
+  }
+
   my (%group, @atEnds, %usuallyAtEnd, %sortIndex);
   my $nDevsInRoom = 0;
   foreach my $dev (@devs) {
@@ -3381,6 +3395,15 @@ FW_widgetOverride($$)
   return $str;
 }
 
+sub
+FW_show($$)
+{
+  my ($hash, $param) = @_;
+  return "usage: show <devspec>" if( !$param);
+
+  $FW_room = "#devspec=$param";
+  return undef;
+}
 
 1;
 
