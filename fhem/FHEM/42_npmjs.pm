@@ -37,6 +37,7 @@ package npmjs;
 use strict;
 use warnings;
 use POSIX;
+use RESIDENTStk;
 
 # our @EXPORT  = qw(get_time_suffix);
 our $VERSION = "0.10.2";
@@ -113,7 +114,7 @@ sub Define($$) {
         # presets for FHEMWEB
         $attr{$name}{alias} = 'Node.js Package Update Status';
         $attr{$name}{devStateIcon} =
-'npm.updates.available:security@red:outdated npm.is.up.to.date:security@green:outdated .*in.progress:system_fhem_reboot@orange warning.*:message_attention@orange error.*:message_attention@red';
+'npm.updates.available:security@red:outdated npm.is.up.to.date:security@green:outdated .*npm.outdated.*in.progress:system_fhem_reboot@orange .*in.progress:system_fhem_update@orange warning.*:message_attention@orange error.*:message_attention@red';
         $attr{$name}{group} = 'System';
         $attr{$name}{icon}  = 'npm-old';
         $attr{$name}{room}  = 'System';
@@ -539,10 +540,11 @@ sub Get($$@) {
     }
 }
 
-sub FhemTrigger ($$) {
-    my $hash    = shift;
-    my $trigger = shift;
-    my $name    = $hash->{NAME};
+sub Event ($$) {
+    my $hash  = shift;
+    my $event = shift;
+    my $name  = $hash->{NAME};
+
     return
       unless ( defined( $hash->{".fhem"}{npm}{cmd} )
         && $hash->{".fhem"}{npm}{cmd} =~
@@ -551,12 +553,50 @@ sub FhemTrigger ($$) {
     my $cmd      = $1;
     my $packages = $2;
 
+    my $list;
+
     foreach my $package ( split / /, $packages ) {
         next
           unless (
             $package =~ /^(?:@([\w-]+)\/)?([\w-]+)(?:@([\d\.=<>]+|latest))?$/ );
-        DoTrigger( $name, uc($trigger) . uc($cmd) . " $2", 1 );
+        $list .= " " if ($list);
+        $list .= $2;
     }
+
+    DoModuleTrigger( $hash, uc($event) . uc($cmd) . " $name $list" );
+}
+
+sub DoModuleTrigger($$@) {
+    my ( $hash, $eventString, $noreplace, $TYPE ) = @_;
+    $hash      = $defs{$hash}  unless ( ref($hash) );
+    $noreplace = 1             unless ( defined($noreplace) );
+    $TYPE      = $hash->{TYPE} unless ( defined($TYPE) );
+
+    return ""
+      unless ( defined($TYPE)
+        && defined( $modules{$TYPE} )
+        && defined($eventString)
+        && $eventString =~
+        m/^([A-Za-z\d._]+)(?:\s+([A-Za-z\d._]+)(?:\s+(.+))?)?$/ );
+
+    my $event = $1;
+    my $dev   = $2;
+
+    return "DoModuleTrigger() can only handle module related events"
+      if ( ( $hash->{NAME} && $hash->{NAME} eq "global" )
+        || $dev eq "global" );
+
+    # This is a global event on module level
+    return DoTrigger( "global", "$TYPE:$eventString", $noreplace )
+      unless ( $event =~
+/^INITIALIZED|INITIALIZING|MODIFIED|DELETED|BEGIN(?:UPDATE|INSTALL|UNINSTALL)|END(?:UPDATE|INSTALL|UNINSTALL)$/
+      );
+
+    # This is a global event on module level and in device context
+    return "$event: missing device name"
+      if ( !defined($dev) || $dev eq "" );
+
+    return DoTrigger( "global", "$TYPE:$eventString", $noreplace );
 }
 
 ###################################
@@ -635,7 +675,7 @@ sub AsynchronousExecuteNpmCommand($) {
         return undef;
     }
 
-    FhemTrigger( $hash, "BEGIN" );
+    Event( $hash, "BEGIN" );
     Log3 $name, 4, "npmjs ($name) - execute command asynchronously (PID= $pid)";
 
     $hash->{".fhem"}{subprocess} = $subprocess;
@@ -1151,7 +1191,7 @@ sub WriteReadings($$) {
         );
     }
 
-    FhemTrigger( $hash, "FINISH" );
+    Event( $hash, "FINISH" );
     readingsEndUpdate( $hash, 1 );
 
     ProcessUpdateTimer($hash)
