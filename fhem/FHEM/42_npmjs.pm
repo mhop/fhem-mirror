@@ -62,6 +62,7 @@ BEGIN {
           modules
           Log3
           Debug
+          DoTrigger
           CommandAttr
           attr
           AttrVal
@@ -444,7 +445,6 @@ sub Set($$@) {
         return "Unknown argument $cmd, choose one of $list";
     }
 
-    FhemTrigger($hash);
     AsynchronousExecuteNpmCommand($hash);
 
     return undef;
@@ -538,23 +538,23 @@ sub Get($$@) {
     }
 }
 
-sub FhemTrigger ($) {
-    my $hash = shift;
-    my $name = $hash->{NAME};
+sub FhemTrigger ($$) {
+    my $hash    = shift;
+    my $trigger = shift;
+    my $name    = $hash->{NAME};
     return
       unless ( defined( $hash->{".fhem"}{npm}{cmd} )
         && $hash->{".fhem"}{npm}{cmd} =~
         m/^(install|uninstall|update)(?: (.+))/i );
 
-  # my $cmd      = $1;
-  # my $packages = $2;
-  #
-  # foreach my $package ( split / /, $1 ) {
-  #     next
-  #       unless ( $package =~ /^(?:@([\w-]+)\/)?([\w-]+)(?:@([\d\.=<>]+))?$/ );
-  #
-  #     DoTrigger( $name, "UPDATESTART package", 1 );
-  # }
+    my $cmd      = $1;
+    my $packages = $2;
+
+    foreach my $package ( split / /, $packages ) {
+        next
+          unless ( $package =~ /^(?:@([\w-]+)\/)?([\w-]+)(?:@([\d\.=<>]+))?$/ );
+        DoTrigger( $name, uc($trigger) . uc($cmd) . " $2", 1 );
+    }
 }
 
 ###################################
@@ -633,6 +633,7 @@ sub AsynchronousExecuteNpmCommand($) {
         return undef;
     }
 
+    FhemTrigger( $hash, "BEGIN" );
     Log3 $name, 4, "npmjs ($name) - execute command asynchronously (PID= $pid)";
 
     $hash->{".fhem"}{subprocess} = $subprocess;
@@ -793,7 +794,7 @@ sub ExecuteNpmCommand($) {
             }
         }
         else {
-            my @packages;
+            my @packages = "";
             foreach my $package ( split / /, $1 ) {
                 next
                   unless ( $package =~
@@ -815,14 +816,14 @@ sub ExecuteNpmCommand($) {
                 push @packages, $package;
             }
             my $pkglist = join( ' ', @packages );
-            return unless ($pkglist);
+            return unless ( $pkglist ne "" );
             $npm->{npminstall} =~ s/%PACKAGES%/$pkglist/gi;
         }
         print qq($npm->{npminstall}\n) if ( $npm->{debug} == 1 );
         $response = NpmInstall($npm);
     }
     elsif ( $cmd->{cmd} =~ /^uninstall (.+)/ ) {
-        my @packages;
+        my @packages = "";
         foreach my $package ( split / /, $1 ) {
             next
               unless (
@@ -830,13 +831,13 @@ sub ExecuteNpmCommand($) {
             push @packages, $package;
         }
         my $pkglist = join( ' ', @packages );
-        return unless ($pkglist);
+        return unless ( $pkglist ne "" );
         $npm->{npmuninstall} =~ s/%PACKAGES%/$pkglist/gi;
         print qq($npm->{npmuninstall}\n) if ( $npm->{debug} == 1 );
         $response = NpmUninstall($npm);
     }
     elsif ( $cmd->{cmd} =~ /^update(?: (.+))?/ ) {
-        my $pkglist;
+        my $pkglist = "";
         if ( defined($1) ) {
             my @packages;
             foreach my $package ( split / /, $1 ) {
@@ -1141,6 +1142,7 @@ sub WriteReadings($$) {
         );
     }
 
+    FhemTrigger( $hash, "FINISH" );
     readingsEndUpdate( $hash, 1 );
 
     ProcessUpdateTimer($hash)
