@@ -54,7 +54,7 @@ attr DEVICE model L_01_zigbee2mqtt_bridge
 # Based on https://forum.fhem.de/index.php/topic,94060.msg872371.html#msg872371 
 
 name:L_01a_zigbee2mqtt_bridge_0x
-desc:The zigbee2mqtt bridge device <br>New version, using entire device name including "0x"
+desc:The zigbee2mqtt bridge device <br>Outdated version, using entire device name including "0x". <br>Kept in repo for compability reasons. 
 filter:TYPE=MQTT2_DEVICE
 par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^:]+:([^/]+)[/].*:, ? $1 : undef }
 set DEVICE attrTemplate L_01_zigbee2mqtt_bridge_0x
@@ -120,6 +120,7 @@ attr DEVICE model L_02b_zigbee2mqtt_colorbulbWithoutColorTemp
 
 #source post: https://forum.fhem.de/index.php/topic,96985.msg902627.html#msg902627
 name:L_02c_zigbee2mqtt_colorbulb_rgb
+desc: A dimmable rgb light connected via zigbee2mqtt <br>Experimental, still untested
 filter:TYPE=MQTT2_DEVICE
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
@@ -135,6 +136,25 @@ attr DEVICE setList \
   color_temp:colorpicker,CT,250,1,454 BASE_TOPIC/DEV_ID/set {"$EVTPART0":"$EVTPART1"}\
   hex:colorpicker,HEX,0,15,255 BASE_TOPIC/DEV_ID/set {"color":{"$EVTPART0":"#$EVTPART1"}}
 attr DEVICE model L_02c_zigbee2mqtt_colorbulb_rgb
+
+#source post: https://forum.fhem.de/index.php/topic,97303.msg905935.html#msg905935
+name:L_02d_zigbee2mqtt_colorbulb_rgb_cct
+filter:TYPE=MQTT2_DEVICE
+desc: A dimmable rgb-cct light connected via zigbee2mqtt <br>Experimental, still untested, might work with Gledopto RGB-CCT GL-C-008
+par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+attr DEVICE icon hue_filled_white_and_color_e27_b22
+attr DEVICE stateFormat {lc ReadingsVal("$name","state",0)}
+attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name)}
+attr DEVICE webCmd toggle:on:off:brightness:color_temp:color
+attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+attr DEVICE setList \
+  on:noArg BASE_TOPIC/DEV_ID/set {"state":"ON"}\
+  off:noArg BASE_TOPIC/DEV_ID/set {"state":"OFF"}\
+  color:colorpicker,RGB {"BASE_TOPIC/DEV_ID/set ".zigbee2mqtt_RGB2JSON($EVTPART1)
+attr DEVICE model L_02d_zigbee2mqtt_colorbulb_rgb_cct
+#  brightness:colorpicker,BRI,0,15,255 BASE_TOPIC/DEV_ID/set {"state":"on","$EVTPART0":"$EVTPART1"}\
+#  color_temp:colorpicker,CT,250,1,454 BASE_TOPIC/DEV_ID/set {"$EVTPART0":"$EVTPART1"}\
 
 name:L_03_zigbee2mqtt_smokeDetector
 filter:TYPE=MQTT2_DEVICE
@@ -575,6 +595,41 @@ attr DEVICE_CH4 getList \
   energy3:noArg shellies/DEVNAME/relay/3/energy energy3
 attr DEVICE_CH4 comment Channel 4 for DEVICE, see also DEVICE, DEVICE_CH2 and DEVICE_CH3
 attr DEVICE model A_14a_shelly4pro_split
+
+# shelly4pro unified device using original firmware
+# source: https://forum.fhem.de/index.php/topic,97218.msg905689.html#msg905689
+name:A_14b_shelly4pro_unified
+filter:TYPE=MQTT2_DEVICE
+desc:shelly4pro using original firmware <br>NOTE: UNTESTED! feedback is apreciated, please try also to add toggle commands <br>NOTE: only one device will be created.
+par:DEVNAME;Shelly4Pro name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
+set DEVICE attrTemplate A_10a_shellyplug
+attr DEVICE getList \
+  power0:noArg shellies/DEVNAME/relay/0/power power0\
+  energy0:noArg shellies/DEVNAME/relay/0/energy energy0\
+  power1:noArg shellies/DEVNAME/relay/1/power power1\
+  energy1:noArg shellies/DEVNAME/relay/1/energy energy1\
+  power2:noArg shellies/DEVNAME/relay/2/power power2\
+  energy2:noArg shellies/DDEVNAME/relay/2/energy energy2\
+  power3:noArg shellies/DEVNAME/relay/3/power power3\
+  energy3:noArg shellies/DEVNAME/relay/3/energy energy3
+attr DEVICE readingList \
+  shellies/DEVNAME/relay/0:.* relay0\
+  shellies/DEVNAME/input/0:.* input0\
+  shellies/DEVNAME/relay/1:.* relay1\
+  shellies/DEVNAME/input/1:.* input1\
+  shellies/DEVNAME/relay/2:.* relay2\
+  shellies/DEVNAME/input/2:.* input2\
+  shellies/DEVNAME/relay/3:.* relay3\
+  shellies/DEVNAME/input/3:.* input3\
+  shellies/DEVNAME/online:.* online\
+  shellies/DEVNAME/announce:.* { json2nameValue($EVENT, '', $JSONMAP) }
+attr DEVICE setList \
+  relay0:on,off shellies/DEVNAME/relay/0/command $EVTPART1\
+  relay1:on,off shellies/DEVNAME/relay/1/command $EVTPART1\
+  relay2:on,off shellies/DEVNAME/relay/2/command $EVTPART1\
+  relay3:on,off shellies/DEVNAME/relay/3/command $EVTPART1
+attr DEVICE stateFormat R0: relay0 R1: relay1 R2: relay2 R3: relay3
+attr DEVICE model A_14b_shelly4pro_unified
 
 # shellybulb using original firmware
 name:A_15_shellybulb
