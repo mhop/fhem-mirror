@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  12_HProtocolGateway: moved strapping table csv file to attribute
   - bugfix:  98_WeekdayTimer: restore old Revision; remove Twilight dependency
   - bugfix:  88_HMCCU: Module HttpUtils included
   - changed. 98_WOL: remove dependency on Twilight + German COmmandref

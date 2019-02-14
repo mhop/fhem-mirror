@@ -49,8 +49,7 @@ sub HProtocolGateway_Initialize($) {
                       "parityBit:N,E,O " .
                       "databitsLength:5,6,7,8 " .
                       "stopBit:0,1 " .
-                      "pollIntervalMins " .
-                      "path";
+                      "pollIntervalMins";
 }
 
 sub HProtocolGateway_Define($$) {
@@ -342,8 +341,6 @@ sub HProtocolGateway_Attr (@) {
 	    } else {
 	       RemoveInternalTimer($hash);
         }
-    } elsif ($attr eq 'path') {
-      $attr{$name}{path} = $val; 
     } elsif ($attr eq 'baudrate') {
       $attr{$name}{baudrate} = $val;
       HProtocolGateway_DeviceConfig($hash);
@@ -386,19 +383,19 @@ sub HProtocolGateway_Poll($) {
 sub HProtocolGateway_Tank($$$) {
   my ($hash,$tankHash,$filllevel) = @_;
   my $name = $hash->{NAME};
-  my $path = AttrVal($name,"path","");
-  my $type = AttrVal($tankHash->{NAME},"type","");
+  my $type = AttrVal($tankHash->{NAME}, 'type','');
 
   my %TankChartHash;
-  open my $fh, '<', $path.$type or die "Cannot open: $!";
-  while (my $line = <$fh>) {
+  
+  my @array = split(" ", $type);
+
+  foreach my $line (@array) {
     $line =~ s/\s*\z//;
     my @array = split /,/, $line;
     my $key = shift @array;
     $TankChartHash{$key} = $array[0];
   }
-  close $fh;
-
+  
   my $volume = 0;
   my $volume1 = 0;
   my $level1 = 0;
@@ -433,7 +430,6 @@ sub HProtocolGateway_Tank($$$) {
   <ul>
     <code>define &lt;name&gt; HProtocolGateway /dev/tty???<br />
     attr &lt;name&gt; pollIntervalMins 2<br />
-    attr &lt;name&gt; path /opt/fhem/<br />
     attr &lt;name&gt; baudrate 1200<br />
     attr &lt;name&gt; databitsLength 8<br />
     attr &lt;name&gt; parityBit N<br />
@@ -441,23 +437,6 @@ sub HProtocolGateway_Tank($$$) {
     <br />
     <br />
     Defines an HProtocolGateway connected to RS232 serial standard interface.<br /><br /> 
-    path is the path for tank&lt;01&gt;.csv strapping table files.<br /><br /> 
-
-    <code>
-    level,volume<br />
-    10,16<br />
-    520,7781<br />
-    1330,29105<br />
-    1830,43403<br />
-    2070,49844<br />
-    2220,53580<br />
-    2370,57009<br />
-    2400,57650<br />
-    2430,58275<br />
-    2370,57009<br />
-    2400,57650<br />
-    2430,58275<br />
-    </code> 
 
   </ul><br />
 
@@ -466,8 +445,6 @@ sub HProtocolGateway_Tank($$$) {
   <ul>
     <li>pollIntervalMins<br />
     poll Interval in Mins</li>
-    <li>path<br />
-    Strapping Table csv file path</li>
     <li>baudrate<br />
     Baudrate / 300, 600, 1200, 2400, 4800, 9600</li>
     <li>databitsLength<br />

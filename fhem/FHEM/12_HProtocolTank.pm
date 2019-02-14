@@ -34,10 +34,10 @@ sub HProtocolTank_Initialize($) {
   $hash->{AttrFn}         = "HProtocolGateway_Attr";
   $hash->{Match}          = "^[a-zA-Z0-9_]+ [a-zA-Z0-9_]+ [+-]*[0-9]+([.][0-9]+)?";
   $hash->{AttrList}       = "hID " .
-                            "mode:FillLevel,Volume,Ullage " .
-                            "type " .
-                            "product:Diesel,FuelOil,Petrol " .
                             "sensorSystem:Hectronic,Unitronics,PMS-IB " .
+                            "mode:FillLevel,Volume,Ullage " .
+                            "product:Diesel,FuelOil,Petrol " .
+                            "type " .
                             $readingFnAttributes;
 }
 
@@ -103,10 +103,14 @@ sub HProtocolTank_Attr (@) {
     my $hash = $defs{$name};
     my $msg = '';
 
-    if ($attr eq 'type') {
-      $attr{$name}{type} = $val;
+    if ($attr eq 'strappingTable') {
+      $attr{$name}{strappingTable} = $val;
     } elsif ($attr eq 'mode') {
       $attr{$name}{mode} = $val;
+    } elsif ($attr eq 'product') {
+      $attr{$name}{product} = $val;
+    } elsif ($attr eq 'sensorSystem') {
+      $attr{$name}{sensorSystem} = $val;
     }
 }
 
@@ -172,11 +176,27 @@ sub HProtocolTank_Attr (@) {
     <li>mode<br />
     Mode / FillLevel, Volume, Ullage</li>
     <li>type<br />
-    Strapping Table csv file / tank01.csv</li>
+    Type / Strapping Table csv</li>
     <li>product<br />
     Product / Diesel, FuelOil, Petrol</li>
-  </ul><br />
+  </ul><br /><br /> 
+    strapping table csv<br /><br /> 
 
+    <code>
+    level,volume<br />
+    10,16<br />
+    520,7781<br />
+    1330,29105<br />
+    1830,43403<br />
+    2070,49844<br />
+    2220,53580<br />
+    2370,57009<br />
+    2400,57650<br />
+    2430,58275<br />
+    2370,57009<br />
+    2400,57650<br />
+    2430,58275<br />
+    </code> 
 
 </ul><br />
 
