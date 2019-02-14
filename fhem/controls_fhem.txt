@@ -1,4 +1,4 @@
-REV 18575
+REV 18592
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2019-02-13_07:45:03 278556 ./CHANGED
+UPD 2019-02-14_07:45:03 278684 ./CHANGED
 UPD 2019-02-13_07:45:03 39599 ./MAINTAINER.txt
 UPD 2019-02-07_07:45:02 39624 ./configDB.pm
 UPD 2018-09-17_07:45:03 19987 ./fhem.cfg.demo
@@ -55,7 +55,7 @@ UPD 2018-12-13_07:45:03 143235 FHEM/00_THZ.pm
 UPD 2017-12-16_07:45:02 35823 FHEM/00_TUL.pm
 UPD 2018-04-05_07:45:03 21475 FHEM/00_ZWCUL.pm
 UPD 2018-08-21_07:45:03 45122 FHEM/00_ZWDongle.pm
-UPD 2019-01-23_07:45:02 156307 FHEM/01_FHEMWEB.pm
+UPD 2019-02-14_07:45:03 156765 FHEM/01_FHEMWEB.pm
 UPD 2016-09-07_07:45:12 15690 FHEM/02_FRAMEBUFFER.pm
 UPD 2017-04-23_07:45:02 42910 FHEM/02_FTUISRV.pm
 UPD 2018-06-16_07:45:03 7921 FHEM/02_HTTPSRV.pm
@@ -174,7 +174,7 @@ UPD 2016-11-01_07:45:11 3823 FHEM/30_pilight_raw.pm
 UPD 2016-07-04_07:45:16 3754 FHEM/30_pilight_smoke.pm
 UPD 2016-04-25_07:45:10 5350 FHEM/30_pilight_switch.pm
 UPD 2016-01-15_07:45:16 6136 FHEM/30_pilight_temp.pm
-UPD 2019-01-27_07:45:03 15672 FHEM/30_tradfri.pm
+UPD 2019-02-14_07:45:03 15670 FHEM/30_tradfri.pm
 UPD 2019-01-03_07:45:02 27812 FHEM/31_Aurora.pm
 UPD 2015-07-28_14:05:31 4627 FHEM/31_ENECSYSINV.pm
 UPD 2019-01-31_07:45:02 65080 FHEM/31_HUEDevice.pm
@@ -194,7 +194,7 @@ UPD 2017-12-15_07:45:02 4576 FHEM/33_readingsChange.pm
 UPD 2018-03-02_07:47:09 89206 FHEM/33_readingsGroup.pm
 UPD 2018-03-02_07:47:09 23233 FHEM/33_readingsHistory.pm
 UPD 2018-03-02_07:47:09 12101 FHEM/33_readingsProxy.pm
-UPD 2019-01-25_07:45:03 182521 FHEM/34_ESPEasy.pm
+UPD 2019-02-14_07:45:03 182505 FHEM/34_ESPEasy.pm
 UPD 2015-08-06_07:45:08 13198 FHEM/34_NUT.pm
 UPD 2016-08-23_07:45:12 47048 FHEM/34_SWAP.pm
 UPD 2016-08-23_07:45:12 16074 FHEM/34_panStamp.pm
@@ -229,8 +229,8 @@ UPD 2017-05-31_07:45:02 28640 FHEM/38_CO20.pm
 UPD 2016-02-09_07:45:13 15879 FHEM/38_JawboneUp.pm
 UPD 2019-01-25_07:45:03 241597 FHEM/38_netatmo.pm
 UPD 2018-03-18_07:45:02 80208 FHEM/39_Talk2Fhem.pm
-UPD 2019-01-27_07:45:03 39627 FHEM/39_alexa.pm
-UPD 2019-02-04_07:45:02 20140 FHEM/39_gassistant.pm
+UPD 2019-02-14_07:45:03 39625 FHEM/39_alexa.pm
+UPD 2019-02-14_07:45:03 20467 FHEM/39_gassistant.pm
 UPD 2017-04-21_07:45:02 2759 FHEM/39_siri.pm
 UPD 2016-04-26_07:45:11 13443 FHEM/40_RFXCOM.pm
 UPD 2018-07-05_07:45:04 35494 FHEM/41_OREGON.pm
@@ -239,7 +239,7 @@ UPD 2017-05-26_07:45:02 29928 FHEM/42_Nextion.pm
 UPD 2015-07-28_14:05:31 8038 FHEM/42_RFXMETER.pm
 UPD 2017-06-01_07:45:02 21914 FHEM/42_SMARTMON.pm
 UPD 2018-08-30_07:45:03 194137 FHEM/42_SYSMON.pm
-UPD 2019-02-13_07:45:03 46601 FHEM/42_npmjs.pm
+UPD 2019-02-14_07:45:03 50266 FHEM/42_npmjs.pm
 UPD 2015-07-28_14:05:31 19326 FHEM/43_RFXX10REC.pm
 UPD 2019-01-28_07:45:02 52106 FHEM/44_ROLLO.pm
 UPD 2017-07-13_07:45:02 33874 FHEM/44_S7.pm
@@ -403,7 +403,7 @@ UPD 2018-07-17_07:45:04 6465 FHEM/84_IOhomecontrolDevice.pm
 UPD 2018-08-20_07:45:03 42219 FHEM/86_Robonect.pm
 UPD 2015-07-28_14:05:31 17571 FHEM/87_WS2000.pm
 UPD 2015-07-28_14:05:31 4345 FHEM/88_ALL4000T.pm
-UPD 2019-02-11_07:45:02 276543 FHEM/88_HMCCU.pm
+UPD 2019-02-14_07:45:03 276558 FHEM/88_HMCCU.pm
 UPD 2019-02-11_07:45:02 42592 FHEM/88_HMCCUCHN.pm
 UPD 2019-02-11_07:45:02 37140 FHEM/88_HMCCUDEV.pm
 UPD 2018-02-14_07:45:02 90153 FHEM/88_HMCCURPC.pm
@@ -416,7 +416,7 @@ UPD 2015-07-28_14:05:31 12845 FHEM/88_VantagePro2.pm
 UPD 2015-07-28_14:05:31 4198 FHEM/88_WEBCOUNT.pm
 UPD 2018-05-01_07:45:03 39556 FHEM/88_xs1Bridge.pm
 UPD 2018-04-14_07:45:02 22528 FHEM/88_xs1Dev.pm
-UPD 2019-01-17_07:45:02 27074 FHEM/89_FULLY.pm
+UPD 2019-02-14_07:45:03 27089 FHEM/89_FULLY.pm
 UPD 2016-01-05_07:45:12 44169 FHEM/89_HEATRONIC.pm
 UPD 2019-01-29_07:45:04 52272 FHEM/89_VCLIENT.pm
 UPD 2016-07-11_07:45:14 62016 FHEM/89_VCONTROL.pm
@@ -494,7 +494,7 @@ UPD 2017-05-20_07:45:02 36736 FHEM/98_UbiquitiMP.pm
 UPD 2015-07-28_14:05:31 3492 FHEM/98_UbiquitiOut.pm
 UPD 2019-02-08_07:45:02 31487 FHEM/98_Verkehrsinfo.pm
 UPD 2019-02-13_07:45:03 20746 FHEM/98_WOL.pm
-UPD 2019-02-13_07:45:03 50018 FHEM/98_WeekdayTimer.pm
+UPD 2019-02-14_07:45:03 51353 FHEM/98_WeekdayTimer.pm
 UPD 2017-01-18_07:45:02 3906 FHEM/98_XmlList.pm
 UPD 2018-07-15_07:45:03 56393 FHEM/98_alarmclock.pm
 UPD 2018-03-22_07:45:04 13667 FHEM/98_apptime.pm
@@ -507,7 +507,7 @@ UPD 2018-03-02_07:47:09 3985 FHEM/98_cmdalias.pm
 UPD 2019-02-07_07:45:02 20650 FHEM/98_configdb.pm
 UPD 2018-03-10_07:45:02 1997 FHEM/98_copy.pm
 UPD 2019-02-10_07:45:03 1449 FHEM/98_count.pm
-UPD 2018-07-25_07:45:02 35471 FHEM/98_dewpoint.pm
+UPD 2019-02-14_07:45:03 35482 FHEM/98_dewpoint.pm
 UPD 2018-07-10_07:45:14 5092 FHEM/98_dummy.pm
 UPD 2018-09-12_07:45:02 11093 FHEM/98_expandJSON.pm
 UPD 2018-07-17_07:45:04 49521 FHEM/98_feels_like.pm
@@ -611,7 +611,7 @@ UPD 2017-09-10_16:01:38 392 FHEM/holiday/th.holiday
 UPD 2019-02-12_07:45:04 333486 FHEM/lib/74_AMADautomagicFlowset_4.2.5.xml
 UPD 2019-02-12_07:45:04 440509 FHEM/lib/74_AMADtaskerset_4.2.5.prj.xml
 UPD 2019-01-10_07:45:02 13896 FHEM/lib/AttrTemplate/httpmod.template
-UPD 2019-02-11_07:45:02 47362 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2019-02-14_07:45:03 50622 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
 UPD 2018-01-13_07:45:02 21899 FHEM/lib/Device/Firmata/Constants.pm
@@ -705,12 +705,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2019-02-13_07:45:07 3881584 docs/commandref.html
-UPD 2019-02-13_07:45:09 2371959 docs/commandref_DE.html
+UPD 2019-02-14_07:45:06 3882449 docs/commandref.html
+UPD 2019-02-14_07:45:09 2373143 docs/commandref_DE.html
 UPD 2019-01-19_07:45:03 77621 docs/commandref_frame.html
 UPD 2019-01-19_07:45:03 87066 docs/commandref_frame_DE.html
-UPD 2019-02-13_07:45:10 206918 docs/commandref_modular.html
-UPD 2019-02-13_07:45:11 217677 docs/commandref_modular_DE.html
+UPD 2019-02-14_07:45:10 206918 docs/commandref_modular.html
+UPD 2019-02-14_07:45:10 217677 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -1241,10 +1241,13 @@ UPD 2017-11-14_07:45:02 22160 www/images/fhemSVG/access_keypad_2.svg
 UPD 2017-11-14_07:45:02 2149 www/images/fhemSVG/alarm_system_password.svg
 UPD 2017-01-31_07:45:03 6055 www/images/fhemSVG/alexa.svg
 UPD 2017-01-31_07:45:03 2924 www/images/fhemSVG/alexa2.svg
+UPD 2019-02-14_07:45:03 1101 www/images/fhemSVG/alpine-linux.svg
 UPD 2017-11-14_07:45:02 1811 www/images/fhemSVG/ampel_aus.svg
 UPD 2017-11-14_07:45:02 2095 www/images/fhemSVG/ampel_gelb.svg
 UPD 2017-11-14_07:45:02 2084 www/images/fhemSVG/ampel_gruen.svg
 UPD 2017-11-14_07:45:02 2097 www/images/fhemSVG/ampel_rot.svg
+UPD 2019-02-14_07:45:03 1139 www/images/fhemSVG/arch-linux.svg
+UPD 2019-02-14_07:45:03 3099 www/images/fhemSVG/arduino.svg
 UPD 2017-11-26_07:45:02 696 www/images/fhemSVG/aurora.svg
 UPD 2015-08-11_07:45:11 1801 www/images/fhemSVG/awning.off.svg
 UPD 2015-08-11_07:45:11 1794 www/images/fhemSVG/awning.svg
@@ -1261,12 +1264,14 @@ UPD 2017-01-03_07:45:02 3132 www/images/fhemSVG/checkbox_checked.svg
 UPD 2017-01-03_07:45:02 1972 www/images/fhemSVG/checkbox_unchecked.svg
 UPD 2015-07-28_14:05:32 5818 www/images/fhemSVG/christmas_tree.svg
 UPD 2017-11-14_07:45:02 2570 www/images/fhemSVG/clock.svg
+UPD 2019-02-14_07:45:03 2017 www/images/fhemSVG/cpan.svg
 UPD 2015-07-28_14:05:32 9449 www/images/fhemSVG/cul.svg
 UPD 2015-07-28_14:05:32 12083 www/images/fhemSVG/cul_868.svg
 UPD 2015-07-28_14:05:32 7562 www/images/fhemSVG/cul_cul.svg
 UPD 2017-10-04_07:45:02 13794 www/images/fhemSVG/cul_max.svg
 UPD 2015-07-28_14:05:32 6093 www/images/fhemSVG/cul_usb.svg
 UPD 2017-01-03_07:45:02 6958 www/images/fhemSVG/cul_wlan.svg
+UPD 2019-02-14_07:45:03 3436 www/images/fhemSVG/curl.svg
 UPD 2017-09-07_07:45:02 5233 www/images/fhemSVG/dash_button.svg
 UPD 2015-07-28_14:05:32 4825 www/images/fhemSVG/day_night.svg
 UPD 2019-02-09_07:45:03 5320 www/images/fhemSVG/debian.svg
@@ -1275,7 +1280,19 @@ UPD 2017-11-14_07:45:02 15434 www/images/fhemSVG/dog_silhouette.svg
 UPD 2015-07-28_14:05:32 2935 www/images/fhemSVG/dreambox.svg
 UPD 2015-07-28_14:05:32 8477 www/images/fhemSVG/dustbin.svg
 UPD 2015-08-14_07:45:11 1130 www/images/fhemSVG/euro.svg
+UPD 2019-02-14_07:45:03 1012 www/images/fhemSVG/file_image.svg
+UPD 2019-02-14_07:45:03 906 www/images/fhemSVG/file_json-1.svg
+UPD 2019-02-14_07:45:03 1523 www/images/fhemSVG/file_json-2.svg
+UPD 2019-02-14_07:45:03 6986 www/images/fhemSVG/file_json-ld1.svg
+UPD 2019-02-14_07:45:03 4249 www/images/fhemSVG/file_json-ld2.svg
+UPD 2019-02-14_07:45:03 3164 www/images/fhemSVG/file_json5.svg
+UPD 2019-02-14_07:45:03 1811 www/images/fhemSVG/file_manpage.svg
+UPD 2019-02-14_07:45:03 2949 www/images/fhemSVG/file_pod.svg
+UPD 2019-02-14_07:45:03 1293 www/images/fhemSVG/file_test-generic.svg
+UPD 2019-02-14_07:45:03 369 www/images/fhemSVG/file_unknown.svg
+UPD 2019-02-14_07:45:03 1944 www/images/fhemSVG/finder.svg
 UPD 2015-07-28_14:05:32 3850 www/images/fhemSVG/floor.svg
+UPD 2019-02-14_07:45:03 3325 www/images/fhemSVG/flux.svg
 UPD 2015-07-28_14:05:32 10015 www/images/fhemSVG/frost.svg
 UPD 2016-12-27_07:45:02 1562 www/images/fhemSVG/fs20_S4A-2_1.svg
 UPD 2016-12-27_07:45:02 1564 www/images/fhemSVG/fs20_S4A-2_2.svg
@@ -1322,8 +1339,10 @@ UPD 2015-07-28_14:05:32 5226 www/images/fhemSVG/general_aus.svg
 UPD 2015-07-28_14:05:32 10429 www/images/fhemSVG/general_aus_fuer_zeit.svg
 UPD 2015-07-28_14:05:32 4264 www/images/fhemSVG/general_low.svg
 UPD 2015-07-28_14:05:32 3762 www/images/fhemSVG/general_ok.svg
+UPD 2019-02-14_07:45:03 1111 www/images/fhemSVG/gitlab.svg
 UPD 2017-02-26_07:45:02 20189 www/images/fhemSVG/helper_doif.svg
 UPD 2017-11-18_07:45:03 24960 www/images/fhemSVG/helper_doiftools.svg
+UPD 2019-02-14_07:45:03 1059 www/images/fhemSVG/hewlettpackard.svg
 UPD 2015-07-28_14:05:32 15925 www/images/fhemSVG/hm-cc-rt-dn.svg
 UPD 2015-07-28_14:05:32 8594 www/images/fhemSVG/hm-dis-wm55.svg
 UPD 2017-01-17_07:45:03 14169 www/images/fhemSVG/hm-sec-win.svg
@@ -1403,6 +1422,7 @@ UPD 2017-11-14_07:45:02 3924 www/images/fhemSVG/light_question.svg
 UPD 2015-07-28_14:05:32 10388 www/images/fhemSVG/light_toggle.svg
 UPD 2019-02-09_07:45:03 10998 www/images/fhemSVG/linux.svg
 UPD 2018-01-11_07:45:02 9590 www/images/fhemSVG/logic.svg
+UPD 2019-02-14_07:45:03 1744 www/images/fhemSVG/logo_apple.svg
 UPD 2017-01-17_07:45:03 2684 www/images/fhemSVG/markise_in.svg
 UPD 2017-01-17_07:45:03 3022 www/images/fhemSVG/markise_out.svg
 UPD 2015-07-28_14:05:32 12954 www/images/fhemSVG/max_heizungsthermostat.svg
@@ -1418,9 +1438,18 @@ UPD 2018-01-11_07:45:02 6168 www/images/fhemSVG/mqtt.svg
 UPD 2018-01-11_07:45:02 8635 www/images/fhemSVG/mqtt_broker.svg
 UPD 2018-01-11_07:45:02 7248 www/images/fhemSVG/mqtt_device.svg
 UPD 2017-11-26_07:45:02 3630 www/images/fhemSVG/muelltonne.svg
+UPD 2019-02-14_07:45:03 759 www/images/fhemSVG/nginx.svg
+UPD 2019-02-14_07:45:03 5212 www/images/fhemSVG/nmap.svg
 UPD 2019-02-08_07:45:02 5548 www/images/fhemSVG/nodejs.svg
+UPD 2019-02-14_07:45:03 716 www/images/fhemSVG/npm-old.svg
+UPD 2019-02-14_07:45:03 497 www/images/fhemSVG/npm.svg
 UPD 2015-07-28_14:05:32 8453 www/images/fhemSVG/outside_socket.svg
 UPD 2015-07-28_14:05:32 2926 www/images/fhemSVG/people_sensor.svg
+UPD 2019-02-14_07:45:03 1861 www/images/fhemSVG/perl.svg
+UPD 2019-02-14_07:45:03 6193 www/images/fhemSVG/perl6.svg
+UPD 2019-02-14_07:45:03 3977 www/images/fhemSVG/php.svg
+UPD 2019-02-14_07:45:03 1255 www/images/fhemSVG/pypi.svg
+UPD 2019-02-14_07:45:03 2188 www/images/fhemSVG/python.svg
 UPD 2017-01-03_07:45:02 2504 www/images/fhemSVG/radio_checked.svg
 UPD 2017-01-03_07:45:02 2126 www/images/fhemSVG/radio_unchecked.svg
 UPD 2019-02-09_07:45:03 9270 www/images/fhemSVG/raspberrypi.svg
@@ -1506,6 +1535,7 @@ UPD 2015-07-28_14:05:32 5013 www/images/fhemSVG/recycling.svg
 UPD 2015-07-28_14:05:32 1901 www/images/fhemSVG/refresh.svg
 UPD 2017-11-14_07:45:02 2114 www/images/fhemSVG/remote_control.svg
 UPD 2017-01-17_07:45:03 2190 www/images/fhemSVG/ring.svg
+UPD 2019-02-14_07:45:03 2405 www/images/fhemSVG/robot.svg
 UPD 2015-07-28_14:05:32 3082 www/images/fhemSVG/sani_floor_heating_neutral.svg
 UPD 2015-07-28_14:05:32 7974 www/images/fhemSVG/sani_floor_heating_off.svg
 UPD 2015-07-28_14:05:32 7265 www/images/fhemSVG/sani_heating_boost.svg
@@ -1526,8 +1556,10 @@ UPD 2015-07-28_14:05:32 13389 www/images/fhemSVG/scc_868.svg
 UPD 2015-07-28_14:05:32 2723 www/images/fhemSVG/sdcard.svg
 UPD 2015-07-28_14:05:32 2132 www/images/fhemSVG/security.svg
 UPD 2015-07-28_14:05:32 3640 www/images/fhemSVG/security_password.svg
+UPD 2019-02-14_07:45:03 1921 www/images/fhemSVG/sketchup-layout.svg
 UPD 2015-07-28_14:05:32 5746 www/images/fhemSVG/socket_timer.svg
 UPD 2018-01-28_07:45:02 2742 www/images/fhemSVG/sonos_play1.svg
+UPD 2019-02-14_07:45:03 2375 www/images/fhemSVG/sqlite.svg
 UPD 2015-08-10_07:45:11 29827 www/images/fhemSVG/sunblind_0.svg
 UPD 2015-08-10_07:45:11 29803 www/images/fhemSVG/sunblind_10.svg
 UPD 2015-08-10_07:45:11 21498 www/images/fhemSVG/sunblind_100.svg
@@ -1539,10 +1571,12 @@ UPD 2015-08-10_07:45:11 29827 www/images/fhemSVG/sunblind_60.svg
 UPD 2015-08-10_07:45:11 29741 www/images/fhemSVG/sunblind_70.svg
 UPD 2015-08-10_07:45:11 30837 www/images/fhemSVG/sunblind_80.svg
 UPD 2015-08-10_07:45:11 29746 www/images/fhemSVG/sunblind_90.svg
+UPD 2019-02-14_07:45:03 827 www/images/fhemSVG/svn.svg
 UPD 2015-07-28_14:05:32 5685 www/images/fhemSVG/system_backup.svg
 UPD 2015-07-28_14:05:32 3464 www/images/fhemSVG/system_fhem.svg
 UPD 2015-07-28_14:05:32 4479 www/images/fhemSVG/system_fhem_reboot.svg
 UPD 2015-07-28_14:05:32 5003 www/images/fhemSVG/system_fhem_update.svg
+UPD 2019-02-14_07:45:03 1160 www/images/fhemSVG/tag_label.svg
 UPD 2015-07-28_14:05:32 1342 www/images/fhemSVG/taster.svg
 UPD 2015-07-28_14:05:32 2211 www/images/fhemSVG/taster_ch.svg
 UPD 2015-07-28_14:05:32 2828 www/images/fhemSVG/taster_ch6_1.svg
@@ -1555,7 +1589,9 @@ UPD 2015-07-28_14:05:32 4133 www/images/fhemSVG/taster_ch_1.svg
 UPD 2017-11-14_07:45:02 2877 www/images/fhemSVG/taster_ch_2.svg
 UPD 2015-07-28_14:05:32 2693 www/images/fhemSVG/taster_ch_an_gruen.svg
 UPD 2015-07-28_14:05:32 4548 www/images/fhemSVG/taster_ch_aus_rot.svg
+UPD 2019-02-14_07:45:03 807 www/images/fhemSVG/telegram.svg
 UPD 2015-07-28_14:05:32 3079 www/images/fhemSVG/temperature_humidity.svg
+UPD 2019-02-14_07:45:03 889 www/images/fhemSVG/terminal.svg
 UPD 2017-11-22_07:45:02 2111 www/images/fhemSVG/tradfri_gateway.svg
 UPD 2019-02-09_07:45:03 2304 www/images/fhemSVG/ubuntu.svg
 UPD 2015-07-28_14:05:32 2613 www/images/fhemSVG/unknown.svg
@@ -1564,7 +1600,10 @@ UPD 2017-11-14_07:45:02 6734 www/images/fhemSVG/usb_stick.svg
 UPD 2015-07-28_14:05:32 4105 www/images/fhemSVG/user_unknown.svg
 UPD 2017-10-04_07:45:02 7572 www/images/fhemSVG/vacuum_bold.svg
 UPD 2017-10-04_07:45:02 3866 www/images/fhemSVG/vacuum_top.svg
-UPD 2017-11-22_07:45:02 4357 www/images/fhemSVG/well.svg
+UPD 2019-02-14_07:45:03 828 www/images/fhemSVG/virtualbox-alt.svg
+UPD 2019-02-14_07:45:03 1551 www/images/fhemSVG/virtualbox.svg
+UPD 2019-02-14_07:45:03 3164 www/images/fhemSVG/vmware.svg
+UPD 2019-02-14_07:45:03 4752 www/images/fhemSVG/well.svg
 UPD 2017-03-18_07:45:02 7396 www/images/fhemSVG/wuerfel.svg
 UPD 2015-07-28_14:05:33 1269 www/images/openautomation/audio_audio.svg
 UPD 2015-07-28_14:05:33 1192 www/images/openautomation/audio_eject.svg
