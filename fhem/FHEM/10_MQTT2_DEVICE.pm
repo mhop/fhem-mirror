@@ -103,16 +103,18 @@ MQTT2_DEVICE_Parse($$)
 
     next if(!("$topic:$value" =~ m/^$reAll$/s ||
               "$cid:$topic:$value" =~ m/^$reAll$/s));
-    foreach my $dev (keys %{$dp->{$re}}) {
-      next if(IsDisabled($dev));
+    foreach my $key (keys %{$dp->{$re}}) {
+      my ($dev, $code2) = split(",",$key,2);
       my $hash = $defs{$dev};
+      next if(!$hash);
+      next if(IsDisabled($dev));
       my $reRepl = $re;
       $reRepl =~ s/\$DEVICETOPIC/$hash->{DEVICETOPIC}/g;
       next if(!("$topic:$value" =~ m/^$reRepl$/s ||
                 "$cid:$topic:$value" =~ m/^$reRepl$/s));
 
       my @retData;
-      my $code = $dp->{$re}{$dev};
+      my $code = $dp->{$re}{$key};
       Log3 $dev, 4, "MQTT2_DEVICE_Parse: $dev $topic => $code";
 
       if($code =~ m/^{.*}$/s) {
@@ -443,9 +445,11 @@ MQTT2_DEVICE_delReading($)
   my ($name) = @_;
   my $dp = $modules{MQTT2_DEVICE}{defptr}{re};
   foreach my $re (keys %{$dp}) {
-    if($dp->{$re}{$name}) {
-      delete($dp->{$re}{$name});
-      delete($dp->{$re}) if(!int(keys %{$dp->{$re}}));
+    foreach my $key (keys %{$dp->{$re}}) {
+      if($key =~ m/^$name,/) {
+        delete($dp->{$re}{$key});
+        delete($dp->{$re}) if(!int(keys %{$dp->{$re}}));
+      }
     }
   }
 }
@@ -457,7 +461,8 @@ MQTT2_DEVICE_addReading($$)
   MQTT2_DEVICE_delReading($name);
   foreach my $line (split("\n", $param)) {
     my ($re,$code) = split(" ", $line,2);
-    $modules{MQTT2_DEVICE}{defptr}{re}{$re}{$name} = $code if($re && $code);
+    $modules{MQTT2_DEVICE}{defptr}{re}{$re}{"$name,$code"} = $code
+        if($re && $code);
   }
 }
 
