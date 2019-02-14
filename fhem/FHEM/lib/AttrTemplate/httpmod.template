@@ -1,4 +1,12 @@
-#$id:$
+###########################################
+# $Id: mqtt2.template 18592 2019-02-14 06:27:39Z Beta-User $
+#
+# Comments start with #. Empty lines are ignored.
+# Syntax of one entry: name: line, one optional filter: line, zero or more par: lines,  FHEM-Commands
+# filter:INTERNAL=VALUE (optional)
+# par: name of the parameter; comment; perl_code (optional)
+# perl_code returns a value for the parameter, or undef.
+# If undef, the user has to specify them (the comment is shown to the user)
 
 #################################
 #Clever Tanken
@@ -44,11 +52,21 @@ attr DEVICE reading05Regex <div >(.*)<\/div>
 attr DEVICE reading05RegOpt g 
 attr DEVICE model A_01a_clever_tanken_multi_station
 
+#German weather warnings from DWD, Forum: https://forum.fhem.de/index.php/topic,45176.msg905879.html#msg905879
+name:A_02a_DWD_weather_warnings
+filter:TYPE=HTTPMOD
+desc: Get weather warnings from DWD.<br>Define a HTTPMOD device like <br>defmod Wetterwarner HTTPMOD https://www.dwd.de/DWD/warnungen/warnapp/json/warnings.json 0 <br>Change region to your needs <br><a href="https://forum.fhem.de/index.php/topic,45176.msg906203.html#msg906203">Source: Forum</a>
+par:REGIONCODE;Get region code from https://www.dwd.de/DE/leistungen/opendata/help/warnungen/cap_warncellids_csv.csv?__blob=publicationFile&v=3;{ undef }
+attr DEVICE enableControlSet 1
+attr DEVICE extractAllJSON 1
+attr DEVICE extractAllJSONFilter REGIONCODE
+attr DEVICE preProcessRegex s/warnWetter..............|\);;|\t|\n|\r//g
+attr DEVICE model A_02a_DWD_weather_warnings
 
 #Austrian weather, Forum: https://forum.fhem.de/index.php/topic,94110.msg868080.html#msg868080
 name:A_02m_ORF_weather
 filter:TYPE=HTTPMOD
-desc: Get austrian weather.<br>Define a HTTPMOD device like <br>defmod DEVICE HTTPMOD defmod weatherORF HTTPMOD https://wetter.orf.at/wien/ 1800 <br>Change city to your needs <br><a href="https://forum.fhem.de/index.php/topic,94110.msg868080.html#msg868080">Source: Forum</a>
+desc: Get austrian weather.<br>Define a HTTPMOD device like <br>defmod weatherORF HTTPMOD https://wetter.orf.at/wien/ 1800 <br>Change city to your needs <br><a href="https://forum.fhem.de/index.php/topic,94110.msg868080.html#msg868080">Source: Forum</a>
 attr DEVICE userattr reading01-1Name reading01-2Name reading01-3Name reading01-4Name reading01-5Name reading01Regex reading02-1Name reading02-2Name reading02-3Name reading02-4Name reading02-5Name reading02-6Name reading02-7Name reading02-8Name reading02Regex
 attr DEVICE enableControlSet 1
 attr DEVICE reading01-1Name temperature
