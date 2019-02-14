@@ -103,8 +103,8 @@ sub HProtocolTank_Attr (@) {
     my $hash = $defs{$name};
     my $msg = '';
 
-    if ($attr eq 'strappingTable') {
-      $attr{$name}{strappingTable} = $val;
+    if ($attr eq 'type') {
+      $attr{$name}{type} = $val;
     } elsif ($attr eq 'mode') {
       $attr{$name}{mode} = $val;
     } elsif ($attr eq 'product') {
