@@ -73,6 +73,7 @@
 #   2019-01-12  fixed a small bug in logging
 #   2019-01-18  better logging for disallowed pins
 #   2019-01-29  changed handling of analog pins to better support future boards like ESP32
+#   2019-02-14  fixed typo in attr definitions
 #
 # ideas / todo:
 #
@@ -96,7 +97,7 @@ use strict;
 use warnings;                        
 use Time::HiRes qw(gettimeofday);    
 
-my $ArduCounter_Version = '6.07 - 27.1.2019';
+my $ArduCounter_Version = '6.08 - 14.3.2019';
 
 
 my %ArduCounter_sets = (  
@@ -163,7 +164,7 @@ sub ArduCounter_Initialize($)
     $hash->{NotifyFn} = "ArduCounter_Notify";
     $hash->{AttrList} =
         'board:UNO,NANO,ESP8266 ' .
-        'pin.[AD]?[0-9]+ ' .
+        'pin[AD]?[0-9]+ ' .
         'interval ' .
         'factor ' .                                     # legacy (should be removed, use pulsesPerKwh instead)
         'pulsesPerKWh ' .       
