@@ -361,7 +361,7 @@ sub OBIS_trySMLdecode($$)
 	   							  $unit eq "01" ? ""  : 
 	   							  $unit eq "1D" ? "varh" :
 	   							  $unit eq "" ? "" : "var";
-						$scaler=$scaler ne "" ? 10**unpack("l", pack("L", hex($scaler))) : 1;
+						$scaler=$scaler ne "" ? (10**unpack("c", pack("C", hex($scaler)))) : 1;
 						if ($scaler==0) {$scaler=1};	# just to make sure
 						$line2.="<" if ($status=~/[aA]2$/);
 						$line2.=">" if ($status=~/82$/);
