@@ -74,6 +74,7 @@
 #   2019-01-18  better logging for disallowed pins
 #   2019-01-29  changed handling of analog pins to better support future boards like ESP32
 #   2019-02-14  fixed typo in attr definitions
+#   2019-02-15  fixed bug in configureDevice
 #
 # ideas / todo:
 #
@@ -97,7 +98,7 @@ use strict;
 use warnings;                        
 use Time::HiRes qw(gettimeofday);    
 
-my $ArduCounter_Version = '6.08 - 14.3.2019';
+my $ArduCounter_Version = '6.10 - 15.3.2019';
 
 
 my %ArduCounter_sets = (  
@@ -653,14 +654,15 @@ sub ArduCounter_ConfigureDevice($)
         } elsif ($aName =~ /^pin([dDaA])?([\d+]+)/) {
             my $type = $1;
             my $num  = $2;
-            my $aPinNum = ArduCounter_PinNumber($hash, "A$num") if ($type =~ /[aA]/);
+            my $aPinNum = $num;
+            $aPinNum = ArduCounter_PinNumber($hash, "A$num") if ($type =~ /[aA]/);
             if ($aPinNum) {
                 delete $cPins{$aPinNum};
                 #Log3 $name, 5, "$name: ConfigureDevice ignore pin $aPinNum";
                 Log3 $name, 5, "$name: ConfigureDevice calls Attr with $aName $val";
                 ArduCounter_Attr("set", $name, $aName, $val); 
             } else {
-                Log3 $name, 5, "$name: ConfigureDevice can not send pin config for $aName, internal pin number can not be determined";
+                Log3 $name, 3, "$name: ConfigureDevice can not send pin config for $aName, internal pin number can not be determined";
             }
         }
     }
