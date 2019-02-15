@@ -35,7 +35,7 @@ package main;
 use strict;
 use warnings;
 
-my $version = "2.4.6";
+my $version = "2.4.7";
 
 sub XiaomiBTLESens_Initialize($) {
 
@@ -111,7 +111,8 @@ BEGIN {
           DoTrigger
           BlockingKill
           BlockingCall
-          FmtDateTime)
+          FmtDateTime
+          makeDeviceName)
     );
 }
 
