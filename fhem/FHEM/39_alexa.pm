@@ -129,7 +129,7 @@ alexa_Define($$)
 
   alexa_AttrDefaults($hash);
 
-  $hash->{NOTIFYDEV} = "global";
+  $hash->{NOTIFYDEV} = "global,global:npmjs.*alexa-fhem.*";
 
   if( $attr{global}{logdir} ) {
     CommandAttr(undef, "$name alexaFHEM-log %L/alexa-%Y-%m-%d.log") if( !AttrVal($name, 'alexaFHEM-log', undef ) );
@@ -163,9 +163,19 @@ alexa_Notify($$)
   my ($hash,$dev) = @_;
 
   return if($dev->{NAME} ne "global");
-  return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
 
-  CoProcess::start($hash);
+  if( grep(m/^npmjs:BEGIN.*alexa-fhem.*/, @{$dev->{CHANGED}}) ) {
+    CoProcess::stop($hash);
+    return undef;
+
+  } elsif( grep(m/^npmjs:FINISH.*alexa-fhem.*/, @{$dev->{CHANGED}}) ) {
+    CoProcess::start($hash);
+    return undef;
+
+  } elsif( grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}) ) {
+    CoProcess::start($hash);
+    return undef;
+  }
 
   return undef;
 }

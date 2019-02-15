@@ -7,7 +7,6 @@ use strict;
 use warnings;
 
 use CoProcess;
-#require "30_HUEBridge.pm";
 require "$attr{global}{modpath}/FHEM/30_HUEBridge.pm";
 
 use JSON;
@@ -78,7 +77,7 @@ tradfri_Define($$)
 
   tradfri_AttrDefaults($hash);
 
-  $hash->{NOTIFYDEV} = "global";
+  $hash->{NOTIFYDEV} = "global,global:npmjs.*tradfri-fhem.*";
 
   if( !AttrVal($name, 'devStateIcon', undef ) ) {
     CommandAttr(undef, "$name createGroupReadings 0");
@@ -107,9 +106,19 @@ tradfri_Notify($$)
   my ($hash,$dev) = @_;
 
   return if($dev->{NAME} ne "global");
-  return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
 
-  CoProcess::start($hash);
+  if( grep(m/^npmjs:BEGIN.*tradfri-fhem.*/, @{$dev->{CHANGED}}) ) {
+    CoProcess::stop($hash);
+    return undef;
+
+  } elsif( grep(m/^npmjs:FINISH.*tradfri-fhem.*/, @{$dev->{CHANGED}}) ) {
+    CoProcess::start($hash);
+    return undef;
+
+  } elsif( grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}) ) {
+    CoProcess::start($hash);
+    return undef;
+  }
 
   return undef;
 }
