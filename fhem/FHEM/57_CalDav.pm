@@ -7,6 +7,7 @@ use warnings;
 use HttpUtils;
 use XML::LibXML;
 use Data::Dumper;
+use English qw(-no_match_vars); 
 
 sub CalDav_Initialize($$)
 {
@@ -54,8 +55,10 @@ sub CalDav_Process($$$) {
     next if ($u =~ /(inbox|outbox)\/$/);
     my @a = split(/\//,$u);
     my $t = "define $name$a[-1] Calendar ical url $url$a[-1]$options";
-    Log3 (3, "caldav", "Creating Calendar: $t");
     fhem  $t;  
+    $t =~ /https?:\/\/([^^\/]*)/;
+    substr($t, $LAST_MATCH_START[1], $LAST_MATCH_END[1] - $LAST_MATCH_START[1], "..."); 
+    Log3 ("caldav",3,"Creating Calendar: $t");
   }
 }
 
