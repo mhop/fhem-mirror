@@ -76,7 +76,9 @@ sub CalDav_Process($$$) {
   <br/>
   Example for ownCloud / Nextcloud:<br/>
   <br/>
-  <code>caldav https://&lt;user&gt;:&lt;password&gt;@my.cloudServer.de/remote.php/dav/calendars/&lt;user&gt;/ /?export</code>
+  <code>caldav https://&lt;user&gt;:&lt;password&gt;@my.cloudServer.de/remote.php/dav/calendars/&lt;user&gt;/ /?export</code><br/>
+  <br/>
+  This command module requires the perl library XML::LibXML<br/>
 </ul>
 
 =end html
