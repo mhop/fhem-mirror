@@ -47,6 +47,7 @@ use Encode;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.10.0" => "15.02.2019  send recordings integrated by telegram, a lot of internal changes for send telegrams ",
   "8.9.2"  => "05.02.2019  sub SSCam_sendTelegram changed ",
   "8.9.1"  => "05.02.2019  sub SSCam_snaplimsize changed ",
   "8.9.0"  => "05.02.2019  new streaming device type \"lastsnap\" ",
@@ -129,6 +130,7 @@ our %SSCam_vNotesIntern = (
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
+  "8.10.0" => "15.02.2019 Possibility of send recordings by telegram is integrated as well as sending snapshots ",
   "8.9.0"  => "05.02.2019 A new streaming device type \"lastsnap\" was implemented. You can create such device with \"set ... createStreamDev lastsnap\". ".
                           "This streaming device shows the newest snapshot which was taken. ",
   "8.8.0"  => "01.02.2019 Snapshots can now be sent by telegramBot ",
@@ -320,8 +322,8 @@ our %SSCam_ttips_de = (
 );
 
 # Standardvariablen und Forward-Deklaration
-my $SSCam_slim = 3;                          # default Anzahl der abzurufenden Schnappschüsse mit snapGallery
-my $SSCAM_snum = "1,2,3,4,5,6,7,8,9,10";     # mögliche Anzahl der abzurufenden Schnappschüsse mit snapGallery                
+my $SSCam_slim            = 3;                          # default Anzahl der abzurufenden Schnappschüsse mit snapGallery
+my $SSCAM_snum            = "1,2,3,4,5,6,7,8,9,10";     # mögliche Anzahl der abzurufenden Schnappschüsse mit snapGallery
 
 use vars qw($FW_ME);      # webname (default is fhem), used by 97_GROUP/weblink
 use vars qw($FW_subdir);  # Sub-path in URL, used by FLOORPLAN/weblink
@@ -377,6 +379,7 @@ sub SSCam_Initialize($) {
          "pollnologging:1,0 ".
          "debugactivetoken:1,0 ".
          "recEmailTxt ".
+         "recTelegramTxt ".
          "rectime ".
          "recextend:1,0 ".
          "noQuotesForSID:1,0 ".
@@ -812,12 +815,26 @@ sub SSCam_Set($@) {
           $hash->{HELPER}{SMTPRECMSG} = $emtxt;
       }
       
+      my $teletxt = AttrVal($name, "recTelegramTxt", "");
+      my $bt = join(" ",@a);
+      if($bt =~ /recTelegramTxt:/) {
+          $bt =~ m/.*recTelegramTxt:"(.*)".*/i;
+          $teletxt = $1;
+      }
+      
+      if ($teletxt) {
+	      # Recording soll nach Erstellung per TelegramBot versendet werden
+		  # Format $teletxt muss sein: recTelegramTxt:"tbot => <teleBot Device>, peers => <peer1 peer2 ..>, subject => <Beschreibungstext>"
+          $hash->{HELPER}{TELERECMSG} = $teletxt;
+      }
+
       SSCam_camstartrec($hash);
  
   } elsif ($opt eq "off" && SSCam_IsModelCam($hash)) {
 	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-      my $emtxt = $hash->{HELPER}{SMTPRECMSG}?delete $hash->{HELPER}{SMTPRECMSG}:"";
-      SSCam_camstoprec("$name:$emtxt");
+      my $emtxt   = $hash->{HELPER}{SMTPRECMSG}?delete $hash->{HELPER}{SMTPRECMSG}:"";
+      my $teletxt = $hash->{HELPER}{TELERECMSG}?delete $hash->{HELPER}{TELERECMSG}:"";
+      SSCam_camstoprec("$name:$emtxt:$teletxt");
         
   } elsif ($opt eq "snap" && SSCam_IsModelCam($hash)) {
 	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
@@ -1827,8 +1844,8 @@ sub SSCam_initonboot ($) {
      # check ob alle Recordings = "Stop" nach Reboot -> sonst stoppen
      if (ReadingsVal($hash->{NAME}, "Record", "Stop") eq "Start") {
          Log3($name, 2, "$name - Recording of $hash->{CAMNAME} seems to be still active after FHEM restart - try to stop it now");
-         my $emtxt = "";
-         SSCam_camstoprec("$name:$emtxt");
+         my ($emtxt,$teletxt) = ("","");
+         SSCam_camstoprec("$name:$emtxt:$teletxt");
      }
          
      # Konfiguration der Synology Surveillance Station abrufen
@@ -2129,10 +2146,10 @@ sub SSCam_camstartrec ($) {
 #                           Kamera Aufnahme stoppen
 ###############################################################################
 sub SSCam_camstoprec ($) {
-    my ($str)         = @_;
-	my ($name,$emtxt) = split(":",$str);
-	my $hash          = $defs{$name};
-    my $camname       = $hash->{CAMNAME};
+    my ($str)                  = @_;
+	my ($name,$emtxt,$teletxt) = split(":",$str);
+	my $hash                   = $defs{$name};
+    my $camname                = $hash->{CAMNAME};
     my $errorcode;
     my $error;
     
@@ -2167,16 +2184,18 @@ sub SSCam_camstoprec ($) {
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         $hash->{OPMODE} = "Stop";
         $hash->{HELPER}{LOGINRETRIES} = 0;
-		if($emtxt) {
-            $hash->{HELPER}{CANSENDREC}   = 1;                             # Versand Aufnahme soll erfolgen
-            $hash->{HELPER}{SMTPRECMSG}   = $emtxt;                        # Text für Email-Versand
+		if($emtxt || $teletxt) {
+            $hash->{HELPER}{CANSENDREC} = 1 if($emtxt);                  # Versand Aufnahme soll per Email erfolgen
+            $hash->{HELPER}{CANTELEREC} = 1 if($teletxt);                # Versand Aufnahme soll per TelegramBot erfolgen
+            $hash->{HELPER}{SMTPRECMSG} = $emtxt if($emtxt);             # Text für Email-Versand
+            $hash->{HELPER}{TELERECMSG} = $teletxt if($teletxt);         # Text für Telegram-Versand
         }
-                
+               
         SSCam_setActiveToken($hash);  
         SSCam_getapisites($hash);
 		
     } else {
-        InternalTimer(gettimeofday()+0.3, "SSCam_camstoprec", "$name:$emtxt", 0);
+        InternalTimer(gettimeofday()+0.3, "SSCam_camstoprec", "$name:$emtxt:$teletxt", 0);
     }
 }
 
@@ -4796,7 +4815,6 @@ sub SSCam_camop_parse ($) {
             ($hash,$success,$myjson) = SSCam_evaljson($hash,$myjson);        
             unless ($success) {
                 Log3($name, 4, "$name - Data returned: ".$myjson);
-
                 SSCam_delActiveToken($hash);
                 return;
             }
@@ -4844,9 +4862,10 @@ sub SSCam_camop_parse ($) {
                 
                 if ($rectime != 0) {
                     # Stop der Aufnahme nach Ablauf $rectime, wenn rectime = 0 -> endlose Aufnahme
-                    my $emtxt = $hash->{HELPER}{SMTPRECMSG}?$hash->{HELPER}{SMTPRECMSG}:"";
+                    my $emtxt   = $hash->{HELPER}{SMTPRECMSG}?$hash->{HELPER}{SMTPRECMSG}:"";
+                    my $teletxt = $hash->{HELPER}{TELERECMSG}?$hash->{HELPER}{TELERECMSG}:"";
                     RemoveInternalTimer($hash, "SSCam_camstoprec");
-                    InternalTimer(gettimeofday()+$rectime, "SSCam_camstoprec", "$name:$emtxt");
+                    InternalTimer(gettimeofday()+$rectime, "SSCam_camstoprec", "$name:$emtxt:$teletxt");
                 }      
                 
                 SSCam_refresh($hash,0,0,1);    # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event
@@ -4893,7 +4912,7 @@ sub SSCam_camop_parse ($) {
 				$sendrecs{$sn}{".imageData"} = $myjson;
 				Log3($name,4, "$name - Snap '$sn' added to send recording hash: ID => $sendrecs{$sn}{recid}, File => $sendrecs{$sn}{fileName}, Created => $sendrecs{$sn}{createdTm}");
                 
-                # prüfen ob Recording als Email versendet werden soll
+                # prüfen ob Recording als Email / Telegram versendet werden soll                
 				SSCam_prepareSendData ($hash, $OpMode, \%sendrecs);
                         
                 readingsBeginUpdate($hash);
@@ -5884,7 +5903,7 @@ sub SSCam_camop_parse ($) {
                 Log3($name, $verbose, "$name - Query eventlist of camera $camname retrieved");
                 
                 # Versand Aufnahme initiieren
-                if($hash->{HELPER}{CANSENDREC}) {
+                if($hash->{HELPER}{CANSENDREC} || $hash->{HELPER}{CANTELEREC}) {
                     SSCam_getrec($hash);
                 }
             
@@ -7578,7 +7597,7 @@ sub SSCam_prepareSendData ($$;$) {
    my $name   = $hash->{NAME};
    my $calias = AttrVal($name,"alias",$hash->{CAMNAME});              # Alias der Kamera wenn gesetzt oder Originalname aus SVS
    my ($ret,$sdat,$vdat,$fname,$snapid,$lsnaptime,$tac) = ('','','','','','');
-   
+      
    ### prüfen ob Schnappschnüsse aller Kameras durch ein SVS-Device angefordert wurde,
    ### Bilddaten werden erst zum Versand weitergeleitet wenn Schnappshußhash komplett gefüllt ist
    my $asref;
@@ -7631,7 +7650,7 @@ sub SSCam_prepareSendData ($$;$) {
        $smtpsslport = AttrVal($name,"smtpSSLPort",0);
    }
    
-   ### Bilddaten als Email versenden wenn $hash->{HELPER}{CANSENDSNAP} definiert ist
+   ### Schnappschüsse als Email versenden wenn $hash->{HELPER}{CANSENDSNAP} definiert ist
    if($OpMode =~ /^getsnap/ && $hash->{HELPER}{CANSENDSNAP}) {     
        delete $hash->{HELPER}{CANSENDSNAP};
        my $mt = delete $hash->{HELPER}{SMTPMSG};
@@ -7671,7 +7690,7 @@ sub SSCam_prepareSendData ($$;$) {
                              );
    }
    
-   ### Recordings als Email versenden wenn $hash->{HELPER}{CANSENDREC} definiert ist
+   ### Aufnahmen als Email versenden wenn $hash->{HELPER}{CANSENDREC} definiert ist
    if($OpMode =~ /^GetRec/ && $hash->{HELPER}{CANSENDREC}) {     
        delete $hash->{HELPER}{CANSENDREC};
        my $mt  = delete $hash->{HELPER}{SMTPRECMSG};
@@ -7708,7 +7727,7 @@ sub SSCam_prepareSendData ($$;$) {
                              );
    }
 
-   ### Bilddaten mit Telegram versenden
+   ### Schnappschüsse mit Telegram versenden
    if($OpMode =~ /^getsnap/ && $hash->{HELPER}{CANTELESNAP}) {     
        # snapTelegramTxt aus $hash->{HELPER}{TELEMSG}
        # Format in $hash->{HELPER}{TELEMSG} muss sein: tbot => <teleBot Device>, peers => <peer1 peer2 ..>, subject => <Beschreibungstext>
@@ -7752,6 +7771,47 @@ sub SSCam_prepareSendData ($$;$) {
                                         }
                                 );                   
    }
+
+   ### Aufnahmen mit Telegram versenden
+   if($OpMode =~ /^GetRec/ && $hash->{HELPER}{CANTELEREC}) {   
+       # recTelegramTxt aus $hash->{HELPER}{TELERECMSG}
+       # Format in $hash->{HELPER}{TELEMSG} muss sein: tbot => <teleBot Device>, peers => <peer1 peer2 ..>, subject => <Beschreibungstext>
+       delete $hash->{HELPER}{CANTELEREC};
+       my $mt = delete $hash->{HELPER}{TELERECMSG};
+       $mt    =~ s/['"]//g;
+             
+       my($telebot,$peers,$subj) = split(",", $mt, 3);
+       my($tbotk,$tbott)   = split("=>", $telebot) if($telebot);
+       my($peerk,$peert)   = split("=>", $peers) if($peers);
+       my($subjk,$subjt)   = split("=>", $subj) if($subj);
+
+       $tbotk = SSCam_trim($tbotk) if($tbotk);
+       $tbott = SSCam_trim($tbott) if($tbott);
+       $peerk = SSCam_trim($peerk) if($peerk);
+       $peert = SSCam_trim($peert) if($peert);
+       $subjk = SSCam_trim($subjk) if($subjk);
+       if($subjt) {
+           $subjt = SSCam_trim($subjt);
+           $subjt =~ s/\$CAM/$calias/g;
+           $subjt =~ s/\$DATE/$date/g;
+           $subjt =~ s/\$TIME/$time/g;
+       }       
+       
+       my %telemsg = ();
+	   $telemsg{$tbotk} = "$tbott" if($tbott);
+	   $telemsg{$peerk} = "$peert" if($peert);
+       $telemsg{$subjk} = "$subjt" if($subjt);
+       
+       $vdat = $data;  
+       $ret = SSCam_sendTelegram($hash, {'subject'      => $telemsg{subject},
+                                         'vdat'         => $vdat,
+                                         'opmode'       => $OpMode, 
+                                         'telebot'      => $telemsg{$tbotk}, 
+                                         'peers'        => $telemsg{$peerk},                                      
+                                         'MediaStream'  => '-30',                       # Code für MediaStream im TelegramBot (png/jpg = -1)
+                                        }
+                                );                   
+   }
    
 return;
 }
@@ -7775,11 +7835,11 @@ sub SSCam_sendTelegram ($$) {
        'part2type'    => {                       'default'=>'',                          'required'=>0, 'set'=>1},
        'sdat'         => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # (Hash)Daten base64 codiert, wenn gesetzt muss 'part2type' auf 'image/jpeg' gesetzt sein
        'image'        => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # Daten als File, wenn gesetzt muss 'part2type' auf 'image/jpeg' gesetzt sein
-       'fname'        => {                       'default'=>'image.jpg',                 'required'=>0, 'set'=>1},  # Filename für "image"
+       'fname'        => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # Filename für "image"
        'lsnaptime'    => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # Zeitstempel der Bilddaten
        'opmode'       => {                       'default'=>'',                          'required'=>1, 'set'=>1},  # OpMode muss gesetzt sein
        'tac'          => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # übermittelter Transaktionscode der ausgewerteten Transaktion
-       'vdat'         => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # Videodaten, wenn gesetzt muss 'part2type' auf 'video/mpeg' gesetzt sein
+       'vdat'         => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # Hashref der Videodaten
        'telebot'      => {                       'default'=>'',                          'required'=>1, 'set'=>1},  # TelegramBot-Device welches zum Senden verwendet werden soll
        'peers'        => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # TelegramBot Peers
        'MediaStream'  => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # Code für MediaStream im TelegramBot (png/jpg = -1)
@@ -7790,11 +7850,11 @@ sub SSCam_sendTelegram ($$) {
        $params{$key} = AttrVal($name, $SSCam_teleparams{$key}->{attr}, $SSCam_teleparams{$key}->{default}) 
                                                                 if(exists $SSCam_teleparams{$key}->{attr}); 
 	   if($SSCam_teleparams{$key}->{set}) {       
-           $params{$key} = $extparamref->{$key} if (exists $extparamref->{$key});
+           $params{$key} = $extparamref->{$key} if(exists $extparamref->{$key});
            $params{$key} = $SSCam_teleparams{$key}->{default} if (!$extparamref->{$key} && !$SSCam_teleparams{$key}->{attr});
 	   }
-       Log3($name, 4, "$name - param $key is now \"".$params{$key}."\" ") if($key !~ /sdat/);
-       Log3($name, 4, "$name - param $key is set") if($key =~ /sdat/ && $params{$key} ne '');
+       Log3($name, 4, "$name - param $key is now \"".$params{$key}."\" ") if($key !~ /[sv]dat/);
+       Log3($name, 4, "$name - param $key is set") if($key =~ /[sv]dat/ && $params{$key} ne '');
    }
    
    $params{name} = $name;
@@ -7814,7 +7874,8 @@ sub SSCam_sendTelegram ($$) {
    
    my $telebot            = $params{telebot};
    my $peers              = $params{peers}; 
-   my $sdat               = $params{sdat};                     # Hash von Imagedaten base64 codiert 
+   my $sdat               = $params{sdat};                     # Hash von Imagedaten base64 codiert
+   my $vdat               = $params{vdat};                     # Hashref der Videodaten   
    
    if(!$defs{$telebot}) {
        $ret = "No TelegramBot device \"$telebot\" available";
@@ -7834,17 +7895,15 @@ sub SSCam_sendTelegram ($$) {
            return;       
        }
    }   
-   
-   
-                                        
+                                    
   no strict "refs";
-  my ($msg,$subject,$MediaStream);
+  my ($msg,$subject,$MediaStream,$fname);
   if($sdat) {
       ### Images liegen in einem Hash (Ref in $sdat) base64-codiert vor
       my @as = sort{$b<=>$a}keys%{$sdat};
       foreach my $key (@as) {
-           ($msg,$subject,$MediaStream) = SSCam_cmdSendTelegram($name,$key);
-		   $ret = TelegramBot_SendIt( $defs{$telebot}, $peers, $msg, $subject, $MediaStream, undef, "" );
+           ($msg,$subject,$MediaStream,$fname) = SSCam_extractForTelegram($name,$key);
+		   $ret = SSCam_TBotSendIt($defs{$telebot}, $name, $fname, $peers, $msg, $subject, $MediaStream, undef, "");
 		   if($ret) {
 			   readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
 			   Log3($name, 2, "$name - ERROR: $ret");
@@ -7855,32 +7914,362 @@ sub SSCam_sendTelegram ($$) {
 		   }
 	  }
   }
+  
+  if($vdat) {
+      ### Aufnahmen liegen in einem Hash-Ref in $vdat vor
+      my $key = 0;
+      ($msg,$subject,$MediaStream,$fname) = SSCam_extractForTelegram($name,$key);
+      $ret = SSCam_TBotSendIt($defs{$telebot}, $name, $fname, $peers, $msg, $subject, $MediaStream, undef, "");
+	  if($ret) {
+	      readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
+	      Log3($name, 2, "$name - ERROR: $ret");
+      } else {
+          $ret = "Telegram message successfully sent to \"$peers\" by \"$telebot\" ";
+          readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
+	      Log3($name, 3, "$name - $ret");
+	  }
+  }
+  
   use strict "refs";
   %params = ();        # erstellten Versandhash löschen
-   
+  
 return;
 }
 
 ####################################################################################################
 #                                Bilddaten extrahieren für Telegram Versand
 ####################################################################################################
-sub SSCam_cmdSendTelegram($$) {
+sub SSCam_extractForTelegram($$) {
   my ($name,$key)  = @_;
   my $hash         = $defs{$name};
   my $paref        = $hash->{HELPER}{PAREF};
   my $subject      = $paref->{subject};
   my $MediaStream  = $paref->{MediaStream};
+  my $sdat         = $paref->{sdat};                     # Hash von Imagedaten base64 codiert
+  my $vdat         = $paref->{vdat};                     # Hashref der Videodaten   
+  my ($data,$fname,$ct);
   
-  my $ct      = $paref->{sdat}{$key}{createdTm};
-  my $img     = $paref->{sdat}{$key}{".imageData"};
-  my $fname   = SSCam_trim($paref->{sdat}{$key}{fileName});
-  my $decoded = MIME::Base64::decode_base64($img); 
-  Log3($name, 4, "$name - image data were decoded for TelegramBot prepare");
+  if($sdat) {
+      $ct     = $paref->{sdat}{$key}{createdTm};
+      my $img = $paref->{sdat}{$key}{".imageData"};
+      $fname  = SSCam_trim($paref->{sdat}{$key}{fileName});
+      $data   = MIME::Base64::decode_base64($img); 
+      Log3($name, 4, "$name - image data decoded for TelegramBot prepare");
+  } 
+  
+  if($vdat) {
+      $ct    = $paref->{vdat}{$key}{createdTm};
+      $data  = $paref->{vdat}{$key}{".imageData"};
+      $fname = SSCam_trim($paref->{vdat}{$key}{fileName});
+  }
   
   $subject =~ s/\$FILE/$fname/g;
   $subject =~ s/\$CTIME/$ct/g;
  
-return ($decoded,$subject,$MediaStream);
+return ($data,$subject,$MediaStream,$fname);
+}
+
+####################################################################################################
+#                  Telegram Send Foto & Aufnahmen
+#                  Adaption der Sub "SendIt" aus TelegramBot
+#                  $hash    = Hash des verwendeten TelegramBot-Devices !
+#                  $isMedia = -1 wenn Foto, -30 wenn Aufnahme
+####################################################################################################
+sub SSCam_TBotSendIt($$$$$$$;$$$) {
+  my ($hash, $camname, $fname, @args) = @_;
+  my ($peers, $msg, $addPar, $isMedia, $replyid, $options, $retryCount) = @args;
+  my $name = $hash->{NAME};
+  my $SSCam_TBotHeader      = "agent: TelegramBot/1.0\r\nUser-Agent: TelegramBot/1.0\r\nAccept: application/json\r\nAccept-Charset: utf-8";
+  my $SSCam_TBotArgRetrycnt = 6;
+  
+  $retryCount = 0 if (!defined($retryCount));
+  $options    = "" if (!defined($options));
+  
+  # increase retrycount for next try
+  $args[$SSCam_TBotArgRetrycnt] = $retryCount+1;
+  
+  Log3($camname, 5, "$camname - SSCam_TBotSendIt: called ");
+
+  # ignore all sends if disabled
+  return if (AttrVal($name,"disable",0));
+
+  # ensure sentQueue exists
+  $hash->{sentQueue} = [] if (!defined($hash->{sentQueue}));
+
+  if ((defined( $hash->{sentMsgResult})) && ($hash->{sentMsgResult} =~ /^WAITING/) && ($retryCount == 0) ){
+      # add to queue
+      Log3($camname, 4, "$camname - SSCam_TBotSendIt: add send to queue :$peers: -:".
+          TelegramBot_MsgForLog($msg, ($isMedia<0)).": - :".(defined($addPar)?$addPar:"<undef>").":");
+      push(@{$hash->{sentQueue}}, \@args);
+      return;
+  }  
+    
+  my $ret;
+  $hash->{sentMsgResult}  = "WAITING";
+  $hash->{sentMsgResult} .= " retry $retryCount" if ($retryCount>0);
+  $hash->{sentMsgId}      = "";
+
+  my $peer;
+  ($peer,$peers) = split(" ", $peers, 2); 
+  
+  # handle addtl peers specified (will be queued since WAITING is set already) 
+  if (defined( $peers )) {
+      # remove msgid from options and also replyid reset
+      my $sepoptions = $options;
+      $sepoptions    =~ s/-msgid-//;
+      SSCam_TBotSendIt($hash,$camname,$fname,$peers,$msg,$addPar,$isMedia,undef,$sepoptions);
+  }
+  
+  Log3($camname, 5, "$camname - SSCam_TBotSendIt: try to send message to :$peer: -:".
+      TelegramBot_MsgForLog($msg, ($isMedia<0) ).": - add :".(defined($addPar)?$addPar:"<undef>").
+      ": - replyid :".(defined($replyid)?$replyid:"<undef>").
+      ":".":    options :".$options.":");
+
+  # trim and convert spaces in peer to underline 
+  $peer = 0 if ( ! $peer );
+  my $peer2 = (!$peer)?$peer:TelegramBot_GetIdForPeer($hash, $peer);
+
+  if (!defined($peer2)) {
+      $ret = "FAILED peer not found :$peer:";
+      $peer2 = "";
+  }
+  
+  $hash->{sentMsgPeer}    = TelegramBot_GetFullnameForContact($hash,$peer2);
+  $hash->{sentMsgPeerId}  = $peer2;
+  $hash->{sentMsgOptions} = $options;
+  
+  # init param hash
+  $hash->{HU_DO_PARAMS}->{hash}   = $hash;
+  $hash->{HU_DO_PARAMS}->{header} = $SSCam_TBotHeader;
+  delete( $hash->{HU_DO_PARAMS}->{args} );
+  delete( $hash->{HU_DO_PARAMS}->{boundary} );
+
+  
+  my $timeout = AttrVal($name,'cmdTimeout',30);
+  $hash->{HU_DO_PARAMS}->{timeout}  = $timeout;
+  $hash->{HU_DO_PARAMS}->{loglevel} = 4;
+  
+  # Start Versand
+  if (!defined($ret)) {
+      # add chat / user id (no file) --> this will also do init
+      $ret = SSCam_TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "chat_id", undef, $peer2, 0 ) if ( $peer );
+      
+      if (abs($isMedia) == 1) {
+          # Foto send    
+          $hash->{sentMsgText}         = "Image: ".TelegramBot_MsgForLog($msg,($isMedia<0)).((defined($addPar))?" - ".$addPar:"");
+          $hash->{HU_DO_PARAMS}->{url} = TelegramBot_getBaseURL($hash)."sendPhoto";
+
+          # add caption
+          if (defined($addPar)) {
+              $addPar =~ s/(?<![\\])\\n/\x0A/g;
+              $addPar =~ s/(?<![\\])\\t/\x09/g;
+
+              $ret = SSCam_TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "caption", undef, $addPar, 0 ) if (!defined($ret));
+              $addPar = undef;
+          }
+      
+          # add msg or file or stream
+          Log3($camname, 4, "$camname - SSCam_TBotSendIt: Filename for image file :".
+            TelegramBot_MsgForLog($msg, ($isMedia<0) ).":");
+          $ret = SSCam_TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "photo", undef, $msg, $isMedia) if(!defined($ret));
+      
+      } elsif ( abs($isMedia) == 30 ) {
+          # Video send    
+          $hash->{sentMsgText}         = "Image: ".TelegramBot_MsgForLog($msg,($isMedia<0)).((defined($addPar))?" - ".$addPar:"");
+          $hash->{HU_DO_PARAMS}->{url} = TelegramBot_getBaseURL($hash)."sendVideo";
+
+          # add caption
+          if (defined( $addPar) ) {
+              $addPar =~ s/(?<![\\])\\n/\x0A/g;
+              $addPar =~ s/(?<![\\])\\t/\x09/g;
+
+              $ret = SSCam_TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "caption", undef, $addPar, 0) if(!defined($ret));
+              $addPar = undef;
+          }
+      
+          # add msg or file or stream
+          Log3($camname, 4, "$camname - SSCam_TBotSendIt: Filename for image file :".$fname.":");
+          $ret = SSCam_TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "video", undef, $msg, $isMedia) if(!defined($ret));
+      
+      } else {
+          # nur Message senden
+          $msg = "No media File was created by SSCam. Can't send it.";
+          $hash->{HU_DO_PARAMS}->{url} = TelegramBot_getBaseURL($hash)."sendMessage";
+      
+          my $parseMode = TelegramBot_AttrNum($name,"parseModeSend","0" );
+        
+          if ($parseMode == 1) {
+              $parseMode = "Markdown";
+        
+          } elsif ($parseMode == 2) {
+              $parseMode = "HTML";
+        
+          } elsif ($parseMode == 3) {
+              $parseMode = 0;
+              if ($msg =~ /^markdown(.*)$/i) {
+                  $msg = $1;
+                  $parseMode = "Markdown";
+              } elsif ($msg =~ /^HTML(.*)$/i) {
+                  $msg = $1;
+                  $parseMode = "HTML";
+              }
+        
+          } else {
+              $parseMode = 0;
+          }
+      
+          Log3($camname, 4, "$camname - SSCam_TBotSendIt: parseMode $parseMode");
+    
+          if (length($msg) > 1000) {
+              $hash->{sentMsgText} = substr($msg, 0, 1000)."...";
+          } else {
+              $hash->{sentMsgText} = $msg;
+          }
+        
+          $msg =~ s/(?<![\\])\\n/\x0A/g;
+          $msg =~ s/(?<![\\])\\t/\x09/g;
+
+          # add msg (no file)
+          $ret = SSCam_TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "text", undef, $msg, 0) if(!defined($ret));
+
+          # add parseMode
+          $ret = SSCam_TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "parse_mode", undef, $parseMode, 0) if((!defined($ret)) && ($parseMode));
+
+          # add disable_web_page_preview 	
+          $ret = SSCam_TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "disable_web_page_preview", undef, JSON::true, 0) 
+            if ((!defined($ret))&&(!AttrVal($name,'webPagePreview',1)));            
+      }
+
+      if (defined($replyid)) {
+          $ret = SSCam_TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "reply_to_message_id", undef, $replyid, 0) if(!defined($ret));
+      }
+
+      if (defined($addPar)) {
+          $ret = SSCam_TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "reply_markup", undef, $addPar, 0) if(!defined($ret));
+      } elsif ($options =~ /-force_reply-/) {
+          $ret = SSCam_TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "reply_markup", undef, "{\"force_reply\":true}", 0 ) if(!defined($ret));
+      }
+
+      if ($options =~ /-silent-/) {
+          $ret = SSCam_TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "disable_notification", undef, "true", 0) if(!defined($ret));
+      }
+
+      # finalize multipart 
+      $ret = SSCam_TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, undef, undef, undef, 0) if(!defined($ret));
+
+  }
+  
+  if (defined($ret)) {
+      Log3($camname, 3, "$camname - SSCam_TBotSendIt: Failed with :$ret:");
+      TelegramBot_Callback($hash->{HU_DO_PARAMS}, $ret, "");
+
+  } else {
+      $hash->{HU_DO_PARAMS}->{args} = \@args;
+    
+      # if utf8 is set on string this will lead to length wrongly calculated in HTTPUtils (char instead of bytes) for some installations
+      if ((AttrVal($name,'utf8Special',0)) && (utf8::is_utf8($hash->{HU_DO_PARAMS}->{data}))) {
+          Log3 $camname, 4, "$camname - SSCam_TBotSendIt: utf8 encoding for data in message ";
+          utf8::downgrade($hash->{HU_DO_PARAMS}->{data}); 
+      }
+    
+      Log3($camname, 4, "$camname - SSCam_TBotSendIt: timeout for sent :".$hash->{HU_DO_PARAMS}->{timeout}.": ");
+      HttpUtils_NonblockingGet($hash->{HU_DO_PARAMS});
+  }
+  
+return $ret;
+}
+
+####################################################################################################
+#                  Telegram Media zusammenstellen
+#                  Adaption der Sub "AddMultipart" aus TelegramBot
+#                  
+#   Parameter:
+#   $hash    = Hash des verwendeten TelegramBot-Devices !
+#   params   = (hash for building up the data)
+#   paramname --> if not sepecifed / undef - multipart will be finished
+#   header for multipart
+#   content 
+#   isFile to specify if content is providing a file to be read as content
+#     
+#   returns string in case of error or undef
+####################################################################################################
+sub SSCam_TBotAddMultipart($$$$$$$) {
+  my ($hash, $fname, $params, $parname, $parheader, $parcontent, $isMedia ) = @_;
+  my $name = $hash->{NAME};
+
+  my $ret;
+  
+  # Check if boundary is defined
+  if ( ! defined( $params->{boundary} ) ) {
+      $params->{boundary} = "TelegramBot_boundary-x0123";
+      $params->{header}  .= "\r\nContent-Type: multipart/form-data; boundary=".$params->{boundary};
+      $params->{method}   = "POST";
+      $params->{data}     = "";
+  }
+  
+  # ensure parheader is defined and add final header new lines
+  $parheader  = "" if (!defined($parheader));
+  $parheader .= "\r\n" if ((length($parheader) > 0) && ($parheader !~ /\r\n$/));
+
+  # add content 
+  my $finalcontent;
+  if (defined($parname)) {
+      $params->{data} .= "--".$params->{boundary}."\r\n";
+      if ($isMedia > 0) {
+          # url decode filename
+          $parcontent = uri_unescape($parcontent) if(AttrVal($name,'filenameUrlEscape',0));
+
+          my $baseFilename = basename($parcontent);
+          $parheader = "Content-Disposition: form-data; name=\"".$parname."\"; filename=\"".$baseFilename."\"\r\n".$parheader."\r\n";
+
+          return("FAILED file :$parcontent: not found or empty" ) if(! -e $parcontent) ;
+          
+          my $size = -s $parcontent;
+          my $limit = AttrVal($name,'maxFileSize',10485760);
+          return("FAILED file :$parcontent: is too large for transfer (current limit: ".$limit."B)") if($size > $limit) ;
+          
+          $finalcontent = TelegramBot_BinaryFileRead($hash, $parcontent);
+          if ($finalcontent eq "") {
+            return("FAILED file :$parcontent: not found or empty");
+          }
+      
+      } elsif ($isMedia < 0) {
+          my ($im, $ext)   = SSCam_TBotIdentifyStream($hash, $parcontent);
+          $fname           =~ s/.mp4$/.$ext/;
+          $parheader       = "Content-Disposition: form-data; name=\"".$parname."\"; filename=\"".$fname."\"\r\n".$parheader."\r\n";
+          $finalcontent    = $parcontent;
+      
+      } else {
+          $parheader    = "Content-Disposition: form-data; name=\"".$parname."\"\r\n".$parheader."\r\n";
+          $finalcontent = $parcontent;
+      }
+    
+      $params->{data} .= $parheader.$finalcontent."\r\n";
+    
+  } else {
+      return( "No content defined for multipart" ) if ( length( $params->{data} ) == 0 );
+      $params->{data} .= "--".$params->{boundary}."--";     
+  }
+
+return undef;
+}
+
+####################################################################################################
+#                  Telegram Media Identifikation
+#                  Adaption der Sub "IdentifyStream" aus TelegramBot
+#                  $hash    = Hash des verwendeten TelegramBot-Devices !
+####################################################################################################
+sub SSCam_TBotIdentifyStream($$) {
+  my ($hash, $msg) = @_;
+
+  # signatures for media files are documented here --> https://en.wikipedia.org/wiki/List_of_file_signatures
+  # seems sometimes more correct: https://wangrui.wordpress.com/2007/06/19/file-signatures-table/
+  # Video Signatur aus: https://www.garykessler.net/library/file_sigs.html
+  return (-1,"png") if ( $msg =~ /^\x89PNG\r\n\x1a\n/ );                       # PNG
+  return (-1,"jpg") if ( $msg =~ /^\xFF\xD8\xFF/ );                            # JPG not necessarily complete, but should be fine here
+  return (-30,"mpg") if ( $msg =~ /^....\x66\x74\x79\x70\x69\x73\x6f\x6d/ );   # mp4     
+
+return (0,undef);
 }
 
 #############################################################################################
@@ -8514,7 +8903,7 @@ return ($str);
   At present the following functions are available: <br><br>
    <ul>
     <ul>
-       <li>Start a recording and send it optionally by Email </li>
+       <li>Start a recording and send it optionally by Email and/or Telegram </li>
        <li>Stop a recording by command or automatically after an adjustable period </li>
        <li>Trigger of snapshots and optionally send them alltogether by Email/TelegramBot using the integrated Email client </li>
        <li>Trigger snapshots of all defined cams and optionally send them alltogether by Email using the integrated Email client </li>
@@ -9107,7 +9496,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <br><br>
   
   <ul>
-  <li><b>set &lt;name&gt; on [&lt;rectime&gt;] [recEmailTxt:"subject => &lt;subject text&gt;, body => &lt;message text&gt;"]  </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
+  <li><b>set &lt;name&gt; on [&lt;rectime&gt;] [recEmailTxt:"subject => &lt;subject text&gt;, body => &lt;message text&gt;"] [recTelegramTxt:"tbot => &lt;TelegramBot device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;subject text&gt;]"]  </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
    
   A recording will be started. The default recording time is 15 seconds. It can be individually changed by 
   the <a href="#SSCamattr">attribute</a> "rectime". 
@@ -9146,6 +9535,13 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   (the tag syntax is identical to the "recEmailTxt" attribute)
   <br><br>
   
+  The shipping of the last recording by <b>Telegram</b> can be activated permanently by setting <a href="#SSCamattr">attribute</a> 
+  "recTelegramTxt". Of course, the <a href="http://fhem.de/commandref.html#TelegramBot">TelegramBot device</a> which is 
+  used, must be defined and fully functional before. <br>
+  If you want temporary overwrite the message text as set with attribute "recTelegramTxt", you can optionally specify the 
+  "recTelegramTxt:"-tag as shown above. If the attribute "recTelegramTxt" is not set, the shipping by Telegram is
+  activated one-time. (the tag-syntax is equivalent to the "recTelegramTxt" attribute) <br><br>
+  
   <b>Examples: </b> <br><br>
   set &lt;name&gt; on [rectime]  <br>
   # starts a recording, stops automatically after [rectime] <br>
@@ -9153,6 +9549,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   # starts a permanent record which must be stopped with the "off"-command. <br>
   <code> set &lt;name&gt; on recEmailTxt:"subject => New recording for $CAM created, body => The last recording of $CAM is atteched."  </code><br>
   # starts a recording and send it after completion by Email. <br>
+  <code> set &lt;name&gt; on recTelegramTxt:"tbot => teleBot, peers => @xxxx , subject => Movement alarm by $CAM. The snapshot $FILE was created at $CTIME"  </code><br>
+  # starts a recording and send it after completion by Telegram. <br>
   </ul>
   <br><br>
   
@@ -9905,6 +10303,38 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
       <br>
   </li>
   
+  <a name="recTelegramTxt"></a>
+  <li><b>snapTelegramTxt tbot => &lt;TelegramBot device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;subject text&gt;]  </b><br>
+    Activates the permanent shipping of recordings by TelegramBot after their creation. <br>
+    The attribute has to be definied in the form as described. With key "tbot" the TelegramBot device is specified, which is 
+	used for shipping the data. Of course, the <a href="http://fhem.de/commandref.html#TelegramBot">TelegramBot device</a> 
+    must be available and has to be running well. <br>
+	The setting of "peers" and "subject" is optional, but the keys must (empty) specified. 
+	If "peer" is empty, teh default peer of the TelegramBot is used. <br>
+	You can use the placeholder in "subject". <br><br>
+	
+		<ul>   
+		<table>  
+		<colgroup> <col width=10%> <col width=90%> </colgroup>
+		  <tr><td> $CAM   </td><td>- Device alias respectively the name of the camera in SVS if the device alias isn't set </td></tr>
+		  <tr><td> $DATE  </td><td>- current date </td></tr>
+		  <tr><td> $TIME  </td><td>- current time </td></tr>
+		  <tr><td> $FILE  </td><td>- Name of recording file </td></tr>
+		  <tr><td> $CTIME </td><td>- recording creation time </td></tr>
+		</table>
+		</ul>     
+		<br>	
+    
+       <ul>
+		<b>Examples:</b><br>
+        recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Motion alarm ($FILE)  <br>
+		recTelegramTxt tbot =&gt; teleBot, peers =&gt; @nabuko @foo @bar, subject =&gt;  <br>
+		recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt;  <br>
+		recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Motion alarm from $CAM. At $CTIME the recording $FILE was created. Now it is $TIME. <br>
+      </ul>
+      <br>
+  </li><br>	 
+  
   <a name="rectime"></a>
   <li><b>rectime</b><br>
    determines the recordtime when a recording starts. If rectime = 0 an endless recording will be started. If 
@@ -10207,7 +10637,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     Zur Zeit werden folgende Funktionen unterstützt: <br><br>
     <ul>
      <ul>
-      <li>Start einer Aufnahme und optionaler Versand per Email </li>
+      <li>Start einer Aufnahme und optionaler Versand per Email und/oder Telegram </li>
       <li>Stop einer Aufnahme per Befehl bzw. automatisch nach Ablauf einer einstellbaren Dauer </li>
       <li>Auslösen von Schnappschnüssen und optional gemeinsamer Email/TelegramBot-Versand mittels integrierten Email-Client </li>
       <li>Auslösen von Schnappschnüssen aller definierten Kameras und optionaler gemeinsamer Email-Versand mittels integrierten Email-Client </li>
@@ -10806,7 +11236,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; on [&lt;rectime&gt;] [recEmailTxt:"subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;"] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li><br>
+  <li><b> set &lt;name&gt; on [&lt;rectime&gt;] [recEmailTxt:"subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;"] [recTelegramTxt:"tbot => &lt;TelegramBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;]"] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li><br>
 
   Startet eine Aufnahme. Die Standardaufnahmedauer beträgt 15 Sekunden. Sie kann mit dem 
   Attribut "rectime" individuell festgelegt werden. 
@@ -10845,7 +11275,14 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   Beendigung aktiviert werden. Sollte das Attribut "recEmailTxt" bereits gesetzt sein, wird der Text des "recEmailTxt:"-Tags  
   anstatt des Attribut-Textes verwendet. <br><br>
   
-  <b>Beispiele </b>: <br><br>
+  Ein <b>Telegram-Versand</b> der letzten Aufnahme kann durch Setzen des <a href="#SSCamattr">Attributs</a> "recTelegramTxt" permanent aktiviert
+  werden. Das zu verwendende <a href="http://fhem.de/commandref_DE.html#TelegramBot">TelegramBot-Device</a> muss natürlich 
+  funktionstüchtig eingerichtet sein. <br>
+  Der Text im Attribut "recTelegramTxt" kann durch die Spezifikation des optionalen "recTelegramTxt:"-Tags, wie oben 
+  gezeigt, temporär überschrieben bzw. geändert werden. Sollte das Attribut "recTelegramTxt" nicht gesetzt sein, wird durch Angabe dieses Tags
+  der Telegram-Versand einmalig aktiviert. (die Tag-Syntax entspricht dem "recTelegramTxt"-Attribut) <br><br>
+  
+  <b>Beispiele </b>: <br>
   <code> set &lt;name&gt; on [rectime] </code><br>
   # startet die Aufnahme der Kamera &lt;name&gt;, automatischer Stop der Aufnahme nach Ablauf der Zeit [rectime] 
   (default 15s oder wie im <a href="#SSCamattr">Attribut</a> "rectime" angegeben) <br>
@@ -10853,6 +11290,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   # startet eine Daueraufnahme die mit "off" gestoppt werden muss. <br>
   <code> set &lt;name&gt; on recEmailTxt:"subject => Neue Aufnahme $CAM, body => Die aktuelle Aufnahme von $CAM ist angehängt."  </code><br>
   # startet eine Aufnahme und versendet sie nach Beendigung per Email. <br>
+  <code> set &lt;name&gt; on recTelegramTxt:"tbot => teleBot, peers => @xxxx , subject => Bewegungsalarm bei $CAM. Es wurde $CTIME die Aufnahme $FILE erstellt"  </code><br>
+  # startet eine Aufnahme und versendet sie nach Beendigung per Telegram. <br>
 
   </ul>
   <br><br>
@@ -11654,6 +12093,38 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
       </ul>
       <br>
   </li>  
+  
+  <a name="recTelegramTxt"></a>
+  <li><b>recTelegramTxt tbot => &lt;TelegramBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;]  </b><br>
+    Aktiviert den permanenten Versand von Aufnahmen nach deren Erstellung per TelegramBot. <br>
+    Das Attribut muß in der angegebenen Form definiert werden. Im Schlüssel "tbot" ist das TelegramBot-Device anzugeben, welches für 
+	den Versand der Daten verwendet werden soll. Das <a href="http://fhem.de/commandref_DE.html#TelegramBot">TelegramBot-Device</a> muss natürlich
+	vorhanden und funktionstüchtig sein. <br>
+	Die Angabe von "peers" und "subject" ist optional, jedoch muß der Schlüssel (leer) angegeben werden. 
+	Wurde "peer" leer gelassen, wird der Default-Peer des TelegramBot verwendet. <br>
+	Es können die Platzhalter im subject verwendet werden. <br><br>
+	
+		<ul>   
+		<table>  
+		<colgroup> <col width=10%> <col width=90%> </colgroup>
+		  <tr><td> $CAM   </td><td>- Device-Alias bzw. den Namen der Kamera in der SVS ersetzt falls der Device-Alias nicht vorhanden ist </td></tr>
+		  <tr><td> $DATE  </td><td>- aktuelles Datum </td></tr>
+		  <tr><td> $TIME  </td><td>- aktuelle Zeit </td></tr>
+		  <tr><td> $FILE  </td><td>- Filename </td></tr>
+		  <tr><td> $CTIME </td><td>- Erstellungszeit der Aufnahme </td></tr>
+		</table>
+		</ul>     
+		<br>	
+    
+       <ul>
+		<b>Beispiele:</b><br>
+        recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Bewegungsalarm ($FILE)  <br>
+		recTelegramTxt tbot =&gt; teleBot, peers =&gt; @nabuko @foo @bar, subject =&gt;  <br>
+		recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt;  <br>
+		recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Bewegungsalarm bei $CAM. Es wurde $CTIME die Aufnahme $FILE erstellt. Jetzt ist es $TIME. <br>
+      </ul>
+      <br>
+  </li><br>
   
   <a name="rectime"></a>  
   <li><b>rectime</b><br>

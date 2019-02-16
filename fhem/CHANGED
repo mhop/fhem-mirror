@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 49_SSCam: send recordings by telegram is integrated as well as 
+                       sending snapshots
   - bugfix:  74_XiaomiBTLESens: fix Undefined subroutine
                                 &XiaomiBTLESens::makeDeviceName Bug
   - change:  12_HProtocolGateway: moved strapping table csv file to attribute
