@@ -295,7 +295,7 @@ sub cfgDB_Init() {
 	$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemversions(VERSION INT, VERSIONUUID CHAR(50))");
 
 #	create TABLE fhemconfig if nonexistent
-	$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemconfig(COMMAND VARCHAR(32), DEVICE VARCHAR(64), P1 VARCHAR(128), P2 TEXT, VERSION INT, VERSIONUUID CHAR(50))");
+	$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemconfig(COMMAND VARCHAR(32), DEVICE VARCHAR(64), P1 VARCHAR(64), P2 TEXT, VERSION INT, VERSIONUUID CHAR(50))");
 	
 #	create INDEX on fhemconfig if nonexistent (only if SQLITE)
 	$fhem_dbh->do("CREATE INDEX IF NOT EXISTS config_idx on 'fhemconfig' (versionuuid,version)") 
