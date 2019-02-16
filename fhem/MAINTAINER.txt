@@ -289,6 +289,7 @@ FHEM/55_DWD_OpenData.pm      jensb                Unterstuetzende Dienste/Wetter
 FHEM/55_InfoPanel.pm         betateilchen         Unterstuetzende Dienste
 FHEM/55_PIFACE.pm            klaus.schauer        Einplatinencomputer
 FHEM/56_POKEYS.pm            axelberner           Sonstiges
+FHEM/57_CalDav.pm            betateilchen         Unterstuetzende Dienste/Kalendermodule
 FHEM/57_Calendar.pm          neubert              Unterstuetzende Dienste/Kalendermodule
 FHEM/57_CALVIEW.pm           chris1284            Unterstuetzende Dienste/Kalendermodule
 FHEM/59_HCS.pm               hjr                  Automatisierung (oder auch PM)
