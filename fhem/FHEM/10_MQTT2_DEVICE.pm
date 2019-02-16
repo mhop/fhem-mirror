@@ -42,6 +42,12 @@ MQTT2_DEVICE_Initialize($)
   $hash->{AttrList} = join(" ", @attrList)." ".$readingFnAttributes;
   my %h = ( re=>{}, cid=>{}, bridge=>{} );
   $modules{MQTT2_DEVICE}{defptr} = \%h;
+
+  # Create cache directory
+  my $fn = $attr{global}{modpath}."/www/deviceimages";
+  if(! -d $fn) { mkdir($fn) || Log 3, "Can't create $fn"; }
+  $fn .= "/mqtt2";
+  if(! -d $fn) { mkdir($fn) || Log 3, "Can't create $fn"; }
 }
 
 
@@ -546,14 +552,15 @@ MQTT2_DEVICE_nlData($)
 
   my (%img,%h,%n2n);
   my $fo="";
-  my $pref = "https://koenkk.github.io/zigbee2mqtt/images/devices/";
+  #my $pref = "https://koenkk.github.io/zigbee2mqtt/images/devices/";
+  my $pref = "https://www.zigbee2mqtt.io/images/devices/";
 
   # Needed for the image links
   my $dv = ReadingsVal($d, ".devices", ReadingsVal($d, "devices", ""));
   $dv =~ s@ieeeAddr":"([^"]+)"[^}]+model":"([^"]+)"@
             my $img = $2;
             $img =~ s+[/: ]+-+g; # Forum #91394: supported-devices.js
-            $img{$1} = "$pref$img.jpg";
+            $img{$1} = "$img.jpg";
           @xeg;
 
   # Name translation
@@ -581,7 +588,20 @@ MQTT2_DEVICE_nlData($)
       if($v =~ m/{(.*)\|(.*)\|(.*)\|(.*)}/) {
         my ($x1,$x2,$x3,$x4) = ($1,$2,$3,$4);
         $nv = $n2n{$x1} if($n2n{$x1});
-        $h{$n}{img} = $img{$n} if($img{$n});
+        if($img{$n}) {
+          my $fn = $attr{global}{modpath}."/www/deviceimages/mqtt2/$img{$n}";
+          if(!-f $fn) {      # Cache the picture
+            my $url = "$pref/$img{$n}";
+            Log 3, "MQTT2_DEVICE: downloading $url to $fn";
+            my $data = GetFileFromURL($url);
+            if($data && open(FH,">$fn")) {
+              binmode(FH);
+              print FH $data;
+              close(FH)
+            }
+          }
+          $h{$n}{img} = "$FW_ME/deviceimages/mqtt2/$img{$n}";
+        }
         if($img{$n} && $n2n{$x1} && !AttrVal($n2n{$x1}, "imageLink", "")) {
           CommandAttr(undef, "$nv imageLink $h{$n}{img}");
         }
