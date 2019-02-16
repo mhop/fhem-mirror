@@ -37,7 +37,7 @@ use HttpUtils;
 use Color;
 use SetExtensions;
 
-my $module_version      = "2.17";     # Version of this module
+my $module_version      = "2.18";     # Version of this module
 
 # ------------------------------------------------------------------------------
 # modul version and required ESP Easy firmware / JSON lib version
@@ -1911,7 +1911,9 @@ sub ESPEasy_httpReq(@)
   else {
     my $plist = join(",",@cmdArgs);    # join cmd params into a string to be used in http url
     $plist = ",".$plist if @cmdArgs;   # add leading comma if defined
-    $url = "http://".$host.":".$port.$path.$cmd.$plist; # build full url
+    $url = "http://".$host.":".$port.$path; # build base url
+    $url .= $cmd if($data{ESPEasy}{$dname}{sets}{$cmd}{args} ne "-1"); #Forum 97301
+    $url .= $plist;
   }
 
   my $httpParams = {
@@ -4543,7 +4545,12 @@ sub ESPEasy_dumpSingleLine($)
       Argument must be a <a href="https://perldoc.perl.org/perldsc.html#Declaration-of-a-HASH-OF-HASHES">perl hash</a>.
       The following hash keys can be used. An omitted key will be replaced with the appropriate default value.<br>
       <ul>
-        <li><code>args:</code> minimum number of required arguments. Default: 0</li>
+        <li><code>args:</code> minimum number of required arguments for set cmd.
+          Default: 0, no additional arguments required.<br>
+          [Special case: if set to -1 then &lt;FHEM cmd&gt; will not be added to
+          &lt;ESP Easy cmd&gt;. Useful if &lt;FHEM cmd&gt; differs from
+          &lt;ESP Easy cmd&gt;. &lt;ESP Easy cmd&gt; must then be part of url hash key. See
+          <a href="https://forum.fhem.de/index.php?topic=97301">Forum</a> or example myCmd4 below.]</li>
         <li><code>url:</code> ESPEasy URL to be called. Default: "/control?cmd="</li>
         <li><code>widget:</code> <a href="#widgetOverride">FHEM widget</a> to be
           used for this set command. Default: none
@@ -4574,6 +4581,7 @@ sub ESPEasy_dumpSingleLine($)
           <li><code>( myCmd1 =&gt; {}, myCmd2 =&gt; {} )</code></li>
           <li><code>( myCmd3 =&gt; {args =&gt; 2, url =&gt; "/?cmd=", widget=&gt; "",
                     usage =&gt; "&lt;param1&gt; &lt;param2&gt;"} )</code></li>
+          <li><code>( myCmd4 =&gt; {url =&gt;"/control?cmd=event,myevent", args =&gt; -1} )</code></li>
        </ul>
       <br>
 
