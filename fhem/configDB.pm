@@ -145,6 +145,8 @@
 # 2019-01-17 - added     support for device specific uuid (setuuid)
 # 2019-01-18 - changed   use GetDefAndAttr()
 #
+# 2019-02-16 - changed   default field length for table creation
+#
 ##############################################################################
 =cut
 
@@ -293,7 +295,7 @@ sub cfgDB_Init() {
 	$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemversions(VERSION INT, VERSIONUUID CHAR(50))");
 
 #	create TABLE fhemconfig if nonexistent
-	$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemconfig(COMMAND VARCHAR(32), DEVICE VARCHAR(64), P1 VARCHAR(50), P2 TEXT, VERSION INT, VERSIONUUID CHAR(50))");
+	$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemconfig(COMMAND VARCHAR(32), DEVICE VARCHAR(64), P1 VARCHAR(128), P2 TEXT, VERSION INT, VERSIONUUID CHAR(50))");
 	
 #	create INDEX on fhemconfig if nonexistent (only if SQLITE)
 	$fhem_dbh->do("CREATE INDEX IF NOT EXISTS config_idx on 'fhemconfig' (versionuuid,version)") 
@@ -315,7 +317,7 @@ sub cfgDB_Init() {
 		_cfgDB_InsertLine($fhem_dbh, $uuid, 'define telnetPort telnet 7072 global',6);
 		_cfgDB_InsertLine($fhem_dbh, $uuid, 'define web FHEMWEB 8083 global',7);
 		_cfgDB_InsertLine($fhem_dbh, $uuid, 'attr web allowfrom .*',8);
-		_cfgDB_InsertLine($fhem_dbh, $uuid, 'define Logfile FileLog %L/fhem-%Y-%m-%d.log fakelog',9);
+		_cfgDB_InsertLine($fhem_dbh, $uuid, 'define Logfile FileLog %L/fhem-%Y-%m-%d.log FakeLog',9);
 	}
 
 #	create TABLE fhemstate if nonexistent
