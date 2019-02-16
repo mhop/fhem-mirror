@@ -98,7 +98,7 @@ use strict;
 use warnings;                        
 use Time::HiRes qw(gettimeofday);    
 
-my $ArduCounter_Version = '6.10 - 15.3.2019';
+my $ArduCounter_Version = '6.10 - 16.2.2019';
 
 
 my %ArduCounter_sets = (  
