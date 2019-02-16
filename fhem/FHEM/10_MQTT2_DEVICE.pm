@@ -398,7 +398,10 @@ MQTT2_DEVICE_Attr($$)
 
       }
     }
-    MQTT2_DEVICE_addReading($dev, $param) if($atype eq "reading");
+    if($atype eq "reading") {
+      my $ret = MQTT2_DEVICE_addReading($dev, $param);
+      return $ret if($ret);
+    }
   }
 
   if($attrName eq "bridgeRegexp" && $type eq "set") {
@@ -461,9 +464,12 @@ MQTT2_DEVICE_addReading($$)
   MQTT2_DEVICE_delReading($name);
   foreach my $line (split("\n", $param)) {
     my ($re,$code) = split(" ", $line,2);
+    eval { "Hallo" =~ m/^$re$/ };
+    return "Bad regexp: $@" if($@);
     $modules{MQTT2_DEVICE}{defptr}{re}{$re}{"$name,$code"} = $code
         if($re && $code);
   }
+  return undef;
 }
 
 
