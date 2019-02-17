@@ -84,7 +84,7 @@ gassistant_Define($$)
 
   gassistant_AttrDefaults($hash);
 
-  $hash->{NOTIFYDEV} = "global";
+  $hash->{NOTIFYDEV} = "global,global:npmjs.*gassistant-fhem.*";
 
   if( $attr{global}{logdir} ) {
     CommandAttr(undef, "$name gassistantFHEM-log %L/gassistant-%Y-%m-%d.log") if( !AttrVal($name, 'gassistantFHEM-log', undef ) );
@@ -116,14 +116,24 @@ gassistant_Define($$)
 
 sub
 gassistant_Notify($$)
-{
+{ 
   my ($hash,$dev) = @_;
-
+   
   return if($dev->{NAME} ne "global");
-  return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
-
-  CoProcess::start($hash);
-
+   
+  if( grep(m/^npmjs:BEGIN.*gassistant-fhem.*/, @{$dev->{CHANGED}}) ) {
+    CoProcess::stop($hash);
+    return undef;
+   
+  } elsif( grep(m/^npmjs:FINISH.*gassistant-fhem.*/, @{$dev->{CHANGED}}) ) {
+    CoProcess::start($hash);
+    return undef;
+   
+  } elsif( grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}) ) {
+    CoProcess::start($hash);
+    return undef;
+  }
+   
   return undef;
 }
 
