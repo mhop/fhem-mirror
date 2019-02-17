@@ -71,7 +71,7 @@ attr DEVICE bridgeRegexp BASE_TOPIC/0x([A-Za-z0-9]*)[/]?.*:.* "zigbee_$1"
 attr DEVICE model L_01x_zigbee2mqtt_bridge_outdated
 
 # A dimmable light connected via zigbee2mqtt
-name:L_02a_zigbee2mqtt_bulb
+name:L_02a_zigbee2mqtt_light_dimmer
 desc: A dimmable light connected via zigbee2mqtt <br>Tested with: Tradfri LED1650R5, Osram Lightify W32
 filter:TYPE=MQTT2_DEVICE
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
@@ -83,13 +83,14 @@ attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
 attr DEVICE setList \
   on:noArg BASE_TOPIC/DEV_ID/set {"state":"ON"}\
   off:noArg BASE_TOPIC/DEV_ID/set {"state":"OFF"}\
-  brightness:colorpicker,BRI,0,15,255 BASE_TOPIC/DEV_ID/set {"state":"on","$EVTPART0":"$EVTPART1"}
+  brightness:colorpicker,BRI,0,5,255 BASE_TOPIC/DEV_ID/set {"state":"on","$EVTPART0":"$EVTPART1"}
 attr DEVICE setStateList on off
-attr DEVICE model L_02a_zigbee2mqtt_bulb
+attr DEVICE model L_02a_zigbee2mqtt_light_dimmer
 
 # A dimmable color light connected via zigbee2mqtt
-name:L_02b_zigbee2mqtt_colorbulb
+name:L_02b_zigbee2mqtt_light_cct
 filter:TYPE=MQTT2_DEVICE
+desc: A dimmable light with color temperature via zigbee2mqtt
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 attr DEVICE icon light_control
@@ -98,12 +99,31 @@ attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
 attr DEVICE setList \
   on:noArg BASE_TOPIC/DEV_ID/set {"state":"ON"}\
   off:noArg BASE_TOPIC/DEV_ID/set {"state":"OFF"}\
-  brightness:colorpicker,BRI,0,15,255 BASE_TOPIC/DEV_ID/set {"state":"on","$EVTPART0":"$EVTPART1"}\
-  color_temp:colorpicker,CT,250,1,454 BASE_TOPIC/DEV_ID/set {"$EVTPART0":"$EVTPART1"}
-attr DEVICE model L_02b_zigbee2mqtt_colorbulb
+  brightness:colorpicker,BRI,0,5,255 BASE_TOPIC/DEV_ID/set {"state":"on","$EVTPART0":"$EVTPART1"}\
+  color_temp:colorpicker,CT,154,2,500 BASE_TOPIC/DEV_ID/set {"$EVTPART0":"$EVTPART1"}
+attr DEVICE model L_02b_zigbee2mqtt_light_cct
 
-name:L_02b_zigbee2mqtt_colorbulbWithoutColorTemp
+#source post: https://forum.fhem.de/index.php/topic,97303.msg905935.html#msg905935
+name:L_02c_zigbee2mqtt_light_rgb_hex
 filter:TYPE=MQTT2_DEVICE
+desc: A dimmable rgb light connected via zigbee2mqtt <br>rgb value is encoded as HEX value<br>Experimental, still untested
+par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+attr DEVICE icon hue_filled_white_and_color_e27_b22
+attr DEVICE stateFormat {lc ReadingsVal("$name","state",0)}
+attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name)}
+attr DEVICE webCmd toggle:on:off:brightness:hex
+attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+attr DEVICE setList \
+  on:noArg BASE_TOPIC/DEV_ID/set {"state":"ON"}\
+  off:noArg BASE_TOPIC/DEV_ID/set {"state":"OFF"}\
+  brightness:colorpicker,BRI,0,5,255 BASE_TOPIC/DEV_ID/set {"state":"on","$EVTPART0":"$EVTPART1"}\
+  hex:colorpicker,HEX,0,15,255 BASE_TOPIC/DEV_ID/set {"color":{"$EVTPART0":"#$EVTPART1"}}
+attr DEVICE model L_02c_zigbee2mqtt_light_rgb_hex
+
+name:L_02c_zigbee2mqtt_light_rgb_rgb
+filter:TYPE=MQTT2_DEVICE
+desc: A dimmable rgb light connected via zigbee2mqtt <br>rgb values will be sent as individual values r,g and b<br>Experimental, still untested
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 attr DEVICE icon hue_filled_white_and_color_e27_b22
@@ -114,13 +134,51 @@ attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
 attr DEVICE setList \
   on:noArg BASE_TOPIC/DEV_ID/set {"state":"ON"}\
   off:noArg BASE_TOPIC/DEV_ID/set {"state":"OFF"}\
-  brightness:colorpicker,BRI,0,15,255 BASE_TOPIC/DEV_ID/set {"state":"on","$EVTPART0":"$EVTPART1"}\
+  brightness:colorpicker,BRI,0,5,255 BASE_TOPIC/DEV_ID/set {"state":"on","$EVTPART0":"$EVTPART1"}\
   color:colorpicker,RGB {"BASE_TOPIC/DEV_ID/set ".zigbee2mqtt_RGB2JSON($EVTPART1)}
-attr DEVICE model L_02b_zigbee2mqtt_colorbulbWithoutColorTemp
+attr DEVICE model L_02c_zigbee2mqtt_light_rgb_rgb
+
+#source post: https://forum.fhem.de/index.php/topic,97303.msg905935.html#msg905935
+name:L_02d_zigbee2mqtt_light_rgbw_hex
+filter:TYPE=MQTT2_DEVICE
+desc: A dimmable rgbw light connected via zigbee2mqtt <br>rgb value is encoded as HEX value<br>Experimental, still untested
+par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+attr DEVICE icon hue_filled_white_and_color_e27_b22
+attr DEVICE stateFormat {lc ReadingsVal("$name","state",0)}
+attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name)}
+attr DEVICE webCmd toggle:on:off:brightness:hex:white
+attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+attr DEVICE setList \
+  on:noArg BASE_TOPIC/DEV_ID/set {"state":"ON"}\
+  off:noArg BASE_TOPIC/DEV_ID/set {"state":"OFF"}\
+  white:noArg BASE_TOPIC/DEV_ID/set {"color_temp": 154 , "color_temp": 500}\
+  brightness:colorpicker,BRI,0,5,255 BASE_TOPIC/DEV_ID/set {"state":"on","$EVTPART0":"$EVTPART1"}\
+  hex:colorpicker,HEX,0,15,255 BASE_TOPIC/DEV_ID/set {"color":{"$EVTPART0":"#$EVTPART1"}}
+attr DEVICE model L_02d_zigbee2mqtt_light_rgbw_hex
+
+#source post: https://forum.fhem.de/index.php/topic,97303.msg905935.html#msg905935
+name:L_02d_zigbee2mqtt_light_rgbw_rgb
+filter:TYPE=MQTT2_DEVICE
+desc: A dimmable rgbw light connected via zigbee2mqtt <br>rgb values will be sent as individual values r,g and b<br>Experimental, still untested
+par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+attr DEVICE icon hue_filled_white_and_color_e27_b22
+attr DEVICE stateFormat {lc ReadingsVal("$name","state",0)}
+attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name)}
+attr DEVICE webCmd toggle:on:off:brightness:color:white
+attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+attr DEVICE setList \
+  on:noArg BASE_TOPIC/DEV_ID/set {"state":"ON"}\
+  off:noArg BASE_TOPIC/DEV_ID/set {"state":"OFF"}\
+  white:noArg BASE_TOPIC/DEV_ID/set {"color_temp": 154 , "color_temp": 500}\
+  brightness:colorpicker,BRI,0,5,255 BASE_TOPIC/DEV_ID/set {"state":"on","$EVTPART0":"$EVTPART1"}\
+  color:colorpicker,RGB {"BASE_TOPIC/DEV_ID/set ".zigbee2mqtt_RGB2JSON($EVTPART1)}
+attr DEVICE model L_02d_zigbee2mqtt_light_rgbw_rgb
 
 #source post: https://forum.fhem.de/index.php/topic,96985.msg902627.html#msg902627
-name:L_02c_zigbee2mqtt_colorbulb_rgb
-desc: A dimmable rgb light connected via zigbee2mqtt <br>Experimental, still untested
+name:L_02e_zigbee2mqtt_light_rgbcct_hex
+desc: A dimmable rgb light connected via zigbee2mqtt <br>rgb value is encoded as HEX value<br>Experimental, still untested
 filter:TYPE=MQTT2_DEVICE
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
@@ -132,15 +190,15 @@ attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
 attr DEVICE setList \
   on:noArg BASE_TOPIC/DEV_ID/set {"state":"ON"}\
   off:noArg BASE_TOPIC/DEV_ID/set {"state":"OFF"}\
-  brightness:colorpicker,BRI,0,15,255 BASE_TOPIC/DEV_ID/set {"state":"on","$EVTPART0":"$EVTPART1"}\
-  color_temp:colorpicker,CT,250,1,454 BASE_TOPIC/DEV_ID/set {"$EVTPART0":"$EVTPART1"}\
+  brightness:colorpicker,BRI,0,5,255 BASE_TOPIC/DEV_ID/set {"state":"on","$EVTPART0":"$EVTPART1"}\
+  color_temp:colorpicker,CT,154,2,500 BASE_TOPIC/DEV_ID/set {"$EVTPART0":"$EVTPART1"}\
   hex:colorpicker,HEX,0,15,255 BASE_TOPIC/DEV_ID/set {"color":{"$EVTPART0":"#$EVTPART1"}}
-attr DEVICE model L_02c_zigbee2mqtt_colorbulb_rgb
+attr DEVICE model L_02e_zigbee2mqtt_light_rgbcct_hex
 
 #source post: https://forum.fhem.de/index.php/topic,97303.msg905935.html#msg905935
-name:L_02d_zigbee2mqtt_colorbulb_rgb_cct
+name:L_02e_zigbee2mqtt_light_rgbcct_rgb
 filter:TYPE=MQTT2_DEVICE
-desc: A dimmable rgb-cct light connected via zigbee2mqtt <br>Experimental, still untested, might work with Gledopto RGB-CCT GL-C-008
+desc: A dimmable rgb-cct light connected via zigbee2mqtt <br>rgb values will be sent as individual values r,g and b<br>Tested with: RGB-CCT GL-C-008
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 attr DEVICE icon hue_filled_white_and_color_e27_b22
@@ -151,10 +209,10 @@ attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
 attr DEVICE setList \
   on:noArg BASE_TOPIC/DEV_ID/set {"state":"ON"}\
   off:noArg BASE_TOPIC/DEV_ID/set {"state":"OFF"}\
-  color:colorpicker,RGB {"BASE_TOPIC/DEV_ID/set ".zigbee2mqtt_RGB2JSON($EVTPART1)
-attr DEVICE model L_02d_zigbee2mqtt_colorbulb_rgb_cct
-#  brightness:colorpicker,BRI,0,15,255 BASE_TOPIC/DEV_ID/set {"state":"on","$EVTPART0":"$EVTPART1"}\
-#  color_temp:colorpicker,CT,250,1,454 BASE_TOPIC/DEV_ID/set {"$EVTPART0":"$EVTPART1"}\
+  brightness:colorpicker,BRI,0,5,255 BASE_TOPIC/DEV_ID/set {"state":"on","$EVTPART0":"$EVTPART1"}\
+  color_temp:colorpicker,CT,154,2,500 BASE_TOPIC/DEV_ID/set {"$EVTPART0":"$EVTPART1"}\
+  color:colorpicker,RGB {"BASE_TOPIC/DEV_ID/set ".zigbee2mqtt_RGB2JSON($EVTPART1)}
+attr DEVICE model L_02e_zigbee2mqtt_light_rgbcct_rgb
 
 name:L_03_zigbee2mqtt_smokeDetector
 filter:TYPE=MQTT2_DEVICE

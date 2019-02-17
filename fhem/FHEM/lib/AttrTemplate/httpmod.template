@@ -1,5 +1,5 @@
 ###########################################
-# $Id: mqtt2.template 18592 2019-02-14 06:27:39Z Beta-User $
+# $Id: httpmod.template 18592 2019-02-14 06:27:39Z Beta-User $
 #
 # Comments start with #. Empty lines are ignored.
 # Syntax of one entry: name: line, one optional filter: line, zero or more par: lines,  FHEM-Commands
