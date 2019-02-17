@@ -391,7 +391,8 @@ MQTT2_DEVICE_Attr($$)
                  "%JSONMAP"=>""));
           return $ret if($ret);
         } else {
-          return "unsupported character in readingname $par2"
+          return "bad reading name $par2 ".
+                        "(contains not A-Za-z/\\d_\\.- or is too long)"
               if(!goodReadingName($par2));
         }
 

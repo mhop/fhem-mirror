@@ -32,3 +32,7 @@ enable the old feature.
     fhemSVG:openautomation:default. NOTE: the old version may be needed for
     FLORRPLAN users
   - the default fhem.cfg does not contain a telnet definition
+
+- XXXX-XX-XX (6.0)
+  - attribute names can only consist of the character A-Za-z/\d_\.-
+  - the length of attribute and reading names must be 64 or less

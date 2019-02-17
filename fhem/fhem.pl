@@ -2392,9 +2392,10 @@ CommandSetReading($$)
       ($err, @b) = ReplaceSetMagic($hash, 3, @a);
       delete $hash->{CL};
     }
-    return "WARNING: unsupported character in reading $b[1] ".
-           "(not A-Za-z/\\d_\\.-)" if(!goodReadingName($b[1]));
-    readingsSingleUpdate($defs{$sdev}, $b[1], $b[2], 1);
+    my $b1 = $b[1];
+    return "bad reading name $b1 (contains not A-Za-z/\\d_\\.- or is too long)"
+      if(!goodReadingName($b1));
+    readingsSingleUpdate($defs{$sdev}, $b1, $b[2], 1);
   }
   return join("\n", @rets);
 }
@@ -2830,12 +2831,15 @@ CommandAttr($$)
 
   return "Usage: attr [-a|-r] <name> <attrname> [<attrvalue>]\n$namedef"
            if(@a && @a < 2);
+  my $a1 = $a[1];
+  return "bad attribute name $a1 (contains not A-Za-z/\\d_\\.- or is too long)"
+           if($featurelevel > 5.9 && !goodReadingName($a1));
 
   my @rets;
-  foreach my $sdev (devspec2array($a[0], $a[1] && $a[1] eq "?" ? undef : $cl)) {
+  foreach my $sdev (devspec2array($a[0], $a1 && $a1 eq "?" ? undef : $cl)) {
 
     my $hash = $defs{$sdev};
-    my $attrName = $a[1];
+    my $attrName = $a1;
     my $attrVal = (defined($a[2]) ? $a[2] : 1);
     if(!defined($hash)) {
       push @rets, "Please define $sdev first" if($init_done);#define -ignoreErr
@@ -3045,8 +3049,8 @@ CommandSetstate($$)
         next;
       }
 
-      Log3 $d, 3, "WARNING: unsupported character in reading $sname ".
-             "(not A-Za-z/\\d_\\.-), notify the $d->{TYPE} module maintainer."
+      Log3 $d, 3,
+         "bad reading name $sname (contains not A-Za-z/\\d_\\.- or is too long)"
         if(!goodReadingName($sname));
 
       if(!defined($d->{READINGS}{$sname}) ||
@@ -5700,7 +5704,9 @@ sub
 goodReadingName($)
 {
   my ($name) = @_;
-  return ($name && ($name =~ m/^[a-z0-9._\-\/]+$/i || $name =~ m/^\./));
+  return undef if(!$name);
+  return undef if($featurelevel > 5.9 && length($name) > 64);
+  return ($name =~ m/^[a-z0-9._\-\/]+$/i || $name =~ m/^\./);
 }
 
 sub
@@ -5710,6 +5716,7 @@ makeReadingName($) # Convert non-valid characters to _
   $name = "UNDEFINED" if(!defined($name));
   return $name if($name =~ m/^\./);
   $name =~ s/[^a-z0-9._\-\/]/_/gi;
+  $name = substr($name, 0, 64) if($featurelevel > 5.9 && length($name) > 64);
   return $name;
 }
 

@@ -4123,6 +4123,16 @@ FW_show($$)
         <br>
     </ul>
   </ul>
+
+  <a name="cmdshow"></a>
+  <h3>show</h3>
+  <ul>
+    <code>show [devspec]</code><br>
+    <br><br>
+    Show a temporary room with devices from &lt;devspec&gt;<br>
+    Note: this command is only available through the FHEMWEB interface
+  </ul>
+
 =end html
 
 =begin html_DE
@@ -4843,6 +4853,16 @@ FW_show($$)
         <!-- INSERT_DOC_FROM: www/pgm2/fhemweb.*.js -->
         </ul></li>
 
+    </ul>
+
+    <a name="cmdshow"></a>
+    <h3>show</h3>
+    <ul>
+      <code>show [devspec]</code><br>
+      <br><br>
+      Zeigt einen tempor&auml;ren Raum mit dem Inhalt der &lt;devspec&gt;<br>
+      Achtung: dieser Befehl steht nur &uuml;ber das FHEMWEB Interface zur
+      Verf&uuml;gung.
     </ul>
   </ul>
 

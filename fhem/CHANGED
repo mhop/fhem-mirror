@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: limit reading/attr name length in featurelevel 6.0+ (Forum #97493)
   - feature: 49_SSCam: send recordings by telegram is integrated as well as 
                        sending snapshots
   - bugfix:  74_XiaomiBTLESens: fix Undefined subroutine
