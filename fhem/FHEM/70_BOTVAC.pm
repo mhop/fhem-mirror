@@ -817,9 +817,9 @@ sub ReceiveCommand($$$) {
     if ($err) {
 
         if ( !defined($cmd) || $cmd eq "" ) {
-            Log3($name, 3, "BOTVAC $name:$service RCV $err");
+            Log3($name, 4, "BOTVAC $name:$service RCV $err");
         } else {
-            Log3($name, 3, "BOTVAC $name:$service/$cmd RCV $err");
+            Log3($name, 4, "BOTVAC $name:$service/$cmd RCV $err");
         }
 
         # keep last state
@@ -1900,6 +1900,7 @@ sub wsMasking($$) {
 <b>Get</b>
 <ul>
 <br>
+  <a name="batteryPercent"></a>
   <li><code>get &lt;name&gt; batteryPercent</code>
   <br>
   requests the state of the battery from Robot
@@ -1911,24 +1912,28 @@ sub wsMasking($$) {
 <ul>
 <br>
   <li>
+  <a name="findMe"></a>
   <code> set &lt;name&gt; findMe</code>
   <br>
   plays a sound and let the LED light for easier finding of a stuck robot
   </li>
 <br>
   <li>
+  <a name="dismissCurrentAlert"></a>
   <code> set &lt;name&gt; dismissCurrentAlert</code>
   <br>
         reset an actual Warning (e.g. dustbin full)
   </li>
 <br>
   <li>
+  <a name="nextCleaningMode"></a>
   <code> set &lt;name&gt; nextCleaningMode</code>
   <br>
   Depending on Model, there are Arguments available: eco/turbo
   </li>
 <br>
   <li>
+  <a name="nextCleaningNavigationMode"></a>
   <code> set &lt;name&gt; nextCleaningNavigationMode</code>
   <br>
    The navigation mode is used for the next house cleaning.
@@ -1936,6 +1941,7 @@ sub wsMasking($$) {
   </li>
 <br>
   <li>
+  <a name="nextCleaningNavigationModifier"></a>
   <code> set &lt;name&gt; nextCleaningNavigationModifier</code>
   <br>
    The modifier is used for next spot cleaning.
@@ -1943,66 +1949,77 @@ sub wsMasking($$) {
   </li>
 <br>
   <li>
+  <a name="nextCleaningZone"></a>
   <code> set &lt;name&gt; nextCleaningZone</code>
   <br>
   Depending on Model, the ID of the zone that will be used for the next zone cleaning can be set.
   </li>
 <br>
   <li>
+  <a name="nextCleaningSpotHeight"></a>
   <code> set &lt;name&gt; nextCleaningSpotHeight</code>
   <br>
   Is defined as number between 100 - 400. The unit is cm.
   </li>
 <br>
   <li>
+  <a name="nextCleaningSpotWidth"></a>
   <code> set &lt;name&gt; nextCleaningSpotWidth</code>
   <br>
   Is defined as number between 100 - 400. The unit is cm.
   </li>
 <br>
   <li>
+  <a name="password"></a>
   <code> set &lt;name&gt; password &lt;password&gt;</code>
   <br>
         set the password for the NEATO/VORWERK account
   </li>
 <br>
   <li>
+  <a name="pause"></a>
   <code> set &lt;name&gt; pause</code>
   <br>
         interrupts the cleaning
   </li>
 <br>
   <li>
+  <a name="pauseToBase"></a>
   <code> set &lt;name&gt; pauseToBase</code>
   <br>
   stops cleaning and returns to base
   </li>
 <br>
   <li>
+  <a name="reloadMaps"></a>
   <code> set &lt;name&gt; reloadMaps</code>
   <br>
         load last map from server into the cache of the module. no file is stored!
   </li>
 <br>
   <li>
+  <a name="resume"></a>
   <code> set &lt;name&gt; resume</code>
   <br>
   resume cleaning after pause
   </li>
 <br>
   <li>
+  <a name="schedule"></a>
   <code> set &lt;name&gt; schedule</code>
   <br>
         on and off, switch time control
   </li>
 <br>
   <li>
+  <a name="sendToBase"></a>
   <code> set &lt;name&gt; sendToBase</code>
   <br>
   send roboter back to base
   </li>
 <br>
   <li>
+  <a name="setBoundariesOnFloorplan"></a>
   <code> set &lt;name&gt; setBoundariesOnFloorplan_&lt;floor plan&gt; &lt;name|{JSON String}&gt;</code>
   <br>
     Set boundaries/nogo lines in the corresponding floor plan.<br>
@@ -2018,12 +2035,14 @@ sub wsMasking($$) {
   </li>
 <br>
   <li>
+  <a name="setRobot"></a>
   <code> set &lt;name&gt; setRobot</code>
   <br>
   choose robot if more than one is registered at the used account
   </li>
 <br>
   <li>
+  <a name="startCleaning"></a>
   <code> set &lt;name&gt; startCleaning ([house|map|zone])</code>
   <br>
   start the Cleaning from the scratch.
@@ -2036,12 +2055,14 @@ sub wsMasking($$) {
   </li>
 <br>
   <li>
+  <a name="startSpot"></a>
   <code> set &lt;name&gt; startSpot</code>
   <br>
   start spot-Cleaning from actual position.
   </li>
 <br>
   <li>
+  <a name="startManual"></a>
   <code> set &lt;name&gt; startManual</code>
   <br>
   start Manual Cleaning. This cleaning mode opens a direct websocket connection to the robot.
@@ -2053,24 +2074,28 @@ sub wsMasking($$) {
   </li>
 <br>
   <li>
+  <a name="statusRequest"></a>
   <code> set &lt;name&gt; statusRequest</code>
   <br>
   pull update of all readings. necessary because NEATO/VORWERK does not send updates at their own.
   </li>
 <br>
   <li>
+  <a name="stop"></a>
   <code> set &lt;name&gt; stop</code>
   <br>
   stop cleaning and in case of manual cleaning mode close also the websocket connection
   </li>
 <br>
   <li>
+  <a name="syncRobots"></a>
   <code> set &lt;name&gt; syncRobots</code>
   <br>
   sync robot data with online account. Useful if one has more then one robot registered
   </li>
 <br>
   <li>
+  <a name="wsCommand"></a>
   <code> set &lt;name&gt; wsCommand</code>
   <br>
   Commands start or stop cleaning activities.
@@ -2087,6 +2112,7 @@ sub wsMasking($$) {
   </li>
 <br>
   <li>
+  <a name="wsCombo"></a>
   <code> set &lt;name&gt; wsCombo</code>
   <br>
   Combos specify a behavior on the robot. They need to be sent with less than 1Hz frequency.
@@ -2116,6 +2142,7 @@ sub wsMasking($$) {
   </li>
 <br>
   <li>
+  <a name="boundaries"></a>
   <code>boundaries</code>
   <br>
   Boundary entries separated by space in JSON format, e.g.<br>
