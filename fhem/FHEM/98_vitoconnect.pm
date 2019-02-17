@@ -76,6 +76,10 @@
 #						vor einem set vitoconnect update den alten Timer löschen
 #						set vitoconnect logResponseOnce implementiert (eventuell werden zusätzliche perl Pakete benötigt?)
 # 2019-01-26		Fehler, dass HK3 Readings auf HK2 gemappt wurden gefixt
+# 2019-02-17		Readings für den Stromverbrauch (heating.power.consumption.*) und
+#						  Raumtemperatur (heating.circuits.?.sensors.temperature.room.value) ergänzt
+#						set-Befehle für HKs werden nur noch angezeigt, wenn der HK auch aktiv ist
+#						Wiki aktualisiert
 #          
 #
 #   ToDo:         "set"s für Schedules zum Steuern der Heizung implementieren
@@ -158,6 +162,7 @@ my $RequestList = {
     "heating.circuits.0.operating.programs.reduced.temperature" 		=> "HK1-Solltemperatur_reduziert",
     "heating.circuits.0.operating.programs.standby.active" 				=> "HK1-Standby_aktiv",
     "heating.circuits.0.sensors.temperature.room.status" 				=> "HK1-Raum_Status",
+    "heating.circuits.0.sensors.temperature.room.value"	 				=> "HK1-Raum_Temperatur",
     "heating.circuits.0.sensors.temperature.supply.status"				=> "HK1-Vorlauftemperatur_aktiv",
     "heating.circuits.0.sensors.temperature.supply.value" 				=> "HK1-Vorlauftemperatur",
 
@@ -192,6 +197,7 @@ my $RequestList = {
     "heating.circuits.1.operating.programs.reduced.temperature" 		=> "HK2-Solltemperatur_reduziert",
     "heating.circuits.1.operating.programs.standby.active" 				=> "HK2-Standby_aktiv",
     "heating.circuits.1.sensors.temperature.room.status" 				=> "HK2-Raum_Status",
+    "heating.circuits.1.sensors.temperature.room.value"	 				=> "HK2-Raum_Temperatur",
     "heating.circuits.1.sensors.temperature.supply.status"				=> "HK2-Vorlauftemperatur_aktiv",
     "heating.circuits.1.sensors.temperature.supply.value" 				=> "HK2-Vorlauftemperatur",
     
@@ -226,6 +232,7 @@ my $RequestList = {
     "heating.circuits.2.operating.programs.reduced.temperature" 		=> "HK3-Solltemperatur_reduziert",
     "heating.circuits.2.operating.programs.standby.active" 				=> "HK3-Standby_aktiv",
     "heating.circuits.2.sensors.temperature.room.status" 				=> "HK3-Raum_Status",
+    "heating.circuits.2.sensors.temperature.room.value"	 				=> "HK3-Raum_Temperatur",
     "heating.circuits.2.sensors.temperature.supply.status"				=> "HK3-Vorlauftemperatur_aktiv",
     "heating.circuits.2.sensors.temperature.supply.value" 				=> "HK3-Vorlauftemperatur",
     
@@ -265,7 +272,12 @@ my $RequestList = {
     "heating.gas.consumption.heating.week" 									=> "Gasverbrauch_Heizung/Woche",
     "heating.gas.consumption.heating.month" 									=> "Gasverbrauch_Heizung/Monat",
     "heating.gas.consumption.heating.year" 									=> "Gasverbrauch_Heizung/Jahr",
-
+    
+    "heating.power.consumption.day"												=> "Stromverbrauch/Tag",         
+	 "heating.power.consumption.month"											=> "Stromverbrauch/Monat",     
+	 "heating.power.consumption.week"											=> "Stromverbrauch/Woche",      
+    "heating.power.consumption.year"											=> "Stromverbrauch/Jahr", 
+   
     "heating.sensors.temperature.outside.status" 							=> "Aussen_Status",
     "heating.sensors.temperature.outside.statusWired" 					=> "Aussen_StatusWired",
     "heating.sensors.temperature.outside.statusWireless" 				=> "Aussen_StatusWireless",
@@ -920,48 +932,59 @@ sub vitoconnect_Set($@) {
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
 		return undef;	
 	}
-	return "unknown value $opt, choose one of update:noArg clearReadings:noArg password logResponseOnce:noArg " .
-		"HK1-Heizkurve-Niveau:slider,-13,1,40 ".
-		"HK2-Heizkurve-Niveau:slider,-13,1,40 ".
-		"HK3-Heizkurve-Niveau:slider,-13,1,40 ".
-		"HK1-Heizkurve-Steigung:slider,0.2,0.1,3.5,1 ".
-		"HK2-Heizkurve-Steigung:slider,0.2,0.1,3.5,1 ".
-		"HK3-Heizkurve-Steigung:slider,0.2,0.1,3.5,1 ".
-		"HK1-Urlaub_Start ".   #Start 2019-02-02T23:59:59.000Z und Ende 2019-02-16T00:00:00.000Z
-		"HK2-Urlaub_Start ".
-		"HK3-Urlaub_Start ".
-		"HK1-Urlaub_Ende ".
-		"HK2-Urlaub_Ende ".
-		"HK3-Urlaub_Ende ".
-		"HK1-Urlaub_unschedule:noArg ".
-		"HK2-Urlaub_unschedule:noArg ".
-		"HK3-Urlaub_unschedule:noArg ".
-		"HK1-Betriebsart:standby,dhw,dhwAndHeating,forcedReduced,forcedNormal " .
-		"HK2-Betriebsart:standby,dhw,dhwAndHeating,forcedReduced,forcedNormal " .
-		"HK3-Betriebsart:standby,dhw,dhwAndHeating,forcedReduced,forcedNormal " .
-		"HK1-Solltemperatur_comfort_aktiv:activate,deactivate " .
-		"HK2-Solltemperatur_comfort_aktiv:activate,deactivate " .
-		"HK3-Solltemperatur_comfort_aktiv:activate,deactivate " .
-		"HK1-Solltemperatur_comfort:slider,4,1,37 " .
-		"HK2-Solltemperatur_comfort:slider,4,1,37 " .
-		"HK3-Solltemperatur_comfort:slider,4,1,37 " .
-		"HK1-Solltemperatur_eco_aktiv:activate,deactivate " .
-		"HK2-Solltemperatur_eco_aktiv:activate,deactivate " .
-		"HK3-Solltemperatur_eco_aktiv:activate,deactivate " .	
-		# "HK1-Solltemperatur_eco:slider,?,?,? " . Warum gibt es das nicht?	
-		"HK1-Solltemperatur_normal:slider,3,1,37 " .
-		"HK2-Solltemperatur_normal:slider,3,1,37 " .
-		"HK3-Solltemperatur_normal:slider,3,1,37 " .
-		"HK1-Solltemperatur_reduziert:slider,3,1,37 " .
-		"HK2-Solltemperatur_reduziert:slider,3,1,37 " .
-		"HK3-Solltemperatur_reduziert:slider,3,1,37 " .
-		"WW-einmaliges_Aufladen:activate,deactivate " .
+	my $val = "unknown value $opt, choose one of update:noArg clearReadings:noArg password logResponseOnce:noArg " .
+				"WW-einmaliges_Aufladen:activate,deactivate " .
 		# "WW-Zirkulationspumpe_Zeitplan " . Ist ein Schedule
 		# "WW-Zeitplan " .                   Ist ein Schedule
 		"WW-Haupttemperatur:slider,10,1,60 " .
 		"WW-Solltemperatur:slider,10,1,60 ";
-}	
 
+		if ( ReadingsVal($name, "HK1-aktiv", "0" ) eq "1" ) {
+			$val .= "HK1-Heizkurve-Niveau:slider,-13,1,40 ".
+				"HK1-Heizkurve-Steigung:slider,0.2,0.1,3.5,1 ".
+				"HK1-Urlaub_Start ".   #Start 2019-02-02T23:59:59.000Z und Ende 2019-02-16T00:00:00.000Z
+				"HK1-Urlaub_Ende ".
+				"HK1-Urlaub_unschedule:noArg ".
+				"HK1-Betriebsart:standby,dhw,dhwAndHeating,forcedReduced,forcedNormal " .
+				"HK1-Solltemperatur_comfort_aktiv:activate,deactivate " .
+				"HK1-Solltemperatur_comfort:slider,4,1,37 " .
+				"HK1-Solltemperatur_eco_aktiv:activate,deactivate " .
+				# "HK1-Solltemperatur_eco:slider,?,?,? " . Warum gibt es das nicht?
+				"HK1-Solltemperatur_normal:slider,3,1,37 " .
+				"HK1-Solltemperatur_reduziert:slider,3,1,37 ";			 
+		}
+		if ( ReadingsVal($name, "HK2-aktiv", "0" ) eq "1" ) {
+			$val .= "HK2-Heizkurve-Niveau:slider,-13,1,40 ".
+				"HK2-Heizkurve-Steigung:slider,0.2,0.1,3.5,1 ".
+				"HK2-Urlaub_Start ".   #Start 2019-02-02T23:59:59.000Z und Ende 2019-02-16T00:00:00.000Z
+				"HK2-Urlaub_Ende ".
+				"HK2-Urlaub_unschedule:noArg ".
+				"HK2-Betriebsart:standby,dhw,dhwAndHeating,forcedReduced,forcedNormal " .
+				"HK2-Solltemperatur_comfort_aktiv:activate,deactivate " .
+				"HK2-Solltemperatur_comfort:slider,4,1,37 " .
+				"HK2-Solltemperatur_eco_aktiv:activate,deactivate " .
+				# "HK2-Solltemperatur_eco:slider,?,?,? " . Warum gibt es das nicht?
+				"HK2-Solltemperatur_normal:slider,3,1,37 " .
+				"HK2-Solltemperatur_reduziert:slider,3,1,37 ";			 
+		}
+		
+		if ( ReadingsVal($name, "HK3-aktiv", "0" ) eq "1" ) {
+			$val .= "HK3-Heizkurve-Niveau:slider,-13,1,40 ".
+				"HK3-Heizkurve-Steigung:slider,0.2,0.1,3.5,1 ".
+				"HK3-Urlaub_Start ".   #Start 2019-02-02T23:59:59.000Z und Ende 2019-02-16T00:00:00.000Z
+				"HK3-Urlaub_Ende ".
+				"HK3-Urlaub_unschedule:noArg ".
+				"HK3-Betriebsart:standby,dhw,dhwAndHeating,forcedReduced,forcedNormal " .
+				"HK3-Solltemperatur_comfort_aktiv:activate,deactivate " .
+				"HK3-Solltemperatur_comfort:slider,4,1,37 " .
+				"HK3-Solltemperatur_eco_aktiv:activate,deactivate " .
+				# "HK3-Solltemperatur_eco:slider,?,?,? " . Warum gibt es das nicht?
+				"HK3-Solltemperatur_normal:slider,3,1,37 " .
+				"HK3-Solltemperatur_reduziert:slider,3,1,37 ";			 
+		}
+	
+	return $val;
+}	
 
 sub vitoconnect_Attr(@) {
 	my ($cmd,$name,$attr_name,$attr_value) = @_;
