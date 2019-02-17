@@ -82,6 +82,7 @@ BEGIN {
         readingsBulkUpdate
         readingsBulkUpdateIfChanged
         readingsBeginUpdate
+        readingsDelete
         readingsEndUpdate
         ReadingsNum
         ReadingsVal
@@ -188,6 +189,10 @@ sub GetStatus($;$) {
 
       SendCommand($hash, "messages", "getRobotState", undef, @successor);
     }
+
+    # cleanup
+    readingsDelete($hash, "accessToken");
+    readingsDelete($hash, "secretKey");
 
     return;
 }
@@ -628,14 +633,7 @@ sub SendCommand($$;$$@) {
         Log3($name, 4, "BOTVAC $name: REQ $service/$cmd");
     }
     Log3($name, 4, "BOTVAC $name: REQ option $option") if (defined($option));
-    my $msg = "BOTVAC $name: REQ successors";
-    my @succ_item;
-    for (my $i = 0; $i < @successor; $i++) {
-      @succ_item = @{$successor[$i]};
-      $msg .= " $i: ";
-      $msg .= join(",", map { defined($_) ? $_ : '' } @succ_item);
-    }
-    Log3($name, 4, $msg);
+    LogSuccessors($hash, @successor);
 
     $header = "Accept: application/vnd.neato.nucleo.v1";
     $header .= "\r\nContent-Type: application/json";
@@ -649,7 +647,7 @@ sub SendCommand($$;$$@) {
       %sslArgs = ( SSL_verify_mode => 0 );
 
     } elsif ($service eq "dashboard") {
-      $header .= "\r\nAuthorization: Token token=".ReadingsVal($name, "accessToken", "");
+      $header .= "\r\nAuthorization: Token token=".ReadingsVal($name, ".accessToken", "");
       $URL .= GetBeehiveHost($hash->{VENDOR});
       $URL .= "/dashboard";
       %sslArgs = ( SSL_verify_mode => 0 );
@@ -658,7 +656,7 @@ sub SendCommand($$;$$@) {
       my $serial = ReadingsVal($name, "serial", "");
       return if ($serial eq "");
 
-      $header .= "\r\nAuthorization: Token token=".ReadingsVal($name, "accessToken", "");
+      $header .= "\r\nAuthorization: Token token=".ReadingsVal($name, ".accessToken", "");
       $URL .= GetBeehiveHost($hash->{VENDOR});
       $URL .= "/users/me/robots/$serial/";
       $URL .= (defined($cmd) ? $cmd : "maps");
@@ -757,7 +755,7 @@ sub SendCommand($$;$$@) {
       my $now = time();
       my $date = FmtDateTimeRFC1123($now);
       my $message = join("\n", (lc($serial), $date, $data));
-      my $hmac = hmac_sha256_hex($message, ReadingsVal($name, "secretKey", ""));
+      my $hmac = hmac_sha256_hex($message, ReadingsVal($name, ".secretKey", ""));
 
       $header .= "\r\nDate: $date";
       $header .= "\r\nAuthorization: NEATOAPP $hmac";
@@ -819,13 +817,18 @@ sub ReceiveCommand($$$) {
     if ($err) {
 
         if ( !defined($cmd) || $cmd eq "" ) {
-            Log3($name, 4, "BOTVAC $name:$service RCV $err");
+            Log3($name, 3, "BOTVAC $name:$service RCV $err");
         } else {
-            Log3($name, 4, "BOTVAC $name:$service/$cmd RCV $err");
+            Log3($name, 3, "BOTVAC $name:$service/$cmd RCV $err");
         }
 
         # keep last state
         #readingsBulkUpdateIfChanged( $hash, "state", "Error" );
+        
+        # stop pulling for current interval
+        Log3($name, 4, "BOTVAC $name: drop successors");
+        LogSuccessors($hash, @successor);
+        return;
     }
 
     # data received
@@ -836,14 +839,7 @@ sub ReceiveCommand($$$) {
         } else {
             Log3($name, 4, "BOTVAC $name: RCV $service/$cmd");
         }
-        my $msg = "BOTVAC $name: RCV successors";
-        my @succ_item;
-        for (my $i = 0; $i < @successor; $i++) {
-          @succ_item = @{$successor[$i]};
-          $msg .= " $i: ";
-          $msg .= join(",", map { defined($_) ? $_ : '' } @succ_item);
-        }
-        Log3($name, 4, $msg);
+        LogSuccessors($hash, @successor);
 
         if ( $data ne "" ) {
             if ( $service eq "loadmap" ) {
@@ -1098,7 +1094,7 @@ sub ReceiveCommand($$$) {
         # Sessions
         elsif ( $service eq "sessions" ) {
           if ( ref($return) eq "HASH" and defined($return->{access_token})) {
-            readingsBulkUpdateIfChanged($hash, "accessToken", $return->{access_token});
+            readingsBulkUpdateIfChanged($hash, ".accessToken", $return->{access_token});
           }
         }
         
@@ -1235,15 +1231,15 @@ sub SetRobot($$) {
     Log3($name, 4, "BOTVAC $name: set active robot $robot");
 
     my @robots = @{$hash->{helper}{ROBOTS}};
-    readingsBulkUpdateIfChanged($hash, "serial",    $robots[$robot]->{serial});
-    readingsBulkUpdateIfChanged($hash, "name",      $robots[$robot]->{name});
-    readingsBulkUpdateIfChanged($hash, "model",     $robots[$robot]->{model});
+    readingsBulkUpdateIfChanged($hash, "serial",         $robots[$robot]->{serial});
+    readingsBulkUpdateIfChanged($hash, "name",           $robots[$robot]->{name});
+    readingsBulkUpdateIfChanged($hash, "model",          $robots[$robot]->{model});
     readingsBulkUpdateIfChanged($hash, "firmwareLatest", $robots[$robot]->{recentFirmware})
         if (defined($robots[$robot]->{recentFirmware}));
-    readingsBulkUpdateIfChanged($hash, "secretKey", $robots[$robot]->{secretKey});
-    readingsBulkUpdateIfChanged($hash, "macAddr",   $robots[$robot]->{macAddr});
-    readingsBulkUpdateIfChanged($hash, "nucleoUrl", $robots[$robot]->{nucleoUrl});
-    readingsBulkUpdateIfChanged($hash, "robot",     $robot);
+    readingsBulkUpdateIfChanged($hash, ".secretKey",     $robots[$robot]->{secretKey});
+    readingsBulkUpdateIfChanged($hash, "macAddr",        $robots[$robot]->{macAddr});
+    readingsBulkUpdateIfChanged($hash, "nucleoUrl",      $robots[$robot]->{nucleoUrl});
+    readingsBulkUpdateIfChanged($hash, "robot",          $robot);
 }
 
 sub GetCleaningParameter($$$) {
@@ -1334,7 +1330,7 @@ sub CheckRegistration($$$$$) {
   my ( $hash, $service, $cmd, $option, @successor ) = @_;
   my $name = $hash->{NAME};
 
-  if (ReadingsVal($name, "secretKey", "") eq "") {
+  if (ReadingsVal($name, ".secretKey", "") eq "") {
     my @nextCmd = ($service, $cmd, $option);
     unshift(@successor, [$service, $cmd, $option]);
       
@@ -1347,8 +1343,8 @@ sub CheckRegistration($$$$$) {
       }
       Log3($name, 4, "BOTVAC created".$msg);
       
-    SendCommand($hash, "sessions", undef, undef, @successor)   if (ReadingsVal($name, "accessToken", "") eq "");
-    SendCommand($hash, "dashboard", undef, undef, @successor)  if (ReadingsVal($name, "accessToken", "") ne "");
+    SendCommand($hash, "sessions", undef, undef, @successor)   if (ReadingsVal($name, ".accessToken", "") eq "");
+    SendCommand($hash, "dashboard", undef, undef, @successor)  if (ReadingsVal($name, ".accessToken", "") ne "");
     
     return 1;
   }
@@ -1557,6 +1553,21 @@ sub GetValidityEnd($) {
     return ($validFor =~ /\d+/ ? FmtDateTime(time() + $validFor) : $validFor);
 }
 
+sub LogSuccessors($@) {
+    my ($hash,@successor) = @_;
+    my $name = $hash->{NAME};
+
+    my $msg = "BOTVAC $name: RCV successors";
+    my @succ_item;
+    for (my $i = 0; $i < @successor; $i++) {
+      @succ_item = @{$successor[$i]};
+      $msg .= " $i: ";
+      $msg .= join(",", map { defined($_) ? $_ : '' } @succ_item);
+    }
+    Log3($name, 4, $msg);
+
+}
+
 sub ShowMap($;$$) {
     my ($name,$width,$height) = @_;
 
@@ -1628,7 +1639,7 @@ sub wsHandshake($) {
     my $now     = time();
     my $date    = FmtDateTimeRFC1123($now);
     my $message = lc($serial) . "\n" . $date . "\n";
-    my $hmac    = hmac_sha256_hex($message, ReadingsVal($name, "secretKey", ""));
+    my $hmac    = hmac_sha256_hex($message, ReadingsVal($name, ".secretKey", ""));
     
     my $wsHandshakeCmd = "GET $path HTTP/1.1\r\n";
     $wsHandshakeCmd   .= "Host: $host:$port\r\n";
@@ -2098,6 +2109,7 @@ sub wsMasking($$) {
 <ul>
 <br>
   <li>
+  <a name="actionInterval"></a>
   <code>actionInterval</code>
   <br>
   time in seconds between status requests while Device is working
