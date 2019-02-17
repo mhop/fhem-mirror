@@ -2560,7 +2560,8 @@ plex_parseTimeline($$$)
     }
     CommandAttr(undef, "$cname room plex");
     if( my $entry = plex_entryOfID($hash, 'client', $id ) ) {
-      CommandAttr(undef, "$cname alias ".$entry->{product});
+      CommandAttr(undef, "$cname alias ".$entry->{name});
+      #CommandAttr(undef, "$cname alias ".$entry->{product});
     }
 
     $chash = $modules{plex}{defptr}{$id};
@@ -4051,7 +4052,7 @@ Log 1, "!!!!!!!!!!";
           $len = unpack( 'n', substr($hash->{buf},$i,2) );
           $i += 2;
         } elsif( $len == 127 ) {
-          $len = unpack( 'q', substr($hash->{buf},$i,8) );
+          $len = unpack( 'N', substr($hash->{buf},$i+4,8) );
           $i += 8;
         }
         if( $mask ) {
