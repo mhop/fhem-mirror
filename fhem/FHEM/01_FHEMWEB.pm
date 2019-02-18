@@ -108,6 +108,7 @@ my %FW_icons;      # List of icons
 my @FW_iconDirs;   # Directory search order for icons
 my $FW_RETTYPE;    # image/png or the like
 my %FW_rooms;      # hash of all rooms
+my %FW_extraRooms; # hash of extra rooms
 my @FW_roomsArr;   # ordered list of rooms
 my %FW_groups;     # hash of all groups
 my %FW_types;      # device types, for sorting
@@ -167,6 +168,7 @@ FHEMWEB_Initialize($)
     editFileList:textField-long
     endPlotNow:1,0
     endPlotToday:1,0
+    extraRooms:textField-long
     forbiddenroom
     fwcompress:0,1
     hiddengroup
@@ -1253,6 +1255,19 @@ FW_updateHashes()
     $FW_types{$d} = $t;
   }
 
+  %FW_extraRooms = ();
+  if(my $extra = AttrVal($FW_wname, "extraRooms", undef)) {
+    foreach my $room (split(/ |\n/, $extra)) {
+      next if(!$room || $room =~ /^#/);
+      $room =~ m/name=([^:]+):devspec=([^\s]+)/;
+      my $r = $1;
+      my $d = "#devspec=$2";
+      $FW_rooms{$r}{$d} = 1;
+      $FW_extraRooms{$r} = $d;
+    }
+  }
+
+
   $FW_room = AttrVal($FW_detail, "room", "Unsorted") if($FW_detail);
 
   if(AttrVal($FW_wname, "sortRooms", "")) { # Slow!
@@ -1605,8 +1620,16 @@ FW_roomOverview($)
     next if($r eq "hidden" || $FW_hiddenroom{$r});
     $FW_room = AttrVal($FW_wname, "defaultRoom", $r)
         if(!$FW_room && $FW_ss);
-    push @list1, FW_htmlEscape($r);
-    push @list2, "$FW_ME?room=".urlEncode($r);
+    if(my $devspec = $FW_extraRooms{$r}) {
+      my $r = $r;
+      $r =~ s/&nbsp;/ /g;
+      push @list1, FW_htmlEscape($r);
+      push @list2, "$FW_ME?room=".urlEncode($devspec);
+    } else {
+      push @list1, FW_htmlEscape($r);
+      push @list2, "$FW_ME?room=".urlEncode($r);
+    }
+
   }
   my $sfx = AttrVal("global", "language", "EN");
   $sfx = ($sfx eq "EN" ? "" : "_$sfx");
@@ -1656,6 +1679,9 @@ FW_roomOverview($)
 
     my $tblnr = 1;
     my $roomEscaped = FW_htmlEscape($FW_room);
+    my $current;
+    $current = "$FW_ME?room=".urlEncode($FW_room) if($FW_room);
+    $current = "$FW_ME?cmd=".urlEncode($cmd) if($cmd);
     foreach(my $idx = 0; $idx < @list1; $idx++) {
       my ($l1, $l2) = ($list1[$idx], $list2[$idx]);
       if(!$l1) {
@@ -1666,7 +1692,7 @@ FW_roomOverview($)
         }
 
       } else {
-        FW_pF "<tr%s>", $l1 eq $roomEscaped ? " class=\"sel\"" : "";
+        FW_pF "<tr%s>", ($current && $current eq $l2) ? " class=\"sel\"" : "";
 
         my $class = "menu_$l1";
         $class =~ s/[^A-Z0-9]/_/gi;
@@ -2719,6 +2745,14 @@ FW_Attr(@)
     }
   }
 
+  if($attrName eq "extraRooms") {
+    foreach my $room (split(/ |\n/, $param[0])) {
+      next if(!$room || $room =~ /^#/);
+      return "Bad extraRooms entry $room, not name=<name>:devspec=<devspec>"
+        if($room !~ m/name=([^:]+):devspec=([^\s]+)/);
+    }
+  }
+
   if($attrName eq "longpoll" && $type eq "set" && $param[0] eq "websocket") {
     return "$devName: Could not load Digest::SHA on startup, no websocket"
         if(!$FW_use{sha});
@@ -3702,6 +3736,17 @@ FW_show($$)
         </li>
         <br>
 
+    <a name="extraRooms"></a>
+    <li>extraRooms<br>
+        Space or newline separated list of dynamic rooms to add to the room
+        list.<br>
+        Example:<br>
+          attr WEB extraRooms
+                    name=open:devspec=contact=open.*
+                    name=closed:devspec=contact=closed.*
+        </li>
+        <br>
+
     <a name="forbiddenroom"></a>
     <li>forbiddenroom<br>
         just like hiddenroom (see below), but accessing the room or the
@@ -4124,15 +4169,6 @@ FW_show($$)
     </ul>
   </ul>
 
-  <a name="cmdshow"></a>
-  <h3>show</h3>
-  <ul>
-    <code>show [devspec]</code><br>
-    <br><br>
-    Show a temporary room with devices from &lt;devspec&gt;<br>
-    Note: this command is only available through the FHEMWEB interface
-  </ul>
-
 =end html
 
 =begin html_DE
@@ -4430,6 +4466,17 @@ FW_show($$)
         Wird dieses FHEMWEB Attribut gesetzt, so enden Wochen- bzw. Monatsplots
         am aktuellen Tag, sonst wird die aktuelle Woche/Monat angezeigt.
         </li><br>
+
+    <a name="extraRooms"></a>
+    <li>extraRooms<br>
+        Durch Leerzeichen oder Zeilenumbruch getrennte Liste von dynamischen
+        R&auml;umen, die zus&auml;tzlich angezeigt werden sollen.
+        Beispiel:<br>
+          attr WEB extraRooms
+                        name=Offen:devspec=contact=open.*
+                        name=Geschlossen:devspec=contact=closed.*
+        </li><br>
+
 
     <a name="forbiddenroom"></a>
     <li>forbiddenroom<br>
@@ -4853,16 +4900,6 @@ FW_show($$)
         <!-- INSERT_DOC_FROM: www/pgm2/fhemweb.*.js -->
         </ul></li>
 
-    </ul>
-
-    <a name="cmdshow"></a>
-    <h3>show</h3>
-    <ul>
-      <code>show [devspec]</code><br>
-      <br><br>
-      Zeigt einen tempor&auml;ren Raum mit dem Inhalt der &lt;devspec&gt;<br>
-      Achtung: dieser Befehl steht nur &uuml;ber das FHEMWEB Interface zur
-      Verf&uuml;gung.
     </ul>
   </ul>
 

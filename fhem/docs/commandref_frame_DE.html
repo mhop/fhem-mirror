@@ -69,6 +69,7 @@
       <a href="#setreading">setreading</a> &nbsp; <!-- setzt ein Reading f&uuml;r ein FHEM Ger&auml;t -->
       <a href="#setstate">setstate</a> &nbsp; <!-- setzt den Status eines  FHEM Ger&aumles -->
       <a href="#setuuid">setuuid</a> &nbsp; <!-- setzt den internen FUUID Wert -->
+      <a href="#show">show</a> &nbsp;       <!-- zeigt tempor&aunl;ren Raum. nur in FHEMWB -->
       <a href="#shutdown">shutdown</a> &nbsp; <!-- beendet FHEM -->
       <a href="#sleep">sleep</a> &nbsp;     <!-- verz&ouml;gerte Ausf&uuml;hrung -->
       <a href="#trigger">trigger</a> &nbsp; <!-- generiert ein FHEM Event -->
@@ -1390,6 +1391,23 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
   Ist nicht vom Benutzer zu verwenden.
 </ul>
 <!-- setstate end -->
+
+<a name="show"></a>
+<h3>show</h3>
+<ul>
+  <code>show &lt;devspec&gt;</code>
+  <br><br>
+  Zeigt einen tempor&auml;ren Raum mit Ger&auml;ten aus &lt;devspec&gt;,
+  verf&uuml;gbar nur &uuml;ber FHEMWEB.<br> Siehe den Abschnitt &uuml;ber <a
+  href="#devspec">Ger&auml;te-Spezifikation</a> f&uuml;r Details der
+  &lt;devspec&gt;.<br>
+  <br><br>
+  Example:
+  <ul>
+    <code>show TYPE=CUL_HM</code><br>
+  </ul>
+</ul>
+<!-- show end -->
 
 <a name="shutdown"></a>
 <h3>shutdown</h3>
