@@ -32,6 +32,7 @@
 # 13.12.17 GA fix consider $roomsWaitOffset{$wkey} in oldpulse set for each room
 # 31.01.18 GA add support for stateFormat
 # 05.02.18 GA fix typo overallHeatingSwitchThresholdTemup
+# 19.11.18 GA add support for attribute maxOffTime
 
 ##############################################
 # $Id$
@@ -99,19 +100,22 @@ PWM_Calculate($)
   my ($hash) = @_;
 
   my $name = $hash->{NAME};
-  my %RoomsToSwitchOn       = ();
-  my %RoomsToSwitchOff      = ();
-  my %RoomsToStayOn         = ();
-  my %RoomsToStayOff        = ();
-  my %RoomsValveProtect     = ();
-  my %RoomsPulses           = ();
-  my $roomsActive           = 0;
-  my $newpulseMax           = 0;
-  my $newpulseSum           = 0;
-  my $newpulseAvg           = 0;
-  my $newpulseAvg2          = 0;
-  my $newpulseAvg3          = 0;
-  my $wkey                  = "";
+  my %RoomsToSwitchOn            = ();
+  my %RoomsToSwitchOff           = ();
+  my %RoomsToStayOn              = ();
+  my %RoomsToStayOff             = ();
+  my %RoomsValveProtect          = ();
+  my %RoomsMaxOffTimeProtect     = ();
+  my %RoomsPulses                = ();
+  my $roomsActive                = 0;
+  my $newpulseMax                = 0;
+  my $newpulseSum                = 0;
+  my $newpulseAvg                = 0;
+  my $newpulseAvg2               = 0;
+  my $newpulseAvg3               = 0;
+  my $RoomsMaxOffTimeProtect_on  = 0;
+
+  my $wkey                       = "";
 
   if($hash->{INTERVAL} > 0) {
     InternalTimer(gettimeofday() + $hash->{INTERVAL}, "PWM_Calculate", $hash, 0);
@@ -132,7 +136,6 @@ PWM_Calculate($)
   readingsBeginUpdate ($hash);
 
   readingsBulkUpdate ($hash,  "lastrun", "calculating");
-  #$hash->{STATE} = "lastrun: ".$hash->{READINGS}{lastrun}{TIME};
   readingsBulkUpdate ($hash,  "state", "lastrun: ".$hash->{READINGS}{lastrun}{TIME});
 
   # loop over all devices
@@ -146,12 +149,15 @@ PWM_Calculate($)
          if ($hash->{NAME} eq $defs{$d}{IODev}->{NAME}) {                          # referencing to this fb
 
           Log3 ($hash, 4, "PWM_Calculate calc $name, room $d");
+          $roomsActive++;
 
           ########################
           # calculate room
           # $newstate is "" if state is unchanged
           # $newstate is "on" or "off" if state changes
           # $newstate may be "on_vp" or "off_vp" if valve protection is active
+          # $newstate may be "off_mop" if maxOffTime protection has ended
+          # $newstate may be "on_mop" or "on_mop_stay" or "on_mop_maybe" if maxOffTime protection is active stays active or may become active
 	  my ($newstate, $newpulse, $cycletime, $oldstate) = PWM_CalcRoom($hash, $defs{$d});
 
           my $onoff = $newpulse * $cycletime;
@@ -159,72 +165,133 @@ PWM_Calculate($)
             $onoff = (1 - $newpulse) * $cycletime
           }
 
+          ##############################
+          ##### Valve Protect
+
           if ($newstate eq "on_vp") {
 	    $RoomsValveProtect{$d} = "on";
           } elsif ($newstate eq "off_vp") {
 	    $RoomsValveProtect{$d} = "off";
-          }
-	  
-          $wkey = $name."_".$d;
-          if (defined ($roomsWaitOffset{$wkey})) {
-            $hash->{helper}{pulses}{$d} = $newpulse." / ".$roomsWaitOffset{$wkey}; 
-            $newpulse += $roomsWaitOffset{$wkey};
-            
           } else {
-            $roomsWaitOffset{$wkey} = 0;
-            $hash->{helper}{pulses}{$d} = $newpulse." / ".$roomsWaitOffset{$wkey}; 
-          }
 
-	  $defs{$d}->{READINGS}{oldpulse}{TIME} = TimeNow();
-	  $defs{$d}->{READINGS}{oldpulse}{VAL}  = $newpulse;
+            ##############################
+            ##### maxOffTimeProtect
 
-          $roomsActive++;
-          $RoomsPulses{$d} = $newpulse;
-          $newpulseSum += $newpulse;
-          $newpulseMax = max($newpulseMax, $newpulse);
-
-          # $newstate ne "" -> state changed "on" -> "off" or "off" -> "on"
-          if ((int($hash->{MINONOFFTIME}) > 0) &&
-              (($newstate eq "on") or ($newstate eq "off")) && 
-              ($onoff < int($hash->{MINONOFFTIME})) 
-             ) {
-
-            #######################
-            # actor devices take 3 minutes for an open/close cycle
-            #  this is handled by MINONOFFTIME
-
-            Log3 ($hash, 3, "PWM_Calculate $d: F0 stay unchanged $oldstate: ".
-              "($onoff < $hash->{MINONOFFTIME} sec)");
-                
-            if ($oldstate eq "off") {
-              $RoomsToStayOff{$d} = $newpulse;
-            } else {
-              $RoomsToStayOn{$d}  = $newpulse;
-            }
- 
-          } else {
-          
-            # state changed and it is worth to move the device
-
-            if ($newstate eq "on") {
-              $RoomsToSwitchOn{$d}   = $newpulse;
-
-            } elsif ($newstate eq "off") {
-              $RoomsToSwitchOff{$d}  = $newpulse;
-
-            } elsif ($newstate eq "") {
-
-              if ($oldstate eq "on") {
-                $RoomsToStayOn{$d}   = $newpulse;
-              } else {
-                $RoomsToStayOff{$d}  = $newpulse;
-              }
+            if ($newstate eq "on_mop") {
+	      $RoomsMaxOffTimeProtect_on++;
+	      $RoomsMaxOffTimeProtect{$d} = $newstate;
+	      $newstate = "on";
+            } elsif ($newstate eq "on_mop_stay") {
+	      $RoomsMaxOffTimeProtect_on++;
+	      $RoomsMaxOffTimeProtect{$d} = $newstate;
+	      $newstate = "";
+            } elsif ($newstate eq "on_mop_maybe") {
+	      $RoomsMaxOffTimeProtect{$d} = $newstate;
+	      $newstate = "";
+            } elsif ($newstate eq "off_mop") {
+	      $RoomsMaxOffTimeProtect{$d} = $newstate;
+	      $newstate = "off";
             } 
+     
+  
+            ##############################
+            ##### regular calculation
+
+            $wkey = $name."_".$d;
+            if (defined ($roomsWaitOffset{$wkey})) {
+              $hash->{helper}{pulses}{$d} = $newpulse." / ".$roomsWaitOffset{$wkey}; 
+              $newpulse += $roomsWaitOffset{$wkey};
+              
+            } else {
+              $roomsWaitOffset{$wkey} = 0;
+              $hash->{helper}{pulses}{$d} = $newpulse." / ".$roomsWaitOffset{$wkey}; 
+            }
+
+	    $defs{$d}->{READINGS}{oldpulse}{TIME} = TimeNow();
+	    $defs{$d}->{READINGS}{oldpulse}{VAL}  = $newpulse;
+
+            $RoomsPulses{$d} = $newpulse;
+            $newpulseSum += $newpulse;
+            $newpulseMax = max($newpulseMax, $newpulse);
+
+            # $newstate ne "" -> state changed "on" -> "off" or "off" -> "on"
+            if ((int($hash->{MINONOFFTIME}) > 0) &&
+                (($newstate eq "on") or ($newstate eq "off")) && 
+                ($onoff < int($hash->{MINONOFFTIME})) 
+               ) {
+  
+              #######################
+              # actor devices take 3 minutes for an open/close cycle
+              #  this is handled by MINONOFFTIME
+
+              Log3 ($hash, 3, "PWM_Calculate $d: F0 stay unchanged $oldstate: ".
+                "($onoff < $hash->{MINONOFFTIME} sec)");
+                 
+              if ($oldstate eq "off") {
+                $RoomsToStayOff{$d} = 1;
+              } else {
+                $RoomsToStayOn{$d}  = 1;
+              }
+
+            } else {
+          
+              # state changed and it is worth to move the device
+
+              if ($newstate eq "on") {
+                $RoomsToSwitchOn{$d}   = 1;
+  
+              } elsif ($newstate eq "off") {
+                $RoomsToSwitchOff{$d}  = 1;
+
+              } elsif ($newstate eq "") {
+
+                if ($oldstate eq "on") {
+                  $RoomsToStayOn{$d}   = 1;
+                } else {
+                  $RoomsToStayOff{$d}  = 1;
+                }
+              } 
+            }
 
           }
         }
       }
     }
+  }
+
+
+  # maxOffTimeProtect handling
+  foreach my $d (keys %RoomsMaxOffTimeProtect) {
+
+    if ($RoomsMaxOffTimeProtect{$d}      eq "off_mop") {
+      $RoomsToSwitchOff{$d} = 1;
+      $RoomsPulses{$d}      = 0;
+
+    } elsif ($RoomsMaxOffTimeProtect{$d} eq "on_mop") {
+      $RoomsToSwitchOn{$d} = 1;
+      $RoomsPulses{$d}     = $hash->{MaxPulse};
+
+    } elsif ($RoomsMaxOffTimeProtect{$d} eq "on_mop_stay") {
+      $RoomsToStayOn{$d}  = 1;
+      $RoomsPulses{$d}    = $hash->{MaxPulse};
+
+    } elsif ($RoomsMaxOffTimeProtect{$d} eq "on_mop_maybe") {
+
+      if ($RoomsMaxOffTimeProtect_on > 0) {
+        $RoomsToSwitchOn{$d} = 1;
+        $RoomsPulses{$d}     = $hash->{MaxPulse};
+
+      } else {
+        $RoomsToStayOff{$d}  = 1;
+        $RoomsPulses{$d}     = 0;
+      }
+    }
+
+    $defs{$d}->{READINGS}{oldpulse}{TIME} = TimeNow();
+    $defs{$d}->{READINGS}{oldpulse}{VAL}  = $RoomsPulses{$d};
+
+    $newpulseSum += $RoomsPulses{$d};
+    $newpulseMax = max($newpulseMax, $RoomsPulses{$d});
   }
 
 
@@ -453,6 +520,10 @@ PWM_Calculate($)
 
 	PWMR_SetRoom ($defs{$roomOff}, "off"); 
 
+       if (defined($defs{$roomOff}->{helper}{maxOffTimeLastSwitch})) {
+         delete ($defs{$roomOff}->{helper}{maxOffTimeLastSwitch});
+       }
+
         $cntRoomsOff++;
         $pulseRoomsOff += $RoomsPulses{$roomOff};
   } 
@@ -463,10 +534,36 @@ PWM_Calculate($)
         $roomsWaitOffset{$wkey} = 0;
 	PWMR_SetRoom ($defs{$roomOn}, "on"); 
 
+       if (defined($RoomsMaxOffTimeProtect{$roomOn})) {
+         $defs{$roomOn}->{helper}{maxOffTimeLastSwitch} = time();
+       }
+
         $cntRoomsOn++;
         $pulseRoomsOn += $RoomsPulses{$roomOn};
 
   }
+
+if (0) {
+  foreach my $roomMOP (sort keys %RoomsMaxOffTimeProtect) {
+
+        my $wkey = $name."-".$roomMOP;
+        $roomsWaitOffset{$wkey} = 0;
+
+        if ( $RoomsMaxOffTimeProtect{$roomMOP} eq "on") {
+
+	  PWMR_SetRoom ($defs{$roomMOP}, "on"); 
+          $cntRoomsOn++;
+          $pulseRoomsOn += $RoomsPulses{$roomMOP};
+
+	} else {
+
+	  PWMR_SetRoom ($defs{$roomMOP}, "off"); 
+          $cntRoomsOff++;
+          $pulseRoomsOff += $RoomsPulses{$roomMOP};
+        }
+
+  }
+}
 
   foreach my $roomVP (sort keys %RoomsValveProtect) {
 
@@ -670,6 +767,7 @@ PWM_Calculate($)
 
  
   readingsEndUpdate($hash, 1);
+  Log3 ($hash, 3, "PWM_Calculate $name done");
 
 #  if(!$hash->{LOCAL}) {
 #    DoTrigger($name, undef) if($init_done);
@@ -688,7 +786,7 @@ PWM_CalcRoom(@)
 
   my $cycletime = $hash->{CYCLETIME};
 
-  my ($temperaturV, $actorV, $factor, $oldpulse, $newpulse, $prevswitchtime, $windowV) =
+  my ($temperaturV, $actorV, $factor, $oldpulse, $newpulse, $prevswitchtime, $windowV, $maxOffTimeApply, $maxOffTime, $maxOffTimePeriod, $maxOffTimeAct) =
      PWMR_ReadRoom($room, $cycletime, $hash->{MaxPulse});
 
   my $nextswitchtime; 
@@ -702,6 +800,21 @@ PWM_CalcRoom(@)
 
   if ($actorV eq "on")                   # current state is "on"
   {
+    # ----------------
+    # check if maxOffTime is active and maxOffTimePeriod is over
+
+    if (defined ($room->{helper}{maxOffTimeLastSwitch}))  {
+      if ( $room->{helper}{maxOffTimeLastSwitch} + ($maxOffTimePeriod * 60)  > time()) {
+         Log3 ($hash, 3, "PWM_CalcRoom $room->{NAME}: F15 maxOffTime continue");
+         return ("on_mop_stay", $newpulse, $cycletime, $actorV);
+      } else {
+         Log3 ($hash, 3, "PWM_CalcRoom $room->{NAME}: F16 maxOffTime off");
+         #delete ($room->{helper}{maxOffTimeLastSwitch});
+         return ("off_mop", $newpulse, $cycletime, $actorV);
+      }
+
+    }
+
     # ----------------
     # check if valve protection is active, keep this state for 5 minutes
 
@@ -761,6 +874,7 @@ PWM_CalcRoom(@)
   }
   elsif ($actorV eq "off")               # current state is "off"
   {
+
     # ----------------
     # check if valve protection is activated (attribute valveProtectIdlePeriod is set)
 
@@ -768,9 +882,9 @@ PWM_CalcRoom(@)
       # period is defined in days (*86400)
       if ($room->{READINGS}{lastswitch}{VAL} + ($attr{$name}{"valveProtectIdlePeriod"} * 86400)  < time()) {
 
-      $room->{helper}{valveProtectLastSwitch} = time();
-      Log3 ($hash, 3, "PWM_CalcRoom $room->{NAME}: F12 valve protect");
-      return ("on_vp", $newpulse, $cycletime, $actorV); 
+        $room->{helper}{valveProtectLastSwitch} = time();
+        Log3 ($hash, 3, "PWM_CalcRoom $room->{NAME}: F12 valve protect");
+        return ("on_vp", $newpulse, $cycletime, $actorV); 
       }
     }
 
@@ -778,12 +892,34 @@ PWM_CalcRoom(@)
     # decide if to change to "on"
 
     if ($oldpulse == 0 && $newpulse > 0) { # was 0% now heating is required 
-         Log3 ($hash, 3, "PWM_CalcRoom $room->{NAME}: F7 new on");
-         return ("on", $newpulse, $cycletime, $actorV); 
+       Log3 ($hash, 3, "PWM_CalcRoom $room->{NAME}: F7 new on");
+       return ("on", $newpulse, $cycletime, $actorV); 
     }
+
     if ($newpulse == 0) {
-         Log3 ($hash, 3, "PWM_CalcRoom $room->{NAME}: F11 stay off (0)");
-         return ("", $newpulse, $cycletime, $actorV); 
+
+      # ----------------
+      # check if maxOffTime protection is activated (attribute maxOffTimeIdlePeriod is set)
+
+      if ($maxOffTimeApply > 0) {
+
+        ## wz > 2:00
+        if ($maxOffTimeAct >= $maxOffTime) {
+
+          Log3 ($hash, 3, "PWM_CalcRoom $room->{NAME}: F17 maxOffTime protection");
+          return ("on_mop", $newpulse, $cycletime, $actorV); 
+        }
+
+        ## wz > 2:00 / 2
+        if ($maxOffTimeAct >= $maxOffTime / 2) {
+
+          Log3 ($hash, 3, "PWM_CalcRoom $room->{NAME}: F18 maxOffTime protection (possible)");
+          return ("on_mop_maybe", $newpulse, $cycletime, $actorV); 
+        }
+      }
+
+      Log3 ($hash, 3, "PWM_CalcRoom $room->{NAME}: F11 stay off (0)");
+      return ("", $newpulse, $cycletime, $actorV); 
     }
 
     if ($newpulse > $oldpulse) {         # was 30% now it is 80%
@@ -813,6 +949,7 @@ PWM_CalcRoom(@)
 
 
     }
+    
 
   }
   else # $actorV not "on" of "off"
@@ -906,7 +1043,7 @@ PWM_Set($@)
 {
   my ($hash, @a) = @_;
 
-  my $u = "Unknown argument $a[1], choose one of recalc interval cycletime";
+  my $u = "Unknown argument $a[1], choose one of recalc interval cycletime maxOffTimeCalculation:on,off";
 
 
   if ( $a[1] =~ /^interval$|^cycletime$/ ) {
@@ -921,6 +1058,10 @@ PWM_Set($@)
     RemoveInternalTimer($hash);
     my $v = PWM_Calculate($hash);
     #delete $hash->{LOCAL};
+
+  } elsif ( $a[1] =~ /^maxOffTimeCalculation$/ ) {
+
+    readingsSingleUpdate ($hash,  "maxOffTimeCalculation", $a[2], 1);
 
   } else {
   
@@ -1264,6 +1405,10 @@ PWM_Attr(@)
     <li>recalc<br>
         Cause recalculation that normally appeary every <i>interval</i> seconds.
         </li><br>
+
+    <li>maxOffTimeCalculation<br>
+        Defines if parameter maxOffTime for rooms (PWMR objects) is evaluated or not. Possible Values are "on" or "off". Sets reading maxOffTimeCalculation.<br>
+    </li>
 
   </ul>
 
