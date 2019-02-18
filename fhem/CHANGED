@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  73_AutoShuttersControl: fix many bugs, support for max window
+             contact sensors, fix set partyMode then Reading and set command
+             equivalent
   - bugfix:  70_BOTVAC: solved recursion while looking up hostname of server
   - feature: limit reading/attr name length in featurelevel 6.0+ (Forum #97493)
   - feature: 49_SSCam: send recordings by telegram is integrated as well as 

@@ -41,7 +41,7 @@ package main;
 use strict;
 use warnings;
 
-my $version = '0.4.0.2';
+my $version = '0.4.0.4';
 
 sub AutoShuttersControl_Initialize($) {
     my ($hash) = @_;
@@ -495,7 +495,8 @@ sub Set($$@) {
     }
     elsif ( lc $cmd eq 'partymode' ) {
         return "usage: $cmd" if ( @args > 1 );
-        readingsSingleUpdate( $hash, $cmd, join( ' ', @args ), 1 );
+        readingsSingleUpdate( $hash, $cmd, join( ' ', @args ), 1 )
+          if ( join( ' ', @args ) ne ReadingsVal($name,'partyMode',0) );
     }
     elsif ( lc $cmd eq 'hardlockout' ) {
         return "usage: $cmd" if ( @args > 1 );
@@ -769,16 +770,18 @@ sub EventProcessingWindowRec($@) {
     my ( $hash, $shuttersDev, $events ) = @_;
     my $name = $hash->{NAME};
 
-    if ( $events =~ m#state:\s(open|closed|tilted)#
+    if ( $events =~ m#state:\s(open(ed)?|closed|tilted)#             # weitere mögliche Events  (opened / closed)
         and IsAfterShuttersManualBlocking($shuttersDev) )
     {
         $shutters->setShuttersDev($shuttersDev);
+        my $homemode = $shutters->getRoommatesStatus;
+        $homemode = $ascDev->getResidentsStatus if ( $homemode eq 'none' );
 
         #### Hardware Lock der Rollläden
         $shutters->setHardLockOut('off')
           if ( $1 eq 'closed' and $shutters->getShuttersPlace eq 'terrace' );
         $shutters->setHardLockOut('on')
-          if ( $1 eq 'open' and $shutters->getShuttersPlace eq 'terrace' );
+          if ( ($1 eq 'open' or $1 eq 'opened') and $shutters->getShuttersPlace eq 'terrace' );
 
         $shutters->setNoOffset(1);
 
@@ -800,7 +803,11 @@ sub EventProcessingWindowRec($@) {
 #             ShuttersCommandSet( $hash, $shuttersDev, $shutters->getDelayCmd );
 #         }
         if (  $1 eq 'closed'
-          and IsAfterShuttersTimeBlocking( $hash, $shuttersDev ) )
+          and IsAfterShuttersTimeBlocking( $hash, $shuttersDev )
+          and ($shutters->getModeDown eq $homemode
+            or (    $shutters->getModeDown eq 'absent'
+                and $homemode eq 'gone' )
+            or $shutters->getModeDown eq 'always') )
         {
             if (   $shutters->getStatus == $shutters->getVentilatePos
                 or $shutters->getStatus == $shutters->getComfortOpenPos
@@ -846,7 +853,7 @@ sub EventProcessingWindowRec($@) {
             ShuttersCommandSet( $hash, $shuttersDev,
                 $shutters->getVentilatePos );
         }
-        elsif ( $1 eq 'open'
+        elsif ( ($1 eq 'open' or $1 eq 'opened')
             and $shutters->getSubTyp eq 'threestate'
             and $ascDev->getAutoShuttersControlComfort eq 'on'
             and $queryShuttersPosWinRecComfort )
@@ -1369,7 +1376,7 @@ sub ShadingProcessing($@) {
         ( $shutters->getShadingWaitingPeriod / 2 )
         or not IsAfterShuttersTimeBlocking( $hash, $shuttersDev ) );
 
-    Log3( $name, 3,
+    Log3( $name, 4,
             "AutoShuttersControl ($name) - Shading Processing, Rollladen: "
           . $shuttersDev
           . " Nach dem return" );
@@ -1391,7 +1398,7 @@ sub ShadingProcessing($@) {
           if ( $shutters->getShading eq 'out reserved'
             and ( int( gettimeofday() ) - $shutters->getShadingTimestamp ) >=
             $shutters->getShadingWaitingPeriod );
-        Log3( $name, 3,
+        Log3( $name, 4,
                 "AutoShuttersControl ($name) - Shading Processing, Rollladen: "
               . $shuttersDev
               . " In der Out Abfrage, Shadingwert: "
@@ -1412,7 +1419,7 @@ sub ShadingProcessing($@) {
           if ( $shutters->getShading eq 'in reserved'
             and ( int( gettimeofday() ) - $shutters->getShadingTimestamp ) >=
             ( $shutters->getShadingWaitingPeriod / 2 ) );
-        Log3( $name, 1,
+        Log3( $name, 4,
                 "AutoShuttersControl ($name) - Shading Processing, Rollladen: "
               . $shuttersDev
               . " In der In Abfrage, Shadingwert: "
@@ -1444,12 +1451,9 @@ sub ShadingProcessing($@) {
         {
             $shutters->setLastDrive('shading out');
             ShuttersCommandSet( $hash, $shuttersDev, $shutters->getLastPos );
-            Log3( $name, 3,
-"AutoShuttersControl ($name) - Shading Processing - shading out läuft"
-            );
         }
 
-        Log3( $name, 3,
+        Log3( $name, 4,
 "AutoShuttersControl ($name) - Shading Processing - In der Routine zum fahren der Rollläden, Shading Wert: "
               . $shutters->getShading );
     }
@@ -1614,7 +1618,7 @@ sub CreateSunRiseSetShuttersTimer($$) {
         ),
         1
     );
-    readingsEndUpdate( $shuttersDevHash, 0 );
+    readingsEndUpdate( $shuttersDevHash, 1 );
 
     readingsBeginUpdate($hash);
     readingsBulkUpdateIfChanged(
@@ -2366,7 +2370,7 @@ sub CheckIfShuttersWindowRecOpen($) {
     my $shuttersDev = shift;
     $shutters->setShuttersDev($shuttersDev);
 
-    if ( $shutters->getWinStatus eq 'open' ) { return 2; }
+    if ( $shutters->getWinStatus eq 'open' or $shutters->getWinStatus eq 'opened' ) { return 2; }
     elsif ( $shutters->getWinStatus eq 'tilted'
         and $shutters->getSubTyp eq 'threestate' )
     {
@@ -3653,7 +3657,7 @@ sub getFreezeTemp {
     my $name    = $self->{name};
     my $default = $self->{defaultarg};
 
-    $default = 'none' if ( not defined($default) );
+    $default = 3 if ( not defined($default) );
     return AttrVal( $name, 'ASC_freezeTemp', $default );
 }
 
