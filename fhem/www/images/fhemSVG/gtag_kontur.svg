@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   width="585"
+   height="585"
+   viewBox="0 0 154.78125 154.78125"
+   version="1.1"
+   id="svg8">
+  <defs
+     id="defs2">
+    <clipPath
+       clipPathUnits="userSpaceOnUse"
+       id="clipPath178">
+      <path
+         style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:0.26458332px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+         d="m -34.744556,63.146511 10.95805,-0.200452 0.133635,24.722432 -11.024867,0.06682 z"
+         id="path180" />
+    </clipPath>
+    <clipPath
+       clipPathUnits="userSpaceOnUse"
+       id="clipPath178-6">
+      <path
+         style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:0.26458332px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+         d="m -34.744556,63.146511 10.95805,-0.200452 0.133635,24.722432 -11.024867,0.06682 z"
+         id="path180-7" />
+    </clipPath>
+  </defs>
+  <metadata
+     id="metadata5">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title></dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <g
+     id="layer1"
+     transform="matrix(0.93870541,0,0,0.93578894,162.19423,7.9131185)"
+     style="display:inline">
+    <g
+       id="g261"
+       transform="matrix(0.35277778,0,0,0.35277778,-173.21761,-8.4428025)">
+      <g
+         id="g6"
+         transform="matrix(0.189474,0,0,-0.189474,0,468)"
+         style="fill:#000000;stroke:none">
+        <path
+           id="path8"
+           d="M 395,2455 C 244,2422 112,2322 57,2200 5,2083 6,2112 2,1260 0,702 2,446 10,400 43,208 198,52 398,11 c 71,-15 1628,-15 1692,0 174,40 322,190 365,370 22,94 22,1579 0,1683 -21,98 -66,187 -127,252 -61,64 -113,98 -201,128 -61,21 -75,21 -867,23 -640,1 -817,-1 -865,-12 z m 1737,-163 c 74,-36 132,-95 170,-170 l 21.5112,-66.4142 L 2325,1235 2317.5562,406.94718 2297,338 C 2260,262 2201,204 2126,169 L 2063,151.94718 1224,142 408.82013,152.46699 335,172 C 273,204 196,285 167,348 L 137.55621,420.38777 145,1235 159.88758,2066.0396 172,2127 c 53,100 128,162 227,189 35,10 236,12 856,11 l 810,-16.934 z" />
+      </g>
+    </g>
+  </g>
+  <path
+     style="color:#000000;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:medium;line-height:normal;font-family:sans-serif;font-variant-ligatures:normal;font-variant-position:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-alternates:normal;font-feature-settings:normal;text-indent:0;text-align:start;text-decoration:none;text-decoration-line:none;text-decoration-style:solid;text-decoration-color:#000000;letter-spacing:normal;word-spacing:normal;text-transform:none;writing-mode:lr-tb;direction:ltr;text-orientation:mixed;dominant-baseline:auto;baseline-shift:baseline;text-anchor:start;white-space:normal;shape-padding:0;clip-rule:nonzero;display:inline;overflow:visible;visibility:visible;opacity:1;isolation:auto;mix-blend-mode:normal;color-interpolation:sRGB;color-interpolation-filters:linearRGB;solid-color:#000000;solid-opacity:1;vector-effect:none;fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:5.66499996;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke;color-rendering:auto;image-rendering:auto;shape-rendering:auto;text-rendering:auto;enable-background:accumulate"
+     d="m 119.38086,17.490234 c -9.04794,0 -16.60156,7.041135 -16.60156,15.855469 0,8.814334 7.55362,15.855469 16.60156,15.855469 9.04794,0 16.60352,-7.040623 16.60352,-15.855469 0,-8.814846 -7.55558,-15.855469 -16.60352,-15.855469 z m 0,5.927735 c 6.01861,0 10.67383,4.503492 10.67383,9.927734 0,5.424243 -4.65472,9.925781 -10.67383,9.925781 -6.01911,0 -10.67383,-4.501538 -10.67383,-9.925781 0,-5.424242 4.65522,-9.927735 10.67383,-9.927734 z"
+     id="path141" />
+</svg>
