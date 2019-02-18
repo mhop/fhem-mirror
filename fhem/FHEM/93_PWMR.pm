@@ -48,6 +48,11 @@
 # 27.12.17 GA add handle "off" as c_tempFrostProtect and "on" as c_tempC in getDesiredTempFrom (valid form Homematic)
 # 31.01.18 GA add support for stateFormat
 # 08.02.18 GA fix PID_I_previousTemps was shortened to c_PID_DLookBackCnt instead of c_PID_ILookBackCnt in define
+# 19.11.18 GA add support for attribute maxOffTime
+# 19.11.18 GA add support hh:mm in set desired-temp
+# 20.11.18 GA add integrate $init_done into PWMR_Define to supress error messages during startup
+# 20.11.18 GA add change default for w_regexp from ".*Open.*" to ".*[Oo]pen.*" to fit for MAX window contacts
+# 11.02.19 GA add redesign of maxOffTime
 
 
 # module for PWM (Pulse Width Modulation) calculation
@@ -88,7 +93,6 @@ package main;
 
 use strict;
 use warnings;
-
 my %dayno = (
    "mo"  => 1,
    "di"  => 2,
@@ -136,6 +140,7 @@ PWMR_Initialize($)
 			"tempRule4 ".
 			"tempRule5 ".
 			"valueFormat:textField-long ".
+			"maxOffTime".
  			" ".$readingFnAttributes;
 
 }
@@ -179,10 +184,102 @@ PWMR_getDesiredTempFrom(@)
 
 }
 ###################################
+
+sub
+PWMR_CalcDesiredTempFromRule($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  my $temperature = $hash->{READINGS}{"desired-temp"}{VAL};
+
+  my @time = localtime();
+  my $wday = $time[6];
+  my $cmptime = sprintf ("%02d%02d", $time[2], $time[1]);
+  Log3 ($hash, 4, "PWMR_CalcDesiredTemp $name: wday $wday cmptime $cmptime");
+  
+  foreach my $rule ($hash->{c_tempRule5}, 
+  		$hash->{c_tempRule4}, 
+  		$hash->{c_tempRule3}, 
+  		$hash->{c_tempRule2}, 
+  		$hash->{c_tempRule1} ) 
+    {
+    if ($rule ne "") {		
+
+      # valid rule is 1-5 0600,D 1800,C 2200,N
+  
+      Log3 ($hash, 5, "PWMR_CalcDesiredTempFromRule $name: $rule");
+  
+      my @points = split (" ", $rule);
+  
+      my ($dayfrom, $dayto) = split ("-", $points[0]);
+      #Log3 ($hash, 5, "PWMR_CalcDesiredTempFromRule $name: dayfrom $dayfrom dayto $dayto");
+  
+      my $rulematch = 0;
+      if ($dayfrom <= $dayto ) {                    # rule 1-5 or 4-4
+        $rulematch = ($wday >= $dayfrom && $wday <= $dayto);
+      } else {                                      # rule  5-2
+        $rulematch = ($wday >= $dayfrom || $wday <= $dayto);
+      }
+  
+      if ($rulematch) {
+    
+        for (my $i=int(@points)-1; $i>0; $i--) {
+          Log3 ($hash, 5, "PWMR_CalcDesiredTempFromRule $name: i:$i $points[$i]");
+  
+          my ($ruletime, $tempV) = split (",", $points[$i]);
+  
+          if ($cmptime >= $ruletime) {
+  
+  	  $temperature = $hash->{"c_tempN"};
+  	  $temperature = $hash->{"c_tempD"} if ($tempV eq "D");
+  	  $temperature = $hash->{"c_tempC"} if ($tempV eq "C");
+  	  $temperature = $hash->{"c_tempE"} if ($tempV eq "E");
+    
+  	  Log3 ($hash, 4, "PWMR_CalcDesiredTempFromRule $name: match i:$i $points[$i] ($tempV/$temperature)");
+  	 
+if (0) {
+  	  if ($hash->{READINGS}{"desired-temp"}{VAL} != $temperature 
+  	      or substr(TimeNow(),1,8) ne substr($hash->{READINGS}{"desired-temp"}{TIME},1,8)) {
+  	    readingsSingleUpdate ($hash,  "desired-temp", sprintf ("%.01f", $temperature), 1);
+  	  } else {
+  	    readingsSingleUpdate ($hash,  "desired-temp", sprintf ("%.01f", $temperature), 0);
+  	  }
+  
+  	  return undef;
+}
+          return ($temperature, $tempV);
+          } 
+  
+        }
+
+        # no interval matched .. guess I am before the first one
+        # so I choose the temperature from yesterday :-)
+        # this should match tempN but was correctly calculated before midnight
+
+        $temperature = $hash->{READINGS}{"desired-temp"}{VAL};
+  
+if (0) {
+        Log3 ($hash, 4, "PWMR_CalcDesiredTemp $name: use last value ($temperature)");
+    
+        if ($hash->{READINGS}{"desired-temp"}{VAL} ne $temperature
+          or substr(TimeNow(),1,8) ne substr($hash->{READINGS}{"desired-temp"}{TIME},1,8)) {
+          readingsSingleUpdate ($hash,  "desired-temp", sprintf ("%.01f", $temperature), 1);
+        }
+        return undef;
+}
+        return ($temperature, $hash->{c_tempRuleS});
+        }
+      }
+    }
+}
+
+###################################
 sub
 PWMR_CalcDesiredTemp($)
 {
   my ($hash) = @_;
+  my $name = $hash->{NAME};
 
   if($hash->{INTERVAL} > 0) {
     if ($hash->{INTERVAL} == 300) {
@@ -202,8 +299,6 @@ PWMR_CalcDesiredTemp($)
       #Log3 ($hash, 4, "interval not 300");
     }
   }
-
-  my $name = $hash->{NAME};
 
   if (defined($hash->{READINGS}{"desired-temp-until"})) {
     if ($hash->{READINGS}{"desired-temp-until"}{VAL} ne "no" ) {
@@ -248,94 +343,22 @@ PWMR_CalcDesiredTemp($)
   ####################
   # rule based calculation
 
+  # we need the c_tempRuleS for later use
+  my ($desiredTempFromRule, $desiredTempFromRuleSelector) = PWMR_CalcDesiredTempFromRule($hash);
+  $hash->{c_tempRuleS} = $desiredTempFromRuleSelector;
+
   if ($hash->{c_autoCalcTemp} > 0 ) {
     if ($hash->{c_desiredTempFrom} eq "") {
-
-      #$hash->{STATE}     = "Calculating";
       readingsSingleUpdate ($hash,  "state", "Calculating", 1);
-  
-      my @time = localtime();
-      my $wday = $time[6];
-      my $cmptime = sprintf ("%02d%02d", $time[2], $time[1]);
-      Log3 ($hash, 4, "PWMR_CalcDesiredTemp $name: wday $wday cmptime $cmptime");
-  
-      foreach my $rule ($hash->{c_tempRule5}, 
-                        $hash->{c_tempRule4}, 
-                        $hash->{c_tempRule3}, 
-                        $hash->{c_tempRule2}, 
-                        $hash->{c_tempRule1} ) {
-        if ($rule ne "") {		# valid rule is 1-5 0600,D 1800,C 2200,N
-  
-          Log3 ($hash, 5, "PWMR_CalcDesiredTemp $name: $rule");
-  
-          my @points = split (" ", $rule);
-  
-          my ($dayfrom, $dayto) = split ("-", $points[0]);
-          #Log3 ($hash, 5, "PWMR_CalcDesiredTemp $name: dayfrom $dayfrom dayto $dayto");
-  
-          my $rulematch = 0;
-          if ($dayfrom <= $dayto ) {                    # rule 1-5 or 4-4
-            $rulematch = ($wday >= $dayfrom && $wday <= $dayto);
-          } else {                                      # rule  5-2
-            $rulematch = ($wday >= $dayfrom || $wday <= $dayto);
-          }
-  
-          if ($rulematch) {
-  
-            for (my $i=int(@points)-1; $i>0; $i--) {
-              Log3 ($hash, 5, "PWMR_CalcDesiredTemp $name: i:$i $points[$i]");
-  
-              my ($ruletime, $tempV) = split (",", $points[$i]);
-  
-              if ($cmptime >= $ruletime) {
-  
-                my $temperature = $hash->{"c_tempN"};
-                $temperature = $hash->{"c_tempD"} if ($tempV eq "D");
-                $temperature = $hash->{"c_tempC"} if ($tempV eq "C");
-                $temperature = $hash->{"c_tempE"} if ($tempV eq "E");
-  
-                Log3 ($hash, 4, "PWMR_CalcDesiredTemp $name: match i:$i $points[$i] ($tempV/$temperature)");
-                 
-                if ($hash->{READINGS}{"desired-temp"}{VAL} != $temperature 
-                    or substr(TimeNow(),1,8) ne substr($hash->{READINGS}{"desired-temp"}{TIME},1,8)) {
-                  readingsSingleUpdate ($hash,  "desired-temp", sprintf ("%.01f", $temperature), 1);
-                } else {
-                  readingsSingleUpdate ($hash,  "desired-temp", sprintf ("%.01f", $temperature), 0);
-                }
-  
-                #$hash->{READINGS}{"desired-temp"}{TIME} = TimeNow();
-                #$hash->{READINGS}{"desired-temp"}{VAL} = $temperature;
-  
-                #push @{$hash->{CHANGED}}, "desired-temp $temperature";
-                #DoTrigger($name, undef);
-                return undef;
-              } 
-  
-            }
-            # no interval matched .. guess I am before the first one
-            # so I choose the temperature from yesterday :-)
-            # this should be the tempN
-            my $newTemp = $hash->{"c_tempN"};
-  
-            my $act_dtemp = $hash->{READINGS}{"desired-temp"}{VAL};
-            Log3 ($hash, 4, "PWMR_CalcDesiredTemp $name: use last value ($act_dtemp)");
-  
-            if ($act_dtemp ne $newTemp
-              or substr(TimeNow(),1,8) ne substr($hash->{READINGS}{"desired-temp"}{TIME},1,8)) {
-              readingsSingleUpdate ($hash,  "desired-temp", sprintf ("%.01f", $newTemp), 1);
-            #} else {
-            #  readingsSingleUpdate ($hash,  "desired-temp", $newTemp, 0);
-            }
-  
-            #$hash->{READINGS}{"desired-temp"}{TIME} = TimeNow();
-            #$hash->{READINGS}{"desired-temp"}{VAL} = $newTemp;
-  
-            #push @{$hash->{CHANGED}}, "desired-temp $newTemp";
-            #DoTrigger($name, undef);
-            return undef;
-          }
-        }
+
+      if ($hash->{READINGS}{"desired-temp"}{VAL} != $desiredTempFromRule
+        or substr(TimeNow(),1,8) ne substr($hash->{READINGS}{"desired-temp"}{TIME},1,8)) {
+        readingsSingleUpdate ($hash,  "desired-temp", sprintf ("%.01f", $desiredTempFromRule), 1);
+      } else {
+        readingsSingleUpdate ($hash,  "desired-temp", sprintf ("%.01f", $desiredTempFromRule), 0);
       }
+    
+
     } else { # $hash->{c_desiredTempFrom} is set
       #$hash->{STATE}     = "From $hash->{d_name}";
       readingsSingleUpdate ($hash,  "state", "From $hash->{d_name}", 1);
@@ -441,15 +464,34 @@ PWMR_Set($@)
     }
     
     my $duration = defined($hash->{READINGS}{"manualTempDuration"}{VAL}) ? $hash->{READINGS}{"manualTempDuration"}{VAL} * 60 : 60 * 60;
+    my $now =  time();
 
     if (defined($a[3])) {
-      $duration = int($a[3]) * 60;
+      if ($a[3] =~ /([^:]{1,}):([^:]{1,})/) {
+
+        my $timestamp = FmtDateTime($now);
+
+        $timestamp =~ s/ .*//;
+        $timestamp .= " ".$a[3];
+
+        my $targetTime = time_str2num($timestamp);
+
+        $duration = $targetTime - $now;
+        if ($duration < 0) {
+          $duration += 60 * 60 * 24;
+        }
+
+      } elsif ($a[3] =~ /([0123456789\.]{1,})h/) {
+        $duration = $1*60*60;
+
+      } else {
+        $duration = int($a[3]) * 60;
+      }
     }
     
     # manual set desired-temp will be set for 1 hour (default)
     # afterwards it will be overwritten by auto calc
  
-    my $now =  time();
 
     readingsBeginUpdate ($hash);
     readingsBulkUpdate ($hash,  "desired-temp", sprintf ("%.01f", $a[2]));
@@ -534,6 +576,9 @@ PWMR_Define($$)
          "[<usePID=2>:<PFactor>:<IFactor>:<DFactor>[,<DLookBackCnt>]]"
     if(int(@a) < 6 || int(@a) > 9);
 
+  # $init_done = 0 --> startup in progress
+  # $init_done = 1 --> startup finished
+
   my $iodevname = $a[2];
   my $factor  = ((int(@a) > 2) ? $a[3] : 0.8);
   my $tsensor = ((int(@a) > 3) ? $a[4] : "");
@@ -560,14 +605,13 @@ PWMR_Define($$)
   #$hash->{helper}{cycletime}  = 0;
 
   if ( !$iodevname ) {
-    return "unknown device $iodevname";
+    return "unknown device $iodevname" if ($init_done == 1);
   }
 
   if ( $defs{$iodevname}->{TYPE} ne "PWM" ) {
-    return "wrong type of $iodevname (not PWM)";
+    return "wrong type of $iodevname (not PWM)" if ($init_done == 1);
   }
 
-  #$hash->{IODev} = $iodev;
   $hash->{IODev} = $defs{$iodevname};
   
   ##########
@@ -582,7 +626,7 @@ PWMR_Define($$)
     # this regexp defines the result of ReadRoom
     # if any window is open return 1
 
-    $w_regexp = '.*Open.*'
+    $w_regexp = '.*[Oo]pen.*'
   }
   $hash->{w_regexp}    = $w_regexp;
 
@@ -592,8 +636,8 @@ PWMR_Define($$)
   
       if (!$defs{$onewindow} && $onewindow ne "dummy") {
         my $msg = "$name: Unknown window device $onewindow specified";
-        Log3 ($hash, 3, "PWMR_Define $msg");
-        return $msg;
+        Log3 ($hash, 3, "PWMR_Define $msg (maybe defined later)");
+        return $msg if ($init_done == 1);
       }
 
       if (length($hash->{windows}) > 0 ) {
@@ -765,8 +809,8 @@ PWMR_Define($$)
   if (!$defs{$sensor} && $sensor ne "dummy")
   {
     my $msg = "$name: Unknown sensor device $sensor specified";
-    Log3 ($hash, 3, "PWMR_Define $msg");
-    return $msg;
+    Log3 ($hash, 3, "PWMR_Define $msg (maybe defined later)");
+    return $msg if ($init_done == 1);
   }
 
   $sensor            =~ s/dummy//;
@@ -791,13 +835,12 @@ PWMR_Define($$)
   if (!$defs{$tactor} && $tactor ne "dummy")
   {
     my $msg = "$name: Unknown actor device $tactor specified";
-    Log3 ($hash, 3, "PWMR_Define $msg");
-    return $msg;
+    Log3 ($hash, 3, "PWMR_Define $msg (maybe defined later)");
+    return $msg if ($init_done == 1);
   }
 
   $hash->{actor}       = $tactor;
   $hash->{a_regexp_on} = $a_regexp_on;
-  #$hash->{actorState}  = "unknown";
 
   readingsSingleUpdate ($hash,  "actorState", "unknown", 0);
 
@@ -884,7 +927,7 @@ PWMR_SetRoom(@)
     return;
   }
 
-  if ($room->{actor})
+  if (defined($room->{actor}))
   {
     my $ret = fhem sprintf ("set %s %s", $room->{actor}, $newState);
     if (!defined($ret)) {    # sucessfull
@@ -920,8 +963,8 @@ PWMR_ReadRoom(@)
 
   #$room->{helper}{cycletime} = $cycletime;
 
-  my ($temperaturV, $actorV, $factor, $oldpulse, $newpulse, $newpulsePID, $prevswitchtime, $windowV) = 
-    (99, "off", 0, 0, 0, 0, 0, 0);
+  my ($temperaturV, $actorV, $factor, $oldpulse, $newpulse, $newpulsePID, $prevswitchtime, $windowV, $maxOffTimeApply, $maxOffTime, $maxOffTimePeriod, $maxOffTimeAct) = 
+    (99, "off", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
   #Log3 ($room, 4, "PWMR_ReadRoom $name <$room->{t_sensor}> <$room->{actor}>");
 
@@ -931,31 +974,36 @@ PWMR_ReadRoom(@)
     my $reading  =  $room->{t_reading};
     my $t_regexp =  $room->{t_regexp};
 
-    $temperaturV =  $defs{$sensor}->{READINGS}{$reading}{VAL};
-    $temperaturT =  $defs{$sensor}->{READINGS}{$reading}{TIME};
+    if (defined($defs{$sensor})) {
 
-    $temperaturV =~ s/$t_regexp/$1/;
+      $temperaturV =  $defs{$sensor}->{READINGS}{$reading}{VAL};
+      $temperaturT =  $defs{$sensor}->{READINGS}{$reading}{TIME};
 
-    $temperaturV = PWMR_valueFormat ($room, "temperature", $temperaturV);
+      $temperaturV =~ s/$t_regexp/$1/;
+
+      $temperaturV = PWMR_valueFormat ($room, "temperature", $temperaturV);
+    } else {
+
+      Log3 ($room, 3, "PWMR_ReadRoom temperatureSensor invalid $sensor assume temp 99");
+      $temperaturV = PWMR_valueFormat ($room, "temperature", 99);
+    }
   }
 
-  if ($room->{actor})
+  if (defined($room->{actor}))
   {
-    # HERE
-    #$actorV    =  (($defs{$room->{actor}}->{STATE} eq "on") : "on" ? "off");
-    #$actorV    =  $defs{$room->{actor}}->{STATE};
-    
-    # until 26.01.2013 -> may be undef which forces room to be switched off first
-    #$actorV    =  $room->{actorState};
-    
     # starting from 26.01.2013 -> try to read act status .. (may also be invalid if struct)
     if ($defs{$room->{actor}}->{TYPE} eq "RBRelais") {
       $actorV =  $defs{$room->{actor}}->{STATE};
+      $room->{READINGS}{actorState}{VAL} = $actorV;
     } elsif (defined($defs{$room->{actor}}->{STATE})) {
       $actorV =  $defs{$room->{actor}}->{STATE};
+      $room->{READINGS}{actorState}{VAL} = $actorV if ($room->{READINGS}{actorState}{VAL} eq "unknown");
+    } elsif (defined($defs{$room->{actor}}->{READINGS}{state}{VAL})) {
+      $actorV = $room->{READINGS}{actorState}{VAL};
+      $room->{READINGS}{actorState}{VAL} = $actorV if ($room->{READINGS}{actorState}{VAL} eq "unknown");
     } else {
       #$actorV = $room->{actorState};
-      $actorV = $room->{READINGS}{actorState};
+      $actorV = $room->{READINGS}{actorState}{VAL};
     } 
 
     #my $actorVOrg = $actorV;
@@ -1191,8 +1239,42 @@ PWMR_ReadRoom(@)
 
   readingsEndUpdate($room, 1);
   
+  # handle maxOffTimeProtection
+  if (defined($room->{p_maxOffTimeSelector})) {
 
-  return ($temperaturV, $actorV, $factor, $oldpulse, $newpulse, $prevswitchtime, $windowV);
+    $maxOffTime        = $room->{p_maxOffTime}; 
+    $maxOffTimePeriod  = $room->{p_maxOffTimePeriod}; 
+
+    if (defined($room->{c_tempRuleS})) {
+      if (index ($room->{p_maxOffTimeSelector}, $room->{c_tempRuleS}) >= 0) {  # -1 if not found
+
+        # current selector matches possible selectors eg. we are one of D,C or E
+
+        if ($room->{READINGS}{actorState}{VAL} eq "off") {
+          # current state is off, calculate time since last switch from "on" to "off"
+          if ($room->{p_maxOffTimeTempLimit} > 0) {
+
+            if ($room->{READINGS}{temperature}{VAL} <= $room->{READINGS}{"desired-temp"}{VAL} + $room->{p_maxOffTimeTempLimit}) {
+              $maxOffTimeAct = int((time() - $room->{READINGS}{lastswitch}{VAL}) / 60);
+              $maxOffTimeApply = 1; 
+              my $time = sprintf ("%02d:%02d:%02d", $maxOffTimeAct / 60 / 60, ($maxOffTimeAct / 60) % 60, $maxOffTimeAct % 60);
+              Log3 ($room, 4, "PWMR_ReadRoom $name: candidate for maxOffTime actor($actorV) since $time (".
+                    $room->{READINGS}{temperature}{VAL}." <= ".$room->{READINGS}{"desired-temp"}{VAL}." + ".$room->{p_maxOffTimeTempLimit}.")");
+            }
+
+          } else {
+            $maxOffTimeAct = int((time() - $room->{READINGS}{lastswitch}{VAL}) / 60);
+            $maxOffTimeApply = 1; 
+            my $time = sprintf ("%02d:%02d:%02d", $maxOffTimeAct / 60 / 60, ($maxOffTimeAct / 60) % 60, $maxOffTimeAct % 60);
+            Log3 ($room, 4, "PWMR_ReadRoom $name: candidate for maxOffTime actor($actorV) since $time");
+          }
+        }
+      }
+    }
+  }
+
+  return ($temperaturV, $actorV, $factor, $oldpulse, $newpulse, $prevswitchtime, $windowV, $maxOffTimeApply, $maxOffTime, $maxOffTimePeriod, $maxOffTimeAct);
+
 
 }
   
@@ -1242,20 +1324,6 @@ PWMR_NormalizeRules(@)
   my @week = ();
 
   #Log3 ($hash, 2, "PWMR_NormalizeRules");
-
-  if ($hash->{c_autoCalcTemp} == 0 or $hash->{c_desiredTempFrom} ne "")
-  {
-    #Log3 ($hash, 2, "PWMR_NormalizeRules delete readings timer._..");
-    delete ($hash->{READINGS}{timer1_Mo}) if (defined ($hash->{READINGS}{timer1_Mo}));
-    delete ($hash->{READINGS}{timer2_Di}) if (defined ($hash->{READINGS}{timer2_Di}));
-    delete ($hash->{READINGS}{timer3_Mi}) if (defined ($hash->{READINGS}{timer3_Mi}));
-    delete ($hash->{READINGS}{timer4_Do}) if (defined ($hash->{READINGS}{timer4_Do}));
-    delete ($hash->{READINGS}{timer5_Fr}) if (defined ($hash->{READINGS}{timer5_Fr}));
-    delete ($hash->{READINGS}{timer6_Sa}) if (defined ($hash->{READINGS}{timer6_Sa}));
-    delete ($hash->{READINGS}{timer7_So}) if (defined ($hash->{READINGS}{timer7_So}));
-
-    return;
-  }
 
   foreach my $var ("c_tempRule1", "c_tempRule2", "c_tempRule3", "c_tempRule4", "c_tempRule5")
   {
@@ -1323,17 +1391,31 @@ PWMR_NormalizeRules(@)
 
   }
 
-  # update Readings
+  if ($hash->{c_autoCalcTemp} == 0 or $hash->{c_desiredTempFrom} ne "")
+  {
+    #Log3 ($hash, 2, "PWMR_NormalizeRules delete readings timer._..");
+    delete ($hash->{READINGS}{timer1_Mo}) if (defined ($hash->{READINGS}{timer1_Mo}));
+    delete ($hash->{READINGS}{timer2_Di}) if (defined ($hash->{READINGS}{timer2_Di}));
+    delete ($hash->{READINGS}{timer3_Mi}) if (defined ($hash->{READINGS}{timer3_Mi}));
+    delete ($hash->{READINGS}{timer4_Do}) if (defined ($hash->{READINGS}{timer4_Do}));
+    delete ($hash->{READINGS}{timer5_Fr}) if (defined ($hash->{READINGS}{timer5_Fr}));
+    delete ($hash->{READINGS}{timer6_Sa}) if (defined ($hash->{READINGS}{timer6_Sa}));
+    delete ($hash->{READINGS}{timer7_So}) if (defined ($hash->{READINGS}{timer7_So}));
 
-  readingsBeginUpdate ($hash);
-  readingsBulkUpdate ($hash,  "timer1_Mo", (defined($week[1]) ? $week[1] : ""));
-  readingsBulkUpdate ($hash,  "timer2_Di", (defined($week[2]) ? $week[2] : ""));
-  readingsBulkUpdate ($hash,  "timer3_Mi", (defined($week[3]) ? $week[3] : ""));
-  readingsBulkUpdate ($hash,  "timer4_Do", (defined($week[4]) ? $week[4] : ""));
-  readingsBulkUpdate ($hash,  "timer5_Fr", (defined($week[5]) ? $week[5] : ""));
-  readingsBulkUpdate ($hash,  "timer6_Sa", (defined($week[6]) ? $week[6] : ""));
-  readingsBulkUpdate ($hash,  "timer7_So", (defined($week[7]) ? $week[7] : ""));
-  readingsEndUpdate($hash, 0);
+  } else {
+
+    # update Readings
+
+    readingsBeginUpdate ($hash);
+    readingsBulkUpdate ($hash,  "timer1_Mo", (defined($week[1]) ? $week[1] : ""));
+    readingsBulkUpdate ($hash,  "timer2_Di", (defined($week[2]) ? $week[2] : ""));
+    readingsBulkUpdate ($hash,  "timer3_Mi", (defined($week[3]) ? $week[3] : ""));
+    readingsBulkUpdate ($hash,  "timer4_Do", (defined($week[4]) ? $week[4] : ""));
+    readingsBulkUpdate ($hash,  "timer5_Fr", (defined($week[5]) ? $week[5] : ""));
+    readingsBulkUpdate ($hash,  "timer6_Sa", (defined($week[6]) ? $week[6] : ""));
+    readingsBulkUpdate ($hash,  "timer7_So", (defined($week[7]) ? $week[7] : ""));
+    readingsEndUpdate($hash, 0);
+  }
 }
 
 sub 
@@ -1474,6 +1556,11 @@ PWMR_Attr(@)
       #$hash->{STATE}     = "Calculating";
       readingsSingleUpdate ($hash,  "state", "Calculating", 1);
       PWMR_NormalizeRules($hash);
+    } elsif ($attrname eq "maxOffTime") {
+      delete($hash->{p_maxOffTime});
+      delete($hash->{p_maxOffTimeSelector});
+      delete($hash->{p_maxOffTimePeriod});
+      delete($hash->{p_maxOffTimeTempLimit});
     } 
 
     if ($attrname eq "valueFormat" and defined ($hash->{helper}{$attrname})) {
@@ -1561,6 +1648,29 @@ PWMR_Attr(@)
   } elsif ($attrname eq "tempRule5") {                         # tempRule5
     return PWMR_CheckTempRule($hash, $attrname, "c_tempRule5", $attrval);
 
+  } elsif ($attrname eq "maxOffTime") {
+
+      $hash->{p_maxOffTime}          = 4*60;
+      $hash->{p_maxOffTimeSelector} = "DEC";
+      $hash->{p_maxOffTimePeriod}   = 30;
+      $hash->{p_maxOffTimeTempLimit}   = 0;
+
+      my ($time, $selector, $period, $tempLimit) = split (",", $attrval);
+
+      $hash->{p_maxOffTimeSelector} = $selector if (defined($selector));
+
+      if (defined($time)) {
+        my ($hh, $mm) = split (":", $time);
+        $hash->{p_maxOffTime} = int($hh) * 60 + int($mm);
+      }
+      if (defined($period)) {
+        my ($hh, $mm) = split (":", $period);
+        $hash->{p_maxOffTimePeriod} = int($hh) * 60 + int($mm);
+      }
+      if (defined($tempLimit)) {
+        $hash->{p_maxOffTimeTempLimit} = $tempLimit;
+      }
+
   }
 
   if ($attrname eq "valueFormat") {
@@ -1575,7 +1685,7 @@ PWMR_Attr(@)
       $hash->{helper}{$attrname} = $attrValTmp;
 
       foreach my $key (keys %{$hash->{helper}{$attrname}}) {
-        Log3 ($hash->{NAME}, 3, $hash->{NAME} ." $key ".$hash->{helper}{$attrname}{$key});
+        Log3 ($hash->{NAME}, 3, $hash->{NAME} ." valueFormat format $key using ".$hash->{helper}{$attrname}{$key});
       }
 
       #return "$attrname set to $attrValTmp";
@@ -1591,73 +1701,6 @@ PWMR_Attr(@)
 
   return undef;
 
-}
-
-sub 
-PWMR_Boost(@)
-{
-  my ($me, $outsideSensor, $outsideMax, $deltaTemp, $desiredOffset, $boostDuration) = @_;
-  
-  return undef unless defined ($defs{$me}->{NAME});
-  
-  my $room = $defs{$me};
-  my $name = $room->{NAME};
-  
-  my $outsideTemp = 99;
-  if (defined($defs{$outsideSensor}->{READINGS}{temperature}{VAL})) {
-    $outsideTemp = $defs{$outsideSensor}->{READINGS}{temperature}{VAL};
-  }
-  
-  if ($room->{t_sensor})
-  {
-    my $sensor   =  $room->{t_sensor};
-    my $reading  =  $room->{t_reading};
-    my $t_regexp   =  $room->{t_regexp};
-
-    my $temperaturV =  $defs{$sensor}->{READINGS}{$reading}{VAL};
-    $temperaturV =~ s/$t_regexp/$1/;
-    
-    my $desiredTemp    = $room->{READINGS}{"desired-temp"}{VAL};
-    
-    # boost necessary?
-    if (($outsideTemp < $outsideMax)
-     && ($temperaturV <= $desiredTemp - $deltaTemp)) {
-     
-      Log3 ($room, 3, "PWMR_Boost: $name ".
-        "($outsideTemp, $outsideMax, $deltaTemp, $desiredOffset, $boostDuration) ".
-        "temp($temperaturV) desired-temp($desiredTemp) -> boost");
-        
-      my $now =  time();
-
-      readingsBeginUpdate ($room);
-      readingsBulkUpdate ($room,  "desired-temp", sprintf ("%.01f", $desiredTemp + $desiredOffset));
-      readingsBulkUpdate ($room,  "desired-temp-until", FmtDateTime($now + $boostDuration * 60));
-      readingsEndUpdate($room, 1);
-
-      #$room->{READINGS}{"desired-temp"}{TIME} = FmtDateTime($now + $boostDuration * 60);
-      #$room->{READINGS}{"desired-temp"}{VAL} = $desiredTemp + $desiredOffset;
-
-      #my $t = $room->{READINGS}{"desired-temp"}{VAL};
-      #push @{$room->{CHANGED}}, "desired-temp $t";
-      #DoTrigger($name, undef);
-
-      Log3 ($room, 4, "PWMR_Boost: $name ".
-        "set desired-temp ".$room->{READINGS}{"desired-temp"}{TIME}." for ".
-        $room->{READINGS}{"desired-temp"}{VAL});
-        
-    } else {
-      Log3 ($room, 3, "PWMR_Boost: $name ".
-        "($outsideTemp, $outsideMax, $deltaTemp, $desiredOffset, $boostDuration) ".
-        "temp($temperaturV) desired-temp($desiredTemp) -> do nothing");
-    }
-  
-    
-  } else {
-    Log3 ($room, 3, "PWMR_Boost: $name warning: no sensor.");
-  }
-  
-  
-  return undef;
 }
 
 sub 
@@ -1734,7 +1777,7 @@ PWMR_valueFormat(@)
       <i>window</i> defines several window devices that can prevent heating to be turned on.<br>
       If STATE matches the regular expression then the desired-temp will be decreased to frost-protect temperature.<br>
       'dummy' can be used as a neutral value for window and will be ignored when processing the configuration.<br>
-      <i>w_regexp</i> defines a regular expression to be applied to the reading. Default is '.*Open.*'.<br>
+      <i>w_regexp</i> defines a regular expression to be applied to the reading. Default is '.*[Oo]pen.*'.<br>
     </li>
 
     <li>
@@ -1794,9 +1837,10 @@ PWMR_valueFormat(@)
         </li><br>
 
     <li>desired-temp<br>
-        If <i>desired-temp</i> is automatically calculated (attribute <i>autoCalcTemp</i> not set or 1) then the desired temperature is set for a defined time.<br>
+        If <i>desired-temp</i> is automatically calculated (attribute <i>autoCalcTemp</i> not set or 1) then the desired temperature is set for a defined period.<br>
         Default for this period is 60 minutes, but it can be changed by attribute <i>autoCalcTemp</i>.<br>
         If <i>desired-temp</i> is not automatically calculated (attribute <i>autoCalcTemp</i> is 0) then this will set the actual target temperature.<br>
+        Using the commandline a second parameter can also specify the period. Format one of: mm (period in minutes, eg. 120 for two hours), xxh (period in hours, eg. 2h), hh:mm (end time).<br>
         </li><br>
 
     <li>manualTempDuration<br>
@@ -1858,7 +1902,7 @@ PWMR_valueFormat(@)
 
     <li>tempRule1 ... tempRule5<br>
         Rule to calculate the <i>desired-temp</i> in autoCalcMode.<br>
-        Format is: &lt;weekday&gt;[-&lt;weekday] &lt;time&gt;,&lt;temperatureSelector&gt;<br>
+        Format is: &lt;weekday&gt;[-&lt;weekday&gt;] &lt;time&gt;,&lt;temperatureSelector&gt;<br>
         weekday is one of Mo,Di,Mi,Do,Fr,Sa,So<br>
         time is in format hh:mm, e.g. 7:00 or 07:00<br>
         temperatureSelector is one of D,N,C,E<br>
@@ -1892,6 +1936,23 @@ PWMR_valueFormat(@)
         The following reading can be formated using syntax of sprinf: temperature
 	<br>
         Example: { "temperature" => "%0.2f" }
+        </li><br>
+
+    <li>maxOffTime<br>
+        Defines a maximum time the room can be set to 'off'. After this period the room is forced to be switched to 'on'. This is to prevent the floor to be cooled out too much if desired-temp is already reached. Ranges of tempRule can be used to specify if this should also happen eg. during the night.<br>
+        Format is: &lt;maximum time the room can be off&gt;[,&lt;list of temperatureSelectors which are D,N,C and E&gt;][,&lt;period for "on" state&gt;][,&lt;temperature limit&gt;]<br>
+	See also "set maxOffTimeCalculation [on|off]" for the associated PWM object.<br>
+	temperature limit: if "current temperature" is greater than "desired temperature" + "temperature limit" then maxOffTime is ignored (not evaluated).
+	<br>
+        Examples: <br>
+	maxOffTime 4:00<br>
+        This room will be forced to "on" for 60 Minutes after 4 Hours being in state "off".<br>
+	maxOffTime 4:00,D<br>
+        This room will be forced to "on" for 60 Minutes after 4 Hours being in state "off". Only applies is desired temp is currently derived from tempDay. <br>
+	maxOffTime 4:00,D,0:30<br>
+        This room will be forced to "on" for 30 Minutes after 4 Hours being in state "off". Only applies is desired temp is currently derived from tempDay. <br>
+	maxOffTime 4:00,DCE<br>
+        This room will be forced to "on" for 60 Minutes after 4 Hours being in state "off". Only applies is desired temp is currently derived from tempDay or tempCosy or tempEnergy (=not tempNight). <br>
         </li><br>
 
   </ul>
