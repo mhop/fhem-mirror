@@ -1933,19 +1933,19 @@ sub wsMasking($$) {
   </li>
 <br>
   <li>
+  <a name="nextCleaningModifier"></a>
+  <code> set &lt;name&gt; nextCleaningModifier</code>
+  <br>
+   The modifier is used for next spot cleaning.
+   Depending on Model, there are Arguments available: normal/double
+  </li>
+<br>
+  <li>
   <a name="nextCleaningNavigationMode"></a>
   <code> set &lt;name&gt; nextCleaningNavigationMode</code>
   <br>
    The navigation mode is used for the next house cleaning.
    Depending on Model, there are Arguments available: normal/extraCare/deep
-  </li>
-<br>
-  <li>
-  <a name="nextCleaningNavigationModifier"></a>
-  <code> set &lt;name&gt; nextCleaningNavigationModifier</code>
-  <br>
-   The modifier is used for next spot cleaning.
-   Depending on Model, there are Arguments available: normal/double
   </li>
 <br>
   <li>
