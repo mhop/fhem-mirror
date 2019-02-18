@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  12_HProtocolGateway: start poll timer
   - bugfix:  73_AutoShuttersControl: fix many bugs, support for max window
              contact sensors, fix set partyMode then Reading and set command
              equivalent

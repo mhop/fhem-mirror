@@ -67,7 +67,7 @@ sub HProtocolGateway_Define($$) {
 
   HProtocolGateway_DeviceConfig($hash);
   
-  HProtocolGateway_Poll($hash) if defined(AttrVal($hash->{NAME}, 'pollIntervalMins', undef));  # if pollIntervalMins defind -> start timer
+  HProtocolGateway_Poll($hash); # s
 
   return undef;
 }
@@ -334,7 +334,7 @@ sub HProtocolGateway_Attr (@) {
         if (defined($val)) {
             if ($val =~ m/^(0*[1-9][0-9]*)$/) {
                 RemoveInternalTimer($hash);
-                HProtocolGateway_Poll($hash) if ($main::init_done);
+                HProtocolGateway_Poll($hash);
 	        } else {
 	            $msg = 'Wrong poll intervall defined. pollIntervalMins must be a number > 0';
 	        }
