@@ -1686,7 +1686,9 @@ sub ToDay() {
       },
       "suggests": {
         "ALL=NOPASSWD: /usr/bin/npm install *": 0,
-        "ALL=NOPASSWD: /usr/local/bin/npm install *": 0
+        "ALL=NOPASSWD: /usr/local/bin/npm install *": 0,
+        "ALL=NOPASSWD: /usr/bin/npm uninstall *": 0,
+        "ALL=NOPASSWD: /usr/local/bin/npm uninstall *": 0
       }
     }
   },
