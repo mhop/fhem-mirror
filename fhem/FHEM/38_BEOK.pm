@@ -33,7 +33,7 @@ use Time::Local;
 use IO::Socket::INET;
 use IO::Select;
 
-my $version = 'V1.11 / 05.02.19';
+my $version = 'V1.2 / 19.02.19';
 
 my %gets = ('status:noArg' => '', 'auth:noArg' =>'' , 'temperature:noArg' => '');
 
@@ -48,7 +48,7 @@ sub BEOK_Initialize($)
     $hash->{GetFn}        = 'BEOK_Get';
     $hash->{AttrFn}       = 'BEOK_Attr';
     $hash->{FW_summaryFn} = 'BEOK_summaryFn';
-    $hash->{AttrList}     = 'interval timeout disable:0,1 timesync:0,1 language model:BEOK,Floureon,Hysen,unknown '.$readingFnAttributes;
+    $hash->{AttrList}     = 'interval timeout disable:0,1 timesync:0,1 language model:BEOK,Floureon,Hysen,KETOTEK,unknown weekprofile '.$readingFnAttributes;
 }
 
 sub BEOK_Define($$) {
@@ -74,7 +74,7 @@ sub BEOK_Define($$) {
     $hash->{'counter'}   = 1;
     $hash->{'isAuth'}    = 0;
     $hash->{'lastCMD'}   = '';
-    $hash->{'TIME'}      = gettimeofday();
+    $hash->{TIME}        = time();
     $hash->{VERSION}     = $version;
     $hash->{ERRORCOUNT}  = 0;
     $hash->{weekprofile} = "none";
@@ -84,7 +84,7 @@ sub BEOK_Define($$) {
     # wird mit dem ersten Full Status ueberschrieben
     $hash->{helper}{power}       = 0;
     $hash->{helper}{remote_lock} = 0;
-    $hash->{helper}{loop_mode}   = 0;
+    $hash->{helper}{loop_mode}   = 1;
     $hash->{helper}{SEN}         = 0;
     $hash->{helper}{OSV}         = 0;
     $hash->{helper}{dIF}         = 0;
@@ -117,6 +117,8 @@ sub BEOK_Define($$) {
     CommandAttr(undef,$name.' model unknown')   unless (exists($attr{$name}{model}));
 
     readingsSingleUpdate($hash,'state','defined',1);
+    RemoveInternalTimer($hash);
+    InternalTimer(gettimeofday()+5, "BEOK_update", $hash,0);
     return undef;
 }
 
@@ -137,7 +139,9 @@ sub BEOK_update($)
  my $name   = $hash->{NAME};
 
  RemoveInternalTimer($hash);
- my $interval      = AttrVal($name,'interval',60);
+ my $interval      = AttrNum($name,'interval',60);
+ my $wp            = AttrVal($name,'weekprofile','');
+
  $hash->{INTERVAL} = $interval;
  $hash->{MODEL}    = AttrVal($name,'model','unknown');
 
@@ -150,10 +154,46 @@ sub BEOK_update($)
   if ((time()-($interval*5)) > $hash->{TIME}) { readingsSingleUpdate($hash,'alive','no',1);}
 
   CommandGet(undef,$name.' auth')   if (!$hash->{isAuth});
-  CommandGet(undef,$name.' status') if  ($hash->{isAuth});
- }
+
+
+  if (!$wp)
+  {
+   CommandGet(undef,$name.' status') if  ($hash->{isAuth});
+   return undef;
+  }
+
+  my (undef,undef,undef,undef,undef,undef,$now_day)  = localtime(time());  # jetzt
+  my (undef,undef,undef,undef,undef,undef,$last_day) = localtime($hash->{TIME}); # letzter
+  #my (undef,undef,undef,undef,undef,undef,$next_day) = localtime(time()+$interval); # nächster
+
+  #neuer Tag ?
+  if ($now_day != $last_day)
+  {
+    Log3 $name,4,"BEOK $name, firstday run";
+    my $error = CommandSet(undef,$name.' weekprofile '.$wp);
+    if ($error)
+    {
+     Log3 $name,3,"BEOK $name, $error";
+     $hash->{TIME} = time(); # sonst Endlos Schleife wenn weekprofile nicht gesetzt werden kann !
+    }
+    return undef; # neuer status kommt via set weekprofile
+  }
+  else 
+  { 
+    CommandGet(undef,$name.' status') if  ($hash->{isAuth});
+    #BEOK_checkAuto if AttrNum($name,'keepAuto',0);
+  }
+ } # interval
+
  return undef;
 }
+
+sub BEOK_checkAuto
+{
+
+ return undef;
+}
+
 
 sub BEOK_Get($@) 
 {
@@ -306,15 +346,14 @@ sub BEOK_Set(@)
      $hash->{helper}{SEN} = 1 if ($subcmd eq "external");
     }
 
-    # loop_mode refers to index in [ "12345,67", "123456,7", "1234567" ]
-    # E.g. loop_mode = 0 ("12345,67") means Saturday and Sunday follow the "weekend" schedule
-    # loop_mode = 2 ("1234567") means every day (including Saturday and Sunday) follows the "weekday" schedule
+    # E.g. loop_mode = 1 ("12345,67") means Saturday and Sunday follow the "weekend" schedule
+    # loop_mode = 3 ("1234567") means every day (including Saturday and Sunday) follows the "weekday" schedule
  
     if ($cmd eq 'loop')
     {
-     $hash->{helper}{'loop_mode'} = 2 if ($subcmd eq "1234567");
-     $hash->{helper}{'loop_mode'} = 0 if ($subcmd eq "12345.67");
-     $hash->{helper}{'loop_mode'} = 1 if ($subcmd eq "123456.7");
+     $hash->{helper}{'loop_mode'} = 3 if ($subcmd eq "1234567");
+     $hash->{helper}{'loop_mode'} = 2 if ($subcmd eq "123456.7");
+     $hash->{helper}{'loop_mode'} = 1 if ($subcmd eq "12345.67");
     }
 
     @payload = (1,6,0,2);
@@ -448,11 +487,16 @@ sub BEOK_Set(@)
     return "use set $name weekprofile <weekday_device_name:profile_name[:day]>" if ((!$wpd) || (!$wpp));
     $wpday= ' ' if(!$wpday);
 
+    my $topic;
+    if (AttrNum($wpd, 'useTopics', 0)) { $topic = ReadingsVal($wpd, 'active_topic', '');}
+    $wpp = ($topic) ? $topic.':'.$wpp : $wpp;
+
     eval "use JSON";
     return "please install JSON first"  if ($@);
 
-    my $json = CommandGet(undef,"$wpd profile_data $wpp");
-    if (substr($json,0,2) ne "{\"") #} kein JSON , Fehlermeldung FHEM Device nicht vorhanden oder Fehler von weekprofile
+    my $json = CommandGet(undef,$wpd.' profile_data '.$wpp);
+
+    if (substr($json,0,2) ne "{\"") #} kein JSON = Fehlermeldung FHEM Device nicht vorhanden oder Fehler von weekprofile
     {
      Log3 $name, 2, "BEOK $name, $json";
      readingsSingleUpdate($hash,"error",$json,1);
@@ -526,22 +570,27 @@ sub BEOK_NBStart($)
   return unless(defined($arg));
 
   my ($name,$cmd) = split("\\|",$arg);
-  my $hash              = $defs{$name};
-  my $logname           = $name."[".$$."]";
-  my $timeout           = AttrVal($name, 'timeout', 3);
+  my $hash     = $defs{$name};
+  my $logname  = $name."[".$$."]";
+  my $timeout  = AttrVal($name, 'timeout', 3);
   my $data;
-  Log3 $name,5,'BEOK '.$logname.' NBStart '.$cmd;
-  my $error = 'no data from device';
+  my $error    = 'no data from device';
 
-   my $sock = IO::Socket::INET->new(
+ Log3 $name,5,'BEOK '.$logname.' NBStart '.$cmd;
+ 
+  my $sock = IO::Socket::INET->new(
             PeerAddr  => $hash->{'.ip'},
             PeerPort  => '80',
             Proto     => 'udp',
             ReuseAddr => 1,
             Timeout   => $timeout);
 
-  return $name.'|1|NBStart: '.$! if (!$sock);
- 
+  if (!$sock)
+  {
+   Log3 $name, 2, 'BEOK '.$logname.' '.$!;
+   return $name.'|1|NBStart: '.$!;
+  }
+
   my $select = IO::Select->new($sock);
 
   $cmd = decode_base64($cmd);
@@ -558,16 +607,13 @@ sub BEOK_NBStart($)
   }
   $sock->close();
 
- if (!$data)
-{ 
-  Log3 $name, 2, 'BEOK '.$logname.' '.$error." 2";
-  return "$name|1|$error 2";
-}
+  if (!$data)
+  {
+   Log3 $name, 2, 'BEOK '.$logname.' '.$error;
+   return "$name|1|$error";
+  }
 
-
- return $name.'|1|Timeout' if ( $@ && $@ =~ /Timeout/ );
- return $name.'|1|Error: eval corrupted '.$@ if ($@);
- return $name.'|0|'.encode_base64($data,'');
+  return $name.'|0|'.encode_base64($data,'');
 }
 
 sub BEOK_NBAbort($)
@@ -597,7 +643,7 @@ sub BEOK_NBDone($)
    my $hash     = $defs{$name};
    my $error    = (defined($r[1])) ? $r[1] : "1";
    my $data     = (defined($r[2])) ? $r[2] : "???";
- 
+
    Log3 $name,5,"BEOK $name NBDone : $string";
 
    delete($hash->{helper}{RUNNING_PID});
@@ -688,8 +734,6 @@ sub BEOK_NBDone($)
      $hash->{ERRORCOUNT} = 0;
      $hash->{TIME}       = time();
 
-     #shift @{$hash->{CmdStack}} if ($hash->{'.CmdStack'}); # war das letzte Kommando ein Stack Kommando ?
-
      return BEOK_UpdateTemp($hash,@payload)   if ($hash->{lastCMD} eq 'get temperature'); 
      return CommandGet(undef, "$name status") if ($hash->{lastCMD} ne 'get status');
      BEOK_UpdateStatus($hash,@payload)        if ($hash->{lastCMD} eq 'get status');
@@ -760,10 +804,10 @@ sub BEOK_UpdateStatus(@)
      $val = ($data[7] >> 4) & 15;
      $hash->{helper}{loop_mode} = $val;
 
-     my $loop = "???";
-     if    ($val == 0) {$loop = "12345.67";}
-     elsif ($val == 1) {$loop = "123456.7";}
-     elsif ($val == 2) {$loop = "1234567"; }
+     my $loop = '???';
+     if    ($val == 1) {$loop = "12345.67";}
+     elsif ($val == 2) {$loop = "123456.7";}
+     elsif ($val == 3) {$loop = "1234567"; }
      readingsBulkUpdate ($hash, "loop", $loop);
 
      $val = $data[8];
