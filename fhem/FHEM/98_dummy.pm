@@ -48,7 +48,7 @@ dummy_Set($@)
   my @rl = split(" ", AttrVal($name, "readingList", ""));
   my $doRet;
   eval {
-    if(@rl && grep /\b$a[0]\b/, @rl) {
+    if(@rl && grep /^$a[0]$/, @rl) {
       my $v = shift @a;
       readingsSingleUpdate($hash, $v, join(" ",@a), 1);
       $doRet = 1;
