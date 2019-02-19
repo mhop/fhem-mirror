@@ -94,8 +94,11 @@ FHEM/14_CUL_REDIRECT.pm      dancer0705/bjoernh   Sonstiges
 FHEM/14_CUL_TCM97001.pm      dancer0705/bjoernh   Sonstiges
 FHEM/14_CUL_TX.pm            rudolfkoenig         SlowRF
 FHEM/14_CUL_WS.pm            rudolfkoenig         SlowRF
+FHEM/14_FLAMINGO.pm          HomeAuto_User        Sonstige Systeme
 FHEM/14_Hideki.pm            Sidey/Ralf9          Sonstige Systeme
+FHEM/14_SD_BELL.pm           HomeAuto_User        Sonstige Systeme
 FHEM/14_SD_RSL.pm            Sidey/Ralf9          Sonstige Systeme
+FHEM/14_SD_UT.pm             HomeAuto_User        Sonstige Systeme
 FHEM/14_SD_WS.pm             Sidey/Ralf9          Sonstige Systeme
 FHEM/14_SD_WS07.pm           Sidey/Ralf9          Sonstige Systeme
 FHEM/14_SD_WS09.pm           Sidey/pejonp         Sonstige Systeme
