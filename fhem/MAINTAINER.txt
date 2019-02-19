@@ -536,6 +536,7 @@ FHEM/HMConfig.pm             martinp876           HomeMatic
 FHEM/HOMESTATEtk.pm          loredo               Automatisierung
 FHEM/HttpUtils.pm            rudolfkoenig         Automatisierung
 FHEM/MaxCommon.pm            rudolfkoenig/orphan  MAX
+FHEM/Meta.pm                 loredo               FHEM Development
 FHEM/msgSchema.pm            loredo               Automatisierung
 FHEM/ONKYOdb.pm              loredo               Multimedia
 FHEM/OpenWeatherAPI.pm       CoolTux              Unterstuetzende Dienste/Wettermodule
