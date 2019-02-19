@@ -403,7 +403,7 @@ name:A_01c_tasmota_POW
 filter:TYPE=MQTT2_DEVICE
 desc:Applies to Sonoff POW devices<br>NOTE: Power topic will be set to POWER1; the format the device is sending data will also be changed to lowercase!
 set DEVICE attrTemplate A_01a_tasmota_basic_state_power1
-attr DEVICE stateFormat {sprintf("aktuell: %.1f W Tag: %.2f Kw/h Gestern: %.3f Kw/h Gesamt: %.4f Kw/h", ReadingsVal($name,"ENERGY_Power",undef), ReadingsVal($name,"ENERGY_Today",undef), ReadingsVal($name,"ENERGY_Yesterday",undef), ReadingsVal($name,"ENERGY_Total",undef))}
+attr DEVICE stateFormat {sprintf("aktuell: %.1f W Tag: %.2f kWh Gestern: %.3f kWh Gesamt: %.4f kWh", ReadingsVal($name,"ENERGY_Power",undef), ReadingsVal($name,"ENERGY_Today",undef), ReadingsVal($name,"ENERGY_Yesterday",undef), ReadingsVal($name,"ENERGY_Total",undef))}
 attr DEVICE model A_01c_tasmota_POW
 
 # tasmota 2ch as one FHEM device.
@@ -680,12 +680,21 @@ attr DEVICE readingList \
   shellies/DEVNAME/relay/3:.* relay3\
   shellies/DEVNAME/input/3:.* input3\
   shellies/DEVNAME/online:.* online\
-  shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }
+  shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
+  shellies/DEVNAME/relay/0/power:.* power0\
+  shellies/DEVNAME/relay/1/power:.* power1\
+  shellies/DEVNAME/relay/2/power:.* power2\
+  shellies/DEVNAME/relay/3/power:.* power3\
+  shellies/DEVNAME/relay/0/energy:.* energy0\
+  shellies/DEVNAME/relay/1/energy:.* energy1\
+  shellies/DEVNAME/relay/2/energy:.* energy2\
+  shellies/DEVNAME/relay/3/energy:.* energy3
 attr DEVICE setList \
-  relay0:on,off shellies/DEVNAME/relay/0/command $EVTPART1\
-  relay1:on,off shellies/DEVNAME/relay/1/command $EVTPART1\
-  relay2:on,off shellies/DEVNAME/relay/2/command $EVTPART1\
-  relay3:on,off shellies/DEVNAME/relay/3/command $EVTPART1
+  relay0:iconSwitch,on,li_wht_off,off,li_wht_on shellies/DEVNAME/relay/0/command $EVTPART1\
+  relay1:iconSwitch,on,li_wht_off,off,li_wht_on shellies/DEVNAME/relay/1/command $EVTPART1\
+  relay2:iconSwitch,on,li_wht_off,off,li_wht_on shellies/DEVNAME/relay/2/command $EVTPART1\
+  relay3:iconSwitch,on,li_wht_off,off,li_wht_on shellies/DEVNAME/relay/3/command $EVTPART1 
+attr DEVICE webCmd relay0:relay1:relay2:relay3
 attr DEVICE stateFormat R0: relay0 R1: relay1 R2: relay2 R3: relay3
 attr DEVICE model A_14b_shelly4pro_unified
 
