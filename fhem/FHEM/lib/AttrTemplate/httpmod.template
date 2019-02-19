@@ -1,5 +1,5 @@
 ###########################################
-# $Id: httpmod.template 18592 2019-02-14 06:27:39Z Beta-User $
+# $Id: mqtt2.template 18592 2019-02-14 06:27:39Z Beta-User $
 #
 # Comments start with #. Empty lines are ignored.
 # Syntax of one entry: name: line, one optional filter: line, zero or more par: lines,  FHEM-Commands
@@ -60,8 +60,22 @@ par:REGIONCODE;Get region code from https://www.dwd.de/DE/leistungen/opendata/he
 attr DEVICE enableControlSet 1
 attr DEVICE extractAllJSON 1
 attr DEVICE extractAllJSONFilter REGIONCODE
+attr DEVICE readingEncode UTF-8
 attr DEVICE preProcessRegex s/warnWetter..............|\);;|\t|\n|\r//g
 attr DEVICE model A_02a_DWD_weather_warnings
+
+#German river water levels, Wiki: https://wiki.fhem.de/wiki/Flusspegel
+name:A_02d_pegelonline
+filter:TYPE=HTTPMOD
+desc: Get water level infor for german rivers from www.pegelonline.wsv.de.<br>Define a HTTPMOD device like <br>defmod Pegelstaende HTTPMOD https://www.pegelonline.wsv.de/webservices/rest-api/v2/stations/070b1eb4-3872-4e07-b2e5-e25fd9251b93/W/currentmeasurement.json 3600<br>Change station argument to your needs <br><a href="https://wiki.fhem.de/wiki/Flusspegel">Source: Wiki</a><br><a href="https://forum.fhem.de/index.php/topic,97560.msg908176.html#msg908176">Source: Forum</a>
+attr DEVICE enableControlSet 1
+attr DEVICE extractAllJSON 1
+attr DEVICE event-on-change-reading value,stateMnwMhw,stateNswHsw,timestamp,trend
+attr DEVICE event-on-update-reading value
+attr DEVICE sortby 1
+attr DEVICE stateFormat {sprintf("%.0f",ReadingsVal("DEVICE","value",0))}
+attr DEVICE timeout 5
+attr DEVICE model A_02d_pegelonline
 
 #Austrian weather, Forum: https://forum.fhem.de/index.php/topic,94110.msg868080.html#msg868080
 name:A_02m_ORF_weather
@@ -221,6 +235,28 @@ attr DEVICE reading04Regex Ink_B.*?='([\d]+)'
 attr DEVICE stateFormat C: Cyan% M: Magenta% Y: Yellow% B: Black%
 attr DEVICE model B_01b_epson_printer_cartridge_status
 
+#################################
+#Brother Printers
+#
+# Forum: https://forum.fhem.de/index.php/topic,97483.msg908461.html#msg908461
+
+# Printer cartridge states
+name:B_01c_brother_printer_cartridge_status
+filter:TYPE=HTTPMOD
+desc: Get cartridge states of your Brother printer.<br>Define a HTTPMOD device like <br>defmod DEVICE HTTPMOD http://192.168.178.6/general/information.html 3600<br>Change IP to your needs <br><a href="https://forum.fhem.de/index.php/topic,97483.msg908461.html#msg908461">Source: Forum</a>
+attr DEVICE userattr reading01Name reading01Regex reading02Name reading02Regex reading03Name reading03Regex reading04Name reading04Regex
+attr DEVICE httpVersion 1.1
+attr DEVICE reading01Name Yellow
+attr DEVICE reading01Regex \(Y\)\*\*.{9}\((\d{1,3}\.\d{1,2})%\)
+attr DEVICE reading02Name Cyan
+attr DEVICE reading02Regex \(C\)\*\*.{9}\((\d{1,3}\.\d{1,2})%\)
+attr DEVICE reading03Name Magenta
+attr DEVICE reading03Regex \(M\)\*\*.{9}\((\d{1,3}\.\d{1,2})%\)
+attr DEVICE reading04Name Black
+attr DEVICE reading04Regex \(BK\)\*\*.{9}\((\d{1,3}\.\d{1,2})%\)
+attr DEVICE room Steuerung->Unused_Devices
+attr DEVICE stateFormat C: Cyan% M: Magenta% Y: Yellow% B: Black%
+attr DEVICE model B_01c_brother_printer_cartridge_status
 
 #RESOL Solaranlage, Forum: https://forum.fhem.de/index.php/topic,86678.0.html
 name:C_01a_resol_solar
