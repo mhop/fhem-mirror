@@ -438,7 +438,7 @@ FHEM/98_apptime.pm           martinp876           Sonstiges
 FHEM/98_Arducounter.pm       stefanstrobel        Sonstiges
 FHEM/98_autocreate.pm        rudolfkoenig         Automatisierung
 FHEM/98_average.pm           rudolfkoenig         Automatisierung
-FHEM/98_backup.pm            rudolfkoenig         Sonstiges
+FHEM/98_backup.pm            CoolTux              Sonstiges
 FHEM/98_BOSEST.pm            dominikkarall        Multimedia
 FHEM/98_cloneDummy.pm        Joachim              Automatisierung
 FHEM/98_cmdalias.pm          rudolfkoenig         Automatisierung
