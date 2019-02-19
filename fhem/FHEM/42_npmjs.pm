@@ -788,15 +788,16 @@ sub ExecuteNpmCommand($) {
     else {
         $npm->{npminstall} =
             $cmdPrefix
-          . 'echo n | sudo -n -E sh -c "npm install -g --json --silent --unsafe-perm %PACKAGES% 2>/dev/null" 2>&1'
+          . 'echo n | sh -c "sudo -n npm install -g --json --silent --unsafe-perm %PACKAGES%" 2>&1'
           . $cmdSuffix;
         $npm->{npmuninstall} =
             $cmdPrefix
-          . 'echo n | sudo -n -E sh -c "npm uninstall -g --json --silent %PACKAGES% 2>/dev/null" 2>&1'
+          . 'echo n | sh -c "sudo -n npm uninstall -g --json --silent %PACKAGES%" 2>&1'
           . $cmdSuffix;
-        $npm->{npmupdate} =
-            $cmdPrefix
-          . 'echo n | sudo -n -E sh -c "npm update -g --json --silent --unsafe-perm %PACKAGES% 2>/dev/null" 2>&1'
+        $npm->{npmupdate} = $cmdPrefix
+
+# . 'echo n | sudo -n -E sh -c "npm update -g --json --silent --unsafe-perm %PACKAGES% 2>/dev/null" 2>&1'
+          . 'echo n | sh -c "sudo -n npm update -g --json --silent --unsafe-perm %PACKAGES%" 2>&1'
           . $cmdSuffix;
         $npm->{npmoutdated} =
             $cmdPrefix
@@ -1009,10 +1010,13 @@ sub RetrieveNpmOutput($$) {
                 elsif ( $o =~ m/^sudo: /i ) {
                     $h->{error}{code} = "E403";
                     $h->{error}{summary} =
-                        "Forbidden - "
-                      . "passwordless sudo permissions required "
-                      . "(fhem ALL=NOPASSWD: ALL)";
-                    $h->{error}{detail} = $o;
+                      "Forbidden - " . "passwordless sudo permissions required";
+                    $h->{error}{detail} =
+                        $o . "\n\n"
+                      . "You may add the following lines to /etc/sudoers.d/fhem:\n"
+                      . "  fhem ALL=NOPASSWD: /usr/bin/npm update *\n"
+                      . "  fhem ALL=NOPASSWD: /usr/bin/npm install *\n"
+                      . "  fhem ALL=NOPASSWD: /usr/bin/npm uninstall *";
                 }
                 elsif ( $o =~
                     m/(?:(\w+?): )?(?:(\w+? \d+): )?(\w+?): [^:]*?not.found$/i
@@ -1385,7 +1389,11 @@ sub ToDay() {
   This module allows to install, uninstall and update outdated Node.js packages using NPM package manager.<br>
   Global installations will be controlled by default and running update/install/uninstall require sudo permissions like this:<br>
   <br>
-  <code>fhem ALL=NOPASSWD: ALL</code><br>
+  <code>
+    fhem ALL=NOPASSWD: /usr/bin/npm update *<br>
+    fhem ALL=NOPASSWD: /usr/bin/npm install *<br>
+    fhem ALL=NOPASSWD: /usr/bin/npm uninstall *
+  </code><br>
   <br>
   This line may easily be added to a new file in /etc/sudoers.d/fhem and will automatically included to /etc/sudoers from there.<br>
   More restricted sudo settings are currently not supported.<br>
@@ -1575,7 +1583,7 @@ sub ToDay() {
     "node",
     "npm"
   ],
-  "version": "v0.10.3",
+  "version": "v0.10.4",
   "release_status": "stable",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
