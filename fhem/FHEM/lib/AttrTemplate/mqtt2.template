@@ -471,10 +471,10 @@ par:DEVNAME;ESP's name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,te
 #attr DEVICE userReadings state:POWER.*:.* { lc(ReadingsVal($name,"POWER1","") . " " . ReadingsVal($name,"POWER2","") . " " . ReadingsVal($name,"POWER3","") . " " . ReadingsVal($name,"POWER4","")) }
 attr DEVICE readingList \
   tele/DEVNAME/LWT:.* LWT\
-  tele/DEVNAME/STATE:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  tele/DEVNAME/SENSOR:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  tele/DEVNAME/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  stat/DEVNAME/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }
+  tele/DEVNAME/STATE:.* { json2nameValue($EVENT) }\
+  tele/DEVNAME/SENSOR:.* { json2nameValue($EVENT) }\
+  tele/DEVNAME/INFO.:.* { json2nameValue($EVENT) }\
+  stat/DEVNAME/RESULT:.* { json2nameValue($EVENT) }
 attr DEVICE setList \
   POWER1:on,off,toggle cmnd/DEVNAME/POWER1 $EVTPART1\
   POWER2:on,off,toggle cmnd/DEVNAME/POWER2 $EVTPART1\
@@ -554,7 +554,7 @@ attr DEVICE readingList \
   shellies/DEVNAME/relay/0:.* relay0\
   shellies/DEVNAME/input/0:.* input0\
   shellies/DEVNAME/online:.* online\
-  shellies/DEVNAME/announce:.* { json2nameValue($EVENT, '', $JSONMAP) }
+  shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }
 deleteReading DEVICE .*
 attr DEVICE model A_10_shelly1
 
@@ -680,7 +680,7 @@ attr DEVICE readingList \
   shellies/DEVNAME/relay/3:.* relay3\
   shellies/DEVNAME/input/3:.* input3\
   shellies/DEVNAME/online:.* online\
-  shellies/DEVNAME/announce:.* { json2nameValue($EVENT, '', $JSONMAP) }
+  shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }
 attr DEVICE setList \
   relay0:on,off shellies/DEVNAME/relay/0/command $EVTPART1\
   relay1:on,off shellies/DEVNAME/relay/1/command $EVTPART1\
