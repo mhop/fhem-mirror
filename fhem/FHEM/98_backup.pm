@@ -3,6 +3,7 @@
 # vim: ts=2:et
 #
 #  (c) 2012 Copyright: Martin Fischer (m_fischer at gmx dot de)
+#  Maintained by Marko Oldenburg since 2019
 #  All rights reserved
 #
 #  This script free software; you can redistribute it and/or modify
