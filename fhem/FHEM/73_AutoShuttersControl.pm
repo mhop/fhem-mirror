@@ -41,7 +41,7 @@ package main;
 use strict;
 use warnings;
 
-my $version = '0.4.0.4';
+my $version = '0.4.0.5';
 
 sub AutoShuttersControl_Initialize($) {
     my ($hash) = @_;
@@ -1184,9 +1184,12 @@ sub EventProcessingBrightness($@) {
               if ( $homemode eq 'none' );
             $shutters->setLastDrive('maximum brightness threshold exceeded');
 
-            if (   $shutters->getModeUp eq $homemode
-                or $homemode eq 'none'
-                or $shutters->getModeUp eq 'always' )
+            if (
+                $shutters->getModeUp eq $homemode
+                or (    $shutters->getModeUp eq 'absent'
+                    and $homemode eq 'gone' )
+                or $shutters->getModeUp eq 'always'
+              )
             {
                 if (
                     (
@@ -1245,9 +1248,12 @@ sub EventProcessingBrightness($@) {
               if ( $homemode eq 'none' );
             $shutters->setLastDrive('minimum brightness threshold fell below');
 
-            if (   $shutters->getModeDown eq $homemode
-                or $homemode eq 'none'
-                or $shutters->getModeDown eq 'always' )
+            if (
+                $shutters->getModeUp eq $homemode
+                or (    $shutters->getModeUp eq 'absent'
+                    and $homemode eq 'gone' )
+                or $shutters->getModeUp eq 'always'
+              )
             {
                 ShuttersCommandSet( $hash, $shuttersDev, $posValue );
             }
@@ -1604,8 +1610,7 @@ sub CreateSunRiseSetShuttersTimer($$) {
                 "%e.%m.%Y - %H:%M", localtime($shuttersSunsetUnixtime)
               )
             : 'AutoShuttersControl off'
-        ),
-        1
+        )
     );
     readingsBulkUpdate(
         $shuttersDevHash,
@@ -1615,10 +1620,9 @@ sub CreateSunRiseSetShuttersTimer($$) {
             ? strftime( "%e.%m.%Y - %H:%M",
                 localtime($shuttersSunriseUnixtime) )
             : 'AutoShuttersControl off'
-        ),
-        1
+        )
     );
-    readingsEndUpdate( $shuttersDevHash, 1 );
+    readingsEndUpdate( $shuttersDevHash, 0 );
 
     readingsBeginUpdate($hash);
     readingsBulkUpdateIfChanged(
