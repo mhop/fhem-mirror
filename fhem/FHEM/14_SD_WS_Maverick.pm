@@ -63,7 +63,7 @@ SD_WS_Maverick_Define($$)
   $hash->{STATE} = "Defined";
   
   my $name= $hash->{NAME};
-  # prüfen, ob eine neue Definition angelegt wird 
+  # prÃ¼fen, ob eine neue Definition angelegt wird 
 	if($init_done && !defined($hash->{OLDDEF}))
 	{
 		# setzen von stateFormat
@@ -237,7 +237,7 @@ SD_WS_Maverick_Parse($$)
   $hash->{lastMSG} = $rawData;
   #$hash->{bitMSG} = $bitData2; 
   
-  # Den SensorState bei Inaktivität zurücksetzen lassen durch Timer 
+  # Den SensorState bei InaktivitÃ¤t zurÃ¼cksetzen lassen durch Timer 
   my $inactivityinterval=int(AttrVal($name,"inactivityinterval",360));
   if ($sensor_1_state ne "unknown") {
     $hash->{sensor_1_state}=$sensor_1_state;
@@ -254,15 +254,15 @@ SD_WS_Maverick_Parse($$)
   $checksum_str =~ tr/569A/0123/;
   my $checksum="";
   $checksum=$checksum_str; 
-  # TODO: Die eigentliche Checksum errechnen. Diese ändert sich bei jedem Temperaturwechsel
+  # TODO: Die eigentliche Checksum errechnen. Diese Ã¤ndert sich bei jedem Temperaturwechsel
   # TODO: Evtl. ist in den checksum-bits auch noch eine Info zur Batterie enthalten
-  #       ggf. ist es möglich die checksum als ID zu verwenden und so mehrere Mavericks in fhem einbinden zu können.
+  #       ggf. ist es mÃ¶glich die checksum als ID zu verwenden und so mehrere Mavericks in fhem einbinden zu kÃ¶nnen.
   $hash->{checksum}=$checksum;
   $hash->{temp_food}=$temp_food if ($temp_food ne"");
   $hash->{temp_bbq}=$temp_bbq if ($temp_bbq ne"");
   $hash->{messageType}=$messageType;
   
-  # TODO: Logging kann entfernt werden, wenn checksum entschlüsselt ist. Wird zur Analyse verwendet.
+  # TODO: Logging kann entfernt werden, wenn checksum entschlÃ¼sselt ist. Wird zur Analyse verwendet.
   Log3 $hash, 4, "$name statistic: checksum=$checksum, t1=$temp_str1, temp-food=$temp_food, t2_$temp_str2, temp-bbq=$temp_bbq;";
   
   SD_WS_Maverick_updateReadings($hash);
@@ -407,7 +407,7 @@ sub SD_WS_Maverick_updateReadings($){
   <a name="SD_WS_Maverick_Define"></a>
   <b>Define</b> 
   <ul>Die empfangenen Sensoren werden automatisch angelegt.<br>
-  Da das Maverick bei jedem Start eine neue zufällige ID erzeugt kann das Ger&aumlt nicht mit dem fhem-device gekoppelt werden. 
+  Da das Maverick bei jedem Start eine neue zufÃ¤llige ID erzeugt kann das Ger&aumlt nicht mit dem fhem-device gekoppelt werden. 
   Das bedeutet, dass es nicht m&oumlglich ist in fhem zwei Mavericks parallel zu betreiben.
   </ul>
   <br>

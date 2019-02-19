@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - changed: 14_SD_WS_Maverick: rename Readings for Temperatures
+                                added state reading
   - bugfix:  41_OREGON: typo battery percent fixed. de_commandref added
   - bugfix   73_AutoShuttersControl: fix bug then create timer, timer set to
                                      1970
