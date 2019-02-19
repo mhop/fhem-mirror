@@ -4,54 +4,43 @@
 # Based on 42_AptToDate.pm by CoolTux
 
 package main;
-
 use strict;
 use warnings;
+use FHEM::Meta;
 
 sub npmjs_Initialize($) {
+    my ($modHash) = @_;
 
-    my ($hash) = @_;
-
-    $hash->{SetFn}    = "npmjs::Set";
-    $hash->{GetFn}    = "npmjs::Get";
-    $hash->{DefFn}    = "npmjs::Define";
-    $hash->{NotifyFn} = "npmjs::Notify";
-    $hash->{UndefFn}  = "npmjs::Undef";
-    $hash->{AttrFn}   = "npmjs::Attr";
-    $hash->{AttrList} =
+    $modHash->{SetFn}    = "FHEM::npmjs::Set";
+    $modHash->{GetFn}    = "FHEM::npmjs::Get";
+    $modHash->{DefFn}    = "FHEM::npmjs::Define";
+    $modHash->{NotifyFn} = "FHEM::npmjs::Notify";
+    $modHash->{UndefFn}  = "FHEM::npmjs::Undef";
+    $modHash->{AttrFn}   = "FHEM::npmjs::Attr";
+    $modHash->{AttrList} =
         "disable:1,0 "
       . "disabledForIntervals "
       . "updateListReading:1,0 "
       . "npmglobal:1,0 "
       . $readingFnAttributes;
 
-    # update INTERNAL after module reload
-    foreach my $d ( devspec2array("TYPE=npmjs") ) {
-        $defs{$d}{VERSION} = $npmjs::VERSION;
-    }
+    return FHEM::Meta::Load( __FILE__, $modHash );
 }
 
 # define package
-package npmjs;
-
+package FHEM::npmjs;
 use strict;
 use warnings;
 use POSIX;
-use RESIDENTStk;
+use FHEM::Meta;
 
-# our @EXPORT  = qw(get_time_suffix);
-our $VERSION = "0.10.2";
-
-# supports to import main functions from fhem.pl
 use GPUtils qw(GP_Import);
+use JSON;
+use Data::Dumper;
 
-use Data::Dumper;    #only for Debugging
-
-my $missingModule = "";
-eval "use JSON;1" or $missingModule .= "JSON ";
-
-## Import der FHEM Funktionen
+# Run before module compilation
 BEGIN {
+    # Import from main::
     GP_Import(
         qw(readingsSingleUpdate
           readingsBulkUpdate
@@ -86,20 +75,18 @@ my %fhem_npm_modules = (
 );
 
 sub Define($$) {
-
     my ( $hash, $def ) = @_;
     my @a = split( "[ \t][ \t]*", $def );
 
-    return
-      "Cannot define npmjs device. Perl module ${missingModule} is missing."
-      if ($missingModule);
+    # Initialize the module and the device
+    return $@ unless ( FHEM::Meta::SetInternals($hash) );
+    use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );
 
     my $name = $a[0];
     my $host = $a[2] ? $a[2] : 'localhost';
 
     Undef( $hash, undef ) if ( $hash->{OLDDEF} );    # modify
 
-    $hash->{VERSION}   = $VERSION;
     $hash->{HOST}      = $host;
     $hash->{NOTIFYDEV} = "global,$name";
 
@@ -605,8 +592,11 @@ sub ProcessUpdateTimer($) {
     my $name = $hash->{NAME};
 
     RemoveInternalTimer($hash);
-    InternalTimer( gettimeofday() + 14400,
-        "npmjs::ProcessUpdateTimer", $hash, 0 );
+    InternalTimer(
+        gettimeofday() + 14400,
+        "FHEM::npmjs::ProcessUpdateTimer",
+        $hash, 0
+    );
     Log3 $name, 4, "npmjs ($name) - stateRequestTimer: Call Request Timer";
 
     unless ( IsDisabled($name) ) {
@@ -681,7 +671,7 @@ sub AsynchronousExecuteNpmCommand($) {
     $hash->{".fhem"}{subprocess} = $subprocess;
 
     InternalTimer( gettimeofday() + POLLINTERVAL,
-        "npmjs::PollChild", $hash, 0 );
+        "FHEM::npmjs::PollChild", $hash, 0 );
     Log3 $hash, 4, "npmjs ($name) - control passed back to main loop.";
 }
 
@@ -697,7 +687,7 @@ sub PollChild($) {
         Log3 $name, 5,
           "npmjs ($name) - still waiting (" . $subprocess->{lasterror} . ").";
         InternalTimer( gettimeofday() + POLLINTERVAL,
-            "npmjs::PollChild", $hash, 0 );
+            "FHEM::npmjs::PollChild", $hash, 0 );
         return;
     }
     else {
@@ -1379,9 +1369,10 @@ sub ToDay() {
 1;
 
 =pod
+=encoding utf8
 =item device
-=item summary       Module to control Node.js installation and update
-=item summary_DE    Modul zur Bedienung der Node.js Installation und Updates
+=item summary       Module to control Node.js package installation and update
+=item summary_DE    Modul zur Bedienung der Node.js Paket Installation und Updates
 
 =begin html
 
@@ -1462,7 +1453,7 @@ sub ToDay() {
   <ul>
     <li>disable - disables the device
     </li>
-    <li>upgradeListReading - add Upgrade List Reading as JSON
+    <li>updateListReading - add Update List Reading as JSON
     </li>
     <li>npmglobal - work on global or user installation. Defaults to 1=global
     </li>
@@ -1554,7 +1545,7 @@ sub ToDay() {
   <ul>
     <li>disable - Deaktiviert das Device
     </li>
-    <li>upgradeListReading - f&uuml;gt die Upgrade Liste als ein zus&auml;iches Reading im JSON Format ein.
+    <li>updateListReading - f&uuml;gt die Update Liste als ein zus&auml;iches Reading im JSON Format ein.
     </li>
     <li>npmglobal - wechselt zwischen Global- und Benutzer-Installation. Standard ist 1=global
     </li>
@@ -1564,5 +1555,171 @@ sub ToDay() {
 </ul>
 
 =end html_DE
+
+=begin META.json
+{
+  "name": "FHEM::npmjs",
+  "abstract": "Module to control Node.js package installation and update",
+  "description": "commandref.html#npmjs",
+  "x_lang": {
+    "de": {
+      "abstract": "Modul zur Bedienung der Node.js Installation und Updates",
+      "description": "commandref.html#npmjs"
+    }
+  },
+  "keywords": [
+    "fhem-core",
+    "fhem-mod",
+    "fhem-mod-device",
+    "nodejs",
+    "node",
+    "npm"
+  ],
+  "version": "v0.10.3",
+  "release_status": "stable",
+  "author": [
+    "Julian Pawlowski <julian.pawlowski@gmail.com>"
+  ],
+  "x_fhem_maintainer": [
+    "loredo"
+  ],
+  "x_fhem_maintainer_github": [
+    "jpawlowski"
+  ],
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "perl": 5.014,
+        "GPUtils qw(GP_Import)": 0,
+        "JSON": 0,
+        "Data::Dumper": 0
+      },
+      "recommends": {
+      },
+      "suggests": {
+      }
+    }
+  },
+  "x_prereqs_os": {
+    "runtime": {
+      "requires": {
+      },
+      "recommends": {
+        "debian|ubuntu": 0
+      },
+      "suggests": {
+      }
+    }
+  },
+  "x_prereqs_os_debian": {
+    "runtime": {
+      "requires": {
+      },
+      "recommends": {
+        "openssh-client": 0
+      },
+      "suggests": {
+      }
+    }
+  },
+  "x_prereqs_os_ubuntu": {
+    "runtime": {
+      "requires": {
+      },
+      "recommends": {
+        "openssh-client": 0
+      },
+      "suggests": {
+      }
+    }
+  },
+  "x_prereqs_nodejs": {
+    "runtime": {
+      "requires": {
+        "node": 8.0,
+        "npm": 0
+      },
+      "recommends": {
+      },
+      "suggests": {
+      }
+    }
+  },
+  "x_prereqs_python": {
+    "runtime": {
+      "requires": {
+      },
+      "recommends": {
+      },
+      "suggests": {
+      }
+    }
+  },
+  "x_prereqs_binary_exec": {
+    "runtime": {
+      "requires": {
+        "/usr/bin/node|/usr/local/bin/node": 0,
+        "/usr/bin/npm|/usr/local/bin/npm": 0
+      },
+      "recommends": {
+      },
+      "suggests": {
+        "/usr/bin/ssh|/usr/local/bin/ssh": 0
+      }
+    }
+  },
+  "x_prereqs_sudo": {
+    "runtime": {
+      "requires": {
+      },
+      "recommends": {
+        "ALL=NOPASSWD: /usr/bin/npm update *": 0,
+        "ALL=NOPASSWD: /usr/local/bin/npm update *": 0
+      },
+      "suggests": {
+        "ALL=NOPASSWD: /usr/bin/npm install *": 0,
+        "ALL=NOPASSWD: /usr/local/bin/npm install *": 0
+      }
+    }
+  },
+  "x_prereqs_permissions_fileown": {
+    "runtime": {
+      "requires": {
+      },
+      "recommends": {
+      },
+      "suggests": {
+      }
+    }
+  },
+  "x_prereqs_permissions_filemod": {
+    "runtime": {
+      "requires": {
+      },
+      "recommends": {
+      },
+      "suggests": {
+      }
+    }
+  },
+  "resources": {
+    "license": [
+      "https://fhem.de/#License"
+    ],
+    "homepage": "https://fhem.de/",
+    "bugtracker": {
+      "web": "https://forum.fhem.de/index.php/board,29.0.html",
+      "x_web_title": "Sonstige Systeme"
+    },
+    "repository": {
+      "type": "svn",
+      "url": "https://svn.fhem.de/fhem/",
+      "x_branch_master": "trunk",
+      "x_branch_dev": "trunk",
+      "web": "https://svn.fhem.de/"
+    }
+  }
+}
+=end META.json
 
 =cut
