@@ -3177,65 +3177,70 @@ FW_devState($$@)
     $cmdList = "desiredTemperature" if(!$cmdList);
 
   } else {
-    my ($icon, $isHtml);
-    ($icon, $link, $isHtml) = FW_dev2image($d);
-    $txt = ($isHtml ? $icon : FW_makeImage($icon, $state)) if($icon);
+    my $html;
+    foreach my $state (split("\n", $state)) {
+      $txt = $state;
+      my ($icon, $isHtml);
+      ($icon, $link, $isHtml) = FW_dev2image($d,$state);
+      $txt = ($isHtml ? $icon : FW_makeImage($icon, $state)) if($icon);
 
-    my $cmdlist = (defined($link) ? $link : "");
-    my $h = "";
-    foreach my $cmd (split(":", $cmdlist)) {
-      my $htmlTxt;
-      my @c = split(' ', $cmd);   # @c==0 if $cmd==" ";
-      if(int(@c) && $allSets && $allSets =~ m/\b$c[0]:([^ ]*)/) {
-        my $values = $1;
-        foreach my $fn (sort keys %{$data{webCmdFn}}) {
-          no strict "refs";
-          $htmlTxt = &{$data{webCmdFn}{$fn}}($FW_wname,
-                                           $d, $FW_room, $cmd, $values);
-          use strict "refs";
-          last if(defined($htmlTxt));
+      my $cmdlist = (defined($link) ? $link : "");
+      my $h = "";
+      foreach my $cmd (split(":", $cmdlist)) {
+        my $htmlTxt;
+        my @c = split(' ', $cmd);   # @c==0 if $cmd==" ";
+        if(int(@c) && $allSets && $allSets =~ m/\b$c[0]:([^ ]*)/) {
+          my $values = $1;
+          foreach my $fn (sort keys %{$data{webCmdFn}}) {
+            no strict "refs";
+            $htmlTxt = &{$data{webCmdFn}{$fn}}($FW_wname,
+                                             $d, $FW_room, $cmd, $values);
+            use strict "refs";
+            last if(defined($htmlTxt));
+          }
+        }
+
+        if( $htmlTxt ) {
+          $h .= "<p>$htmlTxt</p>";
         }
       }
 
-      if( $htmlTxt ) {
-        $h .= "<p>$htmlTxt</p>";
-      }
-    }
-
-    if( $h ) {
-      $link = undef;
-      $h =~ s/'/\\"/g;
-      $txt = "<a onClick='FW_okDialog(\"$h\",this)'\>$txt</a>";
-    } else {
-      $link = "cmd.$d=set $d $link" if(defined($link));
-    }
-
-  }
-
-
-  if($hasOnOff) {
-    my $isUpperCase = ($allSets =~ m/(^| )ON(:[^ ]*)?( |$)/ &&
-                       $allSets =~ m/(^| )OFF(:[^ ]*)?( |$)/);
-    # Have to cover: "on:An off:Aus", "A0:Aus AI:An Aus:off An:on"
-    my $on  = ReplaceEventMap($d, $isUpperCase ? "ON" :"on" , 1);
-    my $off = ReplaceEventMap($d, $isUpperCase ? "OFF":"off", 1);
-    $link = "cmd.$d=set $d " . ($state eq $on ? $off : $on) if(!defined($link));
-    $cmdList = "$on:$off" if(!$cmdList);
-
-  }
-
-  if(defined($link)) { # Have command to execute
-    my $room = AttrVal($d, "room", undef);
-    if($room) {
-      if($FW_room && $room =~ m/\b$FW_room\b/) {
-        $room = $FW_room;
+      if( $h ) {
+        $link = undef;
+        $h =~ s/'/\\"/g;
+        $txt = "<a onClick='FW_okDialog(\"$h\",this)'\>$txt</a>";
       } else {
-        $room =~ s/,.*//;
+        $link = "cmd.$d=set $d $link" if(defined($link));
       }
-      $link .= "&room=".urlEncode($room);
+
+      if($hasOnOff) {
+        my $isUpperCase = ($allSets =~ m/(^| )ON(:[^ ]*)?( |$)/ &&
+                           $allSets =~ m/(^| )OFF(:[^ ]*)?( |$)/);
+        # Have to cover: "on:An off:Aus", "A0:Aus AI:An Aus:off An:on"
+        my $on  = ReplaceEventMap($d, $isUpperCase ? "ON" :"on" , 1);
+        my $off = ReplaceEventMap($d, $isUpperCase ? "OFF":"off", 1);
+        $link = "cmd.$d=set $d " . ($state eq $on ? $off : $on)
+                if(!defined($link));
+        $cmdList = "$on:$off" if(!$cmdList);
+      }
+
+      if(defined($link)) { # Have command to execute
+        my $room = AttrVal($d, "room", undef);
+        if($room) {
+          if($FW_room && $room =~ m/\b$FW_room\b/) {
+            $room = $FW_room;
+          } else {
+            $room =~ s/,.*//;
+          }
+          $link .= "&room=".urlEncode($room);
+        }
+        $txt = "<a href=\"$FW_ME$FW_subdir?$link$rf$FW_CSRF\">$txt</a>"
+           if($link !~ m/ noFhemwebLink\b/);
+      }
+      $html .= ' ' if( $html );
+      $html .= $txt;
     }
-    $txt = "<a href=\"$FW_ME$FW_subdir?$link$rf$FW_CSRF\">$txt</a>"
-       if($link !~ m/ noFhemwebLink\b/);
+    $txt = $html;
   }
 
   my $style = AttrVal($d, "devStateStyle", "");
