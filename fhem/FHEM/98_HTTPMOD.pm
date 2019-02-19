@@ -160,11 +160,14 @@
 #   2019-01-09  useSetExtensions attribute to be able to disable setExtensions (by default they are now integrated)
 #   2019-01-12  special handling when extractAllJSON is set to 2
 #   2019-01-13  check for featurelevl > 5.9
+#   2019-02-13  remove Warning when checking for extractAllJSON == 2, new attribute extractAllJSONPrefix as regex filter
 #
 #
 
 #
 #   Todo:       
+#               extractAllReadings mit Filter / Prefix
+#               add examples to the documentation of attributes
 #               get after set um readings zu aktualisieren
 #               definierbarer prefix oder Suffix für Readingsnamen wenn sie von unterschiedlichen gets über readingXY erzeugt werden
 #
@@ -230,7 +233,7 @@ sub HTTPMOD_AddToQueue($$$$$;$$$$);
 sub HTTPMOD_JsonFlatter($$;$);
 sub HTTPMOD_ExtractReading($$$$$);
 
-my $HTTPMOD_Version = '3.5.8 - 12.1.2019';
+my $HTTPMOD_Version = '3.5.9 - 13.2.2019';
 
 #
 # FHEM module intitialisation
@@ -275,6 +278,7 @@ sub HTTPMOD_Initialize($)
       "(reading|get|set)[0-9]*DeleteIfUnmatched " .
       "(reading|get|set)[0-9]*DeleteOnError " .
       "extractAllJSON:0,1,2 " .
+      "extractAllJSONFilter " .
       
       "readingsName.* " .               # old 
       "readingsRegex.* " .              # old 
@@ -294,7 +298,7 @@ sub HTTPMOD_Initialize($)
 
       "showMatched:0,1 " .
       "showError:0,1 " .
-      "showBody " .                     # expose the http response body as internal
+      "showBody:0,1 " .                 # expose the http response body as internal
       #"removeBuf:0,1 " .               # httpUtils doesn't expose buf anymore
       "preProcessRegex " .
       
@@ -498,7 +502,7 @@ sub HTTPMOD_Notify($$)
         }
     }  
     #return if (!grep(m/^INITIALIZED|REREADCFG|(MODIFIED $name)|(DEFINED $name)$/, @{$source->{CHANGED}}));
-	# DEFINED is not triggered if init is not done.
+    # DEFINED is not triggered if init is not done.
     return;
 }
 
@@ -2608,7 +2612,7 @@ sub HTTPMOD_Read($$$)
         " retry $request->{retryCount}" .
          #($header ? ",\r\nHeader: $header" : ", no headers") . 
          ($body ? ",\r\nBody: $body" : ", body empty");
-    	
+        
     $body = "" if (!$body);
     
     my $ppr = AttrVal($name, "preProcessRegex", "");
@@ -2680,15 +2684,16 @@ sub HTTPMOD_Read($$$)
     
     if (AttrVal($name, "extractAllJSON", "") || HTTPMOD_GetFAttr($name, $context, $num, "ExtractAllJSON")) {
         # create a reading for each JSON object and use formatting options if a correspondig reading name / formatting is defined 
-        if ((AttrVal($name, "extractAllJSON", 0) == 2 || HTTPMOD_GetFAttr($name, $context, $num, "ExtractAllJSON") == 2) 
-            && ($context =~/get|set/) 
-            && (AttrVal($name, "${context}${num}CheckAllReadings", "u") eq "u")) {
+        if ((AttrVal($name, "extractAllJSON", 0) == 2 || HTTPMOD_GetFAttr($name, $context, $num, "ExtractAllJSON", 0) == 2) 
+            && ($context =~/get|set/) && (AttrVal($name, "${context}${num}CheckAllReadings", "u") eq "u")) {
             # ExtractAllJSON mode 2 will create attributes, also CheckAllReadings to 1 for get/set unless already defined as 0
             CommandAttr(undef, "$name ${context}${num}CheckAllReadings 1");  
         }
         my $rNum = 100;                     # start value for extractAllJSON mode 2
+        my $filter = AttrVal($name, "extractAllJSONFilter", "");
         if (ref $hash->{ParserData}{JSON} eq "HASH") {
             foreach my $object (keys %{$hash->{ParserData}{JSON}}) {
+                next if ($filter && $object !~ $filter);
                 my $rName = $object;
                 #my $fDefault = ($featurelevel > 5.9 ? 1 : 0);
                 $rName = makeReadingName($object) if (AttrVal($name, "enforceGoodReadingNames", $fDefault));
@@ -3416,7 +3421,7 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
         </ul></code>
         which would only apply to all data read as response to the get command defined as get01.        
         <br>
-        Another option is setting extractAllJSON or get01ExtractAllJSON to 2. In this case the module analyzes the JSON date when it is first read, creates readingXXName and readingXXJSON attributes for you and then removes the extractAllJSON attribute.
+        Another option is setting extractAllJSON or get01ExtractAllJSON to 2. In this case the module analyzes the JSON data when it is first read, creates readingXXName and readingXXJSON attributes for you and then removes the extractAllJSON attribute.
     </ul>
     <br>
 
@@ -3654,6 +3659,11 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
             If you don't know the paths, then start by using extractAllJSON and the use the names of the readings as values for the JSON attribute.<br>
             Please don't forget to also specify a name for a reading, get or set. 
             Using this attribute for a set command only makes sense if you want to parse the HTTP response to the HTTP request that the set command sent by defining the attribute setXXParseResponse.<br>
+        <li><b>get|set[0-9]+ExtractAllJSON or extractAllJSON</b></li>
+            if set to 1 it will create a reading for every JSON object. The reading names will be deducted from the JSON strings hierarchically concatenated by "_".<br>
+            if set to 2 it will create attributes for naming and parsing the JSON objects to make it easier to rename or remove some of them.
+        <li><b>extractAllJSONFilter</b></li>    
+            is an optional regular expression that filters the readings to be created with extractAllJSON.
         <li><b>(get|set|reading)[0-9]*RecombineExpr</b></li> 
             defines an expression that is used in an eval to compute one reading value out of the list of matches. <br>
             This is supposed to be used for regexes or xpath specifications that produce multiple results if only one result that combines them is wanted. The list of matches will be in the variable @matchlist.<br>
