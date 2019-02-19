@@ -131,6 +131,7 @@
 #               logging enhancements
 #   2019-01-31  fixed bug in GetSetCheck (failed to check for busy)
 #   2019-02-09  optimized logging in level 4/5
+#   2019-02-19  little bug fix (warning)
 #
 #
 #
@@ -315,7 +316,7 @@ sub ModbusLD_GetIOHash($);
 sub ModbusLD_DoRequest($$$;$$$$);
 sub ModbusLD_StartUpdateTimer($);
 
-my $Modbus_Version = '4.0.23 - 9.2.2019';
+my $Modbus_Version = '4.0.24 - 18.2.2019';
 my $Modbus_PhysAttrs = 
         "queueDelay " .
         "queueMax " .
@@ -3221,14 +3222,33 @@ sub Modbus_ProcessRequestQueue($;$)
     }
     
     # check defined delays
-    my $lBRead = sprintf("%.3f", $now - $ioHash->{REMEMBER}{lrecv});
-    my $lRead  = sprintf("%.3f", $now - $logHash->{REMEMBER}{lrecv});
-    my $lSend  = sprintf("%.3f", $now - $logHash->{REMEMBER}{lsend});
+    my $lBRead  = 999; 
+    my $lBRText = "never";
+    my $lRead   = 999;
+    my $lRText  = "never";
+    my $lSend   = 999;
+    my $lSText  = "never";
+    my $lIText  = "";
+    if ($ioHash->{REMEMBER}{lrecv}) {
+        $lBRead  = $now - $ioHash->{REMEMBER}{lrecv};
+        $lBRText = sprintf("%.3f", $lBRead) . " secs ago";
+    }
+    if ($logHash->{REMEMBER}{lrecv}) {
+        $lRead  = $now - $logHash->{REMEMBER}{lrecv};
+        $lRText = sprintf("%.3f", $lRead) . " secs ago";
+    }
+    if ($logHash->{REMEMBER}{lsend}) {
+        $lSend  = sprintf("%.3f", $now - $logHash->{REMEMBER}{lsend});
+        $lSText = sprintf("%.3f", $lSend) . " secs ago";
+    }
+    if ($ioHash->{REMEMBER}{lid} && $ioHash->{REMEMBER}{lname}) {
+        $lIText = "from id $ioHash->{REMEMBER}{lid} ($ioHash->{REMEMBER}{lname})";
+    }
     Log3 $name, 4, "$name: ProcessRequestQueue called from " . Modbus_Caller() . ($force ? ", force" : "") . ", qlen $qlen, " .
                     "next entry to id $request->{DEVHASH}{MODBUSID} ($request->{DEVHASH}{NAME}), " .
-                    "last send to this device was $lSend secs ago, last read $lRead secs ago, last read on bus was $lBRead secs ago " .
-                    "from id $ioHash->{REMEMBER}{lid} ($ioHash->{REMEMBER}{lname})";
+                    "last send to this device was $lSText, last read $lRText, last read on bus $lBRText $lIText";
 
+    # todo: use new vars from above and remove CheckDelay function
     my $reqId = $request->{MODBUSID};
     if ($ioHash->{REMEMBER}{lrecv}) {
         #Log3 $name, 5, "$name: ProcessRequestQueue check busDelay ...";
