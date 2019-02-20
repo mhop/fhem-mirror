@@ -229,7 +229,7 @@ sub __PutMetadata {
 # Extract meta data from FHEM module file
 sub __GetMetadata {
     return 0 unless ( __PACKAGE__ eq caller(0) );
-    my ( $filePath, $modMeta, $runInLoop ) = @_;
+    my ( $filePath, $modMeta, $runInLoop, $metaSection ) = @_;
     my @vcs;
     my $fh;
     my $encoding;
@@ -262,7 +262,7 @@ sub __GetMetadata {
     # grep info from file content
     if ( open( $fh, '<' . $filePath ) ) {
         my $skip = 1;
-        my $json;
+        my %json;
 
         # get file stats
         push @{ $modMeta->{x_file} }, [ @{ stat($fh) } ];
@@ -275,7 +275,9 @@ sub __GetMetadata {
         }
 
         my $searchComments = 1;    # not in use, see below
+        my $currentJson    = "";
         while ( my $l = <$fh> ) {
+            next if ( $l eq "" || $l =~ m/^\s+$/ );
 
             # # Track comments section at the beginning of the document
             # if ( $searchComments && $l !~ m/^#|\s*$/ ) {
@@ -283,7 +285,8 @@ sub __GetMetadata {
             # }
 
             # extract VCS info from $Id:
-            if (  !@vcs
+            if (   $skip
+                && !@vcs
                 && $l =~
 m/(\$Id\: ((?:([0-9]+)_)?([\w]+)\.([\w]+))\s([0-9]+)\s((([0-9]+)-([0-9]+)-([0-9]+))\s(([0-9]+):([0-9]+):([0-9]+)))(?:[\w]+?)\s([\w.-]+)\s\$)/
               )
@@ -332,7 +335,8 @@ m/(\$Id\: ((?:([0-9]+)_)?([\w]+)\.([\w]+))\s([0-9]+)\s((([0-9]+)-([0-9]+)-([0-9]
             #
 
             # via $VERSION|$version variable
-            elsif ( !$version
+            elsif ($skip
+                && !$version
                 && $l =~
 m/((?:(?:my|our)\s+)?\$VERSION\s+=\s+[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?:\.\d{1,3})?)))/i
               )
@@ -347,7 +351,8 @@ m/((?:(?:my|our)\s+)?\$VERSION\s+=\s+[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?:\.\d{1,3})?
             }
 
             # via $hash->{VERSION}|$hash->{version}
-            elsif ( !$version
+            elsif ($skip
+                && !$version
                 && $l =~
 m/(->\{VERSION\}\s+=\s+[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?:\.\d{1,3})?)))/i
               )
@@ -365,22 +370,27 @@ m/(->\{VERSION\}\s+=\s+[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?:\.\d{1,3})?)))/i
             ######
 
             # read items from POD
-            elsif ( !$item_modtype
-                && $l =~ m/^=item\s+(device|helper|command)/i )
+            elsif ($skip
+                && !$item_modtype
+                && $l =~ m/^=item\s+(device|helper|command)\s*$/i )
             {
                 return "=item (device|helper|command) pod must occur only once"
                   if ($item_modtype);
                 $item_modtype = lc($1);
             }
-            elsif ( !$item_summary_DE
-                && $l =~ m/^=item\s+(summary_DE)\s+(.*)$/i )
+            elsif ($skip
+                && !$item_summary_DE
+                && $l =~ m/^=item\s+(summary_DE)\s+(.+)$/i )
             {
                 return "=item summary_DE pod must occur only once"
                   if ($item_summary_DE);
                 $item_summary_DE =
                   ( $encoding && $encoding eq "utf8" ) ? encode_utf8($2) : $2;
             }
-            elsif ( !$item_summary && $l =~ m/^=item\s+(summary)\s+(.*)$/i ) {
+            elsif ($skip
+                && !$item_summary
+                && $l =~ m/^=item\s+(summary)\s+(.+)$/i )
+            {
                 return "=item summary_DE pod must occur only once"
                   if ($item_summary);
                 $item_summary =
@@ -394,34 +404,42 @@ m/(->\{VERSION\}\s+=\s+[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?:\.\d{1,3})?)))/i
             }
 
             # read META.json from POD
-            elsif ( $skip && $l =~ m/^=begin\s+META.json/i ) {
-                $skip = 0;
-                $json = "";
+            elsif ($skip
+                && $l =~
+m/^=for\s+:application\/json;q=META\.json\s+([^\s\.]+\.[^\s\.]+)\s*$/i
+              )
+            {
+                $skip               = 0;
+                $currentJson        = $1;
+                $json{$currentJson} = "";
             }
-            elsif ( !$skip && $l =~ m/^=end\s+META.json/i ) {
-                last;
+            elsif ( !$skip
+                && $l =~ m/^=end\s+:application\/json\;q=META\.json/i )
+            {
+                $skip = 1;
             }
             elsif ( !$skip ) {
-                $json .= $l;
+                $json{$currentJson} .= $l;
             }
         }
 
         # if we were unable to get version,
         #   let's also try the initial comments block
-        unless ( $json || $version ) {
+        unless ( keys %json > 0 || $version ) {
             seek $fh, 0, 0;
 
             while ( my $l = <$fh> ) {
+                next if ( $l eq "" || $l =~ m/^\s+$/ );
 
                 # Only seek the document until code starts
-                if ( $l !~ m/^#|\s*$/ ) {
+                if ( $l !~ m/^#/ && $l !~ m/^=[A-Za-z]+/i ) {
                     last;
                 }
 
                 # via Version:
                 elsif ( !$version
                     && $l =~
-m/(^#\s+Version:?\s+[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?:\.\d{1,3})?)))/i
+m/(^#\s+Version:?\s+[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?:\.\d{1,3})?))(?:\s+.*)?)$/i
                   )
                 {
                     my $extr = $2;
@@ -434,15 +452,21 @@ m/(^#\s+Version:?\s+[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?:\.\d{1,3})?)))/i
                     $versionFrom = 'comment/1' if ($version);
                 }
 
-                # via vX.X.X, assuming latest version comes first;
-                #  might include false-positives
+                # via changelog, assuming latest version comes first;
+                #   might include false-positives
                 elsif ( !$version
                     && $l =~
-                    m/(^#\s+(v?(?:\d{1,3}\.\d{1,3}(?:\.\d{1,3})?)))(?:\s+.*)?$/i
+m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?:\.\d{1,3})?))(?:\s+.*)?)$/i
                   )
                 {
                     my $extr = $2;
-                    $version = ( $extr =~ m/^v/i ? lc($extr) : lc( 'v' . $2 ) )
+
+                    # filter false-positives that are actually dates
+                    next
+                      if ( $extr =~ m/^\d{2}\.\d{2}\.(\d{2})$/ && $1 ge 13 );
+
+                    $version =
+                      ( $extr =~ m/^v/i ? lc($extr) : lc( 'v' . $extr ) )
                       if ($extr);
                     $version .= '.0'
                       if ( $version && $version !~ m/v\d+\.\d+\.\d+/ );
@@ -458,41 +482,67 @@ m/(^#\s+Version:?\s+[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?:\.\d{1,3})?)))/i
 
         $encoding = 'latin1' unless ($encoding);
 
-        if ( defined($json) ) {
+        if ( keys %json > 0 ) {
             eval {
                 use JSON;
                 1;
             };
 
             unless ($@) {
-                eval {
-                    my $t;
-                    if ( $encoding ne 'latin1' ) {
-                        if ( $encoding eq "utf8" ) {
-                            $t = encode_utf8($json);
-                        }
-                        elsif ( $encoding =~
-                            /^(latin1|utf8|koi8-r|ShiftJIS|big5)$/ )
-                        {
-                            return "Encoding type $encoding is not supported";
+                foreach ( keys %json ) {
+                    next
+                      if (
+                        (
+                            !$metaSection
+                            && lc($_) ne lc( $modMeta->{x_file}[2] )
+                        )
+                        || ( $metaSection && $_ ne $metaSection )
+                      );
+
+                    eval {
+                        my $t;
+                        if ( $encoding ne 'latin1' ) {
+                            if ( $encoding eq "utf8" ) {
+                                $t = encode_utf8( $json{$_} );
+                            }
+                            elsif ( $encoding =~
+                                /^(latin1|utf8|koi8-r|ShiftJIS|big5)$/ )
+                            {
+                                $@ = "Encoding type $encoding is not supported";
+                            }
+                            else {
+                                $@ = "Invalid encoding type $encoding";
+                            }
                         }
                         else {
-                            return "Invalid encoding type $encoding";
+                            $t = $json{$_};
                         }
-                    }
-                    else {
-                        $t = $json;
-                    }
 
-                    my $decoded = decode_json($t);
-                    while ( my ( $k, $v ) = each %{$decoded} ) {
-                        $modMeta->{$k} = $v;
-                    }
+                        return "$@" if ($@);
 
-                    1;
-                } or do {
-                    return "Error while parsing META.json from $_[0]: $@";
-                };
+                        my $decoded = decode_json($t);
+                        while ( my ( $k, $v ) = each %{$decoded} ) {
+                            $modMeta->{$k} = $v;
+                        }
+
+                        1;
+                    } or do {
+                        $@ = "$_: Error while parsing META.json: $@";
+                        return "$@";
+                    };
+                }
+                return undef if ($metaSection);
+            }
+        }
+
+        # special place for fhem.pl is this module file
+        elsif ( $modMeta->{x_file}[2] eq 'fhem.pl' ) {
+            my %fhempl;
+            my $ret = __GetMetadata( __FILE__, \%fhempl, undef, 'fhem.pl' );
+            delete $fhempl{x_file};
+
+            while ( my ( $k, $v ) = each %fhempl ) {
+                $modMeta->{$k} = $v;
             }
         }
     }
@@ -611,7 +661,8 @@ m/(^#\s+Version:?\s+[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?:\.\d{1,3})?)))/i
         }
     }
 
-    return "Invalid version format '$modMeta->{version}'"
+    $@ .=
+      $modMeta->{x_file}[2] . ": Invalid version format '$modMeta->{version}'"
       if ( defined( $modMeta->{version} )
         && $modMeta->{version} !~ m/^v\d+\.\d+\.\d+$/ );
 
@@ -709,6 +760,7 @@ m/(^#\s+Version:?\s+[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?:\.\d{1,3})?)))/i
         "url"     => "https://metacpan.org/pod/CPAN::Meta::Spec"
     };
 
+    return "$@" if ($@);
     return undef;
 }
 
@@ -718,9 +770,8 @@ m/(^#\s+Version:?\s+[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?:\.\d{1,3})?)))/i
 
 =encoding utf8
 
-=begin META.json
+=for :application/json;q=META.json Meta.pm
 {
-  "name": "FHEM::Meta",
   "abstract": "FHEM component module to enable Metadata support",
   "description": "n/a",
   "x_lang": {
@@ -734,7 +785,7 @@ m/(^#\s+Version:?\s+[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?:\.\d{1,3})?)))/i
     "metadata",
     "meta"
   ],
-  "version": "v0.0.1",
+  "version": "v0.0.2",
   "release_status": "testing",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
@@ -748,6 +799,7 @@ m/(^#\s+Version:?\s+[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?:\.\d{1,3})?)))/i
   "prereqs": {
     "runtime": {
       "requires": {
+        "FHEM": ">= 5.9.18623",
         "perl": 5.014,
         "GPUtils qw(GP_Import)": 0,
         "File::stat": 0,
@@ -871,6 +923,183 @@ m/(^#\s+Version:?\s+[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?:\.\d{1,3})?)))/i
     }
   }
 }
-=end META.json
+=end :application/json;q=META.json
+
+=for :application/json;q=META.json fhem.pl
+{
+  "abstract": "FHEM® is a Perl server for house automation",
+  "description": "FHEM® (registered trademark) is a GPL'd perl server for house automation. It is used to automate some common tasks in the household like switching lamps / shutters / heating / etc. and to log events like temperature / humidity / power consumption.\\n\\nThe program runs as a server, you can control it via web or smartphone frontends, telnet or TCP/IP directly.\\n\\nIn order to use FHEM you'll need a 24/7 server (NAS, RPi, PC, MacMini, etc) with a perl interpreter and some attached hardware like the CUL-, EnOcean-, Z-Wave-USB-Stick, etc. to access the actors and sensors.\\n\\nIt is pronounced without the h, like in feminine.",
+  "x_lang": {
+    "de": {
+      "abstract": "FHEM® ist ein Perl Server zur Hausautomatisierung",
+      "description": "FHEM® (eingetragene Marke) ist ein in Perl geschriebener, GPL lizensierter Server für die Heimautomatisierung. Man kann mit FHEM häufig auftretende Aufgaben automatisieren, wie z.Bsp. Lampen / Rollladen / Heizung / usw. schalten, oder Ereignisse wie Temperatur / Feuchtigkeit / Stromverbrauch protokollieren und visualisieren. Für weitere Ideen siehe diesen Link.\\n\\nDas Programm läuft als Server, man kann es über WEB, dedizierte Smartphone Apps oder telnet bedienen, TCP Schnittstellen für JSON und XML existieren ebenfalls.\\n\\nUm es zu verwenden benötigt man einen 24/7 Rechner (NAS, RPi, PC, MacMini, etc) mit einem Perl Interpreter und angeschlossene Hardware-Komponenten wie CUL-, EnOcean-, Z-Wave-USB-Stick, etc. für einen Zugang zu den Aktoren und Sensoren.\\n\\nAusgesprochen wird es ohne h, wie bei feminin."
+    }
+  },
+  "keywords": [
+    "fhem",
+    "fhem-core"
+  ],
+  "author": [
+    "Rudolf König <r.koenig@koeniglich.de>"
+  ],
+  "x_fhem_maintainer": [
+    "rudolfkoenig"
+  ],
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "perl": 5.006002,
+        "File::Copy qw(copy)": 0,
+        "IO::Socket": 0,
+        "IO::Socket::INET": 0,
+        "Math::Trig": 0,
+        "Scalar::Util qw(looks_like_number)": 0,
+        "Time::HiRes qw(gettimeofday)": 0
+      },
+      "recommends": {
+        "Compress::Zlib": 0,
+        "IO::Socket::INET6": 0,
+        "Socket6": 0
+      },
+      "suggests": {
+      }
+    }
+  },
+  "x_prereqs_os": {
+    "runtime": {
+      "requires": {
+      },
+      "recommends": {
+        "debian|ubuntu": 0
+      },
+      "suggests": {
+      }
+    }
+  },
+  "x_prereqs_os_debian": {
+    "runtime": {
+      "requires": {
+        "perl-base": ">= 5.6.2",
+        "sqlite3": 0,
+        "libcgi-pm-perl": 0,
+        "libdbd-sqlite3-perl": 0,
+        "libdevice-serialport-perl": ">= 1.0",
+        "libio-socket-ssl-perl": ">= 1.0",
+        "libjson-perl": 0,
+        "libtext-diff-perl": 0,
+        "libwww-perl": ">= 1.0"
+      },
+      "recommends": {
+        "ttf-liberation": 0,
+        "libarchive-extract-perl": 0,
+        "libarchive-zip-perl": 0,
+        "libgd-graph-perl": 0,
+        "libgd-text-perl": 0,
+        "libimage-info-perl": 0,
+        "libimage-librsvg-perl": 0,
+        "libio-socket-inet6-perl": 0,
+        "liblist-moreutils-perl": 0,
+        "libmail-imapclient-perl": 0,
+        "libmime-base64-perl": 0,
+        "libnet-server-perl": 0,
+        "libsocket6-perl": 0,
+        "libtext-csv-perl": 0,
+        "libtimedate-perl": 0,
+        "libusb-1.0-0-dev": 0,
+        "libxml-simple-perl": 0
+      },
+      "suggests": {
+      }
+    }
+  },
+  "x_prereqs_os_ubuntu": {
+    "runtime": {
+      "requires": {
+      },
+      "recommends": {
+      },
+      "suggests": {
+      }
+    }
+  },
+  "x_prereqs_nodejs": {
+    "runtime": {
+      "requires": {
+      },
+      "recommends": {
+      },
+      "suggests": {
+      }
+    }
+  },
+  "x_prereqs_python": {
+    "runtime": {
+      "requires": {
+      },
+      "recommends": {
+      },
+      "suggests": {
+      }
+    }
+  },
+  "x_prereqs_binary_exec": {
+    "runtime": {
+      "requires": {
+      },
+      "recommends": {
+      },
+      "suggests": {
+      }
+    }
+  },
+  "x_prereqs_sudo": {
+    "runtime": {
+      "requires": {
+      },
+      "recommends": {
+      },
+      "suggests": {
+      }
+    }
+  },
+  "x_prereqs_permissions_fileown": {
+    "runtime": {
+      "requires": {
+      },
+      "recommends": {
+      },
+      "suggests": {
+      }
+    }
+  },
+  "x_prereqs_permissions_filemod": {
+    "runtime": {
+      "requires": {
+      },
+      "recommends": {
+      },
+      "suggests": {
+      }
+    }
+  },
+  "resources": {
+    "license": [
+      "https://fhem.de/#License"
+    ],
+    "homepage": "https://fhem.de/",
+    "bugtracker": {
+      "web": "https://forum.fhem.de/",
+      "x_web_title": "FHEM Forum"
+    },
+    "repository": {
+      "type": "svn",
+      "url": "https://svn.fhem.de/fhem/",
+      "x_branch_master": "trunk",
+      "x_branch_dev": "trunk",
+      "web": "https://svn.fhem.de/"
+    }
+  }
+}
+=end :application/json;q=META.json
 
 =cut

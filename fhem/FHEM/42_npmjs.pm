@@ -1564,15 +1564,12 @@ sub ToDay() {
 
 =end html_DE
 
-=begin META.json
+=for :application/json;q=META.json 42_npmjs.pm
 {
-  "name": "FHEM::npmjs",
   "abstract": "Module to control Node.js package installation and update",
-  "description": "commandref.html#npmjs",
   "x_lang": {
     "de": {
-      "abstract": "Modul zur Bedienung der Node.js Installation und Updates",
-      "description": "commandref.html#npmjs"
+      "abstract": "Modul zur Bedienung der Node.js Installation und Updates"
     }
   },
   "keywords": [
@@ -1597,6 +1594,7 @@ sub ToDay() {
   "prereqs": {
     "runtime": {
       "requires": {
+        "FHEM": ">= 5.9.18623",
         "perl": 5.014,
         "GPUtils qw(GP_Import)": 0,
         "JSON": 0,
@@ -1730,6 +1728,6 @@ sub ToDay() {
     }
   }
 }
-=end META.json
+=end :application/json;q=META.json
 
 =cut
