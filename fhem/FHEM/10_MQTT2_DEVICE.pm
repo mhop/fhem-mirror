@@ -221,7 +221,7 @@ MQTT2_DEVICE_Parse($$)
     my $cidArr = $modules{MQTT2_DEVICE}{defptr}{cid}{$newCid};
     if(!$cidArr || !int(@{$cidArr})) {
       my $devName = $newCid;
-      $devName =~ makeDeviceName($devName);
+      $devName = makeDeviceName($devName);
       return "UNDEFINED MQTT2_$devName MQTT2_DEVICE $newCid";
     }
     return "";
