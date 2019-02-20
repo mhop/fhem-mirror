@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - changed: 14_SD_WS07: attr correction-xxx to offset-xxx renamed!
+  - feature: 14_SD_WS07: new negation-batt attribute
+                         Temp only sensors supported 
+                         support for max deviation attribute
   - changed: 14_SD_WS09: reading batteryState added, commandref extended
   - changed: 14_Hideki: reading batteryState added
   - bugfix:  73_AutoShuttersControl: fix typo in shuttersMode
