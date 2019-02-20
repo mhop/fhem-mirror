@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 14_SD_WS: support sensors E0001PA,S522,TX-EZ6,other
+                      reading sendmode humidityTrend, temperatureTrend,       
+                      windspeed, batteryState added
+                      attr max-deviation-temp and -hum added
   - changed: 14_SD_WS07: attr correction-xxx to offset-xxx renamed!
   - feature: 14_SD_WS07: new negation-batt attribute
                          Temp only sensors supported 
