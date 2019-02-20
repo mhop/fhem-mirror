@@ -3675,6 +3675,8 @@ FW_show($$)
          style="width:32px;height:32px;background-color:green"&gt;&lt;/div&gt;'}
         </ul>
         </li>
+        Note: The above is valid for each line of STATE. If STATE (through stateFormat)
+        is multilined, multiple icons (one per line) will be created.<br>
         <br>
 
     <a name="devStateStyle"></a>
@@ -4412,6 +4414,8 @@ FW_show($$)
 
         {'&lt;div style="width:32px;height:32px;background-color:green"&gt;&lt;/div&gt;'}
         </ul>
+        Anmerkung: Obiges gilt pro STATE Zeile. Wenn STATE (durch stateFormat) mehrzeilig
+        ist, wird pro Zeile ein Icon erzeugt.<br>
         </li><br>
 
     <a name="devStateStyle"></a>
