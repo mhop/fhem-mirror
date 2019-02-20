@@ -28,7 +28,7 @@ EOF
 my $fList = `$svnlook changed $arg $repos`;
 foreach my $row (split("\n", $fList)) {
   chomp($row);
-  my ($type, $fName) = split(" ", $row);
+  my ($type, $fName) = split(" ", $row, 2);
   next if($type eq "D");
   next if(!$fName);
   my $pl = `svnlook pl $arg $repos $fName`;
@@ -55,8 +55,8 @@ foreach my $row (split("\n", $fList)) {
     next;
   }
   
-  err $fName, "filename contains strange characters (not A-Za-z0-9_.-%)"
-    if($fName =~ m/[^A-Za-z0-9_.%-]/);
+  err $fName, "filename ($fName) contains strange characters (not A-Za-z0-9_.-%)"
+    if($fName =~ m/[^A-Za-z0-9_.%-\/]/);
 
   next unless($fName =~ /\.pm$/);
 
