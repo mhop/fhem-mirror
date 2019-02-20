@@ -650,7 +650,7 @@
     
     
 =pod
-=item summary    Supports weather sensors (WH1080/3080/CTW-600) protocol 9 from SIGNALduino
+=item summary    Supports weather sensors (WH1080/3080/CTW-600) protocl 9 from SIGNALduino
 =item summary_DE Unterstuetzt Wettersensoren (WH1080/3080/CTW-600) mit Protokol 9 vom SIGNALduino
 =begin html
 
@@ -673,7 +673,7 @@
   </ul>
   <br>
   New received device are add in fhem with autocreate.
-  <br><br>
+  <br><br><br>
 
   <a name="SD_WS09_Define"></a>
   <b>Define</b> 
@@ -682,6 +682,61 @@
   If you want to use more sensors, you can use the longid option to differentiate them.
   </ul>
   <br>
+  
+  <a name="SD_WS09_Set"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+  
+  <a name="SD_WS09_Get"></a>
+  <b>Get</b> <ul>N/A</ul><br><br>
+  
+  
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#ignore">ignore</a></li>
+    <li><a href="#showtime">showtime</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+    
+	<a name="Model"></a>
+	<li>Model: WH1080,CTW600
+    </li>
+	
+	<a name="windKorrektur"></a>
+    <li>windKorrektur: -3,-2,-1,0,1,2,3   
+    </li>
+    
+	<a name="Unit_of_Wind"></a>
+	<li>Unit_of_Wind<br>
+    Unit of windSpeed and windGuest. State-Format: Value + Unit.
+       <br>m/s,km/h,ft/s,mph,bft,knot 
+    </li><br>
+
+	<a name="WindDirAverageTime"></a>
+    <li>WindDirAverageTime<br>
+    default is 600s, time span to be considered for the calculation
+    </li><br>
+
+	<a name="WindDirAverageMinSpeed"></a>
+    <li>WindDirAverageMinSpeed<br>
+    since the wind direction is usually not clear at very low wind speeds,
+    minspeed can be used to specify a threshold value. 
+    <br>The (weighted) mean velocity < minspeed is returned undef
+    </li><br>
+
+	<a name="WindDirAverageDecay"></a>
+    <li>WindDirAverageDecay<br>
+       1 -> all values ​​are weighted equally  <br>
+       0 -> only the current value is used.   <br>
+       in practice, you will take values ​​around 0.75 
+    </li><br>
+    
+	<a name="WS09_CRCAUS"></a>
+    <li>WS09_CRCAUS (set in Signalduino-Modul 00_SIGNALduino.pm)
+       <br>0: CRC-Check WH1080 CRC-Summe = 0  on, default   
+       <br>2: CRC-Summe = 49 (x031) WH1080, set OK
+    </li>
+   </ul> <br><br>
+
   <a name="SD_WS09 Events"></a>
   <b>Generated readings:</b>
   <br>Some devices may not support all readings, so they will not be presented<br>
@@ -702,49 +757,6 @@
      <li>Lux</li>
     
   </ul>
-  <br>
-  <b>Attributes</b>
-  <ul>
-    <li><a href="#do_not_notify">do_not_notify</a></li>
-    <li><a href="#ignore">ignore</a></li>
-    <li><a href="#showtime">showtime</a></li>
-    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-    <li>Model: WH1080,CTW600
-    </li>
-    <li>windKorrektur: -3,-2,-1,0,1,2,3   
-    </li>
-    <li>Unit_of_Wind<br>
-    Unit of windSpeed and windGuest. State-Format: Value + Unit.
-       <br>m/s,km/h,ft/s,mph,bft,knot 
-    </li><br>
-    
-    <li>WindDirAverageTime<br>
-    default is 600s, time span to be considered for the calculation
-    </li><br>
-    
-    <li>WindDirAverageMinSpeed<br>
-    since the wind direction is usually not clear at very low wind speeds,
-    minspeed can be used to specify a threshold value. 
-    <br>The (weighted) mean velocity < minspeed is returned undef
-    </li><br>
-    
-    <li>WindDirAverageDecay<br>
-       1 -> all values ​​are weighted equally  <br>
-       0 -> only the current value is used.   <br>
-       in practice, you will take values ​​around 0.75 
-    </li><br>
-    
-    <li>WS09_CRCAUS (set in Signalduino-Modul 00_SIGNALduino.pm)
-       <br>0: CRC-Check WH1080 CRC-Summe = 0  on, default   
-       <br>2: CRC-Summe = 49 (x031) WH1080, set OK
-    </li>
-   </ul> <br>
-  <a name="SD_WS09_Set"></a>
-  <b>Set</b> <ul>N/A</ul><br>
-
-  <a name="SD_WS09_Parse"></a>
-  <b>Parse</b> <ul>N/A</ul><br>
-
 </ul>
 
 =end html
@@ -771,7 +783,7 @@
   </ul>
   <br>
   Neu empfangene Sensoren werden in FHEM per autocreate angelegt.
-  <br><br>
+  <br><br><br>
 
   <a name="SD_WS09_Define"></a>
   <b>Define</b> 
@@ -780,15 +792,73 @@
   CRC Checksumme wird zur Zeit noch nicht überpr&uumlft, deshalb werden Sensoren bei denen die Luftfeuchte < 0 oder > 100 ist, nicht angelegt.<br>
   </ul>
   <br>
+  
+  <a name="SD_WS09_Set"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+  
+  <a name="SD_WS09_Get"></a>
+  <b>Get</b> <ul>N/A</ul><br><br>
+  
+  <b>Attribute</b>
+  <ul>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#ignore">ignore</a></li>
+    <li><a href="#showtime">showtime</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+	
+	<a name="Model"></a>
+	<li>Model<br>
+        WH1080, CTW600
+    </li><br>
+    
+	<a name="windKorrektur"></a>
+	<li>windKorrektur<br>
+    Korrigiert die Nord-Ausrichtung des Windrichtungsmessers, wenn dieser nicht richtig nach Norden ausgerichtet ist. 
+      -3,-2,-1,0,1,2,3    
+    </li><br>
+    
+	<a name="Unit_of_Wind"></a>
+	<li>Unit_of_Wind<br>
+    Hiermit wird der Einheit eingestellt und im State die entsprechenden Werte + Einheit angezeigt.
+       <br>m/s,km/h,ft/s,mph,bft,knot 
+    </li><br>
+
+    <a name="WindDirAverageTime"></a>
+    <li>WindDirAverageTime<br>
+     default ist 600s, Zeitspanne die für die Berechung berücksichtig werden soll
+    </li><br>
+
+    <a name="WindDirAverageMinSpeed"></a>
+    <li>WindDirAverageMinSpeed<br>
+    da bei sehr geringer Windgeschwindigkeit die Windrichtung üblicherweise nicht
+    eindeutig ist, kann mit minspeed ein Schwellwert angegeben werden
+    Ist die (gewichtetete) mittlere Geschwindigkeit < minspeed wird undef zurück geliefert
+    </li><br>
+
+    <a name="WindDirAverageDecay"></a>
+    <li>WindDirAverageDecay<br>
+    1 -> alle Werte werden gleich gewichtet <br>
+    0 -> nur der aktuelle Wert wird verwendet.<br>
+    in der Praxis wird man Werte so um 0.75 nehmen
+    </li><br>
+   
+    <a name="WS09_CRCAUS"></a>
+    <li>WS09_CRCAUS<br>
+    Wird im Signalduino-Modul (00_SIGNALduino.pm) gesetzt 
+       <br>0: CRC-Prüfung bei WH1080 CRC-Summe = 0  
+       <br>2: CRC-Summe = 49 (x031) bei WH1080 wird als OK verarbeitet
+    </li><br>
+   </ul><br>
+
   <a name="SD_WS09 Events"></a>
   <b>Generierte Readings:</b>
   <ul>
      <li>State (T: H: Ws: Wg: Wd: R: )  temperature, humidity, windSpeed, windGuest, Einheit, windDirection, Rain</li>
      <li>Temperature (&deg;C)</li>
-     <li>Humidity: (The humidity (1-100 if available)</li>
+     <li>Humidity: (1-100 wenn verf&uuml;gbar)</li>
      <li>Battery: (low or ok)</li>
-     <li>ID: (The ID-Number (number if)</li>
-     <li>windSpeed/windgust (Einheit siehe Unit_of_Wind)  and windDirection (N-O-S-W)</li>
+     <li>ID: (ID-Nummer wenn verf&uuml;gbar)</li>
+     <li>windSpeed/windgust (Einheit siehe Unit_of_Wind) und windDirection (N-O-S-W)</li>
      <li>Rain (mm)</li>
      <li>windDirectionAverage
       Als Ergebnis wird die Windrichtung zurück geliefert, die aus dem aktuellen und
@@ -799,56 +869,8 @@
      <li>UV Index</li>
      <li>Lux</li>
      
-  </ul>
-  <br>
-  <b>Attribute</b>
-  <ul>
-    <li><a href="#do_not_notify">do_not_notify</a></li>
-    <li><a href="#ignore">ignore</a></li>
-    <li><a href="#showtime">showtime</a></li>
-    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-    <li>Model<br>
-        WH1080, CTW600
-    </li><br>
-    <li>windKorrektur<br>
-    Korrigiert die Nord-Ausrichtung des Windrichtungsmessers, wenn dieser nicht richtig nach Norden ausgerichtet ist. 
-      -3,-2,-1,0,1,2,3    
-    </li><br>
-    <li>Unit_of_Wind<br>
-    Hiermit wird der Einheit eingestellt und im State die entsprechenden Werte + Einheit angezeigt.
-       <br>m/s,km/h,ft/s,mph,bft,knot 
-    </li><br>
-    
-    <li>WindDirAverageTime<br>
-     default ist 600s, Zeitspanne die für die Berechung berücksichtig werden soll
-    </li><br>
-    
-    <li>WindDirAverageMinSpeed<br>
-    da bei sehr geringer Windgeschwindigkeit die Windrichtung üblicherweise nicht
-    eindeutig ist, kann mit minspeed ein Schwellwert angegeben werden
-    Ist die (gewichtetete) mittlere Geschwindigkeit < minspeed wird undef zurück geliefert
-    </li><br>
-    
-    <li>WindDirAverageDecay<br>
-    1 -> alle Werte werden gleich gewichtet <br>
-    0 -> nur der aktuelle Wert wird verwendet.<br>
-    in der Praxis wird man Werte so um 0.75 nehmen
-    </li><br>
+  </ul>   
    
-    <li>WS09_CRCAUS<br>
-    Wird im Signalduino-Modul (00_SIGNALduino.pm) gesetzt 
-       <br>0: CRC-Prüfung bei WH1080 CRC-Summe = 0  
-       <br>2: CRC-Summe = 49 (x031) bei WH1080 wird als OK verarbeitet
-    </li><br>
-    
-   </ul>
-
-  <a name="SD_WS09_Set"></a>
-  <b>Set</b> <ul>N/A</ul><br>
-
-  <a name="SD_WS09_Parse"></a>
-  <b>Parse</b> <ul>N/A</ul><br>
-
 </ul>
 
 =end html_DE
