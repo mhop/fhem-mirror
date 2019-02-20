@@ -41,7 +41,7 @@ package main;
 use strict;
 use warnings;
 
-my $version = '0.4.0.5';
+my $version = '0.4.0.6';
 
 sub AutoShuttersControl_Initialize($) {
     my ($hash) = @_;
@@ -1249,10 +1249,10 @@ sub EventProcessingBrightness($@) {
             $shutters->setLastDrive('minimum brightness threshold fell below');
 
             if (
-                $shutters->getModeUp eq $homemode
-                or (    $shutters->getModeUp eq 'absent'
+                $shutters->getModeDown eq $homemode
+                or (    $shutters->getModeDown eq 'absent'
                     and $homemode eq 'gone' )
-                or $shutters->getModeUp eq 'always'
+                or $shutters->getModeDown eq 'always'
               )
             {
                 ShuttersCommandSet( $hash, $shuttersDev, $posValue );
