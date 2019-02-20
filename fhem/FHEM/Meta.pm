@@ -282,7 +282,7 @@ sub __GetMetadata {
             #     $searchComments = 0;
             # }
 
-            # extract VCS info from $Id$
+            # extract VCS info from $Id:
             if (  !@vcs
                 && $l =~
 m/(\$Id\: ((?:([0-9]+)_)?([\w]+)\.([\w]+))\s([0-9]+)\s((([0-9]+)-([0-9]+)-([0-9]+))\s(([0-9]+):([0-9]+):([0-9]+)))(?:[\w]+?)\s([\w.-]+)\s\$)/
@@ -499,34 +499,11 @@ m/(^#\s+Version:?\s+[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?:\.\d{1,3})?)))/i
 
     # Get some other info about fhem.pl
     if ( $modMeta->{x_file}[2] eq 'fhem.pl' ) {
-
-        # grep Makefile
-        if ( open( $fh, '<' . $modMeta->{x_file}[1] . 'Makefile' ) ) {
-            while ( my $l = <$fh> ) {
-                if ( $l =~ /(^VERS\s*=\s*(\d{1,3}\.\d{1,3})\s*)/i ) {
-                    my $extr = $2;
-
-                    $versionFrom = 'Makefile+vcs';
-                    $version =
-                      ( $extr =~ m/^v/i ? lc($extr) : lc( 'v' . $extr ) )
-                      if ($extr);
-
-                    if ($version) {
-                        $version .= '.' . $vcs[5];
-                        $modMeta->{version} = $version;
-                        $modMeta->{x_version} =
-                          $modMeta->{x_file}[2] . ':' . $version;
-                    }
-                }
-
-                if ( $l =~ /(^DATE\s*=\s*(\d{4}-\d{2}-\d{2})\s*)/i ) {
-                    $modMeta->{x_release_date} = $2 if ($2);
-                }
-
-                last if ( $version && $modMeta->{x_release_date} );
-            }
-        }
-        close($fh);
+        $versionFrom = 'attr/featurelevel+vcs';
+        $version     = 'v' . $1 . '.' . $vcs[5]
+          if ( $modules{'Global'}{AttrList} =~ m/\W*featurelevel:([^,]+)/ );
+        $modMeta->{version}   = $version;
+        $modMeta->{x_version} = 'fhem.pl:' . $version;
     }
 
     ########
