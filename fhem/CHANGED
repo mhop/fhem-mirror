@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 14_SD_RSL: Updated implementation for "all" button on devices
   - feature: 14_SD_WS: support sensors E0001PA,S522,TX-EZ6,other
                       reading sendmode humidityTrend, temperatureTrend,       
                       windspeed, batteryState added
