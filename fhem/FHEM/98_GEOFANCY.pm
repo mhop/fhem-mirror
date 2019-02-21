@@ -8,6 +8,7 @@ use Time::Local;
 use UConv;
 
 use HttpUtils;
+use FHEM::Meta;
 
 # initialize ##################################################################
 sub GEOFANCY_Initialize($) {
@@ -16,6 +17,8 @@ sub GEOFANCY_Initialize($) {
     $hash->{UndefFn}  = "GEOFANCY_Undefine";
     $hash->{SetFn}    = "GEOFANCY_Set";
     $hash->{AttrList} = "devAlias disable:0,1 " . $readingFnAttributes;
+
+    return FHEM::Meta::Load( __FILE__, $hash );
 }
 
 # regular Fn ##################################################################
@@ -27,6 +30,9 @@ sub GEOFANCY_Define($$) {
       if ( int(@a) != 3 );
     my $name  = $a[0];
     my $infix = $a[2];
+
+    # Initialize the device
+    return $@ unless ( FHEM::Meta::SetInternals($hash) );
 
     $hash->{fhem}{infix} = $infix;
 

@@ -6,6 +6,7 @@ use warnings;
 use Data::Dumper;
 
 use Unit;
+use FHEM::Meta;
 our (@RESIDENTStk_attr);
 
 # module variables ############################################################
@@ -72,6 +73,10 @@ sub RESIDENTStk_Define($$) {
       unless ( $TYPE ne "RESIDENTS"
         || !defined( $a[2] )
         || $a[2] =~ /^[A-Za-z\d._]+(?:,[A-Za-z\d._]*)*$/ );
+
+    # Initialize the module and the device
+    return $@ unless ( FHEM::Meta::SetInternals($hash) );
+    use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );
 
     $hash->{MOD_INIT}  = 1;
     $hash->{NOTIFYDEV} = "global";
@@ -1533,10 +1538,11 @@ sub RESIDENTStk_SetLocation(@) {
 
     # update locationPresence
     # if ( $posBeaconUUID eq "" ) {
-        readingsBulkUpdate( $hash, "locationPresence", "present" )
-          if ( $trigger == 1 );
-        readingsBulkUpdate( $hash, "locationPresence", "absent" )
-          if ( $trigger == 0 );
+    readingsBulkUpdate( $hash, "locationPresence", "present" )
+      if ( $trigger == 1 );
+    readingsBulkUpdate( $hash, "locationPresence", "absent" )
+      if ( $trigger == 0 );
+
     # }
 
     # # update positionPresence

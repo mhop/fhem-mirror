@@ -10,6 +10,7 @@ use List::Util qw(sum);
 
 use HttpUtils;
 use Unit;
+use FHEM::Meta;
 
 # module hashes ###############################################################
 my %HP1000_pwsMapping = (
@@ -266,6 +267,8 @@ sub HP1000_Initialize($) {
             },
         },
     };
+
+    return FHEM::Meta::Load( __FILE__, $hash );
 }
 
 # regular Fn ##################################################################
@@ -284,6 +287,9 @@ sub HP1000_Define($$$) {
       . $modules{HP1000}{defptr}{NAME}
       . " (there can only be one instance as per restriction of the weather station itself)"
       if ( defined( $modules{HP1000}{defptr} ) && !defined( $hash->{OLDDEF} ) );
+
+    # Initialize the module and the device
+    return $@ unless ( FHEM::Meta::SetInternals($hash) );
 
     # check FHEMWEB instance when user first defines the device
     if ( $init_done && !defined( $hash->{OLDDEF} ) ) {

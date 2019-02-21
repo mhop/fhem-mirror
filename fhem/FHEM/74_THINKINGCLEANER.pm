@@ -8,6 +8,7 @@ use vars qw(%data);
 use HttpUtils;
 use Encode;
 use Data::Dumper;
+use FHEM::Meta;
 
 # initialize ##################################################################
 sub THINKINGCLEANER_Initialize($) {
@@ -56,6 +57,8 @@ sub THINKINGCLEANER_Initialize($) {
             },
         },
     };
+
+    return FHEM::Meta::Load( __FILE__, $hash );
 }
 
 # regular Fn ##################################################################
@@ -82,6 +85,9 @@ sub THINKINGCLEANER_Define($$$) {
     }
 
     $hash->{TYPE} = "THINKINGCLEANER";
+
+    # Initialize the device
+    return $@ unless ( FHEM::Meta::SetInternals($hash) );
 
     my $address = @$a[2];
     $hash->{DeviceName} = $address;

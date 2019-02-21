@@ -9,6 +9,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use Color;
 use Encode;
+use FHEM::Meta;
 
 # initialize ##################################################################
 sub PHTV_Initialize($) {
@@ -49,6 +50,7 @@ sub PHTV_Initialize($) {
     };
 
     FHEM_colorpickerInit();
+    return FHEM::Meta::Load( __FILE__, $hash );
 }
 
 # regular Fn ##################################################################
@@ -72,6 +74,9 @@ sub PHTV_Define($$) {
         Log3 $name, 4, $msg;
         return $msg;
     }
+
+    # Initialize the module and the device
+    return $@ unless ( FHEM::Meta::SetInternals($hash) );
 
     $hash->{NOTIFYDEV} = "global";
 

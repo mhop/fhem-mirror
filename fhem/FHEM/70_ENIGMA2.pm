@@ -8,6 +8,7 @@ use Time::Local;
 use Encode qw(encode_utf8 decode_utf8);
 
 use HttpUtils;
+use FHEM::Meta;
 
 # initialize ##################################################################
 sub ENIGMA2_Initialize($) {
@@ -58,6 +59,8 @@ sub ENIGMA2_Initialize($) {
             },
         },
     };
+
+    return FHEM::Meta::Load( __FILE__, $hash );
 }
 
 # regular Fn ##################################################################
@@ -92,6 +95,9 @@ sub ENIGMA2_Define($$) {
     return "Interval parameter needs to be of type integer"
       unless ( $interval =~ /^\d+$/ );
     $hash->{INTERVAL} = $interval;
+
+    # Initialize the device
+    return $@ unless ( FHEM::Meta::SetInternals($hash) );
 
     my $http_user   = shift @$a;
     my $http_passwd = shift @$a;

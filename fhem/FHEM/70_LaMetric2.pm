@@ -36,6 +36,7 @@ use HttpUtils;
 use SetExtensions;
 use Unit;
 use utf8;
+use FHEM::Meta;
 
 my %LaMetric2_sounds = (
     notifications => [
@@ -247,6 +248,8 @@ sub LaMetric2_Initialize($$) {
 
     #$hash->{parseParams} = 1; # not possible due to legacy msg command schema
     $hash->{'.msgParams'} = { parseParams => 1, };
+
+    return FHEM::Meta::Load( __FILE__, $hash );
 }
 
 #------------------------------------------------------------------------------
@@ -266,9 +269,11 @@ sub LaMetric2_Define($$) {
         return "$apikey does not seem to be a valid key"
           if ( $apikey !~ /^([a-f0-9]{64})$/ );
 
+        # Initialize the device
+        return $@ unless ( FHEM::Meta::SetInternals($hash) );
+
         $hash->{HOST}       = $host;
         $hash->{".API_KEY"} = $apikey;
-        $hash->{VERSION}    = "2.3.1";
         $hash->{INTERVAL} =
           $interval && looks_like_number($interval) ? $interval : 60;
         $hash->{PORT} = $port && looks_like_number($port) ? $port : 4343;
@@ -2687,4 +2692,38 @@ Leider keine deutsche Dokumentation vorhanden. Die englische Version gibt es hie
 </ul>
 
 =end html_DE
+
+=for :application/json;q=META.json 70_LaMetric2.pm
+{
+  "version": "v2.3.2",
+  "release_status": "stable",
+  "author": [
+    "Julian Pawlowski <julian.pawlowski@gmail.com>"
+  ],
+  "x_fhem_maintainer": [
+    "loredo"
+  ],
+  "x_fhem_maintainer_github": [
+    "jpawlowski"
+  ],
+  "resources": {
+    "license": [
+      "https://fhem.de/#License"
+    ],
+    "homepage": "https://fhem.de/",
+    "bugtracker": {
+      "web": "https://forum.fhem.de/index.php/board,53.0.html",
+      "x_web_title": "Multimedia"
+    },
+    "repository": {
+      "type": "svn",
+      "url": "https://svn.fhem.de/fhem/",
+      "x_branch_master": "trunk",
+      "x_branch_dev": "trunk",
+      "web": "https://svn.fhem.de/"
+    }
+  }
+}
+=end :application/json;q=META.json
+
 =cut

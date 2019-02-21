@@ -12,6 +12,7 @@ use utf8;
 use Encode qw(encode_utf8 decode_utf8);
 use Unit;
 use Data::Dumper;
+use FHEM::Meta;
 
 # initialize ##################################################################
 sub Wunderground_Initialize($) {
@@ -293,6 +294,8 @@ sub Wunderground_Initialize($) {
         'wind_speed'     => { rtype => 'kmph', formula_symbol => 'Ws' },
         'wind_speed_mph' => { rtype => 'mph', formula_symbol => 'Ws' }
     };
+
+    return FHEM::Meta::Load( __FILE__, $hash );
 }
 
 # regular Fn ##################################################################
@@ -320,6 +323,9 @@ sub Wunderground_Define($$$) {
 
     $hash->{API_KEY} = @$a[2];
     $hash->{QUERY}   = @$a[3];
+
+    # Initialize the module and the device
+    return $@ unless ( FHEM::Meta::SetInternals($hash) );
 
     $hash->{QUERY} = "pws:" . $hash->{QUERY}
       if ( $hash->{QUERY} =~ /^[A-Z]{3,}\d{1,}$/ );

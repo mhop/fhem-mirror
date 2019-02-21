@@ -9,6 +9,7 @@ use utf8;
 use Data::Dumper;
 use HttpUtils;
 use Encode;
+use FHEM::Meta;
 
 # initialize ##################################################################
 sub Pushover_Initialize($$) {
@@ -23,6 +24,8 @@ sub Pushover_Initialize($$) {
 
     #$hash->{parseParams} = 1; # not possible due to legacy msg command schema
     $hash->{'.msgParams'} = { parseParams => 1, };
+
+    return FHEM::Meta::Load( __FILE__, $hash );
 }
 
 # regular Fn ##################################################################
@@ -43,6 +46,9 @@ sub Pushover_Define($$) {
       if ( $user !~ /^([a-zA-Z0-9]{30})$/ );
 
     if ( defined($token) && defined($user) ) {
+
+        # Initialize the device
+        return $@ unless ( FHEM::Meta::SetInternals($hash) );
 
         $hash->{APP_TOKEN} = $token;
         $hash->{USER_KEY}  = $user;

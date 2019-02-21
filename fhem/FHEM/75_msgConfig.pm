@@ -4,6 +4,7 @@ package main;
 use strict;
 use warnings;
 use Data::Dumper;
+use FHEM::Meta;
 
 # initialize ##################################################################
 sub msgConfig_Initialize($) {
@@ -144,6 +145,8 @@ sub msgConfig_Initialize($) {
     {
         addToAttrList($_);
     }
+
+    return FHEM::Meta::Load( __FILE__, $hash );
 }
 
 # regular Fn ##################################################################
@@ -159,7 +162,12 @@ sub msgConfig_Define($$) {
 
     return "Global configuration device already defined: "
       . $modules{$TYPE}{defptr}{NAME}
-      if ( defined( $modules{$TYPE}{defptr} ) );
+      if ( defined( $modules{$TYPE}{defptr} )
+        && $init_done
+        && !defined( $hash->{OLDDEF} ) );
+
+    # Initialize the device
+    return $@ unless ( FHEM::Meta::SetInternals($hash) );
 
     # create global unique device definition
     $modules{$TYPE}{defptr} = $hash;

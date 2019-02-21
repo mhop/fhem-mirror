@@ -30,6 +30,8 @@ sub GUEST_Initialize($) {
     foreach (@RESIDENTStk_attr) {
         $hash->{AttrList} .= " " . $hash->{AttrPrefix} . $_;
     }
+
+    return FHEM::Meta::Load( __FILE__, $hash );
 }
 
 1;
