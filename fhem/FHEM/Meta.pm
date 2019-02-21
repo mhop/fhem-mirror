@@ -1,7 +1,4 @@
-###############################################################################
 # $Id$
-#
-# Metadata handling for FHEM modules
 
 # define package
 package FHEM::Meta;
@@ -699,10 +696,10 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
     $modMeta->{x_lang}{DE}{abstract} = $item_summary_DE
       if ( $item_summary_DE && !defined( $modMeta->{x_lang}{DE}{abstract} ) );
 
-    $modMeta->{description} = "/./docs/commandref.html#" . $modMeta->{x_file}[4]
+    $modMeta->{description} = "./docs/commandref.html#" . $modMeta->{x_file}[4]
       unless ( defined( $modMeta->{description} ) );
     $modMeta->{x_lang}{DE}{description} =
-      "/./docs/commandref_DE.html#" . $modMeta->{x_file}[4]
+      "./docs/commandref_DE.html#" . $modMeta->{x_file}[4]
       unless ( defined( $modMeta->{x_lang}{DE}{description} ) );
 
     # Only when this package is reading its own metadata.

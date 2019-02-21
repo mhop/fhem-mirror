@@ -1,7 +1,4 @@
-###############################################################################
 # $Id$
-#
-# Based on 42_AptToDate.pm by CoolTux
 
 package main;
 use strict;
@@ -1264,96 +1261,157 @@ sub CreateErrorList($) {
 
 sub CreateInstalledList($$) {
     my ( $hash, $getCmd ) = @_;
+    my @ret;
     my $packages;
+    my $html = defined( $hash->{CL} ) && $hash->{CL}{TYPE} eq "FHEMWEB" ? 1 : 0;
     $packages = $hash->{".fhem"}{npm}{listedpackages}{dependencies};
 
-    my $ret = '<html><table style="min-width: 450px;"><tr><td>';
-    $ret .= '<table class="block wide">';
-    $ret .= '<tr class="even">';
-    $ret .= "<td><b>Package Name</b></td>";
-    $ret .= "<td><b>Current Version</b></td>";
-    $ret .= "<td></td>";
-    $ret .= '</tr>';
+    my $header = "";
+    my $footer = "";
+    if ($html) {
+        $header = '<html><table style="min-width: 450px;" class="block wide">';
+        $footer = '</table></html>';
+    }
+
+    my $rowOpen     = "";
+    my $rowOpenEven = "";
+    my $rowOpenOdd  = "";
+    my $colOpen     = "";
+    my $txtOpen     = "";
+    my $txtClose    = "";
+    my $colClose    = "\t\t\t";
+    my $rowClose    = "";
+
+    if ($html) {
+        $rowOpen     = '<tr>';
+        $rowOpenEven = '<tr class="even">';
+        $rowOpenOdd  = '<tr class="odd">';
+        $colOpen     = '<td>';
+        $txtOpen     = "<b>";
+        $txtClose    = "</b>";
+        $colClose    = '</td>';
+        $rowClose    = '</tr>';
+    }
+
+    push @ret,
+        $rowOpen
+      . $colOpen
+      . $txtOpen
+      . 'Package Name'
+      . $txtClose
+      . $colClose
+      . $colOpen
+      . $txtOpen
+      . 'Current Version'
+      . $txtClose
+      . $colClose
+      . $rowClose;
 
     if ( ref($packages) eq "HASH" ) {
 
         my $linecount = 1;
         foreach my $package ( sort keys( %{$packages} ) ) {
             next if ( $package eq "undefined" );
-            if ( $linecount % 2 == 0 ) {
-                $ret .= '<tr class="even">';
-            }
-            else {
-                $ret .= '<tr class="odd">';
-            }
 
-            $ret .= "<td>$package</td>";
-            if ( defined( $packages->{$package}{version} ) ) {
-                $ret .= "<td>$packages->{$package}{version}</td>";
-            }
-            else {
-                $ret .= "<td>?</td>";
-            }
+            my $l = $linecount % 2 == 0 ? $rowOpenEven : $rowOpenOdd;
+            $l .= $colOpen . $package . $colClose;
+            $l .= $colOpen
+              . (
+                defined( $packages->{$package}{version} )
+                ? $packages->{$package}{version}
+                : '?'
+              ) . $colClose;
+            $l .= $rowClose;
 
-            $ret .= '</tr>';
+            push @ret, $l;
             $linecount++;
         }
     }
 
-    $ret .= '</table></td></tr>';
-    $ret .= '</table></html>';
-
-    return $ret;
+    return $header . join( "\n", @ret ) . $footer;
 }
 
 sub CreateOutdatedList($$) {
     my ( $hash, $getCmd ) = @_;
+    my @ret;
     my $packages;
+    my $html = defined( $hash->{CL} ) && $hash->{CL}{TYPE} eq "FHEMWEB" ? 1 : 0;
     $packages = $hash->{".fhem"}{npm}{outdatedpackages};
 
-    my $ret = '<html><table style="min-width: 450px;"><tr><td>';
-    $ret .= '<table class="block wide">';
-    $ret .= '<tr class="even">';
-    $ret .= "<td><b>Package Name</b></td>";
-    $ret .= "<td><b>Current Version</b></td>";
-    $ret .= "<td><b>New Version</b></td>";
-    $ret .= "<td></td>";
-    $ret .= '</tr>';
+    my $header = "";
+    my $footer = "";
+    if ($html) {
+        $header = '<html><table style="min-width: 450px;" class="block wide">';
+        $footer = '</table></html>';
+    }
+
+    my $rowOpen     = "";
+    my $rowOpenEven = "";
+    my $rowOpenOdd  = "";
+    my $colOpen     = "";
+    my $txtOpen     = "";
+    my $txtClose    = "";
+    my $colClose    = "\t\t\t";
+    my $rowClose    = "";
+
+    if ($html) {
+        $rowOpen     = '<tr>';
+        $rowOpenEven = '<tr class="even">';
+        $rowOpenOdd  = '<tr class="odd">';
+        $colOpen     = '<td>';
+        $txtOpen     = "<b>";
+        $txtClose    = "</b>";
+        $colClose    = '</td>';
+        $rowClose    = '</tr>';
+    }
+
+    push @ret,
+        $rowOpen
+      . $colOpen
+      . $txtOpen
+      . 'Package Name'
+      . $txtClose
+      . $colClose
+      . $colOpen
+      . $txtOpen
+      . 'Current Version'
+      . $txtClose
+      . $colClose
+      . $colOpen
+      . $txtOpen
+      . 'New Version'
+      . $txtClose
+      . $colClose
+      . $rowClose;
 
     if ( ref($packages) eq "HASH" ) {
 
         my $linecount = 1;
         foreach my $package ( sort keys( %{$packages} ) ) {
-            if ( $linecount % 2 == 0 ) {
-                $ret .= '<tr class="even">';
-            }
-            else {
-                $ret .= '<tr class="odd">';
-            }
+            next if ( $package eq "undefined" );
 
-            $ret .= "<td>$package</td>";
-            if ( defined( $packages->{$package}{current} ) ) {
-                $ret .= "<td>$packages->{$package}{current}</td>";
-            }
-            else {
-                $ret .= "<td>?</td>";
-            }
-            if ( defined( $packages->{$package}{latest} ) ) {
-                $ret .= "<td>$packages->{$package}{latest}</td>";
-            }
-            else {
-                $ret .= "<td>?</td>";
-            }
+            my $l = $linecount % 2 == 0 ? $rowOpenEven : $rowOpenOdd;
+            $l .= $colOpen . $package . $colClose;
+            $l .= $colOpen
+              . (
+                defined( $packages->{$package}{current} )
+                ? $packages->{$package}{current}
+                : '?'
+              ) . $colClose;
+            $l .= $colOpen
+              . (
+                defined( $packages->{$package}{latest} )
+                ? $packages->{$package}{latest}
+                : '?'
+              ) . $colClose;
+            $l .= $rowClose;
 
-            $ret .= '</tr>';
+            push @ret, $l;
             $linecount++;
         }
     }
 
-    $ret .= '</table></td></tr>';
-    $ret .= '</table></html>';
-
-    return $ret;
+    return $header . join( "\n", @ret ) . $footer;
 }
 
 #### my little helper
@@ -1580,7 +1638,7 @@ sub ToDay() {
     "node",
     "npm"
   ],
-  "version": "v0.10.4",
+  "version": "v0.10.5",
   "release_status": "stable",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
