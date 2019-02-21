@@ -47,6 +47,7 @@ use Encode;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.10.1" => "19.02.2019  fix warning when starting fhem, and Forum:#97706",
   "8.10.0" => "15.02.2019  send recordings integrated by telegram, a lot of internal changes for send telegrams ",
   "8.9.2"  => "05.02.2019  sub SSCam_sendTelegram changed ",
   "8.9.1"  => "05.02.2019  sub SSCam_snaplimsize changed ",
@@ -333,7 +334,7 @@ use vars qw($FW_wname);   # Web instance
 sub FW_pH(@);             # add href
 use vars qw(%SSCam_vHintsExt_en);
 use vars qw(%SSCam_vHintsExt_de);
-
+sub SSCam_TBotSendIt($$$$$$$;$$$);
 
 ################################################################
 sub SSCam_Initialize($) {
@@ -5308,6 +5309,7 @@ sub SSCam_camop_parse ($) {
                         $hash->{HELPER}{TOTALCNT} = $data->{data}{total};  # total Anzahl Schnappschüsse
                         
                         while ($data->{'data'}{'data'}[$i]) {
+                            next if(!$data->{'data'}{'data'}[$i]{'camName'});    # Forum:#97706
                             if($data->{'data'}{'data'}[$i]{'camName'} ne $camname) {
                                 $i += 1;
                                 next;
