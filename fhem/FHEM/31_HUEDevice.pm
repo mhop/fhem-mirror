@@ -635,7 +635,7 @@ HUEDevice_Set($@)
       return undef;
 
     } elsif( $cmd eq 'savescene' ) {
-      if( $defs{$name}->{IODev}->{helper}{apiversion} && $defs{$name}->{IODev}->{helper}{apiversion} >= (1<<16) + (11<<8) ) {
+      if( $hash->{IODev} && $hash->{IODev}{helper}{apiversion} && $hash->{IODev}{helper}{apiversion} >= (1<<16) + (11<<8) ) {
         return "usage: savescene <name>" if( @args < 1 );
 
         return fhem( "set $hash->{IODev}{NAME} savescene ". join( ' ', @aa[1..@aa-1]). " $hash->{NAME}" );
@@ -679,7 +679,7 @@ HUEDevice_Set($@)
     }
 
   } elsif( $hash->{helper}->{devtype} eq 'S' ) {
-    my $shash = $defs{$name}->{IODev};
+    my $shash = $hash->{IODev};
 
     my $id = $hash->{ID};
     $id = $1 if( $id =~ m/^S(\d.*)/ );
@@ -825,9 +825,9 @@ HUEDevice_Set($@)
   $list .= " pct:colorpicker,BRI,0,1,100 bri:colorpicker,BRI,0,1,254" if( $subtype =~ m/dimmer/ );
   $list .= " rgb:colorpicker,RGB" if( $subtype =~ m/color/ );
   $list .= " color:colorpicker,CT,2000,1,6500 ct:colorpicker,CT,154,1,500" if( $subtype =~ m/ct|ext/ );
-  $list .= " hue:colorpicker,HUE,0,1,65535 sat:slider,0,1,254 xy effect:none,colorloop" if( $subtype =~ m/color/ );
+  $list .= " hue:colorpicker,HUE,0,1,65535 sat:slider,0,1,254 xy" if( $subtype =~ m/color/ );
 
-  if( $defs{$name}->{IODev}->{helper}{apiversion} && $defs{$name}->{IODev}->{helper}{apiversion} >= (1<<16) + (7<<8) ) {
+  if( $hash->{IODev} && $hash->{IODev}{helper}{apiversion} && $hash->{IODev}{helper}{apiversion} >= (1<<16) + (7<<8) ) {
     $list .= " dimUp:noArg dimDown:noArg" if( $subtype =~ m/dimmer/ );
     $list .= " ctUp:noArg ctDown:noArg" if( $subtype =~ m/ct|ext/ );
     $list .= " hueUp:noArg hueDown:noArg satUp:noArg satDown:noArg" if( $subtype =~ m/color/ );
@@ -835,13 +835,19 @@ HUEDevice_Set($@)
     $list .= " dimUp:noArg dimDown:noArg";
   }
 
-  $list .= " alert:none,select,lselect";
-
   #$list .= " dim06% dim12% dim18% dim25% dim31% dim37% dim43% dim50% dim56% dim62% dim68% dim75% dim81% dim87% dim93% dim100%" if( $subtype =~ m/dimmer/ );
 
-  $list .= " lights" if( $hash->{helper}->{devtype} eq 'G' );
-  $list .= " savescene deletescene scene" if( $hash->{helper}->{devtype} eq 'G' );
-  $list .= " rename";
+  if( $hash->{IODev} && $hash->{IODev}{TYPE} eq 'HUEBridge' ) {
+    $list .= " alert:none,select,lselect";
+    $list .= " effect:none,colorloop" if( $subtype =~ m/color/ );
+
+    $list .= " lights" if( $hash->{helper}->{devtype} eq 'G' );
+
+    $list .= " rename";
+
+    $list .= " savescene deletescene" if( $hash->{helper}->{devtype} eq 'G' );
+  }
+  $list .= " scene" if( $hash->{helper}->{devtype} eq 'G' );
 
   return SetExtensions($hash, $list, $name, @aa);
 }
@@ -1004,7 +1010,7 @@ HUEDevice_Get($@)
   }
 
   my $list = "rgb:noArg RGB:noArg devStateIcon:noArg";
-  if( $defs{$name}->{IODev}->{helper}{apiversion} && $defs{$name}->{IODev}->{helper}{apiversion} >= (1<<16) + (26<<8) ) {
+  if( $hash->{IODev} && $hash->{IODev}{helper}{apiversion} && $hash->{IODev}{helper}{apiversion} >= (1<<16) + (26<<8) ) {
     $list .= " startup:noArg";
   }
   return "Unknown argument $cmd, choose one of $list";
