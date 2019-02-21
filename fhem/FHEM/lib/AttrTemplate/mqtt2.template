@@ -352,6 +352,7 @@ attr DEVICE readingList \
   tele/DEVNAME/STATE:.* { json2nameValue($EVENT) }\
   tele/DEVNAME/SENSOR:.* { json2nameValue($EVENT) }\
   tele/DEVNAME/INFO.:.* { json2nameValue($EVENT) }\
+  tele/DEVNAME/UPTIME:.* { json2nameValue($EVENT) }\
   stat/DEVNAME/RESULT:.* { json2nameValue($EVENT) }
 deletereading DEVICE .*
 set IO_DEV publish cmnd/DEVNAME/Restart 1
@@ -447,19 +448,31 @@ desc:Configures a single device including all readings <br>NOTE: Clicking on ico
 set DEVICE attrTemplate A_01a_tasmota_basic_state_power1
 par:DEVNAME;ESP's name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,tele/([^/]*)/, ? $1 : undef }
 attr DEVICE setList \
-  p1:on,off,toggle cmnd/DEVNAME/POWER1 $EVTPART1\
-  p2:on,off,toggle cmnd/DEVNAME/POWER2 $EVTPART1\
-  p3:on,off,toggle cmnd/DEVNAME/POWER3 $EVTPART1\
-  p4:on,off,toggle cmnd/DEVNAME/POWER4 $EVTPART1
-attr DEVICE devStateIcon { "<div>\
-  <a href=\"/fhem?cmd.dummy=set ".$name." p1 toggle&XHR=1\">POWER1:" . FW_makeImage(lc ReadingsVal($name, "POWER1", "off")) . "</a> \
-  <a href=\"/fhem?cmd.dummy=set ".$name." p2 toggle&XHR=1\">POWER2:" . FW_makeImage(lc ReadingsVal($name, "POWER2", "off")) . "</a> \
-  <a href=\"/fhem?cmd.dummy=set ".$name." p3 toggle&XHR=1\">POWER3:" . FW_makeImage(lc ReadingsVal($name, "POWER3", "off")) . "</a> \
-  <a href=\"/fhem?cmd.dummy=set ".$name." p4 toggle&XHR=1\">POWER4:" . FW_makeImage(lc ReadingsVal($name, "POWER4", "off")) . "</a\
-  ></div>" }
+  POWER1:on,off,toggle cmnd/DEVNAME/POWER1 $EVTPART1\
+  POWER2:on,off,toggle cmnd/DEVNAME/POWER2 $EVTPART1\
+  POWER3:on,off,toggle cmnd/DEVNAME/POWER3 $EVTPART1\
+  POWER4:on,off,toggle cmnd/DEVNAME/POWER4 $EVTPART1
+attr DEVICE devStateIcon Online:10px-kreis-gruen@green Offline:10px-kreis-rot@red 1.on:on:POWER1+off 1.off:off:POWER1+on 2.on:on:POWER2+off 2.off:off:POWER2+on 3.on:on:POWER3+off 3.off:off:POWER3+on 4.on:on:POWER4+off 4.off:off:POWER4+on
 #attr DEVICE userReadings state:POWER.*:.* { lc(ReadingsVal($name,"POWER1","") . " " . ReadingsVal($name,"POWER2","") . " " . ReadingsVal($name,"POWER3","") . " " . ReadingsVal($name,"POWER4","")) }
-attr DEVICE stateFormat P1: POWER1 P2: POWER2 P3: POWER3 P4: POWER4
-attr DEVICE webCmd :
+attr DEVICE readingList \
+  tele/DEVNAME/LWT:.* LWT\
+  tele/DEVNAME/STATE:.* { json2nameValue($EVENT) }\
+  tele/DEVNAME/SENSOR:.* { json2nameValue($EVENT) }\
+  tele/DEVNAME/INFO.:.* { json2nameValue($EVENT) }\
+  stat/DEVNAME/RESULT:.* { json2nameValue($EVENT) }\
+  tele/DEVNAME/UPTIME:.* { json2nameValue($EVENT) }\
+  stat/DEVNAME/POWER1:.* POWER1\
+  stat/DEVNAME/POWER2:.* POWER2\
+  stat/DEVNAME/POWER3:.* POWER3\
+  stat/DEVNAME/POWER4:.* POWER4
+attr DEVICE stateFormat LWT\
+  1:POWER1\
+  2:POWER2\
+  3:POWER3\
+  4:POWER4\
+  <br>\
+  <a href="http://IPAddress" target="_blank">IPAddress</a>
+attr DEVICE webCmd POWER1:POWER2:POWER3:POWER4
 attr DEVICE model A_04b_tasmota_4ch_unified_icon
 
 # tasmota 4ch as one FHEM device.
