@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 1.6
+#  Version 1.7
 #
 #  Subprocess based RPC Server module for HMCCU.
 #
@@ -35,7 +35,7 @@ use SetExtensions;
 ######################################################################
 
 # HMCCURPC version
-my $HMCCURPCPROC_VERSION = '1.6';
+my $HMCCURPCPROC_VERSION = '1.7';
 
 # Maximum number of events processed per call of Read()
 my $HMCCURPCPROC_MAX_EVENTS = 100;
@@ -329,8 +329,7 @@ sub HMCCURPCPROC_InitDevice ($$) {
 	my $iface = $dev_hash->{hmccu}{devspec};
 	
 	# Check if interface is valid
-	my $ifname = HMCCU_GetRPCServerInfo ($hmccu_hash, $iface, 'name'); 
-	my $ifport = HMCCU_GetRPCServerInfo ($hmccu_hash, $iface, 'port'); 
+	my ($ifname, $ifport) = HMCCU_GetRPCServerInfo ($hmccu_hash, $iface, 'name,port'); 
 	return 1 if (!defined ($ifname) || !defined ($ifport));
 
 	# Check if RPC device with same interface already exists
@@ -606,8 +605,8 @@ sub HMCCURPCPROC_Get ($@)
 	}
 	elsif ($opt eq 'rpcstate') {
 		my $clkey = 'CB'.$hash->{rpcport}.$hash->{rpcid};
-		$result = "PID   RPC-Process  State   \n";
-		$result .= "--------------------------\n";
+		$result = "PID   RPC-Process        State   \n";
+		$result .= "--------------------------------\n";
 		my $sid = defined ($hash->{hmccu}{rpc}{pid}) ? sprintf ("%5d", $hash->{hmccu}{rpc}{pid}) : "N/A  ";
 		my $sname = sprintf ("%-10s", $clkey);
 		my $cbport = defined ($hash->{hmccu}{rpc}{cbport}) ? $hash->{hmccu}{rpc}{cbport} : "N/A";
@@ -1071,9 +1070,8 @@ sub HMCCURPCPROC_RegisterCallback ($$)
 	}
 
 	my $cburl = HMCCU_GetRPCCallbackURL ($hmccu_hash, $localaddr, $hash->{hmccu}{rpc}{cbport}, $clkey, $port);
-#	my $clurl = HMCCU_GetRPCServerInfo ($hmccu_hash, $port, 'url');
 	my $clurl = HMCCU_BuildURL ($hmccu_hash, $port);
-	my $rpctype = HMCCU_GetRPCServerInfo ($hmccu_hash, $port, 'type');
+	my ($rpctype) = HMCCU_GetRPCServerInfo ($hmccu_hash, $port, 'type');
 	return (0, "Can't get RPC parameters for ID $clkey") if (!defined ($cburl) || !defined ($clurl) || !defined ($rpctype));
 	
 	$hash->{hmccu}{rpc}{port} = $port;
@@ -1120,7 +1118,6 @@ sub HMCCURPCPROC_DeRegisterCallback ($$)
 	$cburl = $rpchash->{cburl} if (exists ($rpchash->{cburl}));
 	$clurl = $rpchash->{clurl} if (exists ($rpchash->{clurl}));
 	$cburl = HMCCU_GetRPCCallbackURL ($hmccu_hash, $localaddr, $rpchash->{cbport}, $clkey, $port) if ($cburl eq '');
-#	$clurl = HMCCU_GetRPCServerInfo ($hmccu_hash, $port, 'url') if ($clurl eq '');
 	$clurl = HMCCU_BuildURL ($hmccu_hash, $port) if ($clurl eq '');
 	return (0, "Can't get RPC parameters for ID $clkey") if ($cburl eq '' || $clurl eq '');
 
@@ -1276,8 +1273,7 @@ sub HMCCURPCPROC_StartRPCServer ($)
 	                    HMCCURPCPROC_GetAttribute ($hash, 'rpcEventTimeout', 'rpcevtimeout', $HMCCURPCPROC_TIMEOUT_EVENT);
 	my $ccunum        = $hash->{CCUNum};
 	my $rpcport       = $hash->{rpcport};
-	my $serveraddr    = HMCCU_GetRPCServerInfo ($hmccu_hash, $rpcport, 'host');
-	my $interface     = HMCCU_GetRPCServerInfo ($hmccu_hash, $rpcport, 'name');
+	my ($serveraddr, $interface) = HMCCU_GetRPCServerInfo ($hmccu_hash, $rpcport, 'host,name');
 	my $clkey         = 'CB'.$rpcport.$hash->{rpcid};
 	$hash->{hmccu}{localaddr} = $localaddr;
 
@@ -1293,8 +1289,7 @@ sub HMCCURPCPROC_StartRPCServer ($)
 	$procpar{ccuflags}    = AttrVal ($name, 'ccuflags',         'null');
 	$procpar{evttimeout}  = $evttimeout;
 	$procpar{interface}   = $interface;
-	$procpar{flags}       = HMCCU_GetRPCServerInfo ($hmccu_hash, $rpcport, 'flags');
-	$procpar{type}        = HMCCU_GetRPCServerInfo ($hmccu_hash, $rpcport, 'type');
+	($procpar{flags}, $procpar{type}) = HMCCU_GetRPCServerInfo ($hmccu_hash, $rpcport, 'flags,type');
 	$procpar{name}        = $name;
 	$procpar{clkey}       = $clkey;
 	
@@ -1651,7 +1646,6 @@ sub HMCCURPCPROC_SendRequest ($@)
 	
 	if (HMCCU_IsRPCType ($hmccu_hash, $port, 'A')) {
 		# Use XMLRPC
-#		my $clurl = HMCCU_GetRPCServerInfo ($hmccu_hash, $port, 'url');
 		my $clurl = HMCCU_BuildURL ($hmccu_hash, $port);
 		return HMCCU_Log ($hash, 2, "Can't get client URL for port $port", undef)
 			if (!defined ($clurl));
@@ -1664,7 +1658,7 @@ sub HMCCURPCPROC_SendRequest ($@)
 	}
 	elsif (HMCCU_IsRPCType ($hmccu_hash, $port, 'B')) {
 		# Use BINRPC
-		my $serveraddr = HMCCU_GetRPCServerInfo ($hmccu_hash, $port, 'host');
+		my ($serveraddr) = HMCCU_GetRPCServerInfo ($hmccu_hash, $port, 'host');
 		return HMCCU_Log ($hash, 2, "Can't get server address for port $port", undef)
 			if (!defined ($serveraddr));
 	
