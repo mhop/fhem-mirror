@@ -368,46 +368,46 @@ sub Set($$@) {
         else {
             $list = "outdated:noArg";
 
-            if ( defined( $hash->{".fhem"}{npm}{listedpackages} )
-                && defined(
-                    $hash->{".fhem"}{npm}{listedpackages}{dependencies} ) )
-            {
-                my $install;
-                foreach ( keys %fhem_npm_modules ) {
-                    next
-                      if (
-                        defined(
-                            $hash->{".fhem"}{npm}{listedpackages}{dependencies}
-                              {$_}
-                        )
-                      );
-                    $install .= "," if ($install);
-                    $install = "install:fhem-all," unless ($install);
-                    $install .= $_;
-                }
-                $install = "install" unless ($install);
-                $list .= " $install";
+            my $install;
+            foreach ( keys %fhem_npm_modules ) {
+                next
+                  if (
+                    defined( $hash->{".fhem"}{npm}{listedpackages} )
+                    and defined(
+                        $hash->{".fhem"}{npm}{listedpackages}{dependencies}
+                    )
+                    and defined(
+                        $hash->{".fhem"}{npm}{listedpackages}{dependencies}{$_}
+                    )
+                  );
+                $install .= "," if ($install);
+                $install = "install:fhem-all," unless ($install);
+                $install .= $_;
+            }
+            $install = "install" unless ($install);
+            $list .= " $install";
 
-                if (
-                    scalar
+            if (    defined( $hash->{".fhem"}{npm}{listedpackages} )
+                and
+                defined( $hash->{".fhem"}{npm}{listedpackages}{dependencies} )
+                and scalar
+                keys %{ $hash->{".fhem"}{npm}{listedpackages}{dependencies} } >
+                1 )
+            {
+                my $uninstall;
+                foreach (
+                    sort
                     keys %{ $hash->{".fhem"}{npm}{listedpackages}{dependencies}
-                    } > 1 )
-                {
-                    my $uninstall;
-                    foreach (
-                        sort
-                        keys
-                        %{ $hash->{".fhem"}{npm}{listedpackages}{dependencies} }
-                      )
-                    {
-                        next if ( $_ eq "npm" or $_ eq "undefined" );
-                        $uninstall .= "," if ($uninstall);
-                        $uninstall = "uninstall:all,fhem-all,"
-                          unless ($uninstall);
-                        $uninstall .= $_;
                     }
-                    $list .= " $uninstall";
+                  )
+                {
+                    next if ( $_ eq "npm" or $_ eq "undefined" );
+                    $uninstall .= "," if ($uninstall);
+                    $uninstall = "uninstall:all,fhem-all,"
+                      unless ($uninstall);
+                    $uninstall .= $_;
                 }
+                $list .= " $uninstall";
             }
 
             if ( defined( $hash->{".fhem"}{npm}{outdatedpackages} )
@@ -734,7 +734,7 @@ sub ExecuteNpmCommand($) {
 
         # One-time action to add remote hosts key.
         # If key changes, user will need to intervene
-        #  and cleanup known_hosts file manually for security reasons
+        #   and cleanup known_hosts file manually for security reasons
         $cmdPrefix =
             'KEY=$(ssh-keyscan -t ed25519 '
           . $2
@@ -752,63 +752,58 @@ sub ExecuteNpmCommand($) {
         $cmdSuffix = '\' 2>&1';
     }
 
+    my $global = '-g ';
+    my $sudo   = 'sudo -n -E ';
+
+    if ( $cmd->{npmglobal} eq '0' ) {
+        $global = '';
+        $sudo   = '';
+    }
+
     $npm->{nodejsversions} =
         $cmdPrefix
       . 'echo n | node -e "console.log(JSON.stringify(process.versions));" 2>&1'
       . $cmdSuffix;
-    if ( $cmd->{npmglobal} == 0 ) {
-        $npm->{npminstall} =
-            $cmdPrefix
-          . 'echo n | npm install --json --silent --unsafe-perm %PACKAGES% 2>/dev/null'
-          . $cmdSuffix;
-        $npm->{npmuninstall} =
-            $cmdPrefix
-          . 'echo n | npm uninstall --json --silent %PACKAGES% 2>/dev/null'
-          . $cmdSuffix;
-        $npm->{npmupdate} =
-            $cmdPrefix
-          . 'echo n | npm update --json --silent --unsafe-perm %PACKAGES% 2>/dev/null'
-          . $cmdSuffix;
-        $npm->{npmoutdated} =
-            $cmdPrefix
-          . 'echo n | '
-          . 'echo "{' . "\n"
-          . '\"versions\": "; '
-          . 'node -e "console.log(JSON.stringify(process.versions));"; '
-          . 'L1=$(npm list --json --silent --depth=0 2>/dev/null); '
-          . '[ "$L1" != "" ] && [ "$L1" != "\n" ] && echo ", \"listed\": $L1"; '
-          . 'L2=$(npm outdated --json 2>&1); '
-          . '[ "$L2" != "" ] && [ "$L2" != "\n" ] && echo ", \"outdated\": $L2"; '
-          . 'echo "}"'
-          . $cmdSuffix;
-    }
-    else {
-        $npm->{npminstall} =
-            $cmdPrefix
-          . 'echo n | sh -c "sudo -n npm install -g --json --silent --unsafe-perm %PACKAGES%" 2>&1'
-          . $cmdSuffix;
-        $npm->{npmuninstall} =
-            $cmdPrefix
-          . 'echo n | sh -c "sudo -n npm uninstall -g --json --silent %PACKAGES%" 2>&1'
-          . $cmdSuffix;
-        $npm->{npmupdate} = $cmdPrefix
-
-# . 'echo n | sudo -n -E sh -c "npm update -g --json --silent --unsafe-perm %PACKAGES% 2>/dev/null" 2>&1'
-          . 'echo n | sh -c "sudo -n npm update -g --json --silent --unsafe-perm %PACKAGES%" 2>&1'
-          . $cmdSuffix;
-        $npm->{npmoutdated} =
-            $cmdPrefix
-          . 'echo n | '
-          . 'echo "{' . "\n"
-          . '\"versions\": "; '
-          . 'node -e "console.log(JSON.stringify(process.versions));"; '
-          . 'L1=$(npm list -g --json --silent --depth=0 2>/dev/null); '
-          . '[ "$L1" != "" ] && [ "$L1" != "\n" ] && echo ", \"listed\": $L1"; '
-          . 'L2=$(npm outdated -g --json 2>&1); '
-          . '[ "$L2" != "" ] && [ "$L2" != "\n" ] && echo ", \"outdated\": $L2"; '
-          . 'echo "}"'
-          . $cmdSuffix;
-    }
+    $npm->{npminstall} =
+        $cmdPrefix
+      . 'echo n | sh -c "'
+      . $sudo
+      . 'npm install '
+      . $global
+      . '--json --silent --unsafe-perm %PACKAGES%" 2>&1'
+      . $cmdSuffix;
+    $npm->{npmuninstall} =
+        $cmdPrefix
+      . 'echo n | sh -c "'
+      . $sudo
+      . 'npm uninstall '
+      . $global
+      . '--json --silent %PACKAGES%" 2>&1'
+      . $cmdSuffix;
+    $npm->{npmupdate} =
+        $cmdPrefix
+      . 'echo n | sh -c "'
+      . $sudo
+      . 'npm update '
+      . $global
+      . '--json --silent --unsafe-perm %PACKAGES%" 2>&1'
+      . $cmdSuffix;
+    $npm->{npmoutdated} =
+        $cmdPrefix
+      . 'echo n | '
+      . 'echo "{' . "\n"
+      . '\"versions\": "; '
+      . 'node -e "console.log(JSON.stringify(process.versions));"; '
+      . 'L1=$(npm list '
+      . $global
+      . '--json --silent --depth=0 2>/dev/null); '
+      . '[ "$L1" != "" ] && [ "$L1" != "\n" ] && echo ", \"listed\": $L1"; '
+      . 'L2=$(npm outdated '
+      . $global
+      . '--json --silent 2>&1); '
+      . '[ "$L2" != "" ] && [ "$L2" != "\n" ] && echo ", \"outdated\": $L2"; '
+      . 'echo "}"'
+      . $cmdSuffix;
 
     my $response;
 
@@ -822,9 +817,9 @@ sub ExecuteNpmCommand($) {
             elsif ( $1 =~ /^nodejs-v(\d+)/ ) {
                 $npm->{npminstall} =
                     $cmdPrefix
-                  . "echo n | if [ -z \"\$(node --version 2>/dev/null)\" ]; then"
-                  . " curl -sSL https://deb.nodesource.com/setup_$1.x | DEBIAN_FRONTEND=noninteractive sudo -n -E sh -c \"bash - >/dev/null 2>&1\" 2>&1 &&"
-                  . ' DEBIAN_FRONTEND=noninteractive sudo -n -E sh -c "apt-get install -qqy nodejs >/dev/null 2>&1" 2>&1; '
+                  . 'echo n | if [ -z "$(node --version 2>/dev/null)" ]; then'
+                  . ' sh -c "curl -sSL https://deb.nodesource.com/setup_'.$1.'.x | DEBIAN_FRONTEND=noninteractive sudo -n -E bash - >/dev/null 2>&1" 2>&1 &&'
+                  . ' sh -c "DEBIAN_FRONTEND=noninteractive sudo -n -E apt-get install -qqy nodejs >/dev/null 2>&1" 2>&1; '
                   . 'fi; '
                   . 'node -e "console.log(JSON.stringify(process.versions));" 2>&1'
                   . $cmdSuffix;
@@ -1638,7 +1633,7 @@ sub ToDay() {
     "node",
     "npm"
   ],
-  "version": "v0.10.5",
+  "version": "v0.10.6",
   "release_status": "stable",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
