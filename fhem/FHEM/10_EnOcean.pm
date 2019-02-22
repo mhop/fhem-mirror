@@ -360,6 +360,9 @@ my %EnO_eepConfig = (
   "D2.20.00" => {attr => {subType => "fanCtrl.00", webCmd => "fanSpeed"}, GPLOT => "EnO_fanSpeed4humi4:FanSpeed/Humi,"},
   "D2.32.00" => {attr => {subType => "currentClamp.00"}, GPLOT => "EnO_D2-32-xx:Current,"},
   "D2.32.01" => {attr => {subType => "currentClamp.01"}, GPLOT => "EnO_D2-32-xx:Current,"},
+  "D2.34.00" => {attr => {subType => "heatingActuator.00", defaultChannel => 0}, GPLOT => "EnO_D2-34-xx:setpointTemp/temperature,"},
+  "D2.34.01" => {attr => {subType => "heatingActuator.00", defaultChannel => 0}, GPLOT => "EnO_D2-34-xx:setpointTemp/temperature,"},
+  "D2.34.02" => {attr => {subType => "heatingActuator.00", defaultChannel => 0}, GPLOT => "EnO_D2-34-xx:setpointTemp/temperature,"},
   "D2.32.02" => {attr => {subType => "currentClamp.02"}, GPLOT => "EnO_D2-32-xx:Current,"},
   "D2.40.00" => {attr => {subType => "ledCtrlState.00"}, GPLOT => "EnO_dim4:Dim,"},
   "D2.40.01" => {attr => {subType => "ledCtrlState.01"}, GPLOT => "EnO_dim4RGB:DimRGB,"},
@@ -1374,13 +1377,13 @@ sub EnOcean_Get($@)
       $rorg = "A5";
       shift(@a);
       $updateState = 0;
-      if ($cmd eq "state") {
+      if ($cmd eq "status" || $cmd eq "state" ) {
         # query state
         Log3 $name, 3, "EnOcean get $name $cmd";
         $data = "00000008";
 
       } else {
-        $cmdList .= "state:noArg";
+        $cmdList .= "status:noArg";
         return "Unknown argument $cmd, choose one of $cmdList";
       }
 
@@ -1390,19 +1393,19 @@ sub EnOcean_Get($@)
       $rorg = "A5";
       shift(@a);
       $updateState = 0;
-      if ($cmd eq "state") {
+      if ($cmd eq "status" || $cmd eq "state") {
         # query state
         Log3 $name, 3, "EnOcean get $name $cmd";
         $data = "00000008";
 
       } else {
-        $cmdList .= "state:noArg";
+        $cmdList .= "status:noArg";
         return "Unknown argument $cmd, choose one of $cmdList";
       }
 
     } elsif ($st eq "actuator.01") {
       # Electronic switches and dimmers with Energy Measurement and Local Control
-      # (D2-01-00 - D2-01-12)
+      # (D2-01-00 - D2-01-14)
       $rorg = "D2";
       shift(@a);
       my $channel;
@@ -1422,7 +1425,7 @@ sub EnOcean_Get($@)
         }
       }
 
-      if ($cmd eq "state") {
+      if ($cmd eq "status" || $cmd eq "state") {
         $cmdID = 3;
         Log3 $name, 3, "EnOcean get $name $cmd $channel";
         $data = sprintf "%02X%02X", $cmdID, $channel;
@@ -1500,9 +1503,9 @@ sub EnOcean_Get($@)
 
       } else {
         if ($manufID =~ m/^033|046$/) {
-          return "Unknown argument $cmd, choose one of " . $cmdList . "state measurement roomCtrlMode:noArg special settings";
+          return "Unknown argument $cmd, choose one of " . $cmdList . "measurement roomCtrlMode:noArg settings special status";
         } else {
-          return "Unknown argument $cmd, choose one of " . $cmdList . "state measurement roomCtrlMode:noArg settings";
+          return "Unknown argument $cmd, choose one of " . $cmdList . "measurement roomCtrlMode:noArg settings status";
         }
       }
 
@@ -1597,15 +1600,39 @@ sub EnOcean_Get($@)
       $rorg = "D2";
       shift(@a);
       $updateState = 0;
-      if ($cmd eq "state") {
+      if ($cmd eq "status" || $cmd eq "state") {
         # query position and angle
         $data = "F6FFFFFF";
         Log3 $name, 3, "EnOcean get $name $cmd DATA: $data";
 
       } else {
-        $cmdList .= "state:noArg";
+        $cmdList .= "status:noArg";
         return "Unknown argument $cmd, choose one of $cmdList";
       }
+
+    } elsif ($st eq "heatingActuator.00") {
+      # Heating Actuator
+      # (D2-34-00 - D2-34-02)
+      $rorg = "D2";
+      shift(@a);
+      my $channel = shift(@a);
+      $channel = AttrVal($name, "defaultChannel", AttrVal($name, "devChannel", undef)) if (!defined $channel);
+      if (!defined($channel) || defined($channel) && ($channel eq "all" || $channel + 0 >= 30)) {
+        $channel = 30;
+      } elsif ($channel + 0 >= 0 && $channel + 0 <= 29) {
+
+      } else {
+        return "$cmd <channel> wrong, choose 0...29|all.";
+      }
+      if ($cmd eq "status") {
+        $cmdID = 3;
+      } elsif ($cmd eq "setpoint") {
+        $cmdID = 6;
+      } else {
+        return "Unknown argument $cmd, choose one of " . $cmdList . "setpoint status";
+      }
+      $data = sprintf "%02X%02X", $channel << 3, $cmdID;
+      Log3 $name, 3, "EnOcean get $name $cmd $channel";
 
     } elsif ($st eq "heatRecovery.00") {
       # heat recovery ventilation
@@ -1634,7 +1661,7 @@ sub EnOcean_Get($@)
       $rorg = "D2";
       shift(@a);
       $updateState = 0;
-      if ($cmd eq "state") {
+      if ($cmd eq "status" || $cmd eq "state") {
         # query switch state
         $data = "00";
         readingsSingleUpdate($hash, "state", $cmd, 1);
@@ -4403,7 +4430,7 @@ sub EnOcean_Set($@)
 
     } elsif ($st eq "actuator.01") {
       # Electronic switches and dimmers with Energy Measurement and Local Control
-      # (D2-01-00 - D2-01-12)
+      # (D2-01-00 - D2-01-14)
       $rorg = "D2";
       #$updateState = 0;
       my $cmdID;
@@ -5997,6 +6024,117 @@ sub EnOcean_Set($@)
       $data = sprintf "%02X%02X%02X%02X", ($opMode << 4) | ($tempLevel << 1),
                                           ($humidityCtrl << 6) | ($roomSizeRef << 4) | $roomSize,
                                           $humiThreshold, $fanSpeed;
+
+    } elsif ($st eq "heatingActuator.00") {
+      # Heating Actuator
+      # (D2-34-00 - D2-34-02)
+      $rorg = "D2";
+      my ($cmdID, $cfg, $channel, $overridePeriod, $setpointTemp, $setpointTempShift) = (5, 0, undef, 0, 20, 0);
+
+      if ($cmd eq "setpointTempRefDev") {
+        shift(@a);
+        $cfg = 0;
+        $channel = shift(@a);
+        $channel = AttrVal($name, "defaultChannel", AttrVal($name, "devChannel", undef)) if (!defined $channel);
+        if (!defined($channel) || defined($channel) && ($channel eq "all" || $channel + 0 >= 30)) {
+          CommandDeleteReading(undef, "$name channel.*");
+          CommandDeleteReading(undef, "$name overridePeriod.*");
+          CommandDeleteReading(undef, "$name setpointTemp.*");
+          CommandDeleteReading(undef, "$name setpointTempRefDev.*");
+          CommandDeleteReading(undef, "$name setpointTempShift.*");
+          readingsSingleUpdate($hash, "channelAll", "setpointTempRefDev", 1);
+          $channel = 30;
+        } elsif ($channel + 0 >= 0 && $channel + 0 <= 29) {
+          CommandDeleteReading(undef, "$name overridePeriod" . $channel);
+          CommandDeleteReading(undef, "$name setpointTemp" . $channel);
+          CommandDeleteReading(undef, "$name setpointTempShift" . $channel);
+          readingsSingleUpdate($hash, "channel" . $channel, "setpointTempRefDev", 1);
+        } else {
+          return "$cmd $channel wrong, choose 0...29|all.";
+        }
+
+      } elsif ($cmd eq "setpointTemp") {
+        shift(@a);
+        $cfg = 1;
+        $setpointTemp = shift(@a);
+        if (!defined($setpointTemp) || $setpointTemp !~ m/^[+-]?\d+(\.\d+)?$/ || $setpointTemp < 0 || $setpointTemp > 40) {
+          return "Usage: $cmd variable is not numeric or out of range.";
+        }
+        $channel = shift(@a);
+        if (defined $channel) {
+          $overridePeriod = shift(@a);
+          if (defined $overridePeriod) {
+            if ($overridePeriod !~ m/^[+-]?\d+$/ || $overridePeriod < 0 || $overridePeriod > 63) {
+              return "Usage: $cmd <setpointTemp> <channel> $overridePeriod is not numeric or out of range.";
+            }
+          }
+        } else {
+          $channel = AttrVal($name, "defaultChannel", AttrVal($name, "devChannel", 'all'));
+          $overridePeriod = 0;
+        }
+        if ($channel eq "all" || $channel + 0 >= 30) {
+          CommandDeleteReading(undef, "$name channel.*");
+          CommandDeleteReading(undef, "$name overridePeriod.*");
+          CommandDeleteReading(undef, "$name setpointTemp.*");
+          CommandDeleteReading(undef, "$name setpointTempRefDev.*");
+          CommandDeleteReading(undef, "$name setpointTempShift.*");
+          readingsSingleUpdate($hash, "overridePeriodAll", $overridePeriod, 1);
+          readingsSingleUpdate($hash, "setpointTempAll", sprintf("%0.1f", $setpointTemp), 1);
+          readingsSingleUpdate($hash, "channelAll", "setpointTemp", 1);
+          $channel = 30;
+        } elsif ($channel + 0 >= 0 && $channel + 0 <= 29) {
+          readingsSingleUpdate($hash, "overridePeriod" . $channel, $overridePeriod, 1);
+          readingsSingleUpdate($hash, "setpointTemp" . $channel, sprintf("%0.1f", $setpointTemp), 1);
+          readingsSingleUpdate($hash, "channel" . $channel, "setpointTemp", 1);
+        } else {
+          return "Usage: $cmd <setpointTemp> $channel wrong, choose 0...29|all.";
+        }
+
+      } elsif ($cmd eq "setpointTempShift") {
+        shift(@a);
+        $setpointTempShift = shift(@a);
+        if (!defined($setpointTempShift) || $setpointTempShift !~ m/^[+-]?\d+(\.\d+)?$/ || $setpointTempShift < -10 || $setpointTempShift > 10) {
+          return "Usage: $cmd variable is not numeric or out of range.";
+        }
+        $channel = shift(@a);
+        if (defined $channel) {
+          $overridePeriod = shift(@a);
+          if (defined $overridePeriod) {
+            if ($overridePeriod !~ m/^[+-]?\d+$/ || $overridePeriod < 0 || $overridePeriod > 63) {
+              return "Usage: $cmd <setpointTemp> <channel> $overridePeriod is not numeric or out of range.";
+            }
+          }
+        } else {
+          $channel = AttrVal($name, "defaultChannel", AttrVal($name, "devChannel", 'all'));
+          $overridePeriod = 0;
+        }
+        if ($channel eq "all" || $channel + 0 >= 30) {
+          CommandDeleteReading(undef, "$name channel.*");
+          CommandDeleteReading(undef, "$name overridePeriod.*");
+          CommandDeleteReading(undef, "$name setpointTemp.*");
+          CommandDeleteReading(undef, "$name setpointTempRefDev.*");
+          CommandDeleteReading(undef, "$name setpointTempShift.*");
+          readingsSingleUpdate($hash, "overridePeriodAll", $overridePeriod, 1);
+          readingsSingleUpdate($hash, "setpointTempShiftAll", sprintf("%0.1f", $setpointTempShift), 1);
+          readingsSingleUpdate($hash, "channelAll", "setpointTempShift", 1);
+          $channel = 30;
+        } elsif ($channel >= 0 && $channel <= 29) {
+          readingsSingleUpdate($hash, "overridePeriod" . $channel, $overridePeriod, 1);
+          readingsSingleUpdate($hash, "setpointTempShift" . $channel, sprintf("%0.1f", $setpointTempShift), 1);
+          readingsSingleUpdate($hash, "channel" . $channel, "setpointTempShift", 1);
+        } else {
+          return "Usage: $cmd <setpointTempShift> <overridePeriod> $channel wrong, choose 0...29|all.";
+        }
+        $cfg = $setpointTempShift >= 0 ? 2 : 3;
+        $setpointTempShift = abs($setpointTempShift * 10);
+
+      } else {
+        $cmdList .= "setpointTemp setpointTempRefDev setpointTempShift";
+        return "Unknown argument $cmd, choose one of $cmdList";
+      }
+      Log3 $name, 3, "EnOcean set $name $cmd";
+      $setpointTemp = abs($setpointTemp * 10);
+      $data = sprintf "%02X%04X%02X%02X", $cfg << 6 | $overridePeriod, $setpointTempShift << 9 | $setpointTemp, $channel << 3, $cmdID;
 
     } elsif ($st eq "heatRecovery.00") {
       # heat recovery ventilation
@@ -11431,6 +11569,51 @@ sub EnOcean_Parse($$)
           push @event, "3:current3:" . $current3;
           push @event, "3:state:I1: $current1 I2: $current2 I3: $current3";
         }
+      }
+
+    } elsif ($st eq "heatingActuator.00") {
+      # Heating Actuator
+      # (D2-34-00 - D2-34-02)
+      my ($channel, $cmd) = (undef, $db[0] & 0x0F);
+      if ($cmd == 4) {
+        # actuator status response
+        $channel = ((hex substr($data, 4, 4)) & 0x03E0) >> 5;
+        my @operationMode = ('off', 'temperature_unknown', 'no_heating', 'heating');
+        if ($channel == 30) {
+          $channel = "All";
+          CommandDeleteReading(undef, "$name channel.*");
+          CommandDeleteReading(undef, "$name operationMode.*");
+          CommandDeleteReading(undef, "$name overridePeriod.*");
+          CommandDeleteReading(undef, "$name setpointTemp.*");
+          CommandDeleteReading(undef, "$name setpointTempRefDev.*");
+          CommandDeleteReading(undef, "$name setpointTempShift.*");
+        }
+        push @event, "3:temperature" . $channel . ":" . sprintf("%0.1f", (((hex(substr($data, 0, 4))) & 0xFF80) >> 7) / 10);
+        push @event, "3:setpointTemp" . $channel . ":" . sprintf("%0.1f", (((hex(substr($data, 2, 4))) & 0x7FC0) >> 6) / 10);
+        push @event, "3:operationMode" . $channel . ":" . $operationMode[($db[1] & 0x3C) >> 2];
+        push @event, "3:state:" . $channel . ': ' . $operationMode[($db[1] & 0x3C) >> 2];
+
+      } elsif ($cmd == 7) {
+        # actuator setpoint response
+        $channel = ($db[1] & 0x7C) >> 2;
+        my @channel = ('setpointTempRefDev', 'setpointTemp', 'setpointTempShift', 'setpointTempShift');
+        if ($channel == 30) {
+          $channel = "All";
+          CommandDeleteReading(undef, "$name channel.*");
+          CommandDeleteReading(undef, "$name operationMode.*");
+          CommandDeleteReading(undef, "$name overridePeriod.*");
+          CommandDeleteReading(undef, "$name setpointTemp.*");
+          CommandDeleteReading(undef, "$name setpointTempRefDev.*");
+          CommandDeleteReading(undef, "$name setpointTempShift.*");
+        }
+        push @event, "3:channel" . $channel . ":" . $channel[($db[5] & 0xC0) >> 6];
+        push @event, "3:overridePeriod" . $channel . ":" . ($db[5] & 0x3F);
+        push @event, "3:setpointTempRefDev" . $channel . ":" . sprintf("%0.1f", (((hex(substr($data, 2, 4))) & 0xFF80) >> 7) / 10);
+        push @event, "3:setpointTempShift" . $channel . ":" . sprintf("%0.1f", ($db[3] & 0x7F) / 10 * ((($db[5] & 0xC0) >> 6) == 3 ? -1 : 1));
+        push @event, "3:setpointTemp" . $channel . ":" . sprintf("%0.1f", (((hex(substr($data, 6, 4))) & 0xFF80) >> 7) / 10);
+
+      } else {
+        # unknown response
       }
 
     } elsif ($st eq "ledCtrlState.00") {
@@ -18569,6 +18752,31 @@ EnOcean_Delete($$)
     </li>
     <br><br>
 
+    <li>Heating Actuator (D2-34-00 - D2-34-02)<br>
+        [AWAG UPS230/10, UPS230/12, REGH12/08M]<br>
+    <ul>
+    <code>set &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is
+       <li>setpointTemp t/&#176C [&lt;channel&gt; [&lt;overrideTime/h&gt;]]<br>
+         set the temperatur setpoint</li>
+       <li>setpointTempRefDev<br>
+         enable the temperature setpoint via room control unit</li>
+      <li>setpointTempShift t/K [&lt;channel&gt; [&lt;overrideTime/h&gt;]]<br>
+         set the temperatur setpoint shift</li>
+    </ul><br>
+       [setpointTemp] t = 0 &#176C ... 40 &#176C<br>
+       [setpointTempShift] t = Range: t = -10 K ... 10 K<br>
+       [channel] = 0...29|all, all is default<br>
+       The default channel can be specified with the attr <a href="#EnOcean_defaultChannel">defaultChannel</a>.<br>
+       [overrideTime] = 0 h ... 63 h, 0 is default (endless)<br>
+       Duration of the override until fallback to the room control panel setpointTemp value.
+       The attr subType must be heatingActuator.00. This is done if the device was
+       created by autocreate. To control the device, it must be bidirectional paired,
+       see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.
+    </li>
+    <br><br>
+
     <li>Heat Recovery Ventilation (D2-50-00 - D2-50-11)<br>
         [untested]<br>
     <ul>
@@ -18747,13 +18955,13 @@ EnOcean_Delete($$)
       Trigger status messages of the device.
     </li><br><br>
 
-    <li>Dual Channel Switch Actuator (EEP A5-11-059)<br>
+    <li>Dual Channel Switch Actuator (EEP A5-11-05)<br>
          [untested]<br>
     <ul>
     <code>get &lt;name&gt; &lt;value&gt;</code>
     <br><br>
     where <code>value</code> is
-      <li>state<br>
+      <li>status<br>
         status request</li>
     </ul><br>
         The attr subType or subTypSet must be switch.05. This is done if the device was created by autocreate.
@@ -18766,7 +18974,7 @@ EnOcean_Delete($$)
     <code>get &lt;name&gt; &lt;value&gt;</code>
     <br><br>
     where <code>value</code> is
-      <li>state<br>
+      <li>status<br>
         status request</li>
     </ul><br>
         The attr subType or subTypSet must be lightCtrl.01. This is done if the device was created by autocreate.<br>
@@ -18784,7 +18992,7 @@ EnOcean_Delete($$)
        get pilot wire mode</li>
        <li>settings [&lt;channel&gt;]<br>
        get external interface settings</li>
-       <li>state [&lt;channel&gt;]<br>
+       <li>status [&lt;channel&gt;]<br>
        </li>
        <li>measurement &lt;channel&gt; energy|power<br>
        </li>
@@ -18871,10 +19079,27 @@ EnOcean_Delete($$)
     <code>get &lt;name&gt; &lt;value&gt;</code>
     <br><br>
     where <code>value</code> is
-       <li>state<br>
+       <li>status<br>
          get the state of the room controler</li>
     </ul><br>
        The attr subType must be fanCtrl.00. This is done if the device was
+       created by autocreate. To control the device, it must be bidirectional paired,
+       see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.
+    </li>
+    <br><br>
+
+    <li>Heating Actuator (D2-34-00 - D2-34-02)<br>
+        [AWAG UPS230/10, UPS230/12, REGH122/08M]<br>
+    <ul>
+    <code>get &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is
+       <li>setpoint<br>
+         get the setpoint infos of the heating actuator</li>
+       <li>status<br>
+         get the state of the heating actuator</li>
+    </ul><br>
+       The attr subType must be heatingActuator.00. This is done if the device was
        created by autocreate. To control the device, it must be bidirectional paired,
        see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.
     </li>
@@ -21307,6 +21532,30 @@ EnOcean_Delete($$)
      </ul><br>
        The attr subType must be currentClamp.00|currentClamp.01|currentClamp.02. This is done if the device was
        created by autocreate.
+     </li>
+     <br><br>
+
+     <li>Heating Actuator (D2-34-00 - D2-34-02)<br>
+        [AWAG UPS230/10, UPS230/12, REGH12/08M]<br>
+     <ul>
+        <li>&lt;0...29|All&gt;: heating</li>
+        <li>&lt;0...29|All&gt;: no_heating</li>
+        <li>&lt;0...29|All&gt;: off</li>
+        <li>&lt;0...29|All&gt;: temperature_unknown</li>
+        <li>channel&lt;0...29|All&gt;: setpointTempRefDev|setpointTemp|setpointTempShift</li>
+        <li>operationMode&lt;1...29|All&gt;: heating|no_heating|off|temperature_unknown</li>
+        <li>overridePeriod&lt;1...29|All|&gt;: t/h</li>
+        <li>setpointTemp&lt;1...29|All&gt;: t/&#176C</li>
+        <li>setpointTempRefDev&lt;1...29|All&gt;: t/&#176C</li>
+        <li>setpointTempShift&lt;1...29|All&gt;: t/K</li>
+        <li>teach: &lt;result of teach procedure&gt;</li>
+        <li>temperature&lt;1...29|All&gt;: t/&#176C</li>
+        <li>state:&lt;0...29|All&gt;: heating|no_heating|off|temperature_unknownt</li>
+     </ul>
+        <br>
+        The attr subType must be heatingActuator.00. This is done if the device was
+        created by autocreate. To control the device, it must be bidirectional paired,
+        see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.
      </li>
      <br><br>
 
