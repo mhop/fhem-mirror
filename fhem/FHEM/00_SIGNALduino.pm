@@ -1,6 +1,6 @@
 # $Id$
 #
-# v3.3.3 (stable release 3.3)
+# v3.3.4 (stable release 3.3)
 # The module is inspired by the FHEMduino project and modified in serval ways for processing the incoming messages
 # see http://www.fhemwiki.de/wiki/SIGNALDuino
 # It was modified also to provide support for raw message handling which can be send from the SIGNALduino
@@ -250,10 +250,15 @@ SIGNALduino_Initialize($)
   #ours %attr{};
 
   %ProtocolListSIGNALduino = SIGNALduino_LoadProtocolHash("$attr{global}{modpath}/FHEM/lib/signalduino_protocols.hash");
+  #Log3 "SIGNALduino", 1, "%ProtocolListSIGNALduino=" .Dumper(%ProtocolListSIGNALduino);
   if (exists($ProtocolListSIGNALduino{error})  ) {
-  	Log3 "SIGNALduino", 1, "Error loading Protocol Hash. Module is in inoperable mode error message:($ProtocolListSIGNALduino{error})";
+  	Log3 "SIGNALduino", 1, "Error loading protocol hash. module is not in standalone mode:($ProtocolListSIGNALduino{error}). Try loading from svn.fhem.de";
   	delete($ProtocolListSIGNALduino{error});
-  	return undef;
+  	%ProtocolListSIGNALduino = eval GetFileFromURL("https://svn.fhem.de/fhem/trunk/fhem/FHEM/lib/signalduino_protocols.hash",4,"",1,4);
+  	if (!%ProtocolListSIGNALduino) {
+  	  	Log3 "SIGNALduino", 1, "Error reloading protocol hash dynamic from svn.fhem.de. Module is in inoperable mode.";
+	  	return undef;
+  	}
   }
 }
 #
@@ -4534,7 +4539,7 @@ sub SIGNALduino_githubParseHttpResponse($$$)
 
 =pod
 =item summary    supports the same low-cost receiver for digital signals
-=item summary_DE Unterstuetzt den gleichnamigen Low-Cost Empf&aumlnger fuer digitale Signale
+=item summary_DE Unterstuetzt den gleichnamigen Low-Cost Empfaenger fuer digitale Signale
 =begin html
 
 <a name="SIGNALduino"></a>
