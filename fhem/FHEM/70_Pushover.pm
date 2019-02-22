@@ -60,6 +60,13 @@ sub Pushover_Define($$) {
               if ( !Pushover_addExtension( $name, "Pushover_CGI", $infix ) );
         }
 
+        # set default settings on first define
+        if ( $init_done && !defined( $hash->{OLDDEF} ) ) {
+
+            # presets for FHEMWEB
+            $attr{$name}{icon} = 'pushover';
+        }
+
         # start Validation Timer
         RemoveInternalTimer($hash);
         if (   ReadingsVal( $name, "tokenState", "invalid" ) ne "valid"
