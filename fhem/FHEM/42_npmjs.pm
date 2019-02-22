@@ -268,6 +268,9 @@ sub Set($$@) {
     if ( $cmd eq 'outdated' ) {
         $hash->{".fhem"}{npm}{cmd} = $cmd;
     }
+    elsif ( lc($cmd) eq 'statusrequest' ) {
+        $hash->{".fhem"}{npm}{cmd} = 'getNodeVersion';
+    }
     elsif ( $cmd eq 'update' ) {
         if ( defined( $args[0] ) and ( lc( $args[0] ) eq "fhem-all" ) ) {
             return "Please run outdated check first"
@@ -363,7 +366,7 @@ sub Set($$@) {
 
         if ( !defined( $hash->{".fhem"}{npm}{nodejsversions} ) ) {
             $list =
-              "install:nodejs-v11,nodejs-v10,nodejs-v8,nodejs-v6,statusRequest";
+"install:nodejs-v11,nodejs-v10,nodejs-v8,nodejs-v6 statusRequest:noArg";
         }
         else {
             $list = "outdated:noArg";
@@ -811,14 +814,13 @@ sub ExecuteNpmCommand($) {
         if (   not defined( $cmd->{nodejsversions} )
             or not defined( $cmd->{nodejsversions}{node} ) )
         {
-            if ( lc($1) eq "statusrequest" ) {
-                $npm->{npminstall} = $npm->{nodejsversions};
-            }
-            elsif ( $1 =~ /^nodejs-v(\d+)/ ) {
+            if ( $1 =~ /^nodejs-v(\d+)/ ) {
                 $npm->{npminstall} =
                     $cmdPrefix
                   . 'echo n | if [ -z "$(node --version 2>/dev/null)" ]; then'
-                  . ' sh -c "curl -sSL https://deb.nodesource.com/setup_'.$1.'.x | DEBIAN_FRONTEND=noninteractive sudo -n -E bash - >/dev/null 2>&1" 2>&1 &&'
+                  . ' sh -c "curl -sSL https://deb.nodesource.com/setup_'
+                  . $1
+                  . '.x | DEBIAN_FRONTEND=noninteractive sudo -n -E bash - >/dev/null 2>&1" 2>&1 &&'
                   . ' sh -c "DEBIAN_FRONTEND=noninteractive sudo -n -E apt-get install -qqy nodejs >/dev/null 2>&1" 2>&1; '
                   . 'fi; '
                   . 'node -e "console.log(JSON.stringify(process.versions));" 2>&1'
@@ -1488,6 +1490,8 @@ sub ToDay() {
   <br>
   <a name="npmjsset" id="npmjsset"></a><b>Set</b>
   <ul>
+    <li>statusRequest - Update Node.js installation status
+    </li>
     <li>outdated - fetch information about update state
     </li>
     <li>update - trigger complete or selected update process. this will take a moment
