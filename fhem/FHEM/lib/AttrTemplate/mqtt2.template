@@ -417,7 +417,22 @@ attr DEVICE setList \
   POWER1:on,off,toggle cmnd/DEVNAME/POWER1 $EVTPART1\
   POWER2:on,off,toggle cmnd/DEVNAME/POWER2 $EVTPART1
 attr DEVICE webCmd POWER1 on:POWER1 off:POWER2 on:POWER2 off
-attr DEVICE stateFormat P1: POWER1 P2: POWER2
+attr DEVICE devStateIcon Online:10px-kreis-gruen@green Offline:10px-kreis-rot@red 1.on:on:POWER1+off 1.off:off:POWER1+on 2.on:on:POWER2+off 2.off:off:POWER2+on
+attr DEVICE readingList \
+  tele/DEVNAME/LWT:.* LWT\
+  tele/DEVNAME/STATE:.* { json2nameValue($EVENT) }\
+  tele/DEVNAME/SENSOR:.* { json2nameValue($EVENT) }\
+  tele/DEVNAME/INFO.:.* { json2nameValue($EVENT) }\
+  stat/DEVNAME/RESULT:.* { json2nameValue($EVENT) }\
+  tele/DEVNAME/UPTIME:.* { json2nameValue($EVENT) }\
+  stat/DEVNAME/POWER1:.* POWER1\
+  stat/DEVNAME/POWER2:.* POWER2
+attr DEVICE stateFormat LWT\
+1:POWER1\
+2:POWER2\
+<br>\
+<a href="http://IPAddress" target="_blank">IPAddress</a>
+attr DEVICE webCmd POWER1:POWER2
 attr DEVICE model A_02a_tasmota_2ch_unified
 
 # sonoff 2 channel device flashed with Tasmota.
@@ -466,12 +481,12 @@ attr DEVICE readingList \
   stat/DEVNAME/POWER3:.* POWER3\
   stat/DEVNAME/POWER4:.* POWER4
 attr DEVICE stateFormat LWT\
-  1:POWER1\
-  2:POWER2\
-  3:POWER3\
-  4:POWER4\
-  <br>\
-  <a href="http://IPAddress" target="_blank">IPAddress</a>
+1:POWER1\
+2:POWER2\
+3:POWER3\
+4:POWER4\
+<br>\
+<a href="http://IPAddress" target="_blank">IPAddress</a>
 attr DEVICE webCmd POWER1:POWER2:POWER3:POWER4
 attr DEVICE model A_04b_tasmota_4ch_unified_icon
 
