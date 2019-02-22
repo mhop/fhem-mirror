@@ -1,0 +1,28 @@
+##############################################
+# $Id$
+
+# Attribute 'small' is useful for gnuplot/-scroll only,
+# if plotsize is less than 800,400
+#set terminal png transparent small size <SIZE> crop
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set ytics
+#set y2tics
+set title '<TL>'
+set grid xtics ytics
+set ylabel "t/C"
+#set y2label "rH/%"
+
+#FileLog 4:temperature0\x3a:0:
+#FileLog 4:setpointTemp0\x3a:0:
+#FileLog 4:setpointTempRefDev0\x3a:0:
+#FileLog 4:setpointTempShift0\x3a:0:
+
+plot "<IN>" using 1:2 ls l0 axes x1y1 title 'Temperature' with lines,\
+     "<IN>" using 1:2 ls l1 axes x1y1 title 'Setpoint Temperature' with steps,\
+     "<IN>" using 1:2 ls l2 axes x1y1 title 'Setpoint Temperature RefDev' with steps,\
+     "<IN>" using 1:2 ls l3 axes x1y1 title 'Setpoint Temperature Shift' with steps
