@@ -75,6 +75,9 @@
 #   2019-01-29  changed handling of analog pins to better support future boards like ESP32
 #   2019-02-14  fixed typo in attr definitions
 #   2019-02-15  fixed bug in configureDevice
+#   2019-02-18  fix name of pinHistory Reading (pinName)
+#   2019-02-23  get History
+#   2019-02-23  added MaxHist attribute
 #
 # ideas / todo:
 #
@@ -98,7 +101,7 @@ use strict;
 use warnings;                        
 use Time::HiRes qw(gettimeofday);    
 
-my $ArduCounter_Version = '6.10 - 16.2.2019';
+my $ArduCounter_Version = '6.13 - 23.2.2019';
 
 
 my %ArduCounter_sets = (  
@@ -112,8 +115,9 @@ my %ArduCounter_sets = (
 );
 
 my %ArduCounter_gets = (  
-    "info"   =>  "",
-    "levels" =>  ""
+    "info"    =>  "",
+    "history" =>  "",
+    "levels"  =>  ""
 );
 
  
@@ -189,6 +193,7 @@ sub ArduCounter_Initialize($)
         'nextOpenDelay ' .
         'silentReconnect:0,1 ' .
         'openTimeout ' .
+        'MaxHist ' .
         
         'disable:0,1 ' .
         'do_not_notify:1,0 ' . 
@@ -204,7 +209,7 @@ sub ArduCounter_Initialize($)
 sub ArduCounter_Define($$)
 {
     my ($hash, $def) = @_;
-    my @a = split( "[ \t\n]+", $def );
+    my @a = split( /[ \t\n]+/, $def );
 
     return "wrong syntax: define <name> ArduCounter devicename\@speed"
       if ( @a < 3 );
@@ -389,7 +394,7 @@ sub ArduCounter_Ready($)
 sub ArduCounter_DelayedOpen($)
 {
     my $param = shift;
-    my (undef,$name) = split(':',$param);
+    my (undef,$name) = split(/:/,$param);
     my $hash = $defs{$name};
     
     Log3 $name, 4, "$name: try to reopen connection after delay";
@@ -466,7 +471,7 @@ sub ArduCounter_Caller()
 sub ArduCounter_AskForHello($)
 {
     my $param = shift;
-    my (undef,$name) = split(':',$param);
+    my (undef,$name) = split(/:/,$param);
     my $hash = $defs{$name};
     
     Log3 $name, 3, "$name: sending h(ello) to device to ask for version";
@@ -485,7 +490,7 @@ sub ArduCounter_AskForHello($)
 sub ArduCounter_HelloTimeout($)
 {
     my $param = shift;
-    my (undef,$name) = split(':',$param);
+    my (undef,$name) = split(/:/,$param);
     my $hash = $defs{$name};
     Log3 $name, 3, "$name: device didn't reply to h(ello). Is the right sketch flashed? Is speed set to 38400?";
     delete $hash->{WaitForHello};
@@ -499,7 +504,7 @@ sub ArduCounter_HelloTimeout($)
 sub ArduCounter_KeepAlive($)
 {
     my $param = shift;
-    my (undef,$name) = split(':',$param);
+    my (undef,$name) = split(/:/,$param);
     my $hash = $defs{$name};
     my $now = gettimeofday();
     
@@ -529,7 +534,7 @@ sub ArduCounter_KeepAlive($)
 sub ArduCounter_AliveTimeout($)
 {
     my $param = shift;
-    my (undef,$name) = split(':',$param);
+    my (undef,$name) = split(/:/,$param);
     my $hash = $defs{$name};
     Log3 $name, 3, "$name: device didn't reply to k(eeepAlive), setting to disconnected and try to reopen";
     delete $hash->{WaitForAlive};
@@ -550,7 +555,7 @@ sub ArduCounter_AliveTimeout($)
 sub ArduCounter_ConfigureDevice($)
 {
     my $param = shift;
-    my (undef,$name) = split(':',$param);
+    my (undef,$name) = split(/:/,$param);
     my $hash = $defs{$name};
     
     # todo: check if device got disconnected in the meantime!
@@ -583,6 +588,18 @@ sub ArduCounter_ConfigureDevice($)
             }
         } else {
             Log3 $name, 3, "$name: ConfigureDevice: can not compare against interval attr - wrong format";         
+        }
+
+        my $vAttr = AttrVal($name, "devVerbose", "");     
+        if (!$vAttr) {
+            $vAttr = 0;
+            Log3 $name, 5, "$name: ConfigureDevice: devVerbose attr not set - take default $iAttr";
+        }
+        my $vRCfg = ($hash->{runningCfg}{V} ? $hash->{runningCfg}{V} : 0);
+        Log3 $name, 5, "$name: ConfigureDevice: comparing devVerbose $vRCfg vs $vAttr from attr)";
+        if ($vRCfg != $vAttr) {
+            Log3 $name, 5, "$name: ConfigureDevice: devVerbose don't match ($vRCfg vs $vAttr from attr)";
+            last CHECKS;
         }
         
         my $tAttr = AttrVal($name, "analogThresholds", ""); 
@@ -639,6 +656,8 @@ sub ArduCounter_ConfigureDevice($)
         Log3 $name, 5, "$name: ConfigureDevice: running config matches attributes";
         return;
     }
+    # todo: check for additional pins also when rest matches (return above is too early)
+    
     Log3 $name, 5, "$name: ConfigureDevice: now check for pins without attr in @runningPins";
     my %cPins;      # get all pins from running config in a hash to find out if one is not defined on fhem side
     for (my $i = 0; $i < @runningPins; $i++) {
@@ -648,7 +667,7 @@ sub ArduCounter_ConfigureDevice($)
     # send attributes to arduino device. Just call ArduCounter_Attr again
     Log3 $name, 3, "$name: ConfigureDevice: no match -> send config";
     while (my ($aName, $val) = each(%{$attr{$name}})) {
-        if ($aName =~ /^(interval|analogThresholds)/) {
+        if ($aName =~ /^(interval|devVerbose|analogThresholds)/) {
             Log3 $name, 5, "$name: ConfigureDevice calls Attr with $aName $val";
             ArduCounter_Attr("set", $name, $aName, $val); 
         } elsif ($aName =~ /^pin([dDaA])?([\d+]+)/) {
@@ -703,7 +722,7 @@ sub ArduCounter_Attr(@)
             my $pinType = $1;
             my $pin     = $2;
             if ($hash->{allowedPins}) {             # list of allowed pins received with hello
-                my %pins = map { $_ => 1 } split (",", $hash->{allowedPins});
+                my %pins = map { $_ => 1 } split (/,/, $hash->{allowedPins});
                 if ($init_done && %pins && !$pins{$pin}) {
                     Log3 $name, 3, "$name: Invalid pin in attr $name $aName $aVal";
                     return "Invalid / disallowed pin specification $aName. The board reports $hash->{allowedPins} as allowed.";
@@ -824,7 +843,7 @@ sub ArduCounter_Attr(@)
         #Log3 $name, 3, "$name: attribute $aName checking ";
         if (" $modHash->{AttrList} " !~ m/ ${aName}[ :;]/) {
             # nicht direkt in der Liste -> evt. wildcard attr in AttrList
-            foreach my $la (split " ", $modHash->{AttrList}) {
+            foreach my $la (split / /, $modHash->{AttrList}) {
                 $la =~ /([^:;]+)(:?.*)/;
                 my $vgl = $1;           # attribute name in list - probably a regex
                 my $opt = $2;           # attribute hint in list
@@ -836,7 +855,7 @@ sub ArduCounter_Attr(@)
                         my $ualist = $attr{$name}{userattr};
                         $ualist = "" if(!$ualist);  
                         my %uahash;
-                        foreach my $a (split(" ", $ualist)) {
+                        foreach my $a (split(/ /, $ualist)) {
                             if ($a !~ /^${aName}$/) {    # entry in userattr list is attribute without hint
                                 $uahash{$a} = 1;
                             } else {
@@ -887,7 +906,7 @@ sub ArduCounter_Flash($$)
     my ($hash, @args) = @_;
     my $name = $hash->{NAME};
     my $log = "";   
-    my @deviceName = split('@', $hash->{DeviceName});
+    my @deviceName = split(/@/, $hash->{DeviceName});
     my $port = $deviceName[0];
     my $firmwareFolder = "./FHEM/firmware/";
     my $logFile = AttrVal("global", "logdir", "./log") . "/ArduCounterFlash.log";
@@ -1050,6 +1069,23 @@ sub ArduCounter_Get($@)
         my ($err, $msg) = ArduCounter_ReadAnswer($hash, 'Next report in.*seconds');        
         return ($err ? $err : $msg);
         
+    } elsif ($attr eq "history") {
+        Log3 $name, 3, "$name: get history";
+        $hash->{HistIdx} = 0 if (!defined($hash->{HistIdx}));
+        my $idx   = $hash->{HistIdx};           # HistIdx points to the next slot to be overwritten
+        my $ret   = "";
+        my $count = 0;
+        my $histLine;
+        while ($count < AttrVal($name, "MaxHist", 1000)) {
+            if (defined ($hash->{History}[$idx])) {
+                $ret .= $hash->{History}[$idx] . "\n";
+            }
+            $idx++;
+            $count++;
+            $idx = 0 if ($idx > AttrVal($name, "MaxHist", 1000));
+        }
+        return ($ret ? $ret : "no history data so far");
+        
     } elsif ($attr eq "levels") {
         my $msg = "";
         foreach my $level (sort {$a <=> $b} keys %{$hash->{analogLevels}}) {
@@ -1138,7 +1174,7 @@ sub ArduCounter_ParseHello($$$)
             if ($hash->{allowedPins} && $hash->{Board}) {
                 my $newAllowed;
                 my $first = 1;
-                foreach my $pin (split (",", $hash->{allowedPins})) {
+                foreach my $pin (split (/,/, $hash->{allowedPins})) {
                     $newAllowed .= ($first ? '' : ','); # separate by , if not empty anymore
                     $newAllowed .= $pin;
                     if ($rAnalogPinMap{$hash->{Board}}{$pin}) {
@@ -1439,6 +1475,45 @@ sub ArduCounter_ParseReport($$)
 }
 
 
+sub ArduCounter_HandleHistory($$$$) 
+{
+    my ($hash, $now, $pinName, $hist) = @_;
+    my $name  = $hash->{NAME};
+    my @hList = split(/[, ]/, $hist);
+    
+    Log3 $name, 5, "$name: HandleHistory " . ($hash->{CL} ? "client $hash->{CL}{NAME}" : "no CL");
+    
+    foreach my $he (@hList) {
+        if ($he) {
+            if ($he =~ /([\d]+)s([\d-]+)\/([\d]+)@([01])(.)/) {
+                my ($seq, $time, $len, $level, $act) = ($1, $2, $3, $4, $5);
+                my $fTime = FmtDateTime($now + ($time/1000));
+                my $action ="";
+                if    ($act eq "C") {$action = "count"} 
+                elsif ($act eq "G") {$action = "gap"} 
+                elsif ($act eq "R") {$action = "reject"} 
+                elsif ($act eq "X") {$action = "ignore drop"} 
+                elsif ($act eq "P") {$action = "ignore peak"} 
+                my $histLine = "$seq $fTime " . sprintf ("%7s", $len/1000) . " seconds at $level -> $action";
+                Log3 $name, 5, "$name: HandleHistory $histLine ($he)";
+                $hash->{LastHistSeq} = $seq -1 if (!defined($hash->{LastHistSeq}));
+                $hash->{HistIdx}     = 0 if (!defined($hash->{HistIdx}));
+                if ($seq > $hash->{LastHistSeq} || $seq < ($hash->{LastHistSeq} - 10000)) {
+                    $hash->{History}[$hash->{HistIdx}] = $histLine;
+                    $hash->{LastHistSeq} = $seq;
+                    $hash->{HistIdx}++;
+                }
+                $hash->{HistIdx} = 0 if ($hash->{HistIdx} > AttrVal($name, "MaxHist", 1000));
+            } else {
+                Log3 $name, 5, "$name: HandleHistory - no match for $he";
+            }
+        }
+        
+    }
+
+}
+
+
 #########################################################################
 sub ArduCounter_Parse($)
 {
@@ -1458,9 +1533,12 @@ sub ArduCounter_Parse($)
             my $pin  = $1;
             my $hist = $2;
             my $pinName = ArduCounter_PinName($hash, $pin);
+            
+            ArduCounter_HandleHistory($hash, $now, $pinName, $hist);
+            
             if (AttrVal($name, "verboseReadings$pinName", AttrVal($name, "verboseReadings$pin", 0))) {                    
                 readingsBeginUpdate($hash);         
-                readingsBulkUpdate($hash, "pinHistory$pin", $hist);
+                readingsBulkUpdate($hash, "pinHistory$pinName", $hist);
                 readingsEndUpdate($hash, 1);
             }
 
@@ -1652,7 +1730,7 @@ sub ArduCounter_ReadAnswer($$)
     The typical use case is an S0-Interface on an energy meter or water meter, but also reflection light barriers to monitor old ferraris counters are supported<br>
     Counters are configured with attributes that define which Arduino pins should count pulses and in which intervals the Arduino board should report the current counts.<br>
     The Arduino sketch that works with this module uses pin change interrupts so it can efficiently count pulses on all available input pins.<br>
-    The module creates readings for pulse counts, consumption and optionally also a pulse history with pulse lengths and gaps of the last pulses.
+    The module creates readings for pulse counts, consumption and optionally also a pin history with pulse lengths and gaps of the last pulses.
     <br><br>
     <b>Prerequisites</b>
     <ul>
@@ -1717,7 +1795,7 @@ sub ArduCounter_ReadAnswer($$)
         D4 and D5 have their pullup resistors activated and the impulse draws the pins to zero.  <br>
         For D4 and D5 the arduino measures the time in milliseconds between the falling edge and the rising edge. If this time is longer than the specified 5 or 30 milliseconds then the impulse is counted. <br>
         If the time is shorter then this impulse is regarded as noise and added to a separate reject counter.<br>
-        verboseReadings5 causes the module to create additional readings like the pulse history which shows length and gaps between the last pulses.<br>
+        verboseReadings5 causes the module to create additional readings like the pin history which shows length and gaps between the last pulses.<br>
         For pin D6 the arduino does not check pulse lengths and counts every time when the signal changes from 0 to 1.<br>
         The ArduCounter sketch which must be loaded on the Arduino or ESP implements this using pin change interrupts,
         so all avilable input pins can be used, not only the ones that support normal interrupts. <br>
@@ -1930,7 +2008,7 @@ sub ArduCounter_ReadAnswer($$)
             Allow the reading time stamp to be set to the beginning of measuring intervals. 
             
         <li><b>verboseReadings[AD]?[0-9]+</b></li> 
-            create readings timeDiff, countDiff and lastMsg for each pin <br>
+            create readings timeDiff, countDiff, lastMsg and pinHistory for each pin <br>
             Example:
             <code>
             attr myCounter verboseReadingsD4 1
@@ -1939,9 +2017,13 @@ sub ArduCounter_ReadAnswer($$)
         <li><b>devVerbose</b></li> 
             set the verbose level in the counting board. This defaults to 0. <br>
             If the value is >0, then the firmware will echo all commands sent to it by the Fhem module. <br>
-            If the value is >=5, then the firmware will report the pulse history (assuming that the firmware has been compiled with this feature enabled)<br>
+            If the value is >=5, then the firmware will report the pin history (assuming that the firmware has been compiled with this feature enabled)<br>
             If the value is >=10, then the firmware will report every level change of a pin<br>
             If the value is >=20, then the firmware will report every analog measurement (assuming that the firmware has been compiled with analog measurements for old ferraris counters or similar).
+            
+        <li><b>MaxHist</b></li> 
+            specifies how many pin history lines hould be buffered for "get history".<br>
+            This attribute defaults to 1000.
             
         <li><b>analogThresholds</b></li> 
             this Attribute is necessary when you use an arduino nano with connected reflection light barrier (photo transistor and led) to detect the red mark of an old ferraris energy counter. In this case the firmware uses an upper and lower threshold which can be set here.<br>
