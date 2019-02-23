@@ -283,7 +283,8 @@ DevIo_OpenDev($$$;$)
 
   $hash->{PARTIAL} = "";
   Log3 $name, 3, ($hash->{DevioText} ? $hash->{DevioText} : "Opening").
-       " $name device $dev" if(!$reopen);
+       " $name device ". (AttrVal($name,"privacy",0) ? "(private)" : $dev)
+       if(!$reopen);
 
   if($dev =~ m/^UNIX:(SEQPACKET|STREAM):(.*)$/) { # FBAHA
     my ($type, $fname) = ($1, $2);

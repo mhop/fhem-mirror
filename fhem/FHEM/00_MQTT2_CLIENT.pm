@@ -46,6 +46,7 @@ MQTT2_CLIENT_Initialize($)
     msgAfterConnect
     msgBeforeDisconnect
     mqttVersion:3.1.1,3.1
+    privacy:0,1
     rawEvents
     subscriptions
     SSL
