@@ -53,6 +53,8 @@
 # 2018-05-25 V 0218 keepalive of http connection corrected
 # 2018-06-01 V 0219 new Attributes for time interval of getEvents, getStates and refreshAllStates
 # 2018-06-11 V 0220 HttpUtils_Close before login, some newer Debug outputs deleted, Apply command separated, command responds verified
+# 2019-01-19 V 0221 communication updated to actual app standard
+# 2019-02-08 V 0221 new Attribut devName to set personal name instead of 'iPhone'
 
 package main;
 
@@ -62,7 +64,7 @@ use warnings;
 use utf8;
 use Encode qw(decode_utf8);
 use JSON;
-#use Data::Dumper;
+use Data::Dumper;
 use Time::HiRes qw(time);
 
 use HttpUtils;
@@ -87,6 +89,7 @@ sub tahoma_Initialize($)
   $hash->{AttrList} = "IODev ".
                       "blocking ".
                       "debug:1 ".
+                      "devName ".
                       "disable:1 ".
                       "interval ".
                       "intervalRefresh ".
@@ -128,7 +131,7 @@ sub tahoma_Define($$)
 
   my @a = split("[ \t][ \t]*", $def);
 
-  my $ModuleVersion = "0220";
+  my $ModuleVersion = "0221";
   
   my $subtype;
   my $name = $a[0];
@@ -291,14 +294,15 @@ sub tahoma_login($)
   $hash->{logged_in} = undef;
   $hash->{startup_run} = undef;
   $hash->{startup_done} = undef;
-  $hash->{url} = "https://www.tahomalink.com/enduser-mobile-web/externalAPI/json/";
+  $hash->{url} = "https://www.tahomalink.com/enduser-mobile-web/enduserAPI/";
   $hash->{url} = $attr{$name}{url} if (defined $attr{$name}{url});
-  $hash->{userAgent} = "TaHoma/7980 CFNetwork/758.5.3 Darwin/15.6.0";
+  $hash->{userAgent} = "TaHoma/10287 CFNetwork/901.1 Darwin/17.6.0"; 
   $hash->{userAgent} = $attr{$name}{userAgent} if (defined $attr{$name}{userAgent});
   $hash->{timeout} = 10;
   $hash->{HTTPCookies} = undef;
   $hash->{loginRetryTimer} = 5 if (!defined $hash->{loginRetryTimer});
   $hash->{loginRetryTimer} *= 2 if ($hash->{loginRetryTimer} < 160);
+  $hash->{eventId} = undef;
   
   Log3 $name, 2, "$name: login start";
   tahoma_UserAgent_NonblockingGet({
@@ -312,31 +316,32 @@ sub tahoma_login($)
   });
 }
   
-my @startup_pages = ( 'getEndUser',
-                      'getSetup',
-                      'getActionGroups',
-                      #'/../../enduserAPI/setup/interactiveNotifications',
-                      #'/../../enduserAPI/setup/interactiveNotifications/history',
-                      #'getCalendarDayList',
-                      #'getCalendarRuleList',
-                      #'/../../enduserAPI/conditionGroups',
-                      #'getScheduledExecutions',
-                      #'getHistory',
-                      #'getSetupTriggers',
-                      #'getUserPreferences',
-                      #'getSetupOptions',
-                      #'getAvailableProtocolsType',
-                      #'getActiveProtocolsType',
-                      #'getSetupQuota?quotaId=smsCredit',
-                      #'getSetupDawnAndDuskTimes',
-                      '../../enduserAPI/setup/gateways',
-                      #'../../enduserAPI/setup/gateways',
-                      #'../../enduserAPI/setup/subscribe/notification/apple/com.somfy.iPhoneTaHoma',
-                      #'../../enduserAPI/setup/subscribe/notification/devices/tahoma',
-                      #'/../../enduserAPI/setup/subscribe/notification/apple/com.somfy.iPhoneTaHoma',
-                      #'../../enduserAPI/setup/subscribe/notification/devices/tahoma',
-                      'getCurrentExecutions',
-                      'refreshAllStates' );
+my @startup_pages = ( 'enduser/mainAccount',
+                      'setup',
+                      'actionGroups',
+                      #'setup/interactiveNotifications',
+                      #'setup/interactiveNotifications/history',
+                      #'setup/calendar/days',
+                      #'setup/calendar/rules',
+                      #'conditionGroups',
+                      #'exec/schedule',
+                      #'history',
+                      #'triggers',
+                      #'enduser/preferences',
+                      #'setup/options',
+                      #'setup/gateways/###/activeProtocols',
+                      #'setup/gateways/###/supportedProtocols',
+                      #'setup/quotas/smsCredit',
+                      'setup/gateways',
+                      'setup/gateways/###/version',
+                      #'setup/duskTime',
+                      #'setup/dawnTime',
+                      #'setup/gateways/###/availableProtocols',
+                      'P:events/register',
+                      'P:setup/devices/states/refresh',
+                      #'P:setup/subscribe/notification/apple/com.somfy.iPhoneTaHoma',
+                      #'P:events/12345678-abcd-ef09-1234-1234567890ab/fetch',
+                      '' );
 
 sub tahoma_startup($)
 {
@@ -354,7 +359,7 @@ sub tahoma_startup($)
   else
   {
     $hash->{startup_run}++;
-    if ($hash->{startup_run} >= scalar @startup_pages)
+    if (($hash->{startup_run} >= scalar @startup_pages) || ($startup_pages[$hash->{startup_run}] eq ''))
     {
       $hash->{startup_done} = 1;
       return;
@@ -363,16 +368,30 @@ sub tahoma_startup($)
 
   my $page = $startup_pages[$hash->{startup_run}];
   my $subpage = "";
-  $subpage = '?gatewayId='.$hash->{gatewayId} if (substr($page, -13) eq 'ProtocolsType');
-  $subpage = '?quotaId=smsCredit' if ($page eq 'getSetupQuota');
-  $subpage = '/'.$hash->{gatewayId}.'/version' if (substr($page, -8) eq 'gateways');
-
+  #$subpage = '?gatewayId='.$hash->{gatewayId} if (substr($page, -13) eq 'ProtocolsType');
+  #$subpage = '?quotaId=smsCredit' if ($page eq 'getSetupQuota');
+  #$subpage = '/'.$hash->{gatewayId}.'/version' if (substr($page, -8) eq 'gateways');
+  
+  my $method = 'GET';
+  if (substr($page,0,2) eq 'P:')
+  {
+    $method = 'POST';
+    $page = substr($page,2);
+  }
+  
+  my $gateway = index($page,"###");
+  if ($gateway > 0)
+  {
+    $page = substr($page,0,$gateway) . $hash->{gatewayId} . substr($page,$gateway+3);
+  }
+  
   tahoma_UserAgent_NonblockingGet({
     timeout => 10,
     noshutdown => 1,
     hash => $hash,
     page => $page,
     subpage => $subpage,
+    method => $method,
     callback => \&tahoma_dispatch,
     nonblocking => 1,
   });
@@ -388,7 +407,8 @@ sub tahoma_refreshAllStates($)
     timeout => 10,
     noshutdown => 1,
     hash => $hash,
-    page => 'refreshAllStates',
+    page => 'setup/devices/states/refresh',
+    method => 'POST',
     callback => \&tahoma_dispatch,
     nonblocking => 1,
   });
@@ -406,8 +426,9 @@ sub tahoma_getEvents($)
     timeout => 10,
     noshutdown => 1,
     hash => $hash,
-    page => 'getEvents',
-    method => 'PUSH',
+    page => 'events',
+    subpage => '/' . $hash->{eventId} . '/fetch',
+    method => 'POST',
     callback => \&tahoma_dispatch,
     nonblocking => 1,
   });
@@ -620,7 +641,7 @@ sub tahoma_getDevices($$)
     timeout => 10,
     noshutdown => 1,
     hash => $hash,
-    page => 'getSetup',
+    page => 'setup',
     callback => \&tahoma_dispatch,
     nonblocking => $nonblocking,
   });
@@ -652,6 +673,8 @@ sub tahoma_getStates($)
   my $name = $hash->{NAME};
   Log3 $name, 4, "$name: tahoma_getStates";
 
+  return;
+
   my $data = '[';
   
   foreach my $device (@{$hash->{helper}{devices}}) {
@@ -675,7 +698,7 @@ sub tahoma_getStates($)
     timeout => 10,
     noshutdown => 1,
     hash => $hash,
-    page => 'getStates',
+    page => 'setup/devices/states',
     data => tahoma_encode_utf8($data),
     callback => \&tahoma_dispatch,
     nonblocking => 1,
@@ -716,7 +739,7 @@ sub tahoma_getGroupList($$$)
   my @groupDevices = split(',',$oid);
   foreach my $module (@groupDevices) {
     if (defined($defs{$module}) && defined($defs{$module}{device}) && defined($defs{$module}{inClass})) {
-      push ( @{$deviceList}, { device => $defs{$module}{device}, class => $defs{$module}{inClass}, levelInvert => $attr{$module}{levelInvert} } ) if !($attr{$module}{disable});
+      push ( @{$deviceList}, { device => $defs{$module}{device}, class => $defs{$module}{inClass}, commands => $defs{$module}{COMMANDS}, levelInvert => $attr{$module}{levelInvert} } ) if !($attr{$module}{disable});
     }
   }
 }
@@ -730,12 +753,12 @@ sub tahoma_checkCommand($$$$)
   {
     $value = 100 - $value if ($device->{levelInvert} && ($value >= 0) && ($value <= 100));
   }
-  if (($command eq 'setClosure') && ($value == 100) && (index($hash->{COMMANDS}," close:") > 0))
+  if (($command eq 'setClosure') && ($value == 100) && (index($device->{commands}," close:") > 0))
   {
     $command = 'close';
     $value = '';
   }
-  if (($command eq 'setClosure') && ($value == 0) && (index($hash->{COMMANDS}," open:") > 0))
+  if (($command eq 'setClosure') && ($value == 0) && (index($device->{commands}," open:") > 0))
   {
     $command = 'open';
     $value = '';
@@ -785,17 +808,19 @@ sub tahoma_applyRequest($$$)
   }
   return if (length $data < 20);
   
+  my $devName = $attr{$hash->{IODev}->{NAME}}{devName};
+  $devName = 'iphone' if (!defined($devName));
   my $dataHead = '{"label":"' . $hash->{inLabel};
   if ($commandChecked eq 'setClosure') {
-    $dataHead .= ' - Positionieren auf '.$valueChecked.' % - iPhone","actions":[';
+    $dataHead .= ' - Positionieren auf '.$valueChecked.' % - '.$devName.'","actions":[';
   } elsif ($commandChecked eq 'close') {
-    $dataHead .= ' - Schliessen - iPhone","actions":[';
+    $dataHead .= ' - Schliessen - '.$devName.'","actions":[';
   } elsif ($commandChecked eq 'open') {
-    $dataHead .= ' - Oeffnen - iPhone","actions":[';
+    $dataHead .= ' - Oeffnen - '.$devName.'","actions":[';
   } elsif ($commandChecked eq 'setClosureAndLinearSpeed') {                                         #neu fuer setClosureAndLinearSpeed
-    $dataHead .= ' - Positionieren auf '.(split(',',$valueChecked))[0].' % - iPhone","actions":[';  #neu fuer setClosureAndLinearSpeed
+    $dataHead .= ' - Positionieren auf '.(split(',',$valueChecked))[0].' % - '.$devName.'","actions":[';  #neu fuer setClosureAndLinearSpeed
   } else {
-    $dataHead .= " - $commandChecked $valueChecked".' - iPhone","actions":[';
+    $dataHead .= " - $commandChecked $valueChecked".' - '.$devName.'","actions":[';
   }
   $data = $dataHead . $data . ']}';
 
@@ -805,7 +830,7 @@ sub tahoma_applyRequest($$$)
     timeout => 10,
     noshutdown => 1,
     hash => $hash,
-    page => 'apply',
+    page => 'exec/apply',
     data => tahoma_encode_utf8($data),
     callback => \&tahoma_dispatch,
     nonblocking => 1,
@@ -823,14 +848,18 @@ sub tahoma_scheduleActionGroup($$)
     return;
   }
 
-  $delay = 0 if(!defined($delay));
+  $delay = 1 if(!defined($delay));
+  $delay = ($delay+time)*1000;
+  $delay = $delay . '';
+  $delay = substr($delay,0,index($delay,'.')) if (index($delay,'.') > 0);
   
   tahoma_UserAgent_NonblockingGet({
     timeout => 10,
     noshutdown => 1,
     hash => $hash,
-    page => 'scheduleActionGroup',
-    subpage => '?oid='.$hash->{oid}.'&delay='.$delay,
+    page => 'exec/schedule',
+    subpage => '/'.$hash->{oid}.'/'.$delay,
+    method => 'POST',
     callback => \&tahoma_dispatch,
     nonblocking => 1,
   });
@@ -851,8 +880,9 @@ sub tahoma_launchActionGroup($)
     timeout => 10,
     noshutdown => 1,
     hash => $hash,
-    page => 'launchActionGroup',
-    subpage => '?oid='.$hash->{oid},
+    page => 'exec',
+    subpage => '/'.$hash->{oid},
+    method => 'POST',
     callback => \&tahoma_dispatch,
     nonblocking => 1,
   });
@@ -864,16 +894,18 @@ sub tahoma_cancelExecutions($)
   my $name = $hash->{NAME};
   Log3 $name, 4, "$name: tahoma_cancelExecutions";
 
+  my $page = 'exec/current/setup';
   my $subpage = '';
   if (defined($hash->{IODev}))
   {
     if (defined($hash->{inExecId}) && (length $hash->{inExecId} > 20))
     {
-      $subpage = '?execId='.$hash->{inExecId};
+      #$subpage = '?execId='.$hash->{inExecId};
     }
     elsif (defined($hash->{inTriggerId}) && (length $hash->{inTriggerId} > 20))
     {
-      $subpage = '?triggerId='.$hash->{inTriggerId};
+      $page = 'exec/delayedTriggerSchedule';
+      $subpage = '/'.$hash->{inTriggerId};
     }
     else
     {
@@ -887,8 +919,9 @@ sub tahoma_cancelExecutions($)
     timeout => 10,
     noshutdown => 1,
     hash => $hash,
-    page => 'cancelExecutions',
+    page => $page,
     subpage => $subpage,
+    method => 'DELETE',
     callback => \&tahoma_dispatch,
     nonblocking => 1,
   });
@@ -944,27 +977,29 @@ sub tahoma_dispatch($$$)
       return;
     }
 
-    if( $param->{page} eq 'getEvents' ) {
+    if( $param->{page} eq 'events' ) {
       tahoma_parseGetEvents($hash,$json);
-    } elsif( $param->{page} eq 'apply' ) {
+    } elsif( $param->{page} eq 'events/register' ) {
+      tahoma_parseRegisterEvents($hash,$json);
+    } elsif( $param->{page} eq 'exec/apply' ) {
       tahoma_parseApplyRequest($hashIn,$json);
-    } elsif( $param->{page} eq 'getSetup' ) {
+    } elsif( $param->{page} eq 'setup' ) {
       tahoma_parseGetSetup($hash,$json);
-    } elsif( $param->{page} eq 'refreshAllStates' ) {
+    } elsif( $param->{page} eq 'setup/devices/states/refresh' ) {
       tahoma_parseRefreshAllStates($hash,$json);
-    } elsif( $param->{page} eq 'getStates' ) {
+    } elsif( $param->{page} eq 'setup/devices/states' ) {
       tahoma_parseGetStates($hash,$json);
     } elsif( $param->{page} eq 'login' ) {
       tahoma_parseLogin($hash,$json);
-    } elsif( $param->{page} eq 'getActionGroups' ) {
+    } elsif( $param->{page} eq 'actionGroups' ) {
       tahoma_parseGetActionGroups($hash,$json);
-    } elsif( $param->{page} eq '../../enduserAPI/setup/gateways' ) {
+    } elsif( $param->{page} eq 'setup/gateways' ) {
       tahoma_parseEnduserAPISetupGateways($hash,$json);
     } elsif( $param->{page} eq 'getCurrentExecutions' ) {
       tahoma_parseGetCurrentExecutions($hash,$json);
-    } elsif( $param->{page} eq 'scheduleActionGroup' ) {
+    } elsif( $param->{page} eq 'exec/schedule' ) {
       tahoma_parseScheduleActionGroup($hashIn,$json);
-    } elsif( $param->{page} eq 'launchActionGroup' ) {
+    } elsif( $param->{page} eq 'exec' ) {
       tahoma_parseLaunchActionGroup($hashIn,$json);
     } elsif( $param->{page} eq 'cancelExecutions' ) {
       tahoma_parseCancelExecutions($hash,$json);
@@ -1086,6 +1121,18 @@ sub tahoma_parseLogin($$)
   Log3 $name, 2, "$name: login end, logged_in=".$hash->{logged_in};
 }
 
+sub tahoma_parseRegisterEvents($$)
+{
+  my($hash, $json) = @_;
+  my $name = $hash->{NAME};
+  Log3 $name, 4, "$name: tahoma_parseRegisterEvents";
+  if (ref($json) ne 'HASH') {
+    Log3 $name, 3, "$name: tahoma_parseRegisterEvents response is not a valid hash";
+    return;
+  }
+  $hash->{eventId} = $json->{id};
+}
+
 sub tahoma_parseGetEvents($$)
 {
   my($hash, $json) = @_;
@@ -1107,7 +1154,7 @@ sub tahoma_parseGetEvents($$)
         #print "\nDevice=$devices->{deviceURL} found\n";
         my $id = $devices->{deviceURL};
         my $fid = tahoma_fhemIdFromDevice($id);
-        my $devname = "tahoma_". $fid;
+        #my $devname = "tahoma_". $fid;
         my $d = $modules{$hash->{TYPE}}{defptr}{"$fid"};
         if( defined($d) )# && $d->{NAME} eq $devname )
         {
@@ -1139,15 +1186,15 @@ sub tahoma_parseGetEvents($$)
             if ($devices->{name} eq 'ExecutionStateChangedEvent')
             {
               $def->{inExecState} = $devices->{newState};
-              $def->{inExecId} = 'finished' if ($devices->{newState} == 4);
-              $def->{inExecId} = 'canceled' if ($devices->{newState} == 5);
+              $def->{inExecId} = 'finished' if ($devices->{newState} eq 'COMPLETED');
+              $def->{inExecId} = $devices->{failureType} if ($devices->{newState} eq 'FAILED');
             }
           }
           elsif (defined($def->{inTriggerId}) && ($def->{inTriggerId} eq $devices->{triggerId}))
           {
             $def->{inTriggerState} = $devices->{name};
-            $def->{inTriggerId} = 'finished' if ($devices->{name} eq '4');
-            $def->{inTriggerId} = 'canceled' if ($devices->{name} eq '5');
+            $def->{inTriggerId} = 'finished' if ($devices->{name} eq 'GroupTriggeredEvent');
+            $def->{inTriggerId} = 'canceled' if ($devices->{name} eq 'DelayedTriggerCancelledEvent');
           }
         }
       }
@@ -1186,18 +1233,20 @@ sub tahoma_parseGetSetup($$)
     return;
   }
 
-  $hash->{gatewayId} = $json->{setup}{gateways}[0]{gatewayId};
+  $hash->{gatewayId} = $json->{gateways}[0]{gatewayId};
 
   my @devices = ();
-  foreach my $device (@{$json->{setup}{devices}}) {
+  foreach my $device (@{$json->{devices}}) {
     Log3 $name, 4, "$name: tahoma_parseGetSetup device = $device->{label}";
     push( @devices, $device );
+    #renaming states for tahoma_parseGetEvents
+    $device->{deviceStates} = $device->{states} if defined $device->{states};
   }
   
   $hash->{helper}{devices} = \@devices;
 
-  if ($json->{setup}{rootPlace}) {
-    my $places = $json->{setup}{rootPlace};
+  if ($json->{rootPlace}) {
+    my $places = $json->{rootPlace};
     #Log3 $name, 4, "$name: tahoma_parseGetSetup places= " . Dumper($places);
     tahoma_parseGetSetupPlaces($hash, $places);
   }
@@ -1205,6 +1254,7 @@ sub tahoma_parseGetSetup($$)
   tahoma_autocreate($hash);
   tahoma_updateDevices($hash);
   tahoma_defineCommands($hash);
+  tahoma_parseGetEvents($hash,$json->{devices});
 }
 
 sub tahoma_parseGetSetupPlaces($$)
@@ -1237,13 +1287,13 @@ sub tahoma_parseGetActionGroups($$)
   my($hash, $json) = @_;
   my $name = $hash->{NAME};
   Log3 $name, 4, "$name: tahoma_parseGetActionGroups";
-  if (ref($json) ne 'HASH') {
-    Log3 $name, 3, "$name: tahoma_parseGetActionGroups response is not a valid hash";
+  if (ref($json) ne 'ARRAY') {
+    Log3 $name, 3, "$name: tahoma_parseGetActionGroups response is not a valid array";
     return;
   }
   
   my $devices = $hash->{helper}{devices};
-  foreach my $action (@{$json->{actionGroups}}) {
+  foreach my $action (@{$json}) {
     push( @{$devices}, $action );
   }
   tahoma_autocreate($hash);
@@ -1331,11 +1381,10 @@ sub tahoma_parseScheduleActionGroup($$)
     Log3 $name, 3, "$name: tahoma_parseScheduleActionGroup response is not a valid hash";
     return;
   }
-  if (defined $json->{actionGroup})
   {
     $hash->{inTriggerState} = 0;
-    if (defined($json->{actionGroup}[0]{triggerId})) {
-      $hash->{inTriggerId} = $json->{actionGroup}[0]{triggerId};
+    if (defined($json->{triggerId})) {
+      $hash->{inTriggerId} = $json->{triggerId};
     } else {
       $hash->{inTriggerId} = "undefined";
     }
@@ -1355,11 +1404,10 @@ sub tahoma_parseLaunchActionGroup($$)
     Log3 $name, 3, "$name: tahoma_parseLaunchActionGroup response is not a valid hash";
     return;
   }
-  if (defined $json->{actionGroup})
   {
     $hash->{inExecState} = 0;
-    if (defined($json->{actionGroup}[0]{execId})) {
-      $hash->{inExecId} = $json->{actionGroup}[0]{execId};
+    if (defined($json->{execId})) {
+      $hash->{inExecId} = $json->{execId};
     } else {
       $hash->{inExecId} = "undefined";
     }
@@ -1602,7 +1650,8 @@ sub tahoma_UserAgent_NonblockingGet($)
   Log3 $name, 5, "$name: tahoma_UserAgent_NonblockingGet page=$param->{page}";
 
   #"User-Agent":"TaHoma/7980 CFNetwork/758.5.3 Darwin/15.6.0","Proxy-Connection":"keep-alive","Accept":"*/*","Connection":"keep-alive","Content-Length":"49","Accept-Encoding":"gzip, deflate","Content-Type":"application/x-www-form-urlencoded","Accept-Language":"de-de","Host":"www.tahomalink.com"
-  $param->{header} = {'User-Agent' => $hash->{userAgent} }; #, 'Accept-Language' => "de-de", 'Accept-Encoding' => "gzip, deflate"};
+  $param->{header} = {'User-Agent' => $hash->{userAgent}}; #, 'Accept-Language' => "de-de", 'Accept-Encoding' => "gzip, deflate" };
+  $param->{header}{'Content-Type'} = 'application/json' if ($param->{page} ne 'login');
   $param->{header}{Cookie} = $hash->{HTTPCookies} if ($hash->{HTTPCookies});
   $param->{compress} = 1;
   $param->{keepalive} = 1;
@@ -1754,6 +1803,10 @@ sub tahoma_decrypt($)
     <ul>
       Normally, the login data is stored encrypted after the first start, but this functionality can be disabled by cryptLoginData=0<br>
       <code>attr tahoma1 cryptLoginData 0</code><br><br>
+    </ul>
+    <ul>
+      Normally, the command is send by 'iPhone', but it can be changed to a personal device name<br>
+      <code>attr tahoma1 devName myFHEM</code><br><br>
     </ul>
     <ul>
       The account can be completely disabled, so no communication to server is running:<br>
