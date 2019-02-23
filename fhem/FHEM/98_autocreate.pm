@@ -563,8 +563,8 @@ CommandUsb($$)
           my $PARAM = $1;
           $PARAM =~ s/[^A-Za-z0-9]//g;
           my $name = $thash->{NAME};
-          $msg = "### $dev: checking if it is a $name";
-          Log3 undef, 4, $msg; $ret .= $msg . "\n";
+          $msg = "Probing $name device $dev";
+          $ret .= $msg . "\n";
 
           # Check if it already used
           foreach my $d (keys %defs) {
@@ -603,10 +603,16 @@ CommandUsb($$)
           DevIo_TimeoutRead($hash, 0.1);
           DevIo_SimpleWrite($hash, $thash->{request}, 0);
           my $answer = DevIo_TimeoutRead($hash, 0.1);
+          if(AttrVal("global", "verbose", 0) >= 5) {
+            my $aTxt = $answer;
+            $aTxt =~ s/([^ -~])/"(".ord($1).")"/ge;
+            $aTxt = (substr($aTxt,0,60)."...") if(length($aTxt) > 63);
+            Log3 undef, 5, "  answer: $aTxt";
+          }
           DevIo_CloseDev($hash);
 
           if($answer !~ m/$thash->{response}/) {
-            $msg = "got wrong answer for a $name";
+            $msg = "  wrong answer";
             Log3 undef, 4, $msg; $ret .= $msg . "\n";
             next;
           }
@@ -614,7 +620,7 @@ CommandUsb($$)
           my $define = $thash->{define};
           $define =~ s/PARAM/$PARAM/g;
           $define =~ s,DEVICE,$dir/$dev,g;
-          $msg = "create as a fhem device with: define $define";
+          $msg = "  matching answer, create it with: define $define";
           Log3 undef, 4, $msg; $ret .= $msg . "\n";
 
           if(!$scan) {
