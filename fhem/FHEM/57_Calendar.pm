@@ -36,7 +36,7 @@ package main;
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 #
-# *** Potential isses:
+# *** Potential issues:
 #
 # There might be issues when turning to daylight saving time and back that
 # need further investigation. For counterpart please see
@@ -3883,10 +3883,10 @@ sub CalendarEventsAsHtml($;$) {
     Definiert ein Kalender-Device.<br><br>
 
     Ein Kalender-Device ermittelt (Serien-)Termine aus einem Quell-Kalender. Dieser kann eine URL oder eine Datei sein.
-	Die Datei mu&szlig; im iCal-Format vorliegen.<br><br>
+	Die Datei muss im iCal-Format vorliegen.<br><br>
 
-    Beginnt die <abbr>URL</abbr> mit <code>https://</code>, mu&szlig; das Perl-Modul <code>IO::Socket::&szlig;L</code> installiert sein
-    (use <code>cpan -i IO::Socket::&szlig;L</code>).<br><br>
+    Beginnt die <abbr>URL</abbr> mit <code>https://</code>, muss das Perl-Modul <code>IO::Socket::SSL</code> installiert sein
+    (use <code>cpan -i IO::Socket::SSL</code>).<br><br>
 
     Die <code>&lt;URL&gt;</code> kann %-wildcards der POSIX
     strftime-Funktion des darunterliegenden OS enthalten (siehe auch strftime
@@ -3906,7 +3906,7 @@ sub CalendarEventsAsHtml($;$) {
     <br/>
     Hinweis f&uuml;r Nutzer des Google-Kalenders: Du kannst direkt die private iCal-URL des Google-Kalenders nutzen.
 
-    Sollte deine Google-Kalender-URL mit <code>https://</code> beginnen und das Perl-Modul <code>IO::Socket::&szlig;L</code> ist nicht auf deinem System  installiert,
+    Sollte deine Google-Kalender-URL mit <code>https://</code> beginnen und das Perl-Modul <code>IO::Socket::SSL</code> ist nicht auf deinem System  installiert,
 	kannst Du in der URL <code>https://</code> durch <code>http://</code> ersetzen, falls keine automatische Umleitung auf die <code>https://</code> URL erfolgt.
     Solltest Du unsicher sein, ob dies der Fall ist, &uuml;berpr&uuml;fe es bitte zuerst mit deinem Browser.<br><br>
 
@@ -3933,7 +3933,7 @@ sub CalendarEventsAsHtml($;$) {
     <code>interval</code> Sekunden sp&auml;ter.<br><br>
 
     <code>set &lt;name&gt; reload</code><br>
-    Da&szlig;elbe wie <code>update</code>, jedoch werden zuerst alle Termine entfernt.<br><br>
+    Dasselbe wie <code>update</code>, jedoch werden zuerst alle Termine entfernt.<br><br>
 
   </ul>
   <br>
@@ -3950,7 +3950,7 @@ sub CalendarEventsAsHtml($;$) {
     
     
     <li><code>get &lt;name&gt; events [format:&lt;formatSpec&gt;] [timeFormat:&lt;timeFormatSpec&gt;] [filter:&lt;filterSpecs&gt;] [series:next[=&lt;max&gt;]] [limit:&lt;limitSpecs&gt;]</code><br><br>    
-    Das Schweizer Taschenme&szlig;er f&uuml;r die Anzeige von Terminen.
+    Das Schweizer Taschenmesser f&uuml;r die Anzeige von Terminen.
     Die Termine des Kalenders &lt;name&gt; werden Zeile f&uuml;r Zeile entsprechend der Format- und Filterangaben ausgegeben.
     Keiner, einer oder mehrere der Parameter <code>format</code>,
     <code>timeFormat</code>, <code>filter</code>, <code>series</code> und <code>limit</code>
@@ -3985,18 +3985,18 @@ sub CalendarEventsAsHtml($;$) {
     <tr><td><code>$A</code></td><td>Alarmzeit entsprechend Zeitformat</td></tr>
     <tr><td><code>$d</code></td><td>Dauer in Sekunden</td></tr>
     <tr><td><code>$D</code></td><td>Dauer in menschenlesbarer Form</td></tr>
-    <tr><td><code>$S</code></td><td>Zusammenfa&szlig;ung</td></tr>
+    <tr><td><code>$S</code></td><td>Zusammenfassung</td></tr>
     <tr><td><code>$L</code></td><td>Ortsangabe</td></tr>
     <tr><td><code>$CA</code></td><td>Kategorien</td></tr>
-    <tr><td><code>$CL</code></td><td>Kla&szlig;ifizierung</td></tr>
+    <tr><td><code>$CL</code></td><td>Klassifizierung</td></tr>
     <tr><td><code>$DS</code></td><td>Beschreibung</td></tr>
     <tr><td><code>$U</code></td><td>UID</td></tr>
     <tr><td><code>$M</code></td><td>Modus</td></tr>
     </table><br>
-    \, (maskiertes Komma) in Zusammenfa&szlig;ung, Ortsangabe und Beschreibung werden durch ein Komma ersetzt,
+    \, (maskiertes Komma) in Zusammenfassung, Ortsangabe und Beschreibung werden durch ein Komma ersetzt,
     aber \n (kennzeichnet Absatz) bleibt unber&uuml;hrt.<br><br>
 
-    Wird der Parameter <code>format</code> ausgela&szlig;en, dann wird die Formatierung
+    Wird der Parameter <code>format</code> ausgelassen, dann wird die Formatierung
     aus <code>defaultFormat</code> benutzt. Ist dieses Attribut nicht gesetzt,  wird <code>"$T1 $D $S"</code>
     als Formatierung benutzt.
     
@@ -4015,7 +4015,7 @@ sub CalendarEventsAsHtml($;$) {
     Auf <a href="http://strftime.net">strftime.net</a> gibt es ein Tool zum Erstellen von
     <code>&lt;timeFormatSpec&gt;</code>.<br><br>
         
-    Wenn der Parameter <code>timeFormat</code> ausgela&szlig;en, dann wird die Formatierung
+    Wenn der Parameter <code>timeFormat</code> ausgelassen, dann wird die Formatierung
     aus <code>defaultTimeFormat</code> benutzt. Ist dieses Attribut nicht gesetzt, dann
     wird <code>"%d.%m.%Y %H:%M"</code> als Formatierung benutzt.
     Zum Umschlie&szlig;en der Formatangabe k&ouml;nnen einfache (<code>'</code>) oder
@@ -4031,7 +4031,7 @@ sub CalendarEventsAsHtml($;$) {
     Der Parameter <u><code>filter</code></u> schr&auml;nkt die Anzeige der Termine ein.
     <code>&lt;filterSpecs&gt;</code> ist eine kommaseparierte Liste von
     <code>&lt;filterSpec&gt;</code>-Angaben.
-    Alle Filterangaben m&uuml;&szlig;en zutreffen, damit ein Termin angezeigt wird.
+    Alle Filterangaben m&uuml;ssen zutreffen, damit ein Termin angezeigt wird.
     Die Angabe ist kumulativ: jeder angegebene Filter wird zur Filterliste hinzugef&uum;gt
     und ber&uum;cksichtigt.<br><br>
     
@@ -4047,15 +4047,15 @@ sub CalendarEventsAsHtml($;$) {
       entspricht <code>field(mode)=~"&lt;regex&gt;"</code></td></tr>
     <tr><td><code>field(&lt;field&gt;)=="&lt;value&gt;"</code></td><td>Inhalt von <code>&lt;field&gt;</code> ist <code>&lt;value&gt;</code><br>
       &lt;field&gt; ist eines von <code>uid</code>, <code>mode</code>, <code>summary</code>, <code>location</code>,
-      <code>description</code>, <code>categories</code>, <code>cla&szlig;ification</code>
+      <code>description</code>, <code>categories</code>, <code>classification</code>
       </td></tr>
     <tr><td><code>field(&lt;field&gt;)=~"&lt;regex&gt;"</code></td><td>Inhalt von &lt;field&gt; entspricht dem regul&auml;ren Ausdruck <code>&lt;regex&gt;</code><br>
       &lt;field&gt; ist eines von <code>uid</code>, <code>mode</code>, <code>summary</code>, <code>location</code>,
-      <code>description</code>, <code>categories</code>, <code>cla&szlig;ification</code><br>
+      <code>description</code>, <code>categories</code>, <code>classification</code><br>
       </td></tr>
     </table><br>
     Die doppelten Anf&uuml;hrungszeichen auf der rechten Seite von <code>&lt;filterSpec&gt;</code> sind nicht
-    Teil des regul&auml;ren Ausdrucks. Es k&ouml;nnen stattde&szlig;en einfache Anf&uuml;hrungszeichen verwendet werden.
+    Teil des regul&auml;ren Ausdrucks. Es k&ouml;nnen stattdessen einfache Anf&uuml;hrungszeichen verwendet werden.
     <br><br>
         
     Examples:<br>
@@ -4064,7 +4064,7 @@ sub CalendarEventsAsHtml($;$) {
     <code>get MyCalendar events filter:mode=="alarm"</code><br>
     <code>get MyCalendar events filter:mode=~"alarm|upcoming"</code><br>
     <code>get MyCalendar events filter:field(summary)=~"Mama"</code><br>
-    <code>get MyCalendar events filter:field(cla&szlig;ification)=="PUBLIC"</code><br>
+    <code>get MyCalendar events filter:field(classification)=="PUBLIC"</code><br>
     <code>get MyCalendar events filter:field(summary)=~"Gelber Sack",mode=~"upcoming|start"</code><br>
     <code>get MyCalendar events filter:field(summary)=~"Gelber Sack" filter:mode=~"upcoming|start"</code>
     <br><br>
@@ -4101,7 +4101,7 @@ sub CalendarEventsAsHtml($;$) {
     
    
     <li><code>get &lt;name&gt; find &lt;regexp&gt;</code><br>
-    Gibt zeilenweise die UID von allen Terminen aus, deren Zusammenfa&szlig;ung dem regul&auml;ren Ausdruck &lt;regexp&gt; entspricht.<br><br></li>
+    Gibt zeilenweise die UID von allen Terminen aus, deren Zusammenfassung dem regul&auml;ren Ausdruck &lt;regexp&gt; entspricht.<br><br></li>
 
     <li><code>get &lt;name&gt; vcalendar</code><br>
     Gibt den Kalender im ICal-Format aus, so wie er von der Quelle abgerufen wurde.<br><br></li>
@@ -4109,7 +4109,7 @@ sub CalendarEventsAsHtml($;$) {
     <li><code>get &lt;name&gt; vevents</code><br>
     Gibt eine Liste aller VEVENT-Eintr&auml;ge mit weiteren Informationen f&uuml;r Debugzwecke zur&uuml;ck.
     Nur Eigenschaften, die bei der Verarbeitung des Kalenders behalten wurden, werden gezeigt.
-    Die Liste, der aus jedem VEVENT-Eintrag erstellten Termine, wird, ebenso wie die ausgela&szlig;enen Termine, gezeigt.
+    Die Liste, der aus jedem VEVENT-Eintrag erstellten Termine, wird, ebenso wie die ausgelassenen Termine, gezeigt.
     </li>
 
   </ul>
@@ -4122,7 +4122,7 @@ sub CalendarEventsAsHtml($;$) {
   <ul>
     <li><code>defaultFormat &lt;formatSpec&gt;</code><br>
         Setzt das Standardformat f&uuml;r <code>get &lt;name&gt; events</code>.
-        Der Aufbau wird dort erkl&auml;t. &lt;formatSpec&gt; mu&szlig; in doppelte
+        Der Aufbau wird dort erkl&auml;t. &lt;formatSpec&gt; muss in doppelte
         Anf&uuml;hrungszeichen (") gesetzt werden, wie z.B. <code>attr myCalendar defaultFormat "$T1 $D $S"</code>.</li></p>
 
     <li><code>defaultTimeFormat &lt;timeFormatSpec&gt;</code><br>
@@ -4157,18 +4157,18 @@ sub CalendarEventsAsHtml($;$) {
 		Wenn &lt;hideOlderThan&gt; gesetzt ist, werden Termine, die vor &lt;t-hideOlderThan&gt; enden, ingnoriert.<br>
         Wenn &lt;hideLaterThan&gt; gesetzt ist, werden Termine, die nach &lt;t+hideLaterThan&gt; anfangen, ignoriert.<p>
 
-        Bitte beachte, da&szlig; eine Aktion, die durch einen Wechsel in den Modus "end" ausgel&ouml;st wird, nicht auf den Termin
-        zugreifen kann, wenn <code>hideOlderThan</code> 0 ist, denn der Termin ist dann schon versteckt. Setze <code>hideOlderThan</code> be&szlig;er auf 10.<p>
+        Bitte beachte, dass eine Aktion, die durch einen Wechsel in den Modus "end" ausgel&ouml;st wird, nicht auf den Termin
+        zugreifen kann, wenn <code>hideOlderThan</code> 0 ist, denn der Termin ist dann schon versteckt. Setze <code>hideOlderThan</code> besser auf 10.<p>
 
 
-        <code>&lt;timespec&gt;</code> mu&szlig; einem der folgenden Formate entsprechen:<br>
+        <code>&lt;timespec&gt;</code> muss; einem der folgenden Formate entsprechen:<br>
         <table>
         <tr><th>Format</th><th>Beschreibung</th><th>Beispiel</th></tr>
-        <tr><td>&szlig;S</td><td>Sekunden</td><td>3600</td></tr>
-        <tr><td>&szlig;&szlig;</td><td>Sekunden</td><td>3600s</td></tr>
+        <tr><td>SSS</td><td>Sekunden</td><td>3600</td></tr>
+        <tr><td>SSSs</td><td>Sekunden</td><td>3600s</td></tr>
         <tr><td>HH:MM</td><td>Stunden:Minuten</td><td>02:30</td></tr>
-        <tr><td>HH:MM:&szlig;</td><td>Stunden:Minuten:Sekunden</td><td>00:01:30</td></tr>
-        <tr><td>D:HH:MM:&szlig;</td><td>Tage:Stunden:Minuten:Sekunden</td><td>122:10:00:00</td></tr>
+        <tr><td>HH:MM:SS</td><td>Stunden:Minuten:Sekunden</td><td>00:01:30</td></tr>
+        <tr><td>D:HH:MM:SS</td><td>Tage:Stunden:Minuten:Sekunden</td><td>122:10:00:00</td></tr>
         <tr><td>DDDd</td><td>Tage</td><td>100d</td></tr>
         </table></li>
         <p>
@@ -4187,14 +4187,14 @@ sub CalendarEventsAsHtml($;$) {
         Weitere Informationen unter <a href="#CalendarPlugIns">Plug-ins</a> im Text.
     </li><p>
 
-        <li><code>&szlig;LVerify</code><br>
+        <li><code>SSLVerify</code><br>
 
         Dieses Attribut setzt die Art der &Uuml;berpr&uuml;fung des Zertifikats des Partners
-        bei mit &szlig;L gesicherten Verbindungen. Entweder auf 0 setzen f&uuml;r
-        &szlig;L_VERIFY_NONE (keine &Uuml;berpr&uuml;fung des Zertifikats) oder auf 1 f&uuml;r
-        &szlig;L_VERIFY_PEER (&Uuml;berpr&uuml;fung des Zertifikats). Die &Uuml;berpr&uuml;fung auszuschalten
+        bei mit SSL gesicherten Verbindungen. Entweder auf 0 setzen f&uuml;r
+        SSL_VERIFY_NONE (keine &Uuml;berpr&uuml;fung des Zertifikats) oder auf 1 f&uuml;r
+        SSL_VERIFY_PEER (&Uuml;berpr&uuml;fung des Zertifikats). Die &Uuml;berpr&uuml;fung auszuschalten
         ist n&uuml;tzlich f&uuml;r lokale Kalenderinstallationen(e.g. OwnCloud, NextCloud)
-        ohne g&uuml;tiges &szlig;L-Zertifikat.
+        ohne g&uuml;tiges SSL-Zertifikat.
     </li><p>
 
     <li><code>ignoreCancelled</code><br>
@@ -4205,10 +4205,10 @@ sub CalendarEventsAsHtml($;$) {
 
     <li><code>quirks &lt;values&gt;</code><br>
         Parameter f&uuml;r spezielle Situationen. <code>&lt;values&gt;</code> ist
-        eine kommaseparierte Liste der folgenden Schl&uuml;&szlig;elw&ouml;rter:
+        eine kommaseparierte Liste der folgenden Schl&uuml;sselw&ouml;rter:
         <ul>
           <li><code>ignoreDtStamp</code>: wenn gesetzt, dann zeigt
-          ein ver&auml;ndertes DTSTAMP Attribut eines Termins nicht an, da&szlig;
+          ein ver&auml;ndertes DTSTAMP Attribut eines Termins nicht an, dass;
           der Termin ver&auml;ndert wurde.</li>
         </ul>
     </li><p>
@@ -4221,18 +4221,18 @@ sub CalendarEventsAsHtml($;$) {
   <b>Beschreibung</b>
   <ul><br>
 
-  Ein Kalender ist eine Menge von Terminen. Ein Termin hat eine Zusammenfa&szlig;ung (normalerweise der Titel, welcher im Quell-Kalender angezeigt wird), eine Startzeit, eine Endzeit und keine, eine oder mehrere Alarmzeiten. Die Termine werden
-  aus dem Quellkalender ermittelt, welcher &uuml;ber die URL angegeben wird. Sollten mehrere Alarmzeiten f&uuml;r einen Termin existieren, wird nur der fr&uuml;heste Alarmzeitpunkt beibehalten. Wiederkehrende Kalendereintr&auml;ge werden in einem gewi&szlig;en Umfang unterst&uuml;tzt:
+  Ein Kalender ist eine Menge von Terminen. Ein Termin hat eine Zusammenfassg;ung (normalerweise der Titel, welcher im Quell-Kalender angezeigt wird), eine Startzeit, eine Endzeit und keine, eine oder mehrere Alarmzeiten. Die Termine werden
+  aus dem Quellkalender ermittelt, welcher &uuml;ber die URL angegeben wird. Sollten mehrere Alarmzeiten f&uuml;r einen Termin existieren, wird nur der fr&uuml;heste Alarmzeitpunkt beibehalten. Wiederkehrende Kalendereintr&auml;ge werden in einem gewiss;en Umfang unterst&uuml;tzt:
   FREQ INTERVAL UNTIL COUNT werden ausgewertet, BYMONTHDAY BYMONTH WKST
   werden erkannt aber nicht ausgewertet. BYDAY wird f&uuml;r w&ouml;chentliche und monatliche Termine
-  korrekt behandelt. Das Modul wird es sehr wahrscheinlich falsch machen, wenn Du wiederkehrende Termine mit unerkannten oder nicht ausgewerteten Schl&uuml;&szlig;elw&ouml;rtern hast.<p>
+  korrekt behandelt. Das Modul wird es sehr wahrscheinlich falsch machen, wenn Du wiederkehrende Termine mit unerkannten oder nicht ausgewerteten Schl&uuml;sselw&ouml;rtern hast.<p>
 
   Termine werden erzeugt, wenn FHEM gestartet wird oder der betreffende Eintrag im Quell-Kalender ver&auml;ndert
   wurde oder der Kalender mit <code>get &lt;name&gt; reload</code> neu geladen wird. Es werden nur Termine
   innerhalb &pm;400 Tage um die Erzeugungs des Termins herum erzeugt. Ziehe in Betracht, den Kalender von Zeit zu Zeit
-  neu zu laden, um zu vermeiden, da&szlig; FHEM die k&uuml;nftigen Termine ausgehen. Du kann so etwas wie <code>define reloadCalendar at +*240:00:00 set MyCalendar reload</code> daf&uuml;r verwenden.<p>
+  neu zu laden, um zu vermeiden, dass; FHEM die k&uuml;nftigen Termine ausgehen. Du kann so etwas wie <code>define reloadCalendar at +*240:00:00 set MyCalendar reload</code> daf&uuml;r verwenden.<p>
 
-  Manche dumme Kalender benutzen LAST-MODIFIED nicht. Das kann dazu f&uuml;hren, da&szlig; Ver&auml;nderungen im
+  Manche dumme Kalender benutzen LAST-MODIFIED nicht. Das kann dazu f&uuml;hren, dass Ver&auml;nderungen im
   Quell-Kalender unbemerkt bleiben. Lade den Kalender neu, wenn Du dieses Problem hast.<p>
 
   Ein Termin wird durch seine UID identifiziert. Die UID wird vom Quellkalender bezogen. Um das Leben leichter zu machen, werden alle nicht-alphanumerischen Zeichen automatisch aus der UID entfernt.<p>
@@ -4240,31 +4240,31 @@ sub CalendarEventsAsHtml($;$) {
   Ein Termin kann sich in einem der folgenden Modi befinden:
   <table>
   <tr><td>upcoming</td><td>Weder die Alarmzeit noch die Startzeit des Kalendereintrags ist erreicht.</td></tr>
-  <tr><td>alarm</td><td>Die Alarmzeit ist &uuml;berschritten, aber die Startzeit des Kalender-Ereigni&szlig;es ist noch nicht erreicht.</td></tr>
-  <tr><td>start</td><td>Die Startzeit ist &uuml;berschritten, aber die Ende-Zeit des Kalender-Ereigni&szlig;es ist noch nicht erreicht.</td></tr>
-  <tr><td>end</td><td>Die Endzeit des Kalender-Ereigni&szlig;es wurde &uuml;berschritten.</td></tr>
+  <tr><td>alarm</td><td>Die Alarmzeit ist &uuml;berschritten, aber die Startzeit des Kalender-Ereignisses ist noch nicht erreicht.</td></tr>
+  <tr><td>start</td><td>Die Startzeit ist &uuml;berschritten, aber die Ende-Zeit des Kalender-Ereignisses ist noch nicht erreicht.</td></tr>
+  <tr><td>end</td><td>Die Endzeit des Kalender-Ereignisses wurde &uuml;berschritten.</td></tr>
   </table><br>
-  Ein Kalender-Ereignis wechselt umgehend von einem Modus zum anderen, wenn die Zeit f&uuml;r eine &Auml;nderung erreicht wurde. Dies wird dadurch erreicht, da&szlig; auf die fr&uuml;heste zuk&uuml;nftige Zeit aller Alarme, Start- oder Endzeiten aller Kalender-Ereigni&szlig;e gewartet wird.
+  Ein Kalender-Ereignis wechselt umgehend von einem Modus zum anderen, wenn die Zeit f&uuml;r eine &Auml;nderung erreicht wurde. Dies wird dadurch erreicht, dass auf die fr&uuml;heste zuk&uuml;nftige Zeit aller Alarme, Start- oder Endzeiten aller Kalender-Ereignisse gewartet wird.
   <p>
 
-  Ein Kalender-Device hat verschiedene Readings. Mit Ausnahme von <code>calname</code> stellt jedes Reading eine semikolonseparierte Liste aus UID von Kalender-Ereigni&szlig;e dar, welche bestimmte Zust&auml;nde haben:
+  Ein Kalender-Device hat verschiedene Readings. Mit Ausnahme von <code>calname</code> stellt jedes Reading eine semikolonseparierte Liste aus UID von Kalender-Ereignisse dar, welche bestimmte Zust&auml;nde haben:
   <table>
   <tr><td>calname</td><td>Name des Kalenders</td></tr>
-  <tr><td>modeAlarm</td><td>Ereigni&szlig;e im Alarm-Modus</td></tr>
-  <tr><td>modeAlarmOrStart</td><td>Ereigni&szlig;e im Alarm- oder Startmodus</td></tr>
-  <tr><td>modeAlarmed</td><td>Ereigni&szlig;e, welche gerade in den Alarmmodus gewechselt haben</td></tr>
-  <tr><td>modeChanged</td><td>Ereigni&szlig;e, welche gerade in irgendeiner Form ihren Modus gewechselt haben</td></tr>
-  <tr><td>modeEnd</td><td>Ereigni&szlig;e im Endmodus</td></tr>
-  <tr><td>modeEnded</td><td>Ereigni&szlig;e, welche gerade vom Start- in den Endmodus gewechselt haben</td></tr>
-  <tr><td>modeStart</td><td>Ereigni&szlig;e im Startmodus</td></tr>
-  <tr><td>modeStarted</td><td>Ereigni&szlig;e, welche gerade in den Startmodus gewechselt haben</td></tr>
-  <tr><td>modeUpcoming</td><td>Ereigni&szlig;e im zuk&uuml;nftigen Modus</td></tr>
+  <tr><td>modeAlarm</td><td>Ereignisse im Alarm-Modus</td></tr>
+  <tr><td>modeAlarmOrStart</td><td>Ereignisse im Alarm- oder Startmodus</td></tr>
+  <tr><td>modeAlarmed</td><td>Ereignisse, welche gerade in den Alarmmodus gewechselt haben</td></tr>
+  <tr><td>modeChanged</td><td>Ereignisse, welche gerade in irgendeiner Form ihren Modus gewechselt haben</td></tr>
+  <tr><td>modeEnd</td><td>Ereignisse im Endmodus</td></tr>
+  <tr><td>modeEnded</td><td>Ereignisse, welche gerade vom Start- in den Endmodus gewechselt haben</td></tr>
+  <tr><td>modeStart</td><td>Ereignisse im Startmodus</td></tr>
+  <tr><td>modeStarted</td><td>Ereignisse, welche gerade in den Startmodus gewechselt haben</td></tr>
+  <tr><td>modeUpcoming</td><td>Ereignisse im zuk&uuml;nftigen Modus</td></tr>
   </table>
   <p>
 
   F&uuml;r Serientermine werden mehrere Termine mit identischer UID erzeugt. In diesem Fall
-  wird die UID nur im intere&szlig;antesten gelesenen Modus-Reading angezeigt.
-  Der intere&szlig;anteste Modus ist der erste zutreffende Modus aus der Liste der Modi start, alarm, upcoming, end.<p>
+  wird die UID nur im interessantesten gelesenen Modus-Reading angezeigt.
+  Der interessanteste Modus ist der erste zutreffende Modus aus der Liste der Modi start, alarm, upcoming, end.<p>
 
   Die UID eines Serientermins wird nicht angezeigt, solange sich der Termin im Modus: modeEnd oder modeEnded befindet
   und die Serie nicht beendet ist. Die UID befindet sich in einem der anderen mode... Readings.
@@ -4279,7 +4279,7 @@ sub CalendarEventsAsHtml($;$) {
 
   <code>triggered</code><br><br>
 
-  Man kann sich darauf verla&szlig;en, da&szlig; alle Readings des Kalenders in einem konsistenten und aktuellen
+  Man kann sich darauf verlassen, dass alle Readings des Kalenders in einem konsistenten und aktuellen
   Zustand befinden, wenn dieses Event empfangen wird.<p>
 
   Wenn ein Termin ge&auml;ndert wurde, werden zwei FHEM-Events erzeugt:<p>
@@ -4308,17 +4308,17 @@ sub CalendarEventsAsHtml($;$) {
   <tr><td>$e->{start}</td><td>Startzeit des Termins, in Sekunden seit 1.1.1970</td></tr>
   <tr><td>$e->{end}</td><td>Endezeit des Termins, in Sekunden seit 1.1.1970</td></tr>
   <tr><td>$e->{alarm}</td><td>Alarmzeit des Termins, in Sekunden seit 1.1.1970</td></tr>
-  <tr><td>$e->{summary}</td><td>die Zusammenfa&szlig;ung (Betreff, Titel) des Termins</td></tr>
+  <tr><td>$e->{summary}</td><td>die Zusammenfassung (Betreff, Titel) des Termins</td></tr>
   <tr><td>$e->{location}</td><td>Der Ort des Termins</td></tr>
   </table><br>
 
-  Um f&uuml;r alle Termine mit dem Text "Tonne" in der Zusammenfa&szlig;ung die Alarmzeit zu erg&auml;nzen / zu &auml;ndern,
+  Um f&uuml;r alle Termine mit dem Text "Tonne" in der Zusammenfassung die Alarmzeit zu erg&auml;nzen / zu &auml;ndern,
   kann folgendes Plug-In benutzt werden:<br><br>
   <code>attr MyCalendar onCreateEvent { $e->{alarm}= $e->{start}-86400 if($e->{summary} =~ /Tonne/);; }</code><br>
   <br>Das doppelte Semikolon maskiert das Semikolon. <a href="#perl">Perl specials</a> k&ouml;nnen nicht genutzt werden.<br>
   <br>
   Zum Erg&auml;nzen einer fehlenden Endezeit, kann folgendes Plug-In benutzt werden: <br><br>
-  <code>attr MyCalendar onCreateEvent { $e->{end}= $e->{start}+86400 unle&szlig;(defined($e->{end})) }</code><br>
+  <code>attr MyCalendar onCreateEvent { $e->{end}= $e->{start}+86400 unless(defined($e->{end})) }</code><br>
   </ul>
   <br><br>
 
@@ -4335,9 +4335,9 @@ sub CalendarEventsAsHtml($;$) {
 
     <i>Zeige Termine in Deinem Bilderrahmen</i><br><br>
     <ul>
-    F&uuml;ge eine Zeile in die <a href="#R&szlig;layout">layout description</a> ein, um Termine im Alarm- oder Startmodus anzuzeigen:<br><br>
+    F&uuml;ge eine Zeile in die <a href="#RSSlayout">layout description</a> ein, um Termine im Alarm- oder Startmodus anzuzeigen:<br><br>
     <code>text 20 60 { fhem("get MyCalendar events timeFormat:'%d.%m.%Y %H:%M' format:custom='$T1 $S' filter:mode=~'alarm|start') }</code><br><br>
-    Dies kann dann z.B. so au&szlig;ehen:<br><br>
+    Dies kann dann z.B. so aussehen:<br><br>
     <code>
     07.06.12 16:30 Erna zum Kaffee<br>
     08.06.12 00:00 Urlaub
@@ -4363,8 +4363,8 @@ sub CalendarEventsAsHtml($;$) {
 
     <i>Schalte Aktoren an und aus</i><br><br>
     <ul>
-    Stell Dir einen Kalender vor, de&szlig;en Zusammenfa&szlig;ungen (Betreff, Titel) die Namen von Devices in Deiner FHEM-Installation sind.
-    Du willst nun die entsprechenden Devices an- und au&szlig;chalten, wenn das Kalender-Ereignis beginnt bzw. endet.<br><br>
+    Stell Dir einen Kalender vor, dessen Zusammenfassungen (Betreff, Titel) die Namen von Devices in Deiner FHEM-Installation sind.
+    Du willst nun die entsprechenden Devices an- und ausschalten, wenn das Kalender-Ereignis beginnt bzw. endet.<br><br>
     <code>
     define SwitchActorOn  notify MyCalendar:start:.* { \<br>
                 my $reading="$EVTPART0";; \<br>
@@ -4395,7 +4395,7 @@ sub CalendarEventsAsHtml($;$) {
     <i>Benachrichtigen &uuml;ber M&uuml;llabholung</i><br><br>
     <ul>
     Nehmen wir an der <code>GarbageCalendar</code> beinhaltet alle Termine der
-    M&uuml;llabholung mit der Art des M&uuml;lls innerhalb der Zusammenfa&szlig;ung (summary).
+    M&uuml;llabholung mit der Art des M&uuml;lls innerhalb der Zusammenfassung (summary).
     Das folgende notify kann zur Benachrichtigung &uuml;ber die M&uuml;llabholung
     benutzt werden:<br><br><code>
     define GarbageCollectionNotifier notify GarbageCalendar:alarm:.* { \<br>
