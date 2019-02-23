@@ -2369,7 +2369,7 @@ DOIF_Notify($$)
   if ($dev->{NAME} eq "global" and (EventCheckDoif($dev->{NAME},"global",$eventa,'^INITIALIZED$') or EventCheckDoif($dev->{NAME},"global",$eventa,'^REREADCFG$')))
   {
     $hash->{helper}{globalinit}=1;
-    # delete old timer-readings
+     # delete old timer-readings
     foreach my $key (keys %{$defs{$hash->{NAME}}{READINGS}}) {
       delete $defs{$hash->{NAME}}{READINGS}{$key} if ($key =~ "^timer_");
     }
@@ -3139,6 +3139,9 @@ DOIF_Define($$$)
   my $err;
   my $msg;
   $hs=$hash;
+  if (AnalyzeCommandChain(undef,"version 98_DOIF.pm noheader") =~ "^98_DOIF.pm (.*)Z") {
+    $hash->{VERSION}=$1;
+  }
 
   if (!$cmd) {
     $cmd="";
@@ -3149,7 +3152,7 @@ DOIF_Define($$$)
   }
   
   if ($cmd =~ /^\s*(\(|$)/) {
-    $hash->{MODEL}="FHEM";  
+    $hash->{MODEL}="FHEM";
     ($msg,$err)=CmdDoIf($hash,$cmd);
     #delete $defs{$hash->{NAME}}{".AttrList"};
     setDevAttrList($hash->{NAME});
@@ -4095,6 +4098,7 @@ Funktion: <b>med</b><br>
 Bsp.:<br>
 <br>
 <code>define di_frost DOIF ([$SELF:outTempMed] &lt; 0) (set warning frost)<br>
+<br>
 attr di_frost event_Readings outTempMed:[outdoor:temperature:med]</code><br>
 <br>
 Die Definition über das Attribut event_Readings hat den Vorteil, dass der bereinigte Wert im definierten Reading visualisiert und geloggt werden kann (med entspricht med3).<br>
@@ -4107,9 +4111,9 @@ Funktion: <b>diff</b><br>
 <br>
 Bsp.:<br>
 <br>
-<code>define temp_abfall ([outdoor:temperature:diff5] &gt; 3) (set temp fall in temperature)</code><br>
+<code>define temp_abfall DOIF ([outdoor:temperature:diff5] &lt; -3) (set temp fall in temperature)</code><br>
 <br>
-Wenn die Temperaturdifferenz zwischen dem letzten und dem fünftletzten Wert um drei Grad fällt, dann Anweisung ausführen.<br>
+Wenn die Temperaturdifferenz zwischen dem letzten und dem fünftletzten Wert um mindestens drei Grad fällt, dann Anweisung ausführen.<br>
 <br>
 <u>anteiliger Anstieg</u><br>
 <br>
@@ -5376,8 +5380,14 @@ Hierbei wird der aufwändig berechnete Durchschnittswert nur einmal berechnet, s
 <a name="DOIF_event_Readings"></a>
 <b>Erzeugen berechneter Readings mit Events</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
-Dieses Atrribut hat die gleiche Syntax wie DOIF_Readings. Der Unterschied besteht darin, dass event_Readings im Gegensatz zu DOIF_Readings beim Setzen der definierten Readings jedes mal Events produziert.
+Mit Hilfe des Attributes event_Readings können eigene Readings innerhalb des DOIF definiert werden. Dieses Atrribut hat die gleiche Syntax wie <a href="#DOIF_DOIF_Readings">DOIF_Readings</a>. Der Unterschied besteht darin, dass event_Readings im Gegensatz zu DOIF_Readings beim Setzen der definierten Readings jedes mal Events produziert.
 Die Nutzung von event_Readings ist insb. dann sinnvoll, wenn man eventgesteuert außerhalb des Moduls auf die definierten Readings zugreifen möchte.<br>
+<br>
+Syntax<br>
+<br>
+<code>attr &lt;DOIF-Modul&gt; event_Readings &lt;readingname1&gt;:&lt;definiton&gt;, &lt;readingname2&gt;:&lt;definition&gt;,...</code><br>
+<br>
+<code>&lt;definition&gt;</code>: Beliebiger Perlausdruck ergänzt um DOIF-Syntax in eckigen Klammern. Angaben in eckigen Klammern wirken triggernd und aktualisieren das definierte Reading.<br>
 <br>
 Bsp.:<br>
 <br>
