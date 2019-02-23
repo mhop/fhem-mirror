@@ -500,6 +500,33 @@ my @usbtable = (
       response  => "^\x06.*",
       define    => "ZWDongle_PARAM ZWDongle DEVICE\@115200", },
 
+    { NAME      => "SIGNALDuino",
+      matchList => ["cu.usbserial(.*)", "cu.usbmodem(.*)",
+                    "ttyUSB(.*)", "ttyACM(.*)", "ttyAMA(.*)"],
+      DeviceName=> "DEVICE\@57600",
+      flush     => "\n",
+      request   => "V\n",                # request firmware version
+      response  => "^;S.*",
+      define    => "SIGNALDUINO_PARAM SIGNALduino DEVICE\@57600", },
+
+    { NAME      => "MYSENSORS",
+      matchList => ["cu.usbserial(.*)", "cu.usbmodem(.*)",
+                    "ttyUSB(.*)", "ttyACM(.*)", "ttyAMA(.*)"],
+      DeviceName=> "DEVICE\@115200",
+      flush     => "\n",
+      request   => "0;255;3;0;18\n",   # send heartbeat request
+      response  => "^0;255;3;0;22.*",  # heartbeat response
+      define    => "MYSENSORS_PARAM MYSENSORS DEVICE\@115200", },
+
+    { NAME      => "ArduCounter",
+      matchList => ["cu.usbserial(.*)", "cu.usbmodem(.*)",
+                    "ttyUSB(.*)", "ttyACM(.*)", "ttyAMA(.*)"],
+      DeviceName=> "DEVICE\@38400",
+      flush     => "\n",
+      request   => "h\n",   # send firmware version request
+      response  => "^ArduCounter V.*",  # response is two lines
+      define    => "ArduCounter_PARAM ArduCounter DEVICE\@38400", },
+
     { NAME      => "FRM",
       matchList => ["cu.usbserial(.*)", "cu.usbmodem(.*)",
                     "ttyUSB(.*)", "ttyACM(.*)", "ttyAMA(.*)"],
