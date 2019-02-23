@@ -2269,9 +2269,9 @@ sub Calendar_GetSecondsFromTimeSpec($) {
     return ("", $1*86400);
   }
 
-  # seconds
-  if($tspec =~ m/^[0-9]+s?$/) {
-    return ("", $tspec);
+   # seconds
+  if($tspec =~ m/^([0-9]+)s?$/) {
+    return ("", $1);
   }
 
   # D:HH:MM:SS
