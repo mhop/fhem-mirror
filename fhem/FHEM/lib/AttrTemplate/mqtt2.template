@@ -48,7 +48,10 @@ attr DEVICE setList\
   log_level:debug,info,warn,error BASE_TOPIC/bridge/config/log_level $EVTPART1\
   permit_join:true,false BASE_TOPIC/bridge/config/permit_join $EVTPART1\
   remove:textField BASE_TOPIC/bridge/config/remove $EVTPART1\
-  rename:textField BASE_TOPIC/bridge/config/rename  {"old":"$EVTPART1","new":"$EVTPART2"}
+  rename:textField BASE_TOPIC/bridge/config/rename  {"old":"$EVTPART1","new":"$EVTPART2"}\
+  x_add_to_group:textField zigbee2mqtt/bridge/group/$EVTPART1/add $EVTPART2\
+  x_rm_from_group:textField zigbee2mqtt/bridge/group/$EVTPART1/remove $EVTPART2\
+  x_rm_from_all_groups:textField zigbee2mqtt/bridge/group/$EVTPART1/remove_all $EVTPART2
 attr DEVICE setStateList on off
 attr DEVICE model L_01_zigbee2mqtt_bridge
 # Based on https://forum.fhem.de/index.php/topic,94060.msg872371.html#msg872371 
@@ -119,6 +122,7 @@ attr DEVICE setList \
   off:noArg BASE_TOPIC/DEV_ID/set {"state":"OFF"}\
   brightness:colorpicker,BRI,0,5,255 BASE_TOPIC/DEV_ID/set {"state":"on","$EVTPART0":"$EVTPART1"}\
   hex:colorpicker,HEX,0,15,255 BASE_TOPIC/DEV_ID/set {"color":{"$EVTPART0":"#$EVTPART1"}}
+attr DEVICE userReadings hex:color_y.* {Color::xyY2hex(ReadingsVal($name,"color_x",0),ReadingsVal($name,"color_y",0),ReadingsVal($name,"brightness",254))}
 attr DEVICE model L_02c_zigbee2mqtt_light_rgb_hex
 
 name:L_02c_zigbee2mqtt_light_rgb_rgb
