@@ -322,6 +322,12 @@ my $db = {
             },
         },
 
+        'LGTV_WEBOS' => {
+            'Normal' => 'set %DEVICE% screenMsg %MSG%',
+            'High'   => 'set %DEVICE% screenMsg %MSG%',
+            'Low'    => 'set %DEVICE% screenMsg %MSG%',
+        },
+
         'KODI' => {
             'Normal' =>
 '{ my $d=\'%DEVICE%\'; my $msg=\'%MSG%\'; my $title=\'%TITLE%\'; my $timeout=%TIMEOUT%*1000; fhem "set $d msg \'$title\' \'$msg\' $timeout %KODI_ICON%"; }',
