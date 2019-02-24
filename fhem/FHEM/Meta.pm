@@ -620,9 +620,9 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
     push @{ $modMeta->{x_file} }, $version;
 
     # Do not use repeating 0 in version
-    #FIXME breaks modules starting with 00_
-    $modMeta->{version} =~ s/0{2,}/0/g if ( defined( $modMeta->{version} ) );
-    $modMeta->{x_version} =~ s/0{2,}/0/g
+    $modMeta->{version} =~ s/\.0{2,}/\.0/g
+      if ( defined( $modMeta->{version} ) );
+    $modMeta->{x_version} =~ s/\.0{2,}/\.0/g
       if ( defined( $modMeta->{x_version} ) );
 
     # Generate extended version info with added base revision
@@ -726,7 +726,7 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
 
     unless ( $modMeta->{license} ) {
         if ( defined( $modMeta->{x_vcs} ) ) {
-            $modMeta->{license} = 'GPL_3';
+            $modMeta->{license} = 'GPL_2';
         }
         else {
             $modMeta->{license} = 'unknown';
@@ -929,7 +929,7 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
   "x_lang": {
     "de": {
       "abstract": "FHEM® ist ein Perl Server zur Hausautomatisierung",
-      "description": "FHEM® (eingetragene Marke) ist ein in Perl geschriebener, GPL lizensierter Server für die Heimautomatisierung. Man kann mit FHEM häufig auftretende Aufgaben automatisieren, wie z.Bsp. Lampen / Rollladen / Heizung / usw. schalten, oder Ereignisse wie Temperatur / Feuchtigkeit / Stromverbrauch protokollieren und visualisieren. Für weitere Ideen siehe diesen Link.\\n\\nDas Programm läuft als Server, man kann es über WEB, dedizierte Smartphone Apps oder telnet bedienen, TCP Schnittstellen für JSON und XML existieren ebenfalls.\\n\\nUm es zu verwenden benötigt man einen 24/7 Rechner (NAS, RPi, PC, MacMini, etc) mit einem Perl Interpreter und angeschlossene Hardware-Komponenten wie CUL-, EnOcean-, Z-Wave-USB-Stick, etc. für einen Zugang zu den Aktoren und Sensoren.\\n\\nAusgesprochen wird es ohne h, wie bei feminin."
+      "description": "FHEM® (eingetragene Marke) ist ein in Perl geschriebener, GPL lizensierter Server für die Heimautomatisierung. Man kann mit FHEM häufig auftretende Aufgaben automatisieren, wie z.Bsp. Lampen / Rollladen / Heizung / usw. schalten, oder Ereignisse wie Temperatur / Feuchtigkeit / Stromverbrauch protokollieren und visualisieren.\\n\\nDas Programm läuft als Server, man kann es über WEB, dedizierte Smartphone Apps oder telnet bedienen, TCP Schnittstellen für JSON und XML existieren ebenfalls.\\n\\nUm es zu verwenden benötigt man einen 24/7 Rechner (NAS, RPi, PC, MacMini, etc) mit einem Perl Interpreter und angeschlossene Hardware-Komponenten wie CUL-, EnOcean-, Z-Wave-USB-Stick, etc. für einen Zugang zu den Aktoren und Sensoren.\\n\\nAusgesprochen wird es ohne h, wie bei feminin."
     }
   },
   "keywords": [
