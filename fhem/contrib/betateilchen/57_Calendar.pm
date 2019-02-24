@@ -1716,13 +1716,19 @@ sub Calendar_Define($$) {
   my $name      = $a[0];
   my $type      = $a[3];
   my $url       = $a[4];
+
+  my $interval  = 3600;
+  if($#a==5) {
+    $interval= $a[5] if ($a[5] > 0);
+    Log3 $hash,2,"Calendar $name: interval $a[5] not allowed. Using 3600 as default." if ($a[5] <= 0);
+  }
   
   $url =~ /(^https?:\/\/)(.*:.*@)?(.*)/;
   if($2) {
     # credentials found in url, store them in keystore
     setKeyValue($name,$2);
     $url = $1.'credentials@'.$3;
-    $hash->{DEF} = "$a[2] $a[3] $url";
+    $hash->{DEF} = "$a[2] $a[3] $url $interval";
   }  
 
   $url =~ /(^https?:\/\/.*google.*ical\/)(.*private-.*)(\/.*)/;
@@ -1730,14 +1736,8 @@ sub Calendar_Define($$) {
     # private key found in url, store it in keystore
     setKeyValue($name,$2);
     $url = $1.'credentials@'.$3;
-    $hash->{DEF} = "$a[2] $a[3] $url";
+    $hash->{DEF} = "$a[2] $a[3] $url $interval";
   }  
-
-  my $interval  = 3600;
-  if($#a==5) {
-    $interval= $a[5] if ($a[5] > 0);
-    Log3 $hash,2,"Calendar $name: interval $a[5] not allowed. Using 3600 as default." if ($a[5] <= 0);
-  }
 
   $hash->{".fhem"}{type}= $type;
   $hash->{".fhem"}{url}= $url;
