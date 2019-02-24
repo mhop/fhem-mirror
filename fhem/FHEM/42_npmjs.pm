@@ -298,9 +298,8 @@ sub Set($$@) {
             }
         }
 
-        # use 'install' as default update method for global installations
-        #   or when explicit upgrade command was given
-        my $installcmd = $npmglobal || $cmd eq 'upgrade' ? 'install' : 'update';
+        # use 'install' as default update method
+        my $installcmd = 'install';
 
         foreach my $pkgfull (@args) {
             next
@@ -442,7 +441,7 @@ sub Set($$@) {
                 defined( $hash->{".fhem"}{npm}{listedpackages}{dependencies} )
                 and scalar
                 keys %{ $hash->{".fhem"}{npm}{listedpackages}{dependencies} } >
-                1 )
+                0 )
             {
                 my $uninstall;
                 foreach (
@@ -457,7 +456,7 @@ sub Set($$@) {
                       unless ($uninstall);
                     $uninstall .= $_;
                 }
-                $list .= " $uninstall";
+                $list .= " $uninstall" if ($uninstall);
             }
 
             if ( defined( $hash->{".fhem"}{npm}{outdatedpackages} )
@@ -1485,7 +1484,7 @@ sub CreateOutdatedList($$) {
             $l .= $colOpen . (
                 defined( $packages->{$package}{wanted} )
                 ? (
-                      $fhemPkg && $npmglobal
+                      $fhemPkg
                     ? $packages->{$package}{latest}
                     : (
                         defined( $packages->{$package}{current} )
@@ -1600,7 +1599,7 @@ sub ToDay() {
     </li>
     <li>outdated - fetch information about update state
     </li>
-    <li>update - trigger complete or selected update process (using 'npm update' command). For NPM global installations, FHEM related packages will always be upgraded to the latest major version (using 'npm install' instead of 'npm update'). Other packages will repsect <a href="https://semver.org/">semver</a> and major upgrades will not be performed. For non-global NPM installations, FHEM packages will follow the regular NPM update behaviour.
+    <li>update - trigger complete or selected update process (using 'npm update' command). FHEM related packages will always be upgraded to the latest major version (using 'npm install' instead of 'npm update'). Other packages will repsect <a href="https://semver.org/">semantic versioning</a> and major upgrades will not be performed.
     </li>
     <li>upgrade - trigger complete or selected upgrade process (using 'npm install' command). ATTENTION! Every package will be upgraded to the latest and greatest version (using 'npm install' command instead of 'npm update'), no matter if the package maintainer has defined some incompatiblities between the current installed and latest version. If in doubt, consider to only use the update set command instead.
     </li>
@@ -1692,7 +1691,7 @@ sub ToDay() {
   <ul>
     <li>outdated - Holt aktuelle Informationen &uuml;ber den Updatestatus
     </li>
-    <li>update - F&uuml;hrt ein komplettes oder selektives Update aus (nutzt 'npm update' Kommando). Bei globale NPM Installationen werden FHEM relevante Pakete immer auf die neuste Major Version upgegraded (nutzt 'npm install' Kommando anstatt von 'npm update'). <a href="https://semver.org/">semver</a> wird bei anderen Paketen weiterhin respektiert und es werden keine Major Upgrades durchgef&uuml;hrt. Bei nicht-globalen NPM Installationen folgen auch FHEM Pakwte dem gegul&auml;ren NPM Update Verhalten.
+    <li>update - F&uuml;hrt ein komplettes oder selektives Update aus (nutzt 'npm update' Kommando). FHEM relevante Pakete werden immer auf die neuste Major Version upgegraded (nutzt 'npm install' Kommando anstatt von 'npm update'). <a href="https://semver.org/">Semantische Versionierung</a> wird bei anderen Paketen weiterhin respektiert und es werden keine Major Upgrades durchgef&uuml;hrt.
     </li>
     <li>upgrade - F&uuml;hrt ein komplettes oder selektives Upgrade aus (nutzt 'npm install' Kommando). ACHTUNG! Jedes Paket wird auf die neuste und gr&ouml;&szlig;te Version upgegraded (nutzt 'npm install' Kommando anstatt von 'npm update'), ganz egal ob der Paket Maintainer eine Inkompatibilit&auml;t zwischen der aktuell installierten und der neusten Version definiert hat. Im Zweifel sollte besser stattdessen das Update set Kommando benutzt werden.
     </li>
@@ -1747,7 +1746,7 @@ sub ToDay() {
     "node",
     "npm"
   ],
-  "version": "v1.0.0",
+  "version": "v1.0.1",
   "release_status": "stable",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
