@@ -235,14 +235,6 @@ sub Notify($$) {
         }
         $decode_json = undef;
 
-        # restore from upgradedList
-        $decode_json =
-          eval { decode_json( ReadingsVal( $name, '.upgradedList', '' ) ) };
-        unless ($@) {
-            $hash->{".fhem"}{npm}{upgradedpackages} = $decode_json;
-        }
-        $decode_json = undef;
-
         # Trigger update
         if ( ReadingsVal( $name, 'nodejsVersion', 'none' ) ne 'none' ) {
             ProcessUpdateTimer($hash);
