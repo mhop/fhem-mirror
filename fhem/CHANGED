@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - changed: 74_Unifi: removed deprecated UnifiSwitch-functions!
+ - bugfix:  74_UnififSwitch: fixed poe restart
  - feature: 57_Calendar.pm: new features and attributes
                             german commandref added
  - bugfix: 00_SIGNALduino: Load protocolHash from web if file  is 

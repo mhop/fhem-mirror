@@ -40,10 +40,12 @@
 #  - changed: 74_Unifi: Reading(name) for Utilization of APs with UC V 5.7/8.x
 # V 3.0.5
 #  - feature: 74_Unifi: Added readings for wan_ip and results of speedtest
+# V 3.1.0
+#  - changed: 74_Unifi: removed deprecated UnifiSwitch-functions!
 
 
 package main;
-my $version="3.0.4";
+my $version="3.1.0";
 use strict;
 use warnings;
 use HttpUtils;
@@ -237,13 +239,13 @@ sub Unifi_Set($@) {
     my $apNames = Unifi_ApNames($hash);
     my $SSIDs = Unifi_SSIDs($hash);
     
-    if($setName !~ /archiveAlerts|restartAP|setLocateAP|unsetLocateAP|disconnectClient|update|updateClient|clear|poeMode|blockClient|unblockClient|enableWLAN|disableWLAN|switchSiteLEDs|createVoucher/) {
+    if($setName !~ /archiveAlerts|restartAP|setLocateAP|unsetLocateAP|disconnectClient|update|updateClient|clear|blockClient|unblockClient|enableWLAN|disableWLAN|switchSiteLEDs|createVoucher/) {
         return "Unknown argument $setName, choose one of update:noArg "
                ."clear:all,readings,clientData,allData,voucherCache "
                .((defined $hash->{alerts_unarchived}[0] && scalar @{$hash->{alerts_unarchived}}) ? "archiveAlerts:noArg " : "")
                .(($apNames && Unifi_CONNECTED($hash)) ? "restartAP:all,$apNames setLocateAP:all,$apNames unsetLocateAP:all,$apNames " : "")
                .(($clientNames && Unifi_CONNECTED($hash)) ? "disconnectClient:all,$clientNames " : "")
-               ."poeMode createVoucher enableWLAN:$SSIDs disableWLAN:$SSIDs "
+               ."createVoucher enableWLAN:$SSIDs disableWLAN:$SSIDs "
                ."blockClient:$clientNames unblockClient:$clientNames switchSiteLEDs:on,off updateClient";
     }
     else {
@@ -327,73 +329,6 @@ sub Unifi_Set($@) {
             elsif ($setName eq 'updateClient') {
                 return "enter mac of client" if( ! defined $setVal);
                 Unifi_UpdateClient_Send($hash,$setVal);
-            }
-            elsif ($setName eq 'poeMode') {
-                Log3 $name, 2, "$name: deprecated use of set poeMode. Use same feature in autocreated UnifiSwitch-Device.";
-                return "usage: $setName <name|mac|id> <port> <off|auto|passive|passthrough|restart>" if( !$setVal3 );
-                my $apRef;
-                for my $apID (keys %{$hash->{accespoints}}) {
-                  my $ap = $hash->{accespoints}->{$apID};
-                  next if( !$ap->{port_table} );
-                  next if( $ap->{type} ne 'usw' );
-                  next if( $setVal ne $ap->{mac} && $setVal ne $ap->{device_id} && $ap->{name} !~ $setVal );
-                  return "multiple switches found for $setVal" if( $apRef );
-                  $apRef = $ap;
-                }
-                return "no switch $setVal found" if( !$apRef );
-                if( $setVal2 !~ m/\d+/ ) {
-                  for my $port (@{$apRef->{port_table}}) {
-                    next if( $port->{name} !~ $setVal2 );
-                    $setVal2 = $port->{port_idx};
-                    last;
-                  }
-                }
-                return "port musst be numeric" if( $setVal2 !~ m/\d+/ );
-                return "port musst be in [1..". scalar @{$apRef->{port_table}} ."] " if( $setVal2 < 1 || $setVal2 > scalar @{$apRef->{port_table}} );
-                return "switch '$apRef->{name}' has no port $setVal2" if( !defined(@{$apRef->{port_table}}[$setVal2-1] ) );
-                return "port $setVal2 of switch '$apRef->{name}' is not poe capable" if( !@{$apRef->{port_table}}[$setVal2-1]->{port_poe} );
-
-                my $port_overrides = $apRef->{port_overrides};
-                my $idx;
-                my $i = 0;
-                for my $entry (@{$port_overrides}) {
-                  if( $entry->{port_idx} eq $setVal2 ) {
-                    $idx = $i;
-                    last;
-                  }
-                  ++$i;
-                }
-                if( !defined($idx) ) {
-                  push @{$port_overrides}, {port_idx => $setVal2+0};
-                  $idx = scalar @{$port_overrides};
-                }
-
-                if( $setVal3 eq 'off' ) {
-                  $port_overrides->[$idx]{poe_mode} = "off";
-                  Unifi_RestJson_Send($hash, $apRef->{device_id}, {port_overrides => $port_overrides });
-
-                } elsif( $setVal3 eq 'auto' || $setVal3 eq 'poe+' ) {
-                  #return "port $setVal2 not auto poe capable" if( @{$apRef->{port_table}}[$setVal2-1]->{poe_caps} & 0x03 ) ;
-                  $port_overrides->[$idx]{poe_mode} = "auto";
-                  Unifi_RestJson_Send($hash, $apRef->{device_id}, {port_overrides => $port_overrides });
-
-                } elsif( $setVal3 eq 'passive' ) {
-                  #return "port $setVal2 not passive poe capable" if( @{$apRef->{port_table}}[$setVal2-1]->{poe_caps} & 0x04 ) ;
-                  $port_overrides->[$idx]{poe_mode} = "pasv24";
-                  Unifi_RestJson_Send($hash, $apRef->{device_id}, {port_overrides => $port_overrides });
-
-                } elsif( $setVal3 eq 'passthrough' ) {
-                  #return "port $setVal2 not passthrough poe capable" if( @{$apRef->{port_table}}[$setVal2-1]->{poe_caps} & 0x08 ) ;
-                  $port_overrides->[$idx]{poe_mode} = "passthrough";
-                  Unifi_RestJson_Send($hash, $apRef->{device_id}, {port_overrides => $port_overrides });
-
-                } elsif( $setVal3 eq 'restart' ) {
-                  Unifi_ApJson_Send($hash,{cmd => 'power-cycle', mac => $apRef->{mac}, port_idx => $setVal2+0});
-
-                } else {
-                  return "unknwon poe mode $setVal3";
-
-                }
             }
             elsif ($setName eq 'archiveAlerts' && defined $hash->{alerts_unarchived}[0]) {
                 Unifi_ArchiveAlerts_Send($hash);
@@ -516,37 +451,12 @@ sub Unifi_Get($@) {
     
     my $clientNames = Unifi_ClientNames($hash);
     
-    if($getName !~ /events|clientData|unarchivedAlerts|poeState|voucherList|voucher|showAccount/) {
+    if($getName !~ /events|clientData|unarchivedAlerts|voucherList|voucher|showAccount/) {
         return "Unknown argument $getName, choose one of "
                .((defined $hash->{events}[0] && scalar @{$hash->{events}}) ? "events:noArg " : "")
                .((defined $hash->{alerts_unarchived}[0] && scalar @{$hash->{alerts_unarchived}}) ? "unarchivedAlerts:noArg " : "")
                .(($clientNames) ? "clientData:all,$clientNames " : "")
-               ."poeState voucherList:all,$voucherNotes voucher:$voucherNotes showAccount";
-    }
-    elsif ($getName eq 'poeState') {
-        Log3 $name, 2, "$name: deprecated use of get poeState. Use readings in autocreated UnifiSwitch-Device instead.";
-        my $poeState;
-        for my $apID (keys %{$hash->{accespoints}}) {
-          my $apRef = $hash->{accespoints}->{$apID};
-          next if( $apRef->{type} ne 'usw' );
-          next if( !$apRef->{port_table} );
-          next if( $getVal && $getVal ne $apRef->{mac} && $getVal ne $apRef->{device_id} && $apRef->{name} !~ $getVal );
-          $poeState .= "\n" if( $poeState );
-          $poeState .= sprintf( "%-20s (mac:%-17s, id:%s)\n", $apRef->{name}, $apRef->{mac}, $apRef->{device_id} );
-          $poeState .= sprintf( "  %2s  %-15s", "id", "name" );
-          $poeState .= sprintf( " %s %s %-6s %-4s %-10s", "", "on", "mode", "", "class" );
-          $poeState .= "\n";
-          for my $port (@{$apRef->{port_table}}) {
-            #next if( !$port->{port_poe} );
-            $poeState .= sprintf( "  %2i  %-15s", $port->{port_idx}, $port->{name} );
-            $poeState .= sprintf( " %s %s %-6s %-4s %-10s", $port->{poe_caps}, $port->{poe_enable}, $port->{poe_mode}, defined($port->{poe_good})?($port->{poe_good}?"good":""):"", defined($port->{poe_class})?$port->{poe_class}:"" ) if( $port->{port_poe} );
-            $poeState .= sprintf( " %5.2fW %5.2fV %5.2fmA", $port->{poe_power}?$port->{poe_power}:0, $port->{poe_voltage}, $port->{poe_current}?$port->{poe_current}:0 ) if( $port->{port_poe} );
-            $poeState .= "\n";
-          }
-        }
-        $poeState = "====================================================\n". $poeState;
-        $poeState .= "====================================================\n";
-        return $poeState;
+               ."voucherList:all,$voucherNotes voucher:$voucherNotes showAccount";
     }
     elsif ($getName eq 'unarchivedAlerts' && defined $hash->{alerts_unarchived}[0] && scalar @{$hash->{alerts_unarchived}}) {
         my $alerts = "====================================================\n";
@@ -734,12 +644,15 @@ sub Unifi_Attr(@) {
 
 ###############################################################################
 sub Unifi_Write($$){
-	my ( $hash, $type, $ap_id, $port_overrides) = @_; #TODO: ap_id und port_overrides in @a, damit es für andere $type auch geht.
+	my ( $hash, $type, $ap_id, $data) = @_; #TODO: ap_id und port_overrides in @a, damit es für andere $type auch geht.
 	
   my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
   Log3 $name, 5, "$name ($self) - executed with ".$type;
   if($type eq "Unifi_RestJson_Send"){
-    Unifi_RestJson_Send($hash, $ap_id, {port_overrides => $port_overrides });
+    Unifi_RestJson_Send($hash, $ap_id, {port_overrides => $data });
+  }
+  if($type eq "Unifi_ApJson_Send"){
+    Unifi_ApJson_Send($hash, $data );
   }
   
 	return undef;
@@ -1329,12 +1242,12 @@ sub Unifi_SetAccesspointReadings($) {
           readingsBulkUpdate($hash,'-AP_'.$apName.'_utilizationNG',$apRef->{'ng_cu_total'}) if( defined($apRef->{'ng_cu_total'}) );
         }
         readingsBulkUpdate($hash,'-AP_'.$apName.'_locate',(!defined $apRef->{locating}) ? 'unknown' : ($apRef->{locating}) ? 'on' : 'off');
-        my $poe_power;
-        for my $port (@{$apRef->{port_table}}) {
-          next if( !$port->{port_poe} );
-          $poe_power += $port->{poe_power} if( defined($port->{poe_power}) );
-        }
-        readingsBulkUpdate($hash,'-AP_'.$apName.'_poePower', $poe_power) if( defined($poe_power) );
+        #my $poe_power;
+        #for my $port (@{$apRef->{port_table}}) {
+        #  next if( !$port->{port_poe} );
+        #  $poe_power += $port->{poe_power} if( defined($port->{poe_power}) );
+        #}
+        #readingsBulkUpdate($hash,'-AP_'.$apName.'_poePower', $poe_power) if( defined($poe_power) );
 
         # readingsBulkUpdate($hash,'-AP_'.$apName.'_guests',$apRef->{'guest-num_sta'});
         # readingsBulkUpdate($hash,'-AP_'.$apName.'_users',$apRef->{'user-num_sta'});
@@ -2093,7 +2006,7 @@ sub Unifi_ReceiveFailure($$) {
     my ($name,$self) = ($hash->{NAME},Unifi_Whowasi());
     
     if (defined $meta->{msg}) {
-        if ($meta->{msg} eq 'api.err.LoginRequired') {
+        if (($meta->{msg} eq 'api.err.LoginRequired') || ($meta->{msg} =~ /Connection refused$/) || ($meta->{msg} =~ /SSL connect attempt failed$/)){
             Log3 $name, 5, "$name ($self) - LoginRequired detected...";
             if(Unifi_CONNECTED($hash)) {
                 Log3 $name, 5, "$name ($self) - I am the first who detected LoginRequired. Do re-login...";
@@ -2294,9 +2207,6 @@ Or you can use the other readings or set and get features to control your unifi-
     <li><code>set &lt;name&gt; unsetLocateAP &lt;all|_id|name|ip&gt;</code><br>
     Stop 'locate' on one or all accesspoints. </li>
     <br>
-    <li><code>set &lt;name&gt; poeMode &lt;name|mac|id&gt; &lt;port&gt; &lt;off|auto|passive|passthrough|restart&gt;</code><br>
-    Set PoE mode for &lt;port&gt;. </li>
-    <br>
     <li><code>set &lt;name&gt; blockClient &lt;clientname&gt;</code><br>
     Block the &lt;clientname&gt;. Can also be called with the mac-address of the client.</li>
     <br>
@@ -2330,9 +2240,6 @@ Or you can use the other readings or set and get features to control your unifi-
     <br>
     <li><code>get &lt;name&gt; unarchivedAlerts</code><br>
     Show all unarchived Alerts.</li>
-    <br>
-    <li><code>get &lt;name&gt; poeState [name|mac|id]</code><br>
-    Show port PoE state.</li>
     <br>
     <li><code>get &lt;name&gt; voucher [note]</code><br>
     Show next voucher-code with specified note. If &lt;note&gt; is used in voucherCache the voucher will be marked as delivered</li>
