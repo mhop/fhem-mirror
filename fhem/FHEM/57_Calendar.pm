@@ -2484,8 +2484,11 @@ sub Calendar_GetUpdate($$$;$) {
     return;
   }
 
-  my @ti = localtime;
-  my $url= ResolveDateWildcards($hash->{".fhem"}{url}, @ti);
+  my $url = $hash->{".fhem"}{url};
+  unless (AttrVal($name,'quirks','') =~ /noWildcards/) {
+    my @ti = localtime;
+    $url   = ResolveDateWildcards($hash->{".fhem"}{url}, @ti);
+  }
 
   if($url ne $hash->{".fhem"}{lasturl}) {
     $hash->{".fhem"}{lasturl} = $url;
