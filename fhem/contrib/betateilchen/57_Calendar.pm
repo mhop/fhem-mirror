@@ -1725,7 +1725,7 @@ sub Calendar_Define($$) {
     $hash->{DEF} = "$a[2] $a[3] $url";
   }  
 
-  $url =~ /(^https?:\/\/.*google.*\/)(private-.*)(\/.*)/;
+  $url =~ /(^https?:\/\/.*google.*ical\/)(.*private-.*)(\/.*)/;
   if($2) {
     # private key found in url, store it in keystore
     setKeyValue($name,$2);
