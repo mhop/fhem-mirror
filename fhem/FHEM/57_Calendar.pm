@@ -2620,7 +2620,7 @@ sub Calendar_ProcessUpdate($$$) {
   } else {
     $hash->{".fhem"}{iCalendar}= $ics; # the plain text iCalendar
     $hash->{".fhem"}{removeall}= $removeall;
-    if(AttrVal($name, "synchronousUpdate", 0) == 1) {
+    if( $^O =~ m/Win/ || AttrVal($name, "synchronousUpdate", 0) == 1 ) {
       Calendar_SynchronousUpdateCalendar($hash);
     } else {
       Calendar_AsynchronousUpdateCalendar($hash);
@@ -3550,6 +3550,9 @@ sub CalendarEventsAsHtml($;$) {
         in the background and FHEM will not block during updates. <br/>
         If this attribute is set to 1, the processing of the calendar is done 
         in the foreground. Large calendars will block FHEM on slow systems. <br/>
+        <br/>
+        Attribute value will be ignored if FHEM is running on a Windows platform.<br/>
+        On Windows platforms the processing will always be done synchronously<br/>
         </li><p>
 
     <li><code>update onUrlChanged|none</code><br>
@@ -4148,6 +4151,9 @@ sub CalendarEventsAsHtml($;$) {
         und FHEM wird w&auml;hrend der Verarbeitung nicht blockieren.<br/>
         Wird dieses Attribut auf 1 gesetzt, findet die Verarbeitung des Kalenders im Vordergrund statt. 
         Umfangreiche Kalender werden FHEM auf langsamen Systemen blockieren.<br/> 
+        <br/>
+        Das Attribut wird ignoriert, falls FHEM unter Windows betrieben wird. 
+        In diesem Fall erfolgt die Verarbeitung immer synchron.<br/>
        </li><p>
 
     <li><code>update none|onUrlChanged</code><br>
