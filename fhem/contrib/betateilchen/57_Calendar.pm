@@ -1718,7 +1718,6 @@ sub Calendar_Define($$) {
   my $url       = $a[4];
   
   $url =~ /(^https?:\/\/)(.*:.*@)?(.*)/;
-  #$1 = https:// $2 = user:password@ $3 = url
   if($2) {
     # credentials found in url, store them in keystore
     setKeyValue($name,$2);
@@ -1726,15 +1725,11 @@ sub Calendar_Define($$) {
     $hash->{DEF} = "$a[2] $a[3] $url";
   }  
 
-  $url =~ /(^https?:\/\/.*google.*)(\/private-.*\/)(.*)/;
-  #$1 = https:// $2 = /private-.*/ $3 = url
+  $url =~ /(^https?:\/\/.*google.*\/)(private-.*)(\/.*)/;
   if($2) {
-    # private key found in url, store them in keystore
-    $url = $1.'/credentials@/'.$3;
-    my $cred = $2;
-    $cred =~ s/^\/|\/$//g;
-    Debug $cred;
-    setKeyValue($name,$cred);
+    # private key found in url, store it in keystore
+    setKeyValue($name,$2);
+    $url = $1.'credentials@'.$3;
     $hash->{DEF} = "$a[2] $a[3] $url";
   }  
 
