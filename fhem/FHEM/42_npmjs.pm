@@ -235,6 +235,14 @@ sub Notify($$) {
         }
         $decode_json = undef;
 
+        # restore from upgradedList
+        $decode_json =
+          eval { decode_json( ReadingsVal( $name, '.upgradedList', '' ) ) };
+        unless ($@) {
+            $hash->{".fhem"}{npm}{upgradedpackages} = $decode_json;
+        }
+        $decode_json = undef;
+
         # Trigger update
         if ( ReadingsVal( $name, 'nodejsVersion', 'none' ) ne 'none' ) {
             ProcessUpdateTimer($hash);
@@ -265,36 +273,79 @@ sub Set($$@) {
 
     my ( $cmd, @args ) = @aa;
 
+    my $npmglobal = ( AttrVal( $name, 'npmglobal', 1 ) eq '1' ? 1 : 0 );
+
+    # outdated
     if ( $cmd eq 'outdated' ) {
         $hash->{".fhem"}{npm}{cmd} = $cmd;
     }
+
+    # statusRequest
     elsif ( lc($cmd) eq 'statusrequest' ) {
         $hash->{".fhem"}{npm}{cmd} = 'getNodeVersion';
     }
-    elsif ( $cmd eq 'update' ) {
-        if ( defined( $args[0] ) and ( lc( $args[0] ) eq "fhem-all" ) ) {
-            return "Please run outdated check first"
-              unless ( defined( $hash->{".fhem"}{npm}{outdatedpackages} ) );
 
-            my $update;
-            foreach ( keys %fhem_npm_modules ) {
+    # update | upgrade
+    elsif ( $cmd eq 'update' || $cmd eq 'upgrade' ) {
+        return "Please run outdated check first"
+          unless ( defined( $hash->{".fhem"}{npm}{outdatedpackages} ) );
+        my $update;
+
+        # generate explicit list for packages to update
+        if (   @args == 0
+            || lc( $args[0] ) eq 'all'
+            || lc( $args[0] ) eq 'fhem-all' )
+        {
+            my $fhemall = @args > 0 && lc( $args[0] ) eq 'fhem-all' ? 1 : 0;
+            undef @args;
+            foreach ( keys %{ $hash->{".fhem"}{npm}{outdatedpackages} } ) {
                 next
-                  unless (
-                    defined( $hash->{".fhem"}{npm}{outdatedpackages}{$_} ) );
-                $update .= " " if ($update);
-                $update .= $_;
+                  if ( $_ eq 'undefined'
+                    || ( $fhemall && !defined( $fhem_npm_modules{$_} ) ) );
+                push @args, $_;
             }
-            return "No FHEM specific NPM modules left to update"
-              unless ($update);
-            $hash->{".fhem"}{npm}{cmd} = $cmd . " " . $update;
         }
-        elsif ( defined( $args[0] ) and $args[0] eq "all" ) {
-            $hash->{".fhem"}{npm}{cmd} = $cmd;
+
+        # use 'install' as default update method for global installations
+        #   or when explicit upgrade command was given
+        my $installcmd = $npmglobal || $cmd eq 'upgrade' ? 'install' : 'update';
+
+        foreach my $pkgfull (@args) {
+            next
+              unless ( $pkgfull =~
+                /^(?:@([\w-]+)\/)?([\w-]+)(?:@([\d\.=<>]+|latest))?$/
+                && defined( $hash->{".fhem"}{npm}{outdatedpackages}{$2} ) );
+
+            my $pkg = $2;
+
+            # if there is a non-FHEM package requested for update,
+            #   enforce to use update method instead of install.
+            #   See https://forum.fhem.de/index.php/topic,48558. \
+            #     msg910786.html#msg910786
+            #   Also see https://semver.org/
+            $installcmd = 'update'
+              unless ( defined( $fhem_npm_modules{$pkg} )
+                || $cmd eq 'upgrade' );
+
+            my $v =
+              $3 ? $3
+              : (
+                  $installcmd eq 'install'
+                ? $hash->{".fhem"}{npm}{outdatedpackages}{$pkg}{latest}
+                : $hash->{".fhem"}{npm}{outdatedpackages}{$pkg}{wanted}
+              );
+
+            $update .= " " if ($update);
+            $update .= $pkg . '@' . $v;
         }
-        else {
-            $hash->{".fhem"}{npm}{cmd} = $cmd . " " . join( " ", @args );
-        }
+
+        return "Everything is up-to-date already"
+          unless ($update);
+
+        $hash->{".fhem"}{npm}{cmd} = $installcmd . " " . $update;
     }
+
+    # install
     elsif ( $cmd eq 'install' ) {
         return "usage: $cmd <package>" if ( @args < 1 );
         if ( defined( $args[0] )
@@ -319,6 +370,8 @@ sub Set($$@) {
             $hash->{".fhem"}{npm}{cmd} = $cmd . " " . join( " ", @args );
         }
     }
+
+    # uninstall
     elsif ( $cmd eq 'uninstall' ) {
         return "usage: $cmd <package>" if ( @args < 1 );
         if ( defined( $args[0] ) and lc( $args[0] ) eq "fhem-all" ) {
@@ -361,6 +414,8 @@ sub Set($$@) {
             $hash->{".fhem"}{npm}{cmd} = $cmd . " " . join( " ", @args );
         }
     }
+
+    # return Usage:
     else {
         my $list = "";
 
@@ -418,16 +473,49 @@ sub Set($$@) {
                 keys %{ $hash->{".fhem"}{npm}{outdatedpackages} } > 0 )
             {
                 my $update;
+                my $upgrade;
+
                 foreach (
                     sort
                     keys %{ $hash->{".fhem"}{npm}{outdatedpackages} }
                   )
                 {
-                    $update .= "," if ($update);
-                    $update = "update:all,fhem-all," unless ($update);
-                    $update .= $_;
+                    next
+                      unless (
+                        defined(
+                            $hash->{".fhem"}{npm}{outdatedpackages}{$_}{current}
+                        )
+                        && defined(
+                            $hash->{".fhem"}{npm}{outdatedpackages}{$_}{wanted}
+                        )
+                        && defined(
+                            $hash->{".fhem"}{npm}{outdatedpackages}{$_}{latest}
+                        )
+                      );
+
+                    if ( defined( $fhem_npm_modules{$_} )
+                        || $hash->{".fhem"}{npm}{outdatedpackages}{$_}{wanted}
+                        ne
+                        $hash->{".fhem"}{npm}{outdatedpackages}{$_}{current} )
+                    {
+                        $update  .= "," if ($update);
+                        $update  .= $_;
+                        $upgrade .= "," if ($upgrade);
+                        $upgrade .= $_;
+                    }
+                    else {
+                        $upgrade .= "," if ($upgrade);
+                        $upgrade .= $_;
+                    }
                 }
-                $list .= " $update";
+                if ($update) {
+                    $update = "update:all,fhem-all,$update";
+                    $list .= " $update";
+                }
+                if ($upgrade) {
+                    $upgrade = "upgrade:all,fhem-all,$upgrade";
+                    $list .= " $upgrade";
+                }
             }
         }
 
@@ -650,7 +738,7 @@ sub AsynchronousExecuteNpmCommand($) {
     $subprocess->{npm}{debug} =
       ( AttrVal( $name, 'verbose', 0 ) > 3 ? 1 : 0 );
     $subprocess->{npm}{npmglobal} =
-      ( AttrVal( $name, 'npmglobal', 1 ) == 1 ? 1 : 0 );
+      ( AttrVal( $name, 'npmglobal', 1 ) eq '1' ? 1 : 0 );
     my $pid = $subprocess->run();
 
     readingsSingleUpdate( $hash, 'state',
@@ -769,7 +857,7 @@ sub ExecuteNpmCommand($) {
       . $cmdSuffix;
     $npm->{npminstall} =
         $cmdPrefix
-      . 'echo n | sh -c "'
+      . 'echo n | sh -c "NODE_ENV=production '
       . $sudo
       . 'npm install '
       . $global
@@ -777,7 +865,7 @@ sub ExecuteNpmCommand($) {
       . $cmdSuffix;
     $npm->{npmuninstall} =
         $cmdPrefix
-      . 'echo n | sh -c "'
+      . 'echo n | sh -c "NODE_ENV=production '
       . $sudo
       . 'npm uninstall '
       . $global
@@ -785,7 +873,7 @@ sub ExecuteNpmCommand($) {
       . $cmdSuffix;
     $npm->{npmupdate} =
         $cmdPrefix
-      . 'echo n | sh -c "'
+      . 'echo n | sh -c "NODE_ENV=production '
       . $sudo
       . 'npm update '
       . $global
@@ -1299,7 +1387,7 @@ sub CreateInstalledList($$) {
       . $colClose
       . $colOpen
       . $txtOpen
-      . 'Current Version'
+      . 'Installed Version'
       . $txtClose
       . $colClose
       . $rowClose;
@@ -1334,6 +1422,7 @@ sub CreateOutdatedList($$) {
     my $packages;
     my $html = defined( $hash->{CL} ) && $hash->{CL}{TYPE} eq "FHEMWEB" ? 1 : 0;
     $packages = $hash->{".fhem"}{npm}{outdatedpackages};
+    my $npmglobal = ( AttrVal( $hash->{NAME}, 'npmglobal', 1 ) eq '1' ? 1 : 0 );
 
     my $header = "";
     my $footer = "";
@@ -1371,12 +1460,17 @@ sub CreateOutdatedList($$) {
       . $colClose
       . $colOpen
       . $txtOpen
-      . 'Current Version'
+      . 'Installed Version'
       . $txtClose
       . $colClose
       . $colOpen
       . $txtOpen
-      . 'New Version'
+      . 'Update Version'
+      . $txtClose
+      . $colClose
+      . $colOpen
+      . $txtOpen
+      . 'Upgrade Version'
       . $txtClose
       . $colClose
       . $rowClose;
@@ -1386,6 +1480,7 @@ sub CreateOutdatedList($$) {
         my $linecount = 1;
         foreach my $package ( sort keys( %{$packages} ) ) {
             next if ( $package eq "undefined" );
+            my $fhemPkg = defined( $fhem_npm_modules{$package} ) ? 1 : 0;
 
             my $l = $linecount % 2 == 0 ? $rowOpenEven : $rowOpenOdd;
             $l .= $colOpen . $package . $colClose;
@@ -1395,6 +1490,25 @@ sub CreateOutdatedList($$) {
                 ? $packages->{$package}{current}
                 : '?'
               ) . $colClose;
+            $l .= $colOpen . (
+                defined( $packages->{$package}{wanted} )
+                ? (
+                      $fhemPkg && $npmglobal
+                    ? $packages->{$package}{latest}
+                    : (
+                        defined( $packages->{$package}{current} )
+                        ? (
+                            $packages->{$package}{wanted} ne
+                              $packages->{$package}{current}
+                            ? $packages->{$package}{wanted}
+                            : ''
+                          )
+                        : $packages->{$package}{wanted}
+                      )
+
+                  )
+                : '?'
+            ) . $colClose;
             $l .= $colOpen
               . (
                 defined( $packages->{$package}{latest} )
@@ -1494,7 +1608,9 @@ sub ToDay() {
     </li>
     <li>outdated - fetch information about update state
     </li>
-    <li>update - trigger complete or selected update process. this will take a moment
+    <li>update - trigger complete or selected update process (using 'npm update' command). For NPM global installations, FHEM related packages will always be upgraded to the latest major version (using 'npm install' instead of 'npm update'). Other packages will repsect <a href="https://semver.org/">semver</a> and major upgrades will not be performed. For non-global NPM installations, FHEM packages will follow the regular NPM update behaviour.
+    </li>
+    <li>upgrade - trigger complete or selected upgrade process (using 'npm install' command). ATTENTION! Every package will be upgraded to the latest and greatest version (using 'npm install' command instead of 'npm update'), no matter if the package maintainer has defined some incompatiblities between the current installed and latest version. If in doubt, consider to only use the update set command instead.
     </li>
     <li>install - Install one or more NPM packages. If Node.js is not installed on the server, it will offer to
         initially install Node.js (APT compatible Linux distributions only). You may still install Node.js and
@@ -1584,7 +1700,9 @@ sub ToDay() {
   <ul>
     <li>outdated - Holt aktuelle Informationen &uuml;ber den Updatestatus
     </li>
-    <li>update - F&uuml;hrt ein komplettes oder selektives Update aus
+    <li>update - F&uuml;hrt ein komplettes oder selektives Update aus (nutzt 'npm update' Kommando). Bei globale NPM Installationen werden FHEM relevante Pakete immer auf die neuste Major Version upgegraded (nutzt 'npm install' Kommando anstatt von 'npm update'). <a href="https://semver.org/">semver</a> wird bei anderen Paketen weiterhin respektiert und es werden keine Major Upgrades durchgef&uuml;hrt. Bei nicht-globalen NPM Installationen folgen auch FHEM Pakwte dem gegul&auml;ren NPM Update Verhalten.
+    </li>
+    <li>upgrade - F&uuml;hrt ein komplettes oder selektives Upgrade aus (nutzt 'npm install' Kommando). ACHTUNG! Jedes Paket wird auf die neuste und gr&ouml;&szlig;te Version upgegraded (nutzt 'npm install' Kommando anstatt von 'npm update'), ganz egal ob der Paket Maintainer eine Inkompatibilit&auml;t zwischen der aktuell installierten und der neusten Version definiert hat. Im Zweifel sollte besser stattdessen das Update set Kommando benutzt werden.
     </li>
     <li>install - installiert ein oder mehrere NPM Pakete
     </li>
@@ -1637,7 +1755,7 @@ sub ToDay() {
     "node",
     "npm"
   ],
-  "version": "v0.10.6",
+  "version": "v1.0.0",
   "release_status": "stable",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
