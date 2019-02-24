@@ -1727,6 +1727,7 @@ sub Calendar_Define($$) {
   $hash->{".fhem"}{lastid}= 0;
   $hash->{".fhem"}{vevents}= {};
   $hash->{".fhem"}{nxtUpdtTs}= 0;
+  $hash->{".fhem"}{noWildcards} = ($url =~ /google/) ? 1 : 0;
 
   #$attr{$name}{"hideOlderThan"}= 0;
 
@@ -2485,7 +2486,7 @@ sub Calendar_GetUpdate($$$;$) {
   }
 
   my $url = $hash->{".fhem"}{url};
-  unless (AttrVal($name,'quirks','') =~ /noWildcards/) {
+  unless ($hash->{".fhem"}{noWildcards} == 1 || AttrVal($name,'quirks','') =~ /noWildcards/) {
     my @ti = localtime;
     $url   = ResolveDateWildcards($hash->{".fhem"}{url}, @ti);
   }
@@ -3246,14 +3247,19 @@ sub CalendarEventsAsHtml($;$) {
     <li><code>%W</code> week number of year with Monday as first day of week (00..53)</li>
     </ul>
     <br/>
-    Wildcards in url will be evaluated on every calendar update.<br/>
+    - Wildcards in url will be evaluated on every calendar update.<br/>
+    - The evaluation of wildcards maybe disabled by adding literal 'noWildcards' to attribute 'quirks'. 
+    This may be useful in url containing % without marking a wildcard.<br/> 
     <br/>
-    Note for users of Google Calendar: You can literally use the private ICal URL from your Google Calendar.
-    If your Google Calendar
-    URL starts with <code>https://</code> and the perl module IO::Socket::SSL is not installed on your system, you can
-    replace it by <code>http://</code> if and only if there is no redirection to the <code>https://</code> URL.
-    Check with your browser first if unsure.<br><br>
-
+    Note for users of Google Calendar: 
+    <ul>
+    <li>Wildcards must not be used in Google Calendar url!</li>
+    <li>You can literally use the private ICal URL from your Google Calendar.</li>
+    <li>If your Google Calendar URL starts with <code>https://</code> and the perl module IO::Socket::SSL is 
+    not installed on your system, you can replace it by <code>http://</code> if and only if there is 
+    no redirection to the <code>https://</code> URL. Check with your browser first if unsure.</li>
+    </ul>
+    <br/>
     Note for users of Netxtcloud Calendar: you can use an URL of the form
     <code>https://admin:admin@demo.nextcloud.com/wid0ohgh/remote.php/dav/calendars/admin/personal/?export</code>.
     <p>
@@ -3905,14 +3911,19 @@ sub CalendarEventsAsHtml($;$) {
     <li><code>%W</code> Wochennummer des Jahres, wobei Wochenbeginn = Montag (00..53)</li>
     </ul>
     <br/>
-    Die wildcards werden bei jedem Kalenderupdate ausgewertet.<br/>
+    -Die wildcards werden bei jedem Kalenderupdate ausgewertet.<br/>
+    -Die Auswertung von wildcards kann bei Bedarf f&uuml; einen Kalender deaktiviert werden, indem das Schl&uuml;sselwort 'noWildcards'
+     dem Attribut 'quirks' hinzugef&uuml;gt wird. Das ist n&uuml;tzlich bei url die bereits ein % enthalten, ohne damit ein wildcard
+     zu kennzeichnen.<br/>    
     <br/>
-    Hinweis f&uuml;r Nutzer des Google-Kalenders: Du kannst direkt die private iCal-URL des Google-Kalenders nutzen.
-
-    Sollte deine Google-Kalender-URL mit <code>https://</code> beginnen und das Perl-Modul <code>IO::Socket::SSL</code> ist nicht auf deinem System  installiert,
+    Hinweise f&uuml;r Nutzer des Google-Kalenders: 
+    <ul>
+    <li>Wildcards d&uuml;rfen in Google Kalender URL nicht verwendet werden!</li>
+    <li>Du kannst direkt die private iCal-URL des Google-Kalenders nutzen.</li>
+    <li>Sollte deine Google-Kalender-URL mit <code>https://</code> beginnen und das Perl-Modul <code>IO::Socket::SSL</code> ist nicht auf deinem System  installiert,
 	kannst Du in der URL <code>https://</code> durch <code>http://</code> ersetzen, falls keine automatische Umleitung auf die <code>https://</code> URL erfolgt.
-    Solltest Du unsicher sein, ob dies der Fall ist, &uuml;berpr&uuml;fe es bitte zuerst mit deinem Browser.<br><br>
-
+    Solltest Du unsicher sein, ob dies der Fall ist, &uuml;berpr&uuml;fe es bitte zuerst mit deinem Browser.</li>
+    </ul>
     Hinweis f&uuml;r Nutzer des Nextcloud-Kalenders: Du kannst eine URL der folgenden Form benutzen:
     <code>https://admin:admin@demo.nextcloud.com/wid0ohgh/remote.php/dav/calendars/admin/personal/?export</code>.<p>
 
