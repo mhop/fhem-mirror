@@ -61,7 +61,7 @@ sub MQTT_Initialize($) {
   $hash->{NotifyFn}   = "MQTT::Notify";
   $hash->{AttrFn}     = "MQTT::Attr";
 
-  $hash->{AttrList} = "keep-alive "."last-will client-id "."on-connect on-disconnect on-timeout ".$main::readingFnAttributes;
+  $hash->{AttrList} = "keep-alive "."last-will client-id "."on-connect on-disconnect on-timeout privacy:1,0 ".$main::readingFnAttributes;
 }
 
 package MQTT;
