@@ -842,6 +842,58 @@ PROPLANTA_Html(@)
   return $ret;
 }
 
+sub #####################################
+PROPLANTA_Html_Landscape(@)
+{
+  my ($d,$days) = @_;
+  $d = "<none>" if(!$d);
+  $days = 3 unless defined $days;
+  return "$d is not a PROPLANTA instance<br>"
+        if(!$defs{$d} || $defs{$d}{TYPE} ne "PROPLANTA");
+
+  my $uselocal= 0; #AttrVal($d,"localicons",0);
+  my $isday;
+   if ( exists &isday) {
+      $isday = isday();
+   }
+   else {
+      $isday = 1; #($hour>6 && $hour<19);
+   }
+        
+  my $ret = "<table border=0><thead align=center>";
+  $ret .= "<tbody align=center>";
+  $ret .= sprintf '<tr><th colspan=9 align=left>%s</th></tr>', $defs{$d}{DEF};
+  $ret .= '<tr><th>Tag</th>';
+ for(my $i=0; $i<$days; $i++) {
+	  if ($i==0) {
+		  $ret .= '<th>heute';
+	  } elsif ($i==1) {
+		  $ret .= '<th>morgen';
+	  } else {
+		  $ret .= '<th>'.substr(ReadingsVal($d, "fc".$i."_date", ""),0,5);
+	  }
+	  $ret .= ReadingsVal($d, "fc".$i."_frost", "") ? ' (Frost)</th>' : '</th>'; 
+  };
+  
+  $ret .= '</tr><tr><td>Temp</td>';
+  for(my $i=0; $i<$days; $i++) {
+	  $ret .= '<td>'.ReadingsVal($d, "fc".$i."_tempMin", "").'-'.ReadingsVal($d, "fc".$i."_tempMax", "").'&#8451; </td>';
+  };
+  $ret .= '</tr><tr><td>Regen</td>';
+  for(my $i=0; $i<$days; $i++) {
+	  $ret .= '<td>'.ReadingsVal($d, "fc".$i."_chOfRainDay", "").'&#37;</td>';
+  };
+  $ret .= '</tr><tr><td>Wetter</td>';
+  for(my $i=0; $i<$days; $i++) {
+	  $ret .= '<td><img src="'.ReadingsVal($d, "fc".$i."_weatherMorningIcon", "").'">
+	  				<img src="'.ReadingsVal($d, "fc".$i."_weatherDayIcon", "").'">
+					<img src="'.ReadingsVal($d, "fc".$i."_weatherEveningIcon", "").'">|</td>';
+  };
+  $ret .= "</tr></tbody></table>";
+
+  return $ret;
+}
+
 ##################################### 
 1;
 
@@ -887,7 +939,7 @@ PROPLANTA_Html(@)
          <br>
          Optional. Possible values: de (default), at, ch, fr, it 
       </li><br>
-      The function <code>PROPLANTA_Html</code> creates a HTML code for a weather forecast for the given days (default is 3).
+      The function <code>PROPLANTA_Html</code> and <code>PROPLANTA_Html_Landscape</code> creates a HTML code for a weather forecast for the given days (default is 3).
       <br>
       Example:
       <br>
@@ -997,7 +1049,7 @@ PROPLANTA_Html(@)
          <br>
          Optional. Mögliche Werte: de (Standard), at, ch, fr, it
       </li><br>
-      Über die Funktion <code>PROPLANTA_Html</code> wird ein HTML-Code für eine Vorhersage für die angegebenen Anzahl Tage (standardmäßig 3) erzeugt.
+      Über die Funktion <code>PROPLANTA_Html</code> und <code>PROPLANTA_Html_Landscape</code> wird ein HTML-Code für eine Vorhersage für die angegebenen Anzahl Tage (standardmäßig 3) erzeugt.
       <br>
       Beispiel:
       <br>
