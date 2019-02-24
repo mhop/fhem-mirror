@@ -77,7 +77,9 @@
 #   2019-02-15  fixed bug in configureDevice
 #   2019-02-18  fix name of pinHistory Reading (pinName)
 #   2019-02-23  get History
-#   2019-02-23  added MaxHist attribute
+#   2019-02-23  added maxHist attribute
+#   2019-02-24  added documentation and better return value when get history has no data, option to pass a pinName to get history
+#               query new running config after configuring device
 #
 # ideas / todo:
 #
@@ -101,7 +103,7 @@ use strict;
 use warnings;                        
 use Time::HiRes qw(gettimeofday);    
 
-my $ArduCounter_Version = '6.13 - 23.2.2019';
+my $ArduCounter_Version = '6.14 - 24.2.2019';
 
 
 my %ArduCounter_sets = (  
@@ -193,7 +195,7 @@ sub ArduCounter_Initialize($)
         'nextOpenDelay ' .
         'silentReconnect:0,1 ' .
         'openTimeout ' .
-        'MaxHist ' .
+        'maxHist ' .
         
         'disable:0,1 ' .
         'do_not_notify:1,0 ' . 
@@ -695,6 +697,7 @@ sub ArduCounter_ConfigureDevice($)
     } else {
         Log3 $name, 5, "$name: ConfigureDevice: no pins in running config without attribute in Fhem";
     }
+    ArduCounter_Write( $hash, "s");     # get new running config 
 }
 
 
@@ -1025,15 +1028,6 @@ sub ArduCounter_Set($@)
             delete $hash->{Initialized};
             return "sent (r)eset command to device - waiting for its setup message";
         }
-       
-    } elsif ($attr eq "devVerbose") {
-        if ($arg =~ /^\d+$/) {
-            Log3 $name, 4, "$name: set devVerbose $arg called";
-            ArduCounter_Write($hash, "$arg"."v");
-            delete $hash->{analogLevels} if ($arg eq "0");
-        } else {
-            Log3 $name, 4, "$name: set devVerbose called with illegal value $arg";
-        }            
     }
     return undef;
 }
@@ -1047,6 +1041,7 @@ sub ArduCounter_Get($@)
     return "\"set ArduCounter\" needs at least one argument" if ( @a < 2 );    
     my $name = shift @a;
     my $attr = shift @a;
+    my $opt  = shift @a;
 
     if(!defined($ArduCounter_gets{$attr})) {
         my @cList = keys %ArduCounter_gets;
@@ -1076,13 +1071,20 @@ sub ArduCounter_Get($@)
         my $ret   = "";
         my $count = 0;
         my $histLine;
-        while ($count < AttrVal($name, "MaxHist", 1000)) {
+        while ($count < AttrVal($name, "maxHist", 1000)) {
             if (defined ($hash->{History}[$idx])) {
-                $ret .= $hash->{History}[$idx] . "\n";
+                if (!$opt || !$hash->{HistoryPin} || $hash->{HistoryPin}[$idx] eq $opt) {
+                    $ret .= $hash->{History}[$idx] . "\n";
+                }
             }
             $idx++;
             $count++;
-            $idx = 0 if ($idx > AttrVal($name, "MaxHist", 1000));
+            $idx = 0 if ($idx > AttrVal($name, "maxHist", 1000));
+        }
+        if (!$hash->{runningCfg}{V} || $hash->{runningCfg}{V} < 5) {
+            $ret = "Make sure that devVerbose is set to 5 or higher to get pin history data\n" . 
+                    "current devVerbose at device is " . ($hash->{runningCfg}{V} ? $hash->{runningCfg}{V} : "undef") . "\n\n" .
+                    $ret;
         }
         return ($ret ? $ret : "no history data so far");
         
@@ -1494,16 +1496,18 @@ sub ArduCounter_HandleHistory($$$$)
                 elsif ($act eq "R") {$action = "reject"} 
                 elsif ($act eq "X") {$action = "ignore drop"} 
                 elsif ($act eq "P") {$action = "ignore peak"} 
-                my $histLine = "$seq $fTime " . sprintf ("%7s", $len/1000) . " seconds at $level -> $action";
+                my $histLine = sprintf ("%6s", $seq) . ' ' . $fTime . " $pinName " . 
+                    sprintf ("%7s", sprintf("%.3f", $len/1000)) . " seconds at $level -> $action";
                 Log3 $name, 5, "$name: HandleHistory $histLine ($he)";
                 $hash->{LastHistSeq} = $seq -1 if (!defined($hash->{LastHistSeq}));
                 $hash->{HistIdx}     = 0 if (!defined($hash->{HistIdx}));
                 if ($seq > $hash->{LastHistSeq} || $seq < ($hash->{LastHistSeq} - 10000)) {
                     $hash->{History}[$hash->{HistIdx}] = $histLine;
+                    $hash->{HistoryPin}[$hash->{HistIdx}] = $pinName;
                     $hash->{LastHistSeq} = $seq;
                     $hash->{HistIdx}++;
                 }
-                $hash->{HistIdx} = 0 if ($hash->{HistIdx} > AttrVal($name, "MaxHist", 1000));
+                $hash->{HistIdx} = 0 if ($hash->{HistIdx} > AttrVal($name, "maxHist", 1000));
             } else {
                 Log3 $name, 5, "$name: HandleHistory - no match for $he";
             }
@@ -1562,6 +1566,7 @@ sub ArduCounter_Parse($)
             $hash->{runningCfg}{V} = $1;                    # save for later compare
             $hash->{runningCfg}{V} =~ s/\s+$//;             # remove spaces at end
             $retStr .= ($retStr ? "\n" : "") . $line;   
+            Log3 $name, 4, "$name: device sent devVerbose $hash->{runningCfg}{V}";
             
         } elsif ($line =~ /^P([\d]+) (falling|rising|-) ?(pullup)? ?min ([\d]+)/) {    # pin configuration at device
             my $p = ($3 ? $3 : "nop");
@@ -1905,6 +1910,11 @@ sub ArduCounter_ReadAnswer($$)
             This is not needed for normal operation but might be useful sometimes for debugging
         <li><b>levels</b></li> 
             show the count for the measured levels if an analog pin is used to measure e.g. the red mark of a ferraris counter disc. This is useful for setting the thresholds for analog measurements.  
+        <li><b>history <pin></b></li> 
+            shows details regarding all the level changes that the counter device (Arduino or ESP) has detected and how they were used (counted or rejected)<br>
+            If get history is issued with a pin name (e.g. get history D5) then only the history entries concerning D5 will be shown.<br>
+            This information is sent from the device to Fhem when it reports the current count but only if devVerbose is equal or greater than 5.<br>
+            The maximum number of lines that the Arducounter module stores in a ring buffer is defined by the attribute maxHist and defaults to 1000.
     </ul>
     <br>
     <a name="ArduCounterattr"></a>
@@ -2021,7 +2031,7 @@ sub ArduCounter_ReadAnswer($$)
             If the value is >=10, then the firmware will report every level change of a pin<br>
             If the value is >=20, then the firmware will report every analog measurement (assuming that the firmware has been compiled with analog measurements for old ferraris counters or similar).
             
-        <li><b>MaxHist</b></li> 
+        <li><b>maxHist</b></li> 
             specifies how many pin history lines hould be buffered for "get history".<br>
             This attribute defaults to 1000.
             

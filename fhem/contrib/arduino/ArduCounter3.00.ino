@@ -86,6 +86,7 @@
         6.1.19  - V3.1 showIntervals in hello
         19.1.19 - V3.12 support for ESP with analog
         24.2.19 - V3.13 fix internal pin to GPIO mapping (must match ISR functions) when ESP8266 and analog support       
+				- V3.14 added return of devVerbose upon startup
 
     ToDo / Ideas:
         
@@ -107,7 +108,7 @@
 #include "pins_arduino.h"
 #include <EEPROM.h>
 
-const char versionStr[] PROGMEM = "ArduCounter V3.13";
+const char versionStr[] PROGMEM = "ArduCounter V3.14";
 const char compile_date[] PROGMEM = __DATE__ " " __TIME__;
 const char errorStr[]   PROGMEM = "Error: ";
 
@@ -917,6 +918,9 @@ void helloCmd() {
 #ifdef analogIR      
     showThresholds();
 #endif    
+    Output->print(F("V"));
+    Output->println(devVerbose);
+	
     for (uint8_t pinIndex=0; pinIndex < MAX_PIN; pinIndex++) { // go through all observed pins as pinIndex
         if (activePin[pinIndex] >= 0) {
             showPinConfig(pinIndex);
