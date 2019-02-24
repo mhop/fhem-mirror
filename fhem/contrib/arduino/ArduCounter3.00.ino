@@ -29,6 +29,10 @@
  *  17,3,0,50a
  *  15,25t
  *  
+ * for ESP with D5 falling pullup 30
+ *  5,2,1,30a
+ *  20v
+ *  10,20,1,1i
  */
 
 /*
@@ -81,7 +85,7 @@
         9.12.18 - V3.0 start implementing analog input for old ferraris counters
         6.1.19  - V3.1 showIntervals in hello
         19.1.19 - V3.12 support for ESP with analog
-               
+        24.2.19 - V3.13 fix internal pin to GPIO mapping (must match ISR functions) when ESP8266 and analog support       
 
     ToDo / Ideas:
         
@@ -103,7 +107,7 @@
 #include "pins_arduino.h"
 #include <EEPROM.h>
 
-const char versionStr[] PROGMEM = "ArduCounter V3.12";
+const char versionStr[] PROGMEM = "ArduCounter V3.13";
 const char compile_date[] PROGMEM = __DATE__ " " __TIME__;
 const char errorStr[]   PROGMEM = "Error: ";
 
@@ -164,7 +168,7 @@ uint32_t lastDelayedTcpReports = 0; // last time we delayed
 #ifdef analogIR                     // code for ESP with analog pin and reflection light barrier support (test)
 
 #define MAX_APIN 18
-#define MAX_PIN 10
+#define MAX_PIN 9
 
 /* ESP8266 pins that are typically ok to use 
  * (some might be set to -1 (disallowed) because they are used 
@@ -172,10 +176,10 @@ uint32_t lastDelayedTcpReports = 0; // last time we delayed
  * maps printed pin numbers to sketch internal index numbers */
 short allowedPins[MAX_APIN] = 
   { 0,  1,  2, -1,                  // printed pin numbers 0,1,2 are ok to be used
-   -1,  3, -1, -1,                  // printed pin number 5 is ok to be used
+   -1,  5, -1, -1,                  // printed pin number 5 is ok to be used
    -1, -1, -1, -1,                  // 8-11 not avaliable
    -1, -1, -1, -1,                  // 12-15 not avaliable
-   -1,  4 };                        // 16 not available, 17 is analog
+   -1,  8 };                        // 16 not available, 17 is analog
      
 /* Wemos / NodeMCU Pins 3,4 and 8 (GPIO 0,2 and 15) define boot mode and therefore
  * can not be used to connect to signal */
@@ -184,8 +188,11 @@ short allowedPins[MAX_APIN] =
    Note that the internal numbers might be different from the printed 
    pin numbers (e.g. pin 0 is in index 0 but real chip pin number 16! */
 short internalPins[MAX_PIN] = 
-  { D0, D1, D2, D5, A0 };           // only the allowed pins in the internal array,
-                                    // D0=16, D1=5, D2=4, D5=14, A0=17
+  { D0, D1, D2, D3,                 // map from internal pin Index to 
+    D4, D5, D6, D7,                 // real GPIO pin numbers / defines
+    A0 };                           // D0=16, D1=5, D2=4, D5=14, A0=17
+                                    
+                                    
      
 uint8_t analogPins[MAX_PIN] = 
   { 0,0,0,0,1 };                    // internal index 4 is analog 
@@ -549,6 +556,7 @@ uint8_t AddPinChangeInterrupt(uint8_t rPin) {
 
 void ESPISR4() {    // ISR for real pin GPIO 4 / pinIndex 2
     doCount(2, digitalRead(4), millis());
+    // called with pinIndex, level, now
 }
 
 void ESPISR5() {    // ISR for real pin GPIO 5 / pinIndex 1
@@ -1404,18 +1412,18 @@ void debugPinChanges() {
                 lastState[pinIndex] = pinState;
                 Output->print(F("M pin "));
                 Output->print(aPin);
-                Output->print(F(" ( internal "));
+                Output->print(F(" (internal "));
                 Output->print(rPin);
-                Output->print(F(" )"));
+                Output->print(F(")"));
                 Output->print(F(" changed to "));
                 Output->print(pinState);
 #ifdef pulseHistory                     
-                Output->print(F("  histIdx "));
+                Output->print(F(", histIdx "));
                 Output->print(histIndex);
 #endif                  
-                Output->print(F("  count "));
+                Output->print(F(", count "));
                 Output->print(counter[pinIndex]);
-                Output->print(F("  reject "));
+                Output->print(F(", reject "));
                 Output->print(rejectCounter[pinIndex]);
                 Output->println();
             }
