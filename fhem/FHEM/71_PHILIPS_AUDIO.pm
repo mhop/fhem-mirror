@@ -2610,7 +2610,7 @@ sub PHILIPS_AUDIO_getMediaRendererDesc
       <li><b>selectFavoriteByNumber [ number ]</b> &ndash; W&auml;hlt einen Favoriten anhand seiner Speichernummer. Leer falls keine Favoriten vorhanden (s. getFavorites)</li>
       <li><b>selectPreset [ name ]</b> &ndash; W&auml;hlt einen Preset. Leer falls keine Presets vorhanden (s. getPresets)</li>
       <li><b>selectPresetByNumber [ number ]</b> &ndash; W&auml;hlt einen Preset anhand seiner Speichernummer. Leer falls keine Presets vorhanden (see also getPresets)</li>
-      <li><b>selectStream [ name ]</b> &ndash; Context-sensitive. W&auml;hlt einen Audiostream. H&auml;ngt vom aktuellen Inhalt der Playerlist ab. Ein 'c'-Pr&auml;fix repr&auml;sentiert einen 'Container' (Directory). ein 'i'-Pr&auml;fix repr&auml;sentiert ein 'Item' (audio stream).</li></li>
+      <li><b>selectStream [ name ]</b> &ndash; Context-sensitive. W&auml;hlt einen Audiostream. H&auml;ngt vom aktuellen Inhalt der Playerlist ab. Ein 'c'-Pr&auml;fix repr&auml;sentiert einen 'Container' (Directory). ein 'i'-Pr&auml;fix repr&auml;sentiert ein 'Item' (audio stream).</li>
       <li><b>shuffle [ on | off ]</b> &ndash; W&auml;hlt den gew&uuml;nschten Shuffle Modus</li>
       <li><b>standbyButton</b> &ndash; Emuliert den standby-Knopf. Toggelt zwischen standby und power on</li>
       <li><b>volume</b> &ndash; Setzt die relative Lautst&auml;rke 0...100%</li>

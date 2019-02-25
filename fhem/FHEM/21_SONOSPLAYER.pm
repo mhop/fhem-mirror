@@ -2008,7 +2008,7 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 </ul></li>
 <li><a name="SONOSPLAYER_attribut_volumeStep"><b><code>volumeStep &lt;int&gt;</code></b>
 </a><br /> One of (0..100). Definiert die Schrittweite für die Aufrufe von <code>VolumeU</code> und <code>VolumeD</code>.</li>
-</ul></li>
+</ul>
 <li><b>Informationen generieren</b><ul>
 <li><a name="SONOSPLAYER_attribut_generateInfoSummarize1"><b><code>generateInfoSummarize1 &lt;string&gt;</code></b>
 </a><br /> Erzeugt das Reading 'InfoSummarize1' mit dem angegebenen Format. Mehr Informationen dazu im Bereich Beispiele.</li>
@@ -2047,7 +2047,7 @@ Hier wird definiert, dass ein Event erzeugt werden soll, wenn innerhalb von 2 Se
 </a><br /> One of (0..1). Wenn gesetzt, wird ein etwaig gesetztes Attribut "stopSleeptimerInAction" ignoriert.</li>
 <li><a name="SONOSPLAYER_attribut_stopSleeptimerInAction"><b><code>stopSleeptimerInAction &lt;int&gt;</code></b>
 </a><br /> One of (0..1). Wenn gesetzt, wird bei einem Wechsel des transportState auf "PAUSED_PLAYBACK" oder "STOPPED" ein etwaig definierter SleepTimer deaktiviert.</li>
-</ul>
+
 <a name="SONOSPLAYERexamples"></a>
 <h4>Beispiele / Hinweise</h4>
 <ul>
