@@ -47,7 +47,7 @@ sub CalDav_Process($$$) {
   my $url     = $hash->{URL};
   my $options = $hash->{OPTIONS};
   
-  unless $data {
+  unless ($data) {
     Log3 $hash,1,"CalDav: Maybe this is the wrong way to use your calendar. Try 57_Calendar.pm instead.";
     return;
   }
