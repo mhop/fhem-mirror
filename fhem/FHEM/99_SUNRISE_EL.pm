@@ -549,7 +549,7 @@ isday</pre>
         deines Standorts setzen.
     
     <div>
-        Die Voreinstellung ist 50.112, 8.686, Frankfurt am Main).
+        Die Voreinstellung ist 50.112, 8.686 (Frankfurt am Main).
     </div>
     
     SUNRISE_EL geht von einem H&ouml;henwinkel der Sonne bezogen zum Horizont,
