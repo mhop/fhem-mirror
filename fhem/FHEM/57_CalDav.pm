@@ -46,7 +46,9 @@ sub CalDav_Process($$$) {
   my $name    = $hash->{NAME};
   my $url     = $hash->{URL};
   my $options = $hash->{OPTIONS};
-    
+  
+  return "Maybe this is the wrong way to use your calendar. Try 57_Calendar.pm instead." unless $data;
+
   my $d = XML::LibXML->load_xml(string => $data);
 
   foreach my $r ($d->findnodes('/d:multistatus/d:response/d:href')) {
