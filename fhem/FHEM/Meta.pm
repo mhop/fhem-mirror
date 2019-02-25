@@ -161,7 +161,7 @@ sub SetInternals($) {
     return 0
       unless ( defined( $modHash->{LOADED} ) && $modHash->{LOADED} eq '1' );
 
-    $devHash->{'.MetaInternals'} = 1;
+    $devHash->{'.FhemMetaInternalss'} = 1;
     __CopyMetaToInternals( $devHash, $modMeta );
 
     return 1;
@@ -193,7 +193,7 @@ sub Get($$) {
 sub __CopyMetaToInternals {
     return 0 unless ( __PACKAGE__ eq caller(0) );
     my ( $devHash, $modMeta ) = @_;
-    return unless ( defined( $devHash->{'.MetaInternals'} ) );
+    return unless ( defined( $devHash->{'.FhemMetaInternalss'} ) );
     return unless ( defined($modMeta) && ref($modMeta) eq "HASH" );
 
     $devHash->{VERSION} = $modMeta->{x_version}
@@ -542,6 +542,81 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
                 $modMeta->{$k} = $v;
             }
         }
+
+        # Detect prereqs if not provided via META.json
+        if ( !defined( $modMeta->{prereqs} ) ) {
+            eval {
+                use Perl::PrereqScanner::NotQuiteLite;
+                1;
+            };
+
+            unless ($@) {
+                my $scanner = Perl::PrereqScanner::NotQuiteLite->new(
+                    parsers  => [qw/:installed -UniversalVersion/],
+                    suggests => 1,
+                );
+                my $context      = $scanner->scan_file($filePath);
+                my $requirements = $context->requires;
+                my $recommends   = $context->recommends;
+                my $suggestions = $context->suggests;    # requirements in evals
+
+                $modMeta->{x_prereqs_src} = 'scanner';
+
+                # requires
+                foreach ( keys %{ $requirements->{requirements} } ) {
+                    if (
+                        defined( $requirements->{requirements}{$_}{minimum} )
+                        && defined(
+                            $requirements->{requirements}{$_}{minimum}{original}
+                        )
+                      )
+                    {
+                        $modMeta->{prereqs}{runtime}{requires}{$_} =
+                          $requirements->{requirements}{$_}{minimum}{original};
+                    }
+                    else {
+                        $modMeta->{prereqs}{runtime}{requires}{$_} = 0;
+                    }
+                }
+
+                # recommends
+                foreach ( keys %{ $recommends->{requirements} } ) {
+                    if (
+                        defined( $recommends->{requirements}{$_}{minimum} )
+                        && defined(
+                            $recommends->{requirements}{$_}{minimum}{original}
+                        )
+                      )
+                    {
+                        $modMeta->{prereqs}{runtime}{recommends}{$_} =
+                          $recommends->{requirements}{$_}{minimum}{original};
+                    }
+                    else {
+                        $modMeta->{prereqs}{runtime}{recommends}{$_} = 0;
+                    }
+                }
+
+                # suggests
+                foreach ( keys %{ $suggestions->{requirements} } ) {
+                    if (
+                        defined( $suggestions->{requirements}{$_}{minimum} )
+                        && defined(
+                            $suggestions->{requirements}{$_}{minimum}{original}
+                        )
+                      )
+                    {
+                        $modMeta->{prereqs}{runtime}{suggests}{$_} =
+                          $suggestions->{requirements}{$_}{minimum}{original};
+                    }
+                    else {
+                        $modMeta->{prereqs}{runtime}{suggests}{$_} = 0;
+                    }
+                }
+            }
+        }
+        else {
+            $modMeta->{x_prereqs_src} = 'META.json';
+        }
     }
 
     # Get some other info about fhem.pl
@@ -782,7 +857,7 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
     "metadata",
     "meta"
   ],
-  "version": "v0.0.2",
+  "version": "v0.1.0",
   "release_status": "testing",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
@@ -796,15 +871,16 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
   "prereqs": {
     "runtime": {
       "requires": {
-        "FHEM": ">= 5.9.18623",
+        "FHEM": 5.00918623,
         "perl": 5.014,
-        "GPUtils qw(GP_Import)": 0,
+        "GPUtils": 0,
         "File::stat": 0,
         "Data::Dumper": 0,
         "Encode": 0
       },
       "recommends": {
         "JSON": 0,
+        "Perl::PrereqScanner::NotQuiteLite": 0,
         "Time::Local": 0
       },
       "suggests": {
@@ -946,19 +1022,32 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
     "runtime": {
       "requires": {
         "perl": 5.006002,
-        "File::Copy qw(copy)": 0,
+        "constant": 0,
+        "File::Copy": 0,
         "IO::Socket": 0,
         "IO::Socket::INET": 0,
+        "lib": 0,
         "Math::Trig": 0,
-        "Scalar::Util qw(looks_like_number)": 0,
-        "Time::HiRes qw(gettimeofday)": 0
+        "POSIX": 0,
+        "RTypes": 0,
+        "Scalar::Util": 0,
+        "strict": 0,
+        "Time::HiRes": 0,
+        "vars": 0,
+        "warnings": 0
       },
       "recommends": {
         "Compress::Zlib": 0,
         "IO::Socket::INET6": 0,
-        "Socket6": 0
+        "Socket6": 0,
+        "TimeSeries": 0
       },
       "suggests": {
+        "Compress::Zlib": 0,
+        "configDB": 0,
+        "FHEM::WinService": 0,
+        "IO::Socket::INET6": 0,
+        "Socket6": 0
       }
     }
   },
