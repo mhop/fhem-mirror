@@ -1239,6 +1239,7 @@ HUEDevice_Parse($$)
 
       $readings{battery} = $config->{battery} if( defined($config->{battery}) );
       $readings{reachable} = $config->{reachable} if( defined($config->{reachable}) );
+      $readings{temperature} = $config->{temperature} * 0.01 if( defined($config->{temperature}) );
     }
 
     my $lastupdated;
