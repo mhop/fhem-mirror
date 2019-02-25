@@ -319,7 +319,7 @@ sub apptime_CommandDispTiming($$@) {
 
 <a name="apptime"></a>
 <h3>apptime</h3>
-<div style="padding-left: 2ex;">
+
   <h4><code>apptime</code></h4>
     <p>
         apptime provides information about application procedure execution time.
@@ -409,7 +409,7 @@ sub apptime_CommandDispTiming($$@) {
             <p>
                 Number of calls for this procedure.
             </p>
-        </dt>
+        </dd>
         <dt><strong>total</strong></dt>
         <dd>
             <p>
@@ -436,7 +436,6 @@ sub apptime_CommandDispTiming($$@) {
             </p>
         </dd>
     </dl>
-</div>
 
 =end html
 =cut
