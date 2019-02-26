@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  73_AutoShuttersControl: fix Bug open Window befor IsDay and closed
+                                    IsDay
  - changed: 74_Unifi: removed deprecated UnifiSwitch-functions!
  - bugfix:  74_UnififSwitch: fixed poe restart
  - feature: 57_Calendar.pm: new features and attributes

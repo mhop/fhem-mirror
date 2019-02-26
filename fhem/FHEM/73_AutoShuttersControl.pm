@@ -41,7 +41,7 @@ package main;
 use strict;
 use warnings;
 
-my $version = '0.4.0.6';
+my $version = '0.4.0.7';
 
 sub AutoShuttersControl_Initialize($) {
     my ($hash) = @_;
@@ -81,10 +81,10 @@ sub AutoShuttersControl_Initialize($) {
     $hash->{NotifyOrderPrefix} = '51-';    # Order Nummer für NotifyFn
 
 ## Ist nur damit sich bei einem reload auch die Versionsnummer erneuert.
-    foreach my $d ( sort keys %{ $modules{AutoShuttersControl}{defptr} } ) {
-        my $hash = $modules{AutoShuttersControl}{defptr}{$d};
-        $hash->{VERSION} = $version;
-    }
+#     foreach my $d ( sort keys %{ $modules{AutoShuttersControl}{defptr} } ) {
+#         my $hash = $modules{AutoShuttersControl}{defptr}{$d};
+#         $hash->{VERSION} = $version;
+#     }
 }
 
 ## unserer packagename
@@ -2053,9 +2053,20 @@ sub ExtractNotifyDevFromEvent($$$) {
 ## Ist Tag oder Nacht für den entsprechende Rolladen
 sub IsDay($$) {
     my ( $hash, $shuttersDev ) = @_;
+    $shutters->setShuttersDev($shuttersDev);
+
     my $name = $hash->{NAME};
-    return ( ShuttersSunrise( $hash, $shuttersDev, 'unix' ) >
+    my $isday = ( ShuttersSunrise( $hash, $shuttersDev, 'unix' ) >
           ShuttersSunset( $hash, $shuttersDev, 'unix' ) ? 1 : 0 );
+    my $respIsDay = $isday;
+
+    $respIsDay = ( ($shutters->getBrightness > $shutters->getBrightnessMinVal and $isday) ? 1 : 0 )
+        if ( $shutters->getDown eq 'brightness' );
+
+    $respIsDay = ( (($shutters->getBrightness > $shutters->getBrightnessMaxVal and not $isday) or $respIsDay) ? 1 : 0 )
+        if ( $shutters->getUp eq 'brightness' );
+
+    return $respIsDay;
 }
 
 sub ShuttersSunrise($$$) {
@@ -2710,8 +2721,7 @@ sub getFreezeStatus {
         if ( $shutters->getAntiFreeze eq 'soft' ) {
             return 1;
         }
-        elsif ($shutters->getAntiFreeze eq $daytime
-            or $shutters->getAntiFreeze eq $daytime )
+        elsif ($shutters->getAntiFreeze eq $daytime )
         {
             return 2;
         }
