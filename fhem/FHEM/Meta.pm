@@ -480,12 +480,9 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
         $encoding = 'latin1' unless ($encoding);
 
         if ( keys %json > 0 ) {
-            eval {
-                use JSON;
-                1;
-            };
+            eval "use JSON;";
 
-            unless ($@) {
+            if ( !$@ ) {
                 foreach ( keys %json ) {
                     next
                       if (
@@ -530,6 +527,9 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
                 }
                 return undef if ($metaSection);
             }
+            else {
+                $@ = undef;
+            }
         }
 
         # special place for fhem.pl is this module file
@@ -545,12 +545,9 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
 
         # Detect prereqs if not provided via META.json
         if ( !defined( $modMeta->{prereqs} ) ) {
-            eval {
-                use Perl::PrereqScanner::NotQuiteLite;
-                1;
-            };
+            eval "use Perl::PrereqScanner::NotQuiteLite;";
 
-            unless ($@) {
+            if ( !$@ ) {
                 my $scanner = Perl::PrereqScanner::NotQuiteLite->new(
                     parsers  => [qw/:installed -UniversalVersion/],
                     suggests => 1,
@@ -612,6 +609,9 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
                         $modMeta->{prereqs}{runtime}{suggests}{$_} = 0;
                     }
                 }
+            }
+            else {
+                $@ = undef;
             }
         }
         else {
@@ -857,7 +857,7 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
     "metadata",
     "meta"
   ],
-  "version": "v0.1.0",
+  "version": "v0.1.1",
   "release_status": "testing",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
