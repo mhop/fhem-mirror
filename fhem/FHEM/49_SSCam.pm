@@ -47,6 +47,8 @@ use Encode;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.11.0" => "25.02.2019  changed compatibility check, compatibility to SVS version 8.2.3, Popup possible for \"generic\"-Streamdevices, ".
+              "support for \"genericStrmHtmlTag\" in streaming devices ",
   "8.10.1" => "19.02.2019  fix warning when starting fhem, and Forum:#97706",
   "8.10.0" => "15.02.2019  send recordings integrated by telegram, a lot of internal changes for send telegrams ",
   "8.9.2"  => "05.02.2019  sub SSCam_sendTelegram changed ",
@@ -131,6 +133,8 @@ our %SSCam_vNotesIntern = (
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
+  "8.11.0" => "25.02.2019 compatibility set to SVS version 8.2.3, Popup possible for streaming devices of type \"generic\", ".
+              "support for \"genericStrmHtmlTag\" in streaming devices ",
   "8.10.0" => "15.02.2019 Possibility of send recordings by telegram is integrated as well as sending snapshots ",
   "8.9.0"  => "05.02.2019 A new streaming device type \"lastsnap\" was implemented. You can create such device with \"set ... createStreamDev lastsnap\". ".
                           "This streaming device shows the newest snapshot which was taken. ",
@@ -240,7 +244,7 @@ our %SSCam_vNotesExtern = (
 );
 
 # getestete SVS-Version
-my $compstat     = "8.2";
+my $compstat     = "8.2.3";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -1720,7 +1724,11 @@ sub SSCam_FWsummaryFn ($$$$) {
   $ret .= "<script type=\"text/javascript\" src=\"$ttjs\"></script>";
   
   if($wltype eq "image") {
-    $ret .= "<img src=$link $attr><br>";
+    if(SSCam_myVersion($hash) == 823 && ReadingsVal($name, "CamVideoType", "") !~ /MJPEG/) {             
+      $ret .= "<td> <br> <b> Because SVS Version 8.2.3 is running the video format has to be set to MJPEG in SVS ! </b> <br><br>";
+    } else {
+      $ret .= "<img src=$link $attr><br>";
+    }
     $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
     $ret .= $imgblank;  
     if($hash->{HELPER}{RUNVIEW} =~ /live_fw/) {
@@ -1900,12 +1908,28 @@ sub SSCam_versionCheck($) {
   if($cs eq "false") {
       Log3($name, 2, "$name - WARNING - The current/simulated SVS-version ".ReadingsVal($name, "SVSversion", "").
        " may be incompatible with SSCam version $hash->{VERSION}. ".
-       "For further information execute \"get <name> versionNotes 4\".");
+       "For further information execute \"get $name versionNotes 4\".");
   }
   
 InternalTimer(gettimeofday()+$rc, "SSCam_versionCheck", $hash, 0);
 
 return; 
+}
+
+###############################################################################
+#          Liefert die bereinigte SVS-Version dreistellig xxx
+###############################################################################
+sub SSCam_myVersion($) {
+  my ($hash) = @_;
+  my $name   = $hash->{NAME};
+  my $actvs  = ""; 
+
+  my @vl = split (/-/,ReadingsVal($name, "SVSversion", ""),2);
+  if(@vl) {
+      $actvs = $vl[0];
+      $actvs =~ s/\.//g;
+  }
+return $actvs; 
 }
 
 ######################################################################################
@@ -5621,7 +5645,7 @@ sub SSCam_camop_parse ($) {
                 }
                 
                 # Kompatibilitätscheck
-                my $avsc   = $major.$minor; 
+                my $avsc   = $major.$minor.(($small=~/\d/)?$small:0);
                 my $avcomp = $hash->{COMPATIBILITY};
                 $avcomp    =~ s/\.//g;
                 
@@ -6740,12 +6764,14 @@ sub SSCam_ptzpanel($;$$) {
   my $ptz_ret;
   my $row;
   
-  my @vl = split (/\.|-/,ReadingsVal($name, "SVSversion", ""));
-  if(@vl) {
-      my $actvs = $vl[0];
-      $actvs   .= $vl[1];
-      return "" if($actvs <= 71);
-  }
+  #my @vl = split (/\.|-/,ReadingsVal($name, "SVSversion", ""));
+  #if(@vl) {
+  #    my $actvs = $vl[0];
+  #    $actvs   .= $vl[1];
+  #    return "" if($actvs <= 71);
+  #}
+  
+  return if(SSCam_myVersion($hash) <= 71);
   
   $ptz_ret = "<div class=\"ptzpanel\">";
   $ptz_ret.= '<table class="rc_body">';
@@ -7039,19 +7065,23 @@ sub SSCam_StreamDev($$$) {
       return $ret; 
   }
   
-  if ($fmt =~ /mjpeg/) { 
-      if($apivideostmsmaxver) {                                  # keine API "SYNO.SurveillanceStation.VideoStream" mehr ab API v2.8
-          $link = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
-      } elsif ($hash->{HELPER}{STMKEYMJPEGHTTP}) {
-          $link = $hash->{HELPER}{STMKEYMJPEGHTTP};
+  if ($fmt =~ /mjpeg/) {
+      if(SSCam_myVersion($hash) == 823 && ReadingsVal($camname, "CamVideoType", "") !~ /MJPEG/) {  
+          $ret .= "<td> <br> <b> Because SVS Version 8.2.3 is running the video format has to be set to MJPEG in SVS ! </b> <br><br>";
+      } else {
+          if($apivideostmsmaxver) {                                  
+              $link = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
+          } elsif ($hash->{HELPER}{STMKEYMJPEGHTTP}) {
+              $link = $hash->{HELPER}{STMKEYMJPEGHTTP};
+          }
+          if($apiaudiostmmaxver) {                                   
+              $audiolink = "$proto://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmmaxver&method=Stream&cameraId=$camid&_sid=$sid"; 
+          }
+          $ret .= "<td><img src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"><br>";
+          $streamHash->{HELPER}{STREAM} = "<img src=$link $pws>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
+          $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);         # Statusbit wenn ein Stream aktiviert ist      
       }
-      if($apiaudiostmmaxver) {                                   # keine API "SYNO.SurveillanceStation.AudioStream" mehr ab API v2.8 
-	      $audiolink = "$proto://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmmaxver&method=Stream&cameraId=$camid&_sid=$sid"; 
-      }
-	  $ret .= "<td><img src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"><br>";
-      $streamHash->{HELPER}{STREAM} = "<img src=$link $pws>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
-      $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);         # Statusbit wenn ein Stream aktiviert ist
-      
+            
       if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
              # Aufnahmebutton endlos Start
              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
@@ -7093,26 +7123,31 @@ sub SSCam_StreamDev($$$) {
       }
   
   } elsif ($fmt =~ /generic/) {  
-      my $htag  = AttrVal($camname,"genericStrmHtmlTag","");
+      my $htag  = AttrVal($strmdev,"genericStrmHtmlTag",AttrVal($camname,"genericStrmHtmlTag",""));
+      
       if( $htag =~ m/^\s*(.*)\s*$/s ) {
           $htag = $1;
           $htag =~ s/\$NAME/$camname/g;
           $htag =~ s/\$HTMLATTR/$ha/g;
+          $htag =~ s/\$PWS/$pws/g;
       }
 
       if(!$htag) {
-          $ret .= "<td> <br> <b> Set attribute \"genericStrmHtmlTag\" in device <a href=\"/fhem?detail=$camname\">$camname</a></b> <br><br></td>";
+          $ret .= "<td> <br> <b> Set attribute \"genericStrmHtmlTag\" in device <a href=\"/fhem?detail=$camname\">$camname</a> or in device <a href=\"/fhem?detail=$strmdev\">$strmdev</a></b> <br><br></td>";
           $ret .= '</tr>';
           $ret .= '</tbody>';
           $ret .= '</table>';
           $ret .= '</div>';
           return $ret; 
       }
-      
       $ret .= "<td>";
       $ret .= "$htag";
       if($htag) {
-          $streamHash->{HELPER}{STREAM}       = "$htag";   # Stream für "set <SSCamSTRM-Device> popupStream" speichern
+          # Popup-Tag um den Popup-Teil bereinigen 
+          my $ptag = $htag;
+          $ptag    =~ m/^(\s+)?(?<b><)(\s+)?(?<heart>.*)(\s+)?(?<nh>onClick=.*)(\s+)?(?<e>>)(\s+)?$/s;
+          $ptag    = $+{heart}?$+{b}.$+{heart}.$+{e}:$ptag;
+          $streamHash->{HELPER}{STREAM}       = "$ptag";   # Stream für "set <SSCamSTRM-Device> popupStream" speichern
           $streamHash->{HELPER}{STREAM}       =~ s/["']//g;
           $streamHash->{HELPER}{STREAM}       =~ s/\s+/ /g;
           $streamHash->{HELPER}{STREAMACTIVE} = 1;         # Statusbit wenn ein Stream aktiviert ist
@@ -7189,11 +7224,15 @@ sub SSCam_StreamDev($$$) {
       
       if($link && $wltype =~ /image|iframe|video|base64img|embed|hls/) {
           if($wltype =~ /image/) {
-              $ret .= "<td><img src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"><br>" if($link);
-              $streamHash->{HELPER}{STREAM} = "<img src=$link $pws>";    # Stream für "set <SSCamSTRM-Device> popupStream" speichern
-              $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);         # Statusbit wenn ein Stream aktiviert ist
+              if(SSCam_myVersion($hash) == 823 && ReadingsVal($camname, "CamVideoType", "") !~ /MJPEG/) {             
+                  $ret .= "<td> <br> <b> Because SVS Version 8.2.3 is running the video format has to be set to MJPEG in SVS ! </b> <br><br>";
+              } else {
+                  $ret .= "<td><img src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"><br>" if($link);
+                  $streamHash->{HELPER}{STREAM} = "<img src=$link $pws>";    # Stream für "set <SSCamSTRM-Device> popupStream" speichern
+                  $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);         # Statusbit wenn ein Stream aktiviert ist
+              }    
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
-              $ret .= $imgblank;
+              $ret .= $imgblank;              
               if($hash->{HELPER}{RUNVIEW} =~ /live_fw/) {              
                   if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
                       # Aufnahmebutton endlos Start
@@ -8815,7 +8854,7 @@ return ($str);
          "<a href=\"https://www.synology.com/en-global/knowledgebase/Surveillance/help/SurveillanceStation/user\">Surveillance Station online help</a> ".
          "<br><br>",
   "4" => "The message Meldung \"WARNING - The current/simulated SVS-version ... may be incompatible with SSCam version...\" means that ".
-         "the used SSCam version was currently not tested with the installed version of Synology Surveillance Station (Reading \"SVSversion\"). ".
+         "the used SSCam version was currently not tested or (partially) incompatible with the installed version of Synology Surveillance Station (Reading \"SVSversion\"). ".
          "The compatible SVS-Version is printed out in the Internal COMPATIBILITY.\n".
          "<b>Actions:</b> At first please update your SSCam version. If the message does appear furthermore, please inform the SSCam Maintainer. ".
          "To ignore this message temporary, you may reduce the verbose level of your SSCam device. ".
@@ -8876,7 +8915,7 @@ return ($str);
          "<br><br>",
   "4" => "Die Meldung \"WARNING - The current/simulated SVS-version ... may be incompatible with SSCam version...\" ist ein Hinweis darauf, dass ".
          "die eingesetzte SSCam Version noch nicht mit der verwendeten Version von Synology Surveillance Station (Reading \"SVSversion\") getestet ".
-         "wurde. Die kompatible SVS-Version ist im Internal COMPATIBILITY ersichtlich.\n".
+         "wurde oder (teilweise) mit dieser Version nicht kompatibel ist. Die kompatible SVS-Version ist im Internal COMPATIBILITY ersichtlich.\n".
          "<b>Maßnahmen:</b> Bitte SSCam zunächst updaten. Sollte die Meldung weiterhin auftreten, bitte den SSCam Maintainer informieren. Zur ".
          "vorübergehenden Ignorierung kann der verbose Level des SSCam-Devices entsprechend reduziert werden. ".
          "<br><br>",
@@ -9216,9 +9255,15 @@ return ($str);
       <pre>
 attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
                                  &lt;source src='http://192.168.2.10:32000/$NAME.m3u8' type='application/x-mpegURL'&gt;
-                               &lt;/video&gt; 
+                               &lt;/video&gt;
+
+attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR 
+                                 src="http://192.168.2.10:32774"
+                                 onClick="FW_okDialog('&lt;img src=http://192.168.2.10:32774 $PWS&gt')"
+                               &gt                                 
       </pre>
-      The variables $HTMLATTR, $NAME are placeholder and absorb the attribute "htmlattr" (if set) respectively the SSCam-Devicename.
+      The variables $HTMLATTR, $NAME and $PWS are placeholders and absorb the attribute "htmlattr" (if set), the SSCam-Devicename 
+      respectively the value of attribute "popupWindowSize" in streamin-device, which specify the windowsize of a popup window.
     </ul>
   <br><br>
     
@@ -10136,13 +10181,19 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   (see also "set &lt;name&gt; createStreamDev generic") <br><br> 
   
     <ul>
-	  <b>Example:</b>
+	  <b>Examples:</b>
       <pre>
 attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
                                  &lt;source src='http://192.168.2.10:32000/$NAME.m3u8' type='application/x-mpegURL'&gt;
                                &lt;/video&gt; 
+                               
+attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR 
+                                 src="http://192.168.2.10:32774"
+                                 onClick="FW_okDialog('&lt;img src=http://192.168.2.10:32774 $PWS&gt')"
+                               &gt  
       </pre>
-      The variables $HTMLATTR, $NAME are placeholder and absorb the attribute "htmlattr" (if set) respectively the SSCam-Devicename.
+      The variables $HTMLATTR, $NAME and $PWS are placeholders and absorb the attribute "htmlattr" (if set), the SSCam-Devicename 
+      respectively the value of attribute "popupWindowSize" in streaming-device, which specify the windowsize of a popup window.
     </ul>
     <br><br>
     </li>
@@ -10950,13 +11001,19 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   spezifizieren den wiederzugebenden Content. <br><br>
   
     <ul>
-	  <b>Beispiel:</b>
+	  <b>Beispiele:</b>
       <pre>
 attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
                                  &lt;source src='http://192.168.2.10:32000/$NAME.m3u8' type='application/x-mpegURL'&gt;
-                               &lt;/video&gt; 
+                               &lt;/video&gt;
+
+attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR 
+                                 src="http://192.168.2.10:32774"
+                                 onClick="FW_okDialog('&lt;img src=http://192.168.2.10:32774 $PWS &gt')"
+                               &gt                              
       </pre>
-      Die Variablen $HTMLATTR, $NAME sind Platzhalter und übernehmen ein gesetztes Attribut "htmlattr" bzw. den SSCam-Devicenamen.
+      Die Variablen $HTMLATTR, $NAME und $PWS sind Platzhalter und übernehmen ein gesetztes Attribut "htmlattr", den SSCam-
+      Devicenamen bzw. das Attribut "popupWindowSize" im Streaming-Device, welches die Größe eines Popup-Windows festlegt.
     </ul>
   <br><br>
   
@@ -11921,13 +11978,19 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   (siehe "set &lt;name&gt; createStreamDev generic") <br><br> 
   
     <ul>
-	  <b>Beispiel:</b>
+	  <b>Beispiele:</b>
       <pre>
 attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
                                  &lt;source src='http://192.168.2.10:32000/$NAME.m3u8' type='application/x-mpegURL'&gt;
-                               &lt;/video&gt; 
+                               &lt;/video&gt;
+                               
+attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR 
+                                 src="http://192.168.2.10:32774"
+                                 onClick="FW_okDialog('&lt;img src=http://192.168.2.10:32774 $PWS &gt')"
+                               &gt                              
       </pre>
-      Die Variablen $HTMLATTR, $NAME sind Platzhalter und übernehmen ein gesetztes Attribut "htmlattr" bzw. den SSCam-Devicenamen.
+      Die Variablen $HTMLATTR, $NAME und $PWS sind Platzhalter und übernehmen ein gesetztes Attribut "htmlattr", den SSCam-
+      Devicenamen bzw. das Attribut "popupWindowSize" im Streaming-Device, welches die Größe eines Popup-Windows festlegt.    
     </ul>
     <br><br>
     </li>

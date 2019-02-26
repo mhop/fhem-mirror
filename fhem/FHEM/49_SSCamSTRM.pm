@@ -34,6 +34,7 @@ use warnings;
 
 # Versions History intern
 our %SSCamSTRM_vNotesIntern = (
+  "2.4.0"  => "24.02.2019  support for \"genericStrmHtmlTag\" in streaming device MODEL generic ",
   "2.3.0"  => "04.02.2019  SSCamSTRM_Rename / SSCamSTRM_Copy added, Streaming device can now be renamed or copied ",
   "2.2.1"  => "19.12.2018  commandref revised ",
   "2.2.0"  => "13.12.2018  load sscam_hls.js, sscam_tooltip.js from pgm2 for HLS Streaming support and tooltips ",
@@ -75,7 +76,8 @@ sub SSCamSTRM_Initialize($) {
   $hash->{AttrList}           = "autoRefresh:selectnumbers,120,0.2,1800,0,log10 ".
                                 "autoRefreshFW:$fwd ".
                                 "disable:1,0 ". 
-                                "forcePageRefresh:1,0 ". 
+                                "forcePageRefresh:1,0 ".
+                                "genericStrmHtmlTag ".
                                 "htmlattr ".
                                 "hideDisplayName:1,0 ".
                                 "popupWindowSize ".
@@ -205,7 +207,7 @@ sub SSCamSTRM_Attr($$$$) {
     # $name is device name
     # aName and aVal are Attribute name and value
     
-    if ($aName eq "disable") {
+    if($aName eq "disable") {
         if($cmd eq "set") {
             $do = ($aVal) ? 1 : 0;
         }
@@ -213,6 +215,10 @@ sub SSCamSTRM_Attr($$$$) {
 		$val = ($do == 1 ? "disabled" : "initialized");
     
         readingsSingleUpdate($hash, "state", $val, 1);
+    }
+    
+    if($aName eq "genericStrmHtmlTag" && $hash->{MODEL} ne "generic") {
+        return "This attribute is only usable for devices of MODEL \"generic\" ";
     }
     
     if ($cmd eq "set") {
@@ -385,6 +391,29 @@ Dependend of the Streaming-Device state, different buttons are provided to start
     </li>
     <br>
     
+  <a name="genericStrmHtmlTag"></a>
+  <li><b>genericStrmHtmlTag</b> &nbsp;&nbsp;&nbsp;&nbsp;(only valid for MODEL "generic") <br>
+  This attribute contains HTML-Tags for video-specification in a Streaming-Device of type "generic". 
+  <br><br> 
+  
+    <ul>
+	  <b>Examples:</b>
+      <pre>
+attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
+                                 &lt;source src='http://192.168.2.10:32000/$NAME.m3u8' type='application/x-mpegURL'&gt;
+                               &lt;/video&gt; 
+                               
+attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR 
+                                 src="http://192.168.2.10:32774"
+                                 onClick="FW_okDialog('&lt;img src=http://192.168.2.10:32774 $PWS&gt')"
+                               &gt  
+      </pre>
+      The variables $HTMLATTR, $NAME and $PWS are placeholders and absorb the attribute "htmlattr" (if set), the SSCam-Devicename 
+      respectively the value of attribute "popupWindowSize" in streaming-device, which specify the windowsize of a popup window.
+    </ul>
+    <br><br>
+    </li>
+    
     <a name="hideDisplayName"></a>
     <li><b>hideDisplayName</b><br>
       Hide the device/alias name (link to detail view).     
@@ -539,6 +568,29 @@ Abhängig vom Zustand des Streaming-Devices werden zum Start von Aktionen unters
       Dies kann in manchen Fällen die Wiedergabe innerhalb einer Anwendung stabilisieren.     
     </li>
     <br>
+    
+  <a name="genericStrmHtmlTag"></a>  
+  <li><b>genericStrmHtmlTag</b> &nbsp;&nbsp;&nbsp;&nbsp;(nur für MODEL "generic")<br>
+  Das Attribut enthält HTML-Tags zur Video-Spezifikation in einem Streaming-Device von Typ "generic". 
+  <br><br> 
+  
+    <ul>
+	  <b>Beispiele:</b>
+      <pre>
+attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
+                                 &lt;source src='http://192.168.2.10:32000/$NAME.m3u8' type='application/x-mpegURL'&gt;
+                               &lt;/video&gt;
+                               
+attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR 
+                                 src="http://192.168.2.10:32774"
+                                 onClick="FW_okDialog('&lt;img src=http://192.168.2.10:32774 $PWS &gt')"
+                               &gt                              
+      </pre>
+      Die Variablen $HTMLATTR, $NAME und $PWS sind Platzhalter und übernehmen ein gesetztes Attribut "htmlattr", den SSCam-
+      Devicenamen bzw. das Attribut "popupWindowSize" im Streaming-Device, welches die Größe eines Popup-Windows festlegt.    
+    </ul>
+    <br><br>
+    </li>    
     
     <a name="hideDisplayName"></a>
     <li><b>hideDisplayName</b><br>
