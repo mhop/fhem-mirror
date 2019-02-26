@@ -80,15 +80,12 @@ attr DEVICE model A_02d_pegelonline
 #Austrian weather, Forum: https://forum.fhem.de/index.php/topic,94110.msg868080.html#msg868080
 name:A_02m_ORF_weather
 filter:TYPE=HTTPMOD
-desc: Get austrian weather.<br>Define a HTTPMOD device like <br>defmod weatherORF HTTPMOD https://wetter.orf.at/wien/ 1800 <br>Change city to your needs <br><a href="https://forum.fhem.de/index.php/topic,94110.msg868080.html#msg868080">Source: Forum</a>
-attr DEVICE userattr reading01-1Name reading01-2Name reading01-3Name reading01-4Name reading01-5Name reading01Regex reading02-1Name reading02-2Name reading02-3Name reading02-4Name reading02-5Name reading02-6Name reading02-7Name reading02-8Name reading02Regex
+desc: Get austrian weather.<br>Define a HTTPMOD device like <br>defmod weatherORF HTTPMOD https://wetter.orf.at/steiermark/grazuniversitaet/ 1800 <br>Change city to your needs <br><a href="https://forum.fhem.de/index.php/topic,94110.msg868080.html#msg868080">Source: Forum</a> with some enhancements by JoeALLb
+par:STATIONNAME;Name of the respective weather station as written in the last part of the URL;{ InternalVal("DEVICE","path","") =~ m,[/][^/]+[/]([^/]+)[/], ? $1 : undef }
+attr DEVICE userattr get01Name reading01-1Name reading01-2Name reading01-3Name reading01-4Name reading01-5Name reading01Regex reading02-1Name reading02-2Name reading02-3Name reading02-4Name reading02-5Name reading02-6Name reading02-7Name reading02-8Name reading02Regex
 attr DEVICE enableControlSet 1
-attr DEVICE reading01-1Name temperature
-attr DEVICE reading01-2Name weather
-attr DEVICE reading01-3Name wind
-attr DEVICE reading01-4Name windDir
-attr DEVICE reading01-5Name precipitation
-attr DEVICE reading01Regex Innere Stadt<\/h3>[\s\S]*temperature\">(\d*,?\d?)[\s\S]*screen\">, ([\s\S]*)\.<\/span>[\s\S]*wind\">(\d*,?\d?)[\s\S]*screen\">,.([\s\S]*)\.[\s\S]*precipitation\">(\d*,?\d+)
+attr DEVICE get01Name STATIONNAME
+attr DEVICE reading01Regex (?s)Temperatur.*?.*?>.*?(?<temperature>[\d,]+)&thinsp.*?Taupunkt.*?.*?>.*?(?<taupunkt>[\d,]+)&thinsp.*?Wind.*?>\n\s*(?<wind>[^<]+)\s<abbr.*?Windspitzen.*?>\n\s*(?<windspitzen>[^<]+)\s<abbr.*?Luftdruck.*?>\n\s*(?<luftdruck>[^<]+)\s<abbr.*?Luftfeuchtigkeit.*?>\n\s*(?<humidity>[^<]+)\s<abbr.*?Sonnenschein.*?>\n\s*(?<sonne>[^<]+)\s<abbr.*?Niederschlag.*?>\n\s*(?<rain>[^<\n]+).*?</p.*?(?<messwerte>Messwerte[^<\n]+)
 attr DEVICE reading02-1Name sunRise
 attr DEVICE reading02-2Name sunSet
 attr DEVICE reading02-3Name moonPhase
@@ -256,6 +253,9 @@ attr DEVICE reading04Name Black
 attr DEVICE reading04Regex \(BK\)\*\*.{9}\((\d{1,3}\.\d{1,2})%\)
 attr DEVICE room Steuerung->Unused_Devices
 attr DEVICE stateFormat C: Cyan% M: Magenta% Y: Yellow% B: Black%
+attr DEVICE reading05Name Status
+attr DEVICE reading05RegOpt gm
+attr DEVICE reading05Regex <th>1<\/th><td>(.*?)<
 attr DEVICE model B_01c_brother_printer_cartridge_status
 
 #RESOL Solaranlage, Forum: https://forum.fhem.de/index.php/topic,86678.0.html
