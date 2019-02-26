@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 1.7
+#  Version 1.7.001
 #
 #  Subprocess based RPC Server module for HMCCU.
 #
@@ -35,7 +35,7 @@ use SetExtensions;
 ######################################################################
 
 # HMCCURPC version
-my $HMCCURPCPROC_VERSION = '1.7';
+my $HMCCURPCPROC_VERSION = '1.7.001';
 
 # Maximum number of events processed per call of Read()
 my $HMCCURPCPROC_MAX_EVENTS = 100;
@@ -1643,6 +1643,8 @@ sub HMCCURPCPROC_SendRequest ($@)
 	my $port = $hash->{rpcport};
 	
 	my $rc;
+	
+	return HMCCU_Log ($hash, 2, "I/O device not found", undef) if (!defined ($hmccu_hash));
 	
 	if (HMCCU_IsRPCType ($hmccu_hash, $port, 'A')) {
 		# Use XMLRPC

@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.3.013
+#  Version 4.3.014
 #
 #  Module for communication between FHEM and Homematic CCU2/3.
 #
@@ -52,7 +52,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.3.013';
+my $HMCCU_VERSION = '4.3.014';
 
 # Constants and default values
 my $HMCCU_MAX_IOERRORS = 100;
@@ -1375,8 +1375,9 @@ sub HMCCU_Set ($@)
 	my ($hash, $a, $h) = @_;
 	my $name = shift @$a;
 	my $opt = shift @$a;
-	my $options = "var clear delete execute hmscript cleardefaults:noArg defaults:noArg ".
-		"importdefaults rpcregister:all rpcserver:on,off,restart ackmessages:noArg authentication";
+	my $options = "avar clear delete execute hmscript cleardefaults:noArg defaults:noArg ".
+		"importdefaults rpcregister:all rpcserver:on,off,restart ackmessages:noArg authentication ".
+		"prgActivate prgDeactivate";
 	my @ifList = HMCCU_GetRPCInterfaceList ($hash);
 	if (scalar (@ifList) > 0) {
 		my $ifStr = join (',', @ifList);
@@ -1403,13 +1404,25 @@ sub HMCCU_Set ($@)
 	# Add program names to command execute
 	if (exists ($hash->{hmccu}{prg})) {
 		my @progs = ();
+		my @aprogs = ();
+		my @iprogs = ();
 		foreach my $p (keys %{$hash->{hmccu}{prg}}) {
-			push (@progs, $p) if ($hash->{hmccu}{prg}{$p}{internal} eq 'false' && $p !~ /^\$/);
+			if ($hash->{hmccu}{prg}{$p}{internal} eq 'false' && $p !~ /^\$/) {
+				push (@progs, $p);
+				push (@aprogs, $p) if ($hash->{hmccu}{prg}{$p}{active} eq 'true');
+				push (@iprogs, $p) if ($hash->{hmccu}{prg}{$p}{active} eq 'false');
+			}
 		}
 		if (scalar (@progs) > 0) {
 			my $prgopt = "execute:".join(',', @progs);
+			my $prgact = "prgActivate:".join(',', @iprogs);
+			my $prgdac = "prgDeactivate:".join(',', @aprogs);
 			$options =~ s/execute/$prgopt/;
+			$options =~ s/prgActivate/$prgact/;
+			$options =~ s/prgDeactivate/$prgdac/;
 			$usage =~ s/execute/$prgopt/;
+			$usage =~ s/prgActivate/$prgact/;
+			$usage =~ s/prgDeactivate/$prgdac/;
 		}
 	}
 	
@@ -1503,6 +1516,18 @@ sub HMCCU_Set ($@)
 		
 		return HMCCU_SetState ($hash, "OK") if (defined ($value));
 		return HMCCU_SetError ($hash, "Program execution error");
+	}
+	elsif ($opt eq 'prgActivate' || $opt eq 'prgDeactivate') {
+		my $program = shift @$a;
+		my $mode = $opt eq 'prgActivate' ? 'true' : 'false';
+		$usage = "Usage: set $name $opt program-name";
+		
+		return HMCCU_SetError ($hash, $usage) if (!defined ($program));
+		
+		$result = HMCCU_HMScriptExt ($hash, "!ActivateProgram", { name => $program, mode => $mode });
+
+		return HMCCU_SetError ($hash, -2) if ($result =~ /^ERROR:.*/);
+		return HMCCU_SetState ($hash, "OK");	
 	}
 	elsif ($opt eq 'hmscript') {
 		my $script = shift @$a;
@@ -6802,26 +6827,20 @@ sub HMCCU_RPCGetConfig ($$$$)
 	my ($rpctype, $port) = HMCCU_GetRPCServerInfo ($hmccu_hash, $int, 'type,port');
 	return (-9, '') if (!defined ($rpctype) || !defined ($port));
 	
+	# Search RPC device
+	my ($rpcdev, $save) = HMCCU_GetRPCDevice ($hmccu_hash, 0, $int);
+	return (-17, '') if ($rpcdev eq '');
+	my $rpchash = $defs{$rpcdev};
+
 	if ($rpctype eq 'B') {
-		# Search RPC device
-		my $rpcdev = HMCCU_GetRPCDevice ($hmccu_hash, 0, $int);
-		return (-17, '') if ($rpcdev eq '');
 		HMCCU_Trace ($hash, 2, $fnc, "Method=$method Addr=$addr Port=$port");
 		if ($ccuflags =~ /(extrpc|procrpc)/) {
-# 			$res = HMCCURPC_SendBinRequest ($defs{$rpcdev}, $port, $method, $BINRPC_STRING, $addr,
-# 				$BINRPC_STRING, "MASTER");
-# 		}
-# 		elsif ($ccuflags =~ /procrpc/) {
-			$res = HMCCURPCPROC_SendRequest ($defs{$rpcdev}, $method, $BINRPC_STRING, $addr,
+			$res = HMCCURPCPROC_SendRequest ($rpchash, $method, $BINRPC_STRING, $addr,
 				$BINRPC_STRING, "MASTER");
 		}
 	}
-	else {	
-		my $url = HMCCU_BuildURL ($hmccu_hash, $int);
-		return (-9, '') if (!defined ($url));
-		HMCCU_Trace ($hash, 2, $fnc, "Method=$method Addr=$addr Port=$port");
-		my $client = RPC::XML::Client->new ($url);
-		$res = $client->simple_request ($method, $addr, "MASTER");
+	else {
+		$res = HMCCURPCPROC_SendRequest ($rpchash, $method, $addr, "MASTER");
 	}
 
 	return (-5, "Function not available") if (!defined ($res));
@@ -6921,12 +6940,13 @@ sub HMCCU_RPCSetConfig ($$$)
 		}
 		Log3 $name, 2, "HMCCU: RPCSetConfig: addr=$addr".$ps;
 	}
-	
-	if ($rpctype eq 'B') {
-		# Search RPC device
-		my $rpcdev = HMCCU_GetRPCDevice ($hmccu_hash, 0, $int);
-		return -17 if ($rpcdev eq '');
 
+	# Search RPC device
+	my ($rpcdev, $save) = HMCCU_GetRPCDevice ($hmccu_hash, 0, $int);
+	return -17 if ($rpcdev eq '');
+	my $rpchash = $defs{$rpcdev};
+
+	if ($rpctype eq 'B') {
 		# Rebuild parameter hash for binary encoding		
 		my %binpar;
 		foreach my $e (keys %$parref) {
@@ -6935,19 +6955,12 @@ sub HMCCU_RPCSetConfig ($$$)
 		}
 		
 		if ($ccuflags =~ /(extrpc|procrpc)/) {
-# 			$res = HMCCURPC_SendBinRequest ($defs{$rpcdev}, $port, "putParamset", $BINRPC_STRING, $addr,
-# 				$BINRPC_STRING, "MASTER", $BINRPC_STRUCT, \%binpar);
-# 		}
-# 		elsif ($ccuflags =~ /procrpc/) {
-			$res = HMCCURPCPROC_SendRequest ($defs{$rpcdev}, "putParamset", $BINRPC_STRING, $addr,
+			$res = HMCCURPCPROC_SendRequest ($rpchash, "putParamset", $BINRPC_STRING, $addr,
 				$BINRPC_STRING, "MASTER", $BINRPC_STRUCT, \%binpar);
 		}
 	}
 	else {
-		my $url = HMCCU_BuildURL ($hmccu_hash, $int);
-		return -9 if (!defined ($url));
-		my $client = RPC::XML::Client->new ($url);
-		$res = $client->simple_request ("putParamset", $addr, "MASTER", $parref);
+		$res = HMCCURPCPROC_SendRequest ($rpchash, "putParamset", $addr, "MASTER", $parref);
 	}
 
 	return -5 if (! defined ($res));
@@ -8175,6 +8188,12 @@ sub HMCCU_CCURPC_ListDevicesCB ($$)
       </li><br/>
       <li><b>set &lt;name&gt; initialize</b><br/>
       	Initialize I/O device if state of CCU is unreachable.
+      </li><br/>
+      <li><b>set &lt;name&gt; prgActivate &lt;program&gt;</b><br/>
+         Activate a CCU program.
+      </li><br/>
+      <li><b>set &lt;name&gt; prgDeactivate &lt;program&gt;</b><br/>
+         Deactivate a CCU program.
       </li><br/>
       <li><b>set &lt;name&gt; rpcregister [{all | &lt;interface&gt;}]</b><br/>
       	Register RPC servers at CCU.
