@@ -1,12 +1,13 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  DarkSky/OpenWeatherMap API fix bug with umlauts
  - bugfix:  73_AutoShuttersControl: fix Bug open Window befor IsDay and closed
                                     IsDay
  - changed: 74_Unifi: removed deprecated UnifiSwitch-functions!
  - bugfix:  74_UnififSwitch: fixed poe restart
  - feature: 57_Calendar.pm: new features and attributes
                             german commandref added
- - bugfix: 00_SIGNALduino: Load protocolHash from web if file  is 
+ - bugfix:  00_SIGNALduino: Load protocolHash from web if file  is 
                            missing on fs
  - bugfix:  49_SSCam: some warnings, Forum:#97706
  - bugfix:  88_HMCCU: Fixed minor bugs.
@@ -17,7 +18,7 @@
                  Firmware for avr boards can be downloaded and flashed. 
                  on demand from gitghub releases.
                  supports dupTimeout on same iodev
-    change: 00_SIGNALduino: Attribute hardware does not longer support nano
+    change:  00_SIGNALduino: Attribute hardware does not longer support nano
                             select nano328 instead
   - feature: 14_SD_RSL: Updated implementation for "all" button on devices
   - feature: 14_SD_WS: support sensors E0001PA,S522,TX-EZ6,other
@@ -94,7 +95,7 @@
   - feature: 98_livetracking: added events for OwnTrack zones
   - feature: 93_DbRep: command exportToFile or attribute "expimpfile" accept
                        option "MAXLINES="
-  - bugfix: 09_CUL_FHTTK: removed low batt information from state, moved to
+  - bugfix:  09_CUL_FHTTK: removed low batt information from state, moved to
                           reading batteryState
   - feature: 59_Weather: add limit forecast, selection between daily and hourly
                          forecast
@@ -220,7 +221,7 @@
   - bugfix:  51_MOBILEALERTS.pm: Offlimit for decodeHumidityDecimal added
   - change:  98_MSwitch.pm, update V2.07
   - change:  20_FRM_IN: only update on change (Forum #81815)
-  - bugfix: 73_AutoShuttersControl: fix absent Event and ModeDown absent bug
+  - bugfix:  73_AutoShuttersControl: fix absent Event and ModeDown absent bug
   - bugfix:  73_AutoShuttersControl: fix gone then absent bug
   - feature: 49_SSCam: V7.6.0, The PTZ panel is completed by "Preset" and
                        "Patrol" dropdown lists (for PTZ cams only)

@@ -48,7 +48,7 @@ eval "use Encode qw(encode_utf8);1" or $missingModul .= "Encode ";
 # use Data::Dumper;    # for Debug only
 ## API URL
 use constant URL => 'https://api.openweathermap.org/data/2.5/';
-use constant VERSION => '0.2.2';
+use constant VERSION => '0.2.3';
 ## URL . 'weather?' for current data
 ## URL . 'forecast?' for forecast data
 
@@ -264,8 +264,8 @@ sub _ProcessingRetrieveData($$) {
 #                 print 'Response: ' . Dumper $data;
                 ###### Ab hier wird die ResponseHash Referenze für die Rückgabe zusammen gestellt
                 $self->{cached}->{current_date_time} =
-                strftime( "%a, %e %b %Y %H:%M",
-                    localtime( $self->{fetchTime} ) );
+                encode_utf8(strftime( "%a, %e %b %Y %H:%M",
+                    localtime( $self->{fetchTime} ) ));
 
                 if ( $self->{endpoint} eq 'weather' ) {
                     $self->{cached}->{country}       = $data->{sys}->{country};
@@ -311,18 +311,18 @@ sub _ProcessingRetrieveData($$) {
                             int( sprintf( "%.1f", $data->{visibility} ) + 0.5 ),
                         'code'       => $codes{ $data->{weather}->[0]->{id} },
                         'iconAPI'    => $data->{weather}->[0]->{icon},
-                        'sunsetTime' => strftime(
+                        'sunsetTime' => encode_utf8(strftime(
                             "%a, %e %b %Y %H:%M",
                             localtime( $data->{sys}->{sunset} )
-                        ),
-                        'sunriseTime' => strftime(
+                        )),
+                        'sunriseTime' => encode_utf8(strftime(
                             "%a, %e %b %Y %H:%M",
                             localtime( $data->{sys}->{sunrise} )
-                        ),
-                        'pubDate' => strftime(
+                        )),
+                        'pubDate' => encode_utf8(strftime(
                             "%a, %e %b %Y %H:%M",
                             localtime( $data->{dt} )
-                        ),
+                        )),
                     };
                 }
 
@@ -338,12 +338,12 @@ sub _ProcessingRetrieveData($$) {
                             push(
                                 @{ $self->{cached}->{forecast}->{hourly} },
                                 {
-                                    'pubDate' => strftime(
+                                    'pubDate' => encode_utf8(strftime(
                                         "%a, %e %b %Y %H:%M",
                                         localtime(
                                             ( $data->{list}->[$i]->{dt} ) - 3600
                                         )
-                                    ),
+                                    )),
                                     'day_of_week' => strftime(
                                         "%a, %H:%M",
                                         localtime(
@@ -472,7 +472,7 @@ sub _ErrorHandling($$) {
     my ( $self, $err ) = @_;
 
     $self->{cached}->{current_date_time} =
-      strftime( "%a, %e %b %Y %H:%M", localtime( $self->{fetchTime} ) ),
+      encode_utf8(strftime( "%a, %e %b %Y %H:%M", localtime( $self->{fetchTime} ) )),
       $self->{cached}->{status} = $err;
     $self->{cached}->{validity} = 'stale';
 }

@@ -44,7 +44,7 @@ eval "use Encode qw(encode_utf8);1" or $missingModul .= "Encode ";
 # use Data::Dumper;    # for Debug only
 ## API URL
 use constant URL => 'https://api.darksky.net/forecast/';
-use constant VERSION => '0.2.4';
+use constant VERSION => '0.2.5';
 
 my %codes = (
     'clear-day'           => 32,
@@ -209,8 +209,8 @@ sub _ProcessingRetrieveData($$) {
                 #             print Dumper $data;       ## für Debugging
 
                 $self->{cached}->{current_date_time} =
-                strftime( "%a, %e %b %Y %H:%M",
-                    localtime( $self->{fetchTime} ) );
+                encode_utf8(strftime( "%a, %e %b %Y %H:%M",
+                    localtime( $self->{fetchTime} ) ));
                 $self->{cached}->{timezone} = $data->{timezone};
                 $self->{cached}->{license}{text} =
                 $data->{flags}->{'meteoalarm-license'};
@@ -247,10 +247,10 @@ sub _ProcessingRetrieveData($$) {
                     'ozone'   => $data->{currently}->{ozone},
                     'code'    => $codes{ $data->{currently}->{icon} },
                     'iconAPI' => $data->{currently}->{icon},
-                    'pubDate' => strftime(
+                    'pubDate' => encode_utf8(strftime(
                         "%a, %e %b %Y %H:%M",
                         localtime( $data->{currently}->{'time'} )
-                    ),
+                    )),
                     'precipProbability' => $data->{currently}->{precipProbability} * 100,
                     'apparentTemperature' => int(
                         sprintf(
@@ -271,12 +271,12 @@ sub _ProcessingRetrieveData($$) {
                         push(
                             @{ $self->{cached}->{forecast}->{daily} },
                             {
-                                'pubDate' => strftime(
+                                'pubDate' => encode_utf8(strftime(
                                     "%a, %e %b %Y %H:%M",
                                     localtime(
                                         $data->{daily}->{data}->[$i]->{'time'}
                                     )
-                                ),
+                                )),
                                 'day_of_week' => strftime(
                                     "%a",
                                     localtime(
@@ -298,49 +298,49 @@ sub _ProcessingRetrieveData($$) {
                                         $data->{daily}->{data}->[$i]
                                         ->{temperatureLow} ) + 0.5
                                 ),
-                                'tempLowTime' => strftime(
+                                'tempLowTime' => encode_utf8(strftime(
                                     "%a, %e %b %Y %H:%M",
                                     localtime(
                                         $data->{daily}->{data}->[$i]
                                         ->{temperatureLowTime}
                                     )
-                                ),
+                                )),
                                 'tempHigh' => int(
                                     sprintf( "%.1f",
                                         $data->{daily}->{data}->[$i]
                                         ->{temperatureHigh} ) + 0.5
                                 ),
-                                'tempHighTime' => strftime(
+                                'tempHighTime' => encode_utf8(strftime(
                                     "%a, %e %b %Y %H:%M",
                                     localtime(
                                         $data->{daily}->{data}->[$i]
                                         ->{temperatureHighTime}
                                     )
-                                ),
+                                )),
                                 'apparentTempLow' => int(
                                     sprintf( "%.1f",
                                         $data->{daily}->{data}->[$i]
                                         ->{apparentTemperatureLow} ) + 0.5
                                 ),
-                                'apparentTempLowTime' => strftime(
+                                'apparentTempLowTime' => encode_utf8(strftime(
                                     "%a, %e %b %Y %H:%M",
                                     localtime(
                                         $data->{daily}->{data}->[$i]
                                         ->{apparentTemperatureLowTime}
                                     )
-                                ),
+                                )),
                                 'apparentTempHigh' => int(
                                     sprintf( "%.1f",
                                         $data->{daily}->{data}->[$i]
                                         ->{apparentTemperatureHigh} ) + 0.5
                                 ),
-                                'apparentTempHighTime' => strftime(
+                                'apparentTempHighTime' => encode_utf8(strftime(
                                     "%a, %e %b %Y %H:%M",
                                     localtime(
                                         $data->{daily}->{data}->[$i]
                                         ->{apparentTemperatureHighTime}
                                     )
-                                ),
+                                )),
                                 'code' =>
                                 $codes{ $data->{daily}->{data}->[$i]->{icon} },
                                 'iconAPI'   => $data->{daily}->{data}->[$i]->{icon},
@@ -350,12 +350,12 @@ sub _ProcessingRetrieveData($$) {
                                 'ozone' => $data->{daily}->{data}->[$i]->{ozone},
                                 'uvIndex' =>
                                     $data->{daily}->{data}->[$i]->{uvIndex},
-                                'uvIndexTime' => strftime(
+                                'uvIndexTime' => encode_utf8(strftime(
                                     "%a, %e %b %Y %H:%M",
                                     localtime(
                                         $data->{daily}->{data}->[$i]->{uvIndexTime}
                                     )
-                                ),
+                                )),
                                 'dewPoint' => int(
                                     sprintf( "%.1f",
                                         $data->{daily}->{data}->[$i]->{dewPoint} )
@@ -382,26 +382,26 @@ sub _ProcessingRetrieveData($$) {
                                         ($data->{daily}->{data}->[$i]->{windGust} * 3.6) )
                                     + 0.5
                                 ),
-                                'windGustTime' => strftime(
+                                'windGustTime' => encode_utf8(strftime(
                                     "%a, %e %b %Y %H:%M",
                                     localtime(
                                         $data->{daily}->{data}->[$i]->{windGustTime}
                                     )
-                                ),
+                                )),
                                 'moonPhase' =>
                                     $data->{daily}->{data}->[$i]->{moonPhase},
-                                'sunsetTime' => strftime(
+                                'sunsetTime' => encode_utf8(strftime(
                                     "%a, %e %b %Y %H:%M",
                                     localtime(
                                         $data->{daily}->{data}->[$i]->{sunsetTime}
                                     )
-                                ),
-                                'sunriseTime' => strftime(
+                                )),
+                                'sunriseTime' => encode_utf8(strftime(
                                     "%a, %e %b %Y %H:%M",
                                     localtime(
                                         $data->{daily}->{data}->[$i]->{sunriseTime}
                                     )
-                                ),
+                                )),
                                 'pressure' => int(
                                     sprintf( "%.1f",
                                         $data->{daily}->{data}->[$i]->{pressure} )
@@ -419,7 +419,7 @@ sub _ProcessingRetrieveData($$) {
                         $self->{cached}->{forecast}->{daily}[$i]{precipIntensity} = ( defined($data->{daily}->{data}->[$i]->{precipIntensity}) ? $data->{daily}->{data}->[$i]->{precipIntensity} : '-' );  
                         $self->{cached}->{forecast}->{daily}[$i]{precipProbability} = ( defined($data->{daily}->{data}->[$i]->{precipProbability}) ? $data->{daily}->{data}->[$i]->{precipProbability} * 100 : '-' );
                         $self->{cached}->{forecast}->{daily}[$i]{precipType} = ( defined($data->{daily}->{data}->[$i]->{precipType}) ? $data->{daily}->{data}->[$i]->{precipType} : '-' );
-                        $self->{cached}->{forecast}->{daily}[$i]{precipIntensityMaxTime} = ( defined($data->{daily}->{data}->[$i]->{precipIntensityMaxTime}) ? strftime("%a, %e %b %Y %H:%M",localtime($data->{daily}->{data}->[$i]->{precipIntensityMaxTime}) ) : '-' );
+                        $self->{cached}->{forecast}->{daily}[$i]{precipIntensityMaxTime} = ( defined($data->{daily}->{data}->[$i]->{precipIntensityMaxTime}) ? encode_utf8(strftime("%a, %e %b %Y %H:%M",localtime($data->{daily}->{data}->[$i]->{precipIntensityMaxTime}) )) : '-' );
 
                         $i++;
                     }
@@ -435,12 +435,12 @@ sub _ProcessingRetrieveData($$) {
                             push(
                                 @{ $self->{cached}->{forecast}->{hourly} },
                                 {
-                                    'pubDate' => strftime(
+                                    'pubDate' => encode_utf8(strftime(
                                         "%a, %e %b %Y %H:%M",
                                         localtime(
                                             $data->{hourly}->{data}->[$i]->{'time'}
                                         )
-                                    ),
+                                    )),
                                     'day_of_week' => strftime(
                                         "%a, %H:%M",
                                         localtime(
@@ -516,7 +516,7 @@ sub _ErrorHandling($$) {
     my ( $self, $err ) = @_;
 
     $self->{cached}->{current_date_time} =
-      strftime( "%a, %e %b %Y %H:%M", localtime( $self->{fetchTime} ) ),
+      encode_utf8(strftime( "%a, %e %b %Y %H:%M", localtime( $self->{fetchTime} ) )),
       $self->{cached}->{status} = $err;
     $self->{cached}->{validity} = 'stale';
 }
