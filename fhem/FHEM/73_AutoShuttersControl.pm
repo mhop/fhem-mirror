@@ -41,7 +41,7 @@ package main;
 use strict;
 use warnings;
 
-my $version = '0.4.0.8';
+my $version = '0.4.0.9';
 
 sub AutoShuttersControl_Initialize($) {
     my ($hash) = @_;
@@ -1303,14 +1303,14 @@ sub EventProcessingTwilightDevice($@) {
     #
     #     Astro
     #     SunAz = azimuth = Sonnenwinkel
-    #     SunAlt = evaluation = Sonnenhöhe
+    #     SunAlt = elevation = Sonnenhöhe
 
-    if ( $events =~ m#(azimuth|evaluation|SunAz|SunAlt):\s(\d+.\d+)# ) {
+    if ( $events =~ m#(azimuth|elevation|SunAz|SunAlt):\s(\d+.\d+)# ) {
         my $name = $device;
         my ( $azimuth, $elevation );
 
         $azimuth   = $2 if ( $1 eq 'azimuth'    or $1 eq 'SunAz' );
-        $elevation = $2 if ( $1 eq 'evaluation' or $1 eq 'SunAlt' );
+        $elevation = $2 if ( $1 eq 'elevation' or $1 eq 'SunAlt' );
 
         $azimuth = $ascDev->getAzimuth
           if ( not defined($azimuth) and not $azimuth );
