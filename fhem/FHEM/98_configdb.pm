@@ -65,10 +65,10 @@ sub CommandConfigdb($$) {
 
 		when ('diff') {
 			return "\n Syntax: configdb diff <device> <version>" if @a != 3;
-			return "Invalid paramaeter '$param1' for diff. Must be a number."
-				unless looks_like_number($param1);
+#			return "Invalid paramaeter '$param1' for diff. Must be a number."
+#				unless looks_like_number($param1);
 			return "Invalid paramaeter '$param2' for diff. Must be a number."
-				unless looks_like_number($param2);
+				unless (looks_like_number($param2) || $param2 eq 'current');
 			Log3('configdb', 4, "configdb: diff requested for device: $param1 in version $param2.");
 			$ret = _cfgDB_Diff($param1, $param2);
 		}
