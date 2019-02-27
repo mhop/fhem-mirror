@@ -22,6 +22,9 @@
 #
 ##############################################################################
 # 	  Changelog:
+#		0.0.27:	Slightly improved device detection
+#				added set Command getFreezes to enable usage of webCmd
+#				fixed some commandref typos
 #		0.0.26:	Get command for Statistics
 #				remove trailing/leading whitespace for ignored devices
 #		0.0.25:	Further improved statistics function and clear statistics
@@ -106,7 +109,7 @@ use B qw(svref_2object);
 use Blocking;
 use vars qw($FW_CSRF);
 
-my $version = "0.0.26";
+my $version = "0.0.27";
 
 my @logqueue = ();
 my @fmCmd    = ();
@@ -583,7 +586,7 @@ sub freezemon_ProcessTimer($) {
 sub freezemon_Set($@) {
     my ( $hash, $name, $cmd, @args ) = @_;
     my $usage =
-      "Unknown argument $cmd, choose one of active:noArg inactive:noArg clear:statistics_all,statistics_low,all";
+"Unknown argument $cmd, choose one of getFreezes:noArg active:noArg inactive:noArg clear:statistics_all,statistics_low,all";
 
     return "\"set $name\" needs at least one argument" unless ( defined($cmd) );
 
@@ -638,6 +641,34 @@ sub freezemon_Set($@) {
             return "unknown argument $args[0]";
         }
     }
+    elsif ( $cmd eq "getFreezes" ) {
+        my $ret     = "";
+        my @colors  = ( "red", "yellow", "green", "white", "gray" );
+        my @freezes = split( ",", ReadingsVal( $name, ".fm_freezes", "" ) );
+        foreach (@freezes) {
+            my $loglevel = 1;
+            my $freeze   = $_;
+            if ( $freeze =~ /f:(.*)d:/ ) {
+                $freeze = $1;
+            }
+            my %params = map { split /\:/, $_ } ( split /\ /, AttrVal( $name, "fm_log", "" ) );
+            foreach my $param ( reverse sort { $a <=> $b } keys %params ) {
+                if ( $freeze > $param ) {
+                    $loglevel = $params{$param};
+                    last;
+                }
+            }
+            $_ =~ s/(?<=.{240}).{1,}$/.../;
+            $_ =~ s/&%%CSRF%%/$FW_CSRF/;
+            $_ =~ s/#&%/,/g;
+            $ret .= "<font color='$colors[$loglevel-1]'><b>" . $loglevel . "</b></font> - " . $_ . "<br>";
+
+        }
+
+        return "<html>" . $ret . "</html>";
+
+    }
+
     else {
         return $usage;
     }
@@ -1035,13 +1066,24 @@ sub freezemon_getDevice($$) {
             #Log3 $name, 5, "[Freezemon] $name  found a REF $fn " . Dumper( ${$arg} );
         }
     }
+    elsif ( ref($shortarg) eq "" ) {
+        Log3 $name, 5,
+          "[Freezemon] $name found something that's not a REF $fn " . ref($shortarg) . " " . Dumper($shortarg);
+
+        ( undef, $shortarg ) = split( /:|;/, $shortarg, 2 );
+    }
+
     else {
-        #Log3 $name, 3, "[Freezemon] $name found something that's not a HASH $fn ".ref($shortarg)." ".Dumper($shortarg);
+        Log3 $name, 5,
+            "[Freezemon] $name found something that's a REF but not a HASH $fn "
+          . ref($shortarg) . " "
+          . Dumper($shortarg);
+
         $shortarg = "N/A";
     }
     if ( !defined($shortarg) ) {
 
-        #Log3 $name, 5, "Freezemon: something went wrong $fn " . Dumper($arg);
+        Log3 $name, 5, "Freezemon: something went wrong $fn " . Dumper($arg);
         $shortarg = "N/A";
     }
     else {
@@ -1502,14 +1544,14 @@ sub freezemon_getLogPath($) {
 	<h3>freezemon</h3>
 	<div>
 	<ul>
-		FREEZEMON Überwacht - Ähnlich wie PERFMON mögliche Freezes, allerdings ist FREEZEMON ein echtes Modul und hat daher:<br>
+		FREEZEMON &uuml;berwacht - &auml;hnlich wie PERFMON m&ouml;gliche Freezes, allerdings ist FREEZEMON ein echtes Modul und hat daher:<br>
 		<ul>
-		<li>Readings - die geloggt werden können und damit viel einfacher ausgewertet werden können</li>
+		<li>Readings - die geloggt werden k&ouml;nnen und damit viel einfacher ausgewertet werden k&ouml;nnen</li>
 		<li>Attribute - mit denen das Verhalten von freezemon beeinflusst werden kann</li>
-		<li>zusÃ¤tzliche Funktionalität - die versucht das den Freeze verursachende Device zu identifizieren</li>
+		<li>zusÃ¤tzliche Funktionalit&auml;t - die versucht das den Freeze verursachende Device zu identifizieren</li>
 		</ul>
-		Ich würde empfehlen, PERFMON zu deaktivieren, wenn FREEZEMON aktiv ist, da beide auf die selbe Art Freezes erkennen und dann nur alles doppelt kommt.
-		<b>Bitte beachten!</b> FREEZEMON versucht nur intelligent zu erraten, welches Device einen freeze verursacht haben könnte (basierend auf den Timern die laufen sollten). Es gibt eine Menge anderer Faktoren (intern oder extern) die einen Freeze verursachen können. FREEZEMON ersetzt keine detaillierte Analyse. Das Modul versucht nur Hinweise zu geben, was optimiert werden könnte.<br><br>
+		Ich w&uuml;rde empfehlen, PERFMON zu deaktivieren, wenn FREEZEMON aktiv ist, da beide auf die selbe Art Freezes erkennen und dann nur alles doppelt kommt.
+		<b>Bitte beachten!</b> FREEZEMON versucht nur intelligent zu erraten, welches Device einen freeze verursacht haben k&ouml;nnte (basierend auf den Timern die laufen sollten). Es gibt eine Menge anderer Faktoren (intern oder extern) die einen Freeze verursachen k&ouml;nnen. FREEZEMON ersetzt keine detaillierte Analyse. Das Modul versucht nur Hinweise zu geben, was optimiert werden k&ouml;nnte.<br><br>
 		<br>
 		<br>
 	<a name="freezemonDefine"></a>
@@ -1524,12 +1566,12 @@ sub freezemon_getLogPath($) {
   <b>Set</b>
 	<ul>
 		<ul>
-		<li><a name="inactive">inactive</a>: deaktiviert das Device (identisch zum Attribut "disable", aber ohne die Notwendigkeit su "saven".</li>
+		<li><a name="inactive">inactive</a>: deaktiviert das Device (identisch zum Attribut "disable", aber ohne die Notwendigkeit zu "saven".</li>
 		<li><a name="active">active</a>: reaktiviert das Device nachdem es auf inactive gesetzt wurde</li>
 		<li><a name="clear">clear</a>: 
-					<ul><li>statistics_all: löscht die Statistik (d.h. löscht alle readings die für die statistics erzeugt wurden)</li>
-					<li>statistics_low: löscht Statistiken mit geringer Bedeutung (siehe Attribut fm_statistics_low)</li>
-					<li>all: Löscht alle readings (inklusive der Liste der letzten 20 Freezes).</li>
+					<ul><li>statistics_all: l&ouml;scht die Statistik (d.h. l&ouml;scht alle readings die f&uuml;r die statistics erzeugt wurden)</li>
+					<li>statistics_low: l&ouml;scht Statistiken mit geringer Bedeutung (siehe Attribut fm_statistics_low)</li>
+					<li>all: L&ouml;scht alle readings (inklusive der Liste der letzten 20 Freezes).</li>
 			</ul></li>
 	</ul>
 
@@ -1538,9 +1580,9 @@ sub freezemon_getLogPath($) {
   <b>Get</b>
   <ul>
 	<ul>
-		<li><a name="freeze">freeze</a>: gibt die letzten 20 freezes zurück (in Kompakter Darstellung, wie im state) - Dies dient einem schnellen Überblick, für detailliertere Auswertungen empfehle ich die Daten zu loggen.</li>
+		<li><a name="freeze">freeze</a>: gibt die letzten 20 freezes zur&uuml;ck (in Kompakter Darstellung, wie im state) - Dies dient einem schnellen &uuml;berblick, f&uuml;r detailliertere Auswertungen empfehle ich die Daten zu loggen.</li>
 		<li><a name="log">log</a>: gibt Zugriff auf die Logfiles die geschrieben werden, wenn fm_logFile aktiv ist</li>
-		<li><a name="statistic">statistic</a>: Stellt eine schöner formatierte Übersicht der top 20 Freeze Devices aus der Freeze Statistik zur Verfügung</li>
+		<li><a name="statistic">statistic</a>: Stellt eine sch&ouml;ner formatierte &uuml;bersicht der top 20 Freeze Devices aus der Freeze Statistik zur Verf&uuml;gung</li>
 	</ul>
   </ul>
   
@@ -1549,13 +1591,13 @@ sub freezemon_getLogPath($) {
   <ul>
 		<ul>
 			<li>freezeTime: Dauer des Freezes</li>
-			<li>freezeDevice: Liste von möglicherweise den Freeze auslösenden Funktionen(Devices)</li>
+			<li>freezeDevice: Liste von m&ouml;glicherweise den Freeze ausl&ouml;senden Funktionen(Devices)</li>
 			<li>fcDay: kumulierte Anzahl der Freezes pro Tag</li>
 			<li>ftDay: kumulierte Dauer der Freezes pro Tag </li>
-			<li>fcDayLast: speichert die kumulierte Anzahl der Freezes des vergangenen Tages (um tageweise plots zu erstellen). Aus technischen gründen werden Freezes, die sehr kurz nach Mitternacht auftreten möglicherweise noch zum Vortag gezählt.</li>
-			<li>ftDayLast: speichert die kumulierte Dauer der Freezes des vergangenen Tages (um tageweise plots zu erstellen). Aus technischen gründen werden Freezes, die sehr kurz nach Mitternacht auftreten möglicherweise noch zum Vortag gezählt.</li>
-			<li>fs_.*_c: freeze Statistik - Anzahl der freezes bei denen das Device möglicherweise beteiligt war</li>
-			<li>fs_.*_t: freeze Statistik - kumulierte Dauer der freezes bei denen das Device möglicherweise beteiligt war</li>
+			<li>fcDayLast: speichert die kumulierte Anzahl der Freezes des vergangenen Tages (um tageweise plots zu erstellen). Aus technischen gr&uuml;nden werden Freezes, die sehr kurz nach Mitternacht auftreten m&ouml;glicherweise noch zum Vortag gez&auml;hlt.</li>
+			<li>ftDayLast: speichert die kumulierte Dauer der Freezes des vergangenen Tages (um tageweise plots zu erstellen). Aus technischen gr&uuml;nden werden Freezes, die sehr kurz nach Mitternacht auftreten m&ouml;glicherweise noch zum Vortag gez&auml;hlt.</li>
+			<li>fs_.*_c: freeze Statistik - Anzahl der freezes bei denen das Device m&ouml;glicherweise beteiligt war</li>
+			<li>fs_.*_t: freeze Statistik - kumulierte Dauer der freezes bei denen das Device m&ouml;glicherweise beteiligt war</li>
 
 			<li>state: s:&lt;StartZeit&gt; e:&lt;EndeZeit&gt; f:&lt;Dauer&gt; d:&lt;Devices&gt;</li>
 		</ul>
@@ -1565,25 +1607,25 @@ sub freezemon_getLogPath($) {
   <b>Attribute</b>
   <ul>
 		<ul>
-			<li><a name="fm_CatchFnCalls">fm_CatchFnCalls</a>fm_CatchFnCalls: wenn aktiviert, werden zusätzlich FHEM-interne Funktionsaufrufe überwacht, in einigen Fällen kann das zusätzliche Hinweise auf den Freeze-Verursacher geben, 0 bedeuted disabled, Zahlen >= 1 geben den Loglevel für des logging lang laufender Funktionsaufrufe an.</li>
-			<li><a name="fm_CatchCmds">fm_CatchCmds</a>: wenn aktiviert, werden zusätzlich FHEM-Kommandos überwacht, in einigen Fällen kann das zusätzliche Hinweise auf den Freeze-Verursacher geben,  0 bedeuted disabled, Zahlen >= 1 geben den Loglevel für des logging lang laufender Kommandos an.</li>
-			<li><a name="fm_extDetail">fm_extDetail</a>: stellt in einigen Fällen zusätzliche Details bei erkannten Freezes zur Verfügung. In wenigen Fällen wurde berichtet, dass FHEM crasht, also vorsichtig verwenden.</li>
-			<li><a name="fm_freezeThreshold">fm_freezeThreshold</a>: Wert in Sekunden (Default: 1) - Nur Freezes länger als fm_freezeThreshold werden als Freeze betrachtet </li>
+			<li><a name="fm_CatchFnCalls">fm_CatchFnCalls</a>fm_CatchFnCalls: wenn aktiviert, werden zus&auml;tzlich FHEM-interne Funktionsaufrufe &uuml;berwacht, in einigen F&auml;llen kann das zus&auml;tzliche Hinweise auf den Freeze-Verursacher geben, 0 bedeuted disabled, Zahlen >= 1 geben den Loglevel f&uuml;r des logging lang laufender Funktionsaufrufe an.</li>
+			<li><a name="fm_CatchCmds">fm_CatchCmds</a>: wenn aktiviert, werden zus&auml;tzlich FHEM-Kommandos &uuml;berwacht, in einigen F&auml;llen kann das zus&auml;tzliche Hinweise auf den Freeze-Verursacher geben,  0 bedeuted disabled, Zahlen >= 1 geben den Loglevel f&uuml;r des logging lang laufender Kommandos an.</li>
+			<li><a name="fm_extDetail">fm_extDetail</a>: stellt in einigen F&auml;llen zus&auml;tzliche Details bei erkannten Freezes zur Verf&uuml;gung. In wenigen F&auml;llen wurde berichtet, dass FHEM crasht, also vorsichtig verwenden.</li>
+			<li><a name="fm_freezeThreshold">fm_freezeThreshold</a>: Wert in Sekunden (Default: 1) - Nur Freezes l&auml;nger als fm_freezeThreshold werden als Freeze betrachtet </li>
 			<li><a name="fm_forceApptime">fm_forceApptime</a>: Wenn FREEZEMON aktiv ist wird automatisch apptime gestartet (falls nicht aktiv)</li>
-			<li><a name="fm_ignoreDev">fm_ignoreDev</a>: Liste von Komma-getrennten Devices. Wenn einzelne möglicherweise einen Freeze verursachenden Device in dieser Liste sind, wird der Freeze ignoriert (nicht geloggt). Bitte das Attribut fm_ignoreMode beachten</li>
+			<li><a name="fm_ignoreDev">fm_ignoreDev</a>: Liste von Komma-getrennten Devices. Wenn einzelne m&ouml;glicherweise einen Freeze verursachenden Device in dieser Liste sind, wird der Freeze ignoriert (nicht geloggt). Bitte das Attribut fm_ignoreMode beachten</li>
 			<li><a name="fm_ignoreMode">fm_ignoreMode</a>: Kann die Werte off,single oder all annehmen. Wenn in fm_ignoreDev Devices angegeben sind wirken sich der ignoreMode wie folgt aus: <br>
-					all: Ein Freeze wird nur dann ignoriert, wenn alle möglicherweise den Freeze verursachenden Devices in der Ignore-Liste enthalten sind. Dies führt unter Umständen dazu, dass mehr Freezes geloggt werden als erwartet.<br>
-					single: Ein Freeze wird ignoriert, sobald ein möglicher Verursacher in der Ignorierliste enthalten ist. Dies führt möglicherweise dazu, dass Freezes übersehen werden.<br>
+					all: Ein Freeze wird nur dann ignoriert, wenn alle m&ouml;glicherweise den Freeze verursachenden Devices in der Ignore-Liste enthalten sind. Dies f&uuml;hrt unter Umst&auml;nden dazu, dass mehr Freezes geloggt werden als erwartet.<br>
+					single: Ein Freeze wird ignoriert, sobald ein m&ouml;glicher Verursacher in der Ignorierliste enthalten ist. Dies f&uuml;hrt m&ouml;glicherweise dazu, dass Freezes &uuml;bersehen werden.<br>
 					off: Alle Freezes werden geloggt.<br>
 					Sofern das Attribut nicht gesetzt ist, aber Ignore-Devices angegeben sind, wird im Modus "all" ignoriert.</li>
 			<li><a name="fm_log">fm_log</a>: dynamischer Loglevel, nimmt einen String der Form 10:1 5:2 1:3 entgegen, was bedeutet: Freezes > 10 Sekunden werden mit Loglevel 1 geloggt, >5 Sekunden mit Loglevel 2 usw...</li>
-			<li><a name="fm_logFile">fm_logFile</a>: ist ein gültiger Filename (wie z.B. ./log/freeze-%Y%m%d-%H%M%S.log). Wenn gesetzt, werdn Meldungen auf Loglevel 5 (auch wenn global Loglevel < 5 ist) vor einem Freeze in einem seperaten File geloggt.</li>
-			<li><a name="fm_logExtraSeconds">fm_logExtraSeconds</a>: dobsoletes Attribut, wird nicht mehr genutzt und sollte gelöscht werden</li>
-			<li><a name="fm_logKeep">fm_logKeep</a>: Eine Zahl, die angibt wieviele Logfiles behalten werden sollen. Wenn gesetzt, werden alle Logfiles ausser den letzten n Freezemon Logfiles regelmäßig gelöscht.</li>
-			<li><a name="fm_statistics">fm_statistics</a>: EXPERIMENTELL! Erstellt ein reading für jedes Device, das "probably" einen Freeze verursacht hat und zählt, wie oft es möglicherweise an einem Freeze beteiligt war.</li>
-			<li><a name="fm_whitelistSub">fm_whitelistSub</a>: Komma-getrennte Liste von Subroutinen wo du sicher bist, dass sie keinen Freeze verursachen. Whitelisted Subs erscheinen nicht in der "possibly caused by" Liste. Typischerweise listet man hier Subroutinen,  die regelmäßig in der "possibly caused by" Liste auftauchen, wo du aber wirklich sicher bist, dass sie nicht die Ursache sind. Anmerkung: Die Subroutine ist der initiale Teil (vor dem devicename in Klammern) in Freezemon Logmeldungen.</li>
-			<li><a name="fm_statistics">fm_statistics</a>: aktivieren/deaktivieren der Freeze Statistik. Erzeugt Readings für jedes Device, das möglicherweise an einem Freeze beteiligt war und Summiert die Häufigkeit und Dauer dieser Freezes</li>
-			<li><a name="fm_statistics_low">fm_statistics_low</a>: Parametrisierung des clear statistics_low set Kommandos, im Format c:t. Bei clear statistics_low werden alle Statistics-Readings gelöscht deren Count kleiner oder gleich "c" ist UND deren kumulierte Dauer kleiner oder gleich "t" ist</li>
+			<li><a name="fm_logFile">fm_logFile</a>: ist ein g&uuml;ltiger Filename (wie z.B. ./log/freeze-%Y%m%d-%H%M%S.log). Wenn gesetzt, werdn Meldungen auf Loglevel 5 (auch wenn global Loglevel < 5 ist) vor einem Freeze in einem seperaten File geloggt.</li>
+			<li><a name="fm_logExtraSeconds">fm_logExtraSeconds</a>: dobsoletes Attribut, wird nicht mehr genutzt und sollte gel&ouml;scht werden</li>
+			<li><a name="fm_logKeep">fm_logKeep</a>: Eine Zahl, die angibt wieviele Logfiles behalten werden sollen. Wenn gesetzt, werden alle Logfiles ausser den letzten n Freezemon Logfiles regelm&auml;ßig gel&ouml;scht.</li>
+			<li><a name="fm_statistics">fm_statistics</a>: EXPERIMENTELL! Erstellt ein reading f&uuml;r jedes Device, das "probably" einen Freeze verursacht hat und z&auml;hlt, wie oft es m&ouml;glicherweise an einem Freeze beteiligt war.</li>
+			<li><a name="fm_whitelistSub">fm_whitelistSub</a>: Komma-getrennte Liste von Subroutinen wo du sicher bist, dass sie keinen Freeze verursachen. Whitelisted Subs erscheinen nicht in der "possibly caused by" Liste. Typischerweise listet man hier Subroutinen,  die regelm&auml;ßig in der "possibly caused by" Liste auftauchen, wo du aber wirklich sicher bist, dass sie nicht die Ursache sind. Anmerkung: Die Subroutine ist der initiale Teil (vor dem devicename in Klammern) in Freezemon Logmeldungen.</li>
+			<li><a name="fm_statistics">fm_statistics</a>: aktivieren/deaktivieren der Freeze Statistik. Erzeugt Readings f&uuml;r jedes Device, das m&ouml;glicherweise an einem Freeze beteiligt war und Summiert die H&auml;ufigkeit und Dauer dieser Freezes</li>
+			<li><a name="fm_statistics_low">fm_statistics_low</a>: Parametrisierung des clear statistics_low set Kommandos, im Format c:t. Bei clear statistics_low werden alle Statistics-Readings gel&ouml;scht deren Count kleiner oder gleich "c" ist UND deren kumulierte Dauer kleiner oder gleich "t" ist</li>
 			<li><a name="disable">disable</a>: aktivieren/deaktivieren der Freeze-Erkennung</li>
 		</ul>
   </ul>
