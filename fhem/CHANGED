@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  73_AutoShuttersControl: fix little winrec bug then state opened
+                                    (max winrec sensors)
  - feature: DarkSkyAPI: add demo support for FHEM demo konfiguration
  - bugfix:  88_HMCCU: set/get config bug fixed
  - feature: 49_SSCam: support of genericStrmHtmlTag attr in streaming devices
