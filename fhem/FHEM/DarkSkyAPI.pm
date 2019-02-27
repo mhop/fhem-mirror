@@ -168,7 +168,7 @@ sub _RetrieveDataFromDarkSky($) {
           . $self->{lang}
           . '&units=auto';
 
-        if ( $self->{key} eq 'demo' )
+        if ( lc($self->{key}) eq 'demo' )
         { _RetrieveDataFinished($paramRef,undef,DEMODATA); }
         else { main::HttpUtils_NonblockingGet($paramRef); }
     }
