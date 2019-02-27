@@ -80,9 +80,12 @@
 #						  Raumtemperatur (heating.circuits.?.sensors.temperature.room.value) ergänzt
 #						set-Befehle für HKs werden nur noch angezeigt, wenn der HK auch aktiv ist
 #						Wiki aktualisiert
+# 2019-02-27		stacktrace-Fehler (hoffentlich) behoben
+#						Betriebsarten "heating" und "active" ergänz
 #          
 #
-#   ToDo:         "set"s für Schedules zum Steuern der Heizung implementieren
+#   ToDo:         timeout konfigurierbar machen
+#						"set"s für Schedules zum Steuern der Heizung implementieren
 #                 Dokumentation (insbesondere Wiki und auch auf Deutsch)
 #                 Nicht bei jedem Lesen neu einloggen (wenn möglich)
 #                 Fehlerbehandlung verbessern
@@ -691,6 +694,7 @@ sub vitoconnect_Set($@) {
 			hash       => $hash,
 			header     => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
 			data       => '{}',
+			timeout    => 10,
 			method     => "POST",
 			sslargs    => {SSL_verify_mode => 0},
    	};
@@ -945,7 +949,7 @@ sub vitoconnect_Set($@) {
 				"HK1-Urlaub_Start ".   #Start 2019-02-02T23:59:59.000Z und Ende 2019-02-16T00:00:00.000Z
 				"HK1-Urlaub_Ende ".
 				"HK1-Urlaub_unschedule:noArg ".
-				"HK1-Betriebsart:standby,dhw,dhwAndHeating,forcedReduced,forcedNormal " .
+				"HK1-Betriebsart:active,standby,heating,dhw,dhwAndHeating,forcedReduced,forcedNormal " .
 				"HK1-Solltemperatur_comfort_aktiv:activate,deactivate " .
 				"HK1-Solltemperatur_comfort:slider,4,1,37 " .
 				"HK1-Solltemperatur_eco_aktiv:activate,deactivate " .
@@ -959,7 +963,7 @@ sub vitoconnect_Set($@) {
 				"HK2-Urlaub_Start ".   #Start 2019-02-02T23:59:59.000Z und Ende 2019-02-16T00:00:00.000Z
 				"HK2-Urlaub_Ende ".
 				"HK2-Urlaub_unschedule:noArg ".
-				"HK2-Betriebsart:standby,dhw,dhwAndHeating,forcedReduced,forcedNormal " .
+				"HK2-Betriebsart:active,standby,heating,dhw,dhwAndHeating,forcedReduced,forcedNormal " .
 				"HK2-Solltemperatur_comfort_aktiv:activate,deactivate " .
 				"HK2-Solltemperatur_comfort:slider,4,1,37 " .
 				"HK2-Solltemperatur_eco_aktiv:activate,deactivate " .
@@ -974,7 +978,7 @@ sub vitoconnect_Set($@) {
 				"HK3-Urlaub_Start ".   #Start 2019-02-02T23:59:59.000Z und Ende 2019-02-16T00:00:00.000Z
 				"HK3-Urlaub_Ende ".
 				"HK3-Urlaub_unschedule:noArg ".
-				"HK3-Betriebsart:standby,dhw,dhwAndHeating,forcedReduced,forcedNormal " .
+				"HK3-Betriebsart:active,standby,heating,dhw,dhwAndHeating,forcedReduced,forcedNormal " .
 				"HK3-Solltemperatur_comfort_aktiv:activate,deactivate " .
 				"HK3-Solltemperatur_comfort:slider,4,1,37 " .
 				"HK3-Solltemperatur_eco_aktiv:activate,deactivate " .
@@ -1199,6 +1203,7 @@ sub vitoconnect_getResourceCallback($) {
 	my $name = $hash->{NAME};
 	my $file_handle2 = undef;
 
+	readingsBeginUpdate($hash);		
 	if ($err eq "") {	
 		Log3 $name, 4, "$name - getResourceCallback went ok";
    	Log3 $name, 5, "Received response: $response_body\n";
@@ -1220,7 +1225,6 @@ sub vitoconnect_getResourceCallback($) {
 				
 		###########################################
 					
-		readingsBeginUpdate($hash);		
 		for my $item( @{$items->{entities}} ) {
 			my $FieldName = $item->{class}[0];
 			Log3 $name, 5, "FieldName $FieldName";
@@ -1270,7 +1274,6 @@ sub vitoconnect_getResourceCallback($) {
 					Log3 $name, 5, "$FieldName".".$Key: $Value ($Type)";
 				}	
 			}
-			
 			###########################################
 			if (AttrVal($name,'vitoconnect_actions_active',undef) eq "1" )  {
 				my @actions =  @{$item->{actions}};
@@ -1289,7 +1292,7 @@ sub vitoconnect_getResourceCallback($) {
 		
 		$hash->{counter} = $hash->{counter} + 1;
 		readingsBulkUpdate($hash, "state", "ok");             
-   }   else {
+   } else {
 		readingsBulkUpdate($hash, "state", "An error occured: $err");
       Log3 $name, 1, "$name - An error occured: $err";
    }
