@@ -204,7 +204,7 @@ sub HProtocolGateway_ParseMessage($$) {
       while ($sum > 255) {
         $sum = $sum - 255;
       }
-
+      $checksum = int($checksum);
       return if($sum ne $checksum);
 
     } else {
