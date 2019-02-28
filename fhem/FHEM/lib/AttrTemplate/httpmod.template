@@ -8,6 +8,12 @@
 # perl_code returns a value for the parameter, or undef.
 # If undef, the user has to specify them (the comment is shown to the user)
 
+###########################################
+name:0_00_General_Info
+filter:TYPE=HTTPMOD
+desc: Forum <a href="https://forum.fhem.de/index.php/topic,97694.0.html">link</a> for suggestions or bug reports on httpmod-template
+
+
 #################################
 #Clever Tanken
 #
@@ -77,28 +83,34 @@ attr DEVICE stateFormat {sprintf("%.0f",ReadingsVal("DEVICE","value",0))}
 attr DEVICE timeout 5
 attr DEVICE model A_02d_pegelonline
 
-#Austrian weather, Forum: https://forum.fhem.de/index.php/topic,94110.msg868080.html#msg868080
+#Austrian weather, Forum: https://forum.fhem.de/index.php/topic,94110.msg868080.html#msg868080; enhanced by JoeALLb: https://forum.fhem.de/index.php/topic,97694.msg912164.html#msg912164
 name:A_02m_ORF_weather
 filter:TYPE=HTTPMOD
-desc: Get austrian weather.<br>Define a HTTPMOD device like <br>defmod weatherORF HTTPMOD https://wetter.orf.at/steiermark/grazuniversitaet/ 1800 <br>Change city to your needs <br><a href="https://forum.fhem.de/index.php/topic,94110.msg868080.html#msg868080">Source: Forum</a> with some enhancements by JoeALLb
-par:STATIONNAME;Name of the respective weather station as written in the last part of the URL;{ InternalVal("DEVICE","path","") =~ m,[/][^/]+[/]([^/]+)[/], ? $1 : undef }
-attr DEVICE userattr get01Name reading01-1Name reading01-2Name reading01-3Name reading01-4Name reading01-5Name reading01Regex reading02-1Name reading02-2Name reading02-3Name reading02-4Name reading02-5Name reading02-6Name reading02-7Name reading02-8Name reading02Regex
+desc: Get austrian weather.<br>Define a HTTPMOD device like <br>defmod weatherORF HTTPMOD none 1800 <br>You will be asked to provide a MAINURL like https://wetter.orf.at/steiermark/ and a stationname like grazuniversitaet<br><a href="https://forum.fhem.de/index.php/topic,97694.msg912164.html#msg912164">Source: Enhanced version in FHEM Forum</a>
+par:MAINURL;First part of the URL. Example: https://wetter.orf.at/steiermark/;{ AttrVal("DEVICE","get02URL","") =~ m,(https://wetter.orf.at/[^/]+[/]).*, ? $1 : undef }
+par:STATIONNAME;Name of the respective weather station as written in the last part of the URL. Examples: grazuniversitaet or innerestadt;{ AttrVal("DEVICE","get01URL","") =~ m,https://wetter.orf.at/[^/]+[/]([^/]+)[/], ? $1 : undef }
+attr DEVICE userattr get01Name get01Poll:0,1 get01URL get02-1Name get02-2Name get02-3Name get02-4Name get02-5Name get02-6Name get02-7Name get02-8Name get02Name get02Poll:0,1 get02Regex get02URL reading01-1Name reading01-2Name reading01-3Name reading01-4Name reading01-5Name reading01Regex
 attr DEVICE enableControlSet 1
-attr DEVICE get01Name STATIONNAME
+attr DEVICE get01Name Wetterdaten
+attr DEVICE get01Poll 1
+attr DEVICE get01URL MAINURLSTATIONNAME/
+attr DEVICE get02-1Name sunRise
+attr DEVICE get02-2Name sunSet
+attr DEVICE get02-3Name moonPhase
+attr DEVICE get02-4Name moonRise
+attr DEVICE get02-5Name moonSet
+attr DEVICE get02-6Name dayLength
+attr DEVICE get02-7Name dawn
+attr DEVICE get02-8Name dusk
+#attr DEVICE get02-9Name weather
+attr DEVICE get02Name Astro-Daten
+attr DEVICE get02Poll 1
+attr DEVICE get02Regex Sonnenaufgang um <\/span>(.*)<s[\w\W]*Sonnenuntergang um <\/span>(.*)<s\p{Any}*?Mondphase:\s?([^\.]+)[\w\W]*Mondaufgang um\s?<\/span>(\d\d:\d\d)<s[\w\W]*Monduntergang um <\/span>(\d\d:\d\d)<s[\w\W]*Tagesl[^>]+>(\d\d:\d\d)&[\w\W]*Morgen<\/span>: <\/span>(\d\d:\d\d)&[\w\W]*Abend:<\/span><\/span>(\d\d:\d\d)
+attr DEVICE get02URL MAINURL
 attr DEVICE reading01Regex (?s)Temperatur.*?.*?>.*?(?<temperature>[\d,]+)&thinsp.*?Taupunkt.*?.*?>.*?(?<taupunkt>[\d,]+)&thinsp.*?Wind.*?>\n\s*(?<wind>[^<]+)\s<abbr.*?Windspitzen.*?>\n\s*(?<windspitzen>[^<]+)\s<abbr.*?Luftdruck.*?>\n\s*(?<luftdruck>[^<]+)\s<abbr.*?Luftfeuchtigkeit.*?>\n\s*(?<humidity>[^<]+)\s<abbr.*?Sonnenschein.*?>\n\s*(?<sonne>[^<]+)\s<abbr.*?Niederschlag.*?>\n\s*(?<rain>[^<\n]+).*?</p.*?(?<messwerte>Messwerte[^<\n]+)
-attr DEVICE reading02-1Name sunRise
-attr DEVICE reading02-2Name sunSet
-attr DEVICE reading02-3Name moonPhase
-attr DEVICE reading02-4Name moonRise
-attr DEVICE reading02-5Name moonSet
-attr DEVICE reading02-6Name dayLength
-attr DEVICE reading02-7Name dawn
-attr DEVICE reading02-8Name dusk
-attr DEVICE reading02Regex Sonnenaufgang um <\/span>(.*)<s[\w\W]*Sonnenuntergang um <\/span>(.*)<s[\w\W]*Mondphase: (.*)\.[\w\W]*Mondaufgang um <\/span>(.*)<s[\w\W]*Monduntergang um <\/span>(.*)<s[\w\W]*Tagesl&auml;;nge: <\/span>(.*)&[\w\W]*Morgen<\/span>: <\/span>(.*)&[\w\W]*Abend:<\/span><\/span>(.*)&
 attr DEVICE room Wetter
-attr DEVICE stateFormat weather bei temperature°C
+attr DEVICE stateFormat W: wind, H: humidity%rH, T: temperature°C
 attr DEVICE model A_02m_ORF_weather
-
 
 #Geschwindigkeitsüberwachung, Forum: https://forum.fhem.de/index.php/topic,90014.msg824805.html#msg824805
 name:A_03a_blitzer
@@ -240,7 +252,7 @@ attr DEVICE model B_01b_epson_printer_cartridge_status
 # Printer cartridge states
 name:B_01c_brother_printer_cartridge_status
 filter:TYPE=HTTPMOD
-desc: Get cartridge states of your Brother printer.<br>Define a HTTPMOD device like <br>defmod DEVICE HTTPMOD http://192.168.178.6/general/information.html 3600<br>Change IP to your needs <br><a href="https://forum.fhem.de/index.php/topic,97483.msg908461.html#msg908461">Source: Forum</a>
+desc: Get cartridge states of your Brother printer.<br>Define a HTTPMOD device like <br>defmod DEVICE HTTPMOD http://192.168.178.6/general/information.html 3600<br>Change IP to your needs <br><a href="https://forum.fhem.de/index.php/topic,97483.msg908461.html#msg908461">Source: Forum</a><br>Tested with MFC-9142CDN, should work with DCP-9015 CDW DCP-9020 HL-3140 CW HL-3150 CDN HL-3170 MFC-9130 MFC-9140 MFC-9330 MFC-9340
 attr DEVICE userattr reading01Name reading01Regex reading02Name reading02Regex reading03Name reading03Regex reading04Name reading04Regex
 attr DEVICE httpVersion 1.1
 attr DEVICE reading01Name Yellow

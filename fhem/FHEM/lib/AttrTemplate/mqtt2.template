@@ -8,6 +8,11 @@
 # perl_code returns a value for the parameter, or undef.
 # If undef, the user has to specify them (the comment is shown to the user)
 
+###########################################
+name:0_00_General_Info
+filter:TYPE=MQTT2_DEVICE
+desc: <a href="https://forum.fhem.de/index.php/topic,94495.0.html">Forum Thread</a> for <br>- suggesting new templates <br>- bug reports on mqtt2.template
+
 ###############
 #MQTT2_CLIENT_Bridge
 #
