@@ -17,6 +17,7 @@ my $cryptFunc = ($@)?0:1;
 # ========================import constants=====================================
 
 my $culHmModel            =\%HMConfig::culHmModel;
+my $culHmModel2Id         =\%HMConfig::culHmModel2Id;
 
 my $culHmRegDefShLg       =\%HMConfig::culHmRegDefShLg;
 my $culHmRegDefine        =\%HMConfig::culHmRegDefine;
@@ -149,11 +150,17 @@ my $IOpoll     = 0.2;# poll speed to scan IO device out of order
 my $maxPendCmds = 10;  #number of parallel requests
 my @evtEt = ();    #readings for entities. Format hash:trigger:reading:value
 my $evtDly = 0;    # ugly switch to delay set readings if in parser - actually not our job, but fhem.pl refuses
-                 # need to take care that ACK is first
+                   # need to take care that ACK is first
+my $mIdReverse = 0; # CUL_HM model ID reverse search is not supported by default. Check and update at startup
 #+++++++++++++++++ startup, init, definition+++++++++++++++++++++++++++++++++++
 sub CUL_HM_Initialize($) {
   my ($hash) = @_;
 
+  my @modellist;
+  foreach my $model (keys %{$culHmModel}){
+    push @modellist,$culHmModel->{$model}{name};
+  }
+  
   $hash->{Match}     = "^A....................";
   $hash->{DefFn}     = "CUL_HM_Define";
   $hash->{UndefFn}   = "CUL_HM_Undef";
@@ -168,17 +175,20 @@ sub CUL_HM_Initialize($) {
                        ."IODev IOList IOgrp "        
                        ."rssiLog:1,0 "         # enable writing RSSI to Readings (device only)
                        ."actCycle "            # also for action detector    
-                       ."hmKey hmKey2 hmKey3 "                       
+                       ."hmKey hmKey2 hmKey3 "  
                        ."readingOnDead:multiple,noChange,state,periodValues,periodString,channels "
+                       ."subType:"   .join(",",CUL_HM_noDup(map { $culHmModel->{$_}{st} } keys %{$culHmModel}))." "
+                       .".mId "
                        ;
   $hash->{Attr}{devPhy} =    # -- physical device only attributes
                         "serialNr firmware .stc .devInfo "
                        ."actStatus "
                        ."autoReadReg:0_off,1_restart,2_pon-restart,3_onChange,4_reqStatus,5_readMissing,8_stateOnly "
                        ."burstAccess:0_off,1_auto "
-                       ."msgRepeat "
+                       ."msgRepeat "                      
                        ."hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger "
                        ."aesKey:5,4,3,2,1,0  "
+                       ."modelForce:".join(",", sort @modellist)." "
                        ;
   $hash->{Attr}{chn} =  "repPeers "            # -- channel only attributes
                        ."peerIDs "
@@ -193,6 +203,7 @@ sub CUL_HM_Initialize($) {
                        ."readOnly:0,1 "                       
                        ."actAutoTry:0_off,1_on "
                        ."aesCommReq:1,0 "      # IO will request AES if 
+                       ."model "
                        ;
   $hash->{AttrList}  =  $hash->{Attr}{glb}
                        .$hash->{Attr}{dev}
@@ -202,26 +213,19 @@ sub CUL_HM_Initialize($) {
                        ;
                        
   CUL_HM_initRegHash();
-  my @modellist;
-  foreach my $model (keys %{$culHmModel}){
-    push @modellist,$culHmModel->{$model}{name};
-  }
-  $hash->{AttrList}  .= " model:"  .join(",", sort @modellist);
-  $hash->{AttrList}  .= " subType:".join(",",
-               CUL_HM_noDup(map { $culHmModel->{$_}{st} } keys %{$culHmModel}));
 
   $hash->{prot}{rspPend} = 0;#count Pending responses
   my @statQArr     = ();
   my @statQWuArr   = ();
   my @confQArr     = ();
   my @confQWuArr   = ();
-  my @confCheckArr = ();
+  my %confCheckH   ;
   my @confUpdt     = ();
   $hash->{helper}{qReqStat}     = \@statQArr;
   $hash->{helper}{qReqStatWu}   = \@statQWuArr;
   $hash->{helper}{qReqConf}     = \@confQArr;
   $hash->{helper}{qReqConfWu}   = \@confQWuArr;
-  $hash->{helper}{confCheckArr} = \@confCheckArr;
+  $hash->{helper}{confCheckH}   = \%confCheckH;
   $hash->{helper}{confUpdt}     = \@confUpdt;
   $hash->{helper}{cfgCmpl}{init}= 1;# mark entities with complete config
   #statistics
@@ -235,7 +239,8 @@ sub CUL_HM_Initialize($) {
   $hash->{helper}{hmManualOper} = 0;# default automode
 }
 
-sub CUL_HM_updateConfig($){
+sub CUL_HM_updateConfig($){##########################
+  my $type = shift;
   # this routine is called 5 sec after the last define of a restart
   # this gives FHEM sufficient time to fill in attributes
   # it will also be called after each manual definition
@@ -245,7 +250,23 @@ sub CUL_HM_updateConfig($){
     InternalTimer(1,"CUL_HM_updateConfig", "updateConfig", 0);#start asap once FHEM is operational
     return;
   }
-
+  if ($type eq "startUp"){# only once after startup
+    $mIdReverse = 1 if (scalar keys %{$culHmModel2Id});
+    foreach(devspec2array("TYPE=CUL_HM:FILTER=DEF=......")){   # devices only   
+     if ($attr{$_}{subType} && $attr{$_}{subType} eq "virtual"){
+        $attr{$_}{model} = "VIRTUAL" if (!$attr{$_}{model} || $attr{$_}{model} =~ m/virtual_/);
+      }
+      if ($attr{$_}{".mId"} && $culHmModel->{$attr{$_}{".mId"}}){ #if mId is  available set model to its original value -at least temporarliy
+        $attr{$_}{model} = $culHmModel->{$attr{$_}{".mId"}}{name};
+      }
+      else{#if mId is not available use attr model and assign it. 
+        if ($modules{CUL_HM}{AttrList} =~ m /\.mId/){# do not handle .mId if not restarted
+          $attr{$_}{".mId"} = CUL_HM_getmIdFromModel($attr{$_}{model});
+        }
+      }
+      CUL_HM_updtDeviceModel($_,AttrVal($_,"modelForce",AttrVal($_,"model",""))) if($attr{$_}{".mId"});
+    }
+  }
   foreach my $name (@{$modules{CUL_HM}{helper}{updtCfgLst}}){
     my $hash = $defs{$name};
     next if (!$hash->{DEF}); # likely renamed
@@ -319,6 +340,7 @@ sub CUL_HM_updateConfig($){
       $hash->{helper}{role}{vrt} = 1;
       if($hash->{helper}{role}{dev}){
         CUL_HM_UpdtCentral($name); # first update, then keys
+
         foreach my $io (split ",",AttrVal($name,"IOList","")) {
           next if(!$defs{$io});
           if($defs{$io}->{TYPE} eq "HMLAN" && eval "defined(&HMLAN_writeAesKey)"){
@@ -442,7 +464,7 @@ sub CUL_HM_updateConfig($){
         elsif($hash->{helper}{fkt} && $hash->{helper}{fkt} eq "vdCtrl")    {$webCmd="valvePos";}
         elsif($hash->{helper}{fkt} && $hash->{helper}{fkt} eq "virtThSens"){$webCmd="virtTemp:virtHum";}
         elsif(!$hash->{helper}{role}{dev})                                 {$webCmd="press short:press long";}
-        elsif($md =~ m/^virtual_/)                                         {$webCmd="virtual";}
+        elsif($md =~ m/^(virtual_|VIRTUAL)/)                               {$webCmd="virtual";}
         elsif($md eq "CCU-FHEM")                                           {$webCmd="virtual:update";}
 
       }
@@ -507,6 +529,10 @@ sub CUL_HM_updateConfig($){
         delete $attr{$name}{$_} if (defined $attr{$name}{$_});
       }
     }
+    else{# force new calculation for of rxType and mId
+      delete $hash->{helper}{rxType};
+      CUL_HM_getRxType($hash); 
+    }
     if (!$hash->{helper}{role}{chn}){
       my @l = split(" ",$modules{CUL_HM}{Attr}{chn});
       map {$_ =~ s/\:.*//} @l; 
@@ -514,12 +540,11 @@ sub CUL_HM_updateConfig($){
         delete $attr{$name}{$_} if (defined $attr{$name}{$_});
       }
     }
+    
     CUL_HM_complConfig($name);
   }
   delete $modules{CUL_HM}{helper}{updtCfgLst};
   
-  # my $ios = ":".join(",",devspec2array("TYPE=(TSCUL|CUL|HMLAN|HMUARTLGW)"));
-  # $modules{CUL_HM}{AttrList}  =~ s/IOList.*? /IOList$ios /;
 }
 sub CUL_HM_Define($$) {##############################
   my ($hash, $def) = @_;
@@ -537,18 +562,19 @@ sub CUL_HM_Define($$) {##############################
     my $devHash = $modules{CUL_HM}{defptr}{$devHmId};
     return "please define a device with hmId:".$devHmId." first" if(!$devHash);
 
-    my $devName = $devHash->{NAME};
-    $hash->{device} = $devName;          #readable ref to device name
-    $hash->{chanNo} = $chn;              #readable ref to Channel
-    $devHash->{"channel_$chn"} = $name;  #reference in device as well
-    $attr{$name}{model} = AttrVal($devName, "model", undef);
-    $hash->{helper}{role}{chn}=1;
+    my $devName                = $devHash->{NAME};
+    $hash->{device}            = $devName;  #readable ref to device name
+    $hash->{chanNo}            = $chn;      #readable ref to Channel
+    $devHash->{"channel_$chn"} = $name;     #reference in device as well
+    $attr{$name}{model}        = AttrVal($devName, "model", undef);
+    $hash->{helper}{role}{chn} = 1;
     if($chn eq "01"){
-      $attr{$name}{peerIDs} = AttrVal($devName, "peerIDs", "");
+      $attr{$name}{peerIDs}            = AttrVal($devName, "peerIDs", "");
       $hash->{READINGS}{peerList}{VAL} = ReadingsVal($devName,"peerList","");
-      $hash->{peerList} = $devHash->{peerList} if($devHash->{peerList});
+      $hash->{peerList}                = $devHash->{peerList} if($devHash->{peerList});
 
       delete $devHash->{helper}{role}{chn};#device no longer
+      delete $devHash->{chanNo};           #readable ref to Channel
       delete $devHash->{peerList};
       delete $devHash->{READINGS}{peerList};
       delete $attr{$devName}{peerIDs};
@@ -562,8 +588,9 @@ sub CUL_HM_Define($$) {##############################
     $hash->{helper}{mRssi}{mNo}  = "";
     $hash->{helper}{HM_CMDNR}    = int(rand(250));# should be different from previous
     CUL_HM_prtInit ($hash);
-    $hash->{helper}{io}{vccu} = "";
-    $hash->{helper}{io}{prefIO} = undef;
+    $hash->{helper}{io}{vccu}    = "";
+    $hash->{helper}{io}{prefIO}  = undef;
+    $hash->{chanNo}              = "01" if (!defined $defs{$HMid."01"}); #readable ref to Channel
 
     if (   $HMid ne "000000"
         && eval "defined(&TSCUL_RestoreHMDev)") {
@@ -624,6 +651,9 @@ sub CUL_HM_Rename($$$) {#############################
       my $chnHash = $defs{$hash->{$_}};
       $chnHash->{device} = $name;
     }
+    if (!defined $defs{$HMid."01"}){$hash->{chanNo} = "01";}
+    else                           {delete $hash->{chanNo};}
+    
     CUL_HM_UpdtCentral($name) if (AttrVal($name, "model", "") eq "CCU-FHEM");
   }
   if ($hash->{helper}{role}{chn}){
@@ -657,7 +687,7 @@ sub CUL_HM_Rename($$$) {#############################
 }
 sub CUL_HM_Attr(@) {#################################
   my ($cmd,$name, $attrName,$attrVal) = @_;
-  my $chk = ($cmd eq "set")?CUL_HM_AttrCheck($name, $attrName):"";
+  my $chk = ($cmd eq "set") ? CUL_HM_AttrCheck($name, $attrName) : "";
   my $hash = CUL_HM_name2Hash($name);
   return $chk if ($chk);
   
@@ -776,6 +806,7 @@ sub CUL_HM_Attr(@) {#################################
     return;
   }
   elsif($attrName eq "model" && $hash->{helper}{role}{dev}){
+    return "$attrName must not be changed by User. \nUse modelForce instead" if ($init_done);
     delete $hash->{helper}{rxType}; # needs new calculation
     delete $hash->{helper}{mId};
     if ($attrVal eq "CCU-FHEM"){
@@ -788,7 +819,26 @@ sub CUL_HM_Attr(@) {#################################
     }
     $attr{$name}{$attrName} = $attrVal if ($cmd eq "set");
   }
+  elsif($attrName eq "modelForce"){
+    if ($init_done){# while init allow anything. Correct with CUL_HM_updateConfig after init_done
+      if ($cmd eq "set"){
+        return "invalid model name:$attrVal. Please check options" if (!CUL_HM_getmIdFromModel($attrVal));
+        if (!defined $attr{$name}{".mId"} && defined $attr{$name}{model}){ # set .mId in case it is missing
+          $attr{$name}{".mId"} = CUL_HM_getmIdFromModel($attr{$name}{model});
+        }
+        CUL_HM_updtDeviceModel($name,$attrVal);
+      }
+      else{
+        $attr{$name}{model} = $culHmModel->{$attr{$name}{".mId"}}{name} if ($attr{$name}{".mId"});# return to old model name
+        CUL_HM_updtDeviceModel($name,$attr{$name}{model});
+      }
+    }
+  }
+  elsif($attrName eq ".mId"){
+    return "$attrName must not be changed by User. \nUse modelForce instead" if ($init_done);
+  }
   elsif($attrName eq "subType"){
+    return "$attrName must not be changed by User. \nUse modelForce instead" if ($init_done);
     $updtReq = 1;
   }
   elsif($attrName eq "aesCommReq" ){
@@ -964,15 +1014,15 @@ sub CUL_HM_AttrCheck(@) {############################
   return undef if (!$init_done); # we cannot determine if attributes are missing
   if ($defs{$name}{helper}{role}{vrt}){
     return " $attrName illegal for virtual devices"
-      if ($modules{CUL_HM}{Attr}{devPhy} =~ m/\b$attrName\b/);
+      if ($modules{CUL_HM}{Attr}{devPhy} =~ m/$attrName\b/);
   }
   if (!$defs{$name}{helper}{role}{chn}){
     return " $attrName only valid for channels"
-      if ($modules{CUL_HM}{Attr}{chn} =~ m/\b$attrName\b/);
+      if ($modules{CUL_HM}{Attr}{chn} =~ m/$attrName\b/);
   }
   if (!$defs{$name}{helper}{role}{dev}){
     return " $attrName only valid for devices"
-      if (($modules{CUL_HM}{Attr}{dev}.$modules{CUL_HM}{Attr}{devPhy}) =~ m/\b$attrName\b/);
+      if (($modules{CUL_HM}{Attr}{dev}.$modules{CUL_HM}{Attr}{devPhy}) =~ m/$attrName\b/);
   }
   return undef;
 }
@@ -1151,7 +1201,7 @@ sub CUL_HM_Parse($$) {#########################################################
     my $sname = "HM_$mh{src}";
     Log3 undef, 2, "CUL_HM Unknown device $sname is now defined";
     DoTrigger("global","UNDEFINED $sname CUL_HM $mh{src}");
-    $mh{devH}  = CUL_HM_id2Hash($mh{src}); #sourcehash - changed to channel entity
+    $mh{devH} = CUL_HM_id2Hash($mh{src}); #sourcehash - changed to channel entity
     $mh{devH}->{IODev} = $iohash;
     $mh{devH}->{helper}{io}{nextSend} = $mh{rectm}+0.09 if(!defined($mh{devH}->{helper}{io}{nextSend}));# io couldn't set
   }
@@ -2568,7 +2618,7 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$mh{cHash},1,"flags:"  .(($flag)?"none"     :$flag  )];
     }
   }
-  elsif($mh{st} eq "virtual" && $mh{md} =~ m/^virtual_/){ #####################
+  elsif($mh{st} eq "virtual" && $mh{md} =~ m/^(virtual_|VIRTUAL)/){ ###########
     # possibly add code to count all acks that are paired.
     if($mh{mTp} eq "02") {# this must be a reflection from what we sent, ignore
       push @evtEt,[$mh{shash},1,""];
@@ -2870,7 +2920,7 @@ sub CUL_HM_Parse($$) {#########################################################
   #------------ parse if FHEM or virtual actor is destination   ---------------
 
   if(   AttrVal($mh{dstN}, "subType", "none") eq "virtual"
-     && AttrVal($mh{dstN}, "model", "none") =~ m/^virtual_/){# see if need for answer
+     && AttrVal($mh{dstN}, "model", "none") =~ m/^(virtual_|VIRTUAL)/){# see if need for answer
     my $sendAck = 0;
     if($mh{mTp} =~ m/^4/ && @mI > 1) { #Push Button event
       my ($recChn,$trigNo) = (hex($mI[0]),hex($mI[1]));# button number/event count
@@ -3274,7 +3324,7 @@ sub CUL_HM_parseCommon(@){#####################################################
     elsif($mhp->{mStp} eq "01"){ #storePeerList=================================
       my $mNoInt = hex($mhp->{mNo}); 
       if ($pendType eq "PeerList"  && 
-          ($rspWait->{mNo} == $mNoInt || $rspWait->{mNo} == $mNoInt-1)){
+          ($rspWait->{mNo} == $mNoInt || $rspWait->{mNo} == ($mNoInt+255)%256)){ #no +256 - 1 module 255
         $rspWait->{mNo} = $mNoInt;
 
         my $chn = $devHlpr->{prt}{rspWait}{forChn};
@@ -3330,7 +3380,7 @@ sub CUL_HM_parseCommon(@){#####################################################
     elsif($mhp->{mStp} eq "02" ||$mhp->{mStp} eq "03"){ #ParamResp==============
       my $mNoInt = hex($mhp->{mNo}); 
       if ( $pendType eq "RegisterRead" && 
-          ($rspWait->{mNo} == $mNoInt || $rspWait->{mNo} == $mNoInt-1)){
+          ($rspWait->{mNo} == $mNoInt || $rspWait->{mNo} == ($mNoInt+255)%256)){ #no +256 - 1 module 255
         $repeat = 1;#prevent stop for messagenumber match
         $rspWait->{mNo} = $mNoInt;  # next message will be numbered same or one plus.       
         CUL_HM_m_setCh($mhp,$rspWait->{forChn});
@@ -3380,6 +3430,9 @@ sub CUL_HM_parseCommon(@){#####################################################
         else{
           CUL_HM_respPendToutProlong($mhp->{devH});#wasn't last - reschedule timer
         }
+      }
+      else{
+        Log 1,"waiting for: $pendType, got:RegisterRead # await msgNo:$rspWait->{mNo}, rec:$mNoInt";
       }
       $ret = "done";
     }
@@ -4006,8 +4059,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         if ($modules{CUL_HM}{helper}{updating});
   my $act = join(" ", @a[1..$#a]);
   my $name    = $hash->{NAME};
-  return ""
-        if (CUL_HM_getAttrInt($name,"ignore"));
+  return "" if (CUL_HM_getAttrInt($name,"ignore"));
   my $devName = InternalVal($name,"device",$name);
   my $st      = AttrVal($devName, "subType", "");
   my $md      = AttrVal($devName, "model"  , "");
@@ -4037,7 +4089,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
 
   $h = "parameter" if ($cmd =~ m/^tplPara..._/);
   $h = "template"  if ($cmd =~ m/^tplSet_/);
-  
+  $h = "peerSmart" if ($cmd eq "peerSmart" && defined $hash->{helper}{peerFriend} );
+
   if( !defined($h) && $hash->{helper}{regLst}){
     foreach my $rl(grep /./,split(",",$hash->{helper}{regLst})){        
       next if (!defined $culHmReglSets->{$rl});
@@ -4076,15 +4129,16 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     if( $culHmFunctSets->{$fkt}    && $roleC){foreach(keys %{$culHmFunctSets->{$fkt}}    ){push @arr1,"$_:".${$culHmFunctSets->{$fkt}}{$_}    }};
     @arr1 = CUL_HM_noDup(@arr1);
     foreach(@arr1){
-      my ($cmd,$val) = split(":",$_,2);
+      next if(!$_);
+      my ($cmdS,$val) = split(":",$_,2);
       if (!$val){ # no agruments possible
-        $_ = "$cmd:noArg";
+        $_ = "$cmdS:noArg";
       }
       elsif($val !~ m/^\[.*\]$/ ||
             $val =~ m/\[.*\[/   ||
             $val =~ m/(\<|\>)]/
             ){
-        $_ = $cmd;
+        $_ = $cmdS;
       }
       else{
         $val =~ s/(\[|\])//g;
@@ -4096,21 +4150,23 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
             $_ = join(",",@list);
           }
         }
-        $_ = "$cmd:".join(",",@vArr);
+        $_ = "$cmdS:".join(",",@vArr);
       }
     }
     @arr1 = ("--") if (!scalar @arr1);
     my $usg = "Unknown argument $cmd, choose one of ".join(" ",sort @arr1);
 
-
+#General implementation pending    my $pl = CUL_HM_getPeerOption($name);
+#General implementation pending    $usg .= " peerSmart:$pl" if ("pl"); ## General need completion
+    
     $usg =~ s/ pct/ pct:slider,0,1,100/;
     $usg =~ s/ pctSlat/ pctSlat:slider,0,1,100/;
     $usg =~ s/ virtual/ virtual:slider,1,1,50/;
     $usg =~ s/ color/ color:colorpicker,HUE,0,0.5,100/;
 	if ($usg =~ m/ tempTmplSet/){
-      my $tl = $modules{CUL_HM}{AttrList};
+      my $tl = $modules{CUL_HM}{AttrList}."";
       my $ok = ($tl =~ s/.* (tempListTmpl)(\:.*? ).*/$2/);
-	  $tl = $ok?$tl:"";
+	  $tl = $ok ? $tl : "";
       $usg =~ s/ tempTmplSet/ tempTmplSet$tl/;
 	}
 
@@ -4176,8 +4232,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
              foreach (grep /^unknown_/,keys %{$hash->{READINGS}});
       }
       elsif($sect eq "trigger"){
-        delete $hash->{READINGS}{$_} 
-             foreach (grep /^trig/,keys %{$hash->{READINGS}});
+        delete $hash->{READINGS}{$_} foreach (grep /^trig/,keys %{$hash->{READINGS}});
       }
       elsif($sect eq "register"){
         my @cH = ($hash);
@@ -4333,8 +4388,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     return $name." already defines as ".$attr{$name}{subType}
        if ($attr{$name}{subType} && $attr{$name}{subType} ne "virtual");
     $attr{$name}{subType} = "virtual";
-    $attr{$name}{model}   = "virtual_".$maxBtnNo 
-       if (!$attr{$name}{model} ||$attr{$name}{model} =~ m/^virtual_/);
+    $attr{$name}{model}   = "VIRTUAL" if (!$attr{$name}{model});
     my $devId = $hash->{DEF};
     for (my $btn=1;$btn <= $maxBtnNo;$btn++){
       my $chnName = $name."_Btn".$btn;
@@ -4515,9 +4569,9 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       return "unknown peer".$peer if (length($pID) != 8);# peer only to channel
       my $pCh1 = substr($pID,6,2);
       my $pCh2 = $pCh1;
-      if(($culHmSubTypeSets->{$st}   &&$culHmSubTypeSets->{$st}{peerChan}  )||
-         ($culHmModelSets->{$md}     &&$culHmModelSets->{$md}{peerChan}    )||
-         ($culHmChanSets->{$md.$chn} &&$culHmChanSets->{$md.$chn}{peerChan})  ){
+      if(($culHmSubTypeSets->{$st}   && $culHmSubTypeSets->{$st}{peerChan}  )||
+         ($culHmModelSets->{$md}     && $culHmModelSets->{$md}{peerChan}    )||
+         ($culHmChanSets->{$md.$chn} && $culHmChanSets->{$md.$chn}{peerChan})  ){
         $pCh2 = "00";                        # button behavior
       }
       CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.$chn.$set.
@@ -6197,7 +6251,86 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
     return ("",1) if ($target && $target eq "remote");#Nothing for actor
   }
-
+  elsif($cmd eq "peerSmart") { ############################################ reg
+    #peerSmart <peer>  
+    return "implenentation pending";
+    $state = "";
+    my $set  = $a[2] =~ m/^remove/ ? 0    : 1;
+    my $cmdB = $set                ? "01" : "02";
+    my %PInfo;
+    my $pCnt = 0;
+    for my $pn ($a[2],$name){# setup peering information
+#General implement RT      if ($rMd =~ m/^HM-CC-RT-DN/ && $chn =~ m/(04|05)/ ){# rt team peers cross from 05 to 04
+#General implement RT        @aCh = ("04","05");
+#General implement RT        @rCh = ("04","05");
+#General implement RT      }
+      $PInfo{$pCnt}{name}     = $pn;
+      $PInfo{$pCnt}{DId}      = substr(CUL_HM_name2Id($pn),0,6);
+      $PInfo{$pCnt}{hash}     = CUL_HM_name2Hash($pn);
+      $PInfo{$pCnt}{chn}      = substr(CUL_HM_name2Id($pn)."01",6,2);
+      $PInfo{$pCnt}{md}       = $culHmModel->{$PInfo{$pn}{hash}->{helper}{mId}}{name};
+      $PInfo{$pCnt}{st}       = $culHmModel->{$PInfo{$pn}{hash}->{helper}{mId}}{st};
+      $PInfo{$pCnt}{mId}      = $PInfo{$pn}{hash}->{helper}{mId};
+      $PInfo{$pCnt}{BurstReg} = (CUL_HM_getRxType($PInfo{$pn}{hash}) & 0x82)?"0101" :"0100";
+      $PInfo{$pCnt}{haveBReg} = ($culHmRegModel->{$md}{peerNeedsBurst}||$culHmRegType->{$st}{peerNeedsBurst})? 1:0;
+      return "please enter peer"       if(!$PInfo{$pn}{chn});
+      return "peer is not a channel"   if(!$PInfo{$pn}{hash}->{helper}{role}{chn} );
+      $PInfo{$pCnt}{remote} = (($culHmSubTypeSets->{$PInfo{$pCnt}{st}}   && $culHmSubTypeSets->{$PInfo{$pCnt}{st}}{peerChan}  )||
+                               ($culHmModelSets->{$PInfo{$pCnt}{md}}     && $culHmModelSets->{$PInfo{$pCnt}{md}}{peerChan}    )||
+                               ($culHmChanSets->{$PInfo{$pCnt}{md}.$PInfo{$pCnt}{chn}}
+                                                                         && $culHmChanSets->{$PInfo{$pCnt}{md}.$PInfo{$pCnt}{chn}}{peerChan})  )
+                               ?"remote":"actor";
+      $pCnt++;
+    }
+    # foreach my $myNo (keys %PInfo){# execute peering
+    #   my $pNo = ($myNo + 1) % 2;
+    #   if ($PInfo{$myNo}{st} eq "virtual"){
+    #     my $btnName = $pSt eq "smokeDetector" 
+    #                       ? $PInfo{$myNo}{name} 
+    #                       : $PInfo{$pNo}{name};
+    #     next if (!defined $attr{$btnName});
+    #     CUL_HM_ID2PeerList ($btnName,$PInfo{$pNo}{DId}.$PInfo{$pNo}{chn},$set); #upd. peerlist
+    #   }
+    #   else{
+    #     CUL_HM_PushCmdStack($PInfo{$myNo}{hash},"++".$flag."01${id}$PInfo{$myNo}{DId}"
+    #                         .$PInfo{$myNo}{chn}
+    #                         .$cmdB
+    #                         .$PInfo{$pNo}{DId}
+    #                         .($PInfo{$pNo}{st}     eq "smokeDetector" ? "00" : $PInfo{$pNo}{chn})
+    #                         .($PInfo{$pNo}{remote} eq "remote"        
+    #                         ||$PInfo{$pNo}{st}     eq "smokeDetector" ? "00" : $PInfo{$pNo}{chn})
+    #                         );
+    #     CUL_HM_pushConfig($PInfo{$myNo}{hash},$id, $PInfo{$myNo}{DId}
+    #                                          ,$PInfo{$myNo}{chn}
+    #                                          ,$PInfo{$pNo}{DId} 
+    #                                          ,hex($PInfo{$pNo}{chn})
+    #                                          ,4    
+    #                                          ,$PInfo{$pNo}{BurstReg})
+    #                if($cmdB eq "01" && $PInfo{$myNo}{haveBReg}); # only if set peer
+    #     my $rxType = CUL_HM_getRxType($PInfo{$myNo}{hash});
+    # 
+    #     if($rxType & 0x01){#allways
+    #       CUL_HM_ProcessCmdStack($devHash);
+    #     }
+    #     elsif($devHash->{cmdStack}                  &&
+    #           $devHash->{helper}{prt}{sProc} != 1    # not processing
+    #           ){
+    #       if($rxType & 0x02){# handle burst Access devices - add burst Bit
+    #         my ($pre,$tp,$tail) = unpack 'A2A2A*',$devHash->{cmdStack}[0];
+    #         $devHash->{cmdStack}[0] = sprintf("%s%02X%s",$pre,(hex($tp)|0x10),$tail);
+    #         CUL_HM_ProcessCmdStack($devHash);
+    #       }
+    #       elsif (CUL_HM_getAttrInt($name,"burstAccess")){ #burstConditional - have a try
+    #         $hash->{helper}{prt}{brstWu}=1;# start auto-burstWakeup
+    #         CUL_HM_SndCmd($devHash,"++B112$id$dst");
+    #       }
+    #     }
+    # 
+    #     CUL_HM_qAutoRead($name,3);
+    #   }
+    # }    
+  }
+################################################################################################################
   elsif($cmd  =~ m/^(pair|getVersion)$/) { ####################################
     $state = "";
     my $serial = ReadingsVal($name, "D-serialNr", undef);
@@ -6319,7 +6452,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my $ret = HMinfo_SetFn($defs{hm},$hm,"templateSet",$name,$tpl,"$tPeer$tTyp",@par);
     return $ret;
   }
-  elsif($cmd =~ m/tplPara(..)(.)_.*/) { #####################################
+  elsif($cmd =~ m/tplPara(..)(.)_.*/) { #######################################
     $state = "";
     my ($tNo,$pNo) = ($1,$2);
     my ($hm) = devspec2array("TYPE=HMinfo");
@@ -6484,21 +6617,21 @@ sub CUL_HM_weather(@) {#periodically send weather data
   CUL_HM_SndCmd($hash,"++8470".$ioId."00000000".$hash->{helper}{weather});
   InternalTimer(gettimeofday()+150,"CUL_HM_weather","weather:$name",0);
 }
+
 sub CUL_HM_infoUpdtDevData($$$) {#autoread config
   my($name,$hash,$p) = @_;
   my($fw1,$fw2,$mId,$serNo,$stc,$devInfo) = unpack('A1A1A4A20A2A*', $p);
   
-  my $md = $culHmModel->{$mId}{name} ? $culHmModel->{$mId}{name}:"unknown";
+  my $md = $culHmModel->{$mId}{name} ? $culHmModel->{$mId}{name}:"unknown";# original model 
   my $serial = pack('H*',$serNo);
   my $fw = sprintf("%d.%d", hex($fw1),hex($fw2));
-
-  $attr{$name}{model}      = $md;
-  $attr{$name}{subType}    = $culHmModel->{$mId}{st};
+  $attr{$name}{".mId"}     = $mId;
   $attr{$name}{serialNr}   = $serial;  # to be removed from attributes
   $attr{$name}{firmware}   = $fw;      # to be removed from attributes
-#  $attr{$name}{".devInfo"} = $devInfo; # to be removed from attributes
-#  $attr{$name}{".stc"}     = $stc;     # to be removed from attributes
-  CUL_HM_configUpdate($name) if(ReadingsVal($name,"D-firmware","") ne $fw
+
+  CUL_HM_updtDeviceModel($name,AttrVal($name,"modelForce",$md));#model may be overwritten by modelForce
+  
+  CUL_HM_configUpdate($name) if(ReadingsVal($name,"D-firmware","") ne $fw     # force read register
                               ||ReadingsVal($name,"D-serialNr","") ne $serial
                               ||ReadingsVal($name,".D-devInfo","") ne $devInfo
                               ||ReadingsVal($name,".D-stc"    ,"") ne $stc
@@ -6507,33 +6640,56 @@ sub CUL_HM_infoUpdtDevData($$$) {#autoread config
                               "D-serialNr:$serial",
                               ".D-devInfo:$devInfo",
                               ".D-stc:$stc");
+}
+sub CUL_HM_updtDeviceModel($$) {#change the model for a device - obey overwrite modelForce
+  my($name,$model) = @_;
+  my $hash = $defs{$name};
+  $attr{$name}{model} = $model;
   delete $hash->{helper}{rxType};
   CUL_HM_getRxType($hash); #will update rxType
-  $mId = CUL_HM_getMId($hash);# set helper valiable and use result
+  my $mId = CUL_HM_getMId($hash);# set helper valiable and use result
 
   # autocreate undefined channels
-  my @chanTypesList = split(',',$culHmModel->{$mId}{chn});
-  foreach my $chantype (@chanTypesList){
-    my ($chnTpName,$chnStart,$chnEnd) = split(':',$chantype);
-    my $chnNoTyp = 1;
-    for (my $chnNoAbs = $chnStart; $chnNoAbs <= $chnEnd;$chnNoAbs++){
-      my $chnId = $hash->{DEF}.sprintf("%02X",$chnNoAbs);
-      if (!$modules{CUL_HM}{defptr}{$chnId}){
-        my $chnName = $name."_".$chnTpName.(($chnStart == $chnEnd)?
-                                '':'_'.sprintf("%02d",$chnNoTyp));
-                                
-        CommandDefine(undef,$chnName.' CUL_HM '.$chnId);
-        $attr{CUL_HM_id2Name($chnId)}{model} = $md;
-      }
-      $attr{CUL_HM_id2Name($chnId)}{model} = $md;
-      $chnNoTyp++;
-    }
+  my %chanExist;
+  %chanExist = map { $_ => 0 } CUL_HM_getAssChnIds($name);
+  
+  if ($attr{$name}{subType} eq "virtual"){# du not apply all possible channels for virtual
+    $attr{CUL_HM_id2Name($_)}{model} = $model foreach(keys %chanExist);
   }
-  if ($culHmModel->{$mId}{cyc}){
-    CUL_HM_ActAdd($hash->{DEF},AttrVal($name,"actCycle",
-                                             $culHmModel->{$mId}{cyc}));
+  else{
+    my @chanTypesList = split(',',$culHmModel->{$mId}{chn});
+    foreach my $chantype (@chanTypesList){# check all regulat channels
+      my ($chnTpName,$chnStart,$chnEnd) = split(':',$chantype);
+      my $chnNoTyp = 1;
+      for (my $chnNoAbs = $chnStart; $chnNoAbs <= $chnEnd;$chnNoAbs++){
+        my $chnId = $hash->{DEF}.sprintf("%02X",$chnNoAbs);
+        if (!$modules{CUL_HM}{defptr}{$chnId}){# not existing by now - create
+          my $chnName = $name."_".$chnTpName.(($chnStart == $chnEnd)?''
+                                                                    :'_'.sprintf("%02d",$chnNoTyp));
+                                  
+          CommandDefine(undef,$chnName.' CUL_HM '.$chnId);
+          Log3 $name,3,"CUL_HM_update: $name add channel ID: $chnId name: $chnName";
+        }
+        $attr{CUL_HM_id2Name($chnId)}{model} = $model;
+        $chanExist{$chnId} = 1; # mark this channel as required
+        $chnNoTyp++;
+      }
+    }
+    if (scalar @chanTypesList == 0){# we won't delete channel 01. This may be on purpose
+      $chanExist{$defs{$name}{DEF}."01"} = 1;
+      my $cn01 = CUL_HM_id2Name($defs{$name}{DEF}."01");
+      $attr{$cn01}{model} = $model if (defined $attr{$cn01});
+    }
+    foreach(keys %chanExist){
+      next if ($chanExist{$_} == 1);
+      CommandDelete(undef,CUL_HM_id2Name($_));
+      Log3 $name,3,"CUL_HM_update: $name delete channel name: $_";
+    }
+    CUL_HM_ActAdd($hash->{DEF},AttrVal($name,"actCycle", $culHmModel->{$mId}{cyc}))if ($culHmModel->{$mId}{cyc});
+    CUL_HM_queueUpdtCfg($name);
   }
 }
+
 sub CUL_HM_getConfig($){
   my $hash = shift;
   my $flag = 'A0';
@@ -6829,7 +6985,7 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
   if (($mFlg & 0x20) && ($dst ne '000000')){#msg wants ack
     my $rss = $hash->{helper}{prt}{wuReSent}
                        ? $hash->{helper}{prt}{wuReSent}
-                       :1;#resend count - may need preloaded for WU device
+                       :1;#resend counter start value - may need preloaded for WU device
 
     if   ($mTp eq '01' && $sTp)        {
       if   ($sTp eq "03"){ #PeerList-----------
@@ -7205,10 +7361,9 @@ sub CUL_HM_respPendTout($) {
     }
     else{# manage retries
       $pHash->{rspWait}{reSent}++;
-
       CUL_HM_eventP($hash,"Resnd");
       Log3 $name,4,"CUL_HM_Resend: $name nr ".$pHash->{rspWait}{reSent};
-      if ($hash->{protCondBurst}&&$hash->{protCondBurst} eq "on" ){
+      if   ($hash->{protCondBurst} && $hash->{protCondBurst} eq "on" ){
         #timeout while conditional burst was active. try re-wakeup
         my $addr = CUL_HM_IoId($hash);
         $pHash->{rspWaitSec}{$_} = $pHash->{rspWait}{$_}
@@ -7232,7 +7387,7 @@ sub CUL_HM_respPendTout($) {
         CUL_HM_protState($hash,"CMDs_pending");
         $pHash->{wuReSent} = $wuReSent;# restore'invalid' count after general delete
       }
-      else{# normal device resend
+      else{# normal/burst device resend
         if ($rxt & 0x02){# type = burst - need to set burst-Bit for retry
           if ($pHash->{mmcA}){#fillback multi-message command
             unshift @{$hash->{cmdStack}},$_ foreach (reverse@{$pHash->{mmcA}});
@@ -7242,7 +7397,9 @@ sub CUL_HM_respPendTout($) {
             my $cmd = shift @{$hash->{cmdStack}};
             $cmd = sprintf("As%02X01%s", length($cmd)/2, substr($cmd,2));
             $pHash->{rspWait}{cmd} = $cmd;
+            my $rss = $pHash->{rspWait}{reSent}; # rescue repeat counter (will be overwritten in responseSetup)
             CUL_HM_responseSetup($hash,$cmd);
+            $pHash->{rspWait}{reSent} = $rss; # restore repeat counter
           }
 
           my ($pre,$tp,$tail) = unpack 'A6A2A*',$pHash->{rspWait}{cmd};
@@ -7577,7 +7734,7 @@ sub CUL_HM_ID2PeerList ($$$) {
     }
  }
 }
-sub CUL_HM_peerChId($$) {# in:<IDorName> <deviceID>, out:channelID
+sub CUL_HM_peerChId($$) {  #in:<IDorName> <deviceID>, out:channelID
   my($pId,$dId)=@_;
   return "" if (!$pId);
   my $iId = CUL_HM_id2IoId($dId);
@@ -7598,28 +7755,41 @@ sub CUL_HM_peerChName($$) {#in:<IDorName> <deviceID>, out:name
   $pId = $pDev if($pChn =~ m/0[0x]/); # both means device directly. This may be used by remotes and pusdbuttons
   return CUL_HM_id2Name($pId);
 }
-sub CUL_HM_getMId($) {#in: hash(chn or dev) out:model key (key for %culHmModel)
+sub CUL_HM_getMId($) {     #in: hash(chn or dev) out:model key (key for %culHmModel)
  # Will store result in device helper
   my $hash = shift;
   $hash = CUL_HM_getDeviceHash($hash);
   return "" if (!$hash->{NAME});
-  if (!defined $hash->{helper}{mId} || !$hash->{helper}{mId}){
-    my $model = AttrVal($hash->{NAME}, "model", "");
-    $hash->{helper}{mId} = "";
-    foreach my $mIdKey(keys%{$culHmModel}){
-      next if (!$culHmModel->{$mIdKey}{name} ||
-                $culHmModel->{$mIdKey}{name} ne $model);
-      $hash->{helper}{mId} = $mIdKey;
-      #--- mId is updated - now update the reglist
-      foreach(CUL_HM_getAssChnNames($hash->{NAME})){
-        $defs{$_}{helper}{regLst} = CUL_HM_getChnList($defs{$_});
-      }
-      last;
+  if (!defined $hash->{helper}{mId} || !$hash->{helper}{mId}){# need to search
+    $hash->{helper}{mId}     = CUL_HM_getmIdFromModel(AttrVal($hash->{NAME}, "model", ""));
+    $hash->{helper}{mId}     = CUL_HM_getmIdFromModel($culHmModel->{$hash->{helper}{mId}}{alias})    
+                               if ($hash->{helper}{mId} && defined $culHmModel->{$hash->{helper}{mId}}{alias});
+    $attr{$hash->{NAME}}{subType} = $hash->{helper}{mId} ? $culHmModel->{$hash->{helper}{mId}}{st}:"";
+    #--- mId is updated - now update the reglist
+    foreach(CUL_HM_getAssChnNames($hash->{NAME})){
+      $defs{$_}{helper}{regLst}     = CUL_HM_getChnList($_) ;
+      $defs{$_}{helper}{peerOpt}    = CUL_HM_getChnPeers($_);
+      $defs{$_}{helper}{peerFriend} = CUL_HM_getChnPeerFriend($_);
+      CUL_HM_calcPeerOptions();
     }
   }
   return $hash->{helper}{mId};
 }
-sub CUL_HM_getRxType($) { #in:hash(chn or dev) out:binary coded Rx type
+sub CUL_HM_getmIdFromModel($){ # enter model and receive the corresponding ID
+  my $model = shift;
+  $model = "VIRTUAL" if($model =~ m/^virtual_/);
+  return ($model ? $culHmModel2Id->{$model} :"") if ($mIdReverse);
+  # old version: if uer did not reboot or not updated HMconfig
+  my $mId = "";
+  foreach my $mIdKey(keys%{$culHmModel}){
+    next if (!$culHmModel->{$mIdKey}{name} ||
+              $culHmModel->{$mIdKey}{name} ne $model);
+    $mId = $mIdKey;
+    last;
+  }
+  return $mId;
+}
+sub CUL_HM_getRxType($) {      #in:hash(chn or dev) out:binary coded Rx type
  # Will store result in device helper
   my ($hash) = @_;
   $hash = CUL_HM_getDeviceHash($hash);
@@ -7627,6 +7797,7 @@ sub CUL_HM_getRxType($) { #in:hash(chn or dev) out:binary coded Rx type
   my $rxtEntity = int($hash->{helper}{rxType});
   use warnings;
   if (!$rxtEntity){ #at least one bit must be set
+    delete $hash->{helper}{mId}; # force new calculation by now
     my $MId = CUL_HM_getMId($hash);
     my $rxtOfModel = ($MId && $culHmModel->{$MId}{rxt} ? $culHmModel->{$MId}{rxt} : "");
     if ($rxtOfModel){
@@ -7642,7 +7813,7 @@ sub CUL_HM_getRxType($) { #in:hash(chn or dev) out:binary coded Rx type
   }
   return $rxtEntity;
 }
-sub CUL_HM_getAssChnIds($) { #in: name out:ID list of assotiated channels
+sub CUL_HM_getAssChnIds($) {   #in: name out:ID list of assotiated channels
   # if it is a channel only return itself
   # if device and no channel
   my ($name) = @_;
@@ -7669,7 +7840,7 @@ sub CUL_HM_getAssChnNames($) { #in: name out:list of assotiated chan and device
   }
   return sort(@chnN);
 }
-sub CUL_HM_getKeys($) { #in: device-hash out:highest index, hash with keys
+sub CUL_HM_getKeys($) {        #in: device-hash out:highest index, hash with keys
   my ($hash) = @_;
   my $highestIdx = 0;
   my %keys = ();
@@ -8067,7 +8238,7 @@ sub CUL_HMTmplSetParam($){
                      ;
                      #c eq "lit"
         my $literals = "";
-        if($culHmRegDefine->{$reg1}{c} eq "lit"){
+        if(defined $culHmRegDefine->{$reg1}{c} && $culHmRegDefine->{$reg1}{c} eq "lit"){
           $literals = ":".join(",",keys%{$culHmRegDefine->{$reg1}{lit}})
         }
         push @tCmd,"tplPara".sprintf("%02d%d_",$tCnt,$pCnt++).join("_",$t,$pm).$literals;
@@ -8326,8 +8497,16 @@ sub CUL_HM_initRegHash() { #duplicate short and long press register
     no strict "refs";
       my $ret = do $file;
     use strict "refs";
-    if(!$ret){ Log3 undef, 1, "Error loading file: $file:\n $@";}
-    else     { Log3 undef, 3, "additional HM config file loaded: $file";}
+    if(!$ret){ 
+      Log3 undef, 1, "Error loading file: $file:\n $@";
+    }
+    else     { # success - now update some datafiels
+      Log3 undef, 3, "additional HM config file loaded: $file";
+      foreach (keys %{$culHmModel}){
+        $culHmModel2Id->{$culHmModel->{$_}{name}} = $_ ;
+        $culHmModel->{$_}{alias} = $culHmModel->{$_}{name} if (!defined $culHmModel->{$_}{alias});
+      }
+    }
   }
   closedir(DH);
 }
@@ -8398,10 +8577,10 @@ sub CUL_HM_getRegInfo($) { #
   my $devHash = CUL_HM_getDeviceHash($hash);
   my $st  = AttrVal    ($devHash->{NAME},"subType", "" );
   my $md  = AttrVal    ($devHash->{NAME},"model"  , "" );
-  my $chn = InternalVal($hash->{NAME}   ,"chanNo" ,"00");
-  my @regArr = CUL_HM_getRegN($st,$md,$chn);
   my $roleD  = $hash->{helper}{role}{dev};
   my $roleC  = $hash->{helper}{role}{chn};
+  my $chn = $roleD ? "00" : InternalVal($hash->{NAME}   ,"chanNo" ,"00");
+  my @regArr = CUL_HM_getRegN($st,$md,$chn);
 
   my @rI;
   foreach my $regName (@regArr){
@@ -8442,34 +8621,152 @@ sub CUL_HM_getRegN($$@){ # get list of register for a model
   }
   return @regArr;
 }
-sub CUL_HM_getChnList($){ # get reglist assotioted with a channel
-  my ($hash) = @_;
+sub CUL_HM_getChnList($){ # get reglist assotiated with a channel
+  my ($name) = @_;
+  my $hash = $defs{$name};
   my $devHash = CUL_HM_getDeviceHash($hash);  
-  my $chnN = hex(InternalVal($hash->{NAME},"chanNo","0"));
-  my @mLstA = split(",",$culHmModel->{$devHash->{helper}{mId}}{lst});
-  my $chRl = "";
+  my $chnN = hex(InternalVal($name,"chanNo","0"));
+  $chnN = "-" if ($chnN == 0);
+  return if (!$devHash->{helper}{mId});
+  my @chRl;
 
   if    ($hash->{helper}{role}{vrt}){
   }
   elsif ($hash->{helper}{role}{dev}){
-    $chRl = ",0";
-    $chnN = ($hash->{helper}{role}{chn})? 1    # device is added. if we ar channel add this as well. 
-                                        : "-";
+    push @chRl,"0";
   }
-  foreach my $mLst(@mLstA){
-    my ($Lst,$cLst) = split(":",$mLst.":-");
-    $cLst = $chnN if ($cLst eq "-");
+  foreach my $mLst(split(",",$culHmModel->{$devHash->{helper}{mId}}{lst})){
+    my ($Lst,$cLst) = split(":",$mLst.":$chnN"); # if channel  not given in "lst" then use for all channels!
     next if ($Lst eq "p" || $cLst eq "-");# no list, just peers
     foreach my $aaa (grep /$chnN/,split('\.',$cLst)){
       $Lst .= "p" if($Lst =~ m/^[34]$/ || $aaa =~ m/p/);
       $Lst =~ s/ //g;
-      $chRl .= ",".$Lst;
+      push @chRl,$Lst;
     }
   }
-
-  return $chRl;
+  return join(",",sort @chRl );
 }
+
+sub CUL_HM_getChnPeers($){ #which peertype am I
+  my ($name) = @_;
+  my $hash = $defs{$name};
+  my $devHash = CUL_HM_getDeviceHash($hash);  
+  return "-" if (!$devHash->{helper}{mId});
+  my $chnN = hex(InternalVal($name,"chanNo","0"));
+  $chnN = "-" if ($chnN == 0);
+  my @chPopt;
+
+  if ($hash->{helper}{role}{chn}){
+    if ($hash->{helper}{role}{vrt}){
+      push @chPopt,"v";
+    }
+    else{
+      foreach my $mLst(split(",",$culHmModel->{$devHash->{helper}{mId}}{lst})){
+        my ($Lst,$cLst) = split(":",$mLst.":-");
+        push @chPopt,$Lst     if ($Lst =~ m /[p34]/ && $cLst =~m /[-$chnN]/);
+        push @chPopt,$Lst."p" if ($Lst !~ m /[p34]/ && $cLst =~m /[$chnN]p/);
+      }   
+    }
+  }
+  push @chPopt,'-' if(!scalar @chPopt);
+  return join(",",map{$_.":".$culHmModel->{$devHash->{helper}{mId}}{st}} sort @chPopt);
+}
+sub CUL_HM_getChnPeerFriend($){ #which are my peerFriends
+#$defs{$_}{helper}{peerFriend} = CUL_HM_getChnPeerFriend
+  my ($name)  = @_;
+  my $hash    = $defs{$name};
+  my $devHash = CUL_HM_getDeviceHash($hash);  
+  return "-" if (!$devHash->{helper}{mId});
+  my $mIdA    = $devHash->{helper}{mId};
+  my $peerOpt = $hash->{helper}{peerOpt};
+  my $chn     = InternalVal($name,"chanNo","");
+
+  my @chPopt;
   
+  if    ($peerOpt =~ m/4:/ )                       {push @chPopt,"peerAct","peerVirt"         ;}
+  elsif ($peerOpt =~ m/3:/ )                       {push @chPopt,"peerSens","peerVirt"        ;}
+  elsif ($peerOpt eq "p:smokeDetector" )           {push @chPopt,"peerSD"                     ;}
+  elsif ($peerOpt eq "-:virtual" && $chn eq "01" ) {push @chPopt,"peerSD","peerSens","peerAct";}
+  elsif ($peerOpt eq "-:virtual"         )         {push @chPopt,"peerSens","peerAct"         ;}
+  elsif ($peerOpt eq "p:THPLSensor"      )         {push @chPopt,"peerRecT"                   ;}
+  elsif ($mIdA eq "0095" && $chn eq "01" )         {push @chPopt,"peerSensT"                  ;}
+  elsif ($mIdA eq "00AD" && $chn eq "01" )         {push @chPopt,"peerSensT"                  ;}
+  elsif ($mIdA eq "0095" && $chn eq "04" )         {push @chPopt,"peerRTteam2"                ;}
+  elsif ($mIdA eq "0095" && $chn eq "05" )         {push @chPopt,"peerRTteam1"                ;}
+  elsif ($mIdA eq "0095" && $chn eq "02" )         {push @chPopt,"peerRtTc"                   ;}
+  elsif ($mIdA eq "00AD" && $chn eq "02" )         {push @chPopt,"peerRtTc"                   ;}
+  return join(",",@chPopt);
+}
+
+sub CUL_HM_getPeerOption($){ #who are my friends
+  my ($name)  = @_; 
+  CUL_HM_calcPeerOptions() if(!$modules{CUL_HM}{helper}{peerOpt});
+  my $peerFriend = $defs{$name}{helper}{peerFriend};
+  my $modH = $modules{CUL_HM}{helper}{peerOpt};
+
+  my %curPTmp;  
+  $curPTmp{$_} = $_              foreach(grep !/$name/,
+                                         split(",",
+                                         join(",",map{$modules{CUL_HM}{helper}{peerOpt}{$_}}
+                                                  split(",",$peerFriend))));
+
+  $curPTmp{$_} = "remove_".$_    foreach(split(",",InternalVal($name,"peerList","")));
+  delete $curPTmp{$_}            foreach (grep /self/,keys %curPTmp);
+  
+  my @peers = values %curPTmp;
+  my @p1 = sort (grep/remove/,@peers);
+  my @p2 = sort (grep!/remove/,@peers);
+  
+  return join(",",@p1,@p2);  
+}
+sub CUL_HM_calcPeerOptions(){ # calculation peering options
+  my @peerAct;     # normal actor
+  my @peerSens;    # normal sensor
+  my @peerSD;      # smoke detector
+  my @peerVirt;    # virtual
+  my @peerSensT;   # Sensor Temperature
+  my @peerRecT;    # receiver Temperature
+  my @peerRTteam1; # RT team Clima     <-> ClimaTeam
+  my @peerRTteam2; # RT team ClimaTeam <-> Clima
+  my @peerRtTc;    # RT - TC
+  my @peerTcRt;    # TC - RT
+
+  foreach(devspec2array("TYPE=CUL_HM:FILTER=chanNo=..")){
+    my $devHash = CUL_HM_getDeviceHash($defs{$_});  
+    my $mIdA    = $devHash->{helper}{mId};
+    next if (!defined $defs{$_} 
+          || !defined $defs{$_}{helper} 
+          || !$mIdA
+          || !$defs{$_}{helper}{peerOpt});
+    my $peerOpt = $defs{$_}{helper}{peerOpt};
+    my $chn     = $defs{$_}{chanNo};
+    
+    push @peerAct    ,$_ if ($peerOpt =~ m/3:/             ); 
+    push @peerSens   ,$_ if ($peerOpt =~ m/4:/             ); 
+    push @peerSD     ,$_ if ($peerOpt eq "p:smokeDetector" );
+    push @peerSD     ,$_ if ($peerOpt eq "-:virtual"       && $chn eq "01");# chan 01 
+    push @peerVirt   ,$_ if ($peerOpt eq "-:virtual"       ); 
+    push @peerSensT  ,$_ if ($peerOpt eq "p:THPLSensor"    );     
+    push @peerRecT   ,$_ if ($mIdA eq "0095"         && $chn eq "01");   # HM-CC-RT-DN      Weather
+    push @peerRecT   ,$_ if ($mIdA eq "00AD"         && $chn eq "01");   # HM-TC-IT-WM-W-EU Weather
+    push @peerRTteam1,$_ if ($mIdA eq "0095"         && $chn eq "04");   # HM-CC-RT-DN      Clima     <-> HM-CC-RT-DN      ClimaTeam
+    push @peerRTteam2,$_ if ($mIdA eq "0095"         && $chn eq "05");   # HM-CC-RT-DN      ClimaTeam <-> HM-CC-RT-DN      Clima
+    push @peerRtTc   ,$_ if ($mIdA eq "0095"         && $chn eq "02");   # HM-CC-RT-DN      Climate   <-> HM-TC-IT-WM-W-EU Climate
+    push @peerTcRt   ,$_ if ($mIdA eq "00AD"         && $chn eq "02");   # HM-TC-IT-WM-W-EU Climate   <-> HM-CC-RT-DN      Climate
+  }
+  $modules{CUL_HM}{helper}{peerOpt}{peerAct}     = join(",",@peerAct    );
+  $modules{CUL_HM}{helper}{peerOpt}{peerSens}    = join(",",@peerSens   );
+  $modules{CUL_HM}{helper}{peerOpt}{peerSD}      = join(",",@peerSD     );
+  $modules{CUL_HM}{helper}{peerOpt}{peerVirt}    = join(",",@peerVirt   );
+  $modules{CUL_HM}{helper}{peerOpt}{peerSensT}   = join(",",@peerSensT  );
+  $modules{CUL_HM}{helper}{peerOpt}{peerRecT}    = join(",",@peerRecT   );
+  $modules{CUL_HM}{helper}{peerOpt}{peerRTteam1} = join(",",@peerRTteam1);
+  $modules{CUL_HM}{helper}{peerOpt}{peerRTteam2} = join(",",@peerRTteam2);
+  $modules{CUL_HM}{helper}{peerOpt}{peerRtTc}    = join(",",@peerRtTc   );
+  $modules{CUL_HM}{helper}{peerOpt}{peerTcRt}    = join(",",@peerTcRt   );
+  return ;
+}
+
 sub CUL_HM_4DisText($) {      # convert text for 4dis
   #text1: start at 54 (0x36) length 12 (0x0c)
   #text2: start at 70 (0x46) length 12 (0x0c)
@@ -9686,21 +9983,22 @@ sub CUL_HM_reglUsed($) {# provide data for HMinfo
 sub CUL_HM_complConfigTest($){# Q - check register consistency some time later
   my $name = shift;
   return if ($modules{CUL_HM}{helper}{hmManualOper});#no autoaction when manual
-  push @{$modules{CUL_HM}{helper}{confCheckArr}},$name;
-  if (scalar @{$modules{CUL_HM}{helper}{confCheckArr}} == 1){
+  
+  $modules{CUL_HM}{helper}{confCheckH}{CUL_HM_name2Id($name)} = 1;
+  if (scalar keys%{$modules{CUL_HM}{helper}{confCheckH}} == 1){# this was the first
     RemoveInternalTimer("CUL_HM_complConfigTO");
     InternalTimer(gettimeofday()+ 1800,"CUL_HM_complConfigTO","CUL_HM_complConfigTO", 0);
   }
 }
 sub CUL_HM_complConfigTestRm($){# Q - check register consistency some time later
   my $name = shift;
-  my $mQ = $modules{CUL_HM}{helper}{confCheckArr};
-  @{$mQ} = grep !/^$name$/,@{$mQ};
+  delete $modules{CUL_HM}{helper}{confCheckH}{CUL_HM_name2Id($name)};
 }
 sub CUL_HM_complConfigTO($)  {# now perform consistency check of register
-  my @arr = @{$modules{CUL_HM}{helper}{confCheckArr}};
-  @{$modules{CUL_HM}{helper}{confCheckArr}} = ();
-  CUL_HM_complConfig($_) foreach (CUL_HM_noDup(@arr));
+  foreach (keys %{$modules{CUL_HM}{helper}{confCheckH}}){
+    CUL_HM_complConfig(CUL_HM_id2Name($_));
+    delete $modules{CUL_HM}{helper}{confCheckH}{$_};
+  }
 }
 sub CUL_HM_complConfig($;$)  {# read config if enabled and not complete
   my ($name,$dly) = @_;
@@ -11093,6 +11391,11 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
             attr myChannel levelRange 0,40<br>
             attr myChannel levelRange 10,80<br>
           </code></ul>
+          </li>
+      <li><a name="#CUL_HMmodelForce">modelForce</a>,
+          modelForce overwrites the model attribute. Doing that it converts the device and its channel to the new model.<br>
+          Reason for this attribute is an eQ3 bug as some devices are delivered with wrong Module IDs.<br>
+          ATTENTION: changing model id automatically starts reconfiguration of the device and its channels! channels may be deleted or incarnated<br>
           </li>
       <li><a name="#CUL_HMmodel">model</a>,
           <a name="subType">subType</a><br>
@@ -12501,6 +12804,12 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         Um das template nicht zu nutzen kann man es auf '0'setzen.<br>
         Format ist &lt;file&gt;:&lt;templatename&gt;. 
         </li>
+      <li><a name="#CUL_HMmodelForce">modelForce</a>,
+          modelForce überschreibt das model attribut. Dabei wird das Device und seine Kanäle reconfguriert.<br>
+          Grund für dieses Attribut ist ein eQ3 bug bei welchen Devices mit falscher ID ausgeliefert werden. Das Attribut
+          erlaubt dies zu ueberschreiben<br>
+          ACHTUNG: Durch das Eintragen eines anderen model werden die Entites modifiziert, ggf. neu angelegt oder gelöscht.<br>
+          </li>
       <li><a name="CUL_HMmodel">model</a>,
         <a name="subType">subType</a><br>
         Diese Attribute werden bei erfolgreichem Pairing automatisch gesetzt.
