@@ -46,6 +46,7 @@
 # 13.12.2017 : A.Goebel : add "+f" as additional ebus command to disable "-f" for this request
 # 03.01.2019 : A.Goebel : fix mask tilde in set/get
 # 03.01.2019 : A.Goebel : fix change regexp for parsing commands from "/^w$delimiter.{1,7}$delimiter.*/" to "/^w$delimiter[^$delimiter]{1,}$delimiter.*/" to support "feuerung" as class
+# 28.02.2019 : A.Goebel : fix port 8888 was hardcoded in GAEBUS_OpenDev, use $port instead (highlighted by user freetz)
 
 package main;
 
@@ -630,7 +631,7 @@ GAEBUS_OpenDev($$)
 
   my $conn = new IO::Socket::INET (
 	PeerAddr => "$host",
-	PeerPort => '8888',
+	PeerPort => "$port",
 	Proto    => 'tcp',
 	Reuse    => 0,
 	Timeout  => 10
