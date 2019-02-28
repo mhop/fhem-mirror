@@ -3,9 +3,6 @@
 # YAAHM.pm
 #
 # Yet Another Auto Home Module for FHEM
-# 
-# Problem: Wenn man trotz Feiertag geweckt werden möchte, wird zwar die Weckzeit richtig gesetzt - 
-# aber da "Wakeup" voM Timer ausgelöst wird und der nach den Zusatzbedingungen daytype etc fragt, gehen die rollläden eben nicht auf
 #
 # Prof. Dr. Peter A. Henning
 #
@@ -50,7 +47,7 @@ my $yaahmname;
 my $yaahmlinkname   = "Profile";     # link text
 my $yaahmhiddenroom = "ProfileRoom"; # hidden room
 my $yaahmpublicroom = "Unsorted";    # public room
-my $yaahmversion    = "2.02";
+my $yaahmversion    = "3.0";
 my $firstcall       = 1;
     
 my %yaahm_transtable_EN = ( 
@@ -67,6 +64,10 @@ my %yaahm_transtable_EN = (
     "swoff"             =>  "switched off",
     "and"               =>  "and",
     "clock"             =>  "",
+    "device"            =>  "Device",
+    "devices"           =>  "Devices ",
+    "deviceaction"      =>  "Device Action ",
+    "deviceactions"     =>  "Device Actions ",
     "active"            =>  "Active",
     "inactive"          =>  "Inactive",
     "overview"          =>  "Summary",
@@ -74,6 +75,8 @@ my %yaahm_transtable_EN = (
     "event"             =>  "Event", 
     "time"              =>  "Time",
     "timer"             =>  "Timer",
+    "earliest"          =>  "Earliest",
+    "latest"            =>  "Latest",
     "action"            =>  "Action",
     "weekly"            =>  "Weekly ",
     "day"               =>  "Day",
@@ -109,10 +112,6 @@ my %yaahm_transtable_EN = (
     "date"              =>  "Date",
     "today"             =>  "Today",
     "tomorrow"          =>  "Tomorrow",
-    "workday"           =>  "Workday",
-    "weekend"           =>  "Weekend",
-    "vacation"          =>  "Vacation",
-    "holiday"           =>  "Holiday",
     "weekday"           =>  "Day of Week",
     #--
     "mode"              =>  "Mode",
@@ -137,6 +136,10 @@ my %yaahm_transtable_EN = (
     "friday"    =>  ["Friday","Fri"],
     "saturday"  =>  ["Saturday","Sat"],
     "sunday"    =>  ["Sunday","Sun"],
+    "weekend"   =>  ["Weekend","We"],
+    "holiday"   =>  ["Holiday","Hol"],
+    "vacation"  =>  ["Vacation","Vac"],
+    "workday"   =>  ["Workday","Wor"],
     #--
     "spring"    => "Spring",
     "summer"    => "Summer",
@@ -153,6 +156,10 @@ my %yaahm_transtable_EN = (
     "next"              =>  "Nächste",
     "manual"            =>  "Manuelle Zeit",
     "clock"             =>  "Uhr",
+    "device"            =>  "Gerät",
+    "devices"           =>  "Geräte-",
+    "deviceaction"      =>  "Geräte-Aktions-",
+    "deviceactions"     =>  "Geräte-Aktionen",
     "exceptly"          =>  "ausnahmsweise",
     "undecid"           =>  "nicht bestimmbar",
     "off"               =>  "Aus",
@@ -165,6 +172,8 @@ my %yaahm_transtable_EN = (
     "event"             =>  "Event", 
     "time"              =>  "Zeit",
     "timer"             =>  "Timer",
+    "earliest"          =>  "Frühestens",
+    "latest"            =>  "Spätestens",
     "action"            =>  "Aktion",
     "weekly"            =>  "Wochen-",
     "day"               =>  "Tag",
@@ -200,10 +209,6 @@ my %yaahm_transtable_EN = (
     "date"              =>  "Termin",
     "today"             =>  "Heute",
     "tomorrow"          =>  "Morgen",
-    "workday"           =>  "Arbeitstag",
-    "weekend"           =>  "Wochenende",
-    "vacation"          =>  "Ferientag",
-    "holiday"           =>  "Feiertag",
     "weekday"           =>  "Wochentag",
     #--
     "mode"              =>  "Modus",
@@ -228,6 +233,10 @@ my %yaahm_transtable_EN = (
     "friday"    =>  ["Freitag","Fr"],
     "saturday"  =>  ["Samstag","Sa"],
     "sunday"    =>  ["Sonntag","So"],
+    "weekend"   =>  ["Wochenende","We"],
+    "holiday"   =>  ["Feiertag","Fei"],
+    "vacation"  =>  ["Urlaubstag","Url"],
+    "workday"   =>  ["Arbeitstag","Arb"],
     #--
     "spring"    => "Frühling",
     "summer"    => "Sommer",
@@ -262,6 +271,8 @@ my %defaultdailytable = (
     "sleep"             =>  ["22:30",undef,undef,undef],
     "night"             =>  ["22:00",undef,undef,undef],
     "beforemidnight"    =>  [undef,"00:05",undef,undef]);
+   
+my $defaultdailykeys = "(".join(")|(",keys %defaultdailytable).")";
     
 my %dailytable = ();
 
@@ -276,7 +287,9 @@ my @weeklytable = (
     "thursday",
     "friday",   
     "saturday",  
-    "sunday");
+    "sunday",
+    "holiday",
+    "vacation");
     
 my %defaultwakeuptable = (
     "name"      =>  "",
@@ -327,7 +340,7 @@ my @seasons = (
  
 #-- modes or day types that affect the profile
 my @profmode = ("party","absence","donotdisturb");
-my @profday  = ("vacation","holiday"); 
+my @profday  = ("holiday","vacation"); 
 
 #-- color schemes
 my @csmode;
@@ -359,6 +372,9 @@ sub YAAHM_Initialize ($) {
   my $attst            = "linkname publicroom hiddenroom lockstate:locked,unlocked simulation:0,1 norepeat:0,1 ".
                          "modecolor0 modecolor1 modecolor2 modecolor3 statecolor0 statecolor1 statecolor2 statecolor3 ".
                          "timeHelper modeHelper modeAuto:0,1 stateDevices:textField-long stateInterval noicons:0,1 stateWarning stateHelper stateAuto:0,1 ".
+                         "deviceActions:textField-long ".
+                         "sunrise:SunRise,AstroTwilightMorning,NauticTwilightMorning,CivilTwilightMorning,CustomTwilightMorning ".
+                         "sunset:SunSet,AstroTwilightEvening,NauticTwilightEvening,CivilTwilightEvening,CustomTwilightEvening ".
                          "holidayDevices:textField-long vacationDevices:textField-long specialDevices:textField-long";
  
   $hash->{AttrList}    = $attst;
@@ -432,13 +448,20 @@ sub YAAHM_Define ($$) {
  $attr{$name}{"room"}       = $yaahmhiddenroom;
  
  my $date = YAAHM_restore($hash,0);
+ 
  #-- data seems to be ok, restore
  if( defined($date) ){
    YAAHM_restore($hash,1);
    Log3 $name,1,"[YAAHM_Define] data hash restored from save file with date $date";
+   if( !defined($hash->{DATA}{"XT"}) ){
+     $hash->{DATA}{"XT"} = {};
+   }
  #-- intialization
  }else{
    Log3 $name,1,"[YAAHM_Define] data hash is initialized";
+   #-- ZERO device action entries profile
+   $hash->{DATA}{"XT"} = {};
+   
    #-- clone daily default profile
    $hash->{DATA}{"DT"}  = {%defaultdailytable};
  
@@ -446,9 +469,10 @@ sub YAAHM_Define ($$) {
    $hash->{DATA}{"WT"} = ();
    push(@{$hash->{DATA}{"WT"}},{%defaultwakeuptable});
    $hash->{DATA}{"WT"}[0]{"name"} = $yaahm_tt->{"wakeup"};
-    push(@{$hash->{DATA}{"WT"}},{%defaultsleeptable});
+   push(@{$hash->{DATA}{"WT"}},{%defaultsleeptable});
    $hash->{DATA}{"WT"}[1]{"name"} = $yaahm_tt->{"sleep"};
- 
+   
+   
    #-- clone days for today and tomorrow
    $hash->{DATA}{"DD"}  = ();
    push(@{$hash->{DATA}{"DD"}},{%defaultdayproperties});
@@ -834,6 +858,8 @@ sub YAAHM_Set($@) {
      }
      fhem("deletereading ".$name." ring_".($imax-1));
      fhem("deletereading ".$name." ring_".($imax-1)."_1");
+     fhem("deletereading ".$name." ring_".($imax-1)."x");
+     fhem("deletereading ".$name." ring_".($imax-1)."_1x");
      fhem("deletereading ".$name." next_".($imax-1));
      fhem("deletereading ".$name." today_".($imax-1));
      fhem("deletereading ".$name." today_".($imax-1)."_e");
@@ -904,7 +930,42 @@ sub YAAHM_Get($@) {
       return YAAHM_sayWeeklyTime($hash,$if,1);
     }
   }elsif ($arg eq "template") {
-    $res = "sub HouseTimeHelper(\@){\n".
+   $res  = "################## subroutine for housestate transitions ###########\n";
+   $res .= "sub HouseStateHelper(\@){\n".
+           "  my (\$event,\$param1,\$param2) = \@_;\n\n".
+           "  Log 1,\"[HouseStateHelper] event=\$event\";\n\n".
+           "  my \$time    = ReadingsVal(\"".$name."\",\"housetime\",\"\");\n".
+           "  my \$phase   = ReadingsVal(\"".$name."\",\"housephase\",\"\");\n".
+           "  my \$state   = ReadingsVal(\"".$name."\",\"housestate\",\"\");\n".
+           "  my \$party   = (ReadingsVal(\"".$name."\",\"housemode\",\"\") eq \"party\") ? 1 : 0;\n".
+           "  my \$absence = (ReadingsVal(\"".$name."\",\"housemode\",\"\") eq \"absence\") ? 1 : 0;\n".
+           "  my \$dndist  = (ReadingsVal(\"".$name."\",\"housemode\",\"\") eq \"donotdisturb\") ? 1 : 0;\n";
+    #-- iterate through table        
+    for( my $i=0;$i<int(@states);$i++) {
+           $res .= "  #---------------------------------------------------------------------\n";
+           my $if = ($i == 0) ? "if" : "}elsif";
+           $res .= "  ".$if."( \$event eq \"".$states[$i]."\" ){\n\n";
+    }
+    $res .= "  }\n}\n";
+    $res .= "################## subroutine for housemode transitions ###########\n";
+    $res .= "sub HouseModeHelper(\@){\n".
+           "  my (\$event,\$param1,\$param2) = \@_;\n\n".
+           "  Log 1,\"[HouseStateHelper] event=\$event\";\n\n".
+           "  my \$time    = ReadingsVal(\"".$name."\",\"housetime\",\"\");\n".
+           "  my \$phase   = ReadingsVal(\"".$name."\",\"housephase\",\"\");\n".
+           "  my \$state   = ReadingsVal(\"".$name."\",\"housestate\",\"\");\n".
+           "  my \$party   = (ReadingsVal(\"".$name."\",\"housemode\",\"\") eq \"party\") ? 1 : 0;\n".
+           "  my \$absence = (ReadingsVal(\"".$name."\",\"housemode\",\"\") eq \"absence\") ? 1 : 0;\n".
+           "  my \$dndist  = (ReadingsVal(\"".$name."\",\"housemode\",\"\") eq \"donotdisturb\") ? 1 : 0;\n";
+    #-- iterate through table        
+    for( my $i=0;$i<int(@modes);$i++) {
+           $res .= "  #---------------------------------------------------------------------\n";
+           my $if = ($i == 0) ? "if" : "}elsif";
+           $res .= "  ".$if."( \$event eq \"".$modes[$i]."\" ){\n\n";
+    }
+    $res .= "  }\n}\n";
+    $res .= "################## subroutine for housetime transitions ###########\n";
+    $res .= "sub HouseTimeHelper(\@){\n".
            "  my (\$event,\$param1,\$param2) = \@_;\n\n".
            "  Log 1,\"[HouseTimeHelper] event=\$event\";\n\n".
            "  my \$time    = ReadingsVal(\"".$name."\",\"housetime\",\"\");\n".
@@ -924,22 +985,7 @@ sub YAAHM_Get($@) {
            $res .= "  ".$if."( \$event eq \"".$key."\" ){\n\n";
     }
     $res .= "  }\n}\n";
-    $res .= "sub HouseStateHelper(\@){\n".
-           "  my (\$event,\$param1,\$param2) = \@_;\n\n".
-           "  Log 1,\"[HouseStateHelper] event=\$event\";\n\n".
-           "  my \$time    = ReadingsVal(\"".$name."\",\"housetime\",\"\");\n".
-           "  my \$phase   = ReadingsVal(\"".$name."\",\"housephase\",\"\");\n".
-           "  my \$state   = ReadingsVal(\"".$name."\",\"housestate\",\"\");\n".
-           "  my \$party   = (ReadingsVal(\"".$name."\",\"housemode\",\"\") eq \"party\") ? 1 : 0;\n".
-           "  my \$absence = (ReadingsVal(\"".$name."\",\"housemode\",\"\") eq \"absence\") ? 1 : 0;\n".
-           "  my \$dndist  = (ReadingsVal(\"".$name."\",\"housemode\",\"\") eq \"donotdisturb\") ? 1 : 0;\n";
-    #-- iterate through table        
-    for( my $i=0;$i<int(@states);$i++) {
-           $res .= "  #---------------------------------------------------------------------\n";
-           my $if = ($i == 0) ? "if" : "}elsif";
-           $res .= "  ".$if."( \$event eq \"".$states[$i]."\" ){\n\n";
-    }
-    $res .= "  }\n}\n";
+   
     return $res;
   } else {
     $res = "0,1";
@@ -965,7 +1011,6 @@ sub YAAHM_save($) {
   readingsSingleUpdate( $hash, "savedate", $date, 1 ); 
   my $jhash0 = toJSON($hash->{DATA});
   my $error  = FileWrite("YAAHMFILE",$jhash0);
-  #Log 1,"[YAAHM_save] error=$error";
   return;
 }
 	 
@@ -1015,24 +1060,44 @@ sub YAAHM_setParm($@) {
  
   my $cmd  = $a[0];
   my $key  = $a[1];
+  my $dea  = $a[2];
   my $msg  = "";
   my $val;
   
+  #-- device action profile
+  #   start, end/offset, execution, active in mode / daytype
+  if ($cmd eq "xt") {
+    for( my $i=1;$i<6;$i++){
+       $val = $a[$i+1];
+       if( ($val eq "undef")||($val eq "") ){
+         $val = undef;
+       }elsif( ($i>3) && ($i<5) && ($val !~ /\d?\d:\d\d/)){
+         $msg = "wrong time specification $val in device action profile for device no. $key, must be hh:mm";
+         Log 1,"[YAAHM_setParm] ".$msg;
+       }
+    }
+    $hash->{DATA}{"XT"}{$dea}{"name"}     = $a[2];
+    #-- check ??
+    $hash->{DATA}{"XT"}{$dea}{"event"}    = $a[3];
+    $hash->{DATA}{"XT"}{$dea}{"earliest"} = $a[4];
+    $hash->{DATA}{"XT"}{$dea}{"latest"}   = $a[5];
+    $hash->{DATA}{"XT"}{$dea}{"cmd"}      = $a[6];
+    return $msg;
   #-- daily profile
   #   start, end/offset, execution, active in mode / daytype
-  if ($cmd eq "dt") {
+  }elsif ($cmd eq "dt") {
     for( my $i=1;$i<5;$i++){
        $val = $a[$i+1];
        if( ($val eq "undef")||($val eq "") ){
          $val = undef;
        }elsif( ($i<3) && ($val !~ /\d?\d:\d\d/)){
-         $msg = "wrong time specification $val for key $key, must be hh:mm";
+         $msg = "wrong time specification $val in daily profile for timer no. $key, must be hh:mm";
          Log 1,"[YAAHM_setParm] ".$msg;
          $val = "00:00";
        }elsif( $i<3 ){
          my ($hour,$min) = split(':',$val);
          if( $hour>23 || $min>59 ){
-           $msg = "wrong time specification $val for key $key > 23:59";
+           $msg = "wrong time specification $val in daily profile for timer no. $key > 23:59";
            Log 1,"[YAAHM_setParm] ".$msg;
            $val = "00:00";
          }
@@ -1054,12 +1119,12 @@ sub YAAHM_setParm($@) {
       #-- ok
       my ($hour,$min) = split(':',$val);
       if( $hour>23 || $min>59 ){
-        $msg = "wrong time specification next=$val for weekly timer > 23:59".$a[1];
+        $msg = "wrong time specification next=$val for weekly timer ".$hash->{DATA}{"WT"}[$a[1]]{"name"}." > 23:59";
         Log 1,"[YAAHM_setParm] ".$msg;
         $val = "off";
       }
     }else{
-      $msg = "wrong time specification next=$val for weekly timer ".$a[1].", must be hh:mm of 'off'";
+      $msg = "wrong time specification next=$val for weekly timer ".$hash->{DATA}{"WT"}[$a[1]]{"name"}.", must be hh:mm of 'off'";
       Log 1,"[YAAHM_setParm] ".$msg;
       $val = "off";
     }
@@ -1070,7 +1135,7 @@ sub YAAHM_setParm($@) {
     #-- activity vacation/holiday
     $hash->{DATA}{"WT"}[$a[1]]{"acti_d"}    = $a[5];
     #-- weekdays
-    for( my $i=0;$i<7;$i++){
+    for( my $i=0;$i<9;$i++){
       $val = $a[$i+6];
       if( ($val eq "undef")||($val eq "") ){
         $val = undef;
@@ -1080,12 +1145,12 @@ sub YAAHM_setParm($@) {
         #-- ok
         my ($hour,$min) = split(':',$val);
         if( $hour>23 || $min>59 ){
-          $msg = "wrong time specification $val for weekly timer > 23:59 ".$a[1];
+          $msg = "wrong time specification $val for weekly timer ".$hash->{DATA}{"WT"}[$a[1]]{"name"}." > 23:59 ";
           Log 1,"[YAAHM_setParm] ".$msg;
           $val = "off";
         }
       }else{
-        $msg = "wrong time specification $val for weekly timer ".$a[1].", must be hh:mm or 'off'";
+        $msg = "wrong time specification $val for weekly timer ".$hash->{DATA}{"WT"}[$a[1]]{"name"}.", must be hh:mm or 'off'";
         Log 1,"[YAAHM_setParm] ".$msg;
         $val = "off";
       }
@@ -1200,10 +1265,12 @@ sub YAAHM_time {
     readingsBulkUpdate($hash,"tr_housetime",$yaahm_tt->{$targettime});
     readingsBulkUpdate($hash,"housephase",$targetphase);
     readingsBulkUpdate($hash,"tr_housephase",$yaahm_tt->{$targetphase});
+    readingsEndUpdate($hash,1); 
   }
   #-- before fixing new times
   #   if manual wake/sleep/timer, the time for the current day needs to be set to empty, 
   #   but second execution on the same day is blocked if attribute norepeat is set.
+  readingsBeginUpdate($hash);
   if( $targettime eq "wakeup" ){
     $hash->{DATA}{"WT"}[0]{"next"} = "";
     readingsBulkUpdate($hash,"next_0","");
@@ -1216,7 +1283,6 @@ sub YAAHM_time {
     readingsBulkUpdate($hash,"next_".$i,"");
   }
   readingsEndUpdate($hash,1); 
-  YAAHM_setWeeklyTime($hash);
   
   #-- helper function not executed, e.g. by call from external timer
   return
@@ -1327,8 +1393,7 @@ sub YAAHM_nextWeeklyTime {
   #-- all logic in setweeklytime     
   $hash->{DATA}{"WT"}[$i]{"next"} = $time; 
   $hash->{DATA}{"WT"}[$i]{"done"} = 0;
-  YAAHM_setWeeklyTime($hash);                                                   
-   
+  YAAHM_setWeeklyTime($hash);                                          
 }
 
 #########################################################################################
@@ -1612,6 +1677,139 @@ sub YAAHM_informer($) {
   $me->{NTFY_ORDER} = $FW_cname;   # else notifyfn won't be called
   %ntfyHash = ();
 }
+
+#########################################################################################
+#
+# YAAHM_startDeviceActions- start the device action function
+#
+# Parameter name = name of the YAAHM device
+#
+#########################################################################################
+
+sub YAAHM_startDeviceActions($) {
+  my ($name) = @_;
+  return
+    if(!defined($name));
+    
+  my $hash = $defs{$name};
+  return
+    if(!defined($hash));
+
+  my $res;
+  my $avl  = AttrVal($name,"deviceActions",undef);
+  return
+    if( !$avl );
+    
+  my ($dea,$dev,$evt,$eval,$lval,$xval,$tsw,$tfinal);
+    
+  #-- number of action devices
+  my $devactno;  
+  my @actdevlist = split(',',$avl);
+  $devactno=int(@actdevlist);
+  
+  #-- check for obsolete keys and remove from hash
+  my %devacthash = %{$hash->{DATA}{"XT"}};
+  my %actdevattr = map {$_ => 1} @actdevlist;
+  foreach my $key (keys %devacthash){
+    if($actdevattr{$key} != 1){
+      delete($hash->{DATA}{"XT"}{$key});
+    }
+  }
+  
+  readingsBeginUpdate($hash);
+  
+  #-- start timer
+  for( my $i=0;$i < $devactno ;$i++){
+    $dea  = $actdevlist[$i];
+    $dev  = $hash->{DATA}{"XT"}{$dea}{"name"};
+    if( $dea ne $dev){
+      Log3 $name,1,"[YAAHM_startDeviceActions] key $dea not equal to name $dev, no action timer started";
+      next;
+    }
+    $evt  = $hash->{DATA}{"XT"}{$dea}{"event"};
+    $eval = $hash->{DATA}{"XT"}{$dea}{"earliest"};
+    $lval = $hash->{DATA}{"XT"}{$dea}{"latest"};
+    $xval = $hash->{DATA}{"XT"}{$dea}{"cmd"};
+    
+    #-- precise time
+    if( $evt =~ /$defaultdailykeys/ ){
+      $tsw = ReadingsVal($name,"s_".$evt,"?");
+    }else{
+      my $jnd = undef;
+      for( my $j=0;$j < int( @{$hash->{DATA}{"WT"}} );$j++){
+        $jnd = $j
+          if( ($hash->{DATA}{"WT"}[$j]{"name"} eq $evt) && ($evt !~ /(wakeup)|(sleep)/) );
+      }
+      if( defined($jnd) ){
+        $tsw = ReadingsVal($name,"ring_".$jnd,"?");
+      }else{
+        $tsw = "?";
+      }
+    }
+    
+    #-- TODO: only if timer is enabled !!!
+    my $early = $hash->{DATA}{"XT"}{$dea}{"earliest"};
+    my $late  = $hash->{DATA}{"XT"}{$dea}{"latest"};
+    if( $tsw =~ /(^off)|(\d?\d:\d\d(:\d\d)?)/ ){
+      my $early = $hash->{DATA}{"XT"}{$dea}{"earliest"};
+      my $late  = $hash->{DATA}{"XT"}{$dea}{"latest"};
+
+      #-- no direct time, use latest
+      if( $tsw =~ /^off/ ){
+        if( defined($late) && $late =~ /\d?\d:\d\d(:\d\d)?/ ){
+          $tfinal = $late;
+        }else{
+          $tfinal = "?";
+        }
+      }elsif( $tsw =~ /\d?\d:\d\d(:\d\d)?/ ){
+        #-- direct switching time
+        $tfinal = $tsw;
+        my ($hc,$mc) = split(':',$tsw); 
+        #--early time defined
+        if( defined($early) && $early =~ /\d?\d:\d\d(:\d\d)?/ ){
+          my ($he,$me) = split(':',$early);
+          my $de=60*($he-$hc)+($me-$mc);
+          #-- too early, action at early
+          if( $de>0 ){
+            $tfinal = $early;
+          }
+        }
+        #-- late time defined
+        if( defined($late) && $late =~ /\d?\d:\d\d(:\d\d)?/ ){
+          my ($hl,$ml) = split(':',$late);
+          my $dl=60*($hl-$hc)+($ml-$mc);
+          #-- too late, action at late
+          if( $dl<0 ){  
+            $tfinal = $late;
+          }
+        }
+      }else{
+        $tfinal = "?";
+      }
+    }
+    if( $tfinal =~ /\d?\d:\d\d(:\d\d)?/ ){
+      Log3 $name,5,"[YAAHM_startDeviceActions] final switching time found for device action timer $dea is ".$tfinal;
+      my $xval = $hash->{DATA}{"XT"}{$dea}{"cmd"};
+      $hash->{DATA}{"XT"}{$dea}{"time"} = $tfinal;
+      $res  = "defmod ".$name.".xtimer_".$i.".IF DOIF ([$tfinal]) (".$xval.")";
+      fhem($res);
+      fhem("attr ".$name.".xtimer_".$i.".IF comment ".$dev);
+      fhem("attr ".$name.".xtimer_".$i.".IF do always");
+      fhem("attr ".$name.".xtimer_".$i.".IF room ".(defined($attr{$name}{"publicroom"})  ? $attr{$name}{"publicroom"} : $yaahmpublicroom)); 
+      fhem("set  ".$name.".xtimer_".$i.".IF enable");
+      readingsBulkUpdate( $hash, "xdevice_".$i,$tfinal );    
+    }else{
+      Log3 $name, 1,"[YAAHM_startDeviceActions] no switching time found for device action timer $dev with evt $evt"; 
+    }
+  }
+   
+  #-- save everything
+  readingsEndUpdate($hash,1);
+  YAAHM_save($hash);
+  fhem("save");
+  
+  return "Device actions started";
+}
   
 #########################################################################################
 #
@@ -1657,7 +1855,7 @@ sub YAAHM_startDayTimer($) {
   #-- Internal timer for night time
   my ($sec, $min, $hour, $day, $month, $year, $wday,$yday,$isdst) = localtime(time);
   my $nval = $hash->{DATA}{"DT"}{"night"}[0];
-  if( $nval !~ /\d\d:\d\d/ ){
+  if( $nval !~ /\d?\d:\d\d/ ){
     $msg = "Error in night time specification";
     Log3 1,$name,"[YAAHM_startDayTimer] ".$msg;
     return $msg;
@@ -1672,7 +1870,7 @@ sub YAAHM_startDayTimer($) {
   
   #-- Internal timer for daytime
   my $mval = $hash->{DATA}{"DT"}{"morning"}[0];
-  if( $mval !~ /\d\d:\d\d/ ){
+  if( $mval !~ /\d?\d:\d\d/ ){
     $msg = "Error in morning time specification";
     Log3 1,$name,"[YAAHM_startDayTimer] ".$msg;
     return $msg;
@@ -1736,6 +1934,7 @@ sub YAAHM_startDayTimer($) {
   $res =~ s/\nDOELSEIF$//;
   fhem($res);
   fhem("attr $name.dtimer.IF do always");
+  fhem("attr $name.dtimer.IF room ".(defined($attr{$name}{"publicroom"})  ? $attr{$name}{"publicroom"} : $yaahmpublicroom)); 
   fhem("set $name.dtimer.IF enable");
   
   #-- save everything
@@ -1767,10 +1966,12 @@ sub YAAHM_startWeeklyTimer($) {
     $wupn = $hash->{DATA}{"WT"}[$i]{"name"};
     $res = "defmod ".$name.".wtimer_".$i.".IF DOIF ([".$name.":ring_".$i."] eq \"off\")\n()\nDOELSEIF\n(([[".$name.":ring_".$i."]])";
 
-    #-- check for activity description
+    #-- check for mode activation
     my $g4a = defined($hash->{DATA}{"WT"}[$i]{"acti_m"}) ? $hash->{DATA}{"WT"}[$i]{"acti_m"} : "";
-    my $g4b = defined($hash->{DATA}{"WT"}[$i]{"acti_d"}) ? $hash->{DATA}{"WT"}[$i]{"acti_d"} : "";
     my $v4a = ($g4a ne "") ? "(normal)|(".join(')|(',split(',',$g4a)).")" : "(normal)";
+    
+    #-- check for daytype activation
+    my $g4b = defined($hash->{DATA}{"WT"}[$i]{"acti_d"}) ? $hash->{DATA}{"WT"}[$i]{"acti_d"} : "";
     my $v4b = ($g4b ne "") ? "(workday)|(weekend)|(".join(')|(',split(',',$g4b)).")" : "(workday)|(weekend)";
     
     $res .= "\nand ((([" .$name. ":housemode] =~ \"".$v4a."\")";
@@ -1791,7 +1992,9 @@ sub YAAHM_startWeeklyTimer($) {
     
     #-- doit
     fhem($res);
+    fhem("attr ".$name.".wtimer_".$i.".IF comment $g4b");
     fhem("attr ".$name.".wtimer_".$i.".IF do always");
+    fhem("attr ".$name.".wtimer_".$i.".IF room ".(defined($attr{$name}{"publicroom"})  ? $attr{$name}{"publicroom"} : $yaahmpublicroom)); 
     fhem("set  ".$name.".wtimer_".$i.".IF enable");
   }
   
@@ -1815,84 +2018,127 @@ sub YAAHM_setWeeklyTime($) {
   my $name = $hash->{NAME};
   
   #-- weekly profile times
-  my ($sg0,$sg1,$ring_0x,$ring_1x,$ring_0e,$ring_1e,$ring_0,$ring_1,$ng);
+  my ($daytype_0,$daytype_1,$weektime_0,$weektime_1,$ring_0x,$ring_1x,$ring_0e,$ring_1e,$ring_0,$ring_1,$nexttime,$wupad,$wupam);
   
   #-- iterate over timers
   for( my $i=0;$i<int( @{$hash->{DATA}{"WT"}} );$i++){
     #-- obtain next time spec => will override all
-    $ng  = $hash->{DATA}{"WT"}[$i]{ "next" };
+    $nexttime  = $hash->{DATA}{"WT"}[$i]{ "next" };
     #-- highest priority is a disabled timer - no wakeup at all
     if( ReadingsVal($name.".wtimer_".$i.".IF","mode","") eq "disabled" ){
-      $sg0 = "off";
-      $sg1 = "off";
+      $ring_0  = "off";
+      $ring_0x = "off";
       $ring_0e = "disabled (timer)";
+      $ring_1  = "off";
+      $ring_1x = "off";
       $ring_1e = "disabled (timer)";
     #-- if the timer is enabled, we'll use its timing values
     }else{
-      $sg0 = $hash->{DATA}{"WT"}[$i]{ $weeklytable[$hash->{DATA}{"DD"}[0]{"weekday"}] } ;
-      $sg1 = $hash->{DATA}{"WT"}[$i]{ $weeklytable[$hash->{DATA}{"DD"}[1]{"weekday"}] };
-      $ring_0e = "enabled";
-      $ring_1e = "enabled";
-      #-- next higher priority for "off" is daytype 
-      my $wupad = $hash->{DATA}{"WT"}[$i]{"acti_d"}.",workday,weekend"; 
+      #-- timer active for the following daytypes
+      $wupad = $hash->{DATA}{"WT"}[$i]{"acti_d"}.",workday,weekend"; 
+      
       #-- start with tomorrow
-      if( index($wupad, $hash->{DATA}{"DD"}[1]{"daytype"}) == -1 ){
-        $ring_1x = "off (".substr(ReadingsVal($name,"tr_tomorrowType",""),0,3).")";
-        $ring_1e  = "disabled (".ReadingsVal($name,"tomorrowType","").")";
-      }elsif( ($hash->{DATA}{"DD"}[1]{"vacflag"} == 1 ) && index($wupad,"vacation") == -1 ){
-        $ring_1x = "off (".substr($yaahm_tt->{"vacation"},0,3).")";
-        $ring_1e  = "disabled (vacation)";
-      }else{
-        $ring_1x = $sg1;
-      }
       #-- because today we might also have an influence of housemode
-      if( index($wupad, $hash->{DATA}{"DD"}[0]{"daytype"}) == -1 ){
-        $ring_0x = "off (".substr(ReadingsVal($name,"tr_todayType",""),0,3).")";
-        $ring_0e  = "disabled (".ReadingsVal($name,"todayType","").")";
-      }elsif( ($hash->{DATA}{"DD"}[0]{"vacflag"} == 1 ) && index($wupad,"vacation") == -1 ){
-        $ring_0x = "off (".substr($yaahm_tt->{"vacation"},0,3).")";
-        $ring_0e  = "disabled (vacation)";
-      }else{
-      #-- next higher priority for "off" (only today !) is housemode 
-        my $wupam = $hash->{DATA}{"WT"}[$i]{"acti_m"}.",normal";
-        if( index($wupam, ReadingsVal($name,"housemode","")) == -1 ){
-          $ring_0x = "off (".substr(ReadingsVal($name,"tr_housemode",""),0,3).")";
-          $ring_0e  = "disabled (".ReadingsVal($name,"housemode","").")";
+      $daytype_1 = $hash->{DATA}{"DD"}[1]{"daytype"};
+      $ring_1    = $hash->{DATA}{"WT"}[$i]{ $weeklytable[$hash->{DATA}{"DD"}[1]{"weekday"}] } ; 
+      $ring_1x   = $ring_1;
+      $ring_1e   = "enabled";    
+      
+      #-- holiday/vacation have higher priority, check for corresponding time
+      if( $daytype_1 eq "holiday" ){
+        #-- holiday special time
+        $weektime_1 = $hash->{DATA}{"WT"}[$i]{ "holiday" } ;
+        if( defined($weektime_1) && ($weektime_1 =~ /\d?\d:\d\d(:\d\d)?/) ){
+          $ring_1  = $weektime_1;
+          $ring_1x = $weektime_1;
+        }elsif( index($wupad, "holiday") != -1 ){
+          #-- no change
         }else{
-          $ring_0x = $sg0;
-        }
-      }   
-    }  
-    
-    #-- no "next" time specification
-    if( !defined($ng) || $ng eq "" ){
-      $ring_0 = $sg0;
-      $ring_1 = $sg1;
+          $ring_1  = "off (".$yaahm_tt->{"holiday"}[1].")"; 
+          $ring_1x = "off (".$yaahm_tt->{"holiday"}[1].")";
+          $ring_1e = "disabled (holiday)";
+        }    
+      }elsif( $daytype_1 eq "vacation" ){
+        #-- vacation special time
+        $weektime_1 = $hash->{DATA}{"WT"}[$i]{ "vacation" } ;
+        if( defined($weektime_1) && ($weektime_1 =~ /\d?\d:\d\d(:\d\d)?/) ){
+          $ring_1  = $weektime_1;
+          $ring_1x = $weektime_1;
+        }elsif( index($wupad, "vacation") != -1 ){
+          #--no change
+        }else{
+          $ring_1  = "off (".$yaahm_tt->{"vacation"}[1].")"; 
+          $ring_1x = "off (".$yaahm_tt->{"vacation"}[1].")";
+          $ring_1e = "disabled (vacation)";
+        }    
+      }
+      
+      #-- now today
+      #-- because today we might also have an influence of housemode
+      $daytype_0 = $hash->{DATA}{"DD"}[0]{"daytype"};
+      $ring_0    = $hash->{DATA}{"WT"}[$i]{ $weeklytable[$hash->{DATA}{"DD"}[0]{"weekday"}] } ;  
+      $ring_0x   = $ring_0; 
+      $ring_0e   = "enabled";
+     
+      #-- holiday/vacation have higher priority, check for corresponding time
+      if( $daytype_0 eq "holiday" ){
+        #-- holiday special time
+        $weektime_0 = $hash->{DATA}{"WT"}[$i]{ "holiday" } ;
+        if( defined($weektime_0) && ($weektime_0 =~ /\d?\d:\d\d(:\d\d)?/) ){
+          $ring_0  = $weektime_0;
+          $ring_0x = $weektime_0;
+        }elsif( index($wupad, "holiday") != -1 ){
+          #-- no change
+        }else{
+          $ring_0  = "off (".$yaahm_tt->{"holiday"}[1].")"; 
+          $ring_0x = "off (".$yaahm_tt->{"holiday"}[1].")";
+          $ring_0e = "disabled (holiday)";
+        }    
+      }elsif( $daytype_0 eq "vacation" ){
+        #-- vacation special time
+        $weektime_0 = $hash->{DATA}{"WT"}[$i]{ "vacation" } ;
+        if( defined($weektime_0) && ($weektime_0 =~ /\d?\d:\d\d(:\d\d)?/) ){
+          $ring_0  = $weektime_0;
+          $ring_0x = $weektime_0;
+        }elsif( index($wupad, "vacation") != -1 ){
+          #--no change
+        }else{
+          $ring_0  = "off (".$yaahm_tt->{"vacation"}[1].")"; 
+          $ring_0x = "off (".$yaahm_tt->{"vacation"}[1].")";
+          $ring_0e = "disabled (vacation)";
+        }    
+      }
+      #-- next higher priority for "off" (only today !) is housemode 
+      my $wupam = $hash->{DATA}{"WT"}[$i]{"acti_m"}.",normal";
+      if( index($wupam, ReadingsVal($name,"housemode","")) == -1 ){
+        $ring_0x = "off (".substr(ReadingsVal($name,"tr_housemode",""),0,3).")";
+        $ring_0e  = "disabled (".ReadingsVal($name,"housemode","").")";
+      }else{
+        $ring_0x = $ring_0;
+      }
+    }    
+ 
     #-- highest priority is a "next" time specification
-    }else{
+    if( defined($nexttime) && ($nexttime =~ /(\d?\d:\d\d(:\d\d)?)|(off)/) ){
       #-- current time
       my ($sec, $min, $hour, $day, $month, $year, $wday,$yday,$isdst) = localtime(time);
       my $lga = sprintf("%02d%02d",$hour,$min);
       #-- today's waketime
-      my $tga = $sg0;
+      my $tga = $ring_0;
       $tga    =~ s/://;
       #-- tomorrow's waketime
-      my $tgm = $sg1;
+      my $tgm = $ring_1;
       $tgm    =~ s/://;
       #-- "next" input
-      my $nga = (defined $ng)?$ng:"";
+      my $nga = (defined $nexttime)?$nexttime:"";
       $nga    =~ s/://;
       #-- "next" is the same as todays waketime and todays waketime not over => restore !
       if( ($nga eq $tga) && ($tga > $lga)){
-        $ring_0 = $sg0;
-        $ring_1 = $sg1;
-        $ng     = "";
+        $nexttime = "";
         $hash->{DATA}{"WT"}[$i]{ "next" }="";
       #-- "next" is the same as tomorrows waketime and todays waketime over => restore !
       }elsif( ($nga eq $tgm) && ($tga < $lga)){
-        $ring_0 = $sg0;
-        $ring_1 = $sg1;
-        $ng     = "";
+        $nexttime  = "";
         $hash->{DATA}{"WT"}[$i]{ "next" }="";
       #-- "next" is off
       }elsif( $nga eq "off" ){
@@ -1901,81 +2147,50 @@ sub YAAHM_setWeeklyTime($) {
           if( $ring_0x !~ /^off/ ){
             $ring_0x = "off (man)";
             $ring_0 = "off";
-            $ring_1 = $sg1;
           }
         #-- today's waketime over => we mean tomorrow
         }else{
           if( $ring_1x !~ /^off/ ){
-            $ring_1x = "off (man)";
-            $ring_0 = $sg0;
-            $ring_1 = "$sg1 (off)";
+            $ring_1x  = "off (man)";
+            $ring_1 .= " (off)";
           }
         }
       #-- "next" is nontrivial timespec
       }else{
         #-- "next" after current time => we mean today
         if( $nga > $lga ){
-          #-- the same as original waketime => restore ! (do we come here at all ?)
-          #if( $ng eq $sg0 ){
-          #  $ring_0x = $sg0;
-          #  $ring_0 = $sg0;
-          #  $ng     = "";
-          #  $hash->{DATA}{"WT"}[$i]{ "next" } = "";
-          #-- new manual waketime tomorrow
-          #}else{
-            $ring_0x = "$ng (man)";
-            $ring_0  = $ng;
-          #}
-          $ring_1 = $sg1;
+          $ring_0x = "$nexttime (man)";
+          $ring_0  = $nexttime;
         #-- "next" before current time => we mean tomorrow
         }else{
-          #-- the same as original waketime => restore ! (do we come here at all ?)
-          #if( $ng eq $sg1 ){
-          #  $ring_0x = $sg1;
-          #  $ring_1 = $sg1;
-          #  $ng     = "";
-          #  $hash->{DATA}{"WT"}[$i]{ "next" } = "";
-          #}else{
-            $ring_1x = "$ng (man)";
-            $ring_1  = "$sg1 ($ng)";
-          #}
-          $ring_0 = $sg0;
+          $ring_1x = "$nexttime (man)";
+          $ring_1 .= " ($nexttime)";
         }
       }
     }
+    
     $hash->{DATA}{"WT"}[$i]{"ring_0"}  = $ring_0; 
     $hash->{DATA}{"WT"}[$i]{"ring_1"}  = $ring_1; 
     $hash->{DATA}{"WT"}[$i]{"ring_0x"} = $ring_0x; 
     $hash->{DATA}{"WT"}[$i]{"ring_1x"} = $ring_1x;  
     $hash->{DATA}{"WT"}[$i]{"ring_0e"} = $ring_0e;  
     $hash->{DATA}{"WT"}[$i]{"ring_1e"} = $ring_1e;  
-    #Log 1,"====> AFTER FINAL   CHECK TIMER $i sg0=$sg0  ring_0x=$ring_0x  sg1=$sg1  ring_1x=$ring_1x  ng=$ng";
-    #Log 1,"                                   ".$hash->{DATA}{"WT"}[$i]{"ring_0x"}."               ".$hash->{DATA}{"WT"}[$i]{"ring_1x"}; 
-    #-- notation: 
-    #  today_i    is today's waketime of timer i   
-    #  tomorrow_i is tomorrow's waketime of timer i
-    #    timers have additional conditions for activation according
-    #    to housemode and daytype, these conditions are checked in the timer device
-    #    devices and are not part of the table. But we have a reading:
-    #  today_i_e    is a copy of the condition checked in the timer device 
-    #               (housemode and daytype)
-    #  tomorrow_i_e is not a complete copy of the condition checked in the timer device,
-    #               (daytype only, because housemode of tomorrow is not known)
-    #  ring_[i]_1 is tomorrow's ring time of timer i
+  
     readingsBeginUpdate($hash);
-    readingsBulkUpdate( $hash, "today_".$i,$sg0 );  
-    readingsBulkUpdate( $hash, "tomorrow_".$i,$sg1 );
+    readingsBulkUpdate( $hash, "today_".$i,$ring_0 );  
+    readingsBulkUpdate( $hash, "tomorrow_".$i,$ring_1 );
     readingsBulkUpdate( $hash, "today_".$i."_e",$ring_0e );  
     readingsBulkUpdate( $hash, "tomorrow_".$i."_e",$ring_1e );
     readingsBulkUpdate( $hash, "ring_".$i,$ring_0 );    
     readingsBulkUpdate( $hash, "ring_".$i."_1",$ring_1 ); 
     readingsBulkUpdate( $hash, "ring_".$i."x",$ring_0x );    
     readingsBulkUpdate( $hash, "ring_".$i."_1x",$ring_1x ); 
-    readingsBulkUpdate( $hash, "next_".$i,$ng );    
-   
+    readingsBulkUpdate( $hash, "next_".$i,$nexttime );     
     readingsEndUpdate($hash,1);  
+    
     YAAHM_sayWeeklyTime($hash,$i,0);                                   
   }
+   YAAHM_startDeviceActions($name);
 }
 
 #########################################################################################
@@ -2006,21 +2221,20 @@ sub YAAHM_sayWeeklyTime($$$) {
   $msg  = $hash->{DATA}{"WT"}[$timer]{"name"};
 
   #-- get timer values from readings, because these include vacation settings and special time
-  $tod  = $hash->{DATA}{"WT"}[$timer]{"ring_0x"};
-  $tom  = $hash->{DATA}{"WT"}[$timer]{"ring_1x"};
-  $done = $hash->{DATA}{"WT"}[$timer]{"done"};
+  $tod   = $hash->{DATA}{"WT"}[$timer]{"ring_0x"};
+  $tom   = $hash->{DATA}{"WT"}[$timer]{"ring_1x"};
+  $done  = $hash->{DATA}{"WT"}[$timer]{"done"};
   $norep = AttrVal($name,"norepeat",0);
 
   #-- current local time
   ($hl,$ml) = split(':',strftime('%H:%M', localtime(time)));
-  $tl = 60*$hl+$ml;
+  $tl       = 60*$hl+$ml;
   
   #-- today off AND tomorrow any time or off => compare this time with current time
   if( $tod =~ /^off.*/ ){
   
     #-- tomorrow any time
     if( $tom =~ /(\d?\d):(\d\d)(:(\d\d))?/ && $tom !~ /.*\(off\)$/ ){
-      #Log 1,"===========> |$1|$2|$3|$4";
       ($ht,$mt) = split('[\s:]',$tom);
       $tt=60*$ht+$mt;
       
@@ -2046,7 +2260,6 @@ sub YAAHM_sayWeeklyTime($$$) {
     
   #-- today nontrivial => compare this time with current time
   }elsif( $tod =~ /(\d?\d):(\d\d)(:(\d\d))?/ ){
-    #Log 1,"===========> |$1|$2|$3|$4";
     ($ht,$mt) = split('[\s:]',$tod);
     $tt=60*$ht+$mt;
     
@@ -2063,7 +2276,6 @@ sub YAAHM_sayWeeklyTime($$$) {
       $pt   = "off ".lc($yaahm_tt->{"tomorrow"});
       $msg .= " ".lc($yaahm_tt->{"tomorrow"})." ".$yaahm_tt->{"swoff"};
     }elsif( $tom =~ /(\d?\d):(\d\d)(:(\d\d))?( \((\d?\d):(\d\d)(:(\d\d))?\))?/ ){
-      #Log 1,"===========> |$1|$2|$3|$4|$5|$6";
       if( defined($5) && $5 ne ""){
         $hw = $6*1;
         $mw = $7*1;
@@ -2150,9 +2362,13 @@ sub YAAHM_checkMonthly($$$) {
         @tmor  = split('\.',$stom);
         @two   = split('\.',$stwom);
         
-        $fline=Calendar_Get($defs{$specialDev},"get","full","mode=alarm|start|upcoming");
+        $fline=Calendar_Get($defs{$specialDev},,"get","events","format:full filter:mode=~'alarm|start|upcoming'");
         #-- more complicated to check here,
         #   format is '<id> upcoming [<datetoannounce> <timetoannouce>] <datestart> <timestart>-<dateend> <timeend> [<description>]
+        
+              #-- more complicated to check here,
+      #   format is '<id>          start/upcoming  <datestart>  <timestart>-<dateend> <timeend> [<description>]
+      #              d30479...5e6  start/upcoming  03.10.2018   00:00-                          Tag der Deutschen Einheit 
         my ($cstart,$cdesc);
                 
         if($fline){
@@ -2288,6 +2504,7 @@ sub YAAHM_updater($) {
   my ($timerHash) = @_;
   my $hash; 
   my $next;
+  my $name = $hash->{NAME};
 
   #-- start timer for updates - when device is reloaded
   if( defined($firstcall) && ($firstcall==1) ){
@@ -2306,7 +2523,6 @@ sub YAAHM_updater($) {
   
   #-- safeguard if hash is not properly indirected
   if( defined($hash->{HASH}) ){
-    #Log 1,"WARNING ! HASH indirection not ok. firstcall=$firstcall";
     $hash = $hash->{HASH};
   }
   YAAHM_RemoveInternalTimer("aftermidnight",$hash);
@@ -2314,7 +2530,7 @@ sub YAAHM_updater($) {
   Log 1,"[YAAHM_updater] on device ".$hash->{NAME}." called for this day";
   
   YAAHM_GetDayStatus($hash);
-
+  YAAHM_startDeviceActions($name);
   return undef; 
 }
 
@@ -2409,24 +2625,24 @@ sub YAAHM_GetDayStatus($) {
   $hash->{DATA}{"DD"}[0]{"date"}      = $stoday;
   $hash->{DATA}{"DD"}[0]{"weekday"}   = (strftime('%w', localtime(time))+6)%7;
   $hash->{DATA}{"DD"}[0]{"daytype"}   = "workday";
-  $hash->{DATA}{"DD"}[0]{"desc"}      = $yaahm_tt->{"workday"};
+  $hash->{DATA}{"DD"}[0]{"desc"}      = $yaahm_tt->{"workday"}[0];
   $hash->{DATA}{"DD"}[0]{"vacflag"}   = 0; 
   
   $tomtype = "workday";
   $hash->{DATA}{"DD"}[1]{"date"}      = $stom;
   $hash->{DATA}{"DD"}[1]{"weekday"}   = (strftime('%w', localtime(time+86400))+6)%7;
   $hash->{DATA}{"DD"}[1]{"daytype"}   = "workday";
-  $hash->{DATA}{"DD"}[1]{"desc"}      = $yaahm_tt->{"workday"};
+  $hash->{DATA}{"DD"}[1]{"desc"}      = $yaahm_tt->{"workday"}[0];
   $hash->{DATA}{"DD"}[1]{"vacflag"}   = 0;
   
   $twotype = "workday";
   $hash->{DATA}{"DD"}[2]{"date"}      = $stwo;
   $hash->{DATA}{"DD"}[2]{"weekday"}   = (strftime('%w', localtime(time+2*86400))+6)%7;
   $hash->{DATA}{"DD"}[2]{"daytype"}   = "workday";
-  $hash->{DATA}{"DD"}[2]{"desc"}      = $yaahm_tt->{"workday"};
+  $hash->{DATA}{"DD"}[2]{"desc"}      = $yaahm_tt->{"workday"}[0];
   $hash->{DATA}{"DD"}[2]{"vacflag"}   = 0;
 
-  #-- vacation = vacdays has higher priority
+  #-- vacation has higher priority
   my $vacdayDevs = AttrVal( $name, "vacationDevices", "" );
   foreach my $vacdayDev ( split( /,/, $vacdayDevs ) ) {
     #-- device of type holiday 
@@ -2437,31 +2653,34 @@ sub YAAHM_GetDayStatus($) {
       my $tod = holiday_refresh( $vacdayDev, $stoday );
       if ( $tod ne "none" ) {
         $todaydesc = $tod;
-        $todaytype = "vacday";
+        $todaytype = "vacation";
         Log3 $name, 5,"[YAAHM] found today=vacation \"$todaydesc\" in holiday $vacdayDev";
       }
       $tod = holiday_refresh( $vacdayDev, $stom );
       if ( $tod ne "none" ) {
         $tomdesc = $tod;
-        $tomtype = "vacday";
+        $tomtype = "vacation";
         Log3 $name, 5,"[YAAHM] found tomorrow=vacation \"$tomdesc\" in holiday $vacdayDev";
       } 
       $tod = holiday_refresh( $vacdayDev, $stwo );
       if ( $tod ne "none" ) {
         $twodesc = $tod;
-        $twotype = "vacday";
+        $twotype = "vacation";
         Log3 $name, 5,"[YAAHM] found twodays=vacation \"$twodesc\" in holiday $vacdayDev";
       } 
     #-- device of type calendar
     }elsif( IsDevice($vacdayDev, "Calendar" )){
-      $stoday  = strftime('%d.%m.%y', localtime(time));
-      $stom    = strftime('%d.%m.%y', localtime(time+86400));
-      $stwo    = strftime('%d.%m.%y', localtime(time+2*86400));
+      $stoday  = strftime('%d.%m.%Y', localtime(time));
+      $stom    = strftime('%d.%m.%Y', localtime(time+86400));
+      $stwo    = strftime('%d.%m.%Y', localtime(time+2*86400));
       @tday  = split('\.',$stoday);
       @tmor  = split('\.',$stom);
       @ttwo  = split('\.',$stwo);
       #-- more complicated to check here
-      $fline=Calendar_Get($defs{$vacdayDev},"get","full","mode=alarm|start|upcoming");
+      $fline=Calendar_Get($defs{$vacdayDev},"get","events","format:full filter:mode=~'alarm|start|upcoming'");
+      #-- more complicated to check here,
+      #   format is '<id>          start/end    <datestart>  <timestart>-<dateend> <timeend> [<description>]
+      #             58b54d...4b    end          22.05.2018   00:00-03.06.2018      00:00     Pfingstferien 
       if($fline){
         #chomp($fline);
         @lines = split('\n',$fline);
@@ -2469,28 +2688,29 @@ sub YAAHM_GetDayStatus($) {
           chomp($fline);
           @chunks = split(' ',$fline);
           @sday   = split('\.',$chunks[2]);
-          @eday   = split('\.',substr($chunks[3],9,10));
+          @eday   = split('\.',substr($chunks[3],6,10));
+          
           #-- today
           my $rets  = ($sday[2]-$tday[2])*365+($sday[1]-$tday[1])*31+($sday[0]-$tday[0]);
           my $rete  = ($eday[2]-$tday[2])*365+($eday[1]-$tday[1])*31+($eday[0]-$tday[0]);
           if( ($rete>=0) && ($rets<=0) ){
             $todaydesc = $chunks[5];
             $todaytype = "vacation";
-            Log3 $name, 5,"[YAAHM] found today=vacation \"$todaydesc\" in calendar $vacdayDev";
+            Log3 $name, 1,"[YAAHM] found today=vacation \"$todaydesc\" in calendar $vacdayDev";
           }    
           $rets  = ($sday[2]-$tmor[2])*365+($sday[1]-$tmor[1])*31+($sday[0]-$tmor[0]);
           $rete  = ($eday[2]-$tmor[2])*365+($eday[1]-$tmor[1])*31+($eday[0]-$tmor[0]);
           if( ($rete>=0) && ($rets<=0) ){
             $tomdesc = $chunks[5];
             $tomtype = "vacation";
-            Log3 $name, 5,"[YAAHM] found tomorrow=vacation \"$tomdesc\" in calendar $vacdayDev";
+            Log3 $name, 1,"[YAAHM] found tomorrow=vacation \"$tomdesc\" in calendar $vacdayDev";
           }
           $rets  = ($sday[2]-$ttwo[2])*365+($sday[1]-$ttwo[1])*31+($sday[0]-$ttwo[0]);
           $rete  = ($eday[2]-$ttwo[2])*365+($eday[1]-$ttwo[1])*31+($eday[0]-$ttwo[0]);
           if( ($rete>=0) && ($rets<=0) ){
             $twodesc = $chunks[5];
             $twotype = "vacation";
-            Log3 $name, 5,"[YAAHM] found twodays=vacation \"$twodesc\" in calendar $vacdayDev";
+            Log3 $name, 1,"[YAAHM] found twodays=vacation \"$twodesc\" in calendar $vacdayDev";
           }
         }
       }  
@@ -2519,9 +2739,9 @@ sub YAAHM_GetDayStatus($) {
   if( strftime('%u', localtime(time)) > 5){
     $todaytype = "weekend";
     if( $hash->{DATA}{"DD"}[0]{"daytype"} ne "workday" ){
-      $hash->{DATA}{"DD"}[0]{"desc"}       = $yaahm_tt->{"weekend"}.", ".$hash->{DATA}{"DD"}[0]{"desc"};
+      $hash->{DATA}{"DD"}[0]{"desc"}       = $yaahm_tt->{"weekend"}[0].", ".$hash->{DATA}{"DD"}[0]{"desc"};
     }else{
-      $hash->{DATA}{"DD"}[0]{"desc"}       = $yaahm_tt->{"weekend"};
+      $hash->{DATA}{"DD"}[0]{"desc"}       = $yaahm_tt->{"weekend"}[0];
     }
     $hash->{DATA}{"DD"}[0]{"daytype"}    = "weekend";
   }
@@ -2529,9 +2749,9 @@ sub YAAHM_GetDayStatus($) {
   if( strftime('%u', localtime(time+86400)) > 5){
     $tomtype = "weekend";
     if( $hash->{DATA}{"DD"}[1]{"daytype"} ne "workday" ){
-      $hash->{DATA}{"DD"}[1]{"desc"}       = $yaahm_tt->{"weekend"}.", ".$hash->{DATA}{"DD"}[1]{"desc"};
+      $hash->{DATA}{"DD"}[1]{"desc"}       = $yaahm_tt->{"weekend"}[0].", ".$hash->{DATA}{"DD"}[1]{"desc"};
     }else{
-      $hash->{DATA}{"DD"}[1]{"desc"}       = $yaahm_tt->{"weekend"};
+      $hash->{DATA}{"DD"}[1]{"desc"}       = $yaahm_tt->{"weekend"}[0];
     }
     $hash->{DATA}{"DD"}[1]{"daytype"}   = "weekend";
   }
@@ -2539,9 +2759,9 @@ sub YAAHM_GetDayStatus($) {
   if( strftime('%u', localtime(time+2*86400)) > 5){
     $twotype = "weekend";
     if( $hash->{DATA}{"DD"}[2]{"daytype"} ne "workday" ){
-      $hash->{DATA}{"DD"}[2]{"desc"}       = $yaahm_tt->{"weekend"}.", ".$hash->{DATA}{"DD"}[2]{"desc"};
+      $hash->{DATA}{"DD"}[2]{"desc"}       = $yaahm_tt->{"weekend"}[0].", ".$hash->{DATA}{"DD"}[2]{"desc"};
     }else{
-      $hash->{DATA}{"DD"}[2]{"desc"}       = $yaahm_tt->{"weekend"};
+      $hash->{DATA}{"DD"}[2]{"desc"}       = $yaahm_tt->{"weekend"}[0];
     }
     $hash->{DATA}{"DD"}[2]{"daytype"}   = "weekend";
   }
@@ -2576,30 +2796,33 @@ sub YAAHM_GetDayStatus($) {
        
     #-- device of type calendar
     }elsif( IsDevice($holidayDev, "Calendar" )){
-      $stoday  = strftime('%d.%m.%y', localtime(time));
-      $stom    = strftime('%d.%m.%y', localtime(time+86400));
-      $stwo    = strftime('%d.%m.%y', localtime(time+2*86400));
-      $line=Calendar_Get($defs{$holidayDev},"get","text","mode=alarm|start|upcoming");
+      $stoday  = strftime('%d.%m.%Y', localtime(time));
+      $stom    = strftime('%d.%m.%Y', localtime(time+86400));
+      $stwo    = strftime('%d.%m.%Y', localtime(time+2*86400));
+      $line=Calendar_Get($defs{$holidayDev},"get","events","format:text filter:mode=~'alarm|start|upcoming'");
+      #-- more complicated to check here,
+      #   format is <datestart>  <timestart>-<dateend> <timeend> [<description>]
+      #             03.10.2018   00:00-                          Tag der Deutschen Einheit 
       if($line){
         chomp($line);
         @lines = split('\n',$line);
         foreach $line (@lines){
           chomp($line);
-          $date  = substr($line,0,8);
+          $date  = substr($line,0,10);
           if( $date eq $stoday ){
-            $todaydesc = substr($line,15);
+            $todaydesc = substr($line,17);
             $todaytype = "holiday";
-            Log3 $name, 5,"[YAAHM] found today=holiday \"$todaydesc\" in calendar $holidayDev";
+            Log3 $name, 1,"[YAAHM] found today=holiday $date \"$todaydesc\" in calendar $holidayDev";
           }
           if( $date eq $stom ){
-            $tomdesc = substr($line,15);
+            $tomdesc = substr($line,17);
             $tomtype = "holiday";
-            Log3 $name, 5,"[YAAHM] found tomorrow=holiday \"$tomdesc\" in calendar $holidayDev";
+            Log3 $name, 1,"[YAAHM] found tomorrow=holiday $date \"$tomdesc\" in calendar $holidayDev";
           }
           if( $date eq $stwo ){
-            $twodesc = substr($line,15);
+            $twodesc = substr($line,17);
             $twotype = "holiday";
-            Log3 $name, 5,"[YAAHM] found twodays=holiday \"$twodesc\" in calendar $holidayDev";
+            Log3 $name, 1,"[YAAHM] found twodays=holiday $date \"$twodesc\" in calendar $holidayDev";
           }
         }
       }
@@ -2670,7 +2893,7 @@ sub YAAHM_GetDayStatus($) {
   }
   
   readingsBulkUpdateIfChanged( $hash, "todayType",$todaytype );
-  readingsBulkUpdateIfChanged( $hash, "tr_todayType",$yaahm_tt->{$hash->{DATA}{"DD"}[0]{"daytype"}} );
+  readingsBulkUpdateIfChanged( $hash, "tr_todayType",$yaahm_tt->{$hash->{DATA}{"DD"}[0]{"daytype"}}[0] );
   if( $todaytype eq "workday"){
     readingsBulkUpdateIfChanged( $hash, "todayDesc","--" )
   }elsif( $todaytype eq "vacation"){
@@ -2682,7 +2905,7 @@ sub YAAHM_GetDayStatus($) {
   }
   
   readingsBulkUpdateIfChanged( $hash, "tomorrowType",$tomtype );
-  readingsBulkUpdateIfChanged( $hash, "tr_tomorrowType",$yaahm_tt->{$hash->{DATA}{"DD"}[1]{"daytype"}} );
+  readingsBulkUpdateIfChanged( $hash, "tr_tomorrowType",$yaahm_tt->{$hash->{DATA}{"DD"}[1]{"daytype"}}[0] );
   if( $tomtype eq "workday"){
     readingsBulkUpdateIfChanged( $hash, "tomorrowDesc","--" )
   }elsif( $tomtype eq "vacation"){
@@ -2694,7 +2917,7 @@ sub YAAHM_GetDayStatus($) {
   }
   
   readingsBulkUpdateIfChanged( $hash, "twodaysType",$tomtype );
-  readingsBulkUpdateIfChanged( $hash, "tr_twodaysType",$yaahm_tt->{$hash->{DATA}{"DD"}[2]{"daytype"}} );
+  readingsBulkUpdateIfChanged( $hash, "tr_twodaysType",$yaahm_tt->{$hash->{DATA}{"DD"}[2]{"daytype"}}[0] );
   if( $tomtype eq "workday"){
     readingsBulkUpdateIfChanged( $hash, "twodaysDesc","--" )
   }elsif( $tomtype eq "vacation"){
@@ -2733,11 +2956,14 @@ sub YAAHM_sun($) {
   my $strise2 = "";
   my ($msg,$stset0,$stseas0,$stset1,$stseas1,$stset2,$stseas2);
   
+  my $sunsetf  = AttrVal($name,"sunset","SunSet");
+  my $sunrisef = AttrVal($name,"sunrise","SunRise");
+  
   $sttoday = strftime('%Y-%m-%d', localtime(time));
   
   #-- since the Astro module sometimes gives us strange results, we need to do this more than once
   while( $strise0 !~ /^\d\d:\d\d:\d\d/ && $count < 5){
-    $strise0 = Astro_Get($hash,"dummy","text", "SunRise",$sttoday).":00";
+    $strise0 = Astro_Get($hash,"dummy","text", $sunrisef,$sttoday).":00";
     $count++;
     select(undef,undef,undef,0.01);
   }
@@ -2748,8 +2974,9 @@ sub YAAHM_sun($) {
   }
   my ($hour,$min) = split(":",$strise0);
   $hash->{DATA}{"DD"}[0]{"sunrise"} = sprintf("%02d:%02d",$hour,$min);
+ 
   
-  $stset0  = Astro_Get($hash,"dummy","text", "SunSet",$sttoday).":00";
+  $stset0  = Astro_Get($hash,"dummy","text", $sunsetf,$sttoday).":00";
   ($hour,$min) = split(":",$stset0);
   $hash->{DATA}{"DD"}[0]{"sunset"} = sprintf("%02d:%02d",$hour,$min);
   
@@ -2761,7 +2988,7 @@ sub YAAHM_sun($) {
   $msg   = "";
   #-- since the Astro module sometimes gives us strange results, we need to do this more than once
   while( $strise1 !~ /^\d\d:\d\d:\d\d/ && $count < 5){
-    $strise1 = Astro_Get($hash,"dummy","text", "SunRise",$sttom).":00";
+    $strise1 = Astro_Get($hash,"dummy","text", $sunrisef,$sttom).":00";
     $count++;
     select(undef,undef,undef,0.01);
   }
@@ -2773,7 +3000,7 @@ sub YAAHM_sun($) {
   ($hour,$min) = split(":",$strise1);
   $hash->{DATA}{"DD"}[1]{"sunrise"} = sprintf("%02d:%02d",$hour,$min);
   
-  $stset1  = Astro_Get($hash,"dummy","text", "SunSet",$sttom).":00";
+  $stset1  = Astro_Get($hash,"dummy","text", $sunsetf,$sttom).":00";
   ($hour,$min) = split(":",$stset1);
   $hash->{DATA}{"DD"}[1]{"sunset"} = sprintf("%02d:%02d",$hour,$min);
   
@@ -2785,7 +3012,7 @@ sub YAAHM_sun($) {
   $msg   = "";
   #-- since the Astro module sometimes gives us strange results, we need to do this more than once
   while( $strise2 !~ /^\d\d:\d\d:\d\d/ && $count < 5){
-    $strise2 = Astro_Get($hash,"dummy","text", "SunRise",$sttwo).":00";
+    $strise2 = Astro_Get($hash,"dummy","text", $sunrisef,$sttwo).":00";
     $count++;
     select(undef,undef,undef,0.01);
   }
@@ -2797,7 +3024,7 @@ sub YAAHM_sun($) {
   ($hour,$min) = split(":",$strise2);
   $hash->{DATA}{"DD"}[2]{"sunrise"} = sprintf("%02d:%02d",$hour,$min);
   
-  $stset2  = Astro_Get($hash,"dummy","text", "SunSet",$sttom).":00";
+  $stset2  = Astro_Get($hash,"dummy","text", $sunsetf,$sttom).":00";
   ($hour,$min) = split(":",$stset2);
   $hash->{DATA}{"DD"}[2]{"sunset"} = sprintf("%02d:%02d",$hour,$min);
   
@@ -3344,12 +3571,39 @@ sub YAAHM_toptable($){
     my $ts;
     my ($styl,$stym,$styr);
     my $ret = "";
-    YAAHM_GetDayStatus($hash);
+    ###YAAHM_GetDayStatus($hash);
     #--
     my $lockstate = ($hash->{READINGS}{lockstate}{VAL}) ? $hash->{READINGS}{lockstate}{VAL} : "unlocked";
     my $showhelper = ($lockstate eq "unlocked") ? 1 : 0; 
     
     %dailytable = %{$hash->{DATA}{"DT"}};
+    
+    #-- number of action devices
+    my $devactno;
+    my @actdevlist;
+    my $avl  = AttrVal($name,"deviceActions",undef);
+    if( !$avl){
+      $devactno = 0;
+    }else{
+      @actdevlist = split(',',$avl);
+      $devactno=int(@actdevlist);
+    }
+    
+    #-- temporary code to rewrite deviceactions array into a hash
+    my $xt = $hash->{DATA}{"XT"};
+    if( ref $xt eq ref {}){
+    }else{
+      Log 1,"[Temporary code] changing XT array into hash";
+      my %xtn={};
+      for(my $i=0;$i<$devactno;$i++){
+        my $dea=$actdevlist[$i];
+        my %deb=%{$hash->{DATA}{"XT"}[$i]};
+        #Log 1,"++++> Transferring key $dea";
+        $xtn{$dea}=\%deb;
+      }
+      $hash->{DATA}{"XT"}=\%xtn;
+    }
+    
     my $dailyno    = scalar keys %dailytable;
     my $weeklyno   = int( @{$hash->{DATA}{"WT"}} );
     
@@ -3361,6 +3615,8 @@ sub YAAHM_toptable($){
     
     $ret .= "var blinking = 0;\n";
     $ret .= "var hscolor = \"".$csstate[0]."\";\n";
+    
+    $ret .= "var devactno    = ".$devactno.";\n";
     
     $ret .= "var dailyno     = ".$dailyno.";\n";
     $ret .= "var dailykeys   = [\"".join("\",\"",(sort YAAHM_dsort keys %dailytable))."\"];\n";
@@ -3374,6 +3630,7 @@ sub YAAHM_toptable($){
       $ret .= "\"".$hash->{DATA}{"WT"}[$i]{"name"}."\"";
     } 
     $ret .= "];\n";
+    
     #-- watcher for next hidden divisions
     for( my $i=2;$i<$weeklyno;$i++){ 
       $ret .= "\$(\"body\").on('DOMSubtreeModified', \"#wt".$i."_o\",function () {nval = document.getElementById(\"wt".$i."_o\").innerHTML;document.getElementById(\"wt".$i."_n\").value = nval;})\n";
@@ -3382,12 +3639,29 @@ sub YAAHM_toptable($){
   
     $ret .= "<div informId=\"$name-housestate\" style=\"display:none\" id=\"hid_hs\">".ReadingsVal($name,"housestate",undef)."</div>".
             "<div informId=\"$name-housemode\" style=\"display:none\" id=\"hid_hm\">".ReadingsVal($name,"housemode",undef)."</div>";
+            
+    #-- formats for table borders
+    my ($stopleft,$stopmid,$stopright,$sbotleft,$sbotmid,$sbotright,$smidleft,$smidmid,$smidright,$saround);
+    $stopleft = "border-left:1px solid gray;border-top:1px solid gray;border-top-left-radius:10px;border-top-right-radius:0px;border-bottom-left-radius:0px;";  
+    $stopmid  = "border-top:1px solid gray;border-radius:0px;";
+    $stopright= "border-right:1px solid gray;border-top:1px solid gray;border-top-right-radius:10px;border-top-left-radius:0px;border-bottom-right-radius:0px;";
+    $sbotleft = "border-left:1px solid gray;border-bottom:1px solid gray;border-bottom-left-radius:10px;border-bottom-right-radius:0px;border-top-left-radius:0px;";
+    $sbotmid  = "border-bottom:1px solid gray;border-radius:0px;";
+    $sbotright= "border-right:1px solid gray;border-bottom:1px solid gray;border-bottom-right-radius:10px;border-top-right-radius:0px;border-bottom-left-radius:0px;";
+    $smidleft = "border-left:1px solid gray;border-radius:0px;";
+    $smidmid  = "border:none";
+    $smidright= "border-right:1px solid gray;border-radius:0px;";
+    $saround  = "padding:5px;vertical-align:top;border:1px solid gray;border-radius:10px;";
+                   
+    ### main table ############################################################################################ 
     $ret .= "<table class=\"roomoverview\">\n";
+   
+    ### action ################################################################################################
+    #   spanning 3 cols of main table
     $ret .= "<tr><td colspan=\"3\"><div class=\"devType\" style=\"font-weight:bold\">".$yaahm_tt->{"action"}.
       "</div> <div informId=\"$name-tr_errmsg\" class=\"devType\" style=\"font-weight:normal\">".ReadingsVal($name,"tr_errmsg",undef)."</div></td></tr>\n";
     
-    ### action ################################################################################################
-    #-- determine columns 
+    #-- mode/state table, spanning 3 cols of main table
     my $cols = max(max(int(@modes),int(@states)),$weeklyno);
     $ret .= "<tr><td colspan=\"3\" style=\"align:left\"><table class=\"readings\" style=\"border:1px solid gray;border-radius:10px\">".
             "<tr><td rowspan=\"2\" height=\"40\" valign=\"bottom\" id=\"wid_hm\">".YAAHM_modewidget($hash)."</td><td colspan=\"5\" height=\"20\"></td></tr>".
@@ -3416,9 +3690,10 @@ sub YAAHM_toptable($){
             }
             #style=\"height:20px;border-bottom: 10px solid #333333;background-image: linear-gradient(#e5e5e5,#ababab);\"
     $ret .= "</tr><td colspan=\"5\" height=\"20\"></td></tr>";
-    $ret .= "</table><br/><table class=\"readings\">"; 
-      
-    #-- repeat manual next for every weekly table  
+    $ret .= "</table><br/>";
+    
+    #-- manual next time table, just below mode/state table
+    $ret .= "<table class=\"readings\">";   
     my $nval  = "";
     my $wupn;
     $ret .= "<tr class=\"odd\"><td class=\"col1\" style=\"padding:5px; border-left: 1px solid gray; border-top:1px solid gray; border-bottom:1px solid gray; border-bottom-left-radius:10px; border-top-left-radius:10px;\">".$yaahm_tt->{"manual"}."</td>\n";
@@ -3435,47 +3710,75 @@ sub YAAHM_toptable($){
     }
     $ret .= "</tr>\n";
     $ret .= "</table><br/></td></tr>";
-            
-    $ret .= "<tr><td colspan=\"3\"><div class=\"devType\" style=\"font-weight:bold\">".$yaahm_tt->{"overview"}."</div></td></tr>\n";   
     
     ### daily overview ################################################################################################
-    $styl="border-left:1px solid gray;border-top:1px solid gray;border-top-left-radius:10px;border-top-right-radius:0px;border-bottom-left-radius:0px;";
-    $stym="border-top:1px solid gray;border-radius:0px;";
-    $styr="border-right:1px solid gray;border-top:1px solid gray;border-top-right-radius:10px;border-top-left-radius:0px;border-bottom-right-radius:0px;";
-    $ret .= "<tr><td colspan=\"3\"><table>";
+    #   spanning 3 cols of main table
+     $ret .= "<tr><td colspan=\"3\"><div class=\"devType\" style=\"font-weight:bold\">".$yaahm_tt->{"overview"}."</div></td></tr>\n";   
+    #-- widget/state table, spanning 2 cols of main table
+    $ret .= "<tr><td colspan=\"2\"><table>";
     
     #-- time widget  
     $ret .= "<tr><td rowspan=\"8\" width=\"200\" style=\"padding-right:50px\"><img src=\"/fhem/YAAHM_timewidget?name='".$name."'&amp;size='200x200'\" type=\"image/svg+xml\" ></td>";
     
     #-- continue summary with headers
-    $ret .= "<td colspan=\"2\" width=\"150\" style=\"$styl\"></td><td width=\"120\" style=\"$stym\">".$yaahm_tt->{"today"}."</td><td width=\"120\" style=\"$styr\">".$yaahm_tt->{"tomorrow"}."</td>";
+    $ret .= "<td colspan=\"2\" width=\"150\" style=\"$stopleft\"></td><td width=\"120\" style=\"$stopmid\">".$yaahm_tt->{"today"}."</td><td width=\"120\" style=\"$stopright\">".$yaahm_tt->{"tomorrow"}."</td>";
     
-    #-- device states
-    $ret .= "<td rowspan=\"8\" style=\"padding:5px;vertical-align:top;border:1px solid gray;border-radius:10px\">".
-            "<div class=\"dval\" informId=\"$name-tr_housestate\">".ReadingsVal($name,"tr_housestate",undef)."</div>&#x2192;".
-            $yaahm_tt->{"secstate"}."<div class=\"dval\" informId=\"$name-sdev_housestate\">".ReadingsVal($name,"sdev_housestate","")."</div></td></tr>\n";
-   
-    $styl="border-left:1px solid gray;border-radius:0px;";
-    $stym="border:none";
-    $styr="border-right:1px solid gray;border-radius:0px;";
-    $ret .= "<tr><td colspan=\"2\" style=\"$styl\"></td><td style=\"padding:5px;$stym\">".$yaahm_tt->{$weeklytable[$hash->{DATA}{"DD"}[0]{"weekday"}]}[0] .         
-                                  "</td><td style=\"padding:5px;$styr\">".$yaahm_tt->{$weeklytable[$hash->{DATA}{"DD"}[1]{"weekday"}]}[0]."</td></tr>"; 
+    ### device states inserted as new td spanning 8 rows ####################################################################################
+    $ret .= "<td rowspan=\"8\" style=\"$saround\"><table><tr><td height=\"20px\"><b>".
+            $yaahm_tt->{"state"}."</b></td></tr><tr><td height=\"20px\">".
+            "<div class=\"dval\" informId=\"$name-tr_housestate\">".ReadingsVal($name,"tr_housestate",undef)."</div></td></tr><tr><td>&#x2192;".
+            $yaahm_tt->{"secstate"}."<div class=\"dval\" informId=\"$name-sdev_housestate\">".ReadingsVal($name,"sdev_housestate","")."</div></td></tr></table></td>";
+            
+    ### device action table inserted as new td spanning 10 rows ################################################################################################
+    if( $avl ){   
+      my ($dea,$dev,$tim);
+      $ret .= sprintf("<td rowspan=\"%d\" style=\"$saround\"><table>",$weeklyno+8);
+      $ret .= "<tr><td class=\"col1\" height=\"20\"><b>".$yaahm_tt->{"deviceactions"}."</b></td>";
+      $ret .= "<td class=\"col2\"></td>";
+      $ret .= "<td class=\"col2\"></td></tr>";
+      for( my $i=0;$i<$devactno;$i++){
+      
+        #-- timer status
+        my $ts;
+        if( defined($defs{$name.".xtimer_".$i.".IF"})){
+          if( ReadingsVal($name.".xtimer_".$i.".IF","state","") ne "inactive" ){
+            $ts = "<div style=\"color:green\">&#x2713;</div>";
+          }else{
+            $ts = "<div style=\"color:red\">&#x274c;</div>";
+          }
+        }else{
+          $ts = "";
+        }   
+        $dea  = $actdevlist[$i];
+        $dev  = $hash->{DATA}{"XT"}{$dea}{"name"};   
+        Log3 $name,1,"[YAAHM_toptable] key $dea not equal to name $dev"
+          if( $dea ne $dev);
+        $tim  = $hash->{DATA}{"XT"}{$dea}{"time"};   
+        $ret .= "<tr><td class=\"col1\" height=\"20\" style=\"padding-right:5px\">".$dev."</td>";
+        $ret .= "<td class=\"col2\" style=\"padding:5px;\">$ts</td>";
+        $ret .= sprintf("<td informId=\"$name-xdevice_%d\" class=\"col2\" style=\"padding-left:5px\">".$tim."</td></tr>",$i);
+      }
+    
+      $ret .= "</table></td>";
+    }        
+    $ret .= "</tr>\n";
+
+    ### next lines of state summary ########################################################
+    $ret .= "<tr><td colspan=\"2\" style=\"$smidleft\"></td><td style=\"padding:5px;$smidmid\">".$yaahm_tt->{$weeklytable[$hash->{DATA}{"DD"}[0]{"weekday"}]}[0] .         
+                                  "</td><td style=\"padding:5px;$smidright\">".$yaahm_tt->{$weeklytable[$hash->{DATA}{"DD"}[1]{"weekday"}]}[0]."</td></tr>"; 
     #-- continue summary with entries
-    $ret .= "<tr><td colspan=\"2\" style=\"$styl\"></td><td style=\"padding:5px;$stym\">".$hash->{DATA}{"DD"}[0]{"date"}.         
-                                  "</td><td style=\"padding:5px;$styr\">".$hash->{DATA}{"DD"}[1]{"date"}."</td></tr>\n";
-    $ret .= "<tr><td colspan=\"2\" class=\"dname\" style=\"padding:5px;$styl\">".$yaahm_tt->{"daylight"}."</td><td style=\"padding:5px;$stym\">".$hash->{DATA}{"DD"}[0]{"sunrise"}."-".$hash->{DATA}{"DD"}[0]{"sunset"}.         
-                                  "</td><td style=\"padding:5px;$styr\">".$hash->{DATA}{"DD"}[1]{"sunrise"}."-".$hash->{DATA}{"DD"}[1]{"sunset"}."</td></tr>\n";
-    $ret .= "<tr><td colspan=\"2\" class=\"dname\" style=\"padding:5px;$styl\">".$yaahm_tt->{"daytime"}."</td><td style=\"padding:5px;$stym\">".$hash->{DATA}{"DT"}{"morning"}[0]."-".
-                                   $hash->{DATA}{"DT"}{"night"}[0]."</td><td style=\"$styr\"></td></tr>\n";
-    $ret .= "<tr><td colspan=\"2\" class=\"dname\" style=\"padding:5px;$styl\">".$yaahm_tt->{"daytype"}."</td><td style=\"padding:5px;$stym\">".$yaahm_tt->{$hash->{DATA}{"DD"}[0]{"daytype"}}.         
-                                                         "</td><td style=\"padding:5px;$styr\">".$yaahm_tt->{$hash->{DATA}{"DD"}[1]{"daytype"}}."</td></tr>\n";
-    $ret .= "<tr><td colspan=\"2\" class=\"dname\" style=\"padding:5px;$styl\">".$yaahm_tt->{"description"}."</td><td style=\"padding:5px;$stym\">".$hash->{DATA}{"DD"}[0]{"desc"}.                         
-                                                                "</td><td style=\"padding:5px;width:100px;$styr\">".$hash->{DATA}{"DD"}[1]{"desc"}."</td></tr>\n";
-    $styl="border-left:1px solid gray;border-bottom:1px solid gray;border-bottom-left-radius:10px;border-bottom-right-radius:0px;border-top-left-radius:0px;";
-    $stym="border-bottom:1px solid gray;border-radius:0px;";
-    $styr="border-right:1px solid gray;border-bottom:1px solid gray;border-bottom-right-radius:10px;border-top-right-radius:0px;border-bottom-left-radius:0px;";                                                            
-    $ret .= "<tr><td colspan=\"2\" class=\"dname\" style=\"padding:5px;$styl\">".$yaahm_tt->{"date"}."</td><td style=\"padding:5px;width:100px;$stym\">".$hash->{DATA}{"DD"}[0]{"special"}.                         
-                                                                "</td><td style=\"padding:5px;width:100px;$styr\">".$hash->{DATA}{"DD"}[1]{"special"}."</td></tr>\n";
+    $ret .= "<tr><td colspan=\"2\" style=\"$smidleft\"></td><td style=\"padding:5px;$smidmid\">".$hash->{DATA}{"DD"}[0]{"date"}.         
+                                  "</td><td style=\"padding:5px;$smidright\">".$hash->{DATA}{"DD"}[1]{"date"}."</td></tr>\n";
+    $ret .= "<tr><td colspan=\"2\" class=\"dname\" style=\"padding:5px;$smidleft\">".$yaahm_tt->{"daylight"}."</td><td style=\"padding:5px;$smidmid\">".$hash->{DATA}{"DD"}[0]{"sunrise"}."-".$hash->{DATA}{"DD"}[0]{"sunset"}.         
+                                  "</td><td style=\"padding:5px;$smidright\">".$hash->{DATA}{"DD"}[1]{"sunrise"}."-".$hash->{DATA}{"DD"}[1]{"sunset"}."</td></tr>\n";
+    $ret .= "<tr><td colspan=\"2\" class=\"dname\" style=\"padding:5px;$smidleft\">".$yaahm_tt->{"daytime"}."</td><td style=\"padding:5px;$smidmid\">".$hash->{DATA}{"DT"}{"morning"}[0]."-".
+                                   $hash->{DATA}{"DT"}{"night"}[0]."</td><td style=\"$smidright\"></td></tr>\n";
+    $ret .= "<tr><td colspan=\"2\" class=\"dname\" style=\"padding:5px;$smidleft\">".$yaahm_tt->{"daytype"}."</td><td style=\"padding:5px;$smidmid\">".$yaahm_tt->{$hash->{DATA}{"DD"}[0]{"daytype"}}[0].         
+                                                         "</td><td style=\"padding:5px;$smidright\">".$yaahm_tt->{$hash->{DATA}{"DD"}[1]{"daytype"}}[0]."</td></tr>\n";
+    $ret .= "<tr><td colspan=\"2\" class=\"dname\" style=\"padding:5px;$smidleft\">".$yaahm_tt->{"description"}."</td><td style=\"padding:5px;$smidmid\">".$hash->{DATA}{"DD"}[0]{"desc"}.                         
+                                                                "</td><td style=\"padding:5px;width:100px;$smidright\">".$hash->{DATA}{"DD"}[1]{"desc"}."</td></tr>\n";                                                           
+    $ret .= "<tr><td colspan=\"2\" class=\"dname\" style=\"padding:5px;$sbotleft\">".$yaahm_tt->{"date"}."</td><td style=\"padding:5px;width:100px;$sbotmid\">".$hash->{DATA}{"DD"}[0]{"special"}.                         
+                                                                "</td><td style=\"padding:5px;width:100px;$sbotright\">".$hash->{DATA}{"DD"}[1]{"special"}."</td></tr>\n";
                                                                 
     #-- housetime/phase
     $ret .= "<tr><td rowspan=\"".$weeklyno."\" style=\"text-align:center; white-space:nowrap;max-height:20px\">".
@@ -3498,24 +3801,23 @@ sub YAAHM_toptable($){
       }   
 
       #-- ring times
-      my $ring_0x   =  $hash->{DATA}{"WT"}[$i]{"ring_0x"}; 
+      my $ring_0x   = $hash->{DATA}{"WT"}[$i]{"ring_0x"}; 
       my $ring_1x   = $hash->{DATA}{"WT"}[$i]{"ring_1x"};
       my $wake      = $hash->{DATA}{"WT"}[$i]{"wake"};
       
       #-- border styles
- 
       if( $i==0 ){
-        $styl="border-left:1px solid gray;border-top:1px solid gray;border-top-left-radius:10px;border-top-right-radius:0px;border-bottom-left-radius:0px;";
-        $stym="border-top:1px solid gray;border-radius:0px;";
-        $styr="border-right:1px solid gray;border-top:1px solid gray;border-top-right-radius:10px;border-top-left-radius:0px;border-bottom-right-radius:0px;";
+        $styl=$stopleft;
+        $stym=$stopmid;
+        $styr=$stopright;
       }elsif( $i == $weeklyno-1 ){
-        $styl="border-left:1px solid gray;border-bottom:1px solid gray;border-bottom-left-radius:10px;border-bottom-right-radius:0px;border-top-left-radius:0px;";
-        $stym="border-bottom:1px solid gray;border-radius:0px;";
-        $styr="border-right:1px solid gray;border-bottom:1px solid gray;border-bottom-right-radius:10px;border-top-right-radius:0px;border-bottom-left-radius:0px;";
+        $styl=$sbotleft;
+        $stym=$sbotmid;
+        $styr=$sbotright;
       }else{
-        $styl="border-left:1px solid gray;border-radius:0px;";
-        $stym="border:none";
-        $styr="border-right:1px solid gray;border-radius:0px;";
+        $styl=$smidleft;
+        $stym=$smidmid;
+        $styr=$smidright;
       }  
       $ret.="<td style=\"padding:5px;$styl\">".$wupn.
             "</td><td style=\"text-align:center;width:30px;padding:5px;$stym\">$ts</td>".
@@ -3576,6 +3878,83 @@ sub YAAHM_Longtable($){
 
     #--
     $ret = YAAHM_toptable($name);
+    
+    ### device action table ################################################################################################
+    my $avl  = AttrVal($name,"deviceActions",undef);
+    if( $avl){
+      $ret .= "<tr><td colspan=\"4\"><div class=\"devType\" style=\"font-weight:bold; white-space:nowrap;\">".$yaahm_tt->{"deviceaction"}.$yaahm_tt->{"profile"};
+      $ret .= "&nbsp;&nbsp;<input type=\"button\" value=\"".$yaahm_tt->{"start"}." ".$yaahm_tt->{"deviceactions"}."\" onclick=\"javascript:yaahm_startDeviceAction('$name')\"/></td>\n";   
+      $ret .= "<tr><td colspan=\"3\">\n";
+   
+      #-- number of action devices
+      my $devactno;  
+      my @actdevlist = split(',',$avl);
+      $devactno=int(@actdevlist);
+   
+      my ($dea,$dev,$eval,$lval,$xval,$evt);
+      my ($styl,$stym,$styr);
+      $ret .= "<table class=\"block wide\" ><tr><td style=\"text-align:left;padding-left:5px\"><b>".$yaahm_tt->{"name"}."</b></td><td></td><td></td><td style=\"text-align:left;padding-left:5px\"><b>".$yaahm_tt->{"event"}."</b></td>";
+      $ret .= "<td style=\"text-align:left;padding-left:5px\"><b>".$yaahm_tt->{"earliest"}."</b></td><td style=\"text-align:left;padding-left:5px\"><b>".$yaahm_tt->{"latest"}."</b></td><td style=\"text-align:left;padding-left:5px\"><b>".$yaahm_tt->{"action"}."</b></td></tr>";
+      for( my $i=0;$i<$devactno;$i++){
+        $dea  = $actdevlist[$i];
+        $dev  = $hash->{DATA}{"XT"}{$dea}{"name"};
+        #-- Here we may have a new and therefore empty deviceaction
+        if( !defined($dev) || $dev eq "" ){ 
+          $hash->{DATA}{"XT"}{$dea}{"name"}=$dea;
+          $dev = $dea;
+        }
+        $evt  = $hash->{DATA}{"XT"}{$dea}{"event"};
+        $eval = $hash->{DATA}{"XT"}{$dea}{"earliest"};
+        $lval = $hash->{DATA}{"XT"}{$dea}{"latest"};
+        $xval = $hash->{DATA}{"XT"}{$dea}{"cmd"};
+      
+        $ret .= sprintf("<tr><td class=\"col1\" style=\"text-align:left;padding-left:5px\"><label id=\"xt%d_n\">".$dev."</label></td>",$i);
+        $ret .= "<td class=\"col2\" style=\"padding:5px;\"><a href=\"/fhem?detail=$name.xtimer_".$i.".IF\">$name.xtimer_".$i.".IF</a></td>";
+        #-- timer status
+        my $ts;
+        if( defined($defs{$name.".xtimer_".$i.".IF"})){
+          if( ReadingsVal($name.".xtimer_".$i.".IF","state","") ne "inactive" ){
+            $ts = "<div style=\"color:green\">&#x2713;</div>";
+          }else{
+            $ts = "<div style=\"color:red\">&#x274c;</div>";
+          }
+        }else{
+          $ts = "";
+        }   
+        $ret .= "<td class=\"col2\" style=\"padding:5px;\">$ts</td>";     
+        $ret .= sprintf("<td><select id=\"xt%d_v\">",$i);
+
+        my @keys = keys(%defaultdailytable);
+        #-- iterate over daily times
+        for(my $j=0;$j<int(@keys);$j++){
+          if(  $keys[$j] !~ /(wakeup)|(sleep)/ ){
+            if( $keys[$j] eq $evt ){
+              $ret .= "<option selected=\"selected\" value=\"".$keys[$j]."\">";
+            }else{
+              $ret .= "<option value=\"".$keys[$j]."\">"
+            }
+            $ret .= $yaahm_tt->{$keys[$j]}."</option>";
+          }
+        }
+        #-- iterate over timers
+        for( my $i=0;$i<int( @{$hash->{DATA}{"WT"}} );$i++){
+          my $name = $hash->{DATA}{"WT"}[$i]{ "name" };
+          if( $name eq $evt ){
+            $ret .= "<option selected=\"selected\" value=\"".$name."\">";
+          }else{
+            $ret .= "<option value=\"".$name."\">"
+          }
+          $ret .= $name."</option>";
+        }
+        
+        $ret .= "</select></td>";
+        $ret .= sprintf("<td class=\"col2\" style=\"text-align:left;padding-left:5px\"><input type=\"text\" id=\"xt%d_e\" size=\"4\" maxlength=\"120\" value=\"$eval\"/></td>",$i);
+        $ret .= sprintf("<td class=\"col2\" style=\"text-align:left;padding-left:5px\"><input type=\"text\" id=\"xt%d_l\" size=\"4\" maxlength=\"120\" value=\"$lval\"/></td>",$i);
+        $ret .= sprintf("<td class=\"col2\" style=\"text-align:left;padding-left:5px\"><input type=\"text\" id=\"xt%d_x\" size=\"30\" maxlength=\"512\" value=\"$xval\"/></td></tr>",$i);
+      }
+    
+      $ret .= "</table></td></tr>";
+    }
     
     ### daily profile table ################################################################################################
     my $row   = 1;
@@ -3678,14 +4057,19 @@ sub YAAHM_Longtable($){
     $row   = 1;
     $event = "";
     $sval  = "";
-    
+    my $asg   = "";
+    my $ast   = "";
+    my $ass;
+    my $acc;
+   
+    #--header 
     my $wupn;    
     my $wt = ( $weeklyno == 1) ? $yaahm_tt->{"profile"} :$yaahm_tt->{"profiles"};
             
     $ret .= "<tr><td colspan=\"3\"><div class=\"devType\" style=\"font-weight:bold; white-space: nowrap;\">".$yaahm_tt->{"weekly"}.$wt.
             "&nbsp;&nbsp;<input type=\"button\" value=\"".$yaahm_tt->{"start"}." ".$yaahm_tt->{"weekly"}.$yaahm_tt->{"timer"}."\" onclick=\"javascript:yaahm_startWeeklyTimer('$name')\"/></div></td></tr>";  
             
-    $ret .= "<tr><td><table class=\"readings\" id=\"weeklytable\">\n"; 
+    $ret .= "<tr><td><table class=\"block wide\" \" id=\"weeklytable\">\n"; 
 
     #-- repeat name for every weekly table  
     $ret .= "<tr class=\"odd\"><td class=\"col1\" style=\"font-weight:bold;text-align:left;padding:5px\">".$yaahm_tt->{"name"}."</td>";      
@@ -3698,63 +4082,26 @@ sub YAAHM_Longtable($){
     #-- repeat link for every weekly table     
     $ret .= "<tr class=\"even\"><td class=\"col1\" style=\"font-weight:bold;text-align:left;padding:5px\">".$yaahm_tt->{"timer"}."</td>";  
     
-    #-- array with activity status
-    my @tss;
-     
+    #-- timer status
+    my $tss;    
     for (my $i=0;$i<$weeklyno;$i++){
       $wupn = $hash->{DATA}{"WT"}[$i]{"name"};
       #-- timer status
       if( defined($defs{$name.".wtimer_".$i.".IF"})){
         $tl = "<a href=\"/fhem?detail=".$name.".wtimer_".$i.".IF\">".$name.".wtimer_".$i.".IF</a>";
         if( ReadingsVal($name.".wtimer_".$i.".IF","mode","") ne "disabled" ){
-          push(@tss,"<div style=\"color:green\">&#x2713;</div>");
+          $tss="<div style=\"color:green\">&#x2713;</div>";
         }else{
-          push(@tss,"<div style=\"color:red\">&#x274c;</div>");
+          $tss="<div style=\"color:red\">&#x274c;</div>";
         }
       }else{
         $tl = $yaahm_tt->{"notstarted"};
-         push(@tss,"");
+        $tss= "";
       }   
-      $ret .= sprintf("<td class=\"col2\" style=\"text-align:left;padding:5px\"><div id=\"wt%dlink\">%s</div></td>",$i,$tl);
+      $ret .= sprintf("<td class=\"col2\" style=\"text-align:left;padding:5px\"><div id=\"wt%dlink\">%s%s</div></td>",$i,$tl,$tss);
     }
     $ret .= "</tr>\n";
     
-    #-- repeat active status for every weekly table  
-    my $asg   = "";
-    my $ast   = "";
-    my $ass;
-    my $acc;
-    #--header
-    for(my $i=0;$i<int(@profmode);$i++){
-      $asg .= substr($yaahm_tt->{$profmode[$i]},0,3)."&nbsp;";
-      $ast .= $yaahm_tt->{$profmode[$i]}." ";
-    }
-    for(my $i=0;$i<int(@profday);$i++){
-      $asg .= substr($yaahm_tt->{$profday[$i]},0,3)."&nbsp;";
-      $ast .= $yaahm_tt->{$profday[$i]}." ";
-    }
-    $ret .= "<tr class=\"odd\"><td class=\"col1\" style=\"font-weight:bold;text-align:left;padding:5px\">".$yaahm_tt->{"active"}."<br/><div title=\".$ast.\" style=\"font-weight:normal\">".$asg."</div></td>";      
-    for (my $i=0;$i<$weeklyno;$i++){
-      $wupn = $hash->{DATA}{"WT"}[$i]{"name"};
-      $ret .= "<td class=\"col2\" style=\"text-align:center;padding:5px\">".$tss[$i]."</br>";
-    
-      $asg = "";
-      $ass =  ( defined($hash->{DATA}{"WT"}[$i]{"acti_m"}) ) ? $hash->{DATA}{"WT"}[$i]{"acti_m"} : "";
-      for( my $j=0;$j<int(@profmode);$j++ ){
-        $acc = $profmode[$j];
-        $acc = ( $ass =~ /.*$acc.*/ ) ? " checked=\"checked\"" : "";
-        $asg .= sprintf("<input type=\"checkbox\" name=\"acti_%d_m\" value=\"".$profmode[$j]."\" $acc/>&nbsp;",$i);
-      }
-      $ass =  ( defined($hash->{DATA}{"WT"}[$i]{"acti_d"}) ) ? $hash->{DATA}{"WT"}[$i]{"acti_d"} : "";
-      for( my $j=0;$j<int(@profday);$j++ ){
-        $acc = $profday[$j];
-        $acc = ( $ass =~ /.*$acc.*/ ) ? " checked=\"checked\"" : "";
-        $asg .= sprintf("<input type=\"checkbox\" name=\"acti_%d_d\"  value=\"".$profday[$j]."\" $acc/>&nbsp;",$i);
-      }
-      $ret .= "$asg</td>";
-    }
-    $ret .= "</tr>\n";
-
     #-- repeat action for every weekly table      
     $ret .= "<tr class=\"odd\"><td class=\"col1\" style=\"font-weight:bold;text-align:left;padding:5px\">".$yaahm_tt->{"action"}."</td>";
     for (my $i=0;$i<$weeklyno;$i++){
@@ -3774,21 +4121,70 @@ sub YAAHM_Longtable($){
       $ret .= sprintf("<td class=\"col2\" style=\"text-align:left;padding:5px\"><input class=\"expand\" type=\"text\" id=\"wt%d_x\" size=\"10\" maxlength=\"512\" value=\"$xval\"/></td>",$i);
     }
     $ret .= "</tr>\n";
-
-    #-- repeat unit for every weekly table  
-    $ret .= "<tr class=\"even\"><td></td>";
+    
+    #-- specialday header  
+    $ret .= "<tr class=\"even\"><td class=\"col1\" style=\"font-weight:bold;text-align:left;padding:5px\">".$yaahm_tt->{"daytype"}."</td>";
     for (my $i=0;$i<$weeklyno;$i++){
       $ret .= "<td class=\"col2\" style=\"text-align:left;padding:5px\">".$yaahm_tt->{"time"}." [hh:mm]</td>";
     }
     $ret .= "</tr>\n";
     
+    #-- repeat specialday entry every weekly table         
+    for (my $j=7;$j<9;$j++){
+      my $key = $weeklytable[$j];
+      $row++;
+      $event  = $yaahm_tt->{$key}[0];
+
+      $ret .= sprintf("<tr class=\"%s\"><td class=\"col1\" style=\"text-align:left;padding-left:5px\">$event</td>\n", ($row&1)?"odd":"even"); 
+      for (my $i=0;$i<$weeklyno;$i++){
+        $sval = $hash->{DATA}{"WT"}[$i]{$key};
+        #-- check if weekday profile active here or not
+        $ass =  ( defined($hash->{DATA}{"WT"}[$i]{"acti_d"}) ) ? $hash->{DATA}{"WT"}[$i]{"acti_d"} : "";
+        $acc = ( $ass =~ /.*$key.*/ ) ? "disabled=\"disabled\"" : "";
+        $ret .= sprintf("<td class=\"col2\" style=\"text-align:left;padding-left:5px\"><input type=\"text\" id=\"wt%s%d_s\" size=\"4\" maxlength=\"120\" value=\"$sval\" $acc/></td>",$key,$i);
+      }
+      $ret .= "</tr>\n";
+    }    
+    
     #-- weekday header  
     $ret .= "<tr class=\"even\"><td class=\"col1\" style=\"font-weight:bold;text-align:left;padding:5px\">".$yaahm_tt->{"weekday"}."</td>";
     for (my $i=0;$i<$weeklyno;$i++){
-      $ret .= "<td></td>";
+      $ret .= "<td class=\"col2\" style=\"text-align:left;padding:5px\">".$yaahm_tt->{"time"}." [hh:mm]</td>";
     }
     $ret .= "</tr>\n";
-            
+    
+    #-- checkboxes for every weekly table  
+    for(my $i=0;$i<int(@profmode);$i++){
+      $asg .= substr($yaahm_tt->{$profmode[$i]},0,3)."&nbsp;";
+      $ast .= $yaahm_tt->{$profmode[$i]}." ";
+    }
+    for(my $i=0;$i<int(@profday);$i++){
+      $asg .= $yaahm_tt->{$profday[$i]}[1]."&nbsp;";
+      $ast .= $yaahm_tt->{$profday[$i]}." ";
+    }
+    $ret .= "<tr class=\"odd\"><td class=\"col1\" style=\"text-align:left;padding:5px\">".$yaahm_tt->{"active"}."<br/><div title=\".$ast.\" >".$asg."</div></td>";      
+    for (my $i=0;$i<$weeklyno;$i++){
+      $wupn = $hash->{DATA}{"WT"}[$i]{"name"};
+      $ret .= "<td class=\"col2\" style=\"text-align:left;padding:5px\">";
+    
+      $asg = "";
+      $ass =  ( defined($hash->{DATA}{"WT"}[$i]{"acti_m"}) ) ? $hash->{DATA}{"WT"}[$i]{"acti_m"} : "";
+      for( my $j=0;$j<int(@profmode);$j++ ){
+        $acc = $profmode[$j];
+        $acc = ( $ass =~ /.*$acc.*/ ) ? " checked=\"checked\"" : "";
+        $asg .= sprintf("<input type=\"checkbox\" name=\"acti_%d_m\" value=\"".$profmode[$j]."\" $acc/>&nbsp;",$i);
+      }
+      $ass =  ( defined($hash->{DATA}{"WT"}[$i]{"acti_d"}) ) ? $hash->{DATA}{"WT"}[$i]{"acti_d"} : "";
+      for( my $j=0;$j<int(@profday);$j++ ){
+        $acc = $profday[$j];
+        $acc = ( $ass =~ /.*$acc.*/ ) ? " checked=\"checked\"" : "";
+        $asg .= sprintf("<input type=\"checkbox\" name=\"acti_%d_d\" id=\"acti_%s%d_d\" value=\"".$profday[$j]."\" $acc onclick=\"yaahm_dtlogic(%d,'%s')\"/>&nbsp;",$i,$profday[$j],$i,$i,$profday[$j]);
+      }
+      $ret .= "$asg</td>";
+    }
+    $ret .= "</tr>\n";
+    
+    #-- repeat weekday entry every weekly table            
     for (my $j=0;$j<7;$j++){
       my $key = $weeklytable[$j];
       $row++;
@@ -3984,7 +4380,10 @@ sub YAAHM_Longtable($){
                 <li>On <i>any</i> time (event), <i>donotdisturb</i> mode will be reset to <i>normal</i> mode.</li>
                 </ul>
                 </li>    
-            <li><<a name="yaahm_norepeat"><code>attr &lt;name&gt; norepeat 0|1</code></a>
+            <li><a name="yaahm_sunsetrise"></a><code>attr &lt;name&gt; sunrise SunRise|AstroTwilightMorning|NauticTwilightMorning|CivilTwilightMorning|CustomTwilightMorning </code></br>
+                <code>attr &lt;name&gt; sunset SunSet|AstroTwilightEvening|NauticTwilightEvening|CivilTwilightEvening|CustomTwilightEvening</code></br>
+                Use different definitions for sunset and sunrise, see Module Astro</li>         
+            <li><a name="yaahm_norepeat"><code>attr &lt;name&gt; norepeat 0|1</code></a>
                 <br/> if set to 1, repeated executions of wakeup, sleep and other timer events from the weekly programme will be suppressed.</li>      
             <li><a name="yaahm_statedevices"><code>attr &lt;name&gt; stateDevices (&lt;device&gt;:&lt;state-unsecured&gt;:&lt;state-secured&gt;:&lt;state-protected&gt;:&lt;state-guarded&gt;,)*</code></a>
                 <br />comma separated list of devices and their state in each of the house (security) states. Each of the listed devices will be checked in the interval given by the <i>stateInterval</i> attribute
@@ -4002,13 +4401,15 @@ sub YAAHM_Longtable($){
                 <li>If in <i>normal</i> mode and time event <i>sleep</i> or <i>night</i>, and currently in (security) state <i>unsecured</i>, the state will change to <i>secured</i>.</li>
                 </ul>
                 </li>
-            <li><a name="yaahm_holidaydevices"><code>attr &lt;name&gt; &lt;comma-separated list of devices&gt; </code></a>
+            <li><a name="yaahm_deviceactions"><code>attr &lt;name&gt; deviceActions &lt;comma-separated list of virtual device actions&gt; </code></a>
+                <br />list of virtual device actions that yaahm is performing, e.g. roller_up, roller_down etc.</a></li>
+            <li><a name="yaahm_holidaydevices"><code>attr &lt;name&gt; holidayDevices &lt;comma-separated list of devices&gt; </code></a>
                 <br />list of devices that provide holiday information. The devices may be 
                 <a href="#holiday">holiday devices</a> or <a href="#Calendar">Calendar devices</a></li>
-            <li><a name="yaahm_vacationdevices"><code>attr &lt;comma-separated list of devices&gt; </code></a>
+            <li><a name="yaahm_vacationdevices"><code>attr &lt;name&gt; vacationDevices &lt;comma-separated list of devices&gt; </code></a>
                 <br />list of devices that provide vacation information. The devices may be 
                 <a href="#holiday">holiday devices</a> or <a href="#Calendar">Calendar devices</a></li>
-            <li><a name="yaahm_specialdevices"><code>attr &lt;comma-separated list of devices&gt; </code></a>
+            <li><a name="yaahm_specialdevices"><code>attr &lt;name&gt; specialDevices &lt;comma-separated list of devices&gt; </code></a>
                 <br />list of devices that provide special date information (like e.g. garbage collection). The devices may be 
                 <a href="#holiday">holiday devices</a> or <a href="#Calendar">Calendar devices</a></li>
         </ul>
@@ -4019,7 +4420,7 @@ sub YAAHM_Longtable($){
 <a name="YAAHM"></a>
 <h3>YAAHM</h3>
 <ul>
-<a href="https://wiki.fhem.de/wiki/Modul_YAAHM">Deutsche Dokumentation im Wiki</a> vorhanden, die englische Version gibt es hier: <a href="/fhem/docs/commandref.html#YAAHM">YAAHM</a> 
+<a href="https://wiki.fhem.de/wiki/Modul_YAAHM">Deutsche Dokumentation im Wiki</a> vorhanden, die englische Version gibt es hier: <a href="commandref.html#YAAHM">YAAHM</a> 
 </ul>
 =end html_DE
 =cut

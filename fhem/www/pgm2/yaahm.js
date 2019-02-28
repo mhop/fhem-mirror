@@ -1,6 +1,6 @@
 //########################################################################################
 // yaahm.js
-// Version 1.45
+// Version 3.0beta4
 // See 95_YAAHM for licensing
 //########################################################################################
 //# Prof. Dr. Peter A. Henning
@@ -265,6 +265,57 @@ function () {
     }
 });
 
+//------------------------------------------------------------------------------------------------------
+// Device Action 
+//------------------------------------------------------------------------------------------------------
+
+function yaahm_startDeviceAction(name) {
+    
+    var location = document.location.pathname;
+    if (location.substr(location.length -1, 1) == '/') {
+        location = location.substr(0, location.length -1);
+    }
+    var url = document.location.protocol + "//" + document.location.host + location;
+    
+    // saving event, earliest and latest
+    // iterate over different device actions
+    for (var i = 0; i < devactno; i++) {
+        var dev, evt;
+        var eval, lval, xval;
+        if (document.getElementById('xt' + i + '_n') !== null) {
+            dev = encodeParm(document.getElementById('xt' + i + '_n').innerHTML);
+        } else {
+            dev = "undef"
+        }
+        if (document.getElementById('xt' + i + '_v') !== null) {
+            evt = encodeParm(document.getElementById('xt' + i + '_v').value);
+        } else {
+            evt = "undef"
+        }
+        if (document.getElementById('xt' + i + '_e') !== null) {
+            eval = encodeParm(document.getElementById('xt' + i + '_e').value);
+        } else {
+            eval = "undef"
+        }
+        if (document.getElementById('xt' + i + '_l') !== null) {
+            lval = encodeParm(document.getElementById('xt' + i + '_l').value);
+        } else {
+            lval = "undef"
+        }
+        //action
+        if (document.getElementById('xt' + i + '_x') !== null) {
+            xval = encodeParm(document.getElementById('xt' + i + '_x').value);
+        } else {
+            xval = "undef"
+        }
+    
+        
+        FW_cmd(url + '?XHR=1&fwcsrf=' + csrfToken + '&cmd.' + name + '={main::YAAHM_setParm("' + name + '","xt","' + i + '","' + dev + '","' + evt + '","' + eval + '","' + lval + '","' + xval + '")}');
+    }
+    // really start it now
+    FW_cmd(url + '?XHR=1&fwcsrf=' + csrfToken + '&cmd.' + name + ' ={main::YAAHM_startDeviceActions("' + name + '")}');
+    
+}
 
 //------------------------------------------------------------------------------------------------------
 // Start the daily timer
@@ -314,6 +365,28 @@ function yaahm_startDayTimer(name) {
 }
 
 //------------------------------------------------------------------------------------------------------
+// daytype logic
+//------------------------------------------------------------------------------------------------------
+
+function yaahm_dtlogic(i,dt) {
+    //i = timer number, j = daytype number
+    //has it been checked ? 
+    //activity vacation/holiday
+    var aval;
+    //modify input field
+    var field = document.getElementById('wt' + dt + i + '_s');
+    if (field !== null) {
+      var checkBox = document.getElementById('acti_' + dt + i + '_d');
+      if (checkBox.checked == true){
+        field.value = '';
+        field.disabled = true; 
+      }else{       
+        field.disabled = false;
+      }
+    }
+}
+
+//------------------------------------------------------------------------------------------------------
 // Weekly profile
 //------------------------------------------------------------------------------------------------------
 
@@ -331,7 +404,7 @@ function yaahm_startWeeklyTimer(name) {
         var xval;
         var nval;
         var aval1, aval2;
-        var sval =[ "", "", "", "", "", "", ""];
+        var sval =[ "", "", "", "", "", "", "", "", ""];
         //action
         if (document.getElementById('wt' + i + '_x') !== null) {
             xval = encodeParm(document.getElementById('wt' + i + '_x').value);
@@ -354,7 +427,7 @@ function yaahm_startWeeklyTimer(name) {
         }).get();
         
         //iterate over days of week
-        for (var j = 0; j < 7; j++) {
+        for (var j = 0; j < 9; j++) {
             if (document.getElementById('wt' + weeklykeys[j] + i + '_s') !== null) {
                 sval[j] = document.getElementById('wt' + weeklykeys[j] + i + '_s').value;
             } else {
