@@ -22,6 +22,8 @@
 #
 ##############################################################################
 # 	  Changelog:
+#		0.0.28:	Fixed minor bug in regex for statistics
+#				Added Commandref for getFreezes
 #		0.0.27:	Slightly improved device detection
 #				added set Command getFreezes to enable usage of webCmd
 #				fixed some commandref typos
@@ -109,7 +111,7 @@ use B qw(svref_2object);
 use Blocking;
 use vars qw($FW_CSRF);
 
-my $version = "0.0.27";
+my $version = "0.0.28";
 
 my @logqueue = ();
 my @fmCmd    = ();
@@ -721,7 +723,7 @@ sub freezemon_Get($@) {
     elsif ( $a[1] eq "statistic" ) {
         my %stats;
         foreach my $r ( keys %{ $hash->{READINGS} } ) {
-            next unless ( $r =~ /fs_(.*)_c/ );
+            next unless ( $r =~ /^fs_(.*)_c$/ );
             my $dev = $1;
             my $rc  = ReadingsNum( $name, $r, 0 );
             my $t   = $r =~ s/_c/_t/r;
@@ -1471,6 +1473,7 @@ sub freezemon_getLogPath($) {
 			<ul><li>statistics_all: clears the statistics (i.e. deletes all the readings created for statistics)</li>
 			<li>statistics_low: clears the statistics with low significance (see attribute fm_statistics_low)</li>
 			<li>all: clears all readings (including the list of the last 20 freezes.)</li>
+			<li><a name="getFreezes">getFreezes</a>: similar to "get freeze", however as a set command it can be used e.g. in webCmd Attribute</li>
 			</ul></li>
 	</ul>
   </ul>	
@@ -1572,7 +1575,9 @@ sub freezemon_getLogPath($) {
 					<ul><li>statistics_all: l&ouml;scht die Statistik (d.h. l&ouml;scht alle readings die f&uuml;r die statistics erzeugt wurden)</li>
 					<li>statistics_low: l&ouml;scht Statistiken mit geringer Bedeutung (siehe Attribut fm_statistics_low)</li>
 					<li>all: L&ouml;scht alle readings (inklusive der Liste der letzten 20 Freezes).</li>
-			</ul></li>
+		<li><a name="getFreezes">getFreezes</a>: identisch zum "get freeze" Befehl, kann als set-Befehl aber als z.B. im webCmd Attribut genutzt werden</li>
+		</ul></li>
+		
 	</ul>
 
   </ul>	
