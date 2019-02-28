@@ -631,6 +631,8 @@ attr CT setFn {if( $CMD =~ m/on|off/ ) { $ARGS=$CMD;;$CMD = "state" } else {fhem
 attr CT setList on:noArg off:noArg ct:colorpicker,CT,2000,1,6500
 attr CT webCmd ct::ct 2040:ct 2630:ct 3703:ct 6250:on:off
 
+define Weather Weather apikey=demo location=52.4545,13.4545
+attr Weather room Weather
 
 define Weather.weblink weblink htmlCode { WeatherAsHtmlH("Weather") }
 attr Weather.weblink alias Weather Forecast
