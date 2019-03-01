@@ -212,7 +212,8 @@ LightScene_Notify($$)
     LightScene_Save();
   }
 
-  return if($dev->{TYPE} eq $hash->{TYPE});
+  return if( !$init_done );
+  return if( $dev->{TYPE} eq $hash->{TYPE} );
 
   my $max = int(@{$dev->{CHANGED}});
   for (my $i = 0; $i < $max; $i++) {
