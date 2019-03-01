@@ -192,6 +192,7 @@ sub HProtocolGateway_ParseMessage($$) {
 
     # PMS-IB
     if ( $sensorSystem eq "PMS-IB") {
+      $data =~ s/^\s+//;
       ($tanknumber,$error,$temperature,$tankdata,$water,$checksum)=split(/=/,$data);
       $test = substr($data, 0, length($data)-3);
      
