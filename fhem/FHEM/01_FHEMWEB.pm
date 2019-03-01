@@ -3145,12 +3145,14 @@ FW_directNotify($@) # Notify without the event overhead (Forum #31293)
 
 ###################
 # Compute the state (==second) column
+# return ($allSets, $cmdList, $txt);
 sub
 FW_devState($$@)
 {
   my ($d, $rf, $extPage) = @_;
 
   my ($hasOnOff, $link);
+  return ("","","") if(!$FW_wname);
 
   my $cmdList = AttrVal($d, "webCmd", "");
   my $allSets = FW_widgetOverride($d, getAllSets($d, $FW_chash));
