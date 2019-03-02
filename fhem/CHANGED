@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - changed: 98_STOCKQUOTES: moved to contrib since not maintained and broken
+                 due to termination of Yahoo Finance API
  - feature: 55_DWD_OpenData:
                  new readings alertExcludeEvents, SunAz, SunEl and SunUp
                  support forecast resolution value 1 hour
