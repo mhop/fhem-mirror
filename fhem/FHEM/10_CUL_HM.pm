@@ -286,6 +286,7 @@ sub CUL_HM_updateConfig($){##########################
                 AttrVal($name, "event-on-change-reading", ".*")
                 if(!$nAttr);
       $attr{$name}{model} = "ActionDetector";
+      delete $hash->{IODev};
       delete $hash->{helper}{role};
       delete $attr{$name}{$_}
             foreach ( "autoReadReg","actCycle","actStatus","burstAccess","serialNr"
@@ -1481,8 +1482,12 @@ sub CUL_HM_Parse($$) {#########################################################
   }
   CUL_HM_eventP($mh{devH},"Evt_$mh{msgStat}")if ($mh{msgStat});#log io-events
   my $target = " (to $mh{dstN})";
-  $mh{st} = AttrVal($mh{devN}, "subType", "");
-  $mh{md} = AttrVal($mh{devN}, "model"  , "");
+
+  $mh{st} = defined $defs{$mh{devN}}{helper}{mId} ? $culHmModel->{$defs{$mh{devN}}{helper}{mId}}{st}   : AttrVal($mh{devN}, "subType", "");
+  $mh{md} = defined $defs{$mh{devN}}{helper}{mId} ? $culHmModel->{$defs{$mh{devN}}{helper}{mId}}{name} : AttrVal($mh{devN}, "model"  , "");
+
+#  $mh{st} = AttrVal($mh{devN}, "subType", "");
+#  $mh{md} = AttrVal($mh{devN}, "model"  , "");
 
   # +++++ check for duplicate or repeat ++++
   my $msgX = "No:$mh{mNo} - t:$mh{mTp} s:$mh{src} d:$mh{dst} ".($mh{p}?$mh{p}:"");
@@ -3796,10 +3801,10 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
         if (CUL_HM_getAttrInt($name,"ignore"));
 
   my $devName = InternalVal($name,"device",$name);
-  my $st = AttrVal($devName, "subType", "");
-  my $md = AttrVal($devName, "model", "");
+  my $st      = defined $defs{$devName}{helper}{mId} ? $culHmModel->{$defs{$devName}{helper}{mId}}{st}   : AttrVal($devName, "subType", "");
+  my $md      = defined $defs{$devName}{helper}{mId} ? $culHmModel->{$defs{$devName}{helper}{mId}}{name} : AttrVal($devName, "model"  , "");
 
-  my $cmd = $a[1];
+  my $cmd   = $a[1];
   
   my $roleC = $hash->{helper}{role}{chn}?1:0; #entity may act in multiple roles
   my $roleD = $hash->{helper}{role}{dev}?1:0;
@@ -3927,7 +3932,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
                                      : $regVal;
     }
   }
-  elsif($cmd eq "regTable") {  ########################################
+  elsif($cmd eq "regTable") {  ################################################
     return HMinfo_GetFn($hash,$name,"register","-f","\^".$name."\$");
   }       
   elsif($cmd eq "regList") {  #################################################
@@ -3942,8 +3947,8 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     push @arr,"$_ $culHmSubTypeGets->{$st}{$_}" foreach (keys %{$culHmSubTypeGets->{$st}});
     push @arr,"$_ $culHmModelGets->{$md}{$_}"   foreach (keys %{$culHmModelGets->{$md}});
     my   @arr1;
-    if ($hash->{helper}{regLst}){
-      foreach my $rl(grep /./,split(",",$hash->{helper}{regLst})){        
+    if (defined $hash->{helper}{regLst}){
+      foreach my $rl(grep /./,split(",",$hash->{helper}{regLst})){  
         next if (!defined $culHmReglSets->{$rl});
                                               foreach(keys %{$culHmReglSets->{$rl}}      ){push @arr1,"$_:".$culHmReglSets->{$rl}{$_}         };
       }
@@ -4057,12 +4062,15 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   return "no value specified" if(@a < 2);
   return "FW update in progress - please wait" 
         if ($modules{CUL_HM}{helper}{updating});
-  my $act = join(" ", @a[1..$#a]);
+  my $act     = join(" ", @a[1..$#a]);
   my $name    = $hash->{NAME};
   return "" if (CUL_HM_getAttrInt($name,"ignore"));
   my $devName = InternalVal($name,"device",$name);
-  my $st      = AttrVal($devName, "subType", "");
-  my $md      = AttrVal($devName, "model"  , "");
+  
+  if (defined $hash->{helper}{mId} ){$culHmModel->{$hash->{helper}{mId}}{st}}
+  
+  my $st      = defined $defs{$devName}{helper}{mId} ? $culHmModel->{$defs{$devName}{helper}{mId}}{st}   : AttrVal($devName, "subType", "");
+  my $md      = defined $defs{$devName}{helper}{mId} ? $culHmModel->{$defs{$devName}{helper}{mId}}{name} : AttrVal($devName, "model"  , "");
   my $flag    = 'A0'; #set flag
   my $cmd     = $a[1];
   my ($dst,$chn) = unpack 'A6A2',$hash->{DEF}.'01';#default to chn 01 for dev
@@ -4091,7 +4099,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   $h = "template"  if ($cmd =~ m/^tplSet_/);
   $h = "peerSmart" if ($cmd eq "peerSmart" && defined $hash->{helper}{peerFriend} );
 
-  if( !defined($h) && $hash->{helper}{regLst}){
+  if( !defined($h) && defined $hash->{helper}{regLst}){
     foreach my $rl(grep /./,split(",",$hash->{helper}{regLst})){        
       next if (!defined $culHmReglSets->{$rl});
       $h = $culHmReglSets->{$rl}{$cmd};
@@ -4110,7 +4118,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   }
   elsif(!defined($h)) { ### unknown - return the commandlist
     my @arr1 = ();
-    if ($hash->{helper}{regLst}){
+    if (defined $hash->{helper}{regLst}){
       foreach my $rl(grep /./,split(",",$hash->{helper}{regLst})){        
         next if (!defined $culHmReglSets->{$rl});
                                               foreach(keys %{$culHmReglSets->{$rl}}      ){push @arr1,"$_:".$culHmReglSets->{$rl}{$_}         };
@@ -4156,8 +4164,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     @arr1 = ("--") if (!scalar @arr1);
     my $usg = "Unknown argument $cmd, choose one of ".join(" ",sort @arr1);
 
-#General implementation pending    my $pl = CUL_HM_getPeerOption($name);
-#General implementation pending    $usg .= " peerSmart:$pl" if ("pl"); ## General need completion
+    my $pl = CUL_HM_getPeerOption($name);
+    $usg .= " peerSmart:$pl" if ("pl"); 
     
     $usg =~ s/ pct/ pct:slider,0,1,100/;
     $usg =~ s/ pctSlat/ pctSlat:slider,0,1,100/;
@@ -6253,82 +6261,82 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   }
   elsif($cmd eq "peerSmart") { ############################################ reg
     #peerSmart <peer>  
-    return "implenentation pending";
     $state = "";
-    my $set  = $a[2] =~ m/^remove/ ? 0    : 1;
+    my $set  = $a[2] =~ s/^remove_// ? 0    : 1;
     my $cmdB = $set                ? "01" : "02";
     my %PInfo;
     my $pCnt = 0;
+    my $ret;
+    return "peer not defined $a[2]"     if(!defined $defs{$a[2]});
     for my $pn ($a[2],$name){# setup peering information
-#General implement RT      if ($rMd =~ m/^HM-CC-RT-DN/ && $chn =~ m/(04|05)/ ){# rt team peers cross from 05 to 04
-#General implement RT        @aCh = ("04","05");
-#General implement RT        @rCh = ("04","05");
-#General implement RT      }
       $PInfo{$pCnt}{name}     = $pn;
-      $PInfo{$pCnt}{DId}      = substr(CUL_HM_name2Id($pn),0,6);
       $PInfo{$pCnt}{hash}     = CUL_HM_name2Hash($pn);
+      $PInfo{$pCnt}{Dname}    = CUL_HM_getDeviceName($pn);
+      $PInfo{$pCnt}{Dhash}    = CUL_HM_getDeviceHash($PInfo{$pCnt}{hash});
+      $PInfo{$pCnt}{DId}      = substr(CUL_HM_name2Id($PInfo{$pCnt}{Dname}),0,6);
       $PInfo{$pCnt}{chn}      = substr(CUL_HM_name2Id($pn)."01",6,2);
-      $PInfo{$pCnt}{md}       = $culHmModel->{$PInfo{$pn}{hash}->{helper}{mId}}{name};
-      $PInfo{$pCnt}{st}       = $culHmModel->{$PInfo{$pn}{hash}->{helper}{mId}}{st};
-      $PInfo{$pCnt}{mId}      = $PInfo{$pn}{hash}->{helper}{mId};
-      $PInfo{$pCnt}{BurstReg} = (CUL_HM_getRxType($PInfo{$pn}{hash}) & 0x82)?"0101" :"0100";
+      $PInfo{$pCnt}{mId}      = $PInfo{$pCnt}{Dhash}->{helper}{mId};      
+      $PInfo{$pCnt}{md}       = $culHmModel->{$PInfo{$pCnt}{Dhash}->{helper}{mId}}{name};
+      $PInfo{$pCnt}{st}       = $culHmModel->{$PInfo{$pCnt}{Dhash}->{helper}{mId}}{st};  
+      $PInfo{$pCnt}{BurstReg} = (CUL_HM_getRxType($PInfo{$pCnt}{hash}) & 0x82)?"0101" :"0100";
       $PInfo{$pCnt}{haveBReg} = ($culHmRegModel->{$md}{peerNeedsBurst}||$culHmRegType->{$st}{peerNeedsBurst})? 1:0;
-      return "please enter peer"       if(!$PInfo{$pn}{chn});
-      return "peer is not a channel"   if(!$PInfo{$pn}{hash}->{helper}{role}{chn} );
+      return "please enter peer"       if(!defined $PInfo{$pCnt}{chn});
+      return "peer is not a channel"   if(!$PInfo{$pCnt}{hash}->{helper}{role}{chn} );
       $PInfo{$pCnt}{remote} = (($culHmSubTypeSets->{$PInfo{$pCnt}{st}}   && $culHmSubTypeSets->{$PInfo{$pCnt}{st}}{peerChan}  )||
                                ($culHmModelSets->{$PInfo{$pCnt}{md}}     && $culHmModelSets->{$PInfo{$pCnt}{md}}{peerChan}    )||
                                ($culHmChanSets->{$PInfo{$pCnt}{md}.$PInfo{$pCnt}{chn}}
                                                                          && $culHmChanSets->{$PInfo{$pCnt}{md}.$PInfo{$pCnt}{chn}}{peerChan})  )
                                ?"remote":"actor";
+      $ret .="\npeerCount $pCnt \n  ".join("\n  ", sort map{$_.":".$PInfo{$pCnt}{$_}} keys %{$PInfo{$pCnt}});
       $pCnt++;
     }
-    # foreach my $myNo (keys %PInfo){# execute peering
-    #   my $pNo = ($myNo + 1) % 2;
-    #   if ($PInfo{$myNo}{st} eq "virtual"){
-    #     my $btnName = $pSt eq "smokeDetector" 
-    #                       ? $PInfo{$myNo}{name} 
-    #                       : $PInfo{$pNo}{name};
-    #     next if (!defined $attr{$btnName});
-    #     CUL_HM_ID2PeerList ($btnName,$PInfo{$pNo}{DId}.$PInfo{$pNo}{chn},$set); #upd. peerlist
-    #   }
-    #   else{
-    #     CUL_HM_PushCmdStack($PInfo{$myNo}{hash},"++".$flag."01${id}$PInfo{$myNo}{DId}"
-    #                         .$PInfo{$myNo}{chn}
-    #                         .$cmdB
-    #                         .$PInfo{$pNo}{DId}
-    #                         .($PInfo{$pNo}{st}     eq "smokeDetector" ? "00" : $PInfo{$pNo}{chn})
-    #                         .($PInfo{$pNo}{remote} eq "remote"        
-    #                         ||$PInfo{$pNo}{st}     eq "smokeDetector" ? "00" : $PInfo{$pNo}{chn})
-    #                         );
-    #     CUL_HM_pushConfig($PInfo{$myNo}{hash},$id, $PInfo{$myNo}{DId}
-    #                                          ,$PInfo{$myNo}{chn}
-    #                                          ,$PInfo{$pNo}{DId} 
-    #                                          ,hex($PInfo{$pNo}{chn})
-    #                                          ,4    
-    #                                          ,$PInfo{$pNo}{BurstReg})
-    #                if($cmdB eq "01" && $PInfo{$myNo}{haveBReg}); # only if set peer
-    #     my $rxType = CUL_HM_getRxType($PInfo{$myNo}{hash});
-    # 
-    #     if($rxType & 0x01){#allways
-    #       CUL_HM_ProcessCmdStack($devHash);
-    #     }
-    #     elsif($devHash->{cmdStack}                  &&
-    #           $devHash->{helper}{prt}{sProc} != 1    # not processing
-    #           ){
-    #       if($rxType & 0x02){# handle burst Access devices - add burst Bit
-    #         my ($pre,$tp,$tail) = unpack 'A2A2A*',$devHash->{cmdStack}[0];
-    #         $devHash->{cmdStack}[0] = sprintf("%s%02X%s",$pre,(hex($tp)|0x10),$tail);
-    #         CUL_HM_ProcessCmdStack($devHash);
-    #       }
-    #       elsif (CUL_HM_getAttrInt($name,"burstAccess")){ #burstConditional - have a try
-    #         $hash->{helper}{prt}{brstWu}=1;# start auto-burstWakeup
-    #         CUL_HM_SndCmd($devHash,"++B112$id$dst");
-    #       }
-    #     }
-    # 
-    #     CUL_HM_qAutoRead($name,3);
-    #   }
-    # }    
+    foreach my $myNo (keys %PInfo){# execute peering
+      my $pNo = ($myNo + 1) % 2;
+      if ($PInfo{$myNo}{st} eq "virtual"){
+        my $btnName = $PInfo{$pNo}{st} eq "smokeDetector" 
+                          ? $PInfo{$myNo}{name} 
+                          : $PInfo{$pNo}{name};
+        next if (!defined $attr{$btnName});
+        CUL_HM_ID2PeerList ($btnName,$PInfo{$pNo}{DId}.$PInfo{$pNo}{chn},$set); #upd. peerlist
+      }
+      else{
+        CUL_HM_PushCmdStack($PInfo{$myNo}{hash},"++".$flag."01${id}$PInfo{$myNo}{DId}"
+                            .$PInfo{$myNo}{chn}
+                            .$cmdB
+                            .$PInfo{$pNo}{DId}
+                            .($PInfo{$pNo}{st}     eq "smokeDetector" ? "00" : $PInfo{$pNo}{chn})
+                            .($PInfo{$pNo}{remote} eq "remote"        
+                            ||$PInfo{$pNo}{st}     eq "smokeDetector" ? "00" : $PInfo{$pNo}{chn})
+                            );
+        CUL_HM_pushConfig($PInfo{$myNo}{hash},$id, $PInfo{$myNo}{DId}
+                                             ,$PInfo{$myNo}{chn}
+                                             ,$PInfo{$pNo}{DId} 
+                                             ,hex($PInfo{$pNo}{chn})
+                                             ,4    
+                                             ,$PInfo{$pNo}{BurstReg})
+                   if($cmdB eq "01" && $PInfo{$myNo}{haveBReg}); # only if set peer
+        my $rxType = CUL_HM_getRxType($PInfo{$myNo}{Dhash});
+    
+        if($rxType & 0x01){#allways
+          CUL_HM_ProcessCmdStack($PInfo{$myNo}{Dhash});
+        }
+        elsif(   $PInfo{$myNo}{Dhash}->{cmdStack}                 
+              && $PInfo{$myNo}{Dhash}->{helper}{prt}{sProc} != 1    # not processing
+              ){
+          if($rxType & 0x02){# handle burst Access devices - add burst Bit
+            my ($pre,$tp,$tail) = unpack 'A2A2A*',$PInfo{$myNo}{Dhash}->{cmdStack}[0];
+            $PInfo{$myNo}{Dhash}->{cmdStack}[0] = sprintf("%s%02X%s",$pre,(hex($tp)|0x10),$tail);
+            CUL_HM_ProcessCmdStack($PInfo{$myNo}{Dhash});
+          }
+          elsif (CUL_HM_getAttrInt($PInfo{$pCnt}{name},"burstAccess")){ #burstConditional - have a try
+            $PInfo{$pCnt}{hash}->{helper}{prt}{brstWu} = 1;             # start auto-burstWakeup
+            CUL_HM_SndCmd($PInfo{$myNo}{Dhash},"++B112$id$dst");
+          }
+        }
+    
+        CUL_HM_qAutoRead($PInfo{$myNo}{name},3);
+      }
+    }    
   }
 ################################################################################################################
   elsif($cmd  =~ m/^(pair|getVersion)$/) { ####################################
