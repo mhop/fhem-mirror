@@ -330,7 +330,7 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"8002" => {name=>"PS-Th-Sens"              ,st=>'THSensor'          ,cyc=>''      ,rxt=>''       ,lst=>'1,4'          ,chn=>"Sen:1:4",}
  ,"FFF0" => {name=>"CCU-FHEM"                ,st=>'virtual'           ,cyc=>''      ,rxt=>''       ,lst=>''             ,chn=>"Btn:1:50",}
  ,"FFF1" => {name=>"VIRTUAL"                 ,st=>'virtual'           ,cyc=>''      ,rxt=>''       ,lst=>''             ,chn=>"Btn:1:50",}
- 
+ ,"0000" => {name=>"ActionDetector"          ,st=>'virtual'           ,cyc=>''      ,rxt=>''       ,lst=>''             ,chn=>"",}
   #  "HM-LGW-O-TW-W-EU" #Funk LAN Gateway
 #################open:---------------------------
 );
