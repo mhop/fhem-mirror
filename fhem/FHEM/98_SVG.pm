@@ -1070,6 +1070,7 @@ SVG_doShowLog($$$$;$)
 {
   my ($wl, $d, $type, $file, $noHeader) = @_;
   my $pm = AttrVal($wl,"plotmode",$FW_plotmode);
+  $pm = "SVG" if(!defined($pm)); # if called from plotAsPng before FHEMWEB
   my $gplot_pgm = "$FW_gplotdir/$type.gplot";
 
   my ($err, $cfg, $plot, $srcDesc) = SVG_readgplotfile($wl, $gplot_pgm, $pm);
