@@ -3701,7 +3701,6 @@ sub CUL_HM_parseSDteam_2(@){#handle SD team events
   }
   return () if (!$sHash->{sdTeam} || $sHash->{sdTeam} ne "sdLead"
               ||!$dHash);
-
   my ($chn,$No,$state,$null,$aesKNo,$aesStr) = unpack 'A2A2A2A4A2A8',$p;
   if(!$dHash->{helper}{alarmNo} || $dHash->{helper}{alarmNo} ne $No){
     $dHash->{helper}{alarmNo} = $No;
@@ -3749,7 +3748,7 @@ sub CUL_HM_updtSDTeam(@){#in: TeamName, optional caller name and its new state
   # prio: 1:alarm, 2: unknown, 3: off
   # sState given in input may not yet be visible in readings
   my ($name,$sName,$sState) = @_;
-  return undef if (!$defs{$name} || AttrVal($name,"model","") !~ m "virtual");
+  return undef if (!$defs{$name} || AttrVal($name,"model","") !~ m "VIRTUAL");
   ($sName,$sState) = ("","") if (!$sName || !$sState);
   return undef if (ReadingsVal($name,"state","off") =~ m/smoke-Alarm/);
   my $dStat = "off";
@@ -8663,10 +8662,11 @@ sub CUL_HM_getChnPeers($){ #which peertype am I
   my $chnN = hex(InternalVal($name,"chanNo","0"));
   $chnN = "-" if ($chnN == 0);
   my @chPopt;
-
+  return "-:-" if($devHash->{helper}{mId} eq "0000");
+  
   if ($hash->{helper}{role}{chn}){
     if ($hash->{helper}{role}{vrt}){
-      push @chPopt,"v";
+      push @chPopt,"v";# all except action detector
     }
     else{
       foreach my $mLst(split(",",$culHmModel->{$devHash->{helper}{mId}}{lst})){
