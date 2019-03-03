@@ -1140,6 +1140,20 @@ sub Pushover_SetMessage2 ($$$$) {
             $values{text} = join ' ', @$a;
         }
 
+        if ( $values{text} =~ /^\s*html:\s*(.*)$/i ) {
+            Log3 $name, 4, "Pushover $name: Interpreting glance text as HTML";
+            $values{html} = 1;
+            $values{text} = $1;
+        }
+        if ( $values{text} =~
+            m/\<(\/|)[biu]\>|\<(\/|)font(.+)\>|\<(\/|)a(.*)\>|\<br\s?\/?\>/i )
+        {
+            $values{html} = 1;
+
+            # replace \n by <br /> but ignore \\n
+            $values{text} =~ s/(?<!\\)(\\n)/<br \/>/g;
+        }
+
         $values{subtext} = ( defined( $h->{subtext} ) ? $h->{subtext} : undef );
 
         $values{count} = ( defined( $h->{count} ) ? $h->{count} : undef );
@@ -1579,7 +1593,7 @@ sub Pushover_HttpUri ($$;$) {
     The following options may be used to adjust message content and delivery behavior:<br>
     <br>
     <code><b>title</b>&nbsp;&nbsp;&nbsp;</code> - type: text(100 characters) - A description of the data being shown, such as "Widgets Sold".<br>
-    <code><b>text</b>&nbsp;&nbsp;&nbsp;&nbsp;</code> - type: text(100 characters) - The main line of data, used on most screens. Using this option takes precedence; non-option text content will be discarded.<br>
+    <code><b>text</b>&nbsp;&nbsp;&nbsp;&nbsp;</code> - type: text(100 characters) - The main line of data, used on most screens. Using this option takes precedence; non-option text content will be discarded. If you want your text to be interpreted as HTML by the Pushover client app, add the prefix 'html:' before the actual text (unless you already use HTML tags in it where it is automatically detected).<br>
     <code><b>subtext</b>&nbsp;</code> - type: text(100 characters) - A second line of data.<br>
     <code><b>count</b>&nbsp;&nbsp;&nbsp;</code> - type: integer(may be negative) - Shown on smaller screens; useful for simple counts.<br>
     <code><b>percent</b>&nbsp;</code> - type: integer(0-100) - Shown on some screens as a progress bar/circle.<br>
