@@ -149,7 +149,7 @@ SVG_AttrFn(@)
 {
   my ($cmd,$name,$aName,$aVal) = @_;
 
-  if($aName eq "captionLeft" && $cmd eq "set") {
+  if($aName && $aName eq "captionLeft" && $cmd eq "set") {
     my $dir = (!defined($aVal) || $aVal) ? "left" : "right";
     AnalyzeCommand(undef, "attr $name captionPos $dir");
     return "attr $name captionLeft converted to attr $name captionPos $dir";
@@ -179,8 +179,9 @@ sub
 SVG_getplotsize($)
 {
   my ($d) = @_;
-  return $FW_webArgs{plotsize} ? 
-                $FW_webArgs{plotsize} : AttrVal($d,"plotsize",$FW_plotsize);
+  return $FW_webArgs{plotsize} ?
+                $FW_webArgs{plotsize} :
+                AttrVal($d,"plotsize", $FW_plotsize ? $FW_plotsize : "800,400");
 }
 
 sub
