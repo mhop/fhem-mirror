@@ -640,6 +640,8 @@ sub weekprofile_Get($$@)
 {
   my ($hash, $name, $cmd, @params) = @_;
   
+  my $me = $hash->{NAME};
+  
   my $list = '';
   
   my $prfCnt = scalar(@{$hash->{PROFILES}});
@@ -659,8 +661,7 @@ sub weekprofile_Get($$@)
     return 'usage: profile_data <name>' if(@params < 1);
     return "no profile" if ($prfCnt <= 0);
     
-    my ($topic, $name) = weekprofile_splitName($params[0]);
-
+    my ($topic, $name) = weekprofile_splitName($me, $params[0]);
     my ($prf,$idx) = weekprofile_findPRF($hash,$name,$topic,1);
     
     return "profile $params[0] not found" if (!defined($prf));    
@@ -705,7 +706,7 @@ sub weekprofile_Get($$@)
       }
       $refs = substr($refs, 0, -1);
     } else {
-      my ($topic, $name) = weekprofile_splitName($params[0]);
+      my ($topic, $name) = weekprofile_splitName($me, $params[0]);
       my ($prf,$idx) = weekprofile_findPRF($hash,$name,$topic,0);
       return "profile $params[0] not found" unless ($prf);
       $refs = '0';
@@ -744,8 +745,13 @@ sub weekprofile_Get($$@)
 sub weekprofile_findPRF($$$$)
 {
   my ($hash, $name, $topic, $followRef) = @_;
+
+  my $me = $hash->{NAME};
   
-  $topic      = 'default' if (!$topic);
+  if (!$topic) {    
+    $topic = ReadingsVal($me, "active_topic", "default");
+    Log3 $me, 3, "$me(weekprofile_findPRF): use topic $topic";
+  }
   $followRef  = '0'       if (!$followRef);
   
   my $found = undef;
@@ -761,7 +767,7 @@ sub weekprofile_findPRF($$$$)
   $idx = -1 if (!defined($found));
   
   if ($followRef == 1 && defined($found) && defined($found->{REF})) {
-    ($topic, $name) = weekprofile_splitName($found->{REF});
+    ($topic, $name) = weekprofile_splitName($me, $found->{REF});
     ($found,$idx) = weekprofile_findPRF($hash,$name,$topic,0);
   }
   
@@ -782,14 +788,17 @@ sub weekprofile_hasREF(@)
   return undef;
 }
 ############################################## 
-sub weekprofile_splitName($)
+sub weekprofile_splitName($$)
 {
-  my ($in) = @_;
+  my ($me, $in) = @_;
   
   my @parts = split(':',$in);
   
   return ($parts[0],$parts[1]) if (@parts == 2);
-  return ('default',$in);
+  
+  my $topic = ReadingsVal($me, "active_topic", "default");
+  Log3 $me, 5, "$me(weekprofile_splitName): use topic $topic";    
+  return ($topic,$in);
 }
 ############################################## 
 sub weekprofile_Set($$@)
@@ -805,7 +814,7 @@ sub weekprofile_Set($$@)
   if ($cmd eq 'profile_data') {
     return 'usage: profile_data <name> <json data>' if(@params < 2);
     
-    my ($topic, $name) = weekprofile_splitName($params[0]);
+    my ($topic, $name) = weekprofile_splitName($me, $params[0]);
     
     return "Error topics not enabled" if (!$useTopics && ($topic ne 'default'));
     
@@ -847,7 +856,7 @@ sub weekprofile_Set($$@)
   if ($cmd eq 'send_to_device') {
     return 'usage: send_to_device <name> [device(s)]' if(@params < 1);
     
-    my ($topic, $name) = weekprofile_splitName($params[0]);
+    my ($topic, $name) = weekprofile_splitName($me, $params[0]);
     
     return "Error topics not enabled" if (!$useTopics && ($topic ne 'default'));
     
@@ -881,8 +890,8 @@ sub weekprofile_Set($$@)
   if ($cmd eq 'copy_profile') {
     return 'usage: copy_profile <source> <target>' if(@params < 2);
     
-    my ($srcTopic, $srcName) = weekprofile_splitName($params[0]);
-    my ($destTopic, $destName) = weekprofile_splitName($params[1]);
+    my ($srcTopic, $srcName) = weekprofile_splitName($me, $params[0]);
+    my ($destTopic, $destName) = weekprofile_splitName($me, $params[1]);
     
     return "Error topics not enabled" if (!$useTopics && ( ($srcTopic ne 'default') || ($destTopic ne 'default')) );
     
@@ -915,8 +924,8 @@ sub weekprofile_Set($$@)
   if ($cmd eq 'reference_profile') {
     return 'usage: copy_profile <source> <target>' if(@params < 2);
     
-    my ($srcTopic, $srcName) = weekprofile_splitName($params[0]);
-    my ($destTopic, $destName) = weekprofile_splitName($params[1]);
+    my ($srcTopic, $srcName) = weekprofile_splitName($me, $params[0]);
+    my ($destTopic, $destName) = weekprofile_splitName($me, $params[1]);
     
     return "Error topics not enabled" if (!$useTopics && ( ($srcTopic ne 'default') || ($destTopic ne 'default')) );
     
@@ -951,7 +960,7 @@ sub weekprofile_Set($$@)
     return 'Error master profile can not removed' if( ($params[0] eq "master") && defined($hash->{MASTERDEV}) );
     return 'Error Remove last profile is not allowed' if(scalar(@{$hash->{PROFILES}}) == 1);
     
-    my ($topic, $name) = weekprofile_splitName($params[0]);
+    my ($topic, $name) = weekprofile_splitName($me, $params[0]);
     
      return "Error topics not enabled" if (!$useTopics && ($topic ne 'default'));
     
