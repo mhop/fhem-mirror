@@ -1282,11 +1282,15 @@ sub Pushover_SetMessage2 ($$$$) {
 
     if ( defined( $values{attachment} ) ) {
         my $path =
-          "file://"
-          . AttrVal( $name, "storage", AttrVal( "global", "modpath", "." ) );
+          AttrVal( $name, "storage", AttrVal( "global", "modpath", "." ) );
         $path .= "/" unless ( $path =~ /\/$/ );
 
-        $values{attachment} = $path . $values{attachment};
+        $values{attachment} = "file://"
+          . (
+              $values{attachment} =~ /^\//
+            ? $values{attachment}
+            : $path . $values{attachment}
+          );
     }
 
     $body = Pushover_HttpForm( $body, $multipart, \%values );
