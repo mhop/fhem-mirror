@@ -601,6 +601,10 @@ sub Weather_Notify($$) {
     Log3 $hash, 5,
 "Weather $name: FHEM initialization or rereadcfg triggered update, delay $delay seconds.";
     Weather_RearmTimer( $hash, gettimeofday() + $delay );
+    
+    ### quick run GetUpdate then Demo
+    Weather_GetUpdate( $hash )
+    if ( defined($hash->{APIKEY}) and lc($hash->{APIKEY}) eq 'demo' );
 
     return undef;
 }
