@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 49_SSCam.pm 18538 2019-02-09 07:49:49Z DS_Starter $
+# $Id: 49_SSCam.pm 18744 2019-02-26 17:15:07Z DS_Starter $
 #########################################################################################################################
 #       49_SSCam.pm
 #
@@ -47,7 +47,12 @@ use Encode;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
-  "8.10.0" => "12.02.2019  send recordings integrated by telegram, a lot of internal changes for send telegrams ",
+  "8.11.2" => "28.02.2019  bugfix no snapinfos when snap was done by SVS itself, Forum: https://forum.fhem.de/index.php/topic,45671.msg914685.html#msg914685",
+  "8.11.1" => "28.02.2019  commandref revised, minor fixes ",
+  "8.11.0" => "25.02.2019  changed compatibility check, compatibility to SVS version 8.2.3, Popup possible for \"generic\"-Streamdevices, ".
+              "support for \"genericStrmHtmlTag\" in streaming devices ",
+  "8.10.1" => "19.02.2019  fix warning when starting fhem, and Forum:#97706",
+  "8.10.0" => "15.02.2019  send recordings integrated by telegram, a lot of internal changes for send telegrams ",
   "8.9.2"  => "05.02.2019  sub SSCam_sendTelegram changed ",
   "8.9.1"  => "05.02.2019  sub SSCam_snaplimsize changed ",
   "8.9.0"  => "05.02.2019  new streaming device type \"lastsnap\" ",
@@ -130,7 +135,9 @@ our %SSCam_vNotesIntern = (
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
-  "8.10.0" => "12.02.2019 Possibility of send recordings by telegram is integrated as well as sending snapshots ",
+  "8.11.0" => "25.02.2019 compatibility set to SVS version 8.2.3, Popup possible for streaming devices of type \"generic\", ".
+              "support for \"genericStrmHtmlTag\" in streaming devices ",
+  "8.10.0" => "15.02.2019 Possibility of send recordings by telegram is integrated as well as sending snapshots ",
   "8.9.0"  => "05.02.2019 A new streaming device type \"lastsnap\" was implemented. You can create such device with \"set ... createStreamDev lastsnap\". ".
                           "This streaming device shows the newest snapshot which was taken. ",
   "8.8.0"  => "01.02.2019 Snapshots can now be sent by telegramBot ",
@@ -239,7 +246,7 @@ our %SSCam_vNotesExtern = (
 );
 
 # getestete SVS-Version
-my $compstat     = "8.2";
+my $compstat     = "8.2.3";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -333,7 +340,7 @@ use vars qw($FW_wname);   # Web instance
 sub FW_pH(@);             # add href
 use vars qw(%SSCam_vHintsExt_en);
 use vars qw(%SSCam_vHintsExt_de);
-
+sub SSCam_TBotSendIt($$$$$$$;$$$);
 
 ################################################################
 sub SSCam_Initialize($) {
@@ -592,7 +599,7 @@ sub SSCam_Attr($$$$) {
             $hash->{HELPER}{GETSNAPGALLERY} = 1;
 		    $slim  = AttrVal($name,"snapGalleryNumber",$SSCam_slim);    # Anzahl der abzurufenden Snaps
 			$ssize = $do;
-			RemoveInternalTimer("SSCam_getsnapinfo"); 
+			RemoveInternalTimer($hash, "SSCam_getsnapinfo"); 
 			InternalTimer(gettimeofday()+0.7, "SSCam_getsnapinfo", "$name:$slim:$ssize", 0);
 		}
     }     
@@ -617,7 +624,7 @@ sub SSCam_Attr($$$$) {
 		    $slim  = AttrVal($name,"snapGalleryNumber",$SSCam_slim); # Anzahl der abzurufenden Snaps
 			my $sg = AttrVal($name,"snapGallerySize","Icon");        # Auflösung Image
 			$ssize = ($sg eq "Icon")?1:2;
-			RemoveInternalTimer("SSCam_getsnapinfo"); 
+			RemoveInternalTimer($hash, "SSCam_getsnapinfo"); 
 			InternalTimer(gettimeofday()+0.7, "SSCam_getsnapinfo", "$name:$slim:$ssize", 0);
 		}
     } 
@@ -638,7 +645,7 @@ sub SSCam_Attr($$$$) {
 		$hash->{HELPER}{GETSNAPGALLERY} = 1;
 		my $sg = AttrVal($name,"snapGallerySize","Icon");  # Auflösung Image
 		$ssize = ($sg eq "Icon")?1:2;
-		RemoveInternalTimer("SSCam_getsnapinfo"); 
+		RemoveInternalTimer($hash, "SSCam_getsnapinfo"); 
 		InternalTimer(gettimeofday()+0.7, "SSCam_getsnapinfo", "$name:$slim:$ssize", 0);
 	}
     
@@ -1534,9 +1541,9 @@ sub SSCam_Get($@) {
 		}
 
     } elsif ($opt eq "snapinfo" && SSCam_IsModelCam($hash)) {
-        # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps
+        # Schnappschußgalerie abrufen oder nur Info des letzten Snaps
 		if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-        my ($slim,$ssize) = SSCam_snaplimsize($hash);		
+        my ($slim,$ssize) = SSCam_snaplimsize($hash,1);	    # Force-Bit, es wird $hash->{HELPER}{GETSNAPGALLERY} gesetzt !
         SSCam_getsnapinfo("$name:$slim:$ssize");
                 
     } elsif ($opt eq "snapfileinfo" && SSCam_IsModelCam($hash)) {
@@ -1719,7 +1726,11 @@ sub SSCam_FWsummaryFn ($$$$) {
   $ret .= "<script type=\"text/javascript\" src=\"$ttjs\"></script>";
   
   if($wltype eq "image") {
-    $ret .= "<img src=$link $attr><br>";
+    if(SSCam_myVersion($hash) == 823 && ReadingsVal($name, "CamVideoType", "") !~ /MJPEG/) {             
+      $ret .= "<td> <br> <b> Because SVS Version 8.2.3 is running the video format has to be set to MJPEG in SVS ! </b> <br><br>";
+    } else {
+      $ret .= "<img src=$link $attr><br>";
+    }
     $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
     $ret .= $imgblank;  
     if($hash->{HELPER}{RUNVIEW} =~ /live_fw/) {
@@ -1866,9 +1877,9 @@ sub SSCam_initonboot ($) {
              SSCam_getptzlistpreset($hash);
              SSCam_getptzlistpatrol($hash);
 
-             # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps
-             my ($slim,$ssize) = SSCam_snaplimsize($hash);
-             RemoveInternalTimer("SSCam_getsnapinfo"); 
+             # Schnappschußgalerie abrufen oder nur Info des letzten Snaps
+             my ($slim,$ssize) = SSCam_snaplimsize($hash,1);   # Force-Bit, es wird $hash->{HELPER}{GETSNAPGALLERY} erzwungen !
+             RemoveInternalTimer($hash, "SSCam_getsnapinfo"); 
              InternalTimer(gettimeofday()+0.9, "SSCam_getsnapinfo", "$name:$slim:$ssize", 0); 
 		 }
          SSCam_versionCheck($hash);                                                                  # Einstieg in regelmäßigen Check Kompatibilität
@@ -1899,12 +1910,28 @@ sub SSCam_versionCheck($) {
   if($cs eq "false") {
       Log3($name, 2, "$name - WARNING - The current/simulated SVS-version ".ReadingsVal($name, "SVSversion", "").
        " may be incompatible with SSCam version $hash->{VERSION}. ".
-       "For further information execute \"get <name> versionNotes 4\".");
+       "For further information execute \"get $name versionNotes 4\".");
   }
   
 InternalTimer(gettimeofday()+$rc, "SSCam_versionCheck", $hash, 0);
 
 return; 
+}
+
+###############################################################################
+#          Liefert die bereinigte SVS-Version dreistellig xxx
+###############################################################################
+sub SSCam_myVersion($) {
+  my ($hash) = @_;
+  my $name   = $hash->{NAME};
+  my $actvs  = ""; 
+
+  my @vl = split (/-/,ReadingsVal($name, "SVSversion", ""),2);
+  if(@vl) {
+      $actvs = $vl[0];
+      $actvs =~ s/\.//g;
+  }
+return $actvs; 
 }
 
 ######################################################################################
@@ -3219,8 +3246,8 @@ sub SSCam_getcaminfoall ($$) {
         InternalTimer(gettimeofday()+1.4, "SSCam_getstreamformat", $hash, 0);
         
         # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps
-        my ($slim,$ssize) = SSCam_snaplimsize($hash);
-        RemoveInternalTimer("SSCam_getsnapinfo"); 
+        my ($slim,$ssize) = SSCam_snaplimsize($hash,1);       # Force-Bit, es wird $hash->{HELPER}{GETSNAPGALLERY} erzwungen !
+        RemoveInternalTimer($hash, "SSCam_getsnapinfo"); 
         InternalTimer(gettimeofday()+1.5, "SSCam_getsnapinfo", "$name:$slim:$ssize", 0);
 	
         RemoveInternalTimer($hash, "SSCam_getptzlistpreset");
@@ -3267,6 +3294,10 @@ return;
 
 ###########################################################################
 #  Infos zu Snaps abfragen (z.B. weil nicht über SSCam ausgelöst)
+#
+#  $slim  = Anzahl der abzurufenden Snapinfos (snaps)
+#  $ssize = Snapgröße
+#  $tac   = Transaktionscode (für gemeinsamen Versand)
 ###########################################################################
 sub SSCam_getsnapinfo ($) {
     my ($str)   = @_;
@@ -3277,7 +3308,7 @@ sub SSCam_getsnapinfo ($) {
     $tac   = (defined $tac)?$tac:5000;
     my $ta = $hash->{HELPER}{TRANSACTION};
     
-    RemoveInternalTimer("SSCam_getsnapinfo"); 
+    RemoveInternalTimer($hash, "SSCam_getsnapinfo"); 
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off" || ((defined $ta) && $ta == $tac)) {               
@@ -4430,9 +4461,11 @@ sub SSCam_camop ($) {
 	  my $keyword = $hash->{HELPER}{KEYWORD};
       my $snapid  = ReadingsVal("$name", "LastSnapId", " ");
       if($OpMode eq "getsnapinfo" && $snapid =~/\d+/) {
+          # getsnapinfo UND Reading LastSnapId gesetzt
 	      Log3($name,4, "$name - Call getsnapinfo with params: Image numbers => $limit, Image size => $imgsize, Id => $snapid");
           $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&idList=\"$snapid\"&imgSize=\"$imgsize\"&limit=\"$limit\"&_sid=\"$sid\"";      
       } else {
+          # snapgallery oder kein Reading LastSnapId gesetzt
 	      Log3($name,4, "$name - Call getsnapinfo with params: Image numbers => $limit, Image size => $imgsize, Keyword => $keyword");
           $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&keyword=\"$keyword\"&imgSize=\"$imgsize\"&limit=\"$limit\"&_sid=\"$sid\"";
       }
@@ -5188,7 +5221,7 @@ sub SSCam_camop_parse ($) {
                     SSCam_delActiveToken($hash);                        
                 }
                 
-                RemoveInternalTimer("SSCam_getsnapinfo");                
+                RemoveInternalTimer($hash, "SSCam_getsnapinfo");                
                 InternalTimer(gettimeofday()+0.6, "SSCam_getsnapinfo", "$name:$slim:$ssize:$tac", 0);
                 return;
             
@@ -5308,6 +5341,7 @@ sub SSCam_camop_parse ($) {
                         $hash->{HELPER}{TOTALCNT} = $data->{data}{total};  # total Anzahl Schnappschüsse
                         
                         while ($data->{'data'}{'data'}[$i]) {
+                            next if(!$data->{'data'}{'data'}[$i]{'camName'});    # Forum:#97706
                             if($data->{'data'}{'data'}[$i]{'camName'} ne $camname) {
                                 $i += 1;
                                 next;
@@ -5619,7 +5653,7 @@ sub SSCam_camop_parse ($) {
                 }
                 
                 # Kompatibilitätscheck
-                my $avsc   = $major.$minor; 
+                my $avsc   = $major.$minor.(($small=~/\d/)?$small:0);
                 my $avcomp = $hash->{COMPATIBILITY};
                 $avcomp    =~ s/\.//g;
                 
@@ -6586,9 +6620,12 @@ return $bool;
 
 ###############################################################################
 #      Ermittlung Anzahl und Größe der abzurufenden Schnappschußdaten
+#
+#      $force = wenn auf jeden Fall der/die letzten Snaps von der SVS
+#               abgerufen werden sollen unabhängig ob LastSnapId vorhanden ist
 ###############################################################################
-sub SSCam_snaplimsize ($) {      
-  my ($hash)= @_;
+sub SSCam_snaplimsize ($;$) {      
+  my ($hash,$force) = @_;
   my $name  = $hash->{NAME};
   my ($slim,$ssize);
   
@@ -6620,6 +6657,8 @@ sub SSCam_snaplimsize ($) {
   if(scalar(@strmdevs) >= 1) {
       Log3($name, 4, "$name - Streaming devs of type \"lastsnap\": @strmdevs");
   }
+  
+  $hash->{HELPER}{GETSNAPGALLERY} = 1 if($force);                           # Bugfix 04.03.2019 Forum:https://forum.fhem.de/index.php/topic,45671.msg914685.html#msg914685
   
 return ($slim,$ssize);
 }
@@ -6738,12 +6777,14 @@ sub SSCam_ptzpanel($;$$) {
   my $ptz_ret;
   my $row;
   
-  my @vl = split (/\.|-/,ReadingsVal($name, "SVSversion", ""));
-  if(@vl) {
-      my $actvs = $vl[0];
-      $actvs   .= $vl[1];
-      return "" if($actvs <= 71);
-  }
+  #my @vl = split (/\.|-/,ReadingsVal($name, "SVSversion", ""));
+  #if(@vl) {
+  #    my $actvs = $vl[0];
+  #    $actvs   .= $vl[1];
+  #    return "" if($actvs <= 71);
+  #}
+  
+  return if(SSCam_myVersion($hash) <= 71);
   
   $ptz_ret = "<div class=\"ptzpanel\">";
   $ptz_ret.= '<table class="rc_body">';
@@ -7037,19 +7078,23 @@ sub SSCam_StreamDev($$$) {
       return $ret; 
   }
   
-  if ($fmt =~ /mjpeg/) { 
-      if($apivideostmsmaxver) {                                  # keine API "SYNO.SurveillanceStation.VideoStream" mehr ab API v2.8
-          $link = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
-      } elsif ($hash->{HELPER}{STMKEYMJPEGHTTP}) {
-          $link = $hash->{HELPER}{STMKEYMJPEGHTTP};
+  if ($fmt =~ /mjpeg/) {
+      if(SSCam_myVersion($hash) == 823 && ReadingsVal($camname, "CamVideoType", "") !~ /MJPEG/) {  
+          $ret .= "<td> <br> <b> Because SVS Version 8.2.3 is running the video format has to be set to MJPEG in SVS ! </b> <br><br>";
+      } else {
+          if($apivideostmsmaxver) {                                  
+              $link = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
+          } elsif ($hash->{HELPER}{STMKEYMJPEGHTTP}) {
+              $link = $hash->{HELPER}{STMKEYMJPEGHTTP};
+          }
+          if($apiaudiostmmaxver) {                                   
+              $audiolink = "$proto://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmmaxver&method=Stream&cameraId=$camid&_sid=$sid"; 
+          }
+          $ret .= "<td><img src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"><br>";
+          $streamHash->{HELPER}{STREAM} = "<img src=$link $pws>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
+          $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);         # Statusbit wenn ein Stream aktiviert ist      
       }
-      if($apiaudiostmmaxver) {                                   # keine API "SYNO.SurveillanceStation.AudioStream" mehr ab API v2.8 
-	      $audiolink = "$proto://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmmaxver&method=Stream&cameraId=$camid&_sid=$sid"; 
-      }
-	  $ret .= "<td><img src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"><br>";
-      $streamHash->{HELPER}{STREAM} = "<img src=$link $pws>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
-      $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);         # Statusbit wenn ein Stream aktiviert ist
-      
+            
       if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
              # Aufnahmebutton endlos Start
              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
@@ -7091,26 +7136,31 @@ sub SSCam_StreamDev($$$) {
       }
   
   } elsif ($fmt =~ /generic/) {  
-      my $htag  = AttrVal($camname,"genericStrmHtmlTag","");
+      my $htag  = AttrVal($strmdev,"genericStrmHtmlTag",AttrVal($camname,"genericStrmHtmlTag",""));
+      
       if( $htag =~ m/^\s*(.*)\s*$/s ) {
           $htag = $1;
           $htag =~ s/\$NAME/$camname/g;
           $htag =~ s/\$HTMLATTR/$ha/g;
+          $htag =~ s/\$PWS/$pws/g;
       }
 
       if(!$htag) {
-          $ret .= "<td> <br> <b> Set attribute \"genericStrmHtmlTag\" in device <a href=\"/fhem?detail=$camname\">$camname</a></b> <br><br></td>";
+          $ret .= "<td> <br> <b> Set attribute \"genericStrmHtmlTag\" in device <a href=\"/fhem?detail=$camname\">$camname</a> or in device <a href=\"/fhem?detail=$strmdev\">$strmdev</a></b> <br><br></td>";
           $ret .= '</tr>';
           $ret .= '</tbody>';
           $ret .= '</table>';
           $ret .= '</div>';
           return $ret; 
       }
-      
       $ret .= "<td>";
       $ret .= "$htag";
       if($htag) {
-          $streamHash->{HELPER}{STREAM}       = "$htag";   # Stream für "set <SSCamSTRM-Device> popupStream" speichern
+          # Popup-Tag um den Popup-Teil bereinigen 
+          my $ptag = $htag;
+          $ptag    =~ m/^(\s+)?(?<b><)(\s+)?(?<heart>.*)(\s+)?(?<nh>onClick=.*)(\s+)?(?<e>>)(\s+)?$/s;
+          $ptag    = $+{heart}?$+{b}.$+{heart}.$+{e}:$ptag;
+          $streamHash->{HELPER}{STREAM}       = "$ptag";   # Stream für "set <SSCamSTRM-Device> popupStream" speichern
           $streamHash->{HELPER}{STREAM}       =~ s/["']//g;
           $streamHash->{HELPER}{STREAM}       =~ s/\s+/ /g;
           $streamHash->{HELPER}{STREAMACTIVE} = 1;         # Statusbit wenn ein Stream aktiviert ist
@@ -7187,11 +7237,15 @@ sub SSCam_StreamDev($$$) {
       
       if($link && $wltype =~ /image|iframe|video|base64img|embed|hls/) {
           if($wltype =~ /image/) {
-              $ret .= "<td><img src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"><br>" if($link);
-              $streamHash->{HELPER}{STREAM} = "<img src=$link $pws>";    # Stream für "set <SSCamSTRM-Device> popupStream" speichern
-              $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);         # Statusbit wenn ein Stream aktiviert ist
+              if(SSCam_myVersion($hash) == 823 && ReadingsVal($camname, "CamVideoType", "") !~ /MJPEG/) {             
+                  $ret .= "<td> <br> <b> Because SVS Version 8.2.3 is running the video format has to be set to MJPEG in SVS ! </b> <br><br>";
+              } else {
+                  $ret .= "<td><img src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"><br>" if($link);
+                  $streamHash->{HELPER}{STREAM} = "<img src=$link $pws>";    # Stream für "set <SSCamSTRM-Device> popupStream" speichern
+                  $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);         # Statusbit wenn ein Stream aktiviert ist
+              }    
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
-              $ret .= $imgblank;
+              $ret .= $imgblank;              
               if($hash->{HELPER}{RUNVIEW} =~ /live_fw/) {              
                   if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
                       # Aufnahmebutton endlos Start
@@ -8773,6 +8827,8 @@ return ($str);
 #                                       Hint Hash EN           
 #############################################################################################
 %SSCam_vHintsExt_en = (
+  "8" => "Link to official <a href=\"https://community.synology.com/forum/3\">Surveillance Forum</a> in Synology communiy".
+         "<br><br>",
   "7" => "<b>Setup Email Shipping <br>".
          "==================== </b> <br><br>".
          "Snapshots can be sent by <b>Email</b> alltogether after creation. For this purpose the module contains<br>". 
@@ -8813,7 +8869,7 @@ return ($str);
          "<a href=\"https://www.synology.com/en-global/knowledgebase/Surveillance/help/SurveillanceStation/user\">Surveillance Station online help</a> ".
          "<br><br>",
   "4" => "The message Meldung \"WARNING - The current/simulated SVS-version ... may be incompatible with SSCam version...\" means that ".
-         "the used SSCam version was currently not tested with the installed version of Synology Surveillance Station (Reading \"SVSversion\"). ".
+         "the used SSCam version was currently not tested or (partially) incompatible with the installed version of Synology Surveillance Station (Reading \"SVSversion\"). ".
          "The compatible SVS-Version is printed out in the Internal COMPATIBILITY.\n".
          "<b>Actions:</b> At first please update your SSCam version. If the message does appear furthermore, please inform the SSCam Maintainer. ".
          "To ignore this message temporary, you may reduce the verbose level of your SSCam device. ".
@@ -8831,6 +8887,8 @@ return ($str);
 #                                       Hint Hash DE           
 #############################################################################################
 %SSCam_vHintsExt_de = (
+  "8" => "Link zur offiziellen <a href=\"https://community.synology.com/forum/3\">Surveillance Forum</a> Seite innerhalb der Synology Communiy".
+         "<br><br>",
   "7" => "<b>Einstellung Email-Versand <br>".
          "========================= </b> <br><br>".
          "Schnappschüsse können nach der Erstellung per <b>Email</b> gemeinsam versendet werden. Dazu enthält das Modul einen<br>". 
@@ -8874,7 +8932,7 @@ return ($str);
          "<br><br>",
   "4" => "Die Meldung \"WARNING - The current/simulated SVS-version ... may be incompatible with SSCam version...\" ist ein Hinweis darauf, dass ".
          "die eingesetzte SSCam Version noch nicht mit der verwendeten Version von Synology Surveillance Station (Reading \"SVSversion\") getestet ".
-         "wurde. Die kompatible SVS-Version ist im Internal COMPATIBILITY ersichtlich.\n".
+         "wurde oder (teilweise) mit dieser Version nicht kompatibel ist. Die kompatible SVS-Version ist im Internal COMPATIBILITY ersichtlich.\n".
          "<b>Maßnahmen:</b> Bitte SSCam zunächst updaten. Sollte die Meldung weiterhin auftreten, bitte den SSCam Maintainer informieren. Zur ".
          "vorübergehenden Ignorierung kann der verbose Level des SSCam-Devices entsprechend reduziert werden. ".
          "<br><br>",
@@ -8903,7 +8961,7 @@ return ($str);
   At present the following functions are available: <br><br>
    <ul>
     <ul>
-       <li>Start a recording and send it optionally by Email </li>
+       <li>Start a recording and send it optionally by Email and/or Telegram </li>
        <li>Stop a recording by command or automatically after an adjustable period </li>
        <li>Trigger of snapshots and optionally send them alltogether by Email/TelegramBot using the integrated Email client </li>
        <li>Trigger snapshots of all defined cams and optionally send them alltogether by Email using the integrated Email client </li>
@@ -9214,9 +9272,15 @@ return ($str);
       <pre>
 attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
                                  &lt;source src='http://192.168.2.10:32000/$NAME.m3u8' type='application/x-mpegURL'&gt;
-                               &lt;/video&gt; 
+                               &lt;/video&gt;
+
+attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR 
+                                 src="http://192.168.2.10:32774"
+                                 onClick="FW_okDialog('&lt;img src=http://192.168.2.10:32774 $PWS&gt')"
+                               &gt                                 
       </pre>
-      The variables $HTMLATTR, $NAME are placeholder and absorb the attribute "htmlattr" (if set) respectively the SSCam-Devicename.
+      The variables $HTMLATTR, $NAME and $PWS are placeholders and absorb the attribute "htmlattr" (if set), the SSCam-Devicename 
+      respectively the value of attribute "popupWindowSize" in streamin-device, which specify the windowsize of a popup window.
     </ul>
   <br><br>
     
@@ -9496,7 +9560,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <br><br>
   
   <ul>
-  <li><b>set &lt;name&gt; on [&lt;rectime&gt;] [recEmailTxt:"subject => &lt;subject text&gt;, body => &lt;message text&gt;"]  </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
+  <li><b>set &lt;name&gt; on [&lt;rectime&gt;] [recEmailTxt:"subject => &lt;subject text&gt;, body => &lt;message text&gt;"] [recTelegramTxt:"tbot => &lt;TelegramBot device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;subject text&gt;]"]  </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
    
   A recording will be started. The default recording time is 15 seconds. It can be individually changed by 
   the <a href="#SSCamattr">attribute</a> "rectime". 
@@ -9535,6 +9599,13 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   (the tag syntax is identical to the "recEmailTxt" attribute)
   <br><br>
   
+  The shipping of the last recording by <b>Telegram</b> can be activated permanently by setting <a href="#SSCamattr">attribute</a> 
+  "recTelegramTxt". Of course, the <a href="http://fhem.de/commandref.html#TelegramBot">TelegramBot device</a> which is 
+  used, must be defined and fully functional before. <br>
+  If you want temporary overwrite the message text as set with attribute "recTelegramTxt", you can optionally specify the 
+  "recTelegramTxt:"-tag as shown above. If the attribute "recTelegramTxt" is not set, the shipping by Telegram is
+  activated one-time. (the tag-syntax is equivalent to the "recTelegramTxt" attribute) <br><br>
+  
   <b>Examples: </b> <br><br>
   set &lt;name&gt; on [rectime]  <br>
   # starts a recording, stops automatically after [rectime] <br>
@@ -9542,6 +9613,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   # starts a permanent record which must be stopped with the "off"-command. <br>
   <code> set &lt;name&gt; on recEmailTxt:"subject => New recording for $CAM created, body => The last recording of $CAM is atteched."  </code><br>
   # starts a recording and send it after completion by Email. <br>
+  <code> set &lt;name&gt; on recTelegramTxt:"tbot => teleBot, peers => @xxxx , subject => Movement alarm by $CAM. The snapshot $FILE was created at $CTIME"  </code><br>
+  # starts a recording and send it after completion by Telegram. <br>
   </ul>
   <br><br>
   
@@ -9666,6 +9739,10 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   The video format of the camera has to be set to H.264 in the Synology Surveillance Station and not every camera type is
   a proper device for HLS-Streaming.
   At the time only the Mac Safari Browser and modern mobile iOS/Android-Devices are able to playback HLS-Streams. 
+  <br><br>
+  
+  <b>Note for MJPEG:</b> <br>
+  The MJPEG stream is SVS internal transcoded from other codec and is usally only about 1 fps.
   
   </ul>
   <br><br>
@@ -10125,13 +10202,19 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   (see also "set &lt;name&gt; createStreamDev generic") <br><br> 
   
     <ul>
-	  <b>Example:</b>
+	  <b>Examples:</b>
       <pre>
 attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
                                  &lt;source src='http://192.168.2.10:32000/$NAME.m3u8' type='application/x-mpegURL'&gt;
                                &lt;/video&gt; 
+                               
+attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR 
+                                 src="http://192.168.2.10:32774"
+                                 onClick="FW_okDialog('&lt;img src=http://192.168.2.10:32774 $PWS&gt')"
+                               &gt  
       </pre>
-      The variables $HTMLATTR, $NAME are placeholder and absorb the attribute "htmlattr" (if set) respectively the SSCam-Devicename.
+      The variables $HTMLATTR, $NAME and $PWS are placeholders and absorb the attribute "htmlattr" (if set), the SSCam-Devicename 
+      respectively the value of attribute "popupWindowSize" in streaming-device, which specify the windowsize of a popup window.
     </ul>
     <br><br>
     </li>
@@ -10293,6 +10376,38 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
       </ul>
       <br>
   </li>
+  
+  <a name="recTelegramTxt"></a>
+  <li><b>snapTelegramTxt tbot => &lt;TelegramBot device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;subject text&gt;]  </b><br>
+    Activates the permanent shipping of recordings by TelegramBot after their creation. <br>
+    The attribute has to be definied in the form as described. With key "tbot" the TelegramBot device is specified, which is 
+	used for shipping the data. Of course, the <a href="http://fhem.de/commandref.html#TelegramBot">TelegramBot device</a> 
+    must be available and has to be running well. <br>
+	The setting of "peers" and "subject" is optional, but the keys must (empty) specified. 
+	If "peer" is empty, teh default peer of the TelegramBot is used. <br>
+	You can use the placeholder in "subject". <br><br>
+	
+		<ul>   
+		<table>  
+		<colgroup> <col width=10%> <col width=90%> </colgroup>
+		  <tr><td> $CAM   </td><td>- Device alias respectively the name of the camera in SVS if the device alias isn't set </td></tr>
+		  <tr><td> $DATE  </td><td>- current date </td></tr>
+		  <tr><td> $TIME  </td><td>- current time </td></tr>
+		  <tr><td> $FILE  </td><td>- Name of recording file </td></tr>
+		  <tr><td> $CTIME </td><td>- recording creation time </td></tr>
+		</table>
+		</ul>     
+		<br>	
+    
+       <ul>
+		<b>Examples:</b><br>
+        recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Motion alarm ($FILE)  <br>
+		recTelegramTxt tbot =&gt; teleBot, peers =&gt; @nabuko @foo @bar, subject =&gt;  <br>
+		recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt;  <br>
+		recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Motion alarm from $CAM. At $CTIME the recording $FILE was created. Now it is $TIME. <br>
+      </ul>
+      <br>
+  </li><br>	 
   
   <a name="rectime"></a>
   <li><b>rectime</b><br>
@@ -10596,7 +10711,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     Zur Zeit werden folgende Funktionen unterstützt: <br><br>
     <ul>
      <ul>
-      <li>Start einer Aufnahme und optionaler Versand per Email </li>
+      <li>Start einer Aufnahme und optionaler Versand per Email und/oder Telegram </li>
       <li>Stop einer Aufnahme per Befehl bzw. automatisch nach Ablauf einer einstellbaren Dauer </li>
       <li>Auslösen von Schnappschnüssen und optional gemeinsamer Email/TelegramBot-Versand mittels integrierten Email-Client </li>
       <li>Auslösen von Schnappschnüssen aller definierten Kameras und optionaler gemeinsamer Email-Versand mittels integrierten Email-Client </li>
@@ -10907,13 +11022,19 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   spezifizieren den wiederzugebenden Content. <br><br>
   
     <ul>
-	  <b>Beispiel:</b>
+	  <b>Beispiele:</b>
       <pre>
 attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
                                  &lt;source src='http://192.168.2.10:32000/$NAME.m3u8' type='application/x-mpegURL'&gt;
-                               &lt;/video&gt; 
+                               &lt;/video&gt;
+
+attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR 
+                                 src="http://192.168.2.10:32774"
+                                 onClick="FW_okDialog('&lt;img src=http://192.168.2.10:32774 $PWS &gt')"
+                               &gt                              
       </pre>
-      Die Variablen $HTMLATTR, $NAME sind Platzhalter und übernehmen ein gesetztes Attribut "htmlattr" bzw. den SSCam-Devicenamen.
+      Die Variablen $HTMLATTR, $NAME und $PWS sind Platzhalter und übernehmen ein gesetztes Attribut "htmlattr", den SSCam-
+      Devicenamen bzw. das Attribut "popupWindowSize" im Streaming-Device, welches die Größe eines Popup-Windows festlegt.
     </ul>
   <br><br>
   
@@ -11195,7 +11316,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; on [&lt;rectime&gt;] [recEmailTxt:"subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;"] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li><br>
+  <li><b> set &lt;name&gt; on [&lt;rectime&gt;] [recEmailTxt:"subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;"] [recTelegramTxt:"tbot => &lt;TelegramBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;]"] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li><br>
 
   Startet eine Aufnahme. Die Standardaufnahmedauer beträgt 15 Sekunden. Sie kann mit dem 
   Attribut "rectime" individuell festgelegt werden. 
@@ -11234,7 +11355,14 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   Beendigung aktiviert werden. Sollte das Attribut "recEmailTxt" bereits gesetzt sein, wird der Text des "recEmailTxt:"-Tags  
   anstatt des Attribut-Textes verwendet. <br><br>
   
-  <b>Beispiele </b>: <br><br>
+  Ein <b>Telegram-Versand</b> der letzten Aufnahme kann durch Setzen des <a href="#SSCamattr">Attributs</a> "recTelegramTxt" permanent aktiviert
+  werden. Das zu verwendende <a href="http://fhem.de/commandref_DE.html#TelegramBot">TelegramBot-Device</a> muss natürlich 
+  funktionstüchtig eingerichtet sein. <br>
+  Der Text im Attribut "recTelegramTxt" kann durch die Spezifikation des optionalen "recTelegramTxt:"-Tags, wie oben 
+  gezeigt, temporär überschrieben bzw. geändert werden. Sollte das Attribut "recTelegramTxt" nicht gesetzt sein, wird durch Angabe dieses Tags
+  der Telegram-Versand einmalig aktiviert. (die Tag-Syntax entspricht dem "recTelegramTxt"-Attribut) <br><br>
+  
+  <b>Beispiele </b>: <br>
   <code> set &lt;name&gt; on [rectime] </code><br>
   # startet die Aufnahme der Kamera &lt;name&gt;, automatischer Stop der Aufnahme nach Ablauf der Zeit [rectime] 
   (default 15s oder wie im <a href="#SSCamattr">Attribut</a> "rectime" angegeben) <br>
@@ -11242,6 +11370,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   # startet eine Daueraufnahme die mit "off" gestoppt werden muss. <br>
   <code> set &lt;name&gt; on recEmailTxt:"subject => Neue Aufnahme $CAM, body => Die aktuelle Aufnahme von $CAM ist angehängt."  </code><br>
   # startet eine Aufnahme und versendet sie nach Beendigung per Email. <br>
+  <code> set &lt;name&gt; on recTelegramTxt:"tbot => teleBot, peers => @xxxx , subject => Bewegungsalarm bei $CAM. Es wurde $CTIME die Aufnahme $FILE erstellt"  </code><br>
+  # startet eine Aufnahme und versendet sie nach Beendigung per Telegram. <br>
 
   </ul>
   <br><br>
@@ -11370,6 +11500,10 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   Die Kamera muss in der SVS auf das Videoformat H.264 eingestellt sein und nicht jeder Kameratyp ist gleichermassen für 
   HLS-Streaming geeignet.
   Momentan kann HLS nur durch den Mac Safari Browser sowie auf mobilen iOS/Android-Geräten wiedergegeben werden.
+  <br><br>
+  
+  <b>Hinweis zu MJPEG:</b> <br>
+  Der MJPEG Stream wird innerhalb der SVS aus anderen Codecs (H.264) transkodiert und beträgt normalerweise ca. 1 Fps.
     
   </ul>
   <br><br>
@@ -11869,13 +12003,19 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   (siehe "set &lt;name&gt; createStreamDev generic") <br><br> 
   
     <ul>
-	  <b>Beispiel:</b>
+	  <b>Beispiele:</b>
       <pre>
 attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
                                  &lt;source src='http://192.168.2.10:32000/$NAME.m3u8' type='application/x-mpegURL'&gt;
-                               &lt;/video&gt; 
+                               &lt;/video&gt;
+                               
+attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR 
+                                 src="http://192.168.2.10:32774"
+                                 onClick="FW_okDialog('&lt;img src=http://192.168.2.10:32774 $PWS &gt')"
+                               &gt                              
       </pre>
-      Die Variablen $HTMLATTR, $NAME sind Platzhalter und übernehmen ein gesetztes Attribut "htmlattr" bzw. den SSCam-Devicenamen.
+      Die Variablen $HTMLATTR, $NAME und $PWS sind Platzhalter und übernehmen ein gesetztes Attribut "htmlattr", den SSCam-
+      Devicenamen bzw. das Attribut "popupWindowSize" im Streaming-Device, welches die Größe eines Popup-Windows festlegt.    
     </ul>
     <br><br>
     </li>
@@ -12043,6 +12183,38 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
       </ul>
       <br>
   </li>  
+  
+  <a name="recTelegramTxt"></a>
+  <li><b>recTelegramTxt tbot => &lt;TelegramBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;]  </b><br>
+    Aktiviert den permanenten Versand von Aufnahmen nach deren Erstellung per TelegramBot. <br>
+    Das Attribut muß in der angegebenen Form definiert werden. Im Schlüssel "tbot" ist das TelegramBot-Device anzugeben, welches für 
+	den Versand der Daten verwendet werden soll. Das <a href="http://fhem.de/commandref_DE.html#TelegramBot">TelegramBot-Device</a> muss natürlich
+	vorhanden und funktionstüchtig sein. <br>
+	Die Angabe von "peers" und "subject" ist optional, jedoch muß der Schlüssel (leer) angegeben werden. 
+	Wurde "peer" leer gelassen, wird der Default-Peer des TelegramBot verwendet. <br>
+	Es können die Platzhalter im subject verwendet werden. <br><br>
+	
+		<ul>   
+		<table>  
+		<colgroup> <col width=10%> <col width=90%> </colgroup>
+		  <tr><td> $CAM   </td><td>- Device-Alias bzw. den Namen der Kamera in der SVS ersetzt falls der Device-Alias nicht vorhanden ist </td></tr>
+		  <tr><td> $DATE  </td><td>- aktuelles Datum </td></tr>
+		  <tr><td> $TIME  </td><td>- aktuelle Zeit </td></tr>
+		  <tr><td> $FILE  </td><td>- Filename </td></tr>
+		  <tr><td> $CTIME </td><td>- Erstellungszeit der Aufnahme </td></tr>
+		</table>
+		</ul>     
+		<br>	
+    
+       <ul>
+		<b>Beispiele:</b><br>
+        recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Bewegungsalarm ($FILE)  <br>
+		recTelegramTxt tbot =&gt; teleBot, peers =&gt; @nabuko @foo @bar, subject =&gt;  <br>
+		recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt;  <br>
+		recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Bewegungsalarm bei $CAM. Es wurde $CTIME die Aufnahme $FILE erstellt. Jetzt ist es $TIME. <br>
+      </ul>
+      <br>
+  </li><br>
   
   <a name="rectime"></a>  
   <li><b>rectime</b><br>
