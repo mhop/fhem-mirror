@@ -42,7 +42,8 @@ use MIME::Base64;
 use Time::HiRes;
 use HttpUtils;
 use Blocking;                                                     # für EMail-Versand
-use Encode;                                                     
+use Encode; 
+use JSON;                                                         # für Telegram Versand                                                    
 # no if $] >= 5.017011, warnings => 'experimental';
 
 # Versions History intern
