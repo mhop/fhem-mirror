@@ -19,7 +19,7 @@ sub Pushover_Initialize($$) {
     $hash->{SetFn}   = "Pushover_Set";
 
     $hash->{AttrList} =
-"disable:0,1 disabledForIntervals do_not_notify:0,1 timestamp:0,1 title sound:pushover,bike,bugle,cashregister,classical,cosmic,falling,gamelan,incoming,intermission,magic,mechanical,pianobar,siren,spacealarm,tugboat,alien,climb,persistent,echo,updown,none device priority:0,1,2,-1,-2 callbackUrl retry expire "
+"disable:0,1 disabledForIntervals do_not_notify:0,1 timestamp:0,1 title sound:pushover,bike,bugle,cashregister,classical,cosmic,falling,gamelan,incoming,intermission,magic,mechanical,pianobar,siren,spacealarm,tugboat,alien,climb,persistent,echo,updown,none device priority:0,1,2,-1,-2 callbackUrl retry expire storagePath "
       . $readingFnAttributes;
 
     #$hash->{parseParams} = 1; # not possible due to legacy msg command schema
@@ -1282,7 +1282,7 @@ sub Pushover_SetMessage2 ($$$$) {
 
     if ( defined( $values{attachment} ) ) {
         my $path =
-          AttrVal( $name, "storage", AttrVal( "global", "modpath", "." ) );
+          AttrVal( $name, "storagePath", AttrVal( "global", "modpath", "." ) );
         $path .= "/" unless ( $path =~ /\/$/ );
 
         $values{attachment} = "file://"
@@ -1524,7 +1524,7 @@ sub Pushover_HttpUri ($$;$) {
     <code><b>cancel_id</b>&nbsp;</code> - type: text - Custom ID to immediate expire messages with priority &gt;=2 and disable reoccuring notification.<br>
     <code><b>timestamp</b>&nbsp;</code> - type: integer - A Unix timestamp of your message's date and time to display to the user, rather than the time your message is received by the Pushover servers. Takes precendence over attribute timestamp=1.<br>
     <code><b>sound</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - type: text -  The name of one of the <a href="https://pushover.net/api#sounds">sounds</a> supported by device clients to override the user's default sound choice.<br>
-    <code><b>attachment</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - type: text -  Path to an image file that should be attached to the message. The base path is relative to the FHEM directory and may be overwritten using the storage attribute.<br>
+    <code><b>attachment</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - type: text -  Path to an image file that should be attached to the message. The base path is relative to the FHEM directory and may be overwritten using the storagePath attribute.<br>
     <br>
     Examples:
     <ul>
@@ -1643,7 +1643,7 @@ sub Pushover_HttpUri ($$;$) {
     <li><a name="PushoverAttrsound"></a><code>sound</code><br>
         Will be used as the default sound if sound argument is missing. If left blank the adjusted sound of the app will be used. 
     </li>
-    <li><a name="PushoverAttrstorage"></a><code>storage</code><br>
+    <li><a name="PushoverAttrstoragePath"></a><code>storagePath</code><br>
         Will be used as the default path when sending attachments, otherwise global attribute modpath will be used.
     </li>
   </ul>
@@ -1712,7 +1712,7 @@ sub Pushover_HttpUri ($$;$) {
     <code><b>cancel_id</b>&nbsp;</code> - Typ: Text - Benutzerdefinierte ID, um Nachrichten mit einer Priorit&auml;t &gt;= 2 sofort ablaufen zu lassen und die wiederholte Benachrichtigung auszuschalten.<br>
     <code><b>timestamp</b>&nbsp;</code> - Typ: Integer - Ein Unix Zeitstempfel mit Datum und Uhrzeit deiner Nachricht, die dem Empf&auml;nger statt der Uhrzeit des Einganges auf den Pushover Servern angezeigt wird. Hat Vorrang bei gesetztem Attribut timestamp=1.<br>
     <code><b>sound</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - Typ: Text -  Der Name eines vom Empf&auml;ngerger&auml;t unterst&uuml;tzten <a href="https://pushover.net/api#sounds">Klangs</a>, um den vom Empf&auml;nger ausgew&auml;hlten Klang zu &uuml;berschreiben.<br>
-    <code><b>attachment</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - Typ: Text -  Pfad zu einer Bilddatei, welche an die Nachricht angeh&auml;ngt werden soll. Der Basispfad ist relativ zum FHEM Verzeichnis und kann &uuml;ber das storage Attribut &uuml;berschrieben werden.<br>
+    <code><b>attachment</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - Typ: Text -  Pfad zu einer Bilddatei, welche an die Nachricht angeh&auml;ngt werden soll. Der Basispfad ist relativ zum FHEM Verzeichnis und kann &uuml;ber das storagePath Attribut &uuml;berschrieben werden.<br>
     <br>
     Beispiele:
     <ul>
@@ -1830,7 +1830,7 @@ sub Pushover_HttpUri ($$;$) {
     <li><a name="PushoverAttrsound"></a><code>sound</code><br>
         Wird beim Senden als Titel verwendet, sofern dieser nicht als Aufrufargument angegeben wurde. Kann auch generell entfallen, dann wird der eingestellte Ton der App verwendet.
     </li>
-    <li><a name="PushoverAttrstorage"></a><code>storage</code><br>
+    <li><a name="PushoverAttrstoragePath"></a><code>storagePath</code><br>
         Wird als Standardpfad beim Versand von Anh&auml;ngen verwendet, ansonsten wird das globale Attribut modpath benutzt.
     </li>
   </ul>
