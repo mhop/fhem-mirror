@@ -50,6 +50,7 @@
 #
 # Version History
 #
+# 2019-01-28 version 0.2.11j: vcontrold-Neigung (Heizkurve) commands not rounded to full number anymore 
 # 2019-01-28 version 0.2.11i: update starts now if device initiated (for example, via FHEM restart) 
 # 2018-12-26 version 0.2.11h: warnings removed
 # 2018-12-24 version 0.2.11g: minor bugfix, more comments with verbose 5
@@ -73,7 +74,7 @@ use Scalar::Util qw(looks_like_number);
 use Blocking;
 use Data::Dumper;
 
-my $VCLIENT_version = "0.2.11i";
+my $VCLIENT_version = "0.2.11j";
 my $internal_update_interval  = 0.1; #internal update interval for Write (time between two different write_to_Viessmann commands)
 my $daily_commands_last_day_with_execution = strftime('%d', localtime)-1; #last day when daily commands (commands with type 'daily' ) were executed; set to today
 
@@ -409,8 +410,8 @@ sub VCLIENT_ParseBuf_And_WriteReading($$){
 			# ueblicherweise stehen hier numerische Angaben, ausser zB bei der Betriebsart
 			if (looks_like_number($results[0])){
 				#if ( $last_cmd =~ /(S|s)tatus/ || $last_cmd =~ /BetriebSpar/ || $last_cmd =~ /BetriebParty/ )
-				# Wenn vcontrold-command "Temp" enthaelt, Runden auf 1 , sonst Runden auf 0 (=Statuswert)
-				if ($last_cmd !~ /(T|t)emp/)
+				# Wenn vcontrold-command "Temp" oder "Neigung" (Heizkurve!) enthaelt, Runden auf 1 , sonst Runden auf 0 (=Statuswert)
+				if (($last_cmd !~ /(T|t)emp/) and ($last_cmd !~ /Neigung/))
 				{
 					$value = sprintf("%.0f", $results[0]); #rounding to integer, if status value
 				} else {
