@@ -53,7 +53,7 @@ sub ZoneMinder_Initialize {
   $hash->{WriteFn}   = "ZoneMinder_Write";
   $hash->{ReadyFn}   = "ZoneMinder_Ready";
 
-  $hash->{AttrList} = "usePublicUrlForZmWeb:0,1 loginInterval publicAddress webConsoleContext " . $readingFnAttributes;
+  $hash->{AttrList} = "apiTimeout usePublicUrlForZmWeb:0,1 loginInterval publicAddress webConsoleContext " . $readingFnAttributes;
   $hash->{MatchList} = { "1:ZM_Monitor" => "^.*" };
 
   Log3 '', 3, "ZoneMinder - Initialize done ...";
@@ -163,11 +163,13 @@ sub ZoneMinder_API_Login {
   my $usePublicUrlForZmWeb = AttrVal($name, 'usePublicUrlForZmWeb', 0);
   my $zmWebUrl = ZoneMinder_getZmWebUrl($hash, $usePublicUrlForZmWeb);
   my $loginUrl = "$zmWebUrl/index.php?username=$username&password=$password&action=login&view=console";
+  my $apiTimeout = AttrVal($name, 'apiTimeout', 5);
 
   Log3 $name, 4, "ZoneMinder ($name) - loginUrl: $loginUrl";
   my $apiParam = {
     url => $loginUrl,
     method => "POST",
+    timeout => $apiTimeout,
     callback => \&ZoneMinder_API_Login_Callback,
     hash => $hash
   };
@@ -750,6 +752,7 @@ sub ZoneMinder_Ready {
   <b>Attributes</b>
   <br><br>
   <ul>
+    <li><code>apiTimeout &lt;seconds&gt;</code><br>This defines the request timeout in seconds for calls to the ZoneMinder API (right now, only for the login)</li>
     <li><code>publicAddress &lt;address&gt;</code><br>This configures public accessibility of your LAN (eg your ddns address). Define a valid URL here, eg <code>https://my.own.domain:2344</code></li>
     <li><code>webConsoleContext &lt;path&gt;</code><br>If not set, this defaults to <code>/zm</code>. This is used for building the URL to the ZoneMinder web console.</li>
     <li><code>usePublicUrlForZmWeb</code><br>If a public address is defined, this setting will use the public address for connecting to ZoneMinder API, instead of trying to use the IP-address.</li>

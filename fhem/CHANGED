@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 70_ZoneMinder: added attribute 'apiTimeout'
  - changed: 93_DbLog: minor change of Log entry
  - changed: 70_Pushover: attribute 'storage' was renamed to 'storagePath'
                  and is now visible in FHEMWEB
