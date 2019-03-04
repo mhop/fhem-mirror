@@ -1,5 +1,5 @@
 ﻿##########################################################################################################
-# $Id: 93_DbRep.pm 18488 2019-02-03 07:38:03Z DS_Starter $
+# $Id: 93_DbRep.pm 18563 2019-02-11 21:10:32Z DS_Starter $
 ##########################################################################################################
 #       93_DbRep.pm
 #
@@ -57,7 +57,9 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Versions History intern
 our %DbRep_vNotesIntern = (
-  "8.13.0" => "10.02.2019  executeBeforeProc / executeAfterProc for sumValue, maxValue, minValue, diffValue, averageValue ",
+  "8.14.1" => "04.03.2019  Bugfix in deldoublets with SQLite, Forum: https://forum.fhem.de/index.php/topic,53584.msg914489.html#msg914489 ",
+  "8.14.0" => "19.02.2019  delete Readings if !goodReadingName and featurelevel > 5.9 ",
+  "8.13.0" => "11.02.2019  executeBeforeProc / executeAfterProc for sumValue, maxValue, minValue, diffValue, averageValue ",
   "8.12.0" => "10.02.2019  executeBeforeProc / executeAfterProc for sqlCmd ",
   "8.11.2" => "03.02.2019  fix no running tableCurrentFillup if database is closed ",
   "8.11.1" => "25.01.2019  fix sort of versionNotes ",
@@ -137,7 +139,7 @@ our %DbRep_vNotesIntern = (
 
 # Versions History extern:
 our %DbRep_vNotesExtern = (
-  "8.12.0" => "10.02.2019 executeBeforeProc / executeAfterProc is now available for sqlCmd ",
+  "8.13.0" => "11.02.2019 executeBeforeProc / executeAfterProc is now available for sqlCmd,sumValue, maxValue, minValue, diffValue, averageValue ",
   "8.11.0" => "24.01.2019 command exportToFile or attribute \"expimpfile\" accepts option \"MAXLINES=\" ",
   "8.10.0" => "19.01.2019 In commands sqlCmd, dbValue you may now use SQL session variables like \"SET \@open:=NULL,\@closed:=NULL; SELECT ...\", Forum:#96082",
   "8.9.0"  => "07.11.2018 new command set delDoublets added. This command allows to delete multiple occuring identical records. ",
@@ -4851,10 +4853,19 @@ sub deldoublets_DoParse($) {
  $table   = "history";
  $selspec = "TIMESTAMP,DEVICE,READING,VALUE,count(*)";
  $addon   = "GROUP BY TIMESTAMP, DEVICE, READING, VALUE ASC HAVING count(*) > 1";
+ if($dbloghash->{MODEL} eq 'SQLITE') {
+     $addon = "GROUP BY TIMESTAMP, DEVICE, READING, VALUE HAVING count(*) > 1 ORDER BY TIMESTAMP ASC";     # Forum: https://forum.fhem.de/index.php/topic,53584.msg914489.html#msg914489
+ }
   
  # SQL zusammenstellen für DB-Abfrage
  $sql = DbRep_createSelectSql($hash,$table,$selspec,$device,$reading,"?","?",$addon);
- $sth = $dbh->prepare_cached($sql);
+ eval{$sth = $dbh->prepare_cached($sql);};
+ if ($@) {
+     $err = encode_base64($@,"");
+     Log3 ($name, 2, "DbRep $name - $@");
+     $dbh->disconnect;
+     return "$name|''|''|$err|''|$opt";
+ }
  
  # DB-Abfrage zeilenweise für jeden Timearray-Eintrag
  my @todel; 
@@ -9084,6 +9095,8 @@ sub DbRep_delread($;$$) {
  my ($hash,$shutdown) = @_;
  my $name   = $hash->{NAME};
  my @allrds = keys%{$defs{$name}{READINGS}};
+ my $featurelevel = AttrVal("global","featurelevel",99.99);
+ 
  if($shutdown) {
      my $do = 0;
      foreach my $key(@allrds) {
@@ -9092,6 +9105,11 @@ sub DbRep_delread($;$$) {
              $do = 1;
              delete($defs{$name}{READINGS}{$key});
          }
+         # Reading löschen wenn Featuelevel > 5.9 und zu lang nach der neuen Festlegung
+         if($do == 0 && $featurelevel > 5.9 && !goodReadingName($key)) {
+             $do = 1;
+             delete($defs{$name}{READINGS}{$key});
+         }         
      }
      WriteStatefile() if($do == 1);
      return undef;
