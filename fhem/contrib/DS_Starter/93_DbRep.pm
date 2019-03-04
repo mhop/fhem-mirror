@@ -57,6 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Versions History intern
 our %DbRep_vNotesIntern = (
+  "8.15.0" => "04.03.2019  readingsRename can rename readings of a given (optional) device ",
   "8.14.1" => "04.03.2019  Bugfix in deldoublets with SQLite, Forum: https://forum.fhem.de/index.php/topic,53584.msg914489.html#msg914489 ",
   "8.14.0" => "19.02.2019  delete Readings if !goodReadingName and featurelevel > 5.9 ",
   "8.13.0" => "11.02.2019  executeBeforeProc / executeAfterProc for sumValue, maxValue, minValue, diffValue, averageValue ",
@@ -139,9 +140,10 @@ our %DbRep_vNotesIntern = (
 
 # Versions History extern:
 our %DbRep_vNotesExtern = (
+  "8.15.0" => "04.03.2019 readingsRename can now rename readings of a given (optional) device instead of all found readings specified in command ",
   "8.13.0" => "11.02.2019 executeBeforeProc / executeAfterProc is now available for sqlCmd,sumValue, maxValue, minValue, diffValue, averageValue ",
   "8.11.0" => "24.01.2019 command exportToFile or attribute \"expimpfile\" accepts option \"MAXLINES=\" ",
-  "8.10.0" => "19.01.2019 In commands sqlCmd, dbValue you may now use SQL session variables like \"SET \@open:=NULL,\@closed:=NULL; SELECT ...\", Forum:#96082",
+  "8.10.0" => "19.01.2019 In commands sqlCmd, dbValue you may now use SQL session variables like \"SET \@open:=NULL,\@closed:=NULL; SELECT ...\", Forum:#96082 ",
   "8.9.0"  => "07.11.2018 new command set delDoublets added. This command allows to delete multiple occuring identical records. ",
   "8.8.0"  => "06.11.2018 new attribute 'fastStart'. Usually every DbRep-device is making a short connect to its database when "
               ."FHEM is restarted. When this attribute is set, the initial connect is done when the DbRep-device is doing its "
@@ -4303,7 +4305,7 @@ sub change_Push($) {
  my $dblogname  = $dbloghash->{NAME};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
  my $table      = "history";
- my ($dbh,$err,$sql);
+ my ($dbh,$err,$sql,$dev);
  
  # Background-Startzeit
  my $bst = [gettimeofday];
@@ -4342,16 +4344,21 @@ sub change_Push($) {
 	 $sth = $dbh->prepare($sql) ;
  
  } elsif ($renmode eq "readren") {
-     $old = delete $hash->{HELPER}{OLDREAD};
+     $old = delete $hash->{HELPER}{OLDREAD};        # Wert besteht aus [device]:old_readingname
+     ($dev,$old) = split(":",$old,2);
      $new = delete $hash->{HELPER}{NEWREAD};
 	 
 	 # SQL zusammenstellen für DB-Operation
-     Log3 ($name, 5, "DbRep $name -> Rename old reading name \"$old\" to new reading name \"$new\" in database $dblogname ");
+     Log3 ($name, 5, "DbRep $name -> Rename old reading name \"$old\" ".($dev?"(of device $dev)":"")." to new reading name \"$new\" in database $dblogname ");
 	 
 	 # prepare DB operation
 	 $old =~ s/'/''/g;       # escape ' with ''
 	 $new =~ s/'/''/g;       # escape ' with ''
-	 $sql = "UPDATE history SET TIMESTAMP=TIMESTAMP,READING='$new' WHERE READING='$old'; ";
+     if($dev) {
+         $sql = "UPDATE history SET TIMESTAMP=TIMESTAMP,READING='$new' WHERE DEVICE='$dev' AND READING='$old'; ";
+     } else {
+	     $sql = "UPDATE history SET TIMESTAMP=TIMESTAMP,READING='$new' WHERE READING='$old'; ";
+     }
 	 Log3 ($name, 4, "DbRep $name - SQL execute: $sql"); 
 	 $sth = $dbh->prepare($sql) ;
      
@@ -4382,6 +4389,7 @@ sub change_Push($) {
  my $brt = tv_interval($bst);
 
  $rt = $rt.",".$brt;
+ $old = $dev?"$dev:$old":$old;
  
  return "$name|$urow|$rt|0|$old|$new";
 }
@@ -11307,23 +11315,29 @@ return;
 								 </li><br>
                                  </ul>   
 								 
-    <li><b> readingRename </b> - renames the reading name of a device inside the connected database (see Internal DATABASE).
+    <li><b> readingRename &lt;[device:]oldreadingname&gt;,&lt;newreadingname&gt; </b> <br>
+                                 Renames the reading name of a device inside the connected database (see Internal DATABASE).
                                  The readingname will allways be changed in the <b>entire</b> database. Possibly set time limits or restrictions by 
-                                 <a href="#DbRepattr">attributes</a> device and/or reading will not be considered.  <br><br>
+                                 <a href="#DbRepattr">attributes</a> device and/or reading will not be considered.  <br>
+                                 As an option a device can be specified. In this case only the old readings of this device
+                                 will be renamed. <br><br>
                                  
                                  <ul>
-                                 <b>Example: </b> <br> 
-                                 set &lt;name&gt; readingRename &lt;old reading name&gt;,&lt;new reading name&gt;  <br>               
-                                 # The amount of renamed reading names (datasets) will be displayed in reading "reading_renamed". <br>
-                                 # If the reading name to be renamed was not found in the database, a WARNUNG will appear in reading "reading_not_renamed". <br>
-                                 # Appropriate entries will be written to Logfile if verbose >= 3 is set.
+                                   <b>Examples: </b> <br> 
+                                   set &lt;name&gt; readingRename TotalConsumtion,L1_TotalConsumtion  <br>  
+                                   set &lt;name&gt; readingRename Dum.Energy:TotalConsumtion,L1_TotalConsumtion  <br>                                   
+                                 </ul>
+                                 <br>
+                                 
+                                 The amount of renamed reading names (datasets) will be displayed in reading "reading_renamed". <br>
+                                 If the reading name to be renamed was not found in the database, a WARNING will appear in reading "reading_not_renamed". <br>
+                                 Appropriate entries will be written to Logfile if verbose >= 3 is set.
                                  <br><br>
 								 
 								 <b>Note:</b> <br>
                                  Even though the function itself is designed non-blocking, make sure the assigned DbLog-device
                                  is operating in asynchronous mode to avoid FHEMWEB from blocking. <br><br> 
                                  </li> <br>
-                                 </ul>
                                  
     <li><b> reduceLog [average[=day]] </b> <br>
                                  Reduces historical records within the limits given by the "time.*"-attributes to one record 
@@ -13672,26 +13686,32 @@ sub bdump {
 								</li>
                                 </ul><br>
                                                          				 
-    <li><b> readingRename </b> - benennt den Namen eines Readings innerhalb der angeschlossenen Datenbank (siehe Internal DATABASE) um.
+    <li><b> readingRename &lt;[Device:]alterReadingname&gt;,&lt;neuerReadingname&gt; </b>  <br>
+                                 Benennt den Namen eines Readings innerhalb der angeschlossenen Datenbank (siehe Internal DATABASE) um.
                                  Der Readingname wird immer in der <b>gesamten</b> Datenbank umgesetzt. Eventuell 
 								 gesetzte Zeitgrenzen oder Beschränkungen durch die <a href="#DbRepattr">Attribute</a> 
-								 Device bzw. Reading werden nicht berücksichtigt.  <br><br>
+								 Device bzw. Reading werden nicht berücksichtigt.  <br>
+                                 Optional kann eine Device angegeben werden. In diesem Fall werden <b>nur</b> die alten Readings 
+                                 dieses Devices in den neuen Readingnamen umgesetzt.
+                                 <br><br>
                                  
                                  <ul>
-                                 <b>Beispiel: </b><br>  
-                                 set &lt;name&gt; readingRename &lt;alter Readingname&gt;,&lt;neuer Readingname&gt;  <br>               
-                                 # Die Anzahl der umbenannten Device-Datensätze wird im Reading "reading_renamed" 
-								   ausgegeben. <br>
-                                 # Wird der umzubenennende Readingname in der Datenbank nicht gefunden, wird eine 
-								   WARNUNG im Reading "reading_not_renamed" ausgegeben. <br>
-                                 # Entsprechende Einträge erfolgen auch im Logfile mit verbose=3.
+                                   <b>Beispiele: </b><br>  
+                                   set &lt;name&gt; readingRename TotalConsumption,L1_TotalConsumption  <br> 
+                                   set &lt;name&gt; readingRename Dum.Energy:TotalConsumption,L1_TotalConsumption  <br>                                    
+                                 </ul>
+                                 <br>
+                                 
+                                 Die Anzahl der umbenannten Device-Datensätze wird im Reading "reading_renamed" ausgegeben. <br>
+                                 Wird der umzubenennende Readingname in der Datenbank nicht gefunden, wird eine WARNUNG im Reading 
+                                 "reading_not_renamed" ausgegeben. <br>
+                                 Entsprechende Einträge erfolgen auch im Logfile mit verbose=3.
                                  <br><br>
 								 
 								 <b>Hinweis:</b> <br>
                                  Obwohl die Funktion selbst non-blocking ausgelegt ist, sollte das zugeordnete DbLog-Device
                                  im asynchronen Modus betrieben werden um ein Blockieren von FHEMWEB zu vermeiden (Tabellen-Lock). <br><br> 
                                  </li> <br>
-                                 </ul>
 
     <li><b> reduceLog [average[=day]] </b> <br>
                                  Reduziert historische Datensätze innerhalb der durch die "time.*"-Attribute bestimmten 
