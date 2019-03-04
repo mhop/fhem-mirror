@@ -15,6 +15,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter:
 #
+# 3.13.3     04.03.2019       addLog better Log3 Outputs
 # 3.13.2     09.02.2019       Commandref revised
 # 3.13.1     27.11.2018       DbLog_ExecSQL log output changed
 # 3.13.0     12.11.2018       adding attributes traceFlag, traceLevel
@@ -3689,12 +3690,12 @@ sub DbLog_AddLog($$$$$) {
 
 	  if(!$found) {
           if(goodReadingName($rdspec) && defined($value)) {
-              Log3 $name, 3, "DbLog $name -> Reading '$rdspec' of device '$dev_name' not found - add it as new reading.";
+              Log3 $name, 3, "DbLog $name -> addLog WARNING - Device: '$dev_name' -> Reading '$rdspec' not found - add it as new reading.";
               push @exrds,$rdspec;
           } elsif (goodReadingName($rdspec) && !defined($value)) {
-              Log3 $name, 2, "DbLog $name -> WARNING - new Reading '$rdspec' has no value - can't add it !";
+              Log3 $name, 2, "DbLog $name -> addLog WARNING - Device: '$dev_name' -> new Reading '$rdspec' has no value - can't add it !";
           } else {
-              Log3 $name, 2, "DbLog $name -> WARNING - Readingname '$rdspec' is no valid or regexp - can't add regexp as new reading !";
+              Log3 $name, 2, "DbLog $name -> addLog WARNING - Device: '$dev_name' -> Readingname '$rdspec' is no valid or regexp - can't add regexp as new reading !";
           }
       }
       
