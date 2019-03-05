@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  22_HOMEMODE: - fix illegal division by zero in HOMEMODE_Luminance
+                         - renamed attribute name HomeYahooWeatherDevice to
+                           HomeWeatherDevic
+                         - changed characteristic AirPressure UUID to name
  - bugfix:  49_SSCam: no snapinfos when snap was done by SVS itself
                       (Forum: #45671.msg914685.html#msg914685), minor fixes
  - feature: 59_Weather: use demo data up to start then apikey equevalent demo
