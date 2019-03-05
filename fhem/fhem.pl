@@ -1654,7 +1654,8 @@ CommandSave($$)
 
   if($param && $param eq "?") {
     return "No structural changes." if(!@structChangeHist);
-    return "Last saved structural changes:\n  ".join("\n  ", @structChangeHist);
+    return "Last unsaved structural changes:\n  ".
+                join("\n  ", @structChangeHist);
   }
 
   if(!$cl && !AttrVal("global", "autosave", 1)) { # Forum #78769
