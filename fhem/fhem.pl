@@ -341,6 +341,7 @@ my @globalAttrList = qw(
   logdir
   logfile
   longitude
+  maxChangeLog
   maxShutdownDelay
   modpath
   motd
@@ -1653,7 +1654,7 @@ CommandSave($$)
 
   if($param && $param eq "?") {
     return "No structural changes." if(!@structChangeHist);
-    return "Last 10 structural changes:\n  ".join("\n  ", @structChangeHist);
+    return "Last saved structural changes:\n  ".join("\n  ", @structChangeHist);
   }
 
   if(!$cl && !AttrVal("global", "autosave", 1)) { # Forum #78769
@@ -5444,7 +5445,8 @@ addStructChange($$$)
   $lastDefChange++;
   return if($defs{$dev}{VOLATILE});
 
-  shift @structChangeHist if(@structChangeHist > 9);
+  shift @structChangeHist
+          if(@structChangeHist > AttrVal('global', 'maxChangeLog', 10) - 1);
   $param = substr($param, 0, 40)."..." if(length($param) > 40);
   push @structChangeHist, "$cmd $param";
 }
