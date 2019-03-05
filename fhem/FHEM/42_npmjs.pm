@@ -835,7 +835,7 @@ sub ExecuteNpmCommand($) {
     }
 
     my $global = '-g ';
-    my $sudo   = 'sudo -n -E ';
+    my $sudo   = 'sudo -n ';
 
     if ( $cmd->{npmglobal} eq '0' ) {
         $global = '';
@@ -899,8 +899,8 @@ sub ExecuteNpmCommand($) {
                   . 'echo n | if [ -z "$(node --version 2>/dev/null)" ]; then'
                   . ' sh -c "curl -sSL https://deb.nodesource.com/setup_'
                   . $1
-                  . '.x | DEBIAN_FRONTEND=noninteractive sudo -n -E bash - >/dev/null 2>&1" 2>&1 &&'
-                  . ' sh -c "DEBIAN_FRONTEND=noninteractive sudo -n -E apt-get install -qqy nodejs >/dev/null 2>&1" 2>&1; '
+                  . '.x | DEBIAN_FRONTEND=noninteractive sudo -n bash - >/dev/null 2>&1" 2>&1 &&'
+                  . ' sh -c "DEBIAN_FRONTEND=noninteractive sudo -n apt-get install -qqy nodejs >/dev/null 2>&1" 2>&1; '
                   . 'fi; '
                   . 'node -e "console.log(JSON.stringify(process.versions));" 2>&1'
                   . $cmdSuffix;
@@ -1028,6 +1028,8 @@ sub RetrieveNpmOutput($$) {
     my $cmd = shift;
     my $p   = shift;
     my $h   = {};
+
+    return $h unless ( defined($p) && $p ne "" );
 
     # first try to interprete text as JSON directly
     my $decode_json = eval { decode_json($p) };
@@ -1746,7 +1748,7 @@ sub ToDay() {
     "node",
     "npm"
   ],
-  "version": "v1.0.1",
+  "version": "v1.0.3",
   "release_status": "stable",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
@@ -1760,9 +1762,9 @@ sub ToDay() {
   "prereqs": {
     "runtime": {
       "requires": {
-        "FHEM": ">= 5.9.18623",
+        "FHEM": 5.00918623,
         "perl": 5.014,
-        "GPUtils qw(GP_Import)": 0,
+        "GPUtils": 0,
         "JSON": 0,
         "Data::Dumper": 0
       },
@@ -1788,9 +1790,10 @@ sub ToDay() {
       "requires": {
       },
       "recommends": {
-        "openssh-client": 0
+        "curl": 0
       },
       "suggests": {
+        "openssh-client": 0
       }
     }
   },
@@ -1799,9 +1802,10 @@ sub ToDay() {
       "requires": {
       },
       "recommends": {
-        "openssh-client": 0
+        "curl": 0
       },
       "suggests": {
+        "openssh-client": 0
       }
     }
   },
@@ -1846,11 +1850,11 @@ sub ToDay() {
       },
       "recommends": {
         "ALL=NOPASSWD: /usr/bin/npm update *": 0,
-        "ALL=NOPASSWD: /usr/local/bin/npm update *": 0
+        "ALL=NOPASSWD: /usr/local/bin/npm update *": 0,
+        "ALL=NOPASSWD: /usr/bin/npm install *": 0,
+        "ALL=NOPASSWD: /usr/local/bin/npm install *": 0
       },
       "suggests": {
-        "ALL=NOPASSWD: /usr/bin/npm install *": 0,
-        "ALL=NOPASSWD: /usr/local/bin/npm install *": 0,
         "ALL=NOPASSWD: /usr/bin/npm uninstall *": 0,
         "ALL=NOPASSWD: /usr/local/bin/npm uninstall *": 0
       }
