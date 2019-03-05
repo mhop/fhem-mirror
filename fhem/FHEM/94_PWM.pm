@@ -33,6 +33,7 @@
 # 31.01.18 GA add support for stateFormat
 # 05.02.18 GA fix typo overallHeatingSwitchThresholdTemup
 # 19.11.18 GA add support for attribute maxOffTime
+# 05.03.19 GA fix reading maxOffTimeCalculation was set but not used
 
 ##############################################
 # $Id$
@@ -809,7 +810,6 @@ PWM_CalcRoom(@)
          return ("on_mop_stay", $newpulse, $cycletime, $actorV);
       } else {
          Log3 ($hash, 3, "PWM_CalcRoom $room->{NAME}: F16 maxOffTime off");
-         #delete ($room->{helper}{maxOffTimeLastSwitch});
          return ("off_mop", $newpulse, $cycletime, $actorV);
       }
 
@@ -901,7 +901,7 @@ PWM_CalcRoom(@)
       # ----------------
       # check if maxOffTime protection is activated (attribute maxOffTimeIdlePeriod is set)
 
-      if ($maxOffTimeApply > 0) {
+      if ($maxOffTimeApply > 0 and ReadingsVal($hash, "maxOffTimeCalculation", "off") eq "on") {
 
         ## wz > 2:00
         if ($maxOffTimeAct >= $maxOffTime) {
