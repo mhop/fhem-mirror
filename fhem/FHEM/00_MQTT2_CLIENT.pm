@@ -36,7 +36,7 @@ MQTT2_CLIENT_Initialize($)
 
   no warnings 'qw';
   my @attrList = qw(
-    autocreate:1,0
+    autocreate:no,simple,complex
     clientId
     disable:1,0
     disabledForIntervals
@@ -341,10 +341,12 @@ MQTT2_CLIENT_Read($@)
 
     if(!IsDisabled($name)) {
       $val = "" if(!defined($val));
-      my $ac = AttrVal($name, "autocreate", undef) ? "autocreate\0":"";
+      my $ac = AttrVal($name, "autocreate", "no");
+      $ac = $ac eq "1" ? "simple" : ($ac eq "0" ? "no" : $ac); # backward comp.
+
       my $cid = $hash->{clientId};
       $tp =~ s/:/_/g; # 96608
-      Dispatch($hash, "$ac$cid\0$tp\0$val", undef, !$ac);
+      Dispatch($hash, "autocreate=$ac\0$cid\0$tp\0$val", undef, $ac eq "no");
 
       my $re = AttrVal($name, "rawEvents", undef);
       DoTrigger($name, "$tp:$val") if($re && $tp =~ m/$re/);
@@ -516,12 +518,19 @@ MQTT2_CLIENT_getStr($$)
   <ul>
 
     <a name="autocreate"></a>
-    <li>autocreate<br>
-      if set, at least one MQTT2_DEVICE will be created, and its readingsList
-      will be expanded upon reception of published messages. Note: this is
-      slightly different from MQTT2_SERVER, where each connection has its own
-      clientId.  This parameter is sadly not transferred via the MQTT protocol,
-      so the clientId of this MQTT2_CLIENT instance will be used.
+    <li>autocreate [no|simple|complex]<br>
+      if set to simple/complex, at least one MQTT2_DEVICE will be created, and
+      its readingsList will be expanded upon reception of published messages.
+      Note: this is slightly different from MQTT2_SERVER, where each connection
+      has its own clientId.  This parameter is sadly not transferred via the
+      MQTT protocol, so the clientId of this MQTT2_CLIENT instance will be
+      used.<br>
+      With simple the one-argument version of json2nameValue is added:
+      json2nameValue($EVENT), with complex the full version:
+      json2nameValue($EVENT, 'SENSOR_', $JSONMAP). Which one is better depends
+      on the attached devices and on the personal taste, and it is only
+      relevant for json payload. For non-json payload there is no difference
+      between simple and complex.
       </li></br>
 
     <a name="clientId"></a>

@@ -40,7 +40,7 @@ MQTT2_SERVER_Initialize($)
   no warnings 'qw';
   my @attrList = qw(
     SSL:0,1
-    autocreate:0,1
+    autocreate:no,simple,complex
     disable:0,1
     disabledForIntervals
     keepaliveFactor
@@ -427,8 +427,10 @@ MQTT2_SERVER_doPublish($$$$;$)
      AttrVal($serverName, "rePublish", undef)) {
     $cid = $src->{NAME} if(!defined($cid));
     $cid =~ s,[^a-z0-9._],_,gi;
-    my $ac = AttrVal($serverName, "autocreate", 1) ? "autocreate\0":"";
-    Dispatch($server, "$ac$cid\0$tp\0$val", undef, !$ac);
+    my $ac = AttrVal($serverName, "autocreate", "simple");
+    $ac = $ac eq "1" ? "simple" : ($ac eq "0" ? "no" : $ac); # backward comp.
+
+    Dispatch($server, "autocreate=$ac\0$cid\0$tp\0$val", undef, $ac eq "no"); 
     my $re = AttrVal($serverName, "rawEvents", undef);
     DoTrigger($server->{NAME}, "$tp:$val") if($re && $tp =~ m/$re/);
   }
@@ -642,9 +644,16 @@ MQTT2_SERVER_ReadDebug($$)
        </li><br>
 
     <a name="autocreate"></a>
-    <li>autocreate<br>
+    <li>autocreate [no|simple|complex]<br>
       MQTT2_DEVICES will be automatically created upon receiving an
-      unknown message. Set this value to 0 to disable autocreating.
+      unknown message. Set this value to no to disable autocreating, the
+      default is simple.<br>
+      With simple the one-argument version of json2nameValue is added:
+      json2nameValue($EVENT), with complex the full version:
+      json2nameValue($EVENT, 'SENSOR_', $JSONMAP). Which one is better depends
+      on the attached devices and on the personal taste, and it is only
+      relevant for json payload. For non-json payload there is no difference
+      between simple and complex.
       </li><br>
 
   </ul>

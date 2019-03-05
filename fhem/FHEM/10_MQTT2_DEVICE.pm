@@ -95,10 +95,10 @@ MQTT2_DEVICE_Parse($$)
     }
   }
 
-  my $autocreate;
-  if($msg =~ m/^autocreate\0(.*)$/s) {
-    $msg = $1;
-    $autocreate = 1;
+  my $autocreate = "no";
+  if($msg =~ m/^autocreate=([^\0]+)\0(.*)$/s) {
+    $autocreate = $1;
+    $msg = $2;
   }
 
   my ($cid, $topic, $value) = split("\0", $msg, 3);
@@ -150,8 +150,8 @@ MQTT2_DEVICE_Parse($$)
   }
 
   #################################################
-  # autocreate and/or expand readingList
-  if($autocreate && !%fnd) {
+  # IODevs autocreate and/or expand readingList
+  if($autocreate ne "no" && !%fnd) {
     return "" if($cid && $cid =~ m/mosqpub.*/);
 
     ################## bridge stuff
@@ -180,7 +180,10 @@ MQTT2_DEVICE_Parse($$)
         my $ret = json2nameValue($value);
         if(keys %{$ret}) {
           $topic =~ m,.*/([^/]+),;
-          $add = "{ json2nameValue(\$EVENT) }";
+          my $ltopic = makeReadingName($1)."_";
+          $add = $autocreate eq "simple" ?
+                  "{ json2nameValue(\$EVENT) }" :
+                  "{ json2nameValue(\$EVENT, '$ltopic', \$JSONMAP) }";
         }
       }
       if(!$add) {
@@ -206,7 +209,7 @@ MQTT2_DEVICE_Parse($$)
 
       for my $ch (@{$cidArr}) {
         my $nn = $ch->{NAME};
-        next if(!AttrVal($nn, "autocreate", 1));
+        next if(!AttrVal($nn, "autocreate", 1)); # device autocreate
         my $rl = AttrVal($nn, "readingList", "");
         $rl .= "\n" if($rl);
         my $regex = ($cid eq $newCid ? "$cid:" : "").$topic.":.*";
