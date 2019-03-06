@@ -600,7 +600,7 @@ sub SSCam_Attr($$$$) {
             $hash->{HELPER}{GETSNAPGALLERY} = 1;
 		    $slim  = AttrVal($name,"snapGalleryNumber",$SSCam_slim);    # Anzahl der abzurufenden Snaps
 			$ssize = $do;
-			RemoveInternalTimer($hash, "SSCam_getsnapinfo"); 
+			RemoveInternalTimer("SSCam_getsnapinfo"); 
 			InternalTimer(gettimeofday()+0.7, "SSCam_getsnapinfo", "$name:$slim:$ssize", 0);
 		}
     }     
@@ -625,7 +625,7 @@ sub SSCam_Attr($$$$) {
 		    $slim  = AttrVal($name,"snapGalleryNumber",$SSCam_slim); # Anzahl der abzurufenden Snaps
 			my $sg = AttrVal($name,"snapGallerySize","Icon");        # Auflösung Image
 			$ssize = ($sg eq "Icon")?1:2;
-			RemoveInternalTimer($hash, "SSCam_getsnapinfo"); 
+			RemoveInternalTimer("SSCam_getsnapinfo"); 
 			InternalTimer(gettimeofday()+0.7, "SSCam_getsnapinfo", "$name:$slim:$ssize", 0);
 		}
     } 
@@ -646,7 +646,7 @@ sub SSCam_Attr($$$$) {
 		$hash->{HELPER}{GETSNAPGALLERY} = 1;
 		my $sg = AttrVal($name,"snapGallerySize","Icon");  # Auflösung Image
 		$ssize = ($sg eq "Icon")?1:2;
-		RemoveInternalTimer($hash, "SSCam_getsnapinfo"); 
+		RemoveInternalTimer("SSCam_getsnapinfo"); 
 		InternalTimer(gettimeofday()+0.7, "SSCam_getsnapinfo", "$name:$slim:$ssize", 0);
 	}
     
@@ -1880,7 +1880,7 @@ sub SSCam_initonboot ($) {
 
              # Schnappschußgalerie abrufen oder nur Info des letzten Snaps
              my ($slim,$ssize) = SSCam_snaplimsize($hash,1);   # Force-Bit, es wird $hash->{HELPER}{GETSNAPGALLERY} erzwungen !
-             RemoveInternalTimer($hash, "SSCam_getsnapinfo"); 
+             RemoveInternalTimer("SSCam_getsnapinfo"); 
              InternalTimer(gettimeofday()+0.9, "SSCam_getsnapinfo", "$name:$slim:$ssize", 0); 
 		 }
          SSCam_versionCheck($hash);                                                                  # Einstieg in regelmäßigen Check Kompatibilität
@@ -3248,7 +3248,7 @@ sub SSCam_getcaminfoall ($$) {
         
         # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps
         my ($slim,$ssize) = SSCam_snaplimsize($hash,1);       # Force-Bit, es wird $hash->{HELPER}{GETSNAPGALLERY} erzwungen !
-        RemoveInternalTimer($hash, "SSCam_getsnapinfo"); 
+        RemoveInternalTimer("SSCam_getsnapinfo"); 
         InternalTimer(gettimeofday()+1.5, "SSCam_getsnapinfo", "$name:$slim:$ssize", 0);
 	
         RemoveInternalTimer($hash, "SSCam_getptzlistpreset");
@@ -3309,7 +3309,7 @@ sub SSCam_getsnapinfo ($) {
     $tac   = (defined $tac)?$tac:5000;
     my $ta = $hash->{HELPER}{TRANSACTION};
     
-    RemoveInternalTimer($hash, "SSCam_getsnapinfo"); 
+    RemoveInternalTimer("SSCam_getsnapinfo"); 
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off" || ((defined $ta) && $ta == $tac)) {               
@@ -5222,7 +5222,7 @@ sub SSCam_camop_parse ($) {
                     SSCam_delActiveToken($hash);                        
                 }
                 
-                RemoveInternalTimer($hash, "SSCam_getsnapinfo");                
+                RemoveInternalTimer("SSCam_getsnapinfo");                
                 InternalTimer(gettimeofday()+0.6, "SSCam_getsnapinfo", "$name:$slim:$ssize:$tac", 0);
                 return;
             
@@ -8828,7 +8828,7 @@ return ($str);
 #                                       Hint Hash EN           
 #############################################################################################
 %SSCam_vHintsExt_en = (
-  "8" => "Link to official <a href=\"https://community.synology.com/forum/3\">Surveillance Forum</a> in Synology communiy".
+  "8" => "Link to official <a href=\"https://community.synology.com/forum/3\">Surveillance Forum</a> in Synology community".
          "<br><br>",
   "7" => "<b>Setup Email Shipping <br>".
          "==================== </b> <br><br>".
@@ -8888,7 +8888,7 @@ return ($str);
 #                                       Hint Hash DE           
 #############################################################################################
 %SSCam_vHintsExt_de = (
-  "8" => "Link zur offiziellen <a href=\"https://community.synology.com/forum/3\">Surveillance Forum</a> Seite innerhalb der Synology Communiy".
+  "8" => "Link zur offiziellen <a href=\"https://community.synology.com/forum/3\">Surveillance Forum</a> Seite innerhalb der Synology Community".
          "<br><br>",
   "7" => "<b>Einstellung Email-Versand <br>".
          "========================= </b> <br><br>".
