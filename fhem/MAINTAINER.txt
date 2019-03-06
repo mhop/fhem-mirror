@@ -256,6 +256,7 @@ FHEM/46_TRX_LIGHT.pm         KernSani             RFXTRX
 FHEM/46_TRX_SECURITY.pm      KernSani             RFXTRX
 FHEM/46_TRX_WEATHER.pm       KernSani             RFXTRX
 FHEM/47_OBIS.pm              icinger              Sonstige Systeme
+FHEM/49_Arlo.pm              maluk                Sonstige Systeme
 FHEM/49_IPCAM.pm             mfr69bs              Sonstiges
 FHEM/49_SSCAM.pm             DS_Starter           Sonstiges
 FHEM/49_SSCamSTRM.pm         DS_Starter           Sonstiges
