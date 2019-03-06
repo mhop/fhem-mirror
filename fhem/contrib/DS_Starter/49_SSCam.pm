@@ -600,7 +600,7 @@ sub SSCam_Attr($$$$) {
             $hash->{HELPER}{GETSNAPGALLERY} = 1;
 		    $slim  = AttrVal($name,"snapGalleryNumber",$SSCam_slim);    # Anzahl der abzurufenden Snaps
 			$ssize = $do;
-			RemoveInternalTimer("SSCam_getsnapinfo"); 
+			RemoveInternalTimer($hash, "SSCam_getsnapinfo"); 
 			InternalTimer(gettimeofday()+0.7, "SSCam_getsnapinfo", "$name:$slim:$ssize", 0);
 		}
     }     
@@ -625,7 +625,7 @@ sub SSCam_Attr($$$$) {
 		    $slim  = AttrVal($name,"snapGalleryNumber",$SSCam_slim); # Anzahl der abzurufenden Snaps
 			my $sg = AttrVal($name,"snapGallerySize","Icon");        # Auflösung Image
 			$ssize = ($sg eq "Icon")?1:2;
-			RemoveInternalTimer("SSCam_getsnapinfo"); 
+			RemoveInternalTimer($hash, "SSCam_getsnapinfo"); 
 			InternalTimer(gettimeofday()+0.7, "SSCam_getsnapinfo", "$name:$slim:$ssize", 0);
 		}
     } 
@@ -646,7 +646,7 @@ sub SSCam_Attr($$$$) {
 		$hash->{HELPER}{GETSNAPGALLERY} = 1;
 		my $sg = AttrVal($name,"snapGallerySize","Icon");  # Auflösung Image
 		$ssize = ($sg eq "Icon")?1:2;
-		RemoveInternalTimer("SSCam_getsnapinfo"); 
+		RemoveInternalTimer($hash, "SSCam_getsnapinfo"); 
 		InternalTimer(gettimeofday()+0.7, "SSCam_getsnapinfo", "$name:$slim:$ssize", 0);
 	}
     
@@ -1880,7 +1880,7 @@ sub SSCam_initonboot ($) {
 
              # Schnappschußgalerie abrufen oder nur Info des letzten Snaps
              my ($slim,$ssize) = SSCam_snaplimsize($hash);   # Force-Bit, es wird $hash->{HELPER}{GETSNAPGALLERY} erzwungen !
-             RemoveInternalTimer("SSCam_getsnapinfo"); 
+             RemoveInternalTimer($hash, "SSCam_getsnapinfo"); 
              InternalTimer(gettimeofday()+0.9, "SSCam_getsnapinfo", "$name:$slim:$ssize", 0); 
 		 }
          SSCam_versionCheck($hash);                                                                  # Einstieg in regelmäßigen Check Kompatibilität
@@ -3248,7 +3248,7 @@ sub SSCam_getcaminfoall ($$) {
         
         # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps
         my ($slim,$ssize) = SSCam_snaplimsize($hash);       # Force-Bit, es wird $hash->{HELPER}{GETSNAPGALLERY} erzwungen !
-        RemoveInternalTimer("SSCam_getsnapinfo"); 
+        RemoveInternalTimer($hash, "SSCam_getsnapinfo"); 
         InternalTimer(gettimeofday()+1.5, "SSCam_getsnapinfo", "$name:$slim:$ssize", 0);
 	
         RemoveInternalTimer($hash, "SSCam_getptzlistpreset");
@@ -3309,7 +3309,7 @@ sub SSCam_getsnapinfo ($) {
     $tac   = (defined $tac)?$tac:5000;
     my $ta = $hash->{HELPER}{TRANSACTION};
     
-    RemoveInternalTimer("SSCam_getsnapinfo"); 
+    RemoveInternalTimer($hash, "SSCam_getsnapinfo"); 
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off" || ((defined $ta) && $ta == $tac)) {               
@@ -5222,7 +5222,7 @@ sub SSCam_camop_parse ($) {
                     SSCam_delActiveToken($hash);                        
                 }
                 
-                RemoveInternalTimer("SSCam_getsnapinfo");                
+                RemoveInternalTimer($hash, "SSCam_getsnapinfo");                
                 InternalTimer(gettimeofday()+0.6, "SSCam_getsnapinfo", "$name:$slim:$ssize:$tac", 0);
                 return;
             
