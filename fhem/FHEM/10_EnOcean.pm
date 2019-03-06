@@ -44,7 +44,6 @@ sub EnOcean_Initialize($);
 sub EnOcean_Parse($$);
 sub EnOcean_Get($@);
 sub EnOcean_Set($@);
-sub EnOcean_hvac_01Cmd($$$);
 sub EnOcean_roomCtrlPanel_00Snd($$$$$$$$);
 sub EnOcean_CheckSenderID($$$);
 sub EnOcean_SndRadio($$$$$$$$);
@@ -136,7 +135,7 @@ my %EnO_manuf = (
   "015" => "Diehl Controls",
   "016" => "BSC Computer",
   "017" => "S+S Regeltechnik GmbH",
-  "018" => "Masco Corporation",
+  "018" => "ZENO Controls, LLC",
   "019" => "Intesis Software SL",
   "01A" => "Viessmann",
   "01B" => "Lutuo Technology",
@@ -158,27 +157,75 @@ my %EnO_manuf = (
   "02B" => "Ecologix Controls",
   "02C" => "Trio 2 Sys",
   "02D" => "Afriso-Euro-Index",
-  "030" => "NEC AccessTechnica Ltd",
+  "030" => "NEC Access Technica Ltd",
   "031" => "ITEC Corporation",
   "032" => "Simix Co Ltd",
   "033" => "Permundo GmbH",
-  "034" => "Eurotronic Technology GmbH",
-  "035" => "Art Japan Co Ltd",
+  "034" => "EUROtronic Technology GmbH",
+  "035" => "Art Japan Co. Ltd.",
   "036" => "Tiansu Automation Control System Co Ltd",
-  "038" => "Gruppo Giordano Idea Spa",
+  "038" => "Gruppo Giordano, Idea Spa",
   "039" => "alphaEOS AG",
   "03A" => "Tag Technologies",
-  "03C" => "Cloud Buildings Ltd",
-  "03E" => "GIGA Concept",
-  "03F" => "Sensortec",
+  "03B" => "Wattstopper",
+  "03C" => "Pressac Communications Ltd.",
+  "03E" => "GIGA-concept",
+  "03F" => "Sensortec AG",
   "040" => "Jaeger Direkt",
-  "041" => "Air System Components Inc",
+  "041" => "Air System Components Inc.",
+  "042" => "ERMINE Corp.",
   "043" => "SODA GmbH",
-  "045" => "Holter",
+  "045" => "Holter Regelarmaturen GmbH Co. KG",
   "046" => "ID-RF",
+  "047" => "DEUTA Controls GmbH",
+  "048" => "Ewattch",
   "049" => "Micropelt GmbH",
-  "05F" => "EFP GmbH",
-  "7FF" => "Multi user Manufacturer ID",
+  "04A" => "Caleffi Spa.",
+  "04B" => "Digital Concepts GmbH",
+  "04C" => "Emerson Climate Technologies",
+  "04D" => "ADEE electronic",
+  "04E" => "ALTECON srl",
+  "04F" => "Nanjing Putian elecommunications Co.",
+  "050" => "Terralux",
+  "051" => "iEXERGY GmbH",
+  "052" => "Connectivity Solutions GmbH",
+  "053" => "Oventrop GmbH Co. KG",
+  "054" => "Builing Automation Products",
+  "055" => "Functional Devices, Inc.",
+  "056" => "OGGA",
+  "057" => "itho daalderop",
+  "058" => "Resol",
+  "059" => "Advanced Devices",
+  "05A" => "Autani LLC.",
+  "05B" => "Dr. Riedel GmbH",
+  "05C" => "HOPPE Holding AG",
+  "05D" => "SIEGENIA-AUBI KG",
+  "05E" => "ADEO Services",
+  "05F" => "EiMSIG, EFP GmbH",
+  "060" => "VIMAR S.p.a.",
+  "061" => "Glen Dimplex",
+  "062" => "PMDM GmbH",
+  "063" => "Hubbell Lighting",
+  "064" => "Debflex S.A.",
+  "065" => "Perfactory Sensorsystems",
+  "066" => "Watty Corporation",
+  "067" => "WAGO Kontakttechnik GmbH Co. KG",
+  "068" => "Kessel AG",
+  "069" => "Aug. GmbH Co. KG",
+  "06A" => "DECELECT",
+  "06B" => "MST Industries",
+  "06C" => "Becker Antriebs GmbH",
+  "06D" => "Nexelec",
+  "06E" => "Wieland Electric GmbH",
+  "06F" => "AVIDSEN",
+  "070" => "CWS-boco International GmbH",
+  "071" => "Roto Frank AG",
+  "072" => "ALM Controls e.k.",
+  "073" => "Tommaso Technologies Ltd.",
+  "074" => "Rehaus AG + Co.",
+  "075" => "Inaba Denki Sangyo Co. Ltd.",
+  "076" => "Hager Control SAS",
+  "7FF" => "Multi user Manufacturer ID"
 );
 
 my %EnO_eepConfig = (
@@ -279,7 +326,7 @@ my %EnO_eepConfig = (
   "A5.12.05" => {attr => {subType => "autoMeterReading.05"}, GPLOT => "EnO_A5-12-05:Amount,EnO_A5-12-05_2:Temperature/Battery,"},
   "A5.12.10" => {attr => {subType => "autoMeterReading.10"}, GPLOT => "EnO_A5-12-10:Current/Change,"},
   "A5.13.01" => {attr => {subType => "environmentApp"}, GPLOT => "EnO_A5-13-01:WindSpeed/Raining,EnO_temp4brightness4:Temp/Brightness,"},
-  "A5.13.02" => {attr => {subType => "environmentApp"}, GPLOT => "EnO_A5-13-01:SunIntensity,"},
+  "A5.13.02" => {attr => {subType => "environmentApp"}, GPLOT => "EnO_A5-13-02:SunIntensity,"},
   "A5.13.03" => {attr => {subType => "environmentApp"}},
   "A5.13.04" => {attr => {subType => "environmentApp"}},
   "A5.13.05" => {attr => {subType => "environmentApp"}},
@@ -399,7 +446,7 @@ my %EnO_eepConfig = (
   "N5.38.08" => {attr => {subType => "gateway", comMode => "confirm", eep => "A5-38-08", gwCmd => "switching", manufID => "00D", model => "Eltako_TF", teachMethod => "confirm", webCmd => "on:off"}},
   "G5.ZZ.ZZ" => {attr => {subType => "PM101", manufID => "005"}, GPLOT => "EnO_motion:Motion,EnO_brightness4:Brightness,"},
   "L6.02.01" => {attr => {subType => "smokeDetector.02", eep => "F6-05-02", manufID => "00D"}},
-  "ZZ.ZZ.ZZ" => {attr => {subType => "raw"}},
+  "ZZ.ZZ.ZZ" => {attr => {subType => "raw"}}
 );
 
 my %EnO_extendedRemoteFunctionCode = (
@@ -18760,7 +18807,7 @@ EnOcean_Delete($$)
     where <code>value</code> is
        <li>setpointTemp t/&#176C [&lt;channel&gt; [&lt;overrideTime/h&gt;]]<br>
          set the temperatur setpoint</li>
-       <li>setpointTempRefDev<br>
+       <li>setpointTempRefDev [&lt;channel&gt;]<br>
          enable the temperature setpoint via room control unit</li>
       <li>setpointTempShift t/K [&lt;channel&gt; [&lt;overrideTime/h&gt;]]<br>
          set the temperatur setpoint shift</li>
@@ -19094,9 +19141,9 @@ EnOcean_Delete($$)
     <code>get &lt;name&gt; &lt;value&gt;</code>
     <br><br>
     where <code>value</code> is
-       <li>setpoint<br>
+       <li>setpoint [&lt;channel&gt;]<br>
          get the setpoint infos of the heating actuator</li>
-       <li>status<br>
+       <li>status [&lt;channel&gt;]<br>
          get the state of the heating actuator</li>
     </ul><br>
        The attr subType must be heatingActuator.00. This is done if the device was
@@ -21550,7 +21597,7 @@ EnOcean_Delete($$)
         <li>setpointTempShift&lt;1...29|All&gt;: t/K</li>
         <li>teach: &lt;result of teach procedure&gt;</li>
         <li>temperature&lt;1...29|All&gt;: t/&#176C</li>
-        <li>state:&lt;0...29|All&gt;: heating|no_heating|off|temperature_unknownt</li>
+        <li>state: &lt;0...29|All&gt;: heating|no_heating|off|temperature_unknown</li>
      </ul>
         <br>
         The attr subType must be heatingActuator.00. This is done if the device was
