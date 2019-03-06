@@ -40,6 +40,7 @@ sub monitoring_modify($);
 sub monitoring_RemoveInternalTimer($);
 sub monitoring_return($$);
 sub monitoring_setActive($);
+sub monitoring_setInactive($);
 
 # initialize ##################################################################
 sub monitoring_Initialize($) {
@@ -59,12 +60,15 @@ sub monitoring_Initialize($) {
     "disable:1,0 ".
     "disabledForIntervals ".
     "errorFuncAdd:textField-long ".
+    "errorFuncAdded:textField-long ".
     "errorFuncRemove:textField-long ".
     "errorWait ".
     "errorReturn:textField-long ".
     "getDefault:all,error,warning ".
     "setActiveFunc:textField-long ".
+    "setInactiveFunc:textField-long ".
     "warningFuncAdd:textField-long ".
+    "warningFuncAdded:textField-long ".
     "warningFuncRemove:textField-long ".
     "warningWait ".
     "warningReturn:textField-long ".
@@ -90,6 +94,7 @@ sub monitoring_Define($$) {
 sub monitoring_Undefine($$) {
   my ($hash, $arg) = @_;
 
+  monitoring_setInactive($hash);
   monitoring_RemoveInternalTimer($hash);
 
   return;
@@ -125,6 +130,7 @@ sub monitoring_Set($@) {
     monitoring_setActive($hash);
   }
   elsif($argument eq "inactive"){
+    monitoring_setInactive($hash);
     readingsSingleUpdate($hash, "state", $argument, 0);
 
     Log3($SELF, 3, "$SELF ($TYPE) set $SELF inactive");
@@ -251,6 +257,7 @@ sub monitoring_Attr(@) {
       monitoring_setActive($hash);
     }
     else{
+      monitoring_setInactive($hash);
       readingsSingleUpdate($hash, "state", "disabled", 0);
       Log3($SELF, 3, "$hash->{TYPE} ($SELF) attr $SELF disabled");
     }
@@ -461,6 +468,12 @@ sub monitoring_modify($) {
     ReadingsNum($SELF, ($list eq "warning" ? "error" : "warning")."Count", 0)
   ;
 
+  if ($operation eq "add") {
+    my $name = $value;
+    my $listFuncAdded = AttrVal($SELF, $list."FuncAdded", "");
+    $listFuncAdded = $listFuncAdded =~ /^\{.*\}$/s ? eval($listFuncAdded) : fhem($listFuncAdded);
+  }
+
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash, "state", "$list $operation: $value");
   readingsBulkUpdate($hash, $list, join(",", sort(keys %readings)));
@@ -537,6 +550,16 @@ sub monitoring_setActive($) {
   }
 
   AnalyzeCommandChain(undef, AttrVal($SELF, "setActiveFunc", "preset"));
+
+  return;
+}
+
+sub monitoring_setInactive($) {
+  my ($hash) = @_;
+  my $SELF = $hash->{NAME};
+  my $TYPE = $hash->{TYPE};
+
+  AnalyzeCommandChain(undef, AttrVal($SELF, "setInactiveFunc", "preset"));
 
   return;
 }
@@ -630,7 +653,9 @@ sub monitoring_setActive($) {
       </li>
       <li>
         <code>inactive</code><br>
-        Inactivates the current device. Note the slight difference to the
+        Two things will happen:<br>
+        1. Executes the commands specified under the "setInactiveFunc" attribute.<br>
+        2. Inactivates the current device. Note the slight difference to the
         disable attribute: using set inactive the state is automatically saved
         to the statefile on shutdown, there is no explicit save necesary.
       </li>
@@ -726,7 +751,8 @@ sub monitoring_setActive($) {
       </li>
       <li>
         <code>disable (1|0)</code><br>
-        1: Disables the monitoring.<br>
+        1: Executes the commands specified under the "setInactiveFunc" attribute
+        and disables the monitoring.<br>
         0: see "set active"
       </li>
       <li>
@@ -765,6 +791,22 @@ sub monitoring_setActive($) {
         the wait time.<br>
         If the attribute is not set, it will be checked for
         <code>$addMatch</code>.
+      </li>
+      <li>
+        <code>errorFuncAdded {&lt;perl code&gt;}</code><br>
+        The following variables are available in this function:
+        <br>
+        <ul>
+          <li>
+            <code>$name</code><br>
+            Name of the event triggering device
+          </li>
+          <li>
+            <code>$SELF</code><br>
+            Name of the monitoring
+          </li>
+        </ul>
+        This function will be executed when a device is added to the error list.
       </li>
       <li>
         <code>errorFuncRemove {&lt;perl code&gt;}</code><br>
@@ -816,6 +858,10 @@ sub monitoring_setActive($) {
       <li>
         <code>warningFuncAdd {&lt;perl code&gt;}</code><br>
         Like errorFuncAdd, just for the warning list.
+      </li>
+      <li>
+        <code>warningFuncAdd {&lt;perl code&gt;}</code><br>
+        Like errorFuncAdded, just for the warning list.
       </li>
       <li>
         <code>warningFuncRemove {&lt;perl code&gt;}</code><br>
@@ -1253,6 +1299,22 @@ attr BeamerFilter_monitoring warningFuncRemove {return}</pre>
         gepr&uuml;ft.
       </li>
       <li>
+        <code>errorFuncAdded {&lt;perl code&gt;}</code><br>
+        In dieser Funktion stehen die folgende Variablen zur Verf&uuml;gung:
+        <br>
+        <ul>
+          <li>
+            <code>$name</code><br>
+            Name des Event ausl&ouml;senden Ger&auml;tes
+          </li>
+          <li>
+            <code>$SELF</code><br>
+            Eigenname des monitoring
+          </li>
+        </ul>
+        Diese Funktion wird ausgeführt, wenn ein Gerät in die Fehlerliste aufgenommen wird.
+      </li>
+      <li>
         <code>errorFuncRemove {&lt;perl code&gt;}</code><br>
         In dieser Funktion stehen die selben Variablen wie bei "errorFuncAdd"
         zur Verf&uuml;gung.<br>
@@ -1304,6 +1366,10 @@ attr BeamerFilter_monitoring warningFuncRemove {return}</pre>
       <li>
         <code>warningFuncAdd {&lt;perl code&gt;}</code><br>
         Wie errorFuncAdd, nur f&uuml;r die warning-Liste.
+      </li>
+      <li>
+        <code>warningFuncAdded {&lt;perl code&gt;}</code><br>
+        Wie errorFuncAdded, nur f&uuml;r die warning-Liste.
       </li>
       <li>
         <code>warningFuncRemove {&lt;perl code&gt;}</code><br>
