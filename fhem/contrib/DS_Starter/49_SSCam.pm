@@ -1879,7 +1879,7 @@ sub SSCam_initonboot ($) {
              SSCam_getptzlistpatrol($hash);
 
              # Schnappschußgalerie abrufen oder nur Info des letzten Snaps
-             my ($slim,$ssize) = SSCam_snaplimsize($hash,1);   # Force-Bit, es wird $hash->{HELPER}{GETSNAPGALLERY} erzwungen !
+             my ($slim,$ssize) = SSCam_snaplimsize($hash);   # Force-Bit, es wird $hash->{HELPER}{GETSNAPGALLERY} erzwungen !
              RemoveInternalTimer("SSCam_getsnapinfo"); 
              InternalTimer(gettimeofday()+0.9, "SSCam_getsnapinfo", "$name:$slim:$ssize", 0); 
 		 }
@@ -3247,7 +3247,7 @@ sub SSCam_getcaminfoall ($$) {
         InternalTimer(gettimeofday()+1.4, "SSCam_getstreamformat", $hash, 0);
         
         # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps
-        my ($slim,$ssize) = SSCam_snaplimsize($hash,1);       # Force-Bit, es wird $hash->{HELPER}{GETSNAPGALLERY} erzwungen !
+        my ($slim,$ssize) = SSCam_snaplimsize($hash);       # Force-Bit, es wird $hash->{HELPER}{GETSNAPGALLERY} erzwungen !
         RemoveInternalTimer("SSCam_getsnapinfo"); 
         InternalTimer(gettimeofday()+1.5, "SSCam_getsnapinfo", "$name:$slim:$ssize", 0);
 	
