@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 49_SSCam.pm 18744 2019-02-26 17:15:07Z DS_Starter $
+# $Id: 49_SSCam.pm 18797 2019-03-05 17:13:05Z DS_Starter $
 #########################################################################################################################
 #       49_SSCam.pm
 #
@@ -36,19 +36,19 @@ package main;
 
 use strict;                           
 use warnings;
-eval "use JSON qw( decode_json );1;" or my $SScamMMDBI = "JSON";  # Debian: apt-get install libjson-perl
+eval "use JSON;1;" or my $SScamMMDBI = "JSON";                    # Debian: apt-get install libjson-perl
 use Data::Dumper;                                                 # Perl Core module
 use MIME::Base64;
 use Time::HiRes;
 use HttpUtils;
 use Blocking;                                                     # für EMail-Versand
-use Encode; 
-use JSON;                                                         # für Telegram Versand                                                    
+use Encode;                                                    
 # no if $] >= 5.017011, warnings => 'experimental';
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
-  "8.11.2" => "28.02.2019  bugfix no snapinfos when snap was done by SVS itself, Forum: https://forum.fhem.de/index.php/topic,45671.msg914685.html#msg914685",
+  "8.11.3" => "04.03.2019  avoid possible JSON errors ",
+  "8.11.2" => "04.03.2019  bugfix no snapinfos when snap was done by SVS itself, Forum: https://forum.fhem.de/index.php/topic,45671.msg914685.html#msg914685",
   "8.11.1" => "28.02.2019  commandref revised, minor fixes ",
   "8.11.0" => "25.02.2019  changed compatibility check, compatibility to SVS version 8.2.3, Popup possible for \"generic\"-Streamdevices, ".
               "support for \"genericStrmHtmlTag\" in streaming devices ",
@@ -8190,8 +8190,8 @@ sub SSCam_TBotSendIt($$$$$$$;$$$) {
           # add parseMode
           $ret = SSCam_TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "parse_mode", undef, $parseMode, 0) if((!defined($ret)) && ($parseMode));
 
-          # add disable_web_page_preview 	
-          $ret = SSCam_TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "disable_web_page_preview", undef, JSON::true, 0) 
+          # add disable_web_page_preview       
+          $ret = SSCam_TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "disable_web_page_preview", undef, \1, 0) 
             if ((!defined($ret))&&(!AttrVal($name,'webPagePreview',1)));            
       }
 
