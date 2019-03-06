@@ -158,6 +158,7 @@ MQTT2_DEVICE_Parse($$)
     my $newCid = $cid;
     my $bp = $modules{MQTT2_DEVICE}{defptr}{bridge};
     my $parentBridge;
+    my %matching; # For debugging
     foreach my $re (keys %{$bp}) {
       next if(!("$topic:$value" =~ m/^$re$/s ||
                 "$cid:$topic:$value" =~ m/^$re$/s));
@@ -168,9 +169,13 @@ MQTT2_DEVICE_Parse($$)
         return "";
       }
       $parentBridge = $bp->{$re}{parent};
-      last;
+      $matching{$re} = 1;
     }
     return if(!$newCid);
+    if(int(keys %matching) > 1) {
+      Log 1, "MULTIPLE MATCH in bridgeRegexp for $cid:$topic:$value: ".
+                join(",",keys %matching);
+    }
 
     PrioQueue_add(sub{
       my $cidArr = $modules{MQTT2_DEVICE}{defptr}{cid}{$newCid};
