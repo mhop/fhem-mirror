@@ -1,7 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
- - new:     49_Arlo: module for Arlo cameras
- - feature: 98_monitoring: - add "$listFuncAdded" function
+ - new:     71_YAMAHA_MC: initial release
  - bugfix:  22_HOMEMODE: - fix illegal division by zero in HOMEMODE_Luminance
                          - renamed attribute name HomeYahooWeatherDevice to
                            HomeWeatherDevic
