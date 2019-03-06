@@ -347,6 +347,7 @@ FHEM/71_ONKYO_AVR_ZONE.pm    delmar               Multimedia
 FHEM/71_PHILIPS_AUDIO.pm     ra666ack             Multimedia
 FHEM/71_YAMAHA_AVR.pm        markusbloch          Multimedia
 FHEM/71_YAMAHA_BD.pm         markusbloch          Multimedia
+FHEM/71_YAMAHA_MC.pm         Leugi                Multimedia
 FHEM/71_YAMAHA_NP.pm         ra666ack             Multimedia
 FHEM/71_ZM_Monitor.pm        delmar               Sonstige Systeme
 FHEM/72_FB_CALLLIST.pm       markusbloch          Frontends
