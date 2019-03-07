@@ -848,25 +848,25 @@ sub ExecuteNpmCommand($) {
       . $cmdSuffix;
     $npm->{npminstall} =
         $cmdPrefix
-      . 'echo n | sh -c "NODE_ENV=production '
+      . 'echo n | sh -c "'
       . $sudo
-      . 'npm install '
+      . 'NODE_ENV=${NODE_ENV:-production} npm install '
       . $global
       . '--json --silent --unsafe-perm %PACKAGES%" 2>&1'
       . $cmdSuffix;
     $npm->{npmuninstall} =
         $cmdPrefix
-      . 'echo n | sh -c "NODE_ENV=production '
+      . 'echo n | sh -c "'
       . $sudo
-      . 'npm uninstall '
+      . 'NODE_ENV=${NODE_ENV:-production} npm uninstall '
       . $global
       . '--json --silent %PACKAGES%" 2>&1'
       . $cmdSuffix;
     $npm->{npmupdate} =
         $cmdPrefix
-      . 'echo n | sh -c "NODE_ENV=production '
+      . 'echo n | sh -c "'
       . $sudo
-      . 'npm update '
+      . 'NODE_ENV=${NODE_ENV:-production} npm update '
       . $global
       . '--json --silent --unsafe-perm %PACKAGES%" 2>&1'
       . $cmdSuffix;
@@ -1748,7 +1748,7 @@ sub ToDay() {
     "node",
     "npm"
   ],
-  "version": "v1.0.3",
+  "version": "v1.0.4",
   "release_status": "stable",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
