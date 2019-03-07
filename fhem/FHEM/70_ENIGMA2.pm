@@ -23,7 +23,7 @@ sub ENIGMA2_Initialize($) {
     $hash->{parseParams} = 1;
 
     $hash->{AttrList} =
-"disable:1,0 disabledForIntervals do_not_notify:1,0 https:0,1 http-method:GET,POST http-noshutdown:1,0 disable:0,1 bouquet-tv bouquet-radio timeout remotecontrol:standard,advanced,keyboard lightMode:0,1 ignoreState:0,1 macaddr:textField model wakeupCmd:textField WOL_useUdpBroadcast WOL_port WOL_mode:EW,UDP,BOTH "
+"disable:1,0 disabledForIntervals do_not_notify:1,0 https:0,1 http-method:GET,POST http-noshutdown:1,0 disable:0,1 bouquet-tv bouquet-radio timeout remotecontrol:standard,advanced,keyboard remotecontrolChannel:LEFT_RIGHT,CHANNELDOWN_CHANNELUP lightMode:0,1 ignoreState:0,1 macaddr:textField model wakeupCmd:textField WOL_useUdpBroadcast WOL_port WOL_mode:EW,UDP,BOTH "
       . $readingFnAttributes;
 
     $data{RC_layout}{ENIGMA2_DreamMultimedia_DM500_DM800_SVG} =
@@ -662,10 +662,18 @@ sub ENIGMA2_Set($@) {
 
         if ( $state eq "on" || $ignoreState ne "0" ) {
             if ( lc($set) eq "channelup" ) {
-                $cmd = "command=" . ENIGMA2_GetRemotecontrolCommand("RIGHT");
+                $cmd =
+                  "command="
+                  . ENIGMA2_GetRemotecontrolCommand(
+                    AttrVal( $name, 'remotecontrolChannel', 'LEFT_RIGHT' ) eq
+                      'CHANNELDOWN_CHANNELUP' ? 'CHANNELUP' : 'RIGHT' );
             }
             else {
-                $cmd = "command=" . ENIGMA2_GetRemotecontrolCommand("LEFT");
+                $cmd =
+                  "command="
+                  . ENIGMA2_GetRemotecontrolCommand(
+                    AttrVal( $name, 'remotecontrolChannel', 'LEFT_RIGHT' ) eq
+                      'CHANNELDOWN_CHANNELUP' ? 'CHANNELDOWN' : 'LEFT' );
             }
             $result = ENIGMA2_SendCommand( $hash, "remotecontrol", $cmd );
         }
@@ -3039,6 +3047,9 @@ sub ENIGMA2_RClayout_VUplusDuo2() {
           </li>
           <li>
             <b>remotecontrol</b> - Explicitly set specific remote control unit format. This will only be considered for set-command <strong>remoteControl</strong> as of now.
+          </li>
+          <li>
+            <b>remotecontrolChannel</b> - Switch between remote control commands used for set-commands <strong>channelUp</strong> and <strong>channelDown</strong>.
           </li>
           <li>
             <b>timeout</b> - Set different polling timeout in seconds (default=6)
