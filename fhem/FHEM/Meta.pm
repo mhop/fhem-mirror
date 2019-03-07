@@ -1084,7 +1084,7 @@ m/^((\S+) (((....)-(..)-(..))_((..):(..):(..))) (\d+) (?:\.\/)?((.+\/)?((?:(\d+)
     "metadata",
     "meta"
   ],
-  "version": "v0.1.1",
+  "version": "v0.1.2",
   "release_status": "testing",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
