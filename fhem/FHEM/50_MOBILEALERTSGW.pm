@@ -34,7 +34,7 @@ sub MOBILEALERTSGW_Initialize($) {
     #$hash->{NotifyFn}= ($init_done ? "FW_Notify" : "FW_SecurityCheck");
     #$hash->{AsyncOutputFn} = "MOBILEALERTSGW_AsyncOutput";
     #$hash->{ActivateInformFn} = "MOBILEALERTSGW_ActivateInform";
-    $hash->{AttrList} = "forward:0,1 " . $readingFnAttributes;
+    $hash->{AttrList} = "forward:0,1 allowfrom " . $readingFnAttributes;
     Log3 "MOBILEALERTSGW", 5, "MOBILEALERTSGW_Initialize finished.";
 }
 
@@ -755,6 +755,9 @@ sub MOBILEALERTSGW_DecodeUDP($$$) {
     <li>forward<br>
       If value 1 is set, the data will be forwarded to the MobileAlerts Server http://www.data199.com/gateway/put .
     </li>
+    <li>allowfrom<br>
+      Sets from which hosts (gateways) IPs inputs are accepted. If not set all private IPs are allowed.
+    </li>
   </ul>
 </ul>
 
@@ -825,6 +828,9 @@ sub MOBILEALERTSGW_DecodeUDP($$$) {
   <ul>
     <li>forward<br>
       Wenn dieser Wert auf 1 gesetzt ist, werden die Daten zus&auml;tzlich zum MobileAlerts Server http://www.data199.com/gateway/put gesendet.
+    </li>
+    <li>allowfrom<br>
+      Gibt an von welchens Host-(Gateways) IPs eingaben angenommen werden. Wenn nicht gesetzt, sind alle privaten IP-Adressen erlaubt.
     </li>
   </ul>
 </ul>
