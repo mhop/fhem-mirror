@@ -30,6 +30,10 @@
 # 
 # CHANGE LOG
 # 
+# 07.03.2019 1.1.7
+# fix        : Anpassung fuer MQTT2* 
+#              (https://forum.fhem.de/index.php?topic=98249.new#new)
+#
 # 09.02.2019 1.1.6
 # bugfix     : Unterstuetzung von Variablen ($device, $reading, $name, $topic)
 #              in publish-expression
@@ -315,7 +319,7 @@ use warnings;
 
 #my $DEBUG = 1;
 my $cvsid = '$Id$';
-my $VERSION = "version 1.1.6 by hexenmeister\n$cvsid";
+my $VERSION = "version 1.1.7 by hexenmeister\n$cvsid";
 
 my %sets = (
 );
@@ -2608,6 +2612,13 @@ sub Parse($$) {
   #my $iotype = $iodev->{TYPE};
   #Log3($iodev->{NAME},1,"MQTT_GENERIC_BRIDGE: Parse: IODev: $ioname");
   #Log3("XXX",1,"MQTT_GENERIC_BRIDGE: Parse: $msg");
+
+  # no support for autocreate
+  #my $autocreate = "no";
+  if($msg =~ m/^autocreate=([^\0]+)\0(.*)$/s) {
+    #$autocreate = $1;
+    $msg = $2;
+  }
 
   #my ($cid, $topic, $value) = split(":", $msg, 3);
   my ($cid, $topic, $value) = split("\0", $msg, 3);
