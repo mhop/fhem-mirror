@@ -37,11 +37,24 @@ return "$@" if ($@);
 return $ret if ($ret);
 use version 0.77; our $VERSION = $META{version};
 
-# sub import(@) {
-#     my $pkg = caller(0);
-#     if ( $pkg ne "main" ) {
-#     }
-# }
+our $coreUpdate;
+our %corePackageUpdates;
+our %coreFileUpdates;
+
+our %moduleUpdates;
+our %packageUpdates;
+our %fileUpdates;
+
+sub import(@) {
+    my $pkg = caller(0);
+
+    # Initially load update information
+    #   to be ready for meta analysis
+    __GetUpdatedata() unless ( defined($coreUpdate) );
+
+    if ( $pkg ne "main" ) {
+    }
+}
 
 # Loads Metadata for a module
 sub Load($$;$) {
@@ -88,6 +101,8 @@ sub LoadAll(;$$) {
     my $t = TimeNow();
     my $v = __PACKAGE__->VERSION();
     my @rets;
+
+    __GetUpdatedata() if ($reload);
 
     foreach my $modName ( keys %modules ) {
 
@@ -196,7 +211,7 @@ sub __CopyMetaToInternals {
     return unless ( defined( $devHash->{'.FhemMetaInternalss'} ) );
     return unless ( defined($modMeta) && ref($modMeta) eq "HASH" );
 
-    $devHash->{VERSION} = $modMeta->{x_version}
+    $devHash->{FUPDATE} = $modMeta->{x_version}
       if ( defined( $modMeta->{x_version} ) );
 }
 
@@ -239,7 +254,7 @@ sub __GetMetadata {
     my $item_summary_DE;
 
     # extract all info from file name
-    if ( $filePath =~ m/^((.+\/)((?:(\d+)_)?(.+)\.(.+)))$/ ) {
+    if ( $filePath =~ m/^((?:\.\/)?(.+\/)((?:(\d+)_)?(.+)\.(.+)))$/ ) {
         my @file;
         $file[0] = $1;    # complete match
         $file[1] = $2;    # relative file path
@@ -480,7 +495,10 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
         $encoding = 'latin1' unless ($encoding);
 
         if ( keys %json > 0 ) {
-            eval "use JSON;";
+            eval {
+                require JSON;
+                1;
+            };
 
             if ( !$@ ) {
                 foreach ( keys %json ) {
@@ -514,7 +532,7 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
 
                         return "$@" if ($@);
 
-                        my $decoded = decode_json($t);
+                        my $decoded = JSON::decode_json($t);
                         while ( my ( $k, $v ) = each %{$decoded} ) {
                             $modMeta->{$k} = $v;
                         }
@@ -545,7 +563,10 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
 
         # Detect prereqs if not provided via META.json
         if ( !defined( $modMeta->{prereqs} ) ) {
-            eval "use Perl::PrereqScanner::NotQuiteLite;";
+            eval {
+                require Perl::PrereqScanner::NotQuiteLite;
+                1;
+            };
 
             if ( !$@ ) {
                 my $scanner = Perl::PrereqScanner::NotQuiteLite->new(
@@ -624,8 +645,7 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
         $versionFrom = 'attr/featurelevel+vcs';
         $version     = 'v' . $1 . '.' . $vcs[5]
           if ( $modules{'Global'}{AttrList} =~ m/\W*featurelevel:([^,]+)/ );
-        $modMeta->{version}   = $version;
-        $modMeta->{x_version} = 'fhem.pl:' . $version;
+        $modMeta->{version} = $version;
     }
 
     ########
@@ -669,25 +689,12 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
         {
             $versionFrom = 'generated/vcs';
             $modMeta->{version} .= $modMeta->{x_vcs}[5];
-
-            # Generate extended version info based
-            #   on base revision
-            $modMeta->{x_version} =
-              $modMeta->{x_file}[2] . ':'
-              . (
-                $modMeta->{version} =~ m/0+\.0+(?:\.0+)?$/
-                ? '?'
-                : $modMeta->{version}
-              );
         }
 
         # we don't know anything about this module at all
         else {
             $versionFrom = 'generated/blank';
             $modMeta->{version} .= '0';
-
-            # Generate generic version to fill the gap
-            $modMeta->{x_version} = $modMeta->{x_file}[2] . ':?';
         }
     }
 
@@ -697,41 +704,6 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
     # Do not use repeating 0 in version
     $modMeta->{version} =~ s/\.0{2,}/\.0/g
       if ( defined( $modMeta->{version} ) );
-    $modMeta->{x_version} =~ s/\.0{2,}/\.0/g
-      if ( defined( $modMeta->{x_version} ) );
-
-    # Generate extended version info with added base revision
-    $modMeta->{x_version} =
-      $modMeta->{x_file}[2] . ':'
-      . (
-        $modMeta->{version} =~ m/^v0+\.0+(?:\.0+)*?$/
-        ? '?'
-        : $modMeta->{version}
-      )
-      . '-s'    # assume we only have Subversion for now
-      . $modMeta->{x_vcs}[5]
-      if ( !$modMeta->{x_version}
-        && defined( $modMeta->{x_vcs} )
-        && $modMeta->{x_vcs}[5] ne '' );
-
-    # Add modified date to extended version
-    if ( defined( $modMeta->{x_version} ) ) {
-        if ( defined( $modMeta->{x_vcs} ) ) {
-            $modMeta->{x_version} .= '/' . $modMeta->{x_vcs}[7];
-
-            # #FIXME can't use modified time because FHEM Update currently
-            # #      does not set it based on controls_fhem.txt :-(
-            # #      We need the block size from controls_fhem.txt here but
-            # #      doesn't make sense to load that file here...
-            # $modMeta->{x_version} .= '/' . $modMeta->{x_file}[6][9][2];
-            # $modMeta->{x_version} .= '+modified'
-            #   if ( defined( $modMeta->{x_vcs} )
-            #     && $modMeta->{x_vcs}[16] ne $modMeta->{x_file}[6][9][0] );
-        }
-        else {
-            $modMeta->{x_version} .= '/' . $modMeta->{x_file}[6][9][2];
-        }
-    }
 
     $@ .=
       $modMeta->{x_file}[2] . ": Invalid version format '$modMeta->{version}'"
@@ -832,8 +804,263 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
         "url"     => "https://metacpan.org/pod/CPAN::Meta::Spec"
     };
 
+    # generate x_version
+    __SetXVersion($modMeta);
+
     return "$@" if ($@);
     return undef;
+}
+
+# Set x_version based on existing meta data
+sub __SetXVersion {
+    return 0 unless ( __PACKAGE__ eq caller(0) );
+    my ($modMeta) = @_;
+    my $modName = $modMeta->{x_file}[4];
+
+    delete $modMeta->{x_version} if ( defined( $modMeta->{x_version} ) );
+
+    # Special handling for fhem.pl
+    if ( $modMeta->{x_file}[2] eq 'fhem.pl' ) {
+        $modMeta->{x_version} = 'fhem.pl:' . $modMeta->{version};
+    }
+
+    # Generate extended version info based
+    #   on base revision
+    elsif ( defined( $modMeta->{x_file}[7] eq 'generated/vcs' ) ) {
+
+        $modMeta->{x_version} =
+          $modMeta->{x_file}[2] . ':'
+          . (
+            $modMeta->{version} =~ m/0+\.0+(?:\.0+)?$/
+            ? '?'
+            : $modMeta->{version}
+          );
+    }
+
+    # Generate generic version to fill the gap
+    elsif ( defined( $modMeta->{x_file}[7] eq 'generated/blank' ) ) {
+        $modMeta->{x_version} = $modMeta->{x_file}[2] . ':?';
+    }
+
+    # Generate extended version info with added base revision
+    elsif ( defined( $modMeta->{x_vcs} )
+        && $modMeta->{x_vcs}[5] ne '' )
+    {
+        $modMeta->{x_version} =
+          $modMeta->{x_file}[2] . ':'
+          . (
+            $modMeta->{version} =~ m/^v0+\.0+(?:\.0+)*?$/
+            ? '?'
+            : $modMeta->{version}
+          )
+          . '-s'    # assume we only have Subversion for now
+          . $modMeta->{x_vcs}[5];
+    }
+
+    if ( defined( $modMeta->{x_version} ) ) {
+
+        # Add modified date to extended version
+        if ( defined( $modMeta->{x_vcs} ) ) {
+            $modMeta->{x_version} .= '/' . $modMeta->{x_vcs}[7];
+
+            # #FIXME can't use modified time because FHEM Update currently
+            # #      does not set it based on controls_fhem.txt :-(
+            # #      We need the block size from controls_fhem.txt here but
+            # #      doesn't make sense to load that file here...
+            # $modMeta->{x_version} .= '/' . $modMeta->{x_file}[6][9][2];
+            # $modMeta->{x_version} .= '+modified'
+            #   if ( defined( $modMeta->{x_vcs} )
+            #     && $modMeta->{x_vcs}[16] ne $modMeta->{x_file}[6][9][0] );
+        }
+        else {
+            $modMeta->{x_version} .= '/' . $modMeta->{x_file}[6][9][2];
+        }
+    }
+}
+
+sub __GetUpdatedata {
+    return 0 unless ( __PACKAGE__ eq caller(0) );
+    my $fh;
+    my @fileList;
+
+    # if there are 3rd party source file repositories involved
+    if ( open( $fh, '<' . './FHEM/controls.txt' ) ) {
+        while ( my $l = <$fh> ) {
+            push @fileList, $1 if ( $l =~ m/([^\/\s]+)$/ );
+        }
+        close($fh);
+    }
+
+    # FHEM core update control file only
+    else {
+        push @fileList, 'controls_fhem.txt';
+    }
+
+    # loop through control files
+    foreach my $file (@fileList) {
+        if ( open( $fh, '<' . './FHEM/' . $file ) ) {
+            my $filePrefix;
+            my $srcRepoName;
+            my $fileExtension;
+
+            if ( $file =~ m/^([^_\s\.]+)_([^_\s\.]+)\.([^_\s\.]+)$/ ) {
+                $filePrefix    = $1;
+                $srcRepoName   = $2;
+                $fileExtension = $3;
+            }
+
+            while ( my $l = <$fh> ) {
+
+                if ( $l =~
+m/^((\S+) (((....)-(..)-(..))_((..):(..):(..))) (\d+) (?:\.\/)?((.+\/)?((?:(\d+)_)?(.+)\.(.+))))$/
+                  )
+                {
+                    # this is a FHEM core update
+                    #   under path ./
+                    if ( $2 eq 'UPD' && !$14 ) {
+
+                        # core updates may only origin
+                        #  from original fhem source repo
+                        if ( $srcRepoName ne 'fhem' ) {
+                            Log 1,
+                                __PACKAGE__
+                              . "::__GetUpdatedata: ERROR: Core file '"
+                              . $13
+                              . '\' can only be updated from FHEM original update server';
+                            next;
+                        }
+
+                        my @update;
+                        $update[0]  = $srcRepoName;     # source repository name
+                        $update[1]  = $1;               # complete match
+                        $update[2]  = $2;               # controls command
+                        $update[3]  = $4 . ' ' . $8;    # date and time
+                        $update[4]  = $4;               # date
+                        $update[5]  = $5;               # year
+                        $update[6]  = $6;               # month
+                        $update[7]  = $7;               # day
+                        $update[8]  = $8;               # time
+                        $update[9]  = $9;               # hour
+                        $update[10] = $10;              # minute
+                        $update[11] = $11;              # second
+                        $update[12] = $12;              # size in bytes
+                        $update[13] = $13;              # relative file path
+                        $update[14] = $14;              # relative path
+                        $update[15] = $15;              # file name
+                        $update[16] = $16;    # order number, may be undefined
+                        $update[17] = $17;    # FHEM module name
+                        $update[18] = $18;    # file extension
+
+                        # this is a FHEM core update
+                        if ( $15 eq 'fhem.pl' ) {
+                            $coreUpdate = undef;
+                            $coreUpdate = \@update;
+                        }
+
+                        # this is a FHEM core Perl package update
+                        elsif ( $18 eq 'pm' ) {
+                            delete $corePackageUpdates{$17}
+                              if ( defined( $corePackageUpdates{$17} ) );
+                            $corePackageUpdates{$17} = \@update;
+                        }
+
+                        # this is a FHEM core file update
+                        else {
+                            # our %coreFileUpdates;
+                        }
+                    }
+
+                    # this is a FHEM module or Perl package update
+                    #   under path ./FHEM/
+                    elsif ( $2 eq 'UPD' && $14 eq 'FHEM/' && $18 eq 'pm' ) {
+                        my @update;
+                        $update[0]  = $srcRepoName;     # source repository name
+                        $update[1]  = $1;               # complete match
+                        $update[2]  = $2;               # controls command
+                        $update[3]  = $4 . ' ' . $8;    # date and time
+                        $update[4]  = $4;               # date
+                        $update[5]  = $5;               # year
+                        $update[6]  = $6;               # month
+                        $update[7]  = $7;               # day
+                        $update[8]  = $8;               # time
+                        $update[9]  = $9;               # hour
+                        $update[10] = $10;              # minute
+                        $update[11] = $11;              # second
+                        $update[12] = $12;              # size in bytes
+                        $update[13] = $13;              # relative file path
+                        $update[14] = $14;              # relative path
+                        $update[15] = $15;              # file name
+                        $update[16] = $16;    # order number, may be undefined
+                        $update[17] = $17;    # FHEM module name
+                        $update[18] = $18;    # file extension
+
+                        # this is a FHEM module update
+                        if ($16) {
+                            if ( defined( $moduleUpdates{$17} ) ) {
+
+                                # We're not overwriting update info
+                                #  if source repo name does not match
+                                if ( ref( $moduleUpdates{$17} ) eq 'ARRAY'
+                                    && $moduleUpdates{$17}[0] ne $update[0] )
+                                {
+                                    Log 1,
+                                        __PACKAGE__
+                                      . "::__GetUpdatedata: ERROR: "
+                                      . $update[13]
+                                      . ' belongs to source repository "'
+                                      . $moduleUpdates{$17}[0]
+                                      . '". Ignoring identical file name from source repository '
+                                      . $update[0];
+                                    next;
+                                }
+
+                                else {
+                                    delete $moduleUpdates{$17};
+                                }
+                            }
+
+                            $moduleUpdates{$17} = \@update;
+                        }
+
+                        # this is a FHEM Perl package update
+                        else {
+                            if ( defined( $packageUpdates{$17} ) ) {
+
+                                # We're not overwriting update info
+                                #  if source repo name does not match
+                                if ( ref( $packageUpdates{$17} ) eq 'ARRAY'
+                                    && $packageUpdates{$17}[0] ne $update[0] )
+                                {
+                                    Log 1,
+                                        __PACKAGE__
+                                      . "::__GetUpdatedata: ERROR: "
+                                      . $update[13]
+                                      . ' belongs to source repository "'
+                                      . $packageUpdates{$17}[0]
+                                      . '". Ignoring identical file name from source repository '
+                                      . $update[0];
+                                    next;
+                                }
+
+                                else {
+                                    delete $packageUpdates{$17};
+                                }
+                            }
+
+                            $packageUpdates{$17} = \@update;
+                        }
+                    }
+
+                    # this is a FHEM file update
+                    #   under any other path
+                    else {
+                        # our %fileUpdates;
+                    }
+                }
+            }
+            close($fh);
+        }
+    }
 }
 
 1;
