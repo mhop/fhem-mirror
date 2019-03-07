@@ -42,14 +42,11 @@ use MIME::Base64;
 use Time::HiRes;
 use HttpUtils;
 use Blocking;                                                     # für EMail-Versand
-use Encode; 
-use JSON;                                                         # für Telegram Versand                                                    
+use Encode;                                                     
 # no if $] >= 5.017011, warnings => 'experimental';
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
-  "8.11.2" => "28.02.2019  bugfix no snapinfos when snap was done by SVS itself, Forum: https://forum.fhem.de/index.php/topic,45671.msg914685.html#msg914685",
-  "8.11.1" => "28.02.2019  commandref revised, minor fixes ",
   "8.11.0" => "25.02.2019  changed compatibility check, compatibility to SVS version 8.2.3, Popup possible for \"generic\"-Streamdevices, ".
               "support for \"genericStrmHtmlTag\" in streaming devices ",
   "8.10.1" => "19.02.2019  fix warning when starting fhem, and Forum:#97706",
@@ -600,7 +597,7 @@ sub SSCam_Attr($$$$) {
             $hash->{HELPER}{GETSNAPGALLERY} = 1;
 		    $slim  = AttrVal($name,"snapGalleryNumber",$SSCam_slim);    # Anzahl der abzurufenden Snaps
 			$ssize = $do;
-			RemoveInternalTimer($hash, "SSCam_getsnapinfo"); 
+			RemoveInternalTimer("SSCam_getsnapinfo"); 
 			InternalTimer(gettimeofday()+0.7, "SSCam_getsnapinfo", "$name:$slim:$ssize", 0);
 		}
     }     
@@ -625,7 +622,7 @@ sub SSCam_Attr($$$$) {
 		    $slim  = AttrVal($name,"snapGalleryNumber",$SSCam_slim); # Anzahl der abzurufenden Snaps
 			my $sg = AttrVal($name,"snapGallerySize","Icon");        # Auflösung Image
 			$ssize = ($sg eq "Icon")?1:2;
-			RemoveInternalTimer($hash, "SSCam_getsnapinfo"); 
+			RemoveInternalTimer("SSCam_getsnapinfo"); 
 			InternalTimer(gettimeofday()+0.7, "SSCam_getsnapinfo", "$name:$slim:$ssize", 0);
 		}
     } 
@@ -646,7 +643,7 @@ sub SSCam_Attr($$$$) {
 		$hash->{HELPER}{GETSNAPGALLERY} = 1;
 		my $sg = AttrVal($name,"snapGallerySize","Icon");  # Auflösung Image
 		$ssize = ($sg eq "Icon")?1:2;
-		RemoveInternalTimer($hash, "SSCam_getsnapinfo"); 
+		RemoveInternalTimer("SSCam_getsnapinfo"); 
 		InternalTimer(gettimeofday()+0.7, "SSCam_getsnapinfo", "$name:$slim:$ssize", 0);
 	}
     
@@ -1542,9 +1539,9 @@ sub SSCam_Get($@) {
 		}
 
     } elsif ($opt eq "snapinfo" && SSCam_IsModelCam($hash)) {
-        # Schnappschußgalerie abrufen oder nur Info des letzten Snaps
+        # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps
 		if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-        my ($slim,$ssize) = SSCam_snaplimsize($hash,1);	    # Force-Bit, es wird $hash->{HELPER}{GETSNAPGALLERY} gesetzt !
+        my ($slim,$ssize) = SSCam_snaplimsize($hash);		
         SSCam_getsnapinfo("$name:$slim:$ssize");
                 
     } elsif ($opt eq "snapfileinfo" && SSCam_IsModelCam($hash)) {
@@ -1878,9 +1875,9 @@ sub SSCam_initonboot ($) {
              SSCam_getptzlistpreset($hash);
              SSCam_getptzlistpatrol($hash);
 
-             # Schnappschußgalerie abrufen oder nur Info des letzten Snaps
-             my ($slim,$ssize) = SSCam_snaplimsize($hash,1);   # Force-Bit, es wird $hash->{HELPER}{GETSNAPGALLERY} erzwungen !
-             RemoveInternalTimer($hash, "SSCam_getsnapinfo"); 
+             # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps
+             my ($slim,$ssize) = SSCam_snaplimsize($hash);
+             RemoveInternalTimer("SSCam_getsnapinfo"); 
              InternalTimer(gettimeofday()+0.9, "SSCam_getsnapinfo", "$name:$slim:$ssize", 0); 
 		 }
          SSCam_versionCheck($hash);                                                                  # Einstieg in regelmäßigen Check Kompatibilität
@@ -3247,8 +3244,8 @@ sub SSCam_getcaminfoall ($$) {
         InternalTimer(gettimeofday()+1.4, "SSCam_getstreamformat", $hash, 0);
         
         # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps
-        my ($slim,$ssize) = SSCam_snaplimsize($hash,1);       # Force-Bit, es wird $hash->{HELPER}{GETSNAPGALLERY} erzwungen !
-        RemoveInternalTimer($hash, "SSCam_getsnapinfo"); 
+        my ($slim,$ssize) = SSCam_snaplimsize($hash);
+        RemoveInternalTimer("SSCam_getsnapinfo"); 
         InternalTimer(gettimeofday()+1.5, "SSCam_getsnapinfo", "$name:$slim:$ssize", 0);
 	
         RemoveInternalTimer($hash, "SSCam_getptzlistpreset");
@@ -3295,10 +3292,6 @@ return;
 
 ###########################################################################
 #  Infos zu Snaps abfragen (z.B. weil nicht über SSCam ausgelöst)
-#
-#  $slim  = Anzahl der abzurufenden Snapinfos (snaps)
-#  $ssize = Snapgröße
-#  $tac   = Transaktionscode (für gemeinsamen Versand)
 ###########################################################################
 sub SSCam_getsnapinfo ($) {
     my ($str)   = @_;
@@ -3309,7 +3302,7 @@ sub SSCam_getsnapinfo ($) {
     $tac   = (defined $tac)?$tac:5000;
     my $ta = $hash->{HELPER}{TRANSACTION};
     
-    RemoveInternalTimer($hash, "SSCam_getsnapinfo"); 
+    RemoveInternalTimer("SSCam_getsnapinfo"); 
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off" || ((defined $ta) && $ta == $tac)) {               
@@ -4462,11 +4455,9 @@ sub SSCam_camop ($) {
 	  my $keyword = $hash->{HELPER}{KEYWORD};
       my $snapid  = ReadingsVal("$name", "LastSnapId", " ");
       if($OpMode eq "getsnapinfo" && $snapid =~/\d+/) {
-          # getsnapinfo UND Reading LastSnapId gesetzt
 	      Log3($name,4, "$name - Call getsnapinfo with params: Image numbers => $limit, Image size => $imgsize, Id => $snapid");
           $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&idList=\"$snapid\"&imgSize=\"$imgsize\"&limit=\"$limit\"&_sid=\"$sid\"";      
       } else {
-          # snapgallery oder kein Reading LastSnapId gesetzt
 	      Log3($name,4, "$name - Call getsnapinfo with params: Image numbers => $limit, Image size => $imgsize, Keyword => $keyword");
           $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&keyword=\"$keyword\"&imgSize=\"$imgsize\"&limit=\"$limit\"&_sid=\"$sid\"";
       }
@@ -5222,7 +5213,7 @@ sub SSCam_camop_parse ($) {
                     SSCam_delActiveToken($hash);                        
                 }
                 
-                RemoveInternalTimer($hash, "SSCam_getsnapinfo");                
+                RemoveInternalTimer("SSCam_getsnapinfo");                
                 InternalTimer(gettimeofday()+0.6, "SSCam_getsnapinfo", "$name:$slim:$ssize:$tac", 0);
                 return;
             
@@ -6621,12 +6612,9 @@ return $bool;
 
 ###############################################################################
 #      Ermittlung Anzahl und Größe der abzurufenden Schnappschußdaten
-#
-#      $force = wenn auf jeden Fall der/die letzten Snaps von der SVS
-#               abgerufen werden sollen unabhängig ob LastSnapId vorhanden ist
 ###############################################################################
-sub SSCam_snaplimsize ($;$) {      
-  my ($hash,$force) = @_;
+sub SSCam_snaplimsize ($) {      
+  my ($hash)= @_;
   my $name  = $hash->{NAME};
   my ($slim,$ssize);
   
@@ -6658,8 +6646,6 @@ sub SSCam_snaplimsize ($;$) {
   if(scalar(@strmdevs) >= 1) {
       Log3($name, 4, "$name - Streaming devs of type \"lastsnap\": @strmdevs");
   }
-  
-  $hash->{HELPER}{GETSNAPGALLERY} = 1 if($force);                           # Bugfix 04.03.2019 Forum:https://forum.fhem.de/index.php/topic,45671.msg914685.html#msg914685
   
 return ($slim,$ssize);
 }
@@ -8828,8 +8814,6 @@ return ($str);
 #                                       Hint Hash EN           
 #############################################################################################
 %SSCam_vHintsExt_en = (
-  "8" => "Link to official <a href=\"https://community.synology.com/forum/3\">Surveillance Forum</a> in Synology communiy".
-         "<br><br>",
   "7" => "<b>Setup Email Shipping <br>".
          "==================== </b> <br><br>".
          "Snapshots can be sent by <b>Email</b> alltogether after creation. For this purpose the module contains<br>". 
@@ -8888,8 +8872,6 @@ return ($str);
 #                                       Hint Hash DE           
 #############################################################################################
 %SSCam_vHintsExt_de = (
-  "8" => "Link zur offiziellen <a href=\"https://community.synology.com/forum/3\">Surveillance Forum</a> Seite innerhalb der Synology Communiy".
-         "<br><br>",
   "7" => "<b>Einstellung Email-Versand <br>".
          "========================= </b> <br><br>".
          "Schnappschüsse können nach der Erstellung per <b>Email</b> gemeinsam versendet werden. Dazu enthält das Modul einen<br>". 
@@ -9740,10 +9722,6 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   The video format of the camera has to be set to H.264 in the Synology Surveillance Station and not every camera type is
   a proper device for HLS-Streaming.
   At the time only the Mac Safari Browser and modern mobile iOS/Android-Devices are able to playback HLS-Streams. 
-  <br><br>
-  
-  <b>Note for MJPEG:</b> <br>
-  The MJPEG stream is SVS internal transcoded from other codec and is usally only about 1 fps.
   
   </ul>
   <br><br>
@@ -11501,10 +11479,6 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   Die Kamera muss in der SVS auf das Videoformat H.264 eingestellt sein und nicht jeder Kameratyp ist gleichermassen für 
   HLS-Streaming geeignet.
   Momentan kann HLS nur durch den Mac Safari Browser sowie auf mobilen iOS/Android-Geräten wiedergegeben werden.
-  <br><br>
-  
-  <b>Hinweis zu MJPEG:</b> <br>
-  Der MJPEG Stream wird innerhalb der SVS aus anderen Codecs (H.264) transkodiert und beträgt normalerweise ca. 1 Fps.
     
   </ul>
   <br><br>

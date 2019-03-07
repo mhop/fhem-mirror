@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bufgix:  49_SSCam: back to V8.11.0 due to some problems with 8.11.2
  - feature: 70_ENIGMA2: add remotecontrolChannel attribute to customize
                         channelUp/channelDown remote control commands
  - feature: 50_MOBILEALERTSGW: attribut allowfrom added
