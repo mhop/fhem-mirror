@@ -1013,7 +1013,8 @@ sub KODI_Set($@)
     return KODI_Call($hash,{'method' => 'Input.ExecuteAction', 'params' => { 'action' => $action}},0);
   }
   elsif($cmd eq 'jsonraw') {
-    my $action = join("",@args);
+    # note: multiple whitespaces in the string will be condenced to singel whitespace
+    my $action = join(" ",@args);
     return KODI_Call_raw($hash,$action,0);
   }
   elsif($cmd eq 'showcodec') {
