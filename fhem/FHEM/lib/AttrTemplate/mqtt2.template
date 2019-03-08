@@ -18,10 +18,24 @@ desc: <a href="https://forum.fhem.de/index.php/topic,94495.0.html">Forum Thread<
 #
 name:A_00_MQTT2_CLIENT_general_bridge
 filter:TYPE=MQTT2_DEVICE
-desc:recommended to use this as general bridgeing device when using MQTT2_CLIENT as IO to get around missing CID info for distinguishing different devices
-attr DEVICE bridgeRegexp [^:]+:([^/]+)/([^/]+)[/]?.*:.* "$1_$2"
+desc:recommended to use this as general bridgeing device when using MQTT2_CLIENT as IO to get around missing CID info for distinguishing different popular devices<br>NOTE: <br>NOTE:<br>- for use with MQTT2_CLIENT use a copy of the device and change its DEF to a different clientId like GeneralBridge, delete original's readingList after applying the template!
+par:IODEVNAME;Name of the IO-Device; {AttrVal("DEVICE","IODev","") ? AttrVal("DEVICE","IODev","" ) : undef } 
+par:DEVTYPE;TYPE of the device; { InternalVal("DEVICE","TYPE","")}
+par:DEVCID;CID of the device as written in the DEF; { InternalVal(AttrVal("DEVICE","IODev",""),"clientId","mosquitto") eq InternalVal("DEVICE","DEF","mosquitto") ? "MQTT2_GeneralBridge" : InternalVal("DEVICE","DEF","mosquitto")}
+par:IODEVROOM;Room of the IOdevice; {AttrVal(AttrVal("DEVICE","IODev",""),"room","" ) ? AttrVal(AttrVal("DEVICE","IODev",""),"room","" ) : undef } 
+attr DEVICE bridgeRegexp   (tele|cmnd)[/]([^/]+)[/].*:.* "$2"\
+  shellies[/]([^/]+)[/].*:.* "$1"\
+  (ESPClient_[^/]+)[/].*:.* "$1"
 attr DEVICE autocreate 1
+attr DEVICE room IODEVROOM
 attr DEVICE setStateList on off
+#modify DEVICE DEVCID
+#copy DEVICE DEVCID
+deleteAttr DEVICE readingList
+#deleteAttr DEVCID readingList
+#delete DEVICE
+#reload 10_DEVTYPE.pm
+#attr DEVCID model A_00_MQTT2_CLIENT_general_bridge
 attr DEVICE model A_00_MQTT2_CLIENT_general_bridge
 
 ###########################################
@@ -348,7 +362,7 @@ attr DEVICE model A_01a_tasmota_basic_state_power1
 # sonoff 1 channel device flashed with Tasmota.
 name:A_01_tasmota_basic
 filter:TYPE=MQTT2_DEVICE
-desc:Applies to Sonoff 1 Channel devices using POWER-topic for relay state <br>NOTE: Power topic will be set to POWER1; the format the device is sending data will also be changed to lowercase!
+desc:Applies to Sonoff 1 Channel devices using POWER-topic for relay state <br>NOTE:<br>- Power topic will be set to POWER1; <br>- the format the device is sending data will also be changed to lowercase!<br>- finally, you'll see the device as model A_01a_tasmota_basic_state_power1.
 set DEVICE attrTemplate A_01a_tasmota_basic_state_power1
 
 name:A_01x_tasmota_clear_readings_reset_readingsList_and_reboot
@@ -764,6 +778,25 @@ attr DEVICE model A_16_shellyht
 
 
 ###############
+#ebusd
+#
+#ebus daemon device
+name:E_01a_eBus_daemon_splitter
+filter:TYPE=MQTT2_DEVICE
+desc:Device containing all status messages from the ebus daemon itself<br>NOTE: acts also as a bridge device to split up the hardware on the bus into different mqtt2_devices<br>NOTE:<br>- for use with MQTT2_CLIENT use a copy of the Device with the same clientId than the IO, delete original's readingList after applying the template!<br>- this might change the devices CID
+par:DEVTYPE;Internal TYPE of the device; { InternalVal("DEVICE","TYPE","")}
+par:DEV_ID;base topic set ebus;{ AttrVal("DEVICE","readingList","") =~ m,[^:]+:?(ebus[a-zA-Z])[^/]*[/].*:, ? $1 : "ebusd" }
+modify DEVICE DEV_ID
+attr DEVICE autocreate 1
+attr DEVICE bridgeRegexp   (ebus.)[^/]*/(bai|broadcast)/.*:.* "$1_bai"\
+  (ebus.)[^/]*/([\d]+)/.*:.* "$1_$2"\
+  (ebus.)[^/]*[/][^b][a-zA-Z]+[/].*:.* "$1"
+#attr DEVICE icon icoTempHeizung
+#attr DEVICE devStateStyle style="text-align:right"
+attr DEVICE model E_01a_eBus_daemon_splitter
+
+
+###############
 #ESP Milight Hub
 #use this with Chris Mullins ESP-Milight-Hub. for further details visit https://github.com/sidoh/esp8266_milight_hub
 #recommended structure of the topic pattern milight/:device_id/:device_type/:group_id 
@@ -940,3 +973,4 @@ attr DEVICE webCmdLabel    An:Aus\
   :Sättigung:Modus
 attr DEVICE setStateList on off
 attr DEVICE model X_01x_esp_milight_hub_max_features_bulb
+
