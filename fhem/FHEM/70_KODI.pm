@@ -775,7 +775,7 @@ sub KODI_ProcessResponse($$)
   }  
   else {
     my $result = $obj->{result};
-    if($result && $result ne 'OK') {
+    if($result && $result ne 'OK' && $result ne JSON::true) {
       readingsBeginUpdate($hash);
       foreach my $key (keys %$result) {
         if ($key eq 'item') {
