@@ -5236,7 +5236,7 @@ sub SSCam_camop_parse ($) {
         
                 my %snaps  = ( 0 => {'createdTm' => 'n.a.', 'fileName' => 'n.a.','snapid' => 'n.a.'} );  # Hilfshash 
                 my ($k,$l) = (0,0);              
-				if(exists($data->{data}{data}[0]{createdTm})) {
+				if($data->{'data'}{'data'}[0]{'createdTm'}) {
                     while ($data->{'data'}{'data'}[$k]) {
                         if(!$data->{'data'}{'data'}[$k]{'camName'} || $data->{'data'}{'data'}[$k]{'camName'} ne $camname) {    # Forum:#97706
                             $k += 1;
