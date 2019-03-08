@@ -47,7 +47,7 @@ use Encode;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
-  "8.11.3" => "04.03.2019  avoid possible JSON errors, fix fhem is hanging Forum: https://forum.fhem.de/index.php/topic,45671.msg915546.html#msg915546 ",
+  "8.11.3" => "08.03.2019  avoid possible JSON errors, fix fhem is hanging while restart or get snapinfo - Forum: #45671.msg915546.html#msg915546 ",
   "8.11.2" => "04.03.2019  bugfix no snapinfos when snap was done by SVS itself, Forum: https://forum.fhem.de/index.php/topic,45671.msg914685.html#msg914685",
   "8.11.1" => "28.02.2019  commandref revised, minor fixes ",
   "8.11.0" => "25.02.2019  changed compatibility check, compatibility to SVS version 8.2.3, Popup possible for \"generic\"-Streamdevices, ".
@@ -5238,11 +5238,7 @@ sub SSCam_camop_parse ($) {
                 my ($k,$l) = (0,0);              
 				if(exists($data->{data}{data}[0]{createdTm})) {
                     while ($data->{'data'}{'data'}[$k]) {
-                        if(!$data->{'data'}{'data'}[$k]{'camName'}) {    # Forum:#97706
-                            $k += 1;
-                            next;                                                  
-                        }
-                        if($data->{'data'}{'data'}[$k]{'camName'} ne $camname) {
+                        if(!$data->{'data'}{'data'}[$k]{'camName'} || $data->{'data'}{'data'}[$k]{'camName'} ne $camname) {    # Forum:#97706
                             $k += 1;
                             next;
                         }
@@ -5298,11 +5294,7 @@ sub SSCam_camop_parse ($) {
 						my %sendsnaps = ();  # Schnappschuss Hash zum Versand wird leer erstellt
 						
 						while ($data->{'data'}{'data'}[$i]) {
-                            if(!$data->{'data'}{'data'}[$i]{'camName'}) {    # Forum:#97706
-                                $i += 1;
-                                next;                                                  
-                            }
-							if($data->{'data'}{'data'}[$i]{'camName'} ne $camname) {
+							if(!$data->{'data'}{'data'}[$i]{'camName'} || $data->{'data'}{'data'}[$i]{'camName'} ne $camname) {    # Forum:#97706
 								$i += 1;
 								next;
 							}
@@ -5350,14 +5342,10 @@ sub SSCam_camop_parse ($) {
                         $hash->{HELPER}{TOTALCNT} = $data->{data}{total};  # total Anzahl Schnappschüsse
                         
                         while ($data->{'data'}{'data'}[$i]) {
-                            if(!$data->{'data'}{'data'}[$i]{'camName'}) {    # Forum:#97706
-                                $i += 1;
-                                next;                                                  
-                            }
-                            if($data->{'data'}{'data'}[$i]{'camName'} ne $camname) {
-                                $i += 1;
-                                next;
-                            }
+							if(!$data->{'data'}{'data'}[$i]{'camName'} || $data->{'data'}{'data'}[$i]{'camName'} ne $camname) {    # Forum:#97706
+								$i += 1;
+								next;
+							}	
                             $snapid = $data->{data}{data}[$i]{id};
                             my $createdTm = $data->{data}{data}[$i]{createdTm};
                             my $fileName  = $data->{data}{data}[$i]{fileName};
