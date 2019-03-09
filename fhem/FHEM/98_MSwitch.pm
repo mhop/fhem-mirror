@@ -83,7 +83,7 @@ if ( $preconf && $preconf ne "" ) {
 }
 
 my $autoupdate = 'off';    #off/on
-my $version    = '2.10';
+my $version    = '2.11';
 my $vupdate    = 'V2.00'
   ; # versionsnummer der datenstruktur . änderung der nummer löst MSwitch_VUpdate aus .
 my $savecount = 30
@@ -3684,6 +3684,11 @@ sub MSwitch_fhemwebFn($$$$) {
 
         my $alert;
         foreach (@affecteddevices) {
+		
+		my $nopoint =$_;
+	
+		$nopoint =~ s/\./point/g;
+		
             $alert = '';
             my @devicesplit = split( /-AbsCmd/, $_ );
             my $devicenamet = $devicesplit[0];
@@ -3714,8 +3719,12 @@ sub MSwitch_fhemwebFn($$$$) {
             }
 
             @befehlssatz = split( / /, $cmdsatz{$devicenamet} );
-            my $aktdevice = $_;
+           
 
+			
+			
+			 my $aktdevice = $_;
+			
             ## optionen erzeugen
             my $option1html  = '';
             my $option2html  = '';
@@ -3839,14 +3848,14 @@ sub MSwitch_fhemwebFn($$$$) {
             if ( AttrVal( $Name, 'MSwitch_Debug', "0" ) eq '4' ) {
                 $realname =
                     "<input id='' name='devicename"
-                  . $_
+                  . $nopoint
                   . "' size='20'  value ='"
                   . $_ . "'>";
             }
             else {
                 $realname =
                     "<input type='$hidden' id='' name='devicename"
-                  . $_
+                  . $nopoint
                   . "' size='20'  value ='"
                   . $_ . "'>";
             }
@@ -3863,7 +3872,7 @@ sub MSwitch_fhemwebFn($$$$) {
 
                 ###################### priority
                 my $aktfolge = $reihenfolgehtml;
-                my $newname  = "reihe" . $_;
+                my $newname  = "reihe" . $nopoint;
                 my $tochange =
 "<option value='$savedetails{ $aktdevice . '_priority' }'>$savedetails{ $aktdevice . '_priority' }</option>";
                 my $change =
@@ -3895,7 +3904,7 @@ sub MSwitch_fhemwebFn($$$$) {
 
                 # ID
                 $aktfolge = $idfolgehtml;
-                $newname  = "idreihe" . $_;
+                $newname  = "idreihe" . $nopoint;
                 $tochange =
 "<option value='$savedetails{ $aktdevice . '_id' }'>$savedetails{ $aktdevice . '_id' }</option>";
                 $change =
@@ -3916,7 +3925,7 @@ sub MSwitch_fhemwebFn($$$$) {
 				</td>";
 
                 my $aktfolge = $showfolgehtml;
-                my $newname  = "showreihe" . $_;
+                my $newname  = "showreihe" . $nopoint;
                 my $tochange =
 "<option value='$savedetails{ $aktdevice . '_showreihe' }'>$savedetails{ $aktdevice . '_showreihe' }</option>";
                 my $change =
@@ -3941,7 +3950,7 @@ sub MSwitch_fhemwebFn($$$$) {
 			<textarea class=\"devdetails\" cols='100' rows='1' id='cmdcomment"
               . $_
               . "1' name='cmdcomment"
-              . $_ . "'>"
+              . $nopoint . "'>"
               . $savedetails{ $aktdevice . '_comment' }
               . "</textarea>
 			</td>
@@ -3975,7 +3984,7 @@ sub MSwitch_fhemwebFn($$$$) {
 				Set <select class=\"devdetails2\" id='"
                   . $_
                   . "_on' name='cmdon"
-                  . $_
+                  . $nopoint
                   . "' onchange=\"javascript: activate(document.getElementById('"
                   . $_
                   . "_on').value,'"
@@ -3997,13 +4006,13 @@ sub MSwitch_fhemwebFn($$$$) {
 				<td  class='col2' style=\"width: 100%\">&nbsp;<br><input type='$hidden' id='cmdseton"
                   . $_
                   . "' name='cmdseton"
-                  . $_
+                  . $nopoint
                   . "' size='20'  value ='"
                   . $cmdsatz{$devicenamet} . "'>
 				<input type='$hidden' id='cmdonopt"
                   . $_
                   . "1' name='cmdonopt"
-                  . $_
+                  . $nopoint
                   . "' size='20'  value ='"
                   . $savedetails{ $aktdevice . '_onarg' }
                   . "'>&nbsp;&nbsp;&nbsp;";
@@ -4024,7 +4033,7 @@ sub MSwitch_fhemwebFn($$$$) {
 
                 $detailhtml = $detailhtml . "MSwitch 'cmd1':</td>
 			<td><textarea class=\"devdetails\" cols='50' rows='3' id='cmdonopt"
-                  . $_ . "1' name='cmdonopt" . $_ . "'
+                  . $_ . "1' name='cmdonopt" . $nopoint . "'
 			>" . $savedetails{ $aktdevice . '_onarg' } . "</textarea>
 			</td>
 			</tr></table>
@@ -4036,10 +4045,10 @@ sub MSwitch_fhemwebFn($$$$) {
 			<td nowrap><input type='$hidden' id='"
                   . $_
                   . "_on' name='cmdon"
-                  . $_
+                  . $nopoint
                   . "' size='20'  value ='cmd'></td>
 			<td  class='col2' style=\"width: 100%\">&nbsp;<br><input type='$hidden' id='cmdseton"
-                  . $_ . "' name='cmdseton" . $_ . "' size='20'  value ='cmd'>";
+                  . $_ . "' name='cmdseton" . $nopoint . "' size='20'  value ='cmd'>";
             }
 
             $detailhtml = $detailhtml . "</td><td></td></tr>";
@@ -4062,7 +4071,7 @@ sub MSwitch_fhemwebFn($$$$) {
 				Set <select class=\"devdetails2\" id='"
                   . $_
                   . "_off' name='cmdoff"
-                  . $_
+                  . $nopoint
                   . "' onchange=\"javascript: activate(document.getElementById('"
                   . $_
                   . "_off').value,'"
@@ -4087,13 +4096,13 @@ sub MSwitch_fhemwebFn($$$$) {
 				<input type='$hidden' id='cmdsetoff"
                   . $_
                   . "' name='cmdsetoff"
-                  . $_
+                  . $nopoint
                   . "' size='20'  value ='"
                   . $cmdsatz{$devicenamet} . "'>
 				<input type='$hidden'   id='cmdoffopt"
                   . $_
                   . "1' name='cmdoffopt"
-                  . $_
+                  . $nopoint
                   . "' size='20' value ='"
                   . $savedetails{ $aktdevice . '_offarg' }
                   . "'>&nbsp;&nbsp;&nbsp;";
@@ -4150,7 +4159,7 @@ sub MSwitch_fhemwebFn($$$$) {
               . "'cmd1' condition: <input class=\"devdetails\" type='text' id='conditionon"
               . $_
               . "' name='conditionon"
-              . $_
+              . $nopoint
               . "' size='55' value ='"
               . $savedetails{ $aktdevice . '_conditionon' }
               . "' onClick=\"javascript:bigwindow(this.id);\">&nbsp;&nbsp;&nbsp;";
@@ -4168,14 +4177,14 @@ sub MSwitch_fhemwebFn($$$$) {
                 $detailhtml =
                     $detailhtml
                   . "<input type=\"checkbox\" $exit1 name='exit1"
-                  . $_
+                  . $nopoint
                   . "' /> execute and exit if applies";
             }
             else {
                 $detailhtml =
                     $detailhtml
                   . "<input hidden type=\"checkbox\" $exit1 name='exit1"
-                  . $_ . "' /> ";
+                  . $nopoint . "' /> ";
             }
 
             if ( AttrVal( $Name, 'MSwitch_Debug', "0" ) eq '1' ) {
@@ -4209,7 +4218,7 @@ sub MSwitch_fhemwebFn($$$$) {
               . "'cmd2' condition: <input class=\"devdetails\" type='text' id='conditionoff"
               . $_
               . "' name='conditionoff"
-              . $_
+              . $nopoint
               . "' size='55' value ='"
               . $savedetails{ $aktdevice . '_conditionoff' }
               . "' onClick=\"javascript:bigwindow(this.id);\">&nbsp;&nbsp;&nbsp;";
@@ -4225,14 +4234,14 @@ sub MSwitch_fhemwebFn($$$$) {
                 $detailhtml =
                     $detailhtml
                   . "<input type=\"checkbox\" $exit2 name='exit2"
-                  . $_
+                  . $nopoint
                   . "' /> execute and exit if applies";
             }
             else {
                 $detailhtml =
                     $detailhtml
                   . "<input hidden type=\"checkbox\" $exit2 name='exit1"
-                  . $_ . "' /> ";
+                  . $nopoint . "' /> ";
             }
 
             if ( AttrVal( $Name, 'MSwitch_Debug', "0" ) eq '1' ) {
@@ -4314,7 +4323,7 @@ sub MSwitch_fhemwebFn($$$$) {
             $detailhtml =
                 $detailhtml
               . "'cmd1'&nbsp;<select id = '' name='onatdelay"
-              . $_ . "'>";
+              . $nopoint . "'>";
             my $se11    = '';
             my $sel2    = '';
             my $sel3    = '';
@@ -4354,7 +4363,7 @@ sub MSwitch_fhemwebFn($$$$) {
               . "</select><input type='text' class=\"devdetails\" id='timeseton"
               . $_
               . "' name='timeseton"
-              . $_
+              . $nopoint
               . "' size='30' value ='"
               . $timestron
               . "'> (hh:mm:ss)</td></tr>";
@@ -4370,7 +4379,7 @@ sub MSwitch_fhemwebFn($$$$) {
             $detailhtml =
                 $detailhtml
               . "'cmd2'&nbsp;<select id = '' name='offatdelay"
-              . $_ . "'>";
+              . $nopoint . "'>";
 
             $se11    = '';
             $sel2    = '';
@@ -4412,9 +4421,9 @@ sub MSwitch_fhemwebFn($$$$) {
             $detailhtml =
                 $detailhtml
               . "</select><input type='text' class=\"devdetails\" id='timesetoff"
-              . $_
+              . $nopoint
               . "' name='timesetoff"
-              . $_
+              . $nopoint
               . "' size='30' value ='"
               . $timestroff
               . "'> (hh:mm:ss)&nbsp;&nbsp;&nbsp;";
@@ -4430,13 +4439,13 @@ sub MSwitch_fhemwebFn($$$$) {
 
             $detailhtml = $detailhtml . "Repeats: 
 			<input type='text' id='repeatcount' name='repeatcount"
-              . $_
+              . $nopoint
               . "' size='10' value ='"
               . $savedetails{ $aktdevice . '_repeatcount' } . "'>
 			&nbsp;&nbsp;&nbsp;
 			Repeatdelay in sec:
 			<input type='text' id='repeattime' name='repeattime"
-              . $_
+              . $nopoint
               . "' size='10' value ='"
               . $savedetails{ $aktdevice . '_repeattime' } . "'>
 			</td></tr>";
@@ -4466,47 +4475,47 @@ sub MSwitch_fhemwebFn($$$$) {
             # javazeile für übergabe erzeugen
             $javaform = $javaform . "
 			 
-			devices += \$(\"[name=devicename$_]\").val();
+			devices += \$(\"[name=devicename$nopoint]\").val();
 			devices += '#[DN]'; 
 			 
 			 
-			devices += \$(\"[name=cmdon$_]\").val()+'#[NF]';
-			devices += \$(\"[name=cmdoff$_]\").val()+'#[NF]';
-			change = \$(\"[name=cmdonopt$_]\").val();
+			devices += \$(\"[name=cmdon$nopoint]\").val()+'#[NF]';
+			devices += \$(\"[name=cmdoff$nopoint]\").val()+'#[NF]';
+			change = \$(\"[name=cmdonopt$nopoint]\").val();
 			devices += change+'#[NF]';;
-			change = \$(\"[name=cmdoffopt$_]\").val();
+			change = \$(\"[name=cmdoffopt$nopoint]\").val();
 			devices += change+'#[NF]';;
-			devices += \$(\"[name=onatdelay$_]\").val();
+			devices += \$(\"[name=onatdelay$nopoint]\").val();
 			devices += '#[NF]';
-			devices += \$(\"[name=offatdelay$_]\").val();
+			devices += \$(\"[name=offatdelay$nopoint]\").val();
 			devices += '#[NF]';
-			delay1 = \$(\"[name=timesetoff$_]\").val();
+			delay1 = \$(\"[name=timesetoff$nopoint]\").val();
 			devices += delay1+'#[NF]';
-			delay2 = \$(\"[name=timeseton$_]\").val();
+			delay2 = \$(\"[name=timeseton$nopoint]\").val();
 			devices += delay2+'#[NF]';
-			devices1 = \$(\"[name=conditionon$_]\").val();
+			devices1 = \$(\"[name=conditionon$nopoint]\").val();
 			devices1 = devices1.replace(/\\|/g,'(DAYS)');
-			devices2 = \$(\"[name=conditionoff$_]\").val();
+			devices2 = \$(\"[name=conditionoff$nopoint]\").val();
 			devices2 = devices2.replace(/\\|/g,'(DAYS)');
 			devices += devices1+'#[NF]';
 			devices += devices2;
 			devices += '#[NF]';
-			devices3 = \$(\"[name=repeatcount$_]\").val();
+			devices3 = \$(\"[name=repeatcount$nopoint]\").val();
 			devices += devices3;
 			devices += '#[NF]';
-			devices += \$(\"[name=repeattime$_]\").val();
+			devices += \$(\"[name=repeattime$nopoint]\").val();
 			devices += '#[NF]';
-			devices += \$(\"[name=reihe$_]\").val();
+			devices += \$(\"[name=reihe$nopoint]\").val();
 			devices += '#[NF]';
-			devices += \$(\"[name=idreihe$_]\").val();
+			devices += \$(\"[name=idreihe$nopoint]\").val();
 			devices += '#[NF]';
-			devices += \$(\"[name=cmdcomment$_]\").val();
+			devices += \$(\"[name=cmdcomment$nopoint]\").val();
 			devices += '#[NF]';
-			devices += \$(\"[name=exit1$_]\").prop(\"checked\") ? \"1\":\"0\";
+			devices += \$(\"[name=exit1$nopoint]\").prop(\"checked\") ? \"1\":\"0\";
 			devices += '#[NF]';
-			devices += \$(\"[name=exit2$_]\").prop(\"checked\") ? \"1\":\"0\";
+			devices += \$(\"[name=exit2$nopoint]\").prop(\"checked\") ? \"1\":\"0\";
 			devices += '#[NF]';
-			devices += \$(\"[name=showreihe$_]\").val();
+			devices += \$(\"[name=showreihe$nopoint]\").val();
 			devices += '#[DN]';
 			";
         }
