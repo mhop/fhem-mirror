@@ -3893,7 +3893,7 @@ sub MSwitch_fhemwebFn($$$$) {
                 # showfolgehtml
 
                 $aktfolge = $showfolgehtml;
-                $newname  = "showreihe" . $_;
+                $newname  = "showreihe" . $nopoint;
                 $tochange =
 "<option value='$savedetails{ $aktdevice . '_showreihe' }'>$savedetails{ $aktdevice . '_showreihe' }</option>";
                 $change =
