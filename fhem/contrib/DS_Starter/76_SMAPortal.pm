@@ -49,7 +49,7 @@ use JSON qw(decode_json);
 
 # Versions History intern
 our %SMAPortal_vNotesIntern = ( 
-  "1.2.0"  => "09.03.2019  integrate weather data ",
+  "1.2.0"  => "09.03.2019  integrate weather data, minor fixes ",
   "1.1.0"  => "09.03.2019  make get data more stable, new attribute \"getDataRetries\" ",
   "1.0.0"  => "03.03.2019  initial "
 );
@@ -529,7 +529,8 @@ sub SMAPortal_ParseData($) {
   
   readingsBeginUpdate($hash);
   
-  my ($FeedIn_done,$GridConsumption_done,$PV_done) = (0,0,0);
+  my ($FeedIn_done,$GridConsumption_done,$PV_done,$AutarkyQuote_done,$SelfConsumption_done) = (0,0,0,0,0);
+  my ($SelfConsumptionQuote_done,$SelfSupply_done) = (0,0);
   for my $k (keys %$livedata_content) {
       my $new_val = ""; 
       if (defined $livedata_content->{$k}) {
@@ -556,6 +557,10 @@ sub SMAPortal_ParseData($) {
               $FeedIn_done          = 1 if($k =~ /^FeedIn$/);
               $GridConsumption_done = 1 if($k =~ /^GridConsumption$/);
               $PV_done              = 1 if($k =~ /^PV$/);
+              $AutarkyQuote_done    = 1 if($k =~ /^AutarkyQuote$/);
+              $SelfConsumption_done = 1 if($k =~ /^SelfConsumption$/);
+              $SelfConsumptionQuote_done = 1 if($k =~ /^SelfConsumptionQuote$/);
+              $SelfSupply_done = 1 if($k =~ /^SelfSupply$/);
           }
       }
   }
@@ -563,6 +568,10 @@ sub SMAPortal_ParseData($) {
   readingsBulkUpdate($hash, "L1_FeedIn", 0) if(!$FeedIn_done);
   readingsBulkUpdate($hash, "L1_GridConsumption", 0) if(!$GridConsumption_done);
   readingsBulkUpdate($hash, "L1_PV", 0) if(!$PV_done);
+  readingsBulkUpdate($hash, "L1_AutarkyQuote", 0) if(!$AutarkyQuote_done);
+  readingsBulkUpdate($hash, "L1_SelfConsumption", 0) if(!$SelfConsumption_done);
+  readingsBulkUpdate($hash, "L1_SelfConsumptionQuote", 0) if(!$SelfConsumptionQuote_done);
+  readingsBulkUpdate($hash, "L1_SelfSupply", 0) if(!$SelfSupply_done);
   
   readingsEndUpdate($hash, 1);
   
