@@ -1244,7 +1244,7 @@ sub HMinfo_GetFn($@) {#########################################################
            ."\n    status request       : ".join(" ",@{$modules{CUL_HM}{helper}{qReqStat}}) 
            ."\n    autoReadReg wakeup   : ".join(" ",@{$modules{CUL_HM}{helper}{qReqConfWu}})
            ."\n    status request wakeup: ".join(" ",@{$modules{CUL_HM}{helper}{qReqStatWu}})
-           ."\n    autoReadTest         : ".join(" ",@{$modules{CUL_HM}{helper}{confCheckArr}})
+           ."\n    autoReadTest         : ".join(" ",map{CUL_HM_id2Name($_)} keys%{$modules{CUL_HM}{helper}{confCheckH}})
            ."\n"
            ;
     @IOlist = HMinfo_noDup(@IOlist);
@@ -2935,7 +2935,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
       <li>Action Detector status</li>
       <li>CUL_HM related IO devices and condition</li>
       <li>Device protocol events which are related to communication errors</li>
-      <li>count of certain readings (e.g. batterie) and conditions - <a href="#HMinfoattr">attribut controlled</a></li>
+      <li>count of certain readings (e.g. battery) and conditions - <a href="#HMinfoattr">attribut controlled</a></li>
       <li>count of error condition in readings (e.g. overheat, motorErr) - <a href="#HMinfoattr">attribut controlled</a></li>
   </ul>
   <br>
@@ -3247,7 +3247,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
          attr hm sumStatus battery,sabotageError<br>
        </code></ul>
        will cause a reading like<br>
-       W_sum_batterie ok:5 low:3<br>
+       W_sum_battery ok:5 low:3<br>
        W_sum_sabotageError on:1<br>
        <br>
        Note: counter with '0' value will not be reported. HMinfo will find all present values autonomously<br>
@@ -3265,7 +3265,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
        </code></ul>
        will cause a reading like<br>
        <ul><code>
-         ERR_batterie low:3<br>
+         ERR_battery low:3<br>
          ERR_sabotageError on:1<br>
          ERR_overheat on:3<br>
          ERR_Activity dead:5<br>
@@ -3700,7 +3700,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
            attr hm sumStatus battery,sabotageError<br>
         </code></ul>
         k&ouml;nnte nachfolgende Ausgaben erzeugen<br>
-        W_sum_batterie ok:5 low:3<br>
+        W_sum_battery ok:5 low:3<br>
         W_sum_sabotageError on:1<br>
         <br>
         Anmerkung: Z&auml;hler mit Werten von '0' werden nicht angezeigt. HMinfo findet alle vorhanden Werte selbstst&auml;ndig.<br>
@@ -3717,7 +3717,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
         </code></ul>
         erzeugt folgende Ausgabe:<br>
         <ul><code>
-        ERR_batterie low:3<br>
+        ERR_battery low:3<br>
         ERR_sabotageError on:1<br>
         ERR_overheat on:3<br>
         ERR_Activity dead:5<br>
