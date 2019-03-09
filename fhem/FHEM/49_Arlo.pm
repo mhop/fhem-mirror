@@ -195,10 +195,6 @@ sub Arlo_Set($) {
     } else {
       return "Unknown argument $opt, choose one of on:noArg off:noArg";
     }
-  } elsif ($subtype eq 'BRIDGE') {
-    if (!Arlo_SetBasestationCmd($hash, $opt, $value)) {
-      return "Unknown argument $opt, choose one of arm:noArg disarm:noArg mode";
-    }
   } elsif ($subtype eq 'ARLOQ') {
     if (!Arlo_SetBasestationCmd($hash, $opt, $value)) {
       if (!Arlo_SetCameraCmd($hash, $opt, $value)) {
@@ -1268,25 +1264,25 @@ sub Arlo_decrypt($) {
 		   The data of all base stations and cameras are retrieved from the Arlo cloud. This is done every hour automatically, if you don't set the 
 		   attribute disable=1 at the Cloud device. The interval can be changed by setting the attribute updateInterval (in seconds, e.g. 600 for 10 minutes, 7200 for 2 hours).
         </li>	
-		<li>arm (subtype BASESTATION)<br>
+		<li>arm (subtype BASESTATION, BRIDGE, ARLOQ and BABYCAM)<br>
 		    Activates the motion detection.
 		</li>	
-		<li>disarm (subtype BASESTATION)<br>
+		<li>disarm (subtype BASESTATION, BRIDGE, ARLOQ and BABYCAM)<br>
 		    Deactivates the motion detection.
 		</li>	
-		<li>mode (subtype BASESTATION)<br>
+		<li>mode (subtype BASESTATION and BRIDGE)<br>
 		    Set a custom mode (parameter: name of the mode).
 		</li>	
 		<li>siren (subtype BASESTATION)<br>
 		    Activates or deactivates the siren of the base station (attention: the siren is loud!).
 		</li>	
-		<li>subscribe (subtype BASESTATION)<br>
+		<li>subscribe (subtype BASESTATION, ARLOQ and BABYCAM)<br>
 		    Subscribe base station for the SSE connection. Normally you don't have to do this manually, this is done automatically after login.
 		</li>
-		<li>unsubscribe (subtype BASESTATION)<br>
+		<li>unsubscribe (subtype BASESTATION, ARLOQ and BABYCAM)<br>
 		    Unsubscribe base station for the current SSE connection.			
 		</li>
-		<li>brightness (subtype CAMERA)<br>
+		<li>brightness (subtype CAMERA, ARLOQ and BABYCAM)<br>
 			Adjust brightness of the camera (possible values: -2 to +2).
 		</li>	
 		<li>on (Subtype CAMERA)<br>
@@ -1295,14 +1291,23 @@ sub Arlo_decrypt($) {
 		<li>off (subtype CAMERA)<br>
 		    Switch off camera (activate privacy mode).
 		</li>		
-		<li>snapshot (subtype CAMERA)<br>
+		<li>snapshot (subtype CAMERA, ARLOQ and BABYCAM)<br>
 		    Take a snapshot. The snapshot url is written to the reading snapshotUrl. This command only works if the camera has the state on.
 		</li>	
-		<li>startRecording (subtype CAMERA)<br>
+		<li>startRecording (subtype CAMERA, ARLOQ and BABYCAM)<br>
 		    Start recording. This command only works if the camera has the state on.
 		</li>	
-		<li>stopRecording (subtype CAMERA)<br>
+		<li>stopRecording (subtype CAMERA, ARLOQ and BABYCAM)<br>
 		    Stops an active recording. The recording url is stored in the reading lastVideoUrl, a frame of the recording in lastVideoImageUrl and a thumbnail of the recording in lastVideoThumbnailUrl.
+		</li>	
+		<li>nightlight (Subtype BABYCAM)<br>
+			Switch nightlight on or off.
+		</li>	
+		<li>nightlight-brightness (Subtype BABYCAM)<br>
+			Set brightness of nightlight.
+		</li>	
+		<li>nightlight-color (Subtype BABYCAM)<br>
+			Set color of nightlight.
 		</li>	
   </ul>
   
@@ -1398,51 +1403,60 @@ sub Arlo_decrypt($) {
 		</li>
 		<li>reconnect (Subtype ACCOUNT)<br>
 			Neuaufbau der Verbindung zum Arlo-Server. Zunächst loggt sich FHEM neu bei Arlo ein, danach wird die SSE-Verbindung aufgebaut. Wird nur benötigt, 
-      falls unerwartete Verbindungsabbrüche auftreten.
+			falls unerwartete Verbindungsabbrüche auftreten.
 		</li>
 		<li>readModes (Subtype ACCOUNT)<br>
 			Liest die Modes der Basisstationen (inkl. Custom Modes). Wird automatisch aufgerufen, daher normalerweise kein manueller Aufruf notwendig.
 		</li>
 		<li>updateReadings (Subtype ACCOUNT)<br>
-      Aktuelle Daten aller Basisstationen und Kameras aus der Cloud abrufen. Dies passiert einmal stündlich automatisch, falls dies nicht 
-      durch Setzen des Attributes disabled=1 am Cloud-Device unterbunden wird. Den Abruf-Intervall kann man durch Setzen des Attributs updateInterval 
-      anpassen (Angabe von Sekunden, also z.B. 600 für Abruf alle 10 Minuten oder 7200 für Abruf alle 2 Stunden).		
-    </li>	
-		<li>arm (Subtype BASESTATION)<br>
+			Aktuelle Daten aller Basisstationen und Kameras aus der Cloud abrufen. Dies passiert einmal stündlich automatisch, falls dies nicht 
+			durch Setzen des Attributes disabled=1 am Cloud-Device unterbunden wird. Den Abruf-Intervall kann man durch Setzen des Attributs updateInterval 
+			anpassen (Angabe von Sekunden, also z.B. 600 für Abruf alle 10 Minuten oder 7200 für Abruf alle 2 Stunden).		
+		</li>	
+		<li>arm (Subtypes BASESTATION, BRIDGE, ARLOQ und BABYCAM)<br>
 			Aktivieren der Bewegungserkennung.
 		</li>	
-		<li>disarm (Subtype BASESTATION)<br>
+		<li>disarm (Subtype BASESTATION, BRIDGE, ARLOQ und BABYCAM)<br>
 			Deaktivieren der Bewegungserkennung.
 		</li>	
-		<li>mode (Subtype BASESTATION)<br>
+		<li>mode (Subtype BASESTATION und BRIDGE)<br>
 			Setzen eines benutzerdefinierten Modus (Parameter: Name des Modus).
 		</li>	
 		<li>siren (Subtype BASESTATION)<br>
 			Schaltet die Siren der Basisstation an oder aus (Achtung: laut!!).
 		</li>	
-		<li>subscribe (Subtype BASESTATION)<br>
+		<li>subscribe (Subtype BASESTATION, ARLOQ und BABYCAM)<br>
 			Basisstation für die SSE-Schnittstelle registrieren. Muss normalerweise nie manuell aufgerufen werden, da dies beim Login automatisch passiert.
 		</li>
-		<li>unsubscribe (Subtype BASESTATION)<br>
+		<li>unsubscribe (Subtype BASESTATION, ARLOQ und BABYCAM)<br>
 			Registrierung einer Basisstation für die SSE-Schnittstelle rückgängig machen.
 		</li>
-		<li>brightness (Subtype CAMERA)<br>
+		<li>brightness (Subtype CAMERA, ARLOQ und BABYCAM)<br>
 			Helligkeit der Kamera anpassen (mögliche Werte: -2 bis +2).
 		</li>	
-		<li>on (Subtype CAMERA)<br>
-			Kamera einschalten.
+		<li>on (Subtype CAMERA und LIGHT)<br>
+			Kamera/Licht einschalten.
 		</li>	
-		<li>off (Subtype CAMERA)<br>
-			Kamera ausschalten.
+		<li>off (Subtype CAMERA und LIGHT)<br>
+			Kamera/Licht ausschalten.
 		</li>		
-		<li>snapshot (Subtype CAMERA)<br>
+		<li>snapshot (Subtype CAMERA, ARLOQ und BABYCAM)<br>
 			Ein Standbild aufnehmen. Dieses kann danach über die URL aus dem Reading snapshotUrl aufgerufen werden. Damit der Befehl funktioniert, muss die Kamera den Status on haben.
 		</li>	
-		<li>startRecording (Subtype CAMERA)<br>
+		<li>startRecording (Subtype CAMERA, ARLOQ und BABYCAM)<br>
 			 Aufnahme starten. Damit der Befehl funktioniert, muss die Kamera den Status on haben.
 		</li>	
-		<li>stopRecording (Subtype CAMERA)<br>
+		<li>stopRecording (Subtype CAMERA, ARLOQ und BABYCAM)<br>
 			 Aufnahme stoppen. Die Aufnahme kann danach über lastVideoUrl abgerufen werden, das Standbild dazu unter lastVideoImageUrl und lastVideoThumbnailUrl (klein).
+		</li>	
+		<li>nightlight (Subtype BABYCAM)<br>
+			Nachtlicht ein-/ausschalten (on/off).
+		</li>	
+		<li>nightlight-brightness (Subtype BABYCAM)<br>
+			Helligkeit des Nachtlichts anpassen.
+		</li>	
+		<li>nightlight-color (Subtype BABYCAM)<br>
+			Farbe des Nachtlichts anpassen.
 		</li>	
   </ul>
   

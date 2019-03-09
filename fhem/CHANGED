@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - new:     49_Arlo: module for Arlo security cams
  - feature: 93_DbRep: V8.15.0, readingsRename can be restricted to readings of
                       a optional given device, fix deldoublets in SQLite
  - bugfix:  49_SSCam: V8.11.3, fhem hang in loop while restart or get snapinfo
