@@ -48,7 +48,8 @@ use HTTP::Cookies;
 use JSON qw(decode_json);
 
 # Versions History intern
-our %SMAPortal_vNotesIntern = (
+our %SMAPortal_vNotesIntern = ( 
+  "1.1.0"  => "09.03.2019  make get data more stable, new attribute \"getDataRetries\" ",
   "1.0.0"  => "03.03.2019  initial "
 );
 
@@ -64,14 +65,15 @@ sub SMAPortal_Initialize($) {
   $hash->{AttrFn}    = "SMAPortal_Attr";
   $hash->{SetFn}     = "SMAPortal_Set";
   $hash->{GetFn}     = "SMAPortal_Get";
-  $hash->{AttrList}  = "interval ".
-                       "showPassInLog:1,0 ".
+  $hash->{AttrList}  = "cookieLocation ".
+                       "cookielifetime ".
                        "detailLevel:1,2,3,4 ".
+                       "disable:0,1 ".
+                       "getDataRetries:1,2,3,4,5,6,7,8,9,10 ".
+                       "interval ".
+                       "showPassInLog:1,0 ".
                        "timeout ". 
                        "userAgent ".
-                       "cookieLocation ".
-                       "cookielifetime ".
-                       "disable:0,1 ".
                        $readingFnAttributes;
  }
 
@@ -351,7 +353,7 @@ sub SMAPortal_CallInfo($) {
   if($init_done == 1) {
       if(!$hash->{CREDENTIALS}) {
           Log3($name, 1, "$name - Credentials not set. Set it with \"set $name credentials <username> <password>\""); 
-          readingsSingleUpdate($hash, "state", "Credntials not set", 1);    
+          readingsSingleUpdate($hash, "state", "Credentials not set", 1);    
           return;          
       }
       
@@ -369,7 +371,8 @@ sub SMAPortal_CallInfo($) {
           BlockingKill($hash->{HELPER}{RUNNING_PID});
           delete($hash->{HELPER}{RUNNING_PID});
       } 
-          
+      
+	  $hash->{HELPER}{RETRIES} = AttrVal($name, "getDataRetries", 3);
       $hash->{HELPER}{RUNNING_PID} = BlockingCall("SMAPortal_GetData", $name, "SMAPortal_ParseData", $timeout, "SMAPortal_ParseAborted", $hash);
       $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057
   
@@ -388,7 +391,7 @@ sub SMAPortal_GetData($) {
   my $hash   = $defs{$name};
   my ($livedata_content);
   my $login_state = 0;
-  my $forecast_content = "";
+  my ($forecast_content,$weatherdata_content) = ("","");
   my $useragent      = AttrVal($name, "userAgent", "Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.2; Trident/6.0)");
   my $cookieLocation = AttrVal($name, "cookieLocation", "./log/mycookies.txt"); 
    
@@ -417,6 +420,12 @@ sub SMAPortal_GetData($) {
       $login_state = 1;
       Log3 $name, 4, "$name - Getting live data now";
       Log3 $name, 5, "$name - Data received:\n".Dumper decode_json($livedata_content);
+      
+      # JSON Wetterdaten
+      Log3 $name, 4, "$name - Getting weather data now";
+      my $weatherdata = $ua->get('https://www.sunnyportal.com/Dashboard/Weather');
+      $weatherdata_content = $weatherdata->content;
+      Log3 $name, 5, "$name - Data received:\n".Dumper decode_json($weatherdata_content);
       
       # JSON Forecast Daten
       my $dl = AttrVal($name, "detailLevel", 1);
@@ -457,7 +466,7 @@ sub SMAPortal_GetData($) {
               Log3 $name, 1, "$name - Error: login to SMA-Portal failed";
               $livedata_content = "{\"Login-Status\":\"failed\"}";
           } else {
-              Log3 $name, 3, "$name - login to SMA-Portal successful, get data with next data cycle ...";
+              Log3 $name, 3, "$name - login to SMA-Portal successful ... ";
               $livedata_content = '{"Login-Status":"successful", "InfoMessages":["login to SMA-Portal successful but get data with next data cycle."]}';
               $login_state = 1;
           }
@@ -467,11 +476,13 @@ sub SMAPortal_GetData($) {
       }
   }
   
+  my ($reread,$retry) = SMAPortal_analivedat($hash,$livedata_content);
+  
   # Daten müssen als Einzeiler zurückgegeben werden
   $livedata_content = encode_base64($livedata_content,"");
   $forecast_content = encode_base64($forecast_content,"") if($forecast_content);
 
-return "$name|$livedata_content|$forecast_content|$login_state";
+return "$name|$livedata_content|$forecast_content|$login_state|$reread|$retry";
 }
 
 ################################################################
@@ -485,8 +496,28 @@ sub SMAPortal_ParseData($) {
   my $ld_response      = decode_base64($a[1]);
   my $fd_response      = decode_base64($a[2]) if($a[2]);
   my $login_state      = $a[3];
+  my $reread           = $a[4];
+  my $retry            = $a[5];
   my $livedata_content = decode_json($ld_response);
   my $forecast_content = decode_json($fd_response) if($fd_response);
+  
+  my $timeout = AttrVal($name, "timeout", 30);
+  if($reread) {
+      # login war erfolgreich, aber Daten müssen jetzt noch gelesen werden
+	  delete($hash->{HELPER}{RUNNING_PID});
+      readingsSingleUpdate($hash, "L1_Login-Status", "successful", 1);
+      $hash->{HELPER}{oldlogintime} = gettimeofday();
+	  $hash->{HELPER}{RUNNING_PID} = BlockingCall("SMAPortal_GetData", $name, "SMAPortal_ParseData", $timeout, "SMAPortal_ParseAborted", $hash);
+      $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057
+      return;
+  }
+  if($retry && $hash->{HELPER}{RETRIES}) {
+      # Livedaten konnte nicht gelesen werden, neuer Versuch zeitverzögert
+	  delete($hash->{HELPER}{RUNNING_PID});
+	  $hash->{HELPER}{RETRIES} -= 1;
+      InternalTimer(gettimeofday()+5, "SMAPortal_retrygetdata", $hash, 0);
+      return;
+  }  
   
   my $dl = AttrVal($name, "detailLevel", 1);
   SMAPortal_delread($hash, $dl+1);
@@ -521,7 +552,7 @@ sub SMAPortal_ParseData($) {
           }
         
           if ($new_val && $k !~ /__type/i) {
-              Log3 $hash->{NAME}, 4, "$name -> $k - $new_val";
+              Log3 $name, 4, "$name -> $k - $new_val";
               readingsBulkUpdate($hash, "L1_$k", $new_val);
           }
       }
@@ -546,7 +577,6 @@ sub SMAPortal_ParseData($) {
   } 
   readingsEndUpdate($hash, 1);
   
-  $hash->{HELPER}{oldlogintime} = gettimeofday() if (defined($livedata_content->{"Login-Status"}) && $livedata_content->{"Login-Status"} =~ m/successful/i);
   delete($hash->{HELPER}{RUNNING_PID});
 }
 
@@ -781,6 +811,67 @@ sub SMAPortal_delread($;$) {
 return;
 }
 
+################################################################
+#                 analysiere Livedaten
+################################################################
+sub SMAPortal_analivedat($$) {
+  my ($hash,$lc) = @_;
+  my $name       = $hash->{NAME};
+  my ($reread,$retry) = (0,0);
+
+  my $livedata_content = decode_json($lc);
+  for my $k (keys %$livedata_content) {
+      my $new_val = "";
+      
+      if (defined $livedata_content->{$k}) {
+          if (($livedata_content->{$k} =~ m/ARRAY/i) || ($livedata_content->{$k} =~ m/HASH/i)) {
+              if($livedata_content->{$k} =~ m/ARRAY/i) {
+                  my $hd0 = Dumper($livedata_content->{$k}[0]);
+                  if(!$hd0) {
+                      next;
+                  }
+                  chomp $hd0;
+                  $hd0 =~ s/[;']//g;
+                  $hd0 = ($hd0 =~ /^undef$/)?"none":$hd0;
+                  Log3 $name, 4, "$name - livedata ARRAY content \"$k\": $hd0";
+                  $new_val = $hd0;
+              }
+		  } else {
+              $new_val = $livedata_content->{$k};
+          }
+
+          if ($new_val && $k !~ /__type/i) {
+			  if($k =~ /InfoMessages/ && $new_val =~ /.*login to SMA-Portal successful.*/) {
+			      # Login war erfolgreich, Daten neu lesen
+			      Log3 $name, 3, "$name - get data again";
+				  $reread = 1;
+			  }
+			  if($k =~ /ErrorMessages/ && $new_val =~ /.*The current data cannot be retrieved from the PV system. Check the cabling and configuration of the following energy meters.*/) {
+			      # Energiedaten konnten nicht ermittelt werden, Daten neu lesen mit Zeitverzögerung
+			      Log3 $name, 3, "$name - The current data cannot be retrieved from the PV system, get data again.";
+				  $retry = 1;
+			  }
+          }
+      }
+  }
+  
+return ($reread,$retry);
+}
+
+################################################################
+#                    Restart get Data
+################################################################
+sub SMAPortal_retrygetdata($) {
+  my ($hash)  = @_;
+  my $name    = $hash->{NAME};
+  my $timeout = AttrVal($name, "timeout", 30);
+
+  $hash->{HELPER}{RUNNING_PID} = BlockingCall("SMAPortal_GetData", $name, "SMAPortal_ParseData", $timeout, "SMAPortal_ParseAborted", $hash);
+  $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057
+	  
+return;
+}
+
 1;
 
 =pod
@@ -916,7 +1007,7 @@ return;
 	   <colgroup> <col width=5%> <col width=95%> </colgroup>
 		  <tr><td> <b>L1</b>  </td><td>- nur Live-Daten werden generiert. </td></tr>
 		  <tr><td> <b>L2</b>  </td><td>- Live-Daten und Prognose der nächsten 4 Stunden </td></tr>
-		  <tr><td> <b>L3</b>  </td><td>- wie L2 und zusätzlich Daten des Resttages und Folgetages </td></tr>
+		  <tr><td> <b>L3</b>  </td><td>- wie L2 und zusätzlich Prognosedaten des Resttages und Folgetages </td></tr>
           <tr><td> <b>L4</b>  </td><td>- wie L3 und zusätzlich die detaillierte Prognose der nächsten 24 Stunden </td></tr>
 	   </table>
 	   </ul>     
@@ -927,6 +1018,11 @@ return;
        <li><b>disable</b><br>
        Deaktiviert das Device. </li><br>
        
+       <a name="getDataRetries"></a>
+       <li><b>getDataRetries &lt;Anzahl&gt; </b><br>
+       Anzahl der Wiederholungen (get data) im Fall dass keine Live-Daten vom SMA-Portal geliefert 
+       wurden (default: 3). </li><br>
+
        <a name="interval"></a>
        <li><b>interval &lt;Sekunden&gt; </b><br>
        Zeitintervall zum kontinuierlichen Datenabruf aus dem SMA-Portal (Default: 300 Sekunden). <br>
