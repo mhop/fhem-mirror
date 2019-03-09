@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  14_SD_WS07.pm: fix bug autocreate define loop,
+            broken definitions will be repaired. You need so save your config!
+            removed rssi, slider for offsets and battery reading
  - new:     49_Arlo: module for Arlo security cams
  - feature: 93_DbRep: V8.15.0, readingsRename can be restricted to readings of
                       a optional given device, fix deldoublets in SQLite
