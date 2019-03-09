@@ -148,6 +148,7 @@ sub HMUARTLGW_Initialize($)
 	$hash->{AttrFn}    = "HMUARTLGW_Attr";
 	$hash->{RenameFn}  = "HMUARTLGW_Rename";
 	$hash->{ShutdownFn}= "HMUARTLGW_Shutdown";
+	$hash->{NotifyFn}  = "HMUARTLGW_Notify";
 
 	$hash->{AttrList}= "hmId " .
 	                   "lgwPw " .
@@ -161,7 +162,10 @@ sub HMUARTLGW_Initialize($)
 	                   $readingFnAttributes;
 }
 
+sub HMUARTLGW_InitConnection($);
 sub HMUARTLGW_Connect($$);
+sub HMUARTLGW_Reopen($;$);
+sub HMUARTLGW_Dummy($);
 sub HMUARTLGW_SendPendingCmd($);
 sub HMUARTLGW_SendCmd($$);
 sub HMUARTLGW_GetSetParameterReq($);
@@ -235,8 +239,24 @@ sub HMUARTLGW_DoInit($)
 sub HMUARTLGW_Connect($$)
 {
 	my ($hash, $err) = @_;
+	my $name = $hash->{NAME};
 
-	Log3($hash, 5, "HMUARTLGW $hash->{NAME}: ${err}") if ($err);
+	if (defined(AttrVal($name, "dummy", undef))) {
+		HMUARTLGW_Dummy($hash);
+		return;
+	}
+
+	if ($err) {
+		my $retry;
+		if(defined($hash->{NEXT_OPEN})) {
+			$retry = ", retrying in " . sprintf("%.2f", ($hash->{NEXT_OPEN} - time())) . "s";
+		}
+		Log3($hash, 3, "HMUARTLGW $hash->{NAME}: ${err}".(defined($retry)?$retry:""));
+		if (!defined($hash->{NEXT_OPEN})) {
+			Log3($hash, 0, "DevIO giving up on ${err}, retrying anyway");
+			HMUARTLGW_Reopen($hash);
+		}
+	}
 }
 
 sub HMUARTLGW_Define($$)
@@ -276,13 +296,50 @@ sub HMUARTLGW_Define($$)
 	my %ml = ( "1:CUL_HM" => "^A......................" );
 	$hash->{MatchList} = \%ml;
 
+	$hash->{NOTIFYDEV} = "global";
+
+	HMUARTLGW_InitConnection($hash) if ($init_done);
+
+	return;
+}
+
+sub HMUARTLGW_InitConnection($)
+{
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+
 	if (defined(AttrVal($name, "dummy", undef))) {
 		readingsSingleUpdate($hash, "state", "dummy", 1);
 		HMUARTLGW_updateCondition($hash);
 		return;
 	}
 
-	return DevIo_OpenDev($hash, 0, "HMUARTLGW_DoInit", \&HMUARTLGW_Connect);
+	if (!$init_done) {
+		#handle rereadcfg
+		InternalTimer(gettimeofday()+15, "HMUARTLGW_InitConnection", $hash, 0);
+		return;
+	}
+
+	DevIo_OpenDev($hash, 0, "HMUARTLGW_DoInit", \&HMUARTLGW_Connect);
+
+	return;
+}
+
+sub HMUARTLGW_Notify($$)
+{
+	my ($hash, $source) = @_;
+	my $name = $hash->{NAME};
+
+	#We are only interested in events from global concerning the general
+	#system state or this module in particular
+	return if($source->{NAME} ne "global");
+	#return if (!grep(m/^INITIALIZED|REREADCFG|(MODIFIED $name)|(DEFINED $name)$/, @{$source->{CHANGED}}));
+
+	if (grep(m/^INITIALIZED|REREADCFG$/, @{$source->{CHANGED}})) {
+		HMUARTLGW_InitConnection($hash);
+	}
+
+	return;
 }
 
 sub HMUARTLGW_Undefine($$;$)
@@ -301,8 +358,9 @@ sub HMUARTLGW_Undefine($$;$)
 	}
 
 	if (!$noclose) {
+		my $oldFD = $hash->{FD};
 		DevIo_CloseDev($hash);
-		Log3($hash, 3, "${name} device closed") if (!defined($hash->{FD}));
+		Log3($hash, 3, "${name} device closed") if (defined($oldFD) && $oldFD && (!defined($hash->{FD})));
 	}
 	$hash->{DevState} = HMUARTLGW_STATE_NONE;
 	$hash->{XmitOpen} = 0;
@@ -371,6 +429,21 @@ sub HMUARTLGW_Shutdown($)
 	DevIo_CloseDev($hash);
 
 	return undef;
+}
+
+sub HMUARTLGW_Dummy($)
+{
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+
+	#switch to bootloader to stop the module from interfering
+	HMUARTLGW_send($hash, HMUARTLGW_OS_CHANGE_APP, HMUARTLGW_DST_OS)
+		if ($hash->{DevState} > HMUARTLGW_STATE_ENTER_APP);
+	HMUARTLGW_Undefine($hash, $name);
+	readingsSingleUpdate($hash, "state", "dummy", 1);
+	HMUARTLGW_updateCondition($hash);
+	$hash->{XmitOpen} = 0;
+	return;
 }
 
 #HM-LGW communicates line-based during init
@@ -757,7 +830,7 @@ sub HMUARTLGW_UpdatePeer($$) {
 		HMUARTLGW_UpdatePeerReq($hash, $peer);
 	} else {
 		#enqueue for next update
-		push @{$hash->{Helper}{PeerQueue}}, $peer;
+		push @{$hash->{PeerQueue}}, $peer;
 	}
 }
 
@@ -765,9 +838,11 @@ sub HMUARTLGW_UpdateQueuedPeer($) {
 	my ($hash) = @_;
 
 	if ($hash->{DevState} == HMUARTLGW_STATE_RUNNING &&
-	    $hash->{Helper}{PeerQueue} &&
-	    @{$hash->{Helper}{PeerQueue}}) {
-		return HMUARTLGW_UpdatePeer($hash, shift(@{$hash->{Helper}{PeerQueue}}));
+	    $hash->{PeerQueue} &&
+	    @{$hash->{PeerQueue}}) {
+		HMUARTLGW_UpdatePeer($hash, shift(@{$hash->{PeerQueue}}));
+		delete ($hash->{PeerQueue}) if (!@{$hash->{PeerQueue}});
+		return;
 	}
 }
 
@@ -1018,7 +1093,7 @@ sub HMUARTLGW_GetSetParameters($;$$)
 				#enqueue for later
 				if ($p->{operation} eq "+") {
 					$hash->{Peers}{$peer} = "pending";
-					push @{$hash->{Helper}{PeerQueue}}, $p;
+					push @{$hash->{PeerQueue}}, $p;
 				} else {
 					delete($hash->{Peers}{$peer});
 				}
@@ -1431,7 +1506,7 @@ sub HMUARTLGW_Read($)
 		$unprocessed = $p;
 
 		(undef, my $frame, $p) = split(/\xfd/, $unprocessed, 3);
-		$p = chr(0xfd) . $p if ($p);
+		$p = chr(0xfd) . $p if (defined($p));
 
 		my $unescaped = '';
 		my $unescape_next = 0;
@@ -1817,7 +1892,7 @@ sub HMUARTLGW_Set($@)
 		readingsSingleUpdate($hash, "state", "closed", 1);
 		$hash->{XmitOpen} = 0;
 	} elsif ($cmd eq "open") {
-		DevIo_OpenDev($hash, 0, "HMUARTLGW_DoInit", \&HMUARTLGW_Connect);
+		HMUARTLGW_InitConnection($hash);
 	} elsif ($cmd eq "restart") {
 		HMUARTLGW_send($hash, HMUARTLGW_OS_CHANGE_APP, HMUARTLGW_DST_OS);
 	} elsif ($cmd eq "updateCoPro") {
@@ -1943,13 +2018,7 @@ sub HMUARTLGW_Attr(@)
 	} elsif ($aName eq "dummy") {
 		if ($cmd eq "set") {
 			if (!defined($attr{$name}{$aName})) {
-				#switch to bootloader to stop the module from interfering
-				HMUARTLGW_send($hash, HMUARTLGW_OS_CHANGE_APP, HMUARTLGW_DST_OS)
-					if ($hash->{DevState} > HMUARTLGW_STATE_ENTER_APP);
-				HMUARTLGW_Undefine($hash, $name);
-				readingsSingleUpdate($hash, "state", "dummy", 1);
-				HMUARTLGW_updateCondition($hash);
-				$hash->{XmitOpen} = 0;
+				HMUARTLGW_Dummy($hash);
 			}
 		} else {
 			if (defined($attr{$name}{$aName})) {
