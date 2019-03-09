@@ -49,6 +49,7 @@ use JSON qw(decode_json);
 
 # Versions History intern
 our %SMAPortal_vNotesIntern = ( 
+  "1.2.0"  => "09.03.2019  integrate weather data ",
   "1.1.0"  => "09.03.2019  make get data more stable, new attribute \"getDataRetries\" ",
   "1.0.0"  => "03.03.2019  initial "
 );
@@ -479,10 +480,11 @@ sub SMAPortal_GetData($) {
   my ($reread,$retry) = SMAPortal_analivedat($hash,$livedata_content);
   
   # Daten müssen als Einzeiler zurückgegeben werden
-  $livedata_content = encode_base64($livedata_content,"");
-  $forecast_content = encode_base64($forecast_content,"") if($forecast_content);
+  $livedata_content    = encode_base64($livedata_content,"");
+  $forecast_content    = encode_base64($forecast_content,"") if($forecast_content);
+  $weatherdata_content = encode_base64($weatherdata_content,"") if($weatherdata_content);
 
-return "$name|$livedata_content|$forecast_content|$login_state|$reread|$retry";
+return "$name|$livedata_content|$forecast_content|$weatherdata_content|$login_state|$reread|$retry";
 }
 
 ################################################################
@@ -491,15 +493,18 @@ return "$name|$livedata_content|$forecast_content|$login_state|$reread|$retry";
 sub SMAPortal_ParseData($) {
   my ($string) = @_;
   my @a = split("\\|",$string);
-  my $hash             = $defs{$a[0]};
-  my $name             = $hash->{NAME};
-  my $ld_response      = decode_base64($a[1]);
-  my $fd_response      = decode_base64($a[2]) if($a[2]);
-  my $login_state      = $a[3];
-  my $reread           = $a[4];
-  my $retry            = $a[5];
-  my $livedata_content = decode_json($ld_response);
-  my $forecast_content = decode_json($fd_response) if($fd_response);
+  my $hash        = $defs{$a[0]};
+  my $name        = $hash->{NAME};
+  my $ld_response = decode_base64($a[1]);
+  my $fd_response = decode_base64($a[2]) if($a[2]);
+  my $wd_response = decode_base64($a[3]) if($a[3]);
+  my $login_state = $a[4];
+  my $reread      = $a[5];
+  my $retry       = $a[6];
+  
+  my $livedata_content    = decode_json($ld_response);
+  my $forecast_content    = decode_json($fd_response) if($fd_response);
+  my $weatherdata_content = decode_json($wd_response) if($wd_response);
   
   my $timeout = AttrVal($name, "timeout", 30);
   if($reread) {
@@ -528,7 +533,7 @@ sub SMAPortal_ParseData($) {
   for my $k (keys %$livedata_content) {
       my $new_val = ""; 
       if (defined $livedata_content->{$k}) {
-          Log3 $name, 4, "$name - livedata content \"$k\": ".($livedata_content->{$k});
+          Log3 $name, 4, "$name - Livedata content \"$k\": ".($livedata_content->{$k});
           if (($livedata_content->{$k} =~ m/ARRAY/i) || ($livedata_content->{$k} =~ m/HASH/i)) {
               if($livedata_content->{$k} =~ m/ARRAY/i) {
                   my $hd0 = Dumper($livedata_content->{$k}[0]);
@@ -538,7 +543,7 @@ sub SMAPortal_ParseData($) {
                   chomp $hd0;
                   $hd0 =~ s/[;']//g;
                   $hd0 = ($hd0 =~ /^undef$/)?"none":$hd0;
-                  Log3 $name, 4, "$name - livedata ARRAY content \"$k\": $hd0";
+                  Log3 $name, 4, "$name - Livedata ARRAY content \"$k\": $hd0";
                   $new_val = $hd0;
               }
 		  } else {
@@ -564,6 +569,11 @@ sub SMAPortal_ParseData($) {
   if ($forecast_content && $forecast_content !~ m/undefined/i) {
       # Auswertung der Forecast Daten
       SMAPortal_extractForecastData($hash,$forecast_content);
+  }
+  
+  if ($weatherdata_content && $weatherdata_content !~ m/undefined/i) {
+      # Auswertung Wetterdaten
+      SMAPortal_extractWeatherData($hash,$weatherdata_content);
   }
   
   my $pv = ReadingsVal($name, "L1_PV", 0);
@@ -763,6 +773,51 @@ return;
 }
 
 ################################################################
+##         Auswertung Wetterdaten
+################################################################
+sub SMAPortal_extractWeatherData($$) {
+  my ($hash,$weather) = @_;
+  my $name = $hash->{NAME};
+  
+  my $dl = AttrVal($name, "detailLevel", 1);
+  
+  readingsBeginUpdate($hash);
+  
+  for my $k (keys %$weather) {
+      my $new_val = ""; 
+      if (defined $weather->{$k}) {
+          Log3 $name, 4, "$name - Weatherdata content \"$k\": ".($weather->{$k});
+          if ($weather->{$k} =~ m/HASH/i) {
+              my $ih = $weather->{$k};
+              for my $i (keys %$ih) {
+                  my $hd0 = Dumper($weather->{$k}{$i});
+                  if(!$hd0) {
+                      next;
+                  }
+                  chomp $hd0;
+                  $hd0 =~ s/[;']//g;
+                  $hd0 = ($hd0 =~ /^undef$/)?"none":$hd0;
+                  Log3 $name, 4, "$name - Weatherdata HASH content \"$k $i\": $hd0";
+                  next if($i =~ /^WeatherIcon$/);
+                  $new_val = $hd0;
+                  
+                  if ($new_val) {
+                      $new_val =~ s/.*}([A-Z]).*/°$1/ if($i =~ /^TemperatureSymbol$/);
+                      $new_val = sprintf("%.1f",$new_val) if($i =~ /^Temperature$/);
+                      Log3 $name, 4, "$name -> ${k}_${i} - $new_val";
+                      readingsBulkUpdate($hash, "L1_${k}_${i}", $new_val);
+                  }
+              }
+		  }
+      }
+  }
+  
+  readingsEndUpdate($hash, 1); 
+
+return;
+}
+
+################################################################
 # sortiert eine Liste von Versionsnummern x.x.x
 # Schwartzian Transform and the GRT transform
 # Übergabe: "asc | desc",<Liste von Versionsnummern>
@@ -849,7 +904,7 @@ sub SMAPortal_analivedat($$) {
 			  }
 			  if($k =~ /ErrorMessages/ && $new_val =~ /.*The current data cannot be retrieved from the PV system. Check the cabling and configuration of the following energy meters.*/) {
 			      # Energiedaten konnten nicht ermittelt werden, Daten neu lesen mit Zeitverzögerung
-			      Log3 $name, 3, "$name - The current data cannot be retrieved from the PV system, get data again.";
+			      Log3 $name, 3, "$name - The current data cannot be retrieved from PV system, get data again.";
 				  $retry = 1;
 			  }
           }
