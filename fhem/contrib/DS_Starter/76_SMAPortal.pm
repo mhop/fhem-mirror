@@ -523,16 +523,10 @@ sub SMAPortal_ParseData($) {
   SMAPortal_delread($hash, $dl+1);
   
   readingsBeginUpdate($hash);
-  readingsBulkUpdate($hash, "L1_FeedIn", 0);
-  readingsBulkUpdate($hash, "L1_GridConsumption", 0);
-  readingsBulkUpdate($hash, "L1_PV", 0);
-  readingsEndUpdate($hash, 0);  
   
-  readingsBeginUpdate($hash);
-  
+  my ($FeedIn_done,$GridConsumption_done,$PV_done) = (0,0,0);
   for my $k (keys %$livedata_content) {
-      my $new_val = "";
-      
+      my $new_val = ""; 
       if (defined $livedata_content->{$k}) {
           Log3 $name, 4, "$name - livedata content \"$k\": ".($livedata_content->{$k});
           if (($livedata_content->{$k} =~ m/ARRAY/i) || ($livedata_content->{$k} =~ m/HASH/i)) {
@@ -554,9 +548,16 @@ sub SMAPortal_ParseData($) {
           if ($new_val && $k !~ /__type/i) {
               Log3 $name, 4, "$name -> $k - $new_val";
               readingsBulkUpdate($hash, "L1_$k", $new_val);
+              $FeedIn_done          = 1 if($k =~ /^FeedIn$/);
+              $GridConsumption_done = 1 if($k =~ /^GridConsumption$/);
+              $PV_done              = 1 if($k =~ /^PV$/);
           }
       }
   }
+  
+  readingsBulkUpdate($hash, "L1_FeedIn", 0) if(!$FeedIn_done);
+  readingsBulkUpdate($hash, "L1_GridConsumption", 0) if(!$GridConsumption_done);
+  readingsBulkUpdate($hash, "L1_PV", 0) if(!$PV_done);
   
   readingsEndUpdate($hash, 1);
   
