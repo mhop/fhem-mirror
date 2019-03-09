@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 93_DbRep: V8.15.0, readingsRename can be restricted to readings of
+                      a optional given device, fix deldoublets in SQLite
  - bugfix:  49_SSCam: V8.11.3, fhem hang in loop while restart or get snapinfo
                       Forum: #45671.msg915546.html#msg915546
  - feature: mqtt2.template: A_00_MQTT2_CLIENT_general_bridge revised for better 
