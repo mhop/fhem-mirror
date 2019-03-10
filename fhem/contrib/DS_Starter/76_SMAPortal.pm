@@ -6,8 +6,7 @@
 #       (c) 2019 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
-#       This Module can be used to operate Cameras defined in Synology Surveillance Station 7.0 or higher.
-#       It's based on and uses Synology Surveillance Station API.
+#       This module can be used to get data from SMA Portal https://www.sunnyportal.com/Templates/Start.aspx .
 # 
 #       This script is part of fhem.
 #
@@ -48,7 +47,8 @@ use HTTP::Cookies;
 use JSON qw(decode_json);
 
 # Versions History intern
-our %SMAPortal_vNotesIntern = ( 
+our %SMAPortal_vNotesIntern = (
+  "1.2.1"  => "10.03.2019  behavior of state changed, commandref revised ", 
   "1.2.0"  => "09.03.2019  integrate weather data, minor fixes ",
   "1.1.0"  => "09.03.2019  make get data more stable, new attribute \"getDataRetries\" ",
   "1.0.0"  => "03.03.2019  initial "
@@ -506,6 +506,8 @@ sub SMAPortal_ParseData($) {
   my $forecast_content    = decode_json($fd_response) if($fd_response);
   my $weatherdata_content = decode_json($wd_response) if($wd_response);
   
+  my $state = "ok";
+  
   my $timeout = AttrVal($name, "timeout", 30);
   if($reread) {
       # login war erfolgreich, aber Daten müssen jetzt noch gelesen werden
@@ -588,12 +590,18 @@ sub SMAPortal_ParseData($) {
   my $pv = ReadingsVal($name, "L1_PV", 0);
   my $fi = ReadingsVal($name, "L1_FeedIn", 0);
   my $gc = ReadingsVal($name, "L1_GridConsumption", 0);
-  my $state = $fi-$gc;
+  my $sum = $fi-$gc;
+  
+  if(!$hash->{HELPER}{RETRIES} && !$pv && !$fi && !$gc) {
+      # keine Anlagendaten vorhanden
+      $state = "Data can't be retrieved from SMA-Portal. They will read again next scheduled cycle.";
+      Log3 $name, 2, "$name - $state";
+  }
   
   readingsBeginUpdate($hash);
   if($login_state) {
       readingsBulkUpdate($hash, "state", $state);
-      readingsBulkUpdate($hash, "summary", $state);
+      readingsBulkUpdate($hash, "summary", $sum);
   } 
   readingsEndUpdate($hash, 1);
   
@@ -968,6 +976,7 @@ return;
    <ul>
     <ul>
      <li>Live-Daten (Verbrauch und PV-Erzeugung) </li>
+     <li>Wetter-Daten von SMA für den Anlagenstandort </li>
      <li>Prognosedaten (Verbrauch und PV-Erzeugung) inklusive Verbraucherempfehlung </li>
     </ul> 
    </ul>
@@ -1070,8 +1079,8 @@ return;
 	   <ul>   
 	   <table>  
 	   <colgroup> <col width=5%> <col width=95%> </colgroup>
-		  <tr><td> <b>L1</b>  </td><td>- nur Live-Daten werden generiert. </td></tr>
-		  <tr><td> <b>L2</b>  </td><td>- Live-Daten und Prognose der nächsten 4 Stunden </td></tr>
+		  <tr><td> <b>L1</b>  </td><td>- nur Live-Daten und Wetter-Daten werden generiert. </td></tr>
+		  <tr><td> <b>L2</b>  </td><td>- wie L1 und zusätzlich Prognose der nächsten 4 Stunden </td></tr>
 		  <tr><td> <b>L3</b>  </td><td>- wie L2 und zusätzlich Prognosedaten des Resttages und Folgetages </td></tr>
           <tr><td> <b>L4</b>  </td><td>- wie L3 und zusätzlich die detaillierte Prognose der nächsten 24 Stunden </td></tr>
 	   </table>
