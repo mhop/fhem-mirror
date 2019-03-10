@@ -18,7 +18,7 @@ desc: <a href="https://forum.fhem.de/index.php/topic,94495.0.html">Forum Thread<
 #
 name:A_00_MQTT2_CLIENT_general_bridge
 filter:TYPE=MQTT2_DEVICE
-desc:recommended to use this as general bridgeing device when using MQTT2_CLIENT as IO to get around missing CID info for distinguishing different popular devices<br>NOTE: <br>NOTE:<br>- for use with MQTT2_CLIENT use a copy of the device and change its DEF to a different clientId like GeneralBridge, delete original's readingList after applying the template!
+desc:recommended to use this as general bridgeing device when using MQTT2_CLIENT as IO to get around missing CID info for distinguishing different popular devices<br>NOTE: <br>NOTE:<br>- for use with MQTT2_CLIENT use a copy of the device and change its DEF to a different clientId like GeneralBridge, delete original's readingList after applying the template! 
 par:IODEVNAME;Name of the IO-Device; {AttrVal("DEVICE","IODev","") ? AttrVal("DEVICE","IODev","" ) : undef } 
 par:DEVTYPE;TYPE of the device; { InternalVal("DEVICE","TYPE","")}
 par:DEVCID;CID of the device as written in the DEF; { InternalVal(AttrVal("DEVICE","IODev",""),"clientId","mosquitto") eq InternalVal("DEVICE","DEF","mosquitto") ? "MQTT2_GeneralBridge" : InternalVal("DEVICE","DEF","mosquitto")}
@@ -27,6 +27,7 @@ attr DEVICE bridgeRegexp   (tele|cmnd)[/]([^/]+)[/].*:.* "$2"\
   shellies[/]([^/]+)[/].*:.* "$1"\
   (ESPClient_[^/]+)[/].*:.* "$1"
 attr DEVICE autocreate 1
+attr DEVICE comment Do not use very open bridgeRegexp expressions! This might lead to irritating results...
 attr DEVICE room IODEVROOM
 attr DEVICE setStateList on off
 #modify DEVICE DEVCID
@@ -265,7 +266,7 @@ attr DEVICE setList \
 attr DEVICE model L_05_zigbee2mqtt_smart+plug
 
 name:L_06_zigbee2mqtt_ContactSensor
-desc: Contact sensor via zigbee2mqtt <br>Tested with: Xiaomi models Aquara and Mijia
+desc: Contact sensor via zigbee2mqtt <br>Tested with: Xiaomi models Aqara and Mijia
 filter:TYPE=MQTT2_DEVICE
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
@@ -278,7 +279,7 @@ deletereading DEVICE .*
 attr DEVICE model L_06_zigbee2mqtt_ContactSensor
 
 name:L_07_zigbee2mqtt_TempHumHpaSensor
-desc: Temp/hum/hpa sensor via zigbee2mqtt <br>Tested with: Xiaomi Aquara WSDCGQ11LM Temperature Humidity Sensor
+desc: Temp/hum/hpa sensor via zigbee2mqtt <br>Tested with: Xiaomi Aqara WSDCGQ11LM Temperature Humidity Sensor
 filter:TYPE=MQTT2_DEVICE
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
@@ -289,7 +290,7 @@ attr DEVICE model L_07_TempHumHpa_TempSensor
 
 #source post: https://forum.fhem.de/index.php/topic,94495.msg898198.html#msg898198
 name:L_08_zigbee2mqtt_Human_Motion_Sensor
-desc: Temp/hum/hpa sensor via zigbee2mqtt <br>Tested with: Xiaomi Aquara RTCGQ11LM Human Motion Sensor
+desc: Temp/hum/hpa sensor via zigbee2mqtt <br>Tested with: Xiaomi Aqara RTCGQ11LM Human Motion Sensor
 filter:TYPE=MQTT2_DEVICE
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
@@ -300,7 +301,7 @@ attr DEVICE model L_08_Human_Motion_TempSensor
 
 #source post: https://forum.fhem.de/index.php/topic,94495.msg898198.html#msg898198
 name:L_09_zigbee2mqtt_Motion_Sensor
-desc: Temp/hum/hpa sensor via zigbee2mqtt <br>Tested with: Xiaomi Aquara DJT11LM Smart Motion Sensor
+desc: Temp/hum/hpa sensor via zigbee2mqtt <br>Tested with: Xiaomi Aqara DJT11LM Smart Motion Sensor
 filter:TYPE=MQTT2_DEVICE
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
@@ -311,7 +312,7 @@ attr DEVICE model L_09_Motion_Sensor
 
 #source post: https://forum.fhem.de/index.php/topic,94495.msg898198.html#msg898198
 name:L_10_zigbee2mqtt_Water_Leak_Sensor
-desc: Temp/hum/hpa sensor via zigbee2mqtt <br>Tested with: Xiaomi Aquara SJCGQ11LM Water Leak Sensor
+desc: Temp/hum/hpa sensor via zigbee2mqtt <br>Tested with: Xiaomi Aqara SJCGQ11LM Water Leak Sensor
 filter:TYPE=MQTT2_DEVICE
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/](.*):, ? $1 : undef }
@@ -322,7 +323,7 @@ attr DEVICE model L_10_Water_Leak_Sensor
 
 #source post: https://forum.fhem.de/index.php/topic,94495.msg898198.html#msg898198
 name:L_11_zigbee2mqtt_Light_Switch
-desc: Temp/hum/hpa sensor via zigbee2mqtt <br>Tested with: Xiaomi Aquara WXKG02LM 2btn Smart Light Switch
+desc: Temp/hum/hpa sensor via zigbee2mqtt <br>Tested with: Xiaomi Aqara WXKG02LM 2btn Smart Light Switch
 filter:TYPE=MQTT2_DEVICE
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
@@ -330,6 +331,17 @@ attr DEVICE stateFormat click
 attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
 deletereading DEVICE .*
 attr DEVICE model L_11_Light_Switch
+
+#source post: https://forum.fhem.de/index.php/topic,94495.msg916789.html#msg916789
+name:L_12_zigbee2mqtt_Wireless_Button
+desc: Wireless button via zigbee2mqtt <br>Tested with: Xiaomi Aqara WXKG12LM wireless switch with gyroscope
+filter:TYPE=MQTT2_DEVICE
+par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+attr DEVICE stateFormat Click: click Action: action
+attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+deletereading DEVICE .*
+attr DEVICE model L_12_Wireless_Button
 
 ###########################################
 # TASMOTA
