@@ -1374,7 +1374,7 @@ sub CreateMetadataList ($$$) {
           . "\n"
           . 'and can be incorrect.'
           . $lb
-          if ( !defined( $modMeta->{x_prereqs_src} )
+          if ( defined( $modMeta->{x_prereqs_src} )
             && $modMeta->{x_prereqs_src} ne 'META.json' );
 
         my @mAttrs = qw(
