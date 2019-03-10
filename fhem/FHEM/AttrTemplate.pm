@@ -43,9 +43,8 @@ AttrTemplate_Initialize()
         $templates{$name}{desc} = $lastComment if($lastComment);
         $lastComment = "";
 
-      } elsif($line =~ m/^filter:(.*)=(.*)/) {
-        $templates{$name}{filterName} = $1;
-        $templates{$name}{filterVal} = $2;
+      } elsif($line =~ m/^filter:(.*)/) {
+        $templates{$name}{filter} = $1;
 
       } elsif($line =~ m/^par:(.*)/) {
         push(@{$templates{$name}{pars}}, $1);
@@ -78,7 +77,8 @@ AttrTemplate_Set($$@)
       my @list;
       for my $k (sort keys %templates) {
         my $h = $templates{$k};
-        if(!$h->{filterName} || $hash->{$h->{filterName}} eq $h->{filterVal}) {
+        my $matches = grep /$name/, devspec2array($h->{filter}) if($h->{filter});
+        if(!$h->{filter} || $matches) {
           push @list, $k;
           $haveDesc = 1 if($h->{desc});
         }
@@ -97,7 +97,8 @@ AttrTemplate_Set($$@)
     my @hlp;
     for my $k (sort keys %templates) {
       my $h = $templates{$k};
-      if(!$h->{filterName} || $hash->{$h->{filterName}} eq $h->{filterVal}) {
+      my $matches = grep /$name/, devspec2array($h->{filter}) if($h->{filter});
+      if(!$h->{filter} || $matches) {
         push @hlp, "$k: $h->{desc}" if($h->{desc});
       }
     }
