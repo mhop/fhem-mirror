@@ -276,7 +276,7 @@ dewpoint_Notify($$)
     # We found temperature and humidity. so we can calculate dewpoint first
     # Prüfen, ob humidity im erlaubten Bereich ist
     if (($humidity <= 0) || ($humidity >= 110)){
-        Log3($hashName, 1, "dewpoint_notify: humidity invalid: $humidity");
+        Log3($hashName, 1, "dewpoint_notify: humidity device $devName ($hum_name) invalid: $humidity");
         return undef;
     }
 
