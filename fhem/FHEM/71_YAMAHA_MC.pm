@@ -275,6 +275,7 @@ sub YAMAHA_MC_Define($$)  # only called when defined, not on reload.
   unless(defined($hash->{attemptsToReturnMenu})) {$hash->{attemptsToReturnMenu}=0;}
   unless(defined($hash->{PowerOnInProgress})) {$hash->{PowerOnInProgress}=0;}
   unless(defined($hash->{LastTtsFile})) {$hash->{LastTtsFile}="";}
+  unless(defined($hash->{helper}{TIMEOUT_COUNT})) {$hash->{helper}{TIMEOUT_COUNT}=0;}
       
     
   $name = $a[0];
@@ -2169,7 +2170,9 @@ sub YAMAHA_MC_Set($$@)
 	my $pathToFavoritesNetRadio = YAMAHA_MC_Param2SpaceList(AttrVal($hash->{NAME}, "pathToFavoritesNetRadio","0 0 0 0 0"),0);
 	my $menuNameFavoritesNetRadio = YAMAHA_MC_Param2SpaceList(AttrVal($hash->{NAME}, "menuNameFavoritesNetRadio","My__Favorites"),0);
 	my $FavoriteNetRadioChannel = AttrVal($hash->{NAME}, "FavoriteNetRadioChannel",0);
-	
+	my $alreadyInCorrectMenu = 0;
+	my $powerCmdDelay = AttrVal($hash->{NAME}, "powerCmdDelay",3);
+	my $menuLayerDelay = AttrVal($hash->{NAME}, "menuLayerDelay",0.5); 
 	
 	Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn Current Input set to  $currentInput";
 	Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn Menu Path to Favourites $pathToFavoritesNetRadio";
@@ -2177,82 +2180,13 @@ sub YAMAHA_MC_Set($$@)
 	Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn  Favourite Channel $FavoriteNetRadioChannel";	
 	Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn Going Back to root menu";
 	
+	
     	
-	# first go back- if not already first menu
-	my $currentMenuLayer = ReadingsVal($name, "currentMenuLayer", undef); 
-	my $currentMenuName = ReadingsVal($name, "currentMenuName", undef); 
 		
-	# If Menu Layer Attribute does not exist first getMenu
-    if (!defined($currentMenuLayer)){
-	  Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannel no currentMenuLayer defined calling getMenuItems";
-	  YAMAHA_MC_httpRequestQueue($hash, "getMenuItems", "",{options => { can_fail => 1, priority => 2, original_cmd => "TurnFavNetRadioChannelOn"}}); # call fn that will do the http request	 
-	  return undef;
-	} 
-	else {
-	  Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannel currentMenuLayer is defined : $currentMenuLayer";
-	}
-	
-	my $alreadyInCorrectMenu = 0;
-	my $powerCmdDelay = AttrVal($hash->{NAME}, "powerCmdDelay",3);
-	my $menuLayerDelay = AttrVal($hash->{NAME}, "menuLayerDelay",$powerCmdDelay); 
-	
-	if(($currentMenuLayer==0) && (lc($currentMenuName) eq "net radio")){
-	  Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn already in root menu";
-	}
-	#elsif(($currentMenuLayer==2) && (lc($currentMenuName) eq lc($menuNameFavoritesNetRadio))){
-	# Log3 $name, 4, "YAMAHA_MC_Set TurnFavNetRadioChannelOn already in correct menu Layer $currentMenuLayer and menuname $currentMenuName";
-	# $alreadyInCorrectMenu = 1;
-	#}
-	else {
-	
-	    Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn NOT in correct menu Layer $currentMenuLayer and menuname $currentMenuName";
-		
-	    Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn  incrementing attempts to returnmenu; attempt".$hash->{attemptsToReturnMenu};
-		$hash->{attemptsToReturnMenu}=$hash->{attemptsToReturnMenu}+1;
-		
-		if ($hash->{attemptsToReturnMenu}==6) {
-		   Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn  more than 5 attempts to returnmenu; try to get Menu again";
-		   YAMAHA_MC_httpRequestQueue($hash, "getMenuItems", "",{options => { can_fail => 1, priority => 1, original_cmd => "TurnFavNetRadioChannelOn"}}); # call fn that will do the http request	
-           return undef;		   
-		}
-		elsif($hash->{attemptsToReturnMenu}>9) {
-		   Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn  more thn 9 attempts to returnmenu; giving up";
-		   YAMAHA_MC_httpRequestQueue($hash, "getMenuItems", "",{options => { can_fail => 1, priority => 1, original_cmd => ""}}); # call fn that will do the http request	
-		   $hash->{attemptsToReturnMenu}=0;
-		}
-		else {
-		  Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn not in root menu Layer $currentMenuLayer and menuname $currentMenuName";
-		  Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn  next attempts to returnmenu started";
-		  YAMAHA_MC_httpRequestQueue($hash, "returnMenu", "",{ options    => {unless_in_queue => 1, priority => 2, can_fail => 1,  original_cmd => "TurnFavNetRadioChannelOn"}}); # call fn that will do the http request
-		  return undef;	
-		}
-        
-	}
-	
-	Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn  resetting attempts to 0";
-	$hash->{attemptsToReturnMenu}=0;
-	
-	# now in root menu
-	# navigate through Favourite Path if we are not already there
-	if($alreadyInCorrectMenu == 0) 
-	{
-		Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn now Back to root menu, going through menu structure now";
-		Log3 $name, 4, "$name : YAMAHA_MC_Set $cmd now Back to root menu, Menu Layer = $currentMenuLayer Menu Name=" . $currentMenuName;
-					
-		# going through menu path to Favourite			
-		
-		for my $favStartmenu ( split /\s+/, $pathToFavoritesNetRadio ){    
-		  Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn now navigating to menu $favStartmenu";
-		  YAMAHA_MC_httpRequestQueue($hash, "selectMenu", $favStartmenu,{options    => {priority => 2, can_fail => 1, not_before => gettimeofday()+$menuLayerDelay}}); # call fn that will do the http request
-		  $menuLayerDelay = $menuLayerDelay + 0.5;
-		  Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn menu $favStartmenu waiting one second";	  
-		  #YAMAHA_MC_httpRequestQueue($hash, "getMenuItems", "",{options => {can_fail => 1, not_before => gettimeofday()+7}}); # call fn that will do the http request	  
-		}
-	}
-	
 	# playing Favourite channel now
-	Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn now playing channel $FavoriteNetRadioChannel";
-	YAMAHA_MC_httpRequestQueue($hash, "selectPlayMenu", $FavoriteNetRadioChannel,{options => {priority => 2, can_fail => 1, not_before => gettimeofday()+$menuLayerDelay+0.5, init_fav_menuname => 1}}); # call fn that will do the http request
+	Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn now playing channel $FavoriteNetRadioChannel via setNetRadioPreset";
+	#YAMAHA_MC_httpRequestQueue($hash, "setNetRadioPreset", $FavoriteNetRadioChannel,{options => {priority => 2, can_fail => 1, not_before => gettimeofday()+$menuLayerDelay}}); # call fn that will do the http request
+	YAMAHA_MC_httpRequestQueue($hash, "setNetRadioPreset", $FavoriteNetRadioChannel,{options => {priority => 2, can_fail => 1}}); # call fn that will do the http request
 		
 	# setting current Channel
 	Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn now setting current Channel to $FavoriteNetRadioChannel";
@@ -2429,67 +2363,59 @@ sub YAMAHA_MC_Set($$@)
 	    
 	my $pathToFavoritesNetRadio = YAMAHA_MC_Param2SpaceList(AttrVal($hash->{NAME}, "pathToFavoritesNetRadio","0 0 "),0);
 	my $menuNameFavoritesNetRadio = YAMAHA_MC_Param2SpaceList(AttrVal($hash->{NAME}, "menuNameFavoritesNetRadio","Best Radio"),0);
-	my $FavoriteNetRadioChannel = AttrVal($hash->{NAME}, "FavoriteNetRadioChannel",0);
-	my $currentFavNetRadioChannel = ReadingsVal($name, "currentFavNetRadioChannel", 0);
+	my $FavoriteNetRadioChannel = AttrVal($hash->{NAME}, "FavoriteNetRadioChannel",1);
+	my $currentFavNetRadioChannel = ReadingsVal($name, "currentFavNetRadioChannel", $FavoriteNetRadioChannel);
 	
-	Log3 $name, 4, "$name : YAMAHA_MC_Set NetRadioNextFavChannel Current Input set to  $currentInput";
-	Log3 $name, 4, "$name : YAMAHA_MC_Set NetRadioNextFavChannel Menu Path to Favourites $pathToFavoritesNetRadio";
-	Log3 $name, 4, "$name : YAMAHA_MC_Set NetRadioNextFavChannel menuNameFavoritesNetRadio $menuNameFavoritesNetRadio";
-	Log3 $name, 4, "$name : YAMAHA_MC_Set NetRadioNextFavChannel  Favourite Channel $FavoriteNetRadioChannel";	
-	Log3 $name, 4, "$name : YAMAHA_MC_Set NetRadioNextFavChannel Going Back to root menu";
-	
-    	
 	# first go back- if not already first menu
 	my $currentMenuLayer = ReadingsVal($name, "currentMenuLayer", undef); 
 	my $currentMenuName = ReadingsVal($name, "currentMenuName", undef); 
-	my $currentMenumaxItems = ReadingsVal($name, "currentMenumaxItems", 0); 
+	#my $currentMenumaxItems = ReadingsVal($name, "currentMenumaxItems", 8); 
+	my $currentMenumaxItems = 8;
 	my $menuLayerDelay = 0.5;
 	my $alreadyInCorrectMenu = 0;
 	
+	Log3 $name, 4, "$name : YAMAHA_MC_Set NetRadioNextFavChannel Current Input set to  $currentInput";
+	#Log3 $name, 4, "$name : YAMAHA_MC_Set NetRadioNextFavChannel Menu Path to Favourites $pathToFavoritesNetRadio";
+	#Log3 $name, 4, "$name : YAMAHA_MC_Set NetRadioNextFavChannel menuNameFavoritesNetRadio $menuNameFavoritesNetRadio";
+	Log3 $name, 4, "$name : YAMAHA_MC_Set NetRadioNextFavChannel  Favourite Channel $FavoriteNetRadioChannel";	
+	Log3 $name, 4, "$name : YAMAHA_MC_Set NetRadioNextFavChannel  currentFavNetRadioChannel $currentFavNetRadioChannel";	
+	#Log3 $name, 4, "$name : YAMAHA_MC_Set NetRadioNextFavChannel Going Back to root menu";
+	
+    	
+	
+	
 		
 	# If Menu Layer Attribute does not exist first getMenu
-    if (!defined($currentMenuLayer)){
-	  Log3 $name, 4, "$name : YAMAHA_MC_Set NetRadioNextFavChannel currentMenuLayer not defined calling getMenuItems";
-	  YAMAHA_MC_httpRequestQueue($hash, "getMenuItems", "",{options => {unless_in_queue => 1,  can_fail => 1, priority => 2, original_cmd => $cmd}}); # call fn that will do the http request	 
-	  return undef;
-	}
-	else {
-	  Log3 $name, 4, "$name : YAMAHA_MC_Set NetRadioNextFavChannel currentMenuLayer is defined : $currentMenuLayer";
-	}
+    #if (!defined($currentMenuLayer)){
+	#  Log3 $name, 4, "$name : YAMAHA_MC_Set NetRadioNextFavChannel currentMenuLayer not defined calling getMenuItems";
+	#  YAMAHA_MC_httpRequestQueue($hash, "getMenuItems", "",{options => {unless_in_queue => 1,  can_fail => 1, priority => 2, original_cmd => $cmd}}); # call fn that will do the http request	 
+	#  return undef;
+	#}
+	#else {
+	#  Log3 $name, 4, "$name : YAMAHA_MC_Set NetRadioNextFavChannel currentMenuLayer is defined : $currentMenuLayer";
+	#}
 	
-	if(($currentMenuLayer==0) && (lc($currentMenuName) eq "net radio")){
-	  Log3 $name, 4, "$name : YAMAHA_MC_Set NetRadioNextFavChannel already in root menu";
-	}
+	#if(($currentMenuLayer==0) && (lc($currentMenuName) eq "net radio")){
+	#  Log3 $name, 4, "$name : YAMAHA_MC_Set NetRadioNextFavChannel already in root menu";
+	#}
 	# diese Optimierung besser weglassen,
 	# scheint nicht zu funktionieren, wenn man zwar im Richtigen Menu ist aber längere zeit Keine Menü NAvigation gemacht hat
 	# doch mal probieren schein nur beim Einschalten ein PRoblem zu sein
-	elsif(($currentMenuLayer==2) && (lc($currentMenuName) eq lc($menuNameFavoritesNetRadio))){
-	 Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn already in correct menu Layer $currentMenuLayer and menuname $currentMenuName";
-	 $alreadyInCorrectMenu = 1;
-	}
-	else {
-	    Log3 $name, 4, "$name : YAMAHA_MC_Set NetRadioNextFavChannel not in root menu Layer $currentMenuLayer and menuname $currentMenuName";
-		YAMAHA_MC_httpRequestQueue($hash, "returnMenu", "",{ options => {unless_in_queue => 1, priority => 2, can_fail => 1, original_cmd => $cmd, newMenuLayer => ($currentMenuLayer-1)}}); # call fn that will do the http request
-        return undef;
-	}
+	#elsif(($currentMenuLayer==2) && (lc($currentMenuName) eq lc($menuNameFavoritesNetRadio))){
+	# Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn already in correct menu Layer $currentMenuLayer and menuname $currentMenuName";
+	# $alreadyInCorrectMenu = 1;
+	#}
+	#else {
+	#    Log3 $name, 4, "$name : YAMAHA_MC_Set NetRadioNextFavChannel not in root menu Layer $currentMenuLayer and menuname $currentMenuName";
+	#	YAMAHA_MC_httpRequestQueue($hash, "returnMenu", "",{ options => {unless_in_queue => 1, priority => 2, can_fail => 1, original_cmd => $cmd, newMenuLayer => ($currentMenuLayer-1)}}); # call fn that will do the http request
+    #    return undef;
+	#}
 	
-	Log3 $name, 4, "$name : YAMAHA_MC_Set NetRadioNextFavChannel now Back to root menu, going through menu structure now";
-	Log3 $name, 4, "$name : YAMAHA_MC_Set $cmd now Back to root menu, Menu Layer = $currentMenuLayer Menu Name=" . $currentMenuName;
+	#Log3 $name, 4, "$name : YAMAHA_MC_Set NetRadioNextFavChannel now Back to root menu, going through menu structure now";
+	#Log3 $name, 4, "$name : YAMAHA_MC_Set $cmd now Back to root menu, Menu Layer = $currentMenuLayer Menu Name=" . $currentMenuName;
 	
     
 	
-	# now in root menu
-	# navigate through Favourite Path if we are not already there
-	if($alreadyInCorrectMenu == 0) 
-	{
-		for my $favStartmenu ( split /\s+/, $pathToFavoritesNetRadio ){    
-		  Log3 $name, 4, "$name : YAMAHA_MC_Set NetRadioNextFavChannel now navigating to menu $favStartmenu";
-		  YAMAHA_MC_httpRequestQueue($hash, "selectMenu", $favStartmenu,{options    => {priority => 2, can_fail => 1, original_cmd => "", not_before => gettimeofday()+$menuLayerDelay, newMenuLayer => ($currentMenuLayer+1)}}); # call fn that will do the http request
-		  $menuLayerDelay = $menuLayerDelay + 0.5;
-		  Log3 $name, 4, "$name : YAMAHA_MC_Set NetRadioNextFavChannel menu $favStartmenu waiting one second";	  
-		  #YAMAHA_MC_httpRequestQueue($hash, "getMenuItems", "",{options => {can_fail => 1, not_before => gettimeofday()+7}}); # call fn that will do the http request	  
-		}
-    }
 	
 	# playing Favourite channel now	
 	# setting current Channel
@@ -2502,17 +2428,20 @@ sub YAMAHA_MC_Set($$@)
 	  $newTargetChannel = $currentFavNetRadioChannel - 1;
 	 }	 
 	
-	if($newTargetChannel<0){
-	  $newTargetChannel = $currentMenumaxItems - 1;
+	if (($newTargetChannel==0) && ($cmd eq "NetRadioPrevFavChannel")){
+	  $newTargetChannel = $currentMenumaxItems;	
+	}
+	elsif(($newTargetChannel==0) && ($cmd eq "NetRadioNextFavChannel")){
+	  $newTargetChannel = 1;	
 	}
 	
-	if($newTargetChannel>($currentMenumaxItems-1)){
-	  $newTargetChannel = 0;
+	if($newTargetChannel>($currentMenumaxItems)){
+	  $newTargetChannel = 1;
 	}
 	
 	# remember that setting channel is in progress
 	# will be reset in parse request of playChannel
-	$hash->{settingChannelInProgress} = 1;
+	#$hash->{settingChannelInProgress} = 1;
 	
 	
 	Log3 $name, 4, "$name : YAMAHA_MC_Set NetRadioNextFavChannel now setting current Channel to $newTargetChannel";
@@ -2520,11 +2449,12 @@ sub YAMAHA_MC_Set($$@)
 	
 	# playing channel now
 	Log3 $name, 4, "$name : YAMAHA_MC_Set $cmd now playing channel $newTargetChannel";	
-	YAMAHA_MC_httpRequestQueue($hash, "selectPlayMenu", $newTargetChannel,{options => {priority => 2, can_fail => 1, original_cmd => "", not_before => gettimeofday()+$menuLayerDelay+0.5}}); # call fn that will do the http request
+	#YAMAHA_MC_httpRequestQueue($hash, "setNetRadioPreset", $newTargetChannel,{options => {priority => 2, can_fail => 1, original_cmd => "", not_before => gettimeofday()+$menuLayerDelay+0.5}}); # call fn that will do the http request
+	YAMAHA_MC_httpRequestQueue($hash, "setNetRadioPreset", $newTargetChannel,{options => {priority => 2, can_fail => 1, original_cmd => "" }}); # call fn that will do the http request
 	
 	# setting current Channel
 	Log3 $name, 4, "$name : YAMAHA_MC_Set $cmd now setting current Channel $newTargetChannel";
-	readingsSingleUpdate($hash, 'currentFavNetRadioChannel', $newTargetChannel, 0);
+	readingsSingleUpdate($hash, 'currentFavNetRadioChannel', $newTargetChannel, 1);
 	
 	# getting Menu once again, index playing should be set
 	#YAMAHA_MC_httpRequestQueue($hash, "getMenuItems", "",{options => {can_fail => 1, not_before => gettimeofday()+$menuLayerDelay+1}}); # call fn that will do the http request	
@@ -2818,24 +2748,39 @@ sub YAMAHA_MC_HandleCmdQueue($$$)
 			else {
 			  $url .= $YAMAHA_MC_setCmdswithoutArgs{$reqCmd};
 			}
-          Log3 $name, 4, "$type ($name) - YAMAHA_MC_HandleCmdQueue: cmd=$reqCmd starte httpRequest url => $url";			
+          Log3 $name, 4, "$type ($name) - YAMAHA_MC_HandleCmdQueue: ALLOWED cmd=$reqCmd starte httpRequest url => $url";			
 	     }
+		 else {
+		   Log3 $name, 4, "$type ($name) - YAMAHA_MC_HandleCmdQueue: UNALLOWED cmd=$reqCmd starte httpRequest url => $url";
+		 }
 	  }	 
 	  else {
 	     # empty request for time keeping sake
 	     Log3 $name, 4, "$type ($name) - YAMAHA_MC_HandleCmdQueue: dummy request";
 	  }
-	  
+	
+	 #wenn sich batch_cmd in der URL befindet, dann URL
+	 ## umschreiben auf /v1/main/getStatus
+	 # ansonsten gibt es einen Responsecode 3
+	 # und keine Beachtung des weitergehenden Batch Bearbeitung in YAMAHA_MC
+	 if ($url =~ /batch_cmd/) {
+	   Log3 $name, 4, "$type ($name) - YAMAHA_MC_HandleCmdQueue: batch_cmd detected, replacing in url $url ";
+	   $url =~ s/batch_cmd/\/v1\/main\/getStatus/g;
+	   Log3 $name, 4, "$type ($name) - YAMAHA_MC_HandleCmdQueue: batch_cmd detected, replaced - new url is $url ";
+	 }
+	
      # v1/main/setPower?power=on in URL ersetzen durch tatsaechliche Zone	 
      #$url =~ s/\Q$find\E/$replace/g;	 	 
 	 #my $url_replace = $url;
 	 $url =~ s/main/$hash->{ZONE}/g;
 	 $url =~ s/ mode/&mode/g;  
 	 
+
+	 
 	  #TOE: Anpassungen auf "dotted" API Versionen mit "." 
 	 my $shortAPI = $hash->{API_VERSION};
 	 $shortAPI=~s/\.[0-9]+//;
-     Log3 $name,4,"TOe: API Version cut to $shortAPI";
+     Log3 $name,4,"TOe: API Version cut to $shortAPI URL before $url";
 	 
 	 #api version setzen durch korrekte Version des Devices
 	 $url =~ s/v1/v$shortAPI/g;
@@ -3034,8 +2979,11 @@ sub YAMAHA_MC_httpRequestParse($$$)
   # error handling here
   if (($err ne "")  and not $options->{can_fail}){
     Log3 $name, 2, "$type: $name YAMAHA_MC_httpRequestParse last cmd=$cmd failed with error: $err";
-	Log3 $name, 2, "$type: $name YAMAHA_MC_httpRequestParse guessing device is absent, setting state and power to off";
 	
+	readingsBeginUpdate($hash);
+	readingsBulkUpdate($hash, "last_error", $err, 1);
+	readingsEndUpdate($hash, 1);
+		
 	if (($cmd eq "getDeviceInfo") and   ($err =~ m/empty answer received/sgi)) {
 	  Log3 $name, 2, "$type: $name YAMAHA_MC_httpRequestParse seems to be okay when playing via dlna";
 	  YAMAHA_MC_HandleCmdQueue($queue_hash,$cmd,$arg);
@@ -3043,29 +2991,33 @@ sub YAMAHA_MC_httpRequestParse($$$)
       return undef
 	}
 	
+	# Perhaps device turned off, increasing timeout counter
+	$hash->{helper}{TIMEOUT_COUNT} = $hash->{helper}{TIMEOUT_COUNT} + 1;
+	if ($hash->{helper}{TIMEOUT_COUNT} > 10) {
+		Log3 $name, 2, "$type: $name YAMAHA_MC_httpRequestParse more than 10 timeouts, guessing device is absent, setting state and power to off";
 
-	#see: http://www.fhemwiki.de/wiki/DevelopmentModuleIntro#Readings
-	readingsBeginUpdate($hash);
-	readingsBulkUpdate($hash, "last_error", $err, 1);
-	readingsBulkUpdate($hash, "presence", "absent", 1);
-	
-	readingsBulkUpdate($hash, "state", "off", 1);	
-	readingsBulkUpdate($hash, "power", "off",1);		
-	readingsEndUpdate($hash, 1);
-	
-	#delete readings, because unsure if menu still avaliable
-	if (defined($hash->{$name}{READINGS}{currentMenuLayer})) {
-	    delete($hash->{$name}{READINGS}{currentMenuLayer});
-	  }
-	  if (defined($hash->{$name}{READINGS}{currentMenuName})) {
-	    delete($hash->{$name}{READINGS}{currentMenuName});
-	  } 	
-	  if (defined($hash->{READINGS}{currentMenuLayer})) {
-	    delete($hash->{READINGS}{currentMenuLayer});
-	  }	
-	  if (defined($hash->{$name}{READINGS}{currentMenuName})) {
-	    delete($hash->{READINGS}{currentMenuName});
-	  }	
+		#see: http://www.fhemwiki.de/wiki/DevelopmentModuleIntro#Readings
+		
+		readingsBulkUpdate($hash, "presence", "absent", 1);
+		
+		readingsBulkUpdate($hash, "state", "off", 1);	
+		readingsBulkUpdate($hash, "power", "off",1);		
+		readingsEndUpdate($hash, 1);
+		
+		#delete readings, because unsure if menu still avaliable
+		if (defined($hash->{$name}{READINGS}{currentMenuLayer})) {
+			delete($hash->{$name}{READINGS}{currentMenuLayer});
+		  }
+		  if (defined($hash->{$name}{READINGS}{currentMenuName})) {
+			delete($hash->{$name}{READINGS}{currentMenuName});
+		  } 	
+		  if (defined($hash->{READINGS}{currentMenuLayer})) {
+			delete($hash->{READINGS}{currentMenuLayer});
+		  }	
+		  if (defined($hash->{$name}{READINGS}{currentMenuName})) {
+			delete($hash->{READINGS}{currentMenuName});
+		  }	
+	}  
 
 	if((not exists($hash->{helper}{AVAILABLE})) or (exists($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1))
         {
@@ -3097,6 +3049,10 @@ sub YAMAHA_MC_httpRequestParse($$$)
   { 
     Log3 $name, 4, "$type: $name YAMAHA_MC_httpRequestParse data: \n $data";
     Log3 $name, 4, "$type: $name YAMAHA_MC_httpRequestParse cmd: \n $cmd"; 
+	
+	# resetting timeout to 0
+	$hash->{helper}{TIMEOUT_COUNT} = 0;
+	
 	if (defined($arg)){
 	  Log3 $name, 4, "$type: $name YAMAHA_MC_httpRequestParse args:  ".join(" ", $arg); 
 	}  
@@ -3121,7 +3077,7 @@ sub YAMAHA_MC_httpRequestParse($$$)
         Log3 $name, 5, Dumper(%res);
 
         my $responseCode = $res{"response_code"}; #see Dumper output what keyXYZ really is.
-	Log3 $name, 4, "$type: $name YAMAHA_MC_httpRequestParse ResponseCode = \n $responseCode"; 
+	Log3 $name, 4, "$type: $name YAMAHA_MC_httpRequestParse ResponseCode = $responseCode"; 
 		
 		#response code description
 		#0 Successful request
@@ -4325,7 +4281,10 @@ sub YAMAHA_MC_Link($$$@)
   my %postdata_hash = "";
   my $json = "";
   my $serverHost = $hash->{HOST};
+  my $serverZone = $hash->{ZONE};
+  unless(defined($hash->{location_name})) {$hash->{NAME}=$hash->{HOST};}
   my $locationName = $hash->{location_name};
+  
   
   Log3 $name, 4, "$hash->{TYPE} $name: Link Musiccast Devices server is $serverHost with locatioName $locationName";
   Log3 $name, 4, "$hash->{TYPE} $name: Link Musiccast Devices try getting ip of CLient=".$plist;
@@ -4348,6 +4307,7 @@ sub YAMAHA_MC_Link($$$@)
 		  
 		  my $clientIp = $clienthash->{HOST};
 		  my $clientType = $clienthash->{TYPE};
+		  my $clientZone = $clienthash->{ZONE};
 			  
 		  Log3 $name, 4, "$hash->{TYPE} $name: Link Musiccast Devices server=$serverHost CLientName $mc_client  IP=$clientIp Type=$clientType";
 		  
@@ -4360,13 +4320,15 @@ sub YAMAHA_MC_Link($$$@)
 			  $group_id = "d2d82d2b86434a35a35ad77c7ec0241c";
 			  my @zones = ('main');
 			  
-			  Log3 $name, 4, "$hash->{TYPE} $name : Link Musiccast send setClientInfo zones= ".join(";",@zones);
+			  Log3 $name, 4, "$hash->{TYPE} $name : Link Musiccast send setClientInfo to $clientIp zone $clientZone";
 			  
 			  my $server_ip_address="$serverHost";
 			  $cmd="setClientInfo"; 
 			  $sendto="$clientIp"; # Client  
 				
-			  %postdata_hash = ('group_id'=>$group_id,'zone'=>\@zones,'server_ip_address'=>$server_ip_address);
+			  #%postdata_hash = ('group_id'=>$group_id,'zone'=>\@zones,'server_ip_address'=>$server_ip_address);
+			  %postdata_hash = ('group_id'=>$group_id,'zone'=>$clientZone,'server_ip_address'=>$server_ip_address);
+			  
 			  $json = encode_json \%postdata_hash;
 			  Log3 $name, 4, "$hash->{TYPE} $name : Link Musiccast send setClientInfo to $sendto Json Request ".$json;
 			  $hash->{POSTDATA} = $json;  
@@ -4375,12 +4337,14 @@ sub YAMAHA_MC_Link($$$@)
 			  
 			  # Read Disribution Info for CLient
 			  Log3 $name, 4, "$hash->{TYPE} $name : Link Musiccast getting DistributionInfo for $mc_client ";		  
-			  Log3 $name, 4, "$name : Link Musiccast getting DistributionInfo Ende1 for ". $clienthash->{NAME}; 
+			  Log3 $name, 4, "$name : Link Musiccast getting DistributionInfo Ende for ". $clienthash->{NAME}; 
 			  YAMAHA_MC_getDistributionInfo($clienthash);
 			  Log3 $name, 4, "$clienthash->{NAME} $name : Link Musiccast getting DistributionInfo End";
 						
 			  Log3 $name, 4, "$name : Link Musiccast adding $clientIp to ClientList";	
 			  push @clientListIP, $clientIp;
+			  
+			  
 		   }
 	  }
   }
@@ -4395,7 +4359,7 @@ sub YAMAHA_MC_Link($$$@)
   ##{"group_id":"d2d82d2b86434a35a35ad77c7ec0241c","type":"add","zone":"main","client_list":["192.168.0.28"]}
   
   my $distype="add";
-  my $zone="main";
+  my $zone=$serverZone;
   
   Log3 $name, 4, "$hash->{TYPE} $name : Link Musiccast send setServerInfo client_list= ".join(";",@clientListIP);
   
@@ -4409,6 +4373,7 @@ sub YAMAHA_MC_Link($$$@)
   $hash->{POSTDATA} = $json;  
     
   YAMAHA_MC_httpRequestDirect($hash, $cmd, $sendto, @params); # call fn that will do the http request
+  
   sleep 1;
 
   #------------------------------------------------
@@ -4488,11 +4453,13 @@ sub YAMAHA_MC_UnLink($$$@)
   return if (IsDisabled $name);
   
   my $group_id = "";
+  my $old_group_id = "d2d82d2b86434a35a35ad77c7ec0241c";
   my $sendto="";
   my $groupName = "";
   my %postdata_hash = "";
   my $json = "";
   my $serverHost = $hash->{HOST};
+  my $serverZone = $hash->{ZONE};
   my $locationName = $hash->{location_name};
   
   Log3 $name, 4, "$hash->{TYPE} $name: UNLink Musiccast Devices server is $serverHost with locatioName $locationName";
@@ -4517,8 +4484,9 @@ sub YAMAHA_MC_UnLink($$$@)
 	  
       my $clientIp = $clienthash->{HOST};
 	  my $clientType = $clienthash->{TYPE};
+	  my $clientZone = $clienthash->{ZONE};
 	  	  
-	  Log3 $name, 4, "$hash->{TYPE} $name: UNLink Musiccast Devices server=$serverHost CLientName $mc_client  IP=$clientIp Type=$clientType";
+	  Log3 $name, 4, "$hash->{TYPE} $name: UNLink Musiccast Devices server=$serverHost CLientName $mc_client  IP=$clientIp ClientZone=$clientZone Type=$clientType";
 	  
 	  # if device found with ip	and then send client signal to device
 	  if (($clientIp ne "") && ($clientType eq "YAMAHA_MC") && ($clientIp ne $serverHost) )
@@ -4538,43 +4506,120 @@ sub YAMAHA_MC_UnLink($$$@)
 	  $cmd="setClientInfo"; 
 	  $sendto="$clientIp"; # Client  
 		
-	  %postdata_hash = ('group_id'=>$group_id);
+	  %postdata_hash = ('group_id'=>$group_id,'zone'=>$clientZone);
 	  $json = encode_json \%postdata_hash;
-	  Log3 $name, 4, "$hash->{TYPE} $name : UnLink Musiccast send setClientInfo to $sendto Json Request ".$json;
+	  Log3 $name, 4, "$hash->{TYPE} $name : UnLink Musiccast send setClientInfo to $sendto Zone $clientZone Json Request ".$json;
 	  $hash->{POSTDATA} = $json;  
 		
 	  YAMAHA_MC_httpRequestDirect($hash, $cmd, $sendto, @params); # call fn that will do the http request
 	  
-	  # Read Disribution Info for CLient
-	  Log3 $name, 4, "$hash->{TYPE} $name : UNLink Musiccast getting DistributionInfo for $mc_client ";		  
-	  Log3 $name, 4, "$name : UNLink Musiccast getting DistributionInfo Ende1 for ". $clienthash->{NAME}; 
-	  YAMAHA_MC_getDistributionInfo($clienthash);
-	  Log3 $name, 4, "$clienthash->{NAME} $name : UNLink Musiccast getting DistributionInfo End";
+	  #------------------
+      #
+	  # now send the client list to server
+	  # 
+	  #------------------------------------------------  
+	  #post /YamahaExtendedControl/v1/dist/setServerInfo
+	  ##{"group_id":"d2d82d2b86434a35a35ad77c7ec0241c","type":"remove","zone":"main","client_list":["192.168.0.28"]}
+	  
+	  my $distype="remove";
+	  my $zone=$serverZone;
+	  
+	  Log3 $name, 4, "$hash->{TYPE} $name : UnLink Musiccast send setServerInfo client_list= $clientIp";
+	  
+	  $cmd="setServerInfo"; 
+	  $sendto="$serverHost"; # Server
+	 
+	  %postdata_hash = ('group_id'=>$old_group_id,'type'=>$distype,'zone'=>$zone,'client_list'=>$clientIp);
+	  $json = encode_json \%postdata_hash;
+	  
+	  Log3 $name, 4, "$hash->{TYPE} $name : UnLink Musiccast send setServerInfo to $sendto Json Request ".$json;
+	  $hash->{POSTDATA} = $json;  
+		
+	  YAMAHA_MC_httpRequestDirect($hash, $cmd, $sendto, @params); # call fn that will do the http request
+	  #sleep 1;
+	  
+	  #---------------
+	  
+	  
 				
-	  Log3 $name, 4, "$name : UNLink Musiccast adding $clientIp to ClientList";	
+	  #Log3 $name, 4, "$name : UNLink Musiccast adding $clientIp to ClientList";	
 	  #here the delete from lsit is missing
 	  #push @clientListIP, $clientIp;
 
      }  
   }
-	 
+  
+ 	 
   #------------------------------------------------
   # delete group for Server 
   #post /YamahaExtendedControl/v1/dist/setServerInfo
-  
+  #
+  # die Group darf nur geloescht werden, wenn alle Clients unlinkt sind
+  # voher nur den Gruppen Namen des Servers reduzieren
+  # fraglich ist, ob auch die Client List des Servers reduziert werden muss
+  #
   Log3 $name, 4, "$hash->{TYPE} $name : UnLink Musiccast send setServerInfo ";
   
   $cmd="setServerInfo"; 
   $sendto="$serverHost"; # Server
  
-  %postdata_hash = ('group_id'=>$group_id);
-  $json = encode_json \%postdata_hash;
+  my $countUnlinkClients=scalar(@mc_clients);
+  Log3 $name, 4, "$hash->{TYPE} $name : Count Clients to unlink ".$countUnlinkClients; 
+  Log3 $name, 4, "$hash->{TYPE} $name : currently link group name $hash->{dist_group_name}"; 
   
-  Log3 $name, 4, "$hash->{TYPE} $name : Link Musiccast send setServerInfo to $sendto Json Request ".$json;
-  $hash->{POSTDATA} = $json;  
+  my $unlinkall=0;
+   
+  if (($hash->{dist_group_name} =~ /2 R/ ) && ($countUnlinkClients>1)) { #2Raeume sind gelinkt und es werden 2 unlinkt
+    $unlinkall=1;	
+	$hash->{dist_group_name} =~ s/ +2 Räume//g;
+	$hash->{dist_group_name} =~ s/ +2 RÃ¤ume//g;	
+  }
+  elsif (($hash->{dist_group_name} =~ /2 R/ ) && ($countUnlinkClients=1)) { #2Raeume sind gelinkt und es wird 1 unlinkt
+    $unlinkall=0;	
+	$hash->{dist_group_name} =~ s/2 Räume/1 Raum/g;
+	$hash->{dist_group_name} =~ s/2 RÃ¤ume/1 Raum/g;	
+  }
+  elsif ($hash->{dist_group_name} =~ /1 R/ ) { #1Raum ist gelinkt
+    $unlinkall=1;
+	$hash->{dist_group_name} =~ s/ +1 Raum//g;
+  }	
+
+  Log3 $name, 4, "$hash->{TYPE} $name : unlink all is set to $unlinkall new dist_group_name ".$hash->{dist_group_name};   
     
-  YAMAHA_MC_httpRequestDirect($hash, $cmd, $sendto, @params); # call fn that will do the http request
-  sleep 1;
+
+ if ($unlinkall==1) {
+      %postdata_hash = ('group_id'=>"");
+	  $json = encode_json \%postdata_hash;
+	  
+	  Log3 $name, 4, "$hash->{TYPE} $name : Link Musiccast send setServerInfo to unlink all $sendto Json Request ".$json;
+	  $hash->{POSTDATA} = $json;  
+ }
+ 
+ 
+  # server group auslesen
+  #my $oldServerGroupId = ReadingsVal($name, "group_id", undef); 
+  #$hash->{helper}{client_list} = () unless(defined($hash->{helper}{client_list}));
+  
+  #if (defined($oldServerGroupId)){
+	  #Log3 $name, 4, "$hash->{TYPE} $name : Link Musiccast delete ip $name from group_id $oldServerGroupId "; 
+	  # unlinked ip entfernen
+	  #my $newServerGroupId = $oldServerGroupId =~ s/$name,//r;
+	  #$newServerGroupId = $oldServerGroupId =~ s/,$name)/)/r;
+	  #$newServerGroupId = $oldServerGroupId =~ s/$name//r;
+	 
+	  #%postdata_hash = ('group_id'=>$newServerGroupId);
+	  #$json = encode_json \%postdata_hash;
+	  
+	  #Log3 $name, 4, "$hash->{TYPE} $name : Link Musiccast send setServerInfo to $sendto Json Request ".$json;
+	  #$hash->{POSTDATA} = $json;  
+		
+	  #YAMAHA_MC_httpRequestDirect($hash, $cmd, $sendto, @params); # call fn that will do the http request
+	  #sleep 1;
+	  #}
+  #else {
+  #  Log3 $name, 4, "$hash->{TYPE} $name : Link Musiccast delete ip $name from group_id not possible, unknown group_id at server ";
+  #}
+  
   YAMAHA_MC_httpRequestQueue($hash, "getDistributionInfo", "", {options => {priority => 3, unless_in_queue => 1}}); # call fn that will do the http request
   
   Log3 $name, 4, "$hash->{TYPE}: UnLink Musiccast Ende ".$json;
