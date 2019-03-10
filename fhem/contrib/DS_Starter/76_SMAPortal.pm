@@ -594,7 +594,7 @@ sub SMAPortal_ParseData($) {
   
   if(!$hash->{HELPER}{RETRIES} && !$pv && !$fi && !$gc) {
       # keine Anlagendaten vorhanden
-      $state = "Data can't be retrieved from SMA-Portal. They will read again next scheduled cycle.";
+      $state = "Data can't be retrieved from SMA-Portal. It will be reread at next scheduled cycle.";
       Log3 $name, 2, "$name - $state";
   }
   
