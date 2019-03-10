@@ -99,6 +99,7 @@ my %statusMapping = (
   "scaleF1"   => [2,80],
   "scaleF2"   => [10,400],
   "scaleF3"   => [2,-8],
+  "scaleF4"   => [100,0],
   "hex"       => [1,0],
 );
 
@@ -175,7 +176,7 @@ my %statusIds = (
   170 => {"name" => "manualMode",           "map" => "onOff",                   "chan" => { "01" => {"position" => 2, "from" => 4, "to" => 4}}},
   171 => {"name" => "measured-temp2",       "map" => "scaleF2",                 "chan" => { "01" => {"position" => 3, "from" => 0, "to" => 10}}},
   180 => {"name" => "desired-temp",         "map" => "scaleF3",                 "chan" => { "01" => {"position" => 0, "from" => 0, "to" => 5}}},
-  181 => {"name" => "measured-temp",        "map" => "scaleF2",                 "chan" => { "01" => {"position" => 2, "from" => 0, "to" => 15}}}, 
+  181 => {"name" => "measured-temp",        "map" => "scaleF4",                 "chan" => { "01" => {"position" => 2, "from" => 0, "to" => 15}}}, 
   182 => {"name" => "manualMode",           "map" => "onOff",                   "chan" => { "01" => {"position" => 4, "from" => 0, "to" => 0}}},
   183 => {"name" => "timeAutomatic",        "map" => "onOff",                   "chan" => { "01" => {"position" => 4, "from" => 1, "to" => 1}}},
   184 => {"name" => "sendingInterval",                                          "chan" => { "01" => {"position" => 4, "from" => 6, "to" => 11}}},
@@ -626,6 +627,18 @@ DUOFERN_Set($@)
   %sets = (%sets, %setsBlinds)    if ($blindsMode eq "on");
   
   my $list =  join(" ", sort keys %sets);
+  
+  if(exists $sets{"position:slider,0,1,100"} && $cmd =~ m/^\d+/) {
+    $arg2 = $arg;
+    $arg = $cmd;
+    $cmd = "position";
+  }
+  
+  if(exists $sets{"level:slider,0,1,100"} && $cmd =~ m/^\d+/) {
+    $arg2 = $arg;
+    $arg = $cmd;
+    $cmd = "level";
+  }
    
   if (exists $commandsStatus{$cmd}) { 
     my $buf = $duoStatusRequest;
