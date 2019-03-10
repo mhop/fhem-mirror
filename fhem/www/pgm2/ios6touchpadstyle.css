@@ -72,7 +72,13 @@ and (orientation : portrait) {
 body {
 	width:320px
 }
-
+.colorpicker_widget {
+	display: none !important;
+}
+.SVGplot {
+    width: 265px;
+    overflow: scroll;
+}
 #content,#right {
 	padding:0 10px!important
 }
@@ -96,7 +102,13 @@ and (orientation : portrait) {
 body {
 	width:320px
 }
-
+.colorpicker_widget {
+	display: none !important;
+}
+.SVGplot {
+    width: 265px;
+    overflow: scroll;
+}
 #content,#right {
 	padding:0 10px!important
 }
@@ -119,7 +131,13 @@ and (orientation : portrait) {
 body {
 	width:375px
 }
-
+.colorpicker_widget {
+	display: none !important;
+}
+.SVGplot {
+    width: 320px;
+    overflow: scroll;
+}
 #content,#right {
 	padding:0 10px!important
 }
@@ -141,6 +159,13 @@ and (orientation : portrait) {
 body {
 	width:414px
 }
+.SVGplot {
+    width: 359px;
+    overflow: scroll;
+}
+.colorpicker_widget {
+display: none;
+}
 }
 
 /* iPhone 6+(landscape) ----------- */
@@ -153,20 +178,11 @@ body {
 }
 
 /*iPad Skalierung*/
-/* iPads (landscape) ----------- */
-@media only screen
-and (min-device-width : 768px)
-and (max-device-width : 1024px)
-and (orientation : landscape) {
-body {
-	width:1024px
-}
-}
 
 /* iPads (portrait) ----------- */
 @media only screen
 and (min-device-width : 768px)
-and (max-device-width : 1024px)
+and (max-device-width : 768px)
 and (orientation : portrait) {
 body {
 	width:768px
@@ -177,7 +193,10 @@ body {
 @media only screen
 and (orientation : portrait) {
 .isAndroidPhone {
-	width:360px
+	width:360px;
+}
+.colorpicker_widget {
+display: none;
 }
 .isAndroidTablet {
 }
@@ -600,7 +619,8 @@ table.block tr:last-child td {
 
 .block td:first-child {
 	padding-left:10px;
-	font-weight:700
+	font-weight:700;
+    	word-break: break-word;
 }
 
 .block > tbody > tr > td:last-child {
@@ -724,13 +744,13 @@ table.room tr.sel a:hover svg {
 }
 
 .slider {
-	margin-top:10px;
+	margin-top:0px;
 	display:inline-block;
 	-webkit-box-sizing:border-box;
 	-moz-box-sizing:padding-box;
 	box-sizing:padding-box;
-	height:9px;
-	width:120px;
+	height:28px;
+	width:250px;
 	padding:1px;
 	-webkit-border-radius:4px;
 	-moz-border-radius:4px;
@@ -753,10 +773,10 @@ table.room tr.sel a:hover svg {
 	box-shadow:inset 0 1px #e8e8e8;
 	border:1px solid #9d9d9d;
 	color:#666;
-	height:15px;
-	width:18px;
+	height:26px;
+	width:20px;
 	left:0;
-	top:-6px;
+	top:-2px;
 	-webkit-border-radius:10px;
 	-moz-border-radius:10px;
 	border-radius:10px;
