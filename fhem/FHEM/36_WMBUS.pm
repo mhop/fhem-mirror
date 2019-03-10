@@ -34,6 +34,7 @@ sub WMBUS_Initialize($) {
                        " ignore:0,1".
                        " rawmsg_as_reading:0,1".
                        " ignoreUnknownDataBlocks:0,1".
+                       " ignoreMasterMessages:0,1".
                        " $readingFnAttributes";
 }
 
@@ -238,6 +239,11 @@ WMBUS_Parse($$)
 		
 		($msg, $rssi, $hash->{MessageEncoding}) = WMBUS_HandleEncoding($mb, $rawMsg);
 		
+		if (uc(substr($msg, 0, 8)) eq "1144FF03") {
+      Log3 $name, 2, "received possible KNX-RF message, ignoring it";
+      return undef;
+    }
+		
 		if ($mb->parseLinkLayer(pack('H*',substr($msg,1)))) {
 			$addr = join("_", $mb->{manufacturer}, $mb->{afield_id}, $mb->{afield_ver}, $mb->{afield_type});  
 
@@ -329,7 +335,11 @@ sub WMBUS_SetReadings($$$)
 
 	readingsBeginUpdate($hash);
 	
-	if ($mb->{decrypted}) {
+	if ($mb->{decrypted} && 
+	   # decode messages sent from master to slave/meter only if it is explictly enabled 
+	    ( $mb->{sent_from_master} == 0 || AttrVal($name, "ignoreMasterMessages", 1) ) 
+     )
+  {
 		my $dataBlocks = $mb->{datablocks};
 		my $dataBlock;
 		
@@ -533,6 +543,10 @@ WMBUS_Attr(@)
      formats of which some can be interpreted and some not. This prevents the unknown data overwriting the readings of the data that can be
      interpreted.
   </li>
+  <li>ignoreMasterMessages
+     Some devices (e.g. Letrika solar inverters) only send data if they have received a special message from a master device.
+     The messages sent by the master are ignored unless explictly enabled by this attribute.
+  </li>
   </ul>
 	<br>
   <a name="WMBUSreadings"></a>
@@ -647,6 +661,10 @@ WMBUS_Attr(@)
      Wenn auf 1 gesetzt so werden Datenblocks die unbekannte/herstellerspezifische Daten enthalten ignoriert. Das ist hilfreich wenn ein Z&auml;hler Daten in unterschiedlichen
      Formaten sendet von denen einige nicht interpretiert werden k&ouml;nnen. Es verhindert, dass die unbekannten Daten die Readings der interpretierbaren Daten &uuml;berschreiben.
   </li>  
+  <li>ignoreMasterMessages
+     Einige Geräte (z. B. Letrika Wechselrichter) senden nur dann Daten wenn sie eine spezielle Nachricht von einem Mastergerät erhalten haben.
+     Die Nachrichten von dem Master werden ignoriert es sei denn es wird explizit mit diesem Attribut eingeschaltet.
+  </li>
   </ul>
 	<br>
   <a name="WMBUSreadings"></a>

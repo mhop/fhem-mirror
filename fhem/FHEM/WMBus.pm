@@ -50,6 +50,7 @@ use constant {
   CI_AFL => 0x90,     # Authentification and Fragmentation Layer, variable size
   CI_RESP_SML_4 => 0x7e, # Response from device, 4 Bytes, application layer SML encoded
   CI_RESP_SML_12 => 0x7f, # Response from device, 12 Bytes, application layer SML encoded  
+  CI_SND_UD_MODE_1 => 0x51, # The master can send data to a slave using a SND_UD with CI-Field 51h for mode 1 or 55h for mode 2
   
   # DIF types (Data Information Field), see page 32
   DIF_NONE => 0x00,
@@ -546,10 +547,50 @@ my %VIFInfo_FD = (
     unit         => '',
     calcFunc     => \&valueCalcNumeric,
   },
+  VIF_MANUFACTURER  => {                  #  Manufacturer (as in fixed header)
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00001010,
+    bias         => 0,
+    unit         => '',
+    calcFunc     => \&valueCalcNumeric,
+  },
+  VIF_PARAMETER_SET_ID  => {             #  Parameter set identification
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00001011,
+    bias         => 0,
+    unit         => '',
+    calcFunc     => \&valueCalcNumeric,
+  },
   VIF_MODEL_VERSION => {                  #  Model / Version
     typeMask     => 0b01111111,
     expMask      => 0b00000000,
     type         => 0b00001100,
+    bias         => 0,
+    unit         => '',
+    calcFunc     => \&valueCalcNumeric,
+  },
+  VIF_HARDWARE_VERSION => {               #  Hardware version #
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00001101,
+    bias         => 0,
+    unit         => '',
+    calcFunc     => \&valueCalcNumeric,
+  },
+  VIF_FIRMWARE_VERSION => {               #  Firmware version #
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00001110,
+    bias         => 0,
+    unit         => '',
+    calcFunc     => \&valueCalcNumeric,
+  },
+  VIF_SOFTWARE_VERSION => {               #  Software version #
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00001111,
     bias         => 0,
     unit         => '',
     calcFunc     => \&valueCalcNumeric,
@@ -586,7 +627,7 @@ my %VIFInfo_FD = (
     unit         => 'A',
     calcFunc     => \&valueCalcNumeric,
   },  
-  VIF_RECEPTION_LEVEL => {                  #   reception level of a received radio device.
+  VIF_RECEPTION_LEVEL => {                #   reception level of a received radio device.
     typeMask     => 0b01111111,
     expMask      => 0b00000000,
     type         => 0b01110001,
@@ -594,6 +635,23 @@ my %VIFInfo_FD = (
     unit         => 'dBm',
     calcFunc     => \&valueCalcNumeric,
   },
+  VIF_STATE_PARAMETER_ACTIVATION => {     #  State of parameter activation
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b01100110,
+    bias         => 0,
+    unit         => '',
+    calcFunc     => \&valueCalcNumeric,
+  },
+  VIF_SPECIAL_SUPPLIER_INFORMATION => {     #  Special supplier information
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b01100111,
+    bias         => 0,
+    unit         => '',
+    calcFunc     => \&valueCalcNumeric,
+  },
+  
   VIF_FD_RESERVED => {                   # Reserved
     typeMask     => 0b01110000,
     expMask      => 0b00000000,
@@ -642,6 +700,13 @@ my %VIFInfo_other = (
     unit         => 'Illegal VIF-Group',
   },
 
+  VIF_DATA_UNDERFLOW => {
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00010111,
+    bias         => 0,
+    unit         => 'Data underflow',
+  },
 
 
   VIF_PER_SECOND => {
@@ -723,6 +788,90 @@ my %VIFInfo_other = (
     bias         => 0,
     unit         => 'per liter',
   },
+  VIF_PER_M3 => {
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00101101,
+    bias         => 0,
+    unit         => 'per m³',
+  },
+  VIF_PER_KG => {
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00101110,
+    bias         => 0,
+    unit         => 'per kg',
+  },  
+  VIF_PER_K => {
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00101111,
+    bias         => 0,
+    unit         => 'per K',
+  },  
+  VIF_PER_KWH => {
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00110000,
+    bias         => 0,
+    unit         => 'per kWh',
+  },  
+  VIF_PER_GJ => {
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00110001,
+    bias         => 0,
+    unit         => 'per GJ',
+  },  
+  VIF_PER_KW => {
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00110010,
+    bias         => 0,
+    unit         => 'per kW',
+  },  
+  VIF_PER_KL => {
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00110011,
+    bias         => 0,
+    unit         => 'per (K*l)',
+  },  
+  VIF_PER_V => {
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00110100,
+    bias         => 0,
+    unit         => 'per V',
+  },  
+  VIF_PER_A => {
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00110101,
+    bias         => 0,
+    unit         => 'per A',
+  },  
+  VIF_PER_MULT_S => {
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00110110,
+    bias         => 0,
+    unit         => 'multiplied by sek',
+  },  
+  VIF_PER_MULT_SV => {
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00110111,
+    bias         => 0,
+    unit         => 'multiplied by sek / V',
+  },  
+  VIF_PER_MULT_SA => {
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00111000,
+    bias         => 0,
+    unit         => 'multiplied by sek / A',
+  },  
 
   VIF_START_DATE_TIME => {
     typeMask     => 0b01111111,
@@ -1162,7 +1311,7 @@ sub decodeValueInformationBlock($$$) {
       # Plaintext VIF
       my $vifLength = unpack('C', substr($vib,$offset++,1));
       $dataBlockRef->{type} = "see unit";
-      $dataBlockRef->{unit} = unpack(sprintf("C%d",$vifLength), substr($vib, $offset, $vifLength));
+      $dataBlockRef->{unit} = substr($vib, $offset, $vifLength);
       $offset += $vifLength;
       $analyzeVIF = 0;
       last EXTENSION;
@@ -1207,7 +1356,13 @@ sub decodeValueInformationBlock($$$) {
   }
 
   if ($analyzeVIF) {  
-    if (findVIF($vif, $vifInfoRef, $dataBlockRef) == 0) {
+    if ($vif == 0x7C) {
+      # Plaintext VIF
+      my $vifLength = unpack('C', substr($vib,$offset++,1));
+      $dataBlockRef->{type} = "see unit";
+      $dataBlockRef->{unit} = substr($vib, $offset, $vifLength);
+      $offset += $vifLength;
+    } elsif (findVIF($vif, $vifInfoRef, $dataBlockRef) == 0) {
       $dataBlockRef->{errormsg} = "unknown VIF " . sprintf("%x", $vifExtension) . " at offset " . ($offset-1);
       $dataBlockRef->{errorcode} = ERR_UNKNOWN_VIFE;    
     }
@@ -1327,11 +1482,9 @@ sub decodePayload($$) {
     $offset += $self->decodeDataRecordHeader(substr($payload,$offset), $dataBlock);
     #printf("No. %d, type %x at offset %d\n", $dataBlockNo, $dataBlock->{dataField}, $offset-1);
     
-    if ($dataBlock->{dataField} == DIF_NONE) {
-    } elsif ($dataBlock->{dataField} == DIF_READOUT) {
-      $self->{errormsg} = "in datablock $dataBlockNo: unexpected DIF_READOUT";
-      $self->{errorcode} = ERR_UNKNOWN_DATAFIELD;
-      return 0;
+    if ($dataBlock->{dataField} == DIF_NONE or $dataBlock->{dataField} == DIF_READOUT) {
+      $dataBlockNo--;
+      $offset++;
     } elsif ($dataBlock->{dataField} == DIF_BCD2) {
       $value = $self->decodeBCD(2, substr($payload,$offset,1));
       $offset += 1;
@@ -1407,7 +1560,7 @@ sub decodePayload($$) {
       #print "DIF_SPECIAL at $offset\n";
       $value = unpack("H*", substr($payload,$offset));
       last PAYLOAD;
-    }  else {
+    } else {
       $self->{errormsg} = "in datablock $dataBlockNo: unhandled datafield " . sprintf("%x",$dataBlock->{dataField});
       $self->{errorcode} = ERR_UNKNOWN_DATAFIELD;
       return 0;
@@ -1744,20 +1897,23 @@ sub decodeApplicationLayer($) {
   $self->{status} = 0;
   $self->{statusstring} = "";
   $self->{access_no} = 0;
+  $self->{sent_from_master} = 0;
+  
+  #printf("CI Field %02x\n", $self->{cifield});
   
   if ($self->{cifield} == CI_RESP_4 || $self->{cifield} == CI_RESP_SML_4) {
     # Short header
-    #print "short header\n";
     ($self->{access_no}, $self->{status}, $self->{cw_1}, $self->{cw_2}) = unpack('CCCC', substr($applicationlayer,$offset));
+    #printf("Short header access_no %x\n", $self->{access_no});
     $offset += 4;
   } elsif ($self->{cifield} == CI_RESP_12 || $self->{cifield} == CI_RESP_SML_12) {
     # Long header
-    #print "Long header\n";
     ($self->{meter_id}, $self->{meter_man}, $self->{meter_vers}, $self->{meter_dev}, $self->{access_no}, $self->{status}, $self->{cw_1}, $self->{cw_2}) 
       = unpack('VvCCCCCC', substr($applicationlayer,$offset)); 
     $self->{meter_id} = sprintf("%08d", $self->{meter_id});  
     $self->{meter_devtypestring} =  $validDeviceTypes{$self->{meter_dev}} || 'unknown'; 
     $self->{meter_manufacturer} = uc($self->manId2ascii($self->{meter_man}));
+    #printf("Long header access_no %x\n", $self->{access_no});
     $offset += 12;
   } elsif ($self->{cifield} == CI_RESP_0) {
     # no header
@@ -1802,6 +1958,8 @@ sub decodeApplicationLayer($) {
       $self->{errorcode} = ERR_CRC_FAILED;
       return 0;
     }
+  } elsif ($self->{cifield} == CI_SND_UD_MODE_1) {
+    $self->{sent_from_master} = 1;
   } else {
     # unsupported
     $self->decodeConfigword();
