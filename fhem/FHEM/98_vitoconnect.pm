@@ -81,7 +81,10 @@
 #						set-Befehle für HKs werden nur noch angezeigt, wenn der HK auch aktiv ist
 #						Wiki aktualisiert
 # 2019-02-27		stacktrace-Fehler (hoffentlich) behoben
-#						Betriebsarten "heating" und "active" ergänz
+#						Betriebsarten "heating" und "active" ergänzt
+# 2019-03-02		Readings für heating.boiler.sensors.temperature.commonSupply.value und
+#							heating.circuits.1.operating.modes.heating.active hinzugefügt
+#						Typo fixed
 #          
 #
 #   ToDo:         timeout konfigurierbar machen
@@ -98,6 +101,7 @@
 #						devices/0 ? Was, wenn es mehrere Devices gibt?
 #						vitoconnect_Set effizienter implementieren
 #						nach einem set Befehl Readings aktualisieren, vorher alten Timer löschen
+#						heating.circuits.0.operating.programs.holiday.changeEndDate action: end implementieren? 
 #
 
 
@@ -123,6 +127,7 @@ my $RequestList = {
     "heating.boiler.serial.value" 												=> "Kessel_Seriennummer",
     "heating.boiler.temperature.value"											=> "Kesseltemperatur_exact",
     "heating.boiler.sensors.temperature.commonSupply.status"			=> "Kessel_Common_Supply",
+    "heating.boiler.sensors.temperature.commonSupply.value"				=> "Kessel_Common_Supply_Temperatur",
     "heating.boiler.sensors.temperature.main.status" 						=> "Kessel_Status",
     "heating.boiler.sensors.temperature.main.value" 						=> "Kesseltemperatur",
     "heating.burner.active" 														=> "Brenner_aktiv",
@@ -130,7 +135,7 @@ my $RequestList = {
     "heating.burner.automatic.errorCode" 										=> "Brenner_Fehlercode",
     "heating.burner.current.power.value"                             => "Brenner_Leistung", 
     "heating.burner.modulation.value"                                => "Brenner_Modulation",
-    "heating.burner.statistics.hours"                                => "Brenner_Beriebsstunden",
+    "heating.burner.statistics.hours"                                => "Brenner_Betriebsstunden",
 	 "heating.burner.statistics.starts" 									 	=> "Brenner_Starts",
 
     "heating.circuits.enabled" 													=> "Aktive_Heizkreise",
@@ -148,6 +153,7 @@ my $RequestList = {
     "heating.circuits.0.operating.modes.dhwAndHeating.active" 			=> "HK1-WW_und_Heizen_aktiv",
     "heating.circuits.0.operating.modes.forcedNormal.active" 			=> "HK1-Solltemperatur_erzwungen",
     "heating.circuits.0.operating.modes.forcedReduced.active" 			=> "HK1-Reduzierte_Temperatur_erzwungen",
+    "heating.circuits.0.operating.modes.heating.active" 					=> "HK1-heizen_aktiv",
     "heating.circuits.0.operating.modes.standby.active" 					=> "HK1-Standby_aktiv",
     "heating.circuits.0.operating.programs.active.value" 				=> "HK1-Programmstatus",
     "heating.circuits.0.operating.programs.comfort.active" 				=> "HK1-Solltemperatur_comfort_aktiv",
@@ -183,6 +189,7 @@ my $RequestList = {
     "heating.circuits.1.operating.modes.dhwAndHeating.active" 			=> "HK2-WW_und_Heizen_aktiv",
     "heating.circuits.1.operating.modes.forcedNormal.active" 			=> "HK2-Solltemperatur_erzwungen",
     "heating.circuits.1.operating.modes.forcedReduced.active" 			=> "HK2-Reduzierte_Temperatur_erzwungen",
+    "heating.circuits.1.operating.modes.heating.active" 					=> "HK2-heizen_aktiv",
     "heating.circuits.1.operating.modes.standby.active" 					=> "HK2-Standby_aktiv",
     "heating.circuits.1.operating.programs.active.value" 				=> "HK2-Programmstatus",
     "heating.circuits.1.operating.programs.comfort.active" 				=> "HK2-Solltemperatur_comfort_aktiv",
@@ -218,6 +225,7 @@ my $RequestList = {
     "heating.circuits.2.operating.modes.dhwAndHeating.active" 			=> "HK3-WW_und_Heizen_aktiv",
     "heating.circuits.2.operating.modes.forcedNormal.active" 			=> "HK3-Solltemperatur_erzwungen",
     "heating.circuits.2.operating.modes.forcedReduced.active" 			=> "HK3-Reduzierte_Temperatur_erzwungen",
+    "heating.circuits.2.operating.modes.heating.active" 					=> "HK3-heizen_aktiv",
     "heating.circuits.2.operating.modes.standby.active" 					=> "HK3-Standby_aktiv",
     "heating.circuits.2.operating.programs.active.value" 				=> "HK3-Programmstatus",
     "heating.circuits.2.operating.programs.comfort.active" 				=> "HK3-Solltemperatur_comfort_aktiv",
