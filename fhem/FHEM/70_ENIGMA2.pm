@@ -60,7 +60,7 @@ sub ENIGMA2_Initialize($) {
         },
     };
 
-    return FHEM::Meta::Load( __FILE__, $hash );
+    return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
 # regular Fn ##################################################################

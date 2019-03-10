@@ -21,7 +21,7 @@ sub npmjs_Initialize($) {
       . "npmglobal:1,0 "
       . $readingFnAttributes;
 
-    return FHEM::Meta::Load( __FILE__, $modHash );
+    return FHEM::Meta::InitMod( __FILE__, $modHash );
 }
 
 # define package
@@ -99,7 +99,7 @@ sub Define($$) {
         $attr{$name}{alias} = 'Node.js Package Update Status';
         $attr{$name}{devStateIcon} =
 'npm.updates.available:security@red:outdated npm.is.up.to.date:security@green:outdated .*npm.outdated.*in.progress:system_fhem_reboot@orange .*in.progress:system_fhem_update@orange warning.*:message_attention@orange error.*:message_attention@red';
-        $attr{$name}{group} = 'System';
+        $attr{$name}{group} = 'Update';
         $attr{$name}{icon}  = 'npm-old';
         $attr{$name}{room}  = 'System';
     }
@@ -408,7 +408,7 @@ sub Set($$@) {
 
     # return Usage:
     else {
-        my $list = "";
+        my $list = '';
 
         if ( !defined( $hash->{".fhem"}{npm}{nodejsversions} ) ) {
             $list =
@@ -574,7 +574,7 @@ sub Get($$@) {
         return $ret;
     }
     else {
-        my $list = "";
+        my $list = '';
         $list .= " showOutdatedList:noArg"
           if ( defined( $hash->{".fhem"}{npm}{outdatedpackages} )
             and scalar keys %{ $hash->{".fhem"}{npm}{outdatedpackages} } > 0 );
@@ -638,7 +638,7 @@ sub DoModuleTrigger($$@) {
     $noreplace = 1             unless ( defined($noreplace) );
     $TYPE      = $hash->{TYPE} unless ( defined($TYPE) );
 
-    return ""
+    return ''
       unless ( defined($TYPE)
         && defined( $modules{$TYPE} )
         && defined($eventString)
@@ -660,7 +660,7 @@ sub DoModuleTrigger($$@) {
 
     # This is a global event on module level and in device context
     return "$event: missing device name"
-      if ( !defined($dev) || $dev eq "" );
+      if ( !defined($dev) || $dev eq '' );
 
     return DoTrigger( "global", "$TYPE:$eventString", $noreplace );
 }
@@ -803,13 +803,13 @@ sub ExecuteNpmCommand($) {
     my $npm = {};
     $npm->{debug} = $cmd->{debug};
 
-    my $cmdPrefix = "";
-    my $cmdSuffix = "";
+    my $cmdPrefix = '';
+    my $cmdSuffix = '';
 
     if ( $cmd->{host} =~ /^(?:(.*)@)?([^:]+)(?::(\d+))?$/
         && lc($2) ne "localhost" )
     {
-        my $port = "";
+        my $port = '';
         if ($3) {
             $port = "-p $3 ";
         }
@@ -830,7 +830,7 @@ sub ExecuteNpmCommand($) {
 
         # wrap SSH command
         $cmdPrefix .=
-          'ssh -oBatchMode=yes ' . $port . ( $1 ? "$1@" : "" ) . $2 . ' \'';
+          'ssh -oBatchMode=yes ' . $port . ( $1 ? "$1@" : '' ) . $2 . ' \'';
         $cmdSuffix = '\' 2>&1';
     }
 
@@ -907,7 +907,7 @@ sub ExecuteNpmCommand($) {
             }
         }
         else {
-            my @packages = "";
+            my @packages = '';
             foreach my $package ( split / /, $1 ) {
                 next
                   unless ( $package =~
@@ -929,14 +929,14 @@ sub ExecuteNpmCommand($) {
                 push @packages, $package;
             }
             my $pkglist = join( ' ', @packages );
-            return unless ( $pkglist ne "" );
+            return unless ( $pkglist ne '' );
             $npm->{npminstall} =~ s/%PACKAGES%/$pkglist/gi;
         }
         print qq($npm->{npminstall}\n) if ( $npm->{debug} == 1 );
         $response = NpmInstall($npm);
     }
     elsif ( $cmd->{cmd} =~ /^uninstall (.+)/ ) {
-        my @packages = "";
+        my @packages = '';
         foreach my $package ( split / /, $1 ) {
             next
               unless ( $package =~
@@ -944,13 +944,13 @@ sub ExecuteNpmCommand($) {
             push @packages, $package;
         }
         my $pkglist = join( ' ', @packages );
-        return unless ( $pkglist ne "" );
+        return unless ( $pkglist ne '' );
         $npm->{npmuninstall} =~ s/%PACKAGES%/$pkglist/gi;
         print qq($npm->{npmuninstall}\n) if ( $npm->{debug} == 1 );
         $response = NpmUninstall($npm);
     }
     elsif ( $cmd->{cmd} =~ /^update(?: (.+))?/ ) {
-        my $pkglist = "";
+        my $pkglist = '';
         if ( defined($1) ) {
             my @packages;
             foreach my $package ( split / /, $1 ) {
@@ -1029,7 +1029,7 @@ sub RetrieveNpmOutput($$) {
     my $p   = shift;
     my $h   = {};
 
-    return $h unless ( defined($p) && $p ne "" );
+    return $h unless ( defined($p) && $p ne '' );
 
     # first try to interprete text as JSON directly
     my $decode_json = eval { decode_json($p) };
@@ -1344,21 +1344,21 @@ sub CreateInstalledList($$) {
     my $html = defined( $hash->{CL} ) && $hash->{CL}{TYPE} eq "FHEMWEB" ? 1 : 0;
     $packages = $hash->{".fhem"}{npm}{listedpackages}{dependencies};
 
-    my $header = "";
-    my $footer = "";
+    my $header = '';
+    my $footer = '';
     if ($html) {
         $header = '<html><table style="min-width: 450px;" class="block wide">';
         $footer = '</table></html>';
     }
 
-    my $rowOpen     = "";
-    my $rowOpenEven = "";
-    my $rowOpenOdd  = "";
-    my $colOpen     = "";
-    my $txtOpen     = "";
-    my $txtClose    = "";
+    my $rowOpen     = '';
+    my $rowOpenEven = '';
+    my $rowOpenOdd  = '';
+    my $colOpen     = '';
+    my $txtOpen     = '';
+    my $txtClose    = '';
     my $colClose    = "\t\t\t";
-    my $rowClose    = "";
+    my $rowClose    = '';
 
     if ($html) {
         $rowOpen     = '<tr>';
@@ -1417,21 +1417,21 @@ sub CreateOutdatedList($$) {
     $packages = $hash->{".fhem"}{npm}{outdatedpackages};
     my $npmglobal = ( AttrVal( $hash->{NAME}, 'npmglobal', 1 ) eq '1' ? 1 : 0 );
 
-    my $header = "";
-    my $footer = "";
+    my $header = '';
+    my $footer = '';
     if ($html) {
         $header = '<html><table style="min-width: 450px;" class="block wide">';
         $footer = '</table></html>';
     }
 
-    my $rowOpen     = "";
-    my $rowOpenEven = "";
-    my $rowOpenOdd  = "";
-    my $colOpen     = "";
-    my $txtOpen     = "";
-    my $txtClose    = "";
+    my $rowOpen     = '';
+    my $rowOpenEven = '';
+    my $rowOpenOdd  = '';
+    my $colOpen     = '';
+    my $txtOpen     = '';
+    my $txtClose    = '';
     my $colClose    = "\t\t\t";
-    my $rowClose    = "";
+    my $rowClose    = '';
 
     if ($html) {
         $rowOpen     = '<tr>';
@@ -1748,7 +1748,7 @@ sub ToDay() {
     "node",
     "npm"
   ],
-  "version": "v1.0.4",
+  "version": "v1.0.5",
   "release_status": "stable",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
@@ -1762,7 +1762,7 @@ sub ToDay() {
   "prereqs": {
     "runtime": {
       "requires": {
-        "FHEM": 5.00918623,
+        "FHEM": 5.00918799,
         "perl": 5.014,
         "GPUtils": 0,
         "JSON": 0,
@@ -1881,20 +1881,9 @@ sub ToDay() {
     }
   },
   "resources": {
-    "license": [
-      "https://fhem.de/#License"
-    ],
-    "homepage": "https://fhem.de/",
     "bugtracker": {
       "web": "https://forum.fhem.de/index.php/board,29.0.html",
-      "x_web_title": "Sonstige Systeme"
-    },
-    "repository": {
-      "type": "svn",
-      "url": "https://svn.fhem.de/fhem/",
-      "x_branch_master": "trunk",
-      "x_branch_dev": "trunk",
-      "web": "https://svn.fhem.de/"
+      "x_web_title": "FHEM Forum: Sonstige Systeme"
     }
   }
 }

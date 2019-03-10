@@ -31,7 +31,7 @@ sub GUEST_Initialize($) {
         $hash->{AttrList} .= " " . $hash->{AttrPrefix} . $_;
     }
 
-    return FHEM::Meta::Load( __FILE__, $hash );
+    return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
 1;

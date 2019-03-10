@@ -37,37 +37,25 @@ return "$@" if ($@);
 return $ret if ($ret);
 use version 0.77; our $VERSION = $META{version};
 
-our $coreUpdate;
-our %corePackageUpdates;
-our %coreFileUpdates;
+# sub import(@) {
+#     my $pkg = caller(0);
+#
+#     if ( $pkg ne "main" ) {
+#     }
+# }
 
-our %moduleUpdates;
-our %packageUpdates;
-our %fileUpdates;
-
-sub import(@) {
-    my $pkg = caller(0);
-
-    # Initially load update information
-    #   to be ready for meta analysis
-    __GetUpdatedata() unless ( defined($coreUpdate) );
-
-    if ( $pkg ne "main" ) {
-    }
-}
-
-# Loads Metadata for a module
-sub Load($$;$) {
+# Loads Metadata for single module, based on filename
+sub InitMod($$;$) {
     my ( $filePath, $modHash, $runInLoop ) = @_;
 
     my $ret = __PutMetadata( $filePath, $modHash, 1, $runInLoop );
 
     if ($@) {
-        Log 1, __PACKAGE__ . "::Load: ERROR: \$\@:\n" . $@;
+        Log 1, __PACKAGE__ . "::InitMod: ERROR: \$\@:\n" . $@;
         return "$@";
     }
     elsif ($ret) {
-        Log 1, __PACKAGE__ . "::Load: ERROR: \$ret:\n" . $ret;
+        Log 1, __PACKAGE__ . "::InitMod: ERROR: \$ret:\n" . $ret;
         return $ret;
     }
 
@@ -92,33 +80,70 @@ sub Load($$;$) {
     return undef;
 }
 
-#TODO allow to have array of module names as optional parameter, use keys %modules when not given
-#     Then make this function to be called by X_Initialize(). Problem: We don't know the module name yet, just filename.
-#     So maybe one can give wither filepath or modulename as parameter?
-# Load Metadata for non-loaded modules
-sub LoadAll(;$$) {
-    my ( $unused, $reload ) = @_;
+# Load Metadata for a list of modules
+sub Load(;$$) {
+    my ( $modList, $reload ) = @_;
     my $t = TimeNow();
     my $v = __PACKAGE__->VERSION();
     my @rets;
 
+    my $unused = 0;
+    my @lmodules;
+
+    # if modList is undefined or is equal to '1'
+    if ( !$modList || ( !ref($modList) && $modList eq '1' ) ) {
+        $unused = 1 if ( $modList && $modList eq '1' );
+
+        foreach ( keys %modules ) {
+
+            # Only process loaded modules
+            #   unless unused modules were
+            #   explicitly requested
+            push @lmodules,
+              $_
+              if (
+                $unused
+                || ( defined( $modules{$_}{LOADED} )
+                    && $modules{$_}{LOADED} eq '1' )
+              );
+        }
+    }
+
+    # if a single module name was given
+    elsif ( !ref($modList) ) {
+        push @lmodules, $modList;
+    }
+
+    # if a list of module names was given
+    elsif ( ref($modList) eq 'ARRAY' ) {
+        foreach ( @{$modList} ) {
+            push @lmodules, $_;
+        }
+    }
+
+    # if a hash was given, assume every
+    #   key is a module name
+    elsif ( ref($modList) eq 'HASH' ) {
+        foreach ( keys %{$modList} ) {
+            push @lmodules, $_;
+        }
+    }
+
+    # Wrong method use
+    else {
+        $@ = __PACKAGE__ . "::Load: ERROR: Unknown parameter value";
+        Log 1, $@;
+        return "$@";
+    }
+
     __GetUpdatedata() if ($reload);
 
-    foreach my $modName ( keys %modules ) {
-
-        # Only add META to loaded modules
-        #  if not enforced for all
-        next
-          unless (
-            $unused
-            || ( defined( $modules{$modName}{LOADED} )
-                && $modules{$modName}{LOADED} eq '1' )
-          );
+    foreach my $modName (@lmodules) {
 
         # Abort when module file was not indexed by
         #   fhem.pl before.
         # Only continue if META was not loaded
-        #   or should explicitly reloaded.
+        #   or should explicitly be reloaded.
         next
           if (
             !defined( $modules{$modName}{ORDER} )
@@ -141,15 +166,17 @@ sub LoadAll(;$$) {
               . $modName . '.pm';
         }
 
-        my $ret = Load( $filePath, $modules{$modName}, 1 );
-        push @rets, $@   if ( $@   && $@ ne "" );
-        push @rets, $ret if ( $ret && $ret ne "" );
+        my $ret = InitMod( $filePath, $modules{$modName}, 1 );
+        push @rets, $@   if ( $@   && $@ ne '' );
+        push @rets, $ret if ( $ret && $ret ne '' );
 
         $modules{$modName}{META}{generated_by} = $META{name} . " $v, $t"
           if ( defined( $modules{$modName}{META} ) );
-    }
 
-    SetInternals( $defs{'global'} );
+        foreach my $devName ( devspec2array( 'TYPE=' . $modName ) ) {
+            SetInternals( $defs{$devName} );
+        }
+    }
 
     if (@rets) {
         $@ = join( "\n", @rets );
@@ -176,13 +203,13 @@ sub SetInternals($) {
     return 0
       unless ( defined( $modHash->{LOADED} ) && $modHash->{LOADED} eq '1' );
 
-    $devHash->{'.FhemMetaInternalss'} = 1;
+    $devHash->{'.FhemMetaInternals'} = 1;
     __CopyMetaToInternals( $devHash, $modMeta );
 
     return 1;
 }
 
-# Get meta data
+# Get metadata
 sub Get($$) {
     my ( $devHash, $field ) = @_;
     $devHash = $defs{$devHash} unless ( ref($devHash) );
@@ -208,10 +235,10 @@ sub Get($$) {
 sub __CopyMetaToInternals {
     return 0 unless ( __PACKAGE__ eq caller(0) );
     my ( $devHash, $modMeta ) = @_;
-    return unless ( defined( $devHash->{'.FhemMetaInternalss'} ) );
+    return unless ( defined( $devHash->{'.FhemMetaInternals'} ) );
     return unless ( defined($modMeta) && ref($modMeta) eq "HASH" );
 
-    $devHash->{FUPDATE} = $modMeta->{x_version}
+    $devHash->{FVERSION} = $modMeta->{x_version}
       if ( defined( $modMeta->{x_version} ) );
 }
 
@@ -238,7 +265,7 @@ sub __PutMetadata {
     return undef;
 }
 
-# Extract meta data from FHEM module file
+# Extract metadata from FHEM module file
 sub __GetMetadata {
     return 0 unless ( __PACKAGE__ eq caller(0) );
     my ( $filePath, $modMeta, $runInLoop, $metaSection ) = @_;
@@ -287,9 +314,9 @@ sub __GetMetadata {
         }
 
         my $searchComments = 1;    # not in use, see below
-        my $currentJson    = "";
+        my $currentJson    = '';
         while ( my $l = <$fh> ) {
-            next if ( $l eq "" || $l =~ m/^\s+$/ );
+            next if ( $l eq '' || $l =~ m/^\s+$/ );
 
             # # Track comments section at the beginning of the document
             # if ( $searchComments && $l !~ m/^#|\s*$/ ) {
@@ -338,7 +365,7 @@ m/(\$Id\: ((?:([0-9]+)_)?([\w]+)\.([\w]+))\s([0-9]+)\s((([0-9]+)-([0-9]+)-([0-9]
 #                 $authorName     = $authorMail
 #                   if ( $authorName && $authorName =~ m/written| from| by/i );
 #
-#                 $authorName = "" unless ($authorName);
+#                 $authorName = '' unless ($authorName);
 #             }
 
             ######
@@ -423,7 +450,7 @@ m/^=for\s+:application\/json;q=META\.json\s+([^\s\.]+\.[^\s\.]+)\s*$/i
             {
                 $skip               = 0;
                 $currentJson        = $1;
-                $json{$currentJson} = "";
+                $json{$currentJson} = '';
             }
             elsif ( !$skip
                 && $l =~ m/^=end\s+:application\/json\;q=META\.json/i )
@@ -441,7 +468,7 @@ m/^=for\s+:application\/json;q=META\.json\s+([^\s\.]+\.[^\s\.]+)\s*$/i
             seek $fh, 0, 0;
 
             while ( my $l = <$fh> ) {
-                next if ( $l eq "" || $l =~ m/^\s+$/ );
+                next if ( $l eq '' || $l =~ m/^\s+$/ );
 
                 # Only seek the document until code starts
                 if ( $l !~ m/^#/ && $l !~ m/^=[A-Za-z]+/i ) {
@@ -649,7 +676,7 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
     }
 
     ########
-    # Meta data refactoring starts here
+    # Metadata refactoring starts here
     #
 
     #TODO
@@ -702,7 +729,7 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
     push @{ $modMeta->{x_file} }, $version;
 
     # Do not use repeating 0 in version
-    $modMeta->{version} =~ s/\.0{2,}/\.0/g
+    $modMeta->{version} = version->parse( $modMeta->{version} )->stringify
       if ( defined( $modMeta->{version} ) );
 
     $@ .=
@@ -740,14 +767,8 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
       );
     $modMeta->{abstract} = $item_summary
       if ( $item_summary && !defined( $modMeta->{abstract} ) );
-    $modMeta->{x_lang}{DE}{abstract} = $item_summary_DE
-      if ( $item_summary_DE && !defined( $modMeta->{x_lang}{DE}{abstract} ) );
-
-    $modMeta->{description} = "./docs/commandref.html#" . $modMeta->{x_file}[4]
-      unless ( defined( $modMeta->{description} ) );
-    $modMeta->{x_lang}{DE}{description} =
-      "./docs/commandref_DE.html#" . $modMeta->{x_file}[4]
-      unless ( defined( $modMeta->{x_lang}{DE}{description} ) );
+    $modMeta->{x_lang}{de}{abstract} = $item_summary_DE
+      if ( $item_summary_DE && !defined( $modMeta->{x_lang}{de}{abstract} ) );
 
     # Only when this package is reading its own metadata.
     # Other modules shall get this added elsewhere for performance reasons
@@ -762,6 +783,12 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
           $META{name} . ' ' . __PACKAGE__->VERSION() . ', ' . TimeNow();
     }
 
+    # mandatory
+    unless ( $modMeta->{description} ) {
+        $modMeta->{description} = 'n/a';
+    }
+
+    # mandatory
     unless ( $modMeta->{release_status} ) {
         if ( defined( $modMeta->{x_vcs} ) ) {
             $modMeta->{release_status} = 'stable';
@@ -771,6 +798,7 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
         }
     }
 
+    # mandatory
     unless ( $modMeta->{license} ) {
         if ( defined( $modMeta->{x_vcs} ) ) {
             $modMeta->{license} = 'GPL_2';
@@ -780,6 +808,7 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
         }
     }
 
+    # mandatory
     unless ( $modMeta->{author} ) {
         if ( defined( $modMeta->{x_vcs} ) ) {
             $modMeta->{author} = [ $modMeta->{x_vcs}[15] . ' <>' ];
@@ -797,6 +826,66 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
         }
     }
 
+    unless ( defined( $modMeta->{resources} )
+        && defined( $modMeta->{resources}{license} ) )
+    {
+        if ( defined( $modMeta->{x_vcs} ) ) {
+            $modMeta->{resources}{license} =
+              ['https://fhem.de/#License'];
+        }
+    }
+
+    unless ( defined( $modMeta->{resources} )
+        && defined( $modMeta->{resources}{bugtracker} ) )
+    {
+        if ( defined( $modMeta->{x_vcs} ) ) {
+            $modMeta->{resources}{bugtracker}{web} = 'https://forum.fhem.de/';
+        }
+    }
+
+    unless ( defined( $modMeta->{resources} )
+        && defined( $modMeta->{resources}{x_wiki} ) )
+    {
+        if ( defined( $modMeta->{x_vcs} ) ) {
+            $modMeta->{resources}{x_wiki}{web}     = 'https://wiki.fhem.de/';
+            $modMeta->{resources}{x_wiki}{modpath} = 'wiki/';
+        }
+    }
+
+    unless ( defined( $modMeta->{resources} )
+        && defined( $modMeta->{resources}{x_commandref} ) )
+    {
+        if ( defined( $modMeta->{x_vcs} ) ) {
+            $modMeta->{resources}{x_commandref}{web} =
+              'https://fhem.de/commandref.html';
+            $modMeta->{resources}{x_commandref}{modpath} = '#';
+        }
+    }
+
+    unless ( defined( $modMeta->{resources} )
+        && defined( $modMeta->{resources}{x_support_community} ) )
+    {
+        if ( defined( $modMeta->{x_vcs} ) ) {
+            $modMeta->{resources}{x_support_community}{web} =
+              'https://forum.fhem.de/';
+        }
+    }
+
+    unless ( defined( $modMeta->{resources} )
+        && defined( $modMeta->{resources}{repository} ) )
+    {
+        if ( defined( $modMeta->{x_vcs} ) ) {
+            $modMeta->{resources}{repository}{type} = 'svn';
+            $modMeta->{resources}{repository}{web} =
+              'https://svn.fhem.de/trac/browser/';
+            $modMeta->{resources}{repository}{url} =
+              'https://svn.fhem.de/fhem/';
+            $modMeta->{resources}{repository}{x_branch_master} = 'trunk';
+            $modMeta->{resources}{repository}{x_branch_dev}    = 'trunk';
+            $modMeta->{resources}{repository}{x_filepath}      = 'fhem/FHEM/';
+        }
+    }
+
     # Static meta information
     $modMeta->{dynamic_config} = 1;
     $modMeta->{'meta-spec'} = {
@@ -811,80 +900,13 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
     return undef;
 }
 
-# Set x_version based on existing meta data
-sub __SetXVersion {
-    return 0 unless ( __PACKAGE__ eq caller(0) );
-    my ($modMeta) = @_;
-    my $modName = $modMeta->{x_file}[4];
-
-    delete $modMeta->{x_version} if ( defined( $modMeta->{x_version} ) );
-
-    # Special handling for fhem.pl
-    if ( $modMeta->{x_file}[2] eq 'fhem.pl' ) {
-        $modMeta->{x_version} = 'fhem.pl:' . $modMeta->{version};
-    }
-
-    # Generate extended version info based
-    #   on base revision
-    elsif ( defined( $modMeta->{x_file}[7] eq 'generated/vcs' ) ) {
-
-        $modMeta->{x_version} =
-          $modMeta->{x_file}[2] . ':'
-          . (
-            $modMeta->{version} =~ m/0+\.0+(?:\.0+)?$/
-            ? '?'
-            : $modMeta->{version}
-          );
-    }
-
-    # Generate generic version to fill the gap
-    elsif ( defined( $modMeta->{x_file}[7] eq 'generated/blank' ) ) {
-        $modMeta->{x_version} = $modMeta->{x_file}[2] . ':?';
-    }
-
-    # Generate extended version info with added base revision
-    elsif ( defined( $modMeta->{x_vcs} )
-        && $modMeta->{x_vcs}[5] ne '' )
-    {
-        $modMeta->{x_version} =
-          $modMeta->{x_file}[2] . ':'
-          . (
-            $modMeta->{version} =~ m/^v0+\.0+(?:\.0+)*?$/
-            ? '?'
-            : $modMeta->{version}
-          )
-          . '-s'    # assume we only have Subversion for now
-          . $modMeta->{x_vcs}[5];
-    }
-
-    if ( defined( $modMeta->{x_version} ) ) {
-
-        # Add modified date to extended version
-        if ( defined( $modMeta->{x_vcs} ) ) {
-            $modMeta->{x_version} .= '/' . $modMeta->{x_vcs}[7];
-
-            # #FIXME can't use modified time because FHEM Update currently
-            # #      does not set it based on controls_fhem.txt :-(
-            # #      We need the block size from controls_fhem.txt here but
-            # #      doesn't make sense to load that file here...
-            # $modMeta->{x_version} .= '/' . $modMeta->{x_file}[6][9][2];
-            # $modMeta->{x_version} .= '+modified'
-            #   if ( defined( $modMeta->{x_vcs} )
-            #     && $modMeta->{x_vcs}[16] ne $modMeta->{x_file}[6][9][0] );
-        }
-        else {
-            $modMeta->{x_version} .= '/' . $modMeta->{x_file}[6][9][2];
-        }
-    }
-}
-
 sub __GetUpdatedata {
     return 0 unless ( __PACKAGE__ eq caller(0) );
     my $fh;
     my @fileList;
 
     # if there are 3rd party source file repositories involved
-    if ( open( $fh, '<' . './FHEM/controls.txt' ) ) {
+    if ( open( $fh, '<' . $attr{global}{modpath} . '/FHEM/controls.txt' ) ) {
         while ( my $l = <$fh> ) {
             push @fileList, $1 if ( $l =~ m/([^\/\s]+)$/ );
         }
@@ -898,7 +920,7 @@ sub __GetUpdatedata {
 
     # loop through control files
     foreach my $file (@fileList) {
-        if ( open( $fh, '<' . './FHEM/' . $file ) ) {
+        if ( open( $fh, '<' . $attr{global}{modpath} . '/FHEM/' . $file ) ) {
             my $filePrefix;
             my $srcRepoName;
             my $fileExtension;
@@ -1063,6 +1085,65 @@ m/^((\S+) (((....)-(..)-(..))_((..):(..):(..))) (\d+) (?:\.\/)?((.+\/)?((?:(\d+)
     }
 }
 
+# Set x_version based on existing metadata
+sub __SetXVersion {
+    return 0 unless ( __PACKAGE__ eq caller(0) );
+    my ($modMeta) = @_;
+    my $modName = $modMeta->{x_file}[4];
+
+    delete $modMeta->{x_version} if ( defined( $modMeta->{x_version} ) );
+
+    # Special handling for fhem.pl
+    if ( $modMeta->{x_file}[2] eq 'fhem.pl' ) {
+        $modMeta->{x_version} = 'fhem.pl:' . $modMeta->{version};
+    }
+
+    # Generate extended version info based
+    #   on base revision
+    elsif ( defined( $modMeta->{x_vcs} ) ) {
+
+        $modMeta->{x_version} =
+          $modMeta->{x_file}[2] . ':'
+          . (
+            $modMeta->{version} =~ m/^v0+\.0+(?:\.0+)*?$/
+            ? '?'
+            : $modMeta->{version}
+          )
+          . (
+            $modMeta->{x_file}[7] ne 'generated/vcs'
+              && $modMeta->{x_vcs}[5] ne ''
+            ? '-s'    # assume we only have Subversion for now
+              . $modMeta->{x_vcs}[5]
+            : ''
+          );
+    }
+
+    # Generate generic version to fill the gap
+    elsif ( defined( $modMeta->{x_file}[7] eq 'generated/blank' ) ) {
+        $modMeta->{x_version} = $modMeta->{x_file}[2] . ':?';
+    }
+
+    if ( defined( $modMeta->{x_version} ) ) {
+
+        # Add modified date to extended version
+        if ( defined( $modMeta->{x_vcs} ) ) {
+            $modMeta->{x_version} .= '/' . $modMeta->{x_vcs}[7];
+
+            # #FIXME can't use modified time because FHEM Update currently
+            # #      does not set it based on controls_fhem.txt :-(
+            # #      We need the block size from controls_fhem.txt here but
+            # #      doesn't make sense to load that file here...
+            # $modMeta->{x_version} .= '/' . $modMeta->{x_file}[6][9][2];
+            # $modMeta->{x_version} .= '+modified'
+            #   if ( defined( $modMeta->{x_vcs} )
+            #     && $modMeta->{x_vcs}[16] ne $modMeta->{x_file}[6][9][0] );
+        }
+        else {
+            $modMeta->{x_version} .= '/' . $modMeta->{x_file}[6][9][2];
+        }
+    }
+}
+
 1;
 
 =pod
@@ -1084,7 +1165,7 @@ m/^((\S+) (((....)-(..)-(..))_((..):(..):(..))) (\d+) (?:\.\/)?((.+\/)?((?:(\d+)
     "metadata",
     "meta"
   ],
-  "version": "v0.1.2",
+  "version": "v0.1.3",
   "release_status": "testing",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
@@ -1206,20 +1287,9 @@ m/^((\S+) (((....)-(..)-(..))_((..):(..):(..))) (\d+) (?:\.\/)?((.+\/)?((?:(\d+)
     }
   },
   "resources": {
-    "license": [
-      "https://fhem.de/#License"
-    ],
-    "homepage": "https://fhem.de/",
     "bugtracker": {
       "web": "https://forum.fhem.de/index.php/board,48.0.html",
-      "x_web_title": "FHEM Development"
-    },
-    "repository": {
-      "type": "svn",
-      "url": "https://svn.fhem.de/fhem/",
-      "x_branch_master": "trunk",
-      "x_branch_dev": "trunk",
-      "web": "https://svn.fhem.de/"
+      "x_web_title": "FHEM Forum: FHEM Development"
     }
   }
 }
@@ -1239,6 +1309,7 @@ m/^((\S+) (((....)-(..)-(..))_((..):(..):(..))) (\d+) (?:\.\/)?((.+\/)?((?:(\d+)
     "fhem",
     "fhem-core"
   ],
+  "x_copyright": "FHEM e.V., Rudolf König <vorstand@fhem.de>",
   "author": [
     "Rudolf König <r.koenig@koeniglich.de>"
   ],
@@ -1271,7 +1342,6 @@ m/^((\S+) (((....)-(..)-(..))_((..):(..):(..))) (\d+) (?:\.\/)?((.+\/)?((?:(\d+)
       },
       "suggests": {
         "Compress::Zlib": 0,
-        "configDB": 0,
         "FHEM::WinService": 0,
         "IO::Socket::INET6": 0,
         "Socket6": 0
@@ -1396,20 +1466,21 @@ m/^((\S+) (((....)-(..)-(..))_((..):(..):(..))) (\d+) (?:\.\/)?((.+\/)?((?:(\d+)
     }
   },
   "resources": {
-    "license": [
-      "https://fhem.de/#License"
-    ],
-    "homepage": "https://fhem.de/",
-    "bugtracker": {
-      "web": "https://forum.fhem.de/",
-      "x_web_title": "FHEM Forum"
+    "x_copyright": {
+      "web": "https://verein.fhem.de/"
     },
+    "x_privacy": {
+      "web": "https://fhem.de/Impressum.html#Datenschutz",
+      "title": "FHEM Data Privacy Statement"
+    },
+    "homepage": "https://fhem.de/",
     "repository": {
       "type": "svn",
+      "web": "https://svn.fhem.de/trac/browser/",
       "url": "https://svn.fhem.de/fhem/",
       "x_branch_master": "trunk",
       "x_branch_dev": "trunk",
-      "web": "https://svn.fhem.de/"
+      "x_filepath": "fhem/"
     }
   }
 }

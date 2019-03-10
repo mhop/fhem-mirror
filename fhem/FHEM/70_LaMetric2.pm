@@ -249,7 +249,7 @@ sub LaMetric2_Initialize($$) {
     #$hash->{parseParams} = 1; # not possible due to legacy msg command schema
     $hash->{'.msgParams'} = { parseParams => 1, };
 
-    return FHEM::Meta::Load( __FILE__, $hash );
+    return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
 #------------------------------------------------------------------------------

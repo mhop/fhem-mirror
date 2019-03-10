@@ -295,7 +295,7 @@ sub Wunderground_Initialize($) {
         'wind_speed_mph' => { rtype => 'mph', formula_symbol => 'Ws' }
     };
 
-    return FHEM::Meta::Load( __FILE__, $hash );
+    return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
 # regular Fn ##################################################################

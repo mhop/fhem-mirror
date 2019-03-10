@@ -146,7 +146,7 @@ sub msgConfig_Initialize($) {
         addToAttrList($_);
     }
 
-    return FHEM::Meta::Load( __FILE__, $hash );
+    return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
 # regular Fn ##################################################################

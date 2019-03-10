@@ -18,7 +18,7 @@ sub GEOFANCY_Initialize($) {
     $hash->{SetFn}    = "GEOFANCY_Set";
     $hash->{AttrList} = "devAlias disable:0,1 " . $readingFnAttributes;
 
-    return FHEM::Meta::Load( __FILE__, $hash );
+    return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
 # regular Fn ##################################################################
