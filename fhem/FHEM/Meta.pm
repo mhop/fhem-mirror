@@ -37,12 +37,24 @@ return "$@" if ($@);
 return $ret if ($ret);
 use version 0.77; our $VERSION = $META{version};
 
-# sub import(@) {
-#     my $pkg = caller(0);
-#
-#     if ( $pkg ne "main" ) {
-#     }
-# }
+our $coreUpdate;
+our %corePackageUpdates;
+our %coreFileUpdates;
+
+our %moduleUpdates;
+our %packageUpdates;
+our %fileUpdates;
+
+sub import(@) {
+    my $pkg = caller(0);
+
+    # Initially load update information
+    #   to be ready for meta analysis
+    __GetUpdatedata() unless ( defined($coreUpdate) );
+
+    if ( $pkg ne "main" ) {
+    }
+}
 
 # Loads Metadata for single module, based on filename
 sub InitMod($$;$) {

@@ -64,14 +64,6 @@ BEGIN {
     );
 }
 
-our $coreUpdate;
-our %corePackageUpdates;
-our %coreFileUpdates;
-
-our %moduleUpdates;
-our %packageUpdates;
-our %fileUpdates;
-
 sub Define($$) {
     my ( $hash, $def ) = @_;
     my @a = split( "[ \t][ \t]*", $def );
