@@ -37,6 +37,311 @@ return "$@" if ($@);
 return $ret if ($ret);
 use version 0.77; our $VERSION = $META{version};
 
+our %supportForum = (
+    title            => 'FHEM Forum',
+    url              => 'https://forum.fhem.de',
+    uri              => '/index.php/board,%BOARDID%.0.html',
+    rss              => '/index.php?action=.xml;type=rss;board=%BOARDID%',
+    default_language => 'de',
+);
+our %supportForumCategories = (
+    'Allgemeine Informationen' => {
+        'Forum-Software' => {
+            description =>
+              'Regeln, Diskussionen, Fragen zu diesem FHEM-Forum selbst',
+            boardId => 15,
+        },
+        'Wiki' => {
+            description =>
+'Kommentare, Korrekturvorschläge, Anregungen zu Artikeln im FHEM Wiki',
+            boardId => 80,
+        },
+        'Termine und Veranstaltungen' => {
+            description =>
+'Interessante Termine zu Messen oder sonstigen Veranstaltungen wie z.B. "FHEM Stammtische"',
+            boardId => 54,
+        },
+        'FHEM e.V. - Der Verein' => {
+            description => 'Gesprächsthemen rund um den FHEM e.V.',
+            boardId     => 90,
+
+            'Bildungsförderung' => {
+                boardId => 95,
+            },
+        },
+    },
+    'FHEM' => {
+        'Ankündigungen' => => {
+            description => 'Ankündigungen und Hinweise zu FHEM',
+            boardId     => 40,
+        },
+        'Anfängerfragen' => => {
+            description => 'Jeder fängt mal an ...',
+            boardId     => 18,
+        },
+        'Automatisierung' => {
+            description =>
+'Themen um Aufgaben mit FHEM zu automatisieren (at,notify,structure,watchdog,etc.)',
+            boardId => 20,
+
+            'DOIF' => {
+                boardId => 73,
+            },
+        },
+        'Codeschnipsel' => {
+            description => 'Nützliche Codeschnipsel',
+            boardId     => 8,
+        },
+        'English Corner' => {
+            language    => 'en',
+            description => 'Discussions about FHEM in English',
+            boardId     => 52,
+        },
+        'Frontends' => {
+            description =>
+              'Themen zu FHEM Frontends wie z.B. FHEMWEB, FLOORPLAN, etc.',
+            boardId => 19,
+
+            'FHEMWEB' => {
+                boardId => 75,
+            },
+            'FLOORPLAN' => {
+                boardId => 76,
+            },
+            'RSS' => {
+                boardId => 77,
+            },
+            'TabletUI' => {
+                boardId => 71,
+            },
+            'fronthem/smartVISU' => {
+                boardId => 72,
+            },
+            'SVG/Plots/logProxy' => {
+                boardId => 78,
+            },
+            'readingsGroup/readingsHistory' => {
+                boardId => 79,
+            },
+            'Sprachsteuerung' => {
+                boardId => 93,
+            },
+        },
+        'Mobile Devices' => {
+            description => 'FHEM auf mobilen Geräten',
+            boardId     => 37,
+        },
+        'Sonstiges' => {
+            description => 'Sonstige Themen mit Bezug zu FHEM',
+            boardId     => 46,
+        },
+    },
+    'FHEM - Hausautomations-Systeme' => {
+        '1Wire' => {
+            description => 'Themen zu 1Wire',
+            boardId     => 26,
+        },
+        'EnOcean' => {
+            description => 'Themen zu EnOcean',
+            boardId     => 27,
+        },
+        'Home Connect' => {
+            description =>
+'Themen zu Geräten, API und Modulentwicklung rund um Home Connect in FHEM',
+            boardId => 97,
+        },
+        'Homematic' => {
+            description => 'Themen zu HomeMatic und Zubehör',
+            boardId     => 22,
+        },
+        'InterTechno' => {
+            description => 'Themen zu InterTechno',
+            boardId     => 24,
+        },
+        'KNX/EIB' => {
+            description => 'Themen zu KNX/EIB',
+            boardId     => 51,
+        },
+        'MAX' => {
+            description => 'Themen zu MAX',
+            boardId     => 23,
+        },
+        'MQTT' => {
+            description => 'Themen zu MQTT',
+            boardId     => 94,
+        },
+        'RFXTRX' => {
+            description => 'Themen zu RFXTRX',
+            boardId     => 25,
+        },
+        'SlowRF' => {
+            description => 'Themen zu FS20, FHT, EM, WS, HMS',
+            boardId     => 21,
+        },
+        'Zigbee' => {
+            description => 'Mesh-Netz mit Hue, Tradfri, Xiaomi, usw.',
+            boardId     => 99,
+        },
+        'ZWave' => {
+            description => 'Themen zu ZWave',
+            boardId     => 28,
+        },
+        'Sonstige Systeme' => {
+            description => 'Sonstige Hausautomations-Systeme',
+            boardId     => 29,
+        },
+        'Unterstützende Dienste' => {
+            description =>
+'Themen zu unterstützenden Diensten und Modulen wie z.B. Calendar, HCS, Twiligth, Weather, etc.',
+            boardId => 44,
+
+            'Kalendermodule' => {
+                boardId => 85,
+            },
+            'Wettermodule' => {
+                boardId => 86,
+            },
+        },
+    },
+    'FHEM - Hardware' => {
+        'FRITZ!Box' => {
+            description => 'FHEM auf AVM FRITZ!Box',
+            boardId     => 31,
+        },
+        'Network Attached Storage (NAS)' => {
+            description => 'FHEM auf NAS-Systemen (Synology, etc.)',
+            boardId     => 30,
+        },
+        'Einplatinencomputer' => {
+            description =>
+'FHEM auf Einplatinencomputern (z.B. Raspberry Pi, Beagle Bone, etc.)',
+            boardId => 32,
+        },
+        'Server - Linux' => {
+            description => 'FHEM auf Linux Servern',
+            boardId     => 33,
+        },
+        'Server - Mac' => {
+            description => 'FHEM auf macOS',
+            boardId     => 63,
+        },
+        'Server - Windows' => {
+            description => 'FHEM auf Windows Server',
+            boardId     => 34,
+        },
+    },
+    'FHEM - Anwendungen' => {
+        'Beleuchtung' => {
+            description => 'Alles was mit Beleuchtung zu tun hat',
+            boardId     => 62,
+        },
+        'Heizungssteuerung/Raumklima' => {
+            description =>
+'Anwendungen rund um Heizkörper, Heizungsanlagen, Thermen, Wärme, Raumtemperatur, Belüftung, etc.',
+            boardId => 60,
+        },
+        'Multimedia' => {
+            description =>
+              'Themen zu Multimediageräten, TV, Fernbedienungen, etc.',
+            boardId => 53,
+        },
+        'Solaranlagen' => {
+            description =>
+              'Themen rund um Solaranlagen zur Wärme- oder Stromgewinnung',
+            boardId => 61,
+        },
+    },
+    'FHEM - Entwicklung' => {
+        'FHEM Development' => {
+            description => 'FHEM Developers Corner',
+            boardId     => 48,
+        },
+        'Wunschliste' => {
+            description =>
+              'Anregungen, Ideen, Vorschläge für FHEM Erweiterungen',
+            boardId => 35,
+        },
+    },
+    'CUL' => {
+        'Ankündigungen' => {
+            description => 'Ankündigungen und Hinweise zur CUL-Firmware',
+            boardId     => 41,
+        },
+        'cul-fans' => {
+            boardId => 6,
+        },
+        'Hard- und Firmware' => {
+            description =>
+'Themen in Bezug auf die CUL Hard- und Firmware. Dazu zählen alle Geräte der CUL und CUN Familie.',
+            boardId => 47,
+        },
+    },
+    'CUL - Entwicklung' => {
+        'CUL Development' => {
+            description => 'CUL Developers Corner',
+            boardId     => 49,
+        },
+        'Fehlerberichte' => {
+            description => 'Berichte zu Fehlern in der CUL-Firmware',
+            boardId     => 42,
+        },
+        'Wunschliste' => {
+            description =>
+              'Anregungen, Ideen, Vorschläge für CUL-Firmware Erweiterungen',
+            boardId => 43,
+        },
+    },
+    'Verschiedenes' => {
+        'Bastelecke' => {
+            description =>
+'Projekte für Bastler, die gerne auch mal zum Lötkolben greifen.',
+            boardId => 17,
+
+            'ESP8266' => {
+                boardId => 74,
+            },
+            '3D-Druck/Gehäuse' => {
+                boardId => 92,
+            },
+            'MySensors' => {
+                boardId => 96,
+            },
+        },
+        'Marktplatz - Güter' => {
+            description => 'Kein gewerblicher oder gewerbsmäßiger Handel',
+            boardId     => 16,
+
+            'Sammelbestellungen' => {
+                boardId => 98,
+            },
+        },
+        'Marktplatz - Dienstleistungen' => {
+            boardId => 67,
+        },
+        'Marktplatz - Kommerzielle Güter' => {
+            description => '',
+            boardId     => 101,
+        },
+        'Marktplatz - Kommerzielle Dienstleistungen' => {
+            description => '',
+            boardId     => 100,
+        },
+        'Off-Topic' => {
+            description => 'Allgemeine Themen',
+            boardId     => 39,
+        },
+        'Projekte' => {
+            description =>
+'Vorstellung von größeren Projekten die mit FHEM realisiert wurden',
+            boardId => 50,
+        },
+        'User stellen sich vor' => {
+            description => 'Das "Who is Who" von FHEM',
+            boardId     => 7,
+        },
+    }
+);
+
 our %moduleMaintainers;
 
 our $coreUpdate;
@@ -971,9 +1276,9 @@ sub __GetUpdatedata {
     $coreUpdate         = undef;
     %corePackageUpdates = ();
     %coreFileUpdates    = ();
-    %moduleUpdates  = ();
-    %packageUpdates = ();
-    %fileUpdates    = ();
+    %moduleUpdates      = ();
+    %packageUpdates     = ();
+    %fileUpdates        = ();
 
     # if there are 3rd party source file repositories involved
     if ( open( $fh, '<' . $attr{global}{modpath} . '/FHEM/controls.txt' ) ) {
