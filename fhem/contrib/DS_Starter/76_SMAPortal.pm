@@ -48,6 +48,7 @@ use JSON qw(decode_json);
 
 # Versions History intern
 our %SMAPortal_vNotesIntern = (
+  "1.2.2"  => "11.03.2019  new Erromessage analyze added, make ready for Meta.pm ", 
   "1.2.1"  => "10.03.2019  behavior of state changed, commandref revised ", 
   "1.2.0"  => "09.03.2019  integrate weather data, minor fixes ",
   "1.1.0"  => "09.03.2019  make get data more stable, new attribute \"getDataRetries\" ",
@@ -76,7 +77,9 @@ sub SMAPortal_Initialize($) {
                        "timeout ". 
                        "userAgent ".
                        $readingFnAttributes;
- }
+
+return FHEM::Meta::InitMod( __FILE__, $hash );           # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
+}
 
 ###############################################################
 #                         SMAPortal Define
@@ -924,6 +927,11 @@ sub SMAPortal_analivedat($$) {
 			      Log3 $name, 3, "$name - The current data cannot be retrieved from PV system, get data again.";
 				  $retry = 1;
 			  }
+			  if($k =~ /ErrorMessages/ && $new_val =~ /.*Communication with the Sunny Home Manager is currently not possible.*/) {
+			      # Energiedaten konnten nicht ermittelt werden, Daten neu lesen mit Zeitverzögerung
+			      Log3 $name, 3, "$name - Communication with the Sunny Home Manager currently impossible, get data again.";
+				  $retry = 1;
+			  }
           }
       }
   }
@@ -948,8 +956,9 @@ return;
 1;
 
 =pod
+=encoding utf8
 =item summary    Module for communication with SMA-Portal
-=item summary_DE Mdul zur Kommunikation mit dem SMA-Portal
+=item summary_DE Modul zur Kommunikation mit dem SMA-Portal
 
 =begin html
 
