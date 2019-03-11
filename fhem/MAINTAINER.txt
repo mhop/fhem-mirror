@@ -529,10 +529,9 @@ FHEM/99_Venetian.pm          Christian.Kühnel     Automatisierung
 FHEM/AttrTemplate.pm         rudolfkoenig         Automatisierung
 FHEM/Blocking.pm             rudolfkoenig         Automatisierung
 FHEM/Color.pm                justme1968           Sonstiges
+FHEM/CoProcess.pm            justme1968           Sonstiges
 FHEM/DarkSkyAPI.pm           CoolTux              Unterstuetzende Dienste/Wettermodule
 FHEM/DevIo.pm                rudolfkoenig         Sonstiges
-FHEM/CoProcess.pm            justme1968           Sonstiges
-FHEM/Color.pm                justme1968           Sonstiges
 FHEM/FritzBoxUtils.pm        rudolfkoenig         FRITZ!Box
 FHEM/GPUtils.pm              ntruchsess           FHEM Development
 FHEM/HMCCUConf.pm            zap                  HomeMatic
