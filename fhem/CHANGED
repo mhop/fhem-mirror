@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 72_XiaomiDevice: added map exclusion features of V2 vacuum
  - feature: 32_withings: added some new sleep readings
  - bugfix:  38_netatmo: fix after server changes
  - feature: 36_WMBUS: add preliminary support for Letrika solar inverters

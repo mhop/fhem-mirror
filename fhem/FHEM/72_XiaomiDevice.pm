@@ -130,7 +130,7 @@ sub XiaomiDevice_Initialize($) {
   $hash->{WriteFn}      = "XiaomiDevice_Write";
   $hash->{DbLog_splitFn}= "XiaomiDevice_DbLog_splitFn";
   $hash->{AttrFn}       = "XiaomiDevice_Attr";
-  $hash->{AttrList}     = "subType:AirPurifier,Humidifier,VacuumCleaner,SmartFan,SmartLamp,EyeCare,WaterPurifier,Camera,RiceCooker,PowerPlug intervalData intervalSettings preset disable:0,1 zone_names point_names ".
+  $hash->{AttrList}     = "subType:AirPurifier,Humidifier,VacuumCleaner,SmartFan,SmartLamp,EyeCare,WaterPurifier,Camera,RiceCooker,PowerPlug intervalData intervalSettings preset disable:0,1 zone_names point_names map_names ".
                           $readingFnAttributes;
 
 }
@@ -580,7 +580,6 @@ sub XiaomiDevice_Set($$@) {
     $list  .=  ' start:noArg stop:noArg pause:noArg spot:noArg charge:noArg locate:noArg dnd_enabled:on,off dnd_start dnd_end move remotecontrol:start,stop,forward,left,right reset_consumable:filter,mainbrush,sidebrush,sensors timezone volume:slider,0,1,100 volume_test:noArg';
     $list  .=  ' carpet_mode:on,off';
     $list  .=  '  sleep:noArg wakeup:noArg';
-    $list  .=  ' save_map';
 
     $list  .=  ' fan_power:slider,1,1,100' if(defined($hash->{model}) && $hash->{model} eq "rockrobo.vacuum.v1");
     $list  .=  ' cleaning_mode:quiet,balanced,turbo,max,mop';
@@ -596,6 +595,18 @@ sub XiaomiDevice_Set($$@) {
     } else {
       $list  .=  ' goto';
     }
+    }
+    if(!defined($hash->{model}) || $hash->{model} eq "roborock.vacuum.s5" || $hash->{model} ne "test") {
+      if(defined($hash->{helper}{map_names})) {
+        $list  .=  ' save_map:reset,'.$hash->{helper}{map_names}.' start_edit_map:noArg end_edit_map:noArg reset_map:noArg use_new_map:noArg use_old_map:noArg get_persist_map:noArg get_fresh_map:noArg';
+      } else {
+        $list  .=  ' save_map start_edit_map:noArg end_edit_map:noArg reset_map:noArg use_new_map:noArg use_old_map:noArg get_persist_map:noArg get_fresh_map:noArg';
+      }
+    }
+    if(!defined($hash->{model}) || $hash->{model} eq "roborock.vacuum.s5" || $hash->{model} ne "test") {
+      if(defined(ReadingsVal($name,"lab_status",undef))) {
+        $list  .=  ' lab_status:yes,no';
+      }
     }
 
     if (defined($hash->{helper}{timers})&&($hash->{helper}{timers}>0))
@@ -927,7 +938,82 @@ sub XiaomiDevice_Set($$@) {
     my $packetid = $hash->{helper}{packetid};
     $hash->{helper}{packetid} = $packetid+1;
     $hash->{helper}{packet}{$packetid} = "save_map";
-    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"save_map","params":['.$arg[0].']}' );
+    my $map = "[".join("],[", @arg)."]";
+    $map = $hash->{helper}{maps}{$arg[0]} if(defined($hash->{helper}{maps}) && defined($hash->{helper}{maps}{$arg[0]}));
+    $map = "" if($arg[0] eq "reset");
+    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"save_map","params":['.$map.']}' );
+  }
+  elsif ($cmd eq 'start_edit_map')
+  {
+    my $packetid = $hash->{helper}{packetid};
+    $hash->{helper}{packetid} = $packetid+1;
+    $hash->{helper}{packet}{$packetid} = "start_edit_map";
+    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"start_edit_map","params":[]}' );
+  }
+  elsif ($cmd eq 'end_edit_map')
+  {
+    my $packetid = $hash->{helper}{packetid};
+    $hash->{helper}{packetid} = $packetid+1;
+    $hash->{helper}{packet}{$packetid} = "end_edit_map";
+    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"end_edit_map","params":[]}' );
+  }
+  elsif ($cmd eq 'reset_map')
+  {
+    my $packetid = $hash->{helper}{packetid};
+    $hash->{helper}{packetid} = $packetid+1;
+    $hash->{helper}{packet}{$packetid} = "reset_map";
+    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"reset_map","params":[]}' );
+  }
+  elsif ($cmd eq 'use_new_map')
+  {
+    my $packetid = $hash->{helper}{packetid};
+    $hash->{helper}{packetid} = $packetid+1;
+    $hash->{helper}{packet}{$packetid} = "use_new_map";
+    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"use_new_map","params":[]}' );
+  }
+  elsif ($cmd eq 'use_old_map')
+  {
+    my $packetid = $hash->{helper}{packetid};
+    $hash->{helper}{packetid} = $packetid+1;
+    $hash->{helper}{packet}{$packetid} = "use_old_map";
+    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"use_old_map","params":[]}' );
+  }
+  elsif ($cmd eq 'get_persist_map')
+  {
+    my $packetid = $hash->{helper}{packetid};
+    $hash->{helper}{packetid} = $packetid+1;
+    $hash->{helper}{packet}{$packetid} = "get_persist_map";
+    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_persist_map","params":[]}' );
+    my $packetid = $hash->{helper}{packetid};
+    $hash->{helper}{packetid} = $packetid+1;
+    $hash->{helper}{packet}{$packetid} = "get_persist_map";
+    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_persist_map_v1","params":[]}' );
+    my $packetid = $hash->{helper}{packetid};
+    $hash->{helper}{packetid} = $packetid+1;
+    $hash->{helper}{packet}{$packetid} = "get_persist_map";
+    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_persist_map_v2","params":[]}' );
+  }
+  elsif ($cmd eq 'get_fresh_map')
+  {
+    my $packetid = $hash->{helper}{packetid};
+    $hash->{helper}{packetid} = $packetid+1;
+    $hash->{helper}{packet}{$packetid} = "get_fresh_map";
+    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_fresh_map","params":[]}' );
+    my $packetid = $hash->{helper}{packetid};
+    $hash->{helper}{packetid} = $packetid+1;
+    $hash->{helper}{packet}{$packetid} = "get_fresh_map";
+    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_fresh_map_v1","params":[]}' );
+    my $packetid = $hash->{helper}{packetid};
+    $hash->{helper}{packetid} = $packetid+1;
+    $hash->{helper}{packet}{$packetid} = "get_fresh_map";
+    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_fresh_map_v2","params":[]}' );
+  }
+  elsif ($cmd eq 'lab_status')
+  {
+    my $packetid = $hash->{helper}{packetid};
+    $hash->{helper}{packetid} = $packetid+1;
+    $hash->{helper}{packet}{$packetid} = "lab_status";
+    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"set_lab_status","params":['.(($arg[0] eq "yes")?'1':'0').']}' );
   }
   elsif ($cmd eq 'timezone')
   {
@@ -1559,6 +1645,20 @@ sub XiaomiDevice_ReadZones($) {
     delete $hash->{helper}{point_names};
   }
 
+  if(defined($attr{$name}) && defined($attr{$name}{map_names})) {
+    my @definitionnames;
+    my @definitions = split(" ",$attr{$name}{map_names});
+    foreach my $singledefinition (@definitions) {
+      my @definitionparts = split(":",$singledefinition);
+      push(@definitionnames,$definitionparts[0]);
+      $hash->{helper}{maps}{$definitionparts[0]} = $definitionparts[1];
+    }
+    $hash->{helper}{map_names} = join(',',@definitionnames);
+  } else {
+    delete $hash->{helper}{maps};
+    delete $hash->{helper}{map_names};
+  }
+
   return undef;
 }
 
@@ -1974,6 +2074,7 @@ sub XiaomiDevice_ParseJSON($$)
   return undef if($msgtype eq "app_wakeup_robot");
   return undef if($msgtype eq "app_sleep");
   return undef if($msgtype eq "save_map");
+  return undef if($msgtype eq "start_edit_map");
 
   if($msgtype eq "air_data")
   {
@@ -3046,7 +3147,7 @@ sub XiaomiDevice_Attr($$$) {
     return undef;
   }
 
-  if($attrName eq "zone_names" || $attrName eq "point_names") {
+  if($attrName eq "zone_names" || $attrName eq "point_names" || $attrName eq "map_names") {
     my $hash = $defs{$name};
     InternalTimer( gettimeofday() + 2, "XiaomiDevice_ReadZones", $hash, 0);
   }
@@ -3181,6 +3282,14 @@ sub XiaomiDevice_DbLog_splitFn($) {
    <li><code>goto</code> pointX,pointY <i>(VacuumCleaner)</i>
    <br>
    Go to point X/Y (needs to be valid on the map)
+   </li><br>
+   <li><code>save_map</code> ?,pointX,pointY <i>(VacuumCleaner)</i>
+   <br>
+   Save exclusion lines/zones (needs to be valid on the map)  <br>e.g.: 1,26353,26920,27314,26042 0,25375,26490,25884,26490,25884,25860,25375,25860
+   </li><br>
+   <li><code>start_edit_map</code> <i>(VacuumCleaner)</i>
+   <br>
+   Start editing the map
    </li><br>
    <li><code>locate</code> <i>(VacuumCleaner)</i>
    <br>
@@ -3376,6 +3485,18 @@ sub XiaomiDevice_DbLog_splitFn($) {
    <li><code>preset</code>  <i>(AirPurifier)</i>
       <br>
       Custom preset for dynamic mode changes (defaults to 'mode auto')
+   </li><br>
+   <li><code>point_names</code> point1:[X,Y] point2:[X,Y] <i>(VacuumCleaner)</i>
+      <br>
+      Custom named presets for points
+   </li><br>
+   <li><code>zone_names</code> combinedzone:[X1,Y1,X2,Y2,times],[X1,Y1,X2,Y2,times] zone:[X1,Y1,X2,Y2,times] <i>(VacuumCleaner)</i>
+      <br>
+      Custom named presets for cleaning zones
+   </li><br>
+   <li><code>map_names</code> line_and_area:[1,X1,Y1,X2,Y2],[0,X1,Y1,X2,Y2,X3,Y3,X4,Y4] <i>(VacuumCleaner)</i>
+      <br>
+      Custom named presets for exclusion maps
    </li><br>
   </ul>
 </ul>
