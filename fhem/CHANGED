@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  49_SSCam: V8.11.4, make SSCam ready for SVS version 8.2.3-5829
  - feature: mqtt2.template: add filters to limit shown templates
  - feature: 72_XiaomiDevice: added map exclusion features of V2 vacuum
  - feature: 32_withings: added some new sleep readings
