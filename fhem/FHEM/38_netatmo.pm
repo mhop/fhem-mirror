@@ -59,7 +59,7 @@ netatmo_Initialize($)
                       "setpoint_duration ".
                       "webhookURL webhookPoll:0,1 ".
                       "addresslimit ".
-                      "serverAPI ";
+                      #"serverAPI ";
   $hash->{AttrList} .= $readingFnAttributes;
 }
 
@@ -436,7 +436,7 @@ netatmo_Define($$)
 
     $modules{$hash->{TYPE}}{defptr}{"account"} = $hash;
 
-    $hash->{helper}{apiserver} = AttrVal($name, "serverAPI", "api.netatmo.com");
+    $hash->{helper}{apiserver} = "api.netatmo.com";#AttrVal($name, "serverAPI", "api.netatmo.com");
 
   } else {
     return "Usage: define <name> netatmo device\
@@ -729,7 +729,7 @@ netatmo_getToken($)
     url => "https://".$hash->{helper}{apiserver}."/oauth2/token",
     timeout => 5,
     noshutdown => 1,
-    data => {grant_type => 'password', client_id => $hash->{helper}{client_id},  client_secret=> $hash->{helper}{client_secret}, username => netatmo_decrypt($hash->{helper}{username}), password => netatmo_decrypt($hash->{helper}{password}), scope => 'read_station read_thermostat write_thermostat read_camera write_camera access_camera read_presence write_presence access_presence read_homecoach'},
+    data => {grant_type => 'password', client_id => $hash->{helper}{client_id},  client_secret=> $hash->{helper}{client_secret}, username => netatmo_decrypt($hash->{helper}{username}), password => netatmo_decrypt($hash->{helper}{password}), scope => 'read_station read_thermostat write_thermostat read_camera write_camera access_camera read_presence write_presence access_presence read_homecoach read_smokedetector'},
   });
 
   netatmo_dispatch( {hash=>$hash,type=>'token'},$err,$data );
@@ -755,7 +755,7 @@ netatmo_getAppToken($)
     timeout => 5,
     noshutdown => 1,
     header => "$auth",
-    data => {app_identifier=>'com.netatmo.camera', grant_type => 'password', password => netatmo_decrypt($hash->{helper}{password}), scope => 'write_camera read_camera access_camera read_presence write_presence access_presence read_station', username => netatmo_decrypt($hash->{helper}{username})},
+    data => {app_identifier=>'com.netatmo.camera', grant_type => 'password', password => netatmo_decrypt($hash->{helper}{password}), scope => 'write_camera read_camera access_camera read_presence write_presence access_presence read_station read_smokedetector', username => netatmo_decrypt($hash->{helper}{username})},
   });
 
 
@@ -2172,7 +2172,7 @@ netatmo_setNotifications($$$)
   if( !defined($iohash->{csrf_token}) )
   {
     my($err0,$data0) = HttpUtils_BlockingGet({
-      url => "https://auth.netatmo.com/access/checklogin",
+      url => "https://dev.netatmo.com/en-US",
       timeout => 10,
       noshutdown => 1,
     });
@@ -2181,7 +2181,7 @@ netatmo_setNotifications($$$)
       Log3 $name, 1, "$name: csrf call failed! ".$err0;
       return undef;
     }
-    $data0 =~ /ci_csrf_netatmo" value="(.*)"/;
+    $data0 =~ /csrf_value: "(.*)",/;
     my $tmptoken = $1;
     $iohash->{csrf_token} = $tmptoken;
     if(!defined($iohash->{csrf_token})) {
@@ -3412,7 +3412,7 @@ netatmo_parseReadings($$;$)
       if(scalar(@{$json->{body}}) == 0)
       {
         $hash->{status} = "no data";
-        readingsSingleUpdate( $hash, "active", "dead", 1 ) if($hash->{helper}{last_status_store} > 0 && $hash->{helper}{last_status_store} < (int(time) - 7200) );
+        readingsSingleUpdate( $hash, "active", "dead", 1 ) if(defined($hash->{helper}{last_status_store}) && $hash->{helper}{last_status_store} < (int(time) - 7200) );
       }
 
       foreach my $values ( @{$json->{body}}) {
