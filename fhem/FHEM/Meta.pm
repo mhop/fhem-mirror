@@ -1123,7 +1123,7 @@ sub __SetXVersion {
     }
 
     # Generate generic version to fill the gap
-    elsif ( defined( $modMeta->{x_file}[7] eq 'generated/blank' ) ) {
+    elsif ( $modMeta->{x_file}[7] eq 'generated/blank' ) {
         $modMeta->{x_version} = $modMeta->{x_file}[2] . ':?';
     }
 
@@ -1169,7 +1169,7 @@ sub __SetXVersion {
     "metadata",
     "meta"
   ],
-  "version": "v0.1.4",
+  "version": "v0.1.5",
   "release_status": "testing",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
