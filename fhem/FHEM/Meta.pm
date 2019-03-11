@@ -37,6 +37,8 @@ return "$@" if ($@);
 return $ret if ($ret);
 use version 0.77; our $VERSION = $META{version};
 
+our %moduleMaintainers;
+
 our $coreUpdate;
 our %corePackageUpdates;
 our %coreFileUpdates;
@@ -48,9 +50,10 @@ our %fileUpdates;
 sub import(@) {
     my $pkg = caller(0);
 
-    # Initially load update information
+    # Initially load information
     #   to be ready for meta analysis
     __GetUpdatedata() unless ( defined($coreUpdate) );
+    __GetMaintainerdata() unless ( keys %moduleMaintainers > 0 );
 
     if ( $pkg ne "main" ) {
     }
@@ -148,7 +151,10 @@ sub Load(;$$) {
         return "$@";
     }
 
-    __GetUpdatedata() if ($reload);
+    if ($reload) {
+        __GetUpdatedata();
+        __GetMaintainerdata();
+    }
 
     foreach my $modName (@lmodules) {
 
@@ -904,10 +910,70 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
     return undef;
 }
 
+sub __GetMaintainerdata {
+    return 0 unless ( __PACKAGE__ eq caller(0) );
+    my $fh;
+    %moduleMaintainers = ();
+
+    if ( open( $fh, '<' . $attr{global}{modpath} . '/MAINTAINER.txt' ) ) {
+        my $skip = 1;
+        while ( my $l = <$fh> ) {
+            $skip = 0 if ( $l =~ m/^===+$/ );
+            next if ($skip);
+
+            my @line = map {
+                s/^\s+//;    # strip leading spaces
+                s/\s+$//;    # strip trailing spaces
+                $_           # return the modified string
+            } split( "[ \t][ \t]*", $l, 3 );
+
+            if ( $line[0] =~ m/^((.+\/)?((?:(\d+)_)?(.+)\.(.+)))$/ ) {
+
+                # Ignore all files that are not a main module for now
+                next unless ($4);
+
+                my @maintainer;
+                $maintainer[0][0] = $1;    # complete match
+                $maintainer[0][1] = $2;    # relative file path
+                $maintainer[0][2] = $3;    # file name
+                $maintainer[0][3] = $4;    # order number, may be undefined
+                $maintainer[0][4] =
+                  $3 eq 'fhem.pl' ? 'Global' : $5;    # FHEM module name
+                $maintainer[0][5] = $6;               # file extension
+                $maintainer[1]    = $line[1];         # Maintainer alias name
+                $maintainer[2]    = $line[2];         # Forum support section
+
+                if ( defined( $moduleMaintainers{ $maintainer[0][4] } ) ) {
+                    Log 1,
+                        __PACKAGE__
+                      . "::__GetMaintainerdata ERROR: Duplicate entry:\n"
+                      . ' 1st: '
+                      . $moduleMaintainers{ $maintainer[0][4] }[0][0] . ' '
+                      . $moduleMaintainers{ $maintainer[0][4] }[1] . ' '
+                      . $moduleMaintainers{ $maintainer[0][4] }[2]
+                      . "\n 2nd: "
+                      . join( ' ', @line );
+                }
+                else {
+                    $moduleMaintainers{ $maintainer[0][4] } = \@maintainer;
+                }
+            }
+        }
+
+        close($fh);
+    }
+}
+
 sub __GetUpdatedata {
     return 0 unless ( __PACKAGE__ eq caller(0) );
     my $fh;
     my @fileList;
+    $coreUpdate         = undef;
+    %corePackageUpdates = ();
+    %coreFileUpdates    = ();
+    %moduleUpdates  = ();
+    %packageUpdates = ();
+    %fileUpdates    = ();
 
     # if there are 3rd party source file repositories involved
     if ( open( $fh, '<' . $attr{global}{modpath} . '/FHEM/controls.txt' ) ) {
@@ -1169,7 +1235,7 @@ sub __SetXVersion {
     "metadata",
     "meta"
   ],
-  "version": "v0.1.5",
+  "version": "v0.1.6",
   "release_status": "testing",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
