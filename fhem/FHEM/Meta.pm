@@ -848,14 +848,6 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
     }
 
     unless ( defined( $modMeta->{resources} )
-        && defined( $modMeta->{resources}{bugtracker} ) )
-    {
-        if ( defined( $modMeta->{x_vcs} ) ) {
-            $modMeta->{resources}{bugtracker}{web} = 'https://forum.fhem.de/';
-        }
-    }
-
-    unless ( defined( $modMeta->{resources} )
         && defined( $modMeta->{resources}{x_wiki} ) )
     {
         if ( defined( $modMeta->{x_vcs} ) ) {
@@ -1177,7 +1169,7 @@ sub __SetXVersion {
     "metadata",
     "meta"
   ],
-  "version": "v0.1.3",
+  "version": "v0.1.4",
   "release_status": "testing",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
@@ -1327,6 +1319,17 @@ sub __SetXVersion {
   ],
   "x_fhem_maintainer": [
     "rudolfkoenig"
+  ],
+  "x_fhem_dependant_modules": [
+  ],
+  "x_fhem_parent_modules": [
+  ],
+  "x_fhem_child_modules": [
+    "apptime", "backup", "cmdalias", "configdb", "copy", "count", "CULflash", "fhemdebug", "fheminfo", "IF", "MSG", "notice", "restore", "setuuid", "template", "update", "uptime", "version", "XmlList"
+  ],
+  "x_fhem_master_modules": [
+  ],
+  "x_fhem_slave_modules": [
   ],
   "prereqs": {
     "runtime": {

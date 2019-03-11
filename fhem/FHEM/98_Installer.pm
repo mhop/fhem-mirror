@@ -209,14 +209,17 @@ sub Notify($$) {
     return;
 }
 
+#TODO
+# - filter out FHEM command modules from FHEMWEB view (+attribute) -> difficult as not pre-loaded
+# - disable FHEM automatic link to device instances in output
 sub Get($$@) {
 
     my ( $hash, $name, @aa ) = @_;
 
     my ( $cmd, @args ) = @aa;
 
-    if ( $cmd eq 'showModuleInfo' ) {
-        return "usage: $cmd <MODULE>" if ( @args != 1 );
+    if ( lc($cmd) eq 'showmoduleinfo' ) {
+        return "usage: $cmd MODULE" if ( @args != 1 );
 
         my $ret = CreateMetadataList( $hash, $cmd, $args[0] );
         return $ret;
@@ -224,7 +227,7 @@ sub Get($$@) {
     else {
         my $fhemModules;
 
-        foreach ( sort keys %modules ) {
+        foreach ( sort { "\L$a" cmp "\L$b" } keys %modules ) {
             next if ( $_ eq 'Global' );
             $fhemModules .= ',' if ($fhemModules);
             $fhemModules .= $_;
@@ -831,6 +834,14 @@ sub WriteReadings($$) {
         && !defined( $decode_json->{error} ) );
 }
 
+#TODO
+# - show master/slave dependencies
+# - show parent/child dependencies
+# - show other dependant/related modules
+# - show community and commercial support
+#    - aligned with bugtracker
+# - fill empty keywords
+# - Get Community Support URL from MAINTAINERS.txt
 sub CreateMetadataList ($$$) {
     my ( $hash, $getCmd, $modName ) = @_;
     $modName = 'Global' if ( uc($modName) eq 'FHEM' );
@@ -923,6 +934,49 @@ sub CreateMetadataList ($$$) {
     foreach my $mAttr (@mAttrs) {
         next
           if ( $mAttr eq 'copyright' && !defined( $modMeta->{x_copyright} ) );
+        next
+          if (
+            $mAttr eq 'description'
+            && (   !defined( $modMeta->{description} )
+                || $modMeta->{description} eq 'n/a'
+                || $modMeta->{description} eq '' )
+          );
+        next
+          if (
+            $mAttr eq 'bugtracker'
+            && (   !defined( $modMeta->{resources} )
+                || !defined( $modMeta->{resources}{bugtracker} ) )
+          );
+        next
+          if (
+            $mAttr eq 'homepage'
+            && (   !defined( $modMeta->{resources} )
+                || !defined( $modMeta->{resources}{homepage} ) )
+          );
+        next
+          if (
+            $mAttr eq 'wiki'
+            && (   !defined( $modMeta->{resources} )
+                || !defined( $modMeta->{resources}{x_wiki} ) )
+          );
+        next
+          if (
+            $mAttr eq 'command_reference'
+            && (   !defined( $modMeta->{resources} )
+                || !defined( $modMeta->{resources}{x_commandref} ) )
+          );
+        next
+          if (
+            $mAttr eq 'community_support'
+            && (   !defined( $modMeta->{resources} )
+                || !defined( $modMeta->{resources}{x_support_community} ) )
+          );
+        next
+          if (
+            $mAttr eq 'commercial_support'
+            && (   !defined( $modMeta->{resources} )
+                || !defined( $modMeta->{resources}{x_support_commercial} ) )
+          );
         next
           if (
             $mAttr eq 'privacy'
@@ -1033,8 +1087,7 @@ sub CreateMetadataList ($$$) {
                   ? $modMeta->{resources}{x_commandref}{title}
                   : (
                     $modMeta->{resources}{x_commandref}{web} =~
-                      m/^(?:https?:\/\/)?fhem\.de/i
-                    ? 'FHEM Public Command Reference'
+                      m/^(?:https?:\/\/)?fhem\.de/i ? 'Public'
                     : ''
                   );
 
@@ -1085,6 +1138,52 @@ sub CreateMetadataList ($$$) {
 
                 $l .=
                   '<a href="' . $url . '" target="_blank">' . $title . '</a>';
+            }
+
+            elsif ($mAttr eq 'community_support'
+                && defined( $modMeta->{resources} )
+                && defined( $modMeta->{resources}{x_support_community} )
+                && defined( $modMeta->{resources}{x_support_community}{web} ) )
+            {
+                my $title =
+                  defined(
+                    $modMeta->{resources}{x_support_community}{x_web_title} )
+                  ? $modMeta->{resources}{x_support_community}{x_web_title}
+                  : (
+                    $modMeta->{resources}{x_support_community}{web} =~
+                      m/^(?:https?:\/\/)?forum\.fhem\.de/i ? 'FHEM Forum'
+                    : ''
+                  );
+
+                $title = 'FHEM Forum: ' . $title
+                  if ( $title ne ''
+                    && $title !~ m/^FHEM Forum/i
+                    && $modMeta->{resources}{x_support_community}{web} =~
+                    m/^(?:https?:\/\/)?forum\.fhem\.de/i );
+
+                $l .=
+                    '<a href="'
+                  . $modMeta->{resources}{x_support_community}{web}
+                  . '" target="_blank">'
+                  . $title . '</a>';
+            }
+
+            elsif ($mAttr eq 'commercial_support'
+                && defined( $modMeta->{resources} )
+                && defined( $modMeta->{resources}{x_support_commercial} )
+                && defined( $modMeta->{resources}{x_support_commercial}{web} ) )
+            {
+                my $title =
+                  defined(
+                    $modMeta->{resources}{x_support_commercial}{x_web_title} )
+                  ? $modMeta->{resources}{x_support_commercial}{x_web_title}
+                  : $modMeta->{resources}{x_support_commercial}{web};
+
+                $l .=
+                    '<a href="'
+                  . $modMeta->{resources}{x_support_commercial}{web}
+                  . '" target="_blank">'
+                  . $title . '</a>';
             }
 
             elsif ($mAttr eq 'bugtracker'
@@ -1469,7 +1568,7 @@ sub CreateMetadataList ($$$) {
     }
     else {
         push @ret,
-            'Metadata does not contain any prerequisites.' . "\n"
+            'Module metadata do not contain any prerequisites.' . "\n"
           . 'For automatic source code analysis, please install Perl::PrereqScanner::NotQuiteLite .'
           . $lb
           . $lb;
