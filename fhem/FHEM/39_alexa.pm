@@ -238,7 +238,7 @@ alexa_detailFn($$$$)
   my $ret;
 
   my $logfile = AttrVal($name, 'alexaFHEM-log', 'FHEM' );
-  if( $logfile ne 'FHEM' ) {
+  if( $logfile && $logfile ne 'FHEM' ) {
     my $name = 'alexaFHEMlog';
     $ret .= "<a href=\"$FW_ME?detail=$name\">". AttrVal($name, "alias", "Logfile") ."</a><br>";
   }
@@ -255,20 +255,31 @@ alexa_Read($)
   my $buf = CoProcess::readFn($hash);
   return undef if( !$buf );
 
-  if( $buf =~ m/^\*\*\* ([^\s]+) (.+)/ ) {
-    my $service = $1;
-    my $message = $2;
+  my $data = $hash->{helper}{PARTIAL};
+  $data .= $buf;
 
-    if( $service eq 'FHEM:' ) {
-      if( $message =~ m/^connection failed(: (.*))?/ ) {
-        my $reason = $2;
+  while($data =~ m/\n/) {
+    ($buf,$data) = split("\n", $data, 2);
 
-        $hash->{reason} = 'failed to connect to fhem';
-        $hash->{reason} .= ": $reason" if( $reason );
-        CoProcess::stop($hash);
+    Log3 $name, 5, "$name: read: $buf";
+
+    if( $buf =~ m/^\*\*\* ([^\s]+) (.+)/ ) {
+      my $service = $1;
+      my $message = $2;
+
+      if( $service eq 'FHEM:' ) {
+        if( $message =~ m/^connection failed(: (.*))?/ ) {
+          my $reason = $2;
+
+          $hash->{reason} = 'failed to connect to fhem';
+          $hash->{reason} .= ": $reason" if( $reason );
+          CoProcess::stop($hash);
+        }
       }
     }
   }
+
+  $hash->{PARTIAL} = $data;
 
   return undef;
 }
