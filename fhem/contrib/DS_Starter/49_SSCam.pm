@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 49_SSCam.pm 18797 2019-03-05 17:13:05Z DS_Starter $
+# $Id: 49_SSCam.pm 18828 2019-03-08 22:05:35Z DS_Starter $
 #########################################################################################################################
 #       49_SSCam.pm
 #
@@ -47,6 +47,7 @@ use Encode;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.11.4" => "11.03.2019  make module ready for SVS version 8.2.3-5829 ",
   "8.11.3" => "08.03.2019  avoid possible JSON errors, fix fhem is hanging while restart or get snapinfo - Forum: #45671.msg915546.html#msg915546 ",
   "8.11.2" => "04.03.2019  bugfix no snapinfos when snap was done by SVS itself, Forum: https://forum.fhem.de/index.php/topic,45671.msg914685.html#msg914685",
   "8.11.1" => "28.02.2019  commandref revised, minor fixes ",
@@ -1727,8 +1728,8 @@ sub SSCam_FWsummaryFn ($$$$) {
   $ret .= "<script type=\"text/javascript\" src=\"$ttjs\"></script>";
   
   if($wltype eq "image") {
-    if(SSCam_myVersion($hash) == 823 && ReadingsVal($name, "CamVideoType", "") !~ /MJPEG/) {             
-      $ret .= "<td> <br> <b> Because SVS Version 8.2.3 is running the video format has to be set to MJPEG in SVS ! </b> <br><br>";
+    if(ReadingsVal($name, "SVSversion", "8.2.3-5828") eq "8.2.3-5828" && ReadingsVal($name, "CamVideoType", "") !~ /MJPEG/) {             
+      $ret .= "<td> <br> <b> Because SVS version 8.2.3-5828 is running you cannot see the MJPEG-Stream. Please upgrade to a higher SVS version ! </b> <br><br>";
     } else {
       $ret .= "<img src=$link $attr><br>";
     }
@@ -7079,8 +7080,8 @@ sub SSCam_StreamDev($$$) {
   }
   
   if ($fmt =~ /mjpeg/) {
-      if(SSCam_myVersion($hash) == 823 && ReadingsVal($camname, "CamVideoType", "") !~ /MJPEG/) {  
-          $ret .= "<td> <br> <b> Because SVS Version 8.2.3 is running the video format has to be set to MJPEG in SVS ! </b> <br><br>";
+      if(ReadingsVal($camname, "SVSversion", "8.2.3-5828") eq "8.2.3-5828" && ReadingsVal($camname, "CamVideoType", "") !~ /MJPEG/) {  
+          $ret .= "<td> <br> <b> Because SVS version 8.2.3-5828 is running you cannot see the MJPEG-Stream. Please upgrade to a higher SVS version ! </b> <br><br>";
       } else {
           if($apivideostmsmaxver) {                                  
               $link = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
@@ -7237,8 +7238,8 @@ sub SSCam_StreamDev($$$) {
       
       if($link && $wltype =~ /image|iframe|video|base64img|embed|hls/) {
           if($wltype =~ /image/) {
-              if(SSCam_myVersion($hash) == 823 && ReadingsVal($camname, "CamVideoType", "") !~ /MJPEG/) {             
-                  $ret .= "<td> <br> <b> Because SVS Version 8.2.3 is running the video format has to be set to MJPEG in SVS ! </b> <br><br>";
+              if(ReadingsVal($camname, "SVSversion", "8.2.3-5828") eq "8.2.3-5828" && ReadingsVal($camname, "CamVideoType", "") !~ /MJPEG/) {             
+                  $ret .= "<td> <br> <b> Because SVS version 8.2.3-5828 is running you cannot see the MJPEG-Stream. Please upgrade to a higher SVS version ! </b> <br><br>";
               } else {
                   $ret .= "<td><img src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"><br>" if($link);
                   $streamHash->{HELPER}{STREAM} = "<img src=$link $pws>";    # Stream für "set <SSCamSTRM-Device> popupStream" speichern
