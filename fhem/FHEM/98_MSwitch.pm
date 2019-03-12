@@ -83,7 +83,7 @@ if ( $preconf && $preconf ne "" ) {
 }
 
 my $autoupdate = 'off';    #off/on
-my $version    = '2.11';
+my $version    = '2.12';
 my $vupdate    = 'V2.00'
   ; # versionsnummer der datenstruktur . änderung der nummer löst MSwitch_VUpdate aus .
 my $savecount = 30
@@ -1628,12 +1628,12 @@ MSwitch_Exec_Notif( $hash, 'on', 'nocheck', '', 0 );
 
     #neu ausführung on/off
     if ( $cmd eq "off" || $cmd eq "on" ) {
-
         ### neu
         if ( $delaymode eq '1' ) {
             MSwitch_Delete_Delay( $hash, $name );
         }
         ############
+		readingsSingleUpdate( $hash, "last_activation_by", 'manual', $showevents );
         # ausführen des off befehls
         my $zweig = 'nicht definiert';
         $zweig = "cmd1" if $cmd eq "on";
@@ -2540,13 +2540,12 @@ sub MSwitch_Notify($$) {
         $incommingdevice = $dev_hash->{NAME};    # aufrufendes device
     }
 
-#readingsSingleUpdate( $own_hash, "trigdev", 'vor erste ', 1 );  # nur zu testzwecken
     if ( !$events && $own_hash->{helper}{testevent_device} ne 'Logfile' ) {
         return;
     }
 
-#readingsSingleUpdate( $own_hash, "trigdev1", 'nach erste ', 1 );  # nur zu testzwecken
-
+	readingsSingleUpdate( $own_hash, "last_activation_by", 'event', $showevents );
+	
     my $triggerdevice =
       ReadingsVal( $ownName, 'Trigger_device', '' );    # Triggerdevice
     my @cmdarray;
@@ -7656,7 +7655,7 @@ sub MSwitch_Execute_Timer($) {
     my $hash = $defs{$Name};
     return "" if ( IsDisabled($Name) );
     my @string = split( /ID/, $param );
-
+my $showevents = AttrVal( $Name, "MSwitch_generate_Events", 1 );
     $param = $string[0];
 
     my $execid = 0;
@@ -7674,6 +7673,8 @@ sub MSwitch_Execute_Timer($) {
         return;
     }
 
+	readingsSingleUpdate( $hash, "last_activation_by", 'timer', $showevents );
+	
     if ( AttrVal( $Name, 'MSwitch_RandomNumber', '' ) ne '' ) {
         MSwitch_Createnumber1($hash);
     }
