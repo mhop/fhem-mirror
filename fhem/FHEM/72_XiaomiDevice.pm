@@ -984,11 +984,11 @@ sub XiaomiDevice_Set($$@) {
     $hash->{helper}{packetid} = $packetid+1;
     $hash->{helper}{packet}{$packetid} = "get_persist_map";
     XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_persist_map","params":[]}' );
-    my $packetid = $hash->{helper}{packetid};
+    $packetid = $hash->{helper}{packetid};
     $hash->{helper}{packetid} = $packetid+1;
     $hash->{helper}{packet}{$packetid} = "get_persist_map";
     XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_persist_map_v1","params":[]}' );
-    my $packetid = $hash->{helper}{packetid};
+    $packetid = $hash->{helper}{packetid};
     $hash->{helper}{packetid} = $packetid+1;
     $hash->{helper}{packet}{$packetid} = "get_persist_map";
     XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_persist_map_v2","params":[]}' );
@@ -999,11 +999,11 @@ sub XiaomiDevice_Set($$@) {
     $hash->{helper}{packetid} = $packetid+1;
     $hash->{helper}{packet}{$packetid} = "get_fresh_map";
     XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_fresh_map","params":[]}' );
-    my $packetid = $hash->{helper}{packetid};
+    $packetid = $hash->{helper}{packetid};
     $hash->{helper}{packetid} = $packetid+1;
     $hash->{helper}{packet}{$packetid} = "get_fresh_map";
     XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_fresh_map_v1","params":[]}' );
-    my $packetid = $hash->{helper}{packetid};
+    $packetid = $hash->{helper}{packetid};
     $hash->{helper}{packetid} = $packetid+1;
     $hash->{helper}{packet}{$packetid} = "get_fresh_map";
     XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_fresh_map_v2","params":[]}' );
