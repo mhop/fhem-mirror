@@ -1032,7 +1032,7 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
     # seems the author didn't put any explicit
     #   version number we could find ...
     else {
-        $modMeta->{version} = "v0.0.";
+        $modMeta->{version} = '0.';
 
         if ( defined( $modMeta->{x_vcs} )
             && $modMeta->{x_vcs}[5] ne '' )
@@ -1044,7 +1044,7 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
         # we don't know anything about this module at all
         else {
             $versionFrom = 'generated/blank';
-            $modMeta->{version} .= '0';
+            $modMeta->{version} .= '.0';
         }
     }
 
@@ -1058,7 +1058,8 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
     $@ .=
       $modMeta->{x_file}[2] . ": Invalid version format '$modMeta->{version}'"
       if ( defined( $modMeta->{version} )
-        && $modMeta->{version} !~ m/^v\d+\.\d+\.\d+$/ );
+        && $modMeta->{version} !~ m/^v\d+\.\d+(?:\.\d+)*$/
+        && $modMeta->{version} !~ m/^\d+\.\d+$/ );
 
     # meta name
     unless ( defined( $modMeta->{name} ) ) {
