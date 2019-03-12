@@ -48,7 +48,8 @@ use JSON qw(decode_json);
 
 # Versions History intern
 our %SMAPortal_vNotesIntern = (
-  "1.2.2"  => "11.03.2019  new Erromessage analyze added, make ready for Meta.pm ", 
+  "1.2.3"  => "12.03.2019  make ready for 98_Installer.pm ", 
+  "1.2.2"  => "11.03.2019  new Errormessage analyze added, make ready for Meta.pm ", 
   "1.2.1"  => "10.03.2019  behavior of state changed, commandref revised ", 
   "1.2.0"  => "09.03.2019  integrate weather data, minor fixes ",
   "1.1.0"  => "09.03.2019  make get data more stable, new attribute \"getDataRetries\" ",
@@ -957,7 +958,7 @@ return;
 
 =pod
 =encoding utf8
-=item summary    Module for communication with SMA-Portal
+=item summary    Module for communication with the SMA-Portal
 =item summary_DE Modul zur Kommunikation mit dem SMA-Portal
 
 =begin html
@@ -1139,3 +1140,61 @@ return;
     
     
 </ul>
+
+=end html_DE
+
+=for :application/json;q=META.json 76_SMAPortal.pm
+{
+  "abstract": "Module for communication with the SMA-Portal",
+  "x_lang": {
+    "de": {
+      "abstract": "Modul zur Kommunikation mit dem SMA-Portal"
+    }
+  },
+  "keywords": [
+    "sma",
+    "photovoltaik",
+    "electricity",
+    "portal",
+    "smaportal"
+  ],
+  "version": "v1.2.3",
+  "release_status": "testing",
+  "author": [
+    "Heiko Maaz <heiko.maaz@t-online.de>"
+  ],
+  "x_fhem_maintainer": [
+    "DS_Starter"
+  ],
+  "x_fhem_maintainer_github": [
+    "nasseeder1"
+  ],
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "FHEM": 5.00918799,
+        "perl": 5.014,
+        "JSON": 0,
+        "POSIX": 0,
+        "Data::Dumper": 0,
+        "Blocking":0,
+        "Time::HiRes":0,
+        "LWP":0,
+        "HTTP::Cookies": 0
+      },
+      "recommends": {
+      },
+      "suggests": {
+      }
+    }
+  },
+  "resources": {
+    "bugtracker": {
+      "web": "https://forum.fhem.de/index.php/board,29.0.html",
+      "x_web_title": "FHEM Forum: Sonstige Systeme"
+    }
+  }
+}
+=end :application/json;q=META.json
+
+=cut
