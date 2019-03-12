@@ -1773,6 +1773,9 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                       ? "$installed (FHEM included)"
                       : 'included';
                 }
+                elsif ( $installed eq 'installed' ) {
+                    $installed = $colorGreen . $installed . $colorClose;
+                }
 
                 $prereq =
                     '<a href="https://metacpan.org/pod/'

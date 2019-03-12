@@ -1012,11 +1012,11 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
 
     #TODO
     # - check VCS data against update data
-    # - get dependencies via Perl module
-    # - add info from MAINTAINER.txt
+    # - get dependencies for modules loaded by FHEM modules
 
     # use VCS info 'as is', but only when:
     #   - file name matches
+    #   - file has maintainer in MAINTAINER.txt
     if ( @vcs && $vcs[1] eq $modMeta->{x_file}[2] ) {
         push @vcs,
           fhemTimeGm(
@@ -1169,9 +1169,11 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
             # last update was not by one of the named authors
             if ( defined( $modMeta->{x_vcs} ) ) {
                 my $lastEditor = $modMeta->{x_vcs}[15];
-                push @{ $modMeta->{x_fhem_maintainer} }, $modMeta->{x_vcs}[15]
+                push @{ $modMeta->{x_fhem_maintainer} },
+                  $modMeta->{x_vcs}[15]
                   unless (
-                    grep( m/^$lastEditor$/i, @{ $modMeta->{x_fhem_maintainer} } )
+                    grep( m/^$lastEditor$/i,
+                        @{ $modMeta->{x_fhem_maintainer} } )
                   );
             }
         }
@@ -1260,7 +1262,7 @@ sub __GetMaintainerdata {
                 $_           # return the modified string
             } split( "[ \t][ \t]*", $l, 3 );
 
-            if ( $line[0] =~ m/^((.+\/)?((?:(\d+)_)?(.+)\.(.+)))$/ ) {
+            if ( $line[0] =~ m/^((.+\/)?((?:(\d+)_)?(.+?)(?:\.(.+))?))$/ ) {
 
                 # Ignore all files that are not a main module for now
                 next unless ($4);
