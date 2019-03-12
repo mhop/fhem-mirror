@@ -493,7 +493,8 @@ sub Load(;$$) {
         push @rets, $@   if ( $@   && $@ ne '' );
         push @rets, $ret if ( $ret && $ret ne '' );
 
-        $modules{$modName}{META}{generated_by} = $META{name} . " $v, $t"
+        $modules{$modName}{META}{generated_by} =
+          $META{name} . ' ' . version->parse($v)->normal . ", $t"
           if ( defined( $modules{$modName}{META} ) );
 
         foreach my $devName ( devspec2array( 'TYPE=' . $modName ) ) {
@@ -993,8 +994,14 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
     # Get some other info about fhem.pl
     if ( $modMeta->{x_file}[2] eq 'fhem.pl' ) {
         $versionFrom = 'attr/featurelevel+vcs';
-        $version     = 'v' . $1 . '.' . $vcs[5]
-          if ( $modules{'Global'}{AttrList} =~ m/\W*featurelevel:([^,]+)/ );
+        if ( $modules{'Global'}{AttrList} =~ m/\W*featurelevel:((\d)\.(\d))/ ) {
+            my $fl    = $1;
+            my $major = $2;
+            my $minor = $3;
+            my $patch = $vcs[5];
+            $version =
+              version->parse( $major . '.' . $minor . '.' . $patch )->numify;
+        }
         $modMeta->{version} = $version;
     }
 
@@ -1032,33 +1039,30 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
     # seems the author didn't put any explicit
     #   version number we could find ...
     else {
-        $modMeta->{version} = '0.';
-
         if ( defined( $modMeta->{x_vcs} )
             && $modMeta->{x_vcs}[5] ne '' )
         {
             $versionFrom = 'generated/vcs';
-            $modMeta->{version} .= $modMeta->{x_vcs}[5];
+            $modMeta->{version} = '0.' . $modMeta->{x_vcs}[5];
         }
 
         # we don't know anything about this module at all
         else {
             $versionFrom = 'generated/blank';
-            $modMeta->{version} .= '.0';
+            $modMeta->{version} = '0.000000001';
         }
     }
 
     push @{ $modMeta->{x_file} }, $versionFrom;
     push @{ $modMeta->{x_file} }, $version;
 
-    # Do not use repeating 0 in version
-    $modMeta->{version} = version->parse( $modMeta->{version} )->stringify
+    # Standardize version number
+    $modMeta->{version} = version->parse( $modMeta->{version} )->numify
       if ( defined( $modMeta->{version} ) );
 
     $@ .=
       $modMeta->{x_file}[2] . ": Invalid version format '$modMeta->{version}'"
       if ( defined( $modMeta->{version} )
-        && $modMeta->{version} !~ m/^v\d+\.\d+(?:\.\d+)*$/
         && $modMeta->{version} !~ m/^\d+\.\d+$/ );
 
     # meta name
@@ -1144,9 +1148,6 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
     unless ( $modMeta->{x_fhem_maintainer} ) {
         if ( defined( $modMeta->{x_vcs} ) ) {
             $modMeta->{x_fhem_maintainer} = [ $modMeta->{x_vcs}[15] ];
-        }
-        else {
-            $modMeta->{x_fhem_maintainer} = ['<unknown>'];
         }
     }
 
@@ -1471,7 +1472,12 @@ sub __SetXVersion {
 
     # Special handling for fhem.pl
     if ( $modMeta->{x_file}[2] eq 'fhem.pl' ) {
-        $modMeta->{x_version} = 'fhem.pl:' . $modMeta->{version};
+
+        # only show maximum featurelevel
+        #  and add revision separately
+        $modMeta->{x_version} = 'fhem.pl:' . $1 . '-s' . $modMeta->{x_vcs}[5]
+          if ( version->parse( $modMeta->{version} )->normal =~
+            m/^(v\d+\.\d+).*/ );
     }
 
     # Generate extended version info based
@@ -1481,9 +1487,12 @@ sub __SetXVersion {
         $modMeta->{x_version} =
           $modMeta->{x_file}[2] . ':'
           . (
-            $modMeta->{version} =~ m/^v0+\.0+(?:\.0+)*?$/
-            ? '?'
-            : $modMeta->{version}
+            $modMeta->{version} eq '0.000000001' ? '?'
+            : (
+                $modMeta->{x_file}[7] ne 'generated/vcs'
+                ? version->parse( $modMeta->{version} )->normal
+                : $modMeta->{version}
+            )
           )
           . (
             $modMeta->{x_file}[7] ne 'generated/vcs'
@@ -1560,7 +1569,8 @@ sub __SetXVersion {
         "GPUtils": 0,
         "File::stat": 0,
         "Data::Dumper": 0,
-        "Encode": 0
+        "Encode": 0,
+        "version": 0
       },
       "recommends": {
         "JSON": 0,
