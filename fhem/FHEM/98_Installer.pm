@@ -34,6 +34,185 @@ use GPUtils qw(GP_Import);
 use JSON;
 use Data::Dumper;
 
+# based on https://metacpan.org/release/perl
+my @perlPragmas = qw(
+  attributes
+  autodie
+  autouse
+  base
+  bigint
+  bignum
+  bigrat
+  blib
+  bytes
+  charnames
+  constant
+  diagnostics
+  encoding
+  feature
+  fields
+  filetest
+  if
+  integer
+  less
+  lib
+  locale
+  mro
+  open
+  ops
+  overload
+  overloading
+  parent
+  re
+  sigtrap
+  sort
+  strict
+  subs
+  threads
+  threads::shared
+  utf8
+  vars
+  vmsish
+  warnings
+  warnings::register
+);
+
+# based on https://metacpan.org/release/perl
+my @perlCoreModules = qw(
+  experimental
+  I18N::LangTags
+  I18N::LangTags::Detect
+  I18N::LangTags::List
+  IO
+  IO::Dir
+  IO::File
+  IO::Handle
+  IO::Pipe
+  IO::Poll
+  IO::Seekable
+  IO::Select
+  IO::Socket
+  IO::Socket::INET
+  IO::Socket::UNIX
+  Amiga::ARexx
+  Amiga::Exec
+  B
+  B::Concise
+  B::Showlex
+  B::Terse
+  B::Xref
+  O
+  OptreeCheck
+  Devel::Peek
+  ExtUtils::Miniperl
+  Fcntl
+  File::DosGlob
+  File::Find
+  File::Glob
+  FileCache
+  GDBM_File
+  Hash::Util::FieldHash
+  Hash::Util
+  I18N::Langinfo
+  IPC::Open2
+  IPC::Open3
+  NDBM_File
+  ODBM_File
+  Opcode
+  ops
+  POSIX
+  PerlIO::encoding
+  PerlIO::mmap
+  PerlIO::scalar
+  PerlIO::via
+  Pod::Html
+  SDBM_File
+  Sys::Hostname
+  Tie::Hash::NamedCapture
+  Tie::Memoize
+  VMS::DCLsym
+  VMS::Filespec
+  VMS::Stdio
+  Win32CORE
+  XS::APItest
+  XS::Typemap
+  arybase
+  ext/arybase/t/scope_0.pm
+  attributes
+  mro
+  re
+  Haiku
+  AnyDBM_File
+  B::Deparse
+  B::Op_private
+  Benchmark
+  Class::Struct
+  Config::Extensions
+  DB
+  DBM_Filter
+  DBM_Filter::compress
+  DBM_Filter::encode
+  DBM_Filter::int32
+  DBM_Filter::null
+  DBM_Filter::utf8
+  DirHandle
+  English
+  ExtUtils::Embed
+  ExtUtils::XSSymSet
+  File::Basename
+  File::Compare
+  File::Copy
+  File::stat
+  FileHandle
+  FindBin
+  Getopt::Std
+  Net::hostent
+  Net::netent
+  Net::protoent
+  Net::servent
+  PerlIO
+  SelectSaver
+  Symbol
+  Thread
+  Tie::Array
+  Tie::Handle
+  Tie::StdHandle
+  Tie::SubstrHash
+  Time::gmtime
+  Time::localtime
+  Time::tm
+  UNIVERSAL
+  Unicode::UCD
+  User::grent
+  User::pwent
+  blib
+  bytes
+  charnames
+  deprecate
+  feature
+  filetest
+  integer
+  less
+  locale
+  open
+  overload
+  overloading
+  sigtrap
+  sort
+  strict
+  subs
+  utf8
+  vars
+  vmsish
+  warnings
+  warnings::register
+  OS2::ExtAttr
+  OS2::PrfDB
+  OS2::Process
+  OS2::DLL
+  OS2::REXX
+);
+
 # Run before module compilation
 BEGIN {
     # Import from main::
@@ -1004,7 +1183,7 @@ sub CreateMetadataList ($$$) {
                     $l .= $modMeta->{x_vcs}[7];
                 }
                 else {
-                    $l .= $modMeta->{x_file}[6][8][2] . ' (last modify date)';
+                    $l .= '-';
                 }
             }
 
@@ -1357,28 +1536,44 @@ sub CreateMetadataList ($$$) {
               : $modMeta->{$mAttr};
             $mAttrVal =~ s/\\n/$lb/g;
 
-            if (   $mAttr eq 'license'
-                && defined( $modMeta->{resources} )
-                && defined( $modMeta->{resources}{license} )
-                && ref( $modMeta->{resources}{license} ) eq 'ARRAY'
-                && @{ $modMeta->{resources}{license} } > 0
-                && $modMeta->{resources}{license}[0] ne '' )
-            {
-                $mAttrVal =
-                    '<a href="'
-                  . $modMeta->{resources}{license}[0]
-                  . '" target="_blank">'
-                  . $mAttrVal . '</a>';
-            }
-            elsif ( $mAttr eq 'version' && $modName ne 'Global' ) {
-                if (   $modMeta->{x_file}[7] ne 'generated/vcs'
-                    && defined( $modMeta->{x_vcs} )
-                    && $modMeta->{x_vcs}[5] ne '' )
+            if ( $mAttr eq 'license' ) {
+                if ( $mAttrVal eq 'unknown' ) {
+                    $mAttrVal = '-';
+                }
+                elsif (defined( $modMeta->{resources} )
+                    && defined( $modMeta->{resources}{license} )
+                    && ref( $modMeta->{resources}{license} ) eq 'ARRAY'
+                    && @{ $modMeta->{resources}{license} } > 0
+                    && $modMeta->{resources}{license}[0] ne '' )
                 {
-                    $mAttrVal .= '-s' . $modMeta->{x_vcs}[5];
+                    $mAttrVal =
+                        '<a href="'
+                      . $modMeta->{resources}{license}[0]
+                      . '" target="_blank">'
+                      . $mAttrVal . '</a>';
+                }
+            }
+            elsif ( $mAttr eq 'version' ) {
+                if ( $mAttrVal eq '0.000000001' ) {
+                    $mAttrVal = '-';
+                }
+                elsif ( $modMeta->{x_file}[7] ne 'generated/vcs' ) {
+                    $mAttrVal = version->parse($mAttrVal)->normal;
+
+                    # only show maximum featurelevel for fhem.pl
+                    $mAttrVal = $1
+                      if ( $modName eq 'Global'
+                        && $mAttrVal =~ m/^(v\d+\.\d+).*/ );
+
+                    # Only add commit revision when it is not
+                    #   part of the version already
+                    $mAttrVal .= '-s' . $modMeta->{x_vcs}[5]
+                      if ( defined( $modMeta->{x_vcs} )
+                        && $modMeta->{x_vcs}[5] ne '' );
                 }
             }
 
+            # Add filename to module name
             $mAttrVal .= ' (' . $modMeta->{x_file}[2] . ')'
               if ( $mAttr eq 'name' && $modName ne 'Global' );
 
@@ -1404,6 +1599,10 @@ sub CreateMetadataList ($$$) {
                     if ( $_ =~ m/^([^<>\n\r]+)(?:\s+(?:<(.*)>))?$/ ) {
                         $authorName  = $1;
                         $authorEmail = $2;
+                    }
+                    if ( $authorName eq 'unknown' ) {
+                        $l .= '-';
+                        next;
                     }
 
                     $authorNameEmail =
@@ -1515,8 +1714,6 @@ sub CreateMetadataList ($$$) {
 
                 my $version = $modMeta->{prereqs}{runtime}{$mAttr}{$prereq};
                 $version = '' if ( !defined($version) || $version eq '0' );
-                $version = version->parse($version)->normal
-                  if ( $version ne '' );
 
                 my $check     = __IsInstalledPerl($prereq);
                 my $installed = '';
@@ -1544,12 +1741,33 @@ sub CreateMetadataList ($$$) {
                       if ( $importance eq 'required' );
                 }
 
+                my $isPerlPragma = ModuleIsPerlPragma($prereq);
+                my $isPerlCore = $isPerlPragma ? 0 : ModuleIsPerlCore($prereq);
+                my $isFhem =
+                  $isPerlPragma || $isPerlCore ? 0 : ModuleIsInternal($prereq);
+                if ( $isPerlPragma || $isPerlCore || $prereq eq 'perl' ) {
+                    $installed =
+                      $installed ne 'installed'
+                      ? "$installed (Perl built-in)"
+                      : 'built-in';
+                }
+                elsif ($isFhem) {
+                    $installed =
+                      $installed ne 'installed'
+                      ? "$installed (FHEM included)"
+                      : 'included';
+                }
+
                 $prereq =
                     '<a href="https://metacpan.org/pod/'
                   . $prereq
                   . '" target="_blank">'
                   . $prereq . '</a>'
-                  if ($html);
+                  if ( $html
+                    && !$isFhem
+                    && !$isPerlCore
+                    && !$isPerlPragma
+                    && $prereq ne 'perl' );
 
                 $l .=
                     $colOpenMinWidth
@@ -1604,6 +1822,7 @@ sub CreateRawMetaJson ($$$) {
     return $j->encode( $modules{$modName}{META} );
 }
 
+# Checks whether a perl package is installed in the system
 sub __IsInstalledPerl($) {
     return 0 unless ( __PACKAGE__ eq caller(0) );
     return 0 unless (@_);
@@ -1624,6 +1843,71 @@ sub __IsInstalledPerl($) {
     }
     else {
         return 1;
+    }
+}
+
+sub ModuleIsPerlCore {
+    my ($module) = @_;
+    return grep ( /^$module$/, @perlCoreModules )
+      ? 1
+      : 0;
+}
+
+sub ModuleIsPerlPragma {
+    my ($module) = @_;
+    return grep ( /^$module$/, @perlPragmas )
+      ? 1
+      : 0;
+}
+
+sub ModuleIsInternal {
+    my ($module) = @_;
+    my $p = GetModuleFilepath($module);
+
+    # if module has a relative path,
+    #   assume it is part of FHEM
+    return $p && ( $p =~ m/^(\.\/)?FHEM\/.+/ || $p =~ m/^(\.\/)?[^\/]+\.pm$/ )
+      ? 1
+      : 0;
+}
+
+# Get file path of a Perl module
+sub GetModuleFilepath {
+    my @path;
+
+    foreach (@_) {
+        my $module  = $_;
+        my $package = $module;
+
+        # From This::That to This/That.pm
+        s/::/\//g, s/$/.pm/ foreach $module;
+
+        if ( defined( $INC{$module} ) ) {
+            push @path, $INC{$module};
+        }
+        else {
+            eval {
+                require $module;
+                1;
+            };
+
+            if ( !$@ ) {
+                push @path, $INC{$module};
+            }
+            else {
+                push @path, undef;
+                $@ = undef;
+            }
+        }
+    }
+
+    return unless (@path);
+
+    if (wantarray) {
+        return @path;
+    }
+    elsif ( @path > 0 ) {
+        return join( ',', @path );
     }
 }
 
@@ -1717,7 +2001,7 @@ sub ToDay() {
     "fhem-mod-helper",
     "fhem-3rdparty"
   ],
-  "version": "v0.0.1",
+  "version": "v0.0.2",
   "release_status": "testing",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
@@ -1740,7 +2024,8 @@ sub ToDay() {
         "IO::Socket::SSL": 0,
         "HttpUtils": 0,
         "File::stat": 0,
-        "Encode": 0
+        "Encode": 0,
+        "version": 0
       },
       "recommends": {
         "Perl::PrereqScanner::NotQuiteLite": 0,
