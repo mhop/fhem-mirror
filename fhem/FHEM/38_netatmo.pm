@@ -58,8 +58,8 @@ netatmo_Initialize($)
                       "ignored_device_ids ".
                       "setpoint_duration ".
                       "webhookURL webhookPoll:0,1 ".
-                      "addresslimit ".
-                      #"serverAPI ";
+                      #"serverAPI ".
+                      "addresslimit ";
   $hash->{AttrList} .= $readingFnAttributes;
 }
 
@@ -1759,11 +1759,11 @@ netatmo_initHome($@)
   return undef if( !defined($hash->{IODev}) );
 
   my $iohash = $hash->{IODev};
-  netatmo_refreshToken( $iohash, defined($iohash->{access_token}) );
+  netatmo_refreshAppToken( $iohash, defined($iohash->{access_token_app}) );
 
-  return Log3 $name, 1, "$name: No access token was found! (initHome)" if(!defined($iohash->{access_token}));
+  return Log3 $name, 1, "$name: No access token was found! (initHome)" if(!defined($iohash->{access_token_app}));
 
-  my %data = (access_token => $iohash->{access_token}, home_id => $hash->{Home});
+  #my %data = (access_token => $iohash->{access_token_app}, home_id => $hash->{Home});
 
   my $lastupdate = ReadingsVal( $name, ".lastupdate", undef );
 
