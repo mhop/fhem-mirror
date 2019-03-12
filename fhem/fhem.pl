@@ -120,7 +120,7 @@ sub concatc($$$);
 sub configDBUsed();
 sub createNtfyHash();
 sub createUniqueId();
-sub devspec2array($;$);
+sub devspec2array($;$$);
 sub doGlobalDef($);
 sub escapeLogLine($);
 sub evalStateFormat($);
@@ -1238,9 +1238,9 @@ AnalyzeCommand($$;$)
 }
 
 sub
-devspec2array($;$)
+devspec2array($;$$)
 {
-  my ($name, $cl) = @_;
+  my ($name, $cl, $initialList) = @_;
 
   return "" if(!defined($name));
   if(defined($defs{$name})) {
@@ -1262,7 +1262,7 @@ devspec2array($;$)
       next;
     }
 
-    my @names = sort keys %defs;
+    my @names = $initialList ? @{$initialList} : sort keys %defs;
     my @res;
     foreach my $dName (split(":FILTER=", $l)) {
       my ($n,$op,$re) = ("NAME","=",$dName);

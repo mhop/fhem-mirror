@@ -77,7 +77,8 @@ AttrTemplate_Set($$@)
       my @list;
       for my $k (sort keys %templates) {
         my $h = $templates{$k};
-        my $matches = grep /$name/, devspec2array($h->{filter}) if($h->{filter});
+        my $matches;
+        $matches = devspec2array($h->{filter}, undef, [$name]) if($h->{filter});
         if(!$h->{filter} || $matches) {
           push @list, $k;
           $haveDesc = 1 if($h->{desc});
@@ -97,7 +98,8 @@ AttrTemplate_Set($$@)
     my @hlp;
     for my $k (sort keys %templates) {
       my $h = $templates{$k};
-      my $matches = grep /$name/, devspec2array($h->{filter}) if($h->{filter});
+      my $matches;
+      $matches = devspec2array($h->{filter}, undef, [$name]) if($h->{filter});
       if(!$h->{filter} || $matches) {
         push @hlp, "$k: $h->{desc}" if($h->{desc});
       }
