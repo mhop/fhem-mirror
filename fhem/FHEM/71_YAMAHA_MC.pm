@@ -215,10 +215,10 @@ sub YAMAHA_MC_Initialize($)
 					      "standard_volume:15 ".
 						  "ttsvolume ".
 					      "volumeSteps:3 ".                                             
-					      "pathToFavoritesNetRadio ".
+					     # "pathToFavoritesNetRadio ".
 						  "pathToFavoriteServer ".
 						  "FavoriteServerChannel ".
-						  "menuNameFavoritesNetRadio ".
+						 # "menuNameFavoritesNetRadio ".
 					      "FavoriteNetRadioChannel ".
 					      "autoplay_disabled:true,false ".	
                           "autoReadReg:4_reqStatus ".
@@ -1564,7 +1564,7 @@ sub YAMAHA_MC_UpdateLists($;$)
     "setFmTunerPreset"      => "/v1/tuner/recallPreset?zone=main&band=fm&num=",
 	"setDabTunerPreset"      => "/v1/tuner/recallPreset?zone=main&band=dab&num=",
 	"setNetRadioPreset"		=> "/v1/netusb/recallPreset?zone=main&num=",
-    "TurnFavNetRadioChannelOn:noArg"  => "batch_cmd",	
+    "TurnFavNetRadioChannelOn:1,2,3,4,5,6,7,8"  => "batch_cmd",	
 	"TurnFavServerChannelOn:noArg"  => "batch_cmd",	
 	"navigateListMenu"  => "batch_cmd",	
 	"NetRadioNextFavChannel:noArg" => "batch_cmd",	
@@ -1741,7 +1741,7 @@ sub YAMAHA_MC_Set($$@)
     "setFmTunerPreset:slider,0,1,20 ". 
 	"setDabTunerPreset:slider,0,1,20 ".
 	"setNetRadioPreset ".
-    "TurnFavNetRadioChannelOn:noArg ".
+    "TurnFavNetRadioChannelOn:1,2,3,4,5,6,7,8 ".
 	"TurnFavServerChannelOn:noArg ".
 	"navigateListMenu ".
 	"NetRadioNextFavChannel:noArg ".
@@ -2114,10 +2114,12 @@ sub YAMAHA_MC_Set($$@)
   elsif($cmd eq "TurnFavNetRadioChannelOn") {
     Log3 $name, 4, "$name : YAMAHA_MC_Set start handling for TurnFavNetRadioChannelOn"; 
 	
+	my $FavoriteNetRadioChannelParam = AttrVal($hash->{NAME}, "FavoriteNetRadioChannel",1);
+	
 	# no Args allowed here
     if (defined($a[2])) 
     {
-	  return "TurnFavNetRadioChannelOn has no parameters";	
+	  $FavoriteNetRadioChannelParam = $a[2];
 	}  
 	
 	# check if device is on and current input is net_radio
@@ -2167,30 +2169,30 @@ sub YAMAHA_MC_Set($$@)
 	  YAMAHA_MC_httpRequestQueue($hash, "mute", "false", {options    => {unless_in_queue => 1, can_fail => 1}}); 
 	}    
 	
-	my $pathToFavoritesNetRadio = YAMAHA_MC_Param2SpaceList(AttrVal($hash->{NAME}, "pathToFavoritesNetRadio","0 0 0 0 0"),0);
-	my $menuNameFavoritesNetRadio = YAMAHA_MC_Param2SpaceList(AttrVal($hash->{NAME}, "menuNameFavoritesNetRadio","My__Favorites"),0);
-	my $FavoriteNetRadioChannel = AttrVal($hash->{NAME}, "FavoriteNetRadioChannel",0);
+	#my $pathToFavoritesNetRadio = YAMAHA_MC_Param2SpaceList(AttrVal($hash->{NAME}, "pathToFavoritesNetRadio","0 0 0 0 0"),0);
+	#my $menuNameFavoritesNetRadio = YAMAHA_MC_Param2SpaceList(AttrVal($hash->{NAME}, "menuNameFavoritesNetRadio","My__Favorites"),0);
+	#my $FavoriteNetRadioChannel = 
 	my $alreadyInCorrectMenu = 0;
 	my $powerCmdDelay = AttrVal($hash->{NAME}, "powerCmdDelay",3);
 	my $menuLayerDelay = AttrVal($hash->{NAME}, "menuLayerDelay",0.5); 
 	
 	Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn Current Input set to  $currentInput";
-	Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn Menu Path to Favourites $pathToFavoritesNetRadio";
-	Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn menuNameFavoritesNetRadio $menuNameFavoritesNetRadio";
-	Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn  Favourite Channel $FavoriteNetRadioChannel";	
+	#Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn Menu Path to Favourites $pathToFavoritesNetRadio";
+	#Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn menuNameFavoritesNetRadio $menuNameFavoritesNetRadio";
+	Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn  Favourite Channel $FavoriteNetRadioChannelParam";	
 	Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn Going Back to root menu";
 	
 	
     	
 		
 	# playing Favourite channel now
-	Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn now playing channel $FavoriteNetRadioChannel via setNetRadioPreset";
-	#YAMAHA_MC_httpRequestQueue($hash, "setNetRadioPreset", $FavoriteNetRadioChannel,{options => {priority => 2, can_fail => 1, not_before => gettimeofday()+$menuLayerDelay}}); # call fn that will do the http request
-	YAMAHA_MC_httpRequestQueue($hash, "setNetRadioPreset", $FavoriteNetRadioChannel,{options => {priority => 2, can_fail => 1}}); # call fn that will do the http request
+	Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn now playing channel $FavoriteNetRadioChannelParam via setNetRadioPreset";
+	#YAMAHA_MC_httpRequestQueue($hash, "setNetRadioPreset", $FavoriteNetRadioChannelParam,{options => {priority => 2, can_fail => 1, not_before => gettimeofday()+$menuLayerDelay}}); # call fn that will do the http request
+	YAMAHA_MC_httpRequestQueue($hash, "setNetRadioPreset", $FavoriteNetRadioChannelParam,{options => {priority => 2, can_fail => 1}}); # call fn that will do the http request
 		
 	# setting current Channel
-	Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn now setting current Channel to $FavoriteNetRadioChannel";
-	readingsSingleUpdate($hash, 'currentFavNetRadioChannel', $FavoriteNetRadioChannel,1 );
+	Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn now setting current Channel to $FavoriteNetRadioChannelParam";
+	readingsSingleUpdate($hash, 'currentFavNetRadioChannel', $FavoriteNetRadioChannelParam,1 );
 
   }  
   elsif($cmd eq "TurnFavServerChannelOn") {
@@ -2361,8 +2363,8 @@ sub YAMAHA_MC_Set($$@)
 	  return undef;
 	}
 	    
-	my $pathToFavoritesNetRadio = YAMAHA_MC_Param2SpaceList(AttrVal($hash->{NAME}, "pathToFavoritesNetRadio","0 0 "),0);
-	my $menuNameFavoritesNetRadio = YAMAHA_MC_Param2SpaceList(AttrVal($hash->{NAME}, "menuNameFavoritesNetRadio","Best Radio"),0);
+	#my $pathToFavoritesNetRadio = YAMAHA_MC_Param2SpaceList(AttrVal($hash->{NAME}, "pathToFavoritesNetRadio","0 0 "),0);
+	#my $menuNameFavoritesNetRadio = YAMAHA_MC_Param2SpaceList(AttrVal($hash->{NAME}, "menuNameFavoritesNetRadio","Best Radio"),0);
 	my $FavoriteNetRadioChannel = AttrVal($hash->{NAME}, "FavoriteNetRadioChannel",1);
 	my $currentFavNetRadioChannel = ReadingsVal($name, "currentFavNetRadioChannel", $FavoriteNetRadioChannel);
 	
