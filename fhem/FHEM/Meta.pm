@@ -670,7 +670,8 @@ m/(\$Id\: ((?:([0-9]+)_)?([\w]+)\.([\w]+))\s([0-9]+)\s((([0-9]+)-([0-9]+)-([0-9]
                 $vcs[12] = $13;    # commit hour
                 $vcs[13] = $14;    # commit minute
                 $vcs[14] = $15;    # commit second
-                $vcs[15] = $16;    # svn username (COULD be maintainer)
+                $vcs[15] = $16;    # svn username (COULD be maintainer
+                                   #   if not in MAINTAINER.txt)
 
                 # These items are added later in the code:
                 #   $vcs[16] - commit unix timestamp
@@ -1138,16 +1139,41 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
 
     # mandatory
     unless ( $modMeta->{author} ) {
-        if ( defined( $modMeta->{x_vcs} ) ) {
-            $modMeta->{author} = [ $modMeta->{x_vcs}[15] . ' <>' ];
+        if ( defined( $moduleMaintainers{ $modMeta->{x_file}[4] } ) ) {
+            foreach (
+                split( '/', $moduleMaintainers{ $modMeta->{x_file}[4] }[1] ) )
+            {
+                push @{ $modMeta->{author} }, $_;
+            }
+
+            # last update was not by one of the named authors
+            if ( defined( $modMeta->{x_vcs} ) ) {
+                my $lastEditor = $modMeta->{x_vcs}[15];
+                push @{ $modMeta->{author} },
+                  $modMeta->{x_vcs}[15] . ' (last release only) <>'
+                  unless ( grep( m/^$lastEditor$/i, @{ $modMeta->{author} } ) );
+            }
         }
         else {
             $modMeta->{author} = ['unknown <>'];
         }
     }
     unless ( $modMeta->{x_fhem_maintainer} ) {
-        if ( defined( $modMeta->{x_vcs} ) ) {
-            $modMeta->{x_fhem_maintainer} = [ $modMeta->{x_vcs}[15] ];
+        if ( defined( $moduleMaintainers{ $modMeta->{x_file}[4] } ) ) {
+            foreach (
+                split( '/', $moduleMaintainers{ $modMeta->{x_file}[4] }[1] ) )
+            {
+                push @{ $modMeta->{x_fhem_maintainer} }, $_;
+            }
+
+            # last update was not by one of the named authors
+            if ( defined( $modMeta->{x_vcs} ) ) {
+                my $lastEditor = $modMeta->{x_vcs}[15];
+                push @{ $modMeta->{x_fhem_maintainer} }, $modMeta->{x_vcs}[15]
+                  unless (
+                    grep( m/^$lastEditor$/i, @{ $modMeta->{x_fhem_maintainer} } )
+                  );
+            }
         }
     }
 
@@ -1262,6 +1288,7 @@ sub __GetMaintainerdata {
                       . join( ' ', @line );
                 }
                 else {
+
                     $moduleMaintainers{ $maintainer[0][4] } = \@maintainer;
                 }
             }
@@ -1350,6 +1377,13 @@ m/^((\S+) (((....)-(..)-(..))_((..):(..):(..))) (\d+) (?:\.\/)?((.+\/)?((?:(\d+)
                         $update[17] = $17;    # FHEM module name
                         $update[18] = $18;    # file extension
 
+                        push @update,
+                          fhemTimeGm(
+                            $update[11], $update[10], $update[9], $update[7],
+                            ( $update[6] - 1 ),
+                            ( $update[5] - 1900 )
+                          );
+
                         # this is a FHEM core update
                         if ( $15 eq 'fhem.pl' ) {
                             $coreUpdate = undef;
@@ -1392,6 +1426,13 @@ m/^((\S+) (((....)-(..)-(..))_((..):(..):(..))) (\d+) (?:\.\/)?((.+\/)?((?:(\d+)
                         $update[16] = $16;    # order number, may be undefined
                         $update[17] = $17;    # FHEM module name
                         $update[18] = $18;    # file extension
+
+                        push @update,
+                          fhemTimeGm(
+                            $update[11], $update[10], $update[9], $update[7],
+                            ( $update[6] - 1 ),
+                            ( $update[5] - 1900 )
+                          );
 
                         # this is a FHEM module update
                         if ($16) {
@@ -1736,12 +1777,6 @@ sub __SetXVersion {
         "IO::Socket::INET6": 0,
         "Socket6": 0,
         "TimeSeries": 0
-      },
-      "suggests": {
-        "Compress::Zlib": 0,
-        "FHEM::WinService": 0,
-        "IO::Socket::INET6": 0,
-        "Socket6": 0
       }
     }
   },

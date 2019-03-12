@@ -1593,12 +1593,17 @@ sub CreateMetadataList ($$$) {
                     next if ( $_ eq '' );
 
                     my $authorName;
+                    my $authorEditorOnly;
                     my $authorEmail;
                     my $authorNameEmail;
 
-                    if ( $_ =~ m/^([^<>\n\r]+)(?:\s+(?:<(.*)>))?$/ ) {
-                        $authorName  = $1;
-                        $authorEmail = $2;
+                    if ( $_ =~
+m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
+                      )
+                    {
+                        $authorName       = $1;
+                        $authorEditorOnly = $2 ? ' ' . $2 : '';
+                        $authorEmail      = $3;
                     }
                     if ( $authorName eq 'unknown' ) {
                         $l .= '-';
@@ -1608,9 +1613,11 @@ sub CreateMetadataList ($$$) {
                     $authorNameEmail =
                         '<a href="mailto:'
                       . $authorEmail . '">'
-                      . $authorName . '</a>'
+                      . $authorName
+                      . $authorEditorOnly . '</a>'
                       if ( $html && $authorEmail );
 
+                    # add alias name if different
                     if (   defined( $modMeta->{x_fhem_maintainer} )
                         && ref( $modMeta->{x_fhem_maintainer} ) eq 'ARRAY'
                         && @{ $modMeta->{x_fhem_maintainer} } > 0
@@ -1630,7 +1637,10 @@ sub CreateMetadataList ($$$) {
                     $l .= $lb if ($counter);
                     $l .= $lb . 'Co-' . $mAttrName . ':' . $lb
                       if ( $counter == 1 );
-                    $l .= $authorNameEmail ? $authorNameEmail : $authorName;
+                    $l .=
+                        $authorNameEmail
+                      ? $authorNameEmail
+                      : $authorName . $authorEditorOnly;
 
                     $counter++;
                 }
