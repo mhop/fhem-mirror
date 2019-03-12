@@ -1718,15 +1718,21 @@ sub CreateMetadataList ($$$) {
                 my $check     = __IsInstalledPerl($prereq);
                 my $installed = '';
                 if ($check) {
-                    if ( $check =~ m/^v/ ) {
+                    if ( $check =~ m/^\d+\./ ) {
                         my $nverReq =
-                          $version ne ''
-                          ? version->parse($version)->numify
+                            $version ne ''
+                          ? $version
                           : 0;
-                        my $nverInst = version->parse($check)->numify;
+                        my $nverInst = $check;
 
+                        #TODO suport for version range:
+                        #https://metacpan.org/pod/CPAN::Meta::Spec#Version-Range
                         if ( $nverReq > 0 && $nverInst < $nverReq ) {
-                            $installed .= 'OUTDATED (' . $check . ')';
+                            $installed .=
+                                $colorRed
+                              . 'OUTDATED'
+                              . $colorClose . ' ('
+                              . $check . ')';
                         }
                         else {
                             $installed = 'installed';
@@ -1827,8 +1833,8 @@ sub __IsInstalledPerl($) {
     return 0 unless ( __PACKAGE__ eq caller(0) );
     return 0 unless (@_);
     my ($pkg) = @_;
-    return version->parse($])->normal if ( $pkg eq 'perl' );
-    return version->parse( $modules{'Global'}{META}{version} )->normal
+    return version->parse($])->numify if ( $pkg eq 'perl' );
+    return $modules{'Global'}{META}{version}
       if ( $pkg eq 'FHEM' );
 
     eval "require $pkg;";
@@ -1839,7 +1845,7 @@ sub __IsInstalledPerl($) {
     my $v = eval "$pkg->VERSION()";
 
     if ($v) {
-        return version->parse($v)->normal;
+        return $v;
     }
     else {
         return 1;
@@ -1862,6 +1868,9 @@ sub ModuleIsPerlPragma {
 
 sub ModuleIsInternal {
     my ($module) = @_;
+    return 1
+      if ( $module eq 'fhem.pl' || $module eq 'FHEM' || $module eq 'Global' );
+
     my $p = GetModuleFilepath($module);
 
     # if module has a relative path,
@@ -1882,7 +1891,12 @@ sub GetModuleFilepath {
         # From This::That to This/That.pm
         s/::/\//g, s/$/.pm/ foreach $module;
 
-        if ( defined( $INC{$module} ) ) {
+        if ( $module eq 'perl' ) {
+            push @path, $^X;    # real binary
+
+            # push @path, $ENV{_};    # symlink if any
+        }
+        elsif ( defined( $INC{$module} ) ) {
             push @path, $INC{$module};
         }
         else {
@@ -1895,13 +1909,11 @@ sub GetModuleFilepath {
                 push @path, $INC{$module};
             }
             else {
-                push @path, undef;
+                push @path, '';
                 $@ = undef;
             }
         }
     }
-
-    return unless (@path);
 
     if (wantarray) {
         return @path;
@@ -2019,7 +2031,7 @@ sub ToDay() {
         "perl": 5.014,
         "GPUtils": 0,
         "JSON": 0,
-        "FHEM::Meta": 0,
+        "FHEM::Meta": 0.001006,
         "Data::Dumper": 0,
         "IO::Socket::SSL": 0,
         "HttpUtils": 0,
