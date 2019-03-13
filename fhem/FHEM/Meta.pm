@@ -343,6 +343,8 @@ our %supportForumCategories = (
 );
 
 our %moduleMaintainers;
+our %packageMaintainers;
+our %fileMaintainers;
 
 our $coreUpdate;
 our %corePackageUpdates;
@@ -1017,14 +1019,29 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
     # use VCS info 'as is', but only when:
     #   - file name matches
     #   - file has maintainer in MAINTAINER.txt
-    if ( @vcs && $vcs[1] eq $modMeta->{x_file}[2] ) {
-        push @vcs,
-          fhemTimeGm(
-            $vcs[14], $vcs[13], $vcs[12], $vcs[10],
-            ( $vcs[9] - 1 ),
-            ( $vcs[8] - 1900 )
-          );
-        $modMeta->{x_vcs} = \@vcs;
+    #   - or it is our own package of course
+    if (   @vcs
+        && $vcs[1] eq $modMeta->{x_file}[2] )
+    {
+        if (   defined( $moduleMaintainers{ $modMeta->{x_file}[4] } )
+            || defined( $packageMaintainers{ $modMeta->{x_file}[4] } )
+            || $modMeta->{x_file}[4] eq 'Meta' )
+        {
+            push @vcs,
+              fhemTimeGm(
+                $vcs[14], $vcs[13], $vcs[12], $vcs[10],
+                ( $vcs[9] - 1 ),
+                ( $vcs[8] - 1900 )
+              );
+            $modMeta->{x_vcs} = \@vcs;
+        }
+        else {
+            Log 3,
+                __PACKAGE__
+              . "::__GetMetadata WARNING: Unregistered core module or package:\n  "
+              . $modMeta->{x_file}[0]
+              . ' has defined VCS data but is not registered in MAINTAINER.txt';
+        }
     }
 
     # author has put version into JSON
@@ -1253,7 +1270,10 @@ sub __GetMaintainerdata {
     if ( open( $fh, '<' . $attr{global}{modpath} . '/MAINTAINER.txt' ) ) {
         my $skip = 1;
         while ( my $l = <$fh> ) {
-            $skip = 0 if ( $l =~ m/^===+$/ );
+            if ( $l =~ m/^===+$/ ) {
+                $skip = 0;
+                next;
+            }
             next if ($skip);
 
             my @line = map {
@@ -1264,34 +1284,80 @@ sub __GetMaintainerdata {
 
             if ( $line[0] =~ m/^((.+\/)?((?:(\d+)_)?(.+?)(?:\.(.+))?))$/ ) {
 
-                # Ignore all files that are not a main module for now
-                next unless ($4);
-
                 my @maintainer;
-                $maintainer[0][0] = $1;    # complete match
-                $maintainer[0][1] = $2;    # relative file path
-                $maintainer[0][2] = $3;    # file name
-                $maintainer[0][3] = $4;    # order number, may be undefined
-                $maintainer[0][4] =
-                  $3 eq 'fhem.pl' ? 'Global' : $5;    # FHEM module name
-                $maintainer[0][5] = $6;               # file extension
-                $maintainer[1]    = $line[1];         # Maintainer alias name
-                $maintainer[2]    = $line[2];         # Forum support section
 
-                if ( defined( $moduleMaintainers{ $maintainer[0][4] } ) ) {
-                    Log 1,
-                        __PACKAGE__
-                      . "::__GetMaintainerdata ERROR: Duplicate entry:\n"
-                      . ' 1st: '
-                      . $moduleMaintainers{ $maintainer[0][4] }[0][0] . ' '
-                      . $moduleMaintainers{ $maintainer[0][4] }[1] . ' '
-                      . $moduleMaintainers{ $maintainer[0][4] }[2]
-                      . "\n 2nd: "
-                      . join( ' ', @line );
+                # This is a FHEM module file,
+                #  either in ./ or ./FHEM/. For files in ./,
+                #  file extension must be provided.
+                #  Files in ./FHEM/ use file order number to identify.
+                if (
+                    (
+                           ( !$2 || $2 eq '' || $2 eq './' )
+                        && ( $6 && ( $6 eq 'pl' || $6 eq 'pm' ) )
+                    )
+                    || ( $4 && $2 eq 'FHEM/' )
+                  )
+                {
+                    $maintainer[0][0] = $1;    # complete match
+                    $maintainer[0][1] = $2;    # relative file path
+                    $maintainer[0][2] = $3;    # file name
+                    $maintainer[0][3] = $4;    # order number, may be undefined
+                    $maintainer[0][4] =
+                      $3 eq 'fhem.pl' ? 'Global' : $5;    # FHEM module name
+                    $maintainer[0][5] = $6;          # file extension
+                    $maintainer[1]    = $line[1];    # Maintainer alias name
+                    $maintainer[2]    = $line[2];    # Forum support section
+
+                    if ( defined( $moduleMaintainers{ $maintainer[0][4] } ) ) {
+                        Log 1,
+                            __PACKAGE__
+                          . "::__GetMaintainerdata ERROR: Duplicate entry:\n"
+                          . ' 1st: '
+                          . $moduleMaintainers{ $maintainer[0][4] }[0][0] . ' '
+                          . $moduleMaintainers{ $maintainer[0][4] }[1] . ' '
+                          . $moduleMaintainers{ $maintainer[0][4] }[2]
+                          . "\n 2nd: "
+                          . join( ' ', @line );
+                    }
+                    else {
+                        $moduleMaintainers{ $maintainer[0][4] } = \@maintainer;
+                    }
                 }
-                else {
 
-                    $moduleMaintainers{ $maintainer[0][4] } = \@maintainer;
+                # This is a FHEM Perl package under ./FHEM/,
+                #   used by FHEM modules.
+                #   Packages must provide file extension here.
+                elsif ( $2 && $2 eq 'FHEM/' && $6 eq 'pm' ) {
+                    $maintainer[0][0] = $1;    # complete match
+                    $maintainer[0][1] = $2;    # relative file path
+                    $maintainer[0][2] = $3;    # file name
+                    $maintainer[0][3] = $4;    # order number,
+                         #  empty here but we want the same structure
+                    $maintainer[0][4] = $5;          # FHEM package name
+                    $maintainer[0][5] = $6;          # file extension
+                    $maintainer[1]    = $line[1];    # Maintainer alias name
+                    $maintainer[2]    = $line[2];    # Forum support section
+
+                    if ( defined( $packageMaintainers{ $maintainer[0][4] } ) ) {
+                        Log 1,
+                            __PACKAGE__
+                          . "::__GetMaintainerdata ERROR: Duplicate entry:\n"
+                          . ' 1st: '
+                          . $packageMaintainers{ $maintainer[0][4] }[0][0] . ' '
+                          . $packageMaintainers{ $maintainer[0][4] }[1] . ' '
+                          . $packageMaintainers{ $maintainer[0][4] }[2]
+                          . "\n 2nd: "
+                          . join( ' ', @line );
+                    }
+                    else {
+                        $packageMaintainers{ $maintainer[0][4] } = \@maintainer;
+                    }
+                }
+
+                # this is a FHEM file
+                #   under any path
+                else {
+                    # our %fileMaintainers;
                 }
             }
         }
@@ -1593,7 +1659,7 @@ sub __SetXVersion {
     "metadata",
     "meta"
   ],
-  "version": "v0.1.6",
+  "version": "v0.1.7",
   "release_status": "testing",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
