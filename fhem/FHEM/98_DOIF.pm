@@ -1874,10 +1874,11 @@ sub DOIF_we($) {
   my ($wday)=@_;
   my $we = (($wday==0 || $wday==6) ? 1 : 0);
   if(!$we) {
-    my $h2we = $attr{global}{holiday2we};
-    if($h2we && Value($h2we)) {
-      my ($a, $b) = ReplaceEventMap($h2we, [$h2we, Value($h2we)], 0);
-      $we = 1 if($b ne "none");
+    foreach my $h2we (split(",", AttrVal("global", "holiday2we", ""))) {
+      if($h2we && Value($h2we)) {
+        my ($a, $b) = ReplaceEventMap($h2we, [$h2we, Value($h2we)], 0);
+        $we = 1 if($b ne "none");
+      }
     }
   }
   return $we;
@@ -1887,10 +1888,11 @@ sub DOIF_tomorrow_we($) {
   my ($wday)=@_;
   my $we = (($wday==5 || $wday==6) ? 1 : 0);
   if(!$we) {
-    my $h2we = $attr{global}{holiday2we};
-    if($h2we && ReadingsVal($h2we,"tomorrow",0)) {
-      my ($a, $b) = ReplaceEventMap($h2we, [$h2we, ReadingsVal($h2we,"tomorrow",0)], 0);
-      $we = 1 if($b ne "none");
+    foreach my $h2we (split(",", AttrVal("global", "holiday2we", ""))) {
+      if($h2we && ReadingsVal($h2we,"tomorrow",0)) {
+        my ($a, $b) = ReplaceEventMap($h2we, [$h2we, ReadingsVal($h2we,"tomorrow",0)], 0);
+        $we = 1 if($b ne "none");
+      }
     }
   }
   return $we;
@@ -3118,12 +3120,18 @@ CmdDoIf($$)
       return ($tail,"expected DOELSE");
     }
     $j=0;
-    while ($tail =~ /^\s*\(/) {
-      ($beginning,$else_cmd_ori,$err,$tail)=GetBlockDoIf($tail,'[\(\)]');
-       return ($else_cmd_ori,$err) if ($err);
-       ($else_cmd,$err)=ParseCommandsDoIf($hash,$else_cmd_ori,0);
-       return ($else_cmd,$err) if ($err);
-       $hash->{do}{$last_do+1}{$j++}=$else_cmd_ori;
+    while ($tail =~ /^\s*(\(|\{)/) {
+      if ($tail =~ /^\s*\(/) {
+        ($beginning,$else_cmd_ori,$err,$tail)=GetBlockDoIf($tail,'[\(\)]');
+         return ($else_cmd_ori,$err) if ($err);
+      } elsif ($tail =~ /^\s*\{/) { 
+        ($beginning,$else_cmd_ori,$err,$tail)=GetBlockDoIf($tail,'[\{\}]');
+         return ($else_cmd_ori,$err) if ($err);
+         $else_cmd_ori="{".$else_cmd_ori."}";
+      }  
+      ($else_cmd,$err)=ParseCommandsDoIf($hash,$else_cmd_ori,0);
+      return ($else_cmd,$err) if ($err);
+      $hash->{do}{$last_do+1}{$j++}=$else_cmd_ori;
     }
     $hash->{do}{$last_do+1}{0}=$else_cmd_ori if ($j==0); #doelse without brackets
   }
