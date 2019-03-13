@@ -465,16 +465,18 @@ sub Arlo_CreateDevices($) {
   Arlo_Request($hash, '/users/devices', 'GET', undef, undef, \&Arlo_CreateDevicesCallback);
 }
 
-sub Arlo_CreateDevice($$$$$$;$) {
-  my ($hash, $deviceType, $prefix, $deviceName, $serialNumber, $xCloudId, $basestationSerialNumber) = @_;
+sub Arlo_CreateDevice($$$$$$$;$) {
+  my ($hash, $deviceType, $prefix, $deviceName, $serialNumber, $xCloudId, $model, $basestationSerialNumber) = @_;
   my $d = $modules{$MODULE}{defptr}{"$prefix$serialNumber"};
   if (!defined($d)) {
     if (defined($basestationSerialNumber)) {
-      CommandDefine(undef,"Arlo_$deviceName Arlo $deviceType $basestationSerialNumber $serialNumber $xCloudId");
+      CommandDefine(undef, "Arlo_$deviceName Arlo $deviceType $basestationSerialNumber $serialNumber $xCloudId");
     } else {
-      CommandDefine(undef,"Arlo_$deviceName Arlo $deviceType $serialNumber $xCloudId");
+      CommandDefine(undef, "Arlo_$deviceName Arlo $deviceType $serialNumber $xCloudId");
     }
+    $d = $modules{$MODULE}{defptr}{"$prefix$serialNumber"};
   }
+  readingsSingleUpdate($d, 'model', $model, 0) if (defined($d));
 }
 
 sub Arlo_GetNameWithoutUmlaut($) {
@@ -496,22 +498,23 @@ sub Arlo_CreateDevicesCallback($$$)  {
       $deviceName = Arlo_GetNameWithoutUmlaut($deviceName);
       my $deviceType = $device->{deviceType};
       my $xCloudId = $device->{xCloudId};
+	  my $model = $device->{modelId};
       Log3 $hash->{NAME}, 3, "Found device $deviceType with name $deviceName.";
       if ($deviceType eq 'basestation') {
-        Arlo_CreateDevice($hash, 'BASESTATION', 'B', $deviceName, $serialNumber, $xCloudId);
+        Arlo_CreateDevice($hash, 'BASESTATION', 'B', $deviceName, $serialNumber, $xCloudId, $model);
       } elsif ($deviceType eq 'arlobridge') {
-        Arlo_CreateDevice($hash, 'BRIDGE', 'B', $deviceName, $serialNumber, $xCloudId);
+        Arlo_CreateDevice($hash, 'BRIDGE', 'B', $deviceName, $serialNumber, $xCloudId, $model);
       } elsif ($deviceType eq 'camera') {
         my $parentId = $device->{parentId};
         if ($serialNumber ne $parentId) {
-          Arlo_CreateDevice($hash, 'CAMERA', 'C', $deviceName, $serialNumber, $xCloudId, $parentId);
+          Arlo_CreateDevice($hash, 'CAMERA', 'C', $deviceName, $serialNumber, $xCloudId, $model, $parentId);
         } else {
-          Arlo_CreateDevice($hash, 'BABYCAM', 'B', $deviceName, $serialNumber, $xCloudId);
+          Arlo_CreateDevice($hash, 'BABYCAM', 'B', $deviceName, $serialNumber, $xCloudId, $model);
         }
       } elsif ($deviceType eq 'arloq') {
-        Arlo_CreateDevice($hash, 'ARLOQ', 'B', $deviceName, $serialNumber, $xCloudId);
+        Arlo_CreateDevice($hash, 'ARLOQ', 'B', $deviceName, $serialNumber, $xCloudId, $model);
       } elsif ($deviceType eq 'lights') {
-        Arlo_CreateDevice($hash, 'LIGHT', 'L', $deviceName, $serialNumber, $xCloudId, $device->{parentId});
+        Arlo_CreateDevice($hash, 'LIGHT', 'L', $deviceName, $serialNumber, $xCloudId, $model, $device->{parentId});
       }
     }
   }
@@ -608,7 +611,7 @@ sub Arlo_ReadCamerasAndLights($) {
   my $lights = {action => 'get', resource => 'lights', publishResponse => \0};
   Arlo_PreparePostRequest($hash, $lights);
   my @body = ($cam, $lights);
-  if ($hash->{basestationSerialNumber} eq $hash->{serialNumber}) {
+  if (defined($hash->{basestationSerialNumber}) && $hash->{basestationSerialNumber} eq $hash->{serialNumber}) {
     my $mode = {action => 'get', resource => 'modes', publishResponse => \0};
     my ($account, $deviceId, $xCloudId) = Arlo_PreparePostRequest($hash, $mode);
 	push @body, $mode;
@@ -639,7 +642,7 @@ sub Arlo_UpdateReadingsCallback($$$)  {
         my @activeModes = @{$event->{activeModes}};
         if (@activeModes > 0) {
           Arlo_SetModeReading($serialNumber, $activeModes[0]);
-        } 
+        }
       }
     }
   }
