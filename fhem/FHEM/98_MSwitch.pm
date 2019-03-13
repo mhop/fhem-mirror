@@ -83,7 +83,7 @@ if ( $preconf && $preconf ne "" ) {
 }
 
 my $autoupdate = 'off';    #off/on
-my $version    = '2.12';
+my $version    = '2.11';
 my $vupdate    = 'V2.00'
   ; # versionsnummer der datenstruktur . änderung der nummer löst MSwitch_VUpdate aus .
 my $savecount = 30
@@ -916,7 +916,10 @@ sub MSwitch_Set($@) {
     my $execids = "0";
     $hash->{eventsave} = 'unsaved';
 
-##############################
+	
+	my $ic = 'leer';
+    $ic = $hash->{IncommingHandle} if ($hash->{IncommingHandle});
+#####################
 
     my $showevents = AttrVal( $name, "MSwitch_generate_Events", 1 );
 
@@ -984,6 +987,16 @@ sub MSwitch_Set($@) {
             return "Unknown argument $cmd, choose one of ";
         }
 
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
         # bearbeite setlist und readinglist
 ##############################
         if ( $cmd ne "?" ) {
@@ -1013,8 +1026,8 @@ sub MSwitch_Set($@) {
             }
 #######################################
 
-            my $ic = '';
-            $ic = $hash->{IncommingHandle};
+     #       my $ic = '';
+     #       $ic = $hash->{IncommingHandle};
             if (   ( ( $cmd eq 'on' ) || ( $cmd eq 'off' ) )
                 && ( $args[0] ne '' )
                 && ( $ic ne 'fromnotify' ) )
@@ -1633,7 +1646,12 @@ MSwitch_Exec_Notif( $hash, 'on', 'nocheck', '', 0 );
             MSwitch_Delete_Delay( $hash, $name );
         }
         ############
+		
+		if  ( $ic ne 'fromnotify' && $ic ne 'fromtimer') {
 		readingsSingleUpdate( $hash, "last_activation_by", 'manual', $showevents );
+		
+		}
+		delete( $hash->{IncommingHandle} );
         # ausführen des off befehls
         my $zweig = 'nicht definiert';
         $zweig = "cmd1" if $cmd eq "on";
@@ -7672,7 +7690,8 @@ my $showevents = AttrVal( $Name, "MSwitch_generate_Events", 1 );
               . $ver );
         return;
     }
-
+	 
+    $hash->{IncommingHandle} = 'fromtimer';
 	readingsSingleUpdate( $hash, "last_activation_by", 'timer', $showevents );
 	
     if ( AttrVal( $Name, 'MSwitch_RandomNumber', '' ) ne '' ) {
