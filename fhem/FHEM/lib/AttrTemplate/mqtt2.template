@@ -810,6 +810,57 @@ attr DEVICE icon temperature_humidity
 attr DEVICE stateFormat T: temperature °C H: humidity % B: battery %
 attr DEVICE model A_16_shellyht
 
+#shelly2rgbw
+#contributed by user sledge
+name:A_17a_shelly2rgbw_4w_split
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
+desc:shelly2rgbw configured with 4 white channels, one device for each channel<br>Tested with v1.4.8
+par:DEVNAME;name of this shelly;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
+attr DEVICE readingList shellies/DEVNAME/white/0/status:.* {json2nameValue($EVENT)}\
+  shellies/DEVNAME/white/0:.* state\
+  shellies/DEVNAME/white/0/set:.* { json2nameValue($EVENT) }\
+  shellies/DEVNAME/online:.* online
+attr DEVICE setList off:noArg shellies/DEVNAME/white/0/command off\
+  on:noArg shellies/DEVNAME/white/0/command on\
+  brightness:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/0/set {"ison":"true","mode":"white","brightness":"$EVTPART1"}
+setreading DEVICE associatedWith DEVICE_CH1,DEVICE_CH2,DEVICE_CH4
+attr DEVICE webCmd on:off:brightness
+attr DEVICE model A_17a_shelly2rgbw_4w_split
+attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2, DEVICE_CH3 and DEVICE_CH4
+attr DEVICE icon light_control
+attr DEVICE autocreate 0
+attr DEVICE setStateList on off
+deletereading DEVICE .*
+copy DEVICE DEVICE_CH2
+setreading DEVICE_CH2 associatedWith DEVICE,DEVICE_CH3,DEVICE_CH4
+attr DEVICE_CH2 readingList shellies/DEVNAME/white/1/status:.* {json2nameValue($EVENT)}\
+  shellies/DEVNAME/white/1:.* state\
+  shellies/DEVNAME/white/1/set:.* { json2nameValue($EVENT) }\
+  shellies/DEVNAME/online:.* online
+attr DEVICE_CH2 setList off:noArg shellies/DEVNAME/white/1/command off\
+  on:noArg shellies/DEVNAME/white/1/command on\
+  brightness:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/1/set {"ison":"true","mode":"white","brightness":"$EVTPART1"}
+attr DEVICE_CH2 setStateList on off
+copy DEVICE DEVICE_CH3
+setreading DEVICE_CH3 associatedWith DEVICE,DEVICE_CH2,DEVICE_CH4
+attr DEVICE_CH3 readingList shellies/DEVNAME/white/2/status:.* {json2nameValue($EVENT)}\
+  shellies/DEVNAME/white/2:.* state\
+  shellies/DEVNAME/white/2/set:.* { json2nameValue($EVENT) }\
+  shellies/DEVNAME/online:.* online
+attr DEVICE_CH3 setList off:noArg shellies/DEVNAME/white/2/command off\
+  on:noArg shellies/DEVNAME/white/2/command on\
+  brightness:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/2/set {"ison":"true","mode":"white","brightness":"$EVTPART1"}
+attr DEVICE_CH3 setStateList on off
+copy DEVICE DEVICE_CH4
+attr DEVICE_CH4 readingList shellies/DEVNAME/white/3/status:.* {json2nameValue($EVENT)}\
+shellies/DEVNAME/white/3:.* state\
+shellies/DEVNAME/white/3/set:.* { json2nameValue($EVENT) }\
+shellies/DEVNAME/online:.* online
+attr DEVICE_CH4 setList off:noArg shellies/DEVNAME/white/3/command off\
+  on:noArg shellies/DEVNAME/white/3/command on\
+  brightness:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/3/set {"ison":"true","mode":"white","brightness":"$EVTPART1"}
+setreading DEVICE_CH4 associatedWith DEVICE,DEVICE_CH2,DEVICE_CH3
+attr DEVICE_CH4 setStateList on off
 
 ###############
 #ebusd
