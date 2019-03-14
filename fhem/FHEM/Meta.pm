@@ -202,7 +202,7 @@ our %supportForumCategories = (
         },
         'Unterstützende Dienste' => {
             description =>
-'Themen zu unterstützenden Diensten und Modulen wie z.B. Calendar, HCS, Twiligth, Weather, etc.',
+'Themen zu unterstützenden Diensten und Modulen wie z.B. Calendar, HCS, Twilight, Weather, etc.',
             boardId => 44,
 
             'Kalendermodule' => {
@@ -1018,14 +1018,6 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
         }
     }
 
-    # Add info from MAINTAINER.txt
-    if ( defined( $moduleMaintainers{$modName} ) ) {
-        $modMeta->{x_fhem_maintenance} = $moduleMaintainers{$modName};
-    }
-    elsif ( defined( $packageMaintainers{$modName} ) ) {
-        $modMeta->{x_fhem_maintenance} = $packageMaintainers{$modName};
-    }
-
     # Get some other info about fhem.pl
     if ( $modMeta->{x_file}[2] eq 'fhem.pl' ) {
         $versionFrom = 'attr/featurelevel+vcs';
@@ -1354,8 +1346,10 @@ sub __GetMaintainerdata {
                       $line[2] =~ m/\(deprecated\)/i
                       ? 'deprecated'
                       : 'supported';              # Lifecycle status
+
+                    $line[2] =~ s/\s*\(.*\)\s*$//;    # remove all comments
                     $maintainer[3] =
-                      $line[2] =~ /^\(deprecated\)$/
+                      $maintainer[2] eq 'deprecated'
                       ? ()
                       : __GetSupportForum( $line[2] );   # Forum support section
 
@@ -1422,6 +1416,13 @@ sub __GetSupportForum {
     my ($req) = @_;
     my %ret;
 
+    if ( $req =~ /^http/ ) {
+        $ret{web}   = $req;
+        $ret{title} = $1
+          if ( $req =~ m/^.+:\/\/([^\/]+).*/ && $1 !~ /fhem\.de$/ );
+        return \%ret;
+    }
+
     my %umlaute = (
         "ä" => "ae",
         "Ä" => "Ae",
@@ -1442,7 +1443,8 @@ sub __GetSupportForum {
     );
     my $umlautRevKeys = join( "|", keys(%umlauteRev) );
 
-    $req =~ s/($umlautRevKeys)/$umlauteRev{$1}/g;    # yes, we know umlauts
+    $req =~ s/($umlautRevKeys)/$umlauteRev{$1}/g    # yes, we know umlauts
+      unless ( $req =~ /uerung/ );
 
     foreach my $cat ( keys %supportForumCategories ) {
         foreach my $board ( keys %{ $supportForumCategories{$cat} } ) {
@@ -1488,7 +1490,10 @@ sub __GetSupportForum {
                         || $subBoard eq 'description'
                         || $subBoard eq 'language' );
 
-                    if ( lc($subBoard) eq lc($req) ) {
+                    my $reqSub = $req;
+                    $reqSub =~ s/$board\///;
+
+                    if ( lc($subBoard) eq lc($reqSub) ) {
 
                         # we found a sub board
                         if (
@@ -1959,7 +1964,6 @@ sub __SetXVersion {
       "description": "FHEM® (eingetragene Marke) ist ein in Perl geschriebener, GPL lizensierter Server für die Heimautomatisierung. Man kann mit FHEM häufig auftretende Aufgaben automatisieren, wie z.Bsp. Lampen / Rollladen / Heizung / usw. schalten, oder Ereignisse wie Temperatur / Feuchtigkeit / Stromverbrauch protokollieren und visualisieren.\\n\\nDas Programm läuft als Server, man kann es über WEB, dedizierte Smartphone Apps oder telnet bedienen, TCP Schnittstellen für JSON und XML existieren ebenfalls.\\n\\nUm es zu verwenden benötigt man einen 24/7 Rechner (NAS, RPi, PC, Mac Mini, etc.) mit einem Perl Interpreter und angeschlossene Hardware-Komponenten wie CUL-, EnOcean-, Z-Wave-USB-Stick, etc. für einen Zugang zu den Aktoren und Sensoren.\\n\\nAusgesprochen wird es ohne h, wie bei feminin."
     }
   },
-  "release_status": "testing",
   "prereqs": {
     "runtime": {
       "requires": {

@@ -1132,6 +1132,12 @@ sub CreateMetadataList ($$$) {
     my $linecount = 1;
     foreach my $mAttr (@mAttrs) {
         next
+          if (
+            $mAttr eq 'release_status'
+            && ( !defined( $modMeta->{release_status} )
+                || $modMeta->{release_status} eq 'stable' )
+          );
+        next
           if ( $mAttr eq 'copyright' && !defined( $modMeta->{x_copyright} ) );
         next
           if (
@@ -1291,7 +1297,7 @@ sub CreateMetadataList ($$$) {
                       . $webname
                       . '/docs/commandref.html#'
                       . ( $modName eq 'Global' ? 'global' : $modName )
-                      . '" target="_blank">local</a>';
+                      . '" target="_blank">Offline version</a>';
                 }
 
                 if (   defined( $modMeta->{resources} )
@@ -1301,11 +1307,7 @@ sub CreateMetadataList ($$$) {
                     my $title =
                       defined( $modMeta->{resources}{x_commandref}{title} )
                       ? $modMeta->{resources}{x_commandref}{title}
-                      : (
-                        $modMeta->{resources}{x_commandref}{web} =~
-                          m/^(?:https?:\/\/)?([^\/]+).*/i ? $1
-                        : $modMeta->{resources}{x_commandref}{web}
-                      );
+                      : 'Online version';
 
                     my $url =
                       $modMeta->{resources}{x_commandref}{web};
@@ -1387,7 +1389,17 @@ sub CreateMetadataList ($$$) {
                 $l .=
                     '<a href="'
                   . $modMeta->{resources}{x_support_community}{web}
-                  . '" target="_blank">'
+                  . '" target="_blank"'
+                  . (
+                    defined(
+                        $modMeta->{resources}{x_support_community}{description}
+                      )
+                    ? ' title="'
+                      . $modMeta->{resources}{x_support_community}{description}
+                      . '"'
+                    : ''
+                  )
+                  . '>'
                   . $title . '</a>';
             }
 
@@ -1514,7 +1526,7 @@ sub CreateMetadataList ($$$) {
                         $url .= $modMeta->{resources}{repository}{x_branch_dev};
 
                         $l .=
-                            ' <a href="'
+                            ' | <a href="'
                           . $url
                           . '" target="_blank">'
                           . $modMeta->{resources}{repository}{x_branch_dev}
@@ -1536,7 +1548,7 @@ sub CreateMetadataList ($$$) {
 
                 $l .=
                     uc( $modMeta->{resources}{repository}{type} )
-                  . ' Repository: '
+                  . ' repository: '
                   . $modMeta->{resources}{repository}{url};
 
                 if (
