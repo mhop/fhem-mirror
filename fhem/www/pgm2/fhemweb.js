@@ -201,7 +201,7 @@ FW_jqueryReadyFn()
         // make get use xhr instead of reload
         //return true;
         FW_cmd(FW_root+"?cmd="+encodeURIComponent(val)+"&XHR=1", function(data){
-          if( !data.match( /^<html>.*<\/html>/ ) ) {
+          if( !data.match( /^<html>[\s\S]*<\/html>/ ) ) {
             data = data.replace( '<', '&lt;' );
             data = '<pre>'+data+'</pre>';
           }
