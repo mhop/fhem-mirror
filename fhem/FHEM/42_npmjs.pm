@@ -39,7 +39,8 @@ use Data::Dumper;
 BEGIN {
     # Import from main::
     GP_Import(
-        qw(readingsSingleUpdate
+        qw(
+          readingsSingleUpdate
           readingsBulkUpdate
           readingsBulkUpdateIfChanged
           readingsBeginUpdate
@@ -60,7 +61,9 @@ BEGIN {
           init_done
           gettimeofday
           InternalTimer
-          RemoveInternalTimer)
+          RemoveInternalTimer
+          FW_webArgs
+          )
     );
 }
 
@@ -1274,6 +1277,9 @@ sub CreateWarningList($) {
 
     my $warnings = $hash->{".fhem"}{npm}{'warnings'};
 
+    # disable automatic links to FHEM devices
+    delete $FW_webArgs{addLinks};
+
     my $ret = '<html><table><tr><td>';
     $ret .= '<table class="block wide">';
     $ret .= '<tr class="even">';
@@ -1309,6 +1315,9 @@ sub CreateErrorList($) {
     my $hash  = shift;
     my $error = $hash->{".fhem"}{npm}{errors};
 
+    # disable automatic links to FHEM devices
+    delete $FW_webArgs{addLinks};
+
     my $ret = '<html><table style="min-width: 450px;"><tr><td>';
     $ret .= '<table class="block wide">';
 
@@ -1343,6 +1352,9 @@ sub CreateInstalledList($$) {
     my $packages;
     my $html = defined( $hash->{CL} ) && $hash->{CL}{TYPE} eq "FHEMWEB" ? 1 : 0;
     $packages = $hash->{".fhem"}{npm}{listedpackages}{dependencies};
+
+    # disable automatic links to FHEM devices
+    delete $FW_webArgs{addLinks};
 
     my $header = '';
     my $footer = '';
@@ -1416,6 +1428,9 @@ sub CreateOutdatedList($$) {
     my $html = defined( $hash->{CL} ) && $hash->{CL}{TYPE} eq "FHEMWEB" ? 1 : 0;
     $packages = $hash->{".fhem"}{npm}{outdatedpackages};
     my $npmglobal = ( AttrVal( $hash->{NAME}, 'npmglobal', 1 ) eq '1' ? 1 : 0 );
+
+    # disable automatic links to FHEM devices
+    delete $FW_webArgs{addLinks};
 
     my $header = '';
     my $footer = '';
@@ -1744,14 +1759,6 @@ sub ToDay() {
       "abstract": "Modul zur Bedienung der Node.js Installation und Updates"
     }
   },
-  "keywords": [
-    "fhem-core",
-    "fhem-mod",
-    "fhem-mod-device",
-    "nodejs",
-    "node",
-    "npm"
-  ],
   "version": "v1.0.5",
   "release_status": "stable",
   "author": [
@@ -1817,32 +1824,6 @@ sub ToDay() {
         "ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm uninstall *": 0,
         "ALL=(ALL) NOPASSWD:SETENV: /usr/local/bin/npm uninstall *": 0
       }
-    }
-  },
-  "x_prereqs_permissions_fileown": {
-    "runtime": {
-      "requires": {
-      },
-      "recommends": {
-      },
-      "suggests": {
-      }
-    }
-  },
-  "x_prereqs_permissions_filemod": {
-    "runtime": {
-      "requires": {
-      },
-      "recommends": {
-      },
-      "suggests": {
-      }
-    }
-  },
-  "resources": {
-    "bugtracker": {
-      "web": "https://forum.fhem.de/index.php/board,29.0.html",
-      "x_web_title": "FHEM Forum: Sonstige Systeme"
     }
   }
 }
