@@ -1107,7 +1107,6 @@ sub CreateMetadataList ($$$) {
       author
       copyright
       privacy
-      license
       homepage
       wiki
       command_reference
@@ -1115,6 +1114,7 @@ sub CreateMetadataList ($$$) {
       commercial_support
       bugtracker
       version_control
+      license
       description
     );
 

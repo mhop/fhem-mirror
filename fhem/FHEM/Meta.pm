@@ -1504,7 +1504,7 @@ sub __GetSupportForum {
                           )
                         {
                             $ret{cat}   = $cat;
-                            $ret{board} = $board . ' / ' . $subBoard;
+                            $ret{board} = $board . ' » ' . $subBoard;
                             $ret{boardId} =
                               $supportForumCategories{$cat}{$board}{$subBoard}
                               {boardId};
