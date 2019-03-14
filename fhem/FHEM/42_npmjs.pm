@@ -1089,9 +1089,9 @@ sub RetrieveNpmOutput($$) {
                     $h->{error}{detail} =
                         $o . "\n\n"
                       . "You may add the following lines to /etc/sudoers.d/fhem:\n"
-                      . "  fhem ALL=NOPASSWD: /usr/bin/npm update *\n"
-                      . "  fhem ALL=NOPASSWD: /usr/bin/npm install *\n"
-                      . "  fhem ALL=NOPASSWD: /usr/bin/npm uninstall *";
+                      . "  fhem ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm update *\n"
+                      . "  fhem ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm install *\n"
+                      . "  fhem ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm uninstall *";
                 }
                 elsif ( $o =~
                     m/(?:(\w+?): )?(?:(\w+? \d+): )?(\w+?): [^:]*?not.found$/i
@@ -1552,9 +1552,9 @@ sub ToDay() {
   Global installations will be controlled by default and running update/install/uninstall require sudo permissions like this:<br>
   <br>
   <code>
-    fhem ALL=NOPASSWD: /usr/bin/npm update *<br>
-    fhem ALL=NOPASSWD: /usr/bin/npm install *<br>
-    fhem ALL=NOPASSWD: /usr/bin/npm uninstall *
+    fhem ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm update *<br>
+    fhem ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm install *<br>
+    fhem ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm uninstall *
   </code><br>
   <br>
   This line may easily be added to a new file in /etc/sudoers.d/fhem and will automatically included to /etc/sudoers from there.<br>
@@ -1649,7 +1649,11 @@ sub ToDay() {
   Das Modul erlaubt es Node.js Pakete &uuml;ber den NPM Paket Manager zu installieren, zu deinstallieren und zu aktualisieren.<br>
   Standardm&auml;&szlig;ig werden globale Installationen bedient und das Ausf&uuml;hren von update/install/uninstall erfordert sudo Berechtigungen wie diese:<br>
   <br>
-  <code>fhem ALL=NOPASSWD: ALL</code><br>
+  <code>
+    fhem ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm update *<br>
+    fhem ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm install *<br>
+    fhem ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm uninstall *
+  </code><br>
   <br>
   Diese Zeile kann einfach in einer neuen Datei unter /etc/sudoers.d/fhem hinzugef&uuml;gt werden und wird von dort automatisch in /etc/sudoers inkludiert.<br>
   Restriktiviere sudo Einstellungen sind derzeit nicht m&ouml;glich.<br>
@@ -1774,63 +1778,6 @@ sub ToDay() {
       }
     }
   },
-  "x_prereqs_os": {
-    "runtime": {
-      "requires": {
-      },
-      "recommends": {
-        "debian|ubuntu": 0
-      },
-      "suggests": {
-      }
-    }
-  },
-  "x_prereqs_os_debian": {
-    "runtime": {
-      "requires": {
-      },
-      "recommends": {
-        "curl": 0
-      },
-      "suggests": {
-        "openssh-client": 0
-      }
-    }
-  },
-  "x_prereqs_os_ubuntu": {
-    "runtime": {
-      "requires": {
-      },
-      "recommends": {
-        "curl": 0
-      },
-      "suggests": {
-        "openssh-client": 0
-      }
-    }
-  },
-  "x_prereqs_nodejs": {
-    "runtime": {
-      "requires": {
-        "node": 8.0,
-        "npm": 0
-      },
-      "recommends": {
-      },
-      "suggests": {
-      }
-    }
-  },
-  "x_prereqs_python": {
-    "runtime": {
-      "requires": {
-      },
-      "recommends": {
-      },
-      "suggests": {
-      }
-    }
-  },
   "x_prereqs_binary_exec": {
     "runtime": {
       "requires": {
@@ -1849,14 +1796,14 @@ sub ToDay() {
       "requires": {
       },
       "recommends": {
-        "ALL=NOPASSWD: /usr/bin/npm update *": 0,
-        "ALL=NOPASSWD: /usr/local/bin/npm update *": 0,
-        "ALL=NOPASSWD: /usr/bin/npm install *": 0,
-        "ALL=NOPASSWD: /usr/local/bin/npm install *": 0
+        "ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm update *": 0,
+        "ALL=(ALL) NOPASSWD:SETENV: /usr/local/bin/npm update *": 0,
+        "ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm install *": 0,
+        "ALL=(ALL) NOPASSWD:SETENV: /usr/local/bin/npm install *": 0
       },
       "suggests": {
-        "ALL=NOPASSWD: /usr/bin/npm uninstall *": 0,
-        "ALL=NOPASSWD: /usr/local/bin/npm uninstall *": 0
+        "ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm uninstall *": 0,
+        "ALL=(ALL) NOPASSWD:SETENV: /usr/local/bin/npm uninstall *": 0
       }
     }
   },
