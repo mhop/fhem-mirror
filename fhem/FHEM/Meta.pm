@@ -1,5 +1,12 @@
 # $Id$
 
+package main;
+use strict;
+use warnings;
+
+# provide the same hash as for real FHEM modules
+our %packages;
+
 # define package
 package FHEM::Meta;
 use strict;
@@ -17,6 +24,7 @@ BEGIN {
     GP_Import(
         qw(
           modules
+          packages
           defs
           attr
           Log
@@ -30,18 +38,20 @@ BEGIN {
     );
 }
 
+#TODO this shall be handled by InitMod()
 # Get our own Metadata
 my %META;
 my $ret = __GetMetadata( __FILE__, \%META );
 return "$@" if ($@);
 return $ret if ($ret);
-use version 0.77; our $VERSION = $META{version};
+$packages{Meta} = \%META;
+use version 0.77; our $VERSION = $packages{Meta}{version};
 
 our %supportForum = (
-    title            => 'FHEM Forum',
+    forum            => 'FHEM Forum',
     url              => 'https://forum.fhem.de',
     uri              => '/index.php/board,%BOARDID%.0.html',
-    rss              => '/index.php?action=.xml;type=rss;board=%BOARDID%',
+    rss              => '/index.php?action=.xml;type=rss',
     default_language => 'de',
 );
 our %supportForumCategories = (
@@ -504,7 +514,7 @@ sub Load(;$$) {
         push @rets, $ret if ( $ret && $ret ne '' );
 
         $modules{$modName}{META}{generated_by} =
-          $META{name} . ' ' . version->parse($v)->normal . ", $t"
+          $packages{Meta}{name} . ' ' . version->parse($v)->normal . ", $t"
           if ( defined( $modules{$modName}{META} ) );
 
         foreach my $devName ( devspec2array( 'TYPE=' . $modName ) ) {
@@ -613,12 +623,17 @@ sub __GetMetadata {
     my $item_modtype;
     my $item_summary;
     my $item_summary_DE;
+    my $modName;
 
     # extract all info from file name
-    if ( $filePath =~ m/^((?:\.\/)?(.+\/)((?:(\d+)_)?(.+)\.(.+)))$/ ) {
+    if ( $filePath =~ m/^(?:\.\/)?((.+\/)?((?:(\d+)_)?(.+)\.(.+)))$/ ) {
         my @file;
         $file[0] = $1;    # complete match
-        $file[1] = $2;    # relative file path
+        $file[1] =
+            $2
+          ? $2
+          : '';           # relative file path, may be
+                          #   undefined if same dir as fhem.pl
         $file[2] = $3;    # file name
         $file[3] = $4;    # order number, may be undefined
         $file[4] = $3 eq 'fhem.pl' ? 'Global' : $5;    # FHEM module name
@@ -630,6 +645,7 @@ sub __GetMetadata {
         #   $file[8] - plain extracted version number, may be undefined
 
         $modMeta->{x_file} = \@file;
+        $modName = $file[4];
     }
 
     # grep info from file content
@@ -1002,6 +1018,14 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
         }
     }
 
+    # Add info from MAINTAINER.txt
+    if ( defined( $moduleMaintainers{$modName} ) ) {
+        $modMeta->{x_fhem_maintenance} = $moduleMaintainers{$modName};
+    }
+    elsif ( defined( $packageMaintainers{$modName} ) ) {
+        $modMeta->{x_fhem_maintenance} = $packageMaintainers{$modName};
+    }
+
     # Get some other info about fhem.pl
     if ( $modMeta->{x_file}[2] eq 'fhem.pl' ) {
         $versionFrom = 'attr/featurelevel+vcs';
@@ -1134,7 +1158,9 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
     # If we are not running in loop, this is not time consuming for us here
     elsif ( !$runInLoop ) {
         $modMeta->{generated_by} =
-          $META{name} . ' ' . __PACKAGE__->VERSION() . ', ' . TimeNow();
+            $packages{Meta}{name} . ' '
+          . __PACKAGE__->VERSION() . ', '
+          . TimeNow();
     }
 
     # mandatory
@@ -1235,9 +1261,15 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
     unless ( defined( $modMeta->{resources} )
         && defined( $modMeta->{resources}{x_support_community} ) )
     {
-        if ( defined( $modMeta->{x_vcs} ) ) {
-            $modMeta->{resources}{x_support_community}{web} =
-              'https://forum.fhem.de/';
+        if (   defined( $modMeta->{x_vcs} )
+            && defined( $moduleMaintainers{$modName} )
+            && ref( $moduleMaintainers{$modName} ) eq 'ARRAY'
+            && defined( $moduleMaintainers{$modName}[3] )
+            && ref( $moduleMaintainers{$modName}[3] ) eq 'HASH'
+            && keys %{ $moduleMaintainers{$modName}[3] } > 0 )
+        {
+            $modMeta->{resources}{x_support_community} =
+              $moduleMaintainers{$modName}[3];
         }
     }
 
@@ -1247,12 +1279,16 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
         if ( defined( $modMeta->{x_vcs} ) ) {
             $modMeta->{resources}{repository}{type} = 'svn';
             $modMeta->{resources}{repository}{web} =
-              'https://svn.fhem.de/trac/browser/';
+              'https://svn.fhem.de/trac/browser';
             $modMeta->{resources}{repository}{url} =
-              'https://svn.fhem.de/fhem/';
+              'https://svn.fhem.de/fhem';
             $modMeta->{resources}{repository}{x_branch_master} = 'trunk';
-            $modMeta->{resources}{repository}{x_branch_dev}    = 'trunk';
-            $modMeta->{resources}{repository}{x_filepath}      = 'fhem/FHEM/';
+            $modMeta->{resources}{repository}{x_filepath}      = 'fhem'
+              . (
+                $modMeta->{x_file}[1] ne ''
+                ? '/' . $modMeta->{x_file}[1]
+                : ''
+              );
         }
     }
 
@@ -1312,9 +1348,16 @@ sub __GetMaintainerdata {
                     $maintainer[0][3] = $4;    # order number, may be undefined
                     $maintainer[0][4] =
                       $3 eq 'fhem.pl' ? 'Global' : $5;    # FHEM module name
-                    $maintainer[0][5] = $6;          # file extension
-                    $maintainer[1]    = $line[1];    # Maintainer alias name
-                    $maintainer[2]    = $line[2];    # Forum support section
+                    $maintainer[0][5] = $6;       # file extension
+                    $maintainer[1] = $line[1];    # Maintainer alias name
+                    $maintainer[2] =
+                      $line[2] =~ m/\(deprecated\)/i
+                      ? 'deprecated'
+                      : 'supported';              # Lifecycle status
+                    $maintainer[3] =
+                      $line[2] =~ /^\(deprecated\)$/
+                      ? ()
+                      : __GetSupportForum( $line[2] );   # Forum support section
 
                     if ( defined( $moduleMaintainers{ $maintainer[0][4] } ) ) {
                         Log 1,
@@ -1372,6 +1415,140 @@ sub __GetMaintainerdata {
 
         close($fh);
     }
+}
+
+sub __GetSupportForum {
+    return 0 unless ( __PACKAGE__ eq caller(0) );
+    my ($req) = @_;
+    my %ret;
+
+    my %umlaute = (
+        "ä" => "ae",
+        "Ä" => "Ae",
+        "ü" => "ue",
+        "Ü" => "Ue",
+        "ö" => "oe",
+        "Ö" => "Oe",
+        "ß" => "ss"
+    );
+    my $umlautKeys = join( "|", keys(%umlaute) );
+    my %umlauteRev = (
+        "ae" => "ä",
+        "Ae" => "Ä",
+        "ue" => "ü",
+        "Ue" => "Ü",
+        "oe" => "ö",
+        "Oe" => "Ö"
+    );
+    my $umlautRevKeys = join( "|", keys(%umlauteRev) );
+
+    $req =~ s/($umlautRevKeys)/$umlauteRev{$1}/g;    # yes, we know umlauts
+
+    foreach my $cat ( keys %supportForumCategories ) {
+        foreach my $board ( keys %{ $supportForumCategories{$cat} } ) {
+            next
+              if ( $board eq 'boardId'
+                || $board eq 'description'
+                || $board eq 'language' );
+
+            if ( lc($board) eq lc($req) ) {
+
+                # we found a main board
+                if ( defined( $supportForumCategories{$cat}{$board}{boardId} ) )
+                {
+                    $ret{cat}   = $cat;
+                    $ret{board} = $board;
+                    $ret{boardId} =
+                      $supportForumCategories{$cat}{$board}{boardId};
+                    $ret{description} =
+                      $supportForumCategories{$cat}{$board}{description}
+                      if (
+                        defined(
+                            $supportForumCategories{$cat}{$board}{description}
+                        )
+                      );
+                    $ret{language} =
+                      $supportForumCategories{$cat}{$board}{language}
+                      if (
+                        defined(
+                            $supportForumCategories{$cat}{$board}{language}
+                        )
+                      );
+                    last;
+                }
+            }
+
+            # is it a sub board?
+            else {
+                foreach my $subBoard (
+                    keys %{ $supportForumCategories{$cat}{$board} } )
+                {
+                    next
+                      if ( $subBoard eq 'boardId'
+                        || $subBoard eq 'description'
+                        || $subBoard eq 'language' );
+
+                    if ( lc($subBoard) eq lc($req) ) {
+
+                        # we found a sub board
+                        if (
+                            defined(
+                                $supportForumCategories{$cat}{$board}
+                                  {$subBoard}{boardId}
+                            )
+                          )
+                        {
+                            $ret{cat}   = $cat;
+                            $ret{board} = $board . ' / ' . $subBoard;
+                            $ret{boardId} =
+                              $supportForumCategories{$cat}{$board}{$subBoard}
+                              {boardId};
+                            $ret{description} =
+                              $supportForumCategories{$cat}{$board}{$subBoard}
+                              {description}
+                              if (
+                                defined(
+                                    $supportForumCategories{$cat}{$board}
+                                      {$subBoard}{description}
+                                )
+                              );
+                            $ret{language} =
+                              $supportForumCategories{$cat}{$board}{$subBoard}
+                              {language}
+                              if (
+                                defined(
+                                    $supportForumCategories{$cat}{$board}
+                                      {$subBoard}{language}
+                                )
+                              );
+                            last;
+                        }
+                    }
+                }
+            }
+        }
+        last if ( defined( $ret{boardId} ) );
+    }
+
+    $ret{forum}    = $supportForum{forum};
+    $ret{title}    = $supportForum{forum};
+    $ret{language} = $supportForum{default_language}
+      unless ( defined( $ret{language} ) );
+    $ret{web} = $supportForum{url};
+    $ret{rss} = $supportForum{url} . $supportForum{rss};
+
+    if ( defined( $ret{boardId} ) ) {
+        $ret{title} .= ': ' . $ret{board};
+        $ret{web}   .= $supportForum{uri};
+        $ret{rss}   .= ';board=%BOARDID%';
+        $ret{web} =~ s/%BOARDID%/$ret{boardId}/;
+        $ret{rss} =~ s/%BOARDID%/$ret{boardId}/;
+    }
+    else {
+        $ret{web} .= '/';
+    }
+
+    return \%ret;
 }
 
 sub __GetUpdatedata {
@@ -1643,6 +1820,11 @@ sub __SetXVersion {
         else {
             $modMeta->{x_version} .= '/' . $modMeta->{x_file}[6][9][2];
         }
+
+        # Add release status if != stable
+        $modMeta->{x_version} .= ' ' . uc( $modMeta->{release_status} )
+          if ( defined( $modMeta->{release_status} )
+            && $modMeta->{release_status} ne 'stable' );
     }
 }
 
@@ -1662,12 +1844,7 @@ sub __SetXVersion {
       "description": "n/a"
     }
   },
-  "keywords": [
-    "fhem-core",
-    "metadata",
-    "meta"
-  ],
-  "version": "v0.1.7",
+  "version": "v0.1.8",
   "release_status": "testing",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
@@ -1768,12 +1945,6 @@ sub __SetXVersion {
       "suggests": {
       }
     }
-  },
-  "resources": {
-    "bugtracker": {
-      "web": "https://forum.fhem.de/index.php/board,48.0.html",
-      "x_web_title": "FHEM Forum: FHEM Development"
-    }
   }
 }
 =end :application/json;q=META.json
@@ -1788,28 +1959,7 @@ sub __SetXVersion {
       "description": "FHEM® (eingetragene Marke) ist ein in Perl geschriebener, GPL lizensierter Server für die Heimautomatisierung. Man kann mit FHEM häufig auftretende Aufgaben automatisieren, wie z.Bsp. Lampen / Rollladen / Heizung / usw. schalten, oder Ereignisse wie Temperatur / Feuchtigkeit / Stromverbrauch protokollieren und visualisieren.\\n\\nDas Programm läuft als Server, man kann es über WEB, dedizierte Smartphone Apps oder telnet bedienen, TCP Schnittstellen für JSON und XML existieren ebenfalls.\\n\\nUm es zu verwenden benötigt man einen 24/7 Rechner (NAS, RPi, PC, Mac Mini, etc.) mit einem Perl Interpreter und angeschlossene Hardware-Komponenten wie CUL-, EnOcean-, Z-Wave-USB-Stick, etc. für einen Zugang zu den Aktoren und Sensoren.\\n\\nAusgesprochen wird es ohne h, wie bei feminin."
     }
   },
-  "keywords": [
-    "fhem",
-    "fhem-core"
-  ],
-  "x_copyright": "FHEM e.V., Rudolf König <vorstand@fhem.de>",
-  "author": [
-    "Rudolf König <r.koenig@koeniglich.de>"
-  ],
-  "x_fhem_maintainer": [
-    "rudolfkoenig"
-  ],
-  "x_fhem_dependant_modules": [
-  ],
-  "x_fhem_parent_modules": [
-  ],
-  "x_fhem_child_modules": [
-    "apptime", "backup", "cmdalias", "configdb", "copy", "count", "CULflash", "fhemdebug", "fheminfo", "IF", "MSG", "notice", "restore", "setuuid", "template", "update", "uptime", "version", "XmlList"
-  ],
-  "x_fhem_master_modules": [
-  ],
-  "x_fhem_slave_modules": [
-  ],
+  "release_status": "testing",
   "prereqs": {
     "runtime": {
       "requires": {
@@ -1833,17 +1983,6 @@ sub __SetXVersion {
         "IO::Socket::INET6": 0,
         "Socket6": 0,
         "TimeSeries": 0
-      }
-    }
-  },
-  "x_prereqs_os": {
-    "runtime": {
-      "requires": {
-      },
-      "recommends": {
-        "debian|ubuntu": 0
-      },
-      "suggests": {
       }
     }
   },
@@ -1883,33 +2022,8 @@ sub __SetXVersion {
       }
     }
   },
-  "x_prereqs_os_ubuntu": {
-    "runtime": {
-      "requires": {
-      },
-      "recommends": {
-      },
-      "suggests": {
-      }
-    }
-  },
   "resources": {
-    "x_copyright": {
-      "web": "https://verein.fhem.de/"
-    },
-    "x_privacy": {
-      "web": "https://fhem.de/Impressum.html#Datenschutz",
-      "title": "FHEM Data Privacy Statement"
-    },
-    "homepage": "https://fhem.de/",
-    "repository": {
-      "type": "svn",
-      "web": "https://svn.fhem.de/trac/browser/",
-      "url": "https://svn.fhem.de/fhem/",
-      "x_branch_master": "trunk",
-      "x_branch_dev": "trunk",
-      "x_filepath": "fhem/"
-    }
+    "homepage": "https://fhem.de/"
   }
 }
 =end :application/json;q=META.json
