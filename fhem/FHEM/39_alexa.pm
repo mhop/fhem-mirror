@@ -5,6 +5,7 @@ package main;
 
 use strict;
 use warnings;
+use FHEM::Meta;
 
 use CoProcess;
 
@@ -57,6 +58,8 @@ alexa_Initialize($)
 
   $hash->{FW_detailFn} = "alexa_detailFn";
   $hash->{FW_deviceOverview} = 1;
+
+  return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
 #####################################
@@ -114,6 +117,10 @@ alexa_Define($$)
   my ($hash, $def) = @_;
 
   my @a = split("[ \t][ \t]*", $def);
+
+  return $@ unless ( FHEM::Meta::SetInternals($hash) );
+  #our $VERSION = FHEM::Meta::Get( $hash, 'version' );
+  #Log 1, $VERSION;
 
   return "Usage: define <name> alexa"  if(@a != 2);
 
@@ -1312,4 +1319,60 @@ alexa_Attr($$$)
 </ul><br>
 
 =end html
+
+
+=for :application/json;q=META.json 39_alexa.pm
+{
+  "abstract": "Module to control the FHEM/Alexa integration",
+  "x_lang": {
+    "de": {
+      "abstract": "Modul zur Konfiguration der FHEM/Alexa Integration"
+    }
+  },
+  "keywords": [
+    "fhem-mod",
+    "fhem-mod-device",
+    "alexa",
+    "alexa-fhem",
+    "nodejs",
+    "node"
+  ],
+  "release_status": "stable",
+  "x_fhem_maintainer": [
+    "justme1968"
+  ],
+  "x_fhem_maintainer_github": [
+    "justme-1968"
+  ],
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "FHEM": 5.00918799,
+        "perl": 5.014, 
+        "Meta": 0,
+        "CoProcess": 0,
+        "JSON": 0,
+        "Data::Dumper": 0
+      },
+      "recommends": {
+      },
+      "suggests": {
+      }
+    }
+  },
+  "x_prereqs_nodejs": {
+    "runtime": {
+      "requires": {
+        "node": 8.0,
+        "alexa-fhem": 0
+      },
+      "recommends": {
+      },
+      "suggests": {
+      }
+    }
+  }
+}
+=end :application/json;q=META.json
+
 =cut
