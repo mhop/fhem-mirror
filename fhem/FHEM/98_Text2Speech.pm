@@ -41,9 +41,9 @@ my %sets = (
 # path to mplayer
 my $mplayer 			= 'sudo /usr/bin/mplayer';
 #my $mplayerOpts 		= '-nolirc -noconsolecontrols -http-header-fields "User-Agent:Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.22 (KHTML, like Gecko) Chrome/25.0.1364.172 Safari/537.22m"';
-my $mplayerOpts     = '-nolirc -noconsolecontrols';
+my $mplayerOpts     = '';
 my $mplayerNoDebug  = '-really-quiet';
-my $mplayerAudioOpts 	= '-ao alsa:device=';
+my $mplayerAudioOpts 	= '--audio-device=';
 #my $ttsAddr 			= 'http://translate.google.com/translate_tts?tl=de&q=';
 my %ttsHost         = ("Google"     => "translate.google.com",
                        "VoiceRSS"   => "api.voicerss.org"
@@ -344,7 +344,7 @@ sub Text2Speech_OpenDev($) {
   } 
 
   if(!$conn) {
-    Log3($name, 3, "Text2Speech: Can't connect to $dev: $!");
+    Log3($name, 3, $hash->{NAME}.": Can't connect to $dev: $!");
     $hash->{STATE} = "disconnected";
     return "";
   } else {
@@ -403,20 +403,20 @@ sub Text2Speech_Write($$) {
     }
   }
   if ($hasPRESENCE) {
-    Log3 $hash, 4, "Text2Speech($name): found PRESENCE Device $devname for host: $dev, it\'s state is: ".($isPresent ? "present" : "absent");
+    Log3 $hash, 4, $name.": found PRESENCE Device $devname for host: $dev, it\'s state is: ".($isPresent ? "present" : "absent");
     Text2Speech_OpenDev($hash) if(!$hash->{TCPDev} && $isPresent);
     #lets try again
     Text2Speech_OpenDev($hash) if(!$hash->{TCPDev} && $isPresent);
   } else {
-    Log3 $hash, 4, "Text2Speech($name): no proper PRESENCE Device for host: $dev";
+    Log3 $hash, 4, $name.": no proper PRESENCE Device for host: $dev";
     Text2Speech_OpenDev($hash) if(!$hash->{TCPDev});
     #lets try again
     Text2Speech_OpenDev($hash) if(!$hash->{TCPDev});
   }
 
   if($hash->{TCPDev}) {
-    Log3 $hash, 4, "Text2Speech: Write remote message to $dev: $call";
-    Log3 $hash, 3, "Text2Speech: Could not write remote message ($call) at " .$hash->{Host} if(!defined(syswrite($hash->{TCPDev}, "$call\n")));
+    Log3 $hash, 4, $name.": Write remote message to $dev: $call";
+    Log3 $hash, 3, $name.": Could not write remote message ($call) at " .$hash->{Host} if(!defined(syswrite($hash->{TCPDev}, "$call\n")));
     Text2Speech_CloseDev($hash);
   }
 
@@ -516,8 +516,6 @@ sub Text2Speech_PrepareSpeech($$) {
     $TTS_AddDelemiter = "";
   }
 
-  my @text; 
-
   # ersetze Sonderzeichen die Google nicht auflösen kann
   if($TTS_Ressource eq "Google") {
     $t =~ s/ä/ae/g;
@@ -529,7 +527,7 @@ sub Text2Speech_PrepareSpeech($$) {
     $t =~ s/ß/ss/g;
   }
 
-  @text = $hash->{helper}{Text2Speech} if($hash->{helper}{Text2Speech}[0]); #vorhandene Queue, neuen Sprachbaustein hinten anfuegen
+  my @text;
   push(@text, $t);
 
   # hole alle Filetemplates
@@ -538,12 +536,10 @@ sub Text2Speech_PrepareSpeech($$) {
 
   # bei Angabe direkter MP3-Files wird hier ein temporäres Template vergeben
   for(my $i=0; $i<(@text); $i++) {
-    @FileTplPc = ($text[$i] =~ /:(\w+.+[mp3|ogg|wav]):/g);
+    @FileTplPc = ($text[$i] =~ /\:([^:]+\.(?|mp3|ogg|wav))\:/g);
     for(my $j=0; $j<(@FileTplPc); $j++) {
-      my $time = time();
-      $time =~ s/\.//g;
-      my $tpl = "FileTpl_".$time."_#".$i; #eindeutige Templatedefinition schaffen
-      Log3 $hash, 4, "$me: Angabe einer direkten MP3-Datei gefunden:  $FileTplPc[$i] => $tpl";
+      my $tpl = "FileTpl_#".$i."_".$j; #eindeutige Templatedefinition schaffen
+      Log3 $hash, 4, "$me: Angabe einer direkten MP3-Datei gefunden:  $FileTplPc[$j] => $tpl";
       push(@FileTpl, $tpl.":".$FileTplPc[$j]); #zb: FileTpl_123645875_#0:/ring.mp3
       $text[$i] =~ s/$FileTplPc[$j]/$tpl/g; # Ersetze die DateiDefinition gegen ein Template
     }
@@ -577,7 +573,7 @@ sub Text2Speech_PrepareSpeech($$) {
     Log3 $hash, 4, "$me: $i => ".$text[$i]; 
   }
 
-  @{$hash->{helper}{Text2Speech}} = @text;
+  push( @{$hash->{helper}{Text2Speech}}, \@text );
 }
 
 #####################################
@@ -686,12 +682,12 @@ sub Text2Speech_CalcMP3Duration($$) {
     my $tag = get_mp3info($file);
     if ($tag && defined($tag->{SECS})) {
 	  $time = int($tag->{SECS}+0.5);
-      Log3 $hash, 4, "Text2Speech_CalcMP3Duration: $file hat eine Länge von $time Sekunden.";
+      Log3 $hash, 4, $hash->{NAME}.": $file hat eine Länge von $time Sekunden.";
     }
   };
   
   if ($@) {
-	Log3 $hash, 2, "Text2Speech_CalcMP3Duration: Bei der MP3-Längenermittlung ist ein Fehler aufgetreten: $@";
+    Log3 $hash, 2, $hash->{NAME}.": Bei der MP3-Längenermittlung ist ein Fehler aufgetreten: $@";
     return undef;
   }
   return $time;
@@ -731,8 +727,8 @@ sub Text2Speech_Download($$$) {
        $url .= "&" . $ttsSpeed{$TTS_Ressource} . $TTS_Speed if(length($ttsSpeed{$TTS_Ressource})>0);
        $url .= "&" . $ttsQuery{$TTS_Ressource} . uri_escape($text);
     
-    Log3 $hash->{NAME}, 4, "Text2Speech: Verwende ".$TTS_Ressource." OnlineResource zum Download";
-    Log3 $hash->{NAME}, 4, "Text2Speech: Hole URL: ". $url;
+    Log3 $hash->{NAME}, 4, $hash->{NAME}.": Verwende ".$TTS_Ressource." OnlineResource zum Download";
+    Log3 $hash->{NAME}, 4, $hash->{NAME}.": Hole URL: ". $url;
     #$HttpResponse = GetHttpFile($ttsHost, $ttsPath . $ttsLang . $language{$TTS_Ressource}{$TTS_Language} . "&" . $ttsQuery . uri_escape($text));
     my $param = {
                       url         => $url,
@@ -746,39 +742,39 @@ sub Text2Speech_Download($$$) {
     ($HttpResponseErr, $HttpResponse) = HttpUtils_BlockingGet($param);
     
     if(length($HttpResponseErr) > 0) {
-      Log3 $hash->{NAME}, 3, "Text2Speech: Fehler beim abrufen der Daten von " .$TTS_Ressource. " Translator";
-      Log3 $hash->{NAME}, 3, "Text2Speech: " . $HttpResponseErr; 
+      Log3 $hash->{NAME}, 3, $hash->{NAME}.": Fehler beim abrufen der Daten von " .$TTS_Ressource. " Translator";
+      Log3 $hash->{NAME}, 3, $hash->{NAME}.": " . $HttpResponseErr; 
     }
 
     $fh = new IO::File ">$file";
     if(!defined($fh)) {
-      Log3 $hash->{NAME}, 2, "Text2Speech: mp3 Datei <$file> konnte nicht angelegt werden.";
+      Log3 $hash->{NAME}, 2, $hash->{NAME}.": mp3 Datei <$file> konnte nicht angelegt werden.";
       return undef;
     }
 
     $fh->print($HttpResponse);
-    Log3 $hash->{NAME}, 4, "Text2Speech: Schreibe mp3 in die Datei $file mit ".length($HttpResponse)." Bytes";  
+    Log3 $hash->{NAME}, 4, $hash->{NAME}.": Schreibe mp3 in die Datei $file mit ".length($HttpResponse)." Bytes";  
     close($fh);
   } elsif ($TTS_Ressource eq "ESpeak") {
     my $FileWav = $file . ".wav";
     
     $cmd = "sudo espeak -vde+f3 -k5 -s150 \"" . $text . "\">\"" . $FileWav . "\""; 
-      Log3 $hash, 4, "Text2Speech:" .$cmd;
+      Log3 $hash, 4, $hash->{NAME}.":" .$cmd;
       system($cmd);
     
     $cmd = "lame \"" . $FileWav . "\" \"" . $file . "\""; 
-      Log3 $hash, 4, "Text2Speech:" .$cmd;
+      Log3 $hash, 4, $hash->{NAME}.":" .$cmd;
       system($cmd);
     unlink $FileWav;
   } elsif ($TTS_Ressource eq "SVOX-pico") {
     my $FileWav = $file . ".wav";
     
     $cmd = "pico2wave --lang=" . $language{$TTS_Ressource}{$TTS_Language} . " --wave=\"" . $FileWav . "\" \"" . $text . "\""; 
-      Log3 $hash, 4, "Text2Speech:" .$cmd;
+      Log3 $hash, 4, $hash->{NAME}.":" .$cmd;
       system($cmd);
     
     $cmd = "lame \"" . $FileWav . "\" \"" . $file . "\""; 
-      Log3 $hash, 4, "Text2Speech:" .$cmd;
+      Log3 $hash, 4, $hash->{NAME}.":" .$cmd;
       system($cmd);
     unlink $FileWav;
   }
@@ -800,14 +796,14 @@ sub Text2Speech_DoIt($) {
   my $verbose = AttrVal($hash->{NAME}, "verbose", 3);
   my $cmd;
 
-  Log3 $hash->{NAME}, 4, "Verwende TTS Spracheinstellung: ".$TTS_Language;
+  Log3 $hash->{NAME}, 4, $hash->{NAME}.": Verwende TTS Spracheinstellung: ".$TTS_Language;
 
   my $filename;
   my $file;
 
   unless(-e $TTS_CacheFileDir or mkdir $TTS_CacheFileDir) {
     #Verzeichnis anlegen gescheitert
-    Log3 $hash->{NAME}, 2, "Text2Speech: Angegebenes Verzeichnis $TTS_CacheFileDir konnte erstmalig nicht angelegt werden.";
+    Log3 $hash->{NAME}, 2, $hash->{NAME}.": Angegebenes Verzeichnis $TTS_CacheFileDir konnte erstmalig nicht angelegt werden.";
     return undef;
   }
 
@@ -818,21 +814,21 @@ sub Text2Speech_DoIt($) {
   undef($TTS_SentenceAppendix) if($TTS_SentenceAppendix && (! -e $TTS_SentenceAppendix));
 
   #Abspielliste erstellen
-  foreach my $t (@{$hash->{helper}{Text2Speech}}) {
+  foreach my $t (@{$hash->{helper}{Text2Speech}->[0]}) {
     if(-e $t) {
       # falls eine bestimmte mp3-Datei mit absolutem Pfad gespielt werden soll
       $filename = $t;
       $file = $filename;
-      Log3 $hash->{NAME}, 4, "Text2Speech: $filename als direkte MP3 Datei erkannt!";
+      Log3 $hash->{NAME}, 4, $hash->{NAME}.": $filename als direkte MP3 Datei erkannt!";
     } elsif(-e $TTS_CacheFileDir."/".$t) { 
       # falls eine bestimmte mp3-Datei mit relativem Pfad gespielt werden soll
       $filename = $t;
       $file = $TTS_CacheFileDir."/".$filename;
-      Log3 $hash->{NAME}, 4, "Text2Speech: $filename als direkte MP3 Datei erkannt!";
+      Log3 $hash->{NAME}, 4, $hash->{NAME}.": $filename als direkte MP3 Datei erkannt!";
     } else {
       $filename = md5_hex($language{$TTS_Ressource}{$TTS_Language} ."|". $t) . ".mp3";
       $file = $TTS_CacheFileDir."/".$filename;
-      Log3 $hash->{NAME}, 4, "Text2Speech: Textbaustein ist keine direkte MP3 Datei, ermittle MD5 CacheNamen: $filename";
+      Log3 $hash->{NAME}, 4, $hash->{NAME}.": Textbaustein ist keine direkte MP3 Datei, ermittle MD5 CacheNamen: $filename";
     } 
     
     if(-e $file) {
@@ -860,7 +856,7 @@ sub Text2Speech_DoIt($) {
   if(scalar(@Mp3WrapFiles) >= 2 && AttrVal($hash->{NAME}, "TTS_UseMP3Wrap", 0) == 1) {
     # benutze das Tool MP3Wrap um bereits einzelne vorhandene Sprachdateien
     # zusammenzuführen. Ziel: sauberer Sprachfluss
-    Log3 $hash->{NAME}, 4, "Text2Speech: Bearbeite per MP3Wrap jetzt den Text: ". join(" ", @Mp3WrapText);
+    Log3 $hash->{NAME}, 4, $hash->{NAME}.": Bearbeite per MP3Wrap jetzt den Text: ". join(" ", @Mp3WrapText);
 
     my $Mp3WrapPrefix = md5_hex(join("|", @Mp3WrapFiles));
     my $Mp3WrapFile = $TTS_CacheFileDir ."/". $Mp3WrapPrefix . "_MP3WRAP.mp3"; 
@@ -869,7 +865,7 @@ sub Text2Speech_DoIt($) {
       $cmd = "mp3wrap " .$TTS_CacheFileDir. "/" .$Mp3WrapPrefix. ".mp3 " .join(" ", @Mp3WrapFiles);
       $cmd .= " >/dev/null" if($verbose < 5);
 
-      Log3 $hash->{NAME}, 4, "Text2Speech: " .$cmd;
+      Log3 $hash->{NAME}, 4, $hash->{NAME}.": " .$cmd;
       system($cmd);
     }
     
@@ -879,10 +875,10 @@ sub Text2Speech_DoIt($) {
         $cmd = Text2Speech_BuildMplayerCmdString($hash, $Mp3WrapFile);
         $cmd .= " >/dev/null" if($verbose < 5);
 
-        Log3 $hash->{NAME}, 4, "Text2Speech:" .$cmd;
+        Log3 $hash->{NAME}, 4, $hash->{NAME}.":" .$cmd;
         system($cmd);
       } else {
-        Log3 $hash->{NAME}, 2, "Text2Speech: Mp3Wrap Datei konnte nicht angelegt werden.";
+        Log3 $hash->{NAME}, 2, $hash->{NAME}.": Mp3Wrap Datei konnte nicht angelegt werden.";
       }
     }
 
@@ -892,12 +888,12 @@ sub Text2Speech_DoIt($) {
   }
 
 
-  Log3 $hash->{NAME}, 4, "Text2Speech: Bearbeite jetzt den Text: ". $hash->{helper}{Text2Speech}[0]; 
+  Log3 $hash->{NAME}, 4, $hash->{NAME}.": Bearbeite jetzt den Text: ". join(" ",@{$hash->{helper}{Text2Speech}->[0]}); 
   
   if(! -e $file) { # Datei existiert noch nicht im Cache
-    Text2Speech_Download($hash, $file, $hash->{helper}{Text2Speech}[0]);
+    Text2Speech_Download($hash, $file, $hash->{helper}{Text2Speech}->[0]);
   } else {
-    Log3 $hash->{NAME}, 4, "Text2Speech: $file gefunden, kein Download";
+    Log3 $hash->{NAME}, 4, $hash->{NAME}.": $file gefunden, kein Download";
   }
 
   if(-e $file && $hash->{MODE} ne "SERVER") { 
@@ -906,7 +902,7 @@ sub Text2Speech_DoIt($) {
     $cmd = Text2Speech_BuildMplayerCmdString($hash, $file);
     $cmd .= " >/dev/null" if($verbose < 5);
 
-    Log3 $hash->{NAME}, 4, "Text2Speech:" .$cmd;
+    Log3 $hash->{NAME}, 4, $hash->{NAME}.":" .$cmd;
     system($cmd);
   }
 
@@ -933,22 +929,28 @@ sub Text2Speech_Done($) {
   my $TTS_TimeOut   = AttrVal($hash->{NAME}, "TTS_TimeOut", 60);
 
   if($filename) {
-    my @text;
-    for(my $i=0; $i<$tts_done; $i++) { 
-      push(@text, $hash->{helper}{Text2Speech}[$i]);
-    }         
-    Text2Speech_WriteStats($hash, 1, $filename, join(" ", @text)) if (AttrVal($hash->{NAME},"TTS_noStatisticsLog", "0")==0);
+    my $text = $hash->{helper}{Text2Speech}[0];         
+    Text2Speech_WriteStats($hash, 1, $filename, join(" ", @$text)) if (AttrVal($hash->{NAME},"TTS_noStatisticsLog", "0")==0);
 
     readingsSingleUpdate($hash, "lastFilename", $filename, 1);
   }
 
-  delete($hash->{helper}{RUNNING_PID});
-  splice(@{$hash->{helper}{Text2Speech}}, 0, $tts_done);
+  my $pre = @{$hash->{helper}{Text2Speech}->[0]};
+  if ($tts_done == $pre ) {
+  	# alles wurde bearbeitet und kann komplett entfernt werden
+        Log3($hash,4, $hash->{NAME}.": Es wurden ". $pre ." Teile ausgegeben und der Befehl ist abgearbeitet.");
+  	splice(@{$hash->{helper}{Text2Speech}}, 0, 1);	
+  }else{
+  	# es wurde nur ein Teil abgearbeitet und nur dieser kann entfernt werden
+        Log3($hash,4, $hash->{NAME}.": Es wurden ". $pre ." Teile ausgegeben und weitere folgen!");
+  	splice(@{$hash->{helper}{Text2Speech}->[0]}, 0, $tts_done);
+  }
 
   # erneutes aufrufen da ev. weiterer Text in der Warteschlange steht
   if(@{$hash->{helper}{Text2Speech}} > 0) {
     $hash->{helper}{RUNNING_PID} = BlockingCall("Text2Speech_DoIt", $hash, "Text2Speech_Done", $TTS_TimeOut, "Text2Speech_AbortFn", $hash);
   } else {
+    delete($hash->{helper}{RUNNING_PID});
     readingsSingleUpdate($hash, "playing", "0", 1);
   }
 }
@@ -958,7 +960,7 @@ sub Text2Speech_AbortFn($)     {
   my ($hash) = @_;
 
   delete($hash->{helper}{RUNNING_PID});
-  Log3 $hash->{NAME}, 2, "Text2Speech: BlockingCall for ".$hash->{NAME}." was aborted";
+  Log3 $hash->{NAME}, 2, $hash->{NAME}.": BlockingCall for ".$hash->{NAME}." was aborted";
   readingsSingleUpdate($hash, "playing", "0", 1);
 }
 
@@ -985,6 +987,7 @@ sub Text2Speech_WriteStats($$$$){
     } 
   }
   return undef if($defs{$DbLogDev}{STATE} !~ m/(active|connected)/); # muss active sein!
+  return undef if(AttrVal($defs{$DbLogDev}, "DbLogType", "History") !~ /Current/); # muss die Tabelle Current nutzen
 
   my $logdevice = $hash->{NAME} ."|". $file;
   # den letzten Value von "Usage" ermitteln um dann die Statistik um 1 zu erhoehen.
