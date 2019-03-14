@@ -1273,31 +1273,55 @@ sub CreateMetadataList ($$$) {
                   . $title . '</a>';
             }
 
-            elsif ($mAttr eq 'command_reference'
-                && defined( $modMeta->{resources} )
-                && defined( $modMeta->{resources}{x_commandref} )
-                && defined( $modMeta->{resources}{x_commandref}{web} ) )
-            {
-                my $title =
-                  defined( $modMeta->{resources}{x_commandref}{title} )
-                  ? $modMeta->{resources}{x_commandref}{title}
-                  : (
-                    $modMeta->{resources}{x_commandref}{web} =~
-                      m/^(?:https?:\/\/)?fhem\.de/i ? 'Public'
-                    : ''
-                  );
+            elsif ( $mAttr eq 'command_reference' ) {
+                my $webname;
 
-                my $url =
-                  $modMeta->{resources}{x_commandref}{web};
-
-                if ( defined( $modMeta->{resources}{x_commandref}{modpath} ) ) {
-                    $url .=
-                      $modMeta->{resources}{x_commandref}{modpath};
-                    $url .= $modName eq 'Global' ? 'global' : $modName;
+                if (   defined( $hash->{CL} )
+                    && defined( $hash->{CL}{TYPE} )
+                    && $hash->{CL}{TYPE} eq 'FHEMWEB' )
+                {
+                    $webname =
+                      AttrVal( $hash->{CL}{SNAME}, 'webname', 'fhem' );
+                    $l .=
+                        '<a href="/'
+                      . $webname
+                      . '/docs/commandref.html#'
+                      . ( $modName eq 'Global' ? 'global' : $modName )
+                      . '" target="_blank">local</a>';
                 }
 
-                $l .=
-                  '<a href="' . $url . '" target="_blank">' . $title . '</a>';
+                if (   defined( $modMeta->{resources} )
+                    && defined( $modMeta->{resources}{x_commandref} )
+                    && defined( $modMeta->{resources}{x_commandref}{web} ) )
+                {
+                    my $title =
+                      defined( $modMeta->{resources}{x_commandref}{title} )
+                      ? $modMeta->{resources}{x_commandref}{title}
+                      : (
+                        $modMeta->{resources}{x_commandref}{web} =~
+                          m/^(?:https?:\/\/)?([^\/]+).*/i ? $1
+                        : $modMeta->{resources}{x_commandref}{web}
+                      );
+
+                    my $url =
+                      $modMeta->{resources}{x_commandref}{web};
+
+                    if (
+                        defined( $modMeta->{resources}{x_commandref}{modpath} )
+                      )
+                    {
+                        $url .=
+                          $modMeta->{resources}{x_commandref}{modpath};
+                        $url .= $modName eq 'Global' ? 'global' : $modName;
+                    }
+
+                    $l .=
+                        ( $webname ? ' | ' : '' )
+                      . '<a href="'
+                      . $url
+                      . '" target="_blank">'
+                      . $title . '</a>';
+                }
             }
 
             elsif ($mAttr eq 'wiki'
@@ -1342,9 +1366,8 @@ sub CreateMetadataList ($$$) {
                 && defined( $modMeta->{resources}{x_support_community}{web} ) )
             {
                 my $title =
-                  defined(
-                    $modMeta->{resources}{x_support_community}{x_web_title} )
-                  ? $modMeta->{resources}{x_support_community}{x_web_title}
+                  defined( $modMeta->{resources}{x_support_community}{title} )
+                  ? $modMeta->{resources}{x_support_community}{title}
                   : (
                     $modMeta->{resources}{x_support_community}{web} =~
                       m/^(?:https?:\/\/)?forum\.fhem\.de/i ? 'FHEM Forum'
@@ -1370,9 +1393,8 @@ sub CreateMetadataList ($$$) {
                 && defined( $modMeta->{resources}{x_support_commercial}{web} ) )
             {
                 my $title =
-                  defined(
-                    $modMeta->{resources}{x_support_commercial}{x_web_title} )
-                  ? $modMeta->{resources}{x_support_commercial}{x_web_title}
+                  defined( $modMeta->{resources}{x_support_commercial}{title} )
+                  ? $modMeta->{resources}{x_support_commercial}{title}
                   : $modMeta->{resources}{x_support_commercial}{web};
 
                 $l .=
@@ -1452,18 +1474,6 @@ sub CreateMetadataList ($$$) {
 
                     }
 
-                    $l .=
-                        'Web: <a href="'
-                      . $url
-                      . '" target="_blank">'
-                      . (
-                        defined(
-                            $modMeta->{resources}{repository}{x_web_title}
-                          )
-                        ? $modMeta->{resources}{repository}{x_web_title}
-                        : $url
-                      ) . '</a>';
-
                     if (
                         defined(
                             $modMeta->{resources}{repository}{x_branch_master}
@@ -1475,17 +1485,42 @@ sub CreateMetadataList ($$$) {
                         ne $modMeta->{resources}{repository}{x_branch_dev}
                       )
                     {
-                        my $url =
+                        $l .=
+                            'View online source code: <a href="'
+                          . $url
+                          . '" target="_blank">'
+                          . (
+                            defined(
+                                $modMeta->{resources}{repository}{x_web_title}
+                              ) ? $modMeta->{resources}{repository}{x_web_title}
+                            : (
+                                defined(
+                                    $modMeta->{resources}{repository}
+                                      {x_branch_master}
+                                  )
+                                ? $modMeta->{resources}{repository}
+                                  {x_branch_master}
+                                : 'master'
+                            )
+                          ) . '</a>';
+
+                        $url =
                           $modMeta->{resources}{repository}{web};
                         $url .= '/' unless ( $url =~ m/\/$/ );
                         $url .= $modMeta->{resources}{repository}{x_branch_dev};
 
                         $l .=
-                            ' Development branch: <a href="'
+                            ' <a href="'
                           . $url
                           . '" target="_blank">'
                           . $modMeta->{resources}{repository}{x_branch_dev}
                           . '</a>';
+                    }
+                    else {
+                        $l .=
+                            '<a href="'
+                          . $url
+                          . '" target="_blank">View online source code</a>';
                     }
 
                     $l .= $lb;
@@ -1494,30 +1529,23 @@ sub CreateMetadataList ($$$) {
                 # VCS link
                 my $url =
                   $modMeta->{resources}{repository}{url};
-                $url .= '/' unless ( $url =~ m/\/$/ );
-                $url .= $modMeta->{resources}{repository}{x_branch_master}
-                  if (
+
+                $l .=
+                    uc( $modMeta->{resources}{repository}{type} )
+                  . ' Repository: '
+                  . $modMeta->{resources}{repository}{url};
+
+                if (
                     defined(
                         $modMeta->{resources}{repository}{x_branch_master}
                     )
-                  );
-
-                if ( defined( $modMeta->{resources}{repository}{x_filepath} ) )
+                  )
                 {
-                    $url .= '/' unless ( $url =~ m/\/$/ );
-                    $url .=
-                      $modMeta->{resources}{repository}{x_filepath};
-                    $url .= '/' unless ( $url =~ m/\/$/ );
-                    $url .= $modMeta->{x_file}[2];
-
+                    $l .=
+                        $lb
+                      . 'Main branch: '
+                      . $modMeta->{resources}{repository}{x_branch_master};
                 }
-
-                $l .=
-                    $modMeta->{resources}{repository}{type}
-                  . ': <a href="'
-                  . $url
-                  . '" target="_blank">'
-                  . $url . '</a>';
 
                 if (
                     defined(
@@ -1529,17 +1557,10 @@ sub CreateMetadataList ($$$) {
                     $modMeta->{resources}{repository}{x_branch_dev}
                   )
                 {
-                    my $url =
-                      $modMeta->{resources}{repository}{url};
-                    $url .= '/' unless ( $url =~ m/\/$/ );
-                    $url .= $modMeta->{resources}{repository}{x_branch_dev};
-
                     $l .=
-                        ' Development branch: <a href="'
-                      . $url
-                      . '" target="_blank">'
-                      . $modMeta->{resources}{repository}{x_branch_dev}
-                      . '</a>';
+                        $lb
+                      . 'Dev branch: '
+                      . $modMeta->{resources}{repository}{x_branch_dev};
                 }
             }
             else {
@@ -2293,12 +2314,6 @@ sub ToDay() {
       "abstract": "Modul zum Update von FHEM, zur Installation von Drittanbieter FHEM Modulen und der Verwaltung von Systemvoraussetzungen"
     }
   },
-  "keywords": [
-    "fhem-core",
-    "fhem-mod",
-    "fhem-mod-helper",
-    "fhem-3rdparty"
-  ],
   "version": "v0.0.2",
   "release_status": "testing",
   "author": [
