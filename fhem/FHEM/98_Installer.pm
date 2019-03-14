@@ -217,7 +217,8 @@ my @perlCoreModules = qw(
 BEGIN {
     # Import from main::
     GP_Import(
-        qw(readingsSingleUpdate
+        qw(
+          readingsSingleUpdate
           readingsBulkUpdate
           readingsBulkUpdateIfChanged
           readingsBeginUpdate
@@ -239,9 +240,19 @@ BEGIN {
           init_done
           gettimeofday
           InternalTimer
-          RemoveInternalTimer)
+          RemoveInternalTimer
+          LoadModule
+          )
     );
 }
+
+# Load dependent FHEM modules as packages,
+#  no matter if user also defined FHEM devices or not.
+#  We want to use their functions here :-)
+#TODO let this make Meta.pm for me
+#LoadModule('apt');
+#LoadModule('pypip');
+LoadModule('npmjs');
 
 sub Define($$) {
     my ( $hash, $def ) = @_;
@@ -1175,6 +1186,7 @@ sub CreateMetadataList ($$$) {
 
         $l .= $colOpenMinWidth . $txtOpen . $mAttrName . $txtClose . $colClose;
 
+        # these attributes do not exist under that name in META.json
         if ( !defined( $modMeta->{$mAttr} ) ) {
             $l .= $colOpen;
 
@@ -1381,14 +1393,25 @@ sub CreateMetadataList ($$$) {
                   : (
                     $modMeta->{resources}{bugtracker}{web} =~
                       m/^(?:https?:\/\/)?forum\.fhem\.de/i ? 'FHEM Forum'
-                    : ''
+                    : (
+                        $modMeta->{resources}{bugtracker}{web} =~
+                          m/^(?:https?:\/\/)?github\.com\/fhem/i
+                        ? 'Github Issues: ' . $modMeta->{name}
+                        : $modMeta->{resources}{bugtracker}{web}
+                    )
                   );
 
+                # add prefix if user defined title
                 $title = 'FHEM Forum: ' . $title
                   if ( $title ne ''
                     && $title !~ m/^FHEM Forum/i
                     && $modMeta->{resources}{bugtracker}{web} =~
                     m/^(?:https?:\/\/)?forum\.fhem\.de/i );
+                $title = 'Github Issues: ' . $title
+                  if ( $title ne ''
+                    && $title !~ m/^Github issues/i
+                    && $modMeta->{resources}{bugtracker}{web} =~
+                    m/^(?:https?:\/\/)?github\.com\/fhem/i );
 
                 $l .=
                     '<a href="'
@@ -1525,6 +1548,8 @@ sub CreateMetadataList ($$$) {
 
             $l .= $colClose;
         }
+
+        # these text attributes can be shown directly
         elsif ( !ref( $modMeta->{$mAttr} ) ) {
             $l .= $colOpen;
 
@@ -1579,6 +1604,8 @@ sub CreateMetadataList ($$$) {
 
             $l .= $mAttrVal . $colClose;
         }
+
+        # this attribute is an array and needs further processing
         elsif (ref( $modMeta->{$mAttr} ) eq 'ARRAY'
             && @{ $modMeta->{$mAttr} } > 0
             && $modMeta->{$mAttr}[0] ne '' )
@@ -1651,6 +1678,8 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
 
             $l .= $colClose;
         }
+
+        # woops, we don't know how to handle this attribute
         else {
             $l .= $colOpen . '?' . $colClose;
         }
@@ -1673,7 +1702,7 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
     push @ret, 'This FHEM module is currently ' . $moduleUsage . '.'
       unless ( $modName eq 'Global' );
 
-    push @ret, '<h4>Perl Modules</h4>';
+    push @ret, '<h4>Perl Packages</h4>';
     if (   defined( $modMeta->{prereqs} )
         && defined( $modMeta->{prereqs}{runtime} ) )
     {
@@ -1816,6 +1845,232 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
           . $lb;
     }
 
+    if (   defined( $modMeta->{x_prereqs_nodejs} )
+        && defined( $modMeta->{x_prereqs_nodejs}{runtime} ) )
+    {
+        push @ret, '<h4>Node.js Packages</h4>';
+
+        my @mAttrs = qw(
+          requires
+          recommends
+          suggests
+        );
+
+        push @ret, $tableOpen;
+
+        push @ret, $colOpenMinWidth . $txtOpen . 'Name' . $txtClose . $colClose;
+
+        push @ret,
+          $colOpenMinWidth . $txtOpen . 'Importance' . $txtClose . $colClose;
+
+        push @ret,
+          $colOpenMinWidth . $txtOpen . 'Status' . $txtClose . $colClose;
+
+        my $linecount = 1;
+        foreach my $mAttr (@mAttrs) {
+            next
+              unless ( defined( $modMeta->{x_prereqs_nodejs}{runtime}{$mAttr} )
+                && keys %{ $modMeta->{x_prereqs_nodejs}{runtime}{$mAttr} } >
+                0 );
+
+            foreach my $prereq (
+                sort keys %{ $modMeta->{x_prereqs_nodejs}{runtime}{$mAttr} } )
+            {
+                my $l = $linecount % 2 == 0 ? $rowOpenEven : $rowOpenOdd;
+
+                my $importance = $mAttr;
+                $importance = 'required'    if ( $mAttr eq 'requires' );
+                $importance = 'recommended' if ( $mAttr eq 'recommends' );
+                $importance = 'suggested'   if ( $mAttr eq 'suggests' );
+
+                my $version =
+                  $modMeta->{x_prereqs_nodejs}{runtime}{$mAttr}{$prereq};
+                $version = '' if ( !defined($version) || $version eq '0' );
+
+                my $check     = __IsInstalledNodejs($prereq);
+                my $installed = '';
+                if ($check) {
+                    if ( $check =~ m/^\d+\./ ) {
+                        my $nverReq =
+                            $version ne ''
+                          ? $version
+                          : 0;
+                        my $nverInst = $check;
+
+                        #TODO suport for version range:
+                        #https://metacpan.org/pod/CPAN::Meta::Spec#Version-Range
+                        if ( $nverReq > 0 && $nverInst < $nverReq ) {
+                            $installed .=
+                                $colorRed
+                              . 'OUTDATED'
+                              . $colorClose . ' ('
+                              . $check . ')';
+                        }
+                        else {
+                            $installed = 'installed';
+                        }
+                    }
+                    else {
+                        $installed = 'installed';
+                    }
+                }
+                else {
+                    $installed = $colorRed . 'MISSING' . $colorClose
+                      if ( $importance eq 'required' );
+                }
+
+                $installed = $colorGreen . $installed . $colorClose;
+
+                $prereq =
+                    '<a href="https://www.npmjs.com/package/'
+                  . $prereq
+                  . '" target="_blank">'
+                  . $prereq . '</a>'
+                  if ($html);
+
+                $l .=
+                    $colOpenMinWidth
+                  . $prereq
+                  . ( $version ne '' ? " ($version)" : '' )
+                  . $colClose;
+                $l .= $colOpenMinWidth . $importance . $colClose;
+                $l .= $colOpenMinWidth . $installed . $colClose;
+
+                $l .= $rowClose;
+
+                push @ret, $l;
+                $linecount++;
+            }
+        }
+
+        push @ret, $tableClose;
+
+    }
+
+    if (   defined( $modMeta->{x_prereqs_python} )
+        && defined( $modMeta->{x_prereqs_python}{runtime} ) )
+    {
+        push @ret, '<h4>Python Packages</h4>';
+
+        my @mAttrs = qw(
+          requires
+          recommends
+          suggests
+        );
+
+        push @ret, $tableOpen;
+
+        push @ret, $colOpenMinWidth . $txtOpen . 'Name' . $txtClose . $colClose;
+
+        push @ret,
+          $colOpenMinWidth . $txtOpen . 'Importance' . $txtClose . $colClose;
+
+        push @ret,
+          $colOpenMinWidth . $txtOpen . 'Status' . $txtClose . $colClose;
+
+        my $linecount = 1;
+        foreach my $mAttr (@mAttrs) {
+            next
+              unless ( defined( $modMeta->{x_prereqs_python}{runtime}{$mAttr} )
+                && keys %{ $modMeta->{x_prereqs_python}{runtime}{$mAttr} } >
+                0 );
+
+            foreach my $prereq (
+                sort keys %{ $modMeta->{x_prereqs_python}{runtime}{$mAttr} } )
+            {
+                my $l = $linecount % 2 == 0 ? $rowOpenEven : $rowOpenOdd;
+
+                my $importance = $mAttr;
+                $importance = 'required'    if ( $mAttr eq 'requires' );
+                $importance = 'recommended' if ( $mAttr eq 'recommends' );
+                $importance = 'suggested'   if ( $mAttr eq 'suggests' );
+
+                my $version =
+                  $modMeta->{x_prereqs_python}{runtime}{$mAttr}{$prereq};
+                $version = '' if ( !defined($version) || $version eq '0' );
+
+                my $check     = __IsInstalledPython($prereq);
+                my $installed = '';
+                if ($check) {
+                    if ( $check =~ m/^\d+\./ ) {
+                        my $nverReq =
+                            $version ne ''
+                          ? $version
+                          : 0;
+                        my $nverInst = $check;
+
+                        #TODO suport for version range:
+                        #https://metacpan.org/pod/CPAN::Meta::Spec#Version-Range
+                        if ( $nverReq > 0 && $nverInst < $nverReq ) {
+                            $installed .=
+                                $colorRed
+                              . 'OUTDATED'
+                              . $colorClose . ' ('
+                              . $check . ')';
+                        }
+                        else {
+                            $installed = 'installed';
+                        }
+                    }
+                    else {
+                        $installed = 'installed';
+                    }
+                }
+                else {
+                    $installed = $colorRed . 'MISSING' . $colorClose
+                      if ( $importance eq 'required' );
+                }
+
+                my $isPerlPragma = ModuleIsPerlPragma($prereq);
+                my $isPerlCore = $isPerlPragma ? 0 : ModuleIsPerlCore($prereq);
+                my $isFhem =
+                  $isPerlPragma || $isPerlCore ? 0 : ModuleIsInternal($prereq);
+                if ( $isPerlPragma || $isPerlCore || $prereq eq 'perl' ) {
+                    $installed =
+                      $installed ne 'installed'
+                      ? "$installed (Perl built-in)"
+                      : 'built-in';
+                }
+                elsif ($isFhem) {
+                    $installed =
+                      $installed ne 'installed'
+                      ? "$installed (FHEM included)"
+                      : 'included';
+                }
+                elsif ( $installed eq 'installed' ) {
+                    $installed = $colorGreen . $installed . $colorClose;
+                }
+
+                $prereq =
+                    '<a href="https://metacpan.org/pod/'
+                  . $prereq
+                  . '" target="_blank">'
+                  . $prereq . '</a>'
+                  if ( $html
+                    && !$isFhem
+                    && !$isPerlCore
+                    && !$isPerlPragma
+                    && $prereq ne 'perl' );
+
+                $l .=
+                    $colOpenMinWidth
+                  . $prereq
+                  . ( $version ne '' ? " ($version)" : '' )
+                  . $colClose;
+                $l .= $colOpenMinWidth . $importance . $colClose;
+                $l .= $colOpenMinWidth . $installed . $colClose;
+
+                $l .= $rowClose;
+
+                push @ret, $l;
+                $linecount++;
+            }
+        }
+
+        push @ret, $tableClose;
+
+    }
+
     push @ret, 'Based on data generated by ' . $modMeta->{generated_by};
 
     return $header . join( "\n", @ret ) . $footer;
@@ -1863,6 +2118,24 @@ sub __IsInstalledPerl($) {
     else {
         return 1;
     }
+}
+
+# Checks whether a NodeJS package is installed in the system
+sub __IsInstalledNodejs($) {
+    return 0 unless ( __PACKAGE__ eq caller(0) );
+    return 0 unless (@_);
+    my ($pkg) = @_;
+
+    return 0;
+}
+
+# Checks whether a Python package is installed in the system
+sub __IsInstalledPython($) {
+    return 0 unless ( __PACKAGE__ eq caller(0) );
+    return 0 unless (@_);
+    my ($pkg) = @_;
+
+    return 0;
 }
 
 sub ModuleIsPerlCore {
@@ -2050,7 +2323,8 @@ sub ToDay() {
         "HttpUtils": 0,
         "File::stat": 0,
         "Encode": 0,
-        "version": 0
+        "version": 0,
+        "FHEM::npmjs": 0
       },
       "recommends": {
         "Perl::PrereqScanner::NotQuiteLite": 0,
@@ -2062,8 +2336,7 @@ sub ToDay() {
   },
   "resources": {
     "bugtracker": {
-      "web": "https://forum.fhem.de/index.php/board,44.0.html",
-      "x_web_title": "FHEM Forum: Unterstützende Dienste"
+      "web": "https://github.com/fhem/Installer/issues"
     }
   }
 }

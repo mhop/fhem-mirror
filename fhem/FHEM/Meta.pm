@@ -362,7 +362,15 @@ sub import(@) {
     __GetUpdatedata() unless ( defined($coreUpdate) );
     __GetMaintainerdata() unless ( keys %moduleMaintainers > 0 );
 
-    if ( $pkg ne "main" ) {
+    #TODO Export a function to main context so that
+    #  a device may use metadata to load Perl dependencies from META.json.
+    #  This will provide a central place to maintain module dependencies
+    #  w/o source code analysis.
+    if ( $pkg eq "main" ) {
+    }
+
+    # Not sure yet what else could be done by just loading the module
+    else {
     }
 }
 
@@ -1721,26 +1729,6 @@ sub __SetXVersion {
       }
     }
   },
-  "x_prereqs_nodejs": {
-    "runtime": {
-      "requires": {
-      },
-      "recommends": {
-      },
-      "suggests": {
-      }
-    }
-  },
-  "x_prereqs_python": {
-    "runtime": {
-      "requires": {
-      },
-      "recommends": {
-      },
-      "suggests": {
-      }
-    }
-  },
   "x_prereqs_binary_exec": {
     "runtime": {
       "requires": {
@@ -1793,11 +1781,11 @@ sub __SetXVersion {
 =for :application/json;q=META.json fhem.pl
 {
   "abstract": "FHEM® is a Perl server for house automation",
-  "description": "FHEM® (registered trademark) is a GPL'd perl server for house automation. It is used to automate some common tasks in the household like switching lamps / shutters / heating / etc. and to log events like temperature / humidity / power consumption.\\n\\nThe program runs as a server, you can control it via web or smartphone frontends, telnet or TCP/IP directly.\\n\\nIn order to use FHEM you'll need a 24/7 server (NAS, RPi, PC, MacMini, etc) with a perl interpreter and some attached hardware like the CUL-, EnOcean-, Z-Wave-USB-Stick, etc. to access the actors and sensors.\\n\\nIt is pronounced without the h, like in feminine.",
+  "description": "FHEM® (registered trademark) is a GPL'd Perl server for house automation. It is used to automate some common tasks in the household like switching lamps / shutters / heating / etc. and to log events like temperature / humidity / power consumption.\\n\\nThe program runs as a server, you can control it via web or smartphone frontends, telnet or TCP/IP directly.\\n\\nIn order to use FHEM you'll need a 24/7 server (NAS, RPi, PC, Mac Mini, etc.) with a Perl interpreter and some attached hardware like the CUL-, EnOcean-, Z-Wave-USB-Stick, etc. to access the actors and sensors.\\n\\nIt is pronounced without the h, like in feminine.",
   "x_lang": {
     "de": {
       "abstract": "FHEM® ist ein Perl Server zur Hausautomatisierung",
-      "description": "FHEM® (eingetragene Marke) ist ein in Perl geschriebener, GPL lizensierter Server für die Heimautomatisierung. Man kann mit FHEM häufig auftretende Aufgaben automatisieren, wie z.Bsp. Lampen / Rollladen / Heizung / usw. schalten, oder Ereignisse wie Temperatur / Feuchtigkeit / Stromverbrauch protokollieren und visualisieren.\\n\\nDas Programm läuft als Server, man kann es über WEB, dedizierte Smartphone Apps oder telnet bedienen, TCP Schnittstellen für JSON und XML existieren ebenfalls.\\n\\nUm es zu verwenden benötigt man einen 24/7 Rechner (NAS, RPi, PC, MacMini, etc) mit einem Perl Interpreter und angeschlossene Hardware-Komponenten wie CUL-, EnOcean-, Z-Wave-USB-Stick, etc. für einen Zugang zu den Aktoren und Sensoren.\\n\\nAusgesprochen wird es ohne h, wie bei feminin."
+      "description": "FHEM® (eingetragene Marke) ist ein in Perl geschriebener, GPL lizensierter Server für die Heimautomatisierung. Man kann mit FHEM häufig auftretende Aufgaben automatisieren, wie z.Bsp. Lampen / Rollladen / Heizung / usw. schalten, oder Ereignisse wie Temperatur / Feuchtigkeit / Stromverbrauch protokollieren und visualisieren.\\n\\nDas Programm läuft als Server, man kann es über WEB, dedizierte Smartphone Apps oder telnet bedienen, TCP Schnittstellen für JSON und XML existieren ebenfalls.\\n\\nUm es zu verwenden benötigt man einen 24/7 Rechner (NAS, RPi, PC, Mac Mini, etc.) mit einem Perl Interpreter und angeschlossene Hardware-Komponenten wie CUL-, EnOcean-, Z-Wave-USB-Stick, etc. für einen Zugang zu den Aktoren und Sensoren.\\n\\nAusgesprochen wird es ohne h, wie bei feminin."
     }
   },
   "keywords": [
@@ -1896,66 +1884,6 @@ sub __SetXVersion {
     }
   },
   "x_prereqs_os_ubuntu": {
-    "runtime": {
-      "requires": {
-      },
-      "recommends": {
-      },
-      "suggests": {
-      }
-    }
-  },
-  "x_prereqs_nodejs": {
-    "runtime": {
-      "requires": {
-      },
-      "recommends": {
-      },
-      "suggests": {
-      }
-    }
-  },
-  "x_prereqs_python": {
-    "runtime": {
-      "requires": {
-      },
-      "recommends": {
-      },
-      "suggests": {
-      }
-    }
-  },
-  "x_prereqs_binary_exec": {
-    "runtime": {
-      "requires": {
-      },
-      "recommends": {
-      },
-      "suggests": {
-      }
-    }
-  },
-  "x_prereqs_sudo": {
-    "runtime": {
-      "requires": {
-      },
-      "recommends": {
-      },
-      "suggests": {
-      }
-    }
-  },
-  "x_prereqs_permissions_fileown": {
-    "runtime": {
-      "requires": {
-      },
-      "recommends": {
-      },
-      "suggests": {
-      }
-    }
-  },
-  "x_prereqs_permissions_filemod": {
     "runtime": {
       "requires": {
       },

@@ -1778,6 +1778,18 @@ sub ToDay() {
       }
     }
   },
+  "x_prereqs_nodejs": {
+    "runtime": {
+      "requires": {
+        "node": 8.0,
+        "npm": 0
+      },
+      "recommends": {
+      },
+      "suggests": {
+      }
+    }
+  },
   "x_prereqs_binary_exec": {
     "runtime": {
       "requires": {
