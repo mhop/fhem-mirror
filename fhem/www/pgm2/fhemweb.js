@@ -160,8 +160,14 @@ FW_jqueryReadyFn()
                       "="+encodeURIComponent($(this).val());
     });
     FW_cmd(FW_root+"?"+cmd+"&XHR=1&addLinks=1", function(data) {
-      if(!data.match(/^[\r\n]*$/)) // ignore empty answers
-        FW_okDialog('<pre>'+data+'</pre>', el);
+      if(!data.match(/^[\r\n]*$/)) {// ignore empty answers
+        var ma = /^<html>([\s\S]*)<\/html>/.exec(data);
+        if(ma) {
+          FW_okDialog(ma[1], el);
+        } else {
+          FW_okDialog('<pre>'+data+'</pre>', el);
+        }
+      }
     });
   });
   
@@ -1005,7 +1011,7 @@ FW_doUpdate(evt)
         if(d[2].match(/\n/) && !d[2].match(/<.*>/)) // format multiline
           d[2] = '<html><pre>'+d[2]+'</pre></html>';
 
-        var ma = /^<html>([\s\S]*)<\/html>$/.exec(d[2]);
+        var ma = /^<html>([\s\S]*)<\/html>/.exec(d[2]);
         if(!d[0].match("-")) // not a reading
           $(this).html(d[2]);
         else if(ma)
