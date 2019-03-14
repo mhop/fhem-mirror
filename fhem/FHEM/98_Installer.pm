@@ -242,6 +242,7 @@ BEGIN {
           InternalTimer
           RemoveInternalTimer
           LoadModule
+          FW_webArgs
           )
     );
 }
@@ -1040,6 +1041,9 @@ sub WriteReadings($$) {
 sub CreateMetadataList ($$$) {
     my ( $hash, $getCmd, $modName ) = @_;
     $modName = 'Global' if ( uc($modName) eq 'FHEM' );
+
+    # disable automatic links to FHEM devices
+    delete $FW_webArgs{addLinks};
 
     return 'Unknown module ' . $modName
       unless ( defined( $modules{$modName} ) );
