@@ -1,2 +1,2 @@
-#Sun Aug 26 12:32:29 2018
-{"lcCinema":{"Break":{"ReadingLight":"dim37%","CeilingLight":"dim37%"},"Cinema":{"Projector":"on","ReadingLight":"off","TV":"off","Screen":"down","CeilingLight":"off"},"AllOff":{"CeilingLight":"off","Screen":"up","TV":"off","ReadingLight":"off","Projector":"off"},"WatchTV":{"TV":"on","Projector":"off","ReadingLight":"dim12%","Screen":"up","CeilingLight":"off"}}}
+#Thu Mar 14 20:36:49 2019
+{"lcCinema":{"WatchTV":{"CeilingLight":"off","ReadingLight":"dim12%","Screen":"up","TV":"on","Projector":"off"},"AllOff":{"CeilingLight":"off","ReadingLight":"off","Projector":"off","Screen":"up","TV":"off"},"Break":{"ReadingLight":"dim37%","CeilingLight":"dim37%"},"Cinema":{"Projector":"on","Screen":"down","TV":"off","CeilingLight":"off","ReadingLight":"off"}}}

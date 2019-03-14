@@ -1,4 +1,4 @@
-#Sun Aug 26 12:32:29 2018
+#Thu Mar 14 20:36:49 2019
 setstate Alarm on
 setstate Alarm 2015-01-04 16:22:21 state on
 setstate AllLights undefined
@@ -6,11 +6,11 @@ setstate AllLights 2018-08-26 08:08:39 LastDevice Office
 setstate AllLights 2018-08-26 08:08:39 LastDevice_Abs Office
 setstate AllLights 2018-08-26 08:08:39 state undefined
 setstate AllResidentsAway active
-setstate AllResidentsAway 2018-08-25 21:11:31 state active
+setstate AllResidentsAway 2019-03-14 20:36:02 state active
 setstate CT off
 setstate CT 2015-01-03 01:10:50 ct 3703
 setstate CT 2015-01-04 13:30:52 lastCmd off
-setstate CT 2018-08-25 21:11:31 state off
+setstate CT 2019-03-14 20:36:02 state off
 setstate CeilingLight dim0%
 setstate CeilingLight 2015-01-04 16:22:40 state off
 setstate Cellar T: 21.1  H: 54.6
@@ -31,7 +31,7 @@ setstate Garden 2013-08-13 15:03:17 israining no
 setstate Garden 2013-08-13 15:03:17 rain 81.9
 setstate Garden 2013-08-13 15:03:17 rain_raw 321
 setstate Garden 2013-08-13 15:03:17 rain_raw_adj 321
-setstate Garden 2018-08-25 21:11:31 state defined
+setstate Garden 2019-03-14 20:36:02 state defined
 setstate Garden 2013-08-13 15:03:17 temperature 18.3
 setstate Garden 2013-08-13 15:03:17 tsecs 1376805797
 setstate Garden 2013-08-13 15:03:17 unknown1 a
@@ -42,6 +42,7 @@ setstate Livingroom dim100%
 setstate Livingroom 2015-01-04 16:22:21 state on
 setstate Log.Cellar active
 setstate Log.Dewpoint active
+setstate Log.Dewpoint 2019-03-14 20:36:14 linesInTheFile 2
 setstate Log.Garden active
 setstate Log.Predicted active
 setstate Logfile active
@@ -55,11 +56,11 @@ setstate RGB off
 setstate RGB 2015-01-04 12:55:47 hue 220
 setstate RGB 2015-01-04 13:30:54 lastCmd off
 setstate RGB 2015-01-04 12:55:47 rgb 0054FF
-setstate RGB 2018-08-25 21:11:31 state off
+setstate RGB 2019-03-14 20:36:02 state off
 setstate ReadingLight dim0%
 setstate ReadingLight 2015-01-04 16:22:40 state off
 setstate ResidentsComeHome active
-setstate ResidentsComeHome 2018-08-25 21:11:31 state active
+setstate ResidentsComeHome 2019-03-14 20:36:02 state active
 setstate SVG_01_Garden initialized
 setstate SVG_02_Cellar initialized
 setstate SVG_03_Dewpoint initialized
@@ -69,20 +70,1437 @@ setstate Screen up
 setstate Screen 2015-01-04 16:22:40 state up
 setstate TV off
 setstate TV 2015-01-04 16:22:40 state off
-setstate WEB 2018-08-25 21:11:31 state Initialized
+setstate WEB 2019-03-14 20:36:02 state Initialized
+setstate Weather T: 10 °C F: 56 % W: 2 km/h P: 1033 hPa
+setstate Weather 2019-03-14 20:36:14 .license Based on data from EUMETNET - MeteoAlarm [https://www.meteoalarm.eu/]. Time delays between this website and the MeteoAlarm website are possible;; for the most up to date information about alert levels as published by the participating National Meteorological Services please use the MeteoAlarm website.
+setstate Weather 2019-03-14 20:36:14 apiMaintainer Leon Gaultier (<a href=https://forum.fhem.de/index.php?action=profile;;u=13684>CoolTux</a>)
+setstate Weather 2019-03-14 20:36:14 apiVersion 0.2.6
+setstate Weather 2019-03-14 20:36:14 apparentTemperature 10
+setstate Weather 2019-03-14 20:36:14 cloudCover 0
+setstate Weather 2019-03-14 20:36:14 code 31
+setstate Weather 2019-03-14 20:36:14 condition Heiter
+setstate Weather 2019-03-14 20:36:14 current_date_time Thu, 14 Mar 2019 20:36
+setstate Weather 2019-03-14 20:36:14 dewPoint 1
+setstate Weather 2019-03-14 20:36:14 dewpoint 1.6
+setstate Weather 2019-03-14 20:36:14 fc1_apparentTempHigh 21
+setstate Weather 2019-03-14 20:36:14 fc1_apparentTempHighTime Tue, 26 Feb 2019 16:00
+setstate Weather 2019-03-14 20:36:14 fc1_apparentTempLow 3
+setstate Weather 2019-03-14 20:36:14 fc1_apparentTempLowTime Wed, 27 Feb 2019 07:00
+setstate Weather 2019-03-14 20:36:14 fc1_cloudCover 2
+setstate Weather 2019-03-14 20:36:14 fc1_code 29
+setstate Weather 2019-03-14 20:36:14 fc1_condition Leicht bewölkt in der Nacht.
+setstate Weather 2019-03-14 20:36:14 fc1_day_of_week Tue
+setstate Weather 2019-03-14 20:36:14 fc1_dewPoint 0
+setstate Weather 2019-03-14 20:36:14 fc1_high_c 21
+setstate Weather 2019-03-14 20:36:14 fc1_humidity 55
+setstate Weather 2019-03-14 20:36:14 fc1_icon partly_cloudy_night
+setstate Weather 2019-03-14 20:36:14 fc1_iconAPI partly-cloudy-night
+setstate Weather 2019-03-14 20:36:14 fc1_low_c 3
+setstate Weather 2019-03-14 20:36:14 fc1_moonPhase 0.75
+setstate Weather 2019-03-14 20:36:14 fc1_ozone 285.07
+setstate Weather 2019-03-14 20:36:14 fc1_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 fc1_precipIntensityMax 0.0051
+setstate Weather 2019-03-14 20:36:14 fc1_precipIntensityMaxTime Tue, 26 Feb 2019 14:00
+setstate Weather 2019-03-14 20:36:14 fc1_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 fc1_precipType -
+setstate Weather 2019-03-14 20:36:14 fc1_pressure 1034
+setstate Weather 2019-03-14 20:36:14 fc1_pubDate Tue, 26 Feb 2019 00:00
+setstate Weather 2019-03-14 20:36:14 fc1_sunriseTime Tue, 26 Feb 2019 07:16
+setstate Weather 2019-03-14 20:36:14 fc1_sunsetTime Tue, 26 Feb 2019 18:02
+setstate Weather 2019-03-14 20:36:14 fc1_tempHigh 21
+setstate Weather 2019-03-14 20:36:14 fc1_tempHighTime Tue, 26 Feb 2019 16:00
+setstate Weather 2019-03-14 20:36:14 fc1_tempLow 3
+setstate Weather 2019-03-14 20:36:14 fc1_tempLowTime Wed, 27 Feb 2019 07:00
+setstate Weather 2019-03-14 20:36:14 fc1_uvIndex 3
+setstate Weather 2019-03-14 20:36:14 fc1_uvIndexTime Tue, 26 Feb 2019 13:00
+setstate Weather 2019-03-14 20:36:14 fc1_visibility 10
+setstate Weather 2019-03-14 20:36:14 fc1_wind 2
+setstate Weather 2019-03-14 20:36:14 fc1_windGust 7
+setstate Weather 2019-03-14 20:36:14 fc1_windGustTime Tue, 26 Feb 2019 15:00
+setstate Weather 2019-03-14 20:36:14 fc1_wind_condition Wind: NNO 2 km/h
+setstate Weather 2019-03-14 20:36:14 fc1_wind_direction 16
+setstate Weather 2019-03-14 20:36:14 fc1_wind_speed 2
+setstate Weather 2019-03-14 20:36:14 fc2_apparentTempHigh 19
+setstate Weather 2019-03-14 20:36:14 fc2_apparentTempHighTime Wed, 27 Feb 2019 16:00
+setstate Weather 2019-03-14 20:36:14 fc2_apparentTempLow 2
+setstate Weather 2019-03-14 20:36:14 fc2_apparentTempLowTime Thu, 28 Feb 2019 07:00
+setstate Weather 2019-03-14 20:36:14 fc2_cloudCover 13
+setstate Weather 2019-03-14 20:36:14 fc2_code 32
+setstate Weather 2019-03-14 20:36:14 fc2_condition Den ganzen Tag lang heiter.
+setstate Weather 2019-03-14 20:36:14 fc2_day_of_week Wed
+setstate Weather 2019-03-14 20:36:14 fc2_dewPoint 0
+setstate Weather 2019-03-14 20:36:14 fc2_high_c 19
+setstate Weather 2019-03-14 20:36:14 fc2_humidity 50
+setstate Weather 2019-03-14 20:36:14 fc2_icon sunny
+setstate Weather 2019-03-14 20:36:14 fc2_iconAPI clear-day
+setstate Weather 2019-03-14 20:36:14 fc2_low_c 4
+setstate Weather 2019-03-14 20:36:14 fc2_moonPhase 0.78
+setstate Weather 2019-03-14 20:36:14 fc2_ozone 276.58
+setstate Weather 2019-03-14 20:36:14 fc2_precipIntensity 0.0025
+setstate Weather 2019-03-14 20:36:14 fc2_precipIntensityMax 0.0051
+setstate Weather 2019-03-14 20:36:14 fc2_precipIntensityMaxTime Wed, 27 Feb 2019 02:00
+setstate Weather 2019-03-14 20:36:14 fc2_precipProbability 2
+setstate Weather 2019-03-14 20:36:14 fc2_precipType rain
+setstate Weather 2019-03-14 20:36:14 fc2_pressure 1028
+setstate Weather 2019-03-14 20:36:14 fc2_pubDate Wed, 27 Feb 2019 00:00
+setstate Weather 2019-03-14 20:36:14 fc2_sunriseTime Wed, 27 Feb 2019 07:14
+setstate Weather 2019-03-14 20:36:14 fc2_sunsetTime Wed, 27 Feb 2019 18:04
+setstate Weather 2019-03-14 20:36:14 fc2_tempHigh 19
+setstate Weather 2019-03-14 20:36:14 fc2_tempHighTime Wed, 27 Feb 2019 16:00
+setstate Weather 2019-03-14 20:36:14 fc2_tempLow 4
+setstate Weather 2019-03-14 20:36:14 fc2_tempLowTime Thu, 28 Feb 2019 06:00
+setstate Weather 2019-03-14 20:36:14 fc2_uvIndex 3
+setstate Weather 2019-03-14 20:36:14 fc2_uvIndexTime Wed, 27 Feb 2019 12:00
+setstate Weather 2019-03-14 20:36:14 fc2_visibility 16
+setstate Weather 2019-03-14 20:36:14 fc2_wind 2
+setstate Weather 2019-03-14 20:36:14 fc2_windGust 7
+setstate Weather 2019-03-14 20:36:14 fc2_windGustTime Wed, 27 Feb 2019 23:00
+setstate Weather 2019-03-14 20:36:14 fc2_wind_condition Wind: SO 2 km/h
+setstate Weather 2019-03-14 20:36:14 fc2_wind_direction 139
+setstate Weather 2019-03-14 20:36:14 fc2_wind_speed 2
+setstate Weather 2019-03-14 20:36:14 fc3_apparentTempHigh 16
+setstate Weather 2019-03-14 20:36:14 fc3_apparentTempHighTime Thu, 28 Feb 2019 15:00
+setstate Weather 2019-03-14 20:36:14 fc3_apparentTempLow 7
+setstate Weather 2019-03-14 20:36:14 fc3_apparentTempLowTime Fri,  1 Mar 2019 08:00
+setstate Weather 2019-03-14 20:36:14 fc3_cloudCover 34
+setstate Weather 2019-03-14 20:36:14 fc3_code 29
+setstate Weather 2019-03-14 20:36:14 fc3_condition Den ganzen Tag lang überwiegend bewölkt.
+setstate Weather 2019-03-14 20:36:14 fc3_day_of_week Thu
+setstate Weather 2019-03-14 20:36:14 fc3_dewPoint 3
+setstate Weather 2019-03-14 20:36:14 fc3_high_c 16
+setstate Weather 2019-03-14 20:36:14 fc3_humidity 62
+setstate Weather 2019-03-14 20:36:14 fc3_icon partly_cloudy_night
+setstate Weather 2019-03-14 20:36:14 fc3_iconAPI partly-cloudy-night
+setstate Weather 2019-03-14 20:36:14 fc3_low_c 8
+setstate Weather 2019-03-14 20:36:14 fc3_moonPhase 0.81
+setstate Weather 2019-03-14 20:36:14 fc3_ozone 307.52
+setstate Weather 2019-03-14 20:36:14 fc3_precipIntensity 0.033
+setstate Weather 2019-03-14 20:36:14 fc3_precipIntensityMax 0.3175
+setstate Weather 2019-03-14 20:36:14 fc3_precipIntensityMaxTime Thu, 28 Feb 2019 23:00
+setstate Weather 2019-03-14 20:36:14 fc3_precipProbability 38
+setstate Weather 2019-03-14 20:36:14 fc3_precipType rain
+setstate Weather 2019-03-14 20:36:14 fc3_pressure 1018
+setstate Weather 2019-03-14 20:36:14 fc3_pubDate Thu, 28 Feb 2019 00:00
+setstate Weather 2019-03-14 20:36:14 fc3_sunriseTime Thu, 28 Feb 2019 07:12
+setstate Weather 2019-03-14 20:36:14 fc3_sunsetTime Thu, 28 Feb 2019 18:05
+setstate Weather 2019-03-14 20:36:14 fc3_tempHigh 16
+setstate Weather 2019-03-14 20:36:14 fc3_tempHighTime Thu, 28 Feb 2019 15:00
+setstate Weather 2019-03-14 20:36:14 fc3_tempLow 8
+setstate Weather 2019-03-14 20:36:14 fc3_tempLowTime Fri,  1 Mar 2019 08:00
+setstate Weather 2019-03-14 20:36:14 fc3_uvIndex 2
+setstate Weather 2019-03-14 20:36:14 fc3_uvIndexTime Thu, 28 Feb 2019 11:00
+setstate Weather 2019-03-14 20:36:14 fc3_visibility 15
+setstate Weather 2019-03-14 20:36:14 fc3_wind 14
+setstate Weather 2019-03-14 20:36:14 fc3_windGust 45
+setstate Weather 2019-03-14 20:36:14 fc3_windGustTime Thu, 28 Feb 2019 16:00
+setstate Weather 2019-03-14 20:36:14 fc3_wind_condition Wind: SW 14 km/h
+setstate Weather 2019-03-14 20:36:14 fc3_wind_direction 235
+setstate Weather 2019-03-14 20:36:14 fc3_wind_speed 14
+setstate Weather 2019-03-14 20:36:14 fc4_apparentTempHigh 14
+setstate Weather 2019-03-14 20:36:14 fc4_apparentTempHighTime Fri,  1 Mar 2019 16:00
+setstate Weather 2019-03-14 20:36:14 fc4_apparentTempLow 4
+setstate Weather 2019-03-14 20:36:14 fc4_apparentTempLowTime Sat,  2 Mar 2019 08:00
+setstate Weather 2019-03-14 20:36:14 fc4_cloudCover 62
+setstate Weather 2019-03-14 20:36:14 fc4_code 30
+setstate Weather 2019-03-14 20:36:14 fc4_condition Überwiegend bewölkt bis abends.
+setstate Weather 2019-03-14 20:36:14 fc4_day_of_week Fri
+setstate Weather 2019-03-14 20:36:14 fc4_dewPoint 5
+setstate Weather 2019-03-14 20:36:14 fc4_high_c 14
+setstate Weather 2019-03-14 20:36:14 fc4_humidity 71
+setstate Weather 2019-03-14 20:36:14 fc4_icon partly_cloudy
+setstate Weather 2019-03-14 20:36:14 fc4_iconAPI partly-cloudy-day
+setstate Weather 2019-03-14 20:36:14 fc4_low_c 6
+setstate Weather 2019-03-14 20:36:14 fc4_moonPhase 0.84
+setstate Weather 2019-03-14 20:36:14 fc4_ozone 343.54
+setstate Weather 2019-03-14 20:36:14 fc4_precipIntensity 0.188
+setstate Weather 2019-03-14 20:36:14 fc4_precipIntensityMax 0.8179
+setstate Weather 2019-03-14 20:36:14 fc4_precipIntensityMaxTime Fri,  1 Mar 2019 04:00
+setstate Weather 2019-03-14 20:36:14 fc4_precipProbability 88
+setstate Weather 2019-03-14 20:36:14 fc4_precipType rain
+setstate Weather 2019-03-14 20:36:14 fc4_pressure 1015
+setstate Weather 2019-03-14 20:36:14 fc4_pubDate Fri,  1 Mar 2019 00:00
+setstate Weather 2019-03-14 20:36:14 fc4_sunriseTime Fri,  1 Mar 2019 07:10
+setstate Weather 2019-03-14 20:36:14 fc4_sunsetTime Fri,  1 Mar 2019 18:07
+setstate Weather 2019-03-14 20:36:14 fc4_tempHigh 14
+setstate Weather 2019-03-14 20:36:14 fc4_tempHighTime Fri,  1 Mar 2019 16:00
+setstate Weather 2019-03-14 20:36:14 fc4_tempLow 6
+setstate Weather 2019-03-14 20:36:14 fc4_tempLowTime Sat,  2 Mar 2019 07:00
+setstate Weather 2019-03-14 20:36:14 fc4_uvIndex 2
+setstate Weather 2019-03-14 20:36:14 fc4_uvIndexTime Fri,  1 Mar 2019 12:00
+setstate Weather 2019-03-14 20:36:14 fc4_visibility 14
+setstate Weather 2019-03-14 20:36:14 fc4_wind 10
+setstate Weather 2019-03-14 20:36:14 fc4_windGust 31
+setstate Weather 2019-03-14 20:36:14 fc4_windGustTime Fri,  1 Mar 2019 00:00
+setstate Weather 2019-03-14 20:36:14 fc4_wind_condition Wind: WNW 10 km/h
+setstate Weather 2019-03-14 20:36:14 fc4_wind_direction 284
+setstate Weather 2019-03-14 20:36:14 fc4_wind_speed 10
+setstate Weather 2019-03-14 20:36:14 fc5_apparentTempHigh 14
+setstate Weather 2019-03-14 20:36:14 fc5_apparentTempHighTime Sat,  2 Mar 2019 17:00
+setstate Weather 2019-03-14 20:36:14 fc5_apparentTempLow 7
+setstate Weather 2019-03-14 20:36:14 fc5_apparentTempLowTime Sun,  3 Mar 2019 08:00
+setstate Weather 2019-03-14 20:36:14 fc5_cloudCover 70
+setstate Weather 2019-03-14 20:36:14 fc5_code 30
+setstate Weather 2019-03-14 20:36:14 fc5_condition Den ganzen Tag lang überwiegend bewölkt.
+setstate Weather 2019-03-14 20:36:14 fc5_day_of_week Sat
+setstate Weather 2019-03-14 20:36:14 fc5_dewPoint 5
+setstate Weather 2019-03-14 20:36:14 fc5_high_c 14
+setstate Weather 2019-03-14 20:36:14 fc5_humidity 73
+setstate Weather 2019-03-14 20:36:14 fc5_icon partly_cloudy
+setstate Weather 2019-03-14 20:36:14 fc5_iconAPI partly-cloudy-day
+setstate Weather 2019-03-14 20:36:14 fc5_low_c 10
+setstate Weather 2019-03-14 20:36:14 fc5_moonPhase 0.87
+setstate Weather 2019-03-14 20:36:14 fc5_ozone 338.68
+setstate Weather 2019-03-14 20:36:14 fc5_precipIntensity 0.0381
+setstate Weather 2019-03-14 20:36:14 fc5_precipIntensityMax 0.2667
+setstate Weather 2019-03-14 20:36:14 fc5_precipIntensityMaxTime Sat,  2 Mar 2019 19:00
+setstate Weather 2019-03-14 20:36:14 fc5_precipProbability 29
+setstate Weather 2019-03-14 20:36:14 fc5_precipType rain
+setstate Weather 2019-03-14 20:36:14 fc5_pressure 1017
+setstate Weather 2019-03-14 20:36:14 fc5_pubDate Sat,  2 Mar 2019 00:00
+setstate Weather 2019-03-14 20:36:14 fc5_sunriseTime Sat,  2 Mar 2019 07:08
+setstate Weather 2019-03-14 20:36:14 fc5_sunsetTime Sat,  2 Mar 2019 18:09
+setstate Weather 2019-03-14 20:36:14 fc5_tempHigh 14
+setstate Weather 2019-03-14 20:36:14 fc5_tempHighTime Sat,  2 Mar 2019 17:00
+setstate Weather 2019-03-14 20:36:14 fc5_tempLow 10
+setstate Weather 2019-03-14 20:36:14 fc5_tempLowTime Sun,  3 Mar 2019 08:00
+setstate Weather 2019-03-14 20:36:14 fc5_uvIndex 2
+setstate Weather 2019-03-14 20:36:14 fc5_uvIndexTime Sat,  2 Mar 2019 11:00
+setstate Weather 2019-03-14 20:36:14 fc5_visibility 16
+setstate Weather 2019-03-14 20:36:14 fc5_wind 12
+setstate Weather 2019-03-14 20:36:14 fc5_windGust 40
+setstate Weather 2019-03-14 20:36:14 fc5_windGustTime Sat,  2 Mar 2019 23:00
+setstate Weather 2019-03-14 20:36:14 fc5_wind_condition Wind: SW 12 km/h
+setstate Weather 2019-03-14 20:36:14 fc5_wind_direction 223
+setstate Weather 2019-03-14 20:36:14 fc5_wind_speed 12
+setstate Weather 2019-03-14 20:36:14 fc6_apparentTempHigh 13
+setstate Weather 2019-03-14 20:36:14 fc6_apparentTempHighTime Sun,  3 Mar 2019 14:00
+setstate Weather 2019-03-14 20:36:14 fc6_apparentTempLow 7
+setstate Weather 2019-03-14 20:36:14 fc6_apparentTempLowTime Mon,  4 Mar 2019 02:00
+setstate Weather 2019-03-14 20:36:14 fc6_cloudCover 94
+setstate Weather 2019-03-14 20:36:14 fc6_code 11
+setstate Weather 2019-03-14 20:36:14 fc6_condition Den ganzen Tag lang leichter Wind und Nacht leichter Regen.
+setstate Weather 2019-03-14 20:36:14 fc6_day_of_week Sun
+setstate Weather 2019-03-14 20:36:14 fc6_dewPoint 6
+setstate Weather 2019-03-14 20:36:14 fc6_high_c 13
+setstate Weather 2019-03-14 20:36:14 fc6_humidity 71
+setstate Weather 2019-03-14 20:36:14 fc6_icon chance_of_rain
+setstate Weather 2019-03-14 20:36:14 fc6_iconAPI rain
+setstate Weather 2019-03-14 20:36:14 fc6_low_c 10
+setstate Weather 2019-03-14 20:36:14 fc6_moonPhase 0.9
+setstate Weather 2019-03-14 20:36:14 fc6_ozone 332.44
+setstate Weather 2019-03-14 20:36:14 fc6_precipIntensity 0.3886
+setstate Weather 2019-03-14 20:36:14 fc6_precipIntensityMax 0.8484
+setstate Weather 2019-03-14 20:36:14 fc6_precipIntensityMaxTime Sun,  3 Mar 2019 23:00
+setstate Weather 2019-03-14 20:36:14 fc6_precipProbability 100
+setstate Weather 2019-03-14 20:36:14 fc6_precipType rain
+setstate Weather 2019-03-14 20:36:14 fc6_pressure 1011
+setstate Weather 2019-03-14 20:36:14 fc6_pubDate Sun,  3 Mar 2019 00:00
+setstate Weather 2019-03-14 20:36:14 fc6_sunriseTime Sun,  3 Mar 2019 07:06
+setstate Weather 2019-03-14 20:36:14 fc6_sunsetTime Sun,  3 Mar 2019 18:10
+setstate Weather 2019-03-14 20:36:14 fc6_tempHigh 13
+setstate Weather 2019-03-14 20:36:14 fc6_tempHighTime Sun,  3 Mar 2019 14:00
+setstate Weather 2019-03-14 20:36:14 fc6_tempLow 10
+setstate Weather 2019-03-14 20:36:14 fc6_tempLowTime Mon,  4 Mar 2019 03:00
+setstate Weather 2019-03-14 20:36:14 fc6_uvIndex 2
+setstate Weather 2019-03-14 20:36:14 fc6_uvIndexTime Sun,  3 Mar 2019 11:00
+setstate Weather 2019-03-14 20:36:14 fc6_visibility 10
+setstate Weather 2019-03-14 20:36:14 fc6_wind 24
+setstate Weather 2019-03-14 20:36:14 fc6_windGust 68
+setstate Weather 2019-03-14 20:36:14 fc6_windGustTime Sun,  3 Mar 2019 23:00
+setstate Weather 2019-03-14 20:36:14 fc6_wind_condition Wind: SW 24 km/h
+setstate Weather 2019-03-14 20:36:14 fc6_wind_direction 229
+setstate Weather 2019-03-14 20:36:14 fc6_wind_speed 24
+setstate Weather 2019-03-14 20:36:14 fc7_apparentTempHigh 14
+setstate Weather 2019-03-14 20:36:14 fc7_apparentTempHighTime Mon,  4 Mar 2019 16:00
+setstate Weather 2019-03-14 20:36:14 fc7_apparentTempLow 5
+setstate Weather 2019-03-14 20:36:14 fc7_apparentTempLowTime Tue,  5 Mar 2019 08:00
+setstate Weather 2019-03-14 20:36:14 fc7_cloudCover 91
+setstate Weather 2019-03-14 20:36:14 fc7_code 24
+setstate Weather 2019-03-14 20:36:14 fc7_condition Den ganzen Tag lang überwiegend bewölkt sowie leichter Wind bis Nachmittag.
+setstate Weather 2019-03-14 20:36:14 fc7_day_of_week Mon
+setstate Weather 2019-03-14 20:36:14 fc7_dewPoint 6
+setstate Weather 2019-03-14 20:36:14 fc7_high_c 14
+setstate Weather 2019-03-14 20:36:14 fc7_humidity 67
+setstate Weather 2019-03-14 20:36:14 fc7_icon windy
+setstate Weather 2019-03-14 20:36:14 fc7_iconAPI wind
+setstate Weather 2019-03-14 20:36:14 fc7_low_c 8
+setstate Weather 2019-03-14 20:36:14 fc7_moonPhase 0.93
+setstate Weather 2019-03-14 20:36:14 fc7_ozone 369.63
+setstate Weather 2019-03-14 20:36:14 fc7_precipIntensity 0.3023
+setstate Weather 2019-03-14 20:36:14 fc7_precipIntensityMax 0.8128
+setstate Weather 2019-03-14 20:36:14 fc7_precipIntensityMaxTime Mon,  4 Mar 2019 00:00
+setstate Weather 2019-03-14 20:36:14 fc7_precipProbability 92
+setstate Weather 2019-03-14 20:36:14 fc7_precipType rain
+setstate Weather 2019-03-14 20:36:14 fc7_pressure 1004
+setstate Weather 2019-03-14 20:36:14 fc7_pubDate Mon,  4 Mar 2019 00:00
+setstate Weather 2019-03-14 20:36:14 fc7_sunriseTime Mon,  4 Mar 2019 07:04
+setstate Weather 2019-03-14 20:36:14 fc7_sunsetTime Mon,  4 Mar 2019 18:12
+setstate Weather 2019-03-14 20:36:14 fc7_tempHigh 14
+setstate Weather 2019-03-14 20:36:14 fc7_tempHighTime Mon,  4 Mar 2019 16:00
+setstate Weather 2019-03-14 20:36:14 fc7_tempLow 8
+setstate Weather 2019-03-14 20:36:14 fc7_tempLowTime Tue,  5 Mar 2019 08:00
+setstate Weather 2019-03-14 20:36:14 fc7_uvIndex 2
+setstate Weather 2019-03-14 20:36:14 fc7_uvIndexTime Mon,  4 Mar 2019 11:00
+setstate Weather 2019-03-14 20:36:14 fc7_visibility 13
+setstate Weather 2019-03-14 20:36:14 fc7_wind 22
+setstate Weather 2019-03-14 20:36:14 fc7_windGust 72
+setstate Weather 2019-03-14 20:36:14 fc7_windGustTime Mon,  4 Mar 2019 01:00
+setstate Weather 2019-03-14 20:36:14 fc7_wind_condition Wind: SW 22 km/h
+setstate Weather 2019-03-14 20:36:14 fc7_wind_direction 230
+setstate Weather 2019-03-14 20:36:14 fc7_wind_speed 22
+setstate Weather 2019-03-14 20:36:14 fc8_apparentTempHigh 11
+setstate Weather 2019-03-14 20:36:14 fc8_apparentTempHighTime Tue,  5 Mar 2019 15:00
+setstate Weather 2019-03-14 20:36:14 fc8_apparentTempLow 2
+setstate Weather 2019-03-14 20:36:14 fc8_apparentTempLowTime Wed,  6 Mar 2019 08:00
+setstate Weather 2019-03-14 20:36:14 fc8_cloudCover 79
+setstate Weather 2019-03-14 20:36:14 fc8_code 20
+setstate Weather 2019-03-14 20:36:14 fc8_condition Nachmittags Nebel.
+setstate Weather 2019-03-14 20:36:14 fc8_day_of_week Tue
+setstate Weather 2019-03-14 20:36:14 fc8_dewPoint 3
+setstate Weather 2019-03-14 20:36:14 fc8_high_c 11
+setstate Weather 2019-03-14 20:36:14 fc8_humidity 65
+setstate Weather 2019-03-14 20:36:14 fc8_icon fog
+setstate Weather 2019-03-14 20:36:14 fc8_iconAPI fog
+setstate Weather 2019-03-14 20:36:14 fc8_low_c 6
+setstate Weather 2019-03-14 20:36:14 fc8_moonPhase 0.96
+setstate Weather 2019-03-14 20:36:14 fc8_ozone 442.27
+setstate Weather 2019-03-14 20:36:14 fc8_precipIntensity 0.2083
+setstate Weather 2019-03-14 20:36:14 fc8_precipIntensityMax 0.4597
+setstate Weather 2019-03-14 20:36:14 fc8_precipIntensityMaxTime Tue,  5 Mar 2019 11:00
+setstate Weather 2019-03-14 20:36:14 fc8_precipProbability 72
+setstate Weather 2019-03-14 20:36:14 fc8_precipType rain
+setstate Weather 2019-03-14 20:36:14 fc8_pressure 1002
+setstate Weather 2019-03-14 20:36:14 fc8_pubDate Tue,  5 Mar 2019 00:00
+setstate Weather 2019-03-14 20:36:14 fc8_sunriseTime Tue,  5 Mar 2019 07:02
+setstate Weather 2019-03-14 20:36:14 fc8_sunsetTime Tue,  5 Mar 2019 18:14
+setstate Weather 2019-03-14 20:36:14 fc8_tempHigh 11
+setstate Weather 2019-03-14 20:36:14 fc8_tempHighTime Tue,  5 Mar 2019 15:00
+setstate Weather 2019-03-14 20:36:14 fc8_tempLow 6
+setstate Weather 2019-03-14 20:36:14 fc8_tempLowTime Wed,  6 Mar 2019 08:00
+setstate Weather 2019-03-14 20:36:14 fc8_uvIndex 1
+setstate Weather 2019-03-14 20:36:14 fc8_uvIndexTime Tue,  5 Mar 2019 10:00
+setstate Weather 2019-03-14 20:36:14 fc8_visibility 9
+setstate Weather 2019-03-14 20:36:14 fc8_wind 19
+setstate Weather 2019-03-14 20:36:14 fc8_windGust 58
+setstate Weather 2019-03-14 20:36:14 fc8_windGustTime Tue,  5 Mar 2019 04:00
+setstate Weather 2019-03-14 20:36:14 fc8_wind_condition Wind: SW 19 km/h
+setstate Weather 2019-03-14 20:36:14 fc8_wind_direction 230
+setstate Weather 2019-03-14 20:36:14 fc8_wind_speed 19
+setstate Weather 2019-03-14 20:36:14 hfc10_cloudCover 22
+setstate Weather 2019-03-14 20:36:14 hfc10_code 31
+setstate Weather 2019-03-14 20:36:14 hfc10_condition Heiter
+setstate Weather 2019-03-14 20:36:14 hfc10_day_of_week Wed, 06:00
+setstate Weather 2019-03-14 20:36:14 hfc10_dewPoint -3.6
+setstate Weather 2019-03-14 20:36:14 hfc10_humidity 61
+setstate Weather 2019-03-14 20:36:14 hfc10_icon sunny
+setstate Weather 2019-03-14 20:36:14 hfc10_iconAPI clear-night
+setstate Weather 2019-03-14 20:36:14 hfc10_ozone 273.5
+setstate Weather 2019-03-14 20:36:14 hfc10_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc10_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc10_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc10_pressure 1030.8
+setstate Weather 2019-03-14 20:36:14 hfc10_pubDate Wed, 27 Feb 2019 06:00
+setstate Weather 2019-03-14 20:36:14 hfc10_temperature 3.3
+setstate Weather 2019-03-14 20:36:14 hfc10_uvIndex 0
+setstate Weather 2019-03-14 20:36:14 hfc10_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc10_wind 4
+setstate Weather 2019-03-14 20:36:14 hfc10_windGust 4
+setstate Weather 2019-03-14 20:36:14 hfc10_wind_condition Wind: ONO 4 km/h
+setstate Weather 2019-03-14 20:36:14 hfc10_wind_direction 73
+setstate Weather 2019-03-14 20:36:14 hfc10_wind_speed 4
+setstate Weather 2019-03-14 20:36:14 hfc11_cloudCover 22
+setstate Weather 2019-03-14 20:36:14 hfc11_code 31
+setstate Weather 2019-03-14 20:36:14 hfc11_condition Heiter
+setstate Weather 2019-03-14 20:36:14 hfc11_day_of_week Wed, 07:00
+setstate Weather 2019-03-14 20:36:14 hfc11_dewPoint -3.5
+setstate Weather 2019-03-14 20:36:14 hfc11_humidity 61
+setstate Weather 2019-03-14 20:36:14 hfc11_icon sunny
+setstate Weather 2019-03-14 20:36:14 hfc11_iconAPI clear-night
+setstate Weather 2019-03-14 20:36:14 hfc11_ozone 273.65
+setstate Weather 2019-03-14 20:36:14 hfc11_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc11_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc11_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc11_pressure 1030.5
+setstate Weather 2019-03-14 20:36:14 hfc11_pubDate Wed, 27 Feb 2019 07:00
+setstate Weather 2019-03-14 20:36:14 hfc11_temperature 3.2
+setstate Weather 2019-03-14 20:36:14 hfc11_uvIndex 0
+setstate Weather 2019-03-14 20:36:14 hfc11_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc11_wind 3
+setstate Weather 2019-03-14 20:36:14 hfc11_windGust 4
+setstate Weather 2019-03-14 20:36:14 hfc11_wind_condition Wind: O 3 km/h
+setstate Weather 2019-03-14 20:36:14 hfc11_wind_direction 83
+setstate Weather 2019-03-14 20:36:14 hfc11_wind_speed 3
+setstate Weather 2019-03-14 20:36:14 hfc12_cloudCover 20
+setstate Weather 2019-03-14 20:36:14 hfc12_code 32
+setstate Weather 2019-03-14 20:36:14 hfc12_condition Heiter
+setstate Weather 2019-03-14 20:36:14 hfc12_day_of_week Wed, 08:00
+setstate Weather 2019-03-14 20:36:14 hfc12_dewPoint -2.6
+setstate Weather 2019-03-14 20:36:14 hfc12_humidity 61
+setstate Weather 2019-03-14 20:36:14 hfc12_icon sunny
+setstate Weather 2019-03-14 20:36:14 hfc12_iconAPI clear-day
+setstate Weather 2019-03-14 20:36:14 hfc12_ozone 273.79
+setstate Weather 2019-03-14 20:36:14 hfc12_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc12_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc12_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc12_pressure 1030.2
+setstate Weather 2019-03-14 20:36:14 hfc12_pubDate Wed, 27 Feb 2019 08:00
+setstate Weather 2019-03-14 20:36:14 hfc12_temperature 4.3
+setstate Weather 2019-03-14 20:36:14 hfc12_uvIndex 0
+setstate Weather 2019-03-14 20:36:14 hfc12_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc12_wind 3
+setstate Weather 2019-03-14 20:36:14 hfc12_windGust 3
+setstate Weather 2019-03-14 20:36:14 hfc12_wind_condition Wind: O 3 km/h
+setstate Weather 2019-03-14 20:36:14 hfc12_wind_direction 93
+setstate Weather 2019-03-14 20:36:14 hfc12_wind_speed 3
+setstate Weather 2019-03-14 20:36:14 hfc13_cloudCover 19
+setstate Weather 2019-03-14 20:36:14 hfc13_code 32
+setstate Weather 2019-03-14 20:36:14 hfc13_condition Heiter
+setstate Weather 2019-03-14 20:36:14 hfc13_day_of_week Wed, 09:00
+setstate Weather 2019-03-14 20:36:14 hfc13_dewPoint -1.3
+setstate Weather 2019-03-14 20:36:14 hfc13_humidity 58
+setstate Weather 2019-03-14 20:36:14 hfc13_icon sunny
+setstate Weather 2019-03-14 20:36:14 hfc13_iconAPI clear-day
+setstate Weather 2019-03-14 20:36:14 hfc13_ozone 273.91
+setstate Weather 2019-03-14 20:36:14 hfc13_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc13_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc13_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc13_pressure 1029.9
+setstate Weather 2019-03-14 20:36:14 hfc13_pubDate Wed, 27 Feb 2019 09:00
+setstate Weather 2019-03-14 20:36:14 hfc13_temperature 6.3
+setstate Weather 2019-03-14 20:36:14 hfc13_uvIndex 1
+setstate Weather 2019-03-14 20:36:14 hfc13_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc13_wind 3
+setstate Weather 2019-03-14 20:36:14 hfc13_windGust 3
+setstate Weather 2019-03-14 20:36:14 hfc13_wind_condition Wind: OSO 3 km/h
+setstate Weather 2019-03-14 20:36:14 hfc13_wind_direction 105
+setstate Weather 2019-03-14 20:36:14 hfc13_wind_speed 3
+setstate Weather 2019-03-14 20:36:14 hfc14_cloudCover 16
+setstate Weather 2019-03-14 20:36:14 hfc14_code 32
+setstate Weather 2019-03-14 20:36:14 hfc14_condition Heiter
+setstate Weather 2019-03-14 20:36:14 hfc14_day_of_week Wed, 10:00
+setstate Weather 2019-03-14 20:36:14 hfc14_dewPoint -0.1
+setstate Weather 2019-03-14 20:36:14 hfc14_humidity 55
+setstate Weather 2019-03-14 20:36:14 hfc14_icon sunny
+setstate Weather 2019-03-14 20:36:14 hfc14_iconAPI clear-day
+setstate Weather 2019-03-14 20:36:14 hfc14_ozone 274.33
+setstate Weather 2019-03-14 20:36:14 hfc14_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc14_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc14_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc14_pressure 1029.5
+setstate Weather 2019-03-14 20:36:14 hfc14_pubDate Wed, 27 Feb 2019 10:00
+setstate Weather 2019-03-14 20:36:14 hfc14_temperature 8.4
+setstate Weather 2019-03-14 20:36:14 hfc14_uvIndex 1
+setstate Weather 2019-03-14 20:36:14 hfc14_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc14_wind 2
+setstate Weather 2019-03-14 20:36:14 hfc14_windGust 3
+setstate Weather 2019-03-14 20:36:14 hfc14_wind_condition Wind: OSO 2 km/h
+setstate Weather 2019-03-14 20:36:14 hfc14_wind_direction 116
+setstate Weather 2019-03-14 20:36:14 hfc14_wind_speed 2
+setstate Weather 2019-03-14 20:36:14 hfc15_cloudCover 14
+setstate Weather 2019-03-14 20:36:14 hfc15_code 32
+setstate Weather 2019-03-14 20:36:14 hfc15_condition Heiter
+setstate Weather 2019-03-14 20:36:14 hfc15_day_of_week Wed, 11:00
+setstate Weather 2019-03-14 20:36:14 hfc15_dewPoint 0.7
+setstate Weather 2019-03-14 20:36:14 hfc15_humidity 50
+setstate Weather 2019-03-14 20:36:14 hfc15_icon sunny
+setstate Weather 2019-03-14 20:36:14 hfc15_iconAPI clear-day
+setstate Weather 2019-03-14 20:36:14 hfc15_ozone 275.21
+setstate Weather 2019-03-14 20:36:14 hfc15_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc15_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc15_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc15_pressure 1029.0
+setstate Weather 2019-03-14 20:36:14 hfc15_pubDate Wed, 27 Feb 2019 11:00
+setstate Weather 2019-03-14 20:36:14 hfc15_temperature 10.8
+setstate Weather 2019-03-14 20:36:14 hfc15_uvIndex 2
+setstate Weather 2019-03-14 20:36:14 hfc15_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc15_wind 3
+setstate Weather 2019-03-14 20:36:14 hfc15_windGust 3
+setstate Weather 2019-03-14 20:36:14 hfc15_wind_condition Wind: SO 3 km/h
+setstate Weather 2019-03-14 20:36:14 hfc15_wind_direction 125
+setstate Weather 2019-03-14 20:36:14 hfc15_wind_speed 3
+setstate Weather 2019-03-14 20:36:14 hfc16_cloudCover 11
+setstate Weather 2019-03-14 20:36:14 hfc16_code 32
+setstate Weather 2019-03-14 20:36:14 hfc16_condition Heiter
+setstate Weather 2019-03-14 20:36:14 hfc16_day_of_week Wed, 12:00
+setstate Weather 2019-03-14 20:36:14 hfc16_dewPoint 1.4
+setstate Weather 2019-03-14 20:36:14 hfc16_humidity 44
+setstate Weather 2019-03-14 20:36:14 hfc16_icon sunny
+setstate Weather 2019-03-14 20:36:14 hfc16_iconAPI clear-day
+setstate Weather 2019-03-14 20:36:14 hfc16_ozone 276.39
+setstate Weather 2019-03-14 20:36:14 hfc16_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc16_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc16_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc16_pressure 1028.3
+setstate Weather 2019-03-14 20:36:14 hfc16_pubDate Wed, 27 Feb 2019 12:00
+setstate Weather 2019-03-14 20:36:14 hfc16_temperature 13.4
+setstate Weather 2019-03-14 20:36:14 hfc16_uvIndex 3
+setstate Weather 2019-03-14 20:36:14 hfc16_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc16_wind 4
+setstate Weather 2019-03-14 20:36:14 hfc16_windGust 4
+setstate Weather 2019-03-14 20:36:14 hfc16_wind_condition Wind: SO 4 km/h
+setstate Weather 2019-03-14 20:36:14 hfc16_wind_direction 131
+setstate Weather 2019-03-14 20:36:14 hfc16_wind_speed 4
+setstate Weather 2019-03-14 20:36:14 hfc17_cloudCover 8
+setstate Weather 2019-03-14 20:36:14 hfc17_code 32
+setstate Weather 2019-03-14 20:36:14 hfc17_condition Heiter
+setstate Weather 2019-03-14 20:36:14 hfc17_day_of_week Wed, 13:00
+setstate Weather 2019-03-14 20:36:14 hfc17_dewPoint 2.0
+setstate Weather 2019-03-14 20:36:14 hfc17_humidity 40
+setstate Weather 2019-03-14 20:36:14 hfc17_icon sunny
+setstate Weather 2019-03-14 20:36:14 hfc17_iconAPI clear-day
+setstate Weather 2019-03-14 20:36:14 hfc17_ozone 277.31
+setstate Weather 2019-03-14 20:36:14 hfc17_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc17_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc17_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc17_pressure 1027.6
+setstate Weather 2019-03-14 20:36:14 hfc17_pubDate Wed, 27 Feb 2019 13:00
+setstate Weather 2019-03-14 20:36:14 hfc17_temperature 15.6
+setstate Weather 2019-03-14 20:36:14 hfc17_uvIndex 3
+setstate Weather 2019-03-14 20:36:14 hfc17_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc17_wind 5
+setstate Weather 2019-03-14 20:36:14 hfc17_windGust 5
+setstate Weather 2019-03-14 20:36:14 hfc17_wind_condition Wind: SO 5 km/h
+setstate Weather 2019-03-14 20:36:14 hfc17_wind_direction 140
+setstate Weather 2019-03-14 20:36:14 hfc17_wind_speed 5
+setstate Weather 2019-03-14 20:36:14 hfc18_cloudCover 5
+setstate Weather 2019-03-14 20:36:14 hfc18_code 32
+setstate Weather 2019-03-14 20:36:14 hfc18_condition Heiter
+setstate Weather 2019-03-14 20:36:14 hfc18_day_of_week Wed, 14:00
+setstate Weather 2019-03-14 20:36:14 hfc18_dewPoint 2.2
+setstate Weather 2019-03-14 20:36:14 hfc18_humidity 36
+setstate Weather 2019-03-14 20:36:14 hfc18_icon sunny
+setstate Weather 2019-03-14 20:36:14 hfc18_iconAPI clear-day
+setstate Weather 2019-03-14 20:36:14 hfc18_ozone 277.73
+setstate Weather 2019-03-14 20:36:14 hfc18_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc18_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc18_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc18_pressure 1026.7
+setstate Weather 2019-03-14 20:36:14 hfc18_pubDate Wed, 27 Feb 2019 14:00
+setstate Weather 2019-03-14 20:36:14 hfc18_temperature 17.3
+setstate Weather 2019-03-14 20:36:14 hfc18_uvIndex 2
+setstate Weather 2019-03-14 20:36:14 hfc18_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc18_wind 5
+setstate Weather 2019-03-14 20:36:14 hfc18_windGust 5
+setstate Weather 2019-03-14 20:36:14 hfc18_wind_condition Wind: SSO 5 km/h
+setstate Weather 2019-03-14 20:36:14 hfc18_wind_direction 154
+setstate Weather 2019-03-14 20:36:14 hfc18_wind_speed 5
+setstate Weather 2019-03-14 20:36:14 hfc19_cloudCover 2
+setstate Weather 2019-03-14 20:36:14 hfc19_code 32
+setstate Weather 2019-03-14 20:36:14 hfc19_condition Heiter
+setstate Weather 2019-03-14 20:36:14 hfc19_day_of_week Wed, 15:00
+setstate Weather 2019-03-14 20:36:14 hfc19_dewPoint 2.3
+setstate Weather 2019-03-14 20:36:14 hfc19_humidity 34
+setstate Weather 2019-03-14 20:36:14 hfc19_icon sunny
+setstate Weather 2019-03-14 20:36:14 hfc19_iconAPI clear-day
+setstate Weather 2019-03-14 20:36:14 hfc19_ozone 277.96
+setstate Weather 2019-03-14 20:36:14 hfc19_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc19_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc19_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc19_pressure 1025.7
+setstate Weather 2019-03-14 20:36:14 hfc19_pubDate Wed, 27 Feb 2019 15:00
+setstate Weather 2019-03-14 20:36:14 hfc19_temperature 18.4
+setstate Weather 2019-03-14 20:36:14 hfc19_uvIndex 2
+setstate Weather 2019-03-14 20:36:14 hfc19_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc19_wind 5
+setstate Weather 2019-03-14 20:36:14 hfc19_windGust 5
+setstate Weather 2019-03-14 20:36:14 hfc19_wind_condition Wind: S 5 km/h
+setstate Weather 2019-03-14 20:36:14 hfc19_wind_direction 172
+setstate Weather 2019-03-14 20:36:14 hfc19_wind_speed 5
+setstate Weather 2019-03-14 20:36:14 hfc1_cloudCover 0
+setstate Weather 2019-03-14 20:36:14 hfc1_code 31
+setstate Weather 2019-03-14 20:36:14 hfc1_condition Heiter
+setstate Weather 2019-03-14 20:36:14 hfc1_day_of_week Tue, 21:00
+setstate Weather 2019-03-14 20:36:14 hfc1_dewPoint 1.8
+setstate Weather 2019-03-14 20:36:14 hfc1_humidity 55
+setstate Weather 2019-03-14 20:36:14 hfc1_icon sunny
+setstate Weather 2019-03-14 20:36:14 hfc1_iconAPI clear-night
+setstate Weather 2019-03-14 20:36:14 hfc1_ozone 277
+setstate Weather 2019-03-14 20:36:14 hfc1_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc1_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc1_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc1_pressure 1032.7
+setstate Weather 2019-03-14 20:36:14 hfc1_pubDate Tue, 26 Feb 2019 21:00
+setstate Weather 2019-03-14 20:36:14 hfc1_temperature 10.6
+setstate Weather 2019-03-14 20:36:14 hfc1_uvIndex 0
+setstate Weather 2019-03-14 20:36:14 hfc1_visibility 10.0
+setstate Weather 2019-03-14 20:36:14 hfc1_wind 1
+setstate Weather 2019-03-14 20:36:14 hfc1_windGust 4
+setstate Weather 2019-03-14 20:36:14 hfc1_wind_condition Wind: O 1 km/h
+setstate Weather 2019-03-14 20:36:14 hfc1_wind_direction 89
+setstate Weather 2019-03-14 20:36:14 hfc1_wind_speed 1
+setstate Weather 2019-03-14 20:36:14 hfc20_cloudCover 0
+setstate Weather 2019-03-14 20:36:14 hfc20_code 32
+setstate Weather 2019-03-14 20:36:14 hfc20_condition Heiter
+setstate Weather 2019-03-14 20:36:14 hfc20_day_of_week Wed, 16:00
+setstate Weather 2019-03-14 20:36:14 hfc20_dewPoint 2.2
+setstate Weather 2019-03-14 20:36:14 hfc20_humidity 34
+setstate Weather 2019-03-14 20:36:14 hfc20_icon sunny
+setstate Weather 2019-03-14 20:36:14 hfc20_iconAPI clear-day
+setstate Weather 2019-03-14 20:36:14 hfc20_ozone 278.36
+setstate Weather 2019-03-14 20:36:14 hfc20_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc20_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc20_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc20_pressure 1024.9
+setstate Weather 2019-03-14 20:36:14 hfc20_pubDate Wed, 27 Feb 2019 16:00
+setstate Weather 2019-03-14 20:36:14 hfc20_temperature 18.5
+setstate Weather 2019-03-14 20:36:14 hfc20_uvIndex 1
+setstate Weather 2019-03-14 20:36:14 hfc20_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc20_wind 5
+setstate Weather 2019-03-14 20:36:14 hfc20_windGust 5
+setstate Weather 2019-03-14 20:36:14 hfc20_wind_condition Wind: S 5 km/h
+setstate Weather 2019-03-14 20:36:14 hfc20_wind_direction 184
+setstate Weather 2019-03-14 20:36:14 hfc20_wind_speed 5
+setstate Weather 2019-03-14 20:36:14 hfc21_cloudCover 0
+setstate Weather 2019-03-14 20:36:14 hfc21_code 32
+setstate Weather 2019-03-14 20:36:14 hfc21_condition Heiter
+setstate Weather 2019-03-14 20:36:14 hfc21_day_of_week Wed, 17:00
+setstate Weather 2019-03-14 20:36:14 hfc21_dewPoint 2.0
+setstate Weather 2019-03-14 20:36:14 hfc21_humidity 36
+setstate Weather 2019-03-14 20:36:14 hfc21_icon sunny
+setstate Weather 2019-03-14 20:36:14 hfc21_iconAPI clear-day
+setstate Weather 2019-03-14 20:36:14 hfc21_ozone 278.97
+setstate Weather 2019-03-14 20:36:14 hfc21_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc21_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc21_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc21_pressure 1024.5
+setstate Weather 2019-03-14 20:36:14 hfc21_pubDate Wed, 27 Feb 2019 17:00
+setstate Weather 2019-03-14 20:36:14 hfc21_temperature 17.4
+setstate Weather 2019-03-14 20:36:14 hfc21_uvIndex 0
+setstate Weather 2019-03-14 20:36:14 hfc21_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc21_wind 4
+setstate Weather 2019-03-14 20:36:14 hfc21_windGust 5
+setstate Weather 2019-03-14 20:36:14 hfc21_wind_condition Wind: S 4 km/h
+setstate Weather 2019-03-14 20:36:14 hfc21_wind_direction 191
+setstate Weather 2019-03-14 20:36:14 hfc21_wind_speed 4
+setstate Weather 2019-03-14 20:36:14 hfc22_cloudCover 0
+setstate Weather 2019-03-14 20:36:14 hfc22_code 31
+setstate Weather 2019-03-14 20:36:14 hfc22_condition Heiter
+setstate Weather 2019-03-14 20:36:14 hfc22_day_of_week Wed, 18:00
+setstate Weather 2019-03-14 20:36:14 hfc22_dewPoint 1.8
+setstate Weather 2019-03-14 20:36:14 hfc22_humidity 41
+setstate Weather 2019-03-14 20:36:14 hfc22_icon sunny
+setstate Weather 2019-03-14 20:36:14 hfc22_iconAPI clear-night
+setstate Weather 2019-03-14 20:36:14 hfc22_ozone 279.76
+setstate Weather 2019-03-14 20:36:14 hfc22_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc22_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc22_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc22_pressure 1024.3
+setstate Weather 2019-03-14 20:36:14 hfc22_pubDate Wed, 27 Feb 2019 18:00
+setstate Weather 2019-03-14 20:36:14 hfc22_temperature 15.0
+setstate Weather 2019-03-14 20:36:14 hfc22_uvIndex 0
+setstate Weather 2019-03-14 20:36:14 hfc22_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc22_wind 4
+setstate Weather 2019-03-14 20:36:14 hfc22_windGust 5
+setstate Weather 2019-03-14 20:36:14 hfc22_wind_condition Wind: SSW 4 km/h
+setstate Weather 2019-03-14 20:36:14 hfc22_wind_direction 194
+setstate Weather 2019-03-14 20:36:14 hfc22_wind_speed 4
+setstate Weather 2019-03-14 20:36:14 hfc23_cloudCover 0
+setstate Weather 2019-03-14 20:36:14 hfc23_code 31
+setstate Weather 2019-03-14 20:36:14 hfc23_condition Heiter
+setstate Weather 2019-03-14 20:36:14 hfc23_day_of_week Wed, 19:00
+setstate Weather 2019-03-14 20:36:14 hfc23_dewPoint 1.5
+setstate Weather 2019-03-14 20:36:14 hfc23_humidity 47
+setstate Weather 2019-03-14 20:36:14 hfc23_icon sunny
+setstate Weather 2019-03-14 20:36:14 hfc23_iconAPI clear-night
+setstate Weather 2019-03-14 20:36:14 hfc23_ozone 280.33
+setstate Weather 2019-03-14 20:36:14 hfc23_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc23_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc23_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc23_pressure 1024.1
+setstate Weather 2019-03-14 20:36:14 hfc23_pubDate Wed, 27 Feb 2019 19:00
+setstate Weather 2019-03-14 20:36:14 hfc23_temperature 12.6
+setstate Weather 2019-03-14 20:36:14 hfc23_uvIndex 0
+setstate Weather 2019-03-14 20:36:14 hfc23_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc23_wind 4
+setstate Weather 2019-03-14 20:36:14 hfc23_windGust 5
+setstate Weather 2019-03-14 20:36:14 hfc23_wind_condition Wind: SSW 4 km/h
+setstate Weather 2019-03-14 20:36:14 hfc23_wind_direction 195
+setstate Weather 2019-03-14 20:36:14 hfc23_wind_speed 4
+setstate Weather 2019-03-14 20:36:14 hfc24_cloudCover 0
+setstate Weather 2019-03-14 20:36:14 hfc24_code 31
+setstate Weather 2019-03-14 20:36:14 hfc24_condition Heiter
+setstate Weather 2019-03-14 20:36:14 hfc24_day_of_week Wed, 20:00
+setstate Weather 2019-03-14 20:36:14 hfc24_dewPoint 1.2
+setstate Weather 2019-03-14 20:36:14 hfc24_humidity 51
+setstate Weather 2019-03-14 20:36:14 hfc24_icon sunny
+setstate Weather 2019-03-14 20:36:14 hfc24_iconAPI clear-night
+setstate Weather 2019-03-14 20:36:14 hfc24_ozone 280.69
+setstate Weather 2019-03-14 20:36:14 hfc24_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc24_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc24_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc24_pressure 1023.7
+setstate Weather 2019-03-14 20:36:14 hfc24_pubDate Wed, 27 Feb 2019 20:00
+setstate Weather 2019-03-14 20:36:14 hfc24_temperature 11.0
+setstate Weather 2019-03-14 20:36:14 hfc24_uvIndex 0
+setstate Weather 2019-03-14 20:36:14 hfc24_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc24_wind 4
+setstate Weather 2019-03-14 20:36:14 hfc24_windGust 5
+setstate Weather 2019-03-14 20:36:14 hfc24_wind_condition Wind: SSW 4 km/h
+setstate Weather 2019-03-14 20:36:14 hfc24_wind_direction 194
+setstate Weather 2019-03-14 20:36:14 hfc24_wind_speed 4
+setstate Weather 2019-03-14 20:36:14 hfc25_cloudCover 0
+setstate Weather 2019-03-14 20:36:14 hfc25_code 31
+setstate Weather 2019-03-14 20:36:14 hfc25_condition Heiter
+setstate Weather 2019-03-14 20:36:14 hfc25_day_of_week Wed, 21:00
+setstate Weather 2019-03-14 20:36:14 hfc25_dewPoint 0.8
+setstate Weather 2019-03-14 20:36:14 hfc25_humidity 53
+setstate Weather 2019-03-14 20:36:14 hfc25_icon sunny
+setstate Weather 2019-03-14 20:36:14 hfc25_iconAPI clear-night
+setstate Weather 2019-03-14 20:36:14 hfc25_ozone 280.94
+setstate Weather 2019-03-14 20:36:14 hfc25_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc25_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc25_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc25_pressure 1023.2
+setstate Weather 2019-03-14 20:36:14 hfc25_pubDate Wed, 27 Feb 2019 21:00
+setstate Weather 2019-03-14 20:36:14 hfc25_temperature 10.0
+setstate Weather 2019-03-14 20:36:14 hfc25_uvIndex 0
+setstate Weather 2019-03-14 20:36:14 hfc25_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc25_wind 5
+setstate Weather 2019-03-14 20:36:14 hfc25_windGust 6
+setstate Weather 2019-03-14 20:36:14 hfc25_wind_condition Wind: S 5 km/h
+setstate Weather 2019-03-14 20:36:14 hfc25_wind_direction 191
+setstate Weather 2019-03-14 20:36:14 hfc25_wind_speed 5
+setstate Weather 2019-03-14 20:36:14 hfc26_cloudCover 0
+setstate Weather 2019-03-14 20:36:14 hfc26_code 31
+setstate Weather 2019-03-14 20:36:14 hfc26_condition Heiter
+setstate Weather 2019-03-14 20:36:14 hfc26_day_of_week Wed, 22:00
+setstate Weather 2019-03-14 20:36:14 hfc26_dewPoint 0.5
+setstate Weather 2019-03-14 20:36:14 hfc26_humidity 55
+setstate Weather 2019-03-14 20:36:14 hfc26_icon sunny
+setstate Weather 2019-03-14 20:36:14 hfc26_iconAPI clear-night
+setstate Weather 2019-03-14 20:36:14 hfc26_ozone 281.11
+setstate Weather 2019-03-14 20:36:14 hfc26_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc26_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc26_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc26_pressure 1022.7
+setstate Weather 2019-03-14 20:36:14 hfc26_pubDate Wed, 27 Feb 2019 22:00
+setstate Weather 2019-03-14 20:36:14 hfc26_temperature 9.2
+setstate Weather 2019-03-14 20:36:14 hfc26_uvIndex 0
+setstate Weather 2019-03-14 20:36:14 hfc26_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc26_wind 5
+setstate Weather 2019-03-14 20:36:14 hfc26_windGust 6
+setstate Weather 2019-03-14 20:36:14 hfc26_wind_condition Wind: S 5 km/h
+setstate Weather 2019-03-14 20:36:14 hfc26_wind_direction 190
+setstate Weather 2019-03-14 20:36:14 hfc26_wind_speed 5
+setstate Weather 2019-03-14 20:36:14 hfc27_cloudCover 0
+setstate Weather 2019-03-14 20:36:14 hfc27_code 31
+setstate Weather 2019-03-14 20:36:14 hfc27_condition Heiter
+setstate Weather 2019-03-14 20:36:14 hfc27_day_of_week Wed, 23:00
+setstate Weather 2019-03-14 20:36:14 hfc27_dewPoint 0.4
+setstate Weather 2019-03-14 20:36:14 hfc27_humidity 57
+setstate Weather 2019-03-14 20:36:14 hfc27_icon sunny
+setstate Weather 2019-03-14 20:36:14 hfc27_iconAPI clear-night
+setstate Weather 2019-03-14 20:36:14 hfc27_ozone 281.02
+setstate Weather 2019-03-14 20:36:14 hfc27_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc27_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc27_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc27_pressure 1022.3
+setstate Weather 2019-03-14 20:36:14 hfc27_pubDate Wed, 27 Feb 2019 23:00
+setstate Weather 2019-03-14 20:36:14 hfc27_temperature 8.5
+setstate Weather 2019-03-14 20:36:14 hfc27_uvIndex 0
+setstate Weather 2019-03-14 20:36:14 hfc27_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc27_wind 6
+setstate Weather 2019-03-14 20:36:14 hfc27_windGust 7
+setstate Weather 2019-03-14 20:36:14 hfc27_wind_condition Wind: SSW 6 km/h
+setstate Weather 2019-03-14 20:36:14 hfc27_wind_direction 194
+setstate Weather 2019-03-14 20:36:14 hfc27_wind_speed 6
+setstate Weather 2019-03-14 20:36:14 hfc28_cloudCover 0
+setstate Weather 2019-03-14 20:36:14 hfc28_code 31
+setstate Weather 2019-03-14 20:36:14 hfc28_condition Heiter
+setstate Weather 2019-03-14 20:36:14 hfc28_day_of_week Thu, 00:00
+setstate Weather 2019-03-14 20:36:14 hfc28_dewPoint 0.2
+setstate Weather 2019-03-14 20:36:14 hfc28_humidity 58
+setstate Weather 2019-03-14 20:36:14 hfc28_icon sunny
+setstate Weather 2019-03-14 20:36:14 hfc28_iconAPI clear-night
+setstate Weather 2019-03-14 20:36:14 hfc28_ozone 280.74
+setstate Weather 2019-03-14 20:36:14 hfc28_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc28_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc28_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc28_pressure 1021.9
+setstate Weather 2019-03-14 20:36:14 hfc28_pubDate Thu, 28 Feb 2019 00:00
+setstate Weather 2019-03-14 20:36:14 hfc28_temperature 8.0
+setstate Weather 2019-03-14 20:36:14 hfc28_uvIndex 0
+setstate Weather 2019-03-14 20:36:14 hfc28_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc28_wind 7
+setstate Weather 2019-03-14 20:36:14 hfc28_windGust 7
+setstate Weather 2019-03-14 20:36:14 hfc28_wind_condition Wind: SSW 7 km/h
+setstate Weather 2019-03-14 20:36:14 hfc28_wind_direction 200
+setstate Weather 2019-03-14 20:36:14 hfc28_wind_speed 7
+setstate Weather 2019-03-14 20:36:14 hfc29_cloudCover 0
+setstate Weather 2019-03-14 20:36:14 hfc29_code 31
+setstate Weather 2019-03-14 20:36:14 hfc29_condition Heiter
+setstate Weather 2019-03-14 20:36:14 hfc29_day_of_week Thu, 01:00
+setstate Weather 2019-03-14 20:36:14 hfc29_dewPoint 0.2
+setstate Weather 2019-03-14 20:36:14 hfc29_humidity 60
+setstate Weather 2019-03-14 20:36:14 hfc29_icon sunny
+setstate Weather 2019-03-14 20:36:14 hfc29_iconAPI clear-night
+setstate Weather 2019-03-14 20:36:14 hfc29_ozone 280.75
+setstate Weather 2019-03-14 20:36:14 hfc29_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc29_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc29_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc29_pressure 1021.5
+setstate Weather 2019-03-14 20:36:14 hfc29_pubDate Thu, 28 Feb 2019 01:00
+setstate Weather 2019-03-14 20:36:14 hfc29_temperature 7.5
+setstate Weather 2019-03-14 20:36:14 hfc29_uvIndex 0
+setstate Weather 2019-03-14 20:36:14 hfc29_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc29_wind 8
+setstate Weather 2019-03-14 20:36:14 hfc29_windGust 8
+setstate Weather 2019-03-14 20:36:14 hfc29_wind_condition Wind: SSW 8 km/h
+setstate Weather 2019-03-14 20:36:14 hfc29_wind_direction 206
+setstate Weather 2019-03-14 20:36:14 hfc29_wind_speed 8
+setstate Weather 2019-03-14 20:36:14 hfc2_cloudCover 0
+setstate Weather 2019-03-14 20:36:14 hfc2_code 31
+setstate Weather 2019-03-14 20:36:14 hfc2_condition Heiter
+setstate Weather 2019-03-14 20:36:14 hfc2_day_of_week Tue, 22:00
+setstate Weather 2019-03-14 20:36:14 hfc2_dewPoint 1.4
+setstate Weather 2019-03-14 20:36:14 hfc2_humidity 56
+setstate Weather 2019-03-14 20:36:14 hfc2_icon sunny
+setstate Weather 2019-03-14 20:36:14 hfc2_iconAPI clear-night
+setstate Weather 2019-03-14 20:36:14 hfc2_ozone 276.37
+setstate Weather 2019-03-14 20:36:14 hfc2_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc2_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc2_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc2_pressure 1032.7
+setstate Weather 2019-03-14 20:36:14 hfc2_pubDate Tue, 26 Feb 2019 22:00
+setstate Weather 2019-03-14 20:36:14 hfc2_temperature 9.6
+setstate Weather 2019-03-14 20:36:14 hfc2_uvIndex 0
+setstate Weather 2019-03-14 20:36:14 hfc2_visibility 10.0
+setstate Weather 2019-03-14 20:36:14 hfc2_wind 2
+setstate Weather 2019-03-14 20:36:14 hfc2_windGust 5
+setstate Weather 2019-03-14 20:36:14 hfc2_wind_condition Wind: O 2 km/h
+setstate Weather 2019-03-14 20:36:14 hfc2_wind_direction 83
+setstate Weather 2019-03-14 20:36:14 hfc2_wind_speed 2
+setstate Weather 2019-03-14 20:36:14 hfc30_cloudCover 0
+setstate Weather 2019-03-14 20:36:14 hfc30_code 31
+setstate Weather 2019-03-14 20:36:14 hfc30_condition Heiter
+setstate Weather 2019-03-14 20:36:14 hfc30_day_of_week Thu, 02:00
+setstate Weather 2019-03-14 20:36:14 hfc30_dewPoint 0.1
+setstate Weather 2019-03-14 20:36:14 hfc30_humidity 62
+setstate Weather 2019-03-14 20:36:14 hfc30_icon sunny
+setstate Weather 2019-03-14 20:36:14 hfc30_iconAPI clear-night
+setstate Weather 2019-03-14 20:36:14 hfc30_ozone 281.23
+setstate Weather 2019-03-14 20:36:14 hfc30_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc30_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc30_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc30_pressure 1020.9
+setstate Weather 2019-03-14 20:36:14 hfc30_pubDate Thu, 28 Feb 2019 02:00
+setstate Weather 2019-03-14 20:36:14 hfc30_temperature 6.8
+setstate Weather 2019-03-14 20:36:14 hfc30_uvIndex 0
+setstate Weather 2019-03-14 20:36:14 hfc30_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc30_wind 8
+setstate Weather 2019-03-14 20:36:14 hfc30_windGust 8
+setstate Weather 2019-03-14 20:36:14 hfc30_wind_condition Wind: SSW 8 km/h
+setstate Weather 2019-03-14 20:36:14 hfc30_wind_direction 208
+setstate Weather 2019-03-14 20:36:14 hfc30_wind_speed 8
+setstate Weather 2019-03-14 20:36:14 hfc31_cloudCover 0
+setstate Weather 2019-03-14 20:36:14 hfc31_code 31
+setstate Weather 2019-03-14 20:36:14 hfc31_condition Heiter
+setstate Weather 2019-03-14 20:36:14 hfc31_day_of_week Thu, 03:00
+setstate Weather 2019-03-14 20:36:14 hfc31_dewPoint 0.1
+setstate Weather 2019-03-14 20:36:14 hfc31_humidity 65
+setstate Weather 2019-03-14 20:36:14 hfc31_icon sunny
+setstate Weather 2019-03-14 20:36:14 hfc31_iconAPI clear-night
+setstate Weather 2019-03-14 20:36:14 hfc31_ozone 281.97
+setstate Weather 2019-03-14 20:36:14 hfc31_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc31_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc31_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc31_pressure 1020.2
+setstate Weather 2019-03-14 20:36:14 hfc31_pubDate Thu, 28 Feb 2019 03:00
+setstate Weather 2019-03-14 20:36:14 hfc31_temperature 6.1
+setstate Weather 2019-03-14 20:36:14 hfc31_uvIndex 0
+setstate Weather 2019-03-14 20:36:14 hfc31_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc31_wind 7
+setstate Weather 2019-03-14 20:36:14 hfc31_windGust 9
+setstate Weather 2019-03-14 20:36:14 hfc31_wind_condition Wind: SSW 7 km/h
+setstate Weather 2019-03-14 20:36:14 hfc31_wind_direction 210
+setstate Weather 2019-03-14 20:36:14 hfc31_wind_speed 7
+setstate Weather 2019-03-14 20:36:14 hfc32_cloudCover 0
+setstate Weather 2019-03-14 20:36:14 hfc32_code 31
+setstate Weather 2019-03-14 20:36:14 hfc32_condition Heiter
+setstate Weather 2019-03-14 20:36:14 hfc32_day_of_week Thu, 04:00
+setstate Weather 2019-03-14 20:36:14 hfc32_dewPoint 0.0
+setstate Weather 2019-03-14 20:36:14 hfc32_humidity 68
+setstate Weather 2019-03-14 20:36:14 hfc32_icon sunny
+setstate Weather 2019-03-14 20:36:14 hfc32_iconAPI clear-night
+setstate Weather 2019-03-14 20:36:14 hfc32_ozone 282.78
+setstate Weather 2019-03-14 20:36:14 hfc32_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc32_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc32_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc32_pressure 1019.7
+setstate Weather 2019-03-14 20:36:14 hfc32_pubDate Thu, 28 Feb 2019 04:00
+setstate Weather 2019-03-14 20:36:14 hfc32_temperature 5.4
+setstate Weather 2019-03-14 20:36:14 hfc32_uvIndex 0
+setstate Weather 2019-03-14 20:36:14 hfc32_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc32_wind 7
+setstate Weather 2019-03-14 20:36:14 hfc32_windGust 9
+setstate Weather 2019-03-14 20:36:14 hfc32_wind_condition Wind: SSW 7 km/h
+setstate Weather 2019-03-14 20:36:14 hfc32_wind_direction 211
+setstate Weather 2019-03-14 20:36:14 hfc32_wind_speed 7
+setstate Weather 2019-03-14 20:36:14 hfc33_cloudCover 0
+setstate Weather 2019-03-14 20:36:14 hfc33_code 31
+setstate Weather 2019-03-14 20:36:14 hfc33_condition Heiter
+setstate Weather 2019-03-14 20:36:14 hfc33_day_of_week Thu, 05:00
+setstate Weather 2019-03-14 20:36:14 hfc33_dewPoint -0.2
+setstate Weather 2019-03-14 20:36:14 hfc33_humidity 70
+setstate Weather 2019-03-14 20:36:14 hfc33_icon sunny
+setstate Weather 2019-03-14 20:36:14 hfc33_iconAPI clear-night
+setstate Weather 2019-03-14 20:36:14 hfc33_ozone 283.53
+setstate Weather 2019-03-14 20:36:14 hfc33_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc33_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc33_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc33_pressure 1019.4
+setstate Weather 2019-03-14 20:36:14 hfc33_pubDate Thu, 28 Feb 2019 05:00
+setstate Weather 2019-03-14 20:36:14 hfc33_temperature 4.8
+setstate Weather 2019-03-14 20:36:14 hfc33_uvIndex 0
+setstate Weather 2019-03-14 20:36:14 hfc33_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc33_wind 8
+setstate Weather 2019-03-14 20:36:14 hfc33_windGust 11
+setstate Weather 2019-03-14 20:36:14 hfc33_wind_condition Wind: SW 8 km/h
+setstate Weather 2019-03-14 20:36:14 hfc33_wind_direction 214
+setstate Weather 2019-03-14 20:36:14 hfc33_wind_speed 8
+setstate Weather 2019-03-14 20:36:14 hfc34_cloudCover 0
+setstate Weather 2019-03-14 20:36:14 hfc34_code 31
+setstate Weather 2019-03-14 20:36:14 hfc34_condition Heiter
+setstate Weather 2019-03-14 20:36:14 hfc34_day_of_week Thu, 06:00
+setstate Weather 2019-03-14 20:36:14 hfc34_dewPoint -0.3
+setstate Weather 2019-03-14 20:36:14 hfc34_humidity 72
+setstate Weather 2019-03-14 20:36:14 hfc34_icon sunny
+setstate Weather 2019-03-14 20:36:14 hfc34_iconAPI clear-night
+setstate Weather 2019-03-14 20:36:14 hfc34_ozone 284.44
+setstate Weather 2019-03-14 20:36:14 hfc34_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc34_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc34_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc34_pressure 1019.2
+setstate Weather 2019-03-14 20:36:14 hfc34_pubDate Thu, 28 Feb 2019 06:00
+setstate Weather 2019-03-14 20:36:14 hfc34_temperature 4.2
+setstate Weather 2019-03-14 20:36:14 hfc34_uvIndex 0
+setstate Weather 2019-03-14 20:36:14 hfc34_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc34_wind 9
+setstate Weather 2019-03-14 20:36:14 hfc34_windGust 13
+setstate Weather 2019-03-14 20:36:14 hfc34_wind_condition Wind: SW 9 km/h
+setstate Weather 2019-03-14 20:36:14 hfc34_wind_direction 216
+setstate Weather 2019-03-14 20:36:14 hfc34_wind_speed 9
+setstate Weather 2019-03-14 20:36:14 hfc35_cloudCover 0
+setstate Weather 2019-03-14 20:36:14 hfc35_code 31
+setstate Weather 2019-03-14 20:36:14 hfc35_condition Heiter
+setstate Weather 2019-03-14 20:36:14 hfc35_day_of_week Thu, 07:00
+setstate Weather 2019-03-14 20:36:14 hfc35_dewPoint -0.2
+setstate Weather 2019-03-14 20:36:14 hfc35_humidity 73
+setstate Weather 2019-03-14 20:36:14 hfc35_icon sunny
+setstate Weather 2019-03-14 20:36:14 hfc35_iconAPI clear-night
+setstate Weather 2019-03-14 20:36:14 hfc35_ozone 285.68
+setstate Weather 2019-03-14 20:36:14 hfc35_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc35_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc35_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc35_pressure 1019.0
+setstate Weather 2019-03-14 20:36:14 hfc35_pubDate Thu, 28 Feb 2019 07:00
+setstate Weather 2019-03-14 20:36:14 hfc35_temperature 4.2
+setstate Weather 2019-03-14 20:36:14 hfc35_uvIndex 0
+setstate Weather 2019-03-14 20:36:14 hfc35_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc35_wind 9
+setstate Weather 2019-03-14 20:36:14 hfc35_windGust 15
+setstate Weather 2019-03-14 20:36:14 hfc35_wind_condition Wind: SW 9 km/h
+setstate Weather 2019-03-14 20:36:14 hfc35_wind_direction 218
+setstate Weather 2019-03-14 20:36:14 hfc35_wind_speed 9
+setstate Weather 2019-03-14 20:36:14 hfc36_cloudCover 20
+setstate Weather 2019-03-14 20:36:14 hfc36_code 32
+setstate Weather 2019-03-14 20:36:14 hfc36_condition Heiter
+setstate Weather 2019-03-14 20:36:14 hfc36_day_of_week Thu, 08:00
+setstate Weather 2019-03-14 20:36:14 hfc36_dewPoint 0.6
+setstate Weather 2019-03-14 20:36:14 hfc36_humidity 72
+setstate Weather 2019-03-14 20:36:14 hfc36_icon sunny
+setstate Weather 2019-03-14 20:36:14 hfc36_iconAPI clear-day
+setstate Weather 2019-03-14 20:36:14 hfc36_ozone 287.28
+setstate Weather 2019-03-14 20:36:14 hfc36_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc36_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc36_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc36_pressure 1018.8
+setstate Weather 2019-03-14 20:36:14 hfc36_pubDate Thu, 28 Feb 2019 08:00
+setstate Weather 2019-03-14 20:36:14 hfc36_temperature 5.2
+setstate Weather 2019-03-14 20:36:14 hfc36_uvIndex 0
+setstate Weather 2019-03-14 20:36:14 hfc36_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc36_wind 10
+setstate Weather 2019-03-14 20:36:14 hfc36_windGust 18
+setstate Weather 2019-03-14 20:36:14 hfc36_wind_condition Wind: SW 10 km/h
+setstate Weather 2019-03-14 20:36:14 hfc36_wind_direction 219
+setstate Weather 2019-03-14 20:36:14 hfc36_wind_speed 10
+setstate Weather 2019-03-14 20:36:14 hfc37_cloudCover 47
+setstate Weather 2019-03-14 20:36:14 hfc37_code 30
+setstate Weather 2019-03-14 20:36:14 hfc37_condition Leicht bewölkt
+setstate Weather 2019-03-14 20:36:14 hfc37_day_of_week Thu, 09:00
+setstate Weather 2019-03-14 20:36:14 hfc37_dewPoint 1.7
+setstate Weather 2019-03-14 20:36:14 hfc37_humidity 71
+setstate Weather 2019-03-14 20:36:14 hfc37_icon partly_cloudy
+setstate Weather 2019-03-14 20:36:14 hfc37_iconAPI partly-cloudy-day
+setstate Weather 2019-03-14 20:36:14 hfc37_ozone 289.23
+setstate Weather 2019-03-14 20:36:14 hfc37_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc37_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc37_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc37_pressure 1018.5
+setstate Weather 2019-03-14 20:36:14 hfc37_pubDate Thu, 28 Feb 2019 09:00
+setstate Weather 2019-03-14 20:36:14 hfc37_temperature 6.6
+setstate Weather 2019-03-14 20:36:14 hfc37_uvIndex 1
+setstate Weather 2019-03-14 20:36:14 hfc37_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc37_wind 11
+setstate Weather 2019-03-14 20:36:14 hfc37_windGust 21
+setstate Weather 2019-03-14 20:36:14 hfc37_wind_condition Wind: SW 11 km/h
+setstate Weather 2019-03-14 20:36:14 hfc37_wind_direction 219
+setstate Weather 2019-03-14 20:36:14 hfc37_wind_speed 11
+setstate Weather 2019-03-14 20:36:14 hfc38_cloudCover 66
+setstate Weather 2019-03-14 20:36:14 hfc38_code 30
+setstate Weather 2019-03-14 20:36:14 hfc38_condition Überwiegend bewölkt
+setstate Weather 2019-03-14 20:36:14 hfc38_day_of_week Thu, 10:00
+setstate Weather 2019-03-14 20:36:14 hfc38_dewPoint 2.8
+setstate Weather 2019-03-14 20:36:14 hfc38_humidity 68
+setstate Weather 2019-03-14 20:36:14 hfc38_icon partly_cloudy
+setstate Weather 2019-03-14 20:36:14 hfc38_iconAPI partly-cloudy-day
+setstate Weather 2019-03-14 20:36:14 hfc38_ozone 291.68
+setstate Weather 2019-03-14 20:36:14 hfc38_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc38_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc38_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc38_pressure 1018.2
+setstate Weather 2019-03-14 20:36:14 hfc38_pubDate Thu, 28 Feb 2019 10:00
+setstate Weather 2019-03-14 20:36:14 hfc38_temperature 8.4
+setstate Weather 2019-03-14 20:36:14 hfc38_uvIndex 1
+setstate Weather 2019-03-14 20:36:14 hfc38_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc38_wind 12
+setstate Weather 2019-03-14 20:36:14 hfc38_windGust 25
+setstate Weather 2019-03-14 20:36:14 hfc38_wind_condition Wind: SW 12 km/h
+setstate Weather 2019-03-14 20:36:14 hfc38_wind_direction 222
+setstate Weather 2019-03-14 20:36:14 hfc38_wind_speed 12
+setstate Weather 2019-03-14 20:36:14 hfc39_cloudCover 70
+setstate Weather 2019-03-14 20:36:14 hfc39_code 30
+setstate Weather 2019-03-14 20:36:14 hfc39_condition Überwiegend bewölkt
+setstate Weather 2019-03-14 20:36:14 hfc39_day_of_week Thu, 11:00
+setstate Weather 2019-03-14 20:36:14 hfc39_dewPoint 4.1
+setstate Weather 2019-03-14 20:36:14 hfc39_humidity 64
+setstate Weather 2019-03-14 20:36:14 hfc39_icon partly_cloudy
+setstate Weather 2019-03-14 20:36:14 hfc39_iconAPI partly-cloudy-day
+setstate Weather 2019-03-14 20:36:14 hfc39_ozone 294.4
+setstate Weather 2019-03-14 20:36:14 hfc39_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc39_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc39_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc39_pressure 1017.8
+setstate Weather 2019-03-14 20:36:14 hfc39_pubDate Thu, 28 Feb 2019 11:00
+setstate Weather 2019-03-14 20:36:14 hfc39_temperature 10.6
+setstate Weather 2019-03-14 20:36:14 hfc39_uvIndex 2
+setstate Weather 2019-03-14 20:36:14 hfc39_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc39_wind 14
+setstate Weather 2019-03-14 20:36:14 hfc39_windGust 28
+setstate Weather 2019-03-14 20:36:14 hfc39_wind_condition Wind: SW 14 km/h
+setstate Weather 2019-03-14 20:36:14 hfc39_wind_direction 226
+setstate Weather 2019-03-14 20:36:14 hfc39_wind_speed 14
+setstate Weather 2019-03-14 20:36:14 hfc3_cloudCover 0
+setstate Weather 2019-03-14 20:36:14 hfc3_code 31
+setstate Weather 2019-03-14 20:36:14 hfc3_condition Heiter
+setstate Weather 2019-03-14 20:36:14 hfc3_day_of_week Tue, 23:00
+setstate Weather 2019-03-14 20:36:14 hfc3_dewPoint 0.7
+setstate Weather 2019-03-14 20:36:14 hfc3_humidity 58
+setstate Weather 2019-03-14 20:36:14 hfc3_icon sunny
+setstate Weather 2019-03-14 20:36:14 hfc3_iconAPI clear-night
+setstate Weather 2019-03-14 20:36:14 hfc3_ozone 275.56
+setstate Weather 2019-03-14 20:36:14 hfc3_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc3_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc3_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc3_pressure 1032.6
+setstate Weather 2019-03-14 20:36:14 hfc3_pubDate Tue, 26 Feb 2019 23:00
+setstate Weather 2019-03-14 20:36:14 hfc3_temperature 8.6
+setstate Weather 2019-03-14 20:36:14 hfc3_uvIndex 0
+setstate Weather 2019-03-14 20:36:14 hfc3_visibility 11.5
+setstate Weather 2019-03-14 20:36:14 hfc3_wind 2
+setstate Weather 2019-03-14 20:36:14 hfc3_windGust 5
+setstate Weather 2019-03-14 20:36:14 hfc3_wind_condition Wind: ONO 2 km/h
+setstate Weather 2019-03-14 20:36:14 hfc3_wind_direction 72
+setstate Weather 2019-03-14 20:36:14 hfc3_wind_speed 2
+setstate Weather 2019-03-14 20:36:14 hfc40_cloudCover 66
+setstate Weather 2019-03-14 20:36:14 hfc40_code 30
+setstate Weather 2019-03-14 20:36:14 hfc40_condition Überwiegend bewölkt
+setstate Weather 2019-03-14 20:36:14 hfc40_day_of_week Thu, 12:00
+setstate Weather 2019-03-14 20:36:14 hfc40_dewPoint 5.4
+setstate Weather 2019-03-14 20:36:14 hfc40_humidity 58
+setstate Weather 2019-03-14 20:36:14 hfc40_icon partly_cloudy
+setstate Weather 2019-03-14 20:36:14 hfc40_iconAPI partly-cloudy-day
+setstate Weather 2019-03-14 20:36:14 hfc40_ozone 297.66
+setstate Weather 2019-03-14 20:36:14 hfc40_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc40_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc40_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc40_pressure 1017.3
+setstate Weather 2019-03-14 20:36:14 hfc40_pubDate Thu, 28 Feb 2019 12:00
+setstate Weather 2019-03-14 20:36:14 hfc40_temperature 13.4
+setstate Weather 2019-03-14 20:36:14 hfc40_uvIndex 2
+setstate Weather 2019-03-14 20:36:14 hfc40_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc40_wind 17
+setstate Weather 2019-03-14 20:36:14 hfc40_windGust 31
+setstate Weather 2019-03-14 20:36:14 hfc40_wind_condition Wind: SW 17 km/h
+setstate Weather 2019-03-14 20:36:14 hfc40_wind_direction 231
+setstate Weather 2019-03-14 20:36:14 hfc40_wind_speed 17
+setstate Weather 2019-03-14 20:36:14 hfc41_cloudCover 58
+setstate Weather 2019-03-14 20:36:14 hfc41_code 30
+setstate Weather 2019-03-14 20:36:14 hfc41_condition Leicht bewölkt
+setstate Weather 2019-03-14 20:36:14 hfc41_day_of_week Thu, 13:00
+setstate Weather 2019-03-14 20:36:14 hfc41_dewPoint 6.2
+setstate Weather 2019-03-14 20:36:14 hfc41_humidity 54
+setstate Weather 2019-03-14 20:36:14 hfc41_icon partly_cloudy
+setstate Weather 2019-03-14 20:36:14 hfc41_iconAPI partly-cloudy-day
+setstate Weather 2019-03-14 20:36:14 hfc41_ozone 302.31
+setstate Weather 2019-03-14 20:36:14 hfc41_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc41_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc41_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc41_pressure 1016.8
+setstate Weather 2019-03-14 20:36:14 hfc41_pubDate Thu, 28 Feb 2019 13:00
+setstate Weather 2019-03-14 20:36:14 hfc41_temperature 15.4
+setstate Weather 2019-03-14 20:36:14 hfc41_uvIndex 2
+setstate Weather 2019-03-14 20:36:14 hfc41_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc41_wind 19
+setstate Weather 2019-03-14 20:36:14 hfc41_windGust 35
+setstate Weather 2019-03-14 20:36:14 hfc41_wind_condition Wind: WSW 19 km/h
+setstate Weather 2019-03-14 20:36:14 hfc41_wind_direction 237
+setstate Weather 2019-03-14 20:36:14 hfc41_wind_speed 19
+setstate Weather 2019-03-14 20:36:14 hfc42_cloudCover 47
+setstate Weather 2019-03-14 20:36:14 hfc42_code 30
+setstate Weather 2019-03-14 20:36:14 hfc42_condition Leicht bewölkt
+setstate Weather 2019-03-14 20:36:14 hfc42_day_of_week Thu, 14:00
+setstate Weather 2019-03-14 20:36:14 hfc42_dewPoint 6.3
+setstate Weather 2019-03-14 20:36:14 hfc42_humidity 52
+setstate Weather 2019-03-14 20:36:14 hfc42_icon partly_cloudy
+setstate Weather 2019-03-14 20:36:14 hfc42_iconAPI partly-cloudy-day
+setstate Weather 2019-03-14 20:36:14 hfc42_ozone 309.63
+setstate Weather 2019-03-14 20:36:14 hfc42_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc42_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc42_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc42_pressure 1016.4
+setstate Weather 2019-03-14 20:36:14 hfc42_pubDate Thu, 28 Feb 2019 14:00
+setstate Weather 2019-03-14 20:36:14 hfc42_temperature 16.3
+setstate Weather 2019-03-14 20:36:14 hfc42_uvIndex 2
+setstate Weather 2019-03-14 20:36:14 hfc42_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc42_wind 21
+setstate Weather 2019-03-14 20:36:14 hfc42_windGust 39
+setstate Weather 2019-03-14 20:36:14 hfc42_wind_condition Wind: WSW 21 km/h
+setstate Weather 2019-03-14 20:36:14 hfc42_wind_direction 244
+setstate Weather 2019-03-14 20:36:14 hfc42_wind_speed 21
+setstate Weather 2019-03-14 20:36:14 hfc43_cloudCover 32
+setstate Weather 2019-03-14 20:36:14 hfc43_code 30
+setstate Weather 2019-03-14 20:36:14 hfc43_condition Leicht bewölkt
+setstate Weather 2019-03-14 20:36:14 hfc43_day_of_week Thu, 15:00
+setstate Weather 2019-03-14 20:36:14 hfc43_dewPoint 6.0
+setstate Weather 2019-03-14 20:36:14 hfc43_humidity 50
+setstate Weather 2019-03-14 20:36:14 hfc43_icon partly_cloudy
+setstate Weather 2019-03-14 20:36:14 hfc43_iconAPI partly-cloudy-day
+setstate Weather 2019-03-14 20:36:14 hfc43_ozone 318.45
+setstate Weather 2019-03-14 20:36:14 hfc43_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc43_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc43_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc43_pressure 1016.1
+setstate Weather 2019-03-14 20:36:14 hfc43_pubDate Thu, 28 Feb 2019 15:00
+setstate Weather 2019-03-14 20:36:14 hfc43_temperature 16.4
+setstate Weather 2019-03-14 20:36:14 hfc43_uvIndex 1
+setstate Weather 2019-03-14 20:36:14 hfc43_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc43_wind 23
+setstate Weather 2019-03-14 20:36:14 hfc43_windGust 43
+setstate Weather 2019-03-14 20:36:14 hfc43_wind_condition Wind: WSW 23 km/h
+setstate Weather 2019-03-14 20:36:14 hfc43_wind_direction 253
+setstate Weather 2019-03-14 20:36:14 hfc43_wind_speed 23
+setstate Weather 2019-03-14 20:36:14 hfc44_cloudCover 23
+setstate Weather 2019-03-14 20:36:14 hfc44_code 32
+setstate Weather 2019-03-14 20:36:14 hfc44_condition Heiter
+setstate Weather 2019-03-14 20:36:14 hfc44_day_of_week Thu, 16:00
+setstate Weather 2019-03-14 20:36:14 hfc44_dewPoint 5.7
+setstate Weather 2019-03-14 20:36:14 hfc44_humidity 50
+setstate Weather 2019-03-14 20:36:14 hfc44_icon sunny
+setstate Weather 2019-03-14 20:36:14 hfc44_iconAPI clear-day
+setstate Weather 2019-03-14 20:36:14 hfc44_ozone 325.57
+setstate Weather 2019-03-14 20:36:14 hfc44_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc44_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc44_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc44_pressure 1015.8
+setstate Weather 2019-03-14 20:36:14 hfc44_pubDate Thu, 28 Feb 2019 16:00
+setstate Weather 2019-03-14 20:36:14 hfc44_temperature 16.2
+setstate Weather 2019-03-14 20:36:14 hfc44_uvIndex 1
+setstate Weather 2019-03-14 20:36:14 hfc44_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc44_wind 24
+setstate Weather 2019-03-14 20:36:14 hfc44_windGust 45
+setstate Weather 2019-03-14 20:36:14 hfc44_wind_condition Wind: WSW 24 km/h
+setstate Weather 2019-03-14 20:36:14 hfc44_wind_direction 257
+setstate Weather 2019-03-14 20:36:14 hfc44_wind_speed 24
+setstate Weather 2019-03-14 20:36:14 hfc45_cloudCover 24
+setstate Weather 2019-03-14 20:36:14 hfc45_code 32
+setstate Weather 2019-03-14 20:36:14 hfc45_condition Heiter
+setstate Weather 2019-03-14 20:36:14 hfc45_day_of_week Thu, 17:00
+setstate Weather 2019-03-14 20:36:14 hfc45_dewPoint 5.4
+setstate Weather 2019-03-14 20:36:14 hfc45_humidity 51
+setstate Weather 2019-03-14 20:36:14 hfc45_icon sunny
+setstate Weather 2019-03-14 20:36:14 hfc45_iconAPI clear-day
+setstate Weather 2019-03-14 20:36:14 hfc45_ozone 329.15
+setstate Weather 2019-03-14 20:36:14 hfc45_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc45_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc45_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc45_pressure 1015.6
+setstate Weather 2019-03-14 20:36:14 hfc45_pubDate Thu, 28 Feb 2019 17:00
+setstate Weather 2019-03-14 20:36:14 hfc45_temperature 15.6
+setstate Weather 2019-03-14 20:36:14 hfc45_uvIndex 0
+setstate Weather 2019-03-14 20:36:14 hfc45_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc45_wind 22
+setstate Weather 2019-03-14 20:36:14 hfc45_windGust 43
+setstate Weather 2019-03-14 20:36:14 hfc45_wind_condition Wind: WSW 22 km/h
+setstate Weather 2019-03-14 20:36:14 hfc45_wind_direction 252
+setstate Weather 2019-03-14 20:36:14 hfc45_wind_speed 22
+setstate Weather 2019-03-14 20:36:14 hfc46_cloudCover 32
+setstate Weather 2019-03-14 20:36:14 hfc46_code 29
+setstate Weather 2019-03-14 20:36:14 hfc46_condition Leicht bewölkt
+setstate Weather 2019-03-14 20:36:14 hfc46_day_of_week Thu, 18:00
+setstate Weather 2019-03-14 20:36:14 hfc46_dewPoint 5.1
+setstate Weather 2019-03-14 20:36:14 hfc46_humidity 52
+setstate Weather 2019-03-14 20:36:14 hfc46_icon partly_cloudy_night
+setstate Weather 2019-03-14 20:36:14 hfc46_iconAPI partly-cloudy-night
+setstate Weather 2019-03-14 20:36:14 hfc46_ozone 331.01
+setstate Weather 2019-03-14 20:36:14 hfc46_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc46_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc46_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc46_pressure 1015.4
+setstate Weather 2019-03-14 20:36:14 hfc46_pubDate Thu, 28 Feb 2019 18:00
+setstate Weather 2019-03-14 20:36:14 hfc46_temperature 14.9
+setstate Weather 2019-03-14 20:36:14 hfc46_uvIndex 0
+setstate Weather 2019-03-14 20:36:14 hfc46_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc46_wind 18
+setstate Weather 2019-03-14 20:36:14 hfc46_windGust 39
+setstate Weather 2019-03-14 20:36:14 hfc46_wind_condition Wind: WSW 18 km/h
+setstate Weather 2019-03-14 20:36:14 hfc46_wind_direction 244
+setstate Weather 2019-03-14 20:36:14 hfc46_wind_speed 18
+setstate Weather 2019-03-14 20:36:14 hfc47_cloudCover 42
+setstate Weather 2019-03-14 20:36:14 hfc47_code 29
+setstate Weather 2019-03-14 20:36:14 hfc47_condition Leicht bewölkt
+setstate Weather 2019-03-14 20:36:14 hfc47_day_of_week Thu, 19:00
+setstate Weather 2019-03-14 20:36:14 hfc47_dewPoint 5.0
+setstate Weather 2019-03-14 20:36:14 hfc47_humidity 54
+setstate Weather 2019-03-14 20:36:14 hfc47_icon partly_cloudy_night
+setstate Weather 2019-03-14 20:36:14 hfc47_iconAPI partly-cloudy-night
+setstate Weather 2019-03-14 20:36:14 hfc47_ozone 334.57
+setstate Weather 2019-03-14 20:36:14 hfc47_precipIntensity 0.0102
+setstate Weather 2019-03-14 20:36:14 hfc47_precipProbability 2
+setstate Weather 2019-03-14 20:36:14 hfc47_precipType rain
+setstate Weather 2019-03-14 20:36:14 hfc47_pressure 1015.1
+setstate Weather 2019-03-14 20:36:14 hfc47_pubDate Thu, 28 Feb 2019 19:00
+setstate Weather 2019-03-14 20:36:14 hfc47_temperature 14.1
+setstate Weather 2019-03-14 20:36:14 hfc47_uvIndex 0
+setstate Weather 2019-03-14 20:36:14 hfc47_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc47_wind 16
+setstate Weather 2019-03-14 20:36:14 hfc47_windGust 37
+setstate Weather 2019-03-14 20:36:14 hfc47_wind_condition Wind: WSW 16 km/h
+setstate Weather 2019-03-14 20:36:14 hfc47_wind_direction 239
+setstate Weather 2019-03-14 20:36:14 hfc47_wind_speed 16
+setstate Weather 2019-03-14 20:36:14 hfc48_cloudCover 53
+setstate Weather 2019-03-14 20:36:14 hfc48_code 29
+setstate Weather 2019-03-14 20:36:14 hfc48_condition Leicht bewölkt
+setstate Weather 2019-03-14 20:36:14 hfc48_day_of_week Thu, 20:00
+setstate Weather 2019-03-14 20:36:14 hfc48_dewPoint 5.3
+setstate Weather 2019-03-14 20:36:14 hfc48_humidity 58
+setstate Weather 2019-03-14 20:36:14 hfc48_icon partly_cloudy_night
+setstate Weather 2019-03-14 20:36:14 hfc48_iconAPI partly-cloudy-night
+setstate Weather 2019-03-14 20:36:14 hfc48_ozone 342.62
+setstate Weather 2019-03-14 20:36:14 hfc48_precipIntensity 0.0406
+setstate Weather 2019-03-14 20:36:14 hfc48_precipProbability 6
+setstate Weather 2019-03-14 20:36:14 hfc48_precipType rain
+setstate Weather 2019-03-14 20:36:14 hfc48_pressure 1014.8
+setstate Weather 2019-03-14 20:36:14 hfc48_pubDate Thu, 28 Feb 2019 20:00
+setstate Weather 2019-03-14 20:36:14 hfc48_temperature 13.4
+setstate Weather 2019-03-14 20:36:14 hfc48_uvIndex 0
+setstate Weather 2019-03-14 20:36:14 hfc48_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc48_wind 17
+setstate Weather 2019-03-14 20:36:14 hfc48_windGust 38
+setstate Weather 2019-03-14 20:36:14 hfc48_wind_condition Wind: WSW 17 km/h
+setstate Weather 2019-03-14 20:36:14 hfc48_wind_direction 240
+setstate Weather 2019-03-14 20:36:14 hfc48_wind_speed 17
+setstate Weather 2019-03-14 20:36:14 hfc49_cloudCover 67
+setstate Weather 2019-03-14 20:36:14 hfc49_code 29
+setstate Weather 2019-03-14 20:36:14 hfc49_condition Überwiegend bewölkt
+setstate Weather 2019-03-14 20:36:14 hfc49_day_of_week Thu, 21:00
+setstate Weather 2019-03-14 20:36:14 hfc49_dewPoint 5.8
+setstate Weather 2019-03-14 20:36:14 hfc49_humidity 63
+setstate Weather 2019-03-14 20:36:14 hfc49_icon partly_cloudy_night
+setstate Weather 2019-03-14 20:36:14 hfc49_iconAPI partly-cloudy-night
+setstate Weather 2019-03-14 20:36:14 hfc49_ozone 352.36
+setstate Weather 2019-03-14 20:36:14 hfc49_precipIntensity 0.1346
+setstate Weather 2019-03-14 20:36:14 hfc49_precipProbability 14
+setstate Weather 2019-03-14 20:36:14 hfc49_precipType rain
+setstate Weather 2019-03-14 20:36:14 hfc49_pressure 1014.3
+setstate Weather 2019-03-14 20:36:14 hfc49_pubDate Thu, 28 Feb 2019 21:00
+setstate Weather 2019-03-14 20:36:14 hfc49_temperature 12.7
+setstate Weather 2019-03-14 20:36:14 hfc49_uvIndex 0
+setstate Weather 2019-03-14 20:36:14 hfc49_visibility 13.5
+setstate Weather 2019-03-14 20:36:14 hfc49_wind 18
+setstate Weather 2019-03-14 20:36:14 hfc49_windGust 40
+setstate Weather 2019-03-14 20:36:14 hfc49_wind_condition Wind: WSW 18 km/h
+setstate Weather 2019-03-14 20:36:14 hfc49_wind_direction 244
+setstate Weather 2019-03-14 20:36:14 hfc49_wind_speed 18
+setstate Weather 2019-03-14 20:36:14 hfc4_cloudCover 26
+setstate Weather 2019-03-14 20:36:14 hfc4_code 29
+setstate Weather 2019-03-14 20:36:14 hfc4_condition Leicht bewölkt
+setstate Weather 2019-03-14 20:36:14 hfc4_day_of_week Wed, 00:00
+setstate Weather 2019-03-14 20:36:14 hfc4_dewPoint -0.5
+setstate Weather 2019-03-14 20:36:14 hfc4_humidity 55
+setstate Weather 2019-03-14 20:36:14 hfc4_icon partly_cloudy_night
+setstate Weather 2019-03-14 20:36:14 hfc4_iconAPI partly-cloudy-night
+setstate Weather 2019-03-14 20:36:14 hfc4_ozone 274.76
+setstate Weather 2019-03-14 20:36:14 hfc4_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc4_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc4_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc4_pressure 1032.5
+setstate Weather 2019-03-14 20:36:14 hfc4_pubDate Wed, 27 Feb 2019 00:00
+setstate Weather 2019-03-14 20:36:14 hfc4_temperature 8.1
+setstate Weather 2019-03-14 20:36:14 hfc4_uvIndex 0
+setstate Weather 2019-03-14 20:36:14 hfc4_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc4_wind 3
+setstate Weather 2019-03-14 20:36:14 hfc4_windGust 5
+setstate Weather 2019-03-14 20:36:14 hfc4_wind_condition Wind: NO 3 km/h
+setstate Weather 2019-03-14 20:36:14 hfc4_wind_direction 40
+setstate Weather 2019-03-14 20:36:14 hfc4_wind_speed 3
+setstate Weather 2019-03-14 20:36:14 hfc5_cloudCover 42
+setstate Weather 2019-03-14 20:36:14 hfc5_code 29
+setstate Weather 2019-03-14 20:36:14 hfc5_condition Leicht bewölkt
+setstate Weather 2019-03-14 20:36:14 hfc5_day_of_week Wed, 01:00
+setstate Weather 2019-03-14 20:36:14 hfc5_dewPoint -1.4
+setstate Weather 2019-03-14 20:36:14 hfc5_humidity 53
+setstate Weather 2019-03-14 20:36:14 hfc5_icon partly_cloudy_night
+setstate Weather 2019-03-14 20:36:14 hfc5_iconAPI partly-cloudy-night
+setstate Weather 2019-03-14 20:36:14 hfc5_ozone 274.13
+setstate Weather 2019-03-14 20:36:14 hfc5_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc5_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc5_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc5_pressure 1032.4
+setstate Weather 2019-03-14 20:36:14 hfc5_pubDate Wed, 27 Feb 2019 01:00
+setstate Weather 2019-03-14 20:36:14 hfc5_temperature 7.5
+setstate Weather 2019-03-14 20:36:14 hfc5_uvIndex 0
+setstate Weather 2019-03-14 20:36:14 hfc5_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc5_wind 4
+setstate Weather 2019-03-14 20:36:14 hfc5_windGust 5
+setstate Weather 2019-03-14 20:36:14 hfc5_wind_condition Wind: NNO 4 km/h
+setstate Weather 2019-03-14 20:36:14 hfc5_wind_direction 33
+setstate Weather 2019-03-14 20:36:14 hfc5_wind_speed 4
+setstate Weather 2019-03-14 20:36:14 hfc6_cloudCover 36
+setstate Weather 2019-03-14 20:36:14 hfc6_code 29
+setstate Weather 2019-03-14 20:36:14 hfc6_condition Leicht bewölkt
+setstate Weather 2019-03-14 20:36:14 hfc6_day_of_week Wed, 02:00
+setstate Weather 2019-03-14 20:36:14 hfc6_dewPoint -1.9
+setstate Weather 2019-03-14 20:36:14 hfc6_humidity 54
+setstate Weather 2019-03-14 20:36:14 hfc6_icon partly_cloudy_night
+setstate Weather 2019-03-14 20:36:14 hfc6_iconAPI partly-cloudy-night
+setstate Weather 2019-03-14 20:36:14 hfc6_ozone 273.77
+setstate Weather 2019-03-14 20:36:14 hfc6_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc6_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc6_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc6_pressure 1032.1
+setstate Weather 2019-03-14 20:36:14 hfc6_pubDate Wed, 27 Feb 2019 02:00
+setstate Weather 2019-03-14 20:36:14 hfc6_temperature 6.6
+setstate Weather 2019-03-14 20:36:14 hfc6_uvIndex 0
+setstate Weather 2019-03-14 20:36:14 hfc6_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc6_wind 4
+setstate Weather 2019-03-14 20:36:14 hfc6_windGust 5
+setstate Weather 2019-03-14 20:36:14 hfc6_wind_condition Wind: NO 4 km/h
+setstate Weather 2019-03-14 20:36:14 hfc6_wind_direction 38
+setstate Weather 2019-03-14 20:36:14 hfc6_wind_speed 4
+setstate Weather 2019-03-14 20:36:14 hfc7_cloudCover 29
+setstate Weather 2019-03-14 20:36:14 hfc7_code 29
+setstate Weather 2019-03-14 20:36:14 hfc7_condition Leicht bewölkt
+setstate Weather 2019-03-14 20:36:14 hfc7_day_of_week Wed, 03:00
+setstate Weather 2019-03-14 20:36:14 hfc7_dewPoint -2.4
+setstate Weather 2019-03-14 20:36:14 hfc7_humidity 56
+setstate Weather 2019-03-14 20:36:14 hfc7_icon partly_cloudy_night
+setstate Weather 2019-03-14 20:36:14 hfc7_iconAPI partly-cloudy-night
+setstate Weather 2019-03-14 20:36:14 hfc7_ozone 273.55
+setstate Weather 2019-03-14 20:36:14 hfc7_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc7_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc7_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc7_pressure 1031.8
+setstate Weather 2019-03-14 20:36:14 hfc7_pubDate Wed, 27 Feb 2019 03:00
+setstate Weather 2019-03-14 20:36:14 hfc7_temperature 5.7
+setstate Weather 2019-03-14 20:36:14 hfc7_uvIndex 0
+setstate Weather 2019-03-14 20:36:14 hfc7_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc7_wind 4
+setstate Weather 2019-03-14 20:36:14 hfc7_windGust 5
+setstate Weather 2019-03-14 20:36:14 hfc7_wind_condition Wind: NO 4 km/h
+setstate Weather 2019-03-14 20:36:14 hfc7_wind_direction 46
+setstate Weather 2019-03-14 20:36:14 hfc7_wind_speed 4
+setstate Weather 2019-03-14 20:36:14 hfc8_cloudCover 23
+setstate Weather 2019-03-14 20:36:14 hfc8_code 31
+setstate Weather 2019-03-14 20:36:14 hfc8_condition Heiter
+setstate Weather 2019-03-14 20:36:14 hfc8_day_of_week Wed, 04:00
+setstate Weather 2019-03-14 20:36:14 hfc8_dewPoint -2.8
+setstate Weather 2019-03-14 20:36:14 hfc8_humidity 57
+setstate Weather 2019-03-14 20:36:14 hfc8_icon sunny
+setstate Weather 2019-03-14 20:36:14 hfc8_iconAPI clear-night
+setstate Weather 2019-03-14 20:36:14 hfc8_ozone 273.44
+setstate Weather 2019-03-14 20:36:14 hfc8_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc8_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc8_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc8_pressure 1031.5
+setstate Weather 2019-03-14 20:36:14 hfc8_pubDate Wed, 27 Feb 2019 04:00
+setstate Weather 2019-03-14 20:36:14 hfc8_temperature 4.9
+setstate Weather 2019-03-14 20:36:14 hfc8_uvIndex 0
+setstate Weather 2019-03-14 20:36:14 hfc8_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc8_wind 4
+setstate Weather 2019-03-14 20:36:14 hfc8_windGust 4
+setstate Weather 2019-03-14 20:36:14 hfc8_wind_condition Wind: NO 4 km/h
+setstate Weather 2019-03-14 20:36:14 hfc8_wind_direction 54
+setstate Weather 2019-03-14 20:36:14 hfc8_wind_speed 4
+setstate Weather 2019-03-14 20:36:14 hfc9_cloudCover 21
+setstate Weather 2019-03-14 20:36:14 hfc9_code 31
+setstate Weather 2019-03-14 20:36:14 hfc9_condition Heiter
+setstate Weather 2019-03-14 20:36:14 hfc9_day_of_week Wed, 05:00
+setstate Weather 2019-03-14 20:36:14 hfc9_dewPoint -3.3
+setstate Weather 2019-03-14 20:36:14 hfc9_humidity 59
+setstate Weather 2019-03-14 20:36:14 hfc9_icon sunny
+setstate Weather 2019-03-14 20:36:14 hfc9_iconAPI clear-night
+setstate Weather 2019-03-14 20:36:14 hfc9_ozone 273.43
+setstate Weather 2019-03-14 20:36:14 hfc9_precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 hfc9_precipProbability 0
+setstate Weather 2019-03-14 20:36:14 hfc9_precipType -
+setstate Weather 2019-03-14 20:36:14 hfc9_pressure 1031.2
+setstate Weather 2019-03-14 20:36:14 hfc9_pubDate Wed, 27 Feb 2019 05:00
+setstate Weather 2019-03-14 20:36:14 hfc9_temperature 4.0
+setstate Weather 2019-03-14 20:36:14 hfc9_uvIndex 0
+setstate Weather 2019-03-14 20:36:14 hfc9_visibility 16.1
+setstate Weather 2019-03-14 20:36:14 hfc9_wind 4
+setstate Weather 2019-03-14 20:36:14 hfc9_windGust 4
+setstate Weather 2019-03-14 20:36:14 hfc9_wind_condition Wind: ONO 4 km/h
+setstate Weather 2019-03-14 20:36:14 hfc9_wind_direction 63
+setstate Weather 2019-03-14 20:36:14 hfc9_wind_speed 4
+setstate Weather 2019-03-14 20:36:14 humidity 56
+setstate Weather 2019-03-14 20:36:14 icon sunny
+setstate Weather 2019-03-14 20:36:14 iconAPI clear-night
+setstate Weather 2019-03-14 20:36:14 lastError 
+setstate Weather 2019-03-14 20:36:14 lat 52.4545
+setstate Weather 2019-03-14 20:36:14 long 13.4545
+setstate Weather 2019-03-14 20:36:14 ozone 276.41
+setstate Weather 2019-03-14 20:36:14 precipIntensity 0
+setstate Weather 2019-03-14 20:36:14 precipProbability 0
+setstate Weather 2019-03-14 20:36:14 pressure 1033
+setstate Weather 2019-03-14 20:36:14 pubDate Tue, 26 Feb 2019 21:55
+setstate Weather 2019-03-14 20:36:14 state T: 10 °C F: 56 % W: 2 km/h P: 1033 hPa
+setstate Weather 2019-03-14 20:36:14 status ok
+setstate Weather 2019-03-14 20:36:14 temp_c 10
+setstate Weather 2019-03-14 20:36:14 temperature 10
+setstate Weather 2019-03-14 20:36:14 timezone Europe/Berlin
+setstate Weather 2019-03-14 20:36:14 uvIndex 0
+setstate Weather 2019-03-14 20:36:14 validity up-to-date
+setstate Weather 2019-03-14 20:36:14 visibility 10
+setstate Weather 2019-03-14 20:36:14 wind 2
+setstate Weather 2019-03-14 20:36:14 windGust 5
+setstate Weather 2019-03-14 20:36:14 wind_condition Wind: O 2 km/h
+setstate Weather 2019-03-14 20:36:14 wind_direction 84
+setstate Weather 2019-03-14 20:36:14 wind_speed 2
 setstate Weather.weblink initialized
 setstate autocreate active
-setstate colorInit 2018-08-25 21:11:31
-setstate colorInit 2018-08-25 21:11:31 state active
+setstate colorInit 2019-03-14 20:36:02
+setstate colorInit 2019-03-14 20:36:02 state active
 setstate dew_all active
 setstate eventTypes active
 setstate global no definition
 setstate lcCinema 2015-01-04 16:22:40 state AllOff
 setstate outdoorNotifier active
-setstate outdoorNotifier 2018-08-25 21:11:31 state active
+setstate outdoorNotifier 2019-03-14 20:36:02 state active
 setstate rg_Guest1 none
-setstate rg_Guest1 2018-08-26 12:31:35 durTimerAbsence 39645:22:15
-setstate rg_Guest1 2018-08-26 12:31:35 durTimerAbsence_cr 2378722
+setstate rg_Guest1 2019-03-14 20:36:17 durTimerAbsence 44454:26:57
+setstate rg_Guest1 2019-03-14 20:36:17 durTimerAbsence_cr 2667267
 setstate rg_Guest1 2015-01-04 16:19:19 durTimerPresence 00:00:00
 setstate rg_Guest1 2015-01-04 16:19:19 durTimerPresence_cr 0
 setstate rg_Guest1 2015-01-04 16:19:19 durTimerSleep 00:00:00
@@ -103,8 +1521,8 @@ setstate rg_Guest1 2014-02-16 14:09:20 presence absent
 setstate rg_Guest1 2014-02-16 14:09:20 state none
 setstate rg_Guest1 2014-02-15 16:16:27 wayhome 0
 setstate rg_Guest2 none
-setstate rg_Guest2 2018-08-26 12:31:35 durTimerAbsence 39645:30:50
-setstate rg_Guest2 2018-08-26 12:31:35 durTimerAbsence_cr 2378731
+setstate rg_Guest2 2019-03-14 20:36:17 durTimerAbsence 44454:35:32
+setstate rg_Guest2 2019-03-14 20:36:17 durTimerAbsence_cr 2667276
 setstate rg_Guest2 2015-01-04 16:19:19 durTimerPresence 00:00:00
 setstate rg_Guest2 2015-01-04 16:19:19 durTimerPresence_cr 0
 setstate rg_Guest2 2015-01-04 16:19:19 durTimerSleep 00:00:00
@@ -127,8 +1545,8 @@ setstate rg_Guest2 2014-02-15 16:16:29 wayhome 0
 setstate rgr_Children home
 setstate rgr_Children 2018-07-15 15:19:54 durTimerAbsence 00:00:00
 setstate rgr_Children 2018-07-15 15:19:54 durTimerAbsence_cr 0
-setstate rgr_Children 2018-08-26 12:31:35 durTimerPresence 39645:00:30
-setstate rgr_Children 2018-08-26 12:31:35 durTimerPresence_cr 2378701
+setstate rgr_Children 2019-03-14 20:36:17 durTimerPresence 44454:05:12
+setstate rgr_Children 2019-03-14 20:36:17 durTimerPresence_cr 2667245
 setstate rgr_Children 2018-07-15 15:19:54 durTimerSleep 00:00:00
 setstate rgr_Children 2018-07-15 15:19:54 durTimerSleep_cr 0
 setstate rgr_Children 2015-01-04 16:19:19 lastActivity gone
@@ -155,8 +1573,8 @@ setstate rgr_Children 2014-02-16 14:58:01 residentsTotalPresent 1
 setstate rgr_Children 2014-02-15 16:16:25 residentsTotalWayhome 0
 setstate rgr_Children 2014-02-17 20:45:12 state home
 setstate rgr_Guests none
-setstate rgr_Guests 2018-08-26 12:31:35 durTimerAbsence 39645:22:15
-setstate rgr_Guests 2018-08-26 12:31:35 durTimerAbsence_cr 2378722
+setstate rgr_Guests 2019-03-14 20:36:17 durTimerAbsence 44454:26:57
+setstate rgr_Guests 2019-03-14 20:36:17 durTimerAbsence_cr 2667267
 setstate rgr_Guests 2018-07-15 15:19:54 durTimerPresence 00:00:00
 setstate rgr_Guests 2018-07-15 15:19:54 durTimerPresence_cr 0
 setstate rgr_Guests 2018-07-15 15:19:54 durTimerSleep 00:00:00
@@ -184,8 +1602,8 @@ setstate rgr_Guests 2014-02-16 14:09:20 state none
 setstate rgr_Parents home
 setstate rgr_Parents 2018-07-15 15:19:54 durTimerAbsence 00:00:00
 setstate rgr_Parents 2018-07-15 15:19:54 durTimerAbsence_cr 0
-setstate rgr_Parents 2018-08-26 12:31:35 durTimerPresence 39645:15:18
-setstate rgr_Parents 2018-08-26 12:31:35 durTimerPresence_cr 2378715
+setstate rgr_Parents 2019-03-14 20:36:17 durTimerPresence 44454:20:00
+setstate rgr_Parents 2019-03-14 20:36:17 durTimerPresence_cr 2667260
 setstate rgr_Parents 2018-07-15 15:19:54 durTimerSleep 00:00:00
 setstate rgr_Parents 2018-07-15 15:19:54 durTimerSleep_cr 0
 setstate rgr_Parents 2015-01-04 16:19:19 lastActivity gone
@@ -214,8 +1632,8 @@ setstate rgr_Parents 2014-02-16 14:16:17 state home
 setstate rgr_Residents home
 setstate rgr_Residents 2018-07-15 15:19:54 durTimerAbsence 00:00:00
 setstate rgr_Residents 2018-07-15 15:19:54 durTimerAbsence_cr 0
-setstate rgr_Residents 2018-08-26 12:31:35 durTimerPresence 39645:15:18
-setstate rgr_Residents 2018-08-26 12:31:35 durTimerPresence_cr 2378715
+setstate rgr_Residents 2019-03-14 20:36:17 durTimerPresence 44454:20:00
+setstate rgr_Residents 2019-03-14 20:36:17 durTimerPresence_cr 2667260
 setstate rgr_Residents 2018-07-15 15:19:54 durTimerSleep 00:00:00
 setstate rgr_Residents 2018-07-15 15:19:54 durTimerSleep_cr 0
 setstate rgr_Residents 2015-01-04 16:19:19 lastActivity gone
@@ -244,8 +1662,8 @@ setstate rgr_Residents 2014-02-16 14:16:17 state home
 setstate rr_Baby home
 setstate rr_Baby 2015-01-04 16:19:19 durTimerAbsence 00:00:00
 setstate rr_Baby 2015-01-04 16:19:19 durTimerAbsence_cr 0
-setstate rr_Baby 2018-08-26 12:31:35 durTimerPresence 39645:01:14
-setstate rr_Baby 2018-08-26 12:31:35 durTimerPresence_cr 2378701
+setstate rr_Baby 2019-03-14 20:36:17 durTimerPresence 44454:05:56
+setstate rr_Baby 2019-03-14 20:36:17 durTimerPresence_cr 2667246
 setstate rr_Baby 2015-01-04 16:19:19 durTimerSleep 00:00:00
 setstate rr_Baby 2015-01-04 16:19:19 durTimerSleep_cr 0
 setstate rr_Baby 2014-02-16 14:30:21 lastArrival 2014-02-16 14:30:21
@@ -262,8 +1680,8 @@ setstate rr_Baby 2014-02-16 14:30:21 presence present
 setstate rr_Baby 2014-02-17 20:45:12 state home
 setstate rr_Baby 2014-02-16 14:30:21 wayhome 0
 setstate rr_Daughter gone
-setstate rr_Daughter 2018-08-26 12:31:35 durTimerAbsence 39644:33:36
-setstate rr_Daughter 2018-08-26 12:31:35 durTimerAbsence_cr 2378674
+setstate rr_Daughter 2019-03-14 20:36:17 durTimerAbsence 44453:38:18
+setstate rr_Daughter 2019-03-14 20:36:17 durTimerAbsence_cr 2667218
 setstate rr_Daughter 2015-01-04 16:19:19 durTimerPresence 00:00:00
 setstate rr_Daughter 2015-01-04 16:19:19 durTimerPresence_cr 0
 setstate rr_Daughter 2015-01-04 16:19:19 durTimerSleep 00:00:00
@@ -284,8 +1702,8 @@ setstate rr_Daughter 2014-02-16 14:57:59 presence absent
 setstate rr_Daughter 2015-01-04 16:19:19 state gone
 setstate rr_Daughter 2014-02-16 13:46:26 wayhome 0
 setstate rr_Father gone
-setstate rr_Father 2018-08-26 12:31:35 durTimerAbsence 39645:04:43
-setstate rr_Father 2018-08-26 12:31:35 durTimerAbsence_cr 2378705
+setstate rr_Father 2019-03-14 20:36:17 durTimerAbsence 44454:09:25
+setstate rr_Father 2019-03-14 20:36:17 durTimerAbsence_cr 2667249
 setstate rr_Father 2015-01-04 16:19:19 durTimerPresence 00:00:00
 setstate rr_Father 2015-01-04 16:19:19 durTimerPresence_cr 0
 setstate rr_Father 2015-01-04 16:19:19 durTimerSleep 00:00:00
@@ -305,8 +1723,8 @@ setstate rr_Father 2014-02-16 13:46:02 wayhome 0
 setstate rr_Mother home
 setstate rr_Mother 2015-01-04 16:19:19 durTimerAbsence 00:00:00
 setstate rr_Mother 2015-01-04 16:19:19 durTimerAbsence_cr 0
-setstate rr_Mother 2018-08-26 12:31:35 durTimerPresence 39645:15:18
-setstate rr_Mother 2018-08-26 12:31:35 durTimerPresence_cr 2378715
+setstate rr_Mother 2019-03-14 20:36:17 durTimerPresence 44454:20:00
+setstate rr_Mother 2019-03-14 20:36:17 durTimerPresence_cr 2667260
 setstate rr_Mother 2015-01-04 16:19:19 durTimerSleep 00:00:00
 setstate rr_Mother 2015-01-04 16:19:19 durTimerSleep_cr 0
 setstate rr_Mother 2014-02-16 14:16:17 lastArrival 2014-02-16 14:16:17
@@ -322,8 +1740,8 @@ setstate rr_Mother 2014-02-16 14:16:17 presence present
 setstate rr_Mother 2014-02-16 14:16:17 state home
 setstate rr_Mother 2014-02-16 13:46:09 wayhome 0
 setstate rr_Son gone
-setstate rr_Son 2018-08-26 12:31:35 durTimerAbsence 39644:33:34
-setstate rr_Son 2018-08-26 12:31:35 durTimerAbsence_cr 2378674
+setstate rr_Son 2019-03-14 20:36:17 durTimerAbsence 44453:38:16
+setstate rr_Son 2019-03-14 20:36:17 durTimerAbsence_cr 2667218
 setstate rr_Son 2015-01-04 16:19:19 durTimerPresence 00:00:00
 setstate rr_Son 2015-01-04 16:19:19 durTimerPresence_cr 0
 setstate rr_Son 2015-01-04 16:19:19 durTimerSleep 00:00:00
@@ -343,8 +1761,8 @@ setstate rr_Son 2014-02-16 14:58:01 mood -
 setstate rr_Son 2014-02-16 14:58:01 presence absent
 setstate rr_Son 2015-01-04 16:19:19 state gone
 setstate rr_Son 2014-02-16 13:46:38 wayhome 0
-setstate sunRise Next: 05:57:09
-setstate sunRise 2018-08-26 08:08:39 state Next: 05:57:09
-setstate sunSet Next: 20:57:55
-setstate sunSet 2018-08-25 21:11:31 state Next: 20:57:55
+setstate sunRise Next: 06:08:52
+setstate sunRise 2019-03-14 20:36:02 state Next: 06:08:52
+setstate sunSet Next: 19:01:04
+setstate sunSet 2019-03-14 20:36:02 state Next: 19:01:04
 setstate wlCinema initialized

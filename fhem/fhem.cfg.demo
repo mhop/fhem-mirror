@@ -1,6 +1,12 @@
-attr global userattr cmdIcon devStateIcon devStateStyle icon lightSceneParamsToSave lightSceneRestoreOnlyIfChanged:1,0 sortby structexclude webCmd webCmdLabel:textField-long widgetOverride
+attr global userattr cmdIcon devStateIcon devStateIcon:textField-long devStateStyle icon lightSceneParamsToSave lightSceneRestoreOnlyIfChanged:1,0 sortby structexclude webCmd webCmdLabel:textField-long widgetOverride
+attr global autoload_undefined_devices 1
 attr global logfile -
 attr global modpath .
+attr global motd SecurityCheck:\
+  WEB is not password protected\
+\
+Protect this FHEM installation by defining an allowed device with define allowed allowed\
+You can disable this message with attr global motd none
 attr global mseclog 1
 attr global room System
 attr global sendStatistics never
@@ -8,6 +14,7 @@ attr global statefile ./demolog/fhem.save
 attr global verbose 3
 
 define WEB FHEMWEB 8083 global
+setuuid WEB 5c8aad22-f33f-c296-41f4-900a80ef379174b0
 attr WEB JavaScripts codemirror/fhem_codemirror.js
 attr WEB defaultRoom Light
 attr WEB iconPath openautomation:fhemSVG:default
@@ -286,62 +293,6 @@ attr WEB styleData {\
    "oTop": 40,\
    "oLeft": 0\
   },\
-  "Pos.Room_System_grp_CUL": {\
-   "left": 0,\
-   "top": 0,\
-   "width": 240,\
-   "height": 40,\
-   "oTop": 20,\
-   "oLeft": 0\
-  },\
-  "Pos.Room_System_grp_FHEMWEB": {\
-   "left": 0,\
-   "top": 60,\
-   "width": 240,\
-   "height": 40,\
-   "oTop": 40,\
-   "oLeft": 0\
-  },\
-  "Pos.Room_System_grp_FileLog": {\
-   "left": 0,\
-   "top": 120,\
-   "width": 240,\
-   "height": 40,\
-   "oTop": 40,\
-   "oLeft": 0\
-  },\
-  "Pos.Room_System_grp_Global": {\
-   "left": 0,\
-   "top": 180,\
-   "width": 240,\
-   "height": 40,\
-   "oTop": 40,\
-   "oLeft": 0\
-  },\
-  "Pos.Room_System_grp_autocreate": {\
-   "left": 0,\
-   "top": 240,\
-   "width": 240,\
-   "height": 40,\
-   "oTop": 40,\
-   "oLeft": 0\
-  },\
-  "Pos.Room_System_grp_eventTypes": {\
-   "left": 0,\
-   "top": 300,\
-   "width": 240,\
-   "height": 40,\
-   "oTop": 40,\
-   "oLeft": 0\
-  },\
-  "Pos.Room_System_grp_logProxy": {\
-   "left": 0,\
-   "top": 380,\
-   "width": 240,\
-   "height": 40,\
-   "oTop": 40,\
-   "oLeft": 0\
-  },\
   "Pos.Room_System_grp_telnet": {\
    "left": 0,\
    "top": 440,\
@@ -356,17 +307,22 @@ attr WEB stylesheetPrefix f18
 
 # Fake FileLog entry, to access the fhem log from FHEMWEB 
 define Logfile FileLog ./log/fhem-%Y-%m.log fakelog
+setuuid Logfile 5c8aad22-f33f-c296-8c0d-98c5ff8e9ecf00af
 attr Logfile room System
 
 define autocreate autocreate
+setuuid autocreate 5c8aad22-f33f-c296-ccc7-ab49c267da2ab3bf
 attr autocreate room System
 define eventTypes eventTypes demolog/eventTypes.txt
+setuuid eventTypes 5c8aad22-f33f-c296-9b03-59d0aff3ff49d9e6
 attr eventTypes room System
 
 define CUL_0 CUL none 0000
+setuuid CUL_0 5c8aad22-f33f-c296-2bee-56e406598d1c40a3
 attr CUL_0 dummy 1
 attr CUL_0 room System
 define Outdoor FS20 1234 11
+setuuid Outdoor 5c8aad22-f33f-c296-448f-809499a804475ca9
 attr Outdoor userattr Light Light_map structexclude
 attr Outdoor IODev CUL_0
 attr Outdoor Light AllLights
@@ -374,6 +330,7 @@ attr Outdoor group Single Lights
 attr Outdoor icon light_outdoor
 attr Outdoor room Light
 define Office FS20 1234 12
+setuuid Office 5c8aad22-f33f-c296-9822-b902b4f1b23ec00f
 attr Office userattr Light Light_map structexclude
 attr Office IODev CUL_0
 attr Office Light AllLights
@@ -382,6 +339,7 @@ attr Office icon light_office
 attr Office model fs20st
 attr Office room Light
 define Livingroom FS20 1234 13
+setuuid Livingroom 5c8aad22-f33f-c296-9461-a036f191992e0581
 attr Livingroom userattr Light Light_map structexclude
 attr Livingroom IODev CUL_0
 attr Livingroom Light AllLights
@@ -392,11 +350,13 @@ attr Livingroom model fs20di
 attr Livingroom room Light
 attr Livingroom webCmd dim
 define AllLights structure Light Alarm Livingroom Office Outdoor CT RGB
+setuuid AllLights 5c8aad22-f33f-c296-9f73-2a4b1f6012884d29
 attr AllLights devStateIcon undefined:light_question
 attr AllLights group Structure
 attr AllLights icon light_light
 attr AllLights room Light
 define Alarm FS20 1234 14
+setuuid Alarm 5c8aad22-f33f-c296-4e09-3b9d81bc5bf1fb01
 attr Alarm userattr Light Light_map structexclude
 attr Alarm IODev CUL_0
 attr Alarm Light AllLights
@@ -406,58 +366,75 @@ attr Alarm icon light_wall_2
 attr Alarm room Light
 attr Alarm webCmd blink 5 1
 define Garden KS300 1234
+setuuid Garden 5c8aad22-f33f-c296-7f9c-3aab33922601740e
 attr Garden IODev CUL_0
 attr Garden group Sensors
 attr Garden room Sensors
 define Log.Garden FileLog demolog/garden.log Sens.Out:T:.*
+setuuid Log.Garden 5c8aad22-f33f-c296-7a58-bf4bc0d271479127
 attr Log.Garden room Sensors
 define Log.Predicted FileLog demolog/predicted.log predicted:T:.*
+setuuid Log.Predicted 5c8aad22-f33f-c296-e7fc-b68b61fdd940b6f7
 attr Log.Predicted room Sensors
 define Cellar CUL_WS 1 -1 -3.5
+setuuid Cellar 5c8aad22-f33f-c296-a243-393eb03db15ff125
 attr Cellar group Sensors
 attr Cellar room Sensors
 define SVG_01_Garden SVG Log.Garden:SVG_01_Garden:CURRENT
+setuuid SVG_01_Garden 5c8aad22-f33f-c296-16fb-872a0ea59fe535a9
 attr SVG_01_Garden label "Temp: Min $data{min1}, Max $data{max1}, Last $data{currval1}"
 attr SVG_01_Garden room Sensors
 attr SVG_01_Garden startDate 2013-08-13
 define Log.Cellar FileLog demolog/cellar.log Cellar:T:.*
+setuuid Log.Cellar 5c8aad22-f33f-c296-81eb-e7836b13fc3fa56c
 attr Log.Cellar room Sensors
 define SVG_02_Cellar SVG Log.Cellar:SVG_02_Cellar:CURRENT
+setuuid SVG_02_Cellar 5c8aad22-f33f-c296-7ae0-05034b857f2ad57c
 attr SVG_02_Cellar label "Temp: Min $data{min1}, Max $data{max1}, Last $data{currval1}"
 attr SVG_02_Cellar room Sensors
 attr SVG_02_Cellar startDate 2013-08-13
 define Log.Dewpoint FileLog demolog/dewpoint.log .*dewpoint.*
+setuuid Log.Dewpoint 5c8aad22-f33f-c296-c880-1f10c5dfdfef9ab3
 attr Log.Dewpoint room Sensors
 define dew_all dewpoint dewpoint .*
+setuuid dew_all 5c8aad22-f33f-c296-7869-c7780f77ca59ffea
 attr dew_all group Helper
 attr dew_all room Sensors
 define SVG_03_Dewpoint SVG Log.Dewpoint:SVG_03_Dewpoint:CURRENT
+setuuid SVG_03_Dewpoint 5c8aad22-f33f-c296-91ca-62432d86a38ef9bc
 attr SVG_03_Dewpoint room Sensors
 attr SVG_03_Dewpoint startDate 2013-08-13
 define logProxy logProxy
+setuuid logProxy 5c8aad22-f33f-c296-3381-5913cb787827f233
 attr logProxy room System
 define SVG_04_Sun SVG logProxy:SVG_04_Sun:CURRENT
+setuuid SVG_04_Sun 5c8aad22-f33f-c296-72fa-41552bf960ea0fc1
 attr SVG_04_Sun fixedrange year
 attr SVG_04_Sun room Sensors
 attr SVG_04_Sun title {"".logProxy_dec2hms($data{min1})." - ".logProxy_dec2hms($data{max1})." - ".logProxy_dec2hms($data{min2})." - ".logProxy_dec2hms($data{max2})}
 define SVG_05_Polar SVG logProxy:SVG_05_Polar:CURRENT
+setuuid SVG_05_Polar 5c8aad22-f33f-c296-20bb-4fa81fdc7a6b84b1
 attr SVG_05_Polar plotsize 340,300
 attr SVG_05_Polar room Sensors
 
 define sunRise at *{sunrise()} set Office on
+setuuid sunRise 5c8aad22-f33f-c296-7f6c-07722941a0f3065d
 attr sunRise group Timer
 attr sunRise icon weather_sunrise
 attr sunRise room Light
 define sunSet at *{sunset()} set Office off
+setuuid sunSet 5c8aad22-f33f-c296-835e-1d300e4714eac36c
 attr sunSet group Timer
 attr sunSet icon weather_sunset
 attr sunSet room Light
 define outdoorNotifier notify Outdoor:.* set Office $EVENT
+setuuid outdoorNotifier 5c8aad22-f33f-c296-e45b-1227d9e21dd2210c
 attr outdoorNotifier group Notify
 attr outdoorNotifier icon light_ceiling_light
 attr outdoorNotifier room Light
 
 define Projector dummy
+setuuid Projector 5c8aad22-f33f-c296-652b-60b56474ac12d269
 attr Projector userattr lightSceneParamsToSave lightSceneRestoreOnlyIfChanged:1,0
 attr Projector devStateIcon on:control_on_off:off off:control_home:on
 attr Projector group AV
@@ -465,6 +442,7 @@ attr Projector room Cinema
 attr Projector setList on:noArg off:noArg
 attr Projector webCmd on:off
 define TV dummy
+setuuid TV 5c8aad22-f33f-c296-a062-53ab133aae76310d
 attr TV userattr lightSceneParamsToSave lightSceneRestoreOnlyIfChanged:1,0
 attr TV devStateIcon on:control_on_off:off off:control_home:on
 attr TV group AV
@@ -472,6 +450,7 @@ attr TV room Cinema
 attr TV setList on:noArg off:noArg
 attr TV webCmd on:off
 define Screen dummy
+setuuid Screen 5c8aad22-f33f-c296-6172-9c8fb92428f18164
 attr Screen userattr lightSceneParamsToSave lightSceneRestoreOnlyIfChanged:1,0
 attr Screen devStateIcon down:fts_garage_door_100:up up:fts_garage_door_10:down
 attr Screen group AV
@@ -479,6 +458,7 @@ attr Screen room Cinema
 attr Screen setList up:noArg down:noArg
 attr Screen webCmd down:up
 define CeilingLight FS20 0001 01
+setuuid CeilingLight 5c8aad22-f33f-c296-f0a6-5f36dd3d4f01415f
 attr CeilingLight userattr lightSceneParamsToSave lightSceneRestoreOnlyIfChanged:1,0
 attr CeilingLight IODev CUL_0
 attr CeilingLight eventMap off:dim0% on:dim100%
@@ -488,6 +468,7 @@ attr CeilingLight model dummyDimmer
 attr CeilingLight room Cinema
 attr CeilingLight webCmd on:off:dim
 define ReadingLight FS20 0001 02
+setuuid ReadingLight 5c8aad22-f33f-c296-de16-adf543ac3227eb6d
 attr ReadingLight userattr lightSceneParamsToSave lightSceneRestoreOnlyIfChanged:1,0
 attr ReadingLight IODev CUL_0
 attr ReadingLight eventMap off:dim0% on:dim100%
@@ -496,8 +477,10 @@ attr ReadingLight icon light_floor_lamp
 attr ReadingLight room Cinema
 attr ReadingLight webCmd on:off:dim:dim 50
 define wlCinema weblink htmlCode {LightScene_2html("lcCinema")}
+setuuid wlCinema 5c8aad22-f33f-c296-6eec-207994edc4ceeea9
 attr wlCinema room Cinema
 define lcCinema LightScene Projector Screen TV CeilingLight ReadingLight
+setuuid lcCinema 5c8aad22-f33f-c296-f172-e3c8af0ebddc3b24
 attr lcCinema alias Scenes
 attr lcCinema devStateIcon AllOff:control_home Break:rc_PAUSE Cinema:scene_cinema WatchTV:it_television
 attr lcCinema group Control
@@ -506,6 +489,7 @@ attr lcCinema room Cinema
 attr lcCinema webCmd scene
 
 define rgr_Residents RESIDENTS
+setuuid rgr_Residents 5c8aad22-f33f-c296-9f6e-d7c06ff9e978a875
 attr rgr_Residents alias Residents
 attr rgr_Residents devStateIcon .*home:status_available:absent .*absent:status_away_1:home .*gone:status_standby:home .*none:control_building_empty .*gotosleep:status_night:asleep .*asleep:status_night:awoken .*awoken:status_available:home
 attr rgr_Residents group Home State
@@ -514,6 +498,7 @@ attr rgr_Residents room Residents
 attr rgr_Residents sortby 2
 attr rgr_Residents webCmd state
 define rgr_Parents RESIDENTS
+setuuid rgr_Parents 5c8aad22-f33f-c296-8544-d47dbd7349ad5154
 attr rgr_Parents alias Parents
 attr rgr_Parents devStateIcon .*home:status_available:absent .*absent:status_away_1:home .*gone:status_standby:home .*none:control_building_empty .*gotosleep:status_night:asleep .*asleep:status_night:awoken .*awoken:status_available:home
 attr rgr_Parents group Home State
@@ -522,6 +507,7 @@ attr rgr_Parents room Residents
 attr rgr_Parents sortby 2
 attr rgr_Parents webCmd state
 define rgr_Children RESIDENTS
+setuuid rgr_Children 5c8aad22-f33f-c296-d031-a3670b93d66b0df1
 attr rgr_Children alias Children
 attr rgr_Children devStateIcon .*home:status_available:absent .*absent:status_away_1:home .*gone:status_standby:home .*none:control_building_empty .*gotosleep:status_night:asleep .*asleep:status_night:awoken .*awoken:status_available:home
 attr rgr_Children group Home State
@@ -530,6 +516,7 @@ attr rgr_Children room Residents
 attr rgr_Children sortby 3
 attr rgr_Children webCmd state
 define rgr_Guests RESIDENTS
+setuuid rgr_Guests 5c8aad22-f33f-c296-682c-2f6eec7e6b45b373
 attr rgr_Guests alias Guests
 attr rgr_Guests devStateIcon .*home:status_available:absent .*absent:status_away_1:home .*gone:status_standby:home .*none:control_building_empty .*gotosleep:status_night:asleep .*asleep:status_night:awoken .*awoken:status_available:home
 attr rgr_Guests group Home State
@@ -538,6 +525,7 @@ attr rgr_Guests room Residents
 attr rgr_Guests sortby 4
 attr rgr_Guests webCmd state
 define rg_Guest1 GUEST rgr_Residents,rgr_Guests
+setuuid rg_Guest1 5c8aad22-f33f-c296-6863-0e7ebe5915eb9650
 attr rg_Guest1 alias Guest1
 attr rg_Guest1 devStateIcon .*home:user_available:absent .*absent:user_away:home .*none:control_building_empty:home .*gotosleep:scene_toilet:asleep .*asleep:scene_sleeping:awoken .*awoken:scene_sleeping_alternat:home .*:user_unknown
 attr rg_Guest1 group Guests
@@ -548,6 +536,7 @@ attr rg_Guest1 room Residents
 attr rg_Guest1 sortby 1
 attr rg_Guest1 webCmd state
 define rg_Guest2 GUEST rgr_Residents,rgr_Guests
+setuuid rg_Guest2 5c8aad22-f33f-c296-f3bd-8fba2c0c3935c5ed
 attr rg_Guest2 alias Guest2
 attr rg_Guest2 devStateIcon .*home:user_available:absent .*absent:user_away:home .*none:control_building_empty:home .*gotosleep:scene_toilet:asleep .*asleep:scene_sleeping:awoken .*awoken:scene_sleeping_alternat:home .*:user_unknown
 attr rg_Guest2 group Guests
@@ -558,6 +547,7 @@ attr rg_Guest2 room Residents
 attr rg_Guest2 sortby 1
 attr rg_Guest2 webCmd state
 define rr_Father ROOMMATE rgr_Residents,rgr_Parents
+setuuid rr_Father 5c8aad22-f33f-c296-729e-ae6ad0649b98055d
 attr rr_Father alias Status
 attr rr_Father devStateIcon .*home:user_available:absent .*absent:user_away:home .*gone:user_ext_away:home .*gotosleep:scene_toilet:asleep .*asleep:scene_sleeping:awoken .*awoken:scene_sleeping_alternat:home .*:user_unknown
 attr rr_Father group Father
@@ -567,6 +557,7 @@ attr rr_Father rr_autoGoneAfter 0.1
 attr rr_Father sortby 0
 attr rr_Father webCmd state
 define rr_Mother ROOMMATE rgr_Residents,rgr_Parents
+setuuid rr_Mother 5c8aad22-f33f-c296-0a3f-b4c20c1bee0c0b72
 attr rr_Mother alias Status
 attr rr_Mother devStateIcon .*home:user_available:absent .*absent:user_away:home .*gone:user_ext_away:home .*gotosleep:scene_toilet:asleep .*asleep:scene_sleeping:awoken .*awoken:scene_sleeping_alternat:home .*:user_unknown
 attr rr_Mother group Mother
@@ -577,6 +568,7 @@ attr rr_Mother rr_passPresenceTo rr_Baby
 attr rr_Mother sortby 0
 attr rr_Mother webCmd state
 define rr_Daughter ROOMMATE rgr_Residents,rgr_Children
+setuuid rr_Daughter 5c8aad22-f33f-c296-a4ef-b6f7c16798aff93c
 attr rr_Daughter alias Status
 attr rr_Daughter devStateIcon .*home:user_available:absent .*absent:user_away:home .*gone:user_ext_away:home .*gotosleep:scene_toilet:asleep .*asleep:scene_sleeping:awoken .*awoken:scene_sleeping_alternat:home .*:user_unknown
 attr rr_Daughter group Daughter
@@ -585,6 +577,7 @@ attr rr_Daughter room Residents
 attr rr_Daughter sortby 0
 attr rr_Daughter webCmd state
 define rr_Son ROOMMATE rgr_Residents,rgr_Children
+setuuid rr_Son 5c8aad22-f33f-c296-a0f4-9a5626678ffc24ec
 attr rr_Son alias Status
 attr rr_Son devStateIcon .*home:user_available:absent .*absent:user_away:home .*gone:user_ext_away:home .*gotosleep:scene_toilet:asleep .*asleep:scene_sleeping:awoken .*awoken:scene_sleeping_alternat:home .*:user_unknown
 attr rr_Son group Son
@@ -593,10 +586,13 @@ attr rr_Son room Residents
 attr rr_Son sortby 0
 attr rr_Son webCmd state
 define AllResidentsAway notify rgr_Residents:(absent|gone) set AllLights off;;set lcCinema scene AllOff
+setuuid AllResidentsAway 5c8aad22-f33f-c296-e4ac-f94c2fe0fd5efb03
 attr AllResidentsAway room Residents
 define ResidentsComeHome notify rgr_Residents:home set Outdoor on
+setuuid ResidentsComeHome 5c8aad22-f33f-c296-97c8-fdb79bc177f74438
 attr ResidentsComeHome room Residents
 define rr_Baby ROOMMATE rgr_Residents,rgr_Children
+setuuid rr_Baby 5c8aad22-f33f-c296-6029-997051403c22c0c4
 attr rr_Baby alias Status
 attr rr_Baby devStateIcon .*home:user_available:absent .*absent:user_away:home .*gone:user_ext_away:home .*gotosleep:scene_toilet:asleep .*asleep:scene_sleeping:awoken .*awoken:scene_sleeping_alternat:home .*:user_unknown
 attr rr_Baby group Baby
@@ -605,6 +601,7 @@ attr rr_Baby room Residents
 attr rr_Baby sortby 0
 attr rr_Baby webCmd state
 define RGB readingsProxy RGB
+setuuid RGB 5c8aad22-f33f-c296-a871-85b8dd81f8e7aabf
 attr RGB userattr Light Light_map structexclude
 attr RGB Light AllLights
 attr RGB alias RGB Light
@@ -616,8 +613,10 @@ attr RGB setFn {if( $CMD =~ m/on|off/ ) { $ARGS=$CMD;;$CMD = "state" } else {fhe
 attr RGB setList on:noArg off:noArg rgb:colorpicker,RGB hue:colorpicker,HUE,0,1,359
 attr RGB webCmd hue:rgb:rgb ff0000:rgb 00ff00:rgb 0000ff:rgb ffffff:on:off
 define colorInit notify global:INITIALIZED {use Color;;Color_Initialize()}
+setuuid colorInit 5c8aad22-f33f-c296-a391-7c475dff00d86b9e
 attr colorInit room hidden
 define CT readingsProxy CT
+setuuid CT 5c8aad22-f33f-c296-fe93-1dce5d1aa9faa3ca
 attr CT userattr Light Light_map structexclude
 attr CT Light AllLights
 attr CT alias CT Light
@@ -632,8 +631,10 @@ attr CT setList on:noArg off:noArg ct:colorpicker,CT,2000,1,6500
 attr CT webCmd ct::ct 2040:ct 2630:ct 3703:ct 6250:on:off
 
 define Weather Weather apikey=demo location=52.4545,13.4545
+setuuid Weather 5c8aad22-f33f-c296-1452-823d9aca96945d57
 attr Weather room Weather
 
 define Weather.weblink weblink htmlCode { WeatherAsHtmlH("Weather") }
+setuuid Weather.weblink 5c8aad22-f33f-c296-4c92-75841c119c9b8503
 attr Weather.weblink alias Weather Forecast
 attr Weather.weblink room Weather
