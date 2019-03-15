@@ -27,7 +27,7 @@ TechemWZ_Initialize(@) {
 
   # require "Broker.pm";
   
-  $hash->{Match}      = "^b..446850[\\d]{8}..(?:43|62|72).*";
+  $hash->{Match}      = "^b..446850[\\d]{8}..(?:43|45|62|72).*";
 
   $hash->{DefFn}      = "TechemWZ_Define";
   $hash->{UndefFn}    = "TechemWZ_Undef";
@@ -225,7 +225,7 @@ TechemWZ_Parse(@) {
     $message->{lastVal} /= 10;
     $message->{actualVal} /= 10;
     $message->{meter} = $message->{lastVal} + $message->{actualVal};
-  } elsif ($message->{type} =~ /43/) {
+  } elsif ($message->{type} =~ /43|45/) {
     $message->{lastVal} = TechemWZ_WMZ_Type1_ParseLastPeriod(@m);
     $message->{actualVal} = TechemWZ_WMZ_Type1_ParseActualPeriod(@m);
     ($message->{actual}->{year}, $message->{actual}->{month}, $message->{actual}->{day}) = TechemWZ_WMZ_Type1_ParseActualDate(@m);
@@ -455,6 +455,8 @@ TechemWZ_crc16_13757(@) {
 1;
 
 =pod
+=item summary This module reads the transmission of techem volume data meter.
+=item summary_DE Das modul empfängt Daten von Techem Volumenzählern.
 =begin html
 
 <a name="TechemWZ"></a>
@@ -527,7 +529,6 @@ TechemWZ_crc16_13757(@) {
   </ul>
 </ul>
 =end html
-
 =begin html_DE
 
 <a name="TechemWZ"></a>
@@ -598,7 +599,5 @@ TechemWZ_crc16_13757(@) {
     <br>
   </ul>
 </ul>
-
 =end html_DE
 =cut
-
