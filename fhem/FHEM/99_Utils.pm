@@ -244,6 +244,27 @@ round($$)
   return sprintf("%.${n}f",$v);
 }
 
+sub
+sortTopicNum(@)
+{
+  my ($sseq,@nums) = @_;
+
+  my @sorted = map {$_->[0]}
+               sort {$a->[1] cmp $b->[1]}
+               map {[$_, pack "C*", split /\./]} @nums;
+
+  @sorted = map {join ".", unpack "C*", $_}
+            sort
+            map {pack "C*", split /\./} @nums;
+
+  if($sseq eq "desc") {
+      @sorted = reverse @sorted;
+  }
+
+  return @sorted;
+}
+
+
 1;
 
 =pod
@@ -330,6 +351,11 @@ round($$)
       return ($error, $value), stored previously by setKeyValue.
       $error is set if there was an error.  Both are undef, if there is no
       value yet for this key.
+      </li></br>
+
+    <li><b>sortTopicNum("asc"|"desc",<list of numbers>)</b><br>
+      sort an array of numbers like x.x.x<br>
+      (Forum #98578)
       </li></br>
 
   </ul>
