@@ -32,7 +32,7 @@
 # https://api.openweathermap.org/data/2.5/forecast?lat=[lat]&lon=[long]&APPID=[API]   Forecast
 # https://openweathermap.org/weather-conditions     Icons und Conditions ID's
 
-package OpenWeatherMapAPI::Weather;
+package FHEM::OpenWeatherMapAPI::Weather;
 use strict;
 use warnings;
 
@@ -48,7 +48,7 @@ eval "use Encode qw(encode_utf8);1" or $missingModul .= "Encode ";
 # use Data::Dumper;    # for Debug only
 ## API URL
 use constant URL => 'https://api.openweathermap.org/data/2.5/';
-use constant VERSION => '0.2.3';
+use constant VERSION => '0.2.4';
 ## URL . 'weather?' for current data
 ## URL . 'forecast?' for forecast data
 
@@ -264,12 +264,12 @@ sub _ProcessingRetrieveData($$) {
 #                 print 'Response: ' . Dumper $data;
                 ###### Ab hier wird die ResponseHash Referenze für die Rückgabe zusammen gestellt
                 $self->{cached}->{current_date_time} =
-                encode_utf8(strftime( "%a, %e %b %Y %H:%M",
-                    localtime( $self->{fetchTime} ) ));
+                strftimeWrapper( "%a, %e %b %Y %H:%M",
+                    localtime( $self->{fetchTime} ) );
 
                 if ( $self->{endpoint} eq 'weather' ) {
                     $self->{cached}->{country}       = $data->{sys}->{country};
-                    $self->{cached}->{city}          = $data->{name};
+                    $self->{cached}->{city}          = encode_utf8($data->{name});
                     $self->{cached}->{license}{text} = 'none';
                     $self->{cached}->{current}       = {
                         'temperature' => int(
@@ -311,18 +311,18 @@ sub _ProcessingRetrieveData($$) {
                             int( sprintf( "%.1f", $data->{visibility} ) + 0.5 ),
                         'code'       => $codes{ $data->{weather}->[0]->{id} },
                         'iconAPI'    => $data->{weather}->[0]->{icon},
-                        'sunsetTime' => encode_utf8(strftime(
+                        'sunsetTime' => strftimeWrapper(
                             "%a, %e %b %Y %H:%M",
                             localtime( $data->{sys}->{sunset} )
-                        )),
-                        'sunriseTime' => encode_utf8(strftime(
+                        ),
+                        'sunriseTime' => strftimeWrapper(
                             "%a, %e %b %Y %H:%M",
                             localtime( $data->{sys}->{sunrise} )
-                        )),
-                        'pubDate' => encode_utf8(strftime(
+                        ),
+                        'pubDate' => strftimeWrapper(
                             "%a, %e %b %Y %H:%M",
                             localtime( $data->{dt} )
-                        )),
+                        ),
                     };
                 }
 
@@ -338,12 +338,12 @@ sub _ProcessingRetrieveData($$) {
                             push(
                                 @{ $self->{cached}->{forecast}->{hourly} },
                                 {
-                                    'pubDate' => encode_utf8(strftime(
+                                    'pubDate' => strftimeWrapper(
                                         "%a, %e %b %Y %H:%M",
                                         localtime(
                                             ( $data->{list}->[$i]->{dt} ) - 3600
                                         )
-                                    )),
+                                    ),
                                     'day_of_week' => strftime(
                                         "%a, %H:%M",
                                         localtime(
@@ -472,7 +472,7 @@ sub _ErrorHandling($$) {
     my ( $self, $err ) = @_;
 
     $self->{cached}->{current_date_time} =
-      encode_utf8(strftime( "%a, %e %b %Y %H:%M", localtime( $self->{fetchTime} ) )),
+      strftimeWrapper( "%a, %e %b %Y %H:%M", localtime( $self->{fetchTime} ) ),
       $self->{cached}->{status} = $err;
     $self->{cached}->{validity} = 'stale';
 }
@@ -491,6 +491,25 @@ sub _CreateForecastRef($) {
     );
 
     return $forecastRef;
+}
+
+sub strftimeWrapper(@) {
+    my $string = POSIX::strftime(@_);
+
+    $string =~ s/\xe4/ä/g;
+    $string =~ s/\xc4/Ä/g;
+    $string =~ s/\xf6/ö/g;
+    $string =~ s/\xd6/Ö/g;
+    $string =~ s/\xfc/ü/g;
+    $string =~ s/\xdc/Ü/g;
+    $string =~ s/\xdf/ß/g;
+    $string =~ s/\xdf/ß/g;
+    $string =~ s/\xe1/á/g;
+    $string =~ s/\xe9/é/g;
+    $string =~ s/\xc1/Á/g;
+    $string =~ s/\xc9/É/g;
+
+    return $string;
 }
 
 ##############################################################################

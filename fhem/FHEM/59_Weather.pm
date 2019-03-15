@@ -5,6 +5,11 @@
 #     Copyright by Dr. Boris Neubert
 #     e-mail: omega at online dot de
 #
+#       Contributors:
+#         - Marko Oldenburg (CoolTux)
+#         - Lippie
+#
+#
 #     This file is part of fhem.
 #
 #     Fhem is free software: you can redistribute it and/or modify
@@ -664,7 +669,7 @@ sub Weather_Define($$) {
     readingsSingleUpdate( $hash, 'state', 'Initialized', 1 );
     Weather_LanguageInitialize( $hash->{LANG} );
 
-    my $apistring = $api . '::Weather';
+    my $apistring = 'FHEM::' . $api . '::Weather';
     $hash->{fhem}->{api} = $apistring->new(
         {
             devName    => $hash->{NAME},
@@ -709,10 +714,17 @@ sub WeatherIconIMGTag($) {
 #####################################
 
 sub WeatherAsHtmlV($;$$) {
-    my ( $d, $items, $f ) = @_;
+    my ( $d, $op1, $op2 ) = @_;
+    my $items = $op2;
+    my $f = $op1;
+    if($op1 =~ /[0-9]/g){ $items = $op1; }
+    if($op2 =~ /[dh]/g){ $f = $op2; }
 
-    $d     = "<none>" if ( !$d );
-    $items = 6        if ( !$items );
+    $f =~ tr/dh/./cd;
+    $f = "h" if ( !$f || length($f) > 1);
+    $items =~ tr/0-9/./cd;
+    $items = 6   if ( !$items );
+    
     return "$d is not a Weather instance<br>"
       if ( !$defs{$d} || $defs{$d}->{TYPE} ne "Weather" );
 
@@ -749,32 +761,61 @@ sub WeatherAsHtmlV($;$$) {
     );
 
     for ( my $i = 1 ; $i < $items ; $i++ ) {
-        $ret .= sprintf(
-'<tr><td class="weatherIcon" width=%d>%s</td><td class="weatherValue"><span class="weatherDay">%s: %s</span><br><span class="weatherMin">min %s°C</span> <span class="weatherMax">max %s°C</span></td></tr>',
-            $width,
-            WeatherIconIMGTag( ReadingsVal( $d, "${fc}${i}_icon", "" ) ),
-            ReadingsVal( $d, "${fc}${i}_day_of_week", "" ),
-            ReadingsVal( $d, "${fc}${i}_condition",   "" ),
-            ReadingsVal( $d, "${fc}${i}_low_c",       " - " ),
-            ReadingsVal( $d, "${fc}${i}_high_c",      " - " )
-        );
+        if(defined($h->{READINGS}->{"${fc}${i}_low_c"}) and $h->{READINGS}->{"${fc}${i}_low_c"}){
+            $ret .= sprintf(
+    '<tr><td class="weatherIcon" width=%d>%s</td><td class="weatherValue"><span class="weatherDay">%s: %s</span><br><span class="weatherMin">min %s°C</span> <span class="weatherMax">max %s°C</span><br>%s</td></tr>',
+                $width,
+                WeatherIconIMGTag( ReadingsVal( $d, "${fc}${i}_icon", "" ) ),
+                ReadingsVal( $d, "${fc}${i}_day_of_week", "" ),
+                ReadingsVal( $d, "${fc}${i}_condition",   "" ),
+                ReadingsVal( $d, "${fc}${i}_low_c",       " - " ),
+                ReadingsVal( $d, "${fc}${i}_high_c",      " - " ),
+                ReadingsVal( $d, "${fc}${i}_wind_condition",      " - " )
+            );
+        }else{
+            $ret .= sprintf(
+      '<tr><td class="weatherIcon" width=%d>%s</td><td class="weatherValue"><span class="weatherDay">%s: %s</span><br><span class="weatherTemp"> %s°C</span><br>%s</td></tr>',
+                $width,
+                WeatherIconIMGTag( ReadingsVal( $d, "${fc}${i}_icon", "" ) ),
+                ReadingsVal( $d, "${fc}${i}_day_of_week", "" ),
+                ReadingsVal( $d, "${fc}${i}_condition",   "" ),
+                ReadingsVal( $d, "${fc}${i}_temperature",       " - " ),
+                ReadingsVal( $d, "${fc}${i}_wind_condition",      " - " )
+            );
+        }
     }
 
     $ret .= "</table>";
     return $ret;
 }
 
-sub WeatherAsHtml($;$) {
-    my ( $d, $i ) = @_;
+sub WeatherAsHtml($;$$) {
+    my ( $d, $op1, $op2 ) = @_;
+    my $items = $op2;
+    my $f = $op1;
+    if($op1 =~ /[0-9]/g){ $items = $op1; }
+    if($op2 =~ /[dh]/g){ $f = $op2; }
 
-    WeatherAsHtmlV( $d, $i );
+    $f =~ tr/dh/./cd;
+    $f = "h" if ( !$f || length($f) > 1);
+    $items =~ tr/0-9/./cd;
+    $items = 6   if ( !$items );
+
+    WeatherAsHtmlV( $d, $f, $items );
 }
 
 sub WeatherAsHtmlH($;$$) {
-    my ( $d, $items, $f ) = @_;
-
-    $d     = "<none>" if ( !$d );
-    $items = 6        if ( !$items );
+    my ( $d, $op1, $op2 ) = @_;
+    my $items = $op2;
+    my $f = $op1;
+    if($op1 =~ /[0-9]/g){ $items = $op1; }
+    if($op2 =~ /[dh]/g){ $f = $op2; }
+    
+    $f =~ tr/dh/./cd;
+    $f = "h" if ( !$f || length($f) > 1);
+    $items =~ tr/0-9/./cd;
+    $items = 6   if ( !$items );
+    
     return "$d is not a Weather instance<br>"
       if ( !$defs{$d} || $defs{$d}->{TYPE} ne "Weather" );
 
@@ -832,31 +873,50 @@ sub WeatherAsHtmlH($;$$) {
         ReadingsVal( $d, "humidity", "" )
     );
     for ( my $i = 1 ; $i < $items ; $i++ ) {
-        $ret .= sprintf( '<td class="weatherMin">min %s°C</td>',
-            ReadingsVal( $d, "${fc}${i}_low_c", " - " ) );
+        if(defined($h->{READINGS}->{"${fc}${i}_low_c"}) and $h->{READINGS}->{"${fc}${i}_low_c"}){
+            $ret .= sprintf( '<td class="weatherMin">min %s°C</td>',
+                ReadingsVal( $d, "${fc}${i}_low_c", " - " ) );
+        }
+        else {
+            $ret .= sprintf( '<td class="weatherMin"> %s°C</td>',
+              ReadingsVal( $d, "${fc}${i}_temperature", " - " ) );
+        }
     }
+    
     $ret .= '</tr>';
 
     # wind | max
     $ret .= sprintf( '<tr><td class="weatherMax">%s</td>',
         ReadingsVal( $d, "wind_condition", "" ) );
     for ( my $i = 1 ; $i < $items ; $i++ ) {
-        $ret .= sprintf( '<td class="weatherMax">max %s°C</td>',
-            ReadingsVal( $d, "${fc}${i}_high_c", " - " ) );
+        if(defined($h->{READINGS}->{"${fc}${i}_high_c"}) and $h->{READINGS}->{"${fc}${i}_high_c"}){
+            $ret .= sprintf( '<td class="weatherMax">max %s°C</td>',
+              ReadingsVal( $d, "${fc}${i}_high_c", " - " ) );
+        }
     }
+    
     $ret .= "</tr></table>";
 
     return $ret;
 }
 
-sub WeatherAsHtmlD($;$) {
-    my ( $d, $i ) = @_;
+sub WeatherAsHtmlD($;$$) {
+    my ( $d, $op1, $op2 ) = @_;
+    my $items = $op2;
+    my $f = $op1;
+    if($op1 =~ /[0-9]/g){ $items = $op1; }
+    if($op2 =~ /[dh]/g){ $f = $op2; }
+
+    $f =~ tr/dh/./cd;
+    $f = "h" if ( !$f || length($f) > 1);
+    $items =~ tr/0-9/./cd;
+    $items = 6   if ( !$items );
 
     if ($FW_ss) {
-        WeatherAsHtmlV( $d, $i );
+        WeatherAsHtmlV( $d, $f , $items);
     }
     else {
-        WeatherAsHtmlH( $d, $i );
+        WeatherAsHtmlH( $d, $f , $items);
     }
 }
 
@@ -957,7 +1017,7 @@ sub WeatherAsHtmlD($;$) {
     to limit the numer of icons to display.<br><br>
     Example:
     <pre>
-      define MyWeatherWeblink weblink htmlCode { WeatherAsHtmlH("MyWeather") }
+      define MyWeatherWeblink weblink htmlCode { WeatherAsHtmlH("MyWeather","h",10) }
     </pre>
 
 
@@ -1130,7 +1190,7 @@ sub WeatherAsHtmlD($;$) {
     Wird der dritte Parameter verwendet muss auch der zweite Parameter f&uuml;r die Anzahl der darzustellenden Icons gesetzt werden.<br><br>
     Beispiel:
     <pre>
-      define MyWeatherWeblink weblink htmlCode { WeatherAsHtmlH("MyWeather") }
+      define MyWeatherWeblink weblink htmlCode { WeatherAsHtmlH("MyWeather","h",10) }
     </pre>
 
   </ul>
