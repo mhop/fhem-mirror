@@ -3062,17 +3062,40 @@ sub MSwitch_checkbridge($$$) {
  my ( $hash, $name, $event ) = @_;
  my $bridgemode  = AttrVal( $name, 'MSwitch_Event_Id_Distributor', '0' );
  my $expertmode  = AttrVal( $name, 'MSwitch_Expert', '0' );
+ 
+ 
+MSwitch_LOG( $name, 6, "starte distributor attr " );
+MSwitch_LOG( $name, 6, "expertmode $expertmode" );
+MSwitch_LOG( $name, 6, "bridgemode $bridgemode " );
+MSwitch_LOG( $name, 6, "event  : -$event-" );
+MSwitch_LOG( $name, 6, "checke keys" );
+my $foundkey ="undef";
+my $etikeys= $hash->{helper}{eventtoid};
+foreach my $a ( sort keys %{$etikeys} ) 
+{
+   MSwitch_LOG( $name, 6, "key : $a" );
+   my $re = qr/$a/;
+   $foundkey = $a if ( $event =~ /$re/ );
+   MSwitch_LOG( $name, 6, "foundkey :-$foundkey-" );
+}
+
+MSwitch_LOG( $name, 6, "suche nach schlüssel:-$event-" );
+MSwitch_LOG( $name, 6, "helper eventoid : ".$hash->{helper}{eventtoid}{$foundkey} );
+	 
  return "no_bridge" if $expertmode eq "0";
  return "no_bridge" if $bridgemode eq "0";
- return "no_bridge" if !defined $hash->{helper}{eventtoid}{$event};
- my @bridge = split(/ /,$hash->{helper}{eventtoid}{$event});
+ # return "no_bridge" if !defined $hash->{helper}{eventtoid}{$event};
+ return "no_bridge" if !defined $hash->{helper}{eventtoid}{$foundkey};
+ my @bridge = split(/ /,$hash->{helper}{eventtoid}{$foundkey});
  my $zweig ;
+ 
  $zweig = "on" if $bridge[0] eq "cmd1";
  $zweig = "off" if $bridge[0] eq "cmd2";
+ 
+ MSwitch_LOG( $name, 6, "distrubutorout: $bridge[2] " );
  MSwitch_Exec_Notif( $hash, $zweig, 'nocheck', '', $bridge[2] );
 return "undef";
 }
-
 ############################
 sub MSwitch_fhemwebFn($$$$) {
 
