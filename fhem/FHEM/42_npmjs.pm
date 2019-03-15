@@ -1078,23 +1078,27 @@ sub RetrieveNpmOutput($$) {
         # Final parsing error
         else {
             if ($o) {
+                my $runningUser = getpwuid($<);
                 if ( $o =~ m/Permission.denied.\(publickey\)\.?\r?\n?$/i ) {
                     $h->{error}{code} = "E403";
                     $h->{error}{summary} =
                         "Forbidden - None of the SSH keys from ~/.ssh/ "
                       . "were authorized to access remote host";
-                    $h->{error}{detail} = $o;
+                    $h->{error}{detail} = "<pre>$o</pre>";
                 }
                 elsif ( $o =~ m/^sudo: /i ) {
                     $h->{error}{code} = "E403";
                     $h->{error}{summary} =
                       "Forbidden - " . "passwordless sudo permissions required";
                     $h->{error}{detail} =
-                        $o . "\n\n"
-                      . "You may add the following lines to /etc/sudoers.d/fhem:\n"
-                      . "  fhem ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm update *\n"
-                      . "  fhem ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm install *\n"
-                      . "  fhem ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm uninstall *";
+                        $o
+                      . "<br /><br />"
+                      . "You may add the following lines to /etc/sudoers.d/$runningUser:\n"
+                      . "<pre>"
+                      . "  $runningUser ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm update *\n"
+                      . "  $runningUser ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm install *\n"
+                      . "  $runningUser ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm uninstall *"
+                      . "</pre>";
                 }
                 elsif ( $o =~
                     m/(?:(\w+?): )?(?:(\w+? \d+): )?(\w+?): [^:]*?not.found$/i
@@ -1104,18 +1108,18 @@ m/(?:(\w+?): )?(?:(\w+? \d+): )?(\w+?): [^:]*?No.such.file.or.directory$/i
                 {
                     $h->{error}{code}    = "E404";
                     $h->{error}{summary} = "Not Found - $3 is not installed";
-                    $h->{error}{detail}  = $o;
+                    $h->{error}{detail}  = "<pre>$o</pre>";
                 }
                 else {
                     $h->{error}{code}    = "E501";
                     $h->{error}{summary} = "Parsing error - " . $@;
-                    $h->{error}{detail}  = $p;
+                    $h->{error}{detail}  = "<pre>$p</pre>";
                 }
             }
             else {
                 $h->{error}{code}    = "E500";
                 $h->{error}{summary} = "Parsing error - " . $@;
-                $h->{error}{detail}  = $p;
+                $h->{error}{detail}  = "<pre>$p</pre>";
             }
         }
     }
@@ -1327,10 +1331,10 @@ sub CreateErrorList($) {
         $ret .= "<td></td>";
         $ret .= '</tr>';
         $ret .= '<tr class="odd">';
-        $ret .= "<td>Summary:\n$error->{summary}\n\n</td>";
+        $ret .= "<td><b>Summary:</b><br />$error->{summary}</td>";
         $ret .= '</tr>';
         $ret .= '<tr class="even">';
-        $ret .= "<td>Detail:\n$error->{detail}</td>";
+        $ret .= "<td><b>Detail:</b><br />$error->{detail}</td>";
         $ret .= '</tr>';
     }
     else {
@@ -1359,38 +1363,40 @@ sub CreateInstalledList($$) {
     my $header = '';
     my $footer = '';
     if ($html) {
-        $header = '<html><table style="min-width: 450px;" class="block wide">';
+        $header = '<html><table class="block wide">';
         $footer = '</table></html>';
     }
 
-    my $rowOpen     = '';
-    my $rowOpenEven = '';
-    my $rowOpenOdd  = '';
-    my $colOpen     = '';
-    my $txtOpen     = '';
-    my $txtClose    = '';
-    my $colClose    = "\t\t\t";
-    my $rowClose    = '';
+    my $rowOpen         = '';
+    my $rowOpenEven     = '';
+    my $rowOpenOdd      = '';
+    my $colOpen         = '';
+    my $colOpenMinWidth = '';
+    my $txtOpen         = '';
+    my $txtClose        = '';
+    my $colClose        = "\t\t\t";
+    my $rowClose        = '';
 
     if ($html) {
-        $rowOpen     = '<tr>';
-        $rowOpenEven = '<tr class="even">';
-        $rowOpenOdd  = '<tr class="odd">';
-        $colOpen     = '<td>';
-        $txtOpen     = "<b>";
-        $txtClose    = "</b>";
-        $colClose    = '</td>';
-        $rowClose    = '</tr>';
+        $rowOpen         = '<tr>';
+        $rowOpenEven     = '<tr class="even">';
+        $rowOpenOdd      = '<tr class="odd">';
+        $colOpen         = '<td>';
+        $colOpenMinWidth = '<td style="min-width: 12em;">';
+        $txtOpen         = "<b>";
+        $txtClose        = "</b>";
+        $colClose        = '</td>';
+        $rowClose        = '</tr>';
     }
 
     push @ret,
         $rowOpen
-      . $colOpen
+      . $colOpenMinWidth
       . $txtOpen
       . 'Package Name'
       . $txtClose
       . $colClose
-      . $colOpen
+      . $colOpenMinWidth
       . $txtOpen
       . 'Installed Version'
       . $txtClose
@@ -1404,8 +1410,8 @@ sub CreateInstalledList($$) {
             next if ( $package eq "undefined" );
 
             my $l = $linecount % 2 == 0 ? $rowOpenEven : $rowOpenOdd;
-            $l .= $colOpen . $package . $colClose;
-            $l .= $colOpen
+            $l .= $colOpenMinWidth . $package . $colClose;
+            $l .= $colOpenMinWidth
               . (
                 defined( $packages->{$package}{version} )
                 ? $packages->{$package}{version}
@@ -1435,48 +1441,50 @@ sub CreateOutdatedList($$) {
     my $header = '';
     my $footer = '';
     if ($html) {
-        $header = '<html><table style="min-width: 450px;" class="block wide">';
+        $header = '<html><table class="block wide">';
         $footer = '</table></html>';
     }
 
-    my $rowOpen     = '';
-    my $rowOpenEven = '';
-    my $rowOpenOdd  = '';
-    my $colOpen     = '';
-    my $txtOpen     = '';
-    my $txtClose    = '';
-    my $colClose    = "\t\t\t";
-    my $rowClose    = '';
+    my $rowOpen         = '';
+    my $rowOpenEven     = '';
+    my $rowOpenOdd      = '';
+    my $colOpen         = '';
+    my $colOpenMinWidth = '';
+    my $txtOpen         = '';
+    my $txtClose        = '';
+    my $colClose        = "\t\t\t";
+    my $rowClose        = '';
 
     if ($html) {
-        $rowOpen     = '<tr>';
-        $rowOpenEven = '<tr class="even">';
-        $rowOpenOdd  = '<tr class="odd">';
-        $colOpen     = '<td>';
-        $txtOpen     = "<b>";
-        $txtClose    = "</b>";
-        $colClose    = '</td>';
-        $rowClose    = '</tr>';
+        $rowOpen         = '<tr>';
+        $rowOpenEven     = '<tr class="even">';
+        $rowOpenOdd      = '<tr class="odd">';
+        $colOpen         = '<td>';
+        $colOpenMinWidth = '<td style="min-width: 12em;">';
+        $txtOpen         = "<b>";
+        $txtClose        = "</b>";
+        $colClose        = '</td>';
+        $rowClose        = '</tr>';
     }
 
     push @ret,
         $rowOpen
-      . $colOpen
+      . $colOpenMinWidth
       . $txtOpen
       . 'Package Name'
       . $txtClose
       . $colClose
-      . $colOpen
+      . $colOpenMinWidth
       . $txtOpen
       . 'Installed Version'
       . $txtClose
       . $colClose
-      . $colOpen
+      . $colOpenMinWidth
       . $txtOpen
       . 'Update Version'
       . $txtClose
       . $colClose
-      . $colOpen
+      . $colOpenMinWidth
       . $txtOpen
       . 'Upgrade Version'
       . $txtClose
@@ -1491,14 +1499,14 @@ sub CreateOutdatedList($$) {
             my $fhemPkg = defined( $fhem_npm_modules{$package} ) ? 1 : 0;
 
             my $l = $linecount % 2 == 0 ? $rowOpenEven : $rowOpenOdd;
-            $l .= $colOpen . $package . $colClose;
-            $l .= $colOpen
+            $l .= $colOpenMinWidth . $package . $colClose;
+            $l .= $colOpenMinWidth
               . (
                 defined( $packages->{$package}{current} )
                 ? $packages->{$package}{current}
                 : '?'
               ) . $colClose;
-            $l .= $colOpen . (
+            $l .= $colOpenMinWidth . (
                 defined( $packages->{$package}{wanted} )
                 ? (
                       $fhemPkg
@@ -1517,7 +1525,7 @@ sub CreateOutdatedList($$) {
                   )
                 : '?'
             ) . $colClose;
-            $l .= $colOpen
+            $l .= $colOpenMinWidth
               . (
                 defined( $packages->{$package}{latest} )
                 ? $packages->{$package}{latest}
@@ -1573,7 +1581,6 @@ sub ToDay() {
   </code><br>
   <br>
   This line may easily be added to a new file in /etc/sudoers.d/fhem and will automatically included to /etc/sudoers from there.<br>
-  More restricted sudo settings are currently not supported.<br>
   Only checking for outdated packages does not require any privileged access at all!<br>
   <br>
   <br>
@@ -1671,7 +1678,6 @@ sub ToDay() {
   </code><br>
   <br>
   Diese Zeile kann einfach in einer neuen Datei unter /etc/sudoers.d/fhem hinzugef&uuml;gt werden und wird von dort automatisch in /etc/sudoers inkludiert.<br>
-  Restriktiviere sudo Einstellungen sind derzeit nicht m&ouml;glich.<br>
   Um nur die zu aktualisierenden Pakete zu &uuml;berpr&uuml;fen wird &uuml;berhaupt kein priviligierter Zugriff ben&ouml;tigt!<br>
   <br>
   <br>
@@ -1759,7 +1765,7 @@ sub ToDay() {
       "abstract": "Modul zur Bedienung der Node.js Installation und Updates"
     }
   },
-  "version": "v1.0.5",
+  "version": "v1.0.6",
   "release_status": "stable",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
