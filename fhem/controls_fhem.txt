@@ -1,4 +1,4 @@
-REV 18892
+REV 18907
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,10 +21,10 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2019-03-13_07:45:02 284633 ./CHANGED
-UPD 2019-03-13_07:45:02 40050 ./MAINTAINER.txt
+UPD 2019-03-15_07:45:03 284746 ./CHANGED
+UPD 2019-03-15_07:45:03 40051 ./MAINTAINER.txt
 UPD 2019-02-17_07:45:05 39691 ./configDB.pm
-UPD 2019-03-01_07:45:02 20073 ./fhem.cfg.demo
+UPD 2019-03-15_07:45:03 22394 ./fhem.cfg.demo
 UPD 2019-03-13_07:45:11 156300 ./fhem.pl
 UPD 2018-03-11_07:45:03 22076 FHEM/00_CM11.pm
 UPD 2018-10-19_07:45:03 57590 FHEM/00_CUL.pm
@@ -232,7 +232,7 @@ UPD 2017-05-31_07:45:02 28640 FHEM/38_CO20.pm
 UPD 2016-02-09_07:45:13 15879 FHEM/38_JawboneUp.pm
 UPD 2019-03-13_07:45:02 241653 FHEM/38_netatmo.pm
 UPD 2018-03-18_07:45:02 80208 FHEM/39_Talk2Fhem.pm
-UPD 2019-03-12_07:45:02 40145 FHEM/39_alexa.pm
+UPD 2019-03-15_07:45:03 41305 FHEM/39_alexa.pm
 UPD 2019-02-18_07:45:05 20782 FHEM/39_gassistant.pm
 UPD 2017-04-21_07:45:02 2759 FHEM/39_siri.pm
 UPD 2016-04-26_07:45:11 13443 FHEM/40_RFXCOM.pm
@@ -242,7 +242,7 @@ UPD 2017-05-26_07:45:02 29928 FHEM/42_Nextion.pm
 UPD 2015-07-28_14:05:31 8038 FHEM/42_RFXMETER.pm
 UPD 2017-06-01_07:45:02 21914 FHEM/42_SMARTMON.pm
 UPD 2018-08-30_07:45:03 194137 FHEM/42_SYSMON.pm
-UPD 2019-03-14_07:45:02 58695 FHEM/42_npmjs.pm
+UPD 2019-03-15_07:45:03 58479 FHEM/42_npmjs.pm
 UPD 2015-07-28_14:05:31 19326 FHEM/43_RFXX10REC.pm
 UPD 2019-01-28_07:45:02 52106 FHEM/44_ROLLO.pm
 UPD 2017-07-13_07:45:02 33874 FHEM/44_S7.pm
@@ -475,7 +475,7 @@ UPD 2018-01-27_07:45:02 26432 FHEM/98_Heating_Control.pm
 UPD 2016-04-26_07:45:11 33223 FHEM/98_HourCounter.pm
 UPD 2019-01-26_07:45:02 67684 FHEM/98_Hyperion.pm
 UPD 2017-01-04_07:45:02 21573 FHEM/98_IF.pm
-UPD 2019-03-14_07:45:02 70904 FHEM/98_Installer.pm
+UPD 2019-03-15_07:45:03 72098 FHEM/98_Installer.pm
 UPD 2018-08-31_07:45:03 4884 FHEM/98_JsonList2.pm
 UPD 2019-03-13_07:45:02 322801 FHEM/98_MSwitch.pm
 UPD 2016-03-12_07:45:14 49251 FHEM/98_MaxScanner.pm
@@ -493,7 +493,7 @@ UPD 2018-03-24_07:45:03 97508 FHEM/98_Siro.pm
 UPD 2018-11-12_07:45:03 80535 FHEM/98_SmarterCoffee.pm
 UPD 2017-05-04_07:45:02 52568 FHEM/98_THRESHOLD.pm
 UPD 2018-03-19_07:45:04 49956 FHEM/98_TRAFFIC.pm
-UPD 2018-06-12_07:45:06 58167 FHEM/98_Text2Speech.pm
+UPD 2019-03-15_07:45:03 58572 FHEM/98_Text2Speech.pm
 UPD 2017-05-20_07:45:02 36736 FHEM/98_UbiquitiMP.pm
 UPD 2015-07-28_14:05:31 3492 FHEM/98_UbiquitiOut.pm
 UPD 2019-02-08_07:45:02 31487 FHEM/98_Verkehrsinfo.pm
@@ -560,7 +560,7 @@ UPD 2019-03-03_07:45:03 201784 FHEM/HMConfig.pm
 UPD 2017-05-22_07:45:02 42698 FHEM/HOMESTATEtk.pm
 UPD 2018-11-25_07:45:02 29623 FHEM/HttpUtils.pm
 UPD 2015-07-28_14:05:31 2324 FHEM/MaxCommon.pm
-UPD 2019-03-14_07:45:02 63046 FHEM/Meta.pm
+UPD 2019-03-15_07:45:03 67806 FHEM/Meta.pm
 UPD 2017-04-18_07:45:02 272672 FHEM/ONKYOdb.pm
 UPD 2015-07-28_14:05:31 12165 FHEM/OWX_DS2480.pm
 UPD 2016-01-25_07:45:12 10196 FHEM/OWX_DS9097.pm
@@ -617,7 +617,7 @@ UPD 2017-09-10_16:01:38 392 FHEM/holiday/th.holiday
 UPD 2019-02-12_07:45:04 333486 FHEM/lib/74_AMADautomagicFlowset_4.2.5.xml
 UPD 2019-02-12_07:45:04 440509 FHEM/lib/74_AMADtaskerset_4.2.5.prj.xml
 UPD 2019-03-01_07:45:02 18747 FHEM/lib/AttrTemplate/httpmod.template
-UPD 2019-03-13_07:45:02 62454 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2019-03-15_07:45:03 65367 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
 UPD 2018-01-13_07:45:02 21899 FHEM/lib/Device/Firmata/Constants.pm
@@ -697,11 +697,11 @@ UPD 2015-07-28_14:05:31 162 FHEM/template.layout
 UPD 2018-03-18_07:45:07 6218 contrib/commandref_join.pl
 UPD 2018-01-26_07:45:05 4302 contrib/commandref_modular.pl
 UPD 2018-07-16_07:45:03 1242 demolog/LightScenes.dd.save
-UPD 2018-08-27_07:45:04 390 demolog/LightScenes.save
+UPD 2019-03-15_07:45:03 390 demolog/LightScenes.save
 UPD 2015-07-28_14:05:35 28600 demolog/cellar.log
-UPD 2015-07-28_14:05:35 71762 demolog/dewpoint.log
+UPD 2019-03-15_07:45:03 71930 demolog/dewpoint.log
 UPD 2015-07-28_14:05:35 2944 demolog/eventTypes.txt
-UPD 2018-09-17_07:45:03 19247 demolog/fhem.save
+UPD 2019-03-15_07:45:03 104666 demolog/fhem.save
 UPD 2015-07-28_14:05:35 71800 demolog/garden.log
 UPD 2015-07-28_14:05:35 2225 demolog/layout
 UPD 2015-07-28_14:05:35 219 demolog/pictures-copyright.txt
@@ -715,8 +715,8 @@ UPD 2019-03-14_07:45:06 3948227 docs/commandref.html
 UPD 2019-03-14_07:45:08 2446460 docs/commandref_DE.html
 UPD 2019-03-06_07:45:02 78405 docs/commandref_frame.html
 UPD 2019-03-06_07:45:02 87954 docs/commandref_frame_DE.html
-UPD 2019-03-14_07:45:09 210379 docs/commandref_modular.html
-UPD 2019-03-14_07:45:10 221213 docs/commandref_modular_DE.html
+UPD 2019-03-15_07:45:10 210379 docs/commandref_modular.html
+UPD 2019-03-15_07:45:11 221213 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2113,7 +2113,7 @@ UPD 2017-12-04_07:45:02 2286 www/pgm2/doif.js
 UPD 2018-11-09_07:45:05 28851 www/pgm2/f18.js
 UPD 2018-10-08_07:45:02 9836 www/pgm2/f18style.css
 UPD 2018-05-27_13:13:25 7515 www/pgm2/fhemdoc_modular.js
-UPD 2019-01-25_07:45:03 58768 www/pgm2/fhemweb.js
+UPD 2019-03-15_07:45:03 58917 www/pgm2/fhemweb.js
 UPD 2019-01-26_07:45:02 13786 www/pgm2/fhemweb_colorpicker.js
 UPD 2019-01-09_07:45:02 4402 www/pgm2/fhemweb_fbcalllist.js
 UPD 2018-01-14_07:45:02 8950 www/pgm2/fhemweb_iconButtons.js
