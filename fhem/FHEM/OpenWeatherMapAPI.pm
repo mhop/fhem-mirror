@@ -32,7 +32,7 @@
 # https://api.openweathermap.org/data/2.5/forecast?lat=[lat]&lon=[long]&APPID=[API]   Forecast
 # https://openweathermap.org/weather-conditions     Icons und Conditions ID's
 
-package FHEM::OpenWeatherMapAPI::Weather;
+package OpenWeatherMapAPI::Weather;
 use strict;
 use warnings;
 

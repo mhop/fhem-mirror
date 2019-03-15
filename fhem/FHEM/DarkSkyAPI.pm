@@ -28,7 +28,7 @@
 #
 ###############################################################################
 
-package FHEM::DarkSkyAPI::Weather;
+package DarkSkyAPI::Weather;
 use strict;
 use warnings;
 
