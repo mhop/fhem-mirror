@@ -42,10 +42,12 @@
 #  - feature: 74_Unifi: Added readings for wan_ip and results of speedtest
 # V 3.1.0
 #  - changed: 74_Unifi: removed deprecated UnifiSwitch-functions!
+# V 3.2.0
+#  - changed: 74_Unifi: removed UCv3 support
 
 
 package main;
-my $version="3.1.0";
+my $version="3.2.0";
 use strict;
 use warnings;
 use HttpUtils;
@@ -147,13 +149,11 @@ sub Unifi_Initialize($$) {
 sub Unifi_Define($$) {
     my ($hash, $def) = @_;
     my @a = split("[ \t][ \t]*", $def);
-    return "Wrong syntax: use define <name> Unifi <ip> <port> <username> <password> [<interval> [<siteID> [<version>]]]" if(int(@a) < 6);
+    return "Wrong syntax: use define <name> Unifi <ip> <port> <username> <password> [<interval> [<siteID>]]" if(int(@a) < 6);
     return "Wrong syntax: <port> is not a number!"                           if(!looks_like_number($a[3]));
     return "Wrong syntax: <interval> is not a number!"                       if($a[6] && !looks_like_number($a[6]));
     return "Wrong syntax: <interval> too small, must be at least 5"          if($a[6] && $a[6] < 5);
-    return "Wrong syntax: <version> is not a valid number! Must be 3 or 4."  if($a[8] && (!looks_like_number($a[8]) || $a[8] !~ /3|4/));
     
-    #TODO: Passwort verschlüsseln! (ala Harmony?)
     my $name = $a[0];
     %$hash = (   %$hash,
         NOTIFYDEV => 'global',
@@ -162,7 +162,6 @@ sub Unifi_Define($$) {
             eventPeriod => int(AttrVal($name,"eventPeriod",24)),
             deprecatedClientNames => int(AttrVal($name,"deprecatedClientNames",1)),
             interval    => $a[6] || 30,
-            version     => $a[8] || 4,
             url         => "https://".$a[2].(($a[3] == 443) ? '' : ':'.$a[3]).'/api/s/'.(($a[7]) ? $a[7] : 'default').'/',
         },
     );
@@ -184,10 +183,9 @@ sub Unifi_Define($$) {
     my $define="$a[2] $a[3] $username $password";
     $define.=" $a[6]" if($a[6]);
     $define.=" $a[7]" if($a[7]);
-    $define.=" $a[8]" if($a[8]);
     $hash->{DEF} = $define;
     
-    Log3 $name, 5, "$name: Defined with url:$hash->{unifi}->{url}, interval:$hash->{unifi}->{interval}, version:$hash->{unifi}->{version}";
+    Log3 $name, 5, "$name: Defined with url:$hash->{unifi}->{url}, interval:$hash->{unifi}->{interval}";
     return undef;
 }
 ###############################################################################
@@ -702,13 +700,9 @@ sub Unifi_Login_Send($) {
     my $password = $hash->{helper}{password};
     $user = Unifi_decrypt( $user );
     $password = Unifi_decrypt( $password );
-    if($hash->{unifi}->{version} == 3) {
-        ( $loginurl = $hash->{unifi}->{url} ) =~ s/api\/s.+/login/;
-        $logindata = "login=login&username=".$user."&password=".$password;
-    }else {
-        ( $loginurl = $hash->{unifi}->{url} ) =~ s/api\/s.+/api\/login/;
-        $logindata = '{"username":"'.$user.'", "password":"'.$password.'"}';
-    }
+    ( $loginurl = $hash->{unifi}->{url} ) =~ s/api\/s.+/api\/login/;
+    $logindata = '{"username":"'.$user.'", "password":"'.$password.'"}';
+    
     HttpUtils_NonblockingGet( {
                  %{$hash->{httpParams}},
         url      => $loginurl,
@@ -725,19 +719,12 @@ sub Unifi_Login_Receive($) {
     if ($err ne "") {
         Log3 $name, 5, "$name ($self) - Error while requesting ".$param->{url}." - $err";
     }
-    elsif ($data ne "" && $hash->{unifi}->{version} == 3) {
-        if ($data =~ /Invalid username or password/si) {
-            Log3 $name, 1, "$name ($self) - Login Failed! Invalid username or password!";
-        } else {
-            Log3 $name, 5, "$name ($self) - Login Failed! Version 3 should not deliver data on successfull login.";
-        }
-    }
-    elsif ($data ne "" || $hash->{unifi}->{version} == 3) { # v3 Login is empty if login is successfully
-        if ($param->{code} == 200 || $param->{code} == 400 || $param->{code} == 401 || ($hash->{unifi}->{version} == 3 && ($param->{code} == 302 || $param->{code} == 200))) {
+    elsif ($data ne "" ) { 
+        if ($param->{code} == 200 || $param->{code} == 400 || $param->{code} == 401 || $param->{code} == 200) {
             eval { $data = decode_json($data); 1; } or do { $data = { meta => {rc => 'error.decode_json', msg => $@} }; };
             
-            if ($hash->{unifi}->{version} == 3 || $data->{meta}->{rc} eq "ok") {  # v3 has no rc-state
-                Log3 $name, 5, "$name ($self) - state=ok || version=3";
+            if ($data->{meta}->{rc} eq "ok") { 
+                Log3 $name, 5, "$name ($self) - state=ok";
                 $hash->{httpParams}->{header} = '';
                 for (split("\r\n",$param->{httpheader})) {
                     if(/^Set-Cookie/) {
@@ -763,8 +750,7 @@ sub Unifi_Login_Receive($) {
                                        ." - state:'$data->{meta}->{rc}' - msg:'$data->{meta}->{msg}'";
                     } elsif ($data->{meta}->{msg} eq 'api.err.LoginRequired') {
                         Log3 $name, 1, "$name ($self) - Login Failed! - state:'$data->{meta}->{rc}' - msg:'$data->{meta}->{msg}' -"
-                                       ." This error while login indicates that you use wrong <version> or"
-                                       ." have to define <version> in your fhem definition.";
+                                       ." This error while login indicates that you use an unsupported UnifiController-version";
                     } else {
                         Log3 $name, 5, "$name ($self) - Login Failed! - state:'$data->{meta}->{rc}' - msg:'$data->{meta}->{msg}'";
                     }
@@ -2015,7 +2001,7 @@ sub Unifi_ReceiveFailure($$) {
                 return undef;
             }
         }
-        elsif ($meta->{msg} eq "api.err.NoSiteContext" || ($hash->{unifi}->{version} == 3 && $meta->{msg} eq "api.err.InvalidObject")) {
+        elsif ($meta->{msg} eq "api.err.NoSiteContext") {
             Log3 $name, 1, "$name ($self) - Failed! - state:'$meta->{rc}' - msg:'$meta->{msg}'"
                            ." - This error indicates that the <siteID> in your definition is wrong."
                            ." Try to modify your definition with <sideID> = default.";
@@ -2126,7 +2112,7 @@ Or you can use the other readings or set and get features to control your unifi-
 
 <h4>Define</h4>
 <ul>
-    <code>define &lt;name&gt; Unifi &lt;ip&gt; &lt;port&gt; &lt;username&gt; &lt;password&gt; [&lt;interval&gt; [&lt;siteID&gt; [&lt;version&gt;]]]</code>
+    <code>define &lt;name&gt; Unifi &lt;ip&gt; &lt;port&gt; &lt;username&gt; &lt;password&gt; [&lt;interval&gt; [&lt;siteID&gt;]]</code>
     <br><br>
 	<br>
     &lt;name&gt;:
@@ -2151,23 +2137,16 @@ Or you can use the other readings or set and get features to control your unifi-
     </ul>
     [&lt;interval&gt;]:
     <ul>
-    <code>(optional without &lt;siteID&gt; and &lt;version&gt;)<br>
+    <code>(optional without &lt;siteID&gt)<br>
           Interval to fetch the information from the unifi-api. <br>
           default: 30 seconds</code><br>
     </ul>
     [&lt;siteID&gt;]:
     <ul>
-    <code>(optional without &lt;version&gt;)<br>
+    <code>(optional)<br>
           You can find the site-ID by selecting the site in the UniFi web interface.<br>
           e.g. https://192.168.12.13:8443/manage/s/foobar the siteId you must use is: foobar.<br>
           default: default</code><br>
-    </ul>
-    [&lt;version&gt;]:
-    <ul>
-    <code>(optional if you use unifi v4)<br>
-           Unifi-controller version. <br>
-          Version must be specified if version is not 4. At the moment version 3 and 4 are supported.<br>
-          default: 4</code><br>
     </ul> <br>
 
 </ul>
@@ -2175,8 +2154,8 @@ Or you can use the other readings or set and get features to control your unifi-
 <ul>
     <code>define my_unifi_controller Unifi 192.168.1.15 443 admin secret</code><br>
     <br>
-    Or with optional parameters &lt;interval&gt;, &lt;siteID&gt; and &lt;version&gt;:<br>
-    <code>define my_unifi_controller Unifi 192.168.1.15 443 admin secret 30 default 3</code><br>
+    Or with optional parameters &lt;interval&gt; and &lt;siteID&gt; :<br>
+    <code>define my_unifi_controller Unifi 192.168.1.15 443 admin secret 30 default</code><br>
 </ul>
 
 <h4>Set</h4>
