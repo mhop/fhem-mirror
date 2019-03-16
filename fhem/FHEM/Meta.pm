@@ -1679,7 +1679,10 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
                     : ''
                   );
                 $modMeta->{resources}{repository}{x_raw} =
-                    'https://svn.fhem.de/fhem/trunk/'
+                  'https://svn.fhem.de/fhem/trunk/'
+                  . ( $modMeta->{resources}{repository}{x_filepath} =~ /\/$/
+                    ? $modMeta->{resources}{repository}{x_filepath}
+                    : $modMeta->{resources}{repository}{x_filepath} . '/' )
                   . $modMeta->{x_file}[1]
                   . $modMeta->{x_file}[2];
             }
