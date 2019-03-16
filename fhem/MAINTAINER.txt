@@ -106,6 +106,7 @@ FHEM/14_SD_WS_Maverick.pm    Sidey79/Cruizer      Sonstige Systeme
 FHEM/14_SIGNALduino_un.pm    Sidey                Sonstige Systeme
 FHEM/15_CUL_EM.pm            rudolfkoenig         SlowRF
 FHEM/16_CUL_RFR.pm           rudolfkoenig         SlowRF
+FHEM/16_STACKABLE.pm         rudolfkoenig         SlowRF
 FHEM/16_STACKABLE_CC.pm      rudolfkoenig         SlowRF
 FHEM/17_EGPM2LAN.pm          alexus               Sonstiges
 FHEM/17_SIS_PMS.pm           painseeker           Sonstiges
