@@ -5,6 +5,7 @@ use strict;
 use warnings;
 
 # provide the same hash as for real FHEM modules
+#   in FHEM main context
 our %packages;
 
 # define package
@@ -46,6 +47,9 @@ return "$@" if ($@);
 return $ret if ($ret);
 $packages{Meta} = \%META;
 use version 0.77; our $VERSION = $packages{Meta}{version};
+
+# Exported variables
+#
 
 our %supportForum = (
     forum            => 'FHEM Forum',
@@ -356,6 +360,10 @@ our %moduleMaintainers;
 our %packageMaintainers;
 our %fileMaintainers;
 
+our %maintainerModules;
+our %maintainerPackages;
+our %maintainerFile;
+
 our $coreUpdate;
 our %corePackageUpdates;
 our %coreFileUpdates;
@@ -364,13 +372,218 @@ our %moduleUpdates;
 our %packageUpdates;
 our %fileUpdates;
 
+# Package internal variables
+#
+
+# based on https://metacpan.org/release/perl
+my @perlPragmas = qw(
+  attributes
+  autodie
+  autouse
+  base
+  bigint
+  bignum
+  bigrat
+  blib
+  bytes
+  charnames
+  constant
+  diagnostics
+  encoding
+  feature
+  fields
+  filetest
+  if
+  integer
+  less
+  lib
+  locale
+  mro
+  open
+  ops
+  overload
+  overloading
+  parent
+  re
+  sigtrap
+  sort
+  strict
+  subs
+  threads
+  threads::shared
+  utf8
+  vars
+  vmsish
+  warnings
+  warnings::register
+);
+
+# based on https://metacpan.org/release/perl
+#   and https://metacpan.org/pod/Win32#Alphabetical-Listing-of-Win32-Functions
+my @perlCoreModules = qw(
+  experimental
+  I18N::LangTags
+  I18N::LangTags::Detect
+  I18N::LangTags::List
+  IO
+  IO::Dir
+  IO::File
+  IO::Handle
+  IO::Pipe
+  IO::Poll
+  IO::Seekable
+  IO::Select
+  IO::Socket
+  IO::Socket::INET
+  IO::Socket::UNIX
+  Amiga::ARexx
+  Amiga::Exec
+  B
+  B::Concise
+  B::Showlex
+  B::Terse
+  B::Xref
+  O
+  OptreeCheck
+  Devel::Peek
+  ExtUtils::Miniperl
+  Fcntl
+  File::DosGlob
+  File::Find
+  File::Glob
+  FileCache
+  GDBM_File
+  Hash::Util::FieldHash
+  Hash::Util
+  I18N::Langinfo
+  IPC::Open2
+  IPC::Open3
+  NDBM_File
+  ODBM_File
+  Opcode
+  ops
+  POSIX
+  PerlIO::encoding
+  PerlIO::mmap
+  PerlIO::scalar
+  PerlIO::via
+  Pod::Html
+  SDBM_File
+  Sys::Hostname
+  Tie::Hash::NamedCapture
+  Tie::Memoize
+  VMS::DCLsym
+  VMS::Filespec
+  VMS::Stdio
+  Win32CORE
+  XS::APItest
+  XS::Typemap
+  arybase
+  ext/arybase/t/scope_0.pm
+  attributes
+  mro
+  re
+  Haiku
+  AnyDBM_File
+  B::Deparse
+  B::Op_private
+  Benchmark
+  Class::Struct
+  Config::Extensions
+  DB
+  DBM_Filter
+  DBM_Filter::compress
+  DBM_Filter::encode
+  DBM_Filter::int32
+  DBM_Filter::null
+  DBM_Filter::utf8
+  DirHandle
+  English
+  ExtUtils::Embed
+  ExtUtils::XSSymSet
+  File::Basename
+  File::Compare
+  File::Copy
+  File::stat
+  FileHandle
+  FindBin
+  Getopt::Std
+  Net::hostent
+  Net::netent
+  Net::protoent
+  Net::servent
+  PerlIO
+  SelectSaver
+  Symbol
+  Thread
+  Tie::Array
+  Tie::Handle
+  Tie::StdHandle
+  Tie::SubstrHash
+  Time::gmtime
+  Time::localtime
+  Time::tm
+  UNIVERSAL
+  Unicode::UCD
+  User::grent
+  User::pwent
+  blib
+  bytes
+  charnames
+  deprecate
+  feature
+  filetest
+  integer
+  less
+  locale
+  open
+  overload
+  overloading
+  sigtrap
+  sort
+  strict
+  subs
+  utf8
+  vars
+  vmsish
+  warnings
+  warnings::register
+  OS2::ExtAttr
+  OS2::PrfDB
+  OS2::Process
+  OS2::DLL
+  OS2::REXX
+  Win32::BuildNumber
+  Win32::CopyFile
+  Win32::DomainName
+  Win32::FormatMessage
+  Win32::FsType
+  Win32::GetCwd
+  Win32::GetFullPathName
+  Win32::GetLastError
+  Win32::GetLongPathName
+  Win32::GetNextAvailDrive
+  Win32::GetOSVersion
+  Win32::GetShortPathName
+  Win32::GetTickCount
+  Win32::IsWinNT
+  Win32::IsWin95
+  Win32::LoginName
+  Win32::NodeName
+  Win32::SetChildShowWindow
+  Win32::SetCwd
+  Win32::SetLastError
+  Win32::Sleep
+  Win32::Spawn
+);
+
+# Initially load information
+#   to be ready for meta analysis
+__GetUpdatedata() unless ( defined($coreUpdate) );
+__GetMaintainerdata() unless ( keys %moduleMaintainers > 0 );
+
 sub import(@) {
     my $pkg = caller(0);
-
-    # Initially load information
-    #   to be ready for meta analysis
-    __GetUpdatedata() unless ( defined($coreUpdate) );
-    __GetMaintainerdata() unless ( keys %moduleMaintainers > 0 );
 
     #TODO Export a function to main context so that
     #  a device may use metadata to load Perl dependencies from META.json.
@@ -572,6 +785,105 @@ sub Get($$) {
     return undef;
 }
 
+sub GetModuleSourceOrigin {
+    my ($module) = @_;
+    return 'fhem'
+      if ( $module eq 'fhem.pl'
+        || $module eq 'FHEM'
+        || $module eq 'Global'
+        || $module eq 'FHEM::Meta'
+        || $module eq 'Meta' );
+
+    return $moduleUpdates{$module}[0]
+      if ( defined( $moduleUpdates{$module} ) );
+
+    return $packageUpdates{$module}[0]
+      if ( defined( $packageUpdates{$module} ) );
+
+    return $corePackageUpdates{$module}[0]
+      if ( defined( $corePackageUpdates{$module} ) );
+
+    return $corePackageUpdates{$module}[0]
+      if ( defined( $corePackageUpdates{$module} ) );
+
+    return '';
+}
+
+sub ModuleIsInternal {
+    my ($module) = @_;
+    return 1
+      if ( $module eq 'fhem.pl'
+        || $module eq 'FHEM'
+        || $module eq 'Global'
+        || $module eq 'FHEM::Meta'
+        || $module eq 'Meta' );
+
+    my $p = GetModuleFilepath($module);
+
+    # if module has a relative path,
+    #   assume it is part of FHEM
+    return $p && ( $p =~ m/^(\.\/)?FHEM\/.+/ || $p =~ m/^(\.\/)?[^\/]+\.pm$/ )
+      ? 1
+      : 0;
+}
+
+# Get file path of a Perl module
+sub GetModuleFilepath {
+    my @path;
+
+    foreach (@_) {
+        my $module  = $_;
+        my $package = $module;
+
+        # From This::That to This/That.pm
+        s/::/\//g, s/$/.pm/ foreach $module;
+
+        if ( $module eq 'perl' ) {
+            push @path, $^X;    # real binary
+
+            # push @path, $ENV{_};    # symlink if any
+        }
+        elsif ( defined( $INC{$module} ) ) {
+            push @path, $INC{$module};
+        }
+        else {
+            eval {
+                require $module;
+                1;
+            };
+
+            if ( !$@ ) {
+                push @path, $INC{$module};
+            }
+            else {
+                push @path, '';
+                $@ = undef;
+            }
+        }
+    }
+
+    if (wantarray) {
+        return @path;
+    }
+    elsif ( @path > 0 ) {
+        return join( ',', @path );
+    }
+}
+
+sub ModuleIsPerlCore {
+    my ($module) = @_;
+    return grep ( /^$module$/, @perlCoreModules )
+      ? 1
+      : 0;
+}
+
+sub ModuleIsPerlPragma {
+    my ($module) = @_;
+    return grep ( /^$module$/, @perlPragmas )
+      ? 1
+      : 0;
+}
+
 ##########
 # Private functions
 #
@@ -624,6 +936,13 @@ sub __GetMetadata {
     my $item_summary;
     my $item_summary_DE;
     my $modName;
+
+    # Static meta information
+    $modMeta->{dynamic_config} = 1;
+    $modMeta->{'meta-spec'} = {
+        "version" => 2,
+        "url"     => "https://metacpan.org/pod/CPAN::Meta::Spec"
+    };
 
     # extract all info from file name
     if ( $filePath =~ m/^(?:\.\/)?((.+\/)?((?:(\d+)_)?(.+)\.(.+)))$/ ) {
@@ -1042,29 +1361,50 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
 
     # use VCS info 'as is', but only when:
     #   - file name matches
-    #   - file has maintainer in MAINTAINER.txt
+    #   - module is known in update file AND origin repo is fhem
     #   - or it is our own package of course
     if (   @vcs
         && $vcs[1] eq $modMeta->{x_file}[2] )
     {
-        if (   defined( $moduleMaintainers{ $modMeta->{x_file}[4] } )
-            || defined( $packageMaintainers{ $modMeta->{x_file}[4] } )
-            || $modMeta->{x_file}[4] eq 'Meta' )
+        push @vcs,
+          fhemTimeGm(
+            $vcs[14], $vcs[13], $vcs[12], $vcs[10],
+            ( $vcs[9] - 1 ),
+            ( $vcs[8] - 1900 )
+          );
+        $modMeta->{x_vcs} = \@vcs;
+
+        # if there is no maintainer, we will assign someone acting
+        if (   !defined( $moduleMaintainers{ $modMeta->{x_file}[4] } )
+            && !defined( $packageMaintainers{ $modMeta->{x_file}[4] } )
+            && $modMeta->{x_file}[4] ne 'Meta' )
         {
-            push @vcs,
-              fhemTimeGm(
-                $vcs[14], $vcs[13], $vcs[12], $vcs[10],
-                ( $vcs[9] - 1 ),
-                ( $vcs[8] - 1900 )
-              );
-            $modMeta->{x_vcs} = \@vcs;
-        }
-        else {
-            Log 3,
+            Log 4,
                 __PACKAGE__
               . "::__GetMetadata WARNING: Unregistered core module or package:\n  "
               . $modMeta->{x_file}[0]
-              . ' has defined VCS data but is not registered in MAINTAINER.txt';
+              . " has defined VCS data but is not registered in MAINTAINER.txt.\n  "
+              . "Added acting maintainer with limited support status";
+
+            # add acting maintainer
+            #TODO detect if module or package
+            $moduleMaintainers{ $modMeta->{x_file}[4] }[0][0] =
+              $modMeta->{x_file}[0];
+            $moduleMaintainers{ $modMeta->{x_file}[4] }[0][1] =
+              $modMeta->{x_file}[1];
+            $moduleMaintainers{ $modMeta->{x_file}[4] }[0][2] =
+              $modMeta->{x_file}[2];
+            $moduleMaintainers{ $modMeta->{x_file}[4] }[0][3] =
+              $modMeta->{x_file}[3];
+            $moduleMaintainers{ $modMeta->{x_file}[4] }[0][4] =
+              $modMeta->{x_file}[4];
+            $moduleMaintainers{ $modMeta->{x_file}[4] }[0][5] =
+              $modMeta->{x_file}[5];
+            $moduleMaintainers{ $modMeta->{x_file}[4] }[1] =
+              'rudolfkoenig (acting)';
+            $moduleMaintainers{ $modMeta->{x_file}[4] }[2] = 'limited';
+            $moduleMaintainers{ $modMeta->{x_file}[4] }[3] =
+              __GetSupportForum('Sonstiges');
         }
     }
 
@@ -1155,141 +1495,196 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
           . TimeNow();
     }
 
-    # mandatory
+    # Fill mandatory attributes
+    unless ( $modMeta->{abstract} ) {
+        $modMeta->{abstract} = 'n/a';
+    }
     unless ( $modMeta->{description} ) {
         $modMeta->{description} = 'n/a';
     }
-
-    # mandatory
     unless ( $modMeta->{release_status} ) {
-        if ( defined( $modMeta->{x_vcs} ) ) {
-            $modMeta->{release_status} = 'stable';
-        }
-        else {
-            $modMeta->{release_status} = 'unstable';
-        }
+        $modMeta->{release_status} = 'stable';
     }
-
-    # mandatory
     unless ( $modMeta->{license} ) {
-        if ( defined( $modMeta->{x_vcs} ) ) {
-            $modMeta->{license} = 'GPL_2';
-        }
-        else {
-            $modMeta->{license} = 'unknown';
-        }
+        $modMeta->{license} = 'unknown';
     }
-
-    # mandatory
     unless ( $modMeta->{author} ) {
-        if ( defined( $moduleMaintainers{ $modMeta->{x_file}[4] } ) ) {
-            foreach (
-                split( '/', $moduleMaintainers{ $modMeta->{x_file}[4] }[1] ) )
-            {
-                push @{ $modMeta->{author} }, $_;
-            }
-
-            # last update was not by one of the named authors
-            if ( defined( $modMeta->{x_vcs} ) ) {
-                my $lastEditor = $modMeta->{x_vcs}[15];
-                push @{ $modMeta->{author} },
-                  $modMeta->{x_vcs}[15] . ' (last release only) <>'
-                  unless ( grep( m/^$lastEditor$/i, @{ $modMeta->{author} } ) );
-            }
-        }
-        else {
-            $modMeta->{author} = ['unknown <>'];
-        }
-    }
-    unless ( $modMeta->{x_fhem_maintainer} ) {
-        if ( defined( $moduleMaintainers{ $modMeta->{x_file}[4] } ) ) {
-            foreach (
-                split( '/', $moduleMaintainers{ $modMeta->{x_file}[4] }[1] ) )
-            {
-                push @{ $modMeta->{x_fhem_maintainer} }, $_;
-            }
-
-            # last update was not by one of the named authors
-            if ( defined( $modMeta->{x_vcs} ) ) {
-                my $lastEditor = $modMeta->{x_vcs}[15];
-                push @{ $modMeta->{x_fhem_maintainer} },
-                  $modMeta->{x_vcs}[15]
-                  unless (
-                    grep( m/^$lastEditor$/i,
-                        @{ $modMeta->{x_fhem_maintainer} } )
-                  );
-            }
-        }
+        $modMeta->{author} = ['unknown <>'];
     }
 
-    unless ( defined( $modMeta->{resources} )
-        && defined( $modMeta->{resources}{license} ) )
-    {
-        if ( defined( $modMeta->{x_vcs} ) ) {
-            $modMeta->{resources}{license} =
-              ['https://fhem.de/#License'];
-        }
-    }
+    # Generate META information for FHEM core modules
+    if ( GetModuleSourceOrigin( $modMeta->{x_file}[4] ) eq 'fhem' ) {
 
-    unless ( defined( $modMeta->{resources} )
-        && defined( $modMeta->{resources}{x_wiki} ) )
-    {
-        if ( defined( $modMeta->{x_vcs} ) ) {
-            $modMeta->{resources}{x_wiki}{web}     = 'https://wiki.fhem.de/';
-            $modMeta->{resources}{x_wiki}{modpath} = 'wiki/';
-        }
-    }
-
-    unless ( defined( $modMeta->{resources} )
-        && defined( $modMeta->{resources}{x_commandref} ) )
-    {
-        if ( defined( $modMeta->{x_vcs} ) ) {
-            $modMeta->{resources}{x_commandref}{web} =
-              'https://fhem.de/commandref.html';
-            $modMeta->{resources}{x_commandref}{modpath} = '#';
-        }
-    }
-
-    unless ( defined( $modMeta->{resources} )
-        && defined( $modMeta->{resources}{x_support_community} ) )
-    {
-        if (   defined( $modMeta->{x_vcs} )
-            && defined( $moduleMaintainers{$modName} )
-            && ref( $moduleMaintainers{$modName} ) eq 'ARRAY'
-            && defined( $moduleMaintainers{$modName}[3] )
-            && ref( $moduleMaintainers{$modName}[3] ) eq 'HASH'
-            && keys %{ $moduleMaintainers{$modName}[3] } > 0 )
+        if (  !$modMeta->{release_status}
+            || $modMeta->{release_status} eq 'stable' )
         {
-            $modMeta->{resources}{x_support_community} =
-              $moduleMaintainers{$modName}[3];
+            if ( defined( $modMeta->{x_vcs} ) ) {
+                $modMeta->{release_status} = 'stable';
+            }
+            else {
+                $modMeta->{release_status} = 'unstable';
+            }
+        }
+
+        if ( !$modMeta->{license} || $modMeta->{license} eq 'unknown' ) {
+            if ( defined( $modMeta->{x_vcs} ) ) {
+                $modMeta->{license} = 'GPL_2';
+            }
+        }
+
+        if ( !$modMeta->{author} || $modMeta->{author}[0] eq 'unknown <>' ) {
+            if ( defined( $moduleMaintainers{ $modMeta->{x_file}[4] } ) ) {
+                shift @{ $modMeta->{author} }
+                  if ( $modMeta->{author}
+                    && $modMeta->{author}[0] eq 'unknown <>' );
+
+                foreach (
+                    split(
+                        '/', $moduleMaintainers{ $modMeta->{x_file}[4] }[1]
+                    )
+                  )
+                {
+                    push @{ $modMeta->{author} }, $_;
+                }
+
+                # last update was not by one of the named authors
+                if ( defined( $modMeta->{x_vcs} ) ) {
+                    my $lastEditor = $modMeta->{x_vcs}[15];
+                    push @{ $modMeta->{author} },
+                      $modMeta->{x_vcs}[15] . ' (last release only) <>'
+                      unless (
+                        grep( m/^$lastEditor$/i, @{ $modMeta->{author} } ) );
+                }
+            }
+        }
+        unless ( $modMeta->{x_fhem_maintainer} ) {
+            if ( defined( $moduleMaintainers{ $modMeta->{x_file}[4] } ) ) {
+                foreach (
+                    split(
+                        '/', $moduleMaintainers{ $modMeta->{x_file}[4] }[1]
+                    )
+                  )
+                {
+                    push @{ $modMeta->{x_fhem_maintainer} }, $_;
+                }
+
+                # last update was not by one of the named authors
+                if ( defined( $modMeta->{x_vcs} ) ) {
+                    my $lastEditor = $modMeta->{x_vcs}[15];
+                    push @{ $modMeta->{x_fhem_maintainer} },
+                      $modMeta->{x_vcs}[15]
+                      unless (
+                        grep( m/^$lastEditor$/i,
+                            @{ $modMeta->{x_fhem_maintainer} } )
+                      );
+                }
+            }
+        }
+
+        unless ( defined( $modMeta->{resources} )
+            && defined( $modMeta->{resources}{license} ) )
+        {
+            if ( defined( $modMeta->{x_vcs} ) ) {
+                $modMeta->{resources}{license} =
+                  ['https://fhem.de/#License'];
+            }
+        }
+
+        unless ( defined( $modMeta->{resources} )
+            && defined( $modMeta->{resources}{x_wiki} ) )
+        {
+            if ( defined( $modMeta->{x_vcs} ) ) {
+                $modMeta->{resources}{x_wiki}{web} = 'https://wiki.fhem.de/';
+                $modMeta->{resources}{x_wiki}{modpath} = 'wiki/';
+            }
+        }
+
+        unless ( defined( $modMeta->{resources} )
+            && defined( $modMeta->{resources}{x_commandref} ) )
+        {
+            if ( defined( $modMeta->{x_vcs} ) ) {
+                $modMeta->{resources}{x_commandref}{web} =
+                  'https://fhem.de/commandref.html';
+                $modMeta->{resources}{x_commandref}{modpath} = '#';
+            }
+        }
+
+        unless ( defined( $modMeta->{resources} )
+            && defined( $modMeta->{resources}{x_support_community} ) )
+        {
+            if (   defined( $modMeta->{x_vcs} )
+                && defined( $moduleMaintainers{$modName} )
+                && ref( $moduleMaintainers{$modName} ) eq 'ARRAY'
+                && defined( $moduleMaintainers{$modName}[3] )
+                && ref( $moduleMaintainers{$modName}[3] ) eq 'HASH'
+                && keys %{ $moduleMaintainers{$modName}[3] } > 0 )
+            {
+                $modMeta->{resources}{x_support_community} =
+                  $moduleMaintainers{$modName}[3];
+            }
+            elsif (defined( $modMeta->{x_vcs} )
+                && defined( $packageMaintainers{$modName} )
+                && ref( $packageMaintainers{$modName} ) eq 'ARRAY'
+                && defined( $packageMaintainers{$modName}[3] )
+                && ref( $packageMaintainers{$modName}[3] ) eq 'HASH'
+                && keys %{ $packageMaintainers{$modName}[3] } > 0 )
+            {
+                $modMeta->{resources}{x_support_community} =
+                  $packageMaintainers{$modName}[3];
+            }
+        }
+
+        unless ( defined( $modMeta->{x_support_status} ) ) {
+            if (   defined( $moduleMaintainers{$modName} )
+                && ref( $moduleMaintainers{$modName} ) eq 'ARRAY'
+                && defined( $moduleMaintainers{$modName}[2] ) )
+            {
+                $modMeta->{x_support_status} =
+                  $moduleMaintainers{$modName}[2];
+            }
+            elsif ( defined( $modMeta->{resources} )
+                && $modMeta->{resources}{x_support_community} )
+            {
+                $modMeta->{x_support_status} = 'supported';
+            }
+            else {
+                $modMeta->{x_support_status} = 'unknown';
+            }
+        }
+
+        unless (
+               defined( $modMeta->{resources} )
+            && defined( $modMeta->{resources}{repository} )
+            && (   defined( $modMeta->{resources}{repository}{type} )
+                || defined( $modMeta->{resources}{repository}{url} )
+                || defined( $modMeta->{resources}{repository}{web} )
+                || defined( $modMeta->{resources}{repository}{x_branch} )
+                || defined( $modMeta->{resources}{repository}{x_filepath} )
+                || defined( $modMeta->{resources}{repository}{x_raw} ) )
+          )
+        {
+            if ( defined( $modMeta->{x_vcs} ) ) {
+                $modMeta->{resources}{repository}{type} = 'svn';
+                $modMeta->{resources}{repository}{url} =
+                  'https://svn.fhem.de/fhem';
+                $modMeta->{resources}{repository}{web} =
+                    'https://svn.fhem.de/trac/browser/trunk/fhem/'
+                  . $modMeta->{x_file}[1]
+                  . $modMeta->{x_file}[2];
+                $modMeta->{resources}{repository}{x_branch}   = 'trunk';
+                $modMeta->{resources}{repository}{x_filepath} = 'fhem'
+                  . (
+                    $modMeta->{x_file}[1] ne ''
+                    ? '/' . $modMeta->{x_file}[1]
+                    : ''
+                  );
+                $modMeta->{resources}{repository}{x_raw} =
+                    'https://svn.fhem.de/fhem/trunk/'
+                  . $modMeta->{x_file}[1]
+                  . $modMeta->{x_file}[2];
+            }
         }
     }
-
-    unless ( defined( $modMeta->{resources} )
-        && defined( $modMeta->{resources}{repository} ) )
-    {
-        if ( defined( $modMeta->{x_vcs} ) ) {
-            $modMeta->{resources}{repository}{type} = 'svn';
-            $modMeta->{resources}{repository}{web} =
-              'https://svn.fhem.de/trac/browser';
-            $modMeta->{resources}{repository}{url} =
-              'https://svn.fhem.de/fhem';
-            $modMeta->{resources}{repository}{x_branch_master} = 'trunk';
-            $modMeta->{resources}{repository}{x_filepath}      = 'fhem'
-              . (
-                $modMeta->{x_file}[1] ne ''
-                ? '/' . $modMeta->{x_file}[1]
-                : ''
-              );
-        }
-    }
-
-    # Static meta information
-    $modMeta->{dynamic_config} = 1;
-    $modMeta->{'meta-spec'} = {
-        "version" => 2,
-        "url"     => "https://metacpan.org/pod/CPAN::Meta::Spec"
-    };
 
     # generate x_version
     __SetXVersion($modMeta);
@@ -1301,7 +1696,8 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
 sub __GetMaintainerdata {
     return 0 unless ( __PACKAGE__ eq caller(0) );
     my $fh;
-    %moduleMaintainers = ();
+    %moduleMaintainers  = ();
+    %packageMaintainers = ();
 
     if ( open( $fh, '<' . $attr{global}{modpath} . '/MAINTAINER.txt' ) ) {
         my $skip = 1;
@@ -1366,6 +1762,8 @@ sub __GetMaintainerdata {
                     }
                     else {
                         $moduleMaintainers{ $maintainer[0][4] } = \@maintainer;
+                        push @{ $maintainerModules{ $maintainer[1] } },
+                          $maintainer[0][4];
                     }
                 }
 
@@ -1396,6 +1794,8 @@ sub __GetMaintainerdata {
                     }
                     else {
                         $packageMaintainers{ $maintainer[0][4] } = \@maintainer;
+                        push @{ $maintainerPackages{ $maintainer[1] } },
+                          $maintainer[0][4];
                     }
                 }
 
@@ -1408,6 +1808,13 @@ sub __GetMaintainerdata {
         }
 
         close($fh);
+    }
+    else {
+        Log 1,
+            __PACKAGE__
+          . "::__GetMaintainerdata ERROR: Unable to read MAINTAINER.txt:\n  "
+          . $@;
+        return 0;
     }
 }
 
@@ -1582,7 +1989,7 @@ sub __GetUpdatedata {
 
     # loop through control files
     foreach my $file (@fileList) {
-        if ( open( $fh, '<' . $attr{global}{modpath} . '/FHEM/' . $file ) ) {
+        if ( open( $fh, '<' . $attr{global}{modpath} . '/' . $file ) ) {
             my $filePrefix;
             my $srcRepoName;
             my $fileExtension;
@@ -1594,7 +2001,6 @@ sub __GetUpdatedata {
             }
 
             while ( my $l = <$fh> ) {
-
                 if ( $l =~
 m/^((\S+) (((....)-(..)-(..))_((..):(..):(..))) (\d+) (?:\.\/)?((.+\/)?((?:(\d+)_)?(.+)\.(.+))))$/
                   )
@@ -1755,6 +2161,13 @@ m/^((\S+) (((....)-(..)-(..))_((..):(..):(..))) (\d+) (?:\.\/)?((.+\/)?((?:(\d+)
                         # our %fileUpdates;
                     }
                 }
+
+                else {
+                    Log 5,
+                        __PACKAGE__
+                      . "::__GetUpdatedata: $file: Ignoring line\n  "
+                      . $l;
+                }
             }
             close($fh);
         }
@@ -1849,7 +2262,7 @@ sub __SetXVersion {
       "description": "n/a"
     }
   },
-  "version": "v0.1.8",
+  "version": "v0.2.0",
   "release_status": "testing",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
@@ -1957,11 +2370,11 @@ sub __SetXVersion {
 =for :application/json;q=META.json fhem.pl
 {
   "abstract": "FHEM® is a Perl server for house automation",
-  "description": "FHEM® (registered trademark) is a GPL'd Perl server for house automation. It is used to automate some common tasks in the household like switching lamps / shutters / heating / etc. and to log events like temperature / humidity / power consumption.\\n\\nThe program runs as a server, you can control it via web or smartphone frontends, telnet or TCP/IP directly.\\n\\nIn order to use FHEM you'll need a 24/7 server (NAS, RPi, PC, Mac Mini, etc.) with a Perl interpreter and some attached hardware like the CUL-, EnOcean-, Z-Wave-USB-Stick, etc. to access the actors and sensors.\\n\\nIt is pronounced without the h, like in feminine.",
+  "description": "FHEM® (registered trademark) is a GPL'd Perl server for house automation. It is used to automate some common tasks in the household like switching lamps / shutters / heating / etc. and to log events like temperature / humidity / power consumption.\\nThe program runs as a server, you can control it via web or smartphone frontends, telnet or TCP/IP directly.\\nIn order to use FHEM you'll need a 24/7 server (NAS, RPi, PC, Mac Mini, etc.) with a Perl interpreter and some attached hardware like the CUL-, EnOcean-, Z-Wave-USB-Stick, etc. to access the actors and sensors.\\nIt is pronounced without the h, like in feminine.",
   "x_lang": {
     "de": {
       "abstract": "FHEM® ist ein Perl Server zur Hausautomatisierung",
-      "description": "FHEM® (eingetragene Marke) ist ein in Perl geschriebener, GPL lizensierter Server für die Heimautomatisierung. Man kann mit FHEM häufig auftretende Aufgaben automatisieren, wie z.Bsp. Lampen / Rollladen / Heizung / usw. schalten, oder Ereignisse wie Temperatur / Feuchtigkeit / Stromverbrauch protokollieren und visualisieren.\\n\\nDas Programm läuft als Server, man kann es über WEB, dedizierte Smartphone Apps oder telnet bedienen, TCP Schnittstellen für JSON und XML existieren ebenfalls.\\n\\nUm es zu verwenden benötigt man einen 24/7 Rechner (NAS, RPi, PC, Mac Mini, etc.) mit einem Perl Interpreter und angeschlossene Hardware-Komponenten wie CUL-, EnOcean-, Z-Wave-USB-Stick, etc. für einen Zugang zu den Aktoren und Sensoren.\\n\\nAusgesprochen wird es ohne h, wie bei feminin."
+      "description": "FHEM® (eingetragene Marke) ist ein in Perl geschriebener, GPL lizensierter Server für die Heimautomatisierung. Man kann mit FHEM häufig auftretende Aufgaben automatisieren, wie z.Bsp. Lampen / Rollladen / Heizung / usw. schalten, oder Ereignisse wie Temperatur / Feuchtigkeit / Stromverbrauch protokollieren und visualisieren.\\nDas Programm läuft als Server, man kann es über WEB, dedizierte Smartphone Apps oder telnet bedienen, TCP Schnittstellen für JSON und XML existieren ebenfalls.\\nUm es zu verwenden benötigt man einen 24/7 Rechner (NAS, RPi, PC, Mac Mini, etc.) mit einem Perl Interpreter und angeschlossene Hardware-Komponenten wie CUL-, EnOcean-, Z-Wave-USB-Stick, etc. für einen Zugang zu den Aktoren und Sensoren.\\nAusgesprochen wird es ohne h, wie bei feminin."
     }
   },
   "prereqs": {
