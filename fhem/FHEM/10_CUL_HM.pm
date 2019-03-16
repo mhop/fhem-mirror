@@ -433,8 +433,6 @@ sub CUL_HM_updateConfig($){##########################
     }
     next if ($nAttr);# stop if default setting if attributes is not desired
 
-    my $actCycle = AttrVal($name,"actCycle",undef);
-    CUL_HM_ActAdd($id,$actCycle) if ($actCycle );#add 2 ActionDetect?
     # --- set default attributes if missing ---
     if ($hash->{helper}{role}{dev}){
       if( $st ne "virtual"){
@@ -1160,7 +1158,6 @@ sub CUL_HM_Parse($$) {#########################################################
   $mh{mFlgH} = hex($mh{mFlg});
 
   # Msg format: Allnnffttssssssddddddpp...
-
   return if (!$iohash ||
              ref($iohash) ne 'HASH'  ||
              $mh{t} ne 'A'  || 
@@ -1527,6 +1524,11 @@ sub CUL_HM_Parse($$) {#########################################################
 
   #----------start valid messages parsing ---------
   my $parse = CUL_HM_parseCommon($iohash,\%mh);
+  if(!defined $mh{md} or $mh{md} eq '' or $mh{md} eq "unknown"){
+    Log3 $mh{devH},4, "CUL_HM drop msg for $mh{devN} with unknown model";
+    return;
+  }
+  
   $mh{devH}->{lastMsg} = $msgX;# is used in parseCommon  and need previous setting. so set it here
 
   push @evtEt,[$mh{devH},1,"powerOn:$mh{tmStr}"] if($parse eq "powerOn");
@@ -4046,7 +4048,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
       }
     }
   }
-  elsif($cmd eq "info"){  ###############################################
+  elsif($cmd eq "info"){  #####################################################
     return CUL_HM_ActInfo();
   }
  
@@ -4065,9 +4067,6 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   my $name    = $hash->{NAME};
   return "" if (CUL_HM_getAttrInt($name,"ignore"));
   my $devName = InternalVal($name,"device",$name);
-  
-  if (defined $hash->{helper}{mId} ){$culHmModel->{$hash->{helper}{mId}}{st}}
-  
   my $st      = defined $defs{$devName}{helper}{mId} ? $culHmModel->{$defs{$devName}{helper}{mId}}{st}   : AttrVal($devName, "subType", "");
   my $md      = defined $defs{$devName}{helper}{mId} ? $culHmModel->{$defs{$devName}{helper}{mId}}{name} : AttrVal($devName, "model"  , "");
   my $flag    = 'A0'; #set flag
@@ -4082,7 +4081,6 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   
   my $oCmd = $cmd;# we extend press to press/L/S if press is defined
   $cmd = "press" if ($cmd =~ m/^press/);# substitude pressL/S with press for cmd search
-  
   my $h = undef;
   $h = $culHmGlobalSets->{$cmd}         if(                !$roleV                    &&($roleD || $roleC));
   $h = $culHmGlobalSetsVrtDev->{$cmd}   if(!defined($h) &&( $roleV || !$st)           && $roleD);
@@ -6655,7 +6653,7 @@ sub CUL_HM_updtDeviceModel($$) {#change the model for a device - obey overwrite 
   delete $hash->{helper}{rxType};
   CUL_HM_getRxType($hash); #will update rxType
   my $mId = CUL_HM_getMId($hash);# set helper valiable and use result
-
+  return if(!defined $mId or $mId eq "");
   # autocreate undefined channels
   my %chanExist;
   %chanExist = map { $_ => 0 } CUL_HM_getAssChnIds($name);
