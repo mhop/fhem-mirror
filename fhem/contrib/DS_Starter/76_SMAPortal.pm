@@ -1,5 +1,5 @@
 #########################################################################################################################
-# $Id: $
+# $Id: 76_SMAPortal.pm 00000 2019-03-14 20:21:11Z DS_Starter $
 #########################################################################################################################
 #       76_SMAPortal.pm
 #
@@ -38,36 +38,23 @@
 package main;
 use strict;
 use warnings;
-use POSIX;
-use Data::Dumper;
-use Blocking;
-use Time::HiRes qw(gettimeofday);
-use LWP::UserAgent;
-use HTTP::Cookies;
-use JSON qw(decode_json);
-
-# Versions History intern
-our %SMAPortal_vNotesIntern = (
-  "1.2.3"  => "12.03.2019  make ready for 98_Installer.pm ", 
-  "1.2.2"  => "11.03.2019  new Errormessage analyze added, make ready for Meta.pm ", 
-  "1.2.1"  => "10.03.2019  behavior of state changed, commandref revised ", 
-  "1.2.0"  => "09.03.2019  integrate weather data, minor fixes ",
-  "1.1.0"  => "09.03.2019  make get data more stable, new attribute \"getDataRetries\" ",
-  "1.0.0"  => "03.03.2019  initial "
-);
+use FHEM::Meta;
 
 ###############################################################
 #                  SMAPortal Initialize
+# Da ich mit package arbeite müssen für die jeweiligen hashFn 
+# Funktionen der Funktionsname und davor mit :: getrennt der 
+# eigentliche package Name des Modules
 ###############################################################
 sub SMAPortal_Initialize($) {
   my ($hash) = @_;
 
-  $hash->{DefFn}     = "SMAPortal_Define";
-  $hash->{UndefFn}   = "SMAPortal_Undefine";
-  $hash->{DeleteFn}  = "SMAPortal_Delete"; 
-  $hash->{AttrFn}    = "SMAPortal_Attr";
-  $hash->{SetFn}     = "SMAPortal_Set";
-  $hash->{GetFn}     = "SMAPortal_Get";
+  $hash->{DefFn}     = "FHEM::SMAPortal::Define";
+  $hash->{UndefFn}   = "FHEM::SMAPortal::Undefine";
+  $hash->{DeleteFn}  = "FHEM::SMAPortal::Delete"; 
+  $hash->{AttrFn}    = "FHEM::SMAPortal::Attr";
+  $hash->{SetFn}     = "FHEM::SMAPortal::Set";
+  $hash->{GetFn}     = "FHEM::SMAPortal::Get";
   $hash->{AttrList}  = "cookieLocation ".
                        "cookielifetime ".
                        "detailLevel:1,2,3,4 ".
@@ -79,23 +66,101 @@ sub SMAPortal_Initialize($) {
                        "userAgent ".
                        $readingFnAttributes;
 
-return FHEM::Meta::InitMod( __FILE__, $hash );           # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
+  FHEM::Meta::InitMod( __FILE__, $hash );           # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
+
+return; 
 }
+
+###############################################################
+#                    Begin Package
+###############################################################
+package FHEM::SMAPortal;
+use strict;
+use warnings;
+use GPUtils qw(:all);                   # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
+use POSIX;
+use FHEM::Meta;
+use Data::Dumper;
+use Blocking;
+use Time::HiRes qw(gettimeofday);
+use LWP::UserAgent;
+use HTTP::Cookies;
+use JSON qw(decode_json);
+use MIME::Base64;
+
+# Run before module compilation
+BEGIN {
+  # Import from main::
+  GP_Import( 
+      qw(
+          attr
+          AttrVal
+          addToDevAttrList
+          addToAttrList
+          BlockingCall
+          BlockingKill
+          CommandAttr
+          CommandDeleteAttr
+          CommandDeleteReading
+          CommandSet
+          defs
+          delFromDevAttrList
+          delFromAttrList
+          devspec2array
+          deviceEvents
+          Debug
+          FmtDateTime
+          FmtTime
+          fhemTimeGm
+          getKeyValue
+          gettimeofday
+          genUUID
+          init_done
+          InternalTimer
+          IsDisabled
+          Log
+          Log3         
+          modules          
+          readingsSingleUpdate
+          readingsBulkUpdate
+          readingsBulkUpdateIfChanged
+          readingsBeginUpdate
+          readingsEndUpdate
+          ReadingsVal
+          RemoveInternalTimer
+          setKeyValue
+          TimeNow
+          Value
+        )
+  );
+}
+
+# Versions History intern
+our %vNotesIntern = (
+  "1.3.0"  => "15.03.2019  change module to use package SMAPortal and user Meta.pm, new sub setVersionInfo",
+  "1.2.3"  => "12.03.2019  make ready for 98_Installer.pm ", 
+  "1.2.2"  => "11.03.2019  new Errormessage analyze added, make ready for Meta.pm ", 
+  "1.2.1"  => "10.03.2019  behavior of state changed, commandref revised ", 
+  "1.2.0"  => "09.03.2019  integrate weather data, minor fixes ",
+  "1.1.0"  => "09.03.2019  make get data more stable, new attribute \"getDataRetries\" ",
+  "1.0.0"  => "03.03.2019  initial "
+);
 
 ###############################################################
 #                         SMAPortal Define
 ###############################################################
-sub SMAPortal_Define($$) {
+sub Define($$) {
   my ($hash, $def) = @_;
   my @a = split(/\s+/, $def);
   
   return "Wrong syntax: use \"define <name> SMAPortal\" " if(int(@a) < 1);
 
-  $hash->{VERSION}  = (SMAPortal_sortVersion("desc",keys %SMAPortal_vNotesIntern))[0];
+  # Versionsinformationen setzen
+  setVersionInfo($hash);
   
-  SMAPortal_getcredentials($hash,1);     # Credentials lesen und in RAM laden ($boot=1)
-  SMAPortal_CallInfo($hash);             # Start Daten Abrufschleife
-  SMAPortal_delcookiefile($hash);        # Start Schleife regelmäßiges Löschen Cookiefile
+  getcredentials($hash,1);     # Credentials lesen und in RAM laden ($boot=1)
+  CallInfo($hash);             # Start Daten Abrufschleife
+  delcookiefile($hash);        # Start Schleife regelmäßiges Löschen Cookiefile
  
 return undef;
 }
@@ -103,7 +168,7 @@ return undef;
 ###############################################################
 #                         SMAPortal Undefine
 ###############################################################
-sub SMAPortal_Undefine($$) {
+sub Undefine($$) {
   my ($hash, $arg) = @_;
 
   RemoveInternalTimer($hash);
@@ -115,7 +180,7 @@ return undef;
 ###############################################################
 #                         SMAPortal Delete
 ###############################################################
-sub SMAPortal_Delete($$) {
+sub Delete($$) {
     my ($hash, $arg) = @_;
     my $index = $hash->{TYPE}."_".$hash->{NAME}."_credentials";
     my $name  = $hash->{NAME};
@@ -129,7 +194,7 @@ return undef;
 ###############################################################
 #                          SMAPortal Set
 ###############################################################
-sub SMAPortal_Set($@) {
+sub Set($@) {
   my ($hash, @a) = @_;
   return "\"set X\" needs at least an argument" if ( @a < 2 );
   my $name    = $a[0];
@@ -154,10 +219,10 @@ sub SMAPortal_Set($@) {
 
   if ($opt eq "credentials") {
       return "Credentials are incomplete, use username password" if (!$prop || !$prop1);    
-      ($success) = SMAPortal_setcredentials($hash,$prop,$prop1); 
+      ($success) = setcredentials($hash,$prop,$prop1); 
 	  
 	  if($success) {
-          SMAPortal_CallInfo($hash);
+          CallInfo($hash);
 		  return "Username and Password saved successfully";
 	  } else {
 		   return "Error while saving Username / Password - see logfile for details";
@@ -173,7 +238,7 @@ return;
 ######################################################################################
 #                            Username / Paßwort speichern
 ######################################################################################
-sub SMAPortal_setcredentials ($@) {
+sub setcredentials ($@) {
     my ($hash, @credentials) = @_;
     my $name                 = $hash->{NAME};
     my ($success, $credstr, $index, $retcode);
@@ -197,7 +262,7 @@ sub SMAPortal_setcredentials ($@) {
         Log3($name, 1, "$name - Error while saving the Credentials - $retcode");
         $success = 0;
     } else {
-        SMAPortal_getcredentials($hash,1);        # Credentials nach Speicherung lesen und in RAM laden ($boot=1)
+        getcredentials($hash,1);        # Credentials nach Speicherung lesen und in RAM laden ($boot=1)
         $success = 1;
     }
 
@@ -207,7 +272,7 @@ return ($success);
 ######################################################################################
 #                             Username / Paßwort abrufen
 ######################################################################################
-sub SMAPortal_getcredentials ($$) {
+sub getcredentials ($$) {
     my ($hash,$boot) = @_;
     my $name         = $hash->{NAME};
     my ($success, $username, $passwd, $index, $retcode, $credstr);
@@ -265,7 +330,7 @@ return ($success, $username, $passwd);
 ###############################################################
 #                          SMAPortal Get
 ###############################################################
-sub SMAPortal_Get($$) {
+sub Get($$) {
  my ($hash, @a) = @_;
  return "\"get X\" needs at least an argument" if ( @a < 2 );
  my $name = shift @a;
@@ -278,12 +343,12 @@ sub SMAPortal_Get($$) {
  return "module is disabled" if(IsDisabled($name));
   
  if ($opt eq "data") {
-     SMAPortal_CallInfo($hash);
+     CallInfo($hash);
  
  } elsif ($opt eq "storedCredentials") {
 	    if(!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials &lt;username&gt; &lt;password&gt;\"";}
         # Credentials abrufen
-        my ($success, $username, $password) = SMAPortal_getcredentials($hash,0);
+        my ($success, $username, $password) = getcredentials($hash,0);
         unless ($success) {return "Credentials couldn't be retrieved successfully - see logfile"};
         
         return "Stored Credentials to access SMA Portal:\n".
@@ -300,7 +365,7 @@ return undef;
 ###############################################################
 #                          SMAPortal Attr
 ###############################################################
-sub SMAPortal_Attr($$$$) {
+sub Attr($$$$) {
     my ($cmd,$name,$aName,$aVal) = @_;
     my $hash = $defs{$name};
     my ($do,$val);
@@ -317,13 +382,13 @@ sub SMAPortal_Attr($$$$) {
 		$val = ($do == 1 ? "disabled" : "initialized");
         
         if($do) {
-            SMAPortal_delread($hash);
+            delread($hash);
             delete $hash->{MODE};
             RemoveInternalTimer($hash);            
-            SMAPortal_delcookiefile($hash,1);            
+            delcookiefile($hash,1);            
         } else {
-            InternalTimer(gettimeofday()+1.0, "SMAPortal_CallInfo", $hash, 0);
-            InternalTimer(gettimeofday()+5.0, "SMAPortal_delcookiefile", $hash, 0);
+            InternalTimer(gettimeofday()+1.0, "FHEM::SMAPortal::CallInfo", $hash, 0);
+            InternalTimer(gettimeofday()+5.0, "FHEM::SMAPortal::delcookiefile", $hash, 0);
         }
 	    
         readingsBeginUpdate($hash);
@@ -336,7 +401,7 @@ sub SMAPortal_Attr($$$$) {
             unless ($aVal =~ /^\d+$/) {return " The Value for $aName is not valid. Use only figures 0-9 !";}
         }
         if($aName =~ m/interval/) {
-            InternalTimer(gettimeofday()+1.0, "SMAPortal_CallInfo", $hash, 0);
+            InternalTimer(gettimeofday()+1.0, "FHEM::SMAPortal::CallInfo", $hash, 0);
         }        
     }
 
@@ -346,14 +411,14 @@ return undef;
 ################################################################
 ##               Hauptschleife BlockingCall
 ################################################################
-sub SMAPortal_CallInfo($) {
+sub CallInfo($) {
   my ($hash)   = @_;
   my $name     = $hash->{NAME};
   my $timeout  = AttrVal($name, "timeout", 30);
   my $interval = AttrVal($name, "interval", 300);
   my $new;
   
-  RemoveInternalTimer($hash,"SMAPortal_CallInfo");
+  RemoveInternalTimer($hash,"FHEM::SMAPortal::CallInfo");
   
   if($init_done == 1) {
       if(!$hash->{CREDENTIALS}) {
@@ -366,7 +431,7 @@ sub SMAPortal_CallInfo($) {
           $hash->{MODE} = "Manual";
       } else {
           $new = gettimeofday()+$interval; 
-          InternalTimer($new, "SMAPortal_CallInfo", $hash, 0);
+          InternalTimer($new, "FHEM::SMAPortal::CallInfo", $hash, 0);
           $hash->{MODE} = "Automatic - next polltime: ".FmtTime($new);
       }
 
@@ -378,11 +443,11 @@ sub SMAPortal_CallInfo($) {
       } 
       
 	  $hash->{HELPER}{RETRIES} = AttrVal($name, "getDataRetries", 3);
-      $hash->{HELPER}{RUNNING_PID} = BlockingCall("SMAPortal_GetData", $name, "SMAPortal_ParseData", $timeout, "SMAPortal_ParseAborted", $hash);
+      $hash->{HELPER}{RUNNING_PID} = BlockingCall("FHEM::SMAPortal::GetData", $name, "FHEM::SMAPortal::ParseData", $timeout, "FHEM::SMAPortal::ParseAborted", $hash);
       $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057
   
   } else {
-      InternalTimer(gettimeofday()+5, "SMAPortal_CallInfo", $hash, 0);
+      InternalTimer(gettimeofday()+5, "FHEM::SMAPortal::CallInfo", $hash, 0);
   }
     
 return;  
@@ -391,7 +456,7 @@ return;
 ################################################################
 ##                  Datenabruf SMA-Portal
 ################################################################
-sub SMAPortal_GetData($) {
+sub GetData($) {
   my ($name) = @_;
   my $hash   = $defs{$name};
   my ($livedata_content);
@@ -400,7 +465,7 @@ sub SMAPortal_GetData($) {
   my $useragent      = AttrVal($name, "userAgent", "Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.2; Trident/6.0)");
   my $cookieLocation = AttrVal($name, "cookieLocation", "./log/mycookies.txt"); 
    
-  Log3 $name, 5, "$name - Start BlockingCall SMAPortal_GetData with CookieLocation: $cookieLocation and UserAgent: $useragent";
+  Log3 $name, 5, "$name - Start BlockingCall GetData with CookieLocation: $cookieLocation and UserAgent: $useragent";
   
   my $ua = LWP::UserAgent->new;
 
@@ -455,7 +520,7 @@ sub SMAPortal_GetData($) {
       Log3 $name, 3, "$name - not logged in. Try again ...";
       
       # Credentials abrufen
-      my ($success, $username, $password) = SMAPortal_getcredentials($hash,0);
+      my ($success, $username, $password) = getcredentials($hash,0);
   
       unless ($success) {
           Log3($name, 1, "$name - Credentials couldn't be retrieved successfully - make sure you've set it with \"set $name credentials <username> <password>\"");   
@@ -481,7 +546,7 @@ sub SMAPortal_GetData($) {
       }
   }
   
-  my ($reread,$retry) = SMAPortal_analivedat($hash,$livedata_content);
+  my ($reread,$retry) = analivedat($hash,$livedata_content);
   
   # Daten müssen als Einzeiler zurückgegeben werden
   $livedata_content    = encode_base64($livedata_content,"");
@@ -494,7 +559,7 @@ return "$name|$livedata_content|$forecast_content|$weatherdata_content|$login_st
 ################################################################
 ##  Verarbeitung empfangene Daten, setzen Readings
 ################################################################
-sub SMAPortal_ParseData($) {
+sub ParseData($) {
   my ($string) = @_;
   my @a = split("\\|",$string);
   my $hash        = $defs{$a[0]};
@@ -518,7 +583,7 @@ sub SMAPortal_ParseData($) {
 	  delete($hash->{HELPER}{RUNNING_PID});
       readingsSingleUpdate($hash, "L1_Login-Status", "successful", 1);
       $hash->{HELPER}{oldlogintime} = gettimeofday();
-	  $hash->{HELPER}{RUNNING_PID} = BlockingCall("SMAPortal_GetData", $name, "SMAPortal_ParseData", $timeout, "SMAPortal_ParseAborted", $hash);
+	  $hash->{HELPER}{RUNNING_PID} = BlockingCall("FHEM::SMAPortal::GetData", $name, "FHEM::SMAPortal::ParseData", $timeout, "FHEM::SMAPortal::ParseAborted", $hash);
       $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057
       return;
   }
@@ -526,12 +591,12 @@ sub SMAPortal_ParseData($) {
       # Livedaten konnte nicht gelesen werden, neuer Versuch zeitverzögert
 	  delete($hash->{HELPER}{RUNNING_PID});
 	  $hash->{HELPER}{RETRIES} -= 1;
-      InternalTimer(gettimeofday()+5, "SMAPortal_retrygetdata", $hash, 0);
+      InternalTimer(gettimeofday()+5, "FHEM::SMAPortal::retrygetdata", $hash, 0);
       return;
   }  
   
   my $dl = AttrVal($name, "detailLevel", 1);
-  SMAPortal_delread($hash, $dl+1);
+  delread($hash, $dl+1);
   
   readingsBeginUpdate($hash);
   
@@ -583,12 +648,12 @@ sub SMAPortal_ParseData($) {
   
   if ($forecast_content && $forecast_content !~ m/undefined/i) {
       # Auswertung der Forecast Daten
-      SMAPortal_extractForecastData($hash,$forecast_content);
+      extractForecastData($hash,$forecast_content);
   }
   
   if ($weatherdata_content && $weatherdata_content !~ m/undefined/i) {
       # Auswertung Wetterdaten
-      SMAPortal_extractWeatherData($hash,$weatherdata_content);
+      extractWeatherData($hash,$weatherdata_content);
   }
   
   my $pv = ReadingsVal($name, "L1_PV", 0);
@@ -615,7 +680,7 @@ sub SMAPortal_ParseData($) {
 ################################################################
 ##                   Timeout  BlockingCall
 ################################################################
-sub SMAPortal_ParseAborted($) {
+sub ParseAborted($) {
   my ($hash,$cause) = @_;
   my $name = $hash->{NAME};
    
@@ -628,12 +693,12 @@ sub SMAPortal_ParseAborted($) {
 ################################################################
 ##             regelmäßig Cookie-Datei löschen
 ################################################################
-sub SMAPortal_delcookiefile ($;$) {
+sub delcookiefile ($;$) {
    my ($hash,$must) = @_;
    my $name         = $hash->{NAME};
    my ($validperiod, $cookieLocation, $oldlogintime, $delfile);
    
-   RemoveInternalTimer($hash,"SMAPortal_delcookiefile");
+   RemoveInternalTimer($hash,"FHEM::SMAPortal::delcookiefile");
    
    # Gültigkeitsdauer Cookie in Sekunden
    $validperiod    = AttrVal($name, "cookielifetime", 3000);    
@@ -659,7 +724,7 @@ sub SMAPortal_delcookiefile ($;$) {
    
    return if(IsDisabled($name));
    
-   InternalTimer(gettimeofday()+30, "SMAPortal_delcookiefile", $hash, 0);
+   InternalTimer(gettimeofday()+30, "FHEM::SMAPortal::delcookiefile", $hash, 0);
 
 return;
 }
@@ -667,7 +732,7 @@ return;
 ################################################################
 ##         Auswertung Forecast Daten
 ################################################################
-sub SMAPortal_extractForecastData($$) {
+sub extractForecastData($$) {
   my ($hash,$forecast) = @_;
   my $name = $hash->{NAME};
   
@@ -796,7 +861,7 @@ return;
 ################################################################
 ##         Auswertung Wetterdaten
 ################################################################
-sub SMAPortal_extractWeatherData($$) {
+sub extractWeatherData($$) {
   my ($hash,$weather) = @_;
   my $name = $hash->{NAME};
   
@@ -843,7 +908,7 @@ return;
 # Schwartzian Transform and the GRT transform
 # Übergabe: "asc | desc",<Liste von Versionsnummern>
 ################################################################
-sub SMAPortal_sortVersion (@) {
+sub sortVersionNum (@) {
   my ($sseq,@versions) = @_;
 
   my @sorted = map {$_->[0]}
@@ -862,10 +927,41 @@ return @sorted;
 }
 
 ################################################################
+#               Versionierungen des Moduls setzen
+#  Die Verwendung von Meta.pm und Packages wird berücksichtigt
+################################################################
+sub setVersionInfo($) {
+  my ($hash)  = @_;
+  my $name    = $hash->{NAME};
+
+  my $type = $hash->{TYPE};
+  if($modules{$type}{META}{x_prereqs_src}) {
+	  # META-Daten sind vorhanden
+	  $modules{$type}{META}{version} = "v".(sortVersionNum("desc",keys %vNotesIntern))[0];              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: ... $ im Kopf komplett! vorhanden )
+		  $modules{$type}{META}{x_version} =~ s/0.0.0/(sortVersionNum("desc",keys %vNotesIntern))[0]/e;
+	  } else {
+		  $modules{$type}{META}{x_version} = (sortVersionNum("desc",keys %vNotesIntern))[0]; 
+	  }
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: ... $ im Kopf komplett! vorhanden )
+	  if( __PACKAGE__ eq $type) {
+	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
+		  # kann mit {SMAPortal->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
+	      use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );                                          
+      }
+  } else {
+	  # herkömmliche Modulstruktur
+	  $hash->{VERSION} = (sortVersionNum("desc",keys %vNotesIntern))[0];
+  }
+  
+return;
+}
+
+################################################################
 #                 delete Readings
 #   $dl = detailLevel ab dem das Reading gelöscht werden soll 
 ################################################################
-sub SMAPortal_delread($;$) {
+sub delread($;$) {
   my ($hash,$dl) = @_;
   my $name   = $hash->{NAME};
   my @allrds = keys%{$defs{$name}{READINGS}};
@@ -891,7 +987,7 @@ return;
 ################################################################
 #                 analysiere Livedaten
 ################################################################
-sub SMAPortal_analivedat($$) {
+sub analivedat($$) {
   my ($hash,$lc) = @_;
   my $name       = $hash->{NAME};
   my ($reread,$retry) = (0,0);
@@ -943,12 +1039,12 @@ return ($reread,$retry);
 ################################################################
 #                    Restart get Data
 ################################################################
-sub SMAPortal_retrygetdata($) {
+sub retrygetdata($) {
   my ($hash)  = @_;
   my $name    = $hash->{NAME};
   my $timeout = AttrVal($name, "timeout", 30);
 
-  $hash->{HELPER}{RUNNING_PID} = BlockingCall("SMAPortal_GetData", $name, "SMAPortal_ParseData", $timeout, "SMAPortal_ParseAborted", $hash);
+  $hash->{HELPER}{RUNNING_PID} = BlockingCall("FHEM::SMAPortal::GetData", $name, "FHEM::SMAPortal::ParseData", $timeout, "FHEM::SMAPortal::ParseAborted", $hash);
   $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057
 	  
 return;
@@ -1158,7 +1254,7 @@ return;
     "portal",
     "smaportal"
   ],
-  "version": "v1.2.3",
+  "version": "v0.0.0",
   "release_status": "testing",
   "author": [
     "Heiko Maaz <heiko.maaz@t-online.de>"
@@ -1177,10 +1273,13 @@ return;
         "JSON": 0,
         "POSIX": 0,
         "Data::Dumper": 0,
-        "Blocking":0,
-        "Time::HiRes":0,
-        "LWP":0,
-        "HTTP::Cookies": 0
+        "Blocking": 0,
+        "GPUtils": 0,
+        "Time::HiRes": 0,
+        "LWP": 0,
+        "HTTP::Cookies": 0,
+        "FHEM::Meta": 0,
+        "MIME::Base64": 0
       },
       "recommends": {
       },
