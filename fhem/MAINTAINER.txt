@@ -542,7 +542,7 @@ FHEM/HttpUtils.pm            rudolfkoenig         Automatisierung
 FHEM/MaxCommon.pm            rudolfkoenig/orphan  MAX
 FHEM/Meta.pm                 loredo               FHEM Development
 FHEM/msgSchema.pm            loredo               Automatisierung
-FHEM/ONKYOdb.pm              loredo               Multimedia
+FHEM/ONKYOdb.pm              delmar               Multimedia
 FHEM/OpenWeatherAPI.pm       CoolTux              Unterstuetzende Dienste/Wettermodule
 FHEM/OWX_DS2480.pm           ntruchsess           1Wire
 FHEM/OWX_DS9097.pm           ntruchsess           1Wire
