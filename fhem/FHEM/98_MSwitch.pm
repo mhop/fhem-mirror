@@ -83,7 +83,7 @@ if ( $preconf && $preconf ne "" ) {
 }
 
 my $autoupdate = 'off';    #off/on
-my $version    = '2.11';
+my $version    = '2.12';
 my $vupdate    = 'V2.00'
   ; # versionsnummer der datenstruktur . änderung der nummer löst MSwitch_VUpdate aus .
 my $savecount = 30
@@ -2609,7 +2609,7 @@ sub MSwitch_Notify($$) {
     }
 
     my $triggerlog = ReadingsVal( $ownName, 'Trigger_log', 'off' );
-    if ( $incommingdevice eq $triggerdevice || $triggerdevice eq "all_events" )
+      if ( $incommingdevice eq $triggerdevice || $triggerdevice eq "all_events" || $triggerdevice eq "MSwitch_Self" )
     {
         # teste auf triggertreffer oder GLOBAL trigger
         my $activecount = 0;
@@ -3070,8 +3070,8 @@ MSwitch_LOG( $name, 6, "bridgemode $bridgemode " );
 MSwitch_LOG( $name, 6, "event  : -$event-" );
 MSwitch_LOG( $name, 6, "checke keys" );
 my $foundkey ="undef";
-my $etikeys= $hash->{helper}{eventtoid};
-foreach my $a ( sort keys %{$etikeys} ) 
+ my $etikeys= $hash->{helper}{eventtoid};
+ foreach my $a ( sort keys %{$etikeys} ) 
 {
    MSwitch_LOG( $name, 6, "key : $a" );
    my $re = qr/$a/;
@@ -3096,6 +3096,7 @@ MSwitch_LOG( $name, 6, "helper eventoid : ".$hash->{helper}{eventtoid}{$foundkey
  MSwitch_Exec_Notif( $hash, $zweig, 'nocheck', '', $bridge[2] );
 return "undef";
 }
+
 ############################
 sub MSwitch_fhemwebFn($$$$) {
 
