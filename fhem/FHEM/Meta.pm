@@ -803,10 +803,12 @@ sub GetModuleSourceOrigin {
     return $corePackageUpdates{$module}[0]
       if ( defined( $corePackageUpdates{$module} ) );
 
-    return $corePackageUpdates{$module}[0]
-      if ( defined( $corePackageUpdates{$module} ) );
-
     return '';
+}
+
+sub ModuleIsCore {
+    my ($module) = @_;
+    return GetModuleSourceOrigin($module) eq 'fhem' ? 1 : 0;
 }
 
 sub ModuleIsInternal {
@@ -1467,14 +1469,6 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
         }
     }
 
-    # add legacy POD info as Metadata
-    push @{ $modMeta->{keywords} },
-      "fhem-mod-$item_modtype"
-      if (
-        $item_modtype
-        && (   !defined( $modMeta->{keywords} )
-            || !grep ( "fhem-mod-$item_modtype", @{ $modMeta->{keywords} } ) )
-      );
     $modMeta->{abstract} = $item_summary
       if ( $item_summary && !defined( $modMeta->{abstract} ) );
     $modMeta->{x_lang}{de}{abstract} = $item_summary_DE
@@ -1510,6 +1504,23 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
     }
     unless ( $modMeta->{author} ) {
         $modMeta->{author} = ['unknown <>'];
+    }
+    unless ( defined( $modMeta->{x_support_status} ) ) {
+        if (   defined( $moduleMaintainers{$modName} )
+            && ref( $moduleMaintainers{$modName} ) eq 'ARRAY'
+            && defined( $moduleMaintainers{$modName}[2] ) )
+        {
+            $modMeta->{x_support_status} =
+              $moduleMaintainers{$modName}[2];
+        }
+        elsif ( defined( $modMeta->{resources} )
+            && $modMeta->{resources}{x_support_community} )
+        {
+            $modMeta->{x_support_status} = 'supported';
+        }
+        else {
+            $modMeta->{x_support_status} = 'unknown';
+        }
     }
 
     # Generate META information for FHEM core modules
@@ -1634,24 +1645,6 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
             }
         }
 
-        unless ( defined( $modMeta->{x_support_status} ) ) {
-            if (   defined( $moduleMaintainers{$modName} )
-                && ref( $moduleMaintainers{$modName} ) eq 'ARRAY'
-                && defined( $moduleMaintainers{$modName}[2] ) )
-            {
-                $modMeta->{x_support_status} =
-                  $moduleMaintainers{$modName}[2];
-            }
-            elsif ( defined( $modMeta->{resources} )
-                && $modMeta->{resources}{x_support_community} )
-            {
-                $modMeta->{x_support_status} = 'supported';
-            }
-            else {
-                $modMeta->{x_support_status} = 'unknown';
-            }
-        }
-
         unless (
                defined( $modMeta->{resources} )
             && defined( $modMeta->{resources}{repository} )
@@ -1680,13 +1673,122 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
                   );
                 $modMeta->{resources}{repository}{x_raw} =
                   'https://svn.fhem.de/fhem/trunk/'
-                  . ( $modMeta->{resources}{repository}{x_filepath} =~ /\/$/
+                  . (
+                      $modMeta->{resources}{repository}{x_filepath} =~ /\/$/
                     ? $modMeta->{resources}{repository}{x_filepath}
-                    : $modMeta->{resources}{repository}{x_filepath} . '/' )
+                    : $modMeta->{resources}{repository}{x_filepath} . '/'
+                  )
                   . $modMeta->{x_file}[1]
                   . $modMeta->{x_file}[2];
             }
         }
+    }
+
+    # delete some attributes that are exclusive to FHEM core
+    else {
+        delete $modMeta->{x_fhem_maintainer};
+        delete $modMeta->{x_fhem_maintainer_github};
+    }
+
+    # Filter keywords that are reserved for FHEM core
+    if ( defined( $modMeta->{keywords} ) && @{ $modMeta->{keywords} } > 0 ) {
+        my @filtered;
+
+        foreach ( @{ $modMeta->{keywords} } ) {
+            push @filtered, lc($_)
+              unless ( lc($_) eq 'fhem-core'
+                || lc($_) eq 'fhem-3rdparty'
+                || lc($_) eq 'fhem-mod'
+                || lc($_) eq 'fhem-pkg' );
+        }
+
+        $modMeta->{keywords} = \@filtered;
+    }
+
+    # Generate keywords, based on support data
+    # add legacy POD info as Metadata
+    if (   defined( $modMeta->{resources} )
+        && defined( $modMeta->{resources}{x_support_community} ) )
+    {
+        if ( defined( $modMeta->{resources}{x_support_community}{board} )
+            && $modMeta->{resources}{x_support_community}{board} ne '' )
+        {
+            if (
+                defined(
+                    $modMeta->{resources}{x_support_community}{subCommunity}
+                )
+                && defined(
+                    $modMeta->{resources}{x_support_community}{subCommunity}
+                      {board}
+                )
+                && $modMeta->{resources}{x_support_community}{subCommunity}
+                {board} ne ''
+              )
+            {
+                my $tag =
+                  lc( $modMeta->{resources}{x_support_community}{subCommunity}
+                      {board} );
+                $tag =~ s/ - |»/ /g;
+                $tag =~ s/ +/-/g;
+                $tag = 'fhem-' . $tag
+                  if ( $modMeta->{resources}{x_support_community}{cat} =~
+                    /^FHEM/i );
+                $tag = 'cul-' . $tag
+                  if ( $modMeta->{resources}{x_support_community}{cat} =~
+                    /^CUL/i );
+
+                push @{ $modMeta->{keywords} }, $tag
+                  if ( !defined( $modMeta->{keywords} )
+                    || !grep ( m/^$tag$/i, @{ $modMeta->{keywords} } ) );
+            }
+
+            my $tag = lc( $modMeta->{resources}{x_support_community}{board} );
+            $tag =~ s/ - |»/ /g;
+            $tag =~ s/ +/-/g;
+            $tag = 'fhem-' . $tag
+              if (
+                $modMeta->{resources}{x_support_community}{cat} =~ /^FHEM/i );
+            $tag = 'cul-' . $tag
+              if ( $modMeta->{resources}{x_support_community}{cat} =~ /^CUL/i );
+
+            push @{ $modMeta->{keywords} }, $tag
+              if ( !defined( $modMeta->{keywords} )
+                || !grep ( m/^$tag$/i, @{ $modMeta->{keywords} } ) );
+        }
+
+        if (   defined( $modMeta->{resources}{x_support_community}{cat} )
+            && $modMeta->{resources}{x_support_community}{cat} ne ''
+            && $modMeta->{resources}{x_support_community}{cat} ne 'FHEM' )
+        {
+            my $tag = lc( $modMeta->{resources}{x_support_community}{cat} );
+            $tag =~ s/ - |»/ /g;
+            $tag =~ s/ +/-/g;
+
+            push @{ $modMeta->{keywords} }, $tag
+              if ( !defined( $modMeta->{keywords} )
+                || !grep ( m/^$tag$/i, @{ $modMeta->{keywords} } ) );
+        }
+    }
+
+    # add legacy POD info as Metadata
+    push @{ $modMeta->{keywords} },
+      "fhem-mod-$item_modtype"
+      if (
+        $item_modtype
+        && (   !defined( $modMeta->{keywords} )
+            || !grep ( "fhem-mod-$item_modtype", @{ $modMeta->{keywords} } ) )
+      );
+
+    # Add some keywords about the module origin
+    if ( GetModuleSourceOrigin( $modMeta->{x_file}[4] ) eq 'fhem' ) {
+        push @{ $modMeta->{keywords} }, 'fhem-core';
+    }
+    elsif ( GetModuleSourceOrigin( $modMeta->{x_file}[4] ) ne '' ) {
+        push @{ $modMeta->{keywords} }, 'fhem-3rdparty';
+    }
+    else {
+        my $modType = $modMeta->{x_file}[3] ? 'mod' : 'pkg';
+        push @{ $modMeta->{keywords} }, "fhem-$modType-local";
     }
 
     # generate x_version
@@ -1913,12 +2015,34 @@ sub __GetSupportForum {
                             )
                           )
                         {
-                            $ret{cat}   = $cat;
-                            $ret{board} = $board . ' » ' . $subBoard;
+                            $ret{cat} = $cat;
+
+                            $ret{board} = $board;
                             $ret{boardId} =
+                              $supportForumCategories{$cat}{$board}{boardId};
+                            $ret{description} =
+                              $supportForumCategories{$cat}{$board}{description}
+                              if (
+                                defined(
+                                    $supportForumCategories{$cat}{$board}
+                                      {description}
+                                )
+                              );
+                            $ret{language} =
+                              $supportForumCategories{$cat}{$board}{language}
+                              if (
+                                defined(
+                                    $supportForumCategories{$cat}{$board}
+                                      {language}
+                                )
+                              );
+
+                            $ret{subCommunity}{board} =
+                              $board . ' » ' . $subBoard;
+                            $ret{subCommunity}{boardId} =
                               $supportForumCategories{$cat}{$board}{$subBoard}
                               {boardId};
-                            $ret{description} =
+                            $ret{subCommunity}{description} =
                               $supportForumCategories{$cat}{$board}{$subBoard}
                               {description}
                               if (
@@ -1927,7 +2051,7 @@ sub __GetSupportForum {
                                       {$subBoard}{description}
                                 )
                               );
-                            $ret{language} =
+                            $ret{subCommunity}{language} =
                               $supportForumCategories{$cat}{$board}{$subBoard}
                               {language}
                               if (
@@ -1948,7 +2072,7 @@ sub __GetSupportForum {
     $ret{forum}    = $supportForum{forum};
     $ret{title}    = $supportForum{forum};
     $ret{language} = $supportForum{default_language}
-      unless ( defined( $ret{language} ) );
+      if ( defined( $ret{language} ) );
     $ret{web} = $supportForum{url};
     $ret{rss} = $supportForum{url} . $supportForum{rss};
 
@@ -1958,6 +2082,22 @@ sub __GetSupportForum {
         $ret{rss}   .= ';board=%BOARDID%';
         $ret{web} =~ s/%BOARDID%/$ret{boardId}/;
         $ret{rss} =~ s/%BOARDID%/$ret{boardId}/;
+
+        if (   defined( $ret{subCommunity} )
+            && defined( $ret{subCommunity}{boardId} ) )
+        {
+            $ret{subCommunity}{title}    = $supportForum{forum};
+            $ret{subCommunity}{language} = $supportForum{default_language}
+              unless ( defined( $ret{subCommunity}{language} ) );
+            $ret{subCommunity}{web} = $supportForum{url};
+            $ret{subCommunity}{rss} = $supportForum{url} . $supportForum{rss};
+
+            $ret{subCommunity}{title} .= ': ' . $ret{subCommunity}{board};
+            $ret{subCommunity}{web}   .= $supportForum{uri};
+            $ret{subCommunity}{rss}   .= ';board=%BOARDID%';
+            $ret{subCommunity}{web} =~ s/%BOARDID%/$ret{subCommunity}{boardId}/;
+            $ret{subCommunity}{rss} =~ s/%BOARDID%/$ret{subCommunity}{boardId}/;
+        }
     }
     else {
         $ret{web} .= '/';

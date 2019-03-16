@@ -1217,20 +1217,28 @@ sub CreateMetadataList ($$$) {
                 && defined( $modMeta->{resources}{x_support_community} )
                 && defined( $modMeta->{resources}{x_support_community}{web} ) )
             {
+
+                my $board = $modMeta->{resources}{x_support_community};
+                $board =
+                  $modMeta->{resources}{x_support_community}{subCommunity}
+                  if (
+                    defined(
+                        $modMeta->{resources}{x_support_community}{subCommunity}
+                    )
+                  );
+
                 my $title =
-                  defined( $modMeta->{resources}{x_support_community}{title} )
-                  ? $modMeta->{resources}{x_support_community}{title}
+                  defined( $board->{title} ) ? $board->{title}
                   : (
-                    $modMeta->{resources}{x_support_community}{web} =~
-                      m/^(?:https?:\/\/)?forum\.fhem\.de/i ? 'FHEM Forum'
+                    $board->{web} =~ m/^(?:https?:\/\/)?forum\.fhem\.de/i
+                    ? 'FHEM Forum'
                     : ''
                   );
 
                 $title = 'FHEM Forum: ' . $title
                   if ( $title ne ''
                     && $title !~ m/^FHEM Forum/i
-                    && $modMeta->{resources}{x_support_community}{web} =~
-                    m/^(?:https?:\/\/)?forum\.fhem\.de/i );
+                    && $board->{web} =~ m/^(?:https?:\/\/)?forum\.fhem\.de/i );
 
                 $l .= 'Limited - '
                   if ( defined( $modMeta->{x_support_status} )
@@ -1238,15 +1246,11 @@ sub CreateMetadataList ($$$) {
 
                 $l .=
                     '<a href="'
-                  . $modMeta->{resources}{x_support_community}{web}
+                  . $board->{web}
                   . '" target="_blank"'
                   . (
-                    defined(
-                        $modMeta->{resources}{x_support_community}{description}
-                      )
-                    ? ' title="'
-                      . $modMeta->{resources}{x_support_community}{description}
-                      . '"'
+                    defined( $board->{description} )
+                    ? ' title="' . $board->{description} . '"'
                     : ''
                   )
                   . '>'
