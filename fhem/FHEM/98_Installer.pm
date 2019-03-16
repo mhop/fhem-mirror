@@ -34,185 +34,6 @@ use GPUtils qw(GP_Import);
 use JSON;
 use Data::Dumper;
 
-# based on https://metacpan.org/release/perl
-my @perlPragmas = qw(
-  attributes
-  autodie
-  autouse
-  base
-  bigint
-  bignum
-  bigrat
-  blib
-  bytes
-  charnames
-  constant
-  diagnostics
-  encoding
-  feature
-  fields
-  filetest
-  if
-  integer
-  less
-  lib
-  locale
-  mro
-  open
-  ops
-  overload
-  overloading
-  parent
-  re
-  sigtrap
-  sort
-  strict
-  subs
-  threads
-  threads::shared
-  utf8
-  vars
-  vmsish
-  warnings
-  warnings::register
-);
-
-# based on https://metacpan.org/release/perl
-my @perlCoreModules = qw(
-  experimental
-  I18N::LangTags
-  I18N::LangTags::Detect
-  I18N::LangTags::List
-  IO
-  IO::Dir
-  IO::File
-  IO::Handle
-  IO::Pipe
-  IO::Poll
-  IO::Seekable
-  IO::Select
-  IO::Socket
-  IO::Socket::INET
-  IO::Socket::UNIX
-  Amiga::ARexx
-  Amiga::Exec
-  B
-  B::Concise
-  B::Showlex
-  B::Terse
-  B::Xref
-  O
-  OptreeCheck
-  Devel::Peek
-  ExtUtils::Miniperl
-  Fcntl
-  File::DosGlob
-  File::Find
-  File::Glob
-  FileCache
-  GDBM_File
-  Hash::Util::FieldHash
-  Hash::Util
-  I18N::Langinfo
-  IPC::Open2
-  IPC::Open3
-  NDBM_File
-  ODBM_File
-  Opcode
-  ops
-  POSIX
-  PerlIO::encoding
-  PerlIO::mmap
-  PerlIO::scalar
-  PerlIO::via
-  Pod::Html
-  SDBM_File
-  Sys::Hostname
-  Tie::Hash::NamedCapture
-  Tie::Memoize
-  VMS::DCLsym
-  VMS::Filespec
-  VMS::Stdio
-  Win32CORE
-  XS::APItest
-  XS::Typemap
-  arybase
-  ext/arybase/t/scope_0.pm
-  attributes
-  mro
-  re
-  Haiku
-  AnyDBM_File
-  B::Deparse
-  B::Op_private
-  Benchmark
-  Class::Struct
-  Config::Extensions
-  DB
-  DBM_Filter
-  DBM_Filter::compress
-  DBM_Filter::encode
-  DBM_Filter::int32
-  DBM_Filter::null
-  DBM_Filter::utf8
-  DirHandle
-  English
-  ExtUtils::Embed
-  ExtUtils::XSSymSet
-  File::Basename
-  File::Compare
-  File::Copy
-  File::stat
-  FileHandle
-  FindBin
-  Getopt::Std
-  Net::hostent
-  Net::netent
-  Net::protoent
-  Net::servent
-  PerlIO
-  SelectSaver
-  Symbol
-  Thread
-  Tie::Array
-  Tie::Handle
-  Tie::StdHandle
-  Tie::SubstrHash
-  Time::gmtime
-  Time::localtime
-  Time::tm
-  UNIVERSAL
-  Unicode::UCD
-  User::grent
-  User::pwent
-  blib
-  bytes
-  charnames
-  deprecate
-  feature
-  filetest
-  integer
-  less
-  locale
-  open
-  overload
-  overloading
-  sigtrap
-  sort
-  strict
-  subs
-  utf8
-  vars
-  vmsish
-  warnings
-  warnings::register
-  OS2::ExtAttr
-  OS2::PrfDB
-  OS2::Process
-  OS2::DLL
-  OS2::REXX
-);
-
 # Run before module compilation
 BEGIN {
     # Import from main::
@@ -1141,6 +962,13 @@ sub CreateMetadataList ($$$) {
           if ( $mAttr eq 'copyright' && !defined( $modMeta->{x_copyright} ) );
         next
           if (
+            $mAttr eq 'abstract'
+            && (   !defined( $modMeta->{abstract} )
+                || $modMeta->{abstract} eq 'n/a'
+                || $modMeta->{abstract} eq '' )
+          );
+        next
+          if (
             $mAttr eq 'description'
             && (   !defined( $modMeta->{description} )
                 || $modMeta->{description} eq 'n/a'
@@ -1188,6 +1016,24 @@ sub CreateMetadataList ($$$) {
             && (   !defined( $modMeta->{resources} )
                 || !defined( $modMeta->{resources}{x_privacy} ) )
           );
+        next
+          if (
+            $mAttr eq 'keywords'
+            && (   !defined( $modMeta->{keywords} )
+                || !@{ $modMeta->{keywords} } )
+          );
+        next
+          if ( $mAttr eq 'version'
+            && ( !defined( $modMeta->{version} ) ) );
+        next
+          if (
+            $mAttr eq 'version_control'
+            && (  !defined( $modMeta->{resources} )
+                || defined( $modMeta->{resources}{repository} ) )
+          );
+        next
+          if ( $mAttr eq 'release_date'
+            && ( !defined( $modMeta->{x_vcs} ) ) );
 
         my $l = $linecount % 2 == 0 ? $rowOpenEven : $rowOpenOdd;
         my $mAttrName = $mAttr;
@@ -1386,6 +1232,9 @@ sub CreateMetadataList ($$$) {
                     && $modMeta->{resources}{x_support_community}{web} =~
                     m/^(?:https?:\/\/)?forum\.fhem\.de/i );
 
+                $l .= 'Limited - '
+                  if ( $modMeta->{x_support_status} eq 'limited' );
+
                 $l .=
                     '<a href="'
                   . $modMeta->{resources}{x_support_community}{web}
@@ -1412,6 +1261,9 @@ sub CreateMetadataList ($$$) {
                   defined( $modMeta->{resources}{x_support_commercial}{title} )
                   ? $modMeta->{resources}{x_support_commercial}{title}
                   : $modMeta->{resources}{x_support_commercial}{web};
+
+                $l .= 'Limited - '
+                  if ( $modMeta->{x_support_status} eq 'limited' );
 
                 $l .=
                     '<a href="'
@@ -1466,72 +1318,49 @@ sub CreateMetadataList ($$$) {
             {
                 # Web link
                 if ( defined( $modMeta->{resources}{repository}{web} ) ) {
+
+                    # master link
                     my $url =
                       $modMeta->{resources}{repository}{web};
-                    $url .= '/' unless ( $url =~ m/\/$/ );
-                    $url .= $modMeta->{resources}{repository}{x_branch_master}
-                      if (
-                        defined(
-                            $modMeta->{resources}{repository}{x_branch_master}
-                        )
-                      );
 
                     if (
-                        defined(
-                            $modMeta->{resources}{repository}{x_filepath}
-                        )
-                      )
-                    {
-                        $url .= '/' unless ( $url =~ m/\/$/ );
-                        $url .=
-                          $modMeta->{resources}{repository}{x_filepath};
-                        $url .= '/' unless ( $url =~ m/\/$/ );
-                        $url .= $modMeta->{x_file}[2];
-
-                    }
-
-                    if (
-                        defined(
-                            $modMeta->{resources}{repository}{x_branch_master}
-                        )
+                        defined( $modMeta->{resources}{repository}{x_branch} )
+                        && defined( $modMeta->{resources}{repository}{x_dev} )
                         && defined(
-                            $modMeta->{resources}{repository}{x_branch_dev}
+                            $modMeta->{resources}{repository}{x_dev}{x_branch}
                         )
-                        && $modMeta->{resources}{repository}{x_branch_master}
-                        ne $modMeta->{resources}{repository}{x_branch_dev}
+                        && $modMeta->{resources}{repository}{x_branch} ne
+                        $modMeta->{resources}{repository}{x_dev}{x_branch}
                       )
                     {
+                        # master entry
                         $l .=
                             'View online source code: <a href="'
                           . $url
                           . '" target="_blank">'
-                          . (
-                            defined(
-                                $modMeta->{resources}{repository}{x_web_title}
-                              ) ? $modMeta->{resources}{repository}{x_web_title}
-                            : (
-                                defined(
-                                    $modMeta->{resources}{repository}
-                                      {x_branch_master}
-                                  )
-                                ? $modMeta->{resources}{repository}
-                                  {x_branch_master}
-                                : 'master'
-                            )
-                          ) . '</a>';
+                          . $modMeta->{resources}{repository}{x_branch}
+                          . '</a>';
 
+                        # dev link
                         $url =
-                          $modMeta->{resources}{repository}{web};
-                        $url .= '/' unless ( $url =~ m/\/$/ );
-                        $url .= $modMeta->{resources}{repository}{x_branch_dev};
+                          $modMeta->{resources}{repository}{x_dev}{web};
 
+                        # dev entry
                         $l .=
                             ' | <a href="'
                           . $url
                           . '" target="_blank">'
-                          . $modMeta->{resources}{repository}{x_branch_dev}
-                          . '</a>';
+                          . (
+                            defined(
+                                $modMeta->{resources}{repository}{x_dev}
+                                  {x_branch}
+                              )
+                            ? $modMeta->{resources}{repository}{x_dev}{x_branch}
+                            : 'dev'
+                          ) . '</a>';
                     }
+
+                    # master entry
                     else {
                         $l .=
                             '<a href="'
@@ -1599,10 +1428,7 @@ sub CreateMetadataList ($$$) {
             $mAttrVal =~ s/\\n/$lb/g;
 
             if ( $mAttr eq 'license' ) {
-                if ( $mAttrVal eq 'unknown' ) {
-                    $mAttrVal = '-';
-                }
-                elsif (defined( $modMeta->{resources} )
+                if (   defined( $modMeta->{resources} )
                     && defined( $modMeta->{resources}{license} )
                     && ref( $modMeta->{resources}{license} ) eq 'ARRAY'
                     && @{ $modMeta->{resources}{license} } > 0
@@ -1669,10 +1495,6 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                         $authorEditorOnly = $2 ? ' ' . $2 : '';
                         $authorEmail      = $3;
                     }
-                    if ( $authorName eq 'unknown' ) {
-                        $l .= '-';
-                        next;
-                    }
 
                     $authorNameEmail =
                         '<a href="mailto:'
@@ -1736,7 +1558,7 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
       ? $colorGreen . 'IN USE' . $colorClose
       : $txtOpen . 'not' . $txtClose . ' in use';
 
-    push @ret, 'This FHEM module is currently ' . $moduleUsage . '.'
+    push @ret, $lb . 'This FHEM module is currently ' . $moduleUsage . '.'
       unless ( $modName eq 'Global' );
 
     push @ret, '<h4>Perl Packages</h4>';
@@ -1745,13 +1567,14 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
     {
 
         push @ret,
-            $txtOpen . 'HINT:'
-          . $txtClose . "\n"
+            $txtOpen . 'Hint:'
+          . $txtClose
+          . $lb
           . 'This module does not provide Perl prerequisites from its metadata.'
-          . "\n"
-          . 'The following result is based on automatic source code analysis'
-          . "\n"
+          . $lb
+          . 'The following result is based on automatic source code analysis '
           . 'and can be incorrect.'
+          . $lb
           . $lb
           if ( defined( $modMeta->{x_prereqs_src} )
             && $modMeta->{x_prereqs_src} ne 'META.json' );
@@ -1823,10 +1646,11 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                       if ( $importance eq 'required' );
                 }
 
-                my $isPerlPragma = ModuleIsPerlPragma($prereq);
-                my $isPerlCore = $isPerlPragma ? 0 : ModuleIsPerlCore($prereq);
-                my $isFhem =
-                  $isPerlPragma || $isPerlCore ? 0 : ModuleIsInternal($prereq);
+                my $isPerlPragma = FHEM::Meta::ModuleIsPerlPragma($prereq);
+                my $isPerlCore =
+                  $isPerlPragma ? 0 : FHEM::Meta::ModuleIsPerlCore($prereq);
+                my $isFhem = $isPerlPragma
+                  || $isPerlCore ? 0 : FHEM::Meta::ModuleIsInternal($prereq);
                 if ( $isPerlPragma || $isPerlCore || $prereq eq 'perl' ) {
                     $installed =
                       $installed ne 'installed'
@@ -1872,11 +1696,12 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
         push @ret, $tableClose;
     }
     elsif ( defined( $modMeta->{x_prereqs_src} ) ) {
-        push @ret, 'No known prerequisites.' . $lb . $lb;
+        push @ret, $lb . 'No known prerequisites.' . $lb . $lb;
     }
     else {
         push @ret,
-            'Module metadata do not contain any prerequisites.' . "\n"
+            $lb
+          . 'Module metadata do not contain any prerequisites.' . "\n"
           . 'For automatic source code analysis, please install Perl::PrereqScanner::NotQuiteLite .'
           . $lb
           . $lb;
@@ -2058,10 +1883,11 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                       if ( $importance eq 'required' );
                 }
 
-                my $isPerlPragma = ModuleIsPerlPragma($prereq);
-                my $isPerlCore = $isPerlPragma ? 0 : ModuleIsPerlCore($prereq);
-                my $isFhem =
-                  $isPerlPragma || $isPerlCore ? 0 : ModuleIsInternal($prereq);
+                my $isPerlPragma = FHEM::Meta::ModuleIsPerlPragma($prereq);
+                my $isPerlCore =
+                  $isPerlPragma ? 0 : FHEM::Meta::ModuleIsPerlCore($prereq);
+                my $isFhem = $isPerlPragma
+                  || $isPerlCore ? 0 : FHEM::Meta::ModuleIsInternal($prereq);
                 if ( $isPerlPragma || $isPerlCore || $prereq eq 'perl' ) {
                     $installed =
                       $installed ne 'installed'
@@ -2108,7 +1934,8 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
 
     }
 
-    push @ret, 'Based on data generated by ' . $modMeta->{generated_by};
+    push @ret,
+      $lb . $lb . 'Based on data generated by ' . $modMeta->{generated_by};
 
     return $header . join( "\n", @ret ) . $footer;
 }
@@ -2141,6 +1968,8 @@ sub __IsInstalledPerl($) {
     return version->parse($])->numify if ( $pkg eq 'perl' );
     return $modules{'Global'}{META}{version}
       if ( $pkg eq 'FHEM' );
+    return FHEM::Meta->VERSION()
+      if ( $pkg eq 'FHEM::Meta' || $pkg eq 'Meta' );
 
     eval "require $pkg;";
 
@@ -2173,77 +2002,6 @@ sub __IsInstalledPython($) {
     my ($pkg) = @_;
 
     return 0;
-}
-
-sub ModuleIsPerlCore {
-    my ($module) = @_;
-    return grep ( /^$module$/, @perlCoreModules )
-      ? 1
-      : 0;
-}
-
-sub ModuleIsPerlPragma {
-    my ($module) = @_;
-    return grep ( /^$module$/, @perlPragmas )
-      ? 1
-      : 0;
-}
-
-sub ModuleIsInternal {
-    my ($module) = @_;
-    return 1
-      if ( $module eq 'fhem.pl' || $module eq 'FHEM' || $module eq 'Global' );
-
-    my $p = GetModuleFilepath($module);
-
-    # if module has a relative path,
-    #   assume it is part of FHEM
-    return $p && ( $p =~ m/^(\.\/)?FHEM\/.+/ || $p =~ m/^(\.\/)?[^\/]+\.pm$/ )
-      ? 1
-      : 0;
-}
-
-# Get file path of a Perl module
-sub GetModuleFilepath {
-    my @path;
-
-    foreach (@_) {
-        my $module  = $_;
-        my $package = $module;
-
-        # From This::That to This/That.pm
-        s/::/\//g, s/$/.pm/ foreach $module;
-
-        if ( $module eq 'perl' ) {
-            push @path, $^X;    # real binary
-
-            # push @path, $ENV{_};    # symlink if any
-        }
-        elsif ( defined( $INC{$module} ) ) {
-            push @path, $INC{$module};
-        }
-        else {
-            eval {
-                require $module;
-                1;
-            };
-
-            if ( !$@ ) {
-                push @path, $INC{$module};
-            }
-            else {
-                push @path, '';
-                $@ = undef;
-            }
-        }
-    }
-
-    if (wantarray) {
-        return @path;
-    }
-    elsif ( @path > 0 ) {
-        return join( ',', @path );
-    }
 }
 
 #### my little helper
@@ -2330,7 +2088,7 @@ sub ToDay() {
       "abstract": "Modul zum Update von FHEM, zur Installation von Drittanbieter FHEM Modulen und der Verwaltung von Systemvoraussetzungen"
     }
   },
-  "version": "v0.0.2",
+  "version": "v0.0.3",
   "release_status": "testing",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
