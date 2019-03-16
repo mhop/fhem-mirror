@@ -1028,8 +1028,8 @@ sub CreateMetadataList ($$$) {
         next
           if (
             $mAttr eq 'version_control'
-            && (  !defined( $modMeta->{resources} )
-                || defined( $modMeta->{resources}{repository} ) )
+            && (   !defined( $modMeta->{resources} )
+                || !defined( $modMeta->{resources}{repository} ) )
           );
         next
           if ( $mAttr eq 'release_date'
@@ -1233,7 +1233,8 @@ sub CreateMetadataList ($$$) {
                     m/^(?:https?:\/\/)?forum\.fhem\.de/i );
 
                 $l .= 'Limited - '
-                  if ( $modMeta->{x_support_status} eq 'limited' );
+                  if ( defined( $modMeta->{x_support_status} )
+                    && $modMeta->{x_support_status} eq 'limited' );
 
                 $l .=
                     '<a href="'
