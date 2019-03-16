@@ -1451,17 +1451,15 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
 
     # meta name
     unless ( defined( $modMeta->{name} ) ) {
-        if ( defined( $modMeta->{x_vcs} ) ) {
-            if ( $modMeta->{x_file}[4] eq 'Global' ) {
-                $modMeta->{name} = 'FHEM';
-            }
-            else {
-                $modMeta->{name} = $modMeta->{x_file}[1];
-                $modMeta->{name} =~ s/^\.\///;
-                $modMeta->{name} =~ s/\/$//;
-                $modMeta->{name} =~ s/FHEM\/lib//;
-                $modMeta->{name} =~ s/\//::/g;
-            }
+        if ( $modMeta->{x_file}[4] eq 'Global' ) {
+            $modMeta->{name} = 'FHEM';
+        }
+        else {
+            $modMeta->{name} = $modMeta->{x_file}[1];
+            $modMeta->{name} =~ s/^\.\///;
+            $modMeta->{name} =~ s/\/$//;
+            $modMeta->{name} =~ s/FHEM\/lib//;
+            $modMeta->{name} =~ s/\//::/g;
         }
         if ( $modMeta->{x_file}[4] ne 'Global' ) {
             $modMeta->{name} .= '::' if ( $modMeta->{name} );
@@ -1699,16 +1697,20 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
               unless ( lc($_) eq 'fhem-core'
                 || lc($_) eq 'fhem-3rdparty'
                 || lc($_) eq 'fhem-mod'
-                || lc($_) eq 'fhem-pkg' );
+                || lc($_) eq 'fhem-pkg'
+                || lc($_) eq 'fhem-mod-local'
+                || lc($_) eq 'fhem-pkg-local'
+                || lc($_) eq 'fhem-mod-commercial'
+                || lc($_) eq 'fhem-pkg-commercial' );
         }
 
         $modMeta->{keywords} = \@filtered;
     }
 
     # Generate keywords, based on support data
-    # add legacy POD info as Metadata
     if (   defined( $modMeta->{resources} )
-        && defined( $modMeta->{resources}{x_support_community} ) )
+        && defined( $modMeta->{resources}{x_support_community} )
+        && $modMeta->{x_file}[2] ne 'fhem.pl' )
     {
         if ( defined( $modMeta->{resources}{x_support_community}{board} )
             && $modMeta->{resources}{x_support_community}{board} ne '' )
@@ -1725,9 +1727,13 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
                 {board} ne ''
               )
             {
+                my $parent =
+                  lc( $modMeta->{resources}{x_support_community}{board} );
                 my $tag =
                   lc( $modMeta->{resources}{x_support_community}{subCommunity}
                       {board} );
+
+                $tag =~ s/$parent\s+-\s+|$parent\s+»\s+//g;
                 $tag =~ s/ - |»/ /g;
                 $tag =~ s/ +/-/g;
                 $tag = 'fhem-' . $tag
@@ -1770,14 +1776,20 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
         }
     }
 
+    if (   defined( $modMeta->{resources} )
+        && defined( $modMeta->{resources}{x_support_commercial} ) )
+    {
+        my $modType = $modMeta->{x_file}[3] ? 'mod' : 'pkg';
+        push @{ $modMeta->{keywords} }, "fhem-$modType-commercial";
+    }
+
     # add legacy POD info as Metadata
-    push @{ $modMeta->{keywords} },
-      "fhem-mod-$item_modtype"
-      if (
-        $item_modtype
-        && (   !defined( $modMeta->{keywords} )
-            || !grep ( "fhem-mod-$item_modtype", @{ $modMeta->{keywords} } ) )
-      );
+    if ($item_modtype) {
+        $item_modtype = 'fhem-mod-' . $item_modtype;
+        push @{ $modMeta->{keywords} }, $item_modtype
+          if ( !defined( $modMeta->{keywords} )
+            || !grep ( /^$item_modtype$/i, @{ $modMeta->{keywords} } ) );
+    }
 
     # Add some keywords about the module origin
     if ( GetModuleSourceOrigin( $modMeta->{x_file}[4] ) eq 'fhem' ) {
