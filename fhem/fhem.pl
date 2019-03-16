@@ -81,6 +81,7 @@ sub IsDisabled($);
 sub IsDummy($);
 sub IsIgnored($);
 sub IsIoDummy($);
+sub IsWe(;$$);
 sub LoadModule($;$);
 sub Log($$);
 sub Log3($$$);
@@ -1105,17 +1106,10 @@ AnalyzePerlCommand($$;$)
   }
   my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = 
         localtime(gettimeofday());
-  my $hms = sprintf("%02d:%02d:%02d", $hour, $min, $sec);
-  my $we = (($wday==0 || $wday==6) ? 1 : 0);
-  if(!$we) {
-    foreach my $h2we (split(",", AttrVal("global", "holiday2we", ""))) {
-      my ($a, $b) = ReplaceEventMap($h2we, [$h2we, Value($h2we)], 0);
-      $we = 1 if($b && $b ne "none");
-    }
-  }
-  $month++;
-  $year+=1900;
+  $month++; $year+=1900;
   my $today = sprintf('%04d-%02d-%02d', $year,$month,$mday);
+  my $hms = sprintf("%02d:%02d:%02d", $hour, $min, $sec);
+  my $we = IsWe(undef, $wday);
 
   if($evalSpecials) {
     $cmd = join("", map { my $n = substr($_,1); # ignore the %
@@ -5898,4 +5892,24 @@ sub genUUID()
   $fuuidHash{$uuid} = 1;
   return $uuid;
 }
+
+sub
+IsWe(;$$)
+{
+  my ($when, $wday) = @_;
+  $wday = (localtime(gettimeofday()))[6] if(!defined($wday));
+  $when = "state" if(!$when || $when !~ m/^(yesterday|tomorrow)$/);
+  
+  my $we = ($when eq "yesterday" ? ($wday==0 || $wday==1) :
+           ($when eq "state"     ? ($wday==6 || $wday==0) :
+                                   ($wday==5 || $wday==6))); # tomorrow
+  if(!$we) {
+    foreach my $h2we (split(",", AttrVal("global", "holiday2we", ""))) {
+      my $b = ReadingsVal($h2we, $when, 0);
+      $we = 1 if($b && $b ne "none");
+    }
+  }
+  return $we ? 1 : 0;
+}
+
 1;

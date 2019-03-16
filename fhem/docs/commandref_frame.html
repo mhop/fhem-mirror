@@ -1818,8 +1818,10 @@ The following local attributes are used by a wider range of devices:
         fhem "set light on" } }<br>
       define roll_en *07:45:00 { fhem "trigger SwitchAllRoll on" if(!$we) }<br>
       define roll_en *08:30:00 { fhem "trigger SwitchAllRoll on" if($we) }<br>
-
     </ul>
+    $we is equivalent to calling IsWe(), which optionally takes the arguments
+    "today", "yesterday" and "tomorrow". Note: for everything else "today" is
+    assumed without an error message.<br>
     <br>
 
   <li>

@@ -1950,19 +1950,20 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
     aktuellen Datum in YYYY-MM-DD Format.
     <br>
 
-    Die Variabe <var>$we</var> hat den Wert 1 wenn der abgefragte Tag auf ein Wochenende
-    f&auml;llt (Z.B. <var>$wday</var> == 0 [Sonntag] oder <var>$wday</var> == 6 [Samstag]), und 0
-    f&uuml;r die anderen Wochentage. Wenn man das global <a
-    href="#holiday2we">holiday2we</a> Attribut setzt, dann ist <var>$we</var> ebenfalls 1
-    bei Urlaubstagen.<br>
-
+    Die Variabe <var>$we</var> hat den Wert 1 wenn der abgefragte Tag auf ein
+    Wochenende f&auml;llt (Z.B. <var>$wday</var> == 0 [Sonntag] oder
+    <var>$wday</var> == 6 [Samstag]), und 0 f&uuml;r die anderen Wochentage.
+    Wenn man das global <a href="#holiday2we">holiday2we</a> Attribut setzt,
+    dann ist <var>$we</var> ebenfalls 1 bei Urlaubstagen.<br>
     <ul>
       define n2 notify piri:on { if($hour &gt; 18 || $hour &lt; 5) {
         fhem "set light on" } }<br>
       define roll_en *07:45:00 { fhem "trigger SwitchAllRoll on" if(!$we) }<br>
       define roll_en *08:30:00 { fhem "trigger SwitchAllRoll on" if($we) }<br>
-
     </ul>
+    $we wird mit IsWe() gesetzt, diese Funktion nimmt optional die Argumente
+    "today", "yesterday" und "tomorrow". Achtung: alles andere wird als "today"
+    interpretiert, ohne eine Fehlermeldung zu generieren.
     <br>
 
   </li><li>
