@@ -353,7 +353,7 @@ sortTopicNum(@)
       value yet for this key.
       </li></br>
 
-    <li><b>sortTopicNum("asc"|"desc",<list of numbers>)</b><br>
+    <li><b>sortTopicNum("asc"|"desc",&lt;list of numbers&gt;)</b><br>
       sort an array of numbers like x.x.x<br>
       (Forum #98578)
       </li></br>
