@@ -127,7 +127,10 @@ FRM_IN_observer($$$$)
 {
 	my ($pin,$last,$new,$hash) = @_;
 	my $name = $hash->{NAME};
-	my $old = ReadingsVal($name, "reading", undef) eq "on" ? PIN_HIGH : PIN_LOW;
+	my $old = ReadingsVal($name, "reading", undef);
+	if (defined($old)) {
+		$old = $old eq "on" ? PIN_HIGH : PIN_LOW;
+	}
 	if (AttrVal($hash->{NAME},"activeLow","no") eq "yes") {
 		$new = $new == PIN_LOW ? PIN_HIGH : PIN_LOW;
 	}
@@ -308,6 +311,9 @@ FRM_IN_Attr($$$$) {
 
   CHANGES
 
+  15.02.2019 jensb
+    o bugfix: change detection no longer assumes that reading "reading" is defined
+    
   04.11.2018 jensb
     o bugfix: get alarm/reading/state
     o feature: remove unused FHEMWEB input field from all get commands
