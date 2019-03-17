@@ -1,5 +1,5 @@
 ﻿##########################################################################################################
-# $Id: 93_DbRep.pm 18563 2019-02-11 21:10:32Z DS_Starter $
+# $Id: 93_DbRep.pm 18837 2019-03-09 20:13:59Z DS_Starter $
 ##########################################################################################################
 #       93_DbRep.pm
 #
@@ -57,6 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Versions History intern
 our %DbRep_vNotesIntern = (
+  "8.16.0" => "17.03.2019  include sortTopicNum from 99_Utils, allow PRAGMAS leading an SQLIte SQL-Statement ",
   "8.15.0" => "04.03.2019  readingsRename can rename readings of a given (optional) device ",
   "8.14.1" => "04.03.2019  Bugfix in deldoublets with SQLite, Forum: https://forum.fhem.de/index.php/topic,53584.msg914489.html#msg914489 ",
   "8.14.0" => "19.02.2019  delete Readings if !goodReadingName and featurelevel > 5.9 ",
@@ -393,7 +394,7 @@ sub DbRep_Define($@) {
   $hash->{MODEL}               = $hash->{ROLE};
   $hash->{HELPER}{DBLOGDEVICE} = $a[2];
   $hash->{HELPER}{IDRETRIES}   = 3;                                            # Anzahl wie oft versucht wird initiale Daten zu holen
-  $hash->{VERSION}             = (DbRep_sortVersion("desc",keys %DbRep_vNotesIntern))[0];
+  $hash->{VERSION}             = (sortTopicNum("desc",keys %DbRep_vNotesIntern))[0];
   $hash->{NOTIFYDEV}           = "global,".$name;                              # nur Events dieser Devices an DbRep_Notify weiterleiten 
   my $dbconn                   = $defs{$a[2]}{dbconn};
   $hash->{DATABASE}            = (split(/;|=/, $dbconn))[1];
@@ -964,7 +965,7 @@ sub DbRep_Get($@) {
               }
           }           
           $i = 0;
-          foreach my $key (DbRep_sortVersion("desc",keys %hs)) {
+          foreach my $key (sortTopicNum("desc",keys %hs)) {
               $val0 = $hs{$key};
               $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0</td>" );
               $ret .= "</tr>";
@@ -989,7 +990,7 @@ sub DbRep_Get($@) {
           $ret .= "<tbody>";
           $ret .= "<tr class=\"even\">";
           $i = 0;
-          foreach my $key (DbRep_sortVersion("desc",keys %DbRep_vNotesExtern)) {
+          foreach my $key (sortTopicNum("desc",keys %DbRep_vNotesExtern)) {
               ($val0,$val1) = split(/\s/,$DbRep_vNotesExtern{$key},2);
               $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0  </td><td>$val1</td>" );
               $ret .= "</tr>";
@@ -5665,7 +5666,7 @@ sub sqlCmd_DoParse($) {
       $set = $1;
       $sql = $2;
   }
-  
+    
   if($set) {
       Log3($name, 4, "DbRep $name - Set SQL session variables: $set");    
       eval {$dbh->do($set);};   # @\RB = Resetbit wenn neues Selektionsintervall beginnt
@@ -5675,6 +5676,27 @@ sub sqlCmd_DoParse($) {
      Log3 ($name, 2, "DbRep $name - ERROR - $@");
      $dbh->disconnect;
      return "$name|''|$opt|$set|''|''|$err"; 
+  }
+  
+  # Abarbeitung aller Pragmas in einem SQLite Statement, SQL wird extrahiert
+  # Pragmas müssen im SQL vorangestellt sein
+  if($cmd =~ /^\s*PRAGMA.*;/i) {   
+      my @pms = split(";",$cmd);           
+      foreach my $pm (@pms) {
+          if($pm !~ /PRAGMA/i) {
+              $sql = $pm;
+              next;
+          }
+          $pm = ltrim($pm);
+          Log3($name, 4, "DbRep $name - Exec PRAGMA Statement: $pm");    
+          eval {$dbh->do($pm);};
+          if ($@) {
+             $err = encode_base64($@,"");
+             Log3 ($name, 2, "DbRep $name - ERROR - $@");
+             $dbh->disconnect;
+             return "$name|''|$opt|$set|''|''|$err"; 
+          }      
+      }
   }
   
   # Allow inplace replacement of keywords for timings (use time attribute syntax)
