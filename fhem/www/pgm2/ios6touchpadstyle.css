@@ -3,7 +3,7 @@
 
 /* iOS 6 Theme for FHEM */
 /* by Sandra Ohmayer */
-/* http://www.animeschatten.net */
+/* http://www.foodcat.de */
 body {
 	width:100%
 }
@@ -72,9 +72,7 @@ and (orientation : portrait) {
 body {
 	width:320px
 }
-.colorpicker_widget {
-	display: none !important;
-}
+
 .SVGplot {
     width: 265px;
     overflow: scroll;
@@ -102,9 +100,7 @@ and (orientation : portrait) {
 body {
 	width:320px
 }
-.colorpicker_widget {
-	display: none !important;
-}
+
 .SVGplot {
     width: 265px;
     overflow: scroll;
@@ -131,9 +127,7 @@ and (orientation : portrait) {
 body {
 	width:375px
 }
-.colorpicker_widget {
-	display: none !important;
-}
+
 .SVGplot {
     width: 320px;
     overflow: scroll;
@@ -163,9 +157,6 @@ body {
     width: 359px;
     overflow: scroll;
 }
-.colorpicker_widget {
-display: none;
-}
 }
 
 /* iPhone 6+(landscape) ----------- */
@@ -194,9 +185,6 @@ body {
 and (orientation : portrait) {
 .isAndroidPhone {
 	width:360px;
-}
-.colorpicker_widget {
-display: none;
 }
 .isAndroidTablet {
 }
@@ -606,7 +594,8 @@ table.block td {
 
 table.block td {
 	border-top:1px solid #fdfdfd;
-	border-bottom:1px solid #cbcbcb
+	border-bottom:1px solid #cbcbcb;
+	padding-right: 9px;
 }
 
 table.block tr:first-child td {
@@ -620,7 +609,6 @@ table.block tr:last-child td {
 .block td:first-child {
 	padding-left:10px;
 	font-weight:700;
-    	word-break: break-word;
 }
 
 .block > tbody > tr > td:last-child {
@@ -742,9 +730,13 @@ table.room tr.sel a:hover svg {
 	box-shadow:0 1px #fefefe,inset 0 1px #d7d7d7;
 	background:#f7f7f7
 }
+.colorpicker {
+	display: inline-block;
+}
 
 .slider {
-	margin-top:0px;
+	margin-top: 4px;
+    margin-bottom: 4px;
 	display:inline-block;
 	-webkit-box-sizing:border-box;
 	-moz-box-sizing:padding-box;
