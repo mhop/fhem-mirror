@@ -1053,7 +1053,7 @@ sub CreateSearchList ($$$) {
             $found++;
             $foundKeywords++;
 
-            push @ret, '<h4>' . $keyword . '</h4>';
+            push @ret, '<h4>#' . $keyword . '</h4>';
 
             my @mAttrs = qw(
               modules
@@ -1903,6 +1903,7 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                               . $alias
                               . $FW_CSRF . '">'
                               . $authorName . '</a>'
+                              . $authorEditorOnly
                               if ($html);
                         }
                         else {
@@ -1916,11 +1917,15 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                                   . ' search '
                                   . $alias
                                   . $FW_CSRF . '">'
-                                  . $alias . '</a>';
+                                  . $alias . '</a>'
+                                  . $authorEditorOnly;
                             }
                             else {
                                 $authorNameEmail =
-                                  $authorName . ', alias ' . $alias;
+                                    $authorName
+                                  . $authorEditorOnly
+                                  . ', alias '
+                                  . $alias;
                             }
                         }
                     }
