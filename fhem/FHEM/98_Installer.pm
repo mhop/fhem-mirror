@@ -230,7 +230,11 @@ sub Get($$@) {
 
     my ( $cmd, @args ) = @aa;
 
-    if ( lc($cmd) eq 'showmoduleinfo' ) {
+    if ( lc($cmd) eq 'search' ) {
+        my $ret = CreateSearchList( $hash, $cmd, $args[0] );
+        return $ret;
+    }
+    elsif ( lc($cmd) eq 'showmoduleinfo' ) {
         return "usage: $cmd MODULE" if ( @args != 1 );
 
         my $ret = CreateMetadataList( $hash, $cmd, $args[0] );
@@ -242,17 +246,38 @@ sub Get($$@) {
         my $ret = CreateRawMetaJson( $hash, $cmd, $args[0] );
         return $ret;
     }
-    else {
-        my $fhemModules;
+    elsif ( lc($cmd) eq 'zzgetmaintainer.json' ) {
+        return "usage: $cmd MAINTAINER" if ( @args != 1 );
 
+        my $ret = CreateRawMaintainerJson( $hash, $cmd, $args[0] );
+        return $ret;
+    }
+    else {
+        my @fhemModules;
         foreach ( sort { "\L$a" cmp "\L$b" } keys %modules ) {
             next if ( $_ eq 'Global' );
-            $fhemModules .= ',' if ($fhemModules);
-            $fhemModules .= $_;
+            push @fhemModules, $_;
+        }
+
+        my @fhemMaintainers;
+        foreach ( keys %FHEM::Meta::maintainerModules ) {
+            push @fhemMaintainers, $_;
+        }
+        foreach ( keys %FHEM::Meta::maintainerPackages ) {
+            push @fhemMaintainers, $_;
+        }
+        foreach ( keys %FHEM::Meta::maintainerFile ) {
+            push @fhemMaintainers, $_;
         }
 
         my $list =
-          "zzGetMETA.json:FHEM,$fhemModules showModuleInfo:FHEM,$fhemModules";
+            'search'
+          . ' showModuleInfo:FHEM,'
+          . join( ',', @fhemModules )
+          . ' zzGetMaintainer.json:'
+          . join( ',', sort { "\L$a" cmp "\L$b" } __aUniq(@fhemMaintainers) )
+          . ' zzGetMETA.json:FHEM,'
+          . join( ',', @fhemModules );
 
         return "Unknown argument $cmd, choose one of $list";
     }
@@ -342,7 +367,7 @@ sub ProcessUpdateTimer($) {
             or ReadingsVal( $name, 'state', 'none' ) eq 'initialized' );
 
         if (
-            ToDay() ne (
+            __ToDay() ne (
                 split(
                     ' ', ReadingsTimestamp( $name, 'outdated', '1970-01-01' )
                 )
@@ -793,7 +818,7 @@ sub WriteReadings($$) {
                 : 'check failed'
             )
         );
-        $hash->{helper}{lastSync} = ToDay();
+        $hash->{helper}{lastSync} = __ToDay();
     }
 
     readingsBulkUpdateIfChanged( $hash, 'updatesAvailable',
@@ -851,6 +876,269 @@ sub WriteReadings($$) {
     ProcessUpdateTimer($hash)
       if ( $hash->{".fhem"}{installer}{cmd} eq 'getFhemVersion'
         && !defined( $decode_json->{error} ) );
+}
+
+sub CreateSearchList ($$$) {
+    my ( $hash, $getCmd, $search ) = @_;
+    $search = '.+' unless ($search);
+
+    # disable automatic links to FHEM devices
+    delete $FW_webArgs{addLinks};
+
+    my @ret;
+    my $html = defined( $hash->{CL} ) && $hash->{CL}{TYPE} eq "FHEMWEB" ? 1 : 0;
+
+    my $header = '';
+    my $footer = '';
+    if ($html) {
+        $header = '<html>';
+        $footer = '</html>';
+    }
+
+    my $tableOpen       = '';
+    my $rowOpen         = '';
+    my $rowOpenEven     = '';
+    my $rowOpenOdd      = '';
+    my $colOpen         = '';
+    my $colOpenMinWidth = '';
+    my $txtOpen         = '';
+    my $txtClose        = '';
+    my $colClose        = "\t\t\t";
+    my $rowClose        = '';
+    my $tableClose      = '';
+    my $colorRed        = '';
+    my $colorGreen      = '';
+    my $colorClose      = '';
+
+    if ($html) {
+        $tableOpen       = '<table class="block wide">';
+        $rowOpen         = '<tr>';
+        $rowOpenEven     = '<tr class="even">';
+        $rowOpenOdd      = '<tr class="odd">';
+        $colOpen         = '<td>';
+        $colOpenMinWidth = '<td style="min-width: 12em;">';
+        $txtOpen         = "<b>";
+        $txtClose        = "</b>";
+        $colClose        = '</td>';
+        $rowClose        = '</tr>';
+        $tableClose      = '</table>';
+        $colorRed        = '<span style="color:red">';
+        $colorGreen      = '<span style="color:green">';
+        $colorClose      = '</span>';
+    }
+
+    my $space = $html ? '&nbsp;' : ' ';
+    my $lb    = $html ? '<br />' : "\n";
+    my $lang  = lc(
+        AttrVal(
+            $hash->{NAME}, 'language',
+            AttrVal( 'global', 'language', 'EN' )
+        )
+    );
+
+    my $webname =
+      AttrVal( $hash->{CL}{SNAME}, 'webname', 'fhem' );
+    my $FW_CSRF = (
+        defined( $defs{ $hash->{CL}{SNAME} }{CSRFTOKEN} )
+        ? '&fwcsrf=' . $defs{ $hash->{CL}{SNAME} }{CSRFTOKEN}
+        : ''
+    );
+
+    push @ret, '<h2>Search result: ' . $search . '</h2>';
+    my $found = 0;
+
+    # search for matching device
+    my $foundDevices = 0;
+    my $linecount = 1;
+    foreach my $device ( sort keys %defs ) {
+        next
+          unless ( defined( $defs{$device}{TYPE} )
+            && defined( $modules{ $defs{$device}{TYPE} } ) );
+
+        if ( $device =~ m/^.*$search.*$/i ) {
+            unless ($foundDevices) {
+                push @ret, '<h3>Devices</h3>' . $lb;
+                push @ret, $tableOpen;
+                push @ret,
+                    $colOpenMinWidth
+                  . $txtOpen
+                  . 'Device Name'
+                  . $txtClose
+                  . $colClose;
+                push @ret,
+                  $colOpen . $txtOpen . 'Module Name' . $txtClose . $colClose;
+            }
+            $found++;
+            $foundDevices++;
+
+            my $l = $linecount % 2 == 0 ? $rowOpenEven : $rowOpenOdd;
+
+            FHEM::Meta::Load( $modules{ $defs{$device}{TYPE} } );
+
+            my $linkDev = $device;
+            $linkDev =
+                '<a href="/'
+              . $webname
+              . '?detail='
+              . $device
+              . $FW_CSRF . '">'
+              . $device . '</a>'
+              if ($html);
+
+            my $linkMod = $defs{$device}{TYPE};
+            $linkMod =
+                '<a href="/'
+              . $webname
+              . '?cmd=get '
+              . $hash->{NAME}
+              . ' showModuleInfo '
+              . $defs{$device}{TYPE}
+              . $FW_CSRF . '">'
+              . $defs{$device}{TYPE} . '</a>'
+              if ($html);
+
+            $l .= $colOpenMinWidth . $linkDev . $colClose;
+            $l .= $colOpen . $linkMod . $colClose;
+
+            $l .= $rowClose;
+
+            push @ret, $l;
+            $linecount++;
+        }
+    }
+    push @ret, $tableClose if ($foundDevices);
+
+    # search for matching module
+    my $foundModules = 0;
+    $linecount    = 1;
+    foreach my $module ( sort keys %modules ) {
+        if ( $module =~ m/^.*$search.*$/i ) {
+            unless ($foundModules) {
+                push @ret, '<h3>Modules</h3>' . $lb;
+                push @ret, $tableOpen;
+                push @ret,
+                    $colOpenMinWidth
+                  . $txtOpen
+                  . 'Module Name'
+                  . $txtClose
+                  . $colClose;
+                push @ret,
+                  $colOpen . $txtOpen . 'Abstract' . $txtClose . $colClose;
+            }
+            $found++;
+            $foundModules++;
+
+            my $l = $linecount % 2 == 0 ? $rowOpenEven : $rowOpenOdd;
+
+            FHEM::Meta::Load($module);
+
+            my $abstract = '';
+            $abstract = $modules{$module}{META}{abstract}
+              if ( defined( $modules{$module}{META} )
+                && defined( $modules{$module}{META}{abstract} ) );
+
+            my $link = $module;
+            $link =
+                '<a href="/'
+              . $webname
+              . '?cmd=get '
+              . $hash->{NAME}
+              . ' showModuleInfo '
+              . $module
+              . $FW_CSRF . '">'
+              . $module . '</a>'
+              if ($html);
+
+            $l .= $colOpenMinWidth . $link . $colClose;
+            $l .=
+              $colOpen . ( $abstract eq 'n/a' ? '' : $abstract ) . $colClose;
+
+            $l .= $rowClose;
+
+            push @ret, $l;
+            $linecount++;
+        }
+    }
+    push @ret, $tableClose if ($foundModules);
+
+    # search for matching keyword
+    my $foundKeywords = 0;
+    $linecount = 1;
+    foreach my $keyword (%FHEM::Meta::keywords) {
+        if ( $keyword =~ m/^.*$search.*$/i ) {
+            push @ret, '<h3>Keywords</h3>' unless ($foundKeywords);
+            $found++;
+            $foundKeywords++;
+
+            push @ret, '<h4>' . $keyword . '</h4>';
+
+            my @mAttrs = qw(
+              modules
+              packages
+            );
+
+            push @ret, $tableOpen;
+
+            push @ret,
+              $colOpenMinWidth . $txtOpen . 'Name' . $txtClose . $colClose;
+
+            push @ret, $colOpen . $txtOpen . 'Type' . $txtClose . $colClose;
+
+            push @ret, $colOpen . $txtOpen . 'Abstract' . $txtClose . $colClose;
+
+            foreach my $mAttr (@mAttrs) {
+                next
+                  unless ( defined( $FHEM::Meta::keywords{$keyword}{$mAttr} )
+                    && @{ $FHEM::Meta::keywords{$keyword}{$mAttr} } > 0 );
+
+                foreach my $item ( sort { "\L$a" cmp "\L$b" }
+                    @{ $FHEM::Meta::keywords{$keyword}{$mAttr} } )
+                {
+                    my $l = $linecount % 2 == 0 ? $rowOpenEven : $rowOpenOdd;
+
+                    my $type = $mAttr;
+                    $type = 'Module'       if ( $mAttr eq 'modules' );
+                    $type = 'Perl Package' if ( $mAttr eq 'packages' );
+
+                    FHEM::Meta::Load($item);
+
+                    my $abstract = '';
+                    $abstract = $modules{$item}{META}{abstract}
+                      if ( defined( $modules{$item} )
+                        && defined( $modules{$item}{META} )
+                        && defined( $modules{$item}{META}{abstract} ) );
+
+                    my $link = $item;
+                    $link =
+                        '<a href="/'
+                      . $webname
+                      . '?cmd=get '
+                      . $hash->{NAME}
+                      . ' showModuleInfo '
+                      . $item
+                      . $FW_CSRF . '">'
+                      . $item . '</a>'
+                      if ($html);
+
+                    $l .= $colOpenMinWidth . $link . $colClose;
+                    $l .= $colOpen . $type . $colClose;
+                    $l .=
+                        $colOpen
+                      . ( $abstract eq 'n/a' ? '' : $abstract )
+                      . $colClose;
+
+                    $l .= $rowClose;
+
+                    push @ret, $l;
+                    $linecount++;
+                }
+            }
+
+            push @ret, $tableClose;
+        }
+    }
+
+    return $header . join( "\n", @ret ) . $footer;
 }
 
 #TODO
@@ -994,12 +1282,6 @@ sub CreateMetadataList ($$$) {
           );
         next
           if (
-            $mAttr eq 'command_reference'
-            && (   !defined( $modMeta->{resources} )
-                || !defined( $modMeta->{resources}{x_commandref} ) )
-          );
-        next
-          if (
             $mAttr eq 'community_support'
             && (   !defined( $modMeta->{resources} )
                 || !defined( $modMeta->{resources}{x_support_community} ) )
@@ -1039,6 +1321,14 @@ sub CreateMetadataList ($$$) {
         my $mAttrName = $mAttr;
         $mAttrName =~ s/_/$space/g;
         $mAttrName =~ s/([\w'&]+)/\u\L$1/g;
+
+        my $webname =
+          AttrVal( $hash->{CL}{SNAME}, 'webname', 'fhem' );
+        my $FW_CSRF = (
+            defined( $defs{ $hash->{CL}{SNAME} }{CSRFTOKEN} )
+            ? '&fwcsrf=' . $defs{ $hash->{CL}{SNAME} }{CSRFTOKEN}
+            : ''
+        );
 
         $l .= $colOpenMinWidth . $txtOpen . $mAttrName . $txtClose . $colClose;
 
@@ -1130,14 +1420,10 @@ sub CreateMetadataList ($$$) {
             }
 
             elsif ( $mAttr eq 'command_reference' ) {
-                my $webname;
-
                 if (   defined( $hash->{CL} )
                     && defined( $hash->{CL}{TYPE} )
                     && $hash->{CL}{TYPE} eq 'FHEMWEB' )
                 {
-                    $webname =
-                      AttrVal( $hash->{CL}{SNAME}, 'webname', 'fhem' );
                     $l .=
                         '<a href="/'
                       . $webname
@@ -1250,8 +1536,19 @@ sub CreateMetadataList ($$$) {
                   . '" target="_blank"'
                   . (
                     defined( $board->{description} )
-                    ? ' title="' . $board->{description} . '"'
-                    : ''
+                    ? ' title="'
+                      . $board->{description}
+                      . '"'
+                    : (
+                        defined(
+                            $modMeta->{resources}{x_support_community}
+                              {description}
+                          )
+                        ? ' title="'
+                          . $modMeta->{resources}{x_support_community}
+                          {description} . '"'
+                        : ''
+                    )
                   )
                   . '>'
                   . $title . '</a>';
@@ -1536,6 +1833,29 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                     $counter++;
                 }
             }
+            elsif ( $mAttr eq 'keywords' ) {
+                my $counter = 0;
+                foreach my $keyword ( @{ $modMeta->{$mAttr} } ) {
+                    $l .= ', ' if ($counter);
+
+                    if ($html) {
+                        $l .=
+                            '<a href="/'
+                          . $webname
+                          . '?cmd=get '
+                          . $hash->{NAME}
+                          . ' search '
+                          . $keyword
+                          . $FW_CSRF . '">'
+                          . $keyword . '</a>';
+                    }
+                    else {
+                        $l .= $keyword;
+                    }
+
+                    $counter++;
+                }
+            }
             else {
                 $l .= join ', ', @{ $modMeta->{$mAttr} };
             }
@@ -1622,10 +1942,10 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                 my $check     = __IsInstalledPerl($prereq);
                 my $installed = '';
                 if ($check) {
-                    if ( $check =~ m/^\d+\./ ) {
+                    if ( $check ne '1' ) {
                         my $nverReq =
-                            $version ne ''
-                          ? $version
+                          $version ne ''
+                          ? version->parse($version)->numify
                           : 0;
                         my $nverInst = $check;
 
@@ -1965,6 +2285,33 @@ sub CreateRawMetaJson ($$$) {
     return $j->encode( $modules{$modName}{META} );
 }
 
+sub CreateRawMaintainerJson ($$$) {
+    my ( $hash, $getCmd, $maintainer ) = @_;
+    my %ret = ();
+
+    $ret{fhem_modules} = $FHEM::Meta::maintainerModules{$maintainer}
+      if ( defined( $FHEM::Meta::maintainerModules{$maintainer} ) );
+
+    $ret{fhem_packages} = $FHEM::Meta::maintainerPackages{$maintainer}
+      if ( defined( $FHEM::Meta::maintainerPackages{$maintainer} ) );
+
+    $ret{fhem_files} = $FHEM::Meta::maintainerFile{$maintainer}
+      if ( defined( $FHEM::Meta::maintainerFile{$maintainer} ) );
+
+    if ( scalar keys %ret > 0 ) {
+        $ret{fhem_maintainer} = $maintainer;
+    }
+    else {
+        return '{}';
+    }
+
+    my $j = JSON->new;
+    $j->allow_nonref;
+    $j->canonical;
+    $j->pretty;
+    return $j->encode( \%ret );
+}
+
 # Checks whether a perl package is installed in the system
 sub __IsInstalledPerl($) {
     return 0 unless ( __PACKAGE__ eq caller(0) );
@@ -2009,8 +2356,7 @@ sub __IsInstalledPython($) {
     return 0;
 }
 
-#### my little helper
-sub ToDay() {
+sub __ToDay() {
 
     my ( $sec, $min, $hour, $mday, $month, $year, $wday, $yday, $isdst ) =
       localtime( gettimeofday() );
@@ -2021,6 +2367,11 @@ sub ToDay() {
     my $today = sprintf( '%04d-%02d-%02d', $year, $month, $mday );
 
     return $today;
+}
+
+sub __aUniq {
+    my %seen;
+    grep !$seen{$_}++, @_;
 }
 
 1;
@@ -2093,7 +2444,7 @@ sub ToDay() {
       "abstract": "Modul zum Update von FHEM, zur Installation von Drittanbieter FHEM Modulen und der Verwaltung von Systemvoraussetzungen"
     }
   },
-  "version": "v0.0.3",
+  "version": "v0.1.0",
   "release_status": "testing",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"

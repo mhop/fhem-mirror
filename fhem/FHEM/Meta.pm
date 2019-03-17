@@ -372,6 +372,8 @@ our %moduleUpdates;
 our %packageUpdates;
 our %fileUpdates;
 
+our %keywords;
+
 # Package internal variables
 #
 
@@ -1476,14 +1478,16 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
     # Other modules shall get this added elsewhere for performance reasons
     if ( $modMeta->{name} eq __PACKAGE__ ) {
         $modMeta->{generated_by} =
-          $modMeta->{name} . ' ' . $modMeta->{version} . ', ' . TimeNow();
+            $modMeta->{name} . ' '
+          . version->parse( $modMeta->{version} )->normal . ', '
+          . TimeNow();
     }
 
     # If we are not running in loop, this is not time consuming for us here
     elsif ( !$runInLoop ) {
         $modMeta->{generated_by} =
             $packages{Meta}{name} . ' '
-          . __PACKAGE__->VERSION() . ', '
+          . version->parse( __PACKAGE__->VERSION() )->normal . ', '
           . TimeNow();
     }
 
@@ -1549,16 +1553,16 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
 
                 foreach (
                     split(
-                        '/', $moduleMaintainers{ $modMeta->{x_file}[4] }[1]
+                        '/|,', $moduleMaintainers{ $modMeta->{x_file}[4] }[1]
                     )
                   )
                 {
-                    push @{ $modMeta->{author} }, $_;
+                    push @{ $modMeta->{author} }, "$_ <>";
                 }
 
                 # last update was not by one of the named authors
                 if ( defined( $modMeta->{x_vcs} ) ) {
-                    my $lastEditor = $modMeta->{x_vcs}[15];
+                    my $lastEditor = $modMeta->{x_vcs}[15] . ' <>';
                     push @{ $modMeta->{author} },
                       $modMeta->{x_vcs}[15] . ' (last release only) <>'
                       unless (
@@ -1570,7 +1574,7 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
             if ( defined( $moduleMaintainers{ $modMeta->{x_file}[4] } ) ) {
                 foreach (
                     split(
-                        '/', $moduleMaintainers{ $modMeta->{x_file}[4] }[1]
+                        '/|,', $moduleMaintainers{ $modMeta->{x_file}[4] }[1]
                     )
                   )
                 {
@@ -1670,12 +1674,7 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
                     : ''
                   );
                 $modMeta->{resources}{repository}{x_raw} =
-                  'https://svn.fhem.de/fhem/trunk/'
-                  . (
-                      $modMeta->{resources}{repository}{x_filepath} =~ /\/$/
-                    ? $modMeta->{resources}{repository}{x_filepath}
-                    : $modMeta->{resources}{repository}{x_filepath} . '/'
-                  )
+                    'https://svn.fhem.de/fhem/trunk/fhem/'
                   . $modMeta->{x_file}[1]
                   . $modMeta->{x_file}[2];
             }
@@ -1712,67 +1711,15 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
         && defined( $modMeta->{resources}{x_support_community} )
         && $modMeta->{x_file}[2] ne 'fhem.pl' )
     {
-        if ( defined( $modMeta->{resources}{x_support_community}{board} )
-            && $modMeta->{resources}{x_support_community}{board} ne '' )
+        foreach (
+            __GenerateKeywordsFromSupportCommunity(
+                $modMeta->{resources}{x_support_community}
+            )
+          )
         {
-            if (
-                defined(
-                    $modMeta->{resources}{x_support_community}{subCommunity}
-                )
-                && defined(
-                    $modMeta->{resources}{x_support_community}{subCommunity}
-                      {board}
-                )
-                && $modMeta->{resources}{x_support_community}{subCommunity}
-                {board} ne ''
-              )
-            {
-                my $parent =
-                  lc( $modMeta->{resources}{x_support_community}{board} );
-                my $tag =
-                  lc( $modMeta->{resources}{x_support_community}{subCommunity}
-                      {board} );
-
-                $tag =~ s/$parent\s+-\s+|$parent\s+»\s+//g;
-                $tag =~ s/ - |»/ /g;
-                $tag =~ s/ +/-/g;
-                $tag = 'fhem-' . $tag
-                  if ( $modMeta->{resources}{x_support_community}{cat} =~
-                    /^FHEM/i );
-                $tag = 'cul-' . $tag
-                  if ( $modMeta->{resources}{x_support_community}{cat} =~
-                    /^CUL/i );
-
-                push @{ $modMeta->{keywords} }, $tag
-                  if ( !defined( $modMeta->{keywords} )
-                    || !grep ( m/^$tag$/i, @{ $modMeta->{keywords} } ) );
-            }
-
-            my $tag = lc( $modMeta->{resources}{x_support_community}{board} );
-            $tag =~ s/ - |»/ /g;
-            $tag =~ s/ +/-/g;
-            $tag = 'fhem-' . $tag
-              if (
-                $modMeta->{resources}{x_support_community}{cat} =~ /^FHEM/i );
-            $tag = 'cul-' . $tag
-              if ( $modMeta->{resources}{x_support_community}{cat} =~ /^CUL/i );
-
-            push @{ $modMeta->{keywords} }, $tag
+            push @{ $modMeta->{keywords} }, $_
               if ( !defined( $modMeta->{keywords} )
-                || !grep ( m/^$tag$/i, @{ $modMeta->{keywords} } ) );
-        }
-
-        if (   defined( $modMeta->{resources}{x_support_community}{cat} )
-            && $modMeta->{resources}{x_support_community}{cat} ne ''
-            && $modMeta->{resources}{x_support_community}{cat} ne 'FHEM' )
-        {
-            my $tag = lc( $modMeta->{resources}{x_support_community}{cat} );
-            $tag =~ s/ - |»/ /g;
-            $tag =~ s/ +/-/g;
-
-            push @{ $modMeta->{keywords} }, $tag
-              if ( !defined( $modMeta->{keywords} )
-                || !grep ( m/^$tag$/i, @{ $modMeta->{keywords} } ) );
+                || !grep ( m/^$_$/i, @{ $modMeta->{keywords} } ) );
         }
     }
 
@@ -1803,11 +1750,79 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
         push @{ $modMeta->{keywords} }, "fhem-$modType-local";
     }
 
+    # Add keywords to global index
+    if ( @{ $modMeta->{keywords} } > 0 ) {
+        foreach ( @{ $modMeta->{keywords} } ) {
+            if ( $modMeta->{x_file}[3] ) {
+                push @{ $keywords{$_}{modules} }, $modName
+                  if ( !defined( $keywords{$_}{modules} )
+                    || !grep ( /^$modName$/i, @{ $keywords{$_}{modules} } ) );
+            }
+            else {
+                push @{ $keywords{$_}{packages} }, $modName
+                  if ( !defined( $keywords{$_}{packages} )
+                    || !grep ( /^$modName$/i, @{ $keywords{$_}{packages} } ) );
+            }
+        }
+    }
+
     # generate x_version
     __SetXVersion($modMeta);
 
     return "$@" if ($@);
     return undef;
+}
+
+sub __GenerateKeywordsFromSupportCommunity {
+    my ($community) = @_;
+    my @keywords;
+
+    if ( defined( $community->{board} )
+        && $community->{board} ne '' )
+    {
+        my $prefix;
+        $prefix = lc($1) . '-'
+          if ( $community->{cat} =~ /^(\w+)/ );
+
+        if (   defined( $community->{subCommunity} )
+            && defined( $community->{subCommunity}{board} )
+            && $community->{subCommunity}{board} ne '' )
+        {
+            my $parent = lc( $community->{board} );
+            my $tag    = lc( $community->{subCommunity}{board} );
+
+            $tag =~ s/$parent\s+-\s+|$parent\s+»\s+//g;
+            $tag =~ s/ - |»/ /g;
+            $tag =~ s/ +/-/g;
+
+            foreach ( split '/', $tag ) {
+                push @keywords, $prefix . $_;
+            }
+        }
+
+        my $tag = lc( $community->{board} );
+        $tag =~ s/ - |»/ /g;
+        $tag =~ s/ +/-/g;
+
+        foreach ( split '/', $tag ) {
+            push @keywords, $prefix . $_;
+        }
+    }
+
+    if (   defined( $community->{cat} )
+        && $community->{cat} ne ''
+        && $community->{cat} ne 'FHEM' )
+    {
+        my $tag = lc( $community->{cat} );
+        $tag =~ s/ - |»/ /g;
+        $tag =~ s/ +/-/g;
+
+        foreach ( split '/', $tag ) {
+            push @keywords, $_;
+        }
+    }
+
+    return @keywords;
 }
 
 sub __GetMaintainerdata {
@@ -1847,6 +1862,16 @@ sub __GetMaintainerdata {
                     || ( $4 && $2 eq 'FHEM/' )
                   )
                 {
+                    my $type = $4 ? 'module' : 'package';
+
+                    if ( !-f $1 && !-f $1 . '.pm' ) {
+                        Log 4,
+                            __PACKAGE__
+                          . "::__GetMaintainerdata ERROR: Orphan $type entry:\n  "
+                          . join( ' ', @line );
+                        next;
+                    }
+
                     $maintainer[0][0] = $1;    # complete match
                     $maintainer[0][1] = $2;    # relative file path
                     $maintainer[0][2] = $3;    # file name
@@ -1860,6 +1885,8 @@ sub __GetMaintainerdata {
                       ? 'deprecated'
                       : 'supported';              # Lifecycle status
 
+                    my $modName = $maintainer[0][4];
+
                     $line[2] =~ s/\s*\(.*\)\s*$//;    # remove all comments
                     $maintainer[3] =
                       $maintainer[2] eq 'deprecated'
@@ -1869,18 +1896,49 @@ sub __GetMaintainerdata {
                     if ( defined( $moduleMaintainers{ $maintainer[0][4] } ) ) {
                         Log 1,
                             __PACKAGE__
-                          . "::__GetMaintainerdata ERROR: Duplicate entry:\n"
-                          . ' 1st: '
+                          . "::__GetMaintainerdata ERROR: Duplicate $type entry:\n"
+                          . '  1st: '
                           . $moduleMaintainers{ $maintainer[0][4] }[0][0] . ' '
                           . $moduleMaintainers{ $maintainer[0][4] }[1] . ' '
                           . $moduleMaintainers{ $maintainer[0][4] }[2]
-                          . "\n 2nd: "
+                          . "\n  2nd: "
                           . join( ' ', @line );
                     }
                     else {
+                        # Register in global FHEM module index
                         $moduleMaintainers{ $maintainer[0][4] } = \@maintainer;
-                        push @{ $maintainerModules{ $maintainer[1] } },
-                          $maintainer[0][4];
+
+                        # Register in global maintainer index
+                        foreach ( split '/|,', $maintainer[1] ) {
+                            push @{ $maintainerModules{$_} }, $maintainer[0][4];
+                        }
+
+                        # Generate keywords for global index
+                        foreach (
+                            __GenerateKeywordsFromSupportCommunity(
+                                $maintainer[3]
+                            )
+                          )
+                        {
+                            if ( $type eq 'module' ) {
+                                push @{ $keywords{$_}{modules} },
+                                  $modName
+                                  if (
+                                    !defined( $keywords{$_}{modules} )
+                                    || !grep ( /^$modName$/i,
+                                        @{ $keywords{$_}{modules} } )
+                                  );
+                            }
+                            else {
+                                push @{ $keywords{$_}{packages} },
+                                  $modName
+                                  if (
+                                    !defined( $keywords{$_}{packages} )
+                                    || !grep ( /^$modName$/i,
+                                        @{ $keywords{$_}{packages} } )
+                                  );
+                            }
+                        }
                     }
                 }
 
@@ -1888,6 +1946,17 @@ sub __GetMaintainerdata {
                 #   used by FHEM modules.
                 #   Packages must provide file extension here.
                 elsif ( $2 && $2 eq 'FHEM/' && $6 eq 'pm' ) {
+
+                    my $type = 'package';
+
+                    if ( !-f $1 && !-f $1 . '.pm' ) {
+                        Log 4,
+                            __PACKAGE__
+                          . "::__GetMaintainerdata ERROR: Orphan $type entry:\n  "
+                          . join( ' ', @line );
+                        next;
+                    }
+
                     $maintainer[0][0] = $1;    # complete match
                     $maintainer[0][1] = $2;    # relative file path
                     $maintainer[0][2] = $3;    # file name
@@ -1896,23 +1965,53 @@ sub __GetMaintainerdata {
                     $maintainer[0][4] = $5;          # FHEM package name
                     $maintainer[0][5] = $6;          # file extension
                     $maintainer[1]    = $line[1];    # Maintainer alias name
-                    $maintainer[2]    = $line[2];    # Forum support section
+                    $maintainer[2] =
+                      $line[2] =~ m/\(deprecated\)/i
+                      ? 'deprecated'
+                      : 'supported';                 # Lifecycle status
+
+                    my $modName = $maintainer[0][4];
+
+                    $line[2] =~ s/\s*\(.*\)\s*$//;    # remove all comments
+                    $maintainer[3] =
+                      $maintainer[2] eq 'deprecated'
+                      ? ()
+                      : __GetSupportForum( $line[2] );   # Forum support section
 
                     if ( defined( $packageMaintainers{ $maintainer[0][4] } ) ) {
                         Log 1,
                             __PACKAGE__
-                          . "::__GetMaintainerdata ERROR: Duplicate entry:\n"
-                          . ' 1st: '
+                          . "::__GetMaintainerdata ERROR: Duplicate $type entry:\n"
+                          . '  1st: '
                           . $packageMaintainers{ $maintainer[0][4] }[0][0] . ' '
                           . $packageMaintainers{ $maintainer[0][4] }[1] . ' '
                           . $packageMaintainers{ $maintainer[0][4] }[2]
-                          . "\n 2nd: "
+                          . "\n  2nd: "
                           . join( ' ', @line );
                     }
                     else {
+                        # Register in global FHEM package index
                         $packageMaintainers{ $maintainer[0][4] } = \@maintainer;
-                        push @{ $maintainerPackages{ $maintainer[1] } },
-                          $maintainer[0][4];
+
+                        # Register in global maintainer index
+                        foreach ( split '/|,', $maintainer[1] ) {
+                            push @{ $maintainerPackages{$_} },
+                              $maintainer[0][4];
+                        }
+
+                        # Generate keywords for global index
+                        foreach (
+                            __GenerateKeywordsFromSupportCommunity(
+                                $maintainer[3]
+                            )
+                          )
+                        {
+                            push @{ $keywords{$_}{packages} }, $modName
+                              if ( !defined( $keywords{$_}{packages} )
+                                || !
+                                grep ( /^$modName$/i,
+                                    @{ $keywords{$_}{packages} } ) );
+                        }
                     }
                 }
 
@@ -2417,7 +2516,7 @@ sub __SetXVersion {
       "description": "n/a"
     }
   },
-  "version": "v0.2.0",
+  "version": "v0.3.0",
   "release_status": "testing",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
