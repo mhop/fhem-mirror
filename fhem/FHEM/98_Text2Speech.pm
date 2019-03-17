@@ -41,9 +41,9 @@ my %sets = (
 # path to mplayer
 my $mplayer 			= 'sudo /usr/bin/mplayer';
 #my $mplayerOpts 		= '-nolirc -noconsolecontrols -http-header-fields "User-Agent:Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.22 (KHTML, like Gecko) Chrome/25.0.1364.172 Safari/537.22m"';
-my $mplayerOpts     = '';
+my $mplayerOpts     = '-nolirc -noconsolecontrols';
 my $mplayerNoDebug  = '-really-quiet';
-my $mplayerAudioOpts 	= '--audio-device=';
+my $mplayerAudioOpts 	= '-ao alsa:device=';
 #my $ttsAddr 			= 'http://translate.google.com/translate_tts?tl=de&q=';
 my %ttsHost         = ("Google"     => "translate.google.com",
                        "VoiceRSS"   => "api.voicerss.org"

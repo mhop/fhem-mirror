@@ -2,8 +2,7 @@
 # Do not insert empty lines here, update check depends on it.
  - changed: 74_Unifi: removed UCv3 support
  - feature: 59_Weather: and APIs fix utf8 encode bug, insert patch from lippie
- - change:  98_Text2Speech.pm: changed to new mpv API and removed some bugs
-            thanks to RomanticBoy83
+ - change:  98_Text2Speech.pm: removed some bugs, thanks to RomanticBoy83
  - feature:  71_YAMAHA_MC: optional parameter TurnFavNetRadioChannelOn added
  - change:  49_SSCam: V8.11.4, make SSCam ready for SVS version 8.2.3-5829
  - feature: mqtt2.template: add filters to limit shown templates
