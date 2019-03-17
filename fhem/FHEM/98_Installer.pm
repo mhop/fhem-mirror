@@ -246,12 +246,6 @@ sub Get($$@) {
         my $ret = CreateRawMetaJson( $hash, $cmd, $args[0] );
         return $ret;
     }
-    elsif ( lc($cmd) eq 'zzgetmaintainer.json' ) {
-        return "usage: $cmd MAINTAINER" if ( @args != 1 );
-
-        my $ret = CreateRawMaintainerJson( $hash, $cmd, $args[0] );
-        return $ret;
-    }
     else {
         my @fhemModules;
         foreach ( sort { "\L$a" cmp "\L$b" } keys %modules ) {
@@ -259,23 +253,10 @@ sub Get($$@) {
             push @fhemModules, $_;
         }
 
-        my @fhemMaintainers;
-        foreach ( keys %FHEM::Meta::maintainerModules ) {
-            push @fhemMaintainers, $_;
-        }
-        foreach ( keys %FHEM::Meta::maintainerPackages ) {
-            push @fhemMaintainers, $_;
-        }
-        foreach ( keys %FHEM::Meta::maintainerFile ) {
-            push @fhemMaintainers, $_;
-        }
-
         my $list =
             'search'
           . ' showModuleInfo:FHEM,'
           . join( ',', @fhemModules )
-          . ' zzGetMaintainer.json:'
-          . join( ',', sort { "\L$a" cmp "\L$b" } __aUniq(@fhemMaintainers) )
           . ' zzGetMETA.json:FHEM,'
           . join( ',', @fhemModules );
 
@@ -949,8 +930,8 @@ sub CreateSearchList ($$$) {
 
     # search for matching device
     my $foundDevices = 0;
-    my $linecount = 1;
-    foreach my $device ( sort keys %defs ) {
+    my $linecount    = 1;
+    foreach my $device ( sort { "\L$a" cmp "\L$b" } keys %defs ) {
         next
           unless ( defined( $defs{$device}{TYPE} )
             && defined( $modules{ $defs{$device}{TYPE} } ) );
@@ -1010,8 +991,8 @@ sub CreateSearchList ($$$) {
 
     # search for matching module
     my $foundModules = 0;
-    $linecount    = 1;
-    foreach my $module ( sort keys %modules ) {
+    $linecount = 1;
+    foreach my $module ( sort { "\L$a" cmp "\L$b" } keys %modules ) {
         if ( $module =~ m/^.*$search.*$/i ) {
             unless ($foundModules) {
                 push @ret, '<h3>Modules</h3>' . $lb;
@@ -1064,7 +1045,9 @@ sub CreateSearchList ($$$) {
     # search for matching keyword
     my $foundKeywords = 0;
     $linecount = 1;
-    foreach my $keyword (%FHEM::Meta::keywords) {
+    foreach
+      my $keyword ( sort { "\L$a" cmp "\L$b" } keys %FHEM::Meta::keywords )
+    {
         if ( $keyword =~ m/^.*$search.*$/i ) {
             push @ret, '<h3>Keywords</h3>' unless ($foundKeywords);
             $found++;
@@ -1097,8 +1080,8 @@ sub CreateSearchList ($$$) {
                     my $l = $linecount % 2 == 0 ? $rowOpenEven : $rowOpenOdd;
 
                     my $type = $mAttr;
-                    $type = 'Module'       if ( $mAttr eq 'modules' );
-                    $type = 'Perl Package' if ( $mAttr eq 'packages' );
+                    $type = 'Module'  if ( $mAttr eq 'modules' );
+                    $type = 'Package' if ( $mAttr eq 'packages' );
 
                     FHEM::Meta::Load($item);
 
@@ -1137,6 +1120,107 @@ sub CreateSearchList ($$$) {
             push @ret, $tableClose;
         }
     }
+
+    # search for matching maintainer
+    my $foundMaintainers = 0;
+    my %maintainerInfo;
+    $linecount = 1;
+    foreach my $maintainer (
+        sort { "\L$a" cmp "\L$b" }
+        keys %FHEM::Meta::maintainerModules
+      )
+    {
+        if ( $maintainer =~ m/^.*$search.*$/i ) {
+            $maintainerInfo{$maintainer}{modules} =
+              $FHEM::Meta::maintainerModules{$maintainer};
+        }
+    }
+    foreach my $maintainer (
+        sort { "\L$a" cmp "\L$b" }
+        keys %FHEM::Meta::maintainerPackages
+      )
+    {
+        if ( $maintainer =~ m/^.*$search.*$/i ) {
+            $maintainerInfo{$maintainer}{packages} =
+              $FHEM::Meta::maintainerPackages{$maintainer};
+        }
+    }
+    foreach my $maintainer ( sort { "\L$a" cmp "\L$b" } keys %maintainerInfo ) {
+        next
+          unless ( defined( $maintainerInfo{$maintainer}{modules} )
+            || defined( $maintainerInfo{$maintainer}{packages} ) );
+
+        unless ($foundMaintainers) {
+            push @ret, '<h3>Authors & Maintainers</h3>' . $lb;
+            push @ret, $tableOpen;
+            push @ret,
+              $colOpenMinWidth . $txtOpen . 'Author' . $txtClose . $colClose;
+            push @ret, $colOpen . $txtOpen . 'Modules' . $txtClose . $colClose;
+            push @ret, $colOpen . $txtOpen . 'Packages' . $txtClose . $colClose;
+        }
+        $found++;
+        $foundMaintainers++;
+
+        my $l = $linecount % 2 == 0 ? $rowOpenEven : $rowOpenOdd;
+
+        my $modules  = '';
+        my $packages = '';
+
+        my $counter = 0;
+        foreach my $module ( sort { "\L$a" cmp "\L$b" }
+            @{ $maintainerInfo{$maintainer}{modules} } )
+        {
+            $modules .= $lb if ($counter);
+            $counter++;
+
+            if ($html) {
+                $modules .=
+                    '<a href="/'
+                  . $webname
+                  . '?cmd=get '
+                  . $hash->{NAME}
+                  . ' showModuleInfo '
+                  . $module
+                  . $FW_CSRF . '">'
+                  . $module . '</a>';
+            }
+            else {
+                $modules .= $module;
+            }
+        }
+        $counter = 0;
+        foreach my $package ( sort { "\L$a" cmp "\L$b" }
+            @{ $maintainerInfo{$maintainer}{packages} } )
+        {
+            $packages .= $lb if ($counter);
+            $counter++;
+
+            # if ($html) {
+            #     $packages .=
+            #         '<a href="/'
+            #       . $webname
+            #       . '?cmd=get '
+            #       . $hash->{NAME}
+            #       . ' showPackageInfo '
+            #       . $package
+            #       . $FW_CSRF . '">'
+            #       . $package . '</a>';
+            # }
+            # else {
+                $packages .= $package;
+            # }
+        }
+
+        $l .= $colOpenMinWidth . $maintainer . $colClose;
+        $l .= $colOpen . $modules . $colClose;
+        $l .= $colOpen . $packages . $colClose;
+
+        $l .= $rowClose;
+
+        push @ret, $l;
+        $linecount++;
+    }
+    push @ret, $tableClose if ($foundMaintainers);
 
     return $header . join( "\n", @ret ) . $footer;
 }
@@ -1369,7 +1453,7 @@ sub CreateMetadataList ($$$) {
                     $copyWeb = $modMeta->{resources}{x_copyright}{web};
                 }
 
-                if ( $html && $copyEmail ) {
+                if ( $html && $copyWeb ) {
                     $copyNameContact =
                         '<a href="'
                       . $copyWeb
@@ -1787,7 +1871,6 @@ sub CreateMetadataList ($$$) {
                     my $authorName;
                     my $authorEditorOnly;
                     my $authorEmail;
-                    my $authorNameEmail;
 
                     if ( $_ =~
 m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
@@ -1798,12 +1881,7 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                         $authorEmail      = $3;
                     }
 
-                    $authorNameEmail =
-                        '<a href="mailto:'
-                      . $authorEmail . '">'
-                      . $authorName
-                      . $authorEditorOnly . '</a>'
-                      if ( $html && $authorEmail );
+                    my $authorNameEmail = $authorName;
 
                     # add alias name if different
                     if (   defined( $modMeta->{x_fhem_maintainer} )
@@ -1811,15 +1889,39 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                         && @{ $modMeta->{x_fhem_maintainer} } > 0
                         && $modMeta->{x_fhem_maintainer}[$counter] ne '' )
                     {
-                        $authorNameEmail = (
-                              $authorNameEmail
-                            ? $authorNameEmail
-                            : $authorName
-                          )
-                          . ', alias '
-                          . $modMeta->{x_fhem_maintainer}[$counter]
-                          if ( $modMeta->{x_fhem_maintainer}[$counter] ne
-                            $authorName );
+
+                        my $alias = $modMeta->{x_fhem_maintainer}[$counter];
+
+                        if ( $alias eq $authorName ) {
+                            $authorNameEmail =
+                                '<a href="/'
+                              . $webname
+                              . '?cmd=get '
+                              . $hash->{NAME}
+                              . ' search '
+                              . $alias
+                              . $FW_CSRF . '">'
+                              . $authorName . '</a>'
+                              if ($html);
+                        }
+                        else {
+                            if ($html) {
+                                $authorNameEmail =
+                                    $authorName
+                                  . ', alias <a href="/'
+                                  . $webname
+                                  . '?cmd=get '
+                                  . $hash->{NAME}
+                                  . ' search '
+                                  . $alias
+                                  . $FW_CSRF . '">'
+                                  . $alias . '</a>';
+                            }
+                            else {
+                                $authorNameEmail =
+                                  $authorName . ', alias ' . $alias;
+                            }
+                        }
                     }
 
                     $l .= $lb if ($counter);
@@ -2283,33 +2385,6 @@ sub CreateRawMetaJson ($$$) {
     $j->canonical;
     $j->pretty;
     return $j->encode( $modules{$modName}{META} );
-}
-
-sub CreateRawMaintainerJson ($$$) {
-    my ( $hash, $getCmd, $maintainer ) = @_;
-    my %ret = ();
-
-    $ret{fhem_modules} = $FHEM::Meta::maintainerModules{$maintainer}
-      if ( defined( $FHEM::Meta::maintainerModules{$maintainer} ) );
-
-    $ret{fhem_packages} = $FHEM::Meta::maintainerPackages{$maintainer}
-      if ( defined( $FHEM::Meta::maintainerPackages{$maintainer} ) );
-
-    $ret{fhem_files} = $FHEM::Meta::maintainerFile{$maintainer}
-      if ( defined( $FHEM::Meta::maintainerFile{$maintainer} ) );
-
-    if ( scalar keys %ret > 0 ) {
-        $ret{fhem_maintainer} = $maintainer;
-    }
-    else {
-        return '{}';
-    }
-
-    my $j = JSON->new;
-    $j->allow_nonref;
-    $j->canonical;
-    $j->pretty;
-    return $j->encode( \%ret );
 }
 
 # Checks whether a perl package is installed in the system
