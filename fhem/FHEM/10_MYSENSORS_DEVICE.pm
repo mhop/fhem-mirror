@@ -26,6 +26,7 @@
 
 use strict;
 use warnings;
+use SetExtensions;
 
 sub MYSENSORS_DEVICE_Initialize($) {
 
@@ -37,25 +38,26 @@ sub MYSENSORS_DEVICE_Initialize($) {
   $hash->{SetFn}    = "MYSENSORS::DEVICE::Set";
   $hash->{GetFn}    = "MYSENSORS::DEVICE::Get";
   $hash->{AttrFn}   = "MYSENSORS::DEVICE::Attr";
-
-  $hash->{AttrList} =
-    "config:M,I " .
-    "mode:node,repeater " .
-    "version:1.4 " .
-    "setCommands " .
-    "setReading_.+ " .
-    "mapReadingType_.+ " .
-    "mapReading_.+ " .
-    "requestAck:1 " .
-    "timeoutAck " .
-    "timeoutAlive " .
-    "IODev " .
-    "showtime:0,1 " .
-    "OTA_autoUpdate:0,1 " .
-    "OTA_BL_Type:Optiboot,MYSBootloader " .
-    "OTA_Chan76_IODev " .
-    $main::readingFnAttributes;
-
+  no warnings 'qw';
+  my @attrList = qw(
+    config:M,I 
+    mode:node,repeater
+    version:1.4
+    setCommands
+    setReading_.+
+    mapReadingType_.+
+    mapReading_.+
+    requestAck:1
+    timeoutAck
+    timeoutAlive
+    IODev
+    showtime:0,1
+    OTA_autoUpdate:0,1
+    OTA_BL_Type:Optiboot,MYSBootloader
+    OTA_Chan76_IODev
+  );
+  use warnings 'qw';
+  $hash->{AttrList} = join(" ", @attrList)." ".$readingFnAttributes;
   main::LoadModule("MYSENSORS");
 }
 
@@ -67,7 +69,7 @@ use GPUtils qw(:all);
 
 use Device::MySensors::Constants qw(:all);
 use Device::MySensors::Message qw(:all);
-use SetExtensions qw/ :all /;
+#use SetExtensions qw/ :all /;
 
 BEGIN {
     main::LoadModule("MYSENSORS");
@@ -828,6 +830,10 @@ sub onInternalMessage($$) {
     $type == I_HEARTBEAT_RESPONSE and do {
         readingsSingleUpdate($hash, "heartbeat", "last", 0);
         refreshInternalMySTimer($hash,"Alive") if $hash->{timeoutAlive};
+        if ($hash->{nowSleeping}) {
+          $hash->{nowSleeping} = 0 ;
+          sendRetainedMessages($hash);
+        }
         #$hash->{$typeStr} = $msg->{payload};
     last;
     };
@@ -901,10 +907,7 @@ sub onInternalMessage($$) {
         refreshInternalMySTimer($hash,"Asleep");
         refreshInternalMySTimer($hash,"Alive") if $hash->{timeoutAlive};
         MYSENSORS::Timer($hash);
-        my $retainedMsg;
-        while (ref ($retainedMsg = shift @{$hash->{retainedMessagesForRadioId}->{messages}}) eq 'HASH') {
-          sendClientMessage($hash,%$retainedMsg);
-        };
+        sendRetainedMessages($hash) ;
         last;
     };
     $type == I_POST_SLEEP_NOTIFICATION and do {
@@ -927,6 +930,10 @@ sub sendClientMessage($%) {
       sendMessage($hash->{IODev},%msg);
       refreshInternalMySTimer($hash,"Ack") if (($msg{ack} or $hash->{IODev}->{ack}) and $hash->{timeoutAck});
       Log3 ($name,5,"$name is not sleeping, sending message!");
+      if ($hash->{nowSleeping}) {
+        $hash->{nowSleeping} = 0 ;
+        sendRetainedMessages($hash);
+      }
       $hash->{retainedMessages}=scalar(@$messages) if (defined $hash->{retainedMessages});
     } else {
       Log3 ($name,5,"$name is sleeping, enqueing message! ");
@@ -1126,6 +1133,14 @@ sub timeoutMySTimer($) {
     }
 }
 
+sub sendRetainedMessages($) {
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+    my $retainedMsg;
+    while (ref ($retainedMsg = shift @{$hash->{retainedMessagesForRadioId}->{messages}}) eq 'HASH') {
+       sendClientMessage($hash,%$retainedMsg);
+    };
+}
 1;
 
 =pod
