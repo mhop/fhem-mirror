@@ -65,8 +65,12 @@ $(document).ready(function() {
 	var toggleMenuOnFHEMIcon = function() {
 		if ($("body").hasClass("hideMenu")) {
 			recalculateStyleWithMenu();
+			resetcolumns();
+			calccolumns();
 		} else {
 			recalculateStyleWithoutMenu();
+			resetcolumns();
+			calccolumns();
 		}
 	};
 	
@@ -135,7 +139,7 @@ $(document).ready(function() {
 			// Berechnung der hinteren Spalten
 			maxwidthtd.forEach(function(column, index){
 				if(column > 260) {
-					column = 260;
+					maxwidthtd[index] = 260;
 				}
 				innertablewidth=innertablewidth-column-10;
 			});
