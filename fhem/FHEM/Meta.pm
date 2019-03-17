@@ -1796,7 +1796,7 @@ sub __GenerateKeywordsFromSupportCommunity {
             $tag =~ s/ +/-/g;
 
             foreach ( split '/', $tag ) {
-                push @keywords, $prefix . $_;
+                push @keywords, ( $_ =~ /^$prefix/ ? '' : $prefix ) . $_;
             }
         }
 
@@ -1805,7 +1805,7 @@ sub __GenerateKeywordsFromSupportCommunity {
         $tag =~ s/ +/-/g;
 
         foreach ( split '/', $tag ) {
-            push @keywords, $prefix . $_;
+            push @keywords, ( $_ =~ /^$prefix/ ? '' : $prefix ) . $_;
         }
     }
 
@@ -2453,7 +2453,7 @@ sub __SetXVersion {
         $modMeta->{x_version} =
           $modMeta->{x_file}[2] . ':'
           . (
-            $modMeta->{version} eq '0.000000001' ? '?'
+            $modMeta->{version} <= 0.000000001 ? '?'
             : (
                 $modMeta->{x_file}[7] ne 'generated/vcs'
                 ? version->parse( $modMeta->{version} )->normal
