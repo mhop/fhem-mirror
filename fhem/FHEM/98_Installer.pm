@@ -954,7 +954,7 @@ sub CreateSearchList ($$$) {
 
             my $l = $linecount % 2 == 0 ? $rowOpenEven : $rowOpenOdd;
 
-            FHEM::Meta::Load( $modules{ $defs{$device}{TYPE} } );
+            FHEM::Meta::Load( $defs{$device}{TYPE} );
 
             my $linkDev = $device;
             $linkDev =
@@ -1207,7 +1207,8 @@ sub CreateSearchList ($$$) {
             #       . $package . '</a>';
             # }
             # else {
-                $packages .= $package;
+            $packages .= $package;
+
             # }
         }
 
