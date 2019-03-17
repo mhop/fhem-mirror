@@ -464,6 +464,30 @@ set DEVICE attrTemplate A_01a_tasmota_basic_state_power1
 attr DEVICE stateFormat {sprintf("aktuell: %.1f W Tag: %.2f kWh Gestern: %.3f kWh Gesamt: %.4f kWh", ReadingsVal($name,"ENERGY_Power",undef), ReadingsVal($name,"ENERGY_Today",undef), ReadingsVal($name,"ENERGY_Yesterday",undef), ReadingsVal($name,"ENERGY_Total",undef))}
 attr DEVICE model A_01c_tasmota_POW
 
+
+#tasmota device with Infrared-circuit, forum: https://forum.fhem.de/index.php/topic,94494.msg919501.html#msg919501
+name:A_01d_tasmota_ir
+desc:Demonstrates three options (dec, hex, raw) how to configure tasmota devices as IR remote control extension.<br><a href="https://forum.fhem.de/index.php/topic,67316.0.html">Forum Thread</a><br><a href=https://github.com/arendst/Sonoff-Tasmota/wiki/Commands#irremote">Tasmota IRremote Commands</a><br><a href="https://github.com/altelch/SonoffIR">Simple IR-circuit</a>
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd).*
+par:DEVNAME;ESP's name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,tele/([^/]+)/, ? $1 : undef }
+par:POWERCMD;needed command to be sent like in example dec '{"protocol":"NEC","bits":32,"data":551489775}' (without '');
+par:VOLUMEUPCMD;needed command to be sent like in example raw '0,926,844,958,832,1798,868,902,848,900,870,900,852,908,918,958,794,934,874,928,1738,934,856,1764' (without '');
+par:MULTIPLE1CMD;needed command to be sent like in example hex '{"Protocol":"NEC","Bits":32,"Data":0x8166817E}' (without '');
+par:MULTIPLE2CMD;needed command to be sent like in example hex '{"Protocol":"NEC","Bits":32,"Data":0x8166817E}' (without '');
+set DEVICE attrTemplate A_01d_tasmota_ir
+attr DEVICE setList \
+power:noArg cmnd/DEVNAME/IRsend POWERCMD\
+volumeup:noArg cmnd/DEVNAME/IRsend VOLUMEUPCMD\
+11:noArg cmnd/DEVNAME/Backlog IRsend MULTIPLE1CMD;delay 8;IRsend MULTIPLE2CMD
+attr DEVICE readingList \
+  tele/DEVNAME/INFO.:.* { json2nameValue($EVENT) }
+attr DEVICE stateFormat state\
+<br>\
+<a href="http://IPAddress" target="_blank">IPAddress</a>
+attr DEVICE event-on-change-reading .*
+attr DEVICE icon IR
+attr DEVICE model A_01d_tasmota_ir
+
 # tasmota 2ch as one FHEM device.
 name:A_02a_tasmota_2ch_unified
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd).*
