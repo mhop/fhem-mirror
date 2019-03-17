@@ -405,6 +405,7 @@ FHEM/88_xs1Dev.pm            HomeAuto_User        Sonstige Systeme
 FHEM/89_FULLY.pm             zap                  Frontends
 FHEM/89_HEATRONIC.pm         heikoranft           Sonstige Systeme
 FHEM/89_VCONTROL.pm          adamwit              Heizungssteuerung/Raumklima
+FHEM/89_VCLIENT.pm           andies               Heizungssteuerung/Raumklima
 FHEM/90_at.pm                rudolfkoenig         Automatisierung
 FHEM/90_SIGNALduino_un.pm    Sidey                Sonstige Systeme
 FHEM/91_eventTypes.pm        rudolfkoenig         Frontends/FHEMWEB
