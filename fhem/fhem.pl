@@ -2873,7 +2873,7 @@ CommandAttr($$)
     }
     if($remove && $attr{$sdev} && $attr{$sdev}{$attrName}) {
       my $v = $attr{$sdev}{$attrName};
-      $v =~ s/\s*$attrVal\s*//;
+      $v =~ s/\b$attrVal\b//;
       $attrVal = $v;
     }
 
