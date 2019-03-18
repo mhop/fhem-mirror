@@ -512,6 +512,7 @@ MQTT2_DEVICE_Rename($$)
   MQTT2_DEVICE_addReading($new, AttrVal($new, "readingList", ""));
   $defs{$new}{DEVICETOPIC} = $new
     if($defs{$new}{DEVICETOPIC} eq $old && !AttrVal($new,"devicetopic",undef));
+  MQTT2_DEVICE_setBridgeRegexp();
   return undef;
 }
 
