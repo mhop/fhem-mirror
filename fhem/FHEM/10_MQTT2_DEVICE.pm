@@ -527,6 +527,7 @@ MQTT2_DEVICE_Undef($$)
     my @nh = grep { $_->{NAME} ne $hash->{NAME} } @{$dpc};
     $modules{MQTT2_DEVICE}{defptr}{cid}{$hash->{CID}} = \@nh;
   }
+  MQTT2_DEVICE_setBridgeRegexp();
   return undef;
 }
 
