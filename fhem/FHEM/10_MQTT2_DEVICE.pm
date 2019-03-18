@@ -495,7 +495,8 @@ MQTT2_DEVICE_Rename($$)
   my ($new, $old) = @_;
   MQTT2_DEVICE_delReading($old);
   MQTT2_DEVICE_addReading($new, AttrVal($new, "readingList", ""));
-  $defs{$new}{DEVICETOPIC} = $new;
+  $defs{$new}{DEVICETOPIC} = $new
+    if($defs{$new}{DEVICETOPIC} eq $old && !AttrVal($new,"devicetopic",undef));
   return undef;
 }
 
