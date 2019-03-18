@@ -569,10 +569,10 @@ FHEM/lib/SWAP/*              justme1968           Sonstige Systeme
 FHEM/lib/UPnP/*              Reinerlein           Multimedia
 
 contrib/23_WEBTHERM.pm       betateilchen/sachag  Sonstiges
-contrib/70_ONKYO_AVR_PULL.pm loredo               Multimedia
+contrib/70_ONKYO_AVR_PULL.pm loredo               (deprecated)
 contrib/92_rsyslog.pm        DS_Starter           Automatisierung
 contrib/98_EDIPLUG.pm        Wzut                 Sonstige Systeme
-contrib/98_exportdevice.pm   loredo               Sonstiges
+contrib/98_exportdevice.pm   loredo               (deprecated)
 contrib/98_FileLogConvert.pm DeeSPe               Automatisierung
 contrib/97_SprinkleControl.pm Tobias              Unterstuetzende Dienste
 contrib/98_Sprinkle.pm       Tobias               Unterstuetzende Dienste
