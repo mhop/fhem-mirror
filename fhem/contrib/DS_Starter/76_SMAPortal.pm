@@ -137,7 +137,7 @@ BEGIN {
 
 # Versions History intern
 our %vNotesIntern = (
-  "1.3.0"  => "15.03.2019  change module to use package SMAPortal and user Meta.pm, new sub setVersionInfo",
+  "1.3.0"  => "18.03.2019  change module to use package FHEM::SMAPortal and use Meta.pm, new sub setVersionInfo",
   "1.2.3"  => "12.03.2019  make ready for 98_Installer.pm ", 
   "1.2.2"  => "11.03.2019  new Errormessage analyze added, make ready for Meta.pm ", 
   "1.2.1"  => "10.03.2019  behavior of state changed, commandref revised ", 
@@ -931,20 +931,21 @@ return @sorted;
 #  Die Verwendung von Meta.pm und Packages wird berücksichtigt
 ################################################################
 sub setVersionInfo($) {
-  my ($hash)  = @_;
-  my $name    = $hash->{NAME};
-
-  my $type = $hash->{TYPE};
+  my ($hash) = @_;
+  my $name   = $hash->{NAME};
+  my $type   = $hash->{TYPE};
+  
+  $hash->{HELPER}{PACKAGE} = __PACKAGE__;
   if($modules{$type}{META}{x_prereqs_src}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".(sortVersionNum("desc",keys %vNotesIntern))[0];              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
 	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: ... $ im Kopf komplett! vorhanden )
-		  $modules{$type}{META}{x_version} =~ s/0.0.0/(sortVersionNum("desc",keys %vNotesIntern))[0]/e;
+		  $modules{$type}{META}{x_version} =~ s/1.1.1/(sortVersionNum("desc",keys %vNotesIntern))[0]/e;
 	  } else {
 		  $modules{$type}{META}{x_version} = (sortVersionNum("desc",keys %vNotesIntern))[0]; 
 	  }
 	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: ... $ im Kopf komplett! vorhanden )
-	  if( __PACKAGE__ eq $type) {
+	  if( __PACKAGE__ ne "main") {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # kann mit {SMAPortal->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
 	      use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );                                          
@@ -1254,7 +1255,7 @@ return;
     "portal",
     "smaportal"
   ],
-  "version": "v0.0.0",
+  "version": "v1.1.1",
   "release_status": "testing",
   "author": [
     "Heiko Maaz <heiko.maaz@t-online.de>"
