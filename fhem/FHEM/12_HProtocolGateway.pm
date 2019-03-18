@@ -49,7 +49,7 @@ sub HProtocolGateway_Initialize($) {
                       "parityBit:N,E,O " .
                       "databitsLength:5,6,7,8 " .
                       "stopBit:0,1 " .
-                      "pollIntervalMins";
+                      "pollInterval";
 }
 
 sub HProtocolGateway_Define($$) {
@@ -127,8 +127,8 @@ sub HProtocolGateway_GetUpdate($) {
     Log3 $name, 5, "data:". $data;
   }
   
-    my $pollInterval = AttrVal($hash->{NAME}, 'pollIntervalMins', 0);  #restore pollIntervalMins Timer
-    InternalTimer(gettimeofday() + ($pollInterval * 60), 'HProtocolGateway_Poll', $hash, 0) if ($pollInterval > 0);
+    my $pollInterval = AttrVal($hash->{NAME}, 'pollInterval', 0);  #restore pollInterval Timer
+    InternalTimer(gettimeofday() + $pollInterval, 'HProtocolGateway_Poll', $hash, 0) if ($pollInterval > 0);
 }
 
 sub HProtocolGateway_ReadAnswer($$) {
@@ -269,6 +269,7 @@ sub HProtocolGateway_ParseMessage($$) {
     if (defined $probe_offset) { HProtocolGateway_UpdateTankDevice($hash, $tankHash->{NAME}, "probe_offset", $probe_offset); }
     if (defined $version) { HProtocolGateway_UpdateTankDevice($hash, $tankHash->{NAME}, "version", $version); }
     if (defined $error) { HProtocolGateway_UpdateTankDevice($hash, $tankHash->{NAME}, "error", $error); }
+
 }
 
 sub HProtocolGateway_UpdateTankDevice($$$$) {
@@ -337,7 +338,7 @@ sub HProtocolGateway_Attr (@) {
                 RemoveInternalTimer($hash);
                 HProtocolGateway_Poll($hash);
 	        } else {
-	            $msg = 'Wrong poll intervall defined. pollIntervalMins must be a number > 0';
+	            $msg = 'Wrong poll intervall defined. pollInterval must be a number > 0';
 	        }
 	    } else {
 	       RemoveInternalTimer($hash);
@@ -375,9 +376,9 @@ sub HProtocolGateway_Poll($) {
     
     HProtocolGateway_Set($hash, ($name, 'readValues'));
     
-    my $pollInterval = AttrVal($hash->{NAME}, 'pollIntervalMins', 0);
+    my $pollInterval = AttrVal($hash->{NAME}, 'pollInterval', 0);
     if ($pollInterval > 0) {
-        InternalTimer(gettimeofday() + ($pollInterval * 60), 'HProtocolGateway_Poll', $hash, 0);
+        InternalTimer(gettimeofday() + $pollInterval, 'HProtocolGateway_Poll', $hash, 0);
     }
 }
 
@@ -430,7 +431,7 @@ sub HProtocolGateway_Tank($$$) {
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; HProtocolGateway /dev/tty???<br />
-    attr &lt;name&gt; pollIntervalMins 2<br />
+    attr &lt;name&gt; pollInterval 120<br />
     attr &lt;name&gt; baudrate 1200<br />
     attr &lt;name&gt; databitsLength 8<br />
     attr &lt;name&gt; parityBit N<br />
@@ -444,8 +445,8 @@ sub HProtocolGateway_Tank($$$) {
   <a name="HProtocolGateway"></a>
   <b>Attributes</b>
   <ul>
-    <li>pollIntervalMins<br />
-    poll Interval in Mins</li>
+    <li>pollInterval<br />
+    poll Interval in seconds</li>
     <li>baudrate<br />
     Baudrate / 300, 600, 1200, 2400, 4800, 9600</li>
     <li>databitsLength<br />
