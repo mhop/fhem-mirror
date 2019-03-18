@@ -55,8 +55,9 @@ use IO::Uncompress::Gunzip qw(gunzip $GunzipError);
 # no if $] >= 5.018000, warnings => 'experimental';
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
-# Versions History intern
+# Version History intern
 our %DbRep_vNotesIntern = (
+  "8.16.0" => "17.03.2019  include sortTopicNum from 99_Utils, allow PRAGMAS leading an SQLIte SQL-Statement in sqlCmd, switch to DbRep_setVersionInfo ",
   "8.15.0" => "04.03.2019  readingsRename can rename readings of a given (optional) device ",
   "8.14.1" => "04.03.2019  Bugfix in deldoublets with SQLite, Forum: https://forum.fhem.de/index.php/topic,53584.msg914489.html#msg914489 ",
   "8.14.0" => "19.02.2019  delete Readings if !goodReadingName and featurelevel > 5.9 ",
@@ -138,8 +139,9 @@ our %DbRep_vNotesIntern = (
   "1.0.0"  => "19.05.2016  Initial"
 );
 
-# Versions History extern:
+# Version History extern:
 our %DbRep_vNotesExtern = (
+  "8.16.0" => "17.03.2019 allow SQLite PRAGMAS leading an SQLIte SQL-Statement in sqlCmd",
   "8.15.0" => "04.03.2019 readingsRename can now rename readings of a given (optional) device instead of all found readings specified in command ",
   "8.13.0" => "11.02.2019 executeBeforeProc / executeAfterProc is now available for sqlCmd,sumValue, maxValue, minValue, diffValue, averageValue ",
   "8.11.0" => "24.01.2019 command exportToFile or attribute \"expimpfile\" accepts option \"MAXLINES=\" ",
@@ -364,8 +366,10 @@ sub DbRep_Initialize($) {
  # $hash->{AttrRenameMap} = { "reading" => "readingFilter",
  #                            "device" => "deviceFilter",
  #                          }; 
-  
-return undef;   
+ 
+ # FHEM::Meta::InitMod( __FILE__, $hash );           # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
+ 
+return;   
 }
 
 ###################################################################################
@@ -393,11 +397,13 @@ sub DbRep_Define($@) {
   $hash->{MODEL}               = $hash->{ROLE};
   $hash->{HELPER}{DBLOGDEVICE} = $a[2];
   $hash->{HELPER}{IDRETRIES}   = 3;                                            # Anzahl wie oft versucht wird initiale Daten zu holen
-  $hash->{VERSION}             = (DbRep_sortVersion("desc",keys %DbRep_vNotesIntern))[0];
   $hash->{NOTIFYDEV}           = "global,".$name;                              # nur Events dieser Devices an DbRep_Notify weiterleiten 
   my $dbconn                   = $defs{$a[2]}{dbconn};
   $hash->{DATABASE}            = (split(/;|=/, $dbconn))[1];
   $hash->{UTF8}                = defined($defs{$a[2]}{UTF8})?$defs{$a[2]}{UTF8}:0;
+  
+  # Versionsinformationen setzen
+  DbRep_setVersionInfo($hash);
   
   my ($err,$hl)                = DbRep_getCmdFile($name."_sqlCmdList");
   if(!$err) {
@@ -964,7 +970,7 @@ sub DbRep_Get($@) {
               }
           }           
           $i = 0;
-          foreach my $key (DbRep_sortVersion("desc",keys %hs)) {
+          foreach my $key (sortTopicNum("desc",keys %hs)) {
               $val0 = $hs{$key};
               $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0</td>" );
               $ret .= "</tr>";
@@ -989,7 +995,7 @@ sub DbRep_Get($@) {
           $ret .= "<tbody>";
           $ret .= "<tr class=\"even\">";
           $i = 0;
-          foreach my $key (DbRep_sortVersion("desc",keys %DbRep_vNotesExtern)) {
+          foreach my $key (sortTopicNum("desc",keys %DbRep_vNotesExtern)) {
               ($val0,$val1) = split(/\s/,$DbRep_vNotesExtern{$key},2);
               $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0  </td><td>$val1</td>" );
               $ret .= "</tr>";
@@ -5665,7 +5671,7 @@ sub sqlCmd_DoParse($) {
       $set = $1;
       $sql = $2;
   }
-  
+    
   if($set) {
       Log3($name, 4, "DbRep $name - Set SQL session variables: $set");    
       eval {$dbh->do($set);};   # @\RB = Resetbit wenn neues Selektionsintervall beginnt
@@ -5675,6 +5681,27 @@ sub sqlCmd_DoParse($) {
      Log3 ($name, 2, "DbRep $name - ERROR - $@");
      $dbh->disconnect;
      return "$name|''|$opt|$set|''|''|$err"; 
+  }
+  
+  # Abarbeitung aller Pragmas in einem SQLite Statement, SQL wird extrahiert
+  # Pragmas müssen im SQL vorangestellt sein
+  if($cmd =~ /^\s*PRAGMA.*;/i) {   
+      my @pms = split(";",$cmd);           
+      foreach my $pm (@pms) {
+          if($pm !~ /PRAGMA/i) {
+              $sql = $pm;
+              next;
+          }
+          $pm = ltrim($pm);
+          Log3($name, 4, "DbRep $name - Exec PRAGMA Statement: $pm");    
+          eval {$dbh->do($pm);};
+          if ($@) {
+             $err = encode_base64($@,"");
+             Log3 ($name, 2, "DbRep $name - ERROR - $@");
+             $dbh->disconnect;
+             return "$name|''|$opt|$set|''|''|$err"; 
+          }      
+      }
   }
   
   # Allow inplace replacement of keywords for timings (use time attribute syntax)
@@ -10071,6 +10098,37 @@ sub DbRep_sortVersion (@){
 return @sorted;
 }
 
+################################################################
+#               Versionierungen des Moduls setzen
+#  Die Verwendung von Meta.pm und Packages wird berücksichtigt
+################################################################
+sub DbRep_setVersionInfo($) {
+  my ($hash) = @_;
+  my $name   = $hash->{NAME};
+
+  my $type = $hash->{TYPE};
+  if($modules{$type}{META}{x_prereqs_src}) {
+	  # META-Daten sind vorhanden
+	  $modules{$type}{META}{version} = "v".(sortTopicNum("desc",keys %DbRep_vNotesIntern))[0];              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
+		  $modules{$type}{META}{x_version} =~ s/0.0.0/(sortTopicNum("desc",keys %DbRep_vNotesIntern))[0]/e;
+	  } else {
+		  $modules{$type}{META}{x_version} = (sortTopicNum("desc",keys %DbRep_vNotesIntern))[0]; 
+	  }
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
+	  if( __PACKAGE__ eq $type) {
+	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
+		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
+	      use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );                                          
+      }
+  } else {
+	  # herkömmliche Modulstruktur
+	  $hash->{VERSION} = (sortTopicNum("desc",keys %DbRep_vNotesIntern))[0];
+  }
+  
+return;
+}
+
 ####################################################################################################
 #     blockierende DB-Abfrage 
 #     liefert Ergebnis sofort zurück, setzt keine Readings
@@ -11487,8 +11545,8 @@ return;
 								 "allowDeletion" has to be set for security reason. <br>
                                  The statement doesn't consider limitations by attributes "device", "reading", "time.*" 
                                  respectively "aggregation". <br>
-                                 This command also accept the setting of SQL session variables like "SET @open:=NULL, 
-                                 @closed:=NULL;". <br>
+                                 This command also accept the setting of MySQL session variables like "SET @open:=NULL, 
+                                 @closed:=NULL;" or the usage of SQLite PRAGMA before execution of the SQL-Statement. <br>
 								 If the <a href="#DbRepattr">attribute</a> "timestamp_begin" respectively "timestamp_end" 
 								 is assumed in the statement, it is possible to use placeholder "<b>§timestamp_begin§</b>" respectively
 								 "<b>§timestamp_end§</b>" on suitable place. <br><br>
@@ -11514,8 +11572,8 @@ return;
                                  </ul>
                                  <br>
                                  
-                                 Here you can see an example of a more complex statement (MySQL) with setting SQL session 
-                                 variables: <br><br>
+                                 Here you can see examples of a more complex statement (MySQL) with setting SQL session 
+                                 variables and the SQLite PRAGMA usage: <br><br>
                                  
                                  <ul>
                                  <li>set &lt;name&gt; sqlCmd SET @open:=NULL, @closed:=NULL;
@@ -11530,6 +11588,8 @@ return;
                                            READING = "state" AND
                                            (VALUE = "open" OR VALUE = "closed")
                                            ORDER BY  TIMESTAMP; </li>
+                                 <li>set &lt;name&gt; sqlCmd PRAGMA temp_store=MEMORY; PRAGMA synchronous=FULL; PRAGMA journal_mode=WAL; PRAGMA cache_size=4000; select count(*) from history; </li>
+                                 <li>set &lt;name&gt; sqlCmd PRAGMA temp_store=FILE; PRAGMA temp_store_directory = '/opt/fhem/'; VACUUM; </li>
                                  </ul>
 								 <br>
 								 
@@ -13863,7 +13923,8 @@ sub bdump {
                                  Bei der Ausführung dieses Kommandos werden keine Einschränkungen durch gesetzte Attribute
                                  "device", "reading", "time.*" bzw. "aggregation" berücksichtigt. <br>
                                  Dieses Kommando akzeptiert ebenfalls das Setzen von SQL Session Variablen wie z.B.
-                                 "SET @open:=NULL, @closed:=NULL;". <br>
+                                 "SET @open:=NULL, @closed:=NULL;" oder die Verwendung von SQLite PRAGMA vor der 
+                                 Ausführung des SQL-Statements. <br>
 								 Sollen die im Modul gesetzten <a href="#DbRepattr">Attribute</a> "timestamp_begin" bzw. 
 								 "timestamp_end" im Statement berücksichtigt werden, können die Platzhalter 
 								 "<b>§timestamp_begin§</b>" bzw. "<b>§timestamp_end§</b>" dafür verwendet werden. <br><br>
@@ -13889,8 +13950,8 @@ sub bdump {
                                  </ul>
                                  <br>
                                  
-                                 Nachfolgend noch ein Beispiel für ein komplexeres Statement (MySQL) unter Mitgabe von
-                                 SQL Session Variablen: <br><br>
+                                 Nachfolgend Beispiele für ein komplexeres Statement (MySQL) unter Mitgabe von
+                                 SQL Session Variablen und die SQLite PRAGMA-Verwendung: <br><br>
                                  
                                  <ul>
                                  <li>set &lt;name&gt; sqlCmd SET @open:=NULL, @closed:=NULL;
@@ -13905,6 +13966,8 @@ sub bdump {
                                            READING = "state" AND
                                            (VALUE = "open" OR VALUE = "closed")
                                            ORDER BY  TIMESTAMP; </li>
+                                 <li>set &lt;name&gt; sqlCmd PRAGMA temp_store=MEMORY; PRAGMA synchronous=FULL; PRAGMA journal_mode=WAL; PRAGMA cache_size=4000; select count(*) from history; </li>
+                                 <li>set &lt;name&gt; sqlCmd PRAGMA temp_store=FILE; PRAGMA temp_store_directory = '/opt/fhem/'; VACUUM; </li>
                                  </ul>
 								 <br>                                 
 								 
