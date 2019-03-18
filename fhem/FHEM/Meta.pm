@@ -2231,7 +2231,7 @@ sub __GetUpdatedata {
     # if there are 3rd party source file repositories involved
     if ( open( $fh, '<' . $attr{global}{modpath} . '/FHEM/controls.txt' ) ) {
         while ( my $l = <$fh> ) {
-            push @fileList, $1 if ( $l =~ m/([^\/\s]+)$/ );
+            push @fileList, 'FHEM/' . $1 if ( $l =~ m/([^\/\s]+)$/ );
         }
         close($fh);
     }
@@ -2516,7 +2516,7 @@ sub __SetXVersion {
       "description": "n/a"
     }
   },
-  "version": "v0.3.0",
+  "version": "v0.3.1",
   "release_status": "testing",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
