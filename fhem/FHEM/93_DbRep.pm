@@ -10105,18 +10105,19 @@ return @sorted;
 sub DbRep_setVersionInfo($) {
   my ($hash) = @_;
   my $name   = $hash->{NAME};
-
-  my $type = $hash->{TYPE};
+  my $type   = $hash->{TYPE};
+  
+  $hash->{HELPER}{PACKAGE} = __PACKAGE__;
   if($modules{$type}{META}{x_prereqs_src}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".(sortTopicNum("desc",keys %DbRep_vNotesIntern))[0];              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
 	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
-		  $modules{$type}{META}{x_version} =~ s/0.0.0/(sortTopicNum("desc",keys %DbRep_vNotesIntern))[0]/e;
+		  $modules{$type}{META}{x_version} =~ s/1.1.1/(sortTopicNum("desc",keys %DbRep_vNotesIntern))[0]/e;
 	  } else {
 		  $modules{$type}{META}{x_version} = (sortTopicNum("desc",keys %DbRep_vNotesIntern))[0]; 
 	  }
 	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
-	  if( __PACKAGE__ eq $type) {
+	  if( __PACKAGE__ ne "main") {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
 	      use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );                                          
