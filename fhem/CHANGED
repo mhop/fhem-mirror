@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix/feature: 59_Weather/API's: fix weblink bug, add extended hourly
+                                     data format
  - feature: 55_DWD_OpenData: - new readings SunRise, SunSet
                              - SunUp based on upper solar limb
                              - support warncells beginning with 7
