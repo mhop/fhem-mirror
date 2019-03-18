@@ -6,6 +6,8 @@ use strict;
 use warnings;
 use SetExtensions;
 
+my $bridgeTimerStarted;
+
 sub
 MQTT2_DEVICE_Initialize($)
 {
@@ -71,6 +73,10 @@ MQTT2_DEVICE_Define($$)
     }
     push(@{$dpc->{$hash->{CID}}},$hash);
   }
+
+  InternalTimer(1, "MQTT2_DEVICE_setBridgeRegexp", undef, 0)
+    if(!$init_done && !$bridgeTimerStarted);
+  $bridgeTimerStarted = 1;
 
   AssignIoPort($hash);
   return undef;
@@ -367,6 +373,7 @@ MQTT2_DEVICE_Attr($$)
 {
   my ($type, $dev, $attrName, $param) = @_;
   my $hash = $defs{$dev};
+  $attrName = "" if(!$attrName);
 
   if($attrName eq "devicetopic") {
     $hash->{DEVICETOPIC} = ($type eq "del" ? $hash->{NAME} : $param);
@@ -419,27 +426,20 @@ MQTT2_DEVICE_Attr($$)
     }
   }
 
-  if($attrName eq "bridgeRegexp" && $type eq "set") {
-
-    my $old = AttrVal($dev, "bridgeRegexp", "");
-    foreach my $el (split("\n", $old)) {
-      my ($par1, $par2) = split(" ", $el, 2);
-      delete($modules{MQTT2_DEVICE}{defptr}{bridge}{$par1}) if($par1);
-    }
-
-    foreach my $el (split("\n", $param)) {
+  if($attrName eq "bridgeRegexp") {
+    # Check the syntax
+    foreach my $el (split("\n", ($param ? $param : ""))) { #del: param is undef
       my ($par1, $par2) = split(" ", $el, 2);
       next if(!$par1);
       return "$dev attr $attrName: more parameters needed" if(!$par2);
       eval { "Hallo" =~ m/^$par1$/ };
       return "$dev $attrName regexp error: $@" if($@);
-      $modules{MQTT2_DEVICE}{defptr}{bridge}{$par1}= {name=>$par2,parent=>$dev};
     }
-
     if($init_done) {
       my $name = $hash->{NAME};
       AnalyzeCommandChain(undef,
                       "deleteattr $name readingList; deletereading $name .*");
+      InternalTimer(1, "MQTT2_DEVICE_setBridgeRegexp", undef, 0);
     }
   }
 
@@ -455,6 +455,21 @@ MQTT2_DEVICE_Attr($$)
   }
 
   return undef;
+}
+
+sub
+MQTT2_DEVICE_setBridgeRegexp()
+{
+  delete($modules{MQTT2_DEVICE}{defptr}{bridge});
+  for my $dev (devspec2array("TYPE=MQTT2_DEVICE")) {
+    my $bre = AttrVal($dev, "bridgeRegexp", "");
+    next if(!$bre);
+    foreach my $el (split("\n", $bre)) {
+      my ($par1, $par2) = split(" ", $el, 2);
+      next if(!$par1 || !$par2);
+      $modules{MQTT2_DEVICE}{defptr}{bridge}{$par1}= {name=>$par2,parent=>$dev};
+    }
+  }
 }
 
 sub
