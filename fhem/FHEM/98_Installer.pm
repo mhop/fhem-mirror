@@ -1053,7 +1053,7 @@ sub CreateSearchList ($$$) {
             $found++;
             $foundKeywords++;
 
-            push @ret, '<h4>#' . $keyword . '</h4>';
+            push @ret, '<h4># ' . $keyword . '</h4>';
 
             my @mAttrs = qw(
               modules

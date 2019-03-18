@@ -6,7 +6,7 @@ use warnings;
 
 # provide the same hash as for real FHEM modules
 #   in FHEM main context
-our %packages;
+use vars qw(%packages);
 
 # define package
 package FHEM::Meta;
@@ -38,15 +38,6 @@ BEGIN {
           )
     );
 }
-
-#TODO this shall be handled by InitMod()
-# Get our own Metadata
-my %META;
-my $ret = __GetMetadata( __FILE__, \%META );
-return "$@" if ($@);
-return $ret if ($ret);
-$packages{Meta} = \%META;
-use version 0.77; our $VERSION = $packages{Meta}{version};
 
 # Exported variables
 #
@@ -579,6 +570,18 @@ my @perlCoreModules = qw(
   Win32::Spawn
 );
 
+# Initialize global hash %packages
+__GetPackages() unless ( keys %packages > 0 );
+
+#TODO this shall be handled by InitMod()
+# Get our own Metadata
+my %META;
+my $ret = __GetMetadata( __FILE__, \%META );
+return "$@" if ($@);
+return $ret if ($ret);
+$packages{Meta}{META} = \%META;
+use version 0.77; our $VERSION = $packages{Meta}{META}{version};
+
 # Initially load information
 #   to be ready for meta analysis
 __GetUpdatedata() unless ( defined($coreUpdate) );
@@ -698,42 +701,84 @@ sub Load(;$$) {
 
     foreach my $modName (@lmodules) {
 
+        my $type = (
+            exists( $modules{$modName} )
+            ? 'module'
+            : ( exists( $packages{$modName} ) ? 'package' : undef )
+        );
+        next unless ($type);
+
         # Abort when module file was not indexed by
         #   fhem.pl before.
         # Only continue if META was not loaded
         #   or should explicitly be reloaded.
         next
           if (
-            !defined( $modules{$modName}{ORDER} )
-            || (   !$reload
-                && defined( $modules{$modName}{META} )
-                && ref( $modules{$modName}{META} ) eq "HASH" )
+            $type eq 'module'
+            && (
+                !defined( $modules{$modName}{ORDER} )
+                || (   !$reload
+                    && defined( $modules{$modName}{META} )
+                    && ref( $modules{$modName}{META} ) eq "HASH" )
+            )
           );
+        next
+          if ( $type eq 'package'
+            && !$reload
+            && defined( $packages{$modName}{META} )
+            && ref( $packages{$modName}{META} ) eq "HASH" );
 
-        delete $modules{$modName}{META};
+        if ( $type eq 'module'
+            && defined( $modules{$modName}{META} ) )
+        {
+            delete $modules{$modName}{META};
+
+        }
+        elsif ( $type eq 'package'
+            && defined( $packages{$modName}{META} ) )
+        {
+            delete $packages{$modName}{META};
+        }
 
         my $filePath;
         if ( $modName eq 'Global' ) {
             $filePath = $attr{global}{modpath} . "/fhem.pl";
         }
+        elsif ( $modName eq 'configDB' ) {
+            $filePath = $attr{global}{modpath} . "/configDB.pm";
+        }
         else {
             $filePath =
                 $attr{global}{modpath}
               . "/FHEM/"
-              . $modules{$modName}{ORDER} . '_'
+              . ( $type eq 'module' ? $modules{$modName}{ORDER} . '_' : '' )
               . $modName . '.pm';
         }
 
-        my $ret = InitMod( $filePath, $modules{$modName}, 1 );
+        my $ret =
+          InitMod( $filePath,
+            ( $type eq 'module' ? $modules{$modName} : $packages{$modName} ),
+            1 );
         push @rets, $@   if ( $@   && $@ ne '' );
         push @rets, $ret if ( $ret && $ret ne '' );
 
-        $modules{$modName}{META}{generated_by} =
-          $packages{Meta}{name} . ' ' . version->parse($v)->normal . ", $t"
-          if ( defined( $modules{$modName}{META} ) );
+        if ( $type eq 'module' ) {
+            $modules{$modName}{META}{generated_by} =
+              $packages{Meta}{META}{name} . ' '
+              . version->parse($v)->normal . ", $t"
+              if ( defined( $modules{$modName} )
+                && defined( $modules{$modName}{META} ) );
 
-        foreach my $devName ( devspec2array( 'TYPE=' . $modName ) ) {
-            SetInternals( $defs{$devName} );
+            foreach my $devName ( devspec2array( 'TYPE=' . $modName ) ) {
+                SetInternals( $defs{$devName} );
+            }
+        }
+        else {
+            $packages{$modName}{META}{generated_by} =
+              $packages{Meta}{META}{name} . ' '
+              . version->parse($v)->normal . ", $t"
+              if ( defined( $packages{$modName} )
+                && defined( $packages{$modName}{META} ) );
         }
     }
 
@@ -1006,7 +1051,9 @@ m/(\$Id\: ((?:([0-9]+)_)?([\w]+)\.([\w]+))\s([0-9]+)\s((([0-9]+)-([0-9]+)-([0-9]
                 $vcs[0] = $1;    # complete match
                 $vcs[1] = $2;    # file name
                 $vcs[2] =
-                  $2 eq 'fhem.pl' ? '-1' : $3;  # order number, may be indefined
+                  $2 eq 'fhem.pl'
+                  ? '-1'
+                  : $3;          # order number, may be indefined
                 $vcs[3] = $2 eq 'fhem.pl' ? 'Global' : $4;   # FHEM module name
                 $vcs[4] = $5;                                # file extension
                 $vcs[5] = $6;                                # svn base revision
@@ -1339,6 +1386,73 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
         else {
             $modMeta->{x_prereqs_src} = 'META.json';
         }
+
+        # Look for prereqs from FHEM packages
+        #   used by this FHEM module.
+        # We're not going deeper down for Meta.pm itself,
+        # that means Meta.pm manual prereqs need to cover this.
+        if (   $modMeta->{x_file}[4] ne 'Meta'
+            && defined( $modMeta->{prereqs} )
+            && defined( $modMeta->{prereqs}{runtime} ) )
+        {
+            foreach my $pkgReq (qw(requires recommends suggests)) {
+                next
+                  unless ( defined( $modMeta->{prereqs}{runtime}{$pkgReq} ) );
+
+                foreach
+                  my $pkg ( keys %{ $modMeta->{prereqs}{runtime}{$pkgReq} } )
+                {
+
+                    # Found prereq that is a FHEM package
+                    if ( exists( $packages{$pkg} ) ) {
+                        Load($pkg);
+
+                        if (   defined( $packages{$pkg}{META} )
+                            && defined( $packages{$pkg}{META}{prereqs} )
+                            && defined(
+                                $packages{$pkg}{META}{prereqs}{runtime} ) )
+                        {
+                            my $pkgMeta = $packages{$pkg}{META};
+
+                            foreach
+                              my $pkgIreq (qw(requires recommends suggests))
+                            {
+                                next
+                                  unless (
+                                    defined(
+                                        $pkgMeta->{prereqs}{runtime}{$pkgIreq}
+                                    )
+                                  );
+
+                                # inject indirect prereq to FHEM module
+                                foreach my $pkgI (
+                                    keys
+                                    %{ $pkgMeta->{prereqs}{runtime}{$pkgIreq} }
+                                  )
+                                {
+                                    $modMeta->{prereqs}{runtime}{$pkgIreq}
+                                      {$pkgI} =
+                                      $pkgMeta->{prereqs}{runtime}{$pkgIreq}
+                                      {$pkgI}
+                                      if (
+                                        !exists(
+                                            $modMeta->{prereqs}{runtime}
+                                              {$pkgIreq}{$pkgI}
+                                        )
+                                        || ( $pkgMeta->{prereqs}{runtime}
+                                            {$pkgIreq}{$pkgI} ne '0'
+                                            && $modMeta->{prereqs}{runtime}
+                                            {$pkgIreq}{$pkgI} ne
+                                            $pkgMeta->{prereqs}{runtime}
+                                            {$pkgIreq}{$pkgI} )
+                                      );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     # Get some other info about fhem.pl
@@ -1486,7 +1600,7 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
     # If we are not running in loop, this is not time consuming for us here
     elsif ( !$runInLoop ) {
         $modMeta->{generated_by} =
-            $packages{Meta}{name} . ' '
+            $packages{Meta}{META}{name} . ' '
           . version->parse( __PACKAGE__->VERSION() )->normal . ', '
           . TimeNow();
     }
@@ -1694,11 +1808,14 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
         foreach ( @{ $modMeta->{keywords} } ) {
             push @filtered, lc($_)
               unless ( lc($_) eq 'fhem-core'
-                || lc($_) eq 'fhem-3rdparty'
                 || lc($_) eq 'fhem-mod'
                 || lc($_) eq 'fhem-pkg'
+                || lc($_) eq 'fhem-3rdparty'
+                || lc($_) eq 'fhem-mod-3rdparty'
+                || lc($_) eq 'fhem-pkg-3rdparty'
                 || lc($_) eq 'fhem-mod-local'
                 || lc($_) eq 'fhem-pkg-local'
+                || lc($_) eq 'fhem-commercial'
                 || lc($_) eq 'fhem-mod-commercial'
                 || lc($_) eq 'fhem-pkg-commercial' );
         }
@@ -1711,15 +1828,15 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
         && defined( $modMeta->{resources}{x_support_community} )
         && $modMeta->{x_file}[2] ne 'fhem.pl' )
     {
-        foreach (
+        foreach my $keyword (
             __GenerateKeywordsFromSupportCommunity(
                 $modMeta->{resources}{x_support_community}
             )
           )
         {
-            push @{ $modMeta->{keywords} }, $_
+            push @{ $modMeta->{keywords} }, $keyword
               if ( !defined( $modMeta->{keywords} )
-                || !grep ( m/^$_$/i, @{ $modMeta->{keywords} } ) );
+                || !grep ( m/^$keyword$/i, @{ $modMeta->{keywords} } ) );
         }
     }
 
@@ -1739,11 +1856,12 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
     }
 
     # Add some keywords about the module origin
+    my $modType = $modMeta->{x_file}[3] ? 'mod' : 'pkg';
     if ( GetModuleSourceOrigin( $modMeta->{x_file}[4] ) eq 'fhem' ) {
         push @{ $modMeta->{keywords} }, 'fhem-core';
     }
     elsif ( GetModuleSourceOrigin( $modMeta->{x_file}[4] ) ne '' ) {
-        push @{ $modMeta->{keywords} }, 'fhem-3rdparty';
+        push @{ $modMeta->{keywords} }, "fhem-$modType-3rdparty";
     }
     else {
         my $modType = $modMeta->{x_file}[3] ? 'mod' : 'pkg';
@@ -1825,6 +1943,41 @@ sub __GenerateKeywordsFromSupportCommunity {
     return @keywords;
 }
 
+sub __GetPackages {
+    my $dh;
+    my $dir = $attr{global}{modpath};
+    if ( opendir( $dh, $dir ) ) {
+        foreach
+          my $fn ( grep { $_ ne "." && $_ ne ".." && !-d $_ } readdir($dh) )
+        {
+            if (   $fn =~ m/^(?:\.\/)?((.+\/)?((?:(\d+)_)?(.+)\.(.+)))$/
+                && !$4
+                && $6
+                && $6 eq 'pm' )
+            {
+                $packages{$5} = ();
+            }
+        }
+        closedir($dh);
+    }
+
+    $dir = $attr{global}{modpath} . '/FHEM/';
+    if ( opendir( $dh, $dir ) ) {
+        foreach
+          my $fn ( grep { $_ ne "." && $_ ne ".." && !-d $_ } readdir($dh) )
+        {
+            if (   $fn =~ m/^(?:\.\/)?((.+\/)?((?:(\d+)_)?(.+)\.(.+)))$/
+                && !$4
+                && $6
+                && $6 eq 'pm' )
+            {
+                $packages{$5} = ();
+            }
+        }
+        closedir($dh);
+    }
+}
+
 sub __GetMaintainerdata {
     return 0 unless ( __PACKAGE__ eq caller(0) );
     my $fh;
@@ -1898,7 +2051,8 @@ sub __GetMaintainerdata {
                             __PACKAGE__
                           . "::__GetMaintainerdata ERROR: Duplicate $type entry:\n"
                           . '  1st: '
-                          . $moduleMaintainers{ $maintainer[0][4] }[0][0] . ' '
+                          . $moduleMaintainers{ $maintainer[0][4] }[0][0]
+                          . ' '
                           . $moduleMaintainers{ $maintainer[0][4] }[1] . ' '
                           . $moduleMaintainers{ $maintainer[0][4] }[2]
                           . "\n  2nd: "
@@ -1906,7 +2060,8 @@ sub __GetMaintainerdata {
                     }
                     else {
                         # Register in global FHEM module index
-                        $moduleMaintainers{ $maintainer[0][4] } = \@maintainer;
+                        $moduleMaintainers{ $maintainer[0][4] } =
+                          \@maintainer;
 
                         # Register in global maintainer index
                         foreach ( split '/|,', $maintainer[1] ) {
@@ -1983,7 +2138,8 @@ sub __GetMaintainerdata {
                             __PACKAGE__
                           . "::__GetMaintainerdata ERROR: Duplicate $type entry:\n"
                           . '  1st: '
-                          . $packageMaintainers{ $maintainer[0][4] }[0][0] . ' '
+                          . $packageMaintainers{ $maintainer[0][4] }[0][0]
+                          . ' '
                           . $packageMaintainers{ $maintainer[0][4] }[1] . ' '
                           . $packageMaintainers{ $maintainer[0][4] }[2]
                           . "\n  2nd: "
@@ -1991,7 +2147,8 @@ sub __GetMaintainerdata {
                     }
                     else {
                         # Register in global FHEM package index
-                        $packageMaintainers{ $maintainer[0][4] } = \@maintainer;
+                        $packageMaintainers{ $maintainer[0][4] } =
+                          \@maintainer;
 
                         # Register in global maintainer index
                         foreach ( split '/|,', $maintainer[1] ) {
@@ -2114,7 +2271,10 @@ sub __GetSupportForum {
                         || $subBoard eq 'language' );
 
                     my $reqSub = $req;
-                    $reqSub =~ s/$board\///;
+                    if ( $reqSub =~ /^$board\/(.+)/ ) {
+                        $reqSub = $1;
+                        $reqSub =~ s/ /\//g;    # justme1968 special ;D)
+                    }
 
                     if ( lc($subBoard) eq lc($reqSub) ) {
 
@@ -2516,7 +2676,7 @@ sub __SetXVersion {
       "description": "n/a"
     }
   },
-  "version": "v0.3.1",
+  "version": "v0.3.2",
   "release_status": "testing",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
