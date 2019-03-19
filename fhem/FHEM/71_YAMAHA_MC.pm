@@ -71,7 +71,11 @@ sub YAMAHA_MC_hash_replace (\%$$);
 sub YAMAHA_MC_volume_abs2rel($$);
 sub YAMAHA_MC_volume_rel2abs($$);
 sub YAMAHA_MC_getParamName($$$);
+sub YAMAHA_MC_addedDevice($$$);
 sub YAMAHA_MC_DiscoverDLNAProcess($);
+sub YAMAHA_MC_DiscoverMediaServer($);
+sub YAMAHA_MC_DiscoverRenderer($);
+
 
   # the Cmd List without Args will be generated from the cmd list with Args in YAMAHA_MC_UpdateLists
   #my %YAMAHA_MC_setCmdswithoutArgs = ();
@@ -385,14 +389,22 @@ sub YAMAHA_MC_Define($$)  # only called when defined, not on reload.
 	
 	
 	if ($DLNAsearch eq "on") {
-	  Log3 $hash->{NAME}, 2, "$type: $name  DLNAsearch enabled setting timer for getting devices";
+	
+	  YAMAHA_MC_setupControlpoint($hash);
+	  YAMAHA_MC_setupMediaRenderer($hash);
+	  
+	  
+	  Log3 $hash->{NAME}, 2, "$type: $name  DLNAsearch turned $DLNAsearch setting timer for getting devices in 150Secs";
 	  InternalTimer(gettimeofday() + 120, 'YAMAHA_MC_getNetworkStatus', $hash, 0);
 	  InternalTimer(gettimeofday() + 150, 'YAMAHA_MC_DiscoverDLNAProcess', $hash, 0);	  
 	 }
 	 else
 	 {
+	   
 	   Log3 $name, 1, "$type: $name  - DLNASearch turned $DLNAsearch";
-	   Log3 $name, 1, "$type: $name  - starting InternalTimer YAMAHA_MC_DiscoverDLNAProcess anyway once";
+	   Log3 $name, 1, "$type: $name  - starting InternalTimer YAMAHA_MC_DiscoverDLNAProcess anyway once in 150Secs";
+	   YAMAHA_MC_setupControlpoint($hash);
+	   YAMAHA_MC_setupMediaRenderer($hash);
 	   InternalTimer(gettimeofday() + 150, 'YAMAHA_MC_DiscoverDLNAProcess', $hash, 0);	  
 	 }
     
@@ -410,6 +422,43 @@ sub YAMAHA_MC_Define($$)  # only called when defined, not on reload.
 	return undef;
 }
 
+sub YAMAHA_MC_setupControlpoint {
+  my ($hash) = @_;
+  my $error;
+  my $cp;
+  my @usedonlyIPs = split(/,/, AttrVal($hash->{NAME}, 'usedonlyIPs', ''));
+  my @ignoredIPs = split(/,/, AttrVal($hash->{NAME}, 'ignoredIPs', ''));
+  
+  do {
+    eval {
+     #$cp = UPnP::ControlPoint->new(SearchPort => 0, SubscriptionPort => 0, MaxWait => 30, UsedOnlyIP => \@usedonlyIPs, IgnoreIP => \@ignoredIPs, LogLevel => AttrVal($hash->{NAME}, 'verbose', 0));
+      $cp = Net::UPnP::ControlPoint->new();
+	  $hash->{helper}{controlpoint} = $cp;            
+    };
+    $error = $@;
+  } while($error);
+  
+  return undef;
+}
+
+sub  YAMAHA_MC_setupMediaRenderer{
+  my ($hash) = @_;
+  my $error;
+  my $MediaRenderer;
+  my @usedonlyIPs = split(/,/, AttrVal($hash->{NAME}, 'usedonlyIPs', ''));
+  my @ignoredIPs = split(/,/, AttrVal($hash->{NAME}, 'ignoredIPs', ''));
+  
+  do {
+    eval {
+      $MediaRenderer = Net::UPnP::AV::MediaRenderer->new();
+      $hash->{helper}{MediaRenderer} = $MediaRenderer;            
+    };
+    $error = $@;
+  } while($error);
+  
+  return undef;
+}
+
 
 # ------------------------------------------------------------------------------
 #DiscoverDLNA: discover DLNA REnderer und MediaServer (miniDLNA)
@@ -419,29 +468,33 @@ sub YAMAHA_MC_DiscoverDLNAProcess($)
   my ($hash) = @_;
   my $name = $hash->{NAME};
   
-  Log3 $hash->{NAME}, 4, "YAMAHA_MC_DiscoverDLNAProcess started";
+  Log3 $hash->{NAME}, 4, "$name YAMAHA_MC_DiscoverDLNAProcess started";
     
   my $DLNAsearch = AttrVal($hash->{NAME}, "DLNAsearch","off");
   
   Log3 $name, 4, "$name YAMAHA_MC_DiscoverDLNAProcess started, DLNAsearch turned $DLNAsearch ";
   
   if(!$init_done) {
-        #init not done yet, wait 3 more seconds
-        InternalTimer(gettimeofday()+3, "YAMAHA_MC_DiscoverDLNAProcess", $hash, 0);
+        #init not done yet, wait 5 more seconds
+		Log3 $name, 4, "$name YAMAHA_MC_DiscoverDLNAProcess started, init not completed yet, restarting in 5 Seks ";
+        InternalTimer(gettimeofday()+5, "YAMAHA_MC_DiscoverDLNAProcess", $hash, 0);
+		return undef;
     }
 	
   if ($DLNAsearch eq "on") {
   
 	  Log3 $name, 4, "$name YAMAHA_MC_DiscoverDLNAProcess calling YAMAHA_MC_DiscoverDLNAServer";
+	  YAMAHA_MC_DiscoverMediaServer($hash);
 	  
-	  if (!defined($hash->{helper}{DISCOVERY_SERVER_PID})) {
-        $hash->{helper}{DISCOVERY_SERVER_PID} = BlockingCall("YAMAHA_MC_DiscoverMediaServer", $hash->{NAME}."|".$hash, "YAMAHA_MC_finishedDiscoveryServer");
-      }	  
+	  #if (!defined($hash->{helper}{DISCOVERY_SERVER_PID})) {
+      #  $hash->{helper}{DISCOVERY_SERVER_PID} = BlockingCall("YAMAHA_MC_DiscoverMediaServer", $hash->{NAME}."|".$hash, "YAMAHA_MC_finishedDiscoveryServer");
+      #}	  
 	  
 	  Log3 $name, 4, "$name YAMAHA_MC_DiscoverDLNAProcess calling YAMAHA_MC_DiscoverRenderer";
-	  if (!defined($hash->{helper}{DISCOVERY_RENDERER_PID})) {
-        $hash->{helper}{DISCOVERY_RENDERER_PID} = BlockingCall("YAMAHA_MC_DiscoverRenderer", $hash->{NAME}."|".$hash, "YAMAHA_MC_finishedDiscoveryRenderer");
-      }	 
+	  #if (!defined($hash->{helper}{DISCOVERY_RENDERER_PID})) {
+      #  $hash->{helper}{DISCOVERY_RENDERER_PID} = BlockingCall("YAMAHA_MC_DiscoverRenderer", $hash->{NAME}."|".$hash, "YAMAHA_MC_finishedDiscoveryRenderer");
+      #}	 
+	  YAMAHA_MC_DiscoverRenderer($hash);
 	  
 	  Log3 $name, 4, "$name YAMAHA_MC_DiscoverDLNAProcess returning";
   }  
@@ -449,6 +502,7 @@ sub YAMAHA_MC_DiscoverDLNAProcess($)
   {
     Log3 $name, 4, "$name YAMAHA_MC_DiscoverDLNAProcess DLNAsearch is turned $DLNAsearch";
   }
+  return undef;
 }
 
 
@@ -477,6 +531,11 @@ sub YAMAHA_MC_Undef($$)
 sub YAMAHA_MC_Shutdown($)
 {
 	my ($hash) = @_;
+	
+	# kill BlockingCalls if still exists
+  BlockingKill($hash->{helper}{DISCOVERY_SERVER_PID}) if(defined($hash->{helper}{DISCOVERY_SERVER_PID}));  
+  BlockingKill($hash->{helper}{DISCOVERY_RENDERER_PID}) if(defined($hash->{helper}{DISCOVERY_RENDERER_PID}));  
+	
   HttpUtils_Close($hash);
   Log3 $hash->{NAME}, 1, "$hash->{TYPE}: device $hash->{NAME} shutdown requested";
 	return undef;
@@ -521,6 +580,14 @@ sub YAMAHA_MC_Attr(@)
     Log3 $name, 4, "$type: attr $name $aName $aVal != $ret";
     return "$aName must be: $ret";
   }
+  
+  # wenn DLNAsearch eingeschaltet wird, dann Suche starten    
+	if (($aName eq "DLNAsearch") && ($aVal eq "on") && ($init_done==1)){
+		Log3 $name, 3, "YAMAHA_MC_Attr changed attr $name $aName $aVal, start DLNASearch via Timer in 150Seks";		
+		InternalTimer(gettimeofday() + 120, 'YAMAHA_MC_getNetworkStatus', $hash, 0);
+	    InternalTimer(gettimeofday() + 150, 'YAMAHA_MC_DiscoverDLNAProcess', $hash, 0);		
+	}
+
 
   return undef; #attribut will be accepted if undef
 }
@@ -783,24 +850,65 @@ sub YAMAHA_MC_getDistributionInfo($)
 	
 }
 
+
+sub YAMAHA_MC_addedDevice($$$) {
+    my ($hash, $dev, $dlnaType) = @_;
+  
+  my $udn = $dev->getudn();
+  
+  my $uniqueDeviceName = "";
+
+  #TODO check for BOSE UDN
+  if ($dlnaType eq "MediaRenderer") {
+   $uniqueDeviceName = "MC_DLNARENDER_".substr($dev->getudn(),29,12);
+   }
+  else{ 
+   $uniqueDeviceName = "MC_DLNASERVER_".substr($dev->getudn(),29,12);
+  } 
+   
+   Log3 $hash, 3, "YAMAHA_MC_addedDevice: try to create dlna device $uniqueDeviceName";
+	
+   if(length($uniqueDeviceName) < 17) {
+      $uniqueDeviceName = "MC_DLNA_".substr($dev->getudn(),5);
+      $uniqueDeviceName =~ tr/-/_/;
+    }
+	#Typ DLNA REnderer ??
+    CommandDefine(undef, "$uniqueDeviceName DLNARenderer ".$dev->getudn());
+    CommandAttr(undef,"$uniqueDeviceName alias ".$dev->getfriendlyname());
+    CommandAttr(undef,"$uniqueDeviceName webCmd volume");
+    if(AttrVal($hash->{NAME}, "defaultRoom", "") ne "") {
+      CommandAttr(undef,"$uniqueDeviceName room ".AttrVal($hash->{NAME}, "defaultRoom", ""));
+    }
+    Log3 $hash, 3, "YAMAHA_MC_addedDevice: Created device $uniqueDeviceName for ".$dev->getfriendlyname();
+    
+   
+  
+  return undef;
+}
+
 sub  YAMAHA_MC_DiscoverRenderer($)
-{
-    my ($string) = @_;
-    my ($name, $hash) = split("\\|", $string);
-    my $return = "$name";
+{    
+    my ($hash) = @_;
+	my $name = $hash->{NAME};
+    #my ($name, $hash) = split("\\|", $string);
+    #my $return = "$name";
     
-    $hash = $main::defs{$name};
-    
+	Log3 $name, 4, "$name  YAMAHA_MC_DiscoverRenderer START";
+	
+    #$hash = $main::defs{$name};    
 	#my ($hash) = @_;  
-    my $HOST = $hash->{HOST};
-    #my $name = $hash->{NAME};
+    
+	my $HOST = $hash->{HOST};    
 	my $DLNAsearch = AttrVal($hash->{NAME}, "DLNAsearch","off");
   
     Log3 $name, 4, "$name  YAMAHA_MC_DiscoverRenderer DLNAsearch is turned " . $DLNAsearch . "\n";
     if ($DLNAsearch eq "on") {
   
-		my $ControlPointDLNA = Net::UPnP::ControlPoint->new();
-		my $MediaRendererDLNA = Net::UPnP::AV::MediaRenderer->new();
+		#my $ControlPointDLNA = Net::UPnP::ControlPoint->new();
+		my $ControlPointDLNA = $hash->{helper}{controlpoint} ;  
+		
+		#my $MediaRendererDLNA = Net::UPnP::AV::MediaRenderer->new();
+		my $MediaRendererDLNA = $hash->{helper}{MediaRenderer};
 	 
 		Log3 $name, 4, "$name YAMAHA_MC_DiscoverRenderer start search for own dlna Renderer";
 	 
@@ -827,16 +935,28 @@ sub  YAMAHA_MC_DiscoverRenderer($)
 				next;
 			}
 			my $friendlyname = $dev->getfriendlyname(); 
-			Log3 $name, 4, "$name  YAMAHA_MC_DiscoverRenderer Media Renderer found [$devNum] : " . $friendlyname . "\n";
+			Log3 $name, 4, "$name  YAMAHA_MC_DiscoverRenderer MediaRendererDLNA found [$devNum] : " . $friendlyname . "\n";
 			
 			if ($friendlyname eq $hash->{network_name}) {		  
-			  Log3 $name, 4, "$name  YAMAHA_MC_DiscoverRenderer Media Renderer searched device found [$devNum] : " . $friendlyname . "\n";
+			  Log3 $name, 4, "$name  YAMAHA_MC_DiscoverRenderer MediaRendererDLNA searched device found [$devNum] : " . $friendlyname . "\n";
 			  $MediaRendererDLNA->setdevice($dev);
 			  $MediaRendererDLNA->stop();
 			  
 					  
-			  Log3 $name, 4, "$name YAMAHA_MC_DiscoverRenderer Saving Media Renderer in helper ";
+			  Log3 $name, 4, "$name YAMAHA_MC_DiscoverRenderer Saving MediaRendererDLNA in helper ";
 			  $hash->{helper}{MediaRendererDLNA}=$MediaRendererDLNA;
+			  
+			  # neues Device fuer den REnderer erstellen
+			  #YAMAHA_MC_addedDevice($hash->{helper}{MediaRendererDLNA}, $dev, "MediaRenderer");
+			  
+			  Log3 $name, 4, "$name YAMAHA_MC_DiscoverRenderer Saving MediaRendererDLNA in helper done";
+			  
+			  if (exists($hash->{helper}{MediaRendererDLNA})) {
+				 Log3 $hash, 3,   "$name YAMAHA_MC_DiscoverRenderer MediaRendererDLNA exists now";				 
+			 }		   
+			 else {
+			   Log3 $hash, 3,  "$name YAMAHA_MC_DiscoverRenderer MediaRendererDLNA still does not exist";			
+			 }
 			  
 			  #Log3 $name, 4, "$name  getting Media Renderer Transport Service ";
 			  #my $condir_service = $dev->getservicebyname('urn:schemas-upnp-org:service:AVTransport:1');
@@ -853,7 +973,7 @@ sub  YAMAHA_MC_DiscoverRenderer($)
         Log3 $hash, 3, "YAMAHA_MC_DiscoverRenderer: Discovery failed with: $@";
     }
 
-    return $return;
+    return undef;
   }
   
   
@@ -870,28 +990,29 @@ sub YAMAHA_MC_finishedDiscoveryRenderer($) {
     #start discovery again after 120s
     #InternalTimer(gettimeofday()+120, "YAMAHA_MC_DiscoverDLNAProcess", $hash, 1);
     Log3 $hash, 5, "YAMAHA_MC_finishedDiscoveryRenderer: finished renderer discovery";
+	return undef;
 }  
   
 
 sub  YAMAHA_MC_DiscoverMediaServer($)
 {
  
-    my ($string) = @_;
-    my ($name, $hash) = split("\\|", $string);
-    my $return = "$name";
-    
-    $hash = $main::defs{$name};
- 
+    my ($hash) = @_;
+	my $name = $hash->{NAME};
+    #my ($name, $hash) = split("\\|", $string);
+    #my $return = "$name";    
+    #$hash = $main::defs{$name}; 
     #my ($hash) = @_;  
-    my $HOST = $hash->{HOST};
-    #my $name = $hash->{NAME};
-	my $miniDLNAname = AttrVal($hash->{NAME}, "DLNAServer","miniDLNA");
-	
-	my @dev_list = ();
-	my $retry_cnt = 0;
+	Log3 $name, 4, "$name  YAMAHA_MC_DiscoverMediaServer START";
+    
+	my $HOST = $hash->{HOST};    
+	my $miniDLNAname = AttrVal($hash->{NAME}, "DLNAServer","miniDLNA");	
 	my $DLNAsearch = AttrVal($hash->{NAME}, "DLNAsearch","off");
   
     if ($DLNAsearch eq "on") {
+	    
+		my @dev_list = ();
+	    my $retry_cnt = 0;    
 	
 		while (@dev_list <= 0 ) {
 			Log3 $hash, 3,  "$name  Searching for MediaServer.. @dev_list";
@@ -915,16 +1036,23 @@ sub  YAMAHA_MC_DiscoverMediaServer($)
 		  $devNum++;
 		  my $friendlyname = $dev->getfriendlyname();
 		  Log3 $hash, 3, "$name  found [$devNum] : device name: [" . $friendlyname . "] " ;
-		  if ($friendlyname !~ /$miniDLNAname/) {  
+		  if ($friendlyname ne $miniDLNAname) {  
 			Log3 $hash, 3,  "$name  skipping this device.";
 			next;
-		  }
+			}
+		  else {
+	        Log3 $name, 4, "$name YAMAHA_MC_DiscoverMediaServer found correct media server : $friendlyname";
+	      }
 
-		  Log3 $hash, 3,  "Init MediaServer";
-		   my $MediaServer = Net::UPnP::AV::MediaRenderer->new();
+		  Log3 $hash, 3,  "Init MediaServer now";
+		   my $MediaServer = Net::UPnP::AV::MediaServer->new();
 		   $MediaServer->setdevice($dev);
 		   Log3 $name, 4, "$name  Saving MediaServer in helper ";
 		   $hash->{helper}{MediaServerDLNA}=$dev;
+		   # neues Device fuer den REnderer erstellen
+		   #YAMAHA_MC_addedDevice($MediaServer, $dev, "MediaServer");
+		   
+		   Log3 $name, 4, "$name  Saving MediaServer in helper done";		  
 		   last;	   
 		  }		
 	}
@@ -933,7 +1061,7 @@ sub  YAMAHA_MC_DiscoverMediaServer($)
         Log3 $hash, 3, "YAMAHA_MC_DiscoverMediaServer: $name  Discovery failed with: $@";
     }
 
-    return $return;
+    return undef;
 }
 
 
@@ -1051,7 +1179,7 @@ sub YAMAHA_MC_SpeakFile($$)  # only called when defined, not on reload.
 	
 	# Neu
 	if ($currentPower ne "on") {
-	  Log3 $name, 4, "$name : YAMAHA_MC_SpeakFile device not turned on ($currentPower), power on first ";
+	  Log3 $name, 4, "$name : YAMAHA_MC_SpeakFile device not turned on powerstate is ($currentPower), power on first ";
 	  # Power merken, um spaeter zurückschalten zu können
 	  $hash->{helper}{OriginalPowerState} = $currentPower;
 	  
@@ -1135,9 +1263,10 @@ sub YAMAHA_MC_SpeakFile($$)  # only called when defined, not on reload.
 	}
 	
 	
-	Log3 $name, 4, "$name YAMAHA_MC_SpeakFile Networkname $hash->{network_name}";
-	
+	Log3 $name, 4, "$name YAMAHA_MC_SpeakFile Networkname $hash->{network_name}";	
 	Log3 $name, 4, "$name YAMAHA_MC_SpeakFile restart minidlna and rescan";
+	
+	# restarting miniDLNA to rescan files
 	my $ret = "";
     $ret .= qx(sudo minidlna -R);
 	Log3 $name, 4, "$name YAMAHA_MC_SpeakFile rescan return $ret";
@@ -1149,217 +1278,230 @@ sub YAMAHA_MC_SpeakFile($$)  # only called when defined, not on reload.
 	# Renderer ermitteln
 	#
 	#unless(defined(hash->{helper}{MediaRendererDLNA})) 
-	unless(exists($hash->{helper}{MediaRendererDLNA}))
-	{
-	  YAMAHA_MC_DiscoverRenderer($hash);	
-	 }
+	#unless(exists($hash->{helper}{MediaRendererDLNA}))
+	#{
+	#  Log3 $name, 4, "$name YAMAHA_MC_SpeakFile MediaRendererDLNA does not exists, restarting discovery";
+	#  YAMAHA_MC_DiscoverRenderer($hash);	
+	# }	 
+	 if (exists($hash->{helper}{MediaRendererDLNA})) {
+		 Log3 $hash, 3,   "$name YAMAHA_MC_SpeakFile MediaRendererDLNA exists, not restarting discovery";				 
+	 }		   
+	 else {
+	   Log3 $hash, 3,   "$name YAMAHA_MC_SpeakFile MediaRendererDLNA does not exists, restarting discovery";		
+       YAMAHA_MC_DiscoverRenderer($hash);		
+	 } 
 	
 	
 	
 	#
     # searching for mediaServer miniDLNA
 	#
-	unless(exists($hash->{helper}{MediaServerDLNA}))
-	{
-	  YAMAHA_MC_DiscoverMediaServer($hash);	
-	 }
+	#unless(exists($hash->{helper}{MediaServerDLNA}))
+	#{
+	#  Log3 $name, 4, "$name YAMAHA_MC_SpeakFile MediaServerDLNA does not exists, restarting discovery";
+	#  YAMAHA_MC_DiscoverMediaServer($hash);	
+	# }
 	 
 	 if (exists($hash->{helper}{MediaRendererDLNA})) {
+	     Log3 $name, 4, "$name YAMAHA_MC_SpeakFile MediaServerDLNA exists, not restarting discovery";
 		 Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile  Stopping   MediaRendererDLNA";
 		 $hash->{helper}{MediaRendererDLNA}->stop(); 
      }		   
 	 else {
-	   Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile  MediaRendererDLNA not defined";
+	   Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile  MediaRendererDLNA still not defined";
+	   Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile  restarting YAMAHA_MC_DiscoverRenderer again ...";
 	   YAMAHA_MC_DiscoverRenderer($hash);	
 	 }
 	 
 
-	 Log3 $hash, 3,  "Getting  ContentDirectory";
-       #my $condir_service = $dev->getservicebyname('urn:schemas-upnp-org:service:ContentDirectory:1'); 
-	  my $condir_service = $hash->{helper}{MediaServerDLNA}->getservicebyname('urn:schemas-upnp-org:service:ContentDirectory:1');
-  
-	  #unless (defined(condir_service)) {
-	  #      next;
-	  #  }
-	  Log3 $hash, 3,  "Setting Browse Args";
-	  if (defined($condir_service)) 
-	  {
-		my %action_in_arg = (
-				'ObjectID' => '64',
-				'BrowseFlag' => 'BrowseDirectChildren',
-				'Filter' => '*',
-				'StartingIndex' => 0,
-				'RequestedCount' => 100,
-				'SortCriteria' => '',
-			);
-	    Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFileStart Browsing";		
-		my $action_res = $condir_service->postcontrol('Browse', \%action_in_arg);
-		Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFileGetting Browsing result";		
-		my $actrion_out_arg = $action_res->getargumentlist();
-		
-		Log3 $hash, 4, "$name YAMAHA_MC_SpeakFileArgument List is  $actrion_out_arg";
-		
-		Log3 $hash, 4, "$name YAMAHA_MC_SpeakFileDumper List is  \n";
-		Log3 $name, 5, Dumper($actrion_out_arg);
-		
+	 Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile Getting  ContentDirectory";
+     #my $condir_service = $dev->getservicebyname('urn:schemas-upnp-org:service:ContentDirectory:1'); 
+	 if (exists($hash->{helper}{MediaRendererDLNA})) {
+		  my $condir_service = $hash->{helper}{MediaServerDLNA}->getservicebyname('urn:schemas-upnp-org:service:ContentDirectory:1');
+	  
+		  #unless (defined(condir_service)) {
+		  #      next;
+		  #  }
+		  Log3 $hash, 3,  "Setting Browse Args";
+		  if (defined($condir_service)) 
+		  {
+			my %action_in_arg = (
+					'ObjectID' => '64',
+					'BrowseFlag' => 'BrowseDirectChildren',
+					'Filter' => '*',
+					'StartingIndex' => 0,
+					'RequestedCount' => 100,
+					'SortCriteria' => '',
+				);
+			Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFileStart Browsing";		
+			my $action_res = $condir_service->postcontrol('Browse', \%action_in_arg);
+			Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFileGetting Browsing result";		
+			my $actrion_out_arg = $action_res->getargumentlist();
 			
-		
-		#Net::UPnP::ActionResponse
-		
-		#Log3 $hash, 3,  "Getting CurrentTransportState result";		
-		#my $CurrentTransportState = $actrion_out_arg->{'CurrentTransportState'};
-		#Log3 $hash, 4, "Device current state is <<$CurrentTransportState>>. ";
-		
-		my $result = $actrion_out_arg->{'Result'};
-		my @durationresult;
-		
-		# ID'1 ermitteln
-		
-		Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile Gebe gefundene Titel aus";		 
-		while ($result =~ m/<dc:title>(.*?)<\/dc:title>/sgi) {			
-			Log3 $hash, 4, "$name YAMAHA_MC_SpeakFile searchfilename is <<$searchfilename>> content is <<$1>>. ";
-			Log3 $hash, 4, "$name YAMAHA_MC_SpeakFile result is <<$result>>";
+			Log3 $hash, 4, "$name YAMAHA_MC_SpeakFileArgument List is  $actrion_out_arg";
 			
-			if ($1 eq $searchfilename) {
-			  Log3 $hash, 4, "$name YAMAHA_MC_SpeakFile searchfilename found ! "; 
-			  my @resresult = $result =~ m/\<res(.+?)\<\/res\>/sgi;
-			  #my $resresult = ($result =~ m/\<res(.+?)\<\/res\>/sgi);
-			  
-			  Log3 $hash, 4, "$name YAMAHA_MC_SpeakFile resresult is @resresult "; 
-			  
-			  my $resresult = $resresult[0];
-			  my @uriresult = $resresult =~ m/http:\/\/(.+?).mp3/sgi;
-			  @durationresult = $resresult =~ m/duration="0:00:(.+?)"/sgi;
-			  Log3 $hash, 4, "$name YAMAHA_MC_SpeakFile uriresult is @uriresult "; 
-			  Log3 $hash, 4, "$name YAMAHA_MC_SpeakFile duration is @durationresult "; 
-			  
-			  $URILink = "http://@uriresult.mp3";
-			  
-			 # while ($result =~ m/\<res(.+?)\<\/res\>/sgi) {			
-			#	Log3 $hash, 4, "html tag res content is <<$1>>. ";
-			#	while ($1 =~ m/http:\/\/(.+?).mp3/sgi) {
-			#	  Log3 $hash, 4, "html http url content is <<$1>>. ";
-			#	  $URILink = "http://$1.mp3";
-			#	}
-			  #}
-			  #
-			  
-			  last;
-			}
+			Log3 $hash, 4, "$name YAMAHA_MC_SpeakFileDumper List is  \n";
+			Log3 $name, 5, Dumper($actrion_out_arg);
 			
-		}	
 				
-		
-		if ((defined($URILink)) and (defined($hash->{helper}{MediaRendererDLNA})) ) {
-			Log3 $hash, 3,  "URI Link to play is $URILink";		 
+			
+			#Net::UPnP::ActionResponse
+			
+			#Log3 $hash, 3,  "Getting CurrentTransportState result";		
+			#my $CurrentTransportState = $actrion_out_arg->{'CurrentTransportState'};
+			#Log3 $hash, 4, "Device current state is <<$CurrentTransportState>>. ";
+			
+			my $result = $actrion_out_arg->{'Result'};
+			my @durationresult;
+			
+			# ID'1 ermitteln
+			
+			Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile Gebe gefundene Titel aus";		 
+			while ($result =~ m/<dc:title>(.*?)<\/dc:title>/sgi) {			
+				Log3 $hash, 4, "$name YAMAHA_MC_SpeakFile searchfilename is <<$searchfilename>> content is <<$1>>. ";
+				Log3 $hash, 4, "$name YAMAHA_MC_SpeakFile result is <<$result>>";
+				
+				if ($1 eq $searchfilename) {
+				  Log3 $hash, 4, "$name YAMAHA_MC_SpeakFile searchfilename found ! "; 
+				  my @resresult = $result =~ m/\<res(.+?)\<\/res\>/sgi;
+				  #my $resresult = ($result =~ m/\<res(.+?)\<\/res\>/sgi);
+				  
+				  Log3 $hash, 4, "$name YAMAHA_MC_SpeakFile resresult is @resresult "; 
+				  
+				  my $resresult = $resresult[0];
+				  my @uriresult = $resresult =~ m/http:\/\/(.+?).mp3/sgi;
+				  @durationresult = $resresult =~ m/duration="0:00:(.+?)"/sgi;
+				  Log3 $hash, 4, "$name YAMAHA_MC_SpeakFile uriresult is @uriresult "; 
+				  Log3 $hash, 4, "$name YAMAHA_MC_SpeakFile duration is @durationresult "; 
+				  
+				  $URILink = "http://@uriresult.mp3";
+				  
+				 # while ($result =~ m/\<res(.+?)\<\/res\>/sgi) {			
+				#	Log3 $hash, 4, "html tag res content is <<$1>>. ";
+				#	while ($1 =~ m/http:\/\/(.+?).mp3/sgi) {
+				#	  Log3 $hash, 4, "html http url content is <<$1>>. ";
+				#	  $URILink = "http://$1.mp3";
+				#	}
+				  #}
+				  #
+				  
+				  last;
+				}
+				
+			}	
 					
-			#$hash->{helper}{renderer}->setAVTransportURI(CurrentURI => $URILink);		
-			#$hash->{helper}{renderer}->play(); 
-			Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile Sending Link $URILink to Renderer now";		
-			#$MediaRendererDLNA->setAVTransportURI(CurrentURI => $URILink);
-			$hash->{helper}{MediaRendererDLNA}->setAVTransportURI(CurrentURI => $URILink);
-			Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile Playing Link via Renderer now";		
-			#$MediaRendererDLNA->play(); 
-			#$hash->{helper}{MediaRendererDLNA}->stop(); 
-			$hash->{helper}{MediaRendererDLNA}->play(); 
 			
-			Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile waiting for end @durationresult";	
-            Time::HiRes::sleep(@durationresult); #.1 seconds
-			#Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile Getting Status via Renderer now";	
-			#my $InstanceID = 0;
-			#my $CurrentTranpsortState ='';
-			#my $CurrentTransportStatus = '';
-			#my $CurrentSpeed = '0';
+			if ((defined($URILink)) and (defined($hash->{helper}{MediaRendererDLNA})) ) {
+				Log3 $hash, 3,  "URI Link to play is $URILink";		 
+						
+				#$hash->{helper}{renderer}->setAVTransportURI(CurrentURI => $URILink);		
+				#$hash->{helper}{renderer}->play(); 
+				Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile Sending Link $URILink to Renderer now";		
+				#$MediaRendererDLNA->setAVTransportURI(CurrentURI => $URILink);
+				$hash->{helper}{MediaRendererDLNA}->setAVTransportURI(CurrentURI => $URILink);
+				Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile Playing Link via Renderer now";		
+				#$MediaRendererDLNA->play(); 
+				#$hash->{helper}{MediaRendererDLNA}->stop(); 
+				$hash->{helper}{MediaRendererDLNA}->play(); 
+				
+				Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile waiting for end @durationresult";	
+				Time::HiRes::sleep(@durationresult); #.1 seconds
+				#Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile Getting Status via Renderer now";	
+				#my $InstanceID = 0;
+				#my $CurrentTranpsortState ='';
+				#my $CurrentTransportStatus = '';
+				#my $CurrentSpeed = '0';
+				
+				
+				#$hash->{helper}{MediaRendererDLNA}->getTransportInfo(InstanceID => $InstanceID,
+				#                                                     CurrentTranpsortState => $CurrentTranpsortState,
+			#														 CurrentTransportStatus => $CurrentTransportStatus,
+		#															 CurrentSpeed => $CurrentSpeed);
+				#$result = $hash->{helper}{MediaRendererDLNA}->getTransportInfo(0);
+			
+				#$CurrentTranpsortState = $result->getValue('CurrentTransportState');
+				#Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile Status is $CurrentTranpsortState";	
+
+				
+				
+				
+				#$hash->{helper}{MediaRendererDLNA}->stop(); 
+				#last;
+			}
+			else
+			{
+			  Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile File $searchfilename not found or MediaRendererDLNA not found ";		
+			  return "File $searchfilename not found ";
+			}
+
+		  } 
+       # end if (defined($condir_service))
 			
 			
-			#$hash->{helper}{MediaRendererDLNA}->getTransportInfo(InstanceID => $InstanceID,
-			#                                                     CurrentTranpsortState => $CurrentTranpsortState,
-		#														 CurrentTransportStatus => $CurrentTransportStatus,
-	#															 CurrentSpeed => $CurrentSpeed);
-	        #$result = $hash->{helper}{MediaRendererDLNA}->getTransportInfo(0);
+		Log3 $name, 4, "$name YAMAHA_MC_SpeakFile MEdia Ende";
 		
-		    #$CurrentTranpsortState = $result->getValue('CurrentTransportState');
-		    #Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile Status is $CurrentTranpsortState";	
-
-			
-			
-			
-			#$hash->{helper}{MediaRendererDLNA}->stop(); 
-			#last;
-		}
-		else
-        {
-		  Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile File $searchfilename not found or MediaRendererDLNA not found ";		
-		  return "File $searchfilename not found ";
-		}
-
-	  } # end if
-    	
+			if($@) {
 		
-	Log3 $name, 4, "$name YAMAHA_MC_SpeakFile MEdia Ende";
-	
-        if($@) {
-    
-          Log3 $hash, 4, "$name YAMAHA_MC_SpeakFile DLNARenderer: Search failed with error $@";
-  
-         }			
-		 
-	#warten bis AUsgabe beendet	
-	#my $stillplaying = "yes";
-	#while ($stillplaying eq "yes") {
-#		if (defined($hash->{helper}{MediaRendererDLNA}))  {
-#			Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile Waiting for end of play  $URILink";		 					
-#			Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile Getting AVTransport from Renderer now";		
-#			#my $condir_service = $hash->{helper}{MediaRendererDLNA}->getservicebyname('urn:schemas-upnp-org:service:AVTransport:1');
-#			#$hash->{helper}{MediaRendererDLNA}->getTransportInfo(CurrentURI => $URILink);
-#			
-#			Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile Getting status via Renderer now";		
-#			 my %action_in_arg = (               
-#                'InstanceID' => '0'
-#            );
-#			
-#		Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile Creating New Media Renderer";		
-#		my $rendererCtrl = Net::UPnP::AV::MediaRenderer->new();
-#		Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile assigning New Media Renderer";
-#        $rendererCtrl = $hash->{helper}{MediaRendererDLNA};
-#		Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile getting condirService New Media Renderer";
-#   	    my $condir_service = $rendererCtrl->getservicebyname('urn:schemas-upnp-org:service:AVTransport:1');
-#	    Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile starting postcontrol GetTransportInfo New Media Renderer";
-#        #my $action_res = $hash->{helper}{MediaRendererDLNACondirService}->postcontrol('GetTransportInfo', \%action_in_arg);
-#		my $action_res = $condir_service->postcontrol('GetTransportInfo', \%action_in_arg);
-#		Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile Got CondirService from Renderer, getting arguments now";	
-#		#$hash->{helper}{MediaRendererDLNA}->setAVTransportURI(CurrentURI => $URILink);
-#        my $actrion_out_arg = $action_res->getargumentlist();
-#		Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile Got Argumentlist from CondirService, getting CurrentTransportState now";	
-#	    my $x = $actrion_out_arg->{'CurrentTransportState'};
-#	    Log3 $hash, 3, "$name YAMAHA_MC_SpeakFile Device current state is <<$x>>. ";
-#		if (uc($x) eq "STOPPED") {
-#	       Log3 $hash, 3, "$name YAMAHA_MC_SpeakFile end waiting it is  <<$x>> now. ";
-#		   $stillplaying = "no";
-#			last;
-#		}	
-#		}
- #   }
-	
-	
-	# Deleting tts File
-	Log3 $name, 4, "$name YAMAHA_MC_SpeakFile try delete tts file $originalSearchfilename : $ret";
-	$ret .= qx(sudo rm -f $originalSearchfilename);
-	Log3 $name, 4, "$name YAMAHA_MC_SpeakFile delete tts file $originalSearchfilename : $ret";
-	
-	if ( (defined($URILink)) and (defined($hash->{helper}{MediaRendererDLNA})) ) {
-	  Log3 $name, 4, "$name YAMAHA_MC_SpeakFile stopping via Media Renderer";
-	  $hash->{helper}{MediaRendererDLNA}->stop();
-	}
-	$hash->{LastTtsFile}="";
-
+			  Log3 $hash, 4, "$name YAMAHA_MC_SpeakFile DLNARenderer: Search failed with error $@";
+	  
+			 }			
+			 
+		#warten bis AUsgabe beendet	
+		#my $stillplaying = "yes";
+		#while ($stillplaying eq "yes") {
+	#		if (defined($hash->{helper}{MediaRendererDLNA}))  {
+	#			Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile Waiting for end of play  $URILink";		 					
+	#			Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile Getting AVTransport from Renderer now";		
+	#			#my $condir_service = $hash->{helper}{MediaRendererDLNA}->getservicebyname('urn:schemas-upnp-org:service:AVTransport:1');
+	#			#$hash->{helper}{MediaRendererDLNA}->getTransportInfo(CurrentURI => $URILink);
+	#			
+	#			Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile Getting status via Renderer now";		
+	#			 my %action_in_arg = (               
+	#                'InstanceID' => '0'
+	#            );
+	#			
+	#		Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile Creating New Media Renderer";		
+	#		my $rendererCtrl = Net::UPnP::AV::MediaRenderer->new();
+	#		Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile assigning New Media Renderer";
+	#        $rendererCtrl = $hash->{helper}{MediaRendererDLNA};
+	#		Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile getting condirService New Media Renderer";
+	#   	    my $condir_service = $rendererCtrl->getservicebyname('urn:schemas-upnp-org:service:AVTransport:1');
+	#	    Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile starting postcontrol GetTransportInfo New Media Renderer";
+	#        #my $action_res = $hash->{helper}{MediaRendererDLNACondirService}->postcontrol('GetTransportInfo', \%action_in_arg);
+	#		my $action_res = $condir_service->postcontrol('GetTransportInfo', \%action_in_arg);
+	#		Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile Got CondirService from Renderer, getting arguments now";	
+	#		#$hash->{helper}{MediaRendererDLNA}->setAVTransportURI(CurrentURI => $URILink);
+	#        my $actrion_out_arg = $action_res->getargumentlist();
+	#		Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile Got Argumentlist from CondirService, getting CurrentTransportState now";	
+	#	    my $x = $actrion_out_arg->{'CurrentTransportState'};
+	#	    Log3 $hash, 3, "$name YAMAHA_MC_SpeakFile Device current state is <<$x>>. ";
+	#		if (uc($x) eq "STOPPED") {
+	#	       Log3 $hash, 3, "$name YAMAHA_MC_SpeakFile end waiting it is  <<$x>> now. ";
+	#		   $stillplaying = "no";
+	#			last;
+	#		}	
+	#		}
+	 #   }
+		
+		
+		# Deleting tts File
+		Log3 $name, 4, "$name YAMAHA_MC_SpeakFile try delete tts file $originalSearchfilename : $ret";
+		$ret .= qx(sudo rm -f $originalSearchfilename);
+		Log3 $name, 4, "$name YAMAHA_MC_SpeakFile delete tts file $originalSearchfilename : $ret";
+		
+		if ( (defined($URILink)) and (defined($hash->{helper}{MediaRendererDLNA})) ) {
+		  Log3 $name, 4, "$name YAMAHA_MC_SpeakFile stopping via Media Renderer";
+		  $hash->{helper}{MediaRendererDLNA}->stop();
+		}
+		$hash->{LastTtsFile}="";
+    }
 	#
 	# resetting input back
 	# ALte Werte wiederherstellen	
 	# wenn vorher eingeschaltet warn
 	#if ( ($currentInput ne "server") and ($currentPower ne "on")) {
 	if (($hash->{helper}{OriginalPowerState} eq "on") or ($hash->{helper}{OriginalPowerState} eq "")) {
-		if  (($hash->{helper}{OriginalInput}  ne "server") and ($hash->{helper}{OriginalInput}  ne "")) {
+		if  ((defined($hash->{helper}{OriginalInput})) and ($hash->{helper}{OriginalInput}  ne "server") and ($hash->{helper}{OriginalInput}  ne "")) {
 		  Log3 $name, 4, "$name YAMAHA_MC_SpeakFile setting from $currentInput back to old input $hash->{helper}{OriginalInput} ";
 		  YAMAHA_MC_httpRequestQueue($hash, "input", $hash->{helper}{OriginalInput},   {options => { priority => 2, unless_in_queue => 1}} ); # call fn that will do the http request
 		  $hash->{helper}{OriginalInput}="";
@@ -1373,13 +1515,15 @@ sub YAMAHA_MC_SpeakFile($$)  # only called when defined, not on reload.
 		}  	
 		
 		#$currentPlayback
-		Log3 $name, 4, "$name YAMAHA_MC_SpeakFile setting playback from $currentPlayback back to $hash->{helper}{OriginalPlayback}  "; 
-		if ( defined($hash->{helper}{OriginalPlayback}) and ($hash->{helper}{OriginalPlayback} ne "stop") and ($hash->{helper}{OriginalPlayback} ne $currentPlayback)){
-		  YAMAHA_MC_httpRequestQueue($hash, "playback", $hash->{helper}{OriginalPlayback},{options => {can_fail => 1}}); # ca
-		  $hash->{helper}{OriginalPlayback} ="";
-		  Log3 $name, 4, "$name YAMAHA_MC_SpeakFile setting playback from $currentPlayback back to $hash->{helper}{OriginalPlayback}  "; 
-		}	
-		Log3 $name, 4, "$name YAMAHA_MC_SpeakFile setting playback2 from $currentPlayback back to $hash->{helper}{OriginalPlayback}  "; 
+		if (defined($hash->{helper}{OriginalInput})) { 
+			Log3 $name, 4, "$name YAMAHA_MC_SpeakFile setting playback from $currentPlayback back to $hash->{helper}{OriginalPlayback}  "; 
+			if ( defined($hash->{helper}{OriginalPlayback}) and ($hash->{helper}{OriginalPlayback} ne "stop") and ($hash->{helper}{OriginalPlayback} ne $currentPlayback)){
+			  YAMAHA_MC_httpRequestQueue($hash, "playback", $hash->{helper}{OriginalPlayback},{options => {can_fail => 1}}); # ca
+			  $hash->{helper}{OriginalPlayback} ="";
+			  Log3 $name, 4, "$name YAMAHA_MC_SpeakFile setting playback from $currentPlayback back to $hash->{helper}{OriginalPlayback}  "; 
+			}	
+			Log3 $name, 4, "$name YAMAHA_MC_SpeakFile setting playback2 from $currentPlayback back to $hash->{helper}{OriginalPlayback}  "; 
+        }
 		
 		# Löschen des Original Power Status
 		$hash->{helper}{OriginalPowerState}="";
@@ -1785,7 +1929,7 @@ sub YAMAHA_MC_Set($$@)
   elsif(lc($cmd) eq "off")
     {
         Log3 $name, 4, "$name : YAMAHA_MC_Set power off=standby";
-		YAMAHA_MC_httpRequestQueue($hash, "power", "standby",{options    => {wait_after_response => $powerCmdDelay}}); # call fn that will do the http request
+		YAMAHA_MC_httpRequestQueue($hash, "power", "standby",{options    => { unless_in_queue => 1, wait_after_response => $powerCmdDelay}}); # call fn that will do the http request
 		#YAMAHA_MC_ResetTimer($hash);
     }
   elsif(lc($cmd) eq "toggle")
@@ -1806,7 +1950,7 @@ sub YAMAHA_MC_Set($$@)
 		}
 	 elsif((lc($a[2]) eq "off") || ( lc($a[2]) eq "standby")){
         Log3 $name, 4, "$name : YAMAHA_MC_Set power2 off";
-		YAMAHA_MC_httpRequestQueue($hash, "power", "standby", {options    => {wait_after_response => $powerCmdDelay}}); # call fn that will do the http request
+		YAMAHA_MC_httpRequestQueue($hash, "power", "standby", {options    => { unless_in_queue => 1, wait_after_response => $powerCmdDelay}}); # call fn that will do the http request
 		#YAMAHA_MC_ResetTimer($hash);
 		}
     else {
@@ -2188,7 +2332,7 @@ sub YAMAHA_MC_Set($$@)
 	# playing Favourite channel now
 	Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn now playing channel $FavoriteNetRadioChannelParam via setNetRadioPreset";
 	#YAMAHA_MC_httpRequestQueue($hash, "setNetRadioPreset", $FavoriteNetRadioChannelParam,{options => {priority => 2, can_fail => 1, not_before => gettimeofday()+$menuLayerDelay}}); # call fn that will do the http request
-	YAMAHA_MC_httpRequestQueue($hash, "setNetRadioPreset", $FavoriteNetRadioChannelParam,{options => {priority => 2, can_fail => 1}}); # call fn that will do the http request
+	YAMAHA_MC_httpRequestQueue($hash, "setNetRadioPreset", $FavoriteNetRadioChannelParam,{options => {unless_in_queue => 1, priority => 2, can_fail => 1}}); # call fn that will do the http request
 		
 	# setting current Channel
 	Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn now setting current Channel to $FavoriteNetRadioChannelParam";
@@ -2614,7 +2758,7 @@ sub YAMAHA_MC_httpRequestQueue($$$;$)
        
     
 	if (defined($arg)) {
-	  Log3 $name, 4, "YAMAHA_MC_httpRequestQueue ($name) - Args defined as ".$arg;
+	  Log3 $name, 4, "YAMAHA_MC_httpRequestQueue ($name) - Args defined as <".$arg.">";
 	}
 	
 	#if (defined($_->{arg})) {
@@ -2622,7 +2766,7 @@ sub YAMAHA_MC_httpRequestQueue($$$;$)
 	# }
 	
 	if (defined($cmd)) {
-	  Log3 $name, 4, "YAMAHA_MC_httpRequestQueue ($name) - cmd defined as ".$cmd;
+	  Log3 $name, 4, "YAMAHA_MC_httpRequestQueue ($name) - cmd defined as <".$cmd.">";
 	}
 	
 	#if (defined($_->{cmd})) {
@@ -2633,7 +2777,13 @@ sub YAMAHA_MC_httpRequestQueue($$$;$)
      Log3 $name, 4, "YAMAHA_MC_httpRequestQueue ($name) - + Es gibt noch pending commands";
 	 }
 	
-    if($options->{unless_in_queue} and grep( ($_->{cmd} eq $cmd and ( (not(defined($arg) or defined($_->{arg}))) or  $_->{arg} eq $arg)) ,@{$device->{helper}{CMD_QUEUE}}))
+	
+    #if(($options->{unless_in_queue} and defined($arg) and grep( ($_->{cmd} eq $cmd and ( (not(defined($arg) or defined($_->{arg}))) or  (defined $arg && $_->{arg} eq $arg))) ,@{$device->{helper}{CMD_QUEUE}}))
+	if(($options->{unless_in_queue} and defined($arg) and grep( ($_->{cmd} eq $cmd and ( (not(defined($arg) or defined($_->{arg}))) )) ,@{$device->{helper}{CMD_QUEUE}}))
+	  or ($options->{unless_in_queue} and !defined($arg) and grep( ($_->{cmd} eq $cmd and !defined($_->{arg})) ,@{$device->{helper}{CMD_QUEUE}}))
+	  or ($options->{unless_in_queue} and defined($arg) and grep( ($_->{cmd} eq $cmd and defined($_->{arg}) and $_->{arg} eq $arg) ,@{$device->{helper}{CMD_QUEUE}}))
+	  )
+	#if($options->{unless_in_queue} and grep( ($_->{cmd} eq $cmd and  (not(defined($arg) or (defined($_->{arg}) and  $_->{arg} eq $arg))) ,@{$device->{helper}{CMD_QUEUE}}))
     {
         Log3 $name, 4, "YAMAHA_MC_httpRequestQueue ($name) - comand \"$cmd".(defined($arg) ? " ".$arg : "")."\" is already in queue, skip adding another one";
     }
@@ -2982,9 +3132,7 @@ sub YAMAHA_MC_httpRequestParse($$$)
   if (($err ne "")  and not $options->{can_fail}){
     Log3 $name, 2, "$type: $name YAMAHA_MC_httpRequestParse last cmd=$cmd failed with error: $err";
 	
-	readingsBeginUpdate($hash);
-	readingsBulkUpdate($hash, "last_error", $err, 1);
-	readingsEndUpdate($hash, 1);
+	
 		
 	if (($cmd eq "getDeviceInfo") and   ($err =~ m/empty answer received/sgi)) {
 	  Log3 $name, 2, "$type: $name YAMAHA_MC_httpRequestParse seems to be okay when playing via dlna";
@@ -2995,14 +3143,16 @@ sub YAMAHA_MC_httpRequestParse($$$)
 	
 	# Perhaps device turned off, increasing timeout counter
 	$hash->{helper}{TIMEOUT_COUNT} = $hash->{helper}{TIMEOUT_COUNT} + 1;
+	Log3 $name, 2, "$type: $name YAMAHA_MC_httpRequestParse error occured increasing timeout counter to ".$hash->{helper}{TIMEOUT_COUNT};
+	
 	if ($hash->{helper}{TIMEOUT_COUNT} > 10) {
 		Log3 $name, 2, "$type: $name YAMAHA_MC_httpRequestParse more than 10 timeouts, guessing device is absent, setting state and power to off";
 
 		#see: http://www.fhemwiki.de/wiki/DevelopmentModuleIntro#Readings
 		
+		readingsBeginUpdate($hash);
 		readingsBulkUpdate($hash, "presence", "absent", 1);
-		
-		readingsBulkUpdate($hash, "state", "off", 1);	
+	    readingsBulkUpdate($hash, "state", "off", 1);	
 		readingsBulkUpdate($hash, "power", "off",1);		
 		readingsEndUpdate($hash, 1);
 		
@@ -3019,7 +3169,12 @@ sub YAMAHA_MC_httpRequestParse($$$)
 		  if (defined($hash->{$name}{READINGS}{currentMenuName})) {
 			delete($hash->{READINGS}{currentMenuName});
 		  }	
-	}  
+	}
+    else {
+      readingsBeginUpdate($hash);
+	  readingsBulkUpdate($hash, "last_error", $err, 1);
+	  readingsEndUpdate($hash, 1);
+    }	
 
 	if((not exists($hash->{helper}{AVAILABLE})) or (exists($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1))
         {
