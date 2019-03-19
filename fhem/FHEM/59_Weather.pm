@@ -977,7 +977,8 @@ sub WeatherCheckOptions($@) {
         <table border="1">
         <tr><td>API</td><td><code>DarkSkyAPI</code></td></tr>
         <tr><td>apioptions</td><td><code>cachemaxage=&lt;cachemaxage&gt;</code><br>duration
-          in seconds to retrieve the forecast from the cache instead from the API</td></tr>
+          in seconds to retrieve the forecast from the cache instead from the API<br><code>extend=hourly</code>
+      <br>extends the number of hours forecast records to 149</td></tr>
         <tr><td>location</td><td><code>&lt;latitude,longitude&gt;</code><br>
           geographic coordinates in degrees of the location for which the
           weather is forecast; if missing, the values of the attributes
@@ -1144,7 +1145,8 @@ sub WeatherCheckOptions($@) {
     <tr><td>API</td><td><code>DarkSkyAPI</code></td></tr>
     <tr><td>apioptions</td><td><code>cachemaxage=&lt;cachemaxage&gt;</code><br>Zeitdauer in
       Sekunden, innerhalb derer die Wettervorhersage nicht neu abgerufen
-      sondern aus dem Cache zur&uuml;ck geliefert wird.</td></tr>
+      sondern aus dem Cache zur&uuml;ck geliefert wird.<br><code>extend=hourly</code>
+      <br>erweitert die Anzahl der Datens&auml;tze f&uuml;r die Stundenvorhersage auf 149</td></tr>
     <tr><td>location</td><td><code>&lt;latitude,longitude&gt;</code><br> Geographische Breite
       und L&auml;nge des Ortes in Grad, f&uuml;r den das Wetter vorhergesagt wird.
       Bei fehlender Angabe werden die Werte aus den gleichnamigen Attributen

@@ -48,7 +48,7 @@ eval "use Encode qw(encode_utf8);1" or $missingModul .= "Encode ";
 # use Data::Dumper;    # for Debug only
 ## API URL
 use constant URL => 'https://api.openweathermap.org/data/2.5/';
-use constant VERSION => '0.2.4';
+use constant VERSION => '0.2.5';
 ## URL . 'weather?' for current data
 ## URL . 'forecast?' for forecast data
 
@@ -112,6 +112,7 @@ my %codes = (
 sub new {
     ### geliefert wird ein Hash
     my ( $class, $argsRef ) = @_;
+    my $apioptions = parseApiOptions($argsRef->{apioptions});
 
     my $self = {
         devName => $argsRef->{devName},
@@ -120,15 +121,6 @@ sub new {
             ? $argsRef->{apikey}
             : 'none'
         ),
-        cachemaxage => (
-            ( defined( $argsRef->{apioptions} ) and $argsRef->{apioptions} )
-            ? (
-                  ( split( ':', $argsRef->{apioptions} ) )[0] eq 'cachemaxage'
-                ? ( split( ':', $argsRef->{apioptions} ) )[1]
-                : 900
-              )
-            : 900
-        ),
         lang      => $argsRef->{language},
         lat       => ( split( ',', $argsRef->{location} ) )[0],
         long      => ( split( ',', $argsRef->{location} ) )[1],
@@ -136,10 +128,28 @@ sub new {
         endpoint  => 'none',
     };
 
+    $self->{cachemaxage} = ( defined($apioptions->{cachemaxage}) ? $apioptions->{cachemaxage} : 900 );
     $self->{cached} = _CreateForecastRef($self);
 
     bless $self, $class;
     return $self;
+}
+
+sub parseApiOptions($) {
+    my $apioptions = shift;
+
+    my @params;
+    my %h;
+    
+    @params = split(',',$apioptions);
+    while (@params) {
+        my $param = shift(@params);
+        next if($param eq '');
+        my ($key, $value) = split(':', $param, 2 );
+        $h{$key} = $value;
+    }
+    
+    return \%h;
 }
 
 sub setFetchTime {

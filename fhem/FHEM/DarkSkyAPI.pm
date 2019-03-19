@@ -48,7 +48,7 @@ use constant DEMODATA => '{"latitude":50.112,"longitude":8.686,"timezone":"Europ
 
 
 use constant URL => 'https://api.darksky.net/forecast/';
-use constant VERSION => '0.2.8';
+use constant VERSION => '0.2.9';
 
 my %codes = (
     'clear-day'           => 32,
@@ -69,6 +69,7 @@ my %codes = (
 sub new {
     ### geliefert wird ein Hash
     my ( $class, $argsRef ) = @_;
+    my $apioptions = parseApiOptions($argsRef->{apioptions});
 
     my $self = {
         devName => $argsRef->{devName},
@@ -77,25 +78,36 @@ sub new {
             ? $argsRef->{apikey}
             : 'none'
         ),
-        cachemaxage => (
-            ( defined( $argsRef->{apioptions} ) and $argsRef->{apioptions} )
-            ? (
-                  ( split( ':', $argsRef->{apioptions} ) )[0] eq 'cachemaxage'
-                ? ( split( ':', $argsRef->{apioptions} ) )[1]
-                : 900
-              )
-            : 900
-        ),
         lang      => $argsRef->{language},
         lat       => ( split( ',', $argsRef->{location} ) )[0],
         long      => ( split( ',', $argsRef->{location} ) )[1],
         fetchTime => 0,
     };
 
+    $self->{cachemaxage} = ( defined($apioptions->{cachemaxage}) ? $apioptions->{cachemaxage} : 900 );
+    $self->{extend} = ( defined($apioptions->{extend}) ? $apioptions->{extend} : 'none' );
     $self->{cached} = _CreateForecastRef($self);
 
     bless $self, $class;
+
     return $self;
+}
+
+sub parseApiOptions($) {
+    my $apioptions = shift;
+
+    my @params;
+    my %h;
+    
+    @params = split(',',$apioptions);
+    while (@params) {
+        my $param = shift(@params);
+        next if($param eq '');
+        my ($key, $value) = split(':', $param, 2 );
+        $h{$key} = $value;
+    }
+    
+    return \%h;
 }
 
 sub setFetchTime {
@@ -159,6 +171,9 @@ sub _RetrieveDataFromDarkSky($) {
           if ($missingModul);
     }
     else {
+        my $options = '&units=auto';
+        $options .= '&extend=' . $self->{extend} if ( $self->{extend} ne 'none' );
+
         $paramRef->{url} =
             URL
           . $self->{key} . '/'
@@ -166,7 +181,7 @@ sub _RetrieveDataFromDarkSky($) {
           . $self->{long}
           . '?lang='
           . $self->{lang}
-          . '&units=auto&extend=hourly';
+          . $options;
 
         if ( lc($self->{key}) eq 'demo' )
         { _RetrieveDataFinished($paramRef,undef,DEMODATA); }

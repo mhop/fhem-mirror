@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: DarkSkyAPI: add extend=hourly to apioption
  - feature: 93_DbRep: allow PRAGMA leading an SQLIte SQL-Statement in sqlCmd
  - bugfix/feature: 59_Weather/API's: fix weblink bug, add extended hourly
                                      data format
