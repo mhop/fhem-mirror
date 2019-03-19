@@ -40,6 +40,7 @@ eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $Mis
 
 # Versions History intern:
 our %Log2Syslog_vNotesIntern = (
+  "5.5.0"  => "18.03.2019  integrate Meta.pm ",
   "5.4.0"  => "17.03.2019  new feature parseProfile = Automatic ",
   "5.3.2"  => "08.02.2019  fix version numbering ",
   "5.3.1"  => "21.10.2018  get of FQDN changed ",
@@ -265,7 +266,10 @@ sub Log2Syslog_Initialize($) {
 					  "rateCalcRerun ".
                       $readingFnAttributes
                       ;
-return undef;   
+                      
+  FHEM::Meta::InitMod( __FILE__, $hash );           # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
+
+return;   
 }
 
 ###############################################################################
@@ -317,7 +321,6 @@ sub Log2Syslog_Define($@) {
   }
 
   $hash->{SEQNO}            = 1;                            # PROCID in IETF, wird kontinuierlich hochgezählt
-  $hash->{VERSION}          = (reverse sort(keys %Log2Syslog_vNotesIntern))[0];
   
   $logInform{$hash->{NAME}} = "Log2Syslog_fhemlog";         # Funktion die in hash %loginform für $name eingetragen wird
   $hash->{HELPER}{SSLVER}   = "n.a.";                       # Initialisierung
@@ -325,6 +328,9 @@ sub Log2Syslog_Define($@) {
   $hash->{HELPER}{LTIME}    = time();                       # Init Timestmp f. Ratenbestimmung
   $hash->{HELPER}{OLDSEQNO} = $hash->{SEQNO};               # Init Sequenznummer f. Ratenbestimmung
   $hash->{HELPER}{OLDSTATE} = "initialized";
+  
+  # Versionsinformationen setzen
+  Log2Syslog_setVersionInfo($hash);
   
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash, "SSL_Version", "n.a.");
@@ -1820,7 +1826,7 @@ sub Log2Syslog_setpayload ($$$$$$) {
       my $IETFver = 1;                                      # Version von syslog Protokoll Spec RFC5424
 	  my $mid     = "FHEM";                                 # message ID, identify protocol of message, e.g. for firewall filter
 	  my $tim     = $date."T".$time; 
-      my $sdfield = "[version\@Log2Syslog version=\"$hash->{VERSION}\"]";
+      my $sdfield = "[version\@Log2Syslog version=\"$hash->{HELPER}{VERSION}\"]";
       $otp        = Encode::encode_utf8($otp);
       
       # Längenbegrenzung nach RFC5424
@@ -2004,6 +2010,41 @@ sub Log2Syslog_sortVersion (@){
 return @sorted;
 }
 
+################################################################
+#               Versionierungen des Moduls setzen
+#  Die Verwendung von Meta.pm und Packages wird berücksichtigt
+################################################################
+sub Log2Syslog_setVersionInfo($) {
+  my ($hash) = @_;
+  my $name   = $hash->{NAME};
+
+  my $v                    = (sortTopicNum("desc",keys %Log2Syslog_vNotesIntern))[0];
+  my $type                 = $hash->{TYPE};
+  $hash->{HELPER}{PACKAGE} = __PACKAGE__;
+  $hash->{HELPER}{VERSION} = $v;
+  
+  if($modules{$type}{META}{x_prereqs_src}) {
+	  # META-Daten sind vorhanden
+	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: ... $ im Kopf komplett! vorhanden )
+		  $modules{$type}{META}{x_version} =~ s/1.1.1/(sortTopicNum("desc",keys %Log2Syslog_vNotesIntern))[0]/e;
+	  } else {
+		  $modules{$type}{META}{x_version} = $v; 
+	  }
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: ... $ im Kopf komplett! vorhanden )
+	  if( __PACKAGE__ eq $type) {
+	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
+		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
+	      use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );                                          
+      }
+  } else {
+	  # herkömmliche Modulstruktur
+	  $hash->{VERSION} = $v;
+  }
+  
+return;
+}
+
 #############################################################################################
 #                                       Hint Hash EN           
 #############################################################################################
@@ -2026,7 +2067,7 @@ our %Log2Syslog_vHintsExt_de = (
 
 =pod
 =item helper
-=item summary    forward FHEM system logs/events to a syslog server/act as an syslog server
+=item summary    forward FHEM system logs/events to a syslog server/act as a syslog server
 =item summary_DE sendet FHEM Logs/Events an Syslog-Server / agiert als Syslog-Server
 
 =begin html
@@ -3406,4 +3447,57 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
   
 </ul>
 =end html_DE
+
+=for :application/json;q=META.json 93_Log2Syslog.pm
+{
+  "abstract": "forward FHEM system logs/events to a syslog server or act as a syslog server itself",
+  "x_lang": {
+    "de": {
+      "abstract": "sendet FHEM Logs/Events an einen Syslog-Server (Sender) oder agiert selbst als Syslog-Server (Collector)"
+    }
+  },
+  "keywords": [
+    "syslog",
+    "syslog-server",
+    "syslog-client",
+    "logging"
+  ],
+  "version": "v1.1.1",
+  "release_status": "stable",
+  "author": [
+    "Heiko Maaz <heiko.maaz@t-online.de>"
+  ],
+  "x_fhem_maintainer": [
+    "DS_Starter"
+  ],
+  "x_fhem_maintainer_github": [
+    "nasseeder1"
+  ],
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "FHEM": 5.00918799,
+        "perl": 5.014,
+        "TcpServerUtils": 0,
+        "Scalar::Util": 0,
+        "Encode": 0,   
+        "IO::Socket::INET": 0, 
+        "Net::Domain": 0         
+      },
+      "recommends": {
+        "IO::Socket::SSL": 0 
+      },
+      "suggests": {
+      }
+    }
+  },
+  "resources": {
+    "bugtracker": {
+      "web": "https://forum.fhem.de/index.php/board,20.0.html",
+      "x_web_title": "FHEM Forum: Automatisierung"
+    }
+  }
+}
+=end :application/json;q=META.json
+
 =cut
