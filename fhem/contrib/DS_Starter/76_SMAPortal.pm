@@ -129,6 +129,7 @@ BEGIN {
           ReadingsVal
           RemoveInternalTimer
           setKeyValue
+          sortTopicNum
           TimeNow
           Value
         )
@@ -933,26 +934,29 @@ return @sorted;
 sub setVersionInfo($) {
   my ($hash) = @_;
   my $name   = $hash->{NAME};
-  my $type   = $hash->{TYPE};
-  
+
+  my $v                    = (sortTopicNum("desc",keys %vNotesIntern))[0];
+  my $type                 = $hash->{TYPE};
   $hash->{HELPER}{PACKAGE} = __PACKAGE__;
+  $hash->{HELPER}{VERSION} = $v;
+  
   if($modules{$type}{META}{x_prereqs_src}) {
 	  # META-Daten sind vorhanden
-	  $modules{$type}{META}{version} = "v".(sortVersionNum("desc",keys %vNotesIntern))[0];              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
+	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
 	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: ... $ im Kopf komplett! vorhanden )
-		  $modules{$type}{META}{x_version} =~ s/1.1.1/(sortVersionNum("desc",keys %vNotesIntern))[0]/e;
+		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
-		  $modules{$type}{META}{x_version} = (sortVersionNum("desc",keys %vNotesIntern))[0]; 
+		  $modules{$type}{META}{x_version} = $v; 
 	  }
 	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: ... $ im Kopf komplett! vorhanden )
-	  if( __PACKAGE__ ne "main") {
+	  if( __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
-		  # kann mit {SMAPortal->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
+		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
 	      use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );                                          
       }
   } else {
 	  # herkömmliche Modulstruktur
-	  $hash->{VERSION} = (sortVersionNum("desc",keys %vNotesIntern))[0];
+	  $hash->{VERSION} = $v;
   }
   
 return;
