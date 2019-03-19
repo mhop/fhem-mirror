@@ -699,6 +699,7 @@ FW_replaceLink(el)
   $(el).removeAttr("href");
   $(el).removeAttr("onclick");
   $(el).click(function() { 
+    attr = attr.replace(/&.*$/,''); // remove unnecessary params, forum: #97351
     FW_cmd(attr+"&XHR=1", function(txt){
       if(!txt)
         return;
@@ -1171,6 +1172,11 @@ FW_longpoll()
         filter="room="+room;
     }
   }
+
+  // use devspec directly if room is dynamic (#devspec=<devspec>)
+  filter = filter.replace( 'room=#devspec=', '' );
+  filter = filter.replace( 'room=%23devspec%3d', '' );
+
   var iP = $("body").attr("iconPath");
   if(iP != null)
     filter = filter +";iconPath="+iP;
