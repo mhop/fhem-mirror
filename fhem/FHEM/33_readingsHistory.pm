@@ -356,13 +356,33 @@ readingsHistory_detailFn()
   return readingsHistory_2html($d);
 }
 
+# In newer perl versions (>=5.22) POSIX::strftime() returns special chars in ISO-8859 instead of active locale (see: https://forum.fhem.de/index.php/topic,85132.msg777667.html#msg777667 )
+sub readingsHistory_strftime(@)
+{
+    my $string = POSIX::strftime(@_);
+
+    $string =~ s/\xe4/ä/g;
+    $string =~ s/\xc4/Ä/g;
+    $string =~ s/\xf6/ö/g;
+    $string =~ s/\xd6/Ö/g;
+    $string =~ s/\xfc/ü/g;
+    $string =~ s/\xdc/Ü/g;
+    $string =~ s/\xdf/ß/g;
+    $string =~ s/\xdf/ß/g;
+    $string =~ s/\xe1/á/g;
+    $string =~ s/\xe9/é/g;
+    $string =~ s/\xc1/Á/g;
+    $string =~ s/\xc9/É/g;
+
+    return $string;
+}
 sub
 readingsHistory_makeTimestamp($$) {
   my ($t, $timestampFormat) = @_;
 
   my @lt = localtime($t);
 
-  return strftime( $timestampFormat, @lt ) if( $timestampFormat );
+  return readingsHistory_strftime( $timestampFormat, @lt ) if( $timestampFormat );
 
   return sprintf("%02d:%02d:%02d", $lt[2], $lt[1], $lt[0] );
 }
