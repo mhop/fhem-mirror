@@ -479,6 +479,7 @@ FHEM/98_IF.pm                damian-s             Automatisierung
 FHEM/98_inotify.pm           marvin78             Automatisierung
 FHEM/98_Installer.pm         loredo               Unterstuetzende Dienste
 FHEM/98_JsonList2.pm         rudolfkoenig         Automatisierung
+FHEM/98_livetracking.pm      markus-m             Unterstuetzende Dienste
 FHEM/98_logProxy.pm          justme1968           Frontends/SVG Plots logProxy
 FHEM/98_MaxScanner.pm        john                 MAX
 FHEM/98_MediaList.pm         Tobias               Multimedia

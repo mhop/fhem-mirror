@@ -149,9 +149,9 @@ my %measure_types = (  1 => { name => "Weight (kg)", reading => "weight", },
                      120 => { name => "unknown 120", reading => "unknown120", }, #vasistas
                      121 => { name => "Snoring", reading => "snoring", }, # sleep #vasistas
                      122 => { name => "Lean Mass (%)", reading => "fatFreeRatio", },
-                     123 => { name => "unknown 123", reading => "unknown123", },
-                     124 => { name => "unknown 124", reading => "unknown124", },
-                     125 => { name => "unknown 125", reading => "unknown125", },
+                     128 => { name => "unknown 128", reading => "unknown128", },#vasistas
+                     129 => { name => "unknown 129", reading => "unknown129", },#vasistas sleep
+                     132 => { name => "unknown 132", reading => "unknown132", },#vasistas
                       #-10 => { name => "Speed", reading => "speed", },
                       #-11 => { name => "Pace", reading => "pace", },
                       #-12 => { name => "Altitude", reading => "altitude", },
@@ -1071,7 +1071,7 @@ sub withings_initDevice($) {
     $attr{$name}{stateFormat} = "co2 ppm" if( $device->{model} == 4 );
     $attr{$name}{stateFormat} = "voc ppm" if( $device->{model} == 22 );
     $attr{$name}{stateFormat} = "light lux" if( $device->{model} == 60 );
-    $attr{$name}{stateFormat} = "lastWeighinDate" if( $device->{model} == 61 );
+    $attr{$name}{stateFormat} = "lastWeighinDate" if( $hash->{typeID} == 32 && $device->{model} >= 61 );
   }
 
   withings_readAuraAlarm($hash) if( defined(AttrVal($name,"IP",undef)) && defined($device->{model}) && $device->{model} == 60 && defined($device->{type}) && $device->{type} == 32 );
@@ -1794,14 +1794,15 @@ sub withings_getUserReadingsSleep($) {
 #https://scalews.withings.com/cgi-bin/v2/measure?meastype=11,36,37,38,39,40,41,42,43,44,45,57,59,60,61,62,63,64,65,66,67,68,69,70,72,73,87,89,90,96,97,98,99,100,101,120,121&action=getvasistas&userid=2530001&devicetype=128&startdate=1543273200&enddate=1543359599&appname=hmw&apppfm=web&appliver=f692c27
 #https://scalews.withings.com/cgi-bin/v2/measure?meastype=11,36,37,38,39,40,41,42,43,44,45,57,59,60,61,62,63,64,65,66,67,68,69,70,72,73,87,89,90,96,97,98,99,100,101,120,121&action=getvasistas&userid=2530001&devicetype=16&startdate=1543273200&enddate=1543359599&appname=hmw&apppfm=web&appliver=f692c27
 # 16 - 36,37,39,40,41,42,87,90,120
-# 32 - 11,43,44,57,60,61,62,63,64,65,66,67,68,69,121
+# 32 - 11,43,44,57,60,61,62,63,64,65,66,67,68,69,121,129
+# ?? -
 
 
   HttpUtils_NonblockingGet({
     url => "https://scalews.withings.com/cgi-bin/v2/measure",
     timeout => 60,
     noshutdown => 1,
-    data => {sessionid => $hash->{IODev}->{SessionKey}, userid=> $hash->{User}, meastype => '11,39,41,43,44,57,59,87,121', startdate => int($lastupdate), enddate => int($enddate), devicetype => '32', appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getvasistas'},
+    data => {sessionid => $hash->{IODev}->{SessionKey}, userid=> $hash->{User}, meastype => '11,39,41,43,44,57,59,87,121,129', startdate => int($lastupdate), enddate => int($enddate), devicetype => '32', appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getvasistas'},
       hash => $hash,
       type => 'userReadingsSleep',
       enddate => int($enddate),
@@ -1875,7 +1876,7 @@ sub withings_getUserReadingsActivity($) {
     url => "https://scalews.withings.com/cgi-bin/v2/measure",
     timeout => 60,
     noshutdown => 1,
-    data => {sessionid => $hash->{IODev}->{SessionKey}, userid=> $hash->{User}, meastype => '36,37,38,39,40,41,42,43,44,59,70,87,90', startdate => int($lastupdate), enddate => int($enddate), devicetype => '16', appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getvasistas'},
+    data => {sessionid => $hash->{IODev}->{SessionKey}, userid=> $hash->{User}, meastype => '36,37,38,39,40,41,42,43,44,59,70,87,90,120,128,132', startdate => int($lastupdate), enddate => int($enddate), devicetype => '16', appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getvasistas'},
       hash => $hash,
       type => 'userReadingsActivity',
       enddate => int($enddate),
@@ -2984,7 +2985,7 @@ sub withings_parseAuraData($$) {
     #set/ping/init return
     return undef;
   }
-  elsif($data =~ /x0101004a01010100450101/){
+  elsif($data =~ /0101004a01010100450101/){
     #init info
     return undef;
   }
@@ -3971,6 +3972,11 @@ sub withings_DbLog_splitFn($) {
   elsif($event =~ m/spo2/)
   {
     $reading = 'spo2';
+    $unit = '%';
+  }
+  elsif($event =~ m/breathingEventProbability/)
+  {
+    $reading = 'breathingEventProbability';
     $unit = '%';
   }
   elsif($event =~ m/boneMassWeight/)

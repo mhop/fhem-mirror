@@ -2956,7 +2956,7 @@ sub XiaomiDevice_connectFail($)
 
   RemoveInternalTimer($hash, "XiaomiDevice_connectFail");
 
-  Log3 $name, 2, "$name: connection timeout";
+  Log3 $name, 3, "$name: connection timeout";
   readingsSingleUpdate($hash, "state", "disconnected", 1) if($hash->{helper}{ConnectionState} ne "disconnected");
   $hash->{helper}{ConnectionState} = "disconnected";
   $hash->{helper}{delay} += 60;
