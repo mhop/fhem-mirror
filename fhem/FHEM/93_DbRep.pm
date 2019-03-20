@@ -57,6 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.17.0" => "20.03.2019  prepare for Meta.pm, new attribute \"sqlCmdVars\" ",
   "8.16.0" => "17.03.2019  include sortTopicNum from 99_Utils, allow PRAGMAS leading an SQLIte SQL-Statement in sqlCmd, switch to DbRep_setVersionInfo ",
   "8.15.0" => "04.03.2019  readingsRename can rename readings of a given (optional) device ",
   "8.14.1" => "04.03.2019  Bugfix in deldoublets with SQLite, Forum: https://forum.fhem.de/index.php/topic,53584.msg914489.html#msg914489 ",
@@ -141,7 +142,9 @@ our %DbRep_vNotesIntern = (
 
 # Version History extern:
 our %DbRep_vNotesExtern = (
-  "8.16.0" => "17.03.2019 allow SQLite PRAGMAS leading an SQLIte SQL-Statement in sqlCmd",
+  "8.17.0" => "20.03.2019 With new attribute \"sqlCmdVars\" you are able to set SQL session variables or SQLite PRAGMA every time ".
+              "before running a SQL-statement with sqlCmd command.",
+  "8.16.0" => "17.03.2019 allow SQLite PRAGMAS leading an SQLIte SQL-Statement in sqlCmd ",
   "8.15.0" => "04.03.2019 readingsRename can now rename readings of a given (optional) device instead of all found readings specified in command ",
   "8.13.0" => "11.02.2019 executeBeforeProc / executeAfterProc is now available for sqlCmd,sumValue, maxValue, minValue, diffValue, averageValue ",
   "8.11.0" => "24.01.2019 command exportToFile or attribute \"expimpfile\" accepts option \"MAXLINES=\" ",
@@ -350,6 +353,7 @@ sub DbRep_Initialize($) {
                        "showStatus ".
                        "showTableInfo ".
                        "sqlCmdHistoryLength:0,5,10,15,20,25,30,35,40,45,50 ".
+                       "sqlCmdVars ",
 					   "sqlResultFormat:separated,mline,sline,table,json ".
 					   "sqlResultFieldSep:|,:,\/ ".
 					   "timeYearPeriod ".
@@ -5644,7 +5648,7 @@ sub sqlCmd_DoParse($) {
   my $dbpassword = $attr{"sec$dblogname"}{secret};
   my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
   my $srs        = AttrVal($name, "sqlResultFieldSep", "|");
-  my $err;
+  my ($err,@pms);
 
   # Background-Startzeit
   my $bst = [gettimeofday];
@@ -5657,49 +5661,70 @@ sub sqlCmd_DoParse($) {
      Log3 ($name, 2, "DbRep $name - $@");
      return "$name|''|$opt|$cmd|''|''|$err";
   }
-     
+       
   # only for this block because of warnings if details of readings are not set
   no warnings 'uninitialized'; 
-
-  my $sql = ($cmd =~ m/\;$/)?$cmd:$cmd.";"; 
   
-  # split SQL-Parameter Statement falls mitgegeben
-  # z.B. SET  @open:=NULL, @closed:=NULL; Select ...
-  my $set;
-  if($cmd =~ /^SET.*;/i) {
-      $cmd =~ m/^(SET.*?;)(.*)/i;
-      $set = $1;
-      $sql = $2;
-  }
-    
-  if($set) {
-      Log3($name, 4, "DbRep $name - Set SQL session variables: $set");    
-      eval {$dbh->do($set);};   # @\RB = Resetbit wenn neues Selektionsintervall beginnt
-  }
-  if ($@) {
-     $err = encode_base64($@,"");
-     Log3 ($name, 2, "DbRep $name - ERROR - $@");
-     $dbh->disconnect;
-     return "$name|''|$opt|$set|''|''|$err"; 
-  }
+  my $sql = ($cmd =~ m/\;$/)?$cmd:$cmd.";";
   
-  # Abarbeitung aller Pragmas in einem SQLite Statement, SQL wird extrahiert
-  # Pragmas müssen im SQL vorangestellt sein
-  if($cmd =~ /^\s*PRAGMA.*;/i) {   
-      my @pms = split(";",$cmd);           
+  # Set Session Variablen "SET" oder PRAGMA aus Attribut "sqlCmdVars"
+  my $vars = AttrVal($name, "sqlCmdVars", "");
+  if ($vars) {
+      @pms = split(";",$vars);           
       foreach my $pm (@pms) {
-          if($pm !~ /PRAGMA/i) {
-              $sql = $pm;
+          if($pm !~ /PRAGMA|SET/i) {
               next;
           }
-          $pm = ltrim($pm);
+          $pm = ltrim($pm).";";
+          Log3($name, 4, "DbRep $name - Set VARIABLE or PRAGMA: $pm");    
+          eval {$dbh->do($pm);};
+          if ($@) {
+             $err = encode_base64($@,"");
+             Log3 ($name, 2, "DbRep $name - ERROR - $@");
+             $dbh->disconnect;
+             return "$name|''|$opt|$sql|''|''|$err"; 
+          }      
+      }  
+  } 
+  
+  # Abarbeitung von Session Variablen vor einem SQL-Statement
+  # z.B. SET  @open:=NULL, @closed:=NULL; Select ...
+  if($cmd =~ /^\s*SET.*;/i) {   
+      @pms = split(";",$cmd);           
+      foreach my $pm (@pms) {
+          if($pm !~ /SET/i) {
+              $sql = $pm.";";
+              next;
+          }
+          $pm = ltrim($pm).";";
+          Log3($name, 4, "DbRep $name - Set SQL session variable: $pm");    
+          eval {$dbh->do($pm);};
+          if ($@) {
+             $err = encode_base64($@,"");
+             Log3 ($name, 2, "DbRep $name - ERROR - $@");
+             $dbh->disconnect;
+             return "$name|''|$opt|$sql|''|''|$err"; 
+          }      
+      }
+  }
+  
+  # Abarbeitung aller Pragmas vor einem SQLite Statement, SQL wird extrahiert
+  # wenn Pragmas im SQL vorangestellt sind
+  if($cmd =~ /^\s*PRAGMA.*;/i) {   
+      @pms = split(";",$cmd);           
+      foreach my $pm (@pms) {
+          if($pm !~ /PRAGMA/i) {
+              $sql = $pm.";";
+              next;
+          }
+          $pm = ltrim($pm).";";
           Log3($name, 4, "DbRep $name - Exec PRAGMA Statement: $pm");    
           eval {$dbh->do($pm);};
           if ($@) {
              $err = encode_base64($@,"");
              Log3 ($name, 2, "DbRep $name - ERROR - $@");
              $dbh->disconnect;
-             return "$name|''|$opt|$set|''|''|$err"; 
+             return "$name|''|$opt|$sql|''|''|$err"; 
           }      
       }
   }
@@ -10105,26 +10130,29 @@ return @sorted;
 sub DbRep_setVersionInfo($) {
   my ($hash) = @_;
   my $name   = $hash->{NAME};
-  my $type   = $hash->{TYPE};
-  
+
+  my $v                    = (sortTopicNum("desc",keys %DbRep_vNotesIntern))[0];
+  my $type                 = $hash->{TYPE};
   $hash->{HELPER}{PACKAGE} = __PACKAGE__;
+  $hash->{HELPER}{VERSION} = $v;
+  
   if($modules{$type}{META}{x_prereqs_src}) {
 	  # META-Daten sind vorhanden
-	  $modules{$type}{META}{version} = "v".(sortTopicNum("desc",keys %DbRep_vNotesIntern))[0];              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
+	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
 	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
-		  $modules{$type}{META}{x_version} =~ s/1.1.1/(sortTopicNum("desc",keys %DbRep_vNotesIntern))[0]/e;
+		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
-		  $modules{$type}{META}{x_version} = (sortTopicNum("desc",keys %DbRep_vNotesIntern))[0]; 
+		  $modules{$type}{META}{x_version} = $v; 
 	  }
 	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
-	  if( __PACKAGE__ ne "main") {
+	  if( __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
 	      use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );                                          
       }
   } else {
 	  # herkömmliche Modulstruktur
-	  $hash->{VERSION} = (sortTopicNum("desc",keys %DbRep_vNotesIntern))[0];
+	  $hash->{VERSION} = $v;
   }
   
 return;
@@ -10372,8 +10400,8 @@ return;
 
 =pod
 =item helper
-=item summary    Reporting & Management content of DbLog-DB's. Content is depicted as readings
-=item summary_DE Reporting & Management von DbLog-DB Content. Darstellung als Readings
+=item summary    Reporting and management of DbLog database content.
+=item summary_DE Reporting und Management von DbLog-Datenbank Inhalten.
 =begin html
 
 <a name="DbRep"></a>
@@ -11541,13 +11569,15 @@ return;
 								 will are listed. <br><br>
 								 </li><br>
 
-	<li><b> sqlCmd </b>        - executes an arbitrary user specific command. <br>
+	<li><b> sqlCmd </b>        - Execute an arbitrary user specific command. <br>
                                  If the command contains a operation to delete data, the <a href="#DbRepattr">attribute</a> 
 								 "allowDeletion" has to be set for security reason. <br>
                                  The statement doesn't consider limitations by attributes "device", "reading", "time.*" 
                                  respectively "aggregation". <br>
                                  This command also accept the setting of MySQL session variables like "SET @open:=NULL, 
-                                 @closed:=NULL;" or the usage of SQLite PRAGMA before execution of the SQL-Statement. <br>
+                                 @closed:=NULL;" or the usage of SQLite PRAGMA before execution the SQL-Statement.
+                                 If the session variable or PRAGMA has to be set every time before executing a SQL statement, the 
+                                 <a href="#DbRepattr">attribute</a> "sqlCmdVars" can be set. <br>                                 
 								 If the <a href="#DbRepattr">attribute</a> "timestamp_begin" respectively "timestamp_end" 
 								 is assumed in the statement, it is possible to use placeholder "<b>§timestamp_begin§</b>" respectively
 								 "<b>§timestamp_end§</b>" on suitable place. <br><br>
@@ -11612,6 +11642,7 @@ return;
                                       <tr><td> <b>sqlResultFormat</b>     </td><td>: determines presentation style of command result </td></tr>
                                       <tr><td> <b>sqlResultFieldSep</b>   </td><td>: choice of a useful field separator for result </td></tr>
                                       <tr><td> <b>sqlCmdHistoryLength</b> </td><td>: activates command history and length </td></tr>
+                                      <tr><td> <b>sqlCmdVars</b>          </td><td>: set SQL session variable or PRAGMA before execute the SQL statement</td></tr>
                                    </table>
 	                               </ul>
 	                               <br>
@@ -12352,7 +12383,7 @@ sub bdump {
                                 </li>                                
 
   <a name="showTableInfo"></a>								
-  <li><b>showTableInfo </b>   - limits the tablename which is selected by command "get &lt;name&gt; tableinfo". SQL-Wildcard 
+  <li><b>showTableInfo </b>   - Determine the tablenames which are selected by command "get &lt;name&gt; tableinfo". SQL-Wildcard 
                                 (%) can be used.   
                                 <br><br>
 
@@ -12365,8 +12396,20 @@ sub bdump {
   
   <a name="sqlCmdHistoryLength"></a>								
   <li><b>sqlCmdHistoryLength </b> 
-                              - activates the command history of "sqlCmd" and determines the length of it  </li> <br>
+                              - Activates the command history of "sqlCmd" and determines the length of it. </li> <br>
 
+  <a name="sqlCmdVars"></a> 
+  <li><b>sqlCmdVars </b>      - Set a SQL session variable or a PRAGMA every time before executing a SQL 
+                                statement with "set &lt;name&gt; sqlCmd".  <br><br>
+                                
+                                <ul>
+							    <b>Examples:</b> <br>
+							    attr &lt;name&gt; sqlCmdVars SET @open:=NULL, @closed:=NULL; <br>
+								attr &lt;name&gt; sqlCmdVars PRAGMA temp_store=MEMORY;PRAGMA synchronous=FULL;PRAGMA journal_mode=WAL; <br>
+                                </ul> 
+                                <br>                                
+                                </li> <br>                              
+                              
   <a name="sqlResultFieldSep"></a>
   <li><b>sqlResultFieldSep </b> - determines the used field separator (default: "|") in the result of some sql-commands.  </li> <br>
 
@@ -13925,7 +13968,10 @@ sub bdump {
                                  "device", "reading", "time.*" bzw. "aggregation" berücksichtigt. <br>
                                  Dieses Kommando akzeptiert ebenfalls das Setzen von SQL Session Variablen wie z.B.
                                  "SET @open:=NULL, @closed:=NULL;" oder die Verwendung von SQLite PRAGMA vor der 
-                                 Ausführung des SQL-Statements. <br>
+                                 Ausführung des SQL-Statements.
+                                 Soll die Session Variable oder das PRAGMA vor jeder Ausführung eines SQL Statements 
+                                 gesetzt werden, kann dafür das <a href="#DbRepattr">Attribut</a> "sqlCmdVars" 
+                                 verwendet werden. <br>
 								 Sollen die im Modul gesetzten <a href="#DbRepattr">Attribute</a> "timestamp_begin" bzw. 
 								 "timestamp_end" im Statement berücksichtigt werden, können die Platzhalter 
 								 "<b>§timestamp_begin§</b>" bzw. "<b>§timestamp_end§</b>" dafür verwendet werden. <br><br>
@@ -13993,6 +14039,7 @@ sub bdump {
                                       <tr><td> <b>sqlResultFormat</b>     </td><td>: legt die Darstellung des Kommandoergebnis fest  </td></tr>
                                       <tr><td> <b>sqlResultFieldSep</b>   </td><td>: Auswahl Feldtrenner im Ergebnis </td></tr>
                                       <tr><td> <b>sqlCmdHistoryLength</b> </td><td>: Aktivierung Kommando-Historie und deren Umfang</td></tr>
+                                      <tr><td> <b>sqlCmdVars</b>          </td><td>: setzt SQL Session Variablen oder PRAGMA vor jeder Ausführung des SQL-Statements </td></tr>
                                    </table>
 	                               </ul>
 	                               <br>
@@ -14750,15 +14797,27 @@ sub bdump {
                                 # Es werden nur Information der Tabellen "current" und "history" angezeigt <br>
                                 </ul><br>
                                 </li>                                
-
-  <a name="sqlResultFieldSep"></a>
-  <li><b>sqlResultFieldSep </b> - legt den verwendeten Feldseparator (default: "|") im Ergebnis des Kommandos 
-                                  "set ... sqlCmd" fest.    </li> <br>
  
   <a name="sqlCmdHistoryLength"></a> 
   <li><b>sqlCmdHistoryLength </b> 
                               - aktiviert die Kommandohistorie von "sqlCmd" und legt deren Länge fest  </li> <br>
+                              
+  <a name="sqlCmdVars"></a> 
+  <li><b>sqlCmdVars </b>      - Setzt eine SQL Session Variable oder PRAGMA vor jedem mit sqlCmd ausgeführten 
+                                SQL-Statement   <br><br>
+                                
+                                <ul>
+							    <b>Beispiel:</b> <br>
+							    attr &lt;name&gt; sqlCmdVars SET @open:=NULL, @closed:=NULL; <br>
+								attr &lt;name&gt; sqlCmdVars PRAGMA temp_store=MEMORY;PRAGMA synchronous=FULL;PRAGMA journal_mode=WAL; <br>
+                                </ul> 
+                                <br>                                
+                                </li> <br>
 
+  <a name="sqlResultFieldSep"></a>
+  <li><b>sqlResultFieldSep </b> - legt den verwendeten Feldseparator (default: "|") im Ergebnis des Kommandos 
+                                  "set ... sqlCmd" fest.  </li> <br>
+                                  
   <a name="sqlResultFormat"></a>							  
   <li><b>sqlResultFormat </b> - legt die Formatierung des Ergebnisses des Kommandos "set &lt;name&gt; sqlCmd" fest. 
                                 Mögliche Optionen sind: <br><br>
@@ -15119,4 +15178,65 @@ sub bdump {
 </ul>
 
 =end html_DE
+
+=for :application/json;q=META.json 93_DbRep.pm
+{
+  "abstract": "Reporting and management of DbLog database content.",
+  "x_lang": {
+    "de": {
+      "abstract": "Reporting und Management von DbLog Datenbankinhalten."
+    }
+  },
+  "keywords": [
+    "dblog",
+    "database",
+    "reporting",
+    "logging",
+    "analyze"
+  ],
+  "version": "v1.1.1",
+  "release_status": "stable",
+  "author": [
+    "Heiko Maaz <heiko.maaz@t-online.de>"
+  ],
+  "x_fhem_maintainer": [
+    "DS_Starter"
+  ],
+  "x_fhem_maintainer_github": [
+    "nasseeder1"
+  ],
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "FHEM": 5.00918799,
+        "perl": 5.014,
+        "POSIX": 0,
+        "Time::HiRes": 0,
+        "Scalar::Util": 0,
+        "DBI": 0,
+        "DBI::Const::GetInfoType": 0,
+        "Blocking": 0,
+        "Color": 0,
+        "Time::Local": 0,
+        "Encode": 0        
+      },
+      "recommends": {
+        "Net::FTPSSL": 0,
+        "Net::FTP": 0, 
+        "IO::Compress::Gzip": 0, 
+        "IO::Uncompress::Gunzip": 0
+      },
+      "suggests": {
+      }
+    }
+  },
+  "resources": {
+    "bugtracker": {
+      "web": "https://forum.fhem.de/index.php/board,46.0.html",
+      "x_web_title": "FHEM Forum: Sonstiges"
+    }
+  }
+}
+=end :application/json;q=META.json
+
 =cu
