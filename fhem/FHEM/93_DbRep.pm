@@ -353,7 +353,7 @@ sub DbRep_Initialize($) {
                        "showStatus ".
                        "showTableInfo ".
                        "sqlCmdHistoryLength:0,5,10,15,20,25,30,35,40,45,50 ".
-                       "sqlCmdVars ",
+                       "sqlCmdVars ".
 					   "sqlResultFormat:separated,mline,sline,table,json ".
 					   "sqlResultFieldSep:|,:,\/ ".
 					   "timeYearPeriod ".
