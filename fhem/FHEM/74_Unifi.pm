@@ -44,10 +44,14 @@
 #  - changed: 74_Unifi: removed deprecated UnifiSwitch-functions!
 # V 3.2.0
 #  - changed: 74_Unifi: removed UCv3 support
-
+# V 3.2.1
+#  - feature: 74_Unifi: new attribute customClientReadings
 
 package main;
-my $version="3.2.0";
+my $version="3.2.1";
+# Default für clientRedings setzen. Die Readings waren der Standard vor Einführung des Attributes customClientReadings.
+# Eine Änderung hat Auswirkungen auf (alte) Moduldefinitionen ohne dieses Attribut.
+my $defaultClientReadings=".:^accesspoint|^essid|^hostname|^last_seen|^snr|^uptime";
 use strict;
 use warnings;
 use HttpUtils;
@@ -112,6 +116,7 @@ sub Unifi_CreateVoucher_Send($%);
 sub Unifi_CreateVoucher_Receive($);
 sub Unifi_SetVoucherReadings($);
 sub Unifi_initVoucherCache($);
+sub Unifi_initCustomClientReadings($);
 sub Unifi_getNextVoucherForNote($$);
 sub Unifi_NextUpdateFn($$);
 sub Unifi_ReceiveFailure($$);
@@ -137,8 +142,8 @@ sub Unifi_Initialize($$) {
                          ."ignoreWirelessClients:1,0 "
                          ."httpLoglevel:1,2,3,4,5 "
                          ."eventPeriod "
-                         ."deprecatedClientNames:1,0 "
                          ."voucherCache "
+                         ."customClientReadings "
                          .$readingFnAttributes;
                          
 	$hash->{Clients} = "UnifiSwitch";
@@ -160,7 +165,6 @@ sub Unifi_Define($$) {
         unifi     => { 
             CONNECTED   => 0,
             eventPeriod => int(AttrVal($name,"eventPeriod",24)),
-            deprecatedClientNames => int(AttrVal($name,"deprecatedClientNames",1)),
             interval    => $a[6] || 30,
             url         => "https://".$a[2].(($a[3] == 443) ? '' : ':'.$a[3]).'/api/s/'.(($a[7]) ? $a[7] : 'default').'/',
         },
@@ -184,7 +188,10 @@ sub Unifi_Define($$) {
     $define.=" $a[6]" if($a[6]);
     $define.=" $a[7]" if($a[7]);
     $hash->{DEF} = $define;
-    
+	
+    $hash->{unifi}->{customClientReadings}->{attr_value} = AttrVal($name,"customClientReadings",$defaultClientReadings);
+    Unifi_initCustomClientReadings($hash);
+	
     Log3 $name, 5, "$name: Defined with url:$hash->{unifi}->{url}, interval:$hash->{unifi}->{interval}";
     return undef;
 }
@@ -249,9 +256,6 @@ sub Unifi_Set($@) {
     else {
         Log3 $name, 4, "$name: set $setName";
         
-        if (defined $hash->{unifi}->{deprecatedClientNames} && $hash->{unifi}->{deprecatedClientNames} eq 1){
-            Log3 $name, 2, "$name: deprecated use of Attribute 'deprecatedClientNames' (see commandref for details).";
-        }
         if (Unifi_CONNECTED($hash)) {
             if ($setName eq 'disconnectClient') {
                 if ($setVal && $setVal ne 'all') {
@@ -603,13 +607,6 @@ sub Unifi_Attr(@) {
             }
             $hash->{unifi}->{eventPeriod} = int($attr_value);
         }
-        elsif($attr_name eq "deprecatedClientNames") {
-            if (!looks_like_number($attr_value) || int($attr_value) < 0 || int($attr_value) > 1) {
-                return "$name: Value \"$attr_value\" is not allowed.\n"
-                       ."deprecatedClientNames must be a number between 0 and 1."
-            }
-            $hash->{unifi}->{deprecatedClientNames} = int($attr_value);
-        }
         elsif($attr_name eq "voucherCache") {
             #ToDo: nächste Zeile entfernen wenn in Unifi_initVoucherCache das Löschen alter Caches implementiert ist
             # So löscht man die delivery_at der verbleibenden Caches mit
@@ -617,6 +614,11 @@ sub Unifi_Attr(@) {
             $hash->{hotspot}->{voucherCache}=();
             $hash->{hotspot}->{voucherCache}->{attr_value} = $attr_value;
             return Unifi_initVoucherCache($hash);
+        }
+        elsif($attr_name eq "customClientReadings") {
+            $hash->{unifi}->{customClientReadings} = ();
+            $hash->{unifi}->{customClientReadings}->{attr_value} = $attr_value;
+			Unifi_initCustomClientReadings($hash);
         }
     }
     elsif($cmd eq "del") {
@@ -630,11 +632,13 @@ sub Unifi_Attr(@) {
         elsif($attr_name eq "eventPeriod") {
             $hash->{unifi}->{eventPeriod} = 24;
         }
-        elsif($attr_name eq "deprecatedClientNames") {
-            $hash->{unifi}->{deprecatedClientNames} = 1;
-        }
         elsif($attr_name eq "voucherCache") {
             %{$hash->{hotspot}->{voucherCache}} = ();
+        }
+        elsif($attr_name eq "customClientReadings") {
+            $hash->{unifi}->{customClientReadings} = ();
+            $hash->{unifi}->{customClientReadings}->{attr_value} = $defaultClientReadings;
+			Unifi_initCustomClientReadings($hash);
         }
     }
     return undef;
@@ -1130,34 +1134,110 @@ sub Unifi_SetClientReadings($) {
     for my $clientID (keys %{$hash->{clients}}) {
         $clientRef = $hash->{clients}->{$clientID};
         $clientName = Unifi_ClientNames($hash,$clientID,'makeAlias');
-        if (! defined ReadingsVal($hash->{NAME},$clientName,undef)){
-          $newClients.=$sep.$clientName;
-          $sep=",";
-        }
-        next if( $ignoreWired && $clientRef->{is_wired} );
-        next if( $ignoreWireless && !$clientRef->{is_wired} );
+		
+		if (! defined ReadingsVal($hash->{NAME},$clientName,undef)){
+		  $newClients.=$sep.$clientName;
+		  $sep=",";
+		}				
+				
+		next if( $ignoreWired && $clientRef->{is_wired} );
+		next if( $ignoreWireless && !$clientRef->{is_wired} );
+		
+		# folgenden Block müsste man vielleicht besser in Unifi_GetClients_Receive() einbauen
+		# Da man hier aber eh über alle Clients iteriert passt das aber auch hier.
+		{
+			$apName = "unknown";
+			if ($clientRef->{is_wired}
+				&&  defined $clientRef->{sw_mac} && defined($apNames->{$clientRef->{sw_mac}}) ) {
+			  $apName = $apNames->{$clientRef->{sw_mac}};
+			} elsif (defined $clientRef->{ap_mac} && defined($apNames->{$clientRef->{ap_mac}}) ) {
+			  $apName = $apNames->{$clientRef->{ap_mac}};
+			}
+			$clientRef->{accesspoint}=$apName;
+			
+			# ein paar Daten auch formatiert zur Verfügung stellen
+			# falls man Sonderzeichen im WLAN-Namen hat und damit auf ein entsprechendes WLAN-Reading zugreifen möchte
+			$clientRef->{_f_essid}=makeReadingName($clientRef->{essid}); 
+			# Einige Zeitformatierungen:
+			$clientRef->{_f_last_seen}=strftime "%Y-%m-%d %H:%M:%S",localtime($clientRef->{last_seen}) if defined $clientRef->{last_seen};
+			$clientRef->{_f_latest_assoc_time}=strftime "%Y-%m-%d %H:%M:%S",localtime($clientRef->{latest_assoc_time}) if defined $clientRef->{latest_assoc_time};
+			$clientRef->{_f_first_seen}=strftime "%Y-%m-%d %H:%M:%S",localtime($clientRef->{first_seen}) if defined $clientRef->{first_seen};
+			$clientRef->{_f_last_seen_by_usw}=strftime "%Y-%m-%d %H:%M:%S",localtime($clientRef->{_last_seen_by_usw}) if defined $clientRef->{_last_seen_by_usw};
+			$clientRef->{_f_last_seen_by_ugw}=strftime "%Y-%m-%d %H:%M:%S",localtime($clientRef->{_last_seen_by_ugw}) if defined $clientRef->{_last_seen_by_ugw};
+			$clientRef->{_f_last_seen_by_uap}=strftime "%Y-%m-%d %H:%M:%S",localtime($clientRef->{_last_seen_by_uap}) if defined $clientRef->{_last_seen_by_uap};
+			if (defined $clientRef->{uptime}){
+				my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)= gmtime($clientRef->{uptime});
+				$clientRef->{_f_uptime}=$yday."d ".$hour."h ".$min."m ".$sec."s";
+			}
+			if (defined $clientRef->{dhcpend_time}){
+				my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)= gmtime($clientRef->{dhcpend_time});
+				$clientRef->{_f_dhcpend_time}=$yday."d ".$hour."h ".$min."m ".$sec."s";
+			}
+			if (defined $clientRef->{assoc_time}){
+				my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)= gmtime($clientRef->{assoc_time});
+				$clientRef->{_f_assoc_time}=$yday."d ".$hour."h ".$min."m ".$sec."s";
+			}
+			if (defined $clientRef->{_uptime_by_usw}){
+				my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)= gmtime($clientRef->{_uptime_by_usw});
+				$clientRef->{_f_uptime_by_usw}=$yday."d ".$hour."h ".$min."m ".$sec."s";
+			}
+			if (defined $clientRef->{_uptime_by_ugw}){
+				my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)= gmtime($clientRef->{_uptime_by_ugw});
+				$clientRef->{_f_uptime_by_ugw}=$yday."d ".$hour."h ".$min."m ".$sec."s";
+			}
+			if (defined $clientRef->{_uptime_by_uap}){
+				my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)= gmtime($clientRef->{_uptime_by_uap});
+				$clientRef->{_f_uptime_by_uap}=$yday."d ".$hour."h ".$min."m ".$sec."s";
+			}
+		}
 
-        $apName = "unknown";
-        if ($clientRef->{is_wired}
-            &&  defined $clientRef->{sw_mac} && defined($apNames->{$clientRef->{sw_mac}}) ) {
-          $apName = $apNames->{$clientRef->{sw_mac}};
-        } elsif (defined $clientRef->{ap_mac} && defined($apNames->{$clientRef->{ap_mac}}) ) {
-          $apName = $apNames->{$clientRef->{ap_mac}};
-        }
-        
-        if (defined $hash->{unifi}->{connectedClients}->{$clientID}) {
-            readingsBulkUpdate($hash,$clientName."_hostname",(defined $clientRef->{hostname}) ? $clientRef->{hostname} : (defined $clientRef->{ip}) ? $clientRef->{ip} : 'Unknown');
-            readingsBulkUpdate($hash,$clientName."_last_seen",strftime "%Y-%m-%d %H:%M:%S",localtime($clientRef->{last_seen}));
-            readingsBulkUpdate($hash,$clientName."_uptime",$clientRef->{uptime});
-            readingsBulkUpdate($hash,$clientName."_snr",$clientRef->{rssi});
-            readingsBulkUpdate($hash,$clientName."_essid",makeReadingName($clientRef->{essid}));
-            readingsBulkUpdate($hash,$clientName."_accesspoint",$apName);
-            readingsBulkUpdate($hash,$clientName,'connected');
-        }
-        elsif (defined($hash->{READINGS}->{$clientName}) && $hash->{READINGS}->{$clientName}->{VAL} ne 'disconnected') {
-            Log3 $name, 5, "$name ($self) - Client '$clientName' previously connected is now disconnected.";
-            readingsBulkUpdate($hash,$clientName,'disconnected');
-        }
+		
+		if (defined $hash->{unifi}->{connectedClients}->{$clientID}) {
+			readingsBulkUpdate($hash,$clientName,'connected');
+			
+			# altes Standardverhalten kann man auch ohne RegEx-Auswertungen beibehalten
+			if(AttrVal($name,"customClientReadings",$defaultClientReadings) eq $defaultClientReadings){ 
+				readingsBulkUpdate($hash,$clientName."_hostname",(defined $clientRef->{hostname}) ? $clientRef->{hostname} : (defined $clientRef->{ip}) ? $clientRef->{ip} : 'Unknown');
+				readingsBulkUpdate($hash,$clientName."_last_seen",strftime "%Y-%m-%d %H:%M:%S",localtime($clientRef->{last_seen}));
+				readingsBulkUpdate($hash,$clientName."_uptime",$clientRef->{uptime});
+				readingsBulkUpdate($hash,$clientName."_snr",$clientRef->{rssi});
+				# Da essid auch im Readingnamen bei WLAN verwendet wird, wird aus Konsistenzgründen hier beim ReadingValue ebenfalls makeReadingName() verwendet.
+				readingsBulkUpdate($hash,$clientName."_essid",makeReadingName($clientRef->{essid})); 
+				readingsBulkUpdate($hash,$clientName."_accesspoint",$clientRef->{accesspoint});
+			}
+			else{ # Auswerten des Attribute customClientReadings
+				for my $customClientReadingsPart (keys %{$hash->{unifi}->{customClientReadings}->{parts}}) {
+					my $reName = "";
+					my $nameRegEx=$hash->{unifi}->{customClientReadings}->{parts}->{$customClientReadingsPart}->{nameRegEx};
+					eval { $reName = qr/$nameRegEx/; };
+					if ($@){
+						Log3 $name, 2, "$name ($self) - Wrong RegEx (".$nameRegEx.") in name-part in attribute customClientReadings!";
+					}
+					else{
+						if($clientName =~ m/$reName/){ #matched der ClientName?
+							my $reReading = "";
+							my $readingRegEx=$hash->{unifi}->{customClientReadings}->{parts}->{$customClientReadingsPart}->{ReadingRegEx};
+							eval { $reReading = qr/($readingRegEx)/; };
+							if ($@){
+								Log3 $name, 2, "$name ($self) - Wrong RegEx (".$readingRegEx.") in reading-part in attribute customClientReadings!";
+							}
+							else{
+								for my $readingName (sort keys %{$clientRef	}) {
+									if($readingName =~ m/$reReading/){ #matched der ReadingName?
+										my $readingData = ((defined($clientRef->{$readingName})) ? $clientRef->{$readingName} : '');
+										readingsBulkUpdate($hash,$clientName."_".$readingName,$readingData);
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		elsif (defined($hash->{READINGS}->{$clientName}) && $hash->{READINGS}->{$clientName}->{VAL} ne 'disconnected') {
+			Log3 $name, 5, "$name ($self) - Client '$clientName' previously connected is now disconnected.";
+			readingsBulkUpdate($hash,$clientName,'disconnected');
+		}
     }
     readingsBulkUpdate($hash,"-UC_newClients",$newClients);
     
@@ -1786,20 +1866,7 @@ sub Unifi_ClientNames($@) {
     
     if(defined $ID && defined $W && $W eq 'makeAlias') {   # Return Alias from ID
         $clientRef = $hash->{clients}->{$ID};
-        if (defined $hash->{unifi}->{deprecatedClientNames} && $hash->{unifi}->{deprecatedClientNames} eq 0){
-            my $goodName="";
-            $goodName=makeReadingName($clientRef->{name}) if defined $clientRef->{name};
-            my $goodHostname="";
-            $goodHostname=makeReadingName($clientRef->{hostname}) if defined $clientRef->{hostname};
-            if (   ($devAliases && $devAliases =~ /$ID:(.+?)(\s|$)/)
-                || ($devAliases && defined $clientRef->{name} && $devAliases =~ /$goodName:(.+?)(\s|$)/)
-                || ($devAliases && defined $clientRef->{hostname} && $devAliases =~ /$goodHostname:(.+?)(\s|$)/)
-                || ($goodName =~ /(.+)/)
-                || ($goodHostname =~ /(.+)/)
-               ) {
-                $ID = $1;
-            }
-        }elsif (   ($devAliases && $devAliases =~ /$ID:(.+?)(\s|$)/)
+        if (   ($devAliases && $devAliases =~ /$ID:(.+?)(\s|$)/)
             || ($devAliases && defined $clientRef->{name} && $devAliases =~ /$clientRef->{name}:(.+?)(\s|$)/)
             || ($devAliases && defined $clientRef->{hostname} && $devAliases =~ /$clientRef->{hostname}:(.+?)(\s|$)/)
             || (defined $clientRef->{name} && $clientRef->{name} =~ /^([\w\.\-]+)$/)
@@ -1908,6 +1975,39 @@ sub Unifi_ApNames($@) {
 }
 ###############################################################################
 
+sub Unifi_initCustomClientReadings($){
+    my ($hash) = @_;
+	my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
+	my $ccr=$hash->{unifi}->{customClientReadings}->{attr_value};
+	
+	my @clientNameRegEx;
+	my @parts=split(/ /,$ccr);
+	if (scalar @parts < 1){
+		return "Attr customClientReadings: Define at least one customClientReadings-part!";
+	}
+	my $partCount=0;
+	foreach (@parts){
+		my @part=split(/:/,$_);
+		if (scalar @part > 2 ||scalar @part < 1 ){
+			return "Attr customClientReadings: Exactly one : per part allowed!";
+		}
+		elsif(scalar @part == 1 ){
+			push @part, "";
+		}
+		push @clientNameRegEx, $part[0];
+		Log3 $name, 5, "$name ($self) - parsed part: $part[0]  ->  $part[1]";
+		my $pc=substr("00000000".$partCount."_part", -12);
+		$hash->{unifi}->{customClientReadings}->{parts}->{$pc}->{nameRegEx}=$part[0];
+		$hash->{unifi}->{customClientReadings}->{parts}->{$pc}->{ReadingRegEx}=$part[1];
+		$partCount++;
+	}
+	
+    my $json = encode_json( $hash->{unifi}->{customClientReadings} );
+    Log3 $name, 5, "$name ($self) - parsed Attribute customClientReadings: $json.";
+    return undef;
+}
+###############################################################################
+
 sub Unifi_initVoucherCache($){
     my ($hash) = @_;
     #return if ( ! defined $hash->{hotspot}->{voucherCache}->{attr_value});
@@ -1936,6 +2036,7 @@ sub Unifi_initVoucherCache($){
     # wenn $hash->{hotspot}->{voucherCache}->{$note} nicht in @notes, dann löschen
     return undef;
 }
+
 ###############################################################################
 
 sub Unifi_getNextVoucherForNote($$){
@@ -2267,12 +2368,6 @@ Or you can use the other readings or set and get features to control your unifi-
     Can be used to debug the HttpUtils-Module. Set it smaller or equal as your 'global verbose level'.<br>
     <code>default: 5</code></li>
     <br>
-    <li>attr deprecatedClientNames <0,1><br>
-    Client-names in reading-names, reading-values and drop-down-lists can be set in two ways. Both ways generate the client-name in follwing order: 1. Attribute devAlias; 2. client-alias in Unifi;3. hostname;4. internal unifi-id.<br>
-    1: Deprecated. Valid characters for unifi-client-alias or hostname are [a-z][A-Z][0-9][-][.]<br>
-    0: All invalid characters are replaced by using makeReadingName() in fhem.pl.<br> 
-    <code>default: 1 (if module is defined and/or attribute is not set)</code></li>
-    <br>
     <li>attr voucherCache  &lt;expire n quota note, ...&gt;<br>
     Define voucher-cache(s). Comma separeted list of four parameters that are separated by spaces; no spaces in note!.<br>
     By calling <code>get voucher &lt;note&gt;</code> the delivery-time of the voucher will be saved in the cache. 
@@ -2282,13 +2377,17 @@ Or you can use the other readings or set and get features to control your unifi-
     The first cache has a min size of 2 vouchers. The vouchers expire after 120 minutes and can be used one-time.<br>
     The second cache has a min size of 5 vouchers. The vouchers expire after 180 minutes and can be used two-times.</li>
     <br>
+    <li>attr customClientReadings clientNameRegEx1:ClientReadingRegEx1 clientNameRegEx2:ClientReadingRegEx2 ...<br>
+    Can be used to customize the readings for clients. <br>
+    <code>default: .:^accesspoint$|^essid$|^hostname$|^last_seen$|^snr$|^uptime$</code> Note: rssi ist called snr in old default bevor attr customClientReadings.</li>
+    <br>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
 </ul>
 
 <h4>Readings</h4>
 <ul>
     Note: All readings generate events. You can control this with <a href="#readingFnAttributes">these global attributes</a>.
-    <li>Each client has 7 readings for connection-state, SNR, uptime, last_seen-time, connected-AP, essid and hostname.</li>
+    <li>Each client has 7 readings for connection-state, SNR, uptime, last_seen-time, connected-AP, essid and hostname if attribute customClientReadings is not used.</li>
     <li><code>-UC_newClients</code>&nbsp;shows nameof a new client, could be a comma-separated list. Will be set to empty at next interval.</li>
     <li>Each AP has 5 readings for state (can be 'ok' or 'error'), essid's, utilization, locate and count of connected-clients.</li>
     <li>The unifi-controller has 6 readings for event-count in configured 'timePeriod', unarchived-alert count, accesspoint count, overall wlan-state (can be 'ok', 'warning', or other?), connected user count and connected guest count. </li>
