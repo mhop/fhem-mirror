@@ -47,6 +47,7 @@
 # 03.01.2019 : A.Goebel : fix mask tilde in set/get
 # 03.01.2019 : A.Goebel : fix change regexp for parsing commands from "/^w$delimiter.{1,7}$delimiter.*/" to "/^w$delimiter[^$delimiter]{1,}$delimiter.*/" to support "feuerung" as class
 # 28.02.2019 : A.Goebel : fix port 8888 was hardcoded in GAEBUS_OpenDev, use $port instead (highlighted by user freetz)
+# 21.03.2019 : A.Goebel : add support for find -p 
 
 package main;
 
@@ -479,8 +480,8 @@ GAEBUS_Get($@)
     $readingname       =~ s/ .*//;
     $readingname       =~ s/:.*//;
 
-    # only for "r" commands
-    if ($oneattr =~ /^r$delimiter[^$delimiter]{1,}$delimiter.*/)
+    # only for "r" and "u" commands
+    if ($oneattr =~ /^[ru]$delimiter[^$delimiter]{1,}$delimiter.*/)
     {
       $readings{$readingname} = $readingcmdname;
       $readingsCmdaddon{$readingname} = $cmdaddon;
@@ -543,7 +544,7 @@ GAEBUS_Get($@)
   if (defined($a[1])) { $a[1] =~ s/\xe2\x88\xbc/~/g };
   if (defined($a[2])) { $a[2] =~ s/\xe2\x88\xbc/~/g };
 
-  if ($a[1] =~ /^[r]$delimiter/) 
+  if ($a[1] =~ /^[ru]$delimiter/ ) 
   {
     my $readingname = "";
     my $readingcmdname = $a[1].$delimiter.$a[2];
@@ -735,8 +736,8 @@ GAEBUS_Attr(@)
       $reading    =~ s/:.*//;
 
       foreach my $r (split /;/, $reading) {
-        Log3 ($name, 3, "$name: delete reading: $reading");
-        delete($defs{$name}{READINGS}{$reading});
+        Log3 ($name, 3, "$name: delete reading: $r");
+        delete($defs{$name}{READINGS}{$r});
       }
     }
 
@@ -918,7 +919,7 @@ GAEBUS_doEbusCmd($$$$$$$)
 
   } elsif ($action eq "f") {
 
-    $cmd = "find -f -r -w";
+    $cmd = "find -f -r -w -p";
 
   } elsif ($action eq "i") {
 
@@ -927,15 +928,14 @@ GAEBUS_doEbusCmd($$$$$$$)
   } elsif ($action eq "r") {
 
     my $force = " -f "; 
-    $force = "" if ($io eq "h");
+    $force = "" if ($io eq "u");
 
     if ($cmdaddon =~ /\+f/) { 
       $force = "";
       $cmdaddon =~ s/\+f//;
     }
 
-    $cmd = "$io ";
-    #$cmd .= " -f " if ($io ne "h");
+    $cmd = "r ";
     $cmd .= "$force";
     $cmd .= "-c $class " if ($class ne "");
     $cmd .= "$var ";
@@ -943,8 +943,8 @@ GAEBUS_doEbusCmd($$$$$$$)
 
   } elsif ($action eq "v") {
 
-    $cmd = "$io ";
-    $cmd .= " -f " if ($io ne "h");
+    $cmd = "r ";
+    $cmd .= " -f " if ($io ne "u");
     $cmd .= "-v ";
     $cmd .= "-c $class " if ($class ne "");
     $cmd .= "$var ";
@@ -1041,11 +1041,13 @@ GAEBUS_doEbusCmd($$$$$$$)
       next if ($class =~ /^scan/);
 
 
-      push @{$sets{$io.$delimiter.$class}}, $var.$delimiter.$comment if ($io eq "r" or $io eq "h");
+      push @{$sets{"r".$delimiter.$class}}, $var.$delimiter.$comment if ($io =~ /r/);
+      push @{$sets{"u".$delimiter.$class}}, $var.$delimiter.$comment if ($io =~ /u/);
 
-      push @{$setsForWriting{$io.$delimiter.$class}}, $var.$delimiter.$comment if ($io eq "w" or $io eq "wi");
+      push @{$setsForWriting{"w".$delimiter.$class}}, $var.$delimiter.$comment if ($io =~ /w/);
 
-      push @{$gets{$io.$delimiter.$class}}, $var.$delimiter.$comment if ($io eq "r" or $io eq "h");
+      push @{$gets{"r".$delimiter.$class}}, $var.$delimiter.$comment if ($io =~ /r/);
+      push @{$gets{"u".$delimiter.$class}}, $var.$delimiter.$comment if ($io =~ /u/);
 
     }
 
