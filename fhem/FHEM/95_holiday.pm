@@ -385,10 +385,11 @@ holiday_FW_detailFn($$$$)
     will be set to the corresponding values, else the state is set to the text
     none. Most probably you'll want to query this value in some perl script:
     see Value() in the <a href="#perl">perl</a> section or the global attribute
-    <a href="#holiday2we"> holiday2we</a>.<br> The file will be reread once
-    every night, to compute the value for the current day, and by each get
-    command (see below).<br>
-    <br>
+    <a href="#holiday2we"> holiday2we</a>.<br>
+    Note: since March 2019 the IsWe() function (and $we) are accessing the
+    state, tomorrow and yesterday readings, and not the STATE internal.<br>
+    The file will be reread once every night, to compute the value for the
+    current day, and by each get command (see below).<br> <br>
 
     Holiday file definition:<br>
     The file may contain comments (beginning with #) or empty lines.
@@ -534,10 +535,12 @@ holiday_FW_detailFn($$$$)
  
     Meistens wird dieser Wert mit einem Perl Script abgefragt: siehe Value() im
     <a href="#perl">perl</a> Abschnitt oder im globalen Attribut <a
-    href="#holiday2we"> holiday2we</a>.<br> Die Datei wird jede Nacht neu
-    eingelesen um den Wert des aktuellen Tages zu erzeugen.  Auch jeder "get"
-    Befehl liest die Datei neu ein.
-
+    href="#holiday2we"> holiday2we</a>.<br>
+    Achtung: Seit M&auml;rz 2019 verwendet die IsWe() Funktion (und $we) die
+    state, tomorrow und yesterday Readings, und nicht mehr das STATE
+    Internal.<br>
+    Die Datei wird jede Nacht neu eingelesen um den Wert des aktuellen Tages zu
+    erzeugen.  Auch jeder "get" Befehl liest die Datei neu ein.<br>
     <br><br>
 
     Holiday file Definition:<br>
