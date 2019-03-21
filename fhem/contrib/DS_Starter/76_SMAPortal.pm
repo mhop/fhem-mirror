@@ -49,24 +49,25 @@ use FHEM::Meta;
 sub SMAPortal_Initialize($) {
   my ($hash) = @_;
 
-  $hash->{DefFn}     = "FHEM::SMAPortal::Define";
-  $hash->{UndefFn}   = "FHEM::SMAPortal::Undefine";
-  $hash->{DeleteFn}  = "FHEM::SMAPortal::Delete"; 
-  $hash->{AttrFn}    = "FHEM::SMAPortal::Attr";
-  $hash->{SetFn}     = "FHEM::SMAPortal::Set";
-  $hash->{GetFn}     = "FHEM::SMAPortal::Get";
-  $hash->{AttrList}  = "cookieLocation ".
-                       "cookielifetime ".
-                       "detailLevel:1,2,3,4 ".
-                       "disable:0,1 ".
-                       "getDataRetries:1,2,3,4,5,6,7,8,9,10 ".
-                       "interval ".
-                       "showPassInLog:1,0 ".
-                       "timeout ". 
-                       "userAgent ".
-                       $readingFnAttributes;
+  $hash->{DefFn}         = "FHEM::SMAPortal::Define";
+  $hash->{UndefFn}       = "FHEM::SMAPortal::Undefine";
+  $hash->{DeleteFn}      = "FHEM::SMAPortal::Delete"; 
+  $hash->{AttrFn}        = "FHEM::SMAPortal::Attr";
+  $hash->{SetFn}         = "FHEM::SMAPortal::Set";
+  $hash->{GetFn}         = "FHEM::SMAPortal::Get";
+  $hash->{DbLog_splitFn} = "FHEM::SMAPortal::DbLog_split";
+  $hash->{AttrList}      = "cookieLocation ".
+                           "cookielifetime ".
+                           "detailLevel:1,2,3,4 ".
+                           "disable:0,1 ".
+                           "getDataRetries:1,2,3,4,5,6,7,8,9,10 ".
+                           "interval ".
+                           "showPassInLog:1,0 ".
+                           "timeout ". 
+                           "userAgent ".
+                           $readingFnAttributes;
 
-  FHEM::Meta::InitMod( __FILE__, $hash );           # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
+  # FHEM::Meta::InitMod( __FILE__, $hash );           # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
 
 return; 
 }
@@ -138,6 +139,7 @@ BEGIN {
 
 # Versions History intern
 our %vNotesIntern = (
+  "1.4.0"  => "18.03.2019  add function extractPlantData, DbLog_split ",
   "1.3.0"  => "18.03.2019  change module to use package FHEM::SMAPortal and use Meta.pm, new sub setVersionInfo",
   "1.2.3"  => "12.03.2019  make ready for 98_Installer.pm ", 
   "1.2.2"  => "11.03.2019  new Errormessage analyze added, make ready for Meta.pm ", 
@@ -234,6 +236,30 @@ sub Set($@) {
   }  
   
 return;
+}
+
+###############################################################
+#               SMAPortal DbLog_splitFn
+###############################################################
+sub DbLog_split($$) {
+  my ($event, $device) = @_;
+  my $devhash = $defs{$device};
+  my ($reading, $value, $unit);
+
+  if($event =~ m/L2_PlantPeakPower/) {
+      $event   =~ /^L2_PlantPeakPower:\s(.*)\s(.*)/;
+      $reading = "L2_PlantPeakPower";
+	  $value   = $1;
+	  $unit    = $2;
+  }   
+  if($event =~ m/L1_.*_Temperature/) {
+      $event   =~ /^L1_(.*)_Temperature:\s(.*)\s(.*)/;
+      $reading = "L1_$1_Temperature";
+	  $value   = $2;
+	  $unit    = $3;
+  } 
+        
+return ($reading, $value, $unit);
 }
 
 ######################################################################################
@@ -508,7 +534,7 @@ sub GetData($) {
 
           if ($forecast_page->content =~ m/ForecastChartDataPoint/i) {
               $forecast_content = $forecast_page->content;
-              Log3 $name, 5, "$name - Forecast Data received:\n".$forecast_content;
+              Log3 $name, 5, "$name - Forecast Data received:\n".Dumper decode_json($forecast_content);
           }
       }
   
@@ -650,6 +676,7 @@ sub ParseData($) {
   if ($forecast_content && $forecast_content !~ m/undefined/i) {
       # Auswertung der Forecast Daten
       extractForecastData($hash,$forecast_content);
+      extractPlantData($hash,$forecast_content);
   }
   
   if ($weatherdata_content && $weatherdata_content !~ m/undefined/i) {
@@ -664,7 +691,7 @@ sub ParseData($) {
   
   if(!$hash->{HELPER}{RETRIES} && !$pv && !$fi && !$gc) {
       # keine Anlagendaten vorhanden
-      $state = "Data can't be retrieved from SMA-Portal. It will be reread at next scheduled cycle.";
+      $state = "Data can't be retrieved from SMA-Portal. Reread at next scheduled cycle.";
       Log3 $name, 2, "$name - $state";
   }
   
@@ -865,6 +892,7 @@ return;
 sub extractWeatherData($$) {
   my ($hash,$weather) = @_;
   my $name = $hash->{NAME};
+  my ($tsymbol,$ttoday,$ttomorrow);
   
   my $dl = AttrVal($name, "detailLevel", 1);
   
@@ -889,8 +917,21 @@ sub extractWeatherData($$) {
                   $new_val = $hd0;
                   
                   if ($new_val) {
-                      $new_val =~ s/.*}([A-Z]).*/°$1/ if($i =~ /^TemperatureSymbol$/);
-                      $new_val = sprintf("%.1f",$new_val) if($i =~ /^Temperature$/);
+                      if($i =~ /^TemperatureSymbol$/) {
+                          $new_val =~ s/.*}([A-Z]).*/°$1/;
+                          $tsymbol = $new_val;
+                          next;
+                      }
+                      if($i =~ /^Temperature$/) {
+                          if($k =~ /^today$/) {
+                              $ttoday = sprintf("%.1f",$new_val);
+                          }
+                          if($k =~ /^tomorrow$/) {
+                              $ttomorrow = sprintf("%.1f",$new_val);
+                          }                          
+                          next;
+                      }                      
+                      
                       Log3 $name, 4, "$name -> ${k}_${i} - $new_val";
                       readingsBulkUpdate($hash, "L1_${k}_${i}", $new_val);
                   }
@@ -899,8 +940,41 @@ sub extractWeatherData($$) {
       }
   }
   
+  readingsBulkUpdate($hash, "L1_today_Temperature", "$ttoday $tsymbol") if($ttoday && $tsymbol);
+  readingsBulkUpdate($hash, "L1_tomorrow_Temperature", "$ttomorrow $tsymbol") if($ttomorrow && $tsymbol);
+  
   readingsEndUpdate($hash, 1); 
 
+return;
+}
+
+################################################################
+##                     Auswertung Anlagendaten
+################################################################
+sub extractPlantData($$) {
+  my ($hash,$forecast) = @_;
+  my $name = $hash->{NAME};
+  my ($amount,$unit);
+  
+  my $dl = AttrVal($name, "detailLevel", 1);
+  if($dl <= 1) {
+      return;
+  }
+  
+  readingsBeginUpdate($hash);
+  
+  my $ppp = $forecast->{'PlantPeakPower'};
+  if($ppp && $dl >= 2) {
+      $amount = $forecast->{'PlantPeakPower'}{'Amount'}; 
+	  $unit   = $forecast->{'PlantPeakPower'}{'StandardUnit'}{'Symbol'}; 
+      Log3 $name, 4, "$name - Plantdata HASH content \"PlantPeakPower Amount\": $amount";
+	  Log3 $name, 4, "$name - Plantdata HASH content \"PlantPeakPower Symbol\": $unit";
+  }
+
+  readingsBulkUpdate($hash, "L2_PlantPeakPower", "$amount $unit"); 
+  
+  readingsEndUpdate($hash, 1); 
+  
 return;
 }
 
