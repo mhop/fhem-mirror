@@ -165,7 +165,7 @@ sub GetStatus($;$) {
     my $name      = $hash->{NAME};
     my $interval  = $hash->{INTERVAL};
     my @successor = ();
-    
+
     Log3($name, 5, "BOTVAC $name: called function GetStatus()");
 
     # use actionInterval if state is busy or paused
@@ -260,7 +260,7 @@ sub Set($@) {
     $usage .= " findMe:noArg"              if ( GetServiceVersion($hash, "findMe") eq "basic-1" );
     $usage .= " startManual:noArg"         if ( GetServiceVersion($hash, "manualCleaning") ne "" );
     $usage .= " statusRequest:noArg schedule:on,off syncRobots:noArg";
-    
+
     # house cleaning
     $usage .= " nextCleaningMode:eco,turbo" if ($houseCleaningSrv =~ /basic-\d/);
     $usage .= " nextCleaningNavigationMode:normal,extra#care" if ($houseCleaningSrv eq "minimal-2");
@@ -442,7 +442,7 @@ sub Set($@) {
           Log3($name, 2, "BOTVAC Can't set robot, run 'syncRobots' before");
         }
     }
-    
+
     # reloadMaps
     elsif ( $a[1] eq "reloadMaps" ) {
         Log3($name, 2, "BOTVAC set $name $arg");
@@ -490,7 +490,7 @@ sub Set($@) {
 
         readingsSingleUpdate($hash, $a[1], $a[2], 0);
     }
-    
+
     # wsCommand || wsCommand
     elsif ( $a[1] =~ /wsCombo|wsCommand/) {
         Log3($name, 2, "BOTVAC set $name $arg");
@@ -500,7 +500,7 @@ sub Set($@) {
         my $cmd = ($a[1] eq "wsCombo" ? "combo" : "command");
         wsEncode($hash, "{ \"$cmd\": \"$a[2]\" }");
     }
-    
+
     # password
     elsif ( $a[1] eq "password") {
         Log3($name, 2, "BOTVAC set $name " . $a[1]);
@@ -619,7 +619,7 @@ sub SendCommand($$;$$@) {
     my $URL = "https://";
     my $response;
     my $return;
-    
+
     my %sslArgs;
 
     if ($service ne "sessions" && $service ne "dashboard") {
@@ -687,7 +687,7 @@ sub SendCommand($$;$$@) {
           $data .= "\"category\":2";
           $data .= ",\"mode\":";
           $data .= (GetCleaningParameter($hash, "cleaningMode", "eco") eq "eco" ? "1" : "2");
-          $data .= ",\"modifier\":1"; 
+          $data .= ",\"modifier\":1";
         } elsif ($version eq "minimal-2") {
           $data .= "\"category\":2";
           $data .= ",\"navigationMode\":";
@@ -711,7 +711,7 @@ sub SendCommand($$;$$@) {
             my $zone = GetCleaningParameter($hash, "cleaningZone", "");
             $data .= ",\"boundaryId\":\"".$zone."\"" if ($zone ne "");
           }
-        }          
+        }
         $data .= "}";
       }
       elsif ($cmd eq "startSpot") {
@@ -724,7 +724,7 @@ sub SendCommand($$;$$@) {
           $data .= (GetCleaningParameter($hash, "cleaningMode", "eco") eq "eco" ? "1" : "2");
         }
         if ($version eq "basic-1" or $version eq "minimal-2") {
-          $data .= ",\"modifier\":"; 
+          $data .= ",\"modifier\":";
           $data .= (GetCleaningParameter($hash, "cleaningModifier", "normal") eq "normal" ? "1" : "2");
         }
         if ($version eq "micro-2" or $version eq "minimal-2") {
@@ -732,14 +732,14 @@ sub SendCommand($$;$$@) {
           $data .= (GetCleaningParameter($hash, "cleaningNavigationMode", "normal") eq "normal" ? "1" : "2");
         }
         if ($version eq "basic-1" or $version eq "basic-3") {
-          $data .= ",\"spotWidth\":"; 
+          $data .= ",\"spotWidth\":";
           $data .= GetCleaningParameter($hash, "cleaningSpotWidth", "200");
-          $data .= ",\"spotHeight\":"; 
+          $data .= ",\"spotHeight\":";
           $data .= GetCleaningParameter($hash, "cleaningSpotHeight", "200");
-        }          
+        }
         $data .= "}";
       }
-      elsif ($cmd eq "setMapBoundaries" or $cmd eq "getMapBoundaries") {   
+      elsif ($cmd eq "setMapBoundaries" or $cmd eq "getMapBoundaries") {
         if (defined($option) and ref($option) eq "HASH") {
           $data .= ",\"params\":{";
           foreach( keys %$option ) {
@@ -749,7 +749,7 @@ sub SendCommand($$;$$@) {
           $data .= "}";
         }
       }
-      
+
       $data .= "}";
 
       my $now = time();
@@ -804,7 +804,7 @@ sub ReceiveCommand($$$) {
     my @successor = @{$param->{successor}};
 
     my $rc = ( $param->{buf} ) ? $param->{buf} : $param;
-    
+
     my $loadMap;
     my $return;
     my $reqId = 0;
@@ -824,7 +824,7 @@ sub ReceiveCommand($$$) {
 
         # keep last state
         #readingsBulkUpdateIfChanged( $hash, "state", "Error" );
-        
+
         # stop pulling for current interval
         Log3($name, 4, "BOTVAC $name: drop successors");
         LogSuccessors($hash, @successor);
@@ -833,7 +833,7 @@ sub ReceiveCommand($$$) {
 
     # data received
     elsif ($data) {
-      
+
         if ( !defined($cmd) ) {
             Log3($name, 4, "BOTVAC $name: RCV $service");
         } else {
@@ -945,13 +945,13 @@ sub ReceiveCommand($$$) {
                   }
                 }
               }
-              
+
               #remove outdated calendar information
               foreach ( keys %currentEvents ) {
                 delete( $hash->{READINGS}{$_} );
               }
             }
-          } 
+          }
           elsif ( $cmd eq "getMapBoundaries" ) {
               if ( ref($return->{data}) eq "HASH" ) {
                 $reqId = $return->{reqId};
@@ -997,7 +997,7 @@ sub ReceiveCommand($$$) {
 				  readingsBulkUpdateIfChanged($hash, "floorplan_".$reqId."_zones", $zonesList);
                 }
               }
-          } 
+          }
           elsif ( $cmd eq "getGeneralInfo" ) {
             if ( ref($return->{data}) eq "HASH" ) {
               my $generalInfo = $return->{data};
@@ -1017,11 +1017,11 @@ sub ReceiveCommand($$$) {
             # sendToBase, setMapBoundaries, getRobotManualCleaningInfo
             if ( ref($return) eq "HASH" ) {
               push(@successor , ["robots", "maps"])
-                  if ($cmd eq "setMapBoundaries" or 
+                  if ($cmd eq "setMapBoundaries" or
                       (defined($return->{state}) and
                        ($return->{state} == 1 or $return->{state} == 4) and   # Idle or Error
                        $return->{state} != ReadingsNum($name, "stateId", $return->{state})));
-              
+
               #readingsBulkUpdateIfChanged($hash, "version", $return->{version});
               #readingsBulkUpdateIfChanged($hash, "data", $return->{data});
               readingsBulkUpdateIfChanged($hash, "result", $return->{result}) if (defined($return->{result}));
@@ -1090,14 +1090,14 @@ sub ReceiveCommand($$$) {
             }
           }
         }
-    
+
         # Sessions
         elsif ( $service eq "sessions" ) {
           if ( ref($return) eq "HASH" and defined($return->{access_token})) {
             readingsBulkUpdateIfChanged($hash, ".accessToken", $return->{access_token});
           }
         }
-        
+
         # dashboard
         elsif ( $service eq "dashboard" ) {
           if ( ref($return) eq "HASH" ) {
@@ -1121,7 +1121,7 @@ sub ReceiveCommand($$$) {
               $hash->{helper}{ROBOTS} = \@robotList;
 
               SetRobot($hash, ReadingsNum($name, "robot", 0));
-              
+
               push(@successor , ["robots", "maps"]);
             }
           }
@@ -1167,7 +1167,7 @@ sub ReceiveCommand($$$) {
             }
           }
         }
-        
+
         # loadmap
         elsif ( $service eq "loadmap" ) {
           readingsBulkUpdate($hash, ".map_cache", $data)
@@ -1181,12 +1181,12 @@ sub ReceiveCommand($$$) {
     }
 
     readingsEndUpdate( $hash, 1 );
-    
+
     if ($loadMap) {
       my $url = ReadingsVal($name, ".map_url", "");
       push(@successor , ["loadmap", $url]) if ($url ne "");
     }
-    
+
     if (@successor) {
       my @nextCmd = @{shift(@successor)};
       my $cmdLength = @nextCmd;
@@ -1279,13 +1279,13 @@ sub StorePassword($$) {
       $key = Digest::MD5::md5_hex(unpack "H*", $key);
       $key .= Digest::MD5::md5_hex($key);
     }
-    
+
     for my $char (split //, $password) {
       my $encode=chop($key);
       $enc_pwd.=sprintf("%.2x",ord($char)^ord($encode));
       $key=$encode.$key;
     }
-    
+
     my $err = setKeyValue($index, $enc_pwd);
     return "error while saving the password - $err" if(defined($err));
 
@@ -1298,16 +1298,16 @@ sub ReadPassword($) {
     my $index = $hash->{TYPE}."_".$hash->{NAME}."_passwd";
     my $key = getUniqueId().$index;
     my ($password, $err);
-    
+
     Log3($name, 4, "BOTVAC $name: Read password from file");
-    
+
     ($err, $password) = getKeyValue($index);
 
     if ( defined($err) ) {
       Log3($name, 3, "BOTVAC $name: unable to read password from file: $err");
-      return undef; 
+      return undef;
     }
-    
+
     if ( defined($password) ) {
       if ( eval "use Digest::MD5;1" ) {
         $key = Digest::MD5::md5_hex(unpack "H*", $key);
@@ -1333,22 +1333,22 @@ sub CheckRegistration($$$$$) {
   if (ReadingsVal($name, ".secretKey", "") eq "") {
     my @nextCmd = ($service, $cmd, $option);
     unshift(@successor, [$service, $cmd, $option]);
-      
-      my @succ_item;
-      my $msg = " successor:";
-      for (my $i = 0; $i < @successor; $i++) {
-        @succ_item = @{$successor[$i]};
-        $msg .= " $i: ";
-        $msg .= join(",", map { defined($_) ? $_ : '' } @succ_item);
-      }
-      Log3($name, 4, "BOTVAC created".$msg);
-      
+
+    my @succ_item;
+    my $msg = " successor:";
+    for (my $i = 0; $i < @successor; $i++) {
+      @succ_item = @{$successor[$i]};
+      $msg .= " $i: ";
+      $msg .= join(",", map { defined($_) ? $_ : '' } @succ_item);
+    }
+    Log3($name, 4, "BOTVAC created".$msg);
+
     SendCommand($hash, "sessions", undef, undef, @successor)   if (ReadingsVal($name, ".accessToken", "") eq "");
     SendCommand($hash, "dashboard", undef, undef, @successor)  if (ReadingsVal($name, ".accessToken", "") ne "");
-    
+
     return 1;
   }
-  
+
   return;
 }
 
@@ -1557,15 +1557,14 @@ sub LogSuccessors($@) {
     my ($hash,@successor) = @_;
     my $name = $hash->{NAME};
 
-    my $msg = "BOTVAC $name: RCV successors";
+    my $msg = "BOTVAC $name: successors";
     my @succ_item;
     for (my $i = 0; $i < @successor; $i++) {
       @succ_item = @{$successor[$i]};
       $msg .= " $i: ";
       $msg .= join(",", map { defined($_) ? $_ : '' } @succ_item);
     }
-    Log3($name, 4, $msg);
-
+    Log3($name, 4, $msg)  if (@successor > 0);
 }
 
 sub ShowMap($;$$) {
@@ -1575,23 +1574,23 @@ sub ShowMap($;$$) {
     $img   .= ' width="'.$width.'"'  if (defined($width));
     $img   .= ' width="'.$height.'"' if (defined($height));
     $img   .= ' alt="Map currently not available">';
-    
+
     return $img;
 }
 
 sub GetMap() {
     my ($request) = @_;
-    
+
     if ($request =~ /^\/BOTVAC\/(\w+)\/map/) {
       my $name   = $1;
       my $width  = $3;
       my $height = $5;
-      
+
       return ("image/png", ReadingsVal($name, ".map_cache", ""));
     }
 
     return ("text/plain; charset=utf-8", "No BOTVAC device for webhook $request");
-    
+
 }
 
 #######################################
@@ -1604,7 +1603,7 @@ sub wsOpen($$$) {
     Log3($name, 4, "BOTVAC(ws) $name: Establishing socket connection");
     $hash->{DeviceName} = join(':', $ip_address, $port);
 
-    ::DevIo_CloseDev($hash) if(::DevIo_IsOpen($hash)); 
+    ::DevIo_CloseDev($hash) if(::DevIo_IsOpen($hash));
 
     if (::DevIo_OpenDev($hash, 0, "BOTVAC::wsHandshake")) {
       Log3($name, 2, "BOTVAC(ws) $name: ERROR: Can't open websocket to $hash->{DeviceName}");
@@ -1640,7 +1639,7 @@ sub wsHandshake($) {
     my $date    = FmtDateTimeRFC1123($now);
     my $message = lc($serial) . "\n" . $date . "\n";
     my $hmac    = hmac_sha256_hex($message, ReadingsVal($name, ".secretKey", ""));
-    
+
     my $wsHandshakeCmd = "GET $path HTTP/1.1\r\n";
     $wsHandshakeCmd   .= "Host: $host:$port\r\n";
     $wsHandshakeCmd   .= "Sec-WebSocket-Key: $wsKey\r\n";
@@ -1650,13 +1649,13 @@ sub wsHandshake($) {
     $wsHandshakeCmd   .= "Date: $date\r\n";
     $wsHandshakeCmd   .= "Authorization: NEATOAPP $hmac\r\n";
     $wsHandshakeCmd   .= "Connection: Upgrade\r\n";
-    $wsHandshakeCmd   .= "\r\n";          
-    
+    $wsHandshakeCmd   .= "\r\n";
+
     Log3($name, 4, "BOTVAC(ws) $name: Starting Websocket Handshake");
     wsWrite($hash,$wsHandshakeCmd);
-    
+
     $hash->{HELPER}{wsKey}  = $wsKey;
-    
+
     return undef;
 }
 
@@ -1696,7 +1695,7 @@ sub wsCheckHandshake($$) {
 sub wsWrite($@) {
     my ($hash,$string)  = @_;
     my $name = $hash->{NAME};
-    
+
     Log3($name, 4, "BOTVAC(ws) $name: WriteFn called:\n$string");
     ::DevIo_SimpleWrite($hash, $string, 0);
 
@@ -1728,7 +1727,7 @@ sub wsCallback(@) {
     my ($param, $err, $data) = @_;
     my $hash = $param->{hash};
     my $name = $hash->{NAME};
-       
+
         if($err){
         Log3($name, 3, "received callback with error:\n$err");
         } elsif($data){
@@ -1793,10 +1792,10 @@ sub wsEncode($$;$$) {
         $wsString .= pack 'N', $len >> 32;
         $wsString .= pack 'N', ($len & 0xffffffff);
     }
-    if ($masked) { 
+    if ($masked) {
         my $mask = pack 'N', int(rand(2**32));
     $wsString .= $mask;
-    $wsString .= wsMasking($payload, $mask); 
+    $wsString .= wsMasking($payload, $mask);
     } else {
         $wsString .= $payload;
     }
@@ -1815,9 +1814,9 @@ sub wsPong($) {
 sub wsDecode($$) {
     my ($hash,$wsString) = @_;
     my $name = $hash->{NAME};
-  
+
     Log3($name, 5, "BOTVAC(ws) $name: String:\n" . $wsString);
-  
+
     while (length $wsString) {
       my $FIN =    (ord(substr($wsString,0,1)) & 0b10000000) >> 7;
       my $OPCODE = (ord(substr($wsString,0,1)) & 0b00001111);
@@ -2050,7 +2049,7 @@ sub wsMasking($$) {
   <ul>
   <li><code>house</code> - cleaning without a persisted map</li>
   <li><code>map</code> - cleaning with a persisted map</li>
-  <li><code>zone</code> - cleaning in a specific zone, set zone with nextCleaningZone</li> 
+  <li><code>zone</code> - cleaning in a specific zone, set zone with nextCleaningZone</li>
   </ul>
   </li>
 <br>

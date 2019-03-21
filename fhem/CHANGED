@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - changed: 70_BRAVIA: optimized command queue,
+                       introduced own package,
+                       new reading application
  - feature: 93_Log2Syslog: parseProfile = Automatic for automatic protocol
                            detection (default) if a collector is defined
  - feature: 93_DbRep: attribute "sqlCmdVars" to set SQL variables or PRAGMA
