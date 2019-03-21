@@ -264,7 +264,7 @@ DevIo_OpenDev($$$;$)
       }
     }
 
-    DoTrigger($name, "CONNECTED") if($reopen && !$ret);
+    DoTrigger($name, "CONNECTED") if(!$ret);
     return undef;
   };
   
@@ -353,6 +353,7 @@ DevIo_OpenDev($$$;$)
         Log3 $name, 1, "$name: Can't connect to $dev: $!" if(!$reopen && $!);
         $readyfnlist{"$name.$dev"} = $hash;
         DevIo_setStates($hash, "disconnected");
+        DoTrigger($name, "DISCONNECTED") if(!$reopen);
         $hash->{NEXT_OPEN} = time() + $nextOpenDelay;
         return 0;
       }
