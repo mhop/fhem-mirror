@@ -1038,7 +1038,7 @@ sub setVersionInfo($) {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
 	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: ... $ im Kopf komplett! vorhanden )
-	  if( __PACKAGE__ eq $type) {
+	  if( __PACKAGE__ eq "FHEM::$type") {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
 	      use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );                                          
