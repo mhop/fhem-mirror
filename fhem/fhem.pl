@@ -2753,7 +2753,8 @@ GlobalAttr($$$$)
     my $modpath = "$val/FHEM";
 
     opendir(DH, $modpath) || return "Can't read $modpath: $!";
-    push @INC, $modpath if(!grep(/\Q$modpath\E/, @INC));
+    push @INC, $modpath if(!grep(/^\Q$modpath\E$/, @INC));
+    push @INC, $val if(!grep(/^\Q$val\E$/, @INC));
     $cvsid =~ m/(fhem.pl) (\d+) (\d+-\d+-\d+)/;
     $attr{global}{version} = "$1:$2/$3";
     my $counter = 0;
