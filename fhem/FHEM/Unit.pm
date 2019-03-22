@@ -4656,3 +4656,21 @@ sub CommandDeleteReadingDesc($@) {
 }
 
 1;
+
+=for :application/json;q=META.json Unit.pm
+{
+  "author": [
+    "Julian Pawlowski <julian.pawlowski@gmail.com>"
+  ],
+  "x_fhem_maintainer": [
+    "loredo"
+  ],
+  "x_fhem_maintainer_github": [
+    "jpawlowski"
+  ],
+  "keywords": [
+    "RType",
+    "Unit"
+  ]
+}
+=end :application/json;q=META.json

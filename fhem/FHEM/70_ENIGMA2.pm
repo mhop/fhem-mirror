@@ -3309,4 +3309,33 @@ sub ENIGMA2_RClayout_VUplusDuo2() {
 
 =end html_DE
 
+=for :application/json;q=META.json 70_ENIGMA2.pm
+{
+  "author": [
+    "Julian Pawlowski <julian.pawlowski@gmail.com>"
+  ],
+  "x_fhem_maintainer": [
+    "loredo"
+  ],
+  "x_fhem_maintainer_github": [
+    "jpawlowski"
+  ],
+  "keywords": [
+    "Axas",
+    "Dreambox",
+    "GigaBlue",
+    "Protek",
+    "Telestar",
+    "VU+",
+    "VUplus",
+    "DVB-C",
+    "DVB-S",
+    "DVB-T",
+    "SAT Receiver",
+    "Set-top box",
+    "TV"
+  ]
+}
+=end :application/json;q=META.json
+
 =cut

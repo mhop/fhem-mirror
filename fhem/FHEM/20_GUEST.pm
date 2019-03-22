@@ -639,4 +639,25 @@ sub GUEST_Initialize($) {
 
 =end html_DE
 
+=for :application/json;q=META.json 20_GUEST.pm
+{
+  "author": [
+    "Julian Pawlowski <julian.pawlowski@gmail.com>"
+  ],
+  "x_fhem_maintainer": [
+    "loredo"
+  ],
+  "x_fhem_maintainer_github": [
+    "jpawlowski"
+  ],
+  "keywords": [
+    "Attendence",
+    "Family",
+    "People",
+    "Presence",
+    "RESIDENTS"
+  ]
+}
+=end :application/json;q=META.json
+
 =cut

@@ -1776,6 +1776,11 @@ sub ToDay() {
   "x_fhem_maintainer_github": [
     "jpawlowski"
   ],
+  "keywords": [
+    "nodejs",
+    "setup",
+    "update"
+  ],
   "prereqs": {
     "runtime": {
       "requires": {

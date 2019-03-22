@@ -2706,23 +2706,12 @@ Leider keine deutsche Dokumentation vorhanden. Die englische Version gibt es hie
   "x_fhem_maintainer_github": [
     "jpawlowski"
   ],
-  "resources": {
-    "license": [
-      "https://fhem.de/#License"
-    ],
-    "homepage": "https://fhem.de/",
-    "bugtracker": {
-      "web": "https://forum.fhem.de/index.php/board,53.0.html",
-      "x_web_title": "Multimedia"
-    },
-    "repository": {
-      "type": "svn",
-      "url": "https://svn.fhem.de/fhem/",
-      "x_branch_master": "trunk",
-      "x_branch_dev": "trunk",
-      "web": "https://svn.fhem.de/"
-    }
-  }
+  "keywords": [
+    "Clock",
+    "Display",
+    "Time",
+    "Watch"
+  ]
 }
 =end :application/json;q=META.json
 

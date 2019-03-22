@@ -3136,9 +3136,6 @@ sub __SetXVersion {
       "suggests": {
       }
     }
-  },
-  "resources": {
-    "homepage": "https://fhem.de/"
   }
 }
 =end :application/json;q=META.json

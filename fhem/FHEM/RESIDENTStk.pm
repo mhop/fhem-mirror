@@ -3790,3 +3790,20 @@ sub RESIDENTStk_DoInitDev(@) {
 }
 
 1;
+
+=for :application/json;q=META.json RESIDENTStk.pm
+{
+  "author": [
+    "Julian Pawlowski <julian.pawlowski@gmail.com>"
+  ],
+  "x_fhem_maintainer": [
+    "loredo"
+  ],
+  "x_fhem_maintainer_github": [
+    "jpawlowski"
+  ],
+  "keywords": [
+    "RESIDENTS"
+  ]
+}
+=end :application/json;q=META.json

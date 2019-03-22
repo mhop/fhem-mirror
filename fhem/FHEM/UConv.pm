@@ -8,7 +8,6 @@ use Scalar::Util qw(looks_like_number);
 use POSIX qw(strftime);
 use Data::Dumper;
 
-
 ####################
 # Translations
 
@@ -337,6 +336,146 @@ our %dateformats = (
 our %dateformatss = (
     en => '%mon_long% %mday%',
     de => '%mday%. %mon_long%',
+);
+
+# https://www.luftfeuchtigkeit-raumklima.de/tabelle.php
+our %ideal_clima = (
+    bathroom => {
+        c => {
+            '−273.15' => 0,
+            '6'         => 1,
+            '16'        => 2,
+            '20'        => 3,
+            '23'        => 4,
+            '27'        => 5,
+        },
+        h => {
+            '0'  => 0,
+            '40' => 1,
+            '50' => 2,
+            '70' => 3,
+            '80' => 4,
+        },
+    },
+    living => {
+        c => {
+            '−273.15' => 0,
+            '6'         => 1,
+            '16'        => 2,
+            '20'        => 3,
+            '23'        => 4,
+            '27'        => 5,
+        },
+        h => {
+            '0'  => 0,
+            '30' => 1,
+            '40' => 2,
+            '60' => 3,
+            '70' => 4,
+        },
+    },
+    kitchen => {
+        c => {
+            '−273.15' => 0,
+            '6'         => 1,
+            '16'        => 2,
+            '18'        => 3,
+            '20'        => 4,
+            '27'        => 5,
+        },
+        h => {
+            '0'  => 0,
+            '40' => 1,
+            '50' => 2,
+            '60' => 3,
+            '70' => 4,
+        },
+    },
+    bedroom => {
+        c => {
+            '−273.15' => 0,
+            '6'         => 1,
+            '12'        => 2,
+            '17'        => 3,
+            '20'        => 4,
+            '23'        => 5,
+        },
+        h => {
+            '0'  => 0,
+            '30' => 1,
+            '40' => 2,
+            '60' => 3,
+            '70' => 4,
+        },
+    },
+    hallway => {
+        c => {
+            '−273.15' => 0,
+            '6'         => 1,
+            '12'        => 2,
+            '15'        => 3,
+            '18'        => 4,
+            '23'        => 5,
+        },
+        h => {
+            '0'  => 0,
+            '30' => 1,
+            '40' => 2,
+            '60' => 3,
+            '70' => 4,
+        },
+    },
+    cellar => {
+        c => {
+            '−273.15' => 0,
+            '6'         => 1,
+            '7'         => 2,
+            '10'        => 3,
+            '15'        => 4,
+            '20'        => 5,
+        },
+        h => {
+            '0'  => 0,
+            '40' => 1,
+            '50' => 2,
+            '60' => 3,
+            '70' => 4,
+        },
+    },
+    outdoor => {
+        c => {
+            '−273.15' => 0,
+            '2.5'       => 1,
+            '5'         => 2,
+            '14'        => 3,
+            '30'        => 4,
+            '35'        => 5,
+        },
+        h => {
+            '0'  => 0,
+            '40' => 1,
+            '50' => 2,
+            '70' => 3,
+            '80' => 4,
+        },
+    },
+);
+
+our %clima_rgb = (
+    c => [ "0055BB", "0066CC", "009999", "4C9329", "E7652B", "C72A23" ],
+    h => [ "C72A23", "E7652B", "4C9329", "009999", "0066CC" ],
+);
+
+our %clima_names = (
+    c => {
+        en => [ "freeze",  "cold", "low",     "ideal",   "high", "hot" ],
+        de => [ "frostig", "kalt", "niedrig", "optimal", "hoch", "heiß" ],
+
+    },
+    h => {
+        en => [ "dry",     "low",     "ideal",   "high", "wet" ],
+        de => [ "trocken", "niedrig", "optimal", "hoch", "nass" ],
+    }
 );
 
 #################################
@@ -878,35 +1017,29 @@ sub humanReadable($;$) {
 # }
 
 # Condition: convert temperature (Celsius) to temperature condition
-sub c2condition($;$) {
-    my ( $data, $indoor ) = @_;
-    my $val = "freeze";
-    my $rgb = "0055BB";
+sub c2condition($;$$) {
+    my ( $data, $roomType, $lang ) = @_;
+    my $val = "?";
+    my $rgb = "FFFFFF";
+    $lang = "en" if ( !$lang );
 
-    if ($indoor) {
-        $data -= 5 if ( $data < 22.5 );
-        $data += 5 if ( $data > 25 );
+    if ($roomType) {
+        $roomType = "living"
+          if ( looks_like_number($roomType) );
+    }
+    else {
+        $roomType = "outdoor";
     }
 
-    if ( $data >= 35 ) {
-        $val = "hot";
-        $rgb = "C72A23";
-    }
-    elsif ( $data >= 30 ) {
-        $val = "high";
-        $rgb = "E7652B";
-    }
-    elsif ( $data >= 14 ) {
-        $val = "ideal";
-        $rgb = "4C9329";
-    }
-    elsif ( $data >= 5 ) {
-        $val = "low";
-        $rgb = "009999";
-    }
-    elsif ( $data >= 2.5 || $indoor ) {
-        $val = "cold";
-        $rgb = "0066CC";
+    if ( defined( $ideal_clima{$roomType} ) ) {
+        foreach my $th ( reverse sort keys %{ $ideal_clima{$roomType} } ) {
+            if ( $data >= $th ) {
+                my $i = $ideal_clima{$roomType}{$th};
+                $val = $clima_names{c}{$lang}[$i];
+                $rgb = $clima_rgb{c}[$i];
+                last;
+            }
+        }
     }
 
     return ( $val, $rgb ) if (wantarray);
@@ -1902,3 +2035,21 @@ sub _ReplaceStringByHashKey($$;$) {
 }
 
 1;
+
+=for :application/json;q=META.json UConv.pm
+{
+  "author": [
+    "Julian Pawlowski <julian.pawlowski@gmail.com>"
+  ],
+  "x_fhem_maintainer": [
+    "loredo"
+  ],
+  "x_fhem_maintainer_github": [
+    "jpawlowski"
+  ],
+  "keywords": [
+    "RType",
+    "Unit"
+  ]
+}
+=end :application/json;q=META.json

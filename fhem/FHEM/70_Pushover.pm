@@ -1843,4 +1843,24 @@ sub Pushover_HttpUri ($$;$) {
 </ul>
 
 =end html_DE
+
+=for :application/json;q=META.json 70_Pushover.pm
+{
+  "author": [
+    "Julian Pawlowski <julian.pawlowski@gmail.com>"
+  ],
+  "x_fhem_maintainer": [
+    "loredo"
+  ],
+  "x_fhem_maintainer_github": [
+    "jpawlowski"
+  ],
+  "keywords": [
+    "messaging",
+    "messenger",
+    "push"
+  ]
+}
+=end :application/json;q=META.json
+
 =cut

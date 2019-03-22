@@ -1176,4 +1176,18 @@ sub Wunderground_Hash2Readings($$;$) {
 
 =end html_DE
 
+=for :application/json;q=META.json 59_Wunderground.pm
+{
+  "author": [
+    "Julian Pawlowski <julian.pawlowski@gmail.com>"
+  ],
+  "x_fhem_maintainer": [
+    "loredo"
+  ],
+  "x_fhem_maintainer_github": [
+    "jpawlowski"
+  ]
+}
+=end :application/json;q=META.json
+
 =cut

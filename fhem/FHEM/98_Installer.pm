@@ -2826,6 +2826,11 @@ sub __aUniq {
   "x_fhem_maintainer_github": [
     "jpawlowski"
   ],
+  "keywords": [
+    "Dependencies",
+    "Prerequisites",
+    "Setup"
+  ],
   "prereqs": {
     "runtime": {
       "requires": {

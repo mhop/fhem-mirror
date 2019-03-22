@@ -449,3 +449,20 @@ sub get {
 }
 
 1;
+
+=for :application/json;q=META.json msgSchema.pm
+{
+  "author": [
+    "Julian Pawlowski <julian.pawlowski@gmail.com>"
+  ],
+  "x_fhem_maintainer": [
+    "loredo"
+  ],
+  "x_fhem_maintainer_github": [
+    "jpawlowski"
+  ],
+  "keywords": [
+    "messaging"
+  ]
+}
+=end :application/json;q=META.json

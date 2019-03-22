@@ -866,4 +866,27 @@ sub GEOFANCY_ISO8601UTCtoLocal ($) {
 
 =end html_DE
 
+=for :application/json;q=META.json 98_GEOFANCY.pm
+{
+  "author": [
+    "Julian Pawlowski <julian.pawlowski@gmail.com>"
+  ],
+  "x_fhem_maintainer": [
+    "loredo"
+  ],
+  "x_fhem_maintainer_github": [
+    "jpawlowski"
+  ],
+  "keywords": [
+    "Geofencing",
+    "Geofency",
+    "Locative",
+    "EgiGeoZone",
+    "Location",
+    "Presence",
+    "Tracking"
+  ]
+}
+=end :application/json;q=META.json
+
 =cut

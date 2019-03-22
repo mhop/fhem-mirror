@@ -889,4 +889,23 @@ This next step is basically to set attribute msgResidentsDevice to refer to this
 
 =end html_DE
 
+=for :application/json;q=META.json 75_msgConfig.pm
+{
+  "author": [
+    "Julian Pawlowski <julian.pawlowski@gmail.com>"
+  ],
+  "x_fhem_maintainer": [
+    "loredo"
+  ],
+  "x_fhem_maintainer_github": [
+    "jpawlowski"
+  ],
+  "keywords": [
+    "configure",
+    "messaging",
+    "messenger"
+  ]
+}
+=end :application/json;q=META.json
+
 =cut

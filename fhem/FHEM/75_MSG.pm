@@ -2492,4 +2492,26 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
 
 
 =end html_DE
+
+=for :application/json;q=META.json 75_MSG.pm
+{
+  "author": [
+    "Julian Pawlowski <julian.pawlowski@gmail.com>"
+  ],
+  "x_fhem_maintainer": [
+    "loredo"
+  ],
+  "x_fhem_maintainer_github": [
+    "jpawlowski"
+  ],
+  "keywords": [
+    "audio router",
+    "email",
+    "messaging",
+    "messenger",
+    "push"
+  ]
+}
+=end :application/json;q=META.json
+
 =cut
