@@ -67,7 +67,7 @@ sub SMAPortal_Initialize($) {
                            "userAgent ".
                            $readingFnAttributes;
 
-  # FHEM::Meta::InitMod( __FILE__, $hash );           # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
+  FHEM::Meta::InitMod( __FILE__, $hash );           # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
 
 return; 
 }
@@ -139,8 +139,8 @@ BEGIN {
 
 # Versions History intern
 our %vNotesIntern = (
-  "1.4.0"  => "18.03.2019  add function extractPlantData, DbLog_split ",
-  "1.3.0"  => "18.03.2019  change module to use package FHEM::SMAPortal and use Meta.pm, new sub setVersionInfo",
+  "1.4.0"  => "22.03.2019  add function extractPlantData, DbLog_split, change L2 Readings",
+  "1.3.0"  => "18.03.2019  change module to use package FHEM::SMAPortal and Meta.pm, new sub setVersionInfo",
   "1.2.3"  => "12.03.2019  make ready for 98_Installer.pm ", 
   "1.2.2"  => "11.03.2019  new Errormessage analyze added, make ready for Meta.pm ", 
   "1.2.1"  => "10.03.2019  behavior of state changed, commandref revised ", 
@@ -258,7 +258,13 @@ sub DbLog_split($$) {
 	  $value   = $2;
 	  $unit    = $3;
   } 
-        
+  if($event =~ m/summary/) {
+      $event   =~ /summary:\s(.*)\s(.*)/;
+      $reading = "summary";
+	  $value   = $1;
+	  $unit    = $2;
+  } 
+  
 return ($reading, $value, $unit);
 }
 
@@ -698,7 +704,7 @@ sub ParseData($) {
   readingsBeginUpdate($hash);
   if($login_state) {
       readingsBulkUpdate($hash, "state", $state);
-      readingsBulkUpdate($hash, "summary", $sum);
+      readingsBulkUpdate($hash, "summary", "$sum W");
   } 
   readingsEndUpdate($hash, 1);
   
@@ -841,15 +847,24 @@ sub extractForecastData($$) {
       }
       
       # Update values in Fhem if less than 24 hours in the future
-      if($dl >= 4) {
+      if($dl >= 2) {
           if ($obj_nr < 24) {
               my $time_str = "ThisHour";
               $time_str = "NextHour".sprintf("%02d", $obj_nr) if($fc_diff_hours>0);
-              readingsBulkUpdate( $hash, "L4_${time_str}_Time", $fc_obj->{'TimeStamp'}->{'DateTime'} );
-              readingsBulkUpdate( $hash, "L4_${time_str}_PvMeanPower", int( $fc_obj->{'PvMeanPower'}->{'Amount'} ) );
-              readingsBulkUpdate( $hash, "L4_${time_str}_Consumption", int( $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600 ) );
-              readingsBulkUpdate( $hash, "L4_${time_str}_IsConsumptionRecommended", ($fc_obj->{'IsConsumptionRecommended'} ? "yes" : "no") );
-              readingsBulkUpdate( $hash, "L4_${time_str}", int( $fc_obj->{'PvMeanPower'}->{'Amount'} - $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600 ) );
+              if($time_str =~ /NextHour/ && $dl >= 4) {
+                  readingsBulkUpdate( $hash, "L4_${time_str}_Time", $fc_obj->{'TimeStamp'}->{'DateTime'} );
+                  readingsBulkUpdate( $hash, "L4_${time_str}_PvMeanPower", int( $fc_obj->{'PvMeanPower'}->{'Amount'} ) );
+                  readingsBulkUpdate( $hash, "L4_${time_str}_Consumption", int( $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600 ) );
+                  readingsBulkUpdate( $hash, "L4_${time_str}_IsConsumptionRecommended", ($fc_obj->{'IsConsumptionRecommended'} ? "yes" : "no") );
+                  readingsBulkUpdate( $hash, "L4_${time_str}", int( $fc_obj->{'PvMeanPower'}->{'Amount'} - $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600 ) );
+              }
+              if($time_str =~ /ThisHour/ && $dl >= 2) {
+                  readingsBulkUpdate( $hash, "L2_${time_str}_Time", $fc_obj->{'TimeStamp'}->{'DateTime'} );
+                  readingsBulkUpdate( $hash, "L2_${time_str}_PvMeanPower", int( $fc_obj->{'PvMeanPower'}->{'Amount'} ) );
+                  readingsBulkUpdate( $hash, "L2_${time_str}_Consumption", int( $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600 ) );
+                  readingsBulkUpdate( $hash, "L2_${time_str}_IsConsumptionRecommended", ($fc_obj->{'IsConsumptionRecommended'} ? "yes" : "no") );
+                  readingsBulkUpdate( $hash, "L2_${time_str}", int( $fc_obj->{'PvMeanPower'}->{'Amount'} - $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600 ) );
+              }
           }
       }
 
@@ -1265,7 +1280,7 @@ return;
 	   <table>  
 	   <colgroup> <col width=5%> <col width=95%> </colgroup>
 		  <tr><td> <b>L1</b>  </td><td>- nur Live-Daten und Wetter-Daten werden generiert. </td></tr>
-		  <tr><td> <b>L2</b>  </td><td>- wie L1 und zusätzlich Prognose der nächsten 4 Stunden </td></tr>
+		  <tr><td> <b>L2</b>  </td><td>- wie L1 und zusätzlich Prognose der aktuellen und nächsten 4 Stunden </td></tr>
 		  <tr><td> <b>L3</b>  </td><td>- wie L2 und zusätzlich Prognosedaten des Resttages und Folgetages </td></tr>
           <tr><td> <b>L4</b>  </td><td>- wie L3 und zusätzlich die detaillierte Prognose der nächsten 24 Stunden </td></tr>
 	   </table>
