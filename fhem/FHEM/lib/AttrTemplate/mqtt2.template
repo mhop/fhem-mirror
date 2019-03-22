@@ -171,17 +171,17 @@ par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","read
 attr DEVICE icon hue_filled_white_and_color_e27_b22
 attr DEVICE stateFormat {lc ReadingsVal("$name","state",0)}
 attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name)}
-attr DEVICE webCmd toggle:on:off:brightness:color_temp:white:bright:color
+attr DEVICE webCmd toggle:on:off:brightness:color_temp:warm:white:hex
 attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
 attr DEVICE setList \
   on:noArg BASE_TOPIC/DEV_ID/set {"state":"ON"}\
   off:noArg BASE_TOPIC/DEV_ID/set {"state":"OFF"}\
-  white:noArg BASE_TOPIC/DEV_ID/set {"brightness": 200 , "color_temp": 320}\
-  bright:noArg BASE_TOPIC/DEV_ID/set {"brightness": 254, "color_temp": 250}\
+  warm:noArg BASE_TOPIC/DEV_ID/set {"brightness": 200 , "color_temp": 360}\
+  white:noArg BASE_TOPIC/DEV_ID/set {"brightness": 254, "color_temp": 250}\
   color_temp:colorpicker,CT,250,1,454 BASE_TOPIC/DEV_ID/set {"$EVTPART0":"$EVTPART1"}\
   brightness:colorpicker,BRI,0,5,255 BASE_TOPIC/DEV_ID/set {"state":"on","$EVTPART0":"$EVTPART1"}\
-  color:colorpicker,HEX,0,15,255 BASE_TOPIC/DEV_ID/set {"color":{"$EVTPART0":"#$EVTPART1"}}
-attr DEVICE userReadings color:color_y.* {Color::xyY2hex(ReadingsVal($name,"color_x",0),ReadingsVal($name,"color_y",0),ReadingsVal($name,"brightness",254))}  
+  hex:colorpicker,HEX,0,15,255 BASE_TOPIC/DEV_ID/set {"color":{"$EVTPART0":"#$EVTPART1"}}
+attr DEVICE userReadings hex:color_y.* {Color::xyY2hex(ReadingsVal($name,"color_x",0),ReadingsVal($name,"color_y",0),ReadingsVal($name,"brightness",254))}  
 attr DEVICE model L_02d_zigbee2mqtt_light_rgbw_hex
 
 #source post: https://forum.fhem.de/index.php/topic,97303.msg905935.html#msg905935
