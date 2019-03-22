@@ -47,6 +47,7 @@ BEGIN {
           ReadingsTimestamp
           defs
           modules
+          packages
           Log
           Log3
           Debug
@@ -240,8 +241,20 @@ sub Get($$@) {
         my $ret = CreateMetadataList( $hash, $cmd, $args[0] );
         return $ret;
     }
-    elsif ( lc($cmd) eq 'zzgetmeta.json' ) {
+    elsif ( lc($cmd) eq 'showpackageinfo' ) {
+        return "usage: $cmd PACKAGE" if ( @args != 1 );
+
+        my $ret = CreateMetadataList( $hash, $cmd, $args[0] );
+        return $ret;
+    }
+    elsif ( lc($cmd) eq 'zzgetmodulemeta.json' ) {
         return "usage: $cmd MODULE" if ( @args != 1 );
+
+        my $ret = CreateRawMetaJson( $hash, $cmd, $args[0] );
+        return $ret;
+    }
+    elsif ( lc($cmd) eq 'zzgetpackagemeta.json' ) {
+        return "usage: $cmd PACKAGE" if ( @args != 1 );
 
         my $ret = CreateRawMetaJson( $hash, $cmd, $args[0] );
         return $ret;
@@ -253,12 +266,21 @@ sub Get($$@) {
             push @fhemModules, $_;
         }
 
+        my @fhemPackages;
+        foreach ( sort { "\L$a" cmp "\L$b" } keys %packages ) {
+            push @fhemPackages, $_;
+        }
+
         my $list =
             'search'
           . ' showModuleInfo:FHEM,'
           . join( ',', @fhemModules )
-          . ' zzGetMETA.json:FHEM,'
-          . join( ',', @fhemModules );
+          . ' showPackageInfo:'
+          . join( ',', @fhemPackages )
+          . ' zzGetModuleMETA.json:FHEM,'
+          . join( ',', @fhemModules )
+          . ' zzGetPackageMETA.json:'
+          . join( ',', @fhemPackages );
 
         return "Unknown argument $cmd, choose one of $list";
     }
@@ -274,12 +296,12 @@ sub Event ($$) {
         && $hash->{".fhem"}{installer}{cmd} =~
         m/^(install|uninstall|update)(?: (.+))/i );
 
-    my $cmd      = $1;
-    my $packages = $2;
+    my $cmd  = $1;
+    my $pkgs = $2;
 
     my $list;
 
-    foreach my $package ( split / /, $packages ) {
+    foreach my $package ( split / /, $pkgs ) {
         next
           unless (
             $package =~ /^(?:@([\w-]+)\/)?([\w-]+)(?:@([\d\.=<>]+|latest))?$/ );
@@ -917,8 +939,6 @@ sub CreateSearchList ($$$) {
         )
     );
 
-    my $webname =
-      AttrVal( $hash->{CL}{SNAME}, 'webname', 'fhem' );
     my $FW_CSRF = (
         defined( $defs{ $hash->{CL}{SNAME} }{CSRFTOKEN} )
         ? '&fwcsrf=' . $defs{ $hash->{CL}{SNAME} }{CSRFTOKEN}
@@ -947,7 +967,7 @@ sub CreateSearchList ($$$) {
                   . $txtClose
                   . $colClose;
                 push @ret,
-                  $colOpen . $txtOpen . 'Module Name' . $txtClose . $colClose;
+                  $colOpen . $txtOpen . 'Device Type' . $txtClose . $colClose;
             }
             $found++;
             $foundDevices++;
@@ -958,9 +978,7 @@ sub CreateSearchList ($$$) {
 
             my $linkDev = $device;
             $linkDev =
-                '<a href="/'
-              . $webname
-              . '?detail='
+                '<a href="?detail='
               . $device
               . $FW_CSRF . '">'
               . $device . '</a>'
@@ -968,9 +986,7 @@ sub CreateSearchList ($$$) {
 
             my $linkMod = $defs{$device}{TYPE};
             $linkMod =
-                '<a href="/'
-              . $webname
-              . '?cmd=get '
+                '<a href="?cmd=get '
               . $hash->{NAME}
               . ' showModuleInfo '
               . $defs{$device}{TYPE}
@@ -1020,9 +1036,7 @@ sub CreateSearchList ($$$) {
 
             my $link = $module;
             $link =
-                '<a href="/'
-              . $webname
-              . '?cmd=get '
+                '<a href="?cmd=get '
               . $hash->{NAME}
               . ' showModuleInfo '
               . $module
@@ -1042,6 +1056,57 @@ sub CreateSearchList ($$$) {
     }
     push @ret, $tableClose if ($foundModules);
 
+    # search for matching module
+    my $foundPackages = 0;
+    $linecount = 1;
+    foreach my $package ( sort { "\L$a" cmp "\L$b" } keys %packages ) {
+        if ( $package =~ m/^.*$search.*$/i ) {
+            unless ($foundPackages) {
+                push @ret, '<h3>Packages</h3>' . $lb;
+                push @ret, $tableOpen;
+                push @ret,
+                    $colOpenMinWidth
+                  . $txtOpen
+                  . 'Package Name'
+                  . $txtClose
+                  . $colClose;
+                push @ret,
+                  $colOpen . $txtOpen . 'Abstract' . $txtClose . $colClose;
+            }
+            $found++;
+            $foundPackages++;
+
+            my $l = $linecount % 2 == 0 ? $rowOpenEven : $rowOpenOdd;
+
+            FHEM::Meta::Load($package);
+
+            my $abstract = '';
+            $abstract = $packages{$package}{META}{abstract}
+              if ( defined( $packages{$package}{META} )
+                && defined( $packages{$package}{META}{abstract} ) );
+
+            my $link = $package;
+            $link =
+                '<a href="?cmd=get '
+              . $hash->{NAME}
+              . ' showPackageInfo '
+              . $package
+              . $FW_CSRF . '">'
+              . $package . '</a>'
+              if ($html);
+
+            $l .= $colOpenMinWidth . $link . $colClose;
+            $l .=
+              $colOpen . ( $abstract eq 'n/a' ? '' : $abstract ) . $colClose;
+
+            $l .= $rowClose;
+
+            push @ret, $l;
+            $linecount++;
+        }
+    }
+    push @ret, $tableClose if ($foundPackages);
+
     # search for matching keyword
     my $foundKeywords = 0;
     $linecount = 1;
@@ -1053,7 +1118,11 @@ sub CreateSearchList ($$$) {
             $found++;
             $foundKeywords++;
 
-            push @ret, '<h4># ' . $keyword . '</h4>';
+            my $descr = FHEM::Meta::GetKeywordDesc( $keyword, $lang );
+            push @ret,
+                '<h4'
+              . ( $descr ne '' ? ' title="' . $descr . '"' : '' ) . '># '
+              . $keyword . '</h4>';
 
             my @mAttrs = qw(
               modules
@@ -1093,11 +1162,13 @@ sub CreateSearchList ($$$) {
 
                     my $link = $item;
                     $link =
-                        '<a href="/'
-                      . $webname
-                      . '?cmd=get '
+                        '<a href="?cmd=get '
                       . $hash->{NAME}
-                      . ' showModuleInfo '
+                      . (
+                        $type eq 'Module'
+                        ? ' showModuleInfo '
+                        : ' showPackageInfo '
+                      )
                       . $item
                       . $FW_CSRF . '">'
                       . $item . '</a>'
@@ -1123,105 +1194,162 @@ sub CreateSearchList ($$$) {
 
     # search for matching maintainer
     my $foundMaintainers = 0;
-    my %maintainerInfo;
     $linecount = 1;
     foreach my $maintainer (
         sort { "\L$a" cmp "\L$b" }
-        keys %FHEM::Meta::maintainerModules
+        keys %FHEM::Meta::maintainers
       )
     {
         if ( $maintainer =~ m/^.*$search.*$/i ) {
-            $maintainerInfo{$maintainer}{modules} =
-              $FHEM::Meta::maintainerModules{$maintainer};
-        }
-    }
-    foreach my $maintainer (
-        sort { "\L$a" cmp "\L$b" }
-        keys %FHEM::Meta::maintainerPackages
-      )
-    {
-        if ( $maintainer =~ m/^.*$search.*$/i ) {
-            $maintainerInfo{$maintainer}{packages} =
-              $FHEM::Meta::maintainerPackages{$maintainer};
-        }
-    }
-    foreach my $maintainer ( sort { "\L$a" cmp "\L$b" } keys %maintainerInfo ) {
-        next
-          unless ( defined( $maintainerInfo{$maintainer}{modules} )
-            || defined( $maintainerInfo{$maintainer}{packages} ) );
-
-        unless ($foundMaintainers) {
-            push @ret, '<h3>Authors & Maintainers</h3>' . $lb;
-            push @ret, $tableOpen;
-            push @ret,
-              $colOpenMinWidth . $txtOpen . 'Author' . $txtClose . $colClose;
-            push @ret, $colOpen . $txtOpen . 'Modules' . $txtClose . $colClose;
-            push @ret, $colOpen . $txtOpen . 'Packages' . $txtClose . $colClose;
-        }
-        $found++;
-        $foundMaintainers++;
-
-        my $l = $linecount % 2 == 0 ? $rowOpenEven : $rowOpenOdd;
-
-        my $modules  = '';
-        my $packages = '';
-
-        my $counter = 0;
-        foreach my $module ( sort { "\L$a" cmp "\L$b" }
-            @{ $maintainerInfo{$maintainer}{modules} } )
-        {
-            $modules .= $lb if ($counter);
-            $counter++;
-
-            if ($html) {
-                $modules .=
-                    '<a href="/'
-                  . $webname
-                  . '?cmd=get '
-                  . $hash->{NAME}
-                  . ' showModuleInfo '
-                  . $module
-                  . $FW_CSRF . '">'
-                  . $module . '</a>';
+            unless ($foundMaintainers) {
+                push @ret, '<h3>Authors & Maintainers</h3>' . $lb;
+                push @ret, $tableOpen;
+                push @ret,
+                  $colOpenMinWidth . $txtOpen . 'Name' . $txtClose . $colClose;
+                push @ret,
+                  $colOpen . $txtOpen . 'Modules' . $txtClose . $colClose;
+                push @ret,
+                  $colOpen . $txtOpen . 'Packages' . $txtClose . $colClose;
             }
-            else {
-                $modules .= $module;
+            $found++;
+            $foundMaintainers++;
+
+            my $l = $linecount % 2 == 0 ? $rowOpenEven : $rowOpenOdd;
+
+            my $mods = '';
+            if ( defined( $FHEM::Meta::maintainers{$maintainer}{modules} ) ) {
+                my $counter = 0;
+                foreach my $mod ( sort { "\L$a" cmp "\L$b" }
+                    @{ $FHEM::Meta::maintainers{$maintainer}{modules} } )
+                {
+                    if ($html) {
+                        $mods .= '<br />' if ($counter);
+                        $mods .=
+                            '<a href="?cmd=get '
+                          . $hash->{NAME}
+                          . ' showModuleInfo '
+                          . $mod
+                          . $FW_CSRF . '">'
+                          . $mod . '</a>';
+                    }
+                    else {
+                        $mods .= "\n" unless ($counter);
+                        $mods .= $mod;
+                    }
+                    $counter++;
+                }
             }
+            my $pkgs = '';
+            if ( defined( $FHEM::Meta::maintainers{$maintainer}{packages} ) ) {
+                my $counter = 0;
+                foreach my $pkg ( sort { "\L$a" cmp "\L$b" }
+                    @{ $FHEM::Meta::maintainers{$maintainer}{packages} } )
+                {
+                    if ($html) {
+                        $pkgs .= '<br />' if ($counter);
+                        $pkgs .=
+                            '<a href="?cmd=get '
+                          . $hash->{NAME}
+                          . ' showPackageInfo '
+                          . $pkg
+                          . $FW_CSRF . '">'
+                          . $pkg . '</a>';
+                    }
+                    else {
+                        $pkgs .= "\n" unless ($counter);
+                        $pkgs .= $pkg;
+                    }
+                    $counter++;
+                }
+            }
+
+            $l .= $colOpenMinWidth . $maintainer . $colClose;
+            $l .= $colOpen . $mods . $colClose;
+            $l .= $colOpen . $pkgs . $colClose;
+
+            $l .= $rowClose;
+
+            push @ret, $l;
+            $linecount++;
         }
-        $counter = 0;
-        foreach my $package ( sort { "\L$a" cmp "\L$b" }
-            @{ $maintainerInfo{$maintainer}{packages} } )
-        {
-            $packages .= $lb if ($counter);
-            $counter++;
-
-            # if ($html) {
-            #     $packages .=
-            #         '<a href="/'
-            #       . $webname
-            #       . '?cmd=get '
-            #       . $hash->{NAME}
-            #       . ' showPackageInfo '
-            #       . $package
-            #       . $FW_CSRF . '">'
-            #       . $package . '</a>';
-            # }
-            # else {
-            $packages .= $package;
-
-            # }
-        }
-
-        $l .= $colOpenMinWidth . $maintainer . $colClose;
-        $l .= $colOpen . $modules . $colClose;
-        $l .= $colOpen . $packages . $colClose;
-
-        $l .= $rowClose;
-
-        push @ret, $l;
-        $linecount++;
     }
     push @ret, $tableClose if ($foundMaintainers);
+
+    # search for matching Perl package
+    my $foundPerl = 0;
+    $linecount = 1;
+    foreach my $dependent (
+        sort { "\L$a" cmp "\L$b" }
+        keys %{ $FHEM::Meta::dependents{pkgs} }
+      )
+    {
+        next if ( FHEM::Meta::ModuleIsPerlCore($dependent) );
+        next if ( FHEM::Meta::ModuleIsPerlPragma($dependent) );
+        next if ( FHEM::Meta::ModuleIsInternal($dependent) );
+
+        if ( $dependent =~ m/^.*$search.*$/i ) {
+            unless ($foundPerl) {
+                push @ret, '<h3>Perl packages</h3>' . $lb;
+                push @ret, $tableOpen;
+                push @ret,
+                  $colOpenMinWidth . $txtOpen . 'Name' . $txtClose . $colClose;
+                push @ret,
+                    $colOpen
+                  . $txtOpen
+                  . 'Referenced from'
+                  . $txtClose
+                  . $colClose;
+            }
+            $found++;
+            $foundPerl++;
+
+            my $l = $linecount % 2 == 0 ? $rowOpenEven : $rowOpenOdd;
+
+            my $references = '';
+            my $counter    = 0;
+            foreach my $pkgReq (qw(requires recommends suggests)) {
+                next
+                  unless (
+                    defined(
+                        $FHEM::Meta::dependents{pkgs}{$dependent}{$pkgReq}
+                    )
+                  );
+
+                foreach my $mod ( sort { "\L$a" cmp "\L$b" }
+                    @{ $FHEM::Meta::dependents{pkgs}{$dependent}{$pkgReq} } )
+                {
+                    if ($html) {
+                        $references .= '<br />' if ($counter);
+                        $references .=
+                            '<a href="?cmd=get '
+                          . $hash->{NAME}
+                          . (
+                            FHEM::Meta::ModuleIsInternal($mod) eq 'module'
+                            ? ' showModuleInfo '
+                            : ' showPackageInfo '
+                          )
+                          . $mod
+                          . $FW_CSRF . '">'
+                          . $mod . '</a>';
+                    }
+                    else {
+                        $references .= "\n" unless ($counter);
+                        $references .= $mod;
+                    }
+                    $counter++;
+                }
+            }
+
+            $l .= $colOpenMinWidth . $dependent . $colClose;
+            $l .= $colOpen . $references . $colClose;
+
+            $l .= $rowClose;
+
+            push @ret, $l;
+            $linecount++;
+        }
+    }
+    push @ret, $tableClose if ($foundPerl);
 
     return $header . join( "\n", @ret ) . $footer;
 }
@@ -1235,20 +1363,40 @@ sub CreateSearchList ($$$) {
 sub CreateMetadataList ($$$) {
     my ( $hash, $getCmd, $modName ) = @_;
     $modName = 'Global' if ( uc($modName) eq 'FHEM' );
+    my $modType = lc($getCmd) eq 'showmoduleinfo' ? 'module' : 'package';
 
     # disable automatic links to FHEM devices
     delete $FW_webArgs{addLinks};
 
     return 'Unknown module ' . $modName
-      unless ( defined( $modules{$modName} ) );
+      if ( $modType eq 'module' && !defined( $modules{$modName} ) );
 
     FHEM::Meta::Load($modName);
 
-    return 'No metadata found about module ' . $modName
-      unless ( defined( $modules{$modName}{META} )
-        && scalar keys %{ $modules{$modName}{META} } > 0 );
+    return 'Unknown package ' . $modName
+      if ( $modType eq 'package'
+        && !defined( $packages{$modName} ) );
 
-    my $modMeta = $modules{$modName}{META};
+    return 'No metadata found about module '
+      . $modName
+      if (
+        $modType eq 'module'
+        && (  !defined( $modules{$modName}{META} )
+            || scalar keys %{ $modules{$modName}{META} } == 0 )
+      );
+
+    return 'No metadata found about package '
+      . $modName
+      if (
+        $modType eq 'package'
+        && (  !defined( $packages{$modName}{META} )
+            || scalar keys %{ $packages{$modName}{META} } == 0 )
+      );
+
+    my $modMeta =
+        $modType eq 'module'
+      ? $modules{$modName}{META}
+      : $packages{$modName}{META};
     my @ret;
     my $html = defined( $hash->{CL} ) && $hash->{CL}{TYPE} eq "FHEMWEB" ? 1 : 0;
 
@@ -1319,6 +1467,11 @@ sub CreateMetadataList ($$$) {
             $hash->{NAME}, 'language',
             AttrVal( 'global', 'language', 'EN' )
         )
+    );
+    my $FW_CSRF = (
+        defined( $defs{ $hash->{CL}{SNAME} }{CSRFTOKEN} )
+        ? '&fwcsrf=' . $defs{ $hash->{CL}{SNAME} }{CSRFTOKEN}
+        : ''
     );
 
     push @ret, $tableOpen;
@@ -1401,6 +1554,9 @@ sub CreateMetadataList ($$$) {
         next
           if ( $mAttr eq 'release_date'
             && ( !defined( $modMeta->{x_vcs} ) ) );
+        next
+          if ( $mAttr eq 'command_reference'
+            && $modType eq 'package' );
 
         my $l = $linecount % 2 == 0 ? $rowOpenEven : $rowOpenOdd;
         my $mAttrName = $mAttr;
@@ -1409,11 +1565,6 @@ sub CreateMetadataList ($$$) {
 
         my $webname =
           AttrVal( $hash->{CL}{SNAME}, 'webname', 'fhem' );
-        my $FW_CSRF = (
-            defined( $defs{ $hash->{CL}{SNAME} }{CSRFTOKEN} )
-            ? '&fwcsrf=' . $defs{ $hash->{CL}{SNAME} }{CSRFTOKEN}
-            : ''
-        );
 
         $l .= $colOpenMinWidth . $txtOpen . $mAttrName . $txtClose . $colClose;
 
@@ -1850,7 +2001,9 @@ sub CreateMetadataList ($$$) {
 
             # Add filename to module name
             $mAttrVal .= ' (' . $modMeta->{x_file}[2] . ')'
-              if ( $mAttr eq 'name' && $modName ne 'Global' );
+              if ( $modType eq 'module'
+                && $mAttr eq 'name'
+                && $modName ne 'Global' );
 
             $l .= $mAttrVal . $colClose;
         }
@@ -1895,9 +2048,7 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
 
                         if ( $alias eq $authorName ) {
                             $authorNameEmail =
-                                '<a href="/'
-                              . $webname
-                              . '?cmd=get '
+                                '<a href="?cmd=get '
                               . $hash->{NAME}
                               . ' search '
                               . $alias
@@ -1910,9 +2061,7 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                             if ($html) {
                                 $authorNameEmail =
                                     $authorName
-                                  . ', alias <a href="/'
-                                  . $webname
-                                  . '?cmd=get '
+                                  . ', alias <a href="?cmd=get '
                                   . $hash->{NAME}
                                   . ' search '
                                   . $alias
@@ -1945,16 +2094,21 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                 my $counter = 0;
                 foreach my $keyword ( @{ $modMeta->{$mAttr} } ) {
                     $l .= ', ' if ($counter);
+                    my $descr = FHEM::Meta::GetKeywordDesc( $keyword, $lang );
 
                     if ($html) {
                         $l .=
-                            '<a href="/'
-                          . $webname
-                          . '?cmd=get '
+                            '<a href="?cmd=get '
                           . $hash->{NAME}
                           . ' search '
                           . $keyword
-                          . $FW_CSRF . '">'
+                          . $FW_CSRF . '"'
+                          . (
+                            $descr ne ''
+                            ? ' title="' . $descr . '"'
+                            : ''
+                          )
+                          . '>'
                           . $keyword . '</a>';
                     }
                     else {
@@ -1984,15 +2138,108 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
 
     push @ret, $tableClose;
 
+    # show FHEM modules who use this package
+    # if ( $modType eq 'package' ) {
+    @mAttrs = qw(
+      requires
+      recommends
+      suggests
+    );
+
+    $linecount = 1;
+    foreach my $mAttr (@mAttrs) {
+        next
+          unless ( defined( $FHEM::Meta::dependents{pkgs}{$modName}{$mAttr} )
+            && ref( $FHEM::Meta::dependents{pkgs}{$modName}{$mAttr} ) eq
+            'ARRAY'
+            && @{ $FHEM::Meta::dependents{pkgs}{$modName}{$mAttr} } > 0 );
+
+        my $dependents = '';
+
+        my $counter = 0;
+        foreach my $dependant ( sort { "\L$a" cmp "\L$b" }
+            @{ $FHEM::Meta::dependents{pkgs}{$modName}{$mAttr} } )
+        {
+            my $link = $dependant;
+            $link =
+                '<a href="?cmd=get '
+              . $hash->{NAME}
+              . (
+                FHEM::Meta::ModuleIsInternal($dependant) eq 'module'
+                ? ' showModuleInfo '
+                : ' showPackageInfo '
+              )
+              . $dependant
+              . $FW_CSRF . '">'
+              . $dependant . '</a>'
+              if ($html);
+
+            $dependents .= ', ' if ($counter);
+            $dependents .= $link;
+            $counter++;
+        }
+
+        if ( $dependents ne '' ) {
+            if ( $linecount == 1 ) {
+                push @ret, '<h4>FHEM internal dependencies</h4>';
+
+                push @ret,
+                    $txtOpen . 'Hint:'
+                  . $txtClose
+                  . $lb
+                  . 'Dependents can only be shown here if they were loaded into the metadata cache before.'
+                  . $lb
+                  . $lb;
+
+                push @ret, $tableOpen;
+
+                push @ret,
+                    $colOpenMinWidth
+                  . $txtOpen
+                  . 'Importance'
+                  . $txtClose
+                  . $colClose;
+
+                push @ret,
+                    $colOpenMinWidth
+                  . $txtOpen
+                  . 'Dependent Modules'
+                  . $txtClose
+                  . $colClose;
+            }
+
+            my $l = $linecount % 2 == 0 ? $rowOpenEven : $rowOpenOdd;
+
+            my $importance = $mAttr;
+            $importance = 'required'    if ( $mAttr eq 'requires' );
+            $importance = 'recommended' if ( $mAttr eq 'recommends' );
+            $importance = 'suggested'   if ( $mAttr eq 'suggests' );
+
+            $l .= $colOpenMinWidth . $importance . $colClose;
+            $l .= $colOpenMinWidth . $dependents . $colClose;
+
+            $l .= $rowClose;
+
+            push @ret, $l;
+            $linecount++;
+        }
+    }
+
+    push @ret, $tableClose . $lb if ( $linecount > 1 );
+
+    # }
+
     push @ret, '<h3>System Prerequisites</h3>';
 
-    my $moduleUsage =
-      defined( $modules{$modName}{LOADED} )
-      ? $colorGreen . 'IN USE' . $colorClose
-      : $txtOpen . 'not' . $txtClose . ' in use';
+    if ( $modType eq 'module' ) {
+        my $moduleUsage =
+          defined( $modules{$modName}{LOADED} )
+          ? $colorGreen . 'IN USE' . $colorClose
+          : $txtOpen . 'not' . $txtClose . ' in use';
 
-    push @ret, $lb . 'This FHEM module is currently ' . $moduleUsage . '.'
-      unless ( $modName eq 'Global' );
+        push @ret, $lb . 'This FHEM module is currently ' . $moduleUsage . '.'
+          unless ( $modName eq 'Global' );
+    }
 
     push @ret, '<h4>Perl Packages</h4>';
     if (   defined( $modMeta->{prereqs} )
@@ -2012,7 +2259,7 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
           if ( defined( $modMeta->{x_prereqs_src} )
             && $modMeta->{x_prereqs_src} ne 'META.json' );
 
-        my @mAttrs = qw(
+        @mAttrs = qw(
           requires
           recommends
           suggests
@@ -2028,7 +2275,7 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
         push @ret,
           $colOpenMinWidth . $txtOpen . 'Status' . $txtClose . $colClose;
 
-        my $linecount = 1;
+        $linecount = 1;
         foreach my $mAttr (@mAttrs) {
             next
               unless ( defined( $modMeta->{prereqs}{runtime}{$mAttr} )
@@ -2111,6 +2358,20 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                     && !$isPerlPragma
                     && $prereq ne 'perl' );
 
+                $prereq =
+                    '<a href="?cmd=get '
+                  . $hash->{NAME}
+                  . (
+                    $isFhem eq 'module'
+                    ? ' showModuleInfo '
+                    : ' showPackageInfo '
+                  )
+                  . $prereq
+                  . $FW_CSRF . '">'
+                  . $prereq . '</a>'
+                  if ( $html
+                    && $isFhem );
+
                 $l .=
                     $colOpenMinWidth
                   . $prereq
@@ -2161,7 +2422,7 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
         push @ret,
           $colOpenMinWidth . $txtOpen . 'Status' . $txtClose . $colClose;
 
-        my $linecount = 1;
+        $linecount = 1;
         foreach my $mAttr (@mAttrs) {
             next
               unless ( defined( $modMeta->{x_prereqs_nodejs}{runtime}{$mAttr} )
@@ -2263,7 +2524,7 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
         push @ret,
           $colOpenMinWidth . $txtOpen . 'Status' . $txtClose . $colClose;
 
-        my $linecount = 1;
+        $linecount = 1;
         foreach my $mAttr (@mAttrs) {
             next
               unless ( defined( $modMeta->{x_prereqs_python}{runtime}{$mAttr} )
@@ -2376,21 +2637,33 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
 sub CreateRawMetaJson ($$$) {
     my ( $hash, $getCmd, $modName ) = @_;
     $modName = 'Global' if ( uc($modName) eq 'FHEM' );
-
-    return '{}'
-      unless ( defined( $modules{$modName} ) );
+    my $modType = lc($getCmd) eq 'zzgetmodulemeta.json' ? 'module' : 'package';
 
     FHEM::Meta::Load($modName);
 
     return '{}'
-      unless ( defined( $modules{$modName}{META} )
-        && scalar keys %{ $modules{$modName}{META} } > 0 );
+      unless (
+        (
+               $modType eq 'module'
+            && defined( $modules{$modName}{META} )
+            && scalar keys %{ $modules{$modName}{META} } > 0
+        )
+        || (   $modType eq 'package'
+            && defined( $packages{$modName}{META} )
+            && scalar keys %{ $packages{$modName}{META} } > 0 )
+      );
 
     my $j = JSON->new;
     $j->allow_nonref;
     $j->canonical;
     $j->pretty;
-    return $j->encode( $modules{$modName}{META} );
+    if ( $modType eq 'module' ) {
+        return $j->encode( $modules{$modName}{META} );
+
+    }
+    else {
+        return $j->encode( $packages{$modName}{META} );
+    }
 }
 
 # Checks whether a perl package is installed in the system
@@ -2403,6 +2676,23 @@ sub __IsInstalledPerl($) {
       if ( $pkg eq 'FHEM' );
     return FHEM::Meta->VERSION()
       if ( $pkg eq 'FHEM::Meta' || $pkg eq 'Meta' );
+
+    my $fname = $pkg;
+    $fname =~ s/^.*://g;    # strip away any parent module names
+
+    # This is an internal Perl package
+    if ( defined( $packages{$fname} ) ) {
+        return $packages{$fname}{META}{version}
+          if ( defined( $packages{$fname}{META} ) );
+        return 1;
+    }
+
+    # This is an internal Perl package
+    if ( defined( $modules{$fname} ) ) {
+        return $modules{$fname}{META}{version}
+          if ( defined( $modules{$fname}{META} ) );
+        return 1;
+    }
 
     eval "require $pkg;";
 
@@ -2525,7 +2815,7 @@ sub __aUniq {
       "abstract": "Modul zum Update von FHEM, zur Installation von Drittanbieter FHEM Modulen und der Verwaltung von Systemvoraussetzungen"
     }
   },
-  "version": "v0.1.0",
+  "version": "v0.2.0",
   "release_status": "testing",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"

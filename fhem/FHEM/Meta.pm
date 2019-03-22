@@ -85,9 +85,8 @@ our %supportForumCategories = (
             boardId     => 18,
         },
         'Automatisierung' => {
-            description =>
-'Themen um Aufgaben mit FHEM zu automatisieren (at,notify,structure,watchdog,etc.)',
-            boardId => 20,
+            description => 'Aufgaben mit FHEM automatisieren',
+            boardId     => 20,
 
             'DOIF' => {
                 boardId => 73,
@@ -103,9 +102,8 @@ our %supportForumCategories = (
             boardId     => 52,
         },
         'Frontends' => {
-            description =>
-              'Themen zu FHEM Frontends wie z.B. FHEMWEB, FLOORPLAN, etc.',
-            boardId => 19,
+            description => 'FHEM Frontends',
+            boardId     => 19,
 
             'FHEMWEB' => {
                 boardId => 75,
@@ -137,50 +135,50 @@ our %supportForumCategories = (
             boardId     => 37,
         },
         'Sonstiges' => {
-            description => 'Sonstige Themen mit Bezug zu FHEM',
+            description => 'Sonstiger Bezug zu FHEM',
             boardId     => 46,
         },
     },
     'FHEM - Hausautomations-Systeme' => {
         '1Wire' => {
-            description => 'Themen zu 1Wire',
+            description => '1Wire',
             boardId     => 26,
         },
         'EnOcean' => {
-            description => 'Themen zu EnOcean',
+            description => 'EnOcean',
             boardId     => 27,
         },
         'Home Connect' => {
             description =>
-'Themen zu Geräten, API und Modulentwicklung rund um Home Connect in FHEM',
+              'Geräte, API und Modulentwicklung rund um Home Connect',
             boardId => 97,
         },
         'Homematic' => {
-            description => 'Themen zu HomeMatic und Zubehör',
+            description => 'HomeMatic und Zubehör',
             boardId     => 22,
         },
         'InterTechno' => {
-            description => 'Themen zu InterTechno',
+            description => 'InterTechno',
             boardId     => 24,
         },
         'KNX/EIB' => {
-            description => 'Themen zu KNX/EIB',
+            description => 'KNX/EIB',
             boardId     => 51,
         },
         'MAX' => {
-            description => 'Themen zu MAX',
+            description => 'MAX',
             boardId     => 23,
         },
         'MQTT' => {
-            description => 'Themen zu MQTT',
+            description => 'MQTT',
             boardId     => 94,
         },
         'RFXTRX' => {
-            description => 'Themen zu RFXTRX',
+            description => 'RFXTRX',
             boardId     => 25,
         },
         'SlowRF' => {
-            description => 'Themen zu FS20, FHT, EM, WS, HMS',
+            description => 'FS20, FHT, EM, WS, HMS',
             boardId     => 21,
         },
         'Zigbee' => {
@@ -188,7 +186,7 @@ our %supportForumCategories = (
             boardId     => 99,
         },
         'ZWave' => {
-            description => 'Themen zu ZWave',
+            description => 'ZWave',
             boardId     => 28,
         },
         'Sonstige Systeme' => {
@@ -196,9 +194,8 @@ our %supportForumCategories = (
             boardId     => 29,
         },
         'Unterstützende Dienste' => {
-            description =>
-'Themen zu unterstützenden Diensten und Modulen wie z.B. Calendar, HCS, Twilight, Weather, etc.',
-            boardId => 44,
+            description => 'unterstützende Dienste und Module',
+            boardId     => 44,
 
             'Kalendermodule' => {
                 boardId => 85,
@@ -210,28 +207,28 @@ our %supportForumCategories = (
     },
     'FHEM - Hardware' => {
         'FRITZ!Box' => {
-            description => 'FHEM auf AVM FRITZ!Box',
+            description => 'AVM FRITZ!Box',
             boardId     => 31,
         },
         'Network Attached Storage (NAS)' => {
-            description => 'FHEM auf NAS-Systemen (Synology, etc.)',
+            description => 'NAS-Systeme (Synology, etc.)',
             boardId     => 30,
         },
         'Einplatinencomputer' => {
             description =>
-'FHEM auf Einplatinencomputern (z.B. Raspberry Pi, Beagle Bone, etc.)',
+              'Einplatinencomputer (z.B. Raspberry Pi, Beagle Bone, etc.)',
             boardId => 32,
         },
         'Server - Linux' => {
-            description => 'FHEM auf Linux Servern',
+            description => 'Linux Server',
             boardId     => 33,
         },
         'Server - Mac' => {
-            description => 'FHEM auf macOS',
+            description => 'Apple macOS',
             boardId     => 63,
         },
         'Server - Windows' => {
-            description => 'FHEM auf Windows Server',
+            description => 'Microsoft Windows Server',
             boardId     => 34,
         },
     },
@@ -246,14 +243,12 @@ our %supportForumCategories = (
             boardId => 60,
         },
         'Multimedia' => {
-            description =>
-              'Themen zu Multimediageräten, TV, Fernbedienungen, etc.',
-            boardId => 53,
+            description => 'Multimediageräte, TV, Fernbedienungen, etc.',
+            boardId     => 53,
         },
         'Solaranlagen' => {
-            description =>
-              'Themen rund um Solaranlagen zur Wärme- oder Stromgewinnung',
-            boardId => 61,
+            description => 'Solaranlagen zur Wärme- oder Stromgewinnung',
+            boardId     => 61,
         },
     },
     'FHEM - Entwicklung' => {
@@ -276,9 +271,8 @@ our %supportForumCategories = (
             boardId => 6,
         },
         'Hard- und Firmware' => {
-            description =>
-'Themen in Bezug auf die CUL Hard- und Firmware. Dazu zählen alle Geräte der CUL und CUN Familie.',
-            boardId => 47,
+            description => 'CUL/CUN Hard- und Firmware',
+            boardId     => 47,
         },
     },
     'CUL - Entwicklung' => {
@@ -299,7 +293,7 @@ our %supportForumCategories = (
     'Verschiedenes' => {
         'Bastelecke' => {
             description =>
-'Projekte für Bastler, die gerne auch mal zum Lötkolben greifen.',
+'Projekte für Bastler, die gerne auch mal zum Lötkolben greifen',
             boardId => 17,
 
             'ESP8266' => {
@@ -324,12 +318,10 @@ our %supportForumCategories = (
             boardId => 67,
         },
         'Marktplatz - Kommerzielle Güter' => {
-            description => '',
-            boardId     => 101,
+            boardId => 101,
         },
         'Marktplatz - Kommerzielle Dienstleistungen' => {
-            description => '',
-            boardId     => 100,
+            boardId => 100,
         },
         'Off-Topic' => {
             description => 'Allgemeine Themen',
@@ -347,13 +339,10 @@ our %supportForumCategories = (
     }
 );
 
-our %moduleMaintainers;
-our %packageMaintainers;
-our %fileMaintainers;
-
-our %maintainerModules;
-our %maintainerPackages;
-our %maintainerFile;
+our %maintainers;           # maintainers and what they maintain
+our %moduleMaintainers;     # modules and who maintains them
+our %packageMaintainers;    # packages and who maintains them
+our %fileMaintainers;       # files and who maintains them
 
 our $coreUpdate;
 our %corePackageUpdates;
@@ -364,6 +353,79 @@ our %packageUpdates;
 our %fileUpdates;
 
 our %keywords;
+our %keywordDescription = (
+    'fhem-core' => {
+        'en' => 'Belongs to the official FHEM core software',
+        'de' => 'Gehört zum offiziellen Kern von FHEM',
+    },
+    'fhem-3rdparty' => {
+        'en' =>
+          'Originates from a source outside of the official FHEM core software',
+        'de' =>
+          'Stammt aus einer Quelle außerhalb des offiziellen Kern von FHEM',
+    },
+    'fhem-commercial' => {
+        'en' => 'commercial relation',
+        'de' => 'kommerzieller Zusammenhang',
+    },
+    'fhem-mod' => {
+        'en' => 'FHEM module',
+        'de' => 'FHEM Modul',
+    },
+    'fhem-pkg' => {
+        'en' => 'FHEM development package that is used by FHEM modules',
+        'de' => 'FHEM Entwickler Paket, welches in FHEM Modulen verwendet wird',
+    },
+    'fhem-mod-3rdparty' => {
+        'en' =>
+'FHEM module that originates from a source outside of the official FHEM core software',
+        'de' =>
+'FHEM Modul, welches aus einer Quelle außerhalb des offiziellen Kern von FHEM stammt',
+    },
+    'fhem-pkg-3rdparty' => {
+        'en' =>
+'FHEM development package that originates from a source outside of the official FHEM core software',
+        'de' =>
+'FHEM Entwickler Paket, welches aus einer Quelle außerhalb des offiziellen Kern von FHEM stammt',
+    },
+    'fhem-mod-commercial' => {
+        'en' =>
+'commercial FHEM module that originates from a source outside of the official FHEM core software',
+        'de' =>
+'kommerzielles FHEM Modul, welches aus einer Quelle außerhalb des offiziellen Kern von FHEM stammt',
+    },
+    'fhem-pkg-commercial' => {
+        'en' =>
+'commercial FHEM development package that originates from a source outside of the official FHEM core software',
+        'de' =>
+'kommerzielles FHEM Entwickler Paket, welches aus einer Quelle außerhalb des offiziellen Kern von FHEM stammt',
+    },
+    'fhem-mod-local' => {
+        'en' => 'FHEM module that is maintained locally on the machine',
+        'de' => 'FHEM Modul, welches lokal auf der Maschine verwaltet wird',
+    },
+    'fhem-pkg-local' => {
+        'en' =>
+          'FHEM development package that is maintained locally on the machine',
+        'de' =>
+'FHEM Entwickler Paket, welches lokal auf der Maschine verwaltet wird',
+    },
+    'fhem-mod-command' => {
+        'en' => 'FHEM console text command w/o any FHEM device object visible',
+        'de' =>
+          'FHEM Konsolen Text Kommando ohne sichtbares FHEM Geräte-Objekt',
+    },
+    'fhem-mod-device' => {
+        'en' => 'represents a physical device',
+        'de' => 'repräsentiert ein physisches Gerät',
+    },
+    'fhem-mod-helper' => {
+        'en' => 'logical, non-physical device',
+        'de' => 'logisches, nicht physisches Gerät',
+    },
+);
+
+our %dependents;
 
 # Package internal variables
 #
@@ -538,6 +600,7 @@ my @perlCoreModules = qw(
   subs
   utf8
   vars
+  version
   vmsish
   warnings
   warnings::register
@@ -700,12 +763,20 @@ sub Load(;$$) {
     }
 
     foreach my $modName (@lmodules) {
+        $modName = 'Global' if ( uc($modName) eq 'FHEM' );
+        my $type;
 
-        my $type = (
-            exists( $modules{$modName} )
-            ? 'module'
-            : ( exists( $packages{$modName} ) ? 'package' : undef )
-        );
+        if ( exists( $modules{$modName} ) && !exists( $packages{$modName} ) ) {
+            $type = 'module';
+        }
+        elsif ( exists( $packages{$modName} ) && !exists( $modules{$modName} ) )
+        {
+            $type = 'package';
+        }
+        elsif ( exists( $packages{$modName} ) && exists( $modules{$modName} ) )
+        {
+            $type = 'module+package';
+        }
         next unless ($type);
 
         # Abort when module file was not indexed by
@@ -727,58 +798,70 @@ sub Load(;$$) {
             && !$reload
             && defined( $packages{$modName}{META} )
             && ref( $packages{$modName}{META} ) eq "HASH" );
+        next
+          if ( $type eq 'module+package'
+            && !$reload
+            && defined( $modules{$modName}{META} )
+            && ref( $modules{$modName}{META} ) eq "HASH"
+            && defined( $packages{$modName}{META} )
+            && ref( $packages{$modName}{META} ) eq "HASH" );
 
-        if ( $type eq 'module'
+        if ( ( $type eq 'module' || $type eq 'module+package' )
             && defined( $modules{$modName}{META} ) )
         {
             delete $modules{$modName}{META};
 
         }
-        elsif ( $type eq 'package'
+        if ( ( $type eq 'package' || $type eq 'module+package' )
             && defined( $packages{$modName}{META} ) )
         {
             delete $packages{$modName}{META};
         }
 
-        my $filePath;
-        if ( $modName eq 'Global' ) {
-            $filePath = $attr{global}{modpath} . "/fhem.pl";
-        }
-        elsif ( $modName eq 'configDB' ) {
-            $filePath = $attr{global}{modpath} . "/configDB.pm";
-        }
-        else {
-            $filePath =
-                $attr{global}{modpath}
-              . "/FHEM/"
-              . ( $type eq 'module' ? $modules{$modName}{ORDER} . '_' : '' )
-              . $modName . '.pm';
-        }
-
-        my $ret =
-          InitMod( $filePath,
-            ( $type eq 'module' ? $modules{$modName} : $packages{$modName} ),
-            1 );
-        push @rets, $@   if ( $@   && $@ ne '' );
-        push @rets, $ret if ( $ret && $ret ne '' );
-
-        if ( $type eq 'module' ) {
-            $modules{$modName}{META}{generated_by} =
-              $packages{Meta}{META}{name} . ' '
-              . version->parse($v)->normal . ", $t"
-              if ( defined( $modules{$modName} )
-                && defined( $modules{$modName}{META} ) );
-
-            foreach my $devName ( devspec2array( 'TYPE=' . $modName ) ) {
-                SetInternals( $defs{$devName} );
+        foreach my $type ( split( '\+', $type ) ) {
+            my $filePath;
+            if ( $modName eq 'Global' ) {
+                $filePath = $attr{global}{modpath} . "/fhem.pl";
             }
-        }
-        else {
-            $packages{$modName}{META}{generated_by} =
-              $packages{Meta}{META}{name} . ' '
-              . version->parse($v)->normal . ", $t"
-              if ( defined( $packages{$modName} )
-                && defined( $packages{$modName}{META} ) );
+            elsif ( $modName eq 'configDB' ) {
+                $filePath = $attr{global}{modpath} . "/configDB.pm";
+            }
+            else {
+                $filePath =
+                    $attr{global}{modpath}
+                  . "/FHEM/"
+                  . ( $type eq 'module' ? $modules{$modName}{ORDER} . '_' : '' )
+                  . $modName . '.pm';
+            }
+
+            my $ret = InitMod(
+                $filePath,
+                (
+                    $type eq 'module' ? $modules{$modName} : $packages{$modName}
+                ),
+                1
+            );
+            push @rets, $@   if ( $@   && $@ ne '' );
+            push @rets, $ret if ( $ret && $ret ne '' );
+
+            if ( $type eq 'module' ) {
+                $modules{$modName}{META}{generated_by} =
+                  $packages{Meta}{META}{name} . ' '
+                  . version->parse($v)->normal . ", $t"
+                  if ( defined( $modules{$modName} )
+                    && defined( $modules{$modName}{META} ) );
+
+                foreach my $devName ( devspec2array( 'TYPE=' . $modName ) ) {
+                    SetInternals( $defs{$devName} );
+                }
+            }
+            else {
+                $packages{$modName}{META}{generated_by} =
+                  $packages{Meta}{META}{name} . ' '
+                  . version->parse($v)->normal . ", $t"
+                  if ( defined( $packages{$modName} )
+                    && defined( $packages{$modName}{META} ) );
+            }
         }
     }
 
@@ -853,6 +936,22 @@ sub GetModuleSourceOrigin {
     return '';
 }
 
+sub GetKeywordDesc {
+    my ( $keyword, $lang ) = @_;
+    $lang = 'en' unless ($lang);
+    return '' unless ( defined( $keywordDescription{$keyword} ) );
+
+    # turn fallback language around
+    $lang = 'de'
+      if ( !defined( $keywordDescription{$keyword}{$lang} )
+        && $lang eq 'en' );
+
+    return $keywordDescription{$keyword}{$lang}
+      if ( defined( $keywordDescription{$keyword}{$lang} ) );
+
+    return '';
+}
+
 sub ModuleIsCore {
     my ($module) = @_;
     return GetModuleSourceOrigin($module) eq 'fhem' ? 1 : 0;
@@ -860,19 +959,32 @@ sub ModuleIsCore {
 
 sub ModuleIsInternal {
     my ($module) = @_;
-    return 1
+    return 0 if ( ModuleIsPerlCore($module) || ModuleIsPerlPragma($module) );
+
+    return 'module'
       if ( $module eq 'fhem.pl'
         || $module eq 'FHEM'
-        || $module eq 'Global'
-        || $module eq 'FHEM::Meta'
-        || $module eq 'Meta' );
+        || $module eq 'Global' );
+
+    my $fname = $module;
+    $fname =~ s/^.*://g;    # strip away any parent module names
+
+    return 'package'
+      if ( $fname eq 'Meta' );
+
+    return 'module'
+      if ( defined( $modules{$fname} ) && !defined( $packages{$fname} ) );
+    return 'package'
+      if ( defined( $packages{$fname} ) && !defined( $modules{$fname} ) );
+    return 'module+package'
+      if ( defined( $modules{$fname} ) && defined( $packages{$fname} ) );
 
     my $p = GetModuleFilepath($module);
 
     # if module has a relative path,
     #   assume it is part of FHEM
     return $p && ( $p =~ m/^(\.\/)?FHEM\/.+/ || $p =~ m/^(\.\/)?[^\/]+\.pm$/ )
-      ? 1
+      ? 'file'
       : 0;
 }
 
@@ -981,10 +1093,11 @@ sub __GetMetadata {
     my $versionFrom;
     my $authorName;    # not in use, see below
     my $authorMail;    # not in use, see below
-    my $item_modtype;
+    my $item_modsubtype;
     my $item_summary;
     my $item_summary_DE;
     my $modName;
+    my $modType;
 
     # Static meta information
     $modMeta->{dynamic_config} = 1;
@@ -1014,6 +1127,7 @@ sub __GetMetadata {
 
         $modMeta->{x_file} = \@file;
         $modName = $file[4];
+        $modType = $file[3] || $file[2] eq 'fhem.pl' ? 'mod' : 'pkg';
     }
 
     # grep info from file content
@@ -1131,12 +1245,12 @@ m/(->\{VERSION\}\s+=\s+[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?:\.\d{1,3})?)))/i
 
             # read items from POD
             elsif ($skip
-                && !$item_modtype
+                && !$item_modsubtype
                 && $l =~ m/^=item\s+(device|helper|command)\s*$/i )
             {
                 return "=item (device|helper|command) pod must occur only once"
-                  if ($item_modtype);
-                $item_modtype = lc($1);
+                  if ($item_modsubtype);
+                $item_modsubtype = lc($1);
             }
             elsif ($skip
                 && !$item_summary_DE
@@ -1391,7 +1505,7 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
         #   used by this FHEM module.
         # We're not going deeper down for Meta.pm itself,
         # that means Meta.pm manual prereqs need to cover this.
-        if (   $modMeta->{x_file}[4] ne 'Meta'
+        if (   $modName ne 'Meta'
             && defined( $modMeta->{prereqs} )
             && defined( $modMeta->{prereqs}{runtime} ) )
         {
@@ -1402,6 +1516,24 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
                 foreach
                   my $pkg ( keys %{ $modMeta->{prereqs}{runtime}{$pkgReq} } )
                 {
+
+                    # Add to dependency index:
+                    #   packages to FHEM modules/packages
+                    push @{ $dependents{pkgs}{$pkg}{$pkgReq} }, $modName
+                      unless (
+                        grep ( /^$modName$/,
+                            @{ $dependents{pkgs}{$pkg}{$pkgReq} } ) );
+
+                    #   dependents list
+                    push @{ $dependents{$pkgReq}{$pkg} },
+                      $modName
+                      unless (
+                        ModuleIsInternal($pkg)
+                        || (   defined( $dependents{$pkgReq} )
+                            && defined( $dependents{$pkgReq}{$pkg} )
+                            && grep ( /^$modName$/,
+                                @{ $dependents{$pkgReq}{$pkg} } ) )
+                      );
 
                     # Found prereq that is a FHEM package
                     if ( exists( $packages{$pkg} ) ) {
@@ -1493,9 +1625,10 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
         $modMeta->{x_vcs} = \@vcs;
 
         # if there is no maintainer, we will assign someone acting
-        if (   !defined( $moduleMaintainers{ $modMeta->{x_file}[4] } )
-            && !defined( $packageMaintainers{ $modMeta->{x_file}[4] } )
-            && $modMeta->{x_file}[4] ne 'Meta' )
+        if (   !defined( $moduleMaintainers{$modName} )
+            && !defined( $packageMaintainers{$modName} )
+            && GetModuleSourceOrigin($modName) ne ''
+            && $modName ne 'Meta' )
         {
             Log 4,
                 __PACKAGE__
@@ -1505,24 +1638,82 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
               . "Added acting maintainer with limited support status";
 
             # add acting maintainer
-            #TODO detect if module or package
-            $moduleMaintainers{ $modMeta->{x_file}[4] }[0][0] =
-              $modMeta->{x_file}[0];
-            $moduleMaintainers{ $modMeta->{x_file}[4] }[0][1] =
-              $modMeta->{x_file}[1];
-            $moduleMaintainers{ $modMeta->{x_file}[4] }[0][2] =
-              $modMeta->{x_file}[2];
-            $moduleMaintainers{ $modMeta->{x_file}[4] }[0][3] =
-              $modMeta->{x_file}[3];
-            $moduleMaintainers{ $modMeta->{x_file}[4] }[0][4] =
-              $modMeta->{x_file}[4];
-            $moduleMaintainers{ $modMeta->{x_file}[4] }[0][5] =
-              $modMeta->{x_file}[5];
-            $moduleMaintainers{ $modMeta->{x_file}[4] }[1] =
-              'rudolfkoenig (acting)';
-            $moduleMaintainers{ $modMeta->{x_file}[4] }[2] = 'limited';
-            $moduleMaintainers{ $modMeta->{x_file}[4] }[3] =
-              __GetSupportForum('Sonstiges');
+            if ( $modType eq 'mod' ) {
+                $moduleMaintainers{$modName}[0][0] =
+                  $modMeta->{x_file}[0];
+                $moduleMaintainers{$modName}[0][1] =
+                  $modMeta->{x_file}[1];
+                $moduleMaintainers{$modName}[0][2] =
+                  $modMeta->{x_file}[2];
+                $moduleMaintainers{$modName}[0][3] =
+                  $modMeta->{x_file}[3];
+                $moduleMaintainers{$modName}[0][4] =
+                  $modName;
+                $moduleMaintainers{$modName}[0][5] =
+                  $modMeta->{x_file}[5];
+                $moduleMaintainers{$modName}[1] = 'rudolfkoenig (acting)';
+                $moduleMaintainers{$modName}[2] = 'limited';
+                $moduleMaintainers{$modName}[3] =
+                  __GetSupportForum('Sonstiges');
+
+                # add acting maintainer to maintainer hashes
+                my $lastEditor = 'rudolfkoenig (acting)';
+                push @{ $maintainers{$lastEditor}{modules} },
+                  $modName
+                  unless (
+                    defined( $maintainers{$lastEditor} )
+                    && grep( m/^$lastEditor$/i,
+                        @{ $maintainers{$lastEditor}{modules} } )
+                  );
+
+                # add last committer to maintainer hashes
+                $lastEditor = $modMeta->{x_vcs}[15];
+                push @{ $maintainers{$lastEditor}{modules} },
+                  $modName
+                  unless (
+                    defined( $maintainers{$lastEditor} )
+                    && grep( m/^$lastEditor$/i,
+                        @{ $maintainers{$lastEditor}{modules} } )
+                  );
+            }
+            else {
+                $packageMaintainers{$modName}[0][0] =
+                  $modMeta->{x_file}[0];
+                $packageMaintainers{$modName}[0][1] =
+                  $modMeta->{x_file}[1];
+                $packageMaintainers{$modName}[0][2] =
+                  $modMeta->{x_file}[2];
+                $packageMaintainers{$modName}[0][3] =
+                  $modMeta->{x_file}[3];
+                $packageMaintainers{$modName}[0][4] =
+                  $modName;
+                $packageMaintainers{$modName}[0][5] =
+                  $modMeta->{x_file}[5];
+                $packageMaintainers{$modName}[1] = 'rudolfkoenig (acting)';
+                $packageMaintainers{$modName}[2] = 'limited';
+                $packageMaintainers{$modName}[3] =
+                  __GetSupportForum('Sonstiges');
+
+                # add acting maintainer to maintainer hashes
+                my $lastEditor = 'rudolfkoenig (acting)';
+                push @{ $maintainers{$lastEditor}{packages} },
+                  $modName
+                  unless (
+                    defined( $maintainers{$lastEditor} )
+                    && grep( m/^$lastEditor$/i,
+                        @{ $maintainers{$lastEditor}{packages} } )
+                  );
+
+                # add last committer to maintainer hashes
+                $lastEditor = $modMeta->{x_vcs}[15];
+                push @{ $maintainers{$lastEditor}{packages} },
+                  $modName
+                  unless (
+                    defined( $maintainers{$lastEditor} )
+                    && grep( m/^$lastEditor$/i,
+                        @{ $maintainers{$lastEditor}{packages} } )
+                  );
+            }
         }
     }
 
@@ -1567,19 +1758,18 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
 
     # meta name
     unless ( defined( $modMeta->{name} ) ) {
-        if ( $modMeta->{x_file}[4] eq 'Global' ) {
+        if ( $modName eq 'Global' ) {
             $modMeta->{name} = 'FHEM';
         }
         else {
             $modMeta->{name} = $modMeta->{x_file}[1];
             $modMeta->{name} =~ s/^\.\///;
             $modMeta->{name} =~ s/\/$//;
-            $modMeta->{name} =~ s/FHEM\/lib//;
             $modMeta->{name} =~ s/\//::/g;
         }
-        if ( $modMeta->{x_file}[4] ne 'Global' ) {
+        if ( $modName ne 'Global' ) {
             $modMeta->{name} .= '::' if ( $modMeta->{name} );
-            $modMeta->{name} .= $modMeta->{x_file}[4];
+            $modMeta->{name} .= $modName;
         }
     }
 
@@ -1606,41 +1796,39 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
     }
 
     # Fill mandatory attributes
-    unless ( $modMeta->{abstract} ) {
-        $modMeta->{abstract} = 'n/a';
-    }
-    unless ( $modMeta->{description} ) {
-        $modMeta->{description} = 'n/a';
-    }
-    unless ( $modMeta->{release_status} ) {
-        $modMeta->{release_status} = 'stable';
-    }
-    unless ( $modMeta->{license} ) {
-        $modMeta->{license} = 'unknown';
-    }
-    unless ( $modMeta->{author} ) {
-        $modMeta->{author} = ['unknown <>'];
-    }
-    unless ( defined( $modMeta->{x_support_status} ) ) {
-        if (   defined( $moduleMaintainers{$modName} )
-            && ref( $moduleMaintainers{$modName} ) eq 'ARRAY'
-            && defined( $moduleMaintainers{$modName}[2] ) )
-        {
-            $modMeta->{x_support_status} =
-              $moduleMaintainers{$modName}[2];
-        }
-        elsif ( defined( $modMeta->{resources} )
-            && $modMeta->{resources}{x_support_community} )
-        {
-            $modMeta->{x_support_status} = 'supported';
+    unless ( defined( $modMeta->{abstract} ) ) {
+        if ( $modType eq 'pkg' ) {
+            $modMeta->{abstract} =
+              'FHEM development package that is used by FHEM modules';
         }
         else {
-            $modMeta->{x_support_status} = 'unknown';
+            $modMeta->{abstract} = 'n/a';
         }
+    }
+    unless ( defined( $modMeta->{description} ) ) {
+        if ( $modType eq 'pkg' ) {
+            $modMeta->{description} =
+              'This is a FHEM-included Perl package that does not show up as a '
+              . 'regular device in FHEM. \\n'
+              . 'That is because it provides additional functionality that can be used by real '
+              . 'FHEM modules in order to share the same code basis.';
+        }
+        else {
+            $modMeta->{description} = 'n/a';
+        }
+    }
+    unless ( defined( $modMeta->{release_status} ) ) {
+        $modMeta->{release_status} = 'stable';
+    }
+    unless ( defined( $modMeta->{license} ) ) {
+        $modMeta->{license} = 'unknown';
+    }
+    unless ( defined( $modMeta->{author} ) ) {
+        $modMeta->{author} = ['unknown <>'];
     }
 
     # Generate META information for FHEM core modules
-    if ( GetModuleSourceOrigin( $modMeta->{x_file}[4] ) eq 'fhem' ) {
+    if ( GetModuleSourceOrigin($modName) eq 'fhem' ) {
 
         if (  !$modMeta->{release_status}
             || $modMeta->{release_status} eq 'stable' )
@@ -1660,17 +1848,30 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
         }
 
         if ( !$modMeta->{author} || $modMeta->{author}[0] eq 'unknown <>' ) {
-            if ( defined( $moduleMaintainers{ $modMeta->{x_file}[4] } ) ) {
+            if ( defined( $moduleMaintainers{$modName} ) ) {
                 shift @{ $modMeta->{author} }
                   if ( $modMeta->{author}
                     && $modMeta->{author}[0] eq 'unknown <>' );
 
-                foreach (
-                    split(
-                        '/|,', $moduleMaintainers{ $modMeta->{x_file}[4] }[1]
-                    )
-                  )
-                {
+                foreach ( split( '/|,', $moduleMaintainers{$modName}[1] ) ) {
+                    push @{ $modMeta->{author} }, "$_ <>";
+                }
+
+                # last update was not by one of the named authors
+                if ( defined( $modMeta->{x_vcs} ) ) {
+                    my $lastEditor = $modMeta->{x_vcs}[15] . ' <>';
+                    push @{ $modMeta->{author} },
+                      $modMeta->{x_vcs}[15] . ' (last release only) <>'
+                      unless (
+                        grep( m/^$lastEditor$/i, @{ $modMeta->{author} } ) );
+                }
+            }
+            elsif ( defined( $packageMaintainers{$modName} ) ) {
+                shift @{ $modMeta->{author} }
+                  if ( $modMeta->{author}
+                    && $modMeta->{author}[0] eq 'unknown <>' );
+
+                foreach ( split( '/|,', $packageMaintainers{$modName}[1] ) ) {
                     push @{ $modMeta->{author} }, "$_ <>";
                 }
 
@@ -1685,13 +1886,24 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
             }
         }
         unless ( $modMeta->{x_fhem_maintainer} ) {
-            if ( defined( $moduleMaintainers{ $modMeta->{x_file}[4] } ) ) {
-                foreach (
-                    split(
-                        '/|,', $moduleMaintainers{ $modMeta->{x_file}[4] }[1]
-                    )
-                  )
-                {
+            if ( defined( $moduleMaintainers{$modName} ) ) {
+                foreach ( split( '/|,', $moduleMaintainers{$modName}[1] ) ) {
+                    push @{ $modMeta->{x_fhem_maintainer} }, $_;
+                }
+
+                # last update was not by one of the named authors
+                if ( defined( $modMeta->{x_vcs} ) ) {
+                    my $lastEditor = $modMeta->{x_vcs}[15];
+                    push @{ $modMeta->{x_fhem_maintainer} },
+                      $modMeta->{x_vcs}[15]
+                      unless (
+                        grep( m/^$lastEditor$/i,
+                            @{ $modMeta->{x_fhem_maintainer} } )
+                      );
+                }
+            }
+            elsif ( defined( $packageMaintainers{$modName} ) ) {
+                foreach ( split( '/|,', $packageMaintainers{$modName}[1] ) ) {
                     push @{ $modMeta->{x_fhem_maintainer} }, $_;
                 }
 
@@ -1726,13 +1938,15 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
             }
         }
 
-        unless ( defined( $modMeta->{resources} )
-            && defined( $modMeta->{resources}{x_commandref} ) )
+        unless (
+            $modType ne 'mod'
+            || (   defined( $modMeta->{resources} )
+                && defined( $modMeta->{resources}{x_commandref} ) )
+          )
         {
             if ( defined( $modMeta->{x_vcs} ) ) {
                 $modMeta->{resources}{x_commandref}{web} =
-                  'https://fhem.de/commandref.html';
-                $modMeta->{resources}{x_commandref}{modpath} = '#';
+                  'https://fhem.de/commandref.html#' . $modName;
             }
         }
 
@@ -1801,25 +2015,51 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
         delete $modMeta->{x_fhem_maintainer_github};
     }
 
+    unless ( defined( $modMeta->{x_support_status} ) ) {
+        if (   defined( $moduleMaintainers{$modName} )
+            && ref( $moduleMaintainers{$modName} ) eq 'ARRAY'
+            && defined( $moduleMaintainers{$modName}[2] ) )
+        {
+            $modMeta->{x_support_status} =
+              $moduleMaintainers{$modName}[2];
+        }
+        elsif (defined( $packageMaintainers{$modName} )
+            && ref( $packageMaintainers{$modName} ) eq 'ARRAY'
+            && defined( $packageMaintainers{$modName}[2] ) )
+        {
+            $modMeta->{x_support_status} =
+              $packageMaintainers{$modName}[2];
+        }
+        elsif ( defined( $modMeta->{resources} )
+            && $modMeta->{resources}{x_support_community} )
+        {
+            $modMeta->{x_support_status} = 'supported';
+        }
+        else {
+            $modMeta->{x_support_status} = 'unknown';
+        }
+    }
+
     # Filter keywords that are reserved for FHEM core
     if ( defined( $modMeta->{keywords} ) && @{ $modMeta->{keywords} } > 0 ) {
         my @filtered;
 
-        foreach ( @{ $modMeta->{keywords} } ) {
-            push @filtered, lc($_)
-              unless ( lc($_) eq 'fhem-core'
-                || lc($_) eq 'fhem-mod'
-                || lc($_) eq 'fhem-pkg'
-                || lc($_) eq 'fhem-3rdparty'
-                || lc($_) eq 'fhem-mod-3rdparty'
-                || lc($_) eq 'fhem-pkg-3rdparty'
-                || lc($_) eq 'fhem-mod-local'
-                || lc($_) eq 'fhem-pkg-local'
-                || lc($_) eq 'fhem-commercial'
-                || lc($_) eq 'fhem-mod-commercial'
-                || lc($_) eq 'fhem-pkg-commercial' );
+        foreach my $keyword ( @{ $modMeta->{keywords} } ) {
+            push @filtered, lc($keyword)
+              unless ( lc($keyword) eq 'fhem-core'
+                || lc($keyword) eq 'fhem-mod'
+                || lc($keyword) eq 'fhem-pkg'
+                || lc($keyword) eq 'fhem-3rdparty'
+                || lc($keyword) eq 'fhem-mod-3rdparty'
+                || lc($keyword) eq 'fhem-pkg-3rdparty'
+                || lc($keyword) eq 'fhem-mod-local'
+                || lc($keyword) eq 'fhem-pkg-local'
+                || lc($keyword) eq 'fhem-commercial'
+                || lc($keyword) eq 'fhem-mod-commercial'
+                || lc($keyword) eq 'fhem-pkg-commercial' );
         }
 
+        delete $modMeta->{keywords};
         $modMeta->{keywords} = \@filtered;
     }
 
@@ -1843,35 +2083,37 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
     if (   defined( $modMeta->{resources} )
         && defined( $modMeta->{resources}{x_support_commercial} ) )
     {
-        my $modType = $modMeta->{x_file}[3] ? 'mod' : 'pkg';
         push @{ $modMeta->{keywords} }, "fhem-$modType-commercial";
     }
 
     # add legacy POD info as Metadata
-    if ($item_modtype) {
-        $item_modtype = 'fhem-mod-' . $item_modtype;
-        push @{ $modMeta->{keywords} }, $item_modtype
+    if ($item_modsubtype) {
+        $item_modsubtype = "fhem-$modType-" . $item_modsubtype;
+        push @{ $modMeta->{keywords} }, $item_modsubtype
           if ( !defined( $modMeta->{keywords} )
-            || !grep ( /^$item_modtype$/i, @{ $modMeta->{keywords} } ) );
+            || !grep ( /^$item_modsubtype$/i, @{ $modMeta->{keywords} } ) );
+    }
+    else {
+        push @{ $modMeta->{keywords} }, "fhem-$modType"
+          if ( !defined( $modMeta->{keywords} )
+            || !grep ( /^fhem-$modType$/i, @{ $modMeta->{keywords} } ) );
     }
 
     # Add some keywords about the module origin
-    my $modType = $modMeta->{x_file}[3] ? 'mod' : 'pkg';
-    if ( GetModuleSourceOrigin( $modMeta->{x_file}[4] ) eq 'fhem' ) {
+    if ( GetModuleSourceOrigin($modName) eq 'fhem' ) {
         push @{ $modMeta->{keywords} }, 'fhem-core';
     }
-    elsif ( GetModuleSourceOrigin( $modMeta->{x_file}[4] ) ne '' ) {
+    elsif ( GetModuleSourceOrigin($modName) ne '' ) {
         push @{ $modMeta->{keywords} }, "fhem-$modType-3rdparty";
     }
     else {
-        my $modType = $modMeta->{x_file}[3] ? 'mod' : 'pkg';
         push @{ $modMeta->{keywords} }, "fhem-$modType-local";
     }
 
     # Add keywords to global index
     if ( @{ $modMeta->{keywords} } > 0 ) {
         foreach ( @{ $modMeta->{keywords} } ) {
-            if ( $modMeta->{x_file}[3] ) {
+            if ( $modType eq 'mod' ) {
                 push @{ $keywords{$_}{modules} }, $modName
                   if ( !defined( $keywords{$_}{modules} )
                     || !grep ( /^$modName$/i, @{ $keywords{$_}{modules} } ) );
@@ -1914,7 +2156,23 @@ sub __GenerateKeywordsFromSupportCommunity {
             $tag =~ s/ +/-/g;
 
             foreach ( split '/', $tag ) {
-                push @keywords, ( $_ =~ /^$prefix/ ? '' : $prefix ) . $_;
+                my $t = ( $_ =~ /^$prefix/ ? '' : $prefix ) . $_;
+                my $desc =
+                  defined( $community->{subCommunity}{description} )
+                  ? $community->{subCommunity}{description}
+                  : (
+                    defined( $community->{description} )
+                    ? $community->{description}
+                    : ''
+                  );
+
+                push @keywords, $t;
+                $keywordDescription{$t}{de} = $desc
+                  unless (
+                    $desc eq ''
+                    || (   defined( $keywordDescription{$t} )
+                        && defined( $keywordDescription{$t}{de} ) )
+                  );
             }
         }
 
@@ -1923,7 +2181,23 @@ sub __GenerateKeywordsFromSupportCommunity {
         $tag =~ s/ +/-/g;
 
         foreach ( split '/', $tag ) {
-            push @keywords, ( $_ =~ /^$prefix/ ? '' : $prefix ) . $_;
+            my $t = ( $_ =~ /^$prefix/ ? '' : $prefix ) . $_;
+            my $desc =
+                 defined( $community->{subCommunity} )
+              && defined( $community->{subCommunity}{description} )
+              ? $community->{subCommunity}{description}
+              : (
+                defined( $community->{description} ) ? $community->{description}
+                : ''
+              );
+
+            push @keywords, $t;
+            $keywordDescription{$t}{de} = $desc
+              unless (
+                $desc eq ''
+                || (   defined( $keywordDescription{$t} )
+                    && defined( $keywordDescription{$t}{de} ) )
+              );
         }
     }
 
@@ -1936,7 +2210,18 @@ sub __GenerateKeywordsFromSupportCommunity {
         $tag =~ s/ +/-/g;
 
         foreach ( split '/', $tag ) {
-            push @keywords, $_;
+            my $desc =
+              defined( $community->{description} )
+              ? $community->{description}
+              : '';
+
+            push @keywords, $tag;
+            $keywordDescription{$tag}{de} = $desc
+              unless (
+                $desc eq ''
+                || (   defined( $keywordDescription{$tag} )
+                    && defined( $keywordDescription{$tag}{de} ) )
+              );
         }
     }
 
@@ -2065,7 +2350,8 @@ sub __GetMaintainerdata {
 
                         # Register in global maintainer index
                         foreach ( split '/|,', $maintainer[1] ) {
-                            push @{ $maintainerModules{$_} }, $maintainer[0][4];
+                            push @{ $maintainers{$_}{modules} },
+                              $maintainer[0][4];
                         }
 
                         # Generate keywords for global index
@@ -2152,7 +2438,7 @@ sub __GetMaintainerdata {
 
                         # Register in global maintainer index
                         foreach ( split '/|,', $maintainer[1] ) {
-                            push @{ $maintainerPackages{$_} },
+                            push @{ $maintainers{$_}{packages} },
                               $maintainer[0][4];
                         }
 
@@ -2668,15 +2954,13 @@ sub __SetXVersion {
 
 =for :application/json;q=META.json Meta.pm
 {
-  "abstract": "FHEM component module to enable Metadata support",
-  "description": "n/a",
+  "abstract": "FHEM development package to enable Metadata support",
   "x_lang": {
     "de": {
-      "abstract": "FHEM Modul Komponente, um Metadaten Unterstützung zu aktivieren",
-      "description": "n/a"
+      "abstract": "FHEM Entwickler Paket, um Metadaten Unterstützung zu aktivieren"
     }
   },
-  "version": "v0.3.2",
+  "version": "v0.4.0",
   "release_status": "testing",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
