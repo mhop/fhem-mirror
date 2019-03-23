@@ -894,40 +894,41 @@ sub CreateSearchList ($$$) {
     my $header = '';
     my $footer = '';
     if ($html) {
-        $header = '<html>';
+        $header =
+            '<html><a href="?detail='
+          . $hash->{NAME}
+          . '" style="position: absolute; top: 1em; right: 1em; text-align:right; font-size:.85em;">&larr; back to FHEM Installer</a>';
         $footer = '</html>';
     }
 
-    my $tableOpen       = '';
-    my $rowOpen         = '';
-    my $rowOpenEven     = '';
-    my $rowOpenOdd      = '';
-    my $colOpen         = '';
-    my $colOpenMinWidth = '';
-    my $txtOpen         = '';
-    my $txtClose        = '';
-    my $colClose        = "\t\t\t";
-    my $rowClose        = '';
-    my $tableClose      = '';
-    my $colorRed        = '';
-    my $colorGreen      = '';
-    my $colorClose      = '';
+    my $tableOpen   = '';
+    my $rowOpen     = '';
+    my $rowOpenEven = '';
+    my $rowOpenOdd  = '';
+    my $colOpen     = '';
+    my $txtOpen     = '';
+    my $txtClose    = '';
+    my $colClose    = "\t\t\t";
+    my $rowClose    = '';
+    my $tableClose  = '';
+    my $colorRed    = '';
+    my $colorGreen  = '';
+    my $colorClose  = '';
 
     if ($html) {
-        $tableOpen       = '<table class="block wide">';
-        $rowOpen         = '<tr>';
-        $rowOpenEven     = '<tr class="even">';
-        $rowOpenOdd      = '<tr class="odd">';
-        $colOpen         = '<td>';
-        $colOpenMinWidth = '<td style="min-width: 12em;">';
-        $txtOpen         = "<b>";
-        $txtClose        = "</b>";
-        $colClose        = '</td>';
-        $rowClose        = '</tr>';
-        $tableClose      = '</table>';
-        $colorRed        = '<span style="color:red">';
-        $colorGreen      = '<span style="color:green">';
-        $colorClose      = '</span>';
+        $tableOpen   = '<table class="block wide">';
+        $rowOpen     = '<tr class="column">';
+        $rowOpenEven = '<tr class="column even">';
+        $rowOpenOdd  = '<tr class="column odd">';
+        $colOpen     = '<td>';
+        $txtOpen     = "<b>";
+        $txtClose    = "</b>";
+        $colClose    = '</td>';
+        $rowClose    = '</tr>';
+        $tableClose  = '</table>';
+        $colorRed    = '<span style="color:red">';
+        $colorGreen  = '<span style="color:green">';
+        $colorClose  = '</span>';
     }
 
     my $space = $html ? '&nbsp;' : ' ';
@@ -945,7 +946,6 @@ sub CreateSearchList ($$$) {
         : ''
     );
 
-    push @ret, '<h2>Search result: ' . $search . '</h2>';
     my $found = 0;
 
     # search for matching device
@@ -958,14 +958,10 @@ sub CreateSearchList ($$$) {
 
         if ( $device =~ m/^.*$search.*$/i ) {
             unless ($foundDevices) {
-                push @ret, '<h3>Devices</h3>' . $lb;
+                push @ret, '<a name="searchResultDevices"></a><h3>Devices</h3>' . $lb;
                 push @ret, $tableOpen;
                 push @ret,
-                    $colOpenMinWidth
-                  . $txtOpen
-                  . 'Device Name'
-                  . $txtClose
-                  . $colClose;
+                  $colOpen . $txtOpen . 'Device Name' . $txtClose . $colClose;
                 push @ret,
                   $colOpen . $txtOpen . 'Device Type' . $txtClose . $colClose;
             }
@@ -994,7 +990,7 @@ sub CreateSearchList ($$$) {
               . $defs{$device}{TYPE} . '</a>'
               if ($html);
 
-            $l .= $colOpenMinWidth . $linkDev . $colClose;
+            $l .= $colOpen . $linkDev . $colClose;
             $l .= $colOpen . $linkMod . $colClose;
 
             $l .= $rowClose;
@@ -1011,14 +1007,10 @@ sub CreateSearchList ($$$) {
     foreach my $module ( sort { "\L$a" cmp "\L$b" } keys %modules ) {
         if ( $module =~ m/^.*$search.*$/i ) {
             unless ($foundModules) {
-                push @ret, '<h3>Modules</h3>' . $lb;
+                push @ret, '<a name="searchResultModules"></a><h3>Modules</h3>' . $lb;
                 push @ret, $tableOpen;
                 push @ret,
-                    $colOpenMinWidth
-                  . $txtOpen
-                  . 'Module Name'
-                  . $txtClose
-                  . $colClose;
+                  $colOpen . $txtOpen . 'Module Name' . $txtClose . $colClose;
                 push @ret,
                   $colOpen . $txtOpen . 'Abstract' . $txtClose . $colClose;
             }
@@ -1044,7 +1036,7 @@ sub CreateSearchList ($$$) {
               . $module . '</a>'
               if ($html);
 
-            $l .= $colOpenMinWidth . $link . $colClose;
+            $l .= $colOpen . $link . $colClose;
             $l .=
               $colOpen . ( $abstract eq 'n/a' ? '' : $abstract ) . $colClose;
 
@@ -1062,14 +1054,10 @@ sub CreateSearchList ($$$) {
     foreach my $package ( sort { "\L$a" cmp "\L$b" } keys %packages ) {
         if ( $package =~ m/^.*$search.*$/i ) {
             unless ($foundPackages) {
-                push @ret, '<h3>Packages</h3>' . $lb;
+                push @ret, '<a name="searchResultPackages"></a><h3>Packages</h3>' . $lb;
                 push @ret, $tableOpen;
                 push @ret,
-                    $colOpenMinWidth
-                  . $txtOpen
-                  . 'Package Name'
-                  . $txtClose
-                  . $colClose;
+                  $colOpen . $txtOpen . 'Package Name' . $txtClose . $colClose;
                 push @ret,
                   $colOpen . $txtOpen . 'Abstract' . $txtClose . $colClose;
             }
@@ -1095,7 +1083,7 @@ sub CreateSearchList ($$$) {
               . $package . '</a>'
               if ($html);
 
-            $l .= $colOpenMinWidth . $link . $colClose;
+            $l .= $colOpen . $link . $colClose;
             $l .=
               $colOpen . ( $abstract eq 'n/a' ? '' : $abstract ) . $colClose;
 
@@ -1114,7 +1102,7 @@ sub CreateSearchList ($$$) {
       my $keyword ( sort { "\L$a" cmp "\L$b" } keys %FHEM::Meta::keywords )
     {
         if ( $keyword =~ m/^.*$search.*$/i ) {
-            push @ret, '<h3>Keywords</h3>' unless ($foundKeywords);
+            push @ret, '<a name="searchResultKeywords"></a><h3>Keywords</h3>' unless ($foundKeywords);
             $found++;
             $foundKeywords++;
 
@@ -1131,8 +1119,7 @@ sub CreateSearchList ($$$) {
 
             push @ret, $tableOpen;
 
-            push @ret,
-              $colOpenMinWidth . $txtOpen . 'Name' . $txtClose . $colClose;
+            push @ret, $colOpen . $txtOpen . 'Name' . $txtClose . $colClose;
 
             push @ret, $colOpen . $txtOpen . 'Type' . $txtClose . $colClose;
 
@@ -1174,7 +1161,7 @@ sub CreateSearchList ($$$) {
                       . $item . '</a>'
                       if ($html);
 
-                    $l .= $colOpenMinWidth . $link . $colClose;
+                    $l .= $colOpen . $link . $colClose;
                     $l .= $colOpen . $type . $colClose;
                     $l .=
                         $colOpen
@@ -1202,10 +1189,9 @@ sub CreateSearchList ($$$) {
     {
         if ( $maintainer =~ m/^.*$search.*$/i ) {
             unless ($foundMaintainers) {
-                push @ret, '<h3>Authors & Maintainers</h3>' . $lb;
+                push @ret, '<a name="searchResultMaintainers"></a><h3>Authors & Maintainers</h3>' . $lb;
                 push @ret, $tableOpen;
-                push @ret,
-                  $colOpenMinWidth . $txtOpen . 'Name' . $txtClose . $colClose;
+                push @ret, $colOpen . $txtOpen . 'Name' . $txtClose . $colClose;
                 push @ret,
                   $colOpen . $txtOpen . 'Modules' . $txtClose . $colClose;
                 push @ret,
@@ -1263,7 +1249,7 @@ sub CreateSearchList ($$$) {
                 }
             }
 
-            $l .= $colOpenMinWidth . $maintainer . $colClose;
+            $l .= $colOpen . $maintainer . $colClose;
             $l .= $colOpen . $mods . $colClose;
             $l .= $colOpen . $pkgs . $colClose;
 
@@ -1289,10 +1275,9 @@ sub CreateSearchList ($$$) {
 
         if ( $dependent =~ m/^.*$search.*$/i ) {
             unless ($foundPerl) {
-                push @ret, '<h3>Perl packages</h3>' . $lb;
+                push @ret, '<a name="searchResultPerl"></a><h3>Perl packages</h3>' . $lb;
                 push @ret, $tableOpen;
-                push @ret,
-                  $colOpenMinWidth . $txtOpen . 'Name' . $txtClose . $colClose;
+                push @ret, $colOpen . $txtOpen . 'Name' . $txtClose . $colClose;
                 push @ret,
                     $colOpen
                   . $txtOpen
@@ -1340,7 +1325,7 @@ sub CreateSearchList ($$$) {
                 }
             }
 
-            $l .= $colOpenMinWidth . $dependent . $colClose;
+            $l .= $colOpen . $dependent . $colClose;
             $l .= $colOpen . $references . $colClose;
 
             $l .= $rowClose;
@@ -1350,6 +1335,69 @@ sub CreateSearchList ($$$) {
         }
     }
     push @ret, $tableClose if ($foundPerl);
+
+    if ($found) {
+        unshift @ret,
+            $lb
+          . $space
+          . $space
+          . ( $html ? '<a href="#searchResultPerl">' : '' )
+          . $foundPerl . ' '
+          . ( $foundPerl > 1 ? 'Perl modules' : 'Perl module' )
+          . ( $html          ? '</a>'         : '' )
+          if ($foundPerl);
+        unshift @ret,
+            $lb
+          . $space
+          . $space
+          . ( $html ? '<a href="#searchResultMaintainers">' : '' )
+          . $foundMaintainers . ' '
+          . ( $foundMaintainers > 1 ? 'authors' : 'author' )
+          . ( $html                 ? '</a>'        : '' )
+          if ($foundMaintainers);
+        unshift @ret,
+            $lb
+          . $space
+          . $space
+          . ( $html ? '<a href="#searchResultKeywords">' : '' )
+          . $foundKeywords . ' '
+          . ( $foundKeywords > 1 ? 'keywords' : 'keyword' )
+          . ( $html              ? '</a>'     : '' )
+          if ($foundKeywords);
+        unshift @ret,
+            $lb
+          . $space
+          . $space
+          . ( $html ? '<a href="#searchResultPackages">' : '' )
+          . $foundPackages . ' '
+          . ( $foundPackages > 1 ? 'packages' : 'package' )
+          . ( $html              ? '</a>'     : '' )
+          if ($foundPackages);
+        unshift @ret,
+            $lb
+          . $space
+          . $space
+          . ( $html ? '<a href="#searchResultModules">' : '' )
+          . $foundModules . ' '
+          . ( $foundModules > 1 ? 'modules' : 'module' )
+          . ( $html             ? '</a>'    : '' )
+          if ($foundModules);
+        unshift @ret,
+            $lb
+          . $space
+          . $space
+          . ( $html ? '<a href="#searchResultDevices">' : '' )
+          . $foundDevices . ' '
+          . ( $foundDevices > 1 ? 'devices' : 'device' )
+          . ( $html             ? '</a>'    : '' )
+          if ($foundDevices);
+        unshift @ret,
+          $found . ' total search ' . ( $found > 1 ? 'results:' : 'result:' );
+    }
+    else {
+        unshift @ret, 'Nothing found';
+    }
+    unshift @ret, '<a name="searchResultTOP"></a><h2>Search result: ' . $search . '</h2>';
 
     return $header . join( "\n", @ret ) . $footer;
 }
@@ -1403,40 +1451,41 @@ sub CreateMetadataList ($$$) {
     my $header = '';
     my $footer = '';
     if ($html) {
-        $header = '<html>';
+        $header =
+            '<html><a href="?detail='
+          . $hash->{NAME}
+          . '" style="top: 1em; right: 1em; text-align:right; font-size:.85em;">&larr; back to FHEM Installer</a>';
         $footer = '</html>';
     }
 
-    my $tableOpen       = '';
-    my $rowOpen         = '';
-    my $rowOpenEven     = '';
-    my $rowOpenOdd      = '';
-    my $colOpen         = '';
-    my $colOpenMinWidth = '';
-    my $txtOpen         = '';
-    my $txtClose        = '';
-    my $colClose        = "\t\t\t";
-    my $rowClose        = '';
-    my $tableClose      = '';
-    my $colorRed        = '';
-    my $colorGreen      = '';
-    my $colorClose      = '';
+    my $tableOpen   = '';
+    my $rowOpen     = '';
+    my $rowOpenEven = '';
+    my $rowOpenOdd  = '';
+    my $colOpen     = '';
+    my $txtOpen     = '';
+    my $txtClose    = '';
+    my $colClose    = "\t\t\t";
+    my $rowClose    = '';
+    my $tableClose  = '';
+    my $colorRed    = '';
+    my $colorGreen  = '';
+    my $colorClose  = '';
 
     if ($html) {
-        $tableOpen       = '<table class="block wide">';
-        $rowOpen         = '<tr>';
-        $rowOpenEven     = '<tr class="even">';
-        $rowOpenOdd      = '<tr class="odd">';
-        $colOpen         = '<td>';
-        $colOpenMinWidth = '<td style="min-width: 12em;">';
-        $txtOpen         = "<b>";
-        $txtClose        = "</b>";
-        $colClose        = '</td>';
-        $rowClose        = '</tr>';
-        $tableClose      = '</table>';
-        $colorRed        = '<span style="color:red">';
-        $colorGreen      = '<span style="color:green">';
-        $colorClose      = '</span>';
+        $tableOpen   = '<table class="block wide">';
+        $rowOpen     = '<tr class="column">';
+        $rowOpenEven = '<tr class="column even">';
+        $rowOpenOdd  = '<tr class="column odd">';
+        $colOpen     = '<td>';
+        $txtOpen     = "<b>";
+        $txtClose    = "</b>";
+        $colClose    = '</td>';
+        $rowClose    = '</tr>';
+        $tableClose  = '</table>';
+        $colorRed    = '<span style="color:red">';
+        $colorGreen  = '<span style="color:green">';
+        $colorClose  = '</span>';
     }
 
     my @mAttrs = qw(
@@ -1566,7 +1615,7 @@ sub CreateMetadataList ($$$) {
         my $webname =
           AttrVal( $hash->{CL}{SNAME}, 'webname', 'fhem' );
 
-        $l .= $colOpenMinWidth . $txtOpen . $mAttrName . $txtClose . $colClose;
+        $l .= $colOpen . $txtOpen . $mAttrName . $txtClose . $colClose;
 
         # these attributes do not exist under that name in META.json
         if ( !defined( $modMeta->{$mAttr} ) ) {
@@ -2194,14 +2243,10 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                 push @ret, $tableOpen;
 
                 push @ret,
-                    $colOpenMinWidth
-                  . $txtOpen
-                  . 'Importance'
-                  . $txtClose
-                  . $colClose;
+                  $colOpen . $txtOpen . 'Importance' . $txtClose . $colClose;
 
                 push @ret,
-                    $colOpenMinWidth
+                    $colOpen
                   . $txtOpen
                   . 'Dependent Modules'
                   . $txtClose
@@ -2215,8 +2260,8 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
             $importance = 'recommended' if ( $mAttr eq 'recommends' );
             $importance = 'suggested'   if ( $mAttr eq 'suggests' );
 
-            $l .= $colOpenMinWidth . $importance . $colClose;
-            $l .= $colOpenMinWidth . $dependents . $colClose;
+            $l .= $colOpen . $importance . $colClose;
+            $l .= $colOpen . $dependents . $colClose;
 
             $l .= $rowClose;
 
@@ -2267,13 +2312,11 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
 
         push @ret, $tableOpen;
 
-        push @ret, $colOpenMinWidth . $txtOpen . 'Name' . $txtClose . $colClose;
+        push @ret, $colOpen . $txtOpen . 'Name' . $txtClose . $colClose;
 
-        push @ret,
-          $colOpenMinWidth . $txtOpen . 'Importance' . $txtClose . $colClose;
+        push @ret, $colOpen . $txtOpen . 'Importance' . $txtClose . $colClose;
 
-        push @ret,
-          $colOpenMinWidth . $txtOpen . 'Status' . $txtClose . $colClose;
+        push @ret, $colOpen . $txtOpen . 'Status' . $txtClose . $colClose;
 
         $linecount = 1;
         foreach my $mAttr (@mAttrs) {
@@ -2373,12 +2416,12 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                     && $isFhem );
 
                 $l .=
-                    $colOpenMinWidth
+                    $colOpen
                   . $prereq
                   . ( $version ne '' ? " ($version)" : '' )
                   . $colClose;
-                $l .= $colOpenMinWidth . $importance . $colClose;
-                $l .= $colOpenMinWidth . $installed . $colClose;
+                $l .= $colOpen . $importance . $colClose;
+                $l .= $colOpen . $installed . $colClose;
 
                 $l .= $rowClose;
 
@@ -2414,13 +2457,11 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
 
         push @ret, $tableOpen;
 
-        push @ret, $colOpenMinWidth . $txtOpen . 'Name' . $txtClose . $colClose;
+        push @ret, $colOpen . $txtOpen . 'Name' . $txtClose . $colClose;
 
-        push @ret,
-          $colOpenMinWidth . $txtOpen . 'Importance' . $txtClose . $colClose;
+        push @ret, $colOpen . $txtOpen . 'Importance' . $txtClose . $colClose;
 
-        push @ret,
-          $colOpenMinWidth . $txtOpen . 'Status' . $txtClose . $colClose;
+        push @ret, $colOpen . $txtOpen . 'Status' . $txtClose . $colClose;
 
         $linecount = 1;
         foreach my $mAttr (@mAttrs) {
@@ -2485,12 +2526,12 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                   if ($html);
 
                 $l .=
-                    $colOpenMinWidth
+                    $colOpen
                   . $prereq
                   . ( $version ne '' ? " ($version)" : '' )
                   . $colClose;
-                $l .= $colOpenMinWidth . $importance . $colClose;
-                $l .= $colOpenMinWidth . $installed . $colClose;
+                $l .= $colOpen . $importance . $colClose;
+                $l .= $colOpen . $installed . $colClose;
 
                 $l .= $rowClose;
 
@@ -2516,13 +2557,11 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
 
         push @ret, $tableOpen;
 
-        push @ret, $colOpenMinWidth . $txtOpen . 'Name' . $txtClose . $colClose;
+        push @ret, $colOpen . $txtOpen . 'Name' . $txtClose . $colClose;
 
-        push @ret,
-          $colOpenMinWidth . $txtOpen . 'Importance' . $txtClose . $colClose;
+        push @ret, $colOpen . $txtOpen . 'Importance' . $txtClose . $colClose;
 
-        push @ret,
-          $colOpenMinWidth . $txtOpen . 'Status' . $txtClose . $colClose;
+        push @ret, $colOpen . $txtOpen . 'Status' . $txtClose . $colClose;
 
         $linecount = 1;
         foreach my $mAttr (@mAttrs) {
@@ -2610,12 +2649,12 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                     && $prereq ne 'perl' );
 
                 $l .=
-                    $colOpenMinWidth
+                    $colOpen
                   . $prereq
                   . ( $version ne '' ? " ($version)" : '' )
                   . $colClose;
-                $l .= $colOpenMinWidth . $importance . $colClose;
-                $l .= $colOpenMinWidth . $installed . $colClose;
+                $l .= $colOpen . $importance . $colClose;
+                $l .= $colOpen . $installed . $colClose;
 
                 $l .= $rowClose;
 
@@ -2815,7 +2854,7 @@ sub __aUniq {
       "abstract": "Modul zum Update von FHEM, zur Installation von Drittanbieter FHEM Modulen und der Verwaltung von Systemvoraussetzungen"
     }
   },
-  "version": "v0.2.0",
+  "version": "v0.2.1",
   "release_status": "testing",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
