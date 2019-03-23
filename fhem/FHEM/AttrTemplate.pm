@@ -174,13 +174,14 @@ AttrTemplate_Set($$@)
   $repl{DEVICE} = $name;
   map { $cmdlist =~ s/(?<!\\)$_/$repl{$_}/g; } keys %repl;
   map { $cmdlist =~ s/\\$_/$_/g; } keys %repl;
+  my $cl = $hash->{CL};
   my $cmd = "";
   my @ret;
   map {
     if($_ =~ m/^(.*)\\$/) {
       $cmd .= "$1\n";
     } else {
-      my $r = AnalyzeCommand($hash->{CL}, $cmd.$_);
+      my $r = AnalyzeCommand($cl, $cmd.$_);
       push(@ret, $r) if($r);
       $cmd = "";
     }
