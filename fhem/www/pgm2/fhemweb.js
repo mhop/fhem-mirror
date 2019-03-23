@@ -770,8 +770,12 @@ FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
       cmd = $(this).attr("name")+"="+cmd+" "+devName+" "+arg+" "+newDef;
     }
     FW_cmd(FW_root+"?"+encodeURIComponent(cmd)+"&XHR=1", function(resp){
-      if(!resp && reloadIfOk)
-        location.reload();
+      if(!resp && reloadIfOk) {
+        var hr = location.href+"";
+        location.href = hr+     // retain fw_id
+              (hr.match(/fw_id=\d+/) ? "" : '&fw_id='+$("body").attr('fw_id'));
+
+      }
       if(resp) {
         if(!resp.match(/^<html>[\s\S]*<\/html>/ ) ) {
           resp = FW_htmlQuote(resp);

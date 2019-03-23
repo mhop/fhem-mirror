@@ -2337,8 +2337,14 @@ CommandDeleteReading($$)
 {
   my ($cl, $def) = @_;
 
+  my $quiet = undef;
+  if($def =~ m/^\s*-q\s(.*)$/) {
+    $quiet = 1;
+    $def = $1;
+  }
+
   my @a = split(" ", $def, 2);
-  return "Usage: deletereading <name> <reading>\n$namedef" if(@a != 2);
+  return "Usage: deletereading [-q] <name> <reading>\n$namedef" if(@a != 2);
 
   eval { "" =~ m/$a[1]/ };
   return "Bad regexp $a[1]: $@" if($@);
@@ -2362,6 +2368,7 @@ CommandDeleteReading($$)
     }
     
   }
+  return undef if($quiet);
   return join("\n", @rets);
 }
 
