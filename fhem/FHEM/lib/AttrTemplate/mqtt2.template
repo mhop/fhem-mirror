@@ -18,11 +18,12 @@ desc: <a href="https://forum.fhem.de/index.php/topic,94495.0.html">Forum Thread<
 #
 name:A_00_MQTT2_CLIENT_general_bridge
 filter:TYPE=MQTT2_DEVICE
-desc:recommended to use this as general bridgeing device when using MQTT2_CLIENT as IO to get around missing CID info for distinguishing different popular devices<br>NOTE:<br>This might create a new MQTT2-device or change existing ones, especially destroy readingList attributes! Have a look in the room you assigned to the IO device to find the new device.
+desc:recommended to use this as general bridgeing device when using MQTT2_CLIENT as IO to get around missing CID info for distinguishing different popular devices<br>NOTE:<br>This might create a new MQTT2-device or change existing ones, especially destroy readingList attributes!
 par:IODEVNAME;Name of the IO-Device; {AttrVal("DEVICE","IODev","") ? AttrVal("DEVICE","IODev","" ) : undef } 
 par:DEVTYPE;TYPE of the device; { InternalVal("DEVICE","TYPE","")}
 par:DEVCID;CID of the device as written in the DEF; { InternalVal(AttrVal("DEVICE","IODev",""),"clientId","mosquitto") eq InternalVal("DEVICE","DEF","mosquitto") ? "MQTT2_GeneralBridge" : InternalVal("DEVICE","DEF","mosquitto")}
-par:IODEVROOM;Room of the IOdevice; {AttrVal(AttrVal("DEVICE","IODev",""),"room","" ) ? AttrVal(AttrVal("DEVICE","IODev",""),"room","" ) : undef } 
+#par:IODEVROOM;Room of the IOdevice; {AttrVal(AttrVal("DEVICE","IODev",""),"room","" ) ? AttrVal(AttrVal("DEVICE","IODev",""),"room","" ) : undef } 
+par:NEWDEVROOM;Room of the calling device; {AttrVal("DEVCID","room","MQTT2_\DEVICE" )} 
 defmod DEVCID MQTT2_\DEVICE DEVCID
 attr DEVCID bridgeRegexp \
   (tele|cmnd)[/]([^/]+)[/].*:.* "$2"\
@@ -30,13 +31,15 @@ attr DEVCID bridgeRegexp \
   (ESPClient_[^/]+)[/].*:.* "$1"
 attr DEVCID autocreate 1
 attr DEVCID comment Do not use very open bridgeRegexp expressions! This might lead to irritating results...
-attr DEVCID room IODEVROOM
+attr DEVCID room NEWDEVROOM
 setreading DEVCID associatedWith DEVICE
 attr DEVCID setStateList on off
 deleteAttr DEVICE readingList
 deletereading DEVICE .*
 deleteAttr DEVCID readingList
 deletereading DEVCID .*
+{ fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=DEVCID'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
+farewell:template has been applied successfully. Be carefull when extending the brigeRegexp!
 attr DEVCID model A_00_MQTT2_CLIENT_general_bridge
 
 ###########################################
@@ -588,6 +591,7 @@ Use the "set x_configuration" Option. Example: "set x_configuration SHUTTEROPEND
 Shutter specific commands available: SHUTTEROPENDURATION, SHUTTERCLOSEDURATION, SHUTTERRELAY, SHUTTER50PERCENT, SHUTTERSETCLOSE, SHUTTERINVERT; you may use this for general setOptions in tasmota also.\
 commands may need restart to take effect.\
 For calibration and further information on the available commands see https://github.com/stefanbode/Sonoff-Tasmota/wiki/Shutter-blinds-working-with-two-relays.
+farewell:template has been applied successfully. Now it's recommended to set shutter's open and close duration and 50% position, see short instruction in comment attribute or the <br><a href="https://github.com/stefanbode/Sonoff-Tasmota/wiki/Shutter-blinds-working-with-two-relays">firmware contributor's wiki</a>.
 attr DEVICE model A_02b_tasmota_2ch_shutter_invert_1
 
 # tasmota 2ch as shutter device.
