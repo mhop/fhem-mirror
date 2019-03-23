@@ -260,7 +260,7 @@ FHEM/49_IPCAM.pm             mfr69bs              Sonstiges
 FHEM/49_SSCam.pm             DS_Starter           Sonstiges
 FHEM/49_SSCamSTRM.pm         DS_Starter           Sonstiges
 FHEM/49_TBot_List.pm         viegener             Unterstuetzende Dienste
-FHEM/50_HP1000.pm            loredo               Unterstuetzende Dienste/Wettermodule
+FHEM/50_HP1000.pm            loredo               Unterstützende Dienste/Wettermodule
 FHEM/50_MOBILEALERTSGW.pm    MarkusF              Sonstige Systeme
 FHEM/50_TelegramBot.pm       viegener             Unterstuetzende Dienste
 FHEM/50_WS300.pm             Dirk                 SlowRF
@@ -300,7 +300,7 @@ FHEM/59_OPENWEATHER.pm       tupol                Unterstuetzende Dienste/Wetter
 FHEM/59_PROPLANTA.pm         tupol                Unterstuetzende Dienste/Wettermodule (Link als PM an tupol)
 FHEM/59_Twilight.pm          jeschkec             Unterstuetzende Dienste/Wettermodule
 FHEM/59_Weather.pm           neubert              Unterstuetzende Dienste/Wettermodule
-FHEM/59_Wunderground.pm      loredo               Unterstuetzende Dienste/Wettermodule
+FHEM/59_Wunderground.pm      loredo               Unterstützende Dienste/Wettermodule
 FHEM/59_WUup.pm              mahowi               Unterstuetzende Dienste/Wettermodule
 FHEM/59_WWO.pm               baumrasen            Unterstuetzende Dienste/Wettermodule
 FHEM/60_allergy.pm           markus-m             Unterstuetzende Dienste
@@ -326,7 +326,7 @@ FHEM/70_PHTV.pm              loredo               Multimedia
 FHEM/70_PIONEERAVR.pm        50watt               Multimedia
 FHEM/70_Pushbullet.pm        fhainz               Unterstuetzende Dienste
 FHEM/70_PushNotifier.pm      xusader              Unterstuetzende Dienste
-FHEM/70_Pushover.pm          loredo               Unterstuetzende Dienste
+FHEM/70_Pushover.pm          loredo               Unterstützende Dienste
 FHEM/70_Pushsafer.pm         markusbloch          Unterstuetzende Dienste
 FHEM/70_SCIVT.pm             rudolfkoenig/orphan  Sonstiges
 FHEM/70_SISPM.pm             real-wusel           Sonstiges
@@ -368,7 +368,7 @@ FHEM/74_HOMBOT.pm            CoolTux              sonstige Systeme
 FHEM/74_HusqvarnaAutomower.pm krannich            Sonstige Systeme
 FHEM/74_Nmap.pm              igami                Unterstuetzende Dienste
 FHEM/74_NUKIDevice.pm        CoolTux              Sonstige Systeme
-FHEM/74_THINKINGCLEANER.pm   loredo               Unterstuetzende Dienste
+FHEM/74_THINKINGCLEANER.pm   loredo               Unterstützende Dienste
 FHEM/74_Unifi.pm             rapster/wuehler      Automatisierung
 FHEM/74_UnifiSwitch.pm       wuehler              Automatisierung
 FHEM/74_UnifiVideo.pm        justme1968           Sonstiges
@@ -466,7 +466,7 @@ FHEM/98_fheminfo.pm          betateilchen         Sonstiges
 FHEM/98_freezemon            KernSani             Unterstuetzende Dienste
 FHEM/98_FReplacer.pm         StefanStrobel        Sonstiges
 FHEM/98_GAEBUS.pm            jamesgo              Heizungssteuerung/Raumklima
-FHEM/98_GEOFANCY.pm          loredo               Unterstuetzende Dienste
+FHEM/98_GEOFANCY.pm          loredo               Unterstützende Dienste
 FHEM/98_GoogleAuth.pm        betateilchen         Unterstuetzende Dienste
 FHEM/98_GOOGLECAST.pm        dominikkarall        Multimedia
 FHEM/98_Heating_Control.pm   igami                Unterstuetzende Dienste
@@ -477,10 +477,11 @@ FHEM/98_HTTPMOD.pm           StefanStrobel        Sonstiges
 FHEM/98_Hyperion.pm          DeeSPe               Beleuchtung
 FHEM/98_IF.pm                damian-s             Automatisierung
 FHEM/98_inotify.pm           marvin78             Automatisierung
-FHEM/98_Installer.pm         loredo               Unterstuetzende Dienste
+FHEM/98_Installer.pm         loredo               Unterstützende Dienste
 FHEM/98_JsonList2.pm         rudolfkoenig         Automatisierung
 FHEM/98_livetracking.pm      markus-m             Unterstuetzende Dienste
 FHEM/98_logProxy.pm          justme1968           Frontends/SVG Plots logProxy
+FHEM/98_search.pm            loredo               Unterstützende Dienste
 FHEM/98_MaxScanner.pm        john                 MAX
 FHEM/98_MediaList.pm         Tobias               Multimedia
 FHEM/98_Modbus.pm            StefanStrobel        Sonstiges

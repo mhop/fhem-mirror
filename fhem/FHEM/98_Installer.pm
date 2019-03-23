@@ -131,7 +131,7 @@ sub Undef($$) {
 
     RemoveInternalTimer($hash);
 
-    delete( $modules{installer}{defptr}{ $hash->{HOST} } );
+    delete( $modules{ $hash->{TYPE} }{defptr}{localhost} );
     return undef;
 }
 
@@ -958,12 +958,14 @@ sub CreateSearchList ($$$) {
 
         if ( $device =~ m/^.*$search.*$/i ) {
             unless ($foundDevices) {
-                push @ret, '<a name="searchResultDevices"></a><h3>Devices</h3>' . $lb;
-                push @ret, $tableOpen;
+                push @ret,
+                  '<a name="searchResultDevices"></a><h3>Devices</h3>' . $lb;
+                push @ret, $tableOpen . $rowOpen;
                 push @ret,
                   $colOpen . $txtOpen . 'Device Name' . $txtClose . $colClose;
                 push @ret,
                   $colOpen . $txtOpen . 'Device Type' . $txtClose . $colClose;
+                push @ret, $rowClose;
             }
             $found++;
             $foundDevices++;
@@ -1007,12 +1009,14 @@ sub CreateSearchList ($$$) {
     foreach my $module ( sort { "\L$a" cmp "\L$b" } keys %modules ) {
         if ( $module =~ m/^.*$search.*$/i ) {
             unless ($foundModules) {
-                push @ret, '<a name="searchResultModules"></a><h3>Modules</h3>' . $lb;
-                push @ret, $tableOpen;
+                push @ret,
+                  '<a name="searchResultModules"></a><h3>Modules</h3>' . $lb;
+                push @ret, $tableOpen . $rowOpen;
                 push @ret,
                   $colOpen . $txtOpen . 'Module Name' . $txtClose . $colClose;
                 push @ret,
                   $colOpen . $txtOpen . 'Abstract' . $txtClose . $colClose;
+                push @ret, $rowClose;
             }
             $found++;
             $foundModules++;
@@ -1054,12 +1058,14 @@ sub CreateSearchList ($$$) {
     foreach my $package ( sort { "\L$a" cmp "\L$b" } keys %packages ) {
         if ( $package =~ m/^.*$search.*$/i ) {
             unless ($foundPackages) {
-                push @ret, '<a name="searchResultPackages"></a><h3>Packages</h3>' . $lb;
-                push @ret, $tableOpen;
+                push @ret,
+                  '<a name="searchResultPackages"></a><h3>Packages</h3>' . $lb;
+                push @ret, $tableOpen . $rowOpen;
                 push @ret,
                   $colOpen . $txtOpen . 'Package Name' . $txtClose . $colClose;
                 push @ret,
                   $colOpen . $txtOpen . 'Abstract' . $txtClose . $colClose;
+                push @ret, $rowClose;
             }
             $found++;
             $foundPackages++;
@@ -1102,7 +1108,8 @@ sub CreateSearchList ($$$) {
       my $keyword ( sort { "\L$a" cmp "\L$b" } keys %FHEM::Meta::keywords )
     {
         if ( $keyword =~ m/^.*$search.*$/i ) {
-            push @ret, '<a name="searchResultKeywords"></a><h3>Keywords</h3>' unless ($foundKeywords);
+            push @ret, '<a name="searchResultKeywords"></a><h3>Keywords</h3>'
+              unless ($foundKeywords);
             $found++;
             $foundKeywords++;
 
@@ -1117,13 +1124,15 @@ sub CreateSearchList ($$$) {
               packages
             );
 
-            push @ret, $tableOpen;
+            push @ret, $tableOpen . $rowOpen;
 
             push @ret, $colOpen . $txtOpen . 'Name' . $txtClose . $colClose;
 
             push @ret, $colOpen . $txtOpen . 'Type' . $txtClose . $colClose;
 
             push @ret, $colOpen . $txtOpen . 'Abstract' . $txtClose . $colClose;
+
+            push @ret, $rowClose;
 
             foreach my $mAttr (@mAttrs) {
                 next
@@ -1189,13 +1198,16 @@ sub CreateSearchList ($$$) {
     {
         if ( $maintainer =~ m/^.*$search.*$/i ) {
             unless ($foundMaintainers) {
-                push @ret, '<a name="searchResultMaintainers"></a><h3>Authors & Maintainers</h3>' . $lb;
-                push @ret, $tableOpen;
+                push @ret,
+'<a name="searchResultMaintainers"></a><h3>Authors & Maintainers</h3>'
+                  . $lb;
+                push @ret, $tableOpen . $rowOpen;
                 push @ret, $colOpen . $txtOpen . 'Name' . $txtClose . $colClose;
                 push @ret,
                   $colOpen . $txtOpen . 'Modules' . $txtClose . $colClose;
                 push @ret,
                   $colOpen . $txtOpen . 'Packages' . $txtClose . $colClose;
+                push @ret, $rowClose;
             }
             $found++;
             $foundMaintainers++;
@@ -1275,8 +1287,9 @@ sub CreateSearchList ($$$) {
 
         if ( $dependent =~ m/^.*$search.*$/i ) {
             unless ($foundPerl) {
-                push @ret, '<a name="searchResultPerl"></a><h3>Perl packages</h3>' . $lb;
-                push @ret, $tableOpen;
+                push @ret,
+                  '<a name="searchResultPerl"></a><h3>Perl packages</h3>' . $lb;
+                push @ret, $tableOpen . $rowOpen;
                 push @ret, $colOpen . $txtOpen . 'Name' . $txtClose . $colClose;
                 push @ret,
                     $colOpen
@@ -1284,6 +1297,7 @@ sub CreateSearchList ($$$) {
                   . 'Referenced from'
                   . $txtClose
                   . $colClose;
+                push @ret, $rowClose;
             }
             $found++;
             $foundPerl++;
@@ -1343,8 +1357,8 @@ sub CreateSearchList ($$$) {
           . $space
           . ( $html ? '<a href="#searchResultPerl">' : '' )
           . $foundPerl . ' '
-          . ( $foundPerl > 1 ? 'Perl modules' : 'Perl module' )
-          . ( $html          ? '</a>'         : '' )
+          . ( $foundPerl > 1 ? 'Perl packages' : 'Perl package' )
+          . ( $html          ? '</a>'          : '' )
           if ($foundPerl);
         unshift @ret,
             $lb
@@ -1353,7 +1367,7 @@ sub CreateSearchList ($$$) {
           . ( $html ? '<a href="#searchResultMaintainers">' : '' )
           . $foundMaintainers . ' '
           . ( $foundMaintainers > 1 ? 'authors' : 'author' )
-          . ( $html                 ? '</a>'        : '' )
+          . ( $html                 ? '</a>'    : '' )
           if ($foundMaintainers);
         unshift @ret,
             $lb
@@ -1397,7 +1411,8 @@ sub CreateSearchList ($$$) {
     else {
         unshift @ret, 'Nothing found';
     }
-    unshift @ret, '<a name="searchResultTOP"></a><h2>Search result: ' . $search . '</h2>';
+    unshift @ret,
+      '<a name="searchResultTOP"></a><h2>Search result: ' . $search . '</h2>';
 
     return $header . join( "\n", @ret ) . $footer;
 }
@@ -2240,7 +2255,7 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                   . $lb
                   . $lb;
 
-                push @ret, $tableOpen;
+                push @ret, $tableOpen . $rowOpen;
 
                 push @ret,
                   $colOpen . $txtOpen . 'Importance' . $txtClose . $colClose;
@@ -2251,6 +2266,8 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                   . 'Dependent Modules'
                   . $txtClose
                   . $colClose;
+
+                push @ret, $rowClose;
             }
 
             my $l = $linecount % 2 == 0 ? $rowOpenEven : $rowOpenOdd;
@@ -2310,13 +2327,15 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
           suggests
         );
 
-        push @ret, $tableOpen;
+        push @ret, $tableOpen . $rowOpen;
 
         push @ret, $colOpen . $txtOpen . 'Name' . $txtClose . $colClose;
 
         push @ret, $colOpen . $txtOpen . 'Importance' . $txtClose . $colClose;
 
         push @ret, $colOpen . $txtOpen . 'Status' . $txtClose . $colClose;
+
+        push @ret, $rowClose;
 
         $linecount = 1;
         foreach my $mAttr (@mAttrs) {
@@ -2455,13 +2474,15 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
           suggests
         );
 
-        push @ret, $tableOpen;
+        push @ret, $tableOpen . $rowOpen;
 
         push @ret, $colOpen . $txtOpen . 'Name' . $txtClose . $colClose;
 
         push @ret, $colOpen . $txtOpen . 'Importance' . $txtClose . $colClose;
 
         push @ret, $colOpen . $txtOpen . 'Status' . $txtClose . $colClose;
+
+        push @ret, $rowClose;
 
         $linecount = 1;
         foreach my $mAttr (@mAttrs) {
@@ -2555,13 +2576,15 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
           suggests
         );
 
-        push @ret, $tableOpen;
+        push @ret, $tableOpen . $rowOpen;
 
         push @ret, $colOpen . $txtOpen . 'Name' . $txtClose . $colClose;
 
         push @ret, $colOpen . $txtOpen . 'Importance' . $txtClose . $colClose;
 
         push @ret, $colOpen . $txtOpen . 'Status' . $txtClose . $colClose;
+
+        push @ret, $rowClose;
 
         $linecount = 1;
         foreach my $mAttr (@mAttrs) {
