@@ -71,7 +71,6 @@ sub YAMAHA_MC_hash_replace (\%$$);
 sub YAMAHA_MC_volume_abs2rel($$);
 sub YAMAHA_MC_volume_rel2abs($$);
 sub YAMAHA_MC_getParamName($$$);
-sub YAMAHA_MC_addedDevice($$$);
 sub YAMAHA_MC_DiscoverDLNAProcess($);
 sub YAMAHA_MC_DiscoverMediaServer($);
 sub YAMAHA_MC_DiscoverRenderer($);
@@ -196,6 +195,8 @@ sub YAMAHA_MC_DiscoverRenderer($);
     );
 
 # ------------------------------------------------------------------------------
+# YAMAHA_MC_Initialize
+# ------------------------------------------------------------------------------
 sub YAMAHA_MC_Initialize($)  
 {
   my ($hash) = @_;
@@ -218,11 +219,9 @@ sub YAMAHA_MC_Initialize($)
                           "model ".
 					      "standard_volume:15 ".
 						  "ttsvolume ".
-					      "volumeSteps:3 ".                                             
-					     # "pathToFavoritesNetRadio ".
+					      "volumeSteps:3 ".                                             					     
 						  "pathToFavoriteServer ".
-						  "FavoriteServerChannel ".
-						 # "menuNameFavoritesNetRadio ".
+						  "FavoriteServerChannel ".						 
 					      "FavoriteNetRadioChannel ".
 					      "autoplay_disabled:true,false ".	
                           "autoReadReg:4_reqStatus ".
@@ -230,18 +229,14 @@ sub YAMAHA_MC_Initialize($)
 						  "DLNAsearch:on,off ".
 						  "DLNAServer ".
                           "powerCmdDelay ".
-						  "menuLayerDelay ".
-						  #"targetSpeakDir ".
-                         # "targetSpeakURL ".
-                        #  "targetSpeakFileTimestamp ".
-                        #  "targetSpeakMP3FileDir ".
-						  "genericDeviceType ".
+						  "menuLayerDelay ".						
 						  "homebridgeMapping ".
                           $readingFnAttributes;
-
 }
 
 
+# ------------------------------------------------------------------------------
+# YAMAHA_MC_Define
 # ------------------------------------------------------------------------------
 sub YAMAHA_MC_Define($$)  # only called when defined, not on reload.
 {
@@ -291,7 +286,7 @@ sub YAMAHA_MC_Define($$)  # only called when defined, not on reload.
   # http://192.168.0.28:49154/MediaRenderer/desc.xml
   $hash->{URLCMD} = "/YamahaExtendedControl";
   
-  my $VERSION = "v2.0.9";
+  my $VERSION = "v2.1.0";
   $hash->{VERSION} = $VERSION;
   Log3 $hash, 3, "Yamaha MC : $VERSION";
 
@@ -373,26 +368,20 @@ sub YAMAHA_MC_Define($$)  # only called when defined, not on reload.
             Log3 $name, 1, "$type: $name  - selected zone >>".$hash->{helper}{SELECTED_ZONE}."<< is not available on device ".$hash->{NAME}.". Using Main Zone instead";
             $hash->{ACTIVE_ZONE} = "main";
         }
-		Log3 $name, 1, "$type: $name  - selected zone getting inputs via YAMAHA_MC_getInputs ";
-		# already done by timer below
-        #YAMAHA_MC_getInputs($hash);
+		Log3 $name, 1, "$type: $name  - selected zone getting inputs via YAMAHA_MC_getInputs ";		
     }
 	
-	readingsSingleUpdate($hash, 'state', 'opened',1);
-
-	
+	readingsSingleUpdate($hash, 'state', 'opened',1);    
     
-    
-	#Log3 $hash->{NAME}, 2, "$type: $name  device $name defined for first time, startingblocking call  YAMAHA_MC_DiscoverDLNA_blockingcall";
-	#InternalTimer(gettimeofday() + 150, 'YAMAHA_MC_DiscoverDLNA_blockingcall', $hash, 0);
 	my $DLNAsearch = AttrVal($hash->{NAME}, "DLNAsearch","on");
 	
-	
+	readingsSingleUpdate($hash, "DLNARenderer", "unknown", 1);
+    readingsSingleUpdate($hash, 'MediaServer', 'unknown',1);
+	  
 	if ($DLNAsearch eq "on") {
-	
+	  
 	  YAMAHA_MC_setupControlpoint($hash);
 	  YAMAHA_MC_setupMediaRenderer($hash);
-	  
 	  
 	  Log3 $hash->{NAME}, 2, "$type: $name  DLNAsearch turned $DLNAsearch setting timer for getting devices in 150Secs";
 	  InternalTimer(gettimeofday() + 120, 'YAMAHA_MC_getNetworkStatus', $hash, 0);
@@ -403,6 +392,7 @@ sub YAMAHA_MC_Define($$)  # only called when defined, not on reload.
 	   
 	   Log3 $name, 1, "$type: $name  - DLNASearch turned $DLNAsearch";
 	   Log3 $name, 1, "$type: $name  - starting InternalTimer YAMAHA_MC_DiscoverDLNAProcess anyway once in 150Secs";
+	   
 	   YAMAHA_MC_setupControlpoint($hash);
 	   YAMAHA_MC_setupMediaRenderer($hash);
 	   InternalTimer(gettimeofday() + 150, 'YAMAHA_MC_DiscoverDLNAProcess', $hash, 0);	  
@@ -421,7 +411,9 @@ sub YAMAHA_MC_Define($$)  # only called when defined, not on reload.
 	
 	return undef;
 }
-
+# ------------------------------------------------------------------------------
+# YAMAHA_MC_setupControlpoint
+# ------------------------------------------------------------------------------
 sub YAMAHA_MC_setupControlpoint {
   my ($hash) = @_;
   my $error;
@@ -440,7 +432,9 @@ sub YAMAHA_MC_setupControlpoint {
   
   return undef;
 }
-
+# ------------------------------------------------------------------------------
+# YAMAHA_MC_setupMediaRenderer
+# ------------------------------------------------------------------------------
 sub  YAMAHA_MC_setupMediaRenderer{
   my ($hash) = @_;
   my $error;
@@ -463,6 +457,7 @@ sub  YAMAHA_MC_setupMediaRenderer{
 # ------------------------------------------------------------------------------
 #DiscoverDLNA: discover DLNA REnderer und MediaServer (miniDLNA)
 #started vie Timer in Define
+# ------------------------------------------------------------------------------
 sub YAMAHA_MC_DiscoverDLNAProcess($)
 {
   my ($hash) = @_;
@@ -485,15 +480,7 @@ sub YAMAHA_MC_DiscoverDLNAProcess($)
   
 	  Log3 $name, 4, "$name YAMAHA_MC_DiscoverDLNAProcess calling YAMAHA_MC_DiscoverDLNAServer";
 	  YAMAHA_MC_DiscoverMediaServer($hash);
-	  
-	  #if (!defined($hash->{helper}{DISCOVERY_SERVER_PID})) {
-      #  $hash->{helper}{DISCOVERY_SERVER_PID} = BlockingCall("YAMAHA_MC_DiscoverMediaServer", $hash->{NAME}."|".$hash, "YAMAHA_MC_finishedDiscoveryServer");
-      #}	  
-	  
 	  Log3 $name, 4, "$name YAMAHA_MC_DiscoverDLNAProcess calling YAMAHA_MC_DiscoverRenderer";
-	  #if (!defined($hash->{helper}{DISCOVERY_RENDERER_PID})) {
-      #  $hash->{helper}{DISCOVERY_RENDERER_PID} = BlockingCall("YAMAHA_MC_DiscoverRenderer", $hash->{NAME}."|".$hash, "YAMAHA_MC_finishedDiscoveryRenderer");
-      #}	 
 	  YAMAHA_MC_DiscoverRenderer($hash);
 	  
 	  Log3 $name, 4, "$name YAMAHA_MC_DiscoverDLNAProcess returning";
@@ -508,7 +495,9 @@ sub YAMAHA_MC_DiscoverDLNAProcess($)
 
 
 # ------------------------------------------------------------------------------
+# YAMAHA_MC_Undef
 #UndefFn: called while deleting device (delete-command) or while rereadcfg
+# ------------------------------------------------------------------------------
 sub YAMAHA_MC_Undef($$)
 {
   my ($hash, $arg) = @_;
@@ -528,6 +517,7 @@ sub YAMAHA_MC_Undef($$)
 
 # ------------------------------------------------------------------------------
 #ShutdownFn: called before fhem's shutdown command
+# ------------------------------------------------------------------------------
 sub YAMAHA_MC_Shutdown($)
 {
 	my ($hash) = @_;
@@ -544,6 +534,7 @@ sub YAMAHA_MC_Shutdown($)
 
 # ------------------------------------------------------------------------------
 #DeleteFn: called while deleting device (delete-command) but after UndefFn
+# ------------------------------------------------------------------------------
 sub YAMAHA_MC_Delete($$)
 {
   my ($hash, $arg) = @_;
@@ -551,6 +542,8 @@ sub YAMAHA_MC_Delete($$)
   return undef;
 }
 
+# ------------------------------------------------------------------------------
+# YAMAHA_MC_Attr
 # ------------------------------------------------------------------------------
 sub YAMAHA_MC_Attr(@)
 {
@@ -592,9 +585,10 @@ sub YAMAHA_MC_Attr(@)
   return undef; #attribut will be accepted if undef
 }
 
-###################################
-sub
-YAMAHA_MC_GetStatus($;$)
+# ------------------------------------------------------------------------------
+# YAMAHA_MC_GetStatus
+# ------------------------------------------------------------------------------
+sub YAMAHA_MC_GetStatus($;$)
 {
     my ($hash, $local) = @_;
     my $name = $hash->{NAME};    
@@ -639,12 +633,12 @@ YAMAHA_MC_GetStatus($;$)
 		
     }
     else{
-	  Log3 $name, 4, "$type: $name YAMAHA_MC_GetStatus device turned off , not getting some detailled status ";
-	  
+	  Log3 $name, 4, "$type: $name YAMAHA_MC_GetStatus device turned off , not getting some detailled status ";	  
 	  Log3 $name, 4, "$type: $name YAMAHA_MC_GetStatus device turned off , deleting readings for menu layer and name ";	  
-	  #readingsSingleUpdate($hash->{name}{READINGS}{currentMenuLayer}
+	  
 	  readingsSingleUpdate($hash, 'currentMenuLayer', undef,1 );	
 	  readingsSingleUpdate($hash, 'currentMenuName', undef,1 );	
+	  
 	  if (defined($hash->{$name}{READINGS}{currentMenuLayer})) {
 	    delete($hash->{$name}{READINGS}{currentMenuLayer});
 	  }
@@ -675,7 +669,7 @@ YAMAHA_MC_GetStatus($;$)
 	
 	
 	Log3 $name, 4, "YAMAHA_MC_GetStatus Device is powered off, calling getFeatures";
-	YAMAHA_MC_httpRequestQueue($hash, "getFeatures", "", {options => {at_first => 1, priority => $priority, unless_in_queue => 1}}); # call fn that will do the http request
+	YAMAHA_MC_httpRequestQueue($hash, "getFeatures", "", {options => {at_first => 0, priority => $priority, unless_in_queue => 1}}); # call fn that will do the http request
 
   
 	
@@ -704,7 +698,12 @@ YAMAHA_MC_GetStatus($;$)
 }
 
 #############################
+# 
+# ------------------------------------------------------------------------------
+# YAMAHA_MC_getInputs
 # queries all available inputs and scenes
+# ------------------------------------------------------------------------------
+
 sub YAMAHA_MC_getInputs($;$)
 {
     my ($hash, $priority) = @_;  
@@ -719,13 +718,19 @@ sub YAMAHA_MC_getInputs($;$)
 	Log3 $name, 4, " $name YAMAHA_MC_getInputs starting with getStatus Function";
 	
     # query all inputs and features
-	YAMAHA_MC_httpRequestQueue($hash, "getStatus", "", {options => {at_first => 1, priority => $priority, unless_in_queue => 1}}); # call fn that will do the http request
+	YAMAHA_MC_httpRequestQueue($hash, "getStatus", "", {options => {at_first => 0, priority => $priority, unless_in_queue => 1}}); # call fn that will do the http request
 	
 	
 	Log3 $name, 4, "$name YAMAHA_MC_getInputs ready, leaving now";
 	return undef;
 }
 
+#############################
+# 
+# ------------------------------------------------------------------------------
+# YAMAHA_MC_getMenu
+# queries all available menu infos
+# ------------------------------------------------------------------------------
 sub YAMAHA_MC_getMenu($;$)
 {
     my ($hash, $priority) = @_;  
@@ -752,6 +757,12 @@ sub YAMAHA_MC_getMenu($;$)
 	return undef;	
 }
 
+#############################
+# 
+# ------------------------------------------------------------------------------
+# YAMAHA_MC_getPlaybackStatus
+# queries play status
+# ------------------------------------------------------------------------------
 sub YAMAHA_MC_getPlaybackStatus($;$)
 {
     my ($hash, $priority) = @_;  
@@ -770,6 +781,12 @@ sub YAMAHA_MC_getPlaybackStatus($;$)
 	
 }
 
+#############################
+# 
+# ------------------------------------------------------------------------------
+# YAMAHA_MC_getNetworkStatus
+# queries netowork status
+# ------------------------------------------------------------------------------
 sub YAMAHA_MC_getNetworkStatus($;$)
 {
     my ($hash, $priority) = @_;  
@@ -792,6 +809,12 @@ sub YAMAHA_MC_getNetworkStatus($;$)
 	
 }
 
+#############################
+# 
+# ------------------------------------------------------------------------------
+# YAMAHA_MC_getLocationInfo
+# queries location info
+# ------------------------------------------------------------------------------
 sub YAMAHA_MC_getLocationInfo($;$)
 {
     my ($hash, $priority) = @_;  
@@ -811,7 +834,12 @@ sub YAMAHA_MC_getLocationInfo($;$)
 }
 
 
-
+#############################
+# 
+# ------------------------------------------------------------------------------
+# YAMAHA_MC_getDeviceInfo
+# queries device info
+# ------------------------------------------------------------------------------
 sub YAMAHA_MC_getDeviceInfo($;$)
 {
     my ($hash, $priority) = @_;  
@@ -830,7 +858,12 @@ sub YAMAHA_MC_getDeviceInfo($;$)
 	
 }
 
-
+#############################
+# 
+# ------------------------------------------------------------------------------
+# YAMAHA_MC_getDistributionInfo
+# queries infos about linked devices
+# ------------------------------------------------------------------------------
 sub YAMAHA_MC_getDistributionInfo($)
 {
     my ($hash) = @_;  
@@ -850,42 +883,12 @@ sub YAMAHA_MC_getDistributionInfo($)
 	
 }
 
-
-sub YAMAHA_MC_addedDevice($$$) {
-    my ($hash, $dev, $dlnaType) = @_;
-  
-  my $udn = $dev->getudn();
-  
-  my $uniqueDeviceName = "";
-
-  #TODO check for BOSE UDN
-  if ($dlnaType eq "MediaRenderer") {
-   $uniqueDeviceName = "MC_DLNARENDER_".substr($dev->getudn(),29,12);
-   }
-  else{ 
-   $uniqueDeviceName = "MC_DLNASERVER_".substr($dev->getudn(),29,12);
-  } 
-   
-   Log3 $hash, 3, "YAMAHA_MC_addedDevice: try to create dlna device $uniqueDeviceName";
-	
-   if(length($uniqueDeviceName) < 17) {
-      $uniqueDeviceName = "MC_DLNA_".substr($dev->getudn(),5);
-      $uniqueDeviceName =~ tr/-/_/;
-    }
-	#Typ DLNA REnderer ??
-    CommandDefine(undef, "$uniqueDeviceName DLNARenderer ".$dev->getudn());
-    CommandAttr(undef,"$uniqueDeviceName alias ".$dev->getfriendlyname());
-    CommandAttr(undef,"$uniqueDeviceName webCmd volume");
-    if(AttrVal($hash->{NAME}, "defaultRoom", "") ne "") {
-      CommandAttr(undef,"$uniqueDeviceName room ".AttrVal($hash->{NAME}, "defaultRoom", ""));
-    }
-    Log3 $hash, 3, "YAMAHA_MC_addedDevice: Created device $uniqueDeviceName for ".$dev->getfriendlyname();
-    
-   
-  
-  return undef;
-}
-
+#############################
+# 
+# ------------------------------------------------------------------------------
+# YAMAHA_MC_DiscoverRenderer
+# searching for own device as MediaREnderer for DLNA
+# ------------------------------------------------------------------------------
 sub  YAMAHA_MC_DiscoverRenderer($)
 {    
     my ($hash) = @_;
@@ -919,14 +922,16 @@ sub  YAMAHA_MC_DiscoverRenderer($)
 			$retry_cnt++;
 		} 
 	 
-		# Network Name als DLNA Renderer verwenden
-		my $network_name= AttrVal($hash->{NAME}, 'network_name', '');
-		
-		if(not defined($network_name)) {
-		  Log3 $name, 4, "$name YAMAHA_MC_DiscoverRenderer Networkname not yet defined, exiting";	  
+		# Network Name als DLNA Renderer verwenden		
+		if (!defined($hash->{network_name})) {
+		  Log3 $name, 4, "$name YAMAHA_MC_DiscoverRenderer Networkname not yet defined, query network first, i try again later, exiting";	  
+		  YAMAHA_MC_getNetworkStatus($hash,2);
+		  InternalTimer(gettimeofday() + 5, 'YAMAHA_MC_DiscoverRenderer', $hash, 0);
 		  return undef;
 		}
-		
+	
+        
+        unless(defined($hash->{network_name})) {$hash->{network_name}='No Network name available'};
 	 
 		my $devNum= 0;
 		foreach my $dev (@dev_list) {
@@ -946,9 +951,8 @@ sub  YAMAHA_MC_DiscoverRenderer($)
 			  Log3 $name, 4, "$name YAMAHA_MC_DiscoverRenderer Saving MediaRendererDLNA in helper ";
 			  $hash->{helper}{MediaRendererDLNA}=$MediaRendererDLNA;
 			  
-			  # neues Device fuer den REnderer erstellen
-			  #YAMAHA_MC_addedDevice($hash->{helper}{MediaRendererDLNA}, $dev, "MediaRenderer");
-			  
+			  readingsSingleUpdate($hash, "DLNARenderer", $friendlyname, 1);
+      			  
 			  Log3 $name, 4, "$name YAMAHA_MC_DiscoverRenderer Saving MediaRendererDLNA in helper done";
 			  
 			  if (exists($hash->{helper}{MediaRendererDLNA})) {
@@ -976,23 +980,12 @@ sub  YAMAHA_MC_DiscoverRenderer($)
     return undef;
   }
   
-  
-sub YAMAHA_MC_finishedDiscoveryRenderer($) {
-    my ($string) = @_;
-    my @commands = split("\\|", $string);
-    my $name = $commands[0];
-    my $hash = $defs{$name};
-    my $i = 0;
-    #my $ignoreDeviceIDs = AttrVal($hash->{NAME}, "ignoreDeviceIDs", "");
-    
-    delete($hash->{helper}{DISCOVERY_RENDERER_PID});
-    
-    #start discovery again after 120s
-    #InternalTimer(gettimeofday()+120, "YAMAHA_MC_DiscoverDLNAProcess", $hash, 1);
-    Log3 $hash, 5, "YAMAHA_MC_finishedDiscoveryRenderer: finished renderer discovery";
-	return undef;
-}  
-  
+#############################
+# 
+# ------------------------------------------------------------------------------
+# YAMAHA_MC_DiscoverMediaServer
+# searching for MediaServer which has access to speak files for DLNA
+# ------------------------------------------------------------------------------  
 
 sub  YAMAHA_MC_DiscoverMediaServer($)
 {
@@ -1049,9 +1042,8 @@ sub  YAMAHA_MC_DiscoverMediaServer($)
 		   $MediaServer->setdevice($dev);
 		   Log3 $name, 4, "$name  Saving MediaServer in helper ";
 		   $hash->{helper}{MediaServerDLNA}=$dev;
-		   # neues Device fuer den REnderer erstellen
-		   #YAMAHA_MC_addedDevice($MediaServer, $dev, "MediaServer");
-		   
+		   readingsSingleUpdate($hash, 'MediaServer', $friendlyname,1);
+		   		   
 		   Log3 $name, 4, "$name  Saving MediaServer in helper done";		  
 		   last;	   
 		  }		
@@ -1065,51 +1057,12 @@ sub  YAMAHA_MC_DiscoverMediaServer($)
 }
 
 
-sub YAMAHA_MC_finishedDiscoveryServer($) {
-    my ($string) = @_;
-    my @commands = split("\\|", $string);
-    my $name = $commands[0];
-    my $hash = $defs{$name};
-    my $i = 0;
-    #my $ignoreDeviceIDs = AttrVal($hash->{NAME}, "ignoreDeviceIDs", "");
-    
-    delete($hash->{helper}{DISCOVERY_SERVER_PID});
-    
-    #start discovery again after 120s
-    InternalTimer(gettimeofday()+120, "YAMAHA_MC_DiscoverDLNAProcess", $hash, 1);
-    Log3 $hash, 5, "YAMAHA_MC_finishedDiscoveryServer: finished server discovery";
-
-}  
-
-  
-
-
-sub YAMAHA_MC_blockingcall_speakfile($)
-{
- my ($string) = @_;
- my ($name, $filename) = split("\\|", $string);
- my $hash = $main::defs{$name};
-
- YAMAHA_MC_SpeakFile($hash, $filename);
-
-
- return "$name|OK";
-
-}
-
-sub YAMAHA_MC_blockingcall_speakfile_Done($)
-{
- my ($string) = @_;
- 
-
- return unless(defined($string));
-
- my @a = split("\\|",$string);
- my $hash = $defs{$a[0]};
- delete($hash->{helper}{RUNNING_PID});
-
-}
-
+#############################
+# 
+# ------------------------------------------------------------------------------
+# YAMAHA_MC_SpeakFile
+# playing speakfile provided by tts to MediaServer via DLNAREnderer
+# ------------------------------------------------------------------------------  
 
 
 sub YAMAHA_MC_SpeakFile($$)  # only called when defined, not on reload.
@@ -1153,13 +1106,11 @@ sub YAMAHA_MC_SpeakFile($$)  # only called when defined, not on reload.
     # Pfad und Endung entfernen
 	#
 	
-	
 	# Fuer DLNA suche nur den basename verwenden
     my $lastslashpos = rindex($searchfilename, "/");  
     $searchfilename = substr($searchfilename,$lastslashpos+1);
     Log3 $name, 4, "$name YAMAHA_MC_SpeakFile searchfile $searchfilename";
-  
-	 
+  	 
 
 	#
 	# aktuelle Werte merken
@@ -1176,14 +1127,13 @@ sub YAMAHA_MC_SpeakFile($$)  # only called when defined, not on reload.
 	my $currentVolume = ReadingsVal($name, "volume", 0); 
 	my $currentMute = ReadingsVal($name, "mute", "false"); 
 		
-	
-	# Neu
+		
 	if ($currentPower ne "on") {
 	  Log3 $name, 4, "$name : YAMAHA_MC_SpeakFile device not turned on powerstate is ($currentPower), power on first ";
 	  # Power merken, um spaeter zurückschalten zu können
 	  $hash->{helper}{OriginalPowerState} = $currentPower;
 	  
-	  YAMAHA_MC_httpRequestQueue($hash, "power", "on", {options    => {unless_in_queue => 1, at_first => 1, priority => 1, wait_after_response => $powerCmdDelay, original_cmd => "speakfile"}}); # call fn that will do the http request
+	  YAMAHA_MC_httpRequestQueue($hash, "power", "on", {options    => {unless_in_queue => 1, at_first => 1, priority => 1, wait_after_response => $powerCmdDelay, original_cmd => "speakfile", original_priority => 1}}); # call fn that will do the http request
 	  return undef;
 	}
 	else {
@@ -1201,32 +1151,18 @@ sub YAMAHA_MC_SpeakFile($$)  # only called when defined, not on reload.
 	  $hash->{helper}{OriginalInput} = $currentInput;
 	  $hash->{helper}{OriginalPlayback} = $currentPlayback;
 	  # Server input ohne Autoplay aufrufen
-	  YAMAHA_MC_httpRequestQueue($hash, "input", "server mode=autoplay_disabled",  {options    => {unless_in_queue => 1, can_fail => 1, priority => 1, original_cmd => "speakfile"}}); # call fn that will do the http request
+	  YAMAHA_MC_httpRequestQueue($hash, "input", "server mode=autoplay_disabled",  {options    => {unless_in_queue => 1, can_fail => 1, priority => 1, original_cmd => "speakfile", original_priority => 1}}); # call fn that will do the http request
 	  return undef;
 	}
 	else {
 	  Log3 $name, 4, "$name : YAMAHA_MC_SpeakFile input defined and already set to $currentInput, continue ";
 	}
-	
-	
-	
-	#if ($currentPower ne "on") {
-	#  Log3 $name, 4, "YAMAHA_MC_SpeakFile device not turned on, power on first ";
-	#  YAMAHA_MC_httpRequestQueue($hash, "power", "on", {options    => {unless_in_queue => 1, at_first => 1, priority => 1}}); # call fn that will do the http request
-	  #YAMAHA_MC_httpRequestQueue($hash, "power", "on", {options    => {unless_in_queue => 1, at_first => 1, priority => 1, wait_after_response => $powerCmdDelay, original_cmd => "speakfile"}}); # call fn that will do the http request
-	  #YAMAHA_MC_httpRequestQueue($hash, "power", "on" ); # call fn that will do the http request
-	  #return undef;
-	#}
-	
-	
-	
+			
     Log3 $name, 4, "YAMAHA_MC_SpeakFile setting volume from old $currentVolume to new volume $ttsvolume"; 
 	if (defined($ttsvolume) and ($ttsvolume != $currentVolume)) {
-	  #YAMAHA_MC_httpRequestQueue($hash, "volume", $ttsvolume, {options => {volume_target => $$ttsvolume}}); # call fn that will do the http request		
-	  #YAMAHA_MC_httpRequestQueue($hash, "volume", $ttsvolume); # call fn that will do the http request	
       # Volume merken, um spaeter zurückschalten zu können
 	  $hash->{helper}{OriginalVolume} = $currentVolume;	  
-      YAMAHA_MC_httpRequestQueue($hash, "volume",   YAMAHA_MC_volume_rel2abs($hash,$ttsvolume), {options    => {unless_in_queue => 1, can_fail => 1,priority => 2, volume_target => $ttsvolume, original_cmd => "speakfile"}}); # call fn that will do the http request			  
+      YAMAHA_MC_httpRequestQueue($hash, "volume",   YAMAHA_MC_volume_rel2abs($hash,$ttsvolume), {options    => {unless_in_queue => 1, can_fail => 1,priority => 2, volume_target => $ttsvolume, original_cmd => "speakfile", original_priority => 1}}); # call fn that will do the http request			  
       return undef; 
 	  }  	
 	else {
@@ -1242,25 +1178,13 @@ sub YAMAHA_MC_SpeakFile($$)  # only called when defined, not on reload.
 	  Log3 $name, 4, "$name : YAMAHA_MC_SpeakFile mute correctly set to $currentMute, continue ";
 	}  
 	
-	#if ( ($currentInput ne "server") and ($currentPower ne "on") ) {
-	#  Log3 $name, 4, "YAMAHA_MC_SpeakFile device not in input server it is $currentInput setting to server";
-	#  #YAMAHA_MC_httpRequestQueue($hash, "power", "on", {options    => {unless_in_queue => 1, at_first => 1, priority => 1, wait_after_response => $powerCmdDelay, original_cmd => "speakfile"}}); # call fn that will do the http request
-	#  YAMAHA_MC_httpRequestQueue($hash, "input", "server" ); # call fn that will do the http request
-	  #return undef;
-	#}
-	
-		
 	my $URILink;
 	my @usedonlyIPs = split(/,/, AttrVal($hash->{NAME}, 'usedonlyIPs', '')); 
     my @ignoredIPs = split(/,/, AttrVal($hash->{NAME}, 'ignoredIPs', ''));
 	
 	# Network Name als DLNA Renderer verwenden
-	my $network_name= AttrVal($hash->{NAME}, 'network_name', '');
 	
-	if(not defined($network_name)) {
-	  Log3 $name, 4, "$name YAMAHA_MC_Speak Networkname not yet defined, exiting";
-	  return undef;
-	}
+	unless(defined($hash->{network_name})) {$hash->{network_name}='No Network name available'};
 	
 	
 	Log3 $name, 4, "$name YAMAHA_MC_SpeakFile Networkname $hash->{network_name}";	
@@ -1277,12 +1201,6 @@ sub YAMAHA_MC_SpeakFile($$)  # only called when defined, not on reload.
 	#
 	# Renderer ermitteln
 	#
-	#unless(defined(hash->{helper}{MediaRendererDLNA})) 
-	#unless(exists($hash->{helper}{MediaRendererDLNA}))
-	#{
-	#  Log3 $name, 4, "$name YAMAHA_MC_SpeakFile MediaRendererDLNA does not exists, restarting discovery";
-	#  YAMAHA_MC_DiscoverRenderer($hash);	
-	# }	 
 	 if (exists($hash->{helper}{MediaRendererDLNA})) {
 		 Log3 $hash, 3,   "$name YAMAHA_MC_SpeakFile MediaRendererDLNA exists, not restarting discovery";				 
 	 }		   
@@ -1295,13 +1213,7 @@ sub YAMAHA_MC_SpeakFile($$)  # only called when defined, not on reload.
 	
 	#
     # searching for mediaServer miniDLNA
-	#
-	#unless(exists($hash->{helper}{MediaServerDLNA}))
-	#{
-	#  Log3 $name, 4, "$name YAMAHA_MC_SpeakFile MediaServerDLNA does not exists, restarting discovery";
-	#  YAMAHA_MC_DiscoverMediaServer($hash);	
-	# }
-	 
+	#	 
 	 if (exists($hash->{helper}{MediaRendererDLNA})) {
 	     Log3 $name, 4, "$name YAMAHA_MC_SpeakFile MediaServerDLNA exists, not restarting discovery";
 		 Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile  Stopping   MediaRendererDLNA";
@@ -1393,40 +1305,17 @@ sub YAMAHA_MC_SpeakFile($$)  # only called when defined, not on reload.
 			
 			if ((defined($URILink)) and (defined($hash->{helper}{MediaRendererDLNA})) ) {
 				Log3 $hash, 3,  "URI Link to play is $URILink";		 
-						
-				#$hash->{helper}{renderer}->setAVTransportURI(CurrentURI => $URILink);		
+										#$hash->{helper}{renderer}->setAVTransportURI(CurrentURI => $URILink);		
 				#$hash->{helper}{renderer}->play(); 
 				Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile Sending Link $URILink to Renderer now";		
-				#$MediaRendererDLNA->setAVTransportURI(CurrentURI => $URILink);
-				$hash->{helper}{MediaRendererDLNA}->setAVTransportURI(CurrentURI => $URILink);
+					$hash->{helper}{MediaRendererDLNA}->setAVTransportURI(CurrentURI => $URILink);
 				Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile Playing Link via Renderer now";		
-				#$MediaRendererDLNA->play(); 
-				#$hash->{helper}{MediaRendererDLNA}->stop(); 
+	
 				$hash->{helper}{MediaRendererDLNA}->play(); 
 				
 				Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile waiting for end @durationresult";	
 				Time::HiRes::sleep(@durationresult); #.1 seconds
-				#Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile Getting Status via Renderer now";	
-				#my $InstanceID = 0;
-				#my $CurrentTranpsortState ='';
-				#my $CurrentTransportStatus = '';
-				#my $CurrentSpeed = '0';
-				
-				
-				#$hash->{helper}{MediaRendererDLNA}->getTransportInfo(InstanceID => $InstanceID,
-				#                                                     CurrentTranpsortState => $CurrentTranpsortState,
-			#														 CurrentTransportStatus => $CurrentTransportStatus,
-		#															 CurrentSpeed => $CurrentSpeed);
-				#$result = $hash->{helper}{MediaRendererDLNA}->getTransportInfo(0);
-			
-				#$CurrentTranpsortState = $result->getValue('CurrentTransportState');
-				#Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile Status is $CurrentTranpsortState";	
-
-				
-				
-				
-				#$hash->{helper}{MediaRendererDLNA}->stop(); 
-				#last;
+	
 			}
 			else
 			{
@@ -1556,7 +1445,11 @@ sub YAMAHA_MC_SpeakFile($$)  # only called when defined, not on reload.
 
 
 #############################
+# 
+# ------------------------------------------------------------------------------
+# YAMAHA_MC_ResetTimer
 # Restarts the internal status request timer according to the given interval or current receiver state
+# ------------------------------------------------------------------------------
 sub YAMAHA_MC_ResetTimer($;$)
 {
     my ($hash, $interval) = @_;
@@ -1593,7 +1486,13 @@ sub YAMAHA_MC_ResetTimer($;$)
 }
 
 
+#############################
+# 
 # ------------------------------------------------------------------------------
+# YAMAHA_MC_Get
+# 
+# ------------------------------------------------------------------------------
+
 sub YAMAHA_MC_Get($@)
 {
   my ($hash, @a) = @_;
@@ -1619,7 +1518,13 @@ sub YAMAHA_MC_Get($@)
   }
 }
 
+#############################
+# 
 # ------------------------------------------------------------------------------
+# YAMAHA_MC_UpdateLists
+# 
+# ------------------------------------------------------------------------------
+
 sub YAMAHA_MC_UpdateLists($;$)
 { 
     my ($hash, $priority) = @_;
@@ -1730,44 +1635,38 @@ sub YAMAHA_MC_UpdateLists($;$)
     "statusRequest:noArg"    => "/v1/main/getStatus"		
     );
   
-  #f($split_key_one) eq "input" {
-#	
-#	}
-
-# create new hash without arguments
-my $key2="";
-foreach (keys%YAMAHA_MC_setCmdsWithArgs) {
-  #Log3 $name,1, "Key: $_ and Value: $YAMAHA_MC_setCmdsWithArgs{$_}\n" ;
-  my @key2 = split(/\:/, $_);   
-  my $value = $YAMAHA_MC_setCmdsWithArgs{$_};
-  my $split_key_one = "";
-  $split_key_one = ($key2[0]);
-  my %newDynamicKey;
   
-  # replacing dynamic cmd with list of input and menuitems
-  #if($split_key_one =~ /^(input|prepareInputChange)$/){  
-   # %newDynamicKey=$split_key_one . ":" . $inputs_comma;
-	#Log3 $name,1, "Replacing Key with $newDynamicKey";
-	# see http://stackoverflow.com/questions/1490356/how-to-replace-a-perl-hash-key
-    #hash_replace %{%YAMAHA_MC_setCmdsWithArgs->{$_}}, $_=> $newDynamicKey;  
-    #} 
-  if((defined($split_key_one)) && ($split_key_one ne "")){
-	#Log3 $name,1, " Splitted Keyvalues : $split_key_one and Value: $value\n" ;	
-	$YAMAHA_MC_setCmdswithoutArgs{$split_key_one} = $value;  
-  }	
+  # create new hash without arguments
+  my $key2="";
+  foreach (keys%YAMAHA_MC_setCmdsWithArgs) {
+  
+	  my @key2 = split(/\:/, $_);   
+	  my $value = $YAMAHA_MC_setCmdsWithArgs{$_};
+	  my $split_key_one = "";
+	  $split_key_one = ($key2[0]);
+	  my %newDynamicKey;  
+	  
+	  if((defined($split_key_one)) && ($split_key_one ne "")){
+		#Log3 $name,1, " Splitted Keyvalues : $split_key_one and Value: $value\n" ;	
+		$YAMAHA_MC_setCmdswithoutArgs{$split_key_one} = $value;  
+	  }	
   }
 
   Log3 $name, 5, "YAMAHA_MC_UpdateLists new YAMAHA_MC_setCmdswithoutArgs List for cmds :";
   Log3 $name, 5, Dumper(%YAMAHA_MC_setCmdswithoutArgs);
- 
-  
   Log3 $name, 5, "YAMAHA_MC_UpdateLists returning now";
   return undef;
   
 }  
   
 
+#############################
+# 
 # ------------------------------------------------------------------------------
+# YAMAHA_MC_Set
+# 
+# ------------------------------------------------------------------------------
+
 sub YAMAHA_MC_Set($$@)
 { 
     my ($hash, @a) = @_;
@@ -1828,10 +1727,6 @@ sub YAMAHA_MC_Set($$@)
   $inputs_comma = $hash->{helper}{inputs_comma};
   $menuitems_comma = $hash->{helper}{menuitems_comma};
   $soundprograms_comma = $hash->{helper}{soundprograms_comma};
-  #my $currentMaxVolume = 60;
-  #if (defined($hash->{READINGS}{max_volume})) {
-#	    $currentMaxVolume = $hash->{READINGS}{max_volume};
- # }	 
   
   if ((exists($hash->{helper}{INPUTS})) && (defined($inputs_comma)) ){
     Log3 $name, 4, "$name : YAMAHA_MC_Set cmd $cmd Helper Inputs available ".$inputs_comma;	 
@@ -2054,8 +1949,6 @@ sub YAMAHA_MC_Set($$@)
 	  return "invalid parameter $a[2] for set setSpeakerB";	
 	}	 
     }		
-	##"setToneBass:slider,0,1,10"           => "/v1/main/setToneControl?bass=",
-    #	"setToneTreble:slider,0,1,10"           => "/v1/main/setToneControl?treble=",
   elsif($cmd  =~ /^(setToneBass|setToneMid|setToneHigh)$/)  {
     Log3 $name, 4, "$name : YAMAHA_MC_Set setToneBass|setToneTreble to $a[2]";
 	if(defined($a[2])) {
@@ -2065,7 +1958,6 @@ sub YAMAHA_MC_Set($$@)
 	  return "invalid parameter $a[2] for set mute";	
 	}	 
     }
-	
   elsif($cmd eq "setSoundProgramList")  {
     Log3 $name, 4, "$name : YAMAHA_MC_Set setSoundProgramList to $a[2]";
 	if(defined($a[2])) {
@@ -2093,7 +1985,6 @@ sub YAMAHA_MC_Set($$@)
 	  return "invalid parameter $a[2] for set enableBluetooth";	
 	}	 
     }	
-	
   elsif($cmd eq "sleep")  {
     
 	if((defined($a[2])) && (($a[2]) eq "30") || (($a[2]) eq "60") || (($a[2]) eq "90") || (($a[2]) eq "120") || (($a[2]) eq "0") ) {
@@ -2104,7 +1995,6 @@ sub YAMAHA_MC_Set($$@)
 	  return "invalid parameter $a[2] for set sleep";	
 	}	 
     }	
-  #"playback:play,stop,pause,play_pause,previous,next,fast_reverse_start,fast_reverse_end,fast_forward_start,fast_forward_end"  => "/v1/netusb/setPlayback?playback=",
   elsif($cmd eq "playback")  {
     
 	if((defined($a[2])) && (lc($a[2]) eq "play") || (lc($a[2]) eq "stop") || (lc($a[2]) eq "pause") || (lc($a[2]) eq "previous") || (lc($a[2]) eq "next")
@@ -2250,8 +2140,7 @@ sub YAMAHA_MC_Set($$@)
 	  YAMAHA_MC_httpRequestQueue($hash, "returnMenu", "",{options => {can_fail => 1, priority => 2}});
 	  # getting new menu info in parsing response
 	 }
-   elsif($cmd eq "navigateListMenu")
-    {
+   elsif($cmd eq "navigateListMenu") {
         Log3 $name, 4, "$name : YAMAHA_MC_Set start handling for navigateListMenu, starte getMenu"; 		
 		YAMAHA_MC_httpRequestQueue($hash, "getMenu", "",{options => {can_fail => 1, init => 1, not_before => gettimeofday()+1}}); # call fn that will do the http request	  
 	}	
@@ -2282,12 +2171,13 @@ sub YAMAHA_MC_Set($$@)
 	  $hash->{attemptsToReturnMenu}=0;      
     }	  
 	
+	# turn on device and restart - wait some seconds to continue
 	if ($currentPower ne "on")   {
 	  Log3 $name, 4, "$name : YAMAHA_MC_Set device not turned on, is set to $currentPower, power on first ";
 	  if($hash->{PowerOnInProgress}==0) {
 	    Log3 $name, 4, "$name : YAMAHA_MC_Set device not turned on, power on not in progress, turn on now ";
 	    $hash->{PowerOnInProgress}=1; 
-	    YAMAHA_MC_httpRequestQueue($hash, "power", "on", {options    => {unless_in_queue => 1, at_first => 1, priority => 1, wait_after_response => $powerCmdDelay, original_cmd => "TurnFavNetRadioChannelOn"}}); # call fn that will do the http request
+	    YAMAHA_MC_httpRequestQueue($hash, "power", "on", {options    => {unless_in_queue => 1, at_first => 1, priority => 1, wait_after_response => $powerCmdDelay, original_cmd => "TurnFavNetRadioChannelOn", original_arg => $FavoriteNetRadioChannelParam, original_priority => 1 }}); # call fn that will do the http request
 	    return undef;
 	  }
       else {
@@ -2295,9 +2185,10 @@ sub YAMAHA_MC_Set($$@)
       }	  
 	}
 	
+	# setting correct input and restart 
 	if ( (!defined($currentInput)) || ($currentInput ne "net_radio")) {
 	  Log3 $name, 4, "$name : YAMAHA_MC_Set current input is set $currentInput and not to net_radio, setting input first ";
-	  YAMAHA_MC_httpRequestQueue($hash, "input", "net_radio", {options    => {unless_in_queue => 1, can_fail => 1, priority => 1, original_cmd => "TurnFavNetRadioChannelOn"}}); # call fn that will do the http request
+	  YAMAHA_MC_httpRequestQueue($hash, "input", "net_radio", {options    => {unless_in_queue => 1, can_fail => 1, priority => 1, original_cmd => "TurnFavNetRadioChannelOn", original_arg => $FavoriteNetRadioChannelParam, original_priority => 1}}); # call fn that will do the http request
 	  return undef;
 	}
 	
@@ -2313,25 +2204,15 @@ sub YAMAHA_MC_Set($$@)
 	  YAMAHA_MC_httpRequestQueue($hash, "mute", "false", {options    => {unless_in_queue => 1, can_fail => 1}}); 
 	}    
 	
-	#my $pathToFavoritesNetRadio = YAMAHA_MC_Param2SpaceList(AttrVal($hash->{NAME}, "pathToFavoritesNetRadio","0 0 0 0 0"),0);
-	#my $menuNameFavoritesNetRadio = YAMAHA_MC_Param2SpaceList(AttrVal($hash->{NAME}, "menuNameFavoritesNetRadio","My__Favorites"),0);
-	#my $FavoriteNetRadioChannel = 
 	my $alreadyInCorrectMenu = 0;
 	my $powerCmdDelay = AttrVal($hash->{NAME}, "powerCmdDelay",3);
 	my $menuLayerDelay = AttrVal($hash->{NAME}, "menuLayerDelay",0.5); 
 	
 	Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn Current Input set to  $currentInput";
-	#Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn Menu Path to Favourites $pathToFavoritesNetRadio";
-	#Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn menuNameFavoritesNetRadio $menuNameFavoritesNetRadio";
 	Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn  Favourite Channel $FavoriteNetRadioChannelParam";	
-	Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn Going Back to root menu";
-	
-	
-    	
-		
+    			
 	# playing Favourite channel now
-	Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn now playing channel $FavoriteNetRadioChannelParam via setNetRadioPreset";
-	#YAMAHA_MC_httpRequestQueue($hash, "setNetRadioPreset", $FavoriteNetRadioChannelParam,{options => {priority => 2, can_fail => 1, not_before => gettimeofday()+$menuLayerDelay}}); # call fn that will do the http request
+	Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn now playing channel $FavoriteNetRadioChannelParam via setNetRadioPreset";	
 	YAMAHA_MC_httpRequestQueue($hash, "setNetRadioPreset", $FavoriteNetRadioChannelParam,{options => {unless_in_queue => 1, priority => 2, can_fail => 1}}); # call fn that will do the http request
 		
 	# setting current Channel
@@ -2362,13 +2243,13 @@ sub YAMAHA_MC_Set($$@)
 	
 	if ($currentPower ne "on") {
 	  Log3 $name, 4, "$name : YAMAHA_MC_Set device not turned on, power on first ";
-	  YAMAHA_MC_httpRequestQueue($hash, "power", "on", {options    => {unless_in_queue => 1, at_first => 1, priority => 1, wait_after_response => $powerCmdDelay, original_cmd => "TurnFavServerChannelOn"}}); # call fn that will do the http request
+	  YAMAHA_MC_httpRequestQueue($hash, "power", "on", {options    => {unless_in_queue => 1, at_first => 1, priority => 1, wait_after_response => $powerCmdDelay, original_cmd => "TurnFavServerChannelOn", original_priority => 1}}); # call fn that will do the http request
 	  return undef;
 	}
 	
 	if ( (!defined($currentInput)) || ($currentInput ne "server")) {
 	  Log3 $name, 4, "$name : YAMAHA_MC_Set current input is set $currentInput and not to server, setting input first ";
-	  YAMAHA_MC_httpRequestQueue($hash, "input", "server", {options    => {unless_in_queue => 1, can_fail => 1, priority => 1, original_cmd => "TurnFavServerChannelOn"}}); # call fn that will do the http request
+	  YAMAHA_MC_httpRequestQueue($hash, "input", "server", {options    => {unless_in_queue => 1, can_fail => 1, priority => 1, original_cmd => "TurnFavServerChannelOn", original_priority => 1}}); # call fn that will do the http request
 	  return undef;
 	}
 	
@@ -2403,7 +2284,7 @@ sub YAMAHA_MC_Set($$@)
 	# If Menu Layer Attribute does not exist first getMenu
 	if (!defined($currentMenuLayer)){
 	  Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavServerChannel no currentMenuLayer defined calling getMenuItems";
-	  YAMAHA_MC_httpRequestQueue($hash, "getMenuItems", "",{options => { can_fail => 1, priority => 2, original_cmd => "TurnFavServerChannelOn"}}); # call fn that will do the http request	 
+	  YAMAHA_MC_httpRequestQueue($hash, "getMenuItems", "",{options => { can_fail => 1, priority => 2, original_cmd => "TurnFavServerChannelOn", original_priority => 2}}); # call fn that will do the http request	 
 	  return undef;
 	} 
 	else {
@@ -2430,7 +2311,7 @@ sub YAMAHA_MC_Set($$@)
 		
 		if ($hash->{attemptsToReturnMenu}==6) {
 		   Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavServerChannelOn  more than 5 attempts to returnmenu; try to get Menu again";
-		   YAMAHA_MC_httpRequestQueue($hash, "getMenuItems", "",{options => { can_fail => 1, priority => 1, original_cmd => "TurnFavServerChannelOn"}}); # call fn that will do the http request	
+		   YAMAHA_MC_httpRequestQueue($hash, "getMenuItems", "",{options => { can_fail => 1, priority => 1, original_cmd => "TurnFavServerChannelOn", original_priority => 1}}); # call fn that will do the http request	
 		   return undef;		   
 		}
 		elsif($hash->{attemptsToReturnMenu}>9) {
@@ -2441,7 +2322,7 @@ sub YAMAHA_MC_Set($$@)
 		else {
 		  Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavServerChannelOn not in root menu Layer $currentMenuLayer and menuname $currentMenuName";
 		  Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavServerChannelOn  next attempts to returnmenu started";
-		  YAMAHA_MC_httpRequestQueue($hash, "returnMenu", "",{ options    => {unless_in_queue => 1, priority => 2, can_fail => 1,  original_cmd => "TurnFavServerChannelOn"}}); # call fn that will do the http request
+		  YAMAHA_MC_httpRequestQueue($hash, "returnMenu", "",{ options    => {unless_in_queue => 1, priority => 2, can_fail => 1,  original_cmd => "TurnFavServerChannelOn", original_priority => 2}}); # call fn that will do the http request
 		  return undef;	
 		}
 		
@@ -2497,13 +2378,13 @@ sub YAMAHA_MC_Set($$@)
 	
 	if ($currentPower ne "on") {
 	  Log3 $name, 4, "$name : YAMAHA_MC_Set NetRadioNextFavChannel device not turned on, power on first ";
-	  YAMAHA_MC_httpRequestQueue($hash, "power", "on", {options => {unless_in_queue => 1, at_first => 1, priority => 1, wait_after_response => $powerCmdDelay, original_cmd => $cmd}}); # call fn that will do the http request
+	  YAMAHA_MC_httpRequestQueue($hash, "power", "on", {options => {unless_in_queue => 1, at_first => 1, priority => 1, wait_after_response => $powerCmdDelay, original_cmd => $cmd, original_priority => 1}}); # call fn that will do the http request
 	  return undef;
 	}
 	
 	if ( (!defined($currentInput)) || ($currentInput ne "net_radio")) {
 	  Log3 $name, 4, "$name : YAMAHA_MC_Set NetRadioNextFavChannel input not set to net_radio, setting input first ";
-	  YAMAHA_MC_httpRequestQueue($hash, "input", "net_radio", {options    => {unless_in_queue => 1, can_fail => 1, at_first => 1, priority => 1, original_cmd => $cmd}}); # call fn that will do the http request
+	  YAMAHA_MC_httpRequestQueue($hash, "input", "net_radio", {options    => {unless_in_queue => 1, can_fail => 1, at_first => 1, priority => 1, original_cmd => $cmd, original_priority => 1}}); # call fn that will do the http request
 	  return undef;
 	}
 	    
@@ -2526,41 +2407,6 @@ sub YAMAHA_MC_Set($$@)
 	Log3 $name, 4, "$name : YAMAHA_MC_Set NetRadioNextFavChannel  Favourite Channel $FavoriteNetRadioChannel";	
 	Log3 $name, 4, "$name : YAMAHA_MC_Set NetRadioNextFavChannel  currentFavNetRadioChannel $currentFavNetRadioChannel";	
 	#Log3 $name, 4, "$name : YAMAHA_MC_Set NetRadioNextFavChannel Going Back to root menu";
-	
-    	
-	
-	
-		
-	# If Menu Layer Attribute does not exist first getMenu
-    #if (!defined($currentMenuLayer)){
-	#  Log3 $name, 4, "$name : YAMAHA_MC_Set NetRadioNextFavChannel currentMenuLayer not defined calling getMenuItems";
-	#  YAMAHA_MC_httpRequestQueue($hash, "getMenuItems", "",{options => {unless_in_queue => 1,  can_fail => 1, priority => 2, original_cmd => $cmd}}); # call fn that will do the http request	 
-	#  return undef;
-	#}
-	#else {
-	#  Log3 $name, 4, "$name : YAMAHA_MC_Set NetRadioNextFavChannel currentMenuLayer is defined : $currentMenuLayer";
-	#}
-	
-	#if(($currentMenuLayer==0) && (lc($currentMenuName) eq "net radio")){
-	#  Log3 $name, 4, "$name : YAMAHA_MC_Set NetRadioNextFavChannel already in root menu";
-	#}
-	# diese Optimierung besser weglassen,
-	# scheint nicht zu funktionieren, wenn man zwar im Richtigen Menu ist aber längere zeit Keine Menü NAvigation gemacht hat
-	# doch mal probieren schein nur beim Einschalten ein PRoblem zu sein
-	#elsif(($currentMenuLayer==2) && (lc($currentMenuName) eq lc($menuNameFavoritesNetRadio))){
-	# Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn already in correct menu Layer $currentMenuLayer and menuname $currentMenuName";
-	# $alreadyInCorrectMenu = 1;
-	#}
-	#else {
-	#    Log3 $name, 4, "$name : YAMAHA_MC_Set NetRadioNextFavChannel not in root menu Layer $currentMenuLayer and menuname $currentMenuName";
-	#	YAMAHA_MC_httpRequestQueue($hash, "returnMenu", "",{ options => {unless_in_queue => 1, priority => 2, can_fail => 1, original_cmd => $cmd, newMenuLayer => ($currentMenuLayer-1)}}); # call fn that will do the http request
-    #    return undef;
-	#}
-	
-	#Log3 $name, 4, "$name : YAMAHA_MC_Set NetRadioNextFavChannel now Back to root menu, going through menu structure now";
-	#Log3 $name, 4, "$name : YAMAHA_MC_Set $cmd now Back to root menu, Menu Layer = $currentMenuLayer Menu Name=" . $currentMenuName;
-	
-    
 	
 	
 	# playing Favourite channel now	
@@ -2595,20 +2441,16 @@ sub YAMAHA_MC_Set($$@)
 	
 	# playing channel now
 	Log3 $name, 4, "$name : YAMAHA_MC_Set $cmd now playing channel $newTargetChannel";	
-	#YAMAHA_MC_httpRequestQueue($hash, "setNetRadioPreset", $newTargetChannel,{options => {priority => 2, can_fail => 1, original_cmd => "", not_before => gettimeofday()+$menuLayerDelay+0.5}}); # call fn that will do the http request
+	
 	YAMAHA_MC_httpRequestQueue($hash, "setNetRadioPreset", $newTargetChannel,{options => {priority => 2, can_fail => 1, original_cmd => "" }}); # call fn that will do the http request
 	
 	# setting current Channel
 	Log3 $name, 4, "$name : YAMAHA_MC_Set $cmd now setting current Channel $newTargetChannel";
 	readingsSingleUpdate($hash, 'currentFavNetRadioChannel', $newTargetChannel, 1);
 	
-	# getting Menu once again, index playing should be set
-	#YAMAHA_MC_httpRequestQueue($hash, "getMenuItems", "",{options => {can_fail => 1, not_before => gettimeofday()+$menuLayerDelay+1}}); # call fn that will do the http request	
-	#Log3 $name, 4, "YAMAHA_MC_Set $cmd setting current Channel done, getting menu once again";
 	Log3 $name, 4, "YAMAHA_MC_Set $cmd setting current Channel done"
 	}
-  elsif($cmd eq "statusRequest")
-    {
+  elsif($cmd eq "statusRequest") {
 	    Log3 $name, 4, "$name : YAMAHA_MC_Set statusRequest calling YAMAHA_MC_GetStatus ";
 		YAMAHA_MC_GetStatus($hash, 1);
 		# das gibt zuviele anfragen, vielleicht mal so probieren :
@@ -2643,10 +2485,7 @@ sub YAMAHA_MC_Set($$@)
       # known cmd, is in cmd_hash but no particular handling above
 	# so execute standard url associated
 	Log3 $name, 4, "$name : YAMAHA_MC_Set SpeakFile now,  using queue";    
-	YAMAHA_MC_httpRequestQueue($hash, $cmd, $argsOnlyList,{options => {unless_in_queue => 1, priority => 2, can_fail => 1}}); # call fn that will do the http request	
-	#Log3 $name, 4, "$name : YAMAHA_MC_Set SpeakFile now, direct execution not using queue";    
-	#YAMAHA_MC_SpeakFile($hash, $a[2]); # call fn that will do the http request		
-	#$hash->{helper}{RUNNING_PID} = BlockingCall("YAMAHA_MC_blockingcall_speakfile", $hash->{NAME}."|".$a[2], "YAMAHA_MC_blockingcall_speakfile_Done", 120) unless(exists($hash->{helper}{RUNNING_PID}));
+	YAMAHA_MC_httpRequestQueue($hash, $cmd, $argsOnlyList,{options => {unless_in_queue => 1, priority => 2, can_fail => 1}}); # call fn that will do the http request		
 	}
 	
   elsif($cmd eq "mcUnLink") {
@@ -2777,17 +2616,19 @@ sub YAMAHA_MC_httpRequestQueue($$$;$)
      Log3 $name, 4, "YAMAHA_MC_httpRequestQueue ($name) - + Es gibt noch pending commands";
 	 }
 	
-	
-    #if(($options->{unless_in_queue} and defined($arg) and grep( ($_->{cmd} eq $cmd and ( (not(defined($arg) or defined($_->{arg}))) or  (defined $arg && $_->{arg} eq $arg))) ,@{$device->{helper}{CMD_QUEUE}}))
+	my $alreadyinqueue = 0;
+    if ($options->{unless_in_queue}) {
 	if(($options->{unless_in_queue} and defined($arg) and grep( ($_->{cmd} eq $cmd and ( (not(defined($arg) or defined($_->{arg}))) )) ,@{$device->{helper}{CMD_QUEUE}}))
 	  or ($options->{unless_in_queue} and !defined($arg) and grep( ($_->{cmd} eq $cmd and !defined($_->{arg})) ,@{$device->{helper}{CMD_QUEUE}}))
 	  or ($options->{unless_in_queue} and defined($arg) and grep( ($_->{cmd} eq $cmd and defined($_->{arg}) and $_->{arg} eq $arg) ,@{$device->{helper}{CMD_QUEUE}}))
 	  )
-	#if($options->{unless_in_queue} and grep( ($_->{cmd} eq $cmd and  (not(defined($arg) or (defined($_->{arg}) and  $_->{arg} eq $arg))) ,@{$device->{helper}{CMD_QUEUE}}))
-    {
+	    {
+		my $alreadyinqueue = 1;
         Log3 $name, 4, "YAMAHA_MC_httpRequestQueue ($name) - comand \"$cmd".(defined($arg) ? " ".$arg : "")."\" is already in queue, skip adding another one";
-    }
-    else
+        }
+	}
+    
+	if ($alreadyinqueue==0)
     {
         Log3 $name, 4, "YAMAHA_MC_httpRequestQueue ($name) - append to queue ".($options->{at_first} ? "(at first) ":"")."of device ".$device->{NAME}." \"$cmd".(defined($arg) ? " ".$arg : "")."\": $data";
         
@@ -2815,6 +2656,9 @@ sub YAMAHA_MC_httpRequestQueue($$$;$)
     return undef;
 }
 
+
+#############################
+#
 # ------------------------------------------------------------------------------
 #see: http://www.fhemwiki.de/wiki/HttpUtils
 # this one is for execution via CMD Queue
@@ -2917,8 +2761,11 @@ sub YAMAHA_MC_HandleCmdQueue($$$)
 	 # und keine Beachtung des weitergehenden Batch Bearbeitung in YAMAHA_MC
 	 if ($url =~ /batch_cmd/) {
 	   Log3 $name, 4, "$type ($name) - YAMAHA_MC_HandleCmdQueue: batch_cmd detected, replacing in url $url ";
-	   $url =~ s/batch_cmd/\/v1\/main\/getStatus/g;
-	   Log3 $name, 4, "$type ($name) - YAMAHA_MC_HandleCmdQueue: batch_cmd detected, replaced - new url is $url ";
+	   my ($url2) = split /batch_cmd/, $url, 2;
+	   #$url =~ s/batch_cmd/\/v1\/main\/getStatus/g;
+	   Log3 $name, 4, "$type ($name) - YAMAHA_MC_HandleCmdQueue: batch_cmd detected, replaced - new url is $url ";	     
+	   $url = $url2 . "/getStatus";
+	   Log3 $name, 4, "$type ($name) - YAMAHA_MC_HandleCmdQueue: batch_cmd detected, replaced - new url2 is $url ";	   	   
 	 }
 	
      # v1/main/setPower?power=on in URL ersetzen durch tatsaechliche Zone	 
@@ -2932,7 +2779,7 @@ sub YAMAHA_MC_HandleCmdQueue($$$)
 	  #TOE: Anpassungen auf "dotted" API Versionen mit "." 
 	 my $shortAPI = $hash->{API_VERSION};
 	 $shortAPI=~s/\.[0-9]+//;
-     Log3 $name,4,"TOe: API Version cut to $shortAPI URL before $url";
+     Log3 $name,4," $type ($name) - YAMAHA_MC_HandleCmdQueue: API Version cut to $shortAPI URL before $url";
 	 
 	 #api version setzen durch korrekte Version des Devices
 	 $url =~ s/v1/v$shortAPI/g;
@@ -2995,6 +2842,8 @@ sub YAMAHA_MC_HandleCmdQueue($$$)
 	
 	
 	$hash->{CMDs_pending} = @{$hash->{helper}{CMD_QUEUE}};
+	Log3 $name, 4, "YAMAHA_MC ($name) YAMAHA_MC_HandleCmdQueue - pending requests ".$hash->{CMDs_pending};	
+	
     delete($hash->{CMDs_pending}) unless($hash->{CMDs_pending}); 
 
   return undef;
@@ -3025,9 +2874,17 @@ sub YAMAHA_MC_getNextRequestHash($)
                 my $data = (defined($param->{data}) ? "1" : "0");
                 my $options = $param->{options};
                 
+				## wenn not before exist, then prio 1 and at first.
                 my $opt_not_before = (exists($options->{not_before}) ? sprintf("%.2fs", ($options->{not_before} - gettimeofday())): "0");
-                my $opt_priority = (exists($options->{priority}) ? $options->{priority} : "-");
+				
+				if (exists($options->{not_before})) {
+				  $options->{priority} = "1";
+				  $options->{at_first} = "1";
+				} 
+                
+				my $opt_priority = (exists($options->{priority}) ? $options->{priority} : "-");
                 my $opt_at_first = (exists($options->{at_first}) ? $options->{at_first} : "0");
+				
                 
                 Log3 $name, 4, "YAMAHA_MC ($name) YAMAHA_MC_getNextRequestHash - checking cmd queue item: $item (cmd: $cmd, arg: $arg, data: $data, priority: $opt_priority, at_first: $opt_at_first, not_before: $opt_not_before)";
             
@@ -3063,6 +2920,10 @@ sub YAMAHA_MC_getNextRequestHash($)
                     elsif(exists($options->{not_before}) and not(defined($next_item) and defined($next_item_prio)))
                     {
                         Log3 $name, 5, "YAMAHA_MC ($name) YAMAHA_MC_getNextRequestHash - we have to wait ".sprintf("%.2fs", ($options->{not_before} - gettimeofday()))." seconds before next item can be checked"; 
+						RemoveInternalTimer($hash, "YAMAHA_MC_HandleCmdQueue");
+                        InternalTimer(gettimeofday()+1,"YAMAHA_MC_HandleCmdQueue", $hash);
+						Log3 $name, 5, "YAMAHA_MC ($name) YAMAHA_MC_getNextRequestHash - anding queue handle, check in 1 Sek again"; 
+						Log3 $name, 5, "YAMAHA_MC ($name) YAMAHA_MC_getNextRequestHash - restart timer in 1 Sek and exit handle Queue"; 
                         last;
                     }
                 }
@@ -3088,6 +2949,7 @@ sub YAMAHA_MC_getNextRequestHash($)
 		  Log3 $name, 5, "YAMAHA_MC ($name) YAMAHA_MC_getNextRequestHash - no no next_item defined";
 		}
         Log3 $name, 4, "YAMAHA_MC ($name) YAMAHA_MC_getNextRequestHash - no suitable command item found - returning";
+		Log3 $name, 4, "YAMAHA_MC ($name) YAMAHA_MC_getNextRequestHash - waiting for next call of YAMAHA_MC_getNextRequestHash ";
         return undef;
     }
 }
@@ -3279,7 +3141,7 @@ sub YAMAHA_MC_httpRequestParse($$$)
 				Log3 $name, 5, "YAMAHA_MC ($name) - REsponse Code 4, original command for device ".$options->{original_cmd}." calling cmd again";
 				Log3 $name, 5, "YAMAHA_MC ($name) - fhem Befehl : ". "set ".$name." ". $options->{original_cmd};
 				#YAMAHA_MC_httpRequestQueue($hash, $options->{original_cmd}, "",{options => {can_fail => 1, priority => 2}}); # call fn that will do the http request	 
-				fhem("set ".$name." ". $options->{original_cmd});
+				fhem("set ".$name." ". $options->{original_cmd}." ". $options->{original_arg});
 				
 				#unshift @{$queue_hash->{helper}{CMD_QUEUE}}, {options=> { priority => 1, not_before => (gettimeofday()+$options->{wait_after_response})} };
 			}
@@ -4145,12 +4007,10 @@ sub YAMAHA_MC_httpRequestParse($$$)
 			if (defined($options->{original_cmd}) && ($options->{original_cmd} ne "") && $cmd ne "?")
 			{
 				Log3 $name, 4, "YAMAHA_MC ($name) YAMAHA_MC_httpRequestParse: current cmd $cmd original command for device ".$options->{original_cmd}." calling cmd again";
-				#Log3 $name, 5, "YAMAHA_MC ($name) YAMAHA_MC_httpRequestParse: fhem Befehl : ". "set ".$name." ". $options->{original_cmd};
-				#YAMAHA_MC_httpRequestQueue($hash, $options->{original_cmd}, "",{options => {can_fail => 1, priority => 2}}); # call fn that will do the http request	 
 				#fhem("set ".$name." ". $options->{original_cmd});
 				
 				my $original_data = "";
-				my $original_arg = "";
+				my $original_arg = $options->{original_arg};
 	
 				Log3 $name, 5, "YAMAHA_MC ($name) YAMAHA_MC_httpRequestParse reset in queue orginal cmd without args  ". $options->{original_cmd};
 				
@@ -4158,7 +4018,8 @@ sub YAMAHA_MC_httpRequestParse($$$)
 				my $param = {
 								data       => $original_data,
 								cmd        => $options->{original_cmd},
-								arg        => $original_arg
+								arg        => $original_arg,
+								options    => {priority => $options->{original_priority}, unless_in_queue => 1}
 							}; 
 				
 				push @{$hash->{helper}{CMD_QUEUE}}, $param;  
@@ -4171,11 +4032,6 @@ sub YAMAHA_MC_httpRequestParse($$$)
 			  Log3 $name, 4, "YAMAHA_MC ($name) - YAMAHA_MC_httpRequestParse end. no additional original_cmd stated";
 			}
 			
-			# some cmd's need an Status Update
-            #if ($cmd =~ /^(on|off|power|mute)$/){	
-            #  Log3 $name, 4, "YAMAHA_MC_httpRequestParse: for cmd $cmd updating Readings neccessary, Resetting Timer";			
-			#  YAMAHA_MC_ResetTimer($hash,1);
-			#}
 			
 			#################################################################
 			#see: http://www.fhemwiki.de/wiki/DevelopmentModuleIntro#Readings
@@ -4208,14 +4064,8 @@ sub YAMAHA_MC_httpRequestParse($$$)
 			Log3 $name, 4, "YAMAHA_MC_httpRequestParse: end of parse of cmd $cmd, calling YAMAHA_MC_GetStatus again, should i really?"  unless($cmd =~ /^statusRequest|navigateListMenu|volume|input|tuner.+$/);
 						
           } #responsecode=0
-		  
-		  # special treatment if error returned and request should not fail ?
-		  #if (!defined($options->{can_fail => 1})){
-		  #  $options->{can_fail}=1;
-		  #}
-		  #if (($responseCode!=0) and not $options->{can_fail => 1}) {
-		  #  Log3 $name, 4, "YAMAHA_MC_httpRequestParse:  Could not execute \"$cmd".(defined($arg) ? " ".(split("\\|", $arg))[0] : "")."\": received return code  $responseCode";
-		  #}
+	  
+
 		} #if data =~/^{//
       else { # no json returned
 	    Log3 $name, 4, "$type: $name YAMAHA_MC_httpRequestParse noJson_response";
@@ -4648,11 +4498,6 @@ sub YAMAHA_MC_UnLink($$$@)
 	  # if device found with ip	and then send client signal to device
 	  if (($clientIp ne "") && ($clientType eq "YAMAHA_MC") && ($clientIp ne $serverHost) )
 	  {
-	  
-	 
-	  
-	  
-	   
 	  #------------------------------------------------
 	  #an Receiver -> als Client setzen
 	  #post /YamahaExtendedControl/v1/dist/setClientInfo  
@@ -4751,32 +4596,7 @@ sub YAMAHA_MC_UnLink($$$@)
 	  Log3 $name, 4, "$hash->{TYPE} $name : Link Musiccast send setServerInfo to unlink all $sendto Json Request ".$json;
 	  $hash->{POSTDATA} = $json;  
  }
- 
- 
-  # server group auslesen
-  #my $oldServerGroupId = ReadingsVal($name, "group_id", undef); 
-  #$hash->{helper}{client_list} = () unless(defined($hash->{helper}{client_list}));
-  
-  #if (defined($oldServerGroupId)){
-	  #Log3 $name, 4, "$hash->{TYPE} $name : Link Musiccast delete ip $name from group_id $oldServerGroupId "; 
-	  # unlinked ip entfernen
-	  #my $newServerGroupId = $oldServerGroupId =~ s/$name,//r;
-	  #$newServerGroupId = $oldServerGroupId =~ s/,$name)/)/r;
-	  #$newServerGroupId = $oldServerGroupId =~ s/$name//r;
-	 
-	  #%postdata_hash = ('group_id'=>$newServerGroupId);
-	  #$json = encode_json \%postdata_hash;
-	  
-	  #Log3 $name, 4, "$hash->{TYPE} $name : Link Musiccast send setServerInfo to $sendto Json Request ".$json;
-	  #$hash->{POSTDATA} = $json;  
-		
-	  #YAMAHA_MC_httpRequestDirect($hash, $cmd, $sendto, @params); # call fn that will do the http request
-	  #sleep 1;
-	  #}
-  #else {
-  #  Log3 $name, 4, "$hash->{TYPE} $name : Link Musiccast delete ip $name from group_id not possible, unknown group_id at server ";
-  #}
-  
+   
   YAMAHA_MC_httpRequestQueue($hash, "getDistributionInfo", "", {options => {priority => 3, unless_in_queue => 1}}); # call fn that will do the http request
   
   Log3 $name, 4, "$hash->{TYPE}: UnLink Musiccast Ende ".$json;
