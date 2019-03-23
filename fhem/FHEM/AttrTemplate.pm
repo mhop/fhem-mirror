@@ -52,6 +52,9 @@ AttrTemplate_Initialize()
       } elsif($line =~ m/^desc:(.*)/) {
         $templates{$name}{desc} = $1;
 
+      } elsif($line =~ m/^farewell:(.*)/) {
+        $templates{$name}{farewell} = $1;
+
       } else {
         push(@{$templates{$name}{cmds}}, $line);
 
@@ -128,7 +131,8 @@ AttrTemplate_Set($$@)
     }
 
     if($perl_code) {
-      $perl_code =~ s/DEVICE/$name/g;
+      $perl_code =~ s/(?<!\\)DEVICE/$name/g;
+      $perl_code =~ s/\\DEVICE/DEVICE/g;
       my $ret = eval $perl_code;
       return "Error checking template regexp: $@" if($@);
       if($ret) {
@@ -186,7 +190,20 @@ AttrTemplate_Set($$@)
       $cmd = "";
     }
   } split("\n", $cmdlist);
-  return @ret ? join("\n", @ret) : undef;
+
+  return join("\n", @ret) if(@ret);
+
+  if($h->{farewell}) {
+    my $fw = $h->{farewell};
+    if(!$cl || $cl->{TYPE} ne "FHEMWEB") {
+      $fw =~ s/<br>/\n/gi;
+      $fw =~ s/<[^>]+>//g;      # remove html tags
+    }
+    return $fw if(!$cl);
+    InternalTimer(gettimeofday()+1, sub{asyncOutput($cl, $fw)}, undef, 0);
+  }
+  return undef;
+
 }
 
 1;
