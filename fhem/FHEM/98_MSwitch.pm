@@ -8221,6 +8221,8 @@ sub MSwitch_backup($) {
     {
         print BACKUPDATEI "#N -> $testdevice\n";                      #
         foreach my $key (@areadings) {
+		next if $key eq "last_exec_cmd";
+		
             my $tmp = ReadingsVal( $testdevice, $key, 'undef' );
             print BACKUPDATEI "#S $key -> $tmp\n";
         }
@@ -8228,8 +8230,19 @@ sub MSwitch_backup($) {
         my %keys;
         foreach my $attrdevice ( keys %{ $attr{$testdevice} } )       #geht
         {
-            print BACKUPDATEI "#A $attrdevice -> "
-              . AttrVal( $testdevice, $attrdevice, '' ) . "\n";
+		
+		
+		my $inhalt = "#A $attrdevice -> ". AttrVal( $testdevice, $attrdevice, '' ) ;
+		$inhalt =~ s/\n/#[nla]/g;
+		print BACKUPDATEI $inhalt . "\n";
+		#CHANGE einspielen ungeprüft
+		
+        #print BACKUPDATEI "#A $attrdevice -> ". AttrVal( $testdevice, $attrdevice, '' ) . "\n";
+			  
+			  
+			  
+			  
+			  
         }
         print BACKUPDATEI "#E -> $testdevice\n";
         print BACKUPDATEI "\n";
@@ -8260,7 +8273,7 @@ sub MSwitch_backup_this($) {
     foreach (@found) {
         if ( $_ =~ m/#S (.*) -> (.*)/ )    # setreading
         {
-
+         next if $1 eq "last_exec_cmd";
             if ( $2 eq 'undef' || $2 eq '' || $2 eq ' ' ) {
             }
             else {
@@ -8270,10 +8283,18 @@ sub MSwitch_backup_this($) {
         }
         if ( $_ =~ m/#A (.*) -> (.*)/ )    # setattr
         {
-            my $cs = "attr $Name $1 $2";
+		my $inhalt =$2;
+		my $aktattr =$1;
+		#MSwitch_LOG( $Name, 0,"$inhalt". __LINE__ );
+		$inhalt =~ s/#\[nla\]/\n/g;
+		$inhalt =~ s/;/;;/g;
+		#MSwitch_LOG( $Name, 0,"$inhalt". __LINE__ );
+		#MSwitch_LOG( $Name, 0,"------------------------". __LINE__ );
+		
+            my $cs = "attr $Name $aktattr $inhalt";
             my $errors = AnalyzeCommandChain( undef, $cs );
             if ( defined($errors) ) {
-                MSwitch_LOG( $Name, 1, "ERROR $cs" );
+                MSwitch_LOG( $Name, 5 , "ERROR $cs" );
 
             }
         }
@@ -8301,38 +8322,38 @@ sub MSwitch_Getsupport($) {
         $tmp =~ s/</\\</g;
         $tmp =~ s/>/\\>/g;
         $tmp =~ s/'/\\'/g;
+       $tmp =~ s/\n/#[nl]/g;
+       $out .= "Attribut $attrdevice: " . $tmp . "\\n";
 
-        $out .= "Attribut $attrdevice: " . $tmp . "\\n";
-
-    }
+   }
 
     $out .= "\\n----- Trigger -----\\n";
     $out .= "Trigger device:  ";
     my $tmp = ReadingsVal( $Name, 'Trigger_device', 'undef' );
-    $out .= "$tmp\\n";
-    $out .= "Trigger time: ";
-    $tmp = ReadingsVal( $Name, '.Trigger_time', 'undef' );
-    $tmp =~ s/~/ /g;
-    $out .= "$tmp\\n";
-    $out .= "Trigger condition: ";
-    $tmp = ReadingsVal( $Name, '.Trigger_condition', 'undef' );
-    $out .= "$tmp\\n";
-    $out .= "Trigger Device Global Whitelist: ";
-    $tmp = ReadingsVal( $Name, '.Trigger_Whitelist', 'undef' );
-    $out .= "$tmp\\n";
-    $out .= "\\n----- Trigger Details -----\\n";
+     $out .= "$tmp\\n";
+     $out .= "Trigger time: ";
+     $tmp = ReadingsVal( $Name, '.Trigger_time', 'undef' );
+     $tmp =~ s/~/ /g;
+     $out .= "$tmp\\n";
+     $out .= "Trigger condition: ";
+     $tmp = ReadingsVal( $Name, '.Trigger_condition', 'undef' );
+     $out .= "$tmp\\n";
+     $out .= "Trigger Device Global Whitelist: ";
+     $tmp = ReadingsVal( $Name, '.Trigger_Whitelist', 'undef' );
+     $out .= "$tmp\\n";
+     $out .= "\\n----- Trigger Details -----\\n";
     $out .= "Trigger cmd1: ";
-    $tmp = ReadingsVal( $Name, '.Trigger_on', 'undef' );
+     $tmp = ReadingsVal( $Name, '.Trigger_on', 'undef' );
+     $out .= "$tmp\\n";
+     $out .= "Trigger cmd2: ";
+     $tmp = ReadingsVal( $Name, '.Trigger_off', 'undef' );
     $out .= "$tmp\\n";
-    $out .= "Trigger cmd2: ";
-    $tmp = ReadingsVal( $Name, '.Trigger_off', 'undef' );
-    $out .= "$tmp\\n";
-    $out .= "Trigger cmd3: ";
-    $tmp = ReadingsVal( $Name, '.Trigger_cmd_on', 'undef' );
-    $out .= "$tmp\\n";
-    $out .= "Trigger cmd4: ";
-    $tmp = ReadingsVal( $Name, '.Trigger_cmd_off', 'undef' );
-    $out .= "$tmp\\n";
+     $out .= "Trigger cmd3: ";
+     $tmp = ReadingsVal( $Name, '.Trigger_cmd_on', 'undef' );
+     $out .= "$tmp\\n";
+     $out .= "Trigger cmd4: ";
+     $tmp = ReadingsVal( $Name, '.Trigger_cmd_off', 'undef' );
+     $out .= "$tmp\\n";
 
     my %savedetails = MSwitch_makeCmdHash($hash);
     $out .= "\\n----- Device Actions -----\\n";
@@ -8344,23 +8365,25 @@ sub MSwitch_Getsupport($) {
         my @devicesplit = split( /#\[NF\]/, $_ );
 
         $devicesplit[4] =~ s/'/\\'/g;
-
         $devicesplit[5] =~ s/'/\\'/g;
+		$devicesplit[1] =~ s/'/\\'/g;
+        $devicesplit[3] =~ s/'/\\'/g;
+		
+         $out .= "\\nDevice: " . $devicesplit[0] . "\\n";
+         $out .= "cmd1: " . $devicesplit[1] . " " . $devicesplit[3] . "\\n";
 
-        $out .= "\\nDevice: " . $devicesplit[0] . "\\n";
-        $out .= "cmd1: " . $devicesplit[1] . " " . $devicesplit[3] . "\\n";
-        $out .= "cmd2: " . $devicesplit[2] . " " . $devicesplit[4] . "\\n";
-        $out .= "cmd1 condition: " . $devicesplit[9] . "\\n";
-        $out .= "cmd2 condition: " . $devicesplit[10] . "\\n";
-        $out .= "cmd1 delay: " . $devicesplit[7] . "\\n";
-        $out .= "cmd2 delay: " . $devicesplit[8] . "\\n";
-        $out .= "repeats: " . $devicesplit[11] . "\\n";
-        $out .= "repeats delay: " . $devicesplit[12] . "\\n";
-        $out .= "priority: " . $devicesplit[13] . "\\n";
-        $out .= "id: " . $devicesplit[14] . "\\n";
-        $out .= "comment: " . $devicesplit[15] . "\\n";
-        $out .= "cmd1 exit: " . $devicesplit[16] . "\\n";
-        $out .= "cmd2 exit: " . $devicesplit[17] . "\\n";
+         $out .= "cmd2: " . $devicesplit[2] . " " . $devicesplit[4] . "\\n";
+         $out .= "cmd1 condition: " . $devicesplit[9] . "\\n";
+         $out .= "cmd2 condition: " . $devicesplit[10] . "\\n";
+         $out .= "cmd1 delay: " . $devicesplit[7] . "\\n";
+         $out .= "cmd2 delay: " . $devicesplit[8] . "\\n";
+         $out .= "repeats: " . $devicesplit[11] . "\\n";
+         $out .= "repeats delay: " . $devicesplit[12] . "\\n";
+         $out .= "priority: " . $devicesplit[13] . "\\n";
+         $out .= "id: " . $devicesplit[14] . "\\n";
+         $out .= "comment: " . $devicesplit[15] . "\\n";
+         $out .= "cmd1 exit: " . $devicesplit[16] . "\\n";
+         $out .= "cmd2 exit: " . $devicesplit[17] . "\\n";
     }
 
     $out =~ s/#\[dp\]/:/g;
@@ -8395,6 +8418,9 @@ sub MSwitch_Getconfig($) {
 
     foreach my $key (@areadings) {
 
+	 next if $key eq "last_exec_cmd";
+	
+	
         my $tmp = ReadingsVal( $testdevice, $key, 'undef' );
         if ( $key eq ".Device_Affected_Details" ) {
             $tmp =~ s/#\[nl\]/;;/g;
@@ -8442,6 +8468,14 @@ sub MSwitch_Getconfig($) {
         $tmp =~ s/</\\</g;
         $tmp =~ s/>/\\>/g;
         $tmp =~ s/'/\\'/g;
+		
+		
+		
+		#CHENGE einspielen noch ungeprüft
+		$tmp =~ s/\n/#[nl]/g;
+		
+		
+		
         $out .= "#A $attrdevice -> " . $tmp . "\\n";
         $count++;
     }
@@ -8524,7 +8558,15 @@ sub MSwitch_backup_all($) {
             }
             if ( $_ =~ m/#A (.*) -> (.*)/ )    # setattr
             {
-                my $cs = "attr  $testdevice $1 $2";
+				my $inhalt =$2;
+				my $aktattr =$1;
+				#MSwitch_LOG( $Name, 0,"$inhalt". __LINE__ );
+				$inhalt =~ s/#\[nla\]/\n/g;
+				$inhalt =~ s/;/;;/g;
+				#MSwitch_LOG( $Name, 0,"$inhalt". __LINE__ );
+				#MSwitch_LOG( $Name, 0,"------------------------". __LINE__ );
+				my $cs = "attr $Name $aktattr $inhalt";
+                #my $cs = "attr  $testdevice $1 $2";
                 my $errors = AnalyzeCommandChain( undef, $cs );
                 if ( defined($errors) ) {
                     MSwitch_LOG( $testdevice, 1, "ERROR $cs" );
@@ -8545,7 +8587,6 @@ sub MSwitch_backup_all($) {
     }
     return $answer;
 }
-
 ################################################
 sub MSwitch_savesys($$) {
     my ( $hash, $cont ) = @_;
@@ -9442,3 +9483,18 @@ werden aber nicht ausgeführt <br />3. schreibt alle Aktionen in ein seperates L
 </ul>
 
 =end html_DE
+
+=for :application/json;q=META.json 98MSwitch.pm
+ 		{
+ 		  "author": [
+ 		    "T. Pause"
+ 		  ],
+ 		  "x_fhem_maintainer": [
+ 		    "Byte09"
+ 		  ],
+ 		  "keywords": [
+ 		    "MSwitch"
+ 		  ]
+ 		}
+ 		=end :application/json;q=META.json
+ 		
