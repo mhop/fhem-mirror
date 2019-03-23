@@ -40,6 +40,7 @@ eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $Mis
 
 # Versions History intern:
 our %Log2Syslog_vNotesIntern = (
+  "5.6.0"  => "23.03.2019  attribute exclErrCond to exclude events from rating as \"error\" ",
   "5.5.0"  => "18.03.2019  prepare for Meta.pm ",
   "5.4.0"  => "17.03.2019  new feature parseProfile = Automatic ",
   "5.3.2"  => "08.02.2019  fix version numbering ",
@@ -95,6 +96,8 @@ our %Log2Syslog_vNotesIntern = (
 
 # Versions History extern:
 our %Log2Syslog_vNotesExtern = (
+  "5.6.0"  => "23.03.2019 New attribute \"exclErrCond\" to exclude events from rating as \"Error\" even though the ".
+                          "event contains the text \"Error\". ",
   "5.4.0"  => "17.03.2019 New feature parseProfile = Automatic. The module may detect the message format BSD or IETF automatically in server mode ",
   "5.3.2"  => "08.02.2019 fix version numbering ",
   "5.3.0"  => "16.10.2018 attribute sslCertPrefix added to support multiple SSL-keys (Forum:#92030)",
@@ -102,7 +105,7 @@ our %Log2Syslog_vNotesExtern = (
   "5.2.0"  => "02.10.2018 direct help for attributes added",
   "5.1.0"  => "29.09.2018 new get &lt;name&gt; versionNotes command ",
   "5.0.1"  => "27.09.2018 automatic reconnect to syslog-server in case of write error ",
-  "5.0.0"  => "26.09.2018 <li>TCP Server mode is possible now for Collector devices<\li><li>the used parse-profile is shown as Internal<\li><li>Parse_Err_No counts faulty persings since start<\li><li>new octetCount attribute switches the syslog framing method (see also RFC6587 <a href=\"https://tools.ietf.org/html/rfc6587\">Transmission of Syslog Messages over TCP</a>)<\li><li>TCP SSL-support<\li><li>new set 'reopen' command to reconnect a broken connection<\li><li>some code fixes ",
+  "5.0.0"  => "26.09.2018 Some changes:<br><li>TCP Server mode is possible now for Collector devices<\li><li>the used parse-profile is shown as Internal<\li><li>Parse_Err_No counts faulty persings since start<\li><li>new octetCount attribute switches the syslog framing method (see also RFC6587 <a href=\"https://tools.ietf.org/html/rfc6587\">Transmission of Syslog Messages over TCP</a>)<\li><li>TCP SSL-support<\li><li>new set 'reopen' command to reconnect a broken connection<\li><li>some code fixes ",
   "4.8.5"  => "20.08.2018 BSD/parseFn parse changed, BSD setpayload changed, new variable \$IGNORE in parseFn ",
   "4.8.4"  => "15.08.2018 BSD parse changed again ",
   "4.8.3"  => "14.08.2018 BSD setpayload changed, BSD parse changed, new Internal MYFQDN ", 
@@ -250,6 +253,7 @@ sub Log2Syslog_Initialize($) {
                       "disable:1,0,maintenance ".
                       "addTimestamp:0,1 ".
                       "contDelimiter ".
+                      "exclErrCond:textField-long ".
 					  "logFormat:BSD,IETF ".
                       "makeEvent:no,intern,reading ".
                       "outputFields:sortable-strict,PRIVAL,FAC,SEV,TS,HOST,DATE,TIME,ID,PID,MID,SDFIELD,CONT ".
@@ -267,7 +271,7 @@ sub Log2Syslog_Initialize($) {
                       $readingFnAttributes
                       ;
                       
-  # FHEM::Meta::InitMod( __FILE__, $hash );           # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
+  FHEM::Meta::InitMod( __FILE__, $hash );           # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
 
 return;   
 }
@@ -1245,7 +1249,7 @@ sub Log2Syslog_Attr ($$$$) {
          return "\"$aName\" is only valid for model \"Collector\"";
 	}
     
-	if ($cmd eq "set" && $hash->{MODEL} =~ /Collector/ && $aName =~ /addTimestamp|contDelimiter|addStateEvent|logFormat|octetCount|ssldebug|timeout/) {
+	if ($cmd eq "set" && $hash->{MODEL} =~ /Collector/ && $aName =~ /addTimestamp|contDelimiter|addStateEvent|logFormat|octetCount|ssldebug|timeout|exclErrCond/) {
         return "\"$aName\" is only valid for model \"Sender\"";
 	}
     
@@ -1422,14 +1426,13 @@ sub Log2Syslog_eventlog($$) {
           my $txt = $events->[$i];
           $txt = "" if(!defined($txt));
           $txt = Log2Syslog_charfilter($hash,$txt);
-	  
 	      my $tim          = (($ct && $ct->[$i]) ? $ct->[$i] : $tn);
           my ($date,$time) = split(" ",$tim);
 	  
 	      if($n =~ m/^$rex$/ || "$n:$txt" =~ m/^$rex$/ || "$tim:$n:$txt" =~ m/^$rex$/) {				  
               my $otp             = "$n $txt";
               $otp                = "$tim $otp" if AttrVal($name,'addTimestamp',0);
-	          ($prival,$sevAstxt) = Log2Syslog_setprival($txt);
+	          ($prival,$sevAstxt) = Log2Syslog_setprival($hash,$txt);
               if($sendsev && $sendsev !~ m/$sevAstxt/) {
                   # nicht senden wenn Severity nicht in "respectSeverity" enthalten
                   Log2Syslog_Log3slog($name, 5, "Log2Syslog $name - Warning - Payload NOT sent due to Message Severity not in attribute \"respectSeverity\"\n");
@@ -1492,7 +1495,7 @@ sub Log2Syslog_fhemlog($$) {
   if($txt =~ m/^$rex$/ || "$vbose: $txt" =~ m/^$rex$/) {  	
       my $otp             = "$vbose: $txt";
       $otp                = "$tim $otp" if AttrVal($name,'addTimestamp',0);
-	  ($prival,$sevAstxt) = Log2Syslog_setprival($txt,$vbose);
+	  ($prival,$sevAstxt) = Log2Syslog_setprival($hash,$txt,$vbose);
       if($sendsev && $sendsev !~ m/$sevAstxt/) {
           # nicht senden wenn Severity nicht in "respectSeverity" enthalten
           Log2Syslog_Log3slog($name, 5, "Log2Syslog $name - Warning - Payload NOT sent due to Message Severity not in attribute \"respectSeverity\"\n");
@@ -1748,8 +1751,10 @@ return;
 ###############################################################################
 #               set PRIVAL (severity & facility)
 ###############################################################################
-sub Log2Syslog_setprival ($;$$) { 
-  my ($txt,$vbose) = @_;
+sub Log2Syslog_setprival ($$;$) { 
+  my ($hash,$txt,$vbose) = @_;
+  my $name = $hash->{NAME};
+  my $do   = 0;
   my ($prival,$sevAstxt);
   
   # Priority = (facility * 8) + severity 
@@ -1778,8 +1783,27 @@ sub Log2Syslog_setprival ($;$$) {
 	  $sv = 6 if ($vbose == 4);
       $sv = 7 if ($vbose == 5);
   }
-                                         
-  $sv = 3 if (lc($txt) =~ m/error/);              # error condition
+  
+  if (lc($txt) =~ m/error/) {
+      # error condition
+      $do = 1;
+      my $ees = AttrVal($name, "exclErrCond", "");
+      if($ees) {
+          $ees =~ m/^\s*(.*)\s*$/s;
+          $ees = $1;
+          $ees =~ s/[\n]//g;
+          $ees =~ s/,,/_ESC_/g;
+          my @excl = split(",",$ees);
+          foreach my $e (@excl) {
+              # Negativliste abarbeiten
+              $e =~ s/_ESC_/,/g;
+              Log2Syslog_trim($e);
+              $do = 0 if($txt =~ m/^$e$/);        
+          }
+      }
+      $sv = 3 if($do); 
+  }  
+               
   $sv = 4 if (lc($txt) =~ m/warning/);            # warning conditions
   
   $prival   = ($fac*8)+$sv;
@@ -2043,6 +2067,15 @@ sub Log2Syslog_setVersionInfo($) {
   }
   
 return;
+}
+
+################################################################
+#   Leerzeichen am Anfang / Ende eines strings entfernen           
+################################################################
+sub Log2Syslog_trim ($) {
+ my $str = shift;
+ $str =~ s/^\s+|\s+$//g;
+return ($str);
 }
 
 #############################################################################################
@@ -2412,6 +2445,29 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
     </li>
     </ul>
     <br>
+    <br>
+    
+    <ul>
+	<a name="exclErrCond"></a>
+    <li><b>exclErrCond &lt;Pattern1,Pattern2,Pattern3,...&gt; </b><br>
+        <br>
+        This attribute is only usable for device type "Sender". <br>
+        If within an event the text "Error" is identified, this message obtain the severity "Error" automatically.
+        The attribute exclErrCond can contain a list of events separated by comma, whose severity nevertheless has not  
+        to be valued as "Error". Commas within the &lt;Pattern&gt; must be escaped by ,, (double comma).
+        The attribute may contain line breaks.  <br><br>
+        
+        <b>Example</b>
+        <pre>
+attr &lt;name&gt; exclErrCond Error: none, 
+                        Errorcode: none,
+                        Dum.Energy PV: 2853.0,, Error: none,
+                        .*Seek_Error_Rate_.*,
+                        .*Raw_Read_Error_Rate_.*,
+                        .*sabotageError:.*,
+        </pre>
+    </li>
+    </ul>
     <br>
 	
     <ul>
@@ -3107,6 +3163,30 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
     <br>
 	
     <ul>
+	<a name="exclErrCond"></a>
+    <li><b>exclErrCond &lt;Pattern1,Pattern2,Pattern3,...&gt; </b><br>
+        <br>
+        Das Attribut ist nur für "Sender" verwendbar. <br>
+        Wird in einem Event der Text "Error" erkannt, bekommt diese Message automatisch den Schweregrad "Error" zugewiesen.
+        Im Attribut exclErrCond kann eine durch Komma getrennte Liste von Events angegeben werden, deren Schweregrad 
+        trotzdem nicht als "Error" gewertet werden soll. Kommas innerhalb von &lt;Pattern&gt; müssen mit ,, (doppeltes 
+        Komma) escaped werden.
+        Das Attribut kann Zeilenumbrüche enthalten.  <br><br>
+        
+        <b>Beispiel</b>
+        <pre>
+attr &lt;name&gt; exclErrCond Error: none, 
+                        Errorcode: none,
+                        Dum.Energy PV: 2853.0,, Error: none,
+                        .*Seek_Error_Rate_.*,
+                        .*Raw_Read_Error_Rate_.*,
+                        .*sabotageError:.*,
+        </pre>
+    </li>
+    </ul>
+    <br>
+    
+    <ul>
 	<a name="logFormat"></a>
     <li><b>logFormat [ BSD | IETF ]</b><br>
         <br>
@@ -3489,12 +3569,6 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
       },
       "suggests": {
       }
-    }
-  },
-  "resources": {
-    "bugtracker": {
-      "web": "https://forum.fhem.de/index.php/board,20.0.html",
-      "x_web_title": "FHEM Forum: Automatisierung"
     }
   }
 }
