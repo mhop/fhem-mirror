@@ -1,7 +1,7 @@
 ﻿##############################################
 # 00_THZ
 # $Id$
-# by immi 12/2018
+# by immi 01/2019
 my $thzversion = "0.181";  #   
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
@@ -281,7 +281,7 @@ my %parsinghash = (
 	      [" collectorTemp: ",	    4,  4, "hex2int", 10],	[" insideTemp: ",		    32, 4, "hex2int", 10], 
 	      [" windowOpen: ",	        47, 1, "bit2", 1], # board X18-1 clamp X4-FA (FensterAuf): window open - signal out 230V
 		  [" quickAirVent: ",	    48, 1, "bit3", 1], # board X15-8 clamp X4-SL (SchnellLüftung): quickAirVent - signal in 230V
-		  [" flowRate: ",	        110, 4, "hex", 10], # board X51 sensor P5 (on newer models B1 flow temp as well)
+		  [" flowRate: ",	        110, 4, "hex", 100], # board X51 sensor P5 (on newer models B1 flow temp as well) changed to l/min as suggested by TheTrumpeter Antwort #771
 		  [" p_HCw: ",		        114, 4, "hex", 100],# board X4-1..3 sensor P4 HC water pressure
 		  [" humidityAirOut: ",	    154, 4, "hex", 100] # board X4-4..6 sensor B15
           ],
@@ -2306,6 +2306,8 @@ sub THZ_backup_readings($){
 =item device
 =item summary Monitors and controls Tecalor/StiebelEltron heatpumps via RS232 or ser2net
 =item summary_DE Kommuniziert mittels RS232 oder ser2net mit einer Tecalor/SE W&auml;rmepumpe
+=item cloudfree
+=item openapi
 =begin html
 
 <a name="THZ"></a>
