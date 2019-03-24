@@ -450,6 +450,9 @@ sub get {
 
 1;
 
+=pod
+=encoding utf8
+
 =for :application/json;q=META.json msgSchema.pm
 {
   "author": [
@@ -466,3 +469,5 @@ sub get {
   ]
 }
 =end :application/json;q=META.json
+
+=cut

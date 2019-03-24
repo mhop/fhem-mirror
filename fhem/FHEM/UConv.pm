@@ -2036,6 +2036,9 @@ sub _ReplaceStringByHashKey($$;$) {
 
 1;
 
+=pod
+=encoding utf8
+
 =for :application/json;q=META.json UConv.pm
 {
   "author": [
@@ -2053,3 +2056,5 @@ sub _ReplaceStringByHashKey($$;$) {
   ]
 }
 =end :application/json;q=META.json
+
+=cut

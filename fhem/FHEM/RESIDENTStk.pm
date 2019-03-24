@@ -3791,6 +3791,9 @@ sub RESIDENTStk_DoInitDev(@) {
 
 1;
 
+=pod
+=encoding utf8
+
 =for :application/json;q=META.json RESIDENTStk.pm
 {
   "author": [
@@ -3807,3 +3810,5 @@ sub RESIDENTStk_DoInitDev(@) {
   ]
 }
 =end :application/json;q=META.json
+
+=cut

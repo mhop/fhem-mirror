@@ -1312,6 +1312,10 @@ sub HOMESTATEtk_UpdateReadings (@) {
 
 1;
 
+
+=pod
+=encoding utf8
+
 =for :application/json;q=META.json HOMESTATEtk.pm
 {
   "author": [
@@ -1328,3 +1332,5 @@ sub HOMESTATEtk_UpdateReadings (@) {
   ]
 }
 =end :application/json;q=META.json
+
+=cut

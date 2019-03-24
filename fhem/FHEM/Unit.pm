@@ -4657,6 +4657,9 @@ sub CommandDeleteReadingDesc($@) {
 
 1;
 
+=pod
+=encoding utf8
+
 =for :application/json;q=META.json Unit.pm
 {
   "author": [
@@ -4674,3 +4677,5 @@ sub CommandDeleteReadingDesc($@) {
   ]
 }
 =end :application/json;q=META.json
+
+=cut
