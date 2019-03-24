@@ -34,9 +34,9 @@ attr DEVCID comment Do not use very open bridgeRegexp expressions! This might le
 attr DEVCID room NEWDEVROOM
 attr DEVCID setStateList on off
 deleteAttr DEVICE readingList
-deletereading -q DEVICE .*
+deletereading -q DEVICE [^(associatedWith)]*
 deleteAttr DEVCID readingList
-deletereading -q DEVCID .*
+deletereading -q DEVCID [^(associatedWith)]*
 setreading DEVCID associatedWith DEVICE
 { fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=DEVCID'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
 farewell:template has been applied successfully. Be carefull when extending the brigeRegexp!
@@ -281,7 +281,7 @@ attr DEVICE devStateIcon open:fts_window_1w_open@red close:fts_window_1w@green
 #attr DEVICE genericDeviceType contact
 attr DEVICE eventMap true:close false:open
 attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
-deletereading -q DEVICE .*
+deletereading -q DEVICE [^(associatedWith)]*
 attr DEVICE model L_06_zigbee2mqtt_ContactSensor
 
 name:L_07_zigbee2mqtt_TempHumHpaSensor
@@ -291,7 +291,7 @@ par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 attr DEVICE stateFormat {sprintf ("Temperature: %.1f°C Humidity: %.1f%% Pressure: %.1fhpa", ReadingsVal($name,"temperature",0), ReadingsVal($name,"humidity",0), ReadingsVal($name,"pressure",0)) }
 attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
-deletereading -q DEVICE .*
+deletereading -q DEVICE [^(associatedWith)]*
 attr DEVICE model L_07_TempHumHpa_TempSensor
 
 #source post: https://forum.fhem.de/index.php/topic,94495.msg898198.html#msg898198
@@ -302,7 +302,7 @@ par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 attr DEVICE stateFormat Motion: occupancy Luminance: illuminance
 attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
-deletereading -q DEVICE .*
+deletereading -q DEVICE [^(associatedWith)]*
 attr DEVICE model L_08_Human_Motion_TempSensor
 
 #source post: https://forum.fhem.de/index.php/topic,94495.msg898198.html#msg898198
@@ -313,7 +313,7 @@ par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 attr DEVICE stateFormat Motion: action X: angle_x Y: angle_y Z: angle_z
 attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
-deletereading -q DEVICE .*
+deletereading -q DEVICE [^(associatedWith)]*
 attr DEVICE model L_09_Motion_Sensor
 
 #source post: https://forum.fhem.de/index.php/topic,94495.msg898198.html#msg898198
@@ -324,7 +324,7 @@ par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/](.*):, ? $1 : undef }
 attr DEVICE stateFormat Leak: water_leak
 attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
-deletereading -q DEVICE .*
+deletereading -q DEVICE [^(associatedWith)]*
 attr DEVICE model L_10_Water_Leak_Sensor
 
 #source post: https://forum.fhem.de/index.php/topic,94495.msg898198.html#msg898198
@@ -335,7 +335,7 @@ par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 attr DEVICE stateFormat click
 attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
-deletereading -q DEVICE .*
+deletereading -q DEVICE [^(associatedWith)]*
 attr DEVICE model L_11_Light_Switch
 
 #source post: https://forum.fhem.de/index.php/topic,94495.msg916789.html#msg916789
@@ -346,7 +346,7 @@ par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 attr DEVICE stateFormat Click: click Action: action
 attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
-deletereading -q DEVICE .*
+deletereading -q DEVICE [^(associatedWith)]*
 attr DEVICE model L_12_Wireless_Button
 
 name:L_13_zigbee2mqtt_wireless_button_old
@@ -356,7 +356,7 @@ par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 attr DEVICE stateFormat Click: click
 attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
-deletereading -q DEVICE .*
+deletereading -q DEVICE [^(associatedWith)]*
 attr DEVICE model L_13_wireless_button_old
 
 name:L_14_zigbee2mqtt_aqara_cube
@@ -366,7 +366,7 @@ par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 attr DEVICE stateFormat Action: action
 attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
-deletereading -q DEVICE .*
+deletereading -q DEVICE [^(associatedWith)]*
 attr DEVICE model L_14_aqara_cube
 
 
@@ -394,7 +394,7 @@ attr DEVICE readingList \
   tele/DEVNAME/SENSOR:.* { json2nameValue($EVENT) }\
   tele/DEVNAME/INFO.:.* { json2nameValue($EVENT) }\
   stat/DEVNAME/RESULT:.* { json2nameValue($EVENT) }
-deletereading -q DEVICE .*
+deletereading -q DEVICE [^(associatedWith)]*
 attr DEVICE setStateList on off toggle
 attr DEVICE autocreate 0
 attr DEVICE model A_01a_tasmota_basic_state_power1
@@ -417,7 +417,7 @@ attr DEVICE readingList \
   tele/DEVNAME/INFO.:.* { json2nameValue($EVENT) }\
   tele/DEVNAME/UPTIME:.* { json2nameValue($EVENT) }\
   stat/DEVNAME/RESULT:.* { json2nameValue($EVENT) }
-deletereading -q DEVICE .*
+deletereading -q DEVICE [^(associatedWith)]*
 set IO_DEV publish cmnd/DEVNAME/Restart 1
 attr DEVICE autocreate 0
 
@@ -428,7 +428,7 @@ par:DEVNAME;ESP's name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,te
 par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev","")}
 par:READINGLISTCLEARED;cleared from prefixes;{ AttrVal("DEVICE","readingList","") =~ s/, '[^_]+[_]'/, ''/g, ? $1 : undef }
 attr DEVICE readingList READINGLISTCLEARED
-deletereading -q DEVICE .*
+deletereading -q DEVICE [^(associatedWith)]*
 set IO_DEV publish cmnd/DEVNAME/Restart 1
 attr DEVICE autocreate 0
 
@@ -471,22 +471,24 @@ attr DEVICE stateFormat {sprintf("aktuell: %.1f W Tag: %.2f kWh Gestern: %.3f kW
 attr DEVICE model A_01c_tasmota_POW
 
 
-#tasmota device with Infrared-circuit, forum: https://forum.fhem.de/index.php/topic,94494.msg919501.html#msg919501
+#tasmota device with Infrared-circuit
 name:A_01d_tasmota_ir
-desc:Demonstrates three options (dec, hex, raw) how to configure tasmota devices as IR remote control extension.<br><a href="https://forum.fhem.de/index.php/topic,67316.0.html">Forum Thread</a><br><a href=https://github.com/arendst/Sonoff-Tasmota/wiki/Commands#irremote">Tasmota IRremote Commands</a><br><a href="https://github.com/altelch/SonoffIR">Simple IR-circuit</a>
+desc:Demonstrates multiple options how to configure tasmota devices as IR remote control extension.<br><a href="https://forum.fhem.de/index.php/topic,67316.0.html">Forum Thread</a><br><a href=https://github.com/arendst/Sonoff-Tasmota/wiki/Commands#irremote">Tasmota IRremote Commands</a><br><a href="https://github.com/altelch/SonoffIR">Simple IR-circuit</a><br><a href="https://forum.fhem.de/index.php/topic,98723.msg920946.html#msg920946">set <devicename> irsend</a>
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd).*
-par:DEVNAME;ESP's name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,tele/([^/]+)/, ? $1 : undef }
-par:POWERCMD;needed command to be sent like in example dec '{"protocol":"NEC","bits":32,"data":551489775}' (without '');
-par:VOLUMEUPCMD;needed command to be sent like in example raw '0,926,844,958,832,1798,868,902,848,900,870,900,852,908,918,958,794,934,874,928,1738,934,856,1764' (without '');
-par:MULTIPLE1CMD;needed command to be sent like in example hex '{"Protocol":"NEC","Bits":32,"Data":0x8166817E}' (without '');
-par:MULTIPLE2CMD;needed command to be sent like in example hex '{"Protocol":"NEC","Bits":32,"Data":0x8166817E}' (without '');
+par:DEVNAME;ESP's name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,tele/([^/]*)/, ? $1 : undef }
+par:POWERCMD;needed command to be sent like in example dec '{"protocol":"NEC","bits":32,"data":551489775}' (without '');{ undef }
+par:VOLUMEUPCMD;needed command to be sent like in example raw '0,926,844,958,832,1798,868,902,848,900,870,900,852,908,918,958,794,934,874,928,1738,934,856,1764' (without '');{ undef }
+par:MULTIPLE1CMD;needed command to be sent like in example hex '{"Protocol":"NEC","Bits":32,"Data":0x8166817E}' (without '');{ undef }
+par:MULTIPLE2CMD;needed command to be sent like in example hex '{"Protocol":"NEC","Bits":32,"Data":0x8166817E}' (without '');{ undef }
 set DEVICE attrTemplate A_01d_tasmota_ir
 attr DEVICE setList \
-power:noArg cmnd/DEVNAME/IRsend POWERCMD\
-volumeup:noArg cmnd/DEVNAME/IRsend VOLUMEUPCMD\
-11:noArg cmnd/DEVNAME/Backlog IRsend MULTIPLE1CMD;delay 8;IRsend MULTIPLE2CMD
+  power:noArg cmnd/DEVNAME/IRsend POWERCMD\
+  volumeup:noArg cmnd/DEVNAME/IRsend VOLUMEUPCMD\
+  11:noArg cmnd/DEVNAME/Backlog IRsend MULTIPLE1CMD;cmnd/DEVNAME/delay 8;cmnd/DEVNAME/IRsend MULTIPLE2CMD\
+  irsend:textField cmnd/DEVNAME/irsend {"Protocol":"$EVTPART1","Bits":$EVTPART2,"Data":"0x$EVTPART3"}
 attr DEVICE readingList \
-  tele/DEVNAME/INFO.:.* { json2nameValue($EVENT) }
+  tele/DEVNAME/INFO.:.* { json2nameValue($EVENT) }\
+  tele/DEVNAME/RESULT:.* { $EVENT =~ m,..IrReceived....Protocol...([A-Za-z0-9]+)...Bits..([\d]+)..Data...([A-Za-z0-9]+)..., ? {"$1_$2"=>$3} : json2nameValue($EVENT) }
 attr DEVICE stateFormat state\
 <br>\
 <a href="http://IPAddress" target="_blank">IPAddress</a>
@@ -584,7 +586,7 @@ attr DEVICE stateFormat <a href="http://IPAddress" target="_blank">\
 LWT\
 </a>\
 state
-deleteReading -q DEVICE .*
+deletereading -q DEVICE [^(associatedWith)]*
 attr DEVICE setStateList open close half stop pct
 attr DEVICE comment After applying the template set SHUTTEROPENDURATION and SHUTTERCLOSEDURATION first.\
 Use the "set x_configuration" Option. Example: "set x_configuration SHUTTEROPENDURATION 35"\
@@ -679,7 +681,7 @@ attr DEVICE readingList \
   tele/DEVNAME/STATE:.* { json2nameValue($EVENT) }\
   stat/DEVNAME/RESULT:.* { json2nameValue($EVENT) }\
   tele/DEVNAME/INFO.:.* { json2nameValue($EVENT) }
-deletereading -q DEVICE .*
+deletereading -q DEVICE [^(associatedWith)]*
 attr DEVICE autocreate 0
 attr DEVICE devStateIcon {Color::devStateIcon($name,"rgb","Color","state")}
 attr DEVICE icon light_control
@@ -732,7 +734,7 @@ attr DEVICE readingList \
   shellies/DEVNAME/input/0:.* input0\
   shellies/DEVNAME/online:.* online\
   shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }
-deleteReading -q DEVICE .*
+deletereading -q DEVICE [^(associatedWith)]*
 attr DEVICE model A_10_shelly1
 
 # shellyplug using original firmware.
@@ -765,7 +767,7 @@ attr DEVICE readingList \
   shellies/DEVNAME/input/0:.* input0
 attr DEVICE devStateIcon 0:fts_shutter_100 100:fts_shutter_10 9\d.*:fts_shutter_10 8\d.*:fts_shutter_20 7\d.*:fts_shutter_30 6\d.*:fts_shutter_40 5\d.*:fts_shutter_50 4\d.*:fts_shutter_60 3\d.*:fts_shutter_70 2\d.*:fts_shutter_80 1\d.*:fts_shutter_90 0\d.*:fts_shutter_100 set_.*:fts_shutter_updown
 attr DEVICE stateFormat pct
-deleteReading -q DEVICE .*
+deletereading -q DEVICE [^(associatedWith)]*
 attr DEVICE setStateList open close stop
 attr DEVICE model A_11b_shelly2_roller
 
@@ -915,7 +917,7 @@ attr DEVICE readingList shellies/DEVNAME/white/0/status:.* {json2nameValue($EVEN
 attr DEVICE setList off:noArg shellies/DEVNAME/white/0/command off\
   on:noArg shellies/DEVNAME/white/0/command on\
   brightness:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/0/set {"ison":"true","mode":"white","brightness":"$EVTPART1"}
-deletereading -q DEVICE .*
+deletereading -q DEVICE [^(associatedWith)]*
 setreading DEVICE associatedWith DEVICE_CH1,DEVICE_CH2,DEVICE_CH4
 attr DEVICE webCmd on:off:brightness
 attr DEVICE model A_17a_shelly2rgbw_4w_split
