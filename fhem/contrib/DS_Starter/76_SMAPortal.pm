@@ -67,7 +67,7 @@ sub SMAPortal_Initialize($) {
                            "userAgent ".
                            $readingFnAttributes;
 
-  FHEM::Meta::InitMod( __FILE__, $hash );           # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
+  eval { FHEM::Meta::InitMod( __FILE__, $hash ) };          # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
 
 return; 
 }
@@ -1487,12 +1487,6 @@ sub UTC2LocalString($$) {
       },
       "suggests": {
       }
-    }
-  },
-  "resources": {
-    "bugtracker": {
-      "web": "https://forum.fhem.de/index.php/board,29.0.html",
-      "x_web_title": "FHEM Forum: Sonstige Systeme"
     }
   }
 }
