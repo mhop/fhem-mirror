@@ -46,12 +46,14 @@
 #  - changed: 74_Unifi: removed UCv3 support
 # V 3.2.1
 #  - feature: 74_Unifi: new attribute customClientReadings
+# V 3.2.2
+#  - feature: 74_Unifi: textField-long support for customClientReadings
 
 package main;
-my $version="3.2.1";
+my $version="3.2.2";
 # Default für clientRedings setzen. Die Readings waren der Standard vor Einführung des Attributes customClientReadings.
 # Eine Änderung hat Auswirkungen auf (alte) Moduldefinitionen ohne dieses Attribut.
-my $defaultClientReadings=".:^accesspoint|^essid|^hostname|^last_seen|^snr|^uptime";
+my $defaultClientReadings=".:^accesspoint|^essid|^hostname|^last_seen|^snr|^uptime"; #ist wegen snr vs rssi nur halb korrekt, wird aber auch nicht wirklich verwendet ;-)
 use strict;
 use warnings;
 use HttpUtils;
@@ -143,7 +145,7 @@ sub Unifi_Initialize($$) {
                          ."httpLoglevel:1,2,3,4,5 "
                          ."eventPeriod "
                          ."voucherCache "
-                         ."customClientReadings "
+                         ."customClientReadings:textField-long "
                          .$readingFnAttributes;
                          
 	$hash->{Clients} = "UnifiSwitch";
@@ -789,6 +791,7 @@ sub Unifi_GetClients_Send($) {
     } );
     return undef;
 }
+###############################################################################
 sub Unifi_GetClients_Receive($) {
     my ($param, $err, $data) = @_;
     my ($name,$self,$hash) = ($param->{hash}->{NAME},Unifi_Whoami(),$param->{hash});
@@ -816,6 +819,61 @@ sub Unifi_GetClients_Receive($) {
         }
     }
     Unifi_NextUpdateFn($hash,$self);
+    return undef;
+}
+###############################################################################
+
+sub Unifi_UpdateClient_Send($$) {
+    my ($hash,$mac) = @_;
+    my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
+    Log3 $name, 5, "$name ($self) - executed with mac ".$mac;
+    
+    HttpUtils_NonblockingGet( {
+                 %{$hash->{httpParams}},
+        method   => "GET",
+        url      => $hash->{unifi}->{url}."stat/user/".$mac,
+        callback => \&Unifi_UpdateClient_Receive
+    } );
+    return undef;
+}
+###############################################################################
+sub Unifi_UpdateClient_Receive($) {
+    my ($param, $err, $data) = @_;
+    my ($name,$self,$hash) = ($param->{hash}->{NAME},Unifi_Whoami(),$param->{hash});
+    Log3 $name, 5, "$name ($self) - executed.";
+    
+    if ($err ne "") {
+        Unifi_ReceiveFailure($hash,{rc => 'Error while requesting', msg => $param->{url}." - $err"});
+    }
+    elsif ($data ne "") {
+        if ($param->{code} == 200 || $param->{code} == 400  || $param->{code} == 401) {
+            eval { $data = decode_json($data); 1; } or do { $data = { meta => {rc => 'error.decode_json', msg => $@} }; };
+            
+            if ($data->{meta}->{rc} eq "ok") {
+                Log3 $name, 5, "$name ($self) - state:'$data->{meta}->{rc}'";
+                
+                my $apNames = {};
+                for my $apID (keys %{$hash->{accespoints}}) {
+                  my $apRef = $hash->{accespoints}->{$apID};
+                  $apNames->{$apRef->{mac}} = $apRef->{name} ? $apRef->{name} : $apRef->{ip};
+                }
+                
+                #$hash->{unifi}->{connectedClients} = undef;
+                for my $h (@{$data->{data}}) {
+                    $hash->{unifi}->{connectedClients}->{$h->{user_id}} = 1;
+                    $hash->{clients}->{$h->{user_id}} = $h;
+                
+                    readingsBeginUpdate($hash);
+                    Unifi_setClientReadings($hash);   
+                    readingsEndUpdate($hash,1);
+                }
+                #$hash->{clients}->{$data->{data}[0]->{user_id}} = $data->{data};
+            }
+            else { Unifi_ReceiveFailure($hash,$data->{meta}); }
+        } else {
+            Unifi_ReceiveFailure($hash,{rc => $param->{code}, msg => "Failed with HTTP Code $param->{code}."});
+        }
+    }
     return undef;
 }
 ###############################################################################
@@ -1134,11 +1192,7 @@ sub Unifi_SetClientReadings($) {
     for my $clientID (keys %{$hash->{clients}}) {
         $clientRef = $hash->{clients}->{$clientID};
         $clientName = Unifi_ClientNames($hash,$clientID,'makeAlias');
-		
-		if (! defined ReadingsVal($hash->{NAME},$clientName,undef)){
-		  $newClients.=$sep.$clientName;
-		  $sep=",";
-		}				
+						
 				
 		next if( $ignoreWired && $clientRef->{is_wired} );
 		next if( $ignoreWireless && !$clientRef->{is_wired} );
@@ -1195,6 +1249,10 @@ sub Unifi_SetClientReadings($) {
 		if (defined $hash->{unifi}->{connectedClients}->{$clientID}) {
 			readingsBulkUpdate($hash,$clientName,'connected');
 			
+			if (! defined ReadingsVal($hash->{NAME},$clientName,undef)){
+			  $newClients.=$sep.$clientName;
+			  $sep=",";
+			}
 			# altes Standardverhalten kann man auch ohne RegEx-Auswertungen beibehalten
 			if(AttrVal($name,"customClientReadings",$defaultClientReadings) eq $defaultClientReadings){ 
 				readingsBulkUpdate($hash,$clientName."_hostname",(defined $clientRef->{hostname}) ? $clientRef->{hostname} : (defined $clientRef->{ip}) ? $clientRef->{ip} : 'Unknown');
@@ -1407,82 +1465,6 @@ sub Unifi_DisconnectClient_Receive($) {
 }
 ###############################################################################
 
-sub Unifi_UpdateClient_Send($$) {
-    my ($hash,$mac) = @_;
-    my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
-    Log3 $name, 5, "$name ($self) - executed with mac ".$mac;
-    
-    HttpUtils_NonblockingGet( {
-                 %{$hash->{httpParams}},
-        method   => "GET",
-        url      => $hash->{unifi}->{url}."stat/user/".$mac,
-        callback => \&Unifi_UpdateClient_Receive
-    } );
-    return undef;
-}
-###############################################################################
-sub Unifi_UpdateClient_Receive($) {
-    my ($param, $err, $data) = @_;
-    my ($name,$self,$hash) = ($param->{hash}->{NAME},Unifi_Whoami(),$param->{hash});
-    Log3 $name, 5, "$name ($self) - executed.";
-    
-    if ($err ne "") {
-        Unifi_ReceiveFailure($hash,{rc => 'Error while requesting', msg => $param->{url}." - $err"});
-    }
-    elsif ($data ne "") {
-        if ($param->{code} == 200 || $param->{code} == 400  || $param->{code} == 401) {
-            eval { $data = decode_json($data); 1; } or do { $data = { meta => {rc => 'error.decode_json', msg => $@} }; };
-            
-            if ($data->{meta}->{rc} eq "ok") {
-                Log3 $name, 5, "$name ($self) - state:'$data->{meta}->{rc}'";
-                
-                my $apNames = {};
-                for my $apID (keys %{$hash->{accespoints}}) {
-                  my $apRef = $hash->{accespoints}->{$apID};
-                  $apNames->{$apRef->{mac}} = $apRef->{name} ? $apRef->{name} : $apRef->{ip};
-                }
-                
-                #$hash->{unifi}->{connectedClients} = undef;
-                for my $h (@{$data->{data}}) {
-                    $hash->{unifi}->{connectedClients}->{$h->{user_id}} = 1;
-                    $hash->{clients}->{$h->{user_id}} = $h;
-                
-                    readingsBeginUpdate($hash);
-                    if(defined $h->{user_id}){
-                        $hash->{unifi}->{connectedClients}->{$h->{user_id}} = $h;
-                        $hash->{clients}->{$h->{user_id}} = $h;
-                        my $clientRef = $hash->{clients}->{$h->{user_id}};
-                        my $clientName = Unifi_ClientNames($hash,$h->{user_id},'makeAlias');
-                        my $apName = "unknown";
-                        if ($clientRef->{is_wired}
-                            &&  defined $clientRef->{sw_mac} && defined($apNames->{$clientRef->{sw_mac}}) ) {
-                          $apName = $apNames->{$clientRef->{sw_mac}};
-                        } elsif (defined $clientRef->{ap_mac} && defined($apNames->{$clientRef->{ap_mac}}) ) {
-                          $apName = $apNames->{$clientRef->{ap_mac}};
-                        }
-                        
-                        readingsBulkUpdate($hash,$clientName."_hostname",(defined $clientRef->{hostname}) ? $clientRef->{hostname} : (defined $clientRef->{ip}) ? $clientRef->{ip} : 'Unknown');
-                        readingsBulkUpdate($hash,$clientName."_last_seen",strftime "%Y-%m-%d %H:%M:%S",localtime($clientRef->{last_seen}));
-                        readingsBulkUpdate($hash,$clientName."_uptime",$clientRef->{uptime});
-                        readingsBulkUpdate($hash,$clientName."_snr",$clientRef->{rssi});
-                        readingsBulkUpdate($hash,$clientName."_accesspoint",$apName);
-                        readingsBulkUpdate($hash,$clientName,'connected');
-                    }else{
-                        Log3 $name, 5, "$name ($self) - Client ".$h->{hostname}." previously connected is now disconnected.";
-                        readingsBulkUpdate($hash,$h->{hostname},'disconnected');
-                    }    
-                    readingsEndUpdate($hash,1);
-                }
-                #$hash->{clients}->{$data->{data}[0]->{user_id}} = $data->{data};
-            }
-            else { Unifi_ReceiveFailure($hash,$data->{meta}); }
-        } else {
-            Unifi_ReceiveFailure($hash,{rc => $param->{code}, msg => "Failed with HTTP Code $param->{code}."});
-        }
-    }
-    return undef;
-}
-###############################################################################
 sub Unifi_BlockClient_Send($$) {
   my ($hash,$mac) = @_;
   my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
