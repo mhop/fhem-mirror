@@ -16,6 +16,7 @@ FBAHAHTTP_Initialize($)
   $hash->{WriteFn}  = "FBAHAHTTP_Write";
   $hash->{DefFn}    = "FBAHAHTTP_Define";
   $hash->{SetFn}    = "FBAHAHTTP_Set";
+  $hash->{GetFn}    = "FBAHAHTTP_Get";
   $hash->{AttrFn}   = "FBAHAHTTP_Attr";
   $hash->{ReadyFn}  = "FBAHAHTTP_Ready";
   $hash->{RenameFn} = "FBAHAHTTP_RenameFn";
@@ -200,12 +201,14 @@ FBAHAHTTP_Set($@)
 {
   my ($hash, @a) = @_;
   my $name = shift @a;
-  my %sets = (password=>2, refreshstate=>1);
+  my %sets = (password=>2, refreshstate=>1,template=>2);
 
   return "set $name needs at least one parameter" if(@a < 1);
   my $type = shift @a;
 
-  return "Unknown argument $type, choose one of refreshstate:noArg password"
+  my $tl = ReadingsVal($name,"templateList","");
+  my $cmdList = "refreshstate:noArg password".($tl ? " template:$tl" : "");
+  return "Unknown argument $type, choose one of $cmdList"
     if(!defined($sets{$type}));
   return "Missing argument for $type" if(int(@a) < $sets{$type}-1);
 
@@ -219,7 +222,60 @@ FBAHAHTTP_Set($@)
     FBAHAHTTP_Poll($hash);
     return;
   }
+  if($type eq "template") {
+    FBAHAHTTP_Write($hash, $a[0], "applytemplate");
+    return;
+  }
 
+  return undef;
+}
+
+#####################################
+sub
+FBAHAHTTP_Get($@)
+{
+  my ($hash, @a) = @_;
+  my $name = shift @a;
+  my %gets = (templatelist=>1);
+  return "get $name needs at least one parameter" if(@a < 1);
+  my $type = shift @a;
+  my $cl = $hash->{CL};
+
+  my $doRet = sub($)
+  {
+    if($cl) {
+      asyncOutput($cl, $_[0]);
+    } else {
+      Log3 $hash, 4, "$_";
+    }
+  };
+
+  return "Unknown argument $type, choose one of templatelist:noArg"
+    if(!defined($gets{$type}));
+  return "Missing argument for $type" if(int(@a) < $gets{$type}-1);
+
+  if($type eq "templatelist") {
+    my $host = ($hash->{DEF} =~ m/^http/i ? $hash->{DEF}:"http://$hash->{DEF}");
+    my $sid = $hash->{".SID"};
+    return "No SID found" if(!$sid);
+    HttpUtils_NonblockingGet({
+      url=>"$host/webservices/homeautoswitch.lua?".
+           "sid=$sid&switchcmd=gettemplatelistinfos",
+      loglevel => AttrVal($name, "verbose", 4),
+      timeout => AttrVal($name, "fbTimeout", 4),
+      callback => sub {
+        if($_[1]) {
+          delete $hash->{".SID"};
+          return $doRet->("$name: $_[1]");
+        }
+        my $ret = (defined($_[2]) ? $_[2] : "") ;
+        my @r;
+        $ret =~ s:<name>([^<]+)</name>:push(@r,$1):ge;
+        readingsSingleUpdate($hash, "templateList", join(",",@r), $1);
+        $doRet->(join(",",@r));
+      }
+    });
+  }
   return undef;
 }
 
@@ -249,7 +305,8 @@ FBAHAHTTP_ProcessStack($)
       Log3 $name, 5, "FBAHAHTTP_Write reply for $name: $ret";
       if($ret eq "") {
         if($hash->{RetriedCmd}) {
-          Log3 $name, 1, "No sensible respone after reconnect, giving up";
+          Log3 $name, 1,
+                "No sensible response for $msg after reconnect, giving up";
           $hash->{CmdStack} = ();
           return;
         }
@@ -342,12 +399,20 @@ FBAHAHTTP_Write($$$)
     The state of all devices is polled every &lt;polltime&gt; seconds (default
     is 300). This command forces a state-refresh.
     </li>
+  <li>template &lt;templateName&gt;<br>
+    Set the the template. Note: currently not working, for unknown reason.
+    </li>
   </ul>
   <br>
 
   <a name="FBAHAHTTPget"></a>
   <b>Get</b>
-  <ul>N/A</ul>
+  <ul>
+  <li>templateList<br>
+    get the list of templates from the Fritz!Box, and store the in the
+    templateList reading. Needed for the set template command.
+    </li>
+  </ul>
   <br>
 
   <a name="FBAHAHTTPattr"></a>
