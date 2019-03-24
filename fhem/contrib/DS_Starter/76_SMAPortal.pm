@@ -141,6 +141,7 @@ BEGIN {
 
 # Versions History intern
 our %vNotesIntern = (
+  "1.5.1"  => "24.03.2019  fix \$VAR1 problem Forum: #27667.msg922983.html#msg922983 ",
   "1.5.0"  => "23.03.2019  add consumer data ",
   "1.4.0"  => "22.03.2019  add function extractPlantData, DbLog_split, change L2 Readings ",
   "1.3.0"  => "18.03.2019  change module to use package FHEM::SMAPortal and Meta.pm, new sub setVersionInfo ",
@@ -644,13 +645,14 @@ sub ParseData($) {
           if (($livedata_content->{$k} =~ m/ARRAY/i) || ($livedata_content->{$k} =~ m/HASH/i)) {
               Log3 $name, 4, "$name - Livedata content \"$k\": ".($livedata_content->{$k});
               if($livedata_content->{$k} =~ m/ARRAY/i) {
-                  my $hd0 = Dumper($livedata_content->{$k}[0]);
+                  my $hd0 = $livedata_content->{$k}[0];
                   if(!$hd0) {
                       next;
                   }
                   chomp $hd0;
                   $hd0 =~ s/[;']//g;
                   $hd0 = ($hd0 =~ /^undef$/)?"none":$hd0;
+                  $hd0 = encode("utf8", $hd0);
                   Log3 $name, 4, "$name - Livedata \"$k\": $hd0";
                   $new_val = $hd0;
               }
@@ -922,20 +924,20 @@ sub extractWeatherData($$) {
           if ($weather->{$k} =~ m/HASH/i) {
               my $ih = $weather->{$k};
               for my $i (keys %$ih) {
-                  my $hd0 = Dumper($weather->{$k}{$i});
+                  my $hd0 = $weather->{$k}{$i};
                   if(!$hd0) {
                       next;
                   }
                   chomp $hd0;
                   $hd0 =~ s/[;']//g;
                   $hd0 = ($hd0 =~ /^undef$/)?"none":$hd0;
+                  $hd0 = encode("utf8", $hd0);
                   Log3 $name, 4, "$name - Weatherdata \"$k $i\": $hd0";
                   next if($i =~ /^WeatherIcon$/);
                   $new_val = $hd0;
-                  
+
                   if ($new_val) {
                       if($i =~ /^TemperatureSymbol$/) {
-                          $new_val =~ s/.*}([A-Z]).*/°$1/;
                           $tsymbol = $new_val;
                           next;
                       }
