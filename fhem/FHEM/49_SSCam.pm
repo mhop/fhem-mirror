@@ -47,6 +47,7 @@ use Encode;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.11.5" => "24.03.2019  fix possible overload Synology DS during shutdown restart ",
   "8.11.4" => "11.03.2019  make module ready for SVS version 8.2.3-5829 ",
   "8.11.3" => "08.03.2019  avoid possible JSON errors, fix fhem is hanging while restart or get snapinfo - Forum: #45671.msg915546.html#msg915546 ",
   "8.11.2" => "04.03.2019  bugfix no snapinfos when snap was done by SVS itself, Forum: https://forum.fhem.de/index.php/topic,45671.msg914685.html#msg914685",
@@ -494,7 +495,7 @@ return undef;
 ################################################################
 sub SSCam_Undef($$) {
   my ($hash, $arg) = @_;
-  SSCam_logout($hash);
+  #SSCam_logout($hash);
   RemoveInternalTimer($hash);
    
 return undef;
