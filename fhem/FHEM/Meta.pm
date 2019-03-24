@@ -1933,8 +1933,8 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
             && defined( $modMeta->{resources}{x_wiki} ) )
         {
             if ( defined( $modMeta->{x_vcs} ) ) {
-                $modMeta->{resources}{x_wiki}{web} = 'https://wiki.fhem.de/';
-                $modMeta->{resources}{x_wiki}{modpath} = 'wiki/';
+                $modMeta->{resources}{x_wiki}{web} =
+                  'https://wiki.fhem.de/wiki/' . $modName;
             }
         }
 

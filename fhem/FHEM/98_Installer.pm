@@ -18,6 +18,7 @@ sub Installer_Initialize($) {
         "disable:1,0 "
       . "disabledForIntervals "
       . "updateListReading:1,0 "
+      . "implicitGlobalSearch:0,1 "
       . $readingFnAttributes;
 
     return FHEM::Meta::InitMod( __FILE__, $modHash );
@@ -47,6 +48,7 @@ BEGIN {
           ReadingsTimestamp
           defs
           modules
+          cmds
           packages
           Log
           Log3
@@ -965,6 +967,8 @@ sub CreateSearchList ($$$) {
                   $colOpen . $txtOpen . 'Device Name' . $txtClose . $colClose;
                 push @ret,
                   $colOpen . $txtOpen . 'Device Type' . $txtClose . $colClose;
+                push @ret,
+                  $colOpen . $txtOpen . 'Device State' . $txtClose . $colClose;
                 push @ret, $rowClose;
             }
             $found++;
@@ -994,6 +998,11 @@ sub CreateSearchList ($$$) {
 
             $l .= $colOpen . $linkDev . $colClose;
             $l .= $colOpen . $linkMod . $colClose;
+            $l .=
+              $colOpen
+              . (
+                defined( $defs{$device}{STATE} ) ? $defs{$device}{STATE} : '' )
+              . $colClose;
 
             $l .= $rowClose;
 
@@ -1350,6 +1359,34 @@ sub CreateSearchList ($$$) {
     }
     push @ret, $tableClose if ($foundPerl);
 
+    #TODO works only if fhem.pl patch was accepted:
+    #  https://forum.fhem.de/index.php/topic,98937.0.html
+    if (   defined( $hash->{CL} )
+        && defined( $hash->{CL}{'.iDefCmdMethod'} )
+        && $hash->{CL}{'.iDefCmdMethod'} eq 'always' )
+    {
+        my $cmdO = $hash->{CL}{'.iDefCmdOrigin'};
+
+        if (   defined( $cmds{$cmdO} )
+            && defined( $hash->{CL}{'.iDefCmdOverwrite'} )
+            && $hash->{CL}{'.iDefCmdOverwrite'} )
+        {
+            my $cmd = $search;
+            $cmd =~ s/^$cmdO//;
+            $cmd = $cmdO . '!' . ( $cmd && $cmd ne '' ? ' ' . $cmd : '' );
+
+            unshift @ret,
+                $lb
+              . $lb
+              . 'Did you mean to <a href="?cmd='
+              . $cmd
+              . $FW_CSRF
+              . '">run command '
+              . $cmdO
+              . '</a> instead?';
+        }
+    }
+
     if ($found) {
         unshift @ret,
             $lb
@@ -1411,6 +1448,7 @@ sub CreateSearchList ($$$) {
     else {
         unshift @ret, 'Nothing found';
     }
+
     unshift @ret,
       '<a name="searchResultTOP"></a><h2>Search result: ' . $search . '</h2>';
 
@@ -1785,14 +1823,6 @@ sub CreateMetadataList ($$$) {
                 my $url =
                   $modMeta->{resources}{x_wiki}{web};
                 $url .= '/' unless ( $url =~ m/\/$/ );
-
-                if ( defined( $modMeta->{resources}{x_wiki}{modpath} ) ) {
-                    $url .= '/' unless ( $url =~ m/\/$/ );
-                    $url .=
-                      $modMeta->{resources}{x_wiki}{modpath};
-                    $url .= '/' unless ( $url =~ m/\/$/ );
-                    $url .= $modName eq 'Global' ? 'global' : $modName;
-                }
 
                 $l .=
                   '<a href="' . $url . '" target="_blank">' . $title . '</a>';
