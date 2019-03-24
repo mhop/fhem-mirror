@@ -1252,13 +1252,14 @@ sub Unifi_SetClientReadings($) {
 		}
 
 		
-		if (defined $hash->{unifi}->{connectedClients}->{$clientID}) {
-			readingsBulkUpdate($hash,$clientName,'connected');
-			
+		if (defined $hash->{unifi}->{connectedClients}->{$clientID}) {			
 			if (! defined ReadingsVal($hash->{NAME},$clientName,undef)){
 			  $newClients.=$sep.$clientName;
 			  $sep=",";
 			}
+			
+			readingsBulkUpdate($hash,$clientName,'connected');
+			
 			# altes Standardverhalten kann man auch ohne RegEx-Auswertungen beibehalten
 			if(AttrVal($name,"customClientReadings",$defaultClientReadings) eq $defaultClientReadings){ 
 				readingsBulkUpdate($hash,$clientName."_hostname",(defined $clientRef->{hostname}) ? $clientRef->{hostname} : (defined $clientRef->{ip}) ? $clientRef->{ip} : 'Unknown');
