@@ -216,18 +216,57 @@ FBAHAHTTP_Set($@)
     setKeyValue("FBAHAHTTP_PASSWORD_$name", $a[0]);
     delete($hash->{".SID"});
     FBAHAHTTP_Poll($hash);
-    return;
-  }
-  if($type eq "refreshstate") {
+
+  } elsif($type eq "refreshstate") {
     FBAHAHTTP_Poll($hash);
-    return;
-  }
-  if($type eq "template") {
-    FBAHAHTTP_Write($hash, $a[0], "applytemplate");
-    return;
+
+  } elsif($type eq "template") {
+    my $cl = $hash->{CL};
+    my $doRet = sub($)
+    {
+      if($cl) {
+        asyncOutput($cl, $_[0]);
+      } else {
+        Log3 $hash, 4, "$_";
+      }
+    };
+    FBAHAHTTP_GetTemplateList($hash, sub($$){
+      my ($err, $r) = @_;
+      return $doRet->($err) if($err);
+      return $doRet->("Unknown template $a[0]") if(!defined($r->{$a[0]}));
+      FBAHAHTTP_Write($hash, $r->{$a[0]}, "applytemplate");
+    });
   }
 
   return undef;
+}
+
+sub
+FBAHAHTTP_GetTemplateList($$)
+{
+  my ($hash, $callbackFn) = @_;
+
+  my $host = ($hash->{DEF} =~ m/^http/i ? $hash->{DEF}:"http://$hash->{DEF}");
+  my $sid = $hash->{".SID"};
+  my $name = $hash->{NAME};
+  return "No SID found" if(!$sid);
+  HttpUtils_NonblockingGet({
+    url=>"$host/webservices/homeautoswitch.lua?".
+         "sid=$sid&switchcmd=gettemplatelistinfos",
+    loglevel => AttrVal($name, "verbose", 4),
+    timeout => AttrVal($name, "fbTimeout", 4),
+    callback => sub {
+      if($_[1]) {
+        delete $hash->{".SID"};
+        return $callbackFn->("$name: $_[1]");
+      }
+      my $ret = (defined($_[2]) ? $_[2] : "") ;
+      my %r;
+      $ret =~ s:<template identifier="([^"]*)".*?<name>([^<]+)</name>:
+                $r{$2}=$1:ge;
+      $callbackFn->(undef, \%r);
+    }
+  });
 }
 
 #####################################
@@ -241,39 +280,25 @@ FBAHAHTTP_Get($@)
   my $type = shift @a;
   my $cl = $hash->{CL};
 
-  my $doRet = sub($)
-  {
-    if($cl) {
-      asyncOutput($cl, $_[0]);
-    } else {
-      Log3 $hash, 4, "$_";
-    }
-  };
-
   return "Unknown argument $type, choose one of templatelist:noArg"
     if(!defined($gets{$type}));
   return "Missing argument for $type" if(int(@a) < $gets{$type}-1);
 
   if($type eq "templatelist") {
-    my $host = ($hash->{DEF} =~ m/^http/i ? $hash->{DEF}:"http://$hash->{DEF}");
-    my $sid = $hash->{".SID"};
-    return "No SID found" if(!$sid);
-    HttpUtils_NonblockingGet({
-      url=>"$host/webservices/homeautoswitch.lua?".
-           "sid=$sid&switchcmd=gettemplatelistinfos",
-      loglevel => AttrVal($name, "verbose", 4),
-      timeout => AttrVal($name, "fbTimeout", 4),
-      callback => sub {
-        if($_[1]) {
-          delete $hash->{".SID"};
-          return $doRet->("$name: $_[1]");
-        }
-        my $ret = (defined($_[2]) ? $_[2] : "") ;
-        my @r;
-        $ret =~ s:<name>([^<]+)</name>:push(@r,$1):ge;
-        readingsSingleUpdate($hash, "templateList", join(",",@r), $1);
-        $doRet->(join(",",@r));
+    my $doRet = sub($)
+    {
+      if($cl) {
+        asyncOutput($cl, $_[0]);
+      } else {
+        Log3 $hash, 4, "$_";
       }
+    };
+    FBAHAHTTP_GetTemplateList($hash, sub($$){
+      my ($err, $r) = @_;
+      return $doRet->($err) if($err);
+      my $str = join(",",sort keys %{$r});
+      readingsSingleUpdate($hash, "templateList", $str, 1);
+      $doRet->($str);
     });
   }
   return undef;
