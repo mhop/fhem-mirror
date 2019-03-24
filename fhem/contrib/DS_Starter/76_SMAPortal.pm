@@ -84,10 +84,12 @@ use FHEM::Meta;
 use Data::Dumper;
 use Blocking;
 use Time::HiRes qw(gettimeofday);
+use Time::Local;
 use LWP::UserAgent;
 use HTTP::Cookies;
 use JSON qw(decode_json);
 use MIME::Base64;
+use Encode;
 
 # Run before module compilation
 BEGIN {
@@ -139,8 +141,9 @@ BEGIN {
 
 # Versions History intern
 our %vNotesIntern = (
-  "1.4.0"  => "22.03.2019  add function extractPlantData, DbLog_split, change L2 Readings",
-  "1.3.0"  => "18.03.2019  change module to use package FHEM::SMAPortal and Meta.pm, new sub setVersionInfo",
+  "1.5.0"  => "23.03.2019  add consumer data ",
+  "1.4.0"  => "22.03.2019  add function extractPlantData, DbLog_split, change L2 Readings ",
+  "1.3.0"  => "18.03.2019  change module to use package FHEM::SMAPortal and Meta.pm, new sub setVersionInfo ",
   "1.2.3"  => "12.03.2019  make ready for 98_Installer.pm ", 
   "1.2.2"  => "11.03.2019  new Errormessage analyze added, make ready for Meta.pm ", 
   "1.2.1"  => "10.03.2019  behavior of state changed, commandref revised ", 
@@ -533,7 +536,7 @@ sub GetData($) {
       # JSON Forecast Daten
       my $dl = AttrVal($name, "detailLevel", 1);
       if($dl > 1) {
-          Log3 $name, 5, "$name - Getting forecast data now";
+          Log3 $name, 4, "$name - Getting forecast data now";
 
           my $forecast_page = $ua->get('https://www.sunnyportal.com/HoMan/Forecast/LoadRecommendationData');
           Log3 $name, 5, "$name - Return Code: ".$forecast_page->code;
@@ -638,8 +641,8 @@ sub ParseData($) {
   for my $k (keys %$livedata_content) {
       my $new_val = ""; 
       if (defined $livedata_content->{$k}) {
-          Log3 $name, 4, "$name - Livedata content \"$k\": ".($livedata_content->{$k});
           if (($livedata_content->{$k} =~ m/ARRAY/i) || ($livedata_content->{$k} =~ m/HASH/i)) {
+              Log3 $name, 4, "$name - Livedata content \"$k\": ".($livedata_content->{$k});
               if($livedata_content->{$k} =~ m/ARRAY/i) {
                   my $hd0 = Dumper($livedata_content->{$k}[0]);
                   if(!$hd0) {
@@ -648,7 +651,7 @@ sub ParseData($) {
                   chomp $hd0;
                   $hd0 =~ s/[;']//g;
                   $hd0 = ($hd0 =~ /^undef$/)?"none":$hd0;
-                  Log3 $name, 4, "$name - Livedata ARRAY content \"$k\": $hd0";
+                  Log3 $name, 4, "$name - Livedata \"$k\": $hd0";
                   $new_val = $hd0;
               }
 		  } else {
@@ -683,6 +686,7 @@ sub ParseData($) {
       # Auswertung der Forecast Daten
       extractForecastData($hash,$forecast_content);
       extractPlantData($hash,$forecast_content);
+      extractConsumerData($hash,$forecast_content);
   }
   
   if ($weatherdata_content && $weatherdata_content !~ m/undefined/i) {
@@ -805,9 +809,8 @@ sub extractForecastData($$) {
   my $current_day = (localtime)[3];
 
   # Loop through all forecast objects
+  # Energie wird als "J" geliefert, Wh = J / 3600
   foreach my $fc_obj (@{$forecast->{'ForecastSeries'}}) {
-      
-      # Log3 $name, 4, "$name - Forecast data: ".Dumper $fc_obj;
       # Example for DateTime: 2016-02-15T23:00:00
       my $fc_datetime = $fc_obj->{'TimeStamp'}->{'DateTime'};
 
@@ -816,7 +819,6 @@ sub extractForecastData($$) {
       my $fc_uts          = POSIX::mktime( 0, 0, $fc_hour,  $fc_day, $fc_month - 1, $fc_year - 1900 );
       my $fc_diff_seconds = $fc_uts - time + 3600;  # So we go above 0 for the current hour                                                                        
       my $fc_diff_hours   = int( $fc_diff_seconds / 3600 );
-      #Log3 $hash->{NAME}, 3, "Found $fc_datetime, diff $fc_diff_seconds seconds, $fc_diff_hours hours.";
 
       # Don't use old data
       next if $fc_diff_seconds < 0;
@@ -852,14 +854,14 @@ sub extractForecastData($$) {
               my $time_str = "ThisHour";
               $time_str = "NextHour".sprintf("%02d", $obj_nr) if($fc_diff_hours>0);
               if($time_str =~ /NextHour/ && $dl >= 4) {
-                  readingsBulkUpdate( $hash, "L4_${time_str}_Time", $fc_obj->{'TimeStamp'}->{'DateTime'} );
+                  readingsBulkUpdate( $hash, "L4_${time_str}_Time", UTC2LocalString($hash,$fc_obj->{'TimeStamp'}->{'DateTime'}) );
                   readingsBulkUpdate( $hash, "L4_${time_str}_PvMeanPower", int( $fc_obj->{'PvMeanPower'}->{'Amount'} ) );
                   readingsBulkUpdate( $hash, "L4_${time_str}_Consumption", int( $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600 ) );
                   readingsBulkUpdate( $hash, "L4_${time_str}_IsConsumptionRecommended", ($fc_obj->{'IsConsumptionRecommended'} ? "yes" : "no") );
                   readingsBulkUpdate( $hash, "L4_${time_str}", int( $fc_obj->{'PvMeanPower'}->{'Amount'} - $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600 ) );
               }
               if($time_str =~ /ThisHour/ && $dl >= 2) {
-                  readingsBulkUpdate( $hash, "L2_${time_str}_Time", $fc_obj->{'TimeStamp'}->{'DateTime'} );
+                  readingsBulkUpdate( $hash, "L2_${time_str}_Time", UTC2LocalString($hash,$fc_obj->{'TimeStamp'}->{'DateTime'}) );
                   readingsBulkUpdate( $hash, "L2_${time_str}_PvMeanPower", int( $fc_obj->{'PvMeanPower'}->{'Amount'} ) );
                   readingsBulkUpdate( $hash, "L2_${time_str}_Consumption", int( $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600 ) );
                   readingsBulkUpdate( $hash, "L2_${time_str}_IsConsumptionRecommended", ($fc_obj->{'IsConsumptionRecommended'} ? "yes" : "no") );
@@ -927,7 +929,7 @@ sub extractWeatherData($$) {
                   chomp $hd0;
                   $hd0 =~ s/[;']//g;
                   $hd0 = ($hd0 =~ /^undef$/)?"none":$hd0;
-                  Log3 $name, 4, "$name - Weatherdata HASH content \"$k $i\": $hd0";
+                  Log3 $name, 4, "$name - Weatherdata \"$k $i\": $hd0";
                   next if($i =~ /^WeatherIcon$/);
                   $new_val = $hd0;
                   
@@ -982,8 +984,8 @@ sub extractPlantData($$) {
   if($ppp && $dl >= 2) {
       $amount = $forecast->{'PlantPeakPower'}{'Amount'}; 
 	  $unit   = $forecast->{'PlantPeakPower'}{'StandardUnit'}{'Symbol'}; 
-      Log3 $name, 4, "$name - Plantdata HASH content \"PlantPeakPower Amount\": $amount";
-	  Log3 $name, 4, "$name - Plantdata HASH content \"PlantPeakPower Symbol\": $unit";
+      Log3 $name, 4, "$name - Plantdata \"PlantPeakPower Amount\": $amount";
+	  Log3 $name, 4, "$name - Plantdata \"PlantPeakPower Symbol\": $unit";
   }
 
   readingsBulkUpdate($hash, "L2_PlantPeakPower", "$amount $unit"); 
@@ -992,6 +994,85 @@ sub extractPlantData($$) {
   
 return;
 }
+
+################################################################
+##                     Auswertung Consumer Data
+################################################################
+sub extractConsumerData($$) {
+  my ($hash,$forecast) = @_;
+  my $name = $hash->{NAME};
+  my %consumers;
+  my ($key,$val);
+  
+  my $dl = AttrVal($name, "detailLevel", 1);
+  if($dl <= 1) {
+      return;
+  }
+  
+  readingsBeginUpdate($hash);
+  
+  # Schleife über alle Consumer Objekte
+  my $i = 0;
+  foreach my $c (@{$forecast->{'Consumers'}}) {
+      $consumers{"${i}_ConsumerName"} = encode("utf8", $c->{'ConsumerName'} );
+      $consumers{"${i}_ConsumerOid"}  = $c->{'ConsumerOid'};
+      $i++;
+  }
+  
+  if(%consumers && $forecast->{'ForecastTimeframes'}) {
+      # es sind Vorhersagen zu geplanten Verbraucherschaltzeiten vorhanden
+      foreach my $c (@{$forecast->{'ForecastTimeframes'}{'PlannedTimeFrames'}}) {
+          my $deviceOid      = $c->{'DeviceOid'};   
+          my $timeFrameStart = UTC2LocalString($hash,$c->{'TimeFrameStart'}{'DateTime'});  # wandele UTC Time zu lokaler Zeit        
+          my $timeFrameEnd   = UTC2LocalString($hash,$c->{'TimeFrameEnd'}{'DateTime'});    # wandele UTC Time zu lokaler Zeit
+          my $tz             = $c->{'TimeFrameStart'}{'Kind'};
+          foreach my $k (keys(%consumers)) {
+               $val = $consumers{$k};
+               if($val eq $deviceOid) {
+                   $k      =~ /^(\d+)_.*$/;
+                   my $lfn = $1;
+                   # $consumer = $consumers{"${lfn}_ConsumerName"};
+                   $consumers{"${lfn}_PlannedOpTimeStart"} = $timeFrameStart;
+                   $consumers{"${lfn}_PlannedOpTimeEnd"}   = $timeFrameEnd;
+               }
+          }          
+      }
+  
+  
+  }
+
+  if(%consumers) {
+      foreach my $key (keys(%consumers)) {
+          Log3 $name, 4, "$name - Consumer data \"$key\": ".$consumers{$key};
+          if($key =~ /ConsumerName/ && $dl >= 3) {
+               $key    =~ /^(\d+)_.*$/;
+               my $lfn = $1; 
+               my $cn  = $consumers{"${lfn}_ConsumerName"};            # Verbrauchername
+               my $pos = $consumers{"${lfn}_PlannedOpTimeStart"};      # geplanter Start
+               my $poe = $consumers{"${lfn}_PlannedOpTimeEnd"};        # geplantes Ende
+               my $rb  = "L3_${cn}_PlannedOpTimeBegin"; 
+               my $re  = "L3_${cn}_PlannedOpTimeEnd";
+			   my $rp  = "L3_${cn}_Planned";
+               if($pos) {             
+                   readingsBulkUpdate($hash, $rb, $pos); 
+                   readingsBulkUpdate($hash, $rp, "yes");  				   
+               } else {
+                   readingsBulkUpdate($hash, $rb, "undefined"); 
+				   readingsBulkUpdate($hash, $rp, "no");  
+               }   
+               if($poe) {             
+                   readingsBulkUpdate($hash, $re, $poe);          
+               } else {
+                   readingsBulkUpdate($hash, $re, "undefined");
+               }                  
+          }
+      }
+  }
+  
+  readingsEndUpdate($hash, 1); 
+  
+return;
+} 
 
 ################################################################
 # sortiert eine Liste von Versionsnummern x.x.x
@@ -1100,7 +1181,7 @@ sub analivedat($$) {
                   chomp $hd0;
                   $hd0 =~ s/[;']//g;
                   $hd0 = ($hd0 =~ /^undef$/)?"none":$hd0;
-                  Log3 $name, 4, "$name - livedata ARRAY content \"$k\": $hd0";
+                  # Log3 $name, 4, "$name - livedata ARRAY content \"$k\": $hd0";
                   $new_val = $hd0;
               }
 		  } else {
@@ -1142,6 +1223,31 @@ sub retrygetdata($) {
   $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057
 	  
 return;
+}
+
+################################################################
+#             UTC in lokale Zeit umwandeln
+################################################################
+sub UTC2LocalString($$) {
+  my ($hash,$t) = @_;
+  $t            =~ s/T/ /;
+  my ($datehour, $rest) = split(/:/,$t,2);
+  my ($year, $month, $day, $hour) = $datehour =~ /(\d+)-(\d\d)-(\d\d)\s+(\d\d)/;
+  
+  #  proto: $time = timegm($sec,$min,$hour,$mday,$mon,$year);
+  my $epoch = timegm (0,0,$hour,$day,$month-1,$year);
+  
+  #  proto: ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+  my ($lyear,$lmonth,$lday,$lhour,$isdst) = (localtime($epoch))[5,4,3,2,-1];
+  
+  $lyear += 1900;                  # year is 1900 based
+  $lmonth++;                       # month number is zero based
+
+  if(AttrVal("global","language","EN") eq "DE") {
+	  return (sprintf("%02d.%02d.%04d %02d:%s", $lday,$lmonth,$lyear,$lhour,$rest));
+  } else {
+	  return (sprintf("%04d-%02d-%02d %02d:%s", $lyear,$lmonth,$lday,$lhour,$rest));
+  }
 }
 
 1;
@@ -1281,7 +1387,7 @@ return;
 	   <colgroup> <col width=5%> <col width=95%> </colgroup>
 		  <tr><td> <b>L1</b>  </td><td>- nur Live-Daten und Wetter-Daten werden generiert. </td></tr>
 		  <tr><td> <b>L2</b>  </td><td>- wie L1 und zusätzlich Prognose der aktuellen und nächsten 4 Stunden </td></tr>
-		  <tr><td> <b>L3</b>  </td><td>- wie L2 und zusätzlich Prognosedaten des Resttages und Folgetages </td></tr>
+		  <tr><td> <b>L3</b>  </td><td>- wie L2 und zusätzlich Prognosedaten des Resttages, des Folgetages und der geplanten Schaltzeiten für Verbraucher </td></tr>
           <tr><td> <b>L4</b>  </td><td>- wie L3 und zusätzlich die detaillierte Prognose der nächsten 24 Stunden </td></tr>
 	   </table>
 	   </ul>     
@@ -1365,11 +1471,13 @@ return;
         "FHEM": 5.00918799,
         "perl": 5.014,
         "JSON": 0,
+        "Encode": 0,
         "POSIX": 0,
         "Data::Dumper": 0,
         "Blocking": 0,
         "GPUtils": 0,
         "Time::HiRes": 0,
+        "Time::Local": 0,
         "LWP": 0,
         "HTTP::Cookies": 0,
         "FHEM::Meta": 0,
