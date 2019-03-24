@@ -48,9 +48,11 @@
 #  - feature: 74_Unifi: new attribute customClientReadings
 # V 3.2.2
 #  - feature: 74_Unifi: textField-long support for customClientReadings
+# V 3.2.3
+#  - feature: 74_Unifi: new customClientReading _f_last_seen_duration
 
 package main;
-my $version="3.2.2";
+my $version="3.2.3";
 # Default für clientRedings setzen. Die Readings waren der Standard vor Einführung des Attributes customClientReadings.
 # Eine Änderung hat Auswirkungen auf (alte) Moduldefinitionen ohne dieses Attribut.
 my $defaultClientReadings=".:^accesspoint|^essid|^hostname|^last_seen|^snr|^uptime"; #ist wegen snr vs rssi nur halb korrekt, wird aber auch nicht wirklich verwendet ;-)
@@ -1219,6 +1221,10 @@ sub Unifi_SetClientReadings($) {
 			$clientRef->{_f_last_seen_by_usw}=strftime "%Y-%m-%d %H:%M:%S",localtime($clientRef->{_last_seen_by_usw}) if defined $clientRef->{_last_seen_by_usw};
 			$clientRef->{_f_last_seen_by_ugw}=strftime "%Y-%m-%d %H:%M:%S",localtime($clientRef->{_last_seen_by_ugw}) if defined $clientRef->{_last_seen_by_ugw};
 			$clientRef->{_f_last_seen_by_uap}=strftime "%Y-%m-%d %H:%M:%S",localtime($clientRef->{_last_seen_by_uap}) if defined $clientRef->{_last_seen_by_uap};
+			if (defined $clientRef->{last_seen}){
+				my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)= gmtime(time() - $clientRef->{last_seen});
+				$clientRef->{_f_last_seen_duration}=$yday."d ".$hour."h ".$min."m ".$sec."s";
+			}
 			if (defined $clientRef->{uptime}){
 				my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)= gmtime($clientRef->{uptime});
 				$clientRef->{_f_uptime}=$yday."d ".$hour."h ".$min."m ".$sec."s";
@@ -2361,7 +2367,7 @@ Or you can use the other readings or set and get features to control your unifi-
     <br>
     <li>attr customClientReadings clientNameRegEx1:ClientReadingRegEx1 clientNameRegEx2:ClientReadingRegEx2 ...<br>
     Can be used to customize the readings for clients. <br>
-    <code>default: .:^accesspoint$|^essid$|^hostname$|^last_seen$|^snr$|^uptime$</code> Note: rssi ist called snr in old default bevor attr customClientReadings.</li>
+    <code>default: .:^accesspoint$|^essid$|^hostname$|^last_seen$|^snr$|^uptime$</code> Note: rssi ist called snr in old default before attr customClientReadings.</li>
     <br>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
 </ul>
