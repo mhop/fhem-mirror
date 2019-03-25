@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 49_SSCam.pm 18828 2019-03-08 22:05:35Z DS_Starter $
+# $Id: 49_SSCam.pm 19022 2019-03-24 21:49:17Z DS_Starter $
 #########################################################################################################################
 #       49_SSCam.pm
 #
@@ -47,6 +47,9 @@ use Encode;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.12.0" => "25.03.2019  FHEM standard function X_DelayedShutdown implemented, delay FHEM shutdown as long as sessions ".
+              "are not terminated. ",
+  "8.11.5" => "24.03.2019  fix possible overload Synology DS during shutdown restart ",
   "8.11.4" => "11.03.2019  make module ready for SVS version 8.2.3-5829 ",
   "8.11.3" => "08.03.2019  avoid possible JSON errors, fix fhem is hanging while restart or get snapinfo - Forum: #45671.msg915546.html#msg915546 ",
   "8.11.2" => "04.03.2019  bugfix no snapinfos when snap was done by SVS itself, Forum: https://forum.fhem.de/index.php/topic,45671.msg914685.html#msg914685",
@@ -137,6 +140,7 @@ our %SSCam_vNotesIntern = (
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
+  "8.12.0" => "25.03.2019 Delay FHEM shutdown as long as sessions are not terminated, but not longer than global attribute \"maxShutdownDelay\". ",
   "8.11.0" => "25.02.2019 compatibility set to SVS version 8.2.3, Popup possible for streaming devices of type \"generic\", ".
               "support for \"genericStrmHtmlTag\" in streaming devices ",
   "8.10.0" => "15.02.2019 Possibility of send recordings by telegram is integrated as well as sending snapshots ",
@@ -347,12 +351,13 @@ sub SSCam_TBotSendIt($$$$$$$;$$$);
 ################################################################
 sub SSCam_Initialize($) {
  my ($hash) = @_;
- $hash->{DefFn}        = "SSCam_Define";
- $hash->{UndefFn}      = "SSCam_Undef";
- $hash->{DeleteFn}     = "SSCam_Delete"; 
- $hash->{SetFn}        = "SSCam_Set";
- $hash->{GetFn}        = "SSCam_Get";
- $hash->{AttrFn}       = "SSCam_Attr";
+ $hash->{DefFn}             = "SSCam_Define";
+ $hash->{UndefFn}           = "SSCam_Undef";
+ $hash->{DeleteFn}          = "SSCam_Delete"; 
+ $hash->{SetFn}             = "SSCam_Set";
+ $hash->{GetFn}             = "SSCam_Get";
+ $hash->{AttrFn}            = "SSCam_Attr";
+ $hash->{DelayedShutdownFn} = "SSCam_DelayedShutdown";
  # Aufrufe aus FHEMWEB
  $hash->{FW_summaryFn} = "SSCam_FWsummaryFn";
  $hash->{FW_detailFn}  = "SSCam_FWdetailFn";
@@ -492,15 +497,56 @@ return undef;
 }
 
 ################################################################
+# Die Undef-Funktion wird aufgerufen wenn ein Gerät mit delete 
+# gelöscht wird oder bei der Abarbeitung des Befehls rereadcfg, 
+# der ebenfalls alle Geräte löscht und danach das 
+# Konfigurationsfile neu einliest. 
+# Funktion: typische Aufräumarbeiten durchgeführt werden wie das 
+# saubere Schließen von Verbindungen oder das Entfernen von 
+# internen Timern, sofern diese im Modul zum Pollen verwendet 
+# wurden.
+################################################################
 sub SSCam_Undef($$) {
   my ($hash, $arg) = @_;
-  SSCam_logout($hash);
+  
   RemoveInternalTimer($hash);
    
 return undef;
 }
 
-################################################################
+#######################################################################################################
+# Mit der X_DelayedShutdown Funktion kann eine Definition das Stoppen von FHEM verzögern um asynchron 
+# hinter sich aufzuräumen. Dies kann z.B. der Verbindungsabbau mit dem physikalischen Gerät sein (z.B. 
+# Session beenden, Logout, etc.), welcher mehrfache Requests/Responses benötigt.  
+# Je nach Rückgabewert $delay_needed wird der Stopp von FHEM verzögert.
+# Im Unterschied zur Shutdown-Funktion steht vor einem bevorstehenden Stopp von FHEM für einen 
+# User-konfigurierbaren Zeitraum (global-Attribut: maxShutdownDelay / Standard: 10 Sekunden) weiterhin
+# die asynchrone FHEM Infrastruktur (DevIo/Read-Funktion und InternalTimer) zur Verfügung.
+# Sobald alle nötigen Maßnahmen erledigt sind, muss der Abschluss mit CancelDelayedShutdown($name) an 
+# FHEM zurückgemeldet werden. 
+#######################################################################################################
+sub SSCam_DelayedShutdown($) {
+  my ($hash) = @_;
+  my $name   = $hash->{NAME};
+  
+  my $delay_needed = 7;
+  
+  Log3($name, 1, "$name - Quit session due to shutdown ... (default delay: $delay_needed sec)");
+  SSCam_logout($hash);
+
+return $delay_needed;
+}
+
+#################################################################
+# Wenn ein Gerät in FHEM gelöscht wird, wird zuerst die Funktion 
+# X_Undef aufgerufen um offene Verbindungen zu schließen, 
+# anschließend wird die Funktion X_Delete aufgerufen. 
+# Funktion: Aufräumen von dauerhaften Daten, welche durch das 
+# Modul evtl. für dieses Gerät spezifisch erstellt worden sind. 
+# Es geht hier also eher darum, alle Spuren sowohl im laufenden 
+# FHEM-Prozess, als auch dauerhafte Daten bspw. im physikalischen 
+# Gerät zu löschen die mit dieser Gerätedefinition zu tun haben. 
+#################################################################
 sub SSCam_Delete($$) {
     my ($hash, $arg) = @_;
     my $index = $hash->{TYPE}."_".$hash->{NAME}."_credentials";
@@ -1892,7 +1938,7 @@ sub SSCam_initonboot ($) {
      InternalTimer(gettimeofday()+int(rand(30)), "SSCam_wdpollcaminfo", $hash, 0);
   
   } else {
-      InternalTimer(gettimeofday()+1, "SSCam_initonboot", $hash, 0);
+      InternalTimer(gettimeofday()+3, "SSCam_initonboot", $hash, 0);
   }
 return;
 }
@@ -6389,6 +6435,7 @@ sub SSCam_logout ($) {
             };
    
    HttpUtils_NonblockingGet ($param);
+   
 }
 
 sub SSCam_logout_return ($) {  
@@ -6429,7 +6476,7 @@ sub SSCam_logout_return ($) {
 
        if ($success) {
            # die Logout-URL konnte erfolgreich aufgerufen werden                        
-           Log3($name, 4, "$name - Session of User $username has ended - SID: \"$sid\" has been deleted");
+           Log3($name, 2, "$name - Session of User \"$username\" terminated - session ID \"$sid\" deleted");
              
        } else {
            # Errorcode aus JSON ermitteln
@@ -6447,6 +6494,7 @@ sub SSCam_logout_return ($) {
    # ausgeführte Funktion ist erledigt (auch wenn logout nicht erfolgreich), Freigabe Funktionstoken
    SSCam_delActiveToken($hash);
    
+   CancelDelayedShutdown($name);
 return;
 }
 
