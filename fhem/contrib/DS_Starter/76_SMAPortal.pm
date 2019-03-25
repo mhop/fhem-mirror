@@ -1307,9 +1307,14 @@ sub UTC2LocalString($$) {
     JSON            <br>
     Data::Dumper    <br>                  
     Time::HiRes     <br>
+    Time::Local     <br>
 	Blocking        (FHEM-Modul) <br>
+    GPUtils         (FHEM-Modul) <br>
+    FHEM::Meta      (FHEM-Modul) <br>
 	LWP::UserAgent  <br>
-	HTTP::Cookies 
+	HTTP::Cookies   <br>
+    MIME::Base64    <br>
+    Encode          <br>
     
     <br><br>  
    </ul>
@@ -1485,7 +1490,6 @@ sub UTC2LocalString($$) {
         "Time::Local": 0,
         "LWP": 0,
         "HTTP::Cookies": 0,
-        "FHEM::Meta": 0,
         "MIME::Base64": 0
       },
       "recommends": {
