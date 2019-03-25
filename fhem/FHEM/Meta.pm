@@ -1946,7 +1946,8 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
         {
             if ( defined( $modMeta->{x_vcs} ) ) {
                 $modMeta->{resources}{x_commandref}{web} =
-                  'https://fhem.de/commandref.html#' . $modName;
+                  'https://fhem.de/commandref.html#'
+                  . ( $modName eq 'Global' ? 'global' : $modName );
             }
         }
 
@@ -3074,6 +3075,9 @@ sub __SetXVersion {
       "abstract": "FHEM® ist ein Perl Server zur Hausautomatisierung",
       "description": "FHEM® (eingetragene Marke) ist ein in Perl geschriebener, GPL lizensierter Server für die Heimautomatisierung. Man kann mit FHEM häufig auftretende Aufgaben automatisieren, wie z.Bsp. Lampen / Rollladen / Heizung / usw. schalten, oder Ereignisse wie Temperatur / Feuchtigkeit / Stromverbrauch protokollieren und visualisieren.\\nDas Programm läuft als Server, man kann es über WEB, dedizierte Smartphone Apps oder telnet bedienen, TCP Schnittstellen für JSON und XML existieren ebenfalls.\\nUm es zu verwenden benötigt man einen 24/7 Rechner (NAS, RPi, PC, Mac Mini, etc.) mit einem Perl Interpreter und angeschlossene Hardware-Komponenten wie CUL-, EnOcean-, Z-Wave-USB-Stick, etc. für einen Zugang zu den Aktoren und Sensoren.\\nAusgesprochen wird es ohne h, wie bei feminin."
     }
+  },
+  "resources": {
+    "homepage": "https://fhem.de/"
   },
   "prereqs": {
     "runtime": {

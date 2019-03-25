@@ -17,8 +17,8 @@ sub Installer_Initialize($) {
     $modHash->{AttrList} =
         "disable:1,0 "
       . "disabledForIntervals "
+      . "installerMode:update,developer "
       . "updateListReading:1,0 "
-      . "implicitGlobalSearch:0,1 "
       . $readingFnAttributes;
 
     return FHEM::Meta::InitMod( __FILE__, $modHash );
@@ -40,33 +40,34 @@ BEGIN {
     # Import from main::
     GP_Import(
         qw(
-          readingsSingleUpdate
-          readingsBulkUpdate
-          readingsBulkUpdateIfChanged
-          readingsBeginUpdate
-          readingsEndUpdate
-          ReadingsTimestamp
-          defs
-          modules
-          cmds
-          packages
-          Log
-          Log3
-          Debug
-          DoTrigger
-          CommandAttr
           attr
           AttrVal
-          ReadingsVal
-          Value
-          IsDisabled
+          cmds
+          CommandAttr
+          Debug
+          defs
           deviceEvents
-          init_done
-          gettimeofday
-          InternalTimer
-          RemoveInternalTimer
-          LoadModule
+          devspec2array
+          DoTrigger
           FW_webArgs
+          gettimeofday
+          init_done
+          InternalTimer
+          IsDisabled
+          LoadModule
+          Log
+          Log3
+          modules
+          packages
+          readingsBeginUpdate
+          readingsBulkUpdate
+          readingsBulkUpdateIfChanged
+          readingsEndUpdate
+          readingsSingleUpdate
+          ReadingsTimestamp
+          ReadingsVal
+          RemoveInternalTimer
+          Value
           )
     );
 }
@@ -110,8 +111,6 @@ sub Define($$) {
         $attr{$name}{icon}  = 'system_fhem';
         $attr{$name}{room}  = 'System';
     }
-
-    # __GetUpdatedata() unless ( defined($coreUpdate) );
 
     readingsSingleUpdate( $hash, "state", "initialized", 1 )
       if ( ReadingsVal( $name, 'state', 'none' ) ne 'none' );
@@ -226,15 +225,18 @@ sub Notify($$) {
 
 #TODO
 # - filter out FHEM command modules from FHEMWEB view (+attribute) -> difficult as not pre-loaded
-# - disable FHEM automatic link to device instances in output
 sub Get($$@) {
 
     my ( $hash, $name, @aa ) = @_;
 
     my ( $cmd, @args ) = @aa;
 
-    if ( lc($cmd) eq 'search' ) {
-        my $ret = CreateSearchList( $hash, $cmd, $args[0] );
+    if ( lc($cmd) eq 'checkprereqs' ) {
+        my $ret = CreatePrereqsList( $hash, $cmd, @args );
+        return $ret;
+    }
+    elsif ( lc($cmd) eq 'search' ) {
+        my $ret = CreateSearchList( $hash, $cmd, @args );
         return $ret;
     }
     elsif ( lc($cmd) eq 'showmoduleinfo' ) {
@@ -262,27 +264,55 @@ sub Get($$@) {
         return $ret;
     }
     else {
+        my $installerMode = AttrVal( $name, 'installerMode', 'update' );
         my @fhemModules;
         foreach ( sort { "\L$a" cmp "\L$b" } keys %modules ) {
             next if ( $_ eq 'Global' );
-            push @fhemModules, $_;
-        }
-
-        my @fhemPackages;
-        foreach ( sort { "\L$a" cmp "\L$b" } keys %packages ) {
-            push @fhemPackages, $_;
+            push @fhemModules, $_
+              if ( $installerMode ne 'update'
+                || defined( $modules{$_}{LOADED} ) );
         }
 
         my $list =
-            'search'
-          . ' showModuleInfo:FHEM,'
-          . join( ',', @fhemModules )
-          . ' showPackageInfo:'
-          . join( ',', @fhemPackages )
-          . ' zzGetModuleMETA.json:FHEM,'
-          . join( ',', @fhemModules )
-          . ' zzGetPackageMETA.json:'
-          . join( ',', @fhemPackages );
+          'search' . ' showModuleInfo:FHEM,' . join( ',', @fhemModules );
+
+        if ( $installerMode eq 'developer' ) {
+            my @fhemPackages;
+            foreach ( sort { "\L$a" cmp "\L$b" } keys %packages ) {
+                push @fhemPackages, $_;
+            }
+
+            $list .=
+                ' showPackageInfo:'
+              . join( ',', @fhemPackages )
+              . ' zzGetModuleMETA.json:FHEM,'
+              . join( ',', @fhemModules )
+              . ' zzGetPackageMETA.json:'
+              . join( ',', @fhemPackages );
+        }
+
+        $list .= " checkPrereqs";
+        if ( $installerMode eq 'install' ) {
+            my $dh;
+            my $dir = $attr{global}{modpath};
+            if ( opendir( $dh, $dir ) ) {
+                my $counter = 0;
+                foreach my $fn (
+                    grep { $_ ne "." && $_ ne ".." && !-d $_ && $_ =~ /\.cfg$/ }
+                    readdir($dh)
+                  )
+                {
+                    $list .= ':' unless ($counter);
+                    $list .= ',' if ($counter);
+                    $list .= $fn;
+                    $counter++;
+                }
+                closedir($dh);
+            }
+        }
+        elsif ( $installerMode eq 'update' ) {
+            $list .= ':noArg';
+        }
 
         return "Unknown argument $cmd, choose one of $list";
     }
@@ -613,7 +643,8 @@ sub ExecuteFhemCommand($) {
         my $pkglist = join( ' ', @packages );
         return unless ( $pkglist ne '' );
         $installer->{npmuninstall} =~ s/%PACKAGES%/$pkglist/gi;
-        print qq($installer->{npmuninstall}\n) if ( $installer->{debug} == 1 );
+        print qq($installer->{npmuninstall}\n)
+          if ( $installer->{debug} == 1 );
         $response = InstallerUninstall($installer);
     }
     elsif ( $cmd->{cmd} =~ /^update(?: (.+))?/ ) {
@@ -883,15 +914,387 @@ sub WriteReadings($$) {
         && !defined( $decode_json->{error} ) );
 }
 
-sub CreateSearchList ($$$) {
-    my ( $hash, $getCmd, $search ) = @_;
+sub CreatePrereqsList {
+    my $hash    = shift;
+    my $getCmd  = shift;
+    my $cfgfile = shift;
+    my $mode    = $cfgfile ? 'file' : 'live';
+    $mode = 'list' if ( $cfgfile && defined( $modules{$cfgfile} ) );
+
+    my @defined;
+    if ( $mode eq 'file' ) {
+        @defined = __GetDefinedModulesFromFile($cfgfile);
+        return
+            'File '
+          . $cfgfile
+          . ' does not seem to contain any FHEM device configuration'
+          unless ( @defined > 0 );
+    }
+    elsif ( $mode eq 'list' ) {
+        @defined = @_;
+        unshift @defined, $cfgfile;
+    }
+    Debug Dumper \@defined;
+
+    # disable automatic links to FHEM devices
+    delete $FW_webArgs{addLinks};
+
+    my @ret;
+    my $html =
+      defined( $hash->{CL} ) && $hash->{CL}{TYPE} eq "FHEMWEB" ? 1 : 0;
+
+    my $header = '';
+    my $footer = '';
+    if ($html) {
+        $header = '<html>';
+        $footer = '</html>';
+    }
+
+    my $tableOpen   = '';
+    my $rowOpen     = '';
+    my $rowOpenEven = '';
+    my $rowOpenOdd  = '';
+    my $colOpen     = '';
+    my $txtOpen     = '';
+    my $txtClose    = '';
+    my $colClose    = "\t\t\t";
+    my $rowClose    = '';
+    my $tableClose  = '';
+    my $colorRed    = '';
+    my $colorGreen  = '';
+    my $colorClose  = '';
+
+    if ($html) {
+        $tableOpen   = '<table class="block wide">';
+        $rowOpen     = '<tr class="column">';
+        $rowOpenEven = '<tr class="column even">';
+        $rowOpenOdd  = '<tr class="column odd">';
+        $colOpen     = '<td>';
+        $txtOpen     = '<b>';
+        $txtClose    = '</b>';
+        $colClose    = '</td>';
+        $rowClose    = '</tr>';
+        $tableClose  = '</table>';
+        $colorRed    = '<span style="color:red">';
+        $colorGreen  = '<span style="color:green">';
+        $colorClose  = '</span>';
+    }
+
+    my $space = $html ? '&nbsp;' : ' ';
+    my $lb    = $html ? '<br />' : "\n";
+    my $lang  = lc(
+        AttrVal(
+            $hash->{NAME}, 'language',
+            AttrVal( 'global', 'language', 'EN' )
+        )
+    );
+
+    my $FW_CSRF = (
+        defined( $defs{ $hash->{CL}{SNAME} }{CSRFTOKEN} )
+        ? '&fwcsrf=' . $defs{ $hash->{CL}{SNAME} }{CSRFTOKEN}
+        : ''
+    );
+
+    ########
+    # Getting Perl prereqs
+    my $perlAnalyzed = 0;
+    my %prereqs;
+
+    foreach my $modName ( keys %modules ) {
+        next
+          if ( $mode eq 'live'
+            && !defined( $modules{$modName}{LOADED} )
+            && $modName ne 'Installer' );
+        next
+          if ( $mode ne 'live'
+            && @defined > 0
+            && !grep ( /^$modName$/, @defined ) );
+
+        FHEM::Meta::Load($modName);
+
+        next
+          unless ( defined( $modules{$modName}{META} ) );
+
+        if ( !defined( $modules{$modName}{META}{x_prereqs_src} ) ) {
+            $perlAnalyzed = 2;
+            next;
+        }
+
+        next
+          unless ( defined( $modules{$modName}{META}{prereqs} )
+            && defined( $modules{$modName}{META}{prereqs}{runtime} ) );
+        my $modPreqs = $modules{$modName}{META}{prereqs}{runtime};
+
+        foreach my $mAttr (qw(requires recommends suggests)) {
+            next
+              unless ( defined( $modPreqs->{$mAttr} )
+                && keys %{ $modPreqs->{$mAttr} } > 0 );
+
+            foreach my $prereq ( keys %{ $modPreqs->{$mAttr} } ) {
+                next
+                  if ( FHEM::Meta::ModuleIsPerlPragma($prereq)
+                    || FHEM::Meta::ModuleIsPerlCore($prereq)
+                    || FHEM::Meta::ModuleIsInternal($prereq) );
+
+                my $version = $modPreqs->{$mAttr}{$prereq};
+                $version = '' if ( !defined($version) || $version eq '0' );
+
+                my $check     = __IsInstalledPerl($prereq);
+                my $installed = '';
+                if ($check) {
+                    if ( $check ne '1' ) {
+                        my $nverReq =
+                          $version ne ''
+                          ? version->parse($version)->numify
+                          : 0;
+                        my $nverInst = $check;
+
+                        #TODO suport for version range:
+                        #https://metacpan.org/pod/CPAN::Meta::Spec#Version-Range
+                        if ( $nverReq > 0 && $nverInst < $nverReq ) {
+                            push @{ $prereqs{$prereq}{$mAttr}{by} },
+                              $modName
+                              unless (
+                                grep ( /^$modName$/,
+                                    @{ $prereqs{$prereq}{$mAttr}{by} } )
+                              );
+                            push @{ $prereqs{$prereq}{$mAttr}{version} },
+                              $nverReq;
+
+                            $perlAnalyzed = 1
+                              if ( $modules{$modName}{META}{x_prereqs_src} ne
+                                'META.json' && !$perlAnalyzed );
+                        }
+                    }
+                }
+                else {
+                    push @{ $prereqs{$prereq}{$mAttr}{by} }, $modName
+                      unless (
+                        grep ( /^$modName$/,
+                            @{ $prereqs{$prereq}{$mAttr}{by} } ) );
+
+                    $perlAnalyzed = 1
+                      if (
+                        $modules{$modName}{META}{x_prereqs_src} ne 'META.json'
+                        && !$perlAnalyzed );
+                }
+            }
+        }
+    }
+
+    my %pending;
+    my $found                = 0;
+    my $foundRequired        = 0;
+    my $foundRecommended     = 0;
+    my $foundSuggested       = 0;
+    my $foundRequiredPerl    = 0;
+    my $foundRecommendedPerl = 0;
+    my $foundSuggestedPerl   = 0;
+
+    # Consolidating prereqs
+    foreach ( keys %prereqs ) {
+        $found++;
+        if ( defined( $prereqs{$_}{requires} ) ) {
+            $foundRequired++;
+            $foundRequiredPerl++;
+            $pending{requires}{Perl}{$_} =
+              $prereqs{$_}{requires}{by};
+
+            if ( defined( $prereqs{$_}{recommends} ) ) {
+                foreach my $i ( @{ $prereqs{$_}{recommends}{by} } ) {
+                    push @{ $pending{requires}{Perl}{$_} }, $i
+                      unless (
+                        grep ( /^$i$/, @{ $pending{requires}{Perl}{$_} } ) );
+                }
+            }
+            if ( defined( $prereqs{$_}{suggestes} ) ) {
+                foreach my $i ( @{ $prereqs{$_}{suggestes}{by} } ) {
+                    push @{ $pending{suggestes}{Perl}{$_} }, $i
+                      unless (
+                        grep ( /^$i$/, @{ $pending{suggestes}{Perl}{$_} } ) );
+                }
+            }
+        }
+        elsif ( defined( $prereqs{$_}{recommends} ) ) {
+            $foundRecommended++;
+            $foundRecommendedPerl++;
+            $pending{recommends}{Perl}{$_} =
+              $prereqs{$_}{recommends}{by};
+
+            if ( defined( $prereqs{$_}{suggestes} ) ) {
+                foreach my $i ( @{ $prereqs{$_}{suggestes}{by} } ) {
+                    push @{ $pending{suggestes}{Perl}{$_} }, $i
+                      unless (
+                        grep ( /^$i$/, @{ $pending{suggestes}{Perl}{$_} } ) );
+                }
+            }
+        }
+        else {
+            $foundSuggested++;
+            $foundSuggestedPerl++;
+            $pending{suggests}{Perl}{$_} =
+              $prereqs{$_}{suggests}{by};
+        }
+    }
+
+    # Display prereqs
+    if ($found) {
+
+        foreach my $mAttr (qw(requires recommends suggests)) {
+            next
+              unless ( defined( $pending{$mAttr} )
+                && keys %{ $pending{$mAttr} } > 0 );
+
+            my $linecount  = 1;
+            my $importance = $mAttr;
+            $importance = 'Required'    if ( $mAttr eq 'requires' );
+            $importance = 'Recommended' if ( $mAttr eq 'recommends' );
+            $importance = 'Suggested'   if ( $mAttr eq 'suggests' );
+
+            if ( $linecount == 1 ) {
+                push @ret,
+                    '<a name="prereqResult'
+                  . $importance
+                  . '"></a><h3>'
+                  . $importance . '</h3>'
+                  . $lb;
+                push @ret, $tableOpen . $rowOpen;
+                push @ret, $colOpen . $txtOpen . 'Item' . $txtClose . $colClose;
+                push @ret, $colOpen . $txtOpen . 'Type' . $txtClose . $colClose;
+                push @ret,
+                  $colOpen . $txtOpen . 'Used by' . $txtClose . $colClose;
+                push @ret, $rowClose;
+            }
+
+            foreach my $area (qw(Perl)) {
+                next
+                  unless ( defined( $pending{$mAttr}{$area} )
+                    && keys %{ $pending{$mAttr}{$area} } > 0 );
+
+                foreach my $item (
+                    sort { "\L$a" cmp "\L$b" }
+                    keys %{ $pending{$mAttr}{$area} }
+                  )
+                {
+                    my $l = $linecount % 2 == 0 ? $rowOpenEven : $rowOpenOdd;
+
+                    my $linkitem = $item;
+                    $linkitem =
+                        '<a href="https://metacpan.org/pod/'
+                      . $item
+                      . '" target="_blank">'
+                      . $item . '</a>'
+                      if ($html);
+
+                    my $linkmod = '';
+                    foreach ( sort { "\L$a" cmp "\L$b" }
+                        @{ $pending{$mAttr}{$area}{$item} } )
+                    {
+                        $linkmod .= ', ' unless ( $linkmod eq '' );
+                        if ($html) {
+                            $linkmod .=
+                                '<a href="?cmd=get '
+                              . $hash->{NAME}
+                              . ' showModuleInfo '
+                              . $_
+                              . $FW_CSRF . '">'
+                              . ( $_ eq 'Global' ? 'FHEM' : $_ ) . '</a>';
+                        }
+                        else {
+                            $linkmod .= ( $_ eq 'Global' ? 'FHEM' : $_ );
+                        }
+                    }
+
+                    $l .= $colOpen . $linkitem . $colClose;
+                    $l .= $colOpen . $area . $colClose;
+                    $l .= $colOpen . $linkmod . $colClose;
+                    $l .= $rowClose;
+
+                    push @ret, $l;
+                    $linecount++;
+                }
+            }
+
+            push @ret, $tableClose;
+        }
+
+        unshift @ret,
+            $lb
+          . $space
+          . $space
+          . ( $html ? '<a href="#prereqResultSuggested">' : '' )
+          . $foundSuggested
+          . ' suggested '
+          . ( $foundSuggested > 1 ? 'items' : 'item' )
+          . ( $html               ? '</a>'  : '' )
+          if ($foundSuggested);
+        unshift @ret,
+            $lb
+          . $space
+          . $space
+          . ( $html ? '<a href="#prereqResultRecommended">' : '' )
+          . $foundRecommended
+          . ' recommended '
+          . ( $foundRecommended > 1 ? 'items' : 'item' )
+          . ( $html                 ? '</a>'  : '' )
+          if ($foundRecommended);
+        unshift @ret,
+            $lb
+          . $space
+          . $space
+          . ( $html ? '<a href="#prereqResultRequired">' : '' )
+          . $foundRequired
+          . ' required '
+          . ( $foundRequired > 1 ? 'items' : 'item' )
+          . ( $html              ? '</a>'  : '' )
+          if ($foundRequired);
+        unshift @ret,
+            $found
+          . ' total missing '
+          . ( $found > 1 ? 'prerequisites:' : 'prerequisite:' );
+    }
+    else {
+        unshift @ret, 'Hooray! All prerequisites are met. 🥳';
+    }
+
+    unshift @ret,
+        '<a name="prereqResultTOP"></a><h2>'
+      . ( $mode eq 'live' ? 'Live ' : '' )
+      . 'System Prerequisites Check</h2>';
+
+    if ($perlAnalyzed) {
+        push @ret,
+            $lb
+          . $txtOpen . 'Hint:'
+          . $txtClose
+          . ' Some of the used FHEM modules do not provide Perl prerequisites from its metadata.'
+          . $lb;
+
+        if ( $perlAnalyzed == 1 ) {
+            push @ret,
+'This check is based on automatic source code analysis and can be incorrect.';
+        }
+        elsif ( $perlAnalyzed == 2 ) {
+            push @ret,
+'This check may be incomplete until you install Perl::PrereqScanner::NotQuiteLite.';
+        }
+    }
+
+    return $header . join( "\n", @ret ) . $footer;
+}
+
+sub CreateSearchList ($$@) {
+    my $hash   = shift;
+    my $getCmd = shift;
+    my $search = join( '\s*', @_ );
     $search = '.+' unless ($search);
 
     # disable automatic links to FHEM devices
     delete $FW_webArgs{addLinks};
 
     my @ret;
-    my $html = defined( $hash->{CL} ) && $hash->{CL}{TYPE} eq "FHEMWEB" ? 1 : 0;
+    my $html =
+      defined( $hash->{CL} ) && $hash->{CL}{TYPE} eq "FHEMWEB" ? 1 : 0;
 
     my $header = '';
     my $footer = '';
@@ -923,8 +1326,8 @@ sub CreateSearchList ($$$) {
         $rowOpenEven = '<tr class="column even">';
         $rowOpenOdd  = '<tr class="column odd">';
         $colOpen     = '<td>';
-        $txtOpen     = "<b>";
-        $txtClose    = "</b>";
+        $txtOpen     = '<b>';
+        $txtClose    = '</b>';
         $colClose    = '</td>';
         $rowClose    = '</tr>';
         $tableClose  = '</table>';
@@ -998,11 +1401,12 @@ sub CreateSearchList ($$$) {
 
             $l .= $colOpen . $linkDev . $colClose;
             $l .= $colOpen . $linkMod . $colClose;
-            $l .=
-              $colOpen
+            $l .= $colOpen
               . (
-                defined( $defs{$device}{STATE} ) ? $defs{$device}{STATE} : '' )
-              . $colClose;
+                defined( $defs{$device}{STATE} )
+                ? $defs{$device}{STATE}
+                : ''
+              ) . $colClose;
 
             $l .= $rowClose;
 
@@ -1385,6 +1789,10 @@ sub CreateSearchList ($$$) {
               . $cmdO
               . '</a> instead?';
         }
+
+        delete $hash->{CL}{'.iDefCmdOrigin'};
+        delete $hash->{CL}{'.iDefCmdMethod'};
+        delete $hash->{CL}{'.iDefCmdOverwrite'};
     }
 
     if ($found) {
@@ -1449,6 +1857,7 @@ sub CreateSearchList ($$$) {
         unshift @ret, 'Nothing found';
     }
 
+    $search =~ s/\\s\*/ /g;
     unshift @ret,
       '<a name="searchResultTOP"></a><h2>Search result: ' . $search . '</h2>';
 
@@ -1499,7 +1908,8 @@ sub CreateMetadataList ($$$) {
       ? $modules{$modName}{META}
       : $packages{$modName}{META};
     my @ret;
-    my $html = defined( $hash->{CL} ) && $hash->{CL}{TYPE} eq "FHEMWEB" ? 1 : 0;
+    my $html =
+      defined( $hash->{CL} ) && $hash->{CL}{TYPE} eq "FHEMWEB" ? 1 : 0;
 
     my $header = '';
     my $footer = '';
@@ -1531,8 +1941,8 @@ sub CreateMetadataList ($$$) {
         $rowOpenEven = '<tr class="column even">';
         $rowOpenOdd  = '<tr class="column odd">';
         $colOpen     = '<td>';
-        $txtOpen     = "<b>";
-        $txtClose    = "</b>";
+        $txtOpen     = '<b>';
+        $txtClose    = '</b>';
         $colClose    = '</td>';
         $rowClose    = '</tr>';
         $tableClose  = '</table>';
@@ -1587,7 +1997,8 @@ sub CreateMetadataList ($$$) {
                 || $modMeta->{release_status} eq 'stable' )
           );
         next
-          if ( $mAttr eq 'copyright' && !defined( $modMeta->{x_copyright} ) );
+          if ( $mAttr eq 'copyright'
+            && !defined( $modMeta->{x_copyright} ) );
         next
           if (
             $mAttr eq 'abstract'
@@ -1779,22 +2190,10 @@ sub CreateMetadataList ($$$) {
                       ? $modMeta->{resources}{x_commandref}{title}
                       : 'Online version';
 
-                    my $url =
-                      $modMeta->{resources}{x_commandref}{web};
-
-                    if (
-                        defined( $modMeta->{resources}{x_commandref}{modpath} )
-                      )
-                    {
-                        $url .=
-                          $modMeta->{resources}{x_commandref}{modpath};
-                        $url .= $modName eq 'Global' ? 'global' : $modName;
-                    }
-
                     $l .=
                         ( $webname ? ' | ' : '' )
                       . '<a href="'
-                      . $url
+                      . $modMeta->{resources}{x_commandref}{web}
                       . '" target="_blank">'
                       . $title . '</a>';
                 }
@@ -1820,12 +2219,11 @@ sub CreateMetadataList ($$$) {
                     && $modMeta->{resources}{x_wiki}{web} =~
                     m/^(?:https?:\/\/)?wiki\.fhem\.de/i );
 
-                my $url =
-                  $modMeta->{resources}{x_wiki}{web};
-                $url .= '/' unless ( $url =~ m/\/$/ );
-
                 $l .=
-                  '<a href="' . $url . '" target="_blank">' . $title . '</a>';
+                    '<a href="'
+                  . $modMeta->{resources}{x_wiki}{web}
+                  . '" target="_blank">'
+                  . $title . '</a>';
             }
 
             elsif ($mAttr eq 'community_support'
@@ -2233,7 +2631,6 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
     push @ret, $tableClose;
 
     # show FHEM modules who use this package
-    # if ( $modType eq 'package' ) {
     @mAttrs = qw(
       requires
       recommends
@@ -2319,19 +2716,46 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
 
     push @ret, $tableClose . $lb if ( $linecount > 1 );
 
-    # }
+    if ( $modType eq 'module' && $modName ne 'Global' ) {
+        push @ret, '<h3>Devices</h3>';
+
+        if ( defined( $modules{$modName}{LOADED} ) ) {
+            my @instances = devspec2array( 'TYPE=' . $modName );
+            if ( @instances > 0 ) {
+                push @ret, $lb, $tableOpen . $rowOpen;
+
+                my $devices = '';
+                foreach my $instance ( sort { "\L$a" cmp "\L$b" } @instances ) {
+                    next if ( defined( $defs{$instance}{TEMPORARY} ) );
+                    $devices .= ', ' unless ( $devices eq '' );
+                    if ($html) {
+                        $devices .=
+                            '<a href="?detail='
+                          . $instance . '">'
+                          . $instance . '</a>';
+                    }
+                    else {
+                        $devices .= $instance;
+                    }
+                }
+
+                push @ret, $colOpen . $devices . $colClose;
+
+                push @ret, $rowClose . $tableClose;
+            }
+            else {
+                push @ret,
+                    $lb
+                  . 'This module was once loaded into memory, '
+                  . 'but currently there is no device defined anymore.';
+            }
+        }
+        else {
+            push @ret, $lb . 'This module is currently not in use.';
+        }
+    }
 
     push @ret, '<h3>System Prerequisites</h3>';
-
-    if ( $modType eq 'module' ) {
-        my $moduleUsage =
-          defined( $modules{$modName}{LOADED} )
-          ? $colorGreen . 'IN USE' . $colorClose
-          : $txtOpen . 'not' . $txtClose . ' in use';
-
-        push @ret, $lb . 'This FHEM module is currently ' . $moduleUsage . '.'
-          unless ( $modName eq 'Global' );
-    }
 
     push @ret, '<h4>Perl Packages</h4>';
     if (   defined( $modMeta->{prereqs} )
@@ -2421,8 +2845,10 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                 my $isPerlPragma = FHEM::Meta::ModuleIsPerlPragma($prereq);
                 my $isPerlCore =
                   $isPerlPragma ? 0 : FHEM::Meta::ModuleIsPerlCore($prereq);
-                my $isFhem = $isPerlPragma
-                  || $isPerlCore ? 0 : FHEM::Meta::ModuleIsInternal($prereq);
+                my $isFhem =
+                  $isPerlPragma || $isPerlCore
+                  ? 0
+                  : FHEM::Meta::ModuleIsInternal($prereq);
                 if ( $isPerlPragma || $isPerlCore || $prereq eq 'perl' ) {
                     $installed =
                       $installed ne 'installed'
@@ -2522,7 +2948,9 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                 0 );
 
             foreach my $prereq (
-                sort keys %{ $modMeta->{x_prereqs_nodejs}{runtime}{$mAttr} } )
+                sort
+                keys %{ $modMeta->{x_prereqs_nodejs}{runtime}{$mAttr} }
+              )
             {
                 my $l = $linecount % 2 == 0 ? $rowOpenEven : $rowOpenOdd;
 
@@ -2624,7 +3052,9 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                 0 );
 
             foreach my $prereq (
-                sort keys %{ $modMeta->{x_prereqs_python}{runtime}{$mAttr} } )
+                sort
+                keys %{ $modMeta->{x_prereqs_python}{runtime}{$mAttr} }
+              )
             {
                 my $l = $linecount % 2 == 0 ? $rowOpenEven : $rowOpenOdd;
 
@@ -2672,8 +3102,10 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                 my $isPerlPragma = FHEM::Meta::ModuleIsPerlPragma($prereq);
                 my $isPerlCore =
                   $isPerlPragma ? 0 : FHEM::Meta::ModuleIsPerlCore($prereq);
-                my $isFhem = $isPerlPragma
-                  || $isPerlCore ? 0 : FHEM::Meta::ModuleIsInternal($prereq);
+                my $isFhem =
+                  $isPerlPragma || $isPerlCore
+                  ? 0
+                  : FHEM::Meta::ModuleIsInternal($prereq);
                 if ( $isPerlPragma || $isPerlCore || $prereq eq 'perl' ) {
                     $installed =
                       $installed ne 'installed'
@@ -2755,6 +3187,30 @@ sub CreateRawMetaJson ($$$) {
     }
     else {
         return $j->encode( $packages{$modName}{META} );
+    }
+}
+
+sub __GetDefinedModulesFromFile($) {
+    my ($filePath) = @_;
+    my @modules;
+    my $fh;
+
+    if ( open( $fh, '<' . $filePath ) ) {
+        while ( my $l = <$fh> ) {
+            if ( $l =~ /^define\s+\S+\s+(\S+).*/ ) {
+                my $modName = $1;
+                push @modules, $modName
+                  unless ( grep ( /^$modName$/, @modules ) );
+            }
+        }
+        close($fh);
+    }
+
+    if (wantarray) {
+        return @modules;
+    }
+    elsif ( @modules > 0 ) {
+        return join( ',', @modules );
     }
 }
 
@@ -2867,7 +3323,17 @@ sub __aUniq {
   <br>
   <a name="Installerget" id="Installerget"></a><b>Get</b>
   <ul>
+    <li>checkPrereqs - list all missing prerequisites. If no parameter was given, the running live system will be inspected. If the parameter is a FHEM cfg file, inspection will be based on devices from this file. If the parameter is a list of module names, those will be used for inspection.
+    </li>
+    <li>search - search FHEM for device names, module names, package names, keywords, authors and Perl package names.
+    </li>
     <li>showModuleInfo - list information about a specific FHEM module
+    </li>
+    <li>showPackageInfo - list information about a specific FHEM package
+    </li>
+    <li>zzGetModuleMETA.json - prints raw meta information of a FHEM module in JSON format
+    </li>
+    <li>zzGetPackageMETA.json - prints raw meta information of a FHEM package in JSON format
     </li>
   </ul><br>
   <br>
@@ -2876,6 +3342,8 @@ sub __aUniq {
     <li>disable - disables the device
     </li>
     <li>disabledForIntervals - disable device for interval time (13:00-18:30 or 13:00-18:30 22:00-23:00)
+    </li>
+    <li>installerMode - sets the installation mode. May be update, developer or install with update being the default setting. Some get and/or set commands may be hidden or limited depending on this.
     </li>
   </ul>
 </ul>
@@ -2907,7 +3375,7 @@ sub __aUniq {
       "abstract": "Modul zum Update von FHEM, zur Installation von Drittanbieter FHEM Modulen und der Verwaltung von Systemvoraussetzungen"
     }
   },
-  "version": "v0.2.1",
+  "version": "v0.3.0",
   "release_status": "testing",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
