@@ -2,7 +2,7 @@
 #
 # Developed with Kate
 #
-#  (c) 2017-2018 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
+#  (c) 2017-2019 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
 #  All rights reserved
 #
 #   Special thanks goes to:
@@ -35,7 +35,7 @@ package main;
 use strict;
 use warnings;
 
-my $version = "1.4.2";
+my $version = "1.4.3";
 
 sub AptToDate_Initialize($) {
 
@@ -499,24 +499,27 @@ sub PollChild($) {
     my $hash = shift;
 
     my $name       = $hash->{NAME};
-    my $subprocess = $hash->{".fhem"}{subprocess};
-    my $json       = $subprocess->readFromChild();
+    
+    if ( defined($hash->{".fhem"}{subprocess}) ) {
+        my $subprocess = $hash->{".fhem"}{subprocess};
+        my $json       = $subprocess->readFromChild();
 
-    if ( !defined($json) ) {
-        Log3 $name, 5, "AptToDate ($name) - still waiting ("
-          . $subprocess->{lasterror} . ").";
-        InternalTimer( gettimeofday() + POLLINTERVAL,
-            "AptToDate::PollChild", $hash, 0 );
-        return;
-    }
-    else {
-        Log3 $name, 4,
-          "AptToDate ($name) - got result from asynchronous parsing.";
-        $subprocess->wait();
-        Log3 $name, 4, "AptToDate ($name) - asynchronous finished.";
+        if ( !defined($json) ) {
+            Log3 $name, 5, "AptToDate ($name) - still waiting ("
+            . $subprocess->{lasterror} . ").";
+            InternalTimer( gettimeofday() + POLLINTERVAL,
+                "AptToDate::PollChild", $hash, 0 );
+            return;
+        }
+        else {
+            Log3 $name, 4,
+            "AptToDate ($name) - got result from asynchronous parsing.";
+            $subprocess->wait();
+            Log3 $name, 4, "AptToDate ($name) - asynchronous finished.";
 
-        CleanSubprocess($hash);
-        PreProcessing( $hash, $json );
+            CleanSubprocess($hash);
+            PreProcessing( $hash, $json );
+        }
     }
 }
 
@@ -843,9 +846,16 @@ sub WriteReadings($$) {
     readingsBulkUpdateIfChanged( $hash, 'updatesAvailable',
         scalar keys %{ $decode_json->{packages} } )
       if ( $hash->{".fhem"}{aptget}{cmd} eq 'getUpdateList' );
-    readingsBulkUpdateIfChanged( $hash, 'upgradeListAsJSON',
-        eval { encode_json( $hash->{".fhem"}{aptget}{packages} ) } )
-      if ( AttrVal( $name, 'upgradeListReading', 'none' ) ne 'none' );
+      
+    if ( scalar keys%{ $hash->{".fhem"}{aptget}{packages} } > 0 ) {
+        readingsBulkUpdateIfChanged( $hash, 'upgradeListAsJSON',
+            eval { encode_json( $hash->{".fhem"}{aptget}{packages} ) } )
+        if ( AttrVal( $name, 'upgradeListReading', 'none' ) ne 'none' );
+    }
+    else { readingsBulkUpdateIfChanged( $hash, 'upgradeListAsJSON', '' )
+        if ( AttrVal( $name, 'upgradeListReading', 'none' ) ne 'none' );
+    }
+    
     readingsBulkUpdate( $hash, 'toUpgrade', 'successful' )
       if (  $hash->{".fhem"}{aptget}{cmd} eq 'toUpgrade'
         and not defined( $hash->{".fhem"}{aptget}{'errors'} )
