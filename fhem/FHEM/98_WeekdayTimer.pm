@@ -305,15 +305,17 @@ sub WeekdayTimer_getListeDerTage($$) {
      my $echteZeit = WeekdayTimer_zeitErmitteln ($now, $stunde, $minute, $sekunde, $relativeDay);
     #Log 3, "echteZeit---$i---->>>$relativeDay<<<----->".FmtDateTime($echteZeit);
      ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($echteZeit);
-     my $h2we = $attr{global}{holiday2we};
-     if($h2we) {
-        my $ergebnis = fhem("get $h2we ".sprintf("%02d-%02d",$mon+1,$mday),1);
-        if ($ergebnis ne "none") {
-          #Log 3, "ergebnis-------$i----->$ergebnis";
-          $hdays{$i} = undef   if ($d==7); #  $we Tag aufnehmen
-          delete $hdays{$i}    if ($d==8); # !$we Tag herausnehmen
+
+    foreach my $h2we (split(',', AttrVal('global', 'holiday2we', ''))) {
+        if($h2we) {
+            my $ergebnis = CommandGet(undef,$h2we . ' ' . sprintf("%02d-%02d",$mon+1,$mday));
+            if ($ergebnis ne 'none') {
+                #Log 3, "ergebnis-------$i----->$ergebnis";
+                $hdays{$i} = undef   if ($d==7); #  $we Tag aufnehmen
+                delete $hdays{$i}    if ($d==8); # !$we Tag herausnehmen
+            }
         }
-     }
+    }
   }
 
   #Log 3, "result------------>" . join (" ", sort keys %hdays);
