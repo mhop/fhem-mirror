@@ -50,12 +50,15 @@
 #  - feature: 74_Unifi: textField-long support for customClientReadings
 # V 3.2.3
 #  - feature: 74_Unifi: new customClientReading _f_last_seen_duration
+# V 3.2.4
+#  - feature: 74_Unifi: new cattribute customClientNames
 
 package main;
-my $version="3.2.3";
+my $version="3.2.4";
 # Default für clientRedings setzen. Die Readings waren der Standard vor Einführung des Attributes customClientReadings.
 # Eine Änderung hat Auswirkungen auf (alte) Moduldefinitionen ohne dieses Attribut.
 my $defaultClientReadings=".:^accesspoint|^essid|^hostname|^last_seen|^snr|^uptime"; #ist wegen snr vs rssi nur halb korrekt, wird aber auch nicht wirklich verwendet ;-)
+my $customClientName="";
 use strict;
 use warnings;
 use HttpUtils;
@@ -148,6 +151,7 @@ sub Unifi_Initialize($$) {
                          ."eventPeriod "
                          ."voucherCache "
                          ."customClientReadings:textField-long "
+						 ."customClientNames "
                          .$readingFnAttributes;
                          
 	$hash->{Clients} = "UnifiSwitch";
@@ -624,6 +628,9 @@ sub Unifi_Attr(@) {
             $hash->{unifi}->{customClientReadings}->{attr_value} = $attr_value;
 			Unifi_initCustomClientReadings($hash);
         }
+        elsif($attr_name eq "customClientNames") {
+            $hash->{unifi}->{customClientNames}->{attr_value} = $attr_value;
+        } 
     }
     elsif($cmd eq "del") {
         if($attr_name eq "disable" && Unifi_CONNECTED($hash) eq "disabled") {
@@ -643,6 +650,9 @@ sub Unifi_Attr(@) {
             $hash->{unifi}->{customClientReadings} = ();
             $hash->{unifi}->{customClientReadings}->{attr_value} = $defaultClientReadings;
 			Unifi_initCustomClientReadings($hash);
+        }
+        elsif($attr_name eq "customClientNames") {
+            $hash->{unifi}->{customClientNames}->{attr_value} = $customClientName;
         }
     }
     return undef;
@@ -1178,7 +1188,7 @@ sub Unifi_SetClientReadings($) {
     my ($hash) = @_;
     my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
     Log3 $name, 5, "$name ($self) - executed.";
-    
+	
     my $apNames = {};
     for my $apID (keys %{$hash->{accespoints}}) {
       my $apRef = $hash->{accespoints}->{$apID};
@@ -1252,12 +1262,12 @@ sub Unifi_SetClientReadings($) {
 		}
 
 		
-		if (defined $hash->{unifi}->{connectedClients}->{$clientID}) {			
+		if (defined $hash->{unifi}->{connectedClients}->{$clientID}) {
+			
 			if (! defined ReadingsVal($hash->{NAME},$clientName,undef)){
 			  $newClients.=$sep.$clientName;
 			  $sep=",";
 			}
-			
 			readingsBulkUpdate($hash,$clientName,'connected');
 			
 			# altes Standardverhalten kann man auch ohne RegEx-Auswertungen beibehalten
@@ -1852,17 +1862,22 @@ sub Unifi_ClientNames($@) {
     
     my $clientRef;
     my $devAliases = AttrVal($hash->{NAME},"devAlias",0);
+	my $attrCustomClientNames = AttrVal($hash->{NAME},"customClientNames",0);
     
     if(defined $ID && defined $W && $W eq 'makeAlias') {   # Return Alias from ID
         $clientRef = $hash->{clients}->{$ID};
         if (   ($devAliases && $devAliases =~ /$ID:(.+?)(\s|$)/)
             || ($devAliases && defined $clientRef->{name} && $devAliases =~ /$clientRef->{name}:(.+?)(\s|$)/)
             || ($devAliases && defined $clientRef->{hostname} && $devAliases =~ /$clientRef->{hostname}:(.+?)(\s|$)/)
-            || (defined $clientRef->{name} && $clientRef->{name} =~ /^([\w\.\-]+)$/)
-            || (defined $clientRef->{hostname} && $clientRef->{hostname} =~ /^([\w\.\-]+)$/)
            ) {
             $ID = $1;
-        }
+        }elsif ( $attrCustomClientNames && defined $clientRef->{$attrCustomClientNames}){
+            $ID = makeReadingName($clientRef->{$attrCustomClientNames});
+		}elsif ( (defined $clientRef->{name} && $clientRef->{name} =~ /^([\w\.\-]+)$/)
+              || (defined $clientRef->{hostname} && $clientRef->{hostname} =~ /^([\w\.\-]+)$/)
+			){
+            $ID = $1;
+		}
         return $ID;
     }
     elsif (defined $ID && defined $W && $W eq 'makeID') {   # Return ID from Alias
@@ -1873,8 +1888,14 @@ sub Unifi_ClientNames($@) {
             if (   ($devAliases && $devAliases =~ /$clientID:$ID/)
                 || ($devAliases && defined $clientRef->{name} && ($devAliases =~ /$clientRef->{name}:$ID/ || $devAliases =~ /$goodName:$ID/) )
                 || ($devAliases && defined $clientRef->{hostname} && ($devAliases =~ /$clientRef->{hostname}:$ID/ || $devAliases =~ /$goodHostname:$ID/) )
-                || (defined $clientRef->{name} && ($clientRef->{name} eq $ID || $goodName eq $ID) ) 
-                || (defined $clientRef->{hostname} && ($clientRef->{hostname} eq $ID || $goodHostname eq $ID) )
+			   ) {
+                $ID = $clientID;
+                last;
+			}elsif ( $attrCustomClientNames && defined $clientRef->{$attrCustomClientNames} && $ID eq makeReadingName($clientRef->{$attrCustomClientNames})){
+                $ID = $clientID;
+                last;
+            } elsif ( (defined $clientRef->{name} && ($clientRef->{name} eq $ID || $goodName eq $ID) ) 
+                   || (defined $clientRef->{hostname} && ($clientRef->{hostname} eq $ID || $goodHostname eq $ID) )
                ) {
                 $ID = $clientID;
                 last;
@@ -2369,6 +2390,17 @@ Or you can use the other readings or set and get features to control your unifi-
     <li>attr customClientReadings clientNameRegEx1:ClientReadingRegEx1 clientNameRegEx2:ClientReadingRegEx2 ...<br>
     Can be used to customize the readings for clients. <br>
     <code>default: .:^accesspoint$|^essid$|^hostname$|^last_seen$|^snr$|^uptime$</code> Note: rssi ist called snr in old default before attr customClientReadings.</li>
+    <br>
+   <li>attr customClientNames &lt;value&gt;<br>
+    Can be used to control the naming convention for client readings. Any valid clientData field is allowed, though only <code>mac</code> seems to be useful. For a list, see <code>&lt;unifi&gt; get ClientData all</code>.<br>
+     Client naming follows these rules: 
+       <ol> 
+          <li><code>devAlias</code> (if present for this client)</li>
+          <li>attribute <code>customClientNames</code> (if it is set <i>and</i> the corresponding data field exists for client)</li>
+          <li>name (alias) in Unifi-Controller</li>
+          <li>hostname of the client</li>
+       </ol>
+    </li>
     <br>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
 </ul>
