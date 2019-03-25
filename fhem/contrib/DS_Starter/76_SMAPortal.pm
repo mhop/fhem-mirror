@@ -38,7 +38,7 @@
 package main;
 use strict;
 use warnings;
-use FHEM::Meta;
+eval "use FHEM::Meta;1";
 
 ###############################################################
 #                  SMAPortal Initialize
@@ -80,7 +80,7 @@ use strict;
 use warnings;
 use GPUtils qw(:all);                   # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 use POSIX;
-use FHEM::Meta;
+eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 use Data::Dumper;
 use Blocking;
 use Time::HiRes qw(gettimeofday);
@@ -141,6 +141,7 @@ BEGIN {
 
 # Versions History intern
 our %vNotesIntern = (
+  "1.5.2"  => "25.03.2019  prevent module from deactivation in case of unavailable Meta.pm ",
   "1.5.1"  => "24.03.2019  fix \$VAR1 problem Forum: #27667.msg922983.html#msg922983 ",
   "1.5.0"  => "23.03.2019  add consumer data ",
   "1.4.0"  => "22.03.2019  add function extractPlantData, DbLog_split, change L2 Readings ",
@@ -162,6 +163,8 @@ sub Define($$) {
   
   return "Wrong syntax: use \"define <name> SMAPortal\" " if(int(@a) < 1);
 
+  $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);   # Modul Meta.pm nicht vorhanden
+  
   # Versionsinformationen setzen
   setVersionInfo($hash);
   
@@ -1112,7 +1115,7 @@ sub setVersionInfo($) {
   $hash->{HELPER}{PACKAGE} = __PACKAGE__;
   $hash->{HELPER}{VERSION} = $v;
   
-  if($modules{$type}{META}{x_prereqs_src}) {
+  if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
 	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: ... $ im Kopf komplett! vorhanden )
@@ -1121,7 +1124,7 @@ sub setVersionInfo($) {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
 	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: ... $ im Kopf komplett! vorhanden )
-	  if( __PACKAGE__ eq "FHEM::$type") {
+	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
 	      use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );                                          
@@ -1486,6 +1489,7 @@ sub UTC2LocalString($$) {
         "MIME::Base64": 0
       },
       "recommends": {
+        "FHEM::Meta": 0
       },
       "suggests": {
       }
