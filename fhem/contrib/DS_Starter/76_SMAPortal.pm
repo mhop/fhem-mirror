@@ -1053,6 +1053,7 @@ sub extractConsumerData($$) {
                $key    =~ /^(\d+)_.*$/;
                my $lfn = $1; 
                my $cn  = $consumers{"${lfn}_ConsumerName"};            # Verbrauchername
+               $cn     = substUmlauts($cn);                            # evtl. Umlaute im Verbrauchernamen ersetzen
                my $pos = $consumers{"${lfn}_PlannedOpTimeStart"};      # geplanter Start
                my $poe = $consumers{"${lfn}_PlannedOpTimeEnd"};        # geplantes Ende
                my $rb  = "L3_${cn}_PlannedOpTimeBegin"; 
@@ -1253,6 +1254,23 @@ sub UTC2LocalString($$) {
   } else {
 	  return (sprintf("%04d-%02d-%02d %02d:%s", $lyear,$lmonth,$lday,$lhour,$rest));
   }
+}
+
+###############################################################################
+#              Umlaute für Readingerstellung ersetzen 
+###############################################################################
+sub substUmlauts ($) { 
+  my ($txt) = @_;
+
+  $txt =~ s/ß/ss/g;
+  $txt =~ s/ä/ae/g;
+  $txt =~ s/ö/oe/g;
+  $txt =~ s/ü/ue/g;
+  $txt =~ s/Ä/Ae/g;
+  $txt =~ s/Ö/Oe/g;
+  $txt =~ s/Ü/Ue/g;     
+  
+return($txt);
 }
 
 1;
