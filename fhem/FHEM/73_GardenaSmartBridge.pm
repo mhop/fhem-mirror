@@ -57,6 +57,7 @@ package main;
 
 use strict;
 use warnings;
+use FHEM::Meta;
 
 my $version = "1.6.0";
 
@@ -105,6 +106,7 @@ my $missingModul = "";
 use strict;
 use warnings;
 use POSIX;
+use FHEM::Meta;
 
 use HttpUtils;
 
