@@ -2162,14 +2162,19 @@ sub YAMAHA_MC_Set($$@)
 	my $currentMute = ReadingsVal($name, "mute", "true"); 
 	my $standardVolume = AttrVal($hash->{NAME}, "standard_volume",15);
 	
+	
 	if (!defined($hash->{PowerOnInProgress})) {
 	 $hash->{PowerOnInProgress}=0;
 	}
 	
-	if (!defined($hash->{attemptsToReturnMenu}))  {
-	  Log3 $name, 4, "$name : TurnFavNetRadioChannelOn start setting attempts to return menu to 0 ";
-	  $hash->{attemptsToReturnMenu}=0;      
-    }	  
+	if (!defined($hash->{FavoriteNetRadioChannelInProgress})) {
+	 $hash->{FavoriteNetRadioChannelInProgress}=0;
+	}
+	
+	#if (!defined($hash->{attemptsToReturnMenu}))  {
+	#  Log3 $name, 4, "$name : TurnFavNetRadioChannelOn start setting attempts to return menu to 0 ";
+	#  $hash->{attemptsToReturnMenu}=0;      
+    #}	  
 	
 	# turn on device and restart - wait some seconds to continue
 	if ($currentPower ne "on")   {
@@ -2177,6 +2182,7 @@ sub YAMAHA_MC_Set($$@)
 	  if($hash->{PowerOnInProgress}==0) {
 	    Log3 $name, 4, "$name : YAMAHA_MC_Set device not turned on, power on not in progress, turn on now ";
 	    $hash->{PowerOnInProgress}=1; 
+		$hash->{FavoriteNetRadioChannelInProgress}=1;
 	    YAMAHA_MC_httpRequestQueue($hash, "power", "on", {options    => {unless_in_queue => 1, at_first => 1, priority => 1, wait_after_response => $powerCmdDelay, original_cmd => "TurnFavNetRadioChannelOn", original_arg => $FavoriteNetRadioChannelParam, original_priority => 1 }}); # call fn that will do the http request
 	    return undef;
 	  }
@@ -2189,8 +2195,11 @@ sub YAMAHA_MC_Set($$@)
 	if ( (!defined($currentInput)) || ($currentInput ne "net_radio")) {
 	  Log3 $name, 4, "$name : YAMAHA_MC_Set current input is set $currentInput and not to net_radio, setting input first ";
 	  YAMAHA_MC_httpRequestQueue($hash, "input", "net_radio", {options    => {unless_in_queue => 1, can_fail => 1, priority => 1, original_cmd => "TurnFavNetRadioChannelOn", original_arg => $FavoriteNetRadioChannelParam, original_priority => 1}}); # call fn that will do the http request
+	  $hash->{FavoriteNetRadioChannelInProgress}=1;
 	  return undef;
 	}
+	
+	$hash->{FavoriteNetRadioChannelInProgress}=0;
 	
 	# setting volume to standard
 	if($currentVolume != $standardVolume){
@@ -2208,6 +2217,7 @@ sub YAMAHA_MC_Set($$@)
 	my $powerCmdDelay = AttrVal($hash->{NAME}, "powerCmdDelay",3);
 	my $menuLayerDelay = AttrVal($hash->{NAME}, "menuLayerDelay",0.5); 
 	
+	$hash->{FavoriteNetRadioChannelInProgress}=0;
 	Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn Current Input set to  $currentInput";
 	Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn  Favourite Channel $FavoriteNetRadioChannelParam";	
     			
@@ -2218,6 +2228,7 @@ sub YAMAHA_MC_Set($$@)
 	# setting current Channel
 	Log3 $name, 4, "$name : YAMAHA_MC_Set TurnFavNetRadioChannelOn now setting current Channel to $FavoriteNetRadioChannelParam";
 	readingsSingleUpdate($hash, 'currentFavNetRadioChannel', $FavoriteNetRadioChannelParam,1 );
+	
 
   }  
   elsif($cmd eq "TurnFavServerChannelOn") {
@@ -2704,10 +2715,11 @@ sub YAMAHA_MC_HandleCmdQueue($$$)
 	 $reqCmd = "";
 	 $reqArg = "";
 	 $reqData = "";
+	 $reqOptions ="";  
 	 $reqCmd = (defined($request->{cmd}) ? $request->{cmd} : "");
 	 $reqArg = (defined($request->{arg}) ? $request->{arg} : "");
 	 $reqData = (defined($request->{data}) ? $request->{data} : "");
-	 #$reqOptions = defined($request->{options}) ? $request->{options} : "");
+	 $reqOptions = (defined($request->{options}) ? $request->{options} : "");
 	 
 	 Log3 $name, 4, "$type YAMAHA_MC_HandleCmdQueue: new request has name $name CMD $reqCmd Args $reqArg";
 	 
@@ -2764,7 +2776,7 @@ sub YAMAHA_MC_HandleCmdQueue($$$)
 	   my ($url2) = split /batch_cmd/, $url, 2;
 	   #$url =~ s/batch_cmd/\/v1\/main\/getStatus/g;
 	   Log3 $name, 4, "$type ($name) - YAMAHA_MC_HandleCmdQueue: batch_cmd detected, replaced - new url is $url ";	     
-	   $url = $url2 . "/getStatus";
+	   $url = $url2 . "/v1/main/getStatus";
 	   Log3 $name, 4, "$type ($name) - YAMAHA_MC_HandleCmdQueue: batch_cmd detected, replaced - new url2 is $url ";	   	   
 	 }
 	
@@ -2799,6 +2811,7 @@ sub YAMAHA_MC_HandleCmdQueue($$$)
 		hash        => $hash,
 		cmd         => $reqCmd,     #passthrouht to YAMAHA_MC_httpRequestParse
 		plist       => $plist,   #passthrouht to YAMAHA_MC_httpRequestParse
+		reqOptions   => $reqOptions, #passthrouht to YAMAHA_MC_httpRequestParse
 	    callback    =>  \&YAMAHA_MC_httpRequestParse # This fn will be called when finished
 	  };
 	  
@@ -2827,7 +2840,7 @@ sub YAMAHA_MC_HandleCmdQueue($$$)
 		{
           $hash->{helper}{RUNNING_REQUEST} = 1;
 		
-          Log3 $name, 4, "YAMAHA_MC ($name) YAMAHA_MC_HandleCmdQueue - send command \"$request->{cmd}".(defined($request->{arg}) ? " ".$request->{arg} : "")."\"".(exists($request->{data}) ? ": ".$request->{data} : "");
+          Log3 $name, 4, "YAMAHA_MC ($name) YAMAHA_MC_HandleCmdQueue - send command via HttpUtils_NonblockingGet \"$request->{cmd}".(defined($request->{arg}) ? " ".$request->{arg} : "")."\"".(exists($request->{data}) ? ": ".$request->{data} : "");
           HttpUtils_NonblockingGet($hash->{helper}{".HTTP_CONNECTION"});
 		}
 	  else {
@@ -2965,6 +2978,7 @@ sub YAMAHA_MC_httpRequestParse($$$)
   my $arg = $param->{arg};  
   my $options = $param->{options};
   my $queue_hash = $param->{hash};
+  my $reqOptions = $param->{reqOptions};
    
   
   $data = "" unless(defined($data));
@@ -3092,11 +3106,11 @@ sub YAMAHA_MC_httpRequestParse($$$)
 
         #Dumps hash to log, there you can see Yamaha's response
         #see: https://wiki.selfhtml.org/wiki/Perl/Hashes
-	Log3 $name, 5, "$type: $name YAMAHA_MC_httpRequestParse got json repsonse, following Dumper von result \n";
+	    Log3 $name, 5, "$type: $name YAMAHA_MC_httpRequestParse got json repsonse, following Dumper von result \n";
         Log3 $name, 5, Dumper(%res);
 
         my $responseCode = $res{"response_code"}; #see Dumper output what keyXYZ really is.
-	Log3 $name, 4, "$type: $name YAMAHA_MC_httpRequestParse ResponseCode = $responseCode"; 
+	    Log3 $name, 4, "$type: $name YAMAHA_MC_httpRequestParse ResponseCode = $responseCode"; 
 		
 		#response code description
 		#0 Successful request
@@ -3123,7 +3137,7 @@ sub YAMAHA_MC_httpRequestParse($$$)
 		  readingsEndUpdate($hash, 1);
 		  }  
 		elsif ($responseCode==3){
-		readingsBeginUpdate($hash); 
+		  readingsBeginUpdate($hash); 
 		  readingsBulkUpdate($hash, "last_error", 'Invalid Request',1);
 		  readingsBulkUpdate($hash, "response_code", $responseCode, );
 		  readingsEndUpdate($hash, 1);
@@ -3133,6 +3147,20 @@ sub YAMAHA_MC_httpRequestParse($$$)
 		  readingsBulkUpdate($hash, "last_error", 'Invalid Parameter (Out of range, invalid characters etc.)',1);
 		  readingsBulkUpdate($hash, "response_code", $responseCode, );
 		  readingsEndUpdate($hash, 1);
+		  
+			# call original cmd again if requested original_cmd
+			if (defined($options->{original_cmd}) && ($options->{original_cmd} ne "") && $cmd ne "?")
+			{
+				Log3 $name, 4, "YAMAHA_MC ($name) YAMAHA_MC_httpRequestParseREsponse Code 4, current cmd $cmd original command for device ".$options->{original_cmd}." calling cmd again";
+				#fhem("set ".$name." ". $options->{original_cmd});
+			 }
+			else {
+			  Log3 $name, 4, "YAMAHA_MC ($name) YAMAHA_MC_httpRequestParseREsponse Code 4, current cmd $cmd original command for device not defined ";
+			}
+		
+			my $original_data = "";
+			my $original_arg = $options->{original_arg};
+
 		  
 		  # perhaps navigate too far back or forth in menu list
 		  # call original cmd again if requested original_cmd
@@ -3374,39 +3402,63 @@ sub YAMAHA_MC_httpRequestParse($$$)
 				Log3 $name, 4, "$type: $name YAMAHA_MC_httpRequestParse handling TurnFavNetRadioChannelOn"; 
 				my @list_cmds = split("/", $arg);
 				
-				if($data =~ /menu_layer/)
-				{
-				   
-					my $current_list = $res{"index"};
-					my $current_line = $res{"index"};					
-					
-					my $menu_layer = $res{"menu_layer"}; 
-			        my $max_line = $res{"max_line"}; 
-			        my $index = $res{"index"}; 
-			        my $menu_name = $res{"menu_name"}; 
-			        my $playing_index = $res{"playing_index"}; 
-					#my $list_info=%res->{list_info};
-					my $list_info=$res{list_info};
-
-					readingsBeginUpdate($hash);	 
-					readingsBulkUpdate($hash, 'currentMenumaxItems', $max_line);		  
-					readingsBulkUpdate($hash, 'currentMenuLayer', $menu_layer);		  
-					readingsBulkUpdate($hash, 'currentMenuName', $menu_name);		  
-					readingsBulkUpdate($hash, 'currentMenuPlayingIndex', $playing_index);		  
-					readingsEndUpdate($hash, 1);
-					
-					my $menu_status = "Ready"; # musiccast devices do not provide <Menu_Status> so "Ready" must be assumed					
-					my $last = ($options->{last_menu_item} or ($menu_layer == ($#list_cmds + 1)));
-
-					Log3 $name, 4, "$type: $name YAMAHA_MC_httpRequestParse currentMenuLayer=$menu_layer"; 
-					Log3 $name, 4, "$type: $name YAMAHA_MC_httpRequestParse currentMenuName=$menu_name"; 
-					Log3 $name, 4, "$type: $name YAMAHA_MC_httpRequestParse index=$index"; 
+				if (!defined($hash->{FavoriteNetRadioChannelInProgress})) {
+				 $hash->{FavoriteNetRadioChannelInProgress}=0;
 				}
+				
+				Log3 $name, 4, "$type: $name YAMAHA_MC_httpRequestParse TurnFavServerChannelOn FavoriteNetRadioChannelInProgress=".$hash->{FavoriteNetRadioChannelInProgress}; 
+				Log3 $name, 4, "$type: $name YAMAHA_MC_httpRequestParse TurnFavServerChannelOn should i call me again ?"; 
+				
+				if (defined($options->{original_cmd})) {
+				  Log3 $name, 4, "$type: $name YAMAHA_MC_httpRequestParse original cmd=".$options->{original_cmd}; 
+				}
+				
+				if ((!defined($options->{original_cmd})) and ($hash->{FavoriteNetRadioChannelInProgress}==1)) {
+                  Log3 $name, 4, "$type: $name YAMAHA_MC_httpRequestParse TurnFavServerChannelOn yes i call me again with Arg ".$arg; 
+			      #YAMAHA_MC_httpRequestQueue($hash, $cmd, $arg,{options => {unless_in_queue => 1, can_fail => 1, priority => 2}}); # call fn that will do the http request	
+				  YAMAHA_MC_Set($hash,$hash,$cmd,$arg);
+				}
+				
+				#if($data =~ /menu_layer/)
+				#{
+				   
+				#	my $current_list = $res{"index"};
+				#	my $current_line = $res{"index"};					
+				#	
+				#	my $menu_layer = $res{"menu_layer"}; 
+			    #    my $max_line = $res{"max_line"}; 
+			    #    my $index = $res{"index"}; 
+			    #    my $menu_name = $res{"menu_name"}; 
+			    #    my $playing_index = $res{"playing_index"}; 
+				#	#my $list_info=%res->{list_info};
+				#	my $list_info=$res{list_info};
+
+				#	readingsBeginUpdate($hash);	 
+				#	readingsBulkUpdate($hash, 'currentMenumaxItems', $max_line);		  
+				#	readingsBulkUpdate($hash, 'currentMenuLayer', $menu_layer);		  
+				#	readingsBulkUpdate($hash, 'currentMenuName', $menu_name);		  
+				#	readingsBulkUpdate($hash, 'currentMenuPlayingIndex', $playing_index);		  
+				#	readingsEndUpdate($hash, 1);
+					
+				#	my $menu_status = "Ready"; # musiccast devices do not provide <Menu_Status> so "Ready" must be assumed					
+				#	my $last = ($options->{last_menu_item} or ($menu_layer == ($#list_cmds + 1)));
+
+				#	Log3 $name, 4, "$type: $name YAMAHA_MC_httpRequestParse currentMenuLayer=$menu_layer"; 
+				#	Log3 $name, 4, "$type: $name YAMAHA_MC_httpRequestParse currentMenuName=$menu_name"; 
+				#	Log3 $name, 4, "$type: $name YAMAHA_MC_httpRequestParse index=$index"; 
+				#}
+				#if ($hash->{FavoriteNetRadioChannelInProgress}==1) {
+				#	  Log3 $name, 4, "$type: $name YAMAHA_MC_httpRequestParse TurnFavServerChannelOn still in progress restart with Arg ".$arg; 
+			    #		  YAMAHA_MC_httpRequestQueue($hash, $cmd, $arg,{options => {unless_in_queue => 1, can_fail => 1, priority => 2}}); # call fn that will do the http request	 
+				#	}
+			
 			}	            
 			elsif($cmd eq "TurnFavServerChannelOn")
 			{
 				Log3 $name, 4, "$type: $name YAMAHA_MC_httpRequestParse handling TurnFavServerChannelOn"; 
 				my @list_cmds = split("/", $arg);
+				
+				
 				
 				if($data =~ /menu_layer/)
 				{
@@ -3415,7 +3467,7 @@ sub YAMAHA_MC_httpRequestParse($$$)
 					my $current_line = $res{"index"};					
 					
 					my $menu_layer = $res{"menu_layer"}; 
-			        my $max_line = $res{"max_line"}; 
+			       my $max_line = $res{"max_line"}; 
 			        my $index = $res{"index"}; 
 			        my $menu_name = $res{"menu_name"}; 
 			        my $playing_index = $res{"playing_index"}; 
@@ -3435,6 +3487,10 @@ sub YAMAHA_MC_httpRequestParse($$$)
 					Log3 $name, 4, "$type: $name YAMAHA_MC_httpRequestParse currentMenuLayer=$menu_layer"; 
 					Log3 $name, 4, "$type: $name YAMAHA_MC_httpRequestParse currentMenuName=$menu_name"; 
 					Log3 $name, 4, "$type: $name YAMAHA_MC_httpRequestParse index=$index"; 
+					
+					
+					
+					
 				}
 			}	            
 			elsif($cmd eq "NetRadioNextFavChannel")
@@ -4006,13 +4062,13 @@ sub YAMAHA_MC_httpRequestParse($$$)
 			# call original cmd again if requested original_cmd
 			if (defined($options->{original_cmd}) && ($options->{original_cmd} ne "") && $cmd ne "?")
 			{
-				Log3 $name, 4, "YAMAHA_MC ($name) YAMAHA_MC_httpRequestParse: current cmd $cmd original command for device ".$options->{original_cmd}." calling cmd again";
+				Log3 $name, 4, "YAMAHA_MC ($name) YAMAHA_MC_httpRequestParse: after all cmd handlings current cmd $cmd original command for device ".$options->{original_cmd}." calling cmd again";
 				#fhem("set ".$name." ". $options->{original_cmd});
 				
 				my $original_data = "";
 				my $original_arg = $options->{original_arg};
 	
-				Log3 $name, 5, "YAMAHA_MC ($name) YAMAHA_MC_httpRequestParse reset in queue orginal cmd without args  ". $options->{original_cmd};
+				Log3 $name, 5, "YAMAHA_MC ($name) YAMAHA_MC_httpRequestParse reset in queue orginal cmd s  ". $options->{original_cmd}." with args ".$original_arg." original prio ".$options->{original_priority};
 				
 				# In case any URL changes must be made, this part is separated in this function".    
 				my $param = {
@@ -4024,7 +4080,7 @@ sub YAMAHA_MC_httpRequestParse($$$)
 				
 				push @{$hash->{helper}{CMD_QUEUE}}, $param;  
 				
-				Log3 $name, 5, "YAMAHA_MC ($name) YAMAHA_MC_httpRequestParse reset in queue orginal cmd without args done  ". $options->{original_cmd};
+				Log3 $name, 5, "YAMAHA_MC ($name) YAMAHA_MC_httpRequestParse reset in queue orginal cmd  done  ". $options->{original_cmd};
 				
 				#unshift @{$queue_hash->{helper}{CMD_QUEUE}}, {options=> { priority => 1, not_before => (gettimeofday()+$options->{wait_after_response})} };
 			}
