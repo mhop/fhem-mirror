@@ -418,7 +418,7 @@ FHEM/91_sequence.pm          rudolfkoenig         Automatisierung
 FHEM/91_watchdog.pm          rudolfkoenig         Automatisierung
 FHEM/92_FileLog.pm           rudolfkoenig         Automatisierung
 FHEM/92_SingleFileLog.pm     rudolfkoenig         Automatisierung
-FHEM/93_DbLog.pm             Tobias/DS_Starter    Automatisierung
+FHEM/93_DbLog.pm             DS_Starter           Automatisierung
 FHEM/93_DbRep.pm             DS_Starter           Sonstiges
 FHEM/93_FHEM2FHEM.pm         rudolfkoenig         Automatisierung
 FHEM/93_Log2Syslog.pm        DS_Starter           Automatisierung
