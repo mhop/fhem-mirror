@@ -307,14 +307,21 @@ sub WeekdayTimer_getListeDerTage($$) {
      ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($echteZeit);
 
     foreach my $h2we (split(',', AttrVal('global', 'holiday2we', ''))) {
-        if($h2we) {
-            my $ergebnis = CommandGet(undef,$h2we . ' ' . sprintf("%02d-%02d",$mon+1,$mday));
-            if ($ergebnis ne 'none') {
-                #Log 3, "ergebnis-------$i----->$ergebnis";
-                $hdays{$i} = undef   if ($d==7); #  $we Tag aufnehmen
-                delete $hdays{$i}    if ($d==8); # !$we Tag herausnehmen
-            }
+      if($h2we) {
+        my $ergebnis = 'none';
+        if (InternalVal($h2we, 'TYPE', '') eq "holiday") {
+          $ergebnis = CommandGet(undef,$h2we . ' ' . sprintf("%02d-%02d",$mon+1,$mday));
+        } elsif ($wday==$nowWday ){
+          $ergebnis = "is_true" if IsWe();
+        }elsif ( $wday==$nowWday+1){
+          $ergebnis = "is_true" if IsWe("tomorrow");
         }
+        if ($ergebnis ne 'none') {
+          #Log 3, "ergebnis-------$i----->$ergebnis";
+          $hdays{$i} = undef if ($d==7); #  $we Tag aufnehmen
+          delete $hdays{$i} if ($d==8); # !$we Tag herausnehmen
+        }
+      }
     }
   }
 
