@@ -128,6 +128,7 @@ BEGIN {
           readingsBulkUpdate
           readingsBulkUpdateIfChanged
           readingsBeginUpdate
+          readingsDelete
           readingsEndUpdate
           ReadingsVal
           RemoveInternalTimer
@@ -141,6 +142,7 @@ BEGIN {
 
 # Versions History intern
 our %vNotesIntern = (
+  "1.5.3"  => "26.03.2019  delete L1_ErrorMessages, L1_WarningMessages if no errors or warnings occur ",
   "1.5.2"  => "25.03.2019  prevent module from deactivation in case of unavailable Meta.pm ",
   "1.5.1"  => "24.03.2019  fix \$VAR1 problem Forum: #27667.msg922983.html#msg922983 ",
   "1.5.0"  => "23.03.2019  add consumer data ",
@@ -641,7 +643,7 @@ sub ParseData($) {
   readingsBeginUpdate($hash);
   
   my ($FeedIn_done,$GridConsumption_done,$PV_done,$AutarkyQuote_done,$SelfConsumption_done) = (0,0,0,0,0);
-  my ($SelfConsumptionQuote_done,$SelfSupply_done) = (0,0);
+  my ($SelfConsumptionQuote_done,$SelfSupply_done,$errMsg,$warnMsg) = (0,0,0,0);
   for my $k (keys %$livedata_content) {
       my $new_val = ""; 
       if (defined $livedata_content->{$k}) {
@@ -666,13 +668,15 @@ sub ParseData($) {
           if ($new_val && $k !~ /__type/i) {
               Log3 $name, 4, "$name -> $k - $new_val";
               readingsBulkUpdate($hash, "L1_$k", $new_val);
-              $FeedIn_done          = 1 if($k =~ /^FeedIn$/);
-              $GridConsumption_done = 1 if($k =~ /^GridConsumption$/);
-              $PV_done              = 1 if($k =~ /^PV$/);
-              $AutarkyQuote_done    = 1 if($k =~ /^AutarkyQuote$/);
-              $SelfConsumption_done = 1 if($k =~ /^SelfConsumption$/);
+              $FeedIn_done               = 1 if($k =~ /^FeedIn$/);
+              $GridConsumption_done      = 1 if($k =~ /^GridConsumption$/);
+              $PV_done                   = 1 if($k =~ /^PV$/);
+              $AutarkyQuote_done         = 1 if($k =~ /^AutarkyQuote$/);
+              $SelfConsumption_done      = 1 if($k =~ /^SelfConsumption$/);
               $SelfConsumptionQuote_done = 1 if($k =~ /^SelfConsumptionQuote$/);
-              $SelfSupply_done = 1 if($k =~ /^SelfSupply$/);
+              $SelfSupply_done           = 1 if($k =~ /^SelfSupply$/);
+              $errMsg                    = 1 if($k =~ /^ErrorMessages$/);
+              $warnMsg                   = 1 if($k =~ /^WarningMessages$/);
           }
       }
   }
@@ -684,8 +688,10 @@ sub ParseData($) {
   readingsBulkUpdate($hash, "L1_SelfConsumption", 0) if(!$SelfConsumption_done);
   readingsBulkUpdate($hash, "L1_SelfConsumptionQuote", 0) if(!$SelfConsumptionQuote_done);
   readingsBulkUpdate($hash, "L1_SelfSupply", 0) if(!$SelfSupply_done);
-  
   readingsEndUpdate($hash, 1);
+  
+  readingsDelete($hash,"L1_ErrorMessages") if(!$errMsg);
+  readingsDelete($hash,"L1_WarningMessages") if(!$warnMsg);
   
   if ($forecast_content && $forecast_content !~ m/undefined/i) {
       # Auswertung der Forecast Daten
