@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 74_GardenaSmartDevice: add support for power plug and META
+ - feature: 73_GardenaSmartBridge: add support for power plug and META
  - feature: 42_AptToDate: add support for META and Installer Modules
  - bugfix:  98_WeekdayTimer: fix problem if use more then one holiday2we entry
  - bugfix:  42_AptToDate: fix Can't call method readFromChild

@@ -2,7 +2,7 @@
 #
 # Developed with Kate
 #
-#  (c) 2017-2018 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
+#  (c) 2017-2019 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
 #  All rights reserved
 #
 #   Special thanks goes to comitters:
@@ -58,7 +58,7 @@ package main;
 use strict;
 use warnings;
 
-my $version = "1.4.0";
+my $version = "1.6.0";
 
 
 sub GardenaSmartBridge_Initialize($) {
@@ -66,19 +66,19 @@ sub GardenaSmartBridge_Initialize($) {
     my ($hash) = @_;
 
     # Provider
-    $hash->{WriteFn}   = "GardenaSmartBridge::Write";
+    $hash->{WriteFn}   = "FHEM::GardenaSmartBridge::Write";
     $hash->{Clients}   = ":GardenaSmartDevice:";
     $hash->{MatchList} = { "1:GardenaSmartDevice" => '^{"id":".*' };
 
     # Consumer
-    $hash->{SetFn}    = "GardenaSmartBridge::Set";
-    $hash->{DefFn}    = "GardenaSmartBridge::Define";
-    $hash->{UndefFn}  = "GardenaSmartBridge::Undef";
-    $hash->{DeleteFn} = "GardenaSmartBridge::Delete";
-    $hash->{RenameFn} = "GardenaSmartBridge::Rename";
-    $hash->{NotifyFn} = "GardenaSmartBridge::Notify";
+    $hash->{SetFn}    = "FHEM::GardenaSmartBridge::Set";
+    $hash->{DefFn}    = "FHEM::GardenaSmartBridge::Define";
+    $hash->{UndefFn}  = "FHEM::GardenaSmartBridge::Undef";
+    $hash->{DeleteFn} = "FHEM::GardenaSmartBridge::Delete";
+    $hash->{RenameFn} = "FHEM::GardenaSmartBridge::Rename";
+    $hash->{NotifyFn} = "FHEM::GardenaSmartBridge::Notify";
 
-    $hash->{AttrFn} = "GardenaSmartBridge::Attr";
+    $hash->{AttrFn} = "FHEM::GardenaSmartBridge::Attr";
     $hash->{AttrList} =
         "debugJSON:0,1 "
       . "disable:1 "
@@ -92,10 +92,12 @@ sub GardenaSmartBridge_Initialize($) {
         my $hash = $modules{GardenaSmartBridge}{defptr}{$d};
         $hash->{VERSION} = $version;
     }
+    
+    return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
-package GardenaSmartBridge;
-use GPUtils qw(:all)
+package FHEM::GardenaSmartBridge;
+use GPUtils qw(GP_Import)
   ;    # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 
 my $missingModul = "";
@@ -145,6 +147,7 @@ sub Define($$) {
 
     my @a = split( "[ \t][ \t]*", $def );
 
+    return $@ unless ( FHEM::Meta::SetInternals($hash) );
     return "too few parameters: define <NAME> GardenaSmartBridge"
       if ( @a != 2 );
     return
@@ -155,7 +158,7 @@ sub Define($$) {
     $hash->{BRIDGE}    = 1;
     $hash->{URL}       = 'https://sg-api.dss.husqvarnagroup.net/sg-1';
     $hash->{VERSION}   = $version;
-    $hash->{INTERVAL}  = 300;
+    $hash->{INTERVAL}  = 60;
     $hash->{NOTIFYDEV} = "global,$name";
 
     CommandAttr( undef, $name . ' room GardenaSmart' )
@@ -234,9 +237,9 @@ sub Attr(@) {
 
         elsif ( $cmd eq "del" ) {
             RemoveInternalTimer($hash);
-            $hash->{INTERVAL} = 300;
+            $hash->{INTERVAL} = 60;
             Log3 $name, 3,
-"GardenaSmartBridge ($name) - delete User interval and set default: 300";
+"GardenaSmartBridge ($name) - delete User interval and set default: 60";
         }
     }
 
@@ -301,7 +304,7 @@ sub Notify($$) {
     {
 
         InternalTimer( gettimeofday() + $hash->{INTERVAL},
-            "GardenaSmartBridge::getDevices", $hash );
+            "FHEM::GardenaSmartBridge::getDevices", $hash );
         Log3 $name, 4,
 "GardenaSmartBridge ($name) - set internal timer function for recall getDevices sub";
     }
@@ -383,6 +386,8 @@ sub Write($@) {
 
     Log3 $name, 4,
 "GardenaSmartBridge ($name) - Send with URL: $hash->{URL}$uri, HEADER: secret!, DATA: secret!, METHOD: $method";
+#     Log3 $name, 3,
+# "GardenaSmartBridge ($name) - Send with URL: $hash->{URL}$uri, HEADER: $header, DATA: $payload, METHOD: $method";
 }
 
 sub ErrorHandling($$$) {
@@ -468,7 +473,7 @@ sub ErrorHandling($$$) {
 
             readingsBulkUpdate( $dhash, "state", "the command is processed",
                 1 );
-            InternalTimer( gettimeofday() + 5, "GardenaSmartBridge::getDevices", $hash, 1 );
+            InternalTimer( gettimeofday() + 5, "FHEM::GardenaSmartBridge::getDevices", $hash, 1 );
 
         }
         elsif ( $param->{code} != 200 ) {
@@ -980,6 +985,21 @@ sub createHttpValueStrings($@) {
               . $valve_id;
 
         }
+        elsif ( defined($abilities)
+            and defined($payload)
+            and $abilities eq 'power' )
+        {
+            my $valve_id;
+            $method = 'PUT';
+
+            $uri .=
+                '/devices/'
+              . $deviceId
+              . '/abilities/'
+              . $abilities
+              . '/properties/power_timer';
+
+        }
         else {
             $uri .=
               '/devices/' . $deviceId . '/abilities/' . $abilities . '/command'
@@ -1065,7 +1085,7 @@ sub DeletePassword($) {
   <ul>
     <li>debugJSON - </li>
     <li>disable - Disables the Bridge</li>
-    <li>interval - Interval in seconds (Default=300)</li>
+    <li>interval - Interval in seconds (Default=60)</li>
     <li>gardenaAccountEmail - Email Adresse which was used in the GardenaAPP</li>
   </ul>
 </ul>
@@ -1126,11 +1146,58 @@ sub DeletePassword($) {
   <b>Attribute</b>
   <ul>
     <li>debugJSON - JSON Fehlermeldungen</li>
-    <li>disable - Schaltet die Daten&uuml;bertragung der Bridge ab</li>
+    <li>disable - Schaltet die Datenübertragung der Bridge ab</li>
     <li>interval - Abfrageinterval in Sekunden (default: 300)</li>
     <li>gardenaAccountEmail - Email Adresse, die auch in der GardenaApp verwendet wurde</li>
   </ul>
 </ul>
 
 =end html_DE
+
+=for :application/json;q=META.json 73_GardenaSmartBridge.pm
+{
+  "abstract": "Modul to communicate with the GardenaCloud",
+  "x_lang": {
+    "de": {
+      "abstract": "Modul zur Datenübertragung zur GardenaCloud"
+    }
+  },
+  "keywords": [
+    "fhem-mod-device",
+    "fhem-core",
+    "Garden",
+    "Gardena",
+    "Smart"
+  ],
+  "release_status": "stable",
+  "license": "GPL_2",
+  "author": [
+    "Marko Oldenburg <leongaultier@gmail.com>"
+  ],
+  "x_fhem_maintainer": [
+    "CoolTux"
+  ],
+  "x_fhem_maintainer_github": [
+    "LeonGaultier"
+  ],
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "FHEM": 5.00918799,
+        "perl": 5.016, 
+        "Meta": 0,
+        "IO::Socket::SSL": 0,
+        "JSON": 0,
+        "HttpUtils": 0,
+        "Encode": 0
+      },
+      "recommends": {
+      },
+      "suggests": {
+      }
+    }
+  }
+}
+=end :application/json;q=META.json
+
 =cut
