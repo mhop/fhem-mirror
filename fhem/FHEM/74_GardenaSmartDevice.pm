@@ -260,7 +260,7 @@ sub Set($@) {
     }
     elsif ( lc $cmd eq 'on' or lc $cmd eq 'off' or lc $cmd eq 'on-for-timer' ) {
     
-        my $val = ( defined($args[0]) ? join( " ", @args ) : lc $cmd );
+        my $val = ( defined($args[0]) ? join(" ", @args)*60 : lc $cmd );
         $payload =
             '"properties":{"value":"' . $val . '"}';
     }
@@ -316,7 +316,7 @@ sub Set($@) {
           if ( AttrVal( $name, 'model', 'unknown' ) eq 'ic24' );
         $list .= 'refresh:temperature,light,humidity'
           if ( AttrVal( $name, 'model', 'unknown' ) eq 'sensor' );
-        $list .= 'on:noArg off:noArg on-for-timer:slider,0,1,3600'
+        $list .= 'on:noArg off:noArg on-for-timer:slider,0,1,60'
           if ( AttrVal( $name, 'model', 'unknown' ) eq 'power' );
 
         return "Unknown argument $cmd, choose one of $list";
