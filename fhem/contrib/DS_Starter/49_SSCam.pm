@@ -491,7 +491,7 @@ sub SSCam_Define($@) {
   
   # initiale Routinen nach Restart ausführen   , verzögerter zufälliger Start
   RemoveInternalTimer($hash, "SSCam_initonboot");
-  InternalTimer(gettimeofday()+int(rand(30)), "SSCam_initonboot", $hash, 0);
+  InternalTimer(gettimeofday()+rand(30), "SSCam_initonboot", $hash, 0);
 
 return undef;
 }
@@ -501,7 +501,7 @@ return undef;
 # gelöscht wird oder bei der Abarbeitung des Befehls rereadcfg, 
 # der ebenfalls alle Geräte löscht und danach das 
 # Konfigurationsfile neu einliest. 
-# Funktion: typische Aufräumarbeiten durchgeführt werden wie das 
+# Funktion: typische Aufräumarbeiten wie das 
 # saubere Schließen von Verbindungen oder das Entfernen von 
 # internen Timern, sofern diese im Modul zum Pollen verwendet 
 # wurden.
@@ -529,12 +529,11 @@ sub SSCam_DelayedShutdown($) {
   my ($hash) = @_;
   my $name   = $hash->{NAME};
   
-  my $delay_needed = 7;
-  
-  Log3($name, 1, "$name - Quit session due to shutdown ... (default delay: $delay_needed sec)");
+  Log3($name, 1, "$name - Quit session due to shutdown ...");
+  $hash->{HELPER}{ACTIVE} = "on";                              # keine weiteren Aktionen erlauben
   SSCam_logout($hash);
 
-return $delay_needed;
+return 1;
 }
 
 #################################################################
