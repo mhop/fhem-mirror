@@ -34,6 +34,8 @@ sub HUEBridge_Initialize($)
   $hash->{AttrFn}   = "HUEBridge_Attr";
   $hash->{UndefFn}  = "HUEBridge_Undefine";
   $hash->{AttrList} = "key disable:1 disabledForIntervals createGroupReadings:1,0 httpUtils:1,0 noshutdown:1,0 pollDevices:1,2,0 queryAfterSet:1,0 $readingFnAttributes";
+
+  #$hash->{isDiscoverable} = { ssdp => {'hue-bridgeid' => '/.*/'}, upnp => {} };
 }
 
 sub
@@ -695,6 +697,33 @@ HUEBridge_Set($@)
 
     return undef;
 
+  } elsif($cmd eq 'updateschedule') {
+    return "usage: updateschedule <id> <attributes json>" if( @args != 2 );
+    return "$arg is not a hue schedule number" if( $arg !~ m/^\d+$/ );
+
+    my $json = $args[@args-1];
+    my $obj = eval { decode_json($json) };
+    if( $@ ) {
+      Log3 $name, 2, "$name: json error: $@ in $json";
+      return undef;
+    }
+
+    my $result;
+    $result = HUEBridge_Call($hash, undef, "schedules/$arg", $obj, 'PUT');
+    return "Error: " . $result->{error}{description} if( $result->{error} );
+    return "Schedule id $arg updated" if( $result->{success} );
+    return undef;
+
+  } elsif($cmd eq 'enableschedule' || $cmd eq 'disableschedule') {
+    return "usage: $cmd <id>" if( @args != 1 );
+    return "$arg is not a hue schedule number" if( $arg !~ m/^\d+$/ );
+
+    my $newStatus = 'enabled';
+    $newStatus = 'disabled' if($cmd eq 'disableschedule');
+
+    $args[1] = sprintf( '{"status":"%s"}', $newStatus );
+    return HUEBridge_Set($hash, $name,'updateschedule',@args)
+
   } elsif($cmd eq 'deleterule') {
     return "usage: deleterule <id>" if( @args != 1 );
     return "$arg is not a hue rule number" if( $arg !~ m/^\d+$/ );
@@ -835,7 +864,7 @@ HUEBridge_Set($@)
     return undef;
 
   } else {
-    my $list = "active inactive delete creategroup deletegroup savescene deletescene modifyscene scene createrule updaterule deleterule createsensor deletesensor configsensor setsensor updatesensor deletewhitelist touchlink:noArg checkforupdate:noArg autodetect:noArg autocreate:noArg statusRequest:noArg";
+    my $list = "active inactive delete creategroup deletegroup savescene deletescene modifyscene scene createrule updaterule updateschedule enableschedule disableschedule deleterule createsensor deletesensor configsensor setsensor updatesensor deletewhitelist touchlink:noArg checkforupdate:noArg autodetect:noArg autocreate:noArg statusRequest:noArg";
     $list .= " swupdate:noArg" if( defined($hash->{updatestate}) && $hash->{updatestate} =~ '^2' );
     return "Unknown argument $cmd, choose one of $list";
   }
@@ -926,6 +955,30 @@ HUEBridge_Get($@)
       $ret = sprintf( "%2s  %-20s\n", "ID", "NAME" ) .$ret if( $ret );
     }
     return $ret;
+  } elsif($cmd eq 'schedules') {
+    my $result =  HUEBridge_Call($hash, undef, 'schedules', undef);
+    return $result->{error}{description} if( $result->{error} );
+
+    # 064:MO
+    # 032:DI
+    # 016:MI
+    # 008:DO
+    # 004:FR
+    # 002:SA
+    # 001:SO
+    my $ret = "";
+    foreach my $key ( sort {$a<=>$b} keys %{$result} ) {
+      $ret .= sprintf( "%2i: %-20s %-12s", $key, $result->{$key}{name},$result->{$key}{status} );
+      $ret .= sprintf( "%s", $result->{$key}{localtime} ) if( $arg && $arg eq 'detail' );
+      
+      $ret .= "\n";
+    }
+    if( $arg && $arg eq 'detail' ) {
+      $ret = sprintf( "%2s  %-20s %-11s %s\n", "ID", "NAME", "STATUS", "TIME" ) .$ret if( $ret );
+    } else {
+      $ret = sprintf( "%2s  %-20s %-12s\n", "ID", "NAME", "STATUS" ) .$ret if( $ret );
+    }
+    return $ret;
 
   } elsif($cmd eq 'sensors') {
     my $result =  HUEBridge_Call($hash, undef, 'sensors', undef);
@@ -978,7 +1031,7 @@ HUEBridge_Get($@)
     return $ret;
 
   } else {
-    my $list = "lights:noArg groups:noArg scenes:noArg rule rules:noArg sensors:noArg whitelist:noArg";
+    my $list = "lights:noArg groups:noArg scenes:noArg rule rules:noArg sensors:noArg schedules:noArg whitelist:noArg";
     if( $hash->{helper}{apiversion} && $hash->{helper}{apiversion} >= (1<<16) + (26<<8) ) {
       $list .= " startup:noArg";
     }
@@ -1874,6 +1927,8 @@ HUEBridge_Attr($$$)
       list the groups known to the bridge.</li>
     <li>scenes [detail]<br>
       list the scenes known to the bridge.</li>
+    <li>schedules [detail]<br>
+      list the schedules known to the bridge.</li>
     <li>startup<br>
       show startup behavior of all known lights</li>
     <li>rule &lt;id&gt; <br>
@@ -1909,6 +1964,12 @@ HUEBridge_Attr($$$)
       Modifys the given scene in the bridge.</li>
     <li>scene &lt;id&gt;<br>
       Recalls the scene with the given id.</li>
+    <li>updateschedule &lt;id&gt; &lt;attributes json&gt;<br>
+      updates the given schedule in the bridge with &lt;attributes json&gt; </li>
+    <li>enableschedule &lt;id&gt;<br>
+      enables the given shedule</li>
+    <li>disableschedule &lt;id&gt;<br>
+      disables the given shedule</li>
     <li>createrule &lt;name&gt; &lt;conditions&amp;actions json&gt;<br>
       Creates a new rule in the bridge.</li>
     <li>deleterule &lt;id&gt;<br>
