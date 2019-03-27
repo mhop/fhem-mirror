@@ -31,9 +31,11 @@ package main;
 
 use strict;
 use warnings;
+eval "use FHEM::Meta;1" or my $modMetaAbsent = 1; 
 
 # Versions History intern
 our %SSCamSTRM_vNotesIntern = (
+  "2.5.0"  => "27.03.2019  add Meta.pm support ",
   "2.4.0"  => "24.02.2019  support for \"genericStrmHtmlTag\" in streaming device MODEL generic ",
   "2.3.0"  => "04.02.2019  SSCamSTRM_Rename / SSCamSTRM_Copy added, Streaming device can now be renamed or copied ",
   "2.2.1"  => "19.12.2018  commandref revised ",
@@ -89,13 +91,13 @@ sub SSCamSTRM_Initialize($) {
   $hash->{FW_summaryFn}       = "SSCamSTRM_FwFn";
   $hash->{FW_detailFn}        = "SSCamSTRM_FwFn";
   $hash->{AttrFn}             = "SSCamSTRM_Attr";
-  $hash->{FW_hideDisplayName} = 1;        # Forum 88667
+  $hash->{FW_hideDisplayName} = 1;                     # Forum 88667
   # $hash->{FW_addDetailToSummary} = 1;
-  # $hash->{FW_atPageEnd} = 1;            # wenn 1 -> kein Longpoll ohne informid in HTML-Tag
+  # $hash->{FW_atPageEnd} = 1;                         # wenn 1 -> kein Longpoll ohne informid in HTML-Tag
 
-  #$data{FWEXT}{SSCAMSTRM}{SCRIPT} = "/pgm2/".$hlsjs if (!$data{FWEXT}{SSCAMSTRM}{SCRIPT});
+  eval { FHEM::Meta::InitMod( __FILE__, $hash ) };     # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
  
-return undef; 
+return; 
 }
 
 ################################################################
@@ -109,10 +111,12 @@ sub SSCamSTRM_Define($$) {
 
   my $arg = (split("[()]",$link))[1];
   $arg   =~ s/'//g;
-  ($hash->{PARENT},$hash->{MODEL}) = ((split(",",$arg))[0],(split(",",$arg))[2]);
+  ($hash->{PARENT},$hash->{MODEL}) = ((split(",",$arg))[0],(split(",",$arg))[2]); 
+  $hash->{HELPER}{MODMETAABSENT}   = 1 if($modMetaAbsent);                         # Modul Meta.pm nicht vorhanden
+  $hash->{LINK}                    = $link;
   
-  $hash->{VERSION} = $hash->{VERSION} = (reverse sort(keys %SSCamSTRM_vNotesIntern))[0];
-  $hash->{LINK}    = $link;
+  # Versionsinformationen setzen
+  SSCamSTRM_setVersionInfo($hash);
   
   readingsSingleUpdate($hash,"state", "initialized", 1);      # Init für "state" 
   
@@ -288,10 +292,45 @@ sub SSCamSTRM_refresh($) {
 return;
 }
 
+#############################################################################################
+#                          Versionierungen des Moduls setzen
+#                  Die Verwendung von Meta.pm und Packages wird berücksichtigt
+#############################################################################################
+sub SSCamSTRM_setVersionInfo($) {
+  my ($hash) = @_;
+  my $name   = $hash->{NAME};
+
+  my $v                    = (sortTopicNum("desc",keys %SSCamSTRM_vNotesIntern))[0];
+  my $type                 = $hash->{TYPE};
+  $hash->{HELPER}{PACKAGE} = __PACKAGE__;
+  $hash->{HELPER}{VERSION} = $v;
+  
+  if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
+	  # META-Daten sind vorhanden
+	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
+		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
+	  } else {
+		  $modules{$type}{META}{x_version} = $v; 
+	  }
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
+	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
+	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
+		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
+	      use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );                                          
+      }
+  } else {
+	  # herkömmliche Modulstruktur
+	  $hash->{VERSION} = $v;
+  }
+  
+return;
+}
+
 1;
 
 =pod
-=item summary    define a Streaming device by SSCam module
+=item summary    Definition of a streaming device by the SSCam module
 =item summary_DE Erstellung eines Streaming-Device durch das SSCam-Modul
 =begin html
 
@@ -647,4 +686,55 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 </ul>
 
 =end html_DE
+
+=for :application/json;q=META.json 49_SSCamSTRM.pm
+{
+  "abstract": "Definition of a streaming device by the SSCam module",
+  "x_lang": {
+    "de": {
+      "abstract": "Erstellung eines Streaming-Device durch das SSCam-Modul"
+    }
+  },
+  "keywords": [
+    "camera",
+    "streaming",
+    "PTZ",
+    "Synology Surveillance Station",
+    "MJPEG",
+    "HLS",
+    "RTSP"
+  ],
+  "version": "v1.1.1",
+  "release_status": "stable",
+  "author": [
+    "Heiko Maaz <heiko.maaz@t-online.de>"
+  ],
+  "x_fhem_maintainer": [
+    "DS_Starter"
+  ],
+  "x_fhem_maintainer_github": [
+    "nasseeder1"
+  ],
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "FHEM": 5.00918799,
+        "perl": 5.014       
+      },
+      "recommends": {
+        "FHEM::Meta": 0
+      },
+      "suggests": {
+      }
+    }
+  },
+  "resources": {
+    "x_wiki": {
+      "web": "https://wiki.fhem.de/wiki/SSCAM_-_Steuerung_von_Kameras_in_Synology_Surveillance_Station",
+      "title": "SSCAM - Steuerung von Kameras in Synology Surveillance Station"
+    }
+  }
+}
+=end :application/json;q=META.json
+
 =cut

@@ -42,11 +42,15 @@ use MIME::Base64;
 use Time::HiRes;
 use HttpUtils;
 use Blocking;                                                     # für EMail-Versand
-use Encode;                                                    
+use Encode;
+eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;                                                    
 # no if $] >= 5.017011, warnings => 'experimental';
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.13.0" => "27.03.2019  add Meta.pm support ",
+  "8.12.0" => "25.03.2019  FHEM standard function X_DelayedShutdown implemented, delay FHEM shutdown as long as sessions ".
+              "are not terminated. ",
   "8.11.5" => "24.03.2019  fix possible overload Synology DS during shutdown restart ",
   "8.11.4" => "11.03.2019  make module ready for SVS version 8.2.3-5829 ",
   "8.11.3" => "08.03.2019  avoid possible JSON errors, fix fhem is hanging while restart or get snapinfo - Forum: #45671.msg915546.html#msg915546 ",
@@ -138,6 +142,7 @@ our %SSCam_vNotesIntern = (
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
+  "8.12.0" => "25.03.2019 Delay FHEM shutdown as long as sessions are not terminated, but not longer than global attribute \"maxShutdownDelay\". ",
   "8.11.0" => "25.02.2019 compatibility set to SVS version 8.2.3, Popup possible for streaming devices of type \"generic\", ".
               "support for \"genericStrmHtmlTag\" in streaming devices ",
   "8.10.0" => "15.02.2019 Possibility of send recordings by telegram is integrated as well as sending snapshots ",
@@ -348,12 +353,13 @@ sub SSCam_TBotSendIt($$$$$$$;$$$);
 ################################################################
 sub SSCam_Initialize($) {
  my ($hash) = @_;
- $hash->{DefFn}        = "SSCam_Define";
- $hash->{UndefFn}      = "SSCam_Undef";
- $hash->{DeleteFn}     = "SSCam_Delete"; 
- $hash->{SetFn}        = "SSCam_Set";
- $hash->{GetFn}        = "SSCam_Get";
- $hash->{AttrFn}       = "SSCam_Attr";
+ $hash->{DefFn}             = "SSCam_Define";
+ $hash->{UndefFn}           = "SSCam_Undef";
+ $hash->{DeleteFn}          = "SSCam_Delete"; 
+ $hash->{SetFn}             = "SSCam_Set";
+ $hash->{GetFn}             = "SSCam_Get";
+ $hash->{AttrFn}            = "SSCam_Attr";
+ $hash->{DelayedShutdownFn} = "SSCam_DelayedShutdown";
  # Aufrufe aus FHEMWEB
  $hash->{FW_summaryFn} = "SSCam_FWsummaryFn";
  $hash->{FW_detailFn}  = "SSCam_FWdetailFn";
@@ -400,7 +406,9 @@ sub SSCam_Initialize($) {
          "webCmd ".
          $readingFnAttributes;   
          
-return undef;   
+ eval { FHEM::Meta::InitMod( __FILE__, $hash ) };           # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
+
+return;   
 }
 
 ################################################################
@@ -426,13 +434,13 @@ sub SSCam_Define($@) {
   my $serverport = $a[4] ? $a[4] : 5000;
   my $proto      = $a[5] ? lc($a[5]) : "http";
   
-  $hash->{SERVERADDR}    = $serveraddr;
-  $hash->{SERVERPORT}    = $serverport;
-  $hash->{CAMNAME}       = $camname;
-  $hash->{VERSION}       = (SSCam_sortVersion("desc",keys %SSCam_vNotesIntern))[0];
-  $hash->{MODEL}         = ($camname =~ m/^SVS$/i)?"SVS":"CAM";                  # initial, CAM wird später ersetzt durch CamModel
-  $hash->{PROTOCOL}      = $proto;
-  $hash->{COMPATIBILITY} = $compstat;                                            # getestete SVS-version Kompatibilität 
+  $hash->{SERVERADDR}            = $serveraddr;
+  $hash->{SERVERPORT}            = $serverport;
+  $hash->{CAMNAME}               = $camname;
+  $hash->{MODEL}                 = ($camname =~ m/^SVS$/i)?"SVS":"CAM";          # initial, CAM wird später ersetzt durch CamModel
+  $hash->{PROTOCOL}              = $proto;
+  $hash->{COMPATIBILITY}         = $compstat;                                    # getestete SVS-version Kompatibilität 
+  $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                         # Modul Meta.pm nicht vorhanden
   
   # benötigte API's in $hash einfügen
   $hash->{HELPER}{APIINFO}        = "SYNO.API.Info";                             # Info-Seite für alle API's, einzige statische Seite !                                                    
@@ -472,6 +480,9 @@ sub SSCam_Define($@) {
   $hash->{HELPER}{SNAPLIMIT}           = 0;                                      # abgerufene Anzahl Snaps
   $hash->{HELPER}{TOTALCNT}            = 0;                                      # totale Anzahl Snaps
   
+  # Versionsinformationen setzen
+  SSCam_setVersionInfo($hash);
+  
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash,"PollState","Inactive");                              # es ist keine Gerätepolling aktiv  
   if(SSCam_IsModelCam($hash)) {
@@ -493,15 +504,55 @@ return undef;
 }
 
 ################################################################
+# Die Undef-Funktion wird aufgerufen wenn ein Gerät mit delete 
+# gelöscht wird oder bei der Abarbeitung des Befehls rereadcfg, 
+# der ebenfalls alle Geräte löscht und danach das 
+# Konfigurationsfile neu einliest. 
+# Funktion: typische Aufräumarbeiten wie das 
+# saubere Schließen von Verbindungen oder das Entfernen von 
+# internen Timern, sofern diese im Modul zum Pollen verwendet 
+# wurden.
+################################################################
 sub SSCam_Undef($$) {
   my ($hash, $arg) = @_;
-  #SSCam_logout($hash);
+  
   RemoveInternalTimer($hash);
    
 return undef;
 }
 
-################################################################
+#######################################################################################################
+# Mit der X_DelayedShutdown Funktion kann eine Definition das Stoppen von FHEM verzögern um asynchron 
+# hinter sich aufzuräumen. Dies kann z.B. der Verbindungsabbau mit dem physikalischen Gerät sein (z.B. 
+# Session beenden, Logout, etc.), welcher mehrfache Requests/Responses benötigt.  
+# Je nach Rückgabewert $delay_needed wird der Stopp von FHEM verzögert.
+# Im Unterschied zur Shutdown-Funktion steht vor einem bevorstehenden Stopp von FHEM für einen 
+# User-konfigurierbaren Zeitraum (global-Attribut: maxShutdownDelay / Standard: 10 Sekunden) weiterhin
+# die asynchrone FHEM Infrastruktur (DevIo/Read-Funktion und InternalTimer) zur Verfügung.
+# Sobald alle nötigen Maßnahmen erledigt sind, muss der Abschluss mit CancelDelayedShutdown($name) an 
+# FHEM zurückgemeldet werden. 
+#######################################################################################################
+sub SSCam_DelayedShutdown($) {
+  my ($hash) = @_;
+  my $name   = $hash->{NAME};
+  
+  Log3($name, 1, "$name - Quit session due to shutdown ...");
+  $hash->{HELPER}{ACTIVE} = "on";                              # keine weiteren Aktionen erlauben
+  SSCam_logout($hash);
+
+return 1;
+}
+
+#################################################################
+# Wenn ein Gerät in FHEM gelöscht wird, wird zuerst die Funktion 
+# X_Undef aufgerufen um offene Verbindungen zu schließen, 
+# anschließend wird die Funktion X_Delete aufgerufen. 
+# Funktion: Aufräumen von dauerhaften Daten, welche durch das 
+# Modul evtl. für dieses Gerät spezifisch erstellt worden sind. 
+# Es geht hier also eher darum, alle Spuren sowohl im laufenden 
+# FHEM-Prozess, als auch dauerhafte Daten bspw. im physikalischen 
+# Gerät zu löschen die mit dieser Gerätedefinition zu tun haben. 
+#################################################################
 sub SSCam_Delete($$) {
     my ($hash, $arg) = @_;
     my $index = $hash->{TYPE}."_".$hash->{NAME}."_credentials";
@@ -1893,7 +1944,7 @@ sub SSCam_initonboot ($) {
      InternalTimer(gettimeofday()+int(rand(30)), "SSCam_wdpollcaminfo", $hash, 0);
   
   } else {
-      InternalTimer(gettimeofday()+1, "SSCam_initonboot", $hash, 0);
+      InternalTimer(gettimeofday()+3, "SSCam_initonboot", $hash, 0);
   }
 return;
 }
@@ -1912,7 +1963,7 @@ sub SSCam_versionCheck($) {
   my $cs = ReadingsVal($name, "compstate", "true");
   if($cs eq "false") {
       Log3($name, 2, "$name - WARNING - The current/simulated SVS-version ".ReadingsVal($name, "SVSversion", "").
-       " may be incompatible with SSCam version $hash->{VERSION}. ".
+       " may be incompatible with SSCam version $hash->{HELPER}{VERSION}. ".
        "For further information execute \"get $name versionNotes 4\".");
   }
   
@@ -6390,6 +6441,7 @@ sub SSCam_logout ($) {
             };
    
    HttpUtils_NonblockingGet ($param);
+   
 }
 
 sub SSCam_logout_return ($) {  
@@ -6430,7 +6482,7 @@ sub SSCam_logout_return ($) {
 
        if ($success) {
            # die Logout-URL konnte erfolgreich aufgerufen werden                        
-           Log3($name, 4, "$name - Session of User $username has ended - SID: \"$sid\" has been deleted");
+           Log3($name, 2, "$name - Session of User \"$username\" terminated - session ID \"$sid\" deleted");
              
        } else {
            # Errorcode aus JSON ermitteln
@@ -6448,6 +6500,7 @@ sub SSCam_logout_return ($) {
    # ausgeführte Funktion ist erledigt (auch wenn logout nicht erfolgreich), Freigabe Funktionstoken
    SSCam_delActiveToken($hash);
    
+   CancelDelayedShutdown($name);
 return;
 }
 
@@ -8823,6 +8876,41 @@ sub SSCam_trim ($) {
  my $str = shift;
  $str =~ s/^\s+|\s+$//g;
 return ($str);
+}
+
+#############################################################################################
+#                          Versionierungen des Moduls setzen
+#                  Die Verwendung von Meta.pm und Packages wird berücksichtigt
+#############################################################################################
+sub SSCam_setVersionInfo($) {
+  my ($hash) = @_;
+  my $name   = $hash->{NAME};
+
+  my $v                    = (SSCam_sortVersion("desc",keys %SSCam_vNotesIntern))[0];
+  my $type                 = $hash->{TYPE};
+  $hash->{HELPER}{PACKAGE} = __PACKAGE__;
+  $hash->{HELPER}{VERSION} = $v;
+  
+  if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
+	  # META-Daten sind vorhanden
+	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
+		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
+	  } else {
+		  $modules{$type}{META}{x_version} = $v; 
+	  }
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
+	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
+	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
+		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
+	      use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );                                          
+      }
+  } else {
+	  # herkömmliche Modulstruktur
+	  $hash->{VERSION} = $v;
+  }
+  
+return;
 }
 
 #############################################################################################
@@ -12513,4 +12601,63 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 </ul>
 
 =end html_DE
+
+=for :application/json;q=META.json 49_SSCam.pm
+{
+  "abstract": "Module to control cameras as well as other functions of the Synology Surveillance Station.",
+  "x_lang": {
+    "de": {
+      "abstract": "Modul zur Steuerung von Kameras und anderen Funktionen der Synology Surveillance Station."
+    }
+  },
+  "keywords": [
+    "camera",
+    "control",
+    "PTZ",
+    "Synology Surveillance Station",
+    "MJPEG",
+    "HLS",
+    "RTSP"
+  ],
+  "version": "v1.1.1",
+  "release_status": "stable",
+  "author": [
+    "Heiko Maaz <heiko.maaz@t-online.de>"
+  ],
+  "x_fhem_maintainer": [
+    "DS_Starter"
+  ],
+  "x_fhem_maintainer_github": [
+    "nasseeder1"
+  ],
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "FHEM": 5.00918799,
+        "perl": 5.014,
+        "POSIX": 0,
+        "JSON": 0,
+        "Data::Dumper": 0,
+        "MIME::Base64": 0,
+        "Time::HiRes": 0,
+        "HttpUtils": 0,
+        "Blocking": 0,
+        "Encode": 0        
+      },
+      "recommends": {
+        "FHEM::Meta": 0
+      },
+      "suggests": {
+      }
+    }
+  },
+  "resources": {
+    "x_wiki": {
+      "web": "https://wiki.fhem.de/wiki/SSCAM_-_Steuerung_von_Kameras_in_Synology_Surveillance_Station",
+      "title": "SSCAM - Steuerung von Kameras in Synology Surveillance Station"
+    }
+  }
+}
+=end :application/json;q=META.json
+
 =cut
