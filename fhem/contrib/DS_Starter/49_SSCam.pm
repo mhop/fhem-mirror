@@ -42,11 +42,13 @@ use MIME::Base64;
 use Time::HiRes;
 use HttpUtils;
 use Blocking;                                                     # für EMail-Versand
-use Encode;                                                    
+use Encode;
+eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;                                                    
 # no if $] >= 5.017011, warnings => 'experimental';
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.13.0" => "27.03.2019  add Meta.pm support ",
   "8.12.0" => "25.03.2019  FHEM standard function X_DelayedShutdown implemented, delay FHEM shutdown as long as sessions ".
               "are not terminated. ",
   "8.11.5" => "24.03.2019  fix possible overload Synology DS during shutdown restart ",
@@ -404,7 +406,9 @@ sub SSCam_Initialize($) {
          "webCmd ".
          $readingFnAttributes;   
          
-return undef;   
+ eval { FHEM::Meta::InitMod( __FILE__, $hash ) };           # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
+
+return;   
 }
 
 ################################################################
@@ -430,13 +434,13 @@ sub SSCam_Define($@) {
   my $serverport = $a[4] ? $a[4] : 5000;
   my $proto      = $a[5] ? lc($a[5]) : "http";
   
-  $hash->{SERVERADDR}    = $serveraddr;
-  $hash->{SERVERPORT}    = $serverport;
-  $hash->{CAMNAME}       = $camname;
-  $hash->{VERSION}       = (SSCam_sortVersion("desc",keys %SSCam_vNotesIntern))[0];
-  $hash->{MODEL}         = ($camname =~ m/^SVS$/i)?"SVS":"CAM";                  # initial, CAM wird später ersetzt durch CamModel
-  $hash->{PROTOCOL}      = $proto;
-  $hash->{COMPATIBILITY} = $compstat;                                            # getestete SVS-version Kompatibilität 
+  $hash->{SERVERADDR}            = $serveraddr;
+  $hash->{SERVERPORT}            = $serverport;
+  $hash->{CAMNAME}               = $camname;
+  $hash->{MODEL}                 = ($camname =~ m/^SVS$/i)?"SVS":"CAM";          # initial, CAM wird später ersetzt durch CamModel
+  $hash->{PROTOCOL}              = $proto;
+  $hash->{COMPATIBILITY}         = $compstat;                                    # getestete SVS-version Kompatibilität 
+  $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                         # Modul Meta.pm nicht vorhanden
   
   # benötigte API's in $hash einfügen
   $hash->{HELPER}{APIINFO}        = "SYNO.API.Info";                             # Info-Seite für alle API's, einzige statische Seite !                                                    
@@ -476,6 +480,9 @@ sub SSCam_Define($@) {
   $hash->{HELPER}{SNAPLIMIT}           = 0;                                      # abgerufene Anzahl Snaps
   $hash->{HELPER}{TOTALCNT}            = 0;                                      # totale Anzahl Snaps
   
+  # Versionsinformationen setzen
+  SSCam_setVersionInfo($hash);
+  
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash,"PollState","Inactive");                              # es ist keine Gerätepolling aktiv  
   if(SSCam_IsModelCam($hash)) {
@@ -491,7 +498,7 @@ sub SSCam_Define($@) {
   
   # initiale Routinen nach Restart ausführen   , verzögerter zufälliger Start
   RemoveInternalTimer($hash, "SSCam_initonboot");
-  InternalTimer(gettimeofday()+rand(30), "SSCam_initonboot", $hash, 0);
+  InternalTimer(gettimeofday()+rand(60), "SSCam_initonboot", $hash, 0);
 
 return undef;
 }
@@ -8872,6 +8879,41 @@ return ($str);
 }
 
 #############################################################################################
+#                          Versionierungen des Moduls setzen
+#                  Die Verwendung von Meta.pm und Packages wird berücksichtigt
+#############################################################################################
+sub SSCam_setVersionInfo($) {
+  my ($hash) = @_;
+  my $name   = $hash->{NAME};
+
+  my $v                    = (SSCam_sortVersion("desc",keys %SSCam_vNotesIntern))[0];
+  my $type                 = $hash->{TYPE};
+  $hash->{HELPER}{PACKAGE} = __PACKAGE__;
+  $hash->{HELPER}{VERSION} = $v;
+  
+  if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
+	  # META-Daten sind vorhanden
+	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 18980 2019-03-20 20:55:44Z DS_Starter $ im Kopf komplett! vorhanden )
+		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
+	  } else {
+		  $modules{$type}{META}{x_version} = $v; 
+	  }
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 18980 2019-03-20 20:55:44Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
+	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
+		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
+	      use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );                                          
+      }
+  } else {
+	  # herkömmliche Modulstruktur
+	  $hash->{VERSION} = $v;
+  }
+  
+return;
+}
+
+#############################################################################################
 #                                       Hint Hash EN           
 #############################################################################################
 %SSCam_vHintsExt_en = (
@@ -12559,4 +12601,63 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 </ul>
 
 =end html_DE
+
+=for :application/json;q=META.json 49_SSCam.pm
+{
+  "abstract": "Module to control cameras as well as other functions of the Synology Surveillance Station.",
+  "x_lang": {
+    "de": {
+      "abstract": "Modul zur Steuerung von Kameras und anderen Funktionen der Synology Surveillance Station."
+    }
+  },
+  "keywords": [
+    "camera",
+    "control",
+    "PTZ",
+    "Synology Surveillance Station",
+    "MJPEG",
+    "HLS",
+    "RTSP"
+  ],
+  "version": "v1.1.1",
+  "release_status": "stable",
+  "author": [
+    "Heiko Maaz <heiko.maaz@t-online.de>"
+  ],
+  "x_fhem_maintainer": [
+    "DS_Starter"
+  ],
+  "x_fhem_maintainer_github": [
+    "nasseeder1"
+  ],
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "FHEM": 5.00918799,
+        "perl": 5.014,
+        "POSIX": 0,
+        "JSON": 0,
+        "Data::Dumper": 0,
+        "MIME::Base64": 0,
+        "Time::HiRes": 0,
+        "HttpUtils": 0,
+        "Blocking": 0,
+        "Encode": 0        
+      },
+      "recommends": {
+        "FHEM::Meta": 0
+      },
+      "suggests": {
+      }
+    }
+  },
+  "resources": {
+    "x_wiki": {
+      "web": "https://wiki.fhem.de/wiki/SSCAM_-_Steuerung_von_Kameras_in_Synology_Surveillance_Station",
+      "title": "SSCAM - Steuerung von Kameras in Synology Surveillance Station"
+    }
+  }
+}
+=end :application/json;q=META.json
+
 =cut
