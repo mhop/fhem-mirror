@@ -52,9 +52,11 @@
 #  - feature: 74_Unifi: new customClientReading _f_last_seen_duration
 # V 3.2.4
 #  - feature: 74_Unifi: new cattribute customClientNames
+# V 3.2.5
+#  - fixed:   74_Unifi: fixed createVoucher and (un-)blockClient for UC-V5.10
 
 package main;
-my $version="3.2.4";
+my $version="3.2.5";
 # Default für clientRedings setzen. Die Readings waren der Standard vor Einführung des Attributes customClientReadings.
 # Eine Änderung hat Auswirkungen auf (alte) Moduldefinitionen ohne dieses Attribut.
 my $defaultClientReadings=".:^accesspoint|^essid|^hostname|^last_seen|^snr|^uptime"; #ist wegen snr vs rssi nur halb korrekt, wird aber auch nicht wirklich verwendet ;-)
@@ -85,6 +87,8 @@ sub Unifi_GetWlans_Send($);
 sub Unifi_GetWlans_Receive($);
 sub Unifi_GetHealth_Send($);
 sub Unifi_GetHealth_Receive($);
+sub Unifi_GetSysinfo_Send($);
+sub Unifi_GetSysinfo_Receive($);
 sub Unifi_GetWlanGroups_Send($);
 sub Unifi_GetWlanGroups_Receive($);
 sub Unifi_GetUnarchivedAlerts_Send($);
@@ -123,6 +127,7 @@ sub Unifi_CreateVoucher_Send($%);
 sub Unifi_CreateVoucher_Receive($);
 sub Unifi_SetVoucherReadings($);
 sub Unifi_initVoucherCache($);
+sub Unifi_isUCversionHigherThan($$);
 sub Unifi_initCustomClientReadings($);
 sub Unifi_getNextVoucherForNote($$);
 sub Unifi_NextUpdateFn($$);
@@ -188,6 +193,7 @@ sub Unifi_Define($$) {
     };
     
     $hash->{VERSION}=$version;
+    $hash->{UC_VERSION}="unknown";
     my $username = Unifi_encrypt($a[4]);
     my $password = Unifi_encrypt($a[5]);    
     $hash->{helper}{username} = $username;
@@ -199,7 +205,6 @@ sub Unifi_Define($$) {
 	
     $hash->{unifi}->{customClientReadings}->{attr_value} = AttrVal($name,"customClientReadings",$defaultClientReadings);
     Unifi_initCustomClientReadings($hash);
-	
     Log3 $name, 5, "$name: Defined with url:$hash->{unifi}->{url}, interval:$hash->{unifi}->{interval}";
     return undef;
 }
@@ -219,6 +224,7 @@ sub Unifi_Notify($$) {
     Log3 $name, 5, "$name ($self) - executed.";
 
     return if($dev->{NAME} ne "global");
+	
     return if(!grep(m/^DEFINED $name|MODIFIED $name|INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
 
     if(AttrVal($name, "disable", 0)) {
@@ -398,6 +404,9 @@ sub Unifi_Set($@) {
                 }
                 my %params=("expire"=>$setVal,"n"=>$setVal2,"quota"=>$setVal3,"note"=>$setVal4);
                 Unifi_CreateVoucher_Send($hash, %params);
+            }
+            elsif ($setName eq 'refreshUCversion') {
+                Unifi_GetSysinfo_Send($hash);
             }
         } 
         if ($setName eq 'update') {
@@ -754,7 +763,9 @@ sub Unifi_Login_Receive($) {
                     $hash->{httpParams}->{header} =~ s/\\r\\n$//;
                     Log3 $name, 5, "$name ($self) - Login successfully!  $hash->{httpParams}->{header}";
                     Unifi_CONNECTED($hash,'connected');
-                    Unifi_DoUpdate($hash);
+					Unifi_GetSysinfo_Send($hash);
+					#Unifi_DoUpdate($hash);
+                    InternalTimer(time()+$hash->{unifi}->{interval}, 'Unifi_DoUpdate', $hash, 0);
                     return undef;
                 } else {
                     $hash->{httpParams}->{header} = undef;
@@ -975,6 +986,49 @@ sub Unifi_GetHealth_Receive($) {
                         $hash->{wan_health} = $h;
                     }
                 }
+            }
+            else { Unifi_ReceiveFailure($hash,$data->{meta}); }
+        } else {
+            Unifi_ReceiveFailure($hash,{rc => $param->{code}, msg => "Failed with HTTP Code $param->{code}."});
+        }
+    }
+    
+    Unifi_NextUpdateFn($hash,$self);
+    return undef;
+}
+###############################################################################
+sub Unifi_GetSysinfo_Send($) {
+    my ($hash) = @_;
+    my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
+    Log3 $name, 5, "$name ($self) - executed.";
+    
+    HttpUtils_NonblockingGet( {
+                 %{$hash->{httpParams}},
+        method   => "GET",
+        url      => $hash->{unifi}->{url}."stat/sysinfo",
+        callback => \&Unifi_GetSysinfo_Receive,
+    } );
+    return undef;
+}
+sub Unifi_GetSysinfo_Receive($) {
+    my ($param, $err, $data) = @_;
+    my ($name,$self,$hash) = ($param->{hash}->{NAME},Unifi_Whoami(),$param->{hash});
+    Log3 $name, 5, "$name ($self) - executed.";
+    
+    if ($err ne "") {
+        Unifi_ReceiveFailure($hash,{rc => 'Error while requesting', msg => $param->{url}." - $err"});
+    }
+    elsif ($data ne "") {
+        if ($param->{code} == 200 || $param->{code} == 400  || $param->{code} == 401) {
+            eval { $data = decode_json($data); 1; } or do { $data = { meta => {rc => 'error.decode_json', msg => $@} }; };
+            
+            if ($data->{meta}->{rc} eq "ok") {
+                Log3 $name, 5, "$name ($self) - state:'$data->{meta}->{rc}'";
+				
+                for my $h (@{$data->{data}}) {
+					$hash->{UC_VERSION}=$h->{version} if defined $h->{version};
+					Log3 $name, 5, "$name ($self) - uc_version: ".$hash->{UC_VERSION};
+				}
             }
             else { Unifi_ReceiveFailure($hash,$data->{meta}); }
         } else {
@@ -1490,9 +1544,9 @@ sub Unifi_BlockClient_Send($$) {
     %{$hash->{httpParams}},
     url   => $hash->{unifi}->{url}."cmd/stamgr",
     callback => \&Unifi_BlockClient_Receive,
-    data => "{'mac': '".$mac."', 'cmd': 'block-sta'}",
+    data => "{\"mac\":\"$mac\",\"cmd\":\"block-sta\"}",
   } );
-
+  
   return undef;
 }
 
@@ -1530,9 +1584,8 @@ sub Unifi_UnblockClient_Send($$) {
     %{$hash->{httpParams}},
     url   => $hash->{unifi}->{url}."cmd/stamgr",
     callback => \&Unifi_UnblockClient_Receive,
-    data => "{'mac': '".$mac."', 'cmd': 'unblock-sta'}",
-  } );
-
+    data => "{\"mac\":\"$mac\",\"cmd\":\"unblock-sta\"}",
+  } );	
   return undef;
 }
 ###############################################################################
@@ -1684,7 +1737,7 @@ sub Unifi_GetVoucherList_Receive($) {
                 #wenn Cache zu leer neue Voucher anlegen
                 if($expand==0){ #Der Unifi-Controller mag es nicht, wenn man kurz  hintereinander zwei requests sendet, daher gleich mehrere auf einmal
                     my $minSize=$hash->{hotspot}->{voucherCache}->{$cache}->{minSize};
-                    my $aktSize=$dataString =~ s/"note" : "$cache"//g;
+                    my $aktSize=$dataString =~ s/note.{1,5}$cache//g;
                     if(defined $minSize && $aktSize<$minSize){
                         my $setCmd=$hash->{hotspot}->{voucherCache}->{$cache}->{setCmd};
                         my @words=split("[ \t][ \t]*", $setCmd);
@@ -1715,7 +1768,7 @@ sub Unifi_CreateVoucher_Send($%) {
                  %{$hash->{httpParams}},
         url      => $hash->{unifi}->{url}."cmd/hotspot",
         callback => \&Unifi_CreateVoucher_Receive,
-        data     => "{'cmd': 'create-voucher', 'expire': '".$expire."', 'n': '".$n."', 'quota': '".$quota."', 'note': '".$note."'}",
+        data     => "{\"cmd\":\"create-voucher\", \"expire\":".$expire.", \"n\":".$n.", \"quota\":".$quota.", \"note\":\"".$note."\"}",
     } );
    
     return undef;
@@ -1983,6 +2036,28 @@ sub Unifi_ApNames($@) {
         return $aps;
     }
 }
+###############################################################################
+sub Unifi_isUCversionHigherThan($$){
+    my ($hash,$check) = @_;
+	my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
+	my $ucversion=$hash->{UC_VERSION};
+	if($ucversion eq "unknown"){
+		Log3 $name, 2, "$name ($self) - unknown UC-Version. Please use set refreshUCversion";
+		return 1; # Trotzdem true zurückgeben, könnte ja auch daran liegen, dass sysinfo bei neuer Version anders funktioniert
+	}else{
+		my($majorCheck, $minorCheck, $patchCheck)=split(/./,$ucversion);
+		my($majorUC, $minorUC, $patchUC)=split(/./,$ucversion);
+		if (defined $majorCheck && defined $majorUC && looks_like_number($majorCheck) && looks_like_number($majorUC) && $majorCheck < $majorUC){
+			return 0;
+		}elsif (defined $minorCheck && defined $minorUC && looks_like_number($minorCheck) && looks_like_number($minorUC) && $minorCheck < $minorUC){
+			return 0;		
+		}elsif (defined $patchCheck && defined $patchUC && looks_like_number($patchCheck) && looks_like_number($patchUC) && $patchCheck < $patchUC){
+			return 0;		
+		}
+	}
+	return 1;
+}
+
 ###############################################################################
 
 sub Unifi_initCustomClientReadings($){
