@@ -1074,7 +1074,7 @@ sub YAMAHA_MC_SpeakFile($$)  # only called when defined, not on reload.
     my $name = $hash->{NAME};
 	
 	# wenn nicht definiert, dann gleich beenden
-	 Log3 $name, 4, "$name YAMAHA_MC_SpeakFile called, parameter Host=$hash->{HOST} " if(!defined($hash->{HOST}));
+	Log3 $name, 4, "$name YAMAHA_MC_SpeakFile called, parameter Host=$hash->{HOST} " if(!defined($hash->{HOST}));
     return undef if(not defined($HOST));
 
 	my $DLNAsearch = AttrVal($hash->{NAME}, "DLNAsearch","off");
@@ -1122,7 +1122,7 @@ sub YAMAHA_MC_SpeakFile($$)  # only called when defined, not on reload.
 	my $powerCmdDelay = AttrVal($hash->{NAME}, "powerCmdDelay",3);
 	
 	my $standardVolume = AttrVal($hash->{NAME}, "standard_volume",15);
-	my $ttsvolume = AttrVal($hash->{NAME}, "ttsvolume",$standardVolume);	
+	my $ttsvolume = AttrVal($hash->{NAME}, "ttsvolume",undef);	
 	my $currentInput = ReadingsVal($name, "input", "unknown"); 	
 	my $currentVolume = ReadingsVal($name, "volume", 0); 
 	my $currentMute = ReadingsVal($name, "mute", "false"); 
@@ -1159,15 +1159,20 @@ sub YAMAHA_MC_SpeakFile($$)  # only called when defined, not on reload.
 	}
 			
     Log3 $name, 4, "YAMAHA_MC_SpeakFile setting volume from old $currentVolume to new volume $ttsvolume"; 
-	if (defined($ttsvolume) and ($ttsvolume != $currentVolume)) {
-      # Volume merken, um spaeter zurückschalten zu können
-	  $hash->{helper}{OriginalVolume} = $currentVolume;	  
-      YAMAHA_MC_httpRequestQueue($hash, "volume",   YAMAHA_MC_volume_rel2abs($hash,$ttsvolume), {options    => {unless_in_queue => 1, can_fail => 1,priority => 2, volume_target => $ttsvolume, original_cmd => "speakfile", original_priority => 1}}); # call fn that will do the http request			  
-      return undef; 
-	  }  	
-	else {
-	  Log3 $name, 4, "$name : YAMAHA_MC_SpeakFile volume correctly set to  and already set to $currentVolume, continue ";
-	}  
+	if (defined($ttsvolume)) {
+	  if ($ttsvolume != $currentVolume) {
+		  # Volume merken, um spaeter zurückschalten zu können
+		  $hash->{helper}{OriginalVolume} = $currentVolume;	  
+		  YAMAHA_MC_httpRequestQueue($hash, "volume",   YAMAHA_MC_volume_rel2abs($hash,$ttsvolume), {options    => {unless_in_queue => 1, can_fail => 1,priority => 2, volume_target => $ttsvolume, original_cmd => "speakfile", original_priority => 1}}); # call fn that will do the http request			  
+		  return undef; 
+		  }  	
+		else {
+		  Log3 $name, 4, "$name : YAMAHA_MC_SpeakFile volume correctly set to  and already set to $currentVolume, continue ";
+		}  
+     }
+     else {
+        Log3 $name, 4, "$name : YAMAHA_MC_SpeakFile no ttsvolume set, continue with current volumne ";
+    }	 
 	
 	# turn muting off
 	if ($currentMute eq "true"){
@@ -1192,17 +1197,23 @@ sub YAMAHA_MC_SpeakFile($$)  # only called when defined, not on reload.
 	
 	# restarting miniDLNA to rescan files
 	my $ret = "";
-    $ret .= qx(sudo minidlna -R);
+    $ret .= qx([ -f /usr/sbin/minidlnad ] && sudo minidlnad -R || sudo minidlna -R);
 	Log3 $name, 4, "$name YAMAHA_MC_SpeakFile rescan return $ret";
 	$ret .= qx(sudo service minidlna restart);
 	Log3 $name, 4, "$name YAMAHA_MC_SpeakFile restart return $ret";
 	   
     
+	my $DLNARendererName = ReadingsVal($name, "DLNARenderer", "unknown");
+	my $DLNAMediaServerName = ReadingsVal($name, "MediaServer", "unknown");
+	
+	
 	#
 	# Renderer ermitteln
 	#
-	 if (exists($hash->{helper}{MediaRendererDLNA})) {
+	 if ((exists($hash->{helper}{MediaRendererDLNA})) && ($DLNARendererName ne "unknown"))  {
 		 Log3 $hash, 3,   "$name YAMAHA_MC_SpeakFile MediaRendererDLNA exists, not restarting discovery";				 
+		 Log3 $hash, 3,   "$name YAMAHA_MC_SpeakFile  Stopping   MediaRendererDLNA";
+		 $hash->{helper}{MediaRendererDLNA}->stop(); 
 	 }		   
 	 else {
 	   Log3 $hash, 3,   "$name YAMAHA_MC_SpeakFile MediaRendererDLNA does not exists, restarting discovery";		
@@ -1211,24 +1222,26 @@ sub YAMAHA_MC_SpeakFile($$)  # only called when defined, not on reload.
 	
 	
 	
+	
 	#
     # searching for mediaServer miniDLNA
 	#	 
-	 if (exists($hash->{helper}{MediaRendererDLNA})) {
-	     Log3 $name, 4, "$name YAMAHA_MC_SpeakFile MediaServerDLNA exists, not restarting discovery";
-		 Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile  Stopping   MediaRendererDLNA";
-		 $hash->{helper}{MediaRendererDLNA}->stop(); 
+	 if ((exists($hash->{helper}{MediaServerDLNA})) && ($DLNAMediaServerName ne "unknown")) {
+	     Log3 $name, 4, "$name YAMAHA_MC_SpeakFile MediaServerDLNA exists, not restarting discovery";		 
      }		   
 	 else {
-	   Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile  MediaRendererDLNA still not defined";
-	   Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile  restarting YAMAHA_MC_DiscoverRenderer again ...";
-	   YAMAHA_MC_DiscoverRenderer($hash);	
+	   Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile  MediaServerDLNA still not defined";
+	   Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile  restarting YAMAHA_MC_DiscoverMediaServer again ...";
+	   YAMAHA_MC_DiscoverMediaServer($hash);	
 	 }
 	 
+	 # perhaps after re-discovering, now available ?
+	 $DLNARendererName = ReadingsVal($name, "DLNARenderer", "unknown");
+	 $DLNAMediaServerName = ReadingsVal($name, "MediaServer", "unknown");
 
 	 Log3 $hash, 3,  "$name YAMAHA_MC_SpeakFile Getting  ContentDirectory";
      #my $condir_service = $dev->getservicebyname('urn:schemas-upnp-org:service:ContentDirectory:1'); 
-	 if (exists($hash->{helper}{MediaRendererDLNA})) {
+	 if ((exists($hash->{helper}{MediaServerDLNA})) && ($DLNAMediaServerName ne "unknown")) {
 		  my $condir_service = $hash->{helper}{MediaServerDLNA}->getservicebyname('urn:schemas-upnp-org:service:ContentDirectory:1');
 	  
 		  #unless (defined(condir_service)) {
@@ -1375,7 +1388,7 @@ sub YAMAHA_MC_SpeakFile($$)  # only called when defined, not on reload.
 		
 		# Deleting tts File
 		Log3 $name, 4, "$name YAMAHA_MC_SpeakFile try delete tts file $originalSearchfilename : $ret";
-		$ret .= qx(sudo rm -f $originalSearchfilename);
+		$ret .= qx(timeout 2 sudo id && sudo rm -f $originalSearchfilename || rm -f $originalSearchfilename );
 		Log3 $name, 4, "$name YAMAHA_MC_SpeakFile delete tts file $originalSearchfilename : $ret";
 		
 		if ( (defined($URILink)) and (defined($hash->{helper}{MediaRendererDLNA})) ) {
@@ -1384,6 +1397,10 @@ sub YAMAHA_MC_SpeakFile($$)  # only called when defined, not on reload.
 		}
 		$hash->{LastTtsFile}="";
     }
+    else {
+	  Log3 $name, 3, "$name YAMAHA_MC_SpeakFile stopping MediaServerDLNA does not exist";
+	}
+	
 	#
 	# resetting input back
 	# ALte Werte wiederherstellen	
@@ -4068,7 +4085,12 @@ sub YAMAHA_MC_httpRequestParse($$$)
 				my $original_data = "";
 				my $original_arg = $options->{original_arg};
 	
-				Log3 $name, 5, "YAMAHA_MC ($name) YAMAHA_MC_httpRequestParse reset in queue orginal cmd s  ". $options->{original_cmd}." with args ".$original_arg." original prio ".$options->{original_priority};
+	            if (defined($original_arg)) {
+				  Log3 $name, 5, "YAMAHA_MC ($name) YAMAHA_MC_httpRequestParse reset in queue orginal cmd ". $options->{original_cmd}." with args ".$original_arg." original prio ".$options->{original_priority};
+				}
+				else {
+				  Log3 $name, 5, "YAMAHA_MC ($name) YAMAHA_MC_httpRequestParse reset in queue orginal cmd ". $options->{original_cmd}." without args original prio ".$options->{original_priority};
+				}
 				
 				# In case any URL changes must be made, this part is separated in this function".    
 				my $param = {
