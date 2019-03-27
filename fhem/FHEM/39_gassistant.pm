@@ -422,7 +422,7 @@ gassistant_getCMD($)
   chomp( $cmd );
 
   if( !$ssh_cmd && !(-X $cmd) ) {
-    my $msg = "gassistant-fhem not installed. install with 'sudo npm install -g gassistant-fhem'.";
+    my $msg = "gassistant-fhem not installed. install with 'sudo npm install -g gassistant-fhem --unsafe-perm'.";
     $msg = "$cmd does not exist" if( $cmd );
     return (undef, $msg);
   }
@@ -494,7 +494,7 @@ gassistant_Set($$@)
     return "usage: set $name $cmd <url>" if( !@args );
     my $url = $args[0];
  
-    $url = "<html><a href=\"$url\">Click here to login</a><br></html>";
+    $url = "<html><a href=\"$url\" target=\"_blank\">Click here to login (new window/tab)</a><br></html>";
     
     $hash->{".triggerUsed"} = 1;
 
