@@ -1963,7 +1963,7 @@ sub SSCam_versionCheck($) {
   my $cs = ReadingsVal($name, "compstate", "true");
   if($cs eq "false") {
       Log3($name, 2, "$name - WARNING - The current/simulated SVS-version ".ReadingsVal($name, "SVSversion", "").
-       " may be incompatible with SSCam version $hash->{VERSION}. ".
+       " may be incompatible with SSCam version $hash->{HELPER}{VERSION}. ".
        "For further information execute \"get $name versionNotes 4\".");
   }
   
