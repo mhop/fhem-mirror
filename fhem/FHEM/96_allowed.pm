@@ -408,7 +408,7 @@ EOF
     <li>password &lt;password&gt;</li>
     <li>globalpassword &lt;password&gt;<br>
       these commands set the corresponding attribute, by computing an SHA256
-      hash from the arguments and a salt. Note: the perl module Device::SHA is
+      hash from the arguments and a salt. Note: the perl module Digest::SHA is
       needed.
     </li>
   </ul><br>
@@ -559,7 +559,7 @@ EOF
     <li>globalpassword &lt;password&gt;<br>
       diese Befehle setzen das entsprechende Attribut, indem sie aus den
       Parameter und ein Salt ein SHA256 Hashwert berechnen. Achtung: das perl
-      Modul Device::SHA wird ben&ouml;tigt.
+      Modul Digest::SHA wird ben&ouml;tigt.
     </li>
   </ul><br>
 
