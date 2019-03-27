@@ -34,10 +34,8 @@
 ##############################################################################
 #
 #	CHANGELOG
-#	26.12.2018	Support for CUVEO devices
-#	09.12.2018	Additional commands for RFY (forum #36451)
-#				Support for Cuevo (not tested)
-#				Fix for Selectplus (forum #71568)
+#
+#	21.03.2019	Added subtype ASA for RFY
 #	25.03.2018	Summary for Commandref
 #				Use SetExtensions
 #				Fix to trigger events (userreadings) - topic #65899
@@ -57,7 +55,7 @@ my $TRX_LIGHT_X10_type_default = "x10";
 my $DOT = q{_};
 
 my %light_device_codes = (    # HEXSTRING => "NAME", "name of reading",
-    # 0x10: Lighting1
+                              # 0x10: Lighting1
     0x1000 => [ "X10",         "light" ],
     0x1001 => [ "ARC",         "light" ],
     0x1002 => [ "AB400D",      "light" ],
@@ -69,15 +67,16 @@ my %light_device_codes = (    # HEXSTRING => "NAME", "name of reading",
     0x1008 => [ "ENER010",     "light" ],    # Energenie ENER010: untested
     0x1009 => [ "ENER5",       "light" ],    # Energenie 5-gang: untested
     0x100A => [ "COCO_GDR2",   "light" ],    # COCO GDR2-2000R: untestedCOCO
-    # 0x11: Lighting2
+                                             # 0x11: Lighting2
     0x1100 => [ "AC",          "light" ],
     0x1101 => [ "HOMEEASY",    "light" ],
     0x1102 => [ "ANSLUT",      "light" ],
+
     # 0x12: Lighting3
     0x1200 => [ "KOPPLA",       "light" ],    # IKEA Koppla
-    # 0x13: Lighting4
+                                              # 0x13: Lighting4
     0x1300 => [ "PT2262",       "light" ],    # PT2262 raw messages
-    # 0x14: Lighting5
+                                              # 0x14: Lighting5
     0x1400 => [ "LIGHTWAVERF",  "light" ],    # LightwaveRF
     0x1401 => [ "EMW100",       "light" ],    # EMW100
     0x1402 => [ "BBSB",         "light" ],    # BBSB
@@ -85,20 +84,19 @@ my %light_device_codes = (    # HEXSTRING => "NAME", "name of reading",
     0x1404 => [ "RSL2",         "light" ],    # Conrad RSL2
     0x1405 => [ "LIVOLO",       "light" ],    # Livolo
     0x1406 => [ "TRC02",        "light" ],    # RGB TRC02
-    # 0x15: Lighting6
+                                              # 0x15: Lighting6
     0x1500 => [ "BLYSS",        "light" ],    # Blyss
-	0x1501 => [ "CUVEO",        "light" ],    # Cuveo
-    # 0x16: Chime
+                                              # 0x16: Chime
     0x1600 => [ "BYRONSX",      "light" ],    # Byron SX
     0x1601 => [ "BYRONMP",      "chime" ],    # Byron MP001
     0x1602 => [ "SELECTPLUS",   "chime" ],    # SelectPlus
     0x1603 => [ "RFU",          "chime" ],    # RFU
     0x1604 => [ "ENVIVO",       "chime" ],    # Envivo
-    # 0x17: Fan
+                                              # 0x17: Fan
     0x1700 => [ "SIEMENS_SF01", "light" ],    # Siemens SF01
-    # 0x18: Curtain1
+                                              # 0x18: Curtain1
     0x1800 => [ "HARRISON",     "light" ],    # Harrison Curtain
-    # 0x19: Blinds1
+                                              # 0x19: Blinds1
     0x1900 => [ "ROLLER_TROL",  "light" ],    # Roller Trol
     0x1901 => [ "HASTA_OLD",    "light" ],    # Hasta old
     0x1902 => [ "AOK_RF01",     "light" ],    # A-OK RF01
@@ -109,10 +107,11 @@ my %light_device_codes = (    # HEXSTRING => "NAME", "name of reading",
     0x1907 => [ "FOREST",       "light" ],    # Forest
     0x1A00 => [ "RFY",          "light" ],    # RTS RFY
     0x1A01 => [ "RFY_ext",      "light" ],    # RTS RFY ext
+    0x1A03 => [ "ASA",          "light" ],    # ASA
 );
 
 my %light_device_commands = (                 # HEXSTRING => commands
-    # 0x10: Lighting1
+                                              # 0x10: Lighting1
     0x1000 => [ "off", "on", "dim", "bright", "", "all_off", "all_on" ],    # X10
     0x1001 => [ "off", "on", "", "", "", "all_off", "all_on", "chime" ],    # ARC
     0x1002 => [ "off", "on" ],                                              # AB400D
@@ -124,19 +123,19 @@ my %light_device_commands = (                 # HEXSTRING => commands
     0x1008 => [ "off", "on", "", "", "", "all_off", "all_on" ],             # Energenie ENER010
     0x1009 => [ "off", "on" ],                                              # Energenie 5-gang
     0x100A => [ "off", "on" ],                                              # COCO GDR2-2000R
-    # 0x11: Lighting2
+                                                                            # 0x11: Lighting2
     0x1100 => [ "off", "on", "level", "all_off", "all_on", "all_level" ],   # AC
     0x1101 => [ "off", "on", "level", "all_off", "all_on", "all_level" ],   # HOMEEASY
     0x1102 => [ "off", "on", "level", "all_off", "all_on", "all_level" ],   # ANSLUT
-    # 0x12: Lighting3
+                                                                            # 0x12: Lighting3
     0x1200 => [
         "bright", "", "", "", "", "", "", "", "dim", "", "", "", "", "", "", "",
         "on", "level1", "level2", "level3", "level4", "level5", "level6", "level7", "level8", "level9", "off", "",
         "program", "", "", "", "",
     ],                                                                      # Koppla
-    # 0x13: Lighting4
+                                                                            # 0x13: Lighting4
     0x1300 => ["Lighting4"],                                                # Lighting4: PT2262
-    # 0x14: Lighting5
+                                                                            # 0x14: Lighting5
     0x1400 => [
         "off",      "on",    "all_off",   "mood1",     "mood2",  "mood3",
         "mood4",    "mood5", "reserved1", "reserved2", "unlock", "lock",
@@ -148,10 +147,9 @@ my %light_device_commands = (                 # HEXSTRING => commands
     0x1404 => [ "off",     "on",     "all_off", "all_on" ],                           # Conrad RSL
     0x1405 => [ "all_off", "on_off", "dim+",    "dim-" ],                             # Livolo
     0x1406 => [ "off",     "on",     "bright",  "dim", "vivid", "pale", "color" ],    # TRC02
-    # 0x15: Lighting6
+                                                                                      # 0x15: Lighting6
     0x1500 => [ "on",      "off",    "all_on",  "all_off" ],                          # Blyss
-	0x1501 => [ "on",      "off",    "all_on",  "all_off" ],                          # Cuveo
-    # 0x16: Chime
+                                                                                      # 0x16: Chime
     0x1600 => [
         "",           "tubular3_1", "solo1",    "bigben1", "",  "tubular2_1",
         "tubular2_2", "",           "dingdong", "solo2",   " ", "",
@@ -178,8 +176,9 @@ my %light_device_commands = (                 # HEXSTRING => commands
     0x1905 => [ "down", "up",    "stop" ],                                            # Media Mount
     0x1906 => [ "open", "close", "stop", "confirm" ],                                 # DC/RMF/Yooda
     0x1907 => [ "open", "close", "stop", "confirm_pair" ],                            # Forest
-    0x1A00 => [ "stop", "up", "", "down", "", "", "", "program", "", "", "", "", "", "", "", "up<0.5s", "down<0.5s", "up>2s", "down>2s", "enable_sun+wind", "disable_sun"], #RFY, forum #36451
+    0x1A00 => [ "stop", "up",    "", "down", "", "", "", "program" ],                 # RTS RFY
     0x1A01 => [ "stop", "up",    "", "down", "", "", "", "program" ],                 # RTS RFY ext
+    0x1A01 => [ "stop", "up",    "", "down", "", "", "", "program" ],                 # ASA
 );
 
 my %light_device_c2b;    # DEVICE_TYPE->hash (reverse of light_device_codes)
@@ -228,14 +227,15 @@ sub TRX_LIGHT_Set($@) {
     my $arg3          = "";
 
     # special for SetExtensions
-	#old TRX_LIGHT used a special on-for-timer notation
-	if ($command eq "on-for-timer") {
-		my ($err,$h,$m,$s,$fb) = GetTimeSpec($a[1]);
-		if (!defined($err)) {
-			$a[1] = $h*3600+$m*60+$s; 
-			Log3 $name, 1, "TRX_LIGHT is now using SetExtensions. Consider changing [Set $name $command] to a numeric value (seconds) instead of a TimeSpec";
-		}
-	}
+    #old TRX_LIGHT used a special on-for-timer notation
+    if ( $command eq "on-for-timer" ) {
+        my ( $err, $h, $m, $s, $fb ) = GetTimeSpec( $a[1] );
+        if ( !defined($err) ) {
+            $a[1] = $h * 3600 + $m * 60 + $s;
+            Log3 $name, 1,
+"TRX_LIGHT is now using SetExtensions. Consider changing [Set $name $command] to a numeric value (seconds) instead of a TimeSpec";
+        }
+    }
 
     if ( $na == 2 ) {
         $arg3 = $a[1];
@@ -290,10 +290,9 @@ sub TRX_LIGHT_Set($@) {
             else {
                 Log3 $name, 5, "TRX_LIGHT_Set() PT2262: else arg=$command l='$l'";
 
-                #my $error = "Unknown command $command, choose one of $l ";
-				return SetExtensions( $hash, $l, $name, @a );
-                #Log3 $name, 1, "TRX_LIGHT_Set() PT2262" . $error if ( $command ne "?" );
-                #return $error;
+                my $error = "Unknown command $command, choose one of $l ";
+                Log3 $name, 1, "TRX_LIGHT_Set() PT2262" . $error if ( $command ne "?" );
+                return $error;
             }
         }
     }
@@ -306,12 +305,14 @@ sub TRX_LIGHT_Set($@) {
             $l =~ s/ color / color:slider,14,2,128 /;
         }
 
-        
-        #my $error = "Unknown command $command, choose one of $l";
-		return SetExtensions( $hash, $l, $name, @a );
-
-        #Log3 $name, 1, "TRX_LIGHT_Set()" . $error if ( $command ne "?" );
-        #return $error;
+        if ( $l =~ /^[on|off]$/ ) {
+            Log3 $name, 1, "TRX_LIGHT_Set() using setExtensions";
+            return SetExtensions( $hash, $l, $name, @a );
+        }
+        else {
+            Log3 $name, 1, "TRX_LIGHT_Set() NOT using setExtensions";
+            return "Unknown command $command, choose one of $l";
+        }
     }
 
     my $seqnr = 0;
@@ -454,32 +455,6 @@ sub TRX_LIGHT_Set($@) {
           "TRX_LIGHT_Set() lighting5 name=$name device_type=$device_type, deviceid=$deviceid command=$command";
         Log3 $name, 5, "TRX_LIGHT_Set() lighting5 hexline=$hex_prefix$hex_command";
     }
-	# Lighting6
-	elsif ( $protocol_type == 0x15 ) {
-		my $id1;
-		my $id2;
-        my $unit;
-		my $group;
-		if ( $deviceid =~ /(..)(..)(.)(.)/ ) {
-            $id1 = $1;
-			$id2 = $2;
-            $group  = $3;
-			$unit  = $4;
-        }
-		else {
-            Log3 $name, 1,
-              "TRX_LIGHT_Set() lighting6 wrong deviceid: name=$name device_type=$device_type, deviceid=$deviceid";
-            return "error set name=$name  deviceid=$deviceid";
-        }
-		$hex_prefix = sprintf "0B15";
-		$hex_command = sprintf "%02x%02x%s%s%02x%02x%02x%02x0070", $device_type_num & 0xff, $seqnr, $id1, $id2, $group, $unit, $cmnd,$cmnd;
-		
-		
-		Log3 $name, 5,
-          "TRX_LIGHT_Set() lighting6 name=$name device_type=$device_type, deviceid=$deviceid command=$command $id1$id2";
-        Log3 $name, 5, "TRX_LIGHT_Set() lighting2 hexline=$hex_prefix$hex_command";
-		
-	}
     elsif ( $protocol_type == 0x16 ) {
 
         # Chime
@@ -562,6 +537,11 @@ sub TRX_LIGHT_Set($@) {
             $unitid   = $1;
             $unitcode = $2;
             if ( ( $device_type_num == 0x1A00 ) && !( $unitcode =~ /^0[0-4]$/ ) ) {
+                Log3 $name, 1,
+"TRX_LIGHT_Set() RFY wrong unitcode: name=$name device_type=$device_type, unitid=$unitid unitcode=$unitcode";
+                return "error set name=$name  deviceid=$deviceid";
+            }
+            elsif ( ( $device_type_num == 0x1A03 ) && !( $unitcode =~ /^0[1-5]$/ ) ) {
                 Log3 $name, 1,
 "TRX_LIGHT_Set() RFY wrong unitcode: name=$name device_type=$device_type, unitid=$unitid unitcode=$unitcode";
                 return "error set name=$name  deviceid=$deviceid";
@@ -654,7 +634,6 @@ sub TRX_LIGHT_Define($$) {
         && $type ne "RSL2"
         && $type ne "LIVOLO"
         && $type ne "BLYSS"
-		&& $type ne "CUVEO"
         && $type ne "BYRONSX"
         && $type ne "SIEMENS_SF01"
         && $type ne "HARRISON"
@@ -796,12 +775,7 @@ sub TRX_LIGHT_parse_X10 ($$) {
         $data = $bytes->[7];
     }
     elsif ( $type == 0x15 ) {
-        if ($subtype == 0x00 ) {    #Blyss
-			$device = sprintf '%02x%02x%c%d', $bytes->[3], $bytes->[4], $bytes->[5], $bytes->[6];
-		}
-		else {						#Cuveo
-			$device = sprintf '%02x%02x%d%d', $bytes->[3], $bytes->[4], $bytes->[5], $bytes->[6];
-		}
+        $device = sprintf '%02x%02x%c%d', $bytes->[3], $bytes->[4], $bytes->[5], $bytes->[6];
         $data = $bytes->[7];
     }
     elsif ( $type == 0x16 ) {    #Chime
@@ -810,7 +784,7 @@ sub TRX_LIGHT_parse_X10 ($$) {
             $data = $bytes->[5];
         }
         else {
-            $device = sprintf '%04x', $bytes->[4], $bytes->[5];		#forum #71568
+            $device = sprintf '%02x', $bytes->[3], $bytes->[4];
             $data = 0;
         }
     }
@@ -836,7 +810,7 @@ sub TRX_LIGHT_parse_X10 ($$) {
     my $command = "";
     if ( exists $light_device_commands{$type_subtype} ) {
         my $code = $light_device_commands{$type_subtype};
-		if ( exists $code->[$data] ) {
+        if ( exists $code->[$data] ) {
             $command = $code->[$data];
         }
         else {
@@ -860,7 +834,6 @@ sub TRX_LIGHT_parse_X10 ($$) {
 
     my $firstdevice = 1;
     my $def         = $modules{TRX_LIGHT}{defptr}{$device_name};
-	#Log3 $hash, 1, "TRX_LIGHT_parse_X10() device $device_name";
     if ( !$def ) {
         $firstdevice = 0;
         $def         = $modules{TRX_LIGHT}{defptr2}{$device_name};
@@ -910,7 +883,7 @@ sub TRX_LIGHT_parse_X10 ($$) {
 
     readingsBeginUpdate($def);
 
-    if ( $type == 0x10 || $type == 0x11 || $type == 0x14 || $type == 0x16 || $type==0x15) {
+    if ( $type == 0x10 || $type == 0x11 || $type == 0x14 || $type == 0x16 ) {
 
         # try to use it for all types:
         $current = $command;
@@ -1197,7 +1170,6 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
 	  <li> <code>LIVOLO</code> (Livolo devices. Commands ["all_off", "on_off", "dim+", "dim-"].)</li>
 	  <li> <code>TRC02</code> (RGB TRC02 devices. Commands ["off", "on", "bright", "dim", "vivid", "pale", "color"].)</li>
 	  <li> <code>BLYSS</code> (Blyss devices. deviceid: [A-P][1-5]. Commands ["off", "on", "all_off", "all_on"].)</li>
-	  <li> <code>CUVEO</code> (Blyss devices. deviceid: [A-P][1-5]. Commands ["off", "on", "all_off", "all_on"].)</li>
 	  <li> <code>BYRONSX</code> (Byron SX chime devices. deviceid: 00-FF. Commands [ "tubular3_1", "solo1", "bigben1", "tubular2_1", "tubular2_2", "solo2", "tubular3_2"].)</li>
 	  <li> <code>SELECTPLUS</code> (SELECTPLUS] chime devices. deviceid: 0000-FFFF. Commands [ "ring"].)</li>
 	  <li> <code>SIEMENS_SF01</code> (Siemens SF01 devices. deviceid: 000000-007FFF. Commands [ "timer", "-", "learn", "+", "confirm", "light", "on", "off" ].)</li>
