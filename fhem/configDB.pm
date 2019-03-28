@@ -265,10 +265,12 @@ if($cfgDB_dbconn =~ m/pg:/i) {
    } elsif ($cfgDB_dbconn =~ m/sqlite:/i) {
       $cfgDB_dbtype = "SQLITE";
       (undef,$cfgDB_filename) = split(/=/,$cfgDB_dbconn);
+      $configDB{filename} = $cfgDB_filename;
    } else {
       $cfgDB_dbtype = "unknown";
 }
 
+$configDB{type}              = $cfgDB_dbtype;
 $configDB{attr}{nostate}     = defined($dbconfig{nostate})     ? $dbconfig{nostate}     : 0;
 $configDB{attr}{rescue}      = defined($dbconfig{rescue})      ? $dbconfig{rescue}      : 0;
 $configDB{attr}{loadversion} = defined($dbconfig{loadversion}) ? $dbconfig{loadversion} : 0;
