@@ -1625,7 +1625,7 @@ sub Unifi_SwitchSiteLEDs_Send($$) {
     %{$hash->{httpParams}},
     url   => $hash->{unifi}->{url}."set/setting/mgmt",
     callback => \&Unifi_SwitchSiteLEDs_Receive,
-    data => "{'led_enabled': ".$state."}",
+    data => "{\"led_enabled\":".$state."}",
   } );
   return undef;
 }
