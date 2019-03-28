@@ -54,9 +54,11 @@
 #  - feature: 74_Unifi: new cattribute customClientNames
 # V 3.2.5
 #  - fixed:   74_Unifi: fixed createVoucher and (un-)blockClient for UC-V5.10
+# V 3.2.6
+#  - fixed:   74_Unifi: fixed locate/restartAP and disconnectClient for UC-V5.10
 
 package main;
-my $version="3.2.5";
+my $version="3.2.6";
 # Default für clientRedings setzen. Die Readings waren der Standard vor Einführung des Attributes customClientReadings.
 # Eine Änderung hat Auswirkungen auf (alte) Moduldefinitionen ohne dieses Attribut.
 my $defaultClientReadings=".:^accesspoint|^essid|^hostname|^last_seen|^snr|^uptime"; #ist wegen snr vs rssi nur halb korrekt, wird aber auch nicht wirklich verwendet ;-)
@@ -1091,7 +1093,7 @@ sub Unifi_GetUnarchivedAlerts_Send($) {
                  %{$hash->{httpParams}},
         url      => $hash->{unifi}->{url}."list/alarm",
         callback => $hash->{updateDispatch}->{$self}[2],
-        data     => "{'_sort': '-time', 'archived': false}",
+        data     => "{\"_sort\":\"-time\", \"archived\":false}",
     } );
     return undef;
 }
@@ -1131,7 +1133,7 @@ sub Unifi_GetEvents_Send($) {
                  %{$hash->{httpParams}},
         url      => $hash->{unifi}->{url}."stat/event",
         callback => $hash->{updateDispatch}->{$self}[2],
-        data     => "{'_sort': '-time', 'within': ".$hash->{unifi}->{eventPeriod}."}",    # last 24 hours
+        data     => "{\"_sort\":\"-time\", \"within\":".$hash->{unifi}->{eventPeriod}."}",    # last 24 hours
     } );
     return undef;
 }
@@ -1171,7 +1173,7 @@ sub Unifi_GetAccesspoints_Send($) {
                  %{$hash->{httpParams}},
         url      => $hash->{unifi}->{url}."stat/device",
         callback => $hash->{updateDispatch}->{$self}[2],
-        data     => "{'_depth': 2, 'test': 0}",
+        data     => "{\"_depth\":2, \"test\":0}",
     } );
     return undef;
 }
@@ -1501,7 +1503,7 @@ sub Unifi_DisconnectClient_Send($@) {
         url      => $hash->{unifi}->{url}."cmd/stamgr",
         callback => \&Unifi_DisconnectClient_Receive,
         clients  => [@clients],
-        data     => "{'mac': '".$hash->{clients}->{$id}->{mac}."', 'cmd': 'kick-sta'}",
+        data     => "{\"mac\":\"".$hash->{clients}->{$id}->{mac}."\", \"cmd\":\"kick-sta\"}",
     } );
     
     return undef;
@@ -1807,7 +1809,7 @@ sub Unifi_ApCmd_Send($$@) {     #cmd: 'set-locate', 'unset-locate', 'restart'
         callback => \&Unifi_ApCmd_Receive,
         aps      => [@aps],
         cmd      => $cmd,
-        data     => "{'mac': '".$hash->{accespoints}->{$id}->{mac}."', 'cmd': '".$cmd."'}",
+        data     => "{\"mac\":\"".$hash->{accespoints}->{$id}->{mac}."\", \"cmd\":\"".$cmd."\"}",
     } );
     return undef;
 }
@@ -1879,7 +1881,7 @@ sub Unifi_ArchiveAlerts_Send($) {
                  %{$hash->{httpParams}},
         url      => $hash->{unifi}->{url}."cmd/evtmgr",
         callback => \&Unifi_Cmd_Receive,
-        data     => "{'cmd': 'archive-all-alarms'}",
+        data     => "{\"cmd\":\"archive-all-alarms\"}",
     } );
     return undef;
 }
