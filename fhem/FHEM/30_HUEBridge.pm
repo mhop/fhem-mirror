@@ -474,6 +474,7 @@ HUEBridge_string2array($)
   return \@lights;
 }
 
+sub HUEBridge_Set($@);
 sub
 HUEBridge_Set($@)
 {
