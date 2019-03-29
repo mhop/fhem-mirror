@@ -45,6 +45,7 @@ use POSIX qw(strftime);
 use Time::HiRes qw(gettimeofday tv_interval);
 use Scalar::Util qw(looks_like_number);
 eval "use DBI;1" or my $DbRepMMDBI = "DBI";
+eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 use DBI::Const::GetInfoType;
 use Blocking;
 use Color;                           # colorpicker Widget
@@ -57,6 +58,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.17.2" => "28.03.2019  consideration of daylight saving time/leap year changed (func DbRep_corrRelTime) ",
+  "8.17.1" => "24.03.2019  edit Meta data, activate Meta.pm, prevent module from deactivation in case of unavailable Meta.pm ",
   "8.17.0" => "20.03.2019  prepare for Meta.pm, new attribute \"sqlCmdVars\" ",
   "8.16.0" => "17.03.2019  include sortTopicNum from 99_Utils, allow PRAGMAS leading an SQLIte SQL-Statement in sqlCmd, switch to DbRep_setVersionInfo ",
   "8.15.0" => "04.03.2019  readingsRename can rename readings of a given (optional) device ",
@@ -371,7 +374,7 @@ sub DbRep_Initialize($) {
  #                            "device" => "deviceFilter",
  #                          }; 
  
- # FHEM::Meta::InitMod( __FILE__, $hash );           # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
+ eval { FHEM::Meta::InitMod( __FILE__, $hash ) };           # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
  
 return;   
 }
@@ -396,15 +399,16 @@ sub DbRep_Define($@) {
       return "The specified DbLog-Device \"$a[2]\" doesn't exist.";
   }
   
-  $hash->{LASTCMD}             = " ";
-  $hash->{ROLE}                = AttrVal($name, "role", "Client");
-  $hash->{MODEL}               = $hash->{ROLE};
-  $hash->{HELPER}{DBLOGDEVICE} = $a[2];
-  $hash->{HELPER}{IDRETRIES}   = 3;                                            # Anzahl wie oft versucht wird initiale Daten zu holen
-  $hash->{NOTIFYDEV}           = "global,".$name;                              # nur Events dieser Devices an DbRep_Notify weiterleiten 
-  my $dbconn                   = $defs{$a[2]}{dbconn};
-  $hash->{DATABASE}            = (split(/;|=/, $dbconn))[1];
-  $hash->{UTF8}                = defined($defs{$a[2]}{UTF8})?$defs{$a[2]}{UTF8}:0;
+  $hash->{LASTCMD}               = " ";
+  $hash->{ROLE}                  = AttrVal($name, "role", "Client");
+  $hash->{MODEL}                 = $hash->{ROLE};
+  $hash->{HELPER}{DBLOGDEVICE}   = $a[2];
+  $hash->{HELPER}{IDRETRIES}     = 3;                                            # Anzahl wie oft versucht wird initiale Daten zu holen
+  $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                         # Modul Meta.pm nicht vorhanden
+  $hash->{NOTIFYDEV}             = "global,".$name;                              # nur Events dieser Devices an DbRep_Notify weiterleiten 
+  my $dbconn                     = $defs{$a[2]}{dbconn};
+  $hash->{DATABASE}              = (split(/;|=/, $dbconn))[1];
+  $hash->{UTF8}                  = defined($defs{$a[2]}{UTF8})?$defs{$a[2]}{UTF8}:0;
   
   # Versionsinformationen setzen
   DbRep_setVersionInfo($hash);
@@ -6427,7 +6431,7 @@ sub mysql_DoDumpClientSide($) {
  my $ead                        = AttrVal($name, "executeAfterProc", undef);
  my $mysql_commentstring        = "-- ";
  my $character_set              = "utf8";
- my $repver                     = $hash->{VERSION};
+ my $repver                     = $hash->{HELPER}{VERSION};
  my $sql_text                   = '';
  my $sql_file                   = '';
  my $dbpraefix                  = "";
@@ -8978,35 +8982,45 @@ sub DbRep_corrRelTime($$$) {
  # year   als Jahre seit 1900 
  # $mon   als 0..11  
  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst);
- my ($dsec,$dmin,$dhour,$dmday,$dmon,$dyear,$dwday,$dyday,$disdst);
+ my ($dsec,$dmin,$dhour,$dmday,$dmon,$dyear,$dwday,$dyday,$disdst,$fyear,$cyear);
+ (undef,undef,undef,undef,undef,$cyear,undef,undef,$isdst)          = localtime(time);       # aktuelles Jahr, Sommer/Winterzeit
  if($tdtn) {
      # timeDiffToNow
-     ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)          = localtime(time);       # Startzeit Ableitung
-     ($dsec,$dmin,$dhour,$dmday,$dmon,$dyear,$dwday,$dyday,$disdst) = localtime(time-$tim);  # Analyse Zieltimestamp timeDiffToNow
+     ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,undef)           = localtime(time);       # Istzeit
+     ($dsec,$dmin,$dhour,$dmday,$dmon,$dyear,$dwday,$dyday,$disdst) = localtime(time-$tim);  # Istzeit abzgl. Differenzzeit = Selektionsbeginnzeit
  } else {
      # timeOlderThan
-     ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)          = localtime(time-$tim);  # Startzeit Ableitung
-     my $mints = $hash->{HELPER}{MINTS}?$hash->{HELPER}{MINTS}:"1970-01-01 01:00:00";        # Timestamp des 1. Datensatzes verwenden falls ermittelt
+     ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$disdst)         = localtime(time-$tim);  # Berechnung Selektionsendezeit
+     my $mints = $hash->{HELPER}{MINTS}?$hash->{HELPER}{MINTS}:"1970-01-01 01:00:00";        # Selektionsstartzeit
      my ($yyyy1, $mm1, $dd1, $hh1, $min1, $sec1) = ($mints =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/); 
      my $tsend = timelocal($sec1, $min1, $hh1, $dd1, $mm1-1, $yyyy1-1900);
-     ($dsec,$dmin,$dhour,$dmday,$dmon,$dyear,$dwday,$dyday,$disdst) = localtime($tsend);     # Analyse Zieltimestamp timeOlderThan
+     ($dsec,$dmin,$dhour,$dmday,$dmon,$dyear,$dwday,$dyday,undef)   = localtime($tsend);     # Timestamp Selektionsstartzeit
  }
- $year += 1900;
- $dyear += 1900;
- my $k   = $year - $dyear;
- my $mg  = ((int($mon)+1)+(($year-$dyear-1)*12)+(11-int($dmon)+1));  # Gesamtzahl der Monate des Bewertungszeitraumes
+ $year += 1900;                                                      # aktuelles Jahr
+ $dyear += 1900;                                                     # Startjahr der Selektion
+ $cyear += 1900;                                                     # aktuelles Jahr
+ if($tdtn) {                                                         
+     # timeDiffToNow
+     $fyear = $dyear;                                                # Berechnungsjahr -> hier Selektionsbeginn
+ } else {
+     # timeOlderThan
+     $fyear = $year;                                                 # Berechnungsjahr -> hier Selektionsende 
+ }
+
+ my $k   = $cyear - $fyear;                                          # Anzahl Jahre
+ my $mg  = ((int($mon)+1)+(($k-1)*12)+(11-int($dmon)+1));            # Gesamtzahl der Monate des Bewertungszeitraumes
  my $cly = 0;                                                        # Anzahl Schaltjahre innerhalb Beginn und Ende Auswertungszeitraum
  my $fly = 0;                                                        # erstes Schaltjahr nach Start
  my $lly = 0;                                                        # letzes Schaltjahr nach Start	 
- while ($dyear+$k >= $dyear) {
-     my $ily = DbRep_IsLeapYear($name,$dyear+$k);
+ while ($fyear+$k >= $fyear) {
+     my $ily = DbRep_IsLeapYear($name,$fyear+$k);
      $cly++ if($ily);
-     $fly = $dyear+$k if($ily && !$fly);
-     $lly = $dyear+$k if($ily);
+     $fly = $fyear+$k if($ily && !$fly);
+     $lly = $fyear+$k if($ily);
      $k--;
  }
- # Log3($name, 4, "DbRep $name - countleapyear: $cly firstleapyear: $fly lastleapyear: $lly totalmonth: $mg isdaylight:$isdst destdaylight:$disdst");
- if( ($fly <= $year && $mon > 1) && ($lly > $dyear || ($lly = $dyear && $dmon < 1)) ) {
+ 
+ if( $mon > 1 && ($lly > $fyear || ($lly = $fyear && $dmon < 1)) ) {
      $tim += $cly*86400;
      # Log3($name, 4, "DbRep $name - leap year correction 1");
  } else {
@@ -9015,7 +9029,10 @@ sub DbRep_corrRelTime($$$) {
  }
 	 
  # Sommer/Winterzeitkorrektur
+ (undef,undef,undef,undef,undef,undef,undef,undef,$disdst) = localtime(time-$tim);
  $tim += ($disdst-$isdst)*3600 if($disdst != $isdst);
+ 
+ Log3($name, 4, "DbRep $name - startMonth: $mon endMonth: $dmon lastleapyear: $lly baseYear: $fyear destdaylight:$disdst isdaylight:$isdst");
 
 return $tim;
 }
@@ -10136,7 +10153,7 @@ sub DbRep_setVersionInfo($) {
   $hash->{HELPER}{PACKAGE} = __PACKAGE__;
   $hash->{HELPER}{VERSION} = $v;
   
-  if($modules{$type}{META}{x_prereqs_src}) {
+  if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
 	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
@@ -10145,7 +10162,7 @@ sub DbRep_setVersionInfo($) {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
 	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
-	  if( __PACKAGE__ eq $type) {
+	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
 	      use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );                                          
@@ -15224,19 +15241,20 @@ sub bdump {
         "Net::FTPSSL": 0,
         "Net::FTP": 0, 
         "IO::Compress::Gzip": 0, 
-        "IO::Uncompress::Gunzip": 0
+        "IO::Uncompress::Gunzip": 0,
+        "FHEM::Meta": 0
       },
       "suggests": {
       }
     }
   },
   "resources": {
-    "bugtracker": {
-      "web": "https://forum.fhem.de/index.php/board,46.0.html",
-      "x_web_title": "FHEM Forum: Sonstiges"
+    "x_wiki": {
+      "web": "https://wiki.fhem.de/wiki/DbRep_-_Reporting_und_Management_von_DbLog-Datenbankinhalten",
+      "title": "DbRep - Reporting und Management von DbLog-Datenbankinhalten"
     }
   }
 }
 =end :application/json;q=META.json
 
-=cu
+=cut
