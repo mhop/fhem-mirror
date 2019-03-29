@@ -306,11 +306,11 @@ sub TRX_LIGHT_Set($@) {
         }
 
         if ( $l =~ /^[on|off]$/ ) {
-            Log3 $name, 1, "TRX_LIGHT_Set() using setExtensions";
+            Log3 $name, 5, "TRX_LIGHT_Set() using setExtensions";
             return SetExtensions( $hash, $l, $name, @a );
         }
         else {
-            Log3 $name, 1, "TRX_LIGHT_Set() NOT using setExtensions";
+            Log3 $name, 5, "TRX_LIGHT_Set() NOT using setExtensions for command $command";
             return "Unknown command $command, choose one of $l";
         }
     }
