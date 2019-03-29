@@ -954,9 +954,9 @@ Telegram</label>
 	<Project sr="proj0" ve="2">
 		<cdate>1502789371413</cdate>
 		<name>AMAD</name>
-		<pids>2613,2594,2602,2597,2598,2593,918,2586,2590,2600,2608,922,2605,2588,2612,2589,926,2585,2607,2604,2601,2611,2596,2592,2603,2584,2591,931,2610,2583,2606,924,2599,2595,2587,2582,2609</pids>
-		<scenes>AMAD_Popup,Lock,AMAD_Dialog_Message,AMAD_settings</scenes>
-		<tids>2524,2552,2576,2545,2510,2570,2512,2522,2517,2530,2575,2502,2534,2572,2537,2492,2551,2580,2495,2542,2568,850,2559,2531,2579,2554,2505,2511,2544,2555,2513,2539,2563,2532,2523,2525,2553,920,2497,914,2490,2567,2526,2504,2507,2516,2540,2536,2533,2496,2562,2500,2561,2574,2571,2581,2573,923,2514,2560,2564,932,2543,2547,2569,2557,2549,2528,2506,2519,2508,2566,2550,2538,2558,2521,2541,2498,2556,2499,2501,2527,2515,2491,2509,2565,2494,2535,2546,927,2493,2578,2529,2503,2548,2518,2488,2520,2577,925</tids>
+		<pids>2593,2598,2603,2610,2608,2613,2583,922,2586,2609,2584,2604,2602,2582,926,2592,2596,2588,2605,2612,2595,2607,2589,924,2591,2594,2611,2590,2601,2597,2587,931,2606,2585,918,2600,2599</pids>
+		<scenes>AMAD_settings,AMAD_Popup,Lock,AMAD_Dialog_Message</scenes>
+		<tids>2558,925,2563,2581,850,2522,2534,2531,2575,2576,2539,2538,2533,2528,2515,2552,2511,2490,2573,2537,2544,2568,932,2509,2540,2492,2545,2517,2580,2521,2512,2535,2499,2557,2556,2543,2493,2529,2541,2530,2559,2546,2555,2505,2495,2554,2567,2547,2527,2553,2578,2506,2500,2510,2516,2520,2496,2566,2561,2577,2507,2508,2562,2504,2519,2571,2572,920,2514,2564,2532,2491,2536,2569,2526,2551,2488,2518,2498,2549,2560,2570,923,2525,2524,2574,2502,2579,2565,2542,2548,2497,927,2503,2523,2513,914,2494,2501,2550</tids>
 		<Kid sr="Kid">
 			<feat0>android.hardware.bluetooth:y</feat0>
 			<feat1>android.hardware.camera.front:y</feat1>
@@ -977,8 +977,11 @@ Telegram</label>
 AMAD is an interface between SmartHome and Android device.
 
 Description:
-See the FHEM commandref description:  https://fhem.de/commandref.html#AMADDevice
-Forum entry: https://forum.fhem.de/index.php/topic,81167.0.html</d>
+See the FHEM commandref description: 
+&lt;a href="https://fhem.de/commandref.html#AMADDevice"&gt;https://fhem.de/commandref.html#AMADDevice&lt;/a&gt; 
+
+Forum entry:
+&lt;a href="https://forum.fhem.de/index.php/topic,81167.0.html"&gt;https://forum.fhem.de/index.php/topic,81167.0.html&lt;/a&gt;</d>
 			<t>AMAD</t>
 		</Share>
 		<Img sr="icon" ve="2">
@@ -10798,11 +10801,26 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 	</Task>
 	<Task sr="task2576">
 		<cdate>1503611036750</cdate>
-		<edate>1533585674453</edate>
+		<edate>1553804949049</edate>
 		<id>2576</id>
 		<nme>AMAD_SDK2Name</nme>
 		<rty>1</rty>
 		<Action sr="act0" ve="7">
+			<code>547</code>
+			<Str sr="arg0" ve="3">%androidversion</Str>
+			<Str sr="arg1" ve="3">10.0 Q</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%SDK</lhs>
+					<op>8</op>
+					<rhs>29</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act1" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
 			<Str sr="arg1" ve="3">9.0 Pie</Str>
@@ -10817,10 +10835,10 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act1" ve="7">
+		<Action sr="act10" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
-			<Str sr="arg1" ve="3">8.1 Oreo</Str>
+			<Str sr="arg1" ve="3">4.3 Jelly Bean MR2</Str>
 			<Int sr="arg2" val="0"/>
 			<Int sr="arg3" val="0"/>
 			<Int sr="arg4" val="0"/>
@@ -10828,11 +10846,11 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				<Condition sr="c0" ve="3">
 					<lhs>%SDK</lhs>
 					<op>8</op>
-					<rhs>27</rhs>
+					<rhs>18</rhs>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act10" ve="7">
+		<Action sr="act11" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
 			<Str sr="arg1" ve="3">4.2 - 4.2.2 Jelly Bean MR1</Str>
@@ -10847,7 +10865,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act11" ve="7">
+		<Action sr="act12" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
 			<Str sr="arg1" ve="3">4.1 - 4.1.1  Jelly Bean</Str>
@@ -10862,7 +10880,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act12" ve="7">
+		<Action sr="act13" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
 			<Str sr="arg1" ve="3">4.0.3 - 4.0.4 Ice Cream Sandwich MR1</Str>
@@ -10877,7 +10895,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act13" ve="7">
+		<Action sr="act14" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
 			<Str sr="arg1" ve="3">4.0 - 4.0.2 Ice Cream Sandwich</Str>
@@ -10892,12 +10910,27 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act14" ve="7">
+		<Action sr="act15" ve="7">
 			<code>126</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
 			<Int sr="arg1" val="1"/>
 		</Action>
 		<Action sr="act2" ve="7">
+			<code>547</code>
+			<Str sr="arg0" ve="3">%androidversion</Str>
+			<Str sr="arg1" ve="3">8.1 Oreo</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%SDK</lhs>
+					<op>8</op>
+					<rhs>27</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act3" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
 			<Str sr="arg1" ve="3">8.0 Oreo</Str>
@@ -10912,7 +10945,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act3" ve="7">
+		<Action sr="act4" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
 			<Str sr="arg1" ve="3">7.1 Nougat</Str>
@@ -10927,7 +10960,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act4" ve="7">
+		<Action sr="act5" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
 			<Str sr="arg1" ve="3">7.0 Nougat</Str>
@@ -10942,7 +10975,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act5" ve="7">
+		<Action sr="act6" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
 			<Str sr="arg1" ve="3">6.0 Marshmallow</Str>
@@ -10957,7 +10990,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act6" ve="7">
+		<Action sr="act7" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
 			<Str sr="arg1" ve="3">5.1 Lollipop MR1</Str>
@@ -10972,7 +11005,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act7" ve="7">
+		<Action sr="act8" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
 			<Str sr="arg1" ve="3">5.0 Lollipop</Str>
@@ -10987,7 +11020,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act8" ve="7">
+		<Action sr="act9" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
 			<Str sr="arg1" ve="3">4.4 KitKat</Str>
@@ -10999,21 +11032,6 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 					<lhs>%SDK</lhs>
 					<op>8</op>
 					<rhs>19</rhs>
-				</Condition>
-			</ConditionList>
-		</Action>
-		<Action sr="act9" ve="7">
-			<code>547</code>
-			<Str sr="arg0" ve="3">%androidversion</Str>
-			<Str sr="arg1" ve="3">4.3 Jelly Bean MR2</Str>
-			<Int sr="arg2" val="0"/>
-			<Int sr="arg3" val="0"/>
-			<Int sr="arg4" val="0"/>
-			<ConditionList sr="if">
-				<Condition sr="c0" ve="3">
-					<lhs>%SDK</lhs>
-					<op>8</op>
-					<rhs>18</rhs>
 				</Condition>
 			</ConditionList>
 		</Action>
@@ -12747,13 +12765,13 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 	</Task>
 	<Task sr="task850">
 		<cdate>1540808276450</cdate>
-		<edate>1549659376695</edate>
+		<edate>1553805007312</edate>
 		<id>850</id>
 		<nme>AMAD_init</nme>
 		<Action sr="act0" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%AMAD_version</Str>
-			<Str sr="arg1" ve="3">4.2.5 (Tasker)</Str>
+			<Str sr="arg1" ve="3">4.4.0 (Tasker)</Str>
 			<Int sr="arg2" val="0"/>
 			<Int sr="arg3" val="0"/>
 			<Int sr="arg4" val="0"/>

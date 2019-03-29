@@ -1,5 +1,5 @@
 ###############################################################################
-# 
+#
 # Developed with Kate
 #
 #  (c) 2015-2019 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
@@ -36,7 +36,7 @@
 #
 # if($@){
 #   Log3($SELF, 2, "$TYPE ($SELF) - error while request: $@");
-#  
+#
 #   readingsSingleUpdate($hash, "state", "error", 1);
 #
 #   return;
@@ -44,798 +44,970 @@
 #
 #
 
-
-
-
 package main;
-
-
-my $missingModul = "";
 
 use strict;
 use warnings;
+use FHEM::Meta;
 
-eval "use Encode qw(encode encode_utf8);1" or $missingModul .= "Encode ";
-eval "use JSON;1" or $missingModul .= "JSON ";
-
-
-
-my $modulversion = "4.2.7";
-my $flowsetversion = "4.2.5";
-
-
-
-
-# Declare functions
-sub AMADDevice_Attr(@);
-sub AMADDevice_Notify($$);
-sub AMADDevice_checkDeviceState($);
-sub AMADDevice_decrypt($);
-sub AMADDevice_Define($$);
-sub AMADDevice_encrypt($);
-sub AMADDevice_GetUpdate($);
-sub AMADDevice_Initialize($);
-sub AMADDevice_WriteReadings($$);
-sub AMADDevice_Set($$@);
-sub AMADDevice_Undef($$);
-sub AMADDevice_Parse($$);
-sub AMADDevice_statusRequest($);
-sub AMADDevice_CreateVolumeValue($$@);
-sub AMADDevice_CreateTtsMsgValue($@);
-sub AMADDevice_CreateScreenValue($$);
-sub AMADDevice_CreateChangeBtDeviceValue($$);
-
-
-
+my $modulversion   = '4.4.0';
+my $flowsetversion = '4.4.0';
 
 sub AMADDevice_Initialize($) {
 
     my ($hash) = @_;
-    
-    $hash->{Match}          = '{"amad": \{"amad_id":.+}}';
 
+    $hash->{Match} = '{"amad": \{"amad_id":.+}}';
 
-    $hash->{SetFn}      = "AMADDevice_Set";
-    $hash->{DefFn}      = "AMADDevice_Define";
-    $hash->{UndefFn}    = "AMADDevice_Undef";
-    $hash->{AttrFn}     = "AMADDevice_Attr";
-    $hash->{NotifyFn}   = "AMADDevice_Notify";
-    $hash->{ParseFn}    = "AMADDevice_Parse";
-    
-    $hash->{AttrList}   = "setOpenApp ".
-                "checkActiveTask ".
-                "setFullscreen:0,1 ".
-                "setScreenOrientation:0,1 ".
-                "setScreenBrightness:noArg ".
-                "setBluetoothDevice ".
-                "setScreenlockPIN ".
-                "setScreenOnForTimer ".
-                "setOpenUrlBrowser ".
-                "setNotifySndFilePath ".
-                "setTtsMsgSpeed ".
-                "setTtsMsgLang:de,en ".
-                "setTtsMsgVol ".
-                "setUserFlowState ".
-                "setVolUpDownStep:1,2,4,5 ".
-                "setVolMax ".
-                "setVolFactor:2,3,4,5 ".
-                "setNotifyVolMax ".
-                "setRingSoundVolMax ".
-                "setAPSSID ".
-                "root:0,1 ".
-                "disable:1 ".
-                "IODev ".
-                "remoteServer:Automagic,Autoremote,TNES,other ".
-                "setTakeScreenshotResolution:1280x720,1920x1080,1920x1200 ".
-                "setTakePictureResolution:800x600,1024x768,1280x720,1600x1200,1920x1080 ".
-                "setTakePictureCamera:Back,Front ".
-                $readingFnAttributes;
-    
-    foreach my $d(sort keys %{$modules{AMADDevice}{defptr}}) {
-    
+    $hash->{SetFn}    = 'FHEM::AMADDevice::Set';
+    $hash->{DefFn}    = 'FHEM::AMADDevice::Define';
+    $hash->{UndefFn}  = 'FHEM::AMADDevice::Undef';
+    $hash->{AttrFn}   = 'FHEM::AMADDevice::Attr';
+    $hash->{NotifyFn} = 'FHEM::AMADDevice::Notify';
+    $hash->{ParseFn}  = 'FHEM::AMADDevice::Parse';
+
+    $hash->{AttrList} =
+        'setOpenApp '
+      . 'checkActiveTask '
+      . 'setFullscreen:0,1 '
+      . 'setScreenOrientation:0,1 '
+      . 'setScreenBrightness:noArg '
+      . 'setBluetoothDevice '
+      . 'setScreenlockPIN '
+      . 'setScreenOnForTimer '
+      . 'setOpenUrlBrowser '
+      . 'setNotifySndFilePath '
+      . 'setTtsMsgSpeed '
+      . 'setTtsMsgLang:de,en '
+      . 'setTtsMsgVol '
+      . 'setUserFlowState '
+      . 'setVolUpDownStep:1,2,4,5 '
+      . 'setVolMax '
+      . 'setVolFactor:2,3,4,5 '
+      . 'setNotifyVolMax '
+      . 'setRingSoundVolMax '
+      . 'setAPSSID '
+      . 'root:0,1 '
+      . 'disable:1 '
+      . 'IODev '
+      . 'remoteServer:Automagic,Autoremote,TNES,other '
+      . 'setTakeScreenshotResolution:1280x720,1920x1080,1920x1200 '
+      . 'setTakePictureResolution:800x600,1024x768,1280x720,1600x1200,1920x1080 '
+      . 'setTakePictureCamera:Back,Front '
+      . $readingFnAttributes;
+
+    foreach my $d ( sort keys %{ $modules{AMADDevice}{defptr} } ) {
+
         my $hash = $modules{AMADDevice}{defptr}{$d};
-        $hash->{VERSIONMODUL}      = $modulversion;
-        $hash->{VERSIONFLOWSET}    = $flowsetversion;
+        $hash->{VERSIONMODUL}   = $modulversion;
+        $hash->{VERSIONFLOWSET} = $flowsetversion;
     }
+
+    return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
-sub AMADDevice_Define($$) {
+## unserer packagename
+package FHEM::AMADDevice;
+
+use strict;
+use warnings;
+use POSIX;
+use FHEM::Meta;
+
+use Data::Dumper;    #only for Debugging
+
+use GPUtils qw(GP_Import)
+  ;    # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
+
+my $missingModul = '';
+
+eval "use Encode qw(encode encode_utf8);1" or $missingModul .= 'Encode ';
+eval "use JSON;1"                          or $missingModul .= 'JSON ';
+
+## Import der FHEM Funktionen
+BEGIN {
+    GP_Import(
+        qw(readingsSingleUpdate
+          readingsBulkUpdate
+          readingsBulkUpdateIfChanged
+          readingsBeginUpdate
+          readingsEndUpdate
+          CommandDeleteReading
+          defs
+          modules
+          Log3
+          CommandAttr
+          attr
+          AttrVal
+          ReadingsVal
+          IsDisabled
+          deviceEvents
+          init_done
+          gettimeofday
+          getUniqueId
+          InternalTimer
+          RemoveInternalTimer
+          IOWrite
+          ReadingsAge
+          urlEncode
+          AssignIoPort)
+    );
+}
+
+sub Define($$) {
 
     my ( $hash, $def ) = @_;
-    my @a = split( "[ \t]+", $def );
-    
-    return "too few parameters: define <name> AMADDevice <HOST-IP> <amad_id> <remoteServer>" if( @a != 5 );
-    return "Cannot define a AMADDevice device. Perl modul $missingModul is missing." if ( $missingModul );
+    my @a = split( '[ \t]+', $def );
 
+    return $@ unless ( FHEM::Meta::SetInternals($hash) );
+    return
+'too few parameters: define <name> AMADDevice <HOST-IP> <amad_id> <remoteServer>'
+      if ( @a != 5 );
+    return
+        'Cannot define a AMADDevice device. Perl modul '
+      . $missingModul
+      . ' is missing.'
+      if ($missingModul);
 
-    my $name                                    = $a[0];
-    my $host                                    = $a[2];
-    my $amad_id                                 = $a[3];
-    my $remoteServer                            = $a[4];
-    
-    $hash->{HOST}                               = $host;
-    $hash->{AMAD_ID}                            = $amad_id;
-    $hash->{VERSIONMODUL}                       = $modulversion;
-    $hash->{VERSIONFLOWSET}                     = $flowsetversion;
-    $hash->{NOTIFYDEV}                          = "global,$name";
-    
-    $hash->{PORT}                               = 8090 if($remoteServer eq 'Automagic');
-    $hash->{PORT}                               = 1817 if($remoteServer eq 'Autoremote');
-    $hash->{PORT}                               = 8765 if($remoteServer eq 'TNES');
-    $hash->{PORT}                               = 1111 if($remoteServer eq 'other');        # Dummy Port for other
-    return 'typo in <remoteServer> field. please use Automagic, Autoremote, TNES or other'
-      unless ( defined($hash->{PORT}) and $hash->{PORT} );
-    
-    $hash->{helper}{infoErrorCounter}           = 0;
-    $hash->{helper}{setCmdErrorCounter}         = 0;
-    $hash->{helper}{deviceStateErrorCounter}    = 0;
+    my $name         = $a[0];
+    my $host         = $a[2];
+    my $amad_id      = $a[3];
+    my $remoteServer = $a[4];
 
+    $hash->{HOST}           = $host;
+    $hash->{AMAD_ID}        = $amad_id;
+    $hash->{VERSIONMODUL}   = $modulversion;
+    $hash->{VERSIONFLOWSET} = $flowsetversion;
+    $hash->{NOTIFYDEV}      = 'global,' . $name;
+    $hash->{MODEL}          = $remoteServer;
 
+    $hash->{PORT} = 8090 if ( $remoteServer eq 'Automagic' );
+    $hash->{PORT} = 1817 if ( $remoteServer eq 'Autoremote' );
+    $hash->{PORT} = 8765 if ( $remoteServer eq 'TNES' );
+    $hash->{PORT} = 1111 if ( $remoteServer eq 'other' ); # Dummy Port for other
+    return
+'typo in <remoteServer> field. please use Automagic, Autoremote, TNES or other'
+      unless ( defined( $hash->{PORT} ) and $hash->{PORT} );
 
-    CommandAttr(undef,"$name IODev $modules{AMADCommBridge}{defptr}{BRIDGE}->{NAME}") if(AttrVal($name,'IODev','none') eq 'none');
+    $hash->{helper}{infoErrorCounter}        = 0;
+    $hash->{helper}{setCmdErrorCounter}      = 0;
+    $hash->{helper}{deviceStateErrorCounter} = 0;
 
-    my $iodev           = AttrVal($name,'IODev','none');
-    
-    AssignIoPort($hash,$iodev) if( !$hash->{IODev} );
-    
-    if(defined($hash->{IODev}->{NAME})) {
-        Log3 $name, 3, "AMADDevice ($name) - I/O device is " . $hash->{IODev}->{NAME};
-    } else {
-        Log3 $name, 1, "AMADDevice ($name) - no I/O device";
+    CommandAttr( undef,
+        $name . ' IODev ' . $modules{AMADCommBridge}{defptr}{BRIDGE}->{NAME} )
+      if ( defined( $modules{AMADCommBridge}{defptr}{BRIDGE}->{NAME} )
+        and AttrVal( $name, 'IODev', 'none' ) eq 'none' );
+
+    my $iodev = AttrVal( $name, 'IODev', 'none' );
+
+    AssignIoPort( $hash, $iodev ) if ( !$hash->{IODev} );
+
+    if ( defined( $hash->{IODev}->{NAME} ) ) {
+        Log3( $name, 3,
+            "AMADDevice ($name) - I/O device is " . $hash->{IODev}->{NAME} );
+    }
+    else {
+        Log3( $name, 1, "AMADDevice ($name) - no I/O device" );
     }
 
-
     $iodev = $hash->{IODev}->{NAME};
-    
+
     my $d = $modules{AMADDevice}{defptr}{$amad_id};
-    
-    return "AMADDevice device $name on AMADCommBridge $iodev already defined."
-    if( defined($d) and $d->{IODev} == $hash->{IODev} and $d->{NAME} ne $name );
 
-    
+    return
+        'AMADDevice device '
+      . $name
+      . ' on AMADCommBridge '
+      . $iodev
+      . ' already defined.'
+      if (  defined($d)
+        and $d->{IODev} == $hash->{IODev}
+        and $d->{NAME} ne $name );
 
-    CommandAttr(undef,"$name room AMAD") if(AttrVal($name,'room','none') eq 'none');
-    CommandAttr(undef,"$name remoteServer $remoteServer") if(AttrVal($name,'remoteServer','none') eq 'none');
-        
+    CommandAttr( undef, $name . ' room AMAD' )
+      if ( AttrVal( $name, 'room', 'none' ) eq 'none' );
+    CommandAttr( undef, $name . ' remoteServer ' . $remoteServer )
+      if ( AttrVal( $name, 'remoteServer', 'none' ) eq 'none' );
+
     readingsBeginUpdate($hash);
-    readingsBulkUpdateIfChanged( $hash, "state", "initialized",1);
-    readingsBulkUpdateIfChanged( $hash, "deviceState", "unknown",1);
-    readingsEndUpdate($hash,1);
-    
-    
-    Log3 $name, 3, "AMADDevice ($name) - defined with AMAD_ID: $amad_id on port $hash->{PORT}";
+    readingsBulkUpdateIfChanged( $hash, 'state',       'initialized', 1 );
+    readingsBulkUpdateIfChanged( $hash, 'deviceState', 'unknown',     1 );
+    readingsEndUpdate( $hash, 1 );
 
+    Log3( $name, 3,
+"AMADDevice ($name) - defined with AMAD_ID: $amad_id on port $hash->{PORT}"
+    );
 
+    $hash->{NOTIFYDEV} .= ',' . $iodev
+      if ( defined($iodev) );
     $modules{AMADDevice}{defptr}{$amad_id} = $hash;
 
     return undef;
 }
 
-sub AMADDevice_Undef($$) {
+sub Undef($$) {
 
-    my ( $hash, $arg )  = @_;
-    my $name            = $hash->{NAME};
-    my $amad_id         = $hash->{AMAD_ID};
-    
-    
-    RemoveInternalTimer( $hash );
+    my ( $hash, $arg ) = @_;
+    my $name    = $hash->{NAME};
+    my $amad_id = $hash->{AMAD_ID};
+
+    RemoveInternalTimer($hash);
     delete $modules{AMADDevice}{defptr}{$amad_id};
 
     return undef;
 }
 
-sub AMADDevice_Attr(@) {
+sub Attr(@) {
 
     my ( $cmd, $name, $attrName, $attrVal ) = @_;
     my $hash = $defs{$name};
-    
+
     my $orig = $attrVal;
 
-    if( $attrName eq "remoteServer" ) {
-        if( $cmd eq "set" ) {
-            if( $attrVal eq "Automagic" ) {
-                $hash->{PORT}   = 8090;
-                Log3 $name, 3, "AMADDevice ($name) - set remoteServer to Automagic";
-            
-            } elsif( $attrVal eq "Autoremote" ) {
-                $hash->{PORT}   = 1817;
-                Log3 $name, 3, "AMADDevice ($name) - set remoteServer to Autoremote";
-            
-            } elsif( $attrVal eq "TNES" ) {
-                $hash->{PORT}   = 8765;
-                Log3 $name, 3, "AMADDevice ($name) - set remoteServer to TNES";
-            
-            } elsif( $attrVal eq "other" ) {
-                $hash->{PORT}   = 1111;
-                Log3 $name, 3, "AMADDevice ($name) - set remoteServer to other";
+    if ( $attrName eq 'remoteServer' ) {
+        if ( $cmd eq 'set' ) {
+            if ( $attrVal eq 'Automagic' ) {
+                $hash->{PORT} = 8090;
+                Log3( $name, 3,
+                    "AMADDevice ($name) - set remoteServer to Automagic" );
+
             }
-            
-            $hash->{DEF} = "$hash->{HOST} $hash->{AMAD_ID} $attrVal";
+            elsif ( $attrVal eq 'Autoremote' ) {
+                $hash->{PORT} = 1817;
+                Log3( $name, 3,
+                    "AMADDevice ($name) - set remoteServer to Autoremote" );
+
+            }
+            elsif ( $attrVal eq 'TNES' ) {
+                $hash->{PORT} = 8765;
+                Log3( $name, 3,
+                    "AMADDevice ($name) - set remoteServer to TNES" );
+
+            }
+            elsif ( $attrVal eq 'other' ) {
+                $hash->{PORT} = 1111;
+                Log3( $name, 3,
+                    "AMADDevice ($name) - set remoteServer to other" );
+            }
+
+            $hash->{DEF} =
+              $hash->{HOST} . ' ' . $hash->{AMAD_ID} . ' ' . $attrVal;
         }
     }
-    
-    elsif( $attrName eq "disable" ) {
-        if( $cmd eq "set" ) {
-            if( $attrVal eq "0" ) {
-                readingsSingleUpdate ( $hash, "state", "active", 1 );
-                Log3 $name, 3, "AMADDevice ($name) - enabled";
-            } else {
+
+    elsif ( $attrName eq 'disable' ) {
+        if ( $cmd eq 'set' ) {
+            if ( $attrVal eq '0' ) {
+                readingsSingleUpdate( $hash, 'state', 'active', 1 );
+                Log3( $name, 3, "AMADDevice ($name) - enabled" );
+            }
+            else {
                 RemoveInternalTimer($hash);
-                readingsSingleUpdate ( $hash, "state", "disabled", 1 );
-                Log3 $name, 3, "AMADDevice ($name) - disabled";
+                readingsSingleUpdate( $hash, 'state', 'disabled', 1 );
+                Log3( $name, 3, "AMADDevice ($name) - disabled" );
             }
-            
-        } else {
-            readingsSingleUpdate ( $hash, "state", "active", 1 );
-            Log3 $name, 3, "AMADDevice ($name) - enabled";
+
+        }
+        else {
+            readingsSingleUpdate( $hash, 'state', 'active', 1 );
+            Log3( $name, 3, "AMADDevice ($name) - enabled" );
         }
     }
-    
-    elsif( $attrName eq "checkActiveTask" ) {
-        if( $cmd eq "del" ) {
-            CommandDeleteReading( undef, "$name checkActiveTask" ); 
+
+    elsif ( $attrName eq 'checkActiveTask' ) {
+        if ( $cmd eq 'del' ) {
+            CommandDeleteReading( undef, $name . ' checkActiveTask' );
         }
-        
-        Log3 $name, 3, "AMADDevice ($name) - $cmd $attrName $attrVal and run statusRequest";
+
+        Log3( $name, 3,
+            "AMADDevice ($name) - $cmd $attrName $attrVal and run statusRequest"
+        );
     }
-    
-    elsif( $attrName eq "setScreenlockPIN" ) {
-        if( $cmd eq "set" and $attrVal ) {
-        
-            $attrVal = AMADDevice_encrypt($attrVal);
-            
-        } else {
-        
-            CommandDeleteReading( undef, "$name screenLock" );
+
+    elsif ( $attrName eq 'setScreenlockPIN' ) {
+        if ( $cmd eq 'set' and $attrVal ) {
+
+            $attrVal = encrypt($attrVal);
+
+        }
+        else {
+
+            CommandDeleteReading( undef, $name . ' screenLock' );
         }
     }
-    
-    elsif( $attrName eq "setUserFlowState" ) {
-        if( $cmd eq "del" ) {
-        
-            CommandDeleteReading( undef, "$name userFlowState" ); 
+
+    elsif ( $attrName eq 'setUserFlowState' ) {
+        if ( $cmd eq 'del' ) {
+
+            CommandDeleteReading( undef, $name . ' userFlowState' );
         }
-        
-        Log3 $name, 3, "AMADDevice ($name) - $cmd $attrName $attrVal and run statusRequest";
+
+        Log3( $name, 3,
+            "AMADDevice ($name) - $cmd $attrName $attrVal and run statusRequest"
+        );
     }
-    
-    
-    
-    if( $cmd eq "set" ) {
-        if( $attrVal and $orig ne $attrVal ) {
-        
+
+    if ( $cmd eq 'set' ) {
+        if ( $attrVal and $orig ne $attrVal ) {
+
             $attr{$name}{$attrName} = $attrVal;
-            return $attrName ." set to ". $attrVal if( $init_done );
+            return $attrName . ' set to ' . $attrVal if ($init_done);
         }
     }
-    
+
     return undef;
 }
 
-sub AMADDevice_Notify($$) {
+sub Notify($$) {
 
-    my ($hash,$dev) = @_;
+    my ( $hash, $dev ) = @_;
     my $name = $hash->{NAME};
-    return if (IsDisabled($name));
-    
+    return if ( IsDisabled($name) );
+
     my $devname = $dev->{NAME};
     my $devtype = $dev->{TYPE};
-    my $events = deviceEvents($dev,1);
-    return if (!$events);
+    my $events  = deviceEvents( $dev, 1 );
+    return if ( !$events );
 
+    statusRequest($hash)
+      if (
+        (
+            grep /^DELETEATTR.$name.setAPSSID$/,
+            @{$events}
+            or grep /^ATTR.$name.setAPSSID.*/,
+            @{$events}
+            or grep /^DELETEATTR.$name.checkActiveTask$/,
+            @{$events}
+            or grep /^ATTR.$name.checkActiveTask.*/,
+            @{$events}
+            or grep /^DELETEATTR.$name.setUserFlowState$/,
+            @{$events}
+            or grep /^ATTR.$name.setUserFlowState.*/,
+            @{$events}
+            or grep /^ATTR.$hash->{IODev}->{NAME}.fhemServerIP.*/,
+            @{$events}
+        )
+        and $devname eq 'global'
+        and $init_done
+      );
 
-    AMADDevice_statusRequest($hash) if( (grep /^DELETEATTR.$name.setAPSSID$/,@{$events}
-                                                    or grep /^ATTR.$name.setAPSSID.*/,@{$events}
-                                                    or grep /^DELETEATTR.$name.checkActiveTask$/,@{$events}
-                                                    or grep /^ATTR.$name.checkActiveTask.*/,@{$events}
-                                                    or grep /^DELETEATTR.$name.setUserFlowState$/,@{$events}
-                                                    or grep /^ATTR.$name.setUserFlowState.*/,@{$events})
-                                                    and $init_done and $devname eq 'global' );
+    GetUpdate($hash)
+      if (
+        (
+            grep /^DEFINED.$name$/,
+            @{$events}
+            or grep /^INITIALIZED$/,
+            @{$events}
+            or grep /^MODIFIED.$name$/,
+            @{$events}
+        )
+        and $devname eq 'global'
+        and $init_done
+      );
 
-    AMADDevice_GetUpdate($hash) if( (grep /^DEFINED.$name$/,@{$events}
-                                                    or grep /^INITIALIZED$/,@{$events}
-                                                    or grep /^MODIFIED.$name$/,@{$events})
-                                                    and $devname eq 'global' and $init_done  );
-                                                    
-    AMADDevice_checkDeviceState($hash) if( (grep /^DELETEATTR.$name.disable$/,@{$events}
-                                                    or grep /^ATTR.$name.disable.0$/,@{$events})
-                                                    and $devname eq 'global' and $init_done );
+    checkDeviceState($hash)
+      if (
+        (
+            grep /^DELETEATTR.$name.disable$/,
+            @{$events}
+            or grep /^ATTR.$name.disable.0$/,
+            @{$events}
+        )
+        and $devname eq 'global'
+        and $init_done
+      );
 
     return;
 }
 
-sub AMADDevice_GetUpdate($) {
+sub GetUpdate($) {
 
-    my ( $hash ) = @_;
-    my $name    = $hash->{NAME};
-    my $bname   = $hash->{IODev}->{NAME};
-    
-    
-    RemoveInternalTimer( $hash );
-    
-    if( $init_done and ( ReadingsVal( $name, "deviceState", "unknown" ) eq "unknown" or ReadingsVal( $name, "deviceState", "online" ) eq "online" ) and AttrVal( $name, "disable", 0 ) ne "1" and ReadingsVal( $bname, "fhemServerIP", "not set" ) ne "not set" ) {
+    my ($hash) = @_;
+    my $name   = $hash->{NAME};
+    my $bname  = $hash->{IODev}->{NAME};
 
-        AMADDevice_statusRequest($hash);
-        AMADDevice_checkDeviceState( $hash );
-        
-    } else {
+    RemoveInternalTimer($hash);
 
-        Log3 $name, 4, "AMADDevice ($name) - GetUpdate, FHEM or Device not ready yet";
-        Log3 $name, 3, "AMADDevice ($bname) - GetUpdate, Please set $bname fhemServerIP <IP-FHEM> NOW!" if( ReadingsVal( $bname, "fhemServerIP", "none" ) eq "none" );
+    if (
+        $init_done
+        and (  ReadingsVal( $name, 'deviceState', 'unknown' ) eq 'unknown'
+            or ReadingsVal( $name, 'deviceState', 'online' ) eq 'online' )
+        and AttrVal( $name,  'disable',      0 ) ne 1
+        and AttrVal( $bname, 'fhemServerIP', 'not set' ) ne 'not set'
+      )
+    {
 
-        InternalTimer( gettimeofday()+30, "AMADDevice_GetUpdate", $hash, 0 );
+        statusRequest($hash);
+        checkDeviceState($hash);
+
+    }
+    else {
+
+        Log3( $name, 4,
+            "AMADDevice ($name) - GetUpdate, FHEM or Device not ready yet" );
+
+        InternalTimer( gettimeofday() + 30,
+            'FHEM::AMADDevice::GetUpdate', $hash, 0 );
     }
 }
 
-sub AMADDevice_statusRequest($) {
+sub statusRequest($) {
 
-    my $hash        = shift;
-    my $name        = $hash->{NAME};
-    
-    my $host                = $hash->{HOST};
-    my $port                = $hash->{PORT};
-    my $amad_id             = $hash->{AMAD_ID};
-    my $uri                 = $hash->{HOST} . ":" . $hash->{PORT};
-    my $header              = 'Connection: close';
-    my $path;
-    my $method;
-    
-    
-    my $activetask      = AttrVal( $name, "checkActiveTask", "none" );
-    my $userFlowState   = AttrVal( $name, "setUserFlowState", "none" );
-    my $apssid          = AttrVal( $name, "setAPSSID", "none" );
-    my $fhemip          = ReadingsVal($hash->{IODev}->{NAME}, "fhemServerIP", "none");
-    my $fhemCtlMode     = AttrVal($hash->{IODev}->{NAME},'fhemControlMode','none' );
-    my $bport           = $hash->{IODev}->{PORT};
-
-    $header  .= "\r\nfhemip: $fhemip\r\nfhemdevice: $name\r\nactivetask: $activetask\r\napssid: $apssid\r\nbport: $bport\r\nuserflowstate: $userFlowState\r\nfhemctlmode: $fhemCtlMode";
-    
-    $method  = "GET" if( AttrVal($name,'remoteServer','Automagic') eq 'Automagic' );
-    $method  = "POST" if (AttrVal($name,'remoteServer','Automagic') ne 'Automagic' );
-    
-    $path     ="/fhem-amad/deviceInfo/";       # Pfad muß so im Automagic als http request Trigger drin stehen
-
-
-    IOWrite($hash,$amad_id,$uri,$path,$header,$method);
-    Log3 $name, 5, "AMADDevice ($name) - IOWrite: $uri $method IODevHash=$hash->{IODev}";
-}
-
-sub AMADDevice_WriteReadings($$) {
-
-    my ( $hash, $decode_json ) = @_;
-    
+    my $hash = shift;
     my $name = $hash->{NAME};
 
+    my $host    = $hash->{HOST};
+    my $port    = $hash->{PORT};
+    my $amad_id = $hash->{AMAD_ID};
+    my $uri     = $hash->{HOST} . ':' . $hash->{PORT};
+    my $header  = 'Connection: close';
+    my $path;
+    my $method;
+
+    my $activetask    = AttrVal( $name, 'checkActiveTask',  'none' );
+    my $userFlowState = AttrVal( $name, 'setUserFlowState', 'none' );
+    my $apssid        = AttrVal( $name, 'setAPSSID',        'none' );
+    my $fhemip = AttrVal( $hash->{IODev}->{NAME}, 'fhemServerIP', 'none' );
+    my $fhemCtlMode =
+      AttrVal( $hash->{IODev}->{NAME}, 'fhemControlMode', 'none' );
+    my $bport = $hash->{IODev}->{PORT};
+
+    $header .=
+"\r\nfhemip: $fhemip\r\nfhemdevice: $name\r\nactivetask: $activetask\r\napssid: $apssid\r\nbport: $bport\r\nuserflowstate: $userFlowState\r\nfhemctlmode: $fhemCtlMode";
+
+    $method = 'GET'
+      if ( AttrVal( $name, 'remoteServer', 'Automagic' ) eq 'Automagic' );
+    $method = 'POST'
+      if ( AttrVal( $name, 'remoteServer', 'Automagic' ) ne 'Automagic' );
+
+    $path = '/fhem-amad/deviceInfo/'
+      ;    # Pfad muß so im Automagic als http request Trigger drin stehen
+
+    IOWrite( $hash, $amad_id, $uri, $path, $header, $method );
+    Log3( $name, 5,
+        "AMADDevice ($name) - IOWrite: $uri $method IODevHash=$hash->{IODev}" );
+}
+
+sub WriteReadings($$) {
+
+    my ( $hash, $decode_json ) = @_;
+
+    my $name = $hash->{NAME};
 
     ############################
     #### schreiben der Readings
 
-    Log3 $name, 5, "AMADDevice ($name) - Processing data: $decode_json";
-    readingsSingleUpdate( $hash, "state", "active", 1) if( ReadingsVal( $name, "state", 0 ) ne "initialized" and ReadingsVal( $name, "state", 0 ) ne "active" );
-    
+    Log3( $name, 5, "AMADDevice ($name) - Processing data: $decode_json" );
+    readingsSingleUpdate( $hash, 'state', 'active', 1 )
+      if (  ReadingsVal( $name, 'state', 0 ) ne 'initialized'
+        and ReadingsVal( $name, 'state', 0 ) ne 'active' );
+
     ### Event Readings
     my $t;
     my $v;
-    
-    
+
     readingsBeginUpdate($hash);
-    
-    while( ( $t, $v ) = each %{$decode_json->{payload}} ) {
-        
-        $v =~ s/\bnull\b/off/g if( ($t eq "nextAlarmDay" or $t eq "nextAlarmTime") and $v eq "null" );
+
+    while ( ( $t, $v ) = each %{ $decode_json->{payload} } ) {
+
+        $v =~ s/\bnull\b/off/g
+          if ( ( $t eq 'nextAlarmDay' or $t eq 'nextAlarmTime' )
+            and $v eq 'null' );
         $v =~ s/\bnull\b//g;
         $v = encode_utf8($v);
-        
-        readingsBulkUpdateIfChanged($hash, $t, $v, 1)   if( defined( $v ) and ($t ne 'deviceState'
-                                                            or $t ne 'incomingCallerName'
-                                                            or $t ne 'incomingCallerNumber'
-                                                            or $t ne 'incomingTelegramMessage'
-                                                            or $t ne 'incomingSmsMessage'
-                                                            or $t ne 'incomingWhatsAppMessage'
-                                                            or $t ne 'nfcLastTagID')
-                                                        );
 
-        readingsBulkUpdateIfChanged( $hash, $t, ($v / AttrVal($name,'setVolFactor',1)) ) if( $t eq 'volume' and AttrVal($name,'setVolFactor',1) > 1 );
-        readingsBulkUpdate( $hash, '.'.$t, $v ) if( $t eq 'deviceState' );
-        readingsBulkUpdate( $hash, $t, $v ) if( defined( $v ) and ($t eq 'incomingCallerName'
-                                                    or $t eq 'incomingCallerNumber'
-                                                    or $t eq 'incomingTelegramMessage'
-                                                    or $t eq 'incomingSmsMessage'
-                                                    or $t eq 'incomingWhatsAppMessage'
-                                                    or $t eq 'nfcLastTagID')
-                                            );
+        readingsBulkUpdateIfChanged( $hash, $t, $v, 1 )
+          if (
+            defined($v)
+            and (  $t ne 'deviceState'
+                or $t ne 'incomingCallerName'
+                or $t ne 'incomingCallerNumber'
+                or $t ne 'incomingTelegramMessage'
+                or $t ne 'incomingSmsMessage'
+                or $t ne 'incomingWhatsAppMessage'
+                or $t ne 'nfcLastTagID' )
+          );
+
+        readingsBulkUpdateIfChanged( $hash, $t,
+            ( $v / AttrVal( $name, 'setVolFactor', 1 ) ) )
+          if ( $t eq 'volume' and AttrVal( $name, 'setVolFactor', 1 ) > 1 );
+        readingsBulkUpdate( $hash, '.' . $t, $v ) if ( $t eq 'deviceState' );
+        readingsBulkUpdate( $hash, $t, $v )
+          if (
+            defined($v)
+            and (  $t eq 'incomingCallerName'
+                or $t eq 'incomingCallerNumber'
+                or $t eq 'incomingTelegramMessage'
+                or $t eq 'incomingSmsMessage'
+                or $t eq 'incomingWhatsAppMessage'
+                or $t eq 'nfcLastTagID' )
+          );
     }
-    
-    readingsBulkUpdateIfChanged( $hash, "deviceState", "offline", 1 ) if( $decode_json->{payload}{airplanemode} and $decode_json->{payload}{airplanemode} eq "on" );
-    readingsBulkUpdateIfChanged( $hash, "deviceState", "online", 1 ) if( $decode_json->{payload}{airplanemode} and $decode_json->{payload}{airplanemode} eq "off" );
 
-    readingsBulkUpdateIfChanged( $hash, "lastStatusRequestState", "statusRequest_done", 1 );
-    
-    if( ReadingsVal($name,'volume',1) > 0 ) {
-        readingsBulkUpdateIfChanged( $hash, "mute", "off", 1 );
-    } else {
-        readingsBulkUpdateIfChanged( $hash, "mute", "on", 1 );
+    readingsBulkUpdateIfChanged( $hash, 'deviceState', 'offline', 1 )
+      if (  $decode_json->{payload}{airplanemode}
+        and $decode_json->{payload}{airplanemode} eq 'on' );
+    readingsBulkUpdateIfChanged( $hash, 'deviceState', 'online', 1 )
+      if (  $decode_json->{payload}{airplanemode}
+        and $decode_json->{payload}{airplanemode} eq 'off' );
+
+    readingsBulkUpdateIfChanged( $hash, 'lastStatusRequestState',
+        'statusRequest_done', 1 );
+
+    if ( ReadingsVal( $name, 'volume', 1 ) > 0 ) {
+        readingsBulkUpdateIfChanged( $hash, 'mute', 'off', 1 );
+    }
+    else {
+        readingsBulkUpdateIfChanged( $hash, 'mute', 'on', 1 );
     }
 
     $hash->{helper}{infoErrorCounter} = 0;
     ### End Response Processing
-    
-    readingsBulkUpdateIfChanged( $hash, "state", "active", 1 ) if( ReadingsVal( $name, "state", 0 ) eq "initialized" );
+
+    readingsBulkUpdateIfChanged( $hash, 'state', 'active', 1 )
+      if ( ReadingsVal( $name, 'state', 0 ) eq 'initialized' );
     readingsEndUpdate( $hash, 1 );
-    
-    $hash->{helper}{deviceStateErrorCounter} = 0 if( $hash->{helper}{deviceStateErrorCounter} > 0 and ReadingsVal( $name, "deviceState", "offline") eq "online" );
-    
+
+    $hash->{helper}{deviceStateErrorCounter} = 0
+      if ( $hash->{helper}{deviceStateErrorCounter} > 0
+        and ReadingsVal( $name, 'deviceState', 'offline' ) eq 'online' );
+
     return undef;
 }
 
-sub AMADDevice_Set($$@) {
+sub Set($$@) {
 
-    my ($hash, $name, @aa)  = @_;
-    my ($cmd, @args)        = @aa;
+    my ( $hash, $name, @aa ) = @_;
+    my ( $cmd, @args ) = @aa;
 
-    my $amad_id             = $hash->{AMAD_ID};
-    my $header              = 'Connection: close';
-    my $uri                 = $hash->{HOST} . ":" . $hash->{PORT};
-    my $path;
+    my $amad_id = $hash->{AMAD_ID};
+    my $header  = 'Connection: close';
+    my $uri     = $hash->{HOST} . ':' . $hash->{PORT};
+    my $path    = '/fhem-amad/setCommands/';
     my $method;
-    
-    my @playerList          = ('GoogleMusic','SamsungMusic','AmazonMusic','SpotifyMusic','TuneinRadio','AldiMusic','YouTube',
-                                'YouTubeKids','VlcPlayer','Audible','Deezer','Poweramp','MXPlayerPro');
-    my @playerCmd           = ('mediaPlay','mediaStop','mediaNext','mediaBack');
-    
-    my $volMax              = AttrVal($name,'setVolMax',15);
-    my $notifyVolMax        = AttrVal($name,'setNotifyVolMax',7);
-    my $ringSoundVolMax     = AttrVal($name,'setRingSoundVolMax',7);
-    
 
-    if( lc $cmd eq 'screenmsg' ) {
-        my $msg = join( " ", @args );
+    my @playerList = (
+        'GoogleMusic', 'SamsungMusic', 'AmazonMusic', 'SpotifyMusic',
+        'TuneinRadio', 'AldiMusic',    'YouTube',     'YouTubeKids',
+        'VlcPlayer',   'Audible',      'Deezer',      'Poweramp',
+        'MXPlayerPro'
+    );
+    my @playerCmd = ( 'mediaPlay', 'mediaStop', 'mediaNext', 'mediaBack' );
 
-        $path   = "/fhem-amad/setCommands/screenMsg?message=".urlEncode($msg);
-        $method = "POST";
-    }
-    
-    elsif( lc $cmd eq 'ttsmsg' ) {
-        my ($msg,$speed,$lang,$ttsmsgvol)   = AMADDevice_CreateTtsMsgValue($hash,@args);
-        
-        $path   = "/fhem-amad/setCommands/ttsMsg?message=".urlEncode($msg)."&msgspeed=".$speed."&msglang=".$lang."&msgvol=".$ttsmsgvol;
-        $method                             = "POST";
-    }
-    
-    elsif( lc $cmd eq 'userflowstate' ) {
-        my $datas           = join( " ", @args );
-        my ($flow,$state)   = split( ":", $datas);
+    my $volMax          = AttrVal( $name, 'setVolMax',          15 );
+    my $notifyVolMax    = AttrVal( $name, 'setNotifyVolMax',    7 );
+    my $ringSoundVolMax = AttrVal( $name, 'setRingSoundVolMax', 7 );
 
-        $path   = "/fhem-amad/setCommands/flowState?flowstate=".$state."&flowname=".urlEncode($flow);
-        $method     = "POST";
-    }
-    
-    elsif( lc $cmd eq 'userflowrun' ) {
-        my $flow            = join( " ", @args );
+    if ( lc $cmd eq 'screenmsg' ) {
+        my $msg = join( ' ', @args );
 
-        $path   = "/fhem-amad/setCommands/flowRun?flowname=".urlEncode($flow);
-        $method     = "POST";
+        $path .= 'screenMsg?message=' . urlEncode($msg);
+        $method = 'POST';
     }
-    
-    elsif( lc $cmd eq 'volume' or $cmd eq 'mute' or $cmd =~ 'volume[Down|Up]' ) {
-        my $vol     = AMADDevice_CreateVolumeValue($hash,$cmd,@args);
-    
-        $path   = "/fhem-amad/setCommands/setVolume?volume=$vol";
-        $method     = "POST";
-    }
-    
-    elsif( lc $cmd eq 'volumenotification' ) {
-        my $volnote = join( " ", @args );
 
-        $path   = "/fhem-amad/setCommands/setNotifiVolume?notifivolume=$volnote";
-        $method = "POST";
-    }
-    
-    elsif( lc $cmd eq 'volumeringsound' ) {
-        my $volring = join( " ", @args );
+    elsif ( lc $cmd eq 'ttsmsg' ) {
+        my ( $msg, $speed, $lang, $ttsmsgvol ) =
+          CreateTtsMsgValue( $hash, @args );
 
-        $path   = "/fhem-amad/setCommands/setRingSoundVolume?ringsoundvolume=$volring";
-        $method = "POST";
+        $path .=
+            'ttsMsg?message='
+          . urlEncode($msg)
+          . '&msgspeed='
+          . $speed
+          . '&msglang='
+          . $lang
+          . '&msgvol='
+          . $ttsmsgvol;
+        $method = 'POST';
     }
-    
-    elsif( lc $cmd =~ /^media/ ) {
-        my $mplayer = join( " ", @args );
 
-        $path   = "/fhem-amad/setCommands/multimediaControl?button=".$cmd."&mplayer=".$mplayer;
-        $method = "POST";
+    elsif ( lc $cmd eq 'userflowstate' ) {
+        my $datas = join( ' ', @args );
+        my ( $flow, $state ) = split( ':', $datas );
+
+        $path .=
+          'flowState?flowstate=' . $state . '&flowname=' . urlEncode($flow);
+        $method = 'POST';
     }
-    
-    elsif( lc $cmd eq 'screenbrightness' ) {
-        my $bri = join( " ", @args );
 
-        $path   = "/fhem-amad/setCommands/setBrightness?brightness=$bri";
-        $method = "POST";
+    elsif ( lc $cmd eq 'userflowrun' ) {
+        my $flow = join( ' ', @args );
+
+        $path .= 'flowRun?flowname=' . urlEncode($flow);
+        $method = 'POST';
     }
-    
-    elsif( lc $cmd eq 'screenbrightnessmode' ) {
-        my $mode = join( " ", @args );
 
-        $path   = "/fhem-amad/setCommands/setBrightnessMode?brightnessmode=".($mode eq 'on' ? 1 : 0);
-        $method = "POST";
+    elsif ( lc $cmd eq 'volume' or $cmd eq 'mute' or $cmd =~ 'volume[Down|Up]' )
+    {
+        my $vol = CreateVolumeValue( $hash, $cmd, @args );
+
+        $path .= 'setVolume?volume=' . $vol;
+        $method = 'POST';
     }
-    
-    elsif( lc $cmd eq 'screen' ) {
-        my $mod = join( " ", @args );
 
+    elsif ( lc $cmd eq 'volumenotification' ) {
+        my $volnote = join( ' ', @args );
 
-        $path        = AMADDevice_CreateScreenValue($hash,$mod);
-        return "Please set \"setScreenlockPIN\" Attribut first"
-        unless($path ne 'NO PIN');
-        $method     = "POST";
+        $path .= 'setNotifiVolume?notifivolume=' . $volnote;
+        $method = 'POST';
     }
-    
-    elsif( lc $cmd eq 'screenorientation' ) {
-    
-        my $mod = join( " ", @args );
 
-        $path   = "/fhem-amad/setCommands/setScreenOrientation?orientation=$mod";
-        $method = "POST";
-    }
-    
-    elsif( lc $cmd eq 'activatevoiceinput' ) {
-        $path   = "/fhem-amad/setCommands/setvoicecmd";
-        $method = "POST";
-    }
-    
-    elsif( lc $cmd eq 'screenfullscreen' ) {
-        my $mod = join( " ", @args );
+    elsif ( lc $cmd eq 'volumeringsound' ) {
+        my $volring = join( ' ', @args );
 
-        $path   = "/fhem-amad/setCommands/setScreenFullscreen?fullscreen=$mod";
-        $method = "POST";
+        $path .= 'setRingSoundVolume?ringsoundvolume=' . $volring;
+        $method = 'POST';
+    }
+
+    elsif ( lc $cmd =~ /^media/ ) {
+        my $mplayer = join( ' ', @args );
+
+        $path .= 'multimediaControl?button=' . $cmd . '&mplayer=' . $mplayer;
+        $method = 'POST';
+    }
+
+    elsif ( lc $cmd eq 'screenbrightness' ) {
+        my $bri = join( ' ', @args );
+
+        $path .= 'setBrightness?brightness=' . $bri;
+        $method = 'POST';
+    }
+
+    elsif ( lc $cmd eq 'screenbrightnessmode' ) {
+        my $mode = join( ' ', @args );
+
+        $path .=
+          'setBrightnessMode?brightnessmode=' . ( $mode eq 'on' ? 1 : 0 );
+        $method = 'POST';
+    }
+
+    elsif ( lc $cmd eq 'screen' ) {
+        my $mod = join( ' ', @args );
+
+        $path = CreateScreenValue( $hash, $mod );
+        return 'Please set "setScreenlockPIN" Attribut first'
+          unless ( $path ne 'NO PIN' );
+        $method = 'POST';
+    }
+
+    elsif ( lc $cmd eq 'screenorientation' ) {
+
+        my $mod = join( ' ', @args );
+
+        $path .= 'setScreenOrientation?orientation=' . $mod;
+        $method = 'POST';
+    }
+
+    elsif ( lc $cmd eq 'activatevoiceinput' ) {
+        $path .= 'setvoicecmd';
+        $method = 'POST';
+    }
+
+    elsif ( lc $cmd eq 'screenfullscreen' ) {
+        my $mod = join( ' ', @args );
+
+        $path .= 'setScreenFullscreen?fullscreen=' . $mod;
+        $method = 'POST';
         readingsSingleUpdate( $hash, $cmd, $mod, 1 );
     }
-    
-    elsif( lc $cmd eq 'openurl' ) {
-        my $openurl = join( " ", @args );
-        my $browser = AttrVal( $name, "setOpenUrlBrowser", "com.android.chrome|com.google.android.apps.chrome.Main" );
+
+    elsif ( lc $cmd eq 'openurl' ) {
+        my $openurl = join( ' ', @args );
+        my $browser = AttrVal( $name, 'setOpenUrlBrowser',
+            'com.android.chrome|com.google.android.apps.chrome.Main' );
         my @browserapp = split( /\|/, $browser );
 
-        $path   = "/fhem-amad/setCommands/openURL?url=".$openurl."&browserapp=".$browserapp[0]."&browserappclass=".$browserapp[1];
-        $method     = "POST";
-    }
-    
-    elsif (lc $cmd eq 'nextalarmtime') {
-        my $value   = join( " ", @args );
-        my @alarm   = split( ":", $value );
-
-        $path   = "/fhem-amad/setCommands/setAlarm?hour=".$alarm[0]."&minute=".$alarm[1];
-        $method     = "POST";
-    }
-    
-    elsif (lc $cmd eq 'timer') {
-        my $timer   = join( " ", @args );
-
-        $path   = "/fhem-amad/setCommands/setTimer?minute=$timer";
-        $method     = "POST";
+        $path .=
+            'openURL?url='
+          . $openurl
+          . '&browserapp='
+          . $browserapp[0]
+          . '&browserappclass='
+          . $browserapp[1];
+        $method = 'POST';
     }
 
-    elsif( lc $cmd eq 'statusrequest' ) {
+    elsif ( lc $cmd eq 'nextalarmtime' ) {
+        my $value = join( ' ', @args );
+        my @alarm = split( ':', $value );
 
-       AMADDevice_statusRequest($hash);
-       return;
+        $path .= 'setAlarm?hour=' . $alarm[0] . '&minute=' . $alarm[1];
+        $method = 'POST';
     }
 
-    elsif( lc $cmd eq 'openapp' ) {
-        my $app = join( " ", @args );
+    elsif ( lc $cmd eq 'timer' ) {
+        my $timer = join( ' ', @args );
 
-        $path   = "/fhem-amad/setCommands/openApp?app=".$app;
-        $method = "POST";
+        $path .= 'setTimer?minute=' . $timer;
+        $method = 'POST';
     }
-    
-    elsif( lc $cmd eq 'nfc' ) {
-        my $mod = join( " ", @args );
 
-        $path   = "/fhem-amad/setCommands/setnfc?nfc=".$mod;
-        $method = "POST";
+    elsif ( lc $cmd eq 'statusrequest' ) {
+
+        statusRequest($hash);
+        return;
     }
-    
-    elsif( lc $cmd eq 'system' ) {
-        my $systemcmd   = join( " ", @args );
 
-        $path   = "/fhem-amad/setCommands/systemcommand?syscmd=$systemcmd";
-        $method         = "POST";
-        readingsSingleUpdate( $hash, "airplanemode", "on", 1 ) if( $systemcmd eq "airplanemodeON" );
-        readingsSingleUpdate( $hash, "deviceState", "offline", 1 ) if( $systemcmd eq "airplanemodeON" or $systemcmd eq "shutdown" );
+    elsif ( lc $cmd eq 'openapp' ) {
+        my $app = join( ' ', @args );
+
+        $path .= 'openApp?app=' . $app;
+        $method = 'POST';
     }
-    
-    elsif( lc $cmd eq 'donotdisturb' ) {
-        my $disturbmod  = join( " ", @args );
 
-        $path   = "/fhem-amad/setCommands/donotdisturb?disturbmod=$disturbmod";
-        $method         = "POST";
+    elsif ( lc $cmd eq 'nfc' ) {
+        my $mod = join( ' ', @args );
+
+        $path .= 'setnfc?nfc=' . $mod;
+        $method = 'POST';
     }
-    
-    elsif( lc $cmd eq 'bluetooth' ) {
-        my $mod = join( " ", @args );
 
-        $path   = "/fhem-amad/setCommands/setbluetooth?bluetooth=$mod";
-        $method = "POST";
+    elsif ( lc $cmd eq 'system' ) {
+        my $systemcmd = join( ' ', @args );
+
+        $path .= 'systemcommand?syscmd=' . $systemcmd;
+        $method = 'POST';
+        readingsSingleUpdate( $hash, 'airplanemode', 'on', 1 )
+          if ( $systemcmd eq 'airplanemodeON' );
+        readingsSingleUpdate( $hash, 'deviceState', 'offline', 1 )
+          if ( $systemcmd eq 'airplanemodeON' or $systemcmd eq 'shutdown' );
     }
-    
-    elsif( lc $cmd eq 'notifysndfile' ) {
-        my $notify      = join( " ", @args );
-        my $filepath    = AttrVal( $name, "setNotifySndFilePath", "/storage/emulated/0/Notifications/" );
 
-        $path   = "/fhem-amad/setCommands/playnotifysnd?notifyfile=".$notify."&notifypath=".$filepath;
-        $method         = "POST";
+    elsif ( lc $cmd eq 'donotdisturb' ) {
+        my $disturbmod = join( ' ', @args );
+
+        $path .= 'donotdisturb?disturbmod=' . $disturbmod;
+        $method = 'POST';
     }
-    
-    elsif( lc $cmd eq 'changetobtdevice' ) {
-        my $swToBtDevice = join( " ", @args );    
 
-        my ($swToBtMac,$btDeviceOne,$btDeviceTwo) = AMADDevice_CreateChangeBtDeviceValue($hash,$swToBtDevice);
-        $path   = "/fhem-amad/setCommands/setbtdevice?swToBtDeviceMac=".$swToBtMac."&btDeviceOne=".$btDeviceOne."&btDeviceTwo=".$btDeviceTwo;
-        $method = "POST";
+    elsif ( lc $cmd eq 'bluetooth' ) {
+        my $mod = join( ' ', @args );
+
+        $path .= 'setbluetooth?bluetooth=' . $mod;
+        $method = 'POST';
     }
-    
-    elsif( lc $cmd eq 'clearnotificationbar' ) {
-        my $appname = join( " ", @args );
 
-        $path   = "/fhem-amad/setCommands/clearnotificationbar?app=$appname";
-        $method     = "POST";
+    elsif ( lc $cmd eq 'notifysndfile' ) {
+        my $notify = join( ' ', @args );
+        my $filepath = AttrVal( $name, 'setNotifySndFilePath',
+            '/storage/emulated/0/Notifications/' );
+
+        $path .=
+          'playnotifysnd?notifyfile=' . $notify . '&notifypath=' . $filepath;
+        $method = 'POST';
     }
-    
-    elsif( lc $cmd eq 'vibrate' ) {
 
-        $path   = "/fhem-amad/setCommands/setvibrate";
-        $method = "POST";
+    elsif ( lc $cmd eq 'changetobtdevice' ) {
+        my $swToBtDevice = join( ' ', @args );
+
+        my ( $swToBtMac, $btDeviceOne, $btDeviceTwo ) =
+          CreateChangeBtDeviceValue( $hash, $swToBtDevice );
+        $path .=
+            'setbtdevice?swToBtDeviceMac='
+          . $swToBtMac
+          . '&btDeviceOne='
+          . $btDeviceOne
+          . '&btDeviceTwo='
+          . $btDeviceTwo;
+        $method = 'POST';
     }
-    
-    elsif( lc $cmd eq 'showhomescreen' ) {
 
-        $path   = "/fhem-amad/setCommands/showhomescreen";
-        $method = "POST";
+    elsif ( lc $cmd eq 'clearnotificationbar' ) {
+        my $appname = join( ' ', @args );
+
+        $path .= 'clearnotificationbar?app=' . $appname;
+        $method = 'POST';
     }
-    
-    elsif( lc $cmd eq 'takepicture' ) {
 
-        return "Please set \"setTakePictureResolution\" Attribut first"
-        unless(AttrVal($name,'setTakePictureResolution','none') ne 'none');
-        
-        return "Please set \"setTakePictureCamera\" Attribut first"
-        unless(AttrVal($name,'setTakePictureCamera','none') ne 'none');
-        
-        $path   = "/fhem-amad/setCommands/takepicture?pictureresolution=".AttrVal($name,'setTakePictureResolution','none')."&picturecamera=".AttrVal($name,'setTakePictureCamera','none');
-        $method = "POST";
+    elsif ( lc $cmd eq 'vibrate' ) {
+
+        $path .= 'setvibrate';
+        $method = 'POST';
     }
-    
-    elsif( lc $cmd eq 'takescreenshot' ) {
 
-        return "Please set \"setTakeScreenshotResolution\" Attribut first"
-        unless(AttrVal($name,'setTakeScreenshotResolution','none') ne 'none');
-        
-        $path   = "/fhem-amad/setCommands/takescreenshot?screenshotresolution=".AttrVal($name,'setTakeScreenshotResolution','none');
-        $method = "POST";
+    elsif ( lc $cmd eq 'showhomescreen' ) {
+
+        $path .= 'showhomescreen';
+        $method = 'POST';
     }
-    
-    elsif( lc $cmd eq 'sendintent' ) {
-        my $intentstring = join( " ", @args );
-        my ( $action, $exkey1, $exval1, $exkey2, $exval2 ) = split( "[ \t][ \t]*", $intentstring );
-        $exkey1 = "" if( !$exkey1 );
-        $exval1 = "" if( !$exval1 );
-        $exkey2 = "" if( !$exkey2 );
-        $exval2 = "" if( !$exval2 );
 
-        $path   = "/fhem-amad/setCommands/sendIntent?action=".$action."&exkey1=".$exkey1."&exval1=".$exval1."&exkey2=".$exkey2."&exval2=".$exval2;
-        $method = "POST";
+    elsif ( lc $cmd eq 'takepicture' ) {
+
+        return 'Please set "setTakePictureResolution" Attribut first'
+          unless (
+            AttrVal( $name, 'setTakePictureResolution', 'none' ) ne 'none' );
+
+        return 'Please set "setTakePictureCamera" Attribut first'
+          unless ( AttrVal( $name, 'setTakePictureCamera', 'none' ) ne 'none' );
+
+        $path .=
+            'takepicture?pictureresolution='
+          . AttrVal( $name, 'setTakePictureResolution', 'none' )
+          . '&picturecamera='
+          . AttrVal( $name, 'setTakePictureCamera', 'none' );
+        $method = 'POST';
     }
-    
-    elsif( lc $cmd eq 'installflowsource' ) {
-        my $flowname    = join( " ", @args );
 
-        $path   = "/fhem-amad/setCommands/installFlow?flowname=$flowname";
-        $method         = "POST";
+    elsif ( lc $cmd eq 'takescreenshot' ) {
+
+        return 'Please set "setTakeScreenshotResolution" Attribut first'
+          unless (
+            AttrVal( $name, 'setTakeScreenshotResolution', 'none' ) ne 'none' );
+
+        $path .= 'takescreenshot?screenshotresolution='
+          . AttrVal( $name, 'setTakeScreenshotResolution', 'none' );
+        $method = 'POST';
     }
-    
-    elsif( lc $cmd eq 'opencall' ) {
-        my $string = join( " ", @args );
-        my ($callnumber, $time) = split( "[ \t][ \t]*", $string );
-        $time   = "none" if( !$time );
 
-        $path   = "/fhem-amad/setCommands/openCall?callnumber=".$callnumber."&hanguptime=".$time;
-        $method = "POST";
+    elsif ( lc $cmd eq 'sendintent' ) {
+        my $intentstring = join( ' ', @args );
+        my ( $action, $exkey1, $exval1, $exkey2, $exval2 ) =
+          split( '[ \t][ \t]*', $intentstring );
+        $exkey1 = '' if ( !$exkey1 );
+        $exval1 = '' if ( !$exval1 );
+        $exkey2 = '' if ( !$exkey2 );
+        $exval2 = '' if ( !$exval2 );
+
+        $path .=
+            'sendIntent?action='
+          . $action
+          . '&exkey1='
+          . $exkey1
+          . '&exval1='
+          . $exval1
+          . '&exkey2='
+          . $exkey2
+          . '&exval2='
+          . $exval2;
+        $method = 'POST';
     }
-    
-    elsif( lc $cmd eq 'closecall' ) {
 
-        $path   = "/fhem-amad/setCommands/closeCall";
-        $method = "POST";
+    elsif ( lc $cmd eq 'installflowsource' ) {
+        my $flowname = join( ' ', @args );
+
+        $path .= 'installFlow?flowname=' . $flowname;
+        $method = 'POST';
     }
-    
-    elsif( lc $cmd eq 'startdaydream' ) {
 
-        $path   = "/fhem-amad/setCommands/startDaydream";
-        $method = "POST";
+    elsif ( lc $cmd eq 'opencall' ) {
+        my $string = join( ' ', @args );
+        my ( $callnumber, $time ) = split( '[ \t][ \t]*', $string );
+        $time = 'none' if ( !$time );
+
+        $path .= 'openCall?callnumber=' . $callnumber . '&hanguptime=' . $time;
+        $method = 'POST';
     }
-    
-    elsif( lc $cmd eq 'currentflowsetupdate' ) {
 
-        if( ReadingsVal($name,'flowsetVersionAtDevice','') lt '4.1.99.6' ) {
-            $path   = "/fhem-amad/currentFlowsetUpdate";
-        } else {
-            $path   = "/fhem-amad/setCommands/currentFlowsetUpdate";
+    elsif ( lc $cmd eq 'closecall' ) {
+
+        $path .= 'closeCall';
+        $method = 'POST';
+    }
+
+    elsif ( lc $cmd eq 'startdaydream' ) {
+
+        $path .= 'startDaydream';
+        $method = 'POST';
+    }
+
+    elsif ( lc $cmd eq 'currentflowsetupdate' ) {
+
+        if ( ReadingsVal( $name, 'flowsetVersionAtDevice', '' ) lt '4.1.99.6' )
+        {
+            $path = '/fhem-amad/currentFlowsetUpdate';
         }
-        
-        $method = "POST";
+        else {
+            $path .= 'currentFlowsetUpdate';
+        }
+
+        $method = 'POST';
     }
-    
-    elsif( lc $cmd eq 'sendsms' ) {
-        my $string = join( " ", @args );
-        my ($smsmessage, $smsnumber) = split( "\\|", $string );
-    
-        $path   = "/fhem-amad/setCommands/sendSms?smsmessage=".urlEncode($smsmessage)."&smsnumber=".$smsnumber;
-        $method = "POST";
-        
-    } else {
-    
-        my $apps = AttrVal( $name, "setOpenApp", "none" );
-        my $btdev = AttrVal( $name, "setBluetoothDevice", "none" );
-        
+
+    elsif ( lc $cmd eq 'sendsms' ) {
+        my $string = join( ' ', @args );
+        my ( $smsmessage, $smsnumber ) = split( '\\|', $string );
+
+        $path .=
+            'sendSms?smsmessage='
+          . urlEncode($smsmessage)
+          . '&smsnumber='
+          . $smsnumber;
+        $method = 'POST';
+
+    }
+    else {
+
+        my $apps  = AttrVal( $name, 'setOpenApp',         'none' );
+        my $btdev = AttrVal( $name, 'setBluetoothDevice', 'none' );
 
         my $list = '';
-        foreach(@playerCmd) {
-            $list .= $_ . ':' . join(',',@playerList) . ' ';
+        foreach (@playerCmd) {
+            $list .= $_ . ':' . join( ',', @playerList ) . ' ';
         }
-        
-        $list .= "screenMsg ttsMsg screenBrightnessMode:on,off screenBrightness:slider,0,1,255 screen:on,off,lock,unlock openURL nextAlarmTime:time timer:slider,1,1,60 statusRequest:noArg bluetooth:on,off notifySndFile clearNotificationBar:All,Automagic activateVoiceInput:noArg vibrate:noArg sendIntent openCall closeCall:noArg currentFlowsetUpdate:noArg installFlowSource doNotDisturb:never,always,alarmClockOnly,onlyImportant userFlowState userFlowRun sendSMS startDaydream:noArg volumeUp:noArg volumeDown:noArg mute:on,off showHomeScreen:noArg takePicture:noArg takeScreenshot:noArg";
 
-        $list .= " screenOrientation:auto,landscape,portrait"   if( AttrVal( $name, "setScreenOrientation", "0" ) eq "1" );
-        $list .= " screenFullscreen:on,off"                     if( AttrVal( $name, "setFullscreen", "0" ) eq "1" );
-        $list .= " openApp:$apps"                               if( AttrVal( $name, "setOpenApp", "none" ) ne "none" );
-        $list .= " system:reboot,shutdown,airplanemodeON"       if( AttrVal( $name, "root", "0" ) eq "1" );
-        $list .= " changetoBTDevice:$btdev"                     if( AttrVal( $name, "setBluetoothDevice", "none" ) ne "none" );
-        $list .= " nfc:on,off"                                  if( AttrVal( $name, "root", "0" ) eq "1" );
-        $list .= " volume:slider,0,1,$volMax";
-        $list .= " volumeNotification:slider,0,1,$notifyVolMax";
-        $list .= " volumeRingSound:slider,0,1,$ringSoundVolMax";
-        
+        $list .=
+'screenMsg ttsMsg screenBrightnessMode:on,off screenBrightness:slider,0,1,255 screen:on,off,lock,unlock openURL nextAlarmTime:time timer:slider,1,1,60 statusRequest:noArg bluetooth:on,off notifySndFile clearNotificationBar:All,Automagic activateVoiceInput:noArg vibrate:noArg sendIntent openCall closeCall:noArg currentFlowsetUpdate:noArg installFlowSource doNotDisturb:never,always,alarmClockOnly,onlyImportant userFlowState userFlowRun sendSMS startDaydream:noArg volumeUp:noArg volumeDown:noArg mute:on,off showHomeScreen:noArg takePicture:noArg takeScreenshot:noArg';
 
+        $list .= ' screenOrientation:auto,landscape,portrait'
+          if ( AttrVal( $name, 'setScreenOrientation', '0' ) eq '1' );
+        $list .= ' screenFullscreen:on,off'
+          if ( AttrVal( $name, 'setFullscreen', '0' ) eq '1' );
+        $list .= ' openApp:' . $apps
+          if ( AttrVal( $name, 'setOpenApp', 'none' ) ne 'none' );
+        $list .= ' system:reboot,shutdown,airplanemodeON'
+          if ( AttrVal( $name, 'root', '0' ) eq '1' );
+        $list .= ' changetoBTDevice:' . $btdev
+          if ( AttrVal( $name, 'setBluetoothDevice', 'none' ) ne 'none' );
+        $list .= ' nfc:on,off' if ( AttrVal( $name, 'root', '0' ) eq '1' );
+        $list .= ' volume:slider,0,1,' . $volMax;
+        $list .= ' volumeNotification:slider,0,1,' . $notifyVolMax;
+        $list .= ' volumeRingSound:slider,0,1,' . $ringSoundVolMax;
 
         return "Unknown argument $cmd, choose one of $list";
     }
-    
-    
-    IOWrite($hash,$amad_id,$uri,$path,$header,$method);
-    Log3 $name, 5, "AMADDevice ($name) - IOWrite: $uri $method IODevHash=$hash->{IODev}";
+
+    IOWrite( $hash, $amad_id, $uri, $path, $header, $method );
+    Log3( $name, 5,
+        "AMADDevice ($name) - IOWrite: $uri $method IODevHash=$hash->{IODev}" );
 
     return undef;
 }
 
-sub AMADDevice_Parse($$) {
+sub Parse($$) {
 
-    my ($io_hash,$json) = @_;
-    my $name            = $io_hash->{NAME};
+    my ( $io_hash, $json ) = @_;
+    my $name = $io_hash->{NAME};
 
-
-    my $decode_json     = eval{decode_json($json)};
-    if($@){
-        Log3 $name, 3, "AMADDevice ($name) - JSON error while request: $@";
+    my $decode_json = eval { decode_json($json) };
+    if ($@) {
+        Log3( $name, 3, "AMADDevice ($name) - JSON error while request: $@" );
         return;
     }
-    
-    Log3 $name, 4, "AMADDevice ($name) - ParseFn was called";
-    Log3 $name, 5, "AMADDevice ($name) - ParseFn was called, !!! AMAD_ID: $decode_json->{amad}{amad_id}";
 
+    Log3( $name, 4, "AMADDevice ($name) - ParseFn was called" );
+    Log3( $name, 5,
+"AMADDevice ($name) - ParseFn was called, !!! AMAD_ID: $decode_json->{amad}{amad_id}"
+    );
 
-    my $fhemDevice  = $decode_json->{firstrun}{fhemdevice} if( defined($decode_json->{firstrun}) and defined($decode_json->{firstrun}{fhemdevice}) );
-    my $amad_id     = $decode_json->{amad}{amad_id};
-        
-    if( my $hash        = $modules{AMADDevice}{defptr}{$amad_id} ) {        
-        my $name        = $hash->{NAME};
-                        
-        AMADDevice_WriteReadings($hash,$decode_json);
-        Log3 $name, 4, "AMADDevice ($name) - find logical device: $hash->{NAME}";
-                        
+    my $fhemDevice = $decode_json->{firstrun}{fhemdevice}
+      if (  defined( $decode_json->{firstrun} )
+        and defined( $decode_json->{firstrun}{fhemdevice} ) );
+    my $amad_id = $decode_json->{amad}{amad_id};
+
+    if ( my $hash = $modules{AMADDevice}{defptr}{$amad_id} ) {
+        my $name = $hash->{NAME};
+
+        WriteReadings( $hash, $decode_json );
+        Log3( $name, 4,
+            "AMADDevice ($name) - find logical device: $hash->{NAME}" );
+
         return $hash->{NAME};
-            
-    } else {
 
-        return "UNDEFINED $fhemDevice AMADDevice $decode_json->{firstrun}{'amaddevice_ip'} $decode_json->{amad}{'amad_id'} $decode_json->{firstrun}{remoteserver}";
+    }
+    else {
+
+        return
+"UNDEFINED $fhemDevice AMADDevice $decode_json->{firstrun}{'amaddevice_ip'} $decode_json->{amad}{'amad_id'} $decode_json->{firstrun}{remoteserver}";
     }
 }
 
@@ -843,173 +1015,191 @@ sub AMADDevice_Parse($$) {
 ##################################
 #### my little helpers ###########
 
-sub AMADDevice_checkDeviceState($) {
+sub checkDeviceState($) {
 
-    my ( $hash ) = @_;
+    my ($hash) = @_;
     my $name = $hash->{NAME};
 
-    Log3 $name, 4, "AMADDevice ($name) - AMADDevice_checkDeviceState: run Check";
+    Log3( $name, 4, "AMADDevice ($name) - checkDeviceState: run Check" );
 
-    
-    if( ReadingsAge( $name, ".deviceState", 240 ) > 240 ) {
-    
-        AMADDevice_statusRequest( $hash ) if( $hash->{helper}{deviceStateErrorCounter} == 0 );
-        readingsSingleUpdate( $hash, "deviceState", "offline", 1 ) if( ReadingsAge( $name, ".deviceState", 300) > 300 and $hash->{helper}{deviceStateErrorCounter} > 0 and ReadingsVal($name,'deviceState','online') ne 'offline' );
-        $hash->{helper}{deviceStateErrorCounter} = ( $hash->{helper}{deviceStateErrorCounter} + 1 );
+    if ( ReadingsAge( $name, '.deviceState', 240 ) > 240 ) {
+
+        statusRequest($hash)
+          if ( $hash->{helper}{deviceStateErrorCounter} == 0 );
+        readingsSingleUpdate( $hash, 'deviceState', 'offline', 1 )
+          if (  ReadingsAge( $name, '.deviceState', 300 ) > 300
+            and $hash->{helper}{deviceStateErrorCounter} > 0
+            and ReadingsVal( $name, 'deviceState', 'online' ) ne 'offline' );
+        $hash->{helper}{deviceStateErrorCounter} =
+          ( $hash->{helper}{deviceStateErrorCounter} + 1 );
     }
-    
-    InternalTimer( gettimeofday()+240, "AMADDevice_checkDeviceState", $hash, 0 );
-    
-    Log3 $name, 4, "AMADDevice ($name) - AMADDevice_checkDeviceState: set new Timer";
+
+    InternalTimer(
+        gettimeofday() + 240,
+        'FHEM::AMADDevice::checkDeviceState',
+        $hash, 0
+    );
+
+    Log3( $name, 4, "AMADDevice ($name) - checkDeviceState: set new Timer" );
 }
 
-sub AMADDevice_encrypt($) {
+sub encrypt($) {
 
     my ($decodedPIN) = @_;
     my $key = getUniqueId();
     my $encodedPIN;
-    
-    return $decodedPIN if( $decodedPIN =~ /^crypt:(.*)/ );
 
-    for my $char (split //, $decodedPIN) {
+    return $decodedPIN if ( $decodedPIN =~ /^crypt:(.*)/ );
+
+    for my $char ( split //, $decodedPIN ) {
         my $encode = chop($key);
-        $encodedPIN .= sprintf("%.2x",ord($char)^ord($encode));
-        $key = $encode.$key;
+        $encodedPIN .= sprintf( "%.2x", ord($char) ^ ord($encode) );
+        $key = $encode . $key;
     }
-    
-    return 'crypt:'. $encodedPIN;
+
+    return 'crypt:' . $encodedPIN;
 }
 
-sub AMADDevice_decrypt($) {
+sub decrypt($) {
 
     my ($encodedPIN) = @_;
     my $key = getUniqueId();
     my $decodedPIN;
 
-    $encodedPIN = $1 if( $encodedPIN =~ /^crypt:(.*)/ );
+    $encodedPIN = $1 if ( $encodedPIN =~ /^crypt:(.*)/ );
 
-    for my $char (map { pack('C', hex($_)) } ($encodedPIN =~ /(..)/g)) {
+    for my $char ( map { pack( 'C', hex($_) ) } ( $encodedPIN =~ /(..)/g ) ) {
         my $decode = chop($key);
-        $decodedPIN .= chr(ord($char)^ord($decode));
-        $key = $decode.$key;
+        $decodedPIN .= chr( ord($char) ^ ord($decode) );
+        $key = $decode . $key;
     }
 
     return $decodedPIN;
 }
 
-sub AMADDevice_CreateVolumeValue($$@) {
+sub CreateVolumeValue($$@) {
 
-    my ($hash,$cmd,@args)       = @_;
-    
-    my $name                    = $hash->{NAME};
+    my ( $hash, $cmd, @args ) = @_;
+
+    my $name = $hash->{NAME};
     my $vol;
-    
 
-    if( $cmd eq 'volume' ) {
+    if ( $cmd eq 'volume' ) {
         $vol = join( " ", @args );
 
-        if( $vol =~ /^\+(.*)/ or $vol =~ /^-(.*)/ ) {
+        if ( $vol =~ /^\+(.*)/ or $vol =~ /^-(.*)/ ) {
 
-            if( $vol =~ /^\+(.*)/ ) {
-                
+            if ( $vol =~ /^\+(.*)/ ) {
+
                 $vol =~ s/^\+//g;
                 $vol = ReadingsVal( $name, "volume", 0 ) + $vol;
             }
-                
-            elsif( $vol =~ /^-(.*)/ ) {
-                
+
+            elsif ( $vol =~ /^-(.*)/ ) {
+
                 $vol =~ s/^-//g;
                 $vol = ReadingsVal( $name, "volume", 15 ) - $vol;
             }
         }
-            
-    } elsif( $cmd eq 'mute') {
-        if($args[0] eq 'on') {
+
+    }
+    elsif ( $cmd eq 'mute' ) {
+        if ( $args[0] eq 'on' ) {
             $vol = 0;
-            readingsSingleUpdate($hash,'.volume',ReadingsVal($name,'volume',0),0);
-        } else {
-            $vol = ReadingsVal($name,'.volume',0);
+            readingsSingleUpdate( $hash, '.volume',
+                ReadingsVal( $name, 'volume', 0 ), 0 );
         }
-            
-    } elsif( $cmd =~ 'volume[Down|Up]') {
-        if( $cmd eq 'volumeUp' ) {
-            $vol = ReadingsVal( $name, "volume", 0 ) + AttrVal($name,'setVolUpDownStep',3);
-        } else {
-            $vol = ReadingsVal( $name, "volume", 0 ) - AttrVal($name,'setVolUpDownStep',3);
+        else {
+            $vol = ReadingsVal( $name, '.volume', 0 );
+        }
+
+    }
+    elsif ( $cmd =~ 'volume[Down|Up]' ) {
+        if ( $cmd eq 'volumeUp' ) {
+            $vol =
+              ReadingsVal( $name, "volume", 0 ) +
+              AttrVal( $name, 'setVolUpDownStep', 3 );
+        }
+        else {
+            $vol =
+              ReadingsVal( $name, "volume", 0 ) -
+              AttrVal( $name, 'setVolUpDownStep', 3 );
         }
     }
-        
+
     return $vol;
 }
 
-sub AMADDevice_CreateTtsMsgValue($@) {
+sub CreateTtsMsgValue($@) {
 
-    my ($hash,@args)       = @_;
-    
-    my $name        = $hash->{NAME};
+    my ( $hash, @args ) = @_;
+
+    my $name = $hash->{NAME};
     my $msg;
     my $speed;
 
-    my $lang        = AttrVal( $name, "setTtsMsgLang","de" );
-    my $ttsmsgvol   = AttrVal( $name, "setTtsMsgVol","none");
-    
-    if( AttrVal($name,"remoteServer","Automagic") ne 'Automagic') {
-        $speed = AttrVal( $name, "setTtsMsgSpeed", "5" );
-    } else {
-        $speed = AttrVal( $name, "setTtsMsgSpeed", "1.0" );
+    my $lang      = AttrVal( $name, 'setTtsMsgLang', 'de' );
+    my $ttsmsgvol = AttrVal( $name, 'setTtsMsgVol',  'none' );
+
+    if ( AttrVal( $name, 'remoteServer', 'Automagic' ) ne 'Automagic' ) {
+        $speed = AttrVal( $name, 'setTtsMsgSpeed', '5' );
+    }
+    else {
+        $speed = AttrVal( $name, 'setTtsMsgSpeed', '1.0' );
     }
 
+    $msg = join( ' ', @args );
 
-    $msg    = join( " ", @args );
-    
-    unless($args[0] ne '&en;' and $args[0] ne '&de;') {
-        $lang   = substr(splice(@args,0,1),1,2);
-        $msg    = join( " ", @args );
+    unless ( $args[0] ne '&en;' and $args[0] ne '&de;' ) {
+        $lang = substr( splice( @args, 0, 1 ), 1, 2 );
+        $msg = join( ' ', @args );
     }
-        
-    return ($msg,$speed,$lang,$ttsmsgvol);
+
+    return ( $msg, $speed, $lang, $ttsmsgvol );
 }
 
-sub AMADDevice_CreateScreenValue($$) {
+sub CreateScreenValue($$) {
 
-    my ($hash,$mod)     = @_;
+    my ( $hash, $mod ) = @_;
 
-    my $name            = $hash->{NAME};
-    my $scot            = AttrVal( $name, "setScreenOnForTimer", undef );
-    $scot               = 60 if( !$scot );
+    my $name = $hash->{NAME};
+    my $scot = AttrVal( $name, 'setScreenOnForTimer', undef );
+    $scot = 60 if ( !$scot );
 
-    if ($mod eq "on" or $mod eq "off") {
-        return ("/fhem-amad/setCommands/setScreenOnOff?screen=".$mod."&screenontime=".$scot);
+    if ( $mod eq 'on' or $mod eq 'off' ) {
+        return ('/fhem-amad/setCommands/setScreenOnOff?screen='
+              . $mod
+              . '&screenontime='
+              . $scot );
     }
 
-    elsif ($mod eq "lock" or $mod eq "unlock") {
-        return "NO PIN"
-        unless( AttrVal( $name, "setScreenlockPIN", "none" ) ne "none" );
-        my $PIN = AttrVal( $name, "setScreenlockPIN", undef );
-        $PIN = AMADDevice_decrypt($PIN);
+    elsif ( $mod eq 'lock' or $mod eq 'unlock' ) {
+        return 'NO PIN'
+          unless ( AttrVal( $name, 'setScreenlockPIN', 'none' ) ne 'none' );
+        my $PIN = AttrVal( $name, 'setScreenlockPIN', undef );
+        $PIN = decrypt($PIN);
 
-        return ("/fhem-amad/setCommands/screenlock?lockmod=".$mod."&lockPIN=".$PIN);
+        return ('/fhem-amad/setCommands/screenlock?lockmod='
+              . $mod
+              . '&lockPIN='
+              . $PIN );
     }
 }
 
-sub AMADDevice_CreateChangeBtDeviceValue($$) {
+sub CreateChangeBtDeviceValue($$) {
 
-    my ($hash,$swToBtDevice)    = @_;
+    my ( $hash, $swToBtDevice ) = @_;
 
-    my $name                    = $hash->{NAME};
-    my @swToBtMac               = split( /\|/, $swToBtDevice );
-    my $btDevices               = AttrVal( $name, "setBluetoothDevice", "none" ) if( AttrVal( $name, "setBluetoothDevice", "none" ) ne "none" );
-    my @btDevice                = split( ',', $btDevices );
-    my @btDeviceOne             = split( /\|/, $btDevice[0] );
-    my @btDeviceTwo             = split( /\|/, $btDevice[1] );
-    
-    
-    return($swToBtMac[1],$btDeviceOne[1],$btDeviceTwo[1]);
+    my $name      = $hash->{NAME};
+    my @swToBtMac = split( /\|/, $swToBtDevice );
+    my $btDevices = AttrVal( $name, 'setBluetoothDevice', 'none' )
+      if ( AttrVal( $name, 'setBluetoothDevice', 'none' ) ne 'none' );
+    my @btDevice    = split( ',',  $btDevices );
+    my @btDeviceOne = split( /\|/, $btDevice[0] );
+    my @btDeviceTwo = split( /\|/, $btDevice[1] );
+
+    return ( $swToBtMac[1], $btDeviceOne[1], $btDeviceTwo[1] );
 }
-
-
-
-
 
 1;
 
@@ -1403,4 +1593,50 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
 </ul>
 
 =end html_DE
+
+=for :application/json;q=META.json 74_AMADDevice.pm
+{
+  "abstract": "Integrates Android devices into FHEM and displays several settings",
+  "x_lang": {
+    "de": {
+      "abstract": "Integriert Android-Geräte in FHEM und zeigt verschiedene Einstellungen an"
+    }
+  },
+  "keywords": [
+    "fhem-mod-device",
+    "fhem-core",
+    "Android",
+    "Tablet",
+    "Handy",
+    "AMAD"
+  ],
+  "release_status": "stable",
+  "license": "GPL_2",
+  "author": [
+    "Marko Oldenburg <leongaultier@gmail.com>"
+  ],
+  "x_fhem_maintainer": [
+    "CoolTux"
+  ],
+  "x_fhem_maintainer_github": [
+    "LeonGaultier"
+  ],
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "FHEM": 5.00918799,
+        "perl": 5.016, 
+        "Meta": 0,
+        "Encode": 0,
+        "JSON": 0
+      },
+      "recommends": {
+      },
+      "suggests": {
+      }
+    }
+  }
+}
+=end :application/json;q=META.json
+
 =cut
