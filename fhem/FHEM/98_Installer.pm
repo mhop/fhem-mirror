@@ -2757,7 +2757,7 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                     && $installed eq 'included' );
 
                 if (
-                    $mAttr ne 'required'
+                    $mAttr ne 'requires'
                     && (   $installed eq 'missing'
                         || $installed eq 'outdated' )
                   )
