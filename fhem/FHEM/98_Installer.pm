@@ -2756,12 +2756,24 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                   if ( $html
                     && $installed eq 'included' );
 
-                if ($html) {
-                    $installed = $colorGreen . $installed . $colorClose
-                      if ( $installed eq 'installed' );
-                    $installed = $colorRed . uc($installed) . $colorClose
-                      if ( $installed eq 'missing'
-                        || $installed eq 'outdated' );
+                if (
+                    $mAttr ne 'required'
+                    && (   $installed eq 'missing'
+                        || $installed eq 'outdated' )
+                  )
+                {
+                    $installed = '';
+
+                }
+                elsif ($html) {
+                    if ( $installed eq 'installed' ) {
+                        $installed = $colorGreen . $installed . $colorClose;
+                    }
+                    elsif ($installed eq 'missing'
+                        || $installed eq 'outdated' )
+                    {
+                        $installed = $colorRed . uc($installed) . $colorClose;
+                    }
                 }
 
                 $l .=
