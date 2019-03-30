@@ -19,7 +19,6 @@ use warnings;
 use GPUtils qw(GP_Import);
 use File::stat;
 use Encode;
-use Data::Dumper;
 
 # Run before module compilation
 BEGIN {
@@ -1565,22 +1564,142 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
                                     %{ $pkgMeta->{prereqs}{runtime}{$pkgIreq} }
                                   )
                                 {
-                                    $modMeta->{prereqs}{runtime}{$pkgIreq}
-                                      {$pkgI} =
-                                      $pkgMeta->{prereqs}{runtime}{$pkgIreq}
-                                      {$pkgI}
-                                      if (
+                                    my $isPerlPragma =
+                                      FHEM::Meta::ModuleIsPerlPragma($pkgI);
+                                    my $isPerlCore =
+                                      $isPerlPragma
+                                      ? 0
+                                      : FHEM::Meta::ModuleIsPerlCore($pkgI);
+                                    next
+                                      if ( $isPerlPragma
+                                        || ( $isPerlCore && $pkgI ne 'perl' ) );
+
+                                    # Do not inherit perl scanner if the author
+                                    #   has provided META.json
+                                    next
+                                      if ( $pkg eq 'Meta'
+                                        && $pkgI eq
+                                        'Perl::PrereqScanner::NotQuiteLite'
+                                        && defined( $modMeta->{x_prereqs_src} )
+                                        && $modMeta->{x_prereqs_src} eq
+                                        'META.json' );
+
+                                    my $prio = $pkgIreq;
+
+                                    # avoid duplicates due to already
+                                    #  existing dependency w/ different prio
+                                    my $inh = 0;
+                                    my $v;
+                                    if ( $pkgIreq eq 'requires' ) {
+                                        if (
+                                            exists(
+                                                $modMeta->{prereqs}{runtime}
+                                                  {recommends}{$pkgI}
+                                            )
+                                          )
+                                        {
+                                            # keep version info
+                                            $v =
+                                              $modMeta->{prereqs}{runtime}
+                                              {recommends}{$pkgI};
+
+                                            delete $modMeta->{prereqs}{runtime}
+                                              {recommends}{$pkgI};
+                                        }
+                                        elsif (
+                                            exists(
+                                                $modMeta->{prereqs}{runtime}
+                                                  {suggests}{$pkgI}
+                                            )
+                                          )
+                                        {
+                                            # keep version info
+                                            $v =
+                                              $modMeta->{prereqs}{runtime}
+                                              {suggests}{$pkgI};
+
+                                            delete $modMeta->{prereqs}{runtime}
+                                              {suggests}{$pkgI};
+                                        }
+                                    }
+                                    elsif ( $pkgIreq eq 'recommends' ) {
+                                        if (
+                                            exists(
+                                                $modMeta->{prereqs}{runtime}
+                                                  {requires}{$pkgI}
+                                            )
+                                          )
+                                        {
+                                            # higher prio
+                                            $prio = 'requires';
+                                        }
+                                        elsif (
+                                            exists(
+                                                $modMeta->{prereqs}{runtime}
+                                                  {suggests}{$pkgI}
+                                            )
+                                          )
+                                        {
+                                            # keep version info
+                                            $v =
+                                              $modMeta->{prereqs}{runtime}
+                                              {suggests}{$pkgI};
+
+                                            delete $modMeta->{prereqs}{runtime}
+                                              {suggests}{$pkgI};
+                                        }
+                                    }
+                                    elsif ( $pkgIreq eq 'suggests' ) {
+                                        if (
+                                            exists(
+                                                $modMeta->{prereqs}{runtime}
+                                                  {requires}{$pkgI}
+                                            )
+                                          )
+                                        {
+                                            # higher prio
+                                            $prio = 'requires';
+                                        }
+                                        elsif (
+                                            exists(
+                                                $modMeta->{prereqs}{runtime}
+                                                  {recommends}{$pkgI}
+                                            )
+                                          )
+                                        {
+                                            # higher prio
+                                            $prio = 'recommends';
+                                        }
+                                    }
+
+                                    $v =
+                                         $v
+                                      && $v > $pkgMeta->{prereqs}{runtime}
+                                      {$pkgIreq}{$pkgI}
+                                      ? $v
+                                      : $pkgMeta->{prereqs}{runtime}
+                                      {$pkgIreq}{$pkgI};
+
+                                    if (
                                         !exists(
                                             $modMeta->{prereqs}{runtime}
-                                              {$pkgIreq}{$pkgI}
+                                              {$prio}{$pkgI}
                                         )
                                         || ( $pkgMeta->{prereqs}{runtime}
                                             {$pkgIreq}{$pkgI} ne '0'
                                             && $modMeta->{prereqs}{runtime}
-                                            {$pkgIreq}{$pkgI} ne
-                                            $pkgMeta->{prereqs}{runtime}
-                                            {$pkgIreq}{$pkgI} )
-                                      );
+                                            {$prio}{$pkgI} < $v )
+                                      )
+                                    {
+                                        $modMeta->{prereqs}{runtime}{$prio}
+                                          {$pkgI} = $v;
+
+                                        # remember this was inherited from
+                                        #   another package
+                                        push @{ $modMeta->{prereqs}{runtime}
+                                              {x_inherited}{$pkgI} },
+                                          $pkg;
+                                    }
                                 }
                             }
                         }
@@ -2982,7 +3101,6 @@ sub __SetXVersion {
         "perl": 5.014,
         "GPUtils": 0,
         "File::stat": 0,
-        "Data::Dumper": 0,
         "Encode": 0,
         "version": 0
       },
