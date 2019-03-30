@@ -3317,6 +3317,8 @@ sub CUL_HM_parseCommon(@){#####################################################
     }
 
     $devHlpr->{HM_CMDNR} += 0x27;  # force new setting. Send will take care of module 255
+    ### some lazy config devices send config as response to first message. We need to repeat our request by then. 
+    CUL_HM_respPendTout("respPend:$mhp->{devH}{DEF}") if (defined $devHlpr->{prt}{rspWait});
     $ret = "done";
   }
   elsif($mhp->{mTp} eq "10"){######################################
@@ -3963,6 +3965,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     if( $culHmSubTypeSets->{$st}   && $roleC){foreach(keys %{$culHmSubTypeSets->{$st}}   ){push @arr1,"$_ ".${$culHmSubTypeSets->{$st}}{$_}   }};
     if( $culHmModelSets->{$md})              {foreach(keys %{$culHmModelSets->{$md}}     ){push @arr1,"$_ ".${$culHmModelSets->{$md}}{$_}     }};
     if( $culHmChanSets->{$md."00"} && $roleD){foreach(keys %{$culHmChanSets->{$md."00"}} ){push @arr1,"$_ ".${$culHmChanSets->{$md."00"}}{$_} }};
+    if( $culHmChanSets->{$md."xx"} && $roleC){foreach(keys %{$culHmChanSets->{$md."xx"}} ){push @arr1,"$_ ".${$culHmChanSets->{$md."xx"}}{$_} }};
     if( $culHmChanSets->{$md.$chn} && $roleC){foreach(keys %{$culHmChanSets->{$md.$chn}} ){push @arr1,"$_ ".${$culHmChanSets->{$md.$chn}}{$_} }};
     if( $culHmFunctSets->{$fkt}    && $roleC){foreach(keys %{$culHmFunctSets->{$fkt}}    ){push @arr1,"$_ ".${$culHmFunctSets->{$fkt}}{$_}    }};
 
@@ -4089,6 +4092,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   $h = $culHmSubTypeSets->{$st}{$cmd}   if(!defined($h) && $culHmSubTypeSets->{$st}   && $roleC);
   $h = $culHmModelSets->{$md}{$cmd}     if(!defined($h) && $culHmModelSets->{$md}  );
   $h = $culHmChanSets->{$md."00"}{$cmd} if(!defined($h) && $culHmChanSets->{$md."00"} && $roleD);
+  $h = $culHmChanSets->{$md."xx"}{$cmd} if(!defined($h) && $culHmChanSets->{$md."xx"} && $roleC); 
   $h = $culHmChanSets->{$md.$chn}{$cmd} if(!defined($h) && $culHmChanSets->{$md.$chn} && $roleC); 
   $h = $culHmFunctSets->{$fkt}{$cmd}    if(!defined($h) && $culHmFunctSets->{$fkt});
 
@@ -4130,6 +4134,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     if( $culHmSubTypeSets->{$st}   && $roleC){foreach(keys %{$culHmSubTypeSets->{$st}}   ){push @arr1,"$_:".${$culHmSubTypeSets->{$st}}{$_}   }};
     if( $culHmModelSets->{$md})              {foreach(keys %{$culHmModelSets->{$md}}     ){push @arr1,"$_:".${$culHmModelSets->{$md}}{$_}     }};
     if( $culHmChanSets->{$md."00"} && $roleD){foreach(keys %{$culHmChanSets->{$md."00"}} ){push @arr1,"$_:".${$culHmChanSets->{$md."00"}}{$_} }};
+    if( $culHmChanSets->{$md."xx"} && $roleC){foreach(keys %{$culHmChanSets->{$md."xx"}} ){push @arr1,"$_:".${$culHmChanSets->{$md."xx"}}{$_} }};
     if( $culHmChanSets->{$md.$chn} && $roleC){foreach(keys %{$culHmChanSets->{$md.$chn}} ){push @arr1,"$_:".${$culHmChanSets->{$md.$chn}}{$_} }};
     if( $culHmFunctSets->{$fkt}    && $roleC){foreach(keys %{$culHmFunctSets->{$fkt}}    ){push @arr1,"$_:".${$culHmFunctSets->{$fkt}}{$_}    }};
     @arr1 = CUL_HM_noDup(@arr1);
@@ -4162,7 +4167,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my $usg = "Unknown argument $cmd, choose one of ".join(" ",sort @arr1);
 
     my $pl = CUL_HM_getPeerOption($name);
-    $usg .= " peerSmart:$pl" if ("pl"); 
+    $usg .= " peerSmart:$pl" if ($pl); 
     
     $usg =~ s/ pct/ pct:slider,0,1,100/;
     $usg =~ s/ pctSlat/ pctSlat:slider,0,1,100/;
@@ -6297,6 +6302,16 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         CUL_HM_ID2PeerList ($btnName,$PInfo{$pNo}{DId}.$PInfo{$pNo}{chn},$set); #upd. peerlist
       }
       else{
+        my $pl = AttrVal($PInfo{$myNo}{name},"peerIDs","leer");
+        my $pId = $PInfo{$pNo}{DId}.$PInfo{$pNo}{chn};
+        if(  ($pl =~ m/$pId/ &&  $set)
+           ||($pl !~ m/$pId/ && !$set) ){ # already peered or removed - skip
+          Log3 $name,2,"peering skip - already done:$PInfo{$pNo}{name} to $PInfo{$myNo}{name}";
+          next;
+        }
+        else{
+          Log3 $name,2,"peering execute:$PInfo{$pNo}{name} to $PInfo{$myNo}{name}";
+        }
         CUL_HM_PushCmdStack($PInfo{$myNo}{hash},"++".$flag."01${id}$PInfo{$myNo}{DId}"
                             .$PInfo{$myNo}{chn}
                             .$cmdB
@@ -6938,7 +6953,7 @@ sub CUL_HM_PushCmdStack($$) {
 sub CUL_HM_ProcessCmdStack($) {
   my ($chnhash) = @_;
   my $hash = CUL_HM_getDeviceHash($chnhash);
-  if (!$hash->{helper}{prt}{rspWait}{cmd}){
+  if (!defined $hash->{helper}{prt}{rspWait} or ! defined $hash->{helper}{prt}{rspWait}{cmd}){
     if($hash->{cmdStack} && @{$hash->{cmdStack}}){
      CUL_HM_SndCmd($hash, shift @{$hash->{cmdStack}});
     }
@@ -7326,7 +7341,7 @@ sub CUL_HM_respPendTout($) {
   my ($HMidIn) =  @_;
   my(undef,$HMid) = split(":",$HMidIn,2);
   my $hash = $modules{CUL_HM}{defptr}{$HMid};
-  my $pHash = $hash->{helper}{prt};#shortcut
+   my $pHash = $hash->{helper}{prt};#shortcut
   if ($hash && $hash->{DEF} ne '000000'){# we know the device
     my $name = $hash->{NAME};
     $pHash->{awake} = 0 if (defined $pHash->{awake});# set to asleep
@@ -7413,6 +7428,7 @@ sub CUL_HM_respPendTout($) {
         IOWrite($hash, "", $pHash->{rspWait}{cmd});
         CUL_HM_eventP($hash,"SndB")          if(hex(substr($pHash->{rspWait}{cmd},6,2)) & 0x10);
         CUL_HM_statCnt($hash->{IODev}{NAME},"s",hex(substr($pHash->{rspWait}{cmd},6,2)));
+        RemoveInternalTimer("respPend:$hash->{DEF}");
         InternalTimer(gettimeofday()+rand(20)/10+4,"CUL_HM_respPendTout","respPend:$hash->{DEF}", 0);
       }
     }
