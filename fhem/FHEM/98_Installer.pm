@@ -57,6 +57,7 @@ BEGIN {
           LoadModule
           Log
           Log3
+          maxNum
           modules
           packages
           readingsBeginUpdate
@@ -67,6 +68,7 @@ BEGIN {
           ReadingsTimestamp
           ReadingsVal
           RemoveInternalTimer
+          TimeNow
           Value
           )
     );
@@ -79,6 +81,8 @@ BEGIN {
 #LoadModule('apt');
 #LoadModule('pypip');
 LoadModule('npmjs');
+
+our %pkgStatus = ();
 
 sub Define($$) {
     my ( $hash, $def ) = @_;
@@ -918,11 +922,18 @@ sub CreatePrereqsList {
     my $hash    = shift;
     my $getCmd  = shift;
     my $cfgfile = shift;
-    my $mode    = $cfgfile ? 'file' : 'live';
+    my $mode =
+      ( $cfgfile && $cfgfile eq '1' ? 'all' : ( $cfgfile ? 'file' : 'live' ) );
     $mode = 'list' if ( $cfgfile && defined( $modules{$cfgfile} ) );
 
     my @defined;
-    if ( $mode eq 'file' ) {
+    if ( $mode eq 'live' || $mode eq 'all' ) {
+        foreach ( keys %modules ) {
+            next unless ( $mode eq 'all' || defined( $modules{$_}{LOADED} ) );
+            push @defined, $_;
+        }
+    }
+    elsif ( $mode eq 'file' ) {
         @defined = __GetDefinedModulesFromFile($cfgfile);
         return
             'File '
@@ -934,7 +945,6 @@ sub CreatePrereqsList {
         @defined = @_;
         unshift @defined, $cfgfile;
     }
-    Debug Dumper \@defined;
 
     # disable automatic links to FHEM devices
     delete $FW_webArgs{addLinks};
@@ -997,272 +1007,139 @@ sub CreatePrereqsList {
 
     ########
     # Getting Perl prereqs
-    my $perlAnalyzed = 0;
-    my %prereqs;
+    LoadInstallStatusPerl( $defined[0] eq '1' ? 1 : \@defined );
 
-    foreach my $modName ( keys %modules ) {
-        next
-          if ( $mode eq 'live'
-            && !defined( $modules{$modName}{LOADED} )
-            && $modName ne 'Installer' );
-        next
-          if ( $mode ne 'live'
-            && @defined > 0
-            && !grep ( /^$modName$/, @defined ) );
-
-        FHEM::Meta::Load($modName);
-
-        next
-          unless ( defined( $modules{$modName}{META} ) );
-
-        if ( !defined( $modules{$modName}{META}{x_prereqs_src} ) ) {
-            $perlAnalyzed = 2;
-            next;
-        }
-
-        next
-          unless ( defined( $modules{$modName}{META}{prereqs} )
-            && defined( $modules{$modName}{META}{prereqs}{runtime} ) );
-        my $modPreqs = $modules{$modName}{META}{prereqs}{runtime};
-
-        foreach my $mAttr (qw(requires recommends suggests)) {
-            next
-              unless ( defined( $modPreqs->{$mAttr} )
-                && keys %{ $modPreqs->{$mAttr} } > 0 );
-
-            foreach my $prereq ( keys %{ $modPreqs->{$mAttr} } ) {
-                next
-                  if ( FHEM::Meta::ModuleIsPerlPragma($prereq)
-                    || FHEM::Meta::ModuleIsPerlCore($prereq)
-                    || FHEM::Meta::ModuleIsInternal($prereq) );
-
-                my $version = $modPreqs->{$mAttr}{$prereq};
-                $version = '' if ( !defined($version) || $version eq '0' );
-
-                my $check     = __IsInstalledPerl($prereq);
-                my $installed = '';
-                if ($check) {
-                    if ( $check ne '1' ) {
-                        my $nverReq =
-                          $version ne ''
-                          ? version->parse($version)->numify
-                          : 0;
-                        my $nverInst = $check;
-
-                        #TODO suport for version range:
-                        #https://metacpan.org/pod/CPAN::Meta::Spec#Version-Range
-                        if ( $nverReq > 0 && $nverInst < $nverReq ) {
-                            push @{ $prereqs{$prereq}{$mAttr}{by} },
-                              $modName
-                              unless (
-                                grep ( /^$modName$/,
-                                    @{ $prereqs{$prereq}{$mAttr}{by} } )
-                              );
-                            push @{ $prereqs{$prereq}{$mAttr}{version} },
-                              $nverReq;
-
-                            $perlAnalyzed = 1
-                              if ( $modules{$modName}{META}{x_prereqs_src} ne
-                                'META.json' && !$perlAnalyzed );
-                        }
-                    }
-                }
-                else {
-                    push @{ $prereqs{$prereq}{$mAttr}{by} }, $modName
-                      unless (
-                        grep ( /^$modName$/,
-                            @{ $prereqs{$prereq}{$mAttr}{by} } ) );
-
-                    $perlAnalyzed = 1
-                      if (
-                        $modules{$modName}{META}{x_prereqs_src} ne 'META.json'
-                        && !$perlAnalyzed );
-                }
-            }
-        }
-    }
-
-    my %pending;
-    my $found                = 0;
-    my $foundRequired        = 0;
-    my $foundRecommended     = 0;
-    my $foundSuggested       = 0;
-    my $foundRequiredPerl    = 0;
-    my $foundRecommendedPerl = 0;
-    my $foundSuggestedPerl   = 0;
-
-    # Consolidating prereqs
-    foreach ( keys %prereqs ) {
-        $found++;
-        if ( defined( $prereqs{$_}{requires} ) ) {
-            $foundRequired++;
-            $foundRequiredPerl++;
-            $pending{requires}{Perl}{$_} =
-              $prereqs{$_}{requires}{by};
-
-            if ( defined( $prereqs{$_}{recommends} ) ) {
-                foreach my $i ( @{ $prereqs{$_}{recommends}{by} } ) {
-                    push @{ $pending{requires}{Perl}{$_} }, $i
-                      unless (
-                        grep ( /^$i$/, @{ $pending{requires}{Perl}{$_} } ) );
-                }
-            }
-            if ( defined( $prereqs{$_}{suggestes} ) ) {
-                foreach my $i ( @{ $prereqs{$_}{suggestes}{by} } ) {
-                    push @{ $pending{suggestes}{Perl}{$_} }, $i
-                      unless (
-                        grep ( /^$i$/, @{ $pending{suggestes}{Perl}{$_} } ) );
-                }
-            }
-        }
-        elsif ( defined( $prereqs{$_}{recommends} ) ) {
-            $foundRecommended++;
-            $foundRecommendedPerl++;
-            $pending{recommends}{Perl}{$_} =
-              $prereqs{$_}{recommends}{by};
-
-            if ( defined( $prereqs{$_}{suggestes} ) ) {
-                foreach my $i ( @{ $prereqs{$_}{suggestes}{by} } ) {
-                    push @{ $pending{suggestes}{Perl}{$_} }, $i
-                      unless (
-                        grep ( /^$i$/, @{ $pending{suggestes}{Perl}{$_} } ) );
-                }
-            }
-        }
-        else {
-            $foundSuggested++;
-            $foundSuggestedPerl++;
-            $pending{suggests}{Perl}{$_} =
-              $prereqs{$_}{suggests}{by};
-        }
-    }
+    my $found                  = 0;
+    my $foundRequired          = 0;
+    my $foundRecommended       = 0;
+    my $foundSuggested         = 0;
+    my $foundRequiredPerl      = 0;
+    my $foundRecommendedPerl   = 0;
+    my $foundSuggestedPerl     = 0;
+    my $foundRequiredNodejs    = 0;
+    my $foundRecommendedNodejs = 0;
+    my $foundSuggestedNodejs   = 0;
+    my $foundRequiredPython    = 0;
+    my $foundRecommendedPython = 0;
+    my $foundSuggestedPython   = 0;
 
     # Display prereqs
-    if ($found) {
-
-        foreach my $mAttr (qw(requires recommends suggests)) {
+    foreach my $mAttr (qw(required recommended suggested)) {
+        foreach my $area (qw(Perl Node.js Python)) {
             next
-              unless ( defined( $pending{$mAttr} )
-                && keys %{ $pending{$mAttr} } > 0 );
+              unless ( defined( $pkgStatus{$mAttr} )
+                && defined( $pkgStatus{$mAttr}{$area} )
+                && keys %{ $pkgStatus{$mAttr}{$area} } > 0 );
 
             my $linecount  = 1;
-            my $importance = $mAttr;
-            $importance = 'Required'    if ( $mAttr eq 'requires' );
-            $importance = 'Recommended' if ( $mAttr eq 'recommends' );
-            $importance = 'Suggested'   if ( $mAttr eq 'suggests' );
+            my $importance = ucfirst($mAttr);
 
-            if ( $linecount == 1 ) {
-                push @ret,
-                    '<a name="prereqResult'
-                  . $importance
-                  . '"></a><h3>'
-                  . $importance . '</h3>'
-                  . $lb;
-                push @ret, $tableOpen . $rowOpen;
-                push @ret, $colOpen . $txtOpen . 'Item' . $txtClose . $colClose;
-                push @ret, $colOpen . $txtOpen . 'Type' . $txtClose . $colClose;
-                push @ret,
-                  $colOpen . $txtOpen . 'Used by' . $txtClose . $colClose;
-                push @ret, $rowClose;
-            }
-
-            foreach my $area (qw(Perl)) {
-                next
-                  unless ( defined( $pending{$mAttr}{$area} )
-                    && keys %{ $pending{$mAttr}{$area} } > 0 );
-
-                foreach my $item (
-                    sort { "\L$a" cmp "\L$b" }
-                    keys %{ $pending{$mAttr}{$area} }
-                  )
+            foreach my $item (
+                sort { "\L$a" cmp "\L$b" }
+                keys %{ $pkgStatus{$mAttr}{$area} }
+              )
+            {
+                my $linkmod = '';
+                my $inScope = 0;
+                foreach my $modName ( sort { "\L$a" cmp "\L$b" }
+                    @{ $pkgStatus{$mAttr}{$area}{$item}{modules} } )
                 {
-                    my $l = $linecount % 2 == 0 ? $rowOpenEven : $rowOpenOdd;
-
-                    my $linkitem = $item;
-                    $linkitem =
-                        '<a href="https://metacpan.org/pod/'
-                      . $item
-                      . '" target="_blank">'
-                      . $item . '</a>'
-                      if ($html);
-
-                    my $linkmod = '';
-                    foreach ( sort { "\L$a" cmp "\L$b" }
-                        @{ $pending{$mAttr}{$area}{$item} } )
-                    {
-                        $linkmod .= ', ' unless ( $linkmod eq '' );
-                        if ($html) {
-                            $linkmod .=
-                                '<a href="?cmd=get '
-                              . $hash->{NAME}
-                              . ' showModuleInfo '
-                              . $_
-                              . $FW_CSRF . '">'
-                              . ( $_ eq 'Global' ? 'FHEM' : $_ ) . '</a>';
-                        }
-                        else {
-                            $linkmod .= ( $_ eq 'Global' ? 'FHEM' : $_ );
-                        }
+                    # check if this package is used by any
+                    #   module that is in install scope
+                    if ( grep ( /^$modName$/, @defined ) ) {
+                        $inScope = 1;
                     }
 
-                    $l .= $colOpen . $linkitem . $colClose;
-                    $l .= $colOpen . $area . $colClose;
-                    $l .= $colOpen . $linkmod . $colClose;
-                    $l .= $rowClose;
-
-                    push @ret, $l;
-                    $linecount++;
+                    $linkmod .= ', ' unless ( $linkmod eq '' );
+                    if ($html) {
+                        $linkmod .=
+                            '<a href="?cmd=get '
+                          . $hash->{NAME}
+                          . ' showModuleInfo '
+                          . $modName
+                          . $FW_CSRF . '">'
+                          . ( $modName eq 'Global' ? 'FHEM' : $modName )
+                          . '</a>';
+                    }
+                    else {
+                        $linkmod .=
+                          ( $modName eq 'Global' ? 'FHEM' : $modName );
+                    }
                 }
+                next unless ($inScope);
+
+                $found++;
+                $foundRequired++    if ( $mAttr eq 'required' );
+                $foundRecommended++ if ( $mAttr eq 'recommended' );
+                $foundSuggested++   if ( $mAttr eq 'suggested' );
+                $foundRequiredPerl++
+                  if ( $area eq 'Perl' && $mAttr eq 'required' );
+                $foundRecommendedPerl++
+                  if ( $area eq 'Perl' && $mAttr eq 'recommended' );
+                $foundSuggestedPerl++
+                  if ( $area eq 'Perl' && $mAttr eq 'suggested' );
+                $foundRequiredNodejs++
+                  if ( $area eq 'Node.js' && $mAttr eq 'required' );
+                $foundRecommendedNodejs++
+                  if ( $area eq 'Node.js' && $mAttr eq 'recommended' );
+                $foundSuggestedNodejs++
+                  if ( $area eq 'Node.js' && $mAttr eq 'suggested' );
+                $foundRequiredPython++
+                  if ( $area eq 'Python' && $mAttr eq 'required' );
+                $foundRecommendedPython++
+                  if ( $area eq 'Python' && $mAttr eq 'recommended' );
+                $foundSuggestedPython++
+                  if ( $area eq 'Python' && $mAttr eq 'suggested' );
+
+                my $l = $linecount % 2 == 0 ? $rowOpenEven : $rowOpenOdd;
+
+                my $linkitem = $item;
+                $linkitem =
+                    '<a href="https://metacpan.org/pod/'
+                  . $item
+                  . '" target="_blank">'
+                  . $item . '</a>'
+                  if ($html);
+
+                $l .=
+                    $colOpen
+                  . $linkitem
+                  . (
+                    $pkgStatus{$mAttr}{$area}{$item}{status} eq 'outdated'
+                    ? ' (wanted version: '
+                      . $pkgStatus{$mAttr}{$area}{$item}{version} . ')'
+                    : ''
+                  ) . $colClose;
+                $l .= $colOpen . $area . $colClose;
+                $l .= $colOpen . $linkmod . $colClose;
+                $l .= $rowClose;
+
+                if ( $linecount == 1 ) {
+                    push @ret,
+                        '<a name="prereqResult'
+                      . $importance
+                      . '"></a><h3>'
+                      . $importance . '</h3>'
+                      . $lb;
+                    push @ret, $tableOpen . $rowOpen;
+                    push @ret,
+                      $colOpen . $txtOpen . 'Item' . $txtClose . $colClose;
+                    push @ret,
+                      $colOpen . $txtOpen . 'Type' . $txtClose . $colClose;
+                    push @ret,
+                      $colOpen . $txtOpen . 'Used by' . $txtClose . $colClose;
+                    push @ret, $rowClose;
+                }
+
+                push @ret, $l;
+                $linecount++;
             }
 
             push @ret, $tableClose;
         }
-
-        unshift @ret,
-            $lb
-          . $space
-          . $space
-          . ( $html ? '<a href="#prereqResultSuggested">' : '' )
-          . $foundSuggested
-          . ' suggested '
-          . ( $foundSuggested > 1 ? 'items' : 'item' )
-          . ( $html               ? '</a>'  : '' )
-          if ($foundSuggested);
-        unshift @ret,
-            $lb
-          . $space
-          . $space
-          . ( $html ? '<a href="#prereqResultRecommended">' : '' )
-          . $foundRecommended
-          . ' recommended '
-          . ( $foundRecommended > 1 ? 'items' : 'item' )
-          . ( $html                 ? '</a>'  : '' )
-          if ($foundRecommended);
-        unshift @ret,
-            $lb
-          . $space
-          . $space
-          . ( $html ? '<a href="#prereqResultRequired">' : '' )
-          . $foundRequired
-          . ' required '
-          . ( $foundRequired > 1 ? 'items' : 'item' )
-          . ( $html              ? '</a>'  : '' )
-          if ($foundRequired);
-        unshift @ret,
-            $found
-          . ' total missing '
-          . ( $found > 1 ? 'prerequisites:' : 'prerequisite:' );
-    }
-    else {
-        unshift @ret, 'Hooray! All prerequisites are met. 🥳';
     }
 
-    unshift @ret,
-        '<a name="prereqResultTOP"></a><h2>'
-      . ( $mode eq 'live' ? 'Live ' : '' )
-      . 'System Prerequisites Check</h2>';
-
-    if ($perlAnalyzed) {
+    if ( defined( $pkgStatus{Perl}{analyzed} ) ) {
         push @ret,
             $lb
           . $txtOpen . 'Hint:'
@@ -1270,15 +1147,55 @@ sub CreatePrereqsList {
           . ' Some of the used FHEM modules do not provide Perl prerequisites from its metadata.'
           . $lb;
 
-        if ( $perlAnalyzed == 1 ) {
+        if ( $pkgStatus{Perl}{analyzed} == 1 ) {
             push @ret,
 'This check is based on automatic source code analysis and can be incorrect.';
         }
-        elsif ( $perlAnalyzed == 2 ) {
+        elsif ( $pkgStatus{Perl}{analyzed} == 2 ) {
             push @ret,
 'This check may be incomplete until you install Perl::PrereqScanner::NotQuiteLite.';
         }
     }
+
+    unshift @ret,
+        $lb
+      . $space
+      . $space
+      . ( $html ? '<a href="#prereqResultSuggested">' : '' )
+      . $foundSuggested
+      . ' suggested '
+      . ( $foundSuggested > 1 ? 'items' : 'item' )
+      . ( $html               ? '</a>'  : '' )
+      if ($foundSuggested);
+    unshift @ret,
+        $lb
+      . $space
+      . $space
+      . ( $html ? '<a href="#prereqResultRecommended">' : '' )
+      . $foundRecommended
+      . ' recommended '
+      . ( $foundRecommended > 1 ? 'items' : 'item' )
+      . ( $html                 ? '</a>'  : '' )
+      if ($foundRecommended);
+    unshift @ret,
+        $lb
+      . $space
+      . $space
+      . ( $html ? '<a href="#prereqResultRequired">' : '' )
+      . $foundRequired
+      . ' required '
+      . ( $foundRequired > 1 ? 'items' : 'item' )
+      . ( $html              ? '</a>'  : '' )
+      if ($foundRequired);
+    unshift @ret,
+        $found
+      . ' total missing '
+      . ( $found > 1 ? 'prerequisites:' : 'prerequisite:' );
+
+    unshift @ret,
+        '<a name="prereqResultTOP"></a><h2>'
+      . ( $mode eq 'live' ? 'Live ' : '' )
+      . 'System Prerequisites Check</h2>';
 
     return $header . join( "\n", @ret ) . $footer;
 }
@@ -1359,6 +1276,7 @@ sub CreateSearchList ($$@) {
     foreach my $device ( sort { "\L$a" cmp "\L$b" } keys %defs ) {
         next
           unless ( defined( $defs{$device}{TYPE} )
+            && !defined( $defs{$device}{TEMPORARY} )
             && defined( $modules{ $defs{$device}{TYPE} } ) );
 
         if ( $device =~ m/^.*$search.*$/i ) {
@@ -2755,6 +2673,8 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
         }
     }
 
+    LoadInstallStatusPerl($modName);
+
     push @ret, '<h3>System Prerequisites</h3>';
 
     push @ret, '<h4>Perl Packages</h4>';
@@ -2800,6 +2720,9 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
             foreach
               my $prereq ( sort keys %{ $modMeta->{prereqs}{runtime}{$mAttr} } )
             {
+                my $isFhem    = FHEM::Meta::ModuleIsInternal($prereq);
+                my $installed = $pkgStatus{Perl}{pkgs}{$prereq}{status};
+
                 my $l = $linecount % 2 == 0 ? $rowOpenEven : $rowOpenOdd;
 
                 my $importance = $mAttr;
@@ -2810,71 +2733,14 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                 my $version = $modMeta->{prereqs}{runtime}{$mAttr}{$prereq};
                 $version = '' if ( !defined($version) || $version eq '0' );
 
-                my $check     = __IsInstalledPerl($prereq);
-                my $installed = '';
-                if ($check) {
-                    if ( $check ne '1' ) {
-                        my $nverReq =
-                          $version ne ''
-                          ? version->parse($version)->numify
-                          : 0;
-                        my $nverInst = $check;
-
-                        #TODO suport for version range:
-                        #https://metacpan.org/pod/CPAN::Meta::Spec#Version-Range
-                        if ( $nverReq > 0 && $nverInst < $nverReq ) {
-                            $installed .=
-                                $colorRed
-                              . 'OUTDATED'
-                              . $colorClose . ' ('
-                              . $check . ')';
-                        }
-                        else {
-                            $installed = 'installed';
-                        }
-                    }
-                    else {
-                        $installed = 'installed';
-                    }
-                }
-                else {
-                    $installed = $colorRed . 'MISSING' . $colorClose
-                      if ( $importance eq 'required' );
-                }
-
-                my $isPerlPragma = FHEM::Meta::ModuleIsPerlPragma($prereq);
-                my $isPerlCore =
-                  $isPerlPragma ? 0 : FHEM::Meta::ModuleIsPerlCore($prereq);
-                my $isFhem =
-                  $isPerlPragma || $isPerlCore
-                  ? 0
-                  : FHEM::Meta::ModuleIsInternal($prereq);
-                if ( $isPerlPragma || $isPerlCore || $prereq eq 'perl' ) {
-                    $installed =
-                      $installed ne 'installed'
-                      ? "$installed (Perl built-in)"
-                      : 'built-in';
-                }
-                elsif ($isFhem) {
-                    $installed =
-                      $installed ne 'installed'
-                      ? "$installed (FHEM included)"
-                      : 'included';
-                }
-                elsif ( $installed eq 'installed' ) {
-                    $installed = $colorGreen . $installed . $colorClose;
-                }
-
                 $prereq =
                     '<a href="https://metacpan.org/pod/'
                   . $prereq
                   . '" target="_blank">'
                   . $prereq . '</a>'
                   if ( $html
-                    && !$isFhem
-                    && !$isPerlCore
-                    && !$isPerlPragma
-                    && $prereq ne 'perl' );
+                    && $installed ne 'built-in'
+                    && $installed ne 'included' );
 
                 $prereq =
                     '<a href="?cmd=get '
@@ -2888,7 +2754,15 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                   . $FW_CSRF . '">'
                   . $prereq . '</a>'
                   if ( $html
-                    && $isFhem );
+                    && $installed eq 'included' );
+
+                if ($html) {
+                    $installed = $colorGreen . $installed . $colorClose
+                      if ( $installed eq 'installed' );
+                    $installed = $colorRed . uc($installed) . $colorClose
+                      if ( $installed eq 'missing'
+                        || $installed eq 'outdated' );
+                }
 
                 $l .=
                     $colOpen
@@ -3214,49 +3088,505 @@ sub __GetDefinedModulesFromFile($) {
     }
 }
 
-# Checks whether a perl package is installed in the system
-sub __IsInstalledPerl($) {
-    return 0 unless ( __PACKAGE__ eq caller(0) );
-    return 0 unless (@_);
-    my ($pkg) = @_;
-    return version->parse($])->numify if ( $pkg eq 'perl' );
-    return $modules{'Global'}{META}{version}
-      if ( $pkg eq 'FHEM' );
-    return FHEM::Meta->VERSION()
-      if ( $pkg eq 'FHEM::Meta' || $pkg eq 'Meta' );
+sub LoadInstallStatusPerl(;$) {
+    my ($modList) = @_;
+    my $t = TimeNow();
+    my @rets;
 
-    my $fname = $pkg;
-    $fname =~ s/^.*://g;    # strip away any parent module names
+    my $unused = 0;
+    my @lmodules;
 
-    # This is an internal Perl package
-    if ( defined( $packages{$fname} ) ) {
-        return $packages{$fname}{META}{version}
-          if ( defined( $packages{$fname}{META} ) );
-        return 1;
+    # if modList is undefined or is equal to '1'
+    if ( !$modList || ( !ref($modList) && $modList eq '1' ) ) {
+        $unused = 1 if ( $modList && $modList eq '1' );
+
+        foreach ( keys %modules ) {
+
+            # Only process loaded modules
+            #   unless unused modules were
+            #   explicitly requested
+            push @lmodules,
+              $_
+              if (
+                $unused
+                || ( defined( $modules{$_}{LOADED} )
+                    && $modules{$_}{LOADED} eq '1' )
+              );
+        }
     }
 
-    # This is an internal Perl package
-    if ( defined( $modules{$fname} ) ) {
-        return $modules{$fname}{META}{version}
-          if ( defined( $modules{$fname}{META} ) );
-        return 1;
+    # if a single module name was given
+    elsif ( !ref($modList) ) {
+        push @lmodules, $modList;
     }
 
-    eval "require $pkg;";
-
-    return 0
-      if ($@);
-
-    my $v = eval "$pkg->VERSION()";
-
-    if ($v) {
-        return $v;
+    # if a list of module names was given
+    elsif ( ref($modList) eq 'ARRAY' ) {
+        foreach ( @{$modList} ) {
+            push @lmodules, $_;
+        }
     }
+
+    # if a hash was given, assume every
+    #   key is a module name
+    elsif ( ref($modList) eq 'HASH' ) {
+        foreach ( keys %{$modList} ) {
+            push @lmodules, $_;
+        }
+    }
+
+    # Wrong method use
     else {
-        return 1;
+        $@ =
+          __PACKAGE__ . "LoadInstallStatusPerl: ERROR: Unknown parameter value";
+        Log 1, $@;
+        return "$@";
     }
+
+    foreach my $modName (@lmodules) {
+        $modName = 'Global' if ( uc($modName) eq 'FHEM' );
+        my $type;
+
+        if ( exists( $modules{$modName} ) && !exists( $packages{$modName} ) ) {
+            $type = 'module';
+        }
+        elsif ( exists( $packages{$modName} ) && !exists( $modules{$modName} ) )
+        {
+            $type = 'package';
+        }
+        elsif ( exists( $packages{$modName} ) && exists( $modules{$modName} ) )
+        {
+            $type = 'module+package';
+        }
+        next unless ($type);
+
+        foreach my $type ( split( '\+', $type ) ) {
+
+            FHEM::Meta::Load($modName);
+
+            next
+              unless (
+                ( $type eq 'module' && defined( $modules{$modName}{META} ) )
+                || ( $type eq 'package'
+                    && defined( $packages{$modName}{META} ) )
+              );
+
+            my $modMeta =
+                $type eq 'module'
+              ? $modules{$modName}{META}
+              : $packages{$modName}{META};
+
+            $pkgStatus{Perl}{analyzed} = 2
+              unless ( defined( $modMeta->{x_prereqs_src} ) );
+
+            # Perl
+            if (   defined( $modMeta->{prereqs} )
+                && defined( $modMeta->{prereqs}{runtime} ) )
+            {
+                my $modPreqs = $modMeta->{prereqs}{runtime};
+
+                foreach my $mAttr (qw(requires recommends suggests)) {
+                    next
+                      unless ( defined( $modPreqs->{$mAttr} )
+                        && keys %{ $modPreqs->{$mAttr} } > 0 );
+
+                    foreach my $pkg ( keys %{ $modPreqs->{$mAttr} } ) {
+                        push
+                          @{ $pkgStatus{Perl}{pkgs}{$pkg}{ $type . 's' }{$mAttr}
+                          },
+                          $modName
+                          unless (
+                            grep ( /^$modName$/,
+                                @{
+                                    $pkgStatus{Perl}{pkgs}{$pkg}{ $type . 's' }
+                                      {$mAttr}
+                                } )
+                          );
+
+                        next
+                          if (
+                            defined( $pkgStatus{Perl}{pkgs}{$pkg}{status} ) );
+
+                        my $fname = $pkg;
+                        $fname =~
+                          s/^.*://g;    # strip away any parent module names
+
+                        my $isPerlPragma = FHEM::Meta::ModuleIsPerlPragma($pkg);
+                        my $isPerlCore =
+                          $isPerlPragma
+                          ? 0
+                          : FHEM::Meta::ModuleIsPerlCore($pkg);
+                        my $isFhem =
+                          $isPerlPragma || $isPerlCore
+                          ? 0
+                          : FHEM::Meta::ModuleIsInternal($pkg);
+
+                        if ( $pkg eq 'perl' ) {
+                            $pkgStatus{Perl}{pkgs}{$pkg}{status} = 'built-in';
+                            $pkgStatus{Perl}{installed}{$pkg} =
+                              version->parse($])->numify;
+                        }
+                        elsif ( $pkg eq 'FHEM' ) {
+                            $pkgStatus{Perl}{pkgs}{$pkg}{status} = 'included';
+                            $pkgStatus{Perl}{installed}{$pkg} =
+                              $modules{'Global'}{META}{version};
+                        }
+                        elsif ( $pkg eq 'FHEM::Meta' || $pkg eq 'Meta' ) {
+                            $pkgStatus{Perl}{pkgs}{$pkg}{status} = 'included';
+                            $pkgStatus{Perl}{installed}{$pkg} =
+                              FHEM::Meta->VERSION();
+                        }
+                        elsif ($isPerlPragma) {
+                            $pkgStatus{Perl}{pkgs}{$pkg}{status} = 'built-in';
+                            $pkgStatus{Perl}{installed}{$pkg} = 0;
+                        }
+                        elsif ($isPerlCore) {
+                            $pkgStatus{Perl}{pkgs}{$pkg}{status} = 'built-in';
+                            $pkgStatus{Perl}{installed}{$pkg} = 0;
+                        }
+
+                        # This is a FHEM package
+                        elsif ( $isFhem && $isFhem eq 'package' ) {
+                            $pkgStatus{Perl}{pkgs}{$pkg}{status} = 'included';
+                            $pkgStatus{Perl}{installed}{$pkg} =
+                              defined( $packages{$fname}{META} )
+                              ? $packages{$fname}{META}{version}
+                              : 0;
+                        }
+
+                        # This is a FHEM module being loaded as package
+                        elsif ( $isFhem && $isFhem eq 'module' ) {
+                            $pkgStatus{Perl}{pkgs}{$pkg}{status} = 'included';
+                            $pkgStatus{Perl}{installed}{$pkg} =
+                              defined( $modules{$fname}{META} )
+                              ? $modules{$fname}{META}{version}
+                              : 0;
+                        }
+                        elsif ( $pkg =~ /^Win32::/ && $^O ne 'MSWin32' ) {
+                            $pkgStatus{Perl}{pkgs}{$pkg}{status} = 'n/a';
+                        }
+                        else {
+
+                            my $pkgpath = $pkg . '.pm';
+                            $pkgpath =~ s/::/\//g;
+
+                            # remove any ealier tries to load
+                            #  to get the original error message
+                            foreach ( keys %INC ) {
+                                delete $INC{$_}
+                                  if ( !$INC{$_} );
+                            }
+
+                            #FIXME disable warnings does not work here...
+                            no warnings;
+                            my $verbose = AttrVal( 'global', 'verbose', 3 );
+                            $attr{global}{verbose} = 0;
+                            eval "no warnings; require $pkg;";
+                            $attr{global}{verbose} = $verbose;
+                            use warnings;
+
+                            if ( $@ && $@ =~ m/^Can't locate (\S+)\.pm/i ) {
+                                my $missing = $1;
+                                $missing =~ s/\//::/g;
+                                $pkgStatus{Perl}{pkgs}{$missing}{status} =
+                                  'missing';
+                                push @{ $pkgStatus{Perl}{missing}{$missing} },
+                                  defined( $modPreqs->{$mAttr}{$missing} )
+                                  ? $modPreqs->{$mAttr}{$missing}
+                                  : 0;
+
+                                $pkgStatus{Perl}{analyzed} = 1
+                                  if ( $modMeta->{x_prereqs_src} ne 'META.json'
+                                    && !$pkgStatus{Perl}{analyzed} );
+
+                                # If the error message does contain a
+                                #   different package name,
+                                #   the actual package is installed and
+                                #   misses another package by it's own
+                                if ( $missing ne $pkg ) {
+                                    my $v = eval "$pkg->VERSION()";
+                                    $pkgStatus{Perl}{pkgs}{$pkg}{status} =
+                                      'installed';
+                                    $pkgStatus{Perl}{installed}{$pkg} =
+                                      $v ? $v : 0;
+
+                                    push @{ $pkgStatus{Perl}{pkgs}{$missing}
+                                          { $type . 's' }{$mAttr} },
+                                      $modName
+                                      unless (
+                                        grep ( /^$modName$/,
+                                            @{
+                                                $pkgStatus{Perl}{pkgs}{$missing}
+                                                  { $type . 's' }{$mAttr}
+                                            } )
+                                      );
+
+                                    # Lets also update the module meta data
+                                    if ( $type eq 'module' ) {
+                                        $modMeta->{prereqs}
+                                          {runtime}{$mAttr}{$missing} = 0;
+                                    }
+                                    else {
+                                        $packages{$modName}{META}{prereqs}
+                                          {runtime}{$mAttr}{$missing} = 0;
+                                    }
+                                }
+                            }
+                            else {
+                                $pkgStatus{Perl}{pkgs}{$pkg}{status} =
+                                  'installed';
+                                my $v = eval "$pkg->VERSION()";
+                                $pkgStatus{Perl}{installed}{$pkg} = $v ? $v : 0;
+                            }
+                        }
+
+                        # check for outdated version
+                        if ( $pkgStatus{Perl}{pkgs}{$pkg}{status} eq 'installed'
+                            || $pkg eq 'perl' )
+                        {
+                            my $reqV  = $modPreqs->{$mAttr}{$pkg};
+                            my $instV = $pkgStatus{Perl}{installed}{$pkg};
+                            if ( $reqV ne '0' && $instV ne '0' ) {
+                                $reqV  = version->parse($reqV)->numify;
+                                $instV = version->parse($instV)->numify;
+
+                                #TODO suport for version range:
+                                #  https://metacpan.org/pod/ \
+                                #   CPAN::Meta::Spec#Version-Range
+                                if ( $reqV > 0 && $instV < $reqV ) {
+
+                                    $pkgStatus{Perl}{pkgs}{$pkg}{status} =
+                                      'outdated';
+                                    push @{ $pkgStatus{Perl}{outdated}{$pkg} },
+                                      $reqV;
+
+                                    $pkgStatus{Perl}{analyzed} = 1
+                                      if (
+                                        $modMeta->{x_prereqs_src} ne 'META.json'
+                                        && !$pkgStatus{Perl}{analyzed} );
+                                }
+                            }
+                        }
+
+                        $pkgStatus{Perl}{pkgs}{$pkg}{timestamp} = $t;
+                    }
+                }
+            }
+
+            #TODO
+            # nodejs
+            # python
+        }
+    }
+
+    # build installation hash
+    foreach my $area ( keys %pkgStatus ) {
+        foreach my $t (qw(missing outdated)) {
+            if (   defined( $pkgStatus{$area}{$t} )
+                && ref( $pkgStatus{$area}{$t} ) eq 'HASH'
+                && %{ $pkgStatus{$area}{$t} } > 0 )
+            {
+                foreach my $pkg ( keys %{ $pkgStatus{$area}{$t} } ) {
+                    next
+                      unless ( ref( $pkgStatus{$area}{$t}{$pkg} ) eq 'ARRAY' );
+
+                    # detect minimum required version
+                    #   for missing and outdated packages
+                    my $v = maxNum( 0, @{ $pkgStatus{$area}{$t}{$pkg} } );
+                    $pkgStatus{$area}{$t}{$pkg} = $v;
+
+                    if (
+                        defined(
+                            $pkgStatus{$area}{pkgs}{$pkg}{modules}{requires}
+                        )
+                        && @{ $pkgStatus{$area}{pkgs}{$pkg}{modules}{requires} }
+                        > 0
+                      )
+                    {
+                        $pkgStatus{counter}{total}++;
+                        $pkgStatus{counter}{$t}++;
+                        $pkgStatus{counter}{required}{total}++;
+                        $pkgStatus{counter}{required}{$t}++;
+                        $pkgStatus{counter}{required}{$area}{total}++;
+                        $pkgStatus{counter}{required}{$area}{$t}++;
+                        $pkgStatus{counter}{$area}{total}++;
+                        $pkgStatus{counter}{$area}{$t}++;
+                        $pkgStatus{counter}{$area}{required}{total}++;
+                        $pkgStatus{counter}{$area}{required}{$t}++;
+
+                        $pkgStatus{required}{$area}{$pkg}{status}  = $t;
+                        $pkgStatus{required}{$area}{$pkg}{version} = $v;
+                        $pkgStatus{required}{$area}{$pkg}{modules} =
+                          $pkgStatus{$area}{pkgs}{$pkg}{modules}{requires};
+
+                        # add other modules
+                        if (
+                            defined(
+                                $pkgStatus{$area}{pkgs}{$pkg}{modules}
+                                  {recommends}
+                            )
+                            && @{
+                                $pkgStatus{$area}{pkgs}{$pkg}{modules}
+                                  {recommends}
+                            } > 0
+                          )
+                        {
+                            foreach my $modName (
+                                @{
+                                    $pkgStatus{$area}{pkgs}{$pkg}{modules}
+                                      {recommends}
+                                }
+                              )
+                            {
+                                push
+                                  @{ $pkgStatus{required}{$area}{$pkg}{modules}
+                                  },
+                                  $modName
+                                  unless (
+                                    grep ( /^$modName$/,
+                                        @{
+                                            $pkgStatus{required}{$area}
+                                              {$pkg}{modules}
+                                        } )
+                                  );
+                            }
+                        }
+
+                        if (
+                            defined(
+                                $pkgStatus{$area}{pkgs}{$pkg}{modules}{suggests}
+                            )
+                            && @{
+                                $pkgStatus{$area}{pkgs}{$pkg}{modules}{suggests}
+                            } > 0
+                          )
+                        {
+                            foreach my $modName (
+                                @{
+                                    $pkgStatus{$area}{pkgs}{$pkg}{modules}
+                                      {suggests}
+                                }
+                              )
+                            {
+                                push
+                                  @{ $pkgStatus{required}{$area}{$pkg}{modules}
+                                  },
+                                  $modName
+                                  unless (
+                                    grep ( /^$modName$/,
+                                        @{
+                                            $pkgStatus{required}{$area}
+                                              {$pkg}{modules}
+                                        } )
+                                  );
+                            }
+                        }
+                    }
+                    elsif (
+                        defined(
+                            $pkgStatus{$area}{pkgs}{$pkg}{modules}{recommends}
+                        )
+                        && @{ $pkgStatus{$area}{pkgs}{$pkg}{modules}{recommends}
+                        } > 0
+                      )
+                    {
+                        $pkgStatus{counter}{total}++;
+                        $pkgStatus{counter}{$t}++;
+                        $pkgStatus{counter}{recommended}{total}++;
+                        $pkgStatus{counter}{recommended}{$t}++;
+                        $pkgStatus{counter}{recommended}{$area}{total}++;
+                        $pkgStatus{counter}{recommended}{$area}{$t}++;
+                        $pkgStatus{counter}{$area}{total}++;
+                        $pkgStatus{counter}{$area}{$t}++;
+                        $pkgStatus{counter}{$area}{recommended}{total}++;
+                        $pkgStatus{counter}{$area}{recommended}{$t}++;
+
+                        $pkgStatus{recommended}{$area}{$pkg}{status}  = $t;
+                        $pkgStatus{recommended}{$area}{$pkg}{version} = $v;
+                        $pkgStatus{recommended}{$area}{$pkg}{modules} =
+                          $pkgStatus{$area}{pkgs}{$pkg}{modules}{recommends};
+
+                        # add other modules
+                        if (
+                            defined(
+                                $pkgStatus{$area}{pkgs}{$pkg}{modules}{suggests}
+                            )
+                            && @{
+                                $pkgStatus{$area}{pkgs}{$pkg}{modules}{suggests}
+                            } > 0
+                          )
+                        {
+                            foreach my $modName (
+                                @{
+                                    $pkgStatus{$area}{pkgs}{$pkg}{modules}
+                                      {suggests}
+                                }
+                              )
+                            {
+                                push @{ $pkgStatus{recommended}{$area}{$pkg}
+                                      {modules} },
+                                  $modName
+                                  unless (
+                                    grep ( /^$modName$/,
+                                        @{
+                                            $pkgStatus{recommended}{$area}
+                                              {$pkg}{modules}
+                                        } )
+                                  );
+                            }
+                        }
+                    }
+                    elsif (
+                        defined(
+                            $pkgStatus{$area}{pkgs}{$pkg}{modules}{suggests}
+                        )
+                        && @{ $pkgStatus{$area}{pkgs}{$pkg}{modules}{suggests} }
+                        > 0
+                      )
+                    {
+                        $pkgStatus{counter}{total}++;
+                        $pkgStatus{counter}{$t}++;
+                        $pkgStatus{counter}{suggested}{total}++;
+                        $pkgStatus{counter}{suggested}{$t}++;
+                        $pkgStatus{counter}{suggested}{$area}{total}++;
+                        $pkgStatus{counter}{suggested}{$area}{$t}++;
+                        $pkgStatus{counter}{$area}{total}++;
+                        $pkgStatus{counter}{$area}{$t}++;
+                        $pkgStatus{counter}{$area}{suggested}{total}++;
+                        $pkgStatus{counter}{$area}{suggested}{$t}++;
+
+                        $pkgStatus{suggested}{$area}{$pkg}{status}  = $t;
+                        $pkgStatus{suggested}{$area}{$pkg}{version} = $v;
+                        $pkgStatus{suggested}{$area}{$pkg}{modules} =
+                          $pkgStatus{$area}{pkgs}{$pkg}{modules}{suggests};
+                    }
+                }
+            }
+            else {
+                $pkgStatus{counter}{$t}                     = 0;
+                $pkgStatus{counter}{required}{$t}           = 0;
+                $pkgStatus{counter}{required}{$area}{$t}    = 0;
+                $pkgStatus{counter}{recommended}{$t}        = 0;
+                $pkgStatus{counter}{recommended}{$area}{$t} = 0;
+                $pkgStatus{counter}{suggested}{$t}          = 0;
+                $pkgStatus{counter}{suggested}{$area}{$t}   = 0;
+                $pkgStatus{counter}{$area}{$t}              = 0;
+                $pkgStatus{counter}{$area}{required}{$t}    = 0;
+                $pkgStatus{counter}{$area}{recommended}{$t} = 0;
+                $pkgStatus{counter}{$area}{suggested}{$t}   = 0;
+            }
+        }
+    }
+
+    if (@rets) {
+        $@ = join( "\n", @rets );
+        return "$@";
+    }
+
+    return undef;
 }
 
+#TODO
 # Checks whether a NodeJS package is installed in the system
 sub __IsInstalledNodejs($) {
     return 0 unless ( __PACKAGE__ eq caller(0) );
@@ -3266,6 +3596,7 @@ sub __IsInstalledNodejs($) {
     return 0;
 }
 
+#TODO
 # Checks whether a Python package is installed in the system
 sub __IsInstalledPython($) {
     return 0 unless ( __PACKAGE__ eq caller(0) );
@@ -3375,7 +3706,7 @@ sub __aUniq {
       "abstract": "Modul zum Update von FHEM, zur Installation von Drittanbieter FHEM Modulen und der Verwaltung von Systemvoraussetzungen"
     }
   },
-  "version": "v0.3.0",
+  "version": "v0.3.5",
   "release_status": "testing",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"

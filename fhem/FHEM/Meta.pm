@@ -4,6 +4,9 @@ package main;
 use strict;
 use warnings;
 
+# only to hopefully have this loaded before any module loads threads::shared
+use threads;
+
 # provide the same hash as for real FHEM modules
 #   in FHEM main context
 use vars qw(%packages);
