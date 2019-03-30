@@ -1687,7 +1687,7 @@ $culHmRegChan{"HM-OU-CFM-TW02"}         = $culHmRegChan{"HM-OU-CFM-PL02"};
                       ,getConfig     => ""
                       ,regSet        => "[prep|exec] -regName- -value- ... [-peerChannel-]"
                       ,clear         => "[readings|trigger|register|oldRegs|rssi|msgEvents|msgErrors|attack|all]"
-                      ,templateDel   => "tmplt"
+                      ,tplDel        => "tmplt"
 );
 %culHmGlobalSetsVrtDev = (# virtuals and devices without subtype
                        virtual       => "-noButtons-"
@@ -1806,9 +1806,7 @@ $culHmSubTypeSets{motionAndBtn}         = $culHmSubTypeSets{threeStateSensor};
                                             ,alarm          => "-count-"
                                             ,display        => "-text- [comma|no] [unit] [off|1|2|3] [off|on|slow|fast] -symbol-"
                                            }
-                     ,"HM-PB-4DIS-WM"    =>{ text           =>"-txt1- -txt2-..."
-                                              #text         => "-btn- [on|off] -txt1- -txt2-...", old style will not be offered anymore
-                                           }
+                     ,"HM-PB-4DIS-WM"    =>{ text           =>"-txt1- -txt2-..."  }
                      ,"HM-OU-LED16"      =>{ led            =>"[off|red|green|orange]"
                                             ,ilum           => "[0-15] [0-127]"
                                             ,statusRequest  =>""
@@ -1841,10 +1839,7 @@ $culHmModelSets{"HM-OU-CM-PCB"}          =
 $culHmModelSets{"HM-OU-CF-PL"}           = 
 $culHmModelSets{"HM-OU-CFM-TW"}          = $culHmModelSets{"HM-OU-CFM-PL"};
 $culHmModelSets{"HM-PB-4DIS-WM-2"}       = 
-$culHmModelSets{"HM-Dis-WM55"}           = 
-$culHmModelSets{"HM-Dis-EP-WM55"}        = 
 $culHmModelSets{"HM-ES-TX-WM"}           = 
-$culHmModelSets{"HM-RC-Dis-H-x-EU"}      = 
 $culHmModelSets{"ROTO_ZEL-STG-RM-DWT-10"}= $culHmModelSets{"HM-PB-4DIS-WM"};
                                          
 #$culHmModelSets{"HM-OU-CFM-PL"}          = $culHmModelSets{"HM-SEC-SD"};# no statusrequest possible
@@ -1858,6 +1853,7 @@ $culHmModelSets{"HM-HM-LC-DW-WM"}        = $culHmSubTypeSets{dimmer};   ##### re
                                                 ,sysTime        =>""
                                                 ,getSerial      => ""
                                                }
+                     ,"HM-RC-Dis-H-x-EUxx"   =>{ text           =>"-txt1- -txt2-..."  }
                      ,"HM-CC-TC02"           =>{ peerChan       =>" 0 -actChn- ... single [set|unset] [actor|remote|both]"
                                                 ,"desired-temp" =>"[on|off|6.0..30.0]"
                                                 ,tempListSat    =>"[prep|exec] HH:MM temp ..."
@@ -1981,6 +1977,8 @@ $culHmModelSets{"HM-HM-LC-DW-WM"}        = $culHmSubTypeSets{dimmer};   ##### re
                                                }
  );
 # clones- - - - - - - - - - - - - - - - -
+$culHmChanSets{"HM-Dis-WM55xx"}         =
+$culHmChanSets{"HM-Dis-EP-WMxx"}        = $culHmChanSets{"HM-RC-Dis-H-x-EUxx"};
 $culHmChanSets{"HM-Sec-Sir-WM02"}       =
 $culHmChanSets{"HM-Sec-Sir-WM03"}       = $culHmChanSets{"HM-Sec-Sir-WM01"};
 $culHmChanSets{"HM-Dis-WM5502"}         = $culHmChanSets{"HM-Dis-WM5501"};
