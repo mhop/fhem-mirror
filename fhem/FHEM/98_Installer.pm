@@ -1115,11 +1115,34 @@ sub CreatePrereqsList {
                 $l .= $rowClose;
 
                 if ( $linecount == 1 ) {
+                    my $descr =
+                        'These dependencies '
+                      . $txtOpen . 'must'
+                      . $txtClose
+                      . ' be installed for the listed FHEM modules to work:';
+                    $descr =
+                        'These dependencies are '
+                      . $txtOpen
+                      . 'strongly encouraged'
+                      . $txtClose
+                      . ' and should be installed for full functionality of the listed FHEM modules, except in resource constrained environments:'
+                      if ( $importance eq 'Recommended' );
+                    $descr =
+                        'These dependencies are '
+                      . $txtOpen
+                      . 'optional'
+                      . $txtClose
+                      . ', but are suggested for enhanced operation of the listed FHEM modules:'
+                      if ( $importance eq 'Suggested' );
+
                     push @ret,
                         '<a name="prereqResult'
                       . $importance
                       . '"></a><h3>'
                       . $importance . '</h3>'
+                      . $lb
+                      . $descr
+                      . $lb
                       . $lb;
                     push @ret, $tableOpen . $rowOpen;
                     push @ret,
@@ -1139,58 +1162,72 @@ sub CreatePrereqsList {
         }
     }
 
-    if ( defined( $pkgStatus{Perl}{analyzed} ) ) {
-        push @ret,
+    if ($found) {
+        if ( defined( $pkgStatus{Perl}{analyzed} ) ) {
+            push @ret,
+                $lb
+              . $txtOpen . 'Hint:'
+              . $txtClose
+              . ' Some of the FHEM modules in use do not provide Perl prerequisites from its metadata.'
+              . $lb;
+
+            if ( $pkgStatus{Perl}{analyzed} == 1 ) {
+                push @ret,
+'This check is based on automatic source code analysis and can be incorrect.'
+                  . ' Suggested Perl items may still be required if the module author had decided to implement some own dependency and/or error handling like returning an informative message instead of the original Perl error message.';
+            }
+            elsif ( $pkgStatus{Perl}{analyzed} == 2 ) {
+                push @ret,
+'This check may be incomplete until you install Perl::PrereqScanner::NotQuiteLite for automatic source code analysis.';
+            }
+        }
+
+        unshift @ret,
             $lb
-          . $txtOpen . 'Hint:'
-          . $txtClose
-          . ' Some of the used FHEM modules do not provide Perl prerequisites from its metadata.'
-          . $lb;
-
-        if ( $pkgStatus{Perl}{analyzed} == 1 ) {
-            push @ret,
-'This check is based on automatic source code analysis and can be incorrect.';
-        }
-        elsif ( $pkgStatus{Perl}{analyzed} == 2 ) {
-            push @ret,
-'This check may be incomplete until you install Perl::PrereqScanner::NotQuiteLite.';
-        }
+          . $space
+          . $space
+          . ( $html ? '<a href="#prereqResultSuggested">' : '' )
+          . $foundSuggested
+          . ' suggested '
+          . ( $foundSuggested > 1 ? 'items' : 'item' )
+          . ( $html               ? '</a>'  : '' )
+          if ($foundSuggested);
+        unshift @ret,
+            $lb
+          . $space
+          . $space
+          . ( $html ? '<a href="#prereqResultRecommended">' : '' )
+          . $foundRecommended
+          . ' recommended '
+          . ( $foundRecommended > 1 ? 'items' : 'item' )
+          . ( $html                 ? '</a>'  : '' )
+          if ($foundRecommended);
+        unshift @ret,
+            $lb
+          . $space
+          . $space
+          . ( $html ? '<a href="#prereqResultRequired">' : '' )
+          . $foundRequired
+          . ' required '
+          . ( $foundRequired > 1 ? 'items' : 'item' )
+          . ( $html              ? '</a>'  : '' )
+          if ($foundRequired);
+        unshift @ret,
+            $found
+          . ' total missing '
+          . ( $found > 1 ? 'prerequisites:' : 'prerequisite:' );
     }
-
-    unshift @ret,
-        $lb
-      . $space
-      . $space
-      . ( $html ? '<a href="#prereqResultSuggested">' : '' )
-      . $foundSuggested
-      . ' suggested '
-      . ( $foundSuggested > 1 ? 'items' : 'item' )
-      . ( $html               ? '</a>'  : '' )
-      if ($foundSuggested);
-    unshift @ret,
-        $lb
-      . $space
-      . $space
-      . ( $html ? '<a href="#prereqResultRecommended">' : '' )
-      . $foundRecommended
-      . ' recommended '
-      . ( $foundRecommended > 1 ? 'items' : 'item' )
-      . ( $html                 ? '</a>'  : '' )
-      if ($foundRecommended);
-    unshift @ret,
-        $lb
-      . $space
-      . $space
-      . ( $html ? '<a href="#prereqResultRequired">' : '' )
-      . $foundRequired
-      . ' required '
-      . ( $foundRequired > 1 ? 'items' : 'item' )
-      . ( $html              ? '</a>'  : '' )
-      if ($foundRequired);
-    unshift @ret,
-        $found
-      . ' total missing '
-      . ( $found > 1 ? 'prerequisites:' : 'prerequisite:' );
+    else {
+        my @hooray = (
+            'hooray', 'hurray', 'phew', 'woop woop',
+            'woopee', 'wow',    'yay',  'yippie',
+        );
+        my $x = 0 + int( rand( scalar @hooray + 1 - 0 ) );
+        unshift @ret,
+            ucfirst( $hooray[$x] )
+          . '! All prerequisites are met.'
+          . ( $html ? ' 🥳' : '' );
+    }
 
     unshift @ret,
         '<a name="prereqResultTOP"></a><h2>'
@@ -2634,7 +2671,16 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
 
     push @ret, $tableClose . $lb if ( $linecount > 1 );
 
-    if ( $modType eq 'module' && $modName ne 'Global' ) {
+    if (
+           $modType eq 'module'
+        && $modName ne 'Global'
+        && (   !defined( $modules{$modName}{META} )
+            || !defined( $modules{$modName}{META}{keywords} )
+            || !
+            grep ( /^fhem-mod-command$/,
+                @{ $modules{$modName}{META}{keywords} } ) )
+      )
+    {
         push @ret, '<h3>Devices</h3>';
 
         if ( defined( $modules{$modName}{LOADED} ) ) {
@@ -2664,12 +2710,12 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
             else {
                 push @ret,
                     $lb
-                  . 'This module was once loaded into memory, '
-                  . 'but currently there is no device defined anymore.';
+                  . 'The module was once loaded into memory, '
+                  . 'but currently there is no device defined.';
             }
         }
         else {
-            push @ret, $lb . 'This module is currently not in use.';
+            push @ret, $lb . 'The module is currently not in use.';
         }
     }
 
@@ -2733,6 +2779,28 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                 my $version = $modMeta->{prereqs}{runtime}{$mAttr}{$prereq};
                 $version = '' if ( !defined($version) || $version eq '0' );
 
+                my $inherited = '';
+                if (
+                    defined( $modMeta->{prereqs}{runtime}{x_inherited} )
+                    && defined(
+                        $modMeta->{prereqs}{runtime}{x_inherited}{$prereq}
+                    )
+                  )
+                {
+                    $inherited = '[inherited]';
+                    $inherited = '<span title="Inherited from '
+                      . join(
+                        ', ',
+                        @{
+                            $modMeta->{prereqs}{runtime}{x_inherited}{$prereq}
+                        }
+                      )
+                      . '" style="color:grey;">'
+                      . $inherited
+                      . '</span>'
+                      if ($html);
+                }
+
                 $prereq =
                     '<a href="https://metacpan.org/pod/'
                   . $prereq
@@ -2772,14 +2840,20 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                     elsif ($installed eq 'missing'
                         || $installed eq 'outdated' )
                     {
-                        $installed = $colorRed . uc($installed) . $colorClose;
+                        $installed =
+                            $colorRed
+                          . $txtOpen
+                          . uc($installed)
+                          . $txtClose
+                          . $colorClose;
                     }
                 }
 
                 $l .=
                     $colOpen
                   . $prereq
-                  . ( $version ne '' ? " ($version)" : '' )
+                  . ( $inherited ne '' ? " $inherited" : '' )
+                  . ( $version ne ''   ? " ($version)" : '' )
                   . $colClose;
                 $l .= $colOpen . $importance . $colClose;
                 $l .= $colOpen . $installed . $colClose;
@@ -2800,7 +2874,7 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
         push @ret,
             $lb
           . 'Module metadata do not contain any prerequisites.' . "\n"
-          . 'For automatic source code analysis, please install Perl::PrereqScanner::NotQuiteLite .'
+          . 'For automatic source code analysis, please install Perl::PrereqScanner::NotQuiteLite first.'
           . $lb
           . $lb;
     }
@@ -3737,18 +3811,18 @@ sub __aUniq {
   "prereqs": {
     "runtime": {
       "requires": {
-        "FHEM": 5.00918623,
-        "perl": 5.014,
-        "GPUtils": 0,
-        "JSON": 0,
-        "FHEM::Meta": 0.001006,
         "Data::Dumper": 0,
-        "IO::Socket::SSL": 0,
-        "HttpUtils": 0,
-        "File::stat": 0,
         "Encode": 0,
-        "version": 0,
-        "FHEM::npmjs": 0
+        "FHEM": 5.00918623,
+        "FHEM::Meta": 0.001006,
+        "FHEM::npmjs": 0,
+        "File::stat": 0,
+        "GPUtils": 0,
+        "HttpUtils": 0,
+        "IO::Socket::SSL": 0,
+        "JSON": 0,
+        "perl": 5.014,
+        "version": 0
       },
       "recommends": {
         "Perl::PrereqScanner::NotQuiteLite": 0,
