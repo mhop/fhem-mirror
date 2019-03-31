@@ -50,6 +50,7 @@
 #
 # Version History
 #
+# 2019-03-27 version 0.2.11k: error message instead of debug
 # 2019-01-28 version 0.2.11j: vcontrold-Neigung (Heizkurve) commands not rounded to full number anymore 
 # 2019-01-28 version 0.2.11i: update starts now if device initiated (for example, via FHEM restart) 
 # 2018-12-26 version 0.2.11h: warnings removed
@@ -74,7 +75,7 @@ use Scalar::Util qw(looks_like_number);
 use Blocking;
 use Data::Dumper;
 
-my $VCLIENT_version = "0.2.11j";
+my $VCLIENT_version = "0.2.11k";
 my $internal_update_interval  = 0.1; #internal update interval for Write (time between two different write_to_Viessmann commands)
 my $daily_commands_last_day_with_execution = strftime('%d', localtime)-1; #last day when daily commands (commands with type 'daily' ) were executed; set to today
 
@@ -437,8 +438,8 @@ sub VCLIENT_ParseBuf_And_WriteReading($$){
 			$value = substr($value, 0, -3);# loesche letztes separation sign | beim timer
 		} else {
 	   		# format der Ausgabe unbekannt
-			$value = "$name: Unkown buffer format";
-			Debug("$name: buf ".$buf);			
+			$value = "";
+			Log3 $name, 1, $name.": Cannot handle buf = ".$buf;			
 		}
 		Log3 $name, 3,  $name.": Received ".$value." for ".$reading;
    	}
