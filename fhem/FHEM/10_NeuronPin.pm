@@ -8,6 +8,7 @@ package main;
 
 use strict;
 use warnings;
+use SetExtensions;
 
 my %sets = (
 	'on' => 1,

@@ -96,7 +96,7 @@ sub Neuron_Undef(@){
 sub Neuron_Set(@) {
 	my ($hash, $name, $cmd, @args) = @_;
 	my $sets = $hash->{HELPER}{SETS};
-	if (index($hash->{HELPER}{SETS}, $cmd) != -1) {			# dynamisch erzeugte outputs
+	if ($hash->{HELPER}{SETS} && index($hash->{HELPER}{SETS}, $cmd) != -1) {			# dynamisch erzeugte outputs
 		my ($dev, $circuit) = (split '_', $cmd, 2);
 		my $value = (looks_like_number($args[0]) ? $args[0] : $setsP{$args[0]});
 		if ($hash->{HELPER}{wsKey} && DevIo_IsOpen($hash)) {
