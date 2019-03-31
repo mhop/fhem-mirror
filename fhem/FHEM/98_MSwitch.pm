@@ -2248,6 +2248,9 @@ return "wrong syntax. The syntax must be: \n\n[DEVICE:]READING:STATE=>cmd<1|2> I
 		#Log3( $name, 0, $val );
 		   
 		#$setid{$key} = $val;   
+		
+		#Log3( $name, 0, "setze event to id" );
+		
 		$hash->{helper}{eventtoid}{$key} = $val;
 		
 		
@@ -2614,7 +2617,13 @@ sub MSwitch_Notify($$) {
         # teste auf triggertreffer oder GLOBAL trigger
         my $activecount = 0;
         my $anzahl;
-      EVENT: foreach my $event (@eventscopy) {
+		
+		
+	##Log3( $ownName, 0, "-".$own_hash->{helper}{eventtoid}."-" );#LOG	
+		
+		
+      EVENT: foreach my $event (@eventscopy) 
+	  {
 ##################################
             MSwitch_LOG( $ownName, 5, "$ownName:     event -> $event  " );
 
@@ -2706,6 +2715,14 @@ sub MSwitch_Notify($$) {
                 }
             }
 
+			
+			
+			##Log3( $ownName, 0, "danach-".$own_hash->{helper}{eventtoid}."-" );#LOG
+			
+			
+			
+			
+			
             if ( $triggerlog eq 'on' ) {
                 if ( $triggerdevice eq "all_events" ) {
                     $own_hash->{helper}{events}{'all_events'}
@@ -5148,9 +5165,15 @@ sub MSwitch_fhemwebFn($$$$) {
 	
 	 #my $bridgemode  = AttrVal( $name, 'MSwitch_Event_Id_Distributor', '0' );
      my $expertmode  = AttrVal( $Name, 'MSwitch_Expert', '0' );
+     my $idmode = AttrVal( $Name, 'MSwitch_Event_Id_Distributor', 'undef' );
  
  
-	if ($hash->{helper}{eventtoid} && $expertmode eq "1" ){
+
+ #Log3( $Name, 0, "-".$eventok ."-" );
+	if ($hash->{helper}{eventtoid} && $idmode ne "undef" && $expertmode eq "1" ){
+	
+#	Log3( $Name, 0, "-".$hash->{helper}{eventtoid}."-" );#LOG
+	
 	$ret .=
     "<table border='$border' class='block wide' id='MSwitchWebBridge' nm='$hash->{NAME}'>
 	<tr class=\"even\">
@@ -7059,7 +7082,9 @@ m/(.*?)(\[\[[a-zA-Z][a-zA-Z0-9_]{0,30}:[a-zA-Z0-9_]{0,30}\]-\[[a-zA-Z][a-zA-Z0-9
     }
 
     $x = 0;
-    while ( $condition =~ m/(.*)({ )(.*)(\$we)( })(.*)/ ) {
+    #while ( $condition =~ m/(.*)({ )(.*)(\$we)( })(.*)/ )
+    while ( $condition =~ m/(.*)(\{ )(.*)(\$we)( \})(.*)/ )
+	{
         last if $x > 20;        # notausstieg
         $condition = $1 . " " . $3 . $4 . " " . $6;
     }
@@ -7067,8 +7092,7 @@ m/(.*?)(\[\[[a-zA-Z][a-zA-Z0-9_]{0,30}:[a-zA-Z0-9_]{0,30}\]-\[[a-zA-Z][a-zA-Z0-9
     ###################################################
     # ersetzte sunset sunrise
     $x = 0;    # notausstieg
-    while (
-        $condition =~ m/(.*)({ )(sunset\([^}]*\)|sunrise\([^}]*\))( })(.*)/ )
+    while ($condition =~ m/(.*)({ )(sunset\([^}]*\)|sunrise\([^}]*\))( })(.*)/ )
     {
 
         $x++;    # notausstieg
@@ -8685,7 +8709,12 @@ sub MSwitch_saveconf($$) {
 
         if ( $_ =~ m/#A (.*) -> (.*)/ )    # setattr
         {
-            $attr{$name}{$1} = $2;
+		my $na =$1;
+		my $ih = $2;
+		$ih =~ s/#\[nl\]/\n/g;
+		
+		
+            $attr{$name}{$na} = $ih;
         }
     }
     MSwitch_set_dev($hash);
@@ -9041,15 +9070,31 @@ sub MSwitch_set_dev($) {
     my ($hash) = @_;
     my $name = $hash->{NAME};
     my $not = ReadingsVal( $name, 'Trigger_device', '' );
-    if ( $not ne 'no_trigger' ) {
-        if ( $not eq "all_events" ) {
+	
+	#MSwitch_LOG( $name, 0, "$name update not - $not " . __LINE__ );
+	
+    if ( $not ne 'no_trigger' ) 
+	{
+        if ( $not eq "all_events" ) 
+		{
             delete( $hash->{NOTIFYDEV} );
-            if ( ReadingsVal( $name, '.Trigger_Whitelist', '' ) ne '' ) {
+            if ( ReadingsVal( $name, '.Trigger_Whitelist', '' ) ne '' ) 
+			{
                 $hash->{NOTIFYDEV} =
                   ReadingsVal( $name, '.Trigger_Whitelist', '' );
             }
         }
-        else {
+		elsif ( $not eq  "MSwitch_Self")
+		{
+		#MSwitch_LOG( $name, 0, "setze notify auf eigenen namen" . __LINE__ );
+		
+		$hash->{NOTIFYDEV} = $name;
+		
+		}
+        else 
+		{
+		
+			#MSwitch_LOG( $name, 0, "setze notify auf not" . __LINE__ );
             $hash->{NOTIFYDEV} = $not;
             my $devices = MSwitch_makeAffected($hash);
             $hash->{DEF} = $not . ' # ' . $devices;
@@ -9483,18 +9528,3 @@ werden aber nicht ausgeführt <br />3. schreibt alle Aktionen in ein seperates L
 </ul>
 
 =end html_DE
-
-=for :application/json;q=META.json 98MSwitch.pm
- 		{
- 		  "author": [
- 		    "T. Pause"
- 		  ],
- 		  "x_fhem_maintainer": [
- 		    "Byte09"
- 		  ],
- 		  "keywords": [
- 		    "MSwitch"
- 		  ]
- 		}
- 		=end :application/json;q=META.json
- 		
