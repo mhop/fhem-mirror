@@ -103,12 +103,13 @@ sub HMtemplate_Attr(@) {#######################################################
       #burstRx  =>{min=>0,max=>255  ,c=>'lit',f=>'',t=>'device reacts on Burst'    ,lit=>{off=>0,on=>1}},
       #MaxTimeF =>{min=>0,max=>25.5 ,c=>''   ,f=>10,t=>"max time first direction." ,lit=>{unused=>25.5}},
       my $rN = substr($attrName,4);
-      my $ty = (AttrVal($name,"tpl_type",InternalVal($name,"tpl_type","")) =~ m/peer-both/) ? "" : "lg"; #RegDef for long and short is identical. Just extend to any sh or lg
+      my $ty = (AttrVal($name,"tpl_type",InternalVal($name,"tpl_type","")) =~ m/(peer-both|basic)/) ? "" : "lg"; #RegDef for long and short is identical. Just extend to any sh or lg
       my $calc = $culHmRegDef->{$ty.$rN}{c};
       if ($attr{$name}{tpl_params} && $attr{$name}{tpl_params} =~ m/\b$attrVal\b/){
         # allow any parameter in any string
       }
-      elsif ($calc eq "lit"){
+      elsif ($calc eq "lit" || defined $culHmRegDef->{$ty.$rN}{lit}{$attrVal}){
+        Log 1,"General found literal $rN:$attrVal";
         return "value $attrVal not allowed for $rN"  if (!defined $culHmRegDef->{$ty.$rN}{lit}{$attrVal});
       }
       elsif ($calc eq "fltCvT"  ){ my $calcVal = CUL_HM_CvTflt  (CUL_HM_fltCvT  ($attrVal)); return "Value $attrVal not possible. Use $calcVal" if ($attrVal != $calcVal); }
