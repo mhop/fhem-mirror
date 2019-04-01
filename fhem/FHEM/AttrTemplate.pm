@@ -21,6 +21,7 @@ AttrTemplate_Initialize()
 
   %templates = ();
   %cachedUsage = ();
+  my %prereqFailed;
   for my $file (@files) {
     if(!open(fh,"$dir/$file")) {
       Log 1, "$me: cant open $dir/$file: $!";
@@ -46,6 +47,18 @@ AttrTemplate_Initialize()
       } elsif($line =~ m/^filter:(.*)/) {
         $templates{$name}{filter} = $1;
 
+      } elsif($line =~ m/^prereq:(.*)/) {
+        my $prereq = $1;
+        if($prereq =~ m/^{.*}$/) {
+          $prereqFailed{$name} = 1
+                if(AnalyzePerlCommand(undef, $prereq) ne "1");
+
+        } else {
+          $prereqFailed{$name} = 1
+            if(!$defs{devspec2array($prereq)});
+
+        }
+
       } elsif($line =~ m/^par:(.*)/) {
         push(@{$templates{$name}{pars}}, $1);
 
@@ -62,6 +75,11 @@ AttrTemplate_Initialize()
     }
     close(fh);
   }
+
+  for my $name (keys %prereqFailed) {
+    delete($templates{$name});
+  }
+
   my $nr = (int keys %templates);
   $initialized = 1;
   Log 2, "AttrTemplates: got $nr entries" if($nr);
@@ -71,6 +89,10 @@ sub
 AttrTemplate_Set($$@)
 {
   my ($hash, $list, $name, $cmd, @a) = @_;
+  $list = "" if(!defined($list));
+
+  return "Unknown argument $cmd, choose one of $list"
+        if(AttrVal("global", "disableFeatures", "") =~ m/\battrTemplate\b/);
 
   AttrTemplate_Initialize() if(!$initialized);
 
@@ -181,12 +203,29 @@ AttrTemplate_Set($$@)
   my $cl = $hash->{CL};
   my $cmd = "";
   my @ret;
+  my $option = 1;
   map {
+
     if($_ =~ m/^(.*)\\$/) {
       $cmd .= "$1\n";
+
     } else {
-      my $r = AnalyzeCommand($cl, $cmd.$_);
-      push(@ret, $r) if($r);
+      $cmd .= $_;
+      if($cmd =~ m/^option:(.*)$/s) {
+        my $optVal = $1;
+        if($optVal =~ m/^{.*}$/) {
+          $option = (AnalyzePerlCommand(undef, $optVal) eq "1");
+
+        } else {
+          $option = defined($defs{devspec2array($optVal)});
+
+        }
+
+      } elsif($option) {
+        my $r = AnalyzeCommand($cl, $cmd);
+        push(@ret, $r) if($r);
+
+      }
       $cmd = "";
     }
   } split("\n", $cmdlist);

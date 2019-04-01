@@ -327,6 +327,7 @@ my @globalAttrList = qw(
   blockingCallMax
   commandref:modular,full
   configfile
+  disableFeatures:multiple,attrTemplate
   dnsHostsFile
   dnsServer
   dupTimeout
