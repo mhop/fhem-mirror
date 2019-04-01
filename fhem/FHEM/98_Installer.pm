@@ -1178,30 +1178,33 @@ sub CreatePrereqsList {
                 $linecount++;
             }
 
-            push @ret, $tBClose;
+            if ( $linecount > 1 ) {
 
-            my $descr =
-                'These dependencies '
-              . $strongOpen . 'must'
-              . $strongClose
-              . ' be installed for the listed FHEM modules to work.';
-            $descr =
-                'These dependencies are '
-              . $strongOpen
-              . 'strongly encouraged'
-              . $strongClose
-              . ' and should be installed for full functionality of the listed FHEM modules, except in resource constrained environments.'
-              if ( $importance eq 'Recommended' );
-            $descr =
-                'These dependencies are '
-              . $strongOpen
-              . 'optional'
-              . $strongClose
-              . ', but are suggested for enhanced operation of the listed FHEM modules.'
-              if ( $importance eq 'Suggested' );
+                push @ret, $tBClose;
 
-            push @ret, $tFOpen . $tdOpen3 . $descr . $tFClose;
-            push @ret, $tClose . $blockClose . $tdClose . $trClose;
+                my $descr =
+                    'These dependencies '
+                  . $strongOpen . 'must'
+                  . $strongClose
+                  . ' be installed for the listed FHEM modules to work.';
+                $descr =
+                    'These dependencies are '
+                  . $strongOpen
+                  . 'strongly encouraged'
+                  . $strongClose
+                  . ' and should be installed for full functionality of the listed FHEM modules, except in resource constrained environments.'
+                  if ( $importance eq 'Recommended' );
+                $descr =
+                    'These dependencies are '
+                  . $strongOpen
+                  . 'optional'
+                  . $strongClose
+                  . ', but are suggested for enhanced operation of the listed FHEM modules.'
+                  if ( $importance eq 'Suggested' );
+
+                push @ret, $tFOpen . $tdOpen3 . $descr . $tFClose;
+                push @ret, $tClose . $blockClose . $tdClose . $trClose;
+            }
         }
     }
 
@@ -3136,6 +3139,7 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
           . $lb
           . 'This result is based on automatic source code analysis '
           . 'and can be incorrect.'
+          . 'Suggested Perl items may still be required if the module author had decided to implement some own dependency and/or error handling like returning an informative message instead of the original Perl error message.'
           . $tdClose
           . $trClose
           . $tFClose
