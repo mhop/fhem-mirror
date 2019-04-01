@@ -956,14 +956,22 @@ sub CreatePrereqsList {
     my $header = '';
     my $footer = '';
     if ($html) {
-        $header = '<html><table><tr><td>';
-        $footer = '</td></tr></table></html>';
+        $header = '<html>';
+        $footer = '</html>';
     }
 
-    my $tOpen       = '';
     my $blockOpen   = '';
     my $tTitleOpen  = '';
     my $tTitleClose = '';
+    my $tOpen       = '';
+    my $tCOpen      = '';
+    my $tCClose     = '';
+    my $tHOpen      = '';
+    my $tHClose     = '';
+    my $tBOpen      = '';
+    my $tBClose     = '';
+    my $tFOpen      = '';
+    my $tFClose     = '';
     my $trOpen      = '';
     my $trOpenEven  = '';
     my $trOpenOdd   = '';
@@ -973,8 +981,8 @@ sub CreatePrereqsList {
     my $tdOpen      = '';
     my $tdOpen2     = '';
     my $tdOpen3     = '';
-    my $txtOpen     = '';
-    my $txtClose    = '';
+    my $strongOpen  = '';
+    my $strongClose = '';
     my $tdClose     = "\t\t\t";
     my $thClose     = "\t\t\t";
     my $trClose     = '';
@@ -985,28 +993,38 @@ sub CreatePrereqsList {
     my $colorClose  = '';
 
     if ($html) {
-        $blockOpen   = '<div class="makeTable wide readings">';
+        $blockOpen   = '<div class="makeTable wide internals">';
         $tTitleOpen  = '<span class="mkTitle">';
         $tTitleClose = '</span>';
-        $tOpen       = '<table class="block wide">';
+        $tOpen       = '<table class="block wide internals wrapcolumns">';
+        $tCOpen      = '<caption style="text-align: left; font-size: larger;">';
+        $tCClose     = '</caption>';
+        $tHOpen      = '<thead>';
+        $tHClose     = '</thead>';
+        $tBOpen      = '<tbody>';
+        $tBClose     = '</tbody>';
+        $tFOpen      = '<tfoot style="font-size: smaller;">';
+        $tFClose     = '</tfoot>';
         $trOpen      = '<tr class="column">';
         $trOpenEven  = '<tr class="column even">';
         $trOpenOdd   = '<tr class="column odd">';
-        $thOpen      = '<th style="text-align:left">';
-        $thOpen2     = '<th style="text-align:left" colspan="2">';
-        $thOpen3     = '<th style="text-align:left" colspan="3">';
-        $tdOpen      = '<td>';
-        $tdOpen2     = '<td colspan="2">';
-        $tdOpen3     = '<td colspan="3">';
-        $txtOpen     = '<b>';
-        $txtClose    = '</b>';
+        $thOpen      = '<th style="text-align: left; vertical-align: top;">';
+        $thOpen2 =
+          '<th style="text-align: left; vertical-align: top;" colspan="2">';
+        $thOpen3 =
+          '<th style="text-align: left; vertical-align: top;" colspan="3">';
+        $tdOpen      = '<td style="vertical-align: top;">';
+        $tdOpen2     = '<td style="vertical-align: top;" colspan="2">';
+        $tdOpen3     = '<td style="vertical-align: top;" colspan="3">';
+        $strongOpen  = '<strong>';
+        $strongClose = '</strong>';
         $tdClose     = '</td>';
         $thClose     = '</th>';
         $trClose     = '</tr>';
         $tClose      = '</table>';
         $blockClose  = '</div>';
-        $colorRed    = '<span style="color:red">';
-        $colorGreen  = '<span style="color:green">';
+        $colorRed    = '<span style="color: red">';
+        $colorGreen  = '<span style="color: green">';
         $colorClose  = '</span>';
     }
 
@@ -1135,56 +1153,68 @@ sub CreatePrereqsList {
                 $l .= $trClose;
 
                 if ( $linecount == 1 ) {
-                    my $descr =
-                        'These dependencies '
-                      . $txtOpen . 'must'
-                      . $txtClose
-                      . ' be installed for the listed FHEM modules to work:';
-                    $descr =
-                        'These dependencies are '
-                      . $txtOpen
-                      . 'strongly encouraged'
-                      . $txtClose
-                      . ' and should be installed for full functionality of the listed FHEM modules, except in resource constrained environments:'
-                      if ( $importance eq 'Recommended' );
-                    $descr =
-                        'These dependencies are '
-                      . $txtOpen
-                      . 'optional'
-                      . $txtClose
-                      . ', but are suggested for enhanced operation of the listed FHEM modules:'
-                      if ( $importance eq 'Suggested' );
-
                     push @ret,
-                        '<a name="prereqResult'
+                        $trOpen
+                      . $tdOpen
+                      . (
+                        $html
+                        ? '<a name="prereqResult' . $importance . '"></a>'
+                        : ''
+                      )
+                      . $blockOpen
+                      . $tOpen
+                      . $tCOpen
                       . $importance
-                      . '"></a><h3>'
-                      . $importance . '</h3>'
-                      . $lb
-                      . $descr
-                      . $lb
-                      . $lb;
-                    push @ret, $tOpen . $trOpen;
+                      . $tCClose;
+
+                    push @ret, $tHOpen . $trOpen;
                     push @ret, $thOpen . 'Item' . $thClose;
                     push @ret, $thOpen . 'Type' . $thClose;
                     push @ret, $thOpen . 'Used by' . $thClose;
-                    push @ret, $trClose;
+                    push @ret, $trClose . $tHClose . $tBOpen;
                 }
 
                 push @ret, $l;
                 $linecount++;
             }
 
-            push @ret, $tClose;
+            push @ret, $tBClose;
+
+            my $descr =
+                'These dependencies '
+              . $strongOpen . 'must'
+              . $strongClose
+              . ' be installed for the listed FHEM modules to work.';
+            $descr =
+                'These dependencies are '
+              . $strongOpen
+              . 'strongly encouraged'
+              . $strongClose
+              . ' and should be installed for full functionality of the listed FHEM modules, except in resource constrained environments.'
+              if ( $importance eq 'Recommended' );
+            $descr =
+                'These dependencies are '
+              . $strongOpen
+              . 'optional'
+              . $strongClose
+              . ', but are suggested for enhanced operation of the listed FHEM modules.'
+              if ( $importance eq 'Suggested' );
+
+            push @ret, $tFOpen . $tdOpen3 . $descr . $tFClose;
+            push @ret, $tClose . $blockClose . $tdClose . $trClose;
         }
     }
 
     if ($found) {
+        push @ret, $tBClose;
+
         if ( defined( $pkgStatus{Perl}{analyzed} ) ) {
             push @ret,
-                $lb
-              . $txtOpen . 'Hint:'
-              . $txtClose
+                $tFOpen
+              . $trOpen
+              . $tdOpen
+              . $strongOpen . 'Hint:'
+              . $strongClose
               . ' Some of the FHEM modules in use do not provide Perl prerequisites from its metadata.'
               . $lb;
 
@@ -1197,7 +1227,11 @@ sub CreatePrereqsList {
                 push @ret,
 'This check may be incomplete until you install Perl::PrereqScanner::NotQuiteLite for automatic source code analysis.';
             }
+
+            push @ret, $tdClose . $trClose . $tFClose;
         }
+
+        unshift @ret, $lb . $lb . $tdClose . $trClose;
 
         unshift @ret,
             $lb
@@ -1233,6 +1267,9 @@ sub CreatePrereqsList {
             $found
           . ' total missing '
           . ( $found > 1 ? 'prerequisites:' : 'prerequisite:' );
+
+        unshift @ret, $blockOpen . $blockClose;
+        unshift @ret, $tBOpen . $trOpen . $tdOpen;
     }
     else {
         my @hooray = (
@@ -1241,15 +1278,32 @@ sub CreatePrereqsList {
         );
         my $x = 0 + int( rand( scalar @hooray + 1 - 0 ) );
         unshift @ret,
-            ucfirst( $hooray[$x] )
+            $tBOpen
+          . $trOpen
+          . $tdOpen
+          . $lb
+          . ucfirst( $hooray[$x] )
           . '! All prerequisites are met.'
-          . ( $html ? ' 🥳' : '' );
+          . ( $html ? ' 🥳' : '' )
+          . $lb
+          . $lb
+          . $tdClose
+          . $trClose
+          . $tBClose;
     }
 
+    push @ret, $tClose . $blockClose;
+
     unshift @ret,
-        '<a name="prereqResultTOP"></a><h2>'
+        $blockOpen
+      . $blockClose
+      . ( $html ? '<a name="prereqResultTOP"></a>' : '' )
+      . $blockOpen
+      . $tTitleOpen
       . ( $mode eq 'live' ? 'Live ' : '' )
-      . 'System Prerequisites Check</h2>';
+      . 'System Prerequisites Check'
+      . $tTitleClose
+      . $tOpen;
 
     return $header . join( "\n", @ret ) . $footer;
 }
@@ -1267,20 +1321,39 @@ sub CreateSearchList ($$@) {
     my $html =
       defined( $hash->{CL} ) && $hash->{CL}{TYPE} eq "FHEMWEB" ? 1 : 0;
 
+    my $FW_CSRF = (
+        defined( $defs{ $hash->{CL}{SNAME} }{CSRFTOKEN} )
+        ? '&fwcsrf=' . $defs{ $hash->{CL}{SNAME} }{CSRFTOKEN}
+        : ''
+    );
+    my $FW_CSRF_input =
+      defined( $defs{ $hash->{CL}{SNAME} }{CSRFTOKEN} )
+      ? '<input type="hidden" name="fwcsrf" value="'
+      . $defs{ $hash->{CL}{SNAME} }{CSRFTOKEN} . '">'
+      : '';
+
     my $header = '';
     my $footer = '';
     if ($html) {
         $header =
-'<html><table><tr><td><div class="detLink installerBack" style="float:right"><a href="?detail='
+'<html><div class="detLink installerBack" style="float:right"><a href="?detail='
           . $hash->{NAME}
           . '">&larr; back to FHEM Installer</a></div>';
-        $footer = '</td></tr></table></html>';
+        $footer = '</html>';
     }
 
-    my $tOpen       = '';
     my $blockOpen   = '';
     my $tTitleOpen  = '';
     my $tTitleClose = '';
+    my $tOpen       = '';
+    my $tCOpen      = '';
+    my $tCClose     = '';
+    my $tHOpen      = '';
+    my $tHClose     = '';
+    my $tBOpen      = '';
+    my $tBClose     = '';
+    my $tFOpen      = '';
+    my $tFClose     = '';
     my $trOpen      = '';
     my $trOpenEven  = '';
     my $trOpenOdd   = '';
@@ -1290,8 +1363,8 @@ sub CreateSearchList ($$@) {
     my $tdOpen      = '';
     my $tdOpen2     = '';
     my $tdOpen3     = '';
-    my $txtOpen     = '';
-    my $txtClose    = '';
+    my $strongOpen  = '';
+    my $strongClose = '';
     my $tdClose     = "\t\t\t";
     my $thClose     = "\t\t\t";
     my $trClose     = '';
@@ -1302,28 +1375,38 @@ sub CreateSearchList ($$@) {
     my $colorClose  = '';
 
     if ($html) {
-        $blockOpen   = '<div class="makeTable wide readings">';
+        $blockOpen   = '<div class="makeTable wide internals">';
         $tTitleOpen  = '<span class="mkTitle">';
         $tTitleClose = '</span>';
-        $tOpen       = '<table class="block wide">';
+        $tOpen       = '<table class="block wide internals wrapcolumns">';
+        $tCOpen      = '<caption style="text-align: left; font-size: larger;">';
+        $tCClose     = '</caption>';
+        $tHOpen      = '<thead>';
+        $tHClose     = '</thead>';
+        $tBOpen      = '<tbody>';
+        $tBClose     = '</tbody>';
+        $tFOpen      = '<tfoot style="font-size: smaller;">';
+        $tFClose     = '</tfoot>';
         $trOpen      = '<tr class="column">';
         $trOpenEven  = '<tr class="column even">';
         $trOpenOdd   = '<tr class="column odd">';
-        $thOpen      = '<th style="text-align:left">';
-        $thOpen2     = '<th style="text-align:left" colspan="2">';
-        $thOpen3     = '<th style="text-align:left" colspan="3">';
-        $tdOpen      = '<td>';
-        $tdOpen2     = '<td colspan="2">';
-        $tdOpen3     = '<td colspan="3">';
-        $txtOpen     = '<b>';
-        $txtClose    = '</b>';
+        $thOpen      = '<th style="text-align: left; vertical-align: top;">';
+        $thOpen2 =
+          '<th style="text-align: left; vertical-align: top;" colspan="2">';
+        $thOpen3 =
+          '<th style="text-align: left; vertical-align: top;" colspan="3">';
+        $tdOpen      = '<td style="vertical-align: top;">';
+        $tdOpen2     = '<td style="vertical-align: top;" colspan="2">';
+        $tdOpen3     = '<td style="vertical-align: top;" colspan="3">';
+        $strongOpen  = '<strong>';
+        $strongClose = '</strong>';
         $tdClose     = '</td>';
         $thClose     = '</td>';
         $trClose     = '</tr>';
         $tClose      = '</table>';
         $blockClose  = '</div>';
-        $colorRed    = '<span style="color:red">';
-        $colorGreen  = '<span style="color:green">';
+        $colorRed    = '<span style="color: red">';
+        $colorGreen  = '<span style="color: green">';
         $colorClose  = '</span>';
     }
 
@@ -1336,11 +1419,18 @@ sub CreateSearchList ($$@) {
         )
     );
 
-    my $FW_CSRF = (
-        defined( $defs{ $hash->{CL}{SNAME} }{CSRFTOKEN} )
-        ? '&fwcsrf=' . $defs{ $hash->{CL}{SNAME} }{CSRFTOKEN}
-        : ''
-    );
+    # Add search input
+    $header .=
+'<form id="fhemsearch" method="get" action="?" onsubmit="cmd.value = \'get '
+      . $hash->{NAME}
+      . ' search \'+ q.value">'
+      . $FW_CSRF_input
+      . '<input type="hidden" name="cmd" value="">'
+      . '<label for="q" style="margin-right: 0.5em;">Search:</label>'
+      . '<input type="text" name="q" id="q" value="'
+      . $search
+      . '" autocorrect="off" autocapitalize="off">'
+      . '</form>';
 
     my $found = 0;
 
@@ -1358,16 +1448,17 @@ sub CreateSearchList ($$@) {
                 push @ret,
                     ( $html ? '<a name="searchResultDevices"></a>' : '' )
                   . $blockOpen
-                  . $tTitleOpen
-                  . 'Devices'
-                  . $tTitleClose
                   . $tOpen
+                  . $tCOpen
+                  . 'Devices'
+                  . $tCClose
+                  . $tHOpen
                   . $trOpen;
 
                 push @ret, $thOpen . 'Device Name' . $thClose;
                 push @ret, $thOpen . 'Device Type' . $thClose;
                 push @ret, $thOpen . 'Device State' . $thClose;
-                push @ret, $trClose;
+                push @ret, $trClose . $tHClose;
             }
             $found++;
             $foundDevices++;
@@ -1420,15 +1511,16 @@ sub CreateSearchList ($$@) {
                 push @ret,
                     ( $html ? '<a name="searchResultModules"></a>' : '' )
                   . $blockOpen
-                  . $tTitleOpen
-                  . 'Modules'
-                  . $tTitleClose
                   . $tOpen
+                  . $tCOpen
+                  . 'Modules'
+                  . $tCClose
+                  . $tHOpen
                   . $trOpen;
 
                 push @ret, $thOpen . 'Module Name' . $thClose;
                 push @ret, $thOpen . 'Abstract' . $thClose;
-                push @ret, $trClose;
+                push @ret, $trClose . $tHClose;
             }
             $found++;
             $foundModules++;
@@ -1472,15 +1564,16 @@ sub CreateSearchList ($$@) {
                 push @ret,
                     ( $html ? '<a name="searchResultPackages"></a>' : '' )
                   . $blockOpen
-                  . $tTitleOpen
-                  . 'Packages'
-                  . $tTitleClose
                   . $tOpen
+                  . $tCOpen
+                  . 'Packages'
+                  . $tCClose
+                  . $tHOpen
                   . $trOpen;
 
                 push @ret, $thOpen . 'Package Name' . $thClose;
                 push @ret, $thOpen . 'Abstract' . $thClose;
-                push @ret, $trClose;
+                push @ret, $trClose . $tHClose;
             }
             $found++;
             $foundPackages++;
@@ -1529,14 +1622,14 @@ sub CreateSearchList ($$@) {
 
             my $descr = FHEM::Meta::GetKeywordDesc( $keyword, $lang );
 
-            push @ret, $blockOpen;
+            push @ret, $blockOpen . $tOpen;
 
             if ($html) {
                 push @ret,
-                    '<span class="mkTitle"'
+                    '<caption style="text-align: left; font-size: larger;"'
                   . ( $descr ne '' ? ' title="' . $descr . '"' : '' ) . '># '
                   . $keyword
-                  . $tTitleClose;
+                  . $tCClose;
             }
             else {
                 push @ret, '# ' . $keyword;
@@ -1547,7 +1640,7 @@ sub CreateSearchList ($$@) {
               packages
             );
 
-            push @ret, $tOpen . $trOpen;
+            push @ret, $tHOpen . $trOpen;
 
             push @ret, $thOpen . 'Name' . $thClose;
 
@@ -1555,7 +1648,7 @@ sub CreateSearchList ($$@) {
 
             push @ret, $thOpen . 'Abstract' . $thClose;
 
-            push @ret, $trClose;
+            push @ret, $trClose . $tHClose;
 
             foreach my $mAttr (@mAttrs) {
                 next
@@ -1623,17 +1716,18 @@ sub CreateSearchList ($$@) {
             unless ($foundMaintainers) {
                 push @ret,
                     $blockOpen
-                  . $tTitleOpen
+                  . $tOpen
+                  . $tCOpen
                   . ( $html ? '<a name="searchResultMaintainers"></a>' : '' )
                   . 'Authors & Maintainers'
-                  . $tTitleClose
-                  . $tOpen
+                  . $tCClose
+                  . $tHOpen
                   . $trOpen;
 
                 push @ret, $thOpen . 'Name' . $thClose;
                 push @ret, $thOpen . 'Modules' . $thClose;
                 push @ret, $thOpen . 'Packages' . $thClose;
-                push @ret, $trClose;
+                push @ret, $trClose . $tHClose;
             }
             $found++;
             $foundMaintainers++;
@@ -1715,16 +1809,17 @@ sub CreateSearchList ($$@) {
             unless ($foundPerl) {
                 push @ret,
                     $blockOpen
-                  . $tTitleOpen
+                  . $tOpen
+                  . $tCOpen
                   . ( $html ? '<a name="searchResultPerl"></a>' : '' )
                   . 'Perl Packages'
-                  . $tTitleClose
-                  . $tOpen
+                  . $tCClose
+                  . $tHOpen
                   . $trOpen;
 
                 push @ret, $thOpen . 'Name' . $thClose;
                 push @ret, $thOpen . 'Referenced from' . $thClose;
-                push @ret, $trClose;
+                push @ret, $trClose . $tHClose;
             }
             $found++;
             $foundPerl++;
@@ -1868,14 +1963,19 @@ sub CreateSearchList ($$@) {
           $found . ' total search ' . ( $found > 1 ? 'results:' : 'result:' );
     }
     else {
-        unshift @ret, 'Nothing found'.$lb.$lb;
+        unshift @ret,
+            $tOpen
+          . $trOpenOdd
+          . $tdOpen
+          . 'Nothing found'
+          . $tdClose
+          . $trClose
+          . $tClose
+          . $lb
+          . $lb;
     }
 
     push @ret, $tdClose . $trClose . $tClose . $blockClose;
-
-    $search =~ s/\\s\*/ /g;
-    unshift @ret,
-      $blockOpen . $blockClose . $txtOpen.'Search string: '.$txtClose . $search . $lb . $lb;
 
     unshift @ret,
         $blockOpen
@@ -1887,7 +1987,9 @@ sub CreateSearchList ($$@) {
       . $tTitleClose
       . $tOpen
       . $trOpen
-      . $tdOpen;
+      . $tdOpen
+      . $blockOpen
+      . $blockClose;
 
     return $header . join( "\n", @ret ) . $footer;
 }
@@ -1943,16 +2045,24 @@ sub CreateMetadataList ($$$) {
     my $footer = '';
     if ($html) {
         $header =
-'<html><table><tr><td><div class="detLink installerBack" style="float:right"><a href="?detail='
+'<html><div class="detLink installerBack" style="float:right"><a href="?detail='
           . $hash->{NAME}
           . '">&larr; back to FHEM Installer</a></div>';
-        $footer = '</td></tr></table></html>';
+        $footer = '</html>';
     }
 
     my $blockOpen   = '';
     my $tTitleOpen  = '';
     my $tTitleClose = '';
     my $tOpen       = '';
+    my $tCOpen      = '';
+    my $tCClose     = '';
+    my $tHOpen      = '';
+    my $tHClose     = '';
+    my $tBOpen      = '';
+    my $tBClose     = '';
+    my $tFOpen      = '';
+    my $tFClose     = '';
     my $trOpen      = '';
     my $trOpenEven  = '';
     my $trOpenOdd   = '';
@@ -1962,8 +2072,8 @@ sub CreateMetadataList ($$$) {
     my $tdOpen      = '';
     my $tdOpen2     = '';
     my $tdOpen3     = '';
-    my $txtOpen     = '';
-    my $txtClose    = '';
+    my $strongOpen  = '';
+    my $strongClose = '';
     my $tdClose     = "\t\t\t";
     my $thClose     = "\t\t\t";
     my $trClose     = '';
@@ -1974,28 +2084,38 @@ sub CreateMetadataList ($$$) {
     my $colorClose  = '';
 
     if ($html) {
-        $blockOpen   = '<div class="makeTable wide readings">';
+        $blockOpen   = '<div class="makeTable wide internals">';
         $tTitleOpen  = '<span class="mkTitle">';
         $tTitleClose = '</span>';
-        $tOpen       = '<table class="block wide readings">';
+        $tOpen       = '<table class="block wide internals wrapcolumns">';
+        $tCOpen      = '<caption style="text-align: left; font-size: larger;">';
+        $tCClose     = '</caption>';
+        $tHOpen      = '<thead>';
+        $tHClose     = '</thead>';
+        $tBOpen      = '<tbody>';
+        $tBClose     = '</tbody>';
+        $tFOpen      = '<tfoot style="font-size: smaller;">';
+        $tFClose     = '</tfoot>';
         $trOpen      = '<tr class="column">';
         $trOpenEven  = '<tr class="column even">';
         $trOpenOdd   = '<tr class="column odd">';
-        $thOpen      = '<th style="text-align:left">';
-        $thOpen2     = '<th style="text-align:left" colspan="2">';
-        $thOpen3     = '<th style="text-align:left" colspan="3">';
-        $tdOpen      = '<td>';
-        $tdOpen2     = '<td colspan="2">';
-        $tdOpen3     = '<td colspan="3">';
-        $txtOpen     = '<b>';
-        $txtClose    = '</b>';
+        $thOpen      = '<th style="text-align: left; vertical-align: top;">';
+        $thOpen2 =
+          '<th style="text-align: left; vertical-align: top;" colspan="2">';
+        $thOpen3 =
+          '<th style="text-align: left; vertical-align: top;" colspan="3">';
+        $tdOpen      = '<td style="vertical-align: top;">';
+        $tdOpen2     = '<td style="vertical-align: top;" colspan="2">';
+        $tdOpen3     = '<td style="vertical-align: top;" colspan="3">';
+        $strongOpen  = '<strong>';
+        $strongClose = '</strong>';
         $tdClose     = '</td>';
         $thClose     = '</th>';
         $trClose     = '</tr>';
         $tClose      = '</table>';
         $blockClose  = '</div>';
-        $colorRed    = '<span style="color:red">';
-        $colorGreen  = '<span style="color:green">';
+        $colorRed    = '<span style="color: red">';
+        $colorGreen  = '<span style="color: green">';
         $colorClose  = '</span>';
     }
 
@@ -2683,17 +2803,19 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
     }
 
     push @ret,
-      $trOpen
+        $tFOpen
+      . $trOpen
       . (
         $html
-        ? '<td style="text-align:right; font-size:.7em;" colspan="2">'
+        ? '<td style="text-align:right;" colspan="2">'
         : ''
       )
       . 'Based on data generated by '
       . $lb
       . $modMeta->{generated_by}
       . $tdClose
-      . $trClose;
+      . $trClose
+      . $tFClose;
 
     push @ret, $tClose . $blockClose;
 
@@ -2746,25 +2868,13 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                   . $tTitleClose
                   . $tOpen;
 
-                push @ret,
-                    $trOpen
-                  . $tdOpen2
-                  . $txtOpen . 'Hint:'
-                  . $txtClose
-                  . $lb
-                  . 'Dependents can only be shown here if they were loaded into the metadata cache before.'
-                  . $lb
-                  . $lb
-                  . $tdClose
-                  . $trClose;
-
-                push @ret, $trOpen;
+                push @ret, $tHOpen . $trOpen;
 
                 push @ret, $thOpen . 'Importance' . $thClose;
 
                 push @ret, $thOpen . 'Dependent Modules' . $thClose;
 
-                push @ret, $trClose;
+                push @ret, $trClose . $tHClose;
             }
 
             my $l = $linecount % 2 == 0 ? $trOpenEven : $trOpenOdd;
@@ -2783,8 +2893,19 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
             $linecount++;
         }
     }
-
-    push @ret, $tClose . $lb if ( $linecount > 1 );
+    push @ret,
+        $tFOpen
+      . $trOpen
+      . $tdOpen2
+      . $strongOpen . 'Hint:'
+      . $strongClose
+      . ' Dependents can only be shown here if they were loaded into the metadata cache before.'
+      . $tdClose
+      . $trClose
+      . $tFClose
+      . $tClose
+      . $blockClose
+      if ( $linecount > 1 );
 
     if (
            $modType eq 'module'
@@ -2800,9 +2921,22 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
 
         my $linecount = 1;
 
-        if ( defined( $modules{$modName}{LOADED} ) ) {
+        if ( defined( $modules{$modName}{LOADED} )
+            && $modules{$modName}{LOADED} )
+        {
             my @instances = devspec2array( 'TYPE=' . $modName );
             if ( @instances > 0 ) {
+                push @ret,
+                    $tHOpen
+                  . $trOpen
+                  . $thOpen . 'Name'
+                  . $thClose
+                  . $thOpen . 'State'
+                  . $thClose
+                  . $trClose
+                  . $tHClose
+                  . $tBOpen;
+
                 foreach my $instance ( sort { "\L$a" cmp "\L$b" } @instances ) {
                     next if ( defined( $defs{$instance}{TEMPORARY} ) );
 
@@ -2821,24 +2955,30 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                     push @ret, $l;
                     $linecount++;
                 }
+
+                push @ret, $tBClose;
             }
             else {
                 push @ret,
-                    $trOpenOdd
+                    $tBOpen
+                  . $trOpen
                   . $tdOpen
                   . 'The module was once loaded into memory, '
                   . 'but currently there is no device defined.'
                   . $tdClose
-                  . $trClose;
+                  . $trClose
+                  . $tBClose;
             }
         }
         else {
             push @ret,
-                $trOpenOdd
+                $tBOpen
+              . $trOpen
               . $tdOpen
               . 'The module is currently not in use.'
               . $tdClose
-              . $trClose;
+              . $trClose
+              . $tBClose;
         }
 
         push @ret, $tClose . $blockClose;
@@ -2855,42 +2995,18 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
       . $trOpen
       . $tdOpen;
 
-    push @ret,
-        $blockOpen
-      . $blockClose
-      . $blockOpen
-      . $tTitleOpen
-      . 'Perl Packages'
-      . $tTitleClose
-      . $tOpen;
+    push @ret, $blockOpen . $tOpen . $tCOpen . 'Perl Packages' . $tCClose;
 
     if (   defined( $modMeta->{prereqs} )
         && defined( $modMeta->{prereqs}{runtime} ) )
     {
-        push @ret,
-            $trOpen
-          . $tdOpen3
-          . $txtOpen . 'Hint:'
-          . $txtClose
-          . $lb
-          . 'This module does not provide Perl prerequisites from its metadata.'
-          . $lb
-          . 'The following result is based on automatic source code analysis '
-          . 'and can be incorrect.'
-          . $lb
-          . $lb
-          . $tdClose
-          . $trClose
-          if ( defined( $modMeta->{x_prereqs_src} )
-            && $modMeta->{x_prereqs_src} ne 'META.json' );
-
         @mAttrs = qw(
           requires
           recommends
           suggests
         );
 
-        push @ret, $trOpen;
+        push @ret, $tHOpen . $trOpen;
 
         push @ret, $thOpen . 'Name' . $thClose;
 
@@ -2898,7 +3014,7 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
 
         push @ret, $thOpen . 'Status' . $thClose;
 
-        push @ret, $trClose;
+        push @ret, $trClose . $tHClose . $tBOpen;
 
         $linecount = 1;
         foreach my $mAttr (@mAttrs) {
@@ -2938,7 +3054,7 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                             $modMeta->{prereqs}{runtime}{x_inherited}{$prereq}
                         }
                       )
-                      . '" style="color:grey;">'
+                      . '" style="color: grey;">'
                       . $inherited
                       . '</span>'
                       if ($html);
@@ -2985,9 +3101,9 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                     {
                         $installed =
                             $colorRed
-                          . $txtOpen
+                          . $strongOpen
                           . uc($installed)
-                          . $txtClose
+                          . $strongClose
                           . $colorClose;
                     }
                 }
@@ -3007,23 +3123,45 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                 $linecount++;
             }
         }
+
+        push @ret, $tBClose;
+
+        push @ret,
+            $tFOpen
+          . $trOpenEven
+          . $tdOpen3
+          . $strongOpen . 'Hint:'
+          . $strongClose
+          . ' The module does not provide Perl prerequisites from its metadata.'
+          . $lb
+          . 'This result is based on automatic source code analysis '
+          . 'and can be incorrect.'
+          . $tdClose
+          . $trClose
+          . $tFClose
+          if ( defined( $modMeta->{x_prereqs_src} )
+            && $modMeta->{x_prereqs_src} ne 'META.json' );
     }
     elsif ( defined( $modMeta->{x_prereqs_src} ) ) {
         push @ret,
-            $trOpenOdd
+            $tBOpen
+          . $trOpenOdd
           . $tdOpen
           . 'No known prerequisites.'
           . $tdClose
-          . $trClose;
+          . $trClose
+          . $tBClose;
     }
     else {
         push @ret,
-            $trOpenOdd
+            $tBOpen
+          . $trOpenOdd
           . $tdOpen
           . 'Module metadata do not contain any prerequisites.' . "\n"
           . 'For automatic source code analysis, please install Perl::PrereqScanner::NotQuiteLite first.'
           . $tdClose
-          . $trClose;
+          . $trClose
+          . $tBClose;
     }
     push @ret, $tClose . $blockClose;
 
@@ -3031,7 +3169,12 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
         && defined( $modMeta->{x_prereqs_nodejs}{runtime} ) )
     {
         push @ret,
-          $blockOpen . $tTitleOpen . 'Node.js Packages' . $tTitleClose . $tOpen;
+            $blockOpen
+          . $tTitleClose
+          . $tOpen
+          . $tCOpen
+          . 'Node.js Packages'
+          . $tCClose;
 
         my @mAttrs = qw(
           requires
@@ -3039,7 +3182,7 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
           suggests
         );
 
-        push @ret, $trOpen;
+        push @ret, $tHOpen . $trOpen;
 
         push @ret, $thOpen . 'Name' . $thClose;
 
@@ -3047,7 +3190,7 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
 
         push @ret, $thOpen . 'Status' . $thClose;
 
-        push @ret, $trClose;
+        push @ret, $trClose . $tHClose . $tBOpen;
 
         $linecount = 1;
         foreach my $mAttr (@mAttrs) {
@@ -3128,14 +3271,13 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
             }
         }
 
-        push @ret, $tClose . $blockClose;
+        push @ret, $tBClose . $tClose . $blockClose;
     }
 
     if (   defined( $modMeta->{x_prereqs_python} )
         && defined( $modMeta->{x_prereqs_python}{runtime} ) )
     {
-        push @ret,
-          $blockOpen . $tTitleOpen . 'Python Packages' . $tTitleClose . $tOpen;
+        push @ret, $blockOpen . $tOpen . $tCOpen . 'Python Packages' . $tCClose;
 
         my @mAttrs = qw(
           requires
@@ -3143,7 +3285,7 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
           suggests
         );
 
-        push @ret, $trOpen;
+        push @ret, $tHOpen . $trOpen;
 
         push @ret, $thOpen . 'Name' . $thClose;
 
@@ -3151,7 +3293,7 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
 
         push @ret, $thOpen . 'Status' . $thClose;
 
-        push @ret, $trClose;
+        push @ret, $trClose . $tHClose . $tBOpen;
 
         $linecount = 1;
         foreach my $mAttr (@mAttrs) {
@@ -3257,7 +3399,7 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
             }
         }
 
-        push @ret, $tClose . $blockClose;
+        push @ret, $tBClose . $tClose . $blockClose;
     }
 
     push @ret, $tdClose . $trClose . $tClose . $blockClose;
@@ -3872,10 +4014,10 @@ sub __aUniq {
   Installer
 </h3>
 <ul>
-  <u><b>Installer - Module to update FHEM, install 3rd-party FHEM modules and manage system prerequisites</b></u><br>
+  <u><strong>Installer - Module to update FHEM, install 3rd-party FHEM modules and manage system prerequisites</strong></u><br>
   <br>
   <br>
-  <a name="Installerdefine" id="Installerdefine"></a><b>Define</b><br>
+  <a name="Installerdefine" id="Installerdefine"></a><strong>Define</strong><br>
   <ul>
     <code>define &lt;name&gt; Installer</code><br>
     <br>
@@ -3885,7 +4027,7 @@ sub __aUniq {
     </ul><br>
   </ul><br>
   <br>
-  <a name="Installerget" id="Installerget"></a><b>Get</b>
+  <a name="Installerget" id="Installerget"></a><strong>Get</strong>
   <ul>
     <li>checkPrereqs - list all missing prerequisites. If no parameter was given, the running live system will be inspected. If the parameter is a FHEM cfg file, inspection will be based on devices from this file. If the parameter is a list of module names, those will be used for inspection.
     </li>
@@ -3901,7 +4043,7 @@ sub __aUniq {
     </li>
   </ul><br>
   <br>
-  <a name="Installerattribut" id="Installerattribut"></a><b>Attributes</b>
+  <a name="Installerattribut" id="Installerattribut"></a><strong>Attributes</strong>
   <ul>
     <li>disable - disables the device
     </li>
@@ -3939,7 +4081,7 @@ sub __aUniq {
       "abstract": "Modul zum Update von FHEM, zur Installation von Drittanbieter FHEM Modulen und der Verwaltung von Systemvoraussetzungen"
     }
   },
-  "version": "v0.3.7",
+  "version": "v0.3.8",
   "release_status": "testing",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
