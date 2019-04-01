@@ -85,6 +85,7 @@ BEGIN {
         readingsBeginUpdate
         readingsDelete
         readingsEndUpdate
+        ReadingsAge
         ReadingsNum
         ReadingsTimestamp
         ReadingsVal
@@ -1470,7 +1471,7 @@ sub ProcessCommandData ($$$) {
           if (ReadingsVal($name, "requestFormat", "") eq "json"
               && (!defined($hash->{helper}{device}{channelPreset}) || ReadingsVal($name, "state", "") ne "on"));
         $hash->{helper}{device}{channelPreset}{ $channelNo }{id} = $channelNo;
-        $hash->{helper}{device}{channelPreset}{ $channelNo }{name} = $channelName;
+        $hash->{helper}{device}{channelPreset}{ $channelNo }{name} = GetNormalizedName($channelName);
       }
     
       # get current system settings
