@@ -1,5 +1,5 @@
 ﻿##########################################################################################################
-# $Id: 93_DbRep.pm 18980 2019-03-20 20:55:44Z DS_Starter $
+# $Id: 93_DbRep.pm 19065 2019-03-29 21:25:15Z DS_Starter $
 ##########################################################################################################
 #       93_DbRep.pm
 #
@@ -58,6 +58,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.18.0" => "01.04.2019  new aggregation year ",
   "8.17.2" => "28.03.2019  consideration of daylight saving time/leap year changed (func DbRep_corrRelTime) ",
   "8.17.1" => "24.03.2019  edit Meta data, activate Meta.pm, prevent module from deactivation in case of unavailable Meta.pm ",
   "8.17.0" => "20.03.2019  prepare for Meta.pm, new attribute \"sqlCmdVars\" ",
@@ -145,6 +146,7 @@ our %DbRep_vNotesIntern = (
 
 # Version History extern:
 our %DbRep_vNotesExtern = (
+  "8.18.0" => "01.04.2019 New aggregation type \"year\" ",
   "8.17.0" => "20.03.2019 With new attribute \"sqlCmdVars\" you are able to set SQL session variables or SQLite PRAGMA every time ".
               "before running a SQL-statement with sqlCmd command.",
   "8.16.0" => "17.03.2019 allow SQLite PRAGMAS leading an SQLIte SQL-Statement in sqlCmd ",
@@ -220,12 +222,8 @@ our %DbRep_vNotesExtern = (
   "4.13.4"  => "09.05.2017 attribute sqlResultSingleFormat: mline sline table, attribute 'allowDeletion' is now also valid for sqlResult, sqlResultSingle and delete command is forced ",
   "4.13.2"  => "09.05.2017 sqlResult, sqlResultSingle are able to execute delete, insert, update commands error corrections ",
   "4.12.0"  => "31.03.2017 support of primary key for insert functions ",
-  "4.11.4"  => "29.03.2017 bugfix timestamp in minValue, maxValue if VALUE contains more than one numeric value (like in sysmon) ",
   "4.11.3"  => "26.03.2017 usage of daylight saving time changed to avoid wrong selection when wintertime switch to summertime, minor bug fixes ",
-  "4.11.2"  => "16.03.2017 bugfix in func dbmeta_DoParse (SQLITE_DB_FILENAME) ",
   "4.11.0"  => "18.02.2017 added [current|previous]_[month|week|day|hour]_begin and [current|previous]_[month|week|day|hour]_end as options of timestamp ",
-  "4.10.2"  => "16.01.2017 bugfix uninitialized value \$renmode if RenameAgent ",
-  "4.10.1"  => "30.11.2016 bugfix importFromFile format problem if UNIT-field wasn't set ",
   "4.9.0"  => "23.12.2016 function readingRename added ",
   "4.8.6"  => "17.12.2016 new bugfix group by-clause due to incompatible changes made in MyQL 5.7.5 (Forum #msg541103) ",
   "4.8.5"  => "16.12.2016 bugfix group by-clause due to Forum #msg540610 ",
@@ -342,7 +340,7 @@ sub DbRep_Initialize($) {
 					   "ftpUse:1,0 ".
 					   "ftpUser ".
 					   "ftpUseSSL:1,0 ".
-                       "aggregation:hour,day,week,month,no ".
+                       "aggregation:hour,day,week,month,year,no ".
 					   "diffAccept ".
 					   "limit ".
 					   "optimizeTablesBeforeDump:1,0 ".
@@ -2098,6 +2096,8 @@ sub DbRep_createTimeArray($$$) {
      $aggsec = 604800;
  } elsif ($aggregation eq "month") {
      $aggsec = 2678400;                      # Initialwert, wird in DbRep_collaggstr für jeden Monat berechnet
+ } elsif ($aggregation eq "year") {
+     $aggsec = 31536000;                     # Initialwert, wird in DbRep_collaggstr für jedes Jahr berechnet
  } elsif ($aggregation eq "no") {
      $aggsec = 1;
  } else {
@@ -2161,149 +2161,194 @@ sub DbRep_collaggstr($$$$) {
  # only for this block because of warnings if some values not set
  no warnings 'uninitialized'; 
 
-         # keine Aggregation (all between timestamps)
-         if ($aggregation eq "no") {
-             $runtime_string       = "no_aggregation";                                         # für Readingname
-             $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime);
-             $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);  
-             $ll = 1;
-         }
-         
-         # Monatsaggregation
-         if ($aggregation eq "month") {
-             $runtime_orig = $runtime;
-             
-             # Hilfsrechnungen
-             my $rm   = strftime "%m", localtime($runtime);                    # Monat des aktuell laufenden Startdatums d. SQL-Select
-             my $ry   = strftime "%Y", localtime($runtime);                    # Jahr des aktuell laufenden Startdatums d. SQL-Select
-             my $dim  = $rm-2?30+($rm*3%7<4):28+!($ry%4||$ry%400*!($ry%100));  # Anzahl Tage des aktuell laufenden Monats
-             Log3 ($name, 5, "DbRep $name - act year:  $ry, act month: $rm, days in month: $dim, endyear: $yestr, endmonth: $mestr"); 
-             $aggsec = $dim * 86400;
-             
-             $runtime = $runtime+3600 if(DbRep_dsttest($hash,$runtime,$aggsec) && (strftime "%m", localtime($runtime)) > 6);      # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
-                                  
-             $runtime_string = strftime "%Y-%m", localtime($runtime);          # für Readingname
-             
-             if ($i==1) {
-                 # nur im ersten Durchlauf
-                 $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime_orig);
-             }
-             
-             if ($ysstr == $yestr && $msstr == $mestr || $ry ==  $yestr && $rm == $mestr) {
-                 $runtime_string_first = strftime "%Y-%m-01", localtime($runtime) if($i>1);
-                 $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
-                 $ll=1;
-                
-             } else {
-                 if(($runtime) > $epoch_seconds_end) {
-                     #$runtime_string_first = strftime "%Y-%m-01", localtime($runtime) if($i>11);  # ausgebaut 24.02.2018
-                     $runtime_string_first = strftime "%Y-%m-01", localtime($runtime);                      
-                     $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
-                     $ll=1;
-                 } else {
-                     $runtime_string_first = strftime "%Y-%m-01", localtime($runtime) if($i>1);
-                     $runtime_string_next  = strftime "%Y-%m-01", localtime($runtime+($dim*86400));
-                     
-                 } 
-             }
-         my ($yyyy1, $mm1, $dd1) = ($runtime_string_next =~ /(\d+)-(\d+)-(\d+)/);
-         $runtime = timelocal("00", "00", "00", "01", $mm1-1, $yyyy1-1900);
-         
-         # neue Beginnzeit in Epoche-Sekunden
-         $runtime = $runtime_orig+$aggsec;
-         }
-         
-         # Wochenaggregation
-         if ($aggregation eq "week") {          
-             $runtime = $runtime+3600 if($i!=1 && DbRep_dsttest($hash,$runtime,$aggsec) && (strftime "%m", localtime($runtime)) > 6);      # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
-             $runtime_orig = $runtime; 
-
-             my $w  = strftime "%V", localtime($runtime);            # Wochennummer des aktuellen Startdatum/Zeit
-             $runtime_string = "week_".$w;                           # für Readingname
-             my $ms = strftime "%m", localtime($runtime);            # Startmonat (01-12)
-             my $me = strftime "%m", localtime($epoch_seconds_end);  # Endemonat (01-12)
-             
-             if ($i==1) {
-                 # nur im ersten Schleifendurchlauf
-                 $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime);
-                 
-                 # Korrektur $runtime_orig für Berechnung neue Beginnzeit für nächsten Durchlauf 
-                 my ($yyyy1, $mm1, $dd1) = ($runtime_string_first =~ /(\d+)-(\d+)-(\d+)/);
-                 $runtime = timelocal("00", "00", "00", $dd1, $mm1-1, $yyyy1-1900);
-                 $runtime = $runtime+3600 if(DbRep_dsttest($hash,$runtime,$aggsec) && (strftime "%m", localtime($runtime)) > 6);           # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
-                 $runtime = $runtime+$wdadd;
-                 $runtime_orig = $runtime-$aggsec;                             
-                 
-                 # die Woche Beginn ist gleich der Woche vom Ende Auswertung
-                 if((strftime "%V", localtime($epoch_seconds_end)) eq ($w) && ($ms+$me != 13)) {                  
-                     $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end); 
-                     $ll=1;
-                 } else {
-                      $runtime_string_next  = strftime "%Y-%m-%d", localtime($runtime);
-                 }
-             } else {
-                 # weitere Durchläufe
-                 if(($runtime+$aggsec) > $epoch_seconds_end) {
-                     $runtime_string_first = strftime "%Y-%m-%d", localtime($runtime_orig);
-                     $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end); 
-                     $ll=1;
-                 } else {
-                     $runtime_string_first = strftime "%Y-%m-%d", localtime($runtime_orig) ;
-                     $runtime_string_next  = strftime "%Y-%m-%d", localtime($runtime+$aggsec);  
-                 }
-             }
-         
-         # neue Beginnzeit in Epoche-Sekunden
-         $runtime = $runtime_orig+$aggsec;           
-         }
+ # keine Aggregation (all between timestamps)
+ if ($aggregation eq "no") {
+     $runtime_string       = "no_aggregation";                                         # für Readingname
+     $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime);
+     $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);  
+     $ll = 1;
+ }
+ 
+ # Jahresaggregation
+ if ($aggregation eq "year") {
+     $runtime_orig = $runtime;
      
-         # Tagesaggregation
-         if ($aggregation eq "day") {  
-             $runtime_string       = strftime "%Y-%m-%d", localtime($runtime);                      # für Readingname
-             $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime) if($i==1);
-             $runtime_string_first = strftime "%Y-%m-%d", localtime($runtime) if($i>1);
-             $runtime = $runtime+3600 if(DbRep_dsttest($hash,$runtime,$aggsec) && (strftime "%m", localtime($runtime)) > 6);                          # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
-                                               
-             if((($tsstr gt $testr) ? $runtime : ($runtime+$aggsec)) > $epoch_seconds_end) {
-                 $runtime_string_first = strftime "%Y-%m-%d", localtime($runtime);                    
-                 $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime) if( $dsstr eq $destr);
-                 $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
-                 $ll=1;
-             } else {
-                 $runtime_string_next  = strftime "%Y-%m-%d", localtime($runtime+$aggsec);   
-             }
-         Log3 ($name, 5, "DbRep $name - runtime_string: $runtime_string, runtime_string_first: $runtime_string_first, runtime_string_next: $runtime_string_next");
-
-         # neue Beginnzeit in Epoche-Sekunden
-         $runtime = $runtime+$aggsec;         
-         }
+     # Hilfsrechnungen
+     my $rm   = strftime "%m", localtime($runtime);                    # Monat des aktuell laufenden Startdatums d. SQL-Select
+     my $cy   = strftime "%Y", localtime($runtime);                    # Jahr des aktuell laufenden Startdatums d. SQL-Select
+     # my $icly = DbRep_IsLeapYear($name,$cy);                           
+     # my $inly = DbRep_IsLeapYear($name,$cy+1);                         # ist kommendes Jahr ein Schaltjahr ? 
+     my $yf = 365;
+     $yf = 366 if(DbRep_IsLeapYear($name,$cy));                        # ist aktuelles Jahr ein Schaltjahr ?
+     Log3 ($name, 5, "DbRep $name - current year:  $cy, endyear: $yestr");
+                  
+     $aggsec = $yf * 86400;
      
-         # Stundenaggregation
-         if ($aggregation eq "hour") {
-             $runtime_string       = strftime "%Y-%m-%d_%H", localtime($runtime);                   # für Readingname
-             $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime) if($i==1);
-             $runtime = $runtime+3600 if(DbRep_dsttest($hash,$runtime,$aggsec) && (strftime "%m", localtime($runtime)) > 6);                          # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
-             $runtime_string_first = strftime "%Y-%m-%d %H", localtime($runtime) if($i>1);
-             
-             my @a = split (":",$tsstr);
-             my $hs = $a[0];
-             my $msstr = $a[1].":".$a[2];
-             @a = split (":",$testr);
-             my $he = $a[0];
-             my $mestr = $a[1].":".$a[2];
-             
-             if((($msstr gt $mestr) ? $runtime : ($runtime+$aggsec)) > $epoch_seconds_end) {
-                 $runtime_string_first = strftime "%Y-%m-%d %H", localtime($runtime);                 
-                 $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime) if( $dsstr eq $destr && $hs eq $he);
-                 $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
-                 $ll=1;
-             } else {
-                 $runtime_string_next  = strftime "%Y-%m-%d %H", localtime($runtime+$aggsec);   
-             }
+     $runtime = $runtime+3600 if(DbRep_dsttest($hash,$runtime,$aggsec) && (strftime "%m", localtime($runtime)) > 6);      # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
+                          
+     $runtime_string = strftime "%Y", localtime($runtime);             # für Readingname
+     
+     if ($i==1) {
+         # nur im ersten Durchlauf
+         $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime_orig);
+     }
+     
+     if ($ysstr == $yestr || $cy ==  $yestr) {
+         $runtime_string_first = strftime "%Y-01-01", localtime($runtime) if($i>1);
+         $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
+         $ll=1;
         
-         # neue Beginnzeit in Epoche-Sekunden
-         $runtime = $runtime+$aggsec;         
+     } else {
+         if(($runtime) > $epoch_seconds_end) {
+             $runtime_string_first = strftime "%Y-01-01", localtime($runtime);                      
+             $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
+             $ll=1;
+         } else {
+             $runtime_string_first = strftime "%Y-01-01", localtime($runtime) if($i>1);
+             $runtime_string_next  = strftime "%Y-01-01", localtime($runtime+($yf * 86400));           
+         } 
+     }
+ 
+     # neue Beginnzeit in Epoche-Sekunden
+     $runtime = $runtime_orig+$aggsec;
+ }
+ 
+ # Monatsaggregation
+ if ($aggregation eq "month") {
+     $runtime_orig = $runtime;
+     
+     # Hilfsrechnungen
+     my $rm   = strftime "%m", localtime($runtime);                    # Monat des aktuell laufenden Startdatums d. SQL-Select
+     my $ry   = strftime "%Y", localtime($runtime);                    # Jahr des aktuell laufenden Startdatums d. SQL-Select
+     my $dim  = $rm-2?30+($rm*3%7<4):28+!($ry%4||$ry%400*!($ry%100));  # Anzahl Tage des aktuell laufenden Monats
+     Log3 ($name, 5, "DbRep $name - act year:  $ry, act month: $rm, days in month: $dim, endyear: $yestr, endmonth: $mestr"); 
+     $aggsec = $dim * 86400;
+     
+     $runtime = $runtime+3600 if(DbRep_dsttest($hash,$runtime,$aggsec) && (strftime "%m", localtime($runtime)) > 6);      # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
+                          
+     $runtime_string = strftime "%Y-%m", localtime($runtime);          # für Readingname
+     
+     if ($i==1) {
+         # nur im ersten Durchlauf
+         $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime_orig);
+     }
+     
+     if ($ysstr == $yestr && $msstr == $mestr || $ry ==  $yestr && $rm == $mestr) {
+         $runtime_string_first = strftime "%Y-%m-01", localtime($runtime) if($i>1);
+         $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
+         $ll=1;
+        
+     } else {
+         if(($runtime) > $epoch_seconds_end) {
+             #$runtime_string_first = strftime "%Y-%m-01", localtime($runtime) if($i>11);  # ausgebaut 24.02.2018
+             $runtime_string_first = strftime "%Y-%m-01", localtime($runtime);                      
+             $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
+             $ll=1;
+         } else {
+             $runtime_string_first = strftime "%Y-%m-01", localtime($runtime) if($i>1);
+             $runtime_string_next  = strftime "%Y-%m-01", localtime($runtime+($dim*86400));      
+         } 
+     }
+     
+     # my ($yyyy1, $mm1, $dd1) = ($runtime_string_next =~ /(\d+)-(\d+)-(\d+)/);
+     # $runtime = timelocal("00", "00", "00", "01", $mm1-1, $yyyy1-1900);
+ 
+     # neue Beginnzeit in Epoche-Sekunden
+     $runtime = $runtime_orig+$aggsec;
+ }
+ 
+ # Wochenaggregation
+ if ($aggregation eq "week") {          
+     $runtime = $runtime+3600 if($i!=1 && DbRep_dsttest($hash,$runtime,$aggsec) && (strftime "%m", localtime($runtime)) > 6);      # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
+     $runtime_orig = $runtime; 
+
+     my $w  = strftime "%V", localtime($runtime);            # Wochennummer des aktuellen Startdatum/Zeit
+     $runtime_string = "week_".$w;                           # für Readingname
+     my $ms = strftime "%m", localtime($runtime);            # Startmonat (01-12)
+     my $me = strftime "%m", localtime($epoch_seconds_end);  # Endemonat (01-12)
+     
+     if ($i==1) {
+         # nur im ersten Schleifendurchlauf
+         $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime);
+         
+         # Korrektur $runtime_orig für Berechnung neue Beginnzeit für nächsten Durchlauf 
+         my ($yyyy1, $mm1, $dd1) = ($runtime_string_first =~ /(\d+)-(\d+)-(\d+)/);
+         $runtime = timelocal("00", "00", "00", $dd1, $mm1-1, $yyyy1-1900);
+         $runtime = $runtime+3600 if(DbRep_dsttest($hash,$runtime,$aggsec) && (strftime "%m", localtime($runtime)) > 6);           # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
+         $runtime = $runtime+$wdadd;
+         $runtime_orig = $runtime-$aggsec;                             
+         
+         # die Woche Beginn ist gleich der Woche vom Ende Auswertung
+         if((strftime "%V", localtime($epoch_seconds_end)) eq ($w) && ($ms+$me != 13)) {                  
+             $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end); 
+             $ll=1;
+         } else {
+              $runtime_string_next  = strftime "%Y-%m-%d", localtime($runtime);
          }
+     } else {
+         # weitere Durchläufe
+         if(($runtime+$aggsec) > $epoch_seconds_end) {
+             $runtime_string_first = strftime "%Y-%m-%d", localtime($runtime_orig);
+             $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end); 
+             $ll=1;
+         } else {
+             $runtime_string_first = strftime "%Y-%m-%d", localtime($runtime_orig) ;
+             $runtime_string_next  = strftime "%Y-%m-%d", localtime($runtime+$aggsec);  
+         }
+     }
+ 
+     # neue Beginnzeit in Epoche-Sekunden
+     $runtime = $runtime_orig+$aggsec;           
+ }
+
+ # Tagesaggregation
+ if ($aggregation eq "day") {  
+     $runtime_string       = strftime "%Y-%m-%d", localtime($runtime);                      # für Readingname
+     $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime) if($i==1);
+     $runtime_string_first = strftime "%Y-%m-%d", localtime($runtime) if($i>1);
+     $runtime = $runtime+3600 if(DbRep_dsttest($hash,$runtime,$aggsec) && (strftime "%m", localtime($runtime)) > 6);                          # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
+                                       
+     if((($tsstr gt $testr) ? $runtime : ($runtime+$aggsec)) > $epoch_seconds_end) {
+         $runtime_string_first = strftime "%Y-%m-%d", localtime($runtime);                    
+         $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime) if( $dsstr eq $destr);
+         $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
+         $ll=1;
+     } else {
+         $runtime_string_next  = strftime "%Y-%m-%d", localtime($runtime+$aggsec);   
+     }
+     
+     Log3 ($name, 5, "DbRep $name - runtime_string: $runtime_string, runtime_string_first: $runtime_string_first, runtime_string_next: $runtime_string_next");
+
+     # neue Beginnzeit in Epoche-Sekunden
+     $runtime = $runtime+$aggsec;         
+ }
+
+ # Stundenaggregation
+ if ($aggregation eq "hour") {
+     $runtime_string       = strftime "%Y-%m-%d_%H", localtime($runtime);                   # für Readingname
+     $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime) if($i==1);
+     $runtime = $runtime+3600 if(DbRep_dsttest($hash,$runtime,$aggsec) && (strftime "%m", localtime($runtime)) > 6);                          # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
+     $runtime_string_first = strftime "%Y-%m-%d %H", localtime($runtime) if($i>1);
+     
+     my @a = split (":",$tsstr);
+     my $hs = $a[0];
+     my $msstr = $a[1].":".$a[2];
+     @a = split (":",$testr);
+     my $he = $a[0];
+     my $mestr = $a[1].":".$a[2];
+     
+     if((($msstr gt $mestr) ? $runtime : ($runtime+$aggsec)) > $epoch_seconds_end) {
+         $runtime_string_first = strftime "%Y-%m-%d %H", localtime($runtime);                 
+         $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime) if( $dsstr eq $destr && $hs eq $he);
+         $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
+         $ll=1;
+     } else {
+         $runtime_string_next  = strftime "%Y-%m-%d %H", localtime($runtime+$aggsec);   
+     }
+
+     # neue Beginnzeit in Epoche-Sekunden
+     $runtime = $runtime+$aggsec;         
+ }
          
 return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll);
 }
@@ -8732,7 +8777,7 @@ return ("$hh:$mm:$ss");
 }
 
 ####################################################################################################
-#    Check ob Zeitgrenzen bzw. Aggregation gesetzt sind, evtl. übertseuern (je nach Funktion)
+#    Check ob Zeitgrenzen bzw. Aggregation gesetzt sind, evtl. überseuern (je nach Funktion)
 #    Return "1" wenn Bedingung erfüllt, sonst "0"
 ####################################################################################################
 sub DbRep_checktimeaggr ($) {
@@ -9031,9 +9076,9 @@ sub DbRep_corrRelTime($$$) {
  # Sommer/Winterzeitkorrektur
  (undef,undef,undef,undef,undef,undef,undef,undef,$disdst) = localtime(time-$tim);
  $tim += ($disdst-$isdst)*3600 if($disdst != $isdst);
- 
- Log3($name, 4, "DbRep $name - startMonth: $mon endMonth: $dmon lastleapyear: $lly baseYear: $fyear destdaylight:$disdst isdaylight:$isdst");
 
+ Log3($name, 4, "DbRep $name - startMonth: $dmon endMonth: $mon lastleapyear: $lly baseYear: $fyear diffdaylight:$disdst isdaylight:$isdst");
+ 
 return $tim;
 }
 
@@ -9047,12 +9092,13 @@ return $tim;
 #
 ####################################################################################################
 sub DbRep_IsLeapYear($$) {
- my ($name,$year) = @_;
- my $ily = 0;
- if ($year % 4 == 0 && $year % 100 != 0 || $year % 400 == 0) {    # $year modulo 4 -> muß 0 sein
-     $ily = 1;
- }
- Log3($name, 4, "DbRep $name - Year $year is leap year") if($ily);
+  my ($name,$year) = @_;
+  my $ily = 0;
+  if ($year % 4 == 0 && $year % 100 != 0 || $year % 400 == 0) {    # $year modulo 4 -> muß 0 sein
+      $ily = 1;
+  }
+  Log3($name, 4, "DbRep $name - Year $year is leap year") if($ily);
+
 return $ily;
 }
  
@@ -10156,12 +10202,12 @@ sub DbRep_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 18980 2019-03-20 20:55:44Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 19065 2019-03-29 21:25:15Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 18980 2019-03-20 20:55:44Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 19065 2019-03-29 21:25:15Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -12006,10 +12052,10 @@ return $ret;
   
   <ul><ul>
   <a name="aggregation"></a>
-  <li><b>aggregation </b>     - Aggregation of Device/Reading-selections. Possible is hour, day, week, month or "no". 
+  <li><b>aggregation </b>     - Aggregation of Device/Reading-selections. Possible values are hour, day, week, month, year and "no". 
                                 Delivers e.g. the count of database entries for a day (countEntries), Summation of 
 								difference values of a reading (sumValue) and so on. Using aggregation "no" (default) an 
-								aggregation don't happens but the output contaims all values of Device/Reading in the defined time period.  </li> <br>
+								aggregation don't happens but the output contains all values of Device/Reading in the selected time period.  </li> <br>
 
   <a name="allowDeletion"></a>
   <li><b>allowDeletion </b>   - unlocks the delete-function  </li> <br>
@@ -14414,13 +14460,12 @@ return $ret;
   
   <ul><ul>
   <a name="aggregation"></a>
-  <li><b>aggregation </b>     - Zusammenfassung der Device/Reading-Selektionen in Stunden,Tage,Kalenderwochen,Kalendermonaten 
+  <li><b>aggregation </b>     - Zusammenfassung der Device/Reading-Selektionen in Stunden, Tagen, Kalenderwochen, Kalendermonaten, Kalenderjahren 
                                 oder "no". <br>
-                                Liefert z.B. die Anzahl der DB-Einträge am Tag (countEntries), Summierung von 
-                                Differenzwerten eines Readings (sumValue), usw. <br>
-                                Mit Aggregation "no" (default) erfolgt keine Zusammenfassung in einem Zeitraum, sondern die 
-                                Ausgabe wird aus allen Werten einer Device/Reading-Kombination zwischen den definierten 
-                                Zeiträumen ermittelt.  </li> <br>
+                                Liefert z.B. die Anzahl der DB-Einträge am Tag (countEntries) oder die Summierung von 
+                                Differenzwerten eines Readings (sumValue) usw. <br>
+                                Mit Aggregation "no" (default) wird das Ergebnis aus allen Werten einer Device/Reading-Kombination im 
+                                selektierten Zeitraum ermittelt.  </li> <br>
   
   <a name="allowDeletion"></a>
   <li><b>allowDeletion </b>   - schaltet die Löschfunktion des Moduls frei   </li> <br>
