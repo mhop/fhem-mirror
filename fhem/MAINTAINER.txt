@@ -589,6 +589,8 @@ contrib/deprecated/70_Pushalot.pm Talkabout       (deprecated)
 contrib/deprecated/95_PachLog.pm  rudolfkoenig/orphan (deprecated)
 contrib/DoorPi/70_DoorPi.pm  pahenning            Automatisierung
 contrib/Infratec/*           wzut                 Bastelecke
+contrib/META.json.full.txt   loredo               FHEM Development
+contrib/META.json.txt        loredo               FHEM Development
 contrib/PRESENCE             markusbloch          Unterstuetzende Dienste
 contrib/PRESENCE/lepresenced PatrickR             Unterstuetzende Dienste
 contrib/SIP/*                wzut                 Sonstiges

@@ -1,0 +1,195 @@
+=pod
+
+=encoding utf8
+
+=item [helper|device|command]
+=item summary Short description in English
+=item summary_DE Kurzbeschreibung in Deutsch
+
+=begin html
+
+<a name="myModule" id="myModule"></a>
+<h3>
+  myModule
+</h3>
+<ul>
+  Long description about what this module does and what it is for.<br>
+  <br>
+  <a name="myModuledefine" id="myModuledefine"></a><b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; myModule</code><br>
+    <br>
+    Describe a little bit what this define command will do and how the device instance will behave afterwards.<br>
+  </ul><br>
+  <a name="myModuleset" id="myModuleset"></a><b>Set</b>
+  <ul>
+    <li>setCommand1<br>
+      This command does xyz.
+    </li>
+    <li>setCommand2 &lt;parameter&gt;<br>
+      This command does abc and requires a parameter. Example:
+      <ul>
+        <code>get myModule getCommand1 on</code>
+      </ul>
+    </li>
+  </ul><br>
+  <a name="myModuleget" id="myModuleget"></a><b>Get</b>
+  <ul>
+    <li>getCommand1<br>
+      This command does xyz.
+    </li>
+    <li>getCommand2 &lt;parameter&gt;<br>
+      This command does abc and requires a parameter. Example:
+      <ul>
+        <code>get myModule getCommand1 on</code>
+      </ul>
+    </li>
+  </ul><a name="myModuleattr" id="myModuleattr"></a><b>Attributes</b>
+  <ul>
+    <a name="myAttribute1" id="myAttribute1"></a>
+    <li>myAttribute1<br>
+      This attribute configures xyz.
+    </li><br>
+  </ul>
+</ul>
+
+=end html
+
+=begin html_DE
+
+<a name="myModule" id="myModule"></a>
+<h3>
+  myModule
+</h3>
+<ul>
+  Längere Beschreibung, was dieses Modul macht und wofür es gut ist.<br>
+  <br>
+  <a name="myModuledefine" id="myModuledefine"></a><b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; myModule</code><br>
+    <br>
+    Kurze Beschreibung, was dieses define Kommando genau macht und wie die Device Instanz sich anschließend verhalten wird.<br>
+  </ul><br>
+  <a name="myModuleset" id="myModuleset"></a><b>Set</b>
+  <ul>
+    <li>setCommand1<br>
+      Dieses Kommando macht xyz.
+    </li>
+    <li>setCommand2 &lt;parameter&gt;<br>
+      Dieses Kommando macht abc und benötigt einen Parameter. Beispiel:
+      <ul>
+        <code>get myModule getCommand1 on</code>
+      </ul>
+    </li>
+  </ul><br>
+  <a name="myModuleget" id="myModuleget"></a><b>Get</b>
+  <ul>
+    <li>getCommand1<br>
+      Dieses Kommando macht xyz.
+    </li>
+    <li>getCommand2 &lt;parameter&gt;<br>
+      Dieses Kommando macht abc und benötigt einen Parameter. Beispiel:
+      <ul>
+        <code>get myModule getCommand1 on</code>
+      </ul>
+    </li>
+  </ul><a name="myModuleattr" id="myModuleattr"></a><b>Attributes</b>
+  <ul>
+    <a name="myAttribute1" id="myAttribute1"></a>
+    <li>myAttribute1<br>
+      Dieses Attribut konfiguriert xyz.
+    </li><br>
+  </ul>
+</ul>
+
+=end html_DE
+
+=for :application/json;q=META.json 00_myModule.pm
+{
+  "abstract": "Short description, will overwrite '=item summary'",
+  "description": "This can be some extended description or documentation.",
+  "x_lang": {
+    "de": {
+      "abstract": "Kurzbeschreibung auf Deutsch, überschreibt '=item summary_DE'",
+      "description": "Hier kann eine erweiterte Beschreibung oder Dokumentation stehen."
+    }
+  },
+  "license": "GPL_2",
+  "version": "v1.0.0",
+  "release_status": "stable",
+  "author": [
+    "I am the maintainer <firstname.lastname@gmail.com>",
+    "I am a co-author <firstname.lastname@gmail.com>",
+    "I am another co-author <firstname.lastname@gmail.com>",
+    "I might be the orignal author <firstname.lastname@gmail.com>"
+  ],
+  "keywords": [
+    "additional",
+    "keywords",
+    "that shall",
+    "appear",
+    "for example",
+    "vendorName",
+    "or",
+    "function"
+  ],
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "FHEM": 5.00918623,
+        "FHEM::Meta": 0.001006,
+        "HttpUtils": 0,
+        "JSON": 0,
+        "perl": 5.014
+      },
+      "recommends": {
+      },
+      "suggests": {
+      }
+    }
+  },
+  "resources": {
+    "bugtracker": {
+      "web": "https://github.com/fhem/myModule/issues",
+      "x_web_title": "Github Issues for fhem/myModule"
+    },
+    "homepage": "https://myModuleHasAhomepage.com",
+    "license": [
+      "https://github.com/fhem/myModule/blob/master/LICENSE"
+    ],
+    "repository": {
+      "type": "git",
+      "url": "https://github.com/fhem/myModule.git",
+      "web": "https://github.com/fhem/myModule/blob/master/subdir/00_myModule.pm",
+      "x_branch": "master",
+      "x_dev": {
+        "type": "git",
+        "url": "https://github.com/fhem/myModule.git",
+        "web": "https://github.com/fhem/myModule/blob/dev/subdir/00_myModule.pm",
+        "x_branch": "dev",
+        "x_filepath": "subdir/",
+        "x_raw": "https://raw.githubusercontent.com/fhem/myModule/dev/subdir/00_myModule.pm"
+      },
+      "x_filepath": "subdir/",
+      "x_raw": "https://raw.githubusercontent.com/fhem/myModule/master/subdir/00_myModule.pm"
+    },
+    "x_support_commercial": {
+      "title": "My Company",
+      "web": "https://support.mycompany.com"
+    },
+    "x_support_community": {
+      "rss": "https://forum.fhem.de/index.php?action=.xml;type=rss;board=33",
+      "title": "FHEM Forum: Server - Linux",
+      "web": "https://forum.fhem.de/index.php/board,33.0.html"
+    }
+  },
+  "x_fhem_maintainer": [
+    "myFhemForumAndSVNusername"
+  ],
+  "x_fhem_maintainer_github": [
+    "myGithubUsername"
+  ]
+}
+=end :application/json;q=META.json
+
+=cut

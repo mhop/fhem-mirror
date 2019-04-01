@@ -1,0 +1,42 @@
+{
+  "description": "This can be some extended description or documentation.",
+  "x_lang": {
+    "de": {
+      "description": "Hier kann eine erweiterte Beschreibung oder Dokumentation stehen."
+    }
+  },
+  "author": [
+    "I am the maintainer <firstname.lastname@gmail.com>"
+  ],
+  "keywords": [
+    "additional",
+    "keywords",
+    "that shall",
+    "appear",
+    "for example",
+    "vendorName",
+    "or",
+    "function"
+  ],
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "FHEM": 5.00918623,
+        "FHEM::Meta": 0.001006,
+        "HttpUtils": 0,
+        "JSON": 0,
+        "perl": 5.014
+      },
+      "recommends": {
+      },
+      "suggests": {
+      }
+    }
+  },
+  "x_fhem_maintainer": [
+    "myFhemForumAndSVNusername"
+  ],
+  "x_fhem_maintainer_github": [
+    "myGithubUsername"
+  ]
+}
