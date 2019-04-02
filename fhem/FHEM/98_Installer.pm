@@ -2263,7 +2263,10 @@ sub CreateMetadataList ($$$) {
             $l .= $tdOpen;
 
             if ( $mAttr eq 'release_date' ) {
-                if ( defined( $modMeta->{x_vcs} ) ) {
+                if ( defined( $modMeta->{x_release_date} ) ) {
+                    $l .= $modMeta->{x_release_date};
+                }
+                elsif ( defined( $modMeta->{x_vcs} ) ) {
                     $l .= $modMeta->{x_vcs}[7];
                 }
                 else {

@@ -1,3 +1,18 @@
+###############################################################################
+# About metadata in FHEM
+#------------------------------------------------------------------------------
+#
+# This aims to be a full example of all possible options to document
+# a FHEM module or FHEM package.
+# It does not necessarially mean that every attribute will need to be used or
+# makes sense in every case. Also, some combinations might be weired, depending
+# on the actual use case. That is, if your module is part of FHEM core
+# (hosted on svn.fhem.de) or externally on a different plattform, which is then
+# considered a 3rd-party module.
+#
+# Please consult https://wiki.fhem.de/wiki/Meta for more information.
+#
+
 =pod
 
 =encoding utf8
@@ -114,14 +129,30 @@
       "description": "Hier kann eine erweiterte Beschreibung oder Dokumentation stehen."
     }
   },
-  "license": "GPL_2",
+  "license": [
+    "apache_2_0",
+    "mozilla_1_0"
+  ],
   "version": "v1.0.0",
+  "x_release_date": "1970-01-01",
   "release_status": "stable",
   "author": [
     "I am the maintainer <firstname.lastname@gmail.com>",
     "I am a co-author <firstname.lastname@gmail.com>",
-    "I am another co-author <firstname.lastname@gmail.com>",
-    "I might be the orignal author <firstname.lastname@gmail.com>"
+    "I am another co-author w/o email <>",
+    "I might be the orignal author long time ago <firstname.lastname@gmail.com>"
+  ],
+  "x_fhem_maintainer": [
+    "maintainer-myFhemForumAndSVNusername",
+    "co-maintainer-myFhemForumAndSVNusername",
+    "another-author-myFhemForumAndSVNusername",
+    "original-author-myFhemForumAndSVNusername"
+  ],
+  "x_fhem_maintainer_github": [
+    "maintainer-myGithubUsername",
+    "co-maintainer-myGithubUsername",
+    null,
+    null
   ],
   "keywords": [
     "additional",
@@ -148,8 +179,32 @@
       }
     }
   },
+  "x_prereqs_nodejs": {
+    "runtime": {
+      "requires": {
+        "node": 8.0,
+        "npm": 0
+      },
+      "recommends": {
+      },
+      "suggests": {
+      }
+    }
+  },
+  "x_prereqs_python": {
+    "runtime": {
+      "requires": {
+        "pip": 0
+      },
+      "recommends": {
+      },
+      "suggests": {
+      }
+    }
+  },
   "resources": {
     "bugtracker": {
+      "mailto": "bugs@example.com",
       "web": "https://github.com/fhem/myModule/issues",
       "x_web_title": "Github Issues for fhem/myModule"
     },
@@ -173,22 +228,31 @@
       "x_filepath": "subdir/",
       "x_raw": "https://raw.githubusercontent.com/fhem/myModule/master/subdir/00_myModule.pm"
     },
+    "x_commandref" : {
+      "title" : "I want to name it differently, not 'Online version'",
+      "web" : "https://myModuleHasAhomepage.com/myModuleHasAnExternalOnlineCommandRef.html"
+    },
     "x_support_commercial": {
+      "mailto": "support@mycompany.com",
       "title": "My Company",
       "web": "https://support.mycompany.com"
     },
     "x_support_community": {
-      "rss": "https://forum.fhem.de/index.php?action=.xml;type=rss;board=33",
-      "title": "FHEM Forum: Server - Linux",
-      "web": "https://forum.fhem.de/index.php/board,33.0.html"
-    }
+      "rss": "https://forum.fhem.de/index.php?action=.xml;type=rss;board=19",
+      "title": "I want to have a special title. Prefix 'FHEM Forum: ' will be added if URL is forum.fhem.de",
+      "web": "https://forum.fhem.de/index.php/board,19.0.html",
+      "subCommunity" : {
+          "rss" : "https://forum.fhem.de/index.php?action=.xml;type=rss;board=93",
+          "title" : "This sub-board will be first contact point",
+          "web" : "https://forum.fhem.de/index.php/board,93.0.html"
+       }
+    },
+    "x_wiki" : {
+      "title" : "I want to have a special title. Prefix 'FHEM Wiki: ' will be added if URL is wiki.fhem.de",
+      "web" : "https://wiki.fhem.de/wiki/myModule_is_simply_different"
+     }
   },
-  "x_fhem_maintainer": [
-    "myFhemForumAndSVNusername"
-  ],
-  "x_fhem_maintainer_github": [
-    "myGithubUsername"
-  ]
+  "x_support_status": "supported"
 }
 =end :application/json;q=META.json
 

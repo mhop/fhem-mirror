@@ -2249,7 +2249,7 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
         }
     }
 
-    # generate x_version
+    # generate x_version and x_release_date
     __SetXVersion($modMeta);
 
     return "$@" if ($@);
@@ -3066,6 +3066,12 @@ sub __SetXVersion {
         $modMeta->{x_version} .= ' ' . uc( $modMeta->{release_status} )
           if ( defined( $modMeta->{release_status} )
             && $modMeta->{release_status} ne 'stable' );
+    }
+
+    # set x_release_date
+    unless ( defined( $modMeta->{x_release_date} ) ) {
+        $modMeta->{x_release_date} = $modMeta->{x_vcs}[7]
+          if ( defined( $modMeta->{x_vcs} ) );
     }
 }
 

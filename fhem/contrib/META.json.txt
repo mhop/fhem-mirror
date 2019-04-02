@@ -8,6 +8,9 @@
   "author": [
     "I am the maintainer <firstname.lastname@gmail.com>"
   ],
+  "x_fhem_maintainer": [
+    "myFhemForumAndSVNusername"
+  ],
   "keywords": [
     "additional",
     "keywords",
@@ -32,11 +35,5 @@
       "suggests": {
       }
     }
-  },
-  "x_fhem_maintainer": [
-    "myFhemForumAndSVNusername"
-  ],
-  "x_fhem_maintainer_github": [
-    "myGithubUsername"
-  ]
+  }
 }
