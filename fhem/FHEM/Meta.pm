@@ -2110,7 +2110,7 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
         {
             if ( defined( $modMeta->{x_vcs} ) ) {
                 $modMeta->{resources}{x_commandref}{web} =
-                  'https://fhem.de/commandref.html#'
+                  'https://commandref.fhem.de/#'
                   . ( $modName eq 'Global' ? 'global' : $modName );
             }
         }
