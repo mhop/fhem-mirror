@@ -64,7 +64,7 @@ use strict;
 use warnings;
 use FHEM::Meta;
 
-my $modulversion   = '4.4.0';
+my $modulversion   = '4.4.1';
 my $flowsetversion = '4.4.0';
 
 sub AMADCommBridge_Initialize($) {
@@ -142,7 +142,9 @@ BEGIN {
           HttpUtils_NonblockingGet
           TcpServer_Open
           TcpServer_Close
-          TcpServer_Accept)
+          TcpServer_Accept
+          AnalyzeCommandChain
+          AnalyzePerlCommand)
     );
 }
 
