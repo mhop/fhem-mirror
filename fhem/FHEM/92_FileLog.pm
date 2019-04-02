@@ -646,6 +646,9 @@ FileLog_Get($@)
               if(open(my $out,'>',$tempfileName)){
                 my $sec   = time_str2num("$fy-$fm-$fd 00:00:00");
                 my $secTo = time_str2num("$ty-$tm-$td 00:00:00");
+                if(($secTo-$sec)%86400) { #DST change inbetween, #99215
+                  $secTo = $sec + 86400*int(($secTo-$sec+3600)/86400);
+                }
                 my $lastFile = "";
                 while($sec <= $secTo) { # Loop over each day
                   $linf=ResolveDateWildcards($hash->{logfile},localtime($sec));
