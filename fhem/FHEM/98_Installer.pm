@@ -3141,7 +3141,7 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
           . ' The module does not provide Perl prerequisites from its metadata.'
           . $lb
           . 'This result is based on automatic source code analysis '
-          . 'and can be incorrect.'
+          . 'and can be incorrect. '
           . 'Suggested Perl items may still be required if the module author had decided to implement some own dependency and/or error handling like returning an informative message instead of the original Perl error message.'
           . $tdClose
           . $trClose
@@ -3165,7 +3165,13 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
           . $trOpenOdd
           . $tdOpen
           . 'Module metadata do not contain any prerequisites.' . "\n"
-          . 'For automatic source code analysis, please install Perl::PrereqScanner::NotQuiteLite first.'
+          . 'For automatic source code analysis, please install '
+          . ( $html
+            ? '<a href="https://gist.github.com/jpawlowski/8f6503bcf0356b3e64a98b8b35508e57" target="_blank">'
+            : '' )
+          . 'Perl::PrereqScanner::NotQuiteLite'
+          . ( $html ? '</a>' : '' )
+          . ' first.'
           . $tdClose
           . $trClose
           . $tBClose;
