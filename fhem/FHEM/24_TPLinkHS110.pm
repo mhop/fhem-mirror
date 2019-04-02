@@ -228,7 +228,7 @@ sub TPLinkHS110_Get($$)
 					} else {
 						$total = $total+ $key2->{'energy_wh'};
 						if ($key2->{'day'} == $mday) {
-						readingsBulkUpdate($hash, "daily_total", sprintf("%.3f", $key2->{'energy_wh'}));
+						readingsBulkUpdate($hash, "daily_total", sprintf("%.3f", $key2->{'energy_wh'}*0.001));
 						}
 					}
 					
@@ -236,7 +236,8 @@ sub TPLinkHS110_Get($$)
 			}
 			my $count=1;
 			$count = @{$json->{'emeter'}->{'get_daystat'}->{'day_list'}};
-			readingsBulkUpdate($hash, "monthly_total", $total);
+			if ($hw_ver eq "1.0") {readingsBulkUpdate($hash, "monthly_total", $total);}
+			if ($hw_ver eq "2.0") {readingsBulkUpdate($hash, "monthly_total", $total*0.001);}
 			if ($count) { readingsBulkUpdate($hash, "daily_average", $total/$count)};
             Log3 $hash, 2, "TPLinkHS110: $name Daystat updated";
         } else {
