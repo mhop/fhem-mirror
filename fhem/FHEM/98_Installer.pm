@@ -2242,8 +2242,11 @@ sub CreateMetadataList ($$$) {
                 || !defined( $modMeta->{resources}{repository} ) )
           );
         next
-          if ( $mAttr eq 'release_date'
-            && ( !defined( $modMeta->{x_vcs} ) ) );
+          if (
+            $mAttr eq 'release_date'
+            && (   !defined( $modMeta->{x_release_date} )
+                && !defined( $modMeta->{x_vcs} ) )
+          );
         next
           if ( $mAttr eq 'command_reference'
             && $modType eq 'package' );
@@ -2268,9 +2271,6 @@ sub CreateMetadataList ($$$) {
                 }
                 elsif ( defined( $modMeta->{x_vcs} ) ) {
                     $l .= $modMeta->{x_vcs}[7];
-                }
-                else {
-                    $l .= '-';
                 }
             }
 
@@ -3532,11 +3532,13 @@ sub LoadInstallStatusPerl(;$) {
         if ( exists( $modules{$modName} ) && !exists( $packages{$modName} ) ) {
             $type = 'module';
         }
-        elsif ( exists( $packages{$modName} ) && !exists( $modules{$modName} ) )
+        elsif ( exists( $packages{$modName} )
+            && !exists( $modules{$modName} ) )
         {
             $type = 'package';
         }
-        elsif ( exists( $packages{$modName} ) && exists( $modules{$modName} ) )
+        elsif (exists( $packages{$modName} )
+            && exists( $modules{$modName} ) )
         {
             $type = 'module+package';
         }
@@ -3580,8 +3582,8 @@ sub LoadInstallStatusPerl(;$) {
                           unless (
                             grep ( /^$modName$/,
                                 @{
-                                    $pkgStatus{Perl}{pkgs}{$pkg}{ $type . 's' }
-                                      {$mAttr}
+                                    $pkgStatus{Perl}{pkgs}{$pkg}
+                                      { $type . 's' }{$mAttr}
                                 } )
                           );
 
@@ -3718,7 +3720,8 @@ sub LoadInstallStatusPerl(;$) {
                                 $pkgStatus{Perl}{pkgs}{$pkg}{status} =
                                   'installed';
                                 my $v = eval "$pkg->VERSION()";
-                                $pkgStatus{Perl}{installed}{$pkg} = $v ? $v : 0;
+                                $pkgStatus{Perl}{installed}{$pkg} =
+                                  $v ? $v : 0;
                             }
                         }
 
@@ -3743,8 +3746,8 @@ sub LoadInstallStatusPerl(;$) {
                                       $reqV;
 
                                     $pkgStatus{Perl}{analyzed} = 1
-                                      if (
-                                        $modMeta->{x_prereqs_src} ne 'META.json'
+                                      if ( $modMeta->{x_prereqs_src} ne
+                                        'META.json'
                                         && !$pkgStatus{Perl}{analyzed} );
                                 }
                             }

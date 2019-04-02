@@ -1943,10 +1943,47 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
         $modMeta->{release_status} = 'stable';
     }
     unless ( defined( $modMeta->{license} ) ) {
-        $modMeta->{license} = 'unknown';
+        $modMeta->{license} = ['unknown'];
     }
     unless ( defined( $modMeta->{author} ) ) {
         $modMeta->{author} = ['unknown <>'];
+    }
+
+    # ensure license is an array
+    if ( defined( $modMeta->{license} )
+        && !ref( $modMeta->{license} ) )
+    {
+        $modMeta->{license} = [ $modMeta->{license} ];
+    }
+
+    # ensure author is an array
+    if ( defined( $modMeta->{author} )
+        && !ref( $modMeta->{author} ) )
+    {
+        $modMeta->{author} = [ $modMeta->{author} ];
+    }
+
+    # ensure x_fhem_maintainer is an array
+    if ( defined( $modMeta->{x_fhem_maintainer} )
+        && !ref( $modMeta->{x_fhem_maintainer} ) )
+    {
+        $modMeta->{x_fhem_maintainer} = [ $modMeta->{x_fhem_maintainer} ];
+    }
+
+    # ensure x_fhem_maintainer_github is an array
+    if ( defined( $modMeta->{x_fhem_maintainer_github} )
+        && !ref( $modMeta->{x_fhem_maintainer_github} ) )
+    {
+        $modMeta->{x_fhem_maintainer_github} =
+          [ $modMeta->{x_fhem_maintainer_github} ];
+    }
+
+    # ensure resources/license is an array
+    if (   defined( $modMeta->{resources} )
+        && defined( $modMeta->{resources}{license} )
+        && !ref( $modMeta->{resources}{license} ) )
+    {
+        $modMeta->{resources}{license} = [ $modMeta->{resources}{license} ];
     }
 
     # Generate META information for FHEM core modules
@@ -1963,9 +2000,14 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
             }
         }
 
-        if ( !$modMeta->{license} || $modMeta->{license} eq 'unknown' ) {
+        if (
+            !$modMeta->{license}
+            || ( ref( $modMeta->{license} ) eq 'ARRAY'
+                && $modMeta->{license}[0] eq 'unknown' )
+          )
+        {
             if ( defined( $modMeta->{x_vcs} ) ) {
-                $modMeta->{license} = 'GPL_2';
+                $modMeta->{license}[0] = 'GPL_2';
             }
         }
 
@@ -3089,7 +3131,7 @@ sub __SetXVersion {
       "abstract": "FHEM Entwickler Paket, um Metadaten Unterstützung zu aktivieren"
     }
   },
-  "version": "v0.4.0",
+  "version": "v0.4.1",
   "release_status": "testing",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
