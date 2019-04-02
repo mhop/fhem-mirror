@@ -264,9 +264,10 @@ sub HUEDevice_Define($$)
 {
   my ($hash, $def) = @_;
 
-  my @args = split("[ \t]+", $def);
-
   return $@ unless ( FHEM::Meta::SetInternals($hash) );
+
+
+  my @args = split("[ \t]+", $def);
 
   $hash->{helper}->{devtype} = "";
   if( $args[2] eq "group" ) {
@@ -1732,6 +1733,7 @@ absent:{&lt;json&gt;}</code></li>
 
 =end html
 
+=encoding utf8
 =for :application/json;q=META.json 31_HUEDevice.pm
 {
   "abstract": "devices connected to a Phillips HUE bridge, an Osram LIGHTIFY gateway or a IKEA TRADFRI gateway",
@@ -1748,7 +1750,8 @@ absent:{&lt;json&gt;}</code></li>
   "keywords": [
     "fhem-mod",
     "fhem-mod-device",
-    "HUE"
+    "HUE",
+    "zigbee"
   ],
   "release_status": "stable",
   "x_fhem_maintainer": [

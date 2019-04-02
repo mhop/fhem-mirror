@@ -215,9 +215,10 @@ HUEBridge_Define($$)
 {
   my ($hash, $def) = @_;
 
-  my @args = split("[ \t]+", $def);
-
   return $@ unless ( FHEM::Meta::SetInternals($hash) );
+
+
+  my @args = split("[ \t]+", $def);
 
   return "Usage: define <name> HUEBridge [<host>] [interval]"  if(@args < 2);
 
@@ -2044,6 +2045,7 @@ HUEBridge_Attr($$$)
 
 =end html
 
+=encoding utf8
 =for :application/json;q=META.json 30_HUEBridge.pm
 {
   "abstract": "module for the phillips hue bridge",
@@ -2060,7 +2062,8 @@ HUEBridge_Attr($$$)
   "keywords": [
     "fhem-mod",
     "fhem-mod-device",
-    "HUE"
+    "HUE",
+    "zigbee"
   ],
   "release_status": "stable",
   "x_fhem_maintainer": [

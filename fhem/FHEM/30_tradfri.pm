@@ -6,6 +6,8 @@ package main;
 use strict;
 use warnings;
 
+use FHEM::Meta;
+
 use CoProcess;
 require "$attr{global}{modpath}/FHEM/30_HUEBridge.pm";
 
@@ -47,6 +49,8 @@ tradfri_Initialize($)
                       "disable:1 disabledForIntervals ".
                       "createGroupReadings:1,0 ".
                       $readingFnAttributes;
+
+  return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
 #####################################
@@ -63,6 +67,9 @@ sub
 tradfri_Define($$)
 {
   my ($hash, $def) = @_;
+
+  return $@ unless ( FHEM::Meta::SetInternals($hash) );
+
 
   my @a = split("[ \t][ \t]*", $def);
 
@@ -686,4 +693,61 @@ tradfri_Attr($$$)
 </ul><br>
 
 =end html
+
+=encoding utf8
+=for :application/json;q=META.json 30_tradfri.pm
+{
+  "abstract": "Module to control the FHEM/Tradfri integration",
+  "x_lang": {
+    "de": {
+      "abstract": "Modul zur Konfiguration der FHEM/Tradfri Integration"
+    }
+  },
+  "keywords": [
+    "fhem-mod",
+    "fhem-mod-device",
+    "tradfri",
+    "tradfri-fhem",
+    "zigbee",
+    "nodejs",
+    "node"
+  ],
+  "release_status": "stable",
+  "x_fhem_maintainer": [
+    "justme1968"
+  ],
+  "x_fhem_maintainer_github": [
+    "justme-1968"
+  ],
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "FHEM": 5.00918799,
+        "perl": 5.014, 
+        "Meta": 0,
+        "CoProcess": 0,
+        "JSON": 0,
+        "Data::Dumper": 0
+      },
+      "recommends": {
+      },
+      "suggests": {
+        "HUEDevice": 0
+      }
+    }
+  },
+  "x_prereqs_nodejs": {
+    "runtime": {
+      "requires": {
+        "node": 8.0,
+        "tradfri-fhem": 0
+      },
+      "recommends": {
+      },
+      "suggests": {
+      }
+    }
+  }
+}
+=end :application/json;q=META.json
 =cut

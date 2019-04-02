@@ -1320,7 +1320,7 @@ alexa_Attr($$$)
 
 =end html
 
-
+=encoding utf8
 =for :application/json;q=META.json 39_alexa.pm
 {
   "abstract": "Module to control the FHEM/Alexa integration",
