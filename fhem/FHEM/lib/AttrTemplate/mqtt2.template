@@ -83,7 +83,7 @@ name:L_01a_zigbee2mqtt_bridge_0x
 desc:The zigbee2mqtt bridge device <br>Outdated version, using entire device name including "0x". <br>Kept in repo for compability reasons. 
 filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
 par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^:]+:([^/]+)[/].*:, ? $1 : undef }
-set DEVICE attrTemplate L_01_zigbee2mqtt_bridge_0x
+set DEVICE attrTemplate L_01_zigbee2mqtt_bridge
 attr DEVICE bridgeRegexp BASE_TOPIC/(0x[A-Za-z0-9]*)[/]?.*:.* "zigbee_$1"
 attr DEVICE model L_01a_zigbee2mqtt_bridge_0x
   
@@ -480,7 +480,6 @@ par:POWERCMD;needed command to be sent like in example dec '{"protocol":"NEC","b
 par:VOLUMEUPCMD;needed command to be sent like in example raw '0,926,844,958,832,1798,868,902,848,900,870,900,852,908,918,958,794,934,874,928,1738,934,856,1764' (without '');{ undef }
 par:MULTIPLE1CMD;needed command to be sent like in example hex '{"Protocol":"NEC","Bits":32,"Data":0x8166817E}' (without '');{ undef }
 par:MULTIPLE2CMD;needed command to be sent like in example hex '{"Protocol":"NEC","Bits":32,"Data":0x8166817E}' (without '');{ undef }
-set DEVICE attrTemplate A_01d_tasmota_ir
 attr DEVICE setList \
   power:noArg cmnd/DEVNAME/IRsend POWERCMD\
   volumeup:noArg cmnd/DEVNAME/IRsend VOLUMEUPCMD\
@@ -711,11 +710,6 @@ par:DEVNAME;ESP's name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,te
 par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev","")}
 set IO_DEV publish cmnd/DEVNAME/SetOption26 0
 attr DEVICE userReadings state:POWER:.* { lc(ReadingsVal($name,"POWER","")) }
-
-#name:A_01z_tasmota_test_IPAdress_to_http
-#filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd).*
-#desc:Applies to single relay tasmota devices <br>NOTE: this  template changes existing eventMap attribute
-#attr DEVICE eventMap { dev=>{'^IPAddress.?: (\d+)\.(\d+)\.(\d+)\.(\d+)$'=>'<html><a href=http://$1.$2.$3.$4/>IPAddress</a></html>', } }
 
 
 ###########################################
@@ -970,6 +964,9 @@ attr DEVICE autocreate 1
 attr DEVICE bridgeRegexp   (ebus.)[^/]*/(bai|broadcast)/.*:.* "$1_bai"\
   (ebus.)[^/]*/([\d]+)/.*:.* "$1_$2"\
   (ebus.)[^/]*[/][^b][a-zA-Z]+[/].*:.* "$1"
+#attr DEVICE bridgeRegexp   (ebus.)[^/]*/(bai|broadcast|cc|e7f|ehp|f[\d][\d]|general|hc|he.|hmu|hwc|mc|mc.[\d]|omu|omu.[\d]|pms|rcc|rcc.[\d]|sc|scan|sdr_p|ui|uih|v[\d][\d]|v81|v81.[\d]|vd[\d]|vl[\d]|vr_[\d][\d]|zeo)/.*:.* "$1_$2"\
+#  (ebus.)[^/]*/([\d]+)/.*:.* "$1_$2"\
+# (ebus.)[^/]*[/](?:(bai|broadcast|cc|e7f|ehp|f[\d][\d]|general|hc|he.|hmu|hwc|mc|mc.[\d]|omu|omu.[\d]|pms|rcc|rcc.[\d]|sc|scan|sdr_p|ui|uih|v[\d][\d]|v81|v81.[\d]|vd[\d]|vl[\d]|vr_[\d][\d]|zeo)(*FAIL))[/].*:.* "$1"
 #attr DEVICE icon icoTempHeizung
 #attr DEVICE devStateStyle style="text-align:right"
 attr DEVICE model E_01a_eBus_daemon_splitter
@@ -986,8 +983,8 @@ attr DEVICE model E_01a_eBus_daemon_splitter
 name:X_01_esp_milight_hub_bridge
 filter:TYPE=MQTT2_DEVICE
 desc:use this with Chris Mullins ESP-Milight-Hub. for further details visit https://github.com/sidoh/esp8266_milight_hub <br>#recommended structure of the topic pattern milight/:device_id/:device_type/:group_id as set in the settings section in the bridge's web interface.
-par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*ates/.*:, ? $1 : undef }
-attr DEVICE bridgeRegexp BASE_ID/states/(0x....)/.*/([0-4])?.*:.* "milight_$1_$2"
+par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/][^/]*at[^/]+[/].*:, ? $1 : undef }
+attr DEVICE bridgeRegexp BASE_ID/[^/]*at[^/]+[/]/(0x....)/.*/([0-4])?.*:.* "milight_$1_$2"
 attr DEVICE autocreate 1
 attr DEVICE setStateList on off
 attr DEVICE model X_01_esp_milight_hub_bridge
