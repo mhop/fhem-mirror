@@ -9,6 +9,9 @@ package main;
 
 use strict;
 use warnings;
+
+use FHEM::Meta;
+
 use POSIX;
 use JSON;
 use Data::Dumper;
@@ -36,6 +39,8 @@ sub HUEBridge_Initialize($)
   $hash->{AttrList} = "key disable:1 disabledForIntervals createGroupReadings:1,0 httpUtils:1,0 noshutdown:1,0 pollDevices:1,2,0 queryAfterSet:1,0 $readingFnAttributes";
 
   #$hash->{isDiscoverable} = { ssdp => {'hue-bridgeid' => '/.*/'}, upnp => {} };
+
+  return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
 sub
@@ -211,6 +216,8 @@ HUEBridge_Define($$)
   my ($hash, $def) = @_;
 
   my @args = split("[ \t]+", $def);
+
+  return $@ unless ( FHEM::Meta::SetInternals($hash) );
 
   return "Usage: define <name> HUEBridge [<host>] [interval]"  if(@args < 2);
 
@@ -971,7 +978,7 @@ HUEBridge_Get($@)
     foreach my $key ( sort {$a<=>$b} keys %{$result} ) {
       $ret .= sprintf( "%2i: %-20s %-12s", $key, $result->{$key}{name},$result->{$key}{status} );
       $ret .= sprintf( "%s", $result->{$key}{localtime} ) if( $arg && $arg eq 'detail' );
-      
+
       $ret .= "\n";
     }
     if( $arg && $arg eq 'detail' ) {
@@ -2036,4 +2043,49 @@ HUEBridge_Attr($$$)
 </ul><br>
 
 =end html
+
+=for :application/json;q=META.json 30_HUEBridge.pm
+{
+  "abstract": "module for the phillips hue bridge",
+  "x_lang": {
+    "de": {
+      "abstract": "Modul für die Philips HUE Bridge"
+    }
+  },
+  "resources": {
+    "x_wiki": {
+      "web": "https://wiki.fhem.de/wiki/Hue"
+    }
+  },
+  "keywords": [
+    "fhem-mod",
+    "fhem-mod-device",
+    "HUE"
+  ],
+  "release_status": "stable",
+  "x_fhem_maintainer": [
+    "justme1968"
+  ],
+  "x_fhem_maintainer_github": [
+    "justme-1968"
+  ],
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "FHEM": 5.00918799,
+        "perl": 5.014,
+        "Meta": 0,
+        "JSON": 0,
+        "Data::Dumper": 0,
+        "IO::Socket::INET": 0
+      },
+      "recommends": {
+      },
+      "suggests": {
+        "HUEDevice": 0
+      }
+    }
+  }
+}
+=end :application/json;q=META.json
 =cut

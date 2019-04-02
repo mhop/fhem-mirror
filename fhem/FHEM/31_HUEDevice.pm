@@ -10,6 +10,8 @@ package main;
 use strict;
 use warnings;
 
+use FHEM::Meta;
+
 use Color;
 
 use POSIX;
@@ -185,6 +187,8 @@ sub HUEDevice_Initialize($)
 
   eval "use Data::Dumper";
   $HUEDevice_hasDataDumper = 0 if($@);
+
+  return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
 sub
@@ -261,6 +265,8 @@ sub HUEDevice_Define($$)
   my ($hash, $def) = @_;
 
   my @args = split("[ \t]+", $def);
+
+  return $@ unless ( FHEM::Meta::SetInternals($hash) );
 
   $hash->{helper}->{devtype} = "";
   if( $args[2] eq "group" ) {
@@ -1243,7 +1249,7 @@ HUEDevice_Parse($$)
     }
 
     my $lastupdated;
-    my $lastupdated_local;    
+    my $lastupdated_local;
     if( my $state = $result->{state} ) {
       $lastupdated = $state->{lastupdated};
 
@@ -1258,15 +1264,15 @@ HUEDevice_Parse($$)
         my $sec = SVG_time_to_sec($lastupdated);
 
         $lastupdated = FmtDateTime($sec);
-        
+
         if( my $offset_bridge = $iohash->{helper}{offsetUTC} ) {
           $offset = $offset_bridge;
           Log3 $name, 4, "$name: use offsetUTC $offset from bridge";
         }else{
           #we do not have received the offsetUTC from the bridge, use the system offsetUTC until we received it
           my @t = localtime(time);
-          $offset = timegm(@t) - timelocal(@t);        
-          Log3 $name, 4, "$name: use offsetUTC $offset from system";        
+          $offset = timegm(@t) - timelocal(@t);
+          Log3 $name, 4, "$name: use offsetUTC $offset from system";
         }
 
         #add offset to UTC for displaying in fhem
@@ -1277,7 +1283,7 @@ HUEDevice_Parse($$)
       }
 
       $hash->{lastupdated} = ReadingsVal( $name, '.lastupdated', undef ) if( !$hash->{lastupdated} );
-      $hash->{lastupdated_local} = ReadingsVal( $name, '.lastupdated_local', undef ) if( !$hash->{lastupdated_local} );      
+      $hash->{lastupdated_local} = ReadingsVal( $name, '.lastupdated_local', undef ) if( !$hash->{lastupdated_local} );
       return undef if( $hash->{lastupdated} && $hash->{lastupdated} eq $lastupdated );
 
       Log3 $name, 4, "$name: lastupdated: $lastupdated, hash->{lastupdated}:  $hash->{lastupdated}, lastupdated_local: $lastupdated_local, offsetUTC: $offset";
@@ -1331,9 +1337,9 @@ HUEDevice_Parse($$)
        if( $lastupdated_local ) {
          $hash->{'.updateTimestamp'} = $lastupdated_local;
          $hash->{CHANGETIME}[$i] = $lastupdated_local;
-         readingsBulkUpdate($hash, '.lastupdated_local', $lastupdated_local, 0);         
+         readingsBulkUpdate($hash, '.lastupdated_local', $lastupdated_local, 0);
        }
-       
+
        if( $lastupdated ) {
          readingsBulkUpdate($hash, '.lastupdated', $lastupdated, 0);
        }
@@ -1552,8 +1558,8 @@ HUEDevice_Attr($$$;$)
 =pod
 =item cloudfree
 =item openapi
-=item summary    devices connected to a phillips hue bridge or a osram lightify gateway
-=item summary_DE Geräte an einer Philips HUE Bridge oder einem Osram LIGHTIFY Gateway
+=item summary    Devices connected to a Phillips HUE bridge, an LIGHTIFY or TRADFRI gateway
+=item summary_DE Ger&auml;te an einer Philips HUE Bridge, einem LIGHTIFY oder Tradfri Gateway
 =begin html
 
 <a name="HUEDevice"></a>
@@ -1725,4 +1731,52 @@ absent:{&lt;json&gt;}</code></li>
 </ul><br>
 
 =end html
+
+=for :application/json;q=META.json 31_HUEDevice.pm
+{
+  "abstract": "devices connected to a Phillips HUE bridge, an Osram LIGHTIFY gateway or a IKEA TRADFRI gateway",
+  "x_lang": {
+    "de": {
+      "abstract": "Geräte an einer Philips HUE Bridge, einem Osram LIGHTIFY Gateway oder einem IKEA Tradfri Gateway"
+    }
+  },
+  "resources": {
+    "x_wiki": {
+      "web": "https://wiki.fhem.de/wiki/Hue"
+    }
+  },
+  "keywords": [
+    "fhem-mod",
+    "fhem-mod-device",
+    "HUE"
+  ],
+  "release_status": "stable",
+  "x_fhem_maintainer": [
+    "justme1968"
+  ],
+  "x_fhem_maintainer_github": [
+    "justme-1968"
+  ],
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "FHEM": 5.00918799,
+        "perl": 5.014,
+        "Meta": 0,
+        "Color": 0,
+        "SetExtensions": 0,
+        "JSON": 0,
+        "Time::Local": 0
+      },
+      "recommends": {
+      },
+      "suggests": {
+        "HUEBridge": 0,
+        "tradfri": 0,
+        "LIGHTIFY": 0
+      }
+    }
+  }
+}
+=end :application/json;q=META.json
 =cut
