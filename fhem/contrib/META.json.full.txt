@@ -5,7 +5,7 @@
 # This aims to be a full example of all possible options to document
 # a FHEM module or FHEM package.
 # It does not necessarially mean that every attribute will need to be used or
-# makes sense in every case. Also, some combinations might be weired, depending
+# makes sense in every case. Also, some combinations might be weird, depending
 # on the actual use case. That is, if your module is part of FHEM core
 # (hosted on svn.fhem.de) or externally on a different plattform, which is then
 # considered a 3rd-party module.
