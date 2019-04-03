@@ -262,11 +262,6 @@ textarea,select,input {
 	box-shadow:0 1px #f7f7f7,inset 0 1px 1px #b6b8bd,inset 0 -2px 2px #fff
 }
 
-textarea,input[type="text"] {
-	background-color:#fff;
-	-webkit-appearance:none;
-	/*width:90%*/
-}
 
 input[type="checkbox"] {
 	border-radius:2px
@@ -280,7 +275,8 @@ select,input[type="submit"],input[type="reset"],input[type="button"] {
 }
 
 input[type="text"] {
-	height:25px
+    height: 23px;
+    margin: 9px;
 }
 
 tr.column td {
@@ -499,7 +495,7 @@ table.room tr.sel a svg {
 }
 
 #content table {
-	width:100%!important
+	width:100%;
 }
 
 #content > form > .CodeMirror {
@@ -803,15 +799,18 @@ table.room tr.sel a:hover svg {
 /* next lines are for remotecontrol */
 .rc_body {
 	border-style:solid;
-	border-color:gray;
+	border-radius: 7px;
+	border-color:#7b7b7b;
 	border-width:2px;
 	padding:5px;
-	background:#C8C8B0;
-	font-size:6px
+	background:#FFF;
+	font-size:6px;
+	width: auto!important;
+	margin-top: 8px;
 }
 
 .rc_button {
-	padding:5px 7px
+	padding:6px 8px
 }
 
 .rc_button img {
@@ -822,6 +821,10 @@ table.room tr.sel a:hover svg {
 
 .rc_button img:active {
 	border-color:gray
+}
+
+.rc_BLANK_svg {
+    height: 10px;
 }
 
 .colorpicker {

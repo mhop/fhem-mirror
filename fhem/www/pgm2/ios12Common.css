@@ -1,0 +1,121 @@
+/* jQuery-UI mods */
+
+/*.ui-dialog {
+	top: 150px !important; 
+	left: 300px !important; 
+	}
+	*/
+
+.ui-corner-all {
+	border-radius: 7px !important;
+}
+.ui-widget {
+}
+.ui-widget-content {
+	color:inherit !important;
+}
+.ui-dialog table {
+	border-spacing:5px!important;
+	margin:0px!important;
+	padding:0px!important;
+	width:100%!important;
+}
+
+.ui-dialog .ui-dialog-titlebar { display:none; }
+.ui-dialog-buttonset .ui-button {
+	color:#FFFFFF !important;
+text-shadow: 0px -1px #000000 !important;
+background:none !important;
+background-color:transparent !important;
+border:none !important;
+}
+.ui-widget-overlay {
+	background:none !important;
+	background-color:#000000 !important;
+	opacity:0.5 !important;
+}
+.ui-dialog-buttonpane {
+background-image: -webkit-gradient(
+linear,
+right top,
+right bottom,
+color-stop(0, #C0E2FC),
+color-stop(0.02, #44AAF8),
+color-stop(0.04, #0589F5),
+color-stop(0.96, #015DE6),
+color-stop(0.98, #0157D8),
+color-stop(1, #014BBB),
+color-stop(1, #1B72FF)
+) !important;
+background-image: -o-linear-gradient(bottom, #C0E2FC 0%, #44AAF8 2%, #0589F5 4%, #015DE6 96%, #0157D8 98%, #014BBB 100%, #1B72FF 100%) !important;
+background-image: -moz-linear-gradient(bottom, #C0E2FC 0%, #44AAF8 2%, #0589F5 4%, #015DE6 96%, #0157D8 98%, #014BBB 100%, #1B72FF 100%) !important;
+background-image: -webkit-linear-gradient(top, #C0E2FC 0%, #44AAF8 2%, #0589F5 4%, #015DE6 96%, #0157D8 98%, #014BBB 100%, #1B72FF 100%) !important;
+background-image: -ms-linear-gradient(bottom, #C0E2FC 0%, #44AAF8 2%, #0589F5 4%, #015DE6 96%, #0157D8 98%, #014BBB 100%, #1B72FF 100%) !important;
+background-image: linear-gradient(to bottom, #C0E2FC 0%, #44AAF8 2%, #0589F5 4%, #015DE6 96%, #0157D8 98%, #014BBB 100%, #1B72FF 100%) !important;
+height:44px;
+	border-radius: 0px 0px 10px 10px !important;
+}
+.ui-dialog {
+	background:none !important;
+background-image: -webkit-gradient(
+linear,
+right top,
+right bottom,
+color-stop(0, #F8F9FA),
+color-stop(0.02, #EBEDEF),
+color-stop(0.04, #E4E6EA),
+color-stop(0.96, #E2E5E8),
+color-stop(0.98, #D4D7D9),
+color-stop(1, #B7B9BB)
+) !important;
+background-image: -o-linear-gradient(bottom, #F8F9FA 0%, #EBEDEF 2%, #E4E6EA 4%, #E2E5E8 96%, #D4D7D9 98%, #B7B9BB 100%) !important;
+background-image: -moz-linear-gradient(bottom, #F8F9FA 0%, #EBEDEF 2%, #E4E6EA 4%, #E2E5E8 96%, #D4D7D9 98%, #B7B9BB 100%) !important;
+background-image: -webkit-linear-gradient(top, #F8F9FA 0%, #EBEDEF 2%, #E4E6EA 4%, #E2E5E8 96%, #D4D7D9 98%, #B7B9BB 100%) !important;
+background-image: -ms-linear-gradient(bottom, #F8F9FA 0%, #EBEDEF 2%, #E4E6EA 4%, #E2E5E8 96%, #D4D7D9 98%, #B7B9BB 100%) !important;
+background-image: linear-gradient(to bottom, #F8F9FA 0%, #EBEDEF 2%, #E4E6EA 4%, #E2E5E8 96%, #D4D7D9 98%, #B7B9BB 100%) !important;
+
+}
+
+.uzsuSelect.ui-buttonset {
+    display: block !important;
+    margin: 6px 0px !important;
+}
+
+.uzsuTimerEntry div:nth-child(2) {
+    display: inline-grid !important;
+    margin: 0px 10px 5px 0px !important;
+}
+
+
+.colorpicker_ct .slider { background: url(../jscolor/ct_background.svg); }
+.colorpicker_ct_mired .slider { background: url(../jscolor/ct_mired_background.svg); }
+.colorpicker_hue .slider { background: url(../jscolor/hue_background.svg); }
+.get,.set,.attr { margin-bottom:5px; float:left; }
+select.svgSrc     { width:100px; }
+select.svgColumn  { width:50px;  }
+select.svgRegexp  { width:120px; }
+
+/* jQuery-UI mods */
+div.ui-dialog div.ui-dialog-titlebar { display:none; }
+div.ui-widget-content { background:#FFFFE7; }
+#fwmenu {
+  position: absolute; z-index:1005;
+  text-align:left; max-width:600px;
+  font-weight: normal; font-size: 100%; 
+  background:#FFFFE7; border:1px solid #278727;
+}
+#fwmenu li a { color:#278727; }
+
+div#svgmarker {
+  position: absolute; z-index:1005; padding: 6px 10px;
+  text-align:left; max-width:600px;
+  color:black; background:#999;
+  border:1px solid #fff; border-radius:4px;
+}
+
+svg.zw_nr .zwBox { stroke:#c0c0c0; stroke-width:2px; fill:#f7f7f7; }
+svg.zw_nr .zwDongle { stroke:red; stroke-width:2px; fill:#f7f7f7; }
+svg.zw_nr .zwMargin { stroke:#c0c0c0; stroke-width:1px; fill:none; }
+svg.zw_nr .zwLine { stroke:#c0c0c0; stroke-width:1px; }
+svg.zw_nr .zwArrowHead { fill:#c0c0c0; stroke-width:1px; }
+svg.zw_nr { height:auto; width:auto; margin:0; }

@@ -82,15 +82,20 @@ $(document).ready(function() {
 		var maxlength = 0;
 		var maxtr;
 		tables.each(function() {
-			var td = $(this).children("tbody").children("tr").first().children("td");
-			var trlength = 0;
-			td.each(function() {
-				trlength = trlength+$(this).prop("colSpan");
+			var tr =$(this).children("tbody").children("tr");
+			tr.each(function(){
+				var td = $(this).children("td");
+				var trlength = 0;
+				td.each(function() {
+					trlength = trlength+$(this).prop("colSpan");
+				});
+				if (trlength > maxlength) {
+					maxlength = trlength;
+					maxtr=$(this);
+				}			
 			});
-			if (trlength > maxlength) {
-				maxlength = trlength;
-				maxtr=$(this).children("tbody").children("tr").children('td:eq('+(maxlength-1)+')').parent().first();
-			}
+			
+
 		});
 
 		// Setzen aller hinteren Spalten auf ein Minimum an Platzbedarf
