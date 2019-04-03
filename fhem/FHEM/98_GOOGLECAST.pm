@@ -7,9 +7,12 @@
 # FHEM module to communicate with Google Cast devices
 # e.g. Chromecast Video, Chromecast Audio, Google Home
 #
-# Version: 2.1.3
+# Version: 2.1.4
 #
 #############################################################
+#
+# v2.1.4 - 20190403
+# - BUGFIX:   support pychromecast 3.x
 #
 # v2.1.3 - 20180311
 # - BUGFIX:   fix umlauts for device name readings
@@ -153,7 +156,7 @@ sub GOOGLECAST_Initialize($) {
     $hash->{AttrList} = "favoriteURL_1 favoriteURL_2 favoriteURL_3 favoriteURL_4 ".
                         "favoriteURL_5 ".$readingFnAttributes;
 
-    Log3 $hash, 3, "GOOGLECAST: GoogleCast v2.1.3";
+    Log3 $hash, 3, "GOOGLECAST: GoogleCast v2.1.4";
 
     return undef;
 }
@@ -569,12 +572,15 @@ sub GOOGLECAST_addSocketToMainloop {
     #delete any previous sockets
     delete($selectlist{"GOOGLECAST-".$hash->{NAME}});
 
-    eval {
+    my $result = eval {
         $sock = $hash->{helper}{ccdevice}->{socket_client}->get_socket();
         if ($sock->fileno() > 0) {
             $hash->{helper}{currentsock} = $sock;
         }
     };
+    unless($result) {
+      print $@;
+    }
 
     if ($sock->fileno() > 0) {
         my $chash = GOOGLECAST_newChash($hash, $sock, {NAME => "GOOGLECAST-".$hash->{NAME}});
@@ -709,6 +715,10 @@ def GOOGLECAST_PyFindChromecasts():
 def GOOGLECAST_PyCreateChromecast(ip, port, uuid, model_name, friendly_name):
     logging.basicConfig(level=logging.CRITICAL)
     cast = pychromecast._get_chromecast_from_host((ip.decode("utf-8"), int(port), uuid.decode("utf-8"), model_name.decode("utf-8"), friendly_name.decode("utf-8")), blocking=False, timeout=0.1, tries=1, retry_wait=0.1)
+    try:
+      cast.connect()
+    except:
+      pass
     return cast
 
 def GOOGLECAST_PyPlayMedia(cast, url, mime):
