@@ -10576,7 +10576,7 @@ return;
   
   Due to performance reason the following index should be created in addition: <br>
   <code>
-  CREATE INDEX Report_Idx ON `history` (TIMESTAMP, READING) USING BTREE;
+  CREATE INDEX Report_Idx ON `history` (READING, TIMESTAMP) USING BTREE;
   </code>
 </ul>
 <br>
@@ -12949,7 +12949,7 @@ sub bdump {
   
   Aus Performancegründen sollte zusätzlich folgender Index erstellt werden: <br>
   <code>
-  CREATE INDEX Report_Idx ON `history` (TIMESTAMP, READING) USING BTREE;
+  CREATE INDEX Report_Idx ON `history` (READING, TIMESTAMP) USING BTREE;
   </code>
 </ul>
 <br>
