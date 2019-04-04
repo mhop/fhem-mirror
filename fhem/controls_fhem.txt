@@ -1,4 +1,4 @@
-REV 19102
+REV 19108
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,8 +21,8 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2019-04-03_07:45:02 287101 ./CHANGED
-UPD 2019-04-02_07:45:03 40606 ./MAINTAINER.txt
+UPD 2019-04-04_07:45:03 287315 ./CHANGED
+UPD 2019-04-04_07:45:03 40678 ./MAINTAINER.txt
 UPD 2019-03-29_07:45:02 39782 ./configDB.pm
 UPD 2019-03-15_07:45:03 22394 ./fhem.cfg.demo
 UPD 2019-04-02_07:45:11 156879 ./fhem.pl
@@ -41,7 +41,7 @@ UPD 2016-04-26_07:45:11 33379 FHEM/00_MAXLAN.pm
 UPD 2019-02-25_07:45:03 31183 FHEM/00_MQTT.pm
 UPD 2019-03-06_07:45:02 16777 FHEM/00_MQTT2_CLIENT.pm
 UPD 2019-03-06_07:45:02 18897 FHEM/00_MQTT2_SERVER.pm
-UPD 2019-01-27_07:45:03 21361 FHEM/00_MYSENSORS.pm
+UPD 2019-04-04_07:45:03 21728 FHEM/00_MYSENSORS.pm
 UPD 2017-09-07_07:45:02 25519 FHEM/00_NetzerI2C.pm
 UPD 2019-04-01_07:45:02 35447 FHEM/00_Neuron.pm
 UPD 2018-04-29_07:45:04 60009 FHEM/00_OWX.pm
@@ -82,7 +82,7 @@ UPD 2019-03-19_07:45:03 28848 FHEM/10_MQTT2_DEVICE.pm
 UPD 2018-09-18_07:45:02 11022 FHEM/10_MQTT_BRIDGE.pm
 UPD 2018-09-18_07:45:02 13548 FHEM/10_MQTT_DEVICE.pm
 UPD 2019-03-08_07:45:02 158272 FHEM/10_MQTT_GENERIC_BRIDGE.pm
-UPD 2019-03-17_07:45:03 54506 FHEM/10_MYSENSORS_DEVICE.pm
+UPD 2019-04-04_07:45:03 54975 FHEM/10_MYSENSORS_DEVICE.pm
 UPD 2019-04-01_07:45:02 19526 FHEM/10_NeuronPin.pm
 UPD 2018-03-28_07:45:02 33933 FHEM/10_OWServer.pm
 UPD 2019-03-23_07:45:03 71700 FHEM/10_RESIDENTS.pm
@@ -432,7 +432,7 @@ UPD 2018-07-10_07:45:14 16502 FHEM/91_watchdog.pm
 UPD 2019-04-03_07:45:02 55565 FHEM/92_FileLog.pm
 UPD 2017-08-14_07:45:02 11589 FHEM/92_SingleFileLog.pm
 UPD 2019-03-05_07:45:02 354286 FHEM/93_DbLog.pm
-UPD 2019-03-30_07:45:02 797490 FHEM/93_DbRep.pm
+UPD 2019-04-04_07:45:03 798368 FHEM/93_DbRep.pm
 UPD 2018-09-18_07:45:02 18106 FHEM/93_FHEM2FHEM.pm
 UPD 2019-03-26_07:45:03 148391 FHEM/93_Log2Syslog.pm
 UPD 2019-02-19_07:45:03 70621 FHEM/93_PWMR.pm
@@ -464,7 +464,7 @@ UPD 2017-11-06_07:45:02 40228 FHEM/98_Dooya.pm
 UPD 2017-04-03_07:45:02 25462 FHEM/98_FReplacer.pm
 UPD 2019-03-22_07:45:02 41238 FHEM/98_GAEBUS.pm
 UPD 2019-03-23_07:45:03 33178 FHEM/98_GEOFANCY.pm
-UPD 2018-04-12_07:45:02 30163 FHEM/98_GOOGLECAST.pm
+UPD 2019-04-04_07:45:03 30334 FHEM/98_GOOGLECAST.pm
 UPD 2017-01-21_07:45:02 11576 FHEM/98_GoogleAuth.pm
 UPD 2019-03-10_07:45:02 174836 FHEM/98_HMinfo.pm
 UPD 2019-04-01_07:45:02 31631 FHEM/98_HMtemplate.pm
@@ -617,6 +617,7 @@ UPD 2019-03-30_07:45:02 333519 FHEM/lib/74_AMADautomagicFlowset_4.4.0.xml
 UPD 2019-03-30_07:45:02 441040 FHEM/lib/74_AMADtaskerset_4.4.0.prj.xml
 UPD 2019-03-01_07:45:02 18747 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-04-03_07:45:02 73790 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2019-04-04_07:45:03 3978 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
 UPD 2018-01-13_07:45:02 21899 FHEM/lib/Device/Firmata/Constants.pm
@@ -710,12 +711,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2019-04-02_07:45:06 3939877 docs/commandref.html
-UPD 2019-03-31_07:45:08 2448106 docs/commandref_DE.html
+UPD 2019-04-04_07:45:06 3940456 docs/commandref.html
+UPD 2019-04-04_07:45:09 2448032 docs/commandref_DE.html
 UPD 2019-03-17_07:45:03 78602 docs/commandref_frame.html
 UPD 2019-03-17_07:45:03 88171 docs/commandref_frame_DE.html
-UPD 2019-04-03_07:45:10 210688 docs/commandref_modular.html
-UPD 2019-04-03_07:45:11 221525 docs/commandref_modular_DE.html
+UPD 2019-04-04_07:45:10 210688 docs/commandref_modular.html
+UPD 2019-04-04_07:45:11 221525 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2146,6 +2147,16 @@ UPD 2015-07-28_14:05:34 4549 www/pgm2/images/ui-icons_228ef1_256x240.png
 UPD 2015-07-28_14:05:34 4549 www/pgm2/images/ui-icons_ef8c08_256x240.png
 UPD 2015-07-28_14:05:34 4549 www/pgm2/images/ui-icons_ffd27a_256x240.png
 UPD 2015-07-28_14:05:34 6299 www/pgm2/images/ui-icons_ffffff_256x240.png
+UPD 2019-04-04_07:45:03 245 www/pgm2/ios12.js
+UPD 2019-04-04_07:45:03 4228 www/pgm2/ios12Common.css
+UPD 2019-04-04_07:45:03 18282 www/pgm2/ios12dashboard.css
+UPD 2019-04-04_07:45:03 132 www/pgm2/ios12floorplanstyle.css
+UPD 2019-04-04_07:45:03 123 www/pgm2/ios12style.css
+UPD 2019-04-04_07:45:03 1830 www/pgm2/ios12svg_defs.svg
+UPD 2019-04-04_07:45:03 2945 www/pgm2/ios12svg_style.css
+UPD 2019-04-04_07:45:03 10938 www/pgm2/ios12touchpad.js
+UPD 2019-04-04_07:45:03 6743 www/pgm2/ios12touchpadfloorplanstyle.css
+UPD 2019-04-04_07:45:03 17212 www/pgm2/ios12touchpadstyle.css
 UPD 2019-03-18_07:45:03 235 www/pgm2/ios6.js
 UPD 2019-03-11_07:45:02 4412 www/pgm2/ios6Common.css
 UPD 2015-08-04_07:45:12 19632 www/pgm2/ios6dashboard.css
@@ -2153,9 +2164,9 @@ UPD 2015-07-28_14:05:34 137 www/pgm2/ios6floorplanstyle.css
 UPD 2015-07-28_14:05:34 128 www/pgm2/ios6style.css
 UPD 2015-07-28_14:05:34 1824 www/pgm2/ios6svg_defs.svg
 UPD 2015-07-28_14:05:34 2951 www/pgm2/ios6svg_style.css
-UPD 2019-03-18_07:45:03 10658 www/pgm2/ios6touchpad.js
+UPD 2019-04-04_07:45:03 10630 www/pgm2/ios6touchpad.js
 UPD 2015-07-28_14:05:34 8797 www/pgm2/ios6touchpadfloorplanstyle.css
-UPD 2019-03-18_07:45:03 19622 www/pgm2/ios6touchpadstyle.css
+UPD 2019-04-04_07:45:03 19639 www/pgm2/ios6touchpadstyle.css
 UPD 2016-07-13_07:45:14 1476 www/pgm2/ios7Common.css
 UPD 2015-07-28_14:05:34 3636 www/pgm2/ios7floorplanstyle.css
 UPD 2015-07-28_14:05:34 3636 www/pgm2/ios7smallscreenfloorplanstyle.css
