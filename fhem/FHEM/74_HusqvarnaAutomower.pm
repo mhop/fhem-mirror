@@ -1,6 +1,6 @@
 ###############################################################################
 # 
-#  (c) 2018-2019 Copyright: Dr. Dennis Krannich (blogger at krannich dot de)
+#  (c) 2018 Copyright: Dr. Dennis Krannich (blog at krannich dot de)
 #  All rights reserved
 #
 #  This script is free software; you can redistribute it and/or modify
@@ -32,12 +32,6 @@
 # 			changed:	div. translations
 #
 ################################################################################
-#
-# modifications by krannich
-# 
-# 02.04.19  added:      Try/Catch
-#
-################################################################################
 
 package main;
 
@@ -49,11 +43,10 @@ use Time::Local;
 use JSON;
 use HttpUtils;
 use Blocking;
-use Try::Tiny;
 
 eval "use JSON;1" or $missingModul .= "JSON ";
 
-my $version = "0.2";
+my $version = "0.3";
 
 use constant AUTHURL => "https://iam-api.dss.husqvarnagroup.net/api/v3/";
 use constant APIURLGET => "https://amc-api.dss.husqvarnagroup.net/app/v1/";
@@ -370,15 +363,14 @@ sub HusqvarnaAutomower_APIAuthResponse($) {
         Log3 $name, 5, "error while requesting ".$param->{url}." - $err";     
                                            
     } elsif($data ne "") {
-	    
-	    my $result = "";
-	    try {
-       		$result = decode_json($data);
-        } catch {
-            Log3( $name, 3, " - JSON error while request: " . $data );
+   
+        my $result = {};
+        eval { $result = decode_json($data) };
+       	if ($@) {
+            Log3( $name, 3, " - JSON error while request: $@");
             return undef;
-        };
-        
+        }
+	        
 	    if ($result->{errors}) {
 		    HusqvarnaAutomower_CONNECTED($hash,'error');
 		    Log3 $name, 5, "Error: " . $result->{errors}[0]->{detail};
@@ -515,13 +507,12 @@ sub HusqvarnaAutomower_getMowerResponse($) {
 		    Log3 $name, 5, "Automower(s) found"; 			
 			Log3 $name, 5, $data; 
 			
-			my $result = "";
-    	        try {
-           		$result = decode_json($data);
-            } catch {
-                Log3( $name, 3, " - JSON error while request: " . $data );
+	        my $result = {};
+            eval { $result = decode_json($data) };
+           	if ($@) {
+                Log3( $name, 3, " - JSON error while request: $@");
                 return undef;
-            };
+            }
 			
 			my $mower = $hash->{HusqvarnaAutomower}->{mower};
 			Log3 $name, 5, $result->[$mower]->{'name'};
@@ -601,13 +592,13 @@ sub HusqvarnaAutomower_getMowerStatusResponse($) {
     } elsif($data ne "") {
 	    
 		#Log3 $name, 5, $data; 
-        my $result = "";
-	    try {
-       		$result = decode_json($data);
-        } catch {
-            Log3( $name, 3, " - JSON error while request: " . $data );
+        my $result = {};
+        eval { $result = decode_json($data) };
+       	if ($@) {
+            Log3( $name, 3, " - JSON error while request: $@");
             return undef;
-        };
+        }
+
 		        
 		$hash->{HusqvarnaAutomower}->{mower_battery} = $result->{'batteryPercent'};
 		$hash->{HusqvarnaAutomower}->{mower_activity} = HusqvarnaAutomower_ToGerman($hash, $result->{'mowerStatus'}->{'activity'});
@@ -719,14 +710,13 @@ sub HusqvarnaAutomower_CMDResponse($) {
                                            
     } elsif($data ne "") {
         
-	    my $result = "";
-	    try {
-       		$result = decode_json($data);
-        } catch {
-            Log3( $name, 3, " - JSON error while request: " . $data );
+	    my $result = {};
+        eval { $result = decode_json($data) };
+        if ($@) {
+            Log3( $name, 3, " - JSON error while request: $@");
             return undef;
-        };
-	    
+        }
+
 	    if ($result->{errors}) {
 		    HusqvarnaAutomower_CONNECTED($hash,'error');
 		    Log3 $name, 5, "Error: " . $result->{errors}[0]->{detail};
@@ -767,50 +757,50 @@ sub HusqvarnaAutomower_ToGerman($$) {
 		#'disabled'												=> 'deaktiviert',
 		#'connected'											=> 'verbunden',
 
-		'Today at'												=>	'Heute um',
-		'Tomorrow at'											=>	'Morgen um',
-		'at'													=>	'um',
+		'Today at'                      =>	'Heute um',
+		'Tomorrow at'                   =>	'Morgen um',
+		'at'                            =>	'um',
 
-		'NO_SOURCE'												=>	'keine Quelle',
-		'NOT_APPLICABLE'										=>	'nicht zutreffend',
+		'NO_SOURCE'                     =>	'keine Quelle',
+		'NOT_APPLICABLE'                =>	'undefiniert',
 		
-		'AUTO'                        							=>  'Automatisch',
-		'MAIN_AREA'                        						=>  'Hauptbereich',
+		'AUTO'                          =>  'automatisch',
+		'MAIN_AREA'                     =>  'Hauptbereich',
 		
-		'MOWING'												=>	'mäht',
-		'CHARGING'												=>	'lädt',
+		'MOWING'                        =>	'mäht',
+		'CHARGING'                      =>	'lädt',
 		
-		'LEAVING'												=>  'verlässt Ladestation',
-		'GOING_HOME'											=> 	'auf dem Weg zur Ladestation',
-		'WEEK_TIMER'											=> 	'Wochen-Zeitplan',
-		'WEEK_SCHEDULE'											=> 	'Wochen-Zeitplan',
+		'LEAVING'                       =>  'verlässt Ladestation',
+		'GOING_HOME'                    => 	'fährt zur Ladestation',
+		'WEEK_TIMER'                    => 	'Wochen-Zeitplan',
+		'WEEK_SCHEDULE'                 => 	'Wochen-Zeitplan',
 		
-		'PARKED_IN_CS'                        					=>  'In der Ladestation geparkt',
-		'COMPLETED_CUTTING_TODAY_AUTO'                      	=>  'Fertig für heute',
-		'PAUSED'												=>  'pausiert',
+		'PARKED_IN_CS'                  =>  'geparkt',
+		'COMPLETED_CUTTING_TODAY_AUTO'  =>  'Wetter-Timer',
+		'PAUSED'                        =>  'pausiert',
 
-		'SENSOR'                        						=>  'Sensor',
+		'SENSOR'                        =>  'Sensor',
 
-        'OFF_DISABLED'                      					=>  'ausgeschaltet',
-        'OFF_HATCH_OPEN'                    					=>  'Abdeckung ist offen',
-        'OFF_HATCH_CLOSED'                  					=>  'Ausgeschaltet, manueller Start erforderlich',
+        'OFF_DISABLED'                  =>  'ausgeschaltet',
+        'OFF_HATCH_OPEN'                =>  'Abdeckung ist offen',
+        'OFF_HATCH_CLOSED'              =>  'Ausgeschaltet, manueller Start erforderlich',
 
-        'PARKED_TIMER'                      					=>  'geparkt nach Zeitplan',
-        'PARKED_PARK_SELECTED'              					=>  'geparkt',
+        'PARKED_TIMER'                  =>  'geparkt nach Zeitplan',
+        'PARKED_PARK_SELECTED'          =>  'geparkt',
 
-		'MOWER_CHARGING'										=>	'Automower lädt',
+		'MOWER_CHARGING'                =>	'Automower lädt',
 
-		'OK_SEARCHING'                      					=>  'sucht Ladestation',
-		'OK_LEAVING'                        					=>  'verlässt Ladestation',
-		'OK_CHARGING'                       					=>  'lädt',
-		'OK_CUTTING'                   							=>  'mäht',
-        'OK_CUTTING_TIMER_OVERRIDDEN'       					=>  'manuelles Mähen',
+		'OK_SEARCHING'                  =>  'sucht Ladestation',
+		'OK_LEAVING'                    =>  'verlässt Ladestation',
+		'OK_CHARGING'                   =>  'lädt',
+		'OK_CUTTING'                    =>  'mäht',
+        'OK_CUTTING_TIMER_OVERRIDDEN'   =>  'manuelles Mähen',
 
-        'HOME'								=>	'home',
-		'IN_OPERATION'						=>	'aktiv',
-		'RESTRICTED'						=>	'inaktiv',
+        'HOME'                          =>	'home',
+		'IN_OPERATION'                  =>	'aktiv',
+		'RESTRICTED'                    =>	'inaktiv',
 
-		'OK'                        							=>  'OK'
+		'OK'                            =>  'OK'
 	);
     
     if( defined($langGermanMapping{$readingValue}) and  HusqvarnaAutomower_isSetGerman($hash) ) {
@@ -894,13 +884,15 @@ sub HusqvarnaAutomower_Whowasi() { return (split('::',(caller(2))[3]))[1] || '';
 	<b>Readings</b>
 	<ul>
 		<li>expires - date when session of Husqvarna Cloud expires</li>
+		<li>batteryPercent - Battery power in percent</li>
 		<li>mower_id - ID of the mower</li>
+		<li>mower_battery - Battery power in percent</li>
 		<li>mower_lastLatitude - last known position (latitude)</li>
 		<li>mower_lastLongitude - last known position (longitude)</li>
 		<li>mower_mode - current working mode (e. g. AUTO)</li>
 		<li>mower_name - name of the mower</li>
 		<li>mower_nextStart - next start time</li>
-		<li>mower_status - current status (e. g. OFF_HATCH_CLOSED_DISABLED, PARKED_IN_CS)</li>
+		<li>mower_state - current status (e. g. OFF_HATCH_CLOSED_DISABLED, PARKED_IN_CS)</li>
 		<li>mower_cuttingMode - mode of cutting area (e. g. MAIN_AREA)</li>
         <li>mower_nextStartSource - detailed status (e. g. COMPLETED_CUTTING_TODAY_AUTO)</li>
         <li>mower_restrictedReason - reason for parking (e. g. SENSOR)</li>
@@ -968,13 +960,15 @@ sub HusqvarnaAutomower_Whowasi() { return (split('::',(caller(2))[3]))[1] || '';
 	<b>Readings</b>
 	<ul>
 		<li>expires - Datum wann die Session der Husqvarna Cloud abläuft</li>
-		<li>mower_id - ID des Automowers</li>
+        <li>batteryPercent - Batteryladung in Prozent (ohne %-Zeichen)</li>
+        <li>mower_id - ID des Automowers</li>
+		<li>mower_battery - Bettrieladung in Prozent (mit %-Zeichen)</li>
 		<li>mower_lastLatitude - letzte bekannte Position (Breitengrad)</li>
 		<li>mower_lastLongitude - letzte bekannte Position (Längengrad)</li>
 		<li>mower_mode - aktueller Arbeitsmodus (e. g. AUTO)</li>
 		<li>mower_name - Name des Automowers</li>
 		<li>mower_nextStart - nächste Startzeit</li>
-		<li>mower_status - aktueller Status (e. g. OFF_HATCH_CLOSED_DISABLED, PARKED_IN_CS)</li>
+		<li>mower_state - aktueller Status (e. g. OFF_HATCH_CLOSED_DISABLED, PARKED_IN_CS)</li>
 		<li>mower_cuttingMode - Angabe welcher Bereich gemäht wird (e. g. MAIN_AREA)</li>
         <li>mower_nextStartSource - detaillierter Status (e. g. COMPLETED_CUTTING_TODAY_AUTO)</li>
         <li>mower_restrictedReason - Grund für Parken (e. g. SENSOR)</li>
