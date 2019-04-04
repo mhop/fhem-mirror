@@ -364,11 +364,10 @@ sub HusqvarnaAutomower_APIAuthResponse($) {
                                            
     } elsif($data ne "") {
    
-        my $result = {};
-        eval { $result = decode_json($data) };
-       	if ($@) {
+        my $result = eval { decode_json($data) };
+        if ($@) {
             Log3( $name, 3, " - JSON error while request: $@");
-            return undef;
+            return;
         }
 	        
 	    if ($result->{errors}) {
@@ -507,13 +506,12 @@ sub HusqvarnaAutomower_getMowerResponse($) {
 		    Log3 $name, 5, "Automower(s) found"; 			
 			Log3 $name, 5, $data; 
 			
-	        my $result = {};
-            eval { $result = decode_json($data) };
-           	if ($@) {
+	        my $result = eval { decode_json($data) };
+            if ($@) {
                 Log3( $name, 3, " - JSON error while request: $@");
-                return undef;
-            }
-			
+                return;
+            }	
+            		
 			my $mower = $hash->{HusqvarnaAutomower}->{mower};
 			Log3 $name, 5, $result->[$mower]->{'name'};
 		    
@@ -592,13 +590,11 @@ sub HusqvarnaAutomower_getMowerStatusResponse($) {
     } elsif($data ne "") {
 	    
 		#Log3 $name, 5, $data; 
-        my $result = {};
-        eval { $result = decode_json($data) };
-       	if ($@) {
+        my $result = eval { decode_json($data) };
+        if ($@) {
             Log3( $name, 3, " - JSON error while request: $@");
-            return undef;
+            return;
         }
-
 		        
 		$hash->{HusqvarnaAutomower}->{mower_battery} = $result->{'batteryPercent'};
 		$hash->{HusqvarnaAutomower}->{mower_activity} = HusqvarnaAutomower_ToGerman($hash, $result->{'mowerStatus'}->{'activity'});
@@ -710,11 +706,10 @@ sub HusqvarnaAutomower_CMDResponse($) {
                                            
     } elsif($data ne "") {
         
-	    my $result = {};
-        eval { $result = decode_json($data) };
+	    my $result = eval { decode_json($data) };
         if ($@) {
             Log3( $name, 3, " - JSON error while request: $@");
-            return undef;
+            return;
         }
 
 	    if ($result->{errors}) {
