@@ -83,14 +83,17 @@ f18_menu()
   if($("#menuScrollArea #menuBtn").length)
     return fixMenu();
 
+  $("<div id='textInput'></div>").prependTo("div#menuScrollArea")
+    .css( {"background-image":"url('"+f18_icon.txInp+"')", "cursor":"pointer" })
+    .click(f18_textInput);
   $("<div id='menuBtn'></div>").prependTo("div#menuScrollArea")
     .css( {"background-image":"url('"+f18_icon.bars+"')", "cursor":"pointer" })
     .click(function(){ $("#menu").toggleClass("hidden") });
 
   $("div#menu").prepend("<div></div>");
   f18_addPin("div#menu > div:first", "menu", true, fixMenu, f18_small);
-  setTimeout(function(){ $("#menu,#content,#logo,#hdr").addClass("animated"); },
-             10);
+  setTimeout(function(){ $("#menu,#content,#logo,#hdr,#menuBtn,#textInput")
+        .addClass("animated"); }, 10);
   function
   fixMenu()
   {
@@ -362,6 +365,7 @@ f18_special()
 
     addHider("hideLogo", true, "Hide logo", f18_menu);
     addHider("hideInput", true, "Hide input", f18_menu);
+    addHider("hideTextInput", true, "Hide text input", f18_menu);
     addHider("hidePin", true, "Hide pin", function(c){
       $("div.pinHeader div.pin").css("display", c ? "none":"block");
     });
@@ -413,17 +417,22 @@ f18_resize()
   var hl = f18_getAttr("hideLogo"),
       hi = f18_getAttr("hideInput"),
       pm = f18_getAttr("Pinned.menu"),
-      rm = (f18_getAttr("rightMenu") && f18_small);
+      rm = (f18_getAttr("rightMenu") && f18_small),
+      hti = f18_getAttr("hideTextInput");
 
   var left = 0;
   left += hl ? 0 : 40;
   left += pm ? 0 : 44;
-  var lleft = (pm ? 10 : 52);
+  left += hti ? 0 : 40;
+  var lleft = (pm || hl ? 10 : 52);
   $("input.maininput").css({ width:(w-left-(FW_isiOS ? 36 : 24))+'px', 
                              "margin-left":(rm ? "0px" : "10px"),
                              display: hi ? "none":"block"});
-  $("#menu,#content").css("top", (hi && pm && hl) ? "10px" : "50px");
+  $("#menu,#content").css("top", (hi && pm && hl && hti) ? "10px" : "50px");
   $("#hdr").css({ left:(rm ? 10 : left)+'px' });
+  $("#textInput").css({ left: (rm ? "auto":(left-32)+"px"),
+                        right:(rm ? (lleft+32)+"px":"auto"),
+                        display: hti ? "none":"block"});
   $("#menuBtn").toggle(!pm || f18_small);
   $("#menuBtn").css({ left:(rm ? "auto":"10px"), right:(rm ? "10px":"auto") });
   $("#logo")   .css({ left:(rm ? "auto":lleft ), right:(rm ? "48px":"auto") });
@@ -821,18 +830,38 @@ f18_svgSetCols(svg)
 function
 f18_loadIcons()
 {
-  // font-awesome
+  // font-awesome: txInp:plus-square
   var f18_svgPrefix='data:image/svg+xml;utf8,<svg viewBox="0 0 1792 1792" xmlns="http://www.w3.org/2000/svg"><path fill="gray" ';
-  f18_icon.pinIn=f18_svgPrefix+'d="M896 1088q66 0 128-15v655q0 26-19 45t-45 19h-128q-26 0-45-19t-19-45v-655q62 15 128 15zm0-1088q212 0 362 150t150 362-150 362-362 150-362-150-150-362 150-362 362-150zm0 224q14 0 23-9t9-23-9-23-23-9q-146 0-249 103t-103 249q0 14 9 23t23 9 23-9 9-23q0-119 84.5-203.5t203.5-84.5z"/></svg>';
-
-  f18_icon.bars=f18_svgPrefix+'d="M1664 1344v128q0 26-19 45t-45 19h-1408q-26 0-45-19t-19-45v-128q0-26 19-45t45-19h1408q26 0 45 19t19 45zm0-512v128q0 26-19 45t-45 19h-1408q-26 0-45-19t-19-45v-128q0-26 19-45t45-19h1408q26 0 45 19t19 45zm0-512v128q0 26-19 45t-45 19h-1408q-26 0-45-19t-19-45v-128q0-26 19-45t45-19h1408q26 0 45 19t19 45z"/></svg>';
-
-  f18_icon.arrows=f18_svgPrefix+'d="M1792 896q0 26-19 45l-256 256q-19 19-45 19t-45-19-19-45v-128h-384v384h128q26 0 45 19t19 45-19 45l-256 256q-19 19-45 19t-45-19l-256-256q-19-19-19-45t19-45 45-19h128v-384h-384v128q0 26-19 45t-45 19-45-19l-256-256q-19-19-19-45t19-45l256-256q19-19 45-19t45 19 19 45v128h384v-384h-128q-26 0-45-19t-19-45 19-45l256-256q19-19 45-19t45 19l256 256q19 19 19 45t-19 45-45 19h-128v384h384v-128q0-26 19-45t45-19 45 19l256 256q19 19 19 45z"/></svg>';
-
-  f18_icon.ban=f18_svgPrefix+'d="M1440 893q0-161-87-295l-754 753q137 89 297 89 111 0 211.5-43.5t173.5-116.5 116-174.5 43-212.5zm-999 299l755-754q-135-91-300-91-148 0-273 73t-198 199-73 274q0 162 89 299zm1223-299q0 157-61 300t-163.5 246-245 164-298.5 61-298.5-61-245-164-163.5-246-61-300 61-299.5 163.5-245.5 245-164 298.5-61 298.5 61 245 164 163.5 245.5 61 299.5z"/></svg>';
+  f18_icon.pinIn  = f18_svgPrefix+'d="M896 1088q66 0 128-15v655q0 26-19 45t-45 19h-128q-26 0-45-19t-19-45v-655q62 15 128 15zm0-1088q212 0 362 150t150 362-150 362-362 150-362-150-150-362 150-362 362-150zm0 224q14 0 23-9t9-23-9-23-23-9q-146 0-249 103t-103 249q0 14 9 23t23 9 23-9 9-23q0-119 84.5-203.5t203.5-84.5z"/></svg>';
+  f18_icon.bars   = f18_svgPrefix+'d="M1664 1344v128q0 26-19 45t-45 19h-1408q-26 0-45-19t-19-45v-128q0-26 19-45t45-19h1408q26 0 45 19t19 45zm0-512v128q0 26-19 45t-45 19h-1408q-26 0-45-19t-19-45v-128q0-26 19-45t45-19h1408q26 0 45 19t19 45zm0-512v128q0 26-19 45t-45 19h-1408q-26 0-45-19t-19-45v-128q0-26 19-45t45-19h1408q26 0 45 19t19 45z"/></svg>';
+  f18_icon.arrows = f18_svgPrefix+'d="M1792 896q0 26-19 45l-256 256q-19 19-45 19t-45-19-19-45v-128h-384v384h128q26 0 45 19t19 45-19 45l-256 256q-19 19-45 19t-45-19l-256-256q-19-19-19-45t19-45 45-19h128v-384h-384v128q0 26-19 45t-45 19-45-19l-256-256q-19-19-19-45t19-45l256-256q19-19 45-19t45 19 19 45v128h384v-384h-128q-26 0-45-19t-19-45 19-45l256-256q19-19 45-19t45 19l256 256q19 19 19 45t-19 45-45 19h-128v384h384v-128q0-26 19-45t45-19 45 19l256 256q19 19 19 45z"/></svg>';
+  f18_icon.ban    = f18_svgPrefix+'d="M1440 893q0-161-87-295l-754 753q137 89 297 89 111 0 211.5-43.5t173.5-116.5 116-174.5 43-212.5zm-999 299l755-754q-135-91-300-91-148 0-273 73t-198 199-73 274q0 162 89 299zm1223-299q0 157-61 300t-163.5 246-245 164-298.5 61-298.5-61-245-164-163.5-246-61-300 61-299.5 163.5-245.5 245-164 298.5-61 298.5 61 245 164 163.5 245.5 61 299.5z"/></svg>';
+  f18_icon.txInp  = f18_svgPrefix+'d="M 1302,839 V 939 c 0,19 -15,37 -36,37 H 993 v 277 c 0,19 -15,37 -36,37 H 856 c -20,0 -36,-15 -36,-37 V 977 H 546 c -20,0 -36,-15 -36,-37 V 839 c 0,-19 15,-37 36,-37 H 818 V 521 c 0,-19 15,-37 36,-37 h 97 c 20,0 36,15 36,37 V 798 H 1261 c 20,0 36,15 36,37 z M 1600,331 V 1447 c 0,83 -65,151 -148,151 H 360 C 277,1600 212,1532 212,1448 V 331 C 212,246 277,180 360,180 H 1450 c 81,0 147,66 147,151 z M 1450,1428 V 350 c 0,-8 -7,-17 -17,-17 H 379 c -9,0 -17,7 -17,17 V 1428 c 0,8 7,17 17,17 H 1431 c 9,0 17,-7 17,-17 z"/></svg>';
 }
 
+function
+f18_textInput()
+{
+  var n = "FW_mainTextInput";
+  var aCM = typeof AddCodeMirror == 'function';
+  $("body").append(
+  `<div id="${n}">
+    <textarea rows="20" cols="60" style="width:99%;${aCM?'opacity:0;':''}"/>
+  </div>`);
+  var ta = $("#"+n+" textarea");
+  if(aCM)
+    AddCodeMirror(ta, (cm) => cm.on("change", () => ta.val(cm.getValue()) ) );
 
+  $("#"+n).dialog({
+    dialogClass:"no-close", modal:true, width:"auto", closeOnEscape:true, 
+    maxWidth:$(window).width()*0.9, maxHeight:$(window).height()*0.9,
+    buttons: [
+    {text:"Execute",click:function(){ FW_execRawDef( ta.val()) }},
+    {text:"Close", click:function(){ $(this).remove(); }},
+    ],
+    close:function(){ $("#"+n).remove(); }
+  });
+}
 
 function
 f18_loadTouch()

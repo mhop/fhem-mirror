@@ -12,7 +12,8 @@ input.maininput { margin-left:10px; }
 }
 #menuBtn { position: absolute; top:6.5px; left:10px; width:32px; height:32px;
            display:none; }
-#hdr     { position: absolute; top:10px; left:40px; }
+#textInput { position: absolute; top:6.5px; left:40px; width:32px; height:32px; }
+#hdr     { position: absolute; top:10px; left:72px; }
 #content { 
   position: absolute; top:50px; left:130px; bottom:0; right: 0; 
   padding-right: 10px; 

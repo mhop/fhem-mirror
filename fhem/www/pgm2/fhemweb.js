@@ -338,6 +338,7 @@ FW_jqueryReadyFn()
       });
     });
   }
+
 }
 
 var FW_helpData;
@@ -865,38 +866,43 @@ FW_rawDef()
       $("#rawDef input").click(function(){fillData(this.checked ?"-R":"-r")});
 
       $("#rawDef button").click(function(){
-        var data = $("#rawDef textarea").val();
-        var arr = data.split("\n"), str="", i1=-1;
-        function
-        doNext()
-        {
-          if(++i1 >= arr.length) {
-            return FW_okDialog("Executed everything, no errors found.");
-          }
-          str += arr[i1];
-          if(arr[i1].charAt(arr[i1].length-1) === "\\") {
-            str += "\n";
-            return doNext();
-          }
-          if(str != "") {
-            str = str.replace(/\\\n/g, "\n")
-                     .replace(/;;/g, ";");
-            FW_cmd(FW_root+"?cmd."+dev+"="+encodeURIComponent(str)+"&XHR=1",
-            function(r){
-              if(r)
-                return FW_okDialog('<pre>'+r+'</pre>');
-              str = "";
-              doNext();
-            });
-          } else {
-            doNext();
-          }
-        }
-        doNext();
+        FW_execRawDef($("#rawDef textarea").val());
       });
     });
 
   });
+}
+
+function
+FW_execRawDef(data)
+{
+  var arr = data.split("\n"), str="", i1=-1;
+  function
+  doNext()
+  {
+    if(++i1 >= arr.length) {
+      return FW_okDialog("Executed everything, no errors found.");
+    }
+    str += arr[i1];
+    if(arr[i1].charAt(arr[i1].length-1) === "\\") {
+      str += "\n";
+      return doNext();
+    }
+    if(str != "") {
+      str = str.replace(/\\\n/g, "\n")
+               .replace(/;;/g, ";");
+      FW_cmd(FW_root+"?cmd.x="+encodeURIComponent(str)+"&XHR=1",
+      function(r){
+        if(r)
+          return FW_okDialog('<pre>'+r+'</pre>');
+        str = "";
+        doNext();
+      });
+    } else {
+      doNext();
+    }
+  }
+  doNext();
 }
 
 var FW_arrowDown="", FW_arrowRight="";
