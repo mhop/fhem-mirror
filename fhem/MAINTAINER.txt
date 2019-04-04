@@ -328,6 +328,7 @@ FHEM/70_Pushbullet.pm        fhainz               Unterstuetzende Dienste
 FHEM/70_PushNotifier.pm      xusader              Unterstuetzende Dienste
 FHEM/70_Pushover.pm          loredo               UnterstÃ¼tzende Dienste
 FHEM/70_Pushsafer.pm         markusbloch          Unterstuetzende Dienste
+FHEM/70_SamsungAV.pm         KölnSolar            Multimedia
 FHEM/70_SCIVT.pm             rudolfkoenig/orphan  Sonstiges
 FHEM/70_SISPM.pm             real-wusel           Sonstiges
 FHEM/70_SML.pm               bentele              Sonstiges
