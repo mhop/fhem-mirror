@@ -55,6 +55,7 @@ sub MYSENSORS_DEVICE_Initialize($) {
     OTA_autoUpdate:0,1
     OTA_BL_Type:Optiboot,MYSBootloader
     OTA_Chan76_IODev
+    model
   );
   use warnings 'qw';
   $hash->{AttrList} = join(" ", @attrList)." ".$readingFnAttributes;
@@ -250,7 +251,7 @@ sub Set($@) {
       $hash->{sets}->{fwType} = join(",", MYSENSORS::getFirmwareTypes($hash->{IODev}));
       my $list = join(" ", map {$hash->{sets}->{$_} ne "" ? "$_:$hash->{sets}->{$_}" : $_} sort keys %{$hash->{sets}});
       $hash->{sets}->{fwType} = "";
-      return grep (/(^on$)|(^off$)/,keys %{$hash->{sets}}) == 2 ? SetExtensions($hash, $list, $name, $command, @values) : "Unknown argument $command, choose one of $list";
+      return SetExtensions($hash, $list, $name, $command, @values);
     }
     
     COMMAND_HANDLER: {
@@ -1163,24 +1164,39 @@ sub sendRetainedMessages($) {
     <a name="MYSENSORS_DEVICEset"></a>
     <p><b>Set</b></p>
     <ul>
+      <b>AttrTemplate</b>
+      <li>Helps to easily configure your devices. Just get a list of all available attrTremplates by issuing
+      <ul>
+        <p><code>set &lt;name&gt; attrTemplate ?</code></p>
+      </ul>
+      Have a look at the descriptions and choose a suitable one. Then use the drop-down list and click "set" or issue a.<br>
+      <ul>
+        <p><code>set &lt;name&gt; attrTemplate A_02a_atmospheric_pressure</code></p>
+      </ul>
+      </li><br>
+      <b>clear</b>
       <li>
          <p><code>set &lt;name&gt; clear</code><br/>clears MySensors EEPROM area and reboot (i.e. "factory" reset) - requires MY_SPECIAL_DEBUG</p>
       </li>
+      <b>flash</b>
       <li>
          <p><code>set &lt;name&gt; flash</code><br/>
          Checks whether a newer firmware version is available. If a newer firmware version is
          available the flash procedure is started. The sensor node must support FOTA for
          this.</p>
       </li>
+      <b>fwType</b>
       <li>
          <p><code>set &lt;name&gt; fwType &lt;value&gt;</code><br/>
          assigns a firmware type to this node (must be a numeric value in the range 0 .. 65536).
          Should be contained in the <a href="#MYSENSORSattrOTA_firmwareConfig">FOTA configuration
          file</a>.</p>
       </li>
+      <b>time</b>
       <li>
         <p><code>set &lt;name&gt; time</code><br/>sets time for nodes (that support it)</p>
       </li>
+      <b>reboot</b>
       <li>
         <p><code>set &lt;name&gt; reboot</code><br/>reboots a node (requires a bootloader that supports it).<br/>Attention: Nodes that run the standard arduino-bootloader will enter a bootloop!<br/>Dis- and reconnect the nodes power to restart in this case.</p>
     </li>

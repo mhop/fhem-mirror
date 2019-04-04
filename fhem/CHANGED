@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 10_MYSENSORS_DEVICE: add attrTemplate support
+ - change:  00_MYSENSORS: enhance support for node functions
+                      when using multiple GW's
  - feature: 93_DbRep: new aggregation type year
  - bugfix   73_AMADCommBridge: fix little bug
  - bugfix:  70_BRAVIA: fix channel presets, fix use of ReadingsAge

@@ -1,0 +1,110 @@
+###########################################
+# $Id: $
+#
+# Comments start with #. Empty lines are ignored.
+# Syntax of one entry: name: line, one optional filter: line, zero or more par: lines,  FHEM-Commands
+# filter:INTERNAL=VALUE (optional)
+# par: name of the parameter; comment; perl_code (optional)
+# perl_code returns a value for the parameter, or undef.
+# If undef, the user has to specify them (the comment is shown to the user)
+
+
+###########################################
+# Example sketches from MySensors.org
+# simple stateFormat versions
+name:A_01a1_air_humidity_dht
+filter:TYPE=MYSENSORS_DEVICE
+desc:Applies to standard DHT sketch without battery reading<br>NOTE: Untested first template version
+attr DEVICE stateFormat T: temperature1 H: humidity
+attr DEVICE model A_01a1_air_humidity_dht
+
+name:A_01a2_air_humidity_Si7021
+filter:TYPE=MYSENSORS_DEVICE
+desc:Applies to standard DHT sketch with battery reading<br>NOTE: Untested first template version
+attr DEVICE stateFormat T: temperature1 H: humidity Bat: batteryLevel
+attr DEVICE model A_01a2_air_humidity_Si7021
+
+name:A_02a_atmospheric_pressure
+filter:TYPE=MYSENSORS_DEVICE
+desc:Applies to standard Atmospheric Pressure sketch (BME280)NOTE: Untested first template version
+attr DEVICE stateFormat T: temperature H: humidity1 P: pressure2 Forecast: forecast2
+attr DEVICE model A_02a_atmospheric_pressure
+
+name:A_03a_bed_occupancy
+filter:TYPE=MYSENSORS_DEVICE
+desc:Applies to standard bed occupancy sketch (MPR121) <br>NOTE: Sketch is still in MySensors 1.x format and has to be changed for use with recent arduino libs.NOTE: Untested first template version
+attr DEVICE stateFormat Left: motion Right: motion1
+attr DEVICE model A_03a_bed_occupancy
+
+#A_04a_Dimmer - LED
+#A_05a_Display and Time
+#A_06a_Distance
+#A_07a_Dollhouse
+#A_08a_Door/Window/Button
+#A_09a_Dust
+#A_10a_Gas Detection
+#A_11a_Gesture Controller
+#A_12a_GPS Sensor
+#A_13a_Heatpump Control
+#A_14a_IR Sender/Receiver
+#A_15a_Irrigation Controller
+#A_16a1_Light Level - BH1750
+#A_16a2_Light Level - LM393
+
+name:A_17a_Motion
+filter:TYPE=MYSENSORS_DEVICE
+desc:Applies to standard motion sketch
+attr DEVICE stateFormat Motion: motion1
+attr DEVICE model A_17a_Motion
+
+#A_18a_Orientation Actuator
+#A_19a_Orientation Sensor
+#A_20a_Parking Sensor
+#A_21a_Pulse Power Meter
+#A_22a_Pulse Water Meter
+#A_23a_Rain Gauge
+#A_24a_Relay Actuator
+#A_25a_RFID
+#A_26a_Scene Controller
+#A_27a_Secret Knock
+#A_28a_Servo
+#A_29a_Smart Alarm Clock
+#A_30a_Soil Moisture
+#A_31a_Sonoff Relay
+#A_32a_Starry Sky
+
+
+name:A_33a_temperature
+filter:TYPE=MYSENSORS_DEVICE
+desc:Applies to standard temperature sketch (DS18B20) NOTE: Untested first template version
+attr DEVICE stateFormat T0: temperature T1: temperature1 T2: temperature2
+attr DEVICE model A_33a_temperature
+
+#A_34a_UV
+#A_35a_Whole House Fan
+
+###########################################
+# Example sketches from MySensors.org
+# Advanced stateFormat and devStateIcon versions
+
+
+###########################################
+# Advanced sketches 
+
+#4 relay
+name:C_04_4ch_unified_icon
+filter:TYPE=MYSENSORS_DEVICE
+desc:Device with 4 relays attached <br>NOTE: Clicking on icons will issue a corresponding toggle command
+attr DEVICE devStateIcon {\
+    "<div><a href=\"/fhem?cmd.dummy=set ".$name." status1 toggle&XHR=1\">status1:"\
+    . FW_makeImage(lc ReadingsVal($name, "status1", "off"))\
+    . "</a> <a href=\"/fhem?cmd.dummy=set ".$name." status2 toggle&XHR=1\">status2:"\
+    . FW_makeImage(lc ReadingsVal($name, "status2", "off")) . "</a></div>"\
+    . "</a> <a href=\"/fhem?cmd.dummy=set ".$name." status3 toggle&XHR=1\">status3:"\
+    . FW_makeImage(lc ReadingsVal($name, "status3", "off")) . "</a></div>"\
+    . "</a> <a href=\"/fhem?cmd.dummy=set ".$name." status4 toggle&XHR=1\">status4:"\
+    . FW_makeImage(lc ReadingsVal($name, "status4", "off")) . "</a></div>"\
+    }
+attr DEVICE stateFormat P1: status1 P2: status2 P3: status3 P4: status4 Status: state
+attr DEVICE webCmd :
+attr DEVICE model C_04_4ch_unified_icon
