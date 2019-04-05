@@ -4,9 +4,6 @@ package main;
 use strict;
 use warnings;
 
-# only to hopefully have this loaded before any module loads threads::shared
-use threads;
-
 # provide the same hash as for real FHEM modules
 #   in FHEM main context
 use vars qw(%packages);
@@ -1008,6 +1005,20 @@ sub GetModuleFilepath {
         }
         elsif ( defined( $INC{$module} ) ) {
             push @path, $INC{$module};
+        }
+
+        # avoid to load pragmas and guess their path ...
+        elsif ( ModuleIsPerlPragma($package) ) {
+            my $n = $INC{'version.pm'};
+            $n =~ s/(.*\/).*/$1/;
+            $n .= $module;
+
+            if ( -e $n ) {
+                push @path, $n;
+            }
+            else {
+                push @path, '';
+            }
         }
         else {
             eval {
@@ -3131,7 +3142,7 @@ sub __SetXVersion {
       "abstract": "FHEM Entwickler Paket, um Metadaten Unterstützung zu aktivieren"
     }
   },
-  "version": "v0.4.1",
+  "version": "v0.4.2",
   "release_status": "testing",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
