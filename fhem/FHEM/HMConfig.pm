@@ -1838,8 +1838,11 @@ foreach(keys %HMConfig::culHmModel){$culHmModelSets{$HMConfig::culHmModel{$_}{na
 $culHmModelSets{"HM-OU-CM-PCB"}          = 
 $culHmModelSets{"HM-OU-CF-PL"}           = 
 $culHmModelSets{"HM-OU-CFM-TW"}          = $culHmModelSets{"HM-OU-CFM-PL"};
+
 $culHmModelSets{"HM-PB-4DIS-WM-2"}       = 
 $culHmModelSets{"HM-ES-TX-WM"}           = 
+$culHmModelSets{"HM-Dis-WM55"}           = 
+$culHmModelSets{"HM-Dis-EP-WM55"}        = 
 $culHmModelSets{"ROTO_ZEL-STG-RM-DWT-10"}= $culHmModelSets{"HM-PB-4DIS-WM"};
                                          
 #$culHmModelSets{"HM-OU-CFM-PL"}          = $culHmModelSets{"HM-SEC-SD"};# no statusrequest possible
