@@ -845,12 +845,14 @@ f18_textInput()
   var n = "FW_mainTextInput";
   var aCM = typeof AddCodeMirror == 'function';
   $("body").append(
-  `<div id="${n}">
-    <textarea rows="20" cols="60" style="width:99%;${aCM?'opacity:0;':''}"/>
-  </div>`);
+  '<div id="'+n+'">'+
+  '<textarea rows="20" cols="60" style="width:99%;'+(aCM?'opacity:0;':'')+'"/>'+
+  '</div>');
   var ta = $("#"+n+" textarea");
   if(aCM)
-    AddCodeMirror(ta, (cm) => cm.on("change", () => ta.val(cm.getValue()) ) );
+    AddCodeMirror(ta, (cm), function() { 
+      cm.on("change", function(){ ta.val(cm.getValue()) } );
+    });
 
   $("#"+n).dialog({
     dialogClass:"no-close", modal:true, width:"auto", closeOnEscape:true, 
