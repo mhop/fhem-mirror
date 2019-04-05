@@ -891,7 +891,7 @@ sub Text2Speech_DoIt($) {
   Log3 $hash->{NAME}, 4, $hash->{NAME}.": Bearbeite jetzt den Text: ". join(" ",@{$hash->{helper}{Text2Speech}->[0]}); 
   
   if(! -e $file) { # Datei existiert noch nicht im Cache
-    Text2Speech_Download($hash, $file, $hash->{helper}{Text2Speech}->[0]);
+    Text2Speech_Download($hash, $file, join(" ",@{$hash->{helper}{Text2Speech}->[0]}));
   } else {
     Log3 $hash->{NAME}, 4, $hash->{NAME}.": $file gefunden, kein Download";
   }
