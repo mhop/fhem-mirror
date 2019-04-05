@@ -1338,10 +1338,7 @@ sub CreateSearchList ($$@) {
     my $header = '';
     my $footer = '';
     if ($html) {
-        $header =
-'<html><div class="detLink installerBack" style="float:right"><a href="?detail='
-          . $hash->{NAME}
-          . '">&larr; back to FHEM Installer</a></div>';
+        $header = '<html>';
         $footer = '</html>';
     }
 
@@ -1424,16 +1421,21 @@ sub CreateSearchList ($$@) {
 
     # Add search input
     $header .=
-'<form id="fhemsearch" method="get" action="?" onsubmit="cmd.value = \'get '
+        '<div class="wide">'
+      . '<form id="fhemsearch" method="get" action="?" onsubmit="cmd.value = \'get '
       . $hash->{NAME}
-      . ' search \'+ q.value">'
+      . ' search \'+ q.value" style="float: left; margin-right: 2em;">'
       . $FW_CSRF_input
       . '<input type="hidden" name="cmd" value="">'
       . '<label for="q" style="margin-right: 0.5em;">Search:</label>'
       . '<input type="text" name="q" id="q" value="'
       . $search
       . '" autocorrect="off" autocapitalize="off">'
-      . '</form>';
+      . '</form>'
+      . '<div class="detLink installerBack" style="float: right"><a href="?detail='
+      . $hash->{NAME}
+      . '">&larr; back to FHEM Installer</a></div>'
+      . '</div>';
 
     my $found = 0;
 
@@ -3166,9 +3168,11 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
           . $tdOpen
           . 'Module metadata do not contain any prerequisites.' . "\n"
           . 'For automatic source code analysis, please install '
-          . ( $html
+          . (
+            $html
             ? '<a href="https://gist.github.com/jpawlowski/8f6503bcf0356b3e64a98b8b35508e57" target="_blank">'
-            : '' )
+            : ''
+          )
           . 'Perl::PrereqScanner::NotQuiteLite'
           . ( $html ? '</a>' : '' )
           . ' first.'
