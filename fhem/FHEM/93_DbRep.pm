@@ -58,6 +58,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.19.0" => "04.04.2019  explain is possible in sqlCmd ",
   "8.18.0" => "01.04.2019  new aggregation year ",
   "8.17.2" => "28.03.2019  consideration of daylight saving time/leap year changed (func DbRep_corrRelTime) ",
   "8.17.1" => "24.03.2019  edit Meta data, activate Meta.pm, prevent module from deactivation in case of unavailable Meta.pm ",
@@ -146,6 +147,7 @@ our %DbRep_vNotesIntern = (
 
 # Version History extern:
 our %DbRep_vNotesExtern = (
+  "8.19.0" => "04.04.2019 The \"explain\" SQL-command is possible in sqlCmd ",
   "8.18.0" => "01.04.2019 New aggregation type \"year\" ",
   "8.17.0" => "20.03.2019 With new attribute \"sqlCmdVars\" you are able to set SQL session variables or SQLite PRAGMA every time ".
               "before running a SQL-statement with sqlCmd command.",
@@ -5802,7 +5804,7 @@ sub sqlCmd_DoParse($) {
  
   my @rows;
   my $nrows = 0;
-  if($sql =~ m/^\s*(select|pragma|show)/is) {
+  if($sql =~ m/^\s*(explain|select|pragma|show)/is) {
     while (my @line = $sth->fetchrow_array()) {
       Log3 ($name, 4, "DbRep $name - SQL result: @line");
       my $row = join("$srs", @line);
@@ -9226,12 +9228,14 @@ sub DbRep_delread($;$$) {
          # Highlighted Readings löschen und save statefile wegen Inkompatibilitär beim Restart
          if($key =~ /<html><span/) {
              $do = 1;
-             delete($defs{$name}{READINGS}{$key});
+             # delete($defs{$name}{READINGS}{$key});
+             readingsDelete($hash,$key);
          }
          # Reading löschen wenn Featuelevel > 5.9 und zu lang nach der neuen Festlegung
          if($do == 0 && $featurelevel > 5.9 && !goodReadingName($key)) {
              $do = 1;
-             delete($defs{$name}{READINGS}{$key});
+             # delete($defs{$name}{READINGS}{$key});
+             readingsDelete($hash,$key);
          }         
      }
      WriteStatefile() if($do == 1);
@@ -9248,13 +9252,15 @@ sub DbRep_delread($;$$) {
              }
          }
          if($dodel) {
-             delete($defs{$name}{READINGS}{$key});
+             # delete($defs{$name}{READINGS}{$key});
+             readingsDelete($hash,$key);
          }
      }
  } else {
      foreach my $key(@allrds) {
          # Log3 ($name, 1, "DbRep $name - Reading Schlüssel: $key");
-         delete($defs{$name}{READINGS}{$key}) if($key ne "state");
+         # delete($defs{$name}{READINGS}{$key}) if($key ne "state");
+         readingsDelete($hash,$key) if($key ne "state");
      }
  }
 return undef;
@@ -13680,7 +13686,7 @@ sub bdump {
                                       <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
                                       <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>                                      
                                       <tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
-                                      <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: filtert die anzuzeigenden Datensätze mit einem regulären Ausdruck. Der Regex wird auf Werte des DAtenbankfelder 'VALUE' angewendet. </td></tr>
+                                      <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: filtert die anzuzeigenden Datensätze mit einem regulären Ausdruck (Datenbank spezifischer REGEXP). Der REGEXP wird auf Werte des Datenbankfeldes 'VALUE' angewendet. </td></tr>
                                    </table>
 	                               </ul>
 	                               <br>
