@@ -48,6 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.13.1" => "06.04.2019  verbose level in X_DelayedShutdown changed ",
   "8.13.0" => "27.03.2019  add Meta.pm support ",
   "8.12.0" => "25.03.2019  FHEM standard function X_DelayedShutdown implemented, delay FHEM shutdown as long as sessions ".
               "are not terminated. ",
@@ -523,12 +524,8 @@ return undef;
 
 #######################################################################################################
 # Mit der X_DelayedShutdown Funktion kann eine Definition das Stoppen von FHEM verzögern um asynchron 
-# hinter sich aufzuräumen. Dies kann z.B. der Verbindungsabbau mit dem physikalischen Gerät sein (z.B. 
-# Session beenden, Logout, etc.), welcher mehrfache Requests/Responses benötigt.  
-# Je nach Rückgabewert $delay_needed wird der Stopp von FHEM verzögert.
-# Im Unterschied zur Shutdown-Funktion steht vor einem bevorstehenden Stopp von FHEM für einen 
-# User-konfigurierbaren Zeitraum (global-Attribut: maxShutdownDelay / Standard: 10 Sekunden) weiterhin
-# die asynchrone FHEM Infrastruktur (DevIo/Read-Funktion und InternalTimer) zur Verfügung.
+# hinter sich aufzuräumen.  
+# Je nach Rückgabewert $delay_needed wird der Stopp von FHEM verzögert (0|1).
 # Sobald alle nötigen Maßnahmen erledigt sind, muss der Abschluss mit CancelDelayedShutdown($name) an 
 # FHEM zurückgemeldet werden. 
 #######################################################################################################
@@ -536,7 +533,7 @@ sub SSCam_DelayedShutdown($) {
   my ($hash) = @_;
   my $name   = $hash->{NAME};
   
-  Log3($name, 1, "$name - Quit session due to shutdown ...");
+  Log3($name, 2, "$name - Quit session due to shutdown ...");
   $hash->{HELPER}{ACTIVE} = "on";                              # keine weiteren Aktionen erlauben
   SSCam_logout($hash);
 
