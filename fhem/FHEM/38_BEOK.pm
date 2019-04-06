@@ -27,13 +27,14 @@
 package main;
 use strict;
 use warnings;
+
 use SetExtensions;
 use Blocking; # http://www.fhemwiki.de/wiki/Blocking_Call
 use Time::Local;
 use IO::Socket::INET;
 use IO::Select;
 
-my $version = 'V1.2 / 19.02.19';
+my $version = 'V1.3 / 03.03.19';
 
 my %gets = ('status:noArg' => '', 'auth:noArg' =>'' , 'temperature:noArg' => '');
 
@@ -48,7 +49,13 @@ sub BEOK_Initialize($)
     $hash->{GetFn}        = 'BEOK_Get';
     $hash->{AttrFn}       = 'BEOK_Attr';
     $hash->{FW_summaryFn} = 'BEOK_summaryFn';
-    $hash->{AttrList}     = 'interval timeout disable:0,1 timesync:0,1 language model:BEOK,Floureon,Hysen,KETOTEK,unknown weekprofile '.$readingFnAttributes;
+    $hash->{AttrList}     = 'interval timeout disable:0,1 timesync:0,1 language display:auto,always_on keepAuto:0,1 '
+                            .'skipTimeouts:0,9 maxErrorLog model:BEOK,Floureon,Hysen,KETOTEK,Chunyang,unknown weekprofile '
+                            .$readingFnAttributes;
+
+    #eval "use FHEM::Meta";
+    #return FHEM::Meta::InitMod( __FILE__, $hash ) if (!$@);
+
 }
 
 sub BEOK_Define($$) {
@@ -65,7 +72,7 @@ sub BEOK_Define($$) {
     return "wrong syntax: define <name> BEOK <ip> [<mac>]" if(int(@param) < 2);
 
     $hash->{'.ip'} = $param[2];
-    $hash->{'MAC'} = (defined($param[3])) ? $param[3] : 'de:ad:be:ef:08:15';
+    $hash->{'MAC'} = (defined($param[3])) ? $param[3] : 'de:ad:be:ef:08:15'; # immer noch unklar ob die echte MAC nötig ist oder nicht
 
     $hash->{'.key'} = pack('C*', 0x09, 0x76, 0x28, 0x34, 0x3f, 0xe9, 0x9e, 0x23, 0x76, 0x5c, 0x15, 0x13, 0xac, 0xcf, 0x8b, 0x02);
     $hash->{'.iv'}  = pack('C*', 0x56, 0x2e, 0x17, 0x99, 0x6d, 0x09, 0x3d, 0x28, 0xdd, 0xb3, 0xba, 0x69, 0x5a, 0x2e, 0x6f, 0x58);
@@ -78,10 +85,11 @@ sub BEOK_Define($$) {
     $hash->{VERSION}     = $version;
     $hash->{ERRORCOUNT}  = 0;
     $hash->{weekprofile} = "none";
-    $hash->{CmdStack}    = ();
-    $hash->{'.CmdStack'} = 0;
+    $hash->{'skipError'} = 0;
+    $hash->{'DISPLAY'}   = '';
 
     # wird mit dem ersten Full Status ueberschrieben
+    $hash->{helper}{temp_manual} = 0;
     $hash->{helper}{power}       = 0;
     $hash->{helper}{remote_lock} = 0;
     $hash->{helper}{loop_mode}   = 1;
@@ -119,6 +127,10 @@ sub BEOK_Define($$) {
     readingsSingleUpdate($hash,'state','defined',1);
     RemoveInternalTimer($hash);
     InternalTimer(gettimeofday()+5, "BEOK_update", $hash,0);
+
+    #eval "use FHEM::Meta";
+    #FHEM::Meta::SetInternals($hash) if(!$@);
+
     return undef;
 }
 
@@ -155,21 +167,37 @@ sub BEOK_update($)
 
   CommandGet(undef,$name.' auth')   if (!$hash->{isAuth});
 
+  #xxxx
 
   if (!$wp)
   {
-   CommandGet(undef,$name.' status') if  ($hash->{isAuth});
+   if ((AttrVal($name,'display','auto') eq 'auto') && ($hash->{isAuth}))
+   { CommandGet(undef,$name.' status'); return undef; }
+   CommandSet(undef,$name.' on') if  ($hash->{isAuth}); # Display immer an
    return undef;
   }
 
   my (undef,undef,undef,undef,undef,undef,$now_day)  = localtime(time());  # jetzt
   my (undef,undef,undef,undef,undef,undef,$last_day) = localtime($hash->{TIME}); # letzter
-  #my (undef,undef,undef,undef,undef,undef,$next_day) = localtime(time()+$interval); # nächster
+  my (undef,undef,undef,undef,undef,undef,$next_day) = localtime(time()+$interval); # nächster
 
+  # letzter Lauf für heute ?
+  if ($now_day != $next_day && AttrNum($name,'keepAuto',0) && !$hash->{helper}{auto_mode}) 
+  {
+   $hash->{'.lastdayrun'} = 0;
+   my $error = CommandSet(undef,$name.' mode auto');
+   if ($error)
+   {
+     #Log3 $name,3,"BEOK $name, $error";
+     $hash->{TIME} = time(); 
+   }
+   return undef;
+  }
   #neuer Tag ?
-  if ($now_day != $last_day)
+  elsif ($now_day != $last_day)
   {
     Log3 $name,4,"BEOK $name, firstday run";
+    $hash->{'.firstdayrun'} = 1;
     my $error = CommandSet(undef,$name.' weekprofile '.$wp);
     if ($error)
     {
@@ -180,16 +208,13 @@ sub BEOK_update($)
   }
   else 
   { 
-    CommandGet(undef,$name.' status') if  ($hash->{isAuth});
-    #BEOK_checkAuto if AttrNum($name,'keepAuto',0);
+    $hash->{'.firstdayrun'} = 0;
+    $hash->{'.lastdayrun'}  = 0;
+    if ((AttrVal($name,'display','auto') eq 'auto') && ($hash->{isAuth}))
+    { CommandGet(undef,$name.' status'); return undef; }
+    CommandSet(undef,$name.' on') if  ($hash->{isAuth}); # Display immer an
   }
  } # interval
-
- return undef;
-}
-
-sub BEOK_checkAuto
-{
 
  return undef;
 }
@@ -205,7 +230,7 @@ sub BEOK_Get($@)
  return 'get '.$name.' needs at least one argument' if(int(@a) < 2);
  return $name.' get with unknown argument '.$cmd.', choose one of ' . join(' ', sort keys %gets) if (($cmd ne 'status') && ($cmd ne 'auth') && ($cmd ne 'temperature')); 
 
- $hash->{'.CmdStack'}  = 0;
+ #$hash->{'.CmdStack'}  = 0;
 
  if ($cmd eq 'auth') 
  {
@@ -281,26 +306,25 @@ sub BEOK_Set(@)
 
   Log3 $name,4,"BEOK set $name $cmd $subcmd" if (($cmd ne '?') && $subcmd);
 
-  my $cmdList  = "desired-temp off:noArg on:noArg mode:auto,manual loop:12345.67,123456.7,1234567 ";
+  my $cmdList  = "desired-temp on:noArg off:noArg mode:auto,manual loop:12345.67,123456.7,1234567 ";
   $cmdList    .= " sensor:external,internal,both time:noArg active:noArg inactive:noArg lock:on,off";
-  $cmdList    .= " power-on-memory:on,off fre:open,close room-temp-adj:";
+  $cmdList    .= " display:auto,always_on power-on-memory:on,off fre:open,close room-temp-adj:";
 
-  for (my $i=-10;$i<9;$i++) {$cmdList .= sprintf('%.1f',$i/2).',';}
+  for (my $i=-10;$i<=9;$i++) {my $s= sprintf('%.1f',$i/2); $s+=0; $cmdList.=$s.',';}
 
-  $cmdList .= "4.5,5.0 osv svh svl dif:1,2,3,4,5,6,7,8,9 weekprofile";
+  $cmdList .= "5 osv svh svl dif:1,2,3,4,5,6,7,8,9 weekprofile";
 
   for (my $i=1;$i<7;$i++) {$cmdList .= " day-profile".$i."-temp day-profile".$i."-time";}
   for (my $i=7;$i<9;$i++) {$cmdList .= " we-profile".$i."-temp we-profile".$i."-time";}
 
 
- if ($cmd eq '?') { return SetExtensions($hash,$cmdList,$name,@a); }
+ if (($cmd eq '?') || ($cmd =~ /^(on-|off-|toggle|intervals)/)) { return SetExtensions($hash,$cmdList,$name,@a); }
 
  if ($subcmd) { Log3 $name,5,"BEOK set $name $cmd $subcmd"; }
  else  { Log3 $name,5,"BEOK set $name $cmd"; }
 
  return 'no set commands allowed, auth key and device id are missing ! ( need run get auth first )' if (!$hash->{isAuth});
 
- $hash->{'.CmdStack'} = 0;
 
  if (($cmd eq 'inactive') && !IsDisabled($name)) 
  {
@@ -310,7 +334,7 @@ sub BEOK_Set(@)
  elsif (($cmd eq 'active') && IsDisabled($name)) 
  {
   readingsSingleUpdate($hash,'state','active',1); 
-  BEOK_Update($hash); 
+  BEOK_update($hash); 
  }
  elsif (($cmd eq 'on') || ($cmd eq 'off') || ($cmd eq 'lock'))
  {
@@ -319,13 +343,13 @@ sub BEOK_Set(@)
 
   $hash->{helper}{power}       = 1 if ($cmd  eq 'on');
   $hash->{helper}{power}       = 0 if ($cmd  eq 'off');
-  $hash->{helper}{remote_lock} = 1 if (($cmd eq 'lock') && ($subcmd eq "on" ));
-  $hash->{helper}{remote_lock} = 0 if (($cmd eq 'lock') && ($subcmd eq "off"));
+  $hash->{helper}{remote_lock} = 1 if (($cmd eq 'lock') && ($subcmd eq 'on' ));
+  $hash->{helper}{remote_lock} = 0 if (($cmd eq 'lock') && ($subcmd eq 'off'));
 
   @payload = (1,6,0,0,$hash->{helper}{remote_lock},$hash->{helper}{power});
 
   readingsSingleUpdate($hash,'state','set_'.$cmd,0)   if ($cmd ne 'lock');
-  readingsSingleUpdate($hash,'look','set_'.$subcmd,0) if ($cmd eq 'lock');
+  readingsSingleUpdate($hash,'lock','set_'.$subcmd,0) if ($cmd eq 'lock');
 
   $hash->{lastCMD} = 'set '.$cmd;
   $ret = BEOK_send_packet($hash, 0x6a, @payload);
@@ -445,7 +469,7 @@ sub BEOK_Set(@)
 
   @payload             =  (1,6,0,1,0,$temp);  # setzt angeblich auch mode manu
   $hash->{lastCMD}     = "set $cmd $subcmd";
-  $hash->{'.CmdStack'} = 1;
+  #$hash->{'.CmdStack'} = 1;
   $ret = BEOK_send_packet($hash, 0x6a, @payload);
  }
  elsif ( $cmd =~ /^(day|we)-profile[1-8]-time$/ )
@@ -557,10 +581,12 @@ sub BEOK_Set(@)
    @payload = BEOK_set_timer_schedule($hash);
    $hash->{lastCMD}     = "set $cmd $subcmd";
    $hash->{weekprofile} = "$wpd:$wpp:$today";
-   $hash->{'.CmdStack'} = 1;
    $ret = BEOK_send_packet($hash, 0x6a, @payload);
  }
-
+ else {
+       $cmdList .=' on-for-timer off-for-timer on-till off-till on-till-overnight off-till-overnight toggle intervals';
+       return "$name, set with unknown argument $cmd, choose one of $cmdList"; 
+      }
     return $ret;
 }
 
@@ -574,10 +600,9 @@ sub BEOK_NBStart($)
   my $logname  = $name."[".$$."]";
   my $timeout  = AttrVal($name, 'timeout', 3);
   my $data;
-  my $error    = 'no data from device';
 
- Log3 $name,5,'BEOK '.$logname.' NBStart '.$cmd;
- 
+  Log3 $name,5,'BEOK '.$logname.' NBStart '.$cmd;
+
   my $sock = IO::Socket::INET->new(
             PeerAddr  => $hash->{'.ip'},
             PeerPort  => '80',
@@ -596,23 +621,10 @@ sub BEOK_NBStart($)
   $cmd = decode_base64($cmd);
 
   $sock->send($cmd);
-  if ($select->can_read($timeout)) 
-  {
-   $sock->recv($data, 1024);
-  }
-  else
-  {
-   Log3 $name, 2, 'BEOK '.$logname.' '.$error;
-   return "$name|1|$error";
-  }
+  $sock->recv($data, 1024) if ($select->can_read($timeout));
   $sock->close();
 
-  if (!$data)
-  {
-   Log3 $name, 2, 'BEOK '.$logname.' '.$error;
-   return "$name|1|$error";
-  }
-
+  return $name.'|1|no data from device' if (!$data);
   return $name.'|0|'.encode_base64($data,'');
 }
 
@@ -622,12 +634,12 @@ sub BEOK_NBAbort($)
  my $name   = $hash->{NAME};
  my $error  = 'BlockingCall Timeout';
  $hash->{ERRORCOUNT}++;
- $error .= ' ['.$hash->{ERRORCOUNT}.']';
- Log3 $name,3,"BEOK $name $error" if ($hash->{ERRORCOUNT} < 20);
+ $error .= ' ['.$hash->{ERRORCOUNT}.'], abort for cmd : '.$hash->{lastCMD};
+ Log3 $name,3,"BEOK $name $error" if ($hash->{ERRORCOUNT} < AttrNum($name,'maxErrorLog',10));
  readingsBeginUpdate($hash);
-  readingsBulkUpdate($hash,'error', $error);
-  readingsBulkUpdate($hash,'state', 'error');
-  readingsBulkUpdate($hash,'alive', 'no');
+ readingsBulkUpdate($hash,'error', $error);
+ readingsBulkUpdate($hash,'state', 'error');
+ readingsBulkUpdate($hash,'alive', 'no');
  readingsEndUpdate($hash,1);
  delete($hash->{helper}{RUNNING_PID});
  return $error;
@@ -641,8 +653,8 @@ sub BEOK_NBDone($)
    my @r = split("\\|",$string);
    my $name     = $r[0];
    my $hash     = $defs{$name};
-   my $error    = (defined($r[1])) ? $r[1] : "1";
-   my $data     = (defined($r[2])) ? $r[2] : "???";
+   my $error    = (defined($r[1])) ? int($r[1]) : 1;
+   my $data     = (defined($r[2])) ? $r[2] : "";
 
    Log3 $name,5,"BEOK $name NBDone : $string";
 
@@ -650,14 +662,22 @@ sub BEOK_NBDone($)
 
    if ($error)
    {
+    if ($hash->{'skipError'} < AttrNum($name,'skipTimeouts',1)) 
+    {
+     $hash->{'skipError'}++;
+     Log3 $name,4,"BEOK $name Timeout skip ".$hash->{'skipError'}.' , max : '.AttrVal($name,'skipTimeouts','1');
+     return undef;
+    }
+
+    $hash->{'skipError'} = 0;
     $hash->{ERRORCOUNT}++;
-    $data .= ' ['.$hash->{ERRORCOUNT}.']';
+    $data .= ' ['.$hash->{ERRORCOUNT}.'], for cmd : '.$hash->{lastCMD};
     readingsBeginUpdate($hash);
      readingsBulkUpdate($hash, 'error', $data);
      readingsBulkUpdate($hash, 'state', 'error');
      readingsBulkUpdate($hash, 'alive', 'no');
     readingsEndUpdate($hash,1);
-    Log3 $name,3,"BEOK $name $data" if ($hash->{ERRORCOUNT} < 20);
+    Log3 $name,3,"BEOK $name $data" if ($hash->{ERRORCOUNT} < AttrNum($name,'maxErrorLog',10));
     return $data;
    }
 
@@ -670,8 +690,12 @@ sub BEOK_NBDone($)
 
     if (length($dData) < 32)
     {
-     Log3 $name,3,"BEOK $name auth -> decrypt data to short : ".length($dData);
-     readingsSingleUpdate($hash, "alive", "yes",1);
+     $error = 'auth -> decrypt data to short : '.length($dData);
+     Log3 $name,3,"BEOK $name $error";
+     readingsBeginUpdate($hash);
+     readingsBulkUpdate($hash, 'error', $error);
+     readingsBulkUpdate($hash, 'alive', 'yes');
+     readingsEndUpdate($hash,1);
      return undef;
     }
 
@@ -680,10 +704,10 @@ sub BEOK_NBDone($)
 
     $hash->{isAuth} = 1;
     readingsBeginUpdate($hash);
-     readingsBulkUpdate($hash,'state','auth');
-     readingsBulkUpdate($hash,'alive','yes');
+    readingsBulkUpdate($hash,'state','auth');
+    readingsBulkUpdate($hash,'alive','yes');
     readingsEndUpdate($hash,1);
-    return CommandGet(undef, "$name status"); # gleich die aktuellen Werte holen
+    return CommandGet(undef, $name.' status'); # gleich die aktuellen Werte holen
    }
 
   if ((length($data) < 0x39) || unpack("C*", substr($data, 0x22, 1)) | (unpack("C*", substr($data, 0x23, 1)) << 8))
@@ -727,7 +751,7 @@ sub BEOK_NBDone($)
        readingsBulkUpdate($hash, 'state', 'error');
        readingsBulkUpdate($hash, 'alive', 'yes');
       readingsEndUpdate($hash,1);
-      Log3 $name,2,"BEOK $name $error";
+      Log3 $name,2,"BEOK $name $error" if ($hash->{ERRORCOUNT} < AttrNum($name,'maxErrorLog',10));
       return $error;
      }
 
@@ -793,7 +817,9 @@ sub BEOK_UpdateStatus(@)
      readingsBulkUpdate ($hash, "power",$val);
 
      readingsBulkUpdate ($hash, "relay",        ($data[4] >> 4) & 1);
-     readingsBulkUpdate ($hash, "temp-manual",  ($data[4] >> 6) & 1);
+     $t = ($data[4] >> 6) & 1;
+     $hash->{helper}{temp_manual} = $t*2;
+     readingsBulkUpdate ($hash, "temp-manual",  $t); # 2 = manuelle Temp im Automodus
      readingsBulkUpdate ($hash, "room-temp",     sprintf("%0.1f",$data[5] / 2));
      readingsBulkUpdate ($hash, "desired-temp",  sprintf("%0.1f",$data[6] / 2));
 
@@ -804,11 +830,11 @@ sub BEOK_UpdateStatus(@)
      $val = ($data[7] >> 4) & 15;
      $hash->{helper}{loop_mode} = $val;
 
-     my $loop = '???';
-     if    ($val == 1) {$loop = "12345.67";}
-     elsif ($val == 2) {$loop = "123456.7";}
-     elsif ($val == 3) {$loop = "1234567"; }
-     readingsBulkUpdate ($hash, "loop", $loop);
+     $t = '???';
+     if    ($val == 1) {$t = "12345.67";}
+     elsif ($val == 2) {$t = "123456.7";}
+     elsif ($val == 3) {$t = "1234567"; }
+     readingsBulkUpdate ($hash, "loop", $t);
 
      $val = $data[8];
      $hash->{helper}{SEN} = $data[8];
@@ -849,7 +875,7 @@ sub BEOK_UpdateStatus(@)
      $hash->{helper}{PoM} = $data[16];
      readingsBulkUpdate ($hash, "power-on-mem",  ($data[16]) ? 'off' : 'on');
 
-     #readingsBulkUpdate ($hash, "unknown",    $data[17]); # ???
+     readingsBulkUpdate ($hash, "unknown",    $data[17]); # ???
      readingsBulkUpdate ($hash, "floor-temp", sprintf("%0.1f", $data[18] / 2));
      readingsBulkUpdate ($hash, "time",       sprintf("%02d:%02d:%02d", $data[19],$data[20],$data[21]));
      readingsBulkUpdate ($hash, "dayofweek",  $data[22]);
@@ -870,6 +896,7 @@ sub BEOK_UpdateStatus(@)
        readingsBulkUpdate ($hash, "we-profile".($i+1)."-temp", sprintf("%.1f",$hash->{helper}{$i}{temp}/2));
      }
 
+   readingsBulkUpdate ($hash, "mode_state", $hash->{helper}{temp_manual} + $hash->{helper}{auto_mode});
    readingsBulkUpdate ($hash, "state", ($hash->{helper}{power}) ? "on" : "off");
   readingsEndUpdate($hash,1);
 
@@ -1096,6 +1123,12 @@ sub BEOK_Attr (@)
      $_[3] = $attrVal;
      BEOK_update($hash); # Polling Start
    }
+   elsif ($attrName eq 'display')
+   {
+     $_[3] = $attrVal;
+     $hash->{'DISPLAY'} = $attrVal;
+   }
+
  }
  elsif ($cmd eq "del")
  {
@@ -1103,6 +1136,11 @@ sub BEOK_Attr (@)
    {
      $_[3] = $attrVal;
     RemoveInternalTimer($hash);
+   }
+   elsif ($attrName eq 'display')
+   {
+     $_[3] = $attrVal;
+     $hash->{'DISPLAY'} = '';
    }
  }
 }
@@ -1122,6 +1160,7 @@ sub BEOK_summaryFn($$$$)
  my $csrf         = ($FW_CSRF ? "&fwcsrf=$defs{$FW_wname}{CSRFTOKEN}" : '');
  my $sel          = '';
  my $html         = '';
+ my $link         = '';
  my $icon;
  my @names;
 
@@ -1133,9 +1172,11 @@ sub BEOK_summaryFn($$$$)
  {
 
   ($icon, undef, undef) = FW_dev2image($name,$power);
-  $power = FW_makeImage($icon, $power) if ($icon);
-
-  $html .= '<table border="0" class="header"><tr><td>'.$power.'</td>';
+  $power  = FW_makeImage($icon, $power) if ($icon);
+  $link   = "cmd.$name=set%20$name%20";
+  $link  .= ($state eq 'on') ? 'off' : 'on';
+  $power  = "<a onClick=\"FW_cmd('/fhem?XHR=1&$link&room=$room$csrf')\">$power</a>" if ($power);
+  $html  .= '<table border="0" class="header"><tr><td>'.$power.'</td>';
 
   if ($state eq 'on')
   {
@@ -1144,8 +1185,12 @@ sub BEOK_summaryFn($$$$)
 
    ($icon, undef, undef) = FW_dev2image($name,$locked);
    $locked = FW_makeImage($icon, $locked) if ($icon);
+   #Log3 $hash,1,$locked;
 
-   $html .= '<td>'.$relay.'</td><td>'.$locked.'</td>';
+   $link    = "cmd.$name=set%20$name%20lock%20";
+   $link   .= (int($hash->{helper}{remote_lock})) ? 'off' : 'on';
+   $locked  = "<a onClick=\"FW_cmd('/fhem?XHR=1&$link&room=$room$csrf')\">$locked</a>" if ($locked);
+   $html   .= '<td>'.$relay.'</td><td>'.$locked.'</td>';
 
    $html .= '<td align="right">'.$names[0].ReadingsNum($name,'room-temp',0).' &deg;C<br>'.$names[1].ReadingsNum($name,'floor-temp',0).' &deg;C</td>';
 
@@ -1304,6 +1349,7 @@ return $html;
 <ul>
     BEOK implementiert die Verbindung zu einem BEOK / Floureon / Hysen WiFi Raum Thermostaten
 	<br>
+        Wiki : <a href='https://wiki.fhem.de/wiki/BEOK'>https://wiki.fhem.de/wiki/BEOK</a><br><br>
 	Da das Modul AES-Verschl&uuml;sselung ben&ouml;tigt m&uuml;ssen ggf. noch zus&auml;tzliche Perl Module installiert werden.<br>
         Bsp. f&uuml;r Debian/Raspian :<br>
 	<code>
@@ -1318,7 +1364,9 @@ return $html;
         <code>define &lt;name&gt; BEOK &lt;ip&gt; [mac]</code>
         <br>
         <br>
-        Beispiel: <code>define WT BEOK 192.178.1.100</code>
+        Beispiel: <code>define WT BEOK 192.178.1.100</code><br>
+        <code>define WT BEOK 192.178.1.100 01:02:03:04:05:06</code><br>
+        Es wird empfohlen die MAC Adresse mit anzugeben. Z.z ist noch nicht gekl&auml;rt ob sonst eventuell vermehrte Timeouts die Folge sind.
     </ul>
     <br>
     <br>
@@ -1377,37 +1425,43 @@ return $html;
     <li><code>weekprofile</code><br>
     Setzt alle Wochentag Schaltzeiten und Temperaturen mit Werten aus einem Profil des Moduls weekprofile.<br>
     Syntax : set <name> weekprofile &lt;weekprofile_device:profil_name[:Wochentag]&gt;<br>
-    siehe auch Erkl&auml;rung im Forum : <a href='https://forum.fhem.de/index.php/topic,80703.msg901303.html#msg901303'>https://forum.fhem.de/index.php/topic,80703.msg901303.html#msg901303</a>
+    siehe auch Erkl&auml;rung im <a href='https://forum.fhem.de/index.php/topic,80703.msg901303.html#msg901303'>Forum</a>
+    bzw. im <a href='https://wiki.fhem.de/wiki/BEOK'>Wiki</a>.
     </li><br>
   </ul>
     <a name="BEOKattr"></a>
     <b>Attribute</b>
     <br>
     <ul>
+        <li><code>display</code>
+        <br>
+         auto | always_on , default auto<br>
+         Displaybeleuchtung bei jeder Statusabfrage einschalten (always_on). Wird ausserdem das Attribut interval auf eine Zeit kleiner 9 Sekunden gesetzt,
+         so leuchtet das Display dauerhaft. <b>ACHTUNG</b> dies hat eine wesentlich h&ouml;here Funklast zur Folge !<br>
+         D.h. die Wahrscheinlichkeit von gelegentlichen Timeouts wird stark zunehmen, siehe auch Attribut skipTimeouts.
+        </li>
+    </ul>
+    <br>
+    <ul>
         <li><code>interval</code>
         <br>
-	  Poll Intevall in Sekunden,  0 = kein Polling , default 60
+	  Poll Intevall in Sekunden, 0 = kein Polling , default 60
         </li>
     </ul>
     <br>
     <ul>
-        <li><code>timesync</code>
+        <li><code>keepAuto</code>
         <br>
-	 Uhrzeit und Wochentag automatisch mit FHEM synchronisieren, default 1 (an)
-        </li>
-    </ul>
-    <br>
-    <ul>
-        <li><code>timeout</code>
-        <br>
-	  Timeout in Sekunden für die Netzwerk Kommunikation, default 5
+	  0 | 1 , default 0 (aus)<br>
+          Schaltet das Thermostat kurz vor Ende eines Tages in den Mode auto sollte es sich zu diesem Zeitpunkt
+          im Mode manu befinden.
         </li>
     </ul>
     <br>
     <ul>
         <li><code>language</code>
         <br>
-	  de oder DE f&uuml;r deutsche Bezeichnungen, Raum statt Room , usw.
+	  de oder DE f&uuml;r deutsche Bezeichnungen in der &Uuml;bersicht, z.B. Raum statt Room , usw.
         </li>
     </ul>
     <br>
@@ -1415,6 +1469,30 @@ return $html;
         <li><code>model</code>
         <br>
 	  nur f&uuml;r die FHEM Modul Statistik unter <a href="https://fhem.de/stats/statistics.html">https://fhem.de/stats/statistics.html</a>
+        </li>
+    </ul>
+    <br>
+    <ul>
+        <li><code>skipTimeouts</code>
+        <br>
+        0 - 9 , default 1<br>
+        Anzahl der max. zul&auml;ssigen Timeouts in Folge ohne das ein Logeintrag bzw. eine Fehlermeldung erfolgt (default 1)
+        </li>
+    </ul>
+    <br>
+    <ul>
+        <li><code>timeout</code>
+        <br>
+	  Timeout in Sekunden für die Wlan Kommunikation, default 5<br>
+          <b>ACHTUNG</b> in Verbindung mit dem Attribut display alaways_on darf diese Wert niemals gr&ouml;sser als interval sein ! 
+        </li>
+    </ul>
+    <br>
+    <ul>
+        <li><code>timesync</code>
+        <br>
+	 Uhrzeit und Wochentag automatisch mit FHEM synchronisieren, default 1 (an)<br>
+         Setzt automatisch FHEM Zeit und Wochentag im Thermostsat.
         </li>
     </ul>
 </ul>
