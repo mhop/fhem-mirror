@@ -410,9 +410,9 @@ our %keywordDescription = (
 'FHEM Entwickler Paket, welches lokal auf der Maschine verwaltet wird',
     },
     'fhem-mod-command' => {
-        'en' => 'FHEM console text command w/o any FHEM device object visible',
+        'en' => 'FHEM system command w/o any FHEM device object visible',
         'de' =>
-          'FHEM Konsolen Text Kommando ohne sichtbares FHEM Geräte-Objekt',
+          'FHEM Systembefehl ohne sichtbares FHEM Geräte-Objekt.',
     },
     'fhem-mod-device' => {
         'en' => 'represents a physical device',

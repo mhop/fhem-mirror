@@ -2639,21 +2639,7 @@ sub CreateMetadataList ($$$) {
               : $modMeta->{$mAttr};
             $mAttrVal =~ s/\\n/$lb/g;
 
-            if ( $mAttr eq 'license' ) {
-                if (   defined( $modMeta->{resources} )
-                    && defined( $modMeta->{resources}{license} )
-                    && ref( $modMeta->{resources}{license} ) eq 'ARRAY'
-                    && @{ $modMeta->{resources}{license} } > 0
-                    && $modMeta->{resources}{license}[0] ne '' )
-                {
-                    $mAttrVal =
-                        '<a href="'
-                      . $modMeta->{resources}{license}[0]
-                      . '" target="_blank">'
-                      . $mAttrVal . '</a>';
-                }
-            }
-            elsif ( $mAttr eq 'version' ) {
+            if ( $mAttr eq 'version' ) {
                 if ( $mAttrVal eq '0.000000001' ) {
                     $mAttrVal = '-';
                 }
@@ -2689,7 +2675,24 @@ sub CreateMetadataList ($$$) {
         {
             $l .= $tdOpen;
 
-            if ( $mAttr eq 'author' ) {
+            if ( $mAttr eq 'license' ) {
+                if (   defined( $modMeta->{resources} )
+                    && defined( $modMeta->{resources}{license} )
+                    && ref( $modMeta->{resources}{license} ) eq 'ARRAY'
+                    && @{ $modMeta->{resources}{license} } > 0
+                    && $modMeta->{resources}{license}[0] ne '' )
+                {
+                    $l .=
+                        '<a href="'
+                      . $modMeta->{resources}{license}[0]
+                      . '" target="_blank">'
+                      . $modMeta->{$mAttr}[0] . '</a>';
+                }
+                else {
+                    $l .= $modMeta->{$mAttr}[0];
+                }
+            }
+            elsif ( $mAttr eq 'author' ) {
                 my $authorCount = scalar @{ $modMeta->{$mAttr} };
                 my $counter     = 0;
 
