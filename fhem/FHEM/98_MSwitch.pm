@@ -1879,7 +1879,7 @@ sub MSwitch_Set($@) {
                         $msg = MSwitch_check_setmagic_i( $hash, $msg );
                         $hash->{helper}{delays}{$msg} = $timecond;
                         InternalTimer( $timecond, "MSwitch_Restartcmd", $msg );
-                        MSwitch_LOG( $name, 0,
+                        MSwitch_LOG( $name, 5,
                                 "$name: verzoegerte befehl gesetzt -> "
                               . $timecond . " : "
                               . $msg );
@@ -9286,7 +9286,7 @@ sub MSwitch_check_setmagic_i($$) {
     my $name = $hash->{NAME};
 
     # setmagic ersetzun
-    MSwitch_LOG( $name, 0, "vor freecmd: " . $msg );
+    MSwitch_LOG( $name, 5, "vor freecmd: " . $msg );
     my $x = 0;
     while ( $msg =~ m/(.*)\[(.*)\:(.*)\:i\](.*)/ ) {
         $x++;    # notausstieg notausstieg
@@ -9295,7 +9295,7 @@ sub MSwitch_check_setmagic_i($$) {
         $msg = $1 . $setmagic . $4;
     }
 
-    MSwitch_LOG( $name, 0, "nach freecmd: " . $msg );
+    MSwitch_LOG( $name, 5, "nach freecmd: " . $msg );
     return $msg;
 }
 
