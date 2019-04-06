@@ -850,7 +850,7 @@ f18_textInput()
   '</div>');
   var ta = $("#"+n+" textarea");
   if(aCM)
-    AddCodeMirror(ta, (cm), function() { 
+    AddCodeMirror(ta, function(cm) { 
       cm.on("change", function(){ ta.val(cm.getValue()) } );
     });
 
