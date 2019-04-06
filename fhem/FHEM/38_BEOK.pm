@@ -34,7 +34,7 @@ use Time::Local;
 use IO::Socket::INET;
 use IO::Select;
 
-my $version = 'V1.3 / 03.03.19';
+my $version = 'V1.4 / 06.04.19';
 
 my %gets = ('status:noArg' => '', 'auth:noArg' =>'' , 'temperature:noArg' => '');
 
