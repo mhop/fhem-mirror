@@ -132,6 +132,7 @@
 #   2019-01-31  fixed bug in GetSetCheck (failed to check for busy)
 #   2019-02-09  optimized logging in level 4/5
 #   2019-02-19  little bug fix (warning)
+#   2019-04-05  add a require for DevIO also in LDInitialize to be on the safe side ...
 #
 #
 #
@@ -316,7 +317,7 @@ sub ModbusLD_GetIOHash($);
 sub ModbusLD_DoRequest($$$;$$$$);
 sub ModbusLD_StartUpdateTimer($);
 
-my $Modbus_Version = '4.0.24 - 18.2.2019';
+my $Modbus_Version = '4.0.25 - 5.4.2019';
 my $Modbus_PhysAttrs = 
         "queueDelay " .
         "queueMax " .
@@ -420,6 +421,8 @@ sub Modbus_Initialize($)
 sub ModbusLD_Initialize($ )
 {
     my ($modHash) = @_;
+
+    require "$attr{global}{modpath}/FHEM/DevIo.pm";
 
     $modHash->{DefFn}     = "ModbusLD_Define";    # functions are provided by the Modbus base module
     $modHash->{UndefFn}   = "ModbusLD_Undef";

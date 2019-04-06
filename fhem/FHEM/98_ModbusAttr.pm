@@ -43,6 +43,7 @@
 #   2018-11-10  fixed doku for defSetexpr
 #   2019-01-29  added doku for defSet and defHint
 #   2019-01-30  added once as option for pollDelay in doku
+#   2019-04-05  put require for devio to top
 #
 
 package main;
@@ -55,9 +56,9 @@ ModbusAttr_Initialize($)
 {
     my ($modHash) = @_;
 
+    require "$attr{global}{modpath}/FHEM/DevIo.pm";
     #require "$attr{global}{modpath}/FHEM/98_Modbus.pm";
     LoadModule "Modbus";
-    require "$attr{global}{modpath}/FHEM/DevIo.pm";
 
     ModbusLD_Initialize($modHash);                          # Generic function of the Modbus module does the rest
     
