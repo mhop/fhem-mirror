@@ -236,7 +236,6 @@ sub DbLog_Initialize($)
 							   "expimpdir ".
                                "exportCacheAppend:1,0 ".
 							   "syncInterval ".
-                               "shutdownWait ".
 							   "noNotifyDev:1,0 ".
 							   "showproctime:1,0 ".
 							   "suppressAddLogV3:1,0 ".
@@ -7752,13 +7751,16 @@ return;
         "perl": 5.014,
         "Data::Dumper": 0,
         "DBI": 0,
+        "DBD::mysql" :0,
+        "DBD::SQLite" :0,
         "Blocking": 0,
         "Time::HiRes": 0,
         "Time::Local": 0,
         "Encode": 0        
       },
       "recommends": {
-        "FHEM::Meta": 0
+        "FHEM::Meta": 0,
+        "DBD::Pg" :0
       },
       "suggests": {
       }
