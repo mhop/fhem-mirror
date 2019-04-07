@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 49_SSCam.pm 19022 2019-03-24 21:49:17Z DS_Starter $
+# $Id: 49_SSCam.pm 19124 2019-04-06 09:28:20Z DS_Starter $
 #########################################################################################################################
 #       49_SSCam.pm
 #
@@ -48,6 +48,8 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.13.2" => "07.04.2019  fix perl warning Forum: https://forum.fhem.de/index.php/topic,45671.msg927912.html#msg927912",
+  "8.13.1" => "06.04.2019  verbose level in X_DelayedShutdown changed ",
   "8.13.0" => "27.03.2019  add Meta.pm support ",
   "8.12.0" => "25.03.2019  FHEM standard function X_DelayedShutdown implemented, delay FHEM shutdown as long as sessions ".
               "are not terminated. ",
@@ -498,7 +500,7 @@ sub SSCam_Define($@) {
   
   # initiale Routinen nach Restart ausführen   , verzögerter zufälliger Start
   RemoveInternalTimer($hash, "SSCam_initonboot");
-  InternalTimer(gettimeofday()+rand(60), "SSCam_initonboot", $hash, 0);
+  InternalTimer(gettimeofday()+int(rand(30)), "SSCam_initonboot", $hash, 0);
 
 return undef;
 }
@@ -523,12 +525,8 @@ return undef;
 
 #######################################################################################################
 # Mit der X_DelayedShutdown Funktion kann eine Definition das Stoppen von FHEM verzögern um asynchron 
-# hinter sich aufzuräumen. Dies kann z.B. der Verbindungsabbau mit dem physikalischen Gerät sein (z.B. 
-# Session beenden, Logout, etc.), welcher mehrfache Requests/Responses benötigt.  
-# Je nach Rückgabewert $delay_needed wird der Stopp von FHEM verzögert.
-# Im Unterschied zur Shutdown-Funktion steht vor einem bevorstehenden Stopp von FHEM für einen 
-# User-konfigurierbaren Zeitraum (global-Attribut: maxShutdownDelay / Standard: 10 Sekunden) weiterhin
-# die asynchrone FHEM Infrastruktur (DevIo/Read-Funktion und InternalTimer) zur Verfügung.
+# hinter sich aufzuräumen.  
+# Je nach Rückgabewert $delay_needed wird der Stopp von FHEM verzögert (0|1).
 # Sobald alle nötigen Maßnahmen erledigt sind, muss der Abschluss mit CancelDelayedShutdown($name) an 
 # FHEM zurückgemeldet werden. 
 #######################################################################################################
@@ -536,7 +534,7 @@ sub SSCam_DelayedShutdown($) {
   my ($hash) = @_;
   my $name   = $hash->{NAME};
   
-  Log3($name, 1, "$name - Quit session due to shutdown ...");
+  Log3($name, 2, "$name - Quit session due to shutdown ...");
   $hash->{HELPER}{ACTIVE} = "on";                              # keine weiteren Aktionen erlauben
   SSCam_logout($hash);
 
@@ -7524,12 +7522,13 @@ sub SSCam_composegallery ($;$$) {
   my $imgdosnap     = "<img src=\"$FW_ME/www/images/sscam/black_btn_DOSNAP.png\">";
  
   my $ha  = AttrVal($name, "snapGalleryHtmlAttr", AttrVal($name, "htmlattr", 'width="500" height="325"'));
-  my $pws = AttrVal($strmdev, "popupWindowSize", "");            # Größe eines Popups
-  $pws    =~ s/"//g if($pws);
   
   # falls "SSCam_composegallery" durch ein SSCamSTRM-Device aufgerufen wird
   my $devWlink = "";
+  my $pws      = "";
   if ($strmdev) {
+      $pws     = AttrVal($strmdev, "popupWindowSize", "");       # Größe eines Popups (umgelegt: Forum:https://forum.fhem.de/index.php/topic,45671.msg927912.html#msg927912)
+      $pws     =~ s/"//g if($pws);
       my $wlha = AttrVal($strmdev, "htmlattr", undef); 
       $ha      = (defined($wlha))?$wlha:$ha;                     # htmlattr vom SSCamSTRM-Device übernehmen falls von SSCamSTRM-Device aufgerufen und gesetzt   
   }
@@ -8894,12 +8893,12 @@ sub SSCam_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 18980 2019-03-20 20:55:44Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 49_SSCam.pm 19124 2019-04-06 09:28:20Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 18980 2019-03-20 20:55:44Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCam.pm 19124 2019-04-06 09:28:20Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
