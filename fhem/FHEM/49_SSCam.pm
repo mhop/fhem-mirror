@@ -48,6 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.13.2" => "07.04.2019  fix perl warning Forum: https://forum.fhem.de/index.php/topic,45671.msg927912.html#msg927912",
   "8.13.1" => "06.04.2019  verbose level in X_DelayedShutdown changed ",
   "8.13.0" => "27.03.2019  add Meta.pm support ",
   "8.12.0" => "25.03.2019  FHEM standard function X_DelayedShutdown implemented, delay FHEM shutdown as long as sessions ".
@@ -1975,13 +1976,14 @@ return;
 sub SSCam_myVersion($) {
   my ($hash) = @_;
   my $name   = $hash->{NAME};
-  my $actvs  = ""; 
+  my $actvs  = 0; 
 
   my @vl = split (/-/,ReadingsVal($name, "SVSversion", ""),2);
   if(@vl) {
       $actvs = $vl[0];
       $actvs =~ s/\.//g;
   }
+  
 return $actvs; 
 }
 
@@ -6836,7 +6838,7 @@ sub SSCam_ptzpanel($;$$) {
   #    return "" if($actvs <= 71);
   #}
   
-  return if(SSCam_myVersion($hash) <= 71);
+  return "" if(SSCam_myVersion($hash) <= 71);
   
   $ptz_ret = "<div class=\"ptzpanel\">";
   $ptz_ret.= '<table class="rc_body">';
@@ -7521,12 +7523,13 @@ sub SSCam_composegallery ($;$$) {
   my $imgdosnap     = "<img src=\"$FW_ME/www/images/sscam/black_btn_DOSNAP.png\">";
  
   my $ha  = AttrVal($name, "snapGalleryHtmlAttr", AttrVal($name, "htmlattr", 'width="500" height="325"'));
-  my $pws = AttrVal($strmdev, "popupWindowSize", "");            # Größe eines Popups
-  $pws    =~ s/"//g if($pws);
   
   # falls "SSCam_composegallery" durch ein SSCamSTRM-Device aufgerufen wird
   my $devWlink = "";
+  my $pws      = "";
   if ($strmdev) {
+      $pws     = AttrVal($strmdev, "popupWindowSize", "");       # Größe eines Popups (umgelegt: Forum:https://forum.fhem.de/index.php/topic,45671.msg927912.html#msg927912)
+      $pws     =~ s/"//g if($pws);
       my $wlha = AttrVal($strmdev, "htmlattr", undef); 
       $ha      = (defined($wlha))?$wlha:$ha;                     # htmlattr vom SSCamSTRM-Device übernehmen falls von SSCamSTRM-Device aufgerufen und gesetzt   
   }
