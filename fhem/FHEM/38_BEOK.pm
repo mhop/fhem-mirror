@@ -34,7 +34,7 @@ use Time::Local;
 use IO::Socket::INET;
 use IO::Select;
 
-my $version = 'V1.4 / 06.04.19';
+my $version = 'V1.41 / 07.04.19';
 
 my %gets = ('status:noArg' => '', 'auth:noArg' =>'' , 'temperature:noArg' => '');
 
@@ -86,7 +86,6 @@ sub BEOK_Define($$) {
     $hash->{ERRORCOUNT}  = 0;
     $hash->{weekprofile} = "none";
     $hash->{'skipError'} = 0;
-    $hash->{'DISPLAY'}   = '';
 
     # wird mit dem ersten Full Status ueberschrieben
     $hash->{helper}{temp_manual} = 0;
@@ -308,7 +307,7 @@ sub BEOK_Set(@)
 
   my $cmdList  = "desired-temp on:noArg off:noArg mode:auto,manual loop:12345.67,123456.7,1234567 ";
   $cmdList    .= " sensor:external,internal,both time:noArg active:noArg inactive:noArg lock:on,off";
-  $cmdList    .= " display:auto,always_on power-on-memory:on,off fre:open,close room-temp-adj:";
+  $cmdList    .= " power-on-memory:on,off fre:open,close room-temp-adj:";
 
   for (my $i=-10;$i<=9;$i++) {my $s= sprintf('%.1f',$i/2); $s+=0; $cmdList.=$s.',';}
 
@@ -1123,12 +1122,6 @@ sub BEOK_Attr (@)
      $_[3] = $attrVal;
      BEOK_update($hash); # Polling Start
    }
-   elsif ($attrName eq 'display')
-   {
-     $_[3] = $attrVal;
-     $hash->{'DISPLAY'} = $attrVal;
-   }
-
  }
  elsif ($cmd eq "del")
  {
@@ -1136,11 +1129,6 @@ sub BEOK_Attr (@)
    {
      $_[3] = $attrVal;
     RemoveInternalTimer($hash);
-   }
-   elsif ($attrName eq 'display')
-   {
-     $_[3] = $attrVal;
-     $hash->{'DISPLAY'} = '';
    }
  }
 }
@@ -1484,7 +1472,7 @@ return $html;
         <li><code>timeout</code>
         <br>
 	  Timeout in Sekunden für die Wlan Kommunikation, default 5<br>
-          <b>ACHTUNG</b> in Verbindung mit dem Attribut display alaways_on darf diese Wert niemals gr&ouml;sser als interval sein ! 
+          <b>ACHTUNG</b> in Verbindung mit dem Attribut Display alaways_on darf diese Wert niemals gr&ouml;sser als interval sein ! 
         </li>
     </ul>
     <br>
