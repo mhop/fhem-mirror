@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - new:     10_WS980: new module to control the WS980Wifi weather station
  - feature: 93_DbRep: the "explain" SQL-command is possible now in sqlCmd 
  - feature: 10_MYSENSORS_DEVICE: add attrTemplate support
  - change:  00_MYSENSORS: enhance support for node functions

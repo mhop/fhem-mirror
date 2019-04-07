@@ -77,6 +77,7 @@ FHEM/10_pilight_ctrl.pm      risiko               Sonstige Systeme
 FHEM/10_RESIDENTS.pm         loredo               Automatisierung
 FHEM/10_SOMFY.pm             viegener             Sonstige Systeme
 FHEM/10_UNIRoll.pm           C_Herrmann           SlowRF
+FHEM/10_WS980.pm             choenig              Unterstuetzende Dienste/Wettermodule
 FHEM/10_ZWave.pm             rudolfkoenig         ZWave
 FHEM/11_FHT.pm               rudolfkoenig         SlowRF
 FHEM/11_FHT8V.pm             rudolfkoenig         SlowRF
