@@ -142,6 +142,7 @@ BEGIN {
 
 # Versions History intern
 our %vNotesIntern = (
+  "1.5.4"  => "26.03.2019  delete L1_InfoMessages if no info occur ",
   "1.5.3"  => "26.03.2019  delete L1_ErrorMessages, L1_WarningMessages if no errors or warnings occur ",
   "1.5.2"  => "25.03.2019  prevent module from deactivation in case of unavailable Meta.pm ",
   "1.5.1"  => "24.03.2019  fix \$VAR1 problem Forum: #27667.msg922983.html#msg922983 ",
@@ -643,7 +644,7 @@ sub ParseData($) {
   readingsBeginUpdate($hash);
   
   my ($FeedIn_done,$GridConsumption_done,$PV_done,$AutarkyQuote_done,$SelfConsumption_done) = (0,0,0,0,0);
-  my ($SelfConsumptionQuote_done,$SelfSupply_done,$errMsg,$warnMsg) = (0,0,0,0);
+  my ($SelfConsumptionQuote_done,$SelfSupply_done,$errMsg,$warnMsg,$infoMsg) = (0,0,0,0,0);
   for my $k (keys %$livedata_content) {
       my $new_val = ""; 
       if (defined $livedata_content->{$k}) {
@@ -677,6 +678,7 @@ sub ParseData($) {
               $SelfSupply_done           = 1 if($k =~ /^SelfSupply$/);
               $errMsg                    = 1 if($k =~ /^ErrorMessages$/);
               $warnMsg                   = 1 if($k =~ /^WarningMessages$/);
+              $infoMsg                   = 1 if($k =~ /^InfoMessages$/);
           }
       }
   }
@@ -692,6 +694,7 @@ sub ParseData($) {
   
   readingsDelete($hash,"L1_ErrorMessages") if(!$errMsg);
   readingsDelete($hash,"L1_WarningMessages") if(!$warnMsg);
+  readingsDelete($hash,"L1_InfoMessages") if(!$infoMsg);
   
   if ($forecast_content && $forecast_content !~ m/undefined/i) {
       # Auswertung der Forecast Daten
