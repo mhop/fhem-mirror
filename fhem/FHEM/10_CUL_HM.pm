@@ -30,6 +30,7 @@ my $culHmGlobalGets       =\%HMConfig::culHmGlobalGets;
 my $culHmVrtGets          =\%HMConfig::culHmVrtGets;
 my $culHmSubTypeGets      =\%HMConfig::culHmSubTypeGets;
 my $culHmModelGets        =\%HMConfig::culHmModelGets;
+my $culHmGlobalGetsDev    =\%HMConfig::culHmGlobalGetsDev;
 
 my $culHmSubTypeDevSets   =\%HMConfig::culHmSubTypeDevSets;
 my $culHmGlobalSetsChn    =\%HMConfig::culHmGlobalSetsChn;
@@ -158,6 +159,7 @@ sub CUL_HM_Initialize($) {
 
   my @modellist;
   foreach my $model (keys %{$culHmModel}){
+    next if (!$model);
     push @modellist,$culHmModel->{$model}{name};
   }
   
@@ -3821,6 +3823,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
   $h = $culHmVrtGets->{$cmd}          if(!defined($h) && $roleV);
   $h = $culHmSubTypeGets->{$st}{$cmd} if(!defined($h) && $culHmSubTypeGets->{$st});
   $h = $culHmModelGets->{$md}{$cmd}   if(!defined($h) && $culHmModelGets->{$md});
+  $h = $culHmGlobalGetsDev->{$cmd}    if(!defined($h) && $roleD);
   $h = ""                             if(!defined($h) && (eval "defined(&HMinfo_GetFn)" && $cmd eq "regTable"));
 
   my @h;
@@ -3832,17 +3835,20 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     if($roleV)                      {foreach(keys %{$culHmVrtGets}           ){push @arr,"$_:".$culHmVrtGets->{$_}             }};
     if($culHmSubTypeGets->{$st})    {foreach(keys %{$culHmSubTypeGets->{$st}}){push @arr,"$_:".${$culHmSubTypeGets->{$st}}{$_} }};
     if($culHmModelGets->{$md})      {foreach(keys %{$culHmModelGets->{$md}}  ){push @arr,"$_:".${$culHmModelGets->{$md}}{$_}   }};
-    if($culHmModelGets->{$md})      {foreach(keys %{$culHmModelGets->{$md}}  ){push @arr,"$_:".${$culHmModelGets->{$md}}{$_}   }};
-    if(eval"defined(&HMinfo_GetFn)"){                                         {push @arr,"regTable:"                            }};
+    if($roleD)                      {foreach(keys %{$culHmGlobalGetsDev}     ){push @arr,"$_:".$culHmGlobalGetsDev->{$_}       }};
+    if(eval"defined(&HMinfo_GetFn)"){                                         {push @arr,"regTable:"                           }};
    
     foreach(@arr){
-      my ($cmd,$val) = split(":",$_,2);
-      if (!$val               ||
+      my ($cmdS,$val) = split(":",$_,2);
+      if (!$val){
+        $_ = "$cmdS:noArg";
+      }
+      elsif (
           $val !~ m/^\[.*\]$/ ||
           $val =~ m/\[.*\[/   ||
           $val =~ m/(\<|\>)]/
           ){
-        $_ = $cmd;
+        $_ = $cmdS;
       }
       else{
         $val =~ s/(\[|\])//g;
@@ -3854,7 +3860,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
             $_ = join(",",@list);
           }
         }
-        $_ = "$cmd:".join(",",@vArr);
+        $_ = "$cmdS:".join(",",@vArr);
       }
     }
 
@@ -3944,8 +3950,9 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
   elsif($cmd eq "cmdList") {  #################################################
     my   @arr;
 
-    if(!$roleV) {push @arr,"$_ $culHmGlobalGets->{$_}" foreach (keys %{$culHmGlobalGets})};
-    if($roleV)  {push @arr,"$_ $culHmVrtGets->{$_}"     foreach (keys %{$culHmVrtGets})};
+    if(!$roleV) {push @arr,"$_ $culHmGlobalGets->{$_}"    foreach (keys %{$culHmGlobalGets}   )};
+    if($roleV)  {push @arr,"$_ $culHmVrtGets->{$_}"       foreach (keys %{$culHmVrtGets}      )};
+    if($roleD)  {push @arr,"$_ $culHmGlobalGetsDev->{$_}" foreach (keys %{$culHmGlobalGetsDev})};
 
     push @arr,"$_ $culHmSubTypeGets->{$st}{$_}" foreach (keys %{$culHmSubTypeGets->{$st}});
     push @arr,"$_ $culHmModelGets->{$md}{$_}"   foreach (keys %{$culHmModelGets->{$md}});
@@ -4051,8 +4058,50 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
       }
     }
   }
-  elsif($cmd eq "info"){  #####################################################
+  elsif($cmd eq "status"){  ###################################################
     return CUL_HM_ActInfo();
+  }
+  elsif($cmd eq "deviceInfo"){  ###############################################
+    my $infoTypeLong = (!defined $a[2] || $a[2] ne 'long')?0:1 ;
+    my $orgMId = AttrVal($devName,".mId","");
+    my $FrcMd  = AttrVal($devName,"modelForce","");
+    my $actMId = $defs{$devName}{helper}{mId}; # active mId
+    my $act = ReadingsVal($devName,"Activity","-");
+    my $ret =   " Device name:".$devName;
+    if($infoTypeLong){
+      $ret   .= "\n   org ID   \t:".$orgMId                       ."  Model=".$culHmModel->{$orgMId}{name};
+      $ret   .= "\n   forced   \t:".CUL_HM_getmIdFromModel($FrcMd)."  Model=".$FrcMd                        if($FrcMd  ne "");
+      $ret   .= "\n   alias ID \t:".$actMId                       ."  Model=".$culHmModel->{$actMId}{alias} if($orgMId ne $devName);
+    }
+    else{
+      $ret   .= "\n   mId      \t:".CUL_HM_getmIdFromModel($md)."  Model=$md";
+    }
+    
+    { my $mode = $culHmModel->{$defs{$devName}{helper}{mId}}{rxt};
+      $mode =~ s/\bc\b/config/;
+      $mode =~ s/\bw\b/wakeup/;
+      $mode =~ s/\bb\b/burst/;
+      $mode =~ s/\b3\b/3Burst/;
+      $mode =~ s/\bl\b/lazyConf/;
+      $mode =~ s/\bf\b/burstCond/;
+      $mode =~ s/:/,/g;
+      $mode = "normal" if (!$mode);
+      
+      $ret   .= "\n   mode   \t:".$mode;
+    }
+    
+    if(!$roleV){
+      $ret   .= " - activity:".$act if ($act ne "-");
+      $ret   .= "\n   protState\t: "     .InternalVal($devName,"protState"  ,(!$roleC ? InternalVal($devName,"STATE","unknown"):"unknown"));
+      $ret   .= " pending: ".InternalVal($devName,"protCmdPend","none"   );
+      $ret   .= "\n";
+    }
+    if ($infoTypeLong){
+      foreach (grep(/^channel_/,keys %{$defs{$devName}})){
+        $ret .= "\n   "     .$defs{$devName}{$_}."\t state:".InternalVal($defs{$devName}{$_},"STATE","unknown");
+      }
+    }
+    return $ret;
   }
  
   Log3 $name,3,"CUL_HM get $name " . join(" ", @a[1..$#a]);
@@ -4164,7 +4213,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       }
     }
     @arr1 = ("--") if (!scalar @arr1);
-    my $usg = "Unknown argument $cmd, choose one of ".join(" ",sort @arr1);
+    my $usg = "Unknown argument $cmd, choose one of ".join(" ",sort @arr1)." ";
 
     my $pl = CUL_HM_getPeerOption($name);
     $usg .= " peerSmart:$pl" if ($pl); 
@@ -4199,8 +4248,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         $usg =~ s/ (trgPress.:)/ $1all,$peers/g;
       }
       else{#remove command
-        $usg =~ s/ (press|event)[SL]//g;
-        $usg =~ s/ trg(Press|Event)[SL]//g;
+        $usg =~ s/(press|event)[SL]\S*? //g;
+        $usg =~ s/trg(Press|Event)[SL]\S*? //g;
       }
 	}
     return $usg;
@@ -8524,6 +8573,7 @@ sub CUL_HM_initRegHash() { #duplicate short and long press register
     else     { # success - now update some datafiels
       Log3 undef, 3, "additional HM config file loaded: $file";
       foreach (keys %{$culHmModel}){
+        next if(!$_);
         $culHmModel2Id->{$culHmModel->{$_}{name}} = $_ ;
         $culHmModel->{$_}{alias} = $culHmModel->{$_}{name} if (!defined $culHmModel->{$_}{alias});
       }
