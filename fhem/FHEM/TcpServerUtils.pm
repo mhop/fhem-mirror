@@ -106,7 +106,7 @@ TcpServer_Accept($$)
   if($hash->{SSL}) {
     # Forum #27565: SSLv23:!SSLv3:!SSLv2', #35004: TLSv12:!SSLv3
     my $sslVersion = AttrVal($hash->{NAME}, "sslVersion", 
-                     AttrVal("global", "sslVersion", "TLSv12:!SSLv3"));
+                     AttrVal("global", "sslVersion", undef));
 
     # Certs directory must be in the modpath, i.e. at the same level as the
     # FHEM directory
@@ -130,7 +130,8 @@ TcpServer_Accept($$)
       && $err ne "Socket is not connected") {
       $err = "" if(!$err);
       $err .= " ".($SSL_ERROR ? $SSL_ERROR : IO::Socket::SSL::errstr());
-      Log3 $name, 1, "$type SSL/HTTPS error: $err (peer: $caddr)"
+      my $errLevel = ($err =~ m/error:14094416:SSL/ ? 5 : 1); # 61511
+      Log3 $name, $errLevel, "$type SSL/HTTPS error: $err (peer: $caddr)"
         if($err !~ m/error:00000000:lib.0.:func.0.:reason.0./); #Forum 56364
       close($clientinfo[0]);
       return undef;
