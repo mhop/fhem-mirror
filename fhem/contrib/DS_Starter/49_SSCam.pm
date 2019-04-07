@@ -1976,13 +1976,14 @@ return;
 sub SSCam_myVersion($) {
   my ($hash) = @_;
   my $name   = $hash->{NAME};
-  my $actvs  = ""; 
+  my $actvs  = 0; 
 
   my @vl = split (/-/,ReadingsVal($name, "SVSversion", ""),2);
   if(@vl) {
       $actvs = $vl[0];
       $actvs =~ s/\.//g;
   }
+  
 return $actvs; 
 }
 
