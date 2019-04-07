@@ -6838,7 +6838,7 @@ sub SSCam_ptzpanel($;$$) {
   #    return "" if($actvs <= 71);
   #}
   
-  return if(SSCam_myVersion($hash) <= 71);
+  return "" if(SSCam_myVersion($hash) <= 71);
   
   $ptz_ret = "<div class=\"ptzpanel\">";
   $ptz_ret.= '<table class="rc_body">';
