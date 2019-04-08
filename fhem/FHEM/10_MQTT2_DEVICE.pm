@@ -346,8 +346,10 @@ MQTT2_DEVICE_Set($@)
   return SetExtensions($hash, $cmdList, @a) if(!$cmd);
   return undef if(IsDisabled($hash->{NAME}));
 
+  my $a1 = (@a > 1 ? $a[1] : '');
   $cmd = MQTT2_buildCmd($hash, \@a, $cmd);
   return if(!$cmd);
+  SetExtensionsCancel($hash) if($a1 eq "on" || $a1 eq "off");
   IOWrite($hash, "publish", $cmd);
   my $ssl = AttrVal($hash->{NAME}, "setStateList", "");
   if(!$ssl) {
