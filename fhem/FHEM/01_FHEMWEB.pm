@@ -2676,7 +2676,7 @@ FW_Attr(@)
   my $sP = "stylesheetPrefix";
   my $retMsg;
 
-  if($type eq "set" && $attrName eq "HTTPS") {
+  if($type eq "set" && $attrName eq "HTTPS" && $param[0]) {
     TcpServer_SetSSL($hash);
   }
 
