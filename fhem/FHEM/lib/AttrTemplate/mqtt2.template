@@ -961,14 +961,16 @@ par:DEVTYPE;Internal TYPE of the device; { InternalVal("DEVICE","TYPE","")}
 par:DEV_ID;base topic set ebus;{ AttrVal("DEVICE","readingList","") =~ m,[^:]+:?(ebus[a-zA-Z])[^/]*[/].*:, ? $1 : "ebusd" }
 modify DEVICE DEV_ID
 attr DEVICE autocreate 1
-attr DEVICE bridgeRegexp   (ebus.)[^/]*/(bai|broadcast)/.*:.* "$1_bai"\
-  (ebus.)[^/]*/([\d]+)/.*:.* "$1_$2"\
-  (ebus.)[^/]*[/][^b][a-zA-Z]+[/].*:.* "$1"
-#attr DEVICE bridgeRegexp   (ebus.)[^/]*/(bai|broadcast|cc|e7f|ehp|f[\d][\d]|general|hc|he.|hmu|hwc|mc|mc.[\d]|omu|omu.[\d]|pms|rcc|rcc.[\d]|sc|scan|sdr_p|ui|uih|v[\d][\d]|v81|v81.[\d]|vd[\d]|vl[\d]|vr_[\d][\d]|zeo)/.*:.* "$1_$2"\
-#  (ebus.)[^/]*/([\d]+)/.*:.* "$1_$2"\
-# (ebus.)[^/]*[/](?:(bai|broadcast|cc|e7f|ehp|f[\d][\d]|general|hc|he.|hmu|hwc|mc|mc.[\d]|omu|omu.[\d]|pms|rcc|rcc.[\d]|sc|scan|sdr_p|ui|uih|v[\d][\d]|v81|v81.[\d]|vd[\d]|vl[\d]|vr_[\d][\d]|zeo)(*FAIL))[/].*:.* "$1"
-#attr DEVICE icon icoTempHeizung
-#attr DEVICE devStateStyle style="text-align:right"
+attr DEVICE bridgeRegexp (ebus..*?)/(bai|\d+|cc|e7f|ehp|f\d\d|hc|he.|hmu|hwc|mc|mc.\d|omu|omu.\d|pms|rcc|rcc.\d|sc|sdr_p|ui|uih|v\d\d|v81.\d|vd\d|vl\d|vr_\d\d|zeo)/.*:.* "$1_$2"\
+(ebus..*?)/(global|broadcast|general|scan([^/]*))/.*:.* "$1"
+attr DEVICE icon sani_boiler_temp
+attr DEVICE userReadings formatedUptime:uptime.* {my $m = ReadingsVal($name,"uptime",0)/60;; return sprintf "0 000 00:%02d", $m if $m < 60;; my $h = $m / 60;; $m %= 60;; return sprintf "0 000 %02d:%02d", $h, $m if $h < 24;; my $d = $h / 24;; $h %= 24;; return sprintf "0 %03d %02d:%02d", $d, $h, $m if $d <365;; my $y = $d / 365;; $d %= 365;; return sprintf "%d %03d %02d:%02d", $y, $d, $h, $m}
+attr DEVICE stateFormat Status: \
+1:running\
+Signal: \
+2:signal\
+<br>Uptime: formatedUptime
+attr DEVICE setList getKnown DEV_ID/global/list onlyknown
 attr DEVICE model E_01a_eBus_daemon_splitter
 
 
