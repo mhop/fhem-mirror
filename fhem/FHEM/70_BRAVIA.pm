@@ -564,8 +564,8 @@ sub Set($@) {
 
         return "No 2nd argument given" if ( !defined( $a[2] ) );
 
-		shift(@a); shift(@a);
-		my $inputStr = join("#", @a);
+        shift(@a); shift(@a);
+        my $inputStr = join("#", @a);
         Log3($name, 2, "BRAVIA set $name input $inputStr");
 
         # Resolve input uri
@@ -1362,6 +1362,7 @@ sub ProcessCommandData ($$$) {
       my %contentKeys;
       my $channelName = "-";
       my $channelNo = "-";
+      my $channelUri;
       my $currentTitle = "-";
       my $currentMedia = "-";
       foreach ( keys %{ $hash->{READINGS} } ) {
@@ -1424,6 +1425,7 @@ sub ProcessCommandData ($$$) {
               }
             }
             if ($uri) {
+              $channelUri = $uri;
               readingsBulkUpdateIfChanged($hash, "uri", $uri);
               foreach ( keys %{$hash->{helper}{device}{inputPreset}} )  {
                 if ($hash->{helper}{device}{inputPreset}{$_}{uri} eq $uri) {
@@ -1467,11 +1469,12 @@ sub ProcessCommandData ($$$) {
       readingsEndUpdate( $hash, 1 );
 
       if ($channelName ne "-" && $channelNo ne "-") {
-        push(@$successor, ["getContentList", ReadingsVal($name, "input", "")])
-          if (ReadingsVal($name, "requestFormat", "") eq "json"
-              && (!defined($hash->{helper}{device}{channelPreset}) || ReadingsVal($name, "state", "") ne "on"));
+#        push(@$successor, ["getContentList", ReadingsVal($name, "input", "")])
+#          if (ReadingsVal($name, "requestFormat", "") eq "json"
+#              && (!defined($hash->{helper}{device}{channelPreset}) || ReadingsVal($name, "state", "") ne "on"));
         $hash->{helper}{device}{channelPreset}{ $channelNo }{id} = $channelNo;
         $hash->{helper}{device}{channelPreset}{ $channelNo }{name} = GetNormalizedName($channelName);
+        $hash->{helper}{device}{channelPreset}{ $channelNo }{uri} = $channelUri;
       }
     
       # get current system settings
@@ -1572,7 +1575,11 @@ sub ProcessCommandData ($$$) {
       # increment index, because it starts with 0
       if (++$channelIndex % InternalVal($name, "CHANNELCOUNT", 50) == 0) {
         # try next junk of channels
-        push(@$successor, ["getContentList", ReadingsVal($name, "input", "")."|".$channelIndex]);
+        my $source = $cmd;
+        if ($cmd =~ /^(.*)\|(\d+)$/){
+          $source = $1;
+        }
+        push(@$successor, ["getContentList", $source."|".$channelIndex]);
       }
     }
 
@@ -1618,6 +1625,7 @@ sub ProcessCommandData ($$$) {
               if (defined($source) and $source =~ /tv:dvb(.)/) {
                 my $dvbName = GetNormalizedName("TV / DVB-".uc($1));
                 $hash->{helper}{device}{inputPreset}{$dvbName}{uri} = $source;
+                push(@$successor, ["getContentList", $source]);
               }
             }
           }
