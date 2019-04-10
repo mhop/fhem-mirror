@@ -970,7 +970,9 @@ attr DEVICE stateFormat Status: \
 Signal: \
 2:signal\
 <br>Uptime: formatedUptime
-attr DEVICE setList getKnown DEV_ID/global/list onlyknown
+attr DEVICE setList getKnown:noArg DEV_ID/list onlyknown\
+  getAll:noArg DEV_ID/list
+set DEVICE getKnown
 attr DEVICE model E_01a_eBus_daemon_splitter
 
 

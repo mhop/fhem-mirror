@@ -63,7 +63,15 @@ attr DEVICE model A_17a_Motion
 #A_21a_Pulse Power Meter
 #A_22a_Pulse Water Meter
 #A_23a_Rain Gauge
-#A_24a_Relay Actuator
+
+name:A_24a_Relay_Actuator
+filter:TYPE=MYSENSORS_DEVICE
+desc:Applies to standard relay actuator sketch<br>NOTE: Noty yet heavily tested first template version
+attr DEVICE setCommands on:status1:on off:status1:off
+attr DEVICE devStateIcon .*on:on .*off:off on.for.timer:on-for-timer off.for.timer:off-for-timer
+attr DEVICE model A_24a_Relay_Actuator
+
+
 #A_25a_RFID
 #A_26a_Scene Controller
 #A_27a_Secret Knock
