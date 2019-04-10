@@ -101,7 +101,7 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"0011" => {name=>"HM-LC-SW1-PL"            ,alias=>"HM-LC-SW1-SM"}
  ,"0012" => {name=>"HM-LC-DIM1L-CV"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
  ,"0013" => {name=>"HM-LC-DIM1L-PL"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
- ,"0014" => {name=>"HM-LC-SW1-SM-ATMEGA168"  ,alias=>"HM-LC-Sw1-Pl-OM54"}
+ ,"0014" => {name=>"HM-LC-SW1-SM-ATMEGA168"  ,alias=>"HM-LC-SW1-PL-OM54"}
  ,"0015" => {name=>"HM-LC-SW4-SM-ATMEGA168"  ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",}
  ,"0016" => {name=>"HM-LC-DIM2L-CV"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:2",}
  ,"0018" => {name=>"CMM"                     ,st=>'remote'            ,cyc=>''      ,rxt=>''       ,lst=>'3'            ,chn=>"",}
@@ -270,9 +270,9 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"00CB" => {name=>"HM-LC-Sw2-FM-2"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2",}
  ,"00CC" => {name=>"HM-LC-Sw2-DR-2"          ,alias=>"HM-LC-Sw2-FM-2"}
  ,"00CD" => {name=>"HM-LC-Sw4-SM-2"          ,alias=>"HM-LC-SW4-SM"}
- ,"00CE" => {name=>"HM-LC-Sw4-PCB-2"         ,alias=>"HM-LC-Sw4-SM"}
- ,"00CF" => {name=>"HM-LC-Sw4-WM-2"          ,alias=>"HM-LC-Sw4-SM"}
- ,"00D0" => {name=>"HM-LC-Sw4-DR-2"          ,alias=>"HM-LC-Sw4-SM"}
+ ,"00CE" => {name=>"HM-LC-Sw4-PCB-2"         ,alias=>"HM-LC-SW4-SM"}
+ ,"00CF" => {name=>"HM-LC-Sw4-WM-2"          ,alias=>"HM-LC-SW4-SM"}
+ ,"00D0" => {name=>"HM-LC-Sw4-DR-2"          ,alias=>"HM-LC-SW4-SM"}
  ,"00D1" => {name=>"HM-LC-Bl1-SM-2"          ,alias=>"HM-LC-BL1-FM"} # radio-controlled blind actuator 1-channel (flush-mount)
  ,"00D2" => {name=>"HM-LC-Bl1-FM-2"          ,alias=>"HM-LC-BL1-FM"} # radio-controlled blind actuator 1-channel (flush-mount)
  # check config modess,"00D3" => {name=>"HM-Dis-WM55"             ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1'            ,chn=>"Dis:1:10",}
@@ -346,6 +346,10 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
     next;
   }
   my $mtId = $culHmModel2Id{$culHmModel{$al}{alias}}; # Id of the alias (template for this model)
+  if(!$mtId){
+    $culHmModel{$al}{alias} .= "-failed";
+    next;
+  }
   $culHmModel{$al}{$_} = $culHmModel{$mtId}{$_} foreach(grep !/name/, keys %{$culHmModel{$mtId}});
 
   delete $culHmModel{$al} if (!defined$culHmModel{$al}{st}); # not found - remove entry
