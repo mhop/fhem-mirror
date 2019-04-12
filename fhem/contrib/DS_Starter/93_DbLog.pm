@@ -28,6 +28,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 our %DbLog_vNotesIntern = (
+  "3.14.1"  => "12.04.2019 DbLog_Get: change select of MySQL Forum: https://forum.fhem.de/index.php/topic,99280.0.html ",
   "3.14.0"  => "05.04.2019 add support for Meta.pm and X_DelayedShutdownFn, attribute shutdownWait removed, ".
                            "direct attribute help in FHEMWEB ",
   "3.13.3"  => "04.03.2019 addLog better Log3 Outputs ",
@@ -348,7 +349,6 @@ sub DbLog_DelayedShutdown($) {
   return 0 if(IsDisabled($name));
   
   $hash->{HELPER}{SHUTDOWNSEQ} = 1;
-  # return 0 if(!$async && !$hash->{HELPER}{PUSHISRUNNING});
   Log3($name, 2, "DbLog $name - Last database write cycle due to shutdown ...");
   DbLog_execmemcache($hash);
 
@@ -2578,6 +2578,9 @@ sub DbLog_Get($@) {
     return DbLog_chartQuery($hash, @_);
   }
 
+  ########################
+  # getter für SVG 
+  ########################
   my @readings = ();
   my (%sqlspec, %from_datetime, %to_datetime);
 
@@ -2615,6 +2618,11 @@ sub DbLog_Get($@) {
 
     $readings[$i][1] = "%" if(!$readings[$i][1] || length($readings[$i][1])==0); #falls Reading nicht gefuellt setze Joker
   }
+  
+  Log3 $name, 4, "DbLog $name -> ################################################################";
+  Log3 $name, 4, "DbLog $name -> ###                  new get data for SVG                    ###";
+  Log3 $name, 4, "DbLog $name -> ################################################################";
+  Log3($name, 4, "DbLog $name -> main PID: $hash->{PID}, secondary PID: $$");
 
   $dbh = $hash->{DBHP};
   if ( !$dbh || not $dbh->ping ) {
@@ -2651,7 +2659,7 @@ sub DbLog_Get($@) {
     $sqlspec{from_timestamp} = "STR_TO_DATE('$from', '%Y-%m-%d %H:%i:%s')";
     $sqlspec{to_timestamp}   = "STR_TO_DATE('$to', '%Y-%m-%d %H:%i:%s')";
     $sqlspec{order_by_hour}  = "DATE_FORMAT(TIMESTAMP, '%Y-%m-%d %H')";
-    $sqlspec{max_value}      = "MAX(CAST(VALUE AS DECIMAL(20,8)))";
+    $sqlspec{max_value}      = "MAX(VALUE)";                                           # 12.04.2019 Forum: https://forum.fhem.de/index.php/topic,99280.0.html
     $sqlspec{day_before}     = "DATE_SUB($sqlspec{from_timestamp},INTERVAL 1 DAY)";
   } elsif ($hash->{MODEL} eq "SQLITE") {
     $sqlspec{get_timestamp}  = "TIMESTAMP";
@@ -2776,6 +2784,9 @@ sub DbLog_Get($@) {
       $retval .= "=====================================================\n";
     }
 
+    ################################
+    #        Select Auswertung      
+    ################################
     while($sth->fetch()) {
 
       ############ Auswerten des 5. Parameters: Regexp ###################
