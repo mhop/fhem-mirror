@@ -435,6 +435,9 @@ ZWDongle_Get($@)
      ReadingsVal($name, "caps","") !~ m/\b$zw_func_id{$fb}\b/) {
     return "$cmd is unsupported by this controller";
   }
+  my @ga = split("%", $gets{$cmd}, -1);
+  my $nargs = int(@ga)-1;
+  return "get $name $cmd needs $nargs arguments" if($nargs != int(@a));
 
   if($cmd eq "raw") {
     if($a[0] =~ s/^42//) {
@@ -454,10 +457,6 @@ ZWDongle_Get($@)
     return "Usage: get $name $cmd [excludeDead] [onlyRep] nodeId"
         if(int(@a) != 1);
   }
-
-  my @ga = split("%", $gets{$cmd}, -1);
-  my $nargs = int(@ga)-1;
-  return "get $name $cmd needs $nargs arguments" if($nargs != int(@a));
 
   return "No $cmd for dummies" if(IsDummy($name));
 
