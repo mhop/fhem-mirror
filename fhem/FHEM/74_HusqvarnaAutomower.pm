@@ -22,16 +22,6 @@
 # $Id$
 #  
 ################################################################################
-#																			
-# modifications by guehoe
-#						
-# 05.06.18	added: 		APIURLGET, APIURLPOST for using 'park', 'start', 'stop'
-# 24.06.16	removed:	log3 entries for 'manual update'
-# 14.07.18	changed:	reading 'mower_status' to 'mower_activity'
-# 14.07.18	added:		reading 'mower_state' for extended messages eg 'PARKED'
-# 			changed:	div. translations
-#
-################################################################################
 
 package main;
 
@@ -46,11 +36,10 @@ use Blocking;
 
 eval "use JSON;1" or $missingModul .= "JSON ";
 
-my $version = "0.3";
+my $version = "0.4";
 
 use constant AUTHURL => "https://iam-api.dss.husqvarnagroup.net/api/v3/";
-use constant APIURLGET => "https://amc-api.dss.husqvarnagroup.net/app/v1/";
-use constant APIURLPOST => "https://amc-api.dss.husqvarnagroup.net/v1/";
+use constant APIURL => "https://amc-api.dss.husqvarnagroup.net/app/v1/";
 
 ##############################################################
 #
@@ -120,6 +109,7 @@ sub HusqvarnaAutomower_Define($$){
             mower_state 		 		=> '',
 			mower_mode				=> '',
             mower_cuttingMode		=> '',
+            mower_commandStatus		=> '',
             mower_lastLatitude 		=> 0,
             mower_lastLongitude 		=> 0,
             mower_nextStart 			=> 0,
@@ -286,10 +276,12 @@ sub HusqvarnaAutomower_Set($@){
         Log3 $name, 3, "$name: set called with $setName but device is disabled!" if ($setName ne "?");
         return undef;
     }
-
-    if ($setName !~ /start|stop|park|update/) {
-        return "Unknown argument $setName, choose one of start stop park update";
-	}
+    
+    if ($setName !~ /start3h|start6h|start9h|startTimer|stop|park|parkTimer|update/) {
+        return "Unknown argument $setName, choose one of start3h start6h start9h startTimer stop park parkTimer update";
+	} else {
+        Log3 $name, 3, "$name: set $setName";
+    }
 	
 	if ($setName eq 'update') {
         RemoveInternalTimer($hash);
@@ -297,18 +289,7 @@ sub HusqvarnaAutomower_Set($@){
     }
     
 	if (HusqvarnaAutomower_CONNECTED($hash)) {
-
-	    if ($setName eq 'start') {
-		    HusqvarnaAutomower_CMD($hash,'START');
-		    
-	    } elsif ($setName eq 'stop') {
-		    HusqvarnaAutomower_CMD($hash,'STOP');
-		    
-	    } elsif ($setName eq 'park') {
-		    HusqvarnaAutomower_CMD($hash,'PARK');
-		    
-	    }
-
+        	HusqvarnaAutomower_CMD($hash,$setName);        	
 	}
 	
     return undef;
@@ -433,7 +414,7 @@ sub HusqvarnaAutomower_DoUpdate($) {
     my ($hash) = @_;
     my ($name,$self) = ($hash->{NAME},HusqvarnaAutomower_Whoami());
 
-    #Log3 $name, 3, "doUpdate() called.";
+    Log3 $name, 5, "doUpdate() called.";
 
     if (HusqvarnaAutomower_CONNECTED($hash) eq "disabled") {
         Log3 $name, 3, "$name - Device is disabled.";
@@ -471,7 +452,7 @@ sub HusqvarnaAutomower_getMower($) {
 	my $header = "Content-Type: application/json\r\nAccept: application/json\r\nAuthorization: Bearer " . $token . "\r\nAuthorization-Provider: " . $provider;
 
 	HttpUtils_NonblockingGet({
-        url        	=> APIURLGET . "mowers",
+        url        	=> APIURL . "mowers",
         timeout    	=> 5,
         hash       	=> $hash,
         method     	=> "GET",
@@ -567,7 +548,7 @@ sub HusqvarnaAutomower_getMowerStatus($) {
 	my $mymower_id = $hash->{HusqvarnaAutomower}->{mower_id};
 
 	HttpUtils_NonblockingGet({
-        url        	=> APIURLGET . "mowers/" . $mymower_id . "/status",
+        url        	=> APIURL . "mowers/" . $mymower_id . "/status",
         timeout    	=> 5,
         hash       	=> $hash,
         method     	=> "GET",
@@ -670,20 +651,27 @@ sub HusqvarnaAutomower_CMD($$) {
     my ($hash,$cmd) = @_;
     my $name = $hash->{NAME};
     
-    # valid commands ['PARK', 'STOP', 'START']
     my $token = $hash->{HusqvarnaAutomower}->{token};
 	my $provider = $hash->{HusqvarnaAutomower}->{provider};
     my $mower_id = $hash->{HusqvarnaAutomower}->{mower_id};
 
+    my $json = {};
+    my $cmdURL = '';
+    
 	my $header = "Content-Type: application/json\r\nAccept: application/json\r\nAuthorization: Bearer " . $token . "\r\nAuthorization-Provider: " . $provider;
     
     Log3 $name, 5, "cmd: " . $cmd; 
 
-    #my $json = "{action: " . $cmd . "}";    
-    my $json = '{"action": "' . $cmd . '"}';
+    if      ($cmd eq "start3h")     { $cmdURL = "start/override/period"; $json = '{"period": 180}'; }
+    elsif   ($cmd eq "start6h")     { $cmdURL = "start/override/period"; $json = '{"period": 360}'; }
+    elsif   ($cmd eq "start9h")     { $cmdURL = "start/override/period"; $json = '{"period": 540}'; }
+    elsif   ($cmd eq "startTimer")  { $cmdURL = "start"; }
+    elsif   ($cmd eq "stop")        { $cmdURL = "pause"; }
+    elsif   ($cmd eq "park")        { $cmdURL = "park"; }
+    elsif   ($cmd eq "parkTimer")   { $cmdURL = "park/duration/timer"; }
 
     HttpUtils_NonblockingGet({
-        url        	=> APIURLPOST . "mowers/". $mower_id . "/control",
+        url        	=> APIURL . "mowers/". $mower_id . "/control/" . $cmdURL,
         timeout    	=> 5,
         hash       	=> $hash,
         method     	=> "POST",
@@ -715,11 +703,15 @@ sub HusqvarnaAutomower_CMDResponse($) {
 	    if ($result->{errors}) {
 		    HusqvarnaAutomower_CONNECTED($hash,'error');
 		    Log3 $name, 5, "Error: " . $result->{errors}[0]->{detail};
-		    
+		    $hash->{HusqvarnaAutomower}->{mower_commandStatus} = $result->{errors}[0]->{detail};
+
 	    } else {
 	        Log3 $name, 5, $data; 
-			
+            $hash->{HusqvarnaAutomower}->{mower_commandStatus} = 'OK';
+
 	    }
+
+	    readingsSingleUpdate($hash, 'mower_commandStatus', $hash->{HusqvarnaAutomower}->{mower_commandStatus} ,1);
         
     }
 
@@ -747,10 +739,10 @@ sub HusqvarnaAutomower_ToGerman($$) {
 	my $name = $hash->{NAME};
 	
 	my %langGermanMapping = (
-		#'initialized'											=> 'initialisiert',
-		#'authenticated'										=> 'authentifiziert',
-		#'disabled'												=> 'deaktiviert',
-		#'connected'											=> 'verbunden',
+		#'initialized'					=> 'initialisiert',
+		#'authenticated'					=> 'authentifiziert',
+		#'disabled'						=> 'deaktiviert',
+		#'connected'						=> 'verbunden',
 
 		'Today at'                      =>	'Heute um',
 		'Tomorrow at'                   =>	'Morgen um',
