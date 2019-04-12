@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  93_DbLog: add support for Meta.pm and delayed shutdown, attribute
+                      shutdownWait removed, direct attribute help in FHEMWEB,
+                      !!! NOTE !!! attr shutdownWait will be deleted it set and
+                      an appropriated log message appears.
  - bugfix:  70_BRAVIA: fix channel presets
  - bugfix:  49_SSCam: fix perl warnings, Forum: 45671.msg927912.html#msg927912 
  - new:     10_WS980: new module to control the WS980Wifi weather station
