@@ -255,7 +255,7 @@ sub CUL_HM_updateConfig($){##########################
   if ($type eq "startUp"){# only once after startup
     $mIdReverse = 1 if (scalar keys %{$culHmModel2Id});
     foreach(devspec2array("TYPE=CUL_HM:FILTER=DEF=......")){   # devices only   
-     if ($attr{$_}{subType} && $attr{$_}{subType} eq "virtual"){
+      if ($attr{$_}{subType} && $attr{$_}{subType} eq "virtual"){
         $attr{$_}{model} = "VIRTUAL" if (!$attr{$_}{model} || $attr{$_}{model} =~ m/virtual_/);
       }
       if ($attr{$_}{".mId"} && $culHmModel->{$attr{$_}{".mId"}}){ #if mId is  available set model to its original value -at least temporarliy
@@ -7848,8 +7848,10 @@ sub CUL_HM_getMId($) {     #in: hash(chn or dev) out:model key (key for %culHmMo
 sub CUL_HM_getmIdFromModel($){ # enter model and receive the corresponding ID
   my $model = shift;
   $model = "VIRTUAL" if($model =~ m/^virtual_/);
-  return ($model ? $culHmModel2Id->{$model} :"") if ($mIdReverse);
-  # old version: if uer did not reboot or not updated HMconfig
+  return (defined $culHmModel2Id->{$model}     ? $culHmModel2Id->{$model}
+        :(defined $culHmModel2Id->{uc($model)} ? $culHmModel2Id->{uc($model)}
+        :"no"))                                                              if ($mIdReverse);
+  # old version: if user did not reboot or not updated HMconfig
   my $mId = "";
   foreach my $mIdKey(keys%{$culHmModel}){
     next if (!$culHmModel->{$mIdKey}{name} ||
