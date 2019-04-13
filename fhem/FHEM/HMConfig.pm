@@ -333,6 +333,7 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"FFF0" => {name=>"CCU-FHEM"                ,st=>'virtual'           ,cyc=>''      ,rxt=>''       ,lst=>''             ,chn=>"Btn:1:50",}
  ,"FFF1" => {name=>"VIRTUAL"                 ,st=>'virtual'           ,cyc=>''      ,rxt=>''       ,lst=>''             ,chn=>"Btn:1:50",}
  ,"0000" => {name=>"ACTIONDETECTOR"          ,st=>'virtual'           ,cyc=>''      ,rxt=>''       ,lst=>''             ,chn=>"",}
+ ,"no"   => {name=>"ACTIONDETECTOR"          ,st=>'no'                ,cyc=>''      ,rxt=>''       ,lst=>''             ,chn=>"",}
   #  "HM-LGW-O-TW-W-EU" #Funk LAN Gateway
 #################open:---------------------------
 );
@@ -346,7 +347,7 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
     next;
   }
   my $mtId = $culHmModel2Id{$culHmModel{$al}{alias}}; # Id of the alias (template for this model)
-  if(!$mtId){
+  if(!defined $mtId or !$mtId){
     $culHmModel{$al}{alias} .= "-failed";
     next;
   }
@@ -1834,10 +1835,10 @@ $culHmSubTypeSets{motionAndBtn}         = $culHmSubTypeSets{threeStateSensor};
                      ,"HM-TC-IT-WM-W-EU" =>{ inhibit        =>"[on|off]"}
                      ,"HM-SEC-SD"        =>{ statusRequest  =>""}
                      ,"HM-SEC-SD-2"      =>{ statusRequest  =>""}
-                     ,"HM-LC-Ja1PBU-FM"  =>{ pctSlat        =>"[0-100]|old|noChng"
+                     ,"HM-LC-JA1PBU-FM"  =>{ pctSlat        =>"[0-100]|old|noChng"
                                             ,pctLvlSlat     =>"-value-|old|noChng -slatValue-|old|noChng"
                                            }
-                     ,"ActionDetector"   =>{ clear          =>"[readings|all]"
+                     ,"ACTIONDETECTOR"   =>{ clear          =>"[readings|all]"
                                             ,update         => ""
                                            }
 );
@@ -1855,7 +1856,7 @@ $culHmModelSets{"HM-ES-TX-WM"}           = $culHmModelSets{"HM-PB-4DIS-WM-2"};
                                          
 #$culHmModelSets{"HM-OU-CFM-PL"}          = $culHmModelSets{"HM-SEC-SD"};# no statusrequest possible
 $culHmModelSets{"HM-OU-CM-PCB"}          = $culHmModelSets{"HM-SEC-SD"};
-$culHmModelSets{"HM-Sen-Wa-Od"}          = $culHmModelSets{"HM-SEC-SD"};
+$culHmModelSets{"HM-SEN-WA-OD"}          = $culHmModelSets{"HM-SEC-SD"};
 $culHmModelSets{"HM-HM-LC-DW-WM"}        = $culHmSubTypeSets{dimmer};   ##### reference subtype sets
 
 %culHmChanSets = (
@@ -1864,7 +1865,7 @@ $culHmModelSets{"HM-HM-LC-DW-WM"}        = $culHmSubTypeSets{dimmer};   ##### re
                                                 ,sysTime        =>""
                                                 ,getSerial      => ""
                                                }
-                     ,"HM-RC-Dis-H-x-EUxx"   =>{ text           =>"-txt1- -txt2-..."  }
+                     ,"HM-RC-DIS-H-X-EUxx"   =>{ text           =>"-txt1- -txt2-..."  }
                      ,"HM-CC-TC02"           =>{ peerChan       =>" 0 -actChn- ... single [set|unset] [actor|remote|both]"
                                                 ,"desired-temp" =>"[on|off|6.0..30.0]"
                                                 ,tempListSat    =>"[prep|exec] HH:MM temp ..."
@@ -1922,10 +1923,10 @@ $culHmModelSets{"HM-HM-LC-DW-WM"}        = $culHmSubTypeSets{dimmer};   ##### re
                      ,"HM-OU-CFM-PL01"       =>{ led            =>"[redL|greenL|orangeL|redS|greenS|orangeS|pause][,-color2-...] [-repeat-]"}
                      ,"HM-OU-CFM-PL02"       =>{ playTone       =>"[replay|-MP3No-[,-MP3No-...]] [-repeat-]"
                                                 ,pct            =>"[-value- ... [-ontime-]"}
-                     ,"HM-Dis-EP-WM5503"     =>{ displayEP      =>"text1,icon1:text2,icon2:text3,icon3 ... -sound- -repetition- -pause- -signal-"}                                       
-                     ,"HM-Dis-WM5501"        =>{ displayWM      =>"[long|short|help] -lineX- -textNo1- -color1- -icon1- [-textNo2- -color2- -icon2-] ...[-textNo6- -color6- -icon6-] "
+                     ,"HM-DIS-EP-WM5503"     =>{ displayEP      =>"text1,icon1:text2,icon2:text3,icon3 ... -sound- -repetition- -pause- -signal-"}                                       
+                     ,"HM-DIS-WM5501"        =>{ displayWM      =>"[long|short|help] -lineX- -textNo1- -color1- -icon1- [-textNo2- -color2- -icon2-] ...[-textNo6- -color6- -icon6-] "
                                                 ,peerChan       =>"-btnNumber- -actChn- ... single [set|unset] [actor|remote|both]"}
-                     ,"HM-ES-PMSw1-Pl01"     =>{ "on-for-timer" =>"-sec-"
+                     ,"HM-ES-PMSW1-PL01"     =>{ "on-for-timer" =>"-sec-"
                                                 ,"on-till"      =>"-time-"
                                                 ,on             =>""
                                                 ,off            =>""
@@ -1934,7 +1935,7 @@ $culHmModelSets{"HM-HM-LC-DW-WM"}        = $culHmSubTypeSets{dimmer};   ##### re
                                                 ,inhibit        =>"[on|off]"
                                                 ,statusRequest  =>""
                                                }
-                     ,"HM-ES-PMSw1-Pl00"     =>{ getSerial      => ""
+                     ,"HM-ES-PMSW1-PL00"     =>{ getSerial      => ""
 #                                                ,getDevInfo     => ""
                                                }
                      ,"HM-LC-RGBW-WM01"      =>{ "on-for-timer" =>"-ontime- [-ramptime-]..."
@@ -1960,13 +1961,13 @@ $culHmModelSets{"HM-HM-LC-DW-WM"}        = $culHmSubTypeSets{dimmer};   ##### re
                      ,"HM-LC-RGBW-WM03"      =>{ brightAuto     =>"-bright- -colProg- -min- -max- -duration- -ramp- ..."
                                                 ,colProgram     =>"[0|1|2|3|4|5|6]"
                                                }
-                     ,"HM-Sec-Sir-WM01"      =>{ on             =>""
+                     ,"HM-SEC-SIR-WM01"      =>{ on             =>""
                                                 ,off            =>""
                                                 ,"on-for-timer" =>"-ontime-"
                                                 ,"on-till"      =>"-time-"
                                                 ,inhibit        =>"[on|off]"
                                                }
-                     ,"HM-Sec-Sir-WM04"      =>{ alarmLevel     =>"[disarmed|armExtSens|armAll|armBlocked]"
+                     ,"HM-SEC-SIR-WM04"      =>{ alarmLevel     =>"[disarmed|armExtSens|armAll|armBlocked]"
                                                }
                      ,"HM-SEC-WIN01"         =>{ stop           =>"",
                                                 ,level          =>"-level- -relockDly- -speed-..."
@@ -1974,7 +1975,7 @@ $culHmModelSets{"HM-HM-LC-DW-WM"}        = $culHmSubTypeSets{dimmer};   ##### re
                                                 ,inhibit        =>"[on|off]"
                                                 ,peerIODev      =>"[IO] -btn- [set|unset]... not for future use"
                                                }
-                     ,"HM-Sen-RD-O02"        =>{ "on-for-timer" =>"-sec-"
+                     ,"HM-SEN-RD-O02"        =>{ "on-for-timer" =>"-sec-"
                                                 ,"on-till"      =>"-time-"
                                                 ,on             =>""
                                                 ,off            =>""
@@ -1988,44 +1989,44 @@ $culHmModelSets{"HM-HM-LC-DW-WM"}        = $culHmSubTypeSets{dimmer};   ##### re
                                                }
  );
 # clones- - - - - - - - - - - - - - - - -
-$culHmChanSets{"HM-Dis-WM55xx"}         =
-$culHmChanSets{"HM-Dis-EP-WM5501"}      = 
-$culHmChanSets{"HM-Dis-EP-WM5502"}      = 
-$culHmChanSets{"HM-Dis-EP-WM5504"}      = 
-$culHmChanSets{"HM-Dis-EP-WM5505"}      = 
-$culHmChanSets{"HM-Dis-EP-WM5506"}      = 
-$culHmChanSets{"HM-Dis-EP-WM5507"}      = 
-$culHmChanSets{"HM-Dis-EP-WM5508"}      = $culHmChanSets{"HM-RC-Dis-H-x-EUxx"};
-$culHmChanSets{"HM-Sec-Sir-WM02"}       =
-$culHmChanSets{"HM-Sec-Sir-WM03"}       = $culHmChanSets{"HM-Sec-Sir-WM01"};
-$culHmChanSets{"HM-Dis-WM5502"}         = $culHmChanSets{"HM-Dis-WM5501"};
-$culHmChanSets{"WDF-solar01"}           =
-$culHmChanSets{"HM-Sen-RD-O01"}         =
+$culHmChanSets{"HM-DIS-WM55xx"}         =
+$culHmChanSets{"HM-DIS-EP-WM5501"}      = 
+$culHmChanSets{"HM-DIS-EP-WM5502"}      = 
+$culHmChanSets{"HM-DIS-EP-WM5504"}      = 
+$culHmChanSets{"HM-DIS-EP-WM5505"}      = 
+$culHmChanSets{"HM-DIS-EP-WM5506"}      = 
+$culHmChanSets{"HM-DIS-EP-WM5507"}      = 
+$culHmChanSets{"HM-DIS-EP-WM5508"}      = $culHmChanSets{"HM-RC-DIS-H-X-EUxx"};
+$culHmChanSets{"HM-SEC-SIR-WM02"}       =
+$culHmChanSets{"HM-SEC-SIR-WM03"}       = $culHmChanSets{"HM-SEC-SIR-WM01"};
+$culHmChanSets{"HM-DIS-WM5502"}         = $culHmChanSets{"HM-DIS-WM5501"};
+$culHmChanSets{"WDF-SOLAR01"}           =
+$culHmChanSets{"HM-SEN-RD-O01"}         =
 $culHmChanSets{"HM-SEN-EP01"}           =
 $culHmChanSets{"HM-SEN-EP02"}           =
 $culHmChanSets{"HM-CC-RT-DN05"}         =
-$culHmChanSets{"HM-ES-PMSw1-Pl03"}      = $culHmSubTypeSets{THSensor};
+$culHmChanSets{"HM-ES-PMSW1-PL03"}      = $culHmSubTypeSets{THSensor};
 $culHmChanSets{"HM-OU-CM-PCB01"}        =
 $culHmChanSets{"HM-OU-CFM-TW02"}        = $culHmChanSets{"HM-OU-CFM-PL02"};
-$culHmChanSets{"HM-ES-PMSw1-Pl04"}      =
-$culHmChanSets{"HM-ES-PMSw1-Pl05"}      =
-$culHmChanSets{"HM-ES-PMSw1-Pl06"}      = $culHmChanSets{"HM-ES-PMSw1-Pl03"};
+$culHmChanSets{"HM-ES-PMSW1-PL04"}      =
+$culHmChanSets{"HM-ES-PMSW1-PL05"}      =
+$culHmChanSets{"HM-ES-PMSW1-PL06"}      = $culHmChanSets{"HM-ES-PMSW1-PL03"};
                                         
-$culHmChanSets{"HM-ES-PMSw1-Pl01"}      = $culHmSubTypeSets{switch};
-$culHmChanSets{"HM-ES-PMSw1-Pl02"}      = $culHmSubTypeSets{outputUnit};
+$culHmChanSets{"HM-ES-PMSW1-PL01"}      = $culHmSubTypeSets{switch};
+$culHmChanSets{"HM-ES-PMSW1-PL02"}      = $culHmSubTypeSets{outputUnit};
                                         
-$culHmChanSets{"WDF-solar02"}           = $culHmSubTypeSets{blindActuator};
+$culHmChanSets{"WDF-SOLAR02"}           = $culHmSubTypeSets{blindActuator};
                                         
 $culHmChanSets{"HM-OU-CFM-TW01"}        = $culHmChanSets{"HM-OU-CFM-PL01"};
                                         
 $culHmChanSets{"HM-CC-RT-DN02"}         = $culHmChanSets{"HM-CC-RT-DN00"};
 $culHmChanSets{"HM-CC-RT-DN03"}         = $culHmChanSets{"HM-CC-RT-DN06"};
                                         
-$culHmChanSets{"HM-CC-RD-O00"}          = $culHmChanSets{"HM-LC-Sw1PBU-FM00"};
+$culHmChanSets{"HM-CC-RD-O00"}          = $culHmChanSets{"HM-LC-SW1PBU-FM00"};
 
 $culHmChanSets{"HM-TC-IT-WM-W-EU07"}    = 
-$culHmChanSets{"HM-Dis-EP-WM5501"}      = 
-$culHmChanSets{"HM-Dis-EP-WM5502"}      = $culHmChanSets{"HM-TC-IT-WM-W-EU01"};
+$culHmChanSets{"HM-DIS-EP-WM5501"}      = 
+$culHmChanSets{"HM-DIS-EP-WM5502"}      = $culHmChanSets{"HM-TC-IT-WM-W-EU01"};
 
 
 %culHmFunctSets = (# command depending on function
