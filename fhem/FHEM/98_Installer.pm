@@ -2541,35 +2541,36 @@ sub CreateMetadataList ($$$) {
                         && defined(
                             $modMeta->{resources}{repository}{x_dev}{x_branch}
                         )
-                        && $modMeta->{resources}{repository}{x_branch} ne
-                        $modMeta->{resources}{repository}{x_dev}{x_branch}
                       )
                     {
+                        my $bName = $modMeta->{resources}{repository}{x_branch};
+                        $bName .= ' (prod)'
+                          if ( $modMeta->{resources}{repository}{x_branch} eq
+                            $modMeta->{resources}{repository}{x_dev}{x_branch}
+                          );
+
                         # master entry
                         $l .=
                             'View online source code: <a href="'
                           . $url
                           . '" target="_blank">'
-                          . $modMeta->{resources}{repository}{x_branch}
-                          . '</a>';
+                          . $bName . '</a>';
 
                         # dev link
-                        $url =
-                          $modMeta->{resources}{repository}{x_dev}{web};
+                        $bName =
+                          $modMeta->{resources}{repository}{x_dev}{x_branch};
+                        $bName .= ' (dev)'
+                          if ( $modMeta->{resources}{repository}{x_branch} eq
+                            $modMeta->{resources}{repository}{x_dev}{x_branch}
+                          );
+                        $url = $modMeta->{resources}{repository}{x_dev}{web};
 
                         # dev entry
                         $l .=
                             ' | <a href="'
                           . $url
                           . '" target="_blank">'
-                          . (
-                            defined(
-                                $modMeta->{resources}{repository}{x_dev}
-                                  {x_branch}
-                              )
-                            ? $modMeta->{resources}{repository}{x_dev}{x_branch}
-                            : 'dev'
-                          ) . '</a>';
+                          . $bName . '</a>';
                     }
 
                     # master entry
@@ -4104,7 +4105,7 @@ sub __aUniq {
       "abstract": "Modul zum Update von FHEM, zur Installation von Drittanbieter FHEM Modulen und der Verwaltung von Systemvoraussetzungen"
     }
   },
-  "version": "v0.3.8",
+  "version": "v0.3.9",
   "release_status": "testing",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
@@ -4134,7 +4135,8 @@ sub __aUniq {
         "IO::Socket::SSL": 0,
         "JSON": 0,
         "perl": 5.014,
-        "version": 0
+        "version": 0,
+        "SubProcess": 0
       },
       "recommends": {
         "Perl::PrereqScanner::NotQuiteLite": 0,
