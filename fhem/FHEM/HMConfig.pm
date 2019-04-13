@@ -987,7 +987,7 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
  ,"HM-RC-19"          =>{ backAtKey       =>1, backAtMotion   =>1, backOnTime     =>1,backAtCharge    =>1,language =>1}
  ,"HM-RC-4-2"         =>{ localResDis     =>1}
 
- ,"HM-LC-Dim1L-Pl"    =>{ confBtnTime     =>1,loadAppearBehav =>1,loadErrCalib     =>1}
+ ,"HM-LC-DIM1L-PL"    =>{ confBtnTime     =>1,loadAppearBehav =>1,loadErrCalib     =>1}
  ,"HM-HM-LC-DW-WM"    =>{ confBtnTime     =>1,
                          ,transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1,powerUpAction   =>1
                          ,logicCombination=>1
@@ -1015,14 +1015,14 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
                          ,logicCombination=>1,speedMultiply   =>1
                          ,characteristic  =>1,localResDis     =>1
                         }
- ,"HM-LC-Dim1L-CV-2"  =>{ confBtnTime     =>1,loadAppearBehav =>1,loadErrCalib     =>1
+ ,"HM-LC-DIM1L-CV-2"  =>{ confBtnTime     =>1,loadAppearBehav =>1,loadErrCalib     =>1
                          ,logicCombination=>1
                          ,DimElsOffTimeMd =>1,DimElsOnTimeMd  =>1
                          ,DimElsActionType=>1
                          ,DimElsJtOn      =>1,DimElsJtOff     =>1,DimElsJtDlyOn   =>1
                          ,DimElsJtDlyOff  =>1,DimElsJtRampOn  =>1,DimElsJtRampOff =>1
                         }
- ,"HM-LC-Dim1PWM-CV"  =>{ confBtnTime     =>1,ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1
+ ,"HM-LC-DIM1PWM-CV"  =>{ confBtnTime     =>1,ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1
                          ,characteristic  =>1,localResDis     =>1
                          ,logicCombination=>1,speedMultiply   =>1
                          ,DimElsOffTimeMd =>1,DimElsOnTimeMd  =>1
@@ -1030,14 +1030,14 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
                          ,DimElsJtOn      =>1,DimElsJtOff     =>1,DimElsJtDlyOn   =>1
                          ,DimElsJtDlyOff  =>1,DimElsJtRampOn  =>1,DimElsJtRampOff =>1
                         }
- ,"HM-LC-Dim1T-DR"    =>{ confBtnTime     =>1,ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1
+ ,"HM-LC-DIM1T-DR"    =>{ confBtnTime     =>1,ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1
                          ,fuseDelay       =>1,localResDis     =>1,logicCombination=>1
                         }
  ,"HM-LC-DIM1T-PL"    =>{ confBtnTime     =>1,ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1
                          ,fuseDelay       =>1,localResDis     =>1
                          ,logicCombination=>1
                         }
- ,"HM-LC-Dim1TPBU-FM" =>{                     ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1
+ ,"HM-LC-DIM1TPBU-FM" =>{                     ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1
                          ,fuseDelay       =>1,localResDis     =>1
                          ,logicCombination=>1
                          ,DimElsOffTimeMd =>1,DimElsOnTimeMd  =>1
@@ -1045,7 +1045,7 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
                          ,DimElsJtOn      =>1,DimElsJtOff     =>1,DimElsJtDlyOn   =>1
                          ,DimElsJtDlyOff  =>1,DimElsJtRampOn  =>1,DimElsJtRampOff =>1
                         }
- ,"OLIGO-smart-iq-HM" =>{ confBtnTime     =>1,
+ ,"OLIGO-SMART-IQ-HM" =>{ confBtnTime     =>1,
                          ,characteristic  =>1,localResDis     =>1
                          ,logicCombination=>1,speedMultiply   =>1
                          ,DimElsOffTimeMd =>1,DimElsOnTimeMd  =>1
@@ -1059,20 +1059,20 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
                          ,cyclicInfoMsg   =>1,cyclicInfoMsgDis=>1
                          ,burstRx         =>1,lowBatLimitRT   =>1,backOnTime      =>1
                         }
- ,"HM-MOD-Em-8"       =>{ lowBatLimitBA2  =>1,transmDevTryMax =>1,localResDis     =>1  
+ ,"HM-MOD-EM-8"       =>{ lowBatLimitBA2  =>1,transmDevTryMax =>1,localResDis     =>1  
                          ,ledMode         =>1
                          ,transmitTryMax  =>1,eventFilterTime =>1
                          ,msgScPosA       =>1,msgScPosB       =>1
                          ,triggerMode     =>1
                          }
- ,"HM-MOD-EM-8Bit"    =>{ lowBatLimitBA2  =>1,transmDevTryMax =>1,localResDis     =>1  
+ ,"HM-MOD-EM-8BIT"    =>{ lowBatLimitBA2  =>1,transmDevTryMax =>1,localResDis     =>1  
                          ,ledMode         =>1
                          ,transmitTryMax  =>1,eventFilterTime =>1
                          }
 
  ,"HM-PB-4DIS-WM-2"   =>{ peerNeedsBurst  =>1,expectAES       =>1,language        =>1,stbyTime        =>1}
- ,"HM-Dis-WM55"       =>{ intKeyVisib     =>1,stbyTime        =>1,language        =>1,localResDis     =>1}
- ,"HM-Dis-EP-WM55"    =>{ intKeyVisib     =>1,transmDevTryMax =>1
+ ,"HM-DIS-WM55"       =>{ intKeyVisib     =>1,stbyTime        =>1,language        =>1,localResDis     =>1}
+ ,"HM-DIS-EP-WM55"    =>{ intKeyVisib     =>1,transmDevTryMax =>1
                          ,powerSupply     =>1,localResDis     =>1,wakeupBehavior  =>1
                          ,wakeupBehavMsg  =>1,wakeupBehavMsg_R=>1,statMsgTxtAlign =>1
                          ,displayInvert   =>1}
@@ -1108,7 +1108,7 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
  ,"HM-SEC-SC"         =>{                     sabotageMsg     =>1
                          ,msgScPosA       =>1,msgScPosB       =>1
                          ,                    ledOnTime       =>1,eventDlyTime    =>1}
- ,"HM-SEC-SCo"        =>{                     sabotageMsg     =>1,localResDis     =>1,
+ ,"HM-SEC-SCO"        =>{                     sabotageMsg     =>1,localResDis     =>1,
                          ,msgScPosA       =>1,msgScPosB       =>1,eventDlyTime    =>1}
  ,"HM-SCI-3-FM"       =>{ msgScPosA       =>1,msgScPosB       =>1
                          ,                                        eventDlyTime    =>1}
@@ -1120,22 +1120,22 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
  ,"HM-SEC-SFA-SM"     =>{ cyclicInfoMsg   =>1,sabotageMsg     =>1,transmDevTryMax =>1
                          ,lowBatLimit     =>1,batDefectLimit  =>1
                          ,                                        transmitTryMax  =>1}
- ,"HM-Dis-TD-T"       =>{ lowBatLimitFS   =>1,ledMode         =>1}
- ,"HM-RC-Dis-H-x-EU"  =>{ localResetDis   =>1,stbyTime2       =>1,language        =>1
+ ,"HM-DIS-TD-T"       =>{ lowBatLimitFS   =>1,ledMode         =>1}
+ ,"HM-RC-DIS-H-X-EU"  =>{ localResetDis   =>1,stbyTime2       =>1,language        =>1
                          ,wakeupDefChan   =>1,wakeupBehavior  =>1}
 
  ,"HM-LC-SW1-SM"      =>{ confBtnTime     =>1,localResDis     =>1
                          ,transmitTryMax  =>1,powerUpAction   =>1,statusInfoMinDly=>1,statusInfoRandom=>1
                         }
- ,"HM-LC-Sw1PBU-FM"   =>{                     localResDis     =>1
+ ,"HM-LC-SW1PBU-FM"   =>{                     localResDis     =>1
                          ,transmitTryMax  =>1,powerUpAction   =>1,statusInfoMinDly=>1,statusInfoRandom=>1
                         }
  ,"HM-LC-SW1-BA-PCB"  =>{ lowBatLimitBA   =>1,ledMode         =>1}
  ,"HM-LC-SW4-BA-PCB"  =>{ lowBatLimitBA   =>1,ledMode         =>1,localResDis     =>1}
- ,"HM-Sen-DB-PCB"     =>{                     ledMode         =>1}
- ,"HM-MOD-Re-8"       =>{ lowBatLimitBA3  =>1,ledMode         =>1}
- ,"HM-Sys-sRP-Pl"     =>{ compMode        =>1}
- ,"KFM-Display"       =>{ CtDlyOn         =>1,CtDlyOff        =>1
+ ,"HM-SEN-DB-PCB"     =>{                     ledMode         =>1}
+ ,"HM-MOD-RE-8"       =>{ lowBatLimitBA3  =>1,ledMode         =>1}
+ ,"HM-SYS-SRP-PL"     =>{ compMode        =>1}
+ ,"KFM-DISPLAY"       =>{ CtDlyOn         =>1,CtDlyOff        =>1
                          ,CtOn            =>1,CtOff           =>1,CtRampOn        =>1,CtRampOff       =>1
                          ,CtValLo         =>1,CtValHi         =>1
                          ,ActionType      =>1,OffTimeMode     =>1,OnTimeMode      =>1
@@ -1143,7 +1143,7 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
                          ,DimJtRampOn     =>1,DimJtRampOff    =>1
                          ,lgMultiExec     =>1,shMultiExec     =>1
                         }
- ,"HM-Sen-Wa-Od"      =>{ cyclicInfoMsgDis=>1,                    transmDevTryMax =>1,localResDis     =>1
+ ,"HM-SEN-WA-OD"      =>{ cyclicInfoMsgDis=>1,                    transmDevTryMax =>1,localResDis     =>1
                          ,                    ledOnTime       =>1,transmitTryMax  =>1
                          ,waterUppThr     =>1,waterlowThr     =>1,caseDesign      =>1,caseHigh        =>1
                          ,fillLevel       =>1,caseWidth       =>1,caseLength      =>1,meaLength       =>1
@@ -1162,38 +1162,38 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
                         }
  ,"HM-SEC-SD-2"       =>{ devRepeatCntMax =>1}
  ,"HM-LC-AO-SM"       =>{ voltage_0       =>1,voltage_100     =>1,relayDelay      =>1}
- ,"HM-LC-Ja1PBU-FM"   =>{ refRunTimeSlats =>1,posSaveTime     =>1}
+ ,"HM-LC-JA1PBU-FM"   =>{ refRunTimeSlats =>1,posSaveTime     =>1}
 );
 
 #clones - - - - - - - - - - - - - - -
-$culHmRegModel{"HM-LC-Sw1-Pl-3"}        = 
+$culHmRegModel{"HM-LC-SW1-PL-3"}        = 
 $culHmRegModel{"HM-LC-SW2-SM"}          = 
 $culHmRegModel{"HM-LC-SW4-SM"}          = 
-$culHmRegModel{"Schueco_263-130"}       = 
+$culHmRegModel{"SCHUECO_263-130"}       = 
 $culHmRegModel{"HM-LC-SW2-FM"}          = 
 $culHmRegModel{"HM-LC-SW2-PB-FM"}       = 
 $culHmRegModel{"HM-LC-SW2-DR"}          = 
-$culHmRegModel{"HM-LC-Sw2-FM-2"}        = $culHmRegModel{"HM-LC-SW1-SM"};
-$culHmRegModel{"HM-LC-Dim1L-Pl-2"}      = 
+$culHmRegModel{"HM-LC-SW2-FM-2"}        = $culHmRegModel{"HM-LC-SW1-SM"};
+$culHmRegModel{"HM-LC-DIM1L-PL-2"}      = 
 $culHmRegModel{"HM-LC-DIM1L-CV"}        = 
-$culHmRegModel{"Schueco_263-132"}       = 
+$culHmRegModel{"SCHUECO_263-132"}       = 
 $culHmRegModel{"HM-LC-DIM2L-CV"}        = 
-$culHmRegModel{"HM-LC-DIM2L-SM"}        = $culHmRegModel{"HM-LC-Dim1L-Pl"};
-$culHmRegModel{"HM-LC-Dim1L-Pl-644"}    = 
-$culHmRegModel{"HM-LC-Dim1L-CV-644"}    = 
-$culHmRegModel{"HM-LC-Dim1L-Pl-3"}      = $culHmRegModel{"HM-LC-Dim1L-CV-2"};
+$culHmRegModel{"HM-LC-DIM2L-SM"}        = $culHmRegModel{"HM-LC-DIM1L-PL"};
+$culHmRegModel{"HM-LC-DIM1L-PL-644"}    = 
+$culHmRegModel{"HM-LC-DIM1L-CV-644"}    = 
+$culHmRegModel{"HM-LC-DIM1L-PL-3"}      = $culHmRegModel{"HM-LC-DIM1L-CV-2"};
 
-$culHmRegModel{"HM-LC-Dim1T-FM-LF"}     = $culHmRegModel{"HM-LC-DIM1T-PL"};
+$culHmRegModel{"HM-LC-DIM1T-FM-LF"}     = $culHmRegModel{"HM-LC-DIM1T-PL"};
 
 $culHmRegModel{"ASH550I"}               = 
 $culHmRegModel{"ASH550"}                = 
-$culHmRegModel{"Schueco_263-158"}       = 
+$culHmRegModel{"SCHUECO_263-158"}       = 
 $culHmRegModel{"HM-WDS20-TH-O"}         = 
 $culHmRegModel{"HM-WDS40-TH-I"}         = 
-$culHmRegModel{"Schueco_263-157"}       = 
+$culHmRegModel{"SCHUECO_263-157"}       = 
 $culHmRegModel{"IS-WDS-TH-OD-S-R3"}     = $culHmRegModel{"HM-WDS10-TH-O"};
-$culHmRegModel{"HM-RC-Sec4-2"}          = 
-$culHmRegModel{"HM-RC-Key4-2"}          = $culHmRegModel{"HM-RC-4-2"};
+$culHmRegModel{"HM-RC-SEC4-2"}          = 
+$culHmRegModel{"HM-RC-KEY4-2"}          = $culHmRegModel{"HM-RC-4-2"};
 
 $culHmRegModel{"HM-SEC-WDS-2"}          = $culHmRegModel{"HM-SEC-WDS"};                                        
                                         
@@ -1222,14 +1222,14 @@ $culHmRegModel{"HM-OU-CFM-TW"}          = $culHmRegModel{"HM-OU-CFM-PL"};
                          ,OnTime          =>1,OffTime         =>1,OffLevelKm      =>1,OnLevelKm       =>1
                          ,RampOnSp        =>1,RampOffSp       =>1
                          }
- ,"WDF-solar01"       =>{ WinJtOn         =>1,WinJtOff        =>1,WinJtRampOn     =>1,WinJtRampOff    =>1
+ ,"WDF-SOLAR01"       =>{ WinJtOn         =>1,WinJtOff        =>1,WinJtRampOn     =>1,WinJtRampOff    =>1
                          ,OffLevel        =>1,OnLevel         =>1
                          ,CtValLo         =>1,CtValHi         =>1
                          ,CtOn            =>1,CtOff           =>1,CtRampOn        =>1,CtRampOff       =>1
                          ,RampOnSp        =>1,RampOffSp       =>1
                          ,OnTime          =>1,OffTime         =>1
                          }
- ,"Schueco_263-xxx01" =>{ statusInfoMinDly=>1,statusInfoRandom=>1,
+ ,"SCHUECO_263-xxx01" =>{ statusInfoMinDly=>1,statusInfoRandom=>1,
                          ,#no long here!!!
                          ,shCtValLo       =>1,shCtValHi       =>1
                          ,shCtOn          =>1,shCtDlyOn       =>1,shCtOff         =>1,shCtDlyOff      =>1
@@ -1239,9 +1239,9 @@ $culHmRegModel{"HM-OU-CFM-TW"}          = $culHmRegModel{"HM-OU-CFM-PL"};
                          ,shDimJtDlyOff   =>1,shDimJtRampOn   =>1,shDimJtRampOff  =>1
                          ,shOnLevel       =>1
                          }
- ,"Schueco_263-xxx02" =>{ transmitTryMax  =>1,eventDlyTime    =>1}
- ,"Schueco_263-xxx03" =>{ ttJtOn          =>1,ttJtOff         =>1}
- ,"HM-Sen-RD-O01"     =>{ eventFilterTimeB=>1,transmitTryMax  =>1,peerNeedsBurst  =>1,expectAES       =>1
+ ,"SCHUECO_263-xxx02" =>{ transmitTryMax  =>1,eventDlyTime    =>1}
+ ,"SCHUECO_263-xxx03" =>{ ttJtOn          =>1,ttJtOff         =>1}
+ ,"HM-SEN-RD-O01"     =>{ eventFilterTimeB=>1,transmitTryMax  =>1,peerNeedsBurst  =>1,expectAES       =>1
                          ,cndTxThrhHi     =>1,cndTxThrhLo     =>1,highHoldTime    =>1,evntRelFltTime  =>1
                          }
  ,"HM-CC-RT-DN03"     =>{ shCtValLo       =>1
@@ -1268,44 +1268,44 @@ $culHmRegModel{"HM-OU-CFM-TW"}          = $culHmRegModel{"HM-OU-CFM-PL"};
                          ,modePrioParty   =>1,modePrioManu    =>1,weekPrgSel      =>1
                          }
  ,"HM-TC-IT-WM-W-EU07"=>{ hyst2pointWrite =>1,hyst2pointRead  =>1}
- ,"HM-ES-PMSw1-Pl01"  =>{ OnTime          =>1,OffTime         =>1,OnDly           =>1,OffDly          =>1
+ ,"HM-ES-PMSW1-PL01"  =>{ OnTime          =>1,OffTime         =>1,OnDly           =>1,OffDly          =>1
                          ,SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1
                          ,CtValLo         =>1,CtValHi         =>1
                          ,CtOn            =>1,CtDlyOn         =>1,CtOff           =>1,CtDlyOff        =>1
                          ,ActionType      =>1,OnTimeMode      =>1,OffTimeMode     =>1
                          ,lgMultiExec     =>1,shMultiExec     =>1,powerUpAction   =>1
                           }
- ,"HM-Sec-Sir-WM01"   =>{ soundId         =>1}
- ,"HM-Sec-Sir-WM04"   =>{ OnLevel         =>1
+ ,"HM-SEC-SIR-WM01"   =>{ soundId         =>1}
+ ,"HM-SEC-SIR-WM04"   =>{ OnLevel         =>1
                          ,acusticMultiDly =>1,acusticArmSens  =>1,acusticArmDly   =>1,acusticExtArm   =>1,acusticExtDly   =>1,acusticDisArm   =>1
                          ,opticMultiDly   =>1,opticArmSens    =>1,opticArmDly     =>1,opticExtArm     =>1,opticExtDly     =>1,opticDisArm     =>1
                          ,OnLevelArm      =>1
                          }
- ,"HM-ES-PMSw1-Pl02"  =>{ averaging       =>1
+ ,"HM-ES-PMSW1-PL02"  =>{ averaging       =>1
                          ,txMinDly        =>1,txThrPwr        =>1,txThrCur        =>1,txThrVlt        =>1,txThrFrq        =>1
                           }
- ,"HM-ES-PMSw1-Pl03"  =>{ txThrLoPwr      =>1,txThrHiPwr      =>1,peerNeedsBurst  =>1,expectAES       =>1
+ ,"HM-ES-PMSW1-PL03"  =>{ txThrLoPwr      =>1,txThrHiPwr      =>1,peerNeedsBurst  =>1,expectAES       =>1
                          ,ledOnTime       =>1,transmitTryMax  =>1,
                          ,cndTxFalling    =>1,cndTxRising     =>1,
                          ,cndTxCycBelow   =>1,cndTxCycAbove   =>1,cndTxDecAbove   =>1,cndTxDecBelow   =>1,
                           }
- ,"HM-ES-PMSw1-Pl04"  =>{ txThrLoCur      =>1,txThrHiCur      =>1,peerNeedsBurst  =>1,expectAES       =>1
+ ,"HM-ES-PMSW1-PL04"  =>{ txThrLoCur      =>1,txThrHiCur      =>1,peerNeedsBurst  =>1,expectAES       =>1
                          ,ledOnTime       =>1,transmitTryMax  =>1,
                          ,cndTxFalling    =>1,cndTxRising     =>1,
                          ,cndTxCycBelow   =>1,cndTxCycAbove   =>1,cndTxDecAbove   =>1,cndTxDecBelow   =>1,
                           }
- ,"HM-ES-PMSw1-Pl05"  =>{ txThrLoVlt      =>1,txThrHiVlt      =>1,peerNeedsBurst  =>1,expectAES       =>1
+ ,"HM-ES-PMSW1-PL05"  =>{ txThrLoVlt      =>1,txThrHiVlt      =>1,peerNeedsBurst  =>1,expectAES       =>1
                          ,ledOnTime       =>1,transmitTryMax  =>1,
                          ,cndTxFalling    =>1,cndTxRising     =>1,
                          ,cndTxCycBelow   =>1,cndTxCycAbove   =>1,cndTxDecAbove   =>1,cndTxDecBelow   =>1,
                           }
- ,"HM-ES-PMSw1-Pl06"  =>{ txThrLoFrq      =>1,txThrHiFrq      =>1,peerNeedsBurst  =>1,expectAES       =>1
+ ,"HM-ES-PMSW1-PL06"  =>{ txThrLoFrq      =>1,txThrHiFrq      =>1,peerNeedsBurst  =>1,expectAES       =>1
                          ,ledOnTime       =>1,transmitTryMax  =>1,
                          ,cndTxFalling    =>1,cndTxRising     =>1,
                          ,cndTxCycBelow   =>1,cndTxCycAbove   =>1,cndTxDecAbove   =>1,cndTxDecBelow   =>1,
                           }
- ,"HM-Sen-MDIR-WM5500"=>{ intKeyVisib     =>1,cyclicInfoMsg   =>1,localResDis     =>1,transmDevTryMax =>1}
- ,"HM-Sen-MDIR-WM5501"=>{ peerNeedsBurst  =>1,expectAES       =>1,dblPress        =>1,longPress       =>1
+ ,"HM-SEN-MDIR-WM5500"=>{ intKeyVisib     =>1,cyclicInfoMsg   =>1,localResDis     =>1,transmDevTryMax =>1}
+ ,"HM-SEN-MDIR-WM5501"=>{ peerNeedsBurst  =>1,expectAES       =>1,dblPress        =>1,longPress       =>1
                          ,ledOnTime       =>1,transmitTryMax  =>1,localResDis     =>1
                         }
 
@@ -1357,14 +1357,14 @@ $culHmRegModel{"HM-OU-CFM-TW"}          = $culHmRegModel{"HM-OU-CFM-PL"};
  ,"HM-HM-LC-DW-WM01"  =>{ characteristic  =>1,ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1}
  ,"HM-HM-LC-DW-WM02"  =>{ characteristic  =>1,charactLvlLimit =>1,charactColAssign=>1,charactBase     =>1}
  
- ,"HM-Sen-LI-O00"     =>{ txMinDly        =>1,txThresPercent  =>1}
- ,"SensoTimer-ST-601" =>{ humDesVal       =>1,watDuration     =>1,eco_days        =>1,
+ ,"HM-SEN-LI-O00"     =>{ txMinDly        =>1,txThresPercent  =>1}
+ ,"SENSOTIMER-ST-601" =>{ humDesVal       =>1,watDuration     =>1,eco_days        =>1,
                          ,wat1_hour       =>1,wat1_min        =>1, 
                          ,wat2_hour       =>1,wat2_min        =>1, 
                          }
- ,"HM-Dis-EP-WM5501"  =>{ transmitTryMax  =>1,peerNeedsBurst  =>1,expectAES       =>1}
- ,"HM-Dis-EP-WM5503"  =>{ transmitTryMax  =>1}
- ,"HM-MOD-EM-8Bit03"  =>{ dataTransCond   =>1,stabFltTime     =>1
+ ,"HM-DIS-EP-WM5501"  =>{ transmitTryMax  =>1,peerNeedsBurst  =>1,expectAES       =>1}
+ ,"HM-DIS-EP-WM5503"  =>{ transmitTryMax  =>1}
+ ,"HM-MOD-EM-8BIT03"  =>{ dataTransCond   =>1,stabFltTime     =>1
                          ,dInProp0        =>1,dInProp1        =>1,dInProp2        =>1,dInProp3        =>1
                          ,dInProp4        =>1,dInProp5        =>1,dInProp6        =>1,dInProp7        =>1
                         }
@@ -1467,15 +1467,15 @@ $culHmRegModel{"HM-OU-CFM-TW"}          = $culHmRegModel{"HM-OU-CFM-PL"};
 $culHmRegChan{"HM-DW05"}                = $culHmRegChan{"HM-DW03"};
 $culHmRegChan{"HM-DW06"}                = $culHmRegChan{"HM-DW04"};
 
-$culHmRegChan{"HM-Dis-EP-WM5502"}       = $culHmRegChan{"HM-Dis-EP-WM5501"};
-$culHmRegChan{"HM-Sec-Sir-WM02"}        = 
-$culHmRegChan{"HM-Sec-Sir-WM03"}        = $culHmRegChan{"HM-Sec-Sir-WM01"};
+$culHmRegChan{"HM-DIS-EP-WM5502"}       = $culHmRegChan{"HM-DIS-EP-WM5501"};
+$culHmRegChan{"HM-SEC-SIR-WM02"}        = 
+$culHmRegChan{"HM-SEC-SIR-WM03"}        = $culHmRegChan{"HM-SEC-SIR-WM01"};
                                         
-$culHmRegChan{"SensoTimer-ST-602"}      = $culHmRegChan{"SensoTimer-ST-601"};
-$culHmRegChan{"HM-Sen-MDIR-WM5502"}     = $culHmRegChan{"HM-Sen-MDIR-WM5501"};
-$culHmRegChan{"HM-Sen-MDIR-WM5503"}     = $culHmRegType{motionDetector};
+$culHmRegChan{"SENSOTIMER-ST-602"}      = $culHmRegChan{"SENSOTIMER-ST-601"};
+$culHmRegChan{"HM-SEN-MDIR-WM5502"}     = $culHmRegChan{"HM-SEN-MDIR-WM5501"};
+$culHmRegChan{"HM-SEN-MDIR-WM5503"}     = $culHmRegType{motionDetector};
                                         
-$culHmRegChan{"WDF-solar02"}            = $culHmRegType{"dimmer"};      # type hash
+$culHmRegChan{"WDF-SOLAR02"}            = $culHmRegType{"dimmer"};      # type hash
                                         
 $culHmRegChan{"HM-TC-IT-WM-W-EU03"}     = $culHmRegChan{"HM-CC-RT-DN03"};
 $culHmRegChan{"HM-TC-IT-WM-W-EU06"}     = $culHmRegChan{"HM-CC-RT-DN06"};
