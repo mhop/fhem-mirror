@@ -17,7 +17,7 @@ eval "use Date::Parse;1" or $missingModule .= "Date::Parse ";
 
 #######################
 # Global variables
-my $version = "1.2.0.7";
+my $version = "1.2.0.8";
 
 my $srandUsed;
 
@@ -112,7 +112,7 @@ sub todoist_Initialize($) {
       }
   }
   
-  return undef;
+  return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
 sub todoist_Define($$) {
@@ -167,10 +167,9 @@ sub todoist_Define($$) {
     readingsSingleUpdate($hash,"state","inactive",1) if ($hash->{helper}{PWD_NEEDED} || ReadingsVal($name,"state","-") eq "-");
     ## remove timers
     RemoveInternalTimer($hash,"todoist_GetTasks");
+    ## start polling
+    todoist_GetTasks($hash) if (!IsDisabled($name) && !$hash->{helper}{PWD_NEEDED});
   }
-  
-  ## start polling  
-  todoist_GetTasks($hash) if (!IsDisabled($name) && !$hash->{helper}{PWD_NEEDED});
   
   return undef;
 }
@@ -498,7 +497,7 @@ sub todoist_CreateTask($$) {
   
   my $check=1;
   
-  # we can avoid duplicates in FHEM. There can still be duplicates coming from another app
+  # we can avoid duplicates in FHEM. There may still come duplicates coming from another app
   if (AttrVal($name,"avoidDuplicates",0) == 1 && todoist_inArray(\@{$hash->{helper}{"TITS"}},$title)) {
     $check=-1;
   }
@@ -620,7 +619,7 @@ sub todoist_HandleTaskCallback($$$){
   
   my $name = $hash->{NAME}; 
   
-  Log3 $name,4, "todoist ($name):  ".$param->{wType}."Task Callback data: ".Dumper($data);
+  Log3 $name,4, "todoist ($name):  ".$param->{wType}." - Task Callback data: ".Dumper($data);
 
   my $error;
   
@@ -643,12 +642,12 @@ sub todoist_HandleTaskCallback($$$){
         $reading .= " - ".$taskId;
         
         ## do some logging
-        Log3 $name,5, "todoist ($name):  Task Callback data (decoded JSON): ".Dumper($decoded_json );
+        Log3 $name,5, "todoist ($name): Task Callback data (decoded JSON): ".Dumper($decoded_json );
         
         Log3 $name,4, "todoist ($name): Callback-ID: $taskId" if ($taskId);
       }
-      Log3 $name,4, "todoist ($name):  Task Callback error(s): ".Dumper($err) if ($err);
-      Log3 $name,5, "todoist ($name):  Task Callback param: ".Dumper($param);
+      Log3 $name,4, "todoist ($name): Task Callback error(s): ".Dumper($err) if ($err);
+      Log3 $name,5, "todoist ($name): Task Callback param: ".Dumper($param);
       
       # set information readings
       readingsBulkUpdate($hash, "error","none");
@@ -1454,6 +1453,8 @@ sub todoist_Delete($$) {
 
   
   Log3 $name, 3, "todoist: device $name as been deleted. Access-Token has been deleted too.";
+  
+  return undef;
 }
 
 ################################################
@@ -1498,6 +1499,8 @@ sub todoist_Rename($$) {
   todoist_setPwd($new_hash, $name, $new_key);
   
   Log3 $new, 3, "todoist: device has been renamed from $old to $new. Access-Token has been assigned to new name.";
+  
+  return undef;
 }
 
 ################################################
@@ -1545,6 +1548,8 @@ sub todoist_Copy($$;$) {
   readingsSingleUpdate($new_hash,"state","inactive",1);
   
   Log3 $new, 3, "todoist: device has been copied from $old to $new. Access-Token has been assigned to new device.";
+  
+  return undef;
 }
 
 ## some checks if attribute is set or deleted
@@ -1912,7 +1917,7 @@ sub todoist_Html(;$$$) {
   my $ret="";
   my $rot="";
   
-  my $eo;
+  my $eo="";
   
   my $r=0;
   
@@ -2472,3 +2477,5 @@ sub todoist_genUUID() {
 
 
 =end html
+
+=cut
