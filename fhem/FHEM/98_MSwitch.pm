@@ -3101,8 +3101,7 @@ sub MSwitch_checkbridge($$$) {
     }
 
     MSwitch_LOG( $name, 6, "suche nach schlüssel:-$event-" );
-    MSwitch_LOG( $name, 6,
-        "helper eventoid : " . $hash->{helper}{eventtoid}{$foundkey} );
+    MSwitch_LOG( $name, 6, "helper eventoid : " . $hash->{helper}{eventtoid}{$foundkey} ) if ($hash->{helper}{eventtoid}{$foundkey});
 
     return "no_bridge" if $expertmode eq "0";
     return "no_bridge" if $bridgemode eq "0";
@@ -3601,8 +3600,10 @@ sub MSwitch_fhemwebFn($$$$) {
         $errors =~ s/\| //g;
         $errors =~ s/\|//g;
 
-        if ( $errors eq ''
-            && AttrVal( $Name, 'MSwitch_Include_Webcmds', "1" ) eq '1' )
+       # if ( $errors eq '' && AttrVal( $Name, 'MSwitch_Include_Webcmds', "1" ) eq '1' )
+		if ( AttrVal( $Name, 'MSwitch_Include_Webcmds', "1" ) eq '1' )
+		
+		
         {
             if ( $devicewebcmd ne "noArg" ) {
                 my $device = '';
@@ -3619,7 +3620,7 @@ sub MSwitch_fhemwebFn($$$$) {
                 }
                 chop $device;
                 $devicewebcmd = $device;
-                $errors       = $devicewebcmd;
+               $errors .= ' ' .  $devicewebcmd;
             }
         }
 
