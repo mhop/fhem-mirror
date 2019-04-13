@@ -112,7 +112,8 @@ sub todoist_Initialize($) {
       }
   }
   
-  return FHEM::Meta::InitMod( __FILE__, $hash );
+  return undef;
+  #return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
 sub todoist_Define($$) {
