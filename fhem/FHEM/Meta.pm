@@ -411,8 +411,7 @@ our %keywordDescription = (
     },
     'fhem-mod-command' => {
         'en' => 'FHEM system command w/o any FHEM device object visible',
-        'de' =>
-          'FHEM Systembefehl ohne sichtbares FHEM Geräte-Objekt.',
+        'de' => 'FHEM Systembefehl ohne sichtbares FHEM Geräte-Objekt.',
     },
     'fhem-mod-device' => {
         'en' => 'represents a physical device',
@@ -2878,7 +2877,7 @@ sub __GetUpdatedata {
 
             while ( my $l = <$fh> ) {
                 if ( $l =~
-m/^((\S+) (((....)-(..)-(..))_((..):(..):(..))) (\d+) (?:\.\/)?((.+\/)?((?:(\d+)_)?(.+)\.(.+))))$/
+m/^((\S+) ((([0-9]+)-([0-9]+)-([0-9]+))_(([0-9]+):([0-9]+):([0-9]+))) (\d+) (?:\.\/)?((.+\/)?((?:(\d+)_)?(.+)\.(.+))))$/
                   )
                 {
                     # this is a FHEM core update
@@ -2916,6 +2915,25 @@ m/^((\S+) (((....)-(..)-(..))_((..):(..):(..))) (\d+) (?:\.\/)?((.+\/)?((?:(\d+)
                         $update[16] = $16;    # order number, may be undefined
                         $update[17] = $17;    # FHEM module name
                         $update[18] = $18;    # file extension
+
+                        unless ( $update[11] >= 0
+                            && $update[11] <= 59
+                            && $update[10] >= 0
+                            && $update[10] <= 59
+                            && $update[9] >= 0
+                            && $update[9] <= 23
+                            && $update[7] >= 0
+                            && $update[7] <= 31
+                            && $update[6] >= 1
+                            && $update[6] <= 12
+                            && $update[5] > 0 )
+                        {
+                            Log 1,
+                                __PACKAGE__
+                              . "::__GetUpdatedata: ERROR: Invalid datetime range in $file:\n  "
+                              . $l;
+                            next;
+                        }
 
                         push @update,
                           fhemTimeGm(
@@ -2966,6 +2984,25 @@ m/^((\S+) (((....)-(..)-(..))_((..):(..):(..))) (\d+) (?:\.\/)?((.+\/)?((?:(\d+)
                         $update[16] = $16;    # order number, may be undefined
                         $update[17] = $17;    # FHEM module name
                         $update[18] = $18;    # file extension
+
+                        unless ( $update[11] >= 0
+                            && $update[11] <= 59
+                            && $update[10] >= 0
+                            && $update[10] <= 59
+                            && $update[9] >= 0
+                            && $update[9] <= 23
+                            && $update[7] >= 0
+                            && $update[7] <= 31
+                            && $update[6] >= 1
+                            && $update[6] <= 12
+                            && $update[5] > 0 )
+                        {
+                            Log 1,
+                                __PACKAGE__
+                              . "::__GetUpdatedata: ERROR: Invalid datetime range in $file:\n  "
+                              . $l;
+                            next;
+                        }
 
                         push @update,
                           fhemTimeGm(
@@ -3142,8 +3179,46 @@ sub __SetXVersion {
       "abstract": "FHEM Entwickler Paket, um Metadaten Unterstützung zu aktivieren"
     }
   },
-  "version": "v0.4.2",
+  "version": "v0.4.3",
   "release_status": "testing",
+  "x_changelog": {
+    "2019-04-13": {
+      "version": "v0.4.3",
+      "release_notes": [
+        ""
+      ],
+      "upgrade_notes": [
+        ""
+      ],
+      "bugfixes": [
+        ""
+      ],
+      "changes": [
+        ""
+      ],
+      "new_features": [
+        ""
+      ]
+    },
+    "2019-04-12": {
+      "version": "v0.4.2",
+      "release_notes": [
+        ""
+      ],
+      "upgrade_notes": [
+        ""
+      ],
+      "bugfixes": [
+        ""
+      ],
+      "changes": [
+        ""
+      ],
+      "new_features": [
+        ""
+      ]
+    }
+  },
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
   ],
