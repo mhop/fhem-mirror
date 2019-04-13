@@ -1,6 +1,6 @@
 ###############################################################################
 # 
-#  (c) 2018 Copyright: Dr. Dennis Krannich (blog at krannich dot de)
+#  (c) 2018-2019 Copyright: Dr. Dennis Krannich (blogger at krannich dot de)
 #  All rights reserved
 #
 #  This script is free software; you can redistribute it and/or modify
@@ -36,7 +36,7 @@ use Blocking;
 
 eval "use JSON;1" or $missingModul .= "JSON ";
 
-my $version = "0.4";
+my $version = "0.5";
 
 use constant AUTHURL => "https://iam-api.dss.husqvarnagroup.net/api/v3/";
 use constant APIURL => "https://amc-api.dss.husqvarnagroup.net/app/v1/";
@@ -115,7 +115,7 @@ sub HusqvarnaAutomower_Define($$){
             mower_nextStart 			=> 0,
             mower_nextStartSource 	=> '',
             mower_restrictedReason	=> '',
-            mower 					=> 0,
+            mower 				    => 0,
             batteryPercent          => 0,
             username 				=> '',
             language 				=> 'DE',
@@ -191,44 +191,44 @@ sub HusqvarnaAutomower_Attr(@) {
         if( $cmd eq "set" and $attrVal eq "1" ) {
             RemoveInternalTimer($hash);
             readingsSingleUpdate ( $hash, "state", "disable", 1 );
-            Log3 $name, 5, "$name - disabled";
+            Log3 $name, 3, "$name - disabled";
         }
 
         elsif( $cmd eq "del" ) {
             readingsSingleUpdate ( $hash, "state", "active", 1 );
-            Log3 $name, 5, "$name - enabled";
+            Log3 $name, 3, "$name - enabled";
         }
     }
     
 	elsif( $attrName eq "username" ) {
 		if( $cmd eq "set" ) {
 		    $hash->{HusqvarnaAutomower}->{username} = $attrVal;
-		    Log3 $name, 5, "$name - username set to " . $hash->{HusqvarnaAutomower}->{username};
+		    Log3 $name, 3, "$name - username set to " . $hash->{HusqvarnaAutomower}->{username};
 		}
 	}
 
 	elsif( $attrName eq "password" ) {
 		if( $cmd eq "set" ) {
 			$hash->{HusqvarnaAutomower}->{password} = $attrVal;
-		    Log3 $name, 5, "$name - password set to " . $hash->{HusqvarnaAutomower}->{password};	
+		    Log3 $name, 3, "$name - password set to " . $hash->{HusqvarnaAutomower}->{password};	
 		}
 	}
 
 	elsif( $attrName eq "language" ) {
 		if( $cmd eq "set" ) {
 			$hash->{HusqvarnaAutomower}->{language} = $attrVal;
-		    Log3 $name, 5, "$name - language set to " . $hash->{HusqvarnaAutomower}->{language};	
+		    Log3 $name, 3, "$name - language set to " . $hash->{HusqvarnaAutomower}->{language};	
 		}
 	}
 	
 	elsif( $attrName eq "mower" ) {
 		if( $cmd eq "set" ) {
 			$hash->{HusqvarnaAutomower}->{mower} = $attrVal;
-		    Log3 $name, 5, "$name - mower set to " . $hash->{HusqvarnaAutomower}->{mower};	
+		    Log3 $name, 3, "$name - mower set to " . $hash->{HusqvarnaAutomower}->{mower};	
 		}
 		elsif( $cmd eq "del" ) {
             $hash->{HusqvarnaAutomower}->{mower} = 0;
-            Log3 $name, 5, "$name - deleted mower and set to default: 0";
+            Log3 $name, 3, "$name - deleted mower and set to default: 0";
         }
 	}
 
@@ -239,14 +239,14 @@ sub HusqvarnaAutomower_Attr(@) {
             $hash->{HusqvarnaAutomower}->{interval} = $attrVal;
             RemoveInternalTimer($hash);
             InternalTimer( time() + $hash->{HusqvarnaAutomower}->{interval}, "HusqvarnaAutomower_DoUpdate", $hash, 0 );
-            Log3 $name, 5, "$name - set interval: $attrVal";
+            Log3 $name, 3, "$name - set interval: $attrVal";
         }
 
         elsif( $cmd eq "del" ) {
             $hash->{HusqvarnaAutomower}->{interval} = 300;
             RemoveInternalTimer($hash);
             InternalTimer( time() + $hash->{HusqvarnaAutomower}->{interval}, "HusqvarnaAutomower_DoUpdate", $hash, 0 );
-            Log3 $name, 5, "$name - deleted interval and set to default: 300";
+            Log3 $name, 3, "$name - deleted interval and set to default: 300";
         }
     }
 
@@ -341,22 +341,22 @@ sub HusqvarnaAutomower_APIAuthResponse($) {
 
     if($err ne "") {
 	    HusqvarnaAutomower_CONNECTED($hash,'error');
-        Log3 $name, 5, "error while requesting ".$param->{url}." - $err";     
+        Log3 $name, 2, "error while requesting ".$param->{url}." - $err";     
                                            
     } elsif($data ne "") {
    
         my $result = eval { decode_json($data) };
         if ($@) {
-            Log3( $name, 3, " - JSON error while request: $@");
+            Log3( $name, 2, " - JSON error while request: $@");
             return;
         }
 	        
 	    if ($result->{errors}) {
 		    HusqvarnaAutomower_CONNECTED($hash,'error');
-		    Log3 $name, 5, "Error: " . $result->{errors}[0]->{detail};
+		    Log3 $name, 2, "Error: " . $result->{errors}[0]->{detail};
 		    
 	    } else {
-	        Log3 $name, 5, "$data"; 
+	        Log3 $name, 2, "$data"; 
 
 			$hash->{HusqvarnaAutomower}->{token} = $result->{data}{id};
 			$hash->{HusqvarnaAutomower}->{provider} = $result->{data}{attributes}{provider};
@@ -422,11 +422,11 @@ sub HusqvarnaAutomower_DoUpdate($) {
     }
 
 	if (time() >= $hash->{HusqvarnaAutomower}->{expires} ) {
-		Log3 $name, 3, "LOGIN TOKEN MISSING OR EXPIRED";
+		Log3 $name, 2, "LOGIN TOKEN MISSING OR EXPIRED";
 		HusqvarnaAutomower_CONNECTED($hash,'disconnected');
 
 	} elsif ($hash->{HusqvarnaAutomower}->{CONNECTED} eq 'connected') {
-		Log3 $name, 3, "Update with device: " . $hash->{HusqvarnaAutomower}->{mower_id};
+		Log3 $name, 4, "Update with device: " . $hash->{HusqvarnaAutomower}->{mower_id};
 		HusqvarnaAutomower_getMowerStatus($hash);
         InternalTimer( time() + $hash->{HusqvarnaAutomower}->{interval}, $self, $hash, 0 );
 
@@ -471,12 +471,12 @@ sub HusqvarnaAutomower_getMowerResponse($) {
     my $name = $hash->{NAME};
 
     if($err ne "") {
-        Log3 $name, 5, "error while requesting ".$param->{url}." - $err";     
+        Log3 $name, 2, "error while requesting ".$param->{url}." - $err";     
                                            
     } elsif($data ne "") {
 	    
 		if ($data eq "[]") {
-		    Log3 $name, 3, "Please register an automower first";
+		    Log3 $name, 2, "Please register an automower first";
 		    $hash->{HusqvarnaAutomower}->{mower_id} = "none";
 
 		    # STATUS LOGGEDIN MUST BE REMOVED
@@ -489,7 +489,7 @@ sub HusqvarnaAutomower_getMowerResponse($) {
 			
 	        my $result = eval { decode_json($data) };
             if ($@) {
-                Log3( $name, 3, " - JSON error while request: $@");
+                Log3( $name, 2, " - JSON error while request: $@");
                 return;
             }	
             		
@@ -516,7 +516,6 @@ sub HusqvarnaAutomower_getMowerResponse($) {
 		}
 		
 		readingsBeginUpdate($hash);
-		#readingsBulkUpdate($hash,$reading,$value);
 		readingsBulkUpdate($hash, "mower_id", $hash->{HusqvarnaAutomower}->{mower_id} );    
 		readingsBulkUpdate($hash, "mower_name", $hash->{HusqvarnaAutomower}->{mower_name} );    
 		readingsBulkUpdate($hash, "mower_battery", $hash->{HusqvarnaAutomower}->{mower_battery} );    
@@ -566,14 +565,14 @@ sub HusqvarnaAutomower_getMowerStatusResponse($) {
     my $name = $hash->{NAME};
 
     if($err ne "") {
-        Log3 $name, 5, "error while requesting ".$param->{url}." - $err";     
+        Log3 $name, 2, "error while requesting ".$param->{url}." - $err";     
                                            
     } elsif($data ne "") {
 	    
 		#Log3 $name, 5, $data; 
         my $result = eval { decode_json($data) };
         if ($@) {
-            Log3( $name, 3, " - JSON error while request: $@");
+            Log3( $name, 2, " - JSON error while request: $@");
             return;
         }
 		        
@@ -626,7 +625,7 @@ sub HusqvarnaAutomower_getMowerStatusResponse($) {
 		readingsBulkUpdate($hash, "mower_nextStart", $nextStartTimestamp );  
 		
   		readingsBulkUpdate($hash, "mower_nextStartSource", $hash->{HusqvarnaAutomower}->{mower_nextStartSource} );    
-  		readingsBulkUpdate($hash, "mower_restrictedReason", $hash->{HusqvarnaAutomower}->{mower_} );    
+  		readingsBulkUpdate($hash, "mower_restrictedReason", $hash->{HusqvarnaAutomower}->{mower_restrictedReason} );    
   		readingsBulkUpdate($hash, "mower_cuttingMode", $hash->{HusqvarnaAutomower}->{mower_cuttingMode} );    
 
 		readingsBulkUpdate($hash, "mower_lastLatitude", $hash->{HusqvarnaAutomower}->{mower_lastLatitude} );    
@@ -690,23 +689,23 @@ sub HusqvarnaAutomower_CMDResponse($) {
 
     if($err ne "") {
 	    HusqvarnaAutomower_CONNECTED($hash,'error');
-        Log3 $name, 5, "error while requesting ".$param->{url}." - $err";     
+        Log3 $name, 2, "error while requesting ".$param->{url}." - $err";     
                                            
     } elsif($data ne "") {
         
 	    my $result = eval { decode_json($data) };
         if ($@) {
-            Log3( $name, 3, " - JSON error while request: $@");
+            Log3( $name, 2, " - JSON error while request: $@");
             return;
         }
 
 	    if ($result->{errors}) {
 		    HusqvarnaAutomower_CONNECTED($hash,'error');
-		    Log3 $name, 5, "Error: " . $result->{errors}[0]->{detail};
+		    Log3 $name, 2, "Error: " . $result->{errors}[0]->{detail};
 		    $hash->{HusqvarnaAutomower}->{mower_commandStatus} = $result->{errors}[0]->{detail};
 
 	    } else {
-	        Log3 $name, 5, $data; 
+	        Log3 $name, 3, $data; 
             $hash->{HusqvarnaAutomower}->{mower_commandStatus} = 'OK';
 
 	    }
@@ -758,7 +757,7 @@ sub HusqvarnaAutomower_ToGerman($$) {
 		'CHARGING'                      =>	'lädt',
 		
 		'LEAVING'                       =>  'verlässt Ladestation',
-		'GOING_HOME'                    => 	'fährt zur Ladestation',
+		'GOING_HOME'                    => 	'führt zur Ladestation',
 		'WEEK_TIMER'                    => 	'Wochen-Zeitplan',
 		'WEEK_SCHEDULE'                 => 	'Wochen-Zeitplan',
 		
@@ -851,6 +850,20 @@ sub HusqvarnaAutomower_Whowasi() { return (split('::',(caller(2))[3]))[1] || '';
 	</ul>
 	<br>
 	
+	<a name="HusqvarnaAutomowerSet"></a>
+	<b>Set</b>
+	<ul>
+		<li>startTimer - Start with next timer (Caution: might not start mowing immdiately)</li>
+		<li>start3h - Starts immediately for 3 hours</li>
+        <li>start6h - Starts immediately for 6 hours</li>
+		<li>start9h - Starts immediately for 9 hours</li>
+		<li>stop - Stops/pauses mower immediately at current position</li>
+        <li>park - Parks mower in charging station until further notice</li>
+		<li>parkTimer - Parks mower in charging station and starts with next timer</li>
+        <li>update - Updates the status</li>
+	</ul>
+	<br>
+	
 	<a name="HusqvarnaAutomowerattributes"></a>
 	<b>Attributes</b>
 	<ul>
@@ -874,6 +887,7 @@ sub HusqvarnaAutomower_Whowasi() { return (split('::',(caller(2))[3]))[1] || '';
 		<li>batteryPercent - Battery power in percent</li>
 		<li>mower_id - ID of the mower</li>
 		<li>mower_battery - Battery power in percent</li>
+        <li>mower_commandStatus - Status of the last sent command</li>
 		<li>mower_lastLatitude - last known position (latitude)</li>
 		<li>mower_lastLongitude - last known position (longitude)</li>
 		<li>mower_mode - current working mode (e. g. AUTO)</li>
@@ -927,7 +941,21 @@ sub HusqvarnaAutomower_Whowasi() { return (split('::',(caller(2))[3]))[1] || '';
 	</ul>
 	<br>
 	
-	<a name="HusqvarnaAutomowerattributes"></a>
+	<a name="HusqvarnaAutomowerSet"></a>
+	<b>Set</b>
+	<ul>
+		<li>startTimer - Startet mit dem nächsten Timer</li>
+		<li>start3h - Startet sofort für 3 Stunden</li>
+        <li>start6h - Startet sofort für 6 Stunden</li>
+		<li>start9h - Startet sofort für 9 Stunden</li>
+		<li>stop - Stoppt/pausiert den Mäher sofort an der aktuellen Position</li>
+        <li>park - Parkt den Mäher in der Ladestation bis auf Weiteres</li>
+		<li>parkTimer - Parkt den Mäher in der Ladestation und startet mit dem nächsten Timer</li>
+        <li>update - Aktualisiert den Status</li>
+	</ul>
+	<br>
+  
+  <a name="HusqvarnaAutomowerattributes"></a>
 	<b>Attributes</b>
 	<ul>
 		<li>username - Email, die in der Husqvarna App verwendet wird</li>
@@ -950,6 +978,7 @@ sub HusqvarnaAutomower_Whowasi() { return (split('::',(caller(2))[3]))[1] || '';
         <li>batteryPercent - Batteryladung in Prozent (ohne %-Zeichen)</li>
         <li>mower_id - ID des Automowers</li>
 		<li>mower_battery - Bettrieladung in Prozent (mit %-Zeichen)</li>
+        <li>mower_commandStatus - Status des letzten uebermittelten Kommandos</li>
 		<li>mower_lastLatitude - letzte bekannte Position (Breitengrad)</li>
 		<li>mower_lastLongitude - letzte bekannte Position (Längengrad)</li>
 		<li>mower_mode - aktueller Arbeitsmodus (e. g. AUTO)</li>
