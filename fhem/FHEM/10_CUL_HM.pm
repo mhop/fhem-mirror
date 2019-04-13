@@ -1951,7 +1951,7 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$mh{shash},1,"time-request"];
     }
   }
-  elsif($mh{md} =~ m/^(HM-Sen-Wa-Od|HM-CC-SCD)$/){ ############################
+  elsif($mh{md} =~ m/^(HM-SEN-WA-OD|HM-CC-SCD)$/){ ############################
     if (($mh{mTyp} eq "0201") ||  # handle Ack_Status
         ($mh{mTyp} eq "1006") ||  #or Info_Status message here
         ($mh{mTp} eq "41"))                {
@@ -1966,7 +1966,7 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$mh{devH} ,1,"battery:".($err&0x80?"low":"ok")] if ($err ne "");
     }
   }
-  elsif($mh{md} eq "KFM-Sensor") { ############################################
+  elsif($mh{md} eq "KFM-SENSOR") { ############################################
     if ($mh{mTp} eq "53"){
       if($mh{p} =~ m/^(..)4(.)0200(..)(..)(..)/) {
         my ($chn,$seq, $k_v1, $k_v2, $k_v3) = (hex($1),hex($2),$3,hex($4),hex($5));
@@ -7834,8 +7834,9 @@ sub CUL_HM_getMId($) {     #in: hash(chn or dev) out:model key (key for %culHmMo
     $hash->{helper}{mId}     = CUL_HM_getmIdFromModel(AttrVal($hash->{NAME}, "model", ""));
     $hash->{helper}{mId}     = CUL_HM_getmIdFromModel($culHmModel->{$hash->{helper}{mId}}{alias})    
                                if ($hash->{helper}{mId} && defined $culHmModel->{$hash->{helper}{mId}}{alias});
-    $attr{$hash->{NAME}}{subType} = $hash->{helper}{mId} ? $culHmModel->{$hash->{helper}{mId}}{st}:"";
+    $attr{$hash->{NAME}}{subType} = $hash->{helper}{mId} ? $culHmModel->{$hash->{helper}{mId}}{st}:"no";
     #--- mId is updated - now update the reglist
+    return "" if ($hash->{helper}{mId} eq "no");
     foreach(CUL_HM_getAssChnNames($hash->{NAME})){
       $defs{$_}{helper}{regLst}     = CUL_HM_getChnList($_) ;
       $defs{$_}{helper}{peerOpt}    = CUL_HM_getChnPeers($_);
