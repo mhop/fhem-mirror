@@ -344,7 +344,7 @@ harmony_idOfActivity($$;$)
   $quoted_label =~ s/\./ /g;
   $quoted_label = quotemeta($quoted_label);
 
-  foreach my $activity (@{$hash->{config}->{activity}}) {
+  foreach my $activity (@{$hash->{config}{activity}}) {
     return $activity->{id} if( $activity->{label} =~ m/^$label$/ );
     return $activity->{id} if( $activity->{label} =~ m/^$quoted_label$/ );
   }
@@ -356,7 +356,7 @@ harmony_labelOfActivity($$;$)
 {
   my ($hash, $id, $default) = @_;
 
-  foreach my $activity (@{$hash->{config}->{activity}}) {
+  foreach my $activity (@{$hash->{config}{activity}}) {
     return $activity->{label} if( $activity->{id} == $id );
   }
 
@@ -367,7 +367,7 @@ harmony_activityOfId($$)
 {
   my ($hash, $id) = @_;
 
-  foreach my $activity (@{$hash->{config}->{activity}}) {
+  foreach my $activity (@{$hash->{config}{activity}}) {
     return $activity if( $activity->{id} == $id );
   }
 
@@ -750,8 +750,8 @@ harmony_Set($$@)
     return undef if( !defined($hash->{config}) );
 
     my $activities;
-    if( $hash->{config}->{activity} ) {
-      foreach my $activity (sort { ($a->{activityOrder}||0) <=> ($b->{activityOrder}||0) } @{$hash->{config}->{activity}}) {
+    if( $hash->{config}{activity} ) {
+      foreach my $activity (sort { ($a->{activityOrder}||0) <=> ($b->{activityOrder}||0) } @{$hash->{config}{activity}}) {
         next if( $activity->{id} == -1 );
         $activities .= "," if( $activities );
         $activities .= $activity->{label};
@@ -1240,6 +1240,8 @@ harmony_Read($)
       $params{$name} = $value;
     }
     Log3 $name, 4, Dumper \%params;
+
+    #DoTrigger( $name, "DISCOVERED $hash->{TYPE}:$params{remoteId} type=$hash->{TYPE} alias='$params{friendlyName}' name='".lc($params{friendlyName})."' detail=$params{ip} define='define <name> <TYPE> $params{ip}'" );
 
     $hash->{helper}{discovered}{$params{remoteId}} = \%params;
 
@@ -2165,10 +2167,10 @@ harmony_Get($$@)
 
   my $ret;
   if( $cmd eq "activities" ) {
-    return "no activities found" if( !defined($hash->{config}) || !defined($hash->{config}->{activity}) );
+    return "no activities found" if( !defined($hash->{config}) || !defined($hash->{config}{activity}) );
 
     my $ret = "";
-    foreach my $activity (sort { ($a->{activityOrder}||0) <=> ($b->{activityOrder}||0) } @{$hash->{config}->{activity}}) {
+    foreach my $activity (sort { ($a->{activityOrder}||0) <=> ($b->{activityOrder}||0) } @{$hash->{config}{activity}}) {
       next if( $activity->{id} == -1  );
       $ret .= "\n" if( $ret );
       $ret .= sprintf( "%s\t%-24s", $activity->{id}, $activity->{label});
@@ -2207,7 +2209,7 @@ harmony_Get($$@)
     return $ret;
 
   } elsif( $cmd eq "commands" ) {
-    return "no commands found" if( !defined($hash->{config}) || !defined($hash->{config}->{activity}) );
+    return "no commands found" if( !defined($hash->{config}) || !defined($hash->{config}{activity}) );
 
     my $id = $param;
     $id = harmony_idOfActivity($hash, $id) if( $id && $id !~ m/^([\d-])+$/ );
@@ -2215,7 +2217,7 @@ harmony_Get($$@)
 
     my $ret = "";
 
-    foreach my $activity (sort { ($a->{activityOrder}||0) <=> ($b->{activityOrder}||0) } @{$hash->{config}->{activity}}) {
+    foreach my $activity (sort { ($a->{activityOrder}||0) <=> ($b->{activityOrder}||0) } @{$hash->{config}{activity}}) {
       next if( $activity->{id} == -1 );
       next if( $id && $activity->{id} != $id );
       $ret .= "$activity->{label}\n";
@@ -2241,13 +2243,15 @@ harmony_Get($$@)
 
     my $ret = "";
 
-    foreach my $device (sort { $a->{id} <=> $b->{id} } @{$hash->{config}->{device}}) {
-      next if( $id && $device->{id} != $id );
-      $ret .= "$device->{label}\t$device->{manufacturer}\t$device->{model}\n";
-      foreach my $group (@{$device->{controlGroup}}) {
-        $ret .= "\t$group->{name}\n";
-        foreach my $function (@{$group->{function}}) {
-          $ret .= sprintf( "\t\t%-20s\t%s\n", $function->{name}, $function->{label} );
+    if( $hash->{config}{device} ) {
+      foreach my $device (sort { $a->{id} <=> $b->{id} } @{$hash->{config}->{device}}) {
+        next if( $id && $device->{id} != $id );
+        $ret .= "$device->{label}\t$device->{manufacturer}\t$device->{model}\n";
+        foreach my $group (@{$device->{controlGroup}}) {
+          $ret .= "\t$group->{name}\n";
+          foreach my $function (@{$group->{function}}) {
+            $ret .= sprintf( "\t\t%-20s\t%s\n", $function->{name}, $function->{label} );
+          }
         }
       }
     }
@@ -2263,8 +2267,8 @@ harmony_Get($$@)
     $param = harmony_idOfDevice($hash, $param) if( $param && $param !~ m/^([\d-])+$/ && $cmd eq "deviceDetail" );
 
     my $var;
-    $var = $hash->{config}->{activity} if( $cmd eq "activityDetail"  );
-    $var = $hash->{config}->{device}   if( $cmd eq "deviceDetail"  );
+    $var = $hash->{config}{activity} if( $cmd eq "activityDetail"  );
+    $var = $hash->{config}{device}   if( $cmd eq "deviceDetail"  );
     if( $param ) {
       foreach my $v (@{$var}) {
         if( $v->{id} eq $param ) {
@@ -2297,11 +2301,13 @@ harmony_Get($$@)
     return undef if( !defined($hash->{config}) );
 
     my $activities;
-    foreach my $activity (sort { ($a->{activityOrder}||0) <=> ($b->{activityOrder}||0) } @{$hash->{config}->{activity}}) {
-      next if( $activity->{id} == -1 );
-      $activities .= "," if( $activities );
-      $activities .= $activity->{label};
-     }
+    if( $hash->{config}{activity} ) {
+      foreach my $activity (sort { ($a->{activityOrder}||0) <=> ($b->{activityOrder}||0) } @{$hash->{config}{activity}}) {
+        next if( $activity->{id} == -1 );
+        $activities .= "," if( $activities );
+        $activities .= $activity->{label};
+      }
+    }
     if( $activities ) {
       $activities =~ s/ /./g;
 
@@ -2309,9 +2315,11 @@ harmony_Get($$@)
     }
 
     my $devices;
-    foreach my $device (sort { $a->{id} <=> $b->{id} } @{$hash->{config}->{device}}) {
-      $devices .= "," if( $devices );
-      $devices .= $device->{label};
+    if( $hash->{config}{device} ) {
+      foreach my $device (sort { $a->{id} <=> $b->{id} } @{$hash->{config}->{device}}) {
+        $devices .= "," if( $devices );
+        $devices .= $device->{label};
+      }
     }
     if( $devices ) {
       $devices =~ s/ /./g;
