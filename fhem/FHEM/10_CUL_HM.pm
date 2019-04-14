@@ -720,7 +720,7 @@ sub CUL_HM_Attr(@) {#################################
     my $md  = CUL_HM_Get($hash,$name,"param","model");
     my $st  = CUL_HM_Get($hash,$name,"param","subType");
     my $chn = substr(CUL_HM_hash2Id($hash),6,2);
-    if    ($md eq "HM-Sen-RD-O"    && $chn eq "02"){
+    if    ($md eq "HM-SEN-RD-O"    && $chn eq "02"){
       delete $hash->{helper}{param};
       my @param = split ",",$attrVal;
       foreach (@param){
@@ -729,7 +729,7 @@ sub CUL_HM_Attr(@) {#################################
         else {return "param $_ unknown, use offAtPon or onAtRain";}
       }
     }
-    elsif ($md eq "HM-Dis-EP-WM55" && $chn eq "03"){#reWriteDisplay
+    elsif ($md eq "HM-DIS-EP-WM55" && $chn eq "03"){#reWriteDisplay
       if ($cmd eq "set"){
         if ($attrVal =~ m/^reWriteDisplay([0-9][0-9])$/){# no action, just set
           my $delay = $1;
@@ -3926,9 +3926,9 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
       if    ($md =~ m/^(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/ && $chn eq "02"){$addInfo = CUL_HM_TCtempReadings($hash)}
       elsif ($md =~ m/^HM-CC-RT-DN/ && $chn eq "04"){$addInfo = CUL_HM_TCITRTtempReadings($hash,$md,7)}
       elsif ($md =~ m/^HM-TC-IT/    && $chn eq "02"){$addInfo = CUL_HM_TCITRTtempReadings($hash,$md,7,8,9)}
-      elsif ($md =~ m/^(^HM-PB-4DIS-WM|HM-Dis-WM55|HM-RC-Dis-H-x-EU|ROTO_ZEL-STG-RM-DWT-10)/)
+      elsif ($md =~ m/^(^HM-PB-4DIS-WM|HM-DIS-WM55|HM-RC-DIS-H-X-EU|ROTO_ZEL-STG-RM-DWT-10)/)
                                                    {$addInfo = CUL_HM_4DisText($hash)}
-      elsif ($md eq "HM-Sys-sRP-Pl")               {$addInfo = CUL_HM_repReadings($hash)}
+      elsif ($md eq "HM-SYS-SRP-PL")               {$addInfo = CUL_HM_repReadings($hash)}
 
       return $name." type:".$st." - \n".
              $regHeader.join("",sort(@regValList)).
@@ -4041,7 +4041,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
       }
       return "devices using $name\ncurrent IO / preferred\n  ".join "\n  ", sort @rl;
     } 
-    elsif ($md eq "ActionDetector"){
+    elsif ($md eq "ACTIONDETECTOR"){
       my $re = $a[2]?$a[2]:"all";
       if($re && $re =~ m/^(all|alive|unknown|dead|notAlive)$/){
         my @fnd = map {$_.":".$defs{$name}{READINGS}{$_}{VAL}}
@@ -4466,7 +4466,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     CUL_HM_UpdtCentral($name) if ($md eq "CCU_FHEM");
   }
   elsif($cmd eq "update") { ###################################################
-    if ($md eq "ActionDetector"){
+    if ($md eq "ACTIONDETECTOR"){
       CUL_HM_ActCheck("ActionDetector");
     }
     else{
@@ -4836,7 +4836,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                                 : ($lvlInv?'00':'C8');
     my(undef,$lvlMax)=split",",AttrVal($name, "levelRange", "0,100");
     $hash->{helper}{dlvl} = sprintf("%02X",$lvlMax*2)   if ($hash->{helper}{dlvl} eq 'C8');
-    if ($md eq "HM-LC-Ja1PBU-FM"){ $hash->{helper}{dlvlCmd} = "++$flag"."11$id$dst"."80$chn$hash->{helper}{dlvl}"."CA";}
+    if ($md eq "HM-LC-JA1PBU-FM"){ $hash->{helper}{dlvlCmd} = "++$flag"."11$id$dst"."80$chn$hash->{helper}{dlvl}"."CA";}
     else{                          $hash->{helper}{dlvlCmd} = "++$flag"."11$id$dst"."02$chn$hash->{helper}{dlvl}".'0000';}
     CUL_HM_PushCmdStack($hash,$hash->{helper}{dlvlCmd});
     $hash = $chnHash; # report to channel if defined
@@ -4978,7 +4978,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     else{
       $hash->{helper}{dlvl} = $plvl;
     }
-    if    ($md eq "HM-LC-Ja1PBU-FM"){ $hash->{helper}{dlvlCmd} = "++$flag"."11$id$dst"."80$chn$plvl"."CA";}
+    if    ($md eq "HM-LC-JA1PBU-FM"){ $hash->{helper}{dlvlCmd} = "++$flag"."11$id$dst"."80$chn$plvl"."CA";}
     else{                             $hash->{helper}{dlvlCmd} = "++$flag"."11$id$dst"."02$chn$plvl$rval$tval";}
     CUL_HM_PushCmdStack($hash,$hash->{helper}{dlvlCmd});
     $state = "set_".$lvl;
@@ -8433,7 +8433,7 @@ sub CUL_HM_updtRegDisp($$$) {
   elsif ($md =~ m/^HM-TC-IT-WM-W-EU/){#handle temperature readings
     CUL_HM_TCITRTtempReadings($hash,$md,$list)  if ($list >= 7 && $chn eq "02");
   }
-  elsif ($md =~ m/(^HM-PB-4DIS-WM|HM-Dis-WM55|HM-Dis-EP-WM55|HM-RC-Dis-H-x-EU|ROTO_ZEL-STG-RM-DWT-10)/){#add text
+  elsif ($md =~ m/(^HM-PB-4DIS-WM|HM-DIS-WM55|HM-DIS-EP-WM55|HM-RC-DIS-H-X-EU|ROTO_ZEL-STG-RM-DWT-10)/){#add text
    CUL_HM_4DisText($hash)  if ($list == 1) ;
   }
   elsif ($st eq "repeater"){
