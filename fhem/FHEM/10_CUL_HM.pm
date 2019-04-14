@@ -1201,6 +1201,7 @@ sub CUL_HM_Parse($$) {#########################################################
     my $sname = "HM_$mh{src}";
     Log3 undef, 2, "CUL_HM Unknown device $sname is now defined";
     DoTrigger("global","UNDEFINED $sname CUL_HM $mh{src}");
+    $mh{devN} = $sname ;
     $mh{devH} = CUL_HM_id2Hash($mh{src}); #sourcehash - changed to channel entity
     $mh{devH}->{IODev} = $iohash;
     $mh{devH}->{helper}{io}{nextSend} = $mh{rectm}+0.09 if(!defined($mh{devH}->{helper}{io}{nextSend}));# io couldn't set
