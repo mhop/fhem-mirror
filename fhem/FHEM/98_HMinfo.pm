@@ -637,7 +637,7 @@ sub HMinfo_burstCheck(@) { ####################################################
       my $prxt = CUL_HM_getRxType($defs{$pn});
       
       next if (!($prxt & 0x82)); # not a burst peer
-      my $pnb = ReadingsVal($eName,"R-$pn-peerNeedsBurst",ReadingsVal($eName,".R-$pn-peerNeedsBurst",undef));
+      my $pnb = ReadingsVal($eName,"R-$pn-peerNeedsBurst"   ,ReadingsVal($eName,".R-$pn-peerNeedsBurst",undef));
       if (!$pnb)           {push @needBurstMiss, "$eName:$pn";}
       elsif($pnb !~ m /on/){push @needBurstFail, "$eName:$pn";}
 
@@ -710,34 +710,13 @@ sub HMinfo_tempList(@) { ######################################################
   my $ret;
   
   if    ($action eq "save"){
-#    foreach my $eN(HMinfo_getEntities("d")){#search and select channel
-#      my $md = AttrVal($eN,"model","");
-#      my $chN; #tempList channel name
-#      if ($md =~ m/(HM-CC-RT-DN-BoM|HM-CC-RT-DN)/){
-#        $chN = $defs{$eN}{channel_04};
-#      }
-#      elsif ($md =~ m/(ROTO_ZEL-STG-RM-FWT|HM-CC-TC|HM-TC-IT-WM-W-EU)/){
-#        $chN = $defs{$eN}{channel_02};
-#      }
-#      next if (!$chN || !$defs{$chN} || $chN !~ m/$filter/);
-#      print aSave "\nentities:$chN";
-#      my @tl = sort grep /tempList(P[123])?[SMFWT]/,keys %{$defs{$chN}{READINGS}};
-#      if (scalar @tl != 7 && scalar @tl != 21){
-#        print aSave "\nincomplete:$chN only data for ".join(",",@tl);
-#        push @incmpl,$chN;
-#        next;
-#      }
-#      foreach my $rd (@tl){
-#        print aSave "\n$rd>$defs{$chN}{READINGS}{$rd}{VAL}";
-#      }
-#    }
     my @chList;
     my @storeList;
     my @incmpl;
     foreach my $eN(HMinfo_getEntities("d")){#search and select channel
       my $md = AttrVal($eN,"model","");
       my $chN; #tempList channel name
-      if ($md =~ m/(HM-CC-RT-DN-BoM|HM-CC-RT-DN)/){
+      if ($md =~ m/(HM-CC-RT-DN-BOM|HM-CC-RT-DN)/){
         $chN = $defs{$eN}{channel_04};
       }
       elsif ($md =~ m/(ROTO_ZEL-STG-RM-FWT|HM-CC-TC|HM-TC-IT-WM-W-EU)/){
@@ -805,7 +784,7 @@ sub HMinfo_tempListTmpl(@) { ##################################################
     next if (!$eN);
     my $md = AttrVal($eN,"model","");
     my $chN; #tempList channel name
-    if    ($md =~ m/(HM-CC-RT-DN-BoM|HM-CC-RT-DN)/){$chN = $defs{$eN}{channel_04};}
+    if    ($md =~ m/(HM-CC-RT-DN-BOM|HM-CC-RT-DN)/){$chN = $defs{$eN}{channel_04};}
     elsif ($md =~ m/(ROTO_ZEL-STG-RM-FWT|-TC)/)    {$chN = $defs{$eN}{channel_02};}
     next if (!$chN || !$defs{$chN} || $chN !~ m/$filter/);
     push @el,$chN;
