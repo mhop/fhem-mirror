@@ -84,7 +84,7 @@ my $K_actDetID = '000000'; # id of actionDetector
 #              => list 5 for channel 4 and 5 with peer=00000000
 #
 %culHmModel=(
-  "0001" => {name=>"HM-LC-SW1-PL-OM54"       ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
+  "0001" => {name=>"HM-LC-SW1-PL-OM54"       ,alias=>"HM-LC-SW1-SM"}
  ,"0002" => {name=>"HM-LC-SW1-SM"            ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
  ,"0003" => {name=>"HM-LC-SW4-SM"            ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",}
  ,"0004" => {name=>"HM-LC-SW1-FM"            ,alias=>"HM-LC-SW1-SM"}
@@ -92,8 +92,8 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"0006" => {name=>"HM-LC-BL1-SM"            ,alias=>"HM-LC-BL1-FM"}
  ,"0007" => {name=>"KS550"                   ,alias=>"HM-WDS100-C6-O"}
  ,"0008" => {name=>"HM-RC-4"                 ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:4",}
- ,"0009" => {name=>"HM-LC-SW2-FM"            ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2",}
- ,"000A" => {name=>"HM-LC-SW2-SM"            ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2",}
+ ,"0009" => {name=>"HM-LC-SW2-FM"            ,alias=>"HM-LC-SW2-FM-2"}
+ ,"000A" => {name=>"HM-LC-SW2-SM"            ,alias=>"HM-LC-SW2-FM-2"}
  ,"000B" => {name=>"HM-WS550"                ,st=>'THSensor'          ,cyc=>''      ,rxt=>''       ,lst=>'1,4'          ,chn=>"TH:1:8,CS:9:9,WEATHER:10:10",}
  ,"000D" => {name=>"ASH550"                  ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p'            ,chn=>"",}
  ,"000E" => {name=>"ASH550I"                 ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p'            ,chn=>"",}
@@ -101,7 +101,7 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"0011" => {name=>"HM-LC-SW1-PL"            ,alias=>"HM-LC-SW1-SM"}
  ,"0012" => {name=>"HM-LC-DIM1L-CV"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
  ,"0013" => {name=>"HM-LC-DIM1L-PL"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
- ,"0014" => {name=>"HM-LC-SW1-SM-ATMEGA168"  ,alias=>"HM-LC-SW1-PL-OM54"}
+ ,"0014" => {name=>"HM-LC-SW1-SM-ATMEGA168"  ,alias=>"HM-LC-SW1-SM"}
  ,"0015" => {name=>"HM-LC-SW4-SM-ATMEGA168"  ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",}
  ,"0016" => {name=>"HM-LC-DIM2L-CV"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:2",}
  ,"0018" => {name=>"CMM"                     ,st=>'remote'            ,cyc=>''      ,rxt=>''       ,lst=>'3'            ,chn=>"",}
@@ -160,7 +160,7 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"004F" => {name=>"HM-SEN-MDIR-SM"          ,st=>'motionDetector'    ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"",}
  ,"0050" => {name=>"HM-SEC-SFA-SM"           ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Siren:1:1,Flash:2:2",}
  ,"0051" => {name=>"HM-LC-SW1-PB-FM"         ,alias=>"HM-LC-SW1-SM"}
- ,"0052" => {name=>"HM-LC-SW2-PB-FM"         ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'3'            ,chn=>"Sw:1:2",}
+ ,"0052" => {name=>"HM-LC-SW2-PB-FM"         ,alias=>"HM-LC-SW2-FM-2"}
  ,"0053" => {name=>"HM-LC-BL1-PB-FM"         ,alias=>"HM-LC-BL1-FM"}
  ,"0054" => {name=>"DORMA_RC-H"              ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,3'          ,chn=>"",} # DORMA Remote 4 buttons
  ,"0056" => {name=>"HM-CC-SCD"               ,st=>'smokeDetector'     ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'1,4'          ,chn=>"",}
@@ -173,16 +173,16 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"005F" => {name=>"HM-SCI-3-FM"             ,st=>'threeStateSensor'  ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'1,4'          ,chn=>"Sw:1:3",}
  ,"0060" => {name=>"HM-PB-4DIS-WM"           ,alias=>"HM-PB-4DIS-WM-2"}
  ,"0061" => {name=>"HM-LC-SW4-DR"            ,alias=>"HM-LC-SW4-SM"}
- ,"0062" => {name=>"HM-LC-SW2-DR"            ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2",}
+ ,"0062" => {name=>"HM-LC-SW2-DR"            ,alias=>"HM-LC-SW2-FM-2"}
  ,"0064" => {name=>"DORMA_ATENT"             ,st=>''                  ,cyc=>''      ,rxt=>'c'      ,lst=>'1,3'          ,chn=>"Btn:1:3",} # DORMA Remote 3 buttons
  ,"0065" => {name=>"DORMA_BRC-H"             ,st=>'singleButton'      ,cyc=>''      ,rxt=>'c'      ,lst=>'1,3'          ,chn=>"Btn:1:4",} # Dorma Remote 4 single buttons
  ,"0066" => {name=>"HM-LC-SW4-WM"            ,alias=>"HM-LC-SW4-SM"}
  ,"0067" => {name=>"HM-LC-DIM1PWM-CV"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:1,Dim_V:2:3",}
  ,"0068" => {name=>"HM-LC-DIM1TPBU-FM"       ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:1,Dim_V:2:3",}
- ,"0069" => {name=>"HM-LC-SW1PBU-FM"         ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
+ ,"0069" => {name=>"HM-LC-SW1PBU-FM"         ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>""}
  ,"006A" => {name=>"HM-LC-BL1PBU-FM"         ,alias=>"HM-LC-BL1-FM"}
  ,"006B" => {name=>"HM-PB-2-WM55"            ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:2",}
- ,"006C" => {name=>"HM-LC-SW1-BA-PCB"        ,st=>'switch'            ,cyc=>''      ,rxt=>'b'      ,lst=>'1,3'          ,chn=>"",}
+ ,"006C" => {name=>"HM-LC-SW1-BA-PCB"        ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>""}
  ,"006D" => {name=>"HM-OU-LED16"             ,st=>'outputUnit'        ,cyc=>''      ,rxt=>''       ,lst=>'p,1'          ,chn=>"Led:1:16",}
  ,"006E" => {name=>"HM-LC-DIM1L-CV-644"      ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:1,Dim_V:2:3",}
  ,"006F" => {name=>"HM-LC-DIM1L-PL-644"      ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:1,Dim_V:2:3",}
@@ -211,8 +211,8 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"0088" => {name=>"SCHUECO_263-132"         ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}  # 1 channel dimmer L (ceiling voids)
  ,"0089" => {name=>"SCHUECO_263-134"         ,alias=>"HM-LC-DIM1T-PL"}                                                              # 1 CHANNEL DIMMER T (CEILING VOIDS)
  ,"008A" => {name=>"SCHUECO_263-133"         ,alias=>"HM-LC-DIM1TPBU-FM"}                                                           # 1 CHANNEL DIMMER TPBU (FLUSH MOUNT)
- ,"008B" => {name=>"SCHUECO_263-130"         ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}  # radio-controlled switch actuator 1-channel (flush-mount)
- ,"008C" => {name=>"SCHUECO_263-131"         ,alias=>"HM-LC-SW1PBU-FM"}                                                             # RADIO-CONTROLLED SWITCH ACTUATOR 1-CHANNEL (FLUSH-MOUNT)
+ ,"008B" => {name=>"SCHUECO_263-130"         ,alias=>"HM-LC-SW1-SM"}   # radio-controlled switch actuator 1-channel (flush-mount)
+ ,"008C" => {name=>"SCHUECO_263-131"         ,alias=>"HM-LC-SW1PBU-FM"}# RADIO-CONTROLLED SWITCH ACTUATOR 1-CHANNEL (FLUSH-MOUNT)
  ,"008D" => {name=>"SCHUECO_263-135"         ,alias=>"HM-PB-2-WM55"}   # HM PUSH BUTTON 2
  ,"008E" => {name=>"SCHUECO_263-155"         ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"",}  # HM Remote Display 4 buttons
  ,"008F" => {name=>"SCHUECO_263-145"         ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"",}  # HM Push Button Interface
@@ -264,9 +264,9 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"00C2" => {name=>"HM-PB-2-WM55-2"          ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:2",}
  ,"00C3" => {name=>"HM-SEC-RHS-2"            ,alias=>"HM-SEC-RHS"}
  ,"00C7" => {name=>"HM-SEC-SCO"              ,st=>'threeStateSensor'  ,cyc=>'02:50' ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"",}
- ,"00C8" => {name=>"HM-LC-SW1-PL-3"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
- ,"00C9" => {name=>"HM-LC-SW1-SM-2"          ,alias=>"HM-LC-SW1-PL-3"}
- ,"00CA" => {name=>"HM-LC-SW1-FM-2"          ,alias=>"HM-LC-SW1-PL-3"}
+ ,"00C8" => {name=>"HM-LC-SW1-PL-3"          ,alias=>"HM-LC-SW1-SM"}
+ ,"00C9" => {name=>"HM-LC-SW1-SM-2"          ,alias=>"HM-LC-SW1-SM"}
+ ,"00CA" => {name=>"HM-LC-SW1-FM-2"          ,alias=>"HM-LC-SW1-SM"}
  ,"00CB" => {name=>"HM-LC-SW2-FM-2"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2",}
  ,"00CC" => {name=>"HM-LC-SW2-DR-2"          ,alias=>"HM-LC-SW2-FM-2"}
  ,"00CD" => {name=>"HM-LC-SW4-SM-2"          ,alias=>"HM-LC-SW4-SM"}
@@ -281,7 +281,7 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"00D5" => {name=>"HM-RC-SEC4-3"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c:l'    ,lst=>'1,4'          ,chn=>"armInt:1:1,armExt:2:2,light:3:3,disarm:4:4",}
  ,"00D6" => {name=>"HM-RC-KEY4-3"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c:l'    ,lst=>'1,4'          ,chn=>"unlock:1:1,lock:2:2,light:3:3,open:4:4",}
  ,"00D7" => {name=>"HM-ES-PMSW1-PL-DN-R1"    ,alias=>"HM-ES-PMSW1-PL"}
- ,"00D8" => {name=>"HM-LC-SW1-PL-DN-R1"      ,alias=>"HM-LC-SW1-PL-3"}
+ ,"00D8" => {name=>"HM-LC-SW1-PL-DN-R1"      ,alias=>"HM-LC-SW1-SM"}
  ,"00D9" => {name=>"HM-MOD-EM-8"             ,st=>'remote'            ,cyc=>''      ,rxt=>'l'      ,lst=>'1,4'          ,chn=>"Btn:1:8",}
  ,"00DA" => {name=>"HM-RC-8"                 ,st=>'remote'            ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:8",}
  ,"00DB" => {name=>"HM-SEN-MDIR-WM55"        ,st=>'motionAndBtn'      ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:2,Motion:3:3",}
@@ -294,17 +294,17 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"00E3" => {name=>"HM-ES-PMSW1-PL-DN-R3"    ,alias=>"HM-ES-PMSW1-PL"}
  ,"00E4" => {name=>"HM-ES-PMSW1-PL-DN-R4"    ,alias=>"HM-ES-PMSW1-PL"}
  ,"00E5" => {name=>"HM-ES-PMSW1-PL-DN-R5"    ,alias=>"HM-ES-PMSW1-PL"}
- ,"00E6" => {name=>"HM-LC-SW1-PL-DN-R2"      ,alias=>"HM-LC-SW1-PL-3"}
- ,"00E7" => {name=>"HM-LC-SW1-PL-DN-R3"      ,alias=>"HM-LC-SW1-PL-3"}
- ,"00E8" => {name=>"HM-LC-SW1-PL-DN-R4"      ,alias=>"HM-LC-SW1-PL-3"}
- ,"00E9" => {name=>"HM-LC-SW1-PL-DN-R5"      ,alias=>"HM-LC-SW1-PL-3"}
+ ,"00E6" => {name=>"HM-LC-SW1-PL-DN-R2"      ,alias=>"HM-LC-SW1-SM"}
+ ,"00E7" => {name=>"HM-LC-SW1-PL-DN-R3"      ,alias=>"HM-LC-SW1-SM"}
+ ,"00E8" => {name=>"HM-LC-SW1-PL-DN-R4"      ,alias=>"HM-LC-SW1-SM"}
+ ,"00E9" => {name=>"HM-LC-SW1-PL-DN-R5"      ,alias=>"HM-LC-SW1-SM"}
  ,"00EA" => {name=>"HM-ES-PMSW1-DR"          ,alias=>"HM-ES-PMSW1-PL"}
- ,"00EB" => {name=>"HM-LC-SW1-PL-CT-R1"      ,alias=>"HM-LC-SW1-PL-3"}
- ,"00EC" => {name=>"HM-LC-SW1-PL-CT-R2"      ,alias=>"HM-LC-SW1-PL-3"}
- ,"00ED" => {name=>"HM-LC-SW1-PL-CT-R3"      ,alias=>"HM-LC-SW1-PL-3"}
- ,"00EE" => {name=>"HM-LC-SW1-PL-CT-R4"      ,alias=>"HM-LC-SW1-PL-3"}
- ,"00EF" => {name=>"HM-LC-SW1-PL-CT-R5"      ,alias=>"HM-LC-SW1-PL-3"}
- ,"00F0" => {name=>"HM-LC-SW1-DR"            ,alias=>"HM-LC-SW1-PL-3"}
+ ,"00EB" => {name=>"HM-LC-SW1-PL-CT-R1"      ,alias=>"HM-LC-SW1-SM"}
+ ,"00EC" => {name=>"HM-LC-SW1-PL-CT-R2"      ,alias=>"HM-LC-SW1-SM"}
+ ,"00ED" => {name=>"HM-LC-SW1-PL-CT-R3"      ,alias=>"HM-LC-SW1-SM"}
+ ,"00EE" => {name=>"HM-LC-SW1-PL-CT-R4"      ,alias=>"HM-LC-SW1-SM"}
+ ,"00EF" => {name=>"HM-LC-SW1-PL-CT-R5"      ,alias=>"HM-LC-SW1-SM"}
+ ,"00F0" => {name=>"HM-LC-SW1-DR"            ,alias=>"HM-LC-SW1-SM"}
  ,"00F3" => {name=>"SENSOTIMER-ST-6"         ,st=>'timer'             ,cyc=>''      ,rxt=>'c:b'    ,lst=>'1,4:5p.6p.7p.8p.9p' ,chn=>"Sw:1:2,Sen:3:4,Key:5:7,ecoKey:8:9",}
  ,"00F4" => {name=>"HM-LC-RGBW-WM"           ,st=>'rgb'               ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:1,Color:2:2,Auto:3:3",}
  ,"00F5" => {name=>"HM-LC-DIM1T-FM-LF"       ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
@@ -317,9 +317,9 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"00FC" => {name=>"OLIGO-SMART-IQ-HM"       ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:2,Dim1_V:3:4,Dim2_V:5:6",}
  ,"00FD" => {name=>"HM-SEN-LI-O"             ,st=>'senBright'         ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'1'            ,chn=>""}
 
- ,"0101" => {name=>"HM-LC-SW2PBU-FM"         ,alias=>"HM-LC-SW2-FM-2"}
+ ,"0101" => {name=>"HM-LC-SW2PBU-FM"         ,alias=>"HM-LC-SW2-FM-2"  }
  ,"0102" => {name=>"HM-WDS30-OT2-SM-2"       ,alias=>"HM-WDS30-OT2-SM" }
- ,"0103" => {name=>"HM-LC-SW1-PCB"           ,alias=>"HM-LC-SW1-PL-3" }
+ ,"0103" => {name=>"HM-LC-SW1-PCB"           ,alias=>"HM-LC-SW1-SM"    }
  ,"0104" => {name=>"HM-LC-AO-SM"             ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:1,Dim_V:2:3",}
  ,"0105" => {name=>"HM-LC-DIM1T-DR"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:1,Dim_V:2:3",}
  ,"0106" => {name=>"HM-MOD-EM-8BIT"          ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:2,Tr:3:3",}
@@ -1166,13 +1166,7 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
 );
 
 #clones - - - - - - - - - - - - - - -
-$culHmRegModel{"HM-LC-SW1-PL-3"}        = 
-$culHmRegModel{"HM-LC-SW2-SM"}          = 
 $culHmRegModel{"HM-LC-SW4-SM"}          = 
-$culHmRegModel{"SCHUECO_263-130"}       = 
-$culHmRegModel{"HM-LC-SW2-FM"}          = 
-$culHmRegModel{"HM-LC-SW2-PB-FM"}       = 
-$culHmRegModel{"HM-LC-SW2-DR"}          = 
 $culHmRegModel{"HM-LC-SW2-FM-2"}        = $culHmRegModel{"HM-LC-SW1-SM"};
 $culHmRegModel{"HM-LC-DIM1L-PL-2"}      = 
 $culHmRegModel{"HM-LC-DIM1L-CV"}        = 
