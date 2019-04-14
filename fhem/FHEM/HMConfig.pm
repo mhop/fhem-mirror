@@ -1859,6 +1859,9 @@ $culHmModelSets{"HM-HM-LC-DW-WM"}        = $culHmSubTypeSets{dimmer};   ##### re
                                                 ,sysTime        =>""
                                                 ,getSerial      => ""
                                                }
+                     ,"HM-DIS-EP-WM5501"     =>{ text           =>"-txt1- -txt2-..."  
+                                                ,peerChan       =>"-btnNumber- -actChn- ... single [set|unset] [actor|remote|both]"
+                                               }
                      ,"HM-RC-DIS-H-X-EUxx"   =>{ text           =>"-txt1- -txt2-..."  }
                      ,"HM-CC-TC02"           =>{ peerChan       =>" 0 -actChn- ... single [set|unset] [actor|remote|both]"
                                                 ,"desired-temp" =>"[on|off|6.0..30.0]"
@@ -1983,14 +1986,14 @@ $culHmModelSets{"HM-HM-LC-DW-WM"}        = $culHmSubTypeSets{dimmer};   ##### re
                                                }
  );
 # clones- - - - - - - - - - - - - - - - -
-$culHmChanSets{"HM-DIS-WM55xx"}         =
-$culHmChanSets{"HM-DIS-EP-WM5501"}      = 
-$culHmChanSets{"HM-DIS-EP-WM5502"}      = 
+
+$culHmChanSets{"HM-DIS-EP-WM5502"}      = $culHmChanSets{"HM-DIS-EP-WM5501"};
 $culHmChanSets{"HM-DIS-EP-WM5504"}      = 
 $culHmChanSets{"HM-DIS-EP-WM5505"}      = 
 $culHmChanSets{"HM-DIS-EP-WM5506"}      = 
 $culHmChanSets{"HM-DIS-EP-WM5507"}      = 
-$culHmChanSets{"HM-DIS-EP-WM5508"}      = $culHmChanSets{"HM-RC-DIS-H-X-EUxx"};
+$culHmChanSets{"HM-DIS-EP-WM5508"}      = 
+$culHmChanSets{"HM-DIS-WM55xx"}         = $culHmChanSets{"HM-RC-DIS-H-X-EUxx"};
 $culHmChanSets{"HM-SEC-SIR-WM02"}       =
 $culHmChanSets{"HM-SEC-SIR-WM03"}       = $culHmChanSets{"HM-SEC-SIR-WM01"};
 $culHmChanSets{"HM-DIS-WM5502"}         = $culHmChanSets{"HM-DIS-WM5501"};
@@ -2018,10 +2021,7 @@ $culHmChanSets{"HM-CC-RT-DN03"}         = $culHmChanSets{"HM-CC-RT-DN06"};
                                         
 $culHmChanSets{"HM-CC-RD-O00"}          = $culHmChanSets{"HM-LC-SW1PBU-FM00"};
 
-$culHmChanSets{"HM-TC-IT-WM-W-EU07"}    = 
-$culHmChanSets{"HM-DIS-EP-WM5501"}      = 
-$culHmChanSets{"HM-DIS-EP-WM5502"}      = $culHmChanSets{"HM-TC-IT-WM-W-EU01"};
-
+$culHmChanSets{"HM-TC-IT-WM-W-EU07"}    = $culHmChanSets{"HM-TC-IT-WM-W-EU01"};
 
 %culHmFunctSets = (# command depending on function
   sdLead1             =>{ alarmOn       =>""
