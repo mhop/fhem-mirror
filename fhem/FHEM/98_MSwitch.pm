@@ -207,7 +207,7 @@ sub MSwitch_Initialize($) {
     $hash->{AttrList} =
         "  disable:0,1"
       . "  disabledForIntervals"
-      . "  stateFormat"
+      . "  stateFormat:textField-long"
       . "  MSwitch_Comments:0,1"
       . "  MSwitch_Read_Log:0,1"
       . "  MSwitch_Help:0,1"
