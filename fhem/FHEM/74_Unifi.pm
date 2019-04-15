@@ -56,9 +56,11 @@
 #  - fixed:   74_Unifi: fixed createVoucher and (un-)blockClient for UC-V5.10
 # V 3.2.6
 #  - fixed:   74_Unifi: fixed locate/restartAP and disconnectClient for UC-V5.10
+# V 3.2.7
+#  - fixed:   74_Unifi: fixed reading-Update for disconnected clients
 
 package main;
-my $version="3.2.6";
+my $version="3.2.7";
 # Default für clientRedings setzen. Die Readings waren der Standard vor Einführung des Attributes customClientReadings.
 # Eine Änderung hat Auswirkungen auf (alte) Moduldefinitionen ohne dieses Attribut.
 my $defaultClientReadings=".:^accesspoint|^essid|^hostname|^last_seen|^snr|^uptime"; #ist wegen snr vs rssi nur halb korrekt, wird aber auch nicht wirklich verwendet ;-)
@@ -1324,50 +1326,50 @@ sub Unifi_SetClientReadings($) {
 			  $newClients.=$sep.$clientName;
 			  $sep=",";
 			}
-			readingsBulkUpdate($hash,$clientName,'connected');
-			
-			# altes Standardverhalten kann man auch ohne RegEx-Auswertungen beibehalten
-			if(AttrVal($name,"customClientReadings",$defaultClientReadings) eq $defaultClientReadings){ 
-				readingsBulkUpdate($hash,$clientName."_hostname",(defined $clientRef->{hostname}) ? $clientRef->{hostname} : (defined $clientRef->{ip}) ? $clientRef->{ip} : 'Unknown');
-				readingsBulkUpdate($hash,$clientName."_last_seen",strftime "%Y-%m-%d %H:%M:%S",localtime($clientRef->{last_seen}));
-				readingsBulkUpdate($hash,$clientName."_uptime",$clientRef->{uptime});
-				readingsBulkUpdate($hash,$clientName."_snr",$clientRef->{rssi});
-				# Da essid auch im Readingnamen bei WLAN verwendet wird, wird aus Konsistenzgründen hier beim ReadingValue ebenfalls makeReadingName() verwendet.
-				readingsBulkUpdate($hash,$clientName."_essid",makeReadingName($clientRef->{essid})); 
-				readingsBulkUpdate($hash,$clientName."_accesspoint",$clientRef->{accesspoint});
-			}
-			else{ # Auswerten des Attribute customClientReadings
-				for my $customClientReadingsPart (keys %{$hash->{unifi}->{customClientReadings}->{parts}}) {
-					my $reName = "";
-					my $nameRegEx=$hash->{unifi}->{customClientReadings}->{parts}->{$customClientReadingsPart}->{nameRegEx};
-					eval { $reName = qr/$nameRegEx/; };
-					if ($@){
-						Log3 $name, 2, "$name ($self) - Wrong RegEx (".$nameRegEx.") in name-part in attribute customClientReadings!";
-					}
-					else{
-						if($clientName =~ m/$reName/){ #matched der ClientName?
-							my $reReading = "";
-							my $readingRegEx=$hash->{unifi}->{customClientReadings}->{parts}->{$customClientReadingsPart}->{ReadingRegEx};
-							eval { $reReading = qr/($readingRegEx)/; };
-							if ($@){
-								Log3 $name, 2, "$name ($self) - Wrong RegEx (".$readingRegEx.") in reading-part in attribute customClientReadings!";
-							}
-							else{
-								for my $readingName (sort keys %{$clientRef	}) {
-									if($readingName =~ m/$reReading/){ #matched der ReadingName?
-										my $readingData = ((defined($clientRef->{$readingName})) ? $clientRef->{$readingName} : '');
-										readingsBulkUpdate($hash,$clientName."_".$readingName,$readingData);
-									}
+			readingsBulkUpdate($hash,$clientName,'connected');			
+		}
+		elsif (defined($hash->{READINGS}->{$clientName}) && $hash->{READINGS}->{$clientName}->{VAL} ne 'disconnected') {
+			Log3 $name, 5, "$name ($self) - Client '$clientName' previously connected is now disconnected.";
+			readingsBulkUpdate($hash,$clientName,'disconnected');
+		}
+		
+		# altes Standardverhalten kann man auch ohne RegEx-Auswertungen beibehalten
+		if(AttrVal($name,"customClientReadings",$defaultClientReadings) eq $defaultClientReadings){ 
+			readingsBulkUpdate($hash,$clientName."_hostname",(defined $clientRef->{hostname}) ? $clientRef->{hostname} : (defined $clientRef->{ip}) ? $clientRef->{ip} : 'Unknown');
+			readingsBulkUpdate($hash,$clientName."_last_seen",strftime "%Y-%m-%d %H:%M:%S",localtime($clientRef->{last_seen}));
+			readingsBulkUpdate($hash,$clientName."_uptime",$clientRef->{uptime});
+			readingsBulkUpdate($hash,$clientName."_snr",$clientRef->{rssi});
+			# Da essid auch im Readingnamen bei WLAN verwendet wird, wird aus Konsistenzgründen hier beim ReadingValue ebenfalls makeReadingName() verwendet.
+			readingsBulkUpdate($hash,$clientName."_essid",makeReadingName($clientRef->{essid})); 
+			readingsBulkUpdate($hash,$clientName."_accesspoint",$clientRef->{accesspoint});
+		}
+		else{ # Auswerten des Attribute customClientReadings
+			for my $customClientReadingsPart (keys %{$hash->{unifi}->{customClientReadings}->{parts}}) {
+				my $reName = "";
+				my $nameRegEx=$hash->{unifi}->{customClientReadings}->{parts}->{$customClientReadingsPart}->{nameRegEx};
+				eval { $reName = qr/$nameRegEx/; };
+				if ($@){
+					Log3 $name, 2, "$name ($self) - Wrong RegEx (".$nameRegEx.") in name-part in attribute customClientReadings!";
+				}
+				else{
+					if($clientName =~ m/$reName/){ #matched der ClientName?
+						my $reReading = "";
+						my $readingRegEx=$hash->{unifi}->{customClientReadings}->{parts}->{$customClientReadingsPart}->{ReadingRegEx};
+						eval { $reReading = qr/($readingRegEx)/; };
+						if ($@){
+							Log3 $name, 2, "$name ($self) - Wrong RegEx (".$readingRegEx.") in reading-part in attribute customClientReadings!";
+						}
+						else{
+							for my $readingName (sort keys %{$clientRef	}) {
+								if($readingName =~ m/$reReading/){ #matched der ReadingName?
+									my $readingData = ((defined($clientRef->{$readingName})) ? $clientRef->{$readingName} : '');
+									readingsBulkUpdate($hash,$clientName."_".$readingName,$readingData);
 								}
 							}
 						}
 					}
 				}
 			}
-		}
-		elsif (defined($hash->{READINGS}->{$clientName}) && $hash->{READINGS}->{$clientName}->{VAL} ne 'disconnected') {
-			Log3 $name, 5, "$name ($self) - Client '$clientName' previously connected is now disconnected.";
-			readingsBulkUpdate($hash,$clientName,'disconnected');
 		}
     }
     readingsBulkUpdate($hash,"-UC_newClients",$newClients);
