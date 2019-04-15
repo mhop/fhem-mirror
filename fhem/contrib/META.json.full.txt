@@ -28,32 +28,32 @@
   myModule
 </h3>
 <ul>
-  Long description about what this module does and what it is for.<br>
-  <br>
+  Long description about what this module does and what it is for.<br />
+  <br />
   <a name="myModuledefine" id="myModuledefine"></a><b>Define</b>
   <ul>
-    <code>define &lt;name&gt; myModule</code><br>
-    <br>
-    Describe a little bit what this define command will do and how the device instance will behave afterwards.<br>
-  </ul><br>
+    <code>define &lt;name&gt; myModule</code><br />
+    <br />
+    Describe a little bit what this define command will do and how the device instance will behave afterwards.<br />
+  </ul><br />
   <a name="myModuleset" id="myModuleset"></a><b>Set</b>
   <ul>
-    <li>setCommand1<br>
+    <li>setCommand1<br />
       This command does xyz.
     </li>
-    <li>setCommand2 &lt;parameter&gt;<br>
+    <li>setCommand2 &lt;parameter&gt;<br />
       This command does abc and requires a parameter. Example:
       <ul>
         <code>get myModule getCommand1 on</code>
       </ul>
     </li>
-  </ul><br>
+  </ul><br />
   <a name="myModuleget" id="myModuleget"></a><b>Get</b>
   <ul>
-    <li>getCommand1<br>
+    <li>getCommand1<br />
       This command does xyz.
     </li>
-    <li>getCommand2 &lt;parameter&gt;<br>
+    <li>getCommand2 &lt;parameter&gt;<br />
       This command does abc and requires a parameter. Example:
       <ul>
         <code>get myModule getCommand1 on</code>
@@ -62,9 +62,9 @@
   </ul><a name="myModuleattr" id="myModuleattr"></a><b>Attributes</b>
   <ul>
     <a name="myAttribute1" id="myAttribute1"></a>
-    <li>myAttribute1<br>
+    <li>myAttribute1<br />
       This attribute configures xyz.
-    </li><br>
+    </li><br />
   </ul>
 </ul>
 
@@ -77,32 +77,32 @@
   myModule
 </h3>
 <ul>
-  Längere Beschreibung, was dieses Modul macht und wofür es gut ist.<br>
-  <br>
+  Längere Beschreibung, was dieses Modul macht und wofür es gut ist.<br />
+  <br />
   <a name="myModuledefine" id="myModuledefine"></a><b>Define</b>
   <ul>
-    <code>define &lt;name&gt; myModule</code><br>
-    <br>
-    Kurze Beschreibung, was dieses define Kommando genau macht und wie die Device Instanz sich anschließend verhalten wird.<br>
-  </ul><br>
+    <code>define &lt;name&gt; myModule</code><br />
+    <br />
+    Kurze Beschreibung, was dieses define Kommando genau macht und wie die Device Instanz sich anschließend verhalten wird.<br />
+  </ul><br />
   <a name="myModuleset" id="myModuleset"></a><b>Set</b>
   <ul>
-    <li>setCommand1<br>
+    <li>setCommand1<br />
       Dieses Kommando macht xyz.
     </li>
-    <li>setCommand2 &lt;parameter&gt;<br>
+    <li>setCommand2 &lt;parameter&gt;<br />
       Dieses Kommando macht abc und benötigt einen Parameter. Beispiel:
       <ul>
         <code>get myModule getCommand1 on</code>
       </ul>
     </li>
-  </ul><br>
+  </ul><br />
   <a name="myModuleget" id="myModuleget"></a><b>Get</b>
   <ul>
-    <li>getCommand1<br>
+    <li>getCommand1<br />
       Dieses Kommando macht xyz.
     </li>
-    <li>getCommand2 &lt;parameter&gt;<br>
+    <li>getCommand2 &lt;parameter&gt;<br />
       Dieses Kommando macht abc und benötigt einen Parameter. Beispiel:
       <ul>
         <code>get myModule getCommand1 on</code>
@@ -111,9 +111,9 @@
   </ul><a name="myModuleattr" id="myModuleattr"></a><b>Attributes</b>
   <ul>
     <a name="myAttribute1" id="myAttribute1"></a>
-    <li>myAttribute1<br>
+    <li>myAttribute1<br />
       Dieses Attribut konfiguriert xyz.
-    </li><br>
+    </li><br />
   </ul>
 </ul>
 
@@ -209,6 +209,7 @@
       "x_web_title": "Github Issues for fhem/myModule"
     },
     "homepage": "https://myModuleHasAhomepage.com",
+    "x_homepage_title": "myModuleHasAhomepage",
     "license": [
       "https://github.com/fhem/myModule/blob/master/LICENSE"
     ],
@@ -223,19 +224,29 @@
         "web": "https://github.com/fhem/myModule/blob/dev/subdir/00_myModule.pm",
         "x_branch": "dev",
         "x_filepath": "subdir/",
-        "x_raw": "https://raw.githubusercontent.com/fhem/myModule/dev/subdir/00_myModule.pm"
+        "x_raw": "https://github.com/fhem/myModule/raw/dev/subdir/00_myModule.pm"
       },
       "x_filepath": "subdir/",
-      "x_raw": "https://raw.githubusercontent.com/fhem/myModule/master/subdir/00_myModule.pm"
+      "x_raw": "https://github.com/fhem/myModule/raw/master/subdir/00_myModule.pm"
     },
     "x_commandref" : {
       "title" : "I want to name it differently, not 'Online version'",
       "web" : "https://myModuleHasAhomepage.com/myModuleHasAnExternalOnlineCommandRef.html"
     },
+    "x_copyright": {
+      "mailto": "contact@example.com",
+      "title": "My Company Inc.",
+      "web": "https://www.example.com/legal"
+    },
+    "x_privacy": {
+      "mailto": "dataprivacy@example.com",
+      "title": "About data privacy",
+      "web": "https://www.example.com/privacy"
+    },
     "x_support_commercial": {
-      "mailto": "support@mycompany.com",
+      "mailto": "support@example.com",
       "title": "My Company",
-      "web": "https://support.mycompany.com"
+      "web": "https://support.example.com"
     },
     "x_support_community": {
       "rss": "https://forum.fhem.de/index.php?action=.xml;type=rss;board=19",

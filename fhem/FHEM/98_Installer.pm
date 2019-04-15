@@ -2176,9 +2176,6 @@ sub CreateMetadataList ($$$) {
                 || $modMeta->{release_status} eq 'stable' )
           );
         next
-          if ( $mAttr eq 'copyright'
-            && !defined( $modMeta->{x_copyright} ) );
-        next
           if (
             $mAttr eq 'abstract'
             && (   !defined( $modMeta->{abstract} )
@@ -2206,6 +2203,18 @@ sub CreateMetadataList ($$$) {
           );
         next
           if (
+            $mAttr eq 'copyright'
+            && (   !defined( $modMeta->{resources} )
+                || !defined( $modMeta->{resources}{x_copyright} ) )
+          );
+        next
+          if (
+            $mAttr eq 'privacy'
+            && (   !defined( $modMeta->{resources} )
+                || !defined( $modMeta->{resources}{x_privacy} ) )
+          );
+        next
+          if (
             $mAttr eq 'wiki'
             && (   !defined( $modMeta->{resources} )
                 || !defined( $modMeta->{resources}{x_wiki} ) )
@@ -2221,12 +2230,6 @@ sub CreateMetadataList ($$$) {
             $mAttr eq 'commercial_support'
             && (   !defined( $modMeta->{resources} )
                 || !defined( $modMeta->{resources}{x_support_commercial} ) )
-          );
-        next
-          if (
-            $mAttr eq 'privacy'
-            && (   !defined( $modMeta->{resources} )
-                || !defined( $modMeta->{resources}{x_privacy} ) )
           );
         next
           if (
@@ -2277,22 +2280,19 @@ sub CreateMetadataList ($$$) {
             }
 
             elsif ( $mAttr eq 'copyright' ) {
-                my $copyName;
-                my $copyEmail;
+                my $copyName = '© ';
+                my $copyEmail =
+                  defined( $modMeta->{resources}{x_copyright}{mailto} )
+                  ? $modMeta->{resources}{x_copyright}{mailto}
+                  : '';
                 my $copyWeb;
                 my $copyNameContact;
 
-                if ( $modMeta->{x_copyright} =~
-                    m/^([^<>\n\r]+)(?:\s+(?:<(.*)>))?$/ )
-                {
-                    if ( defined( $modMeta->{x_vcs} ) ) {
-                        $copyName = '© ' . $modMeta->{x_vcs}[8] . ' ' . $1;
-                    }
-                    else {
-                        $copyName = '© ' . $1;
-                    }
-                    $copyEmail = $2;
-                }
+                $copyName .= $modMeta->{x_vcs}[8] . ' '
+                  if ( defined( $modMeta->{x_vcs} ) );
+                $copyName .=
+                  $modMeta->{resources}{x_copyright}{title};
+
                 if (   defined( $modMeta->{resources} )
                     && defined( $modMeta->{resources}{x_copyright} )
                     && defined( $modMeta->{resources}{x_copyright}{web} ) )
@@ -2544,33 +2544,86 @@ sub CreateMetadataList ($$$) {
                       )
                     {
                         my $bName = $modMeta->{resources}{repository}{x_branch};
-                        $bName .= ' (prod)'
+                        $bName = 'production'
                           if ( $modMeta->{resources}{repository}{x_branch} eq
                             $modMeta->{resources}{repository}{x_dev}{x_branch}
                           );
 
-                        # master entry
+                        # webview: master entry
                         $l .=
                             'View online source code: <a href="'
                           . $url
                           . '" target="_blank">'
                           . $bName . '</a>';
 
-                        # dev link
+                        # webview: dev link
                         $bName =
                           $modMeta->{resources}{repository}{x_dev}{x_branch};
-                        $bName .= ' (dev)'
+                        $bName = 'development'
                           if ( $modMeta->{resources}{repository}{x_branch} eq
                             $modMeta->{resources}{repository}{x_dev}{x_branch}
                           );
                         $url = $modMeta->{resources}{repository}{x_dev}{web};
 
-                        # dev entry
+                        # webview: dev entry
                         $l .=
                             ' | <a href="'
                           . $url
                           . '" target="_blank">'
                           . $bName . '</a>';
+
+                        # raw: master entry
+                        if (
+                            defined( $modMeta->{resources}{repository}{x_raw} )
+                          )
+                        {
+                            $bName =
+                              $modMeta->{resources}{repository}{x_branch};
+                            $bName = 'production'
+                              if (
+                                $modMeta->{resources}{repository}{x_branch} eq
+                                $modMeta->{resources}{repository}{x_dev}
+                                {x_branch} );
+
+                            $url = $modMeta->{resources}{repository}{x_raw};
+                            $l .=
+                                $lb
+                              . 'Download raw file: <a href="'
+                              . $url
+                              . '" target="_blank" download="'
+                              . $modMeta->{x_file}[2] . '">'
+                              . $bName . '</a>';
+
+                            # raw: dev link
+                            if (
+                                defined(
+                                    $modMeta->{resources}{repository}{x_dev}
+                                      {x_raw}
+                                )
+                              )
+                            {
+                                $bName =
+                                  $modMeta->{resources}{repository}{x_dev}
+                                  {x_branch};
+                                $bName = 'development'
+                                  if (
+                                    $modMeta->{resources}{repository}{x_branch}
+                                    eq
+                                    $modMeta->{resources}{repository}{x_dev}
+                                    {x_branch} );
+                                $url =
+                                  $modMeta->{resources}{repository}{x_dev}
+                                  {x_raw};
+
+                                # raw: dev entry
+                                $l .=
+                                    ' | <a href="'
+                                  . $url
+                                  . '" target="_blank" download="'
+                                  . $modMeta->{x_file}[2] . '">'
+                                  . $bName . '</a>';
+                            }
+                        }
                     }
 
                     # master entry
@@ -2579,46 +2632,108 @@ sub CreateMetadataList ($$$) {
                             '<a href="'
                           . $url
                           . '" target="_blank">View online source code</a>';
+
+                        if (
+                            defined( $modMeta->{resources}{repository}{x_raw} )
+                          )
+                        {
+                            $l .=
+                                $lb
+                              . '<a href="'
+                              . $modMeta->{resources}{repository}{x_raw}
+                              . '" target="_blank" download="'
+                              . $modMeta->{x_file}[2]
+                              . '">Download raw file</a>';
+                        }
                     }
 
                     $l .= $lb;
                 }
 
                 # VCS link
-                my $url =
-                  $modMeta->{resources}{repository}{url};
+                my $urlPrefix = (
+                    $modMeta->{resources}{repository}{url} =~
+                      /^$modMeta->{resources}{repository}{type}/i
+                    ? ''
+                    : lc( $modMeta->{resources}{repository}{type} ) . '+'
+                );
 
                 $l .=
                     uc( $modMeta->{resources}{repository}{type} )
                   . ' repository: '
-                  . $modMeta->{resources}{repository}{url};
+                  . '<a href="'
+                  . $urlPrefix
+                  . $modMeta->{resources}{repository}{url}
+                  . '" target="_blank">'
+                  . $urlPrefix
+                  . $modMeta->{resources}{repository}{url} . '</a>';
 
-                if (
-                    defined(
-                        $modMeta->{resources}{repository}{x_branch_master}
-                    )
-                  )
-                {
-                    $l .=
-                        $lb
-                      . 'Main branch: '
-                      . $modMeta->{resources}{repository}{x_branch_master};
+                if ( defined( $modMeta->{resources}{repository}{x_branch} ) ) {
+                    if (
+                        lc( $modMeta->{resources}{repository}{type} ) eq 'svn' )
+                    {
+                        $l .=
+                            $lb
+                          . 'Main branch: '
+                          . '<a href="'
+                          . $urlPrefix
+                          . $modMeta->{resources}{repository}{url} . '/'
+                          . (
+                            $modMeta->{resources}{repository}{x_branch} eq
+                              'trunk'
+                            ? 'trunk'
+                            : 'branches/'
+                              . $modMeta->{resources}{repository}{x_branch}
+                          )
+                          . '" target="_blank">'
+                          . $modMeta->{resources}{repository}{x_branch}
+                          . '</a>';
+                    }
+                    else {
+                        $l .=
+                            $lb
+                          . 'Main branch: '
+                          . $modMeta->{resources}{repository}{x_branch};
+                    }
                 }
 
                 if (
-                    defined(
-                        $modMeta->{resources}{repository}{x_branch_master}
-                    )
+                       defined( $modMeta->{resources}{repository}{x_branch} )
+                    && defined( $modMeta->{resources}{repository}{x_dev} )
                     && defined(
-                        $modMeta->{resources}{repository}{x_branch_dev} )
-                    && $modMeta->{resources}{repository}{x_branch_master} ne
-                    $modMeta->{resources}{repository}{x_branch_dev}
+                        $modMeta->{resources}{repository}{x_dev}{x_branch}
+                    )
+                    && $modMeta->{resources}{repository}{x_branch} ne
+                    $modMeta->{resources}{repository}{x_dev}{x_branch}
                   )
                 {
-                    $l .=
-                        $lb
-                      . 'Dev branch: '
-                      . $modMeta->{resources}{repository}{x_branch_dev};
+                    if (
+                        lc( $modMeta->{resources}{repository}{x_dev}{type} ) eq
+                        'svn' )
+                    {
+                        $l .=
+                            $lb
+                          . 'Dev branch: '
+                          . '<a href="'
+                          . $urlPrefix
+                          . $modMeta->{resources}{repository}{url} . '/'
+                          . (
+                            $modMeta->{resources}{repository}{x_branch} eq
+                              'trunk'
+                            ? 'trunk'
+                            : 'branches/'
+                              . $modMeta->{resources}{repository}{x_branch}
+                          )
+                          . '" target="_blank">'
+                          . $modMeta->{resources}{repository}{x_dev}{x_branch}
+                          . '</a>';
+                    }
+                    else {
+                        $l .=
+                            $lb
+                          . 'Dev branch: '
+                          . $modMeta->{resources}{repository}{x_dev}{x_branch};
+                    }
                 }
             }
             else {
@@ -3723,10 +3838,21 @@ sub LoadInstallStatusPerl(;$) {
                                     if ( $type eq 'module' ) {
                                         $modMeta->{prereqs}
                                           {runtime}{$mAttr}{$missing} = 0;
+
+                                        push @{ $modMeta->{prereqs}{runtime}
+                                              {x_inherited}{$missing} },
+                                          $pkg;
+
                                     }
                                     else {
                                         $packages{$modName}{META}{prereqs}
                                           {runtime}{$mAttr}{$missing} = 0;
+
+                                        push
+                                          @{ $packages{$modName}{META}{prereqs}
+                                              {runtime}{x_inherited}{$missing}
+                                          },
+                                          $pkg;
                                     }
                                 }
                             }
@@ -4038,19 +4164,19 @@ sub __aUniq {
   Installer
 </h3>
 <ul>
-  <u><strong>Installer - Module to update FHEM, install 3rd-party FHEM modules and manage system prerequisites</strong></u><br>
-  <br>
-  <br>
-  <a name="Installerdefine" id="Installerdefine"></a><strong>Define</strong><br>
+  <u><strong>Installer - Module to update FHEM, install 3rd-party FHEM modules and manage system prerequisites</strong></u><br />
+  <br />
+  <br />
+  <a name="Installerdefine" id="Installerdefine"></a><strong>Define</strong><br />
   <ul>
-    <code>define &lt;name&gt; Installer</code><br>
-    <br>
-    Example:<br>
+    <code>define &lt;name&gt; Installer</code><br />
+    <br />
+    Example:<br />
     <ul>
-      <code>define fhemInstaller Installer</code><br>
-    </ul><br>
-  </ul><br>
-  <br>
+      <code>define fhemInstaller Installer</code><br />
+    </ul><br />
+  </ul><br />
+  <br />
   <a name="Installerget" id="Installerget"></a><strong>Get</strong>
   <ul>
     <li>checkPrereqs - list all missing prerequisites. If no parameter was given, the running live system will be inspected. If the parameter is a FHEM cfg file, inspection will be based on devices from this file. If the parameter is a list of module names, those will be used for inspection.
@@ -4065,8 +4191,8 @@ sub __aUniq {
     </li>
     <li>zzGetPackageMETA.json - prints raw meta information of a FHEM package in JSON format
     </li>
-  </ul><br>
-  <br>
+  </ul><br />
+  <br />
   <a name="Installerattribut" id="Installerattribut"></a><strong>Attributes</strong>
   <ul>
     <li>disable - disables the device
