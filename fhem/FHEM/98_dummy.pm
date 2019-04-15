@@ -13,9 +13,18 @@ dummy_Initialize($)
 
   $hash->{SetFn}     = "dummy_Set";
   $hash->{DefFn}     = "dummy_Define";
-  $hash->{AttrList}  = "readingList setList useSetExtensions " .
-                       "disable disabledForIntervals ".
-                       $readingFnAttributes;
+  no warnings 'qw';
+  my @attrList = qw(
+    disable
+    disabledForIntervals
+    readingList
+    setExtensionsEvent:1,0
+    setList
+    useSetExtensions
+    $readingFnAttributes;
+  );
+  use warnings 'qw';
+  $hash->{AttrList} = join(" ", @attrList);
 }
 
 ###################################
@@ -60,6 +69,9 @@ dummy_Set($@)
   my $v = join(" ", @a);
   Log3 $name, 4, "dummy set $name $v";
 
+  $v = $hash->{SetExtensionsCommand}
+        if($hash->{SetExtensionsCommand} &&
+           AttrVal($name, "setExtensionsEvent", undef));
   readingsSingleUpdate($hash,"state",$v,1);
   return undef;
 }
@@ -135,6 +147,10 @@ dummy_Define($$)
       In this case no arbitrary set commands are accepted, only the setList and
       the set exensions commands.</li>
 
+    <li><a name="setExtensionsEvent">setExtensionsEvent</a><br>
+      If set, the event will contain the command implemented by SetExtensions
+      (e.g. on-for-timer 10), else the executed command (e.g. on).</li>
+
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
@@ -197,6 +213,11 @@ dummy_Define($$)
       href="#setExtensions">set extensions</a> Befehle sind auch aktiv.  In
       diesem Fall werden nur die Befehle aus setList und die set exensions
       akzeptiert.</li>
+
+    <li><a name="setExtensionsEvent">setExtensionsEvent</a><br>
+      Falls gesetzt, enth&auml;lt das Event den im SetExtensions
+      implementierten Befehl (z.Bsp. on-for-timer 10), sonst den
+      Ausgef&uuml;rten (z.Bsp. on).</li>
 
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>

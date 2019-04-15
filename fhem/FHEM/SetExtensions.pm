@@ -38,6 +38,7 @@ SE_DoSet(@)
   $hash->{InSetExtensions} = 1;
   AnalyzeCommand($hash->{CL}, "set ".join(" ", @_)); # cmdalias (Forum #63896)
   delete $hash->{InSetExtensions};
+  delete $hash->{SetExtensionsCommand};
 }
 
 sub
@@ -114,6 +115,7 @@ SetExtensions($$@)
   my $param = $a[0];
 
 
+  $hash->{SetExtensionsCommand} = $cmd.(@a ? " ".join(" ",@a) : "");
   if($cmd eq "on-for-timer" || $cmd eq "off-for-timer") {
     return "$cmd requires a number as argument" if($param !~ m/^\d*\.?\d*$/);
 
@@ -123,7 +125,7 @@ SetExtensions($$@)
         CMD=>$cmd, NEXTCMD=>$cmd2
       };
       SE_DoSet($name, $cmd1);
-      InternalTimer(gettimeofday()+$param,"SetExtensionsFn","SE $name $cmd",0);
+      InternalTimer(gettimeofday()+$param,"SetExtensionsFn",$hash, 0);
     }
 
   } elsif($cmd =~ m/^(on|off)-till/) {
@@ -153,6 +155,7 @@ SetExtensions($$@)
         if($param !~ m/^\d+$/ || $p2 !~ m/^\d*\.?\d*$/);
 
     if($param) {
+      delete($hash->{SetExtensionsCommand}) if($param == 1 && $a[2]);
       SE_DoSet($name, $a[2] ? $offCmd : $onCmd);
       $param-- if($a[2]);
       if($param) {
@@ -160,7 +163,7 @@ SetExtensions($$@)
           START=>time(), START_FMT=>TimeNow(), DURATION=>$param,
           CMD=>$cmd, NEXTCMD=>"$cmd $param $p2 ".($a[2] ? "0" : "1")
         };
-        InternalTimer(gettimeofday()+$p2, "SetExtensionsFn","SE $name $cmd",0);
+        InternalTimer(gettimeofday()+$p2, "SetExtensionsFn",$hash,0);
       }
     }
 
@@ -175,6 +178,7 @@ SetExtensions($$@)
       my @lt = localtime;
       my $hms_from = sprintf("%02d:%02d:%02d", $hr, $min, $sec);
       my $hms_now  = sprintf("%02d:%02d:%02d", $lt[2], $lt[1], $lt[0]);
+      delete($hash->{SetExtensionsCommand});  # Will be set by on-till
 
       if($hms_from le $hms_now) { # By slight delays at will schedule tomorrow.
         SetExtensions($hash, $list, $name, "on-till", $till);
@@ -194,6 +198,7 @@ SetExtensions($$@)
     }
     
   } elsif($cmd eq "toggle") {
+    delete($hash->{SetExtensionsCommand});  # Need on/off in STATE
     my $value = Value($name);
     (undef,$value) = ReplaceEventMap($name, [$name, $value], 0) if($eventMap);
 
@@ -208,13 +213,12 @@ SetExtensions($$@)
 sub
 SetExtensionsFn($)
 {
-  my (undef, $name, $cmd) = split(" ", shift, 3);
-  my $hash = $defs{$name};
+  my ($hash) = @_;
   return if(!$hash || !$hash->{TIMED_OnOff});
 
   my $nextcmd = $hash->{TIMED_OnOff}{NEXTCMD};
   delete $hash->{TIMED_OnOff};
-  SE_DoSet($name, split(" ",$nextcmd));
+  SE_DoSet($hash->{NAME}, split(" ",$nextcmd));
 }
 
 1;

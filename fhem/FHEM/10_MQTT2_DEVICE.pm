@@ -37,6 +37,7 @@ MQTT2_DEVICE_Initialize($)
     jsonMap:textField-long
     model
     readingList:textField-long
+    setExtensionsEvent:1,0
     setList:textField-long
     setStateList
   );
@@ -338,27 +339,33 @@ MQTT2_DEVICE_Set($@)
 {
   my ($hash, @a) = @_;
   return "Not enough arguments for set" if(!defined($a[1]));
+  my $name = $hash->{NAME};
 
-  my ($sets,$cmdList) = MQTT2_getCmdHash(AttrVal($hash->{NAME}, "setList", ""));
+  my ($sets,$cmdList) = MQTT2_getCmdHash(AttrVal($name, "setList", ""));
   my $cmdName = $a[1];
   return MQTT2_DEVICE_addPos($hash,@a) if($cmdName eq "addPos"); # hidden cmd
   my $cmd = $sets->{$cmdName};
   return SetExtensions($hash, $cmdList, @a) if(!$cmd);
-  return undef if(IsDisabled($hash->{NAME}));
+  return undef if(IsDisabled($name));
 
   my $a1 = (@a > 1 ? $a[1] : '');
   $cmd = MQTT2_buildCmd($hash, \@a, $cmd);
   return if(!$cmd);
   SetExtensionsCancel($hash) if($a1 eq "on" || $a1 eq "off");
   IOWrite($hash, "publish", $cmd);
-  my $ssl = AttrVal($hash->{NAME}, "setStateList", "");
+  my $ssl = AttrVal($name, "setStateList", "");
+
+  my $cmdSE = $cmdName;
+  $cmdSE = $hash->{SetExtensionsCommand}
+              if($hash->{SetExtensionsCommand} &&
+                 AttrVal($name, "setExtensionsEvent", undef));
   if(!$ssl) {
-    readingsSingleUpdate($hash, "state", $cmdName, 1);
+    readingsSingleUpdate($hash, "state", $cmdSE, 1);
 
   } else {
     if($ssl =~ m/\b$cmdName\b/) {
       $hash->{skipStateFormat} = 1;
-      readingsSingleUpdate($hash, "state", "set_$cmdName", 1);
+      readingsSingleUpdate($hash, "state", "set_$cmdSE", 1);
       delete($hash->{skipStateFormat});
     } else {
       shift(@a);
@@ -893,6 +900,10 @@ zigbee2mqtt_devStateIcon255($)
           </li>
       </ul>
       </li><br>
+
+    <li><a name="setExtensionsEvent">setExtensionsEvent</a><br>
+      If set, the event will contain the command implemented by SetExtensions
+      (e.g. on-for-timer 10), else the executed command (e.g. on).</li><br>
 
     <a name="setList"></a>
     <li>setList cmd [topic|perl-Expression] ...<br>

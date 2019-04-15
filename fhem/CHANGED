@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  dummy/MQTT2_DEVICE/ZWave: setExtensionsEvent attr (Forum #95581)
  - change:  93_DbLog: add support for Meta.pm and delayed shutdown, attribute
                       shutdownWait removed, direct attribute help in FHEMWEB,
                       !!! NOTE !!! attr shutdownWait will be deleted it set and

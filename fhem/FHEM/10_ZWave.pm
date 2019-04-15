@@ -728,6 +728,7 @@ ZWave_Initialize($)
     noExplorerFrames:noArg
     noWakeupForApplicationUpdate:noArg
     secure_classes
+    setExtensionsEvent:1,0
     showtime:noArg
     vclasses
     useMultiCmd:noArg
@@ -1128,6 +1129,9 @@ ZWave_Cmd($$@)
     $cmd .= " ".join(" ", @a) if(@a);
     my $iohash = $hash->{IODev};
     my $withSet = ($iohash->{showSetInState} && !$cmdList{$cmd}{ctrlCmd});
+    $cmd = $hash->{SetExtensionsCommand}
+                if($hash->{SetExtensionsCommand} &&
+                   AttrVal($name, "setExtensionsEvent", undef));
     readingsSingleUpdate($hash, "state", $withSet ? "set_$cmd" : $cmd, 1);
 
   }
@@ -6456,6 +6460,11 @@ s2Hex($)
       command. It contains a space seperated list of the the command classes
       that are supported with SECURITY.
       </li>
+
+    <li><a name="setExtensionsEvent">setExtensionsEvent</a><br>
+      If set, the event will contain the command implemented by SetExtensions
+      (e.g. on-for-timer 10), else the executed command (e.g. on).</li><br>
+
     <li><a href="#showtime">showtime</a></li>
     <li><a name="vclasses">vclasses</a><br>
       This is the result of the "get DEVICE versionClassAll" command, and
