@@ -66,9 +66,10 @@ attr DEVICE model A_17a_Motion
 
 name:A_24a_Relay_Actuator
 filter:TYPE=MYSENSORS_DEVICE
-desc:Applies to standard relay actuator sketch<br>NOTE: Noty yet heavily tested first template version
+desc:Applies to standard relay actuator sketch
 attr DEVICE setCommands on:status1:on off:status1:off
-attr DEVICE devStateIcon .*on:on .*off:off on.for.timer:on-for-timer off.for.timer:off-for-timer
+attr DEVICE setExtensionsEvent 1
+attr DEVICE devStateIcon .*on:on .*off:off on.(for.timer|till.*):on-for-timer:off off.(for.timer|till.*):off-for-timer:on blink.*:light_toggle:off
 attr DEVICE model A_24a_Relay_Actuator
 
 
@@ -95,6 +96,25 @@ attr DEVICE model A_33a_temperature
 # Example sketches from MySensors.org
 # Advanced stateFormat and devStateIcon versions
 
+name:B_01a1_air_humidity_dht
+filter:TYPE=MYSENSORS_DEVICE
+desc:Applies to standard DHT sketch without battery reading<br>NOTE: Untested first template version
+attr DEVICE stateFormat temp_temperature\
+ temperature1 \
+humidity\
+ humidity
+attr DEVICE model B_01a1_air_humidity_dht
+
+name:B_02a_atmospheric_pressure
+filter:TYPE=MYSENSORS_DEVICE
+desc:Applies to standard Atmospheric Pressure sketch (BME280)NOTE: Untested first template version
+attr DEVICE stateFormat temp_temperature\
+ temperature \
+humidity\
+ humidity1 <br>
+weather_barometric_pressure\
+ pressure2 Forecast: forecast2
+attr DEVICE model B_02a_atmospheric_pressure
 
 ###########################################
 # Advanced sketches 

@@ -30,7 +30,7 @@ FHEM/00_MAXLAN.pm            rudolfkoenig/orphan  MAX
 FHEM/00_MQTT.pm              hexenmeister         MQTT
 FHEM/00_MQTT2_CLIENT.pm      rudolfkoenig         MQTT
 FHEM/00_MQTT2_SERVER.pm      rudolfkoenig         MQTT
-FHEM/00_MYSENSORS.pm         Hauswart/Beta-User   Bastelecke/MySensors
+FHEM/00_MYSENSORS.pm         Beta-User            Bastelecke/MySensors
 FHEM/00_NetzerI2C.pm         klausw               Sonstige Systeme
 FHEM/00_Neuron.pm            klausw               Sonstige Systeme
 FHEM/00_OWX.pm               pahenning            1Wire
@@ -70,7 +70,7 @@ FHEM/10_MQTT2_DEVICE.pm      rudolfkoenig         MQTT
 FHEM/10_MQTT_BRIDGE          hexenmeister         MQTT
 FHEM/10_MQTT_DEVICE          hexenmeister         MQTT
 FHEM/10_MQTT_GENERIC_BRIDGE  hexenmeister         MQTT
-FHEM/10_MYSENSORS_DEVICE     Hauswart/Beta-User   Bastelecke/MySensors
+FHEM/10_MYSENSORS_DEVICE     Beta-User            Bastelecke/MySensors
 FHEM/10_NeuronPin.pm         klausw               Sonstige Systeme
 FHEM/10_OWServer.pm          neubert/mfr69bs      1Wire
 FHEM/10_pilight_ctrl.pm      risiko               Sonstige Systeme
@@ -569,7 +569,7 @@ FHEM/lib/AttrTemplate/httpmod.template Beta-User  https://forum.fhem.de/index.ph
 FHEM/lib/AttrTemplate/mqtt2.template Beta-User    https://forum.fhem.de/index.php/topic,94494.0.html
 FHEM/lib/AttrTemplate/mysensors.template Beta-User Bastelecke/MySensors
 FHEM/lib/Device/Firmata/*    jensb                Sonstige Systeme
-FHEM/lib/Device/MySensors/*  Hauswart/Beta-User   Bastelecke/MySensors
+FHEM/lib/Device/MySensors/*  Beta-User            Bastelecke/MySensors
 FHEM/lib/MP3/*               Reinerlein           Multimedia
 FHEM/lib/Net/MQTT.pod        hexenmeister         MQTT
 FHEM/lib/Net/MQTT/*          hexenmeister         MQTT
