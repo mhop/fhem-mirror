@@ -1003,8 +1003,10 @@ sub ReceiveCommand($$$) {
               my $generalInfo = $return->{data};
               if ( ref($generalInfo->{battery}) eq "HASH" ) {
                 my $batteryInfo = $generalInfo->{battery};
-                readingsBulkUpdateIfChanged($hash, "batteryTimeToEmpty",         $batteryInfo->{timeToEmpty});
-                readingsBulkUpdateIfChanged($hash, "batteryTimeToFullCharge",    $batteryInfo->{timeToFullCharge});
+                readingsBulkUpdateIfChanged($hash, "batteryTimeToEmpty",         $batteryInfo->{timeToEmpty})
+                    if (defined($batteryInfo->{timeToEmpty}));
+                readingsBulkUpdateIfChanged($hash, "batteryTimeToFullCharge",    $batteryInfo->{timeToFullCharge})
+                    if (defined($batteryInfo->{timeToFullCharge}));
                 readingsBulkUpdateIfChanged($hash, "batteryTotalCharges",        $batteryInfo->{totalCharges});
                 readingsBulkUpdateIfChanged($hash, "batteryManufacturingDate",   $batteryInfo->{manufacturingDate});
                 readingsBulkUpdateIfChanged($hash, "batteryAuthorizationStatus", GetAuthStatusText($batteryInfo->{authorizationStatus}));
