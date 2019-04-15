@@ -28,6 +28,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 our %DbLog_vNotesIntern = (
+  "3.14.1"  => "12.04.2019 DbLog_Get: change select of MySQL Forum: https://forum.fhem.de/index.php/topic,99280.0.html ",
   "3.14.0"  => "05.04.2019 add support for Meta.pm and X_DelayedShutdownFn, attribute shutdownWait removed, ".
                            "direct attribute help in FHEMWEB ",
   "3.13.3"  => "04.03.2019 addLog better Log3 Outputs ",
@@ -2577,6 +2578,9 @@ sub DbLog_Get($@) {
     return DbLog_chartQuery($hash, @_);
   }
 
+  ########################
+  # getter für SVG 
+  ########################
   my @readings = ();
   my (%sqlspec, %from_datetime, %to_datetime);
 
@@ -2614,6 +2618,11 @@ sub DbLog_Get($@) {
 
     $readings[$i][1] = "%" if(!$readings[$i][1] || length($readings[$i][1])==0); #falls Reading nicht gefuellt setze Joker
   }
+  
+  Log3 $name, 4, "DbLog $name -> ################################################################";
+  Log3 $name, 4, "DbLog $name -> ###                  new get data for SVG                    ###";
+  Log3 $name, 4, "DbLog $name -> ################################################################";
+  Log3($name, 4, "DbLog $name -> main PID: $hash->{PID}, secondary PID: $$");
 
   $dbh = $hash->{DBHP};
   if ( !$dbh || not $dbh->ping ) {
@@ -2650,7 +2659,7 @@ sub DbLog_Get($@) {
     $sqlspec{from_timestamp} = "STR_TO_DATE('$from', '%Y-%m-%d %H:%i:%s')";
     $sqlspec{to_timestamp}   = "STR_TO_DATE('$to', '%Y-%m-%d %H:%i:%s')";
     $sqlspec{order_by_hour}  = "DATE_FORMAT(TIMESTAMP, '%Y-%m-%d %H')";
-    $sqlspec{max_value}      = "MAX(CAST(VALUE AS DECIMAL(20,8)))";
+    $sqlspec{max_value}      = "MAX(VALUE)";                                           # 12.04.2019 Forum: https://forum.fhem.de/index.php/topic,99280.0.html
     $sqlspec{day_before}     = "DATE_SUB($sqlspec{from_timestamp},INTERVAL 1 DAY)";
   } elsif ($hash->{MODEL} eq "SQLITE") {
     $sqlspec{get_timestamp}  = "TIMESTAMP";
@@ -2775,6 +2784,9 @@ sub DbLog_Get($@) {
       $retval .= "=====================================================\n";
     }
 
+    ################################
+    #        Select Auswertung      
+    ################################
     while($sth->fetch()) {
 
       ############ Auswerten des 5. Parameters: Regexp ###################
@@ -7750,18 +7762,18 @@ return;
         "perl": 5.014,
         "Data::Dumper": 0,
         "DBI": 0,
-        "DBD::mysql" :0,
-        "DBD::SQLite" :0,
         "Blocking": 0,
         "Time::HiRes": 0,
         "Time::Local": 0,
         "Encode": 0        
       },
       "recommends": {
-        "FHEM::Meta": 0,
-        "DBD::Pg" :0
+        "FHEM::Meta": 0
       },
       "suggests": {
+        "DBD::Pg" :0,
+        "DBD::mysql" :0,
+        "DBD::SQLite" :0
       }
     }
   },
@@ -7769,6 +7781,16 @@ return;
     "x_wiki": {
       "web": "https://wiki.fhem.de/wiki/DbLog",
       "title": "DbLog"
+    },
+    "repository": {
+      "x_dev": {
+        "type": "svn",
+        "url": "https://svn.fhem.de/trac/browser/trunk/fhem/contrib/DS_Starter",
+        "web": "https://svn.fhem.de/trac/browser/trunk/fhem/contrib/DS_Starter/93_DbLog.pm",
+        "x_branch": "dev",
+        "x_filepath": "fhem/contrib/",
+        "x_raw": "https://svn.fhem.de/fhem/trunk/fhem/contrib/DS_Starter/93_DbLog.pm"
+      }      
     }
   }
 }
