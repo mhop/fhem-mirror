@@ -1034,9 +1034,12 @@ sub ReceiveCommand($$$) {
         }
 
         # stop pulling for current interval
-        Log3($name, 4, "BRAVIA $name: drop successors");
-        LogSuccessors($hash, @successor);
-        return;
+        # upnp service might not run at all, e.g. on KDL-65W857C
+        if ($service ne "upnp") {
+            Log3($name, 4, "BRAVIA $name: drop successors");
+            LogSuccessors($hash, @successor);
+            return;
+        }
     }
 
     # data received
