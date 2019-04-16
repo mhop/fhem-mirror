@@ -36,7 +36,7 @@ use Blocking;
 
 eval "use JSON;1" or $missingModul .= "JSON ";
 
-my $version = "0.5";
+my $version = "0.5.1";
 
 use constant AUTHURL => "https://iam-api.dss.husqvarnagroup.net/api/v3/";
 use constant APIURL => "https://amc-api.dss.husqvarnagroup.net/app/v1/";
@@ -757,7 +757,7 @@ sub HusqvarnaAutomower_ToGerman($$) {
 		'CHARGING'                      =>	'lädt',
 		
 		'LEAVING'                       =>  'verlässt Ladestation',
-		'GOING_HOME'                    => 	'führt zur Ladestation',
+		'GOING_HOME'                    => 	'fährt zur Ladestation',
 		'WEEK_TIMER'                    => 	'Wochen-Zeitplan',
 		'WEEK_SCHEDULE'                 => 	'Wochen-Zeitplan',
 		
