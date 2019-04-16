@@ -21,10 +21,9 @@ dummy_Initialize($)
     setExtensionsEvent:1,0
     setList
     useSetExtensions
-    $readingFnAttributes;
   );
   use warnings 'qw';
-  $hash->{AttrList} = join(" ", @attrList);
+  $hash->{AttrList} = join(" ", @attrList)." $readingFnAttributes";
 }
 
 ###################################
