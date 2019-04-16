@@ -1247,6 +1247,9 @@ HUEDevice_Parse($$)
       $readings{battery} = $config->{battery} if( defined($config->{battery}) );
       $readings{reachable} = $config->{reachable} if( defined($config->{reachable}) );
       $readings{temperature} = $config->{temperature} * 0.01 if( defined($config->{temperature}) );
+
+      #Xiaomi Aqara Vibrationsensor (lumi.vibration.aq1)
+      $hash->{sensitivitymax} = $config->{sensitivitymax} if( defined ($config->{sensitivitymax}) );
     }
 
     my $lastupdated;
@@ -1316,6 +1319,12 @@ HUEDevice_Parse($$)
       $readings{fire} = $state->{fire} if( defined($state->{fire}) );
       $readings{tampered} = $state->{tampered} if( defined($state->{tampered}) );
       $readings{batteryState} = $state->{lowbattery}?'low':'ok' if( defined($state->{lowbattery}) );
+
+      #Xiaomi Aqara Vibrationsensor (lumi.vibration.aq1)
+      $readings{tiltangle} = $state->{tiltangle} if( defined ($state->{tiltangle}) );
+      $readings{vibration} = $state->{vibration} if( defined ($state->{vibration}) );
+      $readings{orientation} = join(',', @{$state->{orientation}}) if( defined($state->{orientation}) && ref($state->{orientation}) eq 'ARRAY' );
+      $readings{vibrationstrength} = $state->{vibrationstrength} if( defined ($state->{vibrationstrength}) );
     }
 
     if( scalar keys %readings ) {
