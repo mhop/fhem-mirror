@@ -329,14 +329,14 @@ sub CUL_HM_updateConfig($){##########################
     elsif ($md =~ m/^(HM-CC-VD|ROTO_ZEL-STG-RM-FSA)/){
       $hash->{helper}{oldDes} = "0";
     }
-    elsif ($md =~ m/^(HM-Dis-WM55)/){
+    elsif ($md =~ m/^(HM-DIS-WM55)/){
       foreach my $t ("s","l"){
         if(!defined $hash->{helper}{dispi}{$t}{"l1"}{d}){# setup if one is missing
           $hash->{helper}{dispi}{$t}{"l$_"}{d}=1 foreach (1,2,3,4,5,6);
         }
       }
     }
-    elsif ($md =~ m/^(HM-Dis-EP-WM55)/){
+    elsif ($md =~ m/^(HM-DIS-EP-WM55)/){
       CUL_HM_UpdtReadSingle($hash,"state","-",0) if(InternalVal($name,"chanNo",0)>3);
     }
     elsif ($md =~ m/^(CCU-FHEM)/){
@@ -1125,12 +1125,12 @@ sub CUL_HM_setupHMLAN(@){#################################
     my %lvlStr = ( md  =>{ "HM-SEC-WDS"      =>{"00"=>"dry"     ,"64"=>"damp"    ,"C8"=>"wet"        }
                           ,"HM-SEC-WDS-2"    =>{"00"=>"dry"     ,"64"=>"damp"    ,"C8"=>"wet"        }
                           ,"HM-CC-SCD"       =>{"00"=>"normal"  ,"64"=>"added"   ,"C8"=>"addedStrong"}
-                          ,"HM-Sen-RD-O"     =>{"00"=>"dry"                      ,"C8"=>"rain"}
-                          ,"HM-MOD-Em-8"     =>{"00"=>"closed"                   ,"C8"=>"open"}
+                          ,"HM-SEN-RD-O"     =>{"00"=>"dry"                      ,"C8"=>"rain"}
+                          ,"HM-MOD-EM-8"     =>{"00"=>"closed"                   ,"C8"=>"open"}
                           ,"HM-WDS100-C6-O"  =>{"00"=>"quiet"                    ,"C8"=>"storm"}
                          }
-                  ,mdCh=>{ "HM-Sen-RD-O01"   =>{"00"=>"dry"                      ,"C8"=>"rain"}
-                          ,"HM-Sen-RD-O02"   =>{"00"=>"off"                      ,"C8"=>"on"}
+                  ,mdCh=>{ "HM-SEN-RD-O01"   =>{"00"=>"dry"                      ,"C8"=>"rain"}
+                          ,"HM-SEN-RD-O02"   =>{"00"=>"off"                      ,"C8"=>"on"}
                          }
                   ,st  =>{ "smokeDetector"   =>{"01"=>"no alarm","C7"=>"tone off","C8"=>"Smoke Alarm"}
                           ,"threeStateSensor"=>{"00"=>"closed"  ,"64"=>"tilted"  ,"C8"=>"open"}
@@ -1962,7 +1962,7 @@ sub CUL_HM_Parse($$) {#########################################################
       elsif ($lvlStr{st}{$mh{st}}){$lvl = $lvlStr{st}{$mh{st}}{$lvl} }
       else                    {$lvl = hex($lvl)/2}
 
-      push @evtEt,[$mh{shash},1,"level:$lvl"] if($mh{md} eq "HM-Sen-Wa-Od");
+      push @evtEt,[$mh{shash},1,"level:$lvl"] if($mh{md} eq "HM-SEN-WA-OD");
       push @evtEt,[$mh{shash},1,"state:$lvl"];
       push @evtEt,[$mh{devH} ,1,"battery:".($err&0x80?"low":"ok")] if ($err ne "");
     }
@@ -2302,7 +2302,7 @@ sub CUL_HM_Parse($$) {#########################################################
           }
         }
 
-        if ($mh{md} eq "HM-LC-Ja1PBU-FM" && defined $mI[6]){
+        if ($mh{md} eq "HM-LC-JA1PBU-FM" && defined $mI[6]){
           my %dirName = ( 0=>"stop" ,1=>"up" ,2=>"down" ,3=>"err" );
           push @evtEt,[$mh{cHash},1,"pctSlat:".hex($mI[5])/2];
           push @evtEt,[$mh{cHash},1,"slatDir:".$dirName{hex($mI[6]) & 0x3}];          
@@ -2313,7 +2313,7 @@ sub CUL_HM_Parse($$) {#########################################################
         push @evtEt,[$mh{devH},1,"sabotageError:".(($err&0x04) ? "on":"off")];
         push @evtEt,[$mh{devH},1,"battery:".(($err&0x08)?"critical":($err&0x80?"low":"ok"))];
       }
-      elsif ($mh{md} =~ m/^(HM-LC-SW.-BA-PCB|HM-Dis-TD-T)/){
+      elsif ($mh{md} =~ m/^(HM-LC-SW.-BA-PCB|HM-DIS-TD-T)/){
         push @evtEt,[$mh{devH},1,"battery:" . (($err&0x80) ? "low" : "ok" )];
       }
     }
@@ -2337,7 +2337,7 @@ sub CUL_HM_Parse($$) {#########################################################
 
       push @evtEt,[$mh{devH},1,"battery:$bat"];
       push @evtEt,[$mh{devH},1,"state:$btnName $state"];
-      if($mh{md} eq "HM-Dis-WM55"){
+      if($mh{md} eq "HM-DIS-WM55"){
         if ($mh{devH}->{cmdStack}){# there are pending commands. we only send new ones
           delete $mh{devH}->{cmdStack};
           delete $mh{devH}->{cmdStacAESPend};
@@ -2361,7 +2361,7 @@ sub CUL_HM_Parse($$) {#########################################################
         }
       }
     }
-    if($mh{md} eq "HM-Dis-EP-WM55"){
+    if($mh{md} eq "HM-DIS-EP-WM55"){
       my $disName = InternalVal($mh{devN},"channel_03",undef);
       if (defined $disName ){
         if (AttrVal($disName,"param","") =~ m/reWriteDisplay(..)/){
@@ -2598,7 +2598,7 @@ sub CUL_HM_Parse($$) {#########################################################
       my $eo = ReadingsVal($mh{shash}->{NAME},"energyOffset",0);
       if($eCnt == 0 && hex($mh{mNo}) < 3 && !$mh{shash}->{helper}{pon}){
         if($mh{devH}->{helper}{PONtest}){
-          push @evtEt,[$mh{devH},1,"powerOn:$mh{tmStr}",] if ($mh{md} !~ m/^HM-ES-PMSw1/);
+          push @evtEt,[$mh{devH},1,"powerOn:$mh{tmStr}",] if ($mh{md} !~ m/^HM-ES-PMSW1/);
           $mh{devH}->{helper}{PONtest} = 0;
         }
         $eo += $el;
@@ -2711,7 +2711,7 @@ sub CUL_HM_Parse($$) {#########################################################
       $mh{shash} = $modules{CUL_HM}{defptr}{$chId}
                              if($modules{CUL_HM}{defptr}{$chId});
       push @evtEt,[$mh{shash},1,"brightness:".$bright];
-      if ($mh{md} eq "HM-Sec-MDIR"){
+      if ($mh{md} eq "HM-SEC-MDIR"){
         push @evtEt,[$mh{shash},1,"sabotageError:".(($err&0x0E)?"on":"off")];
       }
       else{
@@ -2825,7 +2825,7 @@ sub CUL_HM_Parse($$) {#########################################################
                              if($modules{CUL_HM}{defptr}{"$mh{src}$chn"});
       push @evtEt,[$mh{devH},1,"alive:yes"];
       push @evtEt,[$mh{devH},1,"battery:". (($err&0x80)?"low"  :"ok"  )];
-      if (  $mh{md} =~ m/^(HM-SEC-SC.*|HM-SEC-RHS|Roto_ZEL-STG-RM-F.K)$/){
+      if (  $mh{md} =~ m/^(HM-SEC-SC.*|HM-SEC-RHS|ROTO_ZEL-STG-RM-F.K)$/){
                                  push @evtEt,[$mh{devH},1,"sabotageError:".(($err&0x0E)?"on"   :"off")];}
       elsif($mh{md} ne "HM-SEC-WDS"){push @evtEt,[$mh{devH},1,"cover:"        .(($err&0x0E)?"open" :"closed")];}
     }
@@ -2997,7 +2997,7 @@ sub CUL_HM_Parse($$) {#########################################################
        && !$mh{AckDone}          #noansi: allready done device specific
        && ($mh{mFlgH} & 0x20)){  #response required Flag
                 # fhem CUL shall ack a button press
-      if ($mh{md} =~ m/^(HM-SEC-SC.*|Roto_ZEL-STG-RM-FFK)$/){# SCs - depending on FW version - do not accept ACK only. Especially if peered
+      if ($mh{md} =~ m/^(HM-SEC-SC.*|ROTO_ZEL-STG-RM-FFK)$/){# SCs - depending on FW version - do not accept ACK only. Especially if peered
         push @ack,$mh{shash},$mh{mNo}."8002".$mh{dst}.$mh{src}."0101".((hex($mI[0])&1)?"C8":"00")."00";
       }
       else{
@@ -3344,7 +3344,7 @@ sub CUL_HM_parseCommon(@){#####################################################
         $chnhash = $mhp->{devH} if (!$chnhash);
         my $chnName = $chnhash->{NAME};
         my @peers;
-        if($mhp->{md} eq "HM-Dis-WM55"){
+        if($mhp->{md} eq "HM-DIS-WM55"){
           #how ugly - this device adds one byte at begin - remove it. 
           (undef,@peers) = unpack 'A4(A8)*',$mhp->{p};
         }
@@ -8408,7 +8408,7 @@ sub CUL_HM_updtRegDisp($$$) {
   my $regLN = ($hash->{helper}{expert}{raw}?"":".")
               .sprintf("RegL_%02X.",$listNo)
               .($peerId ? CUL_HM_peerChName($peerId,$devId) : "");
-  if (($md eq "HM-MOD-Re-8") && $listNo == 0){#handle Fw bug 
+  if (($md eq "HM-MOD-RE-8") && $listNo == 0){#handle Fw bug 
     CUL_HM_ModRe8($hash,$regLN);
   }
   foreach my $rgN (@regArr){
@@ -10881,7 +10881,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
             <li><B>alarmOff</B> - switch off the alarm</li>
           </ul>
         </li>
-        <li>4Dis (HM-PB-4DIS-WM|HM-RC-Dis-H-x-EU|ROTO_ZEL-STG-RM-DWT-10)
+        <li>4Dis (HM-PB-4DIS-WM|HM-RC-DIS-H-X-EU|ROTO_ZEL-STG-RM-DWT-10)
           <ul>
             <li><B>text &lt;btn_no&gt; [on|off] &lt;text1&gt; &lt;text2&gt;</B><br>
               Set the text on the display of the device. To this purpose issue
@@ -10972,7 +10972,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
                 set time in climate channel to system time</li>
           </ul><br>
         </li>
-        <li>Climate-Control (HM-CC-RT-DN|HM-CC-RT-DN-BoM)
+        <li>Climate-Control (HM-CC-RT-DN|HM-CC-RT-DN-BOM)
           <ul>
             <li><B>controlMode &lt;auto|boost|day|night&gt;</B><br></li>
             <li><B>controlManu &lt;temp&gt;</B><br></li>
@@ -11094,7 +11094,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
             </li>
           </ul><br>
         </li>
-        <li>HM-Dis-WM55
+        <li>HM-DIS-WM55
           <ul>
             <li><B>displayWM help </B><br>
               <B>displayWM [long|short] &lt;text1&gt; &lt;color1&gt; &lt;icon1&gt; ... &lt;text6&gt; &lt;color6&gt; &lt;icon6&gt;</B><br>
@@ -11117,7 +11117,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
             </li>
           </ul><br>
         </li>
-        <li>HM-Dis-EP-WM55
+        <li>HM-DIS-EP-WM55
           <ul>
             <li><B>displayEP help </B><br>
               <B>displayEP &lt;text1,icon1:text2,icon2:text3,icon3&gt; &lt;sound&gt; &lt;repetition&gt; &lt;pause&gt; &lt;signal&gt;</B><br>
@@ -11185,7 +11185,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
             </li>
           </ul>
         </li>
-        <li>HM-Sys-sRP-Pl<br><br>
+        <li>HM-SYS-SRP-PL<br><br>
           setup the repeater's entries. Up to 36entries can be applied.
           <ul>
             <li><B>setRepeat    &lt;entry&gt; &lt;sender&gt; &lt;receiver&gt; &lt;broadcast&gt;</B><br>
@@ -11521,7 +11521,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
     </ul>  <br>
     <a name="CUL_HMparams"><b>available parameter for attribut "param"</b></a>
     <ul>
-      <li><B>HM-Sen-RD-O</B><br>
+      <li><B>HM-SEN-RD-O</B><br>
         <B>offAtPon</B> heat channel only: force heating off after powerOn<br>
         <B>onAtRain</B> heat channel only: force heating on while status changes to 'rain' and off when it changes to 'dry'<br>
       </li>
@@ -11591,7 +11591,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           incomplete or incorrect.<br>
           trigLast &lt;channel&gt; #last receiced trigger<br>
       </li>
-      <li><B>HM-CC-RT-DN and HM-CC-RT-DN-BoM</B><br>
+      <li><B>HM-CC-RT-DN and HM-CC-RT-DN-BOM</B><br>
           state:T: $actTemp desired: $setTemp valve: $vp %<br>
           motorErr: [ok|ValveTight|adjustRangeTooLarge|adjustRangeTooSmall|communicationERR|unknown|lowBat|ValveErrorPosition]
           measured-temp $actTemp<br>
@@ -11641,7 +11641,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
       <li><B>HM-OU-CFM-PL</B><br>
           [on|off|$val]<br>
       </li>
-      <li><B>HM-Sen-Wa-Od</B><br>
+      <li><B>HM-SEN-WA-OD</B><br>
           $level%<br>
           level $level%<br>
       </li>
@@ -11665,7 +11665,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           brightness $b<br>
           unknown $p<br>
       </li>
-      <li><B>HM-Sen-RD-O</B><br>
+      <li><B>HM-SEN-RD-O</B><br>
         lastRain: timestamp # no trigger generated. Begin of previous Rain -
                 timestamp of the reading is the end of rain. <br>
       </li>
@@ -11686,8 +11686,8 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           alive<br>
           motion on (to $dest)<br>
           motionCount $cnt _next:$nextTr"-"[0x0|0x1|0x2|0x3|15|30|60|120|240|0x9|0xa|0xb|0xc|0xd|0xe|0xf]<br>
-          cover [closed|open]        # not for HM-Sec-MDIR<br>
-          sabotageError [on|off]     # only HM-Sec-MDIR<br>
+          cover [closed|open]        # not for HM-SEC-MDIR<br>
+          sabotageError [on|off]     # only HM-SEC-MDIR<br>
           battery [low|ok]<br>
           devState_raw.$d1 $d2<br>
       </li>
@@ -11741,7 +11741,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
       <li><B>threeStateSensor</B><br>
           [open|tilted|closed]<br>
           [wet|damp|dry]                 #HM-SEC-WDS only<br>
-          cover [open|closed]            #HM-SEC-WDS and HM-Sec-RHS<br>
+          cover [open|closed]            #HM-SEC-WDS and HM-SEC-RHS<br>
           alive yes<br>
           battery [low|ok]<br>
           contact [open|tilted|closed]<br>
@@ -11872,7 +11872,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
               Beobachter kennt somit den Status jedes Ger&auml;ts.</li>
             <li>Die eingebaute Firmware ist fehlerhaft: Ein "toggle" Befehl wir ausgef&uuml;hrt <b>bevor</b> die
               entsprechende Antwort auf die Signaturanforderung empfangen wurde, zumindest bei einigen Schaltern
-              (HM-LC-Sw1-Pl und HM-LC-SW2-PB-FM).</li>
+              (HM-LC-SW1-PL und HM-LC-SW2-PB-FM).</li>
             <li>Der <a href="#HMLAN">HMLAN</a> Konfigurator beantwortet Signaturanforderungen selbstst&auml;ndig,
               ist dabei die 3-Byte-Adresse einer anderen CCU eingestellt welche noch immer das Standardpasswort hat,
               kann dieser Signaturanfragen korrekt beantworten.</li>
@@ -12313,7 +12313,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
             <li><B>alarmOff</B> - schaltet den Alarm aus</li>
           </ul>
         </li>
-        <li>4Dis (HM-PB-4DIS-WM|HM-PB-4DIS-WM|HM-RC-Dis-H-x-EU|ROTO_ZEL-STG-RM-DWT-10)
+        <li>4Dis (HM-PB-4DIS-WM|HM-PB-4DIS-WM|HM-RC-DIS-H-X-EU|ROTO_ZEL-STG-RM-DWT-10)
           <ul>
             <li><B>text &lt;btn_no&gt; [on|off] &lt;text1&gt; &lt;text2&gt;</B><br>
               Zeigt Text auf dem Display eines Ger&auml;ts an. F&uuml;r diesen Zweck muss zuerst ein set-Befehl
@@ -12523,7 +12523,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
             </li>
           </ul><br>
         </li>
-        <li>HM-Dis-WM55
+        <li>HM-DIS-WM55
           <ul>
             <li><B>displayWM help </B><br>
                <B>displayWM [long|short] &lt;text1&gt; &lt;color1&gt; &lt;icon1&gt; ... &lt;text6&gt; &lt;color6&gt; &lt;icon6&gt;</B><br>
@@ -12547,7 +12547,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
                </li>
           </ul><br>
         </li>
-        <li>HM-Dis-EP-WM55
+        <li>HM-DIS-EP-WM55
           <ul>
             <li><B>displayEP help </B><br>
               <B>displayEP &lt;text1,icon1:text2,icon2:text3,icon3&gt; &lt;sound&gt; &lt;repetition&gt; &lt;pause&gt; &lt;signal&gt;</B><br>
@@ -12614,7 +12614,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           </li>
           </ul>
         </li>
-        <li>HM-Sys-sRP-Pl<br>
+        <li>HM-SYS-SRP-PL<br>
           legt Eintr&auml;ge f&uuml;r den Repeater an. Bis zu 36 Eintr&auml;ge k&ouml;nnen angelegt werden.
           <ul>
             <li><B>setRepeat &lt;entry&gt; &lt;sender&gt; &lt;receiver&gt; &lt;broadcast&gt;</B><br>
@@ -12940,7 +12940,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
       </ul> <br>
     <a name="CUL_HMparams"><b>verf&uuml;gbare Parameter f&uuml;r "param"</b></a>
     <ul>
-      <li><B>HM-Sen-RD-O</B><br>
+      <li><B>HM-SEN-RD-O</B><br>
         offAtPon: nur Heizkan&auml;le: erzwingt Ausschalten der Heizung nach einem powerOn<br>
         onAtRain: nur Heizkan&auml;le: erzwingt Einschalten der Heizung bei Status 'rain' und Ausschalten bei Status 'dry'<br>
       </li>
@@ -13009,7 +13009,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         unvollst&auml;ndig oder fehlerhaft sein.<br>
         trigLast &lt;channel&gt; #letzter empfangener Trigger<br>
       </li>
-      <li><B>HM-CC-RT-DN and HM-CC-RT-DN-BoM</B><br>
+      <li><B>HM-CC-RT-DN and HM-CC-RT-DN-BOM</B><br>
         state:T: $actTemp desired: $setTemp valve: $vp %<br>
         motorErr: [ok|ValveTight|adjustRangeTooLarge|adjustRangeTooSmall|communicationERR|unknown|lowBat|ValveErrorPosition]
         measured-temp $actTemp<br>
@@ -13059,7 +13059,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
       <li><B>HM-OU-CFM-PL</B><br>
         [on|off|$val]<br>
       </li>
-      <li><B>HM-Sen-Wa-Od</B><br>
+      <li><B>HM-SEN-WA-OD</B><br>
         $level%<br>
         level $level%<br>
       </li>
@@ -13083,7 +13083,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         brightness $b<br>
         unknown $p<br>
       </li>
-      <li><B>HM-Sen-RD-O</B><br>
+      <li><B>HM-SEN-RD-O</B><br>
         lastRain: timestamp # kein Trigger wird erzeugt. Anfang des vorherigen Regen-Zeitstempels
         des Messwerts ist Ende des Regens. <br>
       </li>
@@ -13104,8 +13104,8 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         alive<br>
         motion on (to $dest)<br>
         motionCount $cnt _next:$nextTr"-"[0x0|0x1|0x2|0x3|15|30|60|120|240|0x9|0xa|0xb|0xc|0xd|0xe|0xf]<br>
-        cover [closed|open] # nicht bei HM-Sec-MDIR<br>
-        sabotageError [on|off] # nur bei HM-Sec-MDIR<br>
+        cover [closed|open] # nicht bei HM-SEC-MDIR<br>
+        sabotageError [on|off] # nur bei HM-SEC-MDIR<br>
         battery [low|ok]<br>
         devState_raw.$d1 $d2<br>
       </li>
@@ -13159,7 +13159,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
       <li><B>threeStateSensor</B><br>
         [open|tilted|closed]<br>
         [wet|damp|dry] #nur HM-SEC-WDS<br>
-        cover [open|closed] #HM-SEC-WDS und HM-Sec-RHS<br>
+        cover [open|closed] #HM-SEC-WDS und HM-SEC-RHS<br>
         alive yes<br>
         battery [low|ok]<br>
         contact [open|tilted|closed]<br>
