@@ -28,7 +28,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 our %DbLog_vNotesIntern = (
-  "4.0.0"   => "14.04.2019 rewrite DbLog_PushAsync / DbLog_Push / DbLog_Connectxx, new attribute \"bulkInsert\", ",
+  "4.1.0"   => "17.04.2019 DbLog_Get: change reconnect for MySQL, change index suggestion in DbLog_configcheck ",
+  "4.0.0"   => "14.04.2019 rewrite DbLog_PushAsync / DbLog_Push / DbLog_Connectxx, new attribute \"bulkInsert\" ",
   "3.14.1"  => "12.04.2019 DbLog_Get: change select of MySQL Forum: https://forum.fhem.de/index.php/topic,99280.0.html ",
   "3.14.0"  => "05.04.2019 add support for Meta.pm and X_DelayedShutdownFn, attribute shutdownWait removed, ".
                            "direct attribute help in FHEMWEB ",
@@ -3023,19 +3024,42 @@ sub DbLog_Get($@) {
   Log3 $name, 4, "DbLog $name -> ################################################################";
   Log3($name, 4, "DbLog $name -> main PID: $hash->{PID}, secondary PID: $$");
   
-  $dbh = $hash->{DBHP};
-  if ( !$dbh || not $dbh->ping ) {
-      # DB Session dead, try to reopen now !
-      return "Can't connect to database." if(!DbLog_ConnectPush($hash,1));
-	  $dbh = $hash->{DBHP};
-  } 
+#  $dbh = $hash->{DBHP};
+#  if ( !$dbh || not $dbh->ping ) {
+#      # DB Session dead, try to reopen now !
+#      return "Can't connect to database." if(!DbLog_ConnectPush($hash,1));
+#	  $dbh = $hash->{DBHP};
+#  } 
   
-  if( $hash->{PID} != $$ ) {
-      #create new connection for plotfork
-      $dbh->disconnect(); 
-      return "Can't connect to database." if(!DbLog_ConnectPush($hash,1));
-	  $dbh = $hash->{DBHP};
-  }
+#  if( $hash->{PID} != $$ ) {
+#      #create new connection for plotfork
+#      $dbh->disconnect(); 
+#      return "Can't connect to database." if(!DbLog_ConnectPush($hash,1));
+#	  $dbh = $hash->{DBHP};
+#  }
+  
+  my $nh = ($hash->{MODEL} ne 'SQLITE')?1:0;
+  # Unterscheidung $dbh um Abbrüche in Plots (SQLite) zu vermeiden und 
+  # andererseite kein "MySQL-Server has gone away" Fehler
+  # $hash->{PID} != $$ -> create new connection for plotfork
+  if ($nh || $hash->{PID} != $$) {
+      $dbh = DbLog_ConnectNewDBH($hash);
+	  return "Can't connect to database." if(!$dbh);
+  } else {
+      $dbh = $hash->{DBHP};
+      eval {
+          if ( !$dbh || not $dbh->ping ) {
+              # DB Session dead, try to reopen now !
+              DbLog_ConnectPush($hash,1);
+          }  
+      };
+      if ($@) {
+          Log3($name, 1, "DbLog $name: DBLog_Push - DB Session dead! - $@");
+	      return $@;
+      } else {
+          $dbh = $hash->{DBHP};
+      }
+  } 
 
   #vorbereiten der DB-Abfrage, DB-Modell-abhaengig
   if ($hash->{MODEL} eq "POSTGRESQL") {
@@ -3453,7 +3477,9 @@ sub DbLog_Get($@) {
   }
 
   #cleanup (plotfork) connection
-  $dbh->disconnect() if( $hash->{PID} != $$ );
+  # $dbh->disconnect() if( $hash->{PID} != $$ );
+  
+  $dbh->disconnect() if($nh || $hash->{PID} != $$);
 
   if($internal) {
     $internal_data = \$retval;
@@ -3811,13 +3837,13 @@ sub DbLog_configcheck($) {
           @six_rdg = DbLog_sqlget($hash,"SHOW INDEX FROM history where Key_name='Search_Idx' and Column_name='READING'");
           @six_tsp = DbLog_sqlget($hash,"SHOW INDEX FROM history where Key_name='Search_Idx' and Column_name='TIMESTAMP'");
           if (@six_dev && @six_rdg && @six_tsp) {
-              $check .= "Index 'Search_Idx' exists and contains recommended fields 'DEVICE', 'READING', 'TIMESTAMP'. <br>";
+              $check .= "Index 'Search_Idx' exists and contains recommended fields 'DEVICE', 'TIMESTAMP', 'READING'. <br>";
               $rec    = "settings o.k.";
           } else {  
 	          $check .= "Index 'Search_Idx' exists but doesn't contain recommended field 'DEVICE'. <br>" if (!@six_dev);
 		      $check .= "Index 'Search_Idx' exists but doesn't contain recommended field 'READING'. <br>" if (!@six_rdg);
 		      $check .= "Index 'Search_Idx' exists but doesn't contain recommended field 'TIMESTAMP'. <br>" if (!@six_tsp);
-		      $rec    = "The index should contain the fields 'DEVICE', 'READING', 'TIMESTAMP'. ";
+		      $rec    = "The index should contain the fields 'DEVICE', 'TIMESTAMP', 'READING'. ";
 			  $rec   .= "You can change the index by executing e.g. <br>";
 			  $rec   .= "<b>'ALTER TABLE `history` DROP INDEX `Search_Idx`, ADD INDEX `Search_Idx` (`DEVICE`, `READING`, `TIMESTAMP`) USING BTREE;'</b> <br>";
 			  $rec   .= "Depending on your database size this command may running a long time. <br>";
@@ -3906,7 +3932,7 @@ sub DbLog_configcheck($) {
           @dix = DbLog_sqlget($hash,"SHOW INDEX FROM history where Key_name='Report_Idx'");
 	      if (!@dix) {
 	          $check .= "At least one DbRep-device assigned to $name is used, but the recommended index 'Report_Idx' is missing. <br>";
-	          $rec    = "You can create the index by executing statement <b>'CREATE INDEX Report_Idx ON `history` (READING, TIMESTAMP) USING BTREE;'</b> <br>";
+	          $rec    = "You can create the index by executing statement <b>'CREATE INDEX Report_Idx ON `history` (TIMESTAMP,READING) USING BTREE;'</b> <br>";
 		      $rec   .= "Depending on your database size this command may running a long time. <br>";
 		      $rec   .= "Please make sure the device '$name' is operating in asynchronous mode to avoid FHEM from blocking when creating the index. <br>";
 		      $rec   .= "<b>Note:</b> If you have just created another index which covers the same fields and order as suggested (e.g. a primary key) you don't need to create the 'Report_Idx' as well ! <br>";
@@ -3915,13 +3941,13 @@ sub DbLog_configcheck($) {
               @dix_tsp = DbLog_sqlget($hash,"SHOW INDEX FROM history where Key_name='Report_Idx' and Column_name='TIMESTAMP'");
               if (@dix_rdg && @dix_tsp) {
 			      $check .= "At least one DbRep-device assigned to $name is used. ";
-                  $check .= "Index 'Report_Idx' exists and contains recommended fields 'READING', 'TIMESTAMP'. <br>";
+                  $check .= "Index 'Report_Idx' exists and contains recommended fields 'TIMESTAMP', 'READING'. <br>";
                   $rec    = "settings o.k.";
               } else {  
 			      $check .= "You use at least one DbRep-device assigned to $name. ";
 		          $check .= "Index 'Report_Idx' exists but doesn't contain recommended field 'READING'. <br>" if (!@dix_rdg);
 		          $check .= "Index 'Report_Idx' exists but doesn't contain recommended field 'TIMESTAMP'. <br>" if (!@dix_tsp);
-		          $rec    = "The index should contain the fields 'READING', 'TIMESTAMP'. ";
+		          $rec    = "The index should contain the fields 'TIMESTAMP', 'READING'. ";
 		          $rec   .= "You can change the index by executing e.g. <br>";
 		          $rec   .= "<b>'ALTER TABLE `history` DROP INDEX `Report_Idx`, ADD INDEX `Report_Idx` (`READING`, `TIMESTAMP`) USING BTREE'</b> <br>";
 		          $rec   .= "Depending on your database size this command may running a long time. <br>";
@@ -3941,12 +3967,12 @@ sub DbLog_configcheck($) {
 		      $irep_rdg = 1 if($irep =~ /reading/);
 		      $irep_tsp = 1 if($irep =~ /timestamp/);
               if ($irep_rdg && $irep_tsp) {
-                  $check .= "Index 'Report_Idx' exists and contains recommended fields 'READING', 'TIMESTAMP'. <br>";
+                  $check .= "Index 'Report_Idx' exists and contains recommended fields 'TIMESTAMP', 'READING'. <br>";
                   $rec    = "settings o.k.";
               } else {  
 		          $check .= "Index 'Report_Idx' exists but doesn't contain recommended field 'READING'. <br>" if (!$irep_rdg);
 		          $check .= "Index 'Report_Idx' exists but doesn't contain recommended field 'TIMESTAMP'. <br>" if (!$irep_tsp);
-		          $rec    = "The index should contain the fields 'READING', 'TIMESTAMP'. ";
+		          $rec    = "The index should contain the fields 'TIMESTAMP', 'READING'. ";
 			      $rec   .= "You can change the index by executing e.g. <br>";
 			      $rec   .= "<b>'DROP INDEX \"Report_Idx\"; CREATE INDEX \"Report_Idx\" ON history USING btree (reading, \"timestamp\")'</b> <br>";
 			      $rec   .= "Depending on your database size this command may running a long time. <br>";
@@ -3957,7 +3983,7 @@ sub DbLog_configcheck($) {
           @dix = DbLog_sqlget($hash,"SELECT name,sql FROM sqlite_master WHERE type='index' AND name='Report_Idx'");
 	      if (!$dix[0]) {
 	          $check .= "The index 'Report_Idx' is missing. <br>";
-	          $rec    = "You can create the index by executing statement <b>'CREATE INDEX Report_Idx ON `history` (READING, TIMESTAMP)'</b> <br>";
+	          $rec    = "You can create the index by executing statement <b>'CREATE INDEX Report_Idx ON `history` (TIMESTAMP,READING)'</b> <br>";
 		      $rec   .= "Depending on your database size this command may running a long time. <br>";
 		      $rec   .= "Please make sure the device '$name' is operating in asynchronous mode to avoid FHEM from blocking when creating the index. <br>";
               $rec   .= "<b>Note:</b> If you have just created another index which covers the same fields and order as suggested (e.g. a primary key) you don't need to create the 'Search_Idx' as well ! <br>";
@@ -3966,14 +3992,14 @@ sub DbLog_configcheck($) {
 		      $irep_rdg = 1 if(lc($irep) =~ /reading/);
 		      $irep_tsp = 1 if(lc($irep) =~ /timestamp/);
               if ($irep_rdg && $irep_tsp) {
-                  $check .= "Index 'Report_Idx' exists and contains recommended fields 'READING', 'TIMESTAMP'. <br>";
+                  $check .= "Index 'Report_Idx' exists and contains recommended fields 'TIMESTAMP', 'READING'. <br>";
                   $rec    = "settings o.k.";
               } else {
 		          $check .= "Index 'Report_Idx' exists but doesn't contain recommended field 'READING'. <br>" if (!$irep_rdg);
 		          $check .= "Index 'Report_Idx' exists but doesn't contain recommended field 'TIMESTAMP'. <br>" if (!$irep_tsp);
-		          $rec    = "The index should contain the fields 'READING', 'TIMESTAMP'. ";
+		          $rec    = "The index should contain the fields 'TIMESTAMP', 'READING'. ";
 			      $rec   .= "You can change the index by executing e.g. <br>";
-			      $rec   .= "<b>'DROP INDEX \"Report_Idx\"; CREATE INDEX Report_Idx ON `history` (READING, TIMESTAMP)'</b> <br>";
+			      $rec   .= "<b>'DROP INDEX \"Report_Idx\"; CREATE INDEX Report_Idx ON `history` (TIMESTAMP,READING)'</b> <br>";
 			      $rec   .= "Depending on your database size this command may running a long time. <br>";
 	          }
 	      }
