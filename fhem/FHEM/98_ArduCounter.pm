@@ -577,7 +577,7 @@ sub ArduCounter_ConfigureDevice($)
         
         my $iAttr = AttrVal($name, "interval", "");     
         if (!$iAttr) {
-            $iAttr = "30 60 2 2";
+            $iAttr = "30 600 2 2";
             Log3 $name, 5, "$name: ConfigureDevice: interval attr not set - take default $iAttr";
         }
         if ($iAttr =~ /^(\d+) (\d+) ?(\d+)? ?(\d+)?$/) {
@@ -1494,8 +1494,8 @@ sub ArduCounter_HandleHistory($$$$)
                 if    ($act eq "C") {$action = "count"} 
                 elsif ($act eq "G") {$action = "gap"} 
                 elsif ($act eq "R") {$action = "reject"} 
-                elsif ($act eq "X") {$action = "ignore drop"} 
-                elsif ($act eq "P") {$action = "ignore peak"} 
+                elsif ($act eq "X") {$action = "ignore spike"} 
+                elsif ($act eq "P") {$action = "ignore drop"} 
                 my $histLine = sprintf ("%6s", $seq) . ' ' . $fTime . " $pinName " . 
                     sprintf ("%7s", sprintf("%.3f", $len/1000)) . " seconds at $level -> $action";
                 Log3 $name, 5, "$name: HandleHistory $histLine ($he)";
