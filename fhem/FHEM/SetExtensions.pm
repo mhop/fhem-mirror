@@ -21,7 +21,7 @@ SetExtensionsCancel($)
 
   if($hash->{TIMED_OnOff}) {      # on-for-timer, blink
     my $cmd = $hash->{TIMED_OnOff}{CMD};
-    RemoveInternalTimer("SE $name $cmd");
+    RemoveInternalTimer($hash->{TIMED_OnOff});
     delete $hash->{TIMED_OnOff};
   }
 
@@ -122,10 +122,11 @@ SetExtensions($$@)
     if($param) {
       $hash->{TIMED_OnOff} = {
         START=>time(), START_FMT=>TimeNow(), DURATION=>$param,
-        CMD=>$cmd, NEXTCMD=>$cmd2
+        CMD=>$cmd, NEXTCMD=>$cmd2, hash=>$hash
       };
       SE_DoSet($name, $cmd1);
-      InternalTimer(gettimeofday()+$param,"SetExtensionsFn",$hash, 0);
+      InternalTimer(gettimeofday()+$param,
+                        "SetExtensionsFn", $hash->{TIMED_OnOff}, 0);
     }
 
   } elsif($cmd =~ m/^(on|off)-till/) {
@@ -161,9 +162,11 @@ SetExtensions($$@)
       if($param) {
         $hash->{TIMED_OnOff} = {
           START=>time(), START_FMT=>TimeNow(), DURATION=>$param,
-          CMD=>$cmd, NEXTCMD=>"$cmd $param $p2 ".($a[2] ? "0" : "1")
+          CMD=>$cmd, NEXTCMD=>"$cmd $param $p2 ".($a[2] ? "0" : "1"),
+          hash=>$hash
         };
-        InternalTimer(gettimeofday()+$p2, "SetExtensionsFn",$hash,0);
+        InternalTimer(gettimeofday()+$p2,
+                        "SetExtensionsFn", $hash->{TIMED_OnOff}, 0);
       }
     }
 
@@ -213,8 +216,9 @@ SetExtensions($$@)
 sub
 SetExtensionsFn($)
 {
-  my ($hash) = @_;
-  return if(!$hash || !$hash->{TIMED_OnOff});
+  my ($too) = @_;
+  my $hash = $too->{hash};
+  return if(!$hash || !$defs{$hash->{NAME}}); # deleted
 
   my $nextcmd = $hash->{TIMED_OnOff}{NEXTCMD};
   delete $hash->{TIMED_OnOff};
