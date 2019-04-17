@@ -8,7 +8,7 @@ use FHEM::Meta;
 sub Installer_Initialize($) {
     my ($modHash) = @_;
 
-    # $modHash->{SetFn}    = "FHEM::Installer::Set";
+    $modHash->{SetFn}    = "FHEM::Installer::Set";
     $modHash->{GetFn}    = "FHEM::Installer::Get";
     $modHash->{DefFn}    = "FHEM::Installer::Define";
     $modHash->{NotifyFn} = "FHEM::Installer::Notify";
@@ -19,6 +19,11 @@ sub Installer_Initialize($) {
       . "disabledForIntervals "
       . "installerMode:update,developer "
       . "updateListReading:1,0 "
+      . "updatePerlDualLifeModules:0,1 "
+      . "updatePerlUsedModulesOnly:1,0 "
+      . "installPerlReinstall:0,1 "
+      . "installPerlNoTest:0,1 "
+      . "installPerlEnforced:0,1 "
       . $readingFnAttributes;
 
     return FHEM::Meta::InitMod( __FILE__, $modHash );
@@ -34,6 +39,8 @@ use FHEM::Meta;
 use GPUtils qw(GP_Import);
 use JSON;
 use Data::Dumper;
+use Config;
+use ExtUtils::Installed;
 
 # Run before module compilation
 BEGIN {
@@ -70,6 +77,9 @@ BEGIN {
           RemoveInternalTimer
           TimeNow
           Value
+          trim
+          ltrim
+          rtrim
           )
     );
 }
@@ -110,7 +120,7 @@ sub Define($$) {
         # presets for FHEMWEB
         $attr{$name}{alias} = 'FHEM Installer Status';
         $attr{$name}{devStateIcon} =
-'fhem.updates.available:security@red:outdated fhem.is.up.to.date:security@green:outdated .*fhem.outdated.*in.progress:system_fhem_reboot@orange .*in.progress:system_fhem_update@orange warning.*:message_attention@orange error.*:message_attention@red';
+'.*updates.available:security@red:outdated up.to.date:security@green:outdated .*outdated.*in.progress:system_fhem_reboot@orange .*in.progress:system_fhem_update@orange warning.*:message_attention@orange error.*:message_attention@red';
         $attr{$name}{group} = 'Update';
         $attr{$name}{icon}  = 'system_fhem';
         $attr{$name}{room}  = 'System';
@@ -211,20 +221,219 @@ sub Notify($$) {
     {
         # Load metadata for all modules that are in use
         FHEM::Meta::Load();
+
+        # restore from packageList
+        my $decode_json =
+          eval { decode_json( ReadingsVal( $name, '.packageListPerl', '' ) ) };
+        unless ($@) {
+            $hash->{".fhem"}{installer}{cpanversions} = $decode_json->{versions}
+              if ( defined( $decode_json->{versions} ) );
+            $hash->{".fhem"}{installer}{listedPerlPackages} =
+              $decode_json->{listedPerl}
+              if ( defined( $decode_json->{listedPerl} ) );
+            $hash->{".fhem"}{installer}{outdatedPerlPackages} =
+              $decode_json->{outdatedPerl}
+              if ( defined( $decode_json->{outdatedPerl} ) );
+        }
+        $decode_json = undef;
+
+        # restore from installedList
+        $decode_json =
+          eval { decode_json( ReadingsVal( $name, '.installedListPerl', '' ) ) };
+        unless ($@) {
+            $hash->{".fhem"}{installer}{installedPerlPackages} = $decode_json;
+        }
+        $decode_json = undef;
+
+        # restore from uninstalledList
+        $decode_json = eval {
+            decode_json( ReadingsVal( $name, '.uninstalledListPerl', '' ) );
+        };
+        unless ($@) {
+            $hash->{".fhem"}{installer}{uninstalledPerlPackages} = $decode_json;
+        }
+        $decode_json = undef;
+
+        # restore from updatedList
+        $decode_json =
+          eval { decode_json( ReadingsVal( $name, '.updatedListPerl', '' ) ) };
+        unless ($@) {
+            $hash->{".fhem"}{installer}{updatedPerlPackages} = $decode_json;
+        }
+        $decode_json = undef;
+
+        # Trigger update
+        if ( ReadingsVal( $name, 'cpanVersion', 'none' ) ne 'none' ) {
+            ProcessUpdateTimer($hash);
+        }
+        else {
+            $hash->{".fhem"}{installer}{cmd} = 'getCpanVersion';
+            AsynchronousExecuteFhemCommand($hash);
+        }
     }
 
     if (
         $devname eq $name
-        and (  grep ( /^installed:.successful$/, @{$events} )
-            or grep ( /^uninstalled:.successful$/, @{$events} )
-            or grep ( /^updated:.successful$/,     @{$events} ) )
+        and (  grep ( /^installedPerl:.successful$/, @{$events} )
+            or grep ( /^uninstalledPerl:.successful$/, @{$events} )
+            or grep ( /^updatedPerl:.successful$/,     @{$events} ) )
       )
     {
-        $hash->{".fhem"}{installer}{cmd} = 'outdated';
+        $hash->{".fhem"}{installer}{cmd} = 'outdatedPerl';
         AsynchronousExecuteFhemCommand($hash);
     }
 
     return;
+}
+
+sub Set($$@) {
+
+    my ( $hash, $name, @aa ) = @_;
+
+    my ( $cmd, @args ) = @aa;
+
+    my $updatePerlDualLifeModules =
+      AttrVal( $name, 'updatePerlDualLifeModules', 0 );
+    my $updatePerlUsedModulesOnly =
+      AttrVal( $name, 'updatePerlUsedModulesOnly', 1 );
+
+    # outdatedPerl
+    if ( lc($cmd) eq 'outdatedperl' ) {
+        $hash->{".fhem"}{installer}{cmd} = $cmd;
+    }
+
+    # statusRequest
+    elsif ( lc($cmd) eq 'statusrequest' ) {
+        $hash->{".fhem"}{installer}{cmd} = 'getCpanVersion';
+    }
+
+    # update
+    elsif ( lc($cmd) eq 'updateperl' ) {
+        return "Please run outdatedPerl check first"
+          unless (
+            defined( $hash->{".fhem"}{installer}{outdatedPerlPackages} ) );
+        my $update;
+
+        # generate explicit list for packages to update
+        if ( @args == 0
+            || lc( $args[0] ) eq 'all' )
+        {
+            undef @args;
+            foreach (
+                keys %{ $hash->{".fhem"}{installer}{outdatedPerlPackages} } )
+            {
+                next if ( $_ eq 'undefined' );
+                if ( $updatePerlDualLifeModules
+                    || !FHEM::Meta::ModuleIsPerlCore($_) )
+                {
+                    push @args,
+                      $_ . '@'
+                      . $hash->{".fhem"}{installer}{outdatedPerlPackages}{$_}
+                      {latest}
+                      if ( !$updatePerlUsedModulesOnly
+                        || defined( $FHEM::Meta::dependents{pkgs}{$_} ) );
+                }
+            }
+        }
+
+        foreach my $pkgfull (@args) {
+            next
+              unless (
+                $pkgfull =~
+                /^(?:@([\w-]+)\/)?([\w\-\:]+)(?:@([\d\.=<>]+|latest))?$/
+                && defined(
+                    $hash->{".fhem"}{installer}{outdatedPerlPackages}{$2}
+                )
+              );
+
+            $update .= " " if ($update);
+            $update .= $2 . ( $3 && $3 ne 'latest' ? '@' . $3 : '' );
+        }
+
+        return "Everything is up-to-date already"
+          unless ($update);
+
+        $hash->{".fhem"}{installer}{cmd} = "installPerl " . $update;
+    }
+
+    # installPerl
+    elsif ( lc($cmd) eq 'installperl' ) {
+        return "usage: $cmd <package>" if ( @args < 1 );
+        $hash->{".fhem"}{installer}{cmd} = 'installPerl ' . join( " ", @args );
+    }
+
+    # uninstallPerl
+    elsif ( lc($cmd) eq 'uninstallperl' ) {
+        return "usage: $cmd <package>" if ( @args < 1 );
+        return "cpanminus cannot be uninstalled from here"
+          if (
+            grep (
+m/^(?:@([\w-]+)\/)?(?:App::)?(cpanm(?:inus)?)(?:@([\d\.=<>]+|latest))?$/i,
+                @args )
+          );
+        return "cpan-outdated cannot be uninstalled from here"
+          if (
+            grep (
+m/^(?:@([\w-]+)\/)?(?:App::)?(cpan\-?outdated)(?:@([\d\.=<>]+|latest))?$/i,
+                @args )
+          );
+        $hash->{".fhem"}{installer}{cmd} =
+          'uninstallPerl ' . join( " ", @args );
+    }
+
+    # return Usage:
+    else {
+        my $list = '';
+
+        if ( !defined( $hash->{".fhem"}{installer}{cpanversions} ) ) {
+            $list = "installPerl:App::cpanminus statusRequest:noArg";
+        }
+        elsif (
+            !defined( $hash->{".fhem"}{installer}{cpanversions}{cpanoutdated} )
+          )
+        {
+            $list = "installPerl:App::cpanoutdated statusRequest:noArg";
+        }
+        else {
+            $list = "outdatedPerl:noArg";
+            $list .= " installPerl";
+            $list .= " uninstallPerl";
+
+            if ( defined( $hash->{".fhem"}{installer}{outdatedPerlPackages} )
+                and scalar
+                keys %{ $hash->{".fhem"}{installer}{outdatedPerlPackages} } >
+                0 )
+            {
+                my $update;
+
+                foreach (
+                    sort
+                    keys %{ $hash->{".fhem"}{installer}{outdatedPerlPackages} }
+                  )
+                {
+                    if (
+                        (
+                            $updatePerlDualLifeModules
+                            || !FHEM::Meta::ModuleIsPerlCore($_)
+                        )
+                        && ( !$updatePerlUsedModulesOnly
+                            || defined( $FHEM::Meta::dependents{pkgs}{$_} ) )
+                      )
+                    {
+                        $update .= "," if ($update);
+                        $update .= $_;
+                    }
+                }
+                $list .= " updatePerl:all,$update" if ($update);
+            }
+        }
+
+        return "Unknown argument $cmd, choose one of $list";
+    }
+
+    AsynchronousExecuteFhemCommand($hash);
+
+    return undef;
 }
 
 #TODO
@@ -235,7 +444,26 @@ sub Get($$@) {
 
     my ( $cmd, @args ) = @aa;
 
-    if ( lc($cmd) eq 'checkprereqs' ) {
+    my $updatePerlDualLifeModules =
+      AttrVal( $name, 'updatePerlDualLifeModules', 0 );
+    my $updatePerlUsedModulesOnly =
+      AttrVal( $name, 'updatePerlUsedModulesOnly', 1 );
+
+    if ( lc($cmd) eq 'showoutdatedperllist' ) {
+        return "usage: $cmd" if ( @args != 0 );
+
+        my $ret = CreateOutdatedPerlList( $hash, $cmd );
+        return $ret;
+
+    }
+    elsif ( lc($cmd) eq 'showinstalledperllist' ) {
+        return "usage: $cmd" if ( @args != 0 );
+
+        my $ret = CreateInstalledPerlList( $hash, $cmd );
+        return $ret;
+
+    }
+    elsif ( lc($cmd) eq 'checkprereqs' ) {
         my $ret = CreatePrereqsList( $hash, $cmd, @args );
         return $ret;
     }
@@ -265,6 +493,12 @@ sub Get($$@) {
         return "usage: $cmd PACKAGE" if ( @args != 1 );
 
         my $ret = CreateRawMetaJson( $hash, $cmd, $args[0] );
+        return $ret;
+    }
+    elsif ( lc($cmd) eq 'showerrorlist' ) {
+        return "usage: $cmd" if ( @args != 0 );
+
+        my $ret = CreateErrorList($hash);
         return $ret;
     }
     else {
@@ -318,6 +552,33 @@ sub Get($$@) {
             $list .= ':noArg';
         }
 
+        my $counter = 0;
+        if ( defined( $hash->{".fhem"}{installer}{outdatedPerlPackages} ) ) {
+            foreach (
+                keys %{ $hash->{".fhem"}{installer}{outdatedPerlPackages} } )
+            {
+                $counter++
+                  if (
+                    (
+                        $updatePerlDualLifeModules
+                        || !FHEM::Meta::ModuleIsPerlCore($_)
+                    )
+                    && ( !$updatePerlUsedModulesOnly
+                        || defined( $FHEM::Meta::dependents{pkgs}{$_} ) )
+                  );
+            }
+        }
+
+        $list .= " showOutdatedPerlList:noArg"
+          if ($counter);
+        $list .= " showInstalledPerlList:noArg"
+          if ( defined( $hash->{".fhem"}{installer}{listedPerlPackages} )
+            and scalar
+            keys %{ $hash->{".fhem"}{installer}{listedPerlPackages} } > 0 );
+        $list .= " showErrorList:noArg"
+          if ( defined( $hash->{".fhem"}{installer}{errors} )
+            and scalar @{ $hash->{".fhem"}{installer}{errors} } > 0 );
+
         return "Unknown argument $cmd, choose one of $list";
     }
 }
@@ -339,8 +600,8 @@ sub Event ($$) {
 
     foreach my $package ( split / /, $pkgs ) {
         next
-          unless (
-            $package =~ /^(?:@([\w-]+)\/)?([\w-]+)(?:@([\d\.=<>]+|latest))?$/ );
+          unless ( $package =~
+            /^(?:@([\w-]+)\/)?([\w\-\:]+)(?:@([\d\.=<>]+|latest))?$/ );
         $list .= " " if ($list);
         $list .= $2;
     }
@@ -408,13 +669,14 @@ sub ProcessUpdateTimer($) {
         if (
             __ToDay() ne (
                 split(
-                    ' ', ReadingsTimestamp( $name, 'outdated', '1970-01-01' )
+                    ' ',
+                    ReadingsTimestamp( $name, 'outdatedPerl', '1970-01-01' )
                 )
             )[0]
             or ReadingsVal( $name, 'state', '' ) eq 'disabled'
           )
         {
-            $hash->{".fhem"}{installer}{cmd} = 'outdated';
+            $hash->{".fhem"}{installer}{cmd} = 'outdatedPerl';
             AsynchronousExecuteFhemCommand($hash);
         }
     }
@@ -441,17 +703,19 @@ sub AsynchronousExecuteFhemCommand($) {
 
     my $subprocess = SubProcess->new( { onRun => \&OnRun } );
     $subprocess->{installer} = $hash->{".fhem"}{installer};
-    $subprocess->{installer}{host} = $hash->{HOST};
     $subprocess->{installer}{debug} =
       ( AttrVal( $name, 'verbose', 0 ) > 3 ? 1 : 0 );
+    $subprocess->{installer}{installPerlReinstall} =
+      AttrVal( $name, 'installPerlReinstall', 0 ) ? '--reinstall ' : '';
+    $subprocess->{installer}{installPerlNoTest} =
+      AttrVal( $name, 'installPerlNoTest', 0 ) ? '--notest ' : '';
+    $subprocess->{installer}{installPerlEnforced} =
+      AttrVal( $name, 'installPerlEnforced', 0 ) ? '--force ' : '';
+
     my $pid = $subprocess->run();
 
-    readingsSingleUpdate(
-        $hash,
-        'state',
-        'command \'fhem ' . $hash->{".fhem"}{installer}{cmd} . '\' in progress',
-        1
-    );
+    readingsSingleUpdate( $hash, 'state',
+        'command \'' . $hash->{".fhem"}{installer}{cmd} . '\' in progress', 1 );
 
     if ( !defined($pid) ) {
         Log3 $name, 1,
@@ -524,253 +788,520 @@ sub ExecuteFhemCommand($) {
 
     my $installer = {};
     $installer->{debug} = $cmd->{debug};
+    my $sudo = 'sudo -n ';
 
-    my $cmdPrefix = '';
-    my $cmdSuffix = '';
-
-    if ( $cmd->{host} =~ /^(?:(.*)@)?([^:]+)(?::(\d+))?$/
-        && lc($2) ne "localhost" )
-    {
-        my $port = '';
-        if ($3) {
-            $port = "-p $3 ";
-        }
-
-        # One-time action to add remote hosts key.
-        # If key changes, user will need to intervene
-        #   and cleanup known_hosts file manually for security reasons
-        $cmdPrefix =
-            'KEY=$(ssh-keyscan -t ed25519 '
-          . $2
-          . ' 2>/dev/null); '
-          . 'grep -q -E "^${KEY% *}" ${HOME}/.ssh/known_hosts || echo "${KEY}" >> ${HOME}/.ssh/known_hosts; ';
-        $cmdPrefix .=
-            'KEY=$(ssh-keyscan -t rsa '
-          . $2
-          . ' 2>/dev/null); '
-          . 'grep -q -E "^${KEY% *}" ${HOME}/.ssh/known_hosts || echo "${KEY}" >> ${HOME}/.ssh/known_hosts; ';
-
-        # wrap SSH command
-        $cmdPrefix .=
-          'ssh -oBatchMode=yes ' . $port . ( $1 ? "$1@" : '' ) . $2 . ' \'';
-        $cmdSuffix = '\' 2>&1';
-    }
-
-    my $global = '-g ';
-    my $sudo   = 'sudo -n ';
-
-    if ( $cmd->{npmglobal} eq '0' ) {
-        $global = '';
-        $sudo   = '';
-    }
-
-    $installer->{npminstall} =
-        $cmdPrefix
-      . 'echo n | sh -c "'
+    $installer->{cpanversions} = 'echo n | ' . 'cpanm --version 2>&1';
+    $installer->{installperl} =
+        'echo n | sh -c "'
       . $sudo
-      . 'NODE_ENV=${NODE_ENV:-production} npm install '
-      . $global
-      . '--json --silent --unsafe-perm %PACKAGES%" 2>&1'
-      . $cmdSuffix;
-    $installer->{npmuninstall} =
-        $cmdPrefix
-      . 'echo n | sh -c "'
+      . '$(which cpanm) --quiet '
+      . $cmd->{installPerlReinstall}
+      . $cmd->{installPerlNoTest}
+      . $cmd->{installPerlEnforced}
+      . '%PACKAGES%" 2>&1';
+    $installer->{uninstallperl} =
+        'echo n | sh -c "'
       . $sudo
-      . 'NODE_ENV=${NODE_ENV:-production} npm uninstall '
-      . $global
-      . '--json --silent %PACKAGES%" 2>&1'
-      . $cmdSuffix;
-    $installer->{npmupdate} =
-        $cmdPrefix
-      . 'echo n | sh -c "'
-      . $sudo
-      . 'NODE_ENV=${NODE_ENV:-production} npm update '
-      . $global
-      . '--json --silent --unsafe-perm %PACKAGES%" 2>&1'
-      . $cmdSuffix;
-    $installer->{npmoutdated} =
-        $cmdPrefix
-      . 'echo n | '
-      . 'echo "{' . "\n"
-      . '\"versions\": "; '
-      . 'node -e "console.log(JSON.stringify(process.versions));"; '
-      . 'L1=$(npm list '
-      . $global
-      . '--json --silent --depth=0 2>/dev/null); '
-      . '[ "$L1" != "" ] && [ "$L1" != "\n" ] && echo ", \"listed\": $L1"; '
-      . 'L2=$(npm outdated '
-      . $global
-      . '--json --silent 2>&1); '
-      . '[ "$L2" != "" ] && [ "$L2" != "\n" ] && echo ", \"outdated\": $L2"; '
-      . 'echo "}"'
-      . $cmdSuffix;
+      . '$(which cpanm) -U --quiet --force %PACKAGES%" 2>&1';
+    $installer->{outdatedperl} =
+        'echo n | '
+      . '$(which cpanm) --version 2>&1; '
+      . 'L1=$(cpan-outdated --verbose 2>&1); '
+      . '[ "$L1" != "" ] && [ "$L1" != "\n" ] && echo "@Outdated:\n$L1"; ';
 
     my $response;
 
-    if ( $cmd->{cmd} =~ /^install (.+)/ ) {
-        my @packages = '';
-        foreach my $package ( split / /, $1 ) {
-            next
-              unless ( $package =~
-                /^(?:@([\w-]+)\/)?([\w-]+)(?:@([\d\.=<>]+|latest))?$/ );
+    if ( $cmd->{cmd} =~ /^installperl (.+)/i ) {
 
-            push @packages,
-              "homebridge"
-              if (
-                $package =~ m/^homebridge-/i
-                && (
-                        defined( $cmd->{listedpackages} )
-                    and defined( $cmd->{listedpackages}{dependencies} )
-                    and !defined(
-                        $cmd->{listedpackages}{dependencies}{homebridge}
-                    )
-                )
-              );
-
-            push @packages, $package;
+        if (   not defined( $cmd->{cpanversions} )
+            or not defined( $cmd->{cpanversions}{cpanminus} ) )
+        {
+            if ( $1 =~ /App::cpanminus/i ) {
+                $installer->{installperl} =
+                    'echo n | if [ -z "$(cpanm --version 2>/dev/null)" ]; then'
+                  . ' sh -c "curl -sSL https://git.io/cpanm | '
+                  . $sudo
+                  . '$(which perl) - App::cpanminus >/dev/null 2>&1" 2>&1; '
+                  . 'fi; '
+                  . 'cpanm --version >/dev/null 2>&1'
+                  . ' && sh -c "'
+                  . $sudo
+                  . ' $(which cpanm) --quiet App::cpanoutdated" 2>&1';
+            }
         }
-        my $pkglist = join( ' ', @packages );
-        return unless ( $pkglist ne '' );
-        $installer->{npminstall} =~ s/%PACKAGES%/$pkglist/gi;
-
-        print qq($installer->{npminstall}\n) if ( $installer->{debug} == 1 );
-        $response = InstallerInstall($installer);
-    }
-    elsif ( $cmd->{cmd} =~ /^uninstall (.+)/ ) {
-        my @packages = '';
-        foreach my $package ( split / /, $1 ) {
-            next
-              unless ( $package =~
-                /^(?:@([\w-]+)\/)?([\w-]+)(?:@([\d\.=<>]+|latest))?$/ );
-            push @packages, $package;
-        }
-        my $pkglist = join( ' ', @packages );
-        return unless ( $pkglist ne '' );
-        $installer->{npmuninstall} =~ s/%PACKAGES%/$pkglist/gi;
-        print qq($installer->{npmuninstall}\n)
-          if ( $installer->{debug} == 1 );
-        $response = InstallerUninstall($installer);
-    }
-    elsif ( $cmd->{cmd} =~ /^update(?: (.+))?/ ) {
-        my $pkglist = '';
-        if ( defined($1) ) {
-            my @packages;
+        else {
+            my @packages = '';
             foreach my $package ( split / /, $1 ) {
                 next
                   unless ( $package =~
-                    /^(?:@([\w-]+)\/)?([\w-]+)(?:@([\d\.=<>]+|latest))?$/ );
-                push @packages, $package;
+                    /^(?:@([\w-]+)\/)?([\w\-\:]+)(?:@([\d\.=<>]+|latest))?$/ );
+                push @packages, $2 . ( $3 && $3 ne 'latest' ? '@' . $3 : '' );
             }
-            $pkglist = join( ' ', @packages );
+            my $pkglist = join( ' ', @packages );
+            return unless ( $pkglist ne '' );
+            $installer->{installperl} =~ s/%PACKAGES%/$pkglist/gi;
         }
-        $installer->{npmupdate} =~ s/%PACKAGES%/$pkglist/gi;
-        print qq($installer->{npmupdate}\n) if ( $installer->{debug} == 1 );
-        $response = InstallerUpdate($installer);
+        print qq($installer->{installperl}\n)
+          if ( $installer->{debug} == 1 );
+        $response = CpanInstall($installer);
     }
-    elsif ( $cmd->{cmd} eq 'outdated' ) {
-        print qq($installer->{npmoutdated}\n) if ( $installer->{debug} == 1 );
-        $response = InstallerOutdated($installer);
+    elsif ( $cmd->{cmd} =~ /^uninstallperl (.+)/i ) {
+        my @packages = '';
+        foreach my $package ( split / /, $1 ) {
+            next
+              unless ( $package =~
+                /^(?:@([\w-]+)\/)?([\w\-\:]+)(?:@([\d\.=<>]+|latest))?$/ );
+            push @packages, $2;
+        }
+        my $pkglist = join( ' ', @packages );
+        return unless ( $pkglist ne '' );
+        $installer->{uninstallperl} =~ s/%PACKAGES%/$pkglist/gi;
+        print qq($installer->{uninstallperl}\n)
+          if ( $installer->{debug} == 1 );
+        $response = CpanUninstall($installer);
+    }
+    elsif ( lc( $cmd->{cmd} ) eq 'outdatedperl' ) {
+        print qq($installer->{outdatedperl}\n)
+          if ( $installer->{debug} == 1 );
+        $response = CpanOutdated($installer);
+    }
+    elsif ( lc( $cmd->{cmd} ) eq 'getcpanversion' ) {
+        print qq($installer->{cpanversions}\n)
+          if ( $installer->{debug} == 1 );
+        $response = GetCpanVersion($installer);
     }
 
     return $response;
 }
 
-sub InstallerUpdate($) {
+sub GetCpanVersion($) {
     my $cmd = shift;
-    my $p   = `$cmd->{npmupdate}`;
-    my $ret = RetrieveInstallerOutput( $cmd, $p );
-
-    return $ret;
-}
-
-sub InstallerOutdated($) {
-    my $cmd = shift;
-    my $p   = `$cmd->{npmoutdated}`;
-    my $ret = RetrieveInstallerOutput( $cmd, $p );
-
-    return $ret;
-}
-
-sub RetrieveInstallerOutput($$) {
-    my $cmd = shift;
-    my $p   = shift;
     my $h   = {};
+    local $ENV{PATH} = __GetExtendedEnvPath();
+    my $p = `$cmd->{cpanversions}`;
 
-    return $h unless ( defined($p) && $p ne '' );
+    my $found    = 0;
+    my $isConfig = 0;
+    my $isEnv    = 0;
+    my $isInc    = 0;
 
-    # first try to interprete text as JSON directly
-    my $decode_json = eval { decode_json($p) };
-    if ( not $@ ) {
-        $h = $decode_json;
+    if ( $p && $p ne '' ) {
+        foreach my $line ( split /\n/, $p ) {
+            chomp($line);
+            print qq($line\n) if ( $cmd->{debug} == 1 );
+
+            if ( $line =~
+/^cpanm (?:\([A-za-z:]+\) )?version (\d+\.\d+) (\([\w\/\.\-]+\)).*/i
+              )
+            {
+                $h->{versions}{cpanminus} = $1;
+                $found = 1;
+            }
+            elsif ( $line =~ /^perl version (\d+\.\d+) (\([\w\/\.\-]+\)).*/i ) {
+                $h->{versions}{perl} = $1;
+            }
+            elsif ( $line =~ /^\s+\%Config:.*$/i ) {
+                $isConfig = 1;
+            }
+            elsif ( $line =~ /^\s+\%ENV:.*$/i ) {
+                $isConfig = 0;
+                $isEnv    = 1;
+            }
+            elsif ( $line =~ /^\s+\@INC:.*$/i ) {
+                $isConfig = 0;
+                $isEnv    = 0;
+                $isInc    = 1;
+            }
+            elsif ($isConfig) {
+                $line =~ s/^\s+//g;
+                my @splitted = split( /=/, $line, 2 );
+                $h->{versions}{Config}{ $splitted[0] } = $splitted[1];
+            }
+            elsif ($isEnv) {
+                $line =~ s/^\s+//g;
+                my @splitted = split( /=/, $line, 2 );
+                $h->{versions}{ENV}{ $splitted[0] } = $splitted[1];
+            }
+            elsif ($isInc) {
+                $line =~ s/^\s+//g;
+                push @{ $h->{versions}{INC} }, $line;
+            }
+
+            # error
+            elsif ( !$found ) {
+                my $error = {};
+
+                if ( $line =~
+                    m/(?:(\w+?): )?(?:(\w+? \d+): )?(\w+?): [^:]*?not.found$/i
+                    or $line =~
+m/(?:(\w+?): )?(?:(\w+? \d+): )?(\w+?): [^:]*?No.such.file.or.directory$/i
+                  )
+                {
+                    $error->{code}    = "E404";
+                    $error->{summary} = "Not Found - $3 is not installed";
+                    $error->{detail}  = $line;
+                }
+                else {
+                    $error->{code}    = "E501";
+                    $error->{summary} = "Parsing error";
+                    $error->{detail}  = $p;
+                }
+
+                push @{ $h->{error} }, $error;
+                last;
+            }
+        }
+    }
+    else {
+        my $error;
+        $error->{code}    = "E500";
+        $error->{summary} = "Unknown error - Missing command output";
+        $error->{detail}  = $p;
+        push @{ $h->{error} }, $error;
     }
 
-    # if this was not successful,
-    #   we'll disassamble the text
-    else {
-        my $o;
-        my $json;
-        my $skip = 0;
+    # check for cpan-outdated
+    my $cpanoutdated = `which cpan-outdated`;
+    $h->{versions}{cpanoutdated} = 0
+      if ( $cpanoutdated =~ /^\/.+/ );
+
+    return $h;
+}
+
+sub CpanInstall($) {
+    my $cmd = shift;
+    my $h   = {};
+    local $ENV{PATH} = __GetExtendedEnvPath();
+    my $p = `$cmd->{installperl}`;
+
+    if ( $p && $p ne '' ) {
+        $h->{success} = 0;
 
         foreach my $line ( split /\n/, $p ) {
             chomp($line);
             print qq($line\n) if ( $cmd->{debug} == 1 );
 
-            # JSON output
-            if ($skip) {
-                $json .= $line;
+            if ( $line =~
+                /^Successfully\s+(\S+)\s+([\S]+)-(\d+\.\d+(?:_\d+)?).*$/i )
+            {
+                my $r = $1;
+                my $m = $2;
+                my $v = $3;
+                $m =~ s/-/::/g;
+                $h->{installed}{$m}{result}  = $r;
+                $h->{installed}{$m}{version} = $v;
+                $h->{success}++;
             }
 
-            # reached JSON
-            elsif ( $line =~ /^\{$/ ) {
-                $json = $line;
-                $skip = 1;
+            elsif ( $line =~
+                /^(\S+)\s+is\s+up\s+to\s+date.*\((\d+\.\d+(?:_\d+)?)\).*$/i )
+            {
+                my $m = $1;
+                my $v = $2;
+                $h->{installed}{$m}{result}  = 'existing';
+                $h->{installed}{$m}{version} = $v;
+                $h->{success}++;
             }
 
-            # other output before JSON
+            elsif ( $line =~ /^(\d+)\s+(\S+)\s+(\S+)$/i ) {
+
+                # ignore total result
+            }
+
+            elsif ( $line =~ /^\!\s+(.+)$/i ) {
+                my $error = {};
+                my $sum   = $1;
+                $error->{code}    = "E500";
+                $error->{code}    = "E404" if ( $sum =~ /^Couldn't find.*/i );
+                $error->{summary} = $sum;
+                push @{ $h->{error} }, $error;
+            }
+
+            elsif ( $line =~
+                m/(?:(\w+?): )?(?:(\w+? \d+): )?(\w+?): [^:]*?not.found$/i
+                or $line =~
+m/(?:(\w+?): )?(?:(\w+? \d+): )?(\w+?): [^:]*?No.such.file.or.directory$/i
+              )
+            {
+                my $error = {};
+                $error->{code}    = "E404";
+                $error->{summary} = "Not Found - $3 is not installed";
+                $error->{detail}  = $line;
+                push @{ $h->{error} }, $error;
+                last;
+            }
+
+            elsif ( $line =~ m/^curl:.*Failed writing body.*$/i ) {
+                my $error       = {};
+                my $runningUser = getpwuid($<);
+                my $cpanmbin    = `which cpanm`;
+                $cpanmbin =~ s/\n//g;
+                $error->{code} = "E403";
+                $error->{summary} =
+                  "Forbidden - " . "passwordless sudo permissions required";
+                $error->{detail} =
+                    $line
+                  . "<br /><br />"
+                  . "You may add the following lines to /etc/sudoers.d/$runningUser:\n"
+                  . "<pre>"
+                  . "  $runningUser ALL=(ALL) NOPASSWD:SETENV: "
+                  . $cpanmbin
+                  . ' - App\:\:cpanminus'
+                  . "</pre>";
+                push @{ $h->{error} }, $error;
+                last;
+            }
+
+            elsif ( $line =~ m/^sudo: /i ) {
+                my $error       = {};
+                my $runningUser = getpwuid($<);
+                my $cpanmbin    = `which cpanm`;
+                $cpanmbin =~ s/\n//g;
+                $error->{code} = "E403";
+                $error->{summary} =
+                  "Forbidden - " . "passwordless sudo permissions required";
+                $error->{detail} =
+                    $line
+                  . "<br /><br />"
+                  . "You may add the following lines to /etc/sudoers.d/$runningUser:\n"
+                  . "<pre>"
+                  . "  $runningUser ALL=(ALL) NOPASSWD:SETENV: "
+                  . $cpanmbin . " *"
+                  . "</pre>";
+                push @{ $h->{error} }, $error;
+                last;
+            }
+
             else {
-                $o .= $line;
+                my $error = {};
+                $error->{code}    = "E501";
+                $error->{summary} = "Parsing error";
+                $error->{detail}  = $line;
+                push @{ $h->{error} }, $error;
             }
         }
+    }
+    else {
+        my $error = {};
+        $error->{code}    = "E500";
+        $error->{summary} = "Unknown error - Missing command output";
+        $error->{detail}  = $p;
+        push @{ $h->{error} }, $error;
+    }
 
-        $decode_json = eval { decode_json($json) };
+    return $h;
+}
 
-        # Found valid JSON output
-        if ( not $@ ) {
-            $h = $decode_json;
+sub CpanUninstall($) {
+    my $cmd = shift;
+    my $h   = {};
+    local $ENV{PATH} = __GetExtendedEnvPath();
+    my $p = `$cmd->{uninstallperl}`;
+
+    if ( $p && $p ne '' ) {
+        $h->{success} = 0;
+
+        foreach my $line ( split /\n/, $p ) {
+            chomp($line);
+            print qq($line\n) if ( $cmd->{debug} == 1 );
+            next if ( $line eq '' );
+
+            if ( $line =~ /^Successfully\s+(\S+)\s+([\S]+).*$/i ) {
+                $h->{uninstalled}{$2}{result} = $1;
+                $h->{success}++;
+            }
+
+            elsif ( $line =~ /^\!\s(\S+)\s+is\s+not\s+found.*$/i ) {
+                $h->{uninstalled}{$1}{result} = 'not installed';
+                $h->{success}++;
+            }
+
+            elsif ( $line =~ /^\!\s+(.+)$/i ) {
+                my $error = {};
+                $error->{code}    = "E500";
+                $error->{summary} = $1;
+                push @{ $h->{error} }, $error;
+            }
+
+            elsif ( $line =~
+                m/(?:(\w+?): )?(?:(\w+? \d+): )?(\w+?): [^:]*?not.found$/i
+                or $line =~
+m/(?:(\w+?): )?(?:(\w+? \d+): )?(\w+?): [^:]*?No.such.file.or.directory$/i
+              )
+            {
+                my $error = {};
+                $error->{code}    = "E404";
+                $error->{summary} = "Not Found - $3 is not installed";
+                $error->{detail}  = $line;
+                push @{ $h->{error} }, $error;
+                last;
+            }
+
+            elsif ( $line =~ m/^sudo: /i ) {
+                my $error       = {};
+                my $runningUser = getpwuid($<);
+                my $cpanmbin    = `which cpanm`;
+                $cpanmbin =~ s/\n//g;
+                $error->{code} = "E403";
+                $error->{summary} =
+                  "Forbidden - " . "passwordless sudo permissions required";
+                $error->{detail} =
+                    $line
+                  . "<br /><br />"
+                  . "You may add the following lines to /etc/sudoers.d/$runningUser:\n"
+                  . "<pre>"
+                  . "  $runningUser ALL=(ALL) NOPASSWD:SETENV: "
+                  . $cpanmbin . " *"
+                  . "</pre>";
+                push @{ $h->{error} }, $error;
+                last;
+            }
+
+            elsif ( $line =~ m/^\s+.*$/ ) {
+
+                # ignore lines that begin with spaces or are empty
+            }
+
+            else {
+                my $error = {};
+                $error->{code}    = "E501";
+                $error->{summary} = "Parsing error";
+                $error->{detail}  = $line;
+                push @{ $h->{error} }, $error;
+            }
         }
+    }
+    else {
+        my $error = {};
+        $error->{code}    = "E500";
+        $error->{summary} = "Unknown error - Missing command output";
+        $error->{detail}  = $p;
+        push @{ $h->{error} }, $error;
+    }
 
-        # Final parsing error
-        else {
-            if ($o) {
-                if ( $o =~ m/Permission.denied.\(publickey\)\.?\r?\n?$/i ) {
-                    $h->{error}{code} = "E403";
-                    $h->{error}{summary} =
-                        "Forbidden - None of the SSH keys from ~/.ssh/ "
-                      . "were authorized to access remote host";
-                    $h->{error}{detail} = $o;
+    return $h;
+}
+
+sub CpanOutdated($) {
+    my $cmd = shift;
+    my $h   = {};
+    local $ENV{PATH} = __GetExtendedEnvPath();
+    my $p = `$cmd->{outdatedperl}`;
+
+    my $found      = 0;
+    my $isConfig   = 0;
+    my $isEnv      = 0;
+    my $isInc      = 0;
+    my $isOutdated = 0;
+
+    if ( $p && $p ne '' ) {
+        foreach my $line ( split /\n/, $p ) {
+            chomp($line);
+            print qq($line\n) if ( $cmd->{debug} == 1 );
+
+            if ( $line =~
+/^cpanm (?:\([A-za-z:]+\) )?version (\d+\.\d+) (\([\w\/\.\-]+\)).*/i
+              )
+            {
+                $h->{versions}{cpanminus} = $1;
+                $found = 1;
+            }
+            elsif ( $line =~ /^perl version (\d+\.\d+) (\([\w\/\.\-]+\)).*/i ) {
+                $h->{versions}{perl} = $1;
+            }
+            elsif ( $line =~ /^\s+\%Config:.*$/i ) {
+                $isConfig = 1;
+            }
+            elsif ( $line =~ /^\s+\%ENV:.*$/i ) {
+                $isConfig = 0;
+                $isEnv    = 1;
+            }
+            elsif ( $line =~ /^\s+\@INC:.*$/i ) {
+                $isConfig = 0;
+                $isEnv    = 0;
+                $isInc    = 1;
+            }
+            elsif ( $line =~ /^\@Outdated:.*$/i ) {
+                $isConfig   = 0;
+                $isEnv      = 0;
+                $isInc      = 0;
+                $isOutdated = 1;
+            }
+            elsif ($isConfig) {
+                $line =~ s/^\s+//g;
+                my @splitted = split( /=/, $line, 2 );
+                $h->{versions}{Config}{ $splitted[0] } = $splitted[1];
+            }
+            elsif ($isEnv) {
+                $line =~ s/^\s+//g;
+                my @splitted = split( /=/, $line, 2 );
+                $h->{versions}{ENV}{ $splitted[0] } = $splitted[1];
+            }
+            elsif ($isInc) {
+                $line =~ s/^\s+//g;
+                push @{ $h->{versions}{INC} }, $line;
+            }
+            elsif ($isOutdated) {
+                if ( $line =~
+/^([\w\:]+)\s+(\d+.\d+(?:_\d+)?)\s+(\d+.\d+(?:_\d+)?)\s+(\S+)$/
+                  )
+                {
+                    $h->{outdatedPerl}{$1}{current} = $2;
+                    $h->{outdatedPerl}{$1}{latest}  = $3;
                 }
-                elsif ( $o =~
+                else {
+                    $found = 0;
+                }
+            }
+
+            # error
+            if ( !$found ) {
+                my $error       = {};
+                my $runningUser = getpwuid($<);
+                if ( $line =~
                     m/(?:(\w+?): )?(?:(\w+? \d+): )?(\w+?): [^:]*?not.found$/i
-                    or $o =~
+                    or $line =~
 m/(?:(\w+?): )?(?:(\w+? \d+): )?(\w+?): [^:]*?No.such.file.or.directory$/i
                   )
                 {
-                    $h->{error}{code}    = "E404";
-                    $h->{error}{summary} = "Not Found - $3 is not installed";
-                    $h->{error}{detail}  = $o;
+                    $error->{code}    = "E404";
+                    $error->{summary} = "Not Found - $3 is not installed";
+                    $error->{detail}  = $line;
                 }
                 else {
-                    $h->{error}{code}    = "E501";
-                    $h->{error}{summary} = "Parsing error - " . $@;
-                    $h->{error}{detail}  = $p;
+                    $error->{code}    = "E501";
+                    $error->{summary} = "Parsing error";
+                    $error->{detail}  = $p;
                 }
-            }
-            else {
-                $h->{error}{code}    = "E500";
-                $h->{error}{summary} = "Parsing error - " . $@;
-                $h->{error}{detail}  = $p;
+                push @{ $h->{error} }, $error;
+                last;
             }
         }
+    }
+    else {
+        my $error = {};
+        $error->{code}    = "E500";
+        $error->{summary} = "Unknown error - Missing command output";
+        $error->{detail}  = $p;
+        push @{ $h->{error} }, $error;
+    }
+
+    # check for cpan-outdated
+    my $cpanoutdated = `which cpan-outdated`;
+    $h->{versions}{cpanoutdated} = 0
+      if ( $cpanoutdated =~ /^\/.+/ );
+
+    my ($ExtUtilsInstalled) = ExtUtils::Installed->new();
+    my (@modules)           = $ExtUtilsInstalled->modules();
+
+    foreach (@modules) {
+        next if ( $_ eq 'CPAN::outdated' );
+
+        my ($missing) = $ExtUtilsInstalled->validate($_);
+        my $version = $ExtUtilsInstalled->version($_);
+        $h->{listedPerl}{$_}{missing} = $missing if ($missing);
+        $h->{listedPerl}{$_}{version} =
+          $version && $version ne '' ? version->parse($version)->numify : 0;
     }
 
     return $h;
@@ -794,31 +1325,40 @@ sub PreProcessing($$) {
 
     Log3 $hash, 4, "Installer ($name) - JSON: $json";
 
+    if (   defined( $decode_json->{versions} )
+        && defined( $decode_json->{versions}{cpanminus} ) )
+    {
+        $hash->{".fhem"}{installer}{cpanversions} =
+          $decode_json->{versions};
+    }
+
     # safe result in hidden reading
     #   to restore module state after reboot
-    if ( $hash->{".fhem"}{installer}{cmd} eq 'outdated' ) {
-        delete $hash->{".fhem"}{installer}{outdatedpackages};
-        $hash->{".fhem"}{installer}{outdatedpackages} = $decode_json->{outdated}
-          if ( defined( $decode_json->{outdated} ) );
-        delete $hash->{".fhem"}{installer}{listedpackages};
-        $hash->{".fhem"}{installer}{listedpackages} = $decode_json->{listed}
-          if ( defined( $decode_json->{listed} ) );
-        readingsSingleUpdate( $hash, '.packageList', $json, 0 );
+    if ( $hash->{".fhem"}{installer}{cmd} eq 'outdatedPerl' ) {
+        delete $hash->{".fhem"}{installer}{outdatedPerlPackages};
+        $hash->{".fhem"}{installer}{outdatedPerlPackages} =
+          $decode_json->{outdatedPerl}
+          if ( defined( $decode_json->{outdatedPerl} ) );
+        delete $hash->{".fhem"}{installer}{listedPerlPackages};
+        $hash->{".fhem"}{installer}{listedPerlPackages} =
+          $decode_json->{listedPerl}
+          if ( defined( $decode_json->{listedPerl} ) );
+        readingsSingleUpdate( $hash, '.packageListPerl', $json, 0 );
     }
     elsif ( $hash->{".fhem"}{installer}{cmd} =~ /^install/ ) {
-        delete $hash->{".fhem"}{installer}{installedpackages};
-        $hash->{".fhem"}{installer}{installedpackages} = $decode_json;
-        readingsSingleUpdate( $hash, '.installedList', $json, 0 );
+        delete $hash->{".fhem"}{installer}{installedPerlPackages};
+        $hash->{".fhem"}{installer}{installedPerlPackages} = $decode_json;
+        readingsSingleUpdate( $hash, '.installedListPerl', $json, 0 );
     }
     elsif ( $hash->{".fhem"}{installer}{cmd} =~ /^uninstall/ ) {
-        delete $hash->{".fhem"}{installer}{uninstalledpackages};
-        $hash->{".fhem"}{installer}{uninstalledpackages} = $decode_json;
-        readingsSingleUpdate( $hash, '.uninstalledList', $json, 0 );
+        delete $hash->{".fhem"}{installer}{uninstalledPerlPackages};
+        $hash->{".fhem"}{installer}{uninstalledPerlPackages} = $decode_json;
+        readingsSingleUpdate( $hash, '.uninstalledListPerl', $json, 0 );
     }
     elsif ( $hash->{".fhem"}{installer}{cmd} =~ /^update/ ) {
-        delete $hash->{".fhem"}{installer}{updatedpackages};
-        $hash->{".fhem"}{installer}{updatedpackages} = $decode_json;
-        readingsSingleUpdate( $hash, '.updatedList', $json, 0 );
+        delete $hash->{".fhem"}{installer}{updatedPerlPackages};
+        $hash->{".fhem"}{installer}{updatedPerlPackages} = $decode_json;
+        readingsSingleUpdate( $hash, '.updatedListPerl', $json, 0 );
     }
 
     if (   defined( $decode_json->{warning} )
@@ -842,18 +1382,22 @@ sub WriteReadings($$) {
     my ( $hash, $decode_json ) = @_;
 
     my $name = $hash->{NAME};
+    my $updatePerlDualLifeModules =
+      AttrVal( $name, 'updatePerlDualLifeModules', 0 );
+    my $updatePerlUsedModulesOnly =
+      AttrVal( $name, 'updatePerlUsedModulesOnly', 1 );
 
     Log3 $hash, 4, "Installer ($name) - Write Readings";
     Log3 $hash, 5, "Installer ($name) - " . Dumper $decode_json;
 
     readingsBeginUpdate($hash);
 
-    if ( $hash->{".fhem"}{installer}{cmd} eq 'outdated' ) {
+    if ( $hash->{".fhem"}{installer}{cmd} eq 'outdatedPerl' ) {
         readingsBulkUpdate(
             $hash,
-            'outdated',
+            'outdatedPerl',
             (
-                defined( $decode_json->{listed} )
+                defined( $decode_json->{listedPerl} )
                 ? 'check completed'
                 : 'check failed'
             )
@@ -861,29 +1405,50 @@ sub WriteReadings($$) {
         $hash->{helper}{lastSync} = __ToDay();
     }
 
-    readingsBulkUpdateIfChanged( $hash, 'updatesAvailable',
-        scalar keys %{ $decode_json->{outdated} } )
-      if ( $hash->{".fhem"}{installer}{cmd} eq 'outdated' );
-    readingsBulkUpdateIfChanged( $hash, 'updateListAsJSON',
-        eval { encode_json( $hash->{".fhem"}{installer}{outdatedpackages} ) } )
-      if ( AttrVal( $name, 'updateListReading', 'none' ) ne 'none' );
+    my $counter = 0;
+    if ( $hash->{".fhem"}{installer}{cmd} eq 'outdatedPerl' ) {
+        foreach ( keys %{ $decode_json->{outdatedPerl} } ) {
+            $counter++
+              if (
+                (
+                    $updatePerlDualLifeModules
+                    || !FHEM::Meta::ModuleIsPerlCore($_)
+                )
+                && ( !$updatePerlUsedModulesOnly
+                    || defined( $FHEM::Meta::dependents{pkgs}{$_} ) )
+              );
+        }
+        readingsBulkUpdateIfChanged( $hash, 'updatesAvailablePerl', $counter );
+    }
+    readingsBulkUpdateIfChanged(
+        $hash,
+        'updateListAsJSON',
+        eval {
+            encode_json( $hash->{".fhem"}{installer}{outdatedPerlPackages} );
+        }
+    ) if ( AttrVal( $name, 'updateListReading', 'none' ) ne 'none' );
 
     my $result = 'successful';
     $result = 'error' if ( defined( $hash->{".fhem"}{installer}{errors} ) );
     $result = 'warning'
       if ( defined( $hash->{".fhem"}{installer}{'warnings'} ) );
 
-    readingsBulkUpdate( $hash, 'installed', $result )
-      if ( $hash->{".fhem"}{installer}{cmd} =~ /^install/ );
-    readingsBulkUpdate( $hash, 'uninstalled', $result )
-      if ( $hash->{".fhem"}{installer}{cmd} =~ /^uninstall/ );
-    readingsBulkUpdate( $hash, 'updated', $result )
-      if ( $hash->{".fhem"}{installer}{cmd} =~ /^update/ );
+    readingsBulkUpdate( $hash, 'installedPerl', $result )
+      if ( $hash->{".fhem"}{installer}{cmd} =~ /^installperl /i );
+    readingsBulkUpdate( $hash, 'uninstalledPerl', $result )
+      if ( $hash->{".fhem"}{installer}{cmd} =~ /^uninstallperl /i );
+    readingsBulkUpdate( $hash, 'updatedPerl', $result )
+      if ( $hash->{".fhem"}{installer}{cmd} =~ /^updateperl /i );
 
-    readingsBulkUpdateIfChanged( $hash, "nodejsVersion",
-        $decode_json->{versions}{node} )
+    readingsBulkUpdateIfChanged( $hash, "cpanminusVersion",
+        $decode_json->{versions}{cpanminus} )
       if ( defined( $decode_json->{versions} )
-        && defined( $decode_json->{versions}{node} ) );
+        && defined( $decode_json->{versions}{cpanminus} ) );
+
+    readingsBulkUpdateIfChanged( $hash, "perlVersion",
+        $decode_json->{versions}{perl} )
+      if ( defined( $decode_json->{versions} )
+        && defined( $decode_json->{versions}{perl} ) );
 
     if ( defined( $decode_json->{error} ) ) {
         readingsBulkUpdate( $hash, 'state',
@@ -894,18 +1459,28 @@ sub WriteReadings($$) {
             'warning \'' . $hash->{".fhem"}{installer}{cmd} . '\'' );
     }
     else {
+        if ( defined( $hash->{".fhem"}{installer}{outdatedPerlPackages} ) ) {
+            foreach (
+                keys %{ $hash->{".fhem"}{installer}{outdatedPerlPackages} } )
+            {
+                $counter++
+                  if (
+                    (
+                        $updatePerlDualLifeModules
+                        || !FHEM::Meta::ModuleIsPerlCore($_)
+                    )
+                    && ( !$updatePerlUsedModulesOnly
+                        || defined( $FHEM::Meta::dependents{pkgs}{$_} ) )
+                  );
+            }
+        }
 
         readingsBulkUpdate(
             $hash, 'state',
             (
-                (
-                         scalar keys %{ $decode_json->{outdated} } > 0
-                      or scalar
-                      keys %{ $hash->{".fhem"}{installer}{outdatedpackages} } >
-                      0
-                )
-                ? 'npm updates available'
-                : 'npm is up to date'
+                $counter
+                ? 'updates available'
+                : 'up to date'
             )
         );
     }
@@ -914,44 +1489,20 @@ sub WriteReadings($$) {
     readingsEndUpdate( $hash, 1 );
 
     ProcessUpdateTimer($hash)
-      if ( $hash->{".fhem"}{installer}{cmd} eq 'getFhemVersion'
+      if ( $hash->{".fhem"}{installer}{cmd} eq 'getCpanVersion'
         && !defined( $decode_json->{error} ) );
 }
 
-sub CreatePrereqsList {
-    my $hash    = shift;
-    my $getCmd  = shift;
-    my $cfgfile = shift;
-    my $mode =
-      ( $cfgfile && $cfgfile eq '1' ? 'all' : ( $cfgfile ? 'file' : 'live' ) );
-    $mode = 'list' if ( $cfgfile && defined( $modules{$cfgfile} ) );
-
-    my @defined;
-    if ( $mode eq 'live' || $mode eq 'all' ) {
-        foreach ( keys %modules ) {
-            next unless ( $mode eq 'all' || defined( $modules{$_}{LOADED} ) );
-            push @defined, $_;
-        }
-    }
-    elsif ( $mode eq 'file' ) {
-        @defined = __GetDefinedModulesFromFile($cfgfile);
-        return
-            'File '
-          . $cfgfile
-          . ' does not seem to contain any FHEM device configuration'
-          unless ( @defined > 0 );
-    }
-    elsif ( $mode eq 'list' ) {
-        @defined = @_;
-        unshift @defined, $cfgfile;
-    }
+sub CreateErrorList($) {
+    my $hash = shift;
+    my @ret;
+    my $errors;
+    my $html =
+      defined( $hash->{CL} ) && $hash->{CL}{TYPE} eq "FHEMWEB" ? 1 : 0;
+    $errors = $hash->{".fhem"}{installer}{errors};
 
     # disable automatic links to FHEM devices
     delete $FW_webArgs{addLinks};
-
-    my @ret;
-    my $html =
-      defined( $hash->{CL} ) && $hash->{CL}{TYPE} eq "FHEMWEB" ? 1 : 0;
 
     my $header = '';
     my $footer = '';
@@ -1016,6 +1567,509 @@ sub CreatePrereqsList {
         $tdOpen      = '<td style="vertical-align: top;">';
         $tdOpen2     = '<td style="vertical-align: top;" colspan="2">';
         $tdOpen3     = '<td style="vertical-align: top;" colspan="3">';
+        $strongOpen  = '<strong>';
+        $strongClose = '</strong>';
+        $tdClose     = '</td>';
+        $thClose     = '</th>';
+        $trClose     = '</tr>';
+        $tClose      = '</table>';
+        $blockClose  = '</div>';
+        $colorRed    = '<span style="color: red">';
+        $colorGreen  = '<span style="color: green">';
+        $colorClose  = '</span>';
+    }
+
+    my $space = $html ? '&nbsp;' : ' ';
+    my $lb    = $html ? '<br />' : "\n";
+    my $lang  = lc(
+        AttrVal(
+            $hash->{NAME}, 'language',
+            AttrVal( 'global', 'language', 'EN' )
+        )
+    );
+
+    my $FW_CSRF = (
+        defined( $defs{ $hash->{CL}{SNAME} }{CSRFTOKEN} )
+        ? '&fwcsrf=' . $defs{ $hash->{CL}{SNAME} }{CSRFTOKEN}
+        : ''
+    );
+
+    if ( ref($errors) eq "ARRAY" && scalar @{$errors} > 0 ) {
+        push @ret,
+            $blockOpen
+          . $tOpen
+          . $tCOpen
+          . 'Error List'
+          . $tCClose
+          . $tHOpen
+          . $trOpen;
+
+        push @ret, $thOpen . 'No.' . $thClose;
+        push @ret, $thOpen . 'Error Code' . $thClose;
+        push @ret, $thOpen . 'Description' . $thClose;
+        push @ret, $trClose . $tHClose;
+
+        my $linecount = 1;
+        foreach my $error ( sort { "\L$a" cmp "\L$b" } @{$errors} ) {
+            my $l = $linecount % 2 == 0 ? $trOpenEven : $trOpenOdd;
+
+            $l .= $tdOpen . $linecount . $tdClose;
+            $l .= $tdOpen . $error->{code} . $tdClose;
+            $l .=
+                $tdOpen
+              . $error->{summary}
+              . (
+                defined( $error->{detail} )
+                  && $error->{detail} ne ''
+                ? $lb
+                  . $lb
+                  . $strongOpen
+                  . 'Detail:'
+                  . $strongClose
+                  . $lb
+                  . $error->{detail}
+                : ''
+              ) . $tdClose;
+            $l .= $trClose;
+
+            push @ret, $l;
+            $linecount++;
+        }
+
+        push @ret, $tClose . $blockClose;
+    }
+    else {
+        push @ret, 'No errors occured during last command.';
+    }
+
+    return $header . join( "\n", @ret ) . $footer;
+}
+
+sub CreateInstalledPerlList($$) {
+    my ( $hash, $getCmd ) = @_;
+    my @ret;
+    my $packages;
+    my $html =
+      defined( $hash->{CL} ) && $hash->{CL}{TYPE} eq "FHEMWEB" ? 1 : 0;
+    $packages = $hash->{".fhem"}{installer}{listedPerlPackages};
+
+    # disable automatic links to FHEM devices
+    delete $FW_webArgs{addLinks};
+
+    my $header = '';
+    my $footer = '';
+    if ($html) {
+        $header = '<html>';
+        $footer = '</html>';
+    }
+
+    my $blockOpen   = '';
+    my $tTitleOpen  = '';
+    my $tTitleClose = '';
+    my $tOpen       = '';
+    my $tCOpen      = '';
+    my $tCClose     = '';
+    my $tHOpen      = '';
+    my $tHClose     = '';
+    my $tBOpen      = '';
+    my $tBClose     = '';
+    my $tFOpen      = '';
+    my $tFClose     = '';
+    my $trOpen      = '';
+    my $trOpenEven  = '';
+    my $trOpenOdd   = '';
+    my $thOpen      = '';
+    my $thOpen2     = '';
+    my $thOpen3     = '';
+    my $tdOpen      = '';
+    my $tdOpen2     = '';
+    my $tdOpen3     = '';
+    my $strongOpen  = '';
+    my $strongClose = '';
+    my $tdClose     = "\t\t\t";
+    my $thClose     = "\t\t\t";
+    my $trClose     = '';
+    my $tClose      = '';
+    my $blockClose  = '';
+    my $colorRed    = '';
+    my $colorGreen  = '';
+    my $colorClose  = '';
+
+    if ($html) {
+        $blockOpen   = '<div class="makeTable wide internals">';
+        $tTitleOpen  = '<span class="mkTitle">';
+        $tTitleClose = '</span>';
+        $tOpen       = '<table class="block wide internals wrapcolumns">';
+        $tCOpen      = '<caption style="text-align: left; font-size: larger;">';
+        $tCClose     = '</caption>';
+        $tHOpen      = '<thead>';
+        $tHClose     = '</thead>';
+        $tBOpen      = '<tbody>';
+        $tBClose     = '</tbody>';
+        $tFOpen      = '<tfoot style="font-size: smaller;">';
+        $tFClose     = '</tfoot>';
+        $trOpen      = '<tr class="column">';
+        $trOpenEven  = '<tr class="column even">';
+        $trOpenOdd   = '<tr class="column odd">';
+        $thOpen      = '<th style="text-align: left; vertical-align: top;">';
+        $thOpen2 =
+          '<th style="text-align: left; vertical-align: top;" colspan="2">';
+        $thOpen3 =
+          '<th style="text-align: left; vertical-align: top;" colspan="3">';
+        $tdOpen      = '<td style="vertical-align: top;">';
+        $tdOpen2     = '<td style="vertical-align: top;" colspan="2">';
+        $tdOpen3     = '<td style="vertical-align: top;" colspan="3">';
+        $strongOpen  = '<strong>';
+        $strongClose = '</strong>';
+        $tdClose     = '</td>';
+        $thClose     = '</th>';
+        $trClose     = '</tr>';
+        $tClose      = '</table>';
+        $blockClose  = '</div>';
+        $colorRed    = '<span style="color: red">';
+        $colorGreen  = '<span style="color: green">';
+        $colorClose  = '</span>';
+    }
+
+    my $space = $html ? '&nbsp;' : ' ';
+    my $lb    = $html ? '<br />' : "\n";
+    my $lang  = lc(
+        AttrVal(
+            $hash->{NAME}, 'language',
+            AttrVal( 'global', 'language', 'EN' )
+        )
+    );
+
+    my $FW_CSRF = (
+        defined( $defs{ $hash->{CL}{SNAME} }{CSRFTOKEN} )
+        ? '&fwcsrf=' . $defs{ $hash->{CL}{SNAME} }{CSRFTOKEN}
+        : ''
+    );
+
+    if ( ref($packages) eq "HASH" && scalar keys %{$packages} > 0 ) {
+        push @ret,
+            $blockOpen
+          . $tOpen
+          . $tCOpen
+          . 'Installed Perl Packages'
+          . $tCClose
+          . $tHOpen
+          . $trOpen;
+
+        push @ret, $thOpen . 'Package Name' . $thClose;
+        push @ret, $thOpen . 'Version' . $thClose;
+        push @ret, $trClose . $tHClose;
+
+        my $linecount = 1;
+        foreach my $package ( sort { "\L$a" cmp "\L$b" } keys %{$packages} ) {
+            next if ( $package eq "undefined" );
+
+            my $l = $linecount % 2 == 0 ? $trOpenEven : $trOpenOdd;
+
+            $l .= $tdOpen . $package . $tdClose;
+            $l .= $tdOpen
+              . (
+                defined( $packages->{$package}{version} )
+                  && $packages->{$package}{version}
+                ? version->parse( $packages->{$package}{version} )->normal
+                : '?'
+              ) . $tdClose;
+            $l .= $trClose;
+
+            push @ret, $l;
+            $linecount++;
+        }
+
+        push @ret, $tClose . $blockClose;
+    }
+    else {
+        push @ret, 'No installed Perl packages found.';
+    }
+
+    return $header . join( "\n", @ret ) . $footer;
+}
+
+sub CreateOutdatedPerlList($$) {
+    my ( $hash, $getCmd ) = @_;
+    my @ret;
+    my $packages;
+    my $html =
+      defined( $hash->{CL} ) && $hash->{CL}{TYPE} eq "FHEMWEB" ? 1 : 0;
+    $packages = $hash->{".fhem"}{installer}{outdatedPerlPackages};
+
+    # disable automatic links to FHEM devices
+    delete $FW_webArgs{addLinks};
+
+    my $header = '';
+    my $footer = '';
+    if ($html) {
+        $header = '<html>';
+        $footer = '</html>';
+    }
+
+    my $blockOpen   = '';
+    my $tTitleOpen  = '';
+    my $tTitleClose = '';
+    my $tOpen       = '';
+    my $tCOpen      = '';
+    my $tCClose     = '';
+    my $tHOpen      = '';
+    my $tHClose     = '';
+    my $tBOpen      = '';
+    my $tBClose     = '';
+    my $tFOpen      = '';
+    my $tFClose     = '';
+    my $trOpen      = '';
+    my $trOpenEven  = '';
+    my $trOpenOdd   = '';
+    my $thOpen      = '';
+    my $thOpen2     = '';
+    my $thOpen3     = '';
+    my $tdOpen      = '';
+    my $tdOpen2     = '';
+    my $tdOpen3     = '';
+    my $strongOpen  = '';
+    my $strongClose = '';
+    my $tdClose     = "\t\t\t";
+    my $thClose     = "\t\t\t";
+    my $trClose     = '';
+    my $tClose      = '';
+    my $blockClose  = '';
+    my $colorRed    = '';
+    my $colorGreen  = '';
+    my $colorClose  = '';
+
+    if ($html) {
+        $blockOpen   = '<div class="makeTable wide internals">';
+        $tTitleOpen  = '<span class="mkTitle">';
+        $tTitleClose = '</span>';
+        $tOpen       = '<table class="block wide internals wrapcolumns">';
+        $tCOpen      = '<caption style="text-align: left; font-size: larger;">';
+        $tCClose     = '</caption>';
+        $tHOpen      = '<thead>';
+        $tHClose     = '</thead>';
+        $tBOpen      = '<tbody>';
+        $tBClose     = '</tbody>';
+        $tFOpen      = '<tfoot style="font-size: smaller;">';
+        $tFClose     = '</tfoot>';
+        $trOpen      = '<tr class="column">';
+        $trOpenEven  = '<tr class="column even">';
+        $trOpenOdd   = '<tr class="column odd">';
+        $thOpen      = '<th style="text-align: left; vertical-align: top;">';
+        $thOpen2 =
+          '<th style="text-align: left; vertical-align: top;" colspan="2">';
+        $thOpen3 =
+          '<th style="text-align: left; vertical-align: top;" colspan="3">';
+        $tdOpen      = '<td style="vertical-align: top;">';
+        $tdOpen2     = '<td style="vertical-align: top;" colspan="2">';
+        $tdOpen3     = '<td style="vertical-align: top;" colspan="3">';
+        $strongOpen  = '<strong>';
+        $strongClose = '</strong>';
+        $tdClose     = '</td>';
+        $thClose     = '</th>';
+        $trClose     = '</tr>';
+        $tClose      = '</table>';
+        $blockClose  = '</div>';
+        $colorRed    = '<span style="color: red">';
+        $colorGreen  = '<span style="color: green">';
+        $colorClose  = '</span>';
+    }
+
+    my $space = $html ? '&nbsp;' : ' ';
+    my $lb    = $html ? '<br />' : "\n";
+    my $lang  = lc(
+        AttrVal(
+            $hash->{NAME}, 'language',
+            AttrVal( 'global', 'language', 'EN' )
+        )
+    );
+
+    my $FW_CSRF = (
+        defined( $defs{ $hash->{CL}{SNAME} }{CSRFTOKEN} )
+        ? '&fwcsrf=' . $defs{ $hash->{CL}{SNAME} }{CSRFTOKEN}
+        : ''
+    );
+
+    if ( ref($packages) eq "HASH" ) {
+        my $updatePerlDualLifeModules =
+          AttrVal( $hash->{NAME}, 'updatePerlDualLifeModules', 0 );
+        my $updatePerlUsedModulesOnly =
+          AttrVal( $hash->{NAME}, 'updatePerlUsedModulesOnly', 1 );
+
+        my $counter = 0;
+        foreach ( keys %{$packages} ) {
+            $counter++
+              if (
+                (
+                    $updatePerlDualLifeModules
+                    || !FHEM::Meta::ModuleIsPerlCore($_)
+                )
+                && ( !$updatePerlUsedModulesOnly
+                    || defined( $FHEM::Meta::dependents{pkgs}{$_} ) )
+              );
+        }
+
+        if ($counter) {
+            push @ret,
+                $blockOpen
+              . $tOpen
+              . $tCOpen
+              . 'Outdated Perl Packages'
+              . $tCClose
+              . $tHOpen
+              . $trOpen;
+
+            push @ret, $thOpen . 'Package Name' . $thClose;
+            push @ret, $thOpen . 'Current Version' . $thClose;
+            push @ret, $thOpen . 'Latest Version' . $thClose;
+            push @ret, $trClose . $tHClose;
+
+            my $linecount = 1;
+            foreach my $package ( sort { "\L$a" cmp "\L$b" } keys %{$packages} )
+            {
+                next if ( $package eq "undefined" );
+                next
+                  if (
+                    (
+                        !$updatePerlDualLifeModules
+                        && FHEM::Meta::ModuleIsPerlCore($package)
+                    )
+                    || ( $updatePerlUsedModulesOnly
+                        && !defined( $FHEM::Meta::dependents{pkgs}{$package} ) )
+                  );
+
+                my $l = $linecount % 2 == 0 ? $trOpenEven : $trOpenOdd;
+                $l .= $tdOpen . $package . $tdClose;
+                $l .= $tdOpen
+                  . (
+                    defined( $packages->{$package}{current} )
+                    ? $packages->{$package}{current}
+                    : '?'
+                  ) . $tdClose;
+                $l .= $tdOpen
+                  . (
+                    defined( $packages->{$package}{latest} )
+                    ? $packages->{$package}{latest}
+                    : '?'
+                  ) . $tdClose;
+                $l .= $trClose;
+
+                push @ret, $l;
+                $linecount++;
+            }
+        }
+        else {
+            push @ret, 'No outdated Perl packages found.'
+
+        }
+    }
+
+    return $header . join( "\n", @ret ) . $footer;
+}
+
+sub CreatePrereqsList {
+    my $hash    = shift;
+    my $getCmd  = shift;
+    my $cfgfile = shift;
+    my $mode =
+      ( $cfgfile && $cfgfile eq '1' ? 'all' : ( $cfgfile ? 'file' : 'live' ) );
+    $mode = 'list' if ( $cfgfile && defined( $modules{$cfgfile} ) );
+
+    my @defined;
+    if ( $mode eq 'live' || $mode eq 'all' ) {
+        foreach ( keys %modules ) {
+            next
+              unless ( $mode eq 'all' || defined( $modules{$_}{LOADED} ) );
+            push @defined, $_;
+        }
+    }
+    elsif ( $mode eq 'file' ) {
+        @defined = __GetDefinedModulesFromFile($cfgfile);
+        return
+            'File '
+          . $cfgfile
+          . ' does not seem to contain any FHEM device configuration'
+          unless ( @defined > 0 );
+    }
+    elsif ( $mode eq 'list' ) {
+        @defined = @_;
+        unshift @defined, $cfgfile;
+    }
+
+    # disable automatic links to FHEM devices
+    delete $FW_webArgs{addLinks};
+
+    my @ret;
+    my $html =
+      defined( $hash->{CL} ) && $hash->{CL}{TYPE} eq "FHEMWEB" ? 1 : 0;
+
+    my $header = '';
+    my $footer = '';
+    if ($html) {
+        $header = '<html>';
+        $footer = '</html>';
+    }
+
+    my $blockOpen   = '';
+    my $tTitleOpen  = '';
+    my $tTitleClose = '';
+    my $tOpen       = '';
+    my $tCOpen      = '';
+    my $tCClose     = '';
+    my $tHOpen      = '';
+    my $tHClose     = '';
+    my $tBOpen      = '';
+    my $tBClose     = '';
+    my $tFOpen      = '';
+    my $tFClose     = '';
+    my $trOpen      = '';
+    my $trOpenEven  = '';
+    my $trOpenOdd   = '';
+    my $thOpen      = '';
+    my $thOpen2     = '';
+    my $thOpen3     = '';
+    my $tdOpen      = '';
+    my $tdOpen1      = '';
+    my $tdOpen2     = '';
+    my $tdOpen3     = '';
+    my $tdOpen4     = '';
+    my $strongOpen  = '';
+    my $strongClose = '';
+    my $tdClose     = "\t\t\t";
+    my $thClose     = "\t\t\t";
+    my $trClose     = '';
+    my $tClose      = '';
+    my $blockClose  = '';
+    my $colorRed    = '';
+    my $colorGreen  = '';
+    my $colorClose  = '';
+
+    if ($html) {
+        $blockOpen   = '<div class="makeTable wide internals">';
+        $tTitleOpen  = '<span class="mkTitle">';
+        $tTitleClose = '</span>';
+        $tOpen       = '<table class="block wide internals wrapcolumns">';
+        $tCOpen      = '<caption style="text-align: left; font-size: larger;">';
+        $tCClose     = '</caption>';
+        $tHOpen      = '<thead>';
+        $tHClose     = '</thead>';
+        $tBOpen      = '<tbody>';
+        $tBClose     = '</tbody>';
+        $tFOpen      = '<tfoot style="font-size: smaller;">';
+        $tFClose     = '</tfoot>';
+        $trOpen      = '<tr class="column">';
+        $trOpenEven  = '<tr class="column even">';
+        $trOpenOdd   = '<tr class="column odd">';
+        $thOpen      = '<th style="text-align: left; vertical-align: top;">';
+        $thOpen2 =
+          '<th style="text-align: left; vertical-align: top;" colspan="2">';
+        $thOpen3 =
+          '<th style="text-align: left; vertical-align: top;" colspan="3">';
+        $tdOpen      = '<td style="vertical-align: top;">';
+        $tdOpen1     = '<td style="vertical-align: top;" colspan="1">';
+        $tdOpen2     = '<td style="vertical-align: top;" colspan="2">';
+        $tdOpen3     = '<td style="vertical-align: top;" colspan="3">';
+        $tdOpen4     = '<td style="vertical-align: top;" colspan="4">';
         $strongOpen  = '<strong>';
         $strongClose = '</strong>';
         $tdClose     = '</td>';
@@ -1139,6 +2193,14 @@ sub CreatePrereqsList {
                   . $item . '</a>'
                   if ($html);
 
+                my $action =
+                    '<div class="detLink installerAction"><a href="?cmd=set '
+                  . $hash->{NAME}
+                  . ' installPerl '
+                  . $item . ' '
+                  . $FW_CSRF
+                  . '" title="Click here to trigger installation">Install</a></div>';
+
                 $l .=
                     $tdOpen
                   . $linkitem
@@ -1150,6 +2212,7 @@ sub CreatePrereqsList {
                   ) . $tdClose;
                 $l .= $tdOpen . $area . $tdClose;
                 $l .= $tdOpen . $linkmod . $tdClose;
+                $l .= $tdOpen . $action . $tdClose if ($html);
                 $l .= $trClose;
 
                 if ( $linecount == 1 ) {
@@ -1171,6 +2234,7 @@ sub CreatePrereqsList {
                     push @ret, $thOpen . 'Item' . $thClose;
                     push @ret, $thOpen . 'Type' . $thClose;
                     push @ret, $thOpen . 'Used by' . $thClose;
+                    push @ret, $thOpen . 'Action' . $thClose if ($html);
                     push @ret, $trClose . $tHClose . $tBOpen;
                 }
 
@@ -1179,6 +2243,26 @@ sub CreatePrereqsList {
             }
 
             if ( $linecount > 1 ) {
+
+                my $action =
+'<div class="detLink installerAction"><a href="?cmd=set '
+                  . $hash->{NAME}
+                  . ' install'
+                  . ucfirst($area) . ' all-'
+                  . $mAttr
+                  . $FW_CSRF
+                  . '" title="Click here to trigger installation">Install '
+                  . $mAttr.' '.ucfirst($area)
+                  . '</a></div>';
+                # push @ret,
+                #     ( $linecount % 2 == 0 ? $trOpenEven : $trOpenOdd )
+                #   . $tdOpen3
+                #   . $tdClose
+                #   . $tdOpen1
+                #   . $action
+                #   . $tdClose
+                #   . $trClose
+                #   if ($html);
 
                 push @ret, $tBClose;
 
@@ -1202,7 +2286,8 @@ sub CreatePrereqsList {
                   . ', but are suggested for enhanced operation of the listed FHEM modules.'
                   if ( $importance eq 'Suggested' );
 
-                push @ret, $tFOpen . $tdOpen3 . $descr . $tFClose;
+                push @ret,
+                  $tFOpen . ( $html ? $tdOpen4 : $tdOpen3 ) . $descr . $tFClose;
                 push @ret, $tClose . $blockClose . $tdClose . $trClose;
             }
         }
@@ -1228,7 +2313,16 @@ sub CreatePrereqsList {
             }
             elsif ( $pkgStatus{Perl}{analyzed} == 2 ) {
                 push @ret,
-'This check may be incomplete until you install Perl::PrereqScanner::NotQuiteLite for automatic source code analysis.';
+                  'This check may be incomplete until you '
+                  . (
+                    $html
+                    ? '<a href="?cmd=set '
+                      . $hash->{NAME}
+                      . ' installPerl Perl::PrereqScanner::NotQuiteLite'
+                      . $FW_CSRF
+                      . '">click here to install Perl::PrereqScanner::NotQuiteLite</a> '
+                    : 'install Perl::PrereqScanner::NotQuiteLite '
+                  ) . 'for automatic source code analysis.';
             }
 
             push @ret, $tdClose . $trClose . $tFClose;
@@ -1632,7 +2726,8 @@ sub CreateSearchList ($$@) {
             if ($html) {
                 push @ret,
                     '<caption style="text-align: left; font-size: larger;"'
-                  . ( $descr ne '' ? ' title="' . $descr . '"' : '' ) . '># '
+                  . ( $descr ne '' ? ' title="' . $descr . '"' : '' )
+                  . '># '
                   . $keyword
                   . $tCClose;
             }
@@ -1807,7 +2902,6 @@ sub CreateSearchList ($$@) {
       )
     {
         next if ( FHEM::Meta::ModuleIsPerlCore($dependent) );
-        next if ( FHEM::Meta::ModuleIsPerlPragma($dependent) );
         next if ( FHEM::Meta::ModuleIsInternal($dependent) );
 
         if ( $dependent =~ m/^.*$search.*$/i ) {
@@ -2077,6 +3171,7 @@ sub CreateMetadataList ($$$) {
     my $tdOpen      = '';
     my $tdOpen2     = '';
     my $tdOpen3     = '';
+    my $tdOpen4     = '';
     my $strongOpen  = '';
     my $strongClose = '';
     my $tdClose     = "\t\t\t";
@@ -2112,6 +3207,7 @@ sub CreateMetadataList ($$$) {
         $tdOpen      = '<td style="vertical-align: top;">';
         $tdOpen2     = '<td style="vertical-align: top;" colspan="2">';
         $tdOpen3     = '<td style="vertical-align: top;" colspan="3">';
+        $tdOpen4     = '<td style="vertical-align: top;" colspan="4">';
         $strongOpen  = '<strong>';
         $strongClose = '</strong>';
         $tdClose     = '</td>';
@@ -2543,9 +3639,11 @@ sub CreateMetadataList ($$$) {
                         )
                       )
                     {
-                        my $bName = $modMeta->{resources}{repository}{x_branch};
+                        my $bName =
+                          $modMeta->{resources}{repository}{x_branch};
                         $bName = 'production'
-                          if ( $modMeta->{resources}{repository}{x_branch} eq
+                          if (
+                            $modMeta->{resources}{repository}{x_branch} eq
                             $modMeta->{resources}{repository}{x_dev}{x_branch}
                           );
 
@@ -2560,10 +3658,12 @@ sub CreateMetadataList ($$$) {
                         $bName =
                           $modMeta->{resources}{repository}{x_dev}{x_branch};
                         $bName = 'development'
-                          if ( $modMeta->{resources}{repository}{x_branch} eq
+                          if (
+                            $modMeta->{resources}{repository}{x_branch} eq
                             $modMeta->{resources}{repository}{x_dev}{x_branch}
                           );
-                        $url = $modMeta->{resources}{repository}{x_dev}{web};
+                        $url =
+                          $modMeta->{resources}{repository}{x_dev}{web};
 
                         # webview: dev entry
                         $l .=
@@ -3141,6 +4241,8 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
 
         push @ret, $thOpen . 'Status' . $thClose;
 
+        push @ret, $thOpen . 'Action' . $thClose if ($html);
+
         push @ret, $trClose . $tHClose . $tBOpen;
 
         $linecount = 1;
@@ -3165,6 +4267,7 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                 my $version = $modMeta->{prereqs}{runtime}{$mAttr}{$prereq};
                 $version = '' if ( !defined($version) || $version eq '0' );
 
+                my $action    = '';
                 my $inherited = '';
                 if (
                     defined( $modMeta->{prereqs}{runtime}{x_inherited} )
@@ -3185,6 +4288,46 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                       . $inherited
                       . '</span>'
                       if ($html);
+                }
+
+                if (
+                    $mAttr ne 'requires'
+                    && (   $installed eq 'missing'
+                        || $installed eq 'outdated' )
+                  )
+                {
+                    $installed = '';
+
+                    $action =
+                      '<div class="detLink installerAction"><a href="?cmd=set '
+                      . $hash->{NAME}
+                      . ' installPerl '
+                      . $prereq . ' '
+                      . $FW_CSRF . '" title="Click here to trigger installation">'
+                      . ( $installed eq 'outdated' ? 'Update' : 'Install' )
+                      . '</a></div>';
+                }
+                elsif ( $installed eq 'installed' ) {
+                    $installed = $colorGreen . $installed . $colorClose;
+                }
+                elsif ($installed eq 'missing'
+                    || $installed eq 'outdated' )
+                {
+                    $installed =
+                        $colorRed
+                      . $strongOpen
+                      . uc($installed)
+                      . $strongClose
+                      . $colorClose;
+
+                    $action =
+                      '<div class="detLink installerAction"><a href="?cmd=set '
+                      . $hash->{NAME}
+                      . ' installPerl '
+                      . $prereq . ' '
+                      . $FW_CSRF . '" title="Click here to trigger installation">'
+                      . ( $installed eq 'outdated' ? 'Update' : 'Install' )
+                      . '</a></div>';
                 }
 
                 $prereq =
@@ -3210,31 +4353,6 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                   if ( $html
                     && $installed eq 'included' );
 
-                if (
-                    $mAttr ne 'requires'
-                    && (   $installed eq 'missing'
-                        || $installed eq 'outdated' )
-                  )
-                {
-                    $installed = '';
-
-                }
-                elsif ($html) {
-                    if ( $installed eq 'installed' ) {
-                        $installed = $colorGreen . $installed . $colorClose;
-                    }
-                    elsif ($installed eq 'missing'
-                        || $installed eq 'outdated' )
-                    {
-                        $installed =
-                            $colorRed
-                          . $strongOpen
-                          . uc($installed)
-                          . $strongClose
-                          . $colorClose;
-                    }
-                }
-
                 $l .=
                     $tdOpen
                   . $prereq
@@ -3243,6 +4361,7 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                   . $tdClose;
                 $l .= $tdOpen . $importance . $tdClose;
                 $l .= $tdOpen . $installed . $tdClose;
+                $l .= $tdOpen . $action . $tdClose if ($html);
 
                 $l .= $trClose;
 
@@ -3256,7 +4375,7 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
         push @ret,
             $tFOpen
           . $trOpenEven
-          . $tdOpen3
+          . ($html?$tdOpen4:$tdOpen3)
           . $strongOpen . 'Hint:'
           . $strongClose
           . ' The module does not provide Perl prerequisites from its metadata.'
@@ -3286,15 +4405,15 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
           . $trOpenOdd
           . $tdOpen
           . 'Module metadata do not contain any prerequisites.' . "\n"
-          . 'For automatic source code analysis, please install '
           . (
             $html
-            ? '<a href="https://gist.github.com/jpawlowski/8f6503bcf0356b3e64a98b8b35508e57" target="_blank">'
-            : ''
+            ? '<a href="?cmd=set '
+              . $hash->{NAME}
+              . ' installPerl Perl::PrereqScanner::NotQuiteLite'
+              . $FW_CSRF
+              . '">Click here to install Perl::PrereqScanner::NotQuiteLite</a> for automatic source code analysis.'
+            : 'For automatic source code analysis, please install Perl::PrereqScanner::NotQuiteLite first.'
           )
-          . 'Perl::PrereqScanner::NotQuiteLite'
-          . ( $html ? '</a>' : '' )
-          . ' first.'
           . $tdClose
           . $trClose
           . $tBClose;
@@ -3486,14 +4605,12 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                       if ( $importance eq 'required' );
                 }
 
-                my $isPerlPragma = FHEM::Meta::ModuleIsPerlPragma($prereq);
-                my $isPerlCore =
-                  $isPerlPragma ? 0 : FHEM::Meta::ModuleIsPerlCore($prereq);
+                my $isPerlCore = FHEM::Meta::ModuleIsPerlCore($prereq);
                 my $isFhem =
-                  $isPerlPragma || $isPerlCore
+                  $isPerlCore
                   ? 0
                   : FHEM::Meta::ModuleIsInternal($prereq);
-                if ( $isPerlPragma || $isPerlCore || $prereq eq 'perl' ) {
+                if ( $isPerlCore || $prereq eq 'perl' ) {
                     $installed =
                       $installed ne 'installed'
                       ? "$installed (Perl built-in)"
@@ -3517,7 +4634,6 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                   if ( $html
                     && !$isFhem
                     && !$isPerlCore
-                    && !$isPerlPragma
                     && $prereq ne 'perl' );
 
                 $l .=
@@ -3658,7 +4774,9 @@ sub LoadInstallStatusPerl(;$) {
         $modName = 'Global' if ( uc($modName) eq 'FHEM' );
         my $type;
 
-        if ( exists( $modules{$modName} ) && !exists( $packages{$modName} ) ) {
+        if ( exists( $modules{$modName} )
+            && !exists( $packages{$modName} ) )
+        {
             $type = 'module';
         }
         elsif ( exists( $packages{$modName} )
@@ -3724,43 +4842,40 @@ sub LoadInstallStatusPerl(;$) {
                         $fname =~
                           s/^.*://g;    # strip away any parent module names
 
-                        my $isPerlPragma = FHEM::Meta::ModuleIsPerlPragma($pkg);
-                        my $isPerlCore =
-                          $isPerlPragma
-                          ? 0
-                          : FHEM::Meta::ModuleIsPerlCore($pkg);
+                        my $isPerlCore = FHEM::Meta::ModuleIsPerlCore($pkg);
                         my $isFhem =
-                          $isPerlPragma || $isPerlCore
+                          $isPerlCore
                           ? 0
                           : FHEM::Meta::ModuleIsInternal($pkg);
 
                         if ( $pkg eq 'perl' ) {
-                            $pkgStatus{Perl}{pkgs}{$pkg}{status} = 'built-in';
+                            $pkgStatus{Perl}{pkgs}{$pkg}{status} =
+                              'built-in';
                             $pkgStatus{Perl}{installed}{$pkg} =
                               version->parse($])->numify;
                         }
                         elsif ( $pkg eq 'FHEM' ) {
-                            $pkgStatus{Perl}{pkgs}{$pkg}{status} = 'included';
+                            $pkgStatus{Perl}{pkgs}{$pkg}{status} =
+                              'included';
                             $pkgStatus{Perl}{installed}{$pkg} =
                               $modules{'Global'}{META}{version};
                         }
                         elsif ( $pkg eq 'FHEM::Meta' || $pkg eq 'Meta' ) {
-                            $pkgStatus{Perl}{pkgs}{$pkg}{status} = 'included';
+                            $pkgStatus{Perl}{pkgs}{$pkg}{status} =
+                              'included';
                             $pkgStatus{Perl}{installed}{$pkg} =
                               FHEM::Meta->VERSION();
                         }
-                        elsif ($isPerlPragma) {
-                            $pkgStatus{Perl}{pkgs}{$pkg}{status} = 'built-in';
-                            $pkgStatus{Perl}{installed}{$pkg} = 0;
-                        }
                         elsif ($isPerlCore) {
-                            $pkgStatus{Perl}{pkgs}{$pkg}{status} = 'built-in';
+                            $pkgStatus{Perl}{pkgs}{$pkg}{status} =
+                              'built-in';
                             $pkgStatus{Perl}{installed}{$pkg} = 0;
                         }
 
                         # This is a FHEM package
                         elsif ( $isFhem && $isFhem eq 'package' ) {
-                            $pkgStatus{Perl}{pkgs}{$pkg}{status} = 'included';
+                            $pkgStatus{Perl}{pkgs}{$pkg}{status} =
+                              'included';
                             $pkgStatus{Perl}{installed}{$pkg} =
                               defined( $packages{$fname}{META} )
                               ? $packages{$fname}{META}{version}
@@ -3769,7 +4884,8 @@ sub LoadInstallStatusPerl(;$) {
 
                         # This is a FHEM module being loaded as package
                         elsif ( $isFhem && $isFhem eq 'module' ) {
-                            $pkgStatus{Perl}{pkgs}{$pkg}{status} = 'included';
+                            $pkgStatus{Perl}{pkgs}{$pkg}{status} =
+                              'included';
                             $pkgStatus{Perl}{installed}{$pkg} =
                               defined( $modules{$fname}{META} )
                               ? $modules{$fname}{META}{version}
@@ -3882,7 +4998,8 @@ sub LoadInstallStatusPerl(;$) {
 
                                     $pkgStatus{Perl}{pkgs}{$pkg}{status} =
                                       'outdated';
-                                    push @{ $pkgStatus{Perl}{outdated}{$pkg} },
+                                    push
+                                      @{ $pkgStatus{Perl}{outdated}{$pkg} },
                                       $reqV;
 
                                     $pkgStatus{Perl}{analyzed} = 1
@@ -4131,8 +5248,31 @@ sub __IsInstalledPython($) {
     return 0;
 }
 
-sub __ToDay() {
+sub __GetExtendedEnvPath {
+    return 0 unless ( __PACKAGE__ eq caller(0) );
+    my @binpath = (
+        $Config::Config{'installsitebin'},
+        $Config::Config{'installsitescript'},
+        $Config::Config{'sitebin'},
+        $Config::Config{'sitescript'},
+        $Config::Config{'installscript'},
+        $Config::Config{'installvendorbin'},
+        $Config::Config{'installvendorscript'},
+        $Config::Config{'initialinstalllocation'},
+        $Config::Config{'bin'}
+    );
 
+    my @path = split( /:/, $ENV{PATH} );
+
+    foreach my $p ( reverse @binpath ) {
+        next unless ( $p && $p ne '' );
+        unshift @path, $p unless ( grep ( /^$p$/, @path ) );
+    }
+
+    return join( ":", @path );
+}
+
+sub __ToDay() {
     my ( $sec, $min, $hour, $mday, $month, $year, $wday, $yday, $isdst ) =
       localtime( gettimeofday() );
 
@@ -4149,6 +5289,27 @@ sub __aUniq {
     grep !$seen{$_}++, @_;
 }
 
+use B qw/svref_2object/;
+
+sub __in_package {
+    return 0 unless ( __PACKAGE__ eq caller(0) );
+    my ( $coderef, $package ) = @_;
+    my $cv = svref_2object($coderef);
+    return if not $cv->isa('B::CV') or $cv->GV->isa('B::SPECIAL');
+    return $cv->GV->STASH->NAME eq $package;
+}
+
+sub __list_module {
+    return 0 unless ( __PACKAGE__ eq caller(0) );
+    my $module    = shift;
+    my $inPackage = shift;
+    no strict 'refs';
+    return grep {
+        defined &{"$module\::$_"}
+          and ( $inPackage ? __in_package( \&{*$_}, $module ) : 1 )
+      }
+      keys %{"$module\::"};
+}
 1;
 
 =pod
@@ -4231,7 +5392,7 @@ sub __aUniq {
       "abstract": "Modul zum Update von FHEM, zur Installation von Drittanbieter FHEM Modulen und der Verwaltung von Systemvoraussetzungen"
     }
   },
-  "version": "v0.3.9",
+  "version": "v0.5.0",
   "release_status": "testing",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
@@ -4259,6 +5420,9 @@ sub __aUniq {
         "GPUtils": 0,
         "HttpUtils": 0,
         "IO::Socket::SSL": 0,
+        "Config": 0,
+        "ExtUtils::Installed": 0,
+        "B": 0,
         "JSON": 0,
         "perl": 5.014,
         "version": 0,
