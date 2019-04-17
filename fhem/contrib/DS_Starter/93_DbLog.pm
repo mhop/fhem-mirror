@@ -28,7 +28,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 our %DbLog_vNotesIntern = (
-  "4.1.0"   => "17.04.2019 DbLog_Get: change reconnect for MySQL, change index suggestion in DbLog_configcheck ",
+  "4.1.0"   => "17.04.2019 DbLog_Get: change reconnect for MySQL (Forum: #99719), change index suggestion in DbLog_configcheck ",
   "4.0.0"   => "14.04.2019 rewrite DbLog_PushAsync / DbLog_Push / DbLog_Connectxx, new attribute \"bulkInsert\" ",
   "3.14.1"  => "12.04.2019 DbLog_Get: change select of MySQL Forum: https://forum.fhem.de/index.php/topic,99280.0.html ",
   "3.14.0"  => "05.04.2019 add support for Meta.pm and X_DelayedShutdownFn, attribute shutdownWait removed, ".
@@ -3038,11 +3038,10 @@ sub DbLog_Get($@) {
 #	  $dbh = $hash->{DBHP};
 #  }
   
+  
   my $nh = ($hash->{MODEL} ne 'SQLITE')?1:0;
-  # Unterscheidung $dbh um Abbrüche in Plots (SQLite) zu vermeiden und 
-  # andererseite kein "MySQL-Server has gone away" Fehler
   # $hash->{PID} != $$ -> create new connection for plotfork
-  if ($nh || $hash->{PID} != $$) {
+  if ($nh || $hash->{PID} != $$) {                                # 17.04.2019 Forum: https://forum.fhem.de/index.php/topic,99719.0.html
       $dbh = DbLog_ConnectNewDBH($hash);
 	  return "Can't connect to database." if(!$dbh);
   } else {
