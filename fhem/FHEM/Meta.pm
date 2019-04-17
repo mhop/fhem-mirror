@@ -14,6 +14,8 @@ use strict;
 use warnings;
 
 use GPUtils qw(GP_Import);
+use Module::CoreList;
+use Data::Dumper;
 use File::stat;
 use Encode;
 
@@ -474,134 +476,6 @@ my @perlPragmas = qw(
 # based on https://metacpan.org/release/perl
 #   and https://metacpan.org/pod/Win32#Alphabetical-Listing-of-Win32-Functions
 my @perlCoreModules = qw(
-  experimental
-  I18N::LangTags
-  I18N::LangTags::Detect
-  I18N::LangTags::List
-  IO
-  IO::Dir
-  IO::File
-  IO::Handle
-  IO::Pipe
-  IO::Poll
-  IO::Seekable
-  IO::Select
-  IO::Socket
-  IO::Socket::INET
-  IO::Socket::UNIX
-  Amiga::ARexx
-  Amiga::Exec
-  B
-  B::Concise
-  B::Showlex
-  B::Terse
-  B::Xref
-  O
-  OptreeCheck
-  Devel::Peek
-  ExtUtils::Miniperl
-  Fcntl
-  File::DosGlob
-  File::Find
-  File::Glob
-  FileCache
-  GDBM_File
-  Hash::Util::FieldHash
-  Hash::Util
-  I18N::Langinfo
-  IPC::Open2
-  IPC::Open3
-  NDBM_File
-  ODBM_File
-  Opcode
-  ops
-  POSIX
-  PerlIO::encoding
-  PerlIO::mmap
-  PerlIO::scalar
-  PerlIO::via
-  Pod::Html
-  SDBM_File
-  Sys::Hostname
-  Tie::Hash::NamedCapture
-  Tie::Memoize
-  VMS::DCLsym
-  VMS::Filespec
-  VMS::Stdio
-  Win32CORE
-  XS::APItest
-  XS::Typemap
-  arybase
-  ext/arybase/t/scope_0.pm
-  attributes
-  mro
-  re
-  Haiku
-  AnyDBM_File
-  B::Deparse
-  B::Op_private
-  Benchmark
-  Class::Struct
-  Config::Extensions
-  DB
-  DBM_Filter
-  DBM_Filter::compress
-  DBM_Filter::encode
-  DBM_Filter::int32
-  DBM_Filter::null
-  DBM_Filter::utf8
-  DirHandle
-  English
-  ExtUtils::Embed
-  ExtUtils::XSSymSet
-  File::Basename
-  File::Compare
-  File::Copy
-  File::stat
-  FileHandle
-  FindBin
-  Getopt::Std
-  Net::hostent
-  Net::netent
-  Net::protoent
-  Net::servent
-  PerlIO
-  SelectSaver
-  Symbol
-  Thread
-  Tie::Array
-  Tie::Handle
-  Tie::StdHandle
-  Tie::SubstrHash
-  Time::gmtime
-  Time::localtime
-  Time::tm
-  UNIVERSAL
-  Unicode::UCD
-  User::grent
-  User::pwent
-  blib
-  bytes
-  charnames
-  deprecate
-  feature
-  filetest
-  integer
-  less
-  locale
-  open
-  overload
-  overloading
-  sigtrap
-  sort
-  strict
-  subs
-  utf8
-  vars
-  version
-  vmsish
-  warnings
-  warnings::register
   OS2::ExtAttr
   OS2::PrfDB
   OS2::Process
@@ -957,7 +831,7 @@ sub ModuleIsCore {
 
 sub ModuleIsInternal {
     my ($module) = @_;
-    return 0 if ( ModuleIsPerlCore($module) || ModuleIsPerlPragma($module) );
+    return 0 if ( ModuleIsPerlCore($module) );
 
     return 'module'
       if ( $module eq 'fhem.pl'
@@ -1007,7 +881,7 @@ sub GetModuleFilepath {
         }
 
         # avoid to load pragmas and guess their path ...
-        elsif ( ModuleIsPerlPragma($package) ) {
+        elsif ( ModuleIsPerlCore($package) ) {
             my $n = $INC{'version.pm'};
             $n =~ s/(.*\/).*/$1/;
             $n .= $module;
@@ -1045,16 +919,14 @@ sub GetModuleFilepath {
 
 sub ModuleIsPerlCore {
     my ($module) = @_;
-    return grep ( /^$module$/, @perlCoreModules )
-      ? 1
-      : 0;
-}
-
-sub ModuleIsPerlPragma {
-    my ($module) = @_;
-    return grep ( /^$module$/, @perlPragmas )
-      ? 1
-      : 0;
+    return 1 if ( $module =~ /^Perl$/i );
+    return (
+        Module::CoreList::is_core($module) ? 1
+        : (
+            grep ( /^$module$/, @perlCoreModules ) ? 1
+            : 0
+        )
+    );
 }
 
 ##########
@@ -1574,15 +1446,9 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
                                     %{ $pkgMeta->{prereqs}{runtime}{$pkgIreq} }
                                   )
                                 {
-                                    my $isPerlPragma =
-                                      FHEM::Meta::ModuleIsPerlPragma($pkgI);
-                                    my $isPerlCore =
-                                      $isPerlPragma
-                                      ? 0
-                                      : FHEM::Meta::ModuleIsPerlCore($pkgI);
                                     next
-                                      if ( $isPerlPragma
-                                        || ( $isPerlCore && $pkgI ne 'perl' ) );
+                                      if ( ModuleIsPerlCore($pkgI)
+                                        && $pkgI ne 'perl' );
 
                                     # Do not inherit perl scanner if the author
                                     #   has provided META.json
@@ -3179,25 +3045,13 @@ sub __SetXVersion {
       "abstract": "FHEM Entwickler Paket, um Metadaten Unterstützung zu aktivieren"
     }
   },
-  "version": "v0.4.3",
+  "version": "v0.5.0",
   "release_status": "testing",
   "x_changelog": {
-    "2019-04-13": {
-      "version": "v0.4.3",
-      "release_notes": [
-        ""
-      ],
-      "upgrade_notes": [
-        ""
-      ],
-      "bugfixes": [
-        ""
-      ],
+    "2019-04-16": {
+      "version": "v0.5.0",
       "changes": [
-        ""
-      ],
-      "new_features": [
-        ""
+        "use Module::CoreList to identify Perl Core modules"
       ]
     },
     "2019-04-12": {
@@ -3235,6 +3089,8 @@ sub __SetXVersion {
         "perl": 5.014,
         "GPUtils": 0,
         "File::stat": 0,
+        "Data::Dumper": 0,
+        "Module::CoreList": 0,
         "Encode": 0,
         "version": 0
       },
