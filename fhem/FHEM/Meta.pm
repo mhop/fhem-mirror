@@ -971,6 +971,8 @@ sub __PutMetadata {
     return undef;
 }
 
+my $scanner;    # keep the scanner defined
+
 # Extract metadata from FHEM module file
 sub __GetMetadata {
     return 0 unless ( __PACKAGE__ eq caller(0) );
@@ -1247,75 +1249,80 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
 
         if ( keys %json > 0 ) {
 
-            # try to use JSON::MaybeXS wrapper
-            #   for chance of better performance + open code
-            # See: https://perlmaven.com/comparing-the-speed-of-json-decoders
-            eval {
-                require JSON::MaybeXS;
-                import JSON::MaybeXS qw( decode_json );
-                1;
-            };
-            if ($@) {
-                $@ = undef;
+            unless ( defined( &{'decode_json'} ) ) {
 
-                # try to use JSON wrapper
-                #   for chance of better performance
+               # try to use JSON::MaybeXS wrapper
+               #   for chance of better performance + open code
+               # See: https://perlmaven.com/comparing-the-speed-of-json-decoders
                 eval {
-                    require JSON;
-                    import JSON qw( decode_json );
+                    require JSON::MaybeXS;
+                    import JSON::MaybeXS qw( decode_json );
                     1;
                 };
-
                 if ($@) {
                     $@ = undef;
 
-                    # In rare cases, Cpanel::JSON::XS may
-                    #   be installed but JSON|JSON::MaybeXS not ...
+                    # try to use JSON wrapper
+                    #   for chance of better performance
                     eval {
-                        require Cpanel::JSON::XS;
-                        import Cpanel::JSON::XS qw(decode_json encode_json);
+                        require JSON;
+                        import JSON qw( decode_json );
                         1;
                     };
 
                     if ($@) {
                         $@ = undef;
 
-                        # In rare cases, JSON::XS may
-                        #   be installed but JSON not ...
+                        # In rare cases, Cpanel::JSON::XS may
+                        #   be installed but JSON|JSON::MaybeXS not ...
                         eval {
-                            require JSON::XS;
-                            import JSON::XS qw(decode_json encode_json);
+                            require Cpanel::JSON::XS;
+                            import Cpanel::JSON::XS qw(decode_json encode_json);
                             1;
                         };
 
                         if ($@) {
                             $@ = undef;
 
-                            # Fallback to built-in JSON which SHOULD
-                            #   be available since 5.014 ...
+                            # In rare cases, JSON::XS may
+                            #   be installed but JSON not ...
                             eval {
-                                require JSON::PP;
-                                import JSON::PP qw(decode_json encode_json);
+                                require JSON::XS;
+                                import JSON::XS qw(decode_json encode_json);
                                 1;
                             };
 
                             if ($@) {
                                 $@ = undef;
 
-                             # Fallback to JSON::backportPP in really rare cases
+                                # Fallback to built-in JSON which SHOULD
+                                #   be available since 5.014 ...
                                 eval {
-                                    require JSON::backportPP;
-                                    import JSON::backportPP
-                                      qw(decode_json encode_json);
+                                    require JSON::PP;
+                                    import JSON::PP qw(decode_json encode_json);
                                     1;
                                 };
+
+                                if ($@) {
+                                    $@ = undef;
+
+                                    # Fallback to JSON::backportPP
+                                    #   in really rare cases
+                                    eval {
+                                        require JSON::backportPP;
+                                        import JSON::backportPP
+                                          qw(decode_json encode_json);
+                                        1;
+                                    };
+                                    $@ = undef;
+                                }
                             }
                         }
                     }
                 }
             }
 
-            if ( !$@ ) {
+            if ( defined( &{'decode_json'} ) ) {
                 foreach ( keys %json ) {
                     next
                       if (
@@ -1360,9 +1367,6 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
                 }
                 return undef if ($metaSection);
             }
-            else {
-                $@ = undef;
-            }
         }
 
         # special place for fhem.pl is this module file
@@ -1378,16 +1382,27 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
 
         # Detect prereqs if not provided via META.json
         if ( !defined( $modMeta->{prereqs} ) ) {
-            eval {
-                require Perl::PrereqScanner::NotQuiteLite;
-                1;
-            };
 
-            if ( !$@ ) {
-                my $scanner = Perl::PrereqScanner::NotQuiteLite->new(
-                    parsers  => [qw/:installed -UniversalVersion/],
-                    suggests => 1,
-                );
+            # Initialize scanner first
+            unless ( defined($scanner) ) {
+                eval {
+                    require Perl::PrereqScanner::NotQuiteLite;
+                    1;
+                };
+
+                if ($@) {
+                    $@ = undef;
+                }
+                else {
+                    $scanner = Perl::PrereqScanner::NotQuiteLite->new(
+                        parsers  => [qw/:installed -UniversalVersion/],
+                        suggests => 1,
+                    );
+                }
+            }
+
+            # Scan files
+            if ( defined($scanner) ) {
                 my $context      = $scanner->scan_file($filePath);
                 my $requirements = $context->requires;
                 my $recommends   = $context->recommends;
@@ -1445,9 +1460,6 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
                         $modMeta->{prereqs}{runtime}{suggests}{$_} = 0;
                     }
                 }
-            }
-            else {
-                $@ = undef;
             }
         }
         else {

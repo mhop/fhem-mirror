@@ -856,7 +856,10 @@ sub ExecuteFhemCommand($) {
     $installer->{debug} = $cmd->{debug};
     my $sudo = 'sudo -n ';
 
-    $installer->{cpanversions} = 'echo n | ' . 'cpanm --version 2>&1';
+    $installer->{cpanversions} =
+'echo n | TEST=$(which cpanm) || echo "sh: command not found: cpanm"; which cpanm >/dev/null 2>&1 && sh -c "'
+      . $sudo
+      . '$(which cpanm) --version 2>&1" 2>&1';
     $installer->{installperl} =
         'echo n | sh -c "'
       . $sudo
@@ -884,11 +887,9 @@ sub ExecuteFhemCommand($) {
         {
             if ( $1 =~ /App::cpanminus/i ) {
                 $installer->{installperl} =
-                    'echo n | if [ -z "$(cpanm --version 2>/dev/null)" ]; then'
-                  . ' sh -c "curl -fsSL https://git.io/cpanm | '
+                    'sh -c "curl -fsSL https://git.io/cpanm | '
                   . $sudo
                   . '$(which perl) - App::cpanminus >/dev/null 2>&1" 2>&1; '
-                  . 'fi; '
                   . 'cpanm --version >/dev/null'
                   . ' && sh -c "'
                   . $sudo
@@ -1001,12 +1002,38 @@ sub GetCpanVersion($) {
                 if ( $line =~
                     m/(?:(\w+?): )?(?:(\w+? \d+): )?(\w+?): [^:]*?not.found$/i
                     or $line =~
+m/(?:(\w+?): )?(?:(\w+? \d+): )?\w+?: [^:]*?not.found: (\S+)$/i
+                    or $line =~
 m/(?:(\w+?): )?(?:(\w+? \d+): )?(\w+?): [^:]*?No.such.file.or.directory$/i
                   )
                 {
                     $error->{code}    = "E404";
                     $error->{summary} = "Not Found - $3 is not installed";
                     $error->{detail}  = $line;
+                }
+                elsif ( $line =~ m/^sudo: /i ) {
+                    my $error       = {};
+                    my $runningUser = getpwuid($<);
+                    my $cpanmbin    = `which cpanm`;
+                    my $perlbin     = `which perl`;
+                    $cpanmbin =~ s/\n//g;
+                    $perlbin =~ s/\n//g;
+                    $error->{code} = "E403";
+                    $error->{summary} =
+                      "Forbidden - " . "passwordless sudo permissions required";
+                    $error->{detail} =
+                        $line
+                      . "<br /><br />"
+                      . "You may add the following lines to /etc/sudoers.d/$runningUser:\n"
+                      . "<pre>"
+                      . "  $runningUser ALL=(ALL) NOPASSWD:SETENV: "
+                      . $cpanmbin . " *"
+                      . "\n  $runningUser ALL=(ALL) NOPASSWD:SETENV: "
+                      . $perlbin
+                      . ' - App\:\:cpanminus'
+                      . "</pre>";
+                    push @{ $h->{error} }, $error;
+                    last;
                 }
                 else {
                     $error->{code}    = "E501";
@@ -1088,6 +1115,8 @@ sub CpanInstall($) {
             elsif ( $line =~
                 m/(?:(\w+?): )?(?:(\w+? \d+): )?(\w+?): [^:]*?not.found$/i
                 or $line =~
+                m/(?:(\w+?): )?(?:(\w+? \d+): )?\w+?: [^:]*?not.found: (\S+)$/i
+                or $line =~
 m/(?:(\w+?): )?(?:(\w+? \d+): )?(\w+?): [^:]*?No.such.file.or.directory$/i
               )
             {
@@ -1103,7 +1132,9 @@ m/(?:(\w+?): )?(?:(\w+? \d+): )?(\w+?): [^:]*?No.such.file.or.directory$/i
                 my $error       = {};
                 my $runningUser = getpwuid($<);
                 my $cpanmbin    = `which cpanm`;
+                my $perlbin     = `which perl`;
                 $cpanmbin =~ s/\n//g;
+                $perlbin =~ s/\n//g;
                 $error->{code} = "E403";
                 $error->{summary} =
                   "Forbidden - " . "passwordless sudo permissions required";
@@ -1113,7 +1144,7 @@ m/(?:(\w+?): )?(?:(\w+? \d+): )?(\w+?): [^:]*?No.such.file.or.directory$/i
                   . "You may add the following lines to /etc/sudoers.d/$runningUser:\n"
                   . "<pre>"
                   . "  $runningUser ALL=(ALL) NOPASSWD:SETENV: "
-                  . $cpanmbin
+                  . $perlbin
                   . ' - App\:\:cpanminus'
                   . "</pre>";
                 push @{ $h->{error} }, $error;
@@ -1193,6 +1224,8 @@ sub CpanUninstall($) {
 
             elsif ( $line =~
                 m/(?:(\w+?): )?(?:(\w+? \d+): )?(\w+?): [^:]*?not.found$/i
+                or $line =~
+                m/(?:(\w+?): )?(?:(\w+? \d+): )?\w+?: [^:]*?not.found: (\S+)$/i
                 or $line =~
 m/(?:(\w+?): )?(?:(\w+? \d+): )?(\w+?): [^:]*?No.such.file.or.directory$/i
               )
@@ -1328,6 +1361,8 @@ sub CpanOutdated($) {
                 my $runningUser = getpwuid($<);
                 if ( $line =~
                     m/(?:(\w+?): )?(?:(\w+? \d+): )?(\w+?): [^:]*?not.found$/i
+                    or $line =~
+m/(?:(\w+?): )?(?:(\w+? \d+): )?\w+?: [^:]*?not.found: (\S+)$/i
                     or $line =~
 m/(?:(\w+?): )?(?:(\w+? \d+): )?(\w+?): [^:]*?No.such.file.or.directory$/i
                   )
