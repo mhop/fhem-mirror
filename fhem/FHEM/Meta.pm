@@ -1242,7 +1242,8 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
 
         if ( keys %json > 0 ) {
             eval {
-                require JSON;
+                require JSON::PP;
+                JSON::PP::import();
                 1;
             };
 
@@ -1278,7 +1279,7 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
 
                         return "$@" if ($@);
 
-                        my $decoded = JSON::decode_json($t);
+                        my $decoded = decode_json($t);
                         while ( my ( $k, $v ) = each %{$decoded} ) {
                             $modMeta->{$k} = $v;
                         }
@@ -3045,9 +3046,15 @@ sub __SetXVersion {
       "abstract": "FHEM Entwickler Paket, um Metadaten Unterstützung zu aktivieren"
     }
   },
-  "version": "v0.5.0",
+  "version": "v0.5.1",
   "release_status": "testing",
   "x_changelog": {
+    "2019-04-18": {
+      "version": "v0.5.1",
+      "changes": [
+        "use built-in JSON:PP instead of JSON"
+      ]
+    },
     "2019-04-16": {
       "version": "v0.5.0",
       "changes": [
@@ -3095,7 +3102,7 @@ sub __SetXVersion {
         "version": 0
       },
       "recommends": {
-        "JSON": 0,
+        "JSON::PP": 0,
         "Perl::PrereqScanner::NotQuiteLite": 0,
         "Time::Local": 0
       },
