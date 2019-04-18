@@ -896,7 +896,7 @@ sub ExecuteNpmCommand($) {
     }
 
     my $global = '-g ';
-    my $sudo   = 'sudo -n ';
+    my $sudo   = 'sudo -H -n ';
 
     if ( $cmd->{npmglobal} eq '0' ) {
         $global = '';
