@@ -3948,7 +3948,7 @@ sub DbLog_configcheck($) {
 		          $check .= "Index 'Report_Idx' exists but doesn't contain recommended field 'TIMESTAMP'. <br>" if (!@dix_tsp);
 		          $rec    = "The index should contain the fields 'TIMESTAMP', 'READING'. ";
 		          $rec   .= "You can change the index by executing e.g. <br>";
-		          $rec   .= "<b>'ALTER TABLE `history` DROP INDEX `Report_Idx`, ADD INDEX `Report_Idx` (`READING`, `TIMESTAMP`) USING BTREE'</b> <br>";
+		          $rec   .= "<b>'ALTER TABLE `history` DROP INDEX `Report_Idx`, ADD INDEX `Report_Idx` (`TIMESTAMP`, `READING`) USING BTREE'</b> <br>";
 		          $rec   .= "Depending on your database size this command may running a long time. <br>";
 	          }
 	      }
@@ -3957,7 +3957,7 @@ sub DbLog_configcheck($) {
           @dix = DbLog_sqlget($hash,"SELECT * FROM pg_indexes WHERE tablename='history' and indexname ='Report_Idx'");
 	      if (!@dix) {
 	          $check .= "You use at least one DbRep-device assigned to $name, but the recommended index 'Report_Idx' is missing. <br>";
-	          $rec    = "You can create the index by executing statement <b>'CREATE INDEX \"Report_Idx\" ON history USING btree (reading, \"timestamp\")'</b> <br>";
+	          $rec    = "You can create the index by executing statement <b>'CREATE INDEX \"Report_Idx\" ON history USING btree (\"timestamp\", reading)'</b> <br>";
 		      $rec   .= "Depending on your database size this command may running a long time. <br>";
 		      $rec   .= "Please make sure the device '$name' is operating in asynchronous mode to avoid FHEM from blocking when creating the index. <br>";
 		      $rec   .= "<b>Note:</b> If you have just created another index which covers the same fields and order as suggested (e.g. a primary key) you don't need to create the 'Report_Idx' as well ! <br>";
@@ -3973,7 +3973,7 @@ sub DbLog_configcheck($) {
 		          $check .= "Index 'Report_Idx' exists but doesn't contain recommended field 'TIMESTAMP'. <br>" if (!$irep_tsp);
 		          $rec    = "The index should contain the fields 'TIMESTAMP', 'READING'. ";
 			      $rec   .= "You can change the index by executing e.g. <br>";
-			      $rec   .= "<b>'DROP INDEX \"Report_Idx\"; CREATE INDEX \"Report_Idx\" ON history USING btree (reading, \"timestamp\")'</b> <br>";
+			      $rec   .= "<b>'DROP INDEX \"Report_Idx\"; CREATE INDEX \"Report_Idx\" ON history USING btree (\"timestamp\", reading)'</b> <br>";
 			      $rec   .= "Depending on your database size this command may running a long time. <br>";
 	          }
 	      }
