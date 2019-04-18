@@ -25,6 +25,7 @@ use strict;
 use warnings;
 use Data::Dumper;
 use Time::HiRes qw(time);
+use Encode;
 use utf8;
 
 # initialize ##################################################################
@@ -235,19 +236,19 @@ s/^[\s\t ]*([!]?(([A-Za-z0-9%+._-])*@([%+a-z0-9A-Z.-]+))[\w,@.!?|:]*)[\s\t ]+//
 
         # Use JSON module if possible
         eval {
-            require JSON;
-            import JSON qw( decode_json );
+            require JSON::PP;
+            import JSON::PP qw( decode_json );
         };
         if ($@) {
             Log3 $globalDevName, 3,
-              "msg: Error loading Perl::JSON. "
+              "msg: Error loading JSON::PP. "
               . "Please switch to new syntax to use user parameters";
         }
         else {
             Log3 $globalDevName, 4,
               "msg: Please switch to new syntax to use user parameters";
             my $o;
-            eval '$o = decode_json( Encode::encode_utf8($1) ); 1';
+            eval '$o = decode_json( encode_utf8($1) ); 1';
             if ($@) {
                 Log3 $globalDevName, 5,
                   "msg: Error decoding JSON for user parameters: $@";
@@ -1954,18 +1955,19 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                         Log3 $logDevice, 5,
                                           "msg $device: "
                                           . "$type[$i] route command (Perl): $cmd";
-                                        eval $cmd;
-                                        unless ( !$@ || $@ =~ m/^[\s\t\n ]*$/ )
+                                        #eval $cmd;
+                                        my $ret = AnalyzePerlCommand(undef, $cmd);
+                                        unless ( !$ret || $ret =~ m/^[\s\t\n ]*$/ )
                                         {
                                             $error = 1;
-                                            $loopReturn3 .= "$gatewayDev: $@\n";
+                                            $loopReturn3 .= "$gatewayDev: $ret\n";
                                         }
                                     }
                                     else {
                                         Log3 $logDevice, 5,
                                           "msg $device: "
                                           . "$type[$i] route command (fhem): $cmd";
-                                        my $ret = fhem $cmd, 1;
+                                        my $ret = AnalyzeCommandChain(undef,$cmd);
                                         unless ( !$ret
                                             || $ret =~ m/^[\s\t\n ]*$/ )
                                         {
