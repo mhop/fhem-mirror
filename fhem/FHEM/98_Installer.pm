@@ -37,10 +37,62 @@ use POSIX;
 use FHEM::Meta;
 
 use GPUtils qw(GP_Import);
-use JSON::PP;
 use Data::Dumper;
 use Config;
 use ExtUtils::Installed;
+
+# try to use JSON::MaybeXS wrapper
+#   for chance of better performance + open code
+eval {
+    require JSON::MaybeXS;
+    import JSON::MaybeXS qw( decode_json encode_json );
+    1;
+};
+if ($@) {
+    $@ = undef;
+
+    # try to use JSON wrapper
+    #   for chance of better performance
+    eval {
+        require JSON;
+        import JSON qw( decode_json encode_json );
+        1;
+    };
+
+    if ($@) {
+        $@ = undef;
+
+        # In rare cases, Cpanel::JSON::XS may
+        #   be installed but JSON|JSON::MaybeXS not ...
+        eval {
+            require Cpanel::JSON::XS;
+            import Cpanel::JSON::XS qw(decode_json encode_json);
+            1;
+        };
+
+        if ($@) {
+            $@ = undef;
+
+            # In rare cases, JSON::XS may
+            #   be installed but JSON not ...
+            eval {
+                require JSON::XS;
+                import JSON::XS qw(decode_json encode_json);
+                1;
+            };
+
+            if ($@) {
+                $@ = undef;
+
+                # Fallback to built-in JSON which SHOULD
+                #   be available since 5.014 ...
+                require JSON::PP;
+                import JSON::PP qw(decode_json encode_json);
+                1;
+            }
+        }
+    }
+}
 
 # Run before module compilation
 BEGIN {
@@ -1754,7 +1806,7 @@ sub CreateInstalledPerlList($$) {
           . $tHOpen
           . $trOpen;
 
-        push @ret, $thOpen . 'Package Name' . $thClose;
+        push @ret, $thOpen . 'Name' . $thClose;
         push @ret, $thOpen . 'Version' . $thClose;
         push @ret, $trClose . $tHClose;
 
@@ -1917,7 +1969,7 @@ sub CreateOutdatedPerlList($$) {
               . $tHOpen
               . $trOpen;
 
-            push @ret, $thOpen . 'Package Name' . $thClose;
+            push @ret, $thOpen . 'Name' . $thClose;
             push @ret, $thOpen . 'Current Version' . $thClose;
             push @ret, $thOpen . 'Latest Version' . $thClose;
             push @ret, $trClose . $tHClose;
@@ -2253,15 +2305,15 @@ sub CreatePrereqsList {
                   . $mAttr . ' '
                   . ucfirst($area)
                   . '</a></div>';
-                # push @ret,
-                #     ( $linecount % 2 == 0 ? $trOpenEven : $trOpenOdd )
-                #   . $tdOpen3
-                #   . $tdClose
-                #   . $tdOpen1
-                #   . $action
-                #   . $tdClose
-                #   . $trClose
-                #   if ($html);
+                push @ret,
+                    ( $linecount % 2 == 0 ? $trOpenEven : $trOpenOdd )
+                  . $tdOpen3
+                  . $tdClose
+                  . $tdOpen1
+                  . $action
+                  . $tdClose
+                  . $trClose
+                  if ($html);
 
                 push @ret, $tBClose;
 
@@ -5424,16 +5476,19 @@ sub __list_module {
         "Config": 0,
         "ExtUtils::Installed": 0,
         "B": 0,
-        "JSON": 0,
+        "JSON::PP": 0,
         "perl": 5.014,
         "version": 0,
         "SubProcess": 0
       },
       "recommends": {
         "Perl::PrereqScanner::NotQuiteLite": 0,
-        "Time::Local": 0
+        "JSON": 0,
+        "JSON::MaybeXS": 0
       },
       "suggests": {
+        "Cpanel::JSON::XS": 0,
+        "JSON::XS": 0
       }
     }
   },

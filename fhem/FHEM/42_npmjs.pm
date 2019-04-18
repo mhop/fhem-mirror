@@ -32,8 +32,60 @@ use POSIX;
 use FHEM::Meta;
 
 use GPUtils qw(GP_Import);
-use JSON;
 use Data::Dumper;
+
+# try to use JSON::MaybeXS wrapper
+#   for chance of better performance + open code
+eval {
+    require JSON::MaybeXS;
+    import JSON::MaybeXS qw( decode_json encode_json );
+    1;
+};
+if ($@) {
+    $@ = undef;
+
+    # try to use JSON wrapper
+    #   for chance of better performance
+    eval {
+        require JSON;
+        import JSON qw( decode_json encode_json );
+        1;
+    };
+
+    if ($@) {
+        $@ = undef;
+
+        # In rare cases, Cpanel::JSON::XS may
+        #   be installed but JSON|JSON::MaybeXS not ...
+        eval {
+            require Cpanel::JSON::XS;
+            import Cpanel::JSON::XS qw(decode_json encode_json);
+            1;
+        };
+
+        if ($@) {
+            $@ = undef;
+
+            # In rare cases, JSON::XS may
+            #   be installed but JSON not ...
+            eval {
+                require JSON::XS;
+                import JSON::XS qw(decode_json encode_json);
+                1;
+            };
+
+            if ($@) {
+                $@ = undef;
+
+                # Fallback to built-in JSON which SHOULD
+                #   be available since 5.014 ...
+                require JSON::PP;
+                import JSON::PP qw(decode_json encode_json);
+                1;
+            }
+        }
+    }
+}
 
 # Run before module compilation
 BEGIN {
@@ -527,14 +579,14 @@ sub Get($$@) {
 
     my ( $cmd, @args ) = @aa;
 
-    if ( $cmd eq 'showOutdatedList' ) {
+    if ( lc($cmd) eq 'showoutdatedlist' ) {
         return "usage: $cmd" if ( @args != 0 );
 
         my $ret = CreateOutdatedList( $hash, $cmd );
         return $ret;
 
     }
-    elsif ( $cmd eq 'showInstalledList' ) {
+    elsif ( lc($cmd) eq 'showinstalledlist' ) {
         return "usage: $cmd" if ( @args != 0 );
 
         my $ret = CreateInstalledList( $hash, $cmd );
@@ -570,7 +622,7 @@ sub Get($$@) {
     #     return $ret;
     #
     # }
-    elsif ( $cmd eq 'showErrorList' ) {
+    elsif ( lc($cmd) eq 'showerrorlist' ) {
         return "usage: $cmd" if ( @args != 0 );
 
         my $ret = CreateErrorList($hash);
@@ -1406,7 +1458,8 @@ sub CreateInstalledList($$) {
     if ( ref($packages) eq "HASH" ) {
 
         my $linecount = 1;
-        foreach my $package ( sort keys( %{$packages} ) ) {
+        foreach my $package ( sort { "\L$a" cmp "\L$b" } keys( %{$packages} ) )
+        {
             next if ( $package eq "undefined" );
 
             my $l = $linecount % 2 == 0 ? $rowOpenEven : $rowOpenOdd;
@@ -1494,7 +1547,8 @@ sub CreateOutdatedList($$) {
     if ( ref($packages) eq "HASH" ) {
 
         my $linecount = 1;
-        foreach my $package ( sort keys( %{$packages} ) ) {
+        foreach my $package ( sort { "\L$a" cmp "\L$b" } keys( %{$packages} ) )
+        {
             next if ( $package eq "undefined" );
             my $fhemPkg = defined( $fhem_npm_modules{$package} ) ? 1 : 0;
 
@@ -1765,7 +1819,7 @@ sub ToDay() {
       "abstract": "Modul zur Bedienung der Node.js Installation und Updates"
     }
   },
-  "version": "v1.0.6",
+  "version": "v1.1.0",
   "release_status": "stable",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
@@ -1787,12 +1841,17 @@ sub ToDay() {
         "FHEM": 5.00918799,
         "perl": 5.014,
         "GPUtils": 0,
-        "JSON": 0,
-        "Data::Dumper": 0
+        "JSON::PP": 0,
+        "Data::Dumper": 0,
+        "SubProcess": 0
       },
       "recommends": {
+        "JSON": 0,
+        "JSON::MaybeXS": 0
       },
       "suggests": {
+        "Cpanel::JSON::XS": 0,
+        "JSON::XS": 0
       }
     }
   },

@@ -1241,11 +1241,62 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
         $encoding = 'latin1' unless ($encoding);
 
         if ( keys %json > 0 ) {
+
+            # try to use JSON::MaybeXS wrapper
+            #   for chance of better performance + open code
+            # See: https://perlmaven.com/comparing-the-speed-of-json-decoders
             eval {
-                require JSON::PP;
-                JSON::PP->import();
+                require JSON::MaybeXS;
+                import JSON::MaybeXS qw( decode_json );
                 1;
             };
+            if ($@) {
+                $@ = undef;
+
+                # try to use JSON wrapper
+                #   for chance of better performance
+                eval {
+                    require JSON;
+                    import JSON qw( decode_json );
+                    1;
+                };
+
+                if ($@) {
+                    $@ = undef;
+
+                    # In rare cases, Cpanel::JSON::XS may
+                    #   be installed but JSON|JSON::MaybeXS not ...
+                    eval {
+                        require Cpanel::JSON::XS;
+                        import Cpanel::JSON::XS qw(decode_json encode_json);
+                        1;
+                    };
+
+                    if ($@) {
+                        $@ = undef;
+
+                        # In rare cases, JSON::XS may
+                        #   be installed but JSON not ...
+                        eval {
+                            require JSON::XS;
+                            import JSON::XS qw(decode_json encode_json);
+                            1;
+                        };
+
+                        if ($@) {
+                            $@ = undef;
+
+                            # Fallback to built-in JSON which SHOULD
+                            #   be available since 5.014 ...
+                            eval {
+                                require JSON::PP;
+                                import JSON::PP qw(decode_json encode_json);
+                                1;
+                            };
+                        }
+                    }
+                }
+            }
 
             if ( !$@ ) {
                 foreach ( keys %json ) {
@@ -3052,7 +3103,7 @@ sub __SetXVersion {
     "2019-04-18": {
       "version": "v0.5.1",
       "changes": [
-        "use built-in JSON:PP instead of JSON"
+        "improved JSON dependencies"
       ]
     },
     "2019-04-16": {
@@ -3099,14 +3150,18 @@ sub __SetXVersion {
         "Data::Dumper": 0,
         "Module::CoreList": 0,
         "Encode": 0,
-        "version": 0
+        "version": 0,
+        "JSON::PP": 0
       },
       "recommends": {
-        "JSON::PP": 0,
+        "JSON": 0,
+        "JSON::MaybeXS": 0,
         "Perl::PrereqScanner::NotQuiteLite": 0,
         "Time::Local": 0
       },
       "suggests": {
+        "JSON::XS": 0,
+        "Cpanel::JSON::XS": 0
       }
     }
   },
