@@ -37,7 +37,7 @@ use POSIX;
 use FHEM::Meta;
 
 use GPUtils qw(GP_Import);
-use JSON;
+use JSON::PP;
 use Data::Dumper;
 use Config;
 use ExtUtils::Installed;
@@ -77,9 +77,6 @@ BEGIN {
           RemoveInternalTimer
           TimeNow
           Value
-          trim
-          ltrim
-          rtrim
           )
     );
 }
@@ -819,11 +816,11 @@ sub ExecuteFhemCommand($) {
             if ( $1 =~ /App::cpanminus/i ) {
                 $installer->{installperl} =
                     'echo n | if [ -z "$(cpanm --version 2>/dev/null)" ]; then'
-                  . ' sh -c "curl -sSL https://git.io/cpanm | '
+                  . ' sh -c "curl -fsSL https://git.io/cpanm | '
                   . $sudo
                   . '$(which perl) - App::cpanminus >/dev/null 2>&1" 2>&1; '
                   . 'fi; '
-                  . 'cpanm --version >/dev/null 2>&1'
+                  . 'cpanm --version >/dev/null'
                   . ' && sh -c "'
                   . $sudo
                   . ' $(which cpanm) --quiet App::cpanoutdated" 2>&1';
@@ -924,7 +921,8 @@ sub GetCpanVersion($) {
             }
             elsif ($isInc) {
                 $line =~ s/^\s+//g;
-                push @{ $h->{versions}{INC} }, $line;
+                push @{ $h->{versions}{INC} }, $line
+                  unless ( $line =~ /^.+=.+$/i );
             }
 
             # error
@@ -1771,7 +1769,7 @@ sub CreateInstalledPerlList($$) {
               . (
                 defined( $packages->{$package}{version} )
                   && $packages->{$package}{version}
-                ? version->parse( $packages->{$package}{version} )->normal
+                ? $packages->{$package}{version}
                 : '?'
               ) . $tdClose;
             $l .= $trClose;
@@ -2029,7 +2027,7 @@ sub CreatePrereqsList {
     my $thOpen2     = '';
     my $thOpen3     = '';
     my $tdOpen      = '';
-    my $tdOpen1      = '';
+    my $tdOpen1     = '';
     my $tdOpen2     = '';
     my $tdOpen3     = '';
     my $tdOpen4     = '';
@@ -2245,14 +2243,15 @@ sub CreatePrereqsList {
             if ( $linecount > 1 ) {
 
                 my $action =
-'<div class="detLink installerAction"><a href="?cmd=set '
+                    '<div class="detLink installerAction"><a href="?cmd=set '
                   . $hash->{NAME}
                   . ' install'
                   . ucfirst($area) . ' all-'
                   . $mAttr
                   . $FW_CSRF
                   . '" title="Click here to trigger installation">Install '
-                  . $mAttr.' '.ucfirst($area)
+                  . $mAttr . ' '
+                  . ucfirst($area)
                   . '</a></div>';
                 # push @ret,
                 #     ( $linecount % 2 == 0 ? $trOpenEven : $trOpenOdd )
@@ -4303,7 +4302,8 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                       . $hash->{NAME}
                       . ' installPerl '
                       . $prereq . ' '
-                      . $FW_CSRF . '" title="Click here to trigger installation">'
+                      . $FW_CSRF
+                      . '" title="Click here to trigger installation">'
                       . ( $installed eq 'outdated' ? 'Update' : 'Install' )
                       . '</a></div>';
                 }
@@ -4325,7 +4325,8 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
                       . $hash->{NAME}
                       . ' installPerl '
                       . $prereq . ' '
-                      . $FW_CSRF . '" title="Click here to trigger installation">'
+                      . $FW_CSRF
+                      . '" title="Click here to trigger installation">'
                       . ( $installed eq 'outdated' ? 'Update' : 'Install' )
                       . '</a></div>';
                 }
@@ -4375,7 +4376,7 @@ m/^([^<>\n\r]+?)(?:\s+(\(last release only\)))?(?:\s+(?:<(.*)>))?$/
         push @ret,
             $tFOpen
           . $trOpenEven
-          . ($html?$tdOpen4:$tdOpen3)
+          . ( $html ? $tdOpen4 : $tdOpen3 )
           . $strongOpen . 'Hint:'
           . $strongClose
           . ' The module does not provide Perl prerequisites from its metadata.'
@@ -5392,7 +5393,7 @@ sub __list_module {
       "abstract": "Modul zum Update von FHEM, zur Installation von Drittanbieter FHEM Modulen und der Verwaltung von Systemvoraussetzungen"
     }
   },
-  "version": "v0.5.0",
+  "version": "v0.5.1",
   "release_status": "testing",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
