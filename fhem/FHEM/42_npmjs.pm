@@ -34,6 +34,44 @@ use FHEM::Meta;
 use GPUtils qw(GP_Import);
 use Data::Dumper;
 
+# Run before module compilation
+BEGIN {
+
+    # JSON preference order
+    $ENV{PERL_JSON_BACKEND} =
+      'Cpanel::JSON::XS,JSON::XS,JSON::PP,JSON::backportPP'
+      unless ( defined( $ENV{PERL_JSON_BACKEND} ) );
+
+    # Import from main::
+    GP_Import(
+        qw(
+          readingsSingleUpdate
+          readingsBulkUpdate
+          readingsBulkUpdateIfChanged
+          readingsBeginUpdate
+          readingsEndUpdate
+          ReadingsTimestamp
+          defs
+          modules
+          Log3
+          Debug
+          DoTrigger
+          CommandAttr
+          attr
+          AttrVal
+          ReadingsVal
+          Value
+          IsDisabled
+          deviceEvents
+          init_done
+          gettimeofday
+          InternalTimer
+          RemoveInternalTimer
+          FW_webArgs
+          )
+    );
+}
+
 # try to use JSON::MaybeXS wrapper
 #   for chance of better performance + open code
 eval {
@@ -85,38 +123,6 @@ if ($@) {
             }
         }
     }
-}
-
-# Run before module compilation
-BEGIN {
-    # Import from main::
-    GP_Import(
-        qw(
-          readingsSingleUpdate
-          readingsBulkUpdate
-          readingsBulkUpdateIfChanged
-          readingsBeginUpdate
-          readingsEndUpdate
-          ReadingsTimestamp
-          defs
-          modules
-          Log3
-          Debug
-          DoTrigger
-          CommandAttr
-          attr
-          AttrVal
-          ReadingsVal
-          Value
-          IsDisabled
-          deviceEvents
-          init_done
-          gettimeofday
-          InternalTimer
-          RemoveInternalTimer
-          FW_webArgs
-          )
-    );
 }
 
 my %fhem_npm_modules = (
@@ -1846,8 +1852,7 @@ sub ToDay() {
         "SubProcess": 0
       },
       "recommends": {
-        "JSON": 0,
-        "JSON::MaybeXS": 0
+        "JSON": 0
       },
       "suggests": {
         "Cpanel::JSON::XS": 0,

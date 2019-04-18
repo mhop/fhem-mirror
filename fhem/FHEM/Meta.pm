@@ -22,6 +22,11 @@ use Encode;
 # Run before module compilation
 BEGIN {
 
+    # JSON preference order
+    $ENV{PERL_JSON_BACKEND} =
+      'Cpanel::JSON::XS,JSON::XS,JSON::PP,JSON::backportPP'
+      unless ( defined( $ENV{PERL_JSON_BACKEND} ) );
+
     # Import from main::
     GP_Import(
         qw(
@@ -1293,6 +1298,18 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
                                 import JSON::PP qw(decode_json encode_json);
                                 1;
                             };
+
+                            if ($@) {
+                                $@ = undef;
+
+                             # Fallback to JSON::backportPP in really rare cases
+                                eval {
+                                    require JSON::backportPP;
+                                    import JSON::backportPP
+                                      qw(decode_json encode_json);
+                                    1;
+                                };
+                            }
                         }
                     }
                 }
@@ -3155,7 +3172,6 @@ sub __SetXVersion {
       },
       "recommends": {
         "JSON": 0,
-        "JSON::MaybeXS": 0,
         "Perl::PrereqScanner::NotQuiteLite": 0,
         "Time::Local": 0
       },

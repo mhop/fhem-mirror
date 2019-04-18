@@ -41,6 +41,51 @@ use Data::Dumper;
 use Config;
 use ExtUtils::Installed;
 
+# Run before module compilation
+BEGIN {
+
+    # JSON preference order
+    $ENV{PERL_JSON_BACKEND} =
+      'Cpanel::JSON::XS,JSON::XS,JSON::PP,JSON::backportPP'
+      unless ( defined( $ENV{PERL_JSON_BACKEND} ) );
+
+    # Import from main::
+    GP_Import(
+        qw(
+          attr
+          AttrVal
+          cmds
+          CommandAttr
+          Debug
+          defs
+          deviceEvents
+          devspec2array
+          DoTrigger
+          FW_webArgs
+          gettimeofday
+          init_done
+          InternalTimer
+          IsDisabled
+          LoadModule
+          Log
+          Log3
+          maxNum
+          modules
+          packages
+          readingsBeginUpdate
+          readingsBulkUpdate
+          readingsBulkUpdateIfChanged
+          readingsEndUpdate
+          readingsSingleUpdate
+          ReadingsTimestamp
+          ReadingsVal
+          RemoveInternalTimer
+          TimeNow
+          Value
+          )
+    );
+}
+
 # try to use JSON::MaybeXS wrapper
 #   for chance of better performance + open code
 eval {
@@ -86,51 +131,23 @@ if ($@) {
 
                 # Fallback to built-in JSON which SHOULD
                 #   be available since 5.014 ...
-                require JSON::PP;
-                import JSON::PP qw(decode_json encode_json);
-                1;
+                eval {
+                    require JSON::PP;
+                    import JSON::PP qw(decode_json encode_json);
+                    1;
+                };
+
+                if ($@) {
+                    $@ = undef;
+
+                    # Fallback to JSON::backportPP in really rare cases
+                    require JSON::backportPP;
+                    import JSON::backportPP qw(decode_json encode_json);
+                    1;
+                }
             }
         }
     }
-}
-
-# Run before module compilation
-BEGIN {
-    # Import from main::
-    GP_Import(
-        qw(
-          attr
-          AttrVal
-          cmds
-          CommandAttr
-          Debug
-          defs
-          deviceEvents
-          devspec2array
-          DoTrigger
-          FW_webArgs
-          gettimeofday
-          init_done
-          InternalTimer
-          IsDisabled
-          LoadModule
-          Log
-          Log3
-          maxNum
-          modules
-          packages
-          readingsBeginUpdate
-          readingsBulkUpdate
-          readingsBulkUpdateIfChanged
-          readingsEndUpdate
-          readingsSingleUpdate
-          ReadingsTimestamp
-          ReadingsVal
-          RemoveInternalTimer
-          TimeNow
-          Value
-          )
-    );
 }
 
 # Load dependent FHEM modules as packages,
@@ -1032,7 +1049,7 @@ sub CpanInstall($) {
             print qq($line\n) if ( $cmd->{debug} == 1 );
 
             if ( $line =~
-                /^Successfully\s+(\S+)\s+([\S]+)-(\d+\.\d+(?:_\d+)?).*$/i )
+                /^Successfully\s+(\S+)\s+([\S]+)-(\d+(?:\.\d+(?:_\d+)?)?).*$/i )
             {
                 my $r = $1;
                 my $m = $2;
@@ -1044,7 +1061,8 @@ sub CpanInstall($) {
             }
 
             elsif ( $line =~
-                /^(\S+)\s+is\s+up\s+to\s+date.*\((\d+\.\d+(?:_\d+)?)\).*$/i )
+                /^(\S+)\s+is\s+up\s+to\s+date.*\((\d+(?:\.\d+(?:_\d+)?)?)\).*$/i
+              )
             {
                 my $m = $1;
                 my $v = $2;
@@ -5483,8 +5501,7 @@ sub __list_module {
       },
       "recommends": {
         "Perl::PrereqScanner::NotQuiteLite": 0,
-        "JSON": 0,
-        "JSON::MaybeXS": 0
+        "JSON": 0
       },
       "suggests": {
         "Cpanel::JSON::XS": 0,
