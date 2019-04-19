@@ -560,6 +560,7 @@ FHEM/TR064Utils.pm           rudolfkoenig         Automatisierung
 FHEM/UConv.pm                loredo               FHEM Development
 FHEM/Unit.pm                 loredo               FHEM Development
 FHEM/WMBus.pm                kaihs                Sonstige Systeme
+FHEM/wundergroundAPI.pm      loredo               Unterstuetzende Dienste/Wettermodule
 FHEM/YahooWeatherAPI.pm      neubert              (deprecated)
 FHEM/FhemUtils/*             mfr69bs              Sonstiges
 FHEM/holiday/*               jeschkec             Sonstiges
