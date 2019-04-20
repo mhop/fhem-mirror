@@ -275,7 +275,7 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"00D0" => {name=>"HM-LC-SW4-DR-2"          ,alias=>"HM-LC-SW4-SM"}
  ,"00D1" => {name=>"HM-LC-BL1-SM-2"          ,alias=>"HM-LC-BL1-FM"} # RADIO-CONTROLLED BLIND ACTUATOR 1-CHANNEL (FLUSH-MOUNT)
  ,"00D2" => {name=>"HM-LC-BL1-FM-2"          ,alias=>"HM-LC-BL1-FM"} # RADIO-CONTROLLED BLIND ACTUATOR 1-CHANNEL (FLUSH-MOUNT)
- # check config modESS,"00D3" => {NAME=>"HM-Dis-WM55"             ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1'            ,chn=>"Dis:1:10",}
+ # check config modESS,"00D3" => {NAME=>"HM-DIS-WM55"             ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1'            ,chn=>"Dis:1:10",}
  ,"00D3" => {name=>"HM-DIS-WM55"             ,st=>'display'           ,cyc=>''      ,rxt=>'c'      ,lst=>'1,p'          ,chn=>"Dis:1:10",}
  ,"00D4" => {name=>"HM-RC-4-3"               ,st=>'remote'            ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:4",}
  ,"00D5" => {name=>"HM-RC-SEC4-3"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c:l'    ,lst=>'1,4'          ,chn=>"armInt:1:1,armExt:2:2,light:3:3,disarm:4:4",}
@@ -552,10 +552,10 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
 # 4DIS         02:01 
 # HM-SEC-MDIR  02:01 
 # SEC-SC       02:00 
-# Blind               9:00 10:00 20:00
+# BLIND               9:00 10:00 20:00
 # BL1TPBU      02:01 21:FF
-# Dim1TPBU     02:01 21:FF 22:00
-# HM-MOD-Re-8        30:49
+# DIM1TPBU     02:01 21:FF 22:00
+# HM-MOD-RE-8        30:49
 # HM-ES-TX-WM        5C:38 F1:FC
 # tx: D1E8  9158 
 
@@ -1680,7 +1680,7 @@ $culHmRegChan{"HM-OU-CFM-TW02"}         = $culHmRegChan{"HM-OU-CFM-PL02"};
                       );
 %culHmModelGets     = (
                        "CCU-FHEM"     =>{ "listDevice"=>""}
-                      ,ActionDetector =>{ "listDevice"=>"[all|alive|unknown|dead|notAlive] ..." 
+                      ,ACTIONDETECTOR =>{ "listDevice"=>"[all|alive|unknown|dead|notAlive] ..." 
                                          ,"status"      =>""
                                         }
                       );
