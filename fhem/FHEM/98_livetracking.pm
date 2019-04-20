@@ -1,4 +1,4 @@
-##############################################
+﻿##############################################
 # $Id$$$ 2018-11-01
 #
 #  98_livetracking.pm
@@ -887,6 +887,26 @@ sub livetracking_ParseOwnTracks
   my ($hash,$data) = @_;
   my $name = $hash->{NAME};
 
+  #//rcmcronny CSV DECODING
+  if($data =~ m/[0-9]{2},[A-Z,a-z,0-9]{8},[f|c|a|k|L|l|m|t|T|v]{1},[0-9]{8},[0-9]{8},[0-9]{1,5},[0-9]{1,5},[0-9]{1,5},[0-9]{1,5},[0-9]{1,5}/)
+  {
+    Log3 ($name, 4, "$name - CSV encoded payload detected -> ".Dumper($data));
+    my ($csv_tid, $csv_tst, $csv_t, $csv_lat, $csv_lon, $csv_cog, $csv_vel, $csv_alt, $csv_dist, $csv_trip) = $data =~ m/([0-9]{2}),([A-Z,a-z,0-9]{8}),([f|c|a|k|L|l|m|t|T|v]{1}),([0-9]{8}),([0-9]{8}),([0-9]{1,5}),([0-9]{1,5}),([0-9]{1,5}),([0-9]{1,5}),([0-9]{1,5})/;
+    $data = '{
+      "_type": "location",
+      "t": "'.$csv_t.'",
+      "tst": "'.(hex($csv_tst)).'",
+      "tid": "'.$csv_tid.'",
+      "lat": "'.($csv_lat/1000000).'",
+      "lon": "'.($csv_lon/1000000).'",
+      "alt": "'.($csv_alt*10).'",
+      "vel": "'.$csv_vel.'",
+      "cog": "'.($csv_cog*10).'",
+      "dist": "'.$csv_dist.'",
+      "trip": "'.($csv_trip*1000).'"
+    }';
+  }
+
   my $dataset = eval { JSON->new->utf8(0)->decode($data) };
   if($@)
     {
@@ -1164,7 +1184,13 @@ sub livetracking_Notify($$)
       $invaliddata = 0;#traccar
       Log3 ($name, 4, "$name Detected Traccar data from MQTT device notify");
     }
-    if($invaliddata == 1){
+    elsif(($dev->{CHANGED}[0] =~ m/[0-9]{2},[A-Z,a-z,0-9]{8},[f|c|a|k|L|l|m|t|T|v]{1},[0-9]{8},[0-9]{8},[0-9]{2},[0-9]{1},[0-9]{2},[0-9]{1},[0-9]{1}/))
+    {
+      $invaliddata = 0;#owntracks-csv
+      Log3 ($name, 4, "$name Detected OwnTracks CSV ENCODED data from MQTT device notify");
+    }
+    if($invaliddata == 1)
+    {
       Log3 ($name, 4, "WRONG MQTT TYPE ".Dumper($dev->{CHANGED}[0]));
       return undef;
     }

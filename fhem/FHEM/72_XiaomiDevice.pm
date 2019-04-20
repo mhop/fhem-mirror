@@ -2959,7 +2959,7 @@ sub XiaomiDevice_connectFail($)
   Log3 $name, 3, "$name: connection timeout";
   readingsSingleUpdate($hash, "state", "disconnected", 1) if($hash->{helper}{ConnectionState} ne "disconnected");
   $hash->{helper}{ConnectionState} = "disconnected";
-  $hash->{helper}{delay} += 60;
+  $hash->{helper}{delay} += 120;
   InternalTimer( gettimeofday() + $hash->{helper}{delay}, "XiaomiDevice_connect", $hash);
 
   return undef;

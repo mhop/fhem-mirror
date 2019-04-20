@@ -1,4 +1,4 @@
-##############################################################################
+﻿##############################################################################
 # $Id$
 #
 #  38_netatmo.pm
@@ -5138,10 +5138,10 @@ netatmo_parsePublic($$)
 
               if(defined($device->{measures}->{$module}->{rain_live}))
               {
-                push(@readings_rain, $device->{measures}->{$module}->{rain_live});
-                push(@readings_rain_1, $device->{measures}->{$module}->{rain_60min});
-                push(@readings_rain_24, $device->{measures}->{$module}->{rain_24h});
-                push(@timestamps_rain, $device->{measures}->{$module}->{rain_timeutc});
+                push(@readings_rain, $device->{measures}->{$module}->{rain_live}) if(defined($device->{measures}->{$module}->{rain_live}));
+                push(@readings_rain_1, $device->{measures}->{$module}->{rain_60min}) if(defined($device->{measures}->{$module}->{rain_60min}));
+                push(@readings_rain_24, $device->{measures}->{$module}->{rain_24h}) if(defined($device->{measures}->{$module}->{rain_24h}));
+                push(@timestamps_rain, $device->{measures}->{$module}->{rain_timeutc}) if(defined($device->{measures}->{$module}->{rain_timeutc}));
                 next;
               }
               if(defined($device->{measures}->{$module}->{wind_strength}))
@@ -5321,6 +5321,7 @@ netatmo_parsePublic($$)
         my $max_rain_24 = -1000;
         foreach my $val (@readings_rain_24)
         {
+          next if(!defined($val));
           $avg_rain_24 += $val / scalar(@readings_rain_24);
           $min_rain_24 = $val if($val < $min_rain_24);
           $max_rain_24 = $val if($val > $max_rain_24);
