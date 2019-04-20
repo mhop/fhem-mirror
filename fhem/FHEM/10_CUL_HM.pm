@@ -4090,7 +4090,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
       
       $ret   .= "\n   mode   \t:".$mode;
     }
-    
+
     if(!$roleV){
       $ret   .= " - activity:".$act if ($act ne "-");
       $ret   .= "\n   protState\t: "     .InternalVal($devName,"protState"  ,(!$roleC ? InternalVal($devName,"STATE","unknown"):"unknown"));
@@ -8778,6 +8778,7 @@ sub CUL_HM_getPeerOption($){ #who are my friends
   my ($name)  = @_; 
   CUL_HM_calcPeerOptions() if(!$modules{CUL_HM}{helper}{peerOpt});
   my $peerFriend = $defs{$name}{helper}{peerFriend};
+  return "" if (!$peerFriend);
   my $modH = $modules{CUL_HM}{helper}{peerOpt};
 
   my %curPTmp;  
