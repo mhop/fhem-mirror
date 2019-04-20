@@ -215,8 +215,54 @@ sub Get($@) {
         } else {
             return "no such reading: $what";
         }
+    } elsif ( $what =~ /^(statistics)$/ ) {
+      if (defined( $hash->{helper}{MAPS} and @{$hash->{helper}{MAPS}} > 0)) {
+        my $ret = "";
+        my $mapcount = @{$hash->{helper}{MAPS}};
+        my $cw = 9; #column width
+        my $cws = $cw * 11 + 4; #column width sum
+        $ret .= "<b>".sprintf("%-".($cws)."s","Report: ".ReadingsVal($name,"name","name").", ".InternalVal($name,"VENDOR","VENDOR").", ".ReadingsVal($name,"model","model"))."</b>\n\n";
+        
+        $ret .= "<b>".sprintf("%-".($cw-5)."s","Map").sprintf("%-".($cw+1)."s","Expected").sprintf("%-".($cw-4)."s","Map").sprintf("%-".($cw-4)."s","Map").sprintf("%-".($cw-2)."s","Charge").sprintf("%-".($cw+1)."s","Discharge").sprintf("%-".($cw-2)."s","Area").sprintf("%-".($cw+11)."s","Cleaning").sprintf("%-".($cw-2)."s","Charge").sprintf("%-".$cw."s","Status").sprintf("%-".($cw+2)."s","Date").sprintf("%-".($cw+10)."s","Time")."</b>\n";
+        
+        $ret .= "<b>".sprintf("%-".($cw-5)."s","No.").sprintf("%-".($cw-4)."s","Area").sprintf("%-".($cw-4)."s","Time").sprintf("%-".($cw-4)."s","Area").sprintf("%-".($cw-4)."s","Time").sprintf("%-".($cw-2)."s","Delta").sprintf("%-".(($cw+1))."s","Speed").sprintf("%-".($cw-2)."s","Speed").sprintf("%-".($cw-2)."s","Cat.").sprintf("%-".($cw-3)."s","Mode").sprintf("%-".($cw-2)."s","Freq.").sprintf("%-".($cw-2)."s","During").sprintf("%-".$cw."s","").sprintf("%-".($cw+2)."s","").sprintf("%-".($cw+10)."s","")."</b>\n";
+        
+        $ret .= "<b>".sprintf("%-".($cw-5)."s","").sprintf("%-".($cw-4)."s","qm").sprintf("%-".($cw-4)."s","min").sprintf("%-".($cw-4)."s","qm").sprintf("%-".($cw-4)."s","min").sprintf("%-".($cw-2)."s","%").sprintf("%-".($cw+1)."s","%/min").sprintf("%-".($cw-2)."s","qm/min").sprintf("%-".($cw-2)."s","").sprintf("%-".($cw-3)."s","").sprintf("%-".($cw-2)."s","").sprintf("%-".($cw-2)."s","Run").sprintf("%-".$cw."s","").sprintf("%-".($cw+2)."s","YYYY-MM-DD").sprintf("%-".($cw+10)."s","hh:mm:ss")."</b>\n";
+        $ret .= sprintf("-"x($cws))."\n";
+
+        for (my $i=0;$i<$mapcount;$i++) {
+          my $map = \$hash->{helper}{MAPS}[$i];
+          my $t1 = GetSecondsFromString("$$map->{end_at}");
+          my $t2 = GetSecondsFromString("$$map->{start_at}");
+          my $dt = $t1-$t2-$$map->{time_in_suspended_cleaning}-$$map->{time_in_error}-$$map->{time_in_pause};
+          my $dc = $$map->{run_charge_at_start}-$$map->{run_charge_at_end};
+          my $expa = int($$map->{cleaned_area}*100/$dc+.5) if ($dc > 0);
+          my $expt = int($dt*100/$dc/60+.5) if ($dc > 0);
+          $ret .= sprintf("%-".($cw-5)."s",$i+1); # Map No.
+          $ret .= sprintf("%-".($cw-4)."s",($expa>0?$expa:0)); # Expected Area
+          $ret .= sprintf("%-".($cw-4)."s",($expt>0?$expt:0)); # Expected Time
+          $ret .= sprintf("%-".($cw-4)."s",int($$map->{cleaned_area}+.5)); # Map Area
+          $ret .= sprintf("%-".($cw-4)."s",($dt>0)?(int($dt/60+.5)):0); # Map Time
+          $ret .= sprintf("%-".($cw-2)."s",($dc>0?$dc:0)); # Charge Delta
+          $ret .= sprintf("%-".($cw+1)."s",($dt>0 and $dc>0)?(int($dc*600/$dt+.5)/10):0); # Discharge Speed
+          $ret .= sprintf("%-".($cw-2)."s",($expt>0 and $expa>0)?(int($expa*10/$expt+.5))/10:0); # Area Speed
+          $ret .= sprintf("%-".($cw-2)."s",GetCategoryText($$map->{category})); # Cleaning Category
+          $ret .= sprintf("%-".($cw-3)."s",GetModeText($$map->{mode})); # Cleaning Mode
+          $ret .= sprintf("%-".($cw-2)."s",GetModifierText($$map->{modifier})); # Cleaning Frequency
+          $ret .= sprintf("%-".($cw-2)."s",$$map->{suspended_cleaning_charging_count}."x"); # Charge During Run
+          $ret .= sprintf("%-".$cw."s",$$map->{status}); # Status
+          $ret .= sprintf("%-".($cws)."s",GetTimeFromString($$map->{generated_at})); # Date
+          $ret .= "\n";
+          $ret .= "<div style=\"color:#d9d9d9\" >".sprintf("-"x($cws))."</div>" if ($i%5==4);
+        }
+        $ret .= "\nManufacturer Specification\n";
+        $ret .= "Vorwerk VR220(VR300), battery 84 Wh, eco (90 min, 120 qm, power 65 W), turbo (60 min, 90 qm, power 85 W)\n";
+        return $ret;
+      } else {
+        return "maps for $what are not available yet";
+      }
     } else {
-        return "Unknown argument $what, choose one of batteryPercent:noArg";
+        return "Unknown argument $what, choose one of batteryPercent:noArg statistics:noArg";
     }
 }
 
@@ -964,7 +1010,7 @@ sub ReceiveCommand($$$) {
                   for (my $i = 0; $i < @boundaries; $i++) {
                     my $currentBoundary = "{";
                     $currentBoundary .= "\"id\":\"".$boundaries[$i]->{id}."\"," if ($boundaries[$i]->{type} eq "polygon");
-					$currentBoundary .= "\"type\":\"".$boundaries[$i]->{type}."\",";
+                    $currentBoundary .= "\"type\":\"".$boundaries[$i]->{type}."\",";
                     if (ref($boundaries[$i]->{vertices}) eq "ARRAY") {
                       my @vertices = @{$boundaries[$i]->{vertices}};
                       $currentBoundary .= "\"vertices\":[";
@@ -974,8 +1020,8 @@ sub ReceiveCommand($$$) {
                           $currentBoundary .= "[".$xy[0].",".$xy[1]."],";
                         }
                       }
-                    $tmp = chop($currentBoundary);  #remove last ","
-                    $currentBoundary .= "],";
+                      $tmp = chop($currentBoundary);  #remove last ","
+                      $currentBoundary .= "],";
                     }
                     $currentBoundary .= "\"name\":\"".$boundaries[$i]->{name}."\",";
                     $currentBoundary .= "\"color\":\"".$boundaries[$i]->{color}."\",";
@@ -983,18 +1029,18 @@ sub ReceiveCommand($$$) {
                     $currentBoundary .= "\"enabled\":".$tmp.",";
                     $tmp = chop($currentBoundary);  #remove last ","
                     $currentBoundary .= "},\n";
-					if ($boundaries[$i]->{type} eq "polygon") {
-					  $zonesList .= $currentBoundary;
-					} else {
-					  $boundariesList .= $currentBoundary;
-					}
+                    if ($boundaries[$i]->{type} eq "polygon") {
+                      $zonesList .= $currentBoundary;
+                    } else {
+                      $boundariesList .= $currentBoundary;
+                    }
                   }
                   $tmp = chomp($boundariesList);  #remove last "\n"
-				  $tmp = chomp($zonesList);  #remove last "\n"
-				  $tmp = chop($boundariesList);  #remove last ","
-				  $tmp = chop($zonesList);  #remove last ","
+                  $tmp = chomp($zonesList);  #remove last "\n"
+                  $tmp = chop($boundariesList);  #remove last ","
+                  $tmp = chop($zonesList);  #remove last ","
                   readingsBulkUpdateIfChanged($hash, "floorplan_".$reqId."_boundaries", $boundariesList);
-				  readingsBulkUpdateIfChanged($hash, "floorplan_".$reqId."_zones", $zonesList);
+                  readingsBulkUpdateIfChanged($hash, "floorplan_".$reqId."_zones", $zonesList);
                 }
               }
           }
@@ -1135,14 +1181,28 @@ sub ReceiveCommand($$$) {
             if ( ref($return) eq "HASH" ) {
               if ( ref($return->{maps} ) eq "ARRAY" ) {
                 my @maps = @{$return->{maps}};
+                $hash->{helper}{MAPS} = $return->{maps};
                 if (@maps) {
                   # take first - newest
                   my $map = $maps[0];
-                  readingsBulkUpdateIfChanged($hash, "map_status", $map->{status});
-                  readingsBulkUpdateIfChanged($hash, "map_id",     $map->{id});
+                  foreach my $key (keys $map) {
+                    readingsBulkUpdateIfChanged($hash, "map_".$key, defined($map->{$key})?$map->{$key}:"")
+                        if ($key !~ "url|url_valid_for_seconds|generated_at|start_at|end_at");
+                  }
                   readingsBulkUpdateIfChanged($hash, "map_date",   GetTimeFromString($map->{generated_at}));
-                  readingsBulkUpdateIfChanged($hash, "map_area",   $map->{cleaned_area});
                   readingsBulkUpdateIfChanged($hash, ".map_url",   $map->{url});
+                  my $t1 = GetSecondsFromString($map->{end_at});
+                  my $t2 = GetSecondsFromString($map->{start_at});
+                  my $dt = $t1-$t2-$map->{time_in_suspended_cleaning}-$map->{time_in_error}-$map->{time_in_pause};
+                  my $dc = $map->{run_charge_at_start}-$map->{run_charge_at_end};
+                  my $expa = int($map->{cleaned_area}*100/$dc+.5) if ($dc > 0);
+                  my $expt = int($dt*100/$dc/60+.5) if ($dc > 0);
+                  readingsBulkUpdateIfChanged($hash, "map_duration", int($dt/6+.5)/10); # min
+                  readingsBulkUpdateIfChanged($hash, "map_expected_area", $expa>0?$expa:0); # qm
+                  readingsBulkUpdateIfChanged($hash, "map_run_discharge", $dc>0?$dc:0); # %
+                  readingsBulkUpdateIfChanged($hash, "map_expected_time", $expt>0?$expt:0); # min
+                  readingsBulkUpdateIfChanged($hash, "map_area_per_time", ($expt>0 and $expa>0)?(int($expa*10/$expt+.5)/10):0); # qm/min
+                  readingsBulkUpdateIfChanged($hash, "map_discharge_per_time", ($dt>0 and $dc>0)?(int($dc*600/$dt+.5)/10):0); # %/min
                   $loadMap = 1;
                   # getPersistentMaps
                   push(@successor , ["robots", "persistent_maps"]);
@@ -1222,6 +1282,18 @@ sub GetTimeFromString($) {
     if(defined($timeStr) and $timeStr =~ m/^(\d{4})-(\d{2})-(\d{2})T([0-2]\d):([0-5]\d):([0-5]\d)Z$/) {
         my $time = timelocal($6, $5, $4, $3, $2 - 1, $1 - 1900);
         return FmtDateTime($time + fhemTzOffset($time));
+    }
+  }
+}
+
+sub GetSecondsFromString($) {
+  my ($timeStr) = @_;
+
+  eval {
+    use Time::Local;
+    if(defined($timeStr) and $timeStr =~ m/^(\d{4})-(\d{2})-(\d{2})T([0-2]\d):([0-5]\d):([0-5]\d)Z$/) {
+        my $time = timelocal($6, $5, $4, $3, $2 - 1, $1 - 1900);
+        return $time;
     }
   }
 }
@@ -1905,7 +1977,14 @@ sub wsMasking($$) {
   <li><code>get &lt;name&gt; batteryPercent</code>
   <br>
   requests the state of the battery from Robot
-  </li><br>
+  </li>
+<br>
+  <a name="statistics"></a>
+  <li><code>get &lt;name&gt; statistics</code>
+  <br>
+  display statistical data, extracted from available maps of recent cleanings
+  </li>
+<br>
 </ul>
 
 <a name="BOTVACset"></a>
