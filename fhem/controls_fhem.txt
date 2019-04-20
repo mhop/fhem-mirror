@@ -1,4 +1,4 @@
-REV 19220
+REV 19223
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,8 +21,8 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2019-04-18_07:45:03 288277 ./CHANGED
-UPD 2019-04-16_07:45:02 40826 ./MAINTAINER.txt
+UPD 2019-04-20_07:45:02 288345 ./CHANGED
+UPD 2019-04-20_07:45:02 40913 ./MAINTAINER.txt
 UPD 2019-03-29_07:45:02 39782 ./configDB.pm
 UPD 2019-03-15_07:45:03 22394 ./fhem.cfg.demo
 UPD 2019-04-02_07:45:11 156879 ./fhem.pl
@@ -696,6 +696,7 @@ UPD 2017-01-11_07:45:02 22473 FHEM/lib/zwave_pepperlinks.csv.gz
 UPD 2019-03-25_07:45:04 18178 FHEM/msgSchema.pm
 UPD 2015-07-28_14:05:31 401 FHEM/myUtilsTemplate.pm
 UPD 2015-07-28_14:05:31 162 FHEM/template.layout
+UPD 2019-04-20_07:45:02 33627 FHEM/wundergroundAPI.pm
 UPD 2018-03-18_07:45:07 6218 contrib/commandref_join.pl
 UPD 2018-01-26_07:45:05 4302 contrib/commandref_modular.pl
 UPD 2018-07-16_07:45:03 1242 demolog/LightScenes.dd.save
@@ -717,8 +718,8 @@ UPD 2019-04-18_07:45:06 3956723 docs/commandref.html
 UPD 2019-04-17_07:45:08 2452697 docs/commandref_DE.html
 UPD 2019-03-17_07:45:03 78602 docs/commandref_frame.html
 UPD 2019-03-17_07:45:03 88171 docs/commandref_frame_DE.html
-UPD 2019-04-19_07:45:10 211596 docs/commandref_modular.html
-UPD 2019-04-19_07:45:11 222419 docs/commandref_modular_DE.html
+UPD 2019-04-20_07:45:09 211596 docs/commandref_modular.html
+UPD 2019-04-20_07:45:10 222419 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
