@@ -217,47 +217,7 @@ sub Get($@) {
         }
     } elsif ( $what =~ /^(statistics)$/ ) {
       if (defined( $hash->{helper}{MAPS} and @{$hash->{helper}{MAPS}} > 0)) {
-        my $ret = "";
-        my $mapcount = @{$hash->{helper}{MAPS}};
-        my $cw = 9; #column width
-        my $cws = $cw * 11 + 4; #column width sum
-        $ret .= "<b>".sprintf("%-".($cws)."s","Report: ".ReadingsVal($name,"name","name").", ".InternalVal($name,"VENDOR","VENDOR").", ".ReadingsVal($name,"model","model"))."</b>\n\n";
-        
-        $ret .= "<b>".sprintf("%-".($cw-5)."s","Map").sprintf("%-".($cw+1)."s","Expected").sprintf("%-".($cw-4)."s","Map").sprintf("%-".($cw-4)."s","Map").sprintf("%-".($cw-2)."s","Charge").sprintf("%-".($cw+1)."s","Discharge").sprintf("%-".($cw-2)."s","Area").sprintf("%-".($cw+11)."s","Cleaning").sprintf("%-".($cw-2)."s","Charge").sprintf("%-".$cw."s","Status").sprintf("%-".($cw+2)."s","Date").sprintf("%-".($cw+10)."s","Time")."</b>\n";
-        
-        $ret .= "<b>".sprintf("%-".($cw-5)."s","No.").sprintf("%-".($cw-4)."s","Area").sprintf("%-".($cw-4)."s","Time").sprintf("%-".($cw-4)."s","Area").sprintf("%-".($cw-4)."s","Time").sprintf("%-".($cw-2)."s","Delta").sprintf("%-".(($cw+1))."s","Speed").sprintf("%-".($cw-2)."s","Speed").sprintf("%-".($cw-2)."s","Cat.").sprintf("%-".($cw-3)."s","Mode").sprintf("%-".($cw-2)."s","Freq.").sprintf("%-".($cw-2)."s","During").sprintf("%-".$cw."s","").sprintf("%-".($cw+2)."s","").sprintf("%-".($cw+10)."s","")."</b>\n";
-        
-        $ret .= "<b>".sprintf("%-".($cw-5)."s","").sprintf("%-".($cw-4)."s","qm").sprintf("%-".($cw-4)."s","min").sprintf("%-".($cw-4)."s","qm").sprintf("%-".($cw-4)."s","min").sprintf("%-".($cw-2)."s","%").sprintf("%-".($cw+1)."s","%/min").sprintf("%-".($cw-2)."s","qm/min").sprintf("%-".($cw-2)."s","").sprintf("%-".($cw-3)."s","").sprintf("%-".($cw-2)."s","").sprintf("%-".($cw-2)."s","Run").sprintf("%-".$cw."s","").sprintf("%-".($cw+2)."s","YYYY-MM-DD").sprintf("%-".($cw+10)."s","hh:mm:ss")."</b>\n";
-        $ret .= sprintf("-"x($cws))."\n";
-
-        for (my $i=0;$i<$mapcount;$i++) {
-          my $map = \$hash->{helper}{MAPS}[$i];
-          my $t1 = GetSecondsFromString("$$map->{end_at}");
-          my $t2 = GetSecondsFromString("$$map->{start_at}");
-          my $dt = $t1-$t2-$$map->{time_in_suspended_cleaning}-$$map->{time_in_error}-$$map->{time_in_pause};
-          my $dc = $$map->{run_charge_at_start}-$$map->{run_charge_at_end};
-          my $expa = int($$map->{cleaned_area}*100/$dc+.5) if ($dc > 0);
-          my $expt = int($dt*100/$dc/60+.5) if ($dc > 0);
-          $ret .= sprintf("%-".($cw-5)."s",$i+1); # Map No.
-          $ret .= sprintf("%-".($cw-4)."s",($expa>0?$expa:0)); # Expected Area
-          $ret .= sprintf("%-".($cw-4)."s",($expt>0?$expt:0)); # Expected Time
-          $ret .= sprintf("%-".($cw-4)."s",int($$map->{cleaned_area}+.5)); # Map Area
-          $ret .= sprintf("%-".($cw-4)."s",($dt>0)?(int($dt/60+.5)):0); # Map Time
-          $ret .= sprintf("%-".($cw-2)."s",($dc>0?$dc:0)); # Charge Delta
-          $ret .= sprintf("%-".($cw+1)."s",($dt>0 and $dc>0)?(int($dc*600/$dt+.5)/10):0); # Discharge Speed
-          $ret .= sprintf("%-".($cw-2)."s",($expt>0 and $expa>0)?(int($expa*10/$expt+.5))/10:0); # Area Speed
-          $ret .= sprintf("%-".($cw-2)."s",GetCategoryText($$map->{category})); # Cleaning Category
-          $ret .= sprintf("%-".($cw-3)."s",GetModeText($$map->{mode})); # Cleaning Mode
-          $ret .= sprintf("%-".($cw-2)."s",GetModifierText($$map->{modifier})); # Cleaning Frequency
-          $ret .= sprintf("%-".($cw-2)."s",$$map->{suspended_cleaning_charging_count}."x"); # Charge During Run
-          $ret .= sprintf("%-".$cw."s",$$map->{status}); # Status
-          $ret .= sprintf("%-".($cws)."s",GetTimeFromString($$map->{generated_at})); # Date
-          $ret .= "\n";
-          $ret .= "<div style=\"color:#d9d9d9\" >".sprintf("-"x($cws))."</div>" if ($i%5==4);
-        }
-        $ret .= "\nManufacturer Specification\n";
-        $ret .= "Vorwerk VR220(VR300), battery 84 Wh, eco (90 min, 120 qm, power 65 W), turbo (60 min, 90 qm, power 85 W)\n";
-        return $ret;
+        return GetStatistics($hash);
       } else {
         return "maps for $what are not available yet";
       }
@@ -1665,6 +1625,96 @@ sub GetMap() {
 
     return ("text/plain; charset=utf-8", "No BOTVAC device for webhook $request");
 
+}
+
+sub GetStatistics($) {
+    my($hash) = @_;
+    my $name = $hash->{NAME};
+    my $mapcount = @{$hash->{helper}{MAPS}};
+    my $ret = "";
+
+    $ret .= '<html><head><meta charset="utf-8">';
+    $ret .= '<style>thead {background: #E0E0C8; fill: #E0E0C8;} tbody {border-top: 1px solid gray; border-bottom: 1px solid gray;} tbody tr:nth-child(even) {background: #F0F0D8; fill: #F0F0D8;} th, td {text-align: -webkit-center; padding-right: 1em;} caption {text-align: -webkit-left; padding-bottom: 1em; margin-bottom: 1em;}</style>';
+    $ret .= '</head><body><table>';
+    $ret .= '<caption><b>Report: '.ReadingsVal($name,"name","name").', '.InternalVal($name,"VENDOR","VENDOR").', '.ReadingsVal($name,"model","model").'</b></caption>';
+    $ret .= '<thead>';
+    $ret .= '<tr>';
+    $ret .= ' <th>Map</th>';
+    $ret .= ' <th colspan="2">Expected</th>';
+    $ret .= ' <th>Map</th>';
+    $ret .= ' <th>Map</th>';
+    $ret .= ' <th>Charge</th>';
+    $ret .= ' <th>Discharge</th>';
+    $ret .= ' <th>Area</th>';
+    $ret .= ' <th colspan="3">Cleaning</th>';
+    $ret .= ' <th>Charge</th>';
+    $ret .= ' <th>Status</th>';
+    $ret .= ' <th>Date</th>';
+    $ret .= ' <th>Time</th>';
+    $ret .= '</tr><tr>';
+    $ret .= ' <th>No.</th>';
+    $ret .= ' <th>Area</th>';
+    $ret .= ' <th>Time</th>';
+    $ret .= ' <th>Area</th>';
+    $ret .= ' <th>Time</th>';
+    $ret .= ' <th>Delta</th>';
+    $ret .= ' <th>Speed</th>';
+    $ret .= ' <th>Speed</th>';
+    $ret .= ' <th>Cat.</th>';
+    $ret .= ' <th>Mode</th>';
+    $ret .= ' <th>Freq.</th>';
+    $ret .= ' <th>During</th>';
+    $ret .= ' <th></th><th></th><th></th>';
+    $ret .= '</tr><tr>';
+    $ret .= ' <th></th>';
+    $ret .= ' <th>qm</th>';
+    $ret .= ' <th>min</th>';
+    $ret .= ' <th>qm</th>';
+    $ret .= ' <th>min</th>';
+    $ret .= ' <th>%</th>';
+    $ret .= ' <th>%/min</th>';
+    $ret .= ' <th>qm/min</th>';
+    $ret .= ' <th></th><th></th><th></th>';
+    $ret .= ' <th>Run</th>';
+    $ret .= ' <th></th>';
+    $ret .= ' <th colspan="2">YYYY-MM-DD hh:mm:ss</th>';
+    $ret .= '</tr></thead><tbody>';
+    for (my $i=0;$i<$mapcount;$i++) {
+      my $map = \$hash->{helper}{MAPS}[$i];
+      my $t1 = GetSecondsFromString($$map->{end_at});
+      my $t2 = GetSecondsFromString($$map->{start_at});
+      my $dt = $t1-$t2-$$map->{time_in_suspended_cleaning}-$$map->{time_in_error}-$$map->{time_in_pause};
+      my $dc = $$map->{run_charge_at_start}-$$map->{run_charge_at_end};
+      my $expa = int($$map->{cleaned_area}*100/$dc+.5) if ($dc > 0);
+      my $expt = int($dt*100/$dc/60+.5) if ($dc > 0);
+      $ret .= '<tr>';
+      $ret .= ' <td>'.($i+1).'</td>'; # Map No.
+      $ret .= ' <td>'.($expa>0?$expa:0).'</td>'; # Expected Area
+      $ret .= ' <td>'.($expt>0?$expt:0).'</td>'; # Expected Time
+      $ret .= ' <td>'.int($$map->{cleaned_area}+.5).'</td>'; # Map Area
+      $ret .= ' <td>'.(($dt>0)?(int($dt/60+.5)):0).'</td>'; # Map Time
+      $ret .= ' <td>'.($dc>0?$dc:0).'</td>'; # Charge Delta
+      $ret .= ' <td>'.(($dt>0 and $dc>0)?(int($dc*600/$dt+.5)/10):0).'</td>'; # Discharge Speed
+      $ret .= ' <td>'.(($expt>0 and $expa>0)?(int($expa*10/$expt+.5))/10:0).'</td>'; # Area Speed
+      $ret .= ' <td>'.GetCategoryText($$map->{category}).'</td>'; # Cleaning Category
+      $ret .= ' <td>'.GetModeText($$map->{mode}).'</td>'; # Cleaning Mode
+      $ret .= ' <td>'.GetModifierText($$map->{modifier}).'</td>'; # Cleaning Frequency
+      $ret .= ' <td>'.$$map->{suspended_cleaning_charging_count}.'x</td>'; # Charge During Run
+      $ret .= ' <td>'.$$map->{status}.'</td>'; # Status
+      $ret .= ' <td colspan="2">'.GetTimeFromString($$map->{generated_at}).'</td>'; # Date
+      $ret .= '</tr>';
+    }
+    $ret .= '</tbody></table>';
+    $ret .= "<p><b>Manufacturer Specification:</b><br>";
+    $ret .= "Neato Botvac D3 Connected, up to 60 qm<br>";
+    $ret .= "Neato Botvac D4 Connected, up to 75 qm<br>";
+    $ret .= "Neato Botvac D5 Connected, up to 90 qm<br>";
+    $ret .= "Neato Botvac D6/D7 Connected, up to 120 qm<br>";
+    $ret .= "Vorwerk VR200, battery 84 Wh, eco (90 min, 120 qm, power 50 W), turbo (60 min, 90 qm, power 70 W)<br>";
+    $ret .= "Vorwerk VR220(VR300), battery 84 Wh, eco (90 min, 120 qm, power 65 W), turbo (60 min, 90 qm, power 85 W)<br>";
+    $ret .= '</body></html>';
+
+    return $ret;
 }
 
 #######################################
