@@ -44,11 +44,6 @@ use ExtUtils::Installed;
 # Run before module compilation
 BEGIN {
 
-    # JSON preference order
-    $ENV{PERL_JSON_BACKEND} =
-      'Cpanel::JSON::XS,JSON::XS,JSON::PP,JSON::backportPP'
-      unless ( defined( $ENV{PERL_JSON_BACKEND} ) );
-
     # Import from main::
     GP_Import(
         qw(
@@ -99,6 +94,12 @@ if ($@) {
     # try to use JSON wrapper
     #   for chance of better performance
     eval {
+
+        # JSON preference order
+        local $ENV{PERL_JSON_BACKEND} =
+          'Cpanel::JSON::XS,JSON::XS,JSON::PP,JSON::backportPP'
+          unless ( defined( $ENV{PERL_JSON_BACKEND} ) );
+
         require JSON;
         import JSON qw( decode_json encode_json );
         1;
@@ -357,6 +358,7 @@ sub Set($$@) {
     my ( $hash, $name, @aa ) = @_;
 
     my ( $cmd, @args ) = @aa;
+    my $ret;
 
     my $updatePerlDualLifeModules =
       AttrVal( $name, 'updatePerlDualLifeModules', 0 );
@@ -420,12 +422,14 @@ sub Set($$@) {
           unless ($update);
 
         $hash->{".fhem"}{installer}{cmd} = "installPerl " . $update;
+        $ret = "Update started in background";
     }
 
     # installPerl
     elsif ( lc($cmd) eq 'installperl' ) {
         return "usage: $cmd <package>" if ( @args < 1 );
         $hash->{".fhem"}{installer}{cmd} = 'installPerl ' . join( " ", @args );
+        $ret = "Installation started in background";
     }
 
     # uninstallPerl
@@ -445,6 +449,7 @@ m/^(?:@([\w-]+)\/)?(?:App::)?(cpan\-?outdated)(?:@([\d\.=<>]+|latest))?$/i,
           );
         $hash->{".fhem"}{installer}{cmd} =
           'uninstallPerl ' . join( " ", @args );
+          $ret = "Deinstallation started in background";
     }
 
     # return Usage:
@@ -499,6 +504,7 @@ m/^(?:@([\w-]+)\/)?(?:App::)?(cpan\-?outdated)(?:@([\d\.=<>]+|latest))?$/i,
 
     AsynchronousExecuteFhemCommand($hash);
 
+    return $ret if ($ret);
     return undef;
 }
 
@@ -854,15 +860,16 @@ sub ExecuteFhemCommand($) {
 
     my $installer = {};
     $installer->{debug} = $cmd->{debug};
-    my $sudo = 'sudo -H -n ';
+    my $sudo  = 'sudo -n ';
+    my $sudoH = 'sudo -H -n ';
 
     $installer->{cpanversions} =
 'echo n | TEST=$(which cpanm) || echo "sh: command not found: cpanm"; which cpanm >/dev/null 2>&1 && sh -c "'
-      . $sudo
+      . $sudoH
       . '$(which cpanm) --version 2>&1" 2>&1';
     $installer->{installperl} =
         'echo n | sh -c "'
-      . $sudo
+      . $sudoH
       . '$(which cpanm) --quiet '
       . $cmd->{installPerlReinstall}
       . $cmd->{installPerlNoTest}
@@ -870,12 +877,12 @@ sub ExecuteFhemCommand($) {
       . '%PACKAGES%" 2>&1';
     $installer->{uninstallperl} =
         'echo n | sh -c "'
-      . $sudo
+      . $sudoH
       . '$(which cpanm) -U --quiet --force %PACKAGES%" 2>&1';
     $installer->{outdatedperl} =
         'echo n | '
       . 'sh -c "'
-      . $sudo
+      . $sudoH
       . '$(which cpanm) --version 2>&1" 2>&1 && '
       . 'L1=$(cpan-outdated --verbose 2>&1) && '
       . '[ "$L1" != "" ] && [ "$L1" != "\n" ] && echo "@Outdated:\n$L1"; ';
@@ -890,10 +897,10 @@ sub ExecuteFhemCommand($) {
             if ( $1 =~ /App::cpanminus/i ) {
                 $installer->{installperl} =
                     'sh -c "curl -fsSL https://git.io/cpanm | '
-                  . $sudo
+                  . $sudoH
                   . '$(which perl) - App::cpanminus >/dev/null 2>&1" 2>&1 '
                   . '&& TEST=$(which cpanm) || echo "sh: command not found: cpanm"; which cpanm >/dev/null 2>&1 && sh -c "'
-                  . $sudo
+                  . $sudoH
                   . ' $(which cpanm) --quiet App::cpanoutdated" 2>&1';
             }
         }
@@ -5133,7 +5140,7 @@ sub LoadInstallStatusPerl(;$) {
         foreach my $t (qw(missing outdated)) {
             if (   defined( $pkgStatus{$area}{$t} )
                 && ref( $pkgStatus{$area}{$t} ) eq 'HASH'
-                && %{ $pkgStatus{$area}{$t} } > 0 )
+                && scalar keys %{ $pkgStatus{$area}{$t} } > 0 )
             {
                 foreach my $pkg ( keys %{ $pkgStatus{$area}{$t} } ) {
                     next
@@ -5499,7 +5506,7 @@ sub __list_module {
       "abstract": "Modul zum Update von FHEM, zur Installation von Drittanbieter FHEM Modulen und der Verwaltung von Systemvoraussetzungen"
     }
   },
-  "version": "v0.5.1",
+  "version": "v0.5.2",
   "release_status": "testing",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
