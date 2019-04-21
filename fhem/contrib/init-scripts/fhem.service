@@ -4,6 +4,10 @@
 Description=FHEM Home Automation
 Wants=network.target
 After=network.target
+#Requires=postgresql.service
+#After=postgresql.service
+#Requires=mysql.service
+#After=mysql.service
 
 [Service]
 Type=forking
