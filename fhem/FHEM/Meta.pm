@@ -3,6 +3,7 @@
 package main;
 use strict;
 use warnings;
+use POSIX;
 
 # provide the same hash as for real FHEM modules
 #   in FHEM main context
@@ -12,20 +13,15 @@ use vars qw(%packages);
 package FHEM::Meta;
 use strict;
 use warnings;
+use POSIX;
 
 use GPUtils qw(GP_Import);
-use Module::CoreList;
 use Data::Dumper;
 use File::stat;
 use Encode;
 
 # Run before module compilation
 BEGIN {
-
-    # JSON preference order
-    $ENV{PERL_JSON_BACKEND} =
-      'Cpanel::JSON::XS,JSON::XS,JSON::PP,JSON::backportPP'
-      unless ( defined( $ENV{PERL_JSON_BACKEND} ) );
 
     # Import from main::
     GP_Import(
@@ -481,6 +477,134 @@ my @perlPragmas = qw(
 # based on https://metacpan.org/release/perl
 #   and https://metacpan.org/pod/Win32#Alphabetical-Listing-of-Win32-Functions
 my @perlCoreModules = qw(
+  experimental
+  I18N::LangTags
+  I18N::LangTags::Detect
+  I18N::LangTags::List
+  IO
+  IO::Dir
+  IO::File
+  IO::Handle
+  IO::Pipe
+  IO::Poll
+  IO::Seekable
+  IO::Select
+  IO::Socket
+  IO::Socket::INET
+  IO::Socket::UNIX
+  Amiga::ARexx
+  Amiga::Exec
+  B
+  B::Concise
+  B::Showlex
+  B::Terse
+  B::Xref
+  O
+  OptreeCheck
+  Devel::Peek
+  ExtUtils::Miniperl
+  Fcntl
+  File::DosGlob
+  File::Find
+  File::Glob
+  FileCache
+  GDBM_File
+  Hash::Util::FieldHash
+  Hash::Util
+  I18N::Langinfo
+  IPC::Open2
+  IPC::Open3
+  NDBM_File
+  ODBM_File
+  Opcode
+  ops
+  POSIX
+  PerlIO::encoding
+  PerlIO::mmap
+  PerlIO::scalar
+  PerlIO::via
+  Pod::Html
+  SDBM_File
+  Sys::Hostname
+  Tie::Hash::NamedCapture
+  Tie::Memoize
+  VMS::DCLsym
+  VMS::Filespec
+  VMS::Stdio
+  Win32CORE
+  XS::APItest
+  XS::Typemap
+  arybase
+  ext/arybase/t/scope_0.pm
+  attributes
+  mro
+  re
+  Haiku
+  AnyDBM_File
+  B::Deparse
+  B::Op_private
+  Benchmark
+  Class::Struct
+  Config::Extensions
+  DB
+  DBM_Filter
+  DBM_Filter::compress
+  DBM_Filter::encode
+  DBM_Filter::int32
+  DBM_Filter::null
+  DBM_Filter::utf8
+  DirHandle
+  English
+  ExtUtils::Embed
+  ExtUtils::XSSymSet
+  File::Basename
+  File::Compare
+  File::Copy
+  File::stat
+  FileHandle
+  FindBin
+  Getopt::Std
+  Net::hostent
+  Net::netent
+  Net::protoent
+  Net::servent
+  PerlIO
+  SelectSaver
+  Symbol
+  Thread
+  Tie::Array
+  Tie::Handle
+  Tie::StdHandle
+  Tie::SubstrHash
+  Time::gmtime
+  Time::localtime
+  Time::tm
+  UNIVERSAL
+  Unicode::UCD
+  User::grent
+  User::pwent
+  blib
+  bytes
+  charnames
+  deprecate
+  feature
+  filetest
+  integer
+  less
+  locale
+  open
+  overload
+  overloading
+  sigtrap
+  sort
+  strict
+  subs
+  utf8
+  vars
+  version
+  vmsish
+  warnings
+  warnings::register
   OS2::ExtAttr
   OS2::PrfDB
   OS2::Process
@@ -925,13 +1049,31 @@ sub GetModuleFilepath {
 sub ModuleIsPerlCore {
     my ($module) = @_;
     return 1 if ( $module =~ /^Perl$/i );
-    return (
-        Module::CoreList::is_core($module) ? 1
-        : (
-            grep ( /^$module$/, @perlCoreModules ) ? 1
-            : 0
-        )
-    );
+
+    eval {
+        require Module::CoreList;
+        1;
+    };
+
+    if ($@) {
+        $@ = undef;
+
+        # return (
+        #     grep ( /^$module$/, @perlCoreModules )
+        #     ? 1
+        #     : 0
+        # );
+    }
+    else {
+        return (
+              Module::CoreList::is_core($module)
+            ? Module::CoreList::first_release_by_date($module)
+            : (
+                grep ( /^$module$/, @perlCoreModules ) ? 1
+                : 0
+            )
+        );
+    }
 }
 
 ##########
@@ -1265,8 +1407,15 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
                     # try to use JSON wrapper
                     #   for chance of better performance
                     eval {
+
+                        # JSON preference order
+                        local $ENV{PERL_JSON_BACKEND} =
+                          'Cpanel::JSON::XS,JSON::XS,JSON::PP,JSON::backportPP'
+                          unless ( defined( $ENV{PERL_JSON_BACKEND} ) );
+
                         require JSON;
                         import JSON qw( decode_json );
+
                         1;
                     };
 
@@ -3126,11 +3275,11 @@ sub __SetXVersion {
       "abstract": "FHEM Entwickler Paket, um Metadaten Unterstützung zu aktivieren"
     }
   },
-  "version": "v0.5.1",
+  "version": "v0.6.1",
   "release_status": "testing",
   "x_changelog": {
     "2019-04-18": {
-      "version": "v0.5.1",
+      "version": "v0.6.0",
       "changes": [
         "improved JSON dependencies"
       ]
@@ -3177,15 +3326,14 @@ sub __SetXVersion {
         "GPUtils": 0,
         "File::stat": 0,
         "Data::Dumper": 0,
-        "Module::CoreList": 0,
         "Encode": 0,
         "version": 0,
         "JSON::PP": 0
       },
       "recommends": {
-        "JSON": 0,
-        "Perl::PrereqScanner::NotQuiteLite": 0,
-        "Time::Local": 0
+        "JSON": "2.91_01",
+        "Module::CoreList": 0,
+        "Perl::PrereqScanner::NotQuiteLite": 0
       },
       "suggests": {
         "JSON::XS": 0,
