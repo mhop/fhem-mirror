@@ -51,6 +51,7 @@ use constant {
   CI_RESP_SML_4 => 0x7e, # Response from device, 4 Bytes, application layer SML encoded
   CI_RESP_SML_12 => 0x7f, # Response from device, 12 Bytes, application layer SML encoded  
   CI_SND_UD_MODE_1 => 0x51, # The master can send data to a slave using a SND_UD with CI-Field 51h for mode 1 or 55h for mode 2
+  CI_SND_UD_MODE_2 => 0x55,
   
   # DIF types (Data Information Field), see page 32
   DIF_NONE => 0x00,
@@ -1082,7 +1083,7 @@ sub state2string($$) {
 }
 
 
-sub checkCRC($$) {
+sub calcCRC($$) {
   my $self = shift;
   my $data = shift;
   my $ctx = Digest::CRC->new(width=>16, init=>0x0000, xorout=>0xffff, refout=>0, poly=>0x3D65, refin=>0, cont=>0);
@@ -1128,8 +1129,8 @@ sub removeCRC($$)
     }
     
     $crc = unpack('n',substr($msg, $crcoffset, $self->{crc_size}));
-    #printf("%d: CRC %x, calc %x blocksize $blocksize\n", $i, $crc, $self->checkCRC(substr($msg, $blocksize_with_crc*$i, $blocksize))); 
-    if ($crc != $self->checkCRC(substr($msg, $blocksize_with_crc*$i, $blocksize))) {
+    #printf("%d: CRC %x, calc %x blocksize $blocksize\n", $i, $crc, $self->calcCRC(substr($msg, $blocksize_with_crc*$i, $blocksize))); 
+    if ($crc != $self->calcCRC(substr($msg, $blocksize_with_crc*$i, $blocksize))) {
       $self->{errormsg} = "crc check failed for block $i";
       $self->{errorcode} = ERR_CRC_FAILED;
       return 0;
@@ -1262,6 +1263,20 @@ sub findVIF($$$) {
   return 1;
 }
 
+sub decodePlaintext($$$) {
+  my $self = shift;
+  my $vib = shift;
+  my $dataBlockRef = shift;
+  my $offset = shift;
+  my $vifLength = unpack('C', substr($vib,$offset++,1));
+  
+  $dataBlockRef->{type} = "see unit";
+  $dataBlockRef->{unit} = substr($vib, $offset, $vifLength);
+  $dataBlockRef->{unit} = reverse($dataBlockRef->{unit}) unless $self->{mode_bit}; 
+  $offset += $vifLength;
+  return $offset;
+}
+
 sub decodeValueInformationBlock($$$) {
   my $self = shift;
   my $vib = shift;
@@ -1309,10 +1324,7 @@ sub decodeValueInformationBlock($$$) {
       $vifInfoRef = \%VIFInfo_FB;
     } elsif ($vif == 0x7C) {
       # Plaintext VIF
-      my $vifLength = unpack('C', substr($vib,$offset++,1));
-      $dataBlockRef->{type} = "see unit";
-      $dataBlockRef->{unit} = substr($vib, $offset, $vifLength);
-      $offset += $vifLength;
+      $offset = $self->decodePlaintext($vib, $dataBlockRef, $offset);
       $analyzeVIF = 0;
       last EXTENSION;
     } elsif ($vif == 0x7F) {
@@ -1358,10 +1370,7 @@ sub decodeValueInformationBlock($$$) {
   if ($analyzeVIF) {  
     if ($vif == 0x7C) {
       # Plaintext VIF
-      my $vifLength = unpack('C', substr($vib,$offset++,1));
-      $dataBlockRef->{type} = "see unit";
-      $dataBlockRef->{unit} = substr($vib, $offset, $vifLength);
-      $offset += $vifLength;
+      $offset = $self->decodePlaintext($vib, $dataBlockRef, $offset);
     } elsif (findVIF($vif, $vifInfoRef, $dataBlockRef) == 0) {
       $dataBlockRef->{errormsg} = "unknown VIF " . sprintf("%x", $vifExtension) . " at offset " . ($offset-1);
       $dataBlockRef->{errorcode} = ERR_UNKNOWN_VIFE;    
@@ -1854,8 +1863,8 @@ sub decodeApplicationLayer($) {
     $offset += 2;
     # PayloadCRC is  a  cyclic  redundancy  check  covering  the  remainder  of  the  frame  (excluding the CRC fields)
     # payload CRC is also encrypted
-    if ($self->{ell}{crc} != $self->checkCRC(substr($payload, 2, $self->{lfield}-20))) {
-      #printf("crc %x, calculated %x\n", $self->{ell}{crc}, $self->checkCRC(substr($payload, 2, $self->{lfield}-20))); 
+    if ($self->{ell}{crc} != $self->calcCRC(substr($payload, 2, $self->{lfield}-20))) {
+      #printf("crc %x, calculated %x\n", $self->{ell}{crc}, $self->calcCRC(substr($payload, 2, $self->{lfield}-20))); 
       $self->{errormsg} = "Payload CRC check failed on ELL" . ($self->{isEncrypted} ? ", wrong AES key?" : "");
       $self->{errorcode} = ERR_CRC_FAILED;
       return 0;
@@ -1898,6 +1907,7 @@ sub decodeApplicationLayer($) {
   $self->{statusstring} = "";
   $self->{access_no} = 0;
   $self->{sent_from_master} = 0;
+  $self->{isEncrypted} = 0;
   
   #printf("CI Field %02x\n", $self->{cifield});
   
@@ -1925,21 +1935,21 @@ sub decodeApplicationLayer($) {
     $offset += 2;
     $self->{full_frame_payload_crc} = unpack("v", substr($applicationlayer, $offset, 2));
     $offset += 2;
-    if ($self->{format_signature} == $self->checkCRC(pack("H*", "02FF20" . "0413" . "4413"))) {
+    if ($self->{format_signature} == $self->calcCRC(pack("H*", "02FF20" . "0413" . "4413"))) {
       # Info, Volume, Target Volume
       # convert into full frame
       $applicationlayer =   pack("H*", "02FF20") . substr($applicationlayer, 5, 2) # Info
                           . pack("H*", "0413") . substr($applicationlayer,7,4) # volume
                           . pack("H*", "4413") . substr($applicationlayer,11,4); # target volume 
       $offset = 0;
-    } elsif ($self->{format_signature} == $self->checkCRC(pack("H*", "02FF20" . "0413" . "523B"))) {
+    } elsif ($self->{format_signature} == $self->calcCRC(pack("H*", "02FF20" . "0413" . "523B"))) {
       # Info, Volume, Max flow
       # convert into full frame
       $applicationlayer =   pack("H*", "02FF20") . substr($applicationlayer, 5, 2) # Info
                           . pack("H*", "0413") . substr($applicationlayer,7,4) # volume
                           . pack("H*", "523B") . substr($applicationlayer,11,2); # max flow 
       $offset = 0;
-    } elsif ($self->{format_signature} == $self->checkCRC(pack("H*", "02FF20" . "0413" . "4413" . "615B" . "6167"))) {
+    } elsif ($self->{format_signature} == $self->calcCRC(pack("H*", "02FF20" . "0413" . "4413" . "615B" . "6167"))) {
       # Info, Volume, Max flow, flow temp, external temp
       # convert into full frame
       $applicationlayer =   pack("H*", "02FF20") . substr($applicationlayer, 5, 2) # Info
@@ -1953,13 +1963,20 @@ sub decodeApplicationLayer($) {
       $self->{errorcode} = ERR_UNKNOWN_COMPACT_FORMAT;
       return 0;
     }
-    if ($self->{full_frame_payload_crc} != $self->checkCRC($applicationlayer)) {
+    if ($self->{full_frame_payload_crc} != $self->calcCRC($applicationlayer)) {
       $self->{errormsg} = 'Kamstrup compact frame format payload CRC error';
       $self->{errorcode} = ERR_CRC_FAILED;
       return 0;
     }
-  } elsif ($self->{cifield} == CI_SND_UD_MODE_1) {
+  } elsif ($self->{cifield} == CI_SND_UD_MODE_1 || $self->{cifield} == CI_SND_UD_MODE_2) {
     $self->{sent_from_master} = 1;
+    # The  EN1434-3  defines  two  possible  data  sequences  in  multibyte  records.  
+    # The  bit  two (counting begins with bit 0, value 4), which is called M bit or Mode bit, 
+    # in the CI field gives an  information  about  the  used  byte  sequence  in  multibyte  data  structures.  
+    # If  the  Mode  bit  is not set (Mode 1), the least significant byte of a multibyte record is transmitted first, 
+    # otherwise (Mode  2)  the  most  significant  byte.  
+    # The  Usergroup  recommends  to  use  only  the  Mode  1  in future applications.
+    $self->{mode_bit} = $self->{cifield} & 4; 
   } else {
     # unsupported
     $self->decodeConfigword();
@@ -2061,9 +2078,9 @@ sub decodeLinkLayer($$)
     if ($self->{crc_size} > 0) {
       $self->{crc0} = unpack('n', substr($linklayer,TL_BLOCK_SIZE, $self->{crc_size}));
     
-      #printf("crc0 %x calc %x\n", $self->{crc0}, $self->checkCRC(substr($linklayer,0,10)));
+      #printf("crc0 %x calc %x\n", $self->{crc0}, $self->calcCRC(substr($linklayer,0,10)));
     
-      if ($self->{crc0} != $self->checkCRC(substr($linklayer,0,TL_BLOCK_SIZE))) {
+      if ($self->{crc0} != $self->calcCRC(substr($linklayer,0,TL_BLOCK_SIZE))) {
         $self->{errormsg} = "CRC check failed on link layer";
         $self->{errorcode} = ERR_CRC_FAILED;
         #print "CRC check failed on link layer\n";
@@ -2103,8 +2120,8 @@ sub decodeLinkLayer($$)
       #print "length: $length\n";
       $self->{crc0} = unpack('n', substr($self->{msg}, $length, $self->{crc_size}));
       
-      #printf "crc in msg %x crc calculated %x\n", $self->{crc0}, $self->checkCRC(substr($self->{msg}, 0, $length));
-      if ($self->{crc0} != $self->checkCRC(substr($self->{msg}, 0, $length))) {
+      #printf "crc in msg %x crc calculated %x\n", $self->{crc0}, $self->calcCRC(substr($self->{msg}, 0, $length));
+      if ($self->{crc0} != $self->calcCRC(substr($self->{msg}, 0, $length))) {
         $self->{errormsg} = "CRC check failed on block 1";
         $self->{errorcode} = ERR_CRC_FAILED;
         return 0;
@@ -2140,6 +2157,103 @@ sub decodeLinkLayer($$)
   $self->{typestring} =  $validDeviceTypes{$self->{afield_type}} || 'unknown';
   return 1;
 }
+
+sub encodeLinkLayer($)
+{
+  my $self = shift;
+
+  my $linklayer = pack('CCv', $self->{lfield}, $self->{cfield}, $self->{mfield});
+  ($self->{lfield}, $self->{cfield}, $self->{mfield}) = unpack('CCv', $linklayer);
+  $self->{afield} = substr($linklayer,4,6);
+  $self->{afield_id} = sprintf("%08d", $self->decodeBCD(8,substr($linklayer,4,4)));
+  ($self->{afield_ver}, $self->{afield_type}) = unpack('CC', substr($linklayer,8,2));
+  
+  #printf("lfield %d\n", $self->{lfield});
+
+  if ($self->{frame_type} eq FRAME_TYPE_A) {
+    if ($self->{crc_size} > 0) {
+      $self->{crc0} = unpack('n', substr($linklayer,TL_BLOCK_SIZE, $self->{crc_size}));
+    
+      #printf("crc0 %x calc %x\n", $self->{crc0}, $self->calcCRC(substr($linklayer,0,10)));
+    
+      if ($self->{crc0} != $self->calcCRC(substr($linklayer,0,TL_BLOCK_SIZE))) {
+        $self->{errormsg} = "CRC check failed on link layer";
+        $self->{errorcode} = ERR_CRC_FAILED;
+        #print "CRC check failed on link layer\n";
+        return 0;
+      }
+    }
+
+    # header block is 10 bytes + 2 bytes CRC, each following block is 16 bytes + 2 bytes CRC, the last block may be smaller
+    $self->{datalen} = $self->{lfield} - (TL_BLOCK_SIZE - 1); # this is without CRCs and the lfield itself
+    $self->{datablocks} = int($self->{datalen} / LL_BLOCK_SIZE);
+    $self->{datablocks}++ if $self->{datalen} % LL_BLOCK_SIZE != 0;
+    $self->{msglen} = TL_BLOCK_SIZE + $self->{crc_size} + $self->{datalen} + $self->{datablocks} * $self->{crc_size};
+      
+    #printf("calc len %d, actual %d\n", $self->{msglen}, length($self->{msg}));
+    $self->{applicationlayer} = $self->removeCRC(substr($self->{msg},TL_BLOCK_SIZE + $self->{crc_size}));
+  
+  } else {
+    # FRAME TYPE B
+    # each block is at most 129 bytes long.
+    # first contains the header (TL_BLOCK), L field and trailing crc
+    # L field is included in crc calculation
+    # each following block contains only data and trailing crc
+    if (length($self->{msg}) < $self->{lfield}) {
+      $self->{errormsg} = "message too short, expected " . $self->{lfield} . ", got " . length($self->{msg}) . " bytes";
+      $self->{errorcode} = ERR_MSG_TOO_SHORT;
+      return 0;
+    }    
+    
+    
+    my $length = 129;
+    if ($self->{lfield} < $length) {
+      $length = $self->{lfield};
+    }
+    if ($self->{crc_size} > 0) {
+      $length -= $self->{crc_size};
+      $length++; # for L field
+      #print "length: $length\n";
+      $self->{crc0} = unpack('n', substr($self->{msg}, $length, $self->{crc_size}));
+      
+      #printf "crc in msg %x crc calculated %x\n", $self->{crc0}, $self->calcCRC(substr($self->{msg}, 0, $length));
+      if ($self->{crc0} != $self->calcCRC(substr($self->{msg}, 0, $length))) {
+        $self->{errormsg} = "CRC check failed on block 1";
+        $self->{errorcode} = ERR_CRC_FAILED;
+        return 0;
+      }
+    }
+    
+    $self->{datablocks} = int($self->{lfield} / 129);
+    $self->{datablocks}++ if $self->{lfield} % 129 != 0;
+    # header block is 10 bytes, following block 
+    $self->{datalen} = $self->{lfield} - (TL_BLOCK_SIZE - 1) - ($self->{datablocks} * $self->{crc_size}) ; # this is with CRCs but without the lfield itself
+    $self->{msglen} = $self->{lfield};
+
+    if ($self->{datablocks} == 2) {
+      # TODO
+    } else {
+      $self->{applicationlayer} = substr($self->{msg}, TL_BLOCK_SIZE, $length - TL_BLOCK_SIZE); # - $self->{crc_size});
+    }
+  }
+
+  if (length($self->{msg}) > $self->{msglen}) {
+    $self->{remainingData} = substr($self->{msg},$self->{msglen});
+  } elsif (length($self->{msg}) < $self->{msglen}) {
+    $self->{errormsg} = "message too short, expected " . $self->{msglen} . ", got " . length($self->{msg}) . " bytes";
+    $self->{errorcode} = ERR_MSG_TOO_SHORT;
+    return 0;
+  }
+  
+  
+  # according to the MBus spec only upper case letters are allowed.
+  # some devices send lower case letters none the less
+  # convert to upper case to make them spec conformant
+  $self->{manufacturer} = uc($self->manId2ascii($self->{mfield}));
+  $self->{typestring} =  $validDeviceTypes{$self->{afield_type}} || 'unknown';
+  return 1;
+}
+
 
 sub setFrameType($$)
 {
