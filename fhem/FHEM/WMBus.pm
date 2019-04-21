@@ -5,6 +5,7 @@ package WMBus;
 use strict;
 use warnings;
 use feature qw(say);
+use Scalar::Util qw(looks_like_number);
 use Digest::CRC; # libdigest-crc-perl
 eval "use Crypt::Mode::CBC"; # cpan -i Crypt::Mode::CBC
 my $hasCBC = ($@)?0:1;
@@ -111,8 +112,15 @@ use constant {
 sub valueCalcNumeric($$) {
   my $value = shift;
   my $dataBlock = shift;
+
+  # some sanity checks on the provided data
+  if (defined($value) && defined($dataBlock->{valueFactor}) && looks_like_number($value))
+  {
+    return $value * $dataBlock->{valueFactor};
+  } else {
+    return 0;
+  }
   
-  return $value * $dataBlock->{valueFactor}; 
 }
 
 sub valueCalcDate($$) {
@@ -1423,8 +1431,8 @@ sub decodeDataInformationBlock($$$) {
     }
     
     $storageNo |= ($dif & 0b00001111) << ($difExtNo*4)+1;
-    $tariff    |= (($dif & 0b00110000 >> 4)) << (($difExtNo-1)*2);
-    $devUnit   |= (($dif & 0b01000000 >> 6)) << ($difExtNo-1);
+    $tariff    |= (($dif & 0b00110000) >> 4) << (($difExtNo-1)*2);
+    $devUnit   |= (($dif & 0b01000000) >> 6) << ($difExtNo-1);
     #printf("dife %x extno %d storage %d\n", $dif, $difExtNo, $storageNo);
   }
   
@@ -1524,7 +1532,7 @@ sub decodePayload($$) {
       $offset += 4;
     } elsif ($dataBlock->{dataField} == DIF_INT48) {
       my @words = unpack('vvv', substr($payload, $offset, 6));
-      $value = $words[0] + $words[1] << 16 + $words[2] << 32;
+      $value = $words[0] + ($words[1] << 16) + ($words[2] << 32);
       $offset += 6;
     } elsif ($dataBlock->{dataField} == DIF_INT64) {
       $value = unpack('Q<', substr($payload, $offset, 8));
@@ -1545,9 +1553,18 @@ sub decodePayload($$) {
         } else {
           #  ASCII string with LVAR characters
           $value = unpack('a*',substr($payload, $offset, $lvar));
-          if ($self->{manufacturer} eq 'ESY') {
-            # Easymeter stores the string backwards!
-            $value = reverse($value);
+          
+          # check if value only contains printable chars 
+          if(($value =~ tr/\x20-\x7d//c) == 0) {
+          
+            if ($self->{manufacturer} eq 'ESY') {
+              # Easymeter stores the string backwards!
+              $value = reverse($value);
+            }
+          } else {
+            $self->{errormsg} = "Non printable ASCII in LVAR";
+            $self->{errorcode} = ERR_UNKNOWN_DATAFIELD;
+            return 0;
           }
         }
         $offset += $lvar;
