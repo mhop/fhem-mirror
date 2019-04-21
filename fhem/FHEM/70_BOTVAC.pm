@@ -1185,7 +1185,7 @@ sub ReceiveCommand($$$) {
                 if (@maps) {
                   # take first - newest
                   my $map = $maps[0];
-                  foreach my $key (keys $map) {
+                  foreach my $key (keys %$map) {
                     readingsBulkUpdateIfChanged($hash, "map_".$key, defined($map->{$key})?$map->{$key}:"")
                         if ($key !~ "url|url_valid_for_seconds|generated_at|start_at|end_at");
                   }
