@@ -216,7 +216,7 @@ sub Get($@) {
             return "no such reading: $what";
         }
     } elsif ( $what =~ /^(statistics)$/ ) {
-      if (defined( $hash->{helper}{MAPS} and @{$hash->{helper}{MAPS}} > 0)) {
+      if (defined($hash->{helper}{MAPS}) and @{$hash->{helper}{MAPS}} > 0) {
         return GetStatistics($hash);
       } else {
         return "maps for $what are not available yet";
@@ -1627,18 +1627,33 @@ sub GetMap() {
 
 }
 
+sub ShowStatistics($) {
+    my ($name) = @_;
+    my $hash  = $::defs{$name};
+    
+    return "maps for statistics are not available yet"
+        if (!defined($hash->{helper}{MAPS}) or @{$hash->{helper}{MAPS}} == 0);
+
+    return GetStatistics($hash);
+}
+
 sub GetStatistics($) {
     my($hash) = @_;
     my $name = $hash->{NAME};
     my $mapcount = @{$hash->{helper}{MAPS}};
+    my $model = ReadingsVal($name, "model", "");
     my $ret = "";
 
     $ret .= '<html><head><meta charset="utf-8">';
-    $ret .= '<style>thead {background: #E0E0C8; fill: #E0E0C8;} tbody {border-top: 1px solid gray; border-bottom: 1px solid gray;} tbody tr:nth-child(even) {background: #F0F0D8; fill: #F0F0D8;} th, td {text-align: -webkit-center; padding-right: 1em;} caption {text-align: -webkit-left; padding-bottom: 1em; margin-bottom: 1em;}</style>';
-    $ret .= '</head><body><table>';
+    $ret .= '<style>';
+    $ret .= ' .botvac tbody {border-top: 1px solid gray; border-bottom: 1px solid gray;}';
+    $ret .= ' .botvac th, td {text-align: -webkit-center; padding-right: 1em;}';
+    $ret .= ' .botvac caption {text-align: -webkit-left; padding-bottom: 1em; margin-bottom: 1em;}';
+    $ret .= '</style>';
+    $ret .= '</head><body><table class="botvac">';
     $ret .= '<caption><b>Report: '.ReadingsVal($name,"name","name").', '.InternalVal($name,"VENDOR","VENDOR").', '.ReadingsVal($name,"model","model").'</b></caption>';
     $ret .= '<thead>';
-    $ret .= '<tr>';
+    $ret .= '<tr class="col_header">';
     $ret .= ' <th>Map</th>';
     $ret .= ' <th colspan="2">Expected</th>';
     $ret .= ' <th>Map</th>';
@@ -1651,7 +1666,7 @@ sub GetStatistics($) {
     $ret .= ' <th>Status</th>';
     $ret .= ' <th>Date</th>';
     $ret .= ' <th>Time</th>';
-    $ret .= '</tr><tr>';
+    $ret .= '</tr><tr class="col_header">';
     $ret .= ' <th>No.</th>';
     $ret .= ' <th>Area</th>';
     $ret .= ' <th>Time</th>';
@@ -1665,7 +1680,7 @@ sub GetStatistics($) {
     $ret .= ' <th>Freq.</th>';
     $ret .= ' <th>During</th>';
     $ret .= ' <th></th><th></th><th></th>';
-    $ret .= '</tr><tr>';
+    $ret .= '</tr><tr class="col_header">';
     $ret .= ' <th></th>';
     $ret .= ' <th>qm</th>';
     $ret .= ' <th>min</th>';
@@ -1687,7 +1702,7 @@ sub GetStatistics($) {
       my $dc = $$map->{run_charge_at_start}-$$map->{run_charge_at_end};
       my $expa = int($$map->{cleaned_area}*100/$dc+.5) if ($dc > 0);
       my $expt = int($dt*100/$dc/60+.5) if ($dc > 0);
-      $ret .= '<tr>';
+      $ret .= '<tr class="col_'.($i%2?"even":"odd").'row">';
       $ret .= ' <td>'.($i+1).'</td>'; # Map No.
       $ret .= ' <td>'.($expa>0?$expa:0).'</td>'; # Expected Area
       $ret .= ' <td>'.($expt>0?$expt:0).'</td>'; # Expected Time
@@ -1706,12 +1721,17 @@ sub GetStatistics($) {
     }
     $ret .= '</tbody></table>';
     $ret .= "<p><b>Manufacturer Specification:</b><br>";
-    $ret .= "Neato Botvac D3 Connected, up to 60 qm<br>";
-    $ret .= "Neato Botvac D4 Connected, up to 75 qm<br>";
-    $ret .= "Neato Botvac D5 Connected, up to 90 qm<br>";
-    $ret .= "Neato Botvac D6/D7 Connected, up to 120 qm<br>";
-    $ret .= "Vorwerk VR200, battery 84 Wh, eco (90 min, 120 qm, power 50 W), turbo (60 min, 90 qm, power 70 W)<br>";
-    $ret .= "Vorwerk VR220(VR300), battery 84 Wh, eco (90 min, 120 qm, power 65 W), turbo (60 min, 90 qm, power 85 W)<br>";
+
+    my $specification = "$model specification unknown";
+    $specification = "Neato Botvac Connected, eco (120 min), turbo (90 min, power 40 W)<br>" if ($model eq "BotVacConnected");
+    $specification = "Neato Botvac D3 Connected, up to 60 min<br>" if ($model eq "BotVacD3Connected");
+    $specification = "Neato Botvac D4 Connected, up to 75 min<br>" if ($model eq "BotVacD4Connected");
+    $specification = "Neato Botvac D5 Connected, up to 90 min<br>" if ($model eq "BotVacD5Connected");
+    $specification = "Neato Botvac D6/D7 Connected, up to 120 min<br>" if ($model eq "BotVacD6Connected" or $model eq "BotVacD6Connected");
+    $specification = "Vorwerk VR200, battery 84 Wh, eco (90 min, 120 qm, power 50 W), turbo (60 min, 90 qm, power 70 W)<br>" if ($model eq "VR200");
+    $specification = "Vorwerk VR220(VR300), battery 84 Wh, eco (90 min, 120 qm, power 65 W), turbo (60 min, 90 qm, power 85 W)<br>" if ($model eq "VR220");
+
+    $ret .= $specification;
     $ret .= '</body></html>';
 
     return $ret;
