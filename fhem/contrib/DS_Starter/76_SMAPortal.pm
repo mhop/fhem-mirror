@@ -142,6 +142,7 @@ BEGIN {
 
 # Versions History intern
 our %vNotesIntern = (
+  "1.5.5"  => "22.04.2019  fix readings for BattryOut and BatteryIn ",
   "1.5.4"  => "26.03.2019  delete L1_InfoMessages if no info occur ",
   "1.5.3"  => "26.03.2019  delete L1_ErrorMessages, L1_WarningMessages if no errors or warnings occur ",
   "1.5.2"  => "25.03.2019  prevent module from deactivation in case of unavailable Meta.pm ",
@@ -645,6 +646,7 @@ sub ParseData($) {
   
   my ($FeedIn_done,$GridConsumption_done,$PV_done,$AutarkyQuote_done,$SelfConsumption_done) = (0,0,0,0,0);
   my ($SelfConsumptionQuote_done,$SelfSupply_done,$errMsg,$warnMsg,$infoMsg) = (0,0,0,0,0);
+  my ($batteryin,$batteryout);
   for my $k (keys %$livedata_content) {
       my $new_val = ""; 
       if (defined $livedata_content->{$k}) {
@@ -652,12 +654,11 @@ sub ParseData($) {
               Log3 $name, 4, "$name - Livedata content \"$k\": ".($livedata_content->{$k});
               if($livedata_content->{$k} =~ m/ARRAY/i) {
                   my $hd0 = $livedata_content->{$k}[0];
-                  if(!$hd0) {
+                  if(!defined $hd0) {
                       next;
                   }
                   chomp $hd0;
                   $hd0 =~ s/[;']//g;
-                  $hd0 = ($hd0 =~ /^undef$/)?"none":$hd0;
                   $hd0 = encode("utf8", $hd0);
                   Log3 $name, 4, "$name - Livedata \"$k\": $hd0";
                   $new_val = $hd0;
@@ -679,6 +680,8 @@ sub ParseData($) {
               $errMsg                    = 1 if($k =~ /^ErrorMessages$/);
               $warnMsg                   = 1 if($k =~ /^WarningMessages$/);
               $infoMsg                   = 1 if($k =~ /^InfoMessages$/);
+              $batteryin                 = 1 if($k =~ /^BatteryIn$/);
+              $batteryout                = 1 if($k =~ /^BatteryOut$/);
           }
       }
   }
@@ -690,6 +693,10 @@ sub ParseData($) {
   readingsBulkUpdate($hash, "L1_SelfConsumption", 0) if(!$SelfConsumption_done);
   readingsBulkUpdate($hash, "L1_SelfConsumptionQuote", 0) if(!$SelfConsumptionQuote_done);
   readingsBulkUpdate($hash, "L1_SelfSupply", 0) if(!$SelfSupply_done);
+  if(defined $batteryin || defined $batteryout) {
+      readingsBulkUpdate($hash, "L1_BatteryIn", 0) if(!$batteryin);
+      readingsBulkUpdate($hash, "L1_BatteryOut", 0) if(!$batteryout);
+  }  
   readingsEndUpdate($hash, 1);
   
   readingsDelete($hash,"L1_ErrorMessages") if(!$errMsg);
