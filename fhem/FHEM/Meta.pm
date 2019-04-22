@@ -1051,7 +1051,7 @@ sub ModuleIsPerlCore {
     return 1 if ( $module =~ /^Perl$/i );
 
     eval {
-        require sModule::CoreList;
+        require Module::CoreList;
         1;
     };
 
