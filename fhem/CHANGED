@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  98_Text2Speech: now working without mp3wrap too
+            thanks to Mumpitzstuff
  - feature: 70_BOTVAC: add cleaning statistics
  - feature: 98_livetracking: CSV data from OwnTracks
  - new:     98_Weather: add wundergroundAPI for Weather Underground

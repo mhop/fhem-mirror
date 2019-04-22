@@ -573,7 +573,7 @@ sub Text2Speech_PrepareSpeech($$) {
     Log3 $hash, 4, "$me: $i => ".$text[$i]; 
   }
 
-  push( @{$hash->{helper}{Text2Speech}}, \@text );
+  push( @{$hash->{helper}{Text2Speech}}, @text );
 }
 
 #####################################
@@ -814,7 +814,7 @@ sub Text2Speech_DoIt($) {
   undef($TTS_SentenceAppendix) if($TTS_SentenceAppendix && (! -e $TTS_SentenceAppendix));
 
   #Abspielliste erstellen
-  foreach my $t (@{$hash->{helper}{Text2Speech}->[0]}) {
+  foreach my $t (@{$hash->{helper}{Text2Speech}}) {
     if(-e $t) {
       # falls eine bestimmte mp3-Datei mit absolutem Pfad gespielt werden soll
       $filename = $t;
@@ -888,10 +888,10 @@ sub Text2Speech_DoIt($) {
   }
 
 
-  Log3 $hash->{NAME}, 4, $hash->{NAME}.": Bearbeite jetzt den Text: ". join(" ",@{$hash->{helper}{Text2Speech}->[0]}); 
+  Log3 $hash->{NAME}, 4, $hash->{NAME}.": Bearbeite jetzt den Text: ". $hash->{helper}{Text2Speech}[0]; 
   
   if(! -e $file) { # Datei existiert noch nicht im Cache
-    Text2Speech_Download($hash, $file, join(" ",@{$hash->{helper}{Text2Speech}->[0]}));
+    Text2Speech_Download($hash, $file, $hash->{helper}{Text2Speech}[0]);
   } else {
     Log3 $hash->{NAME}, 4, $hash->{NAME}.": $file gefunden, kein Download";
   }
@@ -929,28 +929,28 @@ sub Text2Speech_Done($) {
   my $TTS_TimeOut   = AttrVal($hash->{NAME}, "TTS_TimeOut", 60);
 
   if($filename) {
-    my $text = $hash->{helper}{Text2Speech}[0];         
-    Text2Speech_WriteStats($hash, 1, $filename, join(" ", @$text)) if (AttrVal($hash->{NAME},"TTS_noStatisticsLog", "0")==0);
+    my @text;
+    for(my $i=0; $i<$tts_done; $i++) { 
+      push(@text, $hash->{helper}{Text2Speech}[$i]);
+    }         
+    Text2Speech_WriteStats($hash, 1, $filename, join(" ", @text)) if (AttrVal($hash->{NAME},"TTS_noStatisticsLog", "0")==0);
 
     readingsSingleUpdate($hash, "lastFilename", $filename, 1);
   }
 
-  my $pre = @{$hash->{helper}{Text2Speech}->[0]};
-  if ($tts_done == $pre ) {
-  	# alles wurde bearbeitet und kann komplett entfernt werden
-        Log3($hash,4, $hash->{NAME}.": Es wurden ". $pre ." Teile ausgegeben und der Befehl ist abgearbeitet.");
-  	splice(@{$hash->{helper}{Text2Speech}}, 0, 1);	
-  }else{
-  	# es wurde nur ein Teil abgearbeitet und nur dieser kann entfernt werden
-        Log3($hash,4, $hash->{NAME}.": Es wurden ". $pre ." Teile ausgegeben und weitere folgen!");
-  	splice(@{$hash->{helper}{Text2Speech}->[0]}, 0, $tts_done);
-  }
+  delete($hash->{helper}{RUNNING_PID});
+  splice(@{$hash->{helper}{Text2Speech}}, 0, $tts_done);
 
   # erneutes aufrufen da ev. weiterer Text in der Warteschlange steht
   if(@{$hash->{helper}{Text2Speech}} > 0) {
+    # es wurde nur ein Teil abgearbeitet
+    Log3($hash,4, $hash->{NAME}.": Es wurde nur ein Teil ausgegeben und weitere Teile folgen!");    
+
     $hash->{helper}{RUNNING_PID} = BlockingCall("Text2Speech_DoIt", $hash, "Text2Speech_Done", $TTS_TimeOut, "Text2Speech_AbortFn", $hash);
   } else {
-    delete($hash->{helper}{RUNNING_PID});
+    # alles wurde bearbeitet
+    Log3($hash,4, $hash->{NAME}.": Es wurden alle Teile ausgegeben und der Befehl ist abgearbeitet.");
+
     readingsSingleUpdate($hash, "playing", "0", 1);
   }
 }
