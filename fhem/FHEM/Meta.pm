@@ -1051,18 +1051,20 @@ sub ModuleIsPerlCore {
     return 1 if ( $module =~ /^Perl$/i );
 
     eval {
-        require Module::CoreList;
+        require sModule::CoreList;
         1;
     };
 
-    if ($@) {
+    if (   $@
+        || !defined(&Module::CoreList::is_core)
+        || !defined(&Module::CoreList::first_release_by_date) )
+    {
         $@ = undef;
-
-        # return (
-        #     grep ( /^$module$/, @perlCoreModules )
-        #     ? 1
-        #     : 0
-        # );
+        return (
+            grep ( /^$module$/, @perlCoreModules )
+            ? 1
+            : 0
+        );
     }
     else {
         return (
@@ -3275,7 +3277,7 @@ sub __SetXVersion {
       "abstract": "FHEM Entwickler Paket, um Metadaten Unterstützung zu aktivieren"
     }
   },
-  "version": "v0.6.1",
+  "version": "v0.6.2",
   "release_status": "testing",
   "x_changelog": {
     "2019-04-18": {
