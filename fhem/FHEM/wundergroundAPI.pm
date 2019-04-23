@@ -375,15 +375,26 @@ sub _ProcessingRetrieveData($$) {
                     );
 
                     $self->{cached}{current} = {
+                        'dewPoint' =>
+                          int( sprintf( "%.1f", $data->{$unit}{dewpt} ) + 0.5 ),
+                        'heatIndex'   => $data->{$unit}{heatIndex},
+                        'precipRate'  => $data->{$unit}{precipRate},
+                        'precipTotal' => $data->{$unit}{precipTotal},
+                        'pressure'    => int(
+                            sprintf( "%.1f", $data->{$unit}{pressure} ) + 0.5
+                        ),
                         'temperature' =>
                           int( sprintf( "%.1f", $data->{$unit}{temp} ) + 0.5 ),
                         'temp_c' =>
                           int( sprintf( "%.1f", $data->{$unit}{temp} ) + 0.5 ),
-                        'dewPoint' =>
-                          int( sprintf( "%.1f", $data->{$unit}{dewpt} ) + 0.5 ),
-                        'humidity' => $data->{humidity},
-                        'pressure' =>
-                          int( sprintf( "%.1f", $data->{pressure} ) + 0.5 ),
+                        'wind_chill' => int(
+                            sprintf( "%.1f", ( $data->{$unit}{windChill} ) ) +
+                              0.5
+                        ),
+                        'windGust' => int(
+                            sprintf( "%.1f", ( $data->{$unit}{windGust} ) ) +
+                              0.5
+                        ),
                         'wind' => int(
                             sprintf( "%.1f", ( $data->{$unit}{windSpeed} ) ) +
                               0.5
@@ -393,15 +404,9 @@ sub _ProcessingRetrieveData($$) {
                               0.5
                         ),
                         'wind_direction' => $data->{winddir},
-                        'windGust'       => int(
-                            sprintf( "%.1f", ( $data->{$unit}{windGust} ) ) +
-                              0.5
-                        ),
                         'solarRadiation' => $data->{solarRadiation},
                         'uvIndex'        => $data->{uv},
-                        'heatIndex'      => $data->{$unit}{heatIndex},
-                        'precipRate'     => $data->{$unit}{precipRate},
-                        'precipTotal'    => $data->{$unit}{precipTotal},
+                        'humidity'       => $data->{humidity},
                         'pubDate'        => strftimeWrapper(
                             "%a, %e %b %Y %H:%M",
                             localtime(
@@ -725,7 +730,7 @@ sub strftimeWrapper(@) {
       "abstract": "Wetter API für Weather Underground"
     }
   },
-  "version": "v0.0.2",
+  "version": "v0.0.3",
   "release_status": "testing",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
