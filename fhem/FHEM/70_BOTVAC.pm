@@ -879,7 +879,7 @@ sub ReceiveCommand($$$) {
             # getSchedule, enableSchedule, disableSchedule
             if ( ref($return->{data}) eq "HASH" ) {
               my $scheduleData = $return->{data};
-              readingsBulkUpdateIfChanged($hash, "scheduleEnabled", $scheduleData->{enabled});
+              readingsBulkUpdateIfChanged($hash, "scheduleEnabled", GetBoolean($scheduleData->{enabled}));
               readingsBulkUpdateIfChanged($hash, "scheduleType",    $scheduleData->{type})
                   if (defined($scheduleData->{type}));
 
@@ -1060,19 +1060,19 @@ sub ReceiveCommand($$$) {
               }
               if ( ref($return->{details}) eq "HASH" ) {
                 my $details = $return->{details};
-                readingsBulkUpdateIfChanged($hash, "isCharging",        $details->{isCharging});
-                readingsBulkUpdateIfChanged($hash, "isDocked",          $details->{isDocked});
-                readingsBulkUpdateIfChanged($hash, "isScheduleEnabled", $details->{isScheduleEnabled});
-                readingsBulkUpdateIfChanged($hash, "dockHasBeenSeen",   $details->{dockHasBeenSeen});
-                readingsBulkUpdateIfChanged($hash, "batteryPercent",    $details->{charge});
+                readingsBulkUpdateIfChanged($hash, "isCharging",      GetBoolean($details->{isCharging}));
+                readingsBulkUpdateIfChanged($hash, "isDocked",        GetBoolean($details->{isDocked}));
+                readingsBulkUpdateIfChanged($hash, "scheduleEnabled", GetBoolean($details->{isScheduleEnabled}));
+                readingsBulkUpdateIfChanged($hash, "dockHasBeenSeen", GetBoolean($details->{dockHasBeenSeen}));
+                readingsBulkUpdateIfChanged($hash, "batteryPercent",  $details->{charge});
               }
               if ( ref($return->{availableCommands}) eq "HASH" ) {
                 my $availableCommands = $return->{availableCommands};
-                readingsBulkUpdateIfChanged($hash, ".start",    $availableCommands->{start});
-                readingsBulkUpdateIfChanged($hash, ".pause",    $availableCommands->{pause});
-                readingsBulkUpdateIfChanged($hash, ".resume",   $availableCommands->{resume});
-                readingsBulkUpdateIfChanged($hash, ".goToBase", $availableCommands->{goToBase});
-                readingsBulkUpdateIfChanged($hash, ".stop",     $availableCommands->{stop})
+                readingsBulkUpdateIfChanged($hash, ".start",    GetBoolean($availableCommands->{start}));
+                readingsBulkUpdateIfChanged($hash, ".pause",    GetBoolean($availableCommands->{pause}));
+                readingsBulkUpdateIfChanged($hash, ".resume",   GetBoolean($availableCommands->{resume}));
+                readingsBulkUpdateIfChanged($hash, ".goToBase", GetBoolean($availableCommands->{goToBase}));
+                readingsBulkUpdateIfChanged($hash, ".stop",     GetBoolean($availableCommands->{stop}))
                     unless ($cmd =~ /start.*/ or $cmd eq "getRobotManualCleaningInfo");
               }
               if ( ref($return->{availableServices}) eq "HASH" ) {
@@ -1386,6 +1386,22 @@ sub CheckRegistration($$$$$) {
   return;
 }
 
+sub GetBoolean($) {
+    my ($value) = @_;
+    my $booleans = {
+        '0'       => "0",
+        'false'   => "0",
+        '1'       => "1",
+        'true'    => "1"
+    };
+
+    if (defined( $booleans->{$value})) {
+        return $booleans->{$value};
+    } else {
+        return $value;
+    }	 
+}
+
 sub BuildState($$$$) {
     my ($hash,$state,$action,$error) = @_;
     my $states = {
@@ -1647,8 +1663,8 @@ sub GetStatistics($) {
     $ret .= '<html><head><meta charset="utf-8">';
     $ret .= '<style>';
     $ret .= ' .botvac tbody {border-top: 1px solid gray; border-bottom: 1px solid gray;}';
-    $ret .= ' .botvac th, td {text-align: -webkit-center; padding-right: 1em;}';
-    $ret .= ' .botvac caption {text-align: -webkit-left; padding-bottom: 1em; margin-bottom: 1em;}';
+    $ret .= ' .botvac th, .botvac td {text-align: center; padding-right: 1em;}';
+    $ret .= ' .botvac caption {text-align: left; padding-bottom: 1em; margin-bottom: 1em;}';
     $ret .= '</style>';
     $ret .= '</head><body><table class="botvac">';
     $ret .= '<caption><b>Report: '.ReadingsVal($name,"name","name").', '.InternalVal($name,"VENDOR","VENDOR").', '.ReadingsVal($name,"model","model").'</b></caption>';
