@@ -494,16 +494,28 @@ sub _ProcessingRetrieveData($$) {
                                         $data->{temperatureMin}[$i] ) + 0.5
                                 ),
                                 'high_c' => int(
-                                    sprintf( "%.1f",
-                                        $data->{temperatureMax}[$i] ) + 0.5
+                                    sprintf(
+                                        "%.1f",
+                                        (
+                                              $data->{temperatureMax}[$i]
+                                            ? $data->{temperatureMax}[$i]
+                                            : 0
+                                        )
+                                    ) + 0.5
                                 ),
                                 'tempLow' => int(
                                     sprintf( "%.1f",
                                         $data->{temperatureMin}[$i] ) + 0.5
                                 ),
                                 'tempHigh' => int(
-                                    sprintf( "%.1f",
-                                        $data->{temperatureMax}[$i] ) + 0.5
+                                    sprintf(
+                                        "%.1f",
+                                        (
+                                              $data->{temperatureMax}[$i]
+                                            ? $data->{temperatureMax}[$i]
+                                            : 0
+                                        )
+                                    ) + 0.5
                                 ),
                             }
                         );
@@ -526,7 +538,8 @@ sub _ProcessingRetrieveData($$) {
                         while ( $i < $dayparts ) {
 
                             my $part = (
-                                $data->{dayOrNight}[$i] eq 'N'
+                                $data->{dayOrNight}[$i]
+                                  && $data->{dayOrNight}[$i] eq 'N'
                                 ? 'night'
                                 : 'day'
                             );
