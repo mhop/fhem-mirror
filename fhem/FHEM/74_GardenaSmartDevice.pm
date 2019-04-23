@@ -59,7 +59,7 @@ use strict;
 use warnings;
 use FHEM::Meta;
 
-my $version = "1.6.0";
+my $version = "1.6.1";
 
 sub GardenaSmartDevice_Initialize($) {
 
@@ -741,7 +741,7 @@ sub Zulu2LocalString($) {
         );
     }
     elsif ( $lyear < 2000 ) {
-        return "illegal year";
+        return 'temporarily unavailable';
     }
     else {
         return (
