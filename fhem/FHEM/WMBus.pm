@@ -2008,8 +2008,7 @@ sub decodeApplicationLayer($) {
   $self->{encryptionMode} = $encryptionModes{$self->{cw_parts}{mode}};
   if ($self->{cw_parts}{mode} == 0) {
     # no encryption
-    if (!defined $self->{isEncrypted}) {
-      $self->{isEncrypted} = 0;
+    if (!$self->{isEncrypted}) {
       $self->{decrypted} = 1;
     }
     $payload = substr($applicationlayer, $offset);
