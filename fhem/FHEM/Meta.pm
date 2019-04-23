@@ -1780,23 +1780,33 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
                                         }
                                     }
 
-                                    $v =
-                                         $v
-                                      && $v > $pkgMeta->{prereqs}{runtime}
-                                      {$pkgIreq}{$pkgI}
-                                      ? $v
-                                      : $pkgMeta->{prereqs}{runtime}
-                                      {$pkgIreq}{$pkgI};
+                                    if ($v) {
+                                        $v = version->parse($v)->numify;
+                                        $v = version->parse(
+                                            $pkgMeta->{prereqs}{runtime}
+                                              {$pkgIreq}{$pkgI} )->numify
+                                          if (
+                                            $v < version->parse(
+                                                $pkgMeta->{prereqs}{runtime}
+                                                  {$pkgIreq}{$pkgI}
+                                            )->numify
+                                          );
+                                    }
 
                                     if (
                                         !exists(
                                             $modMeta->{prereqs}{runtime}
                                               {$prio}{$pkgI}
                                         )
-                                        || ( $pkgMeta->{prereqs}{runtime}
+                                        || (
+                                            $pkgMeta->{prereqs}{runtime}
                                             {$pkgIreq}{$pkgI} ne '0'
-                                            && $modMeta->{prereqs}{runtime}
-                                            {$prio}{$pkgI} < $v )
+                                            && $v
+                                            && version->parse(
+                                                $modMeta->{prereqs}{runtime}
+                                                  {$prio}{$pkgI}
+                                            )->numify < $v
+                                        )
                                       )
                                     {
                                         $modMeta->{prereqs}{runtime}{$prio}
@@ -3277,7 +3287,7 @@ sub __SetXVersion {
       "abstract": "FHEM Entwickler Paket, um Metadaten Unterstützung zu aktivieren"
     }
   },
-  "version": "v0.6.2",
+  "version": "v0.6.3",
   "release_status": "testing",
   "x_changelog": {
     "2019-04-18": {
@@ -3333,7 +3343,7 @@ sub __SetXVersion {
         "JSON::PP": 0
       },
       "recommends": {
-        "JSON": "2.91_01",
+        "JSON": "2.92",
         "Module::CoreList": 0,
         "Perl::PrereqScanner::NotQuiteLite": 0
       },
