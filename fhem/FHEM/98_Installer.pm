@@ -3,6 +3,7 @@
 package main;
 use strict;
 use warnings;
+use POSIX;
 use FHEM::Meta;
 
 sub Installer_Initialize($) {
@@ -449,7 +450,7 @@ m/^(?:@([\w-]+)\/)?(?:App::)?(cpan\-?outdated)(?:@([\d\.=<>]+|latest))?$/i,
           );
         $hash->{".fhem"}{installer}{cmd} =
           'uninstallPerl ' . join( " ", @args );
-          $ret = "Deinstallation started in background";
+        $ret = "Deinstallation started in background";
     }
 
     # return Usage:
@@ -5380,6 +5381,7 @@ sub __GetExtendedEnvPath {
 
     foreach my $p ( reverse @binpath ) {
         next unless ( $p && $p ne '' );
+        $p =~ s/\\/\\\/g;
         unshift @path, $p unless ( grep ( /^$p$/, @path ) );
     }
 
@@ -5506,7 +5508,7 @@ sub __list_module {
       "abstract": "Modul zum Update von FHEM, zur Installation von Drittanbieter FHEM Modulen und der Verwaltung von Systemvoraussetzungen"
     }
   },
-  "version": "v0.5.2",
+  "version": "v0.5.3",
   "release_status": "testing",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
