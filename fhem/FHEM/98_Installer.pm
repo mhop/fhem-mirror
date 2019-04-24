@@ -5006,7 +5006,7 @@ sub LoadInstallStatusPerl(;$) {
                               ? $modules{$fname}{META}{version}
                               : 0;
                         }
-                        elsif ( $pkg =~ /^Win32::/ && $^O ne 'MSWin32' ) {
+                        elsif ( $pkg =~ /^Win32::/ && $^O !~ /Win/ ) {
                             $pkgStatus{Perl}{pkgs}{$pkg}{status} = 'n/a';
                         }
                         else {
@@ -5381,7 +5381,7 @@ sub __GetExtendedEnvPath {
 
     foreach my $p ( reverse @binpath ) {
         next unless ( $p && $p ne '' );
-        $p =~ s/\\/\\\/g;
+        $p =~ s/\\/\\\\/g if ($^O =~ m/Win/);
         unshift @path, $p unless ( grep ( /^$p$/, @path ) );
     }
 
