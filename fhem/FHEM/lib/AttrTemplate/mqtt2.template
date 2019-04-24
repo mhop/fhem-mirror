@@ -50,7 +50,7 @@ desc:The zigbee2mqtt bridge device
 filter:TYPE=MQTT2_DEVICE
 par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^:]+:([^/]+)[/].*:, ? $1 : undef }
 attr DEVICE bridgeRegexp\
- BASE_TOPIC/([A-Za-z0-9]*)[/]?.*:.* "zigbee_$1"
+ BASE_TOPIC/([A-Za-z0-9._]*)[/]?.*:.* "zigbee_$1"
 attr DEVICE getList\
   devicelist:noArg log BASE_TOPIC/bridge/config/devices\
   networkmap_raw:noArg raw BASE_TOPIC/bridge/networkmap raw\
@@ -1003,11 +1003,10 @@ attr DEVICE bridgeRegexp BASE_ID/[^/]*at[^/]+[/]/(0x....)/.*/([0-4])?.*:.* "mili
 attr DEVICE autocreate 1
 attr DEVICE setStateList on off
 attr DEVICE stateFormat <a href="http://ip_address" target="_blank">\
-LWT\
-</a>\
-Version: \
+status\
+</a>Version: \
 version
-attr DEVICE devStateIcon online:10px-kreis-gruen offline:10px-kreis-rot
+attr DEVICE devStateIcon connected:10px-kreis-gruen disconnected.*:10px-kreis-rot
 attr DEVICE model X_01_esp_milight_hub_bridge
 
 #rgbw-bulb
@@ -1035,7 +1034,7 @@ attr DEVICE setList\
   hue:colorpicker,HUE,0,1,359 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
   command:uzsuSelectRadio,Weiss,Nacht BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}
 attr DEVICE setStateList on off
-#attr DEVICE userReadings rgb {sprintf("%02X%02X%02X", ReadingsVal($name,"color_r",255), ReadingsVal($name,"color_g",255), ReadingsVal($name,"color_b",255))}
+attr DEVICE userReadings hex:color_r.* {Color::rgb2hex(ReadingsVal($name,"color_r",255),ReadingsVal($name,"color_g",255),ReadingsVal($name,"color_b",255))}, hue:bulb_mode.*white {"0"}
 attr DEVICE model X_01_esp_milight_hub_rgbw_bulb
 
 #rgbw-group
