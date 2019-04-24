@@ -888,10 +888,10 @@ sub livetracking_ParseOwnTracks
   my $name = $hash->{NAME};
 
   #//rcmcronny CSV DECODING
-  if($data =~ m/[0-9]{2},[A-Z,a-z,0-9]{8},[f|c|a|k|L|l|m|t|T|v|s]{1},[0-9]{8},[0-9]{8},[0-9]{1,5},[0-9]{1,5},[0-9]{1,5},[0-9]{1,5},[0-9]{1,5}/)
+  if($data =~ m/[A-Za-z0-9]{2},[A-Za-z0-9]{8},[f|c|a|k|L|l|m|t|T|v|s]{1},[0-9]{8},[0-9]{8},[0-9]{1,5},[0-9]{1,5},[0-9]{1,5},[0-9]{1,5},[0-9]{1,5}$/)
   {
     Log3 ($name, 4, "$name - CSV encoded payload detected -> ".Dumper($data));
-    my ($csv_tid, $csv_tst, $csv_t, $csv_lat, $csv_lon, $csv_cog, $csv_vel, $csv_alt, $csv_dist, $csv_trip) = $data =~ m/([0-9]{2}),([A-Z,a-z,0-9]{8}),([f|c|a|k|L|l|m|t|T|v|s]{1}),([0-9]{8}),([0-9]{8}),([0-9]{1,5}),([0-9]{1,5}),([0-9]{1,5}),([0-9]{1,5}),([0-9]{1,5})/;
+    my ($csv_tid, $csv_tst, $csv_t, $csv_lat, $csv_lon, $csv_cog, $csv_vel, $csv_alt, $csv_dist, $csv_trip) = $data =~ m/([A-Za-z0-9]{2}),([A-Za-z0-9]{8}),([f|c|a|k|L|l|m|t|T|v|s]{1}),([0-9]{8}),([0-9]{8}),([0-9]{1,5}),([0-9]{1,5}),([0-9]{1,5}),([0-9]{1,5}),([0-9]{1,5})$/;
     $data = '{
       "_type": "location",
       "t": "'.$csv_t.'",
@@ -1184,7 +1184,7 @@ sub livetracking_Notify($$)
       $invaliddata = 0;#traccar
       Log3 ($name, 4, "$name Detected Traccar data from MQTT device notify");
     }
-    elsif(($dev->{CHANGED}[0] =~ m/[0-9]{2},[A-Z,a-z,0-9]{8},[f|c|a|k|L|l|m|t|T|v|s]{1},[0-9]{8},[0-9]{8},[0-9]{2},[0-9]{1},[0-9]{2},[0-9]{1},[0-9]{1}/))
+    elsif(($dev->{CHANGED}[0] =~ m/[A-Za-z0-9]{2},[A-Za-z0-9]{8},[f|c|a|k|L|l|m|t|T|v|s]{1},[0-9]{8},[0-9]{8},[0-9]{1,5},[0-9]{1,5},[0-9]{1,5},[0-9]{1,5},[0-9]{1,5}$/))
     {
       $invaliddata = 0;#owntracks-csv
       Log3 ($name, 4, "$name Detected OwnTracks CSV ENCODED data from MQTT device notify");
