@@ -2285,7 +2285,7 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
                     : ''
                   );
                 $modMeta->{resources}{repository}{x_raw} =
-                    'https://svn.fhem.de/fhem/trunk/fhem/'
+                    'https://svn.fhem.de/trac/export/latest/trunk/fhem/'
                   . $modMeta->{x_file}[1]
                   . $modMeta->{x_file}[2];
             }
