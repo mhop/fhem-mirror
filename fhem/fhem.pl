@@ -2682,8 +2682,16 @@ getAllAttr($;$)
   } elsif($modules{$defs{$d}{TYPE}}{AttrList}) {
     $list .= " " . $modules{$defs{$d}{TYPE}}{AttrList};
   }
-  $list .= " " . $attr{global}{userattr} if($attr{global}{userattr});
-  $list .= " " . $attr{$d}{userattr}     if($attr{$d} && $attr{$d}{userattr});
+
+  my $nl2space = sub($)
+  {
+    my $v = $_[0];
+    return if(!defined($v));
+    $v =~ s/\n/ /g;
+    $list .= " $v";
+  };
+  $nl2space->($attr{global}{userattr});
+  $nl2space->($attr{$d}{userattr}) if($attr{$d});
   $list .= " userattr";
   return $list;
 }
