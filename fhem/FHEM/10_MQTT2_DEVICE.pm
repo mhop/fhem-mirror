@@ -713,6 +713,8 @@ zigbee2mqtt_devStateIcon255($;$$)
 {
   my ($name, $rgbReadingName, $useSetExtension) = @_;
 
+  return ".*:off:toggle" if(!$defs{$name});
+
   my $too = $defs{$name}->{TIMED_OnOff};
   $useSetExtension = 0 if(!$too);
   my $state = lc(ReadingsVal($name,"state","on"));
