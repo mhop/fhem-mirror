@@ -723,10 +723,10 @@ zigbee2mqtt_devStateIcon255($;$$)
   my $pct = ReadingsNum($name, "brightness", 255);
 
   my $s = "on";
-  if($useSetExtension && $too->{CMD} =~ m/on-|off-|blink/s) {
-    $s = $too->{CMD} =~ m/on-/s  ? "on-for-timer"  :
-         $too->{CMD} =~ m/off-/s ? "off-for-timer" :
-         $state      =~ m/off-/s ? "off-for-timer" : "light_toggle";
+  if($useSetExtension && $too->{CMD} =~ m/on-|off-|blink/) {
+    $s = $too->{CMD} =~ m/on-/  ? "on-for-timer"  :
+         $too->{CMD} =~ m/off-/ ? "off-for-timer" :
+         $state      =~ m/off-/ ? "off-for-timer" : "light_toggle";
   } elsif ($pct < 254) {
     $s = sprintf("dim%02d%%", int((1+int($pct/18))*6.25));
   }
@@ -734,7 +734,6 @@ zigbee2mqtt_devStateIcon255($;$$)
   my $rgb = ReadingsVal($name, $rgbReadingName, "FFFFFF");
   $s .= "@#$rgb" if($rgb ne "FFFFFF");
 
-Log 1, $s;
   return ".*:$s:toggle";
 }
 
