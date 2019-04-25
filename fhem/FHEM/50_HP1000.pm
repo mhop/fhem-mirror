@@ -151,7 +151,7 @@ sub HP1000_Initialize($) {
     $hash->{parseParams}   = 1;
 
     $hash->{AttrList} =
-"disable:1,0 disabledForIntervals do_not_notify:1,0 wu_push:1,0 wu_indoorValues:1,0 wu_id wu_password wu_realtime:1,0 wu_dataValues extSrvPush_Url stateReadingsLang:en,de,at,ch,nl,fr,pl webhookFWinstances:sortable-strict,$webhookFWinstance stateReadings stateReadingsFormat:0,1 "
+"disable:1,0 disabledForIntervals do_not_notify:1,0 wu_push:1,0 wu_indoorValues:1,0 wu_id wu_password wu_realtime:1,0 wu_dataValues extSrvPush_Url stateReadingsLang:en,de,at,ch,nl,fr,pl webhookFWinstances:sortable-strict,$webhookFWinstance stateReadings stateReadingsFormat:0,1 bogusFilter:0,1 "
       . $readingFnAttributes;
 
     my @wu;
@@ -585,6 +585,22 @@ sub HP1000_CGI() {
 
     my %HP1000_pwsMappingEquivalent_rev =
       %{ { reverse %HP1000_pwsMappingEquivalent } };
+
+    # Filter values that seem bogus
+    if ( AttrVal( $name, 'bogusFilter', 0 ) ne '0' ) {
+        foreach ($webArgs) {
+            next unless ( looks_like_number( $webArgs->{$_} ) );
+
+            if ( $webArgs->{$_} < -273.2 ) {
+                Log3 $name, 4,
+                    "HP1000: "
+                  . "Received value '"
+                  . $webArgs->{$_}
+                  . "' for '$_' seems out of range - removed from data set";
+                delete $webArgs->{$_};
+            }
+        }
+    }
 
     # calculate readings for Metric standard from Angloamerican standard
     #
@@ -1579,36 +1595,40 @@ sub HP1000_HistoryDb($$;$$$) {
       <a name="HP1000define" id="HP10000define"></a> <b>Define</b>
       <div>
       <ul>
-        <code>define &lt;WeatherStation&gt; HP1000 [&lt;ID&gt; &lt;PASSWORD&gt;]</code><br>
-        <br>
-          Provides webhook receiver for Wifi-based weather station which support <a href="http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol">PWS protocol</a> from Weather Underground (e.g. HP1000, WH2600, WH2601, WH2621, WH2900, WH2950 of <a href="http://www.foshk.com/Wifi_Weather_Station/">Fine Offset Electronics</a> - sometimes also known as <a href="http://www.ambientweather.com/peorhowest.html">Ambient Weather</a> WS-1001-WIFI or similar). In Germany, these devices are commonly distributed by <a href="http://www.froggit.de/">froggit</a> or by <a href="http://www.conrad.de/">Conrad</a> under it's brand name Renkforce.<br>
-          There needs to be a dedicated FHEMWEB instance with attribute webname set to "weatherstation".<br>
-          No other name will work as it's hardcoded in the weather station device itself!<br>
-          If necessary, this module will create a matching FHEMWEB instance named WEBweatherstation during initial definition.<br>
-          <br>
-          As the URI has a fixed coding as well there can only be one single instance of this module FHEM installation.<br>
-        <br>
-        Example:<br>
+        <code>define &lt;WeatherStation&gt; HP1000 [&lt;ID&gt; &lt;PASSWORD&gt;]</code><br />
+        <br />
+          Provides webhook receiver for Wifi-based weather station which support <a href="http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol">PWS protocol</a> from Weather Underground (e.g. HP1000, WH2600, WH2601, WH2621, WH2900, WH2950 of <a href="http://www.foshk.com/Wifi_Weather_Station/">Fine Offset Electronics</a> - sometimes also known as <a href="http://www.ambientweather.com/peorhowest.html">Ambient Weather</a> WS-1001-WIFI or similar). In Germany, these devices are commonly distributed by <a href="http://www.froggit.de/">froggit</a> or by <a href="http://www.conrad.de/">Conrad</a> under it's brand name Renkforce.<br />
+          There needs to be a dedicated FHEMWEB instance with attribute webname set to "weatherstation".<br />
+          No other name will work as it's hardcoded in the weather station device itself!<br />
+          If necessary, this module will create a matching FHEMWEB instance named WEBweatherstation during initial definition.<br />
+          <br />
+          As the URI has a fixed coding as well there can only be one single instance of this module FHEM installation.<br />
+        <br />
+        Example:<br />
         <div>
-          <code># unprotected instance where ID and PASSWORD will be ignored<br>
-          define WeatherStation HP1000<br>
-          <br>
-          # protected instance: Weather Station needs to be configured<br>
-          # to send this ID and PASSWORD for data to be accepted<br>
+          <code># unprotected instance where ID and PASSWORD will be ignored<br />
+          define WeatherStation HP1000<br />
+          <br />
+          # protected instance: Weather Station needs to be configured<br />
+          # to send this ID and PASSWORD for data to be accepted<br />
           define WeatherStation HP1000 MyHouse SecretPassword</code>
-        </div><br>
-          IMPORTANT: In your hardware device, make sure you use a DNS name as most revisions cannot handle IP addresses correctly.<br>
+        </div><br />
+          IMPORTANT: In your hardware device, make sure you use a DNS name as most revisions cannot handle IP addresses correctly.<br />
           You might want to check to install a firmware update from <a href="http://www.foshk.com/support/">here</a>.
       </ul>
-      </div><br>
+      </div><br />
     </div>
-    <br>
+    <br />
 
     <a name="HP1000Attr" id="HP10000Attr"></a> <b>Attributes</b>
     <div>
     <ul>
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-      <br>
+      <br />
+
+      <a name="bogusFilter"></a><li><b>bogusFilter</b></li>
+        Will explicitly drop every numeric value that is below -273.2 (defaults to 0).<br />
+        This might help in case your station tends to send out of range values from time to time.
 
       <a name="webhookFWinstances"></a><li><b>webhookFWinstances</b></li>
         Explicitly specify allowed FHEMWEB instaces for data input (defaults to weatherstation)
@@ -1620,7 +1640,7 @@ sub HP1000_HistoryDb($$;$$$) {
         Weather Underground (Wunderground) password
 
       <a name="wu_dataValues"></a><li><b>wu_dataValues</b></li>
-        Add or replace values before pushing data to Weather Underground.<br>
+        Add or replace values before pushing data to Weather Underground.<br />
         Format is key=value while value may be of <a href="#set">set magic format</a>
 
       <a name="wu_indoorValues"></a><li><b>wu_indoorValues</b></li>
@@ -1655,35 +1675,35 @@ sub HP1000_HistoryDb($$;$$$) {
       <a name="HP1000define" id="HP10000define"></a> <b>Define</b>
       <div>
       <ul>
-        <code>define &lt;WeatherStation&gt; HP1000 [&lt;ID&gt; &lt;PASSWORD&gt;]</code><br>
-        <br>
-          Stellt einen Webhook f&uuml;r WLAN-basierte Wetterstationen bereit, die das <a href="http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol">PWS</a> Protokoll von Weather Underground verwenden (z.B. HP1000, WH2600, WH2601, WH2621, WH2900, WH2950 Wetterstation von <a href="http://www.foshk.com/Wifi_Weather_Station/">Fine Offset Electronics</a> - manchmal auch bekannt als <a href="http://www.ambientweather.com/peorhowest.html">Ambient Weather</a> WS-1001-WIFI oder &auml;hnliches). In Deutschland werden die Ger&auml;te zumeist von <a href="http://www.froggit.de/">froggit</a> oder von <a href="http://www.conrad.de/">Conrad</a> unter dem Markennamen Renkforce vertrieben.<br>
-          Es muss noch eine dedizierte FHEMWEB Instanz angelegt werden, wo das Attribut webname auf "weatherstation" gesetzt wurde.<br>
-          Kein anderer Name funktioniert, da dieser fest in der Wetterstation hinterlegt ist!<br>
-          Sofern notwendig, erstellt dieses Modul eine passende FHEMWEB Instanz namens WEBweatherstation w&auml;hrend der initialen Definition.<br>
-          <br>
-          Da die URI ebenfalls fest kodiert ist, kann mit einer einzelnen FHEM Installation maximal eine Instanz dieses Moduls gleichzeitig verwendet werden.<br>
-        <br>
-        Beispiel:<br>
+        <code>define &lt;WeatherStation&gt; HP1000 [&lt;ID&gt; &lt;PASSWORD&gt;]</code><br />
+        <br />
+          Stellt einen Webhook f&uuml;r WLAN-basierte Wetterstationen bereit, die das <a href="http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol">PWS</a> Protokoll von Weather Underground verwenden (z.B. HP1000, WH2600, WH2601, WH2621, WH2900, WH2950 Wetterstation von <a href="http://www.foshk.com/Wifi_Weather_Station/">Fine Offset Electronics</a> - manchmal auch bekannt als <a href="http://www.ambientweather.com/peorhowest.html">Ambient Weather</a> WS-1001-WIFI oder &auml;hnliches). In Deutschland werden die Ger&auml;te zumeist von <a href="http://www.froggit.de/">froggit</a> oder von <a href="http://www.conrad.de/">Conrad</a> unter dem Markennamen Renkforce vertrieben.<br />
+          Es muss noch eine dedizierte FHEMWEB Instanz angelegt werden, wo das Attribut webname auf "weatherstation" gesetzt wurde.<br />
+          Kein anderer Name funktioniert, da dieser fest in der Wetterstation hinterlegt ist!<br />
+          Sofern notwendig, erstellt dieses Modul eine passende FHEMWEB Instanz namens WEBweatherstation w&auml;hrend der initialen Definition.<br />
+          <br />
+          Da die URI ebenfalls fest kodiert ist, kann mit einer einzelnen FHEM Installation maximal eine Instanz dieses Moduls gleichzeitig verwendet werden.<br />
+        <br />
+        Beispiel:<br />
         <div>
-          <code># ungesch&uuml;tzte Instanz bei der ID und PASSWORD ignoriert werden<br>
-          define WeatherStation HP1000<br>
-          <br>
-          # gesch&uuml;tzte Instanz: Die Wetterstation muss so konfiguriert sein, dass sie<br>
-          # diese ID und PASSWORD sendet, damit Daten akzeptiert werden<br>
+          <code># ungesch&uuml;tzte Instanz bei der ID und PASSWORD ignoriert werden<br />
+          define WeatherStation HP1000<br />
+          <br />
+          # gesch&uuml;tzte Instanz: Die Wetterstation muss so konfiguriert sein, dass sie<br />
+          # diese ID und PASSWORD sendet, damit Daten akzeptiert werden<br />
           define WeatherStation HP1000 MyHouse SecretPassword</code>
-        </div><br>
-          WICHTIG: Im Ger&auml;t selbst muss sichergestellt sein, dass ein DNS Name statt einer IP Adresse verwendet wird, da einige Revisionen damit nicht umgehen k&ouml;nnen.<br>
+        </div><br />
+          WICHTIG: Im Ger&auml;t selbst muss sichergestellt sein, dass ein DNS Name statt einer IP Adresse verwendet wird, da einige Revisionen damit nicht umgehen k&ouml;nnen.<br />
           Ggf. sollte man <a href="http://www.foshk.com/support/">hier</a> einmal nach einer neueren Firmware schauen.
       </ul>
-      </div><br>
+      </div><br />
     </div>
 
     <a name="HP1000Attr" id="HP10000Attr"></a> <b>Attributes</b>
     <div>
     <ul>
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-      <br>
+      <br />
 
       <a name="webhookFWinstances"></a><li><b>webhookFWinstances</b></li>
         Explizite Angabe der FHEMWEB Instanzen, &auml;ber die Dateneingaben erlaubt sind (Standard ist weatherstation)
@@ -1695,7 +1715,7 @@ sub HP1000_HistoryDb($$;$$$) {
         Weather Underground (Wunderground) Passwort
 
       <a name="wu_dataValues"></a><li><b>wu_dataValues</b></li>
-        Ersetzt Werte oder f&uuml;gt neue Werte hinzu, bevor diese zu Weather Underground &uuml;bertragen werden.<br>
+        Ersetzt Werte oder f&uuml;gt neue Werte hinzu, bevor diese zu Weather Underground &uuml;bertragen werden.<br />
         Das Format entspricht key=value wobei value im <a href="#set">Format set magic sein</a> kann.
 
       <a name="wu_indoorValues"></a><li><b>wu_indoorValues</b></li>
