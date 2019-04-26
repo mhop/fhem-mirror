@@ -2774,6 +2774,8 @@ GlobalAttr($$$$)
     $cvsid =~ m/(fhem.pl) (\d+) (\d+-\d+-\d+)/;
     $attr{global}{version} = "$1:$2/$3";
     my $counter = 0;
+    my $oldVal = $attr{global}{modpath};
+    $attr{global}{modpath} = $val;
 
     if(configDBUsed()) {
       my $list = cfgDB_Read99(); # retrieve filelist from configDB
@@ -2796,6 +2798,7 @@ GlobalAttr($$$$)
     closedir(DH);
 
     if(!$counter) {
+      $attr{global}{modpath} = $oldVal;
       return "No modules found, set modpath to a directory in which a " .
              "subdirectory called \"FHEM\" exists wich in turn contains " .
              "the fhem module files <*>.pm";
@@ -4287,6 +4290,7 @@ ReplaceEventMap2($$$)
   return @{$str};
 }
 
+# Needed for logfile/pid/nofork
 sub
 setGlobalAttrBeforeFork($)
 {
@@ -4303,15 +4307,7 @@ setGlobalAttrBeforeFork($)
   foreach my $l (@rows) {
     $l =~ s/[\r\n]//g;
     next if($l !~ m/^attr\s+global\s+([^\s]+)\s+(.*)$/);
-    my ($n,$v) = ($1,$2);
-    $v =~ s/#.*//;
-    $v =~ s/ .*$//;
-    if($fhemdebug) {
-      $v = "-" if($n eq "logfile");
-      $v = 5   if($n eq "verbose");
-    }
-    $attr{global}{$n} = $v;
-    GlobalAttr("set", "global", $n, $v);
+    AnalyzeCommand(undef, $l);
   }
 }
 
