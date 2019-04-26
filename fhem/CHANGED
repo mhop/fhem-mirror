@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 73_AutoShuttersControl: new major release 0.6, add wind support,
+               chnage code and Attribut style
  - feature: 93_DbLog: V4.1.0 from contrib, write function rewritten, new attr
                       bulkInsert, fix reconnect behavior of MySQL-Forum: #99719
  - change:  74_GardenaSmartDevice: change output for illigal year
