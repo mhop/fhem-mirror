@@ -94,6 +94,11 @@
 #							heating.dhw.temperature.temp2.value 60
 #						Passwort wird bei "define" nur noch gesetzt, wenn noch kein Passwort gespeichert war
 #                 Attribut "model" implementiert
+# 2019-04-26		neue Readings für
+#						heating.gas.consumption.dhw.unit kilowattHour
+#						heating.gas.consumption.heating.unit kilowattHour
+#						heating.power.consumption.unit kilowattHour
+#						Typo in WW-Zirkulationspumpe_Zeitsteuerung_aktiv fixt
 #          
 #
 #   ToDo:         timeout konfigurierbar machen
@@ -281,7 +286,7 @@ my $RequestList = {
     "heating.dhw.charging.level.value"                               => "WW-Speicherladung",    
     
     "heating.dhw.oneTimeCharge.active" 										=> "WW-einmaliges_Aufladen",
-  	 "heating.dhw.pumps.circulation.schedule.active"                  => "WW-Zirklationspumpe_Zeitsteuerung_aktiv",
+  	 "heating.dhw.pumps.circulation.schedule.active"                  => "WW-Zirkulationspumpe_Zeitsteuerung_aktiv",
   	 "heating.dhw.pumps.circulation.schedule.entries"                 => "WW-Zirkulationspumpe_Zeitplan",
   	 "heating.dhw.pumps.circulation.status"                           => "WW-Zirkulationspumpe_Status",
   	 "heating.dhw.pumps.primary.status"                               => "WW-Zirkulationspumpe_primaer",
@@ -303,16 +308,17 @@ my $RequestList = {
     "heating.gas.consumption.dhw.week" 										=> "Gasverbrauch_WW/Woche",
     "heating.gas.consumption.dhw.month" 										=> "Gasverbrauch_WW/Monat",
     "heating.gas.consumption.dhw.year" 										=> "Gasverbrauch_WW/Jahr",
+    "heating.gas.consumption.dhw.unit"											=> "Gasverbrauch_WW/Einheit",
     "heating.gas.consumption.heating.day" 									=> "Gasverbrauch_Heizung/Tag",
     "heating.gas.consumption.heating.week" 									=> "Gasverbrauch_Heizung/Woche",
     "heating.gas.consumption.heating.month" 									=> "Gasverbrauch_Heizung/Monat",
     "heating.gas.consumption.heating.year" 									=> "Gasverbrauch_Heizung/Jahr",
-    
+    "heating.gas.consumption.heating.unit"									=> "Gasverbrauch_Heizung/Einheit",
     "heating.power.consumption.day"												=> "Stromverbrauch/Tag",         
 	 "heating.power.consumption.month"											=> "Stromverbrauch/Monat",     
 	 "heating.power.consumption.week"											=> "Stromverbrauch/Woche",      
     "heating.power.consumption.year"											=> "Stromverbrauch/Jahr", 
-   
+	 "heating.power.consumption.unit"											=> "Stromverbrauch/Einheit",
     "heating.sensors.temperature.outside.status" 							=> "Aussen_Status",
     "heating.sensors.temperature.outside.statusWired" 					=> "Aussen_StatusWired",
     "heating.sensors.temperature.outside.statusWireless" 				=> "Aussen_StatusWireless",
