@@ -223,8 +223,8 @@ sub TRX_LIGHT_Set($@) {
     my ( $hash, $name, @a ) = @_;
     my $ret = undef;
     my $na  = int(@a);
-
-    return "no set value specified" if ( $na < 1 || $na > 2 );
+	Log3 $name,1,Dumper(@a);
+    return "no set value specified" if ( $na < 1 || $na > 4 );
 
     # look for device_type
 
@@ -232,7 +232,7 @@ sub TRX_LIGHT_Set($@) {
     my $command_state = $a[0];
     my $level         = 0;
     my $color         = 0;
-    my $arg3          = "";
+    my $arg3          = "";	
 
     # special for SetExtensions
     #old TRX_LIGHT used a special on-for-timer notation
