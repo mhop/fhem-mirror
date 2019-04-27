@@ -37,11 +37,6 @@ $Data::Dumper::Sortkeys = 1;
 sub WeekdayTimer_Initialize($){
   my ($hash) = @_;
 
-  if(!$modules{Twilight}{LOADED} && -f "$attr{global}{modpath}/FHEM/59_Twilight.pm") {
-    my $ret = CommandReload(undef, "59_Twilight");
-    Log3 undef, 1, $ret if($ret);
-  }
-
 # Consumer
   $hash->{SetFn}   = "WeekdayTimer_Set";
   $hash->{DefFn}   = "WeekdayTimer_Define";
@@ -1196,6 +1191,7 @@ sub WeekdayTimer_SetAllParms() {            # {WeekdayTimer_SetAllParms()}
          It is possible to define $we or !$we in daylist to easily allow weekend an holiday. $we !$we are coded as 7 8, when using a numeric daylist.<br><br>
       <u>time:</u>define the time to switch, format: HH:MM:[SS](HH in 24 hour format) or a Perlfunction like {sunrise_abs()}. Within the {} you can use the variable $date(epoch) to get the exact switchingtimes of the week. Example: {sunrise_abs_dat($date)}<br><br>
       <u>parameter:</u>the parameter to be set, using any text value like <b>on</b>, <b>off</b>, <b>dim30%</b>, <b>eco</b> or <b>comfort</b> - whatever your device understands.<br>
+      NOTE: Use ":" to replace blanks in parameter and escape ":" in case you need it. So e.g. <code>on-till:06\:00</code> will be a valid parameter.
     </ul>
     <p>
     <ul><b>command</b><br>

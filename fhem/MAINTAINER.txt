@@ -471,7 +471,7 @@ FHEM/98_GAEBUS.pm            jamesgo              Heizungssteuerung/Raumklima
 FHEM/98_GEOFANCY.pm          loredo               Unterstützende Dienste
 FHEM/98_GoogleAuth.pm        betateilchen         Unterstuetzende Dienste
 FHEM/98_GOOGLECAST.pm        dominikkarall        Multimedia
-FHEM/98_Heating_Control.pm   igami                Unterstuetzende Dienste
+FHEM/98_Heating_Control.pm   igami/Beta-User      Unterstuetzende Dienste
 FHEM/98_help.pm              betateilchen         Sonstiges
 FHEM/98_HMinfo.pm            martinp876           HomeMatic
 FHEM/98_HourCounter.pm       john                 MAX
@@ -500,7 +500,7 @@ FHEM/98_ping                 mattwire             Sonstiges
 FHEM/98_powerMap             igami                Unterstuetzende Dienste
 FHEM/98_QRCode.pm            Benni                Unterstuetzende Dienste
 FHEM/98_rain.pm              baumrasen            Sonstiges
-FHEM/98_RandomTimer.pm       igami                Unterstuetzende Dienste/Kalendermodule
+FHEM/98_RandomTimer.pm       igami/Beta-User      Unterstuetzende Dienste/Kalendermodule
 FHEM/98_restore.pm           rudolfkoenig         Sonstiges
 FHEM/98_rssFeed.pm           Benni                Unterstuetzende Dienste
 FHEM/98_serviced.pm          DeeSPe               Unterstuetzende Dienste
@@ -522,7 +522,7 @@ FHEM/98_Verkehrsinfo.pm      martins              Unterstuetzende Dienste
 FHEM/98_version.pm           markusbloch          Sonstiges
 FHEM/98_vitoconnect.pm       andreas13            Heizungssteuerung/Raumklima
 FHEM/98_weblink.pm           rudolfkoenig         Frontends/FHEMWEB
-FHEM/98_WeekdayTimer.pm      igami                Unterstuetzende Dienste
+FHEM/98_WeekdayTimer.pm      igami/Beta-User      Unterstuetzende Dienste
 FHEM/98_weekprofile.pm       risiko               Frontends
 FHEM/98_WOL.pm               KernSani             Unterstuetzende Dienste
 FHEM/98_XmlList.pm           rudolfkoenig         Automatisierung
