@@ -1,5 +1,5 @@
 ﻿##########################################################################################################
-# $Id: 93_DbRep.pm 19065 2019-03-29 21:25:15Z DS_Starter $
+# $Id: 93_DbRep.pm 19155 2019-04-10 22:19:42Z DS_Starter $
 ##########################################################################################################
 #       93_DbRep.pm
 #
@@ -58,6 +58,10 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.20.0" => "27.04.2019  don't save hash refs in central hash to prevent potential memory leak, new set \"index\" ".
+                           "command, \"repository\" added in Meta.json ",
+  "8.19.1" => "10.04.2019  adjust \$hash->{HELPER}{IDRETRIES} if value is negative ",
+  "8.19.0" => "04.04.2019  explain is possible in sqlCmd ",
   "8.18.0" => "01.04.2019  new aggregation year ",
   "8.17.2" => "28.03.2019  consideration of daylight saving time/leap year changed (func DbRep_corrRelTime) ",
   "8.17.1" => "24.03.2019  edit Meta data, activate Meta.pm, prevent module from deactivation in case of unavailable Meta.pm ",
@@ -146,6 +150,9 @@ our %DbRep_vNotesIntern = (
 
 # Version History extern:
 our %DbRep_vNotesExtern = (
+  "8.20.0" => "27.04.2019 With the new set \"index\" command it is now possible to list and (re)create the indexes which are ".
+              "needed for DbLog and/or DbRep operation.",
+  "8.19.0" => "04.04.2019 The \"explain\" SQL-command is possible in sqlCmd ",
   "8.18.0" => "01.04.2019 New aggregation type \"year\" ",
   "8.17.0" => "20.03.2019 With new attribute \"sqlCmdVars\" you are able to set SQL session variables or SQLite PRAGMA every time ".
               "before running a SQL-statement with sqlCmd command.",
@@ -484,6 +491,7 @@ sub DbRep_Set($@) {
                 (($hash->{ROLE} ne "Agent")?"minValue:display,writeToDB ":"").
                 (($hash->{ROLE} ne "Agent")?"fetchrows:history,current ":"").  
                 (($hash->{ROLE} ne "Agent")?"diffValue:display,writeToDB ":"").   
+                (($hash->{ROLE} ne "Agent")?"index:list_all,recreate_Search_Idx,drop_Search_Idx,recreate_Report_Idx,drop_Report_Idx ":"").
                 (($hash->{ROLE} ne "Agent")?"insert ":"").
                 (($hash->{ROLE} ne "Agent")?"reduceLog ":"").
                 (($hash->{ROLE} ne "Agent")?"sqlCmd:textField-long ":"").
@@ -655,6 +663,17 @@ sub DbRep_Set($@) {
       DbRep_Main($hash,$opt);
       return undef;
   }  
+  
+  if ($opt eq "index" && $hash->{ROLE} ne "Agent") {
+       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
+       Log3 ($name, 3, "DbRep $name - ################################################################");
+       Log3 ($name, 3, "DbRep $name - ###                    New Index operation                   ###");
+       Log3 ($name, 3, "DbRep $name - ################################################################"); 
+	   # Befehl vor Procedure ausführen
+       DbRep_beforeproc($hash, "index");
+	   DbRep_Main($hash,$opt,$prop);
+       return undef;
+  }
   
   #######################################################################################################
   ##        keine Aktionen außer die über diesem Eintrag solange Reopen xxxx im DbLog-Device läuft
@@ -1622,6 +1641,18 @@ sub DbRep_Main($$;$) {
      return;
  }
  
+  if ($opt =~ /index/) {	
+     if (exists($hash->{HELPER}{RUNNING_INDEX})) {
+         Log3 ($name, 3, "DbRep $name - WARNING - old process $hash->{HELPER}{RUNNING_INDEX}{pid} will be killed now to start a new index operation");
+         BlockingKill($hash->{HELPER}{RUNNING_INDEX});
+     }
+     Log3 ($name, 4, "DbRep $name - Command: $opt $prop"); 
+     $hash->{HELPER}{RUNNING_INDEX} = BlockingCall("DbRep_Index", "$name|$prop", "DbRep_IndexDone", $to, "DbRep_IndexAborted", $hash);
+	 ReadingsSingleUpdateValue ($hash, "state", "index operation in database is running - be patient and see Logfile !", 1);
+     $hash->{HELPER}{RUNNING_INDEX}{loglevel} = 5 if($hash->{HELPER}{RUNNING_INDEX});  # Forum #77057
+     return;
+ }
+ 
  if (exists($hash->{HELPER}{RUNNING_PID}) && $hash->{ROLE} ne "Agent") {
      Log3 ($name, 3, "DbRep $name - WARNING - old process $hash->{HELPER}{RUNNING_PID}{pid} will be killed now to start a new BlockingCall");
      BlockingKill($hash->{HELPER}{RUNNING_PID});
@@ -1630,6 +1661,7 @@ sub DbRep_Main($$;$) {
  # initiale Datenermittlung wie minimal Timestamp, Datenbankstrukturen, ...
  if(!$hash->{HELPER}{MINTS} or !$hash->{HELPER}{DBREPCOL}{COLSET}) {
      my $dbname = $hash->{DATABASE};
+     $hash->{HELPER}{IDRETRIES} = 3 if($hash->{HELPER}{IDRETRIES} < 0);
      Log3 ($name, 3, "DbRep $name - get initial structure information of database \"$dbname\", remaining attempts: ".$hash->{HELPER}{IDRETRIES});
      $prop = $prop?$prop:'';
      DbRep_firstconnect("$name|$opt|$prop|DbRep_Main") if($hash->{HELPER}{IDRETRIES} > 0);
@@ -2104,33 +2136,30 @@ sub DbRep_createTimeArray($$$) {
     return;
  }
  
-my %cv = (
-  tsstr             => $tsstr,
-  testr             => $testr,
-  dsstr             => $dsstr,
-  destr             => $destr,
-  msstr             => $msstr,
-  mestr             => $mestr,
-  ysstr             => $ysstr,
-  yestr             => $yestr,
-  aggsec            => $aggsec,
-  aggregation       => $aggregation,
-  epoch_seconds_end => $epoch_seconds_end,
-  wdadd             => $wdadd
-);
-$hash->{HELPER}{CV} = \%cv;
+  $hash->{HELPER}{CV}{tsstr}             = $tsstr;
+  $hash->{HELPER}{CV}{testr}             = $testr;
+  $hash->{HELPER}{CV}{dsstr}             = $dsstr;
+  $hash->{HELPER}{CV}{destr}             = $destr;
+  $hash->{HELPER}{CV}{msstr}             = $msstr;
+  $hash->{HELPER}{CV}{mestr}             = $mestr;
+  $hash->{HELPER}{CV}{ysstr}             = $ysstr;
+  $hash->{HELPER}{CV}{yestr}             = $yestr;
+  $hash->{HELPER}{CV}{aggsec}            = $aggsec;
+  $hash->{HELPER}{CV}{aggregation}       = $aggregation;
+  $hash->{HELPER}{CV}{epoch_seconds_end} = $epoch_seconds_end;
+  $hash->{HELPER}{CV}{wdadd}             = $wdadd;
 
-    my $ts;              # für Erstellung Timestamp-Array zur nonblocking SQL-Abarbeitung
-    my $i = 1;           # Schleifenzähler -> nur Indikator für ersten Durchlauf -> anderer $runtime_string_first
-    my $ll;              # loopindikator, wenn 1 = loopausstieg
+  my $ts;              # für Erstellung Timestamp-Array zur nonblocking SQL-Abarbeitung
+  my $i = 1;           # Schleifenzähler -> nur Indikator für ersten Durchlauf -> anderer $runtime_string_first
+  my $ll;              # loopindikator, wenn 1 = loopausstieg
  
-    # Aufbau Timestampstring mit Zeitgrenzen entsprechend Aggregation
-    while (!$ll) {
-        # collect aggregation strings         
-        ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll) = DbRep_collaggstr($hash,$runtime,$i,$runtime_string_next);
-        $ts .= $runtime_string."#".$runtime_string_first."#".$runtime_string_next."|";
-        $i++;
-    } 
+  # Aufbau Timestampstring mit Zeitgrenzen entsprechend Aggregation
+  while (!$ll) {
+      # collect aggregation strings         
+      ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll) = DbRep_collaggstr($hash,$runtime,$i,$runtime_string_next);
+      $ts .= $runtime_string."#".$runtime_string_first."#".$runtime_string_next."|";
+      $i++;
+  } 
 
 return ($epoch_seconds_begin,$epoch_seconds_end,$runtime_string_first,$runtime_string_next,$ts);
 }
@@ -5802,7 +5831,7 @@ sub sqlCmd_DoParse($) {
  
   my @rows;
   my $nrows = 0;
-  if($sql =~ m/^\s*(select|pragma|show)/is) {
+  if($sql =~ m/^\s*(explain|select|pragma|show)/is) {
     while (my @line = $sth->fetchrow_array()) {
       Log3 ($name, 4, "DbRep $name - SQL result: @line");
       my $row = join("$srs", @line);
@@ -6223,6 +6252,241 @@ sub dbmeta_ParseDone($) {
   
   delete($hash->{HELPER}{RUNNING_PID});
   
+return;
+}
+
+####################################################################################################
+#                           Index operations - (re)create, drop, ...
+#     list_all
+#     recreate_Search_Idx
+#     drop_Search_Idx
+#     recreate_Report_Idx
+#     drop_Report_Idx
+#
+####################################################################################################
+sub DbRep_Index($) {
+  my ($string)   = @_;
+  my ($name,$cmdidx) = split("\\|", $string);
+  my $hash       = $defs{$name};
+  my $dbloghash  = $hash->{dbloghash};
+  my $database   = $hash->{DATABASE};
+  my $dbconn     = $dbloghash->{dbconn};
+  my $dbuser     = $dbloghash->{dbuser};
+  my $dblogname  = $dbloghash->{NAME};
+  my $dbmodel    = $dbloghash->{MODEL};
+  my $dbpassword = $attr{"sec$dblogname"}{secret};
+  my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
+  my ($dbh,$err,$sth,$rows,@six);
+  my ($sqldel,$sqlcre,$sqlava,$sqlallidx,$ret) = ("","","","","");
+	
+  Log3 ($name, 5, "DbRep $name -> Start DbRep_Index");
+    
+  # Background-Startzeit
+  my $bst = [gettimeofday];
+	
+  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });};
+ 
+  if ($@) {
+      $err = encode_base64($@,"");
+      Log3 ($name, 2, "DbRep $name - DbRep_Index - $@");
+      return "$name|''|''|$err";
+  }
+  
+  my ($cmd,$idx) = split("_",$cmdidx,2);
+  
+  # SQL-Startzeit
+  my $st = [gettimeofday];
+
+  if($dbmodel =~ /MYSQL/) {
+      $sqlallidx = "SELECT TABLE_NAME,INDEX_NAME,COLUMN_NAME FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = '$database';";
+      $sqlava    = "SHOW INDEX FROM history where Key_name='$idx';";
+      if($cmd =~ /recreate/) {
+          $sqldel = "ALTER TABLE `history` DROP INDEX `$idx`;";
+          $sqlcre = "ALTER TABLE `history` ADD INDEX `Search_Idx` (DEVICE, READING, TIMESTAMP) USING BTREE;" if($idx eq "Search_Idx");
+          $sqlcre = "ALTER TABLE `history` ADD INDEX `Report_Idx` (TIMESTAMP, READING) USING BTREE;" if($idx eq "Report_Idx");
+      }
+      if($cmd =~ /drop/) {
+          $sqldel = "ALTER TABLE `history` DROP INDEX `$idx`;";
+      }
+  } elsif($dbmodel =~ /SQLITE/) {
+      $sqlallidx = "SELECT tbl_name,name,sql FROM sqlite_master WHERE type='index' ORDER BY tbl_name,name DESC;";
+      $sqlava    = "SELECT tbl_name,name FROM sqlite_master WHERE type='index' AND name='$idx';";
+      if($cmd =~ /recreate/) {
+          $sqldel = "DROP INDEX '$idx';";
+          $sqlcre = "CREATE INDEX Search_Idx ON `history` (DEVICE, READING, TIMESTAMP);" if($idx eq "Search_Idx");
+          $sqlcre = "CREATE INDEX Report_Idx ON `history` (TIMESTAMP,READING);" if($idx eq "Report_Idx");
+      }  
+      if($cmd =~ /drop/) {
+          $sqldel = "DROP INDEX '$idx';";
+      } 
+  } elsif($dbmodel =~ /POSTGRESQL/) {
+      $sqlallidx = "SELECT tablename,indexname,indexdef FROM pg_indexes WHERE tablename NOT LIKE 'pg%' ORDER BY tablename,indexname DESC;";
+      $sqlava    = "SELECT * FROM pg_indexes WHERE tablename='history' and indexname ='$idx';";
+      if($cmd =~ /recreate/) {
+          $sqldel = "DROP INDEX \"$idx\";";
+          $sqlcre = "CREATE INDEX \"Search_Idx\" ON history USING btree (device, reading, \"timestamp\");" if($idx eq "Search_Idx");
+          $sqlcre = "CREATE INDEX \"Report_Idx\" ON history USING btree (\"timestamp\", reading);" if($idx eq "Report_Idx");  
+      }
+      if($cmd =~ /drop/) {
+          $sqldel = "DROP INDEX \"$idx\";";
+      }
+  } else {
+      $err = "database model unknown";
+      Log3 ($name, 2, "DbRep $name - DbRep_Index - $err");
+      $err = encode_base64($err,"");
+      $dbh->disconnect();
+      return "$name|''|''|$err"; 
+  }
+  
+  # alle Indizes auflisten
+  Log3($name, 4, "DbRep $name - List all indexes: $sqlallidx");
+  my ($sql_table,$sql_idx,$sql_column);
+  eval {$sth = $dbh->prepare($sqlallidx);
+        $sth->execute();
+        $sth->bind_columns(\$sql_table, \$sql_idx, \$sql_column);
+       };
+  $ret = "";
+  my ($lt,$li) = ("",""); my $i = 0;
+  while($sth->fetch()) {
+      if($lt ne $sql_table || $li ne $sql_idx) {
+          $ret .= "\n" if($i>0);
+          if($dbmodel =~ /SQLITE/ or $dbmodel =~ /POSTGRESQL/) {
+              $sql_column =~ /.*\((.*)\).*/;
+              $sql_column = uc($1);
+              $sql_column =~ s/"//g;
+          }
+          $ret .= "Table: $sql_table, Idx: $sql_idx, Col: $sql_column";
+      } else {
+          $ret .= ", $sql_column";
+      } 
+      $lt = $sql_table;
+      $li = $sql_idx;
+      $i++;      
+  }
+  Log3($name, 4, "DbRep $name - Index found in database:\n$ret"); 
+  $ret = "Index found in database:\n========================\n".$ret;
+  
+  if($cmd !~ /list/) { 
+      Log3($name, 4, "DbRep $name - SQL execute: $sqlava $sqldel $sqlcre");
+      
+      if($sqldel) {
+          eval {@six = $dbh->selectrow_array($sqlava);};
+          if (@six) {
+              eval {$rows = $dbh->do($sqldel);};
+              if ($@) {
+                  if($cmd !~ /recreate/) {
+                      $err = encode_base64($@,"");
+                      Log3 ($name, 2, "DbRep $name - DbRep_Index - $@");
+                      $dbh->disconnect();
+                      return "$name|''|''|$err";
+                  }
+              } else {
+                  $ret = "Index $idx dropped";
+                  Log3 ($name, 3, "DbRep $name - $ret");
+              }
+          } else {
+              $ret = "Index $idx doesn't exist, no need to drop it";
+              Log3 ($name, 3, "DbRep $name - $ret");
+              
+          }
+      }
+      
+      if($sqlcre) {
+          Log3 ($name, 3, "DbRep $name - creating index $idx ... ");
+          eval {$rows = $dbh->do($sqlcre);};
+          if ($@) {
+              $err = encode_base64($@,"");
+              Log3 ($name, 2, "DbRep $name - DbRep_Index - $@");
+              $dbh->disconnect();
+              return "$name|''|''|$err";
+          } else {
+              $ret = "Index $idx created";
+              Log3 ($name, 3, "DbRep $name - $ret");
+          }      
+      }
+      
+      $rows = ($rows eq "0E0")?0:$rows if(defined $rows);                            # always return true if no error
+  }
+  
+  # SQL-Laufzeit ermitteln
+  my $rt = tv_interval($st);
+ 
+  $dbh->disconnect();
+  
+  $ret = encode_base64($ret,"");
+  
+  # Background-Laufzeit ermitteln
+  my $brt = tv_interval($bst);
+
+  $rt = $rt.",".$brt;
+  
+  Log3 ($name, 5, "DbRep $name -> DbRep_Index finished");
+	
+return "$name|$ret|$rt|''";
+}
+
+####################################################################################################
+#                     Auswertungsroutine Index Operation
+####################################################################################################
+sub DbRep_IndexDone($) {
+  my ($string) = @_;
+  my @a          = split("\\|",$string);
+  my $name       = $a[0];
+  my $hash       = $defs{$name};
+  my $ret        = $a[1]?decode_base64($a[1]):undef;
+  my $bt         = $a[2];
+  my ($rt,$brt)  = split(",", $bt);
+  my $err        = $a[3]?decode_base64($a[3]):undef; 
+  my $erread;
+  
+  # Befehl nach Procedure ausführen
+  $erread = DbRep_afterproc($hash, "index");
+  
+  if ($err) {
+      ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
+      ReadingsSingleUpdateValue ($hash, "state", "error", 1);
+      delete($hash->{HELPER}{RUNNING_INDEX});
+      return;
+  }
+ 
+  no warnings 'uninitialized'; 
+  
+  my $state = $erread?$erread:"done";
+  
+  readingsBeginUpdate($hash);
+  ReadingsBulkUpdateValue ($hash, "index_state", $ret);
+  ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);
+  readingsEndUpdate($hash, 1);  
+
+  delete($hash->{HELPER}{RUNNING_INDEX});
+  
+return;
+}
+
+####################################################################################################
+#                    Abbruchroutine Index operation
+####################################################################################################
+sub DbRep_IndexAborted(@) {
+  my ($hash,$cause) = @_;
+  my $name = $hash->{NAME};
+  my $dbh = $hash->{DBH}; 
+  my $erread = "";
+  
+  $cause = $cause?$cause:"Timeout: process terminated";
+  Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_INDEX}{fn} pid:$hash->{HELPER}{RUNNING_INDEX}{pid} $cause");
+  
+  # Befehl nach Procedure ausführen
+  no warnings 'uninitialized'; 
+  $erread = DbRep_afterproc($hash, "index");
+  $erread = ", ".(split("but", $erread))[1] if($erread);    
+  
+  my $state = $cause.$erread;
+  $dbh->disconnect() if(defined($dbh));
+  ReadingsSingleUpdateValue ($hash, "state", $state, 1);
+  
+  Log3 ($name, 2, "DbRep $name - Database index operation aborted due to \"$cause\" ");
+  
+  delete($hash->{HELPER}{RUNNING_INDEX});
 return;
 }
 
@@ -8391,7 +8655,7 @@ sub DbRep_ParseAborted(@) {
   my ($hash,$cause) = @_;
   my $name = $hash->{NAME};
   my $dbh = $hash->{DBH}; 
-  my $erread;
+  my $erread = "";
   
   $cause = $cause?$cause:"Timeout: process terminated";
   Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_PID}{fn} pid:$hash->{HELPER}{RUNNING_PID}{pid} $cause");
@@ -8401,8 +8665,11 @@ sub DbRep_ParseAborted(@) {
   $erread = DbRep_afterproc($hash, "command");
   $erread = ", ".(split("but", $erread))[1] if($erread);    
   
+  my $state = $cause.$erread;
   $dbh->disconnect() if(defined($dbh));
-  ReadingsSingleUpdateValue ($hash,"state",$cause, 1);
+  ReadingsSingleUpdateValue ($hash, "state", $state, 1);
+  
+  Log3 ($name, 2, "DbRep $name - Database command aborted due to \"$cause\" ");
   
   delete($hash->{HELPER}{RUNNING_PID});
 return;
@@ -9226,12 +9493,14 @@ sub DbRep_delread($;$$) {
          # Highlighted Readings löschen und save statefile wegen Inkompatibilitär beim Restart
          if($key =~ /<html><span/) {
              $do = 1;
-             delete($defs{$name}{READINGS}{$key});
+             # delete($defs{$name}{READINGS}{$key});
+             readingsDelete($hash,$key);
          }
          # Reading löschen wenn Featuelevel > 5.9 und zu lang nach der neuen Festlegung
          if($do == 0 && $featurelevel > 5.9 && !goodReadingName($key)) {
              $do = 1;
-             delete($defs{$name}{READINGS}{$key});
+             # delete($defs{$name}{READINGS}{$key});
+             readingsDelete($hash,$key);
          }         
      }
      WriteStatefile() if($do == 1);
@@ -9248,13 +9517,15 @@ sub DbRep_delread($;$$) {
              }
          }
          if($dodel) {
-             delete($defs{$name}{READINGS}{$key});
+             # delete($defs{$name}{READINGS}{$key});
+             readingsDelete($hash,$key);
          }
      }
  } else {
      foreach my $key(@allrds) {
          # Log3 ($name, 1, "DbRep $name - Reading Schlüssel: $key");
-         delete($defs{$name}{READINGS}{$key}) if($key ne "state");
+         # delete($defs{$name}{READINGS}{$key}) if($key ne "state");
+         readingsDelete($hash,$key) if($key ne "state");
      }
  }
 return undef;
@@ -10202,12 +10473,12 @@ sub DbRep_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 19065 2019-03-29 21:25:15Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 19155 2019-04-10 22:19:42Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 19065 2019-03-29 21:25:15Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 19155 2019-04-10 22:19:42Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -10574,10 +10845,6 @@ return;
   IO::Uncompress::Gunzip        <br>
   Blocking        (FHEM-module) <br><br>
   
-  Due to performance reason the following index should be created in addition: <br>
-  <code>
-  CREATE INDEX Report_Idx ON `history` (TIMESTAMP, READING) USING BTREE;
-  </code>
 </ul>
 <br>
 
@@ -10591,7 +10858,16 @@ return;
   </code>
   
   <br><br>
-  (&lt;name of DbLog-instance&gt; - name of the database instance which is wanted to analyze needs to be inserted)
+  (&lt;name of DbLog-instance&gt; - name of the database instance which is wanted to analyze needs to be inserted) 
+  <br><br>
+  
+  Due to a good operation performance, the database should contain the Report_Idx. Please create it after the DbRep 
+  device is created by the set command: <br>
+  <ul>
+   <code>
+    set &lt;name&gt; index recreate_Report_Idx
+   </code>
+  </ul>
 
 </ul>
 
@@ -11316,6 +11592,26 @@ return;
 								 Due to the sample space can be limited by <a href="#limit">attribute</a> "limit". 
                                  Of course ths attribute can be increased if your system capabilities allow a higher workload. <br><br>
 								 </li> <br> 
+                                 
+    <li><b> index &lt;Option&gt; </b>          
+	                           - Reports the existing indexes in the database or creates the needed indexes. 
+                               If the index is already created, it will be renewed (dropped and new created) <br><br> 
+
+                               The possible options are:	<br><br>									 
+
+	                           <ul>
+                                 <table>  
+                                   <colgroup> <col width=25%> <col width=75%> </colgroup>
+                                   <tr><td> <b>list_all</b>                 </td><td>: reports the existing indexes </td></tr>
+                                   <tr><td> <b>recreate_Search_Idx</b>      </td><td>: create or renew (if existing) the index Search_Idx in table history (index for DbLog) </td></tr>
+                                   <tr><td> <b>drop_Search_Idx</b>          </td><td>: delete the index Search_Idx in table history </td></tr>
+                                   <tr><td> <b>recreate_Report_Idx</b>      </td><td>: create or renew (if existing) the index Report_Idx in table history (index for DbRep) </td></tr>                                      
+                                   <tr><td> <b>drop_Report_Idx</b>          </td><td>: delete the index Report_Idx in table history </td></tr>
+                                 </table>              
+	                           </ul>
+	                           <br>
+                                   
+                               </li> <br>
                                  
     <li><b> insert </b>       -  use it to insert data ito table "history" manually. Input values for Date, Time and Value are mandatory. The database fields for Type and Event will be filled in with "manual" automatically and the values of Device, Reading will be get from set <a href="#DbRepattr">attributes</a>.  <br><br>
                                  
@@ -12946,11 +13242,6 @@ sub bdump {
   IO::Compress::Gzip           <br>
   IO::Uncompress::Gunzip       <br>
   Blocking        (FHEM-Modul) <br><br>
-  
-  Aus Performancegründen sollte zusätzlich folgender Index erstellt werden: <br>
-  <code>
-  CREATE INDEX Report_Idx ON `history` (TIMESTAMP, READING) USING BTREE;
-  </code>
 </ul>
 <br>
 
@@ -12965,7 +13256,15 @@ sub bdump {
   
   <br><br>
   (&lt;Name der DbLog-Instanz&gt; - es wird der Name der auszuwertenden DBLog-Datenbankdefinition angegeben <b>nicht</b> der Datenbankname selbst)
-
+  <br><br>
+  
+  Für eine gute Operation Performance sollte die Datenbank den Report_Idx enthalten. Der Index kann nach der 
+  DbRep-Device Definition mit dem set-Kommando angelegt werden: <br>
+  <ul>
+   <code>
+    set &lt;name&gt; index recreate_Report_Idx
+   </code>
+  </ul>
 </ul>
 
 <br><br>
@@ -13680,7 +13979,7 @@ sub bdump {
                                       <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
                                       <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>                                      
                                       <tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
-                                      <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: filtert die anzuzeigenden Datensätze mit einem regulären Ausdruck. Der Regex wird auf Werte des DAtenbankfelder 'VALUE' angewendet. </td></tr>
+                                      <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: filtert die anzuzeigenden Datensätze mit einem regulären Ausdruck (Datenbank spezifischer REGEXP). Der REGEXP wird auf Werte des Datenbankfeldes 'VALUE' angewendet. </td></tr>
                                    </table>
 	                               </ul>
 	                               <br>
@@ -13693,7 +13992,27 @@ sub bdump {
 								 <a href="#limit">Attribut</a> "limit" begrenzt. Bei Bedarf kann dieses Attribut 
 								 geändert werden, falls eine Anpassung der Selektionsbedingungen nicht möglich oder 
 								 gewünscht ist. <br><br>
-								 </li> <br> 								 
+								 </li> <br> 
+
+    <li><b> index &lt;Option&gt; </b>          
+	                           - Listet die in der Datenbank vorhandenen Indexe auf bzw. legt die benötigten Indexe
+                               an. Ist ein Index bereits angelegt, wird er erneuert (gelöscht und erneut angelegt) <br><br> 
+
+                               Die möglichen Optionen sind:	<br><br>									 
+
+	                           <ul>
+                                 <table>  
+                                   <colgroup> <col width=25%> <col width=75%> </colgroup>
+                                   <tr><td> <b>list_all</b>                 </td><td>: listet die vorhandenen Indexe auf </td></tr>
+                                   <tr><td> <b>recreate_Search_Idx</b>      </td><td>: erstellt oder erneuert (falls vorhanden) den Index Search_Idx in Tabelle history (Index für DbLog) </td></tr>
+                                   <tr><td> <b>drop_Search_Idx</b>          </td><td>: löscht den Index Search_Idx in Tabelle history </td></tr>
+                                   <tr><td> <b>recreate_Report_Idx</b>      </td><td>: erstellt oder erneuert (falls vorhanden) den Index Report_Idx in Tabelle history (Index für DbRep) </td></tr>                                      
+                                   <tr><td> <b>drop_Report_Idx</b>          </td><td>: löscht den Index Report_Idx in Tabelle history </td></tr>
+                                 </table>              
+	                           </ul>
+	                           <br>
+                                   
+                               </li> <br>								 
        
     <li><b> insert </b>       -  Manuelles Einfügen eines Datensatzes in die Tabelle "history". Obligatorisch sind Eingabewerte für Datum, Zeit und Value. 
                                  Die Werte für die DB-Felder Type bzw. Event werden mit "manual" gefüllt, sowie die Werte für Device, Reading aus den gesetzten  <a href="#DbRepattr">Attributen </a> genommen.  <br><br>
@@ -15283,13 +15602,13 @@ sub bdump {
         "Encode": 0        
       },
       "recommends": {
-        "Net::FTPSSL": 0,
         "Net::FTP": 0, 
         "IO::Compress::Gzip": 0, 
         "IO::Uncompress::Gunzip": 0,
         "FHEM::Meta": 0
       },
       "suggests": {
+        "Net::FTPSSL": 0
       }
     }
   },
@@ -15297,6 +15616,16 @@ sub bdump {
     "x_wiki": {
       "web": "https://wiki.fhem.de/wiki/DbRep_-_Reporting_und_Management_von_DbLog-Datenbankinhalten",
       "title": "DbRep - Reporting und Management von DbLog-Datenbankinhalten"
+    },
+    "repository": {
+      "x_dev": {
+        "type": "svn",
+        "url": "https://svn.fhem.de/trac/browser/trunk/fhem/contrib/DS_Starter",
+        "web": "https://svn.fhem.de/trac/browser/trunk/fhem/contrib/DS_Starter/93_DbRep.pm",
+        "x_branch": "dev",
+        "x_filepath": "fhem/contrib/",
+        "x_raw": "https://svn.fhem.de/fhem/trunk/fhem/contrib/DS_Starter/93_DbRep.pm"
+      }      
     }
   }
 }
