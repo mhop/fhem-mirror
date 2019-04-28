@@ -58,6 +58,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.21.0" => "28.04.2019  implement FHEM command \"dbReadingsVal\" ",
   "8.20.1" => "28.04.2019  set index verbose changed, check index \"Report_Idx\" in getInitData ",
   "8.20.0" => "27.04.2019  don't save hash refs in central hash to prevent potential memory leak, new set \"index\" ".
                            "command, \"repository\" added in Meta.json ",
@@ -374,8 +375,18 @@ sub DbRep_Initialize($) {
 					   "userExitFn ".
                        "valueFilter ".
                        $readingFnAttributes;
+                       
+ my %hash = (
+       Fn  => 'CommandDbReadingsVal',
+       Hlp => '<name> <device:reading> <timestamp> <default>,Get the value of a device:reading combination from database.
+               The value next to the timestamp is returned if found, otherwise the <default>.
+               <name> = name of used DbRep device,
+               <timestamp> = timestamp like YYYY-MM-DD_hh:mm:ss
+               '
+    );
+    $cmds{dbReadingsVal} = \%hash;
  
- # Umbenennen von existierenden Attrbuten  
+ # Umbenennen von existierenden Attributen  
  # $hash->{AttrRenameMap} = { "reading" => "readingFilter",
  #                            "device" => "deviceFilter",
  #                          }; 
@@ -1493,7 +1504,7 @@ sub DbRep_getInitData($) {
               Log3($name, 3, "DbRep $name - $idxstate. Check ok");
           } else {
               $idxstate = "Index $idx doesn't exist. Please create the index by \"set $name index recreate_Report_Idx\" command !";
-              Log3($name, 2, "DbRep $name - WARNING - $idxstate");
+              Log3($name, 3, "DbRep $name - WARNING - $idxstate");
           }
       }
   }
@@ -10642,12 +10653,25 @@ return ($ret);
 }
 
 ####################################################################################################
-#     blockierende DB-Abfrage 
-#     liefert den Wert eines Device:Readings des nächsmöglichen Logeintrags zum 
-#     angegebenen Zeitpunkt
+# blockierende DB-Abfrage 
+# liefert den Wert eines Device:Readings des nächstmöglichen Logeintrags zum 
+# angegebenen Zeitpunkt
 #
-#     Aufruf: DbReadingsVal("<dbrep-device>","<device:reading>","<timestamp>,"<default>")
+# Aufruf als Funktion: DbReadingsVal("<dbrep-device>","<device:reading>","<timestamp>,"<default>")
+# Aufruf als FHEM-Cmd: DbReadingsVal <dbrep-device> <device:reading> <date_time> <default>
 ####################################################################################################
+sub CommandDbReadingsVal($$) {
+  my ($cl, $param) = @_;
+
+  my @a = split("[ \t][ \t]*", $param);
+  my ($name, $devread, $ts, $default) = @a;
+  $ts =~ s/_/ /;
+
+  my $ret = DbReadingsVal($name, $devread, $ts, $default);
+
+return $ret;
+}
+
 sub DbReadingsVal($$$$) {
   my ($name, $devread, $ts, $default) = @_;
   my $hash = $defs{$name};
@@ -10659,9 +10683,10 @@ sub DbReadingsVal($$$$) {
   }
   unless($defs{$name}{TYPE} eq "DbRep") {
       return ("\"$name\" is not a DbRep-device but of type \"".$defs{$name}{TYPE}."\"");
-  }  
+  }
+  $ts =~ s/_/ /;  
   unless($ts =~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/) {
-      return ("timestamp has not a valid format. Use \"YYYY-MM-DD hh:mm:ss\" as timestamp.");
+      return ("timestamp has not the valid format. Use \"YYYY-MM-DD hh:mm:ss\" as timestamp.");
   }
   my ($dev,$reading) = split(":",$devread);
   unless($dev && $reading) {
@@ -10828,28 +10853,44 @@ return;
   Further informations you can find as described at <a href="#DbRepattr">attribute</a> "userExitFn". 
   <br><br>
   
-  Once a DbRep-Device is defined, the function <b>DbReadingsVal</b> is provided.
+  Once a DbRep-Device is defined, the Perl function <b>DbReadingsVal</b> provided as well as and the FHEM command <b>dbReadingsVal</b>.
   With this function you can, similar to the well known ReadingsVal, get a reading value from database. 
-  The function execution is carried out blocking.
-  The command syntax is: <br><br>
-    
+  The function execution is carried out blocking. <br><br>
+  
   <ul>
-  <code>DbReadingsVal("&lt;name&gt;","&lt;device:reading&gt;","&lt;timestamp&gt;","&lt;default&gt;") </code>   <br><br>
+  The command syntax for the Perl function is: <br><br>
+
+  <code>
+    DbReadingsVal("&lt;name&gt;","&lt;device:reading&gt;","&lt;timestamp&gt;","&lt;default&gt;") 
+  </code>   
+  <br><br>
   
   <b>Examples: </b><br>
-  $ret = DbReadingsVal("Rep.LogDB1","MyWetter:temperature","2018-01-13 08:00:00",""); <br>
-  attr &lt;name&gt; userReadings oldtemp {DbReadingsVal("Rep.LogDB1","MyWetter:temperature","2018-04-13 08:00:00","")}
+  my $ret = DbReadingsVal("Rep.LogDB1","MyWetter:temperature","2018-01-13_08:00:00",""); <br>
+  attr &lt;name&gt; userReadings oldtemp {DbReadingsVal("Rep.LogDB1","MyWetter:temperature","2018-04-13_08:00:00","")}
   <br><br>
+  
+  The command syntax for the FHEM command is: <br><br>
+  
+  <code>
+    dbReadingsVal &lt;name&gt; &lt;device:reading&gt; &lt;timestamp&gt; &lt;default&gt;
+  </code>   
+  <br><br>
+  
+  <b>Example: </b><br>
+  dbReadingsVal Rep.LogDB1 MyWetter:temperature 2018-01-13_08:00:00 0
+  <br><br>  
   
   <table>  
      <colgroup> <col width=5%> <col width=95%> </colgroup>
      <tr><td> <b>&lt;name&gt;</b>           </td><td>: name of the DbRep-Device to request  </td></tr>
      <tr><td> <b>&lt;device:reading&gt;</b> </td><td>: device:reading whose value is to deliver </td></tr>
-     <tr><td> <b>&lt;timestamp&gt;</b>      </td><td>: timestamp of reading whose value is to deliver (*) in the form "YYYY-MM-DD hh:mm:ss" </td></tr>
+     <tr><td> <b>&lt;timestamp&gt;</b>      </td><td>: timestamp of reading whose value is to deliver (*) in the form "YYYY-MM-DD_hh:mm:ss" </td></tr>
      <tr><td> <b>&lt;default&gt;</b>        </td><td>: default value if no reading value can be retrieved </td></tr>
   </table>
   </ul>
   <br>
+  
   (*) If no value can be retrieved at the &lt;timestamp&gt; exactly requested, the chronological most convenient reading 
       value is delivered back. 
   <br><br>
@@ -10858,9 +10899,8 @@ return;
   <a href="https://forum.fhem.de/index.php/topic,53584.msg452567.html#msg452567">Modul 93_DbRep - Reporting and Management of database content (DbLog)</a>.<br><br>
  
   <br>
-
-  
 </ul>
+
   <b>Preparations </b> <br><br>
 <ul>
   The module requires the usage of a DbLog instance and the credentials of the database definition will be used. <br>
@@ -13225,28 +13265,45 @@ sub bdump {
   unabhängig von einer Eventgenerierung. Weitere Informationen dazu ist unter <a href="#DbRepattr">Attribut</a> 
   "userExitFn" beschrieben. <br><br>
   
-  Sobald ein DbRep-Device definiert ist, wird die Funktion <b>DbReadingsVal</b> zur Verfügung gestellt.
+  Sobald ein DbRep-Device definiert ist, wird sowohl die Perl Funktion <b>DbReadingsVal</b> als auch das FHEM Kommando 
+  <b>dbReadingsVal</b> zur Verfügung gestellt.
   Mit dieser Funktion läßt sich, ähnlich dem allgemeinen ReadingsVal, der Wert eines Readings aus der Datenbank abrufen. 
-  Die Funktionsausführung erfolgt blockierend.
-  Die Befehlssyntax ist: <br><br>
-    
+  Die Funktionsausführung erfolgt blockierend. <br><br>
+  
   <ul>
-  <code>DbReadingsVal("&lt;name&gt;","&lt;device:reading&gt;","&lt;timestamp&gt;","&lt;default&gt;") </code>   <br><br>
+  Die Befehlssyntax für die Perl Funktion ist: <br><br>
+    
+  <code>
+    DbReadingsVal("&lt;name&gt;","&lt;device:reading&gt;","&lt;timestamp&gt;","&lt;default&gt;") 
+  </code>   
+  <br><br>
   
   <b>Beispiele: </b><br>
-  $ret = DbReadingsVal("Rep.LogDB1","MyWetter:temperature","2018-01-13 08:00:00",""); <br>
-  attr &lt;name&gt; userReadings oldtemp {DbReadingsVal("Rep.LogDB1","MyWetter:temperature","2018-04-13 08:00:00","")}
+  $ret = DbReadingsVal("Rep.LogDB1","MyWetter:temperature","2018-01-13_08:00:00",""); <br>
+  attr &lt;name&gt; userReadings oldtemp {DbReadingsVal("Rep.LogDB1","MyWetter:temperature","2018-04-13_08:00:00","")}
   <br><br>
+  
+  Die Befehlssyntax als FHEM Kommando ist: <br><br>
+    
+  <code>
+    dbReadingsVal &lt;name&gt; &lt;device:reading&gt; &lt;timestamp&gt; &lt;default&gt; 
+  </code>   
+  <br><br>
+  
+  <b>Beispiel: </b><br>
+  dbReadingsVal Rep.LogDB1 MyWetter:temperature 2018-01-13_08:00:00 0
+  <br><br>  
   
   <table>  
      <colgroup> <col width=5%> <col width=95%> </colgroup>
      <tr><td> <b>&lt;name&gt;</b>           </td><td>: Name des abzufragenden DbRep-Device   </td></tr>
      <tr><td> <b>&lt;device:reading&gt;</b> </td><td>: Device:Reading dessen Wert geliefert werden soll </td></tr>
-     <tr><td> <b>&lt;timestamp&gt;</b>      </td><td>: Zeitpunkt des zu liefernden Readingwertes (*) in der Form "YYYY-MM-DD hh:mm:ss" </td></tr>
+     <tr><td> <b>&lt;timestamp&gt;</b>      </td><td>: Zeitpunkt des zu liefernden Readingwertes (*) im Format "YYYY-MM-DD_hh:mm:ss" </td></tr>
      <tr><td> <b>&lt;default&gt;</b>        </td><td>: Defaultwert falls kein Readingwert ermittelt werden konnte </td></tr>
   </table>
   </ul>
   <br>
+  
   (*) Es wird der zeitlich zu &lt;timestamp&gt; passendste Readingwert zurück geliefert, falls kein Wert exakt zu dem 
         angegebenen Zeitpunkt geloggt wurde. 
   <br><br>
