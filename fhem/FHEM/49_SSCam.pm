@@ -48,6 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.13.3" => "28.04.2019  don't save private hash refs in central hash, \"repository\" added in Meta.json ",
   "8.13.2" => "07.04.2019  fix perl warning Forum: https://forum.fhem.de/index.php/topic,45671.msg927912.html#msg927912",
   "8.13.1" => "06.04.2019  verbose level in X_DelayedShutdown changed ",
   "8.13.0" => "27.03.2019  add Meta.pm support ",
@@ -648,7 +649,7 @@ sub SSCam_Attr($$$$) {
 		} elsif (AttrVal($name,"snapGalleryBoost",0)) {
 		    # snap-Infos abhängig ermitteln wenn gepollt werden soll
 		    my ($slim,$ssize);
-            $hash->{HELPER}{GETSNAPGALLERY} = 1;
+            $hash->{HELPER}{GETSNAPGALLERY} = 1;   
 		    $slim  = AttrVal($name,"snapGalleryNumber",$SSCam_slim);    # Anzahl der abzurufenden Snaps
 			$ssize = $do;
 			RemoveInternalTimer($hash, "SSCam_getsnapinfo"); 
@@ -694,6 +695,7 @@ sub SSCam_Attr($$$$) {
 		    $slim = $aVal;
 		}
         
+        delete($hash->{HELPER}{".SNAPHASH"});              # bestehenden Snaphash löschen
 		$hash->{HELPER}{GETSNAPGALLERY} = 1;
 		my $sg = AttrVal($name,"snapGallerySize","Icon");  # Auflösung Image
 		$ssize = ($sg eq "Icon")?1:2;
@@ -959,25 +961,24 @@ sub SSCam_Set($@) {
           $cams =~ s/\s//g;
       }
       
-      my @camdvs;
-      my %snapac = ();                                                      # Schnappschuss Hash für alle Cams -> Schnappschudaten sollen hinein  
+      my @camdvs;                                                  
       if($cams eq "all") {                                                  # alle nicht disabled Kameras auslösen, sonst nur die gewählten
           @camdvs = devspec2array("TYPE=SSCam:FILTER=MODEL!=SVS");
           foreach (@camdvs) {
               if($defs{$_} && !IsDisabled($_)) {           
-                  $snapac{$_} = "";
+                  $hash->{HELPER}{ALLSNAPREF}{$_} = "";                     # Schnappschuss Hash für alle Cams -> Schnappschußdaten sollen hinein  
               }
           }
       } else {
           @camdvs = split(",",$cams);
           foreach (@camdvs) {
               if($defs{$_} && !IsDisabled($_)) {           
-                  $snapac{$_} = "";
+                  $hash->{HELPER}{ALLSNAPREF}{$_} = "";
               }              
           }
       }
       
-      return "No valid camera devices are specified for trigger snapshots" if(!%snapac);
+      return "No valid camera devices are specified for trigger snapshots" if(!$hash->{HELPER}{ALLSNAPREF});
       
       my $emtxt;
 	  my $teletxt = "";
@@ -992,12 +993,10 @@ sub SSCam_Set($@) {
           $hash->{HELPER}{SMTPMSG} = $rawet;   
       }
       
-      my $asref = \%snapac;
-      $hash->{HELPER}{ALLSNAPREF} = $asref;
       my ($csnap,$cmail) = ("","");
-      foreach my $key (keys%{$asref}) {
+      foreach my $key (keys%{$hash->{HELPER}{ALLSNAPREF}}) {
           if(!AttrVal($key, "snapEmailTxt", "")) {
-              delete $asref->{$key};                                       # Snap dieser Kamera auslösen aber nicht senden
+              delete $hash->{HELPER}{ALLSNAPREF}->{$key};                  # Snap dieser Kamera auslösen aber nicht senden
               $csnap .= $csnap?", $key":$key;
               $emtxt  = "";
           } else {
@@ -4688,9 +4687,9 @@ sub SSCam_camop ($) {
       } elsif ($hash->{HELPER}{MOTDETSC} eq "camera") {
           $motdetsc = "0";
           
-          $motdetoptions{SENSITIVITY} = $hash->{'HELPER'}{'MOTDETSC_PROP1'} if ($hash->{'HELPER'}{'MOTDETSC_PROP1'});
-          $motdetoptions{OBJECTSIZE}  = $hash->{'HELPER'}{'MOTDETSC_PROP2'} if ($hash->{'HELPER'}{'MOTDETSC_PROP2'});
-          $motdetoptions{PERCENTAGE}  = $hash->{'HELPER'}{'MOTDETSC_PROP3'} if ($hash->{'HELPER'}{'MOTDETSC_PROP3'});
+          $motdetoptions{SENSITIVITY} = $hash->{HELPER}{MOTDETSC_PROP1} if ($hash->{HELPER}{MOTDETSC_PROP1});
+          $motdetoptions{OBJECTSIZE}  = $hash->{HELPER}{MOTDETSC_PROP2} if ($hash->{HELPER}{MOTDETSC_PROP2});
+          $motdetoptions{PERCENTAGE}  = $hash->{HELPER}{MOTDETSC_PROP3} if ($hash->{HELPER}{MOTDETSC_PROP3});
           
           $url = "$proto://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventmaxver\"&method=\"MDParamSave\"&camId=\"$camid\"&source=$motdetsc&_sid=\"$sid\"";
           
@@ -4723,8 +4722,8 @@ sub SSCam_camop ($) {
 	  } elsif ($hash->{HELPER}{MOTDETSC} eq "SVS") {
           $motdetsc = "1";
           
-          $motdetoptions{SENSITIVITY} = $hash->{'HELPER'}{'MOTDETSC_PROP1'} if ($hash->{'HELPER'}{'MOTDETSC_PROP1'});
-          $motdetoptions{THRESHOLD}   = $hash->{'HELPER'}{'MOTDETSC_PROP2'} if ($hash->{'HELPER'}{'MOTDETSC_PROP2'});
+          $motdetoptions{SENSITIVITY} = $hash->{HELPER}{MOTDETSC_PROP1} if ($hash->{HELPER}{MOTDETSC_PROP1});
+          $motdetoptions{THRESHOLD}   = $hash->{HELPER}{MOTDETSC_PROP2} if ($hash->{HELPER}{MOTDETSC_PROP2});
       
           # nur Umschaltung, alte Werte beibehalten
           $url = "$proto://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventmaxver\"&method=\"MDParamSave\"&camId=\"$camid\"&source=$motdetsc&keep=true&_sid=\"$sid\"";
@@ -4996,7 +4995,7 @@ sub SSCam_camop_parse ($) {
                 $sendrecs{$sn}{createdTm}    = $createdTm;
 				$sendrecs{$sn}{fileName}     = $fileName;
 				$sendrecs{$sn}{".imageData"} = $myjson;
-				Log3($name,4, "$name - Snap '$sn' added to send recording hash: ID => $sendrecs{$sn}{recid}, File => $sendrecs{$sn}{fileName}, Created => $sendrecs{$sn}{createdTm}");
+				Log3($name,4, "$name - Snap '$sn' added to send recording hash: ID => $recid, File => $fileName, Created => $createdTm");
                 
                 # prüfen ob Recording als Email / Telegram versendet werden soll                
 				SSCam_prepareSendData ($hash, $OpMode, \%sendrecs);
@@ -5234,7 +5233,7 @@ sub SSCam_camop_parse ($) {
                 SSCam_refresh($hash,0,1,0);                   # kein Room-Refresh, SSCam-state-Event, kein SSCamSTRM-Event
 
                 my $tac = "";
-                if($hash->{HELPER}{CANSENDSNAP}) { 
+                if($hash->{HELPER}{CANSENDSNAP} || $hash->{HELPER}{CANTELESNAP}) { 
                     $tac = SSCam_openOrgetTrans($hash);       # Transaktion starten oder vorhandenen Code holen
                 }
                 
@@ -5343,7 +5342,7 @@ sub SSCam_camop_parse ($) {
 					    # es sollen die Anzahl "$hash->{HELPER}{SNAPNUM}" Schnappschüsse versendet werden
 						my $i = 0;
 						my $sn = 0;
-						my %sendsnaps = ();  # Schnappschuss Hash zum Versand wird leer erstellt
+                        my %sendsnaps = ();  # Schnappschuss Hash zum Versand wird leer erstellt
 						
 						while ($data->{'data'}{'data'}[$i]) {
 							if(!$data->{'data'}{'data'}[$i]{'camName'} || $data->{'data'}{'data'}[$i]{'camName'} ne $camname) {    # Forum:#97706
@@ -5361,12 +5360,13 @@ sub SSCam_camop_parse ($) {
                             }
 							my $fileName  = $data->{data}{data}[$i]{fileName};
 							my $imageData = $data->{data}{data}[$i]{imageData};  # Image data of snapshot in base64 format 
-						
+						    
+                            # Schnappschuss Hash zum Versand wird erstellt
 							$sendsnaps{$sn}{snapid}       = $snapid;
 							$sendsnaps{$sn}{createdTm}    = $createdTm;
 							$sendsnaps{$sn}{fileName}     = $fileName;
 							$sendsnaps{$sn}{".imageData"} = $imageData;
-							Log3($name,4, "$name - Snap '$sn' added to send gallery hash: ID => $sendsnaps{$sn}{snapid}, File => $sendsnaps{$sn}{fileName}, Created => $sendsnaps{$sn}{createdTm}");
+							Log3($name,4, "$name - Snap '$sn' added to send gallery hash: ID => $snapid, File => $fileName, Created => $createdTm");
                         
                             # Snaphash um die neuen Snaps ergänzen wenn existent
                             if($hash->{HELPER}{".SNAPHASH"}{$sn}) {
@@ -5389,7 +5389,6 @@ sub SSCam_camop_parse ($) {
                         # werden (Attr snapGalleryBoost=0)
                         my $i = 0;
                         my $sn = 0;
-                        my %allsnaps = ();  # Schnappschuss Hash wird leer erstellt
                          
                         $hash->{HELPER}{TOTALCNT} = $data->{data}{total};  # total Anzahl Schnappschüsse
                         
@@ -5410,17 +5409,14 @@ sub SSCam_camop_parse ($) {
                             } else {
                                 $createdTm = "$d[0]-$d[1]-$d[2] / $t[1]";
                             }
-                            $allsnaps{$sn}{snapid}     = $snapid;
-                            $allsnaps{$sn}{createdTm}  = $createdTm;
-                            $allsnaps{$sn}{fileName}   = $fileName;
-                            $allsnaps{$sn}{imageData}  = $imageData;
-                            Log3($name,4, "$name - Snap '$sn' added to gallery hash: ID => $allsnaps{$sn}{snapid}, File => $allsnaps{$sn}{fileName}, Created => $allsnaps{$sn}{createdTm}");
+                            $hash->{HELPER}{".SNAPHASH"}{$sn}{snapid}     = $snapid;
+                            $hash->{HELPER}{".SNAPHASH"}{$sn}{createdTm}  = $createdTm;
+                            $hash->{HELPER}{".SNAPHASH"}{$sn}{fileName}   = $fileName;
+                            $hash->{HELPER}{".SNAPHASH"}{$sn}{imageData}  = $imageData;
+                            Log3($name,4, "$name - Snap '$sn' added to gallery hash: ID => $hash->{HELPER}{\".SNAPHASH\"}{$sn}{snapid}, File => $hash->{HELPER}{\".SNAPHASH\"}{$sn}{fileName}, Created => $hash->{HELPER}{\".SNAPHASH\"}{$sn}{createdTm}");
                             $sn += 1;
                             $i += 1;
                         }
-                        
-                        # Hash der Schnapschüsse erstellen
-                        $hash->{HELPER}{".SNAPHASH"} = \%allsnaps;
                         
                         # Direktausgabe Snaphash wenn nicht gepollt wird
                         if(!AttrVal($name, "snapGalleryBoost",0)) {		    
@@ -5429,7 +5425,7 @@ sub SSCam_camop_parse ($) {
                             for (my $k=1; (defined($hash->{HELPER}{CL}{$k})); $k++ ) {
                                 asyncOutput($hash->{HELPER}{CL}{$k},"$htmlCode");						
                             }
-                            delete($hash->{HELPER}{".SNAPHASH"});               # Snaphash löschen wenn nicht gepollt wird
+                            delete($hash->{HELPER}{".SNAPHASH"});               # Snaphash Referenz löschen                            %allsnaps = ();
                             delete($hash->{HELPER}{CL});
                         }
                     }
@@ -5679,19 +5675,17 @@ sub SSCam_camop_parse ($) {
                         $userPriv = "Viewer";
                     }
                 }                    
-                # "my" nicht am Anfang deklarieren, sonst wird Hash %version wieder geleert !
-                my %version = (
-                              MAJOR => $data->{'data'}{'version'}{'major'},
-                              MINOR => $data->{'data'}{'version'}{'minor'},
-							  SMALL => $data->{'data'}{'version'}{'small'},
-                              BUILD => $data->{'data'}{'version'}{'build'}
-                              );
+
                 # Werte in $hash zur späteren Auswertung einfügen 
-                $hash->{HELPER}{SVSVERSION} = \%version;
-				my $major = $version{"MAJOR"};
-				my $minor = $version{"MINOR"};
-				my $small = $version{"SMALL"};
-				my $build = $version{"BUILD"};
+                $hash->{HELPER}{SVSVERSION}{MAJOR} = $data->{'data'}{'version'}{'major'};
+                $hash->{HELPER}{SVSVERSION}{MINOR} = $data->{'data'}{'version'}{'minor'};
+				$hash->{HELPER}{SVSVERSION}{SMALL} = $data->{'data'}{'version'}{'small'};
+                $hash->{HELPER}{SVSVERSION}{BUILD} = $data->{'data'}{'version'}{'build'};
+
+				my $major = $hash->{HELPER}{SVSVERSION}{MAJOR};
+				my $minor = $hash->{HELPER}{SVSVERSION}{MINOR};
+				my $small = $hash->{HELPER}{SVSVERSION}{SMALL};
+				my $build = $hash->{HELPER}{SVSVERSION}{BUILD};
                 
                 # simulieren einer anderen SVS-Version
                 if (AttrVal($name, "simu_SVSversion", undef)) {
@@ -6152,25 +6146,20 @@ sub SSCam_camop_parse ($) {
                 my $cnt = 0;
          
                 # alle Presets der Kamera mit Id's in Assoziatives Array einlesen
-                # "my" nicht am Anfang deklarieren, sonst wird Hash %allpresets wieder geleert !
-                my %allpresets;
                 my $home = "not set";
                 while ($cnt < $presetcnt) {
                     # my $presid = $data->{'data'}->{'presets'}->[$cnt]->{'id'};
                     my $presid   = $data->{'data'}->{'presets'}->[$cnt]->{'position'};
                     my $presname = $data->{'data'}->{'presets'}->[$cnt]->{'name'};
-                    $allpresets{$presname} = "$presid";
+                    $hash->{HELPER}{ALLPRESETS}{$presname} = "$presid";
                     my $ptype = $data->{'data'}->{'presets'}->[$cnt]->{'type'};
                     if ($ptype) {
                         $home = $presname;
                     }
                     $cnt += 1;
                 }
-                    
-                # Presethash in $hash einfügen
-                $hash->{HELPER}{ALLPRESETS} = \%allpresets;
 
-                my @preskeys = sort(keys(%allpresets));
+                my @preskeys = sort(keys(%{$hash->{HELPER}{ALLPRESETS}}));
                 my $presetlist = join(",",@preskeys);
 
                 # Setreading 
@@ -6193,23 +6182,16 @@ sub SSCam_camop_parse ($) {
                 my $cnt = 0;
          
                 # alle Patrols der Kamera mit Id's in Assoziatives Array einlesen
-                # "my" nicht am Anfang deklarieren, sonst wird Hash %allpatrols wieder geleert !
-                my %allpatrols = ();
+                delete $hash->{HELPER}{ALLPATROLS};
                 while ($cnt < $patrolcnt) {
                     $patrolid = $data->{'data'}->{'patrols'}->[$cnt]->{'id'};
                     $patrolname = $data->{'data'}->{'patrols'}->[$cnt]->{'name'};
-                    $allpatrols{$patrolname} = $patrolid;
+                    $hash->{HELPER}{ALLPATROLS}{$patrolname} = $patrolid;
                     $cnt += 1;
                 }
-                    
-                # Presethash in $hash einfügen
-                $hash->{HELPER}{ALLPATROLS} = \%allpatrols;
 
-                @patrolkeys = sort(keys(%allpatrols));
+                @patrolkeys = sort(keys(%{$hash->{HELPER}{ALLPATROLS}}));
                 $patrollist = join(",",@patrolkeys);
-                
-                # print "ID von Tour1 ist : ". %allpatrols->{Tour1};
-                # print "aus Hash: ".$hash->{HELPER}{ALLPRESETS}{Tour1};
 
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"Patrols",$patrollist);
@@ -7500,7 +7482,7 @@ sub SSCam_composegallery ($;$$) {
   my ($name,$strmdev,$model) = @_;
   my $hash     = $defs{$name};
   my $camname  = $hash->{CAMNAME};
-  my $allsnaps = $hash->{HELPER}{".SNAPHASH"};                   # = \%allsnaps
+  my $allsnaps = $hash->{HELPER}{".SNAPHASH"};                   # = %allsnaps
   my $sgc      = AttrVal($name,"snapGalleryColumns",3);          # Anzahl der Images in einer Tabellenzeile
   my $lss      = ReadingsVal($name, "LastSnapTime", "");         # Zeitpunkt neueste Aufnahme
   my $lang     = AttrVal("global","language","EN");              # Systemsprache       
@@ -7561,7 +7543,7 @@ sub SSCam_composegallery ($;$$) {
   $header .= $sgbnote;
   
   my $gattr  = (AttrVal($name,"snapGallerySize","Icon") eq "Full")?$ha:"";    
-  my @as     = sort{$a<=>$b}keys%{$allsnaps};
+  my @as     = sort{$a<=>$b}keys %{$allsnaps};
   
   # Ausgabetabelle erstellen
   my ($htmlCode,$ct);
@@ -7735,11 +7717,10 @@ sub SSCam_prepareSendData ($$;$) {
                }
            }
            my %rs  = %{$asref};
-           my $rsref = \%rs;
            delete $svshash->{HELPER}{ALLSNAPREF};                      # ALLSNAPREF löschen -> gemeinsamer Versand beendet
            $hash   = $svshash;                                         # Hash durch SVS-Hash ersetzt
            $name   = $svshash->{NAME};                                 # Name des auslösenden SVS-Devices wird eingesetzt
-           $data   = $rsref;                                           # Referenz zum summarischen Hash einsetzen
+           $data   = \%rs;                                             # Referenz zum summarischen Hash einsetzen
            $calias = AttrVal($name,"alias",$hash->{NAME});             # Alias des SVS-Devices 
            $hash->{HELPER}{TRANSACTION} = "multiple_ta";               # fake Transaction im SVS Device setzen 
            last;                                                       # Schleife verlassen und mit Senden weiter
@@ -8040,7 +8021,7 @@ sub SSCam_sendTelegram ($$) {
   }
   
   use strict "refs";
-  %params = ();        # erstellten Versandhash löschen
+  undef %params;        # erstellten Versandhash löschen
   
 return;
 }
@@ -8748,7 +8729,6 @@ sub SSCam_sendEmailblocking($) {
   }
   
   use strict "refs";
-  %{$paref} = ();        # erstellten Versandhash löschen
   
   # Daten müssen als Einzeiler zurückgegeben werden
   $ret = encode_base64($ret,"");
@@ -12655,6 +12635,16 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     "x_wiki": {
       "web": "https://wiki.fhem.de/wiki/SSCAM_-_Steuerung_von_Kameras_in_Synology_Surveillance_Station",
       "title": "SSCAM - Steuerung von Kameras in Synology Surveillance Station"
+    },
+    "repository": {
+      "x_dev": {
+        "type": "svn",
+        "url": "https://svn.fhem.de/trac/browser/trunk/fhem/contrib/DS_Starter",
+        "web": "https://svn.fhem.de/trac/browser/trunk/fhem/contrib/DS_Starter/49_SSCam.pm",
+        "x_branch": "dev",
+        "x_filepath": "fhem/contrib/",
+        "x_raw": "https://svn.fhem.de/fhem/trunk/fhem/contrib/DS_Starter/49_SSCam.pm"
+      }      
     }
   }
 }

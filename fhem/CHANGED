@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  49_SSCam: Meta.json and minor code change
  - change:  50_MOBILEALERTSGW: Checksum check added
  - change:  93_DbRep: check index "Report_Idx" during first DB connect
  - change:  98_RandomTimer: remove 59_Twilight dependency
