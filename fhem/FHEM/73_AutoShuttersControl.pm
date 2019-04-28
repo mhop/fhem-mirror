@@ -44,7 +44,7 @@ use strict;
 use warnings;
 use FHEM::Meta;
 
-my $version = '0.6.1';
+my $version = '0.6.2';
 
 sub AutoShuttersControl_Initialize($) {
     my ($hash) = @_;
@@ -206,6 +206,7 @@ my %userAttrList = (
     'ASC_WiggleValue'                 => '-',
     'ASC_WindParameters'              => '-',
     'ASC_DriveUpMaxDuration'          => '-',
+    'ASC_WindProtection:on,off'       => '-',
 );
 
 my %posSetCmds = (
@@ -1229,7 +1230,7 @@ sub EventProcessingWind($@) {
             ASC_Debug( 'EventProcessingWind: '
                   . $shutters->getShuttersDev
                   . ' - WindProtection1: '
-                  . $shutters->getWindProtection
+                  . $shutters->getWindProtectionStatus
                   . ' WindMax1: '
                   . $shutters->getWindMax
                   . ' WindMin1: '
@@ -1237,33 +1238,38 @@ sub EventProcessingWind($@) {
                   . ' Bekommender Wert1: '
                   . $1 );
 
-            $shutters->setWindProtection('unprotection')
-              if ( not defined( $shutters->getWindProtection )
-                or not $shutters->getWindProtection );
+            $shutters->setWindProtectionStatus('unprotection')
+              if ( not defined( $shutters->getWindProtectionStatus )
+                or not $shutters->getWindProtectionStatus );
 
             next
-              if ( CheckIfShuttersWindowRecOpen($shuttersDev) != 0
-                and $shutters->getShuttersPlace eq 'terrace' );
+              if (
+                (
+                    CheckIfShuttersWindowRecOpen($shuttersDev) != 0
+                    and $shutters->getShuttersPlace eq 'terrace'
+                )
+                or $shutters->getWindProtection eq 'off'
+              );
 
             if (    $1 > $shutters->getWindMax
-                and $shutters->getWindProtection eq 'unprotection' )
+                and $shutters->getWindProtectionStatus eq 'unprotection' )
             {
                 $shutters->setLastDrive('wind protection');
                 $shutters->setDriveCmd( $shutters->getWindPos );
-                $shutters->setWindProtection('protection');
+                $shutters->setWindProtectionStatus('protection');
             }
             elsif ( $1 < $shutters->getWindMin
-                and $shutters->getWindProtection eq 'protection' )
+                and $shutters->getWindProtectionStatus eq 'protection' )
             {
                 $shutters->setLastDrive('wind un-protection');
                 $shutters->setDriveCmd( $shutters->getLastPos );
-                $shutters->setWindProtection('unprotection');
+                $shutters->setWindProtectionStatus('unprotection');
             }
 
             ASC_Debug( 'EventProcessingWind: '
                   . $shutters->getShuttersDev
                   . ' - WindProtection2: '
-                  . $shutters->getWindProtection
+                  . $shutters->getWindProtectionStatus
                   . ' WindMax2: '
                   . $shutters->getWindMax
                   . ' WindMin2: '
@@ -3582,7 +3588,7 @@ sub setShadingStatus {
     return 0;
 }
 
-sub setWindProtection {    # Werte protection, unprotection
+sub setWindProtectionStatus {    # Werte protection, unprotection
     my ( $self, $value ) = @_;
 
     $self->{ $self->{shuttersDev} }->{ASC_WindParameters}->{VAL} = $value
@@ -3610,7 +3616,7 @@ sub getIfInShading {
     );
 }
 
-sub getWindProtection {    # Werte protection, unprotection
+sub getWindProtectionStatus {    # Werte protection, unprotection
     my $self = shift;
 
     return $self->{ $self->{shuttersDev} }->{ASC_WindParameters}->{VAL}
@@ -3982,6 +3988,12 @@ sub getWindMin {
     $shutters->getWindMax;
 
     return $self->{ $self->{shuttersDev} }->{ASC_WindParameters}->{triggerhyst};
+}
+
+sub getWindProtection {
+    my $self = shift;
+
+    return AttrVal( $self->{shuttersDev}, 'ASC_WindProtection', 'on' );
 }
 
 sub getModeUp {
@@ -5118,6 +5130,7 @@ sub getblockAscDrivesAfterManual {
       <li>ASC_Ventilate_Window_Open - auf l&uuml;ften, wenn das Fenster gekippt/ge&ouml;ffnet wird und aktuelle Position unterhalb der L&uuml;ften-Position ist / default on wenn nicht gesetzt</li>
       <li>ASC_WiggleValue - Wert um welchen sich die Position des Rollladens &auml;ndern soll / default 5 wenn nicht gesetzt</li>
       <li>ASC_WindParameters - TRIGGERMAX[:HYSTERESE] [DRIVEPOSITION] / Angabe von Max Wert ab dem für Wind getriggert werden soll, Hytsrese Wert ab dem der Windschutz aufgehoben werden soll TRIGGERMAX - HYSTERESE / Ist es bei einigen Rolll&auml;den nicht gew&uuml;nscht das gefahren werden soll, so ist der TRIGGERMAX Wert mit -1 an zu geben. / default '50:20 ClosedPosition' wenn nicht gesetzt</li>
+      <li>ASC_WindProtection - on/off aktiviert den Windschutz f&uuml;r diesen Rollladen. / default on wenn nicht gesetzt.</li>
       <li>ASC_WindowRec - Name des Fensterkontaktes, an dessen Fenster der Rollladen angebracht ist / default none wenn nicht gesetzt</li>
       <li>ASC_WindowRec_subType - Typ des verwendeten Fensterkontaktes: twostate (optisch oder magnetisch) oder threestate (Drehgriffkontakt) / default twostate wenn nicht gesetzt</li>
     </ul>
