@@ -10815,6 +10815,7 @@ return;
      <li> transmission of datasets from source database into another (Standby) database (syncStandby) </li>
      <li> reduce the amount of datasets in database (reduceLog) </li>
      <li> delete of duplicate records (delDoublets) </li>
+     <li> drop and (re)create of indexes which are needed for DbLog and DbRep (index) </li>
      </ul></ul>
      <br>
      
@@ -10895,8 +10896,8 @@ return;
   (&lt;name of DbLog-instance&gt; - name of the database instance which is wanted to analyze needs to be inserted) 
   <br><br>
   
-  Due to a good operation performance, the database should contain the Report_Idx. Please create it after the DbRep 
-  device is created by the set command: <br>
+  Due to a good operation performance, the database should contain the index "Report_Idx". Please create it after the DbRep 
+  device definition by the following set command if it isn't already existing on the database: <br>
   <ul>
    <code>
     set &lt;name&gt; index recreate_Report_Idx
@@ -13212,6 +13213,7 @@ sub bdump {
      <li> Übertragung von Datensätzen aus der Quelldatenbank in eine andere (Standby) Datenbank (syncStandby) </li>
      <li> Reduktion der Anzahl von Datensätzen in der Datenbank (reduceLog) </li>
      <li> Löschen von doppelten Datensätzen (delDoublets) </li>
+     <li> Löschen und (Wieder)anlegen der für DbLog und DbRep benötigten Indizes (index) </li>
      </ul></ul>
      <br>
      
@@ -13289,11 +13291,11 @@ sub bdump {
   </code>
   
   <br><br>
-  (&lt;Name der DbLog-Instanz&gt; - es wird der Name der auszuwertenden DBLog-Datenbankdefinition angegeben <b>nicht</b> der Datenbankname selbst)
+  (&lt;Name der DbLog-Instanz&gt; - es wird der Name der auszuwertenden DbLog-Datenbankdefinition angegeben <b>nicht</b> der Datenbankname selbst)
   <br><br>
   
-  Für eine gute Operation Performance sollte die Datenbank den Report_Idx enthalten. Der Index kann nach der 
-  DbRep-Device Definition mit dem set-Kommando angelegt werden: <br>
+  Für eine gute Operation Performance sollte die Datenbank den Index "Report_Idx" enthalten. Der Index kann nach der 
+  DbRep Devicedefinition mit dem set-Kommando angelegt werden sofern er auf der Datenbank noch nicht existiert: <br>
   <ul>
    <code>
     set &lt;name&gt; index recreate_Report_Idx
