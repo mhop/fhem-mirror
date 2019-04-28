@@ -10897,7 +10897,7 @@ return;
   <br><br>
   
   Due to a good operation performance, the database should contain the index "Report_Idx". Please create it after the DbRep 
-  device definition by the following set command if it isn't already existing on the database: <br>
+  device definition by the following set command if it isn't already existing on the database: <br><br>
   <ul>
    <code>
     set &lt;name&gt; index recreate_Report_Idx
@@ -13295,7 +13295,7 @@ sub bdump {
   <br><br>
   
   Für eine gute Operation Performance sollte die Datenbank den Index "Report_Idx" enthalten. Der Index kann nach der 
-  DbRep Devicedefinition mit dem set-Kommando angelegt werden sofern er auf der Datenbank noch nicht existiert: <br>
+  DbRep Devicedefinition mit dem set-Kommando angelegt werden sofern er auf der Datenbank noch nicht existiert: <br><br>
   <ul>
    <code>
     set &lt;name&gt; index recreate_Report_Idx
