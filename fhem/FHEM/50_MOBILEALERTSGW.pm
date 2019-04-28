@@ -150,7 +150,7 @@ sub MOBILEALERTSGW_Set ($$@) {
     if ( $cmd eq "clear" ) {
         if ( $args[0] eq "readings" ) {
             for ( keys %{ $hash->{READINGS} } ) {
-                readingsDelete($hash, $_) if ( $_ ne 'state' );
+                readingsDelete( $hash, $_ ) if ( $_ ne 'state' );
             }
             return undef;
         }
@@ -237,6 +237,8 @@ sub MOBILEALERTSGW_Set ($$@) {
         my $data = pack( "H*", $args[0] );
         my ( $packageHeader, $timeStamp, $packageLength, $deviceID ) =
           unpack( "CNCH12", $data );
+        my ( $sum, $sumWert ) = unpack( "%C63C", $data );
+        $sum &= 0x7F;
         Log3 $name, 4,
             "$name MOBILEALERTSGW: Debuginsert PackageHeader: "
           . $packageHeader
@@ -248,6 +250,19 @@ sub MOBILEALERTSGW_Set ($$@) {
           . $deviceID;
         Log3 $name, 5, "$name MOBILEALERTSGW: Debuginsert for $deviceID: "
           . unpack( "H*", $data );
+        if ( $sum != $sumWert ) {
+            Log3 $MA_wname, 4,
+                "$MA_wname MOBILEALERTSGW: Wrong Checksum expected: 0x"
+              . sprintf( "%02X", $sum )
+              . " got: 0x"
+              . sprintf( "%02X", $sumWert )
+              . "=> ignoring";
+            return undef;
+        }
+        Log3 $MA_wname, 5,
+          "$MA_wname MOBILEALERTSGW: Good Checksum got: 0x"
+          . sprintf( "%02X", $sum );
+
         Dispatch( $hash, $data, undef );
         return undef;
     }
@@ -558,23 +573,35 @@ sub MOBILEALERTSGW_DecodeData($$) {
 
     for ( my $pos = 0 ; $pos < length($POSTdata) ; $pos += MA_PACKAGE_LENGTH ) {
         my $data = substr $POSTdata, $pos, MA_PACKAGE_LENGTH;
-        my ( $packageHeader, $timeStamp, $packageLength, $deviceID ) =
-          unpack( "CNCH12", $data );
-        Log3 $MA_wname, 4,
-            "$MA_wname MOBILEALERTSGW: PackageHeader: "
-          . $packageHeader
-          . " Timestamp: "
-          . scalar( FmtDateTimeRFC1123($timeStamp) )
-          . " PackageLength: "
-          . $packageLength
-          . " DeviceID: "
-          . $deviceID
-          if ( $verbose >= 4 );
-        Log3 $MA_wname, 5,
-          "$MA_wname MOBILEALERTSGW: Data for $deviceID: "
-          . unpack( "H*", $data )
-          if ( $verbose >= 5 );
-        my $found = Dispatch( $defs{$MA_wname}, $data, undef );
+        my ( $sum, $sumWert ) = unpack( "%C63C", $data );
+        $sum &= 0x7F;
+        if ( $sum != $sumWert ) {
+            Log3 $MA_wname, 4,
+                "$MA_wname MOBILEALERTSGW: Wrong Checksum expected: 0x"
+              . sprintf( "%02X", $sum )
+              . " got: 0x"
+              . sprintf( "%02X", $sumWert )
+              . "=> ignoring";
+        }
+        else {
+            my ( $packageHeader, $timeStamp, $packageLength, $deviceID ) =
+              unpack( "CNCH12", $data );
+            Log3 $MA_wname, 4,
+                "$MA_wname MOBILEALERTSGW: PackageHeader: "
+              . $packageHeader
+              . " Timestamp: "
+              . scalar( FmtDateTimeRFC1123($timeStamp) )
+              . " PackageLength: "
+              . $packageLength
+              . " DeviceID: "
+              . $deviceID
+              if ( $verbose >= 4 );
+            Log3 $MA_wname, 5,
+              "$MA_wname MOBILEALERTSGW: Data for $deviceID: "
+              . unpack( "H*", $data )
+              if ( $verbose >= 5 );
+            my $found = Dispatch( $defs{$MA_wname}, $data, undef );
+        }
     }
 }
 
