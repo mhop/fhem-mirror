@@ -1,6 +1,6 @@
-# Id ##########################################################################
+##########################################################################
 # $Id$
-
+#
 # copyright ###################################################################
 #
 # 98_RandomTimer.pm
@@ -61,14 +61,6 @@ sub RandomTimer_zeitBerechnen  ($$$$);
 sub RandomTimer_Initialize($) {
   my ($hash) = @_;
 
-  if(
-    !$modules{Twilight}{LOADED} &&
-    -f "$attr{global}{modpath}/FHEM/59_Twilight.pm"
-  ) {
-    my $ret = CommandReload(undef, "59_Twilight");
-    Log3 undef, 1, $ret if($ret);
-  }
-
   $hash->{DefFn}     = "RandomTimer_Define";
   $hash->{UndefFn}   = "RandomTimer_Undef";
   $hash->{AttrFn}    = "RandomTimer_Attr";
@@ -125,8 +117,8 @@ sub RandomTimer_Define($$) {
 
   readingsSingleUpdate ($hash,  "TimeToSwitch", $hash->{helper}{TIMETOSWITCH}, 1);
 
-  myRemoveInternalTimer("SetTimer", $hash);
-  myInternalTimer      ("SetTimer", time(), "RandomTimer_SetTimer", $hash, 0);
+  RandomTimer_RemoveInternalTimer("SetTimer", $hash);
+  RandomTimer_InternalTimer("SetTimer", time(), "RandomTimer_SetTimer", $hash, 0);
 
   return undef;
 }
@@ -135,8 +127,8 @@ sub RandomTimer_Undef($$) {
 
   my ($hash, $arg) = @_;
 
-  myRemoveInternalTimer("SetTimer", $hash);
-  myRemoveInternalTimer("Exec",     $hash);
+  RandomTimer_RemoveInternalTimer("SetTimer", $hash);
+  RandomTimer_RemoveInternalTimer("Exec",     $hash);
   delete $modules{RandomTimer}{defptr}{$hash->{NAME}};
   return undef;
 }
@@ -153,8 +145,8 @@ sub RandomTimer_Attr($$$) {
   if( $attrName ~~ ["disable","disableCond"] ) {
 
     # Schaltung vorziehen, damit bei einem disable abgeschaltet wird.
-    myRemoveInternalTimer("Exec", $hash);
-    myInternalTimer      ("Exec", time()+1, "RandomTimer_Exec", $hash, 0);
+    RandomTimer_RemoveInternalTimer("Exec", $hash);
+    RandomTimer_InternalTimer("Exec", time()+1, "RandomTimer_Exec", $hash, 0);
   }
   return undef;
 }
@@ -220,7 +212,7 @@ sub RandomTimer_down($) {
 sub RandomTimer_Exec($) {
    my ($myHash) = @_;
 
-   my $hash = myGetHashIndirekt($myHash, (caller(0))[3]);
+   my $hash = RandomTimer_GetHashIndirekt($myHash, (caller(0))[3]);
    return if (!defined($hash));
 
    my $now = time();
@@ -284,8 +276,8 @@ sub RandomTimer_Exec($) {
    }
 
    my $nextSwitch = time() + RandomTimer_getSecsToNextAbschaltTest($hash);
-   myRemoveInternalTimer("Exec", $hash);
-   myInternalTimer      ("Exec", $nextSwitch, "RandomTimer_Exec", $hash, 0);
+   RandomTimer_RemoveInternalTimer("Exec", $hash);
+   RandomTimer_InternalTimer("Exec", $nextSwitch, "RandomTimer_Exec", $hash, 0);
 
 }
 
@@ -376,7 +368,7 @@ sub RandomTimer_setSwitchmode ($$) {
 
 sub RandomTimer_SetTimer($) {
   my ($myHash) = @_;
-  my $hash = myGetHashIndirekt($myHash, (caller(0))[3]);
+  my $hash = RandomTimer_GetHashIndirekt($myHash, (caller(0))[3]);
   return if (!defined($hash));
 
   my $now = time();
@@ -393,14 +385,14 @@ sub RandomTimer_SetTimer($) {
   my $secToMidnight = 24*3600 -(3600*$hour + 60*$min + $sec);
 
   my $setExecTime = max($now, $hash->{helper}{startTime});
-  myRemoveInternalTimer("Exec",     $hash);
-  myInternalTimer      ("Exec",     $setExecTime, "RandomTimer_Exec", $hash, 0);
+  RandomTimer_RemoveInternalTimer("Exec",     $hash);
+  RandomTimer_InternalTimer("Exec",     $setExecTime, "RandomTimer_Exec", $hash, 0);
 
   if ($hash->{helper}{REP} gt "") {
      my $setTimerTime = max($now+$secToMidnight + 15,
                             $hash->{helper}{stopTime}) + $hash->{helper}{TIMETOSWITCH}+15;
-     myRemoveInternalTimer("SetTimer", $hash);
-     myInternalTimer      ("SetTimer", $setTimerTime, "RandomTimer_SetTimer", $hash, 0);
+     RandomTimer_RemoveInternalTimer("SetTimer", $hash);
+     RandomTimer_InternalTimer("SetTimer", $setTimerTime, "RandomTimer_SetTimer", $hash, 0);
   }
 }
 
@@ -480,6 +472,45 @@ sub RandomTimer_zeitBerechnen  ($$$$) {
    $jetzt_arr[2] = $hour; $jetzt_arr[1] = $min; $jetzt_arr[0] = $sec;
    my $next = timelocal_nocheck(@jetzt_arr);
    return $next;
+}
+
+sub RandomTimer_InternalTimer($$$$$) {
+   my ($modifier, $tim, $callback, $hash, $waitIfInitNotDone) = @_;
+
+   my $timerName = "$hash->{NAME}_$modifier";
+   my $mHash = { HASH=>$hash, NAME=>"$hash->{NAME}_$modifier", MODIFIER=>$modifier};
+   if (defined($hash->{TIMER}{$timerName})) {
+      Log3 $hash, 1, "[$hash->{NAME}] possible overwriting of timer $timerName - please delete first";
+      stacktrace();
+   } else {
+      $hash->{TIMER}{$timerName} = $mHash;
+   }
+
+   Log3 $hash, 5, "[$hash->{NAME}] setting  Timer: $timerName " . FmtDateTime($tim);
+   InternalTimer($tim, $callback, $mHash, $waitIfInitNotDone);
+   return $mHash;
+}
+################################################################################
+sub RandomTimer_RemoveInternalTimer($$) {
+   my ($modifier, $hash) = @_;
+
+   my $timerName = "$hash->{NAME}_$modifier";
+   my $myHash = $hash->{TIMER}{$timerName};
+   if (defined($myHash)) {
+      delete $hash->{TIMER}{$timerName};
+      Log3 $hash, 5, "[$hash->{NAME}] removing Timer: $timerName";
+      RemoveInternalTimer($myHash);
+   }
+}
+
+sub RandomTimer_GetHashIndirekt ($$) {
+  my ($myHash, $function) = @_;
+
+  if (!defined($myHash->{HASH})) {
+    Log 3, "[$function] myHash not valid";
+    return undef;
+  };
+  return $myHash->{HASH};
 }
 
 1;

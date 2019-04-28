@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  98_RandomTimer: remove 59_Twilight dependency
  - feature: 93_DbRep: new set "index" command to manage needed indexe for 
                       DbLog and DbRep, minor code changes
  - change:  98_WeekdayTimer: remove 59_Twilight dependency
