@@ -1130,9 +1130,10 @@ sub WeekdayTimer_SetAllParms() {            # {WeekdayTimer_SetAllParms()}
 1;
 
 =pod
+=encoding utf8
 =item device
 =item summary    sends parameter to devices at defined times
-=item summary_DE sendet Parameter an devices zu einer Liste mit festen Zeiten
+=item summary_DE sendet Parameter an Devices zu einer Liste mit festen Zeiten
 =begin html
 
 <a name="WeekdayTimer"></a>
@@ -1314,5 +1315,31 @@ sub WeekdayTimer_SetAllParms() {            # {WeekdayTimer_SetAllParms()}
   </ul><br>
 
 =end html
+
+=for :application/json;q=META.json 98_WeekdayTimer.pm
+{
+   "abstract" : "sends parameter to devices at defined times",
+   "x_lang" : {
+      "de" : {
+         "abstract" : "sendet Parameter an Devices zu einer Liste mit festen Zeiten"
+      }
+   },
+   "keywords" : [
+      "heating",
+      "Heizung"
+   ],
+   "prereqs" : {
+      "runtime" : {
+         "requires" : {
+            "Data::Dumper" : "0",
+            "POSIX" : "0",
+            "Time::Local" : "0",
+            "strict" : "0",
+            "warnings" : "0"
+         }
+      }
+   }
+}
+=end :application/json;q=META.json
 
 =cut

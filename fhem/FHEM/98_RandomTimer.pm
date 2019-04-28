@@ -517,6 +517,7 @@ sub RandomTimer_GetHashIndirekt ($$) {
 
 # commandref ##################################################################
 =pod
+=encoding utf8
 =item helper
 =item summary    imitates the random switch functionality of a timer clock (FS20 ZSU)
 =item summary_DE bildet die Zufallsfunktion einer Zeitschaltuhr nach
@@ -662,4 +663,28 @@ sub RandomTimer_GetHashIndirekt ($$) {
 </div>
 
 =end html
+
+=for :application/json;q=META.json 98_RandomTimer.pm
+{
+   "abstract" : "imitates the random switch functionality of a timer clock (FS20 ZSU)",
+   "x_lang" : {
+      "de" : {
+         "abstract" : "bildet die Zufallsfunktion einer Zeitschaltuhr nach"
+      }
+   },
+   "keywords" : [
+   ],
+   "prereqs" : {
+      "runtime" : {
+         "requires" : {
+            "Time::HiRes" : "0",
+            "Time::Local" : "0",
+            "strict" : "0",
+            "warnings" : "0"
+         }
+      }
+   }
+}
+=end :application/json;q=META.json
+
 =cut
