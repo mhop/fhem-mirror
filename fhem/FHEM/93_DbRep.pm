@@ -1542,7 +1542,7 @@ sub DbRep_getInitDataDone($) {
   my $opt            = $a[4];
   my $prop           = $a[5];
   my $fret           = \&{$a[6]} if($a[6]);
-  my $idxstate       = decode_base64($a[7]);
+  my $idxstate       = $a[7]?decode_base64($a[7]):"";
   my $dblogdevice    = $hash->{HELPER}{DBLOGDEVICE};
   $hash->{dbloghash} = $defs{$dblogdevice};
   my $dbconn         = $hash->{dbloghash}{dbconn};
