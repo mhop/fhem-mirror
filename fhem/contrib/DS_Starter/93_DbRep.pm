@@ -58,6 +58,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.20.1" => "28.04.2019  set index verbose changed, check index \"Report_Idx\" in getInitData ",
   "8.20.0" => "27.04.2019  don't save hash refs in central hash to prevent potential memory leak, new set \"index\" ".
                            "command, \"repository\" added in Meta.json ",
   "8.19.1" => "10.04.2019  adjust \$hash->{HELPER}{IDRETRIES} if value is negative ",
@@ -1397,8 +1398,7 @@ return undef;
 
 ###################################################################################
 #        First Init DB Connect 
-#        Verbindung zur DB aufbauen und den Timestamp des ältesten 
-#        Datensatzes ermitteln
+#        Verbindung zur DB aufbauen und Datenbankeigenschaften ermitteln 
 ###################################################################################
 sub DbRep_firstconnect(@) {
   my ($string)     = @_;
@@ -1439,54 +1439,85 @@ return;
 }
 
 ####################################################################################################
-#     den ältesten Datensatz (Timestamp) in der DB bestimmen 
+#                             DatenDatenbankeigenschaften ermitteln  
 ####################################################################################################
 sub DbRep_getInitData($) {
- my ($string)     = @_;
- my ($name,$opt,$prop,$fret) = split("\\|", $string);
- my $hash       = $defs{$name};
- my $dbloghash  = $hash->{dbloghash};
- my $dbconn     = $dbloghash->{dbconn};
- my $dbuser     = $dbloghash->{dbuser};
- my $dblogname  = $dbloghash->{NAME};
- my $dbpassword = $attr{"sec$dblogname"}{secret};
- my $mintsdef   = "1970-01-01 01:00:00";
- my ($dbh,$sql,$err,$mints);
+  my ($string)     = @_;
+  my ($name,$opt,$prop,$fret) = split("\\|", $string);
+  my $hash       = $defs{$name};
+  my $dbloghash  = $hash->{dbloghash};
+  my $dbconn     = $dbloghash->{dbconn};
+  my $dbuser     = $dbloghash->{dbuser};
+  my $dblogname  = $dbloghash->{NAME};
+  my $dbmodel    = $dbloghash->{MODEL};
+  my $dbpassword = $attr{"sec$dblogname"}{secret};
+  my $mintsdef   = "1970-01-01 01:00:00";
+  my $idxstate   = "";
+  my ($dbh,$sql,$err,$mints);
 
- # Background-Startzeit
- my $bst = [gettimeofday];
+  # Background-Startzeit
+  my $bst = [gettimeofday];
  
- eval { $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 }); };
- if ($@) {
-     $err = encode_base64($@,"");
-     Log3 ($name, 2, "DbRep $name - $@");
-     return "$name|''|''|$err";
- }
+  eval { $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 }); };
+  if ($@) {
+      $err = encode_base64($@,"");
+      Log3 ($name, 2, "DbRep $name - $@");
+      return "$name|''|''|$err";
+  }
  
- # SQL-Startzeit
- my $st = [gettimeofday];
+  # SQL-Startzeit
+  my $st = [gettimeofday];
  
- eval { $mints = $dbh->selectrow_array("SELECT min(TIMESTAMP) FROM history;"); }; 
+  # ältesten Datensatz der DB ermitteln
+  eval { $mints = $dbh->selectrow_array("SELECT min(TIMESTAMP) FROM history;"); }; 
  
- $dbh->disconnect;
+  # Report_Idx Status ermitteln
+  my ($ava,$sqlava);
+  my $idx = "Report_Idx";
+  if($dbmodel =~ /MYSQL/) {
+      $sqlava = "SHOW INDEX FROM history where Key_name='$idx';";
+  } elsif($dbmodel =~ /SQLITE/) {
+      $sqlava = "SELECT name FROM sqlite_master WHERE type='index' AND name='$idx';";
+  } elsif($dbmodel =~ /POSTGRESQL/) {
+      $sqlava = "SELECT indexname FROM pg_indexes WHERE tablename='history' and indexname ='$idx';";
+  } 
+  
+  eval {$ava = $dbh->selectrow_array($sqlava)};
+  if($@) {
+      $idxstate = "state of Index $idx can't be determined !";
+      Log3($name, 2, "DbRep $name - WARNING - $idxstate");
+  } else {
+      if($hash->{LASTCMD} ne "minTimestamp") {
+          if($ava) {
+              $idxstate = "Index $idx exists";
+              Log3($name, 3, "DbRep $name - $idxstate. Check ok");
+          } else {
+              $idxstate = "Index $idx doesn't exist. Please create the index by \"set $name index recreate_Report_Idx\" command !";
+              Log3($name, 2, "DbRep $name - WARNING - $idxstate");
+          }
+      }
+  }
  
- # SQL-Laufzeit ermitteln
- my $rt = tv_interval($st);
+  $dbh->disconnect;
  
- $mints = $mints?encode_base64($mints,""):encode_base64($mintsdef,"");
+  # SQL-Laufzeit ermitteln
+  my $rt = tv_interval($st);
  
- # Background-Laufzeit ermitteln
- my $brt = tv_interval($bst);
+  $mints    = $mints?encode_base64($mints,""):encode_base64($mintsdef,"");
+  $idxstate = encode_base64($idxstate,"");
+ 
+  # Background-Laufzeit ermitteln
+  my $brt = tv_interval($bst);
 
- $rt   = $rt.",".$brt;
- no warnings 'uninitialized';
- Log3 ($name, 3, "DbRep $name - Initial data information retrieved successfully - total time used: $brt seconds");
+  $rt   = $rt.",".$brt;
+  no warnings 'uninitialized';
+  Log3 ($name, 3, "DbRep $name - Initial data information retrieved successfully - total time used: ".sprintf("%.4f",$brt)." seconds");
  
-return "$name|$mints|$rt|0|$opt|$prop|$fret";
+return "$name|$mints|$rt|0|$opt|$prop|$fret|$idxstate";
 }
 
 ####################################################################################################
-# Auswertungsroutine den ältesten Datensatz (Timestamp) in der DB bestimmen 
+#                           Auswertungsroutine DbRep_getInitData
 ####################################################################################################
 sub DbRep_getInitDataDone($) {
   my ($string)       = @_;
@@ -1500,6 +1531,7 @@ sub DbRep_getInitDataDone($) {
   my $opt            = $a[4];
   my $prop           = $a[5];
   my $fret           = \&{$a[6]} if($a[6]);
+  my $idxstate       = decode_base64($a[7]);
   my $dblogdevice    = $hash->{HELPER}{DBLOGDEVICE};
   $hash->{dbloghash} = $defs{$dblogdevice};
   my $dbconn         = $hash->{dbloghash}{dbconn};
@@ -1518,6 +1550,7 @@ sub DbRep_getInitDataDone($) {
 
       readingsBeginUpdate($hash);
       ReadingsBulkUpdateValue ($hash, "timestamp_oldest_dataset", $mints) if($hash->{LASTCMD} eq "minTimestamp");
+      ReadingsBulkUpdateValue ($hash, "index_state", $idxstate) if($hash->{LASTCMD} ne "minTimestamp");
       ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);
       readingsEndUpdate($hash, 1);
       
@@ -1533,7 +1566,7 @@ return &$fret($hash,$opt,$prop);
 }
 
 ####################################################################################################
-#             Abbruchroutine den ältesten Datensatz (Timestamp) in der DB bestimmen 
+#                                 Abbruchroutine DbRep_getInitData 
 ####################################################################################################
 sub DbRep_getInitDataAborted(@) {
   my ($hash,$cause) = @_;
@@ -1646,7 +1679,7 @@ sub DbRep_Main($$;$) {
          Log3 ($name, 3, "DbRep $name - WARNING - old process $hash->{HELPER}{RUNNING_INDEX}{pid} will be killed now to start a new index operation");
          BlockingKill($hash->{HELPER}{RUNNING_INDEX});
      }
-     Log3 ($name, 4, "DbRep $name - Command: $opt $prop"); 
+     Log3 ($name, 3, "DbRep $name - Command: $opt $prop"); 
      $hash->{HELPER}{RUNNING_INDEX} = BlockingCall("DbRep_Index", "$name|$prop", "DbRep_IndexDone", $to, "DbRep_IndexAborted", $hash);
 	 ReadingsSingleUpdateValue ($hash, "state", "index operation in database is running - be patient and see Logfile !", 1);
      $hash->{HELPER}{RUNNING_INDEX}{loglevel} = 5 if($hash->{HELPER}{RUNNING_INDEX});  # Forum #77057
@@ -6363,7 +6396,7 @@ sub DbRep_Index($) {
       $li = $sql_idx;
       $i++;      
   }
-  Log3($name, 4, "DbRep $name - Index found in database:\n$ret"); 
+  Log3($name, 3, "DbRep $name - Index found in database:\n$ret"); 
   $ret = "Index found in database:\n========================\n".$ret;
   
   if($cmd !~ /list/) { 
@@ -6372,6 +6405,7 @@ sub DbRep_Index($) {
       if($sqldel) {
           eval {@six = $dbh->selectrow_array($sqlava);};
           if (@six) {
+              Log3 ($name, 3, "DbRep $name - dropping index $idx ... ");
               eval {$rows = $dbh->do($sqldel);};
               if ($@) {
                   if($cmd !~ /recreate/) {
