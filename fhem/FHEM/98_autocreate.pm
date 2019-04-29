@@ -527,15 +527,17 @@ my @usbtable = (
       response  => "^ArduCounter V.*",  # response is two lines
       define    => "ArduCounter_PARAM ArduCounter DEVICE\@38400", },
 
-    { NAME      => "FRM",
-      matchList => ["cu.usbserial(.*)", "cu.usbmodem(.*)",
-                    "ttyUSB(.*)", "ttyACM(.*)", "ttyAMA(.*)"],
-      DeviceName=> "DEVICE\@57600",
-      init      => pack("H*", "F9"),   # Reset
-      timeout   => 5.0, # StandardFirmata blink takes time
-      request   => pack("H*", "F079F7"),   # Query firmware version and filename START_SYSEX (0xF0), queryFirmware (0x79), END_SYSEX (0xF7)
-      response  => "^\xF0\x79(.*)\xF7",    # Response Sysex xF0 x78 (2 Byte version) (n Byte filename) Endsysex xF7
-      define    => "FRM_PARAM FRM DEVICE\@57600", },
+# FRM causes too much lockups, removed until understood why (Forum #100054)
+#    { NAME      => "FRM",
+#      matchList => ["cu.usbserial(.*)", "cu.usbmodem(.*)",
+#                    "ttyUSB(.*)", "ttyACM(.*)", "ttyAMA(.*)"],
+#      DeviceName=> "DEVICE\@57600",
+#      init      => pack("H*", "F9"),   # Reset
+#      timeout   => 5.0, # StandardFirmata blink takes time
+#      request   => pack("H*", "F079F7"),   # Query firmware version and filename START_SYSEX (0xF0), queryFirmware (0x79), END_SYSEX (0xF7)
+#      response  => "^\xF0\x79(.*)\xF7",    # Response Sysex xF0 x78 (2 Byte version) (n Byte filename) Endsysex xF7
+#      define    => "FRM_PARAM FRM DEVICE\@57600", },
+
 );
 
 
