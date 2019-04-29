@@ -800,7 +800,7 @@ f18_svgSetCols(svg)
 
   var style = $(svg).find("> style").first();
   var sTxt = $(style).text();
-  sTxt = sTxt.replace(/font-family:Times/, "fill:#"+col("fg"));
+  sTxt = sTxt.replace(/Times/, "Arial; fill:#"+col("fg"));
   $(style).text(sTxt);
 
   function
