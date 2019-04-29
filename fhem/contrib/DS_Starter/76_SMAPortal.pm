@@ -103,6 +103,7 @@ BEGIN {
           BlockingCall
           BlockingKill
           CommandAttr
+          CommandDefine
           CommandDeleteAttr
           CommandDeleteReading
           CommandSet
@@ -130,6 +131,7 @@ BEGIN {
           readingsBeginUpdate
           readingsDelete
           readingsEndUpdate
+          ReadingsNum
           ReadingsVal
           RemoveInternalTimer
           setKeyValue
@@ -142,6 +144,7 @@ BEGIN {
 
 # Versions History intern
 our %vNotesIntern = (
+  "1.6.0"  => "29.04.2019  function PortalAsHtml ",
   "1.5.5"  => "22.04.2019  fix readings for BattryOut and BatteryIn ",
   "1.5.4"  => "26.03.2019  delete L1_InfoMessages if no info occur ",
   "1.5.3"  => "26.03.2019  delete L1_ErrorMessages, L1_WarningMessages if no errors or warnings occur ",
@@ -227,7 +230,8 @@ sub Set($@) {
   } else {
       # erweiterte Setlist wenn Credentials gesetzt
       $setlist = "Unknown argument $opt, choose one of ".
-	             "credentials "
+	             "credentials ".
+                 "createPortalGraphic:noArg "
                  ;   
   }  
 
@@ -242,6 +246,24 @@ sub Set($@) {
 		   return "Error while saving Username / Password - see logfile for details";
 	  }
 			
+  } elsif ($opt eq "createPortalGraphic") {
+	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+	  my ($htmldev,$ret);
+      
+      $htmldev = "WL.$name";
+      $ret = CommandDefine($hash->{CL},"$htmldev weblink htmlCode {FHEM::SMAPortal::PortalAsHtml (\"$name\")}");
+      return $ret if($ret);
+      my $c = "This device provides a praphical output of SMA Portal values.\n". 
+              "The device needs to set attribute \"detailLevel\" in device \"$name\" to level \"4\"";
+      CommandAttr($hash->{CL},"$htmldev comment $c"); 
+      $c = "SMA Portal Graphics";
+      CommandAttr($hash->{CL},"$htmldev alias $c");
+      
+	  my $room = AttrVal($name,"room","SMAPortal");
+      CommandAttr($hash->{CL},"$htmldev room $room");
+      CommandAttr($hash->{CL},"$name detailLevel 4");
+	  return "SMA Portal Graphics device \"$htmldev\" created and assigned to room \"$room\".";
+  
   } else {
       return "$setlist";
   }  
@@ -1289,6 +1311,454 @@ sub substUmlauts ($) {
 return($txt);
 }
 
+###############################################################################
+#                  Subroutine für WebLink-Device
+###############################################################################
+sub PortalAsHtml ($) { 
+  my ($name) = @_;
+  my $hash   = $defs{$name};
+  return "Device \"$name\" doesn't exist !" if(!$hash);
+  
+  if(AttrVal($name, "detailLevel", 1) != 4) {
+      return "The attribute \"detailLevel\" of device \"$name\" has to be set to level \"4\" !";
+  }
+
+  my $pv4h = ReadingsNum($name,"L2_Next04Hours-PV", "");
+  my $pvRe = ReadingsNum($name,"L3_RestOfDay-PV", ""); 
+  my $pvTo = ReadingsNum($name,"L3_Tomorrow-PV", "");
+  
+  my $pv00 = ReadingsNum($name,"L2_ThisHour_PvMeanPower", "");
+  my $pv01 = ReadingsNum($name,"L4_NextHour01_PvMeanPower", "");
+  my $pv02 = ReadingsNum($name,"L4_NextHour02_PvMeanPower", "");
+  my $pv03 = ReadingsNum($name,"L4_NextHour03_PvMeanPower", "");
+  my $pv04 = ReadingsNum($name,"L4_NextHour04_PvMeanPower", "");
+  my $pv05 = ReadingsNum($name,"L4_NextHour05_PvMeanPower", "");
+  my $pv06 = ReadingsNum($name,"L4_NextHour06_PvMeanPower", "");
+  my $pv07 = ReadingsNum($name,"L4_NextHour07_PvMeanPower", "");
+  my $pv08 = ReadingsNum($name,"L4_NextHour08_PvMeanPower", "");
+  my $pv09 = ReadingsNum($name,"L4_NextHour09_PvMeanPower", "");
+  my $pv10 = ReadingsNum($name,"L4_NextHour10_PvMeanPower", "");
+  my $pv11 = ReadingsNum($name,"L4_NextHour11_PvMeanPower", "");
+  my $pv12 = ReadingsNum($name,"L4_NextHour12_PvMeanPower", "");
+  my $pv13 = ReadingsNum($name,"L4_NextHour13_PvMeanPower", "");
+  my $pv14 = ReadingsNum($name,"L4_NextHour14_PvMeanPower", "");
+  my $pv15 = ReadingsNum($name,"L4_NextHour15_PvMeanPower", "");
+  my $pv16 = ReadingsNum($name,"L4_NextHour16_PvMeanPower", "");
+  my $pv17 = ReadingsNum($name,"L4_NextHour17_PvMeanPower", "");
+  my $pv18 = ReadingsNum($name,"L4_NextHour18_PvMeanPower", "");
+  my $pv19 = ReadingsNum($name,"L4_NextHour19_PvMeanPower", "");
+  my $pv20 = ReadingsNum($name,"L4_NextHour20_PvMeanPower", "");
+  my $pv21 = ReadingsNum($name,"L4_NextHour21_PvMeanPower", "");
+  my $pv22 = ReadingsNum($name,"L4_NextHour22_PvMeanPower", "");
+  my $pv23 = ReadingsNum($name,"L4_NextHour23_PvMeanPower", "");
+  
+  my $is00 = ReadingsVal($name,"L2_ThisHour_IsConsumptionRecommended", "");
+  my $is01 = ReadingsVal($name,"L4_NextHour01_IsConsumptionRecommended", "");
+  my $is02 = ReadingsVal($name,"L4_NextHour02_IsConsumptionRecommended", "");
+  my $is03 = ReadingsVal($name,"L4_NextHour03_IsConsumptionRecommended", "");
+  my $is04 = ReadingsVal($name,"L4_NextHour04_IsConsumptionRecommended", "");
+  my $is05 = ReadingsVal($name,"L4_NextHour05_IsConsumptionRecommended", "");
+  my $is06 = ReadingsVal($name,"L4_NextHour06_IsConsumptionRecommended", "");
+  my $is07 = ReadingsVal($name,"L4_NextHour07_IsConsumptionRecommended", "");
+  my $is08 = ReadingsVal($name,"L4_NextHour08_IsConsumptionRecommended", "");
+  my $is09 = ReadingsVal($name,"L4_NextHour09_IsConsumptionRecommended", "");
+  my $is10 = ReadingsVal($name,"L4_NextHour10_IsConsumptionRecommended", "");
+  my $is11 = ReadingsVal($name,"L4_NextHour11_IsConsumptionRecommended", "");
+  my $is12 = ReadingsVal($name,"L4_NextHour12_IsConsumptionRecommended", "");
+  my $is13 = ReadingsVal($name,"L4_NextHour13_IsConsumptionRecommended", "");
+  my $is14 = ReadingsVal($name,"L4_NextHour14_IsConsumptionRecommended", "");
+  my $is15 = ReadingsVal($name,"L4_NextHour15_IsConsumptionRecommended", "");
+  my $is16 = ReadingsVal($name,"L4_NextHour16_IsConsumptionRecommended", "");
+  my $is17 = ReadingsVal($name,"L4_NextHour17_IsConsumptionRecommended", "");
+  my $is18 = ReadingsVal($name,"L4_NextHour18_IsConsumptionRecommended", "");
+  my $is19 = ReadingsVal($name,"L4_NextHour19_IsConsumptionRecommended", "");
+  my $is20 = ReadingsVal($name,"L4_NextHour20_IsConsumptionRecommended", "");
+  my $is21 = ReadingsVal($name,"L4_NextHour21_IsConsumptionRecommended", "");
+  my $is22 = ReadingsVal($name,"L4_NextHour22_IsConsumptionRecommended", "");
+  my $is23 = ReadingsVal($name,"L4_NextHour23_IsConsumptionRecommended", "");
+  
+  my $time00 = strftime("%H",localtime);
+  my $time01 = strftime("%H",localtime(time+1*60*60));
+  my $time02 = strftime("%H",localtime(time+2*60*60));
+  my $time03 = strftime("%H",localtime(time+3*60*60)); 
+  my $time04 = strftime("%H",localtime(time+4*60*60)); 
+  my $time05 = strftime("%H",localtime(time+5*60*60)); 
+  my $time06 = strftime("%H",localtime(time+6*60*60));
+  my $time07 = strftime("%H",localtime(time+7*60*60));
+  my $time08 = strftime("%H",localtime(time+8*60*60));
+  my $time09 = strftime("%H",localtime(time+9*60*60));
+  my $time10 = strftime("%H",localtime(time+10*60*60));
+  my $time11 = strftime("%H",localtime(time+11*60*60));
+  my $time12 = strftime("%H",localtime(time+12*60*60));
+  my $time13 = strftime("%H",localtime(time+13*60*60));
+  my $time14 = strftime("%H",localtime(time+14*60*60));
+  my $time15 = strftime("%H",localtime(time+15*60*60));
+  my $time16 = strftime("%H",localtime(time+16*60*60));
+  my $time17 = strftime("%H",localtime(time+17*60*60));
+  my $time18 = strftime("%H",localtime(time+18*60*60));
+  my $time19 = strftime("%H",localtime(time+19*60*60));
+  my $time20 = strftime("%H",localtime(time+20*60*60));
+  my $time21 = strftime("%H",localtime(time+21*60*60));
+  my $time22 = strftime("%H",localtime(time+22*60*60));
+  my $time23 = strftime("%H",localtime(time+23*60*60));
+
+  # Konfiguration des maximal übergebenen Werts (hier wäre der höchste zu erwartende Wert = 8020)
+  my $maxValue = ReadingsNum($name,"L2_PlantPeakPower", 8020);
+  # Konfiguration den Platz zwischen den Balken (hier wäre der höchste zu erwartende Wert = 30)
+  my $space = 2;
+  # Konfiguration des breite der Balken (hier wäre der höchste zu erwartende Wert = 30)
+  my $width = 24;
+  # Konfiguration des höhe der Balken  (hier wäre der höchste zu erwartende Wert = 160)
+  my $height = 160;
+  # Konfiguration der Farbe oben (hier wäre der höchste zu erwartende Wert = "FFFFFF")
+  my $color1 = "#FFFFFF";
+  # Konfiguration der Farbe des Wertes (hier wäre der höchste zu erwartende Wert = "4B9C8A")
+  my $color2 = "#4B9C8A";
+
+  #### Tabelle
+  my $ret = "";
+  $ret .= "<html><table border=2 bordercolor='darkgreen' cellspacing=1><tr>";
+  $ret .= "<td colspan=24 style='text-align:center; font-weight:bold; padding-right:".($space)."px;padding-left:".($space)."px;width:".($width)."px'>Prognose der nächsten 4 Stunden: ".($pv4h)." Wh / Rest des Tages: ".($pvRe)." Wh / Morgen: ".($pvTo)." Wh</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;width:".($width)."px'>";
+  
+  $ret .= "<table border=0 bordercolor='darkgreen' cellspacing=1>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$time00."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$is00."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr style='height:".(($maxValue-$pv00)/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$pv00."</td></tr>";
+  $ret .= "<tr style='height:".($pv00/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color2."'></td></tr>";
+  $ret .= "</table>";
+  
+  $ret .= "</td>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;width:".($width)."px'>";
+  $ret .= "<table border=0 bordercolor='darkgreen' cellspacing=1>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$time01."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$is01."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr style='height:".(($maxValue-$pv01)/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$pv01."</td></tr>";
+  $ret .= "<tr style='height:".($pv01/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color2."'></td></tr>";
+  $ret .= "</table>";
+  
+  $ret .= "</td>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;width:".($width)."px'>";
+  
+  $ret .= "<table border=0 bordercolor='darkgreen' cellspacing=1>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$time02."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$is02."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr style='height:".(($maxValue-$pv02)/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$pv02."</td></tr>";
+  $ret .= "<tr style='height:".($pv02/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color2."'></td></tr>";
+  $ret .= "</table>";
+  
+  $ret .= "</td>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;width:".($width)."px'>";
+  
+  $ret .= "<table border=0 bordercolor='darkgreen' cellspacing=1>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$time03."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$is03."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr style='height:".(($maxValue-$pv03)/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$pv03."</td></tr>";
+  $ret .= "<tr style='height:".($pv03/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color2."'></td></tr>";
+  $ret .= "</table>";
+  
+  $ret .= "</td>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;width:".($width)."px'>";
+  $ret .= "<table border=0 bordercolor='darkgreen' cellspacing=1>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$time04."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$is04."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr style='height:".(($maxValue-$pv04)/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$pv04."</td></tr>";
+  $ret .= "<tr style='height:".($pv04/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color2."'></td></tr>";
+  $ret .= "</table>";
+  
+  $ret .= "</td>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;width:".($width)."px'>";
+  
+  $ret .= "<table border=0 bordercolor='darkgreen' cellspacing=1>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$time05."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$is05."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr style='height:".(($maxValue-$pv05)/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$pv05."</td></tr>";
+  $ret .= "<tr style='height:".($pv05/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color2."'></td></tr>";
+  $ret .= "</table>";
+
+  $ret .= "</td>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;width:".($width)."px'>";
+
+  $ret .= "<table border=0 bordercolor='darkgreen' cellspacing=1>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$time06."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$is06."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr style='height:".(($maxValue-$pv06)/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$pv06."</td></tr>";
+  $ret .= "<tr style='height:".($pv06/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color2."'></td></tr>";
+  $ret .= "</table>";
+
+  $ret .= "</td>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;width:".($width)."px'>";
+
+  $ret .= "<table border=0 bordercolor='darkgreen' cellspacing=1>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$time07."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$is07."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr style='height:".(($maxValue-$pv07)/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$pv07."</td></tr>";
+  $ret .= "<tr style='height:".($pv07/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color2."'></td></tr>";
+  $ret .= "</table>";
+
+  $ret .= "</td>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;width:".($width)."px'>";
+
+  $ret .= "<table border=0 bordercolor='darkgreen' cellspacing=1>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$time08."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$is08."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr style='height:".(($maxValue-$pv08)/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$pv08."</td></tr>";
+  $ret .= "<tr style='height:".($pv08/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color2."'></td></tr>";
+  $ret .= "</table>";
+
+  $ret .= "</td>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;width:".($width)."px'>";
+
+  $ret .= "<table border=0 bordercolor='darkgreen' cellspacing=1>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$time09."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$is09."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr style='height:".(($maxValue-$pv09)/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$pv09."</td></tr>";
+  $ret .= "<tr style='height:".($pv09/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color2."'></td></tr>";
+  $ret .= "</table>";
+  
+  $ret .= "</td>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;width:".($width)."px'>";
+  $ret .= "<table border=0 bordercolor='darkgreen' cellspacing=1>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$time10."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$is10."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr style='height:".(($maxValue-$pv10)/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$pv10."</td></tr>";
+  $ret .= "<tr style='height:".($pv10/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color2."'></td></tr>";
+  $ret .= "</table>";
+
+  $ret .= "</td>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;width:".($width)."px'>";
+  
+  $ret .= "<table border=0 bordercolor='darkgreen' cellspacing=1>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$time11."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$is11."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr align=center style='height:".(($maxValue-$pv11)/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$pv11."</td></tr>";
+  $ret .= "<tr style='height:".($pv11/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color2."'></td></tr>";
+  $ret .= "</table>";
+  
+  $ret .= "</td>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;width:".($width)."px'>";
+  
+  $ret .= "<table border=0 bordercolor='darkgreen' cellspacing=1>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$time12."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$is12."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr style='height:".(($maxValue-$pv12)/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$pv12."</td></tr>";
+  $ret .= "<tr style='height:".($pv12/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color2."'></td></tr>";
+  $ret .= "</table>";
+  
+  $ret .= "</td>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;width:".($width)."px'>";
+  
+  $ret .= "<table border=0 bordercolor='darkgreen' cellspacing=1>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$time13."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$is13."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr style='height:".(($maxValue-$pv13)/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$pv13."</td></tr>";
+  $ret .= "<tr style='height:".($pv13/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color2."'></td></tr>";
+  $ret .= "</table>";
+  
+  $ret .= "</td>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;width:".($width)."px'>";
+  
+  $ret .= "<table border=0 bordercolor='darkgreen' cellspacing=1>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$time14."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$is14."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr style='height:".(($maxValue-$pv14)/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$pv14."</td></tr>";
+  $ret .= "<tr style='height:".($pv14/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color2."'></td></tr>";
+  $ret .= "</table>";
+  
+  $ret .= "</td>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;width:".($width)."px'>";
+  
+  $ret .= "<table border=0 bordercolor='darkgreen' cellspacing=1>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$time15."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$is15."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr style='height:".(($maxValue-$pv15)/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$pv15."</td></tr>";
+  $ret .= "<tr style='height:".($pv15/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color2."'></td></tr>";
+  $ret .= "</table>";
+  
+  $ret .= "</td>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;width:".($width)."px'>";
+  
+  $ret .= "<table border=0 bordercolor='darkgreen' cellspacing=1>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$time16."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$is16."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr style='height:".(($maxValue-$pv16)/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$pv16."</td></tr>";
+  $ret .= "<tr style='height:".($pv16/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color2."'></td></tr>";
+  $ret .= "</table>";
+  
+  $ret .= "</td>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;width:".($width)."px'>";
+  
+  $ret .= "<table border=0 bordercolor='darkgreen' cellspacing=1>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$time17."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$is17."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr style='height:".(($maxValue-$pv17)/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$pv17."</td></tr>";
+  $ret .= "<tr style='height:".($pv17/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color2."'></td></tr>";
+  $ret .= "</table>";
+  
+  $ret .= "</td>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;width:".($width)."px'>";
+  
+  $ret .= "<table border=0 bordercolor='darkgreen' cellspacing=1>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$time18."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$is18."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr style='height:".(($maxValue-$pv18)/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$pv18."</td></tr>";
+  $ret .= "<tr style='height:".($pv18/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color2."'></td></tr>";
+  $ret .= "</table>";
+  
+  $ret .= "</td>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;width:".($width)."px'>";
+  
+  $ret .= "<table border=0 bordercolor='darkgreen' cellspacing=1>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$time19."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$is19."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr style='height:".(($maxValue-$pv19)/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$pv19."</td></tr>";
+  $ret .= "<tr style='height:".($pv19/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color2."'></td></tr>";
+  $ret .= "</table>";
+  
+  $ret .= "</td>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;width:".($width)."px'>";
+  
+  $ret .= "<table border=0 bordercolor='darkgreen' cellspacing=1>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$time20."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$is20."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr style='height:".(($maxValue-$pv20)/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$pv20."</td></tr>";
+  $ret .= "<tr style='height:".($pv20/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color2."'></td></tr>";
+  $ret .= "</table>";
+  
+  $ret .= "</td>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;width:".($width)."px'>";
+  
+  $ret .= "<table border=0 bordercolor='darkgreen' cellspacing=1>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$time21."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$is21."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr style='height:".(($maxValue-$pv21)/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$pv21."</td></tr>";
+  $ret .= "<tr style='height:".($pv21/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color2."'></td></tr>";
+  $ret .= "</table>";
+  
+  $ret .= "</td>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;width:".($width)."px'>";
+  
+  $ret .= "<table border=0 bordercolor='darkgreen' cellspacing=1>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$time22."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$is22."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr style='height:".(($maxValue-$pv22)/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$pv22."</td></tr>";
+  $ret .= "<tr style='height:".($pv22/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color2."'></td></tr>";
+  $ret .= "</table>";
+  
+  $ret .= "</td>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;width:".($width)."px'>";
+  
+  $ret .= "<table border=0 bordercolor='darkgreen' cellspacing=1>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$time23."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr>";
+  $ret .= "<td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$is23."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr style='height:".(($maxValue-$pv23)/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$pv23."</td></tr>";
+  $ret .= "<tr style='height:".($pv23/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color2."'></td></tr>";
+  $ret .= "</table>";
+  
+  $ret .= "</td>";
+  $ret .= "</tr></table></html>";
+    
+return($ret);
+}
+
 1;
 
 =pod
@@ -1321,8 +1791,10 @@ return($txt);
    <ul>
     <ul>
      <li>Live-Daten (Verbrauch und PV-Erzeugung) </li>
+     <li>Batteriedaten (In/Out) </li>
      <li>Wetter-Daten von SMA für den Anlagenstandort </li>
      <li>Prognosedaten (Verbrauch und PV-Erzeugung) inklusive Verbraucherempfehlung </li>
+     <li>die durch den Sunny Home Manager geplanten Schaltzeiten von Verbrauchern (sofern vorhanden) </li>
     </ul> 
    </ul>
    <br>
@@ -1380,6 +1852,13 @@ return($txt);
      <li><b> set &lt;name&gt; credentials &lt;username&gt; &lt;password&gt; </b> </li>  
      Setzt Username / Passwort für den Zugriff zum SMA-Portal.   
      </ul>   
+     <br><br>
+     
+     <ul>
+     <li><b> set &lt;name&gt; createPortalGraphic </b> </li>  
+     Erstellt ein weblink-Device zur grafischen Anzeige der SMA Portaldaten. Das Attribut "detailLevel" muss auf den
+     Level 4 gesetzt sein. Der Befehl setzt dieses Attribut automatisch auf den benötigten Wert.     
+     </ul> 
    </ul>
    <br><br>
    
