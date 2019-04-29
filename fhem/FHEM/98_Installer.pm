@@ -815,7 +815,23 @@ sub PollChild($) {
 
     my $hash = shift;
 
-    my $name       = $hash->{NAME};
+    my $name = $hash->{NAME};
+
+    if (   !exists( $hash->{".fhem"}{subprocess} )
+        || !ref( $hash->{".fhem"}{subprocess} )
+        || ref( $hash->{".fhem"}{subprocess} ) ne 'SubProcess' )
+    {
+        my $emsg =
+          defined( $hash->{".fhem"}{subprocess} )
+          && $hash->{".fhem"}{subprocess}{lasterror} ne ''
+          ? '{"error":"' . $hash->{".fhem"}{subprocess}{lasterror} . '"}'
+          : '{"error":"Child process suddenly ended"}';
+        Log3 $name, 5, "Installer ($name) - $emsg";
+        CleanSubprocess($hash);
+        PreProcessing( $hash, $emsg );
+        return;
+    }
+
     my $subprocess = $hash->{".fhem"}{subprocess};
     my $json       = $subprocess->readFromChild();
 
@@ -897,7 +913,7 @@ sub ExecuteFhemCommand($) {
         {
             if ( $1 =~ /App::cpanminus/i ) {
                 $installer->{installperl} =
-                    'sh -c "curl -fsSL https://git.io/cpanm | '
+'sh -c "( curl -fsSL https://git.io/cpanm 2>/dev/null || wget -qO- https://git.io/cpanm 2>/dev/null ) | '
                   . $sudoH
                   . '$(which perl) - App::cpanminus >/dev/null 2>&1" 2>&1 '
                   . '&& TEST=$(which cpanm) || echo "sh: command not found: cpanm"; which cpanm >/dev/null 2>&1 && sh -c "'
@@ -2380,19 +2396,19 @@ sub CreatePrereqsList {
                 push @ret, $tBClose;
 
                 my $descr =
-                    'These dependencies '
+                    'Required dependencies '
                   . $strongOpen . 'must'
                   . $strongClose
                   . ' be installed for the listed FHEM modules to work.';
                 $descr =
-                    'These dependencies are '
+                    'Recommended dependencies are '
                   . $strongOpen
                   . 'strongly encouraged'
                   . $strongClose
                   . ' and should be installed for full functionality of the listed FHEM modules, except in resource constrained environments.'
                   if ( $importance eq 'Recommended' );
                 $descr =
-                    'These dependencies are '
+                    'Suggested dependencies are '
                   . $strongOpen
                   . 'optional'
                   . $strongClose
@@ -5102,7 +5118,13 @@ sub LoadInstallStatusPerl(;$) {
                         {
                             my $reqV  = $modPreqs->{$mAttr}{$pkg};
                             my $instV = $pkgStatus{Perl}{installed}{$pkg};
-                            if ( $reqV ne '0' && $instV ne '0' ) {
+                            if (   defined($reqV)
+                                && $reqV ne ''
+                                && $reqV ne '0'
+                                && defined($instV)
+                                && $instV ne ''
+                                && $instV ne '0' )
+                            {
                                 $reqV  = version->parse($reqV)->numify;
                                 $instV = version->parse($instV)->numify;
 
@@ -5381,7 +5403,7 @@ sub __GetExtendedEnvPath {
 
     foreach my $p ( reverse @binpath ) {
         next unless ( $p && $p ne '' );
-        $p =~ s/\\/\\\\/g if ($^O =~ m/Win/);
+        $p =~ s/\\/\\\\/g if ( $^O =~ m/Win/ );
         unshift @path, $p unless ( grep ( /^$p$/, @path ) );
     }
 
@@ -5508,7 +5530,7 @@ sub __list_module {
       "abstract": "Modul zum Update von FHEM, zur Installation von Drittanbieter FHEM Modulen und der Verwaltung von Systemvoraussetzungen"
     }
   },
-  "version": "v0.5.3",
+  "version": "v0.5.5",
   "release_status": "testing",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
