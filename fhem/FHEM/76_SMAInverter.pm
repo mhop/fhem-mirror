@@ -28,6 +28,7 @@
 #################################################################################################################
 # Versions History by DS_Starter
 #
+# 2.10.1   28.04.2019      fix perl warnings, Forum:#56080.msg933276.html#msg933276
 # 2.10.0   29.06.2018      Internal MODEL added
 # 2.9.2    08.10.2017      adapted to use extended abortArg (Forum:77472)
 # 2.9.1    24.04.2017      fix for issue #24 (Wrong INV_TYPE for STP10000TL-20) and fix for issue #25 (unpack out of range for SB1.5-1VL-40)
@@ -718,7 +719,7 @@ sub getstatus_DoParse($) {
              if($sup_ChargeStatus) {
 	             push(@row_array, "chargestatus ".$inv_ChargeStatus."\n");		     
              }
-             if($inv_CLASS && $inv_CLASS eq 8007) {
+             if($inv_CLASS && $inv_CLASS eq 8007 && defined($inv_SPOT_PACTOT)) {  # V2.10.1 28.04.2019
                  if($inv_SPOT_PACTOT < 0) {
 	                 push(@row_array, "power_out "."0"."\n");
 	                 push(@row_array, "power_in ".(-1 * $inv_SPOT_PACTOT)."\n");
@@ -809,7 +810,7 @@ sub getstatus_DoParse($) {
              if($sup_ChargeStatus) {
 	             push(@row_array, "ChargeStatus ".$inv_ChargeStatus."\n");
              }
-             if($inv_CLASS && $inv_CLASS eq 8007) {
+             if($inv_CLASS && $inv_CLASS eq 8007 && defined($inv_SPOT_PACTOT)) {  # V2.10.1 28.04.2019
                  if($inv_SPOT_PACTOT < 0) {
 	                 push(@row_array, "POWER_OUT "."0"."\n");
 	                 push(@row_array, "POWER_IN ".(-1 * $inv_SPOT_PACTOT)."\n");
