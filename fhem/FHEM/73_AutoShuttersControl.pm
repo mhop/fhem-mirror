@@ -44,7 +44,7 @@ use strict;
 use warnings;
 use FHEM::Meta;
 
-my $version = '0.6.3';
+my $version = '0.6.4';
 
 sub AutoShuttersControl_Initialize($) {
     my ($hash) = @_;
@@ -845,6 +845,15 @@ sub EventProcessingWindowRec($@) {
             : $shutters->getStatus < $shutters->getComfortOpenPos
         );
 
+        ASC_Debug( 'EventProcessingWindowRec: '
+              . $shutters->getShuttersDev
+              . ' - HOMEMODE: '
+              . $homemode
+              . ' : QueryShuttersPosWinRecTilted'
+              . $queryShuttersPosWinRecTilted
+              . ' QueryShuttersPosWinRecComfort: '
+              . $queryShuttersPosWinRecComfort );
+
         if (
                 $1 eq 'closed'
             and IsAfterShuttersTimeBlocking($shuttersDev)
@@ -853,19 +862,16 @@ sub EventProcessingWindowRec($@) {
                 or $shutters->getStatus == $shutters->getOpenPos )
           )
         {
-            my $homemode = $shutters->getRoommatesStatus;
-            $homemode = $ascDev->getResidentsStatus
-              if ( $homemode eq 'none' );
-
             if (
                     IsDay($shuttersDev)
                 and $shutters->getStatus != $shutters->getOpenPos
-                and (  $homemode ne 'asleep'
-                    or $homemode ne 'gotosleep'
+                and ( ( $homemode ne 'asleep' and $homemode ne 'gotosleep' )
                     or $homemode eq 'none' )
+                and $shutters->getModeUp ne 'absent'
+                and $shutters->getModeUp ne 'off'
               )
             {
-                $shutters->setLastDrive('window day closed');
+                $shutters->setLastDrive('window closed at day');
                 $shutters->setNoOffset(1);
                 $shutters->setDriveCmd(
                     (
@@ -876,11 +882,17 @@ sub EventProcessingWindowRec($@) {
                 );
             }
 
-            elsif (not IsDay($shuttersDev)
-                or $homemode eq 'asleep'
-                or $homemode eq 'gotosleep' )
+            elsif (
+                    $shutters->getModeUp ne 'absent'
+                and $shutters->getModeUp ne 'off'
+                and (  not IsDay($shuttersDev)
+                    or $homemode eq 'asleep'
+                    or $homemode eq 'gotosleep' )
+                and $shutters->getModeDown ne 'absent'
+                and $shutters->getModeDown ne 'off'
+              )
             {
-                $shutters->setLastDrive('window night closed');
+                $shutters->setLastDrive('window closed at night');
                 $shutters->setNoOffset(1);
                 $shutters->setDriveCmd( $shutters->getClosedPos );
             }
@@ -4657,10 +4669,11 @@ sub _getRainSensor {
     $self->{ASC_rainSensor}->{reading} =
       ( $reading ne 'none' ? $reading : 'state' );
     $self->{ASC_rainSensor}->{triggermax} = ( $max ne 'none' ? $max : 1000 );
-    $self->{ASC_rainSensor}->{triggerhyst} =
-      (   $hyst ne 'none'
+    $self->{ASC_rainSensor}->{triggerhyst} = (
+          $hyst ne 'none'
         ? $max - $hyst
-        : ( $self->{ASC_rainSensor}->{triggermax} * 0 ) );
+        : ( $self->{ASC_rainSensor}->{triggermax} * 0 )
+    );
     $self->{ASC_rainSensor}->{shuttersClosedPos} =
       ( $pos ne 'none' ? $pos : $shutters->getClosedPos );
 
