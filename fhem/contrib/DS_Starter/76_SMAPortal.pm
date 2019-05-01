@@ -1652,7 +1652,7 @@ return $ret;
        (default = 0) </li><br>
        
        <a name="portalGraphicColor"></a>
-       <li><b>portalGraphicStyle &lt;RGB-Code&gt; </b><br>
+       <li><b>portalGraphicColor &lt;RGB-Code&gt; </b><br>
        Definiert die Farbe der grafischen Darstellung von SMA Portal Prognosedaten. 
        (siehe "set &lt;name&gt; createPortalGraphic")
        </li><br>
