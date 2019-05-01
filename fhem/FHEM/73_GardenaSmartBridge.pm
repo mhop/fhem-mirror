@@ -59,7 +59,7 @@ use strict;
 use warnings;
 use FHEM::Meta;
 
-my $version = "1.6.0";
+my $version = "1.6.1";
 
 
 sub GardenaSmartBridge_Initialize($) {
@@ -502,6 +502,7 @@ sub ErrorHandling($$$) {
             ( $data =~ /Error/ )
             or defined( eval { decode_json($data) }->{errors} )
         )
+        and ref($param->{code}) eq 'HASH'
         and exists( $param->{code} )
       )
     {
