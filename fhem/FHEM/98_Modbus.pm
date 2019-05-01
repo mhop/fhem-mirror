@@ -133,11 +133,20 @@
 #   2019-02-09  optimized logging in level 4/5
 #   2019-02-19  little bug fix (warning)
 #   2019-04-05  add a require for DevIO also in LDInitialize to be on the safe side ...
+#	2019-04-15	add ModbusReadingsFn to allow the manipulation of readings in a derived module,
+#				allow parseInfo and deviceInfo in device hash with priority over module hash
+#	2019-04-17	better logging
 #
 #
 #
 #
 #   ToDo / Ideas 
+#					Allow parseInfo in device Hash with priority over Module Hash
+#					Allow setting of a _Setup function in the ModbusXY initialize function to be called after init done and not disabled
+#						this can then modify the parseInfo Hash depending of a model variant or an offset 	
+#						maybe call whenever startUpdateTime is called as well and _setup has not been caled yet?
+#						or do it depending on a certain object which is requested during normal getupdate? as expr?
+#			
 #                   learn objects in passive mode
 #
 #                   when an attr is set for a TCP slave or relay, copy attrs to running connection devices
@@ -317,7 +326,7 @@ sub ModbusLD_GetIOHash($);
 sub ModbusLD_DoRequest($$$;$$$$);
 sub ModbusLD_StartUpdateTimer($);
 
-my $Modbus_Version = '4.0.25 - 5.4.2019';
+my $Modbus_Version = '4.1.2 - 17.4.2019';
 my $Modbus_PhysAttrs = 
         "queueDelay " .
         "queueMax " .
@@ -873,7 +882,9 @@ sub ModbusLD_UpdateGetSetList($)
     my ($hash)    = @_;
     my $name      = $hash->{NAME};
     my $modHash   = $modules{$hash->{TYPE}};
-    my $parseInfo = $modHash->{parseInfo};
+    
+	my $parseInfo = ($hash->{parseInfo} ? $hash->{parseInfo} : $modHash->{parseInfo});
+	my $devInfo   = ($hash->{deviceInfo} ? $hash->{deviceInfo} : $modHash->{deviceInfo});
     
     if (AttrVal($name, "enableControlSet", 1)) {            # spezielle Sets freigeschaltet (since 4.0 1 by default)
         if ($hash->{MODE} && $hash->{MODE} eq 'master') {
@@ -1729,7 +1740,7 @@ sub Modbus_HandleServerConnection($)
     $chash->{PROTOCOL}  = $hash->{PROTOCOL};
     $chash->{MODE}      = $hash->{MODE};
     $chash->{RELAY}     = $hash->{RELAY};
-    $chash->{CHILDOF}   = $hash;                                    # point to parent device to get object definitions from there
+    $chash->{CHILDOF}   = $hash;                             	# point to parent device to get object definitions from there
     $chash->{IODev}     = $chash;
     $chash->{TCPConn}   = 1;
     $chash->{TCPChild}  = 1;
@@ -2314,7 +2325,7 @@ sub ModbusLD_ParseObj($$) {
     my ($unpack, $format, $expr, $ignExpr, $map, $rest, $objLen, $encode, $decode);
     $op = "" if (!$op);
     Log3 $name, 5, "$name: ParseObj called with data " . unpack ("H*", $dataPtr->{VALUES}) . ", type $type, adr $startAdr" .  ($valuesLen ? ", valuesLen $valuesLen" : "") .  ($op ? ", op $op" : "");
-    delete $logHash->{gotReadings};         # will be filled later and queried by caller
+    delete $logHash->{gotReadings};         # will be filled later and queried by caller. Used for logging and return value in get-command
 
     if ($type =~ "[cd]") {
         # valuesLen is only used for coils / discrete inputs
@@ -2456,12 +2467,14 @@ sub ModbusLD_ParseObj($$) {
                                 }
                             }                           
                             if (!$outOfBounds) {
-                                Log3 $name, 4, "$name: ParseObj assigns value $val to reading $rname of device $device";
-                                if ($dev eq $logHash) {
-                                    readingsBulkUpdate($dev, $rname, $val);         # assign value to one of this devices readings 
-                                } else {
-                                    readingsSingleUpdate($dev, $rname, $val, 1);    # assign value to reading - another Fhem device
-                                }
+								if (!Modbus_TryCall($logHash, 'ModbusReadingsFn', $reading, $val)) {	
+									Log3 $name, 4, "$name: ParseObj assigns value $val to reading $rname of device $device";
+									if ($dev eq $logHash) {
+										readingsBulkUpdate($dev, $rname, $val);         # assign value to one of this devices readings 
+									} else {
+										readingsSingleUpdate($dev, $rname, $val, 1);    # assign value to reading - another Fhem device
+									}
+								}
                                 $logHash->{gotReadings}{$reading} = $val;
                             } else {
                                 Log3 $name, 4, "$name: ParseObj ignores value $val because it is out of bounds ($setmin / $setmax) for reading $rname of device $device";
@@ -2474,8 +2487,10 @@ sub ModbusLD_ParseObj($$) {
                             $dataPtr->{ERRCODE} = $code if ($code);
                         }
                     } else {
-                        Log3 $name, 4, "$name: ParseObj assigns value $val to $reading";
-                        readingsBulkUpdate($logHash, $reading, $val);
+						if (!Modbus_TryCall($logHash, 'ModbusReadingsFn', $reading, $val)) {	
+							Log3 $name, 4, "$name: ParseObj assigns value $val to $reading";
+							readingsBulkUpdate($logHash, $reading, $val);
+						}
                         $logHash->{gotReadings}{$reading} = $val;
                         $logHash->{lastRead}{$key}        = gettimeofday();     # used for pollDelay checking by getUpdate (mode master)
                     }
@@ -3705,8 +3720,10 @@ sub ModbusLD_GetUpdate($) {
     my ($calltype,$name) = split(':',$param);
     my $hash      = $defs{$name};       # logisches Device, da GetUpdate aus dem logischen Modul per Timer gestartet wird
     my $modHash   = $modules{$hash->{TYPE}};
-    my $parseInfo = $modHash->{parseInfo};
-    my $devInfo   = $modHash->{deviceInfo};
+
+	my $parseInfo = ($hash->{parseInfo} ? $hash->{parseInfo} : $modHash->{parseInfo});
+	my $devInfo   = ($hash->{deviceInfo} ? $hash->{deviceInfo} : $modHash->{deviceInfo});
+	
     my $now       = gettimeofday();
     
     Log3 $name, 5, "$name: GetUpdate called from " . Modbus_Caller();
@@ -4647,10 +4664,10 @@ sub Modbus_ObjAttr($$$) {
 sub Modbus_ObjInfo($$$;$$) {
     my ($hash, $key, $oName, $defName, $lastDefault) = @_;
     #   Device  h123  unpack  defUnpack
-    $hash = $hash->{CHILDOF} if ($hash->{CHILDOF});                     # take info from parent device if TCP server conn
+    $hash = $hash->{CHILDOF} if ($hash->{CHILDOF});                     # take info from parent device if TCP server conn (TCP slave)
     my $name      = $hash->{NAME};
     my $modHash   = $modules{$hash->{TYPE}};
-    my $parseInfo = $modHash->{parseInfo};
+    my $parseInfo = ($hash->{parseInfo} ? $hash->{parseInfo} : $modHash->{parseInfo});
     #Log3 $name, 5, "$name: ObjInfo called from " . Modbus_Caller() . " for $key, object $oName" . 
     #   ($defName ? ", defName $defName" : "") . ($lastDefault ? ", lastDefault $lastDefault" : "");
         
@@ -4709,7 +4726,7 @@ sub Modbus_ObjInfo($$$;$$) {
             return $attr{$name}{$dadName} 
                 if (defined($attr{$name}{$dadName}));
         }
-        my $devInfo = $modHash->{deviceInfo};
+		my $devInfo = ($hash->{deviceInfo} ? $hash->{deviceInfo} : $modHash->{deviceInfo});
         return $devInfo->{$type}{$defName}
             if (defined($devInfo->{$type}) && defined($devInfo->{$type}{$defName}));
     }
@@ -4726,7 +4743,7 @@ sub Modbus_DevInfo($$$;$) {
     $hash = $hash->{CHILDOF} if ($hash->{CHILDOF});                     # take info from parent device if TCP server conn
     my $name    = $hash->{NAME};
     my $modHash = $modules{$hash->{TYPE}};
-    my $devInfo = $modHash->{deviceInfo};
+	my $devInfo = ($hash->{deviceInfo} ? $hash->{deviceInfo} : $modHash->{deviceInfo});
     my $aName   = "dev-".$type."-".$oName;
     my $adName  = "dev-".$oName;
     
@@ -4750,14 +4767,15 @@ sub Modbus_DevInfo($$$;$) {
 ##################################################
 # Get Type/Adr for a reading name from Attributes,
 # or parseInfo Hash
+# called from get and set to get objCombi for name
 sub Modbus_ObjKey($$) {
     my ($hash, $reading) = @_;
     return undef if ($reading eq '?');
-    
+    $hash = $hash->{CHILDOF} if ($hash->{CHILDOF});                     # take info from parent device if TCP server conn	
     my $name      = $hash->{NAME};
-    my $modHash   = $modules{$hash->{TYPE}};
-    my $parseInfo = $modHash->{parseInfo};
-
+    my $modHash   = $modules{$hash->{TYPE}};    
+	my $parseInfo = ($hash->{parseInfo} ? $hash->{parseInfo} : $modHash->{parseInfo});
+	
     foreach my $a (keys %{$attr{$name}}) {
         if ($a =~ /obj-([cdih][0-9]+)-reading/ && $attr{$name}{$a} eq $reading) {
             return $1;
@@ -4793,6 +4811,30 @@ sub Modbus_CheckEval($\@$$) {
     }               
     return $result;
 }
+
+
+# Try to call a user defined function if defined
+#################################################
+sub Modbus_TryCall($$$$)
+{
+    my ($hash, $fName, $reading, $val) = @_;
+    my $name = $hash->{NAME};
+	my $modHash = $modules{$hash->{TYPE}};
+	if ($modHash->{$fName}) {
+		my $func = $modHash->{$fName};
+		Log3 $name, 5, "$name: " . Modbus_Caller() . " is calling $fName via TrCall for reading $reading and val $val";
+		no strict "refs";     
+		my $ret = eval { &{$func}($hash,$reading,$val) };
+		if( $@ ) {         
+			Log3 $name, 3, "$name: " . Modbus_Caller() . " error calling $fName: $@";
+			return;
+		}                   
+		use strict "refs";
+		return $ret
+	}
+	return;
+}
+
 
 
 #####################################
@@ -4913,6 +4955,7 @@ sub Modbus_Caller()
 {
     my ($package, $filename, $line, $subroutine, $hasargs, $wantarray, $evaltext, $is_require, $hints, $bitmask, $hinthash) = caller 2;
     return $1 if ($subroutine =~ /main::Modbus_(.*)/);
+	return $1 if ($subroutine =~ /main::ModbusLD_(.*)/);
     return $1 if ($subroutine =~ /main::(.*)/);
 
     return "$subroutine";
