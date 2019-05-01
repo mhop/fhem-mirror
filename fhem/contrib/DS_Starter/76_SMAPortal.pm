@@ -1376,7 +1376,7 @@ sub PortalAsHtml ($) {
   # Werte aktuelle Stunde
   $pv{0} = ReadingsNum($name,"L2_ThisHour_PvMeanPower", undef);
   $is{0} = (ReadingsVal($name,"L2_ThisHour_IsConsumptionRecommended",'no') eq 'yes' ) ? $icon : undef;
-  return "Awaiting level 4 data ... " if(!defined $pv{0} || !defined $is{0});
+  return "Awaiting level 4 data ... " if(!defined $pv{0});
   if(AttrVal("global","language","EN") eq "DE") {
       (undef,undef,undef,$t{0}) = ReadingsVal($name,"L2_ThisHour_Time",'0') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/;
   } else {
