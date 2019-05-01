@@ -1404,8 +1404,13 @@ sub addDOIF_Readings
 
 sub setDOIF_Reading
 {
-  my ($hash,$DOIF_Reading,$reading,$ReadingType) = @_;
+  my ($hash,$DOIF_Reading,$reading,$ReadingType,$eventa,$eventas,$dev) = @_;
   $lastWarningMsg="";
+  $hash->{helper}{triggerEvents}=$eventa;
+  $hash->{helper}{triggerEventsState}=$eventas;
+  $hash->{helper}{triggerDev}=$dev;
+  $hash->{helper}{event}=join(",",@{$eventa}) if ($eventa);
+
   my $ret = eval $hash->{$ReadingType}{$DOIF_Reading};
   if ($@) {
     $@ =~ s/^(.*) at \(eval.*\)(.*)$/$1,$2/;
@@ -2350,6 +2355,7 @@ sub DOIF_Trigger
 }
 
 
+
 sub
 DOIF_Notify($$)
 {
@@ -2496,7 +2502,7 @@ DOIF_Notify($$)
         #readingsBeginUpdate($hash);
         foreach my $reading (keys %{$hash->{Regex}{"DOIF_Readings"}{$device}}) {
           my $readingregex=CheckRegexpDoIf($hash,"DOIF_Readings",$dev->{NAME},$reading,$eventas,0);
-          setDOIF_Reading($hash,$reading,$readingregex,"DOIF_Readings") if (defined($readingregex));
+          setDOIF_Reading($hash,$reading,$readingregex,"DOIF_Readings",$eventa, $eventas,$dev->{NAME}) if (defined($readingregex));
         }
         #readingsEndUpdate($hash, 1);
       }
@@ -2504,7 +2510,7 @@ DOIF_Notify($$)
     if (defined ($hash->{helper}{DOIF_eventas})) { #$SELF events
       foreach my $reading (keys %{$hash->{Regex}{"DOIF_Readings"}{$hash->{NAME}}}) {
         my $readingregex=CheckRegexpDoIf($hash,"DOIF_Readings",$hash->{NAME},$reading,$hash->{helper}{DOIF_eventas},0);
-        setDOIF_Reading($hash,$reading,$readingregex,"DOIF_Readings") if (defined($readingregex));
+        setDOIF_Reading($hash,$reading,$readingregex,"DOIF_Readings",$eventa, $eventas,$dev->{NAME}) if (defined($readingregex));
       }
     }
   }
@@ -2534,7 +2540,7 @@ DOIF_Notify($$)
         #readingsBeginUpdate($hash);
         foreach my $reading (keys %{$hash->{Regex}{"event_Readings"}{$device}}) {
           my $readingregex=CheckRegexpDoIf($hash,"event_Readings",$dev->{NAME},$reading,$eventas,0);
-          setDOIF_Reading($hash,$reading,$readingregex,"event_Readings") if (defined($readingregex));
+          setDOIF_Reading($hash,$reading,$readingregex,"event_Readings",$eventa, $eventas,$dev->{NAME}) if (defined($readingregex));
         }
         #readingsEndUpdate($hash,1);
       }
@@ -2542,7 +2548,7 @@ DOIF_Notify($$)
     if (defined ($hash->{helper}{DOIF_eventas})) { #$SELF events
       foreach my $reading (keys %{$hash->{Regex}{"event_Readings"}{$hash->{NAME}}}) {
         my $readingregex=CheckRegexpDoIf($hash,"event_Readings",$hash->{NAME},$reading,$hash->{helper}{DOIF_eventas},0);
-        setDOIF_Reading($hash,$reading,$readingregex,"event_Readings") if (defined($readingregex));
+        setDOIF_Reading($hash,$reading,$readingregex,"event_Readings",$eventa, $eventas,$dev->{NAME}) if (defined($readingregex));
       }
     }
   }
@@ -3274,7 +3280,7 @@ DOIF_Attr(@)
     } else {
       if ($init_done) {
         foreach my $reading (keys %{$hash->{$a[2]}}) {
-          setDOIF_Reading ($hash,$reading,"",$a[2]);
+          setDOIF_Reading ($hash,$reading,"",$a[2],"","","");
         }
       }
     }
@@ -4871,7 +4877,6 @@ Zwischen 5:00 und 22:00 Uhr läuft die Zirkulationspumpe alle 60 Minuten jeweils
 <code>define di_presence_simulation DOIF ([19:00-00:00])(set lamp on-for-timer {(int(rand(1800)+300))}) DOELSE (set lamp off)<br>
 attr di_presence_simulation repeatcmd rand(3600)+2200</code><br>
 <br>
-<br>
 </li><li><a name="DOIF_cmdpause"></a>
 <b>Zwangspause für das Ausführen eines Kommandos seit der letzten Zustandsänderung</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
@@ -4941,6 +4946,7 @@ Die Attribute <code>wait</code> und <code>waitdel</code> lassen sich für versch
 <br>
 <code>attr di_cmd wait 2:0<br>
 attr di_cmd waitdel 0:2</code><br>
+<br>
 </li><li><a name="DOIF_checkReadingEvent"></a>
 <b>Readingauswertung bei jedem Event des Devices</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
@@ -5420,7 +5426,7 @@ Mit dem Attribut <code>initialize</code> Wird der Status vorbelegt, mit Initiali
 <br>
 <u>Anwendungsbeispiel</u>: Nach dem Neustart soll der Zustand von <code>di_lamp</code> mit "initialized" vorbelegt werden. Das Reading <code>cmd_nr</code> wird auf 0 gesetzt, damit wird ein Zustandswechsel provoziert, das Modul wird initialisiert - der nächste Trigger führt zum Ausführen eines Kommandos.<br>
 <br>
-<code>attr di_lamp intialize initialized</code><br>
+<code>attr di_lamp initialize initialized</code><br>
 <br>
 Das ist insb. dann sinnvoll, wenn das System ohne Sicherung der Konfiguration (unvorhergesehen) beendet wurde und nach dem Neustart die zuletzt gespeicherten Zustände des Moduls nicht mit den tatsächlichen übereinstimmen.<br>
 <br>
@@ -6026,42 +6032,33 @@ Es sind beliebige Hierarchietiefen möglich:<br>
 <br>
 Bemerkung: Innerhalb eines Ereignisblocks muss mindestens ein Trigger definiert werden, damit der gesamte Block beim passenden Trigger ausgeführt wird.<br>
 <br>
-<a name="DOIF_Inhaltsuebersicht"></a>
-<b>Inhaltsübersicht</b> (Beispiele im Perlmodus sind besonders gekennzeichnet)<br>
+<a name="DOIF_Inhaltsuebersicht_Perl-Modus"></a>
+<b>Inhaltsübersicht Perl-Modus</b><br>
 <ul><br>
-  <a href="#DOIF_Lesbarkeit_der_Definitionen">Lesbarkeit der Definitionen</a><br>
-  <a href="#DOIF_Ereignissteuerung">Ereignissteuerung</a><br>
-  <a href="#DOIF_Teilausdruecke_abfragen">Teilausdrücke abfragen</a><br>
-  <a href="#DOIF_Ereignissteuerung_ueber_Auswertung_von_Events">Ereignissteuerung über Auswertung von Events</a><br>
-  <a href="#DOIF_Angaben_im_Ausfuehrungsteil">Angaben im Ausführungsteil</a><br>
-  <a href="#DOIF_Filtern_nach_Zahlen">Filtern nach Ausdrücken mit Ausgabeformatierung</a><br>
-  <a href="#DOIF_Reading_Funktionen">Durchschnitt, Median, Differenz, anteiliger Anstieg</a><br>
-  <a href="#DOIF_aggregation">Aggregieren von Werten</a><br>
-  <a href="#DOIF_Zeitsteuerung">Zeitsteuerung</a><br>
-  <a href="#DOIF_Relative_Zeitangaben">Relative Zeitangaben</a><br>
-  <a href="#DOIF_Zeitangaben_nach_Zeitraster_ausgerichtet">Zeitangaben nach Zeitraster ausgerichtet</a><br>
-  <a href="#DOIF_Relative_Zeitangaben_nach_Zeitraster_ausgerichtet">Relative Zeitangaben nach Zeitraster ausgerichtet</a><br>
-  <a href="#DOIF_Zeitangaben_nach_Zeitraster_ausgerichtet_alle_X_Stunden">Zeitangaben nach Zeitraster ausgerichtet alle X Stunden</a><br>
-  <a href="#DOIF_Wochentagsteuerung">Wochentagsteuerung</a><br>
-  <a href="#DOIF_Zeitsteuerung_mit_Zeitintervallen">Zeitsteuerung mit Zeitintervallen</a><br>
-  <a href="#DOIF_Indirekten_Zeitangaben">Indirekten Zeitangaben</a><br>
-  <a href="#DOIF_Zeitsteuerung_mit_Zeitberechnung">Zeitsteuerung mit Zeitberechnung</a><br>
-  <a href="#DOIF_Intervall-Timer">Intervall-Timer</a><br>
-  <a href="#DOIF_Kombination_von_Ereignis_und_Zeitsteuerung_mit_logischen_Abfragen">Kombination von Ereignis- und Zeitsteuerung mit logischen Abfragen</a><br>
-  <a href="#DOIF_Zeitintervalle_Readings_und_Status_ohne_Trigger">Zeitintervalle, Readings und Status ohne Trigger</a><br>
-  <a href="#DOIF_notexist">Ersatzwert für nicht existierende Readings oder Status</a><br>
-  <a href="#DOIF_Zeitspanne_eines_Readings_seit_der_letzten_Aenderung">Zeitspanne eines Readings seit der letzten Änderung</a><br>
-  <a href="#DOIF_setList__readingList">Darstellungselement mit Eingabemöglichkeit im Frontend und Schaltfunktion</a><br>
-  <a href="#DOIF_uiTable">uiTable, das User Interface</a><br>
-  <a href="#DOIF_Reine_Statusanzeige_ohne_Ausfuehrung_von_Befehlen">Reine Statusanzeige ohne Ausführung von Befehlen</a><br>
-  <a href="#DOIF_state">Anpassung des Status mit Hilfe des Attributes <code>state</code></a><br>
-  <a href="#DOIF_DOIF_Readings">Erzeugen berechneter Readings<br>
-  <a href="#DOIF_disable">Deaktivieren des Moduls</a><br>
-  <a href="https://wiki.fhem.de/wiki/DOIF">DOIF im FHEM-Wiki</a><br>
-  <a href="https://forum.fhem.de/index.php/board,73.0.html">DOIF im FHEM-Forum</a><br>
-  <a href="#DOIF_Kurzreferenz">Kurzreferenz</a><br>
+  <a href="#DOIF_Eigene_Funktionen">Eigene Funktionen - subs-Block</a><br>
+  <a href="#DOIF_Eigene_Funktionen_mit_Parametern">Eigene Funktionen mit Parametern</a><br>
+  <a href="#DOIF_Eigener_Namensraum">Eigener_Namensraum</a><br>
+  <a href="#DOIF_Spezifische_Perl-Funktionen_im_Perl-Modus">Spezifische Perl-Funktionen im Perl-Modus:</a>&nbsp;
+    <a href="#DOIF_fhem_set">fhem_set</a>&nbsp;
+    <a href="#DOIF_set_Event">set_Event</a>&nbsp;
+    <a href="#DOIF_set_State">set_State</a>&nbsp;
+    <a href="#DOIF_get_State">get_State</a>&nbsp;
+    <a href="#DOIF_set_Reading">set_Reading</a>&nbsp;
+    <a href="#DOIF_get_Reading">get_Reading</a>&nbsp;
+    <a href="#DOIF_set_Reading_Update">set_Reading_Update</a>&nbsp;
+    <a href="#DOIF_fhem_set">fhem_set</a><br>
+  <a href="#DOIF_Ausführungstimer">Ausführungstimer:</a>&nbsp;
+    <a href="#DOIF_set_Exec">set_Exec</a>&nbsp;
+    <a href="#DOIF_get_Exec">get_Exec</a>&nbsp;
+    <a href="#DOIF_del_Exec">del_Exec</a><br>
+  <a href="#DOIF_init-Block">Initialisierung - init-Block</a><br>
+  <a href="#DOIF_Device-Variablen">Device-Variablen</a><br>
+  <a href="#DOIF_Blockierende_Funktionsaufrufe">Blockierende Funktionsaufrufe</a><br>
+  <a href="#DOIF_Attribute_Perl_Modus">Attribute im Perl-Modus</a><br>
+  <a href="#DOIF_Anwendungsbeispiele_im_Perlmodus">Anwendungsbeispiele im Perl-Modus</a><br>
 </ul><br>
-<u>Eigene Funktionen</u><br>
+<a name="DOIF_Eigene_Funktionen"></a>
+<u>Eigene Funktionen</u>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht_Perl-Modus">back</a><br>
 <br>
 Ein besonderer Block ist der Block namens <b>subs</b>. In diesem Block werden Perlfunktionen definiert, die innerhalb des DOIFs genutzt werden. 
 Um eine möglichst hohe Kompatibilität zu Perl sicherzustellen, wird keine DOIF-Syntax in eckigen Klammern unterstützt, insb. gibt es keine Trigger, die den Block ausführen können.<br>
@@ -6083,7 +6080,8 @@ subs { ## Definition von Perlfunktionen lamp_on und lamp_off<br>
 {[08:00];lamp_off()} ## Um 08:00 Uhr wird die Funktion lamp_off aufgerufen<br>
 </code><br>
 <br>
-<u>Eigene Funktionen mit Parametern</u><br>
+<a name="DOIF_Eigene_Funktionen_mit_Parametern"></a>
+<u>Eigene Funktionen mit Parametern</u>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht_Perl-Modus">back</a><br>
 <br>
 Unter Verwendung von Funktionsparamerter lassen sich Definitionen oft vereinfachen, das obige Beispiel lässt sich mit Hilfe nur einer Funktion kürzer wie folgt definieren:<br>
 <br><code>
@@ -6099,6 +6097,9 @@ subs { ## Definition der Perlfunktion lamp<br>
 {[08:00];lamp("off")} ## Um 08:00 Uhr wird die Funktion lamp mit dem Parameter "off" aufgerufen<br>
 </code><br>
 <br>
+<a name="DOIF_Eigener_Namensraum"></a>
+<u>Eigener Namensraum</u>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht_Perl-Modus">back</a><br>
+<br>
 Der Namensraum im Perl-Modus ist gekapselt. Selbstdefinierte Funktionen im DOIF-Device können nicht bereits existierende Perlfunktionen in FHEM (Namensraum main) überschreiben.
 Funktionen aus dem Namensraum main müssen mit vorangestellem Doppelpunkt angegeben werden: <code>::&lt;perlfunction&gt;</code><br>
 <br>
@@ -6110,8 +6111,9 @@ Folgende FHEM-Perlfunktionen wurden ebenfalls im DOIF-Namensraum definiert, sie 
 <code><b>fhem, Log, Log3, InternVal, InternalNum, OldReadingsVal, OldReadingsNum, OldReadingsTimestamp, ReadingsVal, ReadingsNum, ReadingsTimestamp, ReadingsAge, Value, OldValue, OldTimestamp, AttrVal, AttrNum</code></b><br>
 <br>
 <a name="DOIF_Spezifische_Perl-Funktionen_im_Perl-Modus"></a>
-<b>Spezifische Perl-Funktionen im Perl-Modus</b><br>
+<u>Spezifische Perl-Funktionen im Perl-Modus</u>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht_Perl-Modus">back</a><br>
 <br>
+<a name="DOIF_fhem_set"></a>
 FHEM set-Befehl ausführen: <code><b>fhem_set(&lt;content&gt;)</code></b>, mit &lt;content&gt; Übergabeparameter des FHEM set-Befehls<br>
 <br>
 Beispiel: Lampe ausschalten:<br>
@@ -6124,34 +6126,40 @@ entspricht:<br>
 <br>
 Der Aufruf der fhem_set-Funktion ist performater, da das Parsen nach dem set-Befehl im Gegensatz zum Aufruf mit der Funktion <code>fhem</code> entfällt.<br>
 <br>
+<a name="DOIF_set_Event"></a>
 Ein beliebiges FHEM-Event absetzen: <code><b>set_Event(&lt;Event&gt;)</code></b><br>
 <br>
 Beispiel: Setze das Event "on":<br>
 <br>
 <code>set_Event("on");</code><br>
 <br>
+<a name="DOIF_set_State"></a>
 Status setzen: <code><b>set_State(&lt;value&gt;,&lt;trigger&gt;)</code></b>, mit &lt;trigger&gt;: 0 ohne Trigger, 1 mit Trigger, &lt;trigger&gt; ist optional, default ist 1<br>
 <br>
 Beispiel: Status des eignen DOIF-Device auf "on" setzen:<br>
 <br>
 <code>set_State("on");</code><br>
 <br>
+<a name="DOIF_get_State"></a>
 Status des eigenen DOIF-Devices holen: <code><b>get_State()</code></b><br>
 <br>
 Beispiel: Schalte lampe mit dem eigenen Status:<br>
 <br>
 <code>fhem_set("lamp ".get_State());</code><br>
 <br>
+<a name="DOIF_set_Reading"></a>
 Reading des eigenen DOIF-Devices schreiben: <code><b>set_Reading(&lt;readingName&gt;,&lt;value&gt;,&lt;trigger&gt;)</code></b>, mit &lt;trigger&gt;: 0 ohne Trigger, 1 mit Trigger, &lt;trigger&gt; ist optional, default ist 0<br>
 <br>
 <code>set_Reading("weather","cold");</code><br>
 <br>
+<a name="DOIF_get_Reading"></a>
 Reading des eigenen DOIF-Devices holen: <code><b>get_Reading(&lt;readingName&gt;)</code></b><br>
 <br>
 Beispiel: Schalte Lampe mit dem Inhalt des eigenen Readings "dim":<br>
 <br>
 <code>fhem_set("lamp ".get_Reading("dim"));</code><br>
 <br>
+<a name="DOIF_set_Reading_Update"></a>
 Setzen mehrerer Readings des eigenen DOIF-Devices in einem Eventblock:<br>
 <br>
 <code><b>set_Reading_Begin()</code></b><br>
@@ -6169,17 +6177,21 @@ Die Readings "temperature" und "humidity" sollen in einem Eventblock mit dem zuv
 <code>set_Reading_Update("humidity",$hum);</code><br>
 <code>set_Reading_End(1);</code><br>
 <br>
-<u>Ausführungstimer</u><br>
+<a name="DOIF_Ausführungstimer"></a>
+<u>Ausführungstimer</u>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht_Perl-Modus">back</a><br>
 <br>
 Mit Hilfe von Ausführungstimern können Anweisungen verzögert ausgeführt werden. Im Gegensatz zum FHEM-Modus können beliebig viele Timer gleichzeitig genutzt werden.
 Ein Ausführungstimer wird mit einem Timer-Namen eindeutig definiert. Über den Timer-Namen kann die Restlaufzeit abgefragt werden, ebenfalls kann er vor seinem Ablauf gelöscht werden.<br>
 <br>
+<a name="DOIF_set_Exec"></a>
 Timer setzen: <code><b>set_Exec(&lt;timerName&gt;, &lt;seconds&gt;, &lt;perlCode&gt, &lt;parameter&gt)</code></b>, mit &lt;timerName&gt;: beliebige Angabe, sie spezifiziert eindeutig einen Timer, 
 welcher nach Ablauf den angegebenen Perlcode &lt;perlCode&gt; aufruft. Falls als Perlcode eine Perlfunktion angegeben wird, kann optional ein Übergabeparameter &lt;parameter&gt; angegeben werden. Die Perlfunkion muss eindeutig sein und in FHEM zuvor deklariert worden sein.
 Wird set_Exec mit dem gleichen &lt;timerName&gt; vor seinem Ablauf erneut aufgerufen, so wird der laufender Timer gelöscht und neugesetzt.<br>
 <br>
+<a name="DOIF_get_Exec"></a>
 Timer holen: <code><b>get_Exec(&lt;timerName&gt;)</code></b>, Returnwert: 0, wenn Timer abgelaufen oder nicht gesetzt ist, sonst Anzahl der Sekunden bis zum Ablauf des Timers<br>
 <br>
+<a name="DOIF_del_Exec"></a>
 Laufenden Timer löschen: <code><b>del_Exec(&lt;timerName&gt;)</code></b><br>
 <br>
 Beispiel: Funktion namens "lamp" mit dem Übergabeparameter "on" 30 Sekunden verzögert aufrufen:<br>
@@ -6198,13 +6210,15 @@ Beispiel: Das Event "off" 30 Sekunden verzögert auslösen:<br>
 <br>
 <code>set_Exec("off_Event",30,'set_Event("off")');</code><br>
 <br>
-<u>init-Block</u><br>
+<a name="DOIF_init-Block"></a>
+<u>init-Block</u>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht_Perl-Modus">back</a><br>
 <br>
 Wird ein Ereignisblock mit dem Namen <b>init</b> benannt, so wird dieser Block beim Systemstart ausgeführt. Er bietet sich insb. an, um Device-Variablen des Moduls vorzubelegen.<br>
 <br>
-<u>Device-Variablen</u><br>
+<a name="DOIF_Device-Variablen"></a>
+<u>Device-Variablen</u>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht_Perl-Modus">back</a><br>
 <br>
-Device-Variablen sind sogenannte Instanzvariablen, die global innerhalb eines DOIF-Devices genutzt werden können. Deren Inhalt bleibt während der Laufzeit des System erhalten. Sie beginnen mit <b>$_</b> und müssen nicht deklariert werden.
+Device-Variablen sind sogenannte Instanzvariablen, die global innerhalb eines DOIF-Devices genutzt werden können. Deren Inhalt bleibt von Trigger zu Trigger während der Laufzeit des System erhalten. Sie beginnen mit <b>$_</b> und müssen nicht deklariert werden.
 Wenn sie nicht vorbelegt werden, gelten sie als nicht definiert. Das lässt sich abfragen mit:<br>
 <br>
 <code>if (defined $_...) ...</code><br>
@@ -6223,7 +6237,8 @@ $_betrag{$i}=100;</code><br>
 Ebenso funktionieren hash-Variablen z. B.: <br>
 <code>$_betrag{heute}=100;</code><br>
 <br>
-<u>Blokierende Funktionsaufrufe (blocking calls)</u><br>
+<a name="DOIF_Blockierende_Funktionsaufrufe"></a>
+<u>Blockierende Funktionsaufrufe (blocking calls)</u>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht_Perl-Modus">back</a><br>
 <br>
 DOIF verwaltet blockierende Funktionsaufrufe, d.h. die in diesem Zusammenhang gestarteten FHEM-Instanzen werden gel&ouml;scht, beim Herunterfahren (shutdown), Wiedereinlesen der Konfiguration (rereadcfg) &Auml;nderung der Konfiguration (modify) und Deaktivieren des Ger&auml;tes (disabled).<br>
 <br>
@@ -6240,7 +6255,7 @@ Wenn <i>&lt;blocking function&gt;</i>, <i>&lt;finish function&gt;</i> und <i>&lt
 <b>$_blockingcalls</b> ist eine f&uuml;r DOIF reservierte Variable und darf nur in der beschriebener Weise verwendet werden.<br>
 <br>
 <a name="DOIF_Attribute_Perl_Modus"></a>
-<u>Nutzbare Attribute im Perl-Modus</u><br>
+<u>Nutzbare Attribute im Perl-Modus</u>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht_Perl-Modus">back</a><br>
 <br>
   <ul>
   <a href="#DOIF_addStateEvent">addStateEvent</a> &nbsp;
@@ -6256,7 +6271,8 @@ Wenn <i>&lt;blocking function&gt;</i>, <i>&lt;finish function&gt;</i> und <i>&lt
   <br><a href="#readingFnAttributes">readingFnAttributes</a> &nbsp;
 </ul>
 <br>
-<b>Weitere Anwendungsbeispiele:</b><br>
+<a name="DOIF_Anwendungsbeispiele_im_Perlmodus"></a>
+<b>Anwendungsbeispiele im Perlmodus:</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht_Perl-Modus">back</a><br>
 <br>
 <a name="DOIF_Treppenhauslicht mit Bewegungsmelder"></a>
 <u>Treppenhauslicht mit Bewegungsmelder</u><br>
