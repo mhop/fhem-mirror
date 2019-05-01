@@ -44,7 +44,7 @@ use strict;
 use warnings;
 use FHEM::Meta;
 
-my $version = '0.6.4';
+my $version = '0.6.5';
 
 sub AutoShuttersControl_Initialize($) {
     my ($hash) = @_;
@@ -584,6 +584,9 @@ sub ShuttersDeviceScan($) {
           ;    # temporär muss später gelöscht werden ab Version 0.4.11beta6
         delFromDevAttrList( $_, 'ASC_Wind_Pos' )
           ;    # temporär muss später gelöscht werden ab Version 0.4.11beta6
+        CommandDeleteReading( undef, $_ . ' ASC_Time_PrivacyDriveUp' )
+          if ( ReadingsVal( $_, 'ASC_Time_PrivacyDriveUp', 'none' ) ne 'none' )
+          ;    # temporär muss später gelöscht werden ab Version 0.6.3
 
         $shuttersList = $shuttersList . ',' . $_;
         $shutters->setShuttersDev($_);
@@ -862,24 +865,37 @@ sub EventProcessingWindowRec($@) {
                 or $shutters->getStatus == $shutters->getOpenPos )
           )
         {
+            ASC_Debug( 'EventProcessingWindowRec: '
+                  . $shutters->getShuttersDev
+                  . ' Event Closed' );
+
             if (
-                    IsDay($shuttersDev)
-                and $shutters->getStatus != $shutters->getOpenPos
+                IsDay($shuttersDev)
                 and ( ( $homemode ne 'asleep' and $homemode ne 'gotosleep' )
                     or $homemode eq 'none' )
                 and $shutters->getModeUp ne 'absent'
                 and $shutters->getModeUp ne 'off'
               )
             {
-                $shutters->setLastDrive('window closed at day');
-                $shutters->setNoOffset(1);
-                $shutters->setDriveCmd(
-                    (
-                          $shutters->getLastPos != $shutters->getClosedPos
-                        ? $shutters->getLastPos
-                        : $shutters->getOpenPos
-                    )
-                );
+                if (    $shutters->getShadingStatus eq 'in'
+                    and $shutters->getShuttersPlace eq 'terrace'
+                    and $shutters->getShadingPos != $shutters->getStatus )
+                {
+                    $shutters->setLastDrive('shading in');
+                    $shutters->setNoOffset(1);
+                    $shutters->setDriveCmd( $shutters->getShadingPos );
+                }
+                elsif ( $shutters->getStatus != $shutters->getOpenPos ) {
+                    $shutters->setLastDrive('window closed at day');
+                    $shutters->setNoOffset(1);
+                    $shutters->setDriveCmd(
+                        (
+                              $shutters->getLastPos != $shutters->getClosedPos
+                            ? $shutters->getLastPos
+                            : $shutters->getOpenPos
+                        )
+                    );
+                }
             }
 
             elsif (
@@ -1519,6 +1535,7 @@ sub EventProcessingBrightness($@) {
             }
         }
         else {
+            EventProcessingShadingBrightness( $hash, $shuttersDev, $events );
             ASC_Debug( 'EventProcessingBrightness: '
                   . $shutters->getShuttersDev
                   . ' - Brightness Event kam nicht innerhalb der Verarbeitungszeit für Sunset oder Sunris oder aber für beide wurden die entsprechendne Verarbeitungsschwellen nicht erreicht.'
@@ -1856,7 +1873,12 @@ sub ShadingProcessing($@) {
                 : $getStatus < $getShadingPos
             );
 
-            if ( not $queryShuttersShadingPos ) {
+            if (
+                not $queryShuttersShadingPos
+                and not( CheckIfShuttersWindowRecOpen($shuttersDev) == 2
+                    and $shutters->getShuttersPlace eq 'terrace' )
+              )
+            {
                 $shutters->setLastDrive('shading in');
                 ShuttersCommandSet( $hash, $shuttersDev, $getShadingPos );
 
@@ -2115,7 +2137,7 @@ sub CreateSunRiseSetShuttersTimer($$) {
               $shuttersSunsetUnixtime - $shutters->getPrivacyDownTime;
             readingsSingleUpdate(
                 $shuttersDevHash,
-                'ASC_Time_PrivacyDriveUp',
+                'ASC_Time_PrivacyDriveDown',
                 strftime(
                     "%e.%m.%Y - %H:%M",
                     localtime($shuttersSunsetUnixtime)
