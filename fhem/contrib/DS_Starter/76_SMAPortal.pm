@@ -147,6 +147,7 @@ BEGIN {
 
 # Versions History intern
 our %vNotesIntern = (
+  "1.7.1"  => "01.05.2019  PortalAsHtml: use of colored svg-icons possible ",
   "1.7.0"  => "01.05.2019  code change of PortalAsHtml, new attributes \"portalGraphicColor\" and \"portalGraphicStyle\" ",
   "1.6.0"  => "29.04.2019  function PortalAsHtml ",
   "1.5.5"  => "22.04.2019  fix readings for BattryOut and BatteryIn ",
@@ -1335,7 +1336,7 @@ sub PortalAsHtml ($) {
   my ($name) = @_;
   my $hash   = $defs{$name};
   my $ret    = "";
-  my ($i,$header);
+  my ($i,$header,$icon);
   my (%pv,%is,%t);
   
   return "Device \"$name\" doesn't exist !" if(!$hash);
@@ -1354,11 +1355,9 @@ sub PortalAsHtml ($) {
   my $color1 = "#FFFFFF";                                            # Farbwert 1
   my $colorv = "#".AttrVal($name, "portalGraphicColor", "7F7F7F");   # Farbe des Wertes , ggf dyn ermitteln aus Device WEB styleData cols.Header  (original grün -> "#4B9C8A")
   
-  # Icon Erstellung 
-  my $icon     = "light_light_dim_100.svg";
-  # $icon = FW_makeImage($icon,$icon,"icon");
-  my $iconpath = "images/openautomation";
-  $icon        = $main::FW_ME."/$iconpath/$icon"; 
+  # Icon Erstellung, mit @<Farbe> ergänzen falls einfärben
+  # Beispiel mit Farbe:  $icon = FW_makeImage('light_light_dim_100.svg@green');
+  $icon = FW_makeImage('light_light_dim_100.svg@black');
   
   my $pv4h = ReadingsNum($name,"L2_Next04Hours-PV", "");
   my $pvRe = ReadingsNum($name,"L3_RestOfDay-PV", ""); 
@@ -1416,8 +1415,8 @@ sub PortalAsHtml ($) {
 
           if ($he < ($height+$fsize)) {
               $ret .= "<tr style='height:".($height+20-$he)."px;'><td style='background-color:".$colorv."; padding-bottom:0px; padding-top:1px; vertical-align:top'>";
-              $ret .="<img src='".$is{$i}."' height='".$fsize."'/>" if (defined $is{$i});
-              $ret .="</td></tr>";
+              $ret .= $is{$i} if (defined $is{$i});
+              $ret .= "</td></tr>";
           }
 
           $ret .= "<tr><td>".$t{$i}."</td></tr>";
@@ -1448,7 +1447,7 @@ sub PortalAsHtml ($) {
       $ret .= "</tr><tr>";  
       
       foreach $i (0..23) {
-          $is{$i} = "/fhem/images/fhemSVG/rc_BLANK.svg" if(!$is{$i});
+          $is{$i} = FW_makeImage('rc_BLANK.svg') if(!$is{$i});
           $ret .= "</td>";
           $ret .= "<td style='text-align:center; padding-right:".($space)."px;padding-left:".($space)."px;width:".($width)."px'>";
 
@@ -1456,9 +1455,9 @@ sub PortalAsHtml ($) {
           $ret .= "<tr>";
           $ret .= "<td style='text-align:center; padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$t{$i}."</td>";
           $ret .= "</tr><tr>";
-          $ret .= "<td style='text-align:center; padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'><img src='".$is{$i}."' height='".$fsize."'/></td>";
+          $ret .= "<td style='text-align:center; padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1.";height=".$fsize."'>".$is{$i}."</td>";
           $ret .= "</tr>";
-          $ret .= "<tr style='height:".(($maxValue-$pv{$i})/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$pv{$i}."</td></tr>";
+          $ret .= "<tr style='height:".(($maxValue-$pv{$i})/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1.";height=".$fsize."'>".$pv{$i}."</td></tr>";
           $ret .= "<tr style='height:".($pv{$i}/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$colorv."'></td></tr>";
           $ret .= "</table>";
       }
