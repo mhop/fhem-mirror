@@ -25,8 +25,13 @@ use IO::File;
 use HttpUtils;
 use Digest::MD5 qw(md5_hex);
 use URI::Escape;
+use Text::Iconv;
+#use Encode::Detect::Detector;
 use Data::Dumper;
 use lib ('./FHEM/lib', './lib');
+
+# loading in attr function of TTS_RESSOURCE if Paws is really needed
+# require Paws::Polly
 
 sub Text2Speech_OpenDev($);
 sub Text2Speech_CloseDev($);
@@ -39,12 +44,11 @@ my %sets = (
 );
 
 # path to mplayer
-my $mplayer 			= 'sudo /usr/bin/mplayer';
-#my $mplayerOpts 		= '-nolirc -noconsolecontrols -http-header-fields "User-Agent:Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.22 (KHTML, like Gecko) Chrome/25.0.1364.172 Safari/537.22m"';
-my $mplayerOpts     = '-nolirc -noconsolecontrols';
-my $mplayerNoDebug  = '-really-quiet';
-my $mplayerAudioOpts 	= '-ao alsa:device=';
-#my $ttsAddr 			= 'http://translate.google.com/translate_tts?tl=de&q=';
+my $mplayer 		  = 'sudo /usr/bin/mplayer';
+my $mplayerOpts       = '-nolirc -noconsolecontrols';
+my $mplayerNoDebug    = '-really-quiet';
+my $mplayerAudioOpts  = '-ao alsa:device=';
+
 my %ttsHost         = ("Google"     => "translate.google.com",
                        "VoiceRSS"   => "api.voicerss.org"
                        );
@@ -57,7 +61,7 @@ my %ttsQuery        = ("Google"     => "q=",
 my %ttsPath         = ("Google"     => "/translate_tts?",
                        "VoiceRSS"   => "/?"
                        );
-my %ttsAddon        = ("Google"     => "client=tw-ob", 
+my %ttsAddon        = ("Google"     => "client=tw-ob&ie=UTF-8",
                        "VoiceRSS"   => ""
                        );
 my %ttsAPIKey       = ("Google"     => "", # kein APIKey nötig
@@ -74,38 +78,41 @@ my %ttsQuality       = ("Google"     => "",
                        );
 my %ttsMaxChar      = ("Google"     => 100,
                        "VoiceRSS"   => 300,
-                       "SVOX-pico"  => 1000
+                       "SVOX-pico"  => 1000,
+                       "Amazon-Polly" => 3000
                        );
-my %language        = ("Google"     =>  {"Deutsch"        => "de",
-                                         "English-US"     => "en-us",
-                                         "Schwedisch"     => "sv",
-                                         "Indian-Hindi"   => "hi",
-                                         "Arabic"         => "ar",
-                                         "France"         => "fr",
-                                         "Spain"          => "es",
-                                         "Italian"        => "it",
-                                         "Chinese"        => "cn",
-                                         "Dutch"          => "nl"
+my %language        = ("Google"     =>  { "Deutsch"       => "de",
+                                          "English-US"    => "en-us",
+                                          "Schwedisch"    => "sv",
+                                          "France"        => "fr",
+                                          "Spain"         => "es",
+                                          "Italian"       => "it",
+                                          "Chinese"       => "cn",
+                                          "Dutch"         => "nl"
                                          },
-                       "VoiceRSS"   =>  {"Deutsch"        => "de-de",
-                                         "English-US"     => "en-us",
-                                         "Schwedisch"     => "sv-se",
-                                         "Indian-Hindi"   => "en-in", # gibts nicht
-                                         "Arabic"         => "en-us", # gibts nicht
-                                         "France"         => "fr-fr",
-                                         "Spain"          => "es-es",
-                                         "Italian"        => "it-it",
-                                         "Chinese"        => "zh-cn"
+                       "VoiceRSS"   =>  { "Deutsch"       => "de-de",
+                                          "English-US"    => "en-us",
+                                          "Schwedisch"    => "sv-se",
+                                          "France"        => "fr-fr",
+                                          "Spain"         => "es-es",
+                                          "Italian"       => "it-it",
+                                          "Chinese"       => "zh-cn",
+                                          "Dutch"         => "nl-nl"
                                          },
-                        "SVOX-pico" =>  {"Deutsch"        => "de-DE",
-                                         "English-US"     => "en-US",
-                                         "Schwedisch"     => "en-US", # gibts nicht
-                                         "Indian-Hindi"   => "en-US", # gibts nicht
-                                         "Arabic"         => "en-US", # gibts nicht
-                                         "France"         => "fr-FR",
-                                         "Spain"          => "es-ES",
-                                         "Italian"        => "it-IT",
-                                         "Chinese"        => "en-US"  # gibts nicht
+                        "SVOX-pico" =>  { "Deutsch"       => "de-DE",
+                                          "English-US"    => "en-US",
+                                          "France"        => "fr-FR",
+                                          "Spain"         => "es-ES",
+                                          "Italian"       => "it-IT"
+                                         },
+                        "Amazon-Polly"=> {"Deutsch"       => "Marlene",
+                                          "English-US"    => "Joanna",
+                                          "Schwedisch"    => "Astrid",
+                                          "France"        => "Celine",
+                                          "Spain"         => "Conchita",
+                                          "Italian"       => "Carla",
+                                          "Chinese"       => "Zhiyu",
+                                          "Dutch"         => "Lotte"
                                          }
                       );
 
@@ -120,8 +127,8 @@ sub Text2Speech_Initialize($)
   $hash->{UndefFn}   = "Text2Speech_Undefine";
   $hash->{AttrFn}    = "Text2Speech_Attr";
   $hash->{AttrList}  = "disable:0,1".
-                       " TTS_Delemiter".
-                       " TTS_Ressource:ESpeak,SVOX-pico,". join(",", sort keys %ttsHost).
+                       " TTS_Delimiter".
+                       " TTS_Ressource:ESpeak,SVOX-pico,Amazon-Polly,". join(",", sort keys %ttsHost).
                        " TTS_APIKey".
                        " TTS_User".
                        " TTS_Quality:".
@@ -164,7 +171,9 @@ sub Text2Speech_Initialize($)
                        " TTS_VolumeAdjust".
                        " TTS_noStatisticsLog:1,0".
                        " TTS_Language:".join(",", sort keys %{$language{"Google"}}).
+                       " TTS_Language_Custom".
                        " TTS_SpeakAsFastAsPossible:1,0".
+                       " TTS_OutputFile".
                        " ".$readingFnAttributes;
 }
 
@@ -237,15 +246,6 @@ sub Text2Speech_Undefine($$)
  return undef;
 }
 
-###################################
-# Angabe des Delemiters: zb.: +af~ 
-#   + -> erzwinge das Trennen, auch wenn Textbaustein < 100Zeichen
-#   - -> Trenne nur wenn Textbaustein > 100Zeichen
-#  af -> add first -> füge den Delemiter am Satzanfang wieder hinzu
-#  al -> add last  -> füge den Delemiter am Satzende wieder hinzu
-#  an -> add nothing -> Delemiter nicht wieder hinzufügen
-#   ~ -> der Delemiter
-###################################
 sub Text2Speech_Attr(@) {
   my @a = @_;
   my $do = 0;
@@ -256,11 +256,29 @@ sub Text2Speech_Attr(@) {
   my $TTS_CacheFileDir = AttrVal($hash->{NAME}, "TTS_CacheFileDir", "cache");
   my $TTS_FileMapping  = AttrVal($hash->{NAME}, "TTS_FileMapping", ""); # zb, silence:silence.mp3 ring:myringtone.mp3;
 
-  if($a[2] eq "TTS_Delemiter" && $a[0] ne "del") {
-    return "wrong delemiter syntax: [+-]a[lfn]. \n".
+  if($a[2] eq "TTS_Delimiter" && $a[0] ne "del") {
+    return "wrong Delimiter syntax: [+-]a[lfn]. Please see CommandRef for Notation. \n".
            "  Example 1: +an~\n".
            "  Example 2: +al." if($value !~ m/^([+-]a[lfn]){0,1}(.){1}$/i);
     return "This Attribute is only available in direct or server mode" if($hash->{MODE} !~ m/(DIRECT|SERVER)/ );
+
+  } elsif ($a[2] eq "TTS_Ressource" && $value eq "Amazon-Polly") {
+    Log3 $hash->{NAME}, 4, "Wechsele auf Amazon Polly, Lade Librarys nach.";
+    eval {
+      require Paws::Polly;
+      Paws::Polly->import;
+      1;
+    } or return "Paws Module not installed. Please install, goto https://metacpan.org/source/JLMARTIN/Paws-0.39";
+
+    eval {
+      require  File::HomeDir;
+      File::HomeDir->import;
+      1;
+    } or return "File::HomeDir Module not installed. Please install";
+
+    if (! -e File::HomeDir->my_home."/.aws/credentials"){
+      return "No AWS credentials in FHEM Homedir found, please check ".File::HomeDir->my_home."/.aws/credentials <br> please refer https://metacpan.org/pod/Paws#AUTHENTICATION";
+    }
 
   } elsif ($a[2] eq "TTS_Ressource") {
     return "This Attribute is only available in direct or server mode" if($hash->{MODE} !~ m/(DIRECT|SERVER)/ );
@@ -292,7 +310,7 @@ sub Text2Speech_Attr(@) {
       return "Could not create directory: <$value>";
     }
 
-  } elsif ($a[2] eq "TTS_TimeOut") {
+  } elsif ($a[0] eq "set" && $a[2] eq "TTS_TimeOut") {
     return "Only Numbers allowed" if ($value !~ m/[0-9]+/);
 
   } elsif ($a[2] eq "TTS_FileMapping") {
@@ -437,8 +455,8 @@ sub Text2Speech_Set($@)
 
   return "no set argument specified" if(int(@a) < 2);
 
-  return "No APIKey specified"                  if (length($ttsAPIKey{$TTS_Ressource})>0 && !defined($TTS_APIKey)); 
-  return "No Username for TTS Access specified" if (length($ttsUser{$TTS_Ressource})>0 && !defined($TTS_User));
+  return "No APIKey specified"                  if (!defined($TTS_APIKey) && ($ttsAPIKey{$TTS_Ressource} || length($ttsAPIKey{$TTS_Ressource})>0));
+  return "No Username for TTS Access specified" if (!defined($TTS_User) && ($ttsUser{$TTS_Ressource} || length($ttsUser{$TTS_Ressource})>0));
 
   my $cmd = shift(@a); # Dummy
      $cmd = shift(@a); # DevName
@@ -458,6 +476,7 @@ sub Text2Speech_Set($@)
   if($cmd eq "tts") {
     
     if($hash->{MODE} eq "DIRECT" || $hash->{MODE} eq "SERVER") {
+      $hash->{VOLUME} = ReadingsNum($me, "volume", 100);
       readingsSingleUpdate($hash, "playing", "1", 1);
       Text2Speech_PrepareSpeech($hash, join(" ", @a));
       $hash->{helper}{RUNNING_PID} = BlockingCall("Text2Speech_DoIt", $hash, "Text2Speech_Done", $TTS_TimeOut, "Text2Speech_AbortFn", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
@@ -474,6 +493,7 @@ sub Text2Speech_Set($@)
     } elsif ($hash->{MODE} eq "REMOTE") {
       Text2Speech_Write($hash, "volume $vol");
     } else {return undef;}
+
     readingsSingleUpdate($hash, "volume", (($vol>100)?0:$vol), 1);  
   }
 
@@ -490,41 +510,62 @@ sub Text2Speech_Set($@)
 # param2: string to speech
 #
 #####################################
+###################################
+# Angabe des Delimiters: zb.: +af~
+#   + -> erzwinge das Trennen, auch wenn Textbaustein < 100Zeichen
+#   - -> Trenne nur wenn Textbaustein > 100Zeichen
+#  af -> add first -> füge den Delimiter am Satzanfang wieder hinzu
+#  al -> add last  -> füge den Delimiter am Satzende wieder hinzu
+#  an -> add nothing -> Delimiter nicht wieder hinzufügen
+#   ~ -> der Delimiter
+###################################
 sub Text2Speech_PrepareSpeech($$) {
   my ($hash, $t) = @_;
   my $me = $hash->{NAME};
 
   my $TTS_Ressource = AttrVal($hash->{NAME}, "TTS_Ressource", "Google");
-  my $TTS_Delemiter = AttrVal($hash->{NAME}, "TTS_Delemiter", undef); 
+  my $TTS_Delimiter = AttrVal($hash->{NAME}, "TTS_Delimiter", undef); 
   my $TTS_FileTpl   = AttrVal($hash->{NAME}, "TTS_FileMapping", ""); # zb, silence:silence.mp3 ring:myringtone.mp3; im Text: mein Klingelton :ring: ist laut.
   my $TTS_FileTemplateDir = AttrVal($hash->{NAME}, "TTS_FileTemplateDir", "templates");
 
   my $TTS_ForceSplit = 0;
-  my $TTS_AddDelemiter;
+  my $TTS_AddDelimiter;
 
-  if($TTS_Delemiter && $TTS_Delemiter =~ m/^[+-]a[lfn]/i) {
-    $TTS_ForceSplit = 1 if(substr($TTS_Delemiter,0,1) eq "+");
-    $TTS_ForceSplit = 0 if(substr($TTS_Delemiter,0,1) eq "-");
+  if($TTS_Delimiter && $TTS_Delimiter =~ m/^[+-]a[lfn]/i) {
+    $TTS_ForceSplit = 1 if(substr($TTS_Delimiter,0,1) eq "+");
+    $TTS_ForceSplit = 0 if(substr($TTS_Delimiter,0,1) eq "-");
     
-    $TTS_AddDelemiter = substr($TTS_Delemiter,1,2); # af, al oder an
+    $TTS_AddDelimiter = substr($TTS_Delimiter,1,2); # af, al oder an
     
-    $TTS_Delemiter = substr($TTS_Delemiter,3);
+    $TTS_Delimiter = substr($TTS_Delimiter,3);
     
-  } elsif (!$TTS_Delemiter) { # Default wenn Attr nicht gesetzt
-    $TTS_Delemiter = "(?<=[\\.!?])\\s*";
-    $TTS_ForceSplit = 1;
-    $TTS_AddDelemiter = "";
+  } elsif (!$TTS_Delimiter) { # Default wenn Attr nicht gesetzt
+    $TTS_Delimiter = "(?<=[\\.!?])\\s*";
+    $TTS_ForceSplit = 0;
+    $TTS_AddDelimiter = "";
   }
 
+  #-- we may have problems with umlaut characters
   # ersetze Sonderzeichen die Google nicht auflösen kann
+  my $converter;
   if($TTS_Ressource eq "Google") {
-    $t =~ s/ä/ae/g;
-    $t =~ s/ö/oe/g;
-    $t =~ s/ü/ue/g;
-    $t =~ s/Ä/Ae/g;
-    $t =~ s/Ö/Oe/g;
-    $t =~ s/Ü/Ue/g;
-    $t =~ s/ß/ss/g;
+    # Google benötigt UTF-8
+   #   $t =~ s/ä/ae/g;
+   #   $t =~ s/ö/oe/g;
+   #   $t =~ s/ü/ue/g;
+   #   $t =~ s/Ä/Ae/g;
+   #   $t =~ s/Ö/Oe/g;
+   #   $t =~ s/Ü/Ue/g;
+   #   $t =~ s/ß/ss/g;
+
+    # -> use Encode::Detect::Detector;
+    #Log3 $hash, 4, "$me:  ermittelte CodePage: " .detect($t). " , konvertiere nach UTF-8";
+    #$converter = Text::Iconv->new(detect($t), "utf-8");
+    #$t = $converter->convert($t);
+  } elsif ($TTS_Ressource eq "Amazon-Polly") {
+    # Amazon benötigt ISO-8859-1 bei Nutzung Region eu-central-1
+    $converter = Text::Iconv->new("utf-8", "iso-8859-1");
+    $t = $converter->convert($t);
   }
 
   my @text;
@@ -536,7 +577,7 @@ sub Text2Speech_PrepareSpeech($$) {
 
   # bei Angabe direkter MP3-Files wird hier ein temporäres Template vergeben
   for(my $i=0; $i<(@text); $i++) {
-    @FileTplPc = ($text[$i] =~ /\:([^:]+\.(?|mp3|ogg|wav))\:/g);
+    @FileTplPc = ($text[$i] =~ /:(\w+?\.(?:mp3|ogg|wav)):/g);
     for(my $j=0; $j<(@FileTplPc); $j++) {
       my $tpl = "FileTpl_#".$i."_".$j; #eindeutige Templatedefinition schaffen
       Log3 $hash, 4, "$me: Angabe einer direkten MP3-Datei gefunden:  $FileTplPc[$j] => $tpl";
@@ -547,7 +588,7 @@ sub Text2Speech_PrepareSpeech($$) {
 
   #iteriere durch die Sprachbausteine und splitte den Text bei den Filetemplates auf
   for(my $i=0; $i<(@text); $i++) {
-    my $cutter = '#!#'; #eindeutigen Cutter als Delemiter bei den Filetemplates vergeben
+    my $cutter = '#!#'; #eindeutigen Cutter als Delimiter bei den Filetemplates vergeben
     @FileTplPc = ($text[$i] =~ /:([^:]+):/g);
     for(my $j=0; $j<(@FileTplPc); $j++) {
       $text[$i] =~ s/:$FileTplPc[$j]:/$cutter$FileTplPc[$j]$cutter/g;
@@ -555,11 +596,16 @@ sub Text2Speech_PrepareSpeech($$) {
     @text = Text2Speech_SplitString(\@text, 0, $cutter, 1, ""); 
   }
 
-  @text = Text2Speech_SplitString(\@text, $ttsMaxChar{$TTS_Ressource}, $TTS_Delemiter, $TTS_ForceSplit, $TTS_AddDelemiter);
-  @text = Text2Speech_SplitString(\@text, $ttsMaxChar{$TTS_Ressource}, "(?<=[\\.!?])\\s*", 0, "");
+  Log3 $hash, 4, "$me: MaxChar = $ttsMaxChar{$TTS_Ressource}, Delimiter = $TTS_Delimiter, ForceSplit = $TTS_ForceSplit, AddDelimiter = $TTS_AddDelimiter";
+
+  @text = Text2Speech_SplitString(\@text, $ttsMaxChar{$TTS_Ressource}, $TTS_Delimiter, $TTS_ForceSplit, $TTS_AddDelimiter);
+  @text = Text2Speech_SplitString(\@text, $ttsMaxChar{$TTS_Ressource}, "(?<=[.!?])\\s*", 0, "");
   @text = Text2Speech_SplitString(\@text, $ttsMaxChar{$TTS_Ressource}, ",", 0, "al");
   @text = Text2Speech_SplitString(\@text, $ttsMaxChar{$TTS_Ressource}, ";", 0, "al");
   @text = Text2Speech_SplitString(\@text, $ttsMaxChar{$TTS_Ressource}, "und", 0, "af");
+  @text = Text2Speech_SplitString(\@text, $ttsMaxChar{$TTS_Ressource}, ":", 0, "al");
+  @text = Text2Speech_SplitString(\@text, $ttsMaxChar{$TTS_Ressource}, "\\bund\\b", 0, "af");
+  @text = Text2Speech_SplitString(\@text, $ttsMaxChar{$TTS_Ressource}, " ", 0, "");
 
   Log3 $hash, 4, "$me: Auflistung der Textbausteine nach Aufbereitung:"; 
   for(my $i=0; $i<(@text); $i++) {
@@ -579,22 +625,22 @@ sub Text2Speech_PrepareSpeech($$) {
 #####################################
 # param1: array : Text 2 Speech   
 # param2: string: MaxChar
-# param3: string: Delemiter
-# param4: int   : 1 -> es wird am Delemiter gesplittet
+# param3: string: Delimiter
+# param4: int   : 1 -> es wird am Delimiter gesplittet
 #                 0 -> es wird nur gesplittet, wenn Stringlänge länger als MaxChar
-# param5: string: Add Delemiter to String? [al|af|<empty>] (AddLast/AddFirst)
+# param5: string: Add Delimiter to String? [al|af|<empty>] (AddLast/AddFirst)
 #
 # Splittet die Texte aus $hash->{helper}->{Text2Speech} anhand des
-# Delemiters, wenn die Stringlänge MaxChars übersteigt.
-# Ist "AddDelemiter" angegeben, so wird der Delemiter an den 
+# Delimiters, wenn die Stringlänge MaxChars übersteigt.
+# Ist "AddDelimiter" angegeben, so wird der Delimiter an den 
 # String wieder angefügt
 #####################################
 sub Text2Speech_SplitString($$$$$){
   my @text          = @{shift()};
   my $MaxChar       = shift;
-  my $Delemiter     = shift;
+  my $Delimiter     = shift;
   my $ForceSplit    = shift;
-  my $AddDelemiter  = shift;
+  my $AddDelimiter  = shift;
   my @newText;
 
   for(my $i=0; $i<(@text); $i++) {
@@ -603,20 +649,43 @@ sub Text2Speech_SplitString($$$$$){
       next;
     }
 
-    my @b = split(/$Delemiter/, $text[$i]); 
-    for(my $j=0; $j<(@b); $j++) {
-      $b[$j] = $b[$j] . $Delemiter if($AddDelemiter eq "al"); # Am Satzende wieder hinzufügen.
-      $b[$j+1] = $Delemiter . $b[$j+1] if(($AddDelemiter eq "af") && ($b[$j+1])); # Am Satzanfang des nächsten Satzes wieder hinzufügen.
-      push(@newText, $b[$j]);
+    my @b;
+    if($Delimiter =~/^ $/) {
+      @b = split(' ', $text[$i]);
     }
+    else {
+      @b = split(/$Delimiter/, $text[$i]);
+    }
+    if((@b)>1) {
+      # setze zu kleine Textbausteine wieder zusammen bis MaxChar erreicht ist
+      if(length($Delimiter)==1) {
+        for(my $k=0; $k<(@b); ) {
+          if($k+1<(@b) && length($b[$k])+length($b[$k+1]) <= $MaxChar) {
+            $b[$k] = join($Delimiter, $b[$k], $b[$k+1]);
+            splice(@b, $k+1, 1);
+          }
+    	  else {
+    	  	$k++;
+    	  }
+         }
+      }
+      for(my $j=0; $j<(@b); $j++) {
+        (my $boundaryDelimiter = $Delimiter) =~ s/^\\b(.+)\\b$/$1/g;
+         $b[$j] = $b[$j] . $boundaryDelimiter if($AddDelimiter eq "al"); # Am Satzende wieder hinzufügen.
+         $b[$j+1] = $boundaryDelimiter . $b[$j+1] if(($AddDelimiter eq "af") && ($b[$j+1])); # Am Satzanfang des nächsten Satzes wieder hinzufügen.
+         push(@newText, $b[$j]);
+      }
+    }
+    elsif((@b)==1) {
+           push(@newText, $text[$i]);
+      }
   }
   return @newText;
 }
 
 #####################################
 # param1: hash  : Hash
-# param2: string: Typ (mplayer oder mp3wrap oder ....)
-# param3: string: Datei
+# param2: string: Datei
 # 
 # Erstellt den Commandstring für den Systemaufruf
 #####################################
@@ -638,18 +707,21 @@ sub Text2Speech_BuildMplayerCmdString($$) {
     $mplayerAudioOpts = "";
   }
 
-  # anstatt  mplayer wird ein anderer Player verwendet
-  if ($TTS_MplayerCall !~ m/mplayer/) {
-    $AlsaDevice = "";
-    $mplayerAudioOpts = "";
-    $mplayerNoDebug = "";
-    $mplayerOpts = "";
-  }
-
   my $NoDebug = $mplayerNoDebug;
   $NoDebug = "" if($verbose >= 5);
 
-  $cmd = $TTS_MplayerCall . " " . $mplayerAudioOpts . $AlsaDevice . " " .$NoDebug. " " . $mplayerOpts . " " . $file; 
+  # anstatt  mplayer wird ein anderer Player verwendet
+  if ($TTS_MplayerCall !~ m/mplayer/) {
+    $TTS_MplayerCall =~ s/{device}/$AlsaDevice/g;
+    $TTS_MplayerCall =~ s/{volume}/$hash->{VOLUME}/g;
+    $TTS_MplayerCall =~ s/{volumeadjust}/$TTS_VolumeAdjust/g;
+    $TTS_MplayerCall =~ s/{file}/$file/g;
+
+    $cmd = $TTS_MplayerCall;
+  } else {
+    $cmd = $TTS_MplayerCall . " " . $mplayerAudioOpts . $AlsaDevice . " " .$NoDebug. " " . $mplayerOpts . " " . $file;
+  }
+
 
   my $mp3Duration =  Text2Speech_CalcMP3Duration($hash, $file);
   BlockingInformParent("Text2Speech_readingsSingleUpdateByName", [$hash->{NAME}, "duration", "$mp3Duration"], 0);
@@ -664,8 +736,8 @@ sub Text2Speech_BuildMplayerCmdString($$) {
 sub Text2Speech_readingsSingleUpdateByName($$$) {
   my ($devName, $readingName, $readingVal) = @_;
   my $hash = $defs{$devName};
-  #Log3 $hash, 4, "Text2Speech_readingsSingleUpdateByName: Dev:$devName Reading:$readingName Val:$readingVal";
-  readingsSingleUpdate($defs{$devName}, $readingName, $readingVal, 1);
+  Log3 $hash, 5, $hash->{NAME}.": readingsSingleUpdateByName: Dev:$devName Reading:$readingName Val:$readingVal";
+  readingsSingleUpdate($hash, $readingName, $readingVal, 1);
 }
 
 #####################################
@@ -707,7 +779,7 @@ sub Text2Speech_Download($$$) {
   my $TTS_Ressource = AttrVal($hash->{NAME}, "TTS_Ressource", "Google");
   my $TTS_User      = AttrVal($hash->{NAME}, "TTS_User", "");
   my $TTS_APIKey    = AttrVal($hash->{NAME}, "TTS_APIKey", "");
-  my $TTS_Language  = AttrVal($hash->{NAME}, "TTS_Language", "Deutsch");
+  my $TTS_Language  = AttrVal($hash->{NAME}, "TTS_Language_Custom", $language{$TTS_Ressource}{AttrVal($hash->{NAME}, "TTS_Language", "Deutsch")});
   my $TTS_Quality   = AttrVal($hash->{NAME}, "TTS_Quality", "");
   my $TTS_Speed     = AttrVal($hash->{NAME}, "TTS_Speed", "");
   my $cmd;
@@ -718,8 +790,7 @@ sub Text2Speech_Download($$$) {
     my $fh;
 
     my $url  = "http://" . $ttsHost{$TTS_Ressource} . $ttsPath{$TTS_Ressource};
-       $url .= $ttsLang{$TTS_Ressource};
-       $url .= $language{$TTS_Ressource}{$TTS_Language};
+       $url .= $ttsLang{$TTS_Ressource} . $TTS_Language;
        $url .= "&" . $ttsAddon{$TTS_Ressource}              if(length($ttsAddon{$TTS_Ressource})>0);
        $url .= "&" . $ttsUser{$TTS_Ressource} . $TTS_User     if(length($ttsUser{$TTS_Ressource})>0);
        $url .= "&" . $ttsAPIKey{$TTS_Ressource} . $TTS_APIKey if(length($ttsAPIKey{$TTS_Ressource})>0);
@@ -729,7 +800,7 @@ sub Text2Speech_Download($$$) {
     
     Log3 $hash->{NAME}, 4, $hash->{NAME}.": Verwende ".$TTS_Ressource." OnlineResource zum Download";
     Log3 $hash->{NAME}, 4, $hash->{NAME}.": Hole URL: ". $url;
-    #$HttpResponse = GetHttpFile($ttsHost, $ttsPath . $ttsLang . $language{$TTS_Ressource}{$TTS_Language} . "&" . $ttsQuery . uri_escape($text));
+    #$HttpResponse = GetHttpFile($ttsHost, $ttsPath . $ttsLang . $TTS_Language . "&" . $ttsQuery . uri_escape($text));
     my $param = {
                       url         => $url,
                       timeout     => 5,
@@ -755,10 +826,23 @@ sub Text2Speech_Download($$$) {
     $fh->print($HttpResponse);
     Log3 $hash->{NAME}, 4, $hash->{NAME}.": Schreibe mp3 in die Datei $file mit ".length($HttpResponse)." Bytes";  
     close($fh);
-  } elsif ($TTS_Ressource eq "ESpeak") {
+  }
+  elsif ($TTS_Ressource eq "ESpeak") {
+    my $FileWav = $file . ".wav";
+
+    $cmd = "sudo espeak -vde+f3 -k5 -s150 \"" . $text . "\" -w \"" . $FileWav . "\"";
+    Log3 $hash, 4, $hash->{NAME}.":" .$cmd;
+    system($cmd);
+    
+    $cmd = "lame \"" . $FileWav . "\" \"" . $file . "\""; 
+      Log3 $hash, 4, $hash->{NAME}.":" .$cmd;
+      system($cmd);
+    unlink $FileWav;
+  }
+  elsif ($TTS_Ressource eq "SVOX-pico") {
     my $FileWav = $file . ".wav";
     
-    $cmd = "sudo espeak -vde+f3 -k5 -s150 \"" . $text . "\">\"" . $FileWav . "\""; 
+    $cmd = "pico2wave --lang=" . $TTS_Language . " --wave=\"" . $FileWav . "\" \"" . $text . "\"";
       Log3 $hash, 4, $hash->{NAME}.":" .$cmd;
       system($cmd);
     
@@ -766,17 +850,30 @@ sub Text2Speech_Download($$$) {
       Log3 $hash, 4, $hash->{NAME}.":" .$cmd;
       system($cmd);
     unlink $FileWav;
-  } elsif ($TTS_Ressource eq "SVOX-pico") {
-    my $FileWav = $file . ".wav";
-    
-    $cmd = "pico2wave --lang=" . $language{$TTS_Ressource}{$TTS_Language} . " --wave=\"" . $FileWav . "\" \"" . $text . "\""; 
-      Log3 $hash, 4, $hash->{NAME}.":" .$cmd;
-      system($cmd);
-    
-    $cmd = "lame \"" . $FileWav . "\" \"" . $file . "\""; 
-      Log3 $hash, 4, $hash->{NAME}.":" .$cmd;
-      system($cmd);
-    unlink $FileWav;
+  }
+  elsif ($TTS_Ressource eq "Amazon-Polly") {
+    # with awscli
+    # aws polly synthesize-speech --output-format mp3 --voice-id Marlene --text '%text%' abc.mp3
+    #$cmd = "aws polly synthesize-speech --output-format json --speech-mark-types='[\"viseme\"]' --voice-id " . $TTS_Language . " --text '" . $text . "' " . $file;
+    #Log3 $hash, 4, $hash->{NAME}.":" .$cmd;
+    #system($cmd);
+    my $fh;
+    my $polly = Paws->service('Polly', region => 'eu-central-1');
+    my $res = $polly->SynthesizeSpeech(
+        VoiceId => $TTS_Language,
+        Text => $text,
+        OutputFormat => 'mp3',
+    );
+
+    $fh = new IO::File ">$file";
+    if(!defined($fh)) {
+      Log3 $hash->{NAME}, 2, $hash->{NAME}.": mp3 Datei <$file> konnte nicht angelegt werden.";
+      return undef;
+    }
+
+    $fh->print($res->AudioStream);
+    Log3 $hash->{NAME}, 4, $hash->{NAME}.": Schreibe mp3 in die Datei $file mit ". $res->RequestCharacters ." Chars";
+    close($fh);
   }
 }
 
@@ -789,6 +886,7 @@ sub Text2Speech_DoIt($) {
   my $TTS_Language = AttrVal($hash->{NAME}, "TTS_Language", "Deutsch");
   my $TTS_SentenceAppendix = AttrVal($hash->{NAME}, "TTS_SentenceAppendix", undef); #muss eine mp3-Datei sein, ohne Pfadangabe
   my $TTS_FileTemplateDir = AttrVal($hash->{NAME}, "TTS_FileTemplateDir", "templates");
+  my $TTS_OutputFile = AttrVal($hash->{NAME}, "TTS_OutputFile", undef);
 
   my $myFileTemplateDir;
   if($TTS_FileTemplateDir =~ m/^\/.*/) { $myFileTemplateDir = $TTS_FileTemplateDir; } else { $myFileTemplateDir = $TTS_CacheFileDir ."/". $TTS_FileTemplateDir;}
@@ -814,6 +912,7 @@ sub Text2Speech_DoIt($) {
   undef($TTS_SentenceAppendix) if($TTS_SentenceAppendix && (! -e $TTS_SentenceAppendix));
 
   #Abspielliste erstellen
+  my $AnzahlDownloads = 0;
   foreach my $t (@{$hash->{helper}{Text2Speech}}) {
     if(-e $t) {
       # falls eine bestimmte mp3-Datei mit absolutem Pfad gespielt werden soll
@@ -836,8 +935,10 @@ sub Text2Speech_DoIt($) {
       push(@Mp3WrapText, $t);
     } else {
       # es befindet sich noch Text zum Download in der Queue
-      if (AttrVal($hash->{NAME}, "TTS_SpeakAsFastAsPossible", 0) == 0) {
+      if (AttrVal($hash->{NAME}, "TTS_SpeakAsFastAsPossible", 0) == 0 || (AttrVal($hash->{NAME}, "TTS_SpeakAsFastAsPossible", 0) == 1 && $AnzahlDownloads == 0)) {
+        # nur Download wenn kein TTS_SpeakAsFastAsPossible gesetzt ist oder der erste Download erfolgen soll
         Text2Speech_Download($hash, $file, $t);
+        $AnzahlDownloads ++;
         if(-e $file) {
           push(@Mp3WrapFiles, $file);
           push(@Mp3WrapText, $t);
@@ -853,32 +954,57 @@ sub Text2Speech_DoIt($) {
 
   push(@Mp3WrapFiles, $TTS_SentenceAppendix) if($TTS_SentenceAppendix);
     
-  if(scalar(@Mp3WrapFiles) >= 2 && AttrVal($hash->{NAME}, "TTS_UseMP3Wrap", 0) == 1) {
+  if (AttrVal($hash->{NAME}, "TTS_UseMP3Wrap", 0) == 1) {
     # benutze das Tool MP3Wrap um bereits einzelne vorhandene Sprachdateien
     # zusammenzuführen. Ziel: sauberer Sprachfluss
     Log3 $hash->{NAME}, 4, $hash->{NAME}.": Bearbeite per MP3Wrap jetzt den Text: ". join(" ", @Mp3WrapText);
 
-    my $Mp3WrapPrefix = md5_hex(join("|", @Mp3WrapFiles));
-    my $Mp3WrapFile = $TTS_CacheFileDir ."/". $Mp3WrapPrefix . "_MP3WRAP.mp3"; 
+    my $Mp3WrapFile;
+    my $Mp3WrapPrefix;
+    $Mp3WrapPrefix = md5_hex(join("|", @Mp3WrapFiles));
 
-    if(! -e $Mp3WrapFile) {
-      $cmd = "mp3wrap " .$TTS_CacheFileDir. "/" .$Mp3WrapPrefix. ".mp3 " .join(" ", @Mp3WrapFiles);
+    if ($TTS_OutputFile) {
+        if ($TTS_OutputFile !~ m/^\//) {
+            $TTS_OutputFile = $TTS_CacheFileDir ."/".$TTS_OutputFile;
+        }
+        Log3 $hash->{NAME}, 4, $hash->{NAME}.": Verwende fixen Dateinamen: $TTS_OutputFile";
+        $Mp3WrapFile = $TTS_OutputFile;
+        unlink($Mp3WrapFile);
+    } else {
+        $Mp3WrapFile = $TTS_CacheFileDir ."/". $Mp3WrapPrefix . ".mp3";
+    }
+
+    if (scalar(@Mp3WrapFiles) == 1) {
+      # wenn nur eine Datei, dann wird diese genutzt
+      $Mp3WrapFile = $Mp3WrapFiles[0];
+    } elsif(! -e $Mp3WrapFile) {
+      $cmd = "mp3wrap " .$Mp3WrapFile. " " .join(" ", @Mp3WrapFiles);
       $cmd .= " >/dev/null" if($verbose < 5);
 
       Log3 $hash->{NAME}, 4, $hash->{NAME}.": " .$cmd;
       system($cmd);
+
+      my $t = substr($Mp3WrapFile, 0, length($Mp3WrapFile)-4)."_MP3WRAP.mp3";
+      Log3 $hash->{NAME}, 4, $hash->{NAME}.": Benenne Datei um von <".$t."> nach <".$Mp3WrapFile.">";
+      rename($t, $Mp3WrapFile);
+    }
+
+    if ($TTS_OutputFile && $TTS_OutputFile ne $Mp3WrapFile) {
+      Log3 $hash->{NAME}, 4, $hash->{NAME}.": Benenne Datei um von <".$Mp3WrapFile."> nach <".$TTS_OutputFile.">";
+      rename($Mp3WrapFile, $TTS_OutputFile);
+      $Mp3WrapFile = $TTS_OutputFile;
     }
     
     if ($hash->{MODE} ne "SERVER") {
-    # im Falls Server, nicht die Datei abspielen
+    # im Server Mode, nicht die Datei abspielen
       if(-e $Mp3WrapFile) {
         $cmd = Text2Speech_BuildMplayerCmdString($hash, $Mp3WrapFile);
         $cmd .= " >/dev/null" if($verbose < 5);
 
-        Log3 $hash->{NAME}, 4, $hash->{NAME}.":" .$cmd;
+        Log3 $hash->{NAME}, 4, $hash->{NAME}.": " .$cmd;
         system($cmd);
       } else {
-        Log3 $hash->{NAME}, 2, $hash->{NAME}.": Mp3Wrap Datei konnte nicht angelegt werden.";
+        Log3 $hash->{NAME}, 2, $hash->{NAME}.": Mp3Wrap Datei konnte nicht gefunden werden.";
       }
     }
 
@@ -1010,7 +1136,7 @@ sub Text2Speech_WriteStats($$$$){
 =pod
 =item helper
 =item summary    speaks given text via loudspeaker
-=item summary_DE wandelt uebergebenen Text um fuer Ausgabe auf Lautsprecher
+=item summary_DE wandelt Text in Sprache um zur Ausgabe auf Lautsprecher
 =begin html
 
 <a name="Text2Speech"></a>
@@ -1100,9 +1226,9 @@ sub Text2Speech_WriteStats($$$$){
 <a name="Text2Speechattr"></a>
 <b>Attributes</b>
 <ul>
-  <li>TTS_Delemiter<br>
+  <li>TTS_Delimiter<br>
     optional: By using the google engine, its not possible to convert more than 100 characters in a single audio brick.
-    With a delemiter the audio brick will be split at this character. A delemiter must be a single character.!<br>
+    With a Delimiter the audio brick will be split at this character. A Delimiter must be a single character.!<br>
     By default, ech audio brick will be split at sentence end. Is a single sentence longer than 100 characters, 
     the sentence will be split additionally at comma, semicolon and the word <i>and</i>.<br>
     Notice: Only available in locally instances with Google engine!
@@ -1136,7 +1262,27 @@ sub Text2Speech_WriteStats($$$$){
         <code>wget http://www.dr-bischoff.de/raspi/pico2wave.deb</code><br>
         <code>sudo dpkg --install pico2wave.deb</code>
       </li>
+      <li>Amazon-Polly<br>
+       Using the Amazon Polly engine, the same as Amazon Alexa.<br>
+       The perl package Paws is required. An AWS Access and Polly Aws User is required too<br>
+       <code>cpan paws</code><br>
+       The credentials to your AWS Polly are expected at ~/.aws/credentials<br>
+       <code>[default]
+         aws_secret_access_key = xxxxxxxxxxxxxxxxxxxxxx
+         aws_access_key_id = xxxxxxxxxxxxxxx
+       </code>
+      </li>
     </ul>
+  </li>
+
+  <li>TTS_Language<br>
+    Selection of different languages
+  </li>
+
+  <li>TTS_Language_Custom<br>
+    if you want another engine and speech of default languages, you can insert this here.<br>
+    The definition is dependent of used engine. This attribute overrides an TTS_Language attribute.<br>
+    Please refer the specific API reference.
   </li>
 
   <li>TTS_APIKey<br>
@@ -1293,6 +1439,10 @@ sub Text2Speech_WriteStats($$$$){
         hier das Attribut <i>TTS_speakAsFastAsPossible</i> zu verwenden. Die Verwendung des Attributes <i>TTS_useMP3Wrap</i> wird dringend empfohlen. 
         Ansonsten wird hier nur der letzte Teiltext als mp3 Datei im Reading dargestellt.
       </ul>
+      <p>
+          <b>Beispiel:</b><br>
+          <code>define MyTTS Text2Speech none</code>
+        </p>
     </li>
 
   </ul>
@@ -1319,13 +1469,22 @@ sub Text2Speech_WriteStats($$$$){
 <a name="Text2Speechattr"></a>
 <b>Attribute</b>
 <ul>
-  <li>TTS_Delemiter<br>
-    Optional: Wird ein Delemiter angegeben, so wird der Sprachbaustein an dieser Stelle geteilt. 
-    Als Delemiter ist nur ein einzelnes Zeichen zul&auml;ssig.
-    Hintergrund ist die Tatsache, das die Google Sprachengine nur 100Zeichen zul&auml;sst.<br>
+  <li>TTS_Delimiter<br>
+    Optional: Wird ein Delimiter angegeben, so wird der Sprachbaustein an dieser Stelle geteilt. 
+    Als Delimiter ist nur ein einzelnes Zeichen zul&auml;ssig.
+    Hintergrund ist die Tatsache, das die einige Sprachengines nur eine bestimmt Anzahl an Zeichen (zb. Google nur 100Zeichen) zul&auml;sst.<br>
     Im Standard wird nach jedem Satzende geteilt. Ist ein einzelner Satz l&auml;nger als 100 Zeichen,
     so wird zus&auml;tzlich nach Kommata, Semikolon und dem Verbindungswort <i>und</i> geteilt.<br>
-    Achtung: Nur bei einem lokal definierter Text2Speech Instanz m&ouml;glich und nur bei Nutzung der Google Sprachengine relevant!
+    Achtung: Nur bei einem lokal definierter Text2Speech Instanz m&ouml;glich!<br>
+    <b>Notation</b><br>
+       + -> erzwinge das Trennen, auch wenn Textbaustein < x Zeichen<br>
+       - -> Trenne nur wenn Textbaustein > x Zeichen
+      af -> add first -> füge den Delimiter am Satzanfang wieder hinzu<br>
+      al -> add last  -> füge den Delimiter am Satzende wieder hinzu<br>
+      an -> add nothing -> Delimiter nicht wieder hinzufügen<br>
+       ~ -> der Delimiter<br>
+    <b>Beispiel</b><br>
+    <code>attr myTTS TTS_Delimiter -al.</code>
   </li> 
 
   <li>TTS_Ressource<br>
@@ -1340,7 +1499,7 @@ sub Text2Speech_WriteStats($$$$){
         Nutzung der VoiceRSS Sprachengine. Die Nutzung ist frei bis zu 350 Anfragen pro Tag. 
         Wenn mehr benötigt werden ist ein Bezahlmodell wählbar. Ein Internetzugriff ist notwendig! 
         Aufgrund der Qualit&auml;t ist der Einsatz diese Engine ebenfalls zu empfehlen.
-        Wenn diese Engine benutzt wird, ist ein APIKey notwendig (siehe TTXS_APIKey)
+        Wenn diese Engine benutzt wird, ist ein APIKey notwendig (siehe TTS_APIKey)
       </li>
       <li>ESpeak<br>
         Nutzung der ESpeak Offline Sprachengine. Die Qualit&auml; ist schlechter als die Google Engine.
@@ -1358,9 +1517,29 @@ sub Text2Speech_WriteStats($$$$){
         <code>wget http://www.dr-bischoff.de/raspi/pico2wave.deb</code><br>
         <code>sudo dpkg --install pico2wave.deb</code>
       </li>
+      <li>Amazon-Polly<br>
+       Nutzung der Amazon Polly Sprachengine, dieselbe Engine wie für Amazon Alexa verwendet wird.<br>
+       Es muss das Perl Package Paws installiert sowie ein AWS Konto und ein Polly AWS User verfügbar sein<br>
+       <code>cpan paws</code><br>
+       Die Zugangsdaten zum eigenen AWS Konto müssen unter ~/.aws/credentials liegen. <br>
+       <code>[default]
+         aws_secret_access_key = xxxxxxxxxxxxxxxxxxxxxx
+         aws_access_key_id = xxxxxxxxxxxxxxx
+       </code>
+      </li>
     </ul>
   </li>
-  
+
+  <li>TTS_Language<br>
+    Auswahl verschiendener Standardsprachen
+  </li>
+
+  <li>TTS_Language_Custom<br>
+    Möchte man eine Spreche und Stimme abweichend der Standardspreachen verwenden, so kann man diese hier eintragen. <br>
+    Die Definition ist abhängig der verwendeten Sprachengine. Diesea Attribut überschreibt ein ev. vorhandenes TTS_Langugae Attribut.<br>
+    Siehe in die jeweilige API Referenz
+  </li>
+
   <li>TTS_APIKey<br>
     Wenn VoiceRSS genutzt wird, ist ein APIKey notwendig. Um diesen zu erhalten ist eine vorherige
     Registrierung notwendig. Anschließend erhält man den APIKey <br>
@@ -1373,13 +1552,13 @@ sub Text2Speech_WriteStats($$$$){
 
   <li>TTS_CacheFileDir<br>
     Optional: Die per Google geladenen Sprachbausteine werden in diesem Verzeichnis zur Wiedeverwendung abgelegt.
-    Es findet zurZEit keine automatisierte L&ouml;schung statt.<br>
+    Es findet zurZeit keine automatisierte L&ouml;schung statt.<br>
     Default: <i>cache/</i><br>
     Achtung: Nur bei einem lokal definierter Text2Speech Instanz m&ouml;glich!
   </li>
 
   <li>TTS_UseMP3Wrap<br>
-    Optional: F&uuml;r eine fl&uuml;ssige Sprachausgabe ist es zu empfehlen, die einzelnen vorher per Google 
+    Optional: F&uuml;r eine fl&uuml;ssige Sprachausgabe ist es zu empfehlen, die einzelnen vorher
     geladenen Sprachbausteine zu einem einzelnen Sprachbaustein zusammenfassen zu lassen bevor dieses per 
     Mplayer ausgegeben werden. Dazu muss Mp3Wrap installiert werden.<br>
     <code>apt-get install mp3wrap</code><br>
@@ -1387,8 +1566,17 @@ sub Text2Speech_WriteStats($$$$){
   </li>
 
   <li>TTS_MplayerCall<br>
-    Optional: Angabe der Systemaufrufes zu Mplayer. Das folgende Beispiel ist der Standardaufruf.<br>
-    Beispiel: <code>sudo /usr/bin/mplayer</code>
+    Optional: Angabe des Systemaufrufes zu Mplayer oder einem anderem Tool. Wird ein anderes Tool als mplayer<br>
+    dort verwendet gelten folgende Templates: <br>
+    <ul>
+        <li>{device}</li>
+        <li>{volume}</li>
+        <li>{volumeadjust}</li>
+        <li>{file}</li>
+    </ul>
+    Beispiele:<br>
+    <code>attr myTTS TTS_MplayerCall sudo /usr/bin/mplayer</code>
+    <code>attr myTTS TTS_MplayerCall AUDIODEV={device} play -q -v {volume} {file}</code>
   </li>
 
   <li>TTS_SentenceAppendix<br>
@@ -1432,6 +1620,15 @@ sub Text2Speech_WriteStats($$$$){
     Attribut nur verfügbar bei einer lokalen oder Server Instanz
   </li>
 
+  <li>TTS_OutputFile<br>
+      Angabe eines fixen Dateinamens als mp3 Output. Das Attribut ist nur relevant in Verbindung mit TTS_UseMP3Wrap.<br>
+      Wenn ein Dateinamen angegeben wird, so wird zusätzlich TTS_CacheFileDir beachtet. Bei einer absoluten Pfadangabe <br>
+      muss der Dateipfad durch FHEM schreibbar sein.<br>
+      <code>attr myTTS TTS_OutputFile output.mp3</code><br>
+      <code>attr myTTS TTS_OutputFile /media/miniDLNA/output.mp3</code><br>
+  </li>
+
+
   <li><a href="#readingFnAttributes">readingFnAttributes</a>
   </li><br>
 
@@ -1451,6 +1648,12 @@ sub Text2Speech_WriteStats($$$$){
 <a name="Text2SpeechExamples"></a>
 <b>Beispiele</b> 
 <ul>
+  <code>define TTS_EG_WZ Text2Speech hw=/dev/snd/controlC3</code><br>
+  <code>attr TTS_EG_WZ TTS_Language Deutsch</code><br>
+  <code>attr TTS_EG_WZ TTS_MplayerCall /usr/bin/mplayer</code><br>
+  <code>attr TTS_EG_WZ TTS_Ressource Amazon-Polly</code><br>
+  <code>attr TTS_EG_WZ TTS_UseMP3Wrap 1</code><br>
+  <br>
   <code>define MyTTS Text2Speech hw=0.0</code><br>
   <code>set MyTTS tts Die Alarmanlage ist bereit.</code><br>
   <code>set MyTTS tts :beep.mp3:</code><br>
