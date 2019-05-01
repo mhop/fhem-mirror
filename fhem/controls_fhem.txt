@@ -1,4 +1,4 @@
-REV 19294
+REV 19299
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2019-04-30_07:45:03 289731 ./CHANGED
+UPD 2019-05-01_07:45:03 289949 ./CHANGED
 UPD 2019-04-28_07:45:02 40913 ./MAINTAINER.txt
 UPD 2019-03-29_07:45:02 39782 ./configDB.pm
 UPD 2019-03-15_07:45:03 22394 ./fhem.cfg.demo
@@ -368,7 +368,7 @@ UPD 2018-10-01_07:45:02 221693 FHEM/72_FRITZBOX.pm
 UPD 2018-11-11_07:45:02 16051 FHEM/72_TA_CMI_JSON.pm
 UPD 2019-04-21_07:45:02 161113 FHEM/72_XiaomiDevice.pm
 UPD 2019-04-03_07:45:02 49389 FHEM/73_AMADCommBridge.pm
-UPD 2019-04-30_07:45:03 205303 FHEM/73_AutoShuttersControl.pm
+UPD 2019-05-01_07:45:03 205853 FHEM/73_AutoShuttersControl.pm
 UPD 2018-04-14_07:45:02 89324 FHEM/73_ElectricityCalculator.pm
 UPD 2019-03-27_07:45:02 35944 FHEM/73_GardenaSmartBridge.pm
 UPD 2018-04-14_07:45:02 81612 FHEM/73_GasCalculator.pm
@@ -607,18 +607,19 @@ UPD 2017-09-10_16:01:38 430 FHEM/holiday/islam2017.holiday
 UPD 2017-09-10_16:01:38 430 FHEM/holiday/islam2018.holiday
 UPD 2017-09-10_16:01:38 430 FHEM/holiday/islam2019.holiday
 UPD 2017-09-10_16:01:38 384 FHEM/holiday/mv.holiday
-UPD 2018-11-16_07:45:02 291 FHEM/holiday/ns.holiday
+UPD 2019-05-01_07:45:03 307 FHEM/holiday/ni.holiday
+UPD 2019-05-01_07:45:03 418 FHEM/holiday/ns.holiday
 UPD 2017-09-10_16:01:38 397 FHEM/holiday/nw.holiday
 UPD 2017-09-10_16:01:38 393 FHEM/holiday/rp.holiday
 UPD 2018-11-16_07:45:02 386 FHEM/holiday/sh.holiday
 UPD 2017-09-10_16:01:38 381 FHEM/holiday/sl.holiday
 UPD 2017-09-10_16:01:38 422 FHEM/holiday/sn.holiday
 UPD 2017-09-10_16:01:38 405 FHEM/holiday/st.holiday
-UPD 2017-09-10_16:01:38 392 FHEM/holiday/th.holiday
+UPD 2019-05-01_07:45:03 416 FHEM/holiday/th.holiday
 UPD 2019-03-30_07:45:02 333519 FHEM/lib/74_AMADautomagicFlowset_4.4.0.xml
 UPD 2019-03-30_07:45:02 441040 FHEM/lib/74_AMADtaskerset_4.4.0.prj.xml
 UPD 2019-03-01_07:45:02 18747 FHEM/lib/AttrTemplate/httpmod.template
-UPD 2019-04-30_07:45:03 76410 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2019-05-01_07:45:03 76410 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2019-04-16_07:45:02 4962 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
@@ -718,8 +719,8 @@ UPD 2019-04-29_07:45:07 3969244 docs/commandref.html
 UPD 2019-04-30_07:45:08 2460224 docs/commandref_DE.html
 UPD 2019-03-17_07:45:03 78602 docs/commandref_frame.html
 UPD 2019-03-17_07:45:03 88171 docs/commandref_frame_DE.html
-UPD 2019-04-30_07:45:09 212331 docs/commandref_modular.html
-UPD 2019-04-30_07:45:10 223097 docs/commandref_modular_DE.html
+UPD 2019-05-01_07:45:10 212331 docs/commandref_modular.html
+UPD 2019-05-01_07:45:11 223097 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
