@@ -223,7 +223,6 @@ sub TRX_LIGHT_Set($@) {
     my ( $hash, $name, @a ) = @_;
     my $ret = undef;
     my $na  = int(@a);
-	Log3 $name,1,Dumper(@a);
     return "no set value specified" if ( $na < 1 || $na > 4 );
 
     # look for device_type
