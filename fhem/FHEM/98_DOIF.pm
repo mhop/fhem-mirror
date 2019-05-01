@@ -6045,8 +6045,7 @@ Bemerkung: Innerhalb eines Ereignisblocks muss mindestens ein Trigger definiert 
     <a href="#DOIF_get_State">get_State</a>&nbsp;
     <a href="#DOIF_set_Reading">set_Reading</a>&nbsp;
     <a href="#DOIF_get_Reading">get_Reading</a>&nbsp;
-    <a href="#DOIF_set_Reading_Update">set_Reading_Update</a>&nbsp;
-    <a href="#DOIF_fhem_set">fhem_set</a><br>
+    <a href="#DOIF_set_Reading_Update">set_Reading_Update</a><br>
   <a href="#DOIF_Ausführungstimer">Ausführungstimer:</a>&nbsp;
     <a href="#DOIF_set_Exec">set_Exec</a>&nbsp;
     <a href="#DOIF_get_Exec">get_Exec</a>&nbsp;
