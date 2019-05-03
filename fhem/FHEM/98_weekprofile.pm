@@ -49,14 +49,23 @@ $DEV_READINGS{"Fri"}{"CUL_HM"} = "6_tempListFri";
 $DEV_READINGS{"Sat"}{"CUL_HM"} = "0_tempListSat";
 $DEV_READINGS{"Sun"}{"CUL_HM"} = "1_tempListSun";
 
-# HMCCUDEV
-$DEV_READINGS{"Mon"}{"HMCCUDEV"} = "MONDAY";
-$DEV_READINGS{"Tue"}{"HMCCUDEV"} = "TUESDAY";
-$DEV_READINGS{"Wed"}{"HMCCUDEV"} = "WEDNESDAY";
-$DEV_READINGS{"Thu"}{"HMCCUDEV"} = "THURSDAY";
-$DEV_READINGS{"Fri"}{"HMCCUDEV"} = "FRIDAY";
-$DEV_READINGS{"Sat"}{"HMCCUDEV"} = "SATURDAY";
-$DEV_READINGS{"Sun"}{"HMCCUDEV"} = "SUNDAY";
+# HMCCUDEV HMIP
+$DEV_READINGS{"Mon"}{"HMCCU_IP"} = "MONDAY";
+$DEV_READINGS{"Tue"}{"HMCCU_IP"} = "TUESDAY";
+$DEV_READINGS{"Wed"}{"HMCCU_IP"} = "WEDNESDAY";
+$DEV_READINGS{"Thu"}{"HMCCU_IP"} = "THURSDAY";
+$DEV_READINGS{"Fri"}{"HMCCU_IP"} = "FRIDAY";
+$DEV_READINGS{"Sat"}{"HMCCU_IP"} = "SATURDAY";
+$DEV_READINGS{"Sun"}{"HMCCU_IP"} = "SUNDAY";
+
+# HMCCUDEV HM
+$DEV_READINGS{"Mon"}{"HMCCU_HM"} = "MONDAY";
+$DEV_READINGS{"Tue"}{"HMCCU_HM"} = "TUESDAY";
+$DEV_READINGS{"Wed"}{"HMCCU_HM"} = "WEDNESDAY";
+$DEV_READINGS{"Thu"}{"HMCCU_HM"} = "THURSDAY";
+$DEV_READINGS{"Fri"}{"HMCCU_HM"} = "FRIDAY";
+$DEV_READINGS{"Sat"}{"HMCCU_HM"} = "SATURDAY";
+$DEV_READINGS{"Sun"}{"HMCCU_HM"} = "SUNDAY";
 
 sub weekprofile_findPRF($$$$);
 
@@ -110,6 +119,8 @@ sub weekprofile_getDeviceType($$;$)
   }
   
   my $type = undef;
+
+  Log3 $me, 5, "$me(getDeviceType): type: $devHash->{TYPE}";
   
   if ($devHash->{TYPE} =~ /CUL_HM/){
     my $model = AttrVal($device,"model","");
@@ -142,13 +153,18 @@ sub weekprofile_getDeviceType($$;$)
   elsif ( ($devHash->{TYPE} =~ /MAX/) && ($devHash->{type} =~ /.*Thermostat.*/) ){
     $type = "MAX";
   }
+  elsif ( $devHash->{TYPE} =~ /HMCCUDEV/ || $devHash->{TYPE} =~ /dummyHM/){
+	  my $model = $devHash->{ccutype};
+    Log3 $me, 5, "$me(getDeviceType): $devHash->{NAME}, $model";
+	  $type = "HMCCU_IP" if ( $model =~ m/HmIP.*/ );
+    $type = "HMCCU_HM" if ( $model =~ m/HM-.*/ );
+  }
   elsif ($devHash->{TYPE} =~ /dummy/){
+    Log3 $me, 5, "$me(getDeviceType): dummy $device";
     $type = "MAX"     if ($device =~ m/.*MAX.*FAKE.*/);    #dummy (FAKE WT) with name MAX inside for testing
     $type = "CUL_HM"  if ($device =~ m/.*CUL_HM.*FAKE.*/); #dummy (FAKE WT) with name CUL_HM inside for testing
-  }
-  elsif ( $devHash->{TYPE} =~ /HMCCUDEV/){
-	  my $model = $devHash->{ccutype};
-	  $type = "HMCCUDEV" if ( $model =~ /HmIP-eTRV-2/ );
+    $type = "HMCCU_IP"if ($device =~ m/.*HMCCU_IP.*FAKE.*/);  #dummy (FAKE WT) with name HMCCU_IP inside for testing
+    $type = "HMCCU_HM"if ($device =~ m/.*HMCCU_HM.*FAKE.*/);  #dummy (FAKE WT) with name HMCCU_HM inside for testing
   }
   
   return $type if ($sndrcv eq "RCV");
@@ -175,6 +191,8 @@ sub weekprofile_readDayProfile($@)
   
   $type = weekprofile_getDeviceType($me,$device) if (!defined($type));
   return if (!defined($type));
+
+  Log3 $me, 5, "$me(readDayProfile): read from type $type";
 
   my $reading = $DEV_READINGS{$day}{$type};
   
@@ -203,16 +221,20 @@ sub weekprofile_readDayProfile($@)
       push(@temps, $timeTemp[$i+1]);
     }
   }
-  elsif ($type eq "HMCCUDEV"){
+  elsif ($type =~ /HMCCU.*/){    
     my $lastTime = "";
-
     for (my $i = 1; $i < 14; $i+=1){
-      my $prfTemp = ReadingsVal($device, "R-1.P1_TEMPERATURE_" . $reading . "_$i", "");
-      my $prfTime = ReadingsVal($device, "R-1.P1_ENDTIME_" . $reading . "_$i", "");
+      my $prfTime = ReadingsVal($device, "R-1.P1_ENDTIME_$reading"."_$i", "");
+      my $prfTemp = ReadingsVal($device, "R-1.P1_TEMPERATURE_$reading"."_$i", "");
+
+      $prfTime = ReadingsVal($device, "R-ENDTIME_$reading"."_$i", "") if (!$prfTime);
+      $prfTemp = ReadingsVal($device, "R-TEMPERATURE_$reading"."_$i", "") if (!$prfTemp);
+
+      Log3 $me, 5, "$me(readDayProfile): $reading"."_$i $prfTime $prfTemp";
 
       $prfTime = weekprofile_minutesToTime($prfTime);
 
-      if ($lastTime ne $prfTime){
+      if ($lastTime ne "24:00"){
         $lastTime = $prfTime;
 
         push(@temps, $prfTemp);
@@ -220,9 +242,12 @@ sub weekprofile_readDayProfile($@)
       }
     }
   }
+  else {
+    Log3 $me, 3, "$me(readDayProfile): unsupported device type $type";
+  }
   
   for(my $i = 0; $i < scalar(@temps); $i+=1){
-	Log3 $me, 4, "$me(ReadDayProfile): temp $i $temps[$i]";
+	  Log3 $me, 4, "$me(ReadDayProfile): temp $i $temps[$i]";
     $temps[$i] =~s/[^\d.]//g; #only numbers
     my $tempON = myAttrVal($me, "tempON", undef);
     my $tempOFF = myAttrVal($me, "tempOFF", undef);
@@ -345,11 +370,11 @@ sub weekprofile_sendDevProfile(@)
   
   #replace variables with values  
   foreach my $day (@dayToTransfer){
-	my $tmpCnt =  scalar(@{$prfData->{$day}->{"temp"}});
-	for (my $i = 0; $i < $tmpCnt; $i++) {
-      $prfData->{$day}->{"temp"}[$i] = $tempON  if ($prfData->{$day}->{"temp"}[$i] =~/on/i);
-	  $prfData->{$day}->{"temp"}[$i] = $tempOFF if ($prfData->{$day}->{"temp"}[$i] =~/off/i);
-	}
+    my $tmpCnt =  scalar(@{$prfData->{$day}->{"temp"}});
+    for (my $i = 0; $i < $tmpCnt; $i++) {
+        $prfData->{$day}->{"temp"}[$i] = $tempON  if ($prfData->{$day}->{"temp"}[$i] =~/on/i);
+      $prfData->{$day}->{"temp"}[$i] = $tempOFF if ($prfData->{$day}->{"temp"}[$i] =~/off/i);
+    }
   }
     
   my $cmd;
@@ -382,7 +407,7 @@ sub weekprofile_sendDevProfile(@)
       $cmd .= ($k < $dayCnt-1) ? "; ": "";
       $k++;
     }
-  } elsif ($type eq "HMCCUDEV"){
+  } elsif ($type eq "HMCCU_IP"){
     my $k=0;
     my $dayCnt = scalar(@dayToTransfer);
     $cmd .= "set $device config 1";
@@ -397,8 +422,22 @@ sub weekprofile_sendDevProfile(@)
         $cmd .= " " . $dpTemp . "_" . ($i + 1) . "=" . $prfData->{$day}->{"temp"}[$i];
         $cmd .= " " . $dpTime . "_" . ($i + 1) . "=" . weekprofile_timeToMinutes($prfData->{$day}->{"time"}[$i]);
       }
-      
-      #$cmd .= ($k < $dayCnt-1) ? "; ": "";
+      $k++;
+    }
+  } elsif ($type eq "HMCCU_HM"){
+    my $k=0;
+    my $dayCnt = scalar(@dayToTransfer);
+    $cmd .= "set $device config";
+    foreach my $day (@dayToTransfer){
+      my $reading = $DEV_READINGS{$day}{$type};
+      my $dpTime = "ENDTIME_$reading";
+      my $dpTemp = "TEMPERATURE_$reading";
+   
+      my $tmpCnt =  scalar(@{$prfData->{$day}->{"temp"}});      
+      for (my $i = 0; $i < $tmpCnt; $i++) {
+        $cmd .= " " . $dpTemp . "_" . ($i + 1) . "=" . $prfData->{$day}->{"temp"}[$i];
+        $cmd .= " " . $dpTime . "_" . ($i + 1) . "=" . weekprofile_timeToMinutes($prfData->{$day}->{"time"}[$i]);
+      }
       $k++;
     }
   }
