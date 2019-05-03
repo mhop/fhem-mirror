@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  10_MYSENSORS_DEVICE: enhance support for SetExtensions;
+                      separate readings for heatrbeat, smartSleep & NACK
  - bugfix:  73_GardenaSmartBridge: fix undefined_value Error
  - feature: 98_Text2Speech: add Amazon Polly as new suggested TTS-Engine
               due best quality 

@@ -4,6 +4,7 @@
 #
 # Copyright (C) 2014 Norbert Truchsess
 # Copyright (C) 2019 Hauswart@forum.fhem.de
+# Copyright (C) 2019 Beta-User@forum.fhem.de
 #
 #     This file is part of fhem.
 #
