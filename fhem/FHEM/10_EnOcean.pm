@@ -5725,7 +5725,8 @@ sub EnOcean_Set($@)
       my $window = ReadingsVal($name, "window", 'closed');
       if ($cmd eq "desired-temp"|| $cmd eq "setpointTemp") {
         if (defined $a[1]) {
-          if ($a[1] =~ m/^\d+$/ && $a[1] >= 5 && $a[1] <= 40) {
+          if ($a[1] =~ m/^\d+(\.\d)?$/ && $a[1] >= 5 && $a[1] <= 40) {
+            $a[1] = sprintf "%d", $a[1];
             readingsBeginUpdate($hash);
             if ($a[1] < 15) {
               $setpointBase = 15;
@@ -5913,7 +5914,7 @@ sub EnOcean_Set($@)
       #$setpointShift = unpack('C', pack('c', $setpointShift));
       my %fanSpeed = ('auto' => 0, 'off' =>1, 1 => 2, 2 => 3, 3 => 4);
       $occupancy = $occupancy eq 'occupied' ? 1 : 0;
-      $data = sprintf "%02X%02X%02X%02X", $setpointType |$heating | $cooling | $window | 1,
+      $data = sprintf "%02X%02X%02X%02X", $setpointType | $heating | $cooling | $window | 1,
                                           $setpointShift, $setpointBase,
                                           $setpointShiftMax << 4 | $fanSpeed{$fanSpeed} << 1 | $occupancy;
 
@@ -6478,13 +6479,11 @@ sub EnOcean_Set($@)
           # set flag for response request
           $hash->{IODev}{helper}{gpRespWait}{AttrVal($name, "subDef", $hash->{DEF})}{teachInReq} = "in";
           $hash->{IODev}{helper}{gpRespWait}{AttrVal($name, "subDef", $hash->{DEF})}{hash} = $hash;
-          if (!exists($hash->{IODev}{Teach})) {
-            # enable teach-in receiving for 3 sec
-            $hash->{IODev}{Teach} = 1;
-            RemoveInternalTimer($hash->{helper}{timer}{gpRespTimeout}) if(exists $hash->{helper}{timer}{gpRespTimeout});
-            $hash->{helper}{timer}{gpRespTimeout} = {hash => $IOHash, function => "gpRespTimeout", helper => "gpRespWait"};
-            InternalTimer(gettimeofday() + 3, 'EnOcean_RespTimeout', $hash->{helper}{timer}{gpRespTimeout}, 0);
-          }
+          # enable teach-in receiving for 3 sec
+          $hash->{IODev}{Teach} = 1;
+          RemoveInternalTimer($hash->{helper}{timer}{gpRespTimeout}) if(exists $hash->{helper}{timer}{gpRespTimeout});
+          $hash->{helper}{timer}{gpRespTimeout} = {hash => $hash, function => "gpRespTimeout", helper => "gpRespWait"};
+          InternalTimer(gettimeofday() + 3, 'EnOcean_RespTimeout', $hash->{helper}{timer}{gpRespTimeout}, 0);
         }
         $header = (0x7FF << 1 | $comMode) << 4;
         if ($channelDirSeq =~ m/.I$/) {
@@ -6518,13 +6517,11 @@ sub EnOcean_Set($@)
           $comMode = 1;
           $hash->{IODev}{helper}{gpRespWait}{AttrVal($name, "subDef", $hash->{DEF})}{teachInReq} = "out";
           $hash->{IODev}{helper}{gpRespWait}{AttrVal($name, "subDef", $hash->{DEF})}{hash} = $hash;
-          if (!exists($hash->{IODev}{Teach})) {
-            # enable teach-in receiving for 3 sec
-            $hash->{IODev}{Teach} = 1;
-            RemoveInternalTimer($hash->{helper}{timer}{gpRespTimeout}) if(exists $hash->{helper}{timer}{gpRespTimeout});
-            $hash->{helper}{timer}{gpRespTimeout} = {hash => $IOHash, function => "gpRespTimeout", helper => "gpRespWait"};
-            InternalTimer(gettimeofday() + 3, 'EnOcean_RespTimeout', $hash->{helper}{timer}{gpRespTimeout}, 0);
-         }
+          # enable teach-in receiving for 3 sec
+          $hash->{IODev}{Teach} = 1;
+          RemoveInternalTimer($hash->{helper}{timer}{gpRespTimeout}) if(exists $hash->{helper}{timer}{gpRespTimeout});
+          $hash->{helper}{timer}{gpRespTimeout} = {hash => $hash, function => "gpRespTimeout", helper => "gpRespWait"};
+          InternalTimer(gettimeofday() + 3, 'EnOcean_RespTimeout', $hash->{helper}{timer}{gpRespTimeout}, 0);
         }
         $data = sprintf '%04X', (0x7FF << 1 | $comMode) << 4 | 4;
         my $teachInState = $comMode == 1 ? "teach-in deletion sent, response requested" : "teach-in deletion sent";
@@ -6847,7 +6844,7 @@ sub EnOcean_Parse($$)
   my $IODev = $iohash->{NAME};
   my ($hash, $name, $filelogName, $rorgname);
   my ($ctrl, $err, $logLevel, $response);
-  Log3 $IODev, 4, "EnOcean received via $IODev: $msg";
+  Log3 $IODev, 5, "EnOcean received via $IODev: $msg";
   my @msg = split(':', $msg);
   my ($rorg, $data, $senderID, $status, $odata, $subDef, $destinationID, $funcNumber, $manufID, $RSSI, $delay, $subTelNum);
   my $packetType = hex($msg[1]);
@@ -6882,30 +6879,30 @@ sub EnOcean_Parse($$)
       $data = $2;
       if ($idx == 0) {
         # first message part
-        delete $iohash->{helper}{cdm};
+        delete $iohash->{helper}{"cdm_$senderID-$seq"};
         $data =~ m/^(....)(..)(.*)$/;
-        $iohash->{helper}{cdm}{len} = hex($1);
-        $iohash->{helper}{cdm}{rorg} = $2;
-        $iohash->{helper}{cdm}{data}{$idx} = $3;
-        $iohash->{helper}{cdm}{lenCounter} = length($3) / 2;
-        RemoveInternalTimer($hash->{helper}{timer}{helperClear}) if(exists $hash->{helper}{timer}{helperClear});
-        $hash->{helper}{timer}{helperClear} = {hash => $iohash, function => "cdm"};
-        InternalTimer(gettimeofday() + 1, 'EnOcean_helperClear', $hash->{helper}{timer}{helperClear}, 0);
+        $iohash->{helper}{"cdm_$senderID-$seq"}{len} = hex($1);
+        $iohash->{helper}{"cdm_$senderID-$seq"}{rorg} = $2;
+        $iohash->{helper}{"cdm_$senderID-$seq"}{data}{$idx} = $3;
+        $iohash->{helper}{"cdm_$senderID-$seq"}{lenCounter} = length($3) / 2;
+        RemoveInternalTimer($iohash->{helper}{timer}{"helperClear_$senderID-$seq"}) if(exists $iohash->{helper}{timer}{"helperClear_$senderID-$seq"});
+        $iohash->{helper}{timer}{"helperClear_$senderID-$seq"} = {hash => $iohash, function => "cdm_$senderID-$seq"};
+        InternalTimer(gettimeofday() + 3, 'EnOcean_helperClear', $iohash->{helper}{timer}{"helperClear_$senderID-$seq"}, 0);
         #Log3 $IODev, 3, "EnOcean $IODev CDM timer started";
       } else {
-        $iohash->{helper}{cdm}{data}{$idx} = $data;
-        $iohash->{helper}{cdm}{lenCounter} += length($data) / 2;
+        $iohash->{helper}{"cdm_$senderID-$seq"}{data}{$idx} = $data;
+        $iohash->{helper}{"cdm_$senderID-$seq"}{lenCounter} += length($data) / 2;
       }
-      if ($iohash->{helper}{cdm}{lenCounter} >= $iohash->{helper}{cdm}{len}) {
+      if ($iohash->{helper}{"cdm_$senderID-$seq"}{lenCounter} >= $iohash->{helper}{"cdm_$senderID-$seq"}{len}) {
         # data message complete
         # reconstruct RORG, DATA
         my ($idx, $dataPart, @data);
-        while (($idx, $dataPart) = each(%{$iohash->{helper}{cdm}{data}})) {
-          $data[$idx] = $iohash->{helper}{cdm}{data}{$idx};
+        while (($idx, $dataPart) = each(%{$iohash->{helper}{"cdm_$senderID-$seq"}{data}})) {
+          $data[$idx] = $iohash->{helper}{"cdm_$senderID-$seq"}{data}{$idx};
         }
         $data = join('', @data);
         $msg[3] = $data;
-        $rorg = $iohash->{helper}{cdm}{rorg};
+        $rorg = $iohash->{helper}{"cdm_$senderID-$seq"}{rorg};
         $msg[2] = $rorg;
         $msg = join(':', @msg);
         $rorgname = $EnO_rorgname{$rorg};
@@ -6913,10 +6910,10 @@ sub EnOcean_Parse($$)
           Log3 undef, 4, "EnOcean $senderID RORG $rorg unknown.";
           return "";
         }
-        delete $iohash->{helper}{cdm};
-        RemoveInternalTimer($hash->{helper}{timer}{helperClear}) if(exists $hash->{helper}{timer}{helperClear});
-        delete $hash->{helper}{timer}{helperClear} if (exists $hash->{helper}{timer}{helperClear});
-        #Log3 $IODev, 3, "EnOcean $IODev CDM concatenated DATA $data";
+        delete $iohash->{helper}{"cdm_$senderID-$seq"};
+        RemoveInternalTimer($iohash->{helper}{timer}{"helperClear_$senderID-$seq"}) if(exists $iohash->{helper}{timer}{"helperClear_$senderID-$seq"});
+        delete $iohash->{helper}{timer}{"helperClear_$senderID-$seq"} if (exists $iohash->{helper}{timer}{"helperClear_$senderID-$seq"});
+        #Log3 $IODev, 5, "EnOcean $IODev CDM RORG: $rorg concatenated DATA $data";
       } else {
         # wait for next data message part
         return $IODev;
@@ -9703,7 +9700,7 @@ sub EnOcean_Parse($$)
       my $motion = $db[0] >> 7 ? "on" : "off";
       my $lux = $db[2] << 2 | $db[1] >> 6;
       if ($lux == 1001) {$lux = "over range";}
-      my $voltage = sprintf "%0.1f", $db[3] * 0.02;
+      my $voltage = sprintf "%0.2f", $db[3] * 0.02;
       if ($db[3] > 250) {push @event, "3:errorCode:$db[3]";}
       push @event, "3:battery:" . ($db[3] * 0.02 > 2.9 ? "ok" : "low");
       push @event, "3:brightness:$lux";
@@ -10123,17 +10120,23 @@ sub EnOcean_Parse($$)
         my $windSpeed = sprintf "%0.1f", $db[1] * 70 / 255;
         my $dayNight = $db[0] & 4 ? "night" : "day";
         my $isRaining = $db[0] & 2 ? "yes" : "no";
+        my @windStrength = (0.2, 1.5, 3.3, 5.4, 7.9, 10.7, 13.8, 17.1, 20.7, 24.4, 28.4, 32.6);
+        my $windStrength = 0;
+        while($windSpeed > $windStrength[$windStrength] && $windStrength <= @windStrength + 1) {
+          $windStrength ++;
+        }
         push @event, "3:brightness:$dawn";
         push @event, "3:dayNight:$dayNight";
         push @event, "3:isRaining:$isRaining";
         push @event, "3:temperature:$temp";
         push @event, "3:windSpeed:$windSpeed";
+        push @event, "3:windStrength:$windStrength";
         push @event, "3:state:T: $temp B: $dawn W: $windSpeed IR: $isRaining";
       } elsif ($identifier == 2) {
         # Sun Intensity (EEP A5-13-02)
-        # $db[3] is the sun exposure west where 0x00 = 1 lx ... 0xFF = 150 klx
-        # $db[2] is the sun exposure south where 0x00 = 1 lx ... 0xFF = 150 klx
-        # $db[1] is the sun exposure east where 0x00 = 1 lx ... 0xFF = 150 klx
+        # $db[3] is the sun exposure west where 0x00 = 1 klx ... 0xFF = 150 klx
+        # $db[2] is the sun exposure south where 0x00 = 1 klx ... 0xFF = 150 klx
+        # $db[1] is the sun exposure east where 0x00 = 1 klx ... 0xFF = 150 klx
         # $db[0]_bit_2 is hemisphere where 0 = north, 1 = south
         push @event, "3:hemisphere:" . ($db[0] & 4 ? "south" : "north");
         push @event, "3:sunWest:" . sprintf "%d", 1 + $db[3] * 149999 / 255;
@@ -10181,7 +10184,6 @@ sub EnOcean_Parse($$)
         push @event, "3:sunElevation:$sunElev";
         push @event, "3:state:SRA: $solarRad SNA: $sunAzim SNE: $sunElev";
       } else {
-        # EEP A5-13-03 ... EEP A5-13-06 not implemented
       }
 
     } elsif ($st eq "windSensor.01") {
@@ -11405,7 +11407,7 @@ sub EnOcean_Parse($$)
         CommandDeleteReading(undef, "$name waitingCmds");
         $data = sprintf "80%02X%04X%02X", $waitingCmds, $updateInterval, $blinkInterval;
         EnOcean_SndRadio(undef, $hash, $packetType, "D2", $data, AttrVal($name, "subDef", "00000000"), "00", $hash->{DEF});
-        #EnOcean_multisensor_01Snd($crtl, $hash, $packetType);
+        #EnOcean_multisensor_01Snd($ctrl, $hash, $packetType);
       }
 
     } elsif ($st eq "roomCtrlPanel.01") {
@@ -14216,7 +14218,7 @@ EnOcean_Encapsulation($$$$)
 
 # set PID regulator
 sub EnOcean_setPID($$$) {
-  my ($crtl, $hash, $cmd, $adjust) = @_;
+  my ($ctrl, $hash, $cmd, $adjust) = @_;
   my $name = $hash->{NAME};
   my ($err, $response, $logLevel) = (undef, 'start', 5);
   @{$hash->{helper}{calcPID}} = (undef, $hash, $cmd);
@@ -14237,7 +14239,7 @@ sub EnOcean_setPID($$$) {
 # calc valve setpoint (PID regulator)
 sub EnOcean_calcPID($) {
   my ($pidParam) = @_;
-  my ($crtl, $hash, $cmd) = @$pidParam;
+  my ($ctrl, $hash, $cmd) = @$pidParam;
   my $name = $hash->{NAME};
   my ($err, $response, $logLevel, $setpoint) = (undef, $cmd, 5, 0);
   my $reUINT     = '^([\\+]?\\d+)$';               # uint without whitespaces
@@ -14606,7 +14608,7 @@ sub EnOcean_calcPID($) {
 sub
 EnOcean_multisensor_01Snd($$$)
 {
-  my ($crtl, $hash, $packetType) = @_;
+  my ($ctrl, $hash, $packetType) = @_;
   my $name = $hash->{NAME};
   my ($data, $err, $response, $logLevel);
 
@@ -14618,7 +14620,7 @@ EnOcean_multisensor_01Snd($$$)
 sub
 EnOcean_roomCtrlPanel_00Snd($$$$$$$$)
 {
-  my ($crtl, $hash, $packetType, $mid, $mcf, $irc, $fbc, $gmt) = @_;
+  my ($ctrl, $hash, $packetType, $mid, $mcf, $irc, $fbc, $gmt) = @_;
   my $name = $hash->{NAME};
   my ($data, $err, $response, $logLevel);
   my $messagePart = 1;
@@ -14727,7 +14729,7 @@ EnOcean_roomCtrlPanel_00Snd($$$$$$$$)
 sub
 EnOcean_roomCtrlPanel_00Cmd($$$$)
 {
-  my ($crtl, $hash, $mcf, $messagePart) = @_;
+  my ($ctrl, $hash, $mcf, $messagePart) = @_;
   my $name = $hash->{NAME};
   my $data = "0000";
   my $err;
@@ -15182,13 +15184,11 @@ sub EnOcean_4BSRespWait($$$) {
   my $IOHash = $defs{$IODev};
   $hash->{IODev}{helper}{"4BSRespWait"}{$subDef}{teachInReq} = "out";
   $hash->{IODev}{helper}{"4BSRespWait"}{$subDef}{hash} = $hash;
-  if (!exists($hash->{IODev}{Teach})) {
-    # enable teach-in receiving for 3 sec
-    $hash->{IODev}{Teach} = 1;
-    RemoveInternalTimer($hash->{helper}{timer}{"4BSRespTimeout"}) if(exists $hash->{helper}{timer}{"4BSRespTimeout"});
-    $hash->{helper}{timer}{"4BSRespTimeout"} = {hash => $IOHash, function => "4BSRespTimeout", helper => "4BSRespWait"};
-    InternalTimer(gettimeofday() + 3, 'EnOcean_RespTimeout', $hash->{helper}{timer}{"4BSRespTimeout"}, 0);
-  }
+  # enable teach-in receiving for 3 sec
+  $hash->{IODev}{Teach} = 1;
+  RemoveInternalTimer($hash->{helper}{timer}{"4BSRespTimeout"}) if(exists $hash->{helper}{timer}{"4BSRespTimeout"});
+  $hash->{helper}{timer}{"4BSRespTimeout"} = {hash => $hash, function => "4BSRespTimeout", helper => "4BSRespWait"};
+  InternalTimer(gettimeofday() + 3, 'EnOcean_RespTimeout', $hash->{helper}{timer}{"4BSRespTimeout"}, 0);
   return;
 }
 
@@ -15352,12 +15352,24 @@ sub EnOcean_AssignSenderID($$$$)
 sub EnOcean_SndCdm($$$$$$$$)
 {
   my ($ctrl, $hash, $packetType, $rorg, $data, $senderID, $status, $destinationID) = @_;
+  my $IODev = $hash->{IODev}{NAME};
+  my $IOHash = $defs{$IODev};
   if (!defined $data) {
     Log3 $hash->{NAME}, 5, "EnOcean $hash->{NAME} EnOcean_SndCDM SenderID: $senderID DestinationID: $destinationID " .
     "PacketType: $packetType RORG: $rorg DATA: undef STATUS: $status";
     return;
   }
-  my ($seq, $idx, $len, $dataPart, $dataPartLen) = (0, 0, length($data) / 2, undef, 14);
+  my ($seq, $idx, $len, $dataPart, $dataPartLen) = (1, 0, length($data) / 2, undef, 14);
+  if (exists $IOHash->{helper}{cdmSeq}) {
+    if ($IOHash->{helper}{cdmSeq} < 3) {
+      $IOHash->{helper}{cdmSeq} ++;
+      $seq = $IOHash->{helper}{cdmSeq};
+    } else {
+      $IOHash->{helper}{cdmSeq} = $seq;
+    }
+  } else {
+    $IOHash->{helper}{cdmSeq} = $seq;
+  }
   # split telelegram with optional data
   $dataPartLen = 9 if ($destinationID ne "FFFFFFFF");
   if ($packetType == 1 && $len > $dataPartLen) {
@@ -16103,13 +16115,11 @@ sub EnOcean_sndUTE($$$$$$$) {
       $hash->{IODev}{helper}{UTERespWait}{$hash->{DEF}}{hash} = $hash;
     }
     readingsSingleUpdate($hash, "teach", "EEP $eep UTE query sent, response requested", 1);
-    if (!exists($hash->{IODev}{Teach})) {
-      # enable teach-in receiving for 3 sec
-      $hash->{IODev}{Teach} = 1;
-      RemoveInternalTimer($hash->{helper}{timer}{UTERespTimeout}) if(exists $hash->{helper}{timer}{UTERespTimeout});
-      $hash->{helper}{timer}{UTERespTimeout} = {hash => $IOHash, function => "UTERespTimeout", helper => "UTERespWait"};
-      InternalTimer(gettimeofday() + 3, 'EnOcean_RespTimeout', $hash->{helper}{timer}{UTERespTimeout}, 0);
-    }
+    # enable teach-in receiving for 3 sec
+    $hash->{IODev}{Teach} = 1;
+    RemoveInternalTimer($hash->{helper}{timer}{UTERespTimeout}) if(exists $hash->{helper}{timer}{UTERespTimeout});
+    $hash->{helper}{timer}{UTERespTimeout} = {hash => $hash, function => "UTERespTimeout", helper => "UTERespWait"};
+    InternalTimer(gettimeofday() + 3, 'EnOcean_RespTimeout', $hash->{helper}{timer}{UTERespTimeout}, 0);
   }
   $attr{$name}{devChannel} = $devChannel;
   $attr{$name}{eep} = $eep;
@@ -16124,9 +16134,9 @@ sub EnOcean_RespTimeout($) {
   my $function = $functionHash->{function};
   my $hash = $functionHash->{hash};
   my $helper = $functionHash->{helper};
-  my $name = $hash->{NAME};
-  delete $hash->{helper}{$helper};
-  delete $hash->{Teach};
+  delete $hash->{helper}{timer}{$function};
+  delete $hash->{IODev}{helper}{$helper};
+  delete $hash->{IODev}{Teach};
   return;
 }
 
@@ -20766,7 +20776,7 @@ EnOcean_Delete($$)
      <li>Environmental Applications<br>
          Weather Station (EEP A5-13-01)<br>
          Sun Intensity (EEP A5-13-02)<br>
-         [Eltako FWS61]<br>
+         [AWAG XFJ, Eltako FWS61]<br>
      <ul>
        <li>T: t/&#176C B: E/lx W: Vs/m IR: yes|no</li>
        <li>brightness: E/lx (Sensor Range: E = 0 lx ... 999 lx)</li>
@@ -20778,6 +20788,7 @@ EnOcean_Delete($$)
        <li>sunWest: E/lx (Sensor Range: E = 1 lx ... 150 klx)</li>
        <li>temperature: t/&#176C (Sensor Range: t = -40 &#176C ... 80 &#176C)</li>
        <li>windSpeed: Vs/m (Sensor Range: V = 0 m/s ... 70 m/s)</li>
+       <li>windStrength: B (Sensor Range: B = 0 Beaufort ... 12 Beaufort)</li>
        <li>state:T: t/&#176C B: E/lx W: Vs/m IR: yes|no</li>
      </ul><br>
         Brightness is the strength of the dawn light. SunEast,
