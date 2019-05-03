@@ -1,0 +1,26 @@
+##############################################
+# $Id$
+# FileLog definition: 
+# define FileLog_device FileLog ./log/device-%Y.log device
+#
+# Logfile record example:
+# 2015-10-17_08:38:08 device isRaining yes|no
+# 2015-10-17_08:38:08 device windSpeed 2.9
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set title '<TL>'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set ylabel "m/s"
+set y2label "Raining"
+set y2tics ("yes" 1, "no" 0)
+set y2range [-0.1:1.1]
+set grid
+
+#FileLog 4:windSpeed:0:
+#FileLog 4:isRaining:0:$fld[3]=~"yes"?1:0
+
+plot "<IN>" using 1:2 ls l0 lw 1 axes x1y1 title 'Wind Speed' with lines,\
+     "<IN>" using 1:2 ls l1 lw 1 axes x1y2 title 'Raining' with steps

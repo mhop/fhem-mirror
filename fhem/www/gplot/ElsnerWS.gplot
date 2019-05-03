@@ -1,0 +1,31 @@
+##############################################
+# $Id$
+# Display the sun intensities
+#
+# FileLog definition: 
+# define FileLog_device FileLog ./log/device-%Y.log device
+#
+# Logfile record example:
+# 2015-10-17_08:38:08 device sunWest: 10000
+
+# Attribute 'small' is useful for gnuplot/-scroll only,
+# if plotsize is less than 800,400
+#set terminal png transparent small size <SIZE> crop
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set ytics
+set title '<TL>'
+set grid xtics ytics
+set ylabel "E/lx"
+
+#FileLog 4:sunSouth:0:
+#FileLog 4:sunEast:0:
+#FileLog 4:sunWest:0:
+
+plot "<IN>" using 1:2 ls l0 axes x1y1 title 'Sun Intensity South' with lines,\
+     "<IN>" using 1:2 ls l2 axes x1y1 title 'Sun Intensity East' with lines,\
+     "<IN>" using 1:2 ls l1 axes x1y1 title 'Sun Intensity West' with lines
