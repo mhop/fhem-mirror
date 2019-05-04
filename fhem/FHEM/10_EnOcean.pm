@@ -5180,7 +5180,7 @@ sub EnOcean_Set($@)
       $rorg = "D2";
       $updateState = 0;
       my $cmdID;
-      my $channel = AttrVal($name, "defaultChannel", 'all');
+      my $channel = AttrVal($name, "defaultChannel", 16) - 1;
       my $position = 127;
       my $angle = 127;
       my $repo = AttrVal($name, "reposition", "directly");
@@ -5211,10 +5211,12 @@ sub EnOcean_Set($@)
           # position value
           if (($a[0] =~ m/^\d+$/) && ($a[0] >= 0) && ($a[0] <= 100)) {
             $position = shift(@a);
+
             if (defined $a[0]) {
             # angle value
               if (($a[0] =~ m/^\d+$/) && ($a[0] >= 0) && ($a[0] <= 100)) {
                 $angle = shift(@a);
+
                 if (defined $a[0]) {
                   # channel
                   $channel = shift(@a);
@@ -5225,35 +5227,32 @@ sub EnOcean_Set($@)
                   } else {
                     return "Usage: $position $angle $channel argument unknown, choose one of 1|2|3|4|all";
                   }
-                } else {
-                  $channel = 15;
-                }
-                if (defined $a[0]) {
-                  # reposition value
-                  $repo = shift(@a);
-                  if ($repo eq "directly") {
-                    $repo = 0;
-                  } elsif ($repo eq "opens") {
-                    $repo = 1;
-                  } elsif ($repo eq "closes") {
-                    $repo = 2;
-                  } else {
-                    return "Usage: $position $angle $channel $repo argument unknown, choose one of directly opens closes";
+
+                  if (defined $a[0]) {
+                    # reposition value
+                    $repo = shift(@a);
+                    if ($repo eq "directly") {
+                      $repo = 0;
+                    } elsif ($repo eq "opens") {
+                      $repo = 1;
+                    } elsif ($repo eq "closes") {
+                      $repo = 2;
+                    } else {
+                      return "Usage: $position $angle $channel $repo argument unknown, choose one of directly opens closes";
+                    }
                   }
                 }
                 readingsSingleUpdate($hash, "anglePos", $angle, 1);
               } else {
                 return "Usage: $position $a[0] is not numeric or out of range";
               }
-            } else {
-              $channel = 15;
             }
             readingsSingleUpdate($hash, "state", "in_motion", 1);
           } else {
             return "Usage: $a[0] is not numeric or out of range";
           }
         } else {
-          return "Usage: set <name> position <position> [<angle> [<repo>]]";
+          return "Usage: set <name> position <position> [<angle> [<channel> [<repo>]]]";
         }
         $data = sprintf "%02X%02X%02X%02X", $position, $angle, $repo << 4 | $lock, $channel << 4 | $cmdID;
 
@@ -5276,8 +5275,6 @@ sub EnOcean_Set($@)
               } else {
                 return "Usage: $angle $channel argument unknown, choose one of 1|2|3|4|all";
               }
-            } else {
-              $channel = 15;
             }
             readingsSingleUpdate($hash, "state", "in_motion", 1);
           } else {
@@ -5302,8 +5299,6 @@ sub EnOcean_Set($@)
           } else {
             return "Usage: stop $channel argument unknown, choose one of 1|2|3|4|all";
           }
-        } else {
-          $channel = 15;
         }
         readingsSingleUpdate($hash, "state", "stopped", 1);
         $data = sprintf "%02X", $channel << 4 | $cmdID;
@@ -5324,8 +5319,6 @@ sub EnOcean_Set($@)
           } else {
             return "Usage: opens $channel argument unknown, choose one of 1|2|3|4|all";
           }
-        } else {
-          $channel = 15;
         }
         $position = 0;
         $repo = 0;
@@ -5347,8 +5340,6 @@ sub EnOcean_Set($@)
           } else {
             return "Usage: closes $channel argument unknown, choose one of 1|2|3|4|all";
           }
-        } else {
-          $channel = 15;
         }
         $position = 100;
         $repo = 0;
@@ -5367,8 +5358,6 @@ sub EnOcean_Set($@)
           } else {
             return "Usage: unlock $channel argument unknown, choose one of 1|2|3|4|all";
           }
-        } else {
-          $channel = 15;
         }
         $repo = 0;
         $lock = 7;
@@ -5387,8 +5376,6 @@ sub EnOcean_Set($@)
           } else {
             return "Usage: lock $channel argument unknown, choose one of 1|2|3|4|all";
           }
-        } else {
-          $channel = 15;
         }
         $repo = 0;
         $lock = 1;
@@ -5407,8 +5394,6 @@ sub EnOcean_Set($@)
           } else {
             return "Usage: alarm $channel argument unknown, choose one of 1|2|3|4|all";
           }
-        }  else {
-          $channel = 15;
         }
         $repo = 0;
         $lock = 2;
