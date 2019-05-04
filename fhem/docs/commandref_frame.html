@@ -177,7 +177,17 @@ telnet) or single client command (via fhem.pl). Example:
 </ul>
 <br>
 If a OS-user called fhem exists, and FHEM is started as root, FHEM will
-automatically change to to this user via setuid. <br>
+automatically change to to this user via setuid.
+<br><br>
+
+If FHEM is started with the -d option (perl fhem.pl -d fhem.cfg), then the
+verbose level is set to 5 and the logfile is redirected to the STDOUT.
+<br><br>
+
+The environment variable FHEM_GLOBALATTR is evaluated: it consists of space
+separated name=value pairs, where name is a global attribute. Values from this
+source override values set in the configuration file.
+
 </ul>
 <!-- intro end - diese Zeile nicht entfernen! -->
 

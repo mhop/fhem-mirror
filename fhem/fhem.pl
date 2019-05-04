@@ -111,6 +111,7 @@ sub WriteStatefile();
 sub XmlEscape($);
 sub addEvent($$);
 sub addToDevAttrList($$);
+sub applyGlobalAttrFromEnv();
 sub delFromDevAttrList($$);
 sub addToAttrList($);
 sub delFromAttrList($);
@@ -562,7 +563,9 @@ if(configDBUsed()) {
 # As newer Linux versions reset serial parameters after fork, we parse the
 # config file after the fork. But we need some global attr parameters before, so we
 # read them here.
+my (undef, $globalAttrFromEnv) = parseParams($ENV{FHEM_GLOBALATTR});
 setGlobalAttrBeforeFork($attr{global}{configfile});
+applyGlobalAttrFromEnv();
 
 Log 1, $_ for eval{@{$winService->{ServiceLog}};};
 
@@ -609,6 +612,7 @@ if(configDBUsed()) {
     }
   }
 }
+applyGlobalAttrFromEnv();
 
 my $pfn = $attr{global}{pidfilename};
 if($pfn) {
@@ -1481,6 +1485,7 @@ CommandRereadCfg($$)
       $ret = (defined($ret) ? "$ret\n$ret2" : $ret2) if(defined($ret2));
     }
   }
+  applyGlobalAttrFromEnv();
 
   $defs{$name} = $selectlist{$name} = $cl if($name && $name ne "__anonymous__");
   $inform{$name} = $informMe if($informMe);
@@ -2742,7 +2747,10 @@ GlobalAttr($$$$)
     return undef;
   }
 
-  return undef if($type ne "set");
+  my $ev = $globalAttrFromEnv->{$name};
+  return "$name is readonly, it is set in the FHEM_GLOBALATTR environment"
+    if(defined($ev) && defined($val) && $ev ne $val);
+
   ################
   if($name eq "logfile") {
     my @t = localtime(gettimeofday());
@@ -5608,6 +5616,7 @@ parseParams($;$$$)
   $joiner = $separator if(!$joiner); # needed if separator is a regexp
   $keyvalueseparator = '=' if(!$keyvalueseparator);
   my(@a, %h);
+  return(\@a, \%h) if(!defined($cmd));
 
   my @params;
   if( ref($cmd) eq 'ARRAY' ) {
@@ -5923,6 +5932,15 @@ IsWe(;$$)
     }
   }
   return $we ? 1 : 0;
+}
+
+sub
+applyGlobalAttrFromEnv()
+{
+  while(my ($k,$v)= each %{$globalAttrFromEnv}) {
+    Log 3, "From the FHEM_GLOBALATTR environment: attr global $k $v";
+    CommandAttr(undef, "global $k $v");
+  }
 }
 
 1;

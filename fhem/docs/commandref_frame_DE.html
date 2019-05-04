@@ -158,7 +158,17 @@ Die Kommunikation mit FHEM kann entweder in einer "session" (&uuml;ber telnet) o
 </ul>
 <br>
 Falls FHEM als root gestartet wurde, und ein OS-Benutzer fhem existiert, dann
-wechselt FHEM nach dem start zu diesem Benutzer (via setuid). <br>
+wechselt FHEM nach dem start zu diesem Benutzer (via setuid).
+<br><br>
+
+Falls FHEM mit der -d Koommandozeilenoption gestartet wurde (perl fhem.pl -d
+fhem.cfg), dann wird verbose auf 5 gesetzt und die Logs werden auf STDOUT
+geschrieben.
+<br><br>
+
+Die Umgebungsvariable FHEM_GLOBALATTR wird ausgewertet: sie enth&auml;lt
+Leerzeichengetrennte Name=Wert Paare, wobei Name ein global Attribut ist. So
+gesetzte Werte &uuml;berschreiben die Werte aus der Konfigurationsdatei.
 </ul>
 <br>
 <!-- intro end - diese Zeile nicht entfernen! -->
