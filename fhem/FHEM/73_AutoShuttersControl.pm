@@ -1609,8 +1609,8 @@ sub EventProcessingShadingBrightness($@) {
             )
             and IsDay($shuttersDev)
             and $ascDev->getAutoShuttersControlShading eq 'on'
-            and $shutters->getRainProtectionStatus eq 'unprotection'
-            and $shutters->getWindProtectionStatus eq 'unprotection'
+            #and $shutters->getRainProtectionStatus eq 'unprotection'
+            #and $shutters->getWindProtectionStatus eq 'unprotection'
           )
         {
             ShadingProcessing(
