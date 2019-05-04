@@ -23,7 +23,13 @@ sub RESIDENTS_Initialize($) {
 
     $hash->{AttrList} =
         "disable:1,0 disabledForIntervals do_not_notify:1,0 "
-      . "rgr_states:multiple-strict,home,gotosleep,asleep,awoken,absent,gone rgr_lang:EN,DE rgr_noDuration:0,1 rgr_showAllStates:0,1 rgr_wakeupDevice "
+      . "rgr_states:multiple-strict,home,gotosleep,asleep,awoken,absent,gone "
+      . "rgr_lang:EN,DE "
+      . "rgr_noDuration:0,1 "
+      . "rgr_showAllStates:0,1 "
+      . "rgr_wakeupDevice "
+      . "rgr_homealoneInStatus:0,1 "
+      . "rgr_homealoneSubTypes:multiple-strict,pet,bird,pig,monkey,cat,dog,baby,toddler,minor,child,guest,domesticWorker,vacationer,teenager,senior "
       . $readingFnAttributes;
 
     return FHEM::Meta::InitMod( __FILE__, $hash );
@@ -35,6 +41,15 @@ sub RESIDENTS_UpdateReadings (@) {
     my $name = $hash->{NAME};
     my $state    = ReadingsVal( $name, "state",    "none" );
     my $presence = ReadingsVal( $name, "presence", "absent" );
+    my $homealoneInStatus = AttrVal( $name, 'rgr_homealoneInStatus', '0' );
+    my @homealoneSubTypes = split(
+        /,/,
+        AttrVal(
+            $name,
+            "rgr_homealoneSubTypes",
+"pet,bird,pig,monkey,cat,dog,baby,toddler,minor,child,guest,domesticWorker,vacationer,teenager,senior"
+        )
+    );
 
     my $state_home                          = 0;
     my $state_gotosleep                     = 0;
@@ -44,6 +59,7 @@ sub RESIDENTS_UpdateReadings (@) {
     my $state_gone                          = 0;
     my $state_total                         = 0;
     my $state_totalPresent                  = 0;
+    my $state_homealone                     = 1;
     my $state_totalAbsent                   = 0;
     my $state_totalGuests                   = 0;
     my $state_totalGuestsPresent            = 0;
@@ -54,7 +70,6 @@ sub RESIDENTS_UpdateReadings (@) {
     my $state_totalRoommates                = 0;
     my $state_totalRoommatesPresent         = 0;
     my $state_totalRoommatesAbsent          = 0;
-    my $state_guestDev                      = 0;
     my $residentsDevs_home                  = "-";
     my $residentsDevs_absent                = "-";
     my $residentsDevs_asleep                = "-";
@@ -359,6 +374,19 @@ sub RESIDENTS_UpdateReadings (@) {
                     && $residents_wayhomeDelayed eq "-" );
             }
         }
+
+        if ( $state_homealone
+            && ReadingsVal( $roommate, "presence", "absent" ) eq "present" )
+        {
+            my $TYPE = GetType($roommate);
+            my $SubType =
+              defined( $defs{$roommate}{SUBTYPE} )
+              ? $defs{$roommate}{SUBTYPE}
+              : 'generic';
+
+            $state_homealone = 0
+              unless ( grep m/^$SubType$/, @homealoneSubTypes );
+        }
     }
 
     # count child states for PET devices
@@ -607,12 +635,24 @@ sub RESIDENTS_UpdateReadings (@) {
                     && $residents_wayhomeDelayed eq "-" );
             }
         }
+
+        if ( $state_homealone
+            && ReadingsVal( $pet, "presence", "absent" ) eq "present" )
+        {
+            my $TYPE = GetType($pet);
+            my $SubType =
+              defined( $defs{$pet}{SUBTYPE} )
+              ? $defs{$pet}{SUBTYPE}
+              : 'generic';
+            $SubType = 'pet' if ( $SubType eq 'generic' );
+
+            $state_homealone = 0
+              unless ( grep m/^$SubType$/, @homealoneSubTypes );
+        }
     }
 
     # count child states for GUEST devices
     foreach my $guest (@registeredGuests) {
-        $state_guestDev++;
-
         my $guestName =
           AttrVal( $guest, AttrVal( $guest, "rg_realname", "group" ), "" );
 
@@ -804,6 +844,20 @@ sub RESIDENTS_UpdateReadings (@) {
                   if ( $guestName ne ""
                     && $residents_wayhomeDelayed eq "-" );
             }
+        }
+
+        if ( $state_homealone
+            && ReadingsVal( $guest, "presence", "absent" ) eq "present" )
+        {
+            my $TYPE = GetType($guest);
+            my $SubType =
+              defined( $defs{$guest}{SUBTYPE} )
+              ? $defs{$guest}{SUBTYPE}
+              : 'generic';
+            $SubType = 'guest' if ( $SubType eq 'generic' );
+
+            $state_homealone = 0
+              unless ( grep m/^$SubType$/, @homealoneSubTypes );
         }
     }
 
@@ -1071,8 +1125,58 @@ sub RESIDENTS_UpdateReadings (@) {
       ? "present"
       : "absent";
 
+    # calculate homealone state
+    $state_homealone = 0 if ( $newpresence eq "absent" );
+    my $homealone_type;
+    my $homealone_subtype;
+    my $newstate_prefix;
+    if ($state_homealone) {
+        foreach my $obj ( split( /,/, $residentsDevs_totalPresent ) ) {
+            my $TYPE = GetType($obj);
+            next unless $TYPE;
+            $state_homealone++;
+
+            my $subtype = 'generic';
+            $subtype = InternalVal( $obj, 'SUBTYPE', 'pet' )
+              if ( $TYPE eq 'PET' );
+            $subtype = InternalVal( $obj, 'SUBTYPE', 'adult' )
+              if ( $TYPE eq 'ROOMMATE' );
+            $subtype = InternalVal( $obj, 'SUBTYPE', 'guest' )
+              if ( $TYPE eq 'GUEST' );
+
+            my $importance = 99;
+            my (@index) = grep { $homealoneSubTypes[$_] eq $subtype }
+              0 .. scalar @homealoneSubTypes - 1;
+            $importance = $index[0] if ( scalar @index );
+
+            my $importance2 = 99;
+            if ($homealone_subtype) {
+                my (@index2) =
+                  grep { $homealoneSubTypes[$_] eq $homealone_subtype }
+                  0 .. scalar @homealoneSubTypes - 1;
+                $importance2 = $index2[0] if ( scalar @index2 );
+            }
+
+            $homealone_type = $TYPE
+              if ( !$homealone_type || $importance2 < $importance );
+            $homealone_subtype = $subtype
+              if ( !$homealone_subtype || $importance2 < $importance );
+            $newstate_prefix = ( $TYPE eq 'PET' ? 'pet' : $subtype )
+              if ( !$newstate_prefix || $importance2 < $importance );
+        }
+    }
+    readingsBulkUpdateIfChanged( $hash, "residentsHomealone",
+        $state_homealone );
+    readingsBulkUpdateIfChanged( $hash, "residentsHomealoneType",
+        $homealone_type ? $homealone_type : '-' );
+    readingsBulkUpdateIfChanged( $hash, "residentsHomealoneSubtype",
+        $homealone_subtype ? $homealone_subtype : '-' );
+
+    $newstate = $newstate_prefix . '_' . $newstate
+      if ( $homealoneInStatus ne '0' && $newstate_prefix );
+
     Log3 $name, 4,
-"RESIDENTS $name: calculation result - residentsTotal:$state_total residentsTotalRoommates:$state_totalRoommates residentsTotalRoommatesPresent:$state_totalRoommatesPresent residentsTotalRoommatesAbsent:$state_totalRoommatesAbsent residentsTotalGuests:$state_totalGuests residentsTotalPets:$state_totalPets residentsTotalGuestsPresent:$state_totalGuestsPresent residentsTotalPetsPresent:$state_totalPetsPresent residentsTotalGuestsAbsent:$state_totalGuestsAbsent residentsTotalPetsAbsent:$state_totalPetsAbsent residentsTotalPresent:$state_totalPresent residentsTotalAbsent:$state_totalAbsent residentsHome:$state_home residentsGotosleep:$state_gotosleep residentsAsleep:$state_asleep residentsAwoken:$state_awoken residentsAbsent:$state_absent residentsGone:$state_gone presence:$newpresence state:$newstate";
+"RESIDENTS $name: calculation result - residentsTotal:$state_total residentsTotalRoommates:$state_totalRoommates residentsTotalRoommatesPresent:$state_totalRoommatesPresent residentsTotalRoommatesAbsent:$state_totalRoommatesAbsent residentsTotalGuests:$state_totalGuests residentsTotalPets:$state_totalPets residentsTotalGuestsPresent:$state_totalGuestsPresent residentsTotalPetsPresent:$state_totalPetsPresent residentsTotalGuestsAbsent:$state_totalGuestsAbsent residentsTotalPetsAbsent:$state_totalPetsAbsent residentsTotalPresent:$state_totalPresent residentsTotalAbsent:$state_totalAbsent residentsHome:$state_home residentsGotosleep:$state_gotosleep residentsAsleep:$state_asleep residentsAwoken:$state_awoken residentsAbsent:$state_absent residentsGone:$state_gone presence:$newpresence state:$newstate homealone:$state_homealone";
 
     # safe current time
     my $datetime = FmtDateTime(time);
@@ -1292,6 +1396,12 @@ sub RESIDENTS_UpdateReadings (@) {
       <ul>
         <ul>
           <li>
+            <b>rgr_homealoneInStatus</b> - if set, state will have a prefix of the value of residentsHomealoneSubtype; In case it is a pet, it will only be copied to state as 'pet'. Defaults to "0"
+          </li>
+          <li>
+            <b>rgr_homealoneSubTypes</b> - a list of subTypes that will trigger home alone status if they are the only ones present at home. The order here will also affect the determination of the person with the most responsibility at home. The sorting order starts with least important to most important.
+          </li>
+          <li>
             <b>rgr_lang</b> - overwrite global language setting; helps to set device attributes to translate FHEMWEB display text
           </li>
           <li>
@@ -1420,6 +1530,15 @@ sub RESIDENTS_UpdateReadings (@) {
           </li>
           <li>
             <b>residentsHomeNames</b> - device alias of residents with state 'home'
+          </li>
+          <li>
+            <b>residentsHomealone</b> - becomes '1' when there are persons at home that are not fully autonomous
+          </li>
+          <li>
+            <b>residentsHomealoneSubtype</b> - subType of the residential object in charge
+          </li>
+          <li>
+            <b>residentsHomealoneType</b> - type of the residential object in charge
           </li>
           <li>
             <b>residentsTotal</b> - total number of all active residents despite their current state
@@ -1694,6 +1813,12 @@ sub RESIDENTS_UpdateReadings (@) {
       <ul>
         <ul>
           <li>
+            <b>rgr_homealoneInStatus</b> - wenn aktiviert, dann erh&auml;lt state den Wert von HomealoneSubtype als Pr&auml;fix; Standard ist "0"
+          </li>
+          <li>
+            <b>rgr_homealoneSubTypes</b> - eine Liste von subTypes, die den Home Alone Status ausl&ouml;sen, sofern sie diese die einzigen Anwesenden zu Hause sind. Die Reihenfolge beeinflusst die Bestimmung der Person mit der h&ouml;chsten Verantwortung im Haus. Die Sortierung geht vom unwichtigsten zum wichtigsten.
+          </li>
+          <li>
             <b>rgr_lang</b> - &uuml;berschreibt globale Spracheinstellung; hilft beim setzen von Device Attributen, um FHEMWEB Anzeigetext zu &uuml;bersetzen
           </li>
           <li>
@@ -1822,6 +1947,15 @@ sub RESIDENTS_UpdateReadings (@) {
           </li>
           <li>
             <b>residentsHomeNames</b> - Ger&auml;tealias der Bewohner mit Status 'home'
+          </li>
+          <li>
+            <b>residentsHomealone</b> - hat den Wert '1', wenn anwesende Personen nicht komplett eigenständig sind
+          </li>
+          <li>
+            <b>residentsHomealoneSubtype</b> - subType des Bewohner Objekts in Verantwortung
+          </li>
+          <li>
+            <b>residentsHomealoneType</b> - type des Bewohner Objekts in Verantwortung
           </li>
           <li>
             <b>residentsTotal</b> - Summe aller aktiven Bewohner unabh&auml;ngig von ihrem aktuellen Status

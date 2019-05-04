@@ -7,7 +7,7 @@ use Data::Dumper;
 use Time::Local;
 
 require RESIDENTStk;
-our (@RESIDENTStk_attr);
+our ( @RESIDENTStk_attr, %RESIDENTStk_subTypes );
 
 # initialize ##################################################################
 sub PET_Initialize($) {
@@ -25,6 +25,8 @@ sub PET_Initialize($) {
     $hash->{AttrList} =
         "disable:1,0 disabledForIntervals do_not_notify:1,0 "
       . "rp_states:multiple-strict,home,gotosleep,asleep,awoken,absent,gone "
+      . "subType:"
+      . join( ',', @{ $RESIDENTStk_subTypes{PET} } ) . " "
       . $readingFnAttributes;
 
     foreach (@RESIDENTStk_attr) {
@@ -66,7 +68,9 @@ sub PET_Initialize($) {
           <br>
           # Member of multiple groups<br>
           define rp_Pet PET rgr_Residents,rgr_Pets # to be member of resident group rgr_Residents and rgr_Pets</code>
-        </ul>
+        </ul>F&uuml;r gew&ouml;hnlich sind das keine Fische oder Kleintiere in K&auml;figen
+        <br />
+        Note: A pet that is generally "worth" to be represented as a device in FHEM is an animal that usually leaves and re-enters home on a regular basis and that might stay alone at home from time to time. It is supposed to be an animal that you want your home to behave differently based on the pets presence or home status. Usually that is not a fish or small animals in cages, but something more like a dog in particular. Cats might not be worth to be tracked either, depending on their character and your daily family life.
       </ul><br>
       <br>
       <a name="PETset" id="PETset"></a> <b>Set</b>
@@ -247,6 +251,9 @@ sub PET_Initialize($) {
           <li>
             <b>rp_wakeupDevice</b> - reference to enslaved DUMMY devices used as a wake-up timer (part of RESIDENTS Toolkit's wakeuptimer)
           </li>
+          <li>
+            <b>subType</b> - specifies a specific class of a pet for the device. This will be considered for home alone status calculation. Defaults to "generic"
+          </li>
         </ul>
       </ul><br>
       <br>
@@ -374,6 +381,8 @@ sub PET_Initialize($) {
           # Mitglied in mehreren Gruppen<br>
           define rp_Pet PET rgr_Residents,rgr_Pets # um Mitglied der Gruppen rgr_Residents und rgr_Pets zu sein</code>
         </ul>
+        <br />
+        Hinweis: Ein Haustier ist generell "wert" als FHEM Device repr&auml;sentiert zu werden, wenn es sich um ein Tier handelt, welches normalerweise regelm&auml;&szlig;ig das Haus verl&auml;sst und wieder betritt. Es sollte ein Tier sein, bei welchem sich die Hausautomation abh&auml;ngig des Pr&auml;senz- und Zuhause Status anders verhalten soll. F&uuml;r gew&ouml;hnlich sind das keine Fische oder Kleintiere in K&auml;figen, sondern etwas wie insbesondere ein Hund. Bei Katzen kann es sich unter Umst&auml;nden auch nicht lohnen diese zu tracken, je nach Charakter und dem t&auml;glichen Familienleben.
       </ul><br>
       <br>
       <a name="PETset" id="PETset"></a> <b>Set</b>
@@ -554,6 +563,9 @@ sub PET_Initialize($) {
           <li>
             <b>rp_wakeupDevice</b> - Referenz zu versklavten DUMMY Ger&auml;ten, welche als Wecker benutzt werden (Teil von RESIDENTS Toolkit's wakeuptimer)
           </li>
+          <li>
+            <b>subType</b> - Gibt einen bestimmten Typ eines Haustiers f&uuml;r das Device an. Dies wird bei der Berechnung des Home Alone Status ber&uuml;cksichtigt. Standard ist "generic"
+          </li>
         </ul>
       </ul><br>
       <br>
@@ -668,7 +680,7 @@ sub PET_Initialize($) {
   "keywords": [
     "Attendence",
     "Family",
-    "People",
+    "Animals",
     "Presence",
     "RESIDENTS"
   ]

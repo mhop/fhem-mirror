@@ -7,7 +7,7 @@ use Data::Dumper;
 use Time::Local;
 
 require RESIDENTStk;
-our (@RESIDENTStk_attr);
+our ( @RESIDENTStk_attr, %RESIDENTStk_subTypes );
 
 # initialize ##################################################################
 sub GUEST_Initialize($) {
@@ -25,6 +25,8 @@ sub GUEST_Initialize($) {
     $hash->{AttrList} =
         "disable:1,0 disabledForIntervals do_not_notify:1,0 "
       . "rg_states:multiple-strict,home,gotosleep,asleep,awoken,absent,none "
+      . "subType:"
+      . join( ',', @{ $RESIDENTStk_subTypes{GUEST} } ) . " "
       . $readingFnAttributes;
 
     foreach (@RESIDENTStk_attr) {
@@ -246,6 +248,9 @@ sub GUEST_Initialize($) {
           </li>
           <li>
             <b>rg_wakeupDevice</b> - reference to enslaved DUMMY devices used as a wake-up timer (part of RESIDENTS Toolkit's wakeuptimer)
+          </li>
+          <li>
+            <b>subType</b> - specifies a specific class of a guest for the device. This will be considered for home alone status calculation. Defaults to "generic"
           </li>
         </ul>
       </ul><br>
@@ -558,6 +563,9 @@ sub GUEST_Initialize($) {
           <li>
             <b>rg_wakeupDevice</b> - Referenz zu versklavten DUMMY Ger&auml;ten, welche als Wecker benutzt werden (Teil von RESIDENTS Toolkit's wakeuptimer)
           </li>
+          <li>
+            <b>subType</b> - Gibt einen bestimmten Typ eines Gasts f&uuml;r das Device an. Dies wird bei der Berechnung des Home Alone Status ber&uuml;cksichtigt. Standard ist "generic"
+          </li>
         </ul>
       </ul><br>
       <br>
@@ -675,8 +683,7 @@ sub GUEST_Initialize($) {
   ],
   "keywords": [
     "Attendence",
-    "Family",
-    "People",
+    "Workers",
     "Presence",
     "RESIDENTS"
   ]

@@ -217,7 +217,7 @@ attr WEB styleData {\
    "left": 300,\
    "top": 220,\
    "width": 280,\
-   "height": 80,\
+   "height": 200,\
    "oTop": 40,\
    "oLeft": 0\
   },\
@@ -247,7 +247,7 @@ attr WEB styleData {\
   },\
   "Pos.Room_Residents_grp_notify": {\
    "left": 300,\
-   "top": 340,\
+   "top": 460,\
    "width": 280,\
    "height": 58,\
    "oTop": 40,\
@@ -534,6 +534,7 @@ attr rgr_Residents alias Residents
 attr rgr_Residents devStateIcon .*home:user_available:absent .*absent:user_away:home .*gone:user_ext_away:home .*gotosleep:scene_toilet:asleep .*asleep:scene_sleeping:awoken .*awoken:scene_sleeping_alternat:home .*:user_unknown:home
 attr rgr_Residents group Home State
 attr rgr_Residents icon control_building_filled
+attr rgr_Residents rgr_homealoneInStatus 1
 attr rgr_Residents room Residents
 attr rgr_Residents sortby 2
 attr rgr_Residents webCmd state
@@ -566,7 +567,7 @@ attr rgr_Guests sortby 4
 attr rgr_Guests webCmd state
 define rg_Guest1 GUEST rgr_Residents,rgr_Guests
 setuuid rg_Guest1 5c8aad22-f33f-c296-6863-0e7ebe5915eb9650
-attr rg_Guest1 alias Guest1
+attr rg_Guest1 alias Cleaner
 attr rg_Guest1 devStateIcon .*home:user_available:absent .*absent:user_away:home .*none:control_building_empty:home .*gotosleep:scene_toilet:asleep .*asleep:scene_sleeping:awoken .*awoken:scene_sleeping_alternat:home .*:user_unknown
 attr rg_Guest1 group Guests
 attr rg_Guest1 icon scene_visit_guests
@@ -574,10 +575,11 @@ attr rg_Guest1 rg_autoGoneAfter 0.01
 attr rg_Guest1 rg_realname alias
 attr rg_Guest1 room Residents
 attr rg_Guest1 sortby 1
+attr rg_Guest1 subType domesticWorker
 attr rg_Guest1 webCmd state
 define rg_Guest2 GUEST rgr_Residents,rgr_Guests
 setuuid rg_Guest2 5c8aad22-f33f-c296-f3bd-8fba2c0c3935c5ed
-attr rg_Guest2 alias Guest2
+attr rg_Guest2 alias Vacationer
 attr rg_Guest2 devStateIcon .*home:user_available:absent .*absent:user_away:home .*none:control_building_empty:home .*gotosleep:scene_toilet:asleep .*asleep:scene_sleeping:awoken .*awoken:scene_sleeping_alternat:home .*:user_unknown
 attr rg_Guest2 group Guests
 attr rg_Guest2 icon scene_visit_guests
@@ -585,7 +587,31 @@ attr rg_Guest2 rg_autoGoneAfter 0.01
 attr rg_Guest2 rg_realname alias
 attr rg_Guest2 room Residents
 attr rg_Guest2 sortby 1
+attr rg_Guest2 subType vacationer
 attr rg_Guest2 webCmd state
+define rg_Guest3 GUEST rgr_Residents,rgr_Guests
+setuuid rg_Guest3 5ccdd6c9-f33f-57f8-d97d-e713e8e9fa80a27a
+attr rg_Guest3 alias Guest
+attr rg_Guest3 devStateIcon .*home:user_available:absent .*absent:user_away:home .*none:control_building_empty:home .*gotosleep:scene_toilet:asleep .*asleep:scene_sleeping:awoken .*awoken:scene_sleeping_alternat:home .*:user_unknown
+attr rg_Guest3 group Guests
+attr rg_Guest3 icon scene_visit_guests
+attr rg_Guest3 rg_autoGoneAfter 0.01
+attr rg_Guest3 rg_realname alias
+attr rg_Guest3 room Residents
+attr rg_Guest3 sortby 1
+attr rg_Guest3 webCmd state
+define rg_Guest4 GUEST rgr_Residents,rgr_Guests
+setuuid rg_Guest4 5ccdd748-f33f-57f8-52d8-37df89f1be6cfd5b
+attr rg_Guest4 alias Guest (minor)
+attr rg_Guest4 devStateIcon .*home:user_available:absent .*absent:user_away:home .*none:control_building_empty:home .*gotosleep:scene_toilet:asleep .*asleep:scene_sleeping:awoken .*awoken:scene_sleeping_alternat:home .*:user_unknown
+attr rg_Guest4 group Guests
+attr rg_Guest4 icon scene_visit_guests
+attr rg_Guest4 rg_autoGoneAfter 0.01
+attr rg_Guest4 rg_realname alias
+attr rg_Guest4 room Residents
+attr rg_Guest4 sortby 1
+attr rg_Guest4 subType minor
+attr rg_Guest4 webCmd state
 define rr_Father ROOMMATE rgr_Residents,rgr_Parents
 setuuid rr_Father 5c8aad22-f33f-c296-729e-ae6ad0649b98055d
 attr rr_Father alias Status
@@ -616,6 +642,7 @@ attr rr_Daughter group Daughter
 attr rr_Daughter icon people_sensor
 attr rr_Daughter room Residents
 attr rr_Daughter sortby 0
+attr rr_Daughter subType child
 attr rr_Daughter webCmd state
 define rr_Son ROOMMATE rgr_Residents,rgr_Children
 setuuid rr_Son 5c8aad22-f33f-c296-a0f4-9a5626678ffc24ec
@@ -625,6 +652,7 @@ attr rr_Son group Son
 attr rr_Son icon people_sensor
 attr rr_Son room Residents
 attr rr_Son sortby 0
+attr rr_Son subType teenager
 attr rr_Son webCmd state
 define AllResidentsAway notify rgr_Residents:(absent|gone) set AllLights off;;set lcCinema scene AllOff
 setuuid AllResidentsAway 5c8aad22-f33f-c296-e4ac-f94c2fe0fd5efb03
@@ -640,6 +668,7 @@ attr rr_Baby group Baby
 attr rr_Baby icon people_sensor
 attr rr_Baby room Residents
 attr rr_Baby sortby 0
+attr rr_Baby subType baby
 attr rr_Baby webCmd state
 define rgr_Pets RESIDENTS
 setuuid rgr_Pets 5ccd71d7-f33f-57f8-54a1-b4a40f34e54b2b80
@@ -658,6 +687,7 @@ attr rp_Dog icon dog_silhouette
 attr rp_Dog room Residents
 attr rp_Dog rp_realname alias
 attr rp_Dog sortby 1
+attr rp_Dog subType dog
 attr rp_Dog webCmd state
 define RGB readingsProxy RGB
 setuuid RGB 5c8aad22-f33f-c296-a871-85b8dd81f8e7aabf

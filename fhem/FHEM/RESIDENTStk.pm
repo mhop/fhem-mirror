@@ -7,7 +7,7 @@ use Data::Dumper;
 
 use Unit;
 use FHEM::Meta;
-our (@RESIDENTStk_attr);
+our ( @RESIDENTStk_attr, %RESIDENTStk_subTypes );
 
 # module variables ############################################################
 @RESIDENTStk_attr = (
@@ -30,6 +30,11 @@ our (@RESIDENTStk_attr);
     "showAllStates:0,1",
     "wakeupDevice",
 
+);
+%RESIDENTStk_subTypes = (
+    ROOMMATE => [ 'baby', 'toddler', 'child', 'teenager', 'adult', 'senior' ],
+    GUEST => [ 'generic', 'minor', 'domesticWorker', 'vacationer' ],
+    PET   => [ 'generic', 'bird',  'cat',            'dog', 'monkey', 'pig' ]
 );
 
 ## initialize #################################################################
@@ -122,6 +127,12 @@ sub RESIDENTStk_Define($$) {
         }
     }
 
+    my $subtype = 'generic';
+    $subtype = AttrVal( $name, 'subType', 'adult' ) if ( $TYPE eq 'ROOMMATE' );
+    $subtype = AttrVal( $name, 'subType', 'generic' ) if ( $TYPE eq 'PET' );
+    $subtype = AttrVal( $name, 'subType', 'generic' ) if ( $TYPE eq 'GUEST' );
+    $hash->{SUBTYPE} = $subtype if ( $TYPE ne 'RESIDENTS' );
+
     # trigger for modified objects
     if ( $TYPE ne "RESIDENTS" ) {
         readingsBeginUpdate($hash);
@@ -195,6 +206,7 @@ sub RESIDENTStk_Set($@) {
     my ( $hash, @a ) = @_;
     my $name      = $hash->{NAME};
     my $TYPE      = GetType($name);
+    my $SubType   = defined( $hash->{SUBTYPE} ) ? $hash->{SUBTYPE} : 'generic';
     my $prefix    = RESIDENTStk_GetPrefixFromType($name);
     my $state     = ReadingsVal( $name, "state", "initialized" );
     my $presence  = ReadingsVal( $name, "presence", "undefined" );
@@ -629,6 +641,7 @@ sub RESIDENTStk_Set($@) {
                     foreach my $object (@linkedObjects) {
                         if (   IsDevice( $object, "ROOMMATE|GUEST|PET" )
                             && $defs{$object}{NAME} ne $name
+                            && ReadingsVal( $object, "state", "" ) ne "absent"
                             && ReadingsVal( $object, "state", "" ) ne "gone"
                             && ReadingsVal( $object, "state", "" ) ne "none" )
                         {
@@ -639,7 +652,10 @@ sub RESIDENTStk_Set($@) {
             }
 
             # clear readings if guest is gone
-            if ( $newstate eq "none" && $TYPE eq "GUEST" ) {
+            if (   $newstate eq "none"
+                && $TYPE eq "GUEST"
+                && $SubType eq 'generic' )
+            {
                 readingsBulkUpdate( $hash, "lastArrival", "-" )
                   if ( ReadingsVal( $name, "lastArrival", "-" ) ne "-" );
                 readingsBulkUpdate( $hash, "lastAwake", "-" )
@@ -1093,6 +1109,7 @@ sub RESIDENTStk_Set($@) {
 sub RESIDENTStk_Attr(@) {
     my ( $cmd, $name, $attribute, $value ) = @_;
     my $hash   = $defs{$name};
+    my $TYPE   = GetType($name);
     my $prefix = RESIDENTStk_GetPrefixFromType($name);
 
     if (   $attribute eq $prefix . "wakeupDevice"
@@ -1105,8 +1122,30 @@ m/^([a-zA-Z\d._]+(:[A-Za-z\d_\.\-\/]+)?,?)([a-zA-Z\d._]+(:[A-Za-z\d_\.\-\/]+)?,?
           );
     }
 
+    elsif ( $attribute eq "subType" ) {
+        return "invalid value $value"
+          unless (
+            $cmd eq "del"
+            || defined( $RESIDENTStk_subTypes{$TYPE} ) && grep m/^$value$/,
+            @{ $RESIDENTStk_subTypes{$TYPE} }
+          );
+        if ( $cmd eq "del" ) {
+            $hash->{SUBTYPE} = 'generic'
+              if ( $TYPE eq 'GUEST' || $TYPE eq 'PET' );
+            $hash->{SUBTYPE} = 'adult' if ( $TYPE eq 'ROOMMATE' );
+        }
+        else {
+            $hash->{SUBTYPE} = $value;
+        }
+    }
+
     elsif ( !$init_done ) {
         return undef;
+    }
+
+    elsif ( $attribute eq "rgr_homeAloneInStatus" ) {
+        return "invalid value $value"
+          unless ( $cmd eq "del" || $value eq '0' || $value eq '1' );
     }
 
     elsif ( $attribute eq "disable" ) {

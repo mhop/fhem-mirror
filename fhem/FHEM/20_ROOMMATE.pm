@@ -7,7 +7,7 @@ use Data::Dumper;
 use Time::Local;
 
 require RESIDENTStk;
-our (@RESIDENTStk_attr);
+our ( @RESIDENTStk_attr, %RESIDENTStk_subTypes );
 
 # initialize ##################################################################
 sub ROOMMATE_Initialize($) {
@@ -25,6 +25,8 @@ sub ROOMMATE_Initialize($) {
     $hash->{AttrList} =
         "disable:1,0 disabledForIntervals do_not_notify:1,0 "
       . "rr_states:multiple-strict,home,gotosleep,asleep,awoken,absent,gone "
+      . "subType:"
+      . join( ',', @{ $RESIDENTStk_subTypes{ROOMMATE} } ) . " "
       . $readingFnAttributes;
 
     foreach (@RESIDENTStk_attr) {
@@ -253,6 +255,9 @@ sub ROOMMATE_Initialize($) {
           </li>
           <li>
             <b>rr_wakeupDevice</b> - reference to enslaved DUMMY devices used as a wake-up timer (part of RESIDENTS Toolkit's wakeuptimer)
+          </li>
+          <li>
+            <b>subType</b> - specifies a specific class of a roommate for the device. This will be considered for home alone status calculation. Defaults to "adult"
           </li>
         </ul>
       </ul><br>
@@ -566,6 +571,9 @@ sub ROOMMATE_Initialize($) {
           </li>
           <li>
             <b>rr_wakeupDevice</b> - Referenz zu versklavten DUMMY Ger&auml;ten, welche als Wecker benutzt werden (Teil von RESIDENTS Toolkit's wakeuptimer)
+          </li>
+          <li>
+            <b>subType</b> - Gibt einen bestimmten Typ eines Mitbewohner f&uuml;r das Device an. Dies wird bei der Berechnung des Home Alone Status ber&uuml;cksichtigt. Standard ist "adult"
           </li>
         </ul>
       </ul><br />
