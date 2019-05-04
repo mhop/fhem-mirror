@@ -71,7 +71,7 @@ attr DEVICE setList\
   log_level:debug,info,warn,error BASE_TOPIC/bridge/config/log_level $EVTPART1\
   permit_join:true,false BASE_TOPIC/bridge/config/permit_join $EVTPART1\
   remove:textField BASE_TOPIC/bridge/config/remove $EVTPART1\
-  y_device_setting:textField zigbee2mqtt/$EVTPART1/set {"$EVTPART2": "$EVTPART3"}}
+  y_device_setting:textField zigbee2mqtt/$EVTPART1/set {"$EVTPART2": "$EVTPART3"}}\
   x_bind:textField BASE_TOPIC/bridge/bind/$EVTPART1 $EVTPART2\
   x_bind_unbind:textField BASE_TOPIC/bridge/unbind/$EVTPART1 $EVTPART2\
   x_device_options:textField BASE_TOPIC/bridge/config/device_options {"friendly_name":"$EVTPART1",""options": {"$EVTPART2": "$EVTPART3"}}\
@@ -770,9 +770,8 @@ attr DEVICE readingList \
   shellies/DEVNAME/longpush/0:.* longpush_0\
   shellies/announce:.* { json2nameValue($EVENT) }
 attr DEVICE devStateIcon true:10px-kreis-gruen false:10px-kreis-rot on:on:relay0+off off:off:relay0+on  	
-attr DEVICE stateFormat <a href="http://ip" target="_blank">\
+attr DEVICE stateFormat <a href="http://ip" target="_blank">ip</a>\
 online\
-</a>\
 relay0\
 <br>\
 Aktueller Verbrauch: relay_0_power\
@@ -918,21 +917,22 @@ attr DEVICE model A_14b_shelly4pro_unified
 # shellybulb using original firmware
 name:A_15_shellybulb
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
-desc:shellybulb using original firmware <br>Tested with 1.3
+desc:shellybulb using original firmware <br>Tested with 1.49
 par:DEVNAME;name of this shelly;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]+)/, ? $1 : undef }
 attr DEVICE setList\
   off:noArg shellies/DEVNAME/color/0/command off\
   on:noArg shellies/DEVNAME/color/0/command on\
-  brightness:colorpicker,BRI,0,1,100 shellies/DEVNAME/color/0/set {"ison":"true","mode":"white","$EVTPART0":"$EVTPART1"}\
-  temp:colorpicker,CT,3000,10,6500 shellies/DEVNAME/color/0/set {"ison":"true","mode":"white","$EVTPART0":"$EVTPART1"}\
-  rgb:colorpicker,RGB {$EVTPART1=~/(..)(..)(..)/; "shellies/DEVNAME/color/0/set {\"ison\":true,\"mode\":\"color\",\"red\":".hex($1).",\"green\":".hex($2)."\"blue\":".hex($3) }
+  pct:colorpicker,BRI,0,1,100 shellies/DEVNAME/color/0/set {"turn":"on","gain":"$EVTPART1","brightness":"$EVTPART1"}\
+  ct:colorpicker,CT,3000,10,6500 {$EVTPART1=3000 if ($EVTPART1<3000);"shellies/DEVNAME/color/0/set {\"turn\":\"on\",\"mode\":\"white\",\"temp\":\"$EVTPART1\"}"}\
+  rgb:colorpicker,RGB {$EVTPART1=~/(..)(..)(..)/;if($1 ne $2 || $2 ne $3){"shellies/DEVNAME/color/0/set {\"turn\":\"on\",\"mode\":\"color\",\"gain\":\"100\",\"red\":".hex($1).",\"green\":".hex($2).",\"blue\":".hex($3)."}"}else{"shellies/shellybulb-3CC533/color/0/set {\"turn\":\"on\",\"mode\":\"white\",\"brightness\":".int(hex($1)/2.55)."}"}}
 deletereading -q DEVICE status_.*
 attr DEVICE readingList shellies/DEVNAME/color/0/status:.* {json2nameValue($EVENT)}
-attr DEVICE userReadings rgb {sprintf("%02X%02X%02X", ReadingsVal($name,"red",99), ReadingsVal($name,"green",99), ReadingsVal($name,"blue",99))}
-attr DEVICE webCmd on:off:brightness:temp:rgb
+attr DEVICE userReadings ct:temp.* {ReadingsVal($name,"temp",3000)}, rgb:red.* {if(ReadingsVal($name,"mode","") eq "color"){sprintf("%02X%02X%02X", ReadingsVal($name,"red",99), ReadingsVal($name,"green",99), ReadingsVal($name,"blue",99))}else{my $a=sprintf("%02X",ReadingsVal($name,"brightness",0)*2.555);"$a$a$a"}}
+attr DEVICE webCmd on:off:pct:ct:rgb
 attr DEVICE genericDeviceType light
 attr DEVICE icon light_control
 attr DEVICE model A_15_shellybulb
+
 
 # shellyht using original firmware
 name:A_16_shellyht
