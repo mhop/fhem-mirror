@@ -1597,7 +1597,11 @@ sub EventProcessingShadingBrightness($@) {
         ASC_Debug( 'EventProcessingShadingBrightness: '
               . $shutters->getShuttersDev
               . ' - Nummerischer Brightness-Wert wurde erkannt. Der Wert ist: '
-              . $1 );
+              . $1
+              . ' RainProtection: '
+              . $shutters->getRainProtectionStatus
+              . ' WindProtection: '
+              . $shutters->getWindProtectionStatus );
 
         my $homemode = $shutters->getRoommatesStatus;
         $homemode = $ascDev->getResidentsStatus if ( $homemode eq 'none' );
@@ -1609,8 +1613,8 @@ sub EventProcessingShadingBrightness($@) {
             )
             and IsDay($shuttersDev)
             and $ascDev->getAutoShuttersControlShading eq 'on'
-            #and $shutters->getRainProtectionStatus eq 'unprotection'
-            #and $shutters->getWindProtectionStatus eq 'unprotection'
+            and $shutters->getRainProtectionStatus eq 'unprotection'
+            and $shutters->getWindProtectionStatus eq 'unprotection'
           )
         {
             ShadingProcessing(
@@ -1671,6 +1675,13 @@ sub EventProcessingTwilightDevice($@) {
 
             my $homemode = $shutters->getRoommatesStatus;
             $homemode = $ascDev->getResidentsStatus if ( $homemode eq 'none' );
+
+            ASC_Debug( 'EventProcessingTwilightDevice: '
+                  . $shutters->getShuttersDev
+                  . ' RainProtection: '
+                  . $shutters->getRainProtectionStatus
+                  . ' WindProtection: '
+                  . $shutters->getWindProtectionStatus );
 
             if (
                 (
@@ -3718,10 +3729,12 @@ sub getWindProtectionStatus {    # Werte protection, unprotection
     my $self = shift;
 
     return (
-        defined( $self->{ $self->{shuttersDev} }->{ASC_WindParameters} )
-          and defined(
-            $self->{ $self->{shuttersDev} }->{ASC_WindParameters}->{VAL}
-          )
+        (
+            defined( $self->{ $self->{shuttersDev} }->{ASC_WindParameters} )
+              and defined(
+                $self->{ $self->{shuttersDev} }->{ASC_WindParameters}->{VAL}
+              )
+        )
         ? $self->{ $self->{shuttersDev} }->{ASC_WindParameters}->{VAL}
         : 'unprotection'
     );
@@ -3731,9 +3744,12 @@ sub getRainProtectionStatus {    # Werte protection, unprotection
     my $self = shift;
 
     return (
-        defined( $self->{ $self->{shuttersDev} }->{RainProtection} )
-          and
-          defined( $self->{ $self->{shuttersDev} }->{RainProtection}->{VAL} )
+        (
+            defined( $self->{ $self->{shuttersDev} }->{RainProtection} )
+              and defined(
+                $self->{ $self->{shuttersDev} }->{RainProtection}->{VAL}
+              )
+        )
         ? $self->{ $self->{shuttersDev} }->{RainProtection}->{VAL}
         : 'unprotection'
     );
