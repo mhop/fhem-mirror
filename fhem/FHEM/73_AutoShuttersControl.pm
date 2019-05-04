@@ -44,7 +44,7 @@ use strict;
 use warnings;
 use FHEM::Meta;
 
-my $version = '0.6.5';
+my $version = '0.6.6';
 
 sub AutoShuttersControl_Initialize($) {
     my ($hash) = @_;
@@ -698,18 +698,6 @@ sub WriteReadingsShuttersList($) {
                 'none'
             ) eq 'none'
           );
-
-        ### associatedWith damit man sieht das der Rollladen mit einem ASC Device verbunden ist
-        readingsSingleUpdate(
-            $defs{$_},
-            'associatedWith',
-            (
-                ReadingsVal( $_, 'associatedWith', $name ) eq $name
-                ? $name
-                : ReadingsVal( $_, 'associatedWith', 'none' ) . ',' . $name
-            ),
-            0
-        );
     }
     readingsBulkUpdate( $hash, 'state', 'active' );
     readingsEndUpdate( $hash, 0 );
@@ -740,6 +728,23 @@ sub UserAttributs_Readings_ForShutters($$) {
                         not defined( $attr{$_}{ ( split( ':', $attrib ) )[0] } )
                         and $attrib eq 'ASC_Pos_Reading' );
                 }
+
+                ### associatedWith damit man sieht das der Rollladen mit einem ASC Device verbunden ist
+                my $associatedString =
+                  ReadingsVal( $_, 'associatedWith', 'none' );
+                if ( $associatedString ne 'none' ) {
+                    my %hash;
+                    %hash = map { ( $_ => 1 ) }
+                      split( ',', "$associatedString,$name" );
+
+                    readingsSingleUpdate( $defs{$_},
+                        'associatedWith', join( ',', sort keys %hash ), 0 );
+                }
+                else {
+                    readingsSingleUpdate( $defs{$_},
+                        'associatedWith', $name, 0 );
+                }
+                #######################################
             }
             ## Oder das Attribut wird wieder gelöscht.
             elsif ( $cmd eq 'del' ) {
@@ -750,6 +755,21 @@ sub UserAttributs_Readings_ForShutters($$) {
                     $_ . ' .?(AutoShuttersControl|ASC)_.*' );
                 CommandDeleteAttr( undef, $_ . ' ASC' );
                 delFromDevAttrList( $_, $attrib );
+
+                ### associatedWith wird wieder entfernt
+                my $associatedString =
+                  ReadingsVal( $_, 'associatedWith', 'none' );
+                my %hash;
+                %hash = map { ( $_ => 1 ) }
+                  grep { " $name " !~ m/ $_ / }
+                  split( ',', "$associatedString,$name" );
+
+                if ( keys %hash > 1 ) {
+                    readingsSingleUpdate( $defs{$_},
+                        'associatedWith', join( ',', sort keys %hash ), 0 );
+                }
+                else { CommandDeleteReading( undef, $_ . ' associatedWith' ); }
+                ###################################
             }
         }
     }
@@ -772,9 +792,9 @@ sub AddNotifyDev($@) {
 
     my %hash;
     %hash = map { ( $_ => 1 ) }
-      split( ",", "$notifyDev,$dev" );
+      split( ',', "$notifyDev,$dev" );
 
-    $hash->{NOTIFYDEV} = join( ",", sort keys %hash );
+    $hash->{NOTIFYDEV} = join( ',', sort keys %hash );
 
     my @devs = split( ',', $dev );
     foreach (@devs) {
@@ -802,13 +822,13 @@ sub DeleteNotifyDev($@) {
         if ( !keys %{ $hash->{monitoredDevs}{$notifyDev} } ) {
             delete $hash->{monitoredDevs}{$notifyDev};
             my $notifyDevString = $hash->{NOTIFYDEV};
-            $notifyDevString = "" if ( !$notifyDevString );
+            $notifyDevString = '' if ( !$notifyDevString );
             my %hash;
             %hash = map { ( $_ => 1 ) }
               grep { " $notifyDev " !~ m/ $_ / }
-              split( ",", "$notifyDevString,$notifyDev" );
+              split( ',', "$notifyDevString,$notifyDev" );
 
-            $hash->{NOTIFYDEV} = join( ",", sort keys %hash );
+            $hash->{NOTIFYDEV} = join( ',', sort keys %hash );
         }
     }
     readingsSingleUpdate( $hash, '.monitoredDevs',
@@ -1234,17 +1254,21 @@ sub EventProcessingRain($@) {
 
             if (    $val > $triggerMax
                 and $shutters->getStatus != $closedPos
-                and IsAfterShuttersManualBlocking($shuttersDev) )
+                and IsAfterShuttersManualBlocking($shuttersDev)
+                and $shutters->getRainProtectionStatus eq 'unprotection' )
             {
                 $shutters->setLastDrive('rain protection');
                 $shutters->setDriveCmd($closedPos);
+                $shutters->setRainProtectionStatus('protection');
             }
             elsif ( ( $val == 0 or $val < $triggerMax )
                 and $shutters->getStatus == $closedPos
-                and IsAfterShuttersManualBlocking($shuttersDev) )
+                and IsAfterShuttersManualBlocking($shuttersDev)
+                and $shutters->getRainProtectionStatus eq 'protection' )
             {
                 $shutters->setLastDrive('rain un-protection');
                 $shutters->setDriveCmd( $shutters->getLastPos );
+                $shutters->setRainProtectionStatus('unprotection');
             }
         }
     }
@@ -1270,10 +1294,6 @@ sub EventProcessingWind($@) {
                   . $shutters->getWindMin
                   . ' Bekommender Wert1: '
                   . $1 );
-
-            $shutters->setWindProtectionStatus('unprotection')
-              if ( not defined( $shutters->getWindProtectionStatus )
-                or not $shutters->getWindProtectionStatus );
 
             next
               if (
@@ -1588,6 +1608,9 @@ sub EventProcessingShadingBrightness($@) {
                 or $shutters->getShadingMode eq $homemode
             )
             and IsDay($shuttersDev)
+            and $ascDev->getAutoShuttersControlShading eq 'on'
+            and $shutters->getRainProtectionStatus eq 'unprotection'
+            and $shutters->getWindProtectionStatus eq 'unprotection'
           )
         {
             ShadingProcessing(
@@ -1655,6 +1678,9 @@ sub EventProcessingTwilightDevice($@) {
                     or $shutters->getShadingMode eq $homemode
                 )
                 and IsDay($shuttersDev)
+                and $ascDev->getAutoShuttersControlShading eq 'on'
+                and $shutters->getRainProtectionStatus eq 'unprotection'
+                and $shutters->getWindProtectionStatus eq 'unprotection'
               )
             {
                 ShadingProcessing(
@@ -2952,9 +2978,34 @@ sub ShuttersSunrise($$) {
                     }
                 }
                 else {
-                    $shuttersSunriseUnixtime =
-                      computeAlignTime( '24:00',
-                        $shutters->getTimeUpWeHoliday );
+                    if (
+                        IsWe()
+                        and int( gettimeofday() / 86400 ) == int(
+                            computeAlignTime( '24:00',
+                                $shutters->getTimeUpWeHoliday ) / 86400
+                        )
+                      )
+                    {
+                        $shuttersSunriseUnixtime =
+                          computeAlignTime( '24:00',
+                            $shutters->getTimeUpWeHoliday );
+                    }
+                    elsif (
+                        int( gettimeofday() / 86400 ) == int(
+                            computeAlignTime( '24:00',
+                                $shutters->getTimeUpEarly ) / 86400
+                        )
+                      )
+                    {
+                        $shuttersSunriseUnixtime =
+                          computeAlignTime( '24:00',
+                            $shutters->getTimeUpEarly );
+                    }
+                    else {
+                        $shuttersSunriseUnixtime =
+                          computeAlignTime( '24:00',
+                            $shutters->getTimeUpWeHoliday ) + 86400;
+                    }
                 }
             }
             else {
@@ -3635,6 +3686,14 @@ sub setWindProtectionStatus {    # Werte protection, unprotection
     return 0;
 }
 
+sub setRainProtectionStatus {    # Werte protection, unprotection
+    my ( $self, $value ) = @_;
+
+    $self->{ $self->{shuttersDev} }->{RainProtection}->{VAL} = $value
+      if ( defined($value) );
+    return 0;
+}
+
 sub getShadingStatus {   # Werte für value = in, out, in reserved, out reserved
     my $self = shift;
 
@@ -3658,11 +3717,26 @@ sub getIfInShading {
 sub getWindProtectionStatus {    # Werte protection, unprotection
     my $self = shift;
 
-    return $self->{ $self->{shuttersDev} }->{ASC_WindParameters}->{VAL}
-      if (  defined( $self->{ $self->{shuttersDev} }->{ASC_WindParameters} )
-        and
-        defined( $self->{ $self->{shuttersDev} }->{ASC_WindParameters}->{VAL} )
-      );
+    return (
+        defined( $self->{ $self->{shuttersDev} }->{ASC_WindParameters} )
+          and defined(
+            $self->{ $self->{shuttersDev} }->{ASC_WindParameters}->{VAL}
+          )
+        ? $self->{ $self->{shuttersDev} }->{ASC_WindParameters}->{VAL}
+        : 'unprotection'
+    );
+}
+
+sub getRainProtectionStatus {    # Werte protection, unprotection
+    my $self = shift;
+
+    return (
+        defined( $self->{ $self->{shuttersDev} }->{RainProtection} )
+          and
+          defined( $self->{ $self->{shuttersDev} }->{RainProtection}->{VAL} )
+        ? $self->{ $self->{shuttersDev} }->{RainProtection}->{VAL}
+        : 'unprotection'
+    );
 }
 
 sub getShadingStatusTimestamp {
@@ -4600,6 +4674,13 @@ sub getAutoShuttersControlComfort {
     return AttrVal( $name, 'ASC_autoShuttersControlComfort', 'off' );
 }
 
+sub getAutoShuttersControlShading {
+    my $self = shift;
+    my $name = $self->{name};
+
+    return AttrVal( $name, 'ASC_autoShuttersControlShading', 'off' );
+}
+
 sub getFreezeTemp {
     my $self = shift;
     my $name = $self->{name};
@@ -4942,7 +5023,7 @@ sub getblockAscDrivesAfterManual {
       <li>ASC_BlockingTime_afterManual - wie viel Sekunden soll die Automatik nach einer manuellen Fahrt aus setzen. / default 1200 wenn nicht gesetzt</li>
       <li>ASC_BlockingTime_beforDayOpen - wie viel Sekunden vor dem morgendlichen &ouml;ffnen soll keine schließen Fahrt mehr statt finden. / default 3600 wenn nicht gesetzt</li>
       <li>ASC_BlockingTime_beforNightClose - wie viel Sekunden vor dem n&auml;chtlichen schlie&zlig;en soll keine &ouml;ffnen Fahrt mehr statt finden. / default 3600 wenn nicht gesetzt</li>
-      <li>ASC_BrightnessSensor - DEVICE:READING WERT-MORGENS:WERT-ABENDS / 'Helligkeit:brightness 400:800' Angaben zum Helligkeitssensor und den Brightnesswerten f&uuml;r Sonnenuntergang und Sonnenaufgang. Die Sensor Device Angaben werden auch f&uuml;r die Beschattung verwendet. / default none wenn nicht gesetzt</li>
+      <li>ASC_BrightnessSensor - DEVICE[:READING] WERT-MORGENS:WERT-ABENDS / 'Sensorname[:brightness [400:800]]' Angaben zum Helligkeitssensor mit (Readingname, optional) f&uuml;r die Beschattung und dem Fahren der Rollladen nach brightness und den optionalen Brightnesswerten f&uuml;r Sonnenauf- und Sonnenuntergang. / default none wenn nicht gesetzt</li>
       <li>ASC_Closed_Pos - in 10 Schritten von 0 bis 100, Default ist abh&auml;ngig vom Attribut ASC</li>
       <li>ASC_ComfortOpen_Pos - in 10 Schritten von 0 bis 100, Default ist abh&auml;ngig vom Attribut ASC</li>
       <li>ASC_Down - astro/time/brightness - bei astro wird Sonnenuntergang berechnet, bei time wird der Wert aus ASC_Time_Down_Early als Fahrzeit verwendet und bei brightness muss ASC_Time_Down_Early und ASC_Time_Down_Late korrekt gesetzt werden. Der Timer l&auml;uft dann nach ASC_Time_Down_Late Zeit, es wird aber in der Zeit zwischen ASC_Time_Down_Early und ASC_Time_Down_Late geschaut, ob die als Attribut im Moduldevice hinterlegte ASC_brightnessMinVal erreicht wurde. Wenn ja, wird der Rollladen runter gefahren / default astro wenn nicht gesetzt</li>
@@ -5083,9 +5164,9 @@ sub getblockAscDrivesAfterManual {
       <a name="ASC_blockAscDrivesAfterManual"></a>
       <li>ASC_blockAscDrivesAfterManual - 0,1 wenn der Wert auf 1 gesetzt ist und ein Rollladen im Reading ASC_ShuttersLastDrive ein manual stehen hat und der Rollladen eine unbekannte (nicht in den Attributen konfigueriebare) position hat wird dieser Rollladen vom ASC nicht mehr gesteuert.</li>
       <a name="ASC_brightnessDriveUpDown"></a>
-      <li>ASC_brightnessDriveUpDown - WERT-MORGENS:WERT-ABENDS, Werte bei dem Schaltbedingungen für Sunrise und Sunset gepr&uuml;ft werden sollen. Diese globale Einstellung kann durch die WERT-MORGENS:WERT-ABENDS Einstellung von ASC_BrightnessSensor im Rollladen selbst &uuml;berschrieben werden.</li>
+      <li>ASC_brightnessDriveUpDown - WERT-MORGENS:WERT-ABENDS, Werte bei dem Schaltbedingungen f&uuml;r Sunrise und Sunset gepr&uuml;ft werden sollen. Diese globale Einstellung kann durch die WERT-MORGENS:WERT-ABENDS Einstellung von ASC_BrightnessSensor im Rollladen selbst &uuml;berschrieben werden.</li>
       <a name="ASC_debug"></a>
-      <li>ASC_debug - aktiviert die erweiterte Logausgabe für Debugausgaben</li>
+      <li>ASC_debug - aktiviert die erweiterte Logausgabe f&uuml;r Debugausgaben</li>
       <a name="ASC_expert"></a>
       <li>ASC_expert - ist der Wert 1 werden erweiterte Informationen bez&uuml;glich des NotifyDevs unter set und get angezeigt</li>
       <a name="ASC_freezeTemp"></a>
@@ -5135,14 +5216,14 @@ sub getblockAscDrivesAfterManual {
       <li>ASC_AutoAstroModeMorning - aktuell REAL,CIVIL,NAUTIC,ASTRONOMIC / default none wenn nicht gesetzt</li>
       <li>ASC_AutoAstroModeMorningHorizon - H&ouml;he &uuml;ber Horizont wenn beim Attribut ASC_autoAstroModeMorning HORIZON ausgew&auml;hlt / default none wenn nicht gesetzt</li>
       <li>ASC_BlockingTime_afterManual - wie viel Sekunden soll die Automatik nach einer manuellen Fahrt aus setzen. / default 1200 wenn nicht gesetzt</li>
-      <li>ASC_BlockingTime_beforDayOpen - wie viel Sekunden vor dem morgendlichen &ouml;ffnen soll keine schließen Fahrt mehr statt finden. / default 3600 wenn nicht gesetzt</li>
-      <li>ASC_BlockingTime_beforNightClose - wie viel Sekunden vor dem n&auml;chtlichen schlie&zlig;en soll keine &ouml;ffnen Fahrt mehr statt finden. / default 3600 wenn nicht gesetzt</li>
+      <li>ASC_BlockingTime_beforDayOpen - wie viel Sekunden vor dem morgendlichen &ouml;ffnen soll keine schlie&szlig;en Fahrt mehr statt finden. / default 3600 wenn nicht gesetzt</li>
+      <li>ASC_BlockingTime_beforNightClose - wie viel Sekunden vor dem n&auml;chtlichen schlie&szlig;en soll keine &ouml;ffnen Fahrt mehr statt finden. / default 3600 wenn nicht gesetzt</li>
       <li>ASC_BrightnessSensor - DEVICE:READING WERT-MORGENS:WERT-ABENDS / 'Helligkeit:brightness 400:800' Angaben zum Helligkeitssensor und den Brightnesswerten f&uuml;r Sonnenuntergang und Sonnenaufgang. Die Sensor Device Angaben werden auch f&uuml;r die Beschattung verwendet. / default none wenn nicht gesetzt</li>
       <li>ASC_Closed_Pos - in 10 Schritten von 0 bis 100, Default ist abh&auml;ngig vom Attribut ASC</li>
       <li>ASC_ComfortOpen_Pos - in 10 Schritten von 0 bis 100, Default ist abh&auml;ngig vom Attribut ASC</li>
       <li>ASC_Down - astro/time/brightness - bei astro wird Sonnenuntergang berechnet, bei time wird der Wert aus ASC_Time_Down_Early als Fahrzeit verwendet und bei brightness muss ASC_Time_Down_Early und ASC_Time_Down_Late korrekt gesetzt werden. Der Timer l&auml;uft dann nach ASC_Time_Down_Late Zeit, es wird aber in der Zeit zwischen ASC_Time_Down_Early und ASC_Time_Down_Late geschaut, ob die als Attribut im Moduldevice hinterlegte ASC_brightnessMinVal erreicht wurde. Wenn ja, wird der Rollladen runter gefahren / default astro wenn nicht gesetzt</li>
       <li>ASC_DriveUpMaxDuration - die Dauer des hochfahrens vom Rollladen plus 5 Sekunden / default 60 wenn nicht gesetzt</li>
-      <li>ASC_Drive_Offset - maximaler Wert f&uuml;r einen zuf&auml;llig ermittelte Verz&ouml;gerungswert in Sekunden bei der Berechnung der Fahrzeiten, 0 bedeutet keine Verz&ouml;gerung, -1 bedeutet, dass das gleichwertige Attribut aus dem ASC Device ausgewertet werden soll. / default -1 wenn nicht gesetzt</li>
+      <li>ASC_Drive_Offset - maximaler Wert f&uuml;r einen zuf&auml;llig ermittelte Verz&ouml;gerungswert in Sekunden bei der Berechnung der Fahrzeiten, 0 bedeutet keine Verz&ouml;gerung / default -1 wenn nicht gesetzt</li>
       <li>ASC_Drive_OffsetStart - in Sekunden verz&ouml;gerter Wert ab welchen dann erst das Offset startet und dazu addiert wird. Funktioniert nur wenn gleichzeitig ein Drive_Offset gesetzt wird. / default -1 wenn nicht gesetzt</li>
       <li>ASC_LockOut - soft/hard/off - stellt entsprechend den Aussperrschutz ein. Bei global aktivem Aussperrschutz (set ASC-Device lockOut soft) und einem Fensterkontakt open bleibt dann der Rollladen oben. Dies gilt nur bei Steuerbefehle über das ASC Modul. Stellt man global auf hard, wird bei entsprechender M&ouml;glichkeit versucht den Rollladen hardwareseitig zu blockieren. Dann ist auch ein Fahren &uuml;ber die Taster nicht mehr m&ouml;glich. / default off wenn nicht gesetzt</li>
       <li>ASC_LockOut_Cmd - inhibit/blocked/protection - set Befehl f&uuml;r das Rollladen-Device zum Hardware sperren. Dieser Befehl wird gesetzt werden, wenn man "ASC_LockOut" auf hard setzt / default none wenn nicht gesetzt</li>
@@ -5151,21 +5232,31 @@ sub getblockAscDrivesAfterManual {
       <li>ASC_Open_Pos -  in 10 Schritten von 0 bis 100, Default ist abh&auml;ngig vom Attribut ASC</li>
       <li>ASC_Partymode -  on/off - schaltet den Partymodus an oder aus. Wird  am ASC Device set ASC-DEVICE partyMode on geschalten, werden alle Fahrbefehle an den Rolll&auml;den, welche das Attribut auf on haben, zwischengespeichert und sp&auml;ter erst ausgef&uuml;hrt / default off wenn nicht gesetzt</li>
       <li>ASC_Pos_Reading - Name des Readings, welches die Position des Rollladen in Prozent an gibt; wird bei unbekannten Device Typen auch als set Befehl zum fahren verwendet</li>
-      <li>ASC_PrivacyDownTime_beforNightClose - wie viele Sekunden vor dem abendlichen schlie&zlig;en soll der Rollladen in die Sichtschutzposition fahren, -1 bedeutet das diese Funktion unbeachtet bleiben soll / default -1 wenn nicht gesetzt</li>
+      <li>ASC_PrivacyDownTime_beforNightClose - wie viele Sekunden vor dem abendlichen schlie&szlig;en soll der Rollladen in die Sichtschutzposition fahren, / default -1 wenn nicht gesetzt</li>
       <li>ASC_PrivacyDown_Pos - Position den Rollladens f&uuml;r den Sichtschutz / default 50 wenn nicht gesetzt</li>
+      <li>ASC_WindProtection - on/off soll das Rolllo beim Regenschutz beachtet werden. On=JA, off=NEIN.</li>
       <li>ASC_Roommate_Device - mit Komma getrennte Namen des/der Roommate Device/s, welche den/die Bewohner des Raumes vom Rollladen wiedergibt. Es macht nur Sinn in Schlaf- oder Kinderzimmern / default none wenn nicht gesetzt</li>
       <li>ASC_Roommate_Reading - das Reading zum Roommate Device, welches den Status wieder gibt / default state wenn nicht gesetzt</li>
       <li>ASC_Self_Defense_Exclude - on/off - bei on Wert wird dieser Rollladen bei aktiven Self Defense und offenen Fenster nicht runter gefahren, wenn Residents absent ist. / default off wenn nicht gesetzt</li>
-      <li>ASC_Shading_Angle_Left - Vorlaufwinkel im Bezug zum Fenster, ab wann abgeschattet wird. Beispiel: Fenster 180° - 85° ==> ab Sonnenpos. 95° wird abgeschattet / default 75 wenn nicht gesetzt</li>
-      <li>ASC_Shading_Angle_Right - Nachlaufwinkel im Bezug zum Fenster, bis wann abgeschattet wird. Beispiel: Fenster 180° + 85° ==> bis Sonnenpos. 265° wird abgeschattet / default 75 wenn nicht gesetzt</li>
-      <li>ASC_Shading_Direction -  Position in Grad, auf der das Fenster liegt - genau Osten w&auml;re 90, S&uuml;den 180 und Westen 270 / default 180 wenn nicht gesetzt</li>
-      <li>ASC_Shading_Min_Elevation - ab welcher Höhe des Sonnenstandes soll beschattet werden, immer in Abh&auml;ngikkeit der anderen einbezogenden Sensorwerte / default 25.0 wenn nicht gesetzt</li>
-      <li>ASC_Shading_Min_OutsideTemperature - ab welcher Temperatur soll Beschattet werden, immer in Abh&auml;ngikkeit der anderen einbezogenden Sensorwerte / default 18 wenn nicht gesetzt</li>
-      <li>ASC_Shading_Mode - absent,always,off,home / wann soll die Beschattung nur statt finden. / default off wenn nicht gesetzt</li>
-      <li>ASC_Shading_Pos - Position des Rollladens für die Beschattung</li>
-      <li>ASC_Shading_StateChange_Cloudy - Brightness Wert ab welchen die Beschattung aufgehoben werden soll, immer in Abh&auml;ngikkeit der anderen einbezogenden Sensorwerte / default 20000 wenn nicht gesetzt</li>
-      <li>ASC_Shading_StateChange_Sunny - Brightness Wert ab welchen Beschattung statt finden soll, immer in Abh&auml;ngikkeit der anderen einbezogenden Sensorwerte / default 35000 wenn nicht gesetzt</li>
-      <li>ASC_Shading_WaitingPeriod - wie viele Sekunden soll gewartet werden bevor eine weitere Auswertung der Sensordaten für die Beschattung statt finden soll / default 1200 wenn nicht gesetzt</li>
+      <ul>
+        <b><u>Beschreibung der Beschattungsfunktion</u></b>
+        </br>Damit die Beschattung Funktion hat, m&uuml;&szlig;en folgende Anforderungen erf&uuml;llt sein.
+        </br><b>Im ASC Device</b> das Attribut "ASC_autoShuttersControlShading" mit dem Wert on, sowie ein Astro/Twilight Device im Attribut "ASC_twilightDevice" und das Attribut "ASC_tempSensor".
+        </br><b>In den Rollladendevices</b> ben&ouml;tigt ihr ein Helligkeitssensor als Attribut "ASC_BrightnessSensor", sofern noch nicht vorhanden. Findet der Sensor nur f&uuml;r die Beschattung Verwendung ist der Wert DEVICENAME[:READING] ausreichend.
+        </br>Alle weiteren Attribute sind optional und wenn nicht gestezt mit default Werten belegt. Ihr solltet sie dennoch einmal anschauen und entsprechend Euren Gegebenheiten setzen. Die Werte f&uumlr; die Fensterposition und den Vor- Nachlaufwinkel sowie die Granzwerte f&uuml;r die StateChange_Cloudy und StateChange_Sunny solltet ihr besondere Beachtung dabei schenken.
+        <ul>
+            <li>ASC_Shading_Angle_Left - Vorlaufwinkel im Bezug zum Fenster, ab wann abgeschattet wird. Beispiel: Fenster 180&deg; - 85&deg; ==> ab Sonnenpos. 95&deg; wird abgeschattet / default 75 wenn nicht gesetzt</li>
+            <li>ASC_Shading_Angle_Right - Nachlaufwinkel im Bezug zum Fenster, bis wann abgeschattet wird. Beispiel: Fenster 180&deg; + 85&deg; ==> bis Sonnenpos. 265&deg; wird abgeschattet / default 75 wenn nicht gesetzt</li>
+            <li>ASC_Shading_Direction -  Position in Grad, auf der das Fenster liegt - genau Osten w&auml;re 90, S&uuml;den 180 und Westen 270 / default 180 wenn nicht gesetzt</li>
+            <li>ASC_Shading_Min_Elevation - ab welcher H&ouml;he des Sonnenstandes soll beschattet werden, immer in Abh&auml;ngikkeit der anderen einbezogenden Sensorwerte / default 25.0 wenn nicht gesetzt</li>
+            <li>ASC_Shading_Min_OutsideTemperature - ab welcher Temperatur soll Beschattet werden, immer in Abh&auml;ngikkeit der anderen einbezogenden Sensorwerte / default 18 wenn nicht gesetzt</li>
+            <li>ASC_Shading_Mode - absent,always,off,home / wann soll die Beschattung nur statt finden. / default off wenn nicht gesetzt</li>
+            <li>ASC_Shading_Pos - Position des Rollladens f&uuml;r die Beschattung</li>
+            <li>ASC_Shading_StateChange_Cloudy - Brightness Wert ab welchen die Beschattung aufgehoben werden soll, immer in Abh&auml;ngikkeit der anderen einbezogenden Sensorwerte / default 20000 wenn nicht gesetzt</li>
+            <li>ASC_Shading_StateChange_Sunny - Brightness Wert ab welchen Beschattung statt finden soll, immer in Abh&auml;ngikkeit der anderen einbezogenden Sensorwerte / default 35000 wenn nicht gesetzt</li>
+            <li>ASC_Shading_WaitingPeriod - wie viele Sekunden soll gewartet werden bevor eine weitere Auswertung der Sensordaten f&uuml;r die Beschattung statt finden soll / default 1200 wenn nicht gesetzt</li>
+        </ul>
+      </ul>
       <li>ASC_ShuttersPlace - window/terrace - Wenn dieses Attribut auf terrace gesetzt ist, das Residence Device in den Status "gone" geht und SelfDefence aktiv ist (ohne das das Reading selfDefense gesetzt sein muss), wird das Rollo geschlossen / default window wenn nicht gesetzt</li>
       <li>ASC_Time_Down_Early - Sunset fr&uuml;hste Zeit zum Runterfahren / default 16:00 wenn nicht gesetzt</li>
       <li>ASC_Time_Down_Late - Sunset sp&auml;teste Zeit zum Runterfahren / default 22:00 wenn nicht gesetzt</li>
@@ -5177,7 +5268,7 @@ sub getblockAscDrivesAfterManual {
       <li>ASC_Ventilate_Pos -  in 10 Schritten von 0 bis 100, Default ist abh&auml;ngig vom Attribut ASC</li>
       <li>ASC_Ventilate_Window_Open - auf l&uuml;ften, wenn das Fenster gekippt/ge&ouml;ffnet wird und aktuelle Position unterhalb der L&uuml;ften-Position ist / default on wenn nicht gesetzt</li>
       <li>ASC_WiggleValue - Wert um welchen sich die Position des Rollladens &auml;ndern soll / default 5 wenn nicht gesetzt</li>
-      <li>ASC_WindParameters - TRIGGERMAX[:HYSTERESE] [DRIVEPOSITION] / Angabe von Max Wert ab dem für Wind getriggert werden soll, Hytsrese Wert ab dem der Windschutz aufgehoben werden soll TRIGGERMAX - HYSTERESE / Ist es bei einigen Rolll&auml;den nicht gew&uuml;nscht das gefahren werden soll, so ist das Attribut ASC_WindProtection auf off zu setzen. / default '50:20 ClosedPosition' wenn nicht gesetzt</li>
+      <li>ASC_WindParameters - TRIGGERMAX[:HYSTERESE] [DRIVEPOSITION] / Angabe von Max Wert ab dem f&uuml;r Wind getriggert werden soll, Hytsrese Wert ab dem der Windschutz aufgehoben werden soll TRIGGERMAX - HYSTERESE / Ist es bei einigen Rolll&auml;den nicht gew&uuml;nscht das gefahren werden soll, so ist das Attribut ASC_WindProtection auf off zu setzen. / default '50:20 ClosedPosition' wenn nicht gesetzt</li>
       <li>ASC_WindProtection - on/off aktiviert den Windschutz f&uuml;r diesen Rollladen. / default on wenn nicht gesetzt.</li>
       <li>ASC_WindowRec - Name des Fensterkontaktes, an dessen Fenster der Rollladen angebracht ist / default none wenn nicht gesetzt</li>
       <li>ASC_WindowRec_subType - Typ des verwendeten Fensterkontaktes: twostate (optisch oder magnetisch) oder threestate (Drehgriffkontakt) / default twostate wenn nicht gesetzt</li>
