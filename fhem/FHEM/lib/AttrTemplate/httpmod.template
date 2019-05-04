@@ -145,6 +145,57 @@ attr DEVICE set01Header06 Content-Type: application/x-www-form-urlencoded
 attr DEVICE set01NoArg 1
 attr DEVICE model A_02c_homebridge_videodoorbell
 
+# Pihole Statistics, Website: https://wolf-u.li/5987/einbindung-der-pihole-statistiken-in-fhem/
+name:A_02e_pihole_statistics
+filter:TYPE=HTTPMOD
+desc: Get Statistics from your pihole instance.<br />Define a HTTPMOD device like <br />define DEVICE HTTPMOD http://192.168.133.7/admin/api.php 300<br />Change IP to your needs<br /><a href="https://wolf-u.li/5987/einbindung-der-pihole-statistiken-in-fhem/">Source: Website</a>
+attr DEVICE userattr getURL
+attr DEVICE extractAllJSON 1
+attr DEVICE getURL http://dns/admin/api.php
+attr DEVICE stateFormat DNS Anfragen: dns_queries_today<br>Geblockte Seiten: ads_blocked_today (ads_blocked_today_formatted %)
+attr DEVICE userReadings ads_blocked_today_formatted {round(ReadingsNum($name,"ads_percentage_today",0),0)}
+
+# Pharmacy Emergency Service Germany, Forum: https://forum.fhem.de/index.php?topic=87234.0
+name:A_02f_pharmacy_emergency_service_germany
+filter:TYPE=HTTPMOD
+desc: Gets the current emergency service of a pharmacy closeby your postal code<br />Define a HTTPMOD device like <br />define DEVICE HTTPMOD http://apothekenfinder.mobi/interface/json.php?device=web&source=not&search=1337 0<br />Change the postalcode (1337 in this example) to yours<br /><a href="https://forum.fhem.de/index.php/topic,87234.0.html>Source: Forum</a><br />Hint: The emergency service changes every day at 09:00 CET, thus create a AT like this to update the DEVICE timely:<br />defmod UPDATE_EMERGENCY_SERVICE at *09:15:00 set EMERGENCY_HTTPMOD_DEVICE reread
+attr DEVICE userattr get01Encode get01JSON get01Name get02ExtractAllJSON:0,1 getURL reading01Encode reading01JSON reading01Name reading02JSON reading02Name reading03JSON reading03Name reading04JSON reading04Name reading05JSON reading05Name reading06JSON reading06Name reading07JSON reading07Name reading07OExpr reading08JSON reading08Name reading08OExpr reading09JSON reading09Name reading10JSON reading10Name reading11JSON reading11Name readingEncode requestHeader requestHeader1 requestHeader2 requestHeader3 requestHeader4 requestHeader5 requestHeader6 requestHeader7
+attr DEVICE reading01Encode UTF-8
+attr DEVICE reading01JSON result_01_name
+attr DEVICE reading01Name Name
+attr DEVICE reading02JSON result_01_street
+attr DEVICE reading02Name Strasse
+attr DEVICE reading03JSON result_01_plz
+attr DEVICE reading03Name Plz
+attr DEVICE reading04JSON result_01_place
+attr DEVICE reading04Name Ort
+attr DEVICE reading05JSON result_01_number
+attr DEVICE reading05Name Telefon
+attr DEVICE reading06JSON result_01_fax
+attr DEVICE reading06Name Telefax
+attr DEVICE reading07JSON result_01_start
+attr DEVICE reading07Name Beginn
+attr DEVICE reading07OExpr strftime "%a %e.%m.%Y %H:%M", localtime($val)
+attr DEVICE reading08JSON result_01_end
+attr DEVICE reading08Name Ende
+attr DEVICE reading08OExpr strftime "%a %e.%m.%Y %H:%M", localtime($val)
+attr DEVICE reading09JSON result_01_lng
+attr DEVICE reading09Name Laengengrad
+attr DEVICE reading10JSON result_01_lat
+attr DEVICE reading10Name Breitengrad
+attr DEVICE reading11JSON result_01_distance
+attr DEVICE reading11Name Entfernung
+attr DEVICE readingEncode UTF-8
+attr DEVICE requestHeader2 Accept-Encoding: gzip, deflate
+attr DEVICE requestHeader3 Accept-Language: de-DE,de;;q=0.9,en-US;;q=0.8,en;;q=0.7,fr;;q=0.6
+attr DEVICE requestHeader4 User-Agent: Lynx/2.8.8dev.3 libwww-FM/2.14 SSL-MM/1.4.1
+attr DEVICE requestHeader5 Referer: http://apothekenfinder.mobi/
+attr DEVICE requestHeader6 X-Requested-With: XMLHttpRequest
+attr DEVICE requestHeader7 Connection: keep-alive
+attr DEVICE showBody 0
+attr DEVICE stateFormat Name, Telefon, Strasse in Plz Ort
+attr DEVICE timeout 60
+
 #################################
 #HP Printers
 #
@@ -173,8 +224,8 @@ attr DEVICE model B_01a_hp_printer_config
 # Printer cartridge states
 name:B_01a_hp_printer_cartridge_status
 filter:TYPE=HTTPMOD
-desc: Get cartridge states of your hp printer.<br>Define a HTTPMOD device like <br>defmod DEVICE HTTPMOD http://192.168.5.43/DevMgmt/ProductConfigDyn.xml 3600 <br>Change IP to your needs <br><a href="https://forum.fhem.de/index.php/topic,90601.msg874683.html#msg874683">Source: Forum</a>
-attr DEVICE userattr reading01Name reading01XPath-Strict reading02Name reading02XPath-Strict reading03Name reading03XPath-Strict reading04Name reading04XPath-Strict
+desc: Get cartridge states of your HP printer.<br>Define a HTTPMOD device like <br>defmod DEVICE HTTPMOD http://192.168.5.43/DevMgmt/ConsumableConfigDyn.xml 3600 <br>Change IP to your needs <br><a href="https://forum.fhem.de/index.php/topic,90601.msg874683.html#msg874683">Source: Forum</a>
+attr DEVICE userattr reading01Name reading01XPath-Strict reading02Name reading02XPath-Strict reading03Name reading03XPath-Strict reading04Name reading04XPath-Strict reading05Name reading05XPath-Strict reading06Name reading06XPath-Strict$
 attr DEVICE httpVersion 1.1
 attr DEVICE reading01Name Cyan
 attr DEVICE reading01XPath-Strict //ccdyn:ConsumableInfo[2]/dd:ConsumablePercentageLevelRemaining/text()
@@ -184,32 +235,62 @@ attr DEVICE reading03Name Yellow
 attr DEVICE reading03XPath-Strict //ccdyn:ConsumableInfo[4]/dd:ConsumablePercentageLevelRemaining/text()
 attr DEVICE reading04Name Black
 attr DEVICE reading04XPath-Strict //ccdyn:ConsumableInfo[1]/dd:ConsumablePercentageLevelRemaining/text()
+attr DEVICE reading05Name CyanCatridgeModel
+attr DEVICE reading05XPath-Strict //ccdyn:ConsumableInfo[3]/dd:ConsumableSelectibilityNumber/text()
+attr DEVICE reading06Name MagentaCatridgeModel
+attr DEVICE reading06XPath-Strict //ccdyn:ConsumableInfo[2]/dd:ConsumableSelectibilityNumber/text()
+attr DEVICE reading07Name YellowCatridgeModel
+attr DEVICE reading07XPath-Strict //ccdyn:ConsumableInfo[4]/dd:ConsumableSelectibilityNumber/text()
+attr DEVICE reading08Name BlackCatridgeModel
+attr DEVICE reading08XPath-Strict //ccdyn:ConsumableInfo[5]/dd:ConsumableSelectibilityNumber/text()
 attr DEVICE stateFormat C: Cyan% M: Magenta% Y: Yellow% B: Black%
 attr DEVICE model B_01a_hp_printer_cartridge_status
 
 # Printer statistics
 name:B_01a_hp_printer_statistics
 filter:TYPE=HTTPMOD
-desc: Get cartridge states of your hp printer.<br>Define a HTTPMOD device like <br>defmod DEVICE HTTPMOD http://192.168.5.43/DevMgmt/ProductUsageDyn.xml 3600<br>Change IP to your needs <br><a href="https://forum.fhem.de/index.php/topic,90601.msg874683.html#msg874683">Source: Forum</a>
-attr DEVICE userattr reading01Name reading01XPath-Strict reading02Name reading02XPath-Strict reading03Name reading03XPath-Strict reading04Name reading04XPath-Strict reading05Name reading05XPath-Strict reading06Name reading06XPath-Strict reading07Name reading07XPath-Strict reading08Name reading08XPath-Strict
+desc: Gets various statistics from your HP printer.<br>Define a HTTPMOD device like <br>defmod DEVICE HTTPMOD http://192.168.5.43/DevMgmt/ProductUsageDyn.xml 3600<br>Change IP to your needs <br><a href="https://forum.fhem.de/index.php/topic,90601.msg874683.html#msg874683">Source: Forum</a>
+attr DEVICE userattr reading01Name reading01XPath-Strict reading02Name reading02XPath-Strict reading03Name reading03XPath-Strict reading04Name reading04XPath-Strict reading05Name reading05XPath-Strict reading06Name reading06XPath-Strict reading07Name reading07XPath-Strict reading08Name reading08XPath-Strict reading09Name reading09XPath-Strict reading10Name reading10XPath-Strict reading11Name reading11XPath-Strict reading20Name reading20XPath-Strict reading30Name reading30XPath-Strict reading40Name reading40XPath-Strict reading41Name reading41XPath-Strict reading50Name reading50XPath-Strict reading51Name reading51XPath-Strict
 attr DEVICE httpVersion 1.1
-attr DEVICE reading01Name Pages_Total
+attr DEVICE reading01Name Printer_Pages_Total
 attr DEVICE reading01XPath-Strict //pudyn:PrinterSubunit/dd:TotalImpressions/text()
-attr DEVICE reading02Name Pages_Monochrome
+attr DEVICE reading02Name Printer_Pages_Monochrome
 attr DEVICE reading02XPath-Strict //pudyn:PrinterSubunit/dd:MonochromeImpressions/text()
-attr DEVICE reading03Name Pages_Color
+attr DEVICE reading03Name Printer_Pages_Color
 attr DEVICE reading03XPath-Strict //pudyn:PrinterSubunit/dd:ColorImpressions/text()
-attr DEVICE reading04Name Pages_Duplex
+attr DEVICE reading04Name Printer_Pages_Duplex
 attr DEVICE reading04XPath-Strict //pudyn:PrinterSubunit/dd:DuplexSheets/text()
-attr DEVICE reading05Name Jam_Events
+attr DEVICE reading05Name Printer_Jam_Events
 attr DEVICE reading05XPath-Strict //pudyn:PrinterSubunit/dd:JamEvents/text()
-attr DEVICE reading06Name Mispick_Events
+attr DEVICE reading06Name Printer_Mispick_Events
 attr DEVICE reading06XPath-Strict //pudyn:PrinterSubunit/dd:MispickEvents/text()
-attr DEVICE reading07Name ADF_Image_Scans
-attr DEVICE reading07XPath-Strict //pudyn:ScannerEngineSubunit/dd:AdfImages/text()
-attr DEVICE reading08Name Flatbed_Image_Scans
-attr DEVICE reading08XPath-Strict //pudyn:ScannerEngineSubunit/dd:FlatbedImages/text()
-attr DEVICE stateFormat Total: Pages_Total Monochrome: Pages_Monochrome Color: Pages_Color
+attr DEVICE reading10Name Scanner_Scans_Total
+attr DEVICE reading10XPath-Strict //pudyn:ScannerEngineSubunit/dd:ScanImages/text()
+attr DEVICE reading11Name Scanner_Scans_ADF_Image
+attr DEVICE reading11XPath-Strict //pudyn:ScannerEngineSubunit/dd:AdfImages/text()
+attr DEVICE reading12Name Scanner_Scans_Flatbed_Image
+attr DEVICE reading12XPath-Strict //pudyn:ScannerEngineSubunit/dd:FlatbedImages/text()
+attr DEVICE reading13Name Scanner_Jam_Events
+attr DEVICE reading13XPath-Strict //pudyn:ScannerEngineSubunit/dd:JamEvents/text()
+attr DEVICE reading14Name Scanner_Mispick_Events
+attr DEVICE reading14XPath-Strict //pudyn:ScannerEngineSubunit/dd:MispickEvents/text()
+attr DEVICE reading20Name InkMagentaPagesRemaining
+attr DEVICE reading20XPath-Strict //pudyn:Consumable[dd:MarkerColor='Magenta']/dd:EstimatedPagesRemaining/text()
+attr DEVICE reading21Name InkMagentaPercentRemaining
+attr DEVICE reading21XPath-Strict //pudyn:Consumable[dd:MarkerColor='Magenta']/dd:ConsumableRawPercentageLevelRemaining/text()
+attr DEVICE reading30Name InkCyanPagesRemaining
+attr DEVICE reading30XPath-Strict //pudyn:Consumable[dd:MarkerColor='Cyan']/dd:EstimatedPagesRemaining/text()
+attr DEVICE reading31Name InkCyanPercentRemaining
+attr DEVICE reading31XPath-Strict //pudyn:Consumable[dd:MarkerColor='Cyan']/dd:ConsumableRawPercentageLevelRemaining/text()
+attr DEVICE reading40Name InkYellowPagesRemaining
+attr DEVICE reading40XPath-Strict //pudyn:Consumable[dd:MarkerColor='Yellow']/dd:EstimatedPagesRemaining/text()
+attr DEVICE reading41Name InkYellowPercentRemaining
+attr DEVICE reading41XPath-Strict //pudyn:Consumable[dd:MarkerColor='Yellow']/dd:ConsumableRawPercentageLevelRemaining/text()
+attr DEVICE reading50Name InkBlackPagesRemaining
+attr DEVICE reading50XPath-Strict //pudyn:Consumable[dd:MarkerColor='Black']/dd:EstimatedPagesRemaining/text()
+attr DEVICE reading51Name InkBlackPercentRemaining
+attr DEVICE reading51XPath-Strict //pudyn:Consumable[dd:MarkerColor='Black']/dd:ConsumableRawPercentageLevelRemaining/text()
+attr DEVICE stateFormat Total: Printer_Pages_Total Monochrome: Printer_Pages_Monochrome Color: Printer_Pages_Color
 attr DEVICE model B_01a_hp_printer_statistics
 
 # Printer status
@@ -270,6 +351,42 @@ attr DEVICE reading05RegOpt gm
 attr DEVICE reading05Regex <th>1<\/th><td>(.*?)<
 attr DEVICE model B_01c_brother_printer_cartridge_status
 
+#################################
+#Brother Scanners
+
+# Brother ADS Scanners
+name:B_02a_brother_scanner_ads_status
+filter:TYPE=HTTPMOD
+desc: Get status of your Brother scanner.<br>Define a HTTPMOD device like <br>defmod DEVICE HTTPMOD http://192.168.133.7/ft/gen_maintenance 3600<br>Change IP to your needs <br><a href="https://wolf-u.li/6005/darstellung-der-statistiken-des-brother-ads-1700w-in-fhem/">Source: Website</a>.<br />Tested to work with ADS-1700W, possibly others.
+attr DEVICE userattr reading01Name reading01XPath-Strict reading02Name reading02XPath-Strict reading03Name reading03XPath-Strict reading04Name reading04XPath-Strict reading05Name reading05XPath-Strict reading06Name reading06XPath-Strict reading07Name reading07XPath-Strict reading08Name reading08XPath reading08XPath-Strict reading09Name reading09XPath-Strict reading10Name reading10XPath-Strict reading11Name reading11XPath-Strict reading12Name reading12XPath-Strict
+attr DEVICE httpVersion 1.1
+attr DEVICE reading01Name Model
+attr DEVICE reading01XPath-Strict //Model_name/text()
+attr DEVICE reading02Name Serial_Number
+attr DEVICE reading02XPath-Strict //Serial_Number/text()
+attr DEVICE reading03Name Firmware_Version
+attr DEVICE reading03XPath-Strict //MainVersion/text()
+attr DEVICE reading04Name PickupRollerPagesThreshold
+attr DEVICE reading04XPath-Strict //RemainingPick/text()
+attr DEVICE reading05Name PickupRollerPagesUsed
+attr DEVICE reading05XPath-Strict //RemainingPick_current/text()
+attr DEVICE reading06Name ScheduledMaintenancePagesThreshold
+attr DEVICE reading06XPath-Strict //RemainingScheduled/text()
+attr DEVICE reading07Name ScheduledMaintenancePagesUsed
+attr DEVICE reading07XPath-Strict //RemainingScheduled_current/text()
+attr DEVICE reading08XPath SeparationPadPagesThreshold
+attr DEVICE reading08XPath-Strict //RemainingPad_Threshold/text()
+attr DEVICE reading09Name SeparationPadPagesUsed
+attr DEVICE reading09XPath-Strict //RemainingSeparation_Pad/text()
+attr DEVICE reading10Name ScannedPagesTotal
+attr DEVICE reading10XPath-Strict //ScanPage/text()
+attr DEVICE reading11Name RollerReplacements
+attr DEVICE reading11XPath-Strict //RollerReplace/text()
+attr DEVICE reading12Name PaperJams
+attr DEVICE reading12XPath-Strict //PaperJams/text()
+attr DEVICE stateFormat Pages: ScannedPagesTotal Modell: Model SN: Serial_Number
+
+#################################
 #RESOL Solaranlage, Forum: https://forum.fhem.de/index.php/topic,86678.0.html
 name:C_01a_resol_solar
 filter:TYPE=HTTPMOD
