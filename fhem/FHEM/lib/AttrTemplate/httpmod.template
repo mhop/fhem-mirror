@@ -24,11 +24,11 @@ desc: Get prices for a single gas station.<br>Define a HTTPMOD device like <br>d
 attr DEVICE userattr reading01Name reading01Regex reading02Name reading02Regex reading03Name reading03Regex readingOExpr
 attr DEVICE enableControlSet 1
 attr DEVICE reading01Name Diesel
-attr DEVICE reading01Regex SpritsortenController[^0-9]+([0-9,]+)[^0-9]+Diesel
+attr DEVICE reading01Regex "price-type-name">Diesel</div>[\d\D]{700,900}"current-price-.">([0-9\.]+[^0-9]+suffix-price-.">[0-9])
 attr DEVICE reading02Name SuperE10
-attr DEVICE reading02Regex SpritsortenController[^0-9]+([0-9,]+)[^0-9]+Super E10
+attr DEVICE reading02Regex "price-type-name">Super E10</div>[\d\D]{700,900}"current-price-.">([0-9\.]+[^0-9]+suffix-price-.">[0-9])
 attr DEVICE reading03Name SuperE5
-attr DEVICE reading03Regex SpritsortenController[^0-9]+([0-9,]+)[^0-9]+Super E5
+attr DEVICE reading03Regex "price-type-name">Super E5</div>[\d\D]{700,900}"current-price-.">([0-9\.]+[^0-9]+suffix-price-.">[0-9])
 attr DEVICE readingOExpr $val =~ tr/,/./;;$val
 attr DEVICE stateFormat E5: SuperE5 € / E10: SuperE10 € / D: Diesel €
 attr DEVICE timeout 10
