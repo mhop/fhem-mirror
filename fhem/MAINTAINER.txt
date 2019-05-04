@@ -126,6 +126,7 @@ FHEM/20_FRM_STEPPER.pm       ntruchsess           Sonstige Systeme
 FHEM/20_GUEST.pm             loredo               Automatisierung
 FHEM/20_N4HBUS.pm            okoerber             Sonstige Systeme
 FHEM/20_OWFS.pm              mfr69bs              1Wire (deprecated)
+FHEM/20_PET.pm               loredo               Automatisierung
 FHEM/20_ROOMMATE.pm          loredo               Automatisierung
 FHEM/20_X10.pm               neubert              SlowRF
 FHEM/21_HEOSGroup            CoolTux              Multimedia
