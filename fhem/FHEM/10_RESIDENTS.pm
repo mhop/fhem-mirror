@@ -1134,7 +1134,6 @@ sub RESIDENTS_UpdateReadings (@) {
         foreach my $obj ( split( /,/, $residentsDevs_totalPresent ) ) {
             my $TYPE = GetType($obj);
             next unless $TYPE;
-            $state_homealone++;
 
             my $subtype = 'generic';
             $subtype = InternalVal( $obj, 'SUBTYPE', 'pet' )
@@ -1165,11 +1164,16 @@ sub RESIDENTS_UpdateReadings (@) {
               if ( !$newstate_prefix || $importance2 < $importance );
         }
     }
-    readingsBulkUpdateIfChanged( $hash, "residentsHomealone",
-        $state_homealone );
-    readingsBulkUpdateIfChanged( $hash, "residentsHomealoneType",
+    readingsBulkUpdateIfChanged( $hash, "lastHomealoneType",
+        ReadingsVal( $name, "homealoneType", "-" ) )
+      if ( ReadingsVal( $name, "homealoneType", undef ) );
+    readingsBulkUpdateIfChanged( $hash, "lastHomealoneSubtype",
+        ReadingsVal( $name, "homealoneSubtype", "-" ) )
+      if ( ReadingsVal( $name, "homealoneSubtype", undef ) );
+
+    readingsBulkUpdateIfChanged( $hash, "homealoneType",
         $homealone_type ? $homealone_type : '-' );
-    readingsBulkUpdateIfChanged( $hash, "residentsHomealoneSubtype",
+    readingsBulkUpdateIfChanged( $hash, "homealoneSubtype",
         $homealone_subtype ? $homealone_subtype : '-' );
 
     $newstate = $newstate_prefix . '_' . $newstate
@@ -1424,6 +1428,12 @@ sub RESIDENTS_UpdateReadings (@) {
       <ul>
         <ul>
           <li>
+            <b>homealoneSubtype</b> - subType of the residential object in charge
+          </li>
+          <li>
+            <b>homealoneType</b> - type of the residential object in charge
+          </li>
+          <li>
             <b>lastActivity</b> - the last state change of one of the group members
           </li>
           <li>
@@ -1530,15 +1540,6 @@ sub RESIDENTS_UpdateReadings (@) {
           </li>
           <li>
             <b>residentsHomeNames</b> - device alias of residents with state 'home'
-          </li>
-          <li>
-            <b>residentsHomealone</b> - becomes '1' when there are persons at home that are not fully autonomous
-          </li>
-          <li>
-            <b>residentsHomealoneSubtype</b> - subType of the residential object in charge
-          </li>
-          <li>
-            <b>residentsHomealoneType</b> - type of the residential object in charge
           </li>
           <li>
             <b>residentsTotal</b> - total number of all active residents despite their current state
@@ -1841,6 +1842,12 @@ sub RESIDENTS_UpdateReadings (@) {
       <ul>
         <ul>
           <li>
+            <b>homealoneSubtype</b> - subType des Bewohner Objekts in Verantwortung
+          </li>
+          <li>
+            <b>homealoneType</b> - type des Bewohner Objekts in Verantwortung
+          </li>
+          <li>
             <b>lastActivity</b> - der letzte Status Wechsel eines Gruppenmitglieds
           </li>
           <li>
@@ -1947,15 +1954,6 @@ sub RESIDENTS_UpdateReadings (@) {
           </li>
           <li>
             <b>residentsHomeNames</b> - Ger&auml;tealias der Bewohner mit Status 'home'
-          </li>
-          <li>
-            <b>residentsHomealone</b> - hat den Wert '1', wenn anwesende Personen nicht komplett eigenständig sind
-          </li>
-          <li>
-            <b>residentsHomealoneSubtype</b> - subType des Bewohner Objekts in Verantwortung
-          </li>
-          <li>
-            <b>residentsHomealoneType</b> - type des Bewohner Objekts in Verantwortung
           </li>
           <li>
             <b>residentsTotal</b> - Summe aller aktiven Bewohner unabh&auml;ngig von ihrem aktuellen Status

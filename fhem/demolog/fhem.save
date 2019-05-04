@@ -1499,8 +1499,8 @@ setstate lcCinema 2015-01-04 16:22:40 state AllOff
 setstate outdoorNotifier active
 setstate outdoorNotifier 2019-03-14 20:36:02 state active
 setstate rg_Guest1 none
-setstate rg_Guest1 2019-05-04 20:22:56 durTimerAbsence 06:52:28
-setstate rg_Guest1 2019-05-04 20:22:56 durTimerAbsence_cr 412
+setstate rg_Guest1 2019-05-05 00:47:47 durTimerAbsence 11:17:19
+setstate rg_Guest1 2019-05-05 00:47:47 durTimerAbsence_cr 677
 setstate rg_Guest1 2019-05-04 13:13:53 durTimerPresence 00:00:00
 setstate rg_Guest1 2019-05-04 13:13:53 durTimerPresence_cr 0
 setstate rg_Guest1 2015-01-04 16:19:19 durTimerSleep 00:00:00
@@ -1523,8 +1523,8 @@ setstate rg_Guest1 2019-05-04 13:30:28 presence absent
 setstate rg_Guest1 2019-05-04 20:19:07 state none
 setstate rg_Guest1 2014-02-15 16:16:27 wayhome 0
 setstate rg_Guest2 none
-setstate rg_Guest2 2019-05-04 20:22:56 durTimerAbsence 00:03:52
-setstate rg_Guest2 2019-05-04 20:22:56 durTimerAbsence_cr 4
+setstate rg_Guest2 2019-05-05 00:47:47 durTimerAbsence 04:28:43
+setstate rg_Guest2 2019-05-05 00:47:47 durTimerAbsence_cr 269
 setstate rg_Guest2 2019-05-04 13:13:53 durTimerPresence 00:00:00
 setstate rg_Guest2 2019-05-04 13:13:53 durTimerPresence_cr 0
 setstate rg_Guest2 2015-01-04 16:19:19 durTimerSleep 00:00:00
@@ -1547,8 +1547,8 @@ setstate rg_Guest2 2019-05-04 20:19:04 presence absent
 setstate rg_Guest2 2019-05-04 20:19:07 state none
 setstate rg_Guest2 2014-02-15 16:16:29 wayhome 0
 setstate rg_Guest3 none
-setstate rg_Guest3 2019-05-04 20:22:56 durTimerAbsence 00:04:34
-setstate rg_Guest3 2019-05-04 20:22:56 durTimerAbsence_cr 5
+setstate rg_Guest3 2019-05-05 00:47:47 durTimerAbsence 04:29:25
+setstate rg_Guest3 2019-05-05 00:47:47 durTimerAbsence_cr 269
 setstate rg_Guest3 2019-05-04 20:15:52 durTimerPresence 00:00:00
 setstate rg_Guest3 2019-05-04 20:15:52 durTimerPresence_cr 0
 setstate rg_Guest3 2019-05-04 20:15:52 durTimerSleep 00:00:00
@@ -1566,8 +1566,8 @@ setstate rg_Guest3 2019-05-04 20:18:22 presence absent
 setstate rg_Guest3 2019-05-04 20:19:07 state none
 setstate rg_Guest3 2019-05-04 20:18:21 wayhome 0
 setstate rg_Guest4 none
-setstate rg_Guest4 2019-05-04 20:22:56 durTimerAbsence 00:04:34
-setstate rg_Guest4 2019-05-04 20:22:56 durTimerAbsence_cr 5
+setstate rg_Guest4 2019-05-05 00:47:47 durTimerAbsence 04:29:25
+setstate rg_Guest4 2019-05-05 00:47:47 durTimerAbsence_cr 269
 setstate rg_Guest4 2019-05-04 20:17:59 durTimerPresence 00:00:00
 setstate rg_Guest4 2019-05-04 20:17:59 durTimerPresence_cr 0
 setstate rg_Guest4 2019-05-04 20:17:59 durTimerSleep 00:00:00
@@ -1585,29 +1585,33 @@ setstate rg_Guest4 2019-05-04 20:18:22 presence absent
 setstate rg_Guest4 2019-05-04 20:19:07 state none
 setstate rg_Guest4 2019-05-04 20:18:17 wayhome 0
 setstate rgr_Children home
-setstate rgr_Children 2019-05-04 20:23:02 durTimerAbsence 00:00:00
-setstate rgr_Children 2019-05-04 20:23:02 durTimerAbsence_cr 0
-setstate rgr_Children 2019-05-04 20:18:32 durTimerPresence 00:00:00
-setstate rgr_Children 2019-05-04 20:18:32 durTimerPresence_cr 0
+setstate rgr_Children 2019-05-05 00:48:33 durTimerAbsence 00:00:00
+setstate rgr_Children 2019-05-05 00:48:33 durTimerAbsence_cr 0
+setstate rgr_Children 2019-05-05 00:43:46 durTimerPresence 00:00:00
+setstate rgr_Children 2019-05-05 00:43:12 durTimerPresence_cr 0
 setstate rgr_Children 2018-07-15 15:19:54 durTimerSleep 00:00:00
 setstate rgr_Children 2018-07-15 15:19:54 durTimerSleep_cr 0
-setstate rgr_Children 2019-05-04 20:23:02 lastActivity home
-setstate rgr_Children 2019-05-04 20:23:02 lastActivityBy Son
-setstate rgr_Children 2019-05-04 20:23:02 lastActivityByDev rr_Son
-setstate rgr_Children 2019-05-04 20:23:02 lastArrival 2019-05-04 20:23:02
+setstate rgr_Children 2019-05-05 00:48:33 homealoneSubtype baby
+setstate rgr_Children 2019-05-05 00:48:33 homealoneType ROOMMATE
+setstate rgr_Children 2019-05-05 00:48:33 lastActivity home
+setstate rgr_Children 2019-05-05 00:48:33 lastActivityBy Baby
+setstate rgr_Children 2019-05-05 00:48:33 lastActivityByDev rr_Baby
+setstate rgr_Children 2019-05-05 00:48:33 lastArrival 2019-05-05 00:48:33
 setstate rgr_Children 2014-02-17 20:45:12 lastAwake 2014-02-17 20:45:12
-setstate rgr_Children 2019-05-04 20:18:32 lastDeparture 2019-05-04 20:18:32
-setstate rgr_Children 2019-05-04 20:23:02 lastDurAbsence 00:04:30
-setstate rgr_Children 2019-05-04 20:23:02 lastDurAbsence_cr 4
-setstate rgr_Children 2019-05-04 20:18:32 lastDurPresence 00:05:07
-setstate rgr_Children 2019-05-04 20:18:32 lastDurPresence_cr 5
+setstate rgr_Children 2019-05-05 00:43:46 lastDeparture 2019-05-05 00:43:46
+setstate rgr_Children 2019-05-05 00:48:33 lastDurAbsence 00:04:47
+setstate rgr_Children 2019-05-05 00:48:33 lastDurAbsence_cr 5
+setstate rgr_Children 2019-05-05 00:43:46 lastDurPresence 00:00:32
+setstate rgr_Children 2019-05-05 00:43:46 lastDurPresence_cr 1
 setstate rgr_Children 2014-02-17 20:45:12 lastDurSleep 29:47:11
+setstate rgr_Children 2019-05-05 00:48:33 lastHomealoneSubtype -
+setstate rgr_Children 2019-05-05 00:48:33 lastHomealoneType -
 setstate rgr_Children 2014-02-16 14:58:01 lastSleep 2014-02-16 14:58:01
-setstate rgr_Children 2019-05-04 20:23:02 lastState absent
-setstate rgr_Children 2019-05-04 20:23:02 presence present
-setstate rgr_Children 2019-05-04 20:23:02 residentsAbsent 0
-setstate rgr_Children 2019-05-04 20:23:02 residentsAbsentDevs -
-setstate rgr_Children 2019-05-04 20:23:02 residentsAbsentNames -
+setstate rgr_Children 2019-05-05 00:48:33 lastState absent
+setstate rgr_Children 2019-05-05 00:48:33 presence present
+setstate rgr_Children 2019-05-05 00:48:33 residentsAbsent 2
+setstate rgr_Children 2019-05-05 00:48:33 residentsAbsentDevs rr_Daughter,rr_Son
+setstate rgr_Children 2019-05-05 00:48:33 residentsAbsentNames Daughter, Son
 setstate rgr_Children 2019-05-04 13:09:50 residentsAsleep 0
 setstate rgr_Children 2019-05-04 13:09:50 residentsAsleepDevs -
 setstate rgr_Children 2019-05-04 13:09:50 residentsAsleepNames -
@@ -1620,16 +1624,13 @@ setstate rgr_Children 2019-05-04 13:05:39 residentsGoneNames -
 setstate rgr_Children 2019-05-04 13:09:47 residentsGotosleep 0
 setstate rgr_Children 2019-05-04 13:09:47 residentsGotosleepDevs -
 setstate rgr_Children 2019-05-04 13:09:47 residentsGotosleepNames -
-setstate rgr_Children 2019-05-04 20:23:02 residentsHome 3
-setstate rgr_Children 2019-05-04 20:23:02 residentsHomeDevs rr_Baby,rr_Daughter,rr_Son
-setstate rgr_Children 2019-05-04 20:23:02 residentsHomeNames Baby, Daughter, Son
-setstate rgr_Children 2019-05-04 20:23:02 residentsHomealone 3
-setstate rgr_Children 2019-05-04 20:23:02 residentsHomealoneSubtype teenager
-setstate rgr_Children 2019-05-04 20:23:02 residentsHomealoneType ROOMMATE
+setstate rgr_Children 2019-05-05 00:48:33 residentsHome 1
+setstate rgr_Children 2019-05-05 00:48:33 residentsHomeDevs rr_Baby
+setstate rgr_Children 2019-05-05 00:48:33 residentsHomeNames Baby
 setstate rgr_Children 2014-02-16 14:31:05 residentsTotal 3
-setstate rgr_Children 2019-05-04 20:23:02 residentsTotalAbsent 0
-setstate rgr_Children 2019-05-04 20:23:02 residentsTotalAbsentDevs -
-setstate rgr_Children 2019-05-04 20:23:02 residentsTotalAbsentNames -
+setstate rgr_Children 2019-05-05 00:48:33 residentsTotalAbsent 2
+setstate rgr_Children 2019-05-05 00:48:33 residentsTotalAbsentDevs rr_Daughter,rr_Son
+setstate rgr_Children 2019-05-05 00:48:33 residentsTotalAbsentNames Daughter, Son
 setstate rgr_Children 2019-05-04 13:05:39 residentsTotalGuests 0
 setstate rgr_Children 2019-05-04 13:05:39 residentsTotalGuestsAbsent 0
 setstate rgr_Children 2019-05-04 13:05:39 residentsTotalGuestsAbsentDevs -
@@ -1644,16 +1645,16 @@ setstate rgr_Children 2019-05-04 13:05:39 residentsTotalPetsAbsentNames -
 setstate rgr_Children 2019-05-04 13:05:39 residentsTotalPetsPresent 0
 setstate rgr_Children 2019-05-04 13:05:39 residentsTotalPetsPresentDevs -
 setstate rgr_Children 2019-05-04 13:05:39 residentsTotalPetsPresentNames -
-setstate rgr_Children 2019-05-04 20:23:02 residentsTotalPresent 3
-setstate rgr_Children 2019-05-04 20:23:02 residentsTotalPresentDevs rr_Baby,rr_Daughter,rr_Son
-setstate rgr_Children 2019-05-04 20:23:02 residentsTotalPresentNames Baby, Daughter, Son
+setstate rgr_Children 2019-05-05 00:48:33 residentsTotalPresent 1
+setstate rgr_Children 2019-05-05 00:48:33 residentsTotalPresentDevs rr_Baby
+setstate rgr_Children 2019-05-05 00:48:33 residentsTotalPresentNames Baby
 setstate rgr_Children 2019-05-04 13:05:39 residentsTotalRoommates 3
-setstate rgr_Children 2019-05-04 20:23:02 residentsTotalRoommatesAbsent 0
-setstate rgr_Children 2019-05-04 20:23:02 residentsTotalRoommatesAbsentDevs -
-setstate rgr_Children 2019-05-04 20:23:02 residentsTotalRoommatesAbsentNames -
-setstate rgr_Children 2019-05-04 20:23:02 residentsTotalRoommatesPresent 3
-setstate rgr_Children 2019-05-04 20:23:02 residentsTotalRoommatesPresentDevs rr_Baby,rr_Daughter,rr_Son
-setstate rgr_Children 2019-05-04 20:23:02 residentsTotalRoommatesPresentNames Baby, Daughter, Son
+setstate rgr_Children 2019-05-05 00:48:33 residentsTotalRoommatesAbsent 2
+setstate rgr_Children 2019-05-05 00:48:33 residentsTotalRoommatesAbsentDevs rr_Daughter,rr_Son
+setstate rgr_Children 2019-05-05 00:48:33 residentsTotalRoommatesAbsentNames Daughter, Son
+setstate rgr_Children 2019-05-05 00:48:33 residentsTotalRoommatesPresent 1
+setstate rgr_Children 2019-05-05 00:48:33 residentsTotalRoommatesPresentDevs rr_Baby
+setstate rgr_Children 2019-05-05 00:48:33 residentsTotalRoommatesPresentNames Baby
 setstate rgr_Children 2019-05-04 13:05:39 residentsTotalWakeup 0
 setstate rgr_Children 2019-05-04 13:05:39 residentsTotalWakeupDevs -
 setstate rgr_Children 2019-05-04 13:05:39 residentsTotalWakeupNames -
@@ -1663,10 +1664,10 @@ setstate rgr_Children 2019-05-04 13:05:39 residentsTotalWayhomeDelayedDevs -
 setstate rgr_Children 2019-05-04 13:05:39 residentsTotalWayhomeDelayedNames -
 setstate rgr_Children 2019-05-04 13:05:39 residentsTotalWayhomeDevs -
 setstate rgr_Children 2019-05-04 13:05:39 residentsTotalWayhomeNames -
-setstate rgr_Children 2019-05-04 20:23:02 state home
+setstate rgr_Children 2019-05-05 00:48:33 state home
 setstate rgr_Guests none
-setstate rgr_Guests 2019-05-04 20:22:56 durTimerAbsence 00:03:52
-setstate rgr_Guests 2019-05-04 20:22:56 durTimerAbsence_cr 4
+setstate rgr_Guests 2019-05-05 00:47:47 durTimerAbsence 04:28:43
+setstate rgr_Guests 2019-05-05 00:47:47 durTimerAbsence_cr 269
 setstate rgr_Guests 2019-05-04 20:19:04 durTimerPresence 00:00:00
 setstate rgr_Guests 2019-05-04 13:13:53 durTimerPresence_cr 0
 setstate rgr_Guests 2018-07-15 15:19:54 durTimerSleep 00:00:00
@@ -1700,9 +1701,6 @@ setstate rgr_Guests 2019-05-04 13:05:39 residentsGotosleepNames -
 setstate rgr_Guests 2019-05-04 20:19:04 residentsHome 0
 setstate rgr_Guests 2019-05-04 13:05:39 residentsHomeDevs -
 setstate rgr_Guests 2019-05-04 13:05:39 residentsHomeNames -
-setstate rgr_Guests 2019-05-04 20:19:04 residentsHomealone 0
-setstate rgr_Guests 2019-05-04 20:19:04 residentsHomealoneSubtype -
-setstate rgr_Guests 2019-05-04 20:19:04 residentsHomealoneType -
 setstate rgr_Guests 2019-05-04 20:19:07 residentsTotal 0
 setstate rgr_Guests 2019-05-04 20:19:07 residentsTotalAbsent 0
 setstate rgr_Guests 2019-05-04 20:19:07 residentsTotalAbsentDevs -
@@ -1742,29 +1740,33 @@ setstate rgr_Guests 2019-05-04 13:05:39 residentsTotalWayhomeDevs -
 setstate rgr_Guests 2019-05-04 13:05:39 residentsTotalWayhomeNames -
 setstate rgr_Guests 2019-05-04 20:19:07 state none
 setstate rgr_Parents home
-setstate rgr_Parents 2019-05-04 20:23:02 durTimerAbsence 00:00:00
-setstate rgr_Parents 2019-05-04 20:23:02 durTimerAbsence_cr 0
-setstate rgr_Parents 2019-05-04 20:18:32 durTimerPresence 00:00:00
-setstate rgr_Parents 2019-05-04 20:18:32 durTimerPresence_cr 0
+setstate rgr_Parents 2019-05-05 00:48:33 durTimerAbsence 00:00:00
+setstate rgr_Parents 2019-05-05 00:48:33 durTimerAbsence_cr 0
+setstate rgr_Parents 2019-05-05 00:43:46 durTimerPresence 00:00:00
+setstate rgr_Parents 2019-05-05 00:43:12 durTimerPresence_cr 0
 setstate rgr_Parents 2018-07-15 15:19:54 durTimerSleep 00:00:00
 setstate rgr_Parents 2018-07-15 15:19:54 durTimerSleep_cr 0
-setstate rgr_Parents 2019-05-04 20:23:02 lastActivity home
-setstate rgr_Parents 2019-05-04 20:23:02 lastActivityBy Mother
-setstate rgr_Parents 2019-05-04 20:23:02 lastActivityByDev rr_Mother
-setstate rgr_Parents 2019-05-04 20:23:02 lastArrival 2019-05-04 20:23:02
+setstate rgr_Parents 2019-05-05 00:43:12 homealoneSubtype -
+setstate rgr_Parents 2019-05-05 00:43:12 homealoneType -
+setstate rgr_Parents 2019-05-05 00:48:33 lastActivity home
+setstate rgr_Parents 2019-05-05 00:48:33 lastActivityBy Mother
+setstate rgr_Parents 2019-05-05 00:48:33 lastActivityByDev rr_Mother
+setstate rgr_Parents 2019-05-05 00:48:33 lastArrival 2019-05-05 00:48:33
 setstate rgr_Parents 2014-02-15 16:39:35 lastAwake 2014-02-15 16:39:35
-setstate rgr_Parents 2019-05-04 20:18:32 lastDeparture 2019-05-04 20:18:32
-setstate rgr_Parents 2019-05-04 20:23:02 lastDurAbsence 00:04:30
-setstate rgr_Parents 2019-05-04 20:23:02 lastDurAbsence_cr 4
-setstate rgr_Parents 2019-05-04 20:18:32 lastDurPresence 00:05:07
-setstate rgr_Parents 2019-05-04 20:18:32 lastDurPresence_cr 5
+setstate rgr_Parents 2019-05-05 00:43:46 lastDeparture 2019-05-05 00:43:46
+setstate rgr_Parents 2019-05-05 00:48:33 lastDurAbsence 00:04:47
+setstate rgr_Parents 2019-05-05 00:48:33 lastDurAbsence_cr 5
+setstate rgr_Parents 2019-05-05 00:43:46 lastDurPresence 00:00:32
+setstate rgr_Parents 2019-05-05 00:43:46 lastDurPresence_cr 1
 setstate rgr_Parents 2014-02-15 16:39:35 lastDurSleep 00:02:44
+setstate rgr_Parents 2019-05-05 00:43:12 lastHomealoneSubtype -
+setstate rgr_Parents 2019-05-05 00:43:12 lastHomealoneType -
 setstate rgr_Parents 2014-02-15 16:36:51 lastSleep 2014-02-15 16:36:51
-setstate rgr_Parents 2019-05-04 20:23:02 lastState absent
-setstate rgr_Parents 2019-05-04 20:23:02 presence present
-setstate rgr_Parents 2019-05-04 20:23:02 residentsAbsent 0
-setstate rgr_Parents 2019-05-04 20:23:02 residentsAbsentDevs -
-setstate rgr_Parents 2019-05-04 20:23:02 residentsAbsentNames -
+setstate rgr_Parents 2019-05-05 00:48:33 lastState absent
+setstate rgr_Parents 2019-05-05 00:48:33 presence present
+setstate rgr_Parents 2019-05-05 00:48:33 residentsAbsent 0
+setstate rgr_Parents 2019-05-05 00:48:33 residentsAbsentDevs -
+setstate rgr_Parents 2019-05-05 00:48:33 residentsAbsentNames -
 setstate rgr_Parents 2019-05-04 13:10:35 residentsAsleep 0
 setstate rgr_Parents 2019-05-04 13:10:35 residentsAsleepDevs -
 setstate rgr_Parents 2019-05-04 13:10:35 residentsAsleepNames -
@@ -1777,16 +1779,13 @@ setstate rgr_Parents 2019-05-04 13:05:39 residentsGoneNames -
 setstate rgr_Parents 2019-05-04 13:10:34 residentsGotosleep 0
 setstate rgr_Parents 2019-05-04 13:10:34 residentsGotosleepDevs -
 setstate rgr_Parents 2019-05-04 13:10:34 residentsGotosleepNames -
-setstate rgr_Parents 2019-05-04 20:23:02 residentsHome 2
-setstate rgr_Parents 2019-05-04 20:23:02 residentsHomeDevs rr_Father,rr_Mother
-setstate rgr_Parents 2019-05-04 20:23:02 residentsHomeNames Father, Mother
-setstate rgr_Parents 2019-05-04 20:13:22 residentsHomealone 0
-setstate rgr_Parents 2019-05-04 20:13:22 residentsHomealoneSubtype -
-setstate rgr_Parents 2019-05-04 20:13:22 residentsHomealoneType -
+setstate rgr_Parents 2019-05-05 00:48:33 residentsHome 2
+setstate rgr_Parents 2019-05-05 00:48:33 residentsHomeDevs rr_Father,rr_Mother
+setstate rgr_Parents 2019-05-05 00:48:33 residentsHomeNames Father, Mother
 setstate rgr_Parents 2014-02-16 13:48:12 residentsTotal 2
-setstate rgr_Parents 2019-05-04 20:23:02 residentsTotalAbsent 0
-setstate rgr_Parents 2019-05-04 20:23:02 residentsTotalAbsentDevs -
-setstate rgr_Parents 2019-05-04 20:23:02 residentsTotalAbsentNames -
+setstate rgr_Parents 2019-05-05 00:48:33 residentsTotalAbsent 0
+setstate rgr_Parents 2019-05-05 00:48:33 residentsTotalAbsentDevs -
+setstate rgr_Parents 2019-05-05 00:48:33 residentsTotalAbsentNames -
 setstate rgr_Parents 2019-05-04 13:05:39 residentsTotalGuests 0
 setstate rgr_Parents 2019-05-04 13:05:39 residentsTotalGuestsAbsent 0
 setstate rgr_Parents 2019-05-04 13:05:39 residentsTotalGuestsAbsentDevs -
@@ -1801,16 +1800,16 @@ setstate rgr_Parents 2019-05-04 13:05:39 residentsTotalPetsAbsentNames -
 setstate rgr_Parents 2019-05-04 13:05:39 residentsTotalPetsPresent 0
 setstate rgr_Parents 2019-05-04 13:05:39 residentsTotalPetsPresentDevs -
 setstate rgr_Parents 2019-05-04 13:05:39 residentsTotalPetsPresentNames -
-setstate rgr_Parents 2019-05-04 20:23:02 residentsTotalPresent 2
-setstate rgr_Parents 2019-05-04 20:23:02 residentsTotalPresentDevs rr_Father,rr_Mother
-setstate rgr_Parents 2019-05-04 20:23:02 residentsTotalPresentNames Father, Mother
+setstate rgr_Parents 2019-05-05 00:48:33 residentsTotalPresent 2
+setstate rgr_Parents 2019-05-05 00:48:33 residentsTotalPresentDevs rr_Father,rr_Mother
+setstate rgr_Parents 2019-05-05 00:48:33 residentsTotalPresentNames Father, Mother
 setstate rgr_Parents 2019-05-04 13:05:39 residentsTotalRoommates 2
-setstate rgr_Parents 2019-05-04 20:23:02 residentsTotalRoommatesAbsent 0
-setstate rgr_Parents 2019-05-04 20:23:02 residentsTotalRoommatesAbsentDevs -
-setstate rgr_Parents 2019-05-04 20:23:02 residentsTotalRoommatesAbsentNames -
-setstate rgr_Parents 2019-05-04 20:23:02 residentsTotalRoommatesPresent 2
-setstate rgr_Parents 2019-05-04 20:23:02 residentsTotalRoommatesPresentDevs rr_Father,rr_Mother
-setstate rgr_Parents 2019-05-04 20:23:02 residentsTotalRoommatesPresentNames Father, Mother
+setstate rgr_Parents 2019-05-05 00:48:33 residentsTotalRoommatesAbsent 0
+setstate rgr_Parents 2019-05-05 00:48:33 residentsTotalRoommatesAbsentDevs -
+setstate rgr_Parents 2019-05-05 00:48:33 residentsTotalRoommatesAbsentNames -
+setstate rgr_Parents 2019-05-05 00:48:33 residentsTotalRoommatesPresent 2
+setstate rgr_Parents 2019-05-05 00:48:33 residentsTotalRoommatesPresentDevs rr_Father,rr_Mother
+setstate rgr_Parents 2019-05-05 00:48:33 residentsTotalRoommatesPresentNames Father, Mother
 setstate rgr_Parents 2019-05-04 13:05:39 residentsTotalWakeup 0
 setstate rgr_Parents 2019-05-04 13:05:39 residentsTotalWakeupDevs -
 setstate rgr_Parents 2019-05-04 13:05:39 residentsTotalWakeupNames -
@@ -1820,32 +1819,36 @@ setstate rgr_Parents 2019-05-04 13:05:39 residentsTotalWayhomeDelayedDevs -
 setstate rgr_Parents 2019-05-04 13:05:39 residentsTotalWayhomeDelayedNames -
 setstate rgr_Parents 2019-05-04 13:05:39 residentsTotalWayhomeDevs -
 setstate rgr_Parents 2019-05-04 13:05:39 residentsTotalWayhomeNames -
-setstate rgr_Parents 2019-05-04 20:23:02 state home
+setstate rgr_Parents 2019-05-05 00:48:33 state home
 setstate rgr_Pets home
 setstate rgr_Pets 2019-05-04 13:05:10 durTimerAbsence 00:00:00
 setstate rgr_Pets 2019-05-04 13:05:10 durTimerAbsence_cr 0
-setstate rgr_Pets 2019-05-04 20:23:01 durTimerPresence 00:00:00
-setstate rgr_Pets 2019-05-04 20:23:01 durTimerPresence_cr 0
+setstate rgr_Pets 2019-05-05 00:47:47 durTimerPresence 00:04:00
+setstate rgr_Pets 2019-05-05 00:47:47 durTimerPresence_cr 4
 setstate rgr_Pets 2019-05-04 13:05:10 durTimerSleep 00:00:00
 setstate rgr_Pets 2019-05-04 13:05:10 durTimerSleep_cr 0
-setstate rgr_Pets 2019-05-04 20:23:02 lastActivity home
-setstate rgr_Pets 2019-05-04 20:23:02 lastActivityBy Dog
-setstate rgr_Pets 2019-05-04 20:23:02 lastActivityByDev rp_Dog
-setstate rgr_Pets 2019-05-04 20:23:02 lastArrival 2019-05-04 20:23:02
+setstate rgr_Pets 2019-05-05 00:43:47 homealoneSubtype dog
+setstate rgr_Pets 2019-05-05 00:43:47 homealoneType PET
+setstate rgr_Pets 2019-05-05 00:43:47 lastActivity home
+setstate rgr_Pets 2019-05-05 00:43:47 lastActivityBy Dog
+setstate rgr_Pets 2019-05-05 00:43:47 lastActivityByDev rp_Dog
+setstate rgr_Pets 2019-05-05 00:43:47 lastArrival 2019-05-05 00:43:47
 setstate rgr_Pets 2019-05-04 13:10:35 lastAwake 2019-05-04 13:10:35
-setstate rgr_Pets 2019-05-04 20:23:01 lastDeparture 2019-05-04 20:23:01
-setstate rgr_Pets 2019-05-04 20:23:02 lastDurAbsence 00:00:01
-setstate rgr_Pets 2019-05-04 20:23:02 lastDurAbsence_cr 0
-setstate rgr_Pets 2019-05-04 20:23:01 lastDurPresence 00:04:08
-setstate rgr_Pets 2019-05-04 20:23:01 lastDurPresence_cr 4
+setstate rgr_Pets 2019-05-05 00:43:46 lastDeparture 2019-05-05 00:43:46
+setstate rgr_Pets 2019-05-05 00:43:47 lastDurAbsence 00:00:01
+setstate rgr_Pets 2019-05-05 00:43:47 lastDurAbsence_cr 0
+setstate rgr_Pets 2019-05-05 00:43:46 lastDurPresence 00:00:32
+setstate rgr_Pets 2019-05-05 00:43:46 lastDurPresence_cr 1
 setstate rgr_Pets 2019-05-04 13:10:35 lastDurSleep 00:00:01
 setstate rgr_Pets 2019-05-04 13:10:35 lastDurSleep_cr 0
+setstate rgr_Pets 2019-05-05 00:43:47 lastHomealoneSubtype -
+setstate rgr_Pets 2019-05-05 00:43:47 lastHomealoneType -
 setstate rgr_Pets 2019-05-04 13:10:34 lastSleep 2019-05-04 13:10:34
-setstate rgr_Pets 2019-05-04 20:23:02 lastState absent
-setstate rgr_Pets 2019-05-04 20:23:02 presence present
-setstate rgr_Pets 2019-05-04 20:23:02 residentsAbsent 0
-setstate rgr_Pets 2019-05-04 20:23:02 residentsAbsentDevs -
-setstate rgr_Pets 2019-05-04 20:23:02 residentsAbsentNames -
+setstate rgr_Pets 2019-05-05 00:43:47 lastState absent
+setstate rgr_Pets 2019-05-05 00:43:47 presence present
+setstate rgr_Pets 2019-05-05 00:43:47 residentsAbsent 0
+setstate rgr_Pets 2019-05-05 00:43:47 residentsAbsentDevs -
+setstate rgr_Pets 2019-05-05 00:43:47 residentsAbsentNames -
 setstate rgr_Pets 2019-05-04 13:10:35 residentsAsleep 0
 setstate rgr_Pets 2019-05-04 13:10:35 residentsAsleepDevs -
 setstate rgr_Pets 2019-05-04 13:10:35 residentsAsleepNames -
@@ -1858,16 +1861,13 @@ setstate rgr_Pets 2019-05-04 13:05:34 residentsGoneNames -
 setstate rgr_Pets 2019-05-04 13:10:34 residentsGotosleep 0
 setstate rgr_Pets 2019-05-04 13:10:34 residentsGotosleepDevs -
 setstate rgr_Pets 2019-05-04 13:10:34 residentsGotosleepNames -
-setstate rgr_Pets 2019-05-04 20:23:02 residentsHome 1
-setstate rgr_Pets 2019-05-04 20:23:02 residentsHomeDevs rp_Dog
-setstate rgr_Pets 2019-05-04 20:23:02 residentsHomeNames Dog
-setstate rgr_Pets 2019-05-04 20:23:02 residentsHomealone 1
-setstate rgr_Pets 2019-05-04 20:23:02 residentsHomealoneSubtype dog
-setstate rgr_Pets 2019-05-04 20:23:02 residentsHomealoneType PET
+setstate rgr_Pets 2019-05-05 00:43:47 residentsHome 1
+setstate rgr_Pets 2019-05-05 00:43:47 residentsHomeDevs rp_Dog
+setstate rgr_Pets 2019-05-05 00:43:47 residentsHomeNames Dog
 setstate rgr_Pets 2019-05-04 13:05:34 residentsTotal 1
-setstate rgr_Pets 2019-05-04 20:23:02 residentsTotalAbsent 0
-setstate rgr_Pets 2019-05-04 20:23:02 residentsTotalAbsentDevs -
-setstate rgr_Pets 2019-05-04 20:23:02 residentsTotalAbsentNames -
+setstate rgr_Pets 2019-05-05 00:43:47 residentsTotalAbsent 0
+setstate rgr_Pets 2019-05-05 00:43:47 residentsTotalAbsentDevs -
+setstate rgr_Pets 2019-05-05 00:43:47 residentsTotalAbsentNames -
 setstate rgr_Pets 2019-05-04 13:05:34 residentsTotalGuests 0
 setstate rgr_Pets 2019-05-04 13:05:34 residentsTotalGuestsAbsent 0
 setstate rgr_Pets 2019-05-04 13:05:34 residentsTotalGuestsAbsentDevs -
@@ -1876,15 +1876,15 @@ setstate rgr_Pets 2019-05-04 13:05:34 residentsTotalGuestsPresent 0
 setstate rgr_Pets 2019-05-04 13:05:34 residentsTotalGuestsPresentDevs -
 setstate rgr_Pets 2019-05-04 13:05:34 residentsTotalGuestsPresentNames -
 setstate rgr_Pets 2019-05-04 13:05:34 residentsTotalPets 1
-setstate rgr_Pets 2019-05-04 20:23:02 residentsTotalPetsAbsent 0
-setstate rgr_Pets 2019-05-04 20:23:02 residentsTotalPetsAbsentDevs -
-setstate rgr_Pets 2019-05-04 20:23:02 residentsTotalPetsAbsentNames -
-setstate rgr_Pets 2019-05-04 20:23:02 residentsTotalPetsPresent 1
-setstate rgr_Pets 2019-05-04 20:23:02 residentsTotalPetsPresentDevs rp_Dog
-setstate rgr_Pets 2019-05-04 20:23:02 residentsTotalPetsPresentNames Dog
-setstate rgr_Pets 2019-05-04 20:23:02 residentsTotalPresent 1
-setstate rgr_Pets 2019-05-04 20:23:02 residentsTotalPresentDevs rp_Dog
-setstate rgr_Pets 2019-05-04 20:23:02 residentsTotalPresentNames Dog
+setstate rgr_Pets 2019-05-05 00:43:47 residentsTotalPetsAbsent 0
+setstate rgr_Pets 2019-05-05 00:43:47 residentsTotalPetsAbsentDevs -
+setstate rgr_Pets 2019-05-05 00:43:47 residentsTotalPetsAbsentNames -
+setstate rgr_Pets 2019-05-05 00:43:47 residentsTotalPetsPresent 1
+setstate rgr_Pets 2019-05-05 00:43:47 residentsTotalPetsPresentDevs rp_Dog
+setstate rgr_Pets 2019-05-05 00:43:47 residentsTotalPetsPresentNames Dog
+setstate rgr_Pets 2019-05-05 00:43:47 residentsTotalPresent 1
+setstate rgr_Pets 2019-05-05 00:43:47 residentsTotalPresentDevs rp_Dog
+setstate rgr_Pets 2019-05-05 00:43:47 residentsTotalPresentNames Dog
 setstate rgr_Pets 2019-05-04 13:05:34 residentsTotalRoommates 0
 setstate rgr_Pets 2019-05-04 13:05:34 residentsTotalRoommatesAbsent 0
 setstate rgr_Pets 2019-05-04 13:05:34 residentsTotalRoommatesAbsentDevs -
@@ -1901,31 +1901,35 @@ setstate rgr_Pets 2019-05-04 13:05:34 residentsTotalWayhomeDelayedDevs -
 setstate rgr_Pets 2019-05-04 13:05:34 residentsTotalWayhomeDelayedNames -
 setstate rgr_Pets 2019-05-04 13:05:34 residentsTotalWayhomeDevs -
 setstate rgr_Pets 2019-05-04 13:05:34 residentsTotalWayhomeNames -
-setstate rgr_Pets 2019-05-04 20:23:02 state home
+setstate rgr_Pets 2019-05-05 00:43:47 state home
 setstate rgr_Residents home
 setstate rgr_Residents 2018-07-15 15:19:54 durTimerAbsence 00:00:00
 setstate rgr_Residents 2018-07-15 15:19:54 durTimerAbsence_cr 0
-setstate rgr_Residents 2019-05-04 20:23:01 durTimerPresence 00:00:00
-setstate rgr_Residents 2019-05-04 20:23:01 durTimerPresence_cr 0
+setstate rgr_Residents 2019-05-05 00:48:33 durTimerPresence 00:04:46
+setstate rgr_Residents 2019-05-05 00:48:33 durTimerPresence_cr 5
 setstate rgr_Residents 2018-07-15 15:19:54 durTimerSleep 00:00:00
 setstate rgr_Residents 2018-07-15 15:19:54 durTimerSleep_cr 0
-setstate rgr_Residents 2019-05-04 20:23:02 lastActivity home
-setstate rgr_Residents 2019-05-04 20:23:02 lastActivityBy Dog
-setstate rgr_Residents 2019-05-04 20:23:02 lastActivityByDev rp_Dog
-setstate rgr_Residents 2019-05-04 20:23:02 lastArrival 2019-05-04 20:23:02
+setstate rgr_Residents 2019-05-05 00:48:33 homealoneSubtype -
+setstate rgr_Residents 2019-05-05 00:48:33 homealoneType -
+setstate rgr_Residents 2019-05-05 00:48:33 lastActivity home
+setstate rgr_Residents 2019-05-05 00:48:33 lastActivityBy Mother
+setstate rgr_Residents 2019-05-05 00:48:33 lastActivityByDev rr_Mother
+setstate rgr_Residents 2019-05-05 00:43:47 lastArrival 2019-05-05 00:43:47
 setstate rgr_Residents 2014-02-16 14:02:48 lastAwake 2014-02-16 14:02:48
-setstate rgr_Residents 2019-05-04 20:23:01 lastDeparture 2019-05-04 20:23:01
-setstate rgr_Residents 2019-05-04 20:23:02 lastDurAbsence 00:00:01
-setstate rgr_Residents 2019-05-04 20:23:02 lastDurAbsence_cr 0
-setstate rgr_Residents 2019-05-04 20:23:01 lastDurPresence 00:04:08
-setstate rgr_Residents 2019-05-04 20:23:01 lastDurPresence_cr 4
+setstate rgr_Residents 2019-05-05 00:43:46 lastDeparture 2019-05-05 00:43:46
+setstate rgr_Residents 2019-05-05 00:43:47 lastDurAbsence 00:00:01
+setstate rgr_Residents 2019-05-05 00:43:47 lastDurAbsence_cr 0
+setstate rgr_Residents 2019-05-05 00:43:46 lastDurPresence 00:00:32
+setstate rgr_Residents 2019-05-05 00:43:46 lastDurPresence_cr 1
 setstate rgr_Residents 2014-02-16 14:02:48 lastDurSleep 00:00:00
+setstate rgr_Residents 2019-05-05 00:48:33 lastHomealoneSubtype -
+setstate rgr_Residents 2019-05-05 00:48:33 lastHomealoneType -
 setstate rgr_Residents 2014-02-16 14:02:48 lastSleep 2014-02-16 14:02:48
-setstate rgr_Residents 2019-05-04 20:23:02 lastState child_home
-setstate rgr_Residents 2019-05-04 20:23:02 presence present
-setstate rgr_Residents 2019-05-04 20:23:02 residentsAbsent 0
-setstate rgr_Residents 2019-05-04 20:23:02 residentsAbsentDevs -
-setstate rgr_Residents 2019-05-04 20:23:02 residentsAbsentNames -
+setstate rgr_Residents 2019-05-05 00:48:33 lastState pet_home
+setstate rgr_Residents 2019-05-05 00:43:47 presence present
+setstate rgr_Residents 2019-05-05 00:48:33 residentsAbsent 2
+setstate rgr_Residents 2019-05-05 00:48:33 residentsAbsentDevs rr_Daughter,rr_Son
+setstate rgr_Residents 2019-05-05 00:48:33 residentsAbsentNames Daughter, Son
 setstate rgr_Residents 2019-05-04 13:10:35 residentsAsleep 0
 setstate rgr_Residents 2019-05-04 13:10:35 residentsAsleepDevs -
 setstate rgr_Residents 2019-05-04 13:10:35 residentsAsleepNames -
@@ -1938,16 +1942,13 @@ setstate rgr_Residents 2019-05-04 13:05:39 residentsGoneNames -
 setstate rgr_Residents 2019-05-04 13:10:34 residentsGotosleep 0
 setstate rgr_Residents 2019-05-04 13:10:34 residentsGotosleepDevs -
 setstate rgr_Residents 2019-05-04 13:10:34 residentsGotosleepNames -
-setstate rgr_Residents 2019-05-04 20:23:02 residentsHome 6
-setstate rgr_Residents 2019-05-04 20:23:02 residentsHomeDevs rr_Baby,rr_Daughter,rr_Father,rr_Mother,rr_Son,rp_Dog
-setstate rgr_Residents 2019-05-04 20:23:02 residentsHomeNames Baby, Daughter, Father, Mother, Son, Dog
-setstate rgr_Residents 2019-05-04 20:23:02 residentsHomealone 0
-setstate rgr_Residents 2019-05-04 20:23:02 residentsHomealoneSubtype -
-setstate rgr_Residents 2019-05-04 20:23:02 residentsHomealoneType -
+setstate rgr_Residents 2019-05-05 00:48:33 residentsHome 4
+setstate rgr_Residents 2019-05-05 00:48:33 residentsHomeDevs rr_Baby,rr_Father,rr_Mother,rp_Dog
+setstate rgr_Residents 2019-05-05 00:48:33 residentsHomeNames Baby, Father, Mother, Dog
 setstate rgr_Residents 2019-05-04 20:19:07 residentsTotal 6
-setstate rgr_Residents 2019-05-04 20:23:02 residentsTotalAbsent 0
-setstate rgr_Residents 2019-05-04 20:23:02 residentsTotalAbsentDevs -
-setstate rgr_Residents 2019-05-04 20:23:02 residentsTotalAbsentNames -
+setstate rgr_Residents 2019-05-05 00:48:33 residentsTotalAbsent 2
+setstate rgr_Residents 2019-05-05 00:48:33 residentsTotalAbsentDevs rr_Daughter,rr_Son
+setstate rgr_Residents 2019-05-05 00:48:33 residentsTotalAbsentNames Daughter, Son
 setstate rgr_Residents 2019-05-04 20:19:07 residentsTotalGuests 0
 setstate rgr_Residents 2019-05-04 20:19:07 residentsTotalGuestsAbsent 0
 setstate rgr_Residents 2019-05-04 20:19:07 residentsTotalGuestsAbsentDevs -
@@ -1956,22 +1957,22 @@ setstate rgr_Residents 2019-05-04 20:19:04 residentsTotalGuestsPresent 0
 setstate rgr_Residents 2019-05-04 20:19:04 residentsTotalGuestsPresentDevs -
 setstate rgr_Residents 2019-05-04 20:19:04 residentsTotalGuestsPresentNames -
 setstate rgr_Residents 2019-05-04 13:05:34 residentsTotalPets 1
-setstate rgr_Residents 2019-05-04 20:23:02 residentsTotalPetsAbsent 0
-setstate rgr_Residents 2019-05-04 20:23:02 residentsTotalPetsAbsentDevs -
-setstate rgr_Residents 2019-05-04 20:23:02 residentsTotalPetsAbsentNames -
-setstate rgr_Residents 2019-05-04 20:23:02 residentsTotalPetsPresent 1
-setstate rgr_Residents 2019-05-04 20:23:02 residentsTotalPetsPresentDevs rp_Dog
-setstate rgr_Residents 2019-05-04 20:23:02 residentsTotalPetsPresentNames Dog
-setstate rgr_Residents 2019-05-04 20:23:02 residentsTotalPresent 6
-setstate rgr_Residents 2019-05-04 20:23:02 residentsTotalPresentDevs rr_Baby,rr_Daughter,rr_Father,rr_Mother,rr_Son,rp_Dog
-setstate rgr_Residents 2019-05-04 20:23:02 residentsTotalPresentNames Baby, Daughter, Father, Mother, Son, Dog
+setstate rgr_Residents 2019-05-05 00:43:47 residentsTotalPetsAbsent 0
+setstate rgr_Residents 2019-05-05 00:43:47 residentsTotalPetsAbsentDevs -
+setstate rgr_Residents 2019-05-05 00:43:47 residentsTotalPetsAbsentNames -
+setstate rgr_Residents 2019-05-05 00:43:47 residentsTotalPetsPresent 1
+setstate rgr_Residents 2019-05-05 00:43:47 residentsTotalPetsPresentDevs rp_Dog
+setstate rgr_Residents 2019-05-05 00:43:47 residentsTotalPetsPresentNames Dog
+setstate rgr_Residents 2019-05-05 00:48:33 residentsTotalPresent 4
+setstate rgr_Residents 2019-05-05 00:48:33 residentsTotalPresentDevs rr_Baby,rr_Father,rr_Mother,rp_Dog
+setstate rgr_Residents 2019-05-05 00:48:33 residentsTotalPresentNames Baby, Father, Mother, Dog
 setstate rgr_Residents 2019-05-04 13:05:34 residentsTotalRoommates 5
-setstate rgr_Residents 2019-05-04 20:23:02 residentsTotalRoommatesAbsent 0
-setstate rgr_Residents 2019-05-04 20:23:02 residentsTotalRoommatesAbsentDevs -
-setstate rgr_Residents 2019-05-04 20:23:02 residentsTotalRoommatesAbsentNames -
-setstate rgr_Residents 2019-05-04 20:23:02 residentsTotalRoommatesPresent 5
-setstate rgr_Residents 2019-05-04 20:23:02 residentsTotalRoommatesPresentDevs rr_Baby,rr_Daughter,rr_Father,rr_Mother,rr_Son
-setstate rgr_Residents 2019-05-04 20:23:02 residentsTotalRoommatesPresentNames Baby, Daughter, Father, Mother, Son
+setstate rgr_Residents 2019-05-05 00:48:33 residentsTotalRoommatesAbsent 2
+setstate rgr_Residents 2019-05-05 00:48:33 residentsTotalRoommatesAbsentDevs rr_Daughter,rr_Son
+setstate rgr_Residents 2019-05-05 00:48:33 residentsTotalRoommatesAbsentNames Daughter, Son
+setstate rgr_Residents 2019-05-05 00:48:33 residentsTotalRoommatesPresent 3
+setstate rgr_Residents 2019-05-05 00:48:33 residentsTotalRoommatesPresentDevs rr_Baby,rr_Father,rr_Mother
+setstate rgr_Residents 2019-05-05 00:48:33 residentsTotalRoommatesPresentNames Baby, Father, Mother
 setstate rgr_Residents 2019-05-04 13:05:34 residentsTotalWakeup 0
 setstate rgr_Residents 2019-05-04 13:05:34 residentsTotalWakeupDevs -
 setstate rgr_Residents 2019-05-04 13:05:34 residentsTotalWakeupNames -
@@ -1981,150 +1982,150 @@ setstate rgr_Residents 2019-05-04 13:05:34 residentsTotalWayhomeDelayedDevs -
 setstate rgr_Residents 2019-05-04 13:05:34 residentsTotalWayhomeDelayedNames -
 setstate rgr_Residents 2019-05-04 13:05:34 residentsTotalWayhomeDevs -
 setstate rgr_Residents 2019-05-04 13:05:34 residentsTotalWayhomeNames -
-setstate rgr_Residents 2019-05-04 20:23:02 state home
+setstate rgr_Residents 2019-05-05 00:48:33 state home
 setstate rp_Dog home
 setstate rp_Dog 2019-05-04 13:05:34 durTimerAbsence 00:00:00
 setstate rp_Dog 2019-05-04 13:05:34 durTimerAbsence_cr 0
-setstate rp_Dog 2019-05-04 20:23:01 durTimerPresence 00:00:00
-setstate rp_Dog 2019-05-04 20:23:01 durTimerPresence_cr 0
+setstate rp_Dog 2019-05-05 00:47:47 durTimerPresence 00:04:00
+setstate rp_Dog 2019-05-05 00:47:47 durTimerPresence_cr 4
 setstate rp_Dog 2019-05-04 13:05:34 durTimerSleep 00:00:00
 setstate rp_Dog 2019-05-04 13:05:34 durTimerSleep_cr 0
-setstate rp_Dog 2019-05-04 20:23:02 lastArrival 2019-05-04 20:23:02
+setstate rp_Dog 2019-05-05 00:43:47 lastArrival 2019-05-05 00:43:47
 setstate rp_Dog 2019-05-04 13:10:35 lastAwake 2019-05-04 13:10:35
-setstate rp_Dog 2019-05-04 20:23:01 lastDeparture 2019-05-04 20:23:01
-setstate rp_Dog 2019-05-04 20:23:02 lastDurAbsence 00:00:01
-setstate rp_Dog 2019-05-04 20:23:02 lastDurAbsence_cr 0
-setstate rp_Dog 2019-05-04 20:23:01 lastDurPresence 00:04:08
-setstate rp_Dog 2019-05-04 20:23:01 lastDurPresence_cr 4
+setstate rp_Dog 2019-05-05 00:43:46 lastDeparture 2019-05-05 00:43:46
+setstate rp_Dog 2019-05-05 00:43:47 lastDurAbsence 00:00:01
+setstate rp_Dog 2019-05-05 00:43:47 lastDurAbsence_cr 0
+setstate rp_Dog 2019-05-05 00:43:46 lastDurPresence 00:00:32
+setstate rp_Dog 2019-05-05 00:43:46 lastDurPresence_cr 1
 setstate rp_Dog 2019-05-04 13:10:35 lastDurSleep 00:00:01
 setstate rp_Dog 2019-05-04 13:10:35 lastDurSleep_cr 0
 setstate rp_Dog 2019-05-04 13:09:17 lastLocation undefined
-setstate rp_Dog 2019-05-04 20:23:01 lastMood calm
+setstate rp_Dog 2019-05-05 00:43:46 lastMood calm
 setstate rp_Dog 2019-05-04 13:10:34 lastSleep 2019-05-04 13:10:34
-setstate rp_Dog 2019-05-04 20:23:02 lastState absent
+setstate rp_Dog 2019-05-05 00:43:47 lastState absent
 setstate rp_Dog 2019-05-04 13:09:18 location home
-setstate rp_Dog 2019-05-04 20:23:02 mood calm
-setstate rp_Dog 2019-05-04 20:23:02 presence present
-setstate rp_Dog 2019-05-04 20:23:02 state home
+setstate rp_Dog 2019-05-05 00:43:47 mood calm
+setstate rp_Dog 2019-05-05 00:43:47 presence present
+setstate rp_Dog 2019-05-05 00:43:47 state home
 setstate rp_Dog 2019-05-04 13:05:34 wayhome 0
 setstate rr_Baby home
-setstate rr_Baby 2019-05-04 20:23:02 durTimerAbsence 00:00:00
-setstate rr_Baby 2019-05-04 20:23:02 durTimerAbsence_cr 0
-setstate rr_Baby 2019-05-04 20:18:32 durTimerPresence 00:00:00
-setstate rr_Baby 2019-05-04 20:18:32 durTimerPresence_cr 0
+setstate rr_Baby 2019-05-05 00:48:33 durTimerAbsence 00:00:00
+setstate rr_Baby 2019-05-05 00:48:33 durTimerAbsence_cr 0
+setstate rr_Baby 2019-05-05 00:43:12 durTimerPresence 00:00:00
+setstate rr_Baby 2019-05-05 00:43:12 durTimerPresence_cr 0
 setstate rr_Baby 2015-01-04 16:19:19 durTimerSleep 00:00:00
 setstate rr_Baby 2015-01-04 16:19:19 durTimerSleep_cr 0
-setstate rr_Baby 2019-05-04 20:23:02 lastArrival 2019-05-04 20:23:02
+setstate rr_Baby 2019-05-05 00:48:33 lastArrival 2019-05-05 00:48:33
 setstate rr_Baby 2014-02-17 20:45:12 lastAwake 2014-02-17 20:45:12
-setstate rr_Baby 2019-05-04 20:18:32 lastDeparture 2019-05-04 20:18:32
-setstate rr_Baby 2019-05-04 20:23:02 lastDurAbsence 00:04:30
-setstate rr_Baby 2019-05-04 20:23:02 lastDurAbsence_cr 4
-setstate rr_Baby 2019-05-04 20:18:32 lastDurPresence 00:05:07
-setstate rr_Baby 2019-05-04 20:18:32 lastDurPresence_cr 5
+setstate rr_Baby 2019-05-05 00:43:46 lastDeparture 2019-05-05 00:43:46
+setstate rr_Baby 2019-05-05 00:48:33 lastDurAbsence 00:04:47
+setstate rr_Baby 2019-05-05 00:48:33 lastDurAbsence_cr 5
+setstate rr_Baby 2019-05-05 00:43:46 lastDurPresence 00:00:32
+setstate rr_Baby 2019-05-05 00:43:46 lastDurPresence_cr 1
 setstate rr_Baby 2014-02-17 20:45:12 lastDurSleep 30:13:59
 setstate rr_Baby 2019-05-04 13:10:23 lastLocation home
-setstate rr_Baby 2019-05-04 20:18:32 lastMood calm
+setstate rr_Baby 2019-05-05 00:43:46 lastMood calm
 setstate rr_Baby 2014-02-16 14:31:13 lastSleep 2014-02-16 14:31:13
-setstate rr_Baby 2019-05-04 20:23:02 lastState absent
+setstate rr_Baby 2019-05-05 00:48:33 lastState absent
 setstate rr_Baby 2019-05-04 13:10:23 location home
-setstate rr_Baby 2019-05-04 20:23:02 mood calm
-setstate rr_Baby 2019-05-04 20:23:02 presence present
-setstate rr_Baby 2019-05-04 20:23:02 state home
+setstate rr_Baby 2019-05-05 00:48:33 mood calm
+setstate rr_Baby 2019-05-05 00:48:33 presence present
+setstate rr_Baby 2019-05-05 00:48:33 state home
 setstate rr_Baby 2014-02-16 14:30:21 wayhome 0
-setstate rr_Daughter home
-setstate rr_Daughter 2019-05-04 20:23:02 durTimerAbsence 00:00:00
-setstate rr_Daughter 2019-05-04 20:23:02 durTimerAbsence_cr 0
-setstate rr_Daughter 2019-05-04 20:18:32 durTimerPresence 00:00:00
-setstate rr_Daughter 2019-05-04 20:18:32 durTimerPresence_cr 0
+setstate rr_Daughter absent
+setstate rr_Daughter 2019-05-05 00:47:46 durTimerAbsence 00:04:00
+setstate rr_Daughter 2019-05-05 00:47:46 durTimerAbsence_cr 4
+setstate rr_Daughter 2019-05-05 00:43:12 durTimerPresence 00:00:00
+setstate rr_Daughter 2019-05-05 00:43:12 durTimerPresence_cr 0
 setstate rr_Daughter 2015-01-04 16:19:19 durTimerSleep 00:00:00
 setstate rr_Daughter 2015-01-04 16:19:19 durTimerSleep_cr 0
-setstate rr_Daughter 2019-05-04 20:23:02 lastArrival 2019-05-04 20:23:02
+setstate rr_Daughter 2019-05-05 00:43:14 lastArrival 2019-05-05 00:43:14
 setstate rr_Daughter 2014-02-16 14:02:48 lastAwake 2014-02-16 14:02:48
-setstate rr_Daughter 2019-05-04 20:18:32 lastDeparture 2019-05-04 20:18:32
-setstate rr_Daughter 2019-05-04 20:23:02 lastDurAbsence 00:04:30
-setstate rr_Daughter 2019-05-04 20:23:02 lastDurAbsence_cr 4
-setstate rr_Daughter 2019-05-04 20:18:32 lastDurPresence 00:05:07
-setstate rr_Daughter 2019-05-04 20:18:32 lastDurPresence_cr 5
+setstate rr_Daughter 2019-05-05 00:43:46 lastDeparture 2019-05-05 00:43:46
+setstate rr_Daughter 2019-05-05 00:43:14 lastDurAbsence 00:00:02
+setstate rr_Daughter 2019-05-05 00:43:14 lastDurAbsence_cr 0
+setstate rr_Daughter 2019-05-05 00:43:46 lastDurPresence 00:00:32
+setstate rr_Daughter 2019-05-05 00:43:46 lastDurPresence_cr 1
 setstate rr_Daughter 2014-02-16 14:02:48 lastDurSleep 00:08:12
 setstate rr_Daughter 2014-02-16 14:57:59 lastLocation home
-setstate rr_Daughter 2019-05-04 20:18:32 lastMood calm
+setstate rr_Daughter 2019-05-05 00:43:46 lastMood calm
 setstate rr_Daughter 2014-02-16 13:54:36 lastSleep 2014-02-16 13:54:36
-setstate rr_Daughter 2019-05-04 20:23:02 lastState absent
+setstate rr_Daughter 2019-05-05 00:43:46 lastState home
 setstate rr_Daughter 2014-02-16 14:57:59 location underway
-setstate rr_Daughter 2019-05-04 20:23:02 mood calm
-setstate rr_Daughter 2019-05-04 20:23:02 presence present
-setstate rr_Daughter 2019-05-04 20:23:02 state home
+setstate rr_Daughter 2019-05-05 00:43:46 mood -
+setstate rr_Daughter 2019-05-05 00:43:46 presence absent
+setstate rr_Daughter 2019-05-05 00:43:46 state absent
 setstate rr_Daughter 2014-02-16 13:46:26 wayhome 0
 setstate rr_Father home
-setstate rr_Father 2019-05-04 20:23:02 durTimerAbsence 00:00:00
-setstate rr_Father 2019-05-04 20:23:02 durTimerAbsence_cr 0
-setstate rr_Father 2019-05-04 20:18:32 durTimerPresence 00:00:00
-setstate rr_Father 2019-05-04 20:18:32 durTimerPresence_cr 0
+setstate rr_Father 2019-05-05 00:48:33 durTimerAbsence 00:00:00
+setstate rr_Father 2019-05-05 00:48:33 durTimerAbsence_cr 0
+setstate rr_Father 2019-05-05 00:43:12 durTimerPresence 00:00:00
+setstate rr_Father 2019-05-05 00:43:12 durTimerPresence_cr 0
 setstate rr_Father 2015-01-04 16:19:19 durTimerSleep 00:00:00
 setstate rr_Father 2015-01-04 16:19:19 durTimerSleep_cr 0
-setstate rr_Father 2019-05-04 20:23:02 lastArrival 2019-05-04 20:23:02
+setstate rr_Father 2019-05-05 00:48:33 lastArrival 2019-05-05 00:48:33
 setstate rr_Father 2019-05-04 13:10:35 lastAwake 2019-05-04 13:10:35
-setstate rr_Father 2019-05-04 20:18:32 lastDeparture 2019-05-04 20:18:32
-setstate rr_Father 2019-05-04 20:23:02 lastDurAbsence 00:04:30
-setstate rr_Father 2019-05-04 20:23:02 lastDurAbsence_cr 4
-setstate rr_Father 2019-05-04 20:18:32 lastDurPresence 00:05:07
-setstate rr_Father 2019-05-04 20:18:32 lastDurPresence_cr 5
+setstate rr_Father 2019-05-05 00:43:46 lastDeparture 2019-05-05 00:43:46
+setstate rr_Father 2019-05-05 00:48:33 lastDurAbsence 00:04:47
+setstate rr_Father 2019-05-05 00:48:33 lastDurAbsence_cr 5
+setstate rr_Father 2019-05-05 00:43:46 lastDurPresence 00:00:32
+setstate rr_Father 2019-05-05 00:43:46 lastDurPresence_cr 1
 setstate rr_Father 2019-05-04 13:10:35 lastDurSleep 00:00:01
 setstate rr_Father 2019-05-04 13:10:35 lastDurSleep_cr 0
 setstate rr_Father 2014-02-16 14:26:52 lastLocation home
-setstate rr_Father 2019-05-04 20:18:32 lastMood calm
+setstate rr_Father 2019-05-05 00:43:46 lastMood calm
 setstate rr_Father 2019-05-04 13:10:34 lastSleep 2019-05-04 13:10:34
-setstate rr_Father 2019-05-04 20:23:02 lastState absent
+setstate rr_Father 2019-05-05 00:48:33 lastState absent
 setstate rr_Father 2014-02-16 14:26:52 location underway
-setstate rr_Father 2019-05-04 20:23:02 mood calm
-setstate rr_Father 2019-05-04 20:23:02 presence present
-setstate rr_Father 2019-05-04 20:23:02 state home
+setstate rr_Father 2019-05-05 00:48:33 mood calm
+setstate rr_Father 2019-05-05 00:48:33 presence present
+setstate rr_Father 2019-05-05 00:48:33 state home
 setstate rr_Father 2014-02-16 13:46:02 wayhome 0
 setstate rr_Mother home
-setstate rr_Mother 2019-05-04 20:23:02 durTimerAbsence 00:00:00
-setstate rr_Mother 2019-05-04 20:23:02 durTimerAbsence_cr 0
-setstate rr_Mother 2019-05-04 20:18:32 durTimerPresence 00:00:00
-setstate rr_Mother 2019-05-04 20:18:32 durTimerPresence_cr 0
+setstate rr_Mother 2019-05-05 00:48:33 durTimerAbsence 00:00:00
+setstate rr_Mother 2019-05-05 00:48:33 durTimerAbsence_cr 0
+setstate rr_Mother 2019-05-05 00:43:12 durTimerPresence 00:00:00
+setstate rr_Mother 2019-05-05 00:43:12 durTimerPresence_cr 0
 setstate rr_Mother 2015-01-04 16:19:19 durTimerSleep 00:00:00
 setstate rr_Mother 2015-01-04 16:19:19 durTimerSleep_cr 0
-setstate rr_Mother 2019-05-04 20:23:02 lastArrival 2019-05-04 20:23:02
-setstate rr_Mother 2019-05-04 20:18:32 lastDeparture 2019-05-04 20:18:32
-setstate rr_Mother 2019-05-04 20:23:02 lastDurAbsence 00:04:30
-setstate rr_Mother 2019-05-04 20:23:02 lastDurAbsence_cr 4
-setstate rr_Mother 2019-05-04 20:18:32 lastDurPresence 00:05:07
-setstate rr_Mother 2019-05-04 20:18:32 lastDurPresence_cr 5
+setstate rr_Mother 2019-05-05 00:48:33 lastArrival 2019-05-05 00:48:33
+setstate rr_Mother 2019-05-05 00:43:46 lastDeparture 2019-05-05 00:43:46
+setstate rr_Mother 2019-05-05 00:48:33 lastDurAbsence 00:04:47
+setstate rr_Mother 2019-05-05 00:48:33 lastDurAbsence_cr 5
+setstate rr_Mother 2019-05-05 00:43:46 lastDurPresence 00:00:32
+setstate rr_Mother 2019-05-05 00:43:46 lastDurPresence_cr 1
 setstate rr_Mother 2014-02-16 14:16:16 lastLocation home
-setstate rr_Mother 2019-05-04 20:18:32 lastMood calm
-setstate rr_Mother 2019-05-04 20:23:02 lastState absent
+setstate rr_Mother 2019-05-05 00:43:46 lastMood calm
+setstate rr_Mother 2019-05-05 00:48:33 lastState absent
 setstate rr_Mother 2014-02-16 14:16:17 location home
-setstate rr_Mother 2019-05-04 20:23:02 mood calm
-setstate rr_Mother 2019-05-04 20:23:02 presence present
-setstate rr_Mother 2019-05-04 20:23:02 state home
+setstate rr_Mother 2019-05-05 00:48:33 mood calm
+setstate rr_Mother 2019-05-05 00:48:33 presence present
+setstate rr_Mother 2019-05-05 00:48:33 state home
 setstate rr_Mother 2014-02-16 13:46:09 wayhome 0
-setstate rr_Son home
-setstate rr_Son 2019-05-04 20:23:02 durTimerAbsence 00:00:00
-setstate rr_Son 2019-05-04 20:23:02 durTimerAbsence_cr 0
-setstate rr_Son 2019-05-04 20:18:32 durTimerPresence 00:00:00
-setstate rr_Son 2019-05-04 20:18:32 durTimerPresence_cr 0
+setstate rr_Son absent
+setstate rr_Son 2019-05-05 00:47:46 durTimerAbsence 00:04:00
+setstate rr_Son 2019-05-05 00:47:46 durTimerAbsence_cr 4
+setstate rr_Son 2019-05-05 00:43:12 durTimerPresence 00:00:00
+setstate rr_Son 2019-05-05 00:43:12 durTimerPresence_cr 0
 setstate rr_Son 2015-01-04 16:19:19 durTimerSleep 00:00:00
 setstate rr_Son 2015-01-04 16:19:19 durTimerSleep_cr 0
-setstate rr_Son 2019-05-04 20:23:02 lastArrival 2019-05-04 20:23:02
+setstate rr_Son 2019-05-05 00:43:14 lastArrival 2019-05-05 00:43:14
 setstate rr_Son 2019-05-04 13:09:50 lastAwake 2019-05-04 13:09:50
-setstate rr_Son 2019-05-04 20:18:32 lastDeparture 2019-05-04 20:18:32
-setstate rr_Son 2019-05-04 20:23:02 lastDurAbsence 00:04:30
-setstate rr_Son 2019-05-04 20:23:02 lastDurAbsence_cr 4
-setstate rr_Son 2019-05-04 20:18:32 lastDurPresence 00:05:07
-setstate rr_Son 2019-05-04 20:18:32 lastDurPresence_cr 5
+setstate rr_Son 2019-05-05 00:43:46 lastDeparture 2019-05-05 00:43:46
+setstate rr_Son 2019-05-05 00:43:14 lastDurAbsence 00:00:02
+setstate rr_Son 2019-05-05 00:43:14 lastDurAbsence_cr 0
+setstate rr_Son 2019-05-05 00:43:46 lastDurPresence 00:00:32
+setstate rr_Son 2019-05-05 00:43:46 lastDurPresence_cr 1
 setstate rr_Son 2019-05-04 13:09:50 lastDurSleep 00:00:03
 setstate rr_Son 2019-05-04 13:09:50 lastDurSleep_cr 0
 setstate rr_Son 2014-02-16 14:58:01 lastLocation home
-setstate rr_Son 2019-05-04 20:18:32 lastMood calm
+setstate rr_Son 2019-05-05 00:43:46 lastMood calm
 setstate rr_Son 2019-05-04 13:09:47 lastSleep 2019-05-04 13:09:47
-setstate rr_Son 2019-05-04 20:23:02 lastState absent
+setstate rr_Son 2019-05-05 00:43:46 lastState home
 setstate rr_Son 2019-05-04 13:09:44 location home
-setstate rr_Son 2019-05-04 20:23:02 mood calm
-setstate rr_Son 2019-05-04 20:23:02 presence present
-setstate rr_Son 2019-05-04 20:23:02 state home
+setstate rr_Son 2019-05-05 00:43:46 mood -
+setstate rr_Son 2019-05-05 00:43:46 presence absent
+setstate rr_Son 2019-05-05 00:43:46 state absent
 setstate rr_Son 2014-02-16 13:46:38 wayhome 0
 setstate sunRise Next: 06:08:52
 setstate sunRise 2019-03-14 20:36:02 state Next: 06:08:52
