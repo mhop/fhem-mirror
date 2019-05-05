@@ -70,6 +70,9 @@ sub RESIDENTS_UpdateReadings (@) {
     my $state_totalRoommates                = 0;
     my $state_totalRoommatesPresent         = 0;
     my $state_totalRoommatesAbsent          = 0;
+    my $state_totalPeople                   = 0;
+    my $state_totalPeoplePresent            = 0;
+    my $state_totalPeopleAbsent             = 0;
     my $residentsDevs_home                  = "-";
     my $residentsDevs_absent                = "-";
     my $residentsDevs_asleep                = "-";
@@ -87,6 +90,8 @@ sub RESIDENTS_UpdateReadings (@) {
     my $residentsDevs_totalPresentPets      = "-";
     my $residentsDevs_totalAbsentRoommates  = "-";
     my $residentsDevs_totalPresentRoommates = "-";
+    my $residentsDevs_totalAbsentPeople     = "-";
+    my $residentsDevs_totalPresentPeople    = "-";
     my $residents_home                      = "-";
     my $residents_absent                    = "-";
     my $residents_asleep                    = "-";
@@ -104,6 +109,8 @@ sub RESIDENTS_UpdateReadings (@) {
     my $residents_totalPresentPets          = "-";
     my $residents_totalAbsentRoommates      = "-";
     my $residents_totalPresentRoommates     = "-";
+    my $residents_totalAbsentPeople         = "-";
+    my $residents_totalPresentPeople        = "-";
     my $wayhome                             = 0;
     my $wayhomeDelayed                      = 0;
     my $wakeup                              = 0;
@@ -127,6 +134,7 @@ sub RESIDENTS_UpdateReadings (@) {
     # count child states for ROOMMATE devices
     foreach my $roommate (@registeredRoommates) {
         $state_total++;
+        $state_totalPeople++;
         $state_totalRoommates++;
 
         my $roommateName =
@@ -148,11 +156,16 @@ sub RESIDENTS_UpdateReadings (@) {
               if ( $roommateName ne "" && $residents_home eq "-" );
 
             $state_totalPresent++;
+            $state_totalPeoplePresent++;
             $state_totalRoommatesPresent++;
             $residentsDevs_totalPresent .= "," . $roommate
               if ( $residentsDevs_totalPresent ne "-" );
             $residentsDevs_totalPresent = $roommate
               if ( $residentsDevs_totalPresent eq "-" );
+            $residentsDevs_totalPresentPeople .= "," . $roommate
+              if ( $residentsDevs_totalPresentPeople ne "-" );
+            $residentsDevs_totalPresentPeople = $roommate
+              if ( $residentsDevs_totalPresentPeople eq "-" );
             $residentsDevs_totalPresentRoommates .= "," . $roommate
               if ( $residentsDevs_totalPresentRoommates ne "-" );
             $residentsDevs_totalPresentRoommates = $roommate
@@ -161,6 +174,12 @@ sub RESIDENTS_UpdateReadings (@) {
               if ( $roommateName ne "" && $residents_totalPresent ne "-" );
             $residents_totalPresent = $roommateName
               if ( $roommateName ne "" && $residents_totalPresent eq "-" );
+            $residents_totalPresentPeople .= ", " . $roommateName
+              if ( $roommateName ne ""
+                && $residents_totalPresentPeople ne "-" );
+            $residents_totalPresentPeople = $roommateName
+              if ( $roommateName ne ""
+                && $residents_totalPresentPeople eq "-" );
             $residents_totalPresentRoommates .= ", " . $roommateName
               if ( $roommateName ne ""
                 && $residents_totalPresentRoommates ne "-" );
@@ -183,11 +202,16 @@ sub RESIDENTS_UpdateReadings (@) {
               if ( $roommateName ne "" && $residents_gotosleep eq "-" );
 
             $state_totalPresent++;
+            $state_totalPeoplePresent++;
             $state_totalRoommatesPresent++;
             $residentsDevs_totalPresent .= "," . $roommate
               if ( $residentsDevs_totalPresent ne "-" );
             $residentsDevs_totalPresent = $roommate
               if ( $residentsDevs_totalPresent eq "-" );
+            $residentsDevs_totalPresentPeople .= "," . $roommate
+              if ( $residentsDevs_totalPresentPeople ne "-" );
+            $residentsDevs_totalPresentPeople = $roommate
+              if ( $residentsDevs_totalPresentPeople eq "-" );
             $residentsDevs_totalPresentRoommates .= "," . $roommate
               if ( $residentsDevs_totalPresentRoommates ne "-" );
             $residentsDevs_totalPresentRoommates = $roommate
@@ -196,6 +220,12 @@ sub RESIDENTS_UpdateReadings (@) {
               if ( $roommateName ne "" && $residents_totalPresent ne "-" );
             $residents_totalPresent = $roommateName
               if ( $roommateName ne "" && $residents_totalPresent eq "-" );
+            $residents_totalPresentPeople .= ", " . $roommateName
+              if ( $roommateName ne ""
+                && $residents_totalPresentPeople ne "-" );
+            $residents_totalPresentPeople = $roommateName
+              if ( $roommateName ne ""
+                && $residents_totalPresentPeople eq "-" );
             $residents_totalPresentRoommates .= ", " . $roommateName
               if ( $roommateName ne ""
                 && $residents_totalPresentRoommates ne "-" );
@@ -216,11 +246,16 @@ sub RESIDENTS_UpdateReadings (@) {
               if ( $roommateName ne "" && $residents_asleep eq "-" );
 
             $state_totalPresent++;
+            $state_totalPeoplePresent++;
             $state_totalRoommatesPresent++;
             $residentsDevs_totalPresent .= "," . $roommate
               if ( $residentsDevs_totalPresent ne "-" );
             $residentsDevs_totalPresent = $roommate
               if ( $residentsDevs_totalPresent eq "-" );
+            $residentsDevs_totalPresentPeople .= "," . $roommate
+              if ( $residentsDevs_totalPresentPeople ne "-" );
+            $residentsDevs_totalPresentPeople = $roommate
+              if ( $residentsDevs_totalPresentPeople eq "-" );
             $residentsDevs_totalPresentRoommates .= "," . $roommate
               if ( $residentsDevs_totalPresentRoommates ne "-" );
             $residentsDevs_totalPresentRoommates = $roommate
@@ -229,6 +264,12 @@ sub RESIDENTS_UpdateReadings (@) {
               if ( $roommateName ne "" && $residents_totalPresent ne "-" );
             $residents_totalPresent = $roommateName
               if ( $roommateName ne "" && $residents_totalPresent eq "-" );
+            $residents_totalPresentPeople .= ", " . $roommateName
+              if ( $roommateName ne ""
+                && $residents_totalPresentPeople ne "-" );
+            $residents_totalPresentPeople = $roommateName
+              if ( $roommateName ne ""
+                && $residents_totalPresentPeople eq "-" );
             $residents_totalPresentRoommates .= ", " . $roommateName
               if ( $roommateName ne ""
                 && $residents_totalPresentRoommates ne "-" );
@@ -249,11 +290,16 @@ sub RESIDENTS_UpdateReadings (@) {
               if ( $roommateName ne "" && $residents_awoken eq "-" );
 
             $state_totalPresent++;
+            $state_totalPeoplePresent++;
             $state_totalRoommatesPresent++;
             $residentsDevs_totalPresent .= "," . $roommate
               if ( $residentsDevs_totalPresent ne "-" );
             $residentsDevs_totalPresent = $roommate
               if ( $residentsDevs_totalPresent eq "-" );
+            $residentsDevs_totalPresentPeople .= "," . $roommate
+              if ( $residentsDevs_totalPresentPeople ne "-" );
+            $residentsDevs_totalPresentPeople = $roommate
+              if ( $residentsDevs_totalPresentPeople eq "-" );
             $residentsDevs_totalPresentRoommates .= "," . $roommate
               if ( $residentsDevs_totalPresentRoommates ne "-" );
             $residentsDevs_totalPresentRoommates = $roommate
@@ -262,6 +308,12 @@ sub RESIDENTS_UpdateReadings (@) {
               if ( $roommateName ne "" && $residents_totalPresent ne "-" );
             $residents_totalPresent = $roommateName
               if ( $roommateName ne "" && $residents_totalPresent eq "-" );
+            $residents_totalPresentPeople .= ", " . $roommateName
+              if ( $roommateName ne ""
+                && $residents_totalPresentPeople ne "-" );
+            $residents_totalPresentPeople = $roommateName
+              if ( $roommateName ne ""
+                && $residents_totalPresentPeople eq "-" );
             $residents_totalPresentRoommates .= ", " . $roommateName
               if ( $roommateName ne ""
                 && $residents_totalPresentRoommates ne "-" );
@@ -282,11 +334,16 @@ sub RESIDENTS_UpdateReadings (@) {
               if ( $roommateName ne "" && $residents_absent eq "-" );
 
             $state_totalAbsent++;
+            $state_totalPeopleAbsent++;
             $state_totalRoommatesAbsent++;
             $residentsDevs_totalAbsent .= "," . $roommate
               if ( $residentsDevs_totalAbsent ne "-" );
             $residentsDevs_totalAbsent = $roommate
               if ( $residentsDevs_totalAbsent eq "-" );
+            $residentsDevs_totalAbsentPeople .= "," . $roommate
+              if ( $residentsDevs_totalAbsentPeople ne "-" );
+            $residentsDevs_totalAbsentPeople = $roommate
+              if ( $residentsDevs_totalAbsentPeople eq "-" );
             $residentsDevs_totalAbsentRoommates .= "," . $roommate
               if ( $residentsDevs_totalAbsentRoommates ne "-" );
             $residentsDevs_totalAbsentRoommates = $roommate
@@ -295,6 +352,12 @@ sub RESIDENTS_UpdateReadings (@) {
               if ( $roommateName ne "" && $residents_totalAbsent ne "-" );
             $residents_totalAbsent = $roommateName
               if ( $roommateName ne "" && $residents_totalAbsent eq "-" );
+            $residents_totalAbsentPeople .= ", " . $roommateName
+              if ( $roommateName ne ""
+                && $residents_totalAbsentPeople ne "-" );
+            $residents_totalAbsentPeople = $roommateName
+              if ( $roommateName ne ""
+                && $residents_totalAbsentPeople eq "-" );
             $residents_totalAbsentRoommates .= ", " . $roommateName
               if ( $roommateName ne ""
                 && $residents_totalAbsentRoommates ne "-" );
@@ -315,11 +378,16 @@ sub RESIDENTS_UpdateReadings (@) {
               if ( $roommateName ne "" && $residents_gone eq "-" );
 
             $state_totalAbsent++;
+            $state_totalPeopleAbsent++;
             $state_totalRoommatesAbsent++;
             $residentsDevs_totalAbsent .= "," . $roommate
               if ( $residentsDevs_totalAbsent ne "-" );
             $residentsDevs_totalAbsent = $roommate
               if ( $residentsDevs_totalAbsent eq "-" );
+            $residentsDevs_totalAbsentPeople .= "," . $roommate
+              if ( $residentsDevs_totalAbsentPeople ne "-" );
+            $residentsDevs_totalAbsentPeople = $roommate
+              if ( $residentsDevs_totalAbsentPeople eq "-" );
             $residentsDevs_totalAbsentRoommates .= "," . $roommate
               if ( $residentsDevs_totalAbsentRoommates ne "-" );
             $residentsDevs_totalAbsentRoommates = $roommate
@@ -328,6 +396,12 @@ sub RESIDENTS_UpdateReadings (@) {
               if ( $roommateName ne "" && $residents_totalAbsent ne "-" );
             $residents_totalAbsent = $roommateName
               if ( $roommateName ne "" && $residents_totalAbsent eq "-" );
+            $residents_totalAbsentPeople .= ", " . $roommateName
+              if ( $roommateName ne ""
+                && $residents_totalAbsentPeople ne "-" );
+            $residents_totalAbsentPeople = $roommateName
+              if ( $roommateName ne ""
+                && $residents_totalAbsentPeople eq "-" );
             $residents_totalAbsentRoommates .= ", " . $roommateName
               if ( $roommateName ne ""
                 && $residents_totalAbsentRoommates ne "-" );
@@ -661,14 +735,26 @@ sub RESIDENTS_UpdateReadings (@) {
         if ( ReadingsVal( $guest, "state", "initialized" ) eq "home" ) {
             $state_home++;
             $state_totalPresent++;
+            $state_totalPeoplePresent++;
             $state_totalGuestsPresent++;
+            $state_totalPeople++;
             $state_totalGuests++;
             $state_total++;
 
+            $residentsDevs_totalPresentPeople .= "," . $guest
+              if ( $residentsDevs_totalPresentPeople ne "-" );
+            $residentsDevs_totalPresentPeople = $guest
+              if ( $residentsDevs_totalPresentPeople eq "-" );
             $residentsDevs_totalPresentGuests .= "," . $guest
               if ( $residentsDevs_totalPresentGuests ne "-" );
             $residentsDevs_totalPresentGuests = $guest
               if ( $residentsDevs_totalPresentGuests eq "-" );
+            $residents_totalPresentPeople .= ", " . $guestName
+              if ( $guestName ne ""
+                && $residents_totalPresentPeople ne "-" );
+            $residents_totalPresentPeople = $guestName
+              if ( $guestName ne ""
+                && $residents_totalPresentPeople eq "-" );
             $residents_totalPresentGuests .= ", " . $guestName
               if ( $guestName ne ""
                 && $residents_totalPresentGuests ne "-" );
@@ -691,14 +777,26 @@ sub RESIDENTS_UpdateReadings (@) {
         elsif ( ReadingsVal( $guest, "state", "initialized" ) eq "gotosleep" ) {
             $state_gotosleep++;
             $state_totalPresent++;
+            $state_totalPeoplePresent++;
             $state_totalGuestsPresent++;
+            $state_totalPeople++;
             $state_totalGuests++;
             $state_total++;
 
+            $residentsDevs_totalPresentPeople .= "," . $guest
+              if ( $residentsDevs_totalPresentPeople ne "-" );
+            $residentsDevs_totalPresentPeople = $guest
+              if ( $residentsDevs_totalPresentPeople eq "-" );
             $residentsDevs_totalPresentGuests .= "," . $guest
               if ( $residentsDevs_totalPresentGuests ne "-" );
             $residentsDevs_totalPresentGuests = $guest
               if ( $residentsDevs_totalPresentGuests eq "-" );
+            $residents_totalPresentPeople .= ", " . $guestName
+              if ( $guestName ne ""
+                && $residents_totalPresentPeople ne "-" );
+            $residents_totalPresentPeople = $guestName
+              if ( $guestName ne ""
+                && $residents_totalPresentPeople eq "-" );
             $residents_totalPresentGuests .= ", " . $guestName
               if ( $guestName ne ""
                 && $residents_totalPresentGuests ne "-" );
@@ -721,14 +819,26 @@ sub RESIDENTS_UpdateReadings (@) {
         elsif ( ReadingsVal( $guest, "state", "initialized" ) eq "asleep" ) {
             $state_asleep++;
             $state_totalPresent++;
+            $state_totalPeoplePresent++;
             $state_totalGuestsPresent++;
+            $state_totalPeople++;
             $state_totalGuests++;
             $state_total++;
 
+            $residentsDevs_totalPresentPeople .= "," . $guest
+              if ( $residentsDevs_totalPresentPeople ne "-" );
+            $residentsDevs_totalPresentPeople = $guest
+              if ( $residentsDevs_totalPresentPeople eq "-" );
             $residentsDevs_totalPresentGuests .= "," . $guest
               if ( $residentsDevs_totalPresentGuests ne "-" );
             $residentsDevs_totalPresentGuests = $guest
               if ( $residentsDevs_totalPresentGuests eq "-" );
+            $residents_totalPresentPeople .= ", " . $guestName
+              if ( $guestName ne ""
+                && $residents_totalPresentPeople ne "-" );
+            $residents_totalPresentPeople = $guestName
+              if ( $guestName ne ""
+                && $residents_totalPresentPeople eq "-" );
             $residents_totalPresentGuests .= ", " . $guestName
               if ( $guestName ne ""
                 && $residents_totalPresentGuests ne "-" );
@@ -751,14 +861,26 @@ sub RESIDENTS_UpdateReadings (@) {
         elsif ( ReadingsVal( $guest, "state", "initialized" ) eq "awoken" ) {
             $state_awoken++;
             $state_totalPresent++;
+            $state_totalPeoplePresent++;
             $state_totalGuestsPresent++;
+            $state_totalPeople++;
             $state_totalGuests++;
             $state_total++;
 
+            $residentsDevs_totalPresentPeople .= "," . $guest
+              if ( $residentsDevs_totalPresentPeople ne "-" );
+            $residentsDevs_totalPresentPeople = $guest
+              if ( $residentsDevs_totalPresentPeople eq "-" );
             $residentsDevs_totalPresentGuests .= "," . $guest
               if ( $residentsDevs_totalPresentGuests ne "-" );
             $residentsDevs_totalPresentGuests = $guest
               if ( $residentsDevs_totalPresentGuests eq "-" );
+            $residents_totalPresentPeople .= ", " . $guestName
+              if ( $guestName ne ""
+                && $residents_totalPresentPeople ne "-" );
+            $residents_totalPresentPeople = $guestName
+              if ( $guestName ne ""
+                && $residents_totalPresentPeople eq "-" );
             $residents_totalPresentGuests .= ", " . $guestName
               if ( $guestName ne ""
                 && $residents_totalPresentGuests ne "-" );
@@ -781,14 +903,26 @@ sub RESIDENTS_UpdateReadings (@) {
         elsif ( ReadingsVal( $guest, "state", "initialized" ) eq "absent" ) {
             $state_absent++;
             $state_totalAbsent++;
+            $state_totalPeopleAbsent++;
             $state_totalGuestsAbsent++;
+            $state_totalPeople++;
             $state_totalGuests++;
             $state_total++;
 
+            $residentsDevs_totalAbsentPeople .= "," . $guest
+              if ( $residentsDevs_totalAbsentPeople ne "-" );
+            $residentsDevs_totalAbsentPeople = $guest
+              if ( $residentsDevs_totalAbsentPeople eq "-" );
             $residentsDevs_totalAbsentGuests .= "," . $guest
               if ( $residentsDevs_totalAbsentGuests ne "-" );
             $residentsDevs_totalAbsentGuests = $guest
               if ( $residentsDevs_totalAbsentGuests eq "-" );
+            $residents_totalAbsentPeople .= ", " . $guestName
+              if ( $guestName ne ""
+                && $residents_totalAbsentPeople ne "-" );
+            $residents_totalAbsentPeople = $guestName
+              if ( $guestName ne ""
+                && $residents_totalAbsentPeople eq "-" );
             $residents_totalAbsentGuests .= ", " . $guestName
               if ( $guestName ne ""
                 && $residents_totalAbsentGuests ne "-" );
@@ -950,6 +1084,33 @@ sub RESIDENTS_UpdateReadings (@) {
         "residentsTotalRoommatesAbsentNames",
         $residents_totalAbsentRoommates
     );
+
+    readingsBulkUpdateIfChanged( $hash, "residentsTotalPeople",
+        $state_totalPeople );
+
+    readingsBulkUpdateIfChanged( $hash, "residentsTotalPeoplePresent",
+        $state_totalPeoplePresent );
+
+    readingsBulkUpdateIfChanged(
+        $hash,
+        "residentsTotalPeoplePresentDevs",
+        $residentsDevs_totalPresentPeople
+    );
+
+    readingsBulkUpdateIfChanged( $hash, "residentsTotalPeoplePresentNames",
+        $residents_totalPresentPeople );
+
+    readingsBulkUpdateIfChanged( $hash, "residentsTotalPeopleAbsent",
+        $state_totalPeopleAbsent );
+
+    readingsBulkUpdateIfChanged(
+        $hash,
+        "residentsTotalPeopleAbsentDevs",
+        $residentsDevs_totalAbsentPeople
+    );
+
+    readingsBulkUpdateIfChanged( $hash, "residentsTotalPeopleAbsentNames",
+        $residents_totalAbsentPeople );
 
     readingsBulkUpdateIfChanged( $hash, "residentsTotalPresent",
         $state_totalPresent );
@@ -1574,26 +1735,50 @@ sub RESIDENTS_UpdateReadings (@) {
           <li>
             <b>residentsTotalGuestsPresentNames</b> - device alias of all active guests who are currently at home
           </li>
+
+
+
           <li>
-            <b>residentsTotalPets</b> - number of active pets who are currently treated as part of the residents scope
+            <b>residentsTotalPeople</b> - number of active people who are currently treated as part of the residents scope
           </li>
           <li>
-            <b>residentsTotalPetsAbsent</b> - number of all active pets who are currently underway
+            <b>residentsTotalPeopleAbsent</b> - number of all active people who are currently underway
           </li>
           <li>
-            <b>residentsTotalPetsAbsentDevs</b> - device name of all active pets who are currently underway
+            <b>residentsTotalPeopleAbsentDevs</b> - device name of all active people who are currently underway
           </li>
           <li>
-            <b>residentsTotalPetsAbsentNames</b> - device alias of all active pets who are currently underway
+            <b>residentsTotalPeopleAbsentNames</b> - device alias of all active people who are currently underway
           </li>
           <li>
-            <b>residentsTotalPetsPresent</b> - number of all active pets who are currently at home
+            <b>residentsTotalPeoplePresent</b> - number of all active people who are currently at home
           </li>
           <li>
-            <b>residentsTotalPetsPresentDevs</b> - device name of all active pets who are currently at home
+            <b>residentsTotalPeoplePresentDevs</b> - device name of all active people who are currently at home
           </li>
           <li>
-            <b>residentsTotalPetsPresentNames</b> - device alias of all active pets who are currently at home
+            <b>residentsTotalPeoplePresentNames</b> - device alias of all active people who are currently at home
+          </li>
+          <li>
+            <b>residentsTotalPets</b> - number of pets treated as being a permanent resident
+          </li>
+          <li>
+            <b>residentsTotalPetsAbsent</b> - number of all pets who are currently underway
+          </li>
+          <li>
+            <b>residentsTotalPetsAbsentDevs</b> - device name of all pets who are currently underway
+          </li>
+          <li>
+            <b>residentsTotalPetsAbsentNames</b> - device alias of all pets who are currently underway
+          </li>
+          <li>
+            <b>residentsTotalPetsPresent</b> - number of all pets who are currently at home
+          </li>
+          <li>
+            <b>residentsTotalPetsPresentDevs</b> - device name of all pets who are currently at home
+          </li>
+          <li>
+            <b>residentsTotalPetsPresentNames</b> - device alias of all pets who are currently at home
           </li>
           <li>
             <b>residentsTotalRoommates</b> - number of residents treated as being a permanent resident
@@ -1968,7 +2153,7 @@ sub RESIDENTS_UpdateReadings (@) {
             <b>residentsTotalAbsentNames</b> - Ger&auml;tealias aller aktiven Bewohner, die unterwegs sind
           </li>
           <li>
-            <b>residentsTotalGuests</b> - Anzahl der aktiven G&auml;ste, welche momentan du den Bewohnern dazugez&auml;hlt werden
+            <b>residentsTotalGuests</b> - Anzahl der aktiven G&auml;ste, welche momentan zu den Bewohnern dazugez&auml;hlt werden
           </li>
           <li>
             <b>residentsTotalGuestsAbsent</b> - Anzahl der aktiven G&auml;ste, die momentan unterwegs sind
@@ -1989,25 +2174,46 @@ sub RESIDENTS_UpdateReadings (@) {
             <b>residentsTotalGuestsPresentNames</b> - Ger&auml;tealias der aktiven G&auml;ste, die momentan zu Hause sind
           </li>
           <li>
-            <b>residentsTotalPets</b> - Anzahl der aktiven G&auml;ste, welche momentan du den Bewohnern dazugez&auml;hlt werden
+            <b>residentsTotalPeople</b> - Anzahl der aktiven Personen, welche momentan zu den Bewohnern dazugez&auml;hlt werden
           </li>
           <li>
-            <b>residentsTotalPetsAbsent</b> - Anzahl der aktiven G&auml;ste, die momentan unterwegs sind
+            <b>residentsTotalPeopleAbsent</b> - Anzahl der aktiven Personen, die momentan unterwegs sind
           </li>
           <li>
-            <b>residentsTotalPetsAbsentDevs</b> - Ger&auml;tename der aktiven G&auml;ste, die momentan unterwegs sind
+            <b>residentsTotalPeopleAbsentDevs</b> - Ger&auml;tename der aktiven Personen, die momentan unterwegs sind
           </li>
           <li>
-            <b>residentsTotalPetsAbsentNames</b> - Ger&auml;tealias der aktiven G&auml;ste, die momentan unterwegs sind
+            <b>residentsTotalPeopleAbsentNames</b> - Ger&auml;tealias der aktiven Personen, die momentan unterwegs sind
           </li>
           <li>
-            <b>residentsTotalPetsPresent</b> - Anzahl der aktiven G&auml;ste, die momentan zu Hause sind
+            <b>residentsTotalPeoplePresent</b> - Anzahl der aktiven Personen, die momentan zu Hause sind
           </li>
           <li>
-            <b>residentsTotalPetsPresentDevs</b> - Ger&auml;tename der aktiven G&auml;ste, die momentan zu Hause sind
+            <b>residentsTotalPeoplePresentDevs</b> - Ger&auml;tename der aktiven Personen, die momentan zu Hause sind
           </li>
           <li>
-            <b>residentsTotalPetsPresentNames</b> - Ger&auml;tealias der aktiven G&auml;ste, die momentan zu Hause sind
+            <b>residentsTotalPeoplePresentNames</b> - Ger&auml;tealias der aktiven Personen, die momentan zu Hause sind
+          </li>
+          <li>
+            <b>residentsTotalPets</b> - Anzahl der Haustiere, die als permanente Bewohner behandelt werden
+          </li>
+          <li>
+            <b>residentsTotalPetsAbsent</b> - Anzahl der Haustiere, die momentan unterwegs sind
+          </li>
+          <li>
+            <b>residentsTotalPetsAbsentDevs</b> - Ger&auml;tename der Haustiere, die momentan unterwegs sind
+          </li>
+          <li>
+            <b>residentsTotalPetsAbsentNames</b> - Ger&auml;tealias der Haustiere, die momentan unterwegs sind
+          </li>
+          <li>
+            <b>residentsTotalPetsPresent</b> - Anzahl der Haustiere, die momentan zu Hause sind
+          </li>
+          <li>
+            <b>residentsTotalPetsPresentDevs</b> - Ger&auml;tename der Haustiere, die momentan zu Hause sind
+          </li>
+          <li>
+            <b>residentsTotalPetsPresentNames</b> - Ger&auml;tealias der Haustiere, die momentan zu Hause sind
           </li>
           <li>
             <b>residentsTotalRoommates</b> - Anzahl der Bewohner, die als permanente Bewohner behandelt werden
