@@ -624,7 +624,8 @@ CommandUsb($$)
           # Send reset (optional)
           if(defined($thash->{init})) {
             DevIo_SimpleWrite($hash, $thash->{init}, 0);
-            DevIo_TimeoutRead($hash, $thash->{timeout} ? $thash->{timeout}:0.5);
+            DevIo_SimpleReadWithTimeout($hash,
+                                    $thash->{timeout} ? $thash->{timeout}:0.5);
           }
 
           # Clear the USB buffer
