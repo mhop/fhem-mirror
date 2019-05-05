@@ -1159,7 +1159,72 @@ CUL_TCM97001_Parse($$)
       }
     }
     
-    
+    if ($readedModel eq "FreeTec" || (hex($a[0]) == 0x9 && hex($a[7]) == 0 && hex($a[8]) == 0 && $readedModel eq "Unknown")) {
+        # Protocol FreeTec Pool Thermometer NX-9193-917 start everytime with 1001
+        # e.g. 90910DE008DB	   1001 0000 1001 0001 0000 1101 1110 0000 0000 1000 1101 1011
+        #                      A    B    C    D    E    F    G    H    I    J    K    L
+        
+        # A   = Startbit 1001
+        # B+C = Random Address
+        # D   = Bit 1 Battery, 2 Mode, 3+4 Channel 
+        # E   = ???? (might be negative Temperature but not tested)
+        # F+G = Temperature (while in Celsius Mode)
+        # H+I = 0000 0000 for Thermometer
+        # J   = ????
+        # K   = ????
+        # L   = ????
+        
+        
+        my $freeTecId = hex($a[1] . $a[2]);
+        
+        $def = $modules{CUL_TCM97001}{defptr}{$freeTecId};
+        
+        $temp    = (hex($a[4].$a[5].$a[6])) & 0x3FFF;  
+        
+        $temp = $temp / 10;
+
+        if (checkValues($temp, $humidity)) {
+            $channel = (hex($a[3])) & 0x3;
+            $batbit = (hex($a[3]) & 0x8) >> 3;
+            $batbit = ~$batbit & 0x1; # Bat bit umdrehen
+            $mode = (hex($a[3]) & 0x4) >> 2;
+            
+            $model="FreeTec";
+            
+            if ($deviceCode ne $idType1)  # new naming convention
+         	{	
+		      	if ( $enableLongIDs == TRUE || (($longids != "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
+              	{
+		             Log3 $hash,4, "CUL_TCM97001 using longid: $longids model: $model";
+               	} else {
+		             $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
+               	}
+         	}     
+          
+          	$def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
+            if($def) {
+              $name = $def->{NAME};
+            }         
+            if(!$def) {
+                Log3 $name, 2, "CUL_TCM97001 Unknown device $deviceCode, please define it";
+                return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
+            }
+            if (defined($humidity)) {
+                if ($humidity >= 20) {
+                  $hashumidity = TRUE;
+                }  
+            }  
+            $hasbatcheck = TRUE;
+            $hasmode = TRUE;
+            $packageOK = TRUE;
+            $haschannel = TRUE;
+            
+            $readedModel=$model;
+        } else {
+            $name = "Unknown";
+        }
+    }
+
       #Log3 $name, 4, "CUL_TCM97001: CRC for TCM21.... Failed, checking other protocolls";
       # Check for Prologue
     if ($readedModel eq "Prologue" || (hex($a[0]) == 0x9 && $readedModel eq "Unknown")) {
@@ -1230,7 +1295,6 @@ CUL_TCM97001_Parse($$)
             $name = "Unknown";
         }
     } 
-    
     if ($readedModel eq "NC_WS" || (hex($a[0]) == 0x5 && $readedModel eq "Unknown")) {
       # Implementation from Femduino
       # PEARL NC7159, LogiLink WS0002
@@ -1732,6 +1796,15 @@ CUL_TCM97001_Parse($$)
 #    }
     if ($hashumidity == TRUE) {
       readingsBulkUpdate($def, $msgtypeH, $valH);
+    }
+
+    # Update Temperature for FreeTec Pool Thermometer 
+    if($model eq "FreeTec") 
+    {
+      $msgtype = "temperature";
+      $val = sprintf("%2.1f", ($temp) );
+      $state="T: $val";
+      readingsBulkUpdate($def, $msgtype, $val);
     }
     
     readingsBulkUpdate($def, "state", $state);
