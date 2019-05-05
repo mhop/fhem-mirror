@@ -767,8 +767,7 @@ attr DEVICE readingList \
   shellies/DEVNAME/temperature:.* temperature\
   shellies/DEVNAME/overtemperature:.* overtemperature\
   shellies/DEVNAME/relay/0/energy:.* relay_0_energy\
-  shellies/DEVNAME/longpush/0:.* longpush_0\
-  shellies/announce:.* { json2nameValue($EVENT) }
+  shellies/DEVNAME/longpush/0:.* longpush_0
 attr DEVICE devStateIcon true:10px-kreis-gruen false:10px-kreis-rot on:on:relay0+off off:off:relay0+on  	
 attr DEVICE stateFormat <a href="http://ip" target="_blank">ip</a>\
 online\
@@ -1179,14 +1178,14 @@ par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEV
 par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/][^/]+[/][^/]+[/]([^/]+)[/].*:, ? $1 : undef }
 deletereading -q DEVICE .*_.*
 attr DEVICE icon light_control
-attr DEVICE eventMap /set_white:Weiss/night_mode:Nacht/white_mode:white/on:on/off:off/ON:on/OFF:off/next_mode:Mode/mode_speed_up:Faster/mode_speed_down:Slower/level_up:Up/level_down:Down/
-attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name)}
+attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name,'hex',1)}
 attr DEVICE readingList \
   BASE_ID/states/REMOTE_ID/BULB_TYPE/GROUP_ID:.* { json2nameValue($EVENT) }\
   BASE_ID/states/REMOTE_ID/BULB_TYPE/0:.* { json2nameValue($EVENT) }\
   BASE_ID/updates/REMOTE_ID/BULB_TYPE/GROUP_ID:.* { json2nameValue($EVENT) }\
   BASE_ID/updates/REMOTE_ID/BULB_TYPE/0:.* { json2nameValue($EVENT) }
-attr DEVICE setList\
+attr DEVICE setExtensionsEvent 1
+attr DEVICE setList \
   on BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"status":"ON"}\
   off BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"status":"OFF"}\
   brightness:colorpicker,BRI,0,15,255 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
@@ -1197,12 +1196,13 @@ attr DEVICE setList\
   program:uzsuSelectRadio,Mode,Faster,Slower BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"command":"$EVTPART1"}\
   mode:select,0,1,2,3,4,5,6,7,8 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
   dim:uzsuSelectRadio,Up,Down BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"command":"$EVTPART1"}
+attr DEVICE userReadings hex:color_r.* {Color::rgb2hex(ReadingsVal($name,"color_r",255),ReadingsVal($name,"color_g",255),ReadingsVal($name,"color_b",255))}, hue:bulb_mode.*white {"0"}
 attr DEVICE webCmd on:off:brightness:dim:hue:command:color_temp:program:saturation:mode
-attr DEVICE webCmdLabel    An:Aus\
+attr DEVICE webCmdLabel An:Aus\
   :Helligkeit:Dimmen\
   :HUE:Command\
   :Farb-Temp:Programm\
   :Sättigung:Modus
-attr DEVICE setStateList on off
+attr DEVICE eventMap /set_white:Weiss/night_mode:Nacht/white_mode:white/on:on/off:off/ON:on/OFF:off/next_mode:Mode/mode_speed_up:Faster/mode_speed_down:Slower/level_up:Up/level_down:Down/
 attr DEVICE model X_01x_esp_milight_hub_max_features_bulb
 
