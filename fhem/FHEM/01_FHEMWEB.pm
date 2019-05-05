@@ -737,7 +737,8 @@ sub
 FW_closeConn($)
 {
   my ($hash) = @_;
-  if(!$hash->{inform} && !$hash->{BUF}) { # Forum #41125
+  # Forum #41125, 88470
+  if(!$hash->{inform} && !$hash->{BUF} && !defined($hash->{".WRITEBUFFER"})) {
     my $cc = AttrVal($hash->{SNAME}, "closeConn",
                      $FW_userAgent =~ m/(iPhone|iPad|iPod)/);
     if(!$FW_httpheader{Connection} || $cc) {
