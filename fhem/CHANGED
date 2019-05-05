@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bufix:   55_DWD_OpenData: SunUp calculation (forum #83097 msg #931972)
  - feature: 10_RESIDENTS: add home alone mode
  - new:     20_PET: new RESIDENTS module type for pets at home
  - bugfix:  73_AutoShuttersControl: fix bugs and logic problems

@@ -56,6 +56,540 @@ This copyright notice MUST APPEAR in all copies of the script!
 
 =cut
 
+package AstroSun;
+
+use strict;
+use warnings;
+
+use Math::Trig ':pi';
+use POSIX;
+use Time::Local;
+use Time::Piece;
+
+require Exporter;
+our $VERSION   = 1.000.001;
+our @ISA       = qw(Exporter);
+our @EXPORT    = qw(AzimuthElevation RiseSet);
+our @EXPORT_OK = qw(EpochToJulianDate JulianDateToEpoch);
+
+
+=head2 EpochToJulianDate(;$)
+
+=over
+
+=item * param time: epoch time [s], optional, default: now
+
+=item * return Julian date
+
+=back
+
+=cut
+
+sub EpochToJulianDate(;$) {
+  my ($epoch) = @_;
+
+  if (!defined($epoch)) {
+    $epoch = time();
+  }
+
+  return gmtime($epoch)->julian_day;
+}
+
+=head2 EpochToGreenwichMeanSideralDate(;$)
+
+Copyright (c) Plataforma Solar de Almerýa, Spain
+
+simplified algorithm, accurate to within 0.5 minutes of arc for the year 1999-2015
+
+=over
+
+=item * param time: epoch time [s], optional, default: now
+
+=item * return Greenwich mean sideral date [h]
+
+=back
+
+=cut
+
+sub EpochToGreenwichMeanSideralDate(;$) {
+  my ($epoch) = @_;
+
+  if (!defined($epoch)) {
+    $epoch = time();
+  }
+
+  my $elapsedDays = EpochToJulianDate($epoch) - 2451545 + 0.0008;
+  my ($seconds, $minutes, $hours, $day, $month, $year, $wday, $yday, $isdst) = gmtime($epoch);
+  my $timeAsHours = $hours + $minutes/60.0 + $seconds/3600.0;
+
+  return 6.6974243242 + 0.0657098283*$elapsedDays + $timeAsHours;
+}
+
+=head2 JulianDateToEpoch(;$)
+
+Copyright (C) 2012 E. G. Richards
+
+=over
+
+=item * param jd: Julian date [day], optional, default: now
+
+=item * return Gregorian date [epoch]
+
+=back
+
+=cut
+
+sub JulianDateToEpoch(;$) {
+  my ($jd) = @_;
+
+  if (!defined($jd)) {
+    return time();
+  } else {
+    my $j = floor($jd);
+    my $f = $j + 1401;
+    $f += 3*floor(floor((4*$jd + 274277.0)/146097)/4) - 38;
+    my $e = 4*$f + 3;
+    my $g = floor(($e%1461)/4);
+    my $h = 5*$g + 2;
+    my $day = floor(($h%153)/5) + 1;
+    my $month = (floor($h/153) + 2)%12 + 1;
+    my $year = floor($e/1461) - 4716 + floor((14 - $month)/12);
+
+    my $seconds = sprintf("%0.0f", 86400*($jd - $j + 0.5)); # round()
+
+    return timegm(0, 0, 0, $day, $month - 1, $year - 1900) + $seconds;
+  }
+}
+
+=head2 CelestialPosition($)
+
+Copyright (c) Plataforma Solar de Almerýa, Spain
+
+simplified algorithm, accurate to within 0.5 minutes of arc for the year 1999-2015
+
+=over
+
+=item * param epoch: epoch time [s], optional, default: now
+
+=item * return array of rightAscension and declination [rad]
+
+=back
+
+=cut
+
+sub CelestialPosition($) {
+  my ($epoch) = @_;
+
+  # Calculate ecliptic coordinates (ecliptic longitude and obliquity of the
+  # ecliptic in radians but without limiting the angle to 2*pi
+  # (i.e., the result may be greater than 2*pi)
+  my $elapsedDays       = EpochToJulianDate($epoch) - 2451545 + (32.184 + 37)/86400; # 2019: 37 leap seconds
+  my $omega             = 2.1429    - 0.0010394594   * $elapsedDays; # [rad]
+  my $meanLongitude     = 4.8950630 + 0.017202791698 * $elapsedDays; # [rad]
+  my $meanAnomaly       = 6.2400600 + 0.0172019699   * $elapsedDays; # [rad]
+  my $eclipticLongitude = $meanLongitude + 0.03341607*sin($meanAnomaly) + 0.00034894*sin(2*$meanAnomaly) - 0.0001134 - 0.0000203*sin($omega);
+  my $eclipticObliquity = 0.4090928 - 6.2140e-9*$elapsedDays + 0.0000396*cos($omega);
+
+  # Calculate celestial coordinates (right ascension and declination) in radians
+  # but without limiting the angle to 2*pi (i.e., the result may be
+  # greater than 2*pi)
+  my $sinEclipticLongitude = sin($eclipticLongitude);
+  my $y1 = cos($eclipticObliquity)*$sinEclipticLongitude;
+  my $x1 = cos($eclipticLongitude);
+  my $rightAscension = atan2($y1, $x1);
+  if ($rightAscension < 0.0) {
+    $rightAscension = $rightAscension + pi2;
+  }
+  my $declination = asin(sin($eclipticObliquity)*$sinEclipticLongitude);
+
+  return ($rightAscension, $declination);
+}
+
+=head2 AzimuthElevation(;$$$)
+
+Calculate the azimuth and elevation of the sun for the given time and location.
+
+Copyright (c) Plataforma Solar de Almerýa, Spain
+
+simplified algorithm, accurate to within 0.5 minutes of arc for the year 1999-2015
+
+=over
+
+=item * param epoch: epoch time [s], optional, default: now
+
+=item * param longitude: geographic longitude [deg], optional, default: global longitude or Frankfurt, Germany
+
+=item * param latitude: geographic latitude [deg], optional, default: global latitude or Frankfurt, Germany
+
+=item * return array of azimuth and elevation [deg]
+
+=back
+
+=cut
+
+sub AzimuthElevation(;$$$) {
+  my ($epoch, $longitudeEast, $latitudeNorth) = @_;
+
+  if (!defined($longitudeEast) || !defined($latitudeNorth)) {
+    # undefined: use Frankfurt, Germany
+    $longitudeEast = ::AttrVal("global", "longitude", "8.686");
+    $latitudeNorth = ::AttrVal("global", "latitude", "50.112");
+  }
+
+  my ($rightAscensionRadians, $declinationRadians) = CelestialPosition($epoch);
+
+  # Calculate local coordinates (azimuth [deg] and zenith angle [rad])
+  my $rad = pi/180;
+  my $greenwichMeanSiderealDate = EpochToGreenwichMeanSideralDate($epoch);
+  my $localMeanSiderealDateRadians = ($greenwichMeanSiderealDate*15 + $longitudeEast)*$rad;
+  my $hourAngleRadians = $localMeanSiderealDateRadians - $rightAscensionRadians;
+  my $cosHourAngle = cos($hourAngleRadians);
+  my $latitudeRadians = $latitudeNorth*$rad;
+  my $cosLatitude = cos($latitudeRadians);
+  my $sinLatitude = sin($latitudeRadians);
+  my $zenithAngleRadians = acos($cosLatitude*$cosHourAngle*cos($declinationRadians) + sin($declinationRadians)*$sinLatitude);
+  my $y = -sin($hourAngleRadians);
+  my $x = tan($declinationRadians)*$cosLatitude - $sinLatitude*$cosHourAngle;
+  my $azimuthRadians = atan2($y, $x);
+  if ($azimuthRadians < 0.0) {
+    $azimuthRadians = $azimuthRadians + pi2;
+  }
+  my $azimuth = sprintf("%0.1f", $azimuthRadians/$rad); # round(1)
+
+  # Parallax correction of zenith angle [deg]
+  my $meanEarthRadius = 6371.01; # [km]
+  my $astronomicalUnit = 149597890; # [km]
+  my $parallax = ($meanEarthRadius/$astronomicalUnit)*sin($zenithAngleRadians);
+  my $zenithAngle = ($zenithAngleRadians + $parallax)/$rad;
+
+  # Elevation [deg]
+  my $elevation = 90 - $zenithAngle;
+  $elevation = sprintf("%0.1f", $elevation); # round(1)
+
+  return ($azimuth, $elevation);
+}
+
+=head2 Mod($$)
+
+Calculate the arithmetic remainder of a division including fractions.
+
+=cut
+
+sub Mod($$) {
+  my ($dividend, $divisor) = @_;
+  return 0 if ($divisor == 0);
+  return $dividend - int($dividend/$divisor)*$divisor;
+}
+
+=head2 MeanSolarAnomaly($)
+
+Calculate mean solar anomaly for Julian date.
+
+see https://www.aa.quae.nl/en/reken/zonpositie.html
+
+=over
+
+=item * param jd: Julian date
+
+=item * return mean solar anomaly [deg]
+
+=back
+
+=cut
+
+sub MeanSolarAnomaly($) {
+  my ($jd) = @_;
+
+  return Mod(357.5291 + 0.98560028*($jd - 2451545), 360);
+}
+
+=head2 EclipticalLongitude($)
+
+Calculate ecliptical longitude of the sun.
+
+see https://www.aa.quae.nl/en/reken/zonpositie.html
+
+=over
+
+=item * param meanSolarAnomalyRadians: mean solar anomaly [rad]
+
+=item * return ecliptical longitude [rad]
+
+=back
+
+=cut
+
+sub EclipticalLongitude($) {
+  my ($meanSolarAnomalyRadians) = @_;
+
+  my $rad = pi/180;
+  my $equationOfcenter = 1.9148*sin($meanSolarAnomalyRadians) + 0.0200*sin(2*$meanSolarAnomalyRadians) + 0.0003*sin(3*$meanSolarAnomalyRadians);
+  return Mod($meanSolarAnomalyRadians/$rad + $equationOfcenter + 180 + 102.9372, 360)*$rad;
+}
+
+=head2 EquatorialCoordinates($)
+
+Calculate equatorial coordinates of the sun.
+
+see https://www.aa.quae.nl/en/reken/zonpositie.html
+
+=over
+
+=item * param eclipticLongitudeRadians: ecliptic longitude of the sun [rad]
+
+=item * return right ascension and declination [rad]
+
+=back
+
+=cut
+
+sub EquatorialCoordinates($) {
+  my ($eclipticLongitudeRadians) = @_;
+
+  my $rad = pi/180;
+  my $rightAscensionRadians = atan2(sin($eclipticLongitudeRadians)*cos(23.4393*$rad), cos($eclipticLongitudeRadians));
+  my $declinationRadians = asin(sin($eclipticLongitudeRadians)*sin(23.4393*$rad));
+
+  return ($rightAscensionRadians, $declinationRadians);
+}
+
+=head2 HourAngle($$$)
+
+Calculate sun hour angle for Julian date.
+
+see https://www.aa.quae.nl/en/reken/zonpositie.html
+
+=over
+
+=item * param jd: Julian date
+
+=item * param rightAscension: right ascension of sun [deg]
+
+=item * param longitudeEast: geographical longitude [deg]
+
+=item * return hour angle of sun [deg], limited to -180 ... +180
+
+=back
+
+=cut
+
+sub HourAngle($$$) {
+  my ($jd, $rightAscension, $longitudeEast) = @_;
+
+  my $sideralTime = Mod(280.1470 + 360.9856235*($jd - 2451545) + $longitudeEast, 360);
+  my $hourAngle = $sideralTime - $rightAscension;
+  $hourAngle -= 360 if ($hourAngle > 180);
+  $hourAngle += 360 if ($hourAngle < -180);
+  return $hourAngle;
+}
+
+=head2 Transit($$$)
+
+Calculate solar transit date for Julian date.
+
+see https://en.wikipedia.org/wiki/Sunrise_equation
+
+=over
+
+=item * param jd: Julian date
+
+=item * param meanSolarAnomalyRadians: mean solar anomaly [rad]
+
+=item * param eclipticalLongitudeRadians: ecliptical longitude of sun [rad]
+
+=item * return date of solar transit [Julian date]
+
+=back
+
+=cut
+
+sub Transit($$$) {
+  my ($jd, $meanSolarAnomalyRadians, $eclipticalLongitudeRadians) = @_;
+
+  return $jd + 0.0053*sin($meanSolarAnomalyRadians) - 0.0069*sin(2*$eclipticalLongitudeRadians);
+}
+
+=head2 ElevationCorrection(;$)
+
+Calculate upper solar limb elevation offset angle caused by sun diameter, typical atmospheric refraction and altitude of observer for sunrise.
+
+see https://en.wikipedia.org/wiki/Sunrise_equation
+
+=over
+
+=item * param altitude: altitude of observer [m], optional, default: 0 m
+
+=item * return elevation offset angle of upper solar limb at sunrise [deg]
+
+=back
+
+=cut
+
+sub ElevationCorrection(;$) {
+  my ($altitude) = @_;
+
+  if (!defined($altitude)) {
+    # undefined: use 0 m (see level)
+    $altitude = 0;
+  }
+
+  return -0.83 - 2.076*sqrt($altitude)/60
+}
+
+=head2 HourAngleOptimization($$$;$$$)
+
+Iteratively improve sun rise (mode = -1), sun transit (mode = 0) and sun set (mode = +1) dates by minimizing hour angle change.
+
+see https://en.wikipedia.org/wiki/Sunrise_equation
+
+=over
+
+=item * param mode: sun rise (mode = -1), sun transit (mode = 0) and sun set (mode = +1)
+
+=item * param jd: estimated Julian date
+
+=item * param longitudeEast: geographical longitude [deg]
+
+=item * param latitudeNorth: geographical latitude [deg], optional, not used for mode = 0
+
+=item * param altitude: altitude of observer [m], optional, not used for mode = 0
+
+=item * param twilightAngle: twilight angle [deg], optional, not used for mode = 0
+
+=item * return array of optimized Julian date and the declination of the sun [rad]
+
+=back
+
+=cut
+
+sub HourAngleOptimization($$$;$$$) {
+  my ($mode, $jd, $longitudeEast, $latitudeNorth, $altitude, $twilightAngle) = @_;
+
+  # iteratively improve sun rise date
+  my $rad = pi/180;
+  my $loops = 0;
+  my $rightAscensionRadians;
+  my $declinationRadians;
+  my $hourAngleDelta;
+  do {
+    # hour angle
+    my $meanSolarAnomalyRadians = MeanSolarAnomaly($jd)*$rad;
+    my $eclipticalLongitudeRadians = EclipticalLongitude($meanSolarAnomalyRadians);
+    ($rightAscensionRadians, $declinationRadians) = EquatorialCoordinates($eclipticalLongitudeRadians);
+    my $hourAngle = HourAngle($jd, $rightAscensionRadians/$rad, $longitudeEast);
+
+    if ($mode) {
+      # sun rise/set hour angle
+      my $hourAngleRiseSet = acos((sin((ElevationCorrection($altitude) + $twilightAngle)*$rad) - sin($latitudeNorth*$rad)*sin($declinationRadians))/(cos($latitudeNorth*$rad)*cos($declinationRadians)))/$rad;
+
+      # improved sun rise/set date
+      $hourAngleDelta = $hourAngle - $mode*$hourAngleRiseSet;
+      $jd -= $hourAngleDelta/360;
+
+      #::Log3 "", 3, "HourAngleOptimization meanSolarAnomaly ". $meanSolarAnomalyRadians/$rad . " eclipticalLongitude " . $eclipticalLongitudeRadians/$rad . " rightAscensionRadians " . $rightAscensionRadians/$rad . " declinationRadians " . $declinationRadians/$rad . " jd $jd hourAngle $hourAngle hourAngleRiseSet $hourAngleRiseSet hourAngleDelta $hourAngleDelta" . JulianDateToEpoch($jd);
+    } else {
+      # improved solar transit date
+      $hourAngleDelta = $hourAngle;
+      $jd -= $hourAngleDelta/360;
+
+      #::Log3 "", 3, "HourAngleOptimization meanSolarAnomaly ". $meanSolarAnomalyRadians/$rad . " eclipticalLongitude " . $eclipticalLongitudeRadians/$rad . " rightAscensionRadians " . $rightAscensionRadians/$rad . " declinationRadians " . $declinationRadians/$rad . " jd $jd hourAngle $hourAngle " . JulianDateToEpoch($jd);
+    }
+    $loops++;
+  } while (abs($hourAngleDelta) > 0.0005 && $loops < 5);
+
+  return ($jd, $declinationRadians);
+}
+
+=head2 RiseSet(;$$$$$)
+
+Calculate time of sunrise, sun transit and sunset for given time and position including corrections for astronomical refraction, solar disc diameter and altitude of observer.
+
+see https://www.aa.quae.nl/en/reken/zonpositie.html
+see https://en.wikipedia.org/wiki/Sunrise_equation
+
+Note: The calculated times belong to the day in the GMT timezone. If your location is in a different timezone you must add your timezone offset to the epoch time to get the same result for all times between 0:00 and 23:59 of your local time.
+
+Adjust epoch time by time zone offset
+
+=over
+
+=item * param epoch: epoch time [s], optional, default: now
+
+=item * param longitudeEast: geographic longitude [deg], optional, default: global longitude or Frankfurt, Germany
+
+=item * param latitude: geographic latitude [deg], optional, default: global latitude or Frankfurt, Germany
+
+=item * param altitude: altitude of obeserver [m], optional, default: 0 m
+
+=item * param twilightAngle: twilight angle [deg], optional, default: 0 °
+
+=item * return array of sunrise, sun transit and sunset date for a day in the GMT timezone [epoch]
+
+=back
+
+=cut
+
+sub RiseSet(;$$$$$) {
+  my ($epoch, $longitudeEast, $latitudeNorth, $altitude, $twilightAngle) = @_;
+
+  if (!defined($epoch)) {
+    $epoch = time();
+  }
+
+  if (!defined($longitudeEast) || !defined($latitudeNorth)) {
+    # undefined: use Frankfurt, Germany
+    $longitudeEast = ::AttrVal("global", "longitude", "8.686");
+    $latitudeNorth = ::AttrVal("global", "latitude", "50.112");
+  }
+  #$longitudeEast = 5;
+  #$latitudeNorth = 52;
+
+  if (!defined($altitude)) {
+    # undefined: use 0 m (see level)
+    $altitude = 0;
+  }
+  #$altitude = 0;
+
+  if (!defined($twilightAngle)) {
+    # undefined: use 0°
+    $twilightAngle = 0;
+  }
+  #$twilightAngle = 0;
+
+  # initial estimate of solar transit date
+  my $julianDateOffset = 2451545 + (32.184 + 37)/86400 - $longitudeEast/360; # 2019: 37 leap seconds
+  my $julianCycle = floor(EpochToJulianDate($epoch) - $julianDateOffset + 0.5);
+  #$julianCycle = floor(2453097 - $julianDateOffset + 0.5);
+  my $solarTransitJD = $julianCycle + $julianDateOffset;
+
+  # improve estimate of solar transit date
+  my $rad = pi/180;
+  my $meanSolarAnomalyRadians = MeanSolarAnomaly($solarTransitJD)*$rad;
+  my $eclipticalLongitudeRadians = EclipticalLongitude($meanSolarAnomalyRadians);
+  $solarTransitJD = Transit($solarTransitJD, $meanSolarAnomalyRadians, $eclipticalLongitudeRadians);
+
+  # iteratively improve solar transit date at given longitude
+  ($solarTransitJD, my $declinationRadians) = HourAngleOptimization(0, $solarTransitJD, $longitudeEast);
+
+  # initial estimate of sun rise/set hour angle at given latitude and altitude
+  my $hourAngleRiseSet = acos((sin((ElevationCorrection($altitude) + $twilightAngle)*$rad) - sin($latitudeNorth*$rad)*sin($declinationRadians))/(cos($latitudeNorth*$rad)*cos($declinationRadians)))/$rad;
+  my $hourAngleRiseSetRatio = $hourAngleRiseSet/360;
+
+  # initial estimate of sun rise and sun set date
+  my $sunRiseJD = $solarTransitJD - $hourAngleRiseSetRatio;
+  my $sunSetJD = $solarTransitJD + $hourAngleRiseSetRatio;
+
+  # iteratively improve sun rise and sun set date
+  ($sunRiseJD) = HourAngleOptimization(-1, $sunRiseJD, $longitudeEast, $latitudeNorth, $altitude, $twilightAngle);
+  ($sunSetJD) = HourAngleOptimization(+1, $sunSetJD, $longitudeEast, $latitudeNorth, $altitude, $twilightAngle);
+
+  #::Log3 "", 3, "RiseSet: sunRiseJD $sunRiseJD solarTransitJD $solarTransitJD sunSetJD $sunSetJD";
+
+  return (JulianDateToEpoch($sunRiseJD), JulianDateToEpoch($solarTransitJD), JulianDateToEpoch($sunSetJD));
+}
+
+# -----------------------------------------------------------------------------
+
 package DWD_OpenData;
 
 use strict;
@@ -64,7 +598,6 @@ use warnings;
 use Encode;
 use File::Temp qw(tempfile);
 use IO::Uncompress::Unzip qw(unzip $UnzipError);
-use Math::Trig ':pi';
 use POSIX;
 use Scalar::Util qw(looks_like_number);
 use Storable qw(freeze thaw);
@@ -83,7 +616,7 @@ use constant UPDATE_COMMUNEUNIONS => -2;
 use constant UPDATE_ALL           => -3;
 
 require Exporter;
-our $VERSION   = 1.014.002;
+our $VERSION   = 1.014.004;
 our @ISA       = qw(Exporter);
 our @EXPORT    = qw(GetForecast GetAlerts UpdateAlerts UPDATE_DISTRICTS UPDATE_COMMUNEUNIONS UPDATE_ALL);
 our @EXPORT_OK = qw(IsCommuneUnionWarncellId);
@@ -839,522 +1372,6 @@ sub IsCommuneUnionWarncellId($) {
          || $warncellId == UPDATE_COMMUNEUNIONS || $warncellId == UPDATE_ALL? 1 : 0;
 }
 
-=head2 EpochToJulianDate(;$)
-
-=over
-
-=item * param time: epoch time [s], optional, default: now
-
-=item * return Julian date
-
-=back
-
-=cut
-
-sub EpochToJulianDate(;$) {
-  my ($epoch) = @_;
-
-  if (!defined($epoch)) {
-    $epoch = time();
-  }
-
-  return gmtime($epoch)->julian_day;
-}
-
-=head2 EpochToGreenwichMeanSideralDate(;$)
-
-Copyright (c) Plataforma Solar de Almerýa, Spain
-
-simplified algorithm, accurate to within 0.5 minutes of arc for the year 1999-2015
-
-=over
-
-=item * param time: epoch time [s], optional, default: now
-
-=item * return Greenwich mean sideral date
-
-=back
-
-=cut
-
-sub EpochToGreenwichMeanSideralDate(;$) {
-  my ($epoch) = @_;
-
-  if (!defined($epoch)) {
-    $epoch = time();
-  }
-
-  my $elapsedDays = EpochToJulianDate($epoch) - 2451545 + 0.0008;
-  my ($seconds, $minutes, $hours, $day, $month, $year, $wday, $yday, $isdst) = gmtime($epoch);
-  my $timeAsHours = $hours + $minutes/60.0 + $seconds/3600.0;
-
-  return 6.6974243242 + 0.0657098283*$elapsedDays + $timeAsHours;
-}
-
-=head2 JulianDateToEpoch(;$)
-
-Copyright (C) 2012 E. G. Richards
-
-=over
-
-=item * param jd: Julian date [day], optional, default: now
-
-=item * return Gregorian date [epoch]
-
-=back
-
-=cut
-
-sub JulianDateToEpoch(;$) {
-  my ($jd) = @_;
-
-  if (!defined($jd)) {
-    return time();
-  } else {
-    my $j = floor($jd);
-    my $f = $j + 1401;
-    $f += 3*floor(floor((4*$jd + 274277.0)/146097)/4) - 38;
-    my $e = 4*$f + 3;
-    my $g = floor(($e%1461)/4);
-    my $h = 5*$g + 2;
-    my $day = floor(($h%153)/5) + 1;
-    my $month = (floor($h/153) + 2)%12 + 1;
-    my $year = floor($e/1461) - 4716 + floor((14 - $month)/12);
-
-    my $seconds = sprintf("%0.0f", 86400*($jd - $j + 0.5)); # round()
-
-    return timegm(0, 0, 0, $day, $month - 1, $year - 1900) + $seconds;
-  }
-}
-
-=head2 SunCelestialPosition($)
-
-Copyright (c) Plataforma Solar de Almerýa, Spain
-
-simplified algorithm, accurate to within 0.5 minutes of arc for the year 1999-2015
-
-=over
-
-=item * param epoch: epoch time [s], optional, default: now
-
-=item * return array of rightAscension and declination [rad]
-
-=back
-
-=cut
-
-sub SunCelestialPosition($) {
-  my ($epoch) = @_;
-
-  # Calculate ecliptic coordinates (ecliptic longitude and obliquity of the
-  # ecliptic in radians but without limiting the angle to 2*pi
-  # (i.e., the result may be greater than 2*pi)
-  my $elapsedDays       = EpochToJulianDate($epoch) - 2451545 + (32.184 + 37)/86400; # 2019: 37 leap seconds
-  my $omega             = 2.1429    - 0.0010394594   * $elapsedDays; # [rad]
-  my $meanLongitude     = 4.8950630 + 0.017202791698 * $elapsedDays; # [rad]
-  my $meanAnomaly       = 6.2400600 + 0.0172019699   * $elapsedDays; # [rad]
-  my $eclipticLongitude = $meanLongitude + 0.03341607*sin($meanAnomaly) + 0.00034894*sin(2*$meanAnomaly) - 0.0001134 - 0.0000203*sin($omega);
-  my $eclipticObliquity = 0.4090928 - 6.2140e-9*$elapsedDays + 0.0000396*cos($omega);
-
-  # Calculate celestial coordinates (right ascension and declination) in radians
-  # but without limiting the angle to 2*pi (i.e., the result may be
-  # greater than 2*pi)
-  my $sinEclipticLongitude = sin($eclipticLongitude);
-  my $y1 = cos($eclipticObliquity)*$sinEclipticLongitude;
-  my $x1 = cos($eclipticLongitude);
-  my $rightAscension = atan2($y1, $x1);
-  if ($rightAscension < 0.0) {
-    $rightAscension = $rightAscension + pi2;
-  }
-  my $declination = asin(sin($eclipticObliquity)*$sinEclipticLongitude);
-
-  return ($rightAscension, $declination);
-}
-
-=head2 SunAzimuthElevation(;$$$)
-
-Calculate the azimuth and elevation of the sun for the given time and location.
-
-Copyright (c) Plataforma Solar de Almerýa, Spain
-
-simplified algorithm, accurate to within 0.5 minutes of arc for the year 1999-2015
-
-=over
-
-=item * param epoch: epoch time [s], optional, default: now
-
-=item * param longitude: geographic longitude [deg], optional, default: global longitude or Frankfurt, Germany
-
-=item * param latitude: geographic latitude [deg], optional, default: global latitude or Frankfurt, Germany
-
-=item * return array of azimuth and elevation [deg]
-
-=back
-
-=cut
-
-sub SunAzimuthElevation(;$$$) {
-  my ($epoch, $longitudeEast, $latitudeNorth) = @_;
-
-  if (!defined($longitudeEast) || !defined($latitudeNorth)) {
-    # undefined: use Frankfurt, Germany
-    $longitudeEast = ::AttrVal("global", "longitude", "8.686");
-    $latitudeNorth = ::AttrVal("global", "latitude", "50.112");
-  }
-
-  my ($rightAscensionRadians, $declinationRadians) = SunCelestialPosition($epoch);
-
-  # Calculate local coordinates (azimuth [deg] and zenith angle [rad])
-  my $rad = pi/180;
-  my $greenwichMeanSiderealDate = EpochToGreenwichMeanSideralDate($epoch);
-  my $localMeanSiderealDateRadians = ($greenwichMeanSiderealDate*15 + $longitudeEast)*$rad;
-  my $hourAngleRadians = $localMeanSiderealDateRadians - $rightAscensionRadians;
-  my $cosHourAngle = cos($localMeanSiderealDateRadians);
-  my $latitudeRadians = $latitudeNorth*$rad;
-  my $cosLatitude = cos($latitudeRadians);
-  my $sinLatitude = sin($latitudeRadians);
-  my $zenithAngle = acos($cosLatitude*$cosHourAngle*cos($declinationRadians) + sin($declinationRadians)*$sinLatitude);
-  my $y = -sin($hourAngleRadians);
-  my $x = tan($declinationRadians)*$cosLatitude - $sinLatitude*$cosHourAngle;
-  my $azimuth = atan2($y, $x);
-  if ($azimuth < 0.0) {
-    $azimuth = $azimuth + pi2;
-  }
-  $azimuth = $azimuth/$rad;
-  $azimuth = sprintf("%0.1f", $azimuth); # round(1)
-
-  # Parallax correction of zenith angle [deg]
-  my $meanEarthRadius = 6371.01; # [km]
-  my $astronomicalUnit = 149597890; # [km]
-  my $parallax = ($meanEarthRadius/$astronomicalUnit)*sin($zenithAngle);
-  $zenithAngle = ($zenithAngle + $parallax)/$rad;
-
-  # Elevation [deg]
-  my $elevation = 90 - $zenithAngle;
-  $elevation = sprintf("%0.1f", $elevation); # round(1)
-
-  return ($azimuth, $elevation);
-}
-
-=head2 Mod($$)
-
-Calculate the arithmetic remainder of a division including fractions.
-
-=cut
-
-sub Mod($$) {
-  my ($dividend, $divisor) = @_;
-  return 0 if ($divisor == 0);
-  return $dividend - int($dividend/$divisor)*$divisor;
-}
-
-=head2 SunMeanSolarAnomaly($)
-
-Calculate mean solar anomaly for Julian date.
-
-see https://www.aa.quae.nl/en/reken/zonpositie.html
-
-=over
-
-=item * param jd: Julian date
-
-=item * return mean solar anomaly [deg]
-
-=back
-
-=cut
-
-sub SunMeanSolarAnomaly($) {
-  my ($jd) = @_;
-
-  return Mod(357.5291 + 0.98560028*($jd - 2451545), 360);
-}
-
-=head2 SunEclipticalLongitude($)
-
-Calculate ecliptical longitude of the sun.
-
-see https://www.aa.quae.nl/en/reken/zonpositie.html
-
-=over
-
-=item * param meanSolarAnomalyRadians: mean solar anomaly [rad]
-
-=item * return ecliptical longitude [rad]
-
-=back
-
-=cut
-
-sub SunEclipticalLongitude($) {
-  my ($meanSolarAnomalyRadians) = @_;
-
-  my $rad = pi/180;
-  my $equationOfcenter = 1.9148*sin($meanSolarAnomalyRadians) + 0.0200*sin(2*$meanSolarAnomalyRadians) + 0.0003*sin(3*$meanSolarAnomalyRadians);
-  return Mod($meanSolarAnomalyRadians/$rad + $equationOfcenter + 180 + 102.9372, 360)*$rad;
-}
-
-=head2 SunEquatorialCoordinates($)
-
-Calculate equatorial coordinates of the sun.
-
-see https://www.aa.quae.nl/en/reken/zonpositie.html
-
-=over
-
-=item * param eclipticLongitudeRadians: ecliptic longitude of the sun [rad]
-
-=item * return right ascension and declination [rad]
-
-=back
-
-=cut
-
-sub SunEquatorialCoordinates($) {
-  my ($eclipticLongitudeRadians) = @_;
-
-  my $rad = pi/180;
-  my $rightAscensionRadians = atan2(sin($eclipticLongitudeRadians)*cos(23.4393*$rad), cos($eclipticLongitudeRadians));
-  my $declinationRadians = asin(sin($eclipticLongitudeRadians)*sin(23.4393*$rad));
-
-  return ($rightAscensionRadians, $declinationRadians);
-}
-
-=head2 SunEclipticalCoordinates($$$)
-
-Calculate sun hour angle for Julian date.
-
-see https://www.aa.quae.nl/en/reken/zonpositie.html
-
-=over
-
-=item * param jd: Julian date
-
-=item * param rightAscension: right ascension of sun [deg]
-
-=item * param longitudeEast: geographical longitude [deg]
-
-=item * return hour angle of sun [deg], limited to -180 ... +180
-
-=back
-
-=cut
-
-sub SunHourAngle($$$) {
-  my ($jd, $rightAscension, $longitudeEast) = @_;
-
-  my $sideralTime = Mod(280.1470 + 360.9856235*($jd - 2451545) + $longitudeEast, 360);
-  my $hourAngle = $sideralTime - $rightAscension;
-  $hourAngle -= 360 if ($hourAngle > 180);
-  $hourAngle += 360 if ($hourAngle < -180);
-  return $hourAngle;
-}
-
-=head2 SunEclipticalCoordinates($$$)
-
-Calculate solar transit date for Julian date.
-
-see https://en.wikipedia.org/wiki/Sunrise_equation
-
-=over
-
-=item * param jd: Julian date
-
-=item * param meanSolarAnomalyRadians: mean solar anomaly [rad]
-
-=item * param eclipticalLongitudeRadians: ecliptical longitude of sun [rad]
-
-=item * return date of solar transit [Julian date]
-
-=back
-
-=cut
-
-sub SunTransit($$$) {
-  my ($jd, $meanSolarAnomalyRadians, $eclipticalLongitudeRadians) = @_;
-    
-  return $jd + 0.0053*sin($meanSolarAnomalyRadians) - 0.0069*sin(2*$eclipticalLongitudeRadians);
-}
-
-=head2 SunElevationCorrection(;$)
-
-Calculate upper solar limb elevation offset angle caused by sun diameter, typical atmospheric refraction and altitude of observer for sunrise.
-
-see https://en.wikipedia.org/wiki/Sunrise_equation
-
-=over
-
-=item * param altitude: altitude of observer [m], optional, default: 0 m
-
-=item * return elevation offset angle of upper solar limb at sunrise [deg]
-
-=back
-
-=cut
-
-sub SunElevationCorrection(;$) {
-  my ($altitude) = @_;
-
-  if (!defined($altitude)) {
-    # undefined: use 0 m (see level)
-    $altitude = 0;
-  }
-
-  return -0.83 - 2.076*sqrt($altitude)/60
-}
-
-=head2 SunHourAngleOptimization($$$;$$$)
-
-Iteratively improve sun rise (mode = -1), sun transit (mode = 0) and sun set (mode = +1) dates by minimizing hour angle change.
-
-see https://en.wikipedia.org/wiki/Sunrise_equation
-
-=over
-
-=item * param mode: sun rise (mode = -1), sun transit (mode = 0) and sun set (mode = +1)
-
-=item * param jd: estimated Julian date
-
-=item * param longitudeEast: geographical longitude [deg]
-
-=item * param latitudeNorth: geographical latitude [deg], optional, not used for mode = 0
-
-=item * param altitude: altitude of observer [m], optional, not used for mode = 0
-
-=item * param twilightAngle: twilight angle [deg], optional, not used for mode = 0
-
-=item * return array of optimized Julian date and the declination of the sun [rad]
-
-=back
-
-=cut
-
-sub SunHourAngleOptimization($$$;$$$) {
-  my ($mode, $jd, $longitudeEast, $latitudeNorth, $altitude, $twilightAngle) = @_;
-
-  # iteratively improve sun rise date
-  my $rad = pi/180;
-  my $loops = 0;
-  my $rightAscensionRadians;
-  my $declinationRadians;
-  my $hourAngleDelta;
-  do {
-    # hour angle
-    my $meanSolarAnomalyRadians = SunMeanSolarAnomaly($jd)*$rad;
-    my $eclipticalLongitudeRadians = SunEclipticalLongitude($meanSolarAnomalyRadians);
-    ($rightAscensionRadians, $declinationRadians) = SunEquatorialCoordinates($eclipticalLongitudeRadians);
-    my $hourAngle = SunHourAngle($jd, $rightAscensionRadians/$rad, $longitudeEast);
-
-    if ($mode) {
-      # sun rise/set hour angle
-      my $hourAngleRiseSet = acos((sin((SunElevationCorrection($altitude) + $twilightAngle)*$rad) - sin($latitudeNorth*$rad)*sin($declinationRadians))/(cos($latitudeNorth*$rad)*cos($declinationRadians)))/$rad;
-
-      # improved sun rise/set date
-      $hourAngleDelta = $hourAngle - $mode*$hourAngleRiseSet;
-      $jd -= $hourAngleDelta/360;
-
-      #::Log3 "", 3, "SunRiseSetOptimization meanSolarAnomaly ". $meanSolarAnomalyRadians/$rad . " eclipticalLongitude " . $eclipticalLongitudeRadians/$rad . " rightAscensionRadians " . $rightAscensionRadians/$rad . " declinationRadians " . $declinationRadians/$rad . " jd $jd hourAngle $hourAngle hourAngleRiseSet $hourAngleRiseSet hourAngleDelta $hourAngleDelta" . JulianDateToEpoch($jd);
-    } else {
-      # improved solar transit date
-      $hourAngleDelta = $hourAngle;
-      $jd -= $hourAngleDelta/360;
-
-      #::Log3 "", 3, "SunRiseSetOptimization meanSolarAnomaly ". $meanSolarAnomalyRadians/$rad . " eclipticalLongitude " . $eclipticalLongitudeRadians/$rad . " rightAscensionRadians " . $rightAscensionRadians/$rad . " declinationRadians " . $declinationRadians/$rad . " jd $jd hourAngle $hourAngle " . JulianDateToEpoch($jd);
-    }
-    $loops++;
-  } while (abs($hourAngleDelta) > 0.0005 && $loops < 5);
-
-  return ($jd, $declinationRadians);
-}
-
-=head2 SunRiseSet(;$$$$$)
-
-Calculate time of sunrise, sun transit and sunset for given time and position including corrections for astronomical refraction, solar disc diameter and altitude of observer.
-
-see https://www.aa.quae.nl/en/reken/zonpositie.html
-see https://en.wikipedia.org/wiki/Sunrise_equation
-
-Note: The calculated times belong to the day in the GMT timezone. If your location is in a different timezone you must add your timezone offset to the epoch time to get the same result for all times between 0:00 and 23:59 of your local time.
-
-Adjust epoch time by time zone offset
-
-=over
-
-=item * param epoch: epoch time [s], optional, default: now
-
-=item * param longitudeEast: geographic longitude [deg], optional, default: global longitude or Frankfurt, Germany
-
-=item * param latitude: geographic latitude [deg], optional, default: global latitude or Frankfurt, Germany
-
-=item * param altitude: altitude of obeserver [m], optional, default: 0 m
-
-=item * param twilightAngle: twilight angle [deg], optional, default: 0 °
-
-=item * return array of sunrise, sun transit and sunset date for a day in the GMT timezone [epoch]
-
-=back
-
-=cut
-
-sub SunRiseSet(;$$$$$) {
-  my ($epoch, $longitudeEast, $latitudeNorth, $altitude, $twilightAngle) = @_;
-
-  if (!defined($epoch)) {
-    $epoch = time();
-  }
-
-  if (!defined($longitudeEast) || !defined($latitudeNorth)) {
-    # undefined: use Frankfurt, Germany
-    $longitudeEast = ::AttrVal("global", "longitude", "8.686");
-    $latitudeNorth = ::AttrVal("global", "latitude", "50.112");
-  }
-  #$longitudeEast = 5;
-  #$latitudeNorth = 52;
-
-  if (!defined($altitude)) {
-    # undefined: use 0 m (see level)
-    $altitude = 0;
-  }
-  #$altitude = 0;
-
-  if (!defined($twilightAngle)) {
-    # undefined: use 0°
-    $twilightAngle = 0;
-  }
-  #$twilightAngle = 0;
-
-  # initial estimate of solar transit date
-  my $julianDateOffset = 2451545 + (32.184 + 37)/86400 - $longitudeEast/360; # 2019: 37 leap seconds
-  my $julianCycle = floor(EpochToJulianDate($epoch) - $julianDateOffset + 0.5);
-  #$julianCycle = floor(2453097 - $julianDateOffset + 0.5);
-  my $solarTransitJD = $julianCycle + $julianDateOffset;
-
-  # improve estimate of solar transit date
-  my $rad = pi/180;
-  my $meanSolarAnomalyRadians = SunMeanSolarAnomaly($solarTransitJD)*$rad;
-  my $eclipticalLongitudeRadians = SunEclipticalLongitude($meanSolarAnomalyRadians);
-  $solarTransitJD = SunTransit($solarTransitJD, $meanSolarAnomalyRadians, $eclipticalLongitudeRadians);
-
-  # iteratively improve solar transit date at given longitude
-  ($solarTransitJD, my $declinationRadians) = SunHourAngleOptimization(0, $solarTransitJD, $longitudeEast);
-  
-  # initial estimate of sun rise/set hour angle at given latitude and altitude
-  my $hourAngleRiseSet = acos((sin((SunElevationCorrection($altitude) + $twilightAngle)*$rad) - sin($latitudeNorth*$rad)*sin($declinationRadians))/(cos($latitudeNorth*$rad)*cos($declinationRadians)))/$rad;
-  my $hourAngleRiseSetRatio = $hourAngleRiseSet/360;
-
-  # initial estimate of sun rise and sun set date
-  my $sunRiseJD = $solarTransitJD - $hourAngleRiseSetRatio;
-  my $sunSetJD = $solarTransitJD + $hourAngleRiseSetRatio;
-
-  # iteratively improve sun rise and sun set date
-  ($sunRiseJD) = SunHourAngleOptimization(-1, $sunRiseJD, $longitudeEast, $latitudeNorth, $altitude, $twilightAngle);
-  ($sunSetJD) = SunHourAngleOptimization(+1, $sunSetJD, $longitudeEast, $latitudeNorth, $altitude, $twilightAngle);
-
-  #::Log3 "", 3, "SunRiseSet: sunRiseJD $sunRiseJD solarTransitJD $solarTransitJD sunSetJD $sunSetJD";
-
-  return (JulianDateToEpoch($sunRiseJD), JulianDateToEpoch($solarTransitJD), JulianDateToEpoch($sunSetJD));
-}
-
 =head2 RotateForecast($$;$)
 
 =over
@@ -1717,21 +1734,21 @@ sub ProcessForecast($$$)
         my @sunrises;
         my @sunsets;
         my $lastDate = '';
-        my $sunElevationCorrection = SunElevationCorrection($altitude);
+        my $sunElevationCorrection = AstroSun::ElevationCorrection($altitude);
         foreach my $timestamp (@timestamps) {
-          my ($azimuth, $elevation) = SunAzimuthElevation($timestamp, $longitude, $latitude);
+          my ($azimuth, $elevation) = AstroSun::AzimuthElevation($timestamp, $longitude, $latitude);
           push(@azimuths, $azimuth);     # [deg]
           push(@elevations, $elevation); # [deg]
           push(@sunups, $elevation >= $sunElevationCorrection? 1 : 0);
           my $date = FormatDateLocal($hash, $timestamp);
           if ($date ne $lastDate) {
             # one calculation per day
-            my ($rise, $transit, $set) = SunRiseSet($timestamp + LocaltimeOffset($hash, $timestamp), $longitude, $latitude, $altitude);
+            my ($rise, $transit, $set) = AstroSun::RiseSet($timestamp + LocaltimeOffset($hash, $timestamp), $longitude, $latitude, $altitude);
             push(@sunrises, FormatTimeLocal($hash, $rise));    # round down to current minute
             push(@sunsets, FormatTimeLocal($hash, $set + 30)); # round up to next minute
             $lastDate = $date;
-            
-            #::Log3 $name, 3, "$name: ProcessForecast " . FormatDateTimeLocal($hash, $timestamp) . " $rise " . FormatDateTimeLocal($hash, $rise) . " $transit " . FormatDateTimeLocal($hash, $transit). " $set " . FormatDateTimeLocal($hash, $set + 30);            
+
+            #::Log3 $name, 3, "$name: ProcessForecast " . FormatDateTimeLocal($hash, $timestamp) . " $rise " . FormatDateTimeLocal($hash, $rise) . " $transit " . FormatDateTimeLocal($hash, $transit). " $set " . FormatDateTimeLocal($hash, $set + 30);
           } else {
             push(@sunrises, $defaultUndefSign); # round down to current minute
             push(@sunsets, $defaultUndefSign);  # round up to next minute
@@ -2635,6 +2652,12 @@ sub DWD_OpenData_Initialize($) {
 #
 # CHANGES
 #
+# 17.04.2019 (version 1.14.4) jensb
+# bugfix: fix reading SunUp (azimuth/elevation calculation)
+#
+# 17.03.2019 (version 1.14.3) jensb
+# coding: moved sun related code into separate module AstroSun
+#
 # 11.03.2019 (version 1.14.1) jensb
 # feature: support warncells that begin with 7
 #
@@ -2828,7 +2851,7 @@ sub DWD_OpenData_Initialize($) {
   <ul> <br>
       <li>forecastStation &lt;station code&gt;, default: none<br>
           Setting forecastStation enables automatic updates every hour.
-          The station code is either a 5 digit WMO station code or an alphanumeric DWD station code from the <a href="https://www.dwd.de/DE/leistungen/met_verfahren_mosmix/mosmix_stationskatalog.pdf">MOSMIX station catalogue</a>.<br>
+          The station code is either a 5 digit WMO station code or an alphanumeric DWD station code from the <code>id</code> column of the <a href="https://www.dwd.de/DE/leistungen/met_verfahren_mosmix/mosmix_stationskatalog.pdf">MOSMIX station catalogue</a>.<br>
           Note: When value is changed all existing forecast readings will be deleted.
       </li><br>
       <li>forecastDays &lt;n&gt;, default: 6<br>
