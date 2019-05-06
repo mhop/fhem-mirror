@@ -358,6 +358,7 @@ FHEM/72_TA_CMI_JSON.pm       delmar               Sonstige Systeme
 FHEM/72_XiaomiDevice.pm      markus-m             Sonstige Systeme
 FHEM/73_AMADCommBridge.pm    CoolTux              Sonstige Systeme
 FHEM/73_AutoShuttersControl.pm CoolTux            Automatisierung
+FHEM/73_DoorBird.pm          Sailor               https://forum.fhem.de/index.php/topic,41758.msg
 FHEM/73_ElectricityCalculator.pm Sailor           http://forum.fhem.de/index.php/topic,57106.0.html
 FHEM/73_GardenaSmartBridge.pm CoolTux             Sonstige Systeme
 FHEM/73_GasCalculator        Sailor               http://forum.fhem.de/index.php/topic,47909.0.html
