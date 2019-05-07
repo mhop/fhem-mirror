@@ -499,6 +499,7 @@ sub ErrorHandling($$$) {
 
     if ( defined($data)
         and $data
+        and
         (
             ( $data =~ /Error/ )
             or defined( eval { decode_json($data) }->{errors} )
