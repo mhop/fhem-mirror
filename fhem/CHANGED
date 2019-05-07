@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  73_AutoShuttersControl: fix brightness detection for IsDay,
+               fix detection for manual driveing
  - bugfix:  73_GardenaSmartBridge: fix the fix
  - bugfix:  73_GardenaSmartBridge: check if defined $data
  - bufix:   55_DWD_OpenData: SunUp calculation (forum #83097 msg #931972)
