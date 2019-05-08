@@ -51,6 +51,7 @@ use utf8;
 use JSON;
 use HttpUtils;
 use Encode;
+use Cwd;
 use MIME::Base64 qw();
 use Crypt::NaCl::Sodium qw( :utils );
 use Crypt::Argon2 qw/argon2i_pass argon2i_verify argon2id_pass argon2id_verify/;
@@ -78,7 +79,6 @@ sub DoorBird_Undefine($$);
 # }
 # END
 
-
 ###START###### Initialize module ##############################################################################START####
 sub DoorBird_Initialize($)
 {
@@ -102,6 +102,7 @@ sub DoorBird_Initialize($)
 							   "UdpPort:6524,35344 " .
 							   "SipDevice:" . join(",", devspec2array("TYPE=SIP")) . " " .
 							   "SipNumber " .
+							   "ImageFileDir " .
 							   "SessionIdSec:slider,0,10,600 " .
 							   "disable:1,0 " .
 							   "debug:1,0 " .
@@ -191,6 +192,7 @@ sub DoorBird_Define($$)
 	  $hash->{helper}{HistoryTime}						= "????-??-?? ??:??";
 	  $hash->{helper}{UdpPort}							= AttrVal($name, "UdpPort", 6524);
 	  $hash->{helper}{SessionIdSec}						= AttrVal($name, "SessionIdSec", 540);
+	  $hash->{helper}{ImageFileDir}						= AttrVal($name, "ImageFileDir", 0);
 	  $hash->{helper}{SessionId}						= 0;
 	  $hash->{helper}{UdpMessageId}						= 0;
 	@{$hash->{helper}{RelayAdresses}}					= (0);
@@ -427,6 +429,18 @@ sub DoorBird_Attr(@)
 			InternalTimer(gettimeofday()+$hash->{helper}{SessionIdSec}, "DoorBird_RenewSessionID", $hash, 0);
 		}
 	}
+	### Check whether ImageFileSave attribute has been provided
+	elsif ($a[2] eq "ImageFileDir") {
+		### Check whether ImageFileSave is defined
+		if (defined($a[3])) {
+			### Set helper in hash
+			$hash->{helper}{ImageFileDir} = $a[3];
+		}
+		else {
+			### Set helper in hash
+			$hash->{helper}{ImageFileDir} = "";
+		}
+	}
 	### If no attributes of the above known ones have been selected
 	else {
 		# Do nothing
@@ -550,6 +564,7 @@ sub DoorBird_Set($@)
 	}
 	
 	### Log Entry for debugging purposes
+	Log3 $name, 5, $name. " : DoorBird_Set _______________________________________________________________________";
 	Log3 $name, 5, $name. " : DoorBird_Set - name                               : " . $name;
 	Log3 $name, 5, $name. " : DoorBird_Set - command                            : " . $command;
 	Log3 $name, 5, $name. " : DoorBird_Set - option                             : " . $optionString;
@@ -1753,16 +1768,17 @@ sub DoorBird_Image_Request($$) {
 	my ($hash, $option)	= @_;
 
 	### Obtain values from hash
-	my $name			= $hash->{NAME};
-	my $username 		= DoorBird_credential_decrypt($hash->{helper}{".USER"});
-	my $password		= DoorBird_credential_decrypt($hash->{helper}{".PASSWORD"});
-	my $url 			= $hash->{helper}{URL};
-	my $command			= "image.cgi";
-	my $method			= "GET";
-	my $header			= "Accept: application/json";
-	my $err				= " ";
-	my $data			= " ";
-	my $json			= " ";
+	my $name				= $hash->{NAME};
+	my $username 			= DoorBird_credential_decrypt($hash->{helper}{".USER"});
+	my $password			= DoorBird_credential_decrypt($hash->{helper}{".PASSWORD"});
+	my $url 				= $hash->{helper}{URL};
+	my $command				= "image.cgi";
+	my $method				= "GET";
+	my $header				= "Accept: application/json";
+	my $err					= " ";
+	my $data				= " ";
+	my $json				= " ";
+	my $ImageFileName;
 	
 	### Create complete command URL for DoorBird
 	my $UrlPrefix 		= "https://" . $url . "/bha-api/";
@@ -1770,6 +1786,7 @@ sub DoorBird_Image_Request($$) {
 	my $ImageURL 		= $UrlPrefix . $command . $UrlPostfix;
 
 	### Log Entry for debugging purposes
+	Log3 $name, 5, $name. " : DoorBird_Image_Request _____________________________________________________________";
 #	Log3 $name, 5, $name. " : DoorBird_Image_Request - ImageURL                 : " . $ImageURL ;
 
 	### Update Reading
@@ -1792,11 +1809,91 @@ sub DoorBird_Image_Request($$) {
 	
 	### Create Timestamp
 	my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)=localtime(time);
-	my $ImageTimeStamp	= sprintf ( "%04d-%02d-%02d %02d:%02d:%02d",$year+1900, $mon+1, $mday, $hour, $min, $sec);
+	my $ImageTimeStamp		= sprintf ( "%04d-%02d-%02d %02d:%02d:%02d",$year+1900, $mon+1, $mday, $hour, $min, $sec);
+	my $ImageFileTimeStamp	= sprintf ( "%04d%02d%02d-%02d%02d%02d"    ,$year+1900, $mon+1, $mday, $hour, $min, $sec);
 
 	### Save picture and timestamp into hash
 	$hash->{helper}{Images}{Individual}{Data}		= $ImageData;
 	$hash->{helper}{Images}{Individual}{Timestamp} 	= $ImageTimeStamp;
+
+				### Log Entry for debugging purposes
+				Log3 $name, 5, $name. " : DoorBird_Image_Request - hash - ImageFileDir      : " . $hash->{helper}{ImageFileDir};
+
+				### If pictures supposed to be saved as files
+				if ($hash->{helper}{ImageFileDir} ne "0") {
+
+					### Get current working directory
+					my $cwd = getcwd();
+
+					### Log Entry for debugging purposes
+					Log3 $name, 5, $name. " : DoorBird_Image_Request - working directory        : " . $cwd;
+
+
+					### If the path is given as UNIX file system format
+					if ($cwd =~ /\//) {
+						### Log Entry for debugging purposes
+						Log3 $name, 5, $name. " : DoorBird_Image_Request - file system format       : LINUX";
+
+						### Find out whether it is an absolute path or an relative one (leading "/")
+						if ($hash->{helper}{ImageFileDir} =~ /^\//) {
+							$ImageFileName = $hash->{helper}{ImageFileDir};
+						}
+						else {
+							$ImageFileName = $cwd . "/" . $hash->{helper}{ImageFileDir};						
+						}
+
+						### Check whether the last "/" at the end of the path has been given otherwise add it an create complete path
+						if ($hash->{helper}{ImageFileDir} =~ /\/\z/) {
+							$ImageFileName .=       $ImageFileTimeStamp . "_Snapshot.jpg";
+						}
+						else {
+							$ImageFileName .= "/" . $ImageFileTimeStamp . "_Snapshot.jpg";
+						}
+					}
+
+					### If the path is given as Windows file system format
+					if ($hash->{helper}{ImageFileDir} =~ /\\/) {
+						### Log Entry for debugging purposes
+						Log3 $name, 5, $name. " : DoorBird_Image_Request - file system format       : WINDOWS";
+
+						### Find out whether it is an absolute path or an relative one (containing ":\")
+						if ($hash->{helper}{ImageFileDir} != /^.:\//) {
+							$ImageFileName = $cwd . $hash->{helper}{ImageFileDir};
+						}
+						else {
+							$ImageFileName = $hash->{helper}{ImageFileDir};						
+						}
+
+						### Check whether the last "/" at the end of the path has been given otherwise add it an create complete path
+						if ($hash->{helper}{ImageFileDir} =~ /\\\z/) {
+							$ImageFileName .=       $ImageFileTimeStamp . "_Snapshot.jpg";
+						}
+						else {
+							$ImageFileName .= "\\" . $ImageFileTimeStamp . "_Snapshot.jpg";
+						}
+					}
+					
+					### Log Entry for debugging purposes
+					Log3 $name, 5, $name. " : DoorBird_Image_Request - ImageFileName            : " . $ImageFileName;
+
+					### Open file or write error message in log
+					open my $fh, ">", $ImageFileName or do {
+						### Log Entry 
+						Log3 $name, 2, $name. " : DoorBird_Image_Request -  open file error         : " . $! . " - ". $ImageFileName;
+					};
+					
+					### Write the base64 decoded data in file
+					print $fh decode_base64($ImageData) if defined($fh);
+					
+					### Log Entry for debugging purposes
+					Log3 $name, 5, $name. " : DoorBird_Image_Request - write file               : Successfully written " . $ImageFileName;
+					
+					### Close file or write error message in log
+					close $fh or do {
+						### Log Entry 
+						Log3 $name, 2, $name. " : DoorBird_Image_Request - close file error          : " . $! . " - ". $ImageFileName;
+					}
+				}
 	
 	### Log Entry for debugging purposes
 	Log3 $name, 5, $name. " : DoorBird_Image_Request - ImageData size           : " . length($ImageData);
@@ -2072,7 +2169,8 @@ sub DoorBird_History_Request($$) {
 	
 	### Create Timestamp
 	my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)=localtime(time);
-	my $ImageTimeStamp	= sprintf ( "%04d-%02d-%02d %02d:%02d:%02d",$year+1900, $mon+1, $mday, $hour, $min, $sec);
+	my $ImageTimeStamp	    = sprintf ( "%04d-%02d-%02d %02d:%02d:%02d",$year+1900, $mon+1, $mday, $hour, $min, $sec);
+
 	
 	### Create first part command URL for DoorBird
 	my $UrlPrefix 		= "https://" . $url . "/bha-api/";
@@ -2154,7 +2252,7 @@ sub DoorBird_History_Request_Parse($) {
     my $name = $hash->{NAME};
 
 	### Log Entry for debugging purposes
-	Log3 $name, 5, $name. " : DoorBird_History_Request -----------------------------------------------------------";
+	Log3 $name, 5, $name. " : DoorBird_History_Request ___________________________________________________________";
 	Log3 $name, 5, $name. " : DoorBird_History_Request - Download Index         : " . $hash->{helper}{HistoryDownloadCount};
 	Log3 $name, 5, $name. " : DoorBird_History_Request - err                    : " . $err           if (defined($err  ));
 	Log3 $name, 5, $name. " : DoorBird_History_Request - length data            : " . length($data)  if (defined($data ));
@@ -2174,6 +2272,8 @@ sub DoorBird_History_Request_Parse($) {
 			### Predefine Image Data and Image-hash and hash - reference		
 			my $ImageData;
 			my $ImageTimeStamp;
+			my $ImageFileTimeStamp;
+			my $ImageFileName;
 			my %ImageDataHash;
 			my $ref_ImageDataHash = \%ImageDataHash;
 			
@@ -2188,7 +2288,8 @@ sub DoorBird_History_Request_Parse($) {
 				   $httpHeader =~ s/^[^_]*X-Timestamp: //;
 				   $httpHeader =~ s/\n.*//g;
 				my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)=localtime($httpHeader);
-				$ImageTimeStamp	= sprintf ( "%04d-%02d-%02d %02d:%02d:%02d",$year+1900, $mon+1, $mday, $hour, $min, $sec);
+				$ImageTimeStamp	    = sprintf ( "%04d-%02d-%02d %02d:%02d:%02d",$year+1900, $mon+1, $mday, $hour, $min, $sec);
+				$ImageFileTimeStamp	= sprintf ( "%04d%02d%02d-%02d%02d%02d"    ,$year+1900, $mon+1, $mday, $hour, $min, $sec);
 			}
 			### If http response code is 204 = Nno permission to download the event history
 			elsif ($param->{code} == 204) {
@@ -2226,6 +2327,85 @@ sub DoorBird_History_Request_Parse($) {
 				push (@{$hash->{helper}{Images}{History}{doorbell}}, $ref_ImageDataHash);
 
 				### Log Entry for debugging purposes
+				Log3 $name, 5, $name. " : DoorBird_History_Request - hash - ImageFileDir    : " . $hash->{helper}{ImageFileDir};
+
+				### If pictures supposed to be saved as files
+				if ($hash->{helper}{ImageFileDir} ne "0") {
+
+					### Get current working directory
+					my $cwd = getcwd();
+
+					### Log Entry for debugging purposes
+					Log3 $name, 5, $name. " : DoorBird_History_Request - working directory      : " . $cwd;
+
+
+					### If the path is given as UNIX file system format
+					if ($cwd =~ /\//) {
+						### Log Entry for debugging purposes
+						Log3 $name, 5, $name. " : DoorBird_History_Request - file system format     : LINUX";
+
+						### Find out whether it is an absolute path or an relative one (leading "/")
+						if ($hash->{helper}{ImageFileDir} =~ /^\//) {
+							$ImageFileName = $hash->{helper}{ImageFileDir};
+						}
+						else {
+							$ImageFileName = $cwd . "/" . $hash->{helper}{ImageFileDir};						
+						}
+
+						### Check whether the last "/" at the end of the path has been given otherwise add it an create complete path
+						if ($hash->{helper}{ImageFileDir} =~ /\/\z/) {
+							$ImageFileName .=       $ImageFileTimeStamp . "_Doorbell.jpg";
+						}
+						else {
+							$ImageFileName .= "/" . $ImageFileTimeStamp . "_Doorbell.jpg";
+						}
+					}
+
+					### If the path is given as Windows file system format
+					if ($hash->{helper}{ImageFileDir} =~ /\\/) {
+						### Log Entry for debugging purposes
+						Log3 $name, 5, $name. " : DoorBird_History_Request - file system format     : WINDOWS";
+
+						### Find out whether it is an absolute path or an relative one (containing ":\")
+						if ($hash->{helper}{ImageFileDir} != /^.:\//) {
+							$ImageFileName = $cwd . $hash->{helper}{ImageFileDir};
+						}
+						else {
+							$ImageFileName = $hash->{helper}{ImageFileDir};						
+						}
+
+						### Check whether the last "/" at the end of the path has been given otherwise add it an create complete path
+						if ($hash->{helper}{ImageFileDir} =~ /\\\z/) {
+							$ImageFileName .=       $ImageFileTimeStamp . "_Doorbell.jpg";
+						}
+						else {
+							$ImageFileName .= "\\" . $ImageFileTimeStamp . "_Doorbell.jpg";
+						}
+					}
+					
+					### Log Entry for debugging purposes
+					Log3 $name, 5, $name. " : DoorBird_History_Request - ImageFileName          : " . $ImageFileName;
+
+					### Open file or write error message in log
+					open my $fh, ">", $ImageFileName or do {
+						### Log Entry 
+						Log3 $name, 2, $name. " : DoorBird_History_Request -  open file error       : " . $! . " - ". $ImageFileName;
+					};
+					
+					### Write the base64 decoded data in file
+					print $fh decode_base64($ImageData) if defined($fh);
+					
+					### Log Entry for debugging purposes
+					Log3 $name, 5, $name. " : DoorBird_History_Request - write file             : Successfully written " . $ImageFileName;
+					
+					### Close file or write error message in log
+					close $fh or do {
+						### Log Entry 
+						Log3 $name, 2, $name. " : DoorBird_History_Request - close file error       : " . $! . " - ". $ImageFileName;
+					}
+				}
+				
+				### Log Entry for debugging purposes
 				Log3 $name, 5, $name. " : DoorBird_History_Request - Index - doorbell       : " . $UrlIndex;
 				Log3 $name, 5, $name. " : DoorBird_History_Request - ImageData - doorbell   : " . length($ImageData);
 			} 
@@ -2242,6 +2422,85 @@ sub DoorBird_History_Request_Parse($) {
 			
 				### Save image hash into array of hashes
 				push (@{$hash->{helper}{Images}{History}{motionsensor}}, $ref_ImageDataHash);
+
+				### Log Entry for debugging purposes
+				Log3 $name, 5, $name. " : DoorBird_History_Request - hash - ImageFileDir    : " . $hash->{helper}{ImageFileDir};
+
+				### If pictures supposed to be saved as files
+				if ($hash->{helper}{ImageFileDir} ne "0") {
+
+					### Get current working directory
+					my $cwd = getcwd();
+
+					### Log Entry for debugging purposes
+					Log3 $name, 5, $name. " : DoorBird_History_Request - working directory      : " . $cwd;
+
+
+					### If the path is given as UNIX file system format
+					if ($cwd =~ /\//) {
+						### Log Entry for debugging purposes
+						Log3 $name, 5, $name. " : DoorBird_History_Request - file system format     : LINUX";
+
+						### Find out whether it is an absolute path or an relative one (leading "/")
+						if ($hash->{helper}{ImageFileDir} =~ /^\//) {
+							$ImageFileName = $hash->{helper}{ImageFileDir};
+						}
+						else {
+							$ImageFileName = $cwd . "/" . $hash->{helper}{ImageFileDir};						
+						}
+
+						### Check whether the last "/" at the end of the path has been given otherwise add it an create complete path
+						if ($hash->{helper}{ImageFileDir} =~ /\/\z/) {
+							$ImageFileName .=       $ImageFileTimeStamp . "_Motion.jpg";
+						}
+						else {
+							$ImageFileName .= "/" . $ImageFileTimeStamp . "_Motion.jpg";
+						}
+					}
+
+					### If the path is given as Windows file system format
+					if ($hash->{helper}{ImageFileDir} =~ /\\/) {
+						### Log Entry for debugging purposes
+						Log3 $name, 5, $name. " : DoorBird_History_Request - file system format     : WINDOWS";
+
+						### Find out whether it is an absolute path or an relative one (containing ":\")
+						if ($hash->{helper}{ImageFileDir} != /^.:\//) {
+							$ImageFileName = $cwd . $hash->{helper}{ImageFileDir};
+						}
+						else {
+							$ImageFileName = $hash->{helper}{ImageFileDir};						
+						}
+
+						### Check whether the last "/" at the end of the path has been given otherwise add it an create complete path
+						if ($hash->{helper}{ImageFileDir} =~ /\\\z/) {
+							$ImageFileName .=       $ImageFileTimeStamp . "_Motion.jpg";
+						}
+						else {
+							$ImageFileName .= "\\" . $ImageFileTimeStamp . "_Motion.jpg";
+						}
+					}
+					
+					### Log Entry for debugging purposes
+					Log3 $name, 5, $name. " : DoorBird_History_Request - ImageFileName          : " . $ImageFileName;
+
+					### Open file or write error message in log
+					open my $fh, ">", $ImageFileName or do {
+						### Log Entry 
+						Log3 $name, 2, $name. " : DoorBird_History_Request -  open file error       : " . $! . " - ". $ImageFileName;
+					};
+					
+					### Write the base64 decoded data in file
+					print $fh decode_base64($ImageData) if defined($fh);
+					
+					### Log Entry for debugging purposes
+					Log3 $name, 5, $name. " : DoorBird_History_Request - write file             : Successfully written " . $ImageFileName;
+					
+					### Close file or write error message in log
+					close $fh or do {
+						### Log Entry 
+						Log3 $name, 2, $name. " : DoorBird_History_Request - close file error       : " . $! . " - ". $ImageFileName;
+					}
+				}
 			
 				### Log Entry for debugging purposes
 				Log3 $name, 5, $name. " : DoorBird_History_Request - Index - motionsensor   : " . $UrlIndex;
@@ -2744,12 +3003,11 @@ sub DoorBird_BlockGet($$$$) {
 					<li>sudo apt-get install sox					</li>
 					<li>sudo apt-get install libsox-fmt-all			</li>
 					<li>sudo apt-get install libsodium-dev			</li>
-					<li>sudo cpanm HTTP::Request::StreamingUpload	</li>
-					<li>sudo cpanm LWP::UserAgent					</li>
-					<li>sudo cpanm Alien::Base::ModuleBuild			</li>
-					<li>sudo cpanm Alien::Sodium					</li>
-					<li>sudo cpanm Crypt::NaCl::Sodium				</li>
-					<li>sudo cpanm MIME::Base64						</li>
+					<li>sudo cpan LWP::UserAgent					</li>
+					<li>sudo cpan Alien::Base::ModuleBuild			</li>
+					<li>sudo cpan Alien::Sodium					</li>
+					<li>sudo cpan Crypt::NaCl::Sodium				</li>
+					<li>sudo cpan MIME::Base64						</li>
 				</code>
 			</td>
 		</tr>
@@ -2881,6 +3139,12 @@ sub DoorBird_BlockGet($$$$) {
 																   The default value is <code>**620</code><BR>
 				</td>
 			</tr>
+			<tr>
+				<td>
+					<code>ImageFileDir</code> : </td><td>The relative (e.g. "images") or absolute (e.g. "/mnt/NAS/images") with or without trailing "/" directory path to which the image files supposed to be stored.<BR>
+																   The default value is <code>0</code> = disabled<BR>
+				</td>
+			</tr>
 		</table>
 	</ul>
 </ul>
@@ -2903,12 +3167,11 @@ sub DoorBird_BlockGet($$$$) {
 					<li>sudo apt-get install sox					</li>
 					<li>sudo apt-get install libsox-fmt-all			</li>
 					<li>sudo apt-get install libsodium-dev			</li>
-					<li>sudo cpanm HTTP::Request::StreamingUpload	</li>
-					<li>sudo cpanm LWP::UserAgent					</li>
-					<li>sudo cpanm Alien::Base::ModuleBuild			</li>
-					<li>sudo cpanm Alien::Sodium					</li>
-					<li>sudo cpanm Crypt::NaCl::Sodium				</li>
-					<li>sudo cpanm MIME::Base64						</li>
+					<li>sudo cpan LWP::UserAgent					</li>
+					<li>sudo cpan Alien::Base::ModuleBuild			</li>
+					<li>sudo cpan Alien::Sodium					</li>
+					<li>sudo cpan Crypt::NaCl::Sodium				</li>
+					<li>sudo cpan MIME::Base64						</li>
 				</code>
 			</td>
 		</tr>
@@ -3028,6 +3291,12 @@ sub DoorBird_BlockGet($$$$) {
 				<td>
 					<code>SipNumber</code> : </td><td>Die Telefonnummer unter der die DoorBird / Anlage registriert und erreicht werden kann.<BR>
 																   Der Default Wert ist <code>**620</code><BR>
+				</td>
+			</tr>
+					<tr>
+				<td>
+					<code>ImageFileDir</code> : </td><td>Der relative (z.B. "images") oder absolute (z.B. "/mnt/NAS/images") Verzeichnispfad mit oder ohne nachfolgendem Pfadzeichen "/"  in welchen die Bild-Dateien gespeichert werden sollen.<BR>
+																   The Default Wert ist <code>0</code> = deaktiviert<BR>
 				</td>
 			</tr>
 		</table>
