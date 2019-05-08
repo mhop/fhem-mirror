@@ -1,4 +1,4 @@
-<TaskerData sr="" dvi="1" tv="5.6">
+<TaskerData sr="" dvi="1" tv="5.7.1">
 	<dmetric>1440.0,2712.0</dmetric>
 	<Profile sr="prof2582" ve="2">
 		<cdate>1540732022751</cdate>
@@ -639,7 +639,6 @@ Telegram</label>
 	</Profile>
 	<Profile sr="prof2606" ve="2">
 		<cdate>1540732022826</cdate>
-		<clp>true</clp>
 		<edate>1540586468041</edate>
 		<id>2606</id>
 		<mid0>2513</mid0>
@@ -928,7 +927,7 @@ Telegram</label>
 	<Profile sr="prof931" ve="2">
 		<cdate>1517475377117</cdate>
 		<clp>true</clp>
-		<edate>1542273204558</edate>
+		<edate>1556626567371</edate>
 		<id>931</id>
 		<mid0>932</mid0>
 		<nme>AMAD_Call(outgoing)</nme>
@@ -951,12 +950,36 @@ Telegram</label>
 			</ConditionList>
 		</State>
 	</Profile>
+	<Profile sr="prof940" ve="2">
+		<cdate>1556625891107</cdate>
+		<clp>true</clp>
+		<edate>1556627058963</edate>
+		<id>940</id>
+		<mid0>941</mid0>
+		<nme>AMAD_nfcLastTagID</nme>
+		<Event sr="con0" ve="2">
+			<code>2076</code>
+			<pri>0</pri>
+			<Str sr="arg0" ve="3"/>
+			<Str sr="arg1" ve="3"/>
+		</Event>
+		<State sr="con1" ve="2">
+			<code>165</code>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%AMAD_send</lhs>
+					<op>2</op>
+					<rhs>on</rhs>
+				</Condition>
+			</ConditionList>
+		</State>
+	</Profile>
 	<Project sr="proj0" ve="2">
 		<cdate>1502789371413</cdate>
 		<name>AMAD</name>
-		<pids>2593,2598,2603,2610,2608,2613,2583,922,2586,2609,2584,2604,2602,2582,926,2592,2596,2588,2605,2612,2595,2607,2589,924,2591,2594,2611,2590,2601,2597,2587,931,2606,2585,918,2600,2599</pids>
-		<scenes>AMAD_settings,AMAD_Popup,Lock,AMAD_Dialog_Message</scenes>
-		<tids>2558,925,2563,2581,850,2522,2534,2531,2575,2576,2539,2538,2533,2528,2515,2552,2511,2490,2573,2537,2544,2568,932,2509,2540,2492,2545,2517,2580,2521,2512,2535,2499,2557,2556,2543,2493,2529,2541,2530,2559,2546,2555,2505,2495,2554,2567,2547,2527,2553,2578,2506,2500,2510,2516,2520,2496,2566,2561,2577,2507,2508,2562,2504,2519,2571,2572,920,2514,2564,2532,2491,2536,2569,2526,2551,2488,2518,2498,2549,2560,2570,923,2525,2524,2574,2502,2579,2565,2542,2548,2497,927,2503,2523,2513,914,2494,2501,2550</tids>
+		<pids>918,2590,940,2604,2595,2612,2594,2607,2606,2613,926,2605,2588,2596,2598,2593,2601,2608,2602,2584,924,2592,2589,2591,2586,2600,2585,2583,931,2610,2587,2582,2597,922,2599,2603,2609,2611</pids>
+		<scenes>AMAD_settings,AMAD_Dialog_Message,Lock,AMAD_Popup</scenes>
+		<tids>2559,2557,2576,2522,914,2564,2492,2560,2577,2539,850,2537,2499,2544,2567,2538,2503,2573,923,2555,2575,2543,2515,2510,2521,2505,2562,2571,2508,2547,2511,2565,2556,2519,2495,2520,2536,2581,2491,2554,2528,2578,925,2514,2558,2504,2551,2493,2523,2525,2490,2563,2542,2517,2569,2529,2498,2532,2531,2553,2533,2506,2494,2574,2552,2546,2516,2561,2534,2545,2572,2496,2524,2507,2549,2512,2509,2500,2527,2502,2568,2566,2518,2530,932,2535,941,2550,927,2488,2513,2548,2526,920,2579,2540,2501,2570,2541,2497,2580</tids>
 		<Kid sr="Kid">
 			<feat0>android.hardware.bluetooth:y</feat0>
 			<feat1>android.hardware.camera.front:y</feat1>
@@ -968,6 +991,7 @@ Telegram</label>
 			<mplug1>com.joaomgcd.autoremote</mplug1>
 			<mplug2>bidoismorgan.httpevent</mplug2>
 			<pkg>com.schlimbo.amad</pkg>
+			<vTarg>21</vTarg>
 			<vnme>1.0</vnme>
 			<vnum>10</vnum>
 		</Kid>
@@ -978,10 +1002,10 @@ AMAD is an interface between SmartHome and Android device.
 
 Description:
 See the FHEM commandref description: 
-&lt;a href="https://fhem.de/commandref.html#AMADDevice"&gt;https://fhem.de/commandref.html#AMADDevice&lt;/a&gt; 
+&lt;html&gt;&lt;a href="https://fhem.de/commandref.html#AMADDevice"&gt;https://fhem.de/commandref.html#AMADDevice&lt;/a&gt;&lt;/html&gt;
 
 Forum entry:
-&lt;a href="https://forum.fhem.de/index.php/topic,81167.0.html"&gt;https://forum.fhem.de/index.php/topic,81167.0.html&lt;/a&gt;</d>
+&lt;html&gt;&lt;a href="https://forum.fhem.de/index.php/topic,81167.0.html"&gt;https://forum.fhem.de/index.php/topic,81167.0.html&lt;/a&gt;&lt;/html&gt;</d>
 			<t>AMAD</t>
 		</Share>
 		<Img sr="icon" ve="2">
@@ -5751,7 +5775,7 @@ Code: %HTTPR</Str>
 		<cdate>1503937837718</cdate>
 		<edate>1503937837718</edate>
 		<id>2510</id>
-		<pri>102</pri>
+		<pri>9</pri>
 		<Action sr="act0" ve="7">
 			<code>130</code>
 			<label>Einstellungen speichern</label>
@@ -10030,6 +10054,7 @@ URL: %url</Str>
 		<cdate>1512173777582</cdate>
 		<edate>1512173777582</edate>
 		<id>2563</id>
+		<pri>9</pri>
 		<Action sr="act0" ve="7">
 			<code>37</code>
 			<ConditionList sr="if">
@@ -11563,6 +11588,8 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 		<Action sr="act130" ve="7">
 			<code>248</code>
 			<se>false</se>
+			<Int sr="arg0" val="0"/>
+			<Int sr="arg1" val="0"/>
 			<ConditionList sr="if">
 				<Condition sr="c0" ve="3">
 					<lhs>%tpe_screen</lhs>
@@ -12765,13 +12792,13 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 	</Task>
 	<Task sr="task850">
 		<cdate>1540808276450</cdate>
-		<edate>1553805007312</edate>
+		<edate>1556654361557</edate>
 		<id>850</id>
 		<nme>AMAD_init</nme>
 		<Action sr="act0" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%AMAD_version</Str>
-			<Str sr="arg1" ve="3">4.4.0 (Tasker)</Str>
+			<Str sr="arg1" ve="3">4.4.1 (Tasker)</Str>
 			<Int sr="arg2" val="0"/>
 			<Int sr="arg3" val="0"/>
 			<Int sr="arg4" val="0"/>
@@ -13018,7 +13045,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 	</Task>
 	<Task sr="task932">
 		<cdate>1517475385032</cdate>
-		<edate>1542273204558</edate>
+		<edate>1556625976253</edate>
 		<id>932</id>
 		<pri>6</pri>
 		<Action sr="act0" ve="7">
@@ -13111,6 +13138,50 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 			<Str sr="arg3" ve="3">%setreading</Str>
 			<Str sr="arg4" ve="3"/>
 			<Int sr="arg5" val="0"/>
+		</Action>
+	</Task>
+	<Task sr="task941">
+		<cdate>1556625900242</cdate>
+		<edate>1556627058963</edate>
+		<id>941</id>
+		<pri>6</pri>
+		<Action sr="act0" ve="7">
+			<code>37</code>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%evtprm1</lhs>
+					<op>5</op>
+					<rhs>evtprm1</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act1" ve="7">
+			<code>548</code>
+			<Str sr="arg0" ve="3">TagID: %evtprm1</Str>
+			<Int sr="arg1" val="0"/>
+		</Action>
+		<Action sr="act2" ve="7">
+			<code>547</code>
+			<label>nfcLastTagID</label>
+			<Str sr="arg0" ve="3">%setreading</Str>
+			<Str sr="arg1" ve="3">"nfcLastTagID": "%evtprm1"</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+		</Action>
+		<Action sr="act3" ve="7">
+			<code>130</code>
+			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
+			<Int sr="arg1">
+				<var>%priority</var>
+			</Int>
+			<Str sr="arg2" ve="3">setreading</Str>
+			<Str sr="arg3" ve="3">%setreading</Str>
+			<Str sr="arg4" ve="3"/>
+			<Int sr="arg5" val="0"/>
+		</Action>
+		<Action sr="act4" ve="7">
+			<code>38</code>
 		</Action>
 	</Task>
 </TaskerData>

@@ -65,7 +65,7 @@ use warnings;
 use FHEM::Meta;
 
 my $modulversion   = '4.4.1';
-my $flowsetversion = '4.4.0';
+my $flowsetversion = '4.4.1';
 
 sub AMADCommBridge_Initialize($) {
 
