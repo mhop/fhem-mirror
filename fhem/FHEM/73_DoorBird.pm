@@ -79,7 +79,6 @@ sub DoorBird_Undefine($$);
 # END
 
 
-
 ###START###### Initialize module ##############################################################################START####
 sub DoorBird_Initialize($)
 {
@@ -103,9 +102,10 @@ sub DoorBird_Initialize($)
 							   "UdpPort:6524,35344 " .
 							   "SipDevice:" . join(",", devspec2array("TYPE=SIP")) . " " .
 							   "SipNumber " .
+							   "SessionIdSec:slider,0,10,600 " .
 							   "disable:1,0 " .
 							   "debug:1,0 " .
-						       "loglevel:0,1,2,3,4,5 " .
+						       "loglevel:slider,0,1,5 " .
 						       $readingFnAttributes;
 }
 ####END####### Initialize module ###############################################################################END#####
@@ -190,6 +190,8 @@ sub DoorBird_Define($$)
 	  $hash->{helper}{MaxHistory}						= AttrVal($name, "MaxHistory", 50);
 	  $hash->{helper}{HistoryTime}						= "????-??-?? ??:??";
 	  $hash->{helper}{UdpPort}							= AttrVal($name, "UdpPort", 6524);
+	  $hash->{helper}{SessionIdSec}						= AttrVal($name, "SessionIdSec", 540);
+	  $hash->{helper}{SessionId}						= 0;
 	  $hash->{helper}{UdpMessageId}						= 0;
 	@{$hash->{helper}{RelayAdresses}}					= (0);
 	@{$hash->{helper}{Images}{History}{doorbell}}		= ();
@@ -219,7 +221,8 @@ sub DoorBird_Define($$)
 	DoorBird_Live_Video($hash, "off");
 
 	### Initiate the timer for first time
-	InternalTimer(gettimeofday()+300, "DoorBird_LostConn", $hash, 0);
+	InternalTimer(gettimeofday()+ $hash->{helper}{KeepAliveTimeout}	, "DoorBird_LostConn",       $hash, 0);
+	InternalTimer(gettimeofday()+ 10,                                 "DoorBird_RenewSessionID", $hash, 0);
 
 	return undef;
 }
@@ -267,7 +270,7 @@ sub DoorBird_Attr(@)
 		### Check whether device shall be disabled
 		if ($a[3] == 1) {
 			### Update STATE of device
-			readingsSingleUpdate($hash, "state", "Disabled", 1);
+			readingsSingleUpdate($hash, "state", "disabled", 1);
 			
 			### Stop the current timer
 			RemoveInternalTimer($hash);
@@ -380,8 +383,9 @@ sub DoorBird_Attr(@)
 	}
 	### Check whether KeepAliveTimeout attribute has been provided
 	elsif ($a[2] eq "KeepAliveTimeout") {
-		### Stop Timer
-		RemoveInternalTimer($hash);
+		### Remove Timer for LostConn
+		RemoveInternalTimer($hash, "DoorBird_LostConn");
+		
 		### Check whether KeepAliveTimeout is numeric and greater or equal than 10
 		if ($a[3] == int($a[3]) && ($a[3] >= 10)) {
 			### Save attribute as internal
@@ -394,7 +398,35 @@ sub DoorBird_Attr(@)
 		}
 		### Initiate the timer for first time
 		InternalTimer(gettimeofday()+$hash->{helper}{KeepAliveTimeout}, "DoorBird_LostConn", $hash, 0);
-	}	
+	}
+	### Check whether SessionIdSec attribute has been provided
+	elsif ($a[2] eq "SessionIdSec") {	
+		### Remove Timer for LostConn
+		RemoveInternalTimer($hash, "DoorBird_RenewSessionID");
+	
+		### Check whether SessionIdSec is 0 = disabled
+		if ($a[3] == int($a[3]) && ($a[3] == 0)) {
+			### Save attribute as internal
+			$hash->{helper}{SessionIdSec}  = 0;
+		}
+		### If KeepAliveTimeout is numeric and greater than 9s
+		elsif ($a[3] == int($a[3]) &&  ($a[3] > 9)) {
+
+			### Save attribute as internal
+			$hash->{helper}{SessionIdSec}  = $a[3];
+
+			### Re-Initiate the timer
+			InternalTimer(gettimeofday()+$hash->{helper}{SessionIdSec}, "DoorBird_RenewSessionID", $hash, 0);
+		}
+		### If KeepAliveTimeout is NOT numeric or smaller than 10
+		else{
+			### Save standard interval as internal
+			$hash->{helper}{SessionIdSec}  = 540;
+			
+			### Re-Initiate the timer
+			InternalTimer(gettimeofday()+$hash->{helper}{SessionIdSec}, "DoorBird_RenewSessionID", $hash, 0);
+		}
+	}
 	### If no attributes of the above known ones have been selected
 	else {
 		# Do nothing
@@ -635,8 +667,8 @@ sub DoorBird_Read($) {
 				### Log Entry for debugging purposes
 				Log3 $name, 5, $name. " : DoorBird_Read - UDP datagram transmitted is new - Working on it.";
 
-				### Remove all timer
-				RemoveInternalTimer($hash);
+				### Remove timer for LostConn
+				RemoveInternalTimer($hash, "DoorBird_LostConn");
 
 				### If Reading for state is not already "connected"
 				if (ReadingsVal($name, "state", "") ne "connected") {
@@ -833,6 +865,96 @@ sub DoorBird_LostConn($) {
 	return;
 }
 ####END####### Lost Connection with DorBird unit ###############################################################END#####
+
+###START###### Renew Session ID for DorBird unit ##############################################################START####
+sub DoorBird_RenewSessionID($) {
+	my ($hash) = @_;
+
+	### Obtain values from hash
+    my $name 	= $hash->{NAME};
+	my $command	= "getsession.cgi"; 
+	my $method	= "GET";
+	my $header	= "Accept: application/json";
+	my $err 	= " ";
+	my $data 	= " ";
+	my $json;
+	
+	### Obtain data
+	($err, $data) = DoorBird_BlockGet($hash, $command, $method, $header);
+
+	### Remove Newlines for better log entries
+	my $ShowData = $data;
+	$ShowData =~ s/[\t]//g;
+	$ShowData =~ s/[\r]//g;
+	$ShowData =~ s/[\n]//g;
+
+	
+	### Log Entry for debugging purposes
+	Log3 $name, 5, $name. " : DoorBird_RenewSessionID  - err                    : " . $err      if(defined($err));
+	Log3 $name, 5, $name. " : DoorBird_RenewSessionID  - data                   : " . $ShowData if(defined($ShowData));
+	
+	### If no error has been handed back
+	if ($err eq "") {
+		### Check if json can be parsed into hash	
+		eval 
+		{
+			$json = decode_json(encode_utf8($data));
+			1;
+		}
+		or do 
+		{
+			### Log Entry for debugging purposes
+			Log3 $name, 3, $name. " : DoorBird_RenewSessionID - Data cannot parsed JSON   : Info_Request";
+			return $name. " : DoorBird_RenewSessionID - Data cannot be parsed by JSON for Info_Request";
+		};
+	
+		### Extract SessionId from hash
+		$hash->{helper}{SessionId} = $json-> {BHA}{SESSIONID};
+
+		### Remove timer for LostConn
+		RemoveInternalTimer($hash, "DoorBird_RenewSessionID");
+
+		### If a time interval for the Session ID has been provided.
+		if ($hash->{helper}{SessionIdSec} > 0) {
+			### Initiate the timer for renewing SessionId
+			InternalTimer(gettimeofday()+ $hash->{helper}{SessionIdSec}, "DoorBird_RenewSessionID", $hash, 0);
+
+			### Log Entry for debugging purposes
+			Log3 $name, 5, $name. " : DoorBird_RenewSessionID - Session ID refreshed    : " . $hash->{helper}{SessionId};
+		}
+		### If a time interval of 0 = disabled has been provided.
+		else {
+			### Log Entry for debugging purposes
+			Log3 $name, 5, $name. " : DoorBird_RenewSessionID - Session ID Security has been disabled - No further renewing of SessionId.";
+		}
+		
+		### If the VideoStream has been activated
+		if (ReadingsVal($name, ".VideoURL", "") ne "") {
+			### Refresh Video URL
+			DoorBird_Live_Video($hash, undef);
+			
+			### Log Entry for debugging purposes
+			Log3 $name, 5, $name. " : DoorBird_RenewSessionID - VideoUrl refreshed";
+		}
+		
+		### If the AudioStream has been activated
+		if (ReadingsVal($name, ".AudioURL", "") ne "") {
+			### Refresh Video URL
+			DoorBird_Live_Audio($hash, undef);
+			
+			### Log Entry for debugging purposes
+			Log3 $name, 5, $name. " : DoorBird_RenewSessionID - AudioUrl refreshed";
+		}
+		return
+	}
+	### If error has been handed back
+	else {
+		$err =~ s/^[^ ]*//;
+		return "ERROR!\nError Code:" . $err;
+	}
+	return;
+}
+####END####### Renew Session ID for DorBird unit ###############################################################END#####
 
 ###START###### Define Test-Function for UDP decryption ########################################################START####
 sub DoorBird_Decrypt($) {
@@ -1239,8 +1361,8 @@ sub DoorBird_FW_detailFn($$$$) {
 	
 	### Log Entry for debugging purposes
 #	Log3 $name, 5, $name. " : DoorBird_FW_detailFn - ImageHtmlCode              : " . $ImageHtmlCode;
-	Log3 $name, 5, $name. " : DoorBird_FW_detailFn - VideoHtmlCode              : " . $VideoHtmlCode;
-	Log3 $name, 5, $name. " : DoorBird_FW_detailFn - AudioHtmlCode              : " . $AudioHtmlCode;
+#	Log3 $name, 5, $name. " : DoorBird_FW_detailFn - VideoHtmlCode              : " . $VideoHtmlCode;
+#	Log3 $name, 5, $name. " : DoorBird_FW_detailFn - AudioHtmlCode              : " . $AudioHtmlCode;
 	
 	if ((@HistoryDoorbell > 0) || (@HistoryMotion > 0)) {
 		$htmlCode .=	
@@ -1526,17 +1648,25 @@ sub DoorBird_Live_Video($$) {
 
 	### Obtain values from hash
 	my $name			= $hash->{NAME};
-	my $username 		= DoorBird_credential_decrypt($hash->{helper}{".USER"});
-	my $password		= DoorBird_credential_decrypt($hash->{helper}{".PASSWORD"});
+
 	my $url 			= $hash->{helper}{URL};
-	
-	### Create complete command URL for DoorBird
+
+
+	### Create complete command URL for DoorBird depending on whether SessionIdSecurity has been enabled (>0) or disabled (=0)
 	my $UrlPrefix 		= "http://" . $url . "/bha-api/";
-	my $UrlPostfix 		= "?http-user=". $username . "&http-password=" . $password;
+	my $UrlPostfix;
+	if ($hash->{helper}{SessionIdSec} > 0) {
+		$UrlPostfix 	= "?sessionid=" . $hash->{helper}{SessionId};
+	}
+	else {
+		my $username 	= DoorBird_credential_decrypt($hash->{helper}{".USER"});
+		my $password	= DoorBird_credential_decrypt($hash->{helper}{".PASSWORD"});
+		$UrlPostfix 	= "?http-user=". $username . "&http-password=" . $password;
+	}
 	my $VideoURL 		= $UrlPrefix . "video.cgi" . $UrlPostfix;
 
 	### Log Entry for debugging purposes
-	#Log3 $name, 5, $name. " : DoorBird_Live_Video - VideoURL                    : " . $VideoURL ;
+	Log3 $name, 5, $name. " : DoorBird_Live_Video - VideoURL                    : " . $VideoURL ;
 	Log3 $name, 5, $name. " : DoorBird_Live_Video - VideoURL                    : Created";
 
 	### If VideoStreaming shall be switched ON
@@ -1573,13 +1703,19 @@ sub DoorBird_Live_Audio($$) {
 
 	### Obtain values from hash
 	my $name			= $hash->{NAME};
-	my $username 		= DoorBird_credential_decrypt($hash->{helper}{".USER"});
-	my $password		= DoorBird_credential_decrypt($hash->{helper}{".PASSWORD"});
 	my $url 			= $hash->{helper}{URL};
 	
-	### Create complete command URL for DoorBird
+	### Create complete command URL for DoorBird depending on whether SessionIdSecurity has been enabled (>0) or disabled (=0)
 	my $UrlPrefix 		= "http://" . $url . "/bha-api/";
-	my $UrlPostfix 		= "?http-user=". $username . "&http-password=" . $password;
+	my $UrlPostfix;
+	if ($hash->{helper}{SessionIdSec} > 0) {
+		$UrlPostfix 	= "?sessionid=" . $hash->{helper}{SessionId};
+	}
+	else {
+		my $username 	= DoorBird_credential_decrypt($hash->{helper}{".USER"});
+		my $password	= DoorBird_credential_decrypt($hash->{helper}{".PASSWORD"});
+		$UrlPostfix 	= "?http-user=". $username . "&http-password=" . $password;
+	}
 	my $AudioURL 		= $UrlPrefix . "audio-receive.cgi" . $UrlPostfix;
 
 	### Log Entry for debugging purposes
@@ -1629,7 +1765,7 @@ sub DoorBird_Image_Request($$) {
 	my $json			= " ";
 	
 	### Create complete command URL for DoorBird
-	my $UrlPrefix 		= "http://" . $url . "/bha-api/";
+	my $UrlPrefix 		= "https://" . $url . "/bha-api/";
 	my $UrlPostfix 		= "?http-user=". $username . "&http-password=" . $password;
 	my $ImageURL 		= $UrlPrefix . $command . $UrlPostfix;
 
@@ -1939,7 +2075,7 @@ sub DoorBird_History_Request($$) {
 	my $ImageTimeStamp	= sprintf ( "%04d-%02d-%02d %02d:%02d:%02d",$year+1900, $mon+1, $mday, $hour, $min, $sec);
 	
 	### Create first part command URL for DoorBird
-	my $UrlPrefix 		= "http://" . $url . "/bha-api/";
+	my $UrlPrefix 		= "https://" . $url . "/bha-api/";
 
 	### If the Itereation is started for the first time = new polling
 	if ($hash->{helper}{HistoryDownloadCount} == 0) {
@@ -2562,7 +2698,7 @@ sub DoorBird_BlockGet($$$$) {
 	my $PollingTimeout  = $hash->{helper}{PollingTimeout};
 	
 	### Create complete command URL for DoorBird
-	my $UrlPrefix 		= "http://" . $url . "/bha-api/";
+	my $UrlPrefix 		= "https://" . $url . "/bha-api/";
 	my $CommandURL 		= $UrlPrefix . $ApiCom;
 	
 	### Log Entry for debugging purposes
@@ -2734,6 +2870,13 @@ sub DoorBird_BlockGet($$$$) {
 			</tr>
 			<tr>
 				<td>
+					<code>SessionIdSec</code> : </td><td>Time in seconds for how long the session Id shall be valid, which is required for secure Video and Audio transmission. The DoorBird kills the session Id after 10min = 600s automatically. In case of use with CCTV recording units, this function must be disabled by setting to 0.<BR>
+																   The default value is 540s = 9min.<BR>
+
+				</td>
+			</tr>
+			<tr>
+				<td>
 					<code>SipNumber</code> : </td><td>The telephone number under which the DoorBird unit is registered and can be called.<BR>
 																   The default value is <code>**620</code><BR>
 				</td>
@@ -2869,7 +3012,13 @@ sub DoorBird_BlockGet($$$$) {
 														  Der Default Port ist 6524<BR>
 				</td>
 			</tr>
-					<tr>
+			<tr>
+				<td>
+					<code>SessionIdSec</code> : </td><td>Zeit in Sekunden nach welcher die Session Id erneuert werden soll. Diese ist f&uuml;r die sichere &Uuml;bertragung der Video und Audio Verbindungsdaten notwendig. Die DoorBird-Unit devalidiert die Session Id automatisch nach 10min. F&uuml;r den Fall, dass die DoorBird Kamera an ein &Uuml;berwachungssystem angebunden werden soll, muss diese Funktion ausser Betrieb genommen werden indem man den Wert auf 0 setzt 0.<BR>
+																   Der Default Wert ist 540s = 9min.<BR>
+				</td>
+			</tr>
+			<tr>
 				<td>
 					<code>SipDevice</code> : </td><td>Name des fhem SIP Device mit wessen Nummer in der DoorBird - Anlage hinterlegt wurde die die DoorBird - Anlage  anrufen d&uuml;rfen. Refer to <a href="#SIP">SIP</a>.<BR>
 																   Der Default Wert ist das erste SIP device in fhem.<BR>
