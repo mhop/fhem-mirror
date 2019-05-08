@@ -25,6 +25,10 @@
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU General Public License for more details.
 #
+#  TODO: 
+#     Wenn Geräteaktion auf Wecken steht, wird bei manuellem Wecken nicht ausgelöst. Also besser umstellen von ZEIT auf Weckevent
+#     Wieso Tageszeit ab 8:00, wenn schon um 7:30 geweckt wurde ?
+#
 ########################################################################################
 
 package main;
@@ -47,7 +51,7 @@ my $yaahmname;
 my $yaahmlinkname   = "Profile";     # link text
 my $yaahmhiddenroom = "ProfileRoom"; # hidden room
 my $yaahmpublicroom = "Unsorted";    # public room
-my $yaahmversion    = "3.0";
+my $yaahmversion    = "3.1";
 my $firstcall       = 1;
     
 my %yaahm_transtable_EN = ( 
@@ -1700,7 +1704,7 @@ sub YAAHM_startDeviceActions($) {
   return
     if( !$avl );
     
-  my ($dea,$dev,$evt,$eval,$lval,$xval,$tsw,$tfinal);
+  my ($dea,$dev,$evt);
     
   #-- number of action devices
   my $devactno;  
@@ -1715,9 +1719,7 @@ sub YAAHM_startDeviceActions($) {
       delete($hash->{DATA}{"XT"}{$key});
     }
   }
-  
-  readingsBeginUpdate($hash);
-  
+
   #-- start timer
   for( my $i=0;$i < $devactno ;$i++){
     $dea  = $actdevlist[$i];
@@ -1727,84 +1729,55 @@ sub YAAHM_startDeviceActions($) {
       next;
     }
     $evt  = $hash->{DATA}{"XT"}{$dea}{"event"};
-    $eval = $hash->{DATA}{"XT"}{$dea}{"earliest"};
-    $lval = $hash->{DATA}{"XT"}{$dea}{"latest"};
-    $xval = $hash->{DATA}{"XT"}{$dea}{"cmd"};
-    
-    #-- precise time
-    if( $evt =~ /$defaultdailykeys/ ){
-      $tsw = ReadingsVal($name,"s_".$evt,"?");
-    }else{
-      my $jnd = undef;
-      for( my $j=0;$j < int( @{$hash->{DATA}{"WT"}} );$j++){
-        $jnd = $j
-          if( ($hash->{DATA}{"WT"}[$j]{"name"} eq $evt) && ($evt !~ /(wakeup)|(sleep)/) );
-      }
-      if( defined($jnd) ){
-        $tsw = ReadingsVal($name,"ring_".$jnd,"?");
-      }else{
-        $tsw = "?";
-      }
-    }
-    
-    #-- TODO: only if timer is enabled !!!
     my $early = $hash->{DATA}{"XT"}{$dea}{"earliest"};
-    my $late  = $hash->{DATA}{"XT"}{$dea}{"latest"};
-    if( $tsw =~ /(^off)|(\d?\d:\d\d(:\d\d)?)/ ){
-      my $early = $hash->{DATA}{"XT"}{$dea}{"earliest"};
-      my $late  = $hash->{DATA}{"XT"}{$dea}{"latest"};
+    my $late = $hash->{DATA}{"XT"}{$dea}{"latest"};
+    my $exec = $hash->{DATA}{"XT"}{$dea}{"cmd"};
+    my $cond;
+  
+    #-- event given is a housetime event (including wakeup/sleep)
+    if( $evt =~ /$defaultdailykeys/ ){
+      $cond = "[$name:\"housetime: $evt\"]";
+    #-- event is a weekly timer event (excluding wakeup/sleep)
+    #}else{
+    #  $cond = "[$name:\"weeklytimer $evt\"]";
+     }else{
+      Log3 $name,1,"[YAAHM_startDeviceActions] event $evt not in list of allowed events";
+      next;
+    }
 
-      #-- no direct time, use latest
-      if( $tsw =~ /^off/ ){
-        if( defined($late) && $late =~ /\d?\d:\d\d(:\d\d)?/ ){
-          $tfinal = $late;
-        }else{
-          $tfinal = "?";
-        }
-      }elsif( $tsw =~ /\d?\d:\d\d(:\d\d)?/ ){
-        #-- direct switching time
-        $tfinal = $tsw;
-        my ($hc,$mc) = split(':',$tsw); 
-        #--early time defined
-        if( defined($early) && $early =~ /\d?\d:\d\d(:\d\d)?/ ){
-          my ($he,$me) = split(':',$early);
-          my $de=60*($he-$hc)+($me-$mc);
-          #-- too early, action at early
-          if( $de>0 ){
-            $tfinal = $early;
-          }
-        }
-        #-- late time defined
-        if( defined($late) && $late =~ /\d?\d:\d\d(:\d\d)?/ ){
-          my ($hl,$ml) = split(':',$late);
-          my $dl=60*($hl-$hc)+($ml-$mc);
-          #-- too late, action at late
-          if( $dl<0 ){  
-            $tfinal = $late;
-          }
-        }
-      }else{
-        $tfinal = "?";
-      }
-    }
-    if( $tfinal =~ /\d?\d:\d\d(:\d\d)?/ ){
-      Log3 $name,5,"[YAAHM_startDeviceActions] final switching time found for device action timer $dea is ".$tfinal;
-      my $xval = $hash->{DATA}{"XT"}{$dea}{"cmd"};
-      $hash->{DATA}{"XT"}{$dea}{"time"} = $tfinal;
-      $res  = "defmod ".$name.".xtimer_".$i.".IF DOIF ([$tfinal]) (".$xval.")";
-      fhem($res);
-      fhem("attr ".$name.".xtimer_".$i.".IF comment ".$dev);
-      fhem("attr ".$name.".xtimer_".$i.".IF do always");
-      fhem("attr ".$name.".xtimer_".$i.".IF room ".(defined($attr{$name}{"publicroom"})  ? $attr{$name}{"publicroom"} : $yaahmpublicroom)); 
-      fhem("set  ".$name.".xtimer_".$i.".IF enable");
-      readingsBulkUpdate( $hash, "xdevice_".$i,$tfinal );    
+    #-- neither earliest nor latest
+    if( (!defined($early)||($early eq "")) && (!defined($late)||($late eq "")) ){
+      $cond = "($cond and ([$name:exec] eq \"0\"))";
+    #-- only latest
+    }elsif( (!defined($early)||($early eq "")) && defined($late) && $late =~ /\d?\d:\d\d(:\d\d)?/ ){
+      $cond = "((($cond and [?00:00-$late]) or [$late]) and ([".$name.".xtimer_".$i.".IF:exec] eq \"0\"))";
+    #-- only earliest
+    }elsif( defined($early) && (!defined($late)||($late eq "")) && $early =~ /\d?\d:\d\d(:\d\d)?/ ){
+      $cond = "($cond and [?00:00-$early]) (setreading ".$name.".xtimer_".$i.".IF event 1) ".
+                "DOELSEIF ((([$early] and ([".$name.".xtimer_".$i.".IF:event] eq \"1\")) or ($cond and [?$early-23:59:59])) and ([".$name.".xtimer_".$i.".IF:exec] eq \"0\"))";
+    #-- earliest and latest
+    }elsif( defined($early) && defined($late) && $early =~ /\d?\d:\d\d(:\d\d)?/ && $late =~ /\d?\d:\d\d(:\d\d)?/){
+      $cond = "($cond and [?00:00-$early]) (setreading ".$name.".xtimer_".$i.".IF event 1) ".
+                "DOELSEIF ((([$early] and ([".$name.".xtimer_".$i.".IF:event] eq \"1\")) or ($cond and [?$early-$late]) or [$late]) and ([".$name.".xtimer_".$i.".IF:exec] eq \"0\"))";
     }else{
-      Log3 $name, 1,"[YAAHM_startDeviceActions] no switching time found for device action timer $dev with evt $evt"; 
-    }
+      Log3 $name, 1,"[YAAHM_startDeviceActions] no proper conditions found for action timer $dev with evt $evt"; 
+      next;
+    } 
+    #$hash->{DATA}{"XT"}{$dea}{"time"} = $tfinal;
+    $res  = "defmod ".$name.".xtimer_".$i.".IF DOIF $cond (".$exec.") (setreading ".$name.".xtimer_".$i.".IF exec 1)";
+  
+    fhem($res);
+    fhem("attr ".$name.".xtimer_".$i.".IF comment ".$dev);
+    fhem("attr ".$name.".xtimer_".$i.".IF userReadings event:none{},exec:none{}");
+    fhem("attr ".$name.".xtimer_".$i.".IF do always");
+    fhem("attr ".$name.".xtimer_".$i.".IF room ".(defined($attr{$name}{"publicroom"})  ? $attr{$name}{"publicroom"} : $yaahmpublicroom)); 
+    fhem("set  ".$name.".xtimer_".$i.".IF enable");
+    fhem("setreading ".$name.".xtimer_".$i.".IF event 0");
+    fhem("setreading ".$name.".xtimer_".$i.".IF exec 0");   
+   
   }
    
   #-- save everything
-  readingsEndUpdate($hash,1);
   YAAHM_save($hash);
   fhem("save");
   
@@ -1822,6 +1795,8 @@ sub YAAHM_startDeviceActions($) {
 sub YAAHM_startDayTimer($) {
   my ($name) = @_;
   my $hash = $defs{$name};
+  
+  YAAHM_GetDayStatus($hash);
 
   my $res  = "defmod $name.dtimer.IF DOIF ";
   my $msg;
@@ -3752,11 +3727,9 @@ sub YAAHM_toptable($){
         $dea  = $actdevlist[$i];
         $dev  = $hash->{DATA}{"XT"}{$dea}{"name"};   
         Log3 $name,1,"[YAAHM_toptable] key $dea not equal to name $dev"
-          if( $dea ne $dev);
-        $tim  = $hash->{DATA}{"XT"}{$dea}{"time"};   
+          if( $dea ne $dev); 
         $ret .= "<tr><td class=\"col1\" height=\"20\" style=\"padding-right:5px\">".$dev."</td>";
-        $ret .= "<td class=\"col2\" style=\"padding:5px;\">$ts</td>";
-        $ret .= sprintf("<td informId=\"$name-xdevice_%d\" class=\"col2\" style=\"padding-left:5px\">".$tim."</td></tr>",$i);
+        $ret .= "<td class=\"col2\" style=\"padding:5px;\">$ts</td></tr>";
       }
     
       $ret .= "</table></td>";
@@ -3925,27 +3898,27 @@ sub YAAHM_Longtable($){
         $ret .= sprintf("<td><select id=\"xt%d_v\">",$i);
 
         my @keys = keys(%defaultdailytable);
-        #-- iterate over daily times
+        #-- iterate over daily times (including wakeup/sleep)
         for(my $j=0;$j<int(@keys);$j++){
-          if(  $keys[$j] !~ /(wakeup)|(sleep)/ ){
+          #if(  $keys[$j] !~ /(wakeu/ ){
             if( $keys[$j] eq $evt ){
               $ret .= "<option selected=\"selected\" value=\"".$keys[$j]."\">";
             }else{
               $ret .= "<option value=\"".$keys[$j]."\">"
             }
             $ret .= $yaahm_tt->{$keys[$j]}."</option>";
-          }
+          #}
         }
         #-- iterate over timers
-        for( my $i=0;$i<int( @{$hash->{DATA}{"WT"}} );$i++){
-          my $name = $hash->{DATA}{"WT"}[$i]{ "name" };
-          if( $name eq $evt ){
-            $ret .= "<option selected=\"selected\" value=\"".$name."\">";
-          }else{
-            $ret .= "<option value=\"".$name."\">"
-          }
-          $ret .= $name."</option>";
-        }
+        #for( my $i=2;$i<int( @{$hash->{DATA}{"WT"}} );$i++){
+        #  my $name = $hash->{DATA}{"WT"}[$i]{ "name" };
+        #  if( $name eq $evt ){
+        #    $ret .= "<option selected=\"selected\" value=\"".$name."\">";
+        #  }else{
+        #    $ret .= "<option value=\"".$name."\">"
+        #  }
+        #  $ret .= $name."</option>";
+        #}
         
         $ret .= "</select></td>";
         $ret .= sprintf("<td class=\"col2\" style=\"text-align:left;padding-left:5px\"><input type=\"text\" id=\"xt%d_e\" size=\"4\" maxlength=\"120\" value=\"$eval\"/></td>",$i);
@@ -4138,6 +4111,8 @@ sub YAAHM_Longtable($){
       $ret .= sprintf("<tr class=\"%s\"><td class=\"col1\" style=\"text-align:left;padding-left:5px\">$event</td>\n", ($row&1)?"odd":"even"); 
       for (my $i=0;$i<$weeklyno;$i++){
         $sval = $hash->{DATA}{"WT"}[$i]{$key};
+        $sval = ""
+          if(!$sval);
         #-- check if weekday profile active here or not
         $ass =  ( defined($hash->{DATA}{"WT"}[$i]{"acti_d"}) ) ? $hash->{DATA}{"WT"}[$i]{"acti_d"} : "";
         $acc = ( $ass =~ /.*$key.*/ ) ? "disabled=\"disabled\"" : "";
