@@ -435,7 +435,7 @@ set IO_DEV publish CMNDTOPIC/Restart 1
 attr DEVICE autocreate 0
 
 name:A_01x_tasmota_prefix_clearing_and_reboot
-filter:TYPE=MQTT2_DEVICE::FILTER=readingList=.*(tele|cmnd).*
+filter:TYPE=MQTT2_DEVICE::FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Applies to all tasmota devices <br>NOTE: This template will delete some readings and clear the readingList from prefix use when expanding json. <br>When applying the template the tasmota device is rebooted to get all readings
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev","")}
@@ -448,7 +448,7 @@ attr DEVICE autocreate 0
 # tasmota device with one relay, one motion sensor via switch
 name:A_01b_tasmota_1ch+motion+SI7021
 desc:tasmota device with one relay, one motion sensor via switch and one SI7021 combined temperature and humidity sensor. <br>Configures a single device including all readings
-filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd).*
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 set DEVICE attrTemplate A_01a_tasmota_basic_state_power1
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 attr DEVICE setList \
@@ -477,7 +477,7 @@ attr DEVICE devStateIcon {\
 attr DEVICE model A_01b_tasmota_1ch+motion+SI7021
 
 name:A_01c_tasmota_POW
-filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd).*
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Applies to Sonoff POW devices<br>NOTE: Power topic will be set to POWER1; the format the device is sending data will also be changed to lowercase!
 set DEVICE attrTemplate A_01a_tasmota_basic_state_power1
 attr DEVICE stateFormat {sprintf("aktuell: %.1f W Tag: %.2f kWh Gestern: %.3f kWh Gesamt: %.4f kWh", ReadingsVal($name,"ENERGY_Power",undef), ReadingsVal($name,"ENERGY_Today",undef), ReadingsVal($name,"ENERGY_Yesterday",undef), ReadingsVal($name,"ENERGY_Total",undef))}
@@ -487,7 +487,7 @@ attr DEVICE model A_01c_tasmota_POW
 #tasmota device with Infrared-circuit
 name:A_01d_tasmota_ir
 desc:Demonstrates multiple options how to configure tasmota devices as IR remote control extension.<br><a href="https://forum.fhem.de/index.php/topic,67316.0.html">Forum Thread</a><br><a href=https://github.com/arendst/Sonoff-Tasmota/wiki/Commands#irremote">Tasmota IRremote Commands</a><br><a href="https://github.com/altelch/SonoffIR">Simple IR-circuit</a><br><a href="https://forum.fhem.de/index.php/topic,98723.msg920946.html#msg920946">set <devicename> irsend</a>
-filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd).*
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 par:POWERCMD;needed command to be sent like in example dec '{"protocol":"NEC","bits":32,"data":551489775}' (without '');{ undef }
@@ -536,7 +536,7 @@ attr DEVICE model A_01d_tasmota_rf
 
 # tasmota 2ch as one FHEM device.
 name:A_02a_tasmota_2ch_unified
-filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd).*
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Configures a single device including all readings
 set DEVICE attrTemplate A_01a_tasmota_basic_state_power1
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
@@ -566,7 +566,7 @@ attr DEVICE model A_02a_tasmota_2ch_unified
 
 # sonoff 2 channel device flashed with Tasmota.
 name:A_02_tasmota_2channel_split
-filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd).*
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:sonoff 2 channel device flashed with Tasmota. <br>NOTE: a second device will be created for the second channel
 set DEVICE attrTemplate A_01a_tasmota_basic_state_power1
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
@@ -587,7 +587,7 @@ attr DEVICE_CH2 model A_02_tasmota_2channel_split
 #contributed by 87insane
 # tasmota 2ch as shutter device.
 name:A_02b_tasmota_2ch_shutter_invert_1
-filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd).*
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Configures a dual chanel tasmota device as shutter; needs a special firmware version to operate.<br><a href="https://forum.fhem.de/index.php/topic,98366.msg917091.html#msg917091">Forum Thread</a><br>NOTE: This template will configure the shutter in ROLLO style with pct 0% = open shutter. Use template A_02b_tasmota_2ch_shutter_invert_0, if you need a Homematic-style device pct 100% = open.
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev","")}
@@ -636,7 +636,7 @@ attr DEVICE model A_02b_tasmota_2ch_shutter_invert_1
 
 # tasmota 2ch as shutter device.
 name:A_02b_tasmota_2ch_shutter_invert_0
-filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd).*
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Configures a dual chanel tasmota device as shutter; needs a special firmware version to operate.<br><a href="https://forum.fhem.de/index.php/topic,98366.msg917091.html#msg917091">Forum Thread</a><br>NOTE: This template will configure the shutter in Homematic-style with pct 100% = open. For ROLLO style device with pct 0% = open shutter. Use template A_02b_tasmota_2ch_shutter_invert_1 instead. 
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev","")}
@@ -647,7 +647,7 @@ attr DEVICE model A_02b_tasmota_2ch_shutter_invert_0
 
 # tasmota 4ch as one FHEM device.
 name:A_04b_tasmota_4ch_unified_icon
-filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd).*
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Configures a single device including all readings <br>NOTE: Clicking on icons will issue a corresponding toggle command
 set DEVICE attrTemplate A_01a_tasmota_basic_state_power1
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
@@ -683,7 +683,7 @@ attr DEVICE model A_04b_tasmota_4ch_unified_icon
 # tasmota 4ch as one FHEM device.
 name:A_04a_tasmota_4ch_unified_basic_text
 desc:Configures a single device
-filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd).*
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 set DEVICE attrTemplate A_01a_tasmota_basic_state_power1
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
@@ -706,7 +706,7 @@ attr DEVICE model A_04a_tasmota_4ch_unified_basic_text
 
 #source post: https://forum.fhem.de/index.php/topic,94495.msg899041.html#msg899041
 name:A_05a_tasmota_rgb_led_controller
-filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd).*
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Tasmota RGB controller tested with RGB variant of Magichome, arilux LC-01 ,etc... -> https://github.com/arendst/Sonoff-Tasmota/wiki/MagicHome-LED-strip-controller
 set DEVICE attrTemplate A_01a_tasmota_basic_state_power1
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
@@ -716,7 +716,8 @@ attr DEVICE setList\
   off:noArg CMNDTOPIC/POWER1 0\
   on:noArg CMNDTOPIC/POWER1 1\
   toggle:noArg CMNDTOPIC/POWER1 2\
-  Color:colorpicker,RGB CMNDTOPIC/COLOR
+  Color:colorpicker,RGB CMNDTOPIC/COLOR\
+  Dimmer:colorpicker,BRI,0,5,100 CMNDTOPIC/DIMMER
 attr DEVICE readingList \
   TELETOPIC/LWT:.* LWT\
   STATTOPIC/POWER:.* POWER\
@@ -732,14 +733,14 @@ attr DEVICE webCmd Color:Color ff0000:Color 00ff00:Color 0000ff:toggle:on:off
 attr DEVICE model A_05a_tasmota_rgb_led_controller
 
 name:A_01z_tasmota_set_lowercase_texts_and_state1
-filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd).*
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Applies to all tasmota devices <br>NOTE: This template will change ON, OFF etc. sent from tasmota side to lowercase. <br>After applying the template you might consider to delete or change stateFormat, eventMap and/or userReadings attribute values
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev","")}
 set IO_DEV publish CMNDTOPIC/Backlog StateText1 off; StateText2 on; StateText3 toggle; StateText4 hold; SetOption26 1; SaveData 1
 
 name:A_01z_tasmota_set_uppercase_texts_and_state1
-filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd).*
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Applies to all tasmota devices <br>NOTE: This template will change on, off etc. sent from tasmota side to uppercase. NOTE: this  template only exists for compability reasons to older MQTT implementations; not recommended for other user groups
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev","")}
@@ -747,7 +748,7 @@ set IO_DEV publish CMNDTOPIC/Backlog StateText1 OFF; StateText2 ON; StateText3 T
 attr DEVICE userReadings state:POWER1:.* { lc(ReadingsVal($name,"POWER1","")) }
 
 name:A_01z_tasmota_set_power1_state_to_power
-filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd).*
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Applies to single relay tasmota devices <br>NOTE: this  template only exists for compability reasons to other HA solutions; not recommended for usage in FHEM context
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev","")}
@@ -802,14 +803,8 @@ attr DEVICE readingList \
   shellies/DEVNAME/overtemperature:.* overtemperature\
   shellies/DEVNAME/relay/0/energy:.* relay_0_energy\
   shellies/DEVNAME/longpush/0:.* longpush_0
-attr DEVICE devStateIcon true:10px-kreis-gruen false:10px-kreis-rot on:on:relay0+off off:off:relay0+on  	
-attr DEVICE stateFormat <a href="http://ip" target="_blank">ip</a>\
-online\
-relay0\
-<br>\
-Aktueller Verbrauch: relay_0_power\
-<br>\
-Temperatur: temperature Â°C
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot";; my $light = ReadingsVal($name,"state","off");; my $cons = ReadingsVal($name,"relay_0_power","unknown");; my $temp = ReadingsVal($name,"temperature","-100");;\
+"<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a><div>Verbrauch: $cons / Temp: $temp °C</div>"}
 attr DEVICE webCmd :
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model A_10b_shelly1pm
