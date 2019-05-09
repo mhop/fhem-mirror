@@ -1061,7 +1061,7 @@ name:X_01_esp_milight_hub_bridge
 filter:TYPE=MQTT2_DEVICE
 desc:use this with Chris Mullins ESP-Milight-Hub. for further details visit https://github.com/sidoh/esp8266_milight_hub <br>#recommended structure of the topic pattern milight/:device_id/:device_type/:group_id as set in the settings section in the bridge's web interface.
 par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/][^/]*at[^/]+[/].*:, ? $1 : undef }
-attr DEVICE bridgeRegexp BASE_ID/[^/]*at[^/]+[/]/(0x....)/.*/([0-4])?.*:.* "milight_$1_$2"
+attr DEVICE bridgeRegexp BASE_ID/[^/]*at[^/]+/(0x....)/.*/([0-4])?.*:.* "milight_$1_$2"
 attr DEVICE autocreate 1
 attr DEVICE setStateList on off
 attr DEVICE stateFormat <a href="http://ip_address" target="_blank">\
