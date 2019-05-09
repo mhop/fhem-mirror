@@ -50,7 +50,7 @@ use strict;
 use warnings;
 use FHEM::Meta;
 
-my $modulversion   = '4.4.0';
+my $modulversion   = '4.4.1';
 my $flowsetversion = '4.4.1';
 
 sub AMADDevice_Initialize($) {
