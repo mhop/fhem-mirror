@@ -841,12 +841,14 @@ ZWave_setEndpoints($)
     delete($h->{endpointParent});
     delete($h->{endpointChildren});
   }
+  my $tn = TimeNow();
   for my $k (sort keys %{$mp}) {
     my $h = $mp->{$k};
     next if($h->{nodeIdHex} !~ m/(..)(..)/);
     my ($root, $lid) = ($1, $2);
     my $rd = $mp->{$h->{homeId}." ".$root};
     $h->{endpointParent} = ($rd ? $rd->{NAME} : "unknown");
+    setReadingsVal($h, "associatedWith", $h->{endpointParent}, $tn);
     $h->{".vclasses"} = ($rd ? $rd->{".vclasses"} : {} );
     if($rd) {
       if($rd->{endpointChildren}) {
@@ -854,6 +856,7 @@ ZWave_setEndpoints($)
       } else {
         $rd->{endpointChildren} = $h->{NAME};
       }
+      setReadingsVal($rd, "associatedWith", $rd->{endpointChildren}, $tn);
     }
   }
 }
