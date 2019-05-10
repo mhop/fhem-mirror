@@ -393,7 +393,7 @@ par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readi
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
 attr DEVICE stateFormat POWER1
-set DEVICE attrTemplate A_01z_tasmota_set_lowercase_texts_and_state1_nF
+set DEVICE attrTemplate A_01z_tasmota_set_lowercase_texts_and_state1
 attr DEVICE setList \
   off:noArg    CMNDTOPIC/POWER1 0\
   on:noArg     CMNDTOPIC/POWER1 1\
@@ -721,12 +721,13 @@ attr DEVICE setList\
 attr DEVICE readingList \
   TELETOPIC/LWT:.* LWT\
   STATTOPIC/POWER:.* POWER\
+  STATTOPIC/POWER1:.* POWER1\
   TELETOPIC/STATE:.* { json2nameValue($EVENT) }\
   STATTOPIC/RESULT:.* { json2nameValue($EVENT) }\
   TELETOPIC/INFO.:.* { json2nameValue($EVENT) }
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE autocreate 0
-attr DEVICE devStateIcon {Color::devStateIcon($name,"rgb","Color","state")}
+attr DEVICE devStateIcon {Color::devStateIcon($name,"rgb","Color","Dimmer","POWER1")}
 attr DEVICE icon light_control
 attr DEVICE stateFormat POWER1
 attr DEVICE webCmd Color:Color ff0000:Color 00ff00:Color 0000ff:toggle:on:off
@@ -803,8 +804,7 @@ attr DEVICE readingList \
   shellies/DEVNAME/overtemperature:.* overtemperature\
   shellies/DEVNAME/relay/0/energy:.* relay_0_energy\
   shellies/DEVNAME/longpush/0:.* longpush_0
-attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot";; my $light = ReadingsVal($name,"state","off");; my $cons = ReadingsVal($name,"relay_0_power","unknown");; my $temp = ReadingsVal($name,"temperature","-100");;\
-"<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a><div>Verbrauch: $cons / Temp: $temp °C</div>"}
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot";; my $light = ReadingsVal($name,"state","off");; my $cons = ReadingsVal($name,"relay_0_power","unknown");; my $temp = ReadingsVal($name,"temperature","-100");;"<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a><div>Verbrauch: $cons / Temp: $temp °C</div>"}
 attr DEVICE webCmd :
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model A_10b_shelly1pm
