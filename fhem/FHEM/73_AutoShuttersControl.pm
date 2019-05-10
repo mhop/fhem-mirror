@@ -44,7 +44,7 @@ use strict;
 use warnings;
 use FHEM::Meta;
 
-my $version = '0.6.7';
+my $version = '0.6.8';
 
 sub AutoShuttersControl_Initialize($) {
     my ($hash) = @_;
@@ -261,14 +261,6 @@ sub Define($$) {
     CommandAttr( undef, $name . ' icon fts_shutter_automatic' )
       if ( AttrVal( $name, 'icon', 'none' ) eq 'none' );
 
-    #     CommandAttr( undef, $name . ' ASC_autoAstroModeEvening REAL' )
-    #       if ( $ascDev->getAutoAstroModeEvening eq 'none' );
-    #     CommandAttr( undef, $name . ' ASC_autoAstroModeMorning REAL' )
-    #       if ( $ascDev->getAutoAstroModeMorning eq 'none' );
-    #     CommandAttr( undef, $name . ' ASC_autoShuttersControlMorning on' )
-    #       if ( $ascDev->getAutoShuttersControlMorning eq 'none' );
-    #     CommandAttr( undef, $name . ' ASC_autoShuttersControlEvening on' )
-    #       if ( $ascDev->getAutoShuttersControlEvening eq 'none' );
     CommandAttr( undef,
         $name
           . ' devStateIcon selfeDefense.terrace:fts_door_tilt created.new.drive.timer:clock .*asleep:scene_sleeping roommate.(awoken|home):user_available residents.(home|awoken):status_available manual:fts_shutter_manual selfeDefense.active:status_locked selfeDefense.inactive:status_open day.open:scene_day night.close:scene_night shading.in:weather_sun shading.out:weather_cloudy'
@@ -2337,6 +2329,9 @@ sub SunSetShuttersAfterTimerFn($) {
     my $shuttersDev = $funcHash->{shuttersdevice};
     $shutters->setShuttersDev($shuttersDev);
 
+    $shutters->setSunset(1);
+    $shutters->setSunrise(0);
+    
     my $posValue;
     if ( CheckIfShuttersWindowRecOpen($shuttersDev) == 0
         or $shutters->getVentilateOpen eq 'off' )
@@ -2372,7 +2367,6 @@ sub SunSetShuttersAfterTimerFn($) {
                 $shutters->getPrivacyDownPos );
         }
         elsif ( $funcHash->{privacyMode} == 0 ) {
-            $shutters->setSunset(1);
             $shutters->setLastDrive('night close');
             ShuttersCommandSet( $hash, $shuttersDev, $posValue );
         }
@@ -2387,6 +2381,9 @@ sub SunRiseShuttersAfterTimerFn($) {
     my $hash        = $funcHash->{hash};
     my $shuttersDev = $funcHash->{shuttersdevice};
     $shutters->setShuttersDev($shuttersDev);
+    
+    $shutters->setSunset(0);
+    $shutters->setSunrise(1);
 
     my $homemode = $shutters->getRoommatesStatus;
     $homemode = $ascDev->getResidentsStatus if ( $homemode eq 'none' );
@@ -2414,7 +2411,6 @@ sub SunRiseShuttersAfterTimerFn($) {
           )
         {
             $shutters->setLastDrive('day open');
-            $shutters->setSunrise(1);
             ShuttersCommandSet( $hash, $shuttersDev, $shutters->getOpenPos );
         }
     }
