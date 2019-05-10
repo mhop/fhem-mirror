@@ -1,4 +1,4 @@
-REV 19355
+REV 19358
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -379,7 +379,7 @@ UPD 2018-07-12_07:45:02 30806 FHEM/73_NUKIBridge.pm
 UPD 2019-01-19_07:45:03 89124 FHEM/73_PRESENCE.pm
 UPD 2018-04-14_07:45:02 84632 FHEM/73_WaterCalculator.pm
 UPD 2018-12-19_07:45:02 118391 FHEM/73_km200.pm
-UPD 2019-05-09_07:45:02 67182 FHEM/74_AMADDevice.pm
+UPD 2019-05-10_07:45:02 67182 FHEM/74_AMADDevice.pm
 UPD 2019-04-24_07:45:02 43132 FHEM/74_GardenaSmartDevice.pm
 UPD 2018-03-22_07:45:04 41340 FHEM/74_HOMBOT.pm
 UPD 2019-04-17_07:45:02 34049 FHEM/74_HusqvarnaAutomower.pm
@@ -621,7 +621,7 @@ UPD 2019-05-01_07:45:03 416 FHEM/holiday/th.holiday
 UPD 2019-05-09_07:45:02 333578 FHEM/lib/74_AMADautomagicFlowset_4.4.1.xml
 UPD 2019-05-09_07:45:02 442824 FHEM/lib/74_AMADtaskerset_4.4.1.prj.xml
 UPD 2019-05-05_07:45:03 27701 FHEM/lib/AttrTemplate/httpmod.template
-UPD 2019-05-09_07:45:02 81472 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2019-05-10_07:45:02 81507 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2019-04-16_07:45:02 4962 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
@@ -721,8 +721,8 @@ UPD 2019-05-09_07:45:06 3998773 docs/commandref.html
 UPD 2019-05-09_07:45:08 2495464 docs/commandref_DE.html
 UPD 2019-05-05_07:45:03 78973 docs/commandref_frame.html
 UPD 2019-05-05_07:45:03 88573 docs/commandref_frame_DE.html
-UPD 2019-05-09_07:45:09 213445 docs/commandref_modular.html
-UPD 2019-05-09_07:45:10 224260 docs/commandref_modular_DE.html
+UPD 2019-05-10_07:45:09 213445 docs/commandref_modular.html
+UPD 2019-05-10_07:45:10 224260 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
