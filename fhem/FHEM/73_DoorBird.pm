@@ -2300,6 +2300,15 @@ sub DoorBird_History_Request_Parse($) {
 				$ImageData = "Error 204: The user has no permission to download the event history.";
 				$ImageTimeStamp =" ";
 			}
+			### If http response code is 404 = No picture available to download the event history
+			elsif ($param->{code} == 404) {
+				### Create Log entry
+				Log3 $name, 5, $name. " : DoorBird_History_Request - Error 404              : No picture available to download event history. Check settings in DoorBird APP.";
+				
+				### Create Error message
+				$ImageData = "Error 404: No picture available to download in the event history.";
+				$ImageTimeStamp =" ";
+			}
 			### If http response code is none of one above
 			else {
 				### Create Log entry
@@ -2307,8 +2316,9 @@ sub DoorBird_History_Request_Parse($) {
 			
 				### Create Error message
 				$ImageData = "Error : " . $param->{code};
+				$ImageTimeStamp =" ";
 			}
-
+			
 			### Create the URL Index which is identical every 2nd: 1 1 2 2 3 3 4 4 5 5 6 6
 			my $UrlIndex=int(int($hash->{helper}{HistoryDownloadCount})/int(2))+1;
 			
