@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix: 73_DoorBird: Error 404 handling for history images corrected
  - bugfix:  73_AutoShuttersControl: fix sunset sunrise object values
  - feature: 74_AMADtaskerset_4.4.0.prj: add nfc tag support in taskerset
                74_AMADautomagicflowset: fix bug then use VLC player
