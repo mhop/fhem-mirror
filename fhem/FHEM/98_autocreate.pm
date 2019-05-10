@@ -527,16 +527,26 @@ my @usbtable = (
       response  => "^ArduCounter V.*",  # response is two lines
       define    => "ArduCounter_PARAM ArduCounter DEVICE\@38400", },
 
-# FRM causes too much lockups, removed until understood why (Forum #100054)
-#    { NAME      => "FRM",
-#      matchList => ["cu.usbserial(.*)", "cu.usbmodem(.*)",
-#                    "ttyUSB(.*)", "ttyACM(.*)", "ttyAMA(.*)"],
-#      DeviceName=> "DEVICE\@57600",
-#      init      => pack("H*", "F9"),   # Reset
-#      timeout   => 5.0, # StandardFirmata blink takes time
-#      request   => pack("H*", "F079F7"),   # Query firmware version and filename START_SYSEX (0xF0), queryFirmware (0x79), END_SYSEX (0xF7)
-#      response  => "^\xF0\x79(.*)\xF7",    # Response Sysex xF0 x78 (2 Byte version) (n Byte filename) Endsysex xF7
-#      define    => "FRM_PARAM FRM DEVICE\@57600", },
+    { NAME      => "ElsnerWS",
+      matchList => ["cu.usbserial(.*)", "cu.usbmodem(.*)",
+                    "ttyUSB(.*)", "ttyACM(.*)", "ttyAMA(.*)"],
+      DeviceName=> "DEVICE\@19200",
+      timeout   => 1.1,
+      maxLen    => 32,
+      response  => "[GW][+-][0-9]{2}\.[0-9]{7}[JN][0-9]{5}".
+                        "\.[0-9][JN].*[0-9]{4}\x03",
+      define    => "ElsnerWS_PARAM ElsnerWS comtype=rs485 ".
+                                           "devicename=DEVICE\@19200", },
+
+    { NAME      => "FRM",
+      matchList => ["cu.usbserial(.*)", "cu.usbmodem(.*)",
+                    "ttyUSB(.*)", "ttyACM(.*)", "ttyAMA(.*)"],
+      DeviceName=> "DEVICE\@57600",
+      init      => pack("H*", "F9"),   # Reset
+      timeout   => 5.0, # StandardFirmata blink takes time
+      request   => pack("H*", "F079F7"),   # Query firmware version and filename START_SYSEX (0xF0), queryFirmware (0x79), END_SYSEX (0xF7)
+      response  => "^\xF0\x79(.*)\xF7",    # Response Sysex xF0 x78 (2 Byte version) (n Byte filename) Endsysex xF7
+      define    => "FRM_PARAM FRM DEVICE\@57600", },
 
 );
 
@@ -629,10 +639,21 @@ CommandUsb($$)
           }
 
           # Clear the USB buffer
-          DevIo_SimpleWrite($hash, $thash->{flush}, 0) if($thash->{flush});
-          DevIo_TimeoutRead($hash, 0.1);
-          DevIo_SimpleWrite($hash, $thash->{request}, 0);
-          my $answer = DevIo_TimeoutRead($hash, 0.1);
+          if($thash->{flush}) {
+            DevIo_SimpleWrite($hash, $thash->{flush}, 0);
+            DevIo_TimeoutRead($hash, 0.1);
+          }
+
+          my $answer="";
+          if($thash->{request}) {
+            DevIo_SimpleWrite($hash, $thash->{request}, 0);
+            $answer = DevIo_TimeoutRead($hash, 0.1);
+
+          } elsif($thash->{timeout} && $thash->{maxLen}) {
+            $answer = DevIo_TimeoutRead($hash,
+                        $thash->{timeout}, $thash->{maxLen});
+
+          }
           if(AttrVal("global", "verbose", 0) >= 5) {
             my $aTxt = $answer;
             $aTxt =~ s/([^ -~])/"(".ord($1).")"/ge;
