@@ -1468,6 +1468,8 @@ CommandRereadCfg($$)
   %fuuidHash = ();
   %intAt = ();
   @intAtA = ();
+  %sleepers = ();
+  %ntfyHash = ();
 
   doGlobalDef($cfgfile);
   my $ret;
