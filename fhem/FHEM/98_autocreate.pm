@@ -531,8 +531,8 @@ my @usbtable = (
       matchList => ["cu.usbserial(.*)", "cu.usbmodem(.*)",
                     "ttyUSB(.*)", "ttyACM(.*)", "ttyAMA(.*)"],
       DeviceName=> "DEVICE\@19200",
-      timeout   => 1.1,
-      maxLen    => 32,
+      timeout   => 1.0, # msg every second
+      maxLen    => 127, # max packet ist 64 bytes
       response  => "[GW][+-][0-9]{2}\.[0-9]{7}[JN][0-9]{5}".
                         "\.[0-9][JN].*[0-9]{4}\x03",
       define    => "ElsnerWS_PARAM ElsnerWS comtype=rs485 ".
@@ -650,8 +650,8 @@ CommandUsb($$)
             $answer = DevIo_TimeoutRead($hash, 0.1);
 
           } elsif($thash->{timeout} && $thash->{maxLen}) {
-            $answer = DevIo_TimeoutRead($hash,
-                        $thash->{timeout}, $thash->{maxLen});
+            $answer = DevIo_TimeoutRead($hash, $thash->{timeout},
+                                        $thash->{maxLen}, $thash->{response});
 
           }
           if(AttrVal("global", "verbose", 0) >= 5) {

@@ -10,7 +10,7 @@ sub DevIo_SetHwHandshake($);
 sub DevIo_SimpleRead($);
 sub DevIo_SimpleReadWithTimeout($$);
 sub DevIo_SimpleWrite($$$;$);
-sub DevIo_TimeoutRead($$;$);
+sub DevIo_TimeoutRead($$;$$);
 
 sub
 DevIo_setStates($$)
@@ -100,9 +100,9 @@ DevIo_SimpleReadWithTimeout($$)
 # NOTE1: FHEM WILL be blocked for $timeout seconds, DO NOT USE IT!
 # NOTE2: This works on Windows only for TCP connections
 sub
-DevIo_TimeoutRead($$;$)
+DevIo_TimeoutRead($$;$$)
 {
-  my ($hash, $timeout, $maxlen) = @_;
+  my ($hash, $timeout, $maxlen, $regexp) = @_;
 
   my $answer = "";
   $timeout = 1 if(!$timeout);
@@ -111,11 +111,11 @@ DevIo_TimeoutRead($$;$)
     my $rin = "";
     vec($rin, $hash->{FD}, 1) = 1;
     my $nfound = select($rin, undef, undef, $timeout);
-    last if($nfound <= 0);
+    last if($nfound <= 0);      # timeout
     my $r = DevIo_DoSimpleRead($hash);
     last if(!defined($r) || ($r == "" && $hash->{TCPDev}));
     $answer .= $r;
-    last if(length($anser) >= $maxlen);
+    last if(length($anser) >= $maxlen || ($regexp && $answer =~ m/$regexp/));
   }
   return $answer;
 }
