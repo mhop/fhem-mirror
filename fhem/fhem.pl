@@ -3199,7 +3199,7 @@ CommandSleep($$)
     my ($err, $hr,$min,$s, $fn) = GetTimeSpec($sec);
     if($err) { # not a valid timespec => treat as regex
       if(@cmdList && $init_done) {
-        CommandDelete($cl, $name) if($defs{$name});
+        CommandDelete($cl, $sleepers{$id}{name}) if($sleepers{$id});
         $err = CommandDefine($cl,
                         "-temporary $name notify $sec {sleep_WakeUpFn('$id')}");
         $attr{$name}{ignore} = 1;
