@@ -44,7 +44,7 @@ use strict;
 use warnings;
 use FHEM::Meta;
 
-my $version = '0.6.8';
+my $version = '0.6.9';
 
 sub AutoShuttersControl_Initialize($) {
     my ($hash) = @_;
@@ -1356,8 +1356,10 @@ sub EventProcessingBrightness($@) {
                             computeAlignTime( '24:00',
                                 $shutters->getTimeUpEarly ) / 86400
                         )
-                        and not IsWe()
-                    )
+                        and ( not IsWe()
+                          or (IsWe()
+                            and $ascDev->getSunriseTimeWeHoliday eq 'off')
+                    ) )
                     or (
                         int( gettimeofday() / 86400 ) != int(
                             computeAlignTime( '24:00',
@@ -1433,8 +1435,10 @@ sub EventProcessingBrightness($@) {
                             computeAlignTime( '24:00',
                                 $shutters->getTimeUpEarly ) / 86400
                         )
-                        and not IsWe()
-                    )
+                        and ( not IsWe()
+                          or (IsWe()
+                            and $ascDev->getSunriseTimeWeHoliday eq 'off')
+                    ) )
                     or (
                         int( gettimeofday() / 86400 ) != int(
                             computeAlignTime( '24:00',
@@ -2091,6 +2095,12 @@ sub ShuttersCommandSet($$$) {
                 and (  $ascDev->getAutoShuttersControlComfort eq 'off'
                     or $shutters->getComfortOpenPos != $posValue )
                 and $shutters->getVentilateOpen eq 'on'
+            )
+            or (
+                    CheckIfShuttersWindowRecOpen($shuttersDev) == 2
+                and $shutters->getSubTyp eq 'threestate'
+                and $ascDev->getAutoShuttersControlComfort eq 'on'
+                and $shutters->getVentilateOpen eq 'off'
             )
             or (
                 CheckIfShuttersWindowRecOpen($shuttersDev) == 2
