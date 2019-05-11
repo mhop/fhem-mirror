@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.3.014
+#  Version 4.3.015
 #
 #  Module for communication between FHEM and Homematic CCU2/3.
 #
@@ -52,7 +52,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.3.014';
+my $HMCCU_VERSION = '4.3.015';
 
 # Constants and default values
 my $HMCCU_MAX_IOERRORS = 100;
@@ -2639,7 +2639,10 @@ sub HMCCU_SetRPCState ($@)
 			my $st = $hash->{hmccu}{interfaces}{$i}{state};
 			$stc{$st}++ if (exists ($stc{$st}));
 			if ($hash->{hmccu}{interfaces}{$i}{manager} eq 'HMCCU') {
-				$filter = defined ($filter) ? "$filter|$i" : $i;
+				my $rpcFlags = AttrVal ($hash->{hmccu}{interfaces}{$i}{device}, 'ccuflags', 'null');
+				if ($rpcFlags !~ /noInitialUpdate/) {
+					$filter = defined ($filter) ? "$filter|$i" : $i;
+				}
 			}
 		}
 		
@@ -2659,7 +2662,7 @@ sub HMCCU_SetRPCState ($@)
 				DoTrigger ($name, "RPC server $rpcstate");
 				if ($rpcstate eq 'running') {
 					my ($c_ok, $c_err) = HMCCU_UpdateClients ($hash, '.*', 'Attr', 0, $filter);
-					HMCCU_Log ($hash, 2, "Updated devices. Success=$c_ok Failed=$c_err", undef);
+					HMCCU_Log ($hash, 2, "Updated devices for interface filter $filter. Success=$c_ok Failed=$c_err", undef);
 				}
 			}
 		}
@@ -6812,7 +6815,8 @@ sub HMCCU_RPCGetConfig ($$$$)
 	my $hmccu_hash = HMCCU_GetHash ($hash);
 	return (-3, $result) if (!defined ($hmccu_hash));
 	return (-4, $result) if ($type ne 'HMCCU' && $hash->{ccudevstate} eq 'deleted');
-
+	
+	my $hmccuflags = HMCCU_GetFlags ($hmccu_hash->{NAME});
 	my $ccuflags = HMCCU_GetFlags ($name);
 	my $ccureadings = AttrVal ($name, 'ccureadings', $ccuflags =~ /noReadings/ ? 0 : 1);
 	my $readingformat = HMCCU_GetAttrReadingFormat ($hash, $hmccu_hash);
@@ -6834,7 +6838,7 @@ sub HMCCU_RPCGetConfig ($$$$)
 
 	if ($rpctype eq 'B') {
 		HMCCU_Trace ($hash, 2, $fnc, "Method=$method Addr=$addr Port=$port");
-		if ($ccuflags =~ /(extrpc|procrpc)/) {
+		if ($hmccuflags =~ /(extrpc|procrpc)/) {
 			$res = HMCCURPCPROC_SendRequest ($rpchash, $method, $BINRPC_STRING, $addr,
 				$BINRPC_STRING, "MASTER");
 		}
@@ -6916,13 +6920,15 @@ sub HMCCU_RPCSetConfig ($$$)
 	my $name = $hash->{NAME};
 	my $type = $hash->{TYPE};
 
-	my $ccuflags = HMCCU_GetFlags ($name);
 	my $addr;
 	my $res;
 
 	my $hmccu_hash = HMCCU_GetHash ($hash);
 	return -3 if (!defined ($hmccu_hash));
 	return -4 if ($type ne 'HMCCU' && $hash->{ccudevstate} eq 'deleted');
+
+	my $hmccuflags = HMCCU_GetFlags ($hmccu_hash->{NAME});
+	my $ccuflags = HMCCU_GetFlags ($name);
 	
 	my ($int, $add, $chn, $dpt, $nam, $flags) = HMCCU_ParseObject ($hmccu_hash, $param,
 		$HMCCU_FLAG_FULLADDR);
@@ -6954,7 +6960,7 @@ sub HMCCU_RPCSetConfig ($$$)
 			$binpar{$e}{V} = $parref->{$e};
 		}
 		
-		if ($ccuflags =~ /(extrpc|procrpc)/) {
+		if ($hmccuflags =~ /(extrpc|procrpc)/) {
 			$res = HMCCURPCPROC_SendRequest ($rpchash, "putParamset", $BINRPC_STRING, $addr,
 				$BINRPC_STRING, "MASTER", $BINRPC_STRUCT, \%binpar);
 		}
@@ -8400,7 +8406,7 @@ sub HMCCU_CCURPC_ListDevicesCB ($$)
       	procrpc - Use external RPC server provided by module HMCCPRPCPROC. During first RPC
       	server start HMCCU will create a HMCCURPCPROC device for each interface confiugured
       	in attribute 'rpcinterface'<br/>
-      	reconnect - Automatically reconnect to CCU when events timeout occurred.
+      	reconnect - Automatically reconnect to CCU when events timeout occurred.<br/>
       	Flags intrpc, extrpc and procrpc cannot be combined.
       </li><br/>
       <li><b>ccuget {State | <u>Value</u>}</b><br/>

@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 1.7.001
+#  Version 1.7.002
 #
 #  Subprocess based RPC Server module for HMCCU.
 #
@@ -158,6 +158,7 @@ sub HMCCURPCPROC_EventCB ($$$$$);
 sub HMCCURPCPROC_ListDevicesCB ($$);
 
 # Binary RPC encoding functions
+sub HMCCURPCPROC_RPCNewValue ($$);
 sub HMCCURPCPROC_EncInteger ($);
 sub HMCCURPCPROC_EncBool ($);
 sub HMCCURPCPROC_EncString ($);
@@ -202,7 +203,7 @@ sub HMCCURPCPROC_Initialize ($)
 	
 	$hash->{parseParams} = 1;
 
-	$hash->{AttrList} = "ccuflags:multiple-strict,expert,logEvents,ccuInit,queueEvents,noEvents".
+	$hash->{AttrList} = "ccuflags:multiple-strict,expert,logEvents,ccuInit,queueEvents,noEvents,noInitialUpdate".
 		" rpcMaxEvents rpcQueueSend rpcQueueSize rpcMaxIOErrors". 
 		" rpcServerAddr rpcServerPort rpcWriteTimeout rpcAcceptTimeout".
 		" rpcConnTimeout rpcStatistics rpcEventTimeout rpcPingCCU ".
@@ -2252,6 +2253,52 @@ sub HMCCURPCPROC_ListDevicesCB ($$)
 	return RPC::XML::array->new ();
 }
 
+######################################################################
+# Convert value to RPC data type
+# Valid types are bool, boolean, int, integer, float, double, string.
+# If type is undefined, type is detected. If type cannot be detected
+# value is returned as is.
+######################################################################
+
+sub HMCCURPCPROC_RPCNewValue ($$)
+{
+	my ($value, $type) = @_;
+	
+	# Try to detect type if type not specified
+	if (!defined ($type)) {
+		if (lc($value) =~ /^(true|false)$/) {
+			$type = 'boolean';
+		}
+		elsif ($value =~ /^[-+]?\d+$/) {
+			$type = 'integer';
+		}
+		elsif ($value =~ /^[-+]?[0-9]*\.[0-9]+$/) {
+			# A float must contain at least a dot followed by a digit
+			$type = 'float';
+		}
+		elsif ($value =~ /[a-zA-Z_ ]/ || $value =~ /^'.+'$/ || $value =~ /^".+"$/) {
+			$type = 'string';
+		}
+	}
+	
+	if (defined ($type)) {
+		my $lcType = lc($type);
+		if ($lcType =~ /^bool/ && uc($value) =~ /^(TRUE|FALSE|0|1)$/) {
+			return RPC::XML::boolean->new ($value);
+		}
+		elsif ($lcType =~ /^int/ && $value =~ /^[-+]?\d+$/) {
+			return RPC::XML::int->new ($value);
+		}
+		elsif ($lcType =~ /^(float|double)$/ && $value =~ /^[-+]?[0-9]*\.[0-9]+$/) {
+			return RPC::XML::double->new ($value);
+		}
+		elsif ($lcType =~ /^str/) {
+			return RPC::XML::string->new ($value);
+		}
+	}
+
+	return $value;
+}
 
 ######################################################################
 # Binary RPC encoding functions
@@ -2805,6 +2852,7 @@ sub HMCCURPCPROC_DecodeResponse ($)
 			expert - Activate expert mode<br/>
 			logEvents - Events are written into FHEM logfile if verbose is 4<br/>
 			noEvents - Ignore events from CCU, do not update client device readings.<br/>
+			noInitalUpdate - Do not update devices after RPC server started.<br/>
 			queueEvents - Always write events into queue and send them asynchronously to FHEM.
 			Frequency of event transmission to FHEM depends on attribute rpcConnTimeout.<br/>
 		</li><br/>

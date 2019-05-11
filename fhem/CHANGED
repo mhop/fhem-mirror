@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  88_HMCCU: Flag for disabling initial device update
  - bugfix:  10_MYSENSORS_DEVICE: prevent fhem crashing by ack timeout 
              at higher verobse levels
  - change:  98_Heating_Control.pm will be removed soon. Users will need to
