@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  98_Heating_Control.pm will be removed soon. Users will need to
+             change their device definitions to 98_WeekdayTimer; supporting
+             code is provided, but perl calls have to be changed manually.
  - bugfix:  73_AutoShuttersControl: fix bug roommate and windwo comfort
  - bugfix:  73_DoorBird: Error 404 handling for history images corrected
  - bugfix:  73_AutoShuttersControl: fix sunset sunrise object values

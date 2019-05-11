@@ -50,7 +50,7 @@ sub Heating_Control_Set($@) {
   my ($hash, @a) = @_;
 
   return "no set value specified" if(int(@a) < 2);
-  return "Unknown argument $a[1], choose one of enable disable " if($a[1] eq "?");
+  return "Unknown argument $a[1], choose one of enable disable ConvertToWDT:noArg" if($a[1] eq "?");
 
   my $name = shift @a;
   my $v = join(" ", @a);
@@ -61,6 +61,8 @@ sub Heating_Control_Set($@) {
      fhem("attr $name disable 0");
   } elsif ($v eq "disable") {
      fhem("attr $name disable 1");
+  } elsif ($v eq "ConvertToWDT") {
+     Heating_Control_ConvertToWDT();
   }
   return undef;
 }
@@ -71,7 +73,7 @@ sub Heating_Control_Get($@) {
 ########################################################################
 sub Heating_Control_Define($$){
   my ($hash, $def) = @_;
-
+  Log3 $hash, 3, "Heating_Control is deprecated, use WeekdayTimer instead!";
   my $ret = WeekdayTimer_Define($hash, $def);
   return $ret;
 }
@@ -122,21 +124,46 @@ sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
   Log3 undef,  3, "Heating_Control_SetAllTemps() done on: ".join(" ",@hcNamen );
 }
 
+########################################################################
+sub Heating_Control_ConvertToWDT() {  
+  my @hcNamen = sort keys %{$modules{Heating_Control}{defptr}};
+  foreach my $hcName ( @hcNamen ) {
+    my $hash = $defs{$hcName};
+    my $definition = $defs{$hcName}{DEF};
+    my $windows = AttrVal($hcName,"windowSensor",undef);
+    my @a = GetDefAndAttr($hcName);
+    shift @a; shift @a; #delete define and uuid
+    my @b = GetAllReadings($hcName);
+    CommandDelete(undef,$hcName);
+    CommandDefine(undef,"$hcName WeekdayTimer $definition");
+    CommandAttr(undef, "$hcName WDT_delayedExecutionDevices $windows");
+    CommandAttr(undef, "$hcName WDT_Group former_HC");
+    foreach my $linesa  ( @a ){
+       AnalyzeCommand(undef, "$linesa") unless ($linesa =~ m/^attr $hcName windowSensor/);
+    }
+    foreach my $linesb  ( @b ){
+       AnalyzeCommand(undef, "$linesb");
+    }
+  }
+  Log3 undef,  3, "Heating_Control_ConvertToWDT() done on: ".join(" ",@hcNamen );
+}
+
 1;
 
 =pod
 =item device
-=item summary    sends heating commands to heating at defined times
-=item summary_DE sendet Temperaturwerte zu festgelegen Zeiten an eine Heizung
+=item summary sends heating commands to heating at defined times - deprecated module!
+=item summary_DE - nicht mehr supportetes Modul, bitte stattdessen WeekdayTimer nutzen!
 =begin html
 
 <a name="Heating_Control"></a>
 <meta content="text/html; charset=ISO-8859-1" http-equiv="content-type">
 <h3>Heating Control</h3>
 <ul>
-  <br>
+<b>Important Note:</b>  
+  <br>Heating Control is deprecated, as WeekdayTimer offers same functionality at identical syntax. To convert your Heating_Control devices to WeekdayTimer, issue a     <code>set &lt;name&gt; ConvertToWDT</code> to one of them. The WeekdayTimer devices will have the same names, all former HC devices will be in a WDT_Group called former_HC, so they can be switched together. Instead of Heating_Control_SetTemp("HC-device") or Heating_Control_SetAllTemps() use <code>set &lt;name&gt; WDT_Params single</code> or <code>set &lt;name&gt; WDT_Params WDT_Group</code>. For Perl commands, WeekdayTimer offers WeekdayTimer_SetParm("WD-device"), WeekdayTimer_SetAllParms() or WeekdayTimer_SetAllParms("former_HC") (former_HC might also be any other group you want to set).  <br><br>
   <a name="Heating_Controldefine"></a>
-  <b>Define</b>
+    <b>Define</b>
   <ul>
     <code>define &lt;name&gt; Heating_Control &lt;device&gt; [&lt;language&gt;] [<u>weekdays</u>] &lt;profile&gt; [&lt;command&gt;|&lt;condition&gt;]</code>
     <br><br>
@@ -363,7 +390,8 @@ sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
 <meta content="text/html; charset=ISO-8859-1" http-equiv="content-type">
 <h3>Heating Control</h3>
 <ul>
-  <br>
+<br><b>Achtung:</b>  
+  <br>Heating Control wird nicht weiter gepflegt ("deprecated"). WeekdayTimer bietet identische Funktionalität, bei (annähernd) gleicher Syntax. Um alle Heating_Control Devices zu WeekdayTimer umzustellen, genügt ein <code>set &lt;name&gt; ConvertToWDT</code>, wobei als &lt;name&gt; ein beliebiges Heating_Control device angegeben werden kann. Die WeekdayTimer werden mit denselben Namen erstellt, alle früheren HC Geräte erhalten ein WDT_Group-Attribut mit Inhalt former_HC, so dass sie auch in Zukunft miteinander geschalten werden können. Statt des Aufrufs Heating_Control_SetTemp("HC-device") bzw. Heating_Control_SetAllTemps() steht Ihnen <code>set &lt;name&gt; WDT_Params single</code> oder <code>set &lt;name&gt; WDT_Params WDT_Group</code> zur Verfügung, sowie WeekdayTimer_SetParm("WD-device"), WeekdayTimer_SetAllParms() bzw. WeekdayTimer_SetAllParms("former_HC"), wenn Sie Perl nutzen möchten (former_HC ist hier nur ein Beispiel, es können beliebige Gruppennamen verwendet werden.  <br><br>
   <a name="Heating_Controldefine"></a>
   <b>Define</b>
   <ul>
