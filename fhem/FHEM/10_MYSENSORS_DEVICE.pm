@@ -1135,12 +1135,13 @@ sub timeoutAck($) {
     if ($hash->{IODev}->{outstandingAck} == 0) {
       Log3 $hash->{NAME}, 4, "$hash->{NAME}: timeoutAck called, no outstanding Acks at all";
       readingsSingleUpdate($hash,"heartbeat","alive",1) if (ReadingsVal($hash,"heartbeat","dead") eq "NACK");
-    } elsif (@{$hash->{IODev}->{messagesForRadioId}->{$hash->{radioId}}->{messages}}) {
-       Log3 $hash->{NAME}, 4, "$hash->{NAME}: timeoutAck called, outstanding: @$hash->{IODev}->{messagesForRadioId}->{$hash->{radioId}}->{messages}";
-        readingsSingleUpdate($hash,"heartbeat","NACK",1) ;
+    } elsif (my $outs = $hash->{IODev}->{messagesForRadioId}->{$hash->{radioId}}->{messages}) {
+      my $outstanding = @$outs;
+      Log3 $hash->{NAME}, 4, "$hash->{NAME}: timeoutAck called, outstanding: $outstanding";
+      readingsSingleUpdate($hash,"heartbeat","NACK",1) ;
     } else {
-        Log3 $hash->{NAME}, 4, "$hash->{NAME}: timeoutAck called, no outstanding Acks for Node";
-        readingsSingleUpdate($hash,"heartbeat","alive",1) if (ReadingsVal($hash,"heartbeat","dead") eq "NACK");
+      Log3 $hash->{NAME}, 4, "$hash->{NAME}: timeoutAck called, no outstanding Acks for Node";
+      readingsSingleUpdate($hash,"heartbeat","alive",1) if (ReadingsVal($hash,"heartbeat","dead") eq "NACK");
     }
 }
 
