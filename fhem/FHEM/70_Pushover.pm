@@ -1104,13 +1104,8 @@ sub Pushover_SetMessage2 ($$$$) {
           if ( defined( $values{url_title} )
             && !defined( $values{action} ) );
 
-        return "parameter action requires parameter url_title"
-          if ( defined( $values{action} )
-            && !defined( $values{url_title} ) );
-
         return "messages containing a URL require parameter expire"
           if ( defined( $values{action} )
-            && defined( $values{url_title} )
             && !defined( $values{expire} ) );
 
         $values{sound} =
@@ -1226,8 +1221,7 @@ sub Pushover_SetMessage2 ($$$$) {
         }
     }
 
-    if (   $values{url_title}
-        && $values{action}
+    if (   $values{action}
         && defined( $values{expire} ) )
     {
         my $url;
@@ -1251,7 +1245,7 @@ sub Pushover_SetMessage2 ($$$$) {
         }
 
         Log3 $name, 5,
-"Pushover $name: Adding supplementary URL '$values{url_title}' ($url) with "
+"Pushover $name: Adding supplementary URL $url with "
           . "action '$values{action}' (expires after $values{expire} => "
           . "$values{cbNr})";
 
