@@ -927,6 +927,7 @@ sub WeekdayTimer_FensterOffen ($$$) {
                     "EnOcean"         => { "READING" => "state",           "STATUS" => "(open)",        "MODEL" => "r" },
                     "ZWave"           => { "READING" => "state",           "STATUS" => "(open)",        "MODEL" => "r" },
                     "MAX"             => { "READING" => "state",           "STATUS" => "(open.*)",      "MODEL" => "r" },
+                    "dummy"           => { "READING" => "state",           "STATUS" => "(([Oo]pen|[Tt]ilt).*)",   "MODEL" => "r" },
                     "WeekdayTimer"    => { "READING" => "delayedExecution","STATUS" => "^1\$",          "MODEL" => "a" },
                     "Heating_Control" => { "READING" => "delayedExecution","STATUS" => "^1\$",          "MODEL" => "a" }
                   );
@@ -1308,7 +1309,7 @@ sub WeekdayTimer_SetAllParms(;$) {            # {WeekdayTimer_SetAllParms()}
   <b>Attributes</b>
   <ul>
     <li>delayedExecutionCond <br>
-    defines a delay Function. When returning true, the switching of the device is delayed until the function retruns a false value. The behavior is just like a windowsensor in Heating_Control.
+    defines a delay Function. When returning true, the switching of the device is delayed until the function returns a false value. The behavior is just like a windowsensor in Heating_Control.
 
     <br><br>
     <b>Example:</b>
