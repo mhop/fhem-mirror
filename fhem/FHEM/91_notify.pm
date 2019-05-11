@@ -67,7 +67,8 @@ notify_Define($$)
   $hash->{".COMMAND"} = $command;
 
   my $doTrigger = ($name !~ m/^$re$/);            # Forum #34516
-  readingsSingleUpdate($hash, "state", "active", $doTrigger);
+  readingsSingleUpdate($hash, "state", "active", $doTrigger)
+        if(!$hash->{TEMPORARY});
   InternalTimer(0, sub(){  notifyRegexpChanged($hash, $re); }, $hash);
 
   return undef;

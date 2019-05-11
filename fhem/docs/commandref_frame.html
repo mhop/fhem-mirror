@@ -737,7 +737,7 @@ The following local attributes are used by a wider range of devices:
 <ul>
   <code>cancel [&lt;id&gt; [quiet]]</code>
   <br><br>
-  Cancels a named <a href="#sleep">sleep</a>.
+  List named sleeps or cancel a named <a href="#sleep">sleep</a>.
 
 </ul>
 <!-- cancel end -->
@@ -1357,12 +1357,17 @@ The following local attributes are used by a wider range of devices:
 <a name="sleep"></a>
 <h3>sleep</h3>
 <ul>
-  <code>sleep &lt;sec&gt; [&lt;id&gt;] [quiet]</code>
+  <code>sleep &lt;sec|timespec|regex&gt; [&lt;id&gt;] [quiet]</code>
+
   <br><br>
   sleep followed by another command is comparable to a nameless <a
-  href="#at">at</a>, it executes the following commands after waiting the
-  specified time. The unit is seconds, with millisecond accuracy, as you can
-  specify decimal places.<br><br>
+  href="#at">at</a> or <a href="#notify">notify</a>, it executes the
+  following commands after waiting for the specified time or an event matching
+  &lt;regex&gt;. The delay can be given<ul>
+  <li>in seconds, with millisecond accuracy, as you can specify decimal places,
+  </li>
+  <li>as a timespec (HH:MM or HH::MM::SS or {perlfunc})</li>
+  <li>or as a regex (devicename or devicename:event)</li></ul><br>
 
   A sleep with an &lt;id&gt; will replace a sleep with the same &lt;id&gt;
   and can be canceled by <a href="#cancel">cancel</a>.

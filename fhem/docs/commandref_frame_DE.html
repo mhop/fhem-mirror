@@ -757,7 +757,7 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
 <ul>                                         
   <code>cancel [&lt;id&gt; [quiet]]</code>
   <br><br>                                   
-  Entfernt ein benanntes <a href="#sleep">sleep</a>.
+  Listet benannte sleeps oder entfernt ein benanntes <a href="#sleep">sleep</a>.
                                              
 </ul>                                        
 <!-- cancel end -->
@@ -1444,13 +1444,18 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
 <a name="sleep"></a>
 <h3>sleep</h3>
 <ul>
-  <code>sleep &lt;sec&gt; [&lt;id&gt;] [quiet]</code>
+  <code>sleep &lt;sec|timespec|suchmuster&gt; [&lt;id&gt;] [quiet]</code>
   <br><br>
   sleep gefolgt von weiteren Befehlen ist vergleichbar mit einem namenlosen <a
-  href="#at">at</a> Kommando, es f&uuml;hrt die nachfolgenden Befehle aus,
-  nachdem es die spezifizierte Zeitspanne gewartet hat. Die Einheit ist
-  Sekunde, Millisekunden genau, da man Nachkommastellen spezifizieren
-  kann.<br><br>
+  href="#at">at</a> oder <a href="#notify">notify</a> Kommando, es f&uuml;hrt
+  die nachfolgenden Befehle aus, nachdem es die spezifizierte Zeitspanne
+  gewartet hat bzw. ein Event welches dem &lt;suchmuster&gt; entspricht
+  aufgetreten ist. Die verz&ouml;gerung kann<ul>
+  <li>in Sekunden (Millisekunden genau, da man Nachkommastellen spezifizieren
+      kann)</li>
+  <li> als timespec (HH:MM or HH::MM::SS oder {perlfunc})</li>
+  <li>oder als suchmuster (Ger&auml;tename oder Ger&auml;tename:Event)</li>
+  </ul> angegeben werden.<br>
 
   Ein sleep mit einer &lt;id&gt; ersetzt ein sleep mit der gleichen &lt;id&gt;
   and can mit <a href="#cancel">cancel</a> entfernt werden.

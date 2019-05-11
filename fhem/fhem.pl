@@ -106,7 +106,6 @@ sub SemicolonEscape($);
 sub SignalHandling();
 sub TimeNow();
 sub Value($);
-sub WakeUpFn($);
 sub WriteStatefile();
 sub XmlEscape($);
 sub addEvent($$);
@@ -2059,6 +2058,7 @@ CommandDefine($$)
         if($currcfgfile ne AttrVal("global", "configfile", "") &&
           !configDBUsed());
   $hash{CL}    = $cl;
+  $hash{TEMPORARY} = 1 if($temporary);
 
   # If the device wants to issue initialization gets/sets, then it needs to be
   # in the global hash.
@@ -2073,7 +2073,6 @@ CommandDefine($$)
 
   } else {
     delete $hash{CL};
-    $hash{TEMPORARY} = 1 if($temporary);
     foreach my $da (sort keys (%defaultattr)) {     # Default attributes
       CommandAttr($cl, "$name $da $defaultattr{$da}");
     }
@@ -2082,8 +2081,10 @@ CommandDefine($$)
                 $modules{$m}{NotifyOrderPrefix} : "50-") . $name;
     }
     %ntfyHash = ();
-    addStructChange("define", $name, $def);
-    DoTrigger("global", "DEFINED $name", 1) if($init_done);
+    if(!$temporary && !$init_done) {
+      addStructChange("define", $name, $def);
+      DoTrigger("global", "DEFINED $name", 1);
+    }
   }
   return ($ret && $ignoreErr ?
         "Cannot define $name, remove -ignoreErr for details" : $ret);
@@ -3133,15 +3134,19 @@ CommandTrigger($$)
 
 #####################################
 sub
-WakeUpFn($)
+sleep_WakeUpFn($)
 {
-  my $h = shift;
-  delete $sleepers{$h->{id}} if( $h->{id} );
+  my $id = shift;
+  my $h = $sleepers{$id};
+  return if(!$h);
+  delete $sleepers{$id};
+  CommandDelete($h->{cl}, $h->{name}) if(!defined($h->{sec}));
 
   $evalSpecials = $h->{evalSpecials};
   my $ret = AnalyzeCommandChain($h->{cl}, $h->{cmd});
   Log 2, "After sleep: $ret" if($ret && !$h->{quiet});
 }
+
 sub
 CommandCancel($$)
 {
@@ -3151,16 +3156,18 @@ CommandCancel($$)
 
   if( !$id ) {
     my $ret;
-    foreach $id (keys %sleepers) {
+    foreach $id (sort keys %sleepers) {
+      my $h = $sleepers{$id};
       $ret .= "\n" if( $ret );
-      $ret .= sprintf( "%-10s %s", $id, $sleepers{$id}->{cmd} );
+      $ret .= sprintf( "%-12s %-19s %s", $id, $h->{till}, $h->{cmd} );
     }
-    $ret = "no pending sleeps" if( !$ret );
+    $ret = "no pending sleeps" if(!$ret);
     return $ret;
 
   } elsif( my $h = $sleepers{$id} ) {
-    RemoveInternalTimer( $h );
-    delete $sleepers{$h->{id}};
+    RemoveInternalTimer($id, "sleep_WakeUpFn") if(defined($h->{sec}));
+    CommandDelete($cl, $h->{name}) if(!defined($h->{sec}));
+    delete $sleepers{$id};
 
   } else {
     return "no such id: $id" if( !$quiet );
@@ -3179,24 +3186,47 @@ CommandSleep($$)
     $quiet = $id;
     $id = undef;
   }
-
   return "Argument missing" if(!defined($sec));
-  return "Cannot interpret $sec as seconds" if($sec !~ m/^[0-9\.]+$/);
   return "Last parameter must be quiet" if($quiet && $quiet ne "quiet");
 
-  Log 4, "sleeping for $sec";
+  my $name = ".sleep_".(++$intAtCnt);
+  $id = $name if(!$id);
+
+  my $till;
+  if($sec !~ m/^[0-9\.]+$/) {
+    my ($err, $hr,$min,$s, $fn) = GetTimeSpec($sec);
+    if($err) { # not a valid timespec => treat as regex
+      if(@cmdList && $init_done) {
+        CommandDelete($cl, $name) if($defs{$name});
+        $err = CommandDefine($cl,
+                        "-temporary $name notify $sec {sleep_WakeUpFn('$id')}");
+        $attr{$name}{ignore} = 1;
+        return $err if($err);
+      }
+      $till = $sec;
+      $sec = undef;
+
+    } else {
+      $sec = 3600*$hr+60*$min+$s;
+
+    }
+  }
+  $till = gettimeofday()+$sec if(defined($sec));
 
   if(@cmdList && $init_done) {
     my %h = (cmd          => join(";", @cmdList),
              evalSpecials => $evalSpecials,
              quiet        => $quiet,
+             till         => defined($sec) ? FmtDateTime($till) : $till,
+             sec          => $sec,
+             name         => $name,
              cl           => $cl,
              id           => $id);
-    if( $id ) {
-      RemoveInternalTimer( $sleepers{$id} ) if( $sleepers{$id} );
-      $sleepers{$id} = \%h;
+    if(defined($sec)) {
+      RemoveInternalTimer($id, "sleep_WakeUpFn");
+      InternalTimer($till, "sleep_WakeUpFn", $id, 0);
     }
-    InternalTimer(gettimeofday()+$sec, "WakeUpFn", \%h, 0);
+    $sleepers{$id} = \%h;
     @cmdList=();
 
   } else {
