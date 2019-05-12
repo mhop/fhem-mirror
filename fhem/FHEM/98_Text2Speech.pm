@@ -21,17 +21,10 @@ package main;
 use strict;
 use warnings;
 use Blocking;
-use IO::File;
 use HttpUtils;
-use Digest::MD5 qw(md5_hex);
-use URI::Escape;
-use Text::Iconv;
-#use Encode::Detect::Detector;
-use Data::Dumper;
-use lib ('./FHEM/lib', './lib');
+# use Data::Dumper;
 
-# loading in attr function of TTS_RESSOURCE if Paws is really needed
-# require Paws::Polly
+use lib ('./FHEM/lib', './lib');
 
 sub Text2Speech_OpenDev($);
 sub Text2Speech_CloseDev($);
@@ -70,10 +63,10 @@ my %ttsAPIKey       = ("Google"     => "", # kein APIKey nötig
 my %ttsUser         = ("Google"     => "", # kein Username nötig
                        "VoiceRSS"   => ""  # kein Username nötig
                        );
-my %ttsSpeed        = ("Google"     => "", 
+my %ttsSpeed        = ("Google"     => "",
                        "VoiceRSS"   => "r="
                        );
-my %ttsQuality       = ("Google"     => "", 
+my %ttsQuality       = ("Google"     => "",
                        "VoiceRSS"   => "f="
                        );
 my %ttsMaxChar      = ("Google"     => 100,
@@ -121,7 +114,7 @@ sub Text2Speech_Initialize($)
 {
   my ($hash) = @_;
   $hash->{WriteFn}   = "Text2Speech_Write";
-  $hash->{ReadyFn}   = "Text2Speech_Ready"; 
+  $hash->{ReadyFn}   = "Text2Speech_Ready";
   $hash->{DefFn}     = "Text2Speech_Define";
   $hash->{SetFn}     = "Text2Speech_Set";
   $hash->{UndefFn}   = "Text2Speech_Undefine";
@@ -212,7 +205,7 @@ sub Text2Speech_Define($$)
       $dev = "$dev:7072";
     }
     $hash->{Host} = $dev;
-    $hash->{portpassword} = $a[3] if(@a == 4); 
+    $hash->{portpassword} = $a[3] if(@a == 4);
 
     $hash->{MODE} = "REMOTE";
   } elsif (lc($dev) eq "none") {
@@ -230,6 +223,69 @@ sub Text2Speech_Define($$)
   delete($hash->{helper}{RUNNING_PID});
 
   $hash->{STATE} = "Initialized";
+
+  my $ret = Text2Speech_loadmodules($hash, "");
+  if ($ret) {
+    Log3 $hash->{NAME}, 3, $ret;
+  }
+  return undef;
+}
+
+##########################
+# Überprüfung und Einladen der notwendigen Module
+##########################
+sub Text2Speech_loadmodules($$) {
+  my ($hash, $TTS_Ressource) = @_;
+  eval {
+    require IO::File;
+    IO::File->import;
+    1;
+  } or return "IO::File Module not installed, please install";
+
+  eval {
+    require Digest::MD5;
+    Digest::MD5->import;
+    1;
+  } or return "Digest::MD5 Module not installed, please install";
+
+  eval {
+    require URI::Escape;
+    URI::Escape->import;
+    1;
+  } or return "URI::Escape Module not installed, please install";
+
+  eval {
+    require Text::Iconv;
+    Text::Iconv->import;
+    1;
+  } or return "Text::Iconv Module not installed, please install";
+
+  eval {
+    require Encode::Guess;
+    Encode::Guess->import;
+    1;
+  } or return "Encode::Guess Module not installed, please install";
+
+  eval {
+    require MP3::Info;
+    MP3::Info->import;
+    1;
+  } or return "MP3::Info Module not installed, please install";
+
+  if ($TTS_Ressource eq "Amazon-Polly") {
+    # Module werden nur benötigt mit der Polly Engine
+    eval {
+      require Paws::Polly;
+      Paws::Polly->import;
+      1;
+    } or return "Paws Module not installed. Please install, goto https://metacpan.org/source/JLMARTIN/Paws-0.39";
+
+    eval {
+      require File::HomeDir;
+      File::HomeDir->import;
+      1;
+    } or return "File::HomeDir Module not installed. Please install";
+  }
 
   return undef;
 }
@@ -263,18 +319,9 @@ sub Text2Speech_Attr(@) {
     return "This Attribute is only available in direct or server mode" if($hash->{MODE} !~ m/(DIRECT|SERVER)/ );
 
   } elsif ($a[2] eq "TTS_Ressource" && $value eq "Amazon-Polly") {
-    Log3 $hash->{NAME}, 4, "Wechsele auf Amazon Polly, Lade Librarys nach.";
-    eval {
-      require Paws::Polly;
-      Paws::Polly->import;
-      1;
-    } or return "Paws Module not installed. Please install, goto https://metacpan.org/source/JLMARTIN/Paws-0.39";
-
-    eval {
-      require  File::HomeDir;
-      File::HomeDir->import;
-      1;
-    } or return "File::HomeDir Module not installed. Please install";
+    Log3 $hash->{NAME}, 4, $hash->{NAME}. ": Wechsele auf Amazon Polly, Lade Librarys nach.";
+    my $ret = Text2Speech_loadmodules($hash, $a[2]);
+    if ($ret) {return $ret;} # breche ab wenn Module fehlen
 
     if (! -e File::HomeDir->my_home."/.aws/credentials"){
       return "No AWS credentials in FHEM Homedir found, please check ".File::HomeDir->my_home."/.aws/credentials <br> please refer https://metacpan.org/pod/Paws#AUTHENTICATION";
@@ -282,25 +329,25 @@ sub Text2Speech_Attr(@) {
 
   } elsif ($a[2] eq "TTS_Ressource") {
     return "This Attribute is only available in direct or server mode" if($hash->{MODE} !~ m/(DIRECT|SERVER)/ );
-  
+
   } elsif ($a[2] eq "TTS_CacheFileDir") {
     return "This Attribute is only available in direct or server mode" if($hash->{MODE} !~ m/(DIRECT|SERVER)/ );
- 
+
   } elsif ($a[2] eq "TTS_SpeakAsFastAsPossible") {
     return "This Attribute is only available in direct or server mode" if($hash->{MODE} !~ m/(DIRECT|SERVER)/ );
 
   } elsif ($a[2] eq "TTS_UseMP3Wrap") {
     return "This Attribute is only available in direct or server mode" if($hash->{MODE} !~ m/(DIRECT|SERVER)/ );
-    return "Attribute TTS_UseMP3Wrap is required by Attribute TTS_SentenceAppendix! Please delete it first." 
+    return "Attribute TTS_UseMP3Wrap is required by Attribute TTS_SentenceAppendix! Please delete it first."
       if(($a[0] eq "del") && (AttrVal($hash->{NAME}, "TTS_SentenceAppendix", undef)));
 
-  } elsif ($a[2] eq "TTS_SentenceAppendix") { 
+  } elsif ($a[2] eq "TTS_SentenceAppendix") {
     return "This Attribute is only available in direct or server mode" if($hash->{MODE} !~ m/(DIRECT|SERVER)/ );
     return "Attribute TTS_UseMP3Wrap is required!" unless(AttrVal($hash->{NAME}, "TTS_UseMP3Wrap", undef));
-    
+
     my $file = $TTS_CacheFileDir ."/". $value;
     return "File <".$file."> does not exists in CacheFileDir" if(! -e $file);
-  
+
   } elsif ($a[2] eq "TTS_FileTemplateDir") {
     # Verzeichnis beginnt mit /, dann absoluter Pfad, sonst Unterpfad von $TTS_CacheFileDir
     my $newDir;
@@ -342,7 +389,7 @@ sub Text2Speech_Ready($)
 {
 my ($hash) = @_;
 return Text2speech_OpenDev($hash, 1);
-} 
+}
 
 ########################
 sub Text2Speech_OpenDev($) {
@@ -350,7 +397,7 @@ sub Text2Speech_OpenDev($) {
   my $dev = $hash->{Host};
   my $name = $hash->{NAME};
 
-  Log3 $name, 4, "Text2Speech opening $name at $dev"; 
+  Log3 $name, 4, "Text2Speech opening $name at $dev";
 
   my $conn;
   if($hash->{SSL}) {
@@ -359,7 +406,7 @@ sub Text2Speech_OpenDev($) {
     $conn = IO::Socket::SSL->new(PeerAddr => "$dev", MultiHomed => 1) if(!$@);
   } else {
     $conn = IO::Socket::INET->new(PeerAddr => $dev, MultiHomed => 1);
-  } 
+  }
 
   if(!$conn) {
     Log3($name, 3, $hash->{NAME}.": Can't connect to $dev: $!");
@@ -370,12 +417,12 @@ sub Text2Speech_OpenDev($) {
   }
 
   $hash->{TCPDev} = $conn;
-  $hash->{FD} = $conn->fileno(); 
+  $hash->{FD} = $conn->fileno();
 
   Log3 $name, 4, "Text2Speech device opened ($name)";
 
   syswrite($hash->{TCPDev}, $hash->{portpassword} . "\n")
-  if($hash->{portpassword}); 
+  if($hash->{portpassword});
 
   return undef;
 }
@@ -386,15 +433,15 @@ sub Text2Speech_CloseDev($) {
   my $name = $hash->{NAME};
   my $dev = $hash->{Host};
   return if(!$dev);
-  
+
   if($hash->{TCPDev}) {
-    $hash->{TCPDev}->close(); 
+    $hash->{TCPDev}->close();
     Log3 $hash, 4, "Text2speech Device closed ($name)";
   }
 
   delete($hash->{TCPDev});
   delete($hash->{FD});
-} 
+}
 
 ########################
 sub Text2Speech_Write($$) {
@@ -403,7 +450,7 @@ sub Text2Speech_Write($$) {
   my $dev = $hash->{Host};
 
   #my $call = "set tts tts Das ist ein Test.";
-  my $call = "set $name $msg"; 
+  my $call = "set $name $msg";
 
   #Prüfen ob PRESENCE vorhanden und present
   my $isPresent = 0;
@@ -451,12 +498,19 @@ sub Text2Speech_Set($@)
   my $TTS_User      = AttrVal($hash->{NAME}, "TTS_User", undef);
   my $TTS_Ressource = AttrVal($hash->{NAME}, "TTS_Ressource", "Google");
   my $TTS_TimeOut   = AttrVal($hash->{NAME}, "TTS_TimeOut", 60);
-  
+
 
   return "no set argument specified" if(int(@a) < 2);
 
   return "No APIKey specified"                  if (!defined($TTS_APIKey) && ($ttsAPIKey{$TTS_Ressource} || length($ttsAPIKey{$TTS_Ressource})>0));
   return "No Username for TTS Access specified" if (!defined($TTS_User) && ($ttsUser{$TTS_Ressource} || length($ttsUser{$TTS_Ressource})>0));
+
+  my $ret = Text2Speech_loadmodules($hash, $TTS_Ressource);
+  if ($ret) {
+    # breche ab wenn Module fehlen
+    Log3 $me, 3, $ret;
+    return $ret;
+  }
 
   my $cmd = shift(@a); # Dummy
      $cmd = shift(@a); # DevName
@@ -474,7 +528,7 @@ sub Text2Speech_Set($@)
   return "no set cmd on a disabled device !" if(IsDisabled($me));
 
   if($cmd eq "tts") {
-    
+
     if($hash->{MODE} eq "DIRECT" || $hash->{MODE} eq "SERVER") {
       $hash->{VOLUME} = ReadingsNum($me, "volume", 100);
       readingsSingleUpdate($hash, "playing", "1", 1);
@@ -494,7 +548,7 @@ sub Text2Speech_Set($@)
       Text2Speech_Write($hash, "volume $vol");
     } else {return undef;}
 
-    readingsSingleUpdate($hash, "volume", (($vol>100)?0:$vol), 1);  
+    readingsSingleUpdate($hash, "volume", (($vol>100)?0:$vol), 1);
   }
 
   return undef;
@@ -524,7 +578,7 @@ sub Text2Speech_PrepareSpeech($$) {
   my $me = $hash->{NAME};
 
   my $TTS_Ressource = AttrVal($hash->{NAME}, "TTS_Ressource", "Google");
-  my $TTS_Delimiter = AttrVal($hash->{NAME}, "TTS_Delimiter", undef); 
+  my $TTS_Delimiter = AttrVal($hash->{NAME}, "TTS_Delimiter", undef);
   my $TTS_FileTpl   = AttrVal($hash->{NAME}, "TTS_FileMapping", ""); # zb, silence:silence.mp3 ring:myringtone.mp3; im Text: mein Klingelton :ring: ist laut.
   my $TTS_FileTemplateDir = AttrVal($hash->{NAME}, "TTS_FileTemplateDir", "templates");
 
@@ -534,11 +588,11 @@ sub Text2Speech_PrepareSpeech($$) {
   if($TTS_Delimiter && $TTS_Delimiter =~ m/^[+-]a[lfn]/i) {
     $TTS_ForceSplit = 1 if(substr($TTS_Delimiter,0,1) eq "+");
     $TTS_ForceSplit = 0 if(substr($TTS_Delimiter,0,1) eq "-");
-    
+
     $TTS_AddDelimiter = substr($TTS_Delimiter,1,2); # af, al oder an
-    
+
     $TTS_Delimiter = substr($TTS_Delimiter,3);
-    
+
   } elsif (!$TTS_Delimiter) { # Default wenn Attr nicht gesetzt
     $TTS_Delimiter = "(?<=[\\.!?])\\s*";
     $TTS_ForceSplit = 0;
@@ -548,21 +602,29 @@ sub Text2Speech_PrepareSpeech($$) {
   #-- we may have problems with umlaut characters
   # ersetze Sonderzeichen die Google nicht auflösen kann
   my $converter;
-  if($TTS_Ressource eq "Google") {
-    # Google benötigt UTF-8
-   #   $t =~ s/ä/ae/g;
-   #   $t =~ s/ö/oe/g;
-   #   $t =~ s/ü/ue/g;
-   #   $t =~ s/Ä/Ae/g;
-   #   $t =~ s/Ö/Oe/g;
-   #   $t =~ s/Ü/Ue/g;
-   #   $t =~ s/ß/ss/g;
 
-    # -> use Encode::Detect::Detector;
-    #Log3 $hash, 4, "$me:  ermittelte CodePage: " .detect($t). " , konvertiere nach UTF-8";
-    #$converter = Text::Iconv->new(detect($t), "utf-8");
-    #$t = $converter->convert($t);
-  } elsif ($TTS_Ressource eq "Amazon-Polly") {
+  # wandle per standard alles nach UTF8
+  # check only ascii, utf8 and UTF-(16|32) with BOM, if not enough use function set_suspects
+  # Encode::Guess->set_suspects(qw/euc-jp shiftjis 7bit-jis/); # for japanese codepages
+  my $enc = guess_encoding($t);
+  if ($enc->name ne "utf8") {
+    Log3 $hash, 4, "$me: ermittelte CodePage: " .$enc->name. " , konvertiere nach UTF-8";
+    $converter = Text::Iconv->new($enc->name, "utf-8");
+    $t = $converter->convert($t);
+  }
+
+  #if($TTS_Ressource eq "Google") {
+    # Google benötigt UTF-8
+    #   $t =~ s/ä/ae/g;
+    #   $t =~ s/ö/oe/g;
+    #   $t =~ s/ü/ue/g;
+    #   $t =~ s/Ä/Ae/g;
+    #   $t =~ s/Ö/Oe/g;
+    #   $t =~ s/Ü/Ue/g;
+    #   $t =~ s/ß/ss/g;
+  #}
+
+  if ($TTS_Ressource eq "Amazon-Polly") {
     # Amazon benötigt ISO-8859-1 bei Nutzung Region eu-central-1
     $converter = Text::Iconv->new("utf-8", "iso-8859-1");
     $t = $converter->convert($t);
@@ -750,7 +812,6 @@ sub Text2Speech_CalcMP3Duration($$) {
   my $time;
   my ($hash, $file) = @_;
   eval {
-    use MP3::Info;    
     my $tag = get_mp3info($file);
     if ($tag && defined($tag->{SECS})) {
 	  $time = int($tag->{SECS}+0.5);
@@ -784,6 +845,8 @@ sub Text2Speech_Download($$$) {
   my $TTS_Speed     = AttrVal($hash->{NAME}, "TTS_Speed", "");
   my $cmd;
 
+  Log3 $hash->{NAME}, 4, $hash->{NAME}.": Verwende ".$TTS_Ressource." Resource zur TTS-Generierung";
+
   if($TTS_Ressource =~ m/(Google|VoiceRSS)/) {
     my $HttpResponse;
     my $HttpResponseErr;
@@ -798,7 +861,6 @@ sub Text2Speech_Download($$$) {
        $url .= "&" . $ttsSpeed{$TTS_Ressource} . $TTS_Speed if(length($ttsSpeed{$TTS_Ressource})>0);
        $url .= "&" . $ttsQuery{$TTS_Ressource} . uri_escape($text);
     
-    Log3 $hash->{NAME}, 4, $hash->{NAME}.": Verwende ".$TTS_Ressource." OnlineResource zum Download";
     Log3 $hash->{NAME}, 4, $hash->{NAME}.": Hole URL: ". $url;
     #$HttpResponse = GetHttpFile($ttsHost, $ttsPath . $ttsLang . $TTS_Language . "&" . $ttsQuery . uri_escape($text));
     my $param = {
@@ -858,10 +920,16 @@ sub Text2Speech_Download($$$) {
     #Log3 $hash, 4, $hash->{NAME}.":" .$cmd;
     #system($cmd);
     my $fh;
+    my $texttype = "text";
+
+    $texttype = "ssml" if($text =~ m/^<speak>.*<\/speak>$/);
+    Log3 $hash->{NAME}, 4, $hash->{NAME}.": Folgender TextTyp wurde für ".$TTS_Ressource." erkannt: ".$texttype;
+
     my $polly = Paws->service('Polly', region => 'eu-central-1');
     my $res = $polly->SynthesizeSpeech(
         VoiceId => $TTS_Language,
         Text => $text,
+        TextType => $texttype,
         OutputFormat => 'mp3',
     );
 
@@ -985,8 +1053,16 @@ sub Text2Speech_DoIt($) {
       system($cmd);
 
       my $t = substr($Mp3WrapFile, 0, length($Mp3WrapFile)-4)."_MP3WRAP.mp3";
-      Log3 $hash->{NAME}, 4, $hash->{NAME}.": Benenne Datei um von <".$t."> nach <".$Mp3WrapFile.">";
-      rename($t, $Mp3WrapFile);
+      if(-e $t){
+        Log3 $hash->{NAME}, 4, $hash->{NAME}.": Benenne Datei um von <".$t."> nach <".$Mp3WrapFile.">";
+        rename($t, $Mp3WrapFile);
+        #falls die Datei existiert den ID3V1 und ID3V2 Tag entfernen
+        eval{
+          remove_mp3tag($Mp3WrapFile, 2);
+          remove_mp3tag($Mp3WrapFile, 1);
+          Log3 $hash, 4, $hash->{NAME}.": Die ID3 Tags von $Mp3WrapFile wurden geloescht";
+        } or Log3 $hash->{NAME}, 3, "MP3::Info Modul fehlt, konnte MP3 Tags nicht entfernen";
+      } else {Log3 $hash->{NAME}, 3, $hash->{NAME}.": MP3WRAP Fehler!, Datei wurde nicht generiert.";}
     }
 
     if ($TTS_OutputFile && $TTS_OutputFile ne $Mp3WrapFile) {
@@ -1454,7 +1530,8 @@ sub Text2Speech_WriteStats($$$$){
   <li><b>tts</b>:<br>
     Setzen eines Textes zur Sprachausgabe. Um mp3-Dateien direkt auszugeben, müssen diese mit f&uuml;hrenden 
     und schließenden Doppelpunkten angegebenen sein. Die MP3-Dateien müssen unterhalb des Verzeichnisses <i>TTS_FileTemplateDir</i> gespeichert sein.<br>
-    Der Text selbst darf deshalb selbst keine Doppelpunte beinhalten. Siehe Beispiele.
+    Der Text selbst darf deshalb selbst keine Doppelpunte beinhalten. <br>
+    Für die SpracheEngine Amazon Polly kann auch SSML verwendet werden, Siehe Beispiele.
   </li>
   <li><b>volume</b>:<br>
     Setzen der Ausgabe Lautst&auml;rke.<br>
@@ -1652,7 +1729,8 @@ sub Text2Speech_WriteStats($$$$){
   <code>attr TTS_EG_WZ TTS_Language Deutsch</code><br>
   <code>attr TTS_EG_WZ TTS_MplayerCall /usr/bin/mplayer</code><br>
   <code>attr TTS_EG_WZ TTS_Ressource Amazon-Polly</code><br>
-  <code>attr TTS_EG_WZ TTS_UseMP3Wrap 1</code><br>
+  <code>attr TTS_EG_WZ TTS_UseMP3Wrap 1</code><br><br>
+  <code>set MyTTS tts &lt;speak&gt;Mary had a little lamb.&lt;/speak&gt;</code>
   <br>
   <code>define MyTTS Text2Speech hw=0.0</code><br>
   <code>set MyTTS tts Die Alarmanlage ist bereit.</code><br>
