@@ -2083,7 +2083,7 @@ CommandDefine($$)
                 $modules{$m}{NotifyOrderPrefix} : "50-") . $name;
     }
     %ntfyHash = ();
-    if(!$temporary && !$init_done) {
+    if(!$temporary && $init_done) {
       addStructChange("define", $name, $def);
       DoTrigger("global", "DEFINED $name", 1);
     }
