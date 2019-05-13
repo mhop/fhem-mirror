@@ -1,4 +1,4 @@
-REV 19376
+REV 19378
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -481,7 +481,7 @@ UPD 2019-04-30_07:45:03 188169 FHEM/98_Installer.pm
 UPD 2018-08-31_07:45:03 4884 FHEM/98_JsonList2.pm
 UPD 2019-04-15_07:45:02 330920 FHEM/98_MSwitch.pm
 UPD 2016-03-12_07:45:14 49251 FHEM/98_MaxScanner.pm
-UPD 2018-12-13_07:45:03 34556 FHEM/98_MediaList.pm
+UPD 2019-05-13_07:45:02 34555 FHEM/98_MediaList.pm
 UPD 2019-05-02_07:45:02 231297 FHEM/98_Modbus.pm
 UPD 2019-04-07_07:45:02 51318 FHEM/98_ModbusAttr.pm
 UPD 2017-05-10_07:45:02 14229 FHEM/98_ModbusSET.pm
@@ -495,7 +495,7 @@ UPD 2018-03-24_07:45:03 97508 FHEM/98_Siro.pm
 UPD 2018-11-12_07:45:03 80535 FHEM/98_SmarterCoffee.pm
 UPD 2017-05-04_07:45:02 52568 FHEM/98_THRESHOLD.pm
 UPD 2018-03-19_07:45:04 49956 FHEM/98_TRAFFIC.pm
-UPD 2019-05-02_07:45:02 66681 FHEM/98_Text2Speech.pm
+UPD 2019-05-13_07:45:02 69009 FHEM/98_Text2Speech.pm
 UPD 2017-05-20_07:45:02 36736 FHEM/98_UbiquitiMP.pm
 UPD 2015-07-28_14:05:31 3492 FHEM/98_UbiquitiOut.pm
 UPD 2019-02-08_07:45:02 31487 FHEM/98_Verkehrsinfo.pm
@@ -718,11 +718,11 @@ UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
 UPD 2019-05-12_07:45:06 4001125 docs/commandref.html
-UPD 2019-05-12_07:45:08 2496843 docs/commandref_DE.html
+UPD 2019-05-13_07:45:08 2497005 docs/commandref_DE.html
 UPD 2019-05-12_07:45:03 79232 docs/commandref_frame.html
 UPD 2019-05-12_07:45:03 88924 docs/commandref_frame_DE.html
-UPD 2019-05-12_07:45:09 213719 docs/commandref_modular.html
-UPD 2019-05-12_07:45:10 224618 docs/commandref_modular_DE.html
+UPD 2019-05-13_07:45:09 213719 docs/commandref_modular.html
+UPD 2019-05-13_07:45:10 224618 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
