@@ -26,7 +26,7 @@ sub PET_Initialize($) {
         "disable:1,0 disabledForIntervals do_not_notify:1,0 "
       . "rp_states:multiple-strict,home,gotosleep,asleep,awoken,absent,gone "
       . "subType:"
-      . join( ',', @{ $RESIDENTStk_subTypes{PET} } ) . " "
+      . join( ',', @{ $RESIDENTStk_subTypes{en}{PET} } ) . " "
       . $readingFnAttributes;
 
     foreach (@RESIDENTStk_attr) {

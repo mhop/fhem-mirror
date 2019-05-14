@@ -7,6 +7,7 @@ use Data::Dumper;
 use Time::Local;
 
 require RESIDENTStk;
+our ( %RESIDENTStk_types, %RESIDENTStk_subTypes );
 
 # initialize ##################################################################
 sub RESIDENTS_Initialize($) {
@@ -29,7 +30,7 @@ sub RESIDENTS_Initialize($) {
       . "rgr_showAllStates:0,1 "
       . "rgr_wakeupDevice "
       . "rgr_homealoneInStatus:0,1 "
-      . "rgr_homealoneSubTypes:multiple-strict,pet,bird,pig,monkey,cat,dog,baby,toddler,minor,child,guest,domesticWorker,vacationer,teenager,senior "
+      . "rgr_homealoneSubTypes:multiple-strict,pet,bird,pig,monkey,cat,dog,baby,toddler,childcare,child,guest,domesticWorker,vacationer,teenager,senior "
       . $readingFnAttributes;
 
     return FHEM::Meta::InitMod( __FILE__, $hash );
@@ -47,7 +48,7 @@ sub RESIDENTS_UpdateReadings (@) {
         AttrVal(
             $name,
             "rgr_homealoneSubTypes",
-"pet,bird,pig,monkey,cat,dog,baby,toddler,minor,child,guest,domesticWorker,vacationer,teenager,senior"
+"pet,bird,pig,monkey,cat,dog,baby,toddler,childcare,child,guest,domesticWorker,vacationer,teenager,senior"
         )
     );
 
@@ -456,7 +457,7 @@ sub RESIDENTS_UpdateReadings (@) {
             my $SubType =
               defined( $defs{$roommate}{SUBTYPE} )
               ? $defs{$roommate}{SUBTYPE}
-              : 'generic';
+              : 'adult';
 
             $state_homealone = 0
               unless ( grep m/^$SubType$/, @homealoneSubTypes );
@@ -1297,12 +1298,15 @@ sub RESIDENTS_UpdateReadings (@) {
             next unless $TYPE;
 
             my $subtype = 'generic';
-            $subtype = InternalVal( $obj, 'SUBTYPE', 'pet' )
+            $subtype = InternalVal( $obj, 'SUBTYPE', 'generic' )
               if ( $TYPE eq 'PET' );
             $subtype = InternalVal( $obj, 'SUBTYPE', 'adult' )
               if ( $TYPE eq 'ROOMMATE' );
-            $subtype = InternalVal( $obj, 'SUBTYPE', 'guest' )
+            $subtype = InternalVal( $obj, 'SUBTYPE', 'generic' )
               if ( $TYPE eq 'GUEST' );
+
+            $subtype = $RESIDENTStk_types{en}{$TYPE}
+              if ( $subtype eq 'generic' );
 
             my $importance = 99;
             my (@index) = grep { $homealoneSubTypes[$_] eq $subtype }

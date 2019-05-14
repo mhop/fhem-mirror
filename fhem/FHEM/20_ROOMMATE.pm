@@ -26,7 +26,7 @@ sub ROOMMATE_Initialize($) {
         "disable:1,0 disabledForIntervals do_not_notify:1,0 "
       . "rr_states:multiple-strict,home,gotosleep,asleep,awoken,absent,gone "
       . "subType:"
-      . join( ',', @{ $RESIDENTStk_subTypes{ROOMMATE} } ) . " "
+      . join( ',', @{ $RESIDENTStk_subTypes{en}{ROOMMATE} } ) . " "
       . $readingFnAttributes;
 
     foreach (@RESIDENTStk_attr) {

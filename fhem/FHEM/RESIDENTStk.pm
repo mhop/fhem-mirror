@@ -7,7 +7,7 @@ use Data::Dumper;
 
 use Unit;
 use FHEM::Meta;
-our ( @RESIDENTStk_attr, %RESIDENTStk_subTypes );
+our ( @RESIDENTStk_attr, %RESIDENTStk_types, %RESIDENTStk_subTypes );
 
 # module variables ############################################################
 @RESIDENTStk_attr = (
@@ -31,10 +31,50 @@ our ( @RESIDENTStk_attr, %RESIDENTStk_subTypes );
     "wakeupDevice",
 
 );
+%RESIDENTStk_types = (
+    en => {
+        ROOMMATE => 'roommate',
+        GUEST    => 'guest',
+        PET      => 'pet',
+    },
+    de => {
+        ROOMMATE => 'Bewohner',
+        GUEST    => 'Gast',
+        PET      => 'Haustier',
+    },
+);
 %RESIDENTStk_subTypes = (
-    ROOMMATE => [ 'baby', 'toddler', 'child', 'teenager', 'adult', 'senior' ],
-    GUEST => [ 'generic', 'minor', 'domesticWorker', 'vacationer' ],
-    PET   => [ 'generic', 'bird',  'cat',            'dog', 'monkey', 'pig' ]
+    en => {
+        ROOMMATE =>
+          [ 'baby', 'toddler', 'child', 'teenager', 'adult', 'senior' ],
+        GUEST => [ 'generic', 'childcare', 'domesticWorker', 'vacationer' ],
+        PET => [ 'generic', 'bird', 'cat', 'dog', 'monkey', 'pig' ]
+    },
+    de => {
+        ROOMMATE => [
+            'Säugling',   'Kleinkind', 'Kind', 'Teenager',
+            'Erwachsener', 'Senior'
+        ],
+        GUEST =>
+          [ 'generisch', 'Kinderbetreuung', 'Hausangestellter', 'Urlaubsgast' ],
+        PET => [ 'generisch', 'Vogel', 'Katze', 'Hund', 'Affe', 'Schwein' ]
+    },
+    icons => {
+        ROOMMATE => [
+            'scene_baby@orange',        'scene_childs_room@orange',
+            'scene_childs_room@orange', 'people_sensor@orange',
+            'people_sensor@green',      'people_sensor@orange'
+        ],
+        GUEST => [
+            'scene_visit_guests@orange', 'scene_childs_room@orange',
+            'scene_cleaning@orange',   'scene_visit_guests@orange'
+        ],
+        PET => [
+            'dog_silhouette@green', 'dog_silhouette@green',
+            'dog_silhouette@green', 'dog_silhouette@green',
+            'dog_silhouette@green', 'dog_silhouette@green'
+        ]
+    },
 );
 
 ## initialize #################################################################
@@ -1126,8 +1166,8 @@ m/^([a-zA-Z\d._]+(:[A-Za-z\d_\.\-\/]+)?,?)([a-zA-Z\d._]+(:[A-Za-z\d_\.\-\/]+)?,?
         return "invalid value $value"
           unless (
             $cmd eq "del"
-            || defined( $RESIDENTStk_subTypes{$TYPE} ) && grep m/^$value$/,
-            @{ $RESIDENTStk_subTypes{$TYPE} }
+            || defined( $RESIDENTStk_subTypes{en}{$TYPE} ) && grep m/^$value$/,
+            @{ $RESIDENTStk_subTypes{en}{$TYPE} }
           );
         if ( $cmd eq "del" ) {
             $hash->{SUBTYPE} = 'generic'
