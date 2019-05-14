@@ -132,7 +132,7 @@ sub Heating_Control_ConvertToWDT() {
     my $definition = $defs{$hcName}{DEF};
     my $windows = AttrVal($hcName,"windowSensor",undef);
     my @a = GetDefAndAttr($hcName);
-    shift @a; shift @a; #delete define and uuid
+    shift @a; #delete define
     my @b = GetAllReadings($hcName);
     CommandDelete(undef,$hcName);
     CommandDefine(undef,"$hcName WeekdayTimer $definition");
