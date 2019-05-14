@@ -606,10 +606,10 @@ sub Weather_Notify($$) {
     Log3 $hash, 5,
 "Weather $name: FHEM initialization or rereadcfg triggered update, delay $delay seconds.";
     Weather_RearmTimer( $hash, gettimeofday() + $delay );
-    
+
     ### quick run GetUpdate then Demo
-    Weather_GetUpdate( $hash )
-    if ( defined($hash->{APIKEY}) and lc($hash->{APIKEY}) eq 'demo' );
+    Weather_GetUpdate($hash)
+      if ( defined( $hash->{APIKEY} ) and lc( $hash->{APIKEY} ) eq 'demo' );
 
     return undef;
 }
@@ -646,18 +646,20 @@ sub Weather_Define($$) {
     eval { require "$api.pm"; };
     return "$name: cannot load API $api: $@" if ($@);
 
-    $hash->{NOTIFYDEV} = "global";
+    $hash->{NOTIFYDEV}          = "global";
     $hash->{fhem}->{interfaces} = "temperature;humidity;wind";
-    $hash->{LOCATION} =
-      ( ( defined($location) and $location )
+    $hash->{LOCATION}           = (
+        ( defined($location) and $location )
         ? $location
         : AttrVal( 'global', 'latitude', 'error' ) . ','
-          . AttrVal( 'global', 'longitude', 'error' ) );
+          . AttrVal( 'global', 'longitude', 'error' )
+    );
     $hash->{INTERVAL} = $interval;
-    $hash->{LANG} =
-      ( ( defined($lang) and $lang )
+    $hash->{LANG}     = (
+        ( defined($lang) and $lang )
         ? $lang
-        : lc( AttrVal( 'global', 'language', 'de' ) ) );
+        : lc( AttrVal( 'global', 'language', 'de' ) )
+    );
     $hash->{API}                                   = $api;
     $hash->{MODEL}                                 = $api;
     $hash->{APIKEY}                                = $apikey;
@@ -715,8 +717,8 @@ sub WeatherIconIMGTag($) {
 
 sub WeatherAsHtmlV($;$$) {
     my ( $d, $op1, $op2 ) = @_;
-    
-    my ($f,$items) = WeatherCheckOptions($d,$op1,$op2);
+
+    my ( $f, $items ) = WeatherCheckOptions( $d, $op1, $op2 );
 
     my $h     = $defs{$d};
     my $width = int( ICONSCALE * ICONWIDTH );
@@ -751,26 +753,29 @@ sub WeatherAsHtmlV($;$$) {
     );
 
     for ( my $i = 1 ; $i < $items ; $i++ ) {
-        if(defined($h->{READINGS}->{"${fc}${i}_low_c"}) and $h->{READINGS}->{"${fc}${i}_low_c"}){
+        if ( defined( $h->{READINGS}->{"${fc}${i}_low_c"} )
+            and $h->{READINGS}->{"${fc}${i}_low_c"} )
+        {
             $ret .= sprintf(
-    '<tr><td class="weatherIcon" width=%d>%s</td><td class="weatherValue"><span class="weatherDay">%s: %s</span><br><span class="weatherMin">min %s°C</span> <span class="weatherMax">max %s°C</span><br>%s</td></tr>',
+'<tr><td class="weatherIcon" width=%d>%s</td><td class="weatherValue"><span class="weatherDay">%s: %s</span><br><span class="weatherMin">min %s°C</span> <span class="weatherMax">max %s°C</span><br>%s</td></tr>',
                 $width,
                 WeatherIconIMGTag( ReadingsVal( $d, "${fc}${i}_icon", "" ) ),
-                ReadingsVal( $d, "${fc}${i}_day_of_week", "" ),
-                ReadingsVal( $d, "${fc}${i}_condition",   "" ),
-                ReadingsVal( $d, "${fc}${i}_low_c",       " - " ),
-                ReadingsVal( $d, "${fc}${i}_high_c",      " - " ),
-                ReadingsVal( $d, "${fc}${i}_wind_condition",      " - " )
+                ReadingsVal( $d, "${fc}${i}_day_of_week",    "" ),
+                ReadingsVal( $d, "${fc}${i}_condition",      "" ),
+                ReadingsVal( $d, "${fc}${i}_low_c",          " - " ),
+                ReadingsVal( $d, "${fc}${i}_high_c",         " - " ),
+                ReadingsVal( $d, "${fc}${i}_wind_condition", " - " )
             );
-        }else{
+        }
+        else {
             $ret .= sprintf(
-      '<tr><td class="weatherIcon" width=%d>%s</td><td class="weatherValue"><span class="weatherDay">%s: %s</span><br><span class="weatherTemp"> %s°C</span><br>%s</td></tr>',
+'<tr><td class="weatherIcon" width=%d>%s</td><td class="weatherValue"><span class="weatherDay">%s: %s</span><br><span class="weatherTemp"> %s°C</span><br>%s</td></tr>',
                 $width,
                 WeatherIconIMGTag( ReadingsVal( $d, "${fc}${i}_icon", "" ) ),
-                ReadingsVal( $d, "${fc}${i}_day_of_week", "" ),
-                ReadingsVal( $d, "${fc}${i}_condition",   "" ),
-                ReadingsVal( $d, "${fc}${i}_temperature",       " - " ),
-                ReadingsVal( $d, "${fc}${i}_wind_condition",      " - " )
+                ReadingsVal( $d, "${fc}${i}_day_of_week",    "" ),
+                ReadingsVal( $d, "${fc}${i}_condition",      "" ),
+                ReadingsVal( $d, "${fc}${i}_temperature",    " - " ),
+                ReadingsVal( $d, "${fc}${i}_wind_condition", " - " )
             );
         }
     }
@@ -781,8 +786,8 @@ sub WeatherAsHtmlV($;$$) {
 
 sub WeatherAsHtml($;$$) {
     my ( $d, $op1, $op2 ) = @_;
-    
-    my ($f,$items) = WeatherCheckOptions($d,$op1,$op2);
+
+    my ( $f, $items ) = WeatherCheckOptions( $d, $op1, $op2 );
 
     WeatherAsHtmlV( $d, $f, $items );
 }
@@ -790,7 +795,7 @@ sub WeatherAsHtml($;$$) {
 sub WeatherAsHtmlH($;$$) {
     my ( $d, $op1, $op2 ) = @_;
 
-    my ($f,$items) = WeatherCheckOptions($d,$op1,$op2);
+    my ( $f, $items ) = WeatherCheckOptions( $d, $op1, $op2 );
 
     my $h     = $defs{$d};
     my $width = int( ICONSCALE * ICONWIDTH );
@@ -846,28 +851,32 @@ sub WeatherAsHtmlH($;$$) {
         ReadingsVal( $d, "humidity", "" )
     );
     for ( my $i = 1 ; $i < $items ; $i++ ) {
-        if(defined($h->{READINGS}->{"${fc}${i}_low_c"}) and $h->{READINGS}->{"${fc}${i}_low_c"}){
+        if ( defined( $h->{READINGS}->{"${fc}${i}_low_c"} )
+            and $h->{READINGS}->{"${fc}${i}_low_c"} )
+        {
             $ret .= sprintf( '<td class="weatherMin">min %s°C</td>',
                 ReadingsVal( $d, "${fc}${i}_low_c", " - " ) );
         }
         else {
             $ret .= sprintf( '<td class="weatherMin"> %s°C</td>',
-              ReadingsVal( $d, "${fc}${i}_temperature", " - " ) );
+                ReadingsVal( $d, "${fc}${i}_temperature", " - " ) );
         }
     }
-    
+
     $ret .= '</tr>';
 
     # wind | max
     $ret .= sprintf( '<tr><td class="weatherMax">%s</td>',
         ReadingsVal( $d, "wind_condition", "" ) );
     for ( my $i = 1 ; $i < $items ; $i++ ) {
-        if(defined($h->{READINGS}->{"${fc}${i}_high_c"}) and $h->{READINGS}->{"${fc}${i}_high_c"}){
+        if ( defined( $h->{READINGS}->{"${fc}${i}_high_c"} )
+            and $h->{READINGS}->{"${fc}${i}_high_c"} )
+        {
             $ret .= sprintf( '<td class="weatherMax">max %s°C</td>',
-              ReadingsVal( $d, "${fc}${i}_high_c", " - " ) );
+                ReadingsVal( $d, "${fc}${i}_high_c", " - " ) );
         }
     }
-    
+
     $ret .= "</tr></table>";
 
     return $ret;
@@ -876,40 +885,43 @@ sub WeatherAsHtmlH($;$$) {
 sub WeatherAsHtmlD($;$$) {
     my ( $d, $op1, $op2 ) = @_;
 
-    my ($f,$items) = WeatherCheckOptions($d,$op1,$op2);
+    my ( $f, $items ) = WeatherCheckOptions( $d, $op1, $op2 );
 
     if ($FW_ss) {
-        WeatherAsHtmlV( $d, $f , $items);
+        WeatherAsHtmlV( $d, $f, $items );
     }
     else {
-        WeatherAsHtmlH( $d, $f , $items);
+        WeatherAsHtmlH( $d, $f, $items );
     }
 }
 
 sub WeatherCheckOptions($@) {
-    my ($d,$op1,$op2)    = @_;
-    
-    my $items = $op2;
-    my $f = $op1;
+    my ( $d, $op1, $op2 ) = @_;
 
-    if( defined($op1) and $op1 and $op1 =~ /[0-9]/g){ $items = $op1; }
-    if( defined($op2) and $op2 and $op2 =~ /[dh]/g){ $f = $op2; }
+    my $items = $op2;
+    my $f     = $op1;
+
+    if ( defined($op1) and $op1 and $op1 =~ /[0-9]/g ) { $items = $op1; }
+    if ( defined($op2) and $op2 and $op2 =~ /[dh]/g )  { $f     = $op2; }
 
     $f =~ tr/dh/./cd if ( defined $f and $f );
-    $items =~ tr/0-9/./cd if (defined($items) and $items );
-    
-    $items = 6   if ( !$items );
-    
+    $items =~ tr/0-9/./cd if ( defined($items) and $items );
+
+    $items = 6 if ( !$items );
+
     return "$d is not a Weather instance<br>"
       if ( !$defs{$d} || $defs{$d}->{TYPE} ne "Weather" );
 
-    if ( AttrVal($d,'forecast','none') ne 'none' ) {
-        $f = ( AttrVal($d,'forecast','none') eq 'daily' ? 'd' : 'h' );
+    if ( AttrVal( $d, 'forecast', 'none' ) ne 'none' ) {
+        $f =
+          ( AttrVal( $d, 'forecast', 'none' ) eq 'daily'
+            ? 'd'
+            : ( AttrVal( $d, 'forecast', 'none' ) eq 'every' ? $f : 'h' ) );
     }
-    
-    $f = 'h' if ( !$f || length($f) > 1);
 
-    return ($f,$items);
+    $f = 'h' if ( !$f || length($f) > 1 );
+
+    return ( $f, $items );
 }
 
 #####################################
