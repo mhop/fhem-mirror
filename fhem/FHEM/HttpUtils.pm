@@ -618,6 +618,7 @@ HttpUtils_Connect2($)
     $hash->{directWriteFn} = sub($) { # Nonblocking write
       my $ret = syswrite $hash->{conn}, $data;
       if($ret <= 0) {
+        return if($! == EAGAIN);
         my $err = $!;
         RemoveInternalTimer(\%timerHash);
         HttpUtils_Close($hash);
