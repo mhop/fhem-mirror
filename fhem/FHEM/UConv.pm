@@ -14,7 +14,7 @@ use POSIX qw(strftime);
 use Data::Dumper;
 
 sub GetSeason (;$$$);
-sub GetSeasonPheno ($$;$);
+sub _GetSeasonPheno ($$;$$);
 sub _ReplaceStringByHashKey($$;$);
 
 ####################
@@ -1470,7 +1470,7 @@ sub GetDaytime(;$$$$) {
 
     # include season data
     $ret = GetSeason( $ret, $lang );
-    $ret = GetSeasonPheno( $ret, $lang );
+    $ret = _GetSeasonPheno( $ret, $lang );
 
 #$ret = GetSeasonSocial( $ret, $lang ); #TODO https://de.wikipedia.org/wiki/F%C3%BCnfte_Jahreszeit
 
@@ -1744,8 +1744,8 @@ sub GetSeason (;$$$) {
 
 # Estimate phenologic season from astro and meteo season
 # https://de.wikipedia.org/wiki/Ph%C3%A4nologie#Ph.C3.A4nologischer_Kalender
-sub GetSeasonPheno ($$;$) {
-    my ( $time, $lang, $ret2 ) = @_;
+sub _GetSeasonPheno ($$;$$) {
+    my ( $time, $lang, $seasonAstro, $seasonMeteo ) = @_;
     $lang = (
           $main::attr{global}{language}
         ? $main::attr{global}{language}
@@ -1759,8 +1759,8 @@ sub GetSeasonPheno ($$;$) {
     }
     else {
         $ret                = _time($time);
-        $ret->{seasonAstro} = $ret2->{seasonAstro};
-        $ret->{seasonMeteo} = $ret2->{seasonMeteo};
+        $ret->{seasonAstro} = $seasonAstro;
+        $ret->{seasonMeteo} = $seasonMeteo;
     }
 
     # stick to astro season first
@@ -1870,9 +1870,9 @@ sub GetSeasonPheno ($$;$) {
     return ( $ret->{seasonPheno} ) if (wantarray);
 
     ( $ret->{'-1'}{seasonPheno} ) =
-      GetSeasonPheno( $ret->{'-1'}{time_t}, $lang, $ret );
+      _GetSeasonPheno( $ret->{'-1'}{time_t}, $lang, $ret->{'-1'}{seasonAstro}, $ret->{'-1'}{seasonMeteo} );
     ( $ret->{1}{seasonPheno} ) =
-      GetSeasonPheno( $ret->{1}{time_t}, $lang, $ret );
+      _GetSeasonPheno( $ret->{1}{time_t}, $lang, $ret->{1}{seasonAstro}, $ret->{1}{seasonMeteo} );
 
     # text strings
     my @langs = ('EN');
