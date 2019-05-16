@@ -1,4 +1,5 @@
 ###########################################
+###########################################
 # $Id$
 #
 # Comments start with #. Empty lines are ignored.
@@ -71,7 +72,7 @@ attr DEVICE setList\
   log_level:debug,info,warn,error BASE_TOPIC/bridge/config/log_level $EVTPART1\
   permit_join:true,false BASE_TOPIC/bridge/config/permit_join $EVTPART1\
   remove:textField BASE_TOPIC/bridge/config/remove $EVTPART1\
-  y_device_setting:textField zigbee2mqtt/$EVTPART1/set {"$EVTPART2": "$EVTPART3"}}\
+  y_device_setting:textField zigbee2mqtt/$EVTPART1/set {"$EVTPART2": "$EVTPART3"}\
   x_bind:textField BASE_TOPIC/bridge/bind/$EVTPART1 $EVTPART2\
   x_bind_unbind:textField BASE_TOPIC/bridge/unbind/$EVTPART1 $EVTPART2\
   x_device_options:textField BASE_TOPIC/bridge/config/device_options {"friendly_name":"$EVTPART1",""options": {"$EVTPART2": "$EVTPART3"}}\
@@ -479,8 +480,15 @@ attr DEVICE model A_01b_tasmota_1ch+motion+SI7021
 name:A_01c_tasmota_POW
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Applies to Sonoff POW devices<br>NOTE: Power topic will be set to POWER1; the format the device is sending data will also be changed to lowercase!
-set DEVICE attrTemplate A_01a_tasmota_basic_state_power1
+par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }set DEVICE attrTemplate A_01a_tasmota_basic_state_power1attr DEVICE setList \
+  off:noArg    CMNDTOPIC/POWER1 0\
+  on:noArg     CMNDTOPIC/POWER1 1\
+  toggle:noArg CMNDTOPIC/POWER1 2
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"LWT","false") eq "Online"?"10px-kreis-gruen":"10px-kreis-rot";; my $light = ReadingsVal($name,"state","off");;"<a href=\"http://".ReadingsVal($name,"IPAddress","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a> uptime: ".ReadingsVal($name,"Uptime",undef).sprintf(" aktuell: %.1f W Tag: %.2f kWh Gestern: %.3f kWh Gesamt: %.4f kWh", ReadingsVal($name,"ENERGY_Power",undef), ReadingsVal($name,"ENERGY_Today",undef), ReadingsVal($name,"ENERGY_Yesterday",undef), ReadingsVal($name,"ENERGY_Total",undef))}
 attr DEVICE stateFormat {sprintf("aktuell: %.1f W Tag: %.2f kWh Gestern: %.3f kWh Gesamt: %.4f kWh", ReadingsVal($name,"ENERGY_Power",undef), ReadingsVal($name,"ENERGY_Today",undef), ReadingsVal($name,"ENERGY_Yesterday",undef), ReadingsVal($name,"ENERGY_Total",undef))}
+deletereading -q DEVICE (?!associatedWith).*
+attr DEVICE setStateList on off toggle
+attr DEVICE webCmd :
 attr DEVICE model A_01c_tasmota_POW
 
 
@@ -766,7 +774,8 @@ filter:TYPE=MQTT2_DEVICE
 par:DEVNAME;Shelly1 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
 attr DEVICE setList\
   off:noArg shellies/DEVNAME/relay/0/command off\
-  on:noArg shellies/DEVNAME/relay/0/command on
+  on:noArg shellies/DEVNAME/relay/0/command on\
+  update:noArg shellies/DEVNAME/command update_fw
 attr DEVICE readingList \
   shellies/DEVNAME/relay/0:.* state\
   shellies/DEVNAME/relay/0:.* relay0\
@@ -792,7 +801,8 @@ par:DEVNAME;Shelly1 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,
 attr DEVICE setList\
   relay0:on,off,toggle shellies/DEVNAME/relay/0/command $EVTPART1\
   off:noArg shellies/DEVNAME/relay/0/command off\
-  on:noArg shellies/DEVNAME/relay/0/command on
+  on:noArg shellies/DEVNAME/relay/0/command on\
+  update:noArg shellies/DEVNAME/command update_fw
 attr DEVICE readingList \
   shellies/DEVNAME/relay/0:.* state\
   shellies/DEVNAME/relay/0:.* relay0\
@@ -821,7 +831,8 @@ attr DEVICE setList \
   close:noArg shellies/DEVNAME/roller/0/command close\
   stop:noArg shellies/DEVNAME/roller/0/command stop\
   pct:slider,0,1,100 shellies/DEVNAME/roller/0/command/pos $EVTPART1\
-  DoRecalibration:noArg shellies/DEVNAME/roller/0/command rc
+  DoRecalibration:noArg shellies/DEVNAME/roller/0/command rc\
+  update:noArg shellies/DEVNAME/command update_fw
 attr DEVICE readingList \
   shellies/DEVNAME/roller/0/pos:.* pct\
   shellies/DEVNAME/status/0/rollers:.* power\
@@ -835,6 +846,47 @@ attr DEVICE stateFormat pct
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE setStateList open close stop
 attr DEVICE model A_11b_shelly2_roller
+
+# shelly25 using original firmware in roller mode.
+name:A_11b1_shelly25_roller
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
+desc:shelly25 using original firmware. <br>NOTE: shelly25 roller operated, change settings first!
+par:DEVNAME;Shellyswitch25 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
+attr DEVICE comment shelly25 roller operated
+attr DEVICE setList \
+  open:noArg shellies/DEVNAME/roller/0/command open\
+  close:noArg shellies/DEVNAME/roller/0/command close\
+  half:noArg shellies/DEVNAME/roller/0/command/pos 50\
+  stop:noArg shellies/DEVNAME/roller/0/command stop\
+  pct:slider,0,1,100 shellies/DEVNAME/roller/0/command/pos $EVTPART1\
+  x_recalibration:noArg shellies/DEVNAME/roller/0/command rc\
+  x_update:noArg shellies/DEVNAME/command update_fw\
+  x_mqttcom shellies/DEVNAME/command $EVTPART1
+attr DEVICE readingList \
+  shellies/DEVNAME/roller/0/pos:.* pct\
+  shellies/DEVNAME/status/0/rollers:.* power\
+  shellies/DEVNAME/online:.* online\
+  shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
+  shellies/DEVNAME/roller/0:.* current\
+  shellies/DEVNAME/roller/0:open {{'state' => 'opening'}}\
+  shellies/DEVNAME/roller/0:close {{'state' => 'closing'}}\
+  shellies/DEVNAME/roller/0/pos:.* state\
+  shellies/DEVNAME/input/1:.* input1\
+  shellies/DEVNAME/input/0:.* input0\
+  shellies/DEVNAME/relay/power:.* power\
+  shellies/DEVNAME/relay/energy:.* energy\
+  shellies/DEVNAME/temperature:.* temperature\
+  shellies/DEVNAME/overtemperature:.* overtemperature
+attr DEVICE devStateIcon opening:fts_shutter_up@red closing:fts_shutter_down@red true:10px-kreis-gruen false:10px-kreis-rot 100:fts_shutter_100 0:fts_shutter_10 9\d.*:fts_shutter_90 8\d.*:fts_shutter_80 7\d.*:fts_shutter_70 6\d.*:fts_shutter_60 5\d.*:fts_shutter_50 4\d.*:fts_shutter_40 3\d.*:fts_shutter_30 2\d.*:fts_shutter_20 1\d.*:fts_shutter_10 \b\d\b.*:fts_shutter_10 set_.*:fts_shutter_updown
+attr DEVICE cmdIcon open:fts_shutter_up close:fts_shutter_down stop:fts_shutter_manual half:fts_shutter_50
+attr DEVICE webCmd :open:close:half:stop:pct
+attr DEVICE stateFormat <a href="http://ip" target="_blank">\
+online\
+</a>\
+state
+deletereading -q DEVICE (?!associatedWith).*
+attr DEVICE setStateList open close half stop pct
+attr DEVICE model A_11b1_shelly25_roller
 
 # shelly2 using original firmware.
 # NOTE: a second device will be created for the second channel
@@ -937,7 +989,8 @@ attr DEVICE setList \
   relay0:iconSwitch,on,li_wht_off,off,li_wht_on shellies/DEVNAME/relay/0/command $EVTPART1\
   relay1:iconSwitch,on,li_wht_off,off,li_wht_on shellies/DEVNAME/relay/1/command $EVTPART1\
   relay2:iconSwitch,on,li_wht_off,off,li_wht_on shellies/DEVNAME/relay/2/command $EVTPART1\
-  relay3:iconSwitch,on,li_wht_off,off,li_wht_on shellies/DEVNAME/relay/3/command $EVTPART1 
+  relay3:iconSwitch,on,li_wht_off,off,li_wht_on shellies/DEVNAME/relay/3/command $EVTPART1 \
+  update:noArg shellies/DEVNAME/command update_fw
 attr DEVICE webCmd relay0:relay1:relay2:relay3
 attr DEVICE stateFormat R0: relay0 R1: relay1 R2: relay2 R3: relay3
 attr DEVICE model A_14b_shelly4pro_unified
@@ -952,7 +1005,8 @@ attr DEVICE setList\
   on:noArg shellies/DEVNAME/color/0/command on\
   pct:colorpicker,BRI,0,1,100 shellies/DEVNAME/color/0/set {"turn":"on","gain":"$EVTPART1","brightness":"$EVTPART1"}\
   ct:colorpicker,CT,3000,10,6500 {$EVTPART1=3000 if ($EVTPART1<3000);"shellies/DEVNAME/color/0/set {\"turn\":\"on\",\"mode\":\"white\",\"temp\":\"$EVTPART1\"}"}\
-  rgb:colorpicker,RGB {$EVTPART1=~/(..)(..)(..)/;if($1 ne $2 || $2 ne $3){"shellies/DEVNAME/color/0/set {\"turn\":\"on\",\"mode\":\"color\",\"gain\":\"100\",\"red\":".hex($1).",\"green\":".hex($2).",\"blue\":".hex($3)."}"}else{"shellies/shellybulb-3CC533/color/0/set {\"turn\":\"on\",\"mode\":\"white\",\"brightness\":".int(hex($1)/2.55)."}"}}
+  rgb:colorpicker,RGB {$EVTPART1=~/(..)(..)(..)/;if($1 ne $2 || $2 ne $3){"shellies/DEVNAME/color/0/set {\"turn\":\"on\",\"mode\":\"color\",\"gain\":\"100\",\"red\":".hex($1).",\"green\":".hex($2).",\"blue\":".hex($3)."}"}else{"shellies/shellybulb-3CC533/color/0/set {\"turn\":\"on\",\"mode\":\"white\",\"brightness\":".int(hex($1)/2.55)."}"}}\
+  update:noArg shellies/DEVNAME/command update_fw
 deletereading -q DEVICE status_.*
 attr DEVICE readingList shellies/DEVNAME/color/0/status:.* {json2nameValue($EVENT)}
 attr DEVICE userReadings ct:temp.* {ReadingsVal($name,"temp",3000)}, rgb:red.* {if(ReadingsVal($name,"mode","") eq "color"){sprintf("%02X%02X%02X", ReadingsVal($name,"red",99), ReadingsVal($name,"green",99), ReadingsVal($name,"blue",99))}else{my $a=sprintf("%02X",ReadingsVal($name,"brightness",0)*2.555);"$a$a$a"}}
@@ -966,6 +1020,7 @@ attr DEVICE model A_15_shellybulb
 name:A_16_shellyht
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
 desc:shellyht using original firmware <br>Just adds stateFormat and icon
+attr DEVICE setList update:noArg shellies/DEVNAME/command update_fw
 attr DEVICE icon temperature_humidity
 attr DEVICE stateFormat T: temperature °C H: humidity % B: battery %
 attr DEVICE model A_16_shellyht
@@ -982,7 +1037,8 @@ attr DEVICE readingList shellies/DEVNAME/white/0/status:.* {json2nameValue($EVEN
   shellies/DEVNAME/online:.* online
 attr DEVICE setList off:noArg shellies/DEVNAME/white/0/command off\
   on:noArg shellies/DEVNAME/white/0/command on\
-  brightness:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/0/set {"ison":"true","mode":"white","brightness":"$EVTPART1"}
+  brightness:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/0/set {"ison":"true","mode":"white","brightness":"$EVTPART1"}\
+  update:noArg shellies/DEVNAME/command update_fw
 deletereading -q DEVICE (?!associatedWith).*
 setreading DEVICE associatedWith DEVICE_CH1,DEVICE_CH2,DEVICE_CH4
 attr DEVICE webCmd on:off:brightness
