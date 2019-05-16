@@ -1,12 +1,21 @@
 ###############################################################################
 # $Id$
 package main;
+use strict;
+use warnings;
+use Data::Dumper;
+
+#use FHEM::Meta;
 sub UConv_Initialize() { }
 
 package UConv;
 use Scalar::Util qw(looks_like_number);
 use POSIX qw(strftime);
 use Data::Dumper;
+
+sub GetSeason (;$$$);
+sub GetSeasonPheno ($$;$);
+sub _ReplaceStringByHashKey($$;$);
 
 ####################
 # Translations
@@ -132,6 +141,17 @@ our %daytimes = (
         "Morgen",   "Vormittag", "Mittag", "Nachmittag",
         "Vorabend", "Abend",     "Nacht",
     ],
+    nl => [
+        "Ochtend", "Vormiddag", "Middag", "Nachmiddag",
+        "Avond",   "Midavond",  "Nacht",
+    ],
+    fr => [
+        "Matin", "Martinée", "Midi", "Après-midi", "Veille", "Soir", "Nuit",
+    ],
+    pl => [
+        "Ranek",   "Rano",     "Południe", "Popołudnie",
+        "Wigilia", "Wieczór", "Noc",
+    ],
     icons => [
         "weather_sunrise", "scene_day",
         "weather_sun",     "weather_summer",
@@ -245,20 +265,23 @@ our %sdt2daytimes = (
 );
 
 our %seasons = (
-    en    => [ "Spring",    "Summer", "Autumn", "Winter", ],
-    de    => [ "Frühling", "Sommer", "Herbst", "Winter", ],
-    pheno => [ 2,           4,        7,        9 ],
+    en    => [ "Spring",    "Summer", "Autumn",  "Winter", ],
+    de    => [ "Frühling", "Sommer", "Herbst",  "Winter", ],
+    nl    => [ "Voorjaar",  "Zomer",  "Herfst",  "Winter", ],
+    fr    => [ "Printemps", "Été",  "Automne", "Hiver", ],
+    pl    => [ "Wiosna",    "Lato",   "Jesień", "Zima", ],
+    pheno => [ 2,           4,        7,         9 ],
 );
 
 our %seasonsPheno = (
     en => [
         "Early Spring",
         "First Spring",
-        "Spring",
+        "Full Spring",
         "Early Summer",
-        "Summer",
+        "Midsummer",
         "Late Summer",
-        "Early Autumn",
+        "Early Fall",
         "Autumn",
         "Late Autumn",
         "Winter",
@@ -268,21 +291,66 @@ our %seasonsPheno = (
         "Hochsommer",   "Spätsommer",   "Frühherbst",   "Vollherbst",
         "Spätherbst",  "Winter",
     ],
+    nl => [
+        "Vroeg Voorjaar",
+        "Eerste Voorjaar",
+        "Voorjaar",
+        "Vroeg Zomer",
+        "Zomer",
+        "Laat Zomer",
+        "Vroeg Herfst",
+        "Herfst",
+        "Laat Herfst",
+        "Winter",
+    ],
+    fr => [
+        "Avant du printemps",
+        "Début du printemps",
+        "Printemps",
+        "Avant de l'été",
+        "Milieu de l'été",
+        "Fin de l'été",
+        "Avant de l'automne",
+        "Automne",
+        "Fin de l'automne",
+        "Hiver",
+    ],
+    pl => [
+        "Przedwiośnie",
+        "Pierwsza Wiosna",
+        "Wiosna",
+        "Wczesne Lato",
+        "Połowa Lata",
+        "Późnym Latem",
+        "Wczesną Jesienią",
+        "Jesień",
+        "Późną Jesienią",
+        "Zima",
+    ],
 );
 
 our %dst = (
-    en => [ "standard",   "daylight" ],
-    de => [ "Normalzeit", "Sommerzeit" ],
+    en => [ "standard",         "daylight" ],
+    de => [ "Normalzeit",       "Sommerzeit" ],
+    nl => [ "Standaardtijd",    "Zomertijd" ],
+    fr => [ "Heure normale",    "L'heure d'été" ],
+    pl => [ "Standardowy czas", "Czas Letni" ],
 );
 
 our %daystages = (
-    en => [ "weekday",   "weekend",    "holiday",  "vacation", ],
-    de => [ "Wochentag", "Wochenende", "Feiertag", "Urlaubstag", ],
+    en => [ "weekday",   "weekend",    "holiday",     "vacation", ],
+    de => [ "Wochentag", "Wochenende", "Feiertag",    "Urlaubstag", ],
+    nl => [ "Weekdag",   "Weekend",    "Vieringsdag", "Vakantiedag", ],
+    fr => [ "Jour de la semaine", "Weekend", "Vacances", "Villégiature", ],
+    pl => [ "dzień powszedni",   "Weekend", "święto", "Wakacjach", ],
 );
 
 our %reldays = (
-    en => [ "yesterday", "today", "tomorrow" ],
-    de => [ "Gestern",   "Heute", "Morgen" ],
+    en => [ "yesterday", "today",       "tomorrow" ],
+    de => [ "gestern",   "heute",       "morgen" ],
+    nl => [ "gisteren",  "vandaag",     "morgen" ],
+    fr => [ "hier",      "aujourd'hui", "demain" ],
+    pl => [ "wczoraj",   "dzisiaj",     "jutro" ],
 );
 
 our %monthss = (
@@ -293,6 +361,18 @@ our %monthss = (
     de => [
         "Jan", "Feb", "Mar", "Apr", "Mai", "Jun", "Jul", "Aug",
         "Sep", "Okt", "Nov", "Dez", "Jan"
+    ],
+    nl => [
+        "Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Aug",
+        "Sep", "Okt", "Nov", "Dec", "Jan"
+    ],
+    fr => [
+        "Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aût",
+        "Sep", "Oct",  "Nov", "Dec", "Jan"
+    ],
+    pl => [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug",
+        "Sep", "Oct", "Nov", "Dec", "Jan"
     ],
 );
 
@@ -309,11 +389,32 @@ our %months = (
         "September", "Oktober", "November", "Dezember",
         "Januar"
     ],
+    nl => [
+        "Januari",   "Februari", "Maart",    "April",
+        "Mei",       "Juni",     "Juli",     "Augustus",
+        "September", "Oktober",  "November", "December",
+        "Januari"
+    ],
+    fr => [
+        "Janvier",   "Février", "Mars",     "Avril",
+        "Mai",       "Juin",     "Juillet",  "Août",
+        "Septembre", "Octobre",  "Novembre", "Décembre",
+        "Janvier"
+    ],
+    pl => [
+        "Styczeń",  "Luty",         "Marzec",   "Kwiecień",
+        "Maj",       "Czerwiec",     "July",     "Lipiec",
+        "Wrzesień", "Październik", "Listopad", "Grudzień",
+        "Styczeń"
+    ],
 );
 
 our %dayss = (
-    en => [ "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" ],
-    de => [ "So",  "Mo",  "Di",  "Mi",  "Do",  "Fr",  "Sa",  "So" ],
+    en => [ "Sun", "Mon", "Tue", "Wed",  "Thu", "Fri",  "Sat", "Sun" ],
+    de => [ "So",  "Mo",  "Di",  "Mi",   "Do",  "Fr",   "Sa",  "So" ],
+    nl => [ "Zon", "Maa", "Din", "Woe",  "Don", "Vri",  "Zat", "Zon" ],
+    fr => [ "Dim", "Lun", "Mar", "Mer",  "Jeu", "Ven",  "Sam", "Dim" ],
+    pl => [ "Nie", "Pon", "Wto", "śro", "Czw", "Pią", "Sob", "Nie" ],
 );
 
 our %days = (
@@ -325,16 +426,34 @@ our %days = (
         "Sonntag",    "Montag",  "Dienstag", "Mittwoch",
         "Donnerstag", "Freitag", "Samstag",  "Sonntag"
     ],
+    nl => [
+        "Zondag",    "Maandag", "Dinsdag",  "Woensdag",
+        "Donderdag", "Vrijdag", "Zaterdag", "Zondag"
+    ],
+    fr => [
+        "Dimanche", "Lundi",    "Mardi",  "Mercredi",
+        "Jeudi",    "Vendredi", "Samedi", "Dimanche"
+    ],
+    pl => [
+        "Niedziela", "Poniedziałek", "Wtorek", "środa",
+        "Czwartek",  "Piątek",       "Sobota", "Niedziela"
+    ],
 );
 
 our %dateformats = (
     en => '%wday_long%, %mon_long% %mday%',
     de => '%wday_long%, %mday%. %mon_long%',
+    nl => '%wday_long%, %mday%. %mon_long%',
+    fr => '%wday_long%, %mday%. %mon_long%',
+    pl => '%wday_long%, %mday%. %mon_long%',
 );
 
 our %dateformatss = (
     en => '%mon_long% %mday%',
     de => '%mday%. %mon_long%',
+    nl => '%mday%. %mon_long%',
+    fr => '%mday%. %mon_long%',
+    pl => '%mday%. %mon_long%',
 );
 
 # https://www.luftfeuchtigkeit-raumklima.de/tabelle.php
@@ -467,13 +586,19 @@ our %clima_rgb = (
 
 our %clima_names = (
     c => {
-        en => [ "freeze",  "cold", "low",     "ideal",   "high", "hot" ],
-        de => [ "frostig", "kalt", "niedrig", "optimal", "hoch", "heiß" ],
-
+        en => [ "freeze",  "cold",  "low",     "ideal",    "high", "hot" ],
+        de => [ "frostig", "kalt",  "niedrig", "optimal",  "hoch", "heiß" ],
+        nl => [ "kil",     "koude", "laag",    "optimale", "hoog", "heet" ],
+        fr => [ "froid",   "froid", "faible",  "optimal",  "haut", "chaud" ],
+        pl =>
+          [ "chłodny", "zimno", "niski", "optymalny", "wysoki", "gorący" ],
     },
     h => {
-        en => [ "dry",     "low",     "ideal",   "high", "wet" ],
-        de => [ "trocken", "niedrig", "optimal", "hoch", "nass" ],
+        en => [ "dry",     "low",     "ideal",     "high",   "wet" ],
+        de => [ "trocken", "niedrig", "optimal",   "hoch",   "nass" ],
+        nl => [ "droog",   "laag",    "optimale",  "hoog",   "nat" ],
+        fr => [ "sec",     "faible",  "optimal",   "haut",   "humide" ],
+        pl => [ "suchy",   "niski",   "optymalny", "wysoki", "mokro" ],
     }
 );
 
@@ -1345,8 +1470,8 @@ sub GetDaytime(;$$$$) {
 
     # include season data
     $ret = GetSeason( $ret, $lang );
+    $ret = GetSeasonPheno( $ret, $lang );
 
-#$ret = GetSeasonPheno( $ret, $lang );
 #$ret = GetSeasonSocial( $ret, $lang ); #TODO https://de.wikipedia.org/wiki/F%C3%BCnfte_Jahreszeit
 
     # change midnight event when season changes
@@ -1360,6 +1485,11 @@ sub GetDaytime(;$$$$) {
     $ret->{events}{ $ret->{midnight_t} }{DESC} .=
       ", Begin astronomical $ret->{seasonAstro_long} season"
       if ( $ret->{seasonAstroChng} && $ret->{seasonAstroChng} == 1 );
+    $ret->{events}{ $ret->{midnight_t} }{VALUE} = 2
+      if ( $ret->{seasonPhenoChng} && $ret->{seasonPhenoChng} == 1 );
+    $ret->{events}{ $ret->{midnight_t} }{DESC} .=
+      ", Begin phenological season $ret->{seasonPheno_long}"
+      if ( $ret->{seasonPhenoChng} && $ret->{seasonPhenoChng} == 1 );
 
     # calculate daytime from daytimeStage, season and DST
     my $ds = $ret->{daytimeStage};
@@ -1491,8 +1621,6 @@ sub GetDaytime(;$$$$) {
     return $ret;
 }
 
-sub GetSeason (;$$$);
-
 sub GetSeason (;$$$) {
     my ( $time, $lang, $meteo ) = @_;
     $lang = (
@@ -1544,12 +1672,12 @@ sub GetSeason (;$$$) {
     $index++ if ( $ret->{yday} >= ( 356 + $ret->{isly} ) );
     $ret->{seasonAstro} = $index;
 
-    unless (wantarray) {
-        ( $ret->{'-1'}{seasonMeteo}, $ret->{'-1'}{seasonAstro} ) =
-          GetSeason( $ret->{'-1'}{time_t}, $lang );
-        ( $ret->{1}{seasonMeteo}, $ret->{1}{seasonAstro} ) =
-          GetSeason( $ret->{1}{time_t}, $lang );
-    }
+    return ( $ret->{seasonMeteo}, $ret->{seasonAstro} ) if (wantarray);
+
+    ( $ret->{'-1'}{seasonMeteo}, $ret->{'-1'}{seasonAstro} ) =
+      GetSeason( $ret->{'-1'}{time_t}, $lang );
+    ( $ret->{1}{seasonMeteo}, $ret->{1}{seasonAstro} ) =
+      GetSeason( $ret->{1}{time_t}, $lang );
 
     # text strings
     my @langs = ('EN');
@@ -1558,52 +1686,53 @@ sub GetSeason (;$$$) {
         my $l = lc($_);
         $l =~ s/^([a-z]+).*/$1/g;
         next unless ( $seasons{$l} );
-        my $h = $l eq "en" ? $ret : \%{ $ret->{$_} };
 
-        $h->{seasonMeteo_long} = $seasons{$l}[ $ret->{seasonMeteo} ];
-        $h->{seasonAstro_long} = $seasons{$l}[ $ret->{seasonAstro} ];
+        if ($l eq 'en') {
+          $ret->{'-1'}{seasonMeteo_long} = $seasons{$l}[ $ret->{'-1'}{seasonMeteo} ];
+          $ret->{seasonMeteo_long} = $seasons{$l}[ $ret->{seasonMeteo} ];
+          $ret->{1}{seasonMeteo_long} = $seasons{$l}[ $ret->{1}{seasonMeteo} ];
+
+          $ret->{'-1'}{seasonAstro_long} = $seasons{$l}[ $ret->{'-1'}{seasonAstro} ];
+          $ret->{seasonAstro_long} = $seasons{$l}[ $ret->{seasonAstro} ];
+          $ret->{1}{seasonAstro_long} = $seasons{$l}[ $ret->{1}{seasonAstro} ];
+        } else {
+          $ret->{'-1'}{$l}{seasonMeteo_long} = $seasons{$l}[ $ret->{'-1'}{seasonMeteo} ];
+          $ret->{$l}{seasonMeteo_long} = $seasons{$l}[ $ret->{seasonMeteo} ];
+          $ret->{1}{$l}{seasonMeteo_long} = $seasons{$l}[ $ret->{1}{seasonMeteo} ];
+
+          $ret->{'-1'}{$l}{seasonAstro_long} = $seasons{$l}[ $ret->{'-1'}{seasonAstro} ];
+          $ret->{$l}{seasonAstro_long} = $seasons{$l}[ $ret->{seasonAstro} ];
+          $ret->{1}{$l}{seasonAstro_long} = $seasons{$l}[ $ret->{1}{seasonAstro} ];
+        }
     }
+
+    $ret->{'-1'}{seasonMeteoChng} = 0;
+    $ret->{seasonMeteoChng}       = 0;
+    $ret->{1}{seasonMeteoChng}    = 0;
 
     if ( $ret->{seasonMeteo} ne $ret->{1}{seasonMeteo} ) {
         $ret->{seasonMeteoChng} = 2;
+        $ret->{1}{seasonMeteoChng} = 1;
+    }
+    elsif ( $ret->{seasonMeteo} ne $ret->{'-1'}{seasonMeteo} ) {
+        $ret->{'-1'}{seasonMeteoChng} = 2;
+        $ret->{seasonMeteoChng} = 1;
     }
 
-    if (   $ret->{'-1'}
-        && defined( $ret->{'-1'}{seasonMeteo} )
-        && defined( $ret->{'-1'}{seasonAstro} )
-        && $ret->{1}
-        && defined( $ret->{1}{seasonMeteo} )
-        && defined( $ret->{1}{seasonAstro} ) )
-    {
-        $ret->{'-1'}{seasonMeteoChng} = 0;
-        $ret->{seasonMeteoChng}       = 0;
-        $ret->{1}{seasonMeteoChng}    = 0;
+    $ret->{'-1'}{seasonAstroChng} = 0;
+    $ret->{seasonAstroChng}       = 0;
+    $ret->{1}{seasonAstroChng}    = 0;
 
-        if ( $ret->{seasonMeteo} ne $ret->{1}{seasonMeteo} ) {
-            $ret->{seasonMeteoChng} = 2;
-            $ret->{1}{seasonMeteoChng} = 1;
-        }
-        elsif ( $ret->{seasonMeteo} ne $ret->{'-1'}{seasonMeteo} ) {
-            $ret->{'-1'}{seasonMeteoChng} = 2;
-            $ret->{seasonMeteoChng} = 1;
-        }
-
-        $ret->{'-1'}{seasonAstroChng} = 0;
-        $ret->{seasonAstroChng}       = 0;
-        $ret->{1}{seasonAstroChng}    = 0;
-
-        if ( $ret->{seasonAstro} ne $ret->{1}{seasonAstro} ) {
-            $ret->{seasonAstroChng} = 2;
-            $ret->{1}{seasonAstroChng} = 1;
-        }
-        elsif ( $ret->{seasonAstro} ne $ret->{'-1'}{seasonAstro} ) {
-            $ret->{'-1'}{seasonAstroChng} = 2;
-            $ret->{seasonAstroChng} = 1;
-        }
+    if ( $ret->{seasonAstro} ne $ret->{1}{seasonAstro} ) {
+        $ret->{seasonAstroChng} = 2;
+        $ret->{1}{seasonAstroChng} = 1;
+    }
+    elsif ( $ret->{seasonAstro} ne $ret->{'-1'}{seasonAstro} ) {
+        $ret->{'-1'}{seasonAstroChng} = 2;
+        $ret->{seasonAstroChng} = 1;
     }
 
     return $ret if ($wanthash);
-    return ( $ret->{seasonMeteo}, $ret->{seasonAstro} ) if (wantarray);
     return $ret->{$lang}{seasonMeteo_long}
       ? $ret->{$lang}{seasonMeteo_long}
       : $ret->{seasonMeteo_long}
@@ -1615,66 +1744,45 @@ sub GetSeason (;$$$) {
 
 # Estimate phenologic season from astro and meteo season
 # https://de.wikipedia.org/wiki/Ph%C3%A4nologie#Ph.C3.A4nologischer_Kalender
-sub GetSeasonPheno (;$$) {
+sub GetSeasonPheno ($$;$) {
+    my ( $time, $lang, $ret2 ) = @_;
     $lang = (
           $main::attr{global}{language}
         ? $main::attr{global}{language}
         : "EN"
     ) unless ($lang);
 
-    if ( !$time ) {
-        $time = time;
-    }
-    elsif ( $time =~ /^(?:0|1|2|3|4|5|6|7|8|9|10|11)$/ ) {
-        return $seasonsPheno{ lc($lang) }
-          ? $seasonsPheno{ lc($lang) }[$time]
-          : $seasonsPheno{en}[$time];
-    }
-    elsif ( $time =~ /[A-Za-z]/ ) {
-        my $index =
-          $seasonsPheno{ lc($lang) }
-          ? _GetIndexFromArray( $time, $seasonsPheno{ lc($lang) } )
-          : undef;
-        return $index;
-    }
-    elsif ( $time !~ /^\d{10}(?:\.\d+)?$/ ) {
-        return undef;
-    }
+    my $ret;
 
-    my (
-        $sec,            $min,     $hour,
-        $mday,           $mdayrem, $month,
-        $monthISO,       $year,    $week,
-        $weekISO,        $wday,    $wdayISO,
-        $yday,           $ydayrem, $isdst,
-        $isLeapYear,     $iswe,    $isHolidayYesterday,
-        $isHolidayToday, $isHolidayTomorrow
-    ) = GetDaySchedule($time);
-
-    my ( $seasonAstro, $seasonAstroIndex, $seasonAstroChng ) = GetSeason($time);
-    my ( $seasonMeteo, $seasonMeteoIndex, $seasonMeteoChng ) =
-      GetSeason( $time, "en", 1 );
+    if ( ref($time) eq "HASH" ) {
+        $ret         = $time;
+    }
+    else {
+        $ret                = _time($time);
+        $ret->{seasonAstro} = $ret2->{seasonAstro};
+        $ret->{seasonMeteo} = $ret2->{seasonMeteo};
+    }
 
     # stick to astro season first
-    my $index = $seasons{pheno}[$seasonAstro];
+    my $index = $seasons{pheno}[ $ret->{seasonAstro} ];
 
     # meteos say it's spring time
-    if ( $seasonMeteo == 0 ) {
+    if ( $ret->{seasonMeteo} == 0 ) {
         $index = 0;
     }
 
     # meteos say it's summer time
-    elsif ( $seasonMeteo == 1 ) {
+    elsif ( $ret->{seasonMeteo} == 1 ) {
         $index = 3;
     }
 
     # meteos say it's autumn time
-    elsif ( $seasonMeteo == 2 ) {
+    elsif ( $ret->{seasonMeteo} == 2 ) {
         $index = 6;
     }
 
     # meteos say it's winter time
-    elsif ( $seasonMeteo == 3 ) {
+    elsif ( $ret->{seasonMeteo} == 3 ) {
         $index = 9;
     }
 
@@ -1691,7 +1799,8 @@ sub GetSeasonPheno (;$$) {
         );
 
         # TODO: let begin of early spring be set by user
-        my $earlySpringBegin = main::time_str2num("$year-02-28 00:00:00");
+        my $earlySpringBegin =
+          main::time_str2num( $ret->{year} . '-02-28 00:00:00' );
         my $days = ( $time - $earlySpringBegin ) / ( 60 * 60 * 24 );
 
         # comes with 40km per day
@@ -1710,14 +1819,14 @@ sub GetSeasonPheno (;$$) {
 
     # assume spring progress from calendar
     elsif ( ( $index == 0 || $index == 1 ) ) {
-        $index = 1 if ( $monthISO == 4 );
-        $index = 2 if ( $monthISO == 5 );
+        $index = 1 if ( $ret->{monISO} == 4 );
+        $index = 2 if ( $ret->{monISO} == 5 );
     }
 
     # assume summer progress from calendar
     elsif ( $index == 3 ) {
-        $index = 4 if ( $monthISO == 7 );
-        $index = 5 if ( $monthISO == 8 );
+        $index = 4 if ( $ret->{monISO} == 7 );
+        $index = 5 if ( $ret->{monISO} == 8 );
     }
 
     # if we know our position and autumn is ahead
@@ -1733,7 +1842,8 @@ sub GetSeasonPheno (;$$) {
         );
 
         # TODO: let begin of early autumn be set by user
-        my $earlySpringBegin = main::time_str2num("$year-09-01 00:00:00");
+        my $earlySpringBegin =
+          main::time_str2num( $ret->{year} . '-09-01 00:00:00' );
         my $days = ( $time - $earlySpringBegin ) / ( 60 * 60 * 24 );
 
         # comes with 40km per day
@@ -1752,18 +1862,51 @@ sub GetSeasonPheno (;$$) {
 
     # assume autumn progress from calendar
     elsif ( ( $index == 6 || $index == 7 ) ) {
-        $index = 7 if ( $monthISO == 10 );
-        $index = 8 if ( $monthISO == 11 );
+        $index = 7 if ( $ret->{monISO} == 10 );
+        $index = 8 if ( $ret->{monISO} == 11 );
     }
 
-    my $seasonPheno =
-      defined($index)
-      && $index{ lc($lang) }
-      ? $seasonsPheno{ lc($lang) }[$index]
-      : $seasonsPheno{en}[$index];
+    $ret->{seasonPheno} = $index;
+    return ( $ret->{seasonPheno} ) if (wantarray);
 
-    return ( $seasonPheno, $index ) if (wantarray);
-    return ($seasonPheno);
+    ( $ret->{'-1'}{seasonPheno} ) =
+      GetSeasonPheno( $ret->{'-1'}{time_t}, $lang, $ret );
+    ( $ret->{1}{seasonPheno} ) =
+      GetSeasonPheno( $ret->{1}{time_t}, $lang, $ret );
+
+    # text strings
+    my @langs = ('EN');
+    push @langs, $lang unless ( $lang =~ /^EN/i );
+    foreach (@langs) {
+        my $l = lc($_);
+        $l =~ s/^([a-z]+).*/$1/g;
+        next unless ( $seasonsPheno{$l} );
+
+        if ($l eq 'en') {
+          $ret->{'-1'}{seasonPheno_long} = $seasonsPheno{$l}[ $ret->{'-1'}{seasonPheno} ];
+          $ret->{seasonPheno_long} = $seasonsPheno{$l}[ $ret->{seasonPheno} ];
+          $ret->{1}{seasonPheno_long} = $seasonsPheno{$l}[ $ret->{1}{seasonPheno} ];
+        } else {
+          $ret->{'-1'}{$l}{seasonPheno_long} = $seasonsPheno{$l}[ $ret->{'-1'}{seasonPheno} ];
+          $ret->{$l}{seasonPheno_long} = $seasonsPheno{$l}[ $ret->{seasonPheno} ];
+          $ret->{1}{$l}{seasonPheno_long} = $seasonsPheno{$l}[ $ret->{1}{seasonPheno} ];
+        }
+    }
+
+    $ret->{'-1'}{seasonPhenoChng} = 0;
+    $ret->{seasonPhenoChng}       = 0;
+    $ret->{1}{seasonPhenoChng}    = 0;
+
+    if ( $ret->{seasonPheno} ne $ret->{1}{seasonPheno} ) {
+        $ret->{seasonPhenoChng} = 2;
+        $ret->{1}{seasonPhenoChng} = 1;
+    }
+    elsif ( $ret->{seasonPheno} ne $ret->{'-1'}{seasonPheno} ) {
+        $ret->{'-1'}{seasonPhenoChng} = 2;
+        $ret->{seasonPhenoChng} = 1;
+    }
+
+    return $ret;
 }
 
 ####################
@@ -1895,6 +2038,10 @@ sub _time(;$$$$) {
       && main::IsDevice( $main::attr{global}{holiday2we}, "holiday" )
       ? $main::attr{global}{holiday2we}
       : undef;
+
+    my $tod;
+    my $ytd;
+    my $tom;
     if ($holidayDev) {
         my $date = sprintf( "%02d-%02d", $ret{monISO}, $ret{mday} );
         $tod = main::holiday_refresh( $holidayDev, $date );

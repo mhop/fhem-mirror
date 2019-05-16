@@ -5,6 +5,8 @@ use strict;
 use warnings;
 use Data::Dumper;
 
+#use Unit;
+#use RESIDENTStk;
 require RESIDENTStk;
 our ( %RESIDENTStk_types, %RESIDENTStk_subTypes );
 
@@ -50,6 +52,7 @@ my %readingsMap = (
     seasonAstro_long => 'calTodSAstro',
     seasonMeteoChng  => 'calTodSMeteoChng',
     seasonMeteo_long => 'calTodSMeteo',
+    seasonPhenoChng  => 'calTodSPhenoChng',
     seasonPheno_long => 'calTodSPheno',
     sunrise          => 'calTodSunrise',
     sunset           => 'calTodSunset',
@@ -86,7 +89,8 @@ my %readingsMap_tom = (
     seasonAstro_long => 'calTomSAstro',
     seasonMeteoChng  => 'calTomSMeteoChng',
     seasonMeteo_long => 'calTomSMeteo',
-    seasonPheno_long => 'calTodSPheno',
+    seasonPhenoChng  => 'calTomSPhenoChng',
+    seasonPheno_long => 'calTomSPheno',
     sunrise          => 'calTomSunrise',
     sunset           => 'calTomSunset',
     wdaynISO         => 'calTomWeekdayN',
@@ -183,14 +187,14 @@ sub HOMESTATEtk_InitializeDev($) {
 
     foreach ( sort keys %{ $hash->{'.t'} } ) {
         next if ( ref( $hash->{'.t'}{$_} ) );
-        my $r = $readingsMap{$_} ? $readingsMap{$_} : undef;
+        my $r = defined( $readingsMap{$_} ) ? $readingsMap{$_} : undef;
         my $v = $hash->{'.t'}{$_};
 
         readingsBulkUpdateIfChanged( $hash, $r, $v )
           if ( defined($r) );
 
-        $r = $readingsMap_tom{$_} ? $readingsMap_tom{$_} : undef;
-        $v = $hash->{'.t'}{1}{$_} ? $hash->{'.t'}{1}{$_} : undef;
+        $r = defined( $readingsMap_tom{$_} ) ? $readingsMap_tom{$_} : undef;
+        $v = defined( $hash->{'.t'}{1}{$_} ) ? $hash->{'.t'}{1}{$_} : undef;
 
         readingsBulkUpdateIfChanged( $hash, $r, $v )
           if ( defined($r) && defined($v) );
@@ -199,16 +203,23 @@ sub HOMESTATEtk_InitializeDev($) {
     unless ( $lang =~ /^en/i || !$hash->{'.t'}{$lang} ) {
         foreach ( sort keys %{ $hash->{'.t'}{$lang} } ) {
             next if ( ref( $hash->{'.t'}{$lang}{$_} ) );
-            my $r = $readingsMap{$_} ? $readingsMap{$_} . "_$langUc" : undef;
+            my $r =
+              defined( $readingsMap{$_} )
+              ? $readingsMap{$_} . "_$langUc"
+              : undef;
             my $v = $hash->{'.t'}{$lang}{$_};
 
             readingsBulkUpdateIfChanged( $hash, $r, $v )
               if ( defined($r) );
 
             $r =
-              $readingsMap_tom{$_} ? $readingsMap_tom{$_} . "_$langUc" : undef;
+              defined( $readingsMap_tom{$_} )
+              ? $readingsMap_tom{$_} . "_$langUc"
+              : undef;
             $v =
-              $hash->{'.t'}{1}{$lang}{$_} ? $hash->{'.t'}{1}{$lang}{$_} : undef;
+              defined( $hash->{'.t'}{1}{$lang}{$_} )
+              ? $hash->{'.t'}{1}{$lang}{$_}
+              : undef;
 
             readingsBulkUpdateIfChanged( $hash, $r, $v )
               if ( defined($r) && defined($v) );
@@ -410,7 +421,8 @@ sub HOMESTATEtk_Set($$$) {
 
     # usage: mode
     my $i =
-      $autoMode && ReadingsVal( $name, "daytime", "night" ) ne "night"
+      defined($autoMode)
+      && ReadingsVal( $name, "daytime", "night" ) ne "night"
       ? HOMESTATEtk_GetIndexFromArray( ReadingsVal( $name, "daytime", 0 ),
         $UConv::daytimes{en} )
       : 0;
@@ -967,7 +979,7 @@ sub HOMESTATEtk_GetIndexFromArray($$) {
     my ( $string, $array ) = @_;
     return undef unless ( ref($array) eq "ARRAY" );
     my ($index) = grep { $array->[$_] =~ /^$string$/i } ( 0 .. @$array - 1 );
-    return defined $index ? $index : undef;
+    return defined($index) ? $index : undef;
 }
 
 sub HOMESTATEtk_findHomestateSlaves($;$) {
