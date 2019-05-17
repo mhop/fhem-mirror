@@ -1,4 +1,4 @@
-REV 19388
+REV 19392
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -560,7 +560,7 @@ UPD 2018-05-06_07:45:03 3548 FHEM/FritzBoxUtils.pm
 UPD 2015-07-28_14:05:31 1582 FHEM/GPUtils.pm
 UPD 2019-02-11_07:45:02 61856 FHEM/HMCCUConf.pm
 UPD 2019-04-21_07:45:02 200942 FHEM/HMConfig.pm
-UPD 2019-05-15_07:45:03 46556 FHEM/HOMESTATEtk.pm
+UPD 2019-05-17_07:45:03 46853 FHEM/HOMESTATEtk.pm
 UPD 2019-05-15_07:45:03 29742 FHEM/HttpUtils.pm
 UPD 2015-07-28_14:05:31 2324 FHEM/MaxCommon.pm
 UPD 2019-04-25_07:45:02 118927 FHEM/Meta.pm
@@ -579,7 +579,7 @@ UPD 2017-05-21_07:45:02 7416 FHEM/SubProcess.pm
 UPD 2017-11-16_07:45:02 3372 FHEM/TR064Utils.pm
 UPD 2019-04-08_07:45:03 8092 FHEM/TcpServerUtils.pm
 UPD 2016-02-22_07:45:12 27613 FHEM/TimeSeries.pm
-UPD 2019-05-12_07:45:03 53728 FHEM/UConv.pm
+UPD 2019-05-17_07:45:03 59445 FHEM/UConv.pm
 UPD 2019-03-25_07:45:04 138584 FHEM/Unit.pm
 UPD 2019-04-24_07:45:02 75169 FHEM/WMBus.pm
 UPD 2015-07-28_14:05:31 8525 FHEM/WinService.pm
@@ -621,7 +621,7 @@ UPD 2019-05-01_07:45:03 416 FHEM/holiday/th.holiday
 UPD 2019-05-09_07:45:02 333578 FHEM/lib/74_AMADautomagicFlowset_4.4.1.xml
 UPD 2019-05-09_07:45:02 442824 FHEM/lib/74_AMADtaskerset_4.4.1.prj.xml
 UPD 2019-05-05_07:45:03 27701 FHEM/lib/AttrTemplate/httpmod.template
-UPD 2019-05-10_07:45:02 81507 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2019-05-17_07:45:03 85266 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2019-04-16_07:45:02 4962 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
@@ -721,8 +721,8 @@ UPD 2019-05-12_07:45:06 4001125 docs/commandref.html
 UPD 2019-05-13_07:45:08 2497005 docs/commandref_DE.html
 UPD 2019-05-12_07:45:03 79232 docs/commandref_frame.html
 UPD 2019-05-12_07:45:03 88924 docs/commandref_frame_DE.html
-UPD 2019-05-16_07:45:09 213719 docs/commandref_modular.html
-UPD 2019-05-16_07:45:10 224618 docs/commandref_modular_DE.html
+UPD 2019-05-17_07:45:10 213719 docs/commandref_modular.html
+UPD 2019-05-17_07:45:11 224618 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
