@@ -1,4 +1,4 @@
-REV 19392
+REV 19394
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -276,7 +276,7 @@ UPD 2019-04-29_07:45:03 655356 FHEM/49_SSCam.pm
 UPD 2019-03-28_07:45:03 27611 FHEM/49_SSCamSTRM.pm
 UPD 2018-03-12_07:45:04 46280 FHEM/49_TBot_List.pm
 UPD 2019-04-26_07:45:03 63794 FHEM/50_HP1000.pm
-UPD 2019-04-29_07:45:03 30113 FHEM/50_MOBILEALERTSGW.pm
+UPD 2019-05-18_07:45:03 30113 FHEM/50_MOBILEALERTSGW.pm
 UPD 2019-02-26_07:45:02 153996 FHEM/50_TelegramBot.pm
 UPD 2015-07-28_14:05:31 18601 FHEM/50_WS300.pm
 UPD 2016-10-06_07:45:12 19924 FHEM/51_I2C_BH1750.pm
@@ -721,8 +721,8 @@ UPD 2019-05-12_07:45:06 4001125 docs/commandref.html
 UPD 2019-05-13_07:45:08 2497005 docs/commandref_DE.html
 UPD 2019-05-12_07:45:03 79232 docs/commandref_frame.html
 UPD 2019-05-12_07:45:03 88924 docs/commandref_frame_DE.html
-UPD 2019-05-17_07:45:10 213719 docs/commandref_modular.html
-UPD 2019-05-17_07:45:11 224618 docs/commandref_modular_DE.html
+UPD 2019-05-18_07:45:10 213719 docs/commandref_modular.html
+UPD 2019-05-18_07:45:11 224618 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
