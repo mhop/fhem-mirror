@@ -26,17 +26,17 @@ BEGIN {
     # Import from main::
     GP_Import(
         qw(
+          attr
+          Debug
+          defs
+          devspec2array
+          fhemTimeGm
+          FmtDateTime
+          genUUID
+          Log
           modules
           packages
-          defs
-          attr
-          Log
-          Debug
-          devspec2array
-          genUUID
           TimeNow
-          FmtDateTime
-          fhemTimeGm
           )
     );
 }
@@ -1795,11 +1795,18 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
 
                                     if (
                                         !exists(
+                                            $modMeta->{prereqs}{runtime}{$prio}
+                                        )
+                                        || !exists(
                                             $modMeta->{prereqs}{runtime}
                                               {$prio}{$pkgI}
                                         )
                                         || (
-                                            $pkgMeta->{prereqs}{runtime}
+                                            defined(
+                                                $pkgMeta->{prereqs}{runtime}
+                                                  {$pkgIreq}{$pkgI}
+                                            )
+                                            && $pkgMeta->{prereqs}{runtime}
                                             {$pkgIreq}{$pkgI} ne '0'
                                             && $v
                                             && version->parse(
