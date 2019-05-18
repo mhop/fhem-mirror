@@ -480,7 +480,9 @@ attr DEVICE model A_01b_tasmota_1ch+motion+SI7021
 name:A_01c_tasmota_POW
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Applies to Sonoff POW devices<br>NOTE: Power topic will be set to POWER1; the format the device is sending data will also be changed to lowercase!
-par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }set DEVICE attrTemplate A_01a_tasmota_basic_state_power1attr DEVICE setList \
+par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
+set DEVICE attrTemplate A_01a_tasmota_basic_state_power1
+attr DEVICE setList \
   off:noArg    CMNDTOPIC/POWER1 0\
   on:noArg     CMNDTOPIC/POWER1 1\
   toggle:noArg CMNDTOPIC/POWER1 2
