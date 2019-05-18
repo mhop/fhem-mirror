@@ -1053,26 +1053,39 @@ sub c2condition($;$$) {
     my $rgb = "FFFFFF";
     $lang = "en" if ( !$lang );
 
+    my $thresholds;
+
     if ($roomType) {
-        $roomType = "living"
-          if ( looks_like_number($roomType) );
+        if (   ref($roomType)
+            && ref($roomType) eq 'ARRAY'
+            && scalar @{$roomType} == 6 )
+        {
+            $thresholds = $roomType;
+        }
+        elsif (ref($roomType)
+            || looks_like_number($roomType)
+            || !defined( $ideal_clima{$roomType} ) )
+        {
+            $thresholds = $ideal_clima{living}{c};
+        }
+        else {
+            $thresholds = $ideal_clima{$roomType}{c};
+        }
     }
     else {
-        $roomType = "outdoor";
+        $thresholds = $ideal_clima{outdoor}{c};
     }
 
-    if ( defined( $ideal_clima{$roomType} ) ) {
-        my $i = 0;
-        foreach my $th ( @{ $ideal_clima{$roomType}{c} } ) {
-            if ( $data > $th ) {
-                $val = $clima_names{c}{$lang}[$i];
-                $rgb = $clima_names{c}{rgb}[$i];
-            }
-            else {
-                last;
-            }
-            $i++;
+    my $i = 0;
+    foreach my $th ( @{$thresholds} ) {
+        if ( $data > $th ) {
+            $val = $clima_names{c}{ lc($lang) }[$i];
+            $rgb = $clima_names{c}{rgb}[$i];
         }
+        else {
+            last;
+        }
+        $i++;
     }
 
     return ( $val, $rgb ) if (wantarray);
@@ -1086,26 +1099,39 @@ sub humidity2condition($;$$) {
     my $rgb = "FFFFFF";
     $lang = "en" if ( !$lang );
 
+    my $thresholds;
+
     if ($roomType) {
-        $roomType = "living"
-          if ( looks_like_number($roomType) );
+        if (   ref($roomType)
+            && ref($roomType) eq 'ARRAY'
+            && scalar @{$roomType} == 5 )
+        {
+            $thresholds = $roomType;
+        }
+        elsif (ref($roomType)
+            || looks_like_number($roomType)
+            || !defined( $ideal_clima{$roomType} ) )
+        {
+            $thresholds = $ideal_clima{living}{h};
+        }
+        else {
+            $thresholds = $ideal_clima{$roomType}{h};
+        }
     }
     else {
-        $roomType = "outdoor";
+        $thresholds = $ideal_clima{outdoor}{h};
     }
 
-    if ( defined( $ideal_clima{$roomType} ) ) {
-        my $i = 0;
-        foreach my $th ( @{ $ideal_clima{$roomType}{h} } ) {
-            if ( $data > $th ) {
-                $val = $clima_names{h}{$lang}[$i];
-                $rgb = $clima_names{h}{rgb}[$i];
-            }
-            else {
-                last;
-            }
-            $i++;
+    my $i = 0;
+    foreach my $th ( @{$thresholds} ) {
+        if ( $data > $th ) {
+            $val = $clima_names{h}{ lc($lang) }[$i];
+            $rgb = $clima_names{h}{rgb}[$i];
         }
+        else {
+            last;
+        }
+        $i++;
     }
 
     return ( $val, $rgb ) if (wantarray);
