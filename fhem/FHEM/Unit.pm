@@ -1395,7 +1395,7 @@ my $rtypes = {
         scope             => [ '^(no|n|false|0)$', '^(yes|y|true|1)$' ],
         rtype_description => {
             de => 'Boolesch ja/nein',
-            en => 'Boolean ja/nein',
+            en => 'Boolean yes/no',
         },
     },
 
@@ -2619,6 +2619,9 @@ my $readingsDB = {
         azimuth => {
             rtype => 'gon',
         },
+        brightness => {
+            rtype => 'lm',
+        },
         compasspoint => {
             rtype => 'compasspoint'
         },
@@ -2626,7 +2629,7 @@ my $readingsDB = {
             rtype => 'yesno',
         },
         dewpoint => {
-            aliasname => 'dewpoint_c',      # alias only
+            aliasname => 'dewpoint_c',    # alias only
         },
         dewpoint_c => {
             rtype => 'c',
@@ -2635,7 +2638,7 @@ my $readingsDB = {
             rtype => 'gon',
         },
         feelslike => {
-            aliasname => 'feelslike_c',     # alias only
+            aliasname => 'feelslike_c',    # alias only
         },
         feelslike_c => {
             rtype => 'c',
@@ -2693,8 +2696,17 @@ my $readingsDB = {
         luminosity => {
             rtype => 'lx',
         },
+        luminance => {
+            rtype => 'lm',
+        },
+        motion => {
+            rtype => 'yesno',
+        },
         pct => {
             rtype => 'pct',
+        },
+        presence => {
+            rtype => 'reachable',
         },
         pressure => {
             aliasname => 'pressure_hpa',    # alias only
@@ -2761,6 +2773,9 @@ my $readingsDB = {
         },
         rain_year_mm => {
             rtype => 'mm',
+        },
+        reachable => {
+            rtype => 'yesno',
         },
         snow => {
             aliasname => 'snow_cm',          # alias only
@@ -2885,41 +2900,42 @@ sub rname2rtype ($$@) {
 
     # remove some prefix or other values to
     # flatten reading name
-    $r =~ s/^fc\d+_//i;
+    $r =~ s/^h?fc\d+_//i;
     $r =~ s/_(min|max|avg|sum|cum|min\d+m|max\d+m|avg\d+m|sum\d+m|cum\d+m)_/_/i;
     $r =~ s/^(min|max|avg|sum|cum|min\d+m|max\d+m|avg\d+m|sum\d+m|cum\d+m)_//i;
     $r =~ s/_(min|max|avg|sum|cum|min\d+m|max\d+m|avg\d+m|sum\d+m|cum\d+m)$//i;
     $r =~ s/.*[-_](temp)$/$1/i;
 
     # rename capital letter containing readings
-    if ( !$readingsDB->{global}{ lc($r) } ) {
+    unless ( defined( $readingsDB->{global}{ lc($r) } ) ) {
         $r =~ s/^([A-Z])(.*)/\l$1$2/;
         $r =~ s/([A-Z][a-z0-9]+)[\/\|\-_]?/_$1/g;
     }
 
     $r = lc($r);
 
-    # known aliasname reading names
-    if ( $readingsDB->{global}{$r}{aliasname} ) {
-        my $dr = $readingsDB->{global}{$r}{aliasname};
-        $return{aliasname} = $dr;
-        $return{shortname} = $readingsDB->{global}{$dr}{shortname};
-        $rt                = (
-              $readingsDB->{global}{$dr}{rtype}
-            ? $readingsDB->{global}{$dr}{rtype}
-            : undef
-        );
-    }
+    if ( defined( $readingsDB->{global}{$r} ) ) {
 
-    # known standard reading names
-    elsif ( $readingsDB->{global}{$r}{shortname} ) {
-        $return{aliasname} = $reading;
-        $return{shortname} = $readingsDB->{global}{$r}{shortname};
-        $rt                = (
-              $readingsDB->{global}{$r}{rtype}
-            ? $readingsDB->{global}{$r}{rtype}
-            : undef
-        );
+        # known aliasname reading names
+        if ( $readingsDB->{global}{$r}{aliasname} ) {
+            my $dr = $readingsDB->{global}{$r}{aliasname};
+            $return{aliasname} = $dr;
+            $rt = (
+                  $readingsDB->{global}{$dr}{rtype}
+                ? $readingsDB->{global}{$dr}{rtype}
+                : undef
+            );
+        }
+
+        # known standard reading names
+        else {
+            $return{aliasname} = $reading;
+            $rt = (
+                  $readingsDB->{global}{$r}{rtype}
+                ? $readingsDB->{global}{$r}{rtype}
+                : undef
+            );
+        }
     }
 
     # just guessing the rtype from reading name format
@@ -2929,13 +2945,75 @@ sub rname2rtype ($$@) {
     }
 
     if (wantarray) {
-        return ( $reading, $return{aliasname}, $return{shortname},
-            $return{guess} )
+        return ( $reading, $return{aliasname}, $return{guess} )
           if ( $rtypes->{$reading} );
-        return ( $rt, $return{aliasname}, $return{shortname}, $return{guess} );
+        return ( $rt, $return{aliasname}, $return{guess} );
     }
     return $rt if ( $rt && $rtypes->{$rt} );
     return undef;
+}
+
+# find devices based on the reading
+#   types they offer
+sub rtype2dev {
+    my %ret;
+
+    foreach my $rtype (@_) {
+        foreach my $d ( keys %defs ) {
+            next
+              unless ( defined( $defs{$d}{READINGS} )
+                && ref( $defs{$d}{READINGS} ) eq 'HASH' );
+
+            my $readingsDescr =
+                 defined( $defs{$d}{TYPE} )
+              && defined( $modules{ $defs{$d}{TYPE} } )
+              && defined( $modules{ $defs{$d}{TYPE} }{readingsDesc} )
+              ? $modules{ $defs{$d}{TYPE} }{readingsDesc}
+              : undef;
+
+            # if this device's module has defined readingsDesc
+            if ( $readingsDescr
+                && ref($readingsDescr) eq 'HASH' )
+            {
+                foreach my $rn ( keys %{$readingsDescr} ) {
+                    next
+                      unless ( defined( $defs{$d}{READINGS}{$rn} )
+                        && defined( $readingsDescr->{$rn}{rtype} )
+                        && defined( $rtypes->{ $readingsDescr->{$rn}{rtype} } )
+                        && $rtype eq $readingsDescr->{$rn}{rtype} );
+
+                    push @{ $ret{$d} }, $rn
+                      unless ( grep ( /^$rn$/, @{ $ret{$d} } ) );
+                }
+            }
+
+            # try to find by commonly known reading names
+            else {
+                foreach my $rn ( keys %{ $defs{$d}{READINGS} } ) {
+                    my $rt = rname2rtype( $d, $rn );
+
+                    push @{ $ret{$d} }, $rn
+                      if ( $rt
+                        && $rt eq $rtype
+                        && !grep ( /^$rn$/, @{ $ret{$d} } ) );
+                }
+            }
+        }
+    }
+
+    if (wantarray) {
+        my @reta;
+
+        foreach my $d ( sort { "\L$a" cmp "\L$b" } keys %ret ) {
+            foreach my $r ( sort { "\L$a" cmp "\L$b" } @{ $ret{$d} } ) {
+                push @reta, "$d:$r";
+            }
+        }
+
+        return @reta;
+    }
+
+    return \%ret;
 }
 
 ######################################
