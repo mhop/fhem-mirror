@@ -228,7 +228,7 @@ our %sdt2daytimes = (
         }
     },
 
-    # AUTUMN SEASON
+    # FALL SEASON
     2 => {
 
         # DST = no
@@ -265,7 +265,7 @@ our %sdt2daytimes = (
 );
 
 our %seasons = (
-    en    => [ "Spring",    "Summer", "Autumn",  "Winter", ],
+    en    => [ "Spring",    "Summer", "Fall",    "Winter", ],
     de    => [ "Frühling", "Sommer", "Herbst",  "Winter", ],
     nl    => [ "Voorjaar",  "Zomer",  "Herfst",  "Winter", ],
     fr    => [ "Printemps", "Été",  "Automne", "Hiver", ],
@@ -282,8 +282,8 @@ our %seasonsPheno = (
         "Midsummer",
         "Late Summer",
         "Early Fall",
-        "Autumn",
-        "Late Autumn",
+        "Fall",
+        "Late Fall",
         "Winter",
     ],
     de => [
@@ -459,129 +459,33 @@ our %dateformatss = (
 # https://www.luftfeuchtigkeit-raumklima.de/tabelle.php
 our %ideal_clima = (
     bathroom => {
-        c => {
-            '−273.15' => 0,
-            '6'         => 1,
-            '16'        => 2,
-            '20'        => 3,
-            '23'        => 4,
-            '27'        => 5,
-        },
-        h => {
-            '0'  => 0,
-            '40' => 1,
-            '50' => 2,
-            '70' => 3,
-            '80' => 4,
-        },
+        c => [ -273.15, 6,  16, 20, 23, 27, ],
+        h => [ 0,       40, 50, 70, 80 ],
     },
     living => {
-        c => {
-            '−273.15' => 0,
-            '6'         => 1,
-            '16'        => 2,
-            '20'        => 3,
-            '23'        => 4,
-            '27'        => 5,
-        },
-        h => {
-            '0'  => 0,
-            '30' => 1,
-            '40' => 2,
-            '60' => 3,
-            '70' => 4,
-        },
+        c => [ -273.15, 6,  16, 20, 23, 27, ],
+        h => [ 0,       30, 40, 60, 70 ],
     },
     kitchen => {
-        c => {
-            '−273.15' => 0,
-            '6'         => 1,
-            '16'        => 2,
-            '18'        => 3,
-            '20'        => 4,
-            '27'        => 5,
-        },
-        h => {
-            '0'  => 0,
-            '40' => 1,
-            '50' => 2,
-            '60' => 3,
-            '70' => 4,
-        },
+        c => [ -273.15, 6,  16, 18, 20, 27, ],
+        h => [ 0,       40, 50, 60, 70 ],
     },
     bedroom => {
-        c => {
-            '−273.15' => 0,
-            '6'         => 1,
-            '12'        => 2,
-            '17'        => 3,
-            '20'        => 4,
-            '23'        => 5,
-        },
-        h => {
-            '0'  => 0,
-            '30' => 1,
-            '40' => 2,
-            '60' => 3,
-            '70' => 4,
-        },
+        c => [ -273.15, 6,  12, 17, 20, 23, ],
+        h => [ 0,       30, 40, 60, 70 ],
     },
     hallway => {
-        c => {
-            '−273.15' => 0,
-            '6'         => 1,
-            '12'        => 2,
-            '15'        => 3,
-            '18'        => 4,
-            '23'        => 5,
-        },
-        h => {
-            '0'  => 0,
-            '30' => 1,
-            '40' => 2,
-            '60' => 3,
-            '70' => 4,
-        },
+        c => [ -273.15, 6,  12, 15, 18, 23, ],
+        h => [ 0,       30, 40, 60, 70 ],
     },
     cellar => {
-        c => {
-            '−273.15' => 0,
-            '6'         => 1,
-            '7'         => 2,
-            '10'        => 3,
-            '15'        => 4,
-            '20'        => 5,
-        },
-        h => {
-            '0'  => 0,
-            '40' => 1,
-            '50' => 2,
-            '60' => 3,
-            '70' => 4,
-        },
+        c => [ -273.15, 6,  7,  10, 15, 20, ],
+        h => [ 0,       40, 50, 60, 70 ],
     },
     outdoor => {
-        c => {
-            '−273.15' => 0,
-            '2.5'       => 1,
-            '5'         => 2,
-            '14'        => 3,
-            '30'        => 4,
-            '35'        => 5,
-        },
-        h => {
-            '0'  => 0,
-            '40' => 1,
-            '50' => 2,
-            '70' => 3,
-            '80' => 4,
-        },
+        c => [ -273.15, 2.5, 5,  14, 30, 35, ],
+        h => [ 0,       40,  50, 70, 80 ],
     },
-);
-
-our %clima_rgb = (
-    c => [ "0055BB", "0066CC", "009999", "4C9329", "E7652B", "C72A23" ],
-    h => [ "C72A23", "E7652B", "4C9329", "009999", "0066CC" ],
 );
 
 our %clima_names = (
@@ -592,13 +496,15 @@ our %clima_names = (
         fr => [ "froid",   "froid", "faible",  "optimal",  "haut", "chaud" ],
         pl =>
           [ "chłodny", "zimno", "niski", "optymalny", "wysoki", "gorący" ],
+        rgb => [ "0055BB", "0066CC", "009999", "4C9329", "E7652B", "C72A23" ],
     },
     h => {
-        en => [ "dry",     "low",     "ideal",     "high",   "wet" ],
-        de => [ "trocken", "niedrig", "optimal",   "hoch",   "nass" ],
-        nl => [ "droog",   "laag",    "optimale",  "hoog",   "nat" ],
-        fr => [ "sec",     "faible",  "optimal",   "haut",   "humide" ],
-        pl => [ "suchy",   "niski",   "optymalny", "wysoki", "mokro" ],
+        en  => [ "dry",     "low",     "ideal",     "high",   "wet" ],
+        de  => [ "trocken", "niedrig", "optimal",   "hoch",   "nass" ],
+        nl  => [ "droog",   "laag",    "optimale",  "hoog",   "nat" ],
+        fr  => [ "sec",     "faible",  "optimal",   "haut",   "humide" ],
+        pl  => [ "suchy",   "niski",   "optymalny", "wysoki", "mokro" ],
+        rgb => [ "C72A23",  "E7652B",  "4C9329",    "009999", "0066CC" ],
     }
 );
 
@@ -1156,13 +1062,16 @@ sub c2condition($;$$) {
     }
 
     if ( defined( $ideal_clima{$roomType} ) ) {
-        foreach my $th ( reverse sort keys %{ $ideal_clima{$roomType} } ) {
-            if ( $data >= $th ) {
-                my $i = $ideal_clima{$roomType}{$th};
+        my $i = 0;
+        foreach my $th ( @{ $ideal_clima{$roomType}{c} } ) {
+            if ( $data > $th ) {
                 $val = $clima_names{c}{$lang}[$i];
-                $rgb = $clima_rgb{c}[$i];
+                $rgb = $clima_names{c}{rgb}[$i];
+            }
+            else {
                 last;
             }
+            $i++;
         }
     }
 
@@ -1171,26 +1080,32 @@ sub c2condition($;$$) {
 }
 
 # Condition: convert humidity (percent) to humidity condition
-sub humidity2condition($;$) {
-    my ( $data, $indoor ) = @_;
-    my $val = "dry";
-    my $rgb = "C72A23";
+sub humidity2condition($;$$) {
+    my ( $data, $roomType, $lang ) = @_;
+    my $val = "?";
+    my $rgb = "FFFFFF";
+    $lang = "en" if ( !$lang );
 
-    if ( $data >= 80 ) {
-        $val = "wet";
-        $rgb = "0066CC";
+    if ($roomType) {
+        $roomType = "living"
+          if ( looks_like_number($roomType) );
     }
-    elsif ( $data >= 70 ) {
-        $val = "high";
-        $rgb = "009999";
+    else {
+        $roomType = "outdoor";
     }
-    elsif ( $data >= 50 ) {
-        $val = "ideal";
-        $rgb = "4C9329";
-    }
-    elsif ( $data >= 40 ) {
-        $val = "low";
-        $rgb = "E7652B";
+
+    if ( defined( $ideal_clima{$roomType} ) ) {
+        my $i = 0;
+        foreach my $th ( @{ $ideal_clima{$roomType}{h} } ) {
+            if ( $data > $th ) {
+                $val = $clima_names{h}{$lang}[$i];
+                $rgb = $clima_names{h}{rgb}[$i];
+            }
+            else {
+                last;
+            }
+            $i++;
+        }
     }
 
     return ( $val, $rgb ) if (wantarray);
@@ -1472,8 +1387,6 @@ sub GetDaytime(;$$$$) {
     $ret = GetSeason( $ret, $lang );
     $ret = _GetSeasonPheno( $ret, $lang );
 
-#$ret = GetSeasonSocial( $ret, $lang ); #TODO https://de.wikipedia.org/wiki/F%C3%BCnfte_Jahreszeit
-
     # change midnight event when season changes
     $ret->{events}{ $ret->{midnight_t} }{VALUE} = 1
       if ( $ret->{seasonMeteoChng} && $ret->{seasonMeteoChng} == 1 );
@@ -1687,22 +1600,31 @@ sub GetSeason (;$$$) {
         $l =~ s/^([a-z]+).*/$1/g;
         next unless ( $seasons{$l} );
 
-        if ($l eq 'en') {
-          $ret->{'-1'}{seasonMeteo_long} = $seasons{$l}[ $ret->{'-1'}{seasonMeteo} ];
-          $ret->{seasonMeteo_long} = $seasons{$l}[ $ret->{seasonMeteo} ];
-          $ret->{1}{seasonMeteo_long} = $seasons{$l}[ $ret->{1}{seasonMeteo} ];
+        if ( $l eq 'en' ) {
+            $ret->{'-1'}{seasonMeteo_long} =
+              $seasons{$l}[ $ret->{'-1'}{seasonMeteo} ];
+            $ret->{seasonMeteo_long} = $seasons{$l}[ $ret->{seasonMeteo} ];
+            $ret->{1}{seasonMeteo_long} =
+              $seasons{$l}[ $ret->{1}{seasonMeteo} ];
 
-          $ret->{'-1'}{seasonAstro_long} = $seasons{$l}[ $ret->{'-1'}{seasonAstro} ];
-          $ret->{seasonAstro_long} = $seasons{$l}[ $ret->{seasonAstro} ];
-          $ret->{1}{seasonAstro_long} = $seasons{$l}[ $ret->{1}{seasonAstro} ];
-        } else {
-          $ret->{'-1'}{$l}{seasonMeteo_long} = $seasons{$l}[ $ret->{'-1'}{seasonMeteo} ];
-          $ret->{$l}{seasonMeteo_long} = $seasons{$l}[ $ret->{seasonMeteo} ];
-          $ret->{1}{$l}{seasonMeteo_long} = $seasons{$l}[ $ret->{1}{seasonMeteo} ];
+            $ret->{'-1'}{seasonAstro_long} =
+              $seasons{$l}[ $ret->{'-1'}{seasonAstro} ];
+            $ret->{seasonAstro_long} = $seasons{$l}[ $ret->{seasonAstro} ];
+            $ret->{1}{seasonAstro_long} =
+              $seasons{$l}[ $ret->{1}{seasonAstro} ];
+        }
+        else {
+            $ret->{'-1'}{$l}{seasonMeteo_long} =
+              $seasons{$l}[ $ret->{'-1'}{seasonMeteo} ];
+            $ret->{$l}{seasonMeteo_long} = $seasons{$l}[ $ret->{seasonMeteo} ];
+            $ret->{1}{$l}{seasonMeteo_long} =
+              $seasons{$l}[ $ret->{1}{seasonMeteo} ];
 
-          $ret->{'-1'}{$l}{seasonAstro_long} = $seasons{$l}[ $ret->{'-1'}{seasonAstro} ];
-          $ret->{$l}{seasonAstro_long} = $seasons{$l}[ $ret->{seasonAstro} ];
-          $ret->{1}{$l}{seasonAstro_long} = $seasons{$l}[ $ret->{1}{seasonAstro} ];
+            $ret->{'-1'}{$l}{seasonAstro_long} =
+              $seasons{$l}[ $ret->{'-1'}{seasonAstro} ];
+            $ret->{$l}{seasonAstro_long} = $seasons{$l}[ $ret->{seasonAstro} ];
+            $ret->{1}{$l}{seasonAstro_long} =
+              $seasons{$l}[ $ret->{1}{seasonAstro} ];
         }
     }
 
@@ -1755,7 +1677,7 @@ sub _GetSeasonPheno ($$;$$) {
     my $ret;
 
     if ( ref($time) eq "HASH" ) {
-        $ret         = $time;
+        $ret = $time;
     }
     else {
         $ret                = _time($time);
@@ -1766,28 +1688,28 @@ sub _GetSeasonPheno ($$;$$) {
     # stick to astro season first
     my $index = $seasons{pheno}[ $ret->{seasonAstro} ];
 
-    # meteos say it's spring time
+    # meteos say its spring time
     if ( $ret->{seasonMeteo} == 0 ) {
         $index = 0;
     }
 
-    # meteos say it's summer time
+    # meteos say its summer time
     elsif ( $ret->{seasonMeteo} == 1 ) {
         $index = 3;
     }
 
-    # meteos say it's autumn time
+    # meteos say its fall time
     elsif ( $ret->{seasonMeteo} == 2 ) {
         $index = 6;
     }
 
-    # meteos say it's winter time
+    # meteos say its winter time
     elsif ( $ret->{seasonMeteo} == 3 ) {
         $index = 9;
     }
 
     # if we know our position and spring is ahead
-    if (   ( $index == 0 || $index == 1 )
+    if (   ( $index == 0 || $index == 1 || $index == 2 )
         && $main::attr{global}{latitude}
         && $main::attr{global}{longitude} )
     {
@@ -1818,7 +1740,7 @@ sub _GetSeasonPheno ($$;$$) {
     }
 
     # assume spring progress from calendar
-    elsif ( ( $index == 0 || $index == 1 ) ) {
+    elsif ( ( $index == 0 || $index == 1 || $index == 2 ) ) {
         $index = 1 if ( $ret->{monISO} == 4 );
         $index = 2 if ( $ret->{monISO} == 5 );
     }
@@ -1830,7 +1752,7 @@ sub _GetSeasonPheno ($$;$$) {
     }
 
     # if we know our position and autumn is ahead
-    elsif (( $index == 6 || $index == 7 )
+    elsif (( $index == 6 || $index == 7 || $index == 8 )
         && $main::attr{global}{latitude}
         && $main::attr{global}{longitude} )
     {
@@ -1861,7 +1783,7 @@ sub _GetSeasonPheno ($$;$$) {
     }
 
     # assume autumn progress from calendar
-    elsif ( ( $index == 6 || $index == 7 ) ) {
+    elsif ( ( $index == 6 || $index == 7 || $index == 8 ) ) {
         $index = 7 if ( $ret->{monISO} == 10 );
         $index = 8 if ( $ret->{monISO} == 11 );
     }
@@ -1869,10 +1791,18 @@ sub _GetSeasonPheno ($$;$$) {
     $ret->{seasonPheno} = $index;
     return ( $ret->{seasonPheno} ) if (wantarray);
 
-    ( $ret->{'-1'}{seasonPheno} ) =
-      _GetSeasonPheno( $ret->{'-1'}{time_t}, $lang, $ret->{'-1'}{seasonAstro}, $ret->{'-1'}{seasonMeteo} );
-    ( $ret->{1}{seasonPheno} ) =
-      _GetSeasonPheno( $ret->{1}{time_t}, $lang, $ret->{1}{seasonAstro}, $ret->{1}{seasonMeteo} );
+    ( $ret->{'-1'}{seasonPheno} ) = _GetSeasonPheno(
+        $ret->{'-1'}{time_t},
+        $lang,
+        $ret->{'-1'}{seasonAstro},
+        $ret->{'-1'}{seasonMeteo}
+    );
+    ( $ret->{1}{seasonPheno} ) = _GetSeasonPheno(
+        $ret->{1}{time_t},
+        $lang,
+        $ret->{1}{seasonAstro},
+        $ret->{1}{seasonMeteo}
+    );
 
     # text strings
     my @langs = ('EN');
@@ -1882,14 +1812,20 @@ sub _GetSeasonPheno ($$;$$) {
         $l =~ s/^([a-z]+).*/$1/g;
         next unless ( $seasonsPheno{$l} );
 
-        if ($l eq 'en') {
-          $ret->{'-1'}{seasonPheno_long} = $seasonsPheno{$l}[ $ret->{'-1'}{seasonPheno} ];
-          $ret->{seasonPheno_long} = $seasonsPheno{$l}[ $ret->{seasonPheno} ];
-          $ret->{1}{seasonPheno_long} = $seasonsPheno{$l}[ $ret->{1}{seasonPheno} ];
-        } else {
-          $ret->{'-1'}{$l}{seasonPheno_long} = $seasonsPheno{$l}[ $ret->{'-1'}{seasonPheno} ];
-          $ret->{$l}{seasonPheno_long} = $seasonsPheno{$l}[ $ret->{seasonPheno} ];
-          $ret->{1}{$l}{seasonPheno_long} = $seasonsPheno{$l}[ $ret->{1}{seasonPheno} ];
+        if ( $l eq 'en' ) {
+            $ret->{'-1'}{seasonPheno_long} =
+              $seasonsPheno{$l}[ $ret->{'-1'}{seasonPheno} ];
+            $ret->{seasonPheno_long} = $seasonsPheno{$l}[ $ret->{seasonPheno} ];
+            $ret->{1}{seasonPheno_long} =
+              $seasonsPheno{$l}[ $ret->{1}{seasonPheno} ];
+        }
+        else {
+            $ret->{'-1'}{$l}{seasonPheno_long} =
+              $seasonsPheno{$l}[ $ret->{'-1'}{seasonPheno} ];
+            $ret->{$l}{seasonPheno_long} =
+              $seasonsPheno{$l}[ $ret->{seasonPheno} ];
+            $ret->{1}{$l}{seasonPheno_long} =
+              $seasonsPheno{$l}[ $ret->{1}{seasonPheno} ];
         }
     }
 
