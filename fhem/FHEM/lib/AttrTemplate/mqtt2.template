@@ -795,8 +795,9 @@ attr DEVICE model A_10a_shellyplug
 
 #contributed by 87insane, https://forum.fhem.de/index.php/topic,94060.msg934614.html#msg934614
 # shelly1pm using original firmware.
-name:A_10b_shelly1pm
+name:A_10b_shelly1_w_energy_meassuring
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
+desc:Applies to single relay Shelly devices offering energy meassuring like Shelly 1PM or Shelly Plug S
 par:DEVNAME;Shelly1 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
 attr DEVICE setList\
   relay0:on,off,toggle shellies/DEVNAME/relay/0/command $EVTPART1\
@@ -817,7 +818,7 @@ attr DEVICE readingList \
 attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot";; my $light = ReadingsVal($name,"state","off");; my $cons = ReadingsVal($name,"relay_0_power","unknown");; my $temp = ReadingsVal($name,"temperature","-100");;"<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a><div>Verbrauch: $cons / Temp: $temp °C</div>"}
 attr DEVICE webCmd :
 deletereading -q DEVICE (?!associatedWith).*
-attr DEVICE model A_10b_shelly1pm
+attr DEVICE model A_10b_shelly1_w_energy_meassuring
 
 
 # shelly2 using original firmware in roller mode.
@@ -848,11 +849,12 @@ attr DEVICE setStateList open close stop
 attr DEVICE model A_11b_shelly2_roller
 
 # shelly25 using original firmware in roller mode.
-name:A_11b1_shelly25_roller
+# contributed by 87insane, https://forum.fhem.de/index.php/topic,94060.msg940978.html#msg940978
+name:A_11b1a_shelly25_roller_invert_0
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
 desc:shelly25 using original firmware. <br>NOTE: shelly25 roller operated, change settings first!
 par:DEVNAME;Shellyswitch25 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
-attr DEVICE comment shelly25 roller operated
+attr DEVICE comment Shelly 2.5 in Roller-Mode. 100=opened / 0=closed
 attr DEVICE setList \
   open:noArg shellies/DEVNAME/roller/0/command open\
   close:noArg shellies/DEVNAME/roller/0/command close\
@@ -877,7 +879,7 @@ attr DEVICE readingList \
   shellies/DEVNAME/relay/energy:.* energy\
   shellies/DEVNAME/temperature:.* temperature\
   shellies/DEVNAME/overtemperature:.* overtemperature
-attr DEVICE devStateIcon opening:fts_shutter_up@red closing:fts_shutter_down@red true:10px-kreis-gruen false:10px-kreis-rot 100:fts_shutter_100 0:fts_shutter_10 9\d.*:fts_shutter_90 8\d.*:fts_shutter_80 7\d.*:fts_shutter_70 6\d.*:fts_shutter_60 5\d.*:fts_shutter_50 4\d.*:fts_shutter_40 3\d.*:fts_shutter_30 2\d.*:fts_shutter_20 1\d.*:fts_shutter_10 \b\d\b.*:fts_shutter_10 set_.*:fts_shutter_updown
+  attr DEVICE devStateIcon opening:fts_shutter_up@red closing:fts_shutter_down@red true:10px-kreis-gruen false:10px-kreis-rot 0:fts_shutter_100 100:fts_shutter_10 9\d:fts_shutter_10 8\d:fts_shutter_20 7\d:fts_shutter_30 6\d:fts_shutter_40 5\d:fts_shutter_50 4\d:fts_shutter_60 3\d:fts_shutter_70 2\d:fts_shutter_80 1\d:fts_shutter_90 0\d:fts_shutter_100 set_.*:fts_shutter_updown
 attr DEVICE cmdIcon open:fts_shutter_up close:fts_shutter_down stop:fts_shutter_manual half:fts_shutter_50
 attr DEVICE webCmd :open:close:half:stop:pct
 attr DEVICE stateFormat <a href="http://ip" target="_blank">\
@@ -886,7 +888,49 @@ online\
 state
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE setStateList open close half stop pct
-attr DEVICE model A_11b1_shelly25_roller
+attr DEVICE model A_11b1a_shelly25_roller_invert_0
+
+name:A_11b1b_shelly25_roller_invert_1
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
+desc:shelly25 using original firmware. <br>NOTE: shelly25 roller operated, change settings first!
+par:DEVNAME;Shellyswitch25 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
+attr DEVICE comment  Shelly 2.5 in Roller-Mode. 0=opened / 100=closed
+attr DEVICE setList \
+  open:noArg shellies/DEVNAME/roller/0/command open\
+  close:noArg shellies/DEVNAME/roller/0/command close\
+  half:noArg shellies/DEVNAME/roller/0/command/pos 50\
+  stop:noArg shellies/DEVNAME/roller/0/command stop\
+  pct:slider,0,1,100 {"shellies/DEVNAME/roller/0/command/pos ".(100-$EVTPART1)}\
+  x_recalibration:noArg shellies/DEVNAME/roller/0/command rc\
+  x_update:noArg shellies/DEVNAME/command update_fw\
+  x_mqttcom shellies/DEVNAME/command $EVTPART1
+attr DEVICE readingList \
+  shellies/DEVNAME/roller/0/pos:.* {'pct' => 100-$EVENT}\
+  shellies/DEVNAME/status/0/rollers:.* power\
+  shellies/DEVNAME/online:.* online\
+  shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
+  shellies/DEVNAME/roller/0:.* current\
+  shellies/DEVNAME/roller/0:open {{'state' => 'opening'}}\
+  shellies/DEVNAME/roller/0:close {{'state' => 'closing'}}\
+  shellies/DEVNAME/roller/0/pos:.* {'state' => 100-$EVENT}\
+  shellies/DEVNAME/input/1:.* input1\
+  shellies/DEVNAME/input/0:.* input0\
+  shellies/DEVNAME/relay/power:.* power\
+  shellies/DEVNAME/relay/energy:.* energy\
+  shellies/DEVNAME/temperature:.* temperature\
+  shellies/DEVNAME/overtemperature:.* overtemperature
+attr DEVICE devStateIcon opening:fts_shutter_up@red closing:fts_shutter_down@red true:10px-kreis-gruen false:10px-kreis-rot 100:fts_shutter_100 0:fts_shutter_10 9\d:fts_shutter_90 8\d:fts_shutter_80 7\d:fts_shutter_70 6\d:fts_shutter_60 5\d:fts_shutter_50 4\d:fts_shutter_40 3\d:fts_shutter_30 2\d:fts_shutter_20 1\d:fts_shutter_10 0\d.*:fts_shutter_10 set_.*:fts_shutter_updown
+attr DEVICE cmdIcon open:fts_shutter_up close:fts_shutter_down stop:fts_shutter_manual half:fts_shutter_50
+attr DEVICE webCmd :open:close:half:stop:pct
+attr DEVICE stateFormat <a href="http://ip" target="_blank">\
+online\
+</a>\
+state
+deletereading -q DEVICE (?!associatedWith).*
+attr DEVICE setStateList open close half stop pct
+attr DEVICE model A_11b1b_shelly25_roller_invert_1
+
+
 
 # shelly2 using original firmware.
 # NOTE: a second device will be created for the second channel
