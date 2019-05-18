@@ -37,37 +37,32 @@ use Data::Dumper;
 # Run before module compilation
 BEGIN {
 
-    # JSON preference order
-    $ENV{PERL_JSON_BACKEND} =
-      'Cpanel::JSON::XS,JSON::XS,JSON::PP,JSON::backportPP'
-      unless ( defined( $ENV{PERL_JSON_BACKEND} ) );
-
     # Import from main::
     GP_Import(
         qw(
-          readingsSingleUpdate
-          readingsBulkUpdate
-          readingsBulkUpdateIfChanged
-          readingsBeginUpdate
-          readingsEndUpdate
-          ReadingsTimestamp
-          defs
-          modules
-          Log3
-          Debug
-          DoTrigger
-          CommandAttr
           attr
           AttrVal
-          ReadingsVal
-          Value
-          IsDisabled
+          CommandAttr
+          Debug
+          defs
           deviceEvents
-          init_done
-          gettimeofday
-          InternalTimer
-          RemoveInternalTimer
+          DoTrigger
           FW_webArgs
+          gettimeofday
+          init_done
+          InternalTimer
+          IsDisabled
+          Log3
+          modules
+          readingsBeginUpdate
+          readingsBulkUpdate
+          readingsBulkUpdateIfChanged
+          readingsEndUpdate
+          readingsSingleUpdate
+          ReadingsTimestamp
+          ReadingsVal
+          RemoveInternalTimer
+          Value
           )
     );
 }
@@ -85,6 +80,12 @@ if ($@) {
     # try to use JSON wrapper
     #   for chance of better performance
     eval {
+
+        # JSON preference order
+        local $ENV{PERL_JSON_BACKEND} =
+          'Cpanel::JSON::XS,JSON::XS,JSON::PP,JSON::backportPP'
+          unless ( defined( $ENV{PERL_JSON_BACKEND} ) );
+
         require JSON;
         import JSON qw( decode_json encode_json );
         1;
@@ -473,7 +474,7 @@ sub Set($$@) {
 
         if ( !defined( $hash->{".fhem"}{npm}{nodejsversions} ) ) {
             $list =
-"install:nodejs-v11,nodejs-v10,nodejs-v8,nodejs-v6 statusRequest:noArg";
+"install:nodejs-v12,nodejs-v10,nodejs-v8,nodejs-v6 statusRequest:noArg";
         }
         else {
             $list = "outdated:noArg";
@@ -896,7 +897,7 @@ sub ExecuteNpmCommand($) {
     }
 
     my $global = '-g ';
-    my $sudo   = 'sudo -H -n ';
+    my $sudo   = 'sudo -n ';
 
     if ( $cmd->{npmglobal} eq '0' ) {
         $global = '';
@@ -958,9 +959,11 @@ sub ExecuteNpmCommand($) {
                 $npm->{npminstall} =
                     $cmdPrefix
                   . 'echo n | if [ -z "$(node --version 2>/dev/null)" ]; then'
-                  . ' sh -c "curl -sSL https://deb.nodesource.com/setup_'
+                  . ' sh -c "( curl -fsSL https://deb.nodesource.com/setup_'
                   . $1
-                  . '.x | DEBIAN_FRONTEND=noninteractive sudo -n bash - >/dev/null 2>&1" 2>&1 &&'
+                  . '.x 2>/dev/null || wget -qO- https://deb.nodesource.com/setup_'
+                  . $1
+                  . '.x 2>/dev/null ) | DEBIAN_FRONTEND=noninteractive sudo -n bash - >/dev/null 2>&1" 2>&1 &&'
                   . ' sh -c "DEBIAN_FRONTEND=noninteractive sudo -n apt-get install -qqy nodejs >/dev/null 2>&1" 2>&1; '
                   . 'fi; '
                   . 'node -e "console.log(JSON.stringify(process.versions));" 2>&1'
@@ -1825,7 +1828,7 @@ sub ToDay() {
       "abstract": "Modul zur Bedienung der Node.js Installation und Updates"
     }
   },
-  "version": "v1.1.0",
+  "version": "v1.1.1",
   "release_status": "stable",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
