@@ -21,12 +21,14 @@
 # - fixed:   74_UnififSwitch: fixed possible log-error in eq in line 135
 # V 0.93
 # - bugfix:  74_UnififSwitch: fixed poe restart
+# V 0.0.94
+# - feature: 74_UnififSwitch: supports new module UnifiClient
 # 
 # TODOs:
 # - state des USW für weiter state-Numbers korrekt in Worte übersetzen 
 
 package main;
-my $version="0.93";
+my $version="0.0.94";
 # Laden evtl. abhängiger Perl- bzw. FHEM-Module
 use strict;
 use warnings;
@@ -149,22 +151,22 @@ sub UnifiSwitch_Set($@){
 
       if( $setVal2 eq 'off' ) {
         $port_overrides->[$idx]{poe_mode} = "off";
-        IOWrite($hash, "Unifi_RestJson_Send", $apRef->{device_id}, $port_overrides);
+        IOWrite($hash, "Unifi_DeviceRestJson_Send", $apRef->{device_id}, $port_overrides);
 
       } elsif( $setVal2 eq 'auto' || $setVal2 eq 'poe+' ) {
         #return "port $setVal not auto poe capable" if( @{$apRef->{port_table}}[$setVal-1]->{poe_caps} & 0x03 ) ;
         $port_overrides->[$idx]{poe_mode} = "auto";
-        IOWrite($hash, "Unifi_RestJson_Send", $apRef->{device_id}, $port_overrides );
+        IOWrite($hash, "Unifi_DeviceRestJson_Send", $apRef->{device_id}, $port_overrides );
 
       } elsif( $setVal2 eq 'passive' ) {
         #return "port $setVal not passive poe capable" if( @{$apRef->{port_table}}[$setVal-1]->{poe_caps} & 0x04 ) ;
         $port_overrides->[$idx]{poe_mode} = "pasv24";
-        IOWrite($hash, "Unifi_RestJson_Send", $apRef->{device_id}, $port_overrides);
+        IOWrite($hash, "Unifi_DeviceRestJson_Send", $apRef->{device_id}, $port_overrides);
 
       } elsif( $setVal2 eq 'passthrough' ) {
         #return "port $setVal not passthrough poe capable" if( @{$apRef->{port_table}}[$setVal-1]->{poe_caps} & 0x08 ) ;
         $port_overrides->[$idx]{poe_mode} = "passthrough";
-        IOWrite($hash, "Unifi_RestJson_Send", $apRef->{device_id}, $port_overrides);
+        IOWrite($hash, "Unifi_DeviceRestJson_Send", $apRef->{device_id}, $port_overrides);
 
       } elsif( $setVal2 eq 'restart' ) {#TODO: Was wir hier gemacht? Funktioniert das noch?
         IOWrite($hash, "Unifi_ApJson_Send", $apRef->{device_id}, {cmd => 'power-cycle', mac => $apRef->{mac}, port_idx => $setVal});
