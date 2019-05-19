@@ -47,7 +47,7 @@ my $deltaT   = 65;  # Correction time in s
 my %Astro;
 my %Date;
 
-my $astroversion = 1.50;
+my $astroversion = 1.52;
 
 #-- These we may get on request
 my %gets = (
@@ -896,7 +896,7 @@ sub Astro_SunRise($$$$$$){
   my ($transit,$rise,$set) = Astro_RiseSet($jd0UT, $sunCoor1->{diameter}, $sunCoor1->{parallax}, 
     $sunCoor1->{ra}, $sunCoor1->{dec}, $sunCoor2->{ra}, $sunCoor2->{dec}, $lon, $lat, 1,undef); 
   if( $transit eq "---" ){
-    Log 1,"[Astro_SunRise] no solution possible - maybe the sun never sets ?";
+    Log 3,"[Astro_SunRise] no solution possible - maybe the sun never sets ?";
    return( ($transit,$rise,$set) ); 
   }
   
@@ -938,7 +938,7 @@ sub Astro_SunRise($$$$$$){
 	($transittemp,$risetemp,$settemp) = Astro_RiseSet($jd0UT, $sunCoor1->{diameter}, $sunCoor1->{parallax}, 
 	   $sunCoor1->{ra}, $sunCoor1->{dec}, $sunCoor2->{ra}, $sunCoor2->{dec}, $lon, $lat, 1, -6.*$DEG);
 	if( $transittemp eq "---" ){
-      Log 3,"[Astro_SunRise] no solution possible for civil twilight - maybe the sun never sets below -6 degrees?";
+      Log 4,"[Astro_SunRise] no solution possible for civil twilight - maybe the sun never sets below -6 degrees?";
       $CivilTwilightMorning = "---";
       $CivilTwilightEvening = "---";
     }else{
@@ -952,7 +952,7 @@ sub Astro_SunRise($$$$$$){
 	($transittemp,$risetemp,$settemp) = Astro_RiseSet($jd0UT, $sunCoor1->{diameter}, $sunCoor1->{parallax}, 
 	  $sunCoor1->{ra}, $sunCoor1->{dec}, $sunCoor2->{ra}, $sunCoor2->{dec}, $lon, $lat, 1, -12.*$DEG);
 	if( $transittemp eq "---" ){
-      Log 3,"[Astro_SunRise] no solution possible for nautical twilight - maybe the sun never sets below -12 degrees?";
+      Log 4,"[Astro_SunRise] no solution possible for nautical twilight - maybe the sun never sets below -12 degrees?";
       $NauticTwilightMorning = "---";
       $NauticTwilightEvening = "---";
     }else{
@@ -966,7 +966,7 @@ sub Astro_SunRise($$$$$$){
 	($transittemp,$risetemp,$settemp) = Astro_RiseSet($jd0UT, $sunCoor1->{diameter}, $sunCoor1->{parallax}, 
 	  $sunCoor1->{ra}, $sunCoor1->{dec}, $sunCoor2->{ra}, $sunCoor2->{dec}, $lon, $lat, 1, -18.*$DEG);
 	if( $transittemp eq "---" ){
-      Log 3,"[Astro_SunRise] no solution possible for astronomical twilight - maybe the sun never sets below -18 degrees?";
+      Log 4,"[Astro_SunRise] no solution possible for astronomical twilight - maybe the sun never sets below -18 degrees?";
       $AstroTwilightMorning = "---";
       $AstroTwilightEvening = "---";
     }else{
@@ -980,7 +980,7 @@ sub Astro_SunRise($$$$$$){
     ($transittemp,$risetemp,$settemp) = Astro_RiseSet($jd0UT, $sunCoor1->{diameter}, $sunCoor1->{parallax}, 
 	  $sunCoor1->{ra}, $sunCoor1->{dec}, $sunCoor2->{ra}, $sunCoor2->{dec}, $lon, $lat, 1, $Astro{ObsHor}*$DEG);
 	  if( $transittemp eq "---" ){
-      Log 3,"[Astro_SunRise] no solution possible for custom twilight - maybe the sun never sets below ".$Astro{ObsHor}." degrees?";
+      Log 4,"[Astro_SunRise] no solution possible for custom twilight - maybe the sun never sets below ".$Astro{ObsHor}." degrees?";
       $CustomTwilightMorning = "---";
       $CustomTwilightEvening = "---";
     }else{
@@ -1538,7 +1538,7 @@ sub Astro_Get($@) {
         </ul>
         <a name="Astroget"></a>
         <h4>Get</h4>
-        Attention: Get-calls are NOT written into the readings of the device ! Readings change only through periodic updates !<br/>
+        Attention: Get-calls are NOT written into the readings of the device. Readings change only through periodic updates.<br/>
         <ul>
             <li><a name="astro_json"></a>
                 <code>get &lt;name&gt; json [&lt;reading&gt;]</code><br/>
@@ -1580,7 +1580,7 @@ sub Astro_Get($@) {
 <a name="Astro"></a>
 <h3>Astro</h3>
 <ul>
-<a href="https://wiki.fhem.de/wiki/Modul_Astro">Deutsche Dokumentation im Wiki</a> vorhanden, die englische Version gibt es hier: <a href="/fhem/docs/commandref.html#Astro">Astro</a> 
+<a href="https://wiki.fhem.de/wiki/Modul_Astro">Deutsche Dokumentation im Wiki</a> vorhanden, die englische Version gibt es hier: <a href="commandref.html#Astro">Astro</a> 
 </ul>
 =end html_DE
 =cut
