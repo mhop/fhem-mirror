@@ -50,7 +50,7 @@
 #
 # Version History
 #
-# 2019-05-19 version 0.2.12: major bug removed when syswrite impossible
+# 2019-05-19 version 0.2.12a: major bug removed when syswrite impossible
 # 2019-03-27 version 0.2.11k: error message instead of debug
 # 2019-01-28 version 0.2.11j: vcontrold-Neigung (Heizkurve) commands not rounded to full number anymore 
 # 2019-01-28 version 0.2.11i: update starts now if device initiated (for example, via FHEM restart) 
@@ -76,7 +76,7 @@ use Scalar::Util qw(looks_like_number);
 use Blocking;
 use Data::Dumper;
 
-my $VCLIENT_version = "0.2.12";
+my $VCLIENT_version = "0.2.12a";
 my $internal_update_interval  = 0.1; #internal update interval for Write (time between two different write_to_Viessmann commands)
 my $daily_commands_last_day_with_execution = strftime('%d', localtime)-1; #last day when daily commands (commands with type 'daily' ) were executed; set to today
 
@@ -624,11 +624,7 @@ sub VCLIENT_Set($@)
 
   #Hier steht jetzt der set-Befehl und, wenn es kein timer ist, das argument ($a[0] enthaelt $name)
   my $cmd = $a[1];
-  
-  if ($cmd ne "?") { #sonst tauchen ? in der Set-liste auf, diese "Kommandos" ignorieren
-  	Log3 $name, 5, "$name: try to execute set command @a";
-  }
-  
+    
   my $arg = "";
   if (@a > 2){
   	$arg = $a[2];
@@ -684,7 +680,7 @@ sub VCLIENT_Set($@)
   #damit die Argumente ausgeblendet werden (siehe oben)
   my $other_set_cmds = "";
   foreach $cmd (keys %set_hash){
-	  if ($cmd ne "?"){
+	  if ($cmd ne "?"){ #noetig, sonst tauchen die Kommandos nicht auf
   		$other_set_cmds .= $cmd.":";
   		if ( $set_hash{$cmd}[1] !~ m/.*\|.*/ ){
   			$other_set_cmds .= $set_hash{$cmd}[1]." "; #kein timer-Befehl, moegliche Argumente anhaengen	
@@ -876,7 +872,7 @@ sub VCLIENT_Write($)
 {
 	my ($hash) = @_;
     my $name = $hash->{NAME};
-    my $msg = "";
+    my $msg = "OK";
 
     #open device if not already open
 	if (!$hash->{CD}){
@@ -889,7 +885,7 @@ sub VCLIENT_Write($)
 		    VCLIENT_Set_New_Write_Interval($hash);
 	    	return;
 	    }
-		
+	
 	    #read command queue, 
 	    $last_cmd = shift @command_queue;  #global variable, if this command was not recognized by vcontrold there must be an error message in VCLIENT_Read 
 
