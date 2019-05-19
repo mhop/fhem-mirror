@@ -50,6 +50,7 @@
 #
 # Version History
 #
+# 2019-05-19 version 0.2.12: major bug removed when syswrite impossible
 # 2019-03-27 version 0.2.11k: error message instead of debug
 # 2019-01-28 version 0.2.11j: vcontrold-Neigung (Heizkurve) commands not rounded to full number anymore 
 # 2019-01-28 version 0.2.11i: update starts now if device initiated (for example, via FHEM restart) 
@@ -75,7 +76,7 @@ use Scalar::Util qw(looks_like_number);
 use Blocking;
 use Data::Dumper;
 
-my $VCLIENT_version = "0.2.11k";
+my $VCLIENT_version = "0.2.12";
 my $internal_update_interval  = 0.1; #internal update interval for Write (time between two different write_to_Viessmann commands)
 my $daily_commands_last_day_with_execution = strftime('%d', localtime)-1; #last day when daily commands (commands with type 'daily' ) were executed; set to today
 
@@ -192,11 +193,11 @@ sub VCLIENT_Close_Connection($)
    return if ( !$hash->{CD} );
 
    Log3 $name, 5,  "$name: Closing vcontrold connection";
-   close($hash->{CD}) if ($hash->{CD});
+   close ($hash->{CD});
    delete ($hash->{FD});
    delete ($hash->{CD});
    delete ($selectlist{$name});
-   readingsSingleUpdate($hash, 'state', 'disconnected', 1);
+   readingsSingleUpdate($hash, 'state', 'closed', 1);
    
    #set new update interval
    VCLIENT_Set_New_Update_Interval($hash);  
@@ -251,7 +252,7 @@ sub VCLIENT_Define($$)
 								# telnet->waitfor() and telnet->cmd() need the correct prompt. Is this really necessary?
 
 	$modules{VCLIENT}{defptr}{$host} = $hash;
-	readingsSingleUpdate($hash, 'state', 'Initialized', 1);
+	readingsSingleUpdate($hash, 'state', 'device defined', 1);
     Log3 $name, 5, $name.": VCLIENT device defined";	
 	
     return undef;
@@ -274,17 +275,19 @@ sub VCLIENT_Get($@)
 
   my $cmd= $a[1];
 
-  Log3 $name, 5, "$name: execute get command @a";
+  if ($cmd ne "?"){
+	  Log3 $name, 5, "$name: execute get command @a";
+  }
 
   if($cmd eq "update") {
     VCLIENT_Update($hash);
-	readingsSingleUpdate($hash, "state", 'Updating', 1);
+	readingsSingleUpdate($hash, "state", 'updating', 1);
     return undef;
   }
 
   if($cmd eq "update_manually") {
     VCLIENT_Update_Manually($hash);
-	readingsSingleUpdate($hash, "state", 'Updating manually', 1);
+	readingsSingleUpdate($hash, "state", 'updating manually', 1);
     return undef;
   }
 
@@ -355,33 +358,32 @@ sub VCLIENT_Open_Connection($)
    my $name = $hash->{NAME};
    my $host = $hash->{IP};
    my $port = $hash->{PORT};
-   my $msg;
      
-   my $timeout = AttrVal( $name, 'timeout', '1'); #default value is 1 second
+   my $timeout = AttrVal( $name, 'timeout', 1); #default value is 1 second
    my $t_prompt = AttrVal($name,'prompt',$hash->{'.prompt'});
+   Log3 $name, 5, "$name: Opening vcontrold connection to $host:$port";
    my $telnet = new Net::Telnet ( Port => $port, Timeout=>$timeout, Errmode=>'return', Prompt=>'/'.$t_prompt.'/', Dump_Log => '/opt/fhem/log/vcontrold.log');
    
    if (!$telnet) {
-      $msg = "ERROR: Cannot initiate Net::Telnet object";
-      Log3 $name, 1,  $name.": ".$msg;
-      return $msg;
+      Log3 $name, 1,  $name.": ERROR, Cannot initiate Net::Telnet object";
+   	  readingsSingleUpdate($hash, "state", 'error', 1);
+   	  return "Error";
    }
 
-   Log3 $name, 5, "$name: Opening vcontrold connection to $host:$port";
    if (!$telnet->open($host)){
-       $msg = "ERROR: Cannot open vcontrold connection, ".$telnet->errmsg.". Is vcontrold running?";
-	   readingsSingleUpdate($hash, "state", 'Error', 1);
-       Log3 $name, 1,  $name.": ".$msg;
-	   return undef;
+	   readingsSingleUpdate($hash, "state", 'error', 1);
+       Log3 $name, 1,  $name.": ERROR, Cannot open vcontrold connection, ".$telnet->errmsg.". Is vcontrold running?";
+	   VCLIENT_Timeout($hash);
+	   return "Error";
    }
    
    $hash->{FD} = $telnet->fileno(); #Thanks to CoolTux for providing me with this idea, more see forum
    $hash->{CD} = $telnet;
    $selectlist{$name} = $hash;
    
-   readingsSingleUpdate($hash, "state", 'Initialized', 1);
+   readingsSingleUpdate($hash, "state", 'connection opened', 1);
    Log3 $name, 5, "$name: vcontrold opened";
-   return undef;
+   return "OK";
 }
 
 
@@ -400,7 +402,7 @@ sub VCLIENT_ParseBuf_And_WriteReading($$){
    		$value = "ERROR, see logfile";
    		Log3 $name, 1, "$name ERROR: command  ".$last_cmd." from ".$hash->{FILE}." does not seem to be defined in vcontrol.xml";
    	} else {
-		my @zeilen=split /\n/, $buf;
+		my @zeilen = split /\n/, $buf;
 		# Anzahl uebergebener Zeilen
 		my $zeilen = @zeilen; 
 		
@@ -414,9 +416,9 @@ sub VCLIENT_ParseBuf_And_WriteReading($$){
 				# Wenn vcontrold-command "Temp" oder "Neigung" (Heizkurve!) enthaelt, Runden auf 1 , sonst Runden auf 0 (=Statuswert)
 				if (($last_cmd !~ /(T|t)emp/) and ($last_cmd !~ /Neigung/))
 				{
-					$value = sprintf("%.0f", $results[0]); #rounding to integer, if status value
+					$value = sprintf("%.0f", $results[0]); #round to integer, if status value
 				} else {
-					$value = sprintf("%.1f", $results[0]); #rounding to, for example, 16.6	
+					$value = sprintf("%.1f", $results[0]); #round to, for example, 16.6	
 				}
 			} else {
 				$value = $zeilen[0]; #Buchstaben fuer Betriebsart u.Ae.	
@@ -438,7 +440,8 @@ sub VCLIENT_ParseBuf_And_WriteReading($$){
 			$value = substr($value, 0, -3);# loesche letztes separation sign | beim timer
 		} else {
 	   		# format der Ausgabe unbekannt
-			$value = "";
+			$value = "Unkown buffer format";
+			$buf =~ s/\n/<newline>/;; # Zeilenvorschub ersetzen
 			Log3 $name, 1, $name.": Cannot handle buf = ".$buf;			
 		}
 		Log3 $name, 3,  $name.": Received ".$value." for ".$reading;
@@ -474,8 +477,8 @@ sub VCLIENT_Read($){
 		return;
 	}
 
-	#remove prompt (with and without newline)
-	$buf =~ s/vctrld>[\r]?[\n]?//;
+	#remove prompt and empty lines (with and without newline)
+	$buf =~ s/(vctrld>[\r]?[\n]?)*//;
 	
 	if ($buf ne "") {
 		#erst hier kommen echte Daten an, die ins Reading geschrieben werden sollen - nur diese parsen
@@ -612,7 +615,6 @@ sub VCLIENT_Set($@)
 {
   my ($hash, @a) = @_;
   my $name = $hash->{NAME};
-  Log3 $name, 5, "$name: try to execute set command @a";
 
   if(@a < 2) {
 	my $msg = "@a: set needs at least one parameter";
@@ -622,6 +624,10 @@ sub VCLIENT_Set($@)
 
   #Hier steht jetzt der set-Befehl und, wenn es kein timer ist, das argument ($a[0] enthaelt $name)
   my $cmd = $a[1];
+  
+  if ($cmd ne "?") { #sonst tauchen ? in der Set-liste auf, diese "Kommandos" ignorieren
+  	Log3 $name, 5, "$name: try to execute set command @a";
+  }
   
   my $arg = "";
   if (@a > 2){
@@ -663,7 +669,7 @@ sub VCLIENT_Set($@)
 	  }
 	  Log3 $name, 5, $name.": will try to send command ".$vcontrold." ".$arg." now";  	
 	  #Debug ($name.": next command in queue ".$vcontrold." ".$arg);
-  	  readingsSingleUpdate($hash, "last_set_command", "cmd in progress: ".$vcontrold." ".$arg." ...", 1);	
+  	  readingsSingleUpdate($hash, "last_set_command", "cmd: ".$vcontrold." ".$arg." ...", 1);	
 
 	  ##$reading_in_progress = 0; ### Ich glaube, das kann man ausblenden, denn es gibt eine Rueckmeldung naemlich ein OK ###########
 	  push @command_queue, $vcontrold." ".$arg;
@@ -678,14 +684,14 @@ sub VCLIENT_Set($@)
   #damit die Argumente ausgeblendet werden (siehe oben)
   my $other_set_cmds = "";
   foreach $cmd (keys %set_hash){
-		if ($cmd ne "?"){ #warum das hier noetig ist, verstehe ich nicht; sonst tauchen ? in der Set-liste auf
-			$other_set_cmds .= $cmd.":";
-		  	if ( $set_hash{$cmd}[1] !~ m/.*\|.*/ ){
-				$other_set_cmds .= $set_hash{$cmd}[1]." "; #kein timer-Befehl, moegliche Argumente anhaengen	
-	  	  	}  else {
-				$other_set_cmds .= "noArg ";		#timer befehl, ohne Argumente in Set-Liste aufnehmen
-	  	  	}
-		}
+	  if ($cmd ne "?"){
+  		$other_set_cmds .= $cmd.":";
+  		if ( $set_hash{$cmd}[1] !~ m/.*\|.*/ ){
+  			$other_set_cmds .= $set_hash{$cmd}[1]." "; #kein timer-Befehl, moegliche Argumente anhaengen	
+  	  	}  else {
+  			$other_set_cmds .= "noArg ";		#timer befehl, ohne Argumente in Set-Liste aufnehmen
+  	  	}
+	  }
 	}
 
   return "Unknown argument $cmd, choose one of reload_command_file ".$other_set_cmds;
@@ -762,14 +768,20 @@ sub VCLIENT_Timeout($)
     my $name = $hash->{NAME};
     my $host = $hash->{IP};
     my $port = $hash->{PORT};
-    my $interval = $hash->{INTERVAL} ;
+    my $interval = $hash->{INTERVAL};
+    my $telnet = $hash->{CD};
 	
-	Log3 $name, 5, "Timeout: Was not able to receive a signal from $host:$port. Deleting command queue.";
+    Log3 $name, 1, $name." timeout: Was not able to receive a signal from $host:$port. Deleting command queue.";
     @command_queue = (); 
 	@reading_queue = (); 
 	$reading_in_progress = 0;
-    VCLIENT_Close_Connection($hash);
-	
+    if ($telnet){ #wenn Verbindung existent
+		if ($telnet->open($host)){ # und offen
+			VCLIENT_Close_Connection($hash);
+		}
+    }
+
+    readingsSingleUpdate($hash, "state", "timeout", 1);
     #set new update interval
     VCLIENT_Set_New_Update_Interval($hash);  
 }
@@ -862,45 +874,43 @@ sub VCLIENT_Update_Manually($){
 ############################################################################
 sub VCLIENT_Write($)
 {
-	my ( $hash) = @_;
+	my ($hash) = @_;
     my $name = $hash->{NAME};
+    my $msg = "";
 
     #open device if not already open
-	unless ($hash->{CD}){
-        VCLIENT_Open_Connection($hash);
+	if (!$hash->{CD}){
+        $msg = VCLIENT_Open_Connection($hash); #gibt Error im Fehlerfall zurueck und bricht intern ab, sonst OK
     }
 
-	#wenn noch keine Rueckgabe erfolgte, write nicht ausfuehren, sondern verzoegern (=erneut aufrufen)
-    if ($reading_in_progress){
-	    VCLIENT_Set_New_Write_Interval($hash);
-    	return;
-    }
-
-    #read command queue, 
-    $last_cmd = shift @command_queue;  #global variable, if this command was not recognized by vcontrold there must be an error message in VCLIENT_Read 
-
-	if ($last_cmd){ 
-		#send signal
-		Log3 $name, 5,  "$name: Requesting ".$last_cmd." now";
-		$last_cmd .= "\r\n";
-		#flag because we need to stop sending until next timeout / successful reading, do this BEFORE syswrite
-		$reading_in_progress = 1; 
-		if ($hash->{CD}){
-			syswrite($hash->{CD}, $last_cmd);
-	    } else {
-			Log3 $name, 1,  "$name: (ERROR) cannot reach hash, aborting syswrite";
+    if ($msg eq "OK"){
+		#wenn noch keine Rueckgabe erfolgte, write nicht ausfuehren, sondern verzoegern (=erneut aufrufen)
+	    if ($reading_in_progress){
+		    VCLIENT_Set_New_Write_Interval($hash);
+	    	return;
 	    }
-				
-	    #and set timer for timeout
-	    RemoveInternalTimer($hash);
-	    my $this_timeout = AttrVal( $name, 'timeout', '1'); #default value is 1 second
-	    InternalTimer(gettimeofday()+$this_timeout, "VCLIENT_Timeout", $hash);
-	} else {
-		#last command already executed, set now timer for closing
-	    RemoveInternalTimer($hash);
-	    my $my_internal_timer = AttrVal( $name, 'internal_update_interval', $internal_update_interval);
-	    InternalTimer(gettimeofday()+ $my_internal_timer, "VCLIENT_Close_Connection", $hash);
-	}
+		
+	    #read command queue, 
+	    $last_cmd = shift @command_queue;  #global variable, if this command was not recognized by vcontrold there must be an error message in VCLIENT_Read 
+
+		if ($last_cmd){ 
+			#send signal
+			Log3 $name, 5,  "$name: Requesting ".$last_cmd." now";
+			$last_cmd .= "\r\n";
+			#flag because we need to stop sending until next timeout / successful reading, do this BEFORE syswrite
+			$reading_in_progress = 1; 
+			syswrite($hash->{CD}, $last_cmd);		
+		    #and set timer for timeout
+		    RemoveInternalTimer($hash);
+		    my $this_timeout = AttrVal( $name, 'timeout', '1'); #default value is 1 second
+		    InternalTimer(gettimeofday()+$this_timeout, "VCLIENT_Timeout", $hash);
+		} else {
+			#last command already executed, set now timer for closing
+		    RemoveInternalTimer($hash);
+		    my $my_internal_timer = AttrVal( $name, 'internal_update_interval', $internal_update_interval);
+		    InternalTimer(gettimeofday()+ $my_internal_timer, "VCLIENT_Close_Connection", $hash);
+		}
+    }
 }
 
 
