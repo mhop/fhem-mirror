@@ -34,10 +34,8 @@
 ########################################################################################################################
 # List of open Problems:
 #
-#	Check on https://www.doorbird.com/checkonline for firmware - updates
-#
-#
-#
+# Check problems with double relais readings after (re-)start of fhem
+# Check problems with error message after startup: "PERL WARNING: Prototype mismatch: sub main::memcmp: none vs ($$;$) at /usr/local/share/perl/5.24.1/Sub/Exporter.pm line 445."
 #
 #
 #
@@ -54,7 +52,7 @@ use Encode;
 use Cwd;
 use MIME::Base64 qw();
 use Crypt::NaCl::Sodium qw( :utils );
-use Crypt::Argon2 qw/argon2i_pass argon2i_verify argon2id_pass argon2id_verify/;
+use Crypt::Argon2 qw/argon2i_raw/;
 use IO::Socket;
 use LWP::UserAgent;
 use constant false => 0;
@@ -67,17 +65,6 @@ my $libs = Alien::Sodium->libs;
 
 sub DoorBird_Define($$);
 sub DoorBird_Undefine($$);
-
-
-# use Inline C => <<'END';
-# int add(int x, int y) {
-  # return x + y;
-# }
- 
-# int subtract(int x, int y) {
-  # return x - y;
-# }
-# END
 
 ###START###### Initialize module ##############################################################################START####
 sub DoorBird_Initialize($)
@@ -103,6 +90,7 @@ sub DoorBird_Initialize($)
 							   "SipDevice:" . join(",", devspec2array("TYPE=SIP")) . " " .
 							   "SipNumber " .
 							   "ImageFileDir " .
+							   "EventReset " .
 							   "SessionIdSec:slider,0,10,600 " .
 							   "disable:1,0 " .
 							   "debug:1,0 " .
@@ -193,6 +181,7 @@ sub DoorBird_Define($$)
 	  $hash->{helper}{UdpPort}							= AttrVal($name, "UdpPort", 6524);
 	  $hash->{helper}{SessionIdSec}						= AttrVal($name, "SessionIdSec", 540);
 	  $hash->{helper}{ImageFileDir}						= AttrVal($name, "ImageFileDir", 0);
+	  $hash->{helper}{EventReset}						= AttrVal($name, "EventReset", 5);
 	  $hash->{helper}{SessionId}						= 0;
 	  $hash->{helper}{UdpMessageId}						= 0;
 	@{$hash->{helper}{RelayAdresses}}					= (0);
@@ -441,6 +430,28 @@ sub DoorBird_Attr(@)
 			$hash->{helper}{ImageFileDir} = "";
 		}
 	}
+	### Check whether EventReset attribute has been provided
+	elsif ($a[2] eq "EventReset") {
+		### Remove Timer for Event Reset
+		RemoveInternalTimer($hash, "DoorBird_EventResetMotion");
+		RemoveInternalTimer($hash, "DoorBird_EventResetDoorbell");
+		#RemoveInternalTimer($hash, "DoorBird_EventResetKeypad");
+		
+		### Check whether EventReset is numeric and greater than 0
+		if ($a[3] == int($a[3]) && ($a[3] > 0)) {
+			### Save attribute as internal
+			$hash->{helper}{EventReset}  = $a[3];
+		}
+		### If KeepAliveTimeout is NOT numeric or 0
+		else {
+			### Save attribute as internal
+			$hash->{helper}{EventReset}	= 5;
+		}
+
+		readingsSingleUpdate($hash, "doorbell_button", "idle", 1);
+		readingsSingleUpdate($hash, "motion_sensor",   "idle", 1);
+		#readingsSingleUpdate($hash, "keypad",          "idle", 1);
+	}
 	### If no attributes of the above known ones have been selected
 	else {
 		# Do nothing
@@ -574,7 +585,7 @@ sub DoorBird_Set($@)
 	my $usage	= 'Unknown argument, choose one of ';
 
 	### Create Selection List
-	$usage .= "Live_Video:on,off Open_Door:" . join(",", @RelayAdresses) . " Light_On:noArg Restart:noArg Live_Audio:on,off Transmit_Audio X_Test";
+	$usage .= "Live_Video:on,off Open_Door:" . join(",", @RelayAdresses) . " Light_On:noArg Restart:noArg Live_Audio:on,off Transmit_Audio";
 
 	return $usage if $command eq '?';
 	
@@ -617,11 +628,6 @@ sub DoorBird_Set($@)
 	### DELETE FAVORITE
 	### ADD OR UPDATE SCHEDULE ENTRY
 	### DELETE SCHEDULE ENTRY
-	### Test Decrypt
-	elsif ($command eq "X_Test") {
-		### Call Subroutine and hand back return value
-		return DoorBird_Decrypt($hash);	
-	}	
 	### If none of the above have been selected
 	else {
 		### Do nothing
@@ -718,8 +724,6 @@ sub DoorBird_Read($) {
 		
 			### Log Entry for debugging purposes
 			Log3 $name, 5, $name. " : DoorBird_Read - UdpMessage is                     : Event Message";
-			Log3 $name, 5, $name. " : DoorBird_Read - buf                               : " . $buf;
-			Log3 $name, 5, $name. " : DoorBird_Read - data                              : " . $data;
 			Log3 $name, 5, $name. " : DoorBird_Read - version of encryption used        : " . $VERSION;
 
 			### If the version 1 of encryption in accordance to the DoorBird API is used
@@ -781,27 +785,190 @@ sub DoorBird_Read($) {
 				}	
 				
 				### Log Entry for debugging purposes
-				Log3 $name, 5, $name. " : DoorBird_Decrypt ------------------------------ Encryption Version 1 in accordance to DoorBird API has been used ------------------------";
-				Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP Client Udp hex             : " . $data;
-				Log3 $name, 5, $name. " : DoorBird_Decrypt ------------------------------------------------------------------------------------------------------------------------";
-				Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP Client Udp hex             : " . $HexFriendlyData;
-				Log3 $name, 5, $name. " : DoorBird_Decrypt ------------------------------------------------------------------------------------------------------------------------";	
-				Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP Client Ident hex           : " . $HexFriendlyIdent;
-				Log3 $name, 5, $name. " : DoorBird_Decrypt ------------------------------------------------------------------------------------------------------------------------";
-				Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP Client Version hex         : " . $HexFriendlyVersion;
-				Log3 $name, 5, $name. " : DoorBird_Decrypt ------------------------------------------------------------------------------------------------------------------------";
-				Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP Client OpsLimit hex        : " . $HexFriendlyOpsLimit;
-				Log3 $name, 5, $name. " : DoorBird_Decrypt ------------------------------------------------------------------------------------------------------------------------";
-				Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP Client MemLimit hex        : " . $HexFriendlyMemLimit;
-				Log3 $name, 5, $name. " : DoorBird_Decrypt ------------------------------------------------------------------------------------------------------------------------";	
-				Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP Client Salt hex            : " . $HexFriendlySalt;
-				Log3 $name, 5, $name. " : DoorBird_Decrypt ------------------------------------------------------------------------------------------------------------------------";
-				Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP Client Nonce hex           : " . $HexFriendlyNonce;
-				Log3 $name, 5, $name. " : DoorBird_Decrypt ------------------------------------------------------------------------------------------------------------------------";
-				Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP Client Cipher hex          : " . $HexFriendlyCipherText;
-				Log3 $name, 5, $name. " : DoorBird_Decrypt ------------------------------------------------------------------------------------------------------------------------";	
-			
-				### Further encryption methods will be here...
+				Log3 $name, 5, $name. " : DoorBird_Read ------------------------------ Encryption Version 1 in accordance to DoorBird API has been used ------------------------";
+				#Log3 $name, 5, $name. " : DoorBird_Read - UDP Client Udp hex                : " . $HexFriendlyData;
+				Log3 $name, 5, $name. " : DoorBird_Read - UDP Client Ident hex              : " . $HexFriendlyIdent;
+				Log3 $name, 5, $name. " : DoorBird_Read - UDP Client Version hex            : " . $HexFriendlyVersion;
+				Log3 $name, 5, $name. " : DoorBird_Read - UDP Client OpsLimit hex           : " . $HexFriendlyOpsLimit;
+				Log3 $name, 5, $name. " : DoorBird_Read - UDP Client MemLimit hex           : " . $HexFriendlyMemLimit;
+				Log3 $name, 5, $name. " : DoorBird_Read - UDP Client Salt hex               : " . $HexFriendlySalt;
+				Log3 $name, 5, $name. " : DoorBird_Read - UDP Client Nonce hex              : " . $HexFriendlyNonce;
+				Log3 $name, 5, $name. " : DoorBird_Read - UDP Client Cipher hex             : " . $HexFriendlyCipherText;
+
+				### Convert in accordance to API 0.24 description 
+				$IDENT 		= hex($IDENT);
+				$VERSION 	= hex($VERSION);
+				$OPSLIMIT 	= hex($OPSLIMIT);
+				$MEMLIMIT 	= hex($MEMLIMIT);
+				$SALT		= pack("H*", $SALT);
+				$NONCE		= pack("H*", $NONCE);
+				$CIPHERTEXT	= pack("H*", $CIPHERTEXT);
+
+				### Log Entry for debugging purposes			
+				Log3 $name, 5, $name. " : DoorBird_Read -- Part 2 ------------------------------------------------------------------------------------------------------------------------";
+				Log3 $name, 5, $name. " : DoorBird_Read - UDP IDENT       decimal           : " . $IDENT;
+				Log3 $name, 5, $name. " : DoorBird_Read - UDP VERSION     decimal           : " . $VERSION;
+				Log3 $name, 5, $name. " : DoorBird_Read - UDP OPSLIMIT    decimal           : " . $OPSLIMIT;
+				Log3 $name, 5, $name. " : DoorBird_Read - UDP MEMLIMIT    decimal           : " . $MEMLIMIT;
+				Log3 $name, 5, $name. " : DoorBird_Read - UDP FiveCharPw  in character      : " . $FiveCharPw;
+
+				### Create Password Hash or return error message if failed
+				my $PASSWORDHASH;
+				eval {
+					$PASSWORDHASH = argon2i_raw($FiveCharPw, $SALT, $OPSLIMIT, $MEMLIMIT, 1, 32);
+					1;
+				};
+				if ( $@ ) {
+					Log3 $name, 3, $name . " " . $@;
+					return($@);
+				} 
+				
+				### Unpack Password Hash
+				my $StrechedPWHex = unpack("H*",$PASSWORDHASH);
+
+				### Generate user friendly hex-string
+				my $StrechedPWHexFriendly;
+				for (my $i=0; $i < (length($StrechedPWHex)/2); $i++) {
+					$StrechedPWHexFriendly .= "0x" . substr($StrechedPWHex, $i*2,  2) . " ";
+				}
+
+				### Log Entry for debugging purposes
+				Log3 $name, 5, $name. " : DoorBird_Read -- Part 3 ------------------------------------------------------------------------------------------------------------------------";
+				Log3 $name, 5, $name. " : DoorBird_Read - UDP StrechedPW hex friendly       : " . $StrechedPWHexFriendly;
+
+				
+				### Open crypto_aead object
+				my $crypto_aead = Crypt::NaCl::Sodium->aead();
+				my $msg;
+
+				### Decrypt message or create error message
+				eval {
+					$msg = $crypto_aead->decrypt($CIPHERTEXT, "", $NONCE, $PASSWORDHASH);
+					
+					1;
+				};
+				if ( $@ ) {
+					Log3 $name, 3, $name. " Message forged!";
+				return("Messaged forged!");
+				} 
+				
+				### Unpack message as hex
+				 my $DecryptedMsgHex =  $msg->to_hex();
+				
+				### Generate user friendly hex-string
+				my $StrechedMsgHexFriendly;
+				for (my $i=0; $i < (length($DecryptedMsgHex)/2); $i++) {
+					$StrechedMsgHexFriendly .= "0x" . substr($DecryptedMsgHex, $i*2,  2) . " ";
+				}
+				
+				### Log Entry for debugging purposes
+				Log3 $name, 5, $name. " : DoorBird_Read -- Part 4 ------------------------------------------------------------------------------------------------------------------------";
+				Log3 $name, 5, $name. " : DoorBird_Read - UDP Msg        hex friendly       : " . $StrechedMsgHexFriendly;
+
+				### Split up in accordance to API 0.24 description in hex values
+				my $INTERCOM_ID = substr($DecryptedMsgHex,  0, 12);
+				my $EVENT 		= substr($DecryptedMsgHex, 12, 16);
+				my $TIMESTAMP 	= substr($DecryptedMsgHex, 28,  8);
+
+				### Generate user friendly hex-string for Intercom_Id
+				my $Intercom_IdHexFriendly;
+				for (my $i=0; $i < (length($INTERCOM_ID)/2); $i++) {
+					$Intercom_IdHexFriendly .= "0x" . substr($INTERCOM_ID, $i*2,  2) . " ";
+				}
+				### Generate user friendly hex-string for Event
+				my $EventHexFriendly;
+				for (my $i=0; $i < (length($EVENT)/2); $i++) {
+					$EventHexFriendly .= "0x" . substr($EVENT, $i*2,  2) . " ";
+				}
+				### Generate user friendly hex-string for Timestamp
+				my $TimestampHexFriendly;
+				for (my $i=0; $i < (length($TIMESTAMP)/2); $i++) {
+					$TimestampHexFriendly .= "0x" . substr($TIMESTAMP, $i*2,  2) . " ";
+				}
+
+				### Log Entry for debugging purposes
+				Log3 $name, 5, $name. " : DoorBird_Read -- Part 5 ------------------------------------------------------------------------------------------------------------------------";
+				Log3 $name, 5, $name. " : DoorBird_Read - UDP Intercom_Id hex friendly      : " . $Intercom_IdHexFriendly;
+				Log3 $name, 5, $name. " : DoorBird_Read - UDP Event hex friendly            : " . $EventHexFriendly;
+				Log3 $name, 5, $name. " : DoorBird_Read - UDP Timestamp hex friendly        : " . $TimestampHexFriendly;
+
+				### Convert in accordance to API 0.24 description in hex values
+				$INTERCOM_ID    = pack("H*", $INTERCOM_ID);
+				$EVENT          = pack("H*", $EVENT);
+				$TIMESTAMP      = hex($TIMESTAMP);
+
+				### Convert in accordance to API 0.24 description in hex values
+				my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)=localtime($TIMESTAMP);
+				my $TIMESTAMPHR    = sprintf ( "%04d-%02d-%02d %02d:%02d:%02d",$year+1900, $mon+1, $mday, $hour, $min, $sec);
+
+				### Log Entry for debugging purposes
+				Log3 $name, 5, $name. " : DoorBird_Read -- Part 6 ------------------------------------------------------------------------------------------------------------------------";
+				Log3 $name, 5, $name. " : DoorBird_Read - UDP Intercom_Id character         : " . $INTERCOM_ID;
+				Log3 $name, 5, $name. " : DoorBird_Read - UDP EVENT character               : " . $EVENT;
+				Log3 $name, 5, $name. " : DoorBird_Read - UDP TIMESTAMP UNIX                : " . $TIMESTAMP;
+				Log3 $name, 5, $name. " : DoorBird_Read - UDP TIMESTAMP human readeable     : " . $TIMESTAMPHR;
+
+
+
+				### If event belongs to the current user
+				if ($username =~ m/$INTERCOM_ID/){
+					### Log Entry for debugging purposes
+					Log3 $name, 5, $name. " : DoorBird_Read -- Part 7 ------------------------------------------------------------------------------------------------------------------------";
+					Log3 $name, 5, $name. " : DoorBird_Read - INTERCOM_ID matches username";
+				
+					### If event has been triggered by motion sensor
+					if ($EVENT =~ m/motion/) {
+						### Update readings of device
+						readingsSingleUpdate($hash, "state", "motion detected", 1);
+						readingsSingleUpdate($hash, "motion_sensor", "triggered", 1);
+						
+						### Initiate the timer to reset reading "motion_sensor"
+						InternalTimer(gettimeofday()+ $hash->{helper}{EventReset}, "DoorBird_EventResetMotion", $hash, 0);
+						
+						### Log Entry
+						Log3 $name, 3, $name. " : Motion sensor detected a motion in front of DoorBird unit.";
+						Log3 $name, 5, $name. " : DoorBird_Read - Timer for reset reading in        : " . $hash->{helper}{EventReset};
+					}
+					### If event has been triggered by keypad
+					elsif ($EVENT =~ m/keypad/) {
+						### Update readings of device
+						readingsSingleUpdate($hash, "state",  "keypad used!", 1);
+						readingsSingleUpdate($hash, "keypad", "triggered", 1);
+						
+						### Initiate the timer to reset reading "keypad"
+						InternalTimer(gettimeofday()+ $hash->{helper}{EventReset}, "DoorBird_EventResetKeypad", $hash, 0);
+						
+						### Log Entry
+						Log3 $name, 3, $name. " : The keypad of the DoorBird unit has been used.";
+						Log3 $name, 5, $name. " : DoorBird_Read - Timer for reset reading in        : " . $hash->{helper}{EventReset};
+					}
+					### If event has been triggered by doorbell
+					elsif ($EVENT =~ m/1/) {
+						### Update readings of device
+						readingsSingleUpdate($hash, "state", "doorbell pressed!", 1);
+						readingsSingleUpdate($hash, "doorbell_button", "triggered", 1);
+						
+						### Initiate the timer to reset reading "motion_sensor"
+						InternalTimer(gettimeofday()+ $hash->{helper}{EventReset}, "DoorBird_EventResetDoorbell", $hash, 0);
+						
+						### Log Entry
+						Log3 $name, 3, $name. " : The doorbell button of the DoorBird unit has been pressed.";
+						Log3 $name, 5, $name. " : DoorBird_Read - Timer for reset reading in        : " . $hash->{helper}{EventReset};
+					}
+					### If the event has been triggered by unknown code
+					else {
+						### Log Entry
+						Log3 $name, 3, $name. " : Unknown event triggered by Doorbird Unit : " . $EVENT;
+					}
+				}
+				### Event does not belong to the current user
+				else {
+					### Do nothing
+					
+					### Log Entry for debugging purposes
+					Log3 $name, 5, $name. " : DoorBird_Read -- Part 7 ------------------------------------------------------------------------------------------------------------------------";
+					Log3 $name, 5, $name. " : DoorBird_Read - INTERCOM_ID does not matches username. Ignoring datagram packet!";
+				}
 			}
 		}
 	}
@@ -880,6 +1047,60 @@ sub DoorBird_LostConn($) {
 	return;
 }
 ####END####### Lost Connection with DorBird unit ###############################################################END#####
+
+###START###### Reset reading "motion_sensor" ##################################################################START####
+sub DoorBird_EventResetMotion($) {
+	my ($hash) = @_;
+
+	### Obtain values from hash
+    my $name = $hash->{NAME};
+
+	### Log Entry for debugging purposes
+	Log3 $name, 5, $name. " : DoorBird_EventResetMotion - Reseting reading \"motion_sensor\" after given time";
+
+	### Update readings of device
+	readingsSingleUpdate($hash, "state",           "connected", 1);
+	readingsSingleUpdate($hash, "motion_sensor",   "idle",      1);
+	
+	return;
+}
+####END####### Reset reading "motion_sensor" ###################################################################END#####
+
+###START###### Reset reading "doorbell_button" ################################################################START####
+sub DoorBird_EventResetDoorbell($) {
+	my ($hash) = @_;
+
+	### Obtain values from hash
+    my $name = $hash->{NAME};
+
+	### Log Entry for debugging purposes
+	Log3 $name, 5, $name. " : DoorBird_EventResetDoorbell - Reseting reading \"doorbell_button\" after given time";
+
+	### Update readings of device
+	readingsSingleUpdate($hash, "state",           "connected", 1);
+	readingsSingleUpdate($hash, "doorbell_button", "idle",      1);
+	
+	return;
+}
+####END####### Reset reading "doorbell_button" #################################################################END#####
+
+###START###### Reset reading "keypad" #########################################################################START####
+sub DoorBird_EventResetKeypad($) {
+	my ($hash) = @_;
+
+	### Obtain values from hash
+    my $name = $hash->{NAME};
+
+	### Log Entry for debugging purposes
+	Log3 $name, 5, $name. " : DoorBird_EventResetKeypad - Reseting reading \"keypad\" after given time";
+
+	### Update readings of device
+	readingsSingleUpdate($hash, "state",           "connected", 1);
+	readingsSingleUpdate($hash, "keypad",          "idle",      1);
+	
+	return;
+}
+####END####### Reset reading "keypad" ##########################################################################END#####
 
 ###START###### Renew Session ID for DorBird unit ##############################################################START####
 sub DoorBird_RenewSessionID($) {
@@ -970,309 +1191,6 @@ sub DoorBird_RenewSessionID($) {
 	return;
 }
 ####END####### Renew Session ID for DorBird unit ###############################################################END#####
-
-###START###### Define Test-Function for UDP decryption ########################################################START####
-sub DoorBird_Decrypt($) {
-	my ($hash)	 = @_;
-	my $name	 = $hash->{NAME};
-	my $username = "foobar0001";
-	my $password = "QzT3jeK3JY";
-	my $msg = "Decryption failed";
-	
-	##########################################################################################################################################################################################################
-	### Define Test UDP Package from the API example
-	my $buf = pack('C*' , 0xDE, 0xAD, 0xBE, 0x01, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x20, 0x00, 0x77, 0x35, 0x36, 0xDC, 
-						  0xC3, 0x0E, 0x2E, 0x84, 0x7E, 0x0E, 0x75, 0x29, 0xE2, 0x34, 0x60, 0xCF, 0xE3, 0xFF, 0xCC, 0x52, 
-						  0x3F, 0x37, 0xB2, 0xF2, 0xDC, 0x1A, 0x71, 0x80, 0xF2, 0x9B, 0x2E, 0xA0, 0x27, 0xA9, 0x82, 0x41, 
-						  0x9C, 0xCE, 0x45, 0x9D, 0x27, 0x45, 0x2E, 0x42, 0x14, 0xBE, 0x9C, 0x74, 0xE9, 0x33, 0x3A, 0x21, 
-						  0xDB, 0x10, 0x78, 0xB9, 0xF6, 0x7B);
-						
-	### Define the comparisons from the API example
-	my $TestReferenceUdp        = "0xde 0xad 0xbe 0x01 0x00 0x00 0x00 0x04 0x00 0x00 0x20 0x00 0x77 0x35 0x36 0xdc 0xc3 0x0e 0x2e 0x84 0x7e 0x0e 0x75 0x29 0xe2 0x34 0x60 0xcf 0xe3 0xff 0xcc 0x52 0x3f 0x37 0xb2 0xf2 0xdc 0x1a 0x71 0x80 0xf2 0x9b 0x2e 0xa0 0x27 0xa9 0x82 0x41 0x9c 0xce 0x45 0x9d 0x27 0x45 0x2e 0x42 0x14 0xbe 0x9c 0x74 0xe9 0x33 0x3a 0x21 0xdb 0x10 0x78 0xb9 0xf6 0x7b";
-	my $TestReferenceIdent      = "0xde 0xad 0xbe";
-	my $TestReferenceVersion    = "0x01";
-	my $TestReferenceOpsLimit   = "0x00 0x00 0x00 0x04";
-	my $TestReferenceMemLimit   = "0x00 0x00 0x20 0x00";
-	my $TestReferenceSalt		= "0x77 0x35 0x36 0xdc 0xc3 0x0e 0x2e 0x84 0x7e 0x0e 0x75 0x29 0xe2 0x34 0x60 0xcf";
-	my $TestReferenceNonce		= "0xe3 0xff 0xcc 0x52 0x3f 0x37 0xb2 0xf2";
-	my $TestReferenceCypherText = "0xdc 0x1a 0x71 0x80 0xf2 0x9b 0x2e 0xa0 0x27 0xa9 0x82 0x41 0x9c 0xce 0x45 0x9d 0x27 0x45 0x2e 0x42 0x14 0xbe 0x9c 0x74 0xe9 0x33 0x3a 0x21 0xdb 0x10 0x78 0xb9 0xf6 0x7b";
-	my $TestReferenceStrechedPW = "0x47 0xb8 0xa5 0xbc 0xdd 0xda 0x29 0xeb 0x4c 0x0f 0xf6 0x78 0x46 0x41 0xe7 0x2f 0x7b 0x9c 0x45 0xd5 0x46 0x1a 0x60 0x71 0x2c 0x68 0x1f 0x05 0x23 0x9b 0xcc 0xa2";
-	my $TestReferenceDecrypt    = "0x66 0x6f 0x6f 0x62 0x61 0x72 0x31 0x30 0x32 0x20 0x20 0x20 0x20 0x20 0x5a 0x12 0xe4 0x13";
-	##########################################################################################################################################################################################################
-	
-	### Unpack Hex-Package
-	my $data = bin2hex($buf);
-	
-	### Split up in accordance to API 0.24 description in hex values
-	my $IDENT 		= substr($data,     0,  6);
-	my $VERSION 	= substr($data,     6,  2);
-	my $OPSLIMIT 	= substr($data,     8,  8);
-	my $MEMLIMIT 	= substr($data,    16,  8);
-	my $SALT		= substr($data,    24, 32);
-	my $NONCE		= substr($data,    56, 16);
-	my $CIPHERTEXT	= substr($data,    72, 68);
-	my $FiveCharPw  = substr($password, 0,  5);
-
-	### Generate user friendly hex-string for data
-	my $HexFriendlyData;
-	for (my $i=0; $i < (length($data)/2); $i++) {
-		$HexFriendlyData .= "0x" . substr($data, $i*2,  2) . " ";
-    }
-	
-	### Generate user friendly hex-string for Ident
-	my $HexFriendlyIdent;
-	for (my $i=0; $i < (length($IDENT)/2); $i++) {
-		$HexFriendlyIdent .= "0x" . substr($IDENT, $i*2,  2) . " ";
-    }
-	
-	### Generate user friendly hex-string for Version
-	my $HexFriendlyVersion;
-	for (my $i=0; $i < (length($VERSION)/2); $i++) {
-		$HexFriendlyVersion .= "0x" . substr($VERSION, $i*2,  2) . " ";
-    }
-	
-	### Generate user friendly hex-string for OpsLimit
-	my $HexFriendlyOpsLimit;
-	for (my $i=0; $i < (length($OPSLIMIT)/2); $i++) {
-		$HexFriendlyOpsLimit .= "0x" . substr($OPSLIMIT, $i*2,  2) . " ";
-    }
-	
-	### Generate user friendly hex-string for MemLimit
-	my $HexFriendlyMemLimit;
-	for (my $i=0; $i < (length($MEMLIMIT)/2); $i++) {
-		$HexFriendlyMemLimit .= "0x" . substr($MEMLIMIT, $i*2,  2) . " ";
-    }
-	
-	### Generate user friendly hex-string for Salt
-	my $HexFriendlySalt;
-	for (my $i=0; $i < (length($SALT)/2); $i++) {
-		$HexFriendlySalt .= "0x" . substr($SALT, $i*2,  2) . " ";
-    }
-	
-	### Generate user friendly hex-string for Nonce
-	my $HexFriendlyNonce;
-	for (my $i=0; $i < (length($NONCE)/2); $i++) {
-		$HexFriendlyNonce .= "0x" . substr($NONCE, $i*2,  2) . " ";
-    }
-	
-	### Generate user friendly hex-string for CipherText
-	my $HexFriendlyCipherText;
-	for (my $i=0; $i < (length($CIPHERTEXT)/2); $i++) {
-		$HexFriendlyCipherText .= "0x" . substr($CIPHERTEXT, $i*2,  2) . " ";
-    }	
-	
-	### Log Entry for debugging purposes
-	Log3 $name, 5, $name. " : DoorBird_Decrypt -- Part 1 ------------------------------------------------------------------------------------------------------------------------";
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP length data in decimal     : " . length($data);
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP Client Udp                 : " . $buf;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP Client Udp hex             : " . $data;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt ------------------------------------------------------------------------------------------------------------------------";
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP Client Udp hex             : " . $HexFriendlyData;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP Client Udp API Ref.        : " . $TestReferenceUdp;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt ------------------------------------------------------------------------------------------------------------------------";	
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP Client Ident hex           : " . $HexFriendlyIdent;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP Client Ident API Ref.      : " . $TestReferenceIdent;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt ------------------------------------------------------------------------------------------------------------------------";
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP Client Version hex         : " . $HexFriendlyVersion;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP Client Version API Ref.    : " . $TestReferenceVersion;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt ------------------------------------------------------------------------------------------------------------------------";
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP Client OpsLimit hex        : " . $HexFriendlyOpsLimit;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP Client OpsLimit API Ref.   : " . $TestReferenceOpsLimit;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt ------------------------------------------------------------------------------------------------------------------------";
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP Client MemLimit hex        : " . $HexFriendlyMemLimit;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP Client MemLimit API Ref.   : " . $TestReferenceMemLimit;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt ------------------------------------------------------------------------------------------------------------------------";	
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP Client Salt hex            : " . $HexFriendlySalt;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP Client Salt API Ref.       : " . $TestReferenceSalt;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt ------------------------------------------------------------------------------------------------------------------------";
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP Client Nonce hex           : " . $HexFriendlyNonce;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP Client Nonce API Ref.      : " . $TestReferenceNonce;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt ------------------------------------------------------------------------------------------------------------------------";
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP Client Cipher hex          : " . $HexFriendlyCipherText;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP Client Cipher API Ref.     : " . $TestReferenceCypherText;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt -";
-	
-	
-	Log3 $name, 5, $name. " : DoorBird_Decrypt -- Part 2 ------------------------------------------------------------------------------------------------------------------------";
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP IDENT       in hexadecimal : " . $IDENT;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP VERSION     in hexdecimal  : " . $VERSION;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP OPSLIMIT    in hexdecimal  : " . $OPSLIMIT;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP MEMLIMIT    in hexdecimal  : " . $MEMLIMIT;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP SALT        in hexdecimal  : " . $SALT;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP NONCE       in hexdecimal  : " . $NONCE;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP CIPHERTEXT  in hexdecimal  : " . $CIPHERTEXT;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP FiveCharPw  in character   : " . $FiveCharPw;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP length(SALT)               : " . length($SALT);
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP length(FiveCharPw)         : " . length($FiveCharPw);	
-	Log3 $name, 5, $name. " : DoorBird_Decrypt -";
-	
-	### Convert in accordance to API 0.24 description 
-	$IDENT 		= hex($IDENT);
-	$VERSION 	= hex($VERSION);
-	$OPSLIMIT 	= hex($OPSLIMIT);
-	$MEMLIMIT 	= hex($MEMLIMIT);
-
-	$SALT		 = $SALT;																						# Seems to be the only one progressing through but different values from the API reference
-	#$SALT		 = hex($SALT);																					# error - crypto_pwhash_scrypt_str  : Invalid salt
-	#$SALT		 = pack('C', $SALT); 																			# error - crypto_pwhash_scrypt_str  : Invalid salt
-	#$SALT		 = pack('C*', $SALT); 																			# error - crypto_pwhash_scrypt_str  : Invalid salt
-	#$SALT		 = pack('H', $SALT); 																			# error - crypto_pwhash_scrypt_str  : Invalid salt
-	#$SALT		 = pack('H*', $SALT); 																			# error - crypto_pwhash_scrypt_str  : Invalid salt
-
-	Log3 $name, 5, $name. " : DoorBird_Decrypt -- Part 3 ------------------------------------------------------------------------------------------------------------------------";
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP IDENT       decimal        : " . $IDENT;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP VERSION     decimal        : " . $VERSION;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP OPSLIMIT    decimal        : " . $OPSLIMIT;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP MEMLIMIT    decimal        : " . $MEMLIMIT;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP FiveCharPw  in character   : " . $FiveCharPw;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP length(SALT)               : " . length($SALT);
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP length(FiveCharPw)         : " . length($FiveCharPw);	
-	Log3 $name, 5, $name. " : DoorBird_Decrypt -";
-
-
-	### Convert string of hex values in string of char values
-	my $CharSalt;
-	for (my $i=0; $i < (length($SALT)/2); $i++) {
-		$CharSalt .= chr(hex(substr($SALT, $i*2,  2)));
-    }
-	
-	my $StrechedPWHex;
-	
-	###BEGIN################# Part 4a: Crypt::Argon2::argon2i Libary ########################################################
-	my $hashpass = argon2i_pass($FiveCharPw, $CharSalt, 4, 8192, 1, 5);
-	
-	my $StrechedPWChar="x";
-	if($hashpass =~ m/p=(.*)/) {
-		$StrechedPWChar = $1;
-	}
-	
-	$StrechedPWHex = unpack("H*", $StrechedPWChar);
-	
-	### Generate user friendly hex-string
-	my $StrechedPWHexFriendly4a;
-	for (my $i=0; $i < (length($StrechedPWHex)/2); $i++) {
-		$StrechedPWHexFriendly4a .= "0x" . substr($StrechedPWHex, $i*2,  2) . " ";
-    }
-	####END################## Part 4a: Crypt::Argon2::argon2i Libary ########################################################
-
-	###BEGIN################# Part 4b: Crypt::Argon2::argon2id Libary  ######################################################
-	$hashpass = argon2id_pass($FiveCharPw, $CharSalt, 4, 8192, 1, 5);
-	
-	$StrechedPWChar="x";
-	if($hashpass =~ m/p=(.*)/) {
-		$StrechedPWChar = $1;
-	}
-	
-	$StrechedPWHex = unpack("H*", $StrechedPWChar);
-	
-	### Generate user friendly hex-string
-	my $StrechedPWHexFriendly4b;
-	for (my $i=0; $i < (length($StrechedPWHex)/2); $i++) {
-		$StrechedPWHexFriendly4b .= "0x" . substr($StrechedPWHex, $i*2,  2) . " ";
-    }
-	####END################## Part 4b: Crypt::Argon2::argon2id Libary #######################################################
-
-	###BEGIN################# Part 4c: Crypt::NaCl::Sodium Libary ###################################################
-	my $key;
-	my $crypto_pwhash = Crypt::NaCl::Sodium->pwhash();
-
-	eval 
-	{
-		### PW-Hash: https://metacpan.org/pod/distribution/Crypt-NaCl-Sodium/lib/Crypt/NaCl/Sodium/pwhash.pod#key
-		$key = $crypto_pwhash->key($FiveCharPw, $SALT, bytes => 32, opslimit => $OPSLIMIT, memlimit => $MEMLIMIT);
-
-		1;
-	}
-	or do 
-	{
-		### Log Entry
-		Log3 $name, 3, $name. " : DoorBird_Decrypt - error - crypto_pwhash_scrypt_str  : " . $@;
-		return
-	};	
-
-	$key->unlock();
-	my $StrechedPW    = $key->bytes();
-	my $StrechedPWHex4c1 = $key->to_hex();
-
-	my $StrechedPWHex4c2 = unpack("H*", $StrechedPW);
-
-	### Generate user friendly hex-string
-	my $StrechedPWHexFriendly4c1;
-	for (my $i=0; $i < (length($StrechedPWHex)/2); $i++) {
-		$StrechedPWHexFriendly4c1 .= "0x" . substr($StrechedPWHex4c1, $i*2,  2) . " ";
-	}
-	### Generate user friendly hex-string
-	my $StrechedPWHexFriendly4c2;
-	for (my $i=0; $i < (length($StrechedPWHex)/2); $i++) {
-		$StrechedPWHexFriendly4c2 .= "0x" . substr($StrechedPWHex4c2, $i*2,  2) . " ";
-	}
-
-	####END################## Part 4c: Crypt::NaCl::Sodium Libary ###################################################
-
-
-
-
-	### Log Entry for debugging purposes
-	Log3 $name, 5, $name. " : DoorBird_Decrypt -- Part 4 ------------------------------------------------------------------------------------------------------------------------";
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP CharSalt                   : " . $CharSalt;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP StrechedPWChar             : " . $StrechedPWChar;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP StrechedPWHex              : " . $StrechedPWHex;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt ------------------------------------------------------------------------------------------------------------------------";
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP StrechedPW API Reference   : " . $TestReferenceStrechedPW;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP StrechedPW hex friendly 4a : " . $StrechedPWHexFriendly4a;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP StrechedPW hex friendly 4b : " . $StrechedPWHexFriendly4b;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP StrechedPW hex friendly 4c1: " . $StrechedPWHexFriendly4c1;
-	Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP StrechedPW hex friendly 4c2: " . $StrechedPWHexFriendly4c2;
-	
-	
-	Log3 $name, 5, $name. " : DoorBird_Decrypt ------------------------------------------------------------------------------------------------------------------------";
-	Log3 $name, 5, $name. " : DoorBird_Decrypt -";
-
-	
-	
-	
-	
-	
-	
-
-	
-	# my $crypto_aead = Crypt::NaCl::Sodium->aead();
-
-	# eval {
-		# $msg = $crypto_aead->decrypt($CIPHERTEXT, "", $NONCE, $StrechedPWHex);
-		
-		# 1;
-	# };
-	# if ( $@ ) {
-		# Log3 $name, 3, $name. " Message forged!";
-	# } 
-	# else {
-		# Log3 $name, 3, $name. "Decrypted message: " . $msg;
-	# }
-	
-	# ### Unpack Streched Password
-	# my $StrechedMsgHex = unpack('H*', $msg);
-	# # my $StrechedMsgHex =  $msg->to_hex();
-	
-
-	# ### Generate user friendly hex-string
-	# my $StrechedMsgHexFriendly;
-	# for (my $i=0; $i < (length($StrechedMsgHex)/2); $i++) {
-		# $StrechedMsgHexFriendly .= "0x" . substr($StrechedMsgHex, $i*2,  2) . " ";
-    # }
-	
-	# ### Log Entry for debugging purposes
-	# Log3 $name, 5, $name. " : DoorBird_Decrypt -- Part 5 ------------------------------------------------------------------------------------------------------------------------";
-	# Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP crypto_aead                : " . Dumper($crypto_aead);
-	# Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP Msg                        : " . Dumper($msg);
-	# Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP Msg        hex             : " . $StrechedMsgHex;
-	# Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP Msg        hex friendly    : " . $StrechedMsgHexFriendly;
-	# Log3 $name, 5, $name. " : DoorBird_Decrypt - UDP StrechedPW API Reference   : " . $TestReferenceDecrypt;
-	# Log3 $name, 5, $name. " : DoorBird_Decrypt ------------------------------------------------------------------------------------------------------------------------";
-	# Log3 $name, 5, $name. " : DoorBird_Decrypt -";
- return	$msg;
-}
-####END####### Define Test-Function for UDP decryption #########################################################END#####
 
 ###START###### Display of html code preceding the "Internals"-section #########################################START####
 sub DoorBird_FW_detailFn($$$$) {
@@ -3155,6 +3073,12 @@ sub DoorBird_BlockGet($$$$) {
 																   The default value is <code>0</code> = disabled<BR>
 				</td>
 			</tr>
+			<tr>
+				<td>
+					<code>EventReset</code> : </td><td>Time in seconds after wich the Readings for the Events Events (e.g. "doorbell_button", "motions sensor", "keypad") shal be reset to "idle".<BR>
+   																   The default value is 5s<BR>
+				</td>
+			</tr>			
 		</table>
 	</ul>
 </ul>
@@ -3303,12 +3227,18 @@ sub DoorBird_BlockGet($$$$) {
 																   Der Default Wert ist <code>**620</code><BR>
 				</td>
 			</tr>
-					<tr>
+			<tr>
 				<td>
 					<code>ImageFileDir</code> : </td><td>Der relative (z.B. "images") oder absolute (z.B. "/mnt/NAS/images") Verzeichnispfad mit oder ohne nachfolgendem Pfadzeichen "/"  in welchen die Bild-Dateien gespeichert werden sollen.<BR>
-																   The Default Wert ist <code>0</code> = deaktiviert<BR>
+																   Der Default Wert ist <code>0</code> = deaktiviert<BR>
 				</td>
 			</tr>
+			<tr>
+				<td>
+					<code>EventReset</code> : </td><td>Zeit in Sekunden nach welcher die Readings f&uuml;r die Events (z.B. "doorbell_button", "motions sensor", "keypad")wieder auf "idle" gesetzt werden sollen.<BR>
+   																   Der Default Wert ist 5s<BR>
+				</td>
+			</tr>			
 		</table>
 	</ul>
 </ul>
