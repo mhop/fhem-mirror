@@ -867,6 +867,7 @@ sub ExecuteNpmCommand($) {
 
     my $cmdPrefix = '';
     my $cmdSuffix = '';
+    my $locale    = 'LC_ALL=C';
 
     if ( $cmd->{host} =~ /^(?:(.*)@)?([^:]+)(?::(\d+))?$/
         && lc($2) ne "localhost" )
@@ -880,19 +881,27 @@ sub ExecuteNpmCommand($) {
         # If key changes, user will need to intervene
         #   and cleanup known_hosts file manually for security reasons
         $cmdPrefix =
-            'KEY=$(ssh-keyscan -t ed25519 '
+            'KEY=$('
+          . $locale
+          . ' ssh-keyscan -t ed25519 '
           . $2
           . ' 2>/dev/null); '
           . 'grep -q -E "^${KEY% *}" ${HOME}/.ssh/known_hosts || echo "${KEY}" >> ${HOME}/.ssh/known_hosts; ';
         $cmdPrefix .=
-            'KEY=$(ssh-keyscan -t rsa '
+            'KEY=$('
+          . $locale
+          . ' ssh-keyscan -t rsa '
           . $2
           . ' 2>/dev/null); '
           . 'grep -q -E "^${KEY% *}" ${HOME}/.ssh/known_hosts || echo "${KEY}" >> ${HOME}/.ssh/known_hosts; ';
 
         # wrap SSH command
         $cmdPrefix .=
-          'ssh -oBatchMode=yes ' . $port . ( $1 ? "$1@" : '' ) . $2 . ' \'';
+            $locale
+          . ' ssh -oBatchMode=yes '
+          . $port
+          . ( $1 ? "$1@" : '' )
+          . $2 . ' \'';
         $cmdSuffix = '\' 2>&1';
     }
 
@@ -906,13 +915,16 @@ sub ExecuteNpmCommand($) {
 
     $npm->{nodejsversions} =
         $cmdPrefix
-      . 'echo n | node -e "console.log(JSON.stringify(process.versions));" 2>&1'
+      . 'echo n | '
+      . $locale
+      . ' node -e "console.log(JSON.stringify(process.versions));" 2>&1'
       . $cmdSuffix;
     $npm->{npminstall} =
         $cmdPrefix
       . 'echo n | sh -c "'
       . $sudo
-      . 'NODE_ENV=${NODE_ENV:-production} npm install '
+      . $locale
+      . ' NODE_ENV=${NODE_ENV:-production} npm install '
       . $global
       . '--json --silent --unsafe-perm %PACKAGES%" 2>&1'
       . $cmdSuffix;
@@ -920,7 +932,8 @@ sub ExecuteNpmCommand($) {
         $cmdPrefix
       . 'echo n | sh -c "'
       . $sudo
-      . 'NODE_ENV=${NODE_ENV:-production} npm uninstall '
+      . $locale
+      . ' NODE_ENV=${NODE_ENV:-production} npm uninstall '
       . $global
       . '--json --silent %PACKAGES%" 2>&1'
       . $cmdSuffix;
@@ -928,7 +941,8 @@ sub ExecuteNpmCommand($) {
         $cmdPrefix
       . 'echo n | sh -c "'
       . $sudo
-      . 'NODE_ENV=${NODE_ENV:-production} npm update '
+      . $locale
+      . ' NODE_ENV=${NODE_ENV:-production} npm update '
       . $global
       . '--json --silent --unsafe-perm %PACKAGES%" 2>&1'
       . $cmdSuffix;
@@ -937,12 +951,17 @@ sub ExecuteNpmCommand($) {
       . 'echo n | '
       . 'echo "{' . "\n"
       . '\"versions\": "; '
-      . 'node -e "console.log(JSON.stringify(process.versions));"; '
-      . 'L1=$(npm list '
+      . $locale
+      . ' node -e "console.log(JSON.stringify(process.versions));"; '
+      . 'L1=$('
+      . $locale
+      . ' npm list '
       . $global
       . '--json --silent --depth=0 2>/dev/null); '
       . '[ "$L1" != "" ] && [ "$L1" != "\n" ] && echo ", \"listed\": $L1"; '
-      . 'L2=$(npm outdated '
+      . 'L2=$('
+      . $locale
+      . ' npm outdated '
       . $global
       . '--json --silent 2>&1); '
       . '[ "$L2" != "" ] && [ "$L2" != "\n" ] && echo ", \"outdated\": $L2"; '
@@ -959,14 +978,23 @@ sub ExecuteNpmCommand($) {
                 $npm->{npminstall} =
                     $cmdPrefix
                   . 'echo n | if [ -z "$(node --version 2>/dev/null)" ]; then'
-                  . ' sh -c "( curl -fsSL https://deb.nodesource.com/setup_'
+                  . ' sh -c "( '
+                  . $locale
+                  . ' curl -fsSL https://deb.nodesource.com/setup_'
                   . $1
-                  . '.x 2>/dev/null || wget -qO- https://deb.nodesource.com/setup_'
+                  . '.x 2>/dev/null || '
+                  . $locale
+                  . ' wget -qO- https://deb.nodesource.com/setup_'
                   . $1
-                  . '.x 2>/dev/null ) | DEBIAN_FRONTEND=noninteractive sudo -n bash - >/dev/null 2>&1" 2>&1 &&'
-                  . ' sh -c "DEBIAN_FRONTEND=noninteractive sudo -n apt-get install -qqy nodejs >/dev/null 2>&1" 2>&1; '
+                  . '.x 2>/dev/null ) | '
+                  . $locale
+                  . ' DEBIAN_FRONTEND=noninteractive sudo -n bash - >/dev/null 2>&1" 2>&1 &&'
+                  . ' sh -c "'
+                  . $locale
+                  . ' DEBIAN_FRONTEND=noninteractive sudo -n apt-get install -qqy nodejs >/dev/null 2>&1" 2>&1; '
                   . 'fi; '
-                  . 'node -e "console.log(JSON.stringify(process.versions));" 2>&1'
+                  . $locale
+                  . ' node -e "console.log(JSON.stringify(process.versions));" 2>&1'
                   . $cmdSuffix;
             }
         }

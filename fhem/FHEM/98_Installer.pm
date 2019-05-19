@@ -877,17 +877,18 @@ sub ExecuteFhemCommand($) {
 
     my $installer = {};
     $installer->{debug} = $cmd->{debug};
-    my $sudo  = 'sudo -n ';
-    my $sudoH = 'sudo -H -n ';
+    my $locale = 'LC_ALL=C';
+    my $sudo   = $locale . ' sudo -n ';
+    my $sudoH  = $locale . ' sudo -H -n ';
 
     $installer->{cpanversions} =
 'echo n | TEST=$(which cpanm) || echo "sh: command not found: cpanm"; which cpanm >/dev/null 2>&1 && sh -c "'
       . $sudoH
-      . '$(which cpanm) --version 2>&1" 2>&1';
+      . ' $(which cpanm) --version 2>&1" 2>&1';
     $installer->{installperl} =
         'echo n | sh -c "'
       . $sudoH
-      . '$(which cpanm) --quiet '
+      . ' $(which cpanm) --quiet '
       . $cmd->{installPerlReinstall}
       . $cmd->{installPerlNoTest}
       . $cmd->{installPerlEnforced}
@@ -895,13 +896,13 @@ sub ExecuteFhemCommand($) {
     $installer->{uninstallperl} =
         'echo n | sh -c "'
       . $sudoH
-      . '$(which cpanm) -U --quiet --force %PACKAGES%" 2>&1';
+      . ' $(which cpanm) -U --quiet --force %PACKAGES%" 2>&1';
     $installer->{outdatedperl} =
         'echo n | '
       . 'sh -c "'
       . $sudoH
-      . '$(which cpanm) --version 2>&1" 2>&1 && '
-      . 'L1=$(cpan-outdated --verbose 2>&1) && '
+      . ' $(which cpanm) --version 2>&1" 2>&1 && ' . 'L1=$('
+      . ' cpan-outdated --verbose 2>&1) && '
       . '[ "$L1" != "" ] && [ "$L1" != "\n" ] && echo "@Outdated:\n$L1"; ';
 
     my $response;
