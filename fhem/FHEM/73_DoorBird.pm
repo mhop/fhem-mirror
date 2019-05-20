@@ -34,7 +34,6 @@
 ########################################################################################################################
 # List of open Problems:
 #
-# Check problems with double relais readings after (re-)start of fhem
 # Check problems with error message after startup: "PERL WARNING: Prototype mismatch: sub main::memcmp: none vs ($$;$) at /usr/local/share/perl/5.24.1/Sub/Exporter.pm line 445."
 #
 #
@@ -50,7 +49,7 @@ use JSON;
 use HttpUtils;
 use Encode;
 use Cwd;
-use MIME::Base64 qw();
+use MIME::Base64;
 use Crypt::NaCl::Sodium qw( :utils );
 use Crypt::Argon2 qw/argon2i_raw/;
 use IO::Socket;
@@ -58,13 +57,6 @@ use LWP::UserAgent;
 use constant false => 0;
 use constant true  => 1;
 use Data::Dumper;
-use Alien::Sodium;
-
-my $cflags = Alien::Sodium->cflags;
-my $libs = Alien::Sodium->libs;
-
-sub DoorBird_Define($$);
-sub DoorBird_Undefine($$);
 
 ###START###### Initialize module ##############################################################################START####
 sub DoorBird_Initialize($)
@@ -110,7 +102,7 @@ sub DoorBird_Define($$)
 	my $url					= $a[2];
 
 	### Delete all Readings for DoorBird
-	fhem( "deletereading $name .*" );
+	readingsDelete($hash, ".*");
 
 	### Log Entry and state
 	Log3 $name, 4, $name. " : DoorBird - Starting to define device " . $name . " with DoorBird module";
@@ -184,6 +176,9 @@ sub DoorBird_Define($$)
 	  $hash->{helper}{EventReset}						= AttrVal($name, "EventReset", 5);
 	  $hash->{helper}{SessionId}						= 0;
 	  $hash->{helper}{UdpMessageId}						= 0;
+	  $hash->{helper}{UdpMotionId}						= 0;
+	  $hash->{helper}{UdpDoorbellId}					= 0;
+	  $hash->{helper}{UdpKeypadId}						= 0;
 	@{$hash->{helper}{RelayAdresses}}					= (0);
 	@{$hash->{helper}{Images}{History}{doorbell}}		= ();
 	@{$hash->{helper}{Images}{History}{motionsensor}}	= ();
@@ -191,7 +186,7 @@ sub DoorBird_Define($$)
 	  $hash->{helper}{Images}{Individual}{Timestamp}	= "";
 	  $hash->{helper}{HistoryDownloadActive} 			= false;
 	  $hash->{helper}{HistoryDownloadCount}	 			= 0;
-	  $hash->{reusePort} = AttrVal($name, 'reusePort', defined(&SO_REUSEPORT)?1:0)?1:0;
+	  $hash->{reusePort} 								= AttrVal($name, 'reusePort', defined(&SO_REUSEPORT)?1:0)?1:0;
 	  ####END####### Writing values to global hash ################################################################END#####
 
 	
@@ -268,7 +263,7 @@ sub DoorBird_Attr(@)
 			Log3 $name, 4, $name. " : DoorBird - InternalTimer has been removed.";
 
 			### Delete all Readings
-			fhem( "deletereading $name .*" );
+			readingsDelete($hash, ".*");
 
 			### Update STATE of device
 			readingsSingleUpdate($hash, "state", "disconnected", 1);
@@ -638,9 +633,13 @@ sub DoorBird_Set($@)
 
 ###START###### After return of UDP message ####################################################################START####
 sub DoorBird_Read($) {
-	my ($hash) = @_;
-	my $name = $hash->{NAME};
-	my $UdpMessageIdLast = $hash->{helper}{UdpMessageId};
+	my ($hash)            = @_;
+	my $name              = $hash->{NAME};
+	my $UdpMessageIdLast  = $hash->{helper}{UdpMessageId};
+	my $UdpMotionIdLast   = $hash->{helper}{UdpMotionId};
+	my $UdpDoorbellIdLast = $hash->{helper}{UdpDoorbellId};
+	my $UdpKeypadIdLast   = $hash->{helper}{UdpKeypadId};
+	
 	my $buf;
 	my $flags;
 	
@@ -918,42 +917,81 @@ sub DoorBird_Read($) {
 				
 					### If event has been triggered by motion sensor
 					if ($EVENT =~ m/motion/) {
-						### Update readings of device
-						readingsSingleUpdate($hash, "state", "motion detected", 1);
-						readingsSingleUpdate($hash, "motion_sensor", "triggered", 1);
-						
-						### Initiate the timer to reset reading "motion_sensor"
-						InternalTimer(gettimeofday()+ $hash->{helper}{EventReset}, "DoorBird_EventResetMotion", $hash, 0);
-						
-						### Log Entry
-						Log3 $name, 3, $name. " : Motion sensor detected a motion in front of DoorBird unit.";
-						Log3 $name, 5, $name. " : DoorBird_Read - Timer for reset reading in        : " . $hash->{helper}{EventReset};
+						### If the MessageID is integer type has not yet appeared yet
+						if ((int($TIMESTAMP) == $TIMESTAMP) && ($UdpMotionIdLast != $TIMESTAMP)) {
+
+							### Save Timestamp as new ID
+							$hash->{helper}{UdpMotionId} = $TIMESTAMP;
+							
+							### Update readings of device
+							readingsSingleUpdate($hash, "state", "motion detected", 1);
+							readingsSingleUpdate($hash, "motion_sensor", "triggered", 1);
+							
+							### Initiate the timer to reset reading "motion_sensor"
+							InternalTimer(gettimeofday()+ $hash->{helper}{EventReset}, "DoorBird_EventResetMotion", $hash, 0);
+							
+							### Log Entry
+							Log3 $name, 3, $name. " : Motion sensor detected a motion in front of DoorBird unit.";
+							Log3 $name, 5, $name. " : DoorBird_Read - Timer for reset reading in        : " . $hash->{helper}{EventReset};
+						}
+						### If the MessageID is integer type has appeared before
+						else {
+							### Do nothing
+							### Log Entry for debugging purposes
+							Log3 $name, 5, $name. " : DoorBird_Read - Motion sensor message already been sent. Ignoring it!";						
+						}
 					}
 					### If event has been triggered by keypad
 					elsif ($EVENT =~ m/keypad/) {
-						### Update readings of device
-						readingsSingleUpdate($hash, "state",  "keypad used!", 1);
-						readingsSingleUpdate($hash, "keypad", "triggered", 1);
-						
-						### Initiate the timer to reset reading "keypad"
-						InternalTimer(gettimeofday()+ $hash->{helper}{EventReset}, "DoorBird_EventResetKeypad", $hash, 0);
-						
-						### Log Entry
-						Log3 $name, 3, $name. " : The keypad of the DoorBird unit has been used.";
-						Log3 $name, 5, $name. " : DoorBird_Read - Timer for reset reading in        : " . $hash->{helper}{EventReset};
+						### If the MessageID is integer type has not yet appeared yet
+						if ((int($TIMESTAMP) == $TIMESTAMP) && ($UdpKeypadIdLast != $TIMESTAMP)) {
+
+							### Save Timestamp as new ID
+							$hash->{helper}{UdpKeypadId} = $TIMESTAMP;
+
+							### Update readings of device
+							readingsSingleUpdate($hash, "state",  "keypad used!", 1);
+							readingsSingleUpdate($hash, "keypad", "triggered", 1);
+							
+							### Initiate the timer to reset reading "keypad"
+							InternalTimer(gettimeofday()+ $hash->{helper}{EventReset}, "DoorBird_EventResetKeypad", $hash, 0);
+							
+							### Log Entry
+							Log3 $name, 3, $name. " : The keypad of the DoorBird unit has been used.";
+							Log3 $name, 5, $name. " : DoorBird_Read - Timer for reset reading in        : " . $hash->{helper}{EventReset};
+						}
+						### If the MessageID is integer type has appeared before
+						else {
+							### Do nothing
+							### Log Entry for debugging purposes
+							Log3 $name, 5, $name. " : DoorBird_Read - Keypad message already been sent. Ignoring it!";						
+						}
 					}
 					### If event has been triggered by doorbell
 					elsif ($EVENT =~ m/1/) {
-						### Update readings of device
-						readingsSingleUpdate($hash, "state", "doorbell pressed!", 1);
-						readingsSingleUpdate($hash, "doorbell_button", "triggered", 1);
-						
-						### Initiate the timer to reset reading "motion_sensor"
-						InternalTimer(gettimeofday()+ $hash->{helper}{EventReset}, "DoorBird_EventResetDoorbell", $hash, 0);
-						
-						### Log Entry
-						Log3 $name, 3, $name. " : The doorbell button of the DoorBird unit has been pressed.";
-						Log3 $name, 5, $name. " : DoorBird_Read - Timer for reset reading in        : " . $hash->{helper}{EventReset};
+						### If the MessageID is integer type has not yet appeared yet
+						if ((int($TIMESTAMP) == $TIMESTAMP) && ($UdpDoorbellIdLast != $TIMESTAMP)) {
+
+							### Save Timestamp as new ID
+							$hash->{helper}{UdpDoorbellId} = $TIMESTAMP;
+							
+							### Update readings of device
+							readingsSingleUpdate($hash, "state", "doorbell pressed!", 1);
+							readingsSingleUpdate($hash, "doorbell_button", "triggered", 1);
+							
+							### Initiate the timer to reset reading "motion_sensor"
+							InternalTimer(gettimeofday()+ $hash->{helper}{EventReset}, "DoorBird_EventResetDoorbell", $hash, 0);
+							
+							### Log Entry
+							Log3 $name, 3, $name. " : The doorbell button of the DoorBird unit has been pressed.";
+							Log3 $name, 5, $name. " : DoorBird_Read - Timer for reset reading in        : " . $hash->{helper}{EventReset};
+						}
+						### If the MessageID is integer type has appeared before
+						else {
+							### Do nothing
+							### Log Entry for debugging purposes
+							Log3 $name, 5, $name. " : DoorBird_Read - Doorbell message already been sent. Ignoring it!";						
+						}
 					}
 					### If the event has been triggered by unknown code
 					else {
@@ -1469,7 +1507,7 @@ sub DoorBird_Info_Request($$) {
 					Log3 $name, 5, $name. " : DoorBird_Info_Request - {helper}{RelayAdresses}   : " . join(",", @{$hash->{helper}{RelayAdresses}});
 					
 					### Delete all Readings for Relay-Addresses
-					fhem("deletereading $name RelayAddr_.*");
+					readingsDelete($hash, "RelayAddr_.*");
 					
 					### For all registred relays do
 					my $RelayNumber =0;
@@ -1481,7 +1519,7 @@ sub DoorBird_Info_Request($$) {
 						Log3 $name, 5, $name. " : DoorBird_Info_Request - Adress of " . sprintf("%15s %-s", "Relay_" . sprintf("%02d\n", $RelayNumber), ": " . $RelayAddress);
 						
 						### Update Reading
-						readingsBulkUpdate($hash, "RelayAddr_" . sprintf("%02d\n", $RelayNumber), $RelayAddress);
+						readingsBulkUpdate($hash, "RelayAddr_" . sprintf("%02d", $RelayNumber), $RelayAddress);
 					}
 				}
 				### For all other entries
@@ -2931,11 +2969,8 @@ sub DoorBird_BlockGet($$$$) {
 					<li>sudo apt-get install sox					</li>
 					<li>sudo apt-get install libsox-fmt-all			</li>
 					<li>sudo apt-get install libsodium-dev			</li>
-					<li>sudo cpan LWP::UserAgent					</li>
-					<li>sudo cpan Alien::Base::ModuleBuild			</li>
-					<li>sudo cpan Alien::Sodium					</li>
+					<li>sudo cpan Crypt::Argon2						</li>
 					<li>sudo cpan Crypt::NaCl::Sodium				</li>
-					<li>sudo cpan MIME::Base64						</li>
 				</code>
 			</td>
 		</tr>
@@ -3101,11 +3136,8 @@ sub DoorBird_BlockGet($$$$) {
 					<li>sudo apt-get install sox					</li>
 					<li>sudo apt-get install libsox-fmt-all			</li>
 					<li>sudo apt-get install libsodium-dev			</li>
-					<li>sudo cpan LWP::UserAgent					</li>
-					<li>sudo cpan Alien::Base::ModuleBuild			</li>
-					<li>sudo cpan Alien::Sodium					</li>
+					<li>sudo cpan Crypt::Argon2						</li>
 					<li>sudo cpan Crypt::NaCl::Sodium				</li>
-					<li>sudo cpan MIME::Base64						</li>
 				</code>
 			</td>
 		</tr>
@@ -3243,3 +3275,71 @@ sub DoorBird_BlockGet($$$$) {
 	</ul>
 </ul>
 =end html_DE
+
+=for :application/json;q=META.json 00_myModule.pm
+{
+  "abstract": "Connects fhem to the DoorBird IP door station",
+  "description": "The DoorBird module establishes the communication between the DoorBird - door intercommunication unit and the fhem home automation based on the official API, published by the manufacturer. Please make sure, that the user has been enabled the API-Operator button in the DoorBird Android/iPhone APP under Administration -> User -> Edit -> Permission -> API-Operator.",
+  "x_lang": {
+    "de": {
+      "abstract": "Verbindet fhem mit der DoorBird IP T&uuml;rstation",
+      "description": "Das DoorBird Modul erm&ouml;glicht die Komminikation zwischen der DoorBird Interkommunikationseinheit und dem fhem Automationssystem basierend auf der API des Herstellers her. F&uuml;r den vollen Funktionsumfang muss sichergestellt werden, dass das Setting "API-Operator" in der DoorBird Android/iPhone - APP unter Administration -> User -> Edit -> Permission -> API-Operator gesetzt ist."
+    }
+  },
+  "license": [
+    "apache_2_0",
+    "mozilla_1_0"
+  ],
+  "version": "v1.0.0",
+  "x_release_date": "1970-01-01",
+  "release_status": "stable",
+  "author": [
+    "Matthias Deeke <matthias.deeke@deeke.eu>"
+  ],
+  "x_fhem_maintainer": [
+    "maintainer-Sailor"
+  ],
+  "keywords": [
+    "Doorbird",
+    "fhem",
+    "Argon2i",
+    "ChaCha20-Poly1035",
+    "Intercom"
+  ],
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "FHEM": 5.00918623,
+        "FHEM::Meta": 0.001006,
+        "HttpUtils": 0,
+        "JSON": 0,
+        "perl": 5.014,
+		"Encode": 0,
+		"Cwd": 0,
+		"MIME::Base64": 0,
+		"Alien::Base::ModuleBuild": 0,
+		"Alien::Sodium": 0,
+		"Crypt::NaCl::Sodium": 0,
+		"Crypt::Argon2": 0,
+		"IO::Socket": 0,
+		"LWP::UserAgent": 0,
+		"Data::Dumper": 0
+      },
+      "recommends": {
+      },
+      "suggests": {
+      }
+    }
+  },
+  "resources": {
+    "x_support_community": {
+      "rss": "",
+      "title": "Door Bird und FHEM",
+      "web": "https://forum.fhem.de/index.php?topic=41758.msg",
+    }
+  },
+  "x_support_status": "supported"
+}
+=end :application/json;q=META.json
+
+=cut
