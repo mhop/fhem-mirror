@@ -32,11 +32,8 @@ sub TCM_Parse310($$$);
 sub TCM_CRC8($);
 sub TCM_CSUM($);
 
-sub
-TCM_Initialize($)
-{
+sub TCM_Initialize($) {
   my ($hash) = @_;
-
   require "$attr{global}{modpath}/FHEM/DevIo.pm";
 
 # Provider
@@ -61,11 +58,11 @@ TCM_Initialize($)
                       "dummy:1,0 fingerprint:off,on learningDev:all,teachMsg learningMode:always,demand,nearfield " .
                       "sendInterval:0,25,40,50,100,150,200,250 smartAckMailboxMax:slider,0,1,20 " .
                       "smartAckLearnMode:simple,advance,advanceSelectRep";
+  $hash->{NotifyOrderPrefix} = "45-";
 }
 
 # Define
-sub TCM_Define($$)
-{
+sub TCM_Define($$){
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
   my $name = $a[0];
@@ -95,9 +92,7 @@ sub TCM_Define($$)
 }
 
 # Initialize serial communication
-sub
-TCM_InitSerialCom($)
-{
+sub TCM_InitSerialCom($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
   if ($hash->{STATE} eq "disconnected") {
@@ -119,7 +114,7 @@ TCM_InitSerialCom($)
   } else {
     #TCM_ReadAnswer($hash, "set reset");
     #TCM_Read($hash);
-    #$hash->{PARTIAL} = '';
+    $hash->{PARTIAL} = '';
     delete $hash->{helper}{awaitCmdResp};
     TCM_Set($hash, @setCmd);
   }
@@ -139,14 +134,15 @@ TCM_InitSerialCom($)
       Log3 $name, 2, "TCM $name Attribute $_ $setAttrInit{$_}{$hash->{MODEL}} initialized";
     }
   }
-  # 500 ms pause
-  usleep(500 * 1000);
+  # 750 ms pause
+  usleep(750 * 1000);
   # read transceiver IDs
   my $baseID = AttrVal($name, "baseID", undef);
   if (defined($baseID)) {
     $hash->{BaseID} = $baseID;
     $hash->{LastID} = sprintf "%08X", (hex $baseID) + 127;
   } elsif ($comType ne "RS485" && $hash->{DeviceName} ne "none") {
+    #$hash->{PARTIAL} = '';
     my @getBaseID = ("get", "baseID");
     if (TCM_Get($hash, @getBaseID) =~ /[Ff]{2}[\dA-Fa-f]{6}/) {
       $hash->{BaseID} = sprintf "%08X", hex $&;
@@ -158,6 +154,7 @@ TCM_InitSerialCom($)
   }
   if ($hash->{MODEL} eq "ESP3" && $comType ne "RS485" && $hash->{DeviceName} ne "none") {
     # get chipID
+    #$hash->{PARTIAL} = '';
     my @getChipID = ('get', 'version');
     if (TCM_Get($hash, @getChipID) =~ m/ChipID:.([\dA-Fa-f]{8})/) {
       $hash->{ChipID} = sprintf "%08X", hex $1;
@@ -395,7 +392,7 @@ TCM_Read($)
       my $rest = substr($data, 28);
 
       if($crc ne $mycrc) {
-        Log3 $name, 2, "TCM $name wrong checksum: got $crc, computed $mycrc" ;
+        Log3 $name, 2, "TCM $name wrong data checksum: got $crc, computed $mycrc" ;
         $data = $rest;
         next;
       }
@@ -1099,7 +1096,7 @@ sub TCM_ReadAnswer($$)
           my $mycrc = TCM_CSUM($net);
           $hash->{PARTIAL} = substr($data, 28);
           if ($crc ne $mycrc) {
-            return ("wrong checksum: got $crc, computed $mycrc", undef);
+            return ("wrong data checksum: got $crc, computed $mycrc", undef);
           }
           return (undef, $net);
         }
