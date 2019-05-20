@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 49_SSCam.pm 19145 2019-04-07 19:46:23Z DS_Starter $
+# $Id: 49_SSCam.pm 19280 2019-04-28 17:20:21Z DS_Starter $
 #########################################################################################################################
 #       49_SSCam.pm
 #
@@ -48,6 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.13.4" => "03.05.2019  rec/snapemailtxt, rec/snaptelegramtxt can contain \":\", commandref revised ", 
   "8.13.3" => "28.04.2019  don't save private hash refs in central hash, \"repository\" added in Meta.json ",
   "8.13.2" => "07.04.2019  fix perl warning Forum: https://forum.fhem.de/index.php/topic,45671.msg927912.html#msg927912",
   "8.13.1" => "06.04.2019  verbose level in X_DelayedShutdown changed ",
@@ -895,7 +896,7 @@ sub SSCam_Set($@) {
 	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
       my $emtxt   = $hash->{HELPER}{SMTPRECMSG}?delete $hash->{HELPER}{SMTPRECMSG}:"";
       my $teletxt = $hash->{HELPER}{TELERECMSG}?delete $hash->{HELPER}{TELERECMSG}:"";
-      SSCam_camstoprec("$name:$emtxt:$teletxt");
+      SSCam_camstoprec("$name!_!$emtxt!_!$teletxt");
         
   } elsif ($opt eq "snap" && SSCam_IsModelCam($hash)) {
 	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
@@ -939,7 +940,7 @@ sub SSCam_Set($@) {
           $hash->{HELPER}{TELEMSG} = $teletxt;
       }
 	  
-      SSCam_camsnap("$name:$num:$lag:$ncount:$emtxt:$teletxt");
+      SSCam_camsnap("$name!_!$num!_!$lag!_!$ncount!_!$emtxt!_!$teletxt");
               
   } elsif ($opt eq "snapCams" && !SSCam_IsModelCam($hash)) {
 	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
@@ -1003,7 +1004,7 @@ sub SSCam_Set($@) {
               $cmail .= $cmail?", $key":$key;
               $emtxt  = $rawet;
           }
-          SSCam_camsnap("$key:$num:$lag:$ncount:$emtxt:$teletxt");
+          SSCam_camsnap("$key!_!$num!_!$lag!_!$ncount!_!$emtxt!_!$teletxt");
       }
       Log3($name, 4, "$name - Trigger snapshots by SVS - Number: $num, Lag: $lag, Snap only: \"$csnap\", Snap and send: \"$cmail\" ");
       
@@ -1907,7 +1908,7 @@ sub SSCam_initonboot ($) {
      if (ReadingsVal($hash->{NAME}, "Record", "Stop") eq "Start") {
          Log3($name, 2, "$name - Recording of $hash->{CAMNAME} seems to be still active after FHEM restart - try to stop it now");
          my ($emtxt,$teletxt) = ("","");
-         SSCam_camstoprec("$name:$emtxt:$teletxt");
+         SSCam_camstoprec("$name!_!$emtxt!_!$teletxt");
      }
          
      # Konfiguration der Synology Surveillance Station abrufen
@@ -2226,7 +2227,7 @@ sub SSCam_camstartrec ($) {
 ###############################################################################
 sub SSCam_camstoprec ($) {
     my ($str)                  = @_;
-	my ($name,$emtxt,$teletxt) = split(":",$str);
+	my ($name,$emtxt,$teletxt) = split("!_!",$str);
 	my $hash                   = $defs{$name};
     my $camname                = $hash->{CAMNAME};
     my $errorcode;
@@ -2274,7 +2275,7 @@ sub SSCam_camstoprec ($) {
         SSCam_getapisites($hash);
 		
     } else {
-        InternalTimer(gettimeofday()+0.3, "SSCam_camstoprec", "$name:$emtxt:$teletxt", 0);
+        InternalTimer(gettimeofday()+0.3, "SSCam_camstoprec", "$name!_!$emtxt!_!$teletxt", 0);
     }
 }
 
@@ -2376,7 +2377,7 @@ sub SSCam_cammotdetsc($) {
 ###############################################################################
 sub SSCam_camsnap($) {
     my ($str)            = @_;
-	my ($name,$num,$lag,$ncount,$emtxt,$teletxt,$tac) = split(":",$str);
+	my ($name,$num,$lag,$ncount,$emtxt,$teletxt,$tac) = split("!_!",$str);
 	my $hash             = $defs{$name};
     my $camname          = $hash->{CAMNAME};
     my $errorcode;
@@ -2425,7 +2426,7 @@ sub SSCam_camsnap($) {
 		
     } else {
         $tac = (defined $tac)?$tac:"";
-        InternalTimer(gettimeofday()+0.3, "SSCam_camsnap", "$name:$num:$lag:$ncount:$emtxt:$teletxt:$tac", 0);
+        InternalTimer(gettimeofday()+0.3, "SSCam_camsnap", "$name!_!$num!_!$lag!_!$ncount!_!$emtxt!_!$teletxt!_!$tac", 0);
     }    
 }
 
@@ -4950,7 +4951,7 @@ sub SSCam_camop_parse ($) {
                     my $emtxt   = $hash->{HELPER}{SMTPRECMSG}?$hash->{HELPER}{SMTPRECMSG}:"";
                     my $teletxt = $hash->{HELPER}{TELERECMSG}?$hash->{HELPER}{TELERECMSG}:"";
                     RemoveInternalTimer($hash, "SSCam_camstoprec");
-                    InternalTimer(gettimeofday()+$rectime, "SSCam_camstoprec", "$name:$emtxt:$teletxt");
+                    InternalTimer(gettimeofday()+$rectime, "SSCam_camstoprec", "$name!_!$emtxt!_!$teletxt");
                 }      
                 
                 SSCam_refresh($hash,0,0,1);    # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event
@@ -5258,7 +5259,7 @@ sub SSCam_camop_parse ($) {
                 my $emtxt   = $hash->{HELPER}{SMTPMSG}?$hash->{HELPER}{SMTPMSG}:"";  # Text für Email-Versand
 				my $teletxt = $hash->{HELPER}{TELEMSG}?$hash->{HELPER}{TELEMSG}:"";  # Text für TelegramBot-Versand
                 if($ncount > 0) {
-                    InternalTimer(gettimeofday()+$lag, "SSCam_camsnap", "$name:$num:$lag:$ncount:$emtxt:$teletxt:$tac", 0);
+                    InternalTimer(gettimeofday()+$lag, "SSCam_camsnap", "$name!_!$num!_!$lag!_!$ncount!_!$emtxt!_!$teletxt!_!$tac", 0);
                     if(!$tac) {
 					    SSCam_delActiveToken($hash);                               # Token freigeben wenn keine Transaktion läuft
 					}
@@ -8874,12 +8875,12 @@ sub SSCam_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 49_SSCam.pm 19145 2019-04-07 19:46:23Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 49_SSCam.pm 19280 2019-04-28 17:20:21Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCam.pm 19145 2019-04-07 19:46:23Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCam.pm 19280 2019-04-28 17:20:21Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -10154,7 +10155,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
       <tr><td style="vertical-align:top"> <b>snapEmailTxt</b> <td>- <b>Activates the Email shipping of snapshots.</b> This attribute has the format: <br>
                                                                   <code>subject => &lt;subject text&gt;, body => &lt;message text&gt; </code><br> 
                                                                   The placeholder $CAM, $DATE and $TIME can be used. <br> 
-																  Optionally you can specify the "snapEmailTxt:"-tag when trigger snap shot with the "snap"-command.
+																  Optionally you can specify the "snapEmailTxt:"-tag when trigger a snapshot with the "snap"-command.
                                                                   In this case the Email shipping is activated one-time for the snapshot or the tag-text 
                                                                   is used instead of the text defined in the "snapEmailTxt"-attribute. </td></tr>
       <tr><td style="vertical-align:top"> <b>recEmailTxt</b> <td>- <b>Activates the Email shipping of recordings.</b> This attribute has the format: <br>
@@ -10428,7 +10429,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <li><b>recEmailTxt subject => &lt;subject text&gt;, body => &lt;message text&gt; </b><br>
     Activates the Email shipping of recordings after whose creation. <br>
     The attribute has to be definied in the form as described. <br>    
-    You can use the placeholder in "subject" and "body". <br><br>
+    You can use the following placeholders in "subject" and "body". <br><br>
 	
 		<ul>   
 		<table>  
@@ -10450,12 +10451,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <a name="recTelegramTxt"></a>
   <li><b>snapTelegramTxt tbot => &lt;TelegramBot device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;subject text&gt;]  </b><br>
     Activates the permanent shipping of recordings by TelegramBot after their creation. <br>
-    The attribute has to be definied in the form as described. With key "tbot" the TelegramBot device is specified, which is 
-	used for shipping the data. Of course, the <a href="http://fhem.de/commandref.html#TelegramBot">TelegramBot device</a> 
+    The attribute has to be definied in the form as described. With key "tbot" the TelegramBot device is specified, 
+	which is used for shipping the data. Of course, the <a href="http://fhem.de/commandref.html#TelegramBot">TelegramBot device</a> 
     must be available and has to be running well. <br>
 	The setting of "peers" and "subject" is optional, but the keys must (empty) specified. 
 	If "peer" is empty, teh default peer of the TelegramBot is used. <br>
-	You can use the placeholder in "subject". <br><br>
+	You can use the following placeholders in "subject". <br><br>
 	
 		<ul>   
 		<table>  
@@ -10553,7 +10554,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <li><b>snapEmailTxt subject => &lt;subject text&gt;, body => &lt;message text&gt; </b><br>
     Activates the Email shipping of snapshots after whose creation. <br>
     The attribute has to be definied in the form as described. <br>
-    You can use the placeholder in "subject" and "body". <br><br>
+    You can use the following placeholders in "subject" and "body". <br><br>
 	
 		<ul>   
 		<table>  
@@ -10576,12 +10577,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <li><b>snapTelegramTxt tbot => &lt;TelegramBot device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;subject text&gt;]  </b><br>
     Activates the permanent shipping of snapshots by TelegramBot after their creation. If several snapshots were triggert, 
 	they will be sequentially delivered.<br>
-    The attribute has to be definied in the form as described. With key "tbot" the TelegramBot device is specified, which is 
-	used for shipping the data. Of course, the <a href="http://fhem.de/commandref.html#TelegramBot">TelegramBot device</a> 
+    The attribute has to be definied in the form as described. With key "tbot" the TelegramBot device is specified, 
+	which is used for shipping the data. Of course, the <a href="http://fhem.de/commandref.html#TelegramBot">TelegramBot device</a> 
     must be available and has to be running well. <br>
 	The setting of "peers" and "subject" is optional, but the keys must (empty) specified. 
 	If "peer" is empty, teh default peer of the TelegramBot is used. <br>
-	You can use the placeholder in "subject". <br><br>
+	You can use the following placeholders in "subject". <br><br>
 	
 		<ul>   
 		<table>  
@@ -11948,9 +11949,9 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
                                                                   <code>subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;</code><br>
                                                                   </ul>
                                                                   Es können die Platzhalter $CAM, $DATE und $TIME verwendet werden. <br>
-																  Der Email-Versand des letzten Schnappschusses wird einmalig aktiviert falls der "recEmailTxt:"-Tag 
+																  Der Email-Versand des letzten Schnappschusses wird einmalig aktiviert falls der "snapEmailTxt:"-Tag 
 																  beim "snap"-Kommando verwendet wird bzw. der in diesem Tag definierte Text statt des Textes im 
-																  Attribut "recEmailTxt" verwendet. </td></tr>
+																  Attribut "snapEmailTxt" verwendet. </td></tr>
       
       <tr><td style="vertical-align:top"> <b>recEmailTxt</b> <td>- <b>Aktiviert den Email-Versand von Aufnahmen</b>. 
                                                                   Das Attribut hat das Format: <br>
@@ -12235,7 +12236,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <li><b>recEmailTxt subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt; </b><br>
     Aktiviert den Emailversand von Aufnahmen nach deren Erstellung. <br>
     Das Attribut muß in der angegebenen Form definiert werden. <br>
-    Es können die Platzhalter im subject und body verwendet werden. <br><br>
+    Es können die folgenden Platzhalter im subject und body verwendet werden. <br><br>
 	
 		<ul>   
 		<table>  
@@ -12257,12 +12258,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <a name="recTelegramTxt"></a>
   <li><b>recTelegramTxt tbot => &lt;TelegramBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;]  </b><br>
     Aktiviert den permanenten Versand von Aufnahmen nach deren Erstellung per TelegramBot. <br>
-    Das Attribut muß in der angegebenen Form definiert werden. Im Schlüssel "tbot" ist das TelegramBot-Device anzugeben, welches für 
-	den Versand der Daten verwendet werden soll. Das <a href="http://fhem.de/commandref_DE.html#TelegramBot">TelegramBot-Device</a> muss natürlich
-	vorhanden und funktionstüchtig sein. <br>
+    Das Attribut muß in der angegebenen Form definiert werden. Im Schlüssel "tbot" ist das TelegramBot-Device 
+	anzugeben, welches für den Versand der Daten verwendet werden soll. 
+	Das <a href="http://fhem.de/commandref_DE.html#TelegramBot">TelegramBot-Device</a> muss natürlich vorhanden und funktionstüchtig sein. <br>
 	Die Angabe von "peers" und "subject" ist optional, jedoch muß der Schlüssel (leer) angegeben werden. 
 	Wurde "peer" leer gelassen, wird der Default-Peer des TelegramBot verwendet. <br>
-	Es können die Platzhalter im subject verwendet werden. <br><br>
+	Es können die folgenden Platzhalter im subject verwendet werden. <br><br>
 	
 		<ul>   
 		<table>  
@@ -12363,7 +12364,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     Aktiviert den Emailversand von Schnappschüssen nach deren Erstellung. Wurden mehrere Schnappschüsse ausgelöst, 
 	werden sie gemeinsam in einer Mail versendet. <br>
     Das Attribut muß in der angegebenen Form definiert werden. <br>
-    Es können die Platzhalter im subject und body verwendet werden. <br><br>
+    Es können die folgenden Platzhalter im subject und body verwendet werden. <br><br>
 	
 		<ul>   
 		<table>  
@@ -12386,9 +12387,9 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <li><b>snapTelegramTxt tbot => &lt;TelegramBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;]  </b><br>
     Aktiviert den permanenten Versand von Schnappschüssen nach deren Erstellung per TelegramBot. Wurden mehrere Schnappschüsse ausgelöst, 
 	werden sie sequentiell versendet.<br>
-    Das Attribut muß in der angegebenen Form definiert werden. Im Schlüssel "tbot" ist das TelegramBot-Device anzugeben, welches für 
-	den Versand der Daten verwendet werden soll. Das <a href="http://fhem.de/commandref_DE.html#TelegramBot">TelegramBot-Device</a> muss natürlich
-	vorhanden und funktionstüchtig sein. <br>
+    Das Attribut muß in der angegebenen Form definiert werden. Im Schlüssel "tbot" ist das TelegramBot-Device 
+	anzugeben, welches für den Versand der Daten verwendet werden soll. 
+	Das <a href="http://fhem.de/commandref_DE.html#TelegramBot">TelegramBot-Device</a> muss natürlich vorhanden und funktionstüchtig sein. <br>
 	Die Angabe von "peers" und "subject" ist optional, jedoch muß der Schlüssel (leer) angegeben werden. 
 	Wurde "peer" leer gelassen, wird der Default-Peer des TelegramBot verwendet. <br>
 	Es können die Platzhalter im subject verwendet werden. <br><br>
@@ -12595,6 +12596,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     "control",
     "PTZ",
     "Synology Surveillance Station",
+    "Cloudfree",
+    "official API",
     "MJPEG",
     "HLS",
     "RTSP"
