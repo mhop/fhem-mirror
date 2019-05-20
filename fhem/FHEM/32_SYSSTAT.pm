@@ -749,6 +749,7 @@ SYSSTAT_getStat($)
 =pod
 =item device
 =item summary    system statistics for the host FHEM runs on or a remote system
+=item summary_DE System-Statistiken f&uuml;r den FHEM Rechner oder ein entferntes System
 =begin html
 
 <a name="SYSSTAT"></a>
