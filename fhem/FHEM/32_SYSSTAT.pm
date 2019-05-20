@@ -629,6 +629,19 @@ SYSSTAT_getUptime($)
           $uptime += $minutes;
           $uptime *= 60;
           $uptime += $seconds;
+
+        } elsif( $uptime && $uptime =~ m/(\d+)\s\D+,\s(\d+):(\d+).\d+/ ) {
+          my $hours = $1;
+          my $minutes = $2;
+          my $seconds = $3;
+
+          $uptime = 0;
+          $uptime += $hours;
+          $uptime *= 60;
+          $uptime += $minutes;
+          $uptime *= 60;
+          $uptime += $seconds;
+
         }
       }
 
@@ -637,7 +650,6 @@ SYSSTAT_getUptime($)
 
   my $uptime = SYSSTAT_readFile($hash,"/proc/uptime","");
   if($uptime) {
-
     $uptime = $1 if ( $uptime && $uptime =~ /^\s*([0-9.]+)\s+([0-9.]+)/ );
 
     if( AttrVal($name, "uptime", 0) != 2 ) {
@@ -736,6 +748,7 @@ SYSSTAT_getStat($)
 
 =pod
 =item device
+=item summary    system statistics for the host FHEM runs on or a remote system
 =begin html
 
 <a name="SYSSTAT"></a>
