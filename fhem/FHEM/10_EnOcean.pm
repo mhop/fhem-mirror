@@ -445,6 +445,8 @@ my %EnO_eepConfig = (
   "N5.38.08" => {attr => {subType => "gateway", comMode => "confirm", eep => "A5-38-08", gwCmd => "switching", manufID => "00D", model => "Eltako_TF", teachMethod => "confirm", webCmd => "on:off"}},
   "G5.ZZ.ZZ" => {attr => {subType => "PM101", manufID => "005"}, GPLOT => "EnO_motion:Motion,EnO_brightness4:Brightness,"},
   "L6.02.01" => {attr => {subType => "smokeDetector.02", eep => "F6-05-02", manufID => "00D"}},
+  "ZZ.13.03" => {attr => {subType => "environmentApp", eep => "A5-13-03", devMode => "master", manufID => "7FF"}},
+  "ZZ.13.04" => {attr => {subType => "environmentApp", eep => "A5-13-04", devMode => "master", manufID => "7FF"}},
   "ZZ.ZZ.ZZ" => {attr => {subType => "raw"}}
 );
 
@@ -743,7 +745,10 @@ EnOcean_Initialize($)
                       "angleTime setCmdTrigger:man,refDev blockUnknownMSC:no,yes blockMotion:no,yes " .
                       "blockTemp:no,yes blockDisplay:no,yes blockDateTime:no,yes " .
                       "blockTimeProgram:no,yes blockOccupancy:no,yes blockSetpointTemp:no,yes " .
-                      "blockFanSpeed:no,yes blockKey:no,yes comMode:confirm,biDir,uniDir creator:autocreate,manual " .
+                      "blockFanSpeed:no,yes blockKey:no,yes " .
+                      "brightnessDayNight brightnessDayNightCtrl:custom,sensor brightnessDayNightDelay " .
+                      "brightnessSunny brightnessSunnySouth brightnessSunnyWest brightnessSunnyEast " .
+                      "brightnessSunnyDelay brightnessSunnySouthDelay brightnessSunnyWestDelay brightnessSunnyEastDelay " .                      "comMode:confirm,biDir,uniDir creator:autocreate,manual " .
                       "daylightSavingTime:supported,not_supported dataEnc:VAES,AES-CBC " .
                       "defaultChannel:" . join(",", @EnO_defaultChannel) . " " .
                       "demandRespAction demandRespRefDev demandRespMax:A0,AI,B0,BI,C0,CI,D0,DI ".
@@ -767,7 +772,7 @@ EnOcean_Initialize($)
                       "remoteManagement:client,manager,off rlcAlgo:no,2++,3++ rlcRcv rlcSnd rlcTX:true,false " .
                       "reposition:directly,opens,closes rltRepeat:16,32,64,128,256 rltType:1BS,4BS " .
                       "scaleDecimals:0,1,2,3,4,5,6,7,8,9 scaleMax scaleMin secMode:rcv,snd,bidir " .
-                      "secLevel:encapsulation,encryption,off sendDevStatus:no,yes sensorMode:switch,pushbutton " .
+                      "secLevel:encapsulation,encryption,off sendDevStatus:no,yes sendTimePeriodic sensorMode:switch,pushbutton " .
                       "serviceOn:no,yes settingAccuracy:high,low setpointRefDev setpointSummerMode:slider,0,5,100 " .
                       "signal:off,on signOfLife:off,on signOfLifeInterval setpointTempRefDev shutTime shutTimeCloses subDef " .
                       "subDef0 subDefI subDefA subDefB subDefC subDefD subDefH subDefW " .
@@ -776,9 +781,11 @@ EnOcean_Initialize($)
                       "switchHysteresis switchType:direction,universal,channel,central " .
                       "teachMethod:1BS,4BS,confirm,GP,RPS,smartAck,STE,UTE temperatureRefDev " .
                       "temperatureScale:C,F,default,no_change timeNotation:12,24,default,no_change " .
-                      "timeProgram1 timeProgram2 timeProgram3 timeProgram4 trackerWakeUpCycle:10,20,30,40,60,120,180,240,3600,86400 updateState:default,yes,no " .
+                      "timeProgram1 timeProgram2 timeProgram3 timeProgram4 trackerWakeUpCycle:10,20,30,40,60,120,180,240,3600,86400 " .
+                      "updateGlobalAttr:no,yes updateState:default,yes,no " .
                       "uteResponseRequest:yes,no " .
                       "wakeUpCycle:" . join(",", sort keys %wakeUpCycle) . " windowOpenCtrl:disable,enable " .
+                      "windSpeedWindy windSpeedStormy windSpeedWindyDelay windSpeedStormyDelay " .
                       $readingFnAttributes;
 
   for (my $i = 0; $i < @EnO_ptm200btn; $i++) {
@@ -795,6 +802,7 @@ EnOcean_Initialize($)
   } else {
     Log3 undef, 2, "EnOcean XML functions are not available.";
   }
+  #$hash->{NotifyOrderPrefix} = "45-";
   return undef;
 }
 
@@ -1091,9 +1099,9 @@ sub EnOcean_Define($$) {
   # device specific actions
   if (exists($attr{$name}{subType}) && $attr{$name}{subType} =~ m/^hvac\.0(1|4|6)$/) {
     # pid parameter
-    @{$hash->{helper}{calcPID}} = (undef, $hash, 'defined');
+    @{$hash->{helper}{calcPID}} = (undef, $hash, 'defined', '');
     $hash->{helper}{stopped} = 0;
-    #$hash->{helper}{adjust} = '';
+    #delete $hash->{helper}{adjust};
   }
 
   # all notifys needed
@@ -2763,10 +2771,44 @@ sub EnOcean_Set($@)
       }
       Log3 $name, 3, "EnOcean set $name $cmd";
 
+    } elsif ($st eq "environmentApp" && AttrVal($name, "devMode", "slave") eq "master") {
+      # sent EEP A5-13-03 / A5-13-04 telegram periodical (date, time)
+      $rorg = "A5";
+      if ($cmd eq "sendDate") {
+        my ($sec, $min, $hour, $day, $month, $year, $weekday, $dayOfYearTag, $summerTime) = localtime();
+        $updateState = 0;
+        $data = sprintf "%02X%02X%02X%02X", $day, $month + 1, $year - 100, 57;
+      } elsif ($cmd eq "sendTime") {
+        my ($sec, $min, $hour, $day, $month, $year, $weekday, $dayOfYearTag, $summerTime) = localtime();
+        my @weekday = (7, 1, 2, 3, 4, 5, 6);
+        $updateState = 0;
+        $data = sprintf "%02X%02X%02X%02X", $weekday[$weekday] << 5 | $hour, $min, $sec, 73;
+      } elsif ($cmd eq "start") {
+        $updateState = 3;
+        @{$hash->{helper}{periodic}{time}} = ($hash, 'time', $attr{$name}{sendTimePeriodic}, 0, -1, undef);
+        EnOcean_SndPeriodic($hash->{helper}{periodic}{time});
+      } elsif ($cmd eq "stop") {
+        $updateState = 3;
+        @{$hash->{helper}{periodic}{time}} = ($hash, 'time', 'off', 0, -1, undef);
+        EnOcean_SndPeriodic($hash->{helper}{periodic}{time});
+      } elsif ($cmd eq "teachDate") {
+        $attr{$name}{eep} = "A5-13-03";
+        my $manufID = uc(AttrVal($name, "manufID", "7FF"));
+        $updateState = 1;
+        $data = sprintf "%06X80", 0x13 << 18 | 3 << 11 | hex($manufID) & 0x7FF;
+      } elsif ($cmd eq "teachTime") {
+        $attr{$name}{eep} = "A5-13-04";
+        my $manufID = uc(AttrVal($name, "manufID", "7FF"));
+        $updateState = 1;
+        $data = sprintf "%06X80", 0x13 << 18 | 4 << 11 | hex($manufID) & 0x7FF;
+      } else {
+        return "Unknown argument " . $cmd . ", choose one of " . $cmdList . "sendDate:noArg sendTime:noArg start:noArg stop:noArg teachDate:noArg teachTime:noArg";
+      }
+      Log3 $name, 3, "EnOcean set $name $cmd";
+
     } elsif ($st eq "hvac.01" || $st eq "MD15") {
       # Battery Powered Actuator (EEP A5-20-01)
       # [Kieback&Peter MD15-FTL-xx]
-      $rorg = "A5";
       my $setpointTemp = ReadingsVal($name, "setpointTemp", 20);
       my $temperature = ReadingsVal($name, "temperature", 20);
       if ($cmd eq "setpoint") {
@@ -2776,7 +2818,7 @@ sub EnOcean_Set($@)
           readingsBulkUpdate($hash, "waitingCmds", $cmd);
           readingsEndUpdate($hash, 0);
           # stop PID regulator
-          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
           CommandDeleteReading(undef, "$name setpointTempSet");
           Log3 $name, 3, "EnOcean set $name $cmd $a[1]";
           shift(@a);
@@ -2795,7 +2837,7 @@ sub EnOcean_Set($@)
           readingsEndUpdate($hash, 0);
           # PID regulator active
           my $activatePID = AttrVal($name, 'pidCtrl', 'off') eq 'on' ? 'start' : 'stop';
-          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, $activatePID, '');
+          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, $activatePID, undef);
           CommandDeleteReading(undef, "$name setpointSet");
           Log3 $name, 3, "EnOcean set $name $cmd $setpointTemp";
           shift(@a);
@@ -2810,7 +2852,7 @@ sub EnOcean_Set($@)
         readingsBulkUpdate($hash, "waitingCmds", $cmd);
         readingsEndUpdate($hash, 0);
         # stop PID regulator
-        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
         CommandDeleteReading(undef, "$name setpointSet");
         CommandDeleteReading(undef, "$name setpointTempSet");
         Log3 $name, 3, "EnOcean set $name $cmd";
@@ -2834,7 +2876,7 @@ sub EnOcean_Set($@)
           readingsBulkUpdate($hash, "waitingCmds", $cmd);
           readingsEndUpdate($hash, 0);
           # stop PID regulator
-          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
           CommandDeleteReading(undef, "$name setpointTempSet");
           Log3 $name, 3, "EnOcean set $name $cmd $a[1]";
           shift(@a);
@@ -2853,7 +2895,7 @@ sub EnOcean_Set($@)
           readingsEndUpdate($hash, 0);
           # PID regulator active
           my $activatePID = AttrVal($name, 'pidCtrl', 'on') eq 'on' ? 'start' : 'stop';
-          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, $activatePID, '');
+          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, $activatePID, undef);
           CommandDeleteReading(undef, "$name setpointSet");
           Log3 $name, 3, "EnOcean set $name $cmd $setpointTemp";
           shift(@a);
@@ -2867,7 +2909,7 @@ sub EnOcean_Set($@)
         readingsBulkUpdate($hash, "waitingCmds", $cmd);
         readingsEndUpdate($hash, 0);
         # stop PID regulator
-        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
         CommandDeleteReading(undef, "$name setpointSet");
         CommandDeleteReading(undef, "$name setpointTempSet");
         Log3 $name, 3, "EnOcean set $name $cmd";
@@ -2893,7 +2935,7 @@ sub EnOcean_Set($@)
           readingsBulkUpdate($hash, "waitingCmds", $cmd);
           readingsEndUpdate($hash, 0);
           # stop PID regulator
-          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
           CommandDeleteReading(undef, "$name setpointTempSet");
           Log3 $name, 3, "EnOcean set $name $cmd $a[1]";
           shift(@a);
@@ -2912,7 +2954,7 @@ sub EnOcean_Set($@)
           readingsEndUpdate($hash, 0);
           # PID regulator active
           my $activatePID = AttrVal($name, 'pidCtrl', 'off') eq 'on' ? 'start' : 'stop';
-          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, $activatePID, '');
+          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, $activatePID, undef);
           CommandDeleteReading(undef, "$name setpointSet");
           Log3 $name, 3, "EnOcean set $name $cmd $setpointTemp";
           shift(@a);
@@ -2927,7 +2969,7 @@ sub EnOcean_Set($@)
         readingsBulkUpdate($hash, "waitingCmds", $cmd);
         readingsEndUpdate($hash, 0);
         # stop PID regulator
-        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
         CommandDeleteReading(undef, "$name setpointSet");
         CommandDeleteReading(undef, "$name setpointTempSet");
         CommandDeleteReading(undef, "$name alarm");
@@ -7857,7 +7899,7 @@ sub EnOcean_Parse($$)
       if (AttrVal($name, 'windowOpenCtrl', 'disable') eq 'enable' && $window eq 'open') {
         # valve will be closed if the window is open
         # deactivate PID regulator
-        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
         if ($operationMode eq 'setpoint') {
           readingsSingleUpdate($hash, 'setpointSetRestore', $setpointSet, 1);
         }
@@ -7873,7 +7915,7 @@ sub EnOcean_Parse($$)
 
       } elsif ($waitingCmds eq "valveOpens") {
         # deactivate PID regulator
-        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
         if ($operationMode eq 'setpoint') {
           readingsSingleUpdate($hash, 'setpointSetRestore', $setpointSet, 1);
         }
@@ -7912,14 +7954,14 @@ sub EnOcean_Parse($$)
           $waitingCmds = 0x10;
         }
         # stop PID regulator
-        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
         CommandDeleteReading(undef, "$name setpointSet");
         CommandDeleteReading(undef, "$name setpointTemp");
         CommandDeleteReading(undef, "$name setpointTempSet");
 
       } elsif ($waitingCmds eq "runInit") {
         # deactivate PID regulator
-        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
         if ($operationMode eq 'setpoint') {
           readingsSingleUpdate($hash, 'setpointSetRestore', $setpointSet, 1);
         }
@@ -7938,7 +7980,7 @@ sub EnOcean_Parse($$)
 
       } elsif ($waitingCmds eq "liftSet") {
         # deactivate PID regulator
-        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
         if ($operationMode eq 'setpoint') {
           readingsSingleUpdate($hash, 'setpointSetRestore', $setpointSet, 1);
         }
@@ -7957,7 +7999,7 @@ sub EnOcean_Parse($$)
 
       } elsif ($waitingCmds eq "setpoint") {
         # deactivate PID regulator
-        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
         if ($maintenanceMode eq "valveOpend:runInit") {
           $setpointSet = 100;
           $db[2] = 0x20;
@@ -7979,7 +8021,7 @@ sub EnOcean_Parse($$)
       } elsif ($waitingCmds eq "setpointTemp") {
         if ($maintenanceMode eq "valveOpend:runInit") {
           # deactivate PID regulator
-          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
           $setpointSet = 100;
           $db[2] = 0x20;
           readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
@@ -7990,11 +8032,11 @@ sub EnOcean_Parse($$)
         } else {
           if (AttrVal($name, "pidCtrl", 'on') eq 'on') {
             # activate PID regulator
-            ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'actuator', '');
+            ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'actuator', undef);
             $setpointSet = ReadingsVal($name, "setpointSet", $setpoint);
           } else {
             # deactivate PID regulator
-            ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+            ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
             # setpoint temperature
             $setpointSet = $setpointTempSet * 255 / 40;
             $setpointSelect = 4;
@@ -8010,7 +8052,7 @@ sub EnOcean_Parse($$)
 
       } elsif ($waitingCmds eq "summerMode") {
         # deactivate PID regulator
-        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
         if ($operationMode eq 'setpoint') {
           readingsSingleUpdate($hash, 'setpointSetRestore', $setpointSet, 1);
         }
@@ -8027,7 +8069,7 @@ sub EnOcean_Parse($$)
 
       } elsif ($operationMode eq "setpoint") {
         # deactivate PID regulator
-        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
         if ($maintenanceMode eq "valveOpend:runInit") {
           $setpointSet = 100;
           $db[2] = 0x20;
@@ -8046,7 +8088,7 @@ sub EnOcean_Parse($$)
       } elsif ($operationMode eq "setpointTemp") {
         if ($maintenanceMode eq "valveOpend:runInit") {
           # deactivate PID regulator
-          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
           $setpointSet = 100;
           $db[2] = 0x20;
           readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
@@ -8057,11 +8099,11 @@ sub EnOcean_Parse($$)
         } else {
           if (AttrVal($name, "pidCtrl", 'on') eq 'on') {
             # activate PID regulator
-            ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'actuator', '');
+            ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'actuator', undef);
             $setpointSet = ReadingsVal($name, "setpointSet", $setpointSet);
           } else {
             # deactivate PID regulator
-            ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+            ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
             # setpoint temperature
             $setpointSet = $setpointTempSet * 255 / 40;
             $setpointSelect = 4;
@@ -8076,7 +8118,7 @@ sub EnOcean_Parse($$)
 
       } elsif ($operationMode eq "summerMode") {
         # deactivate PID regulator
-        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
         $setpointSet = $setpointSummerMode;
         $db[2] = (40 - $temperature) * 255 / 40;
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
@@ -8086,7 +8128,7 @@ sub EnOcean_Parse($$)
 
        } elsif ($maintenanceMode eq "valveOpend:runInit") {
         # deactivate PID regulator
-        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
         $setpointSet = 100;
         $db[2] = 0x20;
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
@@ -8101,7 +8143,7 @@ sub EnOcean_Parse($$)
 
       } elsif ($maintenanceMode eq "valveClosed") {
         # stop PID regulator
-        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
         $setpointSet = 0;
         $db[2] = 0x20;
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
@@ -8264,7 +8306,7 @@ sub EnOcean_Parse($$)
 
       if ($waitingCmds eq "valveOpens") {
         # deactivate PID regulator
-        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
         $setpointSet = 100;
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
         push @event, "3:maintenanceMode:valveOpend:runInit";
@@ -8291,14 +8333,14 @@ sub EnOcean_Parse($$)
           $waitingCmds = 3;
         }
         # stop PID regulator
-        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
         CommandDeleteReading(undef, "$name setpointSet");
         CommandDeleteReading(undef, "$name setpointTemp");
         CommandDeleteReading(undef, "$name setpointTempSet");
 
       } elsif ($waitingCmds eq "runInit") {
         # deactivate PID regulator
-        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
         $setpointSet = 100;
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
         push @event, "3:maintenanceMode:runInit";
@@ -8311,7 +8353,7 @@ sub EnOcean_Parse($$)
 
       } elsif ($waitingCmds eq "setpoint") {
         # deactivate PID regulator
-        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
         if ($maintenanceMode eq "valveOpend:runInit") {
           $setpointSet = 100;
           readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
@@ -8331,7 +8373,7 @@ sub EnOcean_Parse($$)
       } elsif ($waitingCmds eq "setpointTemp") {
         if ($maintenanceMode eq "valveOpend:runInit") {
           # deactivate PID regulator
-          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
           $setpointSet = 100;
           readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
           push @event, "3:maintenanceMode:runInit";
@@ -8339,7 +8381,7 @@ sub EnOcean_Parse($$)
           $waitingCmds = 2;
         } else {
           # activate PID regulator
-          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, $activatePID, '');
+          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, $activatePID, undef);
           $setpointSet = ReadingsVal($name, "setpointSet", $setpoint);
           $setpointTemp = $setpointTempSet;
           push @event, "3:setpointTemp:$setpointTemp";
@@ -8353,7 +8395,7 @@ sub EnOcean_Parse($$)
 
       } elsif ($waitingCmds eq "summerMode") {
         # deactivate PID regulator
-        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
         $setpointSet = 100;
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
         push @event, "3:maintenanceMode:off";
@@ -8366,7 +8408,7 @@ sub EnOcean_Parse($$)
 
       } elsif ($operationMode eq "setpoint") {
         # deactivate PID regulator
-        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
         if ($maintenanceMode eq "valveOpend:runInit") {
           $setpointSet = 100;
           readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
@@ -8386,7 +8428,7 @@ sub EnOcean_Parse($$)
       } elsif ($operationMode eq "setpointTemp") {
         if ($maintenanceMode eq "valveOpend:runInit") {
           # deactivate PID regulator
-          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
           $setpointSet = 100;
           readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
           push @event, "3:maintenanceMode:off";
@@ -8394,7 +8436,7 @@ sub EnOcean_Parse($$)
           $waitingCmds = 2;
         } else {
           # activate PID regulator
-          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, $activatePID, '');
+          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, $activatePID, undef);
           $setpointSet = ReadingsVal($name, "setpointSet", $setpointSet);
           push @event, "3:setpointTemp:$setpointTemp";
           push @event, "3:maintenanceMode:off";
@@ -8407,7 +8449,7 @@ sub EnOcean_Parse($$)
 
       } elsif ($operationMode eq "summerMode") {
         # deactivate PID regulator
-        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
         $setpointSet = 100;
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
         push @event, "3:maintenanceMode:off";
@@ -8569,7 +8611,7 @@ sub EnOcean_Parse($$)
       if (AttrVal($name, 'windowOpenCtrl', 'disable') eq 'enable' && $window eq 'open') {
         # valve will be closed if the window is open
         # deactivate PID regulator
-        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
         if ($operationMode eq 'setpoint') {
           readingsSingleUpdate($hash, 'setpointSetRestore', $setpointSet, 1);
         }
@@ -8584,7 +8626,7 @@ sub EnOcean_Parse($$)
 
       } elsif ($waitingCmds eq "runInit") {
         # deactivate PID regulator
-        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
         if ($operationMode eq 'setpoint') {
           readingsSingleUpdate($hash, 'setpointSetRestore', $setpointSet, 1);
         }
@@ -8597,7 +8639,7 @@ sub EnOcean_Parse($$)
 
       } elsif ($waitingCmds eq "standby") {
         # deactivate PID regulator
-        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
         if ($operationMode eq 'setpoint') {
           readingsSingleUpdate($hash, 'setpointSetRestore', $setpointSet, 1);
         }
@@ -8611,7 +8653,7 @@ sub EnOcean_Parse($$)
 
       } elsif ($waitingCmds eq "setpoint") {
         # deactivate PID regulator
-        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
         push @event, "3:maintenanceMode:off";
         push @event, "3:operationMode:setpoint";
         CommandDeleteReading(undef, "$name setpointTemp");
@@ -8622,11 +8664,11 @@ sub EnOcean_Parse($$)
       } elsif ($waitingCmds eq "setpointTemp") {
         if (AttrVal($name, "pidCtrl", 'on') eq 'on') {
           # activate PID regulator
-          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'actuator', '');
+          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'actuator', undef);
           $setpointSet = ReadingsVal($name, "setpointSet", $setpoint);
         } else {
           # deactivate PID regulator
-          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
           # setpoint temperature
           $setpointSet = int($setpointTempSet * 2);
           $setpointSelect = 4;
@@ -8641,7 +8683,7 @@ sub EnOcean_Parse($$)
 
       } elsif ($waitingCmds eq "summerMode") {
         # deactivate PID regulator
-        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
         if ($operationMode eq 'setpoint') {
           readingsSingleUpdate($hash, 'setpointSetRestore', $setpointSet, 1);
         }
@@ -8657,7 +8699,7 @@ sub EnOcean_Parse($$)
 
       } elsif ($operationMode eq "setpoint") {
         # deactivate PID regulator
-        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
         push @event, "3:maintenanceMode:off";
         push @event, "3:operationMode:setpoint";
         $waitingCmds = 0;
@@ -8665,11 +8707,11 @@ sub EnOcean_Parse($$)
       } elsif ($operationMode eq "setpointTemp") {
         if (AttrVal($name, "pidCtrl", 'on') eq 'on') {
           # activate PID regulator
-          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'actuator', '');
+          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'actuator', undef);
           $setpointSet = ReadingsVal($name, "setpointSet", $setpointSet);
         } else {
           # deactivate PID regulator
-          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
           # setpoint temperature
           $setpointSet = int($setpointTempSet * 2);
           $setpointSelect = 4;
@@ -8682,7 +8724,7 @@ sub EnOcean_Parse($$)
 
       } elsif ($operationMode eq "summerMode") {
         # deactivate PID regulator
-        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef);
         $setpointSet = $setpointSummerMode;
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
         push @event, "3:maintenanceMode:off";
@@ -10100,35 +10142,62 @@ sub EnOcean_Parse($$)
         # $db[0]_bit_2 is day / night where 0 = day, 1 = night
         # $db[0]_bit_1 is rain indication where 0 = no (no rain), 1 = yes (rain)
         my $dawn = sprintf "%d", $db[3] * 999 / 255;
+        $hash->{helper}{brightness} = $dawn;
+        if (exists($hash->{helper}{sunMax}) && $hash->{helper}{sunMax} >= 1000) {
+          $dawn = $hash->{helper}{sunMax}
+        } else {
+          push @event, "3:brightness:$dawn";
+        }
         my $temp = sprintf "%0.1f", -40 + $db[2] * 120 / 255;
         my $windSpeed = sprintf "%0.1f", $db[1] * 70 / 255;
-        my $dayNight = $db[0] & 4 ? "night" : "day";
+        my $dayNight;
+        if (AttrVal($name, "brightnessDayNightCtrl", 'sensor') eq 'sensor') {
+          $dayNight = $db[0] & 4 ? "night" : "day";
+        } else {
+          $dayNight = EnOcean_swayCtrl($hash, "dayNight", $dawn, "brightnessDayNight", "brightnessDayNightDelay", 10, 20, 600, 600, 'night', 'day');
+        }
         my $isRaining = $db[0] & 2 ? "yes" : "no";
         my @windStrength = (0.2, 1.5, 3.3, 5.4, 7.9, 10.7, 13.8, 17.1, 20.7, 24.4, 28.4, 32.6);
         my $windStrength = 0;
         while($windSpeed > $windStrength[$windStrength] && $windStrength <= @windStrength + 1) {
           $windStrength ++;
         }
-        push @event, "3:brightness:$dawn";
         push @event, "3:dayNight:$dayNight";
         push @event, "3:isRaining:$isRaining";
         push @event, "3:temperature:$temp";
         push @event, "3:windSpeed:$windSpeed";
         push @event, "3:windStrength:$windStrength";
+        push @event, "3:isStormy:" . EnOcean_swayCtrl($hash, "isStormy", $windSpeed, "windSpeedStormy", "windSpeedStormyDelay", 13.9, 17.2, 60, 3, 'no', 'yes');
+        push @event, "3:isWindy:" . EnOcean_swayCtrl($hash, "isWindy", $windSpeed, "windSpeedWindy", "windSpeedWindyDelay", 1.6, 3.4, 60, 3, 'no', 'yes');
         push @event, "3:state:T: $temp B: $dawn W: $windSpeed IR: $isRaining";
       } elsif ($identifier == 2) {
         # Sun Intensity (EEP A5-13-02)
-        # $db[3] is the sun exposure west where 0x00 = 1 klx ... 0xFF = 150 klx
-        # $db[2] is the sun exposure south where 0x00 = 1 klx ... 0xFF = 150 klx
-        # $db[1] is the sun exposure east where 0x00 = 1 klx ... 0xFF = 150 klx
+        # $db[3] is the sun exposure west where 0x00 = 0 klx ... 0xFF = 150 klx
+        # $db[2] is the sun exposure south where 0x00 = 0 klx ... 0xFF = 150 klx
+        # $db[1] is the sun exposure east where 0x00 = 0 klx ... 0xFF = 150 klx
         # $db[0]_bit_2 is hemisphere where 0 = north, 1 = south
+        my $brightness = exists($hash->{helper}{brightness}) ? $hash->{helper}{brightness} : 0;
+        my $sunWest = sprintf "%d", $db[3] * 150000 / 255;
+        my $sunSouth = sprintf "%d", $db[2] * 150000 / 255;
+        my $sunEast = sprintf "%d", $db[1] * 150000 / 255;
+        my @sunlight = ($sunSouth, $sunWest, $sunEast);
+        my ($sunMin, $sunMax) = (sort {$a <=> $b} @sunlight)[0,-1];
+        $hash->{helper}{sunMax} = $sunMax;
+        $sunSouth = $sunSouth < 1000 ? $brightness : $sunSouth;
+        $sunWest = $sunWest < 1000 ? $brightness : $sunWest;
+        $sunEast = $sunEast < 1000 ? $brightness : $sunEast;
+        push @event, "3:brightness:$sunMax" if ($sunMax > 999);
         push @event, "3:hemisphere:" . ($db[0] & 4 ? "south" : "north");
-        push @event, "3:sunWest:" . sprintf "%d", 1 + $db[3] * 149999 / 255;
-        push @event, "3:sunSouth:" . sprintf "%d", 1 + $db[2] * 149999 / 255;
-        push @event, "3:sunEast:" . sprintf "%d", 1 + $db[1] * 149999 / 255;
+        push @event, "3:sunWest:$sunWest";
+        push @event, "3:sunSouth:$sunSouth";
+        push @event, "3:sunEast:$sunEast";
+        push @event, "3:isSunny:" . EnOcean_swayCtrl($hash, "isSunny", $brightness, "brightnessSunny", "brightnessSunnyDelay", 20000, 40000, 120, 30, 'no', 'yes');
+        push @event, "3:isSunnySouth:" . EnOcean_swayCtrl($hash, "isSunnySouth", $sunSouth, "brightnessSunnySouth", "brightnessSunnySouthDelay", 20000, 40000, 120, 30, 'no', 'yes');
+        push @event, "3:isSunnyWest:" . EnOcean_swayCtrl($hash, "isSunnyWest", $sunSouth, "brightnessSunnyWest", "brightnessSunnyWestDelay", 20000, 40000, 120, 30, 'no', 'yes');
+        push @event, "3:isSunnyEast:" . EnOcean_swayCtrl($hash, "isSunnyEast", $sunSouth, "brightnessSunnyEast", "brightnessSunnyEastDelay", 20000, 40000, 120, 30, 'no', 'yes');
       } elsif ($identifier == 3) {
         # Date exchange (EEP A5-13-03)
-        push @event, "3:date:" .  ($db[1] + 2000) . '-' . $db[2] . '-' . $db[3];
+        push @event, "3:date:" . sprintf("%04d-%02d-%02d", $db[1] + 2000, $db[2], $db[3]);
       } elsif ($identifier == 4) {
         # Time und Day exchange (EEP A5-13-04)
         my @day = ('', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday');
@@ -10136,17 +10205,20 @@ sub EnOcean_Parse($$)
         push @event, "3:weekday:" . $day[$day];
         if ($db[0] & 4) {
           # 12 h time format
-          push @event, "3:time:" . ($db[3] & 0x1F) . ':' . $db[2] . ':' . $db[1] . ' ' . ($db[1] & 2 ? 'PM' : 'AM');
+          push @event, "3:time:" . sprintf("%02d:%02d:%02d", ($db[3] & 0x1F), $db[2], $db[1]) . ' ' . ($db[0] & 2 ? 'PM' : 'AM');
         } else {
-          push @event, "3:time:" . ($db[3] & 0x1F) . ':' . $db[2] . ':' . $db[1];
+          push @event, "3:time:" . sprintf("%02d:%02d:%02d", ($db[3] & 0x1F), $db[2], $db[1]);
         }
         push @event, "3:timeSource:" . ($db[0] & 1 ? 'GPS' : 'RTC');
-
       } elsif ($identifier == 5) {
         # Direction exchange (EEP A5-13-05)
-        push @event, "3:elevation:" . ($db[3] - 90);
+        my $elevation = $db[3] - 90;
+        push @event, "3:elevation:$elevation";
         push @event, "3:azimuth:" . hex(substr($data, 2, 4));
-
+        my $twilight = ($elevation + 12) / 18 * 100;
+        $twilight = 0 if ($twilight < 0);
+        $twilight = 100 if ($twilight > 100);
+        push @event, "3:twilight:" . int($twilight);
       } elsif ($identifier == 6) {
         # Geographic Position exchange (EEP A5-13-06)
         push @event, "3:latitude:" . sprintf("%0.3f", hex(substr($data, 0, 1) . substr($data, 2, 2)) / 22.75 - 90);
@@ -13025,6 +13097,37 @@ sub EnOcean_Attr(@)
       $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
+  } elsif ($attrName eq "brightnessDayNightCtrl") {
+    if (!defined $attrVal) {
+
+    } elsif ($attrVal !~ m/^custom|sensor$/) {
+      $err = "attribute-value [$attrName] = $attrVal wrong";
+      CommandDeleteAttr(undef, "$name $attrName");
+    }
+
+  } elsif ($attrName =~ m/^brightness(DayNight|Sunny).*$/) {
+    if (!defined $attrVal) {
+
+    } else {
+      my ($attrVal0, $attrVal1) = split(':', $attrVal);
+      if (!defined($attrVal0) && !defined($attrVal1)) {
+
+      } else {
+        if (!defined $attrVal0 || $attrVal0 eq '') {
+
+        } elsif ($attrVal0 !~ m/^[+]?\d+$/ || $attrVal0 + 0 > 99000) {
+          $err = "attribute-value [$attrName] = $attrVal wrong";
+          CommandDeleteAttr(undef, "$name $attrName");
+        }
+        if (!defined $attrVal1 || $attrVal1 eq '') {
+
+        } elsif ($attrVal1 !~ m/^[+]?\d+$/ || $attrVal1 + 0 > 99000) {
+          $err = "attribute-value [$attrName] = $attrVal wrong";
+          CommandDeleteAttr(undef, "$name $attrName");
+        }
+      }
+    }
+
   } elsif ($attrName eq "comMode") {
     if (!defined $attrVal){
 
@@ -13334,9 +13437,9 @@ sub EnOcean_Attr(@)
     if (!defined $attrVal){
 
     } elsif (lc($attrVal) eq "on") {
-      EnOcean_setPID(undef, $hash, 'start', ReadingsVal($name, "setpoint", ''));
+      EnOcean_setPID(undef, $hash, 'start', ReadingsVal($name, "setpoint", undef));
     } elsif (lc($attrVal) eq "off") {
-      EnOcean_setPID(undef, $hash, 'stop', '');
+      EnOcean_setPID(undef, $hash, 'stop', undef);
     } else {
       $err = "attribute-value [$attrName] = $attrVal wrong";
     }
@@ -13575,6 +13678,16 @@ sub EnOcean_Attr(@)
       $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
+  } elsif ($attrName eq "sendTimePeriodic") {
+    if (!defined $attrVal){
+
+    } elsif ($attrVal =~ m/^\d+|off$/) {
+      @{$hash->{helper}{periodic}{time}} = ($hash, 'time', $attrVal, 0, -1, undef);
+      EnOcean_SndPeriodic($hash->{helper}{periodic}{time});
+    } else {
+      $err = "attribute-value [$attrName] = $attrVal wrong";
+    }
+
   } elsif ($attrName eq "serviceOn") {
     if (!defined $attrVal){
 
@@ -13760,6 +13873,14 @@ sub EnOcean_Attr(@)
       $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
+  } elsif ($attrName eq "updateGlobalAttr") {
+    if (!defined $attrVal) {
+
+    } elsif ($attrVal !~ m/^yes|no$/) {
+      $err = "attribute-value [$attrName] = $attrVal wrong";
+      CommandDeleteAttr(undef, "$name $attrName");
+    }
+
   } elsif ($attrName eq "updateState") {
     if (!defined $attrVal){
 
@@ -13811,6 +13932,26 @@ sub EnOcean_Attr(@)
       $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
+  } elsif ($attrName =~ m/^windSpeed.*$/) {
+    my ($attrVal0, $attrVal1) = split(':', $attrVal);
+    if (!defined $attrVal1) {
+      if (!defined $attrVal0) {
+
+      } elsif ($attrVal0 !~ m/^[+]?\d+(\.\d)?$/ || $attrVal0 + 0 > 35) {
+        $err = "attribute-value [$attrName] = $attrVal wrong";
+        CommandDeleteAttr(undef, "$name $attrName");
+      }
+    } elsif ($attrVal1 !~ m/^[+]?\d+(\.\d)?$/ || $attrVal1 + 0 > 35) {
+      $err = "attribute-value [$attrName] = $attrVal wrong";
+      CommandDeleteAttr(undef, "$name $attrName");
+    } else {
+      if (!defined $attrVal0) {
+
+      } elsif ($attrVal0 !~ m/^[+]?\d+(\.\d)?$/ || $attrVal0 + 0 > 35) {
+        $err = "attribute-value [$attrName] = $attrVal wrong";
+        CommandDeleteAttr(undef, "$name $attrName");
+      }
+    }
   }
   return $err;
 }
@@ -13915,12 +14056,17 @@ sub EnOcean_Notify(@)
     } elsif ($devName eq "global" && $s =~ m/^DEFINED ([^ ]*)$/) {
       my $definedName = $1;
       if ($name eq $definedName) {
-        if (exists($attr{$name}{subType}) && $attr{$name}{subType} =~ m/^hvac\.0(1|4|6)$/) {
-          # control PID regulatior
-          if (AttrVal($name, 'pidCtrl', 'on') eq 'on' && ReadingsVal($name, 'maintenanceMode', 'off') eq 'off') {
-            EnOcean_setPID(undef, $hash, 'start', ReadingsVal($name, "setpoint", ''));
-          } else {
-            EnOcean_setPID(undef, $hash, 'stop', '');
+        if (exists $attr{$name}{subType}) {
+          if ($attr{$name}{subType} =~ m/^hvac\.0(1|4|6)$/) {
+            # control PID regulatior
+            if (AttrVal($name, 'pidCtrl', 'on') eq 'on' && ReadingsVal($name, 'maintenanceMode', 'off') eq 'off') {
+              EnOcean_setPID(undef, $hash, 'start', ReadingsVal($name, "setpoint", undef));
+            } else {
+              EnOcean_setPID(undef, $hash, 'stop', undef);
+            }
+          } elsif ($attr{$name}{subType} eq 'environmentApp' && AttrVal($name, 'devMode', 'slave') eq 'master') {
+            @{$hash->{helper}{periodic}{time}} = ($hash, 'time', $attr{$name}{sendTimePeriodic}, 30, -1, undef);
+            EnOcean_SndPeriodic($hash->{helper}{periodic}{time});
           }
         }
       }
@@ -13936,18 +14082,23 @@ sub EnOcean_Notify(@)
       if (AttrVal($name ,"subType", "") eq "roomCtrlPanel.00") {
         CommandDeleteReading(undef, "$name waitingCmds");
       }
-      if (exists($attr{$name}{subType}) && $attr{$name}{subType} =~ m/^hvac\.0(1|4|6)$/) {
-        # control PID regulatior
-        if (AttrVal($name, 'pidCtrl', 'on') eq 'on' && ReadingsVal($name, 'maintenanceMode', 'off') eq 'off') {
-          EnOcean_setPID(undef, $hash, 'start', ReadingsVal($name, "setpoint", ''));
-        } else {
-          EnOcean_setPID(undef, $hash, 'stop', '');
+      if (exists $attr{$name}{subType}) {
+        if ($attr{$name}{subType} =~ m/^hvac\.0(1|4|6)$/) {
+          # control PID regulatior
+          if (AttrVal($name, 'pidCtrl', 'on') eq 'on' && ReadingsVal($name, 'maintenanceMode', 'off') eq 'off') {
+            EnOcean_setPID(undef, $hash, 'start', ReadingsVal($name, "setpoint", undef));
+          } else {
+            EnOcean_setPID(undef, $hash, 'stop', undef);
+          }
+        } elsif ($attr{$name}{subType} eq 'environmentApp' && AttrVal($name, 'devMode', 'slave') eq 'master') {
+          @{$hash->{helper}{periodic}{time}} = ($hash, 'time', $attr{$name}{sendTimePeriodic}, 30, -1, undef);
+          EnOcean_SndPeriodic($hash->{helper}{periodic}{time});
+        } elsif ($attr{$name}{subType} eq "switch.05") {
+          my @getCmd = ($name, 'state');
+          EnOcean_Get($hash, @getCmd);
         }
       }
-      if (exists($attr{$name}{subType}) && $attr{$name}{subType} eq "switch.05") {
-        my @getCmd = ($name, 'state');
-        EnOcean_Get($hash, @getCmd);
-      }
+
       EnOcean_ReadDevDesc(undef, $hash);
       #Log3($name, 2, "EnOcean $name <notify> INITIALIZED");
 
@@ -13959,12 +14110,17 @@ sub EnOcean_Notify(@)
       if (AttrVal($name ,"subType", "") eq "roomCtrlPanel.00") {
         CommandDeleteReading(undef, "$name waitingCmds");
       }
-      if (exists($attr{$name}{subType}) && $attr{$name}{subType} =~ m/^hvac\.0(1|4|6)$/) {
-        # control PID regulatior
-        if (AttrVal($name, 'pidCtrl', 'on') eq 'on' && ReadingsVal($name, 'maintenanceMode', 'off') eq 'off') {
-          EnOcean_setPID(undef, $hash, 'start', ReadingsVal($name, "setpoint", ''));
-        } else {
-          EnOcean_setPID(undef, $hash, 'stop', '');
+      if (exists $attr{$name}{subType}) {
+        if ($attr{$name}{subType} =~ m/^hvac\.0(1|4|6)$/) {
+          # control PID regulatior
+          if (AttrVal($name, 'pidCtrl', 'on') eq 'on' && ReadingsVal($name, 'maintenanceMode', 'off') eq 'off') {
+            EnOcean_setPID(undef, $hash, 'start', ReadingsVal($name, "setpoint", undef));
+          } else {
+            EnOcean_setPID(undef, $hash, 'stop', undef);
+          }
+        } elsif ($attr{$name}{subType} eq 'environmentApp' && AttrVal($name, 'devMode', 'slave') eq 'master') {
+          @{$hash->{helper}{periodic}{time}} = ($hash, 'time', $attr{$name}{sendTimePeriodic}, 30, -1, undef);
+          EnOcean_SndPeriodic($hash->{helper}{periodic}{time});
         }
       }
 
@@ -14187,6 +14343,84 @@ sub EnOcean_Notify(@)
   return undef;
 }
 
+sub EnOcean_swayCtrl($$$$$$$$$$$) {
+  # sway range and delay calculation
+  my ($hash, $readingName, $readingVal, $attrNameRange, $attrNameDelay, $swayRangeLow, $swayRangeHigh, $swayDelayLow, $swayDelayHigh, $swayRangeLowVal, $swayRangeHighVal) = @_;
+  my ($swayRangeLowAttr, $swayRangeHighAttr) = split(':', AttrVal($hash->{NAME}, $attrNameRange, "$swayRangeLow:$swayRangeHigh"));
+  my ($swayDelayLowAttr, $swayDelayHighAttr) = split(':', AttrVal($hash->{NAME}, $attrNameDelay, "$swayDelayLow:$swayDelayHigh"));
+  my $swayValLast = exists($hash->{helper}{sway}{$readingName}) ? $hash->{helper}{sway}{$readingName} : $swayRangeLowVal;
+  my $swayVal = $swayValLast;
+  if (!defined($swayRangeLowAttr) && !defined($swayRangeHighAttr)) {
+    $swayRangeLowAttr = $swayRangeLow;
+    $swayRangeHighAttr = $swayRangeHigh;
+  } elsif (!defined($swayRangeLowAttr) && $swayRangeHighAttr eq '' || !defined($swayRangeHighAttr) && $swayRangeLowAttr eq '') {
+    $swayRangeLowAttr = $swayRangeLow;
+    $swayRangeHighAttr = $swayRangeHigh;
+  } elsif ($swayRangeHighAttr eq '' && $swayRangeLowAttr eq '') {
+    $swayRangeLowAttr = $swayRangeLow;
+    $swayRangeHighAttr = $swayRangeHigh;
+  } elsif ($swayRangeLowAttr eq '') {
+    $swayRangeLowAttr = $swayRangeHighAttr;
+  } elsif ($swayRangeHighAttr eq '') {
+    $swayRangeHighAttr = $swayRangeLowAttr;
+  }
+  ($swayRangeLowAttr, $swayRangeHighAttr) = ($swayRangeHighAttr, $swayRangeLowAttr) if ($swayRangeLowAttr > $swayRangeHighAttr);
+  if ($readingVal < $swayRangeLowAttr) {
+    $swayVal = $swayRangeLowVal;
+  } elsif ($readingVal >= $swayRangeHighAttr) {
+    $swayVal = $swayRangeHighVal;
+  } elsif ($readingVal >= $swayRangeLowAttr && $swayVal eq $swayRangeLowVal) {
+    $swayVal = $swayRangeLowVal;
+  } elsif ($readingVal < $swayRangeHighAttr && $swayVal eq $swayRangeHighVal) {
+    $swayVal = $swayRangeHighVal;
+  }
+  if (!defined($swayDelayLowAttr) && !defined($swayDelayHighAttr)) {
+    $swayDelayLowAttr = $swayDelayLow;
+    $swayDelayHighAttr = $swayDelayHigh;
+  } elsif (!defined($swayDelayLowAttr) && $swayDelayHighAttr eq '' || !defined($swayDelayHighAttr) && $swayDelayLowAttr eq '') {
+    $swayDelayLowAttr = $swayDelayLow;
+    $swayDelayHighAttr = $swayDelayHigh;
+  } elsif ($swayDelayHighAttr eq '' && $swayDelayLowAttr eq '') {
+    $swayDelayLowAttr = $swayDelayLow;
+    $swayDelayHighAttr = $swayDelayHigh;
+  } elsif ($swayDelayLowAttr eq '') {
+    $swayDelayLowAttr = $swayDelayHighAttr;
+  } elsif ($swayDelayHighAttr eq '') {
+    $swayDelayHighAttr = $swayDelayLowAttr;
+  }
+  if ($swayVal eq $swayValLast) {
+    $hash->{helper}{sway}{$readingName} = $swayVal;
+    if (exists $hash->{helper}{timer}{sway}{$readingName}{delay}) {
+      # clear timer as sway reverses
+      RemoveInternalTimer($hash->{helper}{timer}{sway}{$readingName}{delay});
+      delete $hash->{helper}{timer}{sway}{$readingName}{delay};
+    }
+  } else {
+    $hash->{helper}{sway}{$readingName} = $swayValLast;
+    my $swayDelay = $swayVal eq $swayRangeHighVal ? $swayDelayHighAttr : $swayDelayLowAttr;
+    if (exists $hash->{helper}{timer}{sway}{$readingName}{delay}) {
+      $swayVal = $swayValLast;
+    } elsif ($swayDelay > 0) {
+      @{$hash->{helper}{timer}{sway}{$readingName}{delay}} = ($hash, $readingName, $swayVal, $swayDelay, 1, 5, 1);
+      InternalTimer(gettimeofday() + $swayDelay, 'EnOcean_swayCtrlDelay', $hash->{helper}{timer}{sway}{$readingName}{delay}, 0);
+      $swayVal = $swayValLast;
+    }
+  }
+  return $swayVal;
+}
+
+sub EnOcean_swayCtrlDelay($) {
+  my ($readingParam) = @_;
+  my ($hash, $readingName, $readingVal, $delay, $ctrl, $log, $clear) = @$readingParam;
+  if (defined $hash) {
+    readingsSingleUpdate($hash, $readingName, $readingVal, $ctrl);
+    Log3 $hash->{NAME}, $log, " EnOcean " . $hash->{NAME} . " EVENT $readingName: $readingVal" if ($log);
+    $hash->{helper}{sway}{$readingName} = $readingVal;
+    delete $hash->{helper}{timer}{sway}{$readingName}{delay} if ($clear == 1);
+  }
+  return;
+}
+
 # ADT encapsulation
 sub
 EnOcean_Encapsulation($$$$)
@@ -14201,11 +14435,11 @@ EnOcean_Encapsulation($$$$)
 }
 
 # set PID regulator
-sub EnOcean_setPID($$$) {
+sub EnOcean_setPID($$$$) {
   my ($ctrl, $hash, $cmd, $adjust) = @_;
   my $name = $hash->{NAME};
   my ($err, $response, $logLevel) = (undef, 'start', 5);
-  @{$hash->{helper}{calcPID}} = (undef, $hash, $cmd);
+  @{$hash->{helper}{calcPID}} = (undef, $hash, $cmd, $adjust);
   if ($cmd eq 'stop' || AttrVal($name, 'pidCtrl', 'on') eq 'off') {
     $hash->{helper}{stopped} = 1;
     readingsSingleUpdate($hash, "pidState", 'stopped', 0);
@@ -14213,7 +14447,7 @@ sub EnOcean_setPID($$$) {
     $response = 'stopped';
   } elsif ($cmd eq 'start' || $cmd eq 'actuator') {
     $hash->{helper}{stopped} = 0;
-    $hash->{helper}{adjust}  = $adjust;
+    #$hash->{helper}{adjust}  = $adjust;
     RemoveInternalTimer($hash->{helper}{calcPID});
     ($err, $logLevel, $response) = EnOcean_calcPID($hash->{helper}{calcPID});
   }
@@ -14223,7 +14457,7 @@ sub EnOcean_setPID($$$) {
 # calc valve setpoint (PID regulator)
 sub EnOcean_calcPID($) {
   my ($pidParam) = @_;
-  my ($ctrl, $hash, $cmd) = @$pidParam;
+  my ($ctrl, $hash, $cmd, $adjust) = @$pidParam;
   my $name = $hash->{NAME};
   my ($err, $response, $logLevel, $setpoint) = (undef, $cmd, 5, 0);
   my $reUINT     = '^([\\+]?\\d+)$';               # uint without whitespaces
@@ -14369,14 +14603,13 @@ sub EnOcean_calcPID($) {
       my $isWindup = $actuationCalcOld
         && ( ( $workDelta > 0 && $actuationCalcOld > $actorLimitUpper )
         || ( $workDelta < 0 && $actuationCalcOld < $actorLimitLower ) );
-
-      if ( $hash->{helper}{adjust} ne "" )
-      {
+      $hash->{helper}{adjust} = $adjust if(defined $adjust);
+      if (defined $hash->{helper}{adjust}) {
         $iPortion = $hash->{helper}{adjust} - ( $pPortion + $dPortion );
         $iPortion = $actorLimitUpper if ( $iPortion > $actorLimitUpper );
         $iPortion = $actorLimitLower if ( $iPortion < $actorLimitLower );
         #PID20_Log $hash, 5, "adjust request with:" . $hash->{helper}{adjust} . " ==> p_i:$iPortion";
-        $hash->{helper}{adjust} = "";
+        delete $hash->{helper}{adjust};
       } elsif ( !$isWindup )    # integrate only if no windUp
       {
         # normalize the intervall to minute=60 seconds
@@ -14540,8 +14773,9 @@ sub EnOcean_calcPID($) {
       $retStr = " with return-value:" . $ret if ( defined($ret) && ( $ret ne '' ) );
       #PID20_Log $hash, 3, "<$cmd> " . $retStr;
     }
-    my $updateAlive = ( $actuation ne "" )
-      && EnOcean_TimeDiff( ReadingsTimestamp( $name, 'setpointSet', gettimeofday() ) ) >= $hash->{helper}{updateInterval};
+    my $updateAlive = ($actuation ne "")
+      && EnOcean_TimeDiff(ReadingsTimestamp($name, 'setpointSet', undef)) >= $hash->{helper}{updateInterval};
+      #&& EnOcean_TimeDiff( ReadingsTimestamp( $name, 'setpointSet', gettimeofday() ) ) >= $hash->{helper}{updateInterval};
 
   # my $updateReq = ( ( $actuationReq || $updateAlive ) && $actuation ne "" );
   # PID20_Log $hash, 2, "U1 actReq:$actuationReq updateAlive:$updateAlive -->  updateReq:$updateReq" if ($DEBUG_Update);
@@ -14582,7 +14816,7 @@ sub EnOcean_calcPID($) {
   readingsBulkUpdate($hash, 'pidAlarm', $err) if (defined $err);
   readingsEndUpdate($hash, 1);
   Log3($name, 5, "EnOcean $name EnOcean_calcPID Cmd: $cmd pidState: $stateStr T: $sensorValue SP: $setpoint SPT: $desired");
-  @{$hash->{helper}{calcPID}} = (undef, $hash, 'periodic');
+  @{$hash->{helper}{calcPID}} = (undef, $hash, 'periodic', undef);
   RemoveInternalTimer($hash->{helper}{calcPID});
   InternalTimer(gettimeofday() + $hash->{helper}{calcInterval} * 1.02, "EnOcean_calcPID", $hash->{helper}{calcPID}, 0);
   return ($err, $logLevel, $response);
@@ -15465,6 +15699,32 @@ sub EnOcean_IOWriteTimer($)
   my ($ioParam) = @_;
   my ($hash, $header, $data) = @$ioParam;
   IOWrite($hash, $header, $data);
+  return;
+}
+
+#####
+sub EnOcean_SndPeriodic($) {
+  my ($param) = @_;
+  my ($hash, $function, $period, $startDelay, $repetitions, $log) = @$param;
+  @{$hash->{helper}{periodic}{$function}} = @$param;
+  $period = defined($period) ? $period : 600;
+  if ($period =~ m/^0|off$/) {
+    RemoveInternalTimer($hash->{helper}{periodic}{$function}) if(exists $hash->{helper}{periodic}{$function});
+    delete $hash->{helper}{periodic}{$function};
+    $hash->{'Snd_' . ucfirst($function) . '_Periodic'} = 'off';
+  } elsif ($function eq 'time') {
+    my ($sec, $min, $hour, $day, $month, $year, $weekday, $dayOfYearTag, $summerTime) = localtime(time + $startDelay + 0.1);
+    my @weekday = (7, 1, 2, 3, 4, 5, 6);
+    my $data = sprintf "%02X%02X%02X%02X", $weekday[$weekday] << 5 | $hour, $min, $sec, 73;
+    EnOcean_SndRadio($startDelay > 0 ? $startDelay : undef, $hash, 1, 'A5', $data, AttrVal($hash->{NAME}, "subDef", $hash->{DEF}), "00", 'FFFFFFFF');
+    RemoveInternalTimer($hash->{helper}{periodic}{$function});
+    if ($startDelay > 0) {
+      $hash->{helper}{periodic}{time}[3] = 0;
+    }
+    InternalTimer(gettimeofday() + $period + $startDelay, "EnOcean_SndPeriodic", $hash->{helper}{periodic}{$function}, 0);
+    $hash->{'Snd_' . ucfirst($function) . '_Periodic'} = 'active';
+  }
+  Log3 $hash->{NAME}, $log, "EnOcean " . $hash->{NAME} . " EVENT trigger $function" if ($log);
   return;
 }
 
@@ -17484,6 +17744,8 @@ EnOcean_Delete($$)
      <li>H5-3F-7F Shutter [Eltako TF61J]<br></li>
      <li>L6-02-01 Smoke Detector [Eltako FRW]<br></li>
      <li>G5-ZZ-ZZ Light and Presence Sensor [Omnio Ratio eagle-PM101]<br></li>
+     <li>ZZ-13-03 Environmental Applications, Data Exchange (EEP A5-13-03)<br></li>
+     <li>ZZ-13-04 Environmental Applications, Time and Day Exchange (EEP A5-13-04)<br></li>
      <li>ZZ-ZZ-ZZ EnOcean RAW profile<br></li>
      <br><br>
    </ul>
@@ -17940,6 +18202,35 @@ EnOcean_Delete($$)
       If the attribute <a href="#EnOcean_setCmdTrigger">setCmdTrigger</a> is set to "refDev", a setpoint
       command is sent when the reference device is updated.<br>
       The attr subType must be roomSensorControl.01 and attr manufID must be 00D. The attribute must be set manually.
+    </li>
+    <br><br>
+
+    <li>Environmental Applications<br>
+        Data Exchange (EEP A5-13-03)<br>
+        Time and Day Exchange (EEP A5-13-04)<br>
+    <ul>
+    <code>set &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is
+      <li>sendDate<br>
+        send a date telegram</li>
+      <li>sendTime<br>
+        send a time telegram</li>
+      <li>start<br>
+        start the periodic sending of the time</li>
+      <li>stop<br>
+        stop the periodic sending of the time</li>
+      <li>teachDate<br>
+        send the teach in telegram for date exchange</li>
+      <li>teachTime<br>
+        send the teach in telegram for time exchange</li>
+    </ul><br>
+       The periodic interval is configured using the attribute:<br>
+       <ul>
+       <li><a href="#EnOcean_sendTimePeriodic">sendTimePeriodic</a></li>
+       </ul>
+       The attr subType must be environmentApp and devMode is set to master. This is done with the help of the inofficial EEPs ZZ-13-03 or ZZ-13-04. Type
+       <code>define <name> EnOcean ZZ-13-04 getNextID</code> manually.
     </li>
     <br><br>
 
@@ -19242,6 +19533,55 @@ EnOcean_Delete($$)
       If the structure of the MSC telegrams can not interpret the raw data to be output. Setting this attribute to yes,
       the output can be suppressed.
     </li>
+    <li><a name="EnOcean_brightnessDayNight">brightnessDayNight</a> E_min/lx:E_max/lx,
+      [brightnessDayNight] = 0...99000:0...99000, 10:20 is default.<br>
+      Set switching thresholds for reading dayNight based on the reading brightness.
+    </li>
+    <li><a name="EnOcean_brightnessDayNightCtrl">brightnessDayNightCtrl</a> custom|sensor,
+      [brightnessDayNightCtrl] = custom|sensor, sensor is default.<br>
+      Control the dayNight reading through the device-specific or custom threshold and delay.
+    </li>
+    <li><a name="EnOcean_brightnessDayNightDelay">brightnessDayNightDelay</a> t_reset/s:t_set/s,
+      [brightnessDayNightDelay] = 0...99000:0...99000, 600:600 is default.<br>
+      Set switching delay for reading dayNight based on the reading brightness. The reading dayNight is reset or set
+      if the thresholds are permanently undershot or exceed during the delay time.
+    </li>
+    <li><a name="EnOcean_brightnessSunny">brightnessSunny</a> E_min/lx:E_max/lx,
+     [brightnessSunny] = 0...99000:0...99000, 20000:40000 is default.<br>
+     Set switching thresholds for reading isSunny based on the reading brightness.
+    </li>
+   <li><a name="EnOcean_brightnessSunnyDelay">brightnessSunnyDelay</a> t_reset/s:t_set/s,
+     [brightnessSunnyDelay] = 0...99000:0...99000, 120:30 is default.<br>
+     Set switching delay for reading isSunny based on the reading brightness. The reading isSunny is reset or set
+     if the thresholds are permanently undershot or exceed during the delay time.
+   </li>
+   <li><a name="EnOcean_brightnessSunnyEast">brightnessSunnyEast</a> E_min/lx:E_max/lx,
+     [brightnessSunny] = 0...99000:0...99000, 20000:40000 is default.<br>
+     Set switching thresholds for reading isSunnyEast based on the reading sunEast.
+   </li>
+   <li><a name="EnOcean_brightnessSunnyEastDelay">brightnessSunnyEastDelay</a> t_reset/s:t_set/s,
+     [brightnessSunnyDelay] = 0...99000:0...99000, 120:30 is default.<br>
+     Set switching delay for reading isSunnyEast based on the reading sunEast. The reading isSunnyEast is reset or set
+     if the thresholds are permanently undershot or exceed during the delay time.
+   </li>
+   <li><a name="EnOcean_brightnessSunnySouth">brightnessSunnySouth</a> E_min/lx:E_max/lx,
+     [brightnessSunny] = 0...99000:0...99000, 20000:40000 is default.<br>
+     Set switching thresholds for reading isSunnySouth based on the reading sunSouth.
+   </li>
+   <li><a name="EnOcean_brightnessSunnySouthDelay">brightnessSunnySouthDelay</a> t_reset/s:t_set/s,
+     [brightnessSunnyDelay] = 0...99000:0...99000, 120:30 is default.<br>
+     Set switching delay for reading isSunnySouth based on the reading sunSouth. The reading isSunnySouth is reset or set
+     if the thresholds are permanently undershot or exceed during the delay time.
+   </li>
+   <li><a name="EnOcean_brightnessSunnyWest">brightnessSunnyWest</a> E_min/lx:E_max/lx,
+     [brightnessSunny] = 0...99000:0...99000, 20000:40000 is default.<br>
+     Set switching thresholds for reading isSunnyWest based on the reading sunWest.
+   </li>
+   <li><a name="EnOcean_brightnessSunnyWestDelay">brightnessSunnyWestDelay</a> t_reset/s:t_set/s,
+     [brightnessSunnyDelay] = 0...99000:0...99000, 120:30 is default.<br>
+     Set switching delay for reading isSunnyWest based on the reading sunWest. The reading isSunnyWest is reset or set
+     if the thresholds are permanently undershot or exceed during the delay time.
+   </li>
     <li><a name="EnOcean_comMode">comMode</a> biDir|confirm|uniDir, [comMode] = uniDir is default.<br>
       Communication Mode between an enabled EnOcean device and Fhem.<br>
       Unidirectional communication means a point-to-multipoint communication
@@ -19556,6 +19896,9 @@ EnOcean_Delete($$)
     <li><a name="EnOcean_sendDevStatus">sendDevStatus</a> no|yes, [sendDevStatus] = no is default.<br>
       Send new status of the device.
     </li>
+    <li><a name="EnOcean_sendTimePeriodic">sendTimePeriodic</a> t/s|off, [sendTimePeriodic] = off | 1 ... 86400, 600 is default.<br>
+      Time period of time telegrams.
+    </li>
     <li><a name="sensorMode">sensorMode</a> switch|pushbutton,
       [sensorMode] = switch is default.<br>
       The status "released" will be shown in the reading state if the
@@ -19777,6 +20120,28 @@ EnOcean_Delete($$)
     <li><a href="#webCmd">webCmd</a></li>
     <li><a name="EnOcean_windowOpenCtrl">windowOpenCtrl</a> disable|enable, disable s is default.<br>
       Window open detection. Valve will be closed if the window is open.
+    </li>
+    <li><a name="EnOcean_windSpeedStormy">windSpeedStormy</a> v_min/m/s:v_max/m/s,
+     [windSpeedStormy] = 0...35:0...35, 13.9:17.2 is default.<br>
+     Set switching thresholds for reading isStormy based on the reading windSpeed.
+    </li>
+    <li><a name="EnOcean_windSpeedStormyDelay">windSpeedStormyDelay</a> t_reset/s:t_set/s,
+      [windSpeedStormyDelay] = 0...99000:0...99000, 60:3 is default.<br>
+      Set switching delay for reading isStormy based on the reading windSpeed. The reading isStormy is reset or set
+      if the thresholds are permanently undershot or exceed during the delay time.
+    </li>
+    <li><a name="EnOcean_windSpeedWindy">windSpeedWindy</a> v_min/m/s:v_max/m/s,
+      [windSpeedWindy] = 0...35:0...35, 1.6:3.4 is default.<br>
+      Set switching thresholds for reading isWindy based on the reading windSpeed.
+    </li>
+    <li><a name="EnOcean_windSpeedWindyDelay">windSpeedWindyDelay</a> t_reset/s:t_set/s,
+      [windSpeedWindyDelay] = 0...99000:0...99000, 60:3 is default.<br>
+      Set switching delay for reading isWindy based on the reading windSpeed. The reading isWindy is reset or set
+      if the thresholds are permanently undershot or exceed during the delay time.
+    </li>
+    <li><a name="EnOcean_updateGlobalAttr">updateGlobalAttr</a> no|yes,
+     [timeEvent] = no|yes, no is default.<br>
+     Update the global attributes latitude and longitude with the received GPS coordinates.
     </li>
     </ul>
   </ul>
@@ -20763,13 +21128,19 @@ EnOcean_Delete($$)
          [AWAG XFJ, Eltako FWS61]<br>
      <ul>
        <li>T: t/&#176C B: E/lx W: Vs/m IR: yes|no</li>
-       <li>brightness: E/lx (Sensor Range: E = 0 lx ... 999 lx)</li>
+       <li>brightness: E/lx (Sensor Range: E = 0 lx ... 150 klx)</li>
        <li>dayNight: day|night</li>
        <li>hemisphere: north|south</li>
        <li>isRaining: yes|no</li>
-       <li>sunEast: E/lx (Sensor Range: E = 1 lx ... 150 klx)</li>
-       <li>sunSouth: E/lx (Sensor Range: E = 1 lx ... 150 klx)</li>
-       <li>sunWest: E/lx (Sensor Range: E = 1 lx ... 150 klx)</li>
+       <li>isStormy: no|yes</li>
+       <li>isSunny: no|yes</li>
+       <li>isSunnyEast: no|yes</li>
+       <li>isSunnySouth: no|yes</li>
+       <li>isSunnyWest: no|yes</li>
+       <li>isWindy: no|yes</li>
+       <li>sunEast: E/lx (Sensor Range: E = 0 lx ... 150 klx)</li>
+       <li>sunSouth: E/lx (Sensor Range: E = 0 lx ... 150 klx)</li>
+       <li>sunWest: E/lx (Sensor Range: E = 0 lx ... 150 klx)</li>
        <li>temperature: t/&#176C (Sensor Range: t = -40 &#176C ... 80 &#176C)</li>
        <li>windSpeed: Vs/m (Sensor Range: V = 0 m/s ... 70 m/s)</li>
        <li>windStrength: B (Sensor Range: B = 0 Beaufort ... 12 Beaufort)</li>
@@ -20778,11 +21149,25 @@ EnOcean_Delete($$)
         Brightness is the strength of the dawn light. SunEast,
         sunSouth and sunWest are the solar radiation from the respective
         compass direction. IsRaining is the rain indicator.<br>
-        The attr subType must be environmentApp and attr manufID must be 00D
-        for Eltako Devices. This is done if the device was created by
+        The attr subType must be environmentApp. This is done if the device was created by
         autocreate.<br>
         The Eltako Weather Station FWS61 supports not the day/night indicator
-        (dayNight).<br>
+        (dayNight). The thresholds and delay times can be adjusted by the attributes<br>
+        <a href="#EnOcean_brightnessDayNight">brightnessDayNight</a>,
+        <a href="#EnOcean_brightnessDayNightCtrl">brightnessDayNightCtrl</a>,
+        <a href="#EnOcean_brightnessDayNightDelay">brightnessDayNightDelay</a>,
+        <a href="#EnOcean_brightnessSunny">brightnessSunny</a>,
+        <a href="#EnOcean_brightnessSunnyDelay">brightnessSunnyDelay</a>,
+        <a href="#EnOcean_brightnessSunnyEast">brightnessSunnyEast</a>,
+        <a href="#EnOcean_brightnessSunnyEastDelay">brightnessSunnyEastDelay</a>,
+        <a href="#EnOcean_brightnessSunnySouth">brightnessSunnySouth</a>,
+        <a href="#EnOcean_brightnessSunnySouthDelay">brightnessSunnySouthDelay</a>,
+        <a href="#EnOcean_brightnessSunnyWest">brightnessSunnyWest</a>,
+        <a href="#EnOcean_brightnessSunnyWestDelay">brightnessSunnyWestDelay</a>,
+        <a href="#EnOcean_windSpeedStormy">windSpeedStormy</a>,
+        <a href="#EnOcean_windSpeedStormyDelay">windSpeedStormyDelay</a>,
+        <a href="#EnOcean_windSpeedWindy">windSpeedWindy</a>,
+        <a href="#EnOcean_windSpeedWindyDelay">windSpeedWindyDelay</a>.<br>
      </li>
      <br><br>
 
@@ -20799,10 +21184,12 @@ EnOcean_Delete($$)
        <li>longitude: &lambda;/&deg; (Sensor Range: &lambda; = -180 &deg; ... 180 &deg;)</li>
        <li>time: hh:mm:ss [AM|PM]</li>
        <li>timeSource: GPS|RTC</li>
+       <li>twilight: T/% (Sensor Range: T = 0 % ... 100 %)</li>
        <li>weekday: Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday</li>
      </ul><br>
         The attr subType must be environmentApp. This is done if the device was created by
-        autocreate.
+        autocreate. The global attributes latitude and longitude are set automatically if the attribute
+        <a href="#EnOcean_updateGlobalAttr">updateGlobalAttr</a> is set.<br>
      </li>
      <br><br>
 
