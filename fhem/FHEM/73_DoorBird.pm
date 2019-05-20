@@ -3276,7 +3276,7 @@ sub DoorBird_BlockGet($$$$) {
 </ul>
 =end html_DE
 
-=for :application/json;q=META.json 00_myModule.pm
+=for :application/json;q=META.json 73_DoorBird.pm
 {
   "abstract": "Connects fhem to the DoorBird IP door station",
   "description": "The DoorBird module establishes the communication between the DoorBird - door intercommunication unit and the fhem home automation based on the official API, published by the manufacturer. Please make sure, that the user has been enabled the API-Operator button in the DoorBird Android/iPhone APP under Administration -> User -> Edit -> Permission -> API-Operator.",
