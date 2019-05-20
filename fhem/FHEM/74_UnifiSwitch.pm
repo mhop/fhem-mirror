@@ -280,7 +280,7 @@ sub UnifiSwitch_Parse($$) {
 	else{
 		# Keine Gerätedefinition verfügbar
 		# Daher Vorschlag define-Befehl: <NAME> <MODULNAME> <ADDRESSE>
-        Log3 $name, 3, "$name ($self) - return: UNDEFINED UnifiSwitch_".$address." UnifiSwitch $address";
+        Log3 $name, 4, "$name ($self) - return: UNDEFINED UnifiSwitch_".$address." UnifiSwitch $address";
 		return "UNDEFINED ".$address." UnifiSwitch $address";
 	}
 }

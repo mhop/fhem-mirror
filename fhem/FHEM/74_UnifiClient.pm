@@ -166,12 +166,13 @@ sub UnifiClient_Set($@){
 		}
 	}
 	$usergroups =~ s/.$//;
-	if($setName !~ /clear|blockClient|unblockClient|usergroup/) {
+	if($setName !~ /clear|blockClient|unblockClient|usergroup|update/) {
 		return "Unknown argument $setName, choose one of "
 			."clear:readings,usedOnlineTime "
 			.(($hash->{unifiClient}->{blocked} eq JSON::false) ? "blockClient:noArg " : "")
 			.(($hash->{unifiClient}->{blocked} eq JSON::true) ? "unblockClient:noArg " : "")
-			.(($usergroups ne "") ? "usergroup:$usergroups" : "");
+			.(($usergroups ne "") ? "usergroup:$usergroups" : "")
+			.((defined $hash->{unifiClient}->{mac}) ? " update:noArg" :"");
 	} elsif ($setName eq 'clear') {
 		if ($setVal eq 'readings') {
 			for (keys %{$hash->{READINGS}}) {
@@ -201,6 +202,8 @@ sub UnifiClient_Set($@){
 			$clientnameUC = $hash->{unifiClient}->{hostname};
 		}
 		IOWrite($hash, "Unifi_UserRestJson_Send", $hash->{unifiClient}->{_id},"{\"usergroup_id\":\"".$usergroupID."\",\"name\":\"".$clientnameUC."\"}");
+	} elsif ($setName eq 'update') {
+		IOWrite($hash, "Unifi_UpdateClient_Send", $hash->{unifiClient}->{mac});
 	}
 	return undef;
 }
@@ -317,7 +320,7 @@ sub UnifiClient_Parse($$) {
 	else{
 		# Keine Gerätedefinition verfügbar
 		# Daher Vorschlag define-Befehl: <NAME> <MODULNAME> <ADDRESSE>
-        Log3 $name, 3, "$name ($self) - return: UNDEFINED UnifiClient_".$address." UnifiClient $address";
+        Log3 $name, 4, "$name ($self) - return: UNDEFINED UnifiClient_".$address." UnifiClient $address";
 		#return "UNDEFINED ".$address." UnifiClient $address";
         # lieber kein autocreate ;-)
 		return undef;
@@ -401,12 +404,25 @@ You can use the readings or set features to control your clients.
 <ul>
     <li><code>set &lt;name&gt; clear &lt;readings|usedOnlineTime&gt;</code><br>
     Clears the readings or set the usedOnlimeTime=0. </li>
+	<br>
+    <li><code>set &lt;name&gt; blockClient &lt;</code><br>
+    Blocks the client. </li>
+	<br>
+    <li><code>set &lt;name&gt; unblockClient &lt;</code><br>
+    Unblocks the client. </li>
+	<br>
+    <li><code>set &lt;name&gt; usergroup &lt;</code><br>
+    Set the usergroup for the client. </li>
+	<br>
+    <li><code>set &lt;name&gt; update &lt;</code><br>
+    Updates the client data. </li>
+	<br>
 </ul>
 
 <h4>Get</h4>
 <ul>
-    <li><code>get &lt;name&gt; todo</code><br>
-    todo.</li>
+    <li><code>get &lt;usergroups&gt; todo</code><br>
+    Show information about the configuered usergroups in UnifiController.</li>
     <br>
 
 </ul>

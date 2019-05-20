@@ -271,6 +271,7 @@ sub Unifi_Notify($$) {
 		}
 		for my $clientID (keys %{$hash->{clients}}) {
 			my $clientName=$hash->{clients}->{$clientID}->{name}."_";
+			# TODO: Prüfen, ob es für $clientName ein UnifiClient-Devices gibt und die Werte aus den Readings des UnifiClients wiederherstellen.
 			for my $readingName (keys %{$hash->{READINGS}}) {
 				#Log3 $name, 1, "$name ($self) - checking 2 $readingName for $clientName";
 				if($readingName =~ m/^$clientName.*/){
@@ -791,6 +792,8 @@ sub Unifi_Write($@){
 		Unifi_UnblockClient_Send($hash, $id); # id=mac
 	}elsif($type eq "Unifi_UserRestJson_Send"){
 		Unifi_UserRestJson_Send($hash, $id, $data); # id=_id
+	}elsif($type eq "Unifi_UpdateClient_Send"){
+		Unifi_UpdateClient_Send($hash, $id); # id=mac
 	}
   
 	return undef;
@@ -1073,7 +1076,7 @@ sub Unifi_UpdateClient_Receive($) {
 						}
 					}
                     readingsBeginUpdate($hash);
-                    Unifi_setClientReadings($hash);					
+                    Unifi_SetClientReadings($hash);					
                     readingsEndUpdate($hash,1);
                 }
             }
@@ -1878,7 +1881,7 @@ sub Unifi_WlanconfRest_Send($$@) {
 sub Unifi_WlanconfRest_Receive($) {     
     my ($param, $err, $data) = @_;
     my ($name,$self,$hash) = ($param->{hash}->{NAME},Unifi_Whoami(),$param->{hash});
-    Log3 $name, 3, "$name ($self) - executed.";
+    Log3 $name, 5, "$name ($self) - executed.";
     
     if ($err ne "") {
         Unifi_ReceiveFailure($hash,{rc => 'Error while requesting', msg => $param->{url}." - $err"});
@@ -1949,7 +1952,7 @@ sub Unifi_GetVoucherList_Receive($) {
                         my $setCmd=$hash->{hotspot}->{voucherCache}->{$cache}->{setCmd};
                         my @words=split("[ \t][ \t]*", $setCmd);
                         my %params=("expire"=>$words[0],"n"=>$words[1],"quota"=>$words[2],"note"=>$words[3]);
-                        Log3 $name, 3, "$name ($self) - expand VoucherCache ($cache).";
+                        Log3 $name, 4, "$name ($self) - expand VoucherCache ($cache).";
                         Unifi_CreateVoucher_Send($hash, %params);
                         $expand=1;
                     }
@@ -1985,7 +1988,7 @@ sub Unifi_CreateVoucher_Send($%) {
 sub Unifi_CreateVoucher_Receive($) {
     my ($param, $err, $data) = @_;
     my ($name,$self,$hash) = ($param->{hash}->{NAME},Unifi_Whoami(),$param->{hash});
-    Log3 $name, 3, "$name ($self) - executed.";
+    Log3 $name, 5, "$name ($self) - executed.";
     
     if ($err ne "") {
         Unifi_ReceiveFailure($hash,{rc => 'Error while requesting', msg => $param->{url}." - $err"});
