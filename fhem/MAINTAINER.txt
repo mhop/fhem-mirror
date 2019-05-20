@@ -18,6 +18,7 @@ configDB.pm                  betateilchen         Sonstiges
 FHEM/00_CM11.pm              neubert              SlowRF
 FHEM/00_CUL.pm               rudolfkoenig         SlowRF
 FHEM/00_DFPlayerMini.pm      kaihs                Multimedia
+FHEM/00_ElsnerWS.pm          klaus.schauer        Sonstiges
 FHEM/00_FBAHA.pm             rudolfkoenig         FRITZ!Box
 FHEM/00_FBAHAHTTP.pm         rudolfkoenig         FRITZ!Box
 FHEM/00_FHZ.pm               rudolfkoenig         SlowRF
@@ -490,6 +491,7 @@ FHEM/98_MaxScanner.pm        john                 MAX
 FHEM/98_MediaList.pm         Tobias               Multimedia
 FHEM/98_Modbus.pm            StefanStrobel        Sonstiges
 FHEM/98_ModbusAttr.pm        StefanStrobel        Sonstiges
+FHEM/98_ModbusElsnerWS.pm    klaus.schauer        Sonstiges
 FHEM/98_ModbusSET.pm         StefanStrobel        Sonstiges
 FHEM/98_ModbusTrovis5576.pm  Reinerlein           Heizungssteuerung/Raumklima
 FHEM/98_monitoring.pm        igami                Automatisierung
