@@ -48,7 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
-  "8.13.4" => "03.05.2019  rec/snapemailtxt, rec/snaptelegramtxt can contain \":\", commandref revised ", 
+  "8.13.4" => "21.05.2019  rec/snapemailtxt, rec/snaptelegramtxt can contain \":\", commandref revised ", 
   "8.13.3" => "28.04.2019  don't save private hash refs in central hash, \"repository\" added in Meta.json ",
   "8.13.2" => "07.04.2019  fix perl warning Forum: https://forum.fhem.de/index.php/topic,45671.msg927912.html#msg927912",
   "8.13.1" => "06.04.2019  verbose level in X_DelayedShutdown changed ",
