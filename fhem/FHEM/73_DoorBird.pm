@@ -3276,54 +3276,51 @@ sub DoorBird_BlockGet($$$$) {
 </ul>
 =end html_DE
 
+=encoding utf8
+
 =for :application/json;q=META.json 73_DoorBird.pm
 {
   "abstract": "Connects fhem to the DoorBird IP door station",
   "description": "The DoorBird module establishes the communication between the DoorBird - door intercommunication unit and the fhem home automation based on the official API, published by the manufacturer. Please make sure, that the user has been enabled the API-Operator button in the DoorBird Android/iPhone APP under Administration -> User -> Edit -> Permission -> API-Operator.",
   "x_lang": {
     "de": {
-      "abstract": "Verbindet fhem mit der DoorBird IP T&uuml;rstation",
-      "description": "Das DoorBird Modul erm&ouml;glicht die Komminikation zwischen der DoorBird Interkommunikationseinheit und dem fhem Automationssystem basierend auf der API des Herstellers her. F&uuml;r den vollen Funktionsumfang muss sichergestellt werden, dass das Setting "API-Operator" in der DoorBird Android/iPhone - APP unter Administration -> User -> Edit -> Permission -> API-Operator gesetzt ist."
+      "abstract": "Verbindet fhem mit der DoorBird IP Türstation",
+      "description": "Das DoorBird Modul ermöglicht die Komminikation zwischen der DoorBird Interkommunikationseinheit und dem fhem Automationssystem basierend auf der API des Herstellers her. Für den vollen Funktionsumfang muss sichergestellt werden, dass das Setting \"API-Operator\" in der DoorBird Android/iPhone - APP unter Administration -> User -> Edit -> Permission -> API-Operator gesetzt ist."
     }
   },
   "license": [
-    "apache_2_0",
-    "mozilla_1_0"
+    "GPL_2"
   ],
-  "version": "v1.0.0",
-  "x_release_date": "1970-01-01",
-  "release_status": "stable",
   "author": [
     "Matthias Deeke <matthias.deeke@deeke.eu>"
   ],
   "x_fhem_maintainer": [
-    "maintainer-Sailor"
+    "Sailor"
   ],
   "keywords": [
     "Doorbird",
-    "fhem",
-    "Argon2i",
-    "ChaCha20-Poly1035",
     "Intercom"
   ],
   "prereqs": {
     "runtime": {
       "requires": {
-        "FHEM": 5.00918623,
-        "FHEM::Meta": 0.001006,
+        "Alien::Base::ModuleBuild": 0,
+        "Alien::Sodium": 0,
+        "Crypt::Argon2": 0,
+        "Crypt::NaCl::Sodium": 0,
+        "Cwd": 0,
+        "Data::Dumper": 0,
+        "Encode": 0,
         "HttpUtils": 0,
+        "IO::Socket": 0,
         "JSON": 0,
-        "perl": 5.014,
-		"Encode": 0,
-		"Cwd": 0,
-		"MIME::Base64": 0,
-		"Alien::Base::ModuleBuild": 0,
-		"Alien::Sodium": 0,
-		"Crypt::NaCl::Sodium": 0,
-		"Crypt::Argon2": 0,
-		"IO::Socket": 0,
-		"LWP::UserAgent": 0,
-		"Data::Dumper": 0
+        "LWP::UserAgent": 0,
+        "MIME::Base64": 0,
+        "constant": 0,
+        "strict": 0,
+        "utf8": 0,
+        "warnings": 0,
+        "perl": 5.014
       },
       "recommends": {
       },
@@ -3331,14 +3328,19 @@ sub DoorBird_BlockGet($$$$) {
       }
     }
   },
-  "resources": {
-    "x_support_community": {
-      "rss": "",
-      "title": "Door Bird und FHEM",
-      "web": "https://forum.fhem.de/index.php?topic=41758.msg",
+  "x_prereqs_os_debian": {
+    "runtime": {
+      "requires": {
+        "sox": 0,
+        "libsox-fmt-all": 0,
+        "libsodium-dev": 0
+      },
+      "recommends": {
+      },
+      "suggests": {
+      }
     }
-  },
-  "x_support_status": "supported"
+  }
 }
 =end :application/json;q=META.json
 
