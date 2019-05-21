@@ -48,6 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.13.5" => "21.05.2019  StmKey quoted depending on attr noQuotesForSID (Forum: https://forum.fhem.de/index.php/topic,45671.msg938236.html#msg938236) ",
   "8.13.4" => "21.05.2019  rec/snapemailtxt, rec/snaptelegramtxt can contain \":\", commandref revised ", 
   "8.13.3" => "28.04.2019  don't save private hash refs in central hash, \"repository\" added in Meta.json ",
   "8.13.2" => "07.04.2019  fix perl warning Forum: https://forum.fhem.de/index.php/topic,45671.msg927912.html#msg927912",
@@ -5773,10 +5774,13 @@ sub SSCam_camop_parse ($) {
                 # StmKey extrahieren
                 my @sk = split(/&StmKey=/, $mjpegHttp);
                 my $stmkey = $sk[1];
-                $stmkey =~ tr/"//d;
-				# Quotes in StmKey entfernen falls noQuotesForSID gesezt 
-				# $mjpegHttp =~ tr/"//d if(AttrVal($name, "noQuotesForSID",0));
-                $mjpegHttp =~ tr/"//d;
+                
+				# Quotes in StmKey entfernen falls noQuotesForSID gesetzt 
+                if(AttrVal($name, "noQuotesForSID",0)) {   # Forum: https://forum.fhem.de/index.php/topic,45671.msg938236.html#msg938236
+				    $mjpegHttp =~ tr/"//d;
+                    $mxpegHttp =~ tr/"//d;
+                    $stmkey    =~ tr/"//d;
+                }
                 
                 # Streaminginfos in Helper speichern
                 $hash->{HELPER}{STMKEYMJPEGHTTP}      = $mjpegHttp if($mjpegHttp);
@@ -10357,8 +10361,9 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   
   <a name="noQuotesForSID"></a>
   <li><b>noQuotesForSID</b><br>
-    this attribute may be helpful in some cases to avoid errormessage "402 - permission denied" and makes login 
-	possible.  </li><br>
+    This attribute delete the quotes for SID and for StmKeys.  
+    The attribute may be helpful in some cases to avoid errormessages "402 - permission denied" or "105 - 
+    Insufficient user privilege" and makes login possible.  </li><br>
   
   <a name="pollcaminfoall"></a>
   <li><b>pollcaminfoall</b><br>
@@ -12157,11 +12162,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   
   <a name="loginRetries"></a>
   <li><b>loginRetries</b><br>
-    setzt die Anzahl der Login-Wiederholungen im Fehlerfall (default = 3)   </li><br>
+    Setzt die Anzahl der Login-Wiederholungen im Fehlerfall (default = 3)   </li><br>
   
   <a name="noQuotesForSID"></a>
   <li><b>noQuotesForSID</b><br>
-    dieses Attribut kann in bestimmten Fällen die Fehlermeldung "402 - permission denied" 
+    Dieses Attribut entfernt Quotes für SID bzw. der StmKeys. 
+    Es kann in bestimmten Fällen die Fehlermeldung "402 - permission denied" oder "105 - Insufficient user privilege"
     vermeiden und ein login ermöglichen.  </li><br>                      
   
   <a name="pollcaminfoall"></a>
