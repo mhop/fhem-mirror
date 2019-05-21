@@ -2970,6 +2970,8 @@ sub DoorBird_BlockGet($$$$) {
 					<li>sudo apt-get install libsox-fmt-all			</li>
 					<li>sudo apt-get install libsodium-dev			</li>
 					<li>sudo cpan Crypt::Argon2						</li>
+					<li>sudo cpan Alien::Base::ModuleBuild			</li>
+					<li>sudo cpan Alien::Sodium						</li>
 					<li>sudo cpan Crypt::NaCl::Sodium				</li>
 				</code>
 			</td>
@@ -3137,6 +3139,8 @@ sub DoorBird_BlockGet($$$$) {
 					<li>sudo apt-get install libsox-fmt-all			</li>
 					<li>sudo apt-get install libsodium-dev			</li>
 					<li>sudo cpan Crypt::Argon2						</li>
+					<li>sudo cpan Alien::Base::ModuleBuild			</li>
+					<li>sudo cpan Alien::Sodium						</li>
 					<li>sudo cpan Crypt::NaCl::Sodium				</li>
 				</code>
 			</td>
