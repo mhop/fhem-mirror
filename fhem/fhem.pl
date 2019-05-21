@@ -1844,13 +1844,14 @@ ReplaceSetMagic($$@)       # Forum #38276
 
     if($s && $s =~ /:d|:r|:i/ && $val =~ /(-?\d+(\.\d+)?)/) {
       $val = $1;
-      $val = int($val) if ( $s eq ":i" );
+      $val = int($val)                         if($s eq ":i" );
       $val = round($val, defined($1) ? $1 : 1) if($s =~ /^:r(\d)?/);
+      $val = round($val, $1)                   if($s =~ /^:d(\d)/); #100753
     }
     return $val;
   }
 
-  $a =~s/(\[([ari]:)?([a-zA-Z\d._]+):([a-zA-Z\d._\/-]+)(:(t|sec|i|d|r|r\d))?\])/
+  $a =~s/(\[([ari]:)?([a-zA-Z\d._]+):([a-zA-Z\d._\/-]+)(:(t|sec|i|[dr]\d?))?\])/
          rsmVal($1,$2,$3,$4,$5)/eg;
 
   my $esDef = ($evalSpecials ? 1 : 0);
