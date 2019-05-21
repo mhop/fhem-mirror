@@ -179,9 +179,12 @@ sub SMAEM_DelayedShutdown ($) {
   my ($hash) = @_;
   my $name   = $hash->{NAME};
   
-  Log3($name, 2, "$name - Quit background process due to shutdown ...");
+  if($hash->{HELPER}{RUNNING_PID}) {
+      Log3($name, 2, "$name - Quit background process due to shutdown ...");
+      return 1;
+  }
 
-return 1;
+return 0;
 }
 
 ###############################################################
@@ -736,7 +739,7 @@ sub SMAEM_setserials ($) {
     $as = $hash->{HELPER}{ALLSERIALS};
     
     $index = $hash->{TYPE}."_".$hash->{NAME}."_allserials";
-    $retcode = SMAEM_setCacheValue($index,$as);
+    $retcode = SMAEM_setCacheValue($hash,$index,$as);
     
     if ($retcode) { 
         Log3($name, 1, "SMAEM $name - ERROR while saving all serial numbers - $retcode");
@@ -757,7 +760,7 @@ sub SMAEM_setsum ($$$$) {
     $sumstr = $gridinsum."_".$gridoutsum;
     
     $index = $hash->{TYPE}."_".$hash->{NAME}."_".$smaserial;
-    $retcode = SMAEM_setCacheValue($index,$sumstr);
+    $retcode = SMAEM_setCacheValue($hash,$index,$sumstr);
     
     if ($retcode) { 
         Log3($name, 1, "SMAEM $name - ERROR while saving summary of energy values - $retcode");
@@ -770,8 +773,8 @@ return ($retcode);
 
 ###############################################################
 ###  Schreibroutine in eigenes Keyvalue-File
-sub SMAEM_setCacheValue ($$) {
-  my ($key,$value) = @_;
+sub SMAEM_setCacheValue ($$$) {
+  my ($hash,$key,$value) = @_;
   my $fName = $attr{global}{modpath}."/FHEM/FhemUtils/cacheSMAEM";
   
   my $param = {
@@ -780,7 +783,7 @@ sub SMAEM_setCacheValue ($$) {
               };
   my ($err, @old) = FileRead($param);
   
-  SMAEM_createCacheFile() if($err); 
+  SMAEM_createCacheFile($hash) if($err); 
   
   my @new;
   my $fnd;
@@ -811,7 +814,7 @@ sub SMAEM_getserials ($) {
     if ($retcode) {
         Log3($name, 1, "SMAEM $name - $retcode") if ($retcode);
         Log3($name, 3, "SMAEM $name - Create new cacheFile $modpath/FHEM/FhemUtils/cacheSMAEM");
-		$retcode = SMAEM_createCacheFile(); 
+		$retcode = SMAEM_createCacheFile($hash); 
     } else {
 	    if ($serials) {
             $hash->{HELPER}{ALLSERIALS} = $serials;
@@ -863,7 +866,7 @@ sub SMAEM_getCacheValue ($) {
 
 ###############################################################
 ###  Anlegen eigenes Keyvalue-File wenn nicht vorhanden
-sub SMAEM_createCacheFile () {
+sub SMAEM_createCacheFile ($) {
   my $fName = $attr{global}{modpath}."/FHEM/FhemUtils/cacheSMAEM";
   my $param = {
                FileName   => $fName,
@@ -874,7 +877,7 @@ sub SMAEM_createCacheFile () {
              "# Please do not modify, move or delete it.",
              "");
 
-  return FileWrite($param, @new);
+return FileWrite($param, @new);
 }
 
 ###############################################################
