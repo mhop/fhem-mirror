@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 73_DoorBird: Automatic snapshots at events with path as Reading
  - bugfix:  73_AutoShuttersControl: expand shading out drives, fix commandref
                                     ascAPIget
  - bugfix:  73_GardenaSmartBridge: bugfixes, expand Bridge readings
