@@ -6,7 +6,7 @@
 #
 #     Author                     : Matthias Deeke 
 #     e-mail                     : matthias.deeke(AT)deeke(DOT)eu
-#     Fhem Forum                 : https://forum.fhem.de/index.php?topic=41758
+#     Fhem Forum                 : https://forum.fhem.de/index.php/topic,100758
 #     Fhem Wiki                  : 
 #
 #     This file is part of fhem.
@@ -920,6 +920,15 @@ sub DoorBird_Read($) {
 						### If the MessageID is integer type has not yet appeared yet
 						if ((int($TIMESTAMP) == $TIMESTAMP) && ($UdpMotionIdLast != $TIMESTAMP)) {
 
+							### Call Subroutine and hand back return value
+							my $LastSnapshotPath = DoorBird_Image_Request($hash, "");
+
+							### If pictures supposed to be saved as files
+							if ($hash->{helper}{ImageFileDir} ne "0") {
+								### Write Last Image into reading
+								readingsSingleUpdate($hash, "motion_snapshot", $LastSnapshotPath, 1);
+							}
+							
 							### Save Timestamp as new ID
 							$hash->{helper}{UdpMotionId} = $TIMESTAMP;
 							
@@ -946,6 +955,15 @@ sub DoorBird_Read($) {
 						### If the MessageID is integer type has not yet appeared yet
 						if ((int($TIMESTAMP) == $TIMESTAMP) && ($UdpKeypadIdLast != $TIMESTAMP)) {
 
+							### Call Subroutine and hand back return value
+							my $LastSnapshotPath = DoorBird_Image_Request($hash, "");
+
+							### If pictures supposed to be saved as files
+							if ($hash->{helper}{ImageFileDir} ne "0") {
+								### Write Last Image into reading
+								readingsSingleUpdate($hash, "keypad_snapshot", $LastSnapshotPath, 1);
+							}
+							
 							### Save Timestamp as new ID
 							$hash->{helper}{UdpKeypadId} = $TIMESTAMP;
 
@@ -971,6 +989,15 @@ sub DoorBird_Read($) {
 					elsif ($EVENT =~ m/1/) {
 						### If the MessageID is integer type has not yet appeared yet
 						if ((int($TIMESTAMP) == $TIMESTAMP) && ($UdpDoorbellIdLast != $TIMESTAMP)) {
+
+							### Call Subroutine and hand back return value
+							my $LastSnapshotPath = DoorBird_Image_Request($hash, "");
+
+							### If pictures supposed to be saved as files
+							if ($hash->{helper}{ImageFileDir} ne "0") {
+								### Write Last Image into reading
+								readingsSingleUpdate($hash, "doorbell_snapshot", $LastSnapshotPath, 1);
+							}
 
 							### Save Timestamp as new ID
 							$hash->{helper}{UdpDoorbellId} = $TIMESTAMP;
@@ -1734,7 +1761,7 @@ sub DoorBird_Image_Request($$) {
 	my $err					= " ";
 	my $data				= " ";
 	my $json				= " ";
-	my $ImageFileName;
+	my $ImageFileName		= " ";
 	
 	### Create complete command URL for DoorBird
 	my $UrlPrefix 		= "https://" . $url . "/bha-api/";
@@ -1829,6 +1856,9 @@ sub DoorBird_Image_Request($$) {
 						}
 					}
 					
+					### Save filename of last snapshot into hash
+					$hash->{helper}{Images}{LastSnapshotPath} = $ImageFileName;
+					
 					### Log Entry for debugging purposes
 					Log3 $name, 5, $name. " : DoorBird_Image_Request - ImageFileName            : " . $ImageFileName;
 
@@ -1855,7 +1885,7 @@ sub DoorBird_Image_Request($$) {
 	Log3 $name, 5, $name. " : DoorBird_Image_Request - ImageData size           : " . length($ImageData);
 	Log3 $name, 5, $name. " : DoorBird_Image_Request - ImageTimeStamp           : " . $ImageTimeStamp;
 	
-	return
+	return($ImageFileName);
 }
 ####END####### Define Subfunction for LIVE IMAGE REQUEST #######################################################END#####
 
