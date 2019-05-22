@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  55_PIFACE: Now wiringPi V2.46 is supported. Various optimizations
  - feature: 73_DoorBird: Automatic snapshots at events with path as Reading
  - bugfix:  73_AutoShuttersControl: expand shading out drives, fix commandref
                                     ascAPIget
