@@ -36,7 +36,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History done by DS_Starter 
 our %SMAEM_vNotesIntern = (
-  "3.4.0" => "22.05.2019  support of Installer.pm/Meta.pm added, new version maintenance ",
+  "3.4.0" => "22.05.2019  support of Installer.pm/Meta.pm added, new version maintenance, commandref revised ",
   "3.3.0" => "21.05.2019  set reset to delete and reinitialize cacheFile, support of DelayedShutdownFn ",
   "3.2.0" => "26.07.2018  log entry enhanced if diff overflow ",
   "3.1.0" => "12.02.2018  extend error handling in define ",
@@ -412,7 +412,7 @@ sub SMAEM_DoParse ($) {
 			    # Zyklus verwerfen wenn Plausibilität nicht erfüllt
 				my $d = $bezug_wirk_count - $gridoutsum;
 			    my $errtxt = "Cycle discarded due to allowed diff \"$d\" GRIDOUT exceeding. \n".
-                             "Try to set attribute \"diffAccept > $d\" temporary.";
+                             "Try to set attribute \"diffAccept > $d\" temporary or execute \"reset\".";
 			    $error = encode_base64($errtxt,"");
 				Log3 ($name, 1, "SMAEM $name - $errtxt");
 		        Log3 ($name, 4, "SMAEM $name -> BlockingCall SMAEM_DoParse finished");
@@ -444,7 +444,7 @@ sub SMAEM_DoParse ($) {
 			    # Zyklus verwerfen wenn Plausibilität nicht erfüllt
 				my $d = $einspeisung_wirk_count - $gridinsum;
 			    my $errtxt = "Cycle discarded due to allowed diff \"$d\" GRIDIN exceeding. \n".
-                             "Try to set attribute \"diffAccept > $d\" temporary.";
+                             "Try to set attribute \"diffAccept > $d\" temporary or execute \"reset\".";
 			    $error = encode_base64($errtxt,"");
 				Log3 ($name, 1, "SMAEM $name - $errtxt");
 		        Log3 ($name, 4, "SMAEM $name -> BlockingCall SMAEM_DoParse finished");
@@ -978,33 +978,65 @@ return;
   </ul>  
 <br>
 <br>
+
+<a name="SMAEMset"></a>
+<b>Set </b>
+<ul>
+  <li><b>reset</b> <br>
+  The automatically generated file "cacheSMAEM" will be deleted. Then the file will be recreated again by the module.
+  This function is used to reset the device in possible case of error condition, but may be executed at all times.  
+  </li>
+  <br>  
+</ul>
   
 <a name="SMAEMattr"></a>
 <b>Attribute</b>
 <ul>
   <a name="disableSernoInReading"></a>
-  <li><b>disableSernoInReading</b>  : prevents the prefix "SMAEM&lt;serialnumber_&gt;....."  </li>
+  <li><b>disableSernoInReading</b> <br>
+  prevents the prefix "SMAEM&lt;serialnumber_&gt;....."  
+  </li>
+  <br>
   
   <a name="feedinPrice"></a>
-  <li><b>feedinPrice</b>            : the individual amount of refund of one kilowatt hour</li>
+  <li><b>feedinPrice</b> <br>
+  the individual amount of refund of one kilowatt hour
+  </li>
+  <br>
   
   <a name="interval"></a>
-  <li><b>interval</b>               : evaluation interval in seconds </li>
+  <li><b>interval</b> <br>
+  evaluation interval in seconds 
+  </li>
+  <br>
   
   <a name="disable"></a>
-  <li><b>disable</b>                : 1 = the module is disabled </li>
+  <li><b>disable</b> <br>
+  1 = the module is disabled 
+  </li>
+  <br>
   
   <a name="diffAccept"></a>
-  <li><b>diffAccept</b>             : diffAccept determines the threshold,  up to that a calaculated difference between two 
-                                      straight sequently meter readings (Readings with *_Diff) should be commenly accepted (default = 10). <br>
-                                      Hence faulty DB entries with a disproportional high difference values will be eliminated, don't 
-									  tamper the result and the measure cycles will be discarded.  </li>
+  <li><b>diffAccept</b> <br>
+  diffAccept determines the threshold,  up to that a calaculated difference between two 
+  straight sequently meter readings (Readings with *_Diff) should be commenly accepted (default = 10). <br>
+  Hence faulty DB entries with a disproportional high difference values will be eliminated, don't 
+  tamper the result and the measure cycles will be discarded.  
+  </li>
+  <br>
   
   <a name="powerCost"></a>
-  <li><b>powerCost</b>              : the individual amount of power cost per kWh </li>
+  <li><b>powerCost</b> <br>
+  the individual amount of power cost per kWh 
+  </li>
+  <br>
   
   <a name="timeout"></a>
-  <li><b>timeout</b>                : adjustment timeout of backgound processing (default 60s). The value of timeout has to be higher than the value of "interval". </li> 
+  <li><b>timeout</b> <br>
+  adjustment timeout of backgound processing (default 60s). The value of timeout has to be higher than the value 
+  of "interval". 
+  </li> 
+  <br>
 </ul>
 <br>
 
@@ -1060,33 +1092,66 @@ However there are readings what maybe need some explanation. <br>
   </ul>  
   <br>
   
+<a name="SMAEMset"></a>
+<b>Set </b>
+<ul>
+  <li><b>reset</b> <br>
+  Es wird das automatisch erstellte File "cacheSMAEM" gelöscht. Das File wird durch das Modul wieder neu initialisiert
+  angelegt. Diese Funktion wird zur Rücksetzung eines eventuellen Fehlerzustandes des Devices verwendet, kann 
+  aber auch jederzeit ausgeführt werden.  
+  </li>
+  <br>  
+</ul>
+  
 <a name="SMAEMattr"></a>
 <b>Attribute</b>
 <ul>
   <a name="disableSernoInReading"></a>
-  <li><b>disableSernoInReading</b>  : unterdrückt das Prefix "SMAEM&lt;serialnumber_&gt;....."  </li>
+  <li><b>disableSernoInReading</b> <br>
+  unterdrückt das Prefix "SMAEM&lt;serialnumber_&gt;....."  
+  </li>
+  <br>
   
   <a name="feedinPrice"></a>
-  <li><b>feedinPrice</b>            : die individuelle Höhe der Vergütung pro Kilowattstunde </li>
+  <li><b>feedinPrice</b> <br>
+  die individuelle Höhe der Vergütung pro Kilowattstunde 
+  </li>
+  <br>
   
   <a name="interval"></a>
-  <li><b>interval</b>               : Auswertungsinterval in Sekunden </li>
+  <li><b>interval</b> <br>
+  Auswertungsinterval in Sekunden 
+  </li>
+  <br>
   
   <a name="disable"></a>
-  <li><b>disable</b>                : 1 = das Modul ist disabled </li>
+  <li><b>disable</b> <br>
+  1 = das Modul ist disabled 
+  </li>
+  <br>
   
   <a name="diffAccept"></a>
-  <li><b>diffAccept</b>             : diffAccept legt fest, bis zu welchem Schwellenwert eine berechnete positive Werte-Differenz 
-                                      zwischen zwei unmittelbar aufeinander folgenden Zählerwerten (Readings mit *_Diff) akzeptiert werden 
-									  soll (Standard ist 10). <br>
-								      Damit werden eventuell fehlerhafte Differenzen mit einem unverhältnismäßig hohen Differenzwert von der Berechnung 
-									  ausgeschlossen und der Messzyklus verworfen.  </li>
+  <li><b>diffAccept</b> <br>
+  diffAccept legt fest, bis zu welchem Schwellenwert eine berechnete positive Werte-Differenz 
+  zwischen zwei unmittelbar aufeinander folgenden Zählerwerten (Readings mit *_Diff) akzeptiert werden 
+  soll (Standard ist 10). <br>
+  Damit werden eventuell fehlerhafte Differenzen mit einem unverhältnismäßig hohen Differenzwert von der Berechnung 
+  ausgeschlossen und der Messzyklus verworfen.  
+  </li>
+  <br>
   
   <a name="powerCost"></a>
-  <li><b>powerCost</b>              : die individuelle Höhe der Stromkosten pro Kilowattstunde </li>
+  <li><b>powerCost</b> <br>
+  die individuelle Höhe der Stromkosten pro Kilowattstunde 
+  </li>
+  <br>
   
   <a name="timeout"></a>
-  <li><b>timeout</b>                : Einstellung timeout für Hintergrundverarbeitung (default 60s). Der timeout-Wert muss größer als das Wert von "interval" sein. </li> 
+  <li><b>timeout</b> <br>
+  Einstellung timeout für Hintergrundverarbeitung (default 60s). Der timeout-Wert muss größer als das Wert von 
+  "interval" sein. 
+  </li> 
+  <br>
 </ul>
 <br>
 
