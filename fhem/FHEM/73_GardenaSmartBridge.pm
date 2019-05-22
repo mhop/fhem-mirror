@@ -59,7 +59,7 @@ use strict;
 use warnings;
 use FHEM::Meta;
 
-my $version = "1.6.2";
+my $version = "1.6.3";
 
 
 sub GardenaSmartBridge_Initialize($) {
@@ -386,10 +386,10 @@ sub Write($@) {
         }
     );
 
-    Log3 $name, 4,
-"GardenaSmartBridge ($name) - Send with URL: $hash->{URL}$uri, HEADER: secret!, DATA: secret!, METHOD: $method";
-#     Log3 $name, 3,
-# "GardenaSmartBridge ($name) - Send with URL: $hash->{URL}$uri, HEADER: $header, DATA: $payload, METHOD: $method";
+#     Log3($name, 4,
+#         "GardenaSmartBridge ($name) - Send with URL: $hash->{URL}$uri, HEADER: secret!, DATA: secret!, METHOD: $method");
+    Log3($name, 3,
+        "GardenaSmartBridge ($name) - Send with URL: $hash->{URL}$uri, HEADER: $header, DATA: $payload, METHOD: $method");
 }
 
 sub ErrorHandling($$$) {
@@ -404,6 +404,12 @@ sub ErrorHandling($$$) {
       unless ( not defined( $param->{'device_id'} ) );
 
     my $dname = $dhash->{NAME};
+    
+    my $decode_json = eval { decode_json($data) };
+    if ($@) {
+        Log3 $name, 3,
+          "GardenaSmartBridge ($name) - JSON error while request";
+    }
 
     if ( defined($err) ) {
         if ( $err ne "" ) {
@@ -497,13 +503,10 @@ sub ErrorHandling($$$) {
         return;
     }
 
-    if ( defined($data)
-        and $data
-        and
-        (
-            ( $data =~ /Error/ )
-            or defined( eval { decode_json($data) }->{errors} )
-        )
+    if ( $data =~ /Error/
+      or (  defined( $decode_json )
+        and ref($decode_json) eq 'HASH'
+        and defined($decode_json->{errors}) )
       )
     {
         readingsBeginUpdate($dhash);
@@ -513,28 +516,28 @@ sub ErrorHandling($$$) {
         readingsBulkUpdate( $dhash, "lastRequestState", "request_error", 1 );
 
         if ( $param->{code} == 400 ) {
-            if ( eval { decode_json($data) } ) {
-                if ( ref( eval { decode_json($data) }->{errors} ) eq "ARRAY"
-                    and defined( eval { decode_json($data) }->{errors} ) )
+            if ( $decode_json ) {
+                if ( ref( $decode_json->{errors} ) eq "ARRAY"
+                    and defined( $decode_json->{errors} ) )
                 {
                     readingsBulkUpdate(
                         $dhash,
                         "state",
-                        eval { decode_json($data) }->{errors}[0]{error} . ' '
-                          . eval { decode_json($data) }->{errors}[0]{attribute},
+                        $decode_json->{errors}[0]{error} . ' '
+                          . $decode_json->{errors}[0]{attribute},
                         1
                     );
                     readingsBulkUpdate(
                         $dhash,
                         "lastRequestState",
-                        eval { decode_json($data) }->{errors}[0]{error} . ' '
-                          . eval { decode_json($data) }->{errors}[0]{attribute},
+                        $decode_json->{errors}[0]{error} . ' '
+                          . $decode_json->{errors}[0]{attribute},
                         1
                     );
                     Log3 $dname, 5,
                         "GardenaSmartBridge ($dname) - RequestERROR: "
-                      . eval { decode_json($data) }->{errors}[0]{error} . " "
-                      . eval { decode_json($data) }->{errors}[0]{attribute};
+                      . $decode_json->{errors}[0]{error} . " "
+                      . $decode_json->{errors}[0]{attribute};
                 }
             }
             else {
@@ -593,7 +596,8 @@ sub ErrorHandling($$$) {
 
     readingsSingleUpdate( $hash, 'state', 'connected to cloud', 1 )
       if ( defined( $hash->{helper}{locations_id} ) );
-    ResponseProcessing( $hash, $data );
+    ResponseProcessing( $hash, $data )
+        if ( ref($decode_json) eq 'HASH' );
 }
 
 sub ResponseProcessing($$) {
@@ -682,6 +686,9 @@ sub ResponseProcessing($$) {
 
                 Dispatch( $hash, $json, undef )
                   unless ( $decode_json->{category} eq 'gateway' );
+                WriteReadings($hash,$decode_json)
+                  if (  defined($decode_json->{category})
+                    and $decode_json->{category} eq 'gateway' );
             }
 
             ( $json, $tail ) = ParseJSON( $hash, $tail );
@@ -711,25 +718,64 @@ sub WriteReadings($$) {
         and defined( $decode_json->{name} )
         and $decode_json->{name} )
     {
-
         readingsBeginUpdate($hash);
-        readingsBulkUpdateIfChanged( $hash, 'name', $decode_json->{name} );
-        readingsBulkUpdateIfChanged( $hash, 'authorized_user_ids',
-            scalar( @{ $decode_json->{authorized_user_ids} } ) );
-        readingsBulkUpdateIfChanged( $hash, 'devices',
-            scalar( @{ $decode_json->{devices} } ) );
+        if ( $decode_json->{id} eq $hash->{helper}{locations_id} ) {
+            
+            readingsBulkUpdateIfChanged( $hash, 'name', $decode_json->{name} );
+            readingsBulkUpdateIfChanged( $hash, 'authorized_user_ids',
+                scalar( @{ $decode_json->{authorized_user_ids} } ) );
+            readingsBulkUpdateIfChanged( $hash, 'devices',
+                scalar( @{ $decode_json->{devices} } ) );
 
-        while ( ( my ( $t, $v ) ) = each %{ $decode_json->{geo_position} } ) {
-            $v = encode_utf8($v);
-            readingsBulkUpdateIfChanged( $hash, $t, $v );
+            while ( ( my ( $t, $v ) ) = each %{ $decode_json->{geo_position} } ) {
+                $v = encode_utf8($v);
+                readingsBulkUpdateIfChanged( $hash, $t, $v );
+            }
+
+            readingsBulkUpdateIfChanged( $hash, 'zones',
+                scalar( @{ $decode_json->{zones} } ) );
+        }    
+        elsif ( $decode_json->{id} ne $hash->{helper}{locations_id} ) {
+            my $properties = scalar( @{ $decode_json->{abilities}[0]{properties} } );
+            
+            do {
+                while ( ( my ( $t, $v ) ) = each %{ $decode_json->{abilities}[0]{properties}[$properties] } ) {
+                    next
+                    if ( ref($v) eq 'ARRAY');
+                    #$v = encode_utf8($v);
+                    readingsBulkUpdateIfChanged( $hash, $decode_json->{abilities}[0]{properties}[$properties]{name} . '-' . $t, $v )
+                    unless ( $decode_json->{abilities}[0]{properties}[$properties]{name} eq 'ethernet_status' 
+                            or $decode_json->{abilities}[0]{properties}[$properties]{name} eq 'wifi_status' );
+
+                    if ( ( $decode_json->{abilities}[0]{properties}[$properties]{name} eq 'ethernet_status'
+                        or $decode_json->{abilities}[0]{properties}[$properties]{name} eq 'wifi_status')
+                      and ref($v) eq 'HASH'
+                      )
+                    {
+                        if ( $decode_json->{abilities}[0]{properties}[$properties]{name} eq 'ethernet_status' ) {
+                            readingsBulkUpdateIfChanged( $hash, 'ethernet_status-mac', $v->{mac} );
+                            readingsBulkUpdateIfChanged( $hash, 'ethernet_status-ip', $v->{ip} )
+                              if ( ref($v->{ip}) ne 'HASH' );
+                            readingsBulkUpdateIfChanged( $hash, 'ethernet_status-isconnected', $v->{isconnected} );
+                        }
+                        elsif ( $decode_json->{abilities}[0]{properties}[$properties]{name} eq 'wifi_status') {
+                            readingsBulkUpdateIfChanged( $hash, 'wifi_status-ssid', $v->{ssid} );
+                            readingsBulkUpdateIfChanged( $hash, 'wifi_status-mac', $v->{mac} );
+                            readingsBulkUpdateIfChanged( $hash, 'wifi_status-ip', $v->{ip} )
+                              if ( ref($v->{ip}) ne 'HASH' );
+                            readingsBulkUpdateIfChanged( $hash, 'wifi_status-isconnected', $v->{isconnected} );
+                            readingsBulkUpdateIfChanged( $hash, 'wifi_status-signal', $v->{signal} );
+                        }
+                    }
+                }
+                $properties--;
+
+            } while ( $properties >= 0 );
         }
-
-        readingsBulkUpdateIfChanged( $hash, 'zones',
-            scalar( @{ $decode_json->{zones} } ) );
         readingsEndUpdate( $hash, 1 );
     }
 
-    Log3 $name, 3, "GardenaSmartBridge ($name) - readings would be written";
+    Log3 $name, 4, "GardenaSmartBridge ($name) - readings would be written";
 }
 
 ####################################
@@ -986,6 +1032,21 @@ sub createHttpValueStrings($@) {
               . $abilities
               . '/properties/watering_timer_'
               . $valve_id;
+
+        }
+        elsif ( defined($abilities)
+            and defined($payload)
+            and $abilities eq 'manual_watering' )
+        {
+            my $valve_id;
+            $method = 'PUT';
+
+            $uri .=
+                '/devices/'
+              . $deviceId
+              . '/abilities/'
+              . $abilities
+              . '/properties/manual_watering_timer';
 
         }
         elsif ( defined($abilities)

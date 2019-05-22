@@ -59,7 +59,7 @@ use strict;
 use warnings;
 use FHEM::Meta;
 
-my $version = "1.6.1";
+my $version = "1.6.2";
 
 sub GardenaSmartDevice_Initialize($) {
 
@@ -75,7 +75,7 @@ sub GardenaSmartDevice_Initialize($) {
     $hash->{AttrFn} = "FHEM::GardenaSmartDevice::Attr";
     $hash->{AttrList} =
         "readingValueLanguage:de,en "
-      . "model:watering_computer,sensor,mower,ic24,power "
+      . "model:watering_computer,sensor,mower,ic24,power,electronic_pressure_pump "
       . "IODev "
       . $readingFnAttributes;
 
@@ -243,8 +243,16 @@ sub Set($@) {
           SetPredefinedStartPoints( $hash, @args );
         return $err if ( defined($err) );
 
-    ### watering_computer
     }
+    ### electronic_pressure_pump
+    elsif ( lc $cmd eq 'pumptimer' ) {
+
+        my $duration = join( " ", @args );
+
+        $payload = '"name":"pump_manual_watering_timer","parameters":{"duration":'
+          . $duration . '}';
+    }
+    ### watering_computer
     elsif ( lc $cmd eq 'manualoverride' ) {
 
         my $duration = join( " ", @args );
@@ -281,9 +289,8 @@ sub Set($@) {
           . $duration
           . ',"valve_id":'
           . $valve_id . '}}';
-
-        ### Sensors
     }
+    ### Sensors
     elsif ( lc $cmd eq 'refresh' ) {
 
         my $sensname = join( " ", @args );
@@ -309,13 +316,20 @@ sub Set($@) {
         $list .=
 'parkUntilFurtherNotice:noArg parkUntilNextTimer:noArg startResumeSchedule:noArg startOverrideTimer:slider,0,60,1440 startpoint'
           if ( AttrVal( $name, 'model', 'unknown' ) eq 'mower' );
+
         $list .= 'manualOverride:slider,0,1,59 cancelOverride:noArg'
           if ( AttrVal( $name, 'model', 'unknown' ) eq 'watering_computer' );
+
+        $list .= 'pumpTimer:slider,0,1,59'
+          if ( AttrVal( $name, 'model', 'unknown' ) eq 'electronic_pressure_pump' );
+
         $list .=
 'manualDurationValve1:slider,1,1,59 manualDurationValve2:slider,1,1,59 manualDurationValve3:slider,1,1,59 manualDurationValve4:slider,1,1,59 manualDurationValve5:slider,1,1,59 manualDurationValve6:slider,1,1,59'
           if ( AttrVal( $name, 'model', 'unknown' ) eq 'ic24' );
+
         $list .= 'refresh:temperature,light,humidity'
           if ( AttrVal( $name, 'model', 'unknown' ) eq 'sensor' );
+
         $list .= 'on:noArg off:noArg on-for-timer:slider,0,1,60'
           if ( AttrVal( $name, 'model', 'unknown' ) eq 'power' );
 
@@ -331,6 +345,8 @@ sub Set($@) {
       if ( AttrVal( $name, 'model', 'unknown' ) eq 'ic24' );
     $abilities = 'power'
       if ( AttrVal( $name, 'model', 'unknown' ) eq 'power' );
+    $abilities = 'manual_watering'
+      if ( AttrVal( $name, 'model', 'unknown' ) eq 'electronic_pressure_pump' );
 
     $hash->{helper}{deviceAction} = $payload;
     readingsSingleUpdate( $hash, "state", "send command to gardena cloud", 1 );
@@ -351,7 +367,7 @@ sub Parse($$) {
     my $decode_json = eval { decode_json($json) };
     if ($@) {
         Log3 $name, 3,
-          "GardenaSmartBridge ($name) - JSON error while request: $@";
+          "GardenaSmartDevice ($name) - JSON error while request: $@";
     }
 
     Log3 $name, 4, "GardenaSmartDevice ($name) - ParseFn was called";
