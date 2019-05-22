@@ -331,8 +331,7 @@ sub SMAEM_DoParse ($) {
  my $data          = decode_base64($dataenc);
  my $discycles     = $hash->{HELPER}{FAULTEDCYCLES};
  my $diffaccept    = AttrVal($name, "diffAccept", 10);
- my @row_array;
- my @array;
+ my ($error,@row_array,@array);
  
  Log3 ($name, 4, "SMAEM $name -> Start BlockingCall SMAEM_DoParse");
  
@@ -343,7 +342,7 @@ sub SMAEM_DoParse ($) {
  if($hash->{HELPER}{READFILEERROR}) {
      my $retcode = SMAEM_getsum($hash,$smaserial);
 	 if ($retcode) {
-	     my $error = encode_base64($retcode,"");
+	     $error = encode_base64($retcode,"");
 	     Log3 ($name, 4, "SMAEM $name -> BlockingCall SMAEM_DoParse finished");
 		 $discycles++;
          return "$name|''|''|''|$error|$discycles|''"; 
@@ -402,13 +401,13 @@ sub SMAEM_DoParse ($) {
 			    # Zyklus verwerfen wenn Plausibilität nicht erfüllt
 				my $d = $bezug_wirk_count - $gridoutsum;
 			    my $errtxt = "cycle discarded due to allowed diff GRIDOUT exceeding, diff: $d";
-			    my $error = encode_base64($errtxt,"");
+			    $error = encode_base64($errtxt,"");
 				Log3 ($name, 1, "SMAEM $name - $errtxt");
 		        Log3 ($name, 4, "SMAEM $name -> BlockingCall SMAEM_DoParse finished");
 				$gridinsum = $einspeisung_wirk_count;
 				$gridoutsum = $bezug_wirk_count;
 		        $discycles++;
-                return "$name|''|$gridinsum|$gridoutsum|''|$discycles|''";     
+                return "$name|''|$gridinsum|$gridoutsum|$error|$discycles|''";     
 			}
         }
     }  
@@ -433,13 +432,13 @@ sub SMAEM_DoParse ($) {
 			    # Zyklus verwerfen wenn Plausibilität nicht erfüllt
 				my $d = $einspeisung_wirk_count - $gridinsum;
 			    my $errtxt = "cycle discarded due to allowed diff GRIDIN exceeding, diff: $d";
-			    my $error = encode_base64($errtxt,"");
+			    $error = encode_base64($errtxt,"");
 				Log3 ($name, 1, "SMAEM $name - $errtxt");
 		        Log3 ($name, 4, "SMAEM $name -> BlockingCall SMAEM_DoParse finished");
 				$gridinsum = $einspeisung_wirk_count;
 				$gridoutsum = $bezug_wirk_count;
 		        $discycles++;
-                return "$name|''|$gridinsum|$gridoutsum|''|$discycles|''";  
+                return "$name|''|$gridinsum|$gridoutsum|$error|$discycles|''";  
 			}
         }
     }
@@ -450,7 +449,7 @@ sub SMAEM_DoParse ($) {
 	
 	# error while writing values to file
 	if ($retcode) {
-	    my $error = encode_base64($retcode,"");
+	    $error = encode_base64($retcode,"");
 		Log3 ($name, 4, "SMAEM $name -> BlockingCall SMAEM_DoParse finished");
 		$discycles++;
         return "$name|''|''|''|$error|$discycles|''"; 
