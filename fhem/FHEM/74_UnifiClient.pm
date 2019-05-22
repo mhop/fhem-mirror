@@ -6,9 +6,11 @@
 ##############################################################################
 # V 0.0.1 BETA
 #  - feature: 74_UnifiClient: initial version
+# V 0.0.2 BETA
+#  - fixed: 74_UnifiClient: fixed Loglevel and disconnected state
 
 package main;
-my $version="0.0.1 BETA";
+my $version="0.0.2 BETA";
 my $thresholdBytesPerMinuteDefault=75000;
 my $maxOnlineMinutesPerDayDefault=2000;# deutlich mehr als 1440=24h
 # Laden evtl. abhängiger Perl- bzw. FHEM-Module
@@ -322,8 +324,8 @@ sub UnifiClient_Parse($$) {
 		# Daher Vorschlag define-Befehl: <NAME> <MODULNAME> <ADDRESSE>
         Log3 $name, 4, "$name ($self) - return: UNDEFINED UnifiClient_".$address." UnifiClient $address";
 		#return "UNDEFINED ".$address." UnifiClient $address";
-        # lieber kein autocreate ;-)
-		return undef;
+		return $io_hash->{NAME}; # kein autocreate
+		#return undef;
 	}
 }
 

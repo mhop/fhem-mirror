@@ -65,10 +65,13 @@
 #  - feature: 74_Unifi: read usergroups at define-module, new setter "refreshUsergroups" 
 #  - feature: 74_Unifi: new setter "removeClientReadings" 
 #  - feature: 74_Unifi: persist disconnected clients and rebuild them after fhem-restart
+# V 3.3.1
+#  - fixed:   74_Unifi: fixed Loglevel
+
 
 package main;
-my $version="3.3.0";
-# Default für clientRedings setzen. Die Readings waren der Standard vor Einführung des Attributes customClientReadings.
+my $version="3.3.1";
+# Default für clientReadings setzen. Die Readings waren der Standard vor Einführung des Attributes customClientReadings.
 # Eine Änderung hat Auswirkungen auf (alte) Moduldefinitionen ohne dieses Attribut.
 my $defaultClientReadings=".:^accesspoint|^essid|^hostname|^last_seen|^snr|^uptime"; #ist wegen snr vs rssi nur halb korrekt, wird aber auch nicht wirklich verwendet ;-)
 my $customClientName="";
@@ -111,7 +114,7 @@ sub Unifi_GetEvents_Receive($);
 sub Unifi_GetAccesspoints_Send($);
 sub Unifi_GetAccesspoints_Receive($);
 sub Unifi_ProcessUpdate($);
-sub Unifi_SetClientReadings($);
+sub Unifi_SetClientReadings($$);
 sub Unifi_SetHealthReadings($);
 sub Unifi_SetAccesspointReadings($);
 sub Unifi_SetWlanReadings($);
@@ -781,7 +784,7 @@ sub Unifi_Write($@){
 	my ($hash, @args) = @_;
 	my ($type, $id, $data)=@args;
 	my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
-	Log3 $name, 3, "$name ($self) - executed with ".$type;
+	Log3 $name, 4, "$name ($self) - executed with ".$type;
 	if($type eq "Unifi_DeviceRestJson_Send"){
 		Unifi_DeviceRestJson_Send($hash, $id, {port_overrides => $data });#id=ap_id
 	}elsif($type eq "Unifi_ApJson_Send"){
@@ -1047,6 +1050,7 @@ sub Unifi_UpdateClient_Receive($) {
     my ($param, $err, $data) = @_;
     my ($name,$self,$hash) = ($param->{hash}->{NAME},Unifi_Whoami(),$param->{hash});
     Log3 $name, 5, "$name ($self) - executed.";
+    #Log3 $name, 1, "$name ($self) - executed. $data";
     
     if ($err ne "") {
         Unifi_ReceiveFailure($hash,{rc => 'Error while requesting', msg => $param->{url}." - $err"});
@@ -1057,26 +1061,24 @@ sub Unifi_UpdateClient_Receive($) {
             
             if ($data->{meta}->{rc} eq "ok") {
                 Log3 $name, 5, "$name ($self) - state:'$data->{meta}->{rc}'";
-                
-                my $apNames = {};
-                for my $apID (keys %{$hash->{accespoints}}) {
-                  my $apRef = $hash->{accespoints}->{$apID};
-                  $apNames->{$apRef->{mac}} = $apRef->{name} ? $apRef->{name} : $apRef->{ip};
-                }
-                
+                                
                 for my $h (@{$data->{data}}) {
-                    $hash->{unifi}->{connectedClients}->{$h->{user_id}} = 1;
-                    $hash->{clients}->{$h->{user_id}} = $h;
+					if (defined $h->{ip}){
+						$hash->{unifi}->{connectedClients}->{$h->{_id}} = 1;
+					}else{
+						delete $hash->{unifi}->{connectedClients}->{$h->{_id}};
+					}
+                    $hash->{clients}->{$h->{_id}} = $h;
 					# mergen mit den clientInsights. ACHTUNG: dasselbe muss aufgrund unbekannter Reihenfolge der Aufrufe auch in GetClientInsights_Receive und GetClients_Receive durchgeführt werden.
-					if (defined $hash->{unifi}->{clientInsights}->{$h->{user_id}}){						
-						if (defined $hash->{unifi}->{clientInsights}->{$h->{user_id}}->{blocked} && $hash->{unifi}->{clientInsights}->{$h->{user_id}}->{blocked} eq JSON::true){
-							$hash->{clients}->{$h->{user_id}}->{blocked}=JSON::true;
+					if (defined $hash->{unifi}->{clientInsights}->{$h->{_id}}){						
+						if (defined $hash->{unifi}->{clientInsights}->{$h->{_id}}->{blocked} && $hash->{unifi}->{clientInsights}->{$h->{_id}}->{blocked} eq JSON::true){
+							$hash->{clients}->{$h->{_id}}->{blocked}=JSON::true;
 						}else{
-							$hash->{clients}->{$h->{user_id}}->{blocked}=JSON::false;
+							$hash->{clients}->{$h->{_id}}->{blocked}=JSON::false;
 						}
 					}
                     readingsBeginUpdate($hash);
-                    Unifi_SetClientReadings($hash);					
+                    Unifi_SetClientReadings($hash, $h->{_id});					
                     readingsEndUpdate($hash,1);
                 }
             }
@@ -1411,7 +1413,7 @@ sub Unifi_ProcessUpdate($) {
     readingsBeginUpdate($hash);
     #'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''#
     Unifi_SetHealthReadings($hash);
-    Unifi_SetClientReadings($hash);
+    Unifi_SetClientReadings($hash, undef);
     Unifi_SetAccesspointReadings($hash);
     Unifi_SetWlanReadings($hash);
     Unifi_SetVoucherReadings($hash);
@@ -1426,8 +1428,8 @@ sub Unifi_ProcessUpdate($) {
 }
 ###############################################################################
 
-sub Unifi_SetClientReadings($) {
-    my ($hash) = @_;
+sub Unifi_SetClientReadings($$) {
+    my ($hash, $updatedClientID) = @_;
     my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
     Log3 $name, 5, "$name ($self) - executed.";
 	
@@ -1445,134 +1447,135 @@ sub Unifi_SetClientReadings($) {
     my $blockedClients="";
     for my $clientID (keys %{$hash->{clients}}) {
         $clientRef = $hash->{clients}->{$clientID};
-        $clientName = Unifi_ClientNames($hash,$clientID,'makeAlias');
-						
-				
-		next if( $ignoreWired && $clientRef->{is_wired} );
-		next if( $ignoreWireless && !$clientRef->{is_wired} );
-		
-		# folgenden Block müsste man vielleicht besser in Unifi_GetClients_Receive() einbauen
-		# Da man hier aber eh über alle Clients iteriert passt das aber auch hier.
-		{
-			$apName = "unknown";
-			if ($clientRef->{is_wired}
-				&&  defined $clientRef->{sw_mac} && defined($apNames->{$clientRef->{sw_mac}}) ) {
-			  $apName = $apNames->{$clientRef->{sw_mac}};
-			} elsif (defined $clientRef->{ap_mac} && defined($apNames->{$clientRef->{ap_mac}}) ) {
-			  $apName = $apNames->{$clientRef->{ap_mac}};
-			}
-			$clientRef->{accesspoint}=$apName;
+		if(! defined $updatedClientID || $updatedClientID eq $clientID){
+			$clientName = Unifi_ClientNames($hash,$clientID,'makeAlias');
 			
-			# ein paar Daten auch formatiert zur Verfügung stellen
-			# falls man Sonderzeichen im WLAN-Namen hat und damit auf ein entsprechendes WLAN-Reading zugreifen möchte
-			$clientRef->{_f_essid}=makeReadingName($clientRef->{essid}); 
-			# Einige Zeitformatierungen:
-			$clientRef->{_f_last_seen}=strftime "%Y-%m-%d %H:%M:%S",localtime($clientRef->{last_seen}) if defined $clientRef->{last_seen};
-			$clientRef->{_f_latest_assoc_time}=strftime "%Y-%m-%d %H:%M:%S",localtime($clientRef->{latest_assoc_time}) if defined $clientRef->{latest_assoc_time};
-			$clientRef->{_f_first_seen}=strftime "%Y-%m-%d %H:%M:%S",localtime($clientRef->{first_seen}) if defined $clientRef->{first_seen};
-			$clientRef->{_f_last_seen_by_usw}=strftime "%Y-%m-%d %H:%M:%S",localtime($clientRef->{_last_seen_by_usw}) if defined $clientRef->{_last_seen_by_usw};
-			$clientRef->{_f_last_seen_by_ugw}=strftime "%Y-%m-%d %H:%M:%S",localtime($clientRef->{_last_seen_by_ugw}) if defined $clientRef->{_last_seen_by_ugw};
-			$clientRef->{_f_last_seen_by_uap}=strftime "%Y-%m-%d %H:%M:%S",localtime($clientRef->{_last_seen_by_uap}) if defined $clientRef->{_last_seen_by_uap};
-			if (defined $clientRef->{last_seen}){
-				my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)= gmtime(time() - $clientRef->{last_seen});
-				$clientRef->{_f_last_seen_duration}=$yday."d ".$hour."h ".$min."m ".$sec."s";
-			}
-			if (defined $clientRef->{uptime}){
-				my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)= gmtime($clientRef->{uptime});
-				$clientRef->{_f_uptime}=$yday."d ".$hour."h ".$min."m ".$sec."s";
-			}
-			if (defined $clientRef->{dhcpend_time}){
-				my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)= gmtime($clientRef->{dhcpend_time});
-				$clientRef->{_f_dhcpend_time}=$yday."d ".$hour."h ".$min."m ".$sec."s";
-			}
-			if (defined $clientRef->{assoc_time}){
-				my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)= gmtime($clientRef->{assoc_time});
-				$clientRef->{_f_assoc_time}=$yday."d ".$hour."h ".$min."m ".$sec."s";
-			}
-			if (defined $clientRef->{_uptime_by_usw}){
-				my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)= gmtime($clientRef->{_uptime_by_usw});
-				$clientRef->{_f_uptime_by_usw}=$yday."d ".$hour."h ".$min."m ".$sec."s";
-			}
-			if (defined $clientRef->{_uptime_by_ugw}){
-				my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)= gmtime($clientRef->{_uptime_by_ugw});
-				$clientRef->{_f_uptime_by_ugw}=$yday."d ".$hour."h ".$min."m ".$sec."s";
-			}
-			if (defined $clientRef->{_uptime_by_uap}){
-				my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)= gmtime($clientRef->{_uptime_by_uap});
-				$clientRef->{_f_uptime_by_uap}=$yday."d ".$hour."h ".$min."m ".$sec."s";
-			}
-			my $tx=ReadingsVal($name,$clientName."_tx_bytes","");
-			if ($tx ne "" && defined $clientRef->{tx_bytes}){
-				$clientRef->{_f_diff_tx_bytes}=($clientRef->{tx_bytes})-($tx);
-			}
+			next if( $ignoreWired && $clientRef->{is_wired} );
+			next if( $ignoreWireless && !$clientRef->{is_wired} );
 			
-            if (defined $clientRef->{usergroup_id} && defined $hash->{unifi}->{usergroups}->{$clientRef->{usergroup_id}}){	
-				$clientRef->{_f_usergroup_name}=$hash->{unifi}->{usergroups}->{$clientRef->{usergroup_id}}->{name};
-			}else{
-				$clientRef->{_f_usergroup_name}="Default";
-			}
-			
-			$clientRef->{fhem_clientName}=$clientName;
-		}
-		
-		if (defined $hash->{unifi}->{connectedClients}->{$clientID}) {			
-			if (! defined ReadingsVal($hash->{NAME},$clientName,undef)){
-			  $newClients.=$clientName.",";
-			}
-			$clientRef->{fhem_state}="connected";
-			readingsBulkUpdate($hash,$clientName,'connected');		
-			readingsBulkUpdate($hash,".".$clientName."_user_id",$clientRef->{user_id});			
-		}
-		elsif ((!defined($hash->{READINGS}->{$clientName})) || (defined($hash->{READINGS}->{$clientName}) && $hash->{READINGS}->{$clientName} ne "disconnected")) {
-			Log3 $name, 5, "$name ($self) - Client '$clientName' previously connected is now disconnected.";
-			if(defined $clientRef->{blocked} && $clientRef->{blocked} eq JSON::true){
-				$blockedClients.=$clientName.',';
-			}
-			$clientRef->{fhem_state}="disconnected";
-			readingsBulkUpdate($hash,$clientName,'disconnected');
-		}
-		
-		# altes Standardverhalten kann man auch ohne RegEx-Auswertungen beibehalten
-		if(AttrVal($name,"customClientReadings",$defaultClientReadings) eq $defaultClientReadings){ 
-			readingsBulkUpdate($hash,$clientName."_hostname",(defined $clientRef->{hostname}) ? $clientRef->{hostname} : (defined $clientRef->{ip}) ? $clientRef->{ip} : 'Unknown');
-			readingsBulkUpdate($hash,$clientName."_last_seen",strftime "%Y-%m-%d %H:%M:%S",localtime($clientRef->{last_seen}));
-			readingsBulkUpdate($hash,$clientName."_uptime",$clientRef->{uptime});
-			readingsBulkUpdate($hash,$clientName."_snr",$clientRef->{rssi});
-			# Da essid auch im Readingnamen bei WLAN verwendet wird, wird aus Konsistenzgründen hier beim ReadingValue ebenfalls makeReadingName() verwendet.
-			readingsBulkUpdate($hash,$clientName."_essid",makeReadingName($clientRef->{essid})); 
-			readingsBulkUpdate($hash,$clientName."_accesspoint",$clientRef->{accesspoint});
-		}
-		else{ # Auswerten des Attribute customClientReadings
-			for my $customClientReadingsPart (keys %{$hash->{unifi}->{customClientReadings}->{parts}}) {
-				my $reName = "";
-				my $nameRegEx=$hash->{unifi}->{customClientReadings}->{parts}->{$customClientReadingsPart}->{nameRegEx};
-				eval { $reName = qr/$nameRegEx/; };
-				if ($@){
-					Log3 $name, 2, "$name ($self) - Wrong RegEx (".$nameRegEx.") in name-part in attribute customClientReadings!";
+			# folgenden Block müsste man vielleicht besser in Unifi_GetClients_Receive() einbauen
+			# Da man hier aber eh über alle Clients iteriert passt das aber auch hier.
+			{
+				$apName = "unknown";
+				if ($clientRef->{is_wired}
+					&&  defined $clientRef->{sw_mac} && defined($apNames->{$clientRef->{sw_mac}}) ) {
+				  $apName = $apNames->{$clientRef->{sw_mac}};
+				} elsif (defined $clientRef->{ap_mac} && defined($apNames->{$clientRef->{ap_mac}}) ) {
+				  $apName = $apNames->{$clientRef->{ap_mac}};
 				}
-				else{
-					if($clientName =~ m/$reName/){ #matched der ClientName?
-						my $reReading = "";
-						my $readingRegEx=$hash->{unifi}->{customClientReadings}->{parts}->{$customClientReadingsPart}->{ReadingRegEx};
-						eval { $reReading = qr/($readingRegEx)/; };
-						if ($@){
-							Log3 $name, 2, "$name ($self) - Wrong RegEx (".$readingRegEx.") in reading-part in attribute customClientReadings!";
-						}
-						else{
-							for my $readingName (sort keys %{$clientRef	}) {
-								if($readingName =~ m/$reReading/){ #matched der ReadingName?
-									my $readingData = ((defined($clientRef->{$readingName})) ? $clientRef->{$readingName} : '');
-									readingsBulkUpdate($hash,$clientName."_".$readingName,$readingData);
+				$clientRef->{accesspoint}=$apName;
+				
+				# ein paar Daten auch formatiert zur Verfügung stellen
+				# falls man Sonderzeichen im WLAN-Namen hat und damit auf ein entsprechendes WLAN-Reading zugreifen möchte
+				$clientRef->{_f_essid}=makeReadingName($clientRef->{essid}); 
+				# Einige Zeitformatierungen:
+				$clientRef->{_f_last_seen}=strftime "%Y-%m-%d %H:%M:%S",localtime($clientRef->{last_seen}) if defined $clientRef->{last_seen};
+				$clientRef->{_f_latest_assoc_time}=strftime "%Y-%m-%d %H:%M:%S",localtime($clientRef->{latest_assoc_time}) if defined $clientRef->{latest_assoc_time};
+				$clientRef->{_f_first_seen}=strftime "%Y-%m-%d %H:%M:%S",localtime($clientRef->{first_seen}) if defined $clientRef->{first_seen};
+				$clientRef->{_f_last_seen_by_usw}=strftime "%Y-%m-%d %H:%M:%S",localtime($clientRef->{_last_seen_by_usw}) if defined $clientRef->{_last_seen_by_usw};
+				$clientRef->{_f_last_seen_by_ugw}=strftime "%Y-%m-%d %H:%M:%S",localtime($clientRef->{_last_seen_by_ugw}) if defined $clientRef->{_last_seen_by_ugw};
+				$clientRef->{_f_last_seen_by_uap}=strftime "%Y-%m-%d %H:%M:%S",localtime($clientRef->{_last_seen_by_uap}) if defined $clientRef->{_last_seen_by_uap};
+				if (defined $clientRef->{last_seen}){
+					my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)= gmtime(time() - $clientRef->{last_seen});
+					$clientRef->{_f_last_seen_duration}=$yday."d ".$hour."h ".$min."m ".$sec."s";
+				}
+				if (defined $clientRef->{uptime}){
+					my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)= gmtime($clientRef->{uptime});
+					$clientRef->{_f_uptime}=$yday."d ".$hour."h ".$min."m ".$sec."s";
+				}
+				if (defined $clientRef->{dhcpend_time}){
+					my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)= gmtime($clientRef->{dhcpend_time});
+					$clientRef->{_f_dhcpend_time}=$yday."d ".$hour."h ".$min."m ".$sec."s";
+				}
+				if (defined $clientRef->{assoc_time}){
+					my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)= gmtime($clientRef->{assoc_time});
+					$clientRef->{_f_assoc_time}=$yday."d ".$hour."h ".$min."m ".$sec."s";
+				}
+				if (defined $clientRef->{_uptime_by_usw}){
+					my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)= gmtime($clientRef->{_uptime_by_usw});
+					$clientRef->{_f_uptime_by_usw}=$yday."d ".$hour."h ".$min."m ".$sec."s";
+				}
+				if (defined $clientRef->{_uptime_by_ugw}){
+					my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)= gmtime($clientRef->{_uptime_by_ugw});
+					$clientRef->{_f_uptime_by_ugw}=$yday."d ".$hour."h ".$min."m ".$sec."s";
+				}
+				if (defined $clientRef->{_uptime_by_uap}){
+					my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)= gmtime($clientRef->{_uptime_by_uap});
+					$clientRef->{_f_uptime_by_uap}=$yday."d ".$hour."h ".$min."m ".$sec."s";
+				}
+				my $tx=ReadingsVal($name,$clientName."_tx_bytes","");
+				if ($tx ne "" && defined $clientRef->{tx_bytes}){
+					$clientRef->{_f_diff_tx_bytes}=($clientRef->{tx_bytes})-($tx);
+				}
+				
+				if (defined $clientRef->{usergroup_id} && defined $hash->{unifi}->{usergroups}->{$clientRef->{usergroup_id}}){	
+					$clientRef->{_f_usergroup_name}=$hash->{unifi}->{usergroups}->{$clientRef->{usergroup_id}}->{name};
+				}else{
+					$clientRef->{_f_usergroup_name}="Default";
+				}
+				
+				$clientRef->{fhem_clientName}=$clientName;
+			}
+			
+			if (defined $hash->{unifi}->{connectedClients}->{$clientID}) {			
+				if (! defined ReadingsVal($hash->{NAME},$clientName,undef)){
+				  $newClients.=$clientName.",";
+				}
+				$clientRef->{fhem_state}="connected";
+				readingsBulkUpdate($hash,$clientName,'connected');		
+				readingsBulkUpdate($hash,".".$clientName."_user_id",$clientRef->{user_id});			
+			}
+			elsif ((!defined($hash->{READINGS}->{$clientName})) || (defined($hash->{READINGS}->{$clientName}) && $hash->{READINGS}->{$clientName} ne "disconnected")) {
+				Log3 $name, 5, "$name ($self) - Client '$clientName' previously connected is now disconnected.";
+				if(defined $clientRef->{blocked} && $clientRef->{blocked} eq JSON::true){
+					$blockedClients.=$clientName.',';
+				}
+				$clientRef->{fhem_state}="disconnected";
+				readingsBulkUpdate($hash,$clientName,'disconnected');
+			}
+			
+			# altes Standardverhalten kann man auch ohne RegEx-Auswertungen beibehalten
+			if(AttrVal($name,"customClientReadings",$defaultClientReadings) eq $defaultClientReadings){ 
+				readingsBulkUpdate($hash,$clientName."_hostname",(defined $clientRef->{hostname}) ? $clientRef->{hostname} : (defined $clientRef->{ip}) ? $clientRef->{ip} : 'Unknown');
+				readingsBulkUpdate($hash,$clientName."_last_seen",strftime "%Y-%m-%d %H:%M:%S",localtime($clientRef->{last_seen}));
+				readingsBulkUpdate($hash,$clientName."_uptime",$clientRef->{uptime});
+				readingsBulkUpdate($hash,$clientName."_snr",$clientRef->{rssi});
+				# Da essid auch im Readingnamen bei WLAN verwendet wird, wird aus Konsistenzgründen hier beim ReadingValue ebenfalls makeReadingName() verwendet.
+				readingsBulkUpdate($hash,$clientName."_essid",makeReadingName($clientRef->{essid})); 
+				readingsBulkUpdate($hash,$clientName."_accesspoint",$clientRef->{accesspoint});
+			}
+			else{ # Auswerten des Attribute customClientReadings
+				for my $customClientReadingsPart (keys %{$hash->{unifi}->{customClientReadings}->{parts}}) {
+					my $reName = "";
+					my $nameRegEx=$hash->{unifi}->{customClientReadings}->{parts}->{$customClientReadingsPart}->{nameRegEx};
+					eval { $reName = qr/$nameRegEx/; };
+					if ($@){
+						Log3 $name, 2, "$name ($self) - Wrong RegEx (".$nameRegEx.") in name-part in attribute customClientReadings!";
+					}
+					else{
+						if($clientName =~ m/$reName/){ #matched der ClientName?
+							my $reReading = "";
+							my $readingRegEx=$hash->{unifi}->{customClientReadings}->{parts}->{$customClientReadingsPart}->{ReadingRegEx};
+							eval { $reReading = qr/($readingRegEx)/; };
+							if ($@){
+								Log3 $name, 2, "$name ($self) - Wrong RegEx (".$readingRegEx.") in reading-part in attribute customClientReadings!";
+							}
+							else{
+								for my $readingName (sort keys %{$clientRef	}) {
+									if($readingName =~ m/$reReading/){ #matched der ReadingName?
+										my $readingData = ((defined($clientRef->{$readingName})) ? $clientRef->{$readingName} : '');
+										readingsBulkUpdate($hash,$clientName."_".$readingName,$readingData);
+									}
 								}
 							}
 						}
 					}
 				}
 			}
+			
+			Log3 $name, 5, "$name ($self) - Dispatch: ".$clientName;
+			Dispatch($hash,"UnifiClient_".$clientName.encode_json($clientRef),undef);
 		}
-		
-        Log3 $name, 5, "$name ($self) - Dispatch: ".$clientName;
-		Dispatch($hash,"UnifiClient_".$clientName.encode_json($clientRef),undef);
     }
 	
 	$newClients =~ s/.$// if $newClients  ne "";

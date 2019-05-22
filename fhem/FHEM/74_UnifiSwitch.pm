@@ -68,7 +68,7 @@ sub UnifiSwitch_Define($$) {
     my ( $hash, $def) = @_;
 	my @a = split("[ \t][ \t]*", $def);
 	my $name = $a[0];
-    Log3 $name, 3, "UnifiSwitch_Define - executed. 0 ";
+    Log3 $name, 5, "UnifiSwitch_Define - executed. 0 ";
 	# zweites Argument ist die eindeutige Geräteadresse
 	my $address = $a[2];
     
