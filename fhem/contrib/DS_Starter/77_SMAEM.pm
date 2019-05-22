@@ -21,31 +21,9 @@
 #  - apt-get install install libio-socket-multicast-perl
 #
 #  Origin:
-#  https://github.com/kettenbach-it/FHEM-SMA-Speedwire
+#  https://gitlab.com/volkerkettenbach/FHEM-SMA-Speedwire
 #
-#################################################################################################
-# Versions History done by DS_Starter
-#
-# 3.3.0    21.05.2019     set reset to delete and reinitialize cacheFile 
-# 3.2.0    26.07.2018     log entry enhanced if diff overflow
-# 3.1.0    12.02.2018     extend error handling in define
-# 3.0.1    26.11.2017     use abort cause of BlockingCall
-# 3.0.0    29.09.2017     make SMAEM ready for multimeter usage
-# 2.9.1    29.05.2017     DbLog_splitFn added, some function names adapted
-# 2.9.0    25.05.2017     own SMAEM_setCacheValue, SMAEM_getCacheValue, new internal VERSION
-# 2.8.2    03.12.2016     Prefix SMAEMserialnumber for Reading "state" removed, commandref adapted
-# 2.8.1    02.12.2016     encode / decode $data 
-# 2.8.0    02.12.2016     plausibility check of measured differences, attr diffAccept, timeout
-#                         validation checks, improvement of failure prevention
-# 2.7.0    01.12.2016     logging of discarded cycles 
-# 2.6.0    01.12.2016     some improvements, better logging possibility
-# 2.5.0    30.11.2016     some improvements
-# 2.4.0    30.11.2016     some improvements, attributes disable, timeout for BlockingCall added
-# 2.3.0    30.11.2016     SMAEM_getsum, SMAEM_setsum changed
-# 2.2.0    29.11.2016     check error while writing values to file -> set state with error
-# 2.1.0    29.11.2016     move $hash->{GRIDin_SUM}, $hash->{GRIDOUT_SUM} calc to smaread_ParseDone,
-#                         some little improvements to logging process
-# 2.0.0    28.11.2016     switch to nonblocking
+################################################################################################# 
 
 package main;
 
@@ -54,8 +32,32 @@ use warnings;
 use bignum;
 use IO::Socket::Multicast;
 use Blocking;
+eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
-my $SMAEMVersion = "3.3.0";
+# Versions History done by DS_Starter 
+our %SMAEM_vNotesIntern = (
+  "3.4.0" => "22.05.2019  support of Installer.pm/Meta.pm added, new version maintenance ",
+  "3.3.0" => "21.05.2019  set reset to delete and reinitialize cacheFile, support of DelayedShutdownFn ",
+  "3.2.0" => "26.07.2018  log entry enhanced if diff overflow ",
+  "3.1.0" => "12.02.2018  extend error handling in define ",
+  "3.0.1" => "26.11.2017  use abort cause of BlockingCall ",
+  "3.0.0" => "29.09.2017  make SMAEM ready for multimeter usage ",
+  "2.9.1" => "29.05.2017  DbLog_splitFn added, some function names adapted ",
+  "2.9.0" => "25.05.2017  own SMAEM_setCacheValue, SMAEM_getCacheValue, new internal VERSION ",
+  "2.8.2" => "03.12.2016  Prefix SMAEMserialnumber for Reading \"state\" removed, commandref adapted ",
+  "2.8.1" => "02.12.2016  encode / decode \$data ",
+  "2.8.0" => "02.12.2016  plausibility check of measured differences, attr diffAccept, timeout ".
+                          "validation checks, improvement of failure prevention ",
+  "2.7.0" => "01.12.2016  logging of discarded cycles ",
+  "2.6.0" => "01.12.2016  some improvements, better logging possibility ",
+  "2.5.0" => "30.11.2016  some improvements ",
+  "2.4.0" => "30.11.2016  some improvements, attributes disable, timeout for BlockingCall added ",
+  "2.3.0" => "30.11.2016  SMAEM_getsum, SMAEM_setsum changed ",
+  "2.2.0" => "29.11.2016  check error while writing values to file -> set state with error ", 
+  "2.1.0" => "29.11.2016  move \$hash->{GRIDin_SUM}, \$hash->{GRIDOUT_SUM} calc to smaread_ParseDone, ".
+                          "some little improvements to logging process",
+  "2.0.0" => "28.11.2016  switch to nonblocking "
+);
 
 ###############################################################
 #                  SMAEM Initialize
@@ -79,6 +81,10 @@ sub SMAEM_Initialize ($) {
                                "powerCost ".
                                "timeout ".						
                                "$readingFnAttributes";
+                               
+  eval { FHEM::Meta::InitMod( __FILE__, $hash ) };           # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
+  
+return; 
 }
 
 ###############################################################
@@ -90,8 +96,7 @@ sub SMAEM_Define ($$) {
   my ($success, $gridin_sum, $gridout_sum);
   my $socket;
   
-  $hash->{INTERVAL}              = 60 ;
-  $hash->{VERSION}               = $SMAEMVersion;
+  $hash->{INTERVAL}              = 60;
   $hash->{HELPER}{FAULTEDCYCLES} = 0;
   $hash->{HELPER}{STARTTIME}     = time();
     
@@ -112,14 +117,20 @@ sub SMAEM_Define ($$) {
   
   $socket->mcast_add('239.12.255.254');
 
-  $hash->{TCPDev}= $socket;
-  $hash->{FD} = $socket->fileno();
+  $hash->{TCPDev} = $socket;
+  $hash->{FD}     = $socket->fileno();
   delete($readyfnlist{"$name"});
   $selectlist{"$name"} = $hash;
   
+  $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                         # Modul Meta.pm nicht vorhanden
+  
+  # Versionsinformationen setzen
+  SMAEM_setVersionInfo($hash);
+  
   # gespeicherte Serialnummern lesen und extrahieren
-  my $retcode = SMAEM_getserials($hash);
+  my $retcode = SMAEM_getserials($hash); 
   $hash->{HELPER}{READFILEERROR} = $retcode if($retcode);
+  
   
   if($hash->{HELPER}{ALLSERIALS}) {
       my @allserials = split(/_/,$hash->{HELPER}{ALLSERIALS});
@@ -327,10 +338,10 @@ return undef;
 sub SMAEM_DoParse ($) {
  my ($string) = @_;
  my ($name,$dataenc,$smaserial) = split("\\|", $string);
- my $hash          = $defs{$name};
- my $data          = decode_base64($dataenc);
- my $discycles     = $hash->{HELPER}{FAULTEDCYCLES};
- my $diffaccept    = AttrVal($name, "diffAccept", 10);
+ my $hash       = $defs{$name};
+ my $data       = decode_base64($dataenc);
+ my $discycles  = $hash->{HELPER}{FAULTEDCYCLES};
+ my $diffaccept = AttrVal($name, "diffAccept", 10);
  my ($error,@row_array,@array);
  
  Log3 ($name, 4, "SMAEM $name -> Start BlockingCall SMAEM_DoParse");
@@ -400,7 +411,8 @@ sub SMAEM_DoParse ($) {
 			} else {
 			    # Zyklus verwerfen wenn Plausibilität nicht erfüllt
 				my $d = $bezug_wirk_count - $gridoutsum;
-			    my $errtxt = "cycle discarded due to allowed diff GRIDOUT exceeding, diff: $d";
+			    my $errtxt = "Cycle discarded due to allowed diff \"$d\" GRIDOUT exceeding. \n".
+                             "Try to set attribute \"diffAccept > $d\" temporary.";
 			    $error = encode_base64($errtxt,"");
 				Log3 ($name, 1, "SMAEM $name - $errtxt");
 		        Log3 ($name, 4, "SMAEM $name -> BlockingCall SMAEM_DoParse finished");
@@ -431,7 +443,8 @@ sub SMAEM_DoParse ($) {
 			} else {
 			    # Zyklus verwerfen wenn Plausibilität nicht erfüllt
 				my $d = $einspeisung_wirk_count - $gridinsum;
-			    my $errtxt = "cycle discarded due to allowed diff GRIDIN exceeding, diff: $d";
+			    my $errtxt = "Cycle discarded due to allowed diff \"$d\" GRIDIN exceeding. \n".
+                             "Try to set attribute \"diffAccept > $d\" temporary.";
 			    $error = encode_base64($errtxt,"");
 				Log3 ($name, 1, "SMAEM $name - $errtxt");
 		        Log3 ($name, 4, "SMAEM $name -> BlockingCall SMAEM_DoParse finished");
@@ -894,6 +907,41 @@ sub SMAEM_setlastupdate ($$) {
 	
 return;
 }
+
+#############################################################################################
+#                          Versionierungen des Moduls setzen
+#                  Die Verwendung von Meta.pm und Packages wird berücksichtigt
+#############################################################################################
+sub SMAEM_setVersionInfo($) {
+  my ($hash) = @_;
+  my $name   = $hash->{NAME};
+
+  my $v                    = (sortTopicNum("desc",keys %SMAEM_vNotesIntern))[0];
+  my $type                 = $hash->{TYPE};
+  $hash->{HELPER}{PACKAGE} = __PACKAGE__;
+  $hash->{HELPER}{VERSION} = $v;
+  
+  if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
+	  # META-Daten sind vorhanden
+	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 49_SSCam.pm 19280 2019-04-28 17:20:21Z DS_Starter $ im Kopf komplett! vorhanden )
+		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
+	  } else {
+		  $modules{$type}{META}{x_version} = $v; 
+	  }
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCam.pm 19280 2019-04-28 17:20:21Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
+	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
+		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
+	      use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );                                          
+      }
+  } else {
+	  # herkömmliche Modulstruktur
+	  $hash->{VERSION} = $v;
+  }
+  
+return;
+}
  
 1;
 
@@ -1063,4 +1111,70 @@ Es gibt allerdings Readings die einer Erläuterung bedürfen. <br>
 <br>
 
 =end html_DE
+
+=for :application/json;q=META.json 77_SMAEM.pm
+{
+  "abstract": "Integration of one or more SMA Energy Meters.",
+  "x_lang": {
+    "de": {
+      "abstract": "Integration von einem oder mehreren SMA Energy Metern."
+    }
+  },
+  "keywords": [
+    "SMA",
+    "Photovoltaik",
+    "SMA Energy Meter"
+  ],
+  "version": "v1.1.1",
+  "release_status": "stable",
+  "author": [
+    "Volker Kettenbach <volker@kettenbach-it.de>",
+    "Heiko Maaz <heiko.maaz@t-online.de>",
+    null,
+    null
+  ],
+  "x_fhem_maintainer": [
+    "Volker Kettenbach",
+    "DS_Starter",
+    null,
+    null
+  ],
+  "x_fhem_maintainer_github": [
+    "Volker Kettenbach",
+    "nasseeder1",
+    null,
+    null
+  ],
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "FHEM": 5.00918799,
+        "perl": 5.014,
+        "bignum": 0,
+        "IO::Socket::Multicast": 0,
+        "Blocking": 0      
+      },
+      "recommends": {
+        "FHEM::Meta": 0
+      },
+      "suggests": {
+      }
+    }
+  },
+  "resources": {
+    "repository": {
+      "x_dev": {
+        "type": "git",
+        "url": "https://gitlab.com/volkerkettenbach/FHEM-SMA-Speedwire",
+        "web": "https://gitlab.com/volkerkettenbach/FHEM-SMA-Speedwire/blob/master/77_SMAEM.pm",
+        "x_branch": "dev",
+        "x_raw": "https://gitlab.com/volkerkettenbach/FHEM-SMA-Speedwire/raw/master/77_SMAEM.pm"
+      }      
+    }
+  },
+  "x_support_status": "supported"
+}
+=end :application/json;q=META.json
+
+=cut
 
