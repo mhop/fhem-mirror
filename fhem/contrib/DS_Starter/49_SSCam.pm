@@ -127,7 +127,7 @@ our %SSCam_vNotesIntern = (
   "4.2.0"  => "22.05.2018  PTZ-Panel integrated to created StreamDevice ",
   "4.1.0"  => "05.05.2018  use SYNO.SurveillanceStation.VideoStream instead of SYNO.SurveillanceStation.VideoStreaming, preparation for hls ",
   "4.0.0"  => "01.05.2018  AudioStream possibility added ",
-  "3.10.0"  => "24.04.2018  createStreamDev added, new features lastrec_fw_MJPEG, lastrec_fw_MPEG4/H.264 added to playback MPEG4/H.264 videos ",
+  "3.10.0" => "24.04.2018  createStreamDev added, new features lastrec_fw_MJPEG, lastrec_fw_MPEG4/H.264 added to playback MPEG4/H.264 videos ",
   "3.9.2"  => "21.04.2018  minor fixes ",
   "3.9.1"  => "20.04.2018  Attribute ptzPanel_use, initial webcommands in DeviceOverview changed, minor fixes ptzPanel ",
   "3.9.0"  => "17.04.2018  control panel & PTZcontrol weblink device for PTZ cams ",
@@ -199,7 +199,7 @@ our %SSCam_vNotesExtern = (
   "5.0.1"  => "12.06.2018 control of page refresh improved (for e.g. Floorplan,Dashboard) ",
   "4.2.0"  => "22.05.2018 PTZ-Panel integrated to created StreamDevice ",
   "4.0.0"  => "01.05.2018 AudioStream possibility added ",
-  "3.10.0"  => "24.04.2018 createStreamDev added, new features lastrec_fw_MJPEG, lastrec_fw_MPEG4/H.264 added to playback MPEG4/H.264 videos ",
+  "3.10.0" => "24.04.2018 createStreamDev added, new features lastrec_fw_MJPEG, lastrec_fw_MPEG4/H.264 added to playback MPEG4/H.264 videos ",
   "3.9.1"  => "20.04.2018 Attribute ptzPanel_use, initial webcommands in DeviceOverview changed, minor fixes ptzPanel ",
   "3.9.0"  => "17.04.2018 control panel & PTZcontrol weblink device for PTZ cams ",
   "3.8.4"  => "06.04.2018 Internal MODEL changed to SVS or \"CamVendor - CamModel\" for Cams ",
@@ -259,7 +259,7 @@ our %SSCam_vNotesExtern = (
 );
 
 # getestete SVS-Version
-my $compstat     = "8.2.3";
+my $compstat = "8.2.3";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -342,15 +342,15 @@ our %SSCam_ttips_de = (
 );
 
 # Standardvariablen und Forward-Deklaration
-my $SSCam_slim            = 3;                          # default Anzahl der abzurufenden Schnappschüsse mit snapGallery
-my $SSCAM_snum            = "1,2,3,4,5,6,7,8,9,10";     # mögliche Anzahl der abzurufenden Schnappschüsse mit snapGallery
+my $SSCam_slim  = 3;                                    # default Anzahl der abzurufenden Schnappschüsse mit snapGallery
+my $SSCAM_snum  = "1,2,3,4,5,6,7,8,9,10";               # mögliche Anzahl der abzurufenden Schnappschüsse mit snapGallery
 
-use vars qw($FW_ME);      # webname (default is fhem), used by 97_GROUP/weblink
-use vars qw($FW_subdir);  # Sub-path in URL, used by FLOORPLAN/weblink
-use vars qw($FW_room);    # currently selected room
-use vars qw($FW_detail);  # currently selected device for detail view
-use vars qw($FW_wname);   # Web instance
-sub FW_pH(@);             # add href
+use vars qw($FW_ME);                                    # webname (default is fhem), used by 97_GROUP/weblink
+use vars qw($FW_subdir);                                # Sub-path in URL, used by FLOORPLAN/weblink
+use vars qw($FW_room);                                  # currently selected room
+use vars qw($FW_detail);                                # currently selected device for detail view
+use vars qw($FW_wname);                                 # Web instance
+sub FW_pH(@);                                           # add href
 use vars qw(%SSCam_vHintsExt_en);
 use vars qw(%SSCam_vHintsExt_de);
 sub SSCam_TBotSendIt($$$$$$$;$$$);
@@ -366,8 +366,8 @@ sub SSCam_Initialize($) {
  $hash->{AttrFn}            = "SSCam_Attr";
  $hash->{DelayedShutdownFn} = "SSCam_DelayedShutdown";
  # Aufrufe aus FHEMWEB
- $hash->{FW_summaryFn} = "SSCam_FWsummaryFn";
- $hash->{FW_detailFn}  = "SSCam_FWdetailFn";
+ $hash->{FW_summaryFn}      = "SSCam_FWsummaryFn";
+ $hash->{FW_detailFn}       = "SSCam_FWdetailFn";
  $hash->{FW_deviceOverview} = 1;
  
  $hash->{AttrList} =
@@ -424,7 +424,7 @@ sub SSCam_Define($@) {
   #       ($hash)  [1]    [2]        [3]      [4]  
   #
   my ($hash, $def) = @_;
-  my $name = $hash->{NAME};
+  my $name         = $hash->{NAME};
   
  return "Error: Perl module ".$SScamMMDBI." is missing. Install it on Debian with: sudo apt-get install libjson-perl" if($SScamMMDBI);
   
@@ -3040,7 +3040,7 @@ sub SSCam_stopliveview ($) {
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         
         # Liveview stoppen           
-        $hash->{OPMODE} = "stopliveview";
+        $hash->{OPMODE}               = "stopliveview";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
         
         SSCam_setActiveToken($hash);
@@ -3366,8 +3366,8 @@ sub SSCam_getsnapinfo ($) {
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off" || ((defined $ta) && $ta == $tac)) {               
-        $hash->{OPMODE} = "getsnapinfo";
-		$hash->{OPMODE} = "getsnapgallery" if(exists($hash->{HELPER}{GETSNAPGALLERY}));
+        $hash->{OPMODE}               = "getsnapinfo";
+		$hash->{OPMODE}               = "getsnapgallery" if(exists($hash->{HELPER}{GETSNAPGALLERY}));
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		$hash->{HELPER}{SNAPLIMIT}    = $slim;   # 0-alle Snapshots werden abgerufen und ausgewertet, sonst $slim
 		$hash->{HELPER}{SNAPIMGSIZE}  = $ssize;  # 0-Do not append image, 1-Icon size, 2-Full size
@@ -3393,7 +3393,7 @@ sub SSCam_getsnapfilename ($) {
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {    
-        $hash->{OPMODE} = "getsnapfilename";
+        $hash->{OPMODE}               = "getsnapfilename";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
         
         SSCam_setActiveToken($hash);
@@ -3416,7 +3416,7 @@ sub SSCam_getsvsinfo ($) {
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
-        $hash->{OPMODE} = "getsvsinfo";
+        $hash->{OPMODE}               = "getsvsinfo";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
         SSCam_setActiveToken($hash);
@@ -3439,7 +3439,7 @@ sub SSCam_sethomemode ($) {
     return if(IsDisabled($name) || !defined($hash->{HELPER}{APIHMMAXVER}));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
-        $hash->{OPMODE} = "sethomemode";
+        $hash->{OPMODE}               = "sethomemode";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
         SSCam_setActiveToken($hash);
@@ -3462,7 +3462,7 @@ sub SSCam_setoptpar ($) {
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
-        $hash->{OPMODE} = "setoptpar";
+        $hash->{OPMODE}               = "setoptpar";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
         SSCam_setActiveToken($hash);
@@ -3485,7 +3485,7 @@ sub SSCam_gethomemodestate ($) {
     return if(IsDisabled($name) || !defined($hash->{HELPER}{APIHMMAXVER}));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
-        $hash->{OPMODE} = "gethomemodestate";
+        $hash->{OPMODE}               = "gethomemodestate";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
         SSCam_setActiveToken($hash);
@@ -3508,7 +3508,7 @@ sub SSCam_getsvslog ($) {
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
-        $hash->{OPMODE} = "getsvslog";
+        $hash->{OPMODE}               = "getsvslog";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
         SSCam_setActiveToken($hash);
@@ -3553,7 +3553,7 @@ sub SSCam_getcaminfo($) {
     return if(IsDisabled($name));
 
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
-        $hash->{OPMODE} = "Getcaminfo";
+        $hash->{OPMODE}               = "Getcaminfo";
         $hash->{HELPER}{LOGINRETRIES} = 0;	
         
         SSCam_setActiveToken($hash); 
@@ -3583,7 +3583,7 @@ sub SSCam_getstreamformat ($) {
     }
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
-        $hash->{OPMODE} = "getstreamformat";
+        $hash->{OPMODE}               = "getstreamformat";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
         SSCam_setActiveToken($hash); 
@@ -3607,7 +3607,7 @@ sub SSCam_getStmUrlPath ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         # Stream-Urls abrufen              
-        $hash->{OPMODE} = "getStmUrlPath";
+        $hash->{OPMODE}               = "getStmUrlPath";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
         
         SSCam_setActiveToken($hash);
@@ -3630,7 +3630,7 @@ sub SSCam_geteventlist ($) {
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {      
-        $hash->{OPMODE} = "geteventlist";
+        $hash->{OPMODE}               = "geteventlist";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
         
         SSCam_setActiveToken($hash);
@@ -3653,7 +3653,7 @@ sub SSCam_getmotionenum ($) {
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {   
-        $hash->{OPMODE} = "getmotionenum";
+        $hash->{OPMODE}               = "getmotionenum";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
         SSCam_setActiveToken($hash);
@@ -3677,7 +3677,7 @@ sub SSCam_getcapabilities ($) {
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                       
-        $hash->{OPMODE} = "Getcapabilities";
+        $hash->{OPMODE}               = "Getcapabilities";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
         
         SSCam_setActiveToken($hash);
@@ -3709,7 +3709,7 @@ sub SSCam_getptzlistpreset ($) {
     }
     
 	if ($hash->{HELPER}{ACTIVE} eq "off") {                       
-        $hash->{OPMODE} = "Getptzlistpreset";
+        $hash->{OPMODE}               = "Getptzlistpreset";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
         SSCam_setActiveToken($hash);
@@ -3741,7 +3741,7 @@ sub SSCam_getptzlistpatrol ($) {
     }
 
     if ($hash->{HELPER}{ACTIVE} ne "on") {                        
-        $hash->{OPMODE} = "Getptzlistpatrol";
+        $hash->{OPMODE}               = "Getptzlistpatrol";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
         
         SSCam_setActiveToken($hash);
@@ -4362,21 +4362,17 @@ sub SSCam_getcamid_parse ($) {
            # Ist der gesuchte Kameraname im Hash enhalten (in SVS eingerichtet ?)
            if (exists($allcams{$camname})) {
                $camid = $allcams{$camname};
-               # in hash eintragen
                $hash->{CAMID} = $camid;
                  
-               # Logausgabe
                Log3($name, 4, "$name - Detection Camid successful - $camname ID: $camid");
            
 		   } else {
                # Kameraname nicht gefunden, id = ""
-               # Setreading 
                readingsBeginUpdate($hash);
                readingsBulkUpdate($hash,"Errorcode","none");
                readingsBulkUpdate($hash,"Error","Camera(ID) not found in Surveillance Station");
                readingsEndUpdate($hash, 1);
                                   
-               # Logausgabe
                Log3($name, 2, "$name - ERROR - Cameraname $camname wasn't found in Surveillance Station. Check Userrights, Cameraname and Spelling");		   
                SSCam_delActiveToken($hash);
                return;
@@ -4495,7 +4491,6 @@ sub SSCam_camop ($) {
       # ein Schnappschuß wird ausgelöst
       $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&dsId=\"0\"&method=\"TakeSnapshot\"&version=\"$apitakesnapmaxver\"&camId=\"$camid\"&blSave=\"true\"&_sid=\"$sid\"";
       readingsSingleUpdate($hash,"state", "snap", 1); 
-      #readingsSingleUpdate($hash, "LastSnapId", "", 0);
    
    } elsif ($OpMode eq "SaveRec" || $OpMode eq "GetRec") {
       # eine Aufnahme soll in lokalem File (.mp4) gespeichert werden
@@ -5145,7 +5140,7 @@ sub SSCam_camop_parse ($) {
                 my $pname   = delete($hash->{HELPER}{PNAME});
                 my $pspeed  = delete($hash->{HELPER}{PSPEED});                
                 $pspeed     = $pspeed?$pspeed:"not set";
-                # Logausgabe
+
                 Log3($name, 3, "$name - Camera \"$camname\" preset \"$pname\" was saved to number $pnumber with speed $pspeed");
                 SSCam_getptzlistpreset($hash);
             
@@ -5166,7 +5161,6 @@ sub SSCam_camop_parse ($) {
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
        
-                # Logausgabe
                 my $piract = ($hash->{HELPER}{PIRACT} == 0)?"activated":"deactivated";
                 Log3($name, 3, "$name - PIR sensor $piract");
             
@@ -5207,7 +5201,6 @@ sub SSCam_camop_parse ($) {
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
        
-                # Logausgabe
                 my $sensitivity;
                 if ($hash->{HELPER}{MOTDETSC} eq "SVS" && keys %{$hash->{HELPER}{MOTDETOPTIONS}}) {
                     # Optionen für "SVS" sind gesetzt
@@ -5528,8 +5521,7 @@ sub SSCam_camop_parse ($) {
                 readingsBulkUpdate($hash,"Error","none");
                 readingsBulkUpdate($hash,"LastSnapFilename", $data->{'data'}{'data'}[0]{'fileName'});
                 readingsEndUpdate($hash, 1);
-                                
-                # Logausgabe
+
                 Log3($name, 4, "$name - Filename of Snap-ID $snapid is \"$data->{'data'}{'data'}[0]{'fileName'}\"") if($data->{'data'}{'data'}[0]{'fileName'});
             
 			} elsif ($OpMode eq "getstreamformat") {
@@ -5569,7 +5561,6 @@ sub SSCam_camop_parse ($) {
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
                                 
-                # Logausgabe
                 Log3($name, 3, "$name - Patrol \"$hash->{HELPER}{GOPATROLNAME}\" of camera $camname has been started successfully");
             
 			} elsif ($OpMode eq "goabsptz") {
@@ -5584,7 +5575,6 @@ sub SSCam_camop_parse ($) {
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
                                 
-                # Logausgabe
                 Log3($name, 3, "$name - Camera $camname has been moved to absolute position \"posX=$hash->{HELPER}{GOPTZPOSX}\" and \"posY=$hash->{HELPER}{GOPTZPOSY}\"");
             
 			} elsif ($OpMode eq "startTrack") {
@@ -5595,7 +5585,6 @@ sub SSCam_camop_parse ($) {
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
                                 
-                # Logausgabe
                 Log3($name, 3, "$name - Object tracking of Camera $camname has been switched on");
             
 			} elsif ($OpMode eq "stopTrack") {
@@ -5606,7 +5595,6 @@ sub SSCam_camop_parse ($) {
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
                                 
-                # Logausgabe
                 Log3($name, 3, "$name - Object tracking of Camera $camname has been stopped");
             
 			} elsif ($OpMode eq "movestart") {
@@ -5617,7 +5605,6 @@ sub SSCam_camop_parse ($) {
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
                                 
-                # Logausgabe
                 Log3($name, 3, "$name - Camera $camname started move to direction \"$hash->{HELPER}{GOMOVEDIR}\" with duration of $hash->{HELPER}{GOMOVETIME} s");
                 
                 RemoveInternalTimer($hash, "SSCam_movestop");
@@ -5660,7 +5647,6 @@ sub SSCam_camop_parse ($) {
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
                    
-                # Logausgabe
                 Log3($name, 3, "$name - Camera $camname has been disabled successfully");
             
 			} elsif ($OpMode eq "getsvsinfo") {
@@ -5798,8 +5784,7 @@ sub SSCam_camop_parse ($) {
 				readingsBulkUpdate($hash,"Errorcode","none");
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
-                     
-                # Logausgabe
+
                 Log3($name, $verbose, "$name - Stream-URLs of camera $camname retrieved");
             
 			} elsif ($OpMode eq "Getcaminfo") {
@@ -5984,7 +5969,6 @@ sub SSCam_camop_parse ($) {
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
        
-                # Logausgabe
                 Log3($name, $verbose, "$name - Query eventlist of camera $camname retrieved");
                 
                 # Versand Aufnahme initiieren
@@ -6056,7 +6040,6 @@ sub SSCam_camop_parse ($) {
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
        
-                # Logausgabe
                 Log3($name, $verbose, "$name - Enumerate motion detection parameters of camera $camname retrieved");
             
 			} elsif ($OpMode eq "Getcapabilities") {
@@ -6142,7 +6125,6 @@ sub SSCam_camop_parse ($) {
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
                   
-                # Logausgabe
                 Log3($name, $verbose, "$name - Capabilities of camera $camname retrieved");
             
 			} elsif ($OpMode eq "Getptzlistpreset") {
@@ -6167,7 +6149,6 @@ sub SSCam_camop_parse ($) {
                 my @preskeys = sort(keys(%{$hash->{HELPER}{ALLPRESETS}}));
                 my $presetlist = join(",",@preskeys);
 
-                # Setreading 
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"Presets",$presetlist);
                 readingsBulkUpdate($hash,"PresetHome",$home);
@@ -6178,7 +6159,6 @@ sub SSCam_camop_parse ($) {
                 # spezifische Attribute für PTZ-Cams verfügbar machen
                 SSCam_addptzattr($name);
                              
-                # Logausgabe
                 Log3($name, $verbose, "$name - PTZ Presets of camera $camname retrieved");
             
 			} elsif ($OpMode eq "Getptzlistpatrol") {
@@ -6204,7 +6184,6 @@ sub SSCam_camop_parse ($) {
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
                      
-                # Logausgabe
                 Log3($name, $verbose, "$name - PTZ Patrols of camera $camname retrieved");
             }
             
@@ -6216,7 +6195,6 @@ sub SSCam_camop_parse ($) {
             # Fehlertext zum Errorcode ermitteln
             $error = SSCam_experror($hash,$errorcode);
 			
-            # Setreading 
             readingsBeginUpdate($hash);
             readingsBulkUpdate($hash,"Errorcode",$errorcode);
             readingsBulkUpdate($hash,"Error",$error);
@@ -6227,7 +6205,6 @@ sub SSCam_camop_parse ($) {
 		       return SSCam_login($hash,'SSCam_getapisites');
 		    }
        
-            # Logausgabe
             Log3($name, 2, "$name - ERROR - Operation $OpMode of Camera $camname was not successful. Errorcode: $errorcode - $error");
        }
    }
@@ -6353,13 +6330,11 @@ sub SSCam_login_return ($) {
             # Session ID in hash eintragen
             $hash->{HELPER}{SID} = $sid;
        
-            # Setreading 
             readingsBeginUpdate($hash);
             readingsBulkUpdate($hash,"Errorcode","none");
             readingsBulkUpdate($hash,"Error","none");
             readingsEndUpdate($hash, 1);
        
-            # Logausgabe
             Log3($name, 4, "$name - Login of User $username successful - SID: $sid");
 			
 			return &$subref($hash);
@@ -6371,13 +6346,11 @@ sub SSCam_login_return ($) {
             # Fehlertext zum Errorcode ermitteln
             my $error = SSCam_experrorauth($hash,$errorcode);
 
-            # Setreading 
             readingsBeginUpdate($hash);
             readingsBulkUpdate($hash,"Errorcode",$errorcode);
             readingsBulkUpdate($hash,"Error",$error);
             readingsEndUpdate($hash, 1);
        
-            # Logausgabe
             Log3($name, 3, "$name - Login of User $username unsuccessful. Code: $errorcode - $error - try again"); 
              
             return SSCam_login($hash,$fret);
@@ -6529,9 +6502,8 @@ sub SSCam_Autocreate ($$) {
            if($success) {
                CommandSet(undef, "$camname credentials $username $password");   
            }
-                     
-           #InternalTimer(gettimeofday()+1.8, "SSCam_addptzattr", "$name", 0);
        }
+       
    } else {
        Log3($name, 4, "$name - Autocreate - SVS camera \"$sn\" already defined by \"$dcn\" ");
        $camname = "";
@@ -6560,7 +6532,7 @@ sub SSCam_evaljson($$) {
           } 
       } else {
           $success = 0;
-          # Setreading 
+
           readingsBeginUpdate($hash);
           readingsBulkUpdate($hash,"Errorcode","none");
           readingsBulkUpdate($hash,"Error","malformed JSON string received");
@@ -6817,13 +6789,6 @@ sub SSCam_ptzpanel($;$$) {
   my $rowisset   = 0;
   my $ptz_ret;
   my $row;
-  
-  #my @vl = split (/\.|-/,ReadingsVal($name, "SVSversion", ""));
-  #if(@vl) {
-  #    my $actvs = $vl[0];
-  #    $actvs   .= $vl[1];
-  #    return "" if($actvs <= 71);
-  #}
   
   return "" if(SSCam_myVersion($hash) <= 71);
   
@@ -7593,9 +7558,9 @@ return $htmlCode;
 
 ##############################################################################
 #              Auflösung Errorcodes bei Login / Logout
+#              Übernahmewerte sind $hash, $errorcode
 ##############################################################################
 sub SSCam_experrorauth ($$) {
-  # Übernahmewerte sind $hash, $errorcode
   my ($hash,$errorcode) = @_;
   my $device = $hash->{NAME};
   my $error;
@@ -7610,9 +7575,9 @@ return ($error);
 
 ##############################################################################
 #  Auflösung Errorcodes SVS API
+#  Übernahmewerte sind $hash, $errorcode
 ##############################################################################
 sub SSCam_experror ($$) {
-  # Übernahmewerte sind $hash, $errorcode
   my ($hash,$errorcode) = @_;
   my $device = $hash->{NAME};
   my $error;
