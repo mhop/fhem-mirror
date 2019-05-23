@@ -161,11 +161,19 @@
 #   Allow caption in sendImage also with \n\t
 # 2.8 2018-03-11  more silent cmds, caption formatting, several fixes 
 
+#   Pull request: silentDocument, silentLocation, silentVoice
+#   Corrections for single peer not needed for sent command
+#   single peer limited for reply and other change messages
+#   Allow \s for space in message (allows multiple spaces in preformatted messages)
+#   Document \n \t \s in messages
+#   Corrected Eol
+# 2.9 2019-05-23  allow \s, addtl silenCmds, fixes 
+
 #   
 ##############################################################################
 # TASKS 
+#   Restructure help in logical blocks
 #   
-#   additional silent commands
 #   
 #   queryDialogStart / queryDialogEnd - keep msg id 
 #   
@@ -175,7 +183,6 @@
 #   
 #   replyKeyboardRemove - #msg592808
 #   
-#   \n in inline keyboards - not possible currently
 #   
 ##############################################################################
 
@@ -231,6 +238,9 @@ my %sets = (
   "silentmsg" => "textField",
   "silentImage" => "textField",
   "silentInline" => "textField",
+  "silentDocument" => "textField",
+  "silentLocation" => "textField",
+  "silentVoice" => "textField",
 
   "msgDelete" => "textField",
 
@@ -493,7 +503,7 @@ sub TelegramBot_Set($@)
   
   if( ($cmd eq 'message') || ($cmd eq 'queryInline') || ($cmd eq 'queryEditInline') || ($cmd eq 'queryAnswer') || 
       ($cmd eq 'msg') || ($cmd eq '_msg') || ($cmd eq 'reply') || ($cmd eq 'msgEdit') || ($cmd eq 'msgForceReply') || 
-      ($cmd eq 'silentmsg') || ($cmd eq 'silentImage')  || ($cmd eq 'silentInline') || ($cmd =~ /^send.*/ ) ) {
+      ($cmd =~ /^silent.*/ ) || ($cmd =~ /^send.*/ ) ) {
 
     my $msgid;
     my $msg;
@@ -503,6 +513,7 @@ sub TelegramBot_Set($@)
     my $peers;
     my $inline = 0;
     my $needspeer = 1;
+    my $singlepeer = 0;
     
     if ( ($cmd eq 'reply') || ($cmd eq 'msgEdit' ) || ($cmd eq 'queryEditInline' ) ) {
       return "TelegramBot_Set: Command $cmd, no msgid and no text/file specified" if ( $numberOfArgs < 3 );
@@ -510,6 +521,8 @@ sub TelegramBot_Set($@)
       return "TelegramBot_Set: Command $cmd, msgId must be given as first parameter before peer" if ( $msgid =~ /^@/ );
       $numberOfArgs--;
       # all three messages need also a peer/chat_id
+      # but only a single peer is needed
+      $singlepeer = 1;
     } elsif ($cmd eq 'queryAnswer')  {
       $needspeer = 0;
     }
@@ -517,7 +530,7 @@ sub TelegramBot_Set($@)
     # special options
     $inline = 1 if ( ($cmd eq 'queryInline') || ($cmd eq 'queryEditInline') || ($cmd eq 'silentInline') );
     $options .= " -force_reply- " if ($cmd eq 'msgForceReply');
-    $options .= " -silent- " if ( ($cmd eq 'silentmsg') || ($cmd eq 'silentImage') || ($cmd eq 'silentInline') ) ;
+    $options .= " -silent- " if ( ($cmd =~ /^silent.*/ ) ) ;
     
     
     return "TelegramBot_Set: Command $cmd, no peers and no text/file specified" if ( $numberOfArgs < 2 );
@@ -525,7 +538,7 @@ sub TelegramBot_Set($@)
 
     while ( $args[0] =~ /^@(..+)$/ ) {
       my $ppart = $1;
-      return "TelegramBot_Set: Command $cmd, need exactly one peer" if ( ($cmd eq 'reply') && ( defined( $peers ) ) );
+      return "TelegramBot_Set: Command $cmd, need exactly one peer" if ( ($singlepeer) && ( defined( $peers ) ) );
       $peers .= " " if ( defined( $peers ) );
       $peers = "" if ( ! defined( $peers ) );
       $peers .= $ppart;
@@ -545,13 +558,13 @@ sub TelegramBot_Set($@)
     }
     if ( ($cmd eq 'sendPhoto') || ($cmd eq 'sendImage') || ($cmd eq 'image') || ($cmd eq 'silentImage')  ) {
       $sendType = 1;
-    } elsif ($cmd eq 'sendVoice')  {
+    } elsif ( ($cmd eq 'sendVoice')  || ($cmd eq 'silentVoice') ) {
       $sendType = 2;
-    } elsif ( ($cmd eq 'sendDocument') || ($cmd eq 'sendMedia') ) {
+    } elsif ( ($cmd eq 'sendDocument') || ($cmd eq 'sendMedia')  || ($cmd eq 'silentDocument') ) {
       $sendType = 3;
     } elsif ( ($cmd eq 'msgEdit') || ($cmd eq 'queryEditInline') )  {
       $sendType = 10;
-    } elsif ($cmd eq 'sendLocation')  {
+    } elsif ( ($cmd eq 'sendLocation') || ($cmd eq 'silentLocation') )  {
       $sendType = 11;
     } elsif ($cmd eq 'queryAnswer')  {
       $sendType = 12;
@@ -661,7 +674,6 @@ sub TelegramBot_Set($@)
     my $peers;
     while ( $args[0] =~ /^@(..+)$/ ) {
       my $ppart = $1;
-      return "TelegramBot_Set: Command $cmd, need exactly one peer" if ( ( defined( $peers ) ) );
       $peers .= " " if ( defined( $peers ) );
       $peers = "" if ( ! defined( $peers ) );
       $peers .= $ppart;
@@ -1783,6 +1795,7 @@ sub TelegramBot_SendIt($$$$$;$$$)
        } else {
         $hash->{sentMsgText} = $msg;
        }
+      $msg =~ s/(?<![\\])\\s/ /g;
       $msg =~ s/(?<![\\])\\n/\x0A/g;
       $msg =~ s/(?<![\\])\\t/\x09/g;
 
@@ -3491,6 +3504,8 @@ sub TelegramBot_BinaryFileWrite($$$) {
     <li><code>message|msg|_msg|send [ @&lt;peer1&gt; ... @&lt;peerN&gt; ] [ (&lt;keyrow1&gt;) ... (&lt;keyrowN&gt;) ] &lt;text&gt;</code><br>Sends the given message to the given peer or if peer(s) is ommitted currently defined default peer user. Each peer given needs to be always prefixed with a '@'. Peers can be specified as contact ids, full names (with underscore instead of space), usernames (prefixed with another @) or chat names (also known as groups in telegram groups must be prefixed with #). Multiple peers are to be separated by space<br>
     A reply keyboard can be specified by adding a list of strings enclosed in parentheses "()". Each separate string will make one keyboard row in a reply keyboard. The different keys in the row need to be separated by |. The key strings can contain spaces.<br>
     Messages do not need to be quoted if containing spaces. If you want to use parentheses at the start of the message than add one extra character before the parentheses (i.e. an underline) to avoid the message being parsed as a keyboard <br>
+    Messages can also contain special characters for the message. These include newline =&#92;n, tab = &#92;t and also a normal space = &#92;s <br>
+
     Examples:<br>
       <dl>
         <dt><code>set aTelegramBotDevice message @@someusername a message to be sent</code></dt>
@@ -3512,7 +3527,7 @@ sub TelegramBot_BinaryFileWrite($$$) {
       <dl>
     </li>
     
-    <li><code>silentmsg, silentImage, silentInline ...</code><br>Sends the given message silently (with disabled_notifications) to the recipients. Syntax and parameters are the same as in the corresponding send/message command.
+    <li><code>silentmsg, silentImage, silentDocument, silentLocation, silentVoice , silentInline ...</code><br>Sends the given message silently (with disabled_notifications) to the recipients. Syntax and parameters are the same as in the corresponding send/message command.
     </li>
     
     <li><code>msgForceReply [ @&lt;peer1&gt; ... @&lt;peerN&gt; ] &lt;text&gt;</code><br>Sends the given message to the recipient(s) and requests (forces) a reply. Handling of peers is equal to the message command. Adding reply keyboards is currently not supported by telegram.
