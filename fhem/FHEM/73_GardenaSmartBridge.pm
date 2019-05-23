@@ -386,10 +386,10 @@ sub Write($@) {
         }
     );
 
-#     Log3($name, 4,
-#         "GardenaSmartBridge ($name) - Send with URL: $hash->{URL}$uri, HEADER: secret!, DATA: secret!, METHOD: $method");
-    Log3($name, 3,
-        "GardenaSmartBridge ($name) - Send with URL: $hash->{URL}$uri, HEADER: $header, DATA: $payload, METHOD: $method");
+    Log3($name, 4,
+        "GardenaSmartBridge ($name) - Send with URL: $hash->{URL}$uri, HEADER: secret!, DATA: secret!, METHOD: $method");
+#     Log3($name, 3,
+#         "GardenaSmartBridge ($name) - Send with URL: $hash->{URL}$uri, HEADER: $header, DATA: $payload, METHOD: $method");
 }
 
 sub ErrorHandling($$$) {
