@@ -38,7 +38,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "2.0";
+my $version = "2.01";
 
 #-- these we may get on request
 my %gets = (
@@ -52,7 +52,8 @@ my %gets = (
 my %setssw = (
   "on"            => "O",
   "off"           => "F",
-  "on-for-timer"  => "T",
+  "toggle"        => "T",
+  "on-for-timer"  => "X",
   "off-for-timer" => "E",
   "config"        => "K",
   "password"      => "W"
@@ -71,7 +72,8 @@ my %setsrol = (
 my %setsrgbww = (
   "on"            => "O",
   "off"           => "F",
-  "on-for-timer"  => "T",
+  "toggle"        => "T",
+  "on-for-timer"  => "X",
   "off-for-timer" => "E",
   "config"        => "K",
   "password"      => "P",
@@ -81,7 +83,8 @@ my %setsrgbww = (
 my %setsrgbwc = (
   "on"            => "O",
   "off"           => "F",
-  "on-for-timer"  => "T",
+  "toggle"        => "T",
+  "on-for-timer"  => "X",
   "off-for-timer" => "E",
   "config"        => "K",
   "password"      => "P",
@@ -266,6 +269,7 @@ sub Shelly_Attr(@) {
 
     #-- always clear readings for meters
     fhem("deletereading ".$name." power.*");
+    fhem("deletereading ".$name." energy.*");
     fhem("deletereading ".$name." overpower.*");
     
     #-- change attribute list for model 2/rgbw w. hidden AttrList
@@ -292,6 +296,7 @@ sub Shelly_Attr(@) {
     }
     if( $model =~ /shelly2.*/ ){
       fhem("deletereading ".$name." power.*");
+      fhem("deletereading ".$name." energy.*");
       fhem("deletereading ".$name." overpower.*");
       if( $attrVal !~ /((relay)|(roller))/){
         Log3 $name,1,"[Shelly_Attr] wrong mode value $attrVal, must be relay or roller";
@@ -306,6 +311,7 @@ sub Shelly_Attr(@) {
       }    
     }elsif( $model eq "shellyrgbw" ){
       fhem("deletereading ".$name." power.*");
+      fhem("deletereading ".$name." energy.*");
       fhem("deletereading ".$name." overpower.*");
       if( $attrVal !~ /((white)|(color))/){
         Log3 $name,1,"[Shelly_Attr] wrong mode value $attrVal, must be white or color";
@@ -471,7 +477,7 @@ sub Shelly_Set ($@) {
       my $subs = ($shelly_models{$model}[0] ==1) ? "" : "_".$value;
       readingsSingleUpdate( $hash, "button".$subs, $ison, 1 )
     #-- now real commands
-    }elsif( $cmd =~ /^((on)|(off)).*/ ){
+    }elsif( $cmd =~ /^((on)|(off)|(toggle)).*/ ){
       $channel = $value;
       if( $cmd =~ /(.*)-for-timer/ ){
         $time = $value;
@@ -501,6 +507,10 @@ sub Shelly_Set ($@) {
           return $msg;
         }
         $cmd = $cmd."&timer=$time";
+      }
+      if( $cmd eq "toggle"){
+        my $subs = ($shelly_models{$model}[0] ==1) ? "" : "_".$value;
+        $cmd = (ReadingsVal($name,"relay".$subs,"off") eq "on") ? "off" : "on";
       }
       Shelly_onoff($hash,$channel,"?turn=".$cmd);
     }
@@ -567,7 +577,7 @@ sub Shelly_Set ($@) {
       return "[Shelly_Set] Unknown argument " . $cmd . ", choose one of ".$newkeys;
     }
     
-    if( $cmd =~ /^((on)|(off)).*/ ){
+    if( $cmd =~ /^((on)|(off)|(toggle)).*/ ){
       $channel = $value;
       if( $cmd =~ /(.*)-for-timer/ ){
         $time = $value;
@@ -593,6 +603,9 @@ sub Shelly_Set ($@) {
           return $msg;
         }
         $cmd = $cmd."&timer=$time";
+      }
+      if( $cmd eq "toggle"){
+        $cmd = (ReadingsVal($name,"state","off") eq "on") ? "off" : "on";
       }
       Shelly_dim($hash,"white/$channel","?turn=".$cmd);
       #Shelly_onoff($hash,"white/$channel","?turn=".$cmd);
@@ -624,7 +637,7 @@ sub Shelly_Set ($@) {
       return "[Shelly_Set] Unknown argument " . $cmd . ", choose one of ".$newkeys;
     }
 
-    if( $cmd =~ /^((on)|(off)).*/ ){
+    if( $cmd =~ /^((on)|(off)|(toggle)).*/ ){
       $channel = 0;
  
       if( $cmd =~ /(.*)-for-timer/ ){
@@ -636,6 +649,9 @@ sub Shelly_Set ($@) {
           return $msg;
         }
         $cmd = $cmd."&timer=$time";
+      }
+      if( $cmd eq "toggle"){
+        $cmd = (ReadingsVal($name,"state","off") eq "on") ? "off" : "on";
       }
       Shelly_dim($hash,"color/0","?turn=".$cmd);
       #Shelly_onoff($hash,"color/0","?turn=".$cmd);
@@ -834,7 +850,7 @@ sub Shelly_pwd($){
   my $dimmers  = $shelly_models{$model}[2];
   my $meters   = $shelly_models{$model}[3];
   
-  my ($subs,$ison,$overpower,$rpower,$rstate,$power,$rstopreason,$rcurrpos,$position,$rlastdir,$pct,$pctnormal);
+  my ($subs,$ison,$overpower,$rpower,$rstate,$power,$energy,$rstopreason,$rcurrpos,$position,$rlastdir,$pct,$pctnormal);
   
   readingsBeginUpdate($hash);
   readingsBulkUpdateIfChanged($hash,"network","connected",1);
@@ -858,7 +874,9 @@ sub Shelly_pwd($){
     for( my $i=0;$i<$meters;$i++){
       $subs  = ($meters == 1) ? "" : "_".$i;
       $power = $jhash->{'meters'}[$i]{'power'};
+      $energy = int($jhash->{'meters'}[$i]{'total'}/6)/10;
       readingsBulkUpdateIfChanged($hash,"power".$subs,$power);
+      readingsBulkUpdateIfChanged($hash,"energy".$subs,$energy);
     }
     
   #-- we have a Shelly 2 roller type device
@@ -964,7 +982,9 @@ sub Shelly_pwd($){
     for( my $i=0;$i<$meters;$i++){
       $subs  = ($meters == 1) ? "" : "_".$i;
       $power = $jhash->{'meters'}[$i]{'power'};
-      readingsBulkUpdateIfChanged($hash,"power".$subs,$power);  
+      $energy = int($jhash->{'meters'}[$i]{'total'}/6)/10;
+      readingsBulkUpdateIfChanged($hash,"power".$subs,$power);
+      #readingsBulkUpdateIfChanged($hash,"energy".$subs,$energy); 
     }  
   }
   #-- common to all Shelly models
@@ -1311,12 +1331,12 @@ sub Shelly_updown2($){
     return;
   }
   
-  my $power   = $jhash->{'power'};
-  
-  #-- 
   my $subs = ($shelly_models{$model}[3] ==1) ? "" : "_".$channel;
-
+  my $power   = $jhash->{'power'};
+  my $energy = int($jhash->{'total'}/6)/10;
   readingsSingleUpdate($hash,"power".$subs,$power,1);
+  readingsSingleUpdate($hash,"energy".$subs,$energy,1);
+  
   return undef;
 }
 
@@ -1341,11 +1361,12 @@ sub Shelly_updown2($){
          <li>This module needs the JSON package</li>
          <li>In Shelly switch devices one may set URL values that are "hit" when the input or output status changes. Here one must set
            <ul>
-           <li> For <i>Button switched ON url</i>: http://&lt;FHEM IP address&gt;:&lt;Port&gt;/fhem?cmd=set%20$lt;Devicename&gt;%20<b>button_on</b>%20[&lt;channel&gt;]</li>
-           <li> For <i>Button switched OFF url</i>: http://&lt;FHEM IP address&gt;:&lt;Port&gt;/fhem?cmd=set%20$lt;Devicename&gt;%20<b>button_off</b>%20[&lt;channel&gt;]</li>
-           <li> For <i>Output switched ON url</i>: http://&lt;FHEM IP address&gt;:&lt;Port&gt;/fhem?cmd=set%20$lt;Devicename&gt;%20<b>out_on</b>%20[&lt;channel&gt;]</li>
-           <li> For <i>Output switched OFF url</i>: http://&lt;FHEM IP address&gt;:&lt;Port&gt;/fhem?cmd=set%20$lt;Devicename&gt;%20<b>out_off</b>%20[&lt;channel&gt;]</li>
-           </ul></li>
+           <li> For <i>Button switched ON url</i>: http://&lt;FHEM IP address&gt;:&lt;Port&gt;/fhem?XHR=1&cmd=set%20&lt;Devicename&gt;%20<b>button_on</b>%20[&lt;channel&gt;]</li>
+           <li> For <i>Button switched OFF url</i>: http://&lt;FHEM IP address&gt;:&lt;Port&gt;/fhem?XHR=1&cmd=set%20&lt;Devicename&gt;%20<b>button_off</b>%20[&lt;channel&gt;]</li>
+           <li> For <i>Output switched ON url</i>: http://&lt;FHEM IP address&gt;:&lt;Port&gt;/fhem?XHR=1&cmd=set%20&lt;Devicename&gt;%20<b>out_on</b>%20[&lt;channel&gt;]</li>
+           <li> For <i>Output switched OFF url</i>: http://&lt;FHEM IP address&gt;:&lt;Port&gt;/fhem?XHR=1&cmd=set%20&lt;Devicename&gt;%20<b>out_off</b>%20[&lt;channel&gt;]</li>
+           </ul>
+           Attention: Of course, a csrfToken must be included as well - or a proper allowed device declared.</li>
          </ul>
         <a name="Shellyset"></a>
         <h4>Set</h4>  
@@ -1359,7 +1380,7 @@ sub Shelly_updown2($){
         For Shelly switching devices (model=shelly1|shelly1pm|shelly4|shellyplug or (model=shelly2/2.5 and mode=relay)) 
         <ul>
             <li><a name="shelly_onoff"></a>
-                <code>set &lt;name&gt; on|off  [&lt;channel&gt;] </code>
+                <code>set &lt;name&gt; on|off|toggle  [&lt;channel&gt;] </code>
                 <br />switches channel &lt;channel&gt; on or off. Channel numbers are 0 and 1 for model=shelly2/2.5, 0..3 for model=shelly4. If the channel parameter is omitted, the module will switch the channel defined in the defchannel attribute.</li>
             <li><a name="shelly_onofftimer"></a>
                 <code>set &lt;name&gt; on-for-timer|off-for-timer &lt;time&gt; [&lt;channel&gt;] </code>
@@ -1414,7 +1435,7 @@ sub Shelly_updown2($){
         <h4>Get</h4>
         <ul>
             <li><a name="shelly_config"></a>
-                <code>get &lt;name&gt; config &lt;registername&gt; [$lt;channel&gt;]</code>
+                <code>get &lt;name&gt; config &lt;registername&gt; [&lt;channel&gt;]</code>
                 <br />get the value of a configuration register and writes it in reading config</li>
             <li><a name="shelly_registers"></a>
                 <code>get &lt;name&gt; registers</code>
