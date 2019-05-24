@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  77_SMAEM: set reset to delete and reinitialize cacheFile, 
+                      support of Installer.pm/Meta.pm added
  - change:  73_GardenaSmartBridge: change loglevel
  - change:  50_TelegramBot: allow \s, addtl silenCmds, fixes
  - change:  55_PIFACE: Now wiringPi V2.46 is supported. Various optimizations

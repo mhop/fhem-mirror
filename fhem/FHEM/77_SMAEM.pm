@@ -21,29 +21,9 @@
 #  - apt-get install install libio-socket-multicast-perl
 #
 #  Origin:
-#  https://github.com/kettenbach-it/FHEM-SMA-Speedwire
+#  https://gitlab.com/volkerkettenbach/FHEM-SMA-Speedwire
 #
-#################################################################################################
-# Versions History done by DS_Starter
-#
-# 3.1.0    12.02.2018     extend error handling in define
-# 3.0.1    26.11.2017     use abort cause of BlockingCall
-# 3.0.0    29.09.2017     make SMAEM ready for multimeter usage
-# 2.9.1    29.05.2017     DbLog_splitFn added, some function names adapted
-# 2.9.0    25.05.2017     own SMAEM_setCacheValue, SMAEM_getCacheValue, new internal VERSION
-# 2.8.2    03.12.2016     Prefix SMAEMserialnumber for Reading "state" removed, commandref adapted
-# 2.8.1    02.12.2016     encode / decode $data 
-# 2.8      02.12.2016     plausibility check of measured differences, attr diffAccept, timeout
-#                         validation checks, improvement of failure prevention
-# 2.7      01.12.2016     logging of discarded cycles 
-# 2.6      01.12.2016     some improvements, better logging possibility
-# 2.5      30.11.2016     some improvements
-# 2.4      30.11.2016     some improvements, attributes disable, timeout for BlockingCall added
-# 2.3      30.11.2016     SMAEM_getsum, SMAEM_setsum changed
-# 2.2      29.11.2016     check error while writing values to file -> set state with error
-# 2.1      29.11.2016     move $hash->{GRIDin_SUM}, $hash->{GRIDOUT_SUM} calc to smaread_ParseDone,
-#                         some little improvements to logging process
-# 2.0      28.11.2016     switch to nonblocking
+################################################################################################# 
 
 package main;
 
@@ -52,42 +32,71 @@ use warnings;
 use bignum;
 use IO::Socket::Multicast;
 use Blocking;
+eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
-my $SMAEMVersion = "3.1.0";
+# Versions History done by DS_Starter 
+our %SMAEM_vNotesIntern = (
+  "3.4.0" => "22.05.2019  support of Installer.pm/Meta.pm added, new version maintenance, commandref revised ",
+  "3.3.0" => "21.05.2019  set reset to delete and reinitialize cacheFile, support of DelayedShutdownFn ",
+  "3.2.0" => "26.07.2018  log entry enhanced if diff overflow ",
+  "3.1.0" => "12.02.2018  extend error handling in define ",
+  "3.0.1" => "26.11.2017  use abort cause of BlockingCall ",
+  "3.0.0" => "29.09.2017  make SMAEM ready for multimeter usage ",
+  "2.9.1" => "29.05.2017  DbLog_splitFn added, some function names adapted ",
+  "2.9.0" => "25.05.2017  own SMAEM_setCacheValue, SMAEM_getCacheValue, new internal VERSION ",
+  "2.8.2" => "03.12.2016  Prefix SMAEMserialnumber for Reading \"state\" removed, commandref adapted ",
+  "2.8.1" => "02.12.2016  encode / decode \$data ",
+  "2.8.0" => "02.12.2016  plausibility check of measured differences, attr diffAccept, timeout ".
+                          "validation checks, improvement of failure prevention ",
+  "2.7.0" => "01.12.2016  logging of discarded cycles ",
+  "2.6.0" => "01.12.2016  some improvements, better logging possibility ",
+  "2.5.0" => "30.11.2016  some improvements ",
+  "2.4.0" => "30.11.2016  some improvements, attributes disable, timeout for BlockingCall added ",
+  "2.3.0" => "30.11.2016  SMAEM_getsum, SMAEM_setsum changed ",
+  "2.2.0" => "29.11.2016  check error while writing values to file -> set state with error ", 
+  "2.1.0" => "29.11.2016  move \$hash->{GRIDin_SUM}, \$hash->{GRIDOUT_SUM} calc to smaread_ParseDone, ".
+                          "some little improvements to logging process",
+  "2.0.0" => "28.11.2016  switch to nonblocking "
+);
 
 ###############################################################
 #                  SMAEM Initialize
 ###############################################################
-sub SMAEM_Initialize($) {
+sub SMAEM_Initialize ($) {
   my ($hash) = @_;
   
-  $hash->{ReadFn}        = "SMAEM_Read";
-  $hash->{DefFn}         = "SMAEM_Define";
-  $hash->{UndefFn}       = "SMAEM_Undef";
-  $hash->{DeleteFn}      = "SMAEM_Delete";
-  $hash->{DbLog_splitFn} = "SMAEM_DbLog_splitFn";
-  $hash->{AttrFn}        = "SMAEM_Attr";
-  $hash->{AttrList}      = "interval ".
-                           "disable:1,0 ".
-						   "diffAccept ".
-                           "disableSernoInReading:1,0 ".
-                           "feedinPrice ".
-                           "powerCost ".
-                           "timeout ".						
-                           "$readingFnAttributes";
+  $hash->{ReadFn}            = "SMAEM_Read";
+  $hash->{SetFn}             = "SMAEM_Set";
+  $hash->{DefFn}             = "SMAEM_Define";
+  $hash->{UndefFn}           = "SMAEM_Undef";
+  $hash->{DeleteFn}          = "SMAEM_Delete";
+  $hash->{DbLog_splitFn}     = "SMAEM_DbLog_splitFn";
+  $hash->{DelayedShutdownFn} = "SMAEM_DelayedShutdown";
+  $hash->{AttrFn}            = "SMAEM_Attr";
+  $hash->{AttrList}          = "interval ".
+                               "disable:1,0 ".
+						       "diffAccept ".
+                               "disableSernoInReading:1,0 ".
+                               "feedinPrice ".
+                               "powerCost ".
+                               "timeout ".						
+                               "$readingFnAttributes";
+                               
+  eval { FHEM::Meta::InitMod( __FILE__, $hash ) };           # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
+  
+return; 
 }
 
 ###############################################################
 #                  SMAEM Define
 ###############################################################
-sub SMAEM_Define($$) {
+sub SMAEM_Define ($$) {
   my ($hash, $def) = @_;
   my $name= $hash->{NAME};
   my ($success, $gridin_sum, $gridout_sum);
   my $socket;
   
-  $hash->{INTERVAL}              = 60 ;
-  $hash->{VERSION}               = $SMAEMVersion;
+  $hash->{INTERVAL}              = 60;
   $hash->{HELPER}{FAULTEDCYCLES} = 0;
   $hash->{HELPER}{STARTTIME}     = time();
     
@@ -108,14 +117,20 @@ sub SMAEM_Define($$) {
   
   $socket->mcast_add('239.12.255.254');
 
-  $hash->{TCPDev}= $socket;
-  $hash->{FD} = $socket->fileno();
+  $hash->{TCPDev} = $socket;
+  $hash->{FD}     = $socket->fileno();
   delete($readyfnlist{"$name"});
   $selectlist{"$name"} = $hash;
   
+  $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                         # Modul Meta.pm nicht vorhanden
+  
+  # Versionsinformationen setzen
+  SMAEM_setVersionInfo($hash);
+  
   # gespeicherte Serialnummern lesen und extrahieren
-  my $retcode = SMAEM_getserials($hash);
+  my $retcode = SMAEM_getserials($hash); 
   $hash->{HELPER}{READFILEERROR} = $retcode if($retcode);
+  
   
   if($hash->{HELPER}{ALLSERIALS}) {
       my @allserials = split(/_/,$hash->{HELPER}{ALLSERIALS});
@@ -133,7 +148,7 @@ return undef;
 ###############################################################
 #                  SMAEM Undefine
 ###############################################################
-sub SMAEM_Undef($$) {
+sub SMAEM_Undef ($$) {
   my ($hash, $arg) = @_;
   my $name= $hash->{NAME};
   my $socket= $hash->{TCPDev};
@@ -154,7 +169,7 @@ return;
 ###############################################################
 #                  SMAEM Delete
 ###############################################################
-sub SMAEM_Delete {
+sub SMAEM_Delete ($$) {
     my ($hash, $arg) = @_;
     my $index = $hash->{TYPE}."_".$hash->{NAME}."_energysum";
     
@@ -164,10 +179,61 @@ sub SMAEM_Delete {
 return undef;
 }
 
+#######################################################################################################
+# Mit der X_DelayedShutdown Funktion kann eine Definition das Stoppen von FHEM verzögern um asynchron 
+# hinter sich aufzuräumen.  
+# Je nach Rückgabewert $delay_needed wird der Stopp von FHEM verzögert (0|1).
+# Sobald alle nötigen Maßnahmen erledigt sind, muss der Abschluss mit CancelDelayedShutdown($name) an 
+# FHEM zurückgemeldet werden. 
+#######################################################################################################
+sub SMAEM_DelayedShutdown ($) {
+  my ($hash) = @_;
+  my $name   = $hash->{NAME};
+  
+  if($hash->{HELPER}{RUNNING_PID}) {
+      Log3($name, 2, "$name - Quit background process due to shutdown ...");
+      return 1;
+  }
+
+return 0;
+}
+
+###############################################################
+#                  SMAEM Set
+###############################################################
+sub SMAEM_Set ($@) {
+  my ($hash, @a) = @_;
+  return "\"set X\" needs at least an argument" if ( @a < 2 );
+  my $name = $a[0];
+  my $opt  = $a[1];
+  
+  my $setlist = "Unknown argument $opt, choose one of ".
+                "reset:noArg "
+                ;
+
+  if ($opt eq "reset") {
+      delete $hash->{HELPER}{ALLSERIALS};
+      BlockingKill($hash->{HELPER}{RUNNING_PID}) if(defined($hash->{HELPER}{RUNNING_PID}));
+      my $result = unlink $attr{global}{modpath}."/FHEM/FhemUtils/cacheSMAEM"; 
+      if ($result) {      
+          $result = "Cachefile ".$attr{global}{modpath}."/FHEM/FhemUtils/cacheSMAEM deleted. It will be initialized immediately.";  
+      } else {
+          $result = "Error while deleting Cachefile ".$attr{global}{modpath}."/FHEM/FhemUtils/cacheSMAEM: $!";
+      }
+      Log3 ($name, 3, "SMAEM $name - $result");
+      return $result;
+  
+  } else {
+      return "$setlist";
+  }  
+  
+return;
+}
+
 ###############################################################
 #                  SMAEM Attr
 ###############################################################
-sub SMAEM_Attr {
+sub SMAEM_Attr ($$$$) {
   my ($cmd,$name,$aName,$aVal) = @_;
   my $hash = $defs{$name};
   my $do;
@@ -210,7 +276,7 @@ return undef;
 #                  SMAEM Read (Hauptschleife)
 ###############################################################
 # called from the global loop, when the select for hash->{FD} reports data
-sub SMAEM_Read($) {
+sub SMAEM_Read ($) {
   my ($hash) = @_;
   my $name= $hash->{NAME};
   my $socket= $hash->{TCPDev};
@@ -240,9 +306,9 @@ sub SMAEM_Read($) {
   }
   
   if ( !$hash->{HELPER}{'LASTUPDATE_'.$smaserial} || time() >= ($hash->{HELPER}{'LASTUPDATE_'.$smaserial}+$hash->{INTERVAL}) ) {
-      Log3 ($name, 4, "SMAEM $name - ##############################################################");
+      Log3 ($name, 4, "SMAEM $name - ###############################################################");
       Log3 ($name, 4, "SMAEM $name - ### Begin of new SMA Energymeter $smaserial get data cycle ###");
-	  Log3 ($name, 4, "SMAEM $name - ##############################################################");
+	  Log3 ($name, 4, "SMAEM $name - ###############################################################");
 	  Log3 ($name, 4, "SMAEM $name - discarded cycles since module start: $hash->{HELPER}{FAULTEDCYCLES}");
       
 	  if($hash->{HELPER}{RUNNING_PID}) {
@@ -269,15 +335,14 @@ return undef;
 ###############################################################
 #          non-blocking Inverter Datenabruf
 ###############################################################
-sub SMAEM_DoParse($) {
+sub SMAEM_DoParse ($) {
  my ($string) = @_;
  my ($name,$dataenc,$smaserial) = split("\\|", $string);
- my $hash          = $defs{$name};
- my $data          = decode_base64($dataenc);
- my $discycles     = $hash->{HELPER}{FAULTEDCYCLES};
- my $diffaccept    = AttrVal($name, "diffAccept", 10);
- my @row_array;
- my @array;
+ my $hash       = $defs{$name};
+ my $data       = decode_base64($dataenc);
+ my $discycles  = $hash->{HELPER}{FAULTEDCYCLES};
+ my $diffaccept = AttrVal($name, "diffAccept", 10);
+ my ($error,@row_array,@array);
  
  Log3 ($name, 4, "SMAEM $name -> Start BlockingCall SMAEM_DoParse");
  
@@ -288,7 +353,7 @@ sub SMAEM_DoParse($) {
  if($hash->{HELPER}{READFILEERROR}) {
      my $retcode = SMAEM_getsum($hash,$smaserial);
 	 if ($retcode) {
-	     my $error = encode_base64($retcode,"");
+	     $error = encode_base64($retcode,"");
 	     Log3 ($name, 4, "SMAEM $name -> BlockingCall SMAEM_DoParse finished");
 		 $discycles++;
          return "$name|''|''|''|$error|$discycles|''"; 
@@ -312,7 +377,6 @@ sub SMAEM_DoParse($) {
     # Extract datasets from hex:
     # Generic:
     my $susyid       = hex(substr($hex,36,4));
-    # $smaserial    = hex(substr($hex,40,8));
     my $milliseconds = hex(substr($hex,48,8));
 	# Prestring with SMAEM and SERIALNO or not
     my $ps = (!AttrVal($name, "disableSernoInReading", undef)) ? "SMAEM".$smaserial."_" : "";
@@ -346,14 +410,16 @@ sub SMAEM_DoParse($) {
 				$plausibility_out = 1;
 			} else {
 			    # Zyklus verwerfen wenn Plausibilität nicht erfüllt
-			    my $errtxt = "cycle discarded due to allowed diff GRIDOUT exceeding";
-			    my $error = encode_base64($errtxt,"");
+				my $d = $bezug_wirk_count - $gridoutsum;
+			    my $errtxt = "Cycle discarded due to allowed diff \"$d\" GRIDOUT exceeding. \n".
+                             "Try to set attribute \"diffAccept > $d\" temporary or execute \"reset\".";
+			    $error = encode_base64($errtxt,"");
 				Log3 ($name, 1, "SMAEM $name - $errtxt");
 		        Log3 ($name, 4, "SMAEM $name -> BlockingCall SMAEM_DoParse finished");
 				$gridinsum = $einspeisung_wirk_count;
 				$gridoutsum = $bezug_wirk_count;
 		        $discycles++;
-                return "$name|''|$gridinsum|$gridoutsum|''|$discycles|''";     
+                return "$name|''|$gridinsum|$gridoutsum|$error|$discycles|''";     
 			}
         }
     }  
@@ -376,14 +442,16 @@ sub SMAEM_DoParse($) {
 				$plausibility_in = 1;
 			} else {
 			    # Zyklus verwerfen wenn Plausibilität nicht erfüllt
-			    my $errtxt = "cycle discarded due to allowed diff GRIDIN exceeding";
-			    my $error = encode_base64($errtxt,"");
+				my $d = $einspeisung_wirk_count - $gridinsum;
+			    my $errtxt = "Cycle discarded due to allowed diff \"$d\" GRIDIN exceeding. \n".
+                             "Try to set attribute \"diffAccept > $d\" temporary or execute \"reset\".";
+			    $error = encode_base64($errtxt,"");
 				Log3 ($name, 1, "SMAEM $name - $errtxt");
 		        Log3 ($name, 4, "SMAEM $name -> BlockingCall SMAEM_DoParse finished");
 				$gridinsum = $einspeisung_wirk_count;
 				$gridoutsum = $bezug_wirk_count;
 		        $discycles++;
-                return "$name|''|$gridinsum|$gridoutsum|''|$discycles|''";  
+                return "$name|''|$gridinsum|$gridoutsum|$error|$discycles|''";  
 			}
         }
     }
@@ -394,7 +462,7 @@ sub SMAEM_DoParse($) {
 	
 	# error while writing values to file
 	if ($retcode) {
-	    my $error = encode_base64($retcode,"");
+	    $error = encode_base64($retcode,"");
 		Log3 ($name, 4, "SMAEM $name -> BlockingCall SMAEM_DoParse finished");
 		$discycles++;
         return "$name|''|''|''|$error|$discycles|''"; 
@@ -547,7 +615,7 @@ sub SMAEM_DoParse($) {
     }
  
     # encoding result 
-    my $rowlist = join('|', @row_array);
+    my $rowlist = join('_ESC_', @row_array);
     $rowlist    = encode_base64($rowlist,"");
  
     Log3 ($name, 4, "SMAEM $name -> BlockingCall SMAEM_DoParse finished");
@@ -588,7 +656,7 @@ sub SMAEM_ParseDone ($) {
  $hash->{'GRIDOUT_SUM_'.$smaserial} = $gridoutsum;
  Log3($name, 4, "SMAEM $name - wrote new energy values to INTERNALS - GRIDIN_SUM_$smaserial: $gridinsum, GRIDOUT_SUM_$smaserial: $gridoutsum"); 
 
- my @row_array = split("\\|", $rowlist);
+ my @row_array = split("_ESC_", $rowlist);
  
  Log3 ($name, 5, "SMAEM $name - row_array after decoding:");
  foreach my $row (@row_array) {
@@ -606,6 +674,7 @@ sub SMAEM_ParseDone ($) {
  
  delete($hash->{HELPER}{RUNNING_PID});
  Log3 ($name, 4, "SMAEM $name -> BlockingCall SMAEM_ParseDone finished");
+ CancelDelayedShutdown($name);
  
 return;
 }
@@ -613,7 +682,7 @@ return;
 ###############################################################
 #           Abbruchroutine Timeout Inverter Abfrage
 ###############################################################
-sub SMAEM_ParseAborted($) {
+sub SMAEM_ParseAborted ($) {
   my ($hash,$cause) = @_;
   my $name = $hash->{NAME};
   my $discycles  = $hash->{HELPER}{FAULTEDCYCLES};
@@ -624,16 +693,17 @@ sub SMAEM_ParseAborted($) {
   Log3 ($name, 1, "SMAEM $name -> BlockingCall $hash->{HELPER}{RUNNING_PID}{fn} $cause");
   readingsSingleUpdate($hash, "state", $cause, 1);
   delete($hash->{HELPER}{RUNNING_PID});
+  CancelDelayedShutdown($name);
+  
+return;
 }
 
 ###############################################################
 #                  DbLog_splitFn
 ###############################################################
-sub SMAEM_DbLog_splitFn($) {
+sub SMAEM_DbLog_splitFn ($) {
   my ($event,$device) = @_;
   my ($reading, $value, $unit) = "";
-
-  # Log3 ($device, 5, "SMAEM $device - splitFn splits event: ".$event);
 
   my @parts = split(/ /,$event,3);
   $reading = $parts[0];
@@ -673,15 +743,15 @@ return ($reading, $value, $unit);
 ###############################################################
 ###       alle Serial-Nummern in cacheSMAEM speichern
 sub SMAEM_setserials ($) {
-    my ($hash) = @_;
-    my $name   = $hash->{NAME};
+    my ($hash)  = @_;
+    my $name    = $hash->{NAME};
+	my $modpath = $attr{global}{modpath};
     my ($index,$retcode,$as);
-	my $modpath = AttrVal("global", "modpath", undef);
     
     $as = $hash->{HELPER}{ALLSERIALS};
     
     $index = $hash->{TYPE}."_".$hash->{NAME}."_allserials";
-    $retcode = SMAEM_setCacheValue($index,$as);
+    $retcode = SMAEM_setCacheValue($hash,$index,$as);
     
     if ($retcode) { 
         Log3($name, 1, "SMAEM $name - ERROR while saving all serial numbers - $retcode");
@@ -695,14 +765,14 @@ return ($retcode);
 ###  Summenwerte für GridIn, GridOut speichern
 sub SMAEM_setsum ($$$$) {
     my ($hash,$smaserial,$gridinsum,$gridoutsum) = @_;
-    my $name     = $hash->{NAME};
+    my $name    = $hash->{NAME};
+	my $modpath = $attr{global}{modpath};
     my ($index,$retcode,$sumstr);
-	my $modpath = AttrVal("global", "modpath", undef);
     
     $sumstr = $gridinsum."_".$gridoutsum;
     
     $index = $hash->{TYPE}."_".$hash->{NAME}."_".$smaserial;
-    $retcode = SMAEM_setCacheValue($index,$sumstr);
+    $retcode = SMAEM_setCacheValue($hash,$index,$sumstr);
     
     if ($retcode) { 
         Log3($name, 1, "SMAEM $name - ERROR while saving summary of energy values - $retcode");
@@ -715,8 +785,8 @@ return ($retcode);
 
 ###############################################################
 ###  Schreibroutine in eigenes Keyvalue-File
-sub SMAEM_setCacheValue($$) {
-  my ($key,$value) = @_;
+sub SMAEM_setCacheValue ($$$) {
+  my ($hash,$key,$value) = @_;
   my $fName = $attr{global}{modpath}."/FHEM/FhemUtils/cacheSMAEM";
   
   my $param = {
@@ -725,7 +795,7 @@ sub SMAEM_setCacheValue($$) {
               };
   my ($err, @old) = FileRead($param);
   
-  SMAEM_createCacheFile() if($err); 
+  SMAEM_createCacheFile($hash) if($err); 
   
   my @new;
   my $fnd;
@@ -745,10 +815,10 @@ return FileWrite($param, @new);
 ###############################################################
 ###          gespeicherte Serial-Nummern auslesen
 sub SMAEM_getserials ($) {
-    my ($hash) = @_;
-    my $name   = $hash->{NAME};
+    my ($hash)  = @_;
+    my $name    = $hash->{NAME};
+    my $modpath = $attr{global}{modpath};
     my ($index,$retcode,$serials);
-    my $modpath = AttrVal("global", "modpath", undef);
 	
     $index = $hash->{TYPE}."_".$hash->{NAME}."_allserials";
     ($retcode, $serials) = SMAEM_getCacheValue($index);
@@ -756,7 +826,7 @@ sub SMAEM_getserials ($) {
     if ($retcode) {
         Log3($name, 1, "SMAEM $name - $retcode") if ($retcode);
         Log3($name, 3, "SMAEM $name - Create new cacheFile $modpath/FHEM/FhemUtils/cacheSMAEM");
-		$retcode = SMAEM_createCacheFile(); 
+		$retcode = SMAEM_createCacheFile($hash); 
     } else {
 	    if ($serials) {
             $hash->{HELPER}{ALLSERIALS} = $serials;
@@ -771,8 +841,8 @@ return ($retcode);
 sub SMAEM_getsum ($$) {
     my ($hash,$smaserial) = @_;
     my $name   = $hash->{NAME};
+    my $modpath = $attr{global}{modpath};
     my ($index,$retcode,$sumstr);
-    my $modpath = AttrVal("global", "modpath", undef);
 	
     $index = $hash->{TYPE}."_".$hash->{NAME}."_".$smaserial;
     ($retcode, $sumstr) = SMAEM_getCacheValue($index);
@@ -791,7 +861,7 @@ return ($retcode);
 
 ###############################################################
 ###  Leseroutine aus eigenem Keyvalue-File
-sub SMAEM_getCacheValue($) {
+sub SMAEM_getCacheValue ($) {
   my ($key) = @_;
   my $fName = $attr{global}{modpath}."/FHEM/FhemUtils/cacheSMAEM";
   my $param = {
@@ -808,7 +878,7 @@ sub SMAEM_getCacheValue($) {
 
 ###############################################################
 ###  Anlegen eigenes Keyvalue-File wenn nicht vorhanden
-sub SMAEM_createCacheFile {
+sub SMAEM_createCacheFile ($) {
   my $fName = $attr{global}{modpath}."/FHEM/FhemUtils/cacheSMAEM";
   my $param = {
                FileName   => $fName,
@@ -819,7 +889,7 @@ sub SMAEM_createCacheFile {
              "# Please do not modify, move or delete it.",
              "");
 
-  return FileWrite($param, @new);
+return FileWrite($param, @new);
 }
 
 ###############################################################
@@ -835,6 +905,41 @@ sub SMAEM_setlastupdate ($$) {
     $hash->{'LASTUPDATE_'.$smaserial} = sprintf "%02d.%02d.%04d / %02d:%02d:%02d" , $mday , $mon+=1 ,$year+=1900 , $hour , $min , $sec ;
 	Log3 ($name, 4, "SMAEM $name - last update time set to: $hash->{'LASTUPDATE_'.$smaserial}");
 	
+return;
+}
+
+#############################################################################################
+#                          Versionierungen des Moduls setzen
+#                  Die Verwendung von Meta.pm und Packages wird berücksichtigt
+#############################################################################################
+sub SMAEM_setVersionInfo($) {
+  my ($hash) = @_;
+  my $name   = $hash->{NAME};
+
+  my $v                    = (sortTopicNum("desc",keys %SMAEM_vNotesIntern))[0];
+  my $type                 = $hash->{TYPE};
+  $hash->{HELPER}{PACKAGE} = __PACKAGE__;
+  $hash->{HELPER}{VERSION} = $v;
+  
+  if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
+	  # META-Daten sind vorhanden
+	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
+		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
+	  } else {
+		  $modules{$type}{META}{x_version} = $v; 
+	  }
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
+	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
+	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
+		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
+	      use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );                                          
+      }
+  } else {
+	  # herkömmliche Modulstruktur
+	  $hash->{VERSION} = $v;
+  }
+  
 return;
 }
  
@@ -873,20 +978,65 @@ return;
   </ul>  
 <br>
 <br>
+
+<a name="SMAEMset"></a>
+<b>Set </b>
+<ul>
+  <li><b>reset</b> <br>
+  The automatically generated file "cacheSMAEM" will be deleted. Then the file will be recreated again by the module.
+  This function is used to reset the device in possible case of error condition, but may be executed at all times.  
+  </li>
+  <br>  
+</ul>
   
 <a name="SMAEMattr"></a>
 <b>Attribute</b>
 <ul>
-  <li><b>disableSernoInReading</b>  : prevents the prefix "SMAEM&lt;serialnumber_&gt;....."  </li>
-  <li><b>feedinPrice</b>            : the individual amount of refund of one kilowatt hour</li>
-  <li><b>interval</b>               : evaluation interval in seconds </li>
-  <li><b>disable</b>                : 1 = the module is disabled </li>
-  <li><b>diffAccept</b>             : diffAccept determines the threshold,  up to that a calaculated difference between two 
-                                      straight sequently meter readings (Readings with *_Diff) should be commenly accepted (default = 10). <br>
-                                      Hence faulty DB entries with a disproportional high difference values will be eliminated, don't 
-									  tamper the result and the measure cycles will be discarded.  </li>
-  <li><b>powerCost</b>              : the individual amount of power cost per kWh </li>
-  <li><b>timeout</b>                : adjustment timeout of backgound processing (default 60s). The value of timeout has to be higher than the value of "interval". </li> 
+  <a name="disableSernoInReading"></a>
+  <li><b>disableSernoInReading</b> <br>
+  prevents the prefix "SMAEM&lt;serialnumber_&gt;....."  
+  </li>
+  <br>
+  
+  <a name="feedinPrice"></a>
+  <li><b>feedinPrice</b> <br>
+  the individual amount of refund of one kilowatt hour
+  </li>
+  <br>
+  
+  <a name="interval"></a>
+  <li><b>interval</b> <br>
+  evaluation interval in seconds 
+  </li>
+  <br>
+  
+  <a name="disable"></a>
+  <li><b>disable</b> <br>
+  1 = the module is disabled 
+  </li>
+  <br>
+  
+  <a name="diffAccept"></a>
+  <li><b>diffAccept</b> <br>
+  diffAccept determines the threshold,  up to that a calaculated difference between two 
+  straight sequently meter readings (Readings with *_Diff) should be commenly accepted (default = 10). <br>
+  Hence faulty DB entries with a disproportional high difference values will be eliminated, don't 
+  tamper the result and the measure cycles will be discarded.  
+  </li>
+  <br>
+  
+  <a name="powerCost"></a>
+  <li><b>powerCost</b> <br>
+  the individual amount of power cost per kWh 
+  </li>
+  <br>
+  
+  <a name="timeout"></a>
+  <li><b>timeout</b> <br>
+  adjustment timeout of backgound processing (default 60s). The value of timeout has to be higher than the value 
+  of "interval". 
+  </li> 
+  <br>
 </ul>
 <br>
 
@@ -942,20 +1092,66 @@ However there are readings what maybe need some explanation. <br>
   </ul>  
   <br>
   
+<a name="SMAEMset"></a>
+<b>Set </b>
+<ul>
+  <li><b>reset</b> <br>
+  Es wird das automatisch erstellte File "cacheSMAEM" gelöscht. Das File wird durch das Modul wieder neu initialisiert
+  angelegt. Diese Funktion wird zur Rücksetzung eines eventuellen Fehlerzustandes des Devices verwendet, kann 
+  aber auch jederzeit ausgeführt werden.  
+  </li>
+  <br>  
+</ul>
+  
 <a name="SMAEMattr"></a>
 <b>Attribute</b>
 <ul>
-  <li><b>disableSernoInReading</b>  : unterdrückt das Prefix "SMAEM&lt;serialnumber_&gt;....."  </li>
-  <li><b>feedinPrice</b>            : die individuelle Höhe der Vergütung pro Kilowattstunde </li>
-  <li><b>interval</b>               : Auswertungsinterval in Sekunden </li>
-  <li><b>disable</b>                : 1 = das Modul ist disabled </li>
-  <li><b>diffAccept</b>             : diffAccept legt fest, bis zu welchem Schwellenwert eine berechnete positive Werte-Differenz 
-                                      zwischen zwei unmittelbar aufeinander folgenden Zählerwerten (Readings mit *_Diff) akzeptiert werden 
-									  soll (Standard ist 10). <br>
-								      Damit werden eventuell fehlerhafte Differenzen mit einem unverhältnismäßig hohen Differenzwert von der Berechnung 
-									  ausgeschlossen und der Messzyklus verworfen.  </li>
-  <li><b>powerCost</b>              : die individuelle Höhe der Stromkosten pro Kilowattstunde </li>
-  <li><b>timeout</b>                : Einstellung timeout für Hintergrundverarbeitung (default 60s). Der timeout-Wert muss größer als das Wert von "interval" sein. </li> 
+  <a name="disableSernoInReading"></a>
+  <li><b>disableSernoInReading</b> <br>
+  unterdrückt das Prefix "SMAEM&lt;serialnumber_&gt;....."  
+  </li>
+  <br>
+  
+  <a name="feedinPrice"></a>
+  <li><b>feedinPrice</b> <br>
+  die individuelle Höhe der Vergütung pro Kilowattstunde 
+  </li>
+  <br>
+  
+  <a name="interval"></a>
+  <li><b>interval</b> <br>
+  Auswertungsinterval in Sekunden 
+  </li>
+  <br>
+  
+  <a name="disable"></a>
+  <li><b>disable</b> <br>
+  1 = das Modul ist disabled 
+  </li>
+  <br>
+  
+  <a name="diffAccept"></a>
+  <li><b>diffAccept</b> <br>
+  diffAccept legt fest, bis zu welchem Schwellenwert eine berechnete positive Werte-Differenz 
+  zwischen zwei unmittelbar aufeinander folgenden Zählerwerten (Readings mit *_Diff) akzeptiert werden 
+  soll (Standard ist 10). <br>
+  Damit werden eventuell fehlerhafte Differenzen mit einem unverhältnismäßig hohen Differenzwert von der Berechnung 
+  ausgeschlossen und der Messzyklus verworfen.  
+  </li>
+  <br>
+  
+  <a name="powerCost"></a>
+  <li><b>powerCost</b> <br>
+  die individuelle Höhe der Stromkosten pro Kilowattstunde 
+  </li>
+  <br>
+  
+  <a name="timeout"></a>
+  <li><b>timeout</b> <br>
+  Einstellung timeout für Hintergrundverarbeitung (default 60s). Der timeout-Wert muss größer als das Wert von 
+  "interval" sein. 
+  </li> 
+  <br>
 </ul>
 <br>
 
@@ -980,4 +1176,70 @@ Es gibt allerdings Readings die einer Erläuterung bedürfen. <br>
 <br>
 
 =end html_DE
+
+=for :application/json;q=META.json 77_SMAEM.pm
+{
+  "abstract": "Integration of one or more SMA Energy Meters.",
+  "x_lang": {
+    "de": {
+      "abstract": "Integration von einem oder mehreren SMA Energy Metern."
+    }
+  },
+  "keywords": [
+    "SMA",
+    "Photovoltaik",
+    "SMA Energy Meter"
+  ],
+  "version": "v1.1.1",
+  "release_status": "stable",
+  "author": [
+    "Volker Kettenbach <volker@kettenbach-it.de>",
+    "Heiko Maaz <heiko.maaz@t-online.de>",
+    null,
+    null
+  ],
+  "x_fhem_maintainer": [
+    "Volker Kettenbach",
+    "DS_Starter",
+    null,
+    null
+  ],
+  "x_fhem_maintainer_github": [
+    "Volker Kettenbach",
+    "nasseeder1",
+    null,
+    null
+  ],
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "FHEM": 5.00918799,
+        "perl": 5.014,
+        "bignum": 0,
+        "IO::Socket::Multicast": 0,
+        "Blocking": 0      
+      },
+      "recommends": {
+        "FHEM::Meta": 0
+      },
+      "suggests": {
+      }
+    }
+  },
+  "resources": {
+    "repository": {
+      "x_dev": {
+        "type": "git",
+        "url": "https://gitlab.com/volkerkettenbach/FHEM-SMA-Speedwire",
+        "web": "https://gitlab.com/volkerkettenbach/FHEM-SMA-Speedwire/blob/master/77_SMAEM.pm",
+        "x_branch": "dev",
+        "x_raw": "https://gitlab.com/volkerkettenbach/FHEM-SMA-Speedwire/raw/master/77_SMAEM.pm"
+      }      
+    }
+  },
+  "x_support_status": "supported"
+}
+=end :application/json;q=META.json
+
+=cut
 
