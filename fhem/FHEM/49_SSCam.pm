@@ -48,6 +48,9 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.13.5" => "23.05.2019  StmKey quoted depending on attr noQuotesForSID (Forum: https://forum.fhem.de/index.php/topic,45671.msg938236.html#msg938236), ".
+                           "autoplay muted of hls-StreamDev",
+  "8.13.4" => "21.05.2019  rec/snapemailtxt, rec/snaptelegramtxt can contain \":\", commandref revised ", 
   "8.13.3" => "28.04.2019  don't save private hash refs in central hash, \"repository\" added in Meta.json ",
   "8.13.2" => "07.04.2019  fix perl warning Forum: https://forum.fhem.de/index.php/topic,45671.msg927912.html#msg927912",
   "8.13.1" => "06.04.2019  verbose level in X_DelayedShutdown changed ",
@@ -125,7 +128,7 @@ our %SSCam_vNotesIntern = (
   "4.2.0"  => "22.05.2018  PTZ-Panel integrated to created StreamDevice ",
   "4.1.0"  => "05.05.2018  use SYNO.SurveillanceStation.VideoStream instead of SYNO.SurveillanceStation.VideoStreaming, preparation for hls ",
   "4.0.0"  => "01.05.2018  AudioStream possibility added ",
-  "3.10.0"  => "24.04.2018  createStreamDev added, new features lastrec_fw_MJPEG, lastrec_fw_MPEG4/H.264 added to playback MPEG4/H.264 videos ",
+  "3.10.0" => "24.04.2018  createStreamDev added, new features lastrec_fw_MJPEG, lastrec_fw_MPEG4/H.264 added to playback MPEG4/H.264 videos ",
   "3.9.2"  => "21.04.2018  minor fixes ",
   "3.9.1"  => "20.04.2018  Attribute ptzPanel_use, initial webcommands in DeviceOverview changed, minor fixes ptzPanel ",
   "3.9.0"  => "17.04.2018  control panel & PTZcontrol weblink device for PTZ cams ",
@@ -197,7 +200,7 @@ our %SSCam_vNotesExtern = (
   "5.0.1"  => "12.06.2018 control of page refresh improved (for e.g. Floorplan,Dashboard) ",
   "4.2.0"  => "22.05.2018 PTZ-Panel integrated to created StreamDevice ",
   "4.0.0"  => "01.05.2018 AudioStream possibility added ",
-  "3.10.0"  => "24.04.2018 createStreamDev added, new features lastrec_fw_MJPEG, lastrec_fw_MPEG4/H.264 added to playback MPEG4/H.264 videos ",
+  "3.10.0" => "24.04.2018 createStreamDev added, new features lastrec_fw_MJPEG, lastrec_fw_MPEG4/H.264 added to playback MPEG4/H.264 videos ",
   "3.9.1"  => "20.04.2018 Attribute ptzPanel_use, initial webcommands in DeviceOverview changed, minor fixes ptzPanel ",
   "3.9.0"  => "17.04.2018 control panel & PTZcontrol weblink device for PTZ cams ",
   "3.8.4"  => "06.04.2018 Internal MODEL changed to SVS or \"CamVendor - CamModel\" for Cams ",
@@ -257,7 +260,7 @@ our %SSCam_vNotesExtern = (
 );
 
 # getestete SVS-Version
-my $compstat     = "8.2.3";
+my $compstat = "8.2.3";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -340,15 +343,15 @@ our %SSCam_ttips_de = (
 );
 
 # Standardvariablen und Forward-Deklaration
-my $SSCam_slim            = 3;                          # default Anzahl der abzurufenden Schnappschüsse mit snapGallery
-my $SSCAM_snum            = "1,2,3,4,5,6,7,8,9,10";     # mögliche Anzahl der abzurufenden Schnappschüsse mit snapGallery
+my $SSCam_slim  = 3;                                    # default Anzahl der abzurufenden Schnappschüsse mit snapGallery
+my $SSCAM_snum  = "1,2,3,4,5,6,7,8,9,10";               # mögliche Anzahl der abzurufenden Schnappschüsse mit snapGallery
 
-use vars qw($FW_ME);      # webname (default is fhem), used by 97_GROUP/weblink
-use vars qw($FW_subdir);  # Sub-path in URL, used by FLOORPLAN/weblink
-use vars qw($FW_room);    # currently selected room
-use vars qw($FW_detail);  # currently selected device for detail view
-use vars qw($FW_wname);   # Web instance
-sub FW_pH(@);             # add href
+use vars qw($FW_ME);                                    # webname (default is fhem), used by 97_GROUP/weblink
+use vars qw($FW_subdir);                                # Sub-path in URL, used by FLOORPLAN/weblink
+use vars qw($FW_room);                                  # currently selected room
+use vars qw($FW_detail);                                # currently selected device for detail view
+use vars qw($FW_wname);                                 # Web instance
+sub FW_pH(@);                                           # add href
 use vars qw(%SSCam_vHintsExt_en);
 use vars qw(%SSCam_vHintsExt_de);
 sub SSCam_TBotSendIt($$$$$$$;$$$);
@@ -364,8 +367,8 @@ sub SSCam_Initialize($) {
  $hash->{AttrFn}            = "SSCam_Attr";
  $hash->{DelayedShutdownFn} = "SSCam_DelayedShutdown";
  # Aufrufe aus FHEMWEB
- $hash->{FW_summaryFn} = "SSCam_FWsummaryFn";
- $hash->{FW_detailFn}  = "SSCam_FWdetailFn";
+ $hash->{FW_summaryFn}      = "SSCam_FWsummaryFn";
+ $hash->{FW_detailFn}       = "SSCam_FWdetailFn";
  $hash->{FW_deviceOverview} = 1;
  
  $hash->{AttrList} =
@@ -422,7 +425,7 @@ sub SSCam_Define($@) {
   #       ($hash)  [1]    [2]        [3]      [4]  
   #
   my ($hash, $def) = @_;
-  my $name = $hash->{NAME};
+  my $name         = $hash->{NAME};
   
  return "Error: Perl module ".$SScamMMDBI." is missing. Install it on Debian with: sudo apt-get install libjson-perl" if($SScamMMDBI);
   
@@ -895,7 +898,7 @@ sub SSCam_Set($@) {
 	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
       my $emtxt   = $hash->{HELPER}{SMTPRECMSG}?delete $hash->{HELPER}{SMTPRECMSG}:"";
       my $teletxt = $hash->{HELPER}{TELERECMSG}?delete $hash->{HELPER}{TELERECMSG}:"";
-      SSCam_camstoprec("$name:$emtxt:$teletxt");
+      SSCam_camstoprec("$name!_!$emtxt!_!$teletxt");
         
   } elsif ($opt eq "snap" && SSCam_IsModelCam($hash)) {
 	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
@@ -939,7 +942,7 @@ sub SSCam_Set($@) {
           $hash->{HELPER}{TELEMSG} = $teletxt;
       }
 	  
-      SSCam_camsnap("$name:$num:$lag:$ncount:$emtxt:$teletxt");
+      SSCam_camsnap("$name!_!$num!_!$lag!_!$ncount!_!$emtxt!_!$teletxt");
               
   } elsif ($opt eq "snapCams" && !SSCam_IsModelCam($hash)) {
 	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
@@ -1003,7 +1006,7 @@ sub SSCam_Set($@) {
               $cmail .= $cmail?", $key":$key;
               $emtxt  = $rawet;
           }
-          SSCam_camsnap("$key:$num:$lag:$ncount:$emtxt:$teletxt");
+          SSCam_camsnap("$key!_!$num!_!$lag!_!$ncount!_!$emtxt!_!$teletxt");
       }
       Log3($name, 4, "$name - Trigger snapshots by SVS - Number: $num, Lag: $lag, Snap only: \"$csnap\", Snap and send: \"$cmail\" ");
       
@@ -1907,7 +1910,7 @@ sub SSCam_initonboot ($) {
      if (ReadingsVal($hash->{NAME}, "Record", "Stop") eq "Start") {
          Log3($name, 2, "$name - Recording of $hash->{CAMNAME} seems to be still active after FHEM restart - try to stop it now");
          my ($emtxt,$teletxt) = ("","");
-         SSCam_camstoprec("$name:$emtxt:$teletxt");
+         SSCam_camstoprec("$name!_!$emtxt!_!$teletxt");
      }
          
      # Konfiguration der Synology Surveillance Station abrufen
@@ -2226,7 +2229,7 @@ sub SSCam_camstartrec ($) {
 ###############################################################################
 sub SSCam_camstoprec ($) {
     my ($str)                  = @_;
-	my ($name,$emtxt,$teletxt) = split(":",$str);
+	my ($name,$emtxt,$teletxt) = split("!_!",$str);
 	my $hash                   = $defs{$name};
     my $camname                = $hash->{CAMNAME};
     my $errorcode;
@@ -2274,7 +2277,7 @@ sub SSCam_camstoprec ($) {
         SSCam_getapisites($hash);
 		
     } else {
-        InternalTimer(gettimeofday()+0.3, "SSCam_camstoprec", "$name:$emtxt:$teletxt", 0);
+        InternalTimer(gettimeofday()+0.3, "SSCam_camstoprec", "$name!_!$emtxt!_!$teletxt", 0);
     }
 }
 
@@ -2376,7 +2379,7 @@ sub SSCam_cammotdetsc($) {
 ###############################################################################
 sub SSCam_camsnap($) {
     my ($str)            = @_;
-	my ($name,$num,$lag,$ncount,$emtxt,$teletxt,$tac) = split(":",$str);
+	my ($name,$num,$lag,$ncount,$emtxt,$teletxt,$tac) = split("!_!",$str);
 	my $hash             = $defs{$name};
     my $camname          = $hash->{CAMNAME};
     my $errorcode;
@@ -2425,7 +2428,7 @@ sub SSCam_camsnap($) {
 		
     } else {
         $tac = (defined $tac)?$tac:"";
-        InternalTimer(gettimeofday()+0.3, "SSCam_camsnap", "$name:$num:$lag:$ncount:$emtxt:$teletxt:$tac", 0);
+        InternalTimer(gettimeofday()+0.3, "SSCam_camsnap", "$name!_!$num!_!$lag!_!$ncount!_!$emtxt!_!$teletxt!_!$tac", 0);
     }    
 }
 
@@ -3038,7 +3041,7 @@ sub SSCam_stopliveview ($) {
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         
         # Liveview stoppen           
-        $hash->{OPMODE} = "stopliveview";
+        $hash->{OPMODE}               = "stopliveview";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
         
         SSCam_setActiveToken($hash);
@@ -3364,8 +3367,8 @@ sub SSCam_getsnapinfo ($) {
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off" || ((defined $ta) && $ta == $tac)) {               
-        $hash->{OPMODE} = "getsnapinfo";
-		$hash->{OPMODE} = "getsnapgallery" if(exists($hash->{HELPER}{GETSNAPGALLERY}));
+        $hash->{OPMODE}               = "getsnapinfo";
+		$hash->{OPMODE}               = "getsnapgallery" if(exists($hash->{HELPER}{GETSNAPGALLERY}));
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		$hash->{HELPER}{SNAPLIMIT}    = $slim;   # 0-alle Snapshots werden abgerufen und ausgewertet, sonst $slim
 		$hash->{HELPER}{SNAPIMGSIZE}  = $ssize;  # 0-Do not append image, 1-Icon size, 2-Full size
@@ -3391,7 +3394,7 @@ sub SSCam_getsnapfilename ($) {
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {    
-        $hash->{OPMODE} = "getsnapfilename";
+        $hash->{OPMODE}               = "getsnapfilename";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
         
         SSCam_setActiveToken($hash);
@@ -3414,7 +3417,7 @@ sub SSCam_getsvsinfo ($) {
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
-        $hash->{OPMODE} = "getsvsinfo";
+        $hash->{OPMODE}               = "getsvsinfo";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
         SSCam_setActiveToken($hash);
@@ -3437,7 +3440,7 @@ sub SSCam_sethomemode ($) {
     return if(IsDisabled($name) || !defined($hash->{HELPER}{APIHMMAXVER}));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
-        $hash->{OPMODE} = "sethomemode";
+        $hash->{OPMODE}               = "sethomemode";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
         SSCam_setActiveToken($hash);
@@ -3460,7 +3463,7 @@ sub SSCam_setoptpar ($) {
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
-        $hash->{OPMODE} = "setoptpar";
+        $hash->{OPMODE}               = "setoptpar";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
         SSCam_setActiveToken($hash);
@@ -3483,7 +3486,7 @@ sub SSCam_gethomemodestate ($) {
     return if(IsDisabled($name) || !defined($hash->{HELPER}{APIHMMAXVER}));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
-        $hash->{OPMODE} = "gethomemodestate";
+        $hash->{OPMODE}               = "gethomemodestate";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
         SSCam_setActiveToken($hash);
@@ -3506,7 +3509,7 @@ sub SSCam_getsvslog ($) {
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
-        $hash->{OPMODE} = "getsvslog";
+        $hash->{OPMODE}               = "getsvslog";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
         SSCam_setActiveToken($hash);
@@ -3551,7 +3554,7 @@ sub SSCam_getcaminfo($) {
     return if(IsDisabled($name));
 
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
-        $hash->{OPMODE} = "Getcaminfo";
+        $hash->{OPMODE}               = "Getcaminfo";
         $hash->{HELPER}{LOGINRETRIES} = 0;	
         
         SSCam_setActiveToken($hash); 
@@ -3581,7 +3584,7 @@ sub SSCam_getstreamformat ($) {
     }
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
-        $hash->{OPMODE} = "getstreamformat";
+        $hash->{OPMODE}               = "getstreamformat";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
         SSCam_setActiveToken($hash); 
@@ -3605,7 +3608,7 @@ sub SSCam_getStmUrlPath ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         # Stream-Urls abrufen              
-        $hash->{OPMODE} = "getStmUrlPath";
+        $hash->{OPMODE}               = "getStmUrlPath";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
         
         SSCam_setActiveToken($hash);
@@ -3628,7 +3631,7 @@ sub SSCam_geteventlist ($) {
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {      
-        $hash->{OPMODE} = "geteventlist";
+        $hash->{OPMODE}               = "geteventlist";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
         
         SSCam_setActiveToken($hash);
@@ -3651,7 +3654,7 @@ sub SSCam_getmotionenum ($) {
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {   
-        $hash->{OPMODE} = "getmotionenum";
+        $hash->{OPMODE}               = "getmotionenum";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
         SSCam_setActiveToken($hash);
@@ -3675,7 +3678,7 @@ sub SSCam_getcapabilities ($) {
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                       
-        $hash->{OPMODE} = "Getcapabilities";
+        $hash->{OPMODE}               = "Getcapabilities";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
         
         SSCam_setActiveToken($hash);
@@ -3707,7 +3710,7 @@ sub SSCam_getptzlistpreset ($) {
     }
     
 	if ($hash->{HELPER}{ACTIVE} eq "off") {                       
-        $hash->{OPMODE} = "Getptzlistpreset";
+        $hash->{OPMODE}               = "Getptzlistpreset";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
         SSCam_setActiveToken($hash);
@@ -3739,7 +3742,7 @@ sub SSCam_getptzlistpatrol ($) {
     }
 
     if ($hash->{HELPER}{ACTIVE} ne "on") {                        
-        $hash->{OPMODE} = "Getptzlistpatrol";
+        $hash->{OPMODE}               = "Getptzlistpatrol";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
         
         SSCam_setActiveToken($hash);
@@ -4360,21 +4363,17 @@ sub SSCam_getcamid_parse ($) {
            # Ist der gesuchte Kameraname im Hash enhalten (in SVS eingerichtet ?)
            if (exists($allcams{$camname})) {
                $camid = $allcams{$camname};
-               # in hash eintragen
                $hash->{CAMID} = $camid;
                  
-               # Logausgabe
                Log3($name, 4, "$name - Detection Camid successful - $camname ID: $camid");
            
 		   } else {
                # Kameraname nicht gefunden, id = ""
-               # Setreading 
                readingsBeginUpdate($hash);
                readingsBulkUpdate($hash,"Errorcode","none");
                readingsBulkUpdate($hash,"Error","Camera(ID) not found in Surveillance Station");
                readingsEndUpdate($hash, 1);
                                   
-               # Logausgabe
                Log3($name, 2, "$name - ERROR - Cameraname $camname wasn't found in Surveillance Station. Check Userrights, Cameraname and Spelling");		   
                SSCam_delActiveToken($hash);
                return;
@@ -4493,7 +4492,6 @@ sub SSCam_camop ($) {
       # ein Schnappschuß wird ausgelöst
       $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&dsId=\"0\"&method=\"TakeSnapshot\"&version=\"$apitakesnapmaxver\"&camId=\"$camid\"&blSave=\"true\"&_sid=\"$sid\"";
       readingsSingleUpdate($hash,"state", "snap", 1); 
-      #readingsSingleUpdate($hash, "LastSnapId", "", 0);
    
    } elsif ($OpMode eq "SaveRec" || $OpMode eq "GetRec") {
       # eine Aufnahme soll in lokalem File (.mp4) gespeichert werden
@@ -4950,7 +4948,7 @@ sub SSCam_camop_parse ($) {
                     my $emtxt   = $hash->{HELPER}{SMTPRECMSG}?$hash->{HELPER}{SMTPRECMSG}:"";
                     my $teletxt = $hash->{HELPER}{TELERECMSG}?$hash->{HELPER}{TELERECMSG}:"";
                     RemoveInternalTimer($hash, "SSCam_camstoprec");
-                    InternalTimer(gettimeofday()+$rectime, "SSCam_camstoprec", "$name:$emtxt:$teletxt");
+                    InternalTimer(gettimeofday()+$rectime, "SSCam_camstoprec", "$name!_!$emtxt!_!$teletxt");
                 }      
                 
                 SSCam_refresh($hash,0,0,1);    # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event
@@ -5143,7 +5141,7 @@ sub SSCam_camop_parse ($) {
                 my $pname   = delete($hash->{HELPER}{PNAME});
                 my $pspeed  = delete($hash->{HELPER}{PSPEED});                
                 $pspeed     = $pspeed?$pspeed:"not set";
-                # Logausgabe
+
                 Log3($name, 3, "$name - Camera \"$camname\" preset \"$pname\" was saved to number $pnumber with speed $pspeed");
                 SSCam_getptzlistpreset($hash);
             
@@ -5164,7 +5162,6 @@ sub SSCam_camop_parse ($) {
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
        
-                # Logausgabe
                 my $piract = ($hash->{HELPER}{PIRACT} == 0)?"activated":"deactivated";
                 Log3($name, 3, "$name - PIR sensor $piract");
             
@@ -5205,7 +5202,6 @@ sub SSCam_camop_parse ($) {
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
        
-                # Logausgabe
                 my $sensitivity;
                 if ($hash->{HELPER}{MOTDETSC} eq "SVS" && keys %{$hash->{HELPER}{MOTDETOPTIONS}}) {
                     # Optionen für "SVS" sind gesetzt
@@ -5258,7 +5254,7 @@ sub SSCam_camop_parse ($) {
                 my $emtxt   = $hash->{HELPER}{SMTPMSG}?$hash->{HELPER}{SMTPMSG}:"";  # Text für Email-Versand
 				my $teletxt = $hash->{HELPER}{TELEMSG}?$hash->{HELPER}{TELEMSG}:"";  # Text für TelegramBot-Versand
                 if($ncount > 0) {
-                    InternalTimer(gettimeofday()+$lag, "SSCam_camsnap", "$name:$num:$lag:$ncount:$emtxt:$teletxt:$tac", 0);
+                    InternalTimer(gettimeofday()+$lag, "SSCam_camsnap", "$name!_!$num!_!$lag!_!$ncount!_!$emtxt!_!$teletxt!_!$tac", 0);
                     if(!$tac) {
 					    SSCam_delActiveToken($hash);                               # Token freigeben wenn keine Transaktion läuft
 					}
@@ -5526,8 +5522,7 @@ sub SSCam_camop_parse ($) {
                 readingsBulkUpdate($hash,"Error","none");
                 readingsBulkUpdate($hash,"LastSnapFilename", $data->{'data'}{'data'}[0]{'fileName'});
                 readingsEndUpdate($hash, 1);
-                                
-                # Logausgabe
+
                 Log3($name, 4, "$name - Filename of Snap-ID $snapid is \"$data->{'data'}{'data'}[0]{'fileName'}\"") if($data->{'data'}{'data'}[0]{'fileName'});
             
 			} elsif ($OpMode eq "getstreamformat") {
@@ -5567,7 +5562,6 @@ sub SSCam_camop_parse ($) {
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
                                 
-                # Logausgabe
                 Log3($name, 3, "$name - Patrol \"$hash->{HELPER}{GOPATROLNAME}\" of camera $camname has been started successfully");
             
 			} elsif ($OpMode eq "goabsptz") {
@@ -5582,7 +5576,6 @@ sub SSCam_camop_parse ($) {
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
                                 
-                # Logausgabe
                 Log3($name, 3, "$name - Camera $camname has been moved to absolute position \"posX=$hash->{HELPER}{GOPTZPOSX}\" and \"posY=$hash->{HELPER}{GOPTZPOSY}\"");
             
 			} elsif ($OpMode eq "startTrack") {
@@ -5593,7 +5586,6 @@ sub SSCam_camop_parse ($) {
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
                                 
-                # Logausgabe
                 Log3($name, 3, "$name - Object tracking of Camera $camname has been switched on");
             
 			} elsif ($OpMode eq "stopTrack") {
@@ -5604,7 +5596,6 @@ sub SSCam_camop_parse ($) {
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
                                 
-                # Logausgabe
                 Log3($name, 3, "$name - Object tracking of Camera $camname has been stopped");
             
 			} elsif ($OpMode eq "movestart") {
@@ -5615,7 +5606,6 @@ sub SSCam_camop_parse ($) {
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
                                 
-                # Logausgabe
                 Log3($name, 3, "$name - Camera $camname started move to direction \"$hash->{HELPER}{GOMOVEDIR}\" with duration of $hash->{HELPER}{GOMOVETIME} s");
                 
                 RemoveInternalTimer($hash, "SSCam_movestop");
@@ -5658,7 +5648,6 @@ sub SSCam_camop_parse ($) {
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
                    
-                # Logausgabe
                 Log3($name, 3, "$name - Camera $camname has been disabled successfully");
             
 			} elsif ($OpMode eq "getsvsinfo") {
@@ -5772,10 +5761,13 @@ sub SSCam_camop_parse ($) {
                 # StmKey extrahieren
                 my @sk = split(/&StmKey=/, $mjpegHttp);
                 my $stmkey = $sk[1];
-                $stmkey =~ tr/"//d;
-				# Quotes in StmKey entfernen falls noQuotesForSID gesezt 
-				# $mjpegHttp =~ tr/"//d if(AttrVal($name, "noQuotesForSID",0));
-                $mjpegHttp =~ tr/"//d;
+                
+				# Quotes in StmKey entfernen falls noQuotesForSID gesetzt 
+                if(AttrVal($name, "noQuotesForSID",0)) {   # Forum: https://forum.fhem.de/index.php/topic,45671.msg938236.html#msg938236
+				    $mjpegHttp =~ tr/"//d;
+                    $mxpegHttp =~ tr/"//d;
+                    $stmkey    =~ tr/"//d;
+                }
                 
                 # Streaminginfos in Helper speichern
                 $hash->{HELPER}{STMKEYMJPEGHTTP}      = $mjpegHttp if($mjpegHttp);
@@ -5793,8 +5785,7 @@ sub SSCam_camop_parse ($) {
 				readingsBulkUpdate($hash,"Errorcode","none");
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
-                     
-                # Logausgabe
+
                 Log3($name, $verbose, "$name - Stream-URLs of camera $camname retrieved");
             
 			} elsif ($OpMode eq "Getcaminfo") {
@@ -5979,7 +5970,6 @@ sub SSCam_camop_parse ($) {
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
        
-                # Logausgabe
                 Log3($name, $verbose, "$name - Query eventlist of camera $camname retrieved");
                 
                 # Versand Aufnahme initiieren
@@ -6051,7 +6041,6 @@ sub SSCam_camop_parse ($) {
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
        
-                # Logausgabe
                 Log3($name, $verbose, "$name - Enumerate motion detection parameters of camera $camname retrieved");
             
 			} elsif ($OpMode eq "Getcapabilities") {
@@ -6137,7 +6126,6 @@ sub SSCam_camop_parse ($) {
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
                   
-                # Logausgabe
                 Log3($name, $verbose, "$name - Capabilities of camera $camname retrieved");
             
 			} elsif ($OpMode eq "Getptzlistpreset") {
@@ -6162,7 +6150,6 @@ sub SSCam_camop_parse ($) {
                 my @preskeys = sort(keys(%{$hash->{HELPER}{ALLPRESETS}}));
                 my $presetlist = join(",",@preskeys);
 
-                # Setreading 
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"Presets",$presetlist);
                 readingsBulkUpdate($hash,"PresetHome",$home);
@@ -6173,7 +6160,6 @@ sub SSCam_camop_parse ($) {
                 # spezifische Attribute für PTZ-Cams verfügbar machen
                 SSCam_addptzattr($name);
                              
-                # Logausgabe
                 Log3($name, $verbose, "$name - PTZ Presets of camera $camname retrieved");
             
 			} elsif ($OpMode eq "Getptzlistpatrol") {
@@ -6199,7 +6185,6 @@ sub SSCam_camop_parse ($) {
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
                      
-                # Logausgabe
                 Log3($name, $verbose, "$name - PTZ Patrols of camera $camname retrieved");
             }
             
@@ -6211,7 +6196,6 @@ sub SSCam_camop_parse ($) {
             # Fehlertext zum Errorcode ermitteln
             $error = SSCam_experror($hash,$errorcode);
 			
-            # Setreading 
             readingsBeginUpdate($hash);
             readingsBulkUpdate($hash,"Errorcode",$errorcode);
             readingsBulkUpdate($hash,"Error",$error);
@@ -6222,7 +6206,6 @@ sub SSCam_camop_parse ($) {
 		       return SSCam_login($hash,'SSCam_getapisites');
 		    }
        
-            # Logausgabe
             Log3($name, 2, "$name - ERROR - Operation $OpMode of Camera $camname was not successful. Errorcode: $errorcode - $error");
        }
    }
@@ -6348,13 +6331,11 @@ sub SSCam_login_return ($) {
             # Session ID in hash eintragen
             $hash->{HELPER}{SID} = $sid;
        
-            # Setreading 
             readingsBeginUpdate($hash);
             readingsBulkUpdate($hash,"Errorcode","none");
             readingsBulkUpdate($hash,"Error","none");
             readingsEndUpdate($hash, 1);
        
-            # Logausgabe
             Log3($name, 4, "$name - Login of User $username successful - SID: $sid");
 			
 			return &$subref($hash);
@@ -6366,13 +6347,11 @@ sub SSCam_login_return ($) {
             # Fehlertext zum Errorcode ermitteln
             my $error = SSCam_experrorauth($hash,$errorcode);
 
-            # Setreading 
             readingsBeginUpdate($hash);
             readingsBulkUpdate($hash,"Errorcode",$errorcode);
             readingsBulkUpdate($hash,"Error",$error);
             readingsEndUpdate($hash, 1);
        
-            # Logausgabe
             Log3($name, 3, "$name - Login of User $username unsuccessful. Code: $errorcode - $error - try again"); 
              
             return SSCam_login($hash,$fret);
@@ -6524,9 +6503,8 @@ sub SSCam_Autocreate ($$) {
            if($success) {
                CommandSet(undef, "$camname credentials $username $password");   
            }
-                     
-           #InternalTimer(gettimeofday()+1.8, "SSCam_addptzattr", "$name", 0);
        }
+       
    } else {
        Log3($name, 4, "$name - Autocreate - SVS camera \"$sn\" already defined by \"$dcn\" ");
        $camname = "";
@@ -6555,7 +6533,7 @@ sub SSCam_evaljson($$) {
           } 
       } else {
           $success = 0;
-          # Setreading 
+
           readingsBeginUpdate($hash);
           readingsBulkUpdate($hash,"Errorcode","none");
           readingsBulkUpdate($hash,"Error","malformed JSON string received");
@@ -6812,13 +6790,6 @@ sub SSCam_ptzpanel($;$$) {
   my $rowisset   = 0;
   my $ptz_ret;
   my $row;
-  
-  #my @vl = split (/\.|-/,ReadingsVal($name, "SVSversion", ""));
-  #if(@vl) {
-  #    my $actvs = $vl[0];
-  #    $actvs   .= $vl[1];
-  #    return "" if($actvs <= 71);
-  #}
   
   return "" if(SSCam_myVersion($hash) <= 71);
   
@@ -7243,7 +7214,7 @@ sub SSCam_StreamDev($$$) {
       return $ret; 
       }      
       
-      $ret .= "<td><video $ha id=video_$d controls autoplay></video><br>";
+      $ret .= "<td><video $ha id=video_$d controls autoplay muted></video><br>";
       $ret .= SSCam_bindhlsjs ($camname, $strmdev, $m3u8, $d); 
       
       $streamHash->{HELPER}{STREAM} = "<video $pws id=video_$d></video>";  # Stream für "set <SSCamSTRM-Device> popupStream" speichern   
@@ -7588,9 +7559,9 @@ return $htmlCode;
 
 ##############################################################################
 #              Auflösung Errorcodes bei Login / Logout
+#              Übernahmewerte sind $hash, $errorcode
 ##############################################################################
 sub SSCam_experrorauth ($$) {
-  # Übernahmewerte sind $hash, $errorcode
   my ($hash,$errorcode) = @_;
   my $device = $hash->{NAME};
   my $error;
@@ -7605,9 +7576,9 @@ return ($error);
 
 ##############################################################################
 #  Auflösung Errorcodes SVS API
+#  Übernahmewerte sind $hash, $errorcode
 ##############################################################################
 sub SSCam_experror ($$) {
-  # Übernahmewerte sind $hash, $errorcode
   my ($hash,$errorcode) = @_;
   my $device = $hash->{NAME};
   my $error;
@@ -10154,7 +10125,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
       <tr><td style="vertical-align:top"> <b>snapEmailTxt</b> <td>- <b>Activates the Email shipping of snapshots.</b> This attribute has the format: <br>
                                                                   <code>subject => &lt;subject text&gt;, body => &lt;message text&gt; </code><br> 
                                                                   The placeholder $CAM, $DATE and $TIME can be used. <br> 
-																  Optionally you can specify the "snapEmailTxt:"-tag when trigger snap shot with the "snap"-command.
+																  Optionally you can specify the "snapEmailTxt:"-tag when trigger a snapshot with the "snap"-command.
                                                                   In this case the Email shipping is activated one-time for the snapshot or the tag-text 
                                                                   is used instead of the text defined in the "snapEmailTxt"-attribute. </td></tr>
       <tr><td style="vertical-align:top"> <b>recEmailTxt</b> <td>- <b>Activates the Email shipping of recordings.</b> This attribute has the format: <br>
@@ -10356,8 +10327,9 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   
   <a name="noQuotesForSID"></a>
   <li><b>noQuotesForSID</b><br>
-    this attribute may be helpful in some cases to avoid errormessage "402 - permission denied" and makes login 
-	possible.  </li><br>
+    This attribute delete the quotes for SID and for StmKeys.  
+    The attribute may be helpful in some cases to avoid errormessages "402 - permission denied" or "105 - 
+    Insufficient user privilege" and makes login possible.  </li><br>
   
   <a name="pollcaminfoall"></a>
   <li><b>pollcaminfoall</b><br>
@@ -10428,7 +10400,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <li><b>recEmailTxt subject => &lt;subject text&gt;, body => &lt;message text&gt; </b><br>
     Activates the Email shipping of recordings after whose creation. <br>
     The attribute has to be definied in the form as described. <br>    
-    You can use the placeholder in "subject" and "body". <br><br>
+    You can use the following placeholders in "subject" and "body". <br><br>
 	
 		<ul>   
 		<table>  
@@ -10450,12 +10422,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <a name="recTelegramTxt"></a>
   <li><b>snapTelegramTxt tbot => &lt;TelegramBot device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;subject text&gt;]  </b><br>
     Activates the permanent shipping of recordings by TelegramBot after their creation. <br>
-    The attribute has to be definied in the form as described. With key "tbot" the TelegramBot device is specified, which is 
-	used for shipping the data. Of course, the <a href="http://fhem.de/commandref.html#TelegramBot">TelegramBot device</a> 
+    The attribute has to be definied in the form as described. With key "tbot" the TelegramBot device is specified, 
+	which is used for shipping the data. Of course, the <a href="http://fhem.de/commandref.html#TelegramBot">TelegramBot device</a> 
     must be available and has to be running well. <br>
 	The setting of "peers" and "subject" is optional, but the keys must (empty) specified. 
 	If "peer" is empty, teh default peer of the TelegramBot is used. <br>
-	You can use the placeholder in "subject". <br><br>
+	You can use the following placeholders in "subject". <br><br>
 	
 		<ul>   
 		<table>  
@@ -10553,7 +10525,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <li><b>snapEmailTxt subject => &lt;subject text&gt;, body => &lt;message text&gt; </b><br>
     Activates the Email shipping of snapshots after whose creation. <br>
     The attribute has to be definied in the form as described. <br>
-    You can use the placeholder in "subject" and "body". <br><br>
+    You can use the following placeholders in "subject" and "body". <br><br>
 	
 		<ul>   
 		<table>  
@@ -10576,12 +10548,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <li><b>snapTelegramTxt tbot => &lt;TelegramBot device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;subject text&gt;]  </b><br>
     Activates the permanent shipping of snapshots by TelegramBot after their creation. If several snapshots were triggert, 
 	they will be sequentially delivered.<br>
-    The attribute has to be definied in the form as described. With key "tbot" the TelegramBot device is specified, which is 
-	used for shipping the data. Of course, the <a href="http://fhem.de/commandref.html#TelegramBot">TelegramBot device</a> 
+    The attribute has to be definied in the form as described. With key "tbot" the TelegramBot device is specified, 
+	which is used for shipping the data. Of course, the <a href="http://fhem.de/commandref.html#TelegramBot">TelegramBot device</a> 
     must be available and has to be running well. <br>
 	The setting of "peers" and "subject" is optional, but the keys must (empty) specified. 
 	If "peer" is empty, teh default peer of the TelegramBot is used. <br>
-	You can use the placeholder in "subject". <br><br>
+	You can use the following placeholders in "subject". <br><br>
 	
 		<ul>   
 		<table>  
@@ -11948,9 +11920,9 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
                                                                   <code>subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;</code><br>
                                                                   </ul>
                                                                   Es können die Platzhalter $CAM, $DATE und $TIME verwendet werden. <br>
-																  Der Email-Versand des letzten Schnappschusses wird einmalig aktiviert falls der "recEmailTxt:"-Tag 
+																  Der Email-Versand des letzten Schnappschusses wird einmalig aktiviert falls der "snapEmailTxt:"-Tag 
 																  beim "snap"-Kommando verwendet wird bzw. der in diesem Tag definierte Text statt des Textes im 
-																  Attribut "recEmailTxt" verwendet. </td></tr>
+																  Attribut "snapEmailTxt" verwendet. </td></tr>
       
       <tr><td style="vertical-align:top"> <b>recEmailTxt</b> <td>- <b>Aktiviert den Email-Versand von Aufnahmen</b>. 
                                                                   Das Attribut hat das Format: <br>
@@ -12156,11 +12128,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   
   <a name="loginRetries"></a>
   <li><b>loginRetries</b><br>
-    setzt die Anzahl der Login-Wiederholungen im Fehlerfall (default = 3)   </li><br>
+    Setzt die Anzahl der Login-Wiederholungen im Fehlerfall (default = 3)   </li><br>
   
   <a name="noQuotesForSID"></a>
   <li><b>noQuotesForSID</b><br>
-    dieses Attribut kann in bestimmten Fällen die Fehlermeldung "402 - permission denied" 
+    Dieses Attribut entfernt Quotes für SID bzw. der StmKeys. 
+    Es kann in bestimmten Fällen die Fehlermeldung "402 - permission denied" oder "105 - Insufficient user privilege"
     vermeiden und ein login ermöglichen.  </li><br>                      
   
   <a name="pollcaminfoall"></a>
@@ -12235,7 +12208,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <li><b>recEmailTxt subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt; </b><br>
     Aktiviert den Emailversand von Aufnahmen nach deren Erstellung. <br>
     Das Attribut muß in der angegebenen Form definiert werden. <br>
-    Es können die Platzhalter im subject und body verwendet werden. <br><br>
+    Es können die folgenden Platzhalter im subject und body verwendet werden. <br><br>
 	
 		<ul>   
 		<table>  
@@ -12257,12 +12230,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <a name="recTelegramTxt"></a>
   <li><b>recTelegramTxt tbot => &lt;TelegramBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;]  </b><br>
     Aktiviert den permanenten Versand von Aufnahmen nach deren Erstellung per TelegramBot. <br>
-    Das Attribut muß in der angegebenen Form definiert werden. Im Schlüssel "tbot" ist das TelegramBot-Device anzugeben, welches für 
-	den Versand der Daten verwendet werden soll. Das <a href="http://fhem.de/commandref_DE.html#TelegramBot">TelegramBot-Device</a> muss natürlich
-	vorhanden und funktionstüchtig sein. <br>
+    Das Attribut muß in der angegebenen Form definiert werden. Im Schlüssel "tbot" ist das TelegramBot-Device 
+	anzugeben, welches für den Versand der Daten verwendet werden soll. 
+	Das <a href="http://fhem.de/commandref_DE.html#TelegramBot">TelegramBot-Device</a> muss natürlich vorhanden und funktionstüchtig sein. <br>
 	Die Angabe von "peers" und "subject" ist optional, jedoch muß der Schlüssel (leer) angegeben werden. 
 	Wurde "peer" leer gelassen, wird der Default-Peer des TelegramBot verwendet. <br>
-	Es können die Platzhalter im subject verwendet werden. <br><br>
+	Es können die folgenden Platzhalter im subject verwendet werden. <br><br>
 	
 		<ul>   
 		<table>  
@@ -12363,7 +12336,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     Aktiviert den Emailversand von Schnappschüssen nach deren Erstellung. Wurden mehrere Schnappschüsse ausgelöst, 
 	werden sie gemeinsam in einer Mail versendet. <br>
     Das Attribut muß in der angegebenen Form definiert werden. <br>
-    Es können die Platzhalter im subject und body verwendet werden. <br><br>
+    Es können die folgenden Platzhalter im subject und body verwendet werden. <br><br>
 	
 		<ul>   
 		<table>  
@@ -12386,9 +12359,9 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <li><b>snapTelegramTxt tbot => &lt;TelegramBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;]  </b><br>
     Aktiviert den permanenten Versand von Schnappschüssen nach deren Erstellung per TelegramBot. Wurden mehrere Schnappschüsse ausgelöst, 
 	werden sie sequentiell versendet.<br>
-    Das Attribut muß in der angegebenen Form definiert werden. Im Schlüssel "tbot" ist das TelegramBot-Device anzugeben, welches für 
-	den Versand der Daten verwendet werden soll. Das <a href="http://fhem.de/commandref_DE.html#TelegramBot">TelegramBot-Device</a> muss natürlich
-	vorhanden und funktionstüchtig sein. <br>
+    Das Attribut muß in der angegebenen Form definiert werden. Im Schlüssel "tbot" ist das TelegramBot-Device 
+	anzugeben, welches für den Versand der Daten verwendet werden soll. 
+	Das <a href="http://fhem.de/commandref_DE.html#TelegramBot">TelegramBot-Device</a> muss natürlich vorhanden und funktionstüchtig sein. <br>
 	Die Angabe von "peers" und "subject" ist optional, jedoch muß der Schlüssel (leer) angegeben werden. 
 	Wurde "peer" leer gelassen, wird der Default-Peer des TelegramBot verwendet. <br>
 	Es können die Platzhalter im subject verwendet werden. <br><br>
@@ -12595,6 +12568,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     "control",
     "PTZ",
     "Synology Surveillance Station",
+    "Cloudfree",
+    "official API",
     "MJPEG",
     "HLS",
     "RTSP"
