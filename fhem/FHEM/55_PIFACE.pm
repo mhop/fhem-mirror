@@ -6,8 +6,8 @@
 #	An FHEM Perl module to control RaspberryPi extension board PiFace
 #
 #	The PiFace is an add-on board for the Raspberry Pi featuring 8 open-collector outputs,
-#	with 2 relays and 8 inputs (with 4 on-board buttons).
-#	These functions are fairly well fixed in the hardware,
+#	with 2 relays and 8 inputs (with 4 on-board buttons). 
+#	These functions are fairly well fixed in the hardware, 
 #	so only the read, write and internal pull-up commands are implemented.
 #
 #	Please read commandref for details on prerequisits!
@@ -74,7 +74,7 @@ sub PIFACE_Initialize($){
                           " watchdog:on,off,silent watchdogInterval";
 }
 
-sub PIFACE_Define($$) {
+sub PIFACE_Define($$){
   my ($hash, $def) = @_;
   my $name = $hash->{NAME};
   $hash->{NOTIFYDEV} = "global";
@@ -83,28 +83,28 @@ sub PIFACE_Define($$) {
   return;
 }
 
-sub PIFACE_Undefine($$) {
+sub PIFACE_Undefine($$){
   my($hash, $name) = @_;
   RemoveInternalTimer($hash);
   return;
 }
 
 sub PIFACE_Set($@) {
-	my ($hash, @a) = @_;
+	my ($hash, @a)	= @_;
 	my $name = $hash->{NAME};
         if (IsDisabled($name)) {
-          Log3 $name, 4, "PIFACE $name set commands disabled.";
+          Log3 $name, 4, "PIFACE $name set commands disabled.";  
           return;
         }
 	my $port = $a[1];
 	my $val  = $a[2];
-	my ($adr, $cmd, $i, $j, $k);
+	my ($adr, $cmd, $i, $j, $k);	
 	my $usage = "Unknown argument $port, choose one of all 0:0,1 1:0,1 2:0,1 3:0,1 4:0,1 5:0,1 6:0,1 7:0,1 ";
-	return $usage if ($port eq "?");
+	return $usage if $port eq "?";	
 	if ($port ne "all") {
 		$adr = $base + $port;
 		Log3($name, 3, "PIFACE $name set port $port $val");
-		$cmd = "$gpioCmd -x mcp23s17:200:0:0 write $adr $val";
+		$cmd = "$gpioCmd -p write $adr $val";
 		$cmd = `$cmd`;
 		readingsSingleUpdate($hash, 'out'.$port, $val, 1);
 	} else {
@@ -116,7 +116,7 @@ sub PIFACE_Set($@) {
 			$k = ($k) ? 1 : 0;
 			Log3($name, 3, "PIFACE $name set port $i $k");
 			$adr = $base + $i;
-			$cmd = "$gpioCmd -x mcp23s17:200:0:0 write $adr $k";
+			$cmd = "$gpioCmd -p write $adr $k";
 			$cmd = `$cmd`;
 			readingsBulkUpdate($hash, 'out'.$i, $k);
 		}
@@ -125,7 +125,7 @@ sub PIFACE_Set($@) {
 	return;
 }
 
-sub PIFACE_Get($@) {
+sub PIFACE_Get($@){
 	my ($hash, @a)	= @_;
 	my $name = $hash->{NAME};
 	my $port = $a[1];
@@ -136,23 +136,18 @@ sub PIFACE_Get($@) {
 	return $usage if $port eq "?";
 	if ($port eq "all") {
 	  PIFACE_Read_Inports(1, $hash);
-          PIFACE_Read_Outports(1, $hash);
-	  Log3($name, 3, "PIFACE $name get port $port");
+          PIFACE_Read_Outports(1, $hash);                
 	} elsif ($port eq "in") {
-	  PIFACE_Read_Inports(1, $hash);
-	  Log3($name, 3, "PIFACE $name get port $port");
+	  PIFACE_Read_Inports(0, $hash);	
 	} elsif ($port eq "out") {
-          PIFACE_Read_Outports(1, $hash);
-	  Log3($name, 3, "PIFACE $name get port $port");
+          PIFACE_Read_Outports(0, $hash);	
 	} else {
-	  # get state of in port
-	  $adr  = $base + 8 + $port;
-	  $cmd = "$gpioCmd -x mcp23s17:200:0:0 read $adr";
+	  $adr  = $base + $port;
+	  $cmd = "$gpioCmd -p read $adr";
 	  $val = `$cmd`;
 	  $val =~ s/\n//g;
 	  $val =~ s/\r//g;
-	  readingsSingleUpdate($hash, 'in' . $port, $val, 1);
-	  Log3($name, 3, "PIFACE $name get port in$port");
+	  readingsSingleUpdate($hash, 'in'.$port, $val, 1);
 	}
 	return;
 }
@@ -160,61 +155,59 @@ sub PIFACE_Get($@) {
 sub PIFACE_Attr(@) {
   my ($cmd, $name, $attrName, $attrVal) = @_;
   my $hash = $defs{$name};
-  return undef if (!$init_done);
+  
   if ($attrName eq "pollInterval") {
     if (!defined $attrVal) {
-      #RemoveInternalTimer($hash);
+      #RemoveInternalTimer($hash);    
     } elsif ($attrVal eq "off" || ($attrVal =~ m/^\d+?$/ && $attrVal > 0 && $attrVal < 11)) {
       PIFACE_GetUpdate($hash);
     } else {
-      #RemoveInternalTimer($hash);
+      #RemoveInternalTimer($hash);    
       Log3($name, 3, "PIFACE $name attribute-value [$attrName] = $attrVal wrong");
       CommandDeleteAttr(undef, "$name pollInterval");
     }
-
+    
   } elsif ($attrName eq "defaultState") {
     if (!defined $attrVal){
-
-    } elsif ($attrVal !~ m/^last|off|[01]$/) {
+    
+    } elsif ($attrVal !~ m/^(last|off|[01])$/) {
       Log3($name, 3, "PIFACE $name attribute-value [$attrName] = $attrVal wrong");
       CommandDeleteAttr(undef, "$name defaultState");
     }
-
-  } elsif ($attrName =~ m/^portMode(.)/) {
-    my $port = $1;
-    #my $port = substr($attrName, 8, 1);
-    my $adr = $base + 8 + $port;
+    
+  } elsif ($attrName =~ m/^portMode/) {
+    my $port = substr($attrName, 8, 1);
+    my $adr = $base + $port;
     my $portMode = $attrVal;
     my $val;
     $portMode = "tri" if (!defined $attrVal);
-    if ($attrVal !~ m/^tri|up$/) {
+    if ($attrVal !~ m/^(tri|up)$/) {
       $portMode = "tri" ;
       Log3($name, 3, "PIFACE $name attribute-value [$attrName] = $attrVal wrong");
-      CommandDeleteAttr(undef, "$name portMode$port");
+      CommandDeleteAttr(undef, "$name $port");
     }
-    $cmd = "$gpioCmd -x mcp23s17:200:0:0 mode $adr $portMode";
+    $cmd = "$gpioCmd -p mode $adr $portMode";
     $val = `$cmd`;
-    $cmd = "$gpioCmd -x mcp23s17:200:0:0 read $adr";
+    $cmd = "$gpioCmd -p read $adr";
     $val = `$cmd`;
     $val =~ s/\n//g;
     $val =~ s/\r//g;
     readingsSingleUpdate($hash, 'in' . $port, $val, 1);
-
+    
   } elsif ($attrName eq "watchdog") {
     if (!defined $attrVal) {
       $attrVal = "off" ;
       CommandDeleteReading(undef, "$name watchdog");
     }
-    if ($attrVal !~ m/^on|off|silent$/) {
+    if ($attrVal !~ m/^(on|off|silent)$/) {
       Log3($name, 3, "PIFACE $name attribute-value [$attrName] = $attrVal wrong");
       CommandDeleteAttr(undef, "$name watchdog");
     }
-    if ($attrVal =~ m/^on|silent$/) {
+    if ($attrVal =~ m/^(on|silent)$/) {
       readingsSingleUpdate($hash, 'watchdog', 'start', 1);
-      $attr{$name}{$attrName} = $attrVal;
       PIFACE_Watchdog($hash);
     }
-
+    
   } elsif ($attrName eq "watchdogInterval") {
     if ($attrVal !~ m/^\d+$/ || $attrVal < 10) {
       Log3($name, 3, "PIFACE $name attribute-value [$attrName] = $attrVal wrong");
@@ -226,15 +219,14 @@ sub PIFACE_Attr(@) {
 
 sub PIFACE_Notify(@) {
   my ($hash, $dev) = @_;
-  my $name = $hash->{NAME};
-  if ($dev->{NAME} eq "global" && grep (m/^INITIALIZED|REREADCFG$/,@{$dev->{CHANGED}})){
-    PIFACE_Restore_Inports_Mode($hash);
-    PIFACE_Restore_Outports_State($hash);
-    #PIFACE_Read_Inports(0, $hash);
-    #PIFACE_Read_Outports(0, $hash);
-    PIFACE_GetUpdate($hash);
-    PIFACE_Watchdog($hash);
+  my $name = $hash->{NAME}; 
+  if ($dev->{NAME} eq "global" && grep (m/^INITIALIZED$/,@{$dev->{CHANGED}})){
     Log3($name, 3, "PIFACE $name initialized");
+    PIFACE_Restore_Outports_State($hash);
+    PIFACE_Read_Inports(0, $hash);
+    PIFACE_Read_Outports(0, $hash);
+    PIFACE_GetUpdate($hash);    
+    PIFACE_Watchdog($hash);
   }
   return;
 }
@@ -245,15 +237,15 @@ sub PIFACE_Read_Outports($$){
 	my ($cmd, $i, $port, $val);
 	readingsBeginUpdate($hash);
 	for($i=0; $i<8; $i++){
-		$port = $base + $i;
-		$cmd = "$gpioCmd -x mcp23s17:200:0:0 read $port";
+		$port = $base + $i + 8;
+		$cmd = "$gpioCmd -p read $port";
 		$val = `$cmd`;
 		$val =~ s/\n//g;
 		$val =~ s/\r//g;
 		if ($updateMode == 1){
 		  readingsBulkUpdate($hash, 'out'.$i, $val);
 		} else {
-		  readingsBulkUpdateIfChanged($hash, 'out'.$i, $val);
+		  readingsBulkUpdate($hash, 'out'.$i, $val) if(ReadingsVal($name, 'out'.$i, '') ne $val);		
 		}
 	}
 	readingsEndUpdate($hash, 1);
@@ -266,15 +258,15 @@ sub PIFACE_Read_Inports($$){
 	my ($cmd, $i, $j, $port, $portMode, $val);
 	readingsBeginUpdate($hash);
 	for($i=0; $i<8; $i++){
-	  $port = $base + 8 + $i;
-	  $cmd = "$gpioCmd -x mcp23s17:200:0:0 read $port";
+	  $port = $base + $i;
+	  $cmd = "$gpioCmd -p read $port";
 	  $val = `$cmd`;
 	  $val =~ s/\n//g;
 	  $val =~ s/\r//g;
 	  if ($updateMode == 1) {
 	    readingsBulkUpdate($hash, 'in'.$i, $val);
 	  } else {
-	    readingsBulkUpdateIfChanged($hash, 'in'.$i, $val);
+	    readingsBulkUpdate($hash, 'in'.$i, $val) if(ReadingsVal($name, 'in'.$i, '') ne $val);		
 	  }
 	}
 	readingsEndUpdate($hash, 1);
@@ -292,9 +284,9 @@ sub PIFACE_Restore_Outports_State($) {
       if ($defaultState eq "last") {
         $cmd[2] = ReadingsVal($name, "out" . $port, 0);
       } elsif ($defaultState == 1) {
-        $cmd[2] = 1;
+        $cmd[2] = 1;    
       } else {
-        $cmd[2] = 0;
+        $cmd[2] = 0;    
       }
       PIFACE_Set($hash, @cmd);
     }
@@ -303,21 +295,8 @@ sub PIFACE_Restore_Outports_State($) {
   return;
 }
 
-sub PIFACE_Restore_Inports_Mode($) {
-  my ($hash) = @_;
-  my $name = $hash->{NAME};
-  my ($cmd, $port, $portMode, $valIn);
-  for (my $i = 0; $i <= 7; $i++) {
-    $port = $base + 8 + $i;
-    $portMode = AttrVal($name, "portMode" . $i, "tri");
-    $cmd = "$gpioCmd -x mcp23s17:200:0:0 mode $port $portMode";
-    $valIn = `$cmd`;
-  }
-  PIFACE_Read_Inports(1, $hash);
-  return;
-}
-
-sub PIFACE_GetUpdate($) {
+sub
+PIFACE_GetUpdate($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
   my $pollInterval = AttrVal($name, "pollInterval", "off");
@@ -325,47 +304,48 @@ sub PIFACE_GetUpdate($) {
     InternalTimer(gettimeofday() + $pollInterval, "PIFACE_GetUpdate", $hash, 1);
     PIFACE_Read_Inports(0, $hash);
     PIFACE_Read_Outports(0, $hash);
-  }
+  }  
   return;
 }
 
-sub PIFACE_Watchdog($) {
+sub
+PIFACE_Watchdog($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
   my ($cmd, $port, $portMode, $valIn, $valOut0, $valOut1);
   my $watchdog = AttrVal($name, "watchdog", undef);
   my $watchdogInterval = AttrVal($name, "watchdogInterval", 60);
   $watchdogInterval = 10 if ($watchdogInterval !~ m/^\d+$/ || $watchdogInterval < 10);
-
+  
   if (!defined $watchdog) {
     CommandDeleteReading(undef, "$name watchdog");
-
-  } elsif ($watchdog =~ m/^on|silent$/) {
+    
+  } elsif ($watchdog =~ m/^(on|silent)$/) {
     InternalTimer(gettimeofday() + $watchdogInterval, "PIFACE_Watchdog", $hash, 1);
     for (my $i=0; $i<7; $i++) {
-     $port = $base + 8 + $i;
-     $portMode = AttrVal($name, "portMode" . $i, "tri");
-     $cmd = "$gpioCmd -x mcp23s17:200:0:0 mode $port $portMode";
+     $port = $base + $i;
+     $portMode = AttrVal($name, "portMode" . $i, "tri");     
+     $cmd = "$gpioCmd -p mode $port $portMode";
      $valIn = `$cmd`;
-    }
-    $cmd = "$gpioCmd -x mcp23s17:200:0:0 mode 215 up";
+    }    
+    $cmd = "$gpioCmd -p mode 207 up";
     $valIn = `$cmd`;
-    $cmd = "$gpioCmd -x mcp23s17:200:0:0 read 215";
+    $cmd = "$gpioCmd -p read 207";
     $valIn = `$cmd`;
     $valIn =~ s/\n//g;
     $valIn =~ s/\r//g;
-    $cmd = "$gpioCmd -x mcp23s17:200:0:0 write 207 0";
-    $cmd = `$cmd`;
-    $cmd = "$gpioCmd -x mcp23s17:200:0:0 read 207";
+    $cmd = "$gpioCmd -p write 207 0";
+    $cmd = `$cmd`;    
+    $cmd = "$gpioCmd -p read 215";
     $valOut0 = `$cmd`;
     $valOut0 =~ s/\n//g;
-    $valOut0 =~ s/\r//g;
-    $cmd = "$gpioCmd -x mcp23s17:200:0:0 write 207 1";
-    $cmd = `$cmd`;
-    $cmd = "$gpioCmd -x mcp23s17:200:0:0 read 207";
+    $valOut0 =~ s/\r//g;    
+    $cmd = "$gpioCmd -p write 207 1";
+    $cmd = `$cmd`;    
+    $cmd = "$gpioCmd -p read 215";
     $valOut1 = `$cmd`;
     $valOut1 =~ s/\n//g;
-    $valOut1 =~ s/\r//g;
+    $valOut1 =~ s/\r//g;    
     if ($valIn == 0 && $valOut0 == 0 && $valOut1 == 1) {
       readingsSingleUpdate($hash, "state", "active", 1) if (ReadingsVal($name, "state", undef) ne "active");
       readingsSingleUpdate($hash, ".watchdogRestart", 0, 1);
@@ -376,39 +356,39 @@ sub PIFACE_Watchdog($) {
         readingsSingleUpdate($hash, "watchdog", "ok", 1) if (ReadingsVal($name, "watchdog", undef) ne "ok");
       }
     } else {
-      if ($watchdog eq "on") {
+      if ($watchdog eq "on") {    
         Log3($name, 3, "PIFACE $name Watchdog error");
-        readingsSingleUpdate($hash, "watchdog", "error", 1);
+        readingsSingleUpdate($hash, "watchdog", "error", 1);      
       } elsif ($watchdog eq "silent") {
-        my $watchdogRestart = ReadingsVal($name, ".watchdogRestart", undef);
+        my $watchdogRestart = ReadingsVal($name, ".watchdogRestart", undef);      
         if (!defined($watchdogRestart) || $watchdogRestart == 0) {
           Log3($name, 3, "PIFACE $name Watchdog Fhem restart");
-          readingsSingleUpdate($hash, "watchdog", "restart", 1);
-          readingsSingleUpdate($hash, ".watchdogRestart", 1, 1);
+          readingsSingleUpdate($hash, "watchdog", "restart", 1);      
+          readingsSingleUpdate($hash, ".watchdogRestart", 1, 1);      
           CommandSave(undef, undef);
           CommandShutdown(undef, "restart");
         } elsif ($watchdogRestart == 1) {
           Log3($name, 3, "PIFACE $name Watchdog OS restart");
           readingsSingleUpdate($hash, "watchdog", "restart", 1);
-          readingsSingleUpdate($hash, ".watchdogRestart", 2, 1);
+          readingsSingleUpdate($hash, ".watchdogRestart", 2, 1);      
           CommandSave(undef, undef);
           $cmd = 'shutdown -r now';
           #$cmd = 'sudo /sbin/shutdown -r now';
           #$cmd = 'sudo /sbin/shutdown -r now > /dev/null 2>&1';
-	  $cmd = `$cmd`;
+	  $cmd = `$cmd`;        
         } elsif ($watchdogRestart == 2) {
           $attr{$name}{watchdog} = "off";
           Log3($name, 3, "PIFACE $name Watchdog error");
           Log3($name, 3, "PIFACE $name Watchdog deactivated");
-          CommandDeleteReading(undef, "$name .watchdogRestart");
+          CommandDeleteReading(undef, "$name .watchdogRestart");          
           readingsSingleUpdate($hash, "watchdog", "error", 1);
           readingsSingleUpdate($hash, "state", "error",1);
           CommandSave(undef, undef);
         }
       }
-    }
+    } 
   } else {
-    Log3($name, 3, "PIFACE $name Watchdog off");
+    Log3($name, 3, "PIFACE $name Watchdog off");  
     readingsSingleUpdate($hash, "watchdog", "off", 1);
   }
   return;
@@ -434,7 +414,7 @@ sub PIFACE_Watchdog($) {
   The module can be periodically monitored by a watchdog function.<br>
   The ports can be read and controlled individually by the function <a href="#readingsProxy">readingsProxy</a>.<br>
   PIFACE is tested with the Raspbian OS.<br><br>
-
+  
   <b>Preparatory Work</b><br>
   The use of PIFACE module requires some preparatory work. The module needs the <a href=http://wiringpi.com>Wiring Pi</a> tool.
   <ul>
@@ -454,9 +434,9 @@ sub PIFACE_Watchdog($) {
     and set the <code>A5 SPI</code> option to "Yes".
     </li>
     <li>The function of the PiFace Digital can be tested at OS command line. For example:<br>
-    <code>gpio -x mcp23s17:200:0:0 readall</code><br>
-    <code>gpio -x mcp23s17:200:0:0 read 200</code><br>
-    <code>gpio -x mcp23s17:200:0:0 write 201 0</code> or <code>gpio -x mcp23s17:200:0:0 write 201 1</code><br>
+    <code>gpio -p readall</code><br>
+    <code>gpio -p read 200</code><br>
+    <code>gpio -p write 201 0</code> or <code>gpio -p write 201 1</code><br>
     </li>
     <li>The watchdog function monitors the input port 7 and the output port 7.<br>
       If the watchdog is enabled, this ports can not be used for other tasks.
@@ -474,9 +454,9 @@ sub PIFACE_Watchdog($) {
     and set the <code>A6 SPI</code> option to "Yes".
     </li>
     <li>The function of the PiFace Digital can be tested at OS command line. For example:<br>
-    <code>gpio -x mcp23s17:200:0:0 readall</code><br>
-    <code>gpio -x mcp23s17:200:0:0 read 200</code><br>
-    <code>gpio -x mcp23s17:200:0:0 write 201 0</code> or <code>gpio -x mcp23s17:200:0:0 write 201 1</code><br>
+    <code>gpio -p readall</code><br>
+    <code>gpio -p read 200</code><br>
+    <code>gpio -p write 201 0</code> or <code>gpio -p write 201 1</code><br>
     </li>
     <li>The watchdog function monitors the input port 7 and the output port 7.<br>
       If the watchdog is enabled, this ports can not be used for other tasks.
@@ -487,7 +467,7 @@ sub PIFACE_Watchdog($) {
     </li>
   </ul>
   <br>
-
+	
   <a name="PIFACEdefine"></a>
   <b>Define</b>
     <ul><br>
@@ -612,7 +592,7 @@ sub PIFACE_Watchdog($) {
 		state of the watchdog function</li>
 		<li>state: active|error</li><br>
 	</ul>
-
+	
 </ul>
 
 =end html
