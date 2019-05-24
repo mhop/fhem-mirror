@@ -629,7 +629,7 @@ foreach my $d (keys %defs) {
       $defs{$d}{IODev} = $defs{$defs{$d}{IODevName}};
       delete $defs{$d}{IODevName};
     } else {
-      Log 3, "No I/O device found for $defs{$d}{NAME}";
+      AssignIoPort($defs{$d}); # For fhem.cfg editors? Needs init_done for Log.
     }
     delete $defs{$d}{IODevMissing};
   }
