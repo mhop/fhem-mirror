@@ -309,8 +309,6 @@ MQTT2_CLIENT_Read($@)
   if($cpt eq "CONNACK")  {
     my $rc = ord(substr($pl,1,1));
     if($rc == 0) {
-      my $onc = AttrVal($name, "msgAfterConnect", "");
-      MQTT2_CLIENT_doPublish($hash, split(" ", $onc, 2)) if($onc);
       MQTT2_CLIENT_doinit($hash);
 
     } else {
@@ -324,7 +322,11 @@ MQTT2_CLIENT_Read($@)
     }
   } elsif($cpt eq "PUBACK")   { # ignore it
   } elsif($cpt eq "SUBACK")   {
-    delete($hash->{connecting});
+    if($hash->{connecting}) {
+      delete($hash->{connecting});
+      my $onc = AttrVal($name, "msgAfterConnect", "");
+      MQTT2_CLIENT_doPublish($hash, split(" ", $onc, 2)) if($onc);
+    }
 
   } elsif($cpt eq "PINGRESP") { # ignore it
   } elsif($cpt eq "PUBLISH")  {
