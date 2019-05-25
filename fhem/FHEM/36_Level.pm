@@ -1,7 +1,4 @@
-
 # $Id$
-#
-# TODO:
 
 package main;
 
@@ -27,6 +24,7 @@ Level_Initialize($)
                          ." filterThreshold"
                          ." litersPerCm"
                          ." distanceToBottom"
+                         ." formula:textField-long"
                          ." $readingFnAttributes";
 }
 
@@ -123,10 +121,7 @@ Level_Parse($$)
   my ($hash, $msg) = @_;
   my $name = $hash->{NAME};
   
-  ###$DB::single = 1;
-  
-  
-  my( @bytes, $addr, $type, $distance, $temperature, $voltage );
+  my( @bytes, $addr, $type, $distance, $temperature, $voltage, $rssi );
   if( $msg =~ m/^OK LS/ ) {
     @bytes = split( ' ', substr($msg, 5) );
 
@@ -135,6 +130,9 @@ Level_Parse($$)
     $distance = ($bytes[2]*256 + $bytes[3] - 1000)/10;
     $temperature = ($bytes[4]*256 + $bytes[5] - 1000)/10;
     $voltage = $bytes[6] / 10;
+    if(@bytes > 7) {
+      $rssi = $bytes[7]
+    }
   } else {
     DoTrigger($name, "UNKNOWNCODE $msg");
     Log3 $name, 3, "$name: Unknown code $msg, help me!";
@@ -157,33 +155,46 @@ Level_Parse($$)
 
   readingsBeginUpdate($rhash);
   
-  my $litersPerCm = AttrVal( $rname, "litersPerCm", 1);
+  my $litresPerCm = AttrVal( $rname, "litersPerCm", 1);
   my $distanceToBottom = AttrVal( $rname, "distanceToBottom", 100);
   
   my $level = $distanceToBottom - $distance;
-  my $liters = $litersPerCm * $level;
+  
+  my $litres = 0;
+  my $formula = AttrVal( $rname, "formula", undef);
+  if($formula){
+    eval($formula);
+  }
+  else {
+    $litres = $litresPerCm * $level;
+  }
   
   if( AttrVal( $rname, "doAverage", 0 ) && defined($rhash->{"previousLiters"}) ) {
-    $liters = int(($rhash->{"previousLiters"}*3+$liters)/4);
+    $litres = int(($rhash->{"previousLiters"}*3+$litres)/4);
   }
   if( AttrVal( $rname, "doAverage", 0 ) && defined($rhash->{"previousTemeprature"}) ) {
     $temperature = int(($rhash->{"previousTemeprature"}*3+$temperature)/4);
   }
-      
+  
+  $litres = int($litres);
+  
   readingsBulkUpdate($rhash, "distance", $distance);
   readingsBulkUpdate($rhash, "level", $level);
-  readingsBulkUpdate($rhash, "liters", $liters);
+  readingsBulkUpdate($rhash, "liters", $litres);
   readingsBulkUpdate($rhash, "temperature", $temperature);
   readingsBulkUpdate($rhash, "voltage", $voltage);
+  if($rssi) {
+    readingsBulkUpdate($rhash, "rssi", $rssi);
+  }
   
-  my $state = "L: $liters";
+  my $state = "L: $litres";
   $state .= " T: $temperature";
   $state .= " V: $voltage";
   readingsBulkUpdate($rhash, "state", $state) if( Value($rname) ne $state );
 
   readingsEndUpdate($rhash,1);
 
-  $rhash->{"previousLiters"} = $liters;
+  $rhash->{"previousLiters"} = $litres;
   $rhash->{"previousTemperature"} = $temperature;
 
   return @list;
@@ -245,7 +256,16 @@ Level_Attr(@)
     <li>distanceToBottom<br>
     Distance from the ultra sonic sensor to the bottom of the tank</li>
     <li>litersPerCm<br>
-    Liters for each cm level</li>
+    Liters for each cm level. Only used if the attribute formula is not set</li>
+    <li>formula<br>
+    Own calculation of the content, e.g for a lying ton<br>
+    Get the variabl $level for the current level and must provide the result in $litres<br>
+    Example:<br>
+    my $tankRadius = 0.6;<br>
+    my $tankLength = 2.35;<br>
+    my $levelMtr = $level / 100;<br>
+    $litres = int((($tankRadius ** 2) * acos(($tankRadius - $levelMtr) / $tankRadius) - ($tankRadius - $levelMtr)<br>
+    * sqrt(($tankRadius ** 2) - (($tankRadius - $levelMtr) * ($tankRadius - $levelMtr)))) * $tankLength * 1000 + 0.5);</li>
   </ul><br>
 </ul>
 
