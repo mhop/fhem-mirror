@@ -67,6 +67,8 @@
 #  - feature: 74_Unifi: persist disconnected clients and rebuild them after fhem-restart
 # V 3.3.1
 #  - fixed:   74_Unifi: fixed Loglevel
+# V 3.3.2
+#  - fixed:   74_Unifi: fixed restore clients at fhem restart
 
 
 package main;
@@ -247,6 +249,16 @@ sub Unifi_Notify($$) {
 	
     return if(!grep(m/^DEFINED $name|MODIFIED $name|INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
 
+	#restore clients
+	for my $readingName (keys %{$hash->{READINGS}}) {
+		Log3 $name, 5, "$name ($self) - checking 1 $readingName";
+		if($readingName =~ m/\..*_mac$/){
+			Log3 $name, 5, "$name ($self) - found 1 $readingName";
+			my $mac=ReadingsVal($name,$readingName,"");		
+			$hash->{restoreClients}->{$mac} = 1;
+		}
+	}
+	
     if(AttrVal($name, "disable", 0)) {
         Log3 $name, 5, "$name ($self) - executed. - Device '$name' is disabled, do nothing...";
         Unifi_CONNECTED($hash,'disabled');
@@ -260,32 +272,35 @@ sub Unifi_Notify($$) {
 		$hash->{unifi}->{customClientReadings}->{attr_value} = AttrVal($name,"customClientReadings",$defaultClientReadings); 
 		Unifi_initCustomClientReadings($hash);
 		
-		for my $readingName (keys %{$hash->{READINGS}}) {
-			#Log3 $name, 1, "$name ($self) - checking 1 $readingName";
-			if($readingName =~ m/\..*_user_id$/){
-				#Log3 $name, 1, "$name ($self) - found 1 $readingName";
-				my $readingValue=ReadingsVal($name,$readingName,"");
-				if($readingValue =~ m/^[a-fA-F0-9]*$/g){
-					my $clientName=substr($readingName,1,index($readingName,"_user_id")-1);
-					$hash->{clients}->{$readingValue}->{name} = $clientName;
-					Log3 $name, 5, "$name ($self) - restored client $clientName with ID $readingValue";
-				}
-			}
-		}
-		for my $clientID (keys %{$hash->{clients}}) {
-			my $clientName=$hash->{clients}->{$clientID}->{name}."_";
-			# TODO: Prüfen, ob es für $clientName ein UnifiClient-Devices gibt und die Werte aus den Readings des UnifiClients wiederherstellen.
-			for my $readingName (keys %{$hash->{READINGS}}) {
-				#Log3 $name, 1, "$name ($self) - checking 2 $readingName for $clientName";
-				if($readingName =~ m/^$clientName.*/){
-					#Log3 $name, 1, "$name ($self) - found 2 $readingName";
-					my $readingValue=ReadingsVal($name,$readingName,"");
-					my $readingName=substr($readingName,length($clientName));
-					$hash->{clients}->{$clientID}->{$readingName} = $readingValue;
-					Log3 $name, 5, "$name ($self) - restored internal $readingName = $readingValue for client $clientName";
-				}
-			}
-		}
+		
+		# TODO: der folgende Block kann Ende 2019 entfernt werden. Es ist der alte Restore-Mechanismus
+		# Dieser wurde ersetzt durch de restore von mac-Adressen und anschließendem updateClient in doUpdate()
+		#for my $readingName (keys %{$hash->{READINGS}}) {
+		#	#Log3 $name, 1, "$name ($self) - checking 1 $readingName";
+		#	if($readingName =~ m/\..*_id$/){
+		#		#Log3 $name, 1, "$name ($self) - found 1 $readingName";
+		#		my $readingValue=ReadingsVal($name,$readingName,"");
+		#		if($readingValue =~ m/^[a-fA-F0-9]*$/g){
+		#			my $clientName=substr($readingName,1,index($readingName,"_id")-1);
+		#			$hash->{clients}->{$readingValue}->{name} = $clientName;
+		#			Log3 $name, 5, "$name ($self) - restored client $clientName with ID $readingValue";
+		#		}
+		#	}
+		#}
+		#for my $clientID (keys %{$hash->{clients}}) {
+		#	my $clientName=$hash->{clients}->{$clientID}->{name}."_";
+		#	# TODO: Prüfen, ob es für $clientName ein UnifiClient-Devices gibt und die Werte aus den Readings des UnifiClients wiederherstellen.
+		#	for my $readingName (keys %{$hash->{READINGS}}) {
+		#		#Log3 $name, 1, "$name ($self) - checking 2 $readingName for $clientName";
+		#		if($readingName =~ m/^$clientName.*/){
+		#			#Log3 $name, 1, "$name ($self) - found 2 $readingName";
+		#			my $readingValue=ReadingsVal($name,$readingName,"");
+		#			my $readingName=substr($readingName,length($clientName));
+		#			$hash->{clients}->{$clientID}->{$readingName} = $readingValue;
+		#			Log3 $name, 5, "$name ($self) - restored internal $readingName = $readingValue for client $clientName";
+		#		}
+		#	}
+		#}
 	}
 	
     return undef;
@@ -814,6 +829,15 @@ sub Unifi_DoUpdate($@) {
     }
     
     if (Unifi_CONNECTED($hash)) {
+		# nach Neustart wird restoreClients in notify gefüllt. Muss beim ersten Update nach dem Login erledigt werden
+		if (defined $hash->{restoreClients}){
+			Log3 $name, 5, "$name ($self) - restore clients";
+			for my $mac (keys %{$hash->{restoreClients}}) {
+				Log3 $name, 5, "$name ($self) - restore mac $mac";
+                Unifi_UpdateClient_Send($hash,$mac);			
+			}
+			delete $hash->{restoreClients};
+		}
         $hash->{unifi}->{updateStartTime} = time();
         $hash->{updateDispatch} = {  # {updateDispatch}->{callFn}[callFnRef,'receiveFn',receiveFnRef]
             Unifi_GetClients_Send => [\&Unifi_GetClients_Send,'Unifi_GetClients_Receive',\&Unifi_GetClients_Receive],
@@ -1035,14 +1059,17 @@ sub Unifi_GetClientInsights_Receive($) {
 sub Unifi_UpdateClient_Send($$) {
     my ($hash,$mac) = @_;
     my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
-    Log3 $name, 5, "$name ($self) - executed with mac ".$mac;
-    
-    HttpUtils_NonblockingGet( {
-                 %{$hash->{httpParams}},
-        method   => "GET",
-        url      => $hash->{unifi}->{url}."stat/user/".$mac,
-        callback => \&Unifi_UpdateClient_Receive
-    } );
+    if (defined $mac && $mac ne ""){
+		Log3 $name, 5, "$name ($self) - executed with mac ".$mac;
+		HttpUtils_NonblockingGet( {
+					 %{$hash->{httpParams}},
+			method   => "GET",
+			url      => $hash->{unifi}->{url}."stat/user/".$mac,
+			callback => \&Unifi_UpdateClient_Receive
+		} );
+	}else{
+		Log3 $name, 4, "$name ($self) - executed without mac.";
+	}
     return undef;
 }
 ###############################################################################
@@ -1453,8 +1480,6 @@ sub Unifi_SetClientReadings($$) {
 			next if( $ignoreWired && $clientRef->{is_wired} );
 			next if( $ignoreWireless && !$clientRef->{is_wired} );
 			
-			# folgenden Block müsste man vielleicht besser in Unifi_GetClients_Receive() einbauen
-			# Da man hier aber eh über alle Clients iteriert passt das aber auch hier.
 			{
 				$apName = "unknown";
 				if ($clientRef->{is_wired}
@@ -1523,7 +1548,10 @@ sub Unifi_SetClientReadings($$) {
 				}
 				$clientRef->{fhem_state}="connected";
 				readingsBulkUpdate($hash,$clientName,'connected');		
-				readingsBulkUpdate($hash,".".$clientName."_user_id",$clientRef->{user_id});			
+				#readingsBulkUpdate($hash,".".$clientName."_id",$clientRef->{_id});	
+				
+				# mac-Adresse in den Readings versteckt (statet mit .) speichern, um nach einem Neustart den client restoren zu können
+				readingsBulkUpdate($hash,".".$clientName."_mac",$clientRef->{mac}) if defined $clientRef->{mac};			
 			}
 			elsif ((!defined($hash->{READINGS}->{$clientName})) || (defined($hash->{READINGS}->{$clientName}) && $hash->{READINGS}->{$clientName} ne "disconnected")) {
 				Log3 $name, 5, "$name ($self) - Client '$clientName' previously connected is now disconnected.";
