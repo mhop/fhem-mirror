@@ -23,7 +23,6 @@ use vars qw(%prioQueues);
 sub apptime_getTiming($$$@);
 sub apptime_Initialize($);
 
-use constant DEBUG_OUTPUT_INTATA => 0;
 
 my $apptimeStatus;
 
@@ -45,32 +44,6 @@ my $totCnt         = 0;
 
 sub HandleTimeout() {
   return undef if(!$nextat);
-
-  if (DEBUG_OUTPUT_INTATA) {
-    my $ms = 0;
-    my $n = int(@intAtA);
-    my $j;
-    for ($j=0; $j < ($n-1); $j++) {
-      if (!defined($intAtA[$j])) {
-        Log 0, "Error in intAtA, undefined element $j/$n\n";
-      }
-      elsif (!defined($intAtA[$j]->{TRIGGERTIME})) {
-        Log 0, "Error in intAtA, undefined tim $j/$n\n";
-      }
-      next if ($intAtA[$j]->{TRIGGERTIME} <= $intAtA[$j+1]->{TRIGGERTIME});
-      if (!$ms) {
-        Log 0, "Error in intAtA, sortErr $j/$n\n";
-        $ms = 1;
-      }
-    }
-    $j = $n-1;
-    if (!defined($intAtA[$j])) {
-      Log 0, "Error in intAtA, undefined element $j/$n\n";
-    }
-    elsif (!defined($intAtA[$j]->{TRIGGERTIME})) {
-      Log 0, "Error in intAtA, undefined tim $j/$n\n";
-    }
-  }
 
   my $now = gettimeofday();
   if($now < $nextat) {
@@ -106,7 +79,7 @@ sub HandleTimeout() {
       $fnname = $cv->GV->NAME;
     }
     $arg = $at->{ARG};
-    $shortarg = (defined($arg)?$arg:"");
+    $shortarg = (defined($arg)?$arg:"_");
     $shortarg = "HASH_unnamed" if (   (ref($shortarg) eq "HASH")
                                    && !defined($shortarg->{NAME}) );
     ($shortarg,undef) = split(/:|;/,$shortarg,2); # for special long args with delim ;
@@ -120,7 +93,7 @@ sub HandleTimeout() {
   $now = gettimeofday();
 
   if(%prioQueues) {
-    my $nice = minNum(keys %prioQueues);
+    my $nice = minNum(19,keys %prioQueues);
     my $entry = shift(@{$prioQueues{$nice}});
     delete $prioQueues{$nice} if(!@{$prioQueues{$nice}});
 
