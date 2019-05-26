@@ -50,7 +50,9 @@
 #
 # Version History
 #
-# 2019-05-19 version 0.2.12a: major bug removed when syswrite impossible
+# 2019-05-24 version 0.2.13: bug with blocking sysread, see https://forum.fhem.de/index.php?topic=100698
+# 2019-05-21 version 0.2.12d: minor detail using $buf, https://forum.fhem.de/index.php?topic=100698
+# 2019-05-19 version 0.2.12: major bug removed when syswrite impossible
 # 2019-03-27 version 0.2.11k: error message instead of debug
 # 2019-01-28 version 0.2.11j: vcontrold-Neigung (Heizkurve) commands not rounded to full number anymore 
 # 2019-01-28 version 0.2.11i: update starts now if device initiated (for example, via FHEM restart) 
@@ -75,8 +77,9 @@ use warnings;
 use Scalar::Util qw(looks_like_number);
 use Blocking;
 use Data::Dumper;
+use IO::Select;
 
-my $VCLIENT_version = "0.2.12a";
+my $VCLIENT_version = "0.2.13";
 my $internal_update_interval  = 0.1; #internal update interval for Write (time between two different write_to_Viessmann commands)
 my $daily_commands_last_day_with_execution = strftime('%d', localtime)-1; #last day when daily commands (commands with type 'daily' ) were executed; set to today
 
@@ -359,7 +362,7 @@ sub VCLIENT_Open_Connection($)
    my $host = $hash->{IP};
    my $port = $hash->{PORT};
      
-   my $timeout = AttrVal( $name, 'timeout', 1); #default value is 1 second
+   my $timeout = AttrVal( $name, 'timeout', 5); #default value is 5 seconds
    my $t_prompt = AttrVal($name,'prompt',$hash->{'.prompt'});
    Log3 $name, 5, "$name: Opening vcontrold connection to $host:$port";
    my $telnet = new Net::Telnet ( Port => $port, Timeout=>$timeout, Errmode=>'return', Prompt=>'/'.$t_prompt.'/', Dump_Log => '/opt/fhem/log/vcontrold.log');
@@ -393,12 +396,15 @@ sub VCLIENT_Open_Connection($)
 sub VCLIENT_ParseBuf_And_WriteReading($$){
     my ($hash, $buf) = @_;
     my $name = $hash->{NAME};
+	my $value;                          #zu speichernder Wert
 	
  	my $reading = shift @reading_queue; #Readingname, dorthin sollen Daten gespeichert werden
-	my $value;                          #zu speichernder Wert
+	if (!$reading){
+		return;  						#keine reading queue mehr vorhanden, Aufruf vermutlich nach timeout
+	}
 
 	#Ergebnis = Kommando war fehlerhaft
-    	if ($buf eq "ERR: command unknown"){ 
+    if ($buf eq "ERR: command unknown"){ 
    		$value = "ERROR, see logfile";
    		Log3 $name, 1, "$name ERROR: command  ".$last_cmd." from ".$hash->{FILE}." does not seem to be defined in vcontrol.xml";
    	} else {
@@ -446,10 +452,12 @@ sub VCLIENT_ParseBuf_And_WriteReading($$){
 		}
 		Log3 $name, 3,  $name.": Received ".$value." for ".$reading;
    	}
-	if (($value eq "OK") or VCLIENT_integrity_check($value))
+	
+	if (VCLIENT_integrity_check($value))
 	{
 		readingsSingleUpdate($hash, $reading, $value, 1);	
 	}
+	
     VCLIENT_Set_New_Write_Interval($hash);
 }
 
@@ -461,30 +469,31 @@ sub VCLIENT_ParseBuf_And_WriteReading($$){
 sub VCLIENT_Read($){
     my ($hash) = @_;
     my $name = $hash->{NAME};
+    my $buf;
+    my $select = IO::Select->new($hash->{CD}); # see forum, blocking call with empty sysread
 
-	my $buf;
-	my $line = sysread($hash->{CD}, $buf, 1024);
+    if ($select->can_read(0.1)) #timeout 0.1 Sekunden, FHEM blockiert sonst!
+    {
+		sysread($hash->{CD}, $buf, 1024);
+    }
 
-    if ( !defined($line) || !$line){
-		$reading_in_progress = 0; #enforce finish reading
-		Log3 $name, 5,  "$name: connection closed unexpectedly"; #kann hier eigentlich nicht passieren
+    $reading_in_progress = 0;
+
+    if (!$buf){
+		Log3 $name, 1,  "Error: empty buffer while sysread"; #kann hier eigentlich nicht passieren
 		VCLIENT_Close_Connection($hash);
 		return;
     }
 
-	unless (defined $buf){
-		Log3 $name, 5,  "$name: no data received"; #continue reading
-		return;
-	}
-
-	#remove prompt and empty lines (with and without newline)
-	$buf =~ s/(vctrld>[\r]?[\n]?)*//;
+    #remove prompt and trailing empty lines, auch https://forum.fhem.de/index.php?topic=100698
+    $buf =~ s/\r//g;
+    $buf =~ s/vctrld>//g;
+    $buf =~ s/\n$//;
 	
-	if ($buf ne "") {
-		#erst hier kommen echte Daten an, die ins Reading geschrieben werden sollen - nur diese parsen
+    if ($buf ne '') {
+		#wenn nach remove echte Daten ankommen, die ins Reading geschrieben werden sollen - diese parsen
 		VCLIENT_ParseBuf_And_WriteReading($hash, $buf);
-	}	
-	$reading_in_progress = 0; #reading successfully finished
+    }	
 }
 
 
@@ -664,8 +673,8 @@ sub VCLIENT_Set($@)
 			$arg =~ s/[-\|]/ /g; 			# Zeitabstandszeichen - und senkrechten Strich | durch Leerzeichen ersetzen 
 	  }
 	  Log3 $name, 5, $name.": will try to send command ".$vcontrold." ".$arg." now";  	
-	  #Debug ($name.": next command in queue ".$vcontrold." ".$arg);
-  	  readingsSingleUpdate($hash, "last_set_command", "cmd: ".$vcontrold." ".$arg." ...", 1);	
+	  ###debug Log3 $name, 1, $name.": next command in queue ".$vcontrold." ".$arg);
+  	  readingsSingleUpdate($hash, "last_set_command", $vcontrold." ".$arg, 1);	
 
 	  ##$reading_in_progress = 0; ### Ich glaube, das kann man ausblenden, denn es gibt eine Rueckmeldung naemlich ein OK ###########
 	  push @command_queue, $vcontrold." ".$arg;
@@ -895,10 +904,11 @@ sub VCLIENT_Write($)
 			$last_cmd .= "\r\n";
 			#flag because we need to stop sending until next timeout / successful reading, do this BEFORE syswrite
 			$reading_in_progress = 1; 
+
 			syswrite($hash->{CD}, $last_cmd);		
-		    #and set timer for timeout
+			#and set timer for timeout
 		    RemoveInternalTimer($hash);
-		    my $this_timeout = AttrVal( $name, 'timeout', '1'); #default value is 1 second
+		    my $this_timeout = AttrVal( $name, 'timeout', 5); #default value is 5 second
 		    InternalTimer(gettimeofday()+$this_timeout, "VCLIENT_Timeout", $hash);
 		} else {
 			#last command already executed, set now timer for closing
@@ -1004,13 +1014,13 @@ The set command can also be used to execute vcontrold commands. These commands m
    <ul>
 
      <b>timeout</b>    
-     <ul><code>attr &lt;name&gt; &lt;timeout&gt; 1
+     <ul><code>attr &lt;name&gt; &lt;timeout&gt; 5
 	   </code><br>
 	  Any access to a remote host is not blocking but must still include the possibility of an abort (if no response occurs). Timeout describes after how many seconds the query will be aborted unsuccessfully. 
 
 	  In such a case, the entire query list is also terminated. 
 
-	  Please note: A too short timeout is problematic, because then the module could not receive any feedback from the heating. The default setting (if no attribute is set) is 1 second.<br><br>
+	  Please note: A too short timeout is problematic, because then the module could not receive any feedback from the heating. The default setting (if no attribute is set) is 5 second.<br><br>
      </ul>
      </ul>
      <ul><b>internal_update_interval</b>
@@ -1109,7 +1119,7 @@ Es können mit dem set-Befehl auch vcontrold-Kommandos ausgeführt werden. Diese
 	   </code><br>
       Jeder	Zugriff auf einen entfernten Host ist nicht blockierend,  muss aber dennoch die Möglichkeit eines Abbruches beinhalten (falls partout keine Antwort erfolgt). Timeout beschreibt, nach wie viel Sekunden die Abfrage erfolglos abgebrochen werden soll. 
 In einem solchen Fall wird auch die gesamte Abfrageliste beendet. 
-Beachten Sie: Ein zu kurzer Timeout ist problematisch, weil dann uU noch keine Rückmeldung von der Heizung erfolgen konnte. Voreinstellung (wenn kein Attribut gesetzt) ist 1 Sekunde.<br><br>
+Beachten Sie: Ein zu kurzer Timeout ist problematisch, weil dann uU noch keine Rückmeldung von der Heizung erfolgen konnte. Voreinstellung (wenn kein Attribut gesetzt) ist 5 Sekunden.<br><br>
      </ul>
      </ul>
      <ul><b>internal_update_interval</b>
