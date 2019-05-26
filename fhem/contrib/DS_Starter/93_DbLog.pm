@@ -1,5 +1,5 @@
 ############################################################################################################################################
-# $Id: 93_DbLog.pm 18787 2019-03-04 17:43:22Z DS_Starter $
+# $Id: 93_DbLog.pm 19251 2019-04-23 19:59:00Z DS_Starter $
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -28,6 +28,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 our %DbLog_vNotesIntern = (
+  "4.1.1"   => "25.05.2019 fix ignore MinInterval if value is \"0\" ",
   "4.1.0"   => "17.04.2019 DbLog_Get: change reconnect for MySQL (Forum: #99719), change index suggestion in DbLog_configcheck ",
   "4.0.0"   => "14.04.2019 rewrite DbLog_PushAsync / DbLog_Push / DbLog_Connectxx, new attribute \"bulkInsert\" ",
   "3.14.1"  => "12.04.2019 DbLog_Get: change select of MySQL Forum: https://forum.fhem.de/index.php/topic,99280.0.html ",
@@ -1320,7 +1321,7 @@ sub DbLog_Log($$) {
               $DoIt = 1 if($DbLogSelectionMode =~ m/Exclude/ );
           
 		      if($DbLogExclude && $DbLogSelectionMode =~ m/Exclude/) {
-                  # Bsp: "(temperature|humidity):300 battery:3600"
+                  # Bsp: "(temperature|humidity):300,battery:3600"
                   my @v1 = split(/,/, $DbLogExclude);
               
 			      for (my $i=0; $i<int(@v1); $i++) {
@@ -1332,7 +1333,8 @@ sub DbLog_Log($$) {
                           my $lt = $defs{$dev_hash->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME};
                           my $lv = $defs{$dev_hash->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{VALUE};
                           $lt = 0 if(!$lt);
-                          $lv = "" if(!$lv);
+                          # $lv = "" if(!$lv);         
+                          $lv = "" if(!defined $lv);              # Forum: #100344
 
                           if(($now-$lt < $v2[1]) && ($lv eq $value)) {
                               # innerhalb MinIntervall und LastValue=Value
@@ -1357,7 +1359,8 @@ sub DbLog_Log($$) {
                               my $lt = $defs{$dev_hash->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME};
                               my $lv = $defs{$dev_hash->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{VALUE};
                               $lt = 0 if(!$lt);
-                              $lv = "" if(!$lv);
+                              # $lv = "" if(!$lv);
+                              $lv = "" if(!defined $lv);              # Forum: #100344
        
                               if(($now-$lt < $v2[1]) && ($lv eq $value)) {
                                   # innerhalb MinIntervall und LastValue=Value
@@ -5672,12 +5675,12 @@ sub DbLog_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 19065 2019-03-29 21:25:15Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 19251 2019-04-23 19:59:00Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 19065 2019-03-29 21:25:15Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 19251 2019-04-23 19:59:00Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -6078,13 +6081,12 @@ return;
       Probably same behavior als reopen, but rereadcfg will read the configuration data before reconnect.</ul><br/>
 	  
     <code>set &lt;name&gt; userCommand &lt;validSqlStatement&gt;</code><br/><br/>
-      <ul><b>DO NOT USE THIS COMMAND UNLESS YOU REALLY (REALLY!) KNOW WHAT YOU ARE DOING!!!</b><br/><br/>
-          Performs any (!!!) sql statement on connected database. Usercommand and result will be written into 
-		  corresponding readings.</br>
-		  The result can only be a single line. If the SQL-Statement seems to deliver a multiline result, it can be suitable
-		  to use the analysis module <a href=https://fhem.de/commandref.html#DbRep>DbRep</a>.</br>
-		  If the database interface delivers no result (undef), the reading "userCommandResult" contains the message 
-		  "no result".
+      <ul>
+        Performs simple sql select statements on the connected database. Usercommand and result will be written into 
+		corresponding readings.</br>
+		The result can only be a single line. 
+        The execution of SQL-Statements in DbLog is deprecated. Therefore the analysis module 
+        <a href=https://fhem.de/commandref.html#DbRep>DbRep</a> should be used.</br>
       </ul><br/>
 
   </ul><br>
@@ -7309,14 +7311,12 @@ return;
       Zwischen dem Schließen der Verbindung und dem Neuverbinden werden die Konfigurationsdaten neu gelesen</ul><br/>
 
     <code>set &lt;name&gt; userCommand &lt;validSqlStatement&gt;</code><br/><br/>
-      <ul><b>BENUTZE DIESE FUNKTION NUR, WENN DU WIRKLICH (WIRKLICH!) WEISST, WAS DU TUST!!!</b><br/><br/>
-          Führt einen beliebigen (!!!) sql Befehl in der Datenbank aus. Der Befehl und ein zurückgeliefertes 
-		  Ergebnis wird in das Reading "userCommand" bzw. "userCommandResult" geschrieben. Das Ergebnis kann nur 
-		  einzeilig sein. 
-		  Für SQL-Statements, die mehrzeilige Ergebnisse liefern, kann das Auswertungsmodul 
-		  <a href=https://fhem.de/commandref_DE.html#DbRep>DbRep</a> genutzt werden.</br>
-		  Wird von der Datenbankschnittstelle kein Ergebnis (undef) zurückgeliefert, erscheint die Meldung "no result"
-		  im Reading "userCommandResult".
+      <ul>
+        Führt einfache sql select Befehle auf der Datenbank aus. Der Befehl und ein zurückgeliefertes 
+		Ergebnis wird in das Reading "userCommand" bzw. "userCommandResult" geschrieben. Das Ergebnis kann nur 
+		einzeilig sein. 
+		Die Ausführung von SQL-Befehlen in DbLog sind deprecated. Dafür sollte das Auswertungsmodul 
+		<a href=https://fhem.de/commandref_DE.html#DbRep>DbRep</a> genutzt werden.</br>
       </ul><br>
 
   </ul><br>
