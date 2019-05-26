@@ -48,6 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.13.6" => "26.05.2019  enhanced log entries of snapinfos with debugactivetoken ",
   "8.13.5" => "23.05.2019  StmKey quoted depending on attr noQuotesForSID (Forum: https://forum.fhem.de/index.php/topic,45671.msg938236.html#msg938236), ".
                            "autoplay muted of hls-StreamDev",
   "8.13.4" => "21.05.2019  rec/snapemailtxt, rec/snaptelegramtxt can contain \":\", commandref revised ", 
@@ -5249,6 +5250,9 @@ sub SSCam_camop_parse ($) {
                 
                 my $num     = $hash->{HELPER}{SNAPNUM};                              # Gesamtzahl der auszulösenden Schnappschüsse
                 my $ncount  = $hash->{HELPER}{SNAPNUMCOUNT};                         # Restzahl der auszulösenden Schnappschüsse 
+                if (AttrVal($name,"debugactivetoken",0)) {
+                    Log3($name, 1, "$name - Snapshot number ".($num-$ncount+1)." (ID: $snapid) of total $num snapshots with transaction-ID: $tac done");
+                }
                 $ncount--;                                                           # wird vermindert je Snap
                 my $lag     = $hash->{HELPER}{SNAPLAG};                              # Zeitverzögerung zwischen zwei Schnappschüssen
                 my $emtxt   = $hash->{HELPER}{SMTPMSG}?$hash->{HELPER}{SMTPMSG}:"";  # Text für Email-Versand
@@ -5263,6 +5267,9 @@ sub SSCam_camop_parse ($) {
   
                 # Anzahl und Size für Schnappschußabruf bestimmen
                 my ($slim,$ssize) = SSCam_snaplimsize($hash);
+                if (AttrVal($name,"debugactivetoken",0)) {
+                    Log3($name, 1, "$name - start get snapinfo of last $slim snapshots with transaction-ID: $tac");
+                }
 
                 if(!$hash->{HELPER}{TRANSACTION}) {                  
                     # Token freigeben vor nächstem Kommando wenn keine Transaktion läuft
