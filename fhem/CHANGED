@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  73_GardenaSmartBridge: fix crash then call ARRAY reference
  - change:  49_SSCam: enhanced log entries of snapinfos with debugactivetoken
  - change:  49_SSCam: attributes rec/snapemailtxt, rec/snaptelegramtxt may
                       contain ":", StmKey quoted depending on attribute

@@ -59,7 +59,7 @@ use strict;
 use warnings;
 use FHEM::Meta;
 
-my $version = "1.6.3";
+my $version = "1.6.4";
 
 
 sub GardenaSmartBridge_Initialize($) {
@@ -735,7 +735,7 @@ sub WriteReadings($$) {
             readingsBulkUpdateIfChanged( $hash, 'zones',
                 scalar( @{ $decode_json->{zones} } ) );
         }    
-        elsif ( $decode_json->{id} ne $hash->{helper}{locations_id} ) {
+        elsif ( $decode_json->{id} ne $hash->{helper}{locations_id} and ref($decode_json->{abilities}) eq 'ARRAY' ) {
             my $properties = scalar( @{ $decode_json->{abilities}[0]{properties} } );
             
             do {
