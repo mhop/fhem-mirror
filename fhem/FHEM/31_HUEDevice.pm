@@ -1283,8 +1283,9 @@ HUEDevice_Parse($$)
       $hash->{sensitivitymax} = $config->{sensitivitymax} if( defined ($config->{sensitivitymax}) );
     }
 
-    my $lastupdated;
-    my $lastupdated_local;
+    my $lastupdated = '';
+    my $lastupdated_local = '';
+    my $offset = 0;
     if( my $state = $result->{state} ) {
       $lastupdated = $state->{lastupdated};
 
@@ -1293,7 +1294,6 @@ HUEDevice_Parse($$)
 
       substr( $lastupdated, 10, 1, ' ' ) if($lastupdated);
 
-      my $offset = 0;
       if( my $iohash = $hash->{IODev} ) {
         substr( $lastupdated, 10, 1, '_' );
         my $sec = SVG_time_to_sec($lastupdated);
@@ -1316,13 +1316,6 @@ HUEDevice_Parse($$)
       }else{
         $lastupdated_local = $lastupdated;
       }
-
-      $hash->{lastupdated} = ReadingsVal( $name, '.lastupdated', undef ) if( !$hash->{lastupdated} );
-      $hash->{lastupdated_local} = ReadingsVal( $name, '.lastupdated_local', undef ) if( !$hash->{lastupdated_local} );
-      return undef if( $hash->{lastupdated} && $hash->{lastupdated} eq $lastupdated );
-
-      Log3 $name, 4, "$name: lastupdated: $lastupdated, hash->{lastupdated}:  $hash->{lastupdated}, lastupdated_local: $lastupdated_local, offsetUTC: $offset";
-      Log3 $name, 5, "$name: ". Dumper $result if($HUEDevice_hasDataDumper);
 
       $hash->{lastupdated} = $lastupdated;
       $hash->{lastupdated_local} = $lastupdated_local;
@@ -1358,6 +1351,15 @@ HUEDevice_Parse($$)
       $readings{vibrationstrength} = $state->{vibrationstrength} if( defined ($state->{vibrationstrength}) );
     }
 
+    $hash->{lastupdated} = ReadingsVal( $name, '.lastupdated', undef ) if( !$hash->{lastupdated} );
+    $hash->{lastupdated_local} = ReadingsVal( $name, '.lastupdated_local', undef ) if( !$hash->{lastupdated_local} );
+    return undef if( $hash->{lastupdated}
+                     && $hash->{lastupdated} eq $lastupdated
+                     && (!$readings{state} || $readings{state} eq ReadingsVal( $name, 'state', '' ))  );
+
+    Log3 $name, 4, "$name: lastupdated: $lastupdated, hash->{lastupdated}:  $hash->{lastupdated}, lastupdated_local: $lastupdated_local, offsetUTC: $offset";
+    Log3 $name, 5, "$name: ". Dumper $result if($HUEDevice_hasDataDumper);
+
     if( scalar keys %readings ) {
        readingsBeginUpdate($hash);
 
@@ -1390,7 +1392,6 @@ HUEDevice_Parse($$)
      }
 
     return undef;
-
   }
 
 

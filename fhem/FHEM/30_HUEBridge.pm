@@ -488,6 +488,10 @@ HUEBridge_scene2id($$)
   $hash = $defs{$hash} if( ref($hash) ne 'HASH' );
   return undef if( !$hash );
 
+  if( $id =~ m/\[id=(.*)\]$/ ) {
+    $id = $1;
+  }
+
   if( $hash->{helper}{scenes} ) {
     return $id if( defined($hash->{helper}{scenes}{$id}) );
     $id = lc($id);
@@ -497,13 +501,34 @@ HUEBridge_scene2id($$)
       my $scene = $hash->{helper}{scenes}{$key};
 
       return $key if( lc($key) eq $id );
-      return $key if( lc($scene->{name}) =~ m/^$id$/ );
-      return $key if( lc("$scene->{name} ($key)") =~ m/^$id$/ );
       #return $key if( $scene->{name} eq $id );
+      return $key if( lc($scene->{name}) =~ m/^$id$/ );
     }
   }
 
   return '<unknown>';
+}
+sub
+HUEbridge_groupOfLights($$)
+{
+  my ($hash,$lights) = @_;
+  $hash = $defs{$hash} if( ref($hash) ne 'HASH' );
+  return undef if( !$hash );
+  my $name = $hash->{NAME};
+
+  my $group;
+  foreach my $chash ( values %{$modules{HUEDevice}{defptr}} ) {
+    next if( !$chash->{IODev} );
+    next if( !$chash->{lights} );
+    next if( $chash->{IODev}{NAME} ne $name );
+    next if( $chash->{helper}{devtype} ne 'G' );
+    next if( $chash->{lights} ne $lights );
+
+    $group .= ',' if( $group );
+    $group .= AttrVal($chash->{NAME}, 'alias', $chash->{NAME});
+  }
+
+  return $group;
 }
 
 sub HUEBridge_Set($@);
@@ -901,7 +926,23 @@ HUEBridge_Set($@)
     my $list = "active inactive delete creategroup deletegroup savescene deletescene modifyscene";
 
     if( my $scenes = $hash->{helper}{scenes} ) {
-      $list .= " scene:". join(",", sort map { my $scene = $scenes->{$_}{name}; $scene =~ s/ /#/g ;$scene} keys %{$scenes} );
+      my %count;
+      map { $count{$scenes->{$_}{name}}++ } keys %{$scenes};
+      $list .= " scene:". join(",", sort map { my $scene = $scenes->{$_}{name};
+                                               my $group = '';
+                                               if( $count{$scene} > 1 ) {
+                                                 my $lights = join( ",", @{$scenes->{$_}{lights}} );
+                                                 $group = HUEbridge_groupOfLights($hash,$lights);
+                                                 $group = join( ";", map { my $l = $hash->{helper}{lights}{$_}{name}; $l?$l:$_;} @{$scenes->{$_}{lights}} ) if( !$group && $hash->{helper}{lights} );
+                                                 $group = $lights if( !$group );
+                                                 $group =~ s/,/;/g;
+                                                 $group = '' if( $group =~ /,/ );
+                                                 $group = $_ if( !$group );
+
+                                                 $scene .= " ($group)";
+                                                 $scene .= " [id=$_]" if( 1 || $group =~ /;/ );;
+                                               }
+                                               $scene =~ s/ /#/g; $scene;} keys %{$scenes} );
     } else {
       $list .= " scene";
     }
@@ -969,10 +1010,16 @@ HUEBridge_Get($@)
     foreach my $key ( sort {$result->{$a}{name} cmp $result->{$b}{name}} keys %{$result} ) {
       $ret .= sprintf( "%-20s %-20s", $key, $result->{$key}{name} );
       $ret .= sprintf( "%i %i %i %-40s %-20s", $result->{$key}{recycle}, $result->{$key}{locked},$result->{$key}{version}, $result->{$key}{owner}, $result->{$key}{lastupdated}?$result->{$key}{lastupdated}:'' ) if( $arg && $arg eq 'detail' );
-      if( !$arg && $hash->{helper}{lights} ) {
+      my $lights = join( ",", @{$result->{$key}{lights}} );
+      my $group = HUEbridge_groupOfLights($hash,$lights);
+
+      if( !$arg && $group ) {
+        $ret .= sprintf( " %s\n", $group );
+
+      } elsif( !$arg && $hash->{helper}{lights} ) {
         $ret .= sprintf( " %s\n", join( ",", map { my $l = $hash->{helper}{lights}{$_}{name}; $l?$l:$_;} @{$result->{$key}{lights}} ) );
       } else {
-        $ret .= sprintf( " %s\n", join( ",", @{$result->{$key}{lights}} ) );
+        $ret .= sprintf( " %s\n", $lights );
       }
     }
     if( $ret ) {
