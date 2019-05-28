@@ -660,8 +660,8 @@ HUEDevice_Set($@)
       return fhem( "set $hash->{IODev}{NAME} deletescene $aa[1]" );
 
     } elsif( $cmd eq 'scene' ) {
-      return "usage: scene <id>|<name>" if( @args != 1 );
-      my $arg = $args[0];
+      return "usage: scene <id>|<name>" if( !@args );
+      my $arg = join( ' ', @args );
       $arg = HUEBridge_scene2id($hash->{IODev}, $arg) if( $hash->{IODev} && $hash->{IODev}{TYPE} eq 'HUEBridge' );
 
       my $obj = {'scene' => $arg};

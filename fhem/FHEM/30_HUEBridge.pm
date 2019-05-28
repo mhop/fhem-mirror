@@ -687,8 +687,8 @@ HUEBridge_Set($@)
     return undef;
 
   } elsif($cmd eq 'scene') {
-    return "usage: scene <id>|<name>" if( @args != 1 );
-    $arg = HUEBridge_scene2id($hash, $arg);
+    return "usage: scene <id>|<name>" if( !@args );
+    $arg = HUEBridge_scene2id($hash, join(' ', @args));
 
     my $obj = { 'scene' => $arg };
     my $result = HUEBridge_Call($hash, undef, "groups/0/action", $obj, 'PUT');
