@@ -660,9 +660,11 @@ HUEDevice_Set($@)
       return fhem( "set $hash->{IODev}{NAME} deletescene $aa[1]" );
 
     } elsif( $cmd eq 'scene' ) {
-      return "usage: scene <id>" if( @args != 1 );
+      return "usage: scene <id>|<name>" if( @args != 1 );
+      my $arg = $args[0];
+      $arg = HUEBridge_scene2id($hash->{IODev}, $arg) if( $hash->{IODev} && $hash->{IODev}{TYPE} eq 'HUEBridge' );
 
-      my $obj = {'scene' => $aa[1]};
+      my $obj = {'scene' => $arg};
       $hash->{helper}->{update} = 1;
       my $result = HUEDevice_ReadFromServer($hash,"$hash->{ID}/action",$obj);
       return $result->{error}{description} if( $result->{error} );
@@ -852,9 +854,26 @@ HUEDevice_Set($@)
 
     $list .= " rename";
 
-    $list .= " savescene deletescene" if( $hash->{helper}->{devtype} eq 'G' );
+    if( $hash->{helper}->{devtype} eq 'G' ) {
+      $list .= " savescene deletescene";
+    }
+
+    if( my $scenes = $hash->{IODev}{helper}{scenes} ) {
+      local *containsOneOfMyLights = sub($) {
+        return 1 if( !defined($hash->{helper}{lights}) );
+
+        my( $lights ) = @_;
+
+        foreach my $light (@{$lights}) {
+          return 1 if( defined($hash->{helper}{lights}{$light}) );
+        }
+        return 0;
+      };
+      $list .= " scene:". join(",", sort grep { defined } map {  if( !containsOneOfMyLights($scenes->{$_}{lights}) ) { undef; } else {  my $scene = $scenes->{$_}{name}; $scene =~ s/ /#/g; $scene} } keys %{$scenes} );
+    } else {
+      $list .= " scene";
+    }
   }
-  $list .= " scene" if( $hash->{helper}->{devtype} eq 'G' );
 
   return SetExtensions($hash, $list, $name, @aa);
 }
@@ -1139,9 +1158,21 @@ HUEDevice_Parse($$)
   $hash->{uniqueid} = $result->{uniqueid} if( defined($result->{uniqueid}) );
 
   if( $hash->{helper}->{devtype} eq 'G' ) {
+
+    #if( !defined($attr{$name}{subType}) && $hash->{type} ) {
+    #  if( $hash->{type} eq 'Room' ) {
+    #    $attr{$name}{subType} = 'room';
+    #
+    #  } elsif( $hash->{type} eq 'LightGroup' ) {
+    #    $attr{$name}{subType} = 'lightgroup';
+    #  }
+    #}
+
     if( $result->{lights} ) {
+      $hash->{helper}{lights} = {map {$_=>1} @{$result->{lights}}};
       $hash->{lights} = join( ",", sort { $a <=> $b } @{$result->{lights}} );
     } else {
+      $hash->{helper}{lights} = {};
       $hash->{lights} = '';
     }
 
