@@ -869,7 +869,18 @@ HUEDevice_Set($@)
         }
         return 0;
       };
-      $list .= " scene:". join(",", sort grep { defined } map {  if( !containsOneOfMyLights($scenes->{$_}{lights}) ) { undef; } else {  my $scene = $scenes->{$_}{name}; $scene =~ s/ /#/g; $scene} } keys %{$scenes} );
+      my %count;
+      map { $count{$scenes->{$_}{name}}++ } keys %{$scenes};
+      $list .= " scene:". join(",", sort grep { defined } map { if( !containsOneOfMyLights($scenes->{$_}{lights}) ) {
+                                                                  undef;
+                                                                } else {
+                                                                  my $scene = $scenes->{$_}{name};
+                                                                  if( $count{$scene} > 1 ) {
+                                                                    $scene .= " [id=$_]";
+                                                                   }
+                                                                  $scene =~ s/ /#/g; $scene;
+                                                                }
+                                                              } keys %{$scenes} );
     } else {
       $list .= " scene";
     }
