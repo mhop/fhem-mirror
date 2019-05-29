@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  73_AutoShuttersControl: fix bugs and add patches
  - feature: 30_HUEBridge, 31HUEDevice: scenes can be given by name
                                        scene dropdown in FHEMWEB
                                        show light names for scenes and groups
