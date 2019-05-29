@@ -1190,6 +1190,7 @@ SVG_doShowLog($$$$;$)
 
 }
 
+# Note: d is FileLog-Name if called from the FileLog details, else SVG-name
 sub
 SVG_getData($$$$$)
 {
@@ -1200,7 +1201,8 @@ SVG_getData($$$$$)
 
   foreach my $src (@{$srcDesc->{order}}) {
     my $s = $srcDesc->{src}{$src};
-    my $fname = ($src eq $defs{$d}{LOGDEVICE} ? $defs{$d}{LOGFILE} : "CURRENT");
+    my $fname = ($defs{$d}{LOGDEVICE} && $src eq $defs{$d}{LOGDEVICE} ?
+                $defs{$d}{LOGFILE} : "CURRENT");
     my $cmd = "get $src $fname INT $f $t ".$s->{arg};
     FW_fC($cmd, 1);
     if($showData) {
