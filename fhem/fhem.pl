@@ -5050,6 +5050,9 @@ toJSON($)
   if(not defined $val) {
     return "null";
 
+  } elsif (length( do { no warnings "numeric"; $val & "" } )) {
+    return $val;
+
   } elsif (not ref $val) {
     $val =~ s/([\x00-\x1f\x22\x5c\x7f])/sprintf '\u%04x', ord($1)/ge;
 
