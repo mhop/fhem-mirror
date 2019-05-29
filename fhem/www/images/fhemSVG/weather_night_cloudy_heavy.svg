@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   version="1.0"
+   width="468pt"
+   height="402pt"
+   viewBox="0 0 468 402"
+   preserveAspectRatio="xMidYMid meet"
+   id="svg446"
+   sodipodi:docname="weather_night_cloudy_heavy.svg"
+   inkscape:version="0.92.1 r15371">
+  <defs
+     id="defs450" />
+  <sodipodi:namedview
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="1680"
+     inkscape:window-height="953"
+     id="namedview448"
+     showgrid="false"
+     inkscape:zoom="2"
+     inkscape:cx="272.25424"
+     inkscape:cy="388"
+     inkscape:window-x="0"
+     inkscape:window-y="27"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg446" />
+  <metadata
+     id="metadata432">
+Created by potrace 1.8, written by Peter Selinger 2001-2007
+<rdf:RDF>
+  <cc:Work
+     rdf:about="">
+    <dc:format>image/svg+xml</dc:format>
+    <dc:type
+       rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+    <dc:title></dc:title>
+  </cc:Work>
+</rdf:RDF>
+</metadata>
+  <g
+     transform="translate(0,402) scale(0.158108,-0.158108)"
+     fill="#000000"
+     stroke="none"
+     id="g444">
+    <path
+       d="M 1891.3974,1850.8334 1839,1836.6026 1771,1820 c -37.0779,3.0743 -73.2359,-20.6769 -103,-43 -62,-48 -71,-50 -194,-56 -101,-5 -114,-8 -146,-33 -20,-15 -42,-41 -49,-57 l -13,-30 -236,-3 -237,-3 -35,-27 c -46,-35 -68,-83 -68,-151 v -55 l -172,-4 c -184,-4 -209,-10 -254,-60 -37,-40 -47,-69 -52,-160 l -5,-88 H 173 C 103,1050 34,1000 11,931 -3,889 -4,707 10,661 c 11,-39 51,-86 92,-107 16,-8 57,-14 103,-14 h 75 V 398 c 0,-165 14,-210 78,-250 34,-21 50,-23 215,-26 150,-3 177,-6 177,-19 0,-25 63,-80 105,-92 52,-14 437,-14 490,0 72,20 115,77 115,154 v 45 h 93 92 l 22,-34 c 43,-66 47,-67 487,-64 381,3 396,4 422,24 64,47 69,62 72,224 l 3,148 92,4 c 105,5 142,20 184,75 l 28,36 3,203 c 3,187 2,206 -17,242 -22,44 -62,77 -104,87 -22,6 -27,13 -27,37 v 29 c 22.4572,112.1671 0.4674,201.4705 0,243 0,49 -49.7692,145.6282 -89.7692,164.6282 -25,12 26.3461,-25.8846 0,0 -4,23 -62.8077,68.2308 -70.8077,84.2308 -213.1624,133.4224 -374.1486,163.1107 -758.0257,137.9744 z"
+       id="path438"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cccccccccccscccccssccscsccsccsccccccccccccccscccccc" />
+  </g>
+  <g
+     transform="matrix(0.157576,0,0,-0.157576,2.1773847e-6,385.5)"
+     id="g290">
+    <g
+       id="g293">
+      <path
+         style="stroke-width:0.75747776"
+         inkscape:connector-curvature="0"
+         d="m 2095.3224,2427.8801 c -124.7192,-80.1766 -226.5482,-200.6144 -285.5571,-339.2231 -28.8606,-66.9721 -38.5552,-100.0052 -47.4715,-161.5376 -45.4063,-308.56 103.5356,-604.1468 380.2256,-754.2991 233.6857,-126.3855 508.2014,-127.8223 745.3294,-3.7171 70.0052,36.4671 77.8545,46.1116 60.0684,75.6334 -11.4621,19.0253 -21.8332,21.1242 -76.2564,13.964 -133.4923,-18.0022 -331.919,37.7666 -490.8812,138.3722 -100.0871,63.3443 -198.0161,161.65 -242.2909,243.4519 -57.2838,105.6622 -83.7359,239.5036 -78.3473,396.8272 3.2593,89.0603 36.0073,224.4005 72.1788,301.1548 29.8694,62.2747 31.5862,68.4942 19.8039,84.2719 -13.9014,18.5396 -33.0625,20.1134 -56.8017,5.1015 z m -107.9161,-340.8417 c -35.2829,-397.1607 127.4831,-663.5457 510.8609,-834.3389 50.7177,-22.9663 195.2041,-63.2677 227.2095,-64.2437 16.6126,-0.3667 16.6126,-0.3667 4.0955,-6.0422 -24.2096,-10.4521 -120.5316,-27.4224 -171.5138,-30.4691 -142.3984,-8.5092 -297.9708,31.2996 -417.5877,107.41 -150.1307,95.0164 -256.7162,245.4785 -294.897,416.1701 -21.7552,96.5709 -20.8261,183.4529 2.6224,285.104 24.5931,105.7975 71.8025,197.4842 143.3111,279.0687 l 30.2524,34.4315 -14.8305,-68.3425 c -8.0045,-37.3499 -17.0712,-91.0752 -19.5228,-118.7479 z"
+         id="path19" />
+    </g>
+  </g>
+</svg>
