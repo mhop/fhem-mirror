@@ -733,8 +733,10 @@ zigbee2mqtt_devStateIcon255($;$$)
     $s = sprintf("dim%02d%%", int((1+int($pct/18))*6.25));
   }
 
-  my $rgb = ReadingsVal($name, $rgbReadingName, "FFFFFF");
-  $s .= "@#$rgb" if($rgb ne "FFFFFF");
+  if($rgbReadingName) {
+    my $rgb = ReadingsVal($name, $rgbReadingName, "FFFFFF");
+    $s .= "@#$rgb" if($rgb ne "FFFFFF");
+  }
 
   return ".*:$s:toggle";
 }
