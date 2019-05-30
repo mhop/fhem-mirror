@@ -223,6 +223,7 @@ body.fixedInput #logo,
 body.fixedInput #menu,
 body.fixedInput #menuBtn,
 body.fixedInput #content,
+body.fixedInput #textInput,
 body.fixedInput #hdr {
 	position: fixed;
 	overflow: auto;
