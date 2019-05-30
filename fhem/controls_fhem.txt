@@ -1,4 +1,4 @@
-REV 19479
+REV 19487
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,11 +21,11 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2019-05-29_07:45:02 293936 ./CHANGED
+UPD 2019-05-30_07:45:03 293997 ./CHANGED
 UPD 2019-05-29_07:45:02 41260 ./MAINTAINER.txt
 UPD 2019-03-29_07:45:02 39782 ./configDB.pm
 UPD 2019-05-05_07:45:03 25539 ./fhem.cfg.demo
-UPD 2019-05-25_07:45:11 158517 ./fhem.pl
+UPD 2019-05-30_07:45:11 158599 ./fhem.pl
 UPD 2018-03-11_07:45:03 22076 FHEM/00_CM11.pm
 UPD 2018-10-19_07:45:03 57590 FHEM/00_CUL.pm
 UPD 2018-03-04_07:45:03 76990 FHEM/00_DFPlayerMini.pm
@@ -79,7 +79,7 @@ UPD 2016-02-05_07:45:11 4427 FHEM/10_Itach_IR.pm
 UPD 2018-10-08_07:45:02 83806 FHEM/10_KNX.pm
 UPD 2016-12-22_07:45:02 36655 FHEM/10_KOPP_FC.pm
 UPD 2018-06-11_07:45:06 61938 FHEM/10_MAX.pm
-UPD 2019-04-26_07:45:03 29962 FHEM/10_MQTT2_DEVICE.pm
+UPD 2019-05-30_07:45:03 29994 FHEM/10_MQTT2_DEVICE.pm
 UPD 2018-09-18_07:45:02 11022 FHEM/10_MQTT_BRIDGE.pm
 UPD 2018-09-18_07:45:02 13548 FHEM/10_MQTT_DEVICE.pm
 UPD 2019-05-29_07:45:02 163183 FHEM/10_MQTT_GENERIC_BRIDGE.pm
@@ -183,7 +183,7 @@ UPD 2016-01-15_07:45:16 6136 FHEM/30_pilight_temp.pm
 UPD 2019-04-03_07:45:02 17081 FHEM/30_tradfri.pm
 UPD 2019-01-03_07:45:02 27812 FHEM/31_Aurora.pm
 UPD 2015-07-28_14:05:31 4627 FHEM/31_ENECSYSINV.pm
-UPD 2019-05-29_07:45:02 68314 FHEM/31_HUEDevice.pm
+UPD 2019-05-30_07:45:03 69032 FHEM/31_HUEDevice.pm
 UPD 2019-03-02_07:45:03 36260 FHEM/31_LightScene.pm
 UPD 2018-02-05_07:45:02 98839 FHEM/31_MilightDevice.pm
 UPD 2017-11-20_07:45:02 22207 FHEM/31_Nello.pm
@@ -370,7 +370,7 @@ UPD 2018-10-01_07:45:02 221693 FHEM/72_FRITZBOX.pm
 UPD 2018-11-11_07:45:02 16051 FHEM/72_TA_CMI_JSON.pm
 UPD 2019-04-21_07:45:02 161113 FHEM/72_XiaomiDevice.pm
 UPD 2019-05-09_07:45:02 49389 FHEM/73_AMADCommBridge.pm
-UPD 2019-05-21_07:45:03 202049 FHEM/73_AutoShuttersControl.pm
+UPD 2019-05-30_07:45:03 206554 FHEM/73_AutoShuttersControl.pm
 UPD 2019-05-23_07:45:02 131779 FHEM/73_DoorBird.pm
 UPD 2018-04-14_07:45:02 89324 FHEM/73_ElectricityCalculator.pm
 UPD 2019-05-28_07:45:02 39173 FHEM/73_GardenaSmartBridge.pm
@@ -493,7 +493,7 @@ UPD 2018-11-13_07:45:04 47530 FHEM/98_PHC.pm
 UPD 2016-02-05_07:45:11 34730 FHEM/98_PID20.pm
 UPD 2017-01-24_07:45:02 27747 FHEM/98_QRCode.pm
 UPD 2019-04-29_07:45:03 24261 FHEM/98_RandomTimer.pm
-UPD 2019-03-04_07:45:03 95729 FHEM/98_SVG.pm
+UPD 2019-05-30_07:45:03 95845 FHEM/98_SVG.pm
 UPD 2018-03-24_07:45:03 97508 FHEM/98_Siro.pm
 UPD 2018-11-12_07:45:03 80535 FHEM/98_SmarterCoffee.pm
 UPD 2017-05-04_07:45:02 52568 FHEM/98_THRESHOLD.pm
@@ -721,11 +721,11 @@ UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
 UPD 2019-05-29_07:45:06 4021748 docs/commandref.html
-UPD 2019-05-29_07:45:08 2505640 docs/commandref_DE.html
+UPD 2019-05-30_07:45:08 2507044 docs/commandref_DE.html
 UPD 2019-05-12_07:45:03 79232 docs/commandref_frame.html
 UPD 2019-05-12_07:45:03 88924 docs/commandref_frame_DE.html
-UPD 2019-05-29_07:45:09 216062 docs/commandref_modular.html
-UPD 2019-05-29_07:45:10 226946 docs/commandref_modular_DE.html
+UPD 2019-05-30_07:45:09 216062 docs/commandref_modular.html
+UPD 2019-05-30_07:45:10 226946 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -1624,6 +1624,28 @@ UPD 2017-10-04_07:45:02 3866 www/images/fhemSVG/vacuum_top.svg
 UPD 2019-02-14_07:45:03 828 www/images/fhemSVG/virtualbox-alt.svg
 UPD 2019-02-14_07:45:03 1551 www/images/fhemSVG/virtualbox.svg
 UPD 2019-02-14_07:45:03 3164 www/images/fhemSVG/vmware.svg
+UPD 2019-05-30_07:45:03 4934 www/images/fhemSVG/weather_fog.svg
+UPD 2019-05-30_07:45:03 2002 www/images/fhemSVG/weather_night.svg
+UPD 2019-05-30_07:45:03 4140 www/images/fhemSVG/weather_night_cloudy.svg
+UPD 2019-05-30_07:45:03 4256 www/images/fhemSVG/weather_night_cloudy_heavy.svg
+UPD 2019-05-30_07:45:03 4186 www/images/fhemSVG/weather_night_cloudy_light.svg
+UPD 2019-05-30_07:45:03 6342 www/images/fhemSVG/weather_night_fog.svg
+UPD 2019-05-30_07:45:03 5279 www/images/fhemSVG/weather_night_rain.svg
+UPD 2019-05-30_07:45:03 6757 www/images/fhemSVG/weather_night_rain_fog.svg
+UPD 2019-05-30_07:45:03 7723 www/images/fhemSVG/weather_night_rain_heavy.svg
+UPD 2019-05-30_07:45:03 4262 www/images/fhemSVG/weather_night_rain_light.svg
+UPD 2019-05-30_07:45:03 9660 www/images/fhemSVG/weather_night_snow.svg
+UPD 2019-05-30_07:45:03 13306 www/images/fhemSVG/weather_night_snow_heavy.svg
+UPD 2019-05-30_07:45:03 6001 www/images/fhemSVG/weather_night_snow_light.svg
+UPD 2019-05-30_07:45:03 7786 www/images/fhemSVG/weather_night_snow_rain.svg
+UPD 2019-05-30_07:45:03 11395 www/images/fhemSVG/weather_night_snow_rain_heavy.svg
+UPD 2019-05-30_07:45:03 6889 www/images/fhemSVG/weather_night_snow_rain_light.svg
+UPD 2019-05-30_07:45:03 6849 www/images/fhemSVG/weather_night_thunderstorm.svg
+UPD 2019-05-30_07:45:03 4303 www/images/fhemSVG/weather_night_thunderstorm_light.svg
+UPD 2019-05-30_07:45:03 6360 www/images/fhemSVG/weather_rain_fog.svg
+UPD 2019-05-30_07:45:03 5071 www/images/fhemSVG/weather_rain_snow.svg
+UPD 2019-05-30_07:45:03 8697 www/images/fhemSVG/weather_rain_snow_heavy.svg
+UPD 2019-05-30_07:45:03 4173 www/images/fhemSVG/weather_rain_snow_light.svg
 UPD 2019-02-14_07:45:03 4752 www/images/fhemSVG/well.svg
 UPD 2017-03-18_07:45:02 7396 www/images/fhemSVG/wuerfel.svg
 UPD 2019-02-19_07:45:03 5808 www/images/fhemSVG/xiaomi_multi.svg
