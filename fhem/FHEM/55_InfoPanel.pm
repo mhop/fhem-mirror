@@ -1430,7 +1430,8 @@ sub btIP_HTMLHead {
 
   my $r       = (defined($refresh) && $refresh) ? "<meta http-equiv=\"refresh\" content=\"$refresh\"/>" : "";
   my $scripts = btIP_getScript($name);
-  my $meta    = "<meta charset=\"UTF-8\">";
+  my $meta    = "<meta charset=\"UTF-8\">"."\n";
+     $meta   .= "<meta name=\"google\" content=\"notranslate\">";
   my $code    = "$doctype\n<html $xmlns>\n<head>\n<title>$title</title>\n$meta\n$r\n$viewport\n$webApp\n$scripts</head>\n";
   return $code;
 }
