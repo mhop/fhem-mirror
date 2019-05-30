@@ -388,8 +388,7 @@ sub WeekdayTimer_daylistAsArray($$){
     # Aufzaehlung 1234 ...
     if (      $daylist =~  m/^[0-8]{0,9}$/g) {
 
-        Log3 ($hash, 3, "[$name] " . '"7" in daylist now means $we(weekend) - see dokumentation!!!' )
-           if (index($daylist, '7') != -1);
+        #Log3 ($hash, 3, "[$name] " . '"7" in daylist now means $we(weekend) - see dokumentation!!!' ) if (index($daylist, '7') != -1);
 
         @days = split("", $daylist);
         @hdays{@days} = undef;
