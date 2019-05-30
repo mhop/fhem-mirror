@@ -111,10 +111,12 @@ sub PIONEERAVR_Initialize($) {
       logTraffic:0,1,2,3,4,5
       statusUpdateReconnect:enable,disable
       statusUpdateStart:enable,disable
+      volumeLimit
       volumeLimitStraight
       disable:0,1
       connectionCheck:off,30,45,60,75,90,105,120
       timeout:1,2,3,4,5,7,10,15
+      alternateVolumeControl:enable,disable
     );
     use warnings 'qw';
     $hash->{AttrList} = join( " ", @attrList ) . " " . $readingFnAttributes;
@@ -1811,7 +1813,22 @@ PIONEERAVR_Set($@)
           }
           Log3 $name, 5, "PIONEERAVR $name: set $cmd ".dq($arg);
           my $pioneerVol = (80.5 + $arg)*2;
-          PIONEERAVR_Write( $hash, sprintf "%03dVL", $pioneerVol);
+##          PIONEERAVR_Write( $hash, sprintf "%03dVL", $pioneerVol);
+
+          if ( AttrVal( $name, "alternateVolumeControl", "disable" ) eq "enable" ) {
+            my $vol = ReadingsVal( $name, "volumeStraight", 12 );
+            if ( $arg > $vol ) {
+              for ( my $i=0; $i<($arg-$vol); $i++ ) {
+                PIONEERAVR_Write( $hash, sprintf "VU" );
+              }
+            }elsif( $arg < $vol ){
+              for ( my $i=0; $i<($vol-$arg); $i++ ) {
+                PIONEERAVR_Write( $hash, sprintf "VD" );
+              }
+            }
+          }else{
+            PIONEERAVR_Write( $hash, sprintf "%03dVL", $pioneerVol);
+          }
           return undef;
           ####Volume (0 - 100) in %
           ####according to http://www.fhemwiki.de/wiki/DevelopmentGuidelinesAV
@@ -1822,7 +1839,21 @@ PIONEERAVR_Set($@)
           }
           Log3 $name, 5, "PIONEERAVR $name: set $cmd ".dq($arg);
           my $pioneerVol = sprintf "%d", $arg * 1.85;
-          PIONEERAVR_Write( $hash, sprintf "%03dVL", $pioneerVol);
+##          PIONEERAVR_Write( $hash, sprintf "%03dVL", $pioneerVol);
+          if ( AttrVal( $name, "alternateVolumeControl", "disable" ) eq "enable" ) {
+            my $vol = ReadingsVal( $name, "volume", 10 );
+              if ( $arg > $vol ){
+                for ( my $i=0; $i<($arg-$vol); $i++ ) {
+                  PIONEERAVR_Write( $hash, sprintf "VU" );
+                }
+              }elsif( $arg < $vol ){
+                for ( my $i=0; $i<($vol-$arg); $i++ ) {
+                  PIONEERAVR_Write( $hash, sprintf "VD" );
+                }
+              }
+          }else{
+            PIONEERAVR_Write( $hash, sprintf "%03dVL", $pioneerVol);
+          }
           return undef;
         ####tone (on|bypass)
         } elsif ( $cmd eq "tone" ) {
@@ -3686,6 +3717,7 @@ sub RC_layout_PioneerAVR() {
         <li><b>tunerFrequency</b> - Tuner frequency</li>
         <li><b>volume</b> - Current value of volume (0%-100%)</li>
         <li><b>volumeStraight</b> - Current value of volume os displayed in the display of the Pioneer AV Receiver</li>
+        <li><b>alternateVolumeControl &lt;enable|disable&gt;</b> - Enables/disables alternate volume control for devices that don't support direct volume setting (e.g. VSX-52x/VSX-82x)</li>
     </ul>
   <br><br>
 
@@ -3967,6 +3999,7 @@ sub RC_layout_PioneerAVR() {
         <li><b>tunerFrequency</b> - Tunerfrequenz</li>
         <li><b>volume</b> - Eingestellte Lautstärke (0%-100%)</li>
         <li><b>volumeStraight</b> - Eingestellte Lautstärke, so wie sie auch am Display des Pioneer AV Receivers angezeigt wird</li>
+        <li><b>alternateVolumeControl &lt;enable|disable&gt;</b> - Aktiviert/deaktiviert alternative Lautst?eeinstellung für Gerate, die keine direktes Setzen der Lautst?e zulassen (z.B. VSX-52x/VSX-82x)</li>
     </ul>
     <br/><br/>
 </ul>
