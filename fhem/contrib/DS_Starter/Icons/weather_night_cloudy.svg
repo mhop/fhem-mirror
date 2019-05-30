@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   version="1.0"
+   width="468pt"
+   height="370pt"
+   viewBox="0 0 468 370"
+   preserveAspectRatio="xMidYMid meet"
+   id="svg269"
+   sodipodi:docname="weather_night_cloudy.svg"
+   inkscape:version="0.92.1 r15371">
+  <defs
+     id="defs273" />
+  <sodipodi:namedview
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="1680"
+     inkscape:window-height="953"
+     id="namedview271"
+     showgrid="false"
+     inkscape:zoom="1.4554054"
+     inkscape:cx="312"
+     inkscape:cy="274.15042"
+     inkscape:window-x="0"
+     inkscape:window-y="27"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="g267" />
+  <metadata
+     id="metadata249">
+Created by potrace 1.8, written by Peter Selinger 2001-2007
+<rdf:RDF>
+  <cc:Work
+     rdf:about="">
+    <dc:format>image/svg+xml</dc:format>
+    <dc:type
+       rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+    <dc:title></dc:title>
+  </cc:Work>
+</rdf:RDF>
+</metadata>
+  <g
+     transform="translate(0,370) scale(0.158108,-0.158108)"
+     fill="#000000"
+     stroke="none"
+     id="g267">
+    <path
+       d="m 1508,1360 h -345 c -299,0 -350,-2 -380,-16 -50,-24 -85,-76 -91,-133 l -4,-49 -172,-4 c -182,-4 -207,-10 -252,-60 -37,-40 -47,-69 -52,-160 l -5,-88 H 173 C 103,850 34,800 11,731 -3,689 -4,507 10,461 c 11,-39 51,-86 92,-107 21,-11 86,-14 310,-14 h 283 l 33,-40 c 28,-34 32,-46 32,-97 0,-72 26,-132 71,-164 l 34,-24 405,-3 c 223,-2 419,0 436,3 34,6 91,57 105,92 l 9,23 h 252 c 278,0 310,6 355,64 l 21,26 h 178 c 99,0 195,5 214,10 41,11 94,61 109,103 17,44 14,390 -3,430 -16,39 -61,82 -99,96 -16,6 -104,11 -203,11 h -174 v 68 67 c 6.3155,97.9688 6.4821,136.1514 -58,200 -15,15 -37,31 -50,36 -13,5 -115,9 -228,9 -170,0 -204,2 -204,14 0,8 -38.0743,-28.1487 -53.0743,-16.1487 -34,26 -75.7779,6.9628 -127.5558,1.8151 -38,-36 -5.3699,-6.6664 -23.3699,28.3336 -8,16 -22,34 -30,42 -86.8695,12.2603 -98.5744,25.5169 -188,40 z"
+       id="path263"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cscccccccssccsccscccsccsccsccccsccccsssccccc" />
+    <g
+       transform="matrix(0.99663519,0,0,0.99663519,3.3242033e-5,-94.871785)"
+       id="g290">
+      <g
+         id="g293">
+        <path
+           style="stroke-width:0.75747776"
+           inkscape:connector-curvature="0"
+           d="m 2095.3224,2427.8801 c -124.7192,-80.1766 -226.5482,-200.6144 -285.5571,-339.2231 -28.8606,-66.9721 -38.5552,-100.0052 -47.4715,-161.5376 -45.4063,-308.56 103.5356,-604.1468 380.2256,-754.2991 233.6857,-126.3855 508.2014,-127.8223 745.3294,-3.7171 70.0052,36.4671 77.8545,46.1116 60.0684,75.6334 -11.4621,19.0253 -21.8332,21.1242 -76.2564,13.964 -133.4923,-18.0022 -331.919,37.7666 -490.8812,138.3722 -100.0871,63.3443 -198.0161,161.65 -242.2909,243.4519 -57.2838,105.6622 -83.7359,239.5036 -78.3473,396.8272 3.2593,89.0603 36.0073,224.4005 72.1788,301.1548 29.8694,62.2747 31.5862,68.4942 19.8039,84.2719 -13.9014,18.5396 -33.0625,20.1134 -56.8017,5.1015 z m -107.9161,-340.8417 c -35.2829,-397.1607 127.4831,-663.5457 510.8609,-834.3389 50.7177,-22.9663 195.2041,-63.2677 227.2095,-64.2437 16.6126,-0.3667 16.6126,-0.3667 4.0955,-6.0422 -24.2096,-10.4521 -120.5316,-27.4224 -171.5138,-30.4691 -142.3984,-8.5092 -297.9708,31.2996 -417.5877,107.41 -150.1307,95.0164 -256.7162,245.4785 -294.897,416.1701 -21.7552,96.5709 -20.8261,183.4529 2.6224,285.104 24.5931,105.7975 71.8025,197.4842 143.3111,279.0687 l 30.2524,34.4315 -14.8305,-68.3425 c -8.0045,-37.3499 -17.0712,-91.0752 -19.5228,-118.7479 z"
+           id="path19" />
+      </g>
+    </g>
+  </g>
+</svg>

@@ -23,9 +23,10 @@
 #       You should have received a copy of the GNU General Public License
 #       along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
-#       This module is based on the modules (Thanks to all!):
-#       98_SHM.pm                  from author Brun von der Gönne <brun at goenne dot de>
-#       98_SHMForecastRelative.pm  from author BerndArnold
+#       Credits (Thanks to all!):
+#           Brun von der Gönne <brun at goenne dot de> :  author of 98_SHM.pm
+#           BerndArnold                                :  author of 98_SHMForecastRelative.pm
+#           Wzut/XGuide                                :  creation of SMAPortal graphics
 #       
 #       FHEM Forum: http://forum.fhem.de/index.php/topic,27667.0.html 
 #
@@ -62,8 +63,6 @@ sub SMAPortal_Initialize($) {
                            "disable:0,1 ".
                            "getDataRetries:1,2,3,4,5,6,7,8,9,10 ".
                            "interval ".
-                           "portalGraphicColor:colorpicker,RGB ".
-                           "portalGraphicStyle:default,modern ".
                            "showPassInLog:1,0 ".
                            "timeout ". 
                            "userAgent ".
@@ -100,6 +99,7 @@ BEGIN {
       qw(
           attr
           AttrVal
+		  AttrNum
           addToDevAttrList
           addToAttrList
           BlockingCall
@@ -141,12 +141,14 @@ BEGIN {
           sortTopicNum
           TimeNow
           Value
+          json2nameValue
         )
   );
 }
 
 # Versions History intern
 our %vNotesIntern = (
+  "1.8.0"  => "27.05.2019  redesign of SMAPortal graphics by Wzut/XGuide ",
   "1.7.1"  => "01.05.2019  PortalAsHtml: use of colored svg-icons possible ",
   "1.7.0"  => "01.05.2019  code change of PortalAsHtml, new attributes \"portalGraphicColor\" and \"portalGraphicStyle\" ",
   "1.6.0"  => "29.04.2019  function PortalAsHtml ",
@@ -177,12 +179,10 @@ sub Define($$) {
 
   $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);   # Modul Meta.pm nicht vorhanden
   
-  # Versionsinformationen setzen
-  setVersionInfo($hash);
-  
-  getcredentials($hash,1);     # Credentials lesen und in RAM laden ($boot=1)
-  CallInfo($hash);             # Start Daten Abrufschleife
-  delcookiefile($hash);        # Start Schleife regelmäßiges Löschen Cookiefile
+  setVersionInfo($hash);                                   # Versionsinformationen setzen
+  getcredentials($hash,1);                                 # Credentials lesen und in RAM laden ($boot=1)
+  CallInfo($hash);                                         # Start Daten Abrufschleife
+  delcookiefile($hash);                                    # Start Schleife regelmäßiges Löschen Cookiefile
  
 return undef;
 }
@@ -236,7 +236,7 @@ sub Set($@) {
       # erweiterte Setlist wenn Credentials gesetzt
       $setlist = "Unknown argument $opt, choose one of ".
 	             "credentials ".
-                 "createPortalGraphic:noArg "
+                 "createPortalGraphic:Generation,Consumption,Generation_Consumption,Differential "
                  ;   
   }  
 
@@ -253,20 +253,72 @@ sub Set($@) {
 			
   } elsif ($opt eq "createPortalGraphic") {
 	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-	  my ($htmldev,$ret);
+	  my ($htmldev,$ret,$c,$type,$color2);
       
-      $htmldev = "WL.$name";
-      $ret = CommandDefine($hash->{CL},"$htmldev weblink htmlCode {FHEM::SMAPortal::PortalAsHtml (\"$name\")}");
+      if ($prop eq "Generation") {
+          $htmldev = "SPG1.$name";                                # Grafiktyp Generation (Erzeugung)
+          $type    = 'pv';        
+          $c       = "SMA Sunny Portal Graphics - Generation";
+          $color2  = "000000";                                    # zweite Farbe als schwarz setzen
+      } elsif ($prop eq "Consumption") {
+          $htmldev = "SPG2.$name";                                # Grafiktyp Consumption (Verbrauch)
+          $type    = 'co';    
+          $c       = "SMA Sunny Portal Graphics - Consumption"; 
+          $color2  = "000000";                                    # zweite Farbe als schwarz setzen          
+      } elsif ($prop eq "Generation_Consumption") {
+          $htmldev = "SPG3.$name";                                # Grafiktyp Generation_Consumption (Erzeugung und Verbrauch)
+          $type    = 'pvco'; 
+          $c       = "SMA Sunny Portal Graphics - Generation & Consumption";
+          $color2  = "FF5C82";                                    # zweite Farbe als rot setzen          
+      } elsif ($prop eq "Differential") {
+          $htmldev = "SPG4.$name";                                # Grafiktyp Differential (Differenzanzeige)
+          $type    = 'diff';   
+          $c       = "SMA Sunny Portal Graphics - Differential";   
+          $color2  = "FF5C82";                                    # zweite Farbe als rot setzen           
+      } else {
+          return "Invalid portal graphic devicetype ! Use one of \"Generation\", \"Consumption\", \"Generation_Consumption\", \"Differential\". "
+      }
+
+      $ret = CommandDefine($hash->{CL},"$htmldev weblink htmlCode {FHEM::SMAPortal::PortalAsHtml (\"$name\",\"$htmldev\")}");
       return $ret if($ret);
-      my $c = "This device provides a praphical output of SMA Portal values.\n". 
-              "The device needs to set attribute \"detailLevel\" in device \"$name\" to level \"4\"";
-      CommandAttr($hash->{CL},"$htmldev comment $c"); 
-      $c = "SMA Portal Graphics";
-      CommandAttr($hash->{CL},"$htmldev alias $c");
       
-	  my $room = AttrVal($name,"room","SMAPortal");
+      CommandAttr($hash->{CL},"$htmldev alias $c");               # Alias setzen
+      
+      $c = "This device provides a praphical output of SMA Sunny Portal values.\n". 
+           "The device needs to set attribute \"detailLevel\" in device \"$name\" to level \"4\"";
+      CommandAttr($hash->{CL},"$htmldev comment $c");     
+ 
+      $c  = "color:colorpicker,RGB color2:colorpicker,RGB hours:slider,4,1,24 hour_style show_header:1,0 show_link:1,0 show_night:1,0 maxPV W/kW:W,kW ";
+      $c .= "height font_size html_start html_end consumers legend_style:none,icon_top,icon_bottom,text_top,text_bottom show_weather:1,0 type:pv,co,pvco,diff ";
+      $c .= "weather_color:colorpicker,RGB show_diff:no,top,bottom width";
+      CommandAttr($hash->{CL},"$htmldev userattr $c");
+
+      # es muß nicht unbedingt jedes der möglichen userattr unbedingt vorbesetzt werden
+      # bzw muß überhaupt hier etwas vorbesetzt werden ?
+      # alle Werte enstprechen eh den AttrVal/ AttrNum default Werten
+      
+      CommandAttr($hash->{CL},"$htmldev hours 24");
+      CommandAttr($hash->{CL},"$htmldev icon on");
+      CommandAttr($hash->{CL},"$htmldev show_header 1");
+      CommandAttr($hash->{CL},"$htmldev show_link 1");
+      CommandAttr($hash->{CL},"$htmldev font_size 24");
+      CommandAttr($hash->{CL},"$htmldev show_weather 1");
+      CommandAttr($hash->{CL},"$htmldev type $type");             # Anzeigetyp setzen
+
+      # eine mögliche Startfarbe steht beim installiertem f18 Style direkt zur Verfügung
+      # ohne vorhanden f18 Style bestimmt später tr.odd aus der Style css die Anfangsfarbe
+      my $color = %{json2nameValue(AttrVal('WEB','styleData',undef))}{'f18_cols.header'};
+      if (defined($color)) {
+          CommandAttr($hash->{CL},"$htmldev color $color");
+      }
+	  
+      # zweite Farbe setzen
+      CommandAttr($hash->{CL},"$htmldev color2 $color2");
+
+      my $room = AttrVal($name,"room","SMAPortal");
       CommandAttr($hash->{CL},"$htmldev room $room");
       CommandAttr($hash->{CL},"$name detailLevel 4");
+      
 	  return "SMA Portal Graphics device \"$htmldev\" created and assigned to room \"$room\".";
   
   } else {
@@ -391,7 +443,7 @@ sub getcredentials ($$) {
         } else {
             Log3($name, 1, "$name - Credentials not set in RAM !");
         }
-    
+        
         $success = (defined($passwd)) ? 1 : 0;
     }
 
@@ -430,6 +482,7 @@ sub Get($$) {
  } else {
      return "$getlist";
  } 
+ 
 return undef;
 }
 
@@ -472,6 +525,7 @@ sub Attr($$$$) {
             unless ($aVal =~ /^\d+$/) {return " The Value for $aName is not valid. Use only figures 0-9 !";}
         }
         if($aName =~ m/interval/) {
+            $_[3] = 120 if($aVal > 0 && $aVal < 120);
             InternalTimer(gettimeofday()+1.0, "FHEM::SMAPortal::CallInfo", $hash, 0);
         }        
     }
@@ -653,8 +707,8 @@ sub ParseData($) {
       # login war erfolgreich, aber Daten müssen jetzt noch gelesen werden
 	  delete($hash->{HELPER}{RUNNING_PID});
       readingsSingleUpdate($hash, "L1_Login-Status", "successful", 1);
-      $hash->{HELPER}{oldlogintime} = gettimeofday();
-	  $hash->{HELPER}{RUNNING_PID} = BlockingCall("FHEM::SMAPortal::GetData", $name, "FHEM::SMAPortal::ParseData", $timeout, "FHEM::SMAPortal::ParseAborted", $hash);
+      $hash->{HELPER}{oldlogintime}          = gettimeofday();
+	  $hash->{HELPER}{RUNNING_PID}           = BlockingCall("FHEM::SMAPortal::GetData", $name, "FHEM::SMAPortal::ParseData", $timeout, "FHEM::SMAPortal::ParseAborted", $hash);
       $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057
       return;
   }
@@ -859,14 +913,20 @@ sub extractForecastData($$) {
   # Loop through all forecast objects
   # Energie wird als "J" geliefert, Wh = J / 3600
   foreach my $fc_obj (@{$forecast->{'ForecastSeries'}}) {
-      # Example for DateTime: 2016-02-15T23:00:00
-      my $fc_datetime = $fc_obj->{'TimeStamp'}->{'DateTime'};
+      my $fc_datetime = $fc_obj->{'TimeStamp'}->{'DateTime'};                       # Example for DateTime: 2016-02-15T23:00:00
+      my $tkind       = $fc_obj->{'TimeStamp'}->{'Kind'};                           # Zeitart: Unspecified, Utc
 
       # Calculate Unix timestamp (month begins at 0, year at 1900)
       my ($fc_year, $fc_month, $fc_day, $fc_hour) = $fc_datetime =~ /^(\d\d\d\d)-(\d\d)-(\d\d)T(\d\d):00:00$/;
       my $fc_uts          = POSIX::mktime( 0, 0, $fc_hour,  $fc_day, $fc_month - 1, $fc_year - 1900 );
       my $fc_diff_seconds = $fc_uts - time + 3600;  # So we go above 0 for the current hour                                                                        
       my $fc_diff_hours   = int( $fc_diff_seconds / 3600 );
+      
+      # Use also old data to integrate daily PV and Consumption
+      if ($current_day == $fc_day) {
+         $PV_sum      += int($fc_obj->{'PvMeanPower'}->{'Amount'});                 # integrator of daily PV 
+	     $consum_sum  += int($fc_obj->{'ConsumptionForecast'}->{'Amount'}/3600);    # integrator of daily Consumption forecast
+      }
 
       # Don't use old data
       next if $fc_diff_seconds < 0;
@@ -885,9 +945,7 @@ sub extractForecastData($$) {
          $restOfDaySum{'Consumption'}   += $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600;
          $restOfDaySum{'Total'}         += $fc_obj->{'PvMeanPower'}->{'Amount'} - $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600;
          $restOfDaySum{'ConsumpRcmd'}   += $fc_obj->{'IsConsumptionRecommended'} ? 1 : 0;
-         $PV_sum                        += int($fc_obj->{'PvMeanPower'}->{'Amount'});                 # integrator of daily PV 
-		 $consum_sum                    += int($fc_obj->{'ConsumptionForecast'}->{'Amount'}/3600);    # integrator of daily Consumption forecast
-      }
+     }
       
       # If data is for the next day (quick and dirty: current day different from this object's day)
       # Assuming only the current day and the next day are returned from Sunny Portal
@@ -899,23 +957,31 @@ sub extractForecastData($$) {
       }
       
       # Update values in Fhem if less than 24 hours in the future
+      # TimeStamp Kind:	"Unspecified"
       if($dl >= 2) {
           if ($obj_nr < 24) {
               my $time_str = "ThisHour";
               $time_str = "NextHour".sprintf("%02d", $obj_nr) if($fc_diff_hours>0);
               if($time_str =~ /NextHour/ && $dl >= 4) {
-                  readingsBulkUpdate( $hash, "L4_${time_str}_Time", UTC2LocalString($hash,$fc_obj->{'TimeStamp'}->{'DateTime'}) );
+                  readingsBulkUpdate( $hash, "L4_${time_str}_Time", TimeAdjust($hash,$fc_obj->{'TimeStamp'}->{'DateTime'},$tkind) );
                   readingsBulkUpdate( $hash, "L4_${time_str}_PvMeanPower", int( $fc_obj->{'PvMeanPower'}->{'Amount'} ) );
                   readingsBulkUpdate( $hash, "L4_${time_str}_Consumption", int( $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600 ) );
                   readingsBulkUpdate( $hash, "L4_${time_str}_IsConsumptionRecommended", ($fc_obj->{'IsConsumptionRecommended'} ? "yes" : "no") );
-                  readingsBulkUpdate( $hash, "L4_${time_str}", int( $fc_obj->{'PvMeanPower'}->{'Amount'} - $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600 ) );
+                  # Rundungsfehler möglich -> nicht int((x-y)/3600) besser ist:  int(x/3600) - int(y/3600)
+                  # readingsBulkUpdate( $hash, "L4_${time_str}", int( $fc_obj->{'PvMeanPower'}->{'Amount'} - $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600 ) );
+                  readingsBulkUpdate( $hash, "L4_${time_str}", int( ($fc_obj->{'PvMeanPower'}->{'Amount'}/3600) - ($fc_obj->{'ConsumptionForecast'}->{'Amount'}/3600) ) );
+		          # add WeatherId Helper to show weather icon
+                  $hash->{HELPER}{"L4_".${time_str}."_WeatherId"} = int($fc_obj->{'WeatherId'});		  
               }
               if($time_str =~ /ThisHour/ && $dl >= 2) {
-                  readingsBulkUpdate( $hash, "L2_${time_str}_Time", UTC2LocalString($hash,$fc_obj->{'TimeStamp'}->{'DateTime'}) );
+                  readingsBulkUpdate( $hash, "L2_${time_str}_Time", TimeAdjust($hash,$fc_obj->{'TimeStamp'}->{'DateTime'},$tkind) );
                   readingsBulkUpdate( $hash, "L2_${time_str}_PvMeanPower", int( $fc_obj->{'PvMeanPower'}->{'Amount'} ) );
                   readingsBulkUpdate( $hash, "L2_${time_str}_Consumption", int( $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600 ) );
                   readingsBulkUpdate( $hash, "L2_${time_str}_IsConsumptionRecommended", ($fc_obj->{'IsConsumptionRecommended'} ? "yes" : "no") );
-                  readingsBulkUpdate( $hash, "L2_${time_str}", int( $fc_obj->{'PvMeanPower'}->{'Amount'} - $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600 ) );
+                  # readingsBulkUpdate( $hash, "L2_${time_str}", int( $fc_obj->{'PvMeanPower'}->{'Amount'} - $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600 ) );
+                  readingsBulkUpdate( $hash, "L2_${time_str}", int( ($fc_obj->{'PvMeanPower'}->{'Amount'}/3600) - ($fc_obj->{'ConsumptionForecast'}->{'Amount'}/3600) ) );
+		          # add WeatherId Helper to show weather icon
+		          $hash->{HELPER}{"L2_".${time_str}."_WeatherId"} = int($fc_obj->{'WeatherId'});	           
               }
           }
       }
@@ -1073,10 +1139,12 @@ sub extractConsumerData($$) {
   
   if(%consumers && $forecast->{'ForecastTimeframes'}) {
       # es sind Vorhersagen zu geplanten Verbraucherschaltzeiten vorhanden
+      # TimeFrameStart/End Kind: "Utc"
       foreach my $c (@{$forecast->{'ForecastTimeframes'}{'PlannedTimeFrames'}}) {
+          my $tkind          = $c->{'TimeFrameStart'}->{'Kind'};                             # Zeitart: Unspecified, Utc
           my $deviceOid      = $c->{'DeviceOid'};   
-          my $timeFrameStart = UTC2LocalString($hash,$c->{'TimeFrameStart'}{'DateTime'});  # wandele UTC Time zu lokaler Zeit        
-          my $timeFrameEnd   = UTC2LocalString($hash,$c->{'TimeFrameEnd'}{'DateTime'});    # wandele UTC Time zu lokaler Zeit
+          my $timeFrameStart = TimeAdjust($hash,$c->{'TimeFrameStart'}{'DateTime'},$tkind);  # wandele UTC        
+          my $timeFrameEnd   = TimeAdjust($hash,$c->{'TimeFrameEnd'}{'DateTime'},$tkind);    # wandele UTC
           my $tz             = $c->{'TimeFrameStart'}{'Kind'};
           foreach my $k (keys(%consumers)) {
                $val = $consumers{$k};
@@ -1089,8 +1157,6 @@ sub extractConsumerData($$) {
                }
           }          
       }
-  
-  
   }
 
   if(%consumers) {
@@ -1279,28 +1345,31 @@ return;
 }
 
 ################################################################
-#             UTC in lokale Zeit umwandeln
+#                   Timestamp korrigieren
 ################################################################
-sub UTC2LocalString($$) {
-  my ($hash,$t) = @_;
-  $t            =~ s/T/ /;
+sub TimeAdjust($$$) {
+  my ($hash,$t,$tkind) = @_;
+  $t =~ s/T/ /;
   my ($datehour, $rest) = split(/:/,$t,2);
   my ($year, $month, $day, $hour) = $datehour =~ /(\d+)-(\d\d)-(\d\d)\s+(\d\d)/;
   
+  #  Time::timegm - a UTC version of mktime()
   #  proto: $time = timegm($sec,$min,$hour,$mday,$mon,$year);
-  my $utcepoch = timegm(0,0,$hour,$day,$month-1,$year);
+  my $epoch = timegm(0,0,$hour,$day,$month-1,$year);
   
   #  proto: ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
   my (undef,undef,undef,undef,undef,undef,undef,undef,$isdst) = localtime(time);
   
-  if($isdst) {
-      $utcepoch = $utcepoch - 7200;
-  } else {
-      $utcepoch = $utcepoch - 3600;
+  if(lc($tkind) =~ /unspecified/) {
+      if($isdst) {
+          $epoch = $epoch - 7200;
+      } else {
+          $epoch = $epoch - 3600;
+      }
   }
   
   #  proto: ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
-  my ($lyear,$lmonth,$lday,$lhour) = (localtime($utcepoch))[5,4,3,2];
+  my ($lyear,$lmonth,$lday,$lhour) = (localtime($epoch))[5,4,3,2];
   
   $lyear += 1900;                  # year is 1900 based
   $lmonth++;                       # month number is zero based
@@ -1330,151 +1399,660 @@ return($txt);
 }
 
 ###############################################################################
-#                  Subroutine für WebLink-Device
+#                  Subroutine für Portalgrafik
 ###############################################################################
-sub PortalAsHtml ($) { 
-  my ($name) = @_;
-  my $hash   = $defs{$name};
-  my $ret    = "";
-  my ($i,$header,$icon);
-  my (%pv,%is,%t);
+sub PortalAsHtml ($$) { 
+  my ($name,$wlname) = @_;
+  my $hash           = $defs{$name};
   
   return "Device \"$name\" doesn't exist !" if(!$hash);
-  
-  if(AttrVal($name, "detailLevel", 1) != 4) {
-      return "The attribute \"detailLevel\" of device \"$name\" has to be set to level \"4\" !";
+  return "Graphic device \"$wlname\" doesn't exist !" if (!defined($defs{$wlname})); 
+
+  my $pv0 = ReadingsNum($name,"L2_ThisHour_PvMeanPower", undef);
+  if (AttrVal($name, "detailLevel", 1) != 4) {
+      return "The attribute \"detailLevel\" of device \"$name\" has to be set to level \"4\" ! <br>";
+  } elsif (!defined $pv0) {
+	  # Vorschlag : Das und level 4 data weiter unten stehen so verloren auf der Seite
+	  # man könnte die beiden Meldungen noch in eine mini <table class=roomoverview> packen
+	  # und mit dem Wert aus attr height in etwa auf die spätere Ausǵabe vorformatieren
+	  return "Awaiting level 2 data ... <br>";
   }
-  
-  # Stylewerte
-  my $maxVal;                                                        # max Ertrag in den nächsten 24 Stunden
-  my $he;                                                            # Balkenhöhe
-  my $space  =   1;                                                  # Platz zwischen den Balken
-  my $width  =  24;                                                  # Breite der Balken , 24 max , 6 min
-  my $height = 200;                                                  # Höhe der Balken
-  my $fsize  =  20;                                                  # Höhe für Font
-  my $color1 = "#FFFFFF";                                            # Farbwert 1
-  my $colorv = "#".AttrVal($name, "portalGraphicColor", "7F7F7F");   # Farbe des Wertes , ggf dyn ermitteln aus Device WEB styleData cols.Header  (original grün -> "#4B9C8A")
-  
+
+  my $ret = "";
+  my ($i,$icon,$colorv,$colorc,$maxhours,$hourstyle,$wllink,$header,$legend,$legend_txt,$legend_style);
+  my ($val,$height,$fsize,$html_start,$html_end,$wlalias,$weather,$colorw,$maxVal,$show_night,$type,$kw);
+  my ($maxDif,$minDif,$maxCon,$v,$z2,$z3,$z4,$show_diff,$width,$w);
+  my $he;                                                                               # Balkenhöhe
+  my (%pv,%is,%t,%we,%di,%co);
+  my @pgCDev;
+
+  @pgCDev = split(',',AttrVal($wlname,"consumers",""));                                 # definierte Verbraucher ermitteln
+  ($legend_style, $legend) = split('_',AttrVal($wlname,'legend_style','icon_top'));
+
+  $legend = '' if(($legend_style eq 'none') || (!int(@pgCDev)));
+
+  if ($legend) {
+      foreach (@pgCDev) {
+          my($txt,$im) = split(':',$_);
+          if ($legend_style eq 'icon') {                                                # mögliche Umbruchstellen mit normalen Blanks vorsehen !
+              $legend_txt .= $txt.'&nbsp;'.FW_makeImage($im).' '; 
+          } else {
+              my (undef,$co) = split('\@',$im);
+              $co = '#cccccc' if (!$co);                                                # irgendeine Farbe per default
+              $legend_txt .= '<font color=\''.$co.'\'>'.$txt.'</font>&nbsp;&nbsp; ';    # hier auch Umbruch erlauben
+          }
+      }
+  }
+
+  # Parameter f. Anzeige extrahieren
+  $maxhours   =  AttrNum($wlname, 'hours',         24);
+  $hourstyle  =  AttrVal($wlname, 'hour_style', undef);
+  $colorv     =  AttrVal($wlname, 'color',      undef);
+  $colorc     =  AttrVal($wlname, 'color2',  '000000');                                 # schwarz wenn keine Userauswahl;
+  $icon       =  AttrVal($wlname, 'icon',       undef);
+  $html_start =  AttrVal($wlname, 'html_start', undef);                                 # beliebige HTML Strings die vor dem Weblink ausgegeben werden
+  $html_end   =  AttrVal($wlname, 'html_end',   undef);                                 # beliebige HTML Strings die nach dem Weblink ausgegeben werden
+
+  $type       =  AttrVal($wlname, 'type',        'pv');
+  $kw         =  AttrVal($wlname, 'W/kW',         'W');
+
+  $height     =  AttrNum($wlname, 'height',       200);
+  $width      =  AttrNum($wlname, 'width',          6);                                 # zu klein ist nicht problematisch
+  $w          =  $width*$maxhours;                                                      # gesammte Breite der Ausgabe , WetterIcon brauch ca.34px
+  $fsize      =  AttrNum($wlname, 'font_size',     24);
+  $maxVal     =  AttrNum($wlname, 'maxPV',          0);                                 # dyn. Anpassung der Balkenhöhe oder statisch ?
+
+  $show_night =  AttrNum($wlname, 'show_night',     0);                                 # alle Balken (Spalten) anzeigen ?
+  $show_diff  =  AttrVal($wlname, 'show_diff',    'no');                                # zusätzliche Anzeige $di{} in allen Typen
+  $weather    =  AttrNum($wlname, 'show_weather',   1);
+  $colorw     =  AttrVal($wlname, 'weather_color',undef);
+
+  $wlalias    =  AttrVal($wlname, 'alias',    $wlname);
+  $header     = (AttrNum($wlname, 'show_header',    1))      ? 1       : undef; 
+  $wlname     = (AttrNum($wlname, 'show_link',      1) == 1) ? $wlname : '';
+
   # Icon Erstellung, mit @<Farbe> ergänzen falls einfärben
   # Beispiel mit Farbe:  $icon = FW_makeImage('light_light_dim_100.svg@green');
-  $icon = FW_makeImage('light_light_dim_100.svg@black');
-  
-  my $pv4h = ReadingsNum($name,"L2_Next04Hours-PV", "");
-  my $pvRe = ReadingsNum($name,"L3_RestOfDay-PV", ""); 
-  my $pvTo = ReadingsNum($name,"L3_Tomorrow-PV", "");
-  
-  # Headerzeile generieren
-  my $alias = AttrVal($name, "alias", "SMA Portal");               # Linktext als Aliasname oder "SMA Portal"
-  my $dlink = "<a href=\"/fhem?detail=$name\">$alias</a>"; 
-  if(AttrVal("global","language","EN") eq "DE") {
-      $header = "$dlink Prognosedaten - nächste 4 Stunden: $pv4h Wh / Rest des Tages: $pvRe Wh / Morgen: $pvTo Wh";
+ 
+  $icon    = FW_makeImage($icon) if (defined($icon));
+ 
+  my $co4h = ReadingsNum($name,"L2_Next04Hours-Consumption", 0);
+  my $coRe = ReadingsNum($name,"L3_RestOfDay-Consumption", 0); 
+  my $coTo = ReadingsNum($name,"L3_Tomorrow-Consumption", 0);
+
+  my $pv4h = ReadingsNum($name,"L2_Next04Hours-PV", 0);
+  my $pvRe = ReadingsNum($name,"L3_RestOfDay-PV", 0); 
+  my $pvTo = ReadingsNum($name,"L3_Tomorrow-PV", 0);
+
+  if ($kw eq 'kW') {
+      $co4h = sprintf("%.1f" , $co4h/1000)."&nbsp;kW";
+      $coRe = sprintf("%.1f" , $coRe/1000)."&nbsp;kW";
+      $coTo = sprintf("%.1f" , $coTo/1000)."&nbsp;kW";
+      $pv4h = sprintf("%.1f" , $pv4h/1000)."&nbsp;kW";
+      $pvRe = sprintf("%.1f" , $pvRe/1000)."&nbsp;kW";
+      $pvTo = sprintf("%.1f" , $pvTo/1000)."&nbsp;kW";
   } else {
-      $header = "$dlink forecast data - next 4 hours: $pv4h Wh / rest of day: $pvRe Wh / tomorrow: $pvTo Wh";
+      $co4h .= "&nbsp;W";
+      $coRe .= "&nbsp;W";
+      $coTo .= "&nbsp;W";
+      $pv4h .= "&nbsp;W";
+      $pvRe .= "&nbsp;W";
+      $pvTo .= "&nbsp;W";
   }
-   
+
+  # Headerzeile generieren
+  my $alias = AttrVal($name, "alias", "SMA Sunny Portal");                     # Linktext als Aliasname oder "SMA Sunny Portal"
+  my $dlink = "<a href=\"/fhem?detail=$name\">$alias</a>"; 
+  $wllink   = ($wlname) ? "<a href=\"/fhem?detail=$wlname\">$wlalias</a>" : '';
+
+  # Da der Header relativ viele Zeichen hat, müssen Stellen erlaubt werden an denen automatisch umgebrochen werden kann. 
+  # Sonst sind schmale Ausgaben nicht von den Balken bzw. deren Anzahl abhängig, sondern allein durch die Breite des Headers bestimmt
+
+  if ($header) {
+      my ($h1,$h2);
+      if(AttrVal("global","language","EN") eq "DE") {
+          $h1 = "Prognosedaten[pv] - nächsten&nbsp;4&nbsp;Stunden:&nbsp;$pv4h/h&nbsp;/ Rest&nbsp;des&nbsp;Tages:&nbsp;$pvRe/h&nbsp;/ Morgen:&nbsp;$pvTo/h";
+          $h2 = "Prognosedaten[co] - nächsten&nbsp;4&nbsp;Stunden:&nbsp;$co4h/h&nbsp;/ Rest&nbsp;des&nbsp;Tages:&nbsp;$coRe/h&nbsp;/ Morgen:&nbsp;$coTo/h";
+      } else {
+          $h1 = "forecast&nbsp;data[pv]&nbsp;- next&nbsp;4&nbsp;hours:&nbsp;$pv4h/h&nbsp;/ rest&nbsp;of&nbsp;day:&nbsp;$pvRe&nbsp;/ tomorrow:&nbsp;$pvTo/h";
+          $h2 = "forecast&nbsp;data[co]&nbsp;- next&nbsp;4&nbsp;hours:&nbsp;$co4h/h&nbsp;/ rest&nbsp;of&nbsp;day:&nbsp;$coRe&nbsp;/ tomorrow:&nbsp;$coTo/h";
+      }
+
+      if ($type eq 'pv') { 
+          $header = $dlink.'<br/>'.$h1; 
+      } elsif ($type eq 'co') { 
+          $header = $dlink.'<br/>'.$h2; 
+      } else { 
+          $header = $dlink.'<br/>'.$h1.'<br/>'.$h2;
+      }
+  }
+
   # Werte aktuelle Stunde
-  $pv{0} = ReadingsNum($name,"L2_ThisHour_PvMeanPower", undef);
-  $is{0} = (ReadingsVal($name,"L2_ThisHour_IsConsumptionRecommended",'no') eq 'yes' ) ? $icon : undef;
-  return "Awaiting level 4 data ... " if(!defined $pv{0});
+  $pv{0} = ReadingsNum($name,"L2_ThisHour_PvMeanPower", 0);
+  $co{0} = ReadingsNum($name,"L2_ThisHour_Consumption", 0);
+  #$di{0} = ReadingsNum($name,"L2_ThisHour", 0); # kann wieder verwendet werden -> Rundungsfehler ist beseitigt
+  $di{0} = $pv{0} - $co{0}; 
+  $is{0} = (ReadingsVal($name,"L2_ThisHour_IsConsumptionRecommended",'no') eq 'yes' ) ? $icon : undef;  
+  $we{0} = $hash->{HELPER}{L2_ThisHour_WeatherId} if($weather);              # für Wettericons 
+
   if(AttrVal("global","language","EN") eq "DE") {
       (undef,undef,undef,$t{0}) = ReadingsVal($name,"L2_ThisHour_Time",'0') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/;
   } else {
       (undef,undef,undef,$t{0})  = ReadingsVal($name,"L2_ThisHour_Time",'0') =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/;
   }
   
-  # Style-Auswahl
-  if(AttrVal($name, "portalGraphicStyle", "default") eq "modern") {
-      # modern Style
-	  $maxVal = $pv{0};         # nehmen wir mal als Startwert
+  $t{0} = int($t{0});                                                        # zum Rechnen Integer ohne führende Null
 
-	  foreach $i (1..23) {
-	      $pv{$i} = ReadingsNum($name,"L4_NextHour".sprintf("%02d",$i)."_PvMeanPower",0);
-	      $maxVal = ($pv{$i} > $maxVal) ? $pv{$i} : $maxVal;
-	      $is{$i} = (ReadingsVal($name,"L4_NextHour".sprintf("%02d",$i)."_IsConsumptionRecommended",'no') eq 'yes') ? $icon : undef;
+  ###########################################################
+  # get consumer list and display it in portalGraphics 
+  foreach (@pgCDev) {
+      my ($itemName, undef) = split(':',$_);
+      $itemName =~ s/^\s+|\s+$//g;                                           #trim it, if blanks were used
+      $_        =~ s/^\s+|\s+$//g;                                           #trim it, if blanks were used
+    
+      #check if listed device is planned
+      if (ReadingsVal($name, "L3_".$itemName."_Planned", "no") eq "yes") {
+          #get start and end hour
+          my ($start, $end);                                                   # werden auf Balken Pos 0 - 23 umgerechnet, nicht auf Stunde !!, Pos = 24 -> ungültige Pos = keine Anzeige
+
+          if(AttrVal("global","language","EN") eq "DE") {
+              (undef,undef,undef,$start) = ReadingsVal($name,"L3_".$itemName."_PlannedOpTimeBegin",'00.00.0000 24') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/;
+              (undef,undef,undef,$end)   = ReadingsVal($name,"L3_".$itemName."_PlannedOpTimeEnd",'00.00.0000 24')   =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/;
+          } else {
+              (undef,undef,undef,$start) = ReadingsVal($name,"L3_".$itemName."_PlannedOpTimeBegin",'0000-00-00 24') =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/;
+              (undef,undef,undef,$end)   = ReadingsVal($name,"L3_".$itemName."_PlannedOpTimeEnd",'0000-00-00 24')   =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/;
+          }
+
+          $start = int($start);
+          $end   = int($end);
+
+          #correct the hour for accurate display
+          if ($start < $t{0}) {                                                #consumption seems to be tomorrow
+              $start = 23-$t{0}+$start;
+          } else { 
+              $start -= $t{0}; 
+          }
+
+          if ($end < $t{0}) {                                                  #consumption seems to be tomorrow
+              $end = 23-$t{0}+$end;
+          } else { 
+              $end -= $t{0}; 
+          }
+
+          $_ .= ":".$start.":".$end;
+
+      } else { 
+          $_ .= ":24:24"; 
+      } 
+  }
+
+
+  $maxVal = (!$maxVal) ? $pv{0} : $maxVal;                  # Startwert wenn kein Wert bereits via attr vorgegeben ist
+  $maxCon = $co{0};                                         # für Typ co
+  $maxDif = $di{0};                                         # für Typ dif
+  $minDif = $di{0};                                         # für Typ dif
+
+  foreach $i (1..$maxhours-1) {
+     $pv{$i} = ReadingsNum($name,"L4_NextHour".sprintf("%02d",$i)."_PvMeanPower",0);             # Erzeugung
+     $co{$i} = ReadingsNum($name,"L4_NextHour".sprintf("%02d",$i)."_Consumption",0);             # Verbrauch
+     # $di{$i} = ReadingsNum($name,"L4_NextHour".sprintf("%02d",$i),0);                          # kann wieder verwendet werden -> Rundungsfehler ist beseitigt
+     $di{$i} = $pv{$i} - $co{$i};
+
+     $maxVal = $pv{$i} if ($pv{$i} > $maxVal); 
+     $maxCon = $co{$i} if ($co{$i} > $maxCon);
+     $maxDif = $di{$i} if ($di{$i} > $maxDif);
+     $minDif = $di{$i} if ($di{$i} < $minDif);
+
+     $is{$i} = (ReadingsVal($name,"L4_NextHour".sprintf("%02d",$i)."_IsConsumptionRecommended",'no') eq 'yes') ? $icon : undef;
+	 $we{$i} = $hash->{HELPER}{"L4_NextHour".sprintf("%02d",$i)."_WeatherId"} if($weather);      # für Wettericons 
+
+     if(AttrVal("global","language","EN") eq "DE") {
+        (undef,undef,undef,$t{$i}) = ReadingsVal($name,"L4_NextHour".sprintf("%02d",$i)."_Time",'0') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/;
+     } else {
+        (undef,undef,undef,$t{$i}) = ReadingsVal($name,"L4_NextHour".sprintf("%02d",$i)."_Time",'0') =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/;
+     }
+
+     $t{$i} = int($t{$i});                                   # keine führenden 0
+  }
+
+  return "Awaiting level 4 data ... " if(!defined $pv{1});
+
+  ######################################
+  # Tabellen Ausgabe erzeugen
+  
+  # Wenn Table class=block alleine steht, zieht es bei manchen Styles die Ausgabe auf 100% Seitenbreite
+  # lässt sich durch einbetten in eine zusätzliche Table roomoverview eindämmen
+  # Die Tabelle ist recht schmal angelegt, aber nur so lassen sich Umbrüche erzwingen
+   
+  $ret  = $html_start if (defined($html_start));
+  $ret .= "<style>TD.smaportal {text-align: center; padding-left:1px; padding-right:1px; margin:0px;}</style>";
+  $ret .= "<table class='roomoverview' width='$w' style='width:".$w."px'><tr class='devTypeTr'><td>$wllink</td></tr>";
+  $ret .= "<tr><td class='smaportal'>";
+  $ret .= "\n<table class='block'>";                         # das \n erleichtert das lesen der debug Quelltextausgabe
+
+  if ($header) {                                             # Header ausgeben 
+      $ret .= "<tr class='odd'>";
+      # mit einem extra <td></td> ein wenig mehr Platz machen, ergibt i.d.R. weniger als ein Zeichen
+      $ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>$header</td></tr>";
+  }
+
+  if ($legend_txt && ($legend eq 'top')) {
+      $ret .= "<tr class='odd'>";
+      $ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>$legend_txt</td></tr>";
+  }
+
+  if ($weather) {
+	  $ret .= "<tr class='even'><td class='smaportal'></td>";      # freier Platz am Anfang
+
+	  foreach $i (0..$maxhours-1) {                                # keine Anzeige bei Null Ertrag bzw. in der Nacht , Typ pcvo & diff haben aber immer Daten in der Nacht
+	      if ($pv{$i} || $show_night || ($type eq 'pvco') || ($type eq 'diff')) {
+              # FHEM Wetter Icons (weather_xxx) , Skalierung und Farbe durch FHEM Bordmittel
+              my $icon_name = weather_icon($we{$i});               # unknown -> FHEM Icon Fragezeichen im Kreis wird als Ersatz Icon ausgegeben
+              Log3($name, 3,"$name - unknown SMA Portal weather id: ".$we{$i}.", please inform the maintainer") if($icon_name eq 'unknown');
+              
+              $icon_name .='@'.$colorw if (defined($colorw));
+              $val       = FW_makeImage($icon_name);
+      
+              $val  ='<b>???<b/>' if ($val eq $icon_name);         # passendes Icon beim User nicht vorhanden ! ( attr web iconPath falsch/prüfen/update ? )
+              $ret .= "<td class='smaportal' width='$width' style='margin:1px; vertical-align:middle align:center; padding-bottom:1px;'>$val</td>";
 	      
-          if(AttrVal("global","language","EN") eq "DE") {
-              (undef,undef,undef,$t{$i}) = ReadingsVal($name,"L4_NextHour".sprintf("%02d",$i)."_Time",'0') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/;
-          } else {
-              (undef,undef,undef,$t{$i}) = ReadingsVal($name,"L4_NextHour".sprintf("%02d",$i)."_Time",'0') =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/;
-	      }
+          } else {                                                 # Kein Ertrag oder show_night = 0
+              $ret .= "<td></td>"; $we{$i} = undef; 
+          } 
+	      # mit $we{$i} = undef kann man unten leicht feststellen ob für diese Spalte bereits ein Icon ausgegeben wurde oder nicht
 	  }
+	  
+      $ret .= "<td class='smaportal'></td></tr>";                  # freier Platz am Ende der Icon Zeile
+  }
 
-	  $ret  = "<html><table><tr>";
-	  $ret .= "<td colspan=24 style='text-align:center; font-weight:bold;'> $header </td>";
-      $ret .= "</tr><tr style='height:".$height."px;'>";
-
-	  foreach $i (0..23) {
-          $he     = int(($maxVal-$pv{$i})/$maxVal*$height) + $fsize;
-          $space  = ($pv{$i}) ?  1 : 0;
-          $width  = ($pv{$i}) ? 24 : 6;
-          $pv{$i} = "&nbsp;" if (!$pv{$i});     # keine Anzeige bei Null
-
-          $ret .= "<td style='text-align:center; width:".$width."px; height:".($height+$fsize)."px; padding-right:".$space."px; padding-left:".$space."px'>
-          <table>
-          <tr style='height:".$he."px'><td style='vertical-align:bottom'>".$pv{$i}."</td></tr>";
-
-          if ($he < ($height+$fsize)) {
-              $ret .= "<tr style='height:".($height+20-$he)."px;'><td style='background-color:".$colorv."; padding-bottom:0px; padding-top:1px; vertical-align:top'>";
-              $ret .= $is{$i} if (defined $is{$i});
-              $ret .= "</td></tr>";
-          }
-
-          $ret .= "<tr><td>".$t{$i}."</td></tr>";
-          $ret .= "</table></td>";
-	  }
-
-	  $ret .= "</tr></table></html>";
-	
-  } else {        
-      # default Style
-      my $maxValue = ReadingsNum($name,"L2_PlantPeakPower", 8020);      # Konfiguration des maximal übergebenen Werts
-      $space  += 1;                                                     # Adaption Platz zwischen den Balken
-      $height -= 40;                                                    # Konfiguration der Höhe der Balken
+  if ($show_diff eq 'top') {                                       # Zusätzliche Zeile Ertrag - Verbrauch
+      $ret .= "<tr class='even'><td class='smaportal'></td>";      # freier Platz am Anfang
       
-      foreach $i (1..23) {
-          $pv{$i} = ReadingsNum($name,"L4_NextHour".sprintf("%02d",$i)."_PvMeanPower",undef);
-          $is{$i} = (ReadingsVal($name,"L4_NextHour".sprintf("%02d",$i)."_IsConsumptionRecommended",'no') eq 'yes') ? $icon : undef;
-          if(AttrVal("global","language","EN") eq "DE") {
-              (undef,undef,undef,$t{$i}) = ReadingsVal($name,"L4_NextHour".sprintf("%02d",$i)."_Time",'0') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/;
-          } else {
-              (undef,undef,undef,$t{$i}) = ReadingsVal($name,"L4_NextHour".sprintf("%02d",$i)."_Time",'0') =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/;
-          }
-      }      
-
-      #### Tabelle
-      $ret  = "<html><table border=2 bordercolor='darkgreen' cellspacing=1><tr>";
-      $ret .= "<td colspan=24 style='text-align:center; font-weight:bold; width:".($width)."px'>$header</td>";
-      $ret .= "</tr><tr>";  
-      
-      foreach $i (0..23) {
-          $is{$i} = FW_makeImage('rc_BLANK.svg') if(!$is{$i});
-          $ret .= "</td>";
-          $ret .= "<td style='text-align:center; padding-right:".($space)."px;padding-left:".($space)."px;width:".($width)."px'>";
-
-          $ret .= "<table border=0 bordercolor='darkgreen' cellspacing=1>";
-          $ret .= "<tr>";
-          $ret .= "<td style='text-align:center; padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1."'>".$t{$i}."</td>";
-          $ret .= "</tr><tr>";
-          $ret .= "<td style='text-align:center; padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1.";height=".$fsize."'>".$is{$i}."</td>";
-          $ret .= "</tr>";
-          $ret .= "<tr style='height:".(($maxValue-$pv{$i})/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$color1.";height=".$fsize."'>".$pv{$i}."</td></tr>";
-          $ret .= "<tr style='height:".($pv{$i}/$maxValue*$height)."px'><td style='padding-right:".($space)."px;padding-left:".($space)."px;background-color:".$colorv."'></td></tr>";
-          $ret .= "</table>";
+      foreach $i (0..$maxhours-1) {
+          $val = formatVal6($di{$i},$kw,$we{$i});
+          $val = ($di{$i} < 0) ?  '<b>'.$val.'<b/>' : '+'.$val;    # Geschmacksfrage, negativ Zahlen in Fettschrift 
+          $ret .= "<td class='smaportal' style='vertical-align:middle; text-align:center;'>$val</td>"; 
       }
+      $ret .= "<td class='smaportal'></td></tr>"; # freier Platz am Ende 
+  }
+
+  $ret .= "<tr class='even'><td class='smaportal'></td>"; # Neue Zeile mit freiem Platz am Anfang
+
+  foreach $i (0..$maxhours-1) {
+      # Achtung Falle, Division by Zero möglich, 
+      # maxVal kann gerade bei kleineren maxhours Ausgaben in der Nacht leicht auf 0 fallen  
+      $height = 200 if (!$height); # Fallback, sollte eigentlich nicht vorkommen, ausser der User setzt das auf 0
+      $maxVal = 1   if (!$maxVal);
+      $maxCon = 1   if (!$maxCon);
+
+      # Der zusätzliche Offset durch $fsize verhindert bei den meisten Skins 
+      # dass die Grundlinie der Balken nach unten durchbrochen wird
+      if ($type eq 'co') { 
+          $he = int(($maxCon-$co{$i})/$maxCon*$height) + $fsize;             # he - freier der Raum über den Balken.
+          $z3 = int($height + $fsize - $he);                                 # Resthöhe
       
-      $ret .= "</td>";
-      $ret .= "</tr></table></html>";
+      } elsif ($type eq 'pv') {
+          $he = int(($maxVal-$pv{$i})/$maxVal*$height) + $fsize;
+          $z3 = int($height + $fsize - $he);
+      
+      } elsif ($type eq 'pvco') {
+          # Berechnung der Zonen
+          # he - freier der Raum über den Balken. fsize wird nicht verwendet, da bei diesem Typ keine Zahlen über den Balken stehen 
+          # z2 - der Ertrag ggf mit Icon
+          # z3 - der Verbrauch , bei zu kleinem Wert wird der Platz komplett Zone 2 zugeschlagen und nicht angezeigt
+          # z2 und z3 nach Bedarf tauschen, wenn der Verbrauch größer als der Ertrag ist
+
+          $maxVal = $maxCon if ($maxCon > $maxVal);                          # wer hat den größten Wert ?
+
+          if ($pv{$i} > $co{$i}) {                                           # pv oben , co unten
+              $z2 = $pv{$i}; $z3 = $co{$i}; 
+          } else {                                                           # tauschen, Verbrauch ist größer als Ertrag
+              $z3 = $pv{$i}; $z2 = $co{$i}; 
+          }
+
+          $he = int(($maxVal-$z2)/$maxVal*$height);
+          $z2 = int(($z2 - $z3)/$maxVal*$height);
+
+          $z3 = int($height - $he - $z2);                                    # was von maxVal noch übrig ist
+          
+          if ($z3 < int($fsize/2)) {                                         # dünnen Strichbalken vermeiden / ca. halbe Zeichenhöhe
+              $z2 += $z3; $z3 = 0; 
+          }                  
+      
+      } else {                                                               # Typ dif
+          # Berechnung der Zonen
+          # he - freier der Raum über den Balken , Zahl positiver Wert + fsize
+          # z2 - positiver Balken inkl Icon
+          # z3 - negativer Balken
+          # z4 - Zahl negativer Wert + fsize
+
+          my ($px_pos,$px_neg);
+          my $maxPV = 0;                                                     # ToDo:  maxPV noch aus Attribut maxPV ableiten
+
+          if ($maxPV) {                                                      # Feste Aufteilung +/- , jeder 50 % bei maxPV = 0
+              $px_pos = int($height/2);
+              $px_neg = $height - $px_pos;                                   # Rundungsfehler vermeiden
+          
+          } else {                                                           # Dynamische hoch/runter Verschiebung der Null-Linie        
+              if  ($minDif >= 0 ) {                                          # keine negativen Balken vorhanden, die positiven bekommen den gesammten Raum
+                  $px_neg = 0;
+                  $px_pos = $height;
+              } else {
+                  if ($maxDif > 0) {
+                      $px_neg = int($height * abs($minDif) / ($maxDif + abs($minDif)));     # Wieviel % entfallen auf unten ?
+                      $px_pos = $height-$px_neg;                                            # der Rest ist oben
+                  } else {                                                   # keine positiven Balken vorhanden, die negativen bekommen den gesammten Raum
+                      $px_neg = $height;
+                      $px_pos = 0;
+                  }
+              }
+          }
+
+          if ($di{$i} >= 0) {                                                # Zone 2 & 3 mit ihren direkten Werten vorbesetzen
+              $z2 = $di{$i};
+              $z3 = abs($minDif);
+          } else {
+              $z2 = $maxDif;
+              $z3 = abs($di{$i}); # Nur Betrag ohne Vorzeichen
+          }
+ 
+          # Alle vorbesetzen Werte umrechnen auf echte Ausgabe px
+          $he = (!$px_pos) ? 0 : int(($maxDif-$z2)/$maxDif*$px_pos);           # Teilung durch 0 vermeiden
+          $z2 = ($px_pos - $he) ;
+
+          $z4 = (!$px_neg) ? 0 : int((abs($minDif)-$z3)/abs($minDif)*$px_neg); # Teilung durch 0 unbedingt vermeiden
+          $z3 = ($px_neg - $z4);
+
+          # Beiden Zonen die Werte ausgeben könnten muß fsize als zusätzlicher Raum zugeschlagen werden !
+          $he += $fsize; 
+          $z4 += $fsize if ($z3);                                              # komplette Grafik ohne negativ Balken, keine Ausgabe von z3 & z4
+      }
+
+      # das style des nächsten TD bestimmt ganz wesentlich das gesammte Design
+      # das \n erleichtert das lesen des Seitenquelltext beim debugging
+      # vertical-align:bottom damit alle Balken und Ausgaben wirklich auf der gleichen Grundlinie sitzen
+
+      $ret .="<td style='text-align: center; padding-left:1px; padding-right:1px; margin:0px; vertical-align:bottom; padding-top:0px'>\n";
+
+      if (($type eq 'pv') || ($type eq 'co')) {
+          $v   = ($type eq 'co') ? $co{$i} : $pv{$i} ; 
+          $v   = 0 if (($type eq 'co') && !$pv{$i} && !$show_night);           # auch bei type co die Nacht ggf. unterdrücken
+          $val = formatVal6($v,$kw,$we{$i});
+
+          $ret .="<table width='100%' height='100%'>";                         # mit width=100% etwas bessere Füllung der Balken
+          $ret .="<tr class='even' style='height:".$he."px'>";
+          $ret .="<td class='smaportal' style='vertical-align:bottom'>".$val."</td></tr>";
+
+          if ($v || $show_night) {
+              # Balken nur einfärben wenn der User via Attr eine Farbe vorgibt, sonst bestimmt class odd von TR alleine die Farbe
+              my $style = "style=\"padding-bottom:0px; vertical-align:top; margin-left:auto; margin-right:auto;";
+              $style   .= (defined($colorv)) ? " background-color:#$colorv\"" : '"';         #" Syntaxhilight :)
+
+              $ret .= "<tr class='odd' style='height:".$z3."px;'>";
+              $ret .= "<td align='center' class='smaportal' ".$style.">";
+
+              ##################################
+              # inject the new icon if defined
+              my $show = 0;                                                    # wurde bereits für diese Stunde ein Geräte Icon ausgegeben ?
+              foreach (@pgCDev) {
+                  if ($_) {
+                      my (undef,$im,$start,$end) = split (':', $_);
+                      if ($im && ($i >= $start) && ($i <= $end)) {
+                          $ret .= FW_makeImage($im);
+                          # $show = 1; # nachher dann kein normales Icon mehr anzeigen, oder doch ?
+                          # oder noch ein extra Attr machen zum auswählen ?
+                          # eventuell den Block wieder nach unten schieben und den normalen Birnen
+                          # Vorrang geben
+                     }
+                  }
+              }
+              
+              $ret .= $is{$i} if (defined ($is{$i}) && !$show);
+              $ret .= "</td></tr>";
+         }           
+         
+      } elsif ($type eq 'pvco') { 
+          my ($color1, $color2, $style1, $style2);
+
+          $ret .="<table width='100%' height='100%'>\n";                      # mit width=100% etwas bessere Füllung der Balken
+
+          if ($he) {                                                          # der Freiraum oben kann beim größten Balken ganz entfallen
+              $ret .="<tr class='even' style='height:".$he."px'><td class='smaportal'></td></tr>";
+          }
+
+          if ($pv{$i} > $co{$i}) {                                            # wer ist oben, co pder pv ? Wert und Farbe für Zone 2 & 3 vorbesetzen
+              $val     = formatVal6($pv{$i},$kw,$we{$i});
+              $color1  = $colorv;
+              $style1  = "style=\"padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
+              $style1 .= (defined($color1)) ? " background-color:#$color1\"" : '"';
+              if ($z3) {                                                      # die Zuweisung können wir uns sparen wenn Zone 3 nachher eh nicht ausgegeben wird
+                  $v       = formatVal6($co{$i},$kw,$we{$i});
+                  $color2  = $colorc;
+                  $style2  = "style=\"padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
+                  $style2 .= (defined($color2)) ? " background-color:#$color2\"" : '"';
+              }
+          
+          } else {
+              $val     = formatVal6($co{$i},$kw,$we{$i});
+              $color1  = $colorc;
+              $style1  = "style=\"padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
+              $style1 .= (defined($color1)) ? " background-color:#$color1\"" : '"';
+              if ($z3) {
+                  $v       = formatVal6($pv{$i},$kw,$we{$i});
+                  $color2  = $colorv;
+                  $style2  = "style=\"padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
+                  $style2 .= (defined($color2)) ? " background-color:#$color2\"" : '"';
+              }
+          }
+
+         $ret .= "<tr class='odd' style='height:".$z2."px'>";
+         $ret .= "<td align='center' class='smaportal' ".$style1.">$val";
+         $ret .= $is{$i} if (defined $is{$i});
+         $ret .= "</td></tr>";
+
+         if ($z3) {                                                         # die Zone 3 lassen wir bei zu kleinen Werten auch ganz weg 
+             $ret .= "<tr class='odd' style='height:".$z3."px'>";
+             $ret .= "<td align='center' class='smaportal' ".$style2.">$v</td></tr>";
+         }
+      
+      } else {                                                              # Type dif
+          my $style  = "style=\"padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
+
+          $ret .="<table width='100%' border='0'>\n";                       # Tipp : das nachfolgende border=0 auf 1 setzen hilft sehr Ausgabefehler zu endecken
+
+          $val = ($di{$i} >= 0) ? formatVal6($di{$i},$kw,$we{$i}) : '';
+          $val = '&nbsp;&nbsp;&nbsp;0&nbsp;&nbsp;' if ($di{$i} == 0);       # Sonderfall , hier wird die 0 gebraucht !
+
+          if ($val) {
+              $ret .="<tr class='even' style='height:".$he."px'>";
+              $ret .="<td class='smaportal' style='vertical-align:bottom'>".$val."</td></tr>";
+          }
+
+          if ($di{$i} >= 0) {                                               # mit Farbe 1 colorv füllen
+              $style .= (defined($colorv)) ? " background-color:#$colorv\"" : '"';
+              $z2 = 1 if ($di{$i} == 0);                                    # Sonderfall , 1px dünnen Strich ausgeben
+              $ret .= "<tr class='odd' style='height:".$z2."px'>";
+              $ret .= "<td align='center' class='smaportal' ".$style.">";
+              $ret .= $is{$i} if (defined $is{$i});
+              $ret .="</td></tr>";
+          
+          } else {                                                          # ohne Farbe
+              $z2 = 2 if ($di{$i} == 0);                                    # Sonderfall, hier wird die 0 gebraucht !
+              if ($z2 && $val) {                                            # z2 weglassen wenn nicht unbedigt nötig bzw. wenn zuvor he mit val keinen Wert hatte
+                  $ret .= "<tr class='even' style='height:".$z2."px'>";
+                  $ret .="<td class='smaportal'></td></tr>";
+              }
+          }
+     
+          if ($di{$i} < 0) {                                                         # Negativ Balken anzeigen ?
+              $style .= (defined($colorc)) ? " background-color:#$colorc\"" : '"';   # mit Farbe 2 colorc füllen
+
+              $ret .= "<tr class='odd' style='height:".$z3."px'>";
+              $ret .= "<td align='center' class='smaportal' ".$style."></td></tr>";
+          
+          } elsif ($z3) {                                                            # ohne Farbe
+              $ret .="<tr class='even' style='height:".$z3."px'>";
+              $ret .="<td class='smaportal'></td></tr>";
+          }
+
+          if ($z4) {                                                                 # kann entfallen wenn auch z3 0 ist
+              $val = ($di{$i} < 0) ? formatVal6($di{$i},$kw,$we{$i}) : '&nbsp;';
+              $ret .="<tr class='even' style='height:".$z4."px'>";
+              $ret .="<td class='smaportal' style='vertical-align:top'>".$val."</td></tr>";
+          }
+      }
+
+      if ($show_diff eq 'bottom') {                                        # zusätzliche diff Anzeige
+          $val  = formatVal6($di{$i},$kw,$we{$i});
+          $val  = ($di{$i} < 0) ?  '<b>'.$val.'<b/>' : '+'.$val;           # Kommentar siehe oben bei show_diff eq top
+          $ret .= "<tr class='even'><td class='smaportal' style='vertical-align:middle; text-align:center;'>$val</td></tr>"; 
+      }
+
+      $ret   .= "<tr class='even'><td class='smaportal' style='vertical-align:bottom; text-align:center;'>";
+      $t{$i} = $t{$i}.$hourstyle if(defined($hourstyle));                  # z.B. 10:00 statt 10
+      $ret  .= $t{$i}."</td></tr></table></td>";                           # Stundenwerte ohne führende 0
   }
   
+  $ret .= "<td class='smaportal'></td></tr>";
+
+  ###################
+  # Legende unten
+  if ($legend_txt && ($legend eq 'bottom')) {
+      $ret .= "<tr class='odd'>";
+      $ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>";
+      $ret .= "$legend_txt</td></tr>";
+  }
+
+  $ret .=  "</table></td></tr></table>";
+  $ret .= $html_end if (defined($html_end));
+  
 return $ret;  
+}
+
+###############################################################################
+#                            Balkenbreite normieren
+#
+# Die Balkenbreite wird bestimmt durch den Wert.
+# Damit alle Balken die gleiche Breite bekommen, müssen die Werte auf 
+# 6 Ausgabezeichen angeglichen werden.
+# "align=center" gleicht gleicht es aus, alternativ könnte man sie auch 
+# komplett rechtsbündig ausgeben.
+# Es ergibt bei fast allen Styles gute Ergebnisse, Ausnahme IOS12 & 6, da diese 
+# beiden Styles einen recht großen Font benutzen.
+# Wird Wetter benutzt, wird die Balkenbreite durch das Icon bestimmt
+###############################################################################
+sub formatVal6($$;$) {
+  my ($v,$kw,$w)  = @_;
+  my $n           = '&nbsp;';                               # positive Zahl
+
+  if ($v < 0) {
+      $n = '-';                                             # negatives Vorzeichen merken
+      $v = abs($v);
+  }
+
+  if ($kw eq 'kW') {                                        # bei Anzeige in kW muss weniger aufgefüllt werden
+      $v  = sprintf('%.1f',($v/1000));
+      $v  += 0;                                             # keine 0.0 oder 6.0 etc
+
+      return ($n eq '-') ? ($v*-1) : $v if defined($w) ;
+
+      my $t = $v - int($v);                                 # Nachkommstelle ?
+
+      if (!$t) {                                            # glatte Zahl ohne Nachkommastelle
+          if(!$v) { 
+              return '&nbsp;';                              # 0 nicht anzeigen, passt eigentlich immer bis auf einen Fall im Typ diff
+          } elsif ($v < 10) { 
+              return '&nbsp;&nbsp;'.$n.$v.'&nbsp;&nbsp;'; 
+          } else { 
+              return '&nbsp;&nbsp;'.$n.$v.'&nbsp;'; 
+          }
+      } else {                                              # mit Nachkommastelle -> zwei Zeichen mehr .X
+          if ($v < 10) { 
+              return '&nbsp;'.$n.$v.'&nbsp;'; 
+          } else { 
+              return $n.$v.'&nbsp;'; 
+          }
+      }
+  }
+
+  return ($n eq '-')?($v*-1):$v if defined($w);
+
+  # Werte bleiben in Watt
+  if    (!$v)         { return '&nbsp;'; }                            # keine Anzeige bei Null
+  elsif ($v <    10)  { return '&nbsp;&nbsp;'.$n.$v.'&nbsp;&nbsp;'; } # z.B. 0
+  elsif ($v <   100)  { return '&nbsp;'.$n.$v.'&nbsp;&nbsp;'; }
+  elsif ($v <  1000)  { return '&nbsp;'.$n.$v.'&nbsp;'; }
+  elsif ($v < 10000)  { return  $n.$v.'&nbsp;'; }
+  else                { return  $n.$v; }                              # mehr als 10.000 W :)
+}
+
+###############################################################################
+#         Zuordungstabelle "WeatherId" angepasst auf FHEM Icons
+###############################################################################
+sub weather_icon ($) {
+  my $id = shift;
+
+  my %weather_ids = (
+      '0' => 'weather_sun',         		        # Sonne (klar)   					                    # vorhanden
+      '1' => 'weather_cloudy_light',		        # leichte Bewölkung (1/3) 				                # vorhanden
+      '2' => 'weather_cloudy', 			            # mittlere Bewölkung (2/3) 				                # vorhanden
+      '3' => 'weather_cloudy_heavy',		        # starke Bewölkung (3/3) 				                # vorhanden
+     '10' => 'weather_fog',				            # Nebel   						                        # neu
+     '11' => 'weather_rain_fog',			        # Nebel mit Regen 					                    # neu
+     '20' => 'weather_rain_heavy',  		        # Regen (viel) 						                    # vorhanden
+     '21' => 'weather_rain_snow_heavy',  		    # Regen (viel) mit Schneefall 				            # neu
+     '30' => 'weather_rain_light',  		        # leichter Regen (1 Tropfen) 				            # vorhanden
+     '31' => 'weather_rain', 			            # leichter Regen (2 Tropfen) 				            # vorhanden
+     '32' => 'weather_rain_heavy',  		        # leichter Regen (3 Tropfen) 				            # vorhanden
+     '40' => 'weather_rain_snow_light',  		    # leichter Regen mit Schneefall (1 Tropfen) 		    # neu
+     '41' => 'weather_rain_snow',  			        # leichter Regen mit Schneefall (3 Tropfen) 		    # neu
+     '50' => 'weather_snow_light',  		        # bewölkt mit Schneefall (1 Flocke) 			        # vorhanden
+     '51' => 'weather_snow', 			            # bewölkt mit Schneefall (2 Flocken) 			        # vorhanden
+     '52' => 'weather_snow_heavy',  		        # bewölkt mit Schneefall (3 Flocken) 			        # vorhanden
+     '60' => 'weather_rain_light',  		        # Sonne, Wolke mit Regen (1 Tropfen) 			        # vorhanden
+     '61' => 'weather_rain', 			            # Sonne, Wolke mit Regen (2 Tropfen) 			        # vorhanden
+     '62' => 'weather_rain_heavy',  		        # Sonne, Wolke mit Regen (3 Tropfen) 			        # vorhanden
+     '70' => 'weather_snow_light', 			        # Sonne, Wolke mit Schnee (1 Flocke) 			        # vorhanden
+     '71' => 'weather_snow_heavy',  		        # Sonne, Wolke mit Schnee (3 Flocken) 			        # vorhanden
+     '80' => 'weather_thunderstorm',		        # Wolke mit Blitz 					                    # vorhanden
+     '81' => 'weather_storm',  			            # Wolke mit Blitz und Starkregen 			            # vorhanden
+     '90' => 'weather_sun',	     			        # Sonne (klar) 						                    # vorhanden
+     '91' => 'weather_sun',	     			        # Sonne (klar) wie 90 					                # vorhanden
+    '100' => 'weather_night',			            # Mond - Nacht  					                    # neu
+    '101' => 'weather_night_cloudy_light',		    # Mond mit Wolken - 					                # neu
+    '102' => 'weather_night_cloudy',		        # Wolken mittel (2/2) - Nacht 				            # neu
+    '103' => 'weather_night_cloudy_heavy',		    # Wolken stark (3/3) - Nacht 			            	# neu
+    '110' => 'weather_night_fog',			        # Nebel - Nacht 					                    # neu
+    '111' => 'weather_night_rain_fog',		        # Nebel mit Regen (3 Tropfen) - Nacht 		         	# neu
+    '120' => 'weather_night_rain_heavy',		    # Regen (viel) - Nacht 					                # neu
+    '121' => 'weather_night_snow_rain_heavy',	    # Regen (viel) mit Schneefall - Nacht 			        # neu
+    '130' => 'weather_night_rain_light',		    # leichter Regen (1 Tropfen) - Nacht 			        # neu
+    '131' => 'weather_night_rain',			        # leichter Regen (2 Tropfen) - Nacht 			        # neu
+    '132' => 'weather_night_rain_heavy',		    # leichter Regen (3 Tropfen) - Nacht 			        # neu
+    '140' => 'weather_night_snow_rain_light',	    # leichter Regen mit Schneefall (1 Tropfen) - Nacht 	# neu
+    '141' => 'weather_night_snow_rain_heavy',	    # leichter Regen mit Schneefall (3 Tropfen) - Nacht 	# neu
+    '150' => 'weather_night_snow_light',		    # bewölkt mit Schneefall (1 Flocke) - Nacht 		    # neu
+    '151' => 'weather_night_snow',			        # bewölkt mit Schneefall (2 Flocken) - Nacht 		    # neu
+    '152' => 'weather_night_snow_heavy',		    # bewölkt mit Schneefall (3 Flocken) - Nacht 		    # neu
+    '160' => 'weather_night_rain_light',		    # Mond, Wolke mit Regen (1 Tropfen) - Nacht 		    # neu
+    '161' => 'weather_night_rain',			        # Mond, Wolke mit Regen (2 Tropfen) - Nacht 		    # neu
+    '162' => 'weather_night_rain_heavy',		    # Mond, Wolke mit Regen (3 Tropfen) - Nacht 		    # neu
+    '170' => 'weather_night_snow_rain',		        # Mond, Wolke mit Schnee (1 Flocke) - Nacht 		    # neu
+    '171' => 'weather_night_snow_heavy',		    # Mond, Wolke mit Schnee (3 Flocken) - Nacht		    # neu
+    '180' => 'weather_night_thunderstorm_light',	# Wolke mit Blitz - Nacht 				                # neu
+    '181' => 'weather_night_thunderstorm'		    # Wolke mit Blitz und Starkregen - Nacht 		        # neu
+  );
+  
+return $weather_ids{$id} if(defined($weather_ids{$id}));
+return 'unknown';
 }
 
 1;
 
 =pod
 =encoding utf8
-=item summary    Module for communication with the SMA-Portal
-=item summary_DE Modul zur Kommunikation mit dem SMA-Portal
+=item summary    Module for communication with the SMA Sunny Portal
+=item summary_DE Modul zur Kommunikation mit dem SMA Sunny Portal
 
 =begin html
 
@@ -1559,12 +2137,12 @@ return $ret;
    <ul>
    <br>
      <ul>
-     <li><b> set &lt;name&gt; createPortalGraphic </b> </li>  
-     Erstellt ein weblink-Device zur grafischen Anzeige der SMA Portal Prognosedaten. 
+     <li><b> set &lt;name&gt; createPortalGraphic &lt;Generation | Consumption | Generation_Consumption | Differential&gt; </b> </li>  
+     Erstellt Devices zur grafischen Anzeige der SMA Sunny Portal Prognosedaten in verschiedenen Layouts. 
      Das Attribut "detailLevel" muss auf den Level 4 gesetzt sein. Der Befehl setzt dieses Attribut automatisch auf 
      den benötigten Wert.  <br>
-     Mit den Attributen "portalGraphicStyle" und "portalGraphicColor" können Erscheinungsbild und Farbgebung des erstellten
-     Devices angepasst werden.     
+     Mit den Attributen im Abschnitt <a href="#SMAPortalGraphAttr">"Attribute der Grafikdevices"</a> können Erscheinungsbild und 
+     Farbgebung der Prognosedaten in den erstellten Devices angepasst werden.     
      </ul>   
      <br>
      
@@ -1643,24 +2221,17 @@ return $ret;
        <li><b>interval &lt;Sekunden&gt; </b><br>
        Zeitintervall zum kontinuierlichen Datenabruf aus dem SMA-Portal (Default: 300 Sekunden). <br>
        Ist "interval = 0" gesetzt, erfolgt kein automatischer Datenabruf und muss mit "get &lt;name&gt; data" manuell
-       erfolgen. </li><br>
+       erfolgen. Wird ein Wert kleiner 120 Sekunden (und >0) angegeben, wird der Wert auf 120 Sekunden korrigiert. <br><br>
+       
+       <b>Hinweis:</b> 
+       Das Abfrageintervall sollte nicht kleiner 120 Sekunden sein. Nach bisherigen Erfahrungen toleriert SMA ein 
+       Intervall von 120 Sekunden obwohl lt. SMA AGB der automatische Datenabruf untersagt ist.
+       </li><br>
        
        <a name="showPassInLog"></a>
        <li><b>showPassInLog</b><br>
        Wenn gesetzt, wird das verwendete Passwort im Logfile angezeigt. 
        (default = 0) </li><br>
-       
-       <a name="portalGraphicColor"></a>
-       <li><b>portalGraphicColor &lt;RGB-Code&gt; </b><br>
-       Definiert die Farbe der grafischen Darstellung von SMA Portal Prognosedaten. 
-       (siehe "set &lt;name&gt; createPortalGraphic")
-       </li><br>
-      
-       <a name="portalGraphicStyle"></a>
-       <li><b>portalGraphicStyle &lt;default | modern&gt; </b><br>
-       Wählt das Erscheinungsbild der grafischen Darstellung von SMA Portal Prognosedaten aus. 
-       (siehe "set &lt;name&gt; createPortalGraphic")
-       </li><br>
        
        <a name="timeout"></a>
        <li><b>timeout &lt;Sekunden&gt; </b><br>
@@ -1678,6 +2249,153 @@ return $ret;
         </ul>           
        </li><br>       
    
+     </ul>
+   </ul>
+   <br>
+   
+   <a name="SMAPortalGraphAttr"></a>
+   <b>Attribute der Grafikdevices</b>
+   <ul>
+     <br>
+     <ul>
+       <li><b>alias </b><br>
+       In Verbindung mit "show_link" beliebiger Abzeigename.
+       </li>
+       <br>
+       
+       <li><b>color </b><br>
+       Farbauswahl der Balken.  
+       </li>
+       <br>
+       
+       <li><b>color2 </b><br>
+       Farbauswahl der sekundären Balken. Die zweite Farbe ist nur sinnvoll für Anzeigedevice "Generation_Consumption" 
+       (Type pvco) und "Differential" (Type diff).
+       </li>
+       <br>  
+       
+       <li><b>consumers </b><br>
+       Komma getrennte Liste der am Sunny Home Manager angeschlossenen Geräte in der Form &lt;Name&gt;:&lt;Icon&gt;@&lt;Farbe&gt;. <br><br>
+       
+       <b>Beispiel: </b> <br>
+       Trockner:scene_clothes_dryer@yellow,Waschmaschine:scene_washing_machine@lightgreen
+       <br>
+       </li>
+       <br>  
+       
+       <li><b>font_size &lt;value&gt; </b><br>
+       Legt fest wieviel Platz über den Balken (bei Anzeigetyp Differential (diff) auch unter diesen) zur Anzeige der Werte 
+       freigehalten wird. Bei Styles die große Fonts benutzen, kann der default-Wert zu klein sein, bzw. u.U. rutscht ein 
+       Balken über die Grundlinie. In diesen Fällen bitte den Wert erhöhen.. (default: 24)
+       </li>
+       <br>
+  
+       <li><b>height &lt;value&gt; </b><br>
+       Höhe der Balken in px und damit Bestimmung der gesammten Höhe.
+       In Verbindung mit hour lassen sich damit auch recht kleine Grafikausgaben erzeugen. (default: 200)
+       </li>
+       <br>       
+
+       <li><b>hours &lt;4...24&gt; </b><br>
+       Anzahl der Balken/Stunden. (default: 24)
+       </li>
+       <br>
+       
+       <li><b>hour_style </b><br>
+       Format der Zeitangabe. <br><br>
+       
+	   <ul>   
+	   <table>  
+	   <colgroup> <col width=10%> <col width=90%> </colgroup>
+		  <tr><td> <b>nicht gesetzt</b>  </td><td>- nur Stundenangabe ohne Minuten (default)</td></tr>
+		  <tr><td> <b>:00</b>            </td><td>- Stunden sowie Minuten zweistellig, z.B. 10:00 </td></tr>
+		  <tr><td> <b>:0</b>             </td><td>- Stunden sowie Minuten einstellig, z.B. 8:0 </td></tr>
+	   </table>
+	   </ul>       
+       </li>
+       <br>
+       
+       <li><b>html_start &lt;HTML-String&gt; </b><br>
+       Angabe eines beliebigen HTML-Strings der vor der generierten Portalgrafik ausgegeben wird. 
+       </li>
+       <br>
+
+       <li><b>html_end &lt;HTML-String&gt; </b><br>
+       Angabe eines beliebigen HTML-Strings der nach der generierten Portalgrafik ausgegeben wird. 
+       </li>
+       <br> 
+       
+       <li><b>icon </b><br>
+       Setzt das Icon zur Darstellung der Zeiten mit Verbraucherempfehlung. 
+       Dazu kann ein beliebiges Icon mit Hilfe der Standard "Select Icon"-Funktion (links unten im FHEMWEB) direkt ausgewählt 
+       werden. 
+       </li>
+       
+       <br>
+       <li><b>legend_style &ltnone | icon_top | icon_bottom | text_top | text_bottom&gt; </b><br>
+       Lage bzw. Art und Weise der angezeigten Consumers Legende.
+       </li>
+       <br>  
+         
+       <li><b>maxPV &lt;0...val&gt; </b><br>
+       Maximaler Ertrag in einer Stunde zur Berechnung der Balkenhöhe, 0 = dynamisch. (default: 0)
+       </li>
+       <br>
+       
+       <li><b>show_diff &lt;no | top | bottom&gt; </b><br>
+       Zusätzliche Anzeige der Differenz "Ertrag - Verbrauch" wie beim Anzeigetyp Differential (diff). (default: no)
+       </li>
+       <br>
+       
+       <li><b>show_header &lt;1|0&gt; </b><br>
+       Anzeige der Kopfzeile mit Prognosedaten, Rest des aktuellen Tages und des nächsten Tages (default: 1)
+       </li>
+       <br>
+       
+       <li><b>show_link &lt;1|0&gt; </b><br>
+       Anzeige des Device-Detaillinks über der grafischen Ausgabe (default: 1)
+       </li>
+       <br>
+       
+       <li><b>show_night &lt;1|0&gt; </b><br>
+       Ebenfalls die Nachtstunden ohne Ertragsprognose anzeigen (default: 0)
+       </li>
+       <br>
+
+       <li><b>show_weather &lt;1|0&gt; </b><br>
+       Wettericons anzeigen. (default: 1)
+       </li>
+       <br> 
+
+       <li><b>type &lt;pv | co | pvco | diff&gt; </b><br>
+       Layout der Portalgrafik. (default: pv)  <br><br>
+       
+	   <ul>   
+	   <table>  
+	   <colgroup> <col width=15%> <col width=85%> </colgroup>
+		  <tr><td> <b>pv</b>    </td><td>- Erzeugung </td></tr>
+		  <tr><td> <b>co</b>    </td><td>- Verbrauch </td></tr>
+		  <tr><td> <b>pvco</b>  </td><td>- Erzeugung und Verbrauch </td></tr>
+          <tr><td> <b>diff</b>  </td><td>- Differenz von Erzeugung und Verbrauch </td></tr>
+	   </table>
+	   </ul>
+       </li>
+       <br> 
+       
+       <li><b>W/kW &lt;W | kW&gt; </b><br>
+       Wertanzeige in W oder in kW auf eine Nachkommastelle gerundet. (default: W)
+       </li>
+       <br> 
+       
+       <li><b>width &lt;value&gt; </b><br>
+       Breite der Balken in px. ( default: 6 (auto) )
+       </li>
+       <br>    
+
+       <li><b>weather_color </b><br>
+       Farbe der Wetter-Icons.
+       </li>
+       <br>               
   
      </ul>
    </ul>
@@ -1689,10 +2407,10 @@ return $ret;
 
 =for :application/json;q=META.json 76_SMAPortal.pm
 {
-  "abstract": "Module for communication with the SMA-Portal",
+  "abstract": "Module for communication with the SMA Sunny Portal",
   "x_lang": {
     "de": {
-      "abstract": "Modul zur Kommunikation mit dem SMA-Portal"
+      "abstract": "Modul zur Kommunikation mit dem SMA Sunny Portal"
     }
   },
   "keywords": [
@@ -1705,7 +2423,10 @@ return $ret;
   "version": "v1.1.1",
   "release_status": "testing",
   "author": [
-    "Heiko Maaz <heiko.maaz@t-online.de>"
+    "Heiko Maaz <heiko.maaz@t-online.de>",
+    "Wzut",
+    "XGuide",
+    null
   ],
   "x_fhem_maintainer": [
     "DS_Starter"
