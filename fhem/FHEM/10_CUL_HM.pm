@@ -222,13 +222,13 @@ sub CUL_HM_Initialize($) {
   my @confQArr     = ();
   my @confQWuArr   = ();
   my %confCheckH   ;
-  my @confUpdt     = ();
+  my %confUpdt     ;         # entities with updated config
   $hash->{helper}{qReqStat}     = \@statQArr;
   $hash->{helper}{qReqStatWu}   = \@statQWuArr;
   $hash->{helper}{qReqConf}     = \@confQArr;
   $hash->{helper}{qReqConfWu}   = \@confQWuArr;
   $hash->{helper}{confCheckH}   = \%confCheckH;
-  $hash->{helper}{confUpdt}     = \@confUpdt;
+  $hash->{helper}{confUpdt}     = \%confUpdt;
   $hash->{helper}{cfgCmpl}{init}= 1;# mark entities with complete config
   #statistics
   $hash->{stat}{s}{dummy}=0;
@@ -3967,7 +3967,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     else{#ignore e.g. for virtuals
     }
     if( !$roleV &&($roleD || $roleC)        ){foreach(keys %{$culHmGlobalSets}           ){push @arr1,"$_:".$culHmGlobalSets->{$_}            }};
-    if(( $roleV || !$st)           && $roleD){foreach(keys %{$culHmGlobalSetsVrtDev}     ){push @arr1,"$_ ".$culHmGlobalSetsVrtDev->{$_}      }};
+    if(( $roleV|| !$st||$st eq"no")&& $roleD){foreach(keys %{$culHmGlobalSetsVrtDev}     ){push @arr1,"$_ ".$culHmGlobalSetsVrtDev->{$_}      }};
     if( !$roleV                    && $roleD){foreach(keys %{$culHmSubTypeDevSets->{$st}}){push @arr1,"$_ ".${$culHmSubTypeDevSets->{$st}}{$_}}};
     if( !$roleV                    && $roleC){foreach(keys %{$culHmGlobalSetsChn}        ){push @arr1,"$_ ".$culHmGlobalSetsChn->{$_}         }};
     if( $culHmSubTypeSets->{$st}   && $roleC){foreach(keys %{$culHmSubTypeSets->{$st}}   ){push @arr1,"$_ ".${$culHmSubTypeSets->{$st}}{$_}   }};
@@ -4098,7 +4098,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
       $ret   .= "\n";
     }
     if ($infoTypeLong){
-      foreach (grep(/^channel_/,keys %{$defs{$devName}})){
+      foreach (grep(/^channel_/,sort keys %{$defs{$devName}})){
         $ret .= "\n   "     .$defs{$devName}{$_}."\t state:".InternalVal($defs{$devName}{$_},"STATE","unknown");
       }
     }
@@ -4136,7 +4136,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   $cmd = "press" if ($cmd =~ m/^press/);# substitude pressL/S with press for cmd search
   my $h = undef;
   $h = $culHmGlobalSets->{$cmd}         if(                !$roleV                    &&($roleD || $roleC));
-  $h = $culHmGlobalSetsVrtDev->{$cmd}   if(!defined($h) &&( $roleV || !$st)           && $roleD);
+  $h = $culHmGlobalSetsVrtDev->{$cmd}   if(!defined($h) &&( $roleV|| !$st||$st eq"no")&& $roleD);
   $h = $culHmSubTypeDevSets->{$st}{$cmd}if(!defined($h) && !$roleV                    && $roleD);
   $h = $culHmGlobalSetsChn->{$cmd}      if(!defined($h) && !$roleV                    && $roleC);
   $h = $culHmSubTypeSets->{$st}{$cmd}   if(!defined($h) && $culHmSubTypeSets->{$st}   && $roleC);
@@ -4178,7 +4178,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     else{#ignore e.g. for virtuals
     }
     if( !$roleV &&($roleD || $roleC)        ){foreach(keys %{$culHmGlobalSets}           ){push @arr1,"$_:".$culHmGlobalSets->{$_}            }};
-    if(( $roleV||!$st)             && $roleD){foreach(keys %{$culHmGlobalSetsVrtDev}     ){push @arr1,"$_:".$culHmGlobalSetsVrtDev->{$_}      }};
+    if(( $roleV||!$st||$st eq "no")&& $roleD){foreach(keys %{$culHmGlobalSetsVrtDev}     ){push @arr1,"$_:".$culHmGlobalSetsVrtDev->{$_}      }};
     if( !$roleV                    && $roleD){foreach(keys %{$culHmSubTypeDevSets->{$st}}){push @arr1,"$_:".${$culHmSubTypeDevSets->{$st}}{$_}}};
     if( !$roleV                    && $roleC){foreach(keys %{$culHmGlobalSetsChn}        ){push @arr1,"$_:".$culHmGlobalSetsChn->{$_}         }};
     if( $culHmSubTypeSets->{$st}   && $roleC){foreach(keys %{$culHmSubTypeSets->{$st}}   ){push @arr1,"$_:".${$culHmSubTypeSets->{$st}}{$_}   }};
@@ -4446,7 +4446,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     return "please give a number between 1 and 50"
        if ($maxBtnNo < 1 ||$maxBtnNo > 50);# arbitrary - 255 should be max
     return $name." already defines as ".$attr{$name}{subType}
-       if ($attr{$name}{subType} && $attr{$name}{subType} ne "virtual");
+       if ($attr{$name}{subType} && $attr{$name}{subType} !~ m/^(virtual|no)$/);
     $attr{$name}{subType} = "virtual";
     $attr{$name}{model}   = "VIRTUAL" if (!$attr{$name}{model});
     my $devId = $hash->{DEF};
@@ -6700,12 +6700,12 @@ sub CUL_HM_infoUpdtDevData($$$) {#autoread config
   $attr{$name}{firmware}   = $fw;      # to be removed from attributes
 
   CUL_HM_updtDeviceModel($name,AttrVal($name,"modelForce",$md));#model may be overwritten by modelForce
-  
-  CUL_HM_configUpdate($name) if(ReadingsVal($name,"D-firmware","") ne $fw     # force read register
-                              ||ReadingsVal($name,"D-serialNr","") ne $serial
-                              ||ReadingsVal($name,".D-devInfo","") ne $devInfo
-                              ||ReadingsVal($name,".D-stc"    ,"") ne $stc
-                              ) ;
+  #General CUL_HM_configUpdate
+  CUL_HM_complConfigTest($name) if(ReadingsVal($name,"D-firmware","") ne $fw     # force read register
+                                 ||ReadingsVal($name,"D-serialNr","") ne $serial
+                                 ||ReadingsVal($name,".D-devInfo","") ne $devInfo
+                                 ||ReadingsVal($name,".D-stc"    ,"") ne $stc
+                                 ) ;
   CUL_HM_UpdtReadBulk($hash,1,"D-firmware:$fw",
                               "D-serialNr:$serial",
                               ".D-devInfo:$devInfo",
@@ -6766,7 +6766,7 @@ sub CUL_HM_getConfig($){
   my $id = CUL_HM_IoId($hash);
   my $dst = substr($hash->{DEF},0,6);
   my $name = $hash->{NAME};
-  CUL_HM_configUpdate($name);
+  #General CUL_HM_configUpdate($name);
   delete $modules{CUL_HM}{helper}{cfgCmpl}{$name};
   CUL_HM_complConfigTest($name);
   CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.'00040000000000')
@@ -9758,7 +9758,8 @@ sub CUL_HM_qStateUpdatIfEnab($@){#in:name or id, queue stat-request
 }
 sub CUL_HM_qAutoRead($$){
   my ($name,$lvl) = @_;
-  CUL_HM_configUpdate($name);
+  CUL_HM_complConfigTest($name);
+  #General CUL_HM_configUpdate($name);
   return if (!$defs{$name}
              ||$lvl >= (0x07 & CUL_HM_getAttrInt($name,"autoReadReg")));
   CUL_HM_qEntity($name,"qReqConf");
@@ -10057,7 +10058,7 @@ sub CUL_HM_reglUsed($) {# provide data for HMinfo
   return @lsNo;
 }
 
-sub CUL_HM_complConfigTest($){# Q - check register consistency some time later
+sub CUL_HM_complConfigTest($){  # Q - check register consistency some time later
   my $name = shift;
   return if ($modules{CUL_HM}{helper}{hmManualOper});#no autoaction when manual
   
@@ -10067,7 +10068,7 @@ sub CUL_HM_complConfigTest($){# Q - check register consistency some time later
     InternalTimer(gettimeofday()+ 1800,"CUL_HM_complConfigTO","CUL_HM_complConfigTO", 0);
   }
 }
-sub CUL_HM_complConfigTestRm($){# Q - check register consistency some time later
+sub CUL_HM_complConfigTestRm($){# Q - check register consistency some time later - remove
   my $name = shift;
   delete $modules{CUL_HM}{helper}{confCheckH}{CUL_HM_name2Id($name)};
 }
@@ -10106,10 +10107,9 @@ sub CUL_HM_complConfig($;$)  {# read config if enabled and not complete
     $modules{CUL_HM}{helper}{cfgCmpl}{$name} = 1;#mark config as complete
   }
 }
-sub CUL_HM_configUpdate($)   {# mark entities with changed data
+sub CUL_HM_configUpdate($)   {# mark entities with changed data for archive
   my $name = shift;
-  @{$modules{CUL_HM}{helper}{confUpdt}} = 
-           CUL_HM_noDup(@{$modules{CUL_HM}{helper}{confUpdt}},$name);
+  $modules{CUL_HM}{helper}{confUpdt}{$name} = 1;
 }
 
 sub CUL_HM_cleanShadowReg($){
