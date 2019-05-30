@@ -1429,8 +1429,14 @@ m/(?:(\w+?): )?(?:(\w+? \d+): )?(\w+?): [^:]*?No.such.file.or.directory$/i
         my ($missing) = $ExtUtilsInstalled->validate($_);
         my $version = $ExtUtilsInstalled->version($_);
         $h->{listedPerl}{$_}{missing} = $missing if ($missing);
-        $h->{listedPerl}{$_}{version} =
-          $version && $version ne '' ? version->parse($version)->numify : 0;
+        eval {
+          $h->{listedPerl}{$_}{version} = version->parse($version)->numify;
+          1;
+        };
+        if ($@) {
+          $h->{listedPerl}{$_}{version} = 0;
+          $@ = undef;
+        }
     }
 
     return $h;
@@ -5531,7 +5537,7 @@ sub __list_module {
       "abstract": "Modul zum Update von FHEM, zur Installation von Drittanbieter FHEM Modulen und der Verwaltung von Systemvoraussetzungen"
     }
   },
-  "version": "v0.5.5",
+  "version": "v0.5.6",
   "release_status": "testing",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
