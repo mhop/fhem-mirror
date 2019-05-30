@@ -547,7 +547,7 @@ HttpUtils_Connect2($)
   }
 
   my $method = $hash->{method};
-  $method = ($data ? "POST" : "GET") if( !$method );
+  $method = (defined($data) && length($data) > 0 ? "POST" : "GET") if(!$method);
 
   my $httpVersion = $hash->{httpversion} ? $hash->{httpversion} : "1.0";
 
@@ -569,7 +569,7 @@ HttpUtils_Connect2($)
                  !($hash->{header} &&
                    $hash->{header} =~ /^Authorization:\s*Digest/mi));
   $hdr .= $hash->{header}."\r\n" if($hash->{header});
-  if(defined($data)) {
+  if(defined($data) && length($data) > 0) {
     $hdr .= "Content-Length: ".length($data)."\r\n";
     $hdr .= "Content-Type: application/x-www-form-urlencoded\r\n"
                 if ($hdr !~ "Content-Type:");
