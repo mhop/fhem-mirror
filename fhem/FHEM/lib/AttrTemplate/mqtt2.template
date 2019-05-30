@@ -1,5 +1,4 @@
 ###########################################
-###########################################
 # $Id$
 #
 # Comments start with #. Empty lines are ignored.
@@ -824,7 +823,6 @@ attr DEVICE webCmd :
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model A_10b_shelly1_w_energy_meassuring
 
-
 # shelly2 using original firmware in roller mode.
 name:A_11b_shelly2_roller
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
@@ -934,8 +932,6 @@ state
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE setStateList open close half stop pct
 attr DEVICE model A_11b1b_shelly25_roller_invert_1
-
-
 
 # shelly2 using original firmware.
 # NOTE: a second device will be created for the second channel
@@ -1066,7 +1062,6 @@ attr DEVICE genericDeviceType light
 attr DEVICE icon light_control
 attr DEVICE model A_15_shellybulb
 
-
 # shellyht using original firmware
 name:A_16_shellyht
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
@@ -1079,6 +1074,29 @@ attr DEVICE stateFormat T: temperature °C H: humidity % B: battery %
 attr DEVICE model A_16_shellyht
 
 #shelly2rgbw
+# contributed by dkreutz http://forum.fhem.de/index.php/topic,94060.msg944338.html#msg944338
+# shellyrgbw2 color mode
+name:A_17_shelly2rgbw_color
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
+desc:shellyrgbw2 color mode <br>Tested with 1.5.0-rgbw2-hotfix1
+par:DEVNAME;name of this shelly;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]+)/, ? $1 : undef }
+attr DEVICE setList\
+  off:noArg shellies/DEVNAME/color/0/command off\
+  on:noArg shellies/DEVNAME/color/0/command on\
+  white:colorpicker,BRI,0,1,100 shellies/DEVNAME/color/0/set {"turn":"on","white":"$EVTPART1"}\
+  gain:colorpicker,BRI,0,1,100 shellies/DEVNAME/color/0/set {"turn":"on","gain":"$EVTPART1"}\
+  rgb:colorpicker,RGB {$EVTPART1=~/(..)(..)(..)/;if($1 ne $2 || $2 ne $3) {"shellies/DEVNAME/color/0/set{\"turn\":\"on\",\"mode\":\"color\",\"gain\":\"100\",\"red\":".hex($1).",\"green\":".hex($2).",\"blue\":".hex($3)."}"}else{"shellies/shellybulb-3CC533/color/0/set {\"turn\":\"on\",\"mode\":\"white\",\"brightness\":".int(hex($1)/2.55)."}"}}\
+  effect:select,0,1,2,3 shellies/DEVNAME/color/0/set {"effect":"$EVTPART1"}\
+  update:noArg shellies/DEVNAME/command update_fw
+deletereading -q DEVICE status_.*
+attr DEVICE readingList shellies/DEVNAME/color/0/status:.* {json2nameValue($EVENT)}
+attr DEVICE userReadings rgb:red.* {if(ReadingsVal($name,"mode","") eq "color"){sprintf("%02X%02X%02X", ReadingsVal($name,"red",99), ReadingsVal($name,"green",99), ReadingsVal($name,"blue",99))}else{my $a=sprintf("%02X",ReadingsVal($name,"brightness",0)*2.555);"$a$a$a"}}
+attr DEVICE webCmd on:off:white:gain:rgb:effect
+attr DEVICE setStateList on off
+attr DEVICE icon light_control
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot";; my $light = ReadingsVal($name,"state","off");; "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a>"}
+attr DEVICE model A_17_shelly2rgbw_color
+
 #contributed by user sledge
 name:A_17a_shelly2rgbw_4w_split
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
