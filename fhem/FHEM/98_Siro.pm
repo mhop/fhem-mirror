@@ -294,14 +294,16 @@ sub SendCommand($@) {
     my $command      = $siro_c2b{$cmd};
     my $io           = $hash->{IODev};    # IO-Device (SIGNALduino)
 
-	if ( $hash->{helper}{exexcmd} eq "off") # send kommand blockiert / keine ausf?hrung
+	#if ( $hash->{helper}{exexcmd} eq "off") # send kommand blockiert / keine ausf?hrung
+	if ( defined($hash->{helper}{exexcmd}) and $hash->{helper}{exexcmd} and $hash->{helper}{exexcmd} eq "off") # send kommand blockiert / keine ausf?hrung
 	{
 	Log3( $name, 5,"Siro_sendCommand: ausf?hrung durch helper blockiert ");
 	return;
 	
 	}
 	
-	 if ( $hash->{helper}{ignorecmd} eq "on") # send kommand blockiert / keine ausf?hrung
+	 #if ( $hash->{helper}{ignorecmd} eq "on") # send kommand blockiert / keine ausf?hrung
+	 if ( defined($hash->{helper}) and $hash->{helper} and defined($hash->{helper}{ignorecmd}) and $hash->{helper}{ignorecmd} and $hash->{helper}{ignorecmd} eq "on") # send kommand blockiert / keine ausf?hrung
 	 {
 	 Log3( $name, 5,"Siro_sendCommand: ausführung einmalig blockiert ");
 	
@@ -314,8 +316,11 @@ sub SendCommand($@) {
 
 	#Log3( $name, 5,"Siro_sendCommand: args1 - $args[1]");
 
-    if ( $args[1] eq "longstop" || $hash->{helper}{progmode} eq "on")
-			{
+   # if ( $args[1] eq "longstop" || $hash->{helper}{progmode} eq "on")
+   
+   if ( (defined($args[1]) and $args[1] and $args[1] eq "longstop") || (defined($hash->{helper}) and $hash->{helper} and defined($hash->{helper}{progmode}) and $hash->{helper}{progmode} and $hash->{helper}{progmode} eq "on") )
+ 	
+		{
 			$SignalRepeats = AttrVal( $name, 'SIRO_signalLongStopRepeats', '15' );
 		}
     else
@@ -390,8 +395,10 @@ sub Parse($$) {
         Log3 $hash, 5,"Siro_Parse: Incomming msg from IODevice $testid - $name device is defined";
 		
 		
-        if ( defined($name)&& $testcmd ne "54")# prüfe auf doppele msg falls gerät vorhanden und cmd nicht stop
-        {
+       # if ( defined($name)&& $testcmd ne "54")# prüfe auf doppele msg falls gerät vorhanden und cmd nicht stop
+        if ( defined($name)&& $testcmd ne "54")# pr?fe auf doppele msg falls ger?t vorhanden und cmd nicht stop
+
+		{
             Log3 $lh, 5,"Siro_Parse: Incomming msg $msg from IODevice name/DEF $testid - Hash -> $lh";
 
             my $testparsetime  = gettimeofday();
@@ -447,8 +454,9 @@ sub Parse($$) {
         Log3 $hash, 5, "Siro_Parse: Cmd: $cmd  Newstate: $newstate";
         Log3 $hash, 5, "Siro_Parse: deviceCode: $deviceCode";
 
-        if ( defined($name)&& $testcmd eq "54" )#prüfe auf doppele msg falls gerät vorhanden und cmd stop
-        {
+        #if ( defined($name)&& $testcmd eq "54" )#prüfe auf doppele msg falls gerät vorhanden und cmd stop
+        if ( defined($name)&& $testcmd eq "54" )#pr?fe auf doppele msg falls ger?t vorhanden und cmd stop
+		{
             # Log3 $lh, 5, "Siro_Parse: prüfung auf douplestop ";
             my $testparsetime      = gettimeofday();
             my $lastparsestop      = $lh->{helper}{lastparse_stop};
@@ -637,7 +645,9 @@ sub Set($@) {
 # programmiermodus
 ####################################
 	
-	if ( $hash->{helper}{progmode} eq "on" && $cmd eq "sequenz") # sequenz ausführen 
+	#if ( $hash->{helper}{progmode} eq "on" && $cmd eq "sequenz") # sequenz ausführen 
+	if ( defined($hash->{helper}) and $hash->{helper} and defined($hash->{helper}{progmode}) and $hash->{helper}{progmode} and $hash->{helper}{progmode} eq "on" && $cmd eq "sequenz") # sequenz ausf?hren 
+ 
 	{
 	Log3( $name, 5, "Siro-Programmiermodus: Sequenz gefunden :$args[1]");
 	my @seq = split(/,/, $args[1]);
@@ -655,7 +665,9 @@ sub Set($@) {
 	return;
 	}
 	
-	if ($cmd eq "prog_mode_on" && $hash->{helper}{progmode} ne "on")
+	#if ($cmd eq "prog_mode_on" && $hash->{helper}{progmode} ne "on")
+	if (defined($hash->{helper}) and $hash->{helper} and defined($hash->{helper}{progmode}) and $hash->{helper}{progmode} and $hash->{helper}{progmode} eq "on")
+
 	{
 	readingsSingleUpdate( $hash, "state",  'programming', 1 ); 
 	$hash->{helper}{progmode} = "on";
@@ -695,7 +707,9 @@ sub Set($@) {
 	$hash->{helper}{ignorecmd} = "off" ; #reset ignore send comand states
 	#setze helper neu wenn signal von fb kommt
 	
-	if ($hash->{helper}{remotecmd} eq "on")
+	#if ($hash->{helper}{remotecmd} eq "on")
+	if ( defined($hash->{helper}) and $hash->{helper} and defined($hash->{helper}{remotecmd}) and $hash->{helper}{remotecmd} and $hash->{helper}{remotecmd} eq "on")
+ 
 	{
 	$hash->{helper}{exexcmd} = "off" 
 	}
