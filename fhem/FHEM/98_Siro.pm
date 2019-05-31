@@ -41,6 +41,7 @@ sub Siro_Initialize($) {
       . " SIRO_signalRepeats:1,2,3,4,5,6,7,8,9"
 	  . " SIRO_inversPosition:0,1"
 	  . " SIRO_Battery_low"
+	  . " SIRO_downLimit:slider,0,1,100"
       . " SIRO_signalLongStopRepeats:10,15,20,40,45,50"
       . " $readingFnAttributes"
 	  . " SIRO_send_channel:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15"
@@ -294,6 +295,17 @@ sub SendCommand($@) {
 	return;
 	
 	}
+	
+	 if ( $hash->{helper}{ignorecmd} eq "on") # send kommand blockiert / keine ausf?hrung
+	 {
+	 Log3( $name, 5,"Siro_sendCommand: ausführung einmalig blockiert ");
+	
+	 delete( $hash->{helper}{ignorecmd} );
+	 return;
+	
+	 }
+	
+	
 
 	Log3( $name, 5,"Siro_sendCommand: args1 - $args[1]");
 
@@ -341,8 +353,8 @@ sub SendCommand($@) {
 
 	IOWrite( $hash, 'sendMsg', $message ) if AttrVal( $name, 'SIRO_debug', "0" ) ne "1";
     Log3( $name, 5,
-"Siro_sendCommand: name -> $name command -> $cmd  channel -> $chan bincmd -> $binCommand bin -> $bin
-    message -> $message");
+"Siro_sendCommand: name-$name command-$cmd  channel-$chan bincmd-$binCommand bin-$bin id-$sendid
+    message-$message");
 
     return $ret;
 }
@@ -672,8 +684,8 @@ sub Set($@) {
 	# setze actiontime und lastactiontime
 	# umbauen zu bulk update
 	RemoveInternalTimer($name); #alle vorhandenen timer l?schen
-	delete( $hash->{helper}{exexcmd} ); # on/off off blockiert befehlsausf?hrung / l?schen vor jedem durchgang
-	
+	#delete( $hash->{helper}{exexcmd} ); # on/off off blockiert befehlsausf?hrung / l?schen vor jedem durchgang
+	$hash->{helper}{exexcmd}="on";
 	#setze helper neu wenn signal von fb kommt
 	
 	if ($hash->{helper}{remotecmd} eq "on")
@@ -687,11 +699,43 @@ sub Set($@) {
 	readingsBulkUpdate( $hash, "LastActionTime", $lastactiontime, 0 );
 	readingsBulkUpdate( $hash, "BetweentActionTime", $betweentime, 0 );
 	readingsEndUpdate($hash, 1);
+	
+	
 	# befehl aus %sendCommands ermitteln
     my $comand = $sendCommands{$cmd}; # auzuf?hrender befehl
 	Log3( $name, 5, "Siro-Set: ermittelter Befehl: $comand " ); 
-	
-	
+
+	###############################
+	# limit testen , falls limit wird on zu level limit
+	my $downlimit = AttrVal( $name, 'SIRO_downLimit','undef' ) ;
+	if ($downlimit ne "undef"  && ($comand eq 'on' || $comand eq 'level') && $hash->{helper}{exexcmd} ne "off")
+	# nur wenn befehl nicht von fb kommt
+		{
+			if (!defined $zielposition){$zielposition = 100}
+			if ( $position < $downlimit )
+			{
+				$comand = 'level';
+				$zielposition = $downlimit;
+			}
+			my $sendchan = AttrVal( $name, 'SIRO_send_channel', 'undef' );
+			if ( $sendchan ne $hash->{CHANNEL_RECEIVE} && $position >= $downlimit )
+			{
+				return;
+			}
+		}
+##################
+	if ($downlimit ne "undef"  && ($comand eq 'on' || $comand eq 'level') && $hash->{helper}{exexcmd} eq "off")
+	# nur wenn befehl  von fb kommt
+		{
+		if ( $position < $downlimit )
+			{
+			delete( $hash->{helper}{exexcmd} );
+			$hash->{helper}{ignorecmd} ="on";
+			$comand = 'level';
+			$zielposition = $downlimit;
+			}
+		}
+############################
 	# set reset_motor_term   reset_motor_term
 	if ($comand eq "reset_motor_term")
 		{
@@ -700,7 +744,7 @@ sub Set($@) {
 		return;
 		}
 		
-	# pr?fe auf laufende aktion nur bei definierten laufzeiten
+	# pruefe auf laufende aktion nur bei definierten laufzeiten
 	# wenn vorhanden neuberechnung aller readings 
 	if ($aktendaction > time && ($downtime ne "undef" || $uptime ne "undef"))
 		{
@@ -1114,7 +1158,7 @@ sub Restartset($) {
     my ( $name, $arg ) = split( / /, $input );
     my $hash = $defs{$name};
     return "" if ( IsDisabled($name) );
-	Log3( $name, 5, "Siro-Restartset : aufgerufen");
+	Log3( $name, 0, "Siro-Restartset : aufgerufen");
 	my $cmd = $hash->{helper}{savedcmds}{cmd1};
 	my $pos = $hash->{helper}{savedcmds}{cmd2};
 	delete( $hash->{helper}{savedcmds} );
@@ -1233,7 +1277,7 @@ my ( $FW_wname, $d, $room, $pageHash ) =@_;    # pageHash is set for summaryFn.
 		$msg.=  $sendid ;	
 	}		
 	$msg.= " und dem Kanal:  ";
-		my $sendchan = AttrVal( $name, 'SIRO_send_channel', 'undef' );
+	my $sendchan = AttrVal( $name, 'SIRO_send_channel', 'undef' );
 	if ( $sendchan eq 'undef')
 	{
 		$msg.= $hash->{CHANNEL_RECEIVE} ;
