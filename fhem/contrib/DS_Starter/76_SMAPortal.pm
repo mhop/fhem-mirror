@@ -1614,7 +1614,7 @@ sub PortalAsHtml ($$) {
         (undef,undef,undef,$t{$i}) = ReadingsVal($name,"L4_NextHour".sprintf("%02d",$i)."_Time",'0') =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/;
      }
 
-     $t{$i} = int($t{$i});                                   # keine führenden 0
+     $t{$i} = int($t{$i});                                  # keine führende 0
   }
 
   return "Awaiting level 4 data ... " if(!defined $pv{1});
@@ -2277,10 +2277,11 @@ return 'unknown';
        <br>  
        
        <li><b>consumers </b><br>
-       Komma getrennte Liste der am Sunny Home Manager angeschlossenen Geräte in der Form &lt;Name&gt;:&lt;Icon&gt;@&lt;Farbe&gt;. <br><br>
+       Komma getrennte Liste der am Sunny Home Manager angeschlossenen Geräte in der Form &lt;Verbrauchername&gt;:&lt;Icon&gt;@&lt;Farbe&gt;. <br>
+	   Der Name des Verbrauchers muss dabei dem Namen im Reading "L3_&lt;Verbrauchername&gt;_Planned" entsprechen. <br><br>
        
        <b>Beispiel: </b> <br>
-       Trockner:scene_clothes_dryer@yellow,Waschmaschine:scene_washing_machine@lightgreen
+       Trockner:scene_clothes_dryer@yellow,Waschmaschine:scene_washing_machine@lightgreen,Geschirrspueler:scene_dishwasher@orange
        <br>
        </li>
        <br>  
