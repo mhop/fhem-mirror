@@ -58,6 +58,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.21.1" => "31.05.2019  syncStandby considers executeBeforeProc, commandRef revised ",
   "8.21.0" => "28.04.2019  implement FHEM command \"dbReadingsVal\" ",
   "8.20.1" => "28.04.2019  set index verbose changed, check index \"Report_Idx\" in getInitData ",
   "8.20.0" => "27.04.2019  don't save hash refs in central hash to prevent potential memory leak, new set \"index\" ".
@@ -152,6 +153,7 @@ our %DbRep_vNotesIntern = (
 
 # Version History extern:
 our %DbRep_vNotesExtern = (
+  "8.21.0" => "28.04.2019 FHEM command \"dbReadingsVal\" implemented.",
   "8.20.0" => "27.04.2019 With the new set \"index\" command it is now possible to list and (re)create the indexes which are ".
               "needed for DbLog and/or DbRep operation.",
   "8.19.0" => "04.04.2019 The \"explain\" SQL-command is possible in sqlCmd ",
@@ -884,7 +886,8 @@ sub DbRep_Set($@) {
       if(!exists($defs{$prop}) || $defs{$prop}->{TYPE} ne "DbLog") {
           return "The device \"$prop\" doesn't exist or is not a DbLog-device. ";
       }
-      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";  
+      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt"; 
+      DbRep_beforeproc($hash, "syncStandby");	  
       DbRep_Main($hash,$opt,$prop);
       
   } else {
@@ -8215,6 +8218,10 @@ sub DbRep_syncStandbyDone($) {
   my $bt         = $a[2];
   my ($rt,$brt)  = split(",", $bt);
   my $err        = $a[3]?decode_base64($a[3]):undef;
+  my $erread;
+  
+  # Befehl nach Procedure ausführen
+  $erread = DbRep_afterproc($hash, "syncStandby");
   
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
@@ -8224,16 +8231,14 @@ sub DbRep_syncStandbyDone($) {
       return;
   } 
 
-  # only for this block because of warnings if details of readings are not set
   no warnings 'uninitialized'; 
+  
+  my $state = $erread?$erread:"done";
   
   readingsBeginUpdate($hash);
   ReadingsBulkUpdateValue ($hash, "number_lines_inserted_Standby", $irows); 
-  ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
+  ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);
   readingsEndUpdate($hash, 1);
-  
-  # Befehl nach Procedure ausführen
-  my $erread = DbRep_afterproc($hash, "syncStandby");
 
   delete($hash->{HELPER}{RUNNING_PID});
   
@@ -10987,8 +10992,8 @@ return;
                                  <colgroup> <col width=5%> <col width=95%> </colgroup>
                                     <tr><td> <b>averageCalcForm</b>                        </td><td>: choose the calculation variant for average determination </td></tr>
                                     <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
-                                    <tr><td> <b>executeBeforeProc</b>                      </td><td>: execution of FHEM command (or perl-routine) before operation </td></tr>
-                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: execution of FHEM command (or perl-routine) after operation </td></tr>
+                                    <tr><td> <b>executeBeforeProc</b>                      </td><td>: execution of FHEM command (or Perl-routine) before operation </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: execution of FHEM command (or Perl-routine) after operation </td></tr>
                                     <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>                                      
                                     <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time </td></tr>
                                     <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
@@ -11051,8 +11056,8 @@ return;
                                       <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
                                       <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>                                      
                                       <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time </td></tr>
- 	                                  <tr><td> <b>executeBeforeProc</b>                      </td><td>: execute a FHEM command (or perl-routine) before start of changeValue </td></tr>
-                                      <tr><td> <b>executeAfterProc</b>                       </td><td>: execute a FHEM command (or perl-routine) after changeValue is finished </td></tr>
+ 	                                  <tr><td> <b>executeBeforeProc</b>                      </td><td>: execute a FHEM command (or Perl-routine) before start of changeValue </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>                       </td><td>: execute a FHEM command (or Perl-routine) after changeValue is finished </td></tr>
                                       <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
                                       </table>
 	                               </ul>
@@ -11141,8 +11146,8 @@ return;
 								    <tr><td> <b>limit</b>                                  </td><td>: limits ONLY the count of datasets to display </td></tr>
                                     <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
                                     <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>                                      
- 	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: execute a FHEM command (or perl-routine) before start of the function </td></tr>
-                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: execute a FHEM command (or perl-routine) after the function is finished </td></tr>                       
+ 	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: execute a FHEM command (or Perl-routine) before start of the function </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: execute a FHEM command (or Perl-routine) after the function is finished </td></tr>                       
 								    <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time </td></tr>
                                     <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
 									</table>
@@ -11175,8 +11180,8 @@ return;
                                       <tr><td> <b>device</b>            </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
                                       <tr><td> <b>reading</b>           </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>                                      
                                       <tr><td> <b>time.*</b>            </td><td>: a number of attributes to limit selection by time </td></tr>
- 	                                  <tr><td> <b>executeBeforeProc</b> </td><td>: execute a FHEM command (or perl-routine) before start of delEntries </td></tr>
-                                      <tr><td> <b>executeAfterProc</b>  </td><td>: execute a FHEM command (or perl-routine) after delEntries is finished </td></tr>
+ 	                                  <tr><td> <b>executeBeforeProc</b> </td><td>: execute a FHEM command (or Perl-routine) before start of delEntries </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>  </td><td>: execute a FHEM command (or Perl-routine) after delEntries is finished </td></tr>
                                       </table>
 	                               </ul>
 	                               <br>
@@ -11262,8 +11267,8 @@ return;
 								    <tr><td> <b>limit</b>                                  </td><td>: limits ONLY the count of datasets to display </td></tr>
                                     <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
                                     <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>                                      
- 	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: execute a FHEM command (or perl-routine) before start of the function </td></tr>
-                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: execute a FHEM command (or perl-routine) after the function is finished </td></tr>                       
+ 	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: execute a FHEM command (or Perl-routine) before start of the function </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: execute a FHEM command (or Perl-routine) after the function is finished </td></tr>                       
   						            <tr><td> <b>seqDoubletsVariance</b>                    </td><td>: Up to this value consecutive numerical datasets are handled as identical and should be deleted </td></tr>                                      
 								    <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time </td></tr>
                                     <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
@@ -11342,8 +11347,8 @@ return;
 								    <tr><td> <b>aggregation</b>                            </td><td>: choose the aggregation period </td></tr>
 								    <tr><td> <b>diffAccept</b>                             </td><td>: the maximum accepted difference between sequential records </td></tr>
                                     <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
-	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: execution of FHEM command (or perl-routine) before operation </td></tr>
-                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: execution of FHEM command (or perl-routine) after operation </td></tr>
+	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: execution of FHEM command (or Perl-routine) before operation </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: execution of FHEM command (or Perl-routine) after operation </td></tr>
                                     <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>                                      
  	                                <tr><td> <b>readingNameMap</b>                         </td><td>: rename the resulted reading name </td></tr>
  								    <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time </td></tr>
@@ -11393,8 +11398,8 @@ return;
                                       <tr><td> dumpMemlimit             </td><td>: limits memory usage </td></tr>
                                       <tr><td> dumpSpeed                </td><td>: limits CPU utilization </td></tr>
 	                                  <tr><td> dumpFilesKeep            </td><td>: number of dump files to keep </td></tr>
-	                                  <tr><td> executeBeforeProc        </td><td>: execution of FHEM command (or perl-routine) before dump </td></tr>
-                                      <tr><td> executeAfterProc         </td><td>: execution of FHEM command (or perl-routine) after dump </td></tr>
+	                                  <tr><td> executeBeforeProc        </td><td>: execution of FHEM command (or Perl-routine) before dump </td></tr>
+                                      <tr><td> executeAfterProc         </td><td>: execution of FHEM command (or Perl-routine) after dump </td></tr>
 	                                  <tr><td> optimizeTablesBeforeDump </td><td>: table optimization before dump </td></tr>
                                    </table>
 	                               </ul>
@@ -11448,8 +11453,8 @@ return;
                                       <tr><td> dumpCompress             </td><td>: compress of dump files after creation </td></tr>
                                       <tr><td> dumpDirLocal             </td><td>: the local mounted directory dumpDirRemote </td></tr>
 	                                  <tr><td> dumpFilesKeep            </td><td>: number of dump files to keep </td></tr>
-	                                  <tr><td> executeBeforeProc        </td><td>: execution of FHEM command (or perl-routine) before dump </td></tr>
-                                      <tr><td> executeAfterProc         </td><td>: execution of FHEM command (or perl-routine) after dump </td></tr>
+	                                  <tr><td> executeBeforeProc        </td><td>: execution of FHEM command (or Perl-routine) before dump </td></tr>
+                                      <tr><td> executeAfterProc         </td><td>: execution of FHEM command (or Perl-routine) after dump </td></tr>
 	                                  <tr><td> optimizeTablesBeforeDump </td><td>: table optimization before dump </td></tr>
                                    </table>
 	                               </ul>
@@ -11547,8 +11552,8 @@ return;
                                       <tr><td> dumpCompress             </td><td>: compress of dump files after creation </td></tr>
                                       <tr><td> dumpDirLocal             </td><td>: the local mounted directory dumpDirRemote </td></tr>
 	                                  <tr><td> dumpFilesKeep            </td><td>: number of dump files to keep </td></tr>
-	                                  <tr><td> executeBeforeProc        </td><td>: execution of FHEM command (or perl-routine) before dump </td></tr>
-                                      <tr><td> executeAfterProc         </td><td>: execution of FHEM command (or perl-routine) after dump </td></tr>
+	                                  <tr><td> executeBeforeProc        </td><td>: execution of FHEM command (or Perl-routine) before dump </td></tr>
+                                      <tr><td> executeAfterProc         </td><td>: execution of FHEM command (or Perl-routine) after dump </td></tr>
 	                                  <tr><td> optimizeTablesBeforeDump </td><td>: table optimization before dump </td></tr>
                                    </table>
 	                               </ul>
@@ -11597,8 +11602,8 @@ return;
                                       <tr><td> <b>aggregation</b>                          </td><td>: determination of selection time slices </td></tr>
                                       <tr><td> <b>device</b>                               </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
                                       <tr><td> <b>reading</b>                              </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>                                      <tr><td> <b>time.*</b>            </td><td>: a number of attributes to limit selection by time </td></tr>
-	                                  <tr><td> <b>executeBeforeProc</b>                    </td><td>: execution of FHEM command (or perl-routine) before export </td></tr>
-                                      <tr><td> <b>executeAfterProc</b>                     </td><td>: execution of FHEM command (or perl-routine) after export </td></tr>
+	                                  <tr><td> <b>executeBeforeProc</b>                    </td><td>: execution of FHEM command (or Perl-routine) before export </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>                     </td><td>: execution of FHEM command (or Perl-routine) after export </td></tr>
 	                                  <tr><td> <b>expimpfile</b>                           </td><td>: the name of exportfile </td></tr>
                                       <tr><td> <b>time.*</b>                               </td><td>: a number of attributes to limit selection by time </td></tr>
                                     <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
@@ -11730,8 +11735,8 @@ return;
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>executeBeforeProc</b>  </td><td>: execution of FHEM command (or perl-routine) before import </td></tr>
-                                      <tr><td> <b>executeAfterProc</b>   </td><td>: execution of FHEM command (or perl-routine) after import </td></tr>
+                                      <tr><td> <b>executeBeforeProc</b>  </td><td>: execution of FHEM command (or Perl-routine) before import </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>   </td><td>: execution of FHEM command (or Perl-routine) after import </td></tr>
 	                                  <tr><td> <b>expimpfile</b>         </td><td>: the name of exportfile </td></tr>
                                    </table>
 	                               </ul>  
@@ -11771,8 +11776,8 @@ return;
                                  <colgroup> <col width=5%> <col width=95%> </colgroup>
 								    <tr><td> <b>aggregation</b>                            </td><td>: choose the aggregation period </td></tr>
                                     <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
-                                    <tr><td> <b>executeBeforeProc</b>                      </td><td>: execution of FHEM command (or perl-routine) before operation </td></tr>
-                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: execution of FHEM command (or perl-routine) after operation </td></tr> 
+                                    <tr><td> <b>executeBeforeProc</b>                      </td><td>: execution of FHEM command (or Perl-routine) before operation </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: execution of FHEM command (or Perl-routine) after operation </td></tr> 
                                     <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; from selection </td></tr> 
                                     <tr><td> <b>readingNameMap</b>                         </td><td>: rename the resulted readings </td></tr>									
 								    <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time </td></tr>
@@ -11813,8 +11818,8 @@ return;
                                  <colgroup> <col width=5%> <col width=95%> </colgroup>
 								    <tr><td> <b>aggregation</b>                            </td><td>: choose the aggregation period </td></tr>
                                     <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
-                                    <tr><td> <b>executeBeforeProc</b>                      </td><td>: execution of FHEM command (or perl-routine) before operation </td></tr>
-                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: execution of FHEM command (or perl-routine) after operation </td></tr> 
+                                    <tr><td> <b>executeBeforeProc</b>                      </td><td>: execution of FHEM command (or Perl-routine) before operation </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: execution of FHEM command (or Perl-routine) after operation </td></tr> 
                                     <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; from selection </td></tr> 
                                     <tr><td> <b>readingNameMap</b>                         </td><td>: rename the resulted readings </td></tr>									
 								    <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time </td></tr>
@@ -11882,8 +11887,8 @@ return;
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
-	                                  <tr><td> <b>executeBeforeProc</b>                      </td><td>: execution of FHEM command (or perl-routine) before reducelog </td></tr>
-                                      <tr><td> <b>executeAfterProc</b>                       </td><td>: execution of FHEM command (or perl-routine) after reducelog </td></tr>
+	                                  <tr><td> <b>executeBeforeProc</b>                      </td><td>: execution of FHEM command (or Perl-routine) before reducelog </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>                       </td><td>: execution of FHEM command (or Perl-routine) after reducelog </td></tr>
                                       <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; for selection </td></tr>
                                       <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; for selection </td></tr>
                                       <tr><td> <b>timeOlderThan</b>                          </td><td>: records <b>older</b> than this attribute will be reduced </td></tr>
@@ -12071,8 +12076,8 @@ return;
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
                                       <tr><td> <b>allowDeletion</b>       </td><td>: activates capabilty to delete datasets </td></tr>
-	                                  <tr><td> <b>executeBeforeProc</b>   </td><td>: execution of FHEM command (or perl-routine) before operation </td></tr>
-                                      <tr><td> <b>executeAfterProc</b>    </td><td>: execution of FHEM command (or perl-routine) after operation </td></tr>
+	                                  <tr><td> <b>executeBeforeProc</b>   </td><td>: execution of FHEM command (or Perl-routine) before operation </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>    </td><td>: execution of FHEM command (or Perl-routine) after operation </td></tr>
                                       <tr><td> <b>sqlResultFormat</b>     </td><td>: determines presentation style of command result </td></tr>
                                       <tr><td> <b>sqlResultFieldSep</b>   </td><td>: choice of a useful field separator for result </td></tr>
                                       <tr><td> <b>sqlCmdHistoryLength</b> </td><td>: activates command history and length </td></tr>
@@ -12103,8 +12108,8 @@ return;
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
                                       <tr><td> <b>allowDeletion</b>       </td><td>: activates capabilty to delete datasets </td></tr>
-	                                  <tr><td> <b>executeBeforeProc</b>   </td><td>: execution of FHEM command (or perl-routine) before operation </td></tr>
-                                      <tr><td> <b>executeAfterProc</b>    </td><td>: execution of FHEM command (or perl-routine) after operation </td></tr>
+	                                  <tr><td> <b>executeBeforeProc</b>   </td><td>: execution of FHEM command (or Perl-routine) before operation </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>    </td><td>: execution of FHEM command (or Perl-routine) after operation </td></tr>
                                       <tr><td> <b>sqlResultFormat</b>     </td><td>: determines presentation style of command result </td></tr>
                                       <tr><td> <b>sqlResultFieldSep</b>   </td><td>: choice of a useful field separator for result </td></tr>
                                    </table>
@@ -12123,8 +12128,8 @@ return;
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
-	                                  <tr><td> <b>executeBeforeProc</b>  </td><td>: execution of FHEM command (or perl-routine) before operation </td></tr>
-                                      <tr><td> <b>executeAfterProc</b>   </td><td>: execution of FHEM command (or perl-routine) after operation </td></tr>
+	                                  <tr><td> <b>executeBeforeProc</b>  </td><td>: execution of FHEM command (or Perl-routine) before operation </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>   </td><td>: execution of FHEM command (or Perl-routine) after operation </td></tr>
                                       <tr><td> <b>sqlResultFormat</b>    </td><td>: determines the formatting of the result </td></tr>
                                       <tr><td> <b>sqlResultFieldSep</b>  </td><td>: determines the used field separator in statement result </td></tr>
                                    </table>
@@ -12174,8 +12179,8 @@ return;
                                  <colgroup> <col width=5%> <col width=95%> </colgroup>
 								    <tr><td> <b>aggregation</b>                            </td><td>: choose the aggregation period </td></tr>
                                     <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
-                                    <tr><td> <b>executeBeforeProc</b>                      </td><td>: execution of FHEM command (or perl-routine) before operation </td></tr>
-                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: execution of FHEM command (or perl-routine) after operation </td></tr> 
+                                    <tr><td> <b>executeBeforeProc</b>                      </td><td>: execution of FHEM command (or Perl-routine) before operation </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: execution of FHEM command (or Perl-routine) after operation </td></tr> 
                                     <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; from selection </td></tr> 
                                     <tr><td> <b>readingNameMap</b>                         </td><td>: rename the resulted readings </td></tr>									
 								    <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time </td></tr>
@@ -12190,7 +12195,7 @@ return;
                                  (Standby-database). <br>
                                  Here the "&lt;DbLog-Device Standby&gt;" is the DbLog-Device what is connected to the 
                                  Standby-database. <br><br>
-                                 All the datasets which are determined by timestamp-<a href="#limit">attributes</a>
+                                 All the datasets which are determined by timestamp-<a href="#timestamp_begin">attributes</a>
                                  or respectively the attributes "device", "reading" are transmitted. <br>
                                  The datasets are transmitted in time slices accordingly to the adjusted aggregation.
                                  If the attribute "aggregation" has value "no" or "month", the datasets are transmitted 
@@ -12203,8 +12208,10 @@ return;
 	                             <ul>
                                  <table>  
                                  <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                    <tr><td> <b>aggregation</b>                            </td><td>: adjustment of time slices for data transmission (hour,day,week) </td></tr>
+                                    <tr><td> <b>aggregation</b>                            </td><td>: adjustment of time slices for data transmission (hour,day,week,...) </td></tr>
                                     <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; for transmission </td></tr>
+                                    <tr><td> <b>executeBeforeProc</b>                      </td><td>: execution of FHEM command (or Perl-routine) before operation </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: execution of FHEM command (or Perl-routine) after operation </td></tr> 
                                     <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; for transmission </td></tr>                                      
                                     <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time  </td></tr>
                                     <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
@@ -13402,8 +13409,8 @@ sub bdump {
            					          <tr><td> <b>aggregation</b>                            </td><td>: Auswahl einer Aggregationsperiode </td></tr>
                                       <tr><td> <b>averageCalcForm</b>                        </td><td>: Auswahl der Berechnungsvariante für den Durchschnitt</td></tr>
                                       <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
-	                                  <tr><td> <b>executeBeforeProc</b>                      </td><td>: ausführen FHEM Kommando (oder perl-Routine) vor Start Operation </td></tr>
-                                      <tr><td> <b>executeAfterProc</b>                       </td><td>: ausführen FHEM Kommando (oder perl-Routine) nach Ende Operation </td></tr>
+	                                  <tr><td> <b>executeBeforeProc</b>                      </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor Start Operation </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>                       </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach Ende Operation </td></tr>
                                       <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
                                       <tr><td> <b>readingNameMap</b>                         </td><td>: die entstehenden Ergebnisreadings werden partiell umbenannt </td></tr>									
 								      <tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
@@ -13466,8 +13473,8 @@ sub bdump {
                                       <tr><td> <b>aggregation</b>                             </td><td>: Auswahl einer Aggregationsperiode </td></tr>
                                       <tr><td> <b>reading</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
                                       <tr><td> <b>time.*</b>                                  </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
-	                                  <tr><td> <b>executeBeforeProc</b>                       </td><td>: ausführen FHEM Kommando (oder perl-Routine) vor Start changeValue </td></tr>
-                                      <tr><td> <b>executeAfterProc</b>                        </td><td>: ausführen FHEM Kommando (oder perl-Routine) nach Ende changeValue </td></tr>
+	                                  <tr><td> <b>executeBeforeProc</b>                       </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor Start changeValue </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>                        </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach Ende changeValue </td></tr>
                                       <tr><td style="vertical-align:top"> <b>valueFilter</b>       <td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
                                       </table>
 	                               </ul>
@@ -13560,8 +13567,8 @@ sub bdump {
                                     <tr><td> <b>limit</b>                                  </td><td>: begrenzt NUR die Anzahl der anzuzeigenden Datensätze  </td></tr>
                                     <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
 									<tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
-	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: ausführen FHEM Kommando (oder perl-Routine) vor Start des Befehls </td></tr>
-                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: ausführen FHEM Kommando (oder perl-Routine) nach Ende des Befehls </td></tr>	                                <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
+	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor Start des Befehls </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach Ende des Befehls </td></tr>	                                <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
 									</table>
 	                             </ul>
 	                             <br>
@@ -13595,8 +13602,8 @@ sub bdump {
                                     <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>                                      
                                     <tr><td> <b>readingNameMap</b>                         </td><td>: die entstehenden Ergebnisreadings werden partiell umbenannt </td></tr>
                                     <tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
-	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: ausführen FHEM Kommando (oder perl-Routine) vor Start delEntries </td></tr>
-                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: ausführen FHEM Kommando (oder perl-Routine) nach Ende delEntries </td></tr>
+	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor Start delEntries </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach Ende delEntries </td></tr>
                                     <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>    
                                  </table>
 	                             </ul>
@@ -13685,8 +13692,8 @@ sub bdump {
                                     <tr><td> <b>readingNameMap</b>                         </td><td>: die entstehenden Ergebnisreadings werden partiell umbenannt </td></tr>									
 								    <tr><td> <b>seqDoubletsVariance</b>                    </td><td>: bis zu diesem Wert werden aufeinander folgende numerische Datensätze als identisch angesehen und werden gelöscht </td></tr> 
 									<tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
-	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: ausführen FHEM Kommando (oder perl-Routine) vor Start des Befehls </td></tr>
-                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: ausführen FHEM Kommando (oder perl-Routine) nach Ende des Befehls </td></tr>
+	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor Start des Befehls </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach Ende des Befehls </td></tr>
 	                                <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
 									</table>
 	                             </ul>
@@ -13761,8 +13768,8 @@ sub bdump {
                                  <colgroup> <col width=5%> <col width=95%> </colgroup>
            					        <tr><td> <b>aggregation</b>                            </td><td>: Auswahl einer Aggregationsperiode </td></tr>
                                     <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
-	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: ausführen FHEM Kommando (oder perl-Routine) vor Start Operation </td></tr>
-                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: ausführen FHEM Kommando (oder perl-Routine) nach Ende Operation </td></tr>
+	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor Start Operation </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach Ende Operation </td></tr>
                                     <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
                                     <tr><td> <b>readingNameMap</b>                         </td><td>: die entstehenden Ergebnisreadings werden partiell umbenannt </td></tr>									
 									<tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
@@ -13810,8 +13817,8 @@ sub bdump {
                                       <tr><td> dumpMemlimit             </td><td>: Begrenzung der Speicherverwendung </td></tr>
                                       <tr><td> dumpSpeed                </td><td>: Begrenzung die CPU-Belastung </td></tr>
 	                                  <tr><td> dumpFilesKeep            </td><td>: Anzahl der aufzubwahrenden Dumpfiles </td></tr>
-	                                  <tr><td> executeBeforeProc        </td><td>: ausführen FHEM Kommando (oder perl-Routine) vor dem Dump </td></tr>
-                                      <tr><td> executeAfterProc         </td><td>: ausführen FHEM Kommando (oder perl-Routine) nach dem Dump </td></tr>
+	                                  <tr><td> executeBeforeProc        </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor dem Dump </td></tr>
+                                      <tr><td> executeAfterProc         </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach dem Dump </td></tr>
 	                                  <tr><td> optimizeTablesBeforeDump </td><td>: Tabelloptimierung vor dem Dump ausführen </td></tr>
                                    </table>
 	                               </ul>
@@ -13865,8 +13872,8 @@ sub bdump {
                                       <tr><td> dumpCompress             </td><td>: Komprimierung des Dumpfiles nach der Erstellung </td></tr>
                                       <tr><td> dumpDirLocal             </td><td>: Directory des lokal gemounteten dumpDirRemote-Verzeichnisses  </td></tr>
 	                                  <tr><td> dumpFilesKeep            </td><td>: Anzahl der aufzubwahrenden Dumpfiles </td></tr>
-	                                  <tr><td> executeBeforeProc        </td><td>: ausführen FHEM Kommando (oder perl-Routine) vor dem Dump </td></tr>
-                                      <tr><td> executeAfterProc         </td><td>: ausführen FHEM Kommando (oder perl-Routine) nach dem Dump </td></tr>
+	                                  <tr><td> executeBeforeProc        </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor dem Dump </td></tr>
+                                      <tr><td> executeAfterProc         </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach dem Dump </td></tr>
 	                                  <tr><td> optimizeTablesBeforeDump </td><td>: Tabelloptimierung vor dem Dump ausführen </td></tr>
                                    </table>
 	                               </ul>
@@ -13963,8 +13970,8 @@ sub bdump {
                                       <tr><td> dumpCompress             </td><td>: Komprimierung des Dumpfiles nach der Erstellung </td></tr>
                                       <tr><td> dumpDirLocal             </td><td>: Directory des lokal gemounteten dumpDirRemote-Verzeichnisses  </td></tr>
 	                                  <tr><td> dumpFilesKeep            </td><td>: Anzahl der aufzubwahrenden Dumpfiles </td></tr>
-	                                  <tr><td> executeBeforeProc        </td><td>: ausführen FHEM Kommando (oder perl-Routine) vor dem Dump </td></tr>
-                                      <tr><td> executeAfterProc         </td><td>: ausführen FHEM Kommando (oder perl-Routine) nach dem Dump </td></tr>
+	                                  <tr><td> executeBeforeProc        </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor dem Dump </td></tr>
+                                      <tr><td> executeAfterProc         </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach dem Dump </td></tr>
 	                                  <tr><td> optimizeTablesBeforeDump </td><td>: Tabelloptimierung vor dem Dump ausführen </td></tr>
                                    </table>
 	                               </ul>
@@ -14012,8 +14019,8 @@ sub bdump {
                                     <tr><td> <b>aggregation</b>                            </td><td>: Festlegung der Selektionspaketierung </td></tr>
                                     <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
                                     <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>	                                  
-                                    <tr><td> <b>executeBeforeProc</b>                      </td><td>: FHEM Kommando (oder perl-Routine) vor dem Export ausführen </td></tr>
-                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: FHEM Kommando (oder perl-Routine) nach dem Export ausführen </td></tr>
+                                    <tr><td> <b>executeBeforeProc</b>                      </td><td>: FHEM Kommando (oder Perl-Routine) vor dem Export ausführen </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: FHEM Kommando (oder Perl-Routine) nach dem Export ausführen </td></tr>
 	                                <tr><td> <b>expimpfile</b>                             </td><td>: der Name des Exportfiles </td></tr>
                                     <tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
                                     <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
@@ -14151,8 +14158,8 @@ sub bdump {
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
-	                                  <tr><td> <b>executeBeforeProc</b>  </td><td>: FHEM Kommando (oder perl-Routine) vor dem Import ausführen </td></tr>
-                                      <tr><td> <b>executeAfterProc</b>   </td><td>: FHEM Kommando (oder perl-Routine) nach dem Import ausführen </td></tr>
+	                                  <tr><td> <b>executeBeforeProc</b>  </td><td>: FHEM Kommando (oder Perl-Routine) vor dem Import ausführen </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>   </td><td>: FHEM Kommando (oder Perl-Routine) nach dem Import ausführen </td></tr>
 	                                  <tr><td> <b>expimpfile</b>         </td><td>: der Name des Importfiles </td></tr>
                                    </table>
 	                               </ul>
@@ -14194,8 +14201,8 @@ sub bdump {
                                  <colgroup> <col width=5%> <col width=95%> </colgroup>
            					        <tr><td> <b>aggregation</b>                            </td><td>: Auswahl einer Aggregationsperiode </td></tr>
                                     <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
-	                                <tr><td> <b>executeBeforeProc</b>                       </td><td>: ausführen FHEM Kommando (oder perl-Routine) vor Start Operation </td></tr>
-                                    <tr><td> <b>executeAfterProc</b>                        </td><td>: ausführen FHEM Kommando (oder perl-Routine) nach Ende Operation </td></tr>
+	                                <tr><td> <b>executeBeforeProc</b>                       </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor Start Operation </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                        </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach Ende Operation </td></tr>
                                     <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
                                     <tr><td> <b>readingNameMap</b>                         </td><td>: die entstehenden Ergebnisreadings werden partiell umbenannt </td></tr>									
 									<tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
@@ -14241,8 +14248,8 @@ sub bdump {
                                  <colgroup> <col width=5%> <col width=95%> </colgroup>
            					        <tr><td> <b>aggregation</b>                            </td><td>: Auswahl einer Aggregationsperiode </td></tr>
                                     <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
-	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: ausführen FHEM Kommando (oder perl-Routine) vor Start Operation </td></tr>
-                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: ausführen FHEM Kommando (oder perl-Routine) nach Ende Operation </td></tr>
+	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor Start Operation </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach Ende Operation </td></tr>
                                     <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
                                     <tr><td> <b>readingNameMap</b>                         </td><td>: die entstehenden Ergebnisreadings werden partiell umbenannt </td></tr>									
 									<tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
@@ -14314,8 +14321,8 @@ sub bdump {
 	                             <ul>
                                  <table>  
                                  <colgroup> <col width=5%> <col width=95%> </colgroup>
-	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: FHEM Kommando (oder perl-Routine) vor dem Export ausführen </td></tr>
-                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: FHEM Kommando (oder perl-Routine) nach dem Export ausführen </td></tr>
+	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: FHEM Kommando (oder Perl-Routine) vor dem Export ausführen </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: FHEM Kommando (oder Perl-Routine) nach dem Export ausführen </td></tr>
                                     <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
                                     <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>                                      
                                     <tr><td> <b>timeOlderThan</b>                          </td><td>: es werden Datenbankeinträge <b>älter</b> als dieses Attribut reduziert </td></tr>
@@ -14508,8 +14515,8 @@ sub bdump {
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
-	                                  <tr><td> <b>executeBeforeProc</b>   </td><td>: FHEM Kommando (oder perl-Routine) vor der Operation ausführen </td></tr>
-                                      <tr><td> <b>executeAfterProc</b>    </td><td>: FHEM Kommando (oder perl-Routine) nach der Operation ausführen </td></tr>
+	                                  <tr><td> <b>executeBeforeProc</b>   </td><td>: FHEM Kommando (oder Perl-Routine) vor der Operation ausführen </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>    </td><td>: FHEM Kommando (oder Perl-Routine) nach der Operation ausführen </td></tr>
                                       <tr><td> <b>allowDeletion</b>       </td><td>: aktiviert Löschmöglichkeit </td></tr>
                                       <tr><td> <b>sqlResultFormat</b>     </td><td>: legt die Darstellung des Kommandoergebnis fest  </td></tr>
                                       <tr><td> <b>sqlResultFieldSep</b>   </td><td>: Auswahl Feldtrenner im Ergebnis </td></tr>
@@ -14541,8 +14548,8 @@ sub bdump {
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
-	                                  <tr><td> <b>executeBeforeProc</b>   </td><td>: FHEM Kommando (oder perl-Routine) vor der Operation ausführen </td></tr>
-                                      <tr><td> <b>executeAfterProc</b>    </td><td>: FHEM Kommando (oder perl-Routine) nach der Operation ausführen </td></tr>
+	                                  <tr><td> <b>executeBeforeProc</b>   </td><td>: FHEM Kommando (oder Perl-Routine) vor der Operation ausführen </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>    </td><td>: FHEM Kommando (oder Perl-Routine) nach der Operation ausführen </td></tr>
                                       <tr><td> <b>allowDeletion</b>       </td><td>: aktiviert Löschmöglichkeit </td></tr>
                                       <tr><td> <b>sqlResultFormat</b>     </td><td>: legt die Darstellung des Kommandoergebnis fest  </td></tr>
                                       <tr><td> <b>sqlResultFieldSep</b>   </td><td>: Auswahl Feldtrenner im Ergebnis </td></tr>
@@ -14564,8 +14571,8 @@ sub bdump {
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
-	                                  <tr><td> <b>executeBeforeProc</b>  </td><td>: FHEM Kommando (oder perl-Routine) vor der Operation ausführen </td></tr>
-                                      <tr><td> <b>executeAfterProc</b>   </td><td>: FHEM Kommando (oder perl-Routine) nach der Operation ausführen </td></tr>
+	                                  <tr><td> <b>executeBeforeProc</b>  </td><td>: FHEM Kommando (oder Perl-Routine) vor der Operation ausführen </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>   </td><td>: FHEM Kommando (oder Perl-Routine) nach der Operation ausführen </td></tr>
                                       <tr><td> <b>sqlResultFormat</b>    </td><td>: Optionen der Ergebnisformatierung </td></tr>
                                       <tr><td> <b>sqlResultFieldSep</b>  </td><td>: Auswahl des Trennzeichens zwischen Ergebnisfeldern </td></tr>
                                    </table>
@@ -14615,8 +14622,8 @@ sub bdump {
                                  <colgroup> <col width=5%> <col width=95%> </colgroup>
            					        <tr><td> <b>aggregation</b>                            </td><td>: Auswahl einer Aggregationsperiode </td></tr>
                                     <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
-	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: ausführen FHEM Kommando (oder perl-Routine) vor Start Operation </td></tr>
-                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: ausführen FHEM Kommando (oder perl-Routine) nach Ende Operation </td></tr>
+	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor Start Operation </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach Ende Operation </td></tr>
                                     <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
                                     <tr><td> <b>readingNameMap</b>                         </td><td>: die entstehenden Ergebnisreadings werden partiell umbenannt </td></tr>									
 									<tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
@@ -14632,7 +14639,7 @@ sub bdump {
                                  Datenbank (Standby-Datenbank) übertragen. 
                                  Dabei ist "&lt;DbLog-Device Standby&gt;" das DbLog-Device, welches mit der Standby-Datenbank
                                  verbunden ist. <br><br>
-                                 Es werden alle Datensätze übertragen, die durch Timestamp-<a href="#limit">Attribute</a>
+                                 Es werden alle Datensätze übertragen, die durch Timestamp-<a href="#timestamp_begin">Attribute</a>
                                  bzw. die Attribute "device", "reading" bestimmt sind. <br>
                                  Die Datensätze werden dabei in Zeitscheiben entsprechend der eingestellten Aggregation übertragen.
                                  Hat das Attribut "aggregation" den Wert "no" oder "month", werden die Datensätze automatisch 
@@ -14646,6 +14653,8 @@ sub bdump {
                                  <table>  
                                  <colgroup> <col width=5%> <col width=95%> </colgroup>
                                     <tr><td> <b>aggregation</b>                            </td><td>: Einstellung der Zeitscheiben zur Übertragung (hour,day,week) </td></tr>
+	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor Start Operation </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach Ende Operation </td></tr>
                                     <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
                                     <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>                                      
                                     <tr><td> <b>time.*</b>                                 </td><td>: Attribute zur Zeitabgrenzung der zu übertragenden Datensätze.  </td></tr>
