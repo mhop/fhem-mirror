@@ -85,6 +85,9 @@ sub Siro_Initialize($) {
     };
 
     $hash->{NOTIFYDEV} = "global";
+	
+	$hash->{helper}{progmode} = "off";
+	
     FHEM::Siro::LoadHelper($hash) if ($init_done);
 }
 
@@ -309,7 +312,7 @@ sub SendCommand($@) {
 	
 	
 
-	Log3( $name, 5,"Siro_sendCommand: args1 - $args[1]");
+	#Log3( $name, 5,"Siro_sendCommand: args1 - $args[1]");
 
     if ( $args[1] eq "longstop" || $hash->{helper}{progmode} eq "on")
 			{
@@ -661,7 +664,8 @@ sub Set($@) {
 	if ($cmd eq "prog_mode_off"  && $hash->{helper}{progmode} eq "on")
 	{
 		readingsSingleUpdate( $hash, "state",  $position, 1 ); 
-		delete( $hash->{helper}{progmode} );
+		#delete( $hash->{helper}{progmode} );
+		$hash->{helper}{progmode} = "off";
 	}
 	
 	if ($hash->{helper}{progmode} eq "on")
@@ -687,7 +691,8 @@ sub Set($@) {
 	# umbauen zu bulk update
 	RemoveInternalTimer($name); #alle vorhandenen timer l?schen
 	#delete( $hash->{helper}{exexcmd} ); # on/off off blockiert befehlsausf?hrung / l?schen vor jedem durchgang
-	$hash->{helper}{exexcmd}="on";
+	$hash->{helper}{exexcmd}="on";  #reset ignore send comand states
+	$hash->{helper}{ignorecmd} = "off" ; #reset ignore send comand states
 	#setze helper neu wenn signal von fb kommt
 	
 	if ($hash->{helper}{remotecmd} eq "on")
