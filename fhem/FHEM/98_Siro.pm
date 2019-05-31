@@ -152,6 +152,7 @@ my %sets = (
     "prog_mode_off" => "noArg",
 	"reset_motor_term" => "noArg",
     "pct" => "slider,0,1,100",    # Wird nur bei vorhandenen time_to attributen gesetzt
+	"position" => "slider,0,1,100",    # Wird nur bei vorhandenen time_to attributen gesetzt
     "state"                   => "noArg",
     "set_favorite"            => "noArg",
 	"del_favorite"            => "only_modul,only_shutter,shutter_and_modul",
@@ -163,6 +164,7 @@ my %sets = (
 my %sendCommands = (
 	"pct"         => "level",
 	"level"         => "level",
+	"position"         => "level",
     "stop"         => "stop",
 	"off"          => "off",
     "on"           => "on",
@@ -784,6 +786,7 @@ sub Set($@) {
 		readingsBeginUpdate($hash);
 		readingsBulkUpdate( $hash, "state", $newposition ) ;
 		readingsBulkUpdate( $hash, "pct", $newposition ) ;
+		readingsBulkUpdate( $hash, "position", $newposition) ;
 		readingsBulkUpdate( $hash, "aktRunningAction", "noAction" ) ;
 		readingsBulkUpdate( $hash, "aktEndAction", 0 ) ;
 		readingsBulkUpdate( $hash, "aktTimeAction", 0 ) ;
@@ -1143,6 +1146,7 @@ sub Finish($) {
 	readingsBeginUpdate($hash);
 	readingsBulkUpdate( $hash, "state", $state  ) ;
 	readingsBulkUpdate( $hash, "pct", $state  ) ;
+	readingsBulkUpdate( $hash, "position", $state  ) ;
 	readingsBulkUpdate( $hash, "aktRunningAction", "noAction" ) ;
 	readingsBulkUpdate( $hash, "aktEndAction", 0 ) ;
 	readingsBulkUpdate( $hash, "aktTimeAction", 0 ) ;
@@ -1222,6 +1226,7 @@ sub versionchange($) {
 	readingsBeginUpdate($hash);
     readingsBulkUpdate( $hash, "state", "0" );
 	readingsBulkUpdate( $hash, "pct", "0" ) ;
+	readingsBulkUpdate( $hash, "position", "0" ) ;
 	readingsBulkUpdate( $hash, "motor-term", $seconds ) ;
     readingsEndUpdate( $hash, 1 );
 
