@@ -256,25 +256,25 @@ sub Set($@) {
 	  my ($htmldev,$ret,$c,$type,$color2);
       
       if ($prop eq "Generation") {
-          $htmldev = "SPG1.$name";                                # Grafiktyp Generation (Erzeugung)
+          $htmldev = "SPG1.$name";                                                      # Grafiktyp Generation (Erzeugung)
           $type    = 'pv';        
-          $c       = "SMA Sunny Portal Graphics - Generation";
-          $color2  = "000000";                                    # zweite Farbe als schwarz setzen
+          $c       = "SMA Sunny Portal Graphics - Forecast Generation";
+          $color2  = "000000";                                                          # zweite Farbe als schwarz setzen
       } elsif ($prop eq "Consumption") {
-          $htmldev = "SPG2.$name";                                # Grafiktyp Consumption (Verbrauch)
+          $htmldev = "SPG2.$name";                                                      # Grafiktyp Consumption (Verbrauch)
           $type    = 'co';    
-          $c       = "SMA Sunny Portal Graphics - Consumption"; 
-          $color2  = "000000";                                    # zweite Farbe als schwarz setzen          
+          $c       = "SMA Sunny Portal Graphics - Forecast Consumption"; 
+          $color2  = "000000";                                                          # zweite Farbe als schwarz setzen          
       } elsif ($prop eq "Generation_Consumption") {
-          $htmldev = "SPG3.$name";                                # Grafiktyp Generation_Consumption (Erzeugung und Verbrauch)
+          $htmldev = "SPG3.$name";                                                      # Grafiktyp Generation_Consumption (Erzeugung und Verbrauch)
           $type    = 'pvco'; 
-          $c       = "SMA Sunny Portal Graphics - Generation & Consumption";
-          $color2  = "FF5C82";                                    # zweite Farbe als rot setzen          
+          $c       = "SMA Sunny Portal Graphics - Forecast Generation & Consumption";
+          $color2  = "FF5C82";                                                          # zweite Farbe als rot setzen          
       } elsif ($prop eq "Differential") {
-          $htmldev = "SPG4.$name";                                # Grafiktyp Differential (Differenzanzeige)
+          $htmldev = "SPG4.$name";                                                      # Grafiktyp Differential (Differenzanzeige)
           $type    = 'diff';   
-          $c       = "SMA Sunny Portal Graphics - Differential";   
-          $color2  = "FF5C82";                                    # zweite Farbe als rot setzen           
+          $c       = "SMA Sunny Portal Graphics - Forecast Differential";   
+          $color2  = "FF5C82";                                                          # zweite Farbe als rot setzen           
       } else {
           return "Invalid portal graphic devicetype ! Use one of \"Generation\", \"Consumption\", \"Generation_Consumption\", \"Differential\". "
       }
@@ -282,7 +282,7 @@ sub Set($@) {
       $ret = CommandDefine($hash->{CL},"$htmldev weblink htmlCode {FHEM::SMAPortal::PortalAsHtml (\"$name\",\"$htmldev\")}");
       return $ret if($ret);
       
-      CommandAttr($hash->{CL},"$htmldev alias $c");               # Alias setzen
+      CommandAttr($hash->{CL},"$htmldev alias $c");                                     # Alias setzen
       
       $c = "This device provides a praphical output of SMA Sunny Portal values.\n". 
            "The device needs to set attribute \"detailLevel\" in device \"$name\" to level \"4\"";
@@ -303,7 +303,7 @@ sub Set($@) {
       CommandAttr($hash->{CL},"$htmldev show_link 1");
       CommandAttr($hash->{CL},"$htmldev font_size 24");
       CommandAttr($hash->{CL},"$htmldev show_weather 1");
-      CommandAttr($hash->{CL},"$htmldev type $type");             # Anzeigetyp setzen
+      CommandAttr($hash->{CL},"$htmldev type $type");                                   # Anzeigetyp setzen
 
       # eine mögliche Startfarbe steht beim installiertem f18 Style direkt zur Verfügung
       # ohne vorhanden f18 Style bestimmt später tr.odd aus der Style css die Anfangsfarbe
