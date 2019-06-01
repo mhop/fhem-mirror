@@ -57,7 +57,7 @@ my %setssw = (
   "off-for-timer" => "E",
   "config"        => "K",
   "password"      => "W",
-  "xtrachannels"  => "C"
+  "xtrachannels:noArg"  => "C"
 );
 
 my %setsrol = (
@@ -213,7 +213,7 @@ sub Shelly_Attr(@) {
   my $hash = $main::defs{$name};
   my $ret;
   
-  my $model =  AttrVal($name,"model","shelly1");
+  my $model =  AttrVal($name,"model","");
   my $mode  =  AttrVal($name,"mode","");
 
   #-- temporary code
@@ -228,42 +228,44 @@ sub Shelly_Attr(@) {
       Log3 $name,1,"[Shelly_Attr] wrong value of model attribute, see documentation for possible values";
       return
     } 
-    #-- only one relay
-    if( $shelly_models{$model}[0] == 1){      
-      fhem("deletereading ".$name." relay_.*");
-      fhem("deletereading ".$name." overpower_.*");  
-      fhem("deletereading ".$name." button_.*"); 
-    #-- no relay
-    }elsif( $shelly_models{$model}[0] == 0){
-      fhem("deletereading ".$name." relay.*");
-      fhem("deletereading ".$name." overpower.*");  
-      fhem("deletereading ".$name." button.*"); 
-    #-- other number
-    }else{
-      fhem("deletereading ".$name." relay");
-      fhem("deletereading ".$name." overpower"); 
-      fhem("deletereading ".$name." button");  
-    }
-    #-- no rollers
-    if( $shelly_models{$model}[1] == 0){  
-      fhem("deletereading ".$name." position.*");
-      fhem("deletereading ".$name." stop_reason.*");
-      fhem("deletereading ".$name." last_dir.*");
-      fhem("deletereading ".$name." pct.*");
-      delete $hash->{MOVING};
-      delete $hash->{DURATION};
-    }
-    #-- no dimmers
-    if( $shelly_models{$model}[2] == 0){  
-      fhem("deletereading ".$name." L-.*");
-      fhem("deletereading ".$name." rgb");
-      fhem("deletereading ".$name." pct.*");
-    }
+    if( $model =~ /shelly.*/ ){
+     #-- only one relay
+      if( $shelly_models{$model}[0] == 1){      
+        fhem("deletereading ".$name." relay_.*");
+        fhem("deletereading ".$name." overpower_.*");  
+        fhem("deletereading ".$name." button_.*"); 
+      #-- no relay
+      }elsif( $shelly_models{$model}[0] == 0){
+        fhem("deletereading ".$name." relay.*");
+        fhem("deletereading ".$name." overpower.*");  
+        fhem("deletereading ".$name." button.*"); 
+      #-- other number
+      }else{
+        fhem("deletereading ".$name." relay");
+        fhem("deletereading ".$name." overpower"); 
+        fhem("deletereading ".$name." button");  
+      }
+      #-- no rollers
+      if( $shelly_models{$model}[1] == 0){  
+        fhem("deletereading ".$name." position.*");
+        fhem("deletereading ".$name." stop_reason.*");
+        fhem("deletereading ".$name." last_dir.*");
+        fhem("deletereading ".$name." pct.*");
+        delete $hash->{MOVING};
+        delete $hash->{DURATION};
+      }
+      #-- no dimmers
+      if( $shelly_models{$model}[2] == 0){  
+        fhem("deletereading ".$name." L-.*");
+        fhem("deletereading ".$name." rgb");
+        fhem("deletereading ".$name." pct.*");
+      }
 
-    #-- always clear readings for meters
-    fhem("deletereading ".$name." power.*");
-    fhem("deletereading ".$name." energy.*");
-    fhem("deletereading ".$name." overpower.*");
+      #-- always clear readings for meters
+      fhem("deletereading ".$name." power.*");
+      fhem("deletereading ".$name." energy.*");
+      fhem("deletereading ".$name." overpower.*");
+    }
     
     #-- change attribute list for model 2/rgbw w. hidden AttrList
     my $old = $modules{Shelly}{'AttrList'};
@@ -276,7 +278,7 @@ sub Shelly_Attr(@) {
       $new = $pre." mode:relay,roller ".$pos;
     }elsif( $model eq "shellyrgbw" ){
       $new = $pre." mode:white,color ".$pos;
-    }else{
+    }elsif( $model =~ /shelly.*/){
       $new = $pre." ".$pos;
     }
     $hash->{'.AttrList'} = $new;
