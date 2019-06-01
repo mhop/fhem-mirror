@@ -30,6 +30,9 @@
 # 
 # CHANGE LOG
 # 
+# 01.06.2019 1.2.2
+# bugfix     : mqttPublish Definitionen mit '*' werden nicht verarbeitet
+# 
 # 27.05.2019 1.2.1
 # bugfix     : fixed *:retain in mqttPublish ohne Funktion (auch qos)
 #              jetzt werden *:xxx Angaben aus mqttPublish und auch 
@@ -343,7 +346,7 @@ use warnings;
 
 #my $DEBUG = 1;
 my $cvsid = '$Id$';
-my $VERSION = "version 1.2.1 by hexenmeister\n$cvsid";
+my $VERSION = "version 1.2.2 by hexenmeister\n$cvsid";
 
 my %sets = (
 );
@@ -1078,6 +1081,10 @@ sub getDevicePublishRec($$$) {
       #$devRec->{'postfix'}=defined($keyPostfix)?$keyPostfix:'';
       push(@$ret, $devRec);
     }
+  }
+  # wenn keine explizite Readings gefunden wurden, dann noch einmal fragen, damit evtl. vorhandenen '*'-Definitionen zur Geltung kommen
+  if(!@$ret) {
+    push(@$ret, getDevicePublishRecIntern($hash, $devMap, $globalMap, $dev, $reading, $reading, undef));
   }
 
   return $ret;
