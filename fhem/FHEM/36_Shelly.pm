@@ -38,7 +38,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "2.01";
+my $version = "2.02";
 
 #-- these we may get on request
 my %gets = (
@@ -56,7 +56,8 @@ my %setssw = (
   "on-for-timer"  => "X",
   "off-for-timer" => "E",
   "config"        => "K",
-  "password"      => "W"
+  "password"      => "W",
+  "xtrachannels"  => "C"
 );
 
 my %setsrol = (
@@ -156,17 +157,9 @@ sub Shelly_Define($$) {
     if( $a[2] !~ m|\d\d?\d?\.\d\d?\d?\.\d\d?\d?\.\d\d?\d?(\:\d+)?| );
   
   my $dev = $a[2];
-  #-- split into parts
-  my @tcp = split(':',$dev);
-  #-- when the specified ip address contains a port already, use it as supplied
-  if ( $tcp[1] ){
-    $hash->{TCPIP} = $dev;
-  }else{
-    $hash->{TCPIP} = $tcp[0].":80";
-  };
-    
+  $hash->{TCPIP} = $dev;
   $hash->{DURATION} = 0;
-  $hash->{MOVING} = "stopped";
+  $hash->{MOVING}   = "stopped";
   delete $hash->{BLOCKED};
   $hash->{INTERVAL} = 60;
   
@@ -179,7 +172,7 @@ sub Shelly_Define($$) {
   my $err = Shelly_status($hash);
   if( !defined($err) ){
     readingsBulkUpdate($hash,"state","initialized");
-    readingsBulkUpdate($hash,"network","connected");
+    readingsBulkUpdate($hash,"network","<html>connected to <a href=\"http://".$hash->{TCPIP}."\">".$hash->{TCPIP}."</a></html>");
   }else{
     readingsBulkUpdate($hash,"state",$err);
     readingsBulkUpdate($hash,"network","not connected");
@@ -513,6 +506,20 @@ sub Shelly_Set ($@) {
         $cmd = (ReadingsVal($name,"relay".$subs,"off") eq "on") ? "off" : "on";
       }
       Shelly_onoff($hash,$channel,"?turn=".$cmd);
+    }elsif( $cmd eq "xtrachannels" ){
+      if( $shelly_models{$model}[0]>1){
+        for( my $i=0;$i<$shelly_models{$model}[0];$i++){
+          fhem("defmod ".$name."_$i readingsProxy $name:relay_$i");
+          fhem("attr ".$name."_$i room ".AttrVal($name,"room","Unsorted"));
+          fhem("attr ".$name."_$i group ".AttrVal($name,"group","Shelly"));
+          fhem("attr ".$name."_$i setList on off");
+          fhem("attr ".$name."_$i setFn {\$CMD.\" $i \"}");
+          fhem("attr ".$name."_$i userReadings button {ReadingsVal(\"$name \",\"button_$i\",\"\")}");
+          Log3 $name, 1,"[Shelly_Set] readingsProxy device ".$name."_$i created";   
+        }
+      }else{
+        Log3 $name, 1,"[Shelly_Set] no separate channel device created, only one channel present";  
+      }
     }
     
   #-- we have a Shelly 2 roller type device
@@ -757,7 +764,7 @@ sub Shelly_pwd($){
   my $state = $hash->{READINGS}{state}{VAL};
   my $net   = $hash->{READINGS}{network}{VAL};
   return
-    if( $net ne "connected" );
+    if( $net !~ /connected/ );
 
   my $model =  AttrVal($name,"model","");
   my $creds = Shelly_pwd($hash);
@@ -853,7 +860,7 @@ sub Shelly_pwd($){
   my ($subs,$ison,$overpower,$rpower,$rstate,$power,$energy,$rstopreason,$rcurrpos,$position,$rlastdir,$pct,$pctnormal);
   
   readingsBeginUpdate($hash);
-  readingsBulkUpdateIfChanged($hash,"network","connected",1);
+  readingsBulkUpdateIfChanged($hash,"network","<html>connected to <a href=\"http://".$hash->{TCPIP}."\">".$hash->{TCPIP}."</a></html>",1);
   
   #-- we have a Shelly 1/1pw, Shelly 4, Shelly 2/2.5  or ShellyPlug switch type device
   if( ($model =~ /shelly1.*/) || ($model eq "shellyplug") || ($model eq "shelly4") || (($model =~ /shelly2.*/) && ($mode eq "relay")) ){
@@ -1035,7 +1042,7 @@ sub Shelly_pwd($){
   my $state = $hash->{READINGS}{state}{VAL};
   my $net   = $hash->{READINGS}{network}{VAL};
   return
-    if( $net ne "connected" );
+    if( $net !~ /connected/ );
   
   my $model =  AttrVal($name,"model","");
   my $creds = Shelly_pwd($hash);
@@ -1126,7 +1133,7 @@ sub Shelly_pwd($){
   my $state = $hash->{READINGS}{state}{VAL};
   my $net   = $hash->{READINGS}{network}{VAL};
   return
-    if( $net ne "connected" );
+    if( $net !~ /connected/ );
   
   my $model =  AttrVal($name,"model","");
   my $creds = Shelly_pwd($hash);
@@ -1137,7 +1144,7 @@ sub Shelly_pwd($){
     
   if ( $hash && !$err && !$data ){
      $url    = "http://$creds".$hash->{TCPIP}."/roller/0".$cmd;
-     Log3 $name, 1,"[Shelly_updown] Issue a non-blocking call to $url";  
+     Log3 $name, 5,"[Shelly_updown] Issue a non-blocking call to $url";  
      HttpUtils_NonblockingGet({
         url      => $url,
         callback=>sub($$$){ Shelly_updown($hash,$cmd,$_[1],$_[2]) }
@@ -1210,7 +1217,7 @@ sub Shelly_updown2($){
   my $state = $hash->{READINGS}{state}{VAL};
   my $net   = $hash->{READINGS}{network}{VAL};
   return
-    if( $net ne "connected" );
+    if( $net !~ /connected/ );
   
   my $model =  AttrVal($name,"model","");
   my $creds = Shelly_pwd($hash);
@@ -1302,7 +1309,7 @@ sub Shelly_updown2($){
   my $state = $hash->{READINGS}{state}{VAL};
   my $net   = $hash->{READINGS}{network}{VAL};
   return
-    if( $net ne "connected" );
+    if( $net !~ /connected/ );
    
   my $model =  AttrVal($name,"model","");
     
@@ -1310,7 +1317,7 @@ sub Shelly_updown2($){
     
   if ( $hash && !$err && !$data ){
      $url    = "http://$creds".$hash->{TCPIP}."/meter/".$channel;
-     Log3 $name, 1,"[Shelly_meter] Issue a non-blocking call to $url";  
+     Log3 $name, 5,"[Shelly_meter] Issue a non-blocking call to $url";  
      HttpUtils_NonblockingGet({
         url      => $url,
         callback=>sub($$$){ Shelly_meter($hash,$channel,$_[1],$_[2]) }
@@ -1351,7 +1358,7 @@ sub Shelly_updown2($){
 <h3>Shelly</h3>
 <ul>
         <p> FHEM module to communicate with a Shelly switch/roller actuator/RGBW controller</p>
-        <a name="Shellydefine"></a>
+        <a name="Shellydefine" id="Shellydefine"></a>
         <h4>Define</h4>
         <p>
             <code>define &lt;name&gt; Shelly &lt;IP address&gt;</code>
@@ -1366,109 +1373,112 @@ sub Shelly_updown2($){
            <li> For <i>Output switched ON url</i>: http://&lt;FHEM IP address&gt;:&lt;Port&gt;/fhem?XHR=1&cmd=set%20&lt;Devicename&gt;%20<b>out_on</b>%20[&lt;channel&gt;]</li>
            <li> For <i>Output switched OFF url</i>: http://&lt;FHEM IP address&gt;:&lt;Port&gt;/fhem?XHR=1&cmd=set%20&lt;Devicename&gt;%20<b>out_off</b>%20[&lt;channel&gt;]</li>
            </ul>
-           Attention: Of course, a csrfToken must be included as well - or a proper allowed device declared.</li>
+           Attention: Of course, a csrfToken must be included as well - or a proper <i>allowed</i> device declared.</li>
          </ul>
-        <a name="Shellyset"></a>
+        <a name="Shellyset" id="Shellyset></a>
         <h4>Set</h4>  
         For all Shelly devices
         <ul>
-        <li><a name="shelly_sconfig"></a>
-                <code>set &lt;name&gt; config &lt;registername&gt; [&lt;channel&gt;] &lt;value&gt;</code>
+        <li><code>set &lt;name&gt; config &lt;registername&gt; [&lt;channel&gt;] &lt;value&gt;</code>
                 <br />set the value of a configuration register</li>
-        <li><a name="shelly_password">password &lt;password&gt;</a><br>This is the only way to set the password for the Shelly web interface</li>
+        <li>password &lt;password&gt;<br>This is the only way to set the password for the Shelly web interface</li>
         </ul>
         For Shelly switching devices (model=shelly1|shelly1pm|shelly4|shellyplug or (model=shelly2/2.5 and mode=relay)) 
         <ul>
-            <li><a name="shelly_onoff"></a>
+            <li>
                 <code>set &lt;name&gt; on|off|toggle  [&lt;channel&gt;] </code>
                 <br />switches channel &lt;channel&gt; on or off. Channel numbers are 0 and 1 for model=shelly2/2.5, 0..3 for model=shelly4. If the channel parameter is omitted, the module will switch the channel defined in the defchannel attribute.</li>
-            <li><a name="shelly_onofftimer"></a>
+            <li>
                 <code>set &lt;name&gt; on-for-timer|off-for-timer &lt;time&gt; [&lt;channel&gt;] </code>
                 <br />switches &lt;channel&gt; on or off for &lt;time&gt; seconds. Channel numbers are 0 and 1 for model=shelly2/2.5, and 0..3 model=shelly4.  If the channel parameter is omitted, the module will switch the channel defined in the defchannel attribute.</li>           
+            <li>
+                <code>set &lt;name&gt; xtrachannels </code>
+                <br />create <i>readingsProxy</i> devices for switching device with more than one channel</li>           
+   
         </ul>
         <br/>For Shelly roller blind devices (model=shelly2/2.5 and mode=roller)  
         <ul>
-            <li><a name="shelly_updown"></a>
+            <li>
                 <code>set &lt;name&gt; open|closed|stop </code>
                 <br />drives the roller blind open, closed or to a stop.</li>      
-            <li><a name="shelly_pct"></a>
+            <li>
                 <code>set &lt;name&gt; pct &lt;integer percent value&gt; </code>
                 <br />drives the roller blind to a partially closed position (100=open, 0=closed)</li>    
-            <li><a name="shelly_zero"></a>
+            <li>
                 <code>set &lt;name&gt; zero </code>
                 <br />calibration of roller device (only for model=shelly2/2.5)</li>      
         </ul>
         <br/>For Shelly dimmer devices (model=shellyrgbw and mode=white)  
         <ul>
-            <li><a name="shelly_onoff"></a>
+            <li>
                <code>set &lt;name&gt; on|off  [&lt;channel&gt;] </code>
                 <br />switches channel &lt;channel&gt; on or off. Channel numbers are 0..3 for model=shellyrgbw. If the channel parameter is omitted, the module will switch the channel defined in the defchannel attribute.</li>
-            <li><a name="shelly_onofftimer"></a>
+            <li>
                 <code>set &lt;name&gt; on-for-timer|off-for-timer &lt;time&gt; [&lt;channel&gt;] </code>
                 <br />switches &lt;channel&gt; on or off for &lt;time&gt; seconds. Channel numbers 0..3 for model=shellyrgbw.  If the channel parameter is omitted, the module will switch the channel defined in the defchannel attribute.</li>            
-            <li><a name="shelly_brightness"></a>
+            <li>
                 <code>set &lt;name&gt; pct &lt;0..100&gt; [&lt;channel&gt;] </code>
                 <br />percent value to set brightness value. Channel numbers 0..3 for model=shellyrgbw.  If the channel parameter is omitted, the module will dim the channel defined in the defchannel attribute.</li>     
         </ul>
         <br/>For Shelly RGBW devices (model=shellyrgbw and mode=color)  
         <ul>
-            <li><a name="shelly_onoff"></a>
+            <li>
                <code>set &lt;name&gt; on|off</code>
                 <br />switches device &lt;channel&gt; on or off</li>
-            <li><a name="shelly_onofftimer"></a>
+            <li>
                 <code>set &lt;name&gt; on-for-timer|off-for-timer &lt;time&gt;</code>
                 <br />switches device on or off for &lt;time&gt; seconds. </li> 
-            <li><a name="shelly_hsv"></a>
+            <li>
                 <code>set &lt;name&gt; hsv &lt;hue value 0..360&gt;&lt;saturation value 0..1&gt;&lt;brightness value 0..1&gt; </code>
                 <br />6-digit hex string to set the color.</li>    
-            <li><a name="shelly_rgb"></a>
+            <li>
                 <code>set &lt;name&gt; rgb &lt;rrggbb&gt; </code>
                 <br />6-digit hex string to set the color.</li>      
-            <li><a name="shelly_rgbw"></a>
+            <li>
                 <code>set &lt;name&gt; rgbw &lt;rrggbbww&gt; </code>
                 <br />8-digit hex string to set the color and white value</li>    
-            <li><a name="shelly_white"></a>
+            <li>
                 <code>set &lt;name&gt; white &lt;integer&gt;</code>
                 <br /> number 0..255 to set the white value </li>    
         </ul>
-        <a name="Shellyget"></a>
+        <a name="Shellyget" id="Shellyget"></a>
         <h4>Get</h4>
         <ul>
-            <li><a name="shelly_config"></a>
+            <li>
                 <code>get &lt;name&gt; config &lt;registername&gt; [&lt;channel&gt;]</code>
                 <br />get the value of a configuration register and writes it in reading config</li>
-            <li><a name="shelly_registers"></a>
+            <li>
                 <code>get &lt;name&gt; registers</code>
                 <br />displays the names of the configuration registers for this device</li>      
-            <li><a name="shelly_status"></a>
+            <li>
                 <code>get &lt;name&gt; status</code>
                 <br />returns the current devices status.</li>
-            <li><a name="shelly_version"></a>
+            <li>
                 <code>get &lt;name&gt; version</code>
                 <br />display the version of the module</li>              
         </ul>
-        <a name="Shellyattr"></a>
+        <a name="Shellyattr" id="Shellyattr"></a>
         <h4>Attributes</h4>
         <ul>
-            <li><a name="shelly_shellyuser"><code>attr &lt;name&gt; shellyuser &lt;shellyuser&gt;</code><br>username for addressing the Shelly web interface</li>
-            <li><a name="shelly_model"><code>attr &lt;name&gt; model shelly1|shelly1pm|shelly2|shelly2.5|shelly4|shellyplug|shellyrgbw </code></a>
+            <li><code>attr &lt;name&gt; shellyuser &lt;shellyuser&gt;</code><br>username for addressing the Shelly web interface</li>
+            <li><<code>attr &lt;name&gt; model shelly1|shelly1pm|shelly2|shelly2.5|shelly4|shellyplug|shellyrgbw </code>
                 <br />type of the Shelly device</li>
-            <li><a name="shelly_mode"><code>attr &lt;name&gt; mode relay|roller (only for model=shelly2/2.5) mode white|color (only for model=shellyrgbw)</code></a>
+            <li><code>attr &lt;name&gt; mode relay|roller (only for model=shelly2/2.5) mode white|color (only for model=shellyrgbw)</code>
                 <br />type of the Shelly device</li>
-             <li><a name="shelly_interval">
+             <li>
                 <code>&lt;interval&gt;</code>
                 <br />Update interval for reading in seconds. The default is 60 seconds, a value of 0 disables the automatic update. </li>
         </ul>
         <br/>For Shelly switching devices (mode=relay for model=shelly2/2.5, standard for all other switching models) 
         <ul>
-        <li><a name="shelly_defchannel"><code>attr &lt;name&gt; defchannel <integer> </code></a>
+        <li><code>attr &lt;name&gt; defchannel <integer> </code>
                 <br />only for model=shelly2|shelly2.5|shelly4 or multi-channel switches: Which channel will be switched, if a command is received without channel number</li>
         </ul>
         <br/>For Shelly roller blind devices (mode=roller for model=shelly2/2.5)
         <ul>
-            <li><a name="shelly_maxtime"><code>attr &lt;name&gt; maxtime &lt;float&gt; </code></a>
+            <li><code>attr &lt;name&gt; maxtime &lt;float&gt; </code>
                 <br />time needed for a complete drive upward or downward</li>
-            <li><a name="shelly_pct100"><code>attr &lt;name&gt; pct100 open|closed (default:open) </code></a>
+            <li><code>attr &lt;name&gt; pct100 open|closed (default:open) </code>
                 <br />is pct=100 open or closed ? </li>
         </ul>
         <br/>Standard attributes   
@@ -1483,6 +1493,7 @@ sub Shelly_updown2($){
 =end html
 =begin html_DE
 
+<a name="Shelly"></a>
 <h3>Shelly</h3>
 <ul>
 Absichtlich keine deutsche Dokumentation vorhanden, die englische Version gibt es hier: <a href="commandref.html#Shelly">Shelly</a> 
