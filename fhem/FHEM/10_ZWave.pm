@@ -711,6 +711,7 @@ ZWave_Initialize($)
   $hash->{UndefFn}   = "ZWave_Undef";
   $hash->{AttrFn}    = "ZWave_Attr";
   $hash->{ParseFn}   = "ZWave_Parse";
+  $hash->{RenameFn}  = "ZWave_Rename";
   no warnings 'qw';
   my @attrList = qw(
     IODev
@@ -5024,6 +5025,13 @@ ZWave_Parse($$@)
   return $name;
 }
 
+#####################################
+sub
+ZWave_Rename($$)
+{
+  my ($old, $new) = @_;
+  ZWave_setEndpoints($defs{$new});
+}
 
 #####################################
 sub
