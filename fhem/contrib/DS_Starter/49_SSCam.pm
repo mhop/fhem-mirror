@@ -1922,7 +1922,7 @@ sub SSCam_FWconfCam($$) {
   my $alias   = AttrVal($name, "alias", $name);    
   my $winname = $name."_view";
   my $cicon   = 'edit_settings.svg';                                    # Icon für Cam/SVS Setup-Screen
-  my $hicon   = 'message_help.svg';                                    # Icon für SVS Hilfeseite
+  my $hicon   = 'info_info.svg';                                        # Icon für SVS Hilfeseite
   my $w       = 150;
   my ($ret,$cexpl,$hexpl) = ("","","");
   my ($cs,$bs,$ch,$bh,);
