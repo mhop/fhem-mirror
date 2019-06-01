@@ -1893,7 +1893,9 @@ sub SSCam_FWdetailFn ($$$$) {
   my $ret = "";
   
   $hash->{".setup"} = SSCam_FWconfCam($d,$room);
-  $ret .= $hash->{".setup"};
+  if($hash->{".setup"} ne "") {
+      $ret .= $hash->{".setup"};
+  }
   
   # return undef if(!AttrVal($d,"ptzPanel_use",1));
   $hash->{".ptzhtml"} = SSCam_ptzpanel($d) if($hash->{".ptzhtml"} eq "");
