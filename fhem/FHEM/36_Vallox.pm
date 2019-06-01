@@ -1228,6 +1228,12 @@ sub Vallox_InterpretAndUpdate(@) {
                 readingsSingleUpdate( $hash, $Vallox_datatypes{$rawReadingType},
                     $fineReadingValue, 1 );
 
+		# If this is a FanSpeed update FanSpeedPct as well
+		# 
+		if ($rawReadingType eq "29") {
+		    readingsSingleUpdate( $hash, "FanSpeedPct", POSIX::floor(($fineReadingValue*12.5)) , 1 );
+		}
+
 		# If this is a CO2SetPointLower && CO2SetPointUpper has been set, write CO2SetPoint
 		if ($rawReadingType eq "B4" && ReadingsVal( $name, "CO2SetPointUpper", "unknown" ) ne "unknown" ) {
 		    my $CO2SetPoint =  ReadingsVal( $name, "CO2SetPointUpper", "unknown" ) . $fineReadingValue;
@@ -1706,6 +1712,7 @@ sub Vallox_Set($@) {
     $setCommands .= " FanSpeed:slider,1,1,8";
     $setCommands .= " FanSpeedMin:slider,1,1,8";
     $setCommands .= " FanSpeedMax:slider,1,1,8";
+    $setCommands .= " FanSpeedPct:slider,1,1,100";
     $setCommands .= " BasicHumidityLevel:slider,0,1,100";
     $setCommands .= " HeatRecoveryCellBypassSetpointTemperature:slider,0,1,20";
     $setCommands .= " ServiceReminderMonths:slider,1,1,15";
@@ -1745,6 +1752,13 @@ sub Vallox_Set($@) {
         );
         $cmd = $Vallox_multiReadingTable_realcmd{$cmd};
     }
+
+    # Replace FanSpeedPct with FanSpeed
+    if ( $cmd eq "FanSpeedPct" ) {
+        $cmd = "FanSpeed";
+        $arg = POSIX::ceil($arg / 12.5);
+    }
+
 
     ## TODO
     if ( exists $Vallox_datatypesReverse{$cmd} ) {
