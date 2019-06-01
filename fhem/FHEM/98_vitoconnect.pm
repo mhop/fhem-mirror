@@ -99,7 +99,21 @@
 #						heating.gas.consumption.heating.unit kilowattHour
 #						heating.power.consumption.unit kilowattHour
 #						Typo in WW-Zirkulationspumpe_Zeitsteuerung_aktiv fixt
+# 2019-06-01		neue Readings für 
+#          			    heating.solar.power.production.day	3.984,3.797,5.8,5.5,6.771,5.77,5.441,9.477
+#          			    heating.solar.power.production.month	
+#          			    heating.solar.power.production.unit	kilowattHour
+#          			    heating.solar.power.production.week	
+#          			    heating.solar.power.production.year
+#                     heating.circuits.X.name (wird im Moment noch nicht von der API gefüllt!)
+#                 Format der "Schedule" Readings in JSON geändert
+#						das Format von HKx-Urlaub_Start und _Ende ist jetzt YYYY-MM-TT. 
+#                 	Wenn noch kein Urlaub aktiviert wurde, wird bei
+#                    HKx-Urlaub_Start das Datum für _Ende auf den Folgetag gesetzt
+#                    Dafür werden die Perl Module DateTime, Time:Piece und Time::Seconds
+#                    benötigt (installieren mit apt install libdatetime-perl!)
 #          
+#	
 #
 #   ToDo:         timeout konfigurierbar machen
 #						"set"s für Schedules zum Steuern der Heizung implementieren
@@ -130,6 +144,9 @@ use HttpUtils;
 use Encode qw(decode encode);
 use Data::Dumper;
 use Path::Tiny;
+use DateTime;
+use Time::Piece;
+use Time::Seconds;
 
 my $client_id = '79742319e39245de5f91d15ff4cac2a8';
 my $client_secret = '8ad97aceb92c5892e102b093c7c083fa';
@@ -138,6 +155,10 @@ my $authorizeURL = 'https://iam.viessmann.com/idp/v1/authorize';
 my $apiURLBase = 'https://api.viessmann-platform.io';
 my $general = '/general-management/installations?expanded=true&';
 my $callback_uri = "vicare://oauth-callback/everest"; 
+
+#my $RequestList2 = {
+#    "heating.boiler.serial.value" 												=> "Kessel_Seriennummer"
+#};
 
 my $RequestList = {
     "heating.boiler.serial.value" 												=> "Kessel_Seriennummer",
@@ -165,6 +186,7 @@ my $RequestList = {
     "heating.circuits.0.heating.curve.slope" 								=> "HK1-Heizkurve-Steigung",
     "heating.circuits.0.heating.schedule.active" 							=> "HK1-Zeitsteuerung_Heizung_aktiv",
     "heating.circuits.0.heating.schedule.entries" 							=> "HK1-Zeitsteuerung_Heizung",
+    "heating.circuits.0.name" 						                  	=> "HK1-Name",
     "heating.circuits.0.operating.modes.active.value" 					=> "HK1-Betriebsart",
     "heating.circuits.0.operating.modes.dhw.active" 						=> "HK1-WW_aktiv",
     "heating.circuits.0.operating.modes.dhwAndHeating.active" 			=> "HK1-WW_und_Heizen_aktiv",
@@ -204,6 +226,7 @@ my $RequestList = {
     "heating.circuits.1.heating.curve.slope" 								=> "HK2-Heizkurve-Steigung",
     "heating.circuits.1.heating.schedule.active" 							=> "HK2-Zeitsteuerung_Heizung_aktiv",
     "heating.circuits.1.heating.schedule.entries" 							=> "HK2-Zeitsteuerung_Heizung",
+    "heating.circuits.1.name" 						                  	=> "HK2-Name",
     "heating.circuits.1.operating.modes.active.value" 					=> "HK2-Betriebsart",
     "heating.circuits.1.operating.modes.dhw.active" 						=> "HK2-WW_aktiv",
     "heating.circuits.1.operating.modes.dhwAndHeating.active" 			=> "HK2-WW_und_Heizen_aktiv",
@@ -243,6 +266,7 @@ my $RequestList = {
     "heating.circuits.2.heating.curve.slope" 								=> "HK3-Heizkurve-Steigung",
     "heating.circuits.2.heating.schedule.active" 							=> "HK3-Zeitsteuerung_Heizung_aktiv",
     "heating.circuits.2.heating.schedule.entries" 							=> "HK3-Zeitsteuerung_Heizung",
+    "heating.circuits.2.name" 						                  	=> "HK3-Name",
     "heating.circuits.2.operating.modes.active.value" 					=> "HK3-Betriebsart",
     "heating.circuits.2.operating.modes.dhw.active" 						=> "HK3-WW_aktiv",
     "heating.circuits.2.operating.modes.dhwAndHeating.active" 			=> "HK3-WW_und_Heizen_aktiv",
@@ -331,7 +355,13 @@ my $RequestList = {
     "heating.service.burnerBased.serviceDue" 								=> "Service_fällig_brennerbasiert",
     "heating.service.burnerBased.serviceIntervalBurnerHours" 			=> "Service_Intervall_Betriebsstunden",
     "heating.service.burnerBased.activeBurnerHoursSinceLastService" 	=> "Service_Betriebsstunden_seit_letzten",
-    "heating.service.burnerBased.lastService" 								=> "Service_Letzter_brennerbasiert"
+    "heating.service.burnerBased.lastService" 								=> "Service_Letzter_brennerbasiert",
+    
+    "heating.solar.power.production.month"									=> "Solarproduktion/Monat",	
+    "heating.solar.power.production.day"										=> "Solarproduktion/Tag",
+    "heating.solar.power.production.unit"										=> "Solarproduktion/Einheit",
+    "heating.solar.power.production.week"										=> "Solarproduktion/Woche",
+    "heating.solar.power.production.year"										=> "Solarproduktion/Jahr"
 };
 
 
@@ -344,6 +374,7 @@ sub vitoconnect_Initialize($) {
     $hash->{AttrFn}     = 'vitoconnect_Attr';
     $hash->{ReadFn}     = 'vitoconnect_Read';
     $hash->{AttrList} =  "disable:0,1 "
+    	."mapping:textField-long "
 		."model:Vitodens_200-W_(B2HB),Vitodens_200-W_(B2KB),"
 		."Vitotronic_200_(HO1),Vitotronic_200_(HO1A),Vitotronic_200_(HO1B),Vitotronic_200_(HO1D),Vitotronic_200_(HO2B),"
 		."Vitotronic_200_RF_(HO1C),Vitotronic_200_RF_(HO1E),"
@@ -373,6 +404,16 @@ sub vitoconnect_Define($$) {
     } else {
 		 Log3 $name, 3, "$name - Passwort war bereits gespeichert";   
     }
+    
+	 #my $value = AttrVal($name, "mapping", "");
+	 #if ($value eq "") {
+	 #	$Data::Dumper::Terse = 1; 
+	 #	$Data::Dumper::Useqq = 1; 
+	 #	#$Data::Dumper::Indent = 0;
+	 #	my $cmd = "attr $name mapping ".Dumper($RequestList2);
+	 #	Log3 $name, 3, "$name - Attribut mapping $cmd"; 
+	 #	AnalyzeCommand($hash, $cmd);
+	 #}   
     
 	 InternalTimer(gettimeofday()+10, "vitoconnect_GetUpdate", $hash);   
     return undef;
@@ -515,6 +556,7 @@ sub vitoconnect_Set($@) {
 		return undef;		
 	} elsif ($opt eq "HK1-Urlaub_Start") {
 		my $end = ReadingsVal ($name, "HK1-Urlaub_Ende", undef);
+		if ($end eq ""){my $t = Time::Piece->strptime($args[0], "%Y-%m-%d"); $t += ONE_DAY; $end = $t->strftime("%Y-%m-%d");}
 		vitoconnect_action($hash);
 		my $param = {
 			url        => "https://api.viessmann-platform.io/operational-data/v1/installations/$installation/gateways/$gw/devices/0/features/heating.circuits.0.operating.programs.holiday/schedule",
@@ -532,7 +574,8 @@ sub vitoconnect_Set($@) {
 		return undef;	
 	} elsif ($opt eq "HK2-Urlaub_Start") {
 		my $end = ReadingsVal ($name, "HK2-Urlaub_Ende", undef);
-		vitoconnect_action($hash);
+		if ($end eq ""){my $t = Time::Piece->strptime($args[0], "%Y-%m-%d"); $t += ONE_DAY; $end = $t->strftime("%Y-%m-%d");}
+      vitoconnect_action($hash);
 		my $param = {
 			url        => "https://api.viessmann-platform.io/operational-data/v1/installations/$installation/gateways/$gw/devices/0/features/heating.circuits.1.operating.programs.holiday/schedule",
 			hash       => $hash,
@@ -549,7 +592,8 @@ sub vitoconnect_Set($@) {
 		return undef;	
 	} elsif ($opt eq "HK3-Urlaub_Start") {
 		my $end = ReadingsVal ($name, "HK3-Urlaub_Ende", undef);
-		vitoconnect_action($hash);
+		if ($end eq ""){my $t = Time::Piece->strptime($args[0], "%Y-%m-%d"); $t += ONE_DAY; $end = $t->strftime("%Y-%m-%d");}
+	   vitoconnect_action($hash);
 		my $param = {
 			url        => "https://api.viessmann-platform.io/operational-data/v1/installations/$installation/gateways/$gw/devices/0/features/heating.circuits.2.operating.programs.holiday/schedule",
 			hash       => $hash,
@@ -1052,6 +1096,8 @@ sub vitoconnect_Attr(@) {
 				my $err = "Invalid argument $attr_value to $attr_name. Must be 0 or 1.";
 			   Log 1, "$name: ".$err; return $err;
 			}
+		} elsif($attr_name eq "mapping") {
+			# $RequestList2 = "$attr_value";
 		} elsif($attr_name eq "disable") {
 		
 		} elsif($attr_name eq "verbose") {
@@ -1301,18 +1347,18 @@ sub vitoconnect_getResourceCallback($) {
 					readingsBulkUpdate($hash, $Reading, $Value);
 					Log3 $name, 5, "$FieldName".".$Key: $Value ($Type)";
 				} elsif ( $Type eq "Schedule" ) {
-					my %Entries = %$Value;
-					my @Days = keys (%Entries);
-					my $Result = "";
-					for my $Day ( @Days ){
-						my $Entry = $Entries{$Day};
-						$Result = "$Result $Day";
-						for my $Element ( @$Entry ) {
-							#$Result = "$Result $Element";
-							while(my($k, $v) = each %$Element)  { $Result = "$Result $k:$v"; }
-						$Result = "$Result, ";
-						}
-					}
+					# my %Entries = %$Value;
+					# my @Days = keys (%Entries);
+					# my $Result = "";
+					# for my $Day ( @Days ){
+					#	my $Entry = $Entries{$Day};
+					#	$Result = "$Result $Day";
+					#	for my $Element ( @$Entry ) {
+					#		#$Result = "$Result $Element";
+					#		while(my($k, $v) = each %$Element)  { $Result = "$Result $k:$v"; }
+					#	}
+					#}
+					my $Result = encode_json($Value);
 					readingsBulkUpdate($hash, $Reading, $Result);
 					Log3 $name, 5, "$FieldName".".$Key: $Result ($Type)";
 				} elsif ( $Type eq "ErrorListChanges" ) {
@@ -1339,6 +1385,9 @@ sub vitoconnect_getResourceCallback($) {
 			}
 			###########################################
 		};
+		
+				
+		#readingsBulkUpdate($hash, "xxx", $RequestList2->{"heating.boiler.serial.value"});
 		
 		$hash->{counter} = $hash->{counter} + 1;
 		readingsBulkUpdate($hash, "state", "ok");             
