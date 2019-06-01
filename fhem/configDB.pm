@@ -307,7 +307,6 @@ sub cfgDB_Init() {
 	my $count = $fhem_dbh->selectrow_array('SELECT count(*) FROM fhemconfig');
 	if($count < 1) {
 #		insert default entries to get fhem running
-		$attr{global}{modpath} = '.';
 		$fhem_dbh->commit();
 		my $uuid = _cfgDB_Uuid;
 		$fhem_dbh->do("INSERT INTO fhemversions values (0, '$uuid')");
