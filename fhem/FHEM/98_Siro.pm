@@ -762,6 +762,7 @@ sub Set($@) {
 		{
 		readingsSingleUpdate( $hash, "motor-term", "0", 1 ) ;
 		readingsSingleUpdate( $hash, "batteryState", "unknown", 1 ) ;
+		readingsSingleUpdate( $hash, "motor-term-reset",  time, 1 ); 
 		return;
 		}
 		
