@@ -30,6 +30,10 @@
 # 
 # CHANGE LOG
 # 
+# 02.06.2019 1.2.3
+# improvement: fuer mqttPublish Definitionen mit '*' koennen jetzt auch 
+#              Mehrfachdefinitionen (mit '!suffix') verwendet werden
+#
 # 01.06.2019 1.2.2
 # bugfix     : mqttPublish Definitionen mit '*' werden nicht verarbeitet
 # 
@@ -312,6 +316,7 @@
 #  - global excludes
 #  - commands per mqtt fuer die Bridge: Liste der Geraete, Infos dazu etc.
 #  - mqttOptions (zuschaltbare optionen im Form eines Perl-Routine) (json, ttl)
+#  - template for Publish/Subscribe: in device: reading:template=templateTemperature (template definitions in bridge-device)
 #
 # [I don't like it]
 #  - templates (e.g. 'define template' in der Bridge, 'mqttUseTemplate' in Devices)
@@ -346,7 +351,7 @@ use warnings;
 
 #my $DEBUG = 1;
 my $cvsid = '$Id$';
-my $VERSION = "version 1.2.2 by hexenmeister\n$cvsid";
+my $VERSION = "version 1.2.3 by hexenmeister\n$cvsid";
 
 my %sets = (
 );
@@ -1084,7 +1089,15 @@ sub getDevicePublishRec($$$) {
   }
   # wenn keine explizite Readings gefunden wurden, dann noch einmal fragen, damit evtl. vorhandenen '*'-Definitionen zur Geltung kommen
   if(!@$ret) {
-    push(@$ret, getDevicePublishRecIntern($hash, $devMap, $globalMap, $dev, $reading, $reading, undef));
+    #push(@$ret, getDevicePublishRecIntern($hash, $devMap, $globalMap, $dev, $reading, $reading, undef));
+    foreach my $key (keys %{$devMap->{':publish'}} ) {
+      my($keyRName,$keyPostfix) = split("!",$key);
+      if($keyRName eq '*') {
+        my $devRec = getDevicePublishRecIntern($hash, $devMap, $globalMap, $dev, $key, $reading, $keyPostfix);
+        #$devRec->{'postfix'}=defined($keyPostfix)?$keyPostfix:'';
+        push(@$ret, $devRec);
+      }
+    }
   }
 
   return $ret;
