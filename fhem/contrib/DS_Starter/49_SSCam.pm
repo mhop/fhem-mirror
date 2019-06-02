@@ -1930,18 +1930,18 @@ sub SSCam_FWconfCam($$) {
   if(SSCam_IsModelCam($hash)) {                                         # Camera Device
       return $ret if(!$cip);
       if(AttrVal("global","language","EN") =~ /DE/) {
-          $cexpl = $SSCam_ttips_de{confcam}; $cexpl =~ s/\s+/&nbsp;/g; $cexpl =~ s/§NAME§/$alias/g;
+          $cexpl = $SSCam_ttips_de{confcam}; $cexpl =~ s/§NAME§/$alias/g; $cexpl =~ s/\s+/&nbsp;/g;
       } else {
-          $cexpl = $SSCam_ttips_en{confcam}; $cexpl =~ s/\s+/&nbsp;/g; $cexpl =~ s/§NAME§/$alias/g;
+          $cexpl = $SSCam_ttips_en{confcam}; $cexpl =~ s/§NAME§/$alias/g; $cexpl =~ s/\s+/&nbsp;/g;
       }
       $cs = "window.open('http://$cip')";
   
   } else {                                                              # SVS-Device
       return $ret if(!$svsip);
       if(AttrVal("global","language","EN") =~ /DE/) {
-          $cexpl = $SSCam_ttips_de{confsvs}; $cexpl =~ s/\s+/&nbsp;/g; $cexpl =~ s/§NAME§/$alias/g;
+          $cexpl = $SSCam_ttips_de{confsvs}; $cexpl =~ s/§NAME§/$alias/g; $cexpl =~ s/\s+/&nbsp;/g;
       } else {
-          $cexpl = $SSCam_ttips_en{confsvs}; $cexpl =~ s/\s+/&nbsp;/g; $cexpl =~ s/§NAME§/$alias/g;
+          $cexpl = $SSCam_ttips_en{confsvs}; $cexpl =~ s/§NAME§/$alias/g; $cexpl =~ s/\s+/&nbsp;/g;
       }    
       $cs = "window.open('$svsprot://$svsip:$svsport/cam')";      
   }
