@@ -8,9 +8,11 @@
 #  - feature: 74_UnifiClient: initial version
 # V 0.0.2 BETA
 #  - fixed: 74_UnifiClient: fixed Loglevel and disconnected state
+# V 0.0.3 BETA
+#  - fixed: 74_UnifiClient: fixed use of timelocal()-Funktion
 
 package main;
-my $version="0.0.2 BETA";
+my $version="0.0.3 BETA";
 my $thresholdBytesPerMinuteDefault=75000;
 my $maxOnlineMinutesPerDayDefault=2000;# deutlich mehr als 1440=24h
 # Laden evtl. abhängiger Perl- bzw. FHEM-Module
@@ -341,7 +343,7 @@ sub UnifiClient_DailyReset($){
     $l[0] = 0;
     $l[1] = 0;
     $l[2] = 0;
-    my $localmidnighttime = timelocal(@l)+(60*60*24);
+    my $localmidnighttime = mktime(@l)+(60*60*24);
 	#my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)= gmtime($localmidnighttime);
     #Log3 $name, 1, "$name ($self) - next reset at: $wday $mday.$mon.$year - $hour:$min:$sec";
 	#my ($sec2,$min2,$hour2,$mday2,$mon2,$year2,$wday2,$yday2,$isdst2)= gmtime(time());
