@@ -3,10 +3,14 @@
 package main;
 use strict;
 use warnings;
-use Data::Dumper;
+use POSIX;
 
-use Unit;
 use FHEM::Meta;
+use Time::HiRes qw(gettimeofday);
+use Time::Local;
+use Unit;
+#use Data::Dumper;
+
 our ( @RESIDENTStk_attr, %RESIDENTStk_types, %RESIDENTStk_subTypes );
 
 # module variables ############################################################
@@ -1342,7 +1346,7 @@ m/^((?:DELETE)?ATTR)\s+([A-Za-z\d._]+)\s+([A-Za-z\d_\.\-\/]+)(?:\s+(.*)\s*)?$/
             next
               unless ( $attr eq $prefix . "wakeupDevice"
                 || $attr eq $prefix . "presenceDevices"
-                || $attr eq $prefix . "wakeupResetSwitcher" );
+                || $attr eq "wakeupResetSwitcher" );
 
             # when attributes of RESIDENTS, ROOMMATE, GUEST or PET were changed
             if ( $d eq $name ) {

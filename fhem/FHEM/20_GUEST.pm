@@ -3,10 +3,9 @@
 package main;
 use strict;
 use warnings;
-use Data::Dumper;
-use Time::Local;
+use POSIX;
 
-require RESIDENTStk;
+use RESIDENTStk;
 our ( @RESIDENTStk_attr, %RESIDENTStk_subTypes );
 
 # initialize ##################################################################
