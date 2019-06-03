@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  73_DoorBird: bugfix for History-Image on event.
  - bugfix:  93_DbLog: fix ignore MinInterval if value is "0", Forum: #100344
  - change:  36_Vallox: added reading for handling homebridge speed control
  - bugfix:  72_FB_CALLMONITOR: fix wrong call-by-call number removing for
