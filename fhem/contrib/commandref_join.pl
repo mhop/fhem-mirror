@@ -154,6 +154,7 @@ generateModuleCommandref($$;$$)
     my $docCount = 0;
     my $hasLink = 0;
     my $dosMode = 0;
+    my $nrEnd = 0;
     while(my $l = <$modFh>) {
       $line++;
 
@@ -163,9 +164,11 @@ generateModuleCommandref($$;$$)
         print "*** $lang $mod: nonempty line after =begin html ignored\n"
           if($l =~ m/^...*$/);
         $skip = 0; $line++;
+        $nrEnd++;
 
       } elsif($l =~ m/^=end html$suffix$/) {
         $skip = 1;
+        $nrEnd--;
         print $fh "<p>" if($fh);        
 
       } elsif(!$skip) {
@@ -222,4 +225,7 @@ EOF
                 "($tagcount{$tag}, last line ok: $llwct{$tag})\n")
         if($tagcount{$tag} && !$noWarnings);
     }
+
+    print "*** $lang $fPath: =end html$suffix: ".($nrEnd>0 ? "missing":"there are too many")."\n"
+        if($nrEnd);
 }

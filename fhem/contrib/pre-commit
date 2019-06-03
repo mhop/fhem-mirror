@@ -99,6 +99,7 @@ foreach my $row (split("\n", $fList)) {
     my $docCount = 0;
     my $hasLink = 0;
     my $hasSummary = 0;
+    my $nrEnd = 0;
 
     while(my $l = <MOD>) {
       $line++;
@@ -117,9 +118,11 @@ foreach my $row (split("\n", $fList)) {
         err($fName, "$lang: nonempty line after =begin html.")
           if($l =~ m/^...*$/);
         $skip = 0; $line++;
+        $nrEnd++;
 
       } elsif($l =~ m/^=end html$suffix$/) {
         $skip = 1;
+        $nrEnd--;
 
       } elsif(!$skip) {
         $docCount++;
@@ -144,6 +147,8 @@ foreach my $row (split("\n", $fList)) {
       if(!$suffix && $docCount && !$hasLink);
     err $fName, "$lang: No summary description found"
       if(!$suffix && $docCount && !$hasSummary);
+    err $fName, "$lang: =end html$suffix: ".($nrEnd>0 ? "missing":"there are too many")."\n"
+      if($nrEnd);
 
     foreach $tag (TAGS) {
       err $fName, "$lang: Unbalanced $tag ($tagcount{$tag}, last line ok: $llwct{$tag})"
