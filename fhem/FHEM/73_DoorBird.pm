@@ -84,6 +84,7 @@ sub DoorBird_Initialize($)
 							   "ImageFileDir " .
 							   "EventReset " .
 							   "SessionIdSec:slider,0,10,600 " .
+							   "WaitForHistory " .
 							   "disable:1,0 " .
 							   "debug:1,0 " .
 						       "loglevel:slider,0,1,5 " .
@@ -174,6 +175,7 @@ sub DoorBird_Define($$)
 	  $hash->{helper}{SessionIdSec}						= AttrVal($name, "SessionIdSec", 540);
 	  $hash->{helper}{ImageFileDir}						= AttrVal($name, "ImageFileDir", 0);
 	  $hash->{helper}{EventReset}						= AttrVal($name, "EventReset", 5);
+	  $hash->{helper}{WaitForHistory}					= AttrVal($name, "WaitForHistory", 7);
 	  $hash->{helper}{SessionId}						= 0;
 	  $hash->{helper}{UdpMessageId}						= 0;
 	  $hash->{helper}{UdpMotionId}						= 0;
@@ -442,10 +444,19 @@ sub DoorBird_Attr(@)
 			### Save attribute as internal
 			$hash->{helper}{EventReset}	= 5;
 		}
-
-		readingsSingleUpdate($hash, "doorbell_button", "idle", 1);
-		readingsSingleUpdate($hash, "motion_sensor",   "idle", 1);
-		#readingsSingleUpdate($hash, "keypad",          "idle", 1);
+	}
+	### Check whether WaitForHistory attribute has been provided
+	elsif ($a[2] eq "WaitForHistory") {
+		### Check whether WaitForHistory is numeric and greater than 5
+		if ($a[3] == int($a[3]) && ($a[3] > 5)) {
+			### Save attribute as internal
+			$hash->{helper}{WaitForHistory}  = $a[3];
+		}
+		### If KeepAliveTimeout is NOT numeric or <5
+		else {
+			### Save attribute as internal
+			$hash->{helper}{WaitForHistory}	= 5;
+		}
 	}
 	### If no attributes of the above known ones have been selected
 	else {
@@ -634,17 +645,25 @@ sub DoorBird_Set($@)
 ###START###### After return of UDP message ####################################################################START####
 sub DoorBird_Read($) {
 	my ($hash)            = @_;
+	
+	### Obtain values from hash
 	my $name              = $hash->{NAME};
 	my $UdpMessageIdLast  = $hash->{helper}{UdpMessageId};
 	my $UdpMotionIdLast   = $hash->{helper}{UdpMotionId};
 	my $UdpDoorbellIdLast = $hash->{helper}{UdpDoorbellId};
 	my $UdpKeypadIdLast   = $hash->{helper}{UdpKeypadId};
-	
+	my $Username 		  = DoorBird_credential_decrypt($hash->{helper}{".USER"});
+	my $Password		  = DoorBird_credential_decrypt($hash->{helper}{".PASSWORD"});
+	my $PollingTimeout    = $hash->{helper}{PollingTimeout};
+	my $url 			  = $hash->{helper}{URL};
+	my $Method			  = "GET";
+	my $Header			  = "Accept: application/json";
+	my $UrlPostfix;
+	my $CommandURL;
+	my $err;
+	my $data;
 	my $buf;
 	my $flags;
-	
-	### Get defined PeerHost
-	my $url = $hash->{helper}{URL};
 	
 	### Get sending Peerhost
 	my $PeerHost = $hash->{CD}->peerhost;
@@ -653,7 +672,7 @@ sub DoorBird_Read($) {
 	$hash->{CD}->recv($buf, 1024, $flags);
 	
 	### Unpack Hex-Package
-	my $data = bin2hex($buf);
+	$data = bin2hex($buf);
 	
 	### Remove Newlines for better log entries
 	$buf =~ s/\n+\z//;
@@ -907,7 +926,8 @@ sub DoorBird_Read($) {
 				Log3 $name, 5, $name. " : DoorBird_Read - UDP TIMESTAMP UNIX                : " . $TIMESTAMP;
 				Log3 $name, 5, $name. " : DoorBird_Read - UDP TIMESTAMP human readeable     : " . $TIMESTAMPHR;
 
-
+				### Remove trailing whitespace
+				$EVENT =~ s/\s+$//;
 
 				### If event belongs to the current user
 				if ($username =~ m/$INTERCOM_ID/){
@@ -915,29 +935,43 @@ sub DoorBird_Read($) {
 					Log3 $name, 5, $name. " : DoorBird_Read -- Part 7 ------------------------------------------------------------------------------------------------------------------------";
 					Log3 $name, 5, $name. " : DoorBird_Read - INTERCOM_ID matches username";
 				
+					### Create first part command URL for DoorBird
+					my $UrlPrefix 		= "https://" . $url . "/bha-api/";
+
+					### Update STATE of device
+					readingsSingleUpdate($hash, "state", "Downloading image", 1);
+
+				
 					### If event has been triggered by motion sensor
 					if ($EVENT =~ m/motion/) {
 						### If the MessageID is integer type has not yet appeared yet
 						if ((int($TIMESTAMP) == $TIMESTAMP) && ($UdpMotionIdLast != $TIMESTAMP)) {
-
-							### Call Subroutine and hand back return value
-							my $LastSnapshotPath = DoorBird_Image_Request($hash, "");
-
-							### If pictures supposed to be saved as files
-							if ($hash->{helper}{ImageFileDir} ne "0") {
-								### Write Last Image into reading
-								readingsSingleUpdate($hash, "motion_snapshot", $LastSnapshotPath, 1);
-							}
-							
 							### Save Timestamp as new ID
 							$hash->{helper}{UdpMotionId} = $TIMESTAMP;
+
+							### Create Parameter for CommandURL for motionsensor events
+							$UrlPostfix = "history.cgi?event=motionsensor&index=1";
+
+							### Create complete command URL for DoorBird
+							$CommandURL = $UrlPrefix . $UrlPostfix;	
 							
-							### Update readings of device
-							readingsSingleUpdate($hash, "state", "motion detected", 1);
-							readingsSingleUpdate($hash, "motion_sensor", "triggered", 1);
-							
-							### Initiate the timer to reset reading "motion_sensor"
-							InternalTimer(gettimeofday()+ $hash->{helper}{EventReset}, "DoorBird_EventResetMotion", $hash, 0);
+							### Define Parameter for Non-BlockingGet
+							my $param = {
+								url               => $CommandURL,
+								timeout           => $PollingTimeout,
+								user              => $Username,
+								pwd               => $Password,
+								hash              => $hash,
+								method            => $Method,
+								header            => $Header,
+								timestamp         => $TIMESTAMP,
+								event             => "motionsensor",
+								incrementalTimout => 1,
+								callback          => \&DoorBird_LastEvent_Image
+							};
+
+							### Initiate communication and close
+							HttpUtils_NonblockingGet($param);
 							
 							### Log Entry
 							Log3 $name, 3, $name. " : Motion sensor detected a motion in front of DoorBird unit.";
@@ -954,25 +988,32 @@ sub DoorBird_Read($) {
 					elsif ($EVENT =~ m/keypad/) {
 						### If the MessageID is integer type has not yet appeared yet
 						if ((int($TIMESTAMP) == $TIMESTAMP) && ($UdpKeypadIdLast != $TIMESTAMP)) {
-
-							### Call Subroutine and hand back return value
-							my $LastSnapshotPath = DoorBird_Image_Request($hash, "");
-
-							### If pictures supposed to be saved as files
-							if ($hash->{helper}{ImageFileDir} ne "0") {
-								### Write Last Image into reading
-								readingsSingleUpdate($hash, "keypad_snapshot", $LastSnapshotPath, 1);
-							}
-							
 							### Save Timestamp as new ID
 							$hash->{helper}{UdpKeypadId} = $TIMESTAMP;
 
-							### Update readings of device
-							readingsSingleUpdate($hash, "state",  "keypad used!", 1);
-							readingsSingleUpdate($hash, "keypad", "triggered", 1);
+							### Create Parameter for CommandURL for keypad events
+							$UrlPostfix = "history.cgi?event=keypad&index=1";
+
+							### Create complete command URL for DoorBird
+							$CommandURL = $UrlPrefix . $UrlPostfix;	
 							
-							### Initiate the timer to reset reading "keypad"
-							InternalTimer(gettimeofday()+ $hash->{helper}{EventReset}, "DoorBird_EventResetKeypad", $hash, 0);
+							### Define Parameter for Non-BlockingGet
+							my $param = {
+								url               => $CommandURL,
+								timeout           => $PollingTimeout,
+								user              => $Username,
+								pwd               => $Password,
+								hash              => $hash,
+								method            => $Method,
+								header            => $Header,
+								timestamp         => $TIMESTAMP,
+								event             => "keypad",
+								incrementalTimout => 1,
+								callback          => \&DoorBird_LastEvent_Image
+							};
+
+							### Initiate communication and close
+							HttpUtils_NonblockingGet($param);
 							
 							### Log Entry
 							Log3 $name, 3, $name. " : The keypad of the DoorBird unit has been used.";
@@ -985,33 +1026,37 @@ sub DoorBird_Read($) {
 							Log3 $name, 5, $name. " : DoorBird_Read - Keypad message already been sent. Ignoring it!";						
 						}
 					}
-					### If event has been triggered by doorbell
-					elsif ($EVENT =~ m/1/) {
+					### If event has been triggered by doorbell -> Only a number has been transfered
+					elsif (int($EVENT) == $EVENT) {
 						### If the MessageID is integer type has not yet appeared yet
 						if ((int($TIMESTAMP) == $TIMESTAMP) && ($UdpDoorbellIdLast != $TIMESTAMP)) {
-
-							### Call Subroutine and hand back return value
-							my $LastSnapshotPath = DoorBird_Image_Request($hash, "");
-
-							### If pictures supposed to be saved as files
-							if ($hash->{helper}{ImageFileDir} ne "0") {
-								### Write Last Image into reading
-								readingsSingleUpdate($hash, "doorbell_snapshot", $LastSnapshotPath, 1);
-							}
-
 							### Save Timestamp as new ID
 							$hash->{helper}{UdpDoorbellId} = $TIMESTAMP;
+						
+							### Create Parameter for CommandURL for doorbell events
+							$UrlPostfix = "history.cgi?event=doorbell&index=1";
+
+							### Create complete command URL for DoorBird
+							$CommandURL = $UrlPrefix . $UrlPostfix;	
 							
-							### Update readings of device
-							readingsSingleUpdate($hash, "state", "doorbell pressed!", 1);
-							readingsSingleUpdate($hash, "doorbell_button", "triggered", 1);
-							
-							### Initiate the timer to reset reading "motion_sensor"
-							InternalTimer(gettimeofday()+ $hash->{helper}{EventReset}, "DoorBird_EventResetDoorbell", $hash, 0);
-							
-							### Log Entry
-							Log3 $name, 3, $name. " : The doorbell button of the DoorBird unit has been pressed.";
-							Log3 $name, 5, $name. " : DoorBird_Read - Timer for reset reading in        : " . $hash->{helper}{EventReset};
+							### Define Parameter for Non-BlockingGet
+							my $param = {
+								url               => $CommandURL,
+								timeout           => $PollingTimeout,
+								user              => $Username,
+								pwd               => $Password,
+								hash              => $hash,
+								method            => $Method,
+								header            => $Header,
+								timestamp         => $TIMESTAMP,
+								event             => "doorbell",
+								doorbellNo        => $EVENT,
+								incrementalTimout => 1,
+								callback          => \&DoorBird_LastEvent_Image
+							};
+
+							### Initiate communication and close
+							HttpUtils_NonblockingGet($param);
 						}
 						### If the MessageID is integer type has appeared before
 						else {
@@ -1113,59 +1158,30 @@ sub DoorBird_LostConn($) {
 }
 ####END####### Lost Connection with DorBird unit ###############################################################END#####
 
-###START###### Reset reading "motion_sensor" ##################################################################START####
-sub DoorBird_EventResetMotion($) {
-	my ($hash) = @_;
+###START###### Reset event reading ############################################################################START####
+sub DoorBird_EventReset($) {
+	my ($ContainerRef) = @_;
+	
+	### Transform hash-Reference into hash
+	my %Container = %$ContainerRef;
+	
+	### Extract hash and reading to be reset
+	my $hash        = $Container{"HashReference"};
+	my $Reading     = $Container{"Reading"};
 
 	### Obtain values from hash
     my $name = $hash->{NAME};
 
 	### Log Entry for debugging purposes
-	Log3 $name, 5, $name. " : DoorBird_EventResetMotion - Reseting reading \"motion_sensor\" after given time";
+	Log3 $name, 3, $name. " : DoorBird_EventReset - Reseting reading to idle    : " . $Reading;
 
 	### Update readings of device
-	readingsSingleUpdate($hash, "state",           "connected", 1);
-	readingsSingleUpdate($hash, "motion_sensor",   "idle",      1);
+	readingsSingleUpdate($hash, "state",  "connected", 1);
+	readingsSingleUpdate($hash, $Reading, "idle",      1);
 	
 	return;
 }
-####END####### Reset reading "motion_sensor" ###################################################################END#####
-
-###START###### Reset reading "doorbell_button" ################################################################START####
-sub DoorBird_EventResetDoorbell($) {
-	my ($hash) = @_;
-
-	### Obtain values from hash
-    my $name = $hash->{NAME};
-
-	### Log Entry for debugging purposes
-	Log3 $name, 5, $name. " : DoorBird_EventResetDoorbell - Reseting reading \"doorbell_button\" after given time";
-
-	### Update readings of device
-	readingsSingleUpdate($hash, "state",           "connected", 1);
-	readingsSingleUpdate($hash, "doorbell_button", "idle",      1);
-	
-	return;
-}
-####END####### Reset reading "doorbell_button" #################################################################END#####
-
-###START###### Reset reading "keypad" #########################################################################START####
-sub DoorBird_EventResetKeypad($) {
-	my ($hash) = @_;
-
-	### Obtain values from hash
-    my $name = $hash->{NAME};
-
-	### Log Entry for debugging purposes
-	Log3 $name, 5, $name. " : DoorBird_EventResetKeypad - Reseting reading \"keypad\" after given time";
-
-	### Update readings of device
-	readingsSingleUpdate($hash, "state",           "connected", 1);
-	readingsSingleUpdate($hash, "keypad",          "idle",      1);
-	
-	return;
-}
-####END####### Reset reading "keypad" ##########################################################################END#####
+####END####### Reset event reading #############################################################################END#####
 
 ###START###### Renew Session ID for DorBird unit ##############################################################START####
 sub DoorBird_RenewSessionID($) {
@@ -1188,7 +1204,6 @@ sub DoorBird_RenewSessionID($) {
 	$ShowData =~ s/[\t]//g;
 	$ShowData =~ s/[\r]//g;
 	$ShowData =~ s/[\n]//g;
-
 	
 	### Log Entry for debugging purposes
 	Log3 $name, 5, $name. " : DoorBird_RenewSessionID  - err                    : " . $err      if(defined($err));
@@ -1299,8 +1314,6 @@ sub DoorBird_FW_detailFn($$$$) {
 		my $PopupfunctionCode = "onclick=\"FW_okDialog(\'" . $ImageHtmlCodeBig . "\') \" ";
 		$VideoHtmlCode    =  '<img ' . $PopupfunctionCode . ' width="400" height="300"  src="' . $VideoURL . '">';
 
-
-
 		### Create proper html link
 		#$VideoHtmlCode = '<img src="' . $VideoURL . '" width="400px" height="300px">';
 	}
@@ -1313,9 +1326,9 @@ sub DoorBird_FW_detailFn($$$$) {
 	### If ImageData is NOT empty
 	else {
 		### Create proper html code including popup
-		my $ImageHtmlCodeBig =  "<img src=\\'data:image/jpeg;base64," . $ImageData . "\\'><br><center>" . $ImageTimeStamp . "</center>";
+		my $ImageHtmlCodeBig  =  "<img src=\\'data:image/jpeg;base64," . $ImageData . "\\'><br><center>" . $ImageTimeStamp . "</center>";
 		my $PopupfunctionCode = "onclick=\"FW_okDialog(\'" . $ImageHtmlCodeBig . "\') \" ";
-		$ImageHtmlCode    =  '<img ' . $PopupfunctionCode . ' width="400" height="300" alt="tick" src="data:image/jpeg;base64,' . $ImageData . '">';
+		$ImageHtmlCode   	  =  '<img ' . $PopupfunctionCode . ' width="400" height="300" alt="tick" src="data:image/jpeg;base64,' . $ImageData . '">';
 	}
 	
 		### If AudioURL is empty
@@ -1543,7 +1556,7 @@ sub DoorBird_Info_Request($$) {
 						$RelayNumber++;
 
 						### Log Entry for debugging purposes
-						Log3 $name, 5, $name. " : DoorBird_Info_Request - Adress of " . sprintf("%15s %-s", "Relay_" . sprintf("%02d\n", $RelayNumber), ": " . $RelayAddress);
+						Log3 $name, 5, $name. " : DoorBird_Info_Request - Adress of " . sprintf("%15s %-s", "Relay_" . sprintf("%02d", $RelayNumber), ": " . $RelayAddress);
 						
 						### Update Reading
 						readingsBulkUpdate($hash, "RelayAddr_" . sprintf("%02d", $RelayNumber), $RelayAddress);
@@ -1775,9 +1788,6 @@ sub DoorBird_Image_Request($$) {
 	### Update Reading
 	readingsSingleUpdate($hash, ".ImageURL", $ImageURL, 1);
 		
-	### Refresh Browser Window
-	FW_directNotify("#FHEMWEB:$FW_wname", "location.reload()", "") if defined($FW_wname);
-
 	### Get Image Data
 	($err, $data) = DoorBird_BlockGet($hash, $command, $method, $header);
 
@@ -1799,95 +1809,387 @@ sub DoorBird_Image_Request($$) {
 	$hash->{helper}{Images}{Individual}{Data}		= $ImageData;
 	$hash->{helper}{Images}{Individual}{Timestamp} 	= $ImageTimeStamp;
 
-				### Log Entry for debugging purposes
-				Log3 $name, 5, $name. " : DoorBird_Image_Request - hash - ImageFileDir      : " . $hash->{helper}{ImageFileDir};
+	### Refresh Browser Window
+	FW_directNotify("#FHEMWEB:$FW_wname", "location.reload()", "") if defined($FW_wname);
 
-				### If pictures supposed to be saved as files
-				if ($hash->{helper}{ImageFileDir} ne "0") {
+	### Log Entry for debugging purposes
+	Log3 $name, 5, $name. " : DoorBird_Image_Request - hash - ImageFileDir      : " . $hash->{helper}{ImageFileDir};
 
-					### Get current working directory
-					my $cwd = getcwd();
+	### If pictures supposed to be saved as files
+	if ($hash->{helper}{ImageFileDir} ne "0") {
 
-					### Log Entry for debugging purposes
-					Log3 $name, 5, $name. " : DoorBird_Image_Request - working directory        : " . $cwd;
+		### Get current working directory
+		my $cwd = getcwd();
+
+		### Log Entry for debugging purposes
+		Log3 $name, 5, $name. " : DoorBird_Image_Request - working directory        : " . $cwd;
 
 
-					### If the path is given as UNIX file system format
-					if ($cwd =~ /\//) {
-						### Log Entry for debugging purposes
-						Log3 $name, 5, $name. " : DoorBird_Image_Request - file system format       : LINUX";
+		### If the path is given as UNIX file system format
+		if ($cwd =~ /\//) {
+			### Log Entry for debugging purposes
+			Log3 $name, 5, $name. " : DoorBird_Image_Request - file system format       : LINUX";
 
-						### Find out whether it is an absolute path or an relative one (leading "/")
-						if ($hash->{helper}{ImageFileDir} =~ /^\//) {
-							$ImageFileName = $hash->{helper}{ImageFileDir};
-						}
-						else {
-							$ImageFileName = $cwd . "/" . $hash->{helper}{ImageFileDir};						
-						}
+			### Find out whether it is an absolute path or an relative one (leading "/")
+			if ($hash->{helper}{ImageFileDir} =~ /^\//) {
+				$ImageFileName = $hash->{helper}{ImageFileDir};
+			}
+			else {
+				$ImageFileName = $cwd . "/" . $hash->{helper}{ImageFileDir};						
+			}
 
-						### Check whether the last "/" at the end of the path has been given otherwise add it an create complete path
-						if ($hash->{helper}{ImageFileDir} =~ /\/\z/) {
-							$ImageFileName .=       $ImageFileTimeStamp . "_Snapshot.jpg";
-						}
-						else {
-							$ImageFileName .= "/" . $ImageFileTimeStamp . "_Snapshot.jpg";
-						}
-					}
+			### Check whether the last "/" at the end of the path has been given otherwise add it an create complete path
+			if ($hash->{helper}{ImageFileDir} =~ /\/\z/) {
+				$ImageFileName .=       $ImageFileTimeStamp . "_snapshot.jpg";
+			}
+			else {
+				$ImageFileName .= "/" . $ImageFileTimeStamp . "_snapshot.jpg";
+			}
+		}
 
-					### If the path is given as Windows file system format
-					if ($hash->{helper}{ImageFileDir} =~ /\\/) {
-						### Log Entry for debugging purposes
-						Log3 $name, 5, $name. " : DoorBird_Image_Request - file system format       : WINDOWS";
+		### If the path is given as Windows file system format
+		if ($hash->{helper}{ImageFileDir} =~ /\\/) {
+			### Log Entry for debugging purposes
+			Log3 $name, 5, $name. " : DoorBird_Image_Request - file system format       : WINDOWS";
 
-						### Find out whether it is an absolute path or an relative one (containing ":\")
-						if ($hash->{helper}{ImageFileDir} != /^.:\//) {
-							$ImageFileName = $cwd . $hash->{helper}{ImageFileDir};
-						}
-						else {
-							$ImageFileName = $hash->{helper}{ImageFileDir};						
-						}
+			### Find out whether it is an absolute path or an relative one (containing ":\")
+			if ($hash->{helper}{ImageFileDir} != /^.:\//) {
+				$ImageFileName = $cwd . $hash->{helper}{ImageFileDir};
+			}
+			else {
+				$ImageFileName = $hash->{helper}{ImageFileDir};						
+			}
 
-						### Check whether the last "/" at the end of the path has been given otherwise add it an create complete path
-						if ($hash->{helper}{ImageFileDir} =~ /\\\z/) {
-							$ImageFileName .=       $ImageFileTimeStamp . "_Snapshot.jpg";
-						}
-						else {
-							$ImageFileName .= "\\" . $ImageFileTimeStamp . "_Snapshot.jpg";
-						}
-					}
-					
-					### Save filename of last snapshot into hash
-					$hash->{helper}{Images}{LastSnapshotPath} = $ImageFileName;
-					
-					### Log Entry for debugging purposes
-					Log3 $name, 5, $name. " : DoorBird_Image_Request - ImageFileName            : " . $ImageFileName;
+			### Check whether the last "/" at the end of the path has been given otherwise add it an create complete path
+			if ($hash->{helper}{ImageFileDir} =~ /\\\z/) {
+				$ImageFileName .=       $ImageFileTimeStamp . "_snapshot.jpg";
+			}
+			else {
+				$ImageFileName .= "\\" . $ImageFileTimeStamp . "_snapshot.jpg";
+			}
+		}
+		
+		### Save filename of last snapshot into hash
+		$hash->{helper}{Images}{LastSnapshotPath} = $ImageFileName;
+		
+		### Log Entry for debugging purposes
+		Log3 $name, 5, $name. " : DoorBird_Image_Request - ImageFileName            : " . $ImageFileName;
 
-					### Open file or write error message in log
-					open my $fh, ">", $ImageFileName or do {
-						### Log Entry 
-						Log3 $name, 2, $name. " : DoorBird_Image_Request -  open file error         : " . $! . " - ". $ImageFileName;
-					};
-					
-					### Write the base64 decoded data in file
-					print $fh decode_base64($ImageData) if defined($fh);
-					
-					### Log Entry for debugging purposes
-					Log3 $name, 5, $name. " : DoorBird_Image_Request - write file               : Successfully written " . $ImageFileName;
-					
-					### Close file or write error message in log
-					close $fh or do {
-						### Log Entry 
-						Log3 $name, 2, $name. " : DoorBird_Image_Request - close file error          : " . $! . " - ". $ImageFileName;
-					}
-				}
+		### Open file or write error message in log
+		open my $fh, ">", $ImageFileName or do {
+			### Log Entry 
+			Log3 $name, 2, $name. " : DoorBird_Image_Request -  open file error         : " . $! . " - ". $ImageFileName;
+		};
+		
+		### Write the base64 decoded data in file
+		print $fh decode_base64($ImageData) if defined($fh);
+		
+		### Log Entry for debugging purposes
+		Log3 $name, 5, $name. " : DoorBird_Image_Request - write file               : Successfully written " . $ImageFileName;
+		
+		### Close file or write error message in log
+		close $fh or do {
+			### Log Entry 
+			Log3 $name, 2, $name. " : DoorBird_Image_Request - close file error          : " . $! . " - ". $ImageFileName;
+		}
+	}
 	
 	### Log Entry for debugging purposes
 	Log3 $name, 5, $name. " : DoorBird_Image_Request - ImageData size           : " . length($ImageData);
 	Log3 $name, 5, $name. " : DoorBird_Image_Request - ImageTimeStamp           : " . $ImageTimeStamp;
 	
-	return($ImageFileName);
+	return;
 }
 ####END####### Define Subfunction for LIVE IMAGE REQUEST #######################################################END#####
+
+###START###### Define Subfunction for LAST EVENT IMAGE REQUEST ################################################START####
+sub DoorBird_LastEvent_Image($$$) {
+	my ($param, $err, $data) = @_;
+    my $hash = $param->{hash};
+
+	### Obtain values from hash
+    my $name         = $hash->{NAME};
+	my $event        = $param->{event};
+	my $timestamp	 = $param->{timestamp};
+	my $ReadingEvent;
+	my $ReadingImage;
+	my $ReadingEventContent;
+
+	if ($event =~ m/doorbell/ ){
+		$ReadingEvent 			= "doorbell_button_"   . sprintf("%03d", $param->{doorbellNo});
+		$ReadingImage 			= "doorbell_snapshot_" . sprintf("%03d", $param->{doorbellNo});
+		$ReadingEventContent 	= "doorbell pressed!";
+	}
+	elsif ($event =~ m/motion/ ){
+		$ReadingEvent 			= "motion_sensor";
+		$ReadingImage 			= "motion_snapshot";
+		$ReadingEventContent 	= "Motion detected!";
+	}
+	elsif ($event =~ m/keypad/ ){
+		$ReadingEvent 			= "keypad_pin";
+		$ReadingImage 			= "keypad_snapshot";
+		$ReadingEventContent 	= "Access via Keypad!";
+	}
+	else {
+		### Create Log entry
+		Log3 $name, 2, $name. " : DoorBird_LastEvent_Image - Unknown event. Breaking up";
+		
+		### Exit sub
+		return
+	}
+	
+
+	### Log Entry for debugging purposes
+	Log3 $name, 5, $name. " : DoorBird_LastEvent_Image ___________________________________________________________";
+	Log3 $name, 5, $name. " : DoorBird_LastEvent_Image - err                    : " . $err           if (defined($err  ));
+	Log3 $name, 5, $name. " : DoorBird_LastEvent_Image - length data            : " . length($data)  if (defined($data ));
+	#Log3 $name, 5, $name. " : DoorBird_LastEvent_Image - param                  : " . join("\n", @{[%{$param}]}) if (defined($param));
+
+	### Initiate Bulk Update
+	readingsBeginUpdate($hash);
+	
+	### If error message available
+	if ($err ne "") {
+		### Create Log entry
+		Log3 $name, 3, $name. " : DoorBird_LastEvent_Image - Error                  : " . $err        if (defined($err  ));
+		
+		### Write Last Image into reading
+		readingsBulkUpdate($hash, $ReadingImage, "", 1);
+	}
+	### if no error message available
+	else {
+		### If any image data available
+		if (defined $data) {
+
+			### Predefine Image Data and Image-hash and hash - reference		
+			my $ImageData;
+			my $ImageTimeStamp;
+			my $ImageFileTimeStamp;
+			my $ImageFileName;
+			my %ImageDataHash;
+			my $ref_ImageDataHash = \%ImageDataHash;
+			
+			### If http response code is 200 = OK
+			if ($param->{code} == 200) {
+				### Encode jpeg data into base64 data and remove lose newlines
+				$ImageData =  MIME::Base64::encode($data);
+				$ImageData =~ s{\n}{}g;
+
+				### Create Timestamp
+				my $httpHeader = $param->{httpheader};
+				   $httpHeader =~ s/^[^_]*X-Timestamp: //;
+				   $httpHeader =~ s/\n.*//g;
+
+				### If timestamp from history image has NOT been done since the timestamp from the event
+				if ((int($timestamp) - int($httpHeader)) > 0){
+					### Log Entry for debugging purposes
+					Log3 $name, 5, $name. " : DoorBird_LastEvent_Image - timestamp from history image has NOT been done since the timestamp from the event.";
+					Log3 $name, 5, $name. " : DoorBird_LastEvent_Image - Image timestamp        : " . $httpHeader;
+					Log3 $name, 5, $name. " : DoorBird_LastEvent_Image - Event timestamp        : " . $timestamp;
+					Log3 $name, 5, $name. " : DoorBird_LastEvent_Image - dt                     : " . (int($timestamp) - int($httpHeader));
+
+
+					### If timestamp from the event is NOT older than WaitForHistory from current time => Try again
+					if ((time - int($timestamp)) <= $hash->{helper}{WaitForHistory}){
+
+						### Log Entry for debugging purposes
+						Log3 $name, 5, $name. " : DoorBird_LastEvent_Image - timestamp of event is not older than Attribute WaitForHistory: Still time to try again";
+						Log3 $name, 5, $name. " : DoorBird_LastEvent_Image - Event timestamp        : " . $timestamp;
+						Log3 $name, 5, $name. " : DoorBird_LastEvent_Image - current timestamp      : " . time;
+						Log3 $name, 5, $name. " : DoorBird_LastEvent_Image - Attr WaitForHistory    : " . $hash->{helper}{WaitForHistory};
+						Log3 $name, 5, $name. " : DoorBird_LastEvent_Image - dt                     : " . int(time - int($timestamp));
+
+						### Finish Readings Bulk Update
+						readingsEndUpdate($hash, 0);
+
+						### Try again: Initiate communication and close
+						HttpUtils_NonblockingGet($param);
+							
+						### Exit routine
+						return;
+					}
+					else {
+						### Log Entry for debugging purposes
+						Log3 $name, 2, $name. " : DoorBird_LastEvent_Image - timestamp of event is older than than Attribute WaitForHistory: Proceeding without waiting any longer...";
+						Log3 $name, 5, $name. " : DoorBird_LastEvent_Image - Event timestamp        : " . $timestamp;
+						Log3 $name, 5, $name. " : DoorBird_LastEvent_Image - current timestamp      : " . time;
+						Log3 $name, 5, $name. " : DoorBird_LastEvent_Image - Attr WaitForHistory    : " . $hash->{helper}{WaitForHistory};
+						Log3 $name, 5, $name. " : DoorBird_LastEvent_Image - dt                     : " . int(time - int($timestamp));
+						
+						### Write Last Image into reading
+						readingsBulkUpdate($hash, $ReadingImage, "", 1);
+						
+					}
+				}
+				### If timestamp from history picture has been done since the timestamp from the event			
+				else {
+					### Log Entry for debugging purposes
+					Log3 $name, 5, $name. " : DoorBird_LastEvent_Image - timestamp from history image has been done since the timestamp from the event.";
+					Log3 $name, 5, $name. " : DoorBird_LastEvent_Image - Image timestamp        : " . $httpHeader;
+					Log3 $name, 5, $name. " : DoorBird_LastEvent_Image - Event timestamp        : " . $timestamp;
+					Log3 $name, 5, $name. " : DoorBird_LastEvent_Image - dt                     : " . (int($timestamp) - int($httpHeader));
+					
+					my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)=localtime($httpHeader);
+					$ImageTimeStamp	    = sprintf ( "%04d-%02d-%02d %02d:%02d:%02d",$year+1900, $mon+1, $mday, $hour, $min, $sec);
+					$ImageFileTimeStamp	= sprintf ( "%04d%02d%02d-%02d%02d%02d"    ,$year+1900, $mon+1, $mday, $hour, $min, $sec);
+
+					### Save picture and timestamp into hash
+					$hash->{helper}{Images}{Individual}{Data}		= $ImageData;
+					$hash->{helper}{Images}{Individual}{Timestamp} 	= $ImageTimeStamp;
+					
+					### Refresh Browser Window		
+					FW_directNotify("#FHEMWEB:$FW_wname", "location.reload()", "") if defined($FW_wname);
+
+					### Log Entry for debugging purposes
+					Log3 $name, 5, $name. " : DoorBird_LastEvent_Image - hash - ImageFileDir    : " . $hash->{helper}{ImageFileDir};
+
+					### If pictures supposed to be saved as files
+					if ($hash->{helper}{ImageFileDir} ne "0") {
+
+						### Get current working directory
+						my $cwd = getcwd();
+
+						### Log Entry for debugging purposes
+						Log3 $name, 5, $name. " : DoorBird_LastEvent_Image - working directory      : " . $cwd;
+
+						### If the path is given as UNIX file system format
+						if ($cwd =~ /\//) {
+							### Log Entry for debugging purposes
+							Log3 $name, 5, $name. " : DoorBird_LastEvent_Image - file system format     : LINUX";
+
+							### Find out whether it is an absolute path or an relative one (leading "/")
+							if ($hash->{helper}{ImageFileDir} =~ /^\//) {
+								$ImageFileName = $hash->{helper}{ImageFileDir};
+							}
+							else {
+								$ImageFileName = $cwd . "/" . $hash->{helper}{ImageFileDir};						
+							}
+
+							### Check whether the last "/" at the end of the path has been given otherwise add it an create complete path
+							if ($hash->{helper}{ImageFileDir} =~ /\/\z/) {
+								$ImageFileName .=       $ImageFileTimeStamp . "_" . $event . ".jpg";
+							}
+							else {
+								$ImageFileName .= "/" . $ImageFileTimeStamp . "_" . $event . ".jpg";
+							}
+						}
+
+						### If the path is given as Windows file system format
+						if ($hash->{helper}{ImageFileDir} =~ /\\/) {
+							### Log Entry for debugging purposes
+							Log3 $name, 5, $name. " : DoorBird_LastEvent_Image - file system format     : WINDOWS";
+
+							### Find out whether it is an absolute path or an relative one (containing ":\")
+							if ($hash->{helper}{ImageFileDir} != /^.:\//) {
+								$ImageFileName = $cwd . $hash->{helper}{ImageFileDir};
+							}
+							else {
+								$ImageFileName = $hash->{helper}{ImageFileDir};						
+							}
+
+							### Check whether the last "/" at the end of the path has been given otherwise add it an create complete path
+							if ($hash->{helper}{ImageFileDir} =~ /\\\z/) {
+								$ImageFileName .=       $ImageFileTimeStamp . "_" . $event . ".jpg";
+							}
+							else {
+								$ImageFileName .= "\\" . $ImageFileTimeStamp . "_" . $event . ".jpg";
+							}
+						}
+						
+						### Log Entry for debugging purposes
+						Log3 $name, 5, $name. " : DoorBird_LastEvent_Image - ImageFileName          : " . $ImageFileName;
+
+						### Open file or write error message in log
+						open my $fh, ">", $ImageFileName or do {
+							### Log Entry 
+							Log3 $name, 2, $name. " : DoorBird_LastEvent_Image -  open file error       : " . $! . " - ". $ImageFileName;
+						};
+						
+						### Write the base64 decoded data in file
+						print $fh decode_base64($ImageData) if defined($fh);
+						
+						### Log Entry for debugging purposes
+						Log3 $name, 5, $name. " : DoorBird_LastEvent_Image - write file             : Successfully written " . $ImageFileName;
+						
+						### Close file or write error message in log
+						close $fh or do {
+							### Log Entry 
+							Log3 $name, 2, $name. " : DoorBird_LastEvent_Image - close file error       : " . $! . " - ". $ImageFileName;
+						};
+					
+						### Write Last Image into reading
+						readingsBulkUpdate($hash, $ReadingImage, $ImageFileName, 1);
+					}
+					### Log Entry for debugging purposes
+					Log3 $name, 5, $name. " : DoorBird_LastEvent_Image - ImageData - event      : " . length($ImageData);
+
+				}
+				### Log Entry for debugging purposes
+				Log3 $name, 5, $name. " : DoorBird_LastEvent_Image - Type of event          : " . $event;
+			}
+			### If http response code is 204 = No permission to download the event history
+			elsif ($param->{code} == 204) {
+				### Create Log entry
+				Log3 $name, 3, $name. " : DoorBird_LastEvent_Image - Error 204              : User not authorized to download event history";
+				
+				### Create Error message
+				$ImageData = "Error 204: The user has no permission to download the event history.";
+				$ImageTimeStamp =" ";
+				
+				### Write Last Image into reading
+				readingsBulkUpdate($hash, $ReadingImage, "", 1);
+			}
+			### If http response code is 404 = No picture available to download the event history
+			elsif ($param->{code} == 404) {
+				### Create Log entry
+				Log3 $name, 5, $name. " : DoorBird_LastEvent_Image - Error 404              : No picture available to download event history. Check settings in DoorBird APP.";
+				
+				### Create Error message
+				$ImageData = "Error 404: No picture available to download in the event history.";
+				$ImageTimeStamp =" ";
+				
+				### Write Last Image into reading
+				readingsBulkUpdate($hash, $ReadingImage, "", 1);
+			}
+			### If http response code is none of one above
+			else {
+				### Create Log entry
+				Log3 $name, 3, $name. " : DoorBird_LastEvent_Image - Unknown http response code    : " . $param->{code};
+			
+				### Create Error message
+				$ImageData = "Error : " . $param->{code};
+				$ImageTimeStamp =" ";
+				
+				### Write Last Image into reading
+				readingsBulkUpdate($hash, $ReadingImage, "", 1);
+			}
+		}
+		else {
+			### Write Last Image into reading
+			readingsBulkUpdate($hash, $ReadingImage, "", 1);
+		}
+	}
+
+	### Update readings of device
+	readingsBulkUpdate($hash, "state", $ReadingEventContent, 1);
+	readingsBulkUpdate($hash, $ReadingEvent, "triggered", 1);
+
+	### Execute Readings Bulk Update
+	readingsEndUpdate($hash, 1);
+	
+	### Wrap up a container and initiate the timer to reset reading "doorbell_button"
+	my %Container;
+	$Container{"HashReference"} = $hash;
+	$Container{"Reading"} 		= $ReadingEvent;
+	InternalTimer(gettimeofday()+ $hash->{helper}{EventReset}, "DoorBird_EventReset", \%Container, 0);
+	
+	### Log Entry
+	Log3 $name, 3, $name. " : An event has been triggered by the DoorBird unit  : " . $event;
+	Log3 $name, 5, $name. " : DoorBird_Read - Timer for reset reading in        : " . $hash->{helper}{EventReset};
+
+	return;
+}
+####END####### Define Subfunction for LAST EVENT IMAGE REQUEST #################################################END#####
 
 ###START###### Define Subfunction for OPEN DOOR ###############################################################START####
 sub DoorBird_Open_Door($$) {
@@ -2350,10 +2652,10 @@ sub DoorBird_History_Request_Parse($) {
 
 						### Check whether the last "/" at the end of the path has been given otherwise add it an create complete path
 						if ($hash->{helper}{ImageFileDir} =~ /\/\z/) {
-							$ImageFileName .=       $ImageFileTimeStamp . "_Doorbell.jpg";
+							$ImageFileName .=       $ImageFileTimeStamp . "_doorbell.jpg";
 						}
 						else {
-							$ImageFileName .= "/" . $ImageFileTimeStamp . "_Doorbell.jpg";
+							$ImageFileName .= "/" . $ImageFileTimeStamp . "_doorbell.jpg";
 						}
 					}
 
@@ -2372,10 +2674,10 @@ sub DoorBird_History_Request_Parse($) {
 
 						### Check whether the last "/" at the end of the path has been given otherwise add it an create complete path
 						if ($hash->{helper}{ImageFileDir} =~ /\\\z/) {
-							$ImageFileName .=       $ImageFileTimeStamp . "_Doorbell.jpg";
+							$ImageFileName .=       $ImageFileTimeStamp . "_doorbell.jpg";
 						}
 						else {
-							$ImageFileName .= "\\" . $ImageFileTimeStamp . "_Doorbell.jpg";
+							$ImageFileName .= "\\" . $ImageFileTimeStamp . "_doorbell.jpg";
 						}
 					}
 					
@@ -2447,10 +2749,10 @@ sub DoorBird_History_Request_Parse($) {
 
 						### Check whether the last "/" at the end of the path has been given otherwise add it an create complete path
 						if ($hash->{helper}{ImageFileDir} =~ /\/\z/) {
-							$ImageFileName .=       $ImageFileTimeStamp . "_Motion.jpg";
+							$ImageFileName .=       $ImageFileTimeStamp . "_motionsensor.jpg";
 						}
 						else {
-							$ImageFileName .= "/" . $ImageFileTimeStamp . "_Motion.jpg";
+							$ImageFileName .= "/" . $ImageFileTimeStamp . "_motionsensor.jpg";
 						}
 					}
 
@@ -2469,10 +2771,10 @@ sub DoorBird_History_Request_Parse($) {
 
 						### Check whether the last "/" at the end of the path has been given otherwise add it an create complete path
 						if ($hash->{helper}{ImageFileDir} =~ /\\\z/) {
-							$ImageFileName .=       $ImageFileTimeStamp . "_Motion.jpg";
+							$ImageFileName .=       $ImageFileTimeStamp . "_motionsensor.jpg";
 						}
 						else {
-							$ImageFileName .= "\\" . $ImageFileTimeStamp . "_Motion.jpg";
+							$ImageFileName .= "\\" . $ImageFileTimeStamp . "_motionsensor.jpg";
 						}
 					}
 					
@@ -3145,7 +3447,13 @@ sub DoorBird_BlockGet($$$$) {
 					<code>EventReset</code> : </td><td>Time in seconds after wich the Readings for the Events Events (e.g. "doorbell_button", "motions sensor", "keypad") shal be reset to "idle".<BR>
    																   The default value is 5s<BR>
 				</td>
-			</tr>			
+			</tr>
+			<tr>
+				<td>
+					<code>WaitForHistory</code> : </td><td>Time in seconds after wich the module shall wait for an history image triggered by an event is ready for download. Might be adjusted if fhem-Server and Doorbird unit have large differences in system time.<BR>
+   																   The default value is 7s<BR>
+				</td>
+			</tr>
 		</table>
 	</ul>
 </ul>
@@ -3305,6 +3613,12 @@ sub DoorBird_BlockGet($$$$) {
    																   Der Default Wert ist 5s<BR>
 				</td>
 			</tr>			
+			<tr>
+				<td>
+					<code>WaitForHistory</code> : </td><td>Zeit in Sekunden die das Modul auf das Bereitstellen eines korrespondierenden History Bildes zu einem Event warten soll. Muss ggf. adjustiert werden, sobald deutliche Unterschiede in der Systemzeit zwischen fhemßServer und DoorBird Station vorliegen.<BR>
+   																   Der Default Wert ist 7s<BR>
+				</td>
+			</tr>
 		</table>
 	</ul>
 </ul>
