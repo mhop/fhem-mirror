@@ -48,6 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.14.0" => "01.06.2019  Link to Cam/SVS-Setup Screen and online help in Detailview ",
   "8.13.6" => "26.05.2019  enhanced log entries of snapinfos with debugactivetoken ",
   "8.13.5" => "23.05.2019  StmKey quoted depending on attr noQuotesForSID (Forum: https://forum.fhem.de/index.php/topic,45671.msg938236.html#msg938236), ".
                            "autoplay muted of hls-StreamDev",
@@ -149,6 +150,7 @@ our %SSCam_vNotesIntern = (
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
+  "8.14.0" => "01.06.2019 In detailview are buttons provided to open the camera native setup screen or Synology Surveillance Station and the Synology Surveillance Station online help. ",
   "8.12.0" => "25.03.2019 Delay FHEM shutdown as long as sessions are not terminated, but not longer than global attribute \"maxShutdownDelay\". ",
   "8.11.0" => "25.02.2019 compatibility set to SVS version 8.2.3, Popup possible for streaming devices of type \"generic\", ".
               "support for \"genericStrmHtmlTag\" in streaming devices ",
@@ -326,6 +328,9 @@ our %SSCam_ttips_en = (
     tth264run   => "Playback of last H.264 recording of camera &quot;§NAME§&quot;.<br>It only starts if the recording is type H.264",
     ttlmjpegrun => "Playback of last MJPEG recording of camera &quot;§NAME§&quot;.<br>It only starts if the recording is type MJPEG",
     ttlsnaprun  => "Playback of last snapshot of camera &quot;§NAME§&quot;.",
+    confcam     => "The configuration menu of camera &quot;§NAME§&quot; will be opened in a new Browser page",
+    confsvs     => "The configuration page of Synology Surveillance Station will be opened in a new Browser page",
+    helpsvs     => "The online help page of Synology Surveillance Station will be opened in a new Browser page",
 );
 	  
 our %SSCam_ttips_de = (
@@ -341,6 +346,9 @@ our %SSCam_ttips_de = (
     tth264run   => "Wiedergabe der letzten H.264 Aufnahme von Kamera &quot;§NAME§&quot;.<br>Die Wiedergabe startet nur wenn die Aufnahme vom Typ H.264 ist.",
     ttlmjpegrun => "Wiedergabe der letzten MJPEG Aufnahme von Kamera &quot;§NAME§&quot;.<br>Die Wiedergabe startet nur wenn die Aufnahme vom Typ MJPEG ist.", 
     ttlsnaprun  => "Wiedergabe des letzten Schnappschusses von Kamera &quot;§NAME§&quot;.",
+    confcam     => "Das Konfigurationsmenü von Kamera &quot;§NAME§&quot; wird in einer neuen Browserseite geöffnet",
+    confsvs     => "Die Konfigurationsseite der Synology Surveillance Station wird in einer neuen Browserseite geöffnet",
+    helpsvs     => "Die Onlinehilfe der Synology Surveillance Station wird in einer neuen Browserseite geöffnet",
 );
 
 # Standardvariablen und Forward-Deklaration
@@ -1882,15 +1890,93 @@ return $ret;
 sub SSCam_FWdetailFn ($$$$) {
   my ($FW_wname, $d, $room, $pageHash) = @_;           # pageHash is set for summaryFn.
   my $hash = $defs{$d};
+  my $ret = "";
   
-  return undef if(!AttrVal($d,"ptzPanel_use",1));
+  $hash->{".setup"} = SSCam_FWconfCam($d,$room);
+  if($hash->{".setup"} ne "") {
+      $ret .= $hash->{".setup"};
+  }
+  
+  # return undef if(!AttrVal($d,"ptzPanel_use",1));
   $hash->{".ptzhtml"} = SSCam_ptzpanel($d) if($hash->{".ptzhtml"} eq "");
 
-  if($hash->{".ptzhtml"} ne "") {
-      return $hash->{".ptzhtml"};
-  } else {
-      return undef;
+  if($hash->{".ptzhtml"} ne "" && AttrVal($d,"ptzPanel_use",1)) {
+      $ret .= $hash->{".ptzhtml"};
+  } 
+
+return $ret;
+}
+
+###############################################################################
+#                        Aufruf Konfigseite Kamera
+###############################################################################
+sub SSCam_FWconfCam($$) {
+  my ($name,$room) = @_; 
+  my $hash    = $defs{$name};
+  my $cip     = ReadingsVal("$name","CamIP","");
+  my $svsip   = $hash->{SERVERADDR};
+  my $svsport = $hash->{SERVERPORT};
+  my $svsprot = $hash->{PROTOCOL};
+  my $ttjs    = "/fhem/pgm2/sscam_tooltip.js"; 
+  my $attr    = AttrVal($name, "htmlattr", "");
+  my $alias   = AttrVal($name, "alias", $name);    
+  my $winname = $name."_view";
+  my $cicon   = 'edit_settings.svg';                                    # Icon für Cam/SVS Setup-Screen
+  my $hicon   = 'info_info.svg';                                        # Icon für SVS Hilfeseite
+  my $w       = 150;
+  my ($ret,$cexpl,$hexpl) = ("","","");
+  my ($cs,$bs,$ch,$bh,);
+  
+  if(SSCam_IsModelCam($hash)) {                                         # Camera Device
+      return $ret if(!$cip);
+      if(AttrVal("global","language","EN") =~ /DE/) {
+          $cexpl = $SSCam_ttips_de{confcam}; $cexpl =~ s/§NAME§/$alias/g; $cexpl =~ s/\s+/&nbsp;/g;
+      } else {
+          $cexpl = $SSCam_ttips_en{confcam}; $cexpl =~ s/§NAME§/$alias/g; $cexpl =~ s/\s+/&nbsp;/g;
+      }
+      $cs = "window.open('http://$cip')";
+  
+  } else {                                                              # SVS-Device
+      return $ret if(!$svsip);
+      if(AttrVal("global","language","EN") =~ /DE/) {
+          $cexpl = $SSCam_ttips_de{confsvs}; $cexpl =~ s/§NAME§/$alias/g; $cexpl =~ s/\s+/&nbsp;/g;
+      } else {
+          $cexpl = $SSCam_ttips_en{confsvs}; $cexpl =~ s/§NAME§/$alias/g; $cexpl =~ s/\s+/&nbsp;/g;
+      }    
+      $cs = "window.open('$svsprot://$svsip:$svsport/cam')";      
   }
+  
+  if(AttrVal("global","language","EN") =~ /DE/) {
+      $hexpl = $SSCam_ttips_de{"helpsvs"}; $hexpl =~ s/\s/&nbsp;/g; 
+      $ch    = "window.open('https://www.synology.com/de-de/knowledgebase/Surveillance/help')"; 
+  } else {
+      $hexpl = $SSCam_ttips_en{"helpsvs"}; $hexpl =~ s/\s/&nbsp;/g; 
+      $ch = "window.open('https://www.synology.com/en-global/knowledgebase/Surveillance/help')"; 
+  }   
+  
+  $cicon = FW_makeImage($cicon); $hicon = FW_makeImage($hicon);
+  $bs    = "Tip(`$cexpl`)";
+  $bh    = "Tip(`$hexpl`)";
+  
+  $ret .= "<script type=\"text/javascript\" src=\"$ttjs\"></script>";
+  $ret .= "<style>TD.confcam {text-align: center; padding-left:1px; padding-right:1px; margin:0px;}</style>";
+  $ret .= "<table class='roomoverview' width='$w' style='width:".$w."px'>";
+  $ret .= '<tbody>';  
+  $ret .= "<td>"; 
+  
+  $ret .= "<a onClick=$cs onmouseover=$bs onmouseout=\"UnTip()\"> $cicon </a>";  
+  
+  $ret .= "</td><td>";  
+  
+  $ret .= "<a onClick=$ch onmouseover=$bh onmouseout=\"UnTip()\"> $hicon </a>";  
+ 
+  $ret .= "</td>";
+  $ret .= "</tr>";
+  $ret .= '</tbody>';
+  $ret .= "</table>";  
+  $ret .= "<br>";
+  
+return $ret;
 }
 
 ######################################################################################
