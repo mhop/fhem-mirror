@@ -59,7 +59,7 @@ use strict;
 use warnings;
 use FHEM::Meta;
 
-my $version = "1.6.2";
+my $version = "1.6.3";
 
 sub GardenaSmartDevice_Initialize($) {
 
@@ -84,7 +84,7 @@ sub GardenaSmartDevice_Initialize($) {
         my $hash = $modules{GardenaSmartDevice}{defptr}{$d};
         $hash->{VERSION} = $version;
     }
-    
+
     return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
@@ -249,7 +249,8 @@ sub Set($@) {
 
         my $duration = join( " ", @args );
 
-        $payload = '"name":"pump_manual_watering_timer","parameters":{"duration":'
+        $payload =
+          '"name":"pump_manual_watering_timer","parameters":{"duration":'
           . $duration . '}';
     }
     ### watering_computer
@@ -264,13 +265,11 @@ sub Set($@) {
 
         $payload = '"name":"cancel_override"';
 
-        
     }
     elsif ( lc $cmd eq 'on' or lc $cmd eq 'off' or lc $cmd eq 'on-for-timer' ) {
-    
-        my $val = ( defined($args[0]) ? join(" ", @args)*60 : lc $cmd );
-        $payload =
-            '"properties":{"value":"' . $val . '"}';
+
+        my $val = ( defined( $args[0] ) ? join( " ", @args ) * 60 : lc $cmd );
+        $payload = '"properties":{"value":"' . $val . '"}';
     }
     ### Watering ic24
     elsif ( $cmd =~ /manualDurationValve/ ) {
@@ -320,8 +319,8 @@ sub Set($@) {
         $list .= 'manualOverride:slider,0,1,59 cancelOverride:noArg'
           if ( AttrVal( $name, 'model', 'unknown' ) eq 'watering_computer' );
 
-        $list .= 'pumpTimer:slider,0,1,59'
-          if ( AttrVal( $name, 'model', 'unknown' ) eq 'electronic_pressure_pump' );
+#         $list .= 'pumpTimer:slider,0,1,59'
+#           if ( AttrVal( $name, 'model', 'unknown' ) eq 'electronic_pressure_pump' );
 
         $list .=
 'manualDurationValve1:slider,1,1,59 manualDurationValve2:slider,1,1,59 manualDurationValve3:slider,1,1,59 manualDurationValve4:slider,1,1,59 manualDurationValve5:slider,1,1,59 manualDurationValve6:slider,1,1,59'
@@ -426,9 +425,7 @@ sub WriteReadings($$) {
                     $hash,
                     $decode_json->{abilities}[$abilities]{name} . '-'
                       . $propertie->{name},
-                    RigRadingsValue(
-                        $hash, $propertie->{value}
-                    )
+                    RigRadingsValue( $hash, $propertie->{value} )
                   )
                   if ( defined( $propertie->{value} )
                     and $decode_json->{abilities}[$abilities]{name} . '-'
@@ -451,9 +448,7 @@ sub WriteReadings($$) {
                     $hash,
                     $decode_json->{abilities}[$abilities]{name} . '-'
                       . $propertie->{name},
-                    RigRadingsValue(
-                        $hash, $propertie->{value}
-                    )
+                    RigRadingsValue( $hash, $propertie->{value} )
                   )
                   if (
                     defined( $propertie->{value} )
@@ -578,14 +573,10 @@ sub WriteReadings($$) {
             )
           )
     ) if ( AttrVal( $name, 'model', 'unknown' ) eq 'ic24' );
-    
-    readingsBulkUpdate(
-        $hash, 'state',
-        ReadingsVal(
-                $name, 'power-power_timer',
-                'no info from power-timer'
-            )
-    ) if ( AttrVal( $name, 'model', 'unknown' ) eq 'power' );
+
+    readingsBulkUpdate( $hash, 'state',
+        ReadingsVal( $name, 'power-power_timer', 'no info from power-timer' ) )
+      if ( AttrVal( $name, 'model', 'unknown' ) eq 'power' );
 
     readingsEndUpdate( $hash, 1 );
 
@@ -725,8 +716,7 @@ sub RigRadingsValue($$) {
         $rigReadingValue = Zulu2LocalString($readingValue);
     }
     else {
-        $rigReadingValue =
-          ReadingLangGerman( $hash, $readingValue );
+        $rigReadingValue = ReadingLangGerman( $hash, $readingValue );
     }
 
     return $rigReadingValue;

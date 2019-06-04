@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 73_GardenaSmartBridge: add dynamic baseURL
  - bugfix:  73_AutoShuttersControl: add new english commandref, fix many bugs
                       change manual drive detection code
  - bugfix:  73_DoorBird: bugfix for History-Image on event.

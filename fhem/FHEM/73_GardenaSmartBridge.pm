@@ -59,33 +59,33 @@ use strict;
 use warnings;
 use FHEM::Meta;
 
-my $version = "1.6.4";
-
+my $version = '1.6.5';
 
 sub GardenaSmartBridge_Initialize($) {
 
     my ($hash) = @_;
 
     # Provider
-    $hash->{WriteFn}   = "FHEM::GardenaSmartBridge::Write";
-    $hash->{Clients}   = ":GardenaSmartDevice:";
-    $hash->{MatchList} = { "1:GardenaSmartDevice" => '^{"id":".*' };
+    $hash->{WriteFn}   = 'FHEM::GardenaSmartBridge::Write';
+    $hash->{Clients}   = ':GardenaSmartDevice:';
+    $hash->{MatchList} = { '1:GardenaSmartDevice' => '^{"id":".*' };
 
     # Consumer
-    $hash->{SetFn}    = "FHEM::GardenaSmartBridge::Set";
-    $hash->{DefFn}    = "FHEM::GardenaSmartBridge::Define";
-    $hash->{UndefFn}  = "FHEM::GardenaSmartBridge::Undef";
-    $hash->{DeleteFn} = "FHEM::GardenaSmartBridge::Delete";
-    $hash->{RenameFn} = "FHEM::GardenaSmartBridge::Rename";
-    $hash->{NotifyFn} = "FHEM::GardenaSmartBridge::Notify";
+    $hash->{SetFn}    = 'FHEM::GardenaSmartBridge::Set';
+    $hash->{DefFn}    = 'FHEM::GardenaSmartBridge::Define';
+    $hash->{UndefFn}  = 'FHEM::GardenaSmartBridge::Undef';
+    $hash->{DeleteFn} = 'FHEM::GardenaSmartBridge::Delete';
+    $hash->{RenameFn} = 'FHEM::GardenaSmartBridge::Rename';
+    $hash->{NotifyFn} = 'FHEM::GardenaSmartBridge::Notify';
 
-    $hash->{AttrFn} = "FHEM::GardenaSmartBridge::Attr";
+    $hash->{AttrFn} = 'FHEM::GardenaSmartBridge::Attr';
     $hash->{AttrList} =
-        "debugJSON:0,1 "
-      . "disable:1 "
-      . "interval "
-      . "disabledForIntervals "
-      . "gardenaAccountEmail "
+        'debugJSON:0,1 '
+      . 'disable:1 '
+      . 'interval '
+      . 'disabledForIntervals '
+      . 'gardenaAccountEmail '
+      . 'gardenaBaseURL '
       . $readingFnAttributes;
 
     foreach my $d ( sort keys %{ $modules{GardenaSmartBridge}{defptr} } ) {
@@ -93,7 +93,7 @@ sub GardenaSmartBridge_Initialize($) {
         my $hash = $modules{GardenaSmartBridge}{defptr}{$d};
         $hash->{VERSION} = $version;
     }
-    
+
     return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
@@ -101,7 +101,7 @@ package FHEM::GardenaSmartBridge;
 use GPUtils qw(GP_Import)
   ;    # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 
-my $missingModul = "";
+my $missingModul = '';
 
 use strict;
 use warnings;
@@ -112,8 +112,8 @@ use HttpUtils;
 
 eval "use Encode qw(encode encode_utf8 decode_utf8);1"
   or $missingModul .= "Encode ";
-eval "use JSON;1"            or $missingModul .= "JSON ";
-eval "use IO::Socket::SSL;1" or $missingModul .= "IO::Socket::SSL ";
+eval "use JSON;1"            or $missingModul .= 'JSON ';
+eval "use IO::Socket::SSL;1" or $missingModul .= 'IO::Socket::SSL ';
 
 BEGIN {
     GP_Import(
@@ -147,18 +147,23 @@ sub Define($$) {
 
     my ( $hash, $def ) = @_;
 
-    my @a = split( "[ \t][ \t]*", $def );
+    my @a = split( '[ \t][ \t]*', $def );
 
     return $@ unless ( FHEM::Meta::SetInternals($hash) );
-    return "too few parameters: define <NAME> GardenaSmartBridge"
+    return 'too few parameters: define <NAME> GardenaSmartBridge'
       if ( @a != 2 );
     return
-"Cannot define Gardena Bridge device. Perl modul ${missingModul}is missing."
+        'Cannot define Gardena Bridge device. Perl modul '
+      . ${missingModul}
+      . ' is missing.'
       if ($missingModul);
 
     my $name = $a[0];
-    $hash->{BRIDGE}    = 1;
-    $hash->{URL}       = 'https://sg-api.dss.husqvarnagroup.net/sg-1';
+    $hash->{BRIDGE} = 1;
+    $hash->{URL} =
+      AttrVal( $name, 'gardenaBaseURL',
+        'https://sg-api.dss.husqvarnagroup.net' )
+      . '/sg-1';
     $hash->{VERSION}   = $version;
     $hash->{INTERVAL}  = 60;
     $hash->{NOTIFYDEV} = "global,$name";
@@ -191,7 +196,7 @@ sub Delete($$) {
 
     my ( $hash, $name ) = @_;
 
-    setKeyValue( $hash->{TYPE} . "_" . $name . "_passwd", undef );
+    setKeyValue( $hash->{TYPE} . '_' . $name . '_passwd', undef );
     return undef;
 }
 
@@ -200,48 +205,53 @@ sub Attr(@) {
     my ( $cmd, $name, $attrName, $attrVal ) = @_;
     my $hash = $defs{$name};
 
-    if ( $attrName eq "disable" ) {
-        if ( $cmd eq "set" and $attrVal eq "1" ) {
+    if ( $attrName eq 'disable' ) {
+        if ( $cmd eq 'set' and $attrVal eq '1' ) {
             RemoveInternalTimer($hash);
-            readingsSingleUpdate( $hash, "state", "inactive", 1 );
+            readingsSingleUpdate( $hash, 'state', 'inactive', 1 );
             Log3 $name, 3, "GardenaSmartBridge ($name) - disabled";
         }
-
-        elsif ( $cmd eq "del" ) {
-            readingsSingleUpdate( $hash, "state", "active", 1 );
+        elsif ( $cmd eq 'del' ) {
+            readingsSingleUpdate( $hash, 'state', 'active', 1 );
             Log3 $name, 3, "GardenaSmartBridge ($name) - enabled";
         }
     }
-
-    elsif ( $attrName eq "disabledForIntervals" ) {
-        if ( $cmd eq "set" ) {
+    elsif ( $attrName eq 'disabledForIntervals' ) {
+        if ( $cmd eq 'set' ) {
             return
 "check disabledForIntervals Syntax HH:MM-HH:MM or 'HH:MM-HH:MM HH:MM-HH:MM ...'"
               unless ( $attrVal =~ /^((\d{2}:\d{2})-(\d{2}:\d{2})\s?)+$/ );
             Log3 $name, 3, "GardenaSmartBridge ($name) - disabledForIntervals";
         }
-
-        elsif ( $cmd eq "del" ) {
-            readingsSingleUpdate( $hash, "state", "active", 1 );
+        elsif ( $cmd eq 'del' ) {
+            readingsSingleUpdate( $hash, 'state', 'active', 1 );
             Log3 $name, 3, "GardenaSmartBridge ($name) - enabled";
         }
     }
-
-    elsif ( $attrName eq "interval" ) {
-        if ( $cmd eq "set" ) {
+    elsif ( $attrName eq 'interval' ) {
+        if ( $cmd eq 'set' ) {
             RemoveInternalTimer($hash);
-            return "Interval must be greater than 0"
+            return 'Interval must be greater than 0'
               unless ( $attrVal > 0 );
             $hash->{INTERVAL} = $attrVal;
             Log3 $name, 3,
               "GardenaSmartBridge ($name) - set interval: $attrVal";
         }
-
-        elsif ( $cmd eq "del" ) {
+        elsif ( $cmd eq 'del' ) {
             RemoveInternalTimer($hash);
             $hash->{INTERVAL} = 60;
             Log3 $name, 3,
 "GardenaSmartBridge ($name) - delete User interval and set default: 60";
+        }
+    }
+    elsif ( $attrName eq 'gardenaBaseURL' ) {
+        if ( $cmd eq 'set' ) {
+            $hash->{URL} = $attrVal . '/sg-1';
+            Log3 $name, 3,
+              "GardenaSmartBridge ($name) - set gardenaBaseURL to: $attrVal";
+        }
+        elsif ( $cmd eq 'del' ) {
+            $hash->{URL} = 'https://sg-api.dss.husqvarnagroup.net/sg-1';
         }
     }
 
@@ -386,8 +396,10 @@ sub Write($@) {
         }
     );
 
-    Log3($name, 4,
-        "GardenaSmartBridge ($name) - Send with URL: $hash->{URL}$uri, HEADER: secret!, DATA: secret!, METHOD: $method");
+    Log3( $name, 4,
+"GardenaSmartBridge ($name) - Send with URL: $hash->{URL}$uri, HEADER: secret!, DATA: secret!, METHOD: $method"
+    );
+
 #     Log3($name, 3,
 #         "GardenaSmartBridge ($name) - Send with URL: $hash->{URL}$uri, HEADER: $header, DATA: $payload, METHOD: $method");
 }
@@ -404,11 +416,10 @@ sub ErrorHandling($$$) {
       unless ( not defined( $param->{'device_id'} ) );
 
     my $dname = $dhash->{NAME};
-    
+
     my $decode_json = eval { decode_json($data) };
     if ($@) {
-        Log3 $name, 3,
-          "GardenaSmartBridge ($name) - JSON error while request";
+        Log3 $name, 3, "GardenaSmartBridge ($name) - JSON error while request";
     }
 
     if ( defined($err) ) {
@@ -481,7 +492,11 @@ sub ErrorHandling($$$) {
 
             readingsBulkUpdate( $dhash, "state", "the command is processed",
                 1 );
-            InternalTimer( gettimeofday() + 5, "FHEM::GardenaSmartBridge::getDevices", $hash, 1 );
+            InternalTimer(
+                gettimeofday() + 5,
+                "FHEM::GardenaSmartBridge::getDevices",
+                $hash, 1
+            );
 
         }
         elsif ( $param->{code} != 200 ) {
@@ -503,10 +518,11 @@ sub ErrorHandling($$$) {
         return;
     }
 
-    if ( $data =~ /Error/
-      or (  defined( $decode_json )
-        and ref($decode_json) eq 'HASH'
-        and defined($decode_json->{errors}) )
+    if (
+        $data =~ /Error/
+        or (    defined($decode_json)
+            and ref($decode_json) eq 'HASH'
+            and defined( $decode_json->{errors} ) )
       )
     {
         readingsBeginUpdate($dhash);
@@ -516,7 +532,7 @@ sub ErrorHandling($$$) {
         readingsBulkUpdate( $dhash, "lastRequestState", "request_error", 1 );
 
         if ( $param->{code} == 400 ) {
-            if ( $decode_json ) {
+            if ($decode_json) {
                 if ( ref( $decode_json->{errors} ) eq "ARRAY"
                     and defined( $decode_json->{errors} ) )
                 {
@@ -597,7 +613,7 @@ sub ErrorHandling($$$) {
     readingsSingleUpdate( $hash, 'state', 'connected to cloud', 1 )
       if ( defined( $hash->{helper}{locations_id} ) );
     ResponseProcessing( $hash, $data )
-        if ( ref($decode_json) eq 'HASH' );
+      if ( ref($decode_json) eq 'HASH' );
 }
 
 sub ResponseProcessing($$) {
@@ -686,8 +702,8 @@ sub ResponseProcessing($$) {
 
                 Dispatch( $hash, $json, undef )
                   unless ( $decode_json->{category} eq 'gateway' );
-                WriteReadings($hash,$decode_json)
-                  if (  defined($decode_json->{category})
+                WriteReadings( $hash, $decode_json )
+                  if ( defined( $decode_json->{category} )
                     and $decode_json->{category} eq 'gateway' );
             }
 
@@ -720,51 +736,85 @@ sub WriteReadings($$) {
     {
         readingsBeginUpdate($hash);
         if ( $decode_json->{id} eq $hash->{helper}{locations_id} ) {
-            
+
             readingsBulkUpdateIfChanged( $hash, 'name', $decode_json->{name} );
             readingsBulkUpdateIfChanged( $hash, 'authorized_user_ids',
                 scalar( @{ $decode_json->{authorized_user_ids} } ) );
             readingsBulkUpdateIfChanged( $hash, 'devices',
                 scalar( @{ $decode_json->{devices} } ) );
 
-            while ( ( my ( $t, $v ) ) = each %{ $decode_json->{geo_position} } ) {
+            while ( ( my ( $t, $v ) ) = each %{ $decode_json->{geo_position} } )
+            {
                 $v = encode_utf8($v);
                 readingsBulkUpdateIfChanged( $hash, $t, $v );
             }
 
             readingsBulkUpdateIfChanged( $hash, 'zones',
                 scalar( @{ $decode_json->{zones} } ) );
-        }    
-        elsif ( $decode_json->{id} ne $hash->{helper}{locations_id} and ref($decode_json->{abilities}) eq 'ARRAY' ) {
-            my $properties = scalar( @{ $decode_json->{abilities}[0]{properties} } );
-            
-            do {
-                while ( ( my ( $t, $v ) ) = each %{ $decode_json->{abilities}[0]{properties}[$properties] } ) {
-                    next
-                    if ( ref($v) eq 'ARRAY');
-                    #$v = encode_utf8($v);
-                    readingsBulkUpdateIfChanged( $hash, $decode_json->{abilities}[0]{properties}[$properties]{name} . '-' . $t, $v )
-                    unless ( $decode_json->{abilities}[0]{properties}[$properties]{name} eq 'ethernet_status' 
-                            or $decode_json->{abilities}[0]{properties}[$properties]{name} eq 'wifi_status' );
+        }
+        elsif ( $decode_json->{id} ne $hash->{helper}{locations_id}
+            and ref( $decode_json->{abilities} ) eq 'ARRAY' )
+        {
+            my $properties =
+              scalar( @{ $decode_json->{abilities}[0]{properties} } );
 
-                    if ( ( $decode_json->{abilities}[0]{properties}[$properties]{name} eq 'ethernet_status'
-                        or $decode_json->{abilities}[0]{properties}[$properties]{name} eq 'wifi_status')
-                      and ref($v) eq 'HASH'
+            do {
+                while ( ( my ( $t, $v ) ) =
+                    each
+                    %{ $decode_json->{abilities}[0]{properties}[$properties] } )
+                {
+                    next
+                      if ( ref($v) eq 'ARRAY' );
+
+                    #$v = encode_utf8($v);
+                    readingsBulkUpdateIfChanged(
+                        $hash,
+                        $decode_json->{abilities}[0]{properties}[$properties]
+                          {name} . '-' . $t,
+                        $v
+                      )
+                      unless (
+                        $decode_json->{abilities}[0]{properties}[$properties]
+                        {name} eq 'ethernet_status'
+                        or $decode_json->{abilities}[0]{properties}[$properties]
+                        {name} eq 'wifi_status' );
+
+                    if (
+                        (
+                            $decode_json->{abilities}[0]{properties}
+                            [$properties]{name} eq 'ethernet_status'
+                            or $decode_json->{abilities}[0]{properties}
+                            [$properties]{name} eq 'wifi_status'
+                        )
+                        and ref($v) eq 'HASH'
                       )
                     {
-                        if ( $decode_json->{abilities}[0]{properties}[$properties]{name} eq 'ethernet_status' ) {
-                            readingsBulkUpdateIfChanged( $hash, 'ethernet_status-mac', $v->{mac} );
-                            readingsBulkUpdateIfChanged( $hash, 'ethernet_status-ip', $v->{ip} )
-                              if ( ref($v->{ip}) ne 'HASH' );
-                            readingsBulkUpdateIfChanged( $hash, 'ethernet_status-isconnected', $v->{isconnected} );
+                        if ( $decode_json->{abilities}[0]{properties}
+                            [$properties]{name} eq 'ethernet_status' )
+                        {
+                            readingsBulkUpdateIfChanged( $hash,
+                                'ethernet_status-mac', $v->{mac} );
+                            readingsBulkUpdateIfChanged( $hash,
+                                'ethernet_status-ip', $v->{ip} )
+                              if ( ref( $v->{ip} ) ne 'HASH' );
+                            readingsBulkUpdateIfChanged( $hash,
+                                'ethernet_status-isconnected',
+                                $v->{isconnected} );
                         }
-                        elsif ( $decode_json->{abilities}[0]{properties}[$properties]{name} eq 'wifi_status') {
-                            readingsBulkUpdateIfChanged( $hash, 'wifi_status-ssid', $v->{ssid} );
-                            readingsBulkUpdateIfChanged( $hash, 'wifi_status-mac', $v->{mac} );
-                            readingsBulkUpdateIfChanged( $hash, 'wifi_status-ip', $v->{ip} )
-                              if ( ref($v->{ip}) ne 'HASH' );
-                            readingsBulkUpdateIfChanged( $hash, 'wifi_status-isconnected', $v->{isconnected} );
-                            readingsBulkUpdateIfChanged( $hash, 'wifi_status-signal', $v->{signal} );
+                        elsif ( $decode_json->{abilities}[0]{properties}
+                            [$properties]{name} eq 'wifi_status' )
+                        {
+                            readingsBulkUpdateIfChanged( $hash,
+                                'wifi_status-ssid', $v->{ssid} );
+                            readingsBulkUpdateIfChanged( $hash,
+                                'wifi_status-mac', $v->{mac} );
+                            readingsBulkUpdateIfChanged( $hash,
+                                'wifi_status-ip', $v->{ip} )
+                              if ( ref( $v->{ip} ) ne 'HASH' );
+                            readingsBulkUpdateIfChanged( $hash,
+                                'wifi_status-isconnected', $v->{isconnected} );
+                            readingsBulkUpdateIfChanged( $hash,
+                                'wifi_status-signal', $v->{signal} );
                         }
                     }
                 }
