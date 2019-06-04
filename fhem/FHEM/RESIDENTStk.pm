@@ -3299,6 +3299,8 @@ sub RESIDENTStk_wakeupGetNext($;$) {
       if ( defined( $attr{$name}{"rgr_wakeupDevice"} ) );
     $wakeupDeviceAttrName = "rr_wakeupDevice"
       if ( defined( $attr{$name}{"rr_wakeupDevice"} ) );
+    $wakeupDeviceAttrName = "rp_wakeupDevice"
+      if ( defined( $attr{$name}{"rp_wakeupDevice"} ) );
     $wakeupDeviceAttrName = "rg_wakeupDevice"
       if ( defined( $attr{$name}{"rg_wakeupDevice"} ) );
 
