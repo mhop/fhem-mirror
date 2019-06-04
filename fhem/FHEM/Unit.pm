@@ -3,12 +3,15 @@
 package main;
 use strict;
 use warnings;
+# use locale;
+use POSIX;
 use Data::Dumper;
 use utf8;
 use Encode qw(encode_utf8 decode_utf8);
 
 use UConv;
 
+# only to suppress file reload error in FHEM
 sub Unit_Initialize() { }
 
 # scale helper for metric numbers

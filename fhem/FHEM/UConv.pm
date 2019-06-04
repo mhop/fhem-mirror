@@ -1,17 +1,21 @@
 ###############################################################################
 # $Id$
 package main;
-use strict;
-use warnings;
-use Data::Dumper;
 
-#use FHEM::Meta;
+# only to suppress file reload error in FHEM
 sub UConv_Initialize() { }
 
 package UConv;
+use strict;
+use warnings;
+# use locale;
+use POSIX;
+
+use Time::Local;
 use Scalar::Util qw(looks_like_number);
-use POSIX qw(strftime);
 use Data::Dumper;
+
+# require "95_Astro.pm";
 
 sub GetSeason (;$$$);
 sub _GetSeasonPheno ($$;$$);
@@ -895,7 +899,7 @@ sub distance($$$$;$$) {
     my $km = $r * $c;
 
     return _round(
-        ( $unit eq "nmi" ? km2nmi($km) : ( $unit ? km2mi($km) : $km ) ), $rnd );
+        ( $unit && $unit eq "nmi" ? km2nmi($km) : ( $unit ? km2mi($km) : $km ) ), $rnd );
 }
 
 sub duration ($$;$) {
@@ -1789,7 +1793,7 @@ sub _GetSeasonPheno ($$;$$) {
             60.161880, 24.937267
         );
 
-        # TODO: let begin of early autumn be set by user
+        # TODO: let begin of early fall be set by user
         my $earlySpringBegin =
           main::time_str2num( $ret->{year} . '-09-01 00:00:00' );
         my $days = ( $time - $earlySpringBegin ) / ( 60 * 60 * 24 );
