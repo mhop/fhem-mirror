@@ -24,19 +24,80 @@
 #-mehrere metric/chart/goal/msg frames des gleichen typs (derzeit gehen per msg nur 1x zusätzlich metric,chart,goal) -> reihenfolge?
 
 package main;
-
-use Data::Dumper;
-use JSON qw(decode_json encode_json);
-use Time::HiRes qw(gettimeofday time);
-use Time::Local;
-use IO::Socket::SSL;
+use strict;
+use warnings;
+use POSIX;
 
 use Encode;
+use FHEM::Meta;
 use HttpUtils;
+use IO::Socket::SSL;
 use SetExtensions;
+use Time::HiRes qw(gettimeofday time);
+use Time::Local;
 use Unit;
 use utf8;
-use FHEM::Meta;
+
+#use Data::Dumper;
+
+# try to use JSON::MaybeXS wrapper
+#   for chance of better performance + open code
+eval {
+    require JSON::MaybeXS;
+    import JSON::MaybeXS qw( decode_json encode_json );
+    1;
+};
+if ($@) {
+    $@ = undef;
+
+    # try to use JSON wrapper
+    #   for chance of better performance
+    eval {
+
+        # JSON preference order
+        local $ENV{PERL_JSON_BACKEND} =
+          'Cpanel::JSON::XS,JSON::XS,JSON::PP,JSON::backportPP'
+          unless ( defined( $ENV{PERL_JSON_BACKEND} ) );
+
+        require JSON;
+        import JSON qw( decode_json encode_json );
+        1;
+    };
+
+    if ($@) {
+        $@ = undef;
+
+        # In rare cases, Cpanel::JSON::XS may
+        #   be installed but JSON|JSON::MaybeXS not ...
+        eval {
+            require Cpanel::JSON::XS;
+            import Cpanel::JSON::XS qw(decode_json encode_json);
+            1;
+        };
+
+        if ($@) {
+            $@ = undef;
+
+            # In rare cases, JSON::XS may
+            #   be installed but JSON not ...
+            eval {
+                require JSON::XS;
+                import JSON::XS qw(decode_json encode_json);
+                1;
+            };
+
+            if ($@) {
+                $@ = undef;
+
+                # Fallback to built-in JSON which SHOULD
+                #   be available since 5.014 ...
+                require JSON::PP;
+                import JSON::PP qw(decode_json encode_json);
+                1;
+            }
+        }
+    }
+}
 
 my %LaMetric2_sounds = (
     notifications => [
@@ -272,6 +333,7 @@ sub LaMetric2_Define($$) {
         # Initialize the device
         return $@ unless ( FHEM::Meta::SetInternals($hash) );
 
+        $hash->{VERSION}    = "v2.1.0";
         $hash->{HOST}       = $host;
         $hash->{".API_KEY"} = $apikey;
         $hash->{INTERVAL} =
@@ -536,7 +598,7 @@ sub LaMetric2_SendCommand {
       . $httpMethod . " "
       . urlDecode($url)
       . " (DATA: "
-      . $data
+      . ( defined($data) ? $data : "" )
       . " (noshutdown="
       . $httpNoShutdown . ")";
 
@@ -626,7 +688,7 @@ sub LaMetric2_ReceiveCommand($$$) {
                 # Get a hash of all IDs and their infos in the response
                 foreach my $notification ( @{$response} ) {
                     my ( $year, $mon, $mday, $hour, $min, $sec ) =
-                      split( /[\s-:T]+/, $notification->{created} );
+                      split( m/[\s\-\:T]+/, $notification->{created} );
                     my $time =
                       timelocal( $sec, $min, $hour, $mday, $mon - 1, $year );
 
@@ -646,7 +708,7 @@ sub LaMetric2_ReceiveCommand($$$) {
                         $cancelIDs->{$key} = $value;
 
                         # Determinate oldest notification for auto-cycling
-                        $timestamp = $notificationIDs->{$value}{time};
+                        my $timestamp = $notificationIDs->{$value}{time};
 
                         if ( $timestamp < $oldestTimestamp ) {
                             $oldestCancelID       = $key;
@@ -664,7 +726,7 @@ sub LaMetric2_ReceiveCommand($$$) {
                 if (   exists $info->{cancelID}
                     && exists $hash->{helper}{cancelIDs}{$cancelID} )
                 {
-                    $notificationID = $hash->{helper}{cancelIDs}{$cancelID};
+                    my $notificationID = $hash->{helper}{cancelIDs}{$cancelID};
                     delete $hash->{helper}{cancelIDs}{$cancelID};
 
                     LaMetric2_SendCommand( $hash,
@@ -1071,7 +1133,7 @@ sub LaMetric2_SetScreensaver {
         if ( $screensaver ne "off" ) {
             $body{screensaver}{enabled}           = 1;
             $body{screensaver}{mode}              = $screensaver;
-            $body{screensaver}{mode}{mode_params} = (
+            $body{screensaver}{mode_params} = (
                 {
                     enabled => 1,
                 }
@@ -1531,7 +1593,7 @@ sub LaMetric2_SetNotification {
       "LaMetric2 $name: called function LaMetric2_SetNotification()";
 
     # Set defaults for object
-    $notificationType = "msg";
+    my $notificationType = "msg";
     $values{icontype} =
         $h->{icontype}
       ? $h->{icontype}
@@ -1635,16 +1697,6 @@ sub LaMetric2_SetNotification {
 
                 if ($descr) {
                     my $ref_base = $descr->{ref_base};
-
-                    # Use icon from goaltype DB if none was explicitly given
-                    $h->{goalicon} =
-                      $LaMetric2_goaltype_icons{$ref_base}{lm_icon}
-                      if (
-                        !defined( $h->{goalicon} )
-                        && defined(
-                            $LaMetric2_goaltype_icons{$ref_base}{lm_icon}
-                        )
-                      );
 
                     # Format number with Unit.pm
                     my ( $txt, $txt_long, $value, $value_num, $unit ) =
@@ -2711,7 +2763,35 @@ Leider keine deutsche Dokumentation vorhanden. Die englische Version gibt es hie
     "Display",
     "Time",
     "Watch"
-  ]
+  ],
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "perl": 5.014,
+        "Encode": 0,
+        "FHEM::Meta": 0,
+        "HttpUtils": 0,
+        "IO::Socket::SSL": 0,
+        "JSON::PP": 0,
+        "POSIX": 0,
+        "SetExtensions": 0,
+        "strict": 0,
+        "SubProcess": 0,
+        "Time::HiRes": 0,
+        "Time::Local": 0,
+        "Unit": 0,
+        "utf8": 0,
+        "warnings": 0
+      },
+      "recommends": {
+        "JSON": 0
+      },
+      "suggests": {
+        "Cpanel::JSON::XS": 0,
+        "JSON::XS": 0
+      }
+    }
+  }
 }
 =end :application/json;q=META.json
 
