@@ -172,7 +172,7 @@ MQTT2_DEVICE_Parse($$)
       my $cidExpr = $bp->{$re}{name};
       $newCid = eval $cidExpr;
       if($@) {
-        Log 1, "MQTT2_DEVICE: Error evaluating $cidExpr: $@";
+        Log 1, "MQTT2_DEVICE: Error evaluating bridgeRegexp >$cidExpr<: $@";
         return "";
       }
       $parentBridge = $bp->{$re}{parent};
