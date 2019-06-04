@@ -1444,9 +1444,6 @@ sub PortalAsHtml ($$) {
       } elsif ($dl != 4) {
           $ret .= "The attribute \"detailLevel\" of device \"$name\" has to be set to level \"4\" !";
       } elsif (!defined $pv0) {
-          # Vorschlag : Das und level 4 data weiter unten stehen so verloren auf der Seite
-          # man könnte die beiden Meldungen noch in eine mini <table class=roomoverview> packen
-          # und mit dem Wert aus attr beamHeight in etwa auf die spätere Ausǵabe vorformatieren
           $ret .= "Awaiting level 2 data ...";
       } elsif (!defined $pv1) {
           $ret .= "Awaiting level 4 data ...";
@@ -1534,7 +1531,8 @@ sub PortalAsHtml ($$) {
   # Headerzeile generieren
   my $alias = AttrVal($name, "alias", "SMA Sunny Portal");                     # Linktext als Aliasname oder "SMA Sunny Portal"
   my $dlink = "<a href=\"/fhem?detail=$name\">$alias</a>"; 
-  my $lup   = ReadingsTimestamp($name, "state", "0000-00-00 00:00:00");        # letzte Updatezeit                       
+  my $lup   = ReadingsTimestamp($name, "state", "0000-00-00 00:00:00");        # letzte Updatezeit
+  my $lupt  = "last update:";  
 
   # Da der Header relativ viele Zeichen hat, müssen Stellen erlaubt werden an denen automatisch umgebrochen werden kann. 
   # Sonst sind schmale Ausgaben nicht von den Balken bzw. deren Anzahl abhängig, sondern allein durch die Breite des Headers bestimmt
@@ -1545,13 +1543,14 @@ sub PortalAsHtml ($$) {
           $h1 = "Prognose [pv] - nächste&nbsp;4&nbsp;Stunden:&nbsp;$pv4h/h&nbsp;/ Rest&nbsp;des&nbsp;Tages:&nbsp;$pvRe/h&nbsp;/ Morgen:&nbsp;$pvTo/h";
           $h2 = "Prognose [co] - nächste&nbsp;4&nbsp;Stunden:&nbsp;$co4h/h&nbsp;/ Rest&nbsp;des&nbsp;Tages:&nbsp;$coRe/h&nbsp;/ Morgen:&nbsp;$coTo/h";
           my ($year, $month, $day, $hour, $min, $sec) = $lup =~ /(\d+)-(\d\d)-(\d\d)\s+(.*)/;
-          $lup = "$3.$2.$1 $4";
+          $lup  = "$3.$2.$1 $4";
+          $lupt = "letzte Aktualisierung:"; 
       } else {
           $h1 = "forecast&nbsp;data&nbsp;[pv]&nbsp;- next&nbsp;4&nbsp;hours:&nbsp;$pv4h/h&nbsp;/ rest&nbsp;of&nbsp;day:&nbsp;$pvRe&nbsp;/ tomorrow:&nbsp;$pvTo/h";
           $h2 = "forecast&nbsp;data&nbsp;[co]&nbsp;- next&nbsp;4&nbsp;hours:&nbsp;$co4h/h&nbsp;/ rest&nbsp;of&nbsp;day:&nbsp;$coRe&nbsp;/ tomorrow:&nbsp;$coTo/h";
       }
 
-      $lup = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(last update: $lup)";
+      $lup = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;($lupt $lup)";
       if ($type eq 'pv') { 
           $header = $dlink.' '.$lup.' <br/>'.$h1; 
       } elsif ($type eq 'co') { 
