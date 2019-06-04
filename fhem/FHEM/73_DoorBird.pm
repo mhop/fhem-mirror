@@ -660,6 +660,8 @@ sub DoorBird_Read($) {
 	my $Header			  = "Accept: application/json";
 	my $UrlPostfix;
 	my $CommandURL;
+	my $ReadingEvent;
+	my $ReadingEventContent;
 	my $err;
 	my $data;
 	my $buf;
@@ -866,7 +868,7 @@ sub DoorBird_Read($) {
 					1;
 				};
 				if ( $@ ) {
-					Log3 $name, 3, $name. " Message forged!";
+					Log3 $name, 3, $name. " : Message forged!";
 				return("Messaged forged!");
 				} 
 				
@@ -948,7 +950,11 @@ sub DoorBird_Read($) {
 						if ((int($TIMESTAMP) == $TIMESTAMP) && ($UdpMotionIdLast != $TIMESTAMP)) {
 							### Save Timestamp as new ID
 							$hash->{helper}{UdpMotionId} = $TIMESTAMP;
-
+							
+							### Create name of reading for event
+							$ReadingEvent 			= "motion_sensor";
+							$ReadingEventContent 	= "Motion detected!";
+							
 							### Create Parameter for CommandURL for motionsensor events
 							$UrlPostfix = "history.cgi?event=motionsensor&index=1";
 
@@ -970,11 +976,27 @@ sub DoorBird_Read($) {
 								callback          => \&DoorBird_LastEvent_Image
 							};
 
-							### Initiate communication and close
+							### Initiate Bulk Update
+							readingsBeginUpdate($hash);
+							
+							### Update readings of device
+							readingsBulkUpdate($hash, "state", $ReadingEventContent, 1);
+							readingsBulkUpdate($hash, $ReadingEvent, "triggered", 1);
+
+							### Execute Readings Bulk Update
+							readingsEndUpdate($hash, 1);
+
+							### Initiate communication
 							HttpUtils_NonblockingGet($param);
+
+							### Wrap up a container and initiate the timer to reset reading "doorbell_button"
+							my %Container;
+							$Container{"HashReference"} = $hash;
+							$Container{"Reading"} 		= $ReadingEvent;
+							InternalTimer(gettimeofday()+ $hash->{helper}{EventReset}, "DoorBird_EventReset", \%Container, 0);
 							
 							### Log Entry
-							Log3 $name, 3, $name. " : Motion sensor detected a motion in front of DoorBird unit.";
+							Log3 $name, 3, $name. " : An event has been triggered by the DoorBird unit  : " . $EVENT;
 							Log3 $name, 5, $name. " : DoorBird_Read - Timer for reset reading in        : " . $hash->{helper}{EventReset};
 						}
 						### If the MessageID is integer type has appeared before
@@ -990,6 +1012,10 @@ sub DoorBird_Read($) {
 						if ((int($TIMESTAMP) == $TIMESTAMP) && ($UdpKeypadIdLast != $TIMESTAMP)) {
 							### Save Timestamp as new ID
 							$hash->{helper}{UdpKeypadId} = $TIMESTAMP;
+
+							### Create name of reading for event
+							$ReadingEvent 			= "keypad_pin";
+							$ReadingEventContent 	= "Access via Keypad!";
 
 							### Create Parameter for CommandURL for keypad events
 							$UrlPostfix = "history.cgi?event=keypad&index=1";
@@ -1011,12 +1037,28 @@ sub DoorBird_Read($) {
 								incrementalTimout => 1,
 								callback          => \&DoorBird_LastEvent_Image
 							};
+					
+							### Initiate Bulk Update
+							readingsBeginUpdate($hash);
+							
+							### Update readings of device
+							readingsBulkUpdate($hash, "state", $ReadingEventContent, 1);
+							readingsBulkUpdate($hash, $ReadingEvent, "triggered", 1);
+
+							### Execute Readings Bulk Update
+							readingsEndUpdate($hash, 1);
 
 							### Initiate communication and close
 							HttpUtils_NonblockingGet($param);
+
+							### Wrap up a container and initiate the timer to reset reading "doorbell_button"
+							my %Container;
+							$Container{"HashReference"} = $hash;
+							$Container{"Reading"} 		= $ReadingEvent;
+							InternalTimer(gettimeofday()+ $hash->{helper}{EventReset}, "DoorBird_EventReset", \%Container, 0);
 							
 							### Log Entry
-							Log3 $name, 3, $name. " : The keypad of the DoorBird unit has been used.";
+							Log3 $name, 3, $name. " : An event has been triggered by the DoorBird unit  : " . $EVENT;
 							Log3 $name, 5, $name. " : DoorBird_Read - Timer for reset reading in        : " . $hash->{helper}{EventReset};
 						}
 						### If the MessageID is integer type has appeared before
@@ -1032,7 +1074,11 @@ sub DoorBird_Read($) {
 						if ((int($TIMESTAMP) == $TIMESTAMP) && ($UdpDoorbellIdLast != $TIMESTAMP)) {
 							### Save Timestamp as new ID
 							$hash->{helper}{UdpDoorbellId} = $TIMESTAMP;
-						
+
+							### Create name of reading for event
+							$ReadingEvent 			= "doorbell_button_"   . sprintf("%03d", $EVENT);
+							$ReadingEventContent 	= "doorbell pressed!";
+							
 							### Create Parameter for CommandURL for doorbell events
 							$UrlPostfix = "history.cgi?event=doorbell&index=1";
 
@@ -1054,9 +1100,29 @@ sub DoorBird_Read($) {
 								incrementalTimout => 1,
 								callback          => \&DoorBird_LastEvent_Image
 							};
+					
+							### Initiate Bulk Update
+							readingsBeginUpdate($hash);
+							
+							### Update readings of device
+							readingsBulkUpdate($hash, "state", $ReadingEventContent, 1);
+							readingsBulkUpdate($hash, $ReadingEvent, "triggered", 1);
+
+							### Execute Readings Bulk Update
+							readingsEndUpdate($hash, 1);
 
 							### Initiate communication and close
 							HttpUtils_NonblockingGet($param);
+
+							### Wrap up a container and initiate the timer to reset reading "doorbell_button"
+							my %Container;
+							$Container{"HashReference"} = $hash;
+							$Container{"Reading"} 		= $ReadingEvent;
+							InternalTimer(gettimeofday()+ $hash->{helper}{EventReset}, "DoorBird_EventReset", \%Container, 0);
+							
+							### Log Entry
+							Log3 $name, 3, $name. " : An event has been triggered by the DoorBird unit  : " . $EVENT;
+							Log3 $name, 5, $name. " : DoorBird_Read - Timer for reset reading in        : " . $hash->{helper}{EventReset};
 						}
 						### If the MessageID is integer type has appeared before
 						else {
@@ -1911,24 +1977,16 @@ sub DoorBird_LastEvent_Image($$$) {
     my $name         = $hash->{NAME};
 	my $event        = $param->{event};
 	my $timestamp	 = $param->{timestamp};
-	my $ReadingEvent;
 	my $ReadingImage;
-	my $ReadingEventContent;
 
 	if ($event =~ m/doorbell/ ){
-		$ReadingEvent 			= "doorbell_button_"   . sprintf("%03d", $param->{doorbellNo});
 		$ReadingImage 			= "doorbell_snapshot_" . sprintf("%03d", $param->{doorbellNo});
-		$ReadingEventContent 	= "doorbell pressed!";
 	}
 	elsif ($event =~ m/motion/ ){
-		$ReadingEvent 			= "motion_sensor";
 		$ReadingImage 			= "motion_snapshot";
-		$ReadingEventContent 	= "Motion detected!";
 	}
 	elsif ($event =~ m/keypad/ ){
-		$ReadingEvent 			= "keypad_pin";
 		$ReadingImage 			= "keypad_snapshot";
-		$ReadingEventContent 	= "Access via Keypad!";
 	}
 	else {
 		### Create Log entry
@@ -1937,7 +1995,6 @@ sub DoorBird_LastEvent_Image($$$) {
 		### Exit sub
 		return
 	}
-	
 
 	### Log Entry for debugging purposes
 	Log3 $name, 5, $name. " : DoorBird_LastEvent_Image ___________________________________________________________";
@@ -1945,16 +2002,13 @@ sub DoorBird_LastEvent_Image($$$) {
 	Log3 $name, 5, $name. " : DoorBird_LastEvent_Image - length data            : " . length($data)  if (defined($data ));
 	#Log3 $name, 5, $name. " : DoorBird_LastEvent_Image - param                  : " . join("\n", @{[%{$param}]}) if (defined($param));
 
-	### Initiate Bulk Update
-	readingsBeginUpdate($hash);
-	
 	### If error message available
 	if ($err ne "") {
 		### Create Log entry
 		Log3 $name, 3, $name. " : DoorBird_LastEvent_Image - Error                  : " . $err        if (defined($err  ));
 		
 		### Write Last Image into reading
-		readingsBulkUpdate($hash, $ReadingImage, "", 1);
+		readingsSingleUpdate($hash, $ReadingImage, "No image data", 1);
 	}
 	### if no error message available
 	else {
@@ -1999,9 +2053,6 @@ sub DoorBird_LastEvent_Image($$$) {
 						Log3 $name, 5, $name. " : DoorBird_LastEvent_Image - Attr WaitForHistory    : " . $hash->{helper}{WaitForHistory};
 						Log3 $name, 5, $name. " : DoorBird_LastEvent_Image - dt                     : " . int(time - int($timestamp));
 
-						### Finish Readings Bulk Update
-						readingsEndUpdate($hash, 0);
-
 						### Try again: Initiate communication and close
 						HttpUtils_NonblockingGet($param);
 							
@@ -2017,8 +2068,7 @@ sub DoorBird_LastEvent_Image($$$) {
 						Log3 $name, 5, $name. " : DoorBird_LastEvent_Image - dt                     : " . int(time - int($timestamp));
 						
 						### Write Last Image into reading
-						readingsBulkUpdate($hash, $ReadingImage, "", 1);
-						
+						readingsSingleUpdate($hash, $ReadingImage, "No image data", 1);
 					}
 				}
 				### If timestamp from history picture has been done since the timestamp from the event			
@@ -2118,7 +2168,7 @@ sub DoorBird_LastEvent_Image($$$) {
 						};
 					
 						### Write Last Image into reading
-						readingsBulkUpdate($hash, $ReadingImage, $ImageFileName, 1);
+						readingsSingleUpdate($hash, $ReadingImage, $ImageFileName, 1);
 					}
 					### Log Entry for debugging purposes
 					Log3 $name, 5, $name. " : DoorBird_LastEvent_Image - ImageData - event      : " . length($ImageData);
@@ -2137,7 +2187,7 @@ sub DoorBird_LastEvent_Image($$$) {
 				$ImageTimeStamp =" ";
 				
 				### Write Last Image into reading
-				readingsBulkUpdate($hash, $ReadingImage, "", 1);
+				readingsSingleUpdate($hash, $ReadingImage, "No image data", 1);
 			}
 			### If http response code is 404 = No picture available to download the event history
 			elsif ($param->{code} == 404) {
@@ -2149,7 +2199,7 @@ sub DoorBird_LastEvent_Image($$$) {
 				$ImageTimeStamp =" ";
 				
 				### Write Last Image into reading
-				readingsBulkUpdate($hash, $ReadingImage, "", 1);
+				readingsSingleUpdate($hash, $ReadingImage, "No image data", 1);
 			}
 			### If http response code is none of one above
 			else {
@@ -2161,31 +2211,14 @@ sub DoorBird_LastEvent_Image($$$) {
 				$ImageTimeStamp =" ";
 				
 				### Write Last Image into reading
-				readingsBulkUpdate($hash, $ReadingImage, "", 1);
+				readingsSingleUpdate($hash, $ReadingImage, "No image data", 1);
 			}
 		}
 		else {
 			### Write Last Image into reading
-			readingsBulkUpdate($hash, $ReadingImage, "", 1);
+			readingsSingleUpdate($hash, $ReadingImage, "No image data", 1);
 		}
 	}
-
-	### Update readings of device
-	readingsBulkUpdate($hash, "state", $ReadingEventContent, 1);
-	readingsBulkUpdate($hash, $ReadingEvent, "triggered", 1);
-
-	### Execute Readings Bulk Update
-	readingsEndUpdate($hash, 1);
-	
-	### Wrap up a container and initiate the timer to reset reading "doorbell_button"
-	my %Container;
-	$Container{"HashReference"} = $hash;
-	$Container{"Reading"} 		= $ReadingEvent;
-	InternalTimer(gettimeofday()+ $hash->{helper}{EventReset}, "DoorBird_EventReset", \%Container, 0);
-	
-	### Log Entry
-	Log3 $name, 3, $name. " : An event has been triggered by the DoorBird unit  : " . $event;
-	Log3 $name, 5, $name. " : DoorBird_Read - Timer for reset reading in        : " . $hash->{helper}{EventReset};
 
 	return;
 }
