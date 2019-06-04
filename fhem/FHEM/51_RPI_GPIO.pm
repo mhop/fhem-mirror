@@ -696,7 +696,6 @@ sub RPI_GPIO_inthandling($$) {		#start/stop Interrupthandling
 
 <a name="RPI_GPIO"></a>
 <h3>RPI_GPIO</h3>
-(en | <a href="commandref_DE.html#RPI_GPIO">de</a>)
 <ul>
 	<a name="RPI_GPIO"></a>
 		Raspberry Pi offers direct access to several GPIO via header P1 (and P5 on V2). The Pinout is shown in table under define. 
@@ -842,7 +841,6 @@ sub RPI_GPIO_inthandling($$) {		#start/stop Interrupthandling
 
 <a name="RPI_GPIO"></a>
 <h3>RPI_GPIO</h3>
-(<a href="commandref.html#RPI_GPIO">en</a> | de)
 <ul>
   <a name="RPI_GPIO"></a>
     Das Raspberry Pi erm&ouml;glicht direkten Zugriff zu einigen GPIO's &uuml;ber den Pfostenstecker P1 (und P5 bei V2). Die Steckerbelegung ist in den Tabellen unter Define zu finden.

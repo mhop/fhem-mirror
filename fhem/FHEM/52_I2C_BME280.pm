@@ -505,7 +505,6 @@ sub I2C_BME280_DbLog_splitFn($) {  			# Einheiten
 
 <a name="I2C_BME280"></a>
 <h3>I2C_BME280</h3>
-(en | <a href="commandref_DE.html#I2C_BME280">de</a>)
 <ul>
   <a name="I2C_BME280"></a>
     Provides an interface to the digital pressure/humidity sensor BME280
@@ -573,7 +572,6 @@ sub I2C_BME280_DbLog_splitFn($) {  			# Einheiten
 
 <a name="I2C_BME280"></a>
 <h3>I2C_BME280</h3>
-(<a href="commandref.html#I2C_BME280">en</a> | de)
 <ul>
   <a name="I2C_BME280"></a>
     Erm&ouml;glicht die Verwendung eines digitalen (Luft)druck/feuchtesensors BME280 &uuml;ber den I2C Bus des Raspberry Pi.<br><br>

@@ -345,7 +345,6 @@ sub I2C_PCF8574_I2CRec($@) {				# ueber CallFn vom physical aufgerufen
 
 <a name="I2C_PCF8574"></a>
 <h3>I2C_PCF8574</h3>
-(en | <a href="commandref_DE.html#I2C_PCF8574">de</a>)
 <ul>
 	<a name="I2C_PCF8574"></a>
 		Provides an interface to the PCA9532 8 channel port extender IC. On Raspberry Pi the Interrupt Pin can be connected to an GPIO and <a href="#RPI_GPIO">RPI_GPIO</a> can be used to get the port values if an interrupt occurs.<br>
@@ -426,7 +425,6 @@ sub I2C_PCF8574_I2CRec($@) {				# ueber CallFn vom physical aufgerufen
 
 <a name="I2C_PCF8574"></a>
 <h3>I2C_PCF8574</h3>
-(<a href="commandref.html#I2C_PCF8574">en</a> | de)
 <ul>
 	<a name="I2C_PCF8574"></a>
 		Erm&ouml;glicht die Verwendung eines PCF8574 I2C 8 Bit Portexenders. 

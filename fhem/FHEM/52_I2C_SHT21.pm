@@ -319,7 +319,6 @@ sub I2C_SHT21_DbLog_splitFn($) {
 
 <a name="I2C_SHT21"></a>
 <h3>I2C_SHT21</h3>
-(en | <a href="commandref_DE.html#I2C_SHT21">de</a>)
 <ul>
 	<a name="I2C_SHT21"></a>
 		Provides an interface to the SHT21 I2C Humidity sensor from <a href="www.sensirion.com">Sensirion</a>.
@@ -366,7 +365,6 @@ sub I2C_SHT21_DbLog_splitFn($) {
 
 <a name="I2C_SHT21"></a>
 <h3>I2C_SHT21</h3>
-(<a href="commandref.html#I2C_SHT21">en</a> | de)
 <ul>
 	<a name="I2C_SHT21"></a>
 		Erm&ouml;glicht die Verwendung eines SHT21 I2C Feuchtesensors von <a href="www.sensirion.com">Sensirion</a>.

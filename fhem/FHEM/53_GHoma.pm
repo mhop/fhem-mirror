@@ -537,7 +537,6 @@ sub GHoma_DbLog_splitFn($) {  			# Einheiten
 
 <a name="GHoma"></a>
 <h3>GHoma</h3>
-(en | <a href="commandref_DE.html#GHoma">de</a>)
 <ul>
   <ul>
   Connects fhem to an G-Homa adapter plug<br><br>
@@ -631,7 +630,6 @@ sub GHoma_DbLog_splitFn($) {  			# Einheiten
 
 <a name="GHoma"></a>
 <h3>GHoma</h3>
-(<a href="commandref.html#GHoma">en</a> | de)
 <ul>
   <ul>
   Verbindet fhem mit einem G-Homa Zwischenstecker<br><br>
