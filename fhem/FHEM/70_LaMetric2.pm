@@ -644,7 +644,7 @@ sub LaMetric2_ReceiveCommand($$$) {
       . "HTTP RESPONSE HEADER:\n"
       . $param->{httpheader}
       . "\n\nHTTP RESPONSE BODY:\n"
-      . $data;
+      . ($data?$data:"");
 
     my $state = ReadingsVal( $name, "state", "initialized" );
     my $power = ReadingsVal( $name, "power", "off" );
