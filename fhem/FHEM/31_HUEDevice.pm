@@ -1328,9 +1328,6 @@ HUEDevice_Parse($$)
         $lastupdated_local = $lastupdated;
       }
 
-      $hash->{lastupdated} = $lastupdated;
-      $hash->{lastupdated_local} = $lastupdated_local;
-
       $readings{state} = $state->{status} if( defined($state->{status}) );
       $readings{state} = $state->{flag}?'1':'0' if( defined($state->{flag}) );
       $readings{state} = $state->{open}?'open':'closed' if( defined($state->{open}) );
@@ -1370,6 +1367,9 @@ HUEDevice_Parse($$)
 
     Log3 $name, 4, "$name: lastupdated: $lastupdated, hash->{lastupdated}:  $hash->{lastupdated}, lastupdated_local: $lastupdated_local, offsetUTC: $offset";
     Log3 $name, 5, "$name: ". Dumper $result if($HUEDevice_hasDataDumper);
+      
+    $hash->{lastupdated} = $lastupdated;
+    $hash->{lastupdated_local} = $lastupdated_local;
 
     if( scalar keys %readings ) {
        readingsBeginUpdate($hash);
