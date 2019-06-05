@@ -38,7 +38,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "2.02";
+my $version = "2.03";
 
 #-- these we may get on request
 my %gets = (
@@ -107,14 +107,14 @@ my %shelly_models = (
     );
     
 my %shelly_regs = (
-    "relay" => "reset=1\x{27f6}factory reset\ndefault_state=off|on|last|switch\x{27f6}state after power on\nbtn_type=momentary|toggle|edge\x{27f6}type of local button\nauto_on=&lt;seconds&gt;\x{27f6}timed on\nauto_off=&lt;seconds&gt;\x{27f6}timed off",
+    "relay"  => "reset=1\x{27f6}factory reset\ndefault_state=off|on|last|switch\x{27f6}state after power on\nbtn_type=momentary|toggle|edge|detached\x{27f6}type of local button\nauto_on=&lt;seconds&gt;\x{27f6}timed on\nauto_off=&lt;seconds&gt;\x{27f6}timed off",
     "roller" => "reset=1\x{27f6}factory reset\ndefault_state=stop|open|close|switch\x{27f6}state after power on\nswap=true|false\x{27f6}swap open and close\ninput_mode=openclose|onebutton\x{27f6}two or one local button\n".
-                  "btn_type=momentary|toggle\x{27f6}type of local button\nobstacle_mode=disabled|while_opening|while_closing|while_moving\x{27f6}when to watch\nobstacle_action=stop|reverse\x{27f6}what to do\n".
+                  "btn_type=momentary|toggle|detached\x{27f6}type of local button\nobstacle_mode=disabled|while_opening|while_closing|while_moving\x{27f6}when to watch\nobstacle_action=stop|reverse\x{27f6}what to do\n".
                   "obstacle_power=&lt;watt&gt;\x{27f6}power threshold for detection\nobstacle_delay=&lt;seconds&gt;\x{27f6}delay after motor start to watch\n".
                   "safety_mode=disabled|while_opening|while_closing|while_moving\x{27f6}safety mode=2nd button\nsafety_action=stop|pause|reverse\x{27f6}action when safety mode\n".
                   "safety_allowed_on_trigger=none|open|close|all\x{27f6}commands allowed in safety mode",
-    "rgbw" => ""
-    );
+    "color"   => "reset=1\x{27f6}factory reset\neffect=0|1|2|3|4|5|6{27f6}apply an effect\ndefault_state=off|on|last{27f6}state after power on\nbtn_type=momentary|toggle|edge|detached\x{27f6}type of local button\nbtn_reverse=0|1\x{27f6}invert local button\nauto_on=&lt;seconds&gt;\x{27f6}timed on\nauto_off=&lt;seconds&gt;\x{27f6}timed off",
+    "white"   => "reset=1\x{27f6}factory reset\ndefault_state=off|on|last{27f6}state after power on\nbtn_type=momentary|toggle|edge|detached\x{27f6}type of local button\nbtn_reverse=0|1\x{27f6}invert local button\nauto_on=&lt;seconds&gt;\x{27f6}timed on\nauto_off=&lt;seconds&gt;\x{27f6}timed off");
 
 ########################################################################################
 #
@@ -378,33 +378,43 @@ sub Shelly_Get ($@) {
   
   #-- some help on registers
   }elsif($a[1] eq "registers") {
-    my $txt = "relay";
-    $txt = "roller"
-      if( ($model =~ /shelly2.*/) && ($mode eq "roller") );
-    return $shelly_regs{$txt}."\n\nSet/Get these registers by calling set/get $name config &lt;registername&gt; [&lt;channel&gt;] &lt;value&gt;";
+    my $txt;
+    if( ($model =~ /shelly2.*/) && ($mode eq "roller") ){
+      $txt = "roller";
+    }elsif( ($model eq "shellyrgbw") && ($mode eq "white") ){
+      $txt = "white";
+    }elsif( ($model eq "shellyrgbw") && ($mode eq "color") ){
+      $txt = "color";
+    }else{
+      $txt = "relay";
+    }
+    return $shelly_regs{"$txt"}."\n\nSet/Get these registers by calling set/get $name config  &lt;registername&gt; &lt;value&gt; [&lt;channel&gt;]";
   
   #-- configuration register
   }elsif($a[1] eq "config") {
     my $reg = $a[2];
-    my ($chan,$val);
-    if( int(@a) == 5 ){
+    my ($val,$chan);
+    if( int(@a) == 4 ){
       $chan = $a[3];
-      $val = $a[4];
-    }elsif( int(@a) == 4 ){
+    }elsif( int(@a) == 3 ){
       $chan = 0;
-      $val = $a[3];
     }else{
       my $msg = "Error: wrong number of parameters";
       Log3 $name,1,"[Shelly_Get] ".$msg;
       return $msg;
     }
+    
     my $pre = "settings/";
     if( ($model =~ /shelly2.*/) && ($mode eq "roller") ){
-      $pre .= "roller/$chan?";
+      $pre .= "roller/0?";
+    }elsif( ($model eq "shellyrgbw") && ($mode eq "white") ){
+      $pre .= "white/0?";
+    }elsif( ($model eq "shellyrgbw") && ($mode eq "color") ){
+      $pre .= "color/0?";
     }else{
       $pre .= "relay/$chan?";
-      $v = Shelly_configure($hash,$pre.$reg);
     }
+    $v = Shelly_configure($hash,$pre.$reg);
     
   #-- else
   } else {
@@ -693,10 +703,10 @@ sub Shelly_Set ($@) {
   #-- configuration register
   if($cmd eq "config") {
     my $reg = $value;
-    my ($chan,$val);
+    my ($val,$chan);
     if( int(@a) == 2 ){
-      $chan = $a[0];
-      $val = $a[1];
+      $chan = $a[1];
+      $val = $a[0];
     }elsif( int(@a) == 1 ){
       $chan = 0;
       $val = $a[0];
@@ -707,15 +717,15 @@ sub Shelly_Set ($@) {
     }
     my $pre = "settings/";
     if( ($model =~ /shelly2.*/) && ($mode eq "roller") ){
-      $pre .= "roller/$chan?";
+      $pre .= "roller/0?";
     }elsif( ($model eq "shellyrgbw") && ($mode eq "white") ){
-      $pre .= "white/$chan?";
+      $pre .= "white/0?";
     }elsif( ($model eq "shellyrgbw") && ($mode eq "color") ){
-      $pre .= "color/$chan?";
+      $pre .= "color/0?";
     }else{
       $pre .= "relay/$chan?";
-      $v = Shelly_configure($hash,$pre.$reg."=".$val);
     }
+    $v = Shelly_configure($hash,$pre.$reg."=".$val);
   }
   
   #-- password
@@ -796,10 +806,14 @@ sub Shelly_pwd($){
   
   #-- isolate register name
   my $reg = substr($cmd,index($cmd,"?")+1);
+  my $chan= substr($cmd,index($cmd,"?")-1,1);
+  $reg    = substr($reg,0,index($reg,"="))
+    if(index($reg,"=") > 0);
   my $val = $jhash->{$reg};
   $val = ""
     if(!defined($val));
-  readingsSingleUpdate($hash,"config",$reg."=".$val,1);
+  $chan = " [channel $chan]";
+  readingsSingleUpdate($hash,"config",$reg."=".$val.$chan,1);
   
   return undef;
 }
@@ -1330,7 +1344,7 @@ sub Shelly_updown2($){
     readingsSingleUpdate($hash,"state","Error",1);
     return;
   }
-  Log3 $name, 1,"[Shelly_meter] has obtained data $data";
+  Log3 $name, 5,"[Shelly_meter] has obtained data $data";
     
   my $json = JSON->new->utf8;
   my $jhash = eval{ $json->decode( $data ) };
@@ -1381,7 +1395,7 @@ sub Shelly_updown2($){
         <h4>Set</h4>  
         For all Shelly devices
         <ul>
-        <li><code>set &lt;name&gt; config &lt;registername&gt; [&lt;channel&gt;] &lt;value&gt;</code>
+        <li><code>set &lt;name&gt; config &lt;registername&gt; &lt;value&gt; [&lt;channel&gt;] </code>
                 <br />set the value of a configuration register</li>
         <li>password &lt;password&gt;<br>This is the only way to set the password for the Shelly web interface</li>
         </ul>
