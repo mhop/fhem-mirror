@@ -127,6 +127,7 @@ BEGIN {
           CommandAttr
 		  attr
 		  fhem
+		  init_done
 		  )
 
     );
@@ -195,6 +196,34 @@ sub Attr(@) {
     my $hash = $defs{$name};
     return "\"Siro Attr: \" $name does not exist" if ( !defined($hash) );
 
+	if ( $cmd eq "set" and $init_done == 1) 
+	{
+	
+	
+		if ( $aName eq "SIRO_inversPosition" ) 
+		{
+		my $oldinvers = AttrVal($name,'SIRO_inversPosition','undef');
+		Log3( $name,0 , "Siro_attr_oldinvers: $oldinvers ");
+		Log3( $name,0 , "Siro_attr_newinvers: $aVal ");
+		
+		
+			if ( $aVal ne $oldinvers) 
+				{
+				my $aktstate = ReadingsVal( $name, 'state', 'undef' );
+				$aktstate = 100 - $aktstate;
+				
+				readingsSingleUpdate( $hash, "state", $aktstate , 1 );
+				readingsSingleUpdate( $hash, "pct", $aktstate , 1 );
+				
+				}
+	
+	}
+	
+	Log3( $name,0 , "Siro_attr: $cmd, $name, $aName, $aVal ");
+	
+	}
+	
+	Log3( $name,0 , "Siro_attr init done : $init_done");
 return;
 }
 #################################################################
@@ -231,9 +260,15 @@ sub Define($$) {
     $modules{Siro}{defptr}{$devpointer} = $hash;
 	AssignIoPort($hash);
 	
-    CommandAttr( undef,$name . ' devStateIcon {if (ReadingsVal( $name, \'state\', \'undef\' ) =~ m/[a-z]/ ) { return \'programming:edit_settings notAvaible:hue_room_garage runningUp.*:fts_shutter_up runningDown.*:fts_shutter_down\'}else{return \'[0-9]{1,3}:fts_shutter_1w_\'.(int($state/10)*10)}}' )
-      if ( AttrVal($name,'devStateIcon','none') eq 'none' );
+   # CommandAttr( undef,$name . ' devStateIcon {if (ReadingsVal( $name, \'state\', \'undef\' ) =~ m/[a-z]/ ) { return \'programming:edit_settings notAvaible:hue_room_garage runningUp.*:fts_shutter_up runningDown.*:fts_shutter_down\'}else{return \'[0-9]{1,3}:fts_shutter_1w_\'.(int($state/10)*10)}}' )
+    #  if ( AttrVal($name,'devStateIcon','none') eq 'none' );
 
+	 	
+  
+	   CommandAttr( undef,$name . ' devStateIcon {return FHEM::Siro::Siro_icon($name)}' )
+      if ( AttrVal($name,'devStateIcon','none') eq 'none' );
+	  
+	  
     CommandAttr(undef,$name . ' webCmd stop:open:close:fav:pct')
       if ( AttrVal($name,'webCmd','none') eq 'none' );
 	
@@ -311,15 +346,10 @@ sub SendCommand($@) {
 	 return;
 	
 	 }
-	
-	
 
 	#Log3( $name, 5,"Siro_sendCommand: args1 - $args[1]");
 
-   # if ( $args[1] eq "longstop" || $hash->{helper}{progmode} eq "on")
-   
-   if ( (defined($args[1]) and $args[1] and $args[1] eq "longstop") || (defined($hash->{helper}) and $hash->{helper} and defined($hash->{helper}{progmode}) and $hash->{helper}{progmode} and $hash->{helper}{progmode} eq "on") )
- 	
+   if ( defined($args[1]) and $args[1] eq "longstop" || defined $hash->{helper}{progmode} and $hash->{helper}{progmode} eq "on")
 		{
 			$SignalRepeats = AttrVal( $name, 'SIRO_signalLongStopRepeats', '15' );
 		}
@@ -459,7 +489,8 @@ sub Parse($$) {
 		{
             # Log3 $lh, 5, "Siro_Parse: prüfung auf douplestop ";
             my $testparsetime      = gettimeofday();
-            my $lastparsestop      = $lh->{helper}{lastparse_stop};
+            my $lastparsestop      = 0;
+			$lastparsestop = $lh->{helper}{lastparse_stop} if defined $lh->{helper}{lastparse_stop};
             my $parseaborted       = $lh->{helper}{parse_aborted};
             my @lastparsestoparray = split( / /, $lastparsestop );
             my $timediff           = $testparsetime - $lastparsestoparray[1];
@@ -505,14 +536,12 @@ sub Parse($$) {
             }
         }
 
-Log3( $name, 5, "Siro Parse Befehl:  $newstate");
+		Log3( $name, 5, "Siro Parse Befehl:  $newstate");
 		
         if ( defined($name) ) {#device vorhanden
             my $parseaborted = 0;
             $lh->{helper}{parse_aborted} = $parseaborted;
             Log3 $lh, 5, "Siro_Parse:  $name $newstate";
-			
-			
 			my $defchannnel =  $lh->{CHANNEL_RECEIVE};
 			my $atrrchannel = AttrVal( $name, 'SIRO_send_channel', $defchannnel );
 			
@@ -527,7 +556,6 @@ Log3( $name, 5, "Siro Parse Befehl:  $newstate");
 			Log3 $lh, 5, "Siro_Parse: hash->{helper}{remotecmd} - ".$hash->{helper}{remotecmd};
 			Log3( $name, 3, "Siro-Parse ($name) : Signal FB emfangen -  $newstate");	
             Set( $lh, $name, $newstate );
-          
             return $name;
         }
     }
@@ -598,7 +626,6 @@ sub Set($@) {
 	my $favposition = ReadingsVal( $name, 'Favorite-Position', 'nA' ); #gespeicherte Favoritenposition
 	my $invers = 1; #invertiert position
 	
-	
 	if ($downtime ne "undef" && $uptime ne "undef")
 			{
 			$down1time = $downtime/100;
@@ -606,6 +633,10 @@ sub Set($@) {
 			}
 	
     return "" if ( IsDisabled($name) );
+	
+	$hash->{helper}{progmode} = "off" if !defined $hash->{helper}{progmode};
+	
+	
 	
 	# versionschange
 	#changeconfig
@@ -615,7 +646,7 @@ sub Set($@) {
 		return;
 		}	
 	
-	# pr?fe auf unbekannte sets
+	# pruefe auf unbekannte sets
 	
 	 if ( $cmd =~ m/^exec.*/ )# empfangene sequenz aus programmiermode 
 	 {
@@ -646,7 +677,7 @@ sub Set($@) {
 ####################################
 	
 	#if ( $hash->{helper}{progmode} eq "on" && $cmd eq "sequenz") # sequenz ausführen 
-	if ( defined($hash->{helper}) and $hash->{helper} and defined($hash->{helper}{progmode}) and $hash->{helper}{progmode} and $hash->{helper}{progmode} eq "on" && $cmd eq "sequenz") # sequenz ausf?hren 
+	if ( defined $hash->{helper}{progmode} and $hash->{helper}{progmode} eq "on" && $cmd eq "sequenz") # sequenz ausf?hren 
  
 	{
 	Log3( $name, 5, "Siro-Programmiermodus: Sequenz gefunden :$args[1]");
@@ -665,8 +696,8 @@ sub Set($@) {
 	return;
 	}
 	
-	#if ($cmd eq "prog_mode_on" && $hash->{helper}{progmode} ne "on")
-	if (defined($hash->{helper}) and $hash->{helper} and defined($hash->{helper}{progmode}) and $hash->{helper}{progmode} and $hash->{helper}{progmode} eq "on")
+	if ($cmd eq "prog_mode_on" && $hash->{helper}{progmode} ne "on")
+	
 
 	{
 	readingsSingleUpdate( $hash, "state",  'programming', 1 ); 
@@ -706,10 +737,8 @@ sub Set($@) {
 	$hash->{helper}{exexcmd}="on";  #reset ignore send comand states
 	$hash->{helper}{ignorecmd} = "off" ; #reset ignore send comand states
 	#setze helper neu wenn signal von fb kommt
-	
 	#if ($hash->{helper}{remotecmd} eq "on")
-	if ( defined($hash->{helper}) and $hash->{helper} and defined($hash->{helper}{remotecmd}) and $hash->{helper}{remotecmd} and $hash->{helper}{remotecmd} eq "on")
- 
+	if ( defined($hash->{helper}{remotecmd}) and $hash->{helper}{remotecmd} eq "on")
 	{
 	$hash->{helper}{exexcmd} = "off" 
 	}
@@ -787,7 +816,15 @@ sub Set($@) {
 			 $drivedpercents = $pastaction/$down1time;
 			 $drivedpercents = ( int( $drivedpercents * 10 ) / 10 );
 			 Log3( $name, 5, "Siro-Set: Positionsveraenderung um $drivedpercents Prozent nach unten ");
+			 
+			 
+			 if (AttrVal( $name, 'SIRO_inversPosition',0 ) eq "1")
+			 {
+			 $newposition = int ($position-$drivedpercents);
+			 }
+			 else{
 			 $newposition = int ($position+$drivedpercents);
+			 }
 			}
 		
 		if ($state eq "runningUp" || $state eq "runningUpfortimer")
@@ -795,7 +832,14 @@ sub Set($@) {
 			 $drivedpercents = $pastaction/$up1time;
 			 $drivedpercents = ( int( $drivedpercents * 10 ) / 10 );
 			 Log3( $name, 5, "Siro-Set: Positionsveraenderung um $drivedpercents Prozent nach oben ");
+			 
+			  if (AttrVal( $name, 'SIRO_inversPosition',0 ) eq "1")
+			 {
+			 $newposition = int ($position+$drivedpercents);
+			 }
+			 else{
 			 $newposition = int ($position-$drivedpercents);
+			 }
 			}
 		
 		Log3( $name, 5, "Siro-Set: neue Position - $newposition ");
@@ -825,6 +869,32 @@ sub Set($@) {
 			}
 		}
 
+		
+###############		
+#pct 100 und pct 0 auf on oder off mappen
+		if ($comand eq "level" and $zielposition eq "100")
+		{
+		$comand = "on" if AttrVal( $name, 'SIRO_inversPosition',0 ) eq "0";
+		$comand = "off" if AttrVal( $name, 'SIRO_inversPosition',0 ) eq "1";
+		
+		Log3( $name, 4, "Siro-Set: mapping level 100 - on");
+		}
+		
+		
+		
+		
+		if ($comand eq "level" and $zielposition eq "0")
+		{
+		$comand = "off" if AttrVal( $name, 'SIRO_inversPosition',0 ) eq "0";
+		$comand = "on" if AttrVal( $name, 'SIRO_inversPosition',0 ) eq "1";
+		
+		Log3( $name, 4, "Siro-Set: mapping level 0 - off");
+		}
+
+#################
+# mappe invers position		
+		# verschoben in routine on/off
+		
 ############## on off for timer
 # up/down for timer mappen auf on/off und timer für stop setzen
     if ( $comand eq 'upfortimer' ) 
@@ -944,6 +1014,9 @@ sub Set($@) {
 			}
 			if ($state eq "undef" || $state eq "notAvaible") { $state = 0; }
 			my $waytodrive = 100 - $state;
+			
+			if (AttrVal( $name, 'SIRO_inversPosition',0 ) eq "1"){$waytodrive = $state;}
+			
 			my $timetodrive = $waytodrive * $down1time;
 			my $endaction = time + $timetodrive;
 			Log3( $name, 5, "Siro-Set: on downtime - waytodrive $waytodrive");
@@ -989,14 +1062,22 @@ sub Set($@) {
 			readingsEndUpdate( $hash, 1);
 			SendCommand( $hash, 'off' );
 			}
-			
+			# 
 			if ($state eq "undef" || $state eq "notAvaible") { $state = 100; }
+			
+			
 			my $waytodrive = 0 + $state;
+			if (AttrVal( $name, 'SIRO_inversPosition',0 ) eq "1"){$waytodrive = 0 + (100- $state);}
+			
 			my $timetodrive = $waytodrive * $up1time;
+			
+			
 			my $endaction = time + $timetodrive;
+			
+			
 			Log3( $name, 5, "Siro-Set: off downtime - waytodrive $waytodrive");
 			Log3( $name, 5, "Siro-Set: off downtime - state  $state");
-			Log3( $name, 5, "Siro-Set: off downtime - down1time  $down1time");
+			Log3( $name, 5, "Siro-Set: off downtime - up1time  $up1time");
 			SendCommand( $hash, 'off' );
 			
 			readingsBeginUpdate($hash);
@@ -1229,8 +1310,6 @@ sub versionchange($) {
 	
 	fhem("deleteattr $name operation_mode");
 	fhem("deleteattr $name channel_send_mode_1");
-	
-	
 	fhem("deleteattr $name down_limit_mode_1");
 	fhem("deleteattr $name operation_mode");
 	fhem("deleteattr $name invers_position");
@@ -1238,18 +1317,14 @@ sub versionchange($) {
 	fhem("deleteattr $name prog_fav_sequence");
 	fhem("deleteattr $name time_down_to_favorite");
 	fhem("deleteattr $name time_down_to_favorite");
-	
-
 	my $seconds = ReadingsVal( $name, 'operating_seconds', '0' );
 	fhem("deletereading $name .*");
-
 	readingsBeginUpdate($hash);
     readingsBulkUpdate( $hash, "state", "0" );
 	readingsBulkUpdate( $hash, "pct", "0" ) ;
 	readingsBulkUpdate( $hash, "position", "0" ) ;
 	readingsBulkUpdate( $hash, "motor-term", $seconds ) ;
     readingsEndUpdate( $hash, 1 );
-
 	SendCommand( $hash, 'off' );
 	return;
 }
@@ -1260,9 +1335,10 @@ my ( $FW_wname, $d, $room, $pageHash ) =@_;    # pageHash is set for summaryFn.
     my $name     = $hash->{NAME};
     return "" if ( IsDisabled($name) );
 	my $progmode =$hash->{helper}{progmode};
+	Log3( $name, 5, "Siro-progmode: reached progmode $progmode");
 	if (!defined $progmode){$progmode='off';}
 	my $msg;
-	
+
 ############## versionsänderung
 # kann irgendwann entfernt werden
 	
@@ -1285,13 +1361,8 @@ my ( $FW_wname, $d, $room, $pageHash ) =@_;    # pageHash is set for summaryFn.
 		$msg.= "<table class='block wide' id='SiroWebTR'>
 			<tr class='even'>
 			<td><center>&nbsp;<br>Programmiermodus aktiv, es werden nur folgende Befehle unterstuetzt:<br>&nbsp;<br>";
-
-			
-			
 		$msg.= "Das Anlernen ene Rollos erfolgt unter der ID: ";
 		
-		
-	
 	my $sendid = AttrVal( $name, 'SIRO_send_id', 'undef' );
 	if ( $sendid eq 'undef')
 	{
@@ -1377,6 +1448,19 @@ my ( $FW_wname, $d, $room, $pageHash ) =@_;    # pageHash is set for summaryFn.
 	$msg.= "}</script>";	
 	return $msg;
 }
+
+################	
+sub Siro_icon($) 
+	{
+	my ($name) = @_;
+	my $hash = $defs{$name};
+	my $state = ReadingsVal( $name, 'state', 'undef' );
+	my $invers = AttrVal( $name, 'SIRO_inversPosition',0 ); 
+	my $ret ="programming:edit_settings notAvaible:hue_room_garage runningUp.*:fts_shutter_up runningDown.*:fts_shutter_down ".$state.":fts_shutter_1w_".(int($state/10)*10);
+	$ret ="programming:edit_settings notAvaible:hue_room_garage runningUp.*:fts_shutter_up runningDown.*:fts_shutter_down ".$state.":fts_shutter_1w_".(100 - (int($state/10)*10)) if $invers eq "1";
+	return $ret;
+	}
+
 ################
 
 
@@ -1593,8 +1677,8 @@ set Siro1 stop                        stoppt die aktuelle Fahrt des Rollos<br>
 set Siro1 pct 45              f&auml;hrt das Rollo zur angegebenen Position (45%)<br>
 set Siro1 45                           f&auml;hrt das Rollo zur angegebenen Position (45%)<br>
 set Siro1 fav                          f&auml;hrt das Rollo in die hardwarem&auml;ssig programmierte Mittelposition<br>
-et Siro1 down_for_timer 5                          f&auml;hrt das Rollo 5 Sekunden nach unten<br>
-et Siro1 uown_for_timer 5                         f&auml;hrt das Rollo 5 Sekunden nach oben<br>
+set Siro1 down_for_timer 5                          f&auml;hrt das Rollo 5 Sekunden nach unten<br>
+set Siro1 down_for_timer 5                         f&auml;hrt das Rollo 5 Sekunden nach oben<br>
 set Siro1 progmode_on                       Das Modul wird in den Programmiermodus versetzt<br>
 set Siro1 set_favorite               programmiert den aktuellen Rollostand als Hardwaremittelposition, das ATTR time_down_to_favorite wird neu berechnet und gesetzt. <br>
 </ul>
