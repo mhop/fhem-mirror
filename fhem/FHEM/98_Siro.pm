@@ -869,7 +869,7 @@ sub Set($@) {
 			}
 		}
 
-		
+		Log3( $name, 5, "Siro-Set: cmd nach change : $comand");
 ###############		
 #pct 100 und pct 0 auf on oder off mappen
 		if ($comand eq "level" and $zielposition eq "100")
@@ -1017,8 +1017,8 @@ sub Set($@) {
 			readingsEndUpdate( $hash, 1);
 			SendCommand( $hash, 'on' );
 			
-			return;
-			return;
+			#return;
+			
 			}
 			if ($state eq "undef" || $state eq "notAvaible") { $state = 0; }
 			my $waytodrive = 100 - $state;
@@ -1038,6 +1038,7 @@ sub Set($@) {
 			readingsBulkUpdate( $hash, "aktEndAction", $endaction ) ;
 			readingsBulkUpdate( $hash, "aktTimeAction", $timetodrive ) ;
 			readingsBulkUpdate( $hash, "aktActionFinish", "100" ) ;
+			readingsBulkUpdate( $hash, "LastAction", $comand );
 			readingsEndUpdate( $hash, 1);
 			
 			if ($comand eq "on")
@@ -1071,7 +1072,7 @@ sub Set($@) {
 			readingsEndUpdate( $hash, 1);
 			SendCommand( $hash, 'off' );
 			
-			return;
+			#return;
 			}
 			# 
 			if ($state eq "undef" || $state eq "notAvaible") { $state = 100; }
@@ -1096,6 +1097,7 @@ sub Set($@) {
 			readingsBulkUpdate( $hash, "aktEndAction", $endaction ) ;
 			readingsBulkUpdate( $hash, "aktTimeAction", $timetodrive ) ;
 			readingsBulkUpdate( $hash, "aktActionFinish", "0" ) ;
+			readingsBulkUpdate( $hash, "LastAction", $comand );
 			readingsEndUpdate( $hash, 1);
 			
 			
