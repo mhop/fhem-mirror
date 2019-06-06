@@ -184,16 +184,19 @@ sub Heating_Control_ConvertToWDT() {
     <ul><b>device</b><br>
       The device to switch at the given time.
     </ul>
+	</p>
     <p>
     <ul><b>language</b><br>
       Specifies the language used for definition and profiles.
       de,en,fr are possible. The parameter is optional.
     </ul>
+	</p>
     <p>
     <ul><b>weekdays</b><br>
       Specifies the days for all timer in the <b>Heating_Control</b>.
       The parameter is optional. For details see the weekdays part in profile.
     </ul>
+	</p>
     <p>
     <ul><b>profile</b><br>
       Define the weekly profile. All timings are separated by space. A switchingtime is defined
@@ -217,7 +220,8 @@ sub Heating_Control_ConvertToWDT() {
       <u>parameter:</u>the temperature to be set, using a float with mask 99.9 or a sybolic value like <b>eco</b> or <b>comfort</b> - whatever your thermostat understands.
       The symbolic value can be added an additional parameter:  dayTemp:16 night-temp:15. See examples <br><br>
     </ul>
-    <p>
+    </p>
+	<p>
     <ul><b>command</b><br>
       If no condition is set, all the rest is interpreted as a command. Perl-code is setting up
       by the well-known Block with {}.<br>
@@ -232,37 +236,51 @@ sub Heating_Control_ConvertToWDT() {
           <li>$EVENT => the new temperature</li>
         </ol>
     </ul>
+	</p>
     <p>
     <ul><b>condition</b><br>
       if a condition is defined you must declare this with () and a valid perl-code.<br>
       The returnvalue must be boolean.<br>
       The parameter $NAME and $EVENT will be interpreted.
     </ul>
+	</p>
     <p>
     <b>Examples:</b>
+	</p>
     <ul>
         <code>define HCB Heating_Control Bad_Heizung 12345|05:20|21 12345|05:25|comfort 17:20|21 17:25|eco</code><br>
         Mo-Fr are setting the temperature at 05:20 to 21&deg;C, and at 05:25 to <b>comfort</b>.
-        Every day will be set the temperature at 17:20 to 21&deg;C and 17:25 to <b>eco</b>.<p>
-
+        Every day will be set the temperature at 17:20 to 21&deg;C and 17:25 to <b>eco</b>.
+		
+		<p>
         <code>define HCW Heating_Control WZ_Heizung 07:00|16 Mo,Tu,Th-Fr|16:00|18.5 20:00|12
           {fhem("set dummy on"); fhem("set $NAME desired-temp $EVENT");}</code><br>
-        At the given times and weekdays only(!) the command will be executed.<p>
+        At the given times and weekdays only(!) the command will be executed.
+		</p>
+		<p>
 
         <code>define HCW Heating_Control WZ_Heizung Sa-Su,We|08:00|21 (ReadingsVal("WeAreThere", "state", "no") eq "yes")</code><br>
-        The temperature is only set if the dummy variable WeAreThere is "yes".<p>
+        The temperature is only set if the dummy variable WeAreThere is "yes".
+		</p>
+		<p>
 
         <code>define HCW Heating_Control WZ_Heizung en Su-Fr|{sunrise_abs()}|21 Mo-Fr|{sunset_abs()}|16</code><br>
-        The device is switched at sunrise/sunset. Language: english.<p>
+        The device is switched at sunrise/sunset. Language: english.
+		</p>
+		<p>
 
         <code>define HCW Heating_Control WZ_Heizung en Mo-Fr|{myFunction}|night-temp:18 Mo-Fr|{myFunction()}|dayTemp:16</code><br>
-        The is switched at time myFunction(). It is sent the Command "night-temp 18" and "dayTemp 16".<p>
+        The is switched at time myFunction(). It is sent the Command "night-temp 18" and "dayTemp 16".
+		</p>
+		<p>
 
         If you want to have set all Heating_Controls their current value (after a temperature lowering phase holidays)
         you can call the function <b>Heating_Control_SetTemp("HC-device")</b> or <b>Heating_Control_SetAllTemps()</b>.<br>
         This call can be automatically coupled to a dummy by a notify:<br>
         <code>define HeizStatus2 notify Heating:. * {Heating_Control_SetAllTemps()}</code>
-        <br><p>
+        <br>
+		</p>
+		<p>
         Some definitions without comment:
         <code><pre>
         define hc    Heating_Control  HeizungKueche de        7|23:35|25        34|23:30|22 23:30|16 23:15|22     8|23:45|16
@@ -276,8 +294,8 @@ sub Heating_Control_ConvertToWDT() {
         define hx    Heating_Control  HeizungKueche de        22:35|25  23:00|16
         </code></pre>
 
-        the list of days can be set globaly for the whole  Heating_Control:<p>
-
+        the list of days can be set globaly for the whole  Heating_Control:
+		
         <code><pre>
         define HeizungWohnen_an_wt    Heating_Control HeizungWohnen de  !$we     09:00|19  (heizungAnAus("Ein"))
         define HeizungWohnen_an_we    Heating_Control HeizungWohnen de   $we     09:00|19  (heizungAnAus("Ein"))
@@ -285,7 +303,7 @@ sub Heating_Control_ConvertToWDT() {
         define HeizungWohnen_an_we    Heating_Control HeizungWohnen de   57      09:00|19  (heizungAnAus("Ein"))
         define HeizungWohnen_an_we    Heating_Control HeizungWohnen de  fr,$we   09:00|19  (heizungAnAus("Ein"))
         </code></pre>
-
+        </p>
       An example to be able to temporarily boost the temperature for one hour:
       <code><pre>
       define hc Heating_Control HeatingBath de !$we|05:00|{HC_WithBoost(23,"HeatingBath")} $we|07:00|{HC_WithBoost(23,"HeatingBath")} 23:00|{HC_WithBoost(20,"HeatingBath")}
@@ -336,7 +354,7 @@ sub Heating_Control_ConvertToWDT() {
       }
       </code></pre>
       Pray that the device does not restart during your vacation, as the <code>define defVacationEnd ... at </code> is volatile and will be lost at restart!
-
+      
     </ul>
   </ul>
 
@@ -380,7 +398,8 @@ sub Heating_Control_ConvertToWDT() {
     <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
     <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
     <li><a href="#stateFormat">stateFormat</a></li>
-    <li>windowSensor<br>Defines a list of window sensors. When one of its window state readings is <b>open</b> the aktual switch is delayed.</li>  </ul><br>
+    <li>windowSensor<br>Defines a list of window sensors. When one of its window state readings is <b>open</b> the aktual switch is delayed.</li>  
+  </ul><br>
 </ul>
 
 =end html
@@ -393,7 +412,7 @@ sub Heating_Control_ConvertToWDT() {
 <br><b>Achtung:</b>  
   <br>Heating Control wird nicht weiter gepflegt ("deprecated"). WeekdayTimer bietet identische Funktionalität, bei (annähernd) gleicher Syntax. Um alle Heating_Control Devices zu WeekdayTimer umzustellen, genügt ein <code>set &lt;name&gt; ConvertToWDT</code>, wobei als &lt;name&gt; ein beliebiges Heating_Control device angegeben werden kann. Die WeekdayTimer werden mit denselben Namen erstellt, alle früheren HC Geräte erhalten ein WDT_Group-Attribut mit Inhalt former_HC, so dass sie auch in Zukunft miteinander geschalten werden können. Statt des Aufrufs Heating_Control_SetTemp("HC-device") bzw. Heating_Control_SetAllTemps() steht Ihnen <code>set &lt;name&gt; WDT_Params single</code> oder <code>set &lt;name&gt; WDT_Params WDT_Group</code> zur Verfügung, sowie WeekdayTimer_SetParm("WD-device"), WeekdayTimer_SetAllParms() bzw. WeekdayTimer_SetAllParms("former_HC"), wenn Sie Perl nutzen möchten (former_HC ist hier nur ein Beispiel, es können beliebige Gruppennamen verwendet werden.  <br><br>
   <a name="Heating_Controldefine"></a>
-  <b>Define</b>
+  <h4>Define</h4>
   <ul>
     <code>define &lt;name&gt; Heating_Control &lt;device&gt; [&lt;language&gt;] &lt;wochentage;] &lt;profile&gt; &lt;command&gt;|&lt;condition&gt;</code>
     <br><br>
@@ -413,18 +432,21 @@ sub Heating_Control_ConvertToWDT() {
     <ul><b>device</b><br>
       Name des zu schaltenden Device.
     </ul>
-    <p>
+    </p>
+	<p>
     <ul><b>language</b><br>
       Spezifiziert die Sprache f&uumlr die Definition und die Anzeige der Profile in der Weboberfl&aumlche.
       Zurzeit sind de,en,fr definiert. Der Parameter ist optional.
     </ul>
-    <p>
+    </p>
+	<p>
     <ul><b><u>wochentage</u></b><br>
       Spezifiziert die Tage f&uumlr alle Timer eines <b>Heating_Control</b>.
       Der Parameter ist optional. Bitte f&uumlr Details zur Definition siehe wochentage im part profile.
     </ul>
+	</p>
     <p>
-
+	
     <ul><b>profile</b><br>
       Angabe des Wochenprofils. Die einzelnen Schaltzeiten sind durch Leerzeichen getrennt
       Die Angabe der Schaltzeiten ist nach folgendem Muster definiert:<br>
@@ -452,7 +474,8 @@ sub Heating_Control_ConvertToWDT() {
       or <b>comfort</b> - was immer das Heizk&oumlrperthermostat versteht.
       Symbolischen Werten kann ein zus&aumltzlicher Parameter angeh&aumlngt werden: dayTemp:16 night-temp:15. Unten folgen Beispiele<br><br>
     </ul>
-    <p>
+    </p>
+	<p>
     <ul><b>command</b><br>
       Falls keine Condition in () angegeben wurde, so wird alles weitere als Command
       interpretiert. Perl-Code ist in {} zu setzen. <br>
@@ -465,37 +488,45 @@ sub Heating_Control_ConvertToWDT() {
           <li>$EVENT => die zu setzende Temperatur</li>
         </ol>
     </ul>
-    <p>
+    </p>
+	<p>
     <ul><b>condition</b><br>
       Bei Angabe einer Condition ist diese in () zu setzen und mit validem Perl-Code zu versehen.<br>
       Der R&uumlckgabedatentyp der condition muss boolean sein.<br>
       Die Parameter $NAME und $EVENT werden interpretiert.
     </ul>
-    <p>
+    </p>
+	
     <b>Beispiele:</b>
     <ul>
         <code>define HCW Heating_Control Bad_Heizung 12345|05:20|21 12345|05:25|comfort 17:20|21 17:25|eco</code><br>
         Mo-Fr wird die Temperatur um 05:20Uhr auf 21&deg;C, und um 05:25Uhr auf <b>comfort</b> gesetzt.
-        Jeden Tag wird die Temperatur um 17:20Uhr auf 21&deg;C und 17:25Uhr auf <b>eco</b> gesetzt.<p>
+        Jeden Tag wird die Temperatur um 17:20Uhr auf 21&deg;C und 17:25Uhr auf <b>eco</b> gesetzt.
+		<p>
 
         <code>define HCW Heating_Control WZ_Heizung 07:00|16 Mo,Di,Mi|16:00|18.5 20:00|12
           {fhem("set dummy on"); fhem("set $NAME desired-temp $EVENT");}</code><br>
-        Zu den definierten Schaltzeiten wird nur(!) der in {} angegebene Perl-Code ausgef&uumlhrt.<p>
-
+        Zu den definierten Schaltzeiten wird nur(!) der in {} angegebene Perl-Code ausgef&uumlhrt.
+		</p>
+		<p>
         <code>define HCW Heating_Control WZ_Heizung Sa-So,Mi|08:00|21 (ReadingsVal("WeAreThere", "state", "no") eq "yes")</code><br>
-        Die zu setzende Temperatur wird nur gesetzt, falls die Dummy Variable WeAreThere = "yes" ist.<p>
-
+        Die zu setzende Temperatur wird nur gesetzt, falls die Dummy Variable WeAreThere = "yes" ist.
+		</p>
+		<p>
         <code>define HCW Heating_Control WZ_Heizung en Su-Fr|{sunrise_abs()}|21 Mo-Fr|{sunset_abs()}|16</code><br>
-        Das Ger&aumlt wird bei Sonnenaufgang und Sonnenuntergang geschaltet. Sprache: Englisch.<p>
-
+        Das Ger&aumlt wird bei Sonnenaufgang und Sonnenuntergang geschaltet. Sprache: Englisch.
+		</p>
+		<p>
         <code>define HCW Heating_Control WZ_Heizung en Mo-Fr|{myFunction}|night-temp:18 Mo-Fr|{myFunction()}|dayTemp:16</code><br>
-        Das Ger&aumlt wird bei myFunction() geschaltet. Es wird das Kommando "night-temp 18" bzw. "dayTemp 16" gesendet.<p>
+        Das Ger&aumlt wird bei myFunction() geschaltet. Es wird das Kommando "night-temp 18" bzw. "dayTemp 16" gesendet.<br>
 
         Wenn du beispielsweise nach einer Temperaturabsenkungsphase erreichen willst, dass  alle Heating_Controls ihren aktuellen Wert
-        einstellen sollen, kannst du die Funktion <b>Heating_Control_SetTemp("HC-device")</b> or <b>Heating_Control_SetAllTemps()</b> aufrufen.<p>
+        einstellen sollen, kannst du die Funktion <b>Heating_Control_SetTemp("HC-device")</b> or <b>Heating_Control_SetAllTemps()</b> aufrufen.<br>
         Dieser Aufruf kann per notify automatisch an ein dummy gekoppelt werden:<br>
         <code>define HeizStatus2            notify Heizung:.*                          {Heating_Control_SetAllTemps()}</code>
-        <br><p>
+        <br>
+		</p>
+		<p>
         Einige Definitionen ohne weitere Erkl&aumlrung:
         <code><pre>
         define hc    Heating_Control  HeizungKueche de        7|23:35|25        34|23:30|22 23:30|16 23:15|22     8|23:45|16
@@ -508,7 +539,7 @@ sub Heating_Control_ConvertToWDT() {
         define hh    Heating_Control  HeizungKueche de        {sunrise_abs_dat($date)}|19           {sunset_abs_dat($date)}|21
         define hx    Heating_Control  HeizungKueche de        22:35|25  23:00|16
         </code></pre>
-        Die Tagesliste kann global f&uumlr das ganze Heating_Control angegeben werden:<p>
+        Die Tagesliste kann global f&uumlr das ganze Heating_Control angegeben werden:<br>
         <code><pre>
         define HeizungWohnen_an_wt    Heating_Control HeizungWohnen de  !$we     09:00|19  (heizungAnAus("Ein"))
         define HeizungWohnen_an_we    Heating_Control HeizungWohnen de   $we     09:00|19  (heizungAnAus("Ein"))
@@ -517,17 +548,18 @@ sub Heating_Control_ConvertToWDT() {
         define HeizungWohnen_an_we    Heating_Control HeizungWohnen de  fr,$we   09:00|19  (heizungAnAus("Ein"))
         </code></pre>
 
-       es ist möglich den Parameter als Perlcode zu spezifizieren:<p>
+        es ist möglich den Parameter als Perlcode zu spezifizieren:<br>
         <code><pre>
         ...   7|23:35|{getParameter(13,"this")}   7|23:36|{getParameter(14,"that")}
         </code></pre>
-        ein detailiertes Beispiel ist in Heating_Control(EN) beschrieben<p>
-
-    </ul>
+        ein detailiertes Beispiel ist in Heating_Control(EN) beschrieben<br>
+	    </p>
+	</ul>
+  </ul>  
   </ul>
-
+  <ul>	
   <a name="Heating_Controlset"></a>
-  <b>Set</b>
+  <h4>Set</h4>
 
     <code><b><font size="+1">set &lt;name&gt; &lt;value&gt;</font></b></code>
     <br><br>
@@ -542,13 +574,17 @@ sub Heating_Control_ConvertToWDT() {
       <code>set hc disable</code><br>
       <code>set hc enable</code><br>
     </ul>
+  <br>
   </ul>
 
+  <ul>
   <a name="Heating_Controlget"></a>
-  <b>Get</b> <ul>N/A</ul><br>
-
+  <h4>Get</h4> <ul>N/A</ul><br>
+  </ul>
+     
+  <ul>
   <a name="Heating_ControlLogattr"></a>
-  <b>Attributes</b>
+  <h4>Attributes</h4>
   <ul>
     <li>delayedExecutionCond <br>
     definiert eine Veroegerungsfunktion. Wenn die Funktion wahr liefert, wird die Schaltung des Geraets solage verzoegert, bis die Funktion wieder falsch liefert. Das Verhalten entspricht einem Fensterkontakt.
@@ -582,8 +618,10 @@ sub Heating_Control_ConvertToWDT() {
     <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
     <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
     <li><a href="#stateFormat">stateFormat</a></li>
-    <li>windowSensor<br>Definiert eine Liste mit Fensterkontakten. Wenn das Reading window state eines Fensterkontakts <b>open</b> ist, wird der aktuelle Schaltvorgang verz&oumlgert.</li>
-  </ul><br>
+    <li>windowSensor<br>Definiert eine Liste mit Fensterkontakten. Wenn das Reading window state eines Fensterkontakts <b>open</b> ist, wird der aktuelle Schaltvorgang verz&oumlgert.
+	</li>
+  </ul>
+</ul>
 
 =end html_DE
 =cut
