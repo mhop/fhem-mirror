@@ -203,27 +203,22 @@ sub Attr(@) {
 		if ( $aName eq "SIRO_inversPosition" ) 
 		{
 		my $oldinvers = AttrVal($name,'SIRO_inversPosition','undef');
-		Log3( $name,0 , "Siro_attr_oldinvers: $oldinvers ");
-		Log3( $name,0 , "Siro_attr_newinvers: $aVal ");
-		
-		
-			if ( $aVal ne $oldinvers) 
+		Log3( $name,5 , "Siro_attr_oldinvers: $oldinvers ");
+		Log3( $name,5 , "Siro_attr_newinvers: $aVal ");
+		if ( $aVal ne $oldinvers) 
 				{
 				my $aktstate = ReadingsVal( $name, 'state', 'undef' );
 				$aktstate = 100 - $aktstate;
-				
 				readingsSingleUpdate( $hash, "state", $aktstate , 1 );
 				readingsSingleUpdate( $hash, "pct", $aktstate , 1 );
-				
 				}
+	}
+	
+	Log3( $name,5 , "Siro_attr: $cmd, $name, $aName, $aVal ");
 	
 	}
 	
-	Log3( $name,0 , "Siro_attr: $cmd, $name, $aName, $aVal ");
-	
-	}
-	
-	Log3( $name,0 , "Siro_attr init done : $init_done");
+	Log3( $name,5 , "Siro_attr init done : $init_done");
 return;
 }
 #################################################################
@@ -1468,6 +1463,11 @@ sub Siro_icon($)
 	my ($name) = @_;
 	my $hash = $defs{$name};
 	my $state = ReadingsVal( $name, 'state', 'undef' );
+	
+	
+	if ($state =~ m/[a-z].*/){$state=0;}
+	
+	
 	my $invers = AttrVal( $name, 'SIRO_inversPosition',0 ); 
 	my $ret ="programming:edit_settings notAvaible:hue_room_garage runningUp.*:fts_shutter_up runningDown.*:fts_shutter_down ".$state.":fts_shutter_1w_".(int($state/10)*10);
 	$ret ="programming:edit_settings notAvaible:hue_room_garage runningUp.*:fts_shutter_up runningDown.*:fts_shutter_down ".$state.":fts_shutter_1w_".(100 - (int($state/10)*10)) if $invers eq "1";
