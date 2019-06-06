@@ -553,7 +553,7 @@ sub Parse($$) {
 			$lh->{helper}{remotecmd} = "on"; #verhindert das senden von signalen nur wenn nicht auf anderem kanal gesendet wird
 			}
 			
-			Log3 $lh, 5, "Siro_Parse: hash->{helper}{remotecmd} - ".$hash->{helper}{remotecmd};
+			Log3 $lh, 5, "Siro_Parse: hash->{helper}{remotecmd} - ".$lh->{helper}{remotecmd};
 			Log3( $name, 3, "Siro-Parse ($name) : Signal FB emfangen -  $newstate");	
             Set( $lh, $name, $newstate );
             return $name;
@@ -1007,9 +1007,17 @@ sub Set($@) {
 		Log3( $name, 3, "Siro-Set ($name) : set Down");	
 		if ($downtime eq "undef" || $uptime eq "undef") # bei ungesetzten fahrzeiten
 			{
-			readingsSingleUpdate( $hash, "state", "100", 1 ) ;
-			readingsSingleUpdate( $hash, "motor-term", "Function is not available without set runtime attribute, please define", 1 ) ;
+			
+			
+			readingsBeginUpdate($hash);
+			readingsBulkUpdate( $hash, "state", "100" ) ;
+			readingsBulkUpdate( $hash, "pct", "100" ) ;
+			readingsBulkUpdate( $hash, "motor-term", "Function is not available without set runtime attribute, please define") ;
+			readingsBulkUpdate( $hash, "LastAction", $comand );
+			readingsEndUpdate( $hash, 1);
 			SendCommand( $hash, 'on' );
+			
+			return;
 			return;
 			}
 			if ($state eq "undef" || $state eq "notAvaible") { $state = 0; }
@@ -1057,10 +1065,13 @@ sub Set($@) {
 			
 			readingsBeginUpdate($hash);
 			readingsBulkUpdate( $hash, "state", "0" ) ;
+			readingsBulkUpdate( $hash, "pct", "0" ) ;
 			readingsBulkUpdate( $hash, "motor-term", "Function is not available without set runtime attribute, please define") ;
 			readingsBulkUpdate( $hash, "LastAction", $comand );
 			readingsEndUpdate( $hash, 1);
 			SendCommand( $hash, 'off' );
+			
+			return;
 			}
 			# 
 			if ($state eq "undef" || $state eq "notAvaible") { $state = 100; }
