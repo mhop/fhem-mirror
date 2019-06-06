@@ -1089,7 +1089,9 @@ attr DEVICE setList\
   effect:select,0,1,2,3 shellies/DEVNAME/color/0/set {"effect":"$EVTPART1"}\
   update:noArg shellies/DEVNAME/command update_fw
 deletereading -q DEVICE status_.*
-attr DEVICE readingList shellies/DEVNAME/color/0/status:.* {json2nameValue($EVENT)}
+attr DEVICE readingList \
+  shellies/DEVNAME/color/0/status:.* {json2nameValue($EVENT)}\
+  shellies/DEVNAME/color/0:.* state
 attr DEVICE userReadings rgb:red.* {if(ReadingsVal($name,"mode","") eq "color"){sprintf("%02X%02X%02X", ReadingsVal($name,"red",99), ReadingsVal($name,"green",99), ReadingsVal($name,"blue",99))}else{my $a=sprintf("%02X",ReadingsVal($name,"brightness",0)*2.555);"$a$a$a"}}
 attr DEVICE webCmd on:off:white:gain:rgb:effect
 attr DEVICE setStateList on off
