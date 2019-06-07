@@ -345,8 +345,8 @@ sub DbLog_split($$) {
   my ($reading, $value, $unit);
 
   if($event =~ m/L3_.*_Power/) {
-      $event   =~ /^L1_(.*)_Power:\s(.*)\s(.*)/;
-      $reading = "L1_$1_Power";
+      $event   =~ /^L3_(.*)_Power:\s(.*)\s(.*)/;
+      $reading = "L3_$1_Power";
 	  $value   = $2;
 	  $unit    = $3;
   } 
