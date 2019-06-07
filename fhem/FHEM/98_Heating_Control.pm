@@ -151,7 +151,7 @@ sub Heating_Control_ConvertToWDT() {
 1;
 
 =pod
-=item device
+=item helper
 =item summary sends heating commands to heating at defined times - deprecated module!
 =item summary_DE - nicht mehr supportetes Modul, bitte stattdessen WeekdayTimer nutzen!
 =begin html
@@ -159,7 +159,7 @@ sub Heating_Control_ConvertToWDT() {
 <a name="Heating_Control"></a>
 <meta content="text/html; charset=ISO-8859-1" http-equiv="content-type">
 <h3>Heating Control</h3>
-<ul>
+<ul> <ul>
 <b>Important Note:</b>  
   <br>Heating Control is deprecated, as WeekdayTimer offers same functionality at identical syntax. To convert your Heating_Control devices to WeekdayTimer, issue a     <code>set &lt;name&gt; ConvertToWDT</code> to one of them. The WeekdayTimer devices will have the same names, all former HC devices will be in a WDT_Group called former_HC, so they can be switched together. Instead of Heating_Control_SetTemp("HC-device") or Heating_Control_SetAllTemps() use <code>set &lt;name&gt; WDT_Params single</code> or <code>set &lt;name&gt; WDT_Params WDT_Group</code>. For Perl commands, WeekdayTimer offers WeekdayTimer_SetParm("WD-device"), WeekdayTimer_SetAllParms() or WeekdayTimer_SetAllParms("former_HC") (former_HC might also be any other group you want to set).  <br><br>
   <a name="Heating_Controldefine"></a>
@@ -401,13 +401,16 @@ sub Heating_Control_ConvertToWDT() {
     <li>windowSensor<br>Defines a list of window sensors. When one of its window state readings is <b>open</b> the aktual switch is delayed.</li>  
   </ul><br>
 </ul>
+</ul>
 
 =end html
+
 =begin html_DE
 
 <a name="Heating_Control"></a>
 <meta content="text/html; charset=ISO-8859-1" http-equiv="content-type">
 <h3>Heating Control</h3>
+<ul>
 <ul>
 <br><b>Achtung:</b>  
   <br>Heating Control wird nicht weiter gepflegt ("deprecated"). WeekdayTimer bietet identische Funktionalität, bei (annähernd) gleicher Syntax. Um alle Heating_Control Devices zu WeekdayTimer umzustellen, genügt ein <code>set &lt;name&gt; ConvertToWDT</code>, wobei als &lt;name&gt; ein beliebiges Heating_Control device angegeben werden kann. Die WeekdayTimer werden mit denselben Namen erstellt, alle früheren HC Geräte erhalten ein WDT_Group-Attribut mit Inhalt former_HC, so dass sie auch in Zukunft miteinander geschalten werden können. Statt des Aufrufs Heating_Control_SetTemp("HC-device") bzw. Heating_Control_SetAllTemps() steht Ihnen <code>set &lt;name&gt; WDT_Params single</code> oder <code>set &lt;name&gt; WDT_Params WDT_Group</code> zur Verfügung, sowie WeekdayTimer_SetParm("WD-device"), WeekdayTimer_SetAllParms() bzw. WeekdayTimer_SetAllParms("former_HC"), wenn Sie Perl nutzen möchten (former_HC ist hier nur ein Beispiel, es können beliebige Gruppennamen verwendet werden.  <br><br>
@@ -622,6 +625,6 @@ sub Heating_Control_ConvertToWDT() {
 	</li>
   </ul>
 </ul>
-
+</ul>
 =end html_DE
 =cut

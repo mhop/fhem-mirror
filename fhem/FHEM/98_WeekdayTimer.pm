@@ -1156,7 +1156,7 @@ sub WeekdayTimer_SetAllParms(;$) {            # {WeekdayTimer_SetAllParms()}
 
 =pod
 =encoding utf8
-=item device
+=item helper
 =item summary    sends parameter to devices at defined times
 =item summary_DE sendet Parameter an Devices zu einer Liste mit festen Zeiten
 =begin html
