@@ -1575,8 +1575,8 @@ sub PortalAsHtml ($$) {
               $legend_txt .= $txt.'&nbsp;'.FW_makeImage($im).' '.$swicon.'&nbsp;&nbsp;'; 
           } else {
               my (undef,$co) = split('\@',$im);
-              $co = '#cccccc' if (!$co);                                                # Farbe per default
-              $legend_txt .= '<font color=\''.$co.'\'>'.$txt.'</font>&nbsp;&nbsp; ';    # hier auch Umbruch erlauben
+              $co = '#cccccc' if (!$co);                                                                       # Farbe per default
+              $legend_txt .= '<font color=\''.$co.'\'>'.$txt.'</font> '.$swicon.'&nbsp;&nbsp;';    # hier auch Umbruch erlauben
           }
       }
   }
