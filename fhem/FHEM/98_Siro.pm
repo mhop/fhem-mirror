@@ -387,10 +387,9 @@ sub SendCommand($@) {
     $message = 'P72#' . $bin . '#R' . $SignalRepeats;
 
 	IOWrite( $hash, 'sendMsg', $message ) if AttrVal( $name, 'SIRO_debug', "0" ) ne "1";
-    Log3( $name, 5,
-"Siro_sendCommand: name-$name command-$cmd  channel-$chan bincmd-$binCommand bin-$bin id-$sendid
-    message-$message");
-
+   
+    Log3( $name, 5,"Siro_sendCommand: name-$name command-$cmd  channel-$chan bincmd-$binCommand bin-$bin id-$sendid message-$message");
+    Log3( $name, 3, "Siro_sendCommand: not sent upround debugmode 1") if AttrVal( $name, 'SIRO_debug', "0" ) eq "1";;
     return $ret;
 }
 
@@ -409,11 +408,25 @@ sub Parse($$) {
     return "" if ( IsDisabled($name) );
 	
 	
-	if ($hash->{helper}{progmode} eq "on")
-	{
-	Log3( $name, 5, "Siro Parse deactivated cause off programmingmode");
-	return;
-	}
+	# if ($hash->{helper}{progmode} eq "on")
+	# {
+	# Log3( $name, 4, "Siro Parse deactivated cause of programmingmode");
+	# return;
+	# }
+	
+	
+	# my $lock = 1;
+	# if  ($lock eq "1")
+	# {
+	# Log3( $name, 4, "Siro Parse blocking activated");
+	
+	# $hash->{helper}{savedcmds}{cmd1} = 'pct';
+	# $hash->{helper}{savedcmds}{cmd2} = 10;
+	# InternalTimer( (time+2), "FHEM::Siro::Restartset", "$name" );
+	# }
+	
+
+	
 
     if ( my $lh = $modules{Siro}{defptr}{$testid} ) {
         my $name = $lh->{NAME};
@@ -533,6 +546,35 @@ sub Parse($$) {
 
 		Log3( $name, 5, "Siro Parse Befehl:  $newstate");
 		
+		
+	if ($lh->{helper}{progmode} eq "on")
+	{
+	Log3( $name, 4, "Siro Parse deactivated cause off programmingmode");
+	return;
+	}
+	
+	
+	#my $lock = 1;
+	#if  ($lock eq "1")
+	#{
+	#Log3( $name, 4, "Siro Parse blocking activated");
+	
+	#$lh->{helper}{savedcmds}{cmd1} = 'pct';
+	#$lh->{helper}{savedcmds}{cmd2} = 10;
+	#InternalTimer( (time+3), "FHEM::Siro::Restartset", "$name" );
+	
+	#Log3( $name, 4, "Siro Parse blocking cmd: set $name pct 10");
+	#fhem("set $name pct 10");
+	
+	
+	#}
+		
+		
+		
+		
+		
+		
+		
         if ( defined($name) ) {#device vorhanden
             my $parseaborted = 0;
             $lh->{helper}{parse_aborted} = $parseaborted;
@@ -551,6 +593,13 @@ sub Parse($$) {
 			Log3 $lh, 5, "Siro_Parse: hash->{helper}{remotecmd} - ".$lh->{helper}{remotecmd};
 			Log3( $name, 3, "Siro-Parse ($name) : Signal FB emfangen -  $newstate");	
             Set( $lh, $name, $newstate );
+			
+			
+			#$lh->{helper}{savedcmds}{cmd1} = 'pct';
+			#$lh->{helper}{savedcmds}{cmd2} = 10;
+			#InternalTimer( (time+1), "FHEM::Siro::Restartset", "$name" );
+			
+			
             return $name;
         }
     }
@@ -1271,10 +1320,11 @@ sub Restartset($) {
     my ( $name, $arg ) = split( / /, $input );
     my $hash = $defs{$name};
     return "" if ( IsDisabled($name) );
-	Log3( $name, 0, "Siro-Restartset : aufgerufen");
+	Log3( $name, 5, "Siro-Restartset : aufgerufen");
 	my $cmd = $hash->{helper}{savedcmds}{cmd1};
 	my $pos = $hash->{helper}{savedcmds}{cmd2};
 	delete( $hash->{helper}{savedcmds} );
+	Log3( $name, 5, "Siro-Restartset : cmds $name, $cmd , $pos");
     Set($hash, $name, $cmd , $pos);
 	return;
 }
