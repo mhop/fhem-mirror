@@ -153,8 +153,12 @@ BEGIN {
   );
 }
 
+# Standardvariablen und Forward-Deklaration
+use vars qw($FW_ME);                                    # webname (default is fhem), used by 97_GROUP/weblink
+
 # Versions History intern
 our %vNotesIntern = (
+  "2.1.0"  => "07.06.2019  add informations about consumer switch and power state",
   "2.0.0"  => "03.06.2019  designed for SMAPortalSPG graphics device",
   "1.8.0"  => "27.05.2019  redesign of SMAPortal graphics by Wzut/XGuide ",
   "1.7.1"  => "01.05.2019  PortalAsHtml: use of colored svg-icons possible ",
@@ -340,6 +344,12 @@ sub DbLog_split($$) {
   my $devhash = $defs{$device};
   my ($reading, $value, $unit);
 
+  if($event =~ m/L3_.*_Power/) {
+      $event   =~ /^L1_(.*)_Power:\s(.*)\s(.*)/;
+      $reading = "L1_$1_Power";
+	  $value   = $2;
+	  $unit    = $3;
+  } 
   if($event =~ m/L2_PlantPeakPower/) {
       $event   =~ /^L2_PlantPeakPower:\s(.*)\s(.*)/;
       $reading = "L2_PlantPeakPower";
@@ -592,7 +602,7 @@ sub GetData($) {
   my $hash   = $defs{$name};
   my ($livedata_content);
   my $login_state = 0;
-  my ($forecast_content,$weatherdata_content) = ("","");
+  my ($forecast_content,$weatherdata_content,$consumerlivedata_content) = ("","","");
   my $useragent      = AttrVal($name, "userAgent", "Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.2; Trident/6.0)");
   my $cookieLocation = AttrVal($name, "cookieLocation", "./log/mycookies.txt"); 
    
@@ -638,7 +648,20 @@ sub GetData($) {
 
           if ($forecast_page->content =~ m/ForecastChartDataPoint/i) {
               $forecast_content = $forecast_page->content;
-              Log3 $name, 5, "$name - Forecast Data received:\n".Dumper decode_json($forecast_content);
+              Log3 $name, 5, "$name - Forecast data received:\n".Dumper decode_json($forecast_content);
+          }
+      }
+      
+      # JSON Consumer Livedaten
+      if($dl > 2) {
+          Log3 $name, 4, "$name - Getting consumer live data now";
+
+          my $consumerlivedata = $ua->get('https://www.sunnyportal.com/Homan/ConsumerBalance/GetLiveProxyValues');
+          Log3 $name, 5, "$name - Return Code: ".$consumerlivedata->code;
+
+          if ($consumerlivedata->content =~ m/HoManConsumerLiveData/i) {
+              $consumerlivedata_content = $consumerlivedata->content;
+              Log3 $name, 5, "$name - Consumer live data received:\n".Dumper decode_json($consumerlivedata_content);
           }
       }
   
@@ -680,11 +703,12 @@ sub GetData($) {
   my ($reread,$retry) = analivedat($hash,$livedata_content);
   
   # Daten müssen als Einzeiler zurückgegeben werden
-  $livedata_content    = encode_base64($livedata_content,"");
-  $forecast_content    = encode_base64($forecast_content,"") if($forecast_content);
-  $weatherdata_content = encode_base64($weatherdata_content,"") if($weatherdata_content);
+  $livedata_content         = encode_base64($livedata_content,"");
+  $forecast_content         = encode_base64($forecast_content,"") if($forecast_content);
+  $weatherdata_content      = encode_base64($weatherdata_content,"") if($weatherdata_content);
+  $consumerlivedata_content = encode_base64($consumerlivedata_content,"") if($consumerlivedata_content);
 
-return "$name|$livedata_content|$forecast_content|$weatherdata_content|$login_state|$reread|$retry";
+return "$name|$livedata_content|$forecast_content|$weatherdata_content|$consumerlivedata_content|$login_state|$reread|$retry";
 }
 
 ################################################################
@@ -698,13 +722,15 @@ sub ParseData($) {
   my $ld_response = decode_base64($a[1]);
   my $fd_response = decode_base64($a[2]) if($a[2]);
   my $wd_response = decode_base64($a[3]) if($a[3]);
-  my $login_state = $a[4];
-  my $reread      = $a[5];
-  my $retry       = $a[6];
+  my $cd_response = decode_base64($a[4]) if($a[4]);
+  my $login_state = $a[5];
+  my $reread      = $a[6];
+  my $retry       = $a[7];
   
-  my $livedata_content    = decode_json($ld_response);
-  my $forecast_content    = decode_json($fd_response) if($fd_response);
-  my $weatherdata_content = decode_json($wd_response) if($wd_response);
+  my $livedata_content         = decode_json($ld_response);
+  my $forecast_content         = decode_json($fd_response) if($fd_response);
+  my $weatherdata_content      = decode_json($wd_response) if($wd_response);
+  my $consumerlivedata_content = decode_json($cd_response) if($cd_response);
   
   my $state = "ok";
   
@@ -797,6 +823,11 @@ sub ParseData($) {
       extractConsumerData($hash,$forecast_content);
   }
   
+  if ($consumerlivedata_content && $consumerlivedata_content !~ m/undefined/i) {
+      # Auswertung Consumer Live Daten
+      extractConsumerLiveData($hash,$consumerlivedata_content);
+  }
+  
   if ($weatherdata_content && $weatherdata_content !~ m/undefined/i) {
       # Auswertung Wetterdaten
       extractWeatherData($hash,$weatherdata_content);
@@ -810,7 +841,7 @@ sub ParseData($) {
   if(!$hash->{HELPER}{RETRIES} && !$pv && !$fi && !$gc) {
       # keine Anlagendaten vorhanden
       $state = "Data can't be retrieved from SMA-Portal. Reread at next scheduled cycle.";
-      Log3 $name, 2, "$name - $state";
+      Log3 ($name, 2, "$name - $state");
   }
   
   readingsBeginUpdate($hash);
@@ -1205,6 +1236,73 @@ return;
 } 
 
 ################################################################
+##          Auswertung Consumer Livedata
+################################################################
+sub extractConsumerLiveData($$) {
+  my ($hash,$clivedata) = @_;
+  my $name = $hash->{NAME};
+  my %consumers;
+  my ($key,$val,$i,$res);
+  
+  my $dl = AttrVal($name, "detailLevel", 1);
+  if($dl <= 2) {
+      return;
+  }
+  
+  readingsBeginUpdate($hash);
+  
+  # allen Consumer Objekte die ID zuordnen
+  $i = 0;
+  foreach my $c (@{$clivedata->{'MeasurementData'}}) {
+      $consumers{"${i}_ConsumerName"} = encode("utf8", $c->{'DeviceName'} );
+      $consumers{"${i}_ConsumerOid"}  = $c->{'Consume'}{'ConsumerOid'};
+      $consumers{"${i}_ConsumerLfd"}  = $i;
+	  my $cpower                      = $c->{'Consume'}{'Measurement'};           # aktueller Energieverbrauch in W
+	  my $cn                          = $consumers{"${i}_ConsumerName"};          # Verbrauchername
+      $cn                             = substUmlauts($cn);
+
+      readingsBulkUpdate($hash, "L3_${cn}_Power", $cpower." W");      
+	  
+      $i++;
+  }
+  
+  if(%consumers && $clivedata->{'ParameterData'}) {
+      # es sind Daten zu den Verbrauchern vorhanden
+      # Kind: "Utc" ?
+      $i = 0;
+      foreach my $c (@{$clivedata->{'ParameterData'}}) {
+          my $tkind            = $c->{'Parameters'}[0]{'Timestamp'}{'Kind'};                               # Zeitart: Unspecified, Utc
+          # Log3 ($name, 1, "$name - $tkind");
+          my $GriSwStt         = $c->{'Parameters'}[0]{'Value'};                                           # on: 1, off: 0
+          my $GriSwAuto        = $c->{'Parameters'}[1]{'Value'};                                           # automatic = 1
+          my $OperationAutoEna = $c->{'Parameters'}[2]{'Value'};                                           # Automatic Betrieb erlaubt ?
+		  my $ltchange         = TimeAdjust($hash,$c->{'Parameters'}[0]{'Timestamp'}{'DateTime'},$tkind);  # letzter Schaltzeitpunkt der Bluetooth-Steckdose (Verbraucher)
+          my $cn  = $consumers{"${i}_ConsumerName"};                                                       # Verbrauchername
+          $cn     = substUmlauts($cn);                                                                     # evtl. Umlaute im Verbrauchernamen ersetzen
+          
+          if(!$GriSwStt && $GriSwAuto) {
+              $res = "off (automatic)";
+          } elsif (!$GriSwStt && !$GriSwAuto) {
+              $res = "off";         
+          } elsif ($GriSwStt) {
+              $res = "on";           
+          } else {
+              $res = "undefined";            
+          }
+          
+          readingsBulkUpdate($hash, "L3_${cn}_Switch", $res);
+		  readingsBulkUpdate($hash, "L3_${cn}_SwitchLastTime", $ltchange);
+          
+          $i++;
+      }
+  }
+  
+  readingsEndUpdate($hash, 1); 
+  
+return;
+}
+
+################################################################
 # sortiert eine Liste von Versionsnummern x.x.x
 # Schwartzian Transform and the GRT transform
 # Übergabe: "asc | desc",<Liste von Versionsnummern>
@@ -1455,16 +1553,26 @@ sub PortalAsHtml ($$) {
       return $ret;
   }
 
-  @pgCDev = split(',',AttrVal($wlname,"consumerList",""));                                 # definierte Verbraucher ermitteln
+  @pgCDev = split(',',AttrVal($wlname,"consumerList",""));                              # definierte Verbraucher ermitteln
   ($legend_style, $legend) = split('_',AttrVal($wlname,'consumerLegend','icon_top'));
 
   $legend = '' if(($legend_style eq 'none') || (!int(@pgCDev)));
 
   if ($legend) {
       foreach (@pgCDev) {
-          my($txt,$im) = split(':',$_);
+          my($txt,$im) = split(':',$_);                                                 # $txt ist der Verbrauchername
+		  my $swstate  = ReadingsVal($name,"L3_".$txt."_Switch", "undef");
+		  my $swicon   = "<img src=\"$FW_ME/www/images/default/1px-spacer.png\">";
+		  if($swstate eq "off") {
+		      $swicon = "<img src=\"$FW_ME/www/images/default/10px-kreis-rot.png\">";
+		  } elsif ($swstate eq "on") {
+		      $swicon = "<img src=\"$FW_ME/www/images/default/10px-kreis-gruen.png\">";
+		  } elsif ($swstate =~ /off.*automatic.*/i) {
+		      $swicon = "<img src=\"$FW_ME/www/images/default/10px-kreis-gelb.png\">";
+		  }
+		  
           if ($legend_style eq 'icon') {                                                # mögliche Umbruchstellen mit normalen Blanks vorsehen !
-              $legend_txt .= $txt.'&nbsp;'.FW_makeImage($im).' '; 
+              $legend_txt .= $txt.'&nbsp;'.FW_makeImage($im).' '.$swicon.'&nbsp;&nbsp;'; 
           } else {
               my (undef,$co) = split('\@',$im);
               $co = '#cccccc' if (!$co);                                                # Farbe per default
@@ -2174,7 +2282,7 @@ return;
      <li>Batteriedaten (In/Out) </li>
      <li>Wetter-Daten von SMA für den Anlagenstandort </li>
      <li>Prognosedaten (Verbrauch und PV-Erzeugung) inklusive Verbraucherempfehlung </li>
-     <li>die durch den Sunny Home Manager geplanten Schaltzeiten von Verbrauchern (sofern vorhanden) </li>
+     <li>die durch den Sunny Home Manager geplanten Schaltzeiten und aktuellen Status von Verbrauchern (sofern vorhanden) </li>
     </ul> 
    </ul>
    <br>
@@ -2293,7 +2401,7 @@ return;
 	   <colgroup> <col width=5%> <col width=95%> </colgroup>
 		  <tr><td> <b>L1</b>  </td><td>- nur Live-Daten und Wetter-Daten werden generiert. </td></tr>
 		  <tr><td> <b>L2</b>  </td><td>- wie L1 und zusätzlich Prognose der aktuellen und nächsten 4 Stunden sowie PV-Erzeugung und Verbrauch des aktuellen Tages </td></tr>
-		  <tr><td> <b>L3</b>  </td><td>- wie L2 und zusätzlich Prognosedaten des Resttages, des Folgetages und der geplanten Schaltzeiten für Verbraucher </td></tr>
+		  <tr><td> <b>L3</b>  </td><td>- wie L2 und zusätzlich Prognosedaten des Resttages, des Folgetages, der geplanten Einschaltzeiten von Verbrauchern und deren aktueller Status </td></tr>
           <tr><td> <b>L4</b>  </td><td>- wie L3 und zusätzlich die detaillierte Prognose der nächsten 24 Stunden </td></tr>
 	   </table>
 	   </ul>     
