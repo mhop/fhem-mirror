@@ -30,6 +30,15 @@
 # 
 # CHANGE LOG
 # 
+# 06.06.2019 1.2.5
+# bugfix     : Korrekte Trennung von Events mit mehrzeiligen Werten 
+#              (regex Schalter /sm)
+#
+# 05.06.2019 1.2.4
+# change     : Sonderlocke fuer 'state' in einigen Faellen: 
+#              z.B. bei ReadingsProxy kommt in CHANGEDWITHSTATE nichts an, 
+#              und in CHANGE, wie gehabt, z.B. 'off'
+#
 # 02.06.2019 1.2.3
 # improvement: fuer mqttPublish Definitionen mit '*' koennen jetzt auch 
 #              Mehrfachdefinitionen (mit '!suffix') verwendet werden
@@ -351,7 +360,7 @@ use warnings;
 
 #my $DEBUG = 1;
 my $cvsid = '$Id$';
-my $VERSION = "version 1.2.3 by hexenmeister\n$cvsid";
+my $VERSION = "version 1.2.5 by hexenmeister\n$cvsid";
 
 my %sets = (
 );
@@ -2001,6 +2010,8 @@ sub Get($$$@) {
 # Routine fuer FHEM Notify
 sub Notify() {
   my ($hash,$dev) = @_;
+
+  #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] notify for ".$dev->{NAME}." ".Dumper(@{$dev->{CHANGED}})) if $dev->{TYPE} ne 'MQTT_GENERIC_BRIDGE';
   if( $dev->{NAME} eq "global" ) {
     #Log3($hash->{NAME},5,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] notify for global ".Dumper(@{$dev->{CHANGED}}));
     if( grep(m/^(INITIALIZED|REREADCFG)$/, @{$dev->{CHANGED}}) ) {
@@ -2075,6 +2086,8 @@ sub checkPublishDeviceReadingsUpdates($$) {
   #   return;
   # }
 
+  #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] checkPublishDeviceReadingsUpdates: ".$dev->{NAME}." : ".Dumper(@{$dev->{CHANGED}}))  if $dev->{TYPE} ne 'MQTT_GENERIC_BRIDGE';
+
   # nicht waehrend FHEM startet
   return if( !$main::init_done );
 
@@ -2083,6 +2096,7 @@ sub checkPublishDeviceReadingsUpdates($$) {
 
   #CheckInitialization($hash);
   #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] checkPublishDeviceReadingsUpdates ------------------------ ");
+  #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] checkPublishDeviceReadingsUpdates: ".$dev->{NAME}." : ".Dumper(@{$dev->{CHANGED}}))  if $dev->{TYPE} ne 'MQTT_GENERIC_BRIDGE';
 
   # Pruefen, ob ein ueberwachtes Geraet vorliegt 
   my $devName = $dev->{NAME}; 
@@ -2100,12 +2114,22 @@ sub checkPublishDeviceReadingsUpdates($$) {
   }
 
   foreach my $event (@{deviceEvents($dev,1)}) {
+    #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] Notify for $dev->{NAME} event: $event STATE: $dev->{STATE} ".Dumper($dev));
     #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] Notify for $dev->{NAME} event: $event STATE: $dev->{STATE}");
-    $event =~ /^([^:]+)(: )?(.*)$/;
-    #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] event: $event, '".((defined $1) ? $1 : "-undef-")."', '".((defined $3) ? $3 : "-undef-")."'");
+    $event =~ /^([^:]+)(:\s)?(.*)$/sm; # Schalter /sm ist wichtig! Sonst wir bei mehrzeiligen Texten Ende nicht korrekt erkannt. s. https://perldoc.perl.org/perlretut.html#Using-regular-expressions-in-Perl 
+    #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] event: $event, '".((defined $1) ? $1 : "-undef-")."', '".((defined $3) ? $3 : "-undef-")."'") if $dev->{TYPE} ne 'MQTT_GENERIC_BRIDGE';
     my $devreading = $1;
     my $devval = $3;
+
+    # Sonderlocke fuer 'state' in einigen Faellen: z.B. bei ReadingsProxy kommt in CHANGEDWITHSTATE nichts an, und in CHANGE, wie gehabt, z.B. 'off'
+    if(!$2) {
+      #$devval = $devreading;
+      $devval = $event;
+      $devreading = 'state';
+    }
+
     if(defined $devreading and defined $devval) {
+    #Log3($hash->{NAME},1,">MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] event: $event, '".((defined $devreading) ? $devreading : "-undef-")."', '".((defined $devval) ? $devval : "-undef-")."'");
       # wenn ueberwachtes device and reading
       # pruefen, ob die Aenderung von der Bridge selbst getriggert wurde   TODO TEST
       my $triggeredReading = $dev->{'.mqttGenericBridge_triggeredReading'};
@@ -2445,7 +2469,7 @@ sub publishDeviceUpdate($$$$$) {
 
     $base='' unless defined $base;
 
-    $value="\0" unless defined $value;
+        $value="\0" unless defined $value; # TODO: pruefen: oder doch ""?
 
     my $redefMap=undef;
     my $message=$value;
