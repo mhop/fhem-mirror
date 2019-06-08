@@ -158,8 +158,9 @@ use vars qw($FW_ME);                                    # webname (default is fh
 
 # Versions History intern
 our %vNotesIntern = (
-  "2.1.0"  => "07.06.2019  add informations about consumer switch and power state",
-  "2.0.0"  => "03.06.2019  designed for SMAPortalSPG graphics device",
+  "2.1.1"  => "08.06.2019  add units to values, some bugs fixed ",
+  "2.1.0"  => "07.06.2019  add informations about consumer switch and power state ",
+  "2.0.0"  => "03.06.2019  designed for SMAPortalSPG graphics device ",
   "1.8.0"  => "27.05.2019  redesign of SMAPortal graphics by Wzut/XGuide ",
   "1.7.1"  => "01.05.2019  PortalAsHtml: use of colored svg-icons possible ",
   "1.7.0"  => "01.05.2019  code change of PortalAsHtml, new attributes \"portalGraphicColor\" and \"portalGraphicStyle\" ",
@@ -344,29 +345,29 @@ sub DbLog_split($$) {
   my $devhash = $defs{$device};
   my ($reading, $value, $unit);
 
-  if($event =~ m/L3_.*_Power/) {
-      $event   =~ /^L3_(.*)_Power:\s(.*)\s(.*)/;
-      $reading = "L3_$1_Power";
+  if($event =~ m/[_\-fd]Consumption|Quote/) {
+      $event   =~ /^L(.*):\s(.*)\s(.*)/;
+      $reading = "L".$1;
 	  $value   = $2;
 	  $unit    = $3;
-  } 
-  if($event =~ m/L2_PlantPeakPower/) {
-      $event   =~ /^L2_PlantPeakPower:\s(.*)\s(.*)/;
-      $reading = "L2_PlantPeakPower";
-	  $value   = $1;
-	  $unit    = $2;
+  }
+  if($event =~ m/Power|PV|FeedIn|SelfSupply|Temperature|Total|Hour:|Hour(\d\d):/) {
+      $event   =~ /^L(.*):\s(.*)\s(.*)/;
+      $reading = "L".$1;
+	  $value   = $2;
+	  $unit    = $3;
   }   
-  if($event =~ m/L1_.*_Temperature/) {
-      $event   =~ /^L1_(.*)_Temperature:\s(.*)\s(.*)/;
-      $reading = "L1_$1_Temperature";
+  if($event =~ m/Next04Hours-IsConsumption|RestOfDay-IsConsumption|Tomorrow-IsConsumption/) {
+      $event   =~ /^L(.*):\s(.*)\s(.*)/;
+      $reading = "L".$1;
 	  $value   = $2;
 	  $unit    = $3;
-  } 
-  if($event =~ m/summary/) {
-      $event   =~ /summary:\s(.*)\s(.*)/;
-      $reading = "summary";
-	  $value   = $1;
-	  $unit    = $2;
+  }   
+  if($event =~ m/summary|next04hours_state/) {
+      $event   =~ /(.*):\s(.*)\s(.*)/;
+      $reading = $1;
+	  $value   = $2;
+	  $unit    = $3;
   } 
   
 return ($reading, $value, $unit);
@@ -781,34 +782,66 @@ sub ParseData($) {
           }
         
           if ($new_val && $k !~ /__type/i) {
-              Log3 $name, 4, "$name -> $k - $new_val";
-              readingsBulkUpdate($hash, "L1_$k", $new_val);
-              $FeedIn_done               = 1 if($k =~ /^FeedIn$/);
-              $GridConsumption_done      = 1 if($k =~ /^GridConsumption$/);
-              $PV_done                   = 1 if($k =~ /^PV$/);
-              $AutarkyQuote_done         = 1 if($k =~ /^AutarkyQuote$/);
-              $SelfConsumption_done      = 1 if($k =~ /^SelfConsumption$/);
-              $SelfConsumptionQuote_done = 1 if($k =~ /^SelfConsumptionQuote$/);
-              $SelfSupply_done           = 1 if($k =~ /^SelfSupply$/);
+              if($k =~ /^FeedIn$/) {
+                  $new_val = $new_val." W";
+                  $FeedIn_done = 1        
+              }
+              if($k =~ /^GridConsumption$/) {
+                  $new_val = $new_val." W";
+                  $GridConsumption_done = 1;
+              }
+              if($k =~ /^PV$/) {
+                  $new_val = $new_val." W";
+                  $PV_done = 1; 
+              }
+              if($k =~ /^AutarkyQuote$/) {
+                  $new_val = $new_val." %";
+                  $AutarkyQuote_done = 1;
+              }
+              if($k =~ /^SelfConsumption$/) {
+                  $new_val = $new_val." W";
+                  $SelfConsumption_done = 1;
+              } 
+              if($k =~ /^SelfConsumptionQuote$/) {              
+                  $new_val = $new_val." %";
+                  $SelfConsumptionQuote_done = 1; 
+              }
+              if($k =~ /^SelfSupply$/) {
+                  $new_val = $new_val." W";
+                  $SelfSupply_done = 1;
+              }
+              if($k =~ /^TotalConsumption$/) {
+                  $new_val = $new_val." W";
+              }
+              if($k =~ /^BatteryIn$/) {
+                  $new_val = $new_val." W";
+                  $batteryin = 1;
+              }
+              if($k =~ /^BatteryOut$/) {
+                  $new_val = $new_val." W";
+                  $batteryout = 1;
+              }        
+              
               $errMsg                    = 1 if($k =~ /^ErrorMessages$/);
               $warnMsg                   = 1 if($k =~ /^WarningMessages$/);
               $infoMsg                   = 1 if($k =~ /^InfoMessages$/);
-              $batteryin                 = 1 if($k =~ /^BatteryIn$/);
-              $batteryout                = 1 if($k =~ /^BatteryOut$/);
+
+              Log3 $name, 4, "$name -> $k - $new_val";
+              readingsBulkUpdate($hash, "L1_$k", $new_val);
           }
       }
   }
   
-  readingsBulkUpdate($hash, "L1_FeedIn", 0) if(!$FeedIn_done);
-  readingsBulkUpdate($hash, "L1_GridConsumption", 0) if(!$GridConsumption_done);
-  readingsBulkUpdate($hash, "L1_PV", 0) if(!$PV_done);
-  readingsBulkUpdate($hash, "L1_AutarkyQuote", 0) if(!$AutarkyQuote_done);
-  readingsBulkUpdate($hash, "L1_SelfConsumption", 0) if(!$SelfConsumption_done);
-  readingsBulkUpdate($hash, "L1_SelfConsumptionQuote", 0) if(!$SelfConsumptionQuote_done);
-  readingsBulkUpdate($hash, "L1_SelfSupply", 0) if(!$SelfSupply_done);
+  readingsBulkUpdate($hash, "L1_FeedIn",               "0 W") if(!$FeedIn_done);
+  readingsBulkUpdate($hash, "L1_GridConsumption",      "0 W") if(!$GridConsumption_done);
+  readingsBulkUpdate($hash, "L1_PV",                   "0 W") if(!$PV_done);
+  readingsBulkUpdate($hash, "L1_AutarkyQuote",         "0 %") if(!$AutarkyQuote_done);
+  readingsBulkUpdate($hash, "L1_SelfConsumption",      "0 W") if(!$SelfConsumption_done);
+  readingsBulkUpdate($hash, "L1_SelfConsumptionQuote", "0 %") if(!$SelfConsumptionQuote_done);
+  readingsBulkUpdate($hash, "L1_SelfSupply",           "0 W") if(!$SelfSupply_done);
   if(defined $batteryin || defined $batteryout) {
-      readingsBulkUpdate($hash, "L1_BatteryIn", 0) if(!$batteryin);
-      readingsBulkUpdate($hash, "L1_BatteryOut", 0) if(!$batteryout);
+      readingsBulkUpdate($hash, "L1_BatteryIn",        "0 W") if(!$batteryin);
+      readingsBulkUpdate($hash, "L1_BatteryOut",       "0 W") if(!$batteryout);
   }  
   readingsEndUpdate($hash, 1);
   
@@ -833,9 +866,9 @@ sub ParseData($) {
       extractWeatherData($hash,$weatherdata_content);
   }
   
-  my $pv = ReadingsVal($name, "L1_PV", 0);
-  my $fi = ReadingsVal($name, "L1_FeedIn", 0);
-  my $gc = ReadingsVal($name, "L1_GridConsumption", 0);
+  my $pv = ReadingsNum($name, "L1_PV", 0);
+  my $fi = ReadingsNum($name, "L1_FeedIn", 0);
+  my $gc = ReadingsNum($name, "L1_GridConsumption", 0);
   my $sum = $fi-$gc;
   
   if(!$hash->{HELPER}{RETRIES} && !$pv && !$fi && !$gc) {
@@ -966,8 +999,8 @@ sub extractForecastData($$) {
       
       # Use also old data to integrate daily PV and Consumption
       if ($current_day == $fc_day) {
-         $PV_sum      += int($fc_obj->{'PvMeanPower'}->{'Amount'});                 # integrator of daily PV 
-	     $consum_sum  += int($fc_obj->{'ConsumptionForecast'}->{'Amount'}/3600);    # integrator of daily Consumption forecast
+         $PV_sum      += int($fc_obj->{'PvMeanPower'}->{'Amount'});                 # integrator of daily PV in Wh
+	     $consum_sum  += int($fc_obj->{'ConsumptionForecast'}->{'Amount'}/3600);    # integrator of daily Consumption forecast in Wh
       }
 
       # Don't use old data
@@ -975,26 +1008,26 @@ sub extractForecastData($$) {
 
       # Sum up for the next few hours (4 hours total, this is current hour plus the next 3 hours)
       if ($obj_nr < 4) {
-         $nextFewHoursSum{'PV'}            += $fc_obj->{'PvMeanPower'}->{'Amount'};
-         $nextFewHoursSum{'Consumption'}   += $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600;
-         $nextFewHoursSum{'Total'}         += $fc_obj->{'PvMeanPower'}->{'Amount'} - $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600;
-         $nextFewHoursSum{'ConsumpRcmd'}   += $fc_obj->{'IsConsumptionRecommended'} ? 1 : 0;
+         $nextFewHoursSum{'PV'}            += $fc_obj->{'PvMeanPower'}->{'Amount'};                   # Wh
+         $nextFewHoursSum{'Consumption'}   += $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600;    # Wh
+         $nextFewHoursSum{'Total'}         += $fc_obj->{'PvMeanPower'}->{'Amount'} - $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600;   # Wh
+         $nextFewHoursSum{'ConsumpRcmd'}   += $fc_obj->{'IsConsumptionRecommended'} ? 1 : 0;         
       }
 
       # If data is for the rest of the current day
       if ( $current_day == $fc_day ) {
-         $restOfDaySum{'PV'}            += $fc_obj->{'PvMeanPower'}->{'Amount'};
-         $restOfDaySum{'Consumption'}   += $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600;
-         $restOfDaySum{'Total'}         += $fc_obj->{'PvMeanPower'}->{'Amount'} - $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600;
-         $restOfDaySum{'ConsumpRcmd'}   += $fc_obj->{'IsConsumptionRecommended'} ? 1 : 0;
+         $restOfDaySum{'PV'}            += $fc_obj->{'PvMeanPower'}->{'Amount'};                      # Wh
+         $restOfDaySum{'Consumption'}   += $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600;       # Wh
+         $restOfDaySum{'Total'}         += $fc_obj->{'PvMeanPower'}->{'Amount'} - $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600;      # Wh
+         $restOfDaySum{'ConsumpRcmd'}   += $fc_obj->{'IsConsumptionRecommended'} ? 1 : 0; 
      }
       
       # If data is for the next day (quick and dirty: current day different from this object's day)
       # Assuming only the current day and the next day are returned from Sunny Portal
       if ( $current_day != $fc_day ) {
-         $tomorrowSum{'PV'}            += $fc_obj->{'PvMeanPower'}->{'Amount'} if(exists($fc_obj->{'PvMeanPower'}->{'Amount'}));
-         $tomorrowSum{'Consumption'}   += $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600;
-         $tomorrowSum{'Total'}         += $fc_obj->{'PvMeanPower'}->{'Amount'} - $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600 if ($fc_obj->{'PvMeanPower'}->{'Amount'});
+         $tomorrowSum{'PV'}            += $fc_obj->{'PvMeanPower'}->{'Amount'} if(exists($fc_obj->{'PvMeanPower'}->{'Amount'}));            # Wh
+         $tomorrowSum{'Consumption'}   += $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600;                                              # Wh
+         $tomorrowSum{'Total'}         += $fc_obj->{'PvMeanPower'}->{'Amount'} - $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600 if ($fc_obj->{'PvMeanPower'}->{'Amount'});   # Wh
          $tomorrowSum{'ConsumpRcmd'}   += $fc_obj->{'IsConsumptionRecommended'} ? 1 : 0;
       }
       
@@ -1006,23 +1039,22 @@ sub extractForecastData($$) {
               $time_str = "NextHour".sprintf("%02d", $obj_nr) if($fc_diff_hours>0);
               if($time_str =~ /NextHour/ && $dl >= 4) {
                   readingsBulkUpdate( $hash, "L4_${time_str}_Time", TimeAdjust($hash,$fc_obj->{'TimeStamp'}->{'DateTime'},$tkind) );
-                  readingsBulkUpdate( $hash, "L4_${time_str}_PvMeanPower", int( $fc_obj->{'PvMeanPower'}->{'Amount'} ) );
-                  readingsBulkUpdate( $hash, "L4_${time_str}_Consumption", int( $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600 ) );
+                  readingsBulkUpdate( $hash, "L4_${time_str}_PvMeanPower", int( $fc_obj->{'PvMeanPower'}->{'Amount'} )." Wh" );                                     # in W als Durchschnitt geliefet, d.h. eine Stunde -> Wh
+                  readingsBulkUpdate( $hash, "L4_${time_str}_Consumption", int( $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600 )." Wh" );                      # {'ConsumptionForecast'}->{'Amount'} wird als J = Ws geliefert
                   readingsBulkUpdate( $hash, "L4_${time_str}_IsConsumptionRecommended", ($fc_obj->{'IsConsumptionRecommended'} ? "yes" : "no") );
-                  # Rundungsfehler möglich -> nicht int((x-y)/3600) besser ist:  int(x/3600) - int(y/3600)
-                  # readingsBulkUpdate( $hash, "L4_${time_str}", int( $fc_obj->{'PvMeanPower'}->{'Amount'} - $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600 ) );
-                  readingsBulkUpdate( $hash, "L4_${time_str}", int( ($fc_obj->{'PvMeanPower'}->{'Amount'}/3600) - ($fc_obj->{'ConsumptionForecast'}->{'Amount'}/3600) ) );
-		          # add WeatherId Helper to show weather icon
+                  readingsBulkUpdate( $hash, "L4_${time_str}", (int($fc_obj->{'PvMeanPower'}->{'Amount'}) - int($fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600))." Wh" );
+		          
+                  # add WeatherId Helper to show weather icon
                   $hash->{HELPER}{"L4_".${time_str}."_WeatherId"} = int($fc_obj->{'WeatherId'});		  
               }
               if($time_str =~ /ThisHour/ && $dl >= 2) {
                   readingsBulkUpdate( $hash, "L2_${time_str}_Time", TimeAdjust($hash,$fc_obj->{'TimeStamp'}->{'DateTime'},$tkind) );
-                  readingsBulkUpdate( $hash, "L2_${time_str}_PvMeanPower", int( $fc_obj->{'PvMeanPower'}->{'Amount'} ) );
-                  readingsBulkUpdate( $hash, "L2_${time_str}_Consumption", int( $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600 ) );
+                  readingsBulkUpdate( $hash, "L2_${time_str}_PvMeanPower", int( $fc_obj->{'PvMeanPower'}->{'Amount'} )." Wh" );                                     # in W als Durchschnitt geliefet, d.h. eine Stunde -> Wh
+                  readingsBulkUpdate( $hash, "L2_${time_str}_Consumption", int( $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600 )." Wh" );                      # {'ConsumptionForecast'}->{'Amount'} wird als J = Ws geliefert
                   readingsBulkUpdate( $hash, "L2_${time_str}_IsConsumptionRecommended", ($fc_obj->{'IsConsumptionRecommended'} ? "yes" : "no") );
-                  # readingsBulkUpdate( $hash, "L2_${time_str}", int( $fc_obj->{'PvMeanPower'}->{'Amount'} - $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600 ) );
-                  readingsBulkUpdate( $hash, "L2_${time_str}", int( ($fc_obj->{'PvMeanPower'}->{'Amount'}/3600) - ($fc_obj->{'ConsumptionForecast'}->{'Amount'}/3600) ) );
-		          # add WeatherId Helper to show weather icon
+                  readingsBulkUpdate( $hash, "L2_${time_str}", (int($fc_obj->{'PvMeanPower'}->{'Amount'}) - int($fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600))." Wh" );
+		          
+                  # add WeatherId Helper to show weather icon
 		          $hash->{HELPER}{"L2_".${time_str}."_WeatherId"} = int($fc_obj->{'WeatherId'});	           
               }
           }
@@ -1033,25 +1065,25 @@ sub extractForecastData($$) {
   }
   
   if($dl >= 2) {
-      readingsBulkUpdate($hash, "L2_Next04Hours-Consumption",              int( $nextFewHoursSum{'Consumption'} ) );
-      readingsBulkUpdate($hash, "L2_Next04Hours-PV",                       int( $nextFewHoursSum{'PV'}          ) );
-      readingsBulkUpdate($hash, "L2_Next04Hours-Total",                    int( $nextFewHoursSum{'Total'}       ) );
-      readingsBulkUpdate($hash, "L2_Next04Hours-IsConsumptionRecommended", int( $nextFewHoursSum{'ConsumpRcmd'} ) );
-      readingsBulkUpdate($hash, "next04hours_state",                       int( $nextFewHoursSum{'PV'} ) );
-      readingsBulkUpdate($hash, "L2_Forecast-Today-Consumption",           $consum_sum);                         # publish consumption forecast values 
-      readingsBulkUpdate($hash, "L2_Forecast-Today-PV",                    $PV_sum);                             # publish integrated PV
+      readingsBulkUpdate($hash, "L2_Next04Hours-Consumption",              int( $nextFewHoursSum{'Consumption'} )." Wh" );
+      readingsBulkUpdate($hash, "L2_Next04Hours-PV",                       int( $nextFewHoursSum{'PV'}          )." Wh" );
+      readingsBulkUpdate($hash, "L2_Next04Hours-Total",                    int( $nextFewHoursSum{'Total'}       )." Wh" );
+      readingsBulkUpdate($hash, "L2_Next04Hours-IsConsumptionRecommended", int( $nextFewHoursSum{'ConsumpRcmd'} )." h" );
+      readingsBulkUpdate($hash, "next04hours_state",                       int( $nextFewHoursSum{'PV'} )." Wh" );
+      readingsBulkUpdate($hash, "L2_Forecast-Today-Consumption",           $consum_sum." Wh" );                         # publish consumption forecast values 
+      readingsBulkUpdate($hash, "L2_Forecast-Today-PV",                    $PV_sum." Wh");                             # publish integrated PV
   }
 
   if($dl >= 3) {
-      readingsBulkUpdate($hash, "L3_RestOfDay-Consumption",                int( $restOfDaySum{'Consumption'} ) );
-      readingsBulkUpdate($hash, "L3_RestOfDay-PV",                         int( $restOfDaySum{'PV'}          ) );
-      readingsBulkUpdate($hash, "L3_RestOfDay-Total",                      int( $restOfDaySum{'Total'}       ) );
-      readingsBulkUpdate($hash, "L3_RestOfDay-IsConsumptionRecommended",   int( $restOfDaySum{'ConsumpRcmd'} ) );
+      readingsBulkUpdate($hash, "L3_RestOfDay-Consumption",                int( $restOfDaySum{'Consumption'} )." Wh" );
+      readingsBulkUpdate($hash, "L3_RestOfDay-PV",                         int( $restOfDaySum{'PV'}          )." Wh" );
+      readingsBulkUpdate($hash, "L3_RestOfDay-Total",                      int( $restOfDaySum{'Total'}       )." Wh" );
+      readingsBulkUpdate($hash, "L3_RestOfDay-IsConsumptionRecommended",   int( $restOfDaySum{'ConsumpRcmd'} )." h" );
 
-      readingsBulkUpdate($hash, "L3_Tomorrow-Consumption",                 int( $tomorrowSum{'Consumption'} ) );
-      readingsBulkUpdate($hash, "L3_Tomorrow-PV",                          int( $tomorrowSum{'PV'}          ) );
-      readingsBulkUpdate($hash, "L3_Tomorrow-Total",                       int( $tomorrowSum{'Total'}       ) );
-      readingsBulkUpdate($hash, "L3_Tomorrow-IsConsumptionRecommended",    int( $tomorrowSum{'ConsumpRcmd'} ) );
+      readingsBulkUpdate($hash, "L3_Tomorrow-Consumption",                 int( $tomorrowSum{'Consumption'} )." Wh" );
+      readingsBulkUpdate($hash, "L3_Tomorrow-PV",                          int( $tomorrowSum{'PV'}          )." Wh" );
+      readingsBulkUpdate($hash, "L3_Tomorrow-Total",                       int( $tomorrowSum{'Total'}       )." Wh" );
+      readingsBulkUpdate($hash, "L3_Tomorrow-IsConsumptionRecommended",    int( $tomorrowSum{'ConsumpRcmd'} )." h" );
   }
   
   if($dl >= 4) {  
@@ -1261,7 +1293,7 @@ sub extractConsumerLiveData($$) {
 	  my $cn                          = $consumers{"${i}_ConsumerName"};          # Verbrauchername
       $cn                             = substUmlauts($cn);
 
-      readingsBulkUpdate($hash, "L3_${cn}_Power", $cpower." W");      
+      readingsBulkUpdate($hash, "L3_${cn}_Power", $cpower." W") if(defined($cpower));      
 	  
       $i++;
   }
@@ -1560,7 +1592,7 @@ sub PortalAsHtml ($$) {
 
   if ($legend) {
       foreach (@pgCDev) {
-          my($txt,$im) = split(':',$_);                                                 # $txt ist der Verbrauchername
+          my($txt,$im) = split(':',$_);                                                            # $txt ist der Verbrauchername
 		  my $swstate  = ReadingsVal($name,"L3_".$txt."_Switch", "undef");
 		  my $swicon   = "<img src=\"$FW_ME/www/images/default/1px-spacer.png\">";
 		  if($swstate eq "off") {
@@ -1571,11 +1603,11 @@ sub PortalAsHtml ($$) {
 		      $swicon = "<img src=\"$FW_ME/www/images/default/10px-kreis-gelb.png\">";
 		  }
 		  
-          if ($legend_style eq 'icon') {                                                # mögliche Umbruchstellen mit normalen Blanks vorsehen !
+          if ($legend_style eq 'icon') {                                                           # mögliche Umbruchstellen mit normalen Blanks vorsehen !
               $legend_txt .= $txt.'&nbsp;'.FW_makeImage($im).' '.$swicon.'&nbsp;&nbsp;'; 
           } else {
               my (undef,$co) = split('\@',$im);
-              $co = '#cccccc' if (!$co);                                                                       # Farbe per default
+              $co = '#cccccc' if (!$co);                                                           # Farbe per default
               $legend_txt .= '<font color=\''.$co.'\'>'.$txt.'</font> '.$swicon.'&nbsp;&nbsp;';    # hier auch Umbruch erlauben
           }
       }
@@ -1671,7 +1703,6 @@ sub PortalAsHtml ($$) {
   # Werte aktuelle Stunde
   $pv{0} = ReadingsNum($name,"L2_ThisHour_PvMeanPower", 0);
   $co{0} = ReadingsNum($name,"L2_ThisHour_Consumption", 0);
-  #$di{0} = ReadingsNum($name,"L2_ThisHour", 0); # kann wieder verwendet werden -> Rundungsfehler ist beseitigt
   $di{0} = $pv{0} - $co{0}; 
   $is{0} = (ReadingsVal($name,"L2_ThisHour_IsConsumptionRecommended",'no') eq 'yes' ) ? $icon : undef;  
   $we{0} = $hash->{HELPER}{L2_ThisHour_WeatherId} if($weather);              # für Wettericons 
@@ -1737,7 +1768,6 @@ sub PortalAsHtml ($$) {
   foreach $i (1..$maxhours-1) {
      $pv{$i} = ReadingsNum($name,"L4_NextHour".sprintf("%02d",$i)."_PvMeanPower",0);             # Erzeugung
      $co{$i} = ReadingsNum($name,"L4_NextHour".sprintf("%02d",$i)."_Consumption",0);             # Verbrauch
-     # $di{$i} = ReadingsNum($name,"L4_NextHour".sprintf("%02d",$i),0);                          # kann wieder verwendet werden -> Rundungsfehler ist beseitigt
      $di{$i} = $pv{$i} - $co{$i};
 
      $maxVal = $pv{$i} if ($pv{$i} > $maxVal); 
