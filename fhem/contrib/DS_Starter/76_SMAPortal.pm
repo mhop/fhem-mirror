@@ -158,6 +158,7 @@ use vars qw($FW_ME);                                    # webname (default is fh
 
 # Versions History intern
 our %vNotesIntern = (
+  "2.1.2"  => "08.06.2019  correct planned time of consumer in PortalAsHtml if planned time is at next day ",
   "2.1.1"  => "08.06.2019  add units to values, some bugs fixed ",
   "2.1.0"  => "07.06.2019  add informations about consumer switch and power state ",
   "2.0.0"  => "03.06.2019  designed for SMAPortalSPG graphics device ",
@@ -1738,16 +1739,18 @@ sub PortalAsHtml ($$) {
 
           $start = int($start);
           $end   = int($end);
+          my $flag = 0;                                                 # default kein Tagesverschieber
 
           #correct the hour for accurate display
-          if ($start < $t{0}) {                                                # consumption seems to be tomorrow
-              $start = 23-$t{0}+$start;
+          if ($start < $t{0}) {                                         # consumption seems to be tomorrow
+              $start = 24-$t{0}+$start;
+              $flag = 1;
           } else { 
-              $start -= $t{0}; 
+              $start -= $t{0};          
           }
 
-          if ($end < $t{0}) {                                                  # consumption seems to be tomorrow
-              $end = 23-$t{0}+$end;
+          if ($flag) {                                                  # consumption seems to be tomorrow
+              $end = 24-$t{0}+$end;
           } else { 
               $end -= $t{0}; 
           }
@@ -1757,8 +1760,8 @@ sub PortalAsHtml ($$) {
       } else { 
           $_ .= ":24:24"; 
       } 
+      Log3($name, 4, "$name - Consumer planned data: $_");
   }
-
 
   $maxVal = (!$maxVal) ? $pv{0} : $maxVal;                  # Startwert wenn kein Wert bereits via attr vorgegeben ist
   $maxCon = $co{0};                                         # für Typ co
@@ -1968,7 +1971,8 @@ sub PortalAsHtml ($$) {
               my $show = 0;                                                    # wurde bereits für diese Stunde ein Geräte Icon ausgegeben ?
               foreach (@pgCDev) {
                   if ($_) {
-                      my (undef,$im,$start,$end) = split (':', $_);
+                      my ($cons,$im,$start,$end) = split (':', $_);
+                      Log3($name, 4, "$name - Consumer to show -> $cons, relative to current time -> start: $start, end: $end") if($i<1); 
                       if ($im && ($i >= $start) && ($i <= $end)) {
                           $ret .= FW_makeImage($im);
                           # $show = 1; # nachher dann kein normales Icon mehr anzeigen, oder doch ?
