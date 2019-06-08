@@ -969,7 +969,8 @@ sub extractForecastData($$) {
   
   readingsBeginUpdate($hash);
 
-  my $plantOid = $forecast->{'ForecastTimeframes'}->{'PlantOid'};
+  my $plantOid              = $forecast->{'ForecastTimeframes'}->{'PlantOid'};
+  $hash->{HELPER}{PLANTOID} = $plantOid;                                           # wichtig für erweiterte Selektionen
 
   # Counter for forecast objects
   my $obj_nr = 0;
