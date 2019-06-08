@@ -1,4 +1,4 @@
-REV 19575
+REV 19576
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -724,8 +724,8 @@ UPD 2019-06-08_07:45:06 4055407 docs/commandref.html
 UPD 2019-06-08_07:45:08 2505990 docs/commandref_DE.html
 UPD 2019-05-12_07:45:03 79232 docs/commandref_frame.html
 UPD 2019-05-12_07:45:03 88924 docs/commandref_frame_DE.html
-UPD 2019-06-08_12:09:33 215791 docs/commandref_modular.html
-UPD 2019-06-08_12:09:35 226675 docs/commandref_modular_DE.html
+UPD 2019-06-08_12:11:33 215799 docs/commandref_modular.html
+UPD 2019-06-08_12:11:34 226683 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
