@@ -593,6 +593,8 @@ contrib/98_FileLogConvert.pm DeeSPe               Automatisierung
 contrib/97_SprinkleControl.pm Tobias              Unterstützende Dienste
 contrib/98_Sprinkle.pm       Tobias               Unterstützende Dienste
 contrib/betateilchen/*       betateilchen         Sonstiges
+contrib/commandref*          rudolfkoenig         Sonstiges
+contrib/pre-commit           rudolfkoenig         Sonstiges
 contrib/DEBIAN/*             betateilchen         Sonstiges
 contrib/deprecated/70_Pushalot.pm Talkabout       (deprecated)
 contrib/deprecated/95_PachLog.pm  rudolfkoenig/orphan (deprecated)

@@ -106,6 +106,7 @@ for my $lang (@lang) {
   my $linkDumped = 0;
   while(my $l = <IN>) {
 
+    $l =~ s,class="commandref,class="commandref modular,;
     print OUT $l;
     if($l =~ m,\s*<title>,) {
       print OUT << 'EOF'
