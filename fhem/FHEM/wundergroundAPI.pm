@@ -326,7 +326,6 @@ sub _ProcessingRetrieveData($$) {
     {
         if ( $response =~ m/^\{.*\}$/ ) {
             my $data = eval { decode_json( encode_utf8($response) ) };
-
             if ($@) {
                 _ErrorHandling( $self,
                     'Weather Underground decode JSON err ' . $@ );
@@ -425,15 +424,20 @@ sub _ProcessingRetrieveData($$) {
                     };
                 }
 
-                if (    ref( $data->{daily} ) eq "HASH"
-                    and scalar keys %{ $data->{daily} } > 0
-                    and ref( $data->{daily}{temperatureMin} ) eq "ARRAY"
-                    and scalar @{ $data->{daily}{temperatureMin} } > 0 )
+                if (
+                    (
+                        ref( $data->{temperatureMin} ) eq "ARRAY"
+                        and scalar @{ $data->{temperatureMin} } > 0
+                    )
+                    || ( ref( $data->{daily}{temperatureMin} ) eq "ARRAY"
+                        and scalar @{ $data->{daily}{temperatureMin} } > 0 )
+                  )
                 {
                     ### löschen des alten Datensatzes
                     delete $self->{cached}{forecast};
 
-                    my $data = $data->{daily};
+                    my $data =
+                      exists( $data->{daily} ) ? $data->{daily} : $data;
                     my $days = scalar @{ $data->{temperatureMin} };
 
                     my $i = 0;
@@ -614,10 +618,7 @@ sub _ProcessingRetrieveData($$) {
                             }
 
                             push(
-                                @{
-                                    $self->{cached}{forecast}{daypart}[$day]
-                                      {$part}
-                                },
+                                @{ $self->{cached}{forecast}{hourly} },
                                 {
                                     'cloudCover'  => $data->{cloudCover}[$i],
                                     'dayOrNight'  => $data->{dayOrNight}[$i],
@@ -658,7 +659,7 @@ sub _ProcessingRetrieveData($$) {
                                     'wxPhraseShort' =>
                                       $data->{wxPhraseShort}[$i],
                                 }
-                            );
+                            ) if ( defined( $data->{temperature}[$i] ) );
 
                             $i++;
                             $day++ if ( $part eq 'night' );
@@ -743,8 +744,7 @@ sub strftimeWrapper(@) {
       "abstract": "Wetter API für Weather Underground"
     }
   },
-  "version": "v0.0.3",
-  "release_status": "testing",
+  "version": "v1.0.0",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
   ],
