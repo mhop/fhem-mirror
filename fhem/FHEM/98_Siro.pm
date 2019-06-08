@@ -17,7 +17,7 @@ package main;
 
 use strict;
 use warnings;
-my $version = "1.0";
+my $version = "1.1";
 
 
 sub Siro_Initialize($) {
@@ -52,7 +52,7 @@ sub Siro_Initialize($) {
       . " SIRO_time_to_open"
       . " SIRO_time_to_close"
 	  . " SIRO_debug:0,1"
-	  
+	  . " SIRO_remote_correction:0,0.25,0.5,0.75,1,1.25,1.5,1.75,2,2.5,2.75,3"
 	  #oldversion entfernen mit kommender version 
       # . " SIRO_channel:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15" 
       . " SignalRepeats:1,2,3,4,5,6,7,8,9"
@@ -86,7 +86,9 @@ sub Siro_Initialize($) {
 
     $hash->{NOTIFYDEV} = "global";
 	
-	$hash->{helper}{progmode} = "off";
+	$hash->{helper}{progmode} = "off";   #exexcmd    on
+	#$hash->{helper}{exexcmd} = "on"; 
+	
 	
     FHEM::Siro::LoadHelper($hash) if ($init_done);
 }
@@ -325,7 +327,7 @@ sub SendCommand($@) {
     my $io           = $hash->{IODev};    # IO-Device (SIGNALduino)
 
 	#if ( $hash->{helper}{exexcmd} eq "off") # send kommand blockiert / keine ausf?hrung
-	if ( defined($hash->{helper}{exexcmd}) and $hash->{helper}{exexcmd} and $hash->{helper}{exexcmd} eq "off") # send kommand blockiert / keine ausf?hrung
+	if ( defined($hash->{helper}{exexcmd}) and $hash->{helper}{exexcmd} eq "off") # send kommand blockiert / keine ausf?hrung
 	{
 	Log3( $name, 5,"Siro_sendCommand: ausf?hrung durch helper blockiert ");
 	return;
@@ -333,7 +335,7 @@ sub SendCommand($@) {
 	}
 	
 	 #if ( $hash->{helper}{ignorecmd} eq "on") # send kommand blockiert / keine ausf?hrung
-	 if ( defined($hash->{helper}) and $hash->{helper} and defined($hash->{helper}{ignorecmd}) and $hash->{helper}{ignorecmd} and $hash->{helper}{ignorecmd} eq "on") # send kommand blockiert / keine ausf?hrung
+	 if ( defined($hash->{helper}{ignorecmd}) and $hash->{helper}{ignorecmd} eq "on") # send kommand blockiert / keine ausf?hrung
 	 {
 	 Log3( $name, 5,"Siro_sendCommand: ausführung einmalig blockiert ");
 	
@@ -389,7 +391,7 @@ sub SendCommand($@) {
 	IOWrite( $hash, 'sendMsg', $message ) if AttrVal( $name, 'SIRO_debug', "0" ) ne "1";
    
     Log3( $name, 5,"Siro_sendCommand: name-$name command-$cmd  channel-$chan bincmd-$binCommand bin-$bin id-$sendid message-$message");
-    Log3( $name, 3, "Siro_sendCommand: not sent upround debugmode 1") if AttrVal( $name, 'SIRO_debug', "0" ) eq "1";;
+    Log3( $name, 3, "Siro_sendCommand: not sent upround debugmode 1") if AttrVal( $name, 'SIRO_debug', "0" ) eq "1";
     return $ret;
 }
 
@@ -406,6 +408,10 @@ sub Parse($$) {
 
     my $name = $hash->{NAME};
     return "" if ( IsDisabled($name) );
+	
+	
+	 Log3( $name, 5,"Siro_parse: Incomming msg time -> ".time);
+	
 	
 	
 	# if ($hash->{helper}{progmode} eq "on")
@@ -597,7 +603,7 @@ sub Parse($$) {
 			
 			#$lh->{helper}{savedcmds}{cmd1} = 'pct';
 			#$lh->{helper}{savedcmds}{cmd2} = 10;
-			#InternalTimer( (time+1), "FHEM::Siro::Restartset", "$name" );
+			#InternalTimer( (time), "FHEM::Siro::Restartset", "$name" );
 			
 			
             return $name;
@@ -657,6 +663,7 @@ sub Set($@) {
 	my $betweentime = $actiontime-$lastactiontime; # Zeit zwischen aktuellem und letztem Aufruf
 	my $downtime = AttrVal( $name, 'SIRO_time_to_close','undef' ); # fahrdauer runter
 	my $uptime = AttrVal( $name, 'SIRO_time_to_open','undef' ); # fahrdauer hoch
+	my $correction = AttrVal( $name, 'SIRO_remote_correction',0 ); # zeitkorrektur fernbedienung
 	my $down1time ="undef"; # fahrzeit 1 prozent
 	my $up1time ="undef"; # fahrzeit 1 prozent
 	my $drivingtime; # fahrzeit bei positionsanfahrt
@@ -669,7 +676,7 @@ sub Set($@) {
 	my $newposition ; # beinhaltet neue positin bei aktionswechsel
 	my $favposition = ReadingsVal( $name, 'Favorite-Position', 'nA' ); #gespeicherte Favoritenposition
 	my $invers = 1; #invertiert position
-	
+	my $oldcmdfrom = ReadingsVal( $name, 'ActionTrigger', 'fhem' );# ActionTrigger der letzten aktion
 	if ($downtime ne "undef" && $uptime ne "undef")
 			{
 			$down1time = $downtime/100;
@@ -782,14 +789,18 @@ sub Set($@) {
 	$hash->{helper}{ignorecmd} = "off" ; #reset ignore send comand states
 	#setze helper neu wenn signal von fb kommt
 	#if ($hash->{helper}{remotecmd} eq "on")
+	
+	my $aktcmdfrom ="fhem";
 	if ( defined($hash->{helper}{remotecmd}) and $hash->{helper}{remotecmd} eq "on")
 	{
-	$hash->{helper}{exexcmd} = "off" 
+	$hash->{helper}{exexcmd} = "off" ;
+	$aktcmdfrom = "remote";
 	}
 	delete( $hash->{helper}{remotecmd} );
 	
 	readingsBeginUpdate($hash);
 	readingsBulkUpdate( $hash, "ActionTime", $actiontime, 0 );
+	readingsBulkUpdate( $hash, "ActionTrigger", $aktcmdfrom, 1 );
 	readingsBulkUpdate( $hash, "LastActionTime", $lastactiontime, 0 );
 	readingsBulkUpdate( $hash, "BetweentActionTime", $betweentime, 0 );
 	readingsEndUpdate($hash, 1);
@@ -823,7 +834,8 @@ sub Set($@) {
 		{
 		if ( $position < $downlimit )
 			{
-			delete( $hash->{helper}{exexcmd} );
+			#delete( $hash->{helper}{exexcmd} );
+			$hash->{helper}{exexcmd}="on";
 			$hash->{helper}{ignorecmd} ="on";
 			$comand = 'level';
 			$zielposition = $downlimit;
@@ -851,8 +863,29 @@ sub Set($@) {
 		#$actiontime aktuelle zeit
 		#$aktrunningaction - typ der laufenden aktion
 		#$position -position bei actionsbeginn
+		
 		my $pastaction = $akttimeaction - ($aktendaction  - $actiontime);
 		Log3( $name, 5, "Siro-Set: unterbrochene Aktion $state lief $pastaction ");
+		##################korrektur zeitdifferenz fb/fhem
+		if ($oldcmdfrom eq "remote" and  $aktcmdfrom eq "fhem")
+		{
+		$pastaction = $pastaction + $correction ;
+		Log3( $name, 5, "Siro-Set: unterbrochene Aktion wurde von $oldcmdfrom gestartet und von $aktcmdfrom unterbrochen, starte Korrektur ");
+		Log3( $name, 5, "Siro-Set: unterbrochene Aktion $state lief $pastaction mit Korrektur");
+		Log3( $name, 5, "Siro-Set: Korrektur um $correction sekunden");
+		}
+		
+		if ($oldcmdfrom eq "fhem" and  $aktcmdfrom eq "remote")
+		{
+		$pastaction = $pastaction - $correction ;
+		Log3( $name, 5, "Siro-Set: unterbrochene Aktion wurde von $oldcmdfrom gestartet und von $aktcmdfrom unterbrochen, starte Korrektur ");
+		Log3( $name, 5, "Siro-Set: unterbrochene Aktion $state lief $pastaction mit Korrektur");
+		Log3( $name, 5, "Siro-Set: Korrektur um $correction sekunden");
+		}
+		################
+		
+		
+		
 		Log3( $name, 5, "Siro-Set: Aktionsbeginn bei $position ");
 
 		if ($state eq "runningDown" || $state eq "runningDownfortimer")
@@ -1400,6 +1433,17 @@ my ( $FW_wname, $d, $room, $pageHash ) =@_;    # pageHash is set for summaryFn.
 ############## versionsänderung
 # kann irgendwann entfernt werden
 	
+	if (AttrVal( $name, 'SIRO_debug', "0" ) eq "1")
+	
+	{
+	$msg.= "<table class='block wide' id='SiroWebTR'>
+			<tr class='even'>
+			<td><center>&nbsp;<br>Das Device ist im Debugmodus, es werden keine Befehle gesendet";
+	$msg.= "<br>&nbsp;<br></td></tr></table>";
+	
+	}
+#######################	
+	
 	if (ReadingsVal( $name, 'last_reset_os', 'undef' ) ne 'undef')
 		{
 		$msg.= "<table class='block wide' id='SiroWebTR'>
@@ -1416,7 +1460,7 @@ my ( $FW_wname, $d, $room, $pageHash ) =@_;    # pageHash is set for summaryFn.
 
 	if ( $progmode eq "on")
 		{
-		$msg.= "<table class='block wide' id='SiroWebTR'>
+		$msg= "<table class='block wide' id='SiroWebTR'>
 			<tr class='even'>
 			<td><center>&nbsp;<br>Programmiermodus aktiv, es werden nur folgende Befehle unterstuetzt:<br>&nbsp;<br>";
 		$msg.= "Das Anlernen ene Rollos erfolgt unter der ID: ";
