@@ -1290,10 +1290,13 @@ sub extractConsumerLiveData($$) {
   foreach my $c (@{$clivedata->{'MeasurementData'}}) {
       $consumers{"${i}_ConsumerName"} = encode("utf8", $c->{'DeviceName'} );
       $consumers{"${i}_ConsumerOid"}  = $c->{'Consume'}{'ConsumerOid'};
-      $consumers{"${i}_ConsumerLfd"}  = $i;
 	  my $cpower                      = $c->{'Consume'}{'Measurement'};           # aktueller Energieverbrauch in W
 	  my $cn                          = $consumers{"${i}_ConsumerName"};          # Verbrauchername
       $cn                             = substUmlauts($cn);
+      
+      $hash->{HELPER}{CONSUMER}{$cn}{ConsumerOid}  = $consumers{"${i}_ConsumerOid"};
+      $hash->{HELPER}{CONSUMER}{$cn}{SerialNumber} = $c->{'SerialNumber'};
+      $hash->{HELPER}{CONSUMER}{$cn}{SUSyID}       = $c->{'SUSyID'};
 
       readingsBulkUpdate($hash, "L3_${cn}_Power", $cpower." W") if(defined($cpower));      
 	  
