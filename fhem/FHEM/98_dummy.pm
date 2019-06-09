@@ -142,9 +142,9 @@ dummy_Define($$)
 
     <li><a name="useSetExtensions">useSetExtensions</a><br>
       If set, and setList contains on and off, then the
-      <a href="#setExtensions">set extensions</a> are supported.
-      In this case no arbitrary set commands are accepted, only the setList and
-      the set exensions commands.</li>
+      <a href="#setExtensions">set extensions</a> are available.<br>
+      Side-effect: if set, only the specified parameters are accepted, even if
+      setList contains no on and off.</li>
 
     <li><a name="setExtensionsEvent">setExtensionsEvent</a><br>
       If set, the event will contain the command implemented by SetExtensions
@@ -208,10 +208,10 @@ dummy_Define($$)
       oder Schalter erzeugen.<br> Beispiel: attr dummyName setList on off </li>
 
     <li><a name="useSetExtensions">useSetExtensions</a><br>
-      Falls gesetzt, und setList enth&auml;lt on und off, dann die <a
-      href="#setExtensions">set extensions</a> Befehle sind auch aktiv.  In
-      diesem Fall werden nur die Befehle aus setList und die set exensions
-      akzeptiert.</li>
+      Falls gesetzt, und setList enth&auml;lt on und off, dann sind die <a
+      href="#setExtensions">set extensions</a> verf&uuml;gbar.<br>
+      Seiteneffekt: falls gesetzt, werden nur die spezifizierten Parameter
+      akzeptiert, auch dann, wenn setList kein on und off enth&auml;lt.</li>
 
     <li><a name="setExtensionsEvent">setExtensionsEvent</a><br>
       Falls gesetzt, enth&auml;lt das Event den im SetExtensions
