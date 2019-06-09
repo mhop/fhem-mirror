@@ -174,7 +174,7 @@ sub GetStatus($;$) {
     RemoveInternalTimer($hash);
     InternalTimer( gettimeofday() + $interval, "BOTVAC::GetStatus", $hash, 0 );
 
-    return if ( AttrVal($name, "disable", 0) == 1 );
+    return if ( AttrVal($name, "disable", 0) == 1 or ReadingsVal($name,"pollingMode",1) == 0);
 
     # check device availability
     if (!$update) {
@@ -186,6 +186,7 @@ sub GetStatus($;$) {
 
       push(@successor, ["messages", "getSchedule"]);
       push(@successor, ["messages", "getGeneralInfo"]) if (GetServiceVersion($hash, "generalInfo") =~ /.*-1/);
+      push(@successor, ["messages", "getPreferences"]) if (GetServiceVersion($hash, "preferences") ne "");
 
       SendCommand($hash, "messages", "getRobotState", undef, @successor);
     }
@@ -265,7 +266,13 @@ sub Set($@) {
     $usage .= " dismissCurrentAlert:noArg" if ( ReadingsVal($name, "alert", "") ne "" );
     $usage .= " findMe:noArg"              if ( GetServiceVersion($hash, "findMe") eq "basic-1" );
     $usage .= " startManual:noArg"         if ( GetServiceVersion($hash, "manualCleaning") ne "" );
-    $usage .= " statusRequest:noArg schedule:on,off syncRobots:noArg";
+    $usage .= " statusRequest:noArg schedule:on,off syncRobots:noArg pollingMode:on,off";
+
+    # preferences
+    $usage .= " robotSounds:on,off"                            if ( GetServiceVersion($hash, "preferences") !~ /()|(basic-1)/ );
+    $usage .= " dirtbinAlertReminderInterval:30,60,90,120,150" if ( GetServiceVersion($hash, "preferences") =~ /(basic-\d)|(advanced-\d)/ );
+    $usage .= " filterChangeReminderInterval:1,2,3"            if ( GetServiceVersion($hash, "preferences") =~ /(basic-\d)|(advanced-\d)/ );
+    $usage .= " brushChangeReminderInterval:4,5,6,7,8"         if ( GetServiceVersion($hash, "preferences") =~ /(basic-\d)|(advanced-\d)/ );
 
     # house cleaning
     $usage .= " nextCleaningMode:eco,turbo" if ($houseCleaningSrv =~ /basic-\d/);
@@ -308,7 +315,7 @@ sub Set($@) {
           my $name = $Boundaries[$i]->{name};
           push @names,$name if (!(grep { $_ eq $name } @names) and ($name ne ""));
         }
-        my $BoundariesList  = @names ? join(",", @names) : "textField";
+        my $BoundariesList  = @names ? "multiple-strict,".join(",", @names) : "textField";
         $usage .= " setBoundariesOnFloorplan_0:".$BoundariesList if (ReadingsVal($name, "floorplan_0_id" ,"") ne "");
         $usage .= " setBoundariesOnFloorplan_1:".$BoundariesList if (ReadingsVal($name, "floorplan_1_id" ,"") ne "");
         $usage .= " setBoundariesOnFloorplan_2:".$BoundariesList if (ReadingsVal($name, "floorplan_2_id" ,"") ne "");
@@ -427,8 +434,12 @@ sub Set($@) {
     # statusRequest
     elsif ( $a[1] eq "statusRequest" ) {
         Log3($name, 2, "BOTVAC set $name $arg");
+        
+        my @successor = ();
+        push(@successor, ["messages", "getPreferences"]) if (GetServiceVersion($hash, "preferences") ne "");
+        push(@successor, ["messages", "getSchedule"]);
 
-        SendCommand( $hash, "messages", "getRobotState", undef, ["messages", "getSchedule"] );
+        SendCommand( $hash, "messages", "getRobotState", undef, @successor );
     }
 
     # setRobot
@@ -516,6 +527,39 @@ sub Set($@) {
         StorePassword( $hash, $a[2] );
     }
 
+    # pollingMode
+    elsif ( $a[1] eq "pollingMode") {
+        Log3($name, 4, "BOTVAC set $name $arg");
+
+        return "No argument given" if ( !defined( $a[2] ) );
+
+        readingsSingleUpdate($hash, "pollingMode", ($a[2] eq "off" ? "0" : "1"), 0);
+    }
+
+    # preferences
+    elsif ( $a[1] =~ /^(robotSounds|dirtbinAlertReminderInterval|filterChangeReminderInterval|brushChangeReminderInterval)$/) {
+        my $item = $1;
+        my %params;
+
+        Log3($name, 4, "BOTVAC set $name $arg");
+
+        return "No argument given" if ( !defined( $a[2] ) );
+
+        foreach my $reading ( keys %{ $hash->{READINGS} } ) {
+            if ($reading =~ /^pref_(.*)/) {
+                my $prefName = $1;
+                $params{$prefName} = ReadingsVal($name, $reading, "null");
+                $params{$prefName} *= 43200 if ($prefName =~ /ChangeReminderInterval/ and $params{$prefName} =~ /^\d*$/);
+            }
+        }
+
+        return "No preferences present, execute 'set statusRequest' first." unless (keys %params);
+
+        $params{$item} = ($item =~ /ChangeReminderInterval/ && $a[2] =~ /^\d*$/ ? $a[2] * 43200 : $a[2]);
+
+        SendCommand( $hash, "messages", "setPreferences", \%params );
+    }
+
     # return usage hint
     else {
         return $usage;
@@ -563,7 +607,7 @@ sub Attr(@)
       if ($attr_value !~ /^\{.*\}/){
         $err = "Invalid value $attr_value for attribute $attr_name. Must be a space separated list of JSON strings.";
       } else {
-        my @boundaries = split " ",$attr_value;
+        my @boundaries = split(/\s/, $attr_value);
         my @areas;
         if (@boundaries > 1) {
           foreach my $area (@boundaries) {
@@ -745,7 +789,7 @@ sub SendCommand($$;$$@) {
         }
         $data .= "}";
       }
-      elsif ($cmd eq "setMapBoundaries" or $cmd eq "getMapBoundaries") {
+      elsif ($cmd eq "setMapBoundaries" or $cmd eq "getMapBoundaries" or $cmd eq "setPreferences") {
         if (defined($option) and ref($option) eq "HASH") {
           $data .= ",\"params\":{";
           foreach( keys %$option ) {
@@ -755,7 +799,6 @@ sub SendCommand($$;$$@) {
           $data .= "}";
         }
       }
-
       $data .= "}";
 
       my $now = time();
@@ -1022,7 +1065,7 @@ sub ReceiveCommand($$$) {
           }
           else {
             # getRobotState, startCleaning, pauseCleaning, stopCleaning, resumeCleaning,
-            # sendToBase, setMapBoundaries, getRobotManualCleaningInfo
+            # sendToBase, setMapBoundaries, getRobotManualCleaningInfo, getPreferences
             if ( ref($return) eq "HASH" ) {
               push(@successor , ["robots", "maps"])
                   if ($cmd eq "setMapBoundaries" or
@@ -1046,6 +1089,16 @@ sub ReceiveCommand($$$) {
                   wsOpen($hash, $data->{ip_address}, $data->{port});
                 } elsif (ReadingsVal($name, "wlanValidity", "") ne "") {
                   readingsBulkUpdateIfChanged($hash, "wlanValidity",  "unavailable");
+                }
+              }
+              if ($cmd eq "getPreferences") {
+                if ( ref($return->{data}) eq "HASH") {
+                  my $data = $return->{data};
+                  foreach my $key (keys %{$return->{data}}) {
+                    my $value = $data->{$key};
+                    $value /= 43200   if ($key =~ /ChangeReminderInterval/ and $value =~ /^[1-9]\d*$/);
+                    readingsBulkUpdateIfChanged($hash, "pref_$key", $value);
+                  }
                 }
               }
               if ( ref($return->{cleaning}) eq "HASH" ) {
@@ -1298,7 +1351,7 @@ sub GetServiceVersion($$) {
 sub SetServices {
   my ($hash, $services) = @_;
   my $name = $hash->{NAME};
-  my $serviceList = join(", ", map { "$_:$services->{$_}" } keys %$services);;
+  my $serviceList = join(", ", map { "$_:$services->{$_}" } keys %$services);
 
   $hash->{SERVICES} = $serviceList if (!defined($hash->{SERVICES}) or $hash->{SERVICES} ne $serviceList);
 }
@@ -1399,7 +1452,7 @@ sub GetBoolean($) {
         return $booleans->{$value};
     } else {
         return $value;
-    }	 
+    }
 }
 
 sub BuildState($$$$) {
@@ -1660,79 +1713,77 @@ sub GetStatistics($) {
     my $model = ReadingsVal($name, "model", "");
     my $ret = "";
 
-    $ret .= '<html><head><meta charset="utf-8">';
-    $ret .= '<style>';
-    $ret .= ' .botvac tbody {border-top: 1px solid gray; border-bottom: 1px solid gray;}';
-    $ret .= ' .botvac th, .botvac td {text-align: center; padding-right: 1em;}';
-    $ret .= ' .botvac caption {text-align: left; padding-bottom: 1em; margin-bottom: 1em;}';
-    $ret .= '</style>';
-    $ret .= '</head><body><table class="botvac">';
+    $ret .= '<html>';
+    $ret .= '<table class="block wide">';
     $ret .= '<caption><b>Report: '.ReadingsVal($name,"name","name").', '.InternalVal($name,"VENDOR","VENDOR").', '.ReadingsVal($name,"model","model").'</b></caption>';
-    $ret .= '<thead>';
+    $ret .= '<tbody>';
     $ret .= '<tr class="col_header">';
-    $ret .= ' <th>Map</th>';
-    $ret .= ' <th colspan="2">Expected</th>';
-    $ret .= ' <th>Map</th>';
-    $ret .= ' <th>Map</th>';
-    $ret .= ' <th>Charge</th>';
-    $ret .= ' <th>Discharge</th>';
-    $ret .= ' <th>Area</th>';
-    $ret .= ' <th colspan="3">Cleaning</th>';
-    $ret .= ' <th>Charge</th>';
-    $ret .= ' <th>Status</th>';
-    $ret .= ' <th>Date</th>';
-    $ret .= ' <th>Time</th>';
+    $ret .= ' <td>Map</td><td></td>';
+    $ret .= ' <td colspan="3">Expected</td><td></td>';
+    $ret .= ' <td>Map</td><td></td>';
+    $ret .= ' <td>Map</td><td></td>';
+    $ret .= ' <td>Charge</td><td></td>';
+    $ret .= ' <td>Discharge</td><td></td>';
+    $ret .= ' <td>Area</td><td></td>';
+    $ret .= ' <td colspan="5">Cleaning</td><td></td>';
+    $ret .= ' <td>Charge</td><td></td>';
+    $ret .= ' <td>Status</td><td></td>';
+    $ret .= ' <td>Date</td><td></td>';
+    $ret .= ' <td>Time</td>';
     $ret .= '</tr><tr class="col_header">';
-    $ret .= ' <th>No.</th>';
-    $ret .= ' <th>Area</th>';
-    $ret .= ' <th>Time</th>';
-    $ret .= ' <th>Area</th>';
-    $ret .= ' <th>Time</th>';
-    $ret .= ' <th>Delta</th>';
-    $ret .= ' <th>Speed</th>';
-    $ret .= ' <th>Speed</th>';
-    $ret .= ' <th>Cat.</th>';
-    $ret .= ' <th>Mode</th>';
-    $ret .= ' <th>Freq.</th>';
-    $ret .= ' <th>During</th>';
-    $ret .= ' <th></th><th></th><th></th>';
+    $ret .= ' <td>No.</td><td></td>';
+    $ret .= ' <td>Area</td><td></td>';
+    $ret .= ' <td>Time</td><td></td>';
+    $ret .= ' <td>Area</td><td></td>';
+    $ret .= ' <td>Time</td><td></td>';
+    $ret .= ' <td>Delta</td><td></td>';
+    $ret .= ' <td>Speed</td><td></td>';
+    $ret .= ' <td>Speed</td><td></td>';
+    $ret .= ' <td>Cat.</td><td></td>';
+    $ret .= ' <td>Mode</td><td></td>';
+    $ret .= ' <td>Freq.</td><td></td>';
+    $ret .= ' <td>During</td><td></td>';
+    $ret .= ' <td></td><td></td><td></td><td></td><td></td>';
     $ret .= '</tr><tr class="col_header">';
-    $ret .= ' <th></th>';
-    $ret .= ' <th>qm</th>';
-    $ret .= ' <th>min</th>';
-    $ret .= ' <th>qm</th>';
-    $ret .= ' <th>min</th>';
-    $ret .= ' <th>%</th>';
-    $ret .= ' <th>%/min</th>';
-    $ret .= ' <th>qm/min</th>';
-    $ret .= ' <th></th><th></th><th></th>';
-    $ret .= ' <th>Run</th>';
-    $ret .= ' <th></th>';
-    $ret .= ' <th colspan="2">YYYY-MM-DD hh:mm:ss</th>';
-    $ret .= '</tr></thead><tbody>';
+    $ret .= ' <td></td><td></td>';
+    $ret .= ' <td>qm</td><td></td>';
+    $ret .= ' <td>min</td><td></td>';
+    $ret .= ' <td>qm</td><td></td>';
+    $ret .= ' <td>min</td><td></td>';
+    $ret .= ' <td>%</td><td></td>';
+    $ret .= ' <td>%/min</td><td></td>';
+    $ret .= ' <td>qm/min</td><td></td>';
+    $ret .= ' <td></td><td></td><td></td><td></td><td></td><td></td>';
+    $ret .= ' <td>Run</td><td></td>';
+    $ret .= ' <td></td><td></td>';
+    $ret .= ' <td>YYYY-MM-DD</td><td></td>';
+    $ret .= ' <td>hh:mm:ss</td>';
+    $ret .= '</tr>';
     for (my $i=0;$i<$mapcount;$i++) {
       my $map = \$hash->{helper}{MAPS}[$i];
       my $t1 = GetSecondsFromString($$map->{end_at});
       my $t2 = GetSecondsFromString($$map->{start_at});
       my $dt = $t1-$t2-$$map->{time_in_suspended_cleaning}-$$map->{time_in_error}-$$map->{time_in_pause};
       my $dc = $$map->{run_charge_at_start}-$$map->{run_charge_at_end};
-      my $expa = int($$map->{cleaned_area}*100/$dc+.5) if ($dc > 0);
-      my $expt = int($dt*100/$dc/60+.5) if ($dc > 0);
-      $ret .= '<tr class="col_'.($i%2?"even":"odd").'row">';
-      $ret .= ' <td>'.($i+1).'</td>'; # Map No.
-      $ret .= ' <td>'.($expa>0?$expa:0).'</td>'; # Expected Area
-      $ret .= ' <td>'.($expt>0?$expt:0).'</td>'; # Expected Time
-      $ret .= ' <td>'.int($$map->{cleaned_area}+.5).'</td>'; # Map Area
-      $ret .= ' <td>'.(($dt>0)?(int($dt/60+.5)):0).'</td>'; # Map Time
-      $ret .= ' <td>'.($dc>0?$dc:0).'</td>'; # Charge Delta
-      $ret .= ' <td>'.(($dt>0 and $dc>0)?(int($dc*600/$dt+.5)/10):0).'</td>'; # Discharge Speed
-      $ret .= ' <td>'.(($expt>0 and $expa>0)?(int($expa*10/$expt+.5))/10:0).'</td>'; # Area Speed
-      $ret .= ' <td>'.GetCategoryText($$map->{category}).'</td>'; # Cleaning Category
-      $ret .= ' <td>'.GetModeText($$map->{mode}).'</td>'; # Cleaning Mode
-      $ret .= ' <td>'.GetModifierText($$map->{modifier}).'</td>'; # Cleaning Frequency
-      $ret .= ' <td>'.$$map->{suspended_cleaning_charging_count}.'x</td>'; # Charge During Run
-      $ret .= ' <td>'.$$map->{status}.'</td>'; # Status
-      $ret .= ' <td colspan="2">'.GetTimeFromString($$map->{generated_at}).'</td>'; # Date
+      my $expa = ($dc > 0 ? int($$map->{cleaned_area}*100/$dc+.5) : 0);
+      my $expt = ($dc > 0 ? int($dt*100/$dc/60+.5) : 0);
+      my($gen_date,$gen_time) = split(" ", GetTimeFromString($$map->{generated_at}));
+      $ret .= '<tr class="'.($i%2?"even":"odd").'">';
+      $ret .= ' <td>'.($i+1).'</td><td> </td>'; # Map No.
+      $ret .= ' <td>'.($expa>0?$expa:0).'</td><td> </td>'; # Expected Area
+      $ret .= ' <td>'.($expt>0?$expt:0).'</td><td> </td>'; # Expected Time
+      $ret .= ' <td>'.int($$map->{cleaned_area}+.5).'</td><td> </td>'; # Map Area
+      $ret .= ' <td>'.(($dt>0)?(int($dt/60+.5)):0).'</td><td> </td>'; # Map Time
+      $ret .= ' <td>'.($dc>0?$dc:0).'</td><td> </td>'; # Charge Delta
+      $ret .= ' <td>'.(($dt>0 and $dc>0)?(int($dc*600/$dt+.5)/10):0).'</td><td> </td>'; # Discharge Speed
+      $ret .= ' <td>'.(($expt>0 and $expa>0)?(int($expa*10/$expt+.5))/10:0).'</td><td> </td>'; # Area Speed
+      $ret .= ' <td>'.GetCategoryText($$map->{category}).'</td><td> </td>'; # Cleaning Category
+      $ret .= ' <td>'.GetModeText($$map->{mode}).'</td><td> </td>'; # Cleaning Mode
+      $ret .= ' <td>'.GetModifierText($$map->{modifier}).'</td><td> </td>'; # Cleaning Frequency
+      $ret .= ' <td>'.$$map->{suspended_cleaning_charging_count}.'x</td><td> </td>'; # Charge During Run
+      $ret .= ' <td>'.$$map->{status}.'</td><td> </td>'; # Status
+      $ret .= ' <td>'.$gen_date.'</td><td> </td>'; # Date
+      $ret .= ' <td>'.$gen_time.'</td>'; # Time
       $ret .= '</tr>';
     }
     $ret .= '</tbody></table>';
@@ -1748,7 +1799,7 @@ sub GetStatistics($) {
     $specification = "Vorwerk VR220(VR300), battery 84 Wh, eco (90 min, 120 qm, power 65 W), turbo (60 min, 90 qm, power 85 W)<br>" if ($model eq "VR220");
 
     $ret .= $specification;
-    $ret .= '</body></html>';
+    $ret .= '</html>';
 
     return $ret;
 }
@@ -2250,14 +2301,49 @@ sub wsMasking($$) {
   <a name="stop"></a>
   <code> set &lt;name&gt; stop</code>
   <br>
-  stop cleaning and in case of manual cleaning mode close also the websocket connection
+  stop cleaning and in case of manual cleaning mode close also the websocket connection.
   </li>
 <br>
   <li>
   <a name="syncRobots"></a>
   <code> set &lt;name&gt; syncRobots</code>
   <br>
-  sync robot data with online account. Useful if one has more then one robot registered
+  sync robot data with online account. Useful if one has more then one robot registered.
+  </li>
+<br>
+  <li>
+  <a name="pollingMode"></a>
+  <code> set &lt;name&gt; pollingMode &lt;1|0&gt;</code>
+  <br>
+  set polling on by 1 (default) or off by 0 like attribut disable.
+  </li>
+<br>
+  <li>
+  <a name="robotSounds"></a>
+  <code> set &lt;name&gt; robotSounds &lt;true|false&gt;</code>
+  <br>
+  set sounds on by true or off false.
+  </li>
+<br>
+  <li>
+  <a name="dirtbinAlertReminderInterval"></a>
+  <code> set &lt;name&gt; dirtbinAlertReminderInterval &lt;30|60|90|120|150&gt;</code>
+  <br>
+  set alert intervall in minutes.
+  </li>
+<br>
+  <li>
+  <a name="filterChangeReminderInterval"></a>
+  <code> set &lt;name&gt; filterChangeReminderInterval &lt;1|2|3&gt;</code>
+  <br>
+  set alert intervall in months.
+  </li>
+<br>
+  <li>
+  <a name="brushChangeReminderInterval"></a>
+  <code> set &lt;name&gt; brushChangeReminderInterval &lt;4|5|6|7|8&gt;</code>
+  <br>
+  set alert intervall in months.
   </li>
 <br>
   <li>
@@ -2311,7 +2397,7 @@ sub wsMasking($$) {
   <a name="boundaries"></a>
   <code>boundaries</code>
   <br>
-  Boundary entries separated by space in JSON format, e.g.<br>
+  Boundary entries separated by whitespace in JSON format, e.g.<br>
   {"type":"polyline","vertices":[[0.710,0.6217],[0.710,0.6923]],"name":"Bad","color":"#E54B1C","enabled":true}<br>
   {"type":"polyline","vertices":[[0.7139,0.4101],[0.7135,0.4282],[0.4326,0.3322],[0.4326,0.2533],[0.3931,0.2533],
     [0.3931,0.3426],[0.7452,0.4637],[0.7617,0.4196]],"name":"Kueche","color":"#000000","enabled":true}<br>

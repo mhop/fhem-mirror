@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 70_BOTVAC: add pollingMode
+                       add preferences
+                       use whitespace to separate boundaries
+                       remove style element from cleaning statistics
  - bugfix:  73_AutoShuttersControl: fix litte bugs and change manual drive
                              detection
  - feature: 49_SSCam: In detailview are buttons provided to open the camera 
