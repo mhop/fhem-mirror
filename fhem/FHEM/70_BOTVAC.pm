@@ -550,12 +550,15 @@ sub Set($@) {
                 my $prefName = $1;
                 $params{$prefName} = ReadingsVal($name, $reading, "null");
                 $params{$prefName} *= 43200 if ($prefName =~ /ChangeReminderInterval/ and $params{$prefName} =~ /^\d*$/);
+                $params{$prefName} = SetBoolean($params{$prefName}) if ($prefName eq "robotSounds");
             }
         }
 
         return "No preferences present, execute 'set statusRequest' first." unless (keys %params);
 
-        $params{$item} = ($item =~ /ChangeReminderInterval/ && $a[2] =~ /^\d*$/ ? $a[2] * 43200 : $a[2]);
+        $params{$item} = $a[2];
+        $params{$item} *= 43200 if ($item =~ /ChangeReminderInterval/ && $params{$item} =~ /^\d*$/);
+        $params{$item} = SetBoolean($params{$item}) if ($item eq "robotSounds");
 
         SendCommand( $hash, "messages", "setPreferences", \%params );
     }
@@ -1096,7 +1099,10 @@ sub ReceiveCommand($$$) {
                   my $data = $return->{data};
                   foreach my $key (keys %{$return->{data}}) {
                     my $value = $data->{$key};
-                    $value /= 43200   if ($key =~ /ChangeReminderInterval/ and $value =~ /^[1-9]\d*$/);
+                    $value /= 43200
+                        if ($key =~ /ChangeReminderInterval/ and $value =~ /^[1-9]\d*$/);
+                    $value = GetBoolean($value)
+                        if ($key =~ /(robotSounds)|(dirtbinAlert)|(allAlerts)|(leds)|(buttonClicks)|(clock24h)/);
                     readingsBulkUpdateIfChanged($hash, "pref_$key", $value);
                   }
                 }
@@ -1446,6 +1452,22 @@ sub GetBoolean($) {
         'false'   => "0",
         '1'       => "1",
         'true'    => "1"
+    };
+
+    if (defined( $booleans->{$value})) {
+        return $booleans->{$value};
+    } else {
+        return $value;
+    }
+}
+
+sub SetBoolean($) {
+    my ($value) = @_;
+    my $booleans = {
+        '0'       => "false",
+        'off'     => "false",
+        '1'       => "true",
+        'on'      => "true"
     };
 
     if (defined( $booleans->{$value})) {
