@@ -584,7 +584,7 @@ DUOFERN_Initialize($)
   $hash->{ParseFn}   = "DUOFERN_Parse";
   $hash->{RenameFn}  = "DUOFERN_Rename";
   $hash->{AttrFn}    = "DUOFERN_Attr";
-  $hash->{AttrList}  = "IODev timeout toggleUpDown ignore:1,0 positionInverse:1,0 ". $readingFnAttributes;
+  $hash->{AttrList}  = "IODev timeout toggleUpDown ignore:1,0 positionInverse:1,0 positionDeviation ". $readingFnAttributes;
   #$hash->{AutoCreate}=
   #      { "DUOFERN" => { GPLOT => "", FILTER => "%NAME" } };
 }
@@ -926,7 +926,8 @@ DUOFERN_Set($@)
       } else {
         readingsSingleUpdate($hash, "moving", "stop", 1);
       }
-    }
+      $hash->{helper}{desiredPosition} = $arg;
+    } 
     
     $command = $commands{$cmd}{cmd}{$subCmd};
     
@@ -1152,6 +1153,14 @@ DUOFERN_Parse($$)
             my $value = hex(substr($msg,  6 + $stPos*2,  4));
             
             $value = ($value >> $stFrom) & ((1<<$stLen) - 1);
+            
+            if(defined($hash->{helper}{desiredPosition}) and $stName eq "position") {
+              if(abs($value - $hash->{helper}{desiredPosition}) <= AttrVal($name,"positionDeviation",0)) {
+                $value = $hash->{helper}{desiredPosition};
+              } else {
+                delete $hash->{helper}{desiredPosition};
+              }
+            }
             
             if((exists $statusIds{$statusId}{invert}) && ($positionInverse eq "1")) {
               $value = $statusIds{$statusId}{invert} - $value;
@@ -1931,6 +1940,9 @@ DUOFERN_StatusTimeout($)
         </li><br>
     <li><b>positionInverse</b><br>
         If attribute is set, the position value of the roller shutter is inverted.
+        </li><br>
+    <li><b>positionDeviation</b><br>
+        Maximum deviation for displaying the desired position instead of the reported position.
         </li><br>
   </ul>
   <br>
