@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.3.015
+#  Version 4.3.016
 #
 #  Module for communication between FHEM and Homematic CCU2/3.
 #
@@ -2660,7 +2660,7 @@ sub HMCCU_SetRPCState ($@)
 				HMCCU_Log ($hash, 1, $msg, undef) if (defined ($msg));
 				HMCCU_Log ($hash, 1, "All RPC servers $rpcstate", undef);
 				DoTrigger ($name, "RPC server $rpcstate");
-				if ($rpcstate eq 'running') {
+				if ($rpcstate eq 'running' && defined ($filter)) {
 					my ($c_ok, $c_err) = HMCCU_UpdateClients ($hash, '.*', 'Attr', 0, $filter);
 					HMCCU_Log ($hash, 2, "Updated devices for interface filter $filter. Success=$c_ok Failed=$c_err", undef);
 				}
