@@ -66,6 +66,7 @@ sub SMAPortal_Initialize($) {
                            "showPassInLog:1,0 ".
                            "timeout ". 
                            "userAgent ".
+                           "verbose5Data:none,liveData,weatherData,forecastData,consumerLiveData,consumerDayData,consumerMonthData,consumerYearData ".
                            $readingFnAttributes;
 
   eval { FHEM::Meta::InitMod( __FILE__, $hash ) };          # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
@@ -154,10 +155,12 @@ BEGIN {
 }
 
 # Standardvariablen und Forward-Deklaration
-use vars qw($FW_ME);                                    # webname (default is fhem), used by 97_GROUP/weblink
+use vars qw($FW_ME);                                    # webname (default is fhem)
 
 # Versions History intern
 our %vNotesIntern = (
+  "2.2.0"  => "10.06.2019  relocate RestOfDay and Tomorrow data from level 3 to level 2, change readings to start all with uppercase, ".
+                           "add consumer energy data of current day/month/year, new attribute \"verbose5Data\" ",
   "2.1.2"  => "08.06.2019  correct planned time of consumer in PortalAsHtml if planned time is at next day ",
   "2.1.1"  => "08.06.2019  add units to values, some bugs fixed ",
   "2.1.0"  => "07.06.2019  add informations about consumer switch and power state ",
@@ -352,7 +355,7 @@ sub DbLog_split($$) {
 	  $value   = $2;
 	  $unit    = $3;
   }
-  if($event =~ m/Power|PV|FeedIn|SelfSupply|Temperature|Total|Hour:|Hour(\d\d):/) {
+  if($event =~ m/Power|PV|FeedIn|SelfSupply|Temperature|Total|Energy|Hour:|Hour(\d\d):/) {
       $event   =~ /^L(.*):\s(.*)\s(.*)/;
       $reading = "L".$1;
 	  $value   = $2;
@@ -603,12 +606,18 @@ sub GetData($) {
   my ($name) = @_;
   my $hash   = $defs{$name};
   my ($livedata_content);
-  my $login_state = 0;
-  my ($forecast_content,$weatherdata_content,$consumerlivedata_content) = ("","","");
+  my $login_state    = 0;
   my $useragent      = AttrVal($name, "userAgent", "Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.2; Trident/6.0)");
-  my $cookieLocation = AttrVal($name, "cookieLocation", "./log/mycookies.txt"); 
-   
-  Log3 $name, 5, "$name - Start BlockingCall GetData with CookieLocation: $cookieLocation and UserAgent: $useragent";
+  my $cookieLocation = AttrVal($name, "cookieLocation", "./log/mycookies.txt");
+  my $v5d            = AttrVal($name, "verbose5Data", "none");   
+  my ($forecast_content,$weatherdata_content,$consumerlivedata_content,$ccdaydata_content,$ccmonthdata_content) = ("","","","","");
+  my ($ccyeardata_content) = ("");
+  
+  Log3 ($name, 5, "$name -> ################################################################");
+  Log3 ($name, 5, "$name -> ###      start of set/get data from SMA Sunny Portal         ###");
+  Log3 ($name, 5, "$name -> ################################################################"); 
+  Log3 ($name, 5, "$name - verbose 5 data are specified by attribute \"verbose5Data\": $v5d");     
+  Log3 ($name, 5, "$name - Start getting data with CookieLocation: $cookieLocation and UserAgent: $useragent");
   
   my $ua = LWP::UserAgent->new;
 
@@ -631,39 +640,90 @@ sub GetData($) {
       # JSON Live Daten
       $livedata_content = $livedata->content;
       $login_state = 1;
-      Log3 $name, 4, "$name - Getting live data now";
-      Log3 $name, 5, "$name - Data received:\n".Dumper decode_json($livedata_content);
+      Log3 ($name, 4, "$name - Getting live data");
+      Log3 ($name, 5, "$name - Data received:\n".Dumper decode_json($livedata_content)) if($v5d eq "liveData");
       
       # JSON Wetterdaten
-      Log3 $name, 4, "$name - Getting weather data now";
+      Log3 ($name, 4, "$name - Getting weather data");
       my $weatherdata = $ua->get('https://www.sunnyportal.com/Dashboard/Weather');
       $weatherdata_content = $weatherdata->content;
-      Log3 $name, 5, "$name - Data received:\n".Dumper decode_json($weatherdata_content);
+      Log3 ($name, 5, "$name - Data received:\n".Dumper decode_json($weatherdata_content)) if($v5d eq "weatherData");
       
       # JSON Forecast Daten
       my $dl = AttrVal($name, "detailLevel", 1);
       if($dl > 1) {
-          Log3 $name, 4, "$name - Getting forecast data now";
+          Log3 ($name, 4, "$name - Getting forecast data");
 
           my $forecast_page = $ua->get('https://www.sunnyportal.com/HoMan/Forecast/LoadRecommendationData');
-          Log3 $name, 5, "$name - Return Code: ".$forecast_page->code;
+          Log3 ($name, 5, "$name - Return Code: ".$forecast_page->code) if($v5d eq "forecastData"); 
 
           if ($forecast_page->content =~ m/ForecastChartDataPoint/i) {
               $forecast_content = $forecast_page->content;
-              Log3 $name, 5, "$name - Forecast data received:\n".Dumper decode_json($forecast_content);
+              Log3 ($name, 5, "$name - Forecast data received:\n".Dumper decode_json($forecast_content)) if($v5d eq "forecastData"); 
           }
       }
       
-      # JSON Consumer Livedaten
+      # JSON Consumer Livedaten und historische Energiedaten
       if($dl > 2) {
-          Log3 $name, 4, "$name - Getting consumer live data now";
+          Log3 ($name, 4, "$name - Getting consumer live data");
 
           my $consumerlivedata = $ua->get('https://www.sunnyportal.com/Homan/ConsumerBalance/GetLiveProxyValues');
-          Log3 $name, 5, "$name - Return Code: ".$consumerlivedata->code;
+          
+          Log3 ($name, 5, "$name - Return Code: ".$consumerlivedata->code) if($v5d eq "consumerLiveData"); 
 
           if ($consumerlivedata->content =~ m/HoManConsumerLiveData/i) {
               $consumerlivedata_content = $consumerlivedata->content;
-              Log3 $name, 5, "$name - Consumer live data received:\n".Dumper decode_json($consumerlivedata_content);
+              Log3 ($name, 5, "$name - Consumer live data received:\n".Dumper decode_json($consumerlivedata_content)) if($v5d eq "consumerLiveData"); 
+          }
+          
+          if($hash->{HELPER}{PLANTOID}) {              
+              my $PlantOid = $hash->{HELPER}{PLANTOID};
+              my $dds      = (split(/\s+/,TimeNow()))[0];
+              my $dde      = (split(/\s+/,FmtDateTime(time()+86400)))[0];
+              $dds         =~ /(.*)-(.*)-(.*)/;
+              my $mds      = "$1-$2-01";
+              my $me       = (($2+1)<=12)?$2+1:1;
+              $me          = sprintf("%02d", $me);
+              my $ye       = ($2>$me)?$1+1:$1;
+              my $mde      = "$ye-$me-01";
+              my $yds      = "$1-01-01";
+              my $yde      = ($1+1)."-01-01";
+              
+              # Energiedaten aktueller Tag
+              Log3 ($name, 4, "$name - Getting consumer energy data of current day");
+              Log3 ($name, 4, "$name - Request date -> start: $dds, end: $dde");  
+              my $ccdaydata = $ua->get('https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=2&'.$PlantOid.'&StartTime='.$dds.'&EndTime='.$dde.'');
+              
+              Log3 ($name, 5, "$name - Return Code: ".$ccdaydata->code) if($v5d eq "consumerDayData"); 
+
+              if ($ccdaydata->content =~ m/ConsumerBalanceDeviceInfo/i) {
+                  $ccdaydata_content = $ccdaydata->content;
+                  Log3 ($name, 5, "$name - Consumer energy data of current day received:\n".Dumper decode_json($ccdaydata_content)) if($v5d eq "consumerDayData"); 
+              }
+
+              # Energiedaten aktueller Monat
+              Log3 ($name, 4, "$name - Getting consumer energy data of current month");
+              Log3 ($name, 4, "$name - Request date -> start: $mds, end: $mde"); 
+              my $ccmonthdata = $ua->get('https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=4&'.$PlantOid.'&StartTime='.$mds.'&EndTime='.$mde.'');
+              
+              Log3 ($name, 5, "$name - Return Code: ".$ccmonthdata->code) if($v5d eq "consumerMonthData"); 
+
+              if ($ccmonthdata->content =~ m/ConsumerBalanceDeviceInfo/i) {
+                  $ccmonthdata_content = $ccmonthdata->content;
+                  Log3 ($name, 5, "$name - Consumer energy data of current month received:\n".Dumper decode_json($ccmonthdata_content)) if($v5d eq "consumerMonthData"); 
+              }       
+
+              # Energiedaten aktuelles Jahr
+              Log3 ($name, 4, "$name - Getting consumer energy data of current year");
+              Log3 ($name, 4, "$name - Request date -> start: $yds, end: $yde"); 
+              my $ccyeardata = $ua->get('https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=5&'.$PlantOid.'&StartTime='.$yds.'&EndTime='.$yde.'');
+              
+              Log3 ($name, 5, "$name - Return Code: ".$ccyeardata->code) if($v5d eq "consumerMonthData"); 
+
+              if ($ccyeardata->content =~ m/ConsumerBalanceDeviceInfo/i) {
+                  $ccyeardata_content = $ccyeardata->content;
+                  Log3 ($name, 5, "$name - Consumer energy data of current year received:\n".Dumper decode_json($ccyeardata_content)) if($v5d eq "consumerYearData"); 
+              }               
           }
       }
   
@@ -673,7 +733,7 @@ sub GetData($) {
       my $loginField    = "__EVENTTARGET";
       my $loginButton   = "ctl00\$ContentPlaceHolder1\$Logincontrol1\$LoginBtn";
       
-      Log3 $name, 3, "$name - not logged in. Try again ...";
+      Log3 ($name, 3, "$name - not logged in. Try again ...");
       
       # Credentials abrufen
       my ($success, $username, $password) = getcredentials($hash,0);
@@ -685,32 +745,36 @@ sub GetData($) {
       } else {    
           my $loginp = $ua->post('https://www.sunnyportal.com/Templates/Start.aspx',[$usernameField => $username, $passwordField => $password, "__EVENTTARGET" => $loginButton]);
         
-          Log3 $name, 4, "$name -> ".$loginp->code;
-          Log3 $name, 5, "$name -> Login-Page return: ".$loginp->content;
+          Log3 ($name, 4, "$name -> ".$loginp->code);
+          Log3 ($name, 5, "$name -> Login-Page return: ".$loginp->content);
         
           if( $loginp->content =~ /Logincontrol1_ErrorLabel/i ) {
-              Log3 $name, 1, "$name - Error: login to SMA-Portal failed";
+              Log3 ($name, 1, "$name - Error: login to SMA-Portal failed");
               $livedata_content = "{\"Login-Status\":\"failed\"}";
           } else {
-              Log3 $name, 3, "$name - login to SMA-Portal successful ... ";
+              Log3 ($name, 3, "$name - login to SMA-Portal successful ... ");
               $livedata_content = '{"Login-Status":"successful", "InfoMessages":["login to SMA-Portal successful but get data with next data cycle."]}';
               $login_state = 1;
           }
 
           my $shmp = $ua->get('https://www.sunnyportal.com/FixedPages/HoManLive.aspx');
-          Log3 $name, 5, "$name -> ".$shmp->code;
+          Log3 ($name, 5, "$name -> ".$shmp->code);
       }
   }
   
   my ($reread,$retry) = analivedat($hash,$livedata_content);
   
   # Daten müssen als Einzeiler zurückgegeben werden
-  $livedata_content         = encode_base64($livedata_content,"");
-  $forecast_content         = encode_base64($forecast_content,"") if($forecast_content);
-  $weatherdata_content      = encode_base64($weatherdata_content,"") if($weatherdata_content);
-  $consumerlivedata_content = encode_base64($consumerlivedata_content,"") if($consumerlivedata_content);
+  my ($lc,$fc,$wc,$cl,$cd,$cm,$cy) = ("","","","","","","");
+  $lc = encode_base64($livedata_content,"");
+  $fc = encode_base64($forecast_content,"") if($forecast_content);
+  $wc = encode_base64($weatherdata_content,"") if($weatherdata_content);
+  $cl = encode_base64($consumerlivedata_content,"") if($consumerlivedata_content);
+  $cd = encode_base64($ccdaydata_content,"") if($ccdaydata_content);
+  $cm = encode_base64($ccmonthdata_content,"") if($ccmonthdata_content);
+  $cy = encode_base64($ccyeardata_content,"") if($ccyeardata_content);
 
-return "$name|$livedata_content|$forecast_content|$weatherdata_content|$consumerlivedata_content|$login_state|$reread|$retry";
+return "$name|$login_state|$reread|$retry|$lc|$fc|$wc|$cl|$cd|$cm|$cy";
 }
 
 ################################################################
@@ -721,18 +785,24 @@ sub ParseData($) {
   my @a = split("\\|",$string);
   my $hash        = $defs{$a[0]};
   my $name        = $hash->{NAME};
-  my $ld_response = decode_base64($a[1]);
-  my $fd_response = decode_base64($a[2]) if($a[2]);
-  my $wd_response = decode_base64($a[3]) if($a[3]);
-  my $cd_response = decode_base64($a[4]) if($a[4]);
-  my $login_state = $a[5];
-  my $reread      = $a[6];
-  my $retry       = $a[7];
+  my $login_state = $a[1];
+  my $reread      = $a[2];
+  my $retry       = $a[3];
+  my $lc          = decode_base64($a[4]);
+  my $fc          = decode_base64($a[5])  if($a[5]);
+  my $wc          = decode_base64($a[6])  if($a[6]);
+  my $cl          = decode_base64($a[7])  if($a[7]);
+  my $cd          = decode_base64($a[8])  if($a[8]);
+  my $cm          = decode_base64($a[9])  if($a[9]);
+  my $cy          = decode_base64($a[10]) if($a[10]);
   
-  my $livedata_content         = decode_json($ld_response);
-  my $forecast_content         = decode_json($fd_response) if($fd_response);
-  my $weatherdata_content      = decode_json($wd_response) if($wd_response);
-  my $consumerlivedata_content = decode_json($cd_response) if($cd_response);
+  my $livedata_content         = decode_json($lc);
+  my $forecast_content         = decode_json($fc) if($fc);
+  my $weatherdata_content      = decode_json($wc) if($wc);
+  my $consumerlivedata_content = decode_json($cl) if($cl);
+  my $ccdaydata_content        = decode_json($cd) if($cd);
+  my $ccmonthdata_content      = decode_json($cm) if($cm);
+  my $ccyeardata_content       = decode_json($cy) if($cy);
   
   my $state = "ok";
   
@@ -860,6 +930,21 @@ sub ParseData($) {
   if ($consumerlivedata_content && $consumerlivedata_content !~ m/undefined/i) {
       # Auswertung Consumer Live Daten
       extractConsumerLiveData($hash,$consumerlivedata_content);
+  }
+  
+  if ($ccdaydata_content && $ccdaydata_content !~ m/undefined/i) {
+      # Auswertung Consumer Energiedaten des aktuellen Tages
+      extractConsumerHistData($hash,$ccdaydata_content,"day");
+  }
+  
+  if ($ccmonthdata_content && $ccmonthdata_content !~ m/undefined/i) {
+      # Auswertung Consumer Energiedaten des aktuellen Monats
+      extractConsumerHistData($hash,$ccmonthdata_content,"month");
+  }
+  
+  if ($ccyeardata_content && $ccyeardata_content !~ m/undefined/i) {
+      # Auswertung Consumer Energiedaten des aktuellen Jahres
+      extractConsumerHistData($hash,$ccyeardata_content,"year");
   }
   
   if ($weatherdata_content && $weatherdata_content !~ m/undefined/i) {
@@ -1072,20 +1157,16 @@ sub extractForecastData($$) {
       readingsBulkUpdate($hash, "L2_Next04Hours-Total",                    int( $nextFewHoursSum{'Total'}       )." Wh" );
       readingsBulkUpdate($hash, "L2_Next04Hours-IsConsumptionRecommended", int( $nextFewHoursSum{'ConsumpRcmd'} )." h" );
       readingsBulkUpdate($hash, "next04hours_state",                       int( $nextFewHoursSum{'PV'} )." Wh" );
-      readingsBulkUpdate($hash, "L2_Forecast-Today-Consumption",           $consum_sum." Wh" );                         # publish consumption forecast values 
-      readingsBulkUpdate($hash, "L2_Forecast-Today-PV",                    $PV_sum." Wh");                             # publish integrated PV
-  }
-
-  if($dl >= 3) {
-      readingsBulkUpdate($hash, "L3_RestOfDay-Consumption",                int( $restOfDaySum{'Consumption'} )." Wh" );
-      readingsBulkUpdate($hash, "L3_RestOfDay-PV",                         int( $restOfDaySum{'PV'}          )." Wh" );
-      readingsBulkUpdate($hash, "L3_RestOfDay-Total",                      int( $restOfDaySum{'Total'}       )." Wh" );
-      readingsBulkUpdate($hash, "L3_RestOfDay-IsConsumptionRecommended",   int( $restOfDaySum{'ConsumpRcmd'} )." h" );
-
-      readingsBulkUpdate($hash, "L3_Tomorrow-Consumption",                 int( $tomorrowSum{'Consumption'} )." Wh" );
-      readingsBulkUpdate($hash, "L3_Tomorrow-PV",                          int( $tomorrowSum{'PV'}          )." Wh" );
-      readingsBulkUpdate($hash, "L3_Tomorrow-Total",                       int( $tomorrowSum{'Total'}       )." Wh" );
-      readingsBulkUpdate($hash, "L3_Tomorrow-IsConsumptionRecommended",    int( $tomorrowSum{'ConsumpRcmd'} )." h" );
+      readingsBulkUpdate($hash, "L2_Forecast-Today-Consumption",           $consum_sum." Wh" );                           
+      readingsBulkUpdate($hash, "L2_Forecast-Today-PV",                    $PV_sum." Wh");                                 
+      readingsBulkUpdate($hash, "L2_RestOfDay-Consumption",                int( $restOfDaySum{'Consumption'} )." Wh" );
+      readingsBulkUpdate($hash, "L2_RestOfDay-PV",                         int( $restOfDaySum{'PV'}          )." Wh" );
+      readingsBulkUpdate($hash, "L2_RestOfDay-Total",                      int( $restOfDaySum{'Total'}       )." Wh" );
+      readingsBulkUpdate($hash, "L2_RestOfDay-IsConsumptionRecommended",   int( $restOfDaySum{'ConsumpRcmd'} )." h" );
+      readingsBulkUpdate($hash, "L2_Tomorrow-Consumption",                 int( $tomorrowSum{'Consumption'} )." Wh" );
+      readingsBulkUpdate($hash, "L2_Tomorrow-PV",                          int( $tomorrowSum{'PV'}          )." Wh" );
+      readingsBulkUpdate($hash, "L2_Tomorrow-Total",                       int( $tomorrowSum{'Total'}       )." Wh" );
+      readingsBulkUpdate($hash, "L2_Tomorrow-IsConsumptionRecommended",    int( $tomorrowSum{'ConsumpRcmd'} )." h" );
   }
   
   if($dl >= 4) {  
@@ -1141,6 +1222,9 @@ sub extractWeatherData($$) {
                               $ttomorrow = sprintf("%.1f",$new_val);
                           }                          
                           next;
+                      } 
+                      if($i =~ /^WeatherDescription$/) {
+                          $k =~ s/t/T/;
                       }                      
                       
                       Log3 $name, 4, "$name -> ${k}_${i} - $new_val";
@@ -1151,8 +1235,8 @@ sub extractWeatherData($$) {
       }
   }
   
-  readingsBulkUpdate($hash, "L1_today_Temperature", "$ttoday $tsymbol") if($ttoday && $tsymbol);
-  readingsBulkUpdate($hash, "L1_tomorrow_Temperature", "$ttomorrow $tsymbol") if($ttomorrow && $tsymbol);
+  readingsBulkUpdate($hash, "L1_Today_Temperature", "$ttoday $tsymbol") if($ttoday && $tsymbol);
+  readingsBulkUpdate($hash, "L1_Tomorrow_Temperature", "$ttomorrow $tsymbol") if($ttomorrow && $tsymbol);
   
   readingsEndUpdate($hash, 1); 
 
@@ -1334,6 +1418,63 @@ sub extractConsumerLiveData($$) {
           
           $i++;
       }
+  }
+  
+  readingsEndUpdate($hash, 1); 
+  
+return;
+}
+
+################################################################
+##          Auswertung Consumer History Energy Data
+##          $tf = Time Frame
+################################################################
+sub extractConsumerHistData($$$) {
+  my ($hash,$chdata,$tf) = @_;
+  my $name = $hash->{NAME};
+  my %consumers;
+  my ($key,$val,$i,$res,$gcr,$gct,$pcr,$pct,$tct);
+  
+  my $dl = AttrVal($name, "detailLevel", 1);
+  if($dl <= 2) {
+      return;
+  }
+  
+  readingsBeginUpdate($hash);
+  
+  # allen Consumer Objekte die ID zuordnen
+  $i = 0;
+  foreach my $c (@{$chdata->{'Consumers'}}) {
+      $consumers{"${i}_ConsumerName"} = encode("utf8", $c->{'DeviceName'} );
+      $consumers{"${i}_ConsumerOid"}  = $c->{'ConsumerOid'};
+      $consumers{"${i}_ConsumerLfd"}  = $i;
+	  my $cpower                      = $c->{'TotalEnergy'}{'Measurement'};       # Energieverbrauch im Timeframe in Wh
+	  my $cn                          = $consumers{"${i}_ConsumerName"};          # Verbrauchername
+      $cn                             = substUmlauts($cn);
+      
+      if($tf =~ /month|year/) {
+          $tct = $c->{'TotalEnergyMix'}{'TotalConsumptionTotal'};              # Gesamtverbrauch im Timeframe in Wh
+          $gcr = $c->{'TotalEnergyMix'}{'GridConsumptionRelative'};            # Anteil des Netzbezugs im Timeframe am Gesamtverbrauch in %
+          $gct = $c->{'TotalEnergyMix'}{'GridConsumptionTotal'};               # Anteil des Netzbezugs im Timeframe am Gesamtverbrauch in Wh
+          $pcr = $c->{'TotalEnergyMix'}{'PvConsumptionRelative'};              # Anteil des PV-Nutzung im Timeframe am Gesamtverbrauch in %
+          $pct = $c->{'TotalEnergyMix'}{'PvConsumptionTotal'};                 # Anteil des PV-Nutzung im Timeframe am Gesamtverbrauch in Wh
+      }
+      
+      readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalDay",          sprintf("%.0f", $cpower)." Wh") if(defined($cpower) && $tf eq "day"); 
+      readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalMonth",        sprintf("%.0f", $cpower)." Wh") if(defined($cpower) && $tf eq "month");  
+      readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalYear",         sprintf("%.0f", $cpower)." Wh") if(defined($cpower) && $tf eq "year");                  
+	  
+      readingsBulkUpdate($hash, "L3_${cn}_EnergyRelativeMonthGrid", sprintf("%.0f", $gcr)." %")     if(defined($gcr) && $tf eq "month");            
+      readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalMonthGrid",    sprintf("%.0f", $gct)." Wh")    if(defined($gct) && $tf eq "month");
+      readingsBulkUpdate($hash, "L3_${cn}_EnergyRelativeMonthPV",   sprintf("%.0f", $pcr)." %")     if(defined($pcr) && $tf eq "month");                  
+      readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalMonthPV",      sprintf("%.0f", $pct)." Wh")    if(defined($pct) && $tf eq "month");                  
+
+	  readingsBulkUpdate($hash, "L3_${cn}_EnergyRelativeYearGrid",  sprintf("%.0f", $gcr)." %")     if(defined($gcr) && $tf eq "year");            
+      readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalYearGrid",     sprintf("%.0f", $gct)." Wh")    if(defined($gct) && $tf eq "year");
+      readingsBulkUpdate($hash, "L3_${cn}_EnergyRelativeYearPV",    sprintf("%.0f", $pcr)." %")     if(defined($pcr) && $tf eq "year");                  
+      readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalYearPV",       sprintf("%.0f", $pct)." Wh")    if(defined($pct) && $tf eq "year");  
+      
+      $i++;
   }
   
   readingsEndUpdate($hash, 1); 
@@ -1652,12 +1793,12 @@ sub PortalAsHtml ($$) {
   $icon    = FW_makeImage($icon) if (defined($icon));
  
   my $co4h = ReadingsNum($name,"L2_Next04Hours-Consumption", 0);
-  my $coRe = ReadingsNum($name,"L3_RestOfDay-Consumption", 0); 
-  my $coTo = ReadingsNum($name,"L3_Tomorrow-Consumption", 0);
+  my $coRe = ReadingsNum($name,"L2_RestOfDay-Consumption", 0); 
+  my $coTo = ReadingsNum($name,"L2_Tomorrow-Consumption", 0);
 
   my $pv4h = ReadingsNum($name,"L2_Next04Hours-PV", 0);
-  my $pvRe = ReadingsNum($name,"L3_RestOfDay-PV", 0); 
-  my $pvTo = ReadingsNum($name,"L3_Tomorrow-PV", 0);
+  my $pvRe = ReadingsNum($name,"L2_RestOfDay-PV", 0); 
+  my $pvTo = ReadingsNum($name,"L2_Tomorrow-PV", 0);
 
   if ($kw eq 'kW') {
       $co4h = sprintf("%.1f" , $co4h/1000)."&nbsp;kW";
@@ -2388,7 +2529,7 @@ return;
      
      <ul>
      <li><b> set &lt;name&gt; credentials &lt;username&gt; &lt;password&gt; </b> </li>  
-     Setzt Username / Passwort für den Zugriff zum SMA-Portal.   
+     Setzt Username / Passwort zum Login in das SMA Sunny Portal.   
      </ul> 
    </ul>
    <br><br>
@@ -2417,12 +2558,12 @@ return;
      <ul>
        <a name="cookielifetime"></a>
        <li><b>cookielifetime &lt;Sekunden&gt; </b><br>
-       Gültigkeitszeitraum für einen empfangenen Cookie (Default: 3000 Sekunden).  
+       Gültigkeitszeitraum für einen empfangenen Cookie (default: 3000 Sekunden).  
        </li><br>
        
        <a name="cookieLocation"></a>
        <li><b>cookieLocation &lt;Pfad/File&gt; </b><br>
-       Angabe von Pfad und Datei zur Abspeicherung des empfangenen Cookies (Default: ./log/mycookies.txt).
+       Angabe von Pfad und Datei zur Abspeicherung des empfangenen Cookies (default: ./log/mycookies.txt).
        <br><br> 
   
         <ul>
@@ -2440,8 +2581,8 @@ return;
 	   <table>  
 	   <colgroup> <col width=5%> <col width=95%> </colgroup>
 		  <tr><td> <b>L1</b>  </td><td>- nur Live-Daten und Wetter-Daten werden generiert. </td></tr>
-		  <tr><td> <b>L2</b>  </td><td>- wie L1 und zusätzlich Prognose der aktuellen und nächsten 4 Stunden sowie PV-Erzeugung und Verbrauch des aktuellen Tages </td></tr>
-		  <tr><td> <b>L3</b>  </td><td>- wie L2 und zusätzlich Prognosedaten des Resttages, des Folgetages, der geplanten Einschaltzeiten von Verbrauchern und deren aktueller Status </td></tr>
+		  <tr><td> <b>L2</b>  </td><td>- wie L1 und zusätzlich Prognose der aktuellen und nächsten 4 Stunden sowie PV-Erzeugung / Verbrauch des Resttages und des Folgetages </td></tr>
+		  <tr><td> <b>L3</b>  </td><td>- wie L2 und zusätzlich Prognosedaten der geplanten Einschaltzeiten von Verbrauchern, deren aktueller Status und Energiedaten</td></tr>
           <tr><td> <b>L4</b>  </td><td>- wie L3 und zusätzlich die detaillierte Prognose der nächsten 24 Stunden </td></tr>
 	   </table>
 	   </ul>     
@@ -2475,7 +2616,7 @@ return;
        
        <a name="timeout"></a>
        <li><b>timeout &lt;Sekunden&gt; </b><br>
-       Timeout-Wert für HTTP-Aufrufe zum SMA-Portal (Default: 30 Sekunden).  
+       Timeout-Wert für HTTP-Aufrufe zum SMA-Portal (default: 30 Sekunden).  
        </li><br>
        
        <a name="userAgent"></a>
@@ -2487,6 +2628,12 @@ return;
 		 <b>Beispiel:</b><br>
          attr &lt;name&gt; userAgent Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:65.0) Gecko/20100101 Firefox/65.0 <br>    
         </ul>           
+       </li><br> 
+
+       <a name="verbose5Data"></a>
+       <li><b>verbose5Data </b><br>
+       Mit dem Attributwert verbose 5 werden zu viele Daten generiert. Mit diesem Attribut können gezielt die interessierenden
+       verbose 5 Ausgaben selektiert werden. (default: none).  
        </li><br>       
    
      </ul>
