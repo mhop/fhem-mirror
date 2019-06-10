@@ -269,7 +269,7 @@ sub Set($@) {
     $usage .= " statusRequest:noArg schedule:on,off syncRobots:noArg pollingMode:on,off";
 
     # preferences
-    $usage .= " robotSounds:on,off"                            if ( GetServiceVersion($hash, "preferences") !~ /()|(basic-1)/ );
+    $usage .= " robotSounds:on,off"                            if ( GetServiceVersion($hash, "preferences") !~ /(^$)|(basic-1)/ );
     $usage .= " dirtbinAlertReminderInterval:30,60,90,120,150" if ( GetServiceVersion($hash, "preferences") =~ /(basic-\d)|(advanced-\d)/ );
     $usage .= " filterChangeReminderInterval:1,2,3"            if ( GetServiceVersion($hash, "preferences") =~ /(basic-\d)|(advanced-\d)/ );
     $usage .= " brushChangeReminderInterval:4,5,6,7,8"         if ( GetServiceVersion($hash, "preferences") =~ /(basic-\d)|(advanced-\d)/ );
@@ -2313,16 +2313,16 @@ sub wsMasking($$) {
 <br>
   <li>
   <a name="pollingMode"></a>
-  <code> set &lt;name&gt; pollingMode &lt;1|0&gt;</code>
+  <code> set &lt;name&gt; pollingMode &lt;on|off&gt;</code>
   <br>
-  set polling on by 1 (default) or off by 0 like attribut disable.
+  set polling on (default) or off like attribut disable.
   </li>
 <br>
   <li>
   <a name="robotSounds"></a>
-  <code> set &lt;name&gt; robotSounds &lt;true|false&gt;</code>
+  <code> set &lt;name&gt; robotSounds &lt;on|off&gt;</code>
   <br>
-  set sounds on by true or off false.
+  set sounds on or off.
   </li>
 <br>
   <li>

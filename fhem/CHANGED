@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  70_BOTVAC: set robotSounds filter
  - feature: 70_BOTVAC: add pollingMode
                        add preferences
                        use whitespace to separate boundaries
