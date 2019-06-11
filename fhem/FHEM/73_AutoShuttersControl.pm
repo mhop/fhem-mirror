@@ -48,7 +48,7 @@ use strict;
 use warnings;
 use FHEM::Meta;
 
-my $version = '0.6.16';
+my $version = '0.6.17';
 
 sub AutoShuttersControl_Initialize($) {
     my ($hash) = @_;
@@ -119,8 +119,79 @@ use GPUtils qw(:all)
 use Data::Dumper;    #only for Debugging
 use Date::Parse;
 
-my $missingModul = '';
-eval "use JSON qw(decode_json encode_json);1" or $missingModul .= 'JSON ';
+# my $missingModul = '';
+# eval "use JSON qw(decode_json encode_json);1" or $missingModul .= 'JSON ';
+
+# try to use JSON::MaybeXS wrapper
+#   for chance of better performance + open code
+eval {
+    require JSON::MaybeXS;
+    import JSON::MaybeXS qw( decode_json encode_json );
+    1;
+};
+
+if ($@) {
+    $@ = undef;
+
+    # try to use JSON wrapper
+    #   for chance of better performance
+    eval {
+
+        # JSON preference order
+        local $ENV{PERL_JSON_BACKEND} =
+          'Cpanel::JSON::XS,JSON::XS,JSON::PP,JSON::backportPP'
+          unless ( defined( $ENV{PERL_JSON_BACKEND} ) );
+
+        require JSON;
+        import JSON qw( decode_json encode_json );
+        1;
+    };
+
+    if ($@) {
+        $@ = undef;
+
+        # In rare cases, Cpanel::JSON::XS may
+        #   be installed but JSON|JSON::MaybeXS not ...
+        eval {
+            require Cpanel::JSON::XS;
+            import Cpanel::JSON::XS qw(decode_json encode_json);
+            1;
+        };
+
+        if ($@) {
+            $@ = undef;
+
+            # In rare cases, JSON::XS may
+            #   be installed but JSON not ...
+            eval {
+                require JSON::XS;
+                import JSON::XS qw(decode_json encode_json);
+                1;
+            };
+
+            if ($@) {
+                $@ = undef;
+
+                # Fallback to built-in JSON which SHOULD
+                #   be available since 5.014 ...
+                eval {
+                    require JSON::PP;
+                    import JSON::PP qw(decode_json encode_json);
+                    1;
+                };
+
+                if ($@) {
+                    $@ = undef;
+
+                    # Fallback to JSON::backportPP in really rare cases
+                    require JSON::backportPP;
+                    import JSON::backportPP qw(decode_json encode_json);
+                    1;
+                }
+            }
+        }
+    }
+}
 
 ## Import der FHEM Funktionen
 BEGIN {
@@ -196,7 +267,7 @@ my %userAttrList = (
     'ASC_Shading_Angle_Right'                              => '-',
     'ASC_Shading_StateChange_Sunny'                        => '-',
     'ASC_Shading_StateChange_Cloudy'                       => '-',
-    'ASC_Shading_Min_Elevation'                            => '-',
+    'ASC_Shading_MinMax_Elevation'                         => '-',
     'ASC_Shading_Min_OutsideTemperature'                   => '-',
     'ASC_Shading_WaitingPeriod'                            => '-',
     'ASC_Drive_Offset'                                     => '-',
@@ -257,12 +328,13 @@ sub Define($$) {
       if ( devspec2array('TYPE=AutoShuttersControl') > 1 )
       ; # es wird geprüft ob bereits eine Instanz unseres Modules existiert,wenn ja wird abgebrochen
     return 'too few parameters: define <name> ShuttersControl' if ( @a != 2 );
-    return
-        'Cannot define ShuttersControl device. Perl modul '
-      . ${missingModul}
-      . 'is missing.'
-      if ($missingModul)
-      ; # Abbruch wenn benötigte Hilfsmodule nicht vorhanden sind / vorerst unwichtig
+
+#     return
+#         'Cannot define ShuttersControl device. Perl modul '
+#       . ${missingModul}
+#       . 'is missing.'
+#       if ($missingModul)
+#       ; # Abbruch wenn benötigte Hilfsmodule nicht vorhanden sind / vorerst unwichtig
 
     my $name = $a[0];
 
@@ -844,8 +916,6 @@ sub AddNotifyDev($@) {
     %hash = map { ( $_ => 1 ) }
       split( ',', "$notifyDev,$dev" );
 
-    my $match
-      ; # CK: added local variable to save matched event type (open|opened|close|closed|tilt|tilted)
     $hash->{NOTIFYDEV} = join( ',', sort keys %hash );
 
     my @devs = split( ',', $dev );
@@ -892,7 +962,7 @@ sub EventProcessingWindowRec($@) {
     my ( $hash, $shuttersDev, $events ) = @_;
     my $name = $hash->{NAME};
 
-    if ( $events =~ m#.*state:.*(open(?>ed)?|closed?|tilt(?>ed)?)#
+    if ( $events =~ m#.*state:.*?([Oo]pen(?>ed)?|[Cc]losed?|tilt(?>ed)?)#
         and IsAfterShuttersManualBlocking($shuttersDev) )
     {
         my $match = $1;
@@ -912,9 +982,10 @@ sub EventProcessingWindowRec($@) {
 
         #### Hardware Lock der Rollläden
         $shutters->setHardLockOut('off')
-          if ( $match =~ /close/ and $shutters->getShuttersPlace eq 'terrace' );
+          if (  $match =~ /[Cc]lose/
+            and $shutters->getShuttersPlace eq 'terrace' );
         $shutters->setHardLockOut('on')
-          if (  $match =~ /open/
+          if (  $match =~ /[Oo]pen/
             and $shutters->getShuttersPlace eq 'terrace' );
 
         #         my $queryShuttersPosWinRecTilted = (
@@ -939,7 +1010,7 @@ sub EventProcessingWindowRec($@) {
         );
 
         if (
-                $match =~ /close/
+                $match =~ /[Cc]lose/
             and IsAfterShuttersTimeBlocking($shuttersDev)
             and (  $shutters->getStatus == $shutters->getVentilatePos
                 or $shutters->getStatus == $shutters->getComfortOpenPos
@@ -991,7 +1062,7 @@ sub EventProcessingWindowRec($@) {
         elsif (
             (
                 $match =~ /tilt/
-                or (    $match =~ /open/
+                or (    $match =~ /[Oo]pen/
                     and $shutters->getSubTyp eq 'twostate' )
             )
             and $shutters->getVentilateOpen eq 'on'
@@ -1002,7 +1073,7 @@ sub EventProcessingWindowRec($@) {
             $shutters->setNoOffset(1);
             $shutters->setDriveCmd( $shutters->getVentilatePos );
         }
-        elsif ( $match =~ /open/
+        elsif ( $match =~ /[Oo]pen/
             and $shutters->getSubTyp eq 'threestate' )
         {
             my $posValue;
@@ -1951,6 +2022,7 @@ sub ShadingProcessing($@) {
     if (   $azimuth < $winPosMin
         or $azimuth > $winPosMax
         or $elevation < $shutters->getShadingMinElevation
+        or $elevation > $shutters->getShadingMaxElevation
         or $brightness < $shutters->getShadingStateChangeCloudy
         or $outTemp < $shutters->getShadingMinOutsideTemperature )
     {
@@ -1986,6 +2058,7 @@ sub ShadingProcessing($@) {
     elsif ( $azimuth > $winPosMin
         and $azimuth < $winPosMax
         and $elevation > $shutters->getShadingMinElevation
+        and $elevation < $shutters->getShadingMaxElevation
         and $brightness > $shutters->getShadingStateChangeSunny
         and $outTemp > $shutters->getShadingMinOutsideTemperature )
     {
@@ -2036,14 +2109,14 @@ sub ShadingProcessingDriveCommand($$) {
     if (    $shutters->getShadingStatus eq 'in'
         and $getShadingPos != $getStatus )
     {
-        my $queryShuttersShadingPos = (
-              $shutters->getShuttersPosCmdValueNegate
-            ? $getStatus > $getShadingPos
-            : $getStatus < $getShadingPos
-        );
+        #         my $queryShuttersShadingPos = (
+        #               $shutters->getShuttersPosCmdValueNegate
+        #             ? $getStatus > $getShadingPos
+        #             : $getStatus < $getShadingPos
+        #         );
 
         if (
-            not $queryShuttersShadingPos
+            not $shutters->getQueryShuttersPos( $shutters->getShadingPos )
             and not( CheckIfShuttersWindowRecOpen($shuttersDev) == 2
                 and $shutters->getShuttersPlace eq 'terrace' )
           )
@@ -2233,7 +2306,7 @@ sub ShuttersCommandSet($$$) {
             )
             or (    CheckIfShuttersWindowRecOpen($shuttersDev) == 2
                 and $shutters->getShuttersPlace eq 'terrace'
-                and not $shutters->getQueryShuttersPos($posValue) )
+                and $shutters->getQueryShuttersPos($posValue) )
         )
       )
     {
@@ -2356,11 +2429,9 @@ sub CreateSunRiseSetShuttersTimer($$) {
     }
 
     InternalTimer( $shuttersSunsetUnixtime,
-        'FHEM::AutoShuttersControl::SunSetShuttersAfterTimerFn', \%funcHash )
-      if ( $ascDev->getAutoShuttersControlEvening eq 'on' );
+        'FHEM::AutoShuttersControl::SunSetShuttersAfterTimerFn', \%funcHash );
     InternalTimer( $shuttersSunriseUnixtime,
-        'FHEM::AutoShuttersControl::SunRiseShuttersAfterTimerFn', \%funcHash )
-      if ( $ascDev->getAutoShuttersControlMorning eq 'on' );
+        'FHEM::AutoShuttersControl::SunRiseShuttersAfterTimerFn', \%funcHash );
 
     $ascDev->setStateReading('created new drive timer');
 }
@@ -2394,7 +2465,12 @@ sub RenewSunRiseSetShuttersTimer($) {
 #           ;    # temporär muss später gelöscht werden ab Version 0.4.11beta9
 #         delFromDevAttrList( $_, 'ASC_BrightnessMaxVal' )
 #           ;    # temporär muss später gelöscht werden ab Version 0.4.11beta9
+        $attr{$_}{'ASC_Shading_MinMax_Elevation'} =
+          AttrVal( $_, 'ASC_Shading_Min_Elevation', 'none' )
+          if ( AttrVal( $_, 'ASC_Shading_Min_Elevation', 'none' ) ne 'none' );
 
+        delFromDevAttrList( $_, 'ASC_Shading_Min_Elevation' )
+          ;    # temporär muss später gelöscht werden ab Version 0.6.17
     }
 }
 
@@ -2480,13 +2556,14 @@ sub SunSetShuttersAfterTimerFn($) {
     $homemode = $ascDev->getResidentsStatus if ( $homemode eq 'none' );
 
     if (
-        (
+            $ascDev->getAutoShuttersControlEvening eq 'on'
+        and IsAfterShuttersManualBlocking($shuttersDev)
+        and (
             $shutters->getModeDown eq $homemode
             or (    $shutters->getModeDown eq 'absent'
                 and $homemode eq 'gone' )
             or $shutters->getModeDown eq 'always'
         )
-        and IsAfterShuttersManualBlocking($shuttersDev)
       )
     {
         #         my $queryShuttersPosPrivacyDown = (
@@ -2526,12 +2603,16 @@ sub SunRiseShuttersAfterTimerFn($) {
     $homemode = $ascDev->getResidentsStatus if ( $homemode eq 'none' );
 
     if (
-        $shutters->getModeUp eq $homemode
-        or (    $shutters->getModeUp eq 'absent'
-            and $homemode eq 'gone' )
-        or $shutters->getModeUp eq 'always'
+        $ascDev->getAutoShuttersControlMorning eq 'on'
+        and (
+            $shutters->getModeUp eq $homemode
+            or (    $shutters->getModeUp eq 'absent'
+                and $homemode eq 'gone' )
+            or $shutters->getModeUp eq 'always'
+        )
       )
     {
+
         if (
             (
                    $shutters->getRoommatesStatus eq 'home'
@@ -2552,6 +2633,7 @@ sub SunRiseShuttersAfterTimerFn($) {
             ShuttersCommandSet( $hash, $shuttersDev, $shutters->getOpenPos );
         }
     }
+
     CreateSunRiseSetShuttersTimer( $hash, $shuttersDev );
 }
 
@@ -3365,7 +3447,7 @@ sub CheckIfShuttersWindowRecOpen($) {
     my $shuttersDev = shift;
     $shutters->setShuttersDev($shuttersDev);
 
-    if ( $shutters->getWinStatus =~ /open/ )    # CK: covers: open|opened
+    if ( $shutters->getWinStatus =~ /[Oo]pen/ )    # CK: covers: open|opened
     {
         return 2;
     }
@@ -3374,7 +3456,7 @@ sub CheckIfShuttersWindowRecOpen($) {
     {
         return 1;
     }
-    elsif ( $shutters->getWinStatus =~ /close/ ) {
+    elsif ( $shutters->getWinStatus =~ /[Cc]lose/ ) {
         return 0;
     }                                                 # CK: covers: close|closed
 }
@@ -4089,15 +4171,13 @@ sub _getBrightnessSensor {
 
     ### erwartetes Ergebnis
     # DEVICE:READING MAX:MIN
-
-    return $device if ( $device eq 'none' );
     $self->{ $self->{shuttersDev} }->{ASC_BrightnessSensor}->{device} = $device;
     $self->{ $self->{shuttersDev} }->{ASC_BrightnessSensor}->{reading} =
       ( $reading ne 'none' ? $reading : 'brightness' );
     $self->{ $self->{shuttersDev} }->{ASC_BrightnessSensor}->{triggermin} =
-      ( $min ne 'none' ? $min : '-1' );
+      ( $min ne 'none' ? $min : -1 );
     $self->{ $self->{shuttersDev} }->{ASC_BrightnessSensor}->{triggermax} =
-      ( $max ne 'none' ? $max : '-1' );
+      ( $max ne 'none' ? $max : -1 );
 
     return $self->{ $self->{shuttersDev} }->{ASC_BrightnessSensor}->{device};
 }
@@ -4154,7 +4234,53 @@ sub getShadingMinOutsideTemperature {
 sub getShadingMinElevation {
     my $self = shift;
 
-    return AttrVal( $self->{shuttersDev}, 'ASC_Shading_Min_Elevation', 25.0 );
+    return $self->{ $self->{shuttersDev} }->{ASC_Shading_MinMax_Elevation}
+      ->{minVal}
+      if (
+        exists(
+            $self->{ $self->{shuttersDev} }->{ASC_Shading_MinMax_Elevation}
+              ->{LASTGETTIME}
+        )
+        and ( gettimeofday() -
+            $self->{ $self->{shuttersDev} }->{ASC_Shading_MinMax_Elevation}
+            ->{LASTGETTIME} ) < 2
+      );
+    $self->{ $self->{shuttersDev} }->{ASC_Shading_MinMax_Elevation}
+      ->{LASTGETTIME} = int( gettimeofday() );
+    my ( $min, $max ) =
+      FHEM::AutoShuttersControl::GetAttrValues( $self->{shuttersDev},
+        'ASC_Shading_MinMax_Elevation', '25.0:100.0' );
+
+    ### erwartetes Ergebnis
+    # MIN:MAX
+
+    $self->{ $self->{shuttersDev} }->{ASC_Shading_MinMax_Elevation}->{minVal} =
+      $min;
+    $self->{ $self->{shuttersDev} }->{ASC_Shading_MinMax_Elevation}->{maxVal} =
+      ( $max ne 'none' ? $max : 100 );
+
+    return $self->{ $self->{shuttersDev} }->{ASC_Shading_MinMax_Elevation}
+      ->{minVal};
+}
+
+sub getShadingMaxElevation {
+    my $self = shift;
+
+    return $self->{ $self->{shuttersDev} }->{ASC_Shading_MinMax_Elevation}
+      ->{maxVal}
+      if (
+        exists(
+            $self->{ $self->{shuttersDev} }->{ASC_Shading_MinMax_Elevation}
+              ->{LASTGETTIME}
+        )
+        and ( gettimeofday() -
+            $self->{ $self->{shuttersDev} }->{ASC_Shading_MinMax_Elevation}
+            ->{LASTGETTIME} ) < 2
+      );
+    $shutters->getShadingMinElevation;
+
+    return $self->{ $self->{shuttersDev} }->{ASC_Shading_MinMax_Elevation}
+      ->{maxVal};
 }
 
 sub getShadingStateChangeSunny {
@@ -5157,7 +5283,8 @@ sub getblockAscDrivesAfterManual {
 =pod
 =item device
 =item summary       Module for controlling shutters depending on various conditions
-=item summary_DE    Modul zur Automatischen Rolladensteuerung auf Basis bestimmter Ereignisse
+=item summary_DE    Modul zur automatischen Rolladensteuerung auf Basis bestimmter Ereignisse
+
 
 =begin html
 
@@ -5315,21 +5442,21 @@ sub getblockAscDrivesAfterManual {
                 if the <em>ASC_autoAstroModeMorning</em> attribute is set to <em>HORIZON</em>. Defaults to <em>0</em>.
             </li>
             <a name="ASC_autoShuttersControlComfort"></a>
-            <li><strong>ASC_autoShuttersControlComfort - on/off</strong> -
+            <li><strong>ASC_autoShuttersControlComfort - on|off</strong> -
                 Controls the comfort functions: If a three state sensor, like the <abbr>HmIP-SRH</abbr> window handle
                 sensor, is installed, <abbr>ASC</abbr> will open the window if the sensor signals open position. The
                 <em>ASC_ComfortOpen_Pos</em> attribute has to be set for the shutter to <em>on</em>, defaults to <em>off</em>.
             </li>
             <a name="ASC_autoShuttersControlEvening"></a>
-            <li><strong>ASC_autoShuttersControlEvening - on/off</strong> - Enables the automatic control by <abbr>ASC</abbr>
+            <li><strong>ASC_autoShuttersControlEvening - on|off</strong> - Enables the automatic control by <abbr>ASC</abbr>
                 at the evenings.
             </li>
             <a name="ASC_autoShuttersControlMorning"></a>
-            <li><strong>ASC_autoShuttersControlMorning - on/off</strong> - Enables the automatic control by <abbr>ASC</abbr>
+            <li><strong>ASC_autoShuttersControlMorning - on|off</strong> - Enables the automatic control by <abbr>ASC</abbr>
                 at the mornings.
             </li>
             <a name="ASC_blockAscDrivesAfterManual"></a>
-            <li><strong>ASC_blockAscDrivesAfterManual - 0,1</strong> - If set to <em>1</em>, <abbr>ASC</abbr> will not
+            <li><strong>ASC_blockAscDrivesAfterManual 0|1</strong> - If set to <em>1</em>, <abbr>ASC</abbr> will not
                 automatically control a shutter if there was an manual control to the shutter. To be considered, the
                 <em>ASC_ShuttersLastDrive</em> reading has to contain the value <em>manual</em> and the shutter is in
                 an unknown (i.e. not otherwise configured in <abbr>ASC</abbr>) position.
@@ -5411,7 +5538,7 @@ sub getblockAscDrivesAfterManual {
 
         <p>At shutter devices, controlled by <abbr>ASC</abbr>:</p>
         <ul>
-            <li><strong>ASC - 0/1/2</strong>
+            <li><strong>ASC - 0|1|2</strong>
                 <ul>
                     <li>0 - don't create attributes for <abbr>ASC</abbr> at the first scan and don't be controlled
                     by <abbr>ASC</abbr></li>
@@ -5421,7 +5548,7 @@ sub getblockAscDrivesAfterManual {
                     controlled by <em><abbr>pct</abbr></em> values.</li>
                 </ul>
             </li>
-            <li><strong>ASC_Antifreeze - soft/am/pm/hard/off</strong> - Freeze protection.
+            <li><strong>ASC_Antifreeze - soft|am|pm|hard|off</strong> - Freeze protection.
                 <ul>
                     <li>soft - see <em>ASC_Antifreeze_Pos</em>.</li>
                     <li>hard / <abbr>am</abbr> / <abbr>pm</abbr> - freeze protection will be active (everytime,
@@ -5643,8 +5770,8 @@ sub getblockAscDrivesAfterManual {
                         points. East is 90 &deg;, South 180 &deg;, West is 270 &deg; and North is 0 &deg;.
                         Defaults to South (180).
                     </li>
-                    <li><strong>ASC_Shading_Min_Elevation</strong> - Shading starts as this point of sun elevation is
-                        reached, depending also on other sensor values. Defaults to 25.0.
+                    <li><strong>ASC_Shading_MinMax_Elevation</strong> - Shading starts as min point of sun elevation is
+                        reached and end as max point of sun elevation is reached, depending also on other sensor values. Defaults to 25.0:100.0.
                     </li>
                     <li><strong>ASC_Shading_Min_OutsideTemperature</strong> - Shading starts at this outdoor temperature,
                         depending also on other sensor values. Defaults to 18.0.
@@ -5978,10 +6105,10 @@ sub getblockAscDrivesAfterManual {
             <li><strong>ASC_Pos_Reading</strong> - Name des Readings, welches die Position des Rollladen in Prozent an gibt; wird bei unbekannten Device Typen auch als set Befehl zum fahren verwendet</li>
             <li><strong>ASC_PrivacyDownTime_beforNightClose</strong> - wie viele Sekunden vor dem abendlichen schlie&szlig;en soll der Rollladen in die Sichtschutzposition fahren, -1 bedeutet das diese Funktion unbeachtet bleiben soll (default: -1)</li>
             <li><strong>ASC_PrivacyDown_Pos</strong> - Position den Rollladens f&uuml;r den Sichtschutz (default: 50)</li>
-            <li><strong>ASC_WindProtection - on/off</strong> - soll der Rollladen beim Regenschutz beachtet werden. On=JA, off=NEIN.</li>
+            <li><strong>ASC_WindProtection - on/off</strong> - soll der Rollladen beim Regenschutz beachtet werden. on=JA, off=NEIN.</li>
             <li><strong>ASC_Roommate_Device</strong> - mit Komma getrennte Namen des/der Roommate Device/s, welche den/die Bewohner des Raumes vom Rollladen wiedergibt. Es macht nur Sinn in Schlaf- oder Kinderzimmern (default: none)</li>
             <li><strong>ASC_Roommate_Reading</strong> - das Reading zum Roommate Device, welches den Status wieder gibt (default: state)</li>
-            <li><strong>SC_Self_Defense_Exclude - on/off</strong> - bei on Wert wird dieser Rollladen bei aktiven Self Defense und offenen Fenster nicht runter gefahren, wenn Residents absent ist. (default: off)</li></p>
+            <li><strong>ASC_Self_Defense_Exclude - on/off</strong> - bei on Wert wird dieser Rollladen bei aktiven Self Defense und offenen Fenster nicht runter gefahren, wenn Residents absent ist. (default: off)</li></p>
             <ul>
                 <strong><u>Beschreibung der Beschattungsfunktion</u></strong>
                 </br>Damit die Beschattung Funktion hat, m&uuml;ssen folgende Anforderungen erf&uuml;llt sein.
@@ -5991,7 +6118,7 @@ sub getblockAscDrivesAfterManual {
                 <li><strong>ASC_Shading_Angle_Left</strong> - Vorlaufwinkel im Bezug zum Fenster, ab wann abgeschattet wird. Beispiel: Fenster 180° - 85° ==> ab Sonnenpos. 95° wird abgeschattet (default: 75)</li>
                 <li><strong>ASC_Shading_Angle_Right</strong> - Nachlaufwinkel im Bezug zum Fenster, bis wann abgeschattet wird. Beispiel: Fenster 180° + 85° ==> bis Sonnenpos. 265° wird abgeschattet (default: 75)</li>
                 <li><strong>ASC_Shading_Direction</strong> -  Position in Grad, auf der das Fenster liegt - genau Osten w&auml;re 90, S&uuml;den 180 und Westen 270 (default: 180)</li>
-                <li><strong>ASC_Shading_Min_Elevation</strong> - ab welcher H&ouml;he des Sonnenstandes soll beschattet werden, immer in Abh&auml;ngigkeit der anderen einbezogenen Sensorwerte (default: 25.0)</li>
+                <li><strong>ASC_Shading_MinMax_Elevation</strong> - ab welcher min H&ouml;he des Sonnenstandes soll beschattet und ab welcher max H&ouml;he wieder beendet werden, immer in Abh&auml;ngigkeit der anderen einbezogenen Sensorwerte (default: 25.0:100.0)</li>
                 <li><strong>ASC_Shading_Min_OutsideTemperature</strong> - ab welcher Temperatur soll Beschattet werden, immer in Abh&auml;ngigkeit der anderen einbezogenen Sensorwerte (default: 18)</li>
                 <li><strong>ASC_Shading_Mode - absent,always,off,home</strong> / wann soll die Beschattung nur stattfinden. (default: off)</li>
                 <li><strong>ASC_Shading_Pos</strong> - Position des Rollladens f&uuml;r die Beschattung</li>
@@ -6099,7 +6226,8 @@ sub getblockAscDrivesAfterManual {
         "FHEM": 5.00918799,
         "perl": 5.016, 
         "Meta": 0,
-        "JSON": 0
+        "JSON": 0,
+        "Date::Parse": 0
       },
       "recommends": {
       },
