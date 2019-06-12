@@ -341,7 +341,11 @@ sub Set($@) {
 
       # eine mögliche Startfarbe steht beim installiertem f18 Style direkt zur Verfügung
       # ohne vorhanden f18 Style bestimmt später tr.odd aus der Style css die Anfangsfarbe
-      my $color = %{json2nameValue(AttrVal('WEB','styleData',undef))}{'f18_cols.header'};
+      my $color;
+      my $jh = json2nameValue(AttrVal('WEB','styleData',''));
+      if($jh && ref $jh eq "HASH") {
+          $color = $jh->{'f18_cols.header'};
+      }
       if (defined($color)) {
           CommandAttr($hash->{CL},"$htmldev beamColor $color");
       }
