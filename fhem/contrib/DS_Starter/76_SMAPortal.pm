@@ -1848,11 +1848,11 @@ sub PortalAsHtml ($$) {
           my $swstate  = ReadingsVal($name,"L3_".$txt."_Switch", "undef");
 		  my $swicon   = "<img src=\"$FW_ME/www/images/default/1px-spacer.png\">";
 		  if($swstate eq "off") {
-		      $swicon = "<a onClick=$cmdon><img src=\"$FW_ME/www/images/default/10px-kreis-rot.png\">";
+		      $swicon = "<a onClick=$cmdon><img src=\"$FW_ME/www/images/default/10px-kreis-rot.png\"></a>";
 		  } elsif ($swstate eq "on") {
-		      $swicon = "<a onClick=$cmdauto><img src=\"$FW_ME/www/images/default/10px-kreis-gruen.png\">";
+		      $swicon = "<a onClick=$cmdauto><img src=\"$FW_ME/www/images/default/10px-kreis-gruen.png\"></a>";
 		  } elsif ($swstate =~ /off.*automatic.*/i) {
-		      $swicon = "<a onClick=$cmdoff><img src=\"$FW_ME/www/images/default/10px-kreis-gelb.png\">";
+		      $swicon = "<a onClick=$cmdoff><img src=\"$FW_ME/www/images/default/10px-kreis-gelb.png\"></a>";
 		  }
 		  
           if ($legend_style eq 'icon') {                                                           # mögliche Umbruchstellen mit normalen Blanks vorsehen !
