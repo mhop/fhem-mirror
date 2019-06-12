@@ -105,6 +105,7 @@ BEGIN {
           addToAttrList
           BlockingCall
           BlockingKill
+          BlockingInformParent
           CommandAttr
           CommandDefine
           CommandDeleteAttr
@@ -144,12 +145,13 @@ BEGIN {
           TimeNow
           Value
           json2nameValue
+          FW_cmd
           FW_directNotify
           FW_ME                                     
           FW_subdir                                 
           FW_room                                  
           FW_detail                                 
-          FW_wname                                  
+          FW_wname           
         )
   );
 }
@@ -159,6 +161,7 @@ use vars qw($FW_ME);                                    # webname (default is fh
 
 # Versions History intern
 our %vNotesIntern = (
+  "2.3.0"  => "12.06.2019  add set on,off,automatic cmd for controlled devices ",
   "2.2.0"  => "10.06.2019  relocate RestOfDay and Tomorrow data from level 3 to level 2, change readings to start all with uppercase, ".
                            "add consumer energy data of current day/month/year, new attribute \"verbose5Data\" ",
   "2.1.2"  => "08.06.2019  correct planned time of consumer in PortalAsHtml if planned time is at next day ",
@@ -196,6 +199,9 @@ sub Define($$) {
   return "Wrong syntax: use \"define <name> SMAPortal\" " if(int(@a) < 1);
 
   $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);   # Modul Meta.pm nicht vorhanden
+  
+  $hash->{HELPER}{GETTER} = "all";
+  $hash->{HELPER}{SETTER} = "none";
   
   setVersionInfo($hash);                                   # Versionsinformationen setzen
   getcredentials($hash,1);                                 # Credentials lesen und in RAM laden ($boot=1)
@@ -242,7 +248,8 @@ sub Set($@) {
   my $prop    = $a[2];
   my $prop1   = $a[3];
   my ($setlist,$success);
-        
+  my $ad      = "";
+    
   return if(IsDisabled($name));
  
   if(!$hash->{CREDENTIALS}) {
@@ -256,6 +263,20 @@ sub Set($@) {
 	             "credentials ".
                  "createPortalGraphic:Generation,Consumption,Generation_Consumption,Differential "
                  ;   
+      if($hash->{HELPER}{PLANTOID} && $hash->{HELPER}{CONSUMER}) {
+          my $lfd = 0;
+          foreach my $key (keys %{$hash->{HELPER}{CONSUMER}{$lfd}}) {
+              my $dev = $hash->{HELPER}{CONSUMER}{$lfd}{DeviceName};
+              if($dev) {
+                  $ad .= "|" if($lfd != 0);
+                  $ad .= $dev;
+              }
+              if ($dev && $setlist !~ /$dev/) {
+                  $setlist .= "$dev:on,off,auto ";
+              }
+              $lfd++;
+          }
+      } 
   }  
 
   if ($opt eq "credentials") {
@@ -334,11 +355,55 @@ sub Set($@) {
       
 	  return "SMA Portal Graphics device \"$htmldev\" created and assigned to room \"$room\".";
   
+  } elsif ($opt && $ad && $opt =~ /$ad/) {
+      # Verbraucher schalten
+      $hash->{HELPER}{GETTER} = "none";
+      $hash->{HELPER}{SETTER} = "$opt:$prop";
+      CallInfo($hash);
+      
   } else {
       return "$setlist";
-  }  
+  } 
   
 return;
+}
+
+###############################################################
+#                          SMAPortal Get
+###############################################################
+sub Get($$) {
+ my ($hash, @a) = @_;
+ return "\"get X\" needs at least an argument" if ( @a < 2 );
+ my $name = shift @a;
+ my $opt  = shift @a;
+   
+ my  $getlist = "Unknown argument $opt, choose one of ".
+                "storedCredentials:noArg ".
+                "data:noArg ";
+                   
+ return "module is disabled" if(IsDisabled($name));
+  
+ if ($opt eq "data") {
+     $hash->{HELPER}{GETTER} = "all";
+     $hash->{HELPER}{SETTER} = "none";
+     CallInfo($hash);
+ 
+ } elsif ($opt eq "storedCredentials") {
+	    if(!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials &lt;username&gt; &lt;password&gt;\"";}
+        # Credentials abrufen
+        my ($success, $username, $password) = getcredentials($hash,0);
+        unless ($success) {return "Credentials couldn't be retrieved successfully - see logfile"};
+        
+        return "Stored Credentials to access SMA Portal:\n".
+               "========================================\n".
+               "Username: $username, Password: $password\n".
+               "\n";
+                
+ } else {
+     return "$getlist";
+ } 
+ 
+return undef;
 }
 
 ###############################################################
@@ -470,42 +535,6 @@ return ($success, $username, $passwd);
 }
 
 ###############################################################
-#                          SMAPortal Get
-###############################################################
-sub Get($$) {
- my ($hash, @a) = @_;
- return "\"get X\" needs at least an argument" if ( @a < 2 );
- my $name = shift @a;
- my $opt  = shift @a;
-   
- my  $getlist = "Unknown argument $opt, choose one of ".
-                "storedCredentials:noArg ".
-                "data:noArg ";
-                   
- return "module is disabled" if(IsDisabled($name));
-  
- if ($opt eq "data") {
-     CallInfo($hash);
- 
- } elsif ($opt eq "storedCredentials") {
-	    if(!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials &lt;username&gt; &lt;password&gt;\"";}
-        # Credentials abrufen
-        my ($success, $username, $password) = getcredentials($hash,0);
-        unless ($success) {return "Credentials couldn't be retrieved successfully - see logfile"};
-        
-        return "Stored Credentials to access SMA Portal:\n".
-               "========================================\n".
-               "Username: $username, Password: $password\n".
-               "\n";
-                
- } else {
-     return "$getlist";
- } 
- 
-return undef;
-}
-
-###############################################################
 #                          SMAPortal Attr
 ###############################################################
 sub Attr($$$$) {
@@ -556,6 +585,8 @@ return undef;
 
 ################################################################
 ##               Hauptschleife BlockingCall
+##   $hash->{HELPER}{GETTER} -> Flag für get Informationen
+##   $hash->{HELPER}{SETTER} -> Parameter für set-Befehl
 ################################################################
 sub CallInfo($) {
   my ($hash)   = @_;
@@ -588,8 +619,15 @@ sub CallInfo($) {
           delete($hash->{HELPER}{RUNNING_PID});
       } 
       
+      my $get = $hash->{HELPER}{GETTER};
+      my $set = $hash->{HELPER}{SETTER};
+      
+      Log3 ($name, 4, "$name -> ################################################################");
+      Log3 ($name, 4, "$name -> ###      start of set/get data from SMA Sunny Portal         ###");
+      Log3 ($name, 4, "$name -> ################################################################"); 
+  
 	  $hash->{HELPER}{RETRIES} = AttrVal($name, "getDataRetries", 3);
-      $hash->{HELPER}{RUNNING_PID} = BlockingCall("FHEM::SMAPortal::GetData", $name, "FHEM::SMAPortal::ParseData", $timeout, "FHEM::SMAPortal::ParseAborted", $hash);
+      $hash->{HELPER}{RUNNING_PID} = BlockingCall("FHEM::SMAPortal::GetSetData", "$name|$get|$set", "FHEM::SMAPortal::ParseData", $timeout, "FHEM::SMAPortal::ParseAborted", $hash);
       $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057
   
   } else {
@@ -601,23 +639,28 @@ return;
 
 ################################################################
 ##                  Datenabruf SMA-Portal
+##      schaltet auch Verbraucher des Sunny Home Managers
 ################################################################
-sub GetData($) {
-  my ($name) = @_;
-  my $hash   = $defs{$name};
-  my ($livedata_content);
-  my $login_state    = 0;
-  my $useragent      = AttrVal($name, "userAgent", "Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.2; Trident/6.0)");
-  my $cookieLocation = AttrVal($name, "cookieLocation", "./log/mycookies.txt");
-  my $v5d            = AttrVal($name, "verbose5Data", "none");   
+sub GetSetData($) {
+  my ($string) = @_;
+  my ($name,$get,$set) = split("\\|",$string);
+  my $hash             = $defs{$name}; 
+  my $login_state      = 0;
+  my $useragent        = AttrVal($name, "userAgent", "Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.2; Trident/6.0)");
+  my $cookieLocation   = AttrVal($name, "cookieLocation", "./log/mycookies.txt");
+  my $v5d              = AttrVal($name, "verbose5Data", "none");   
   my ($forecast_content,$weatherdata_content,$consumerlivedata_content,$ccdaydata_content,$ccmonthdata_content) = ("","","","","");
   my ($ccyeardata_content) = ("");
+  my $state                = "ok";
+  my ($livedata_content,$d,$op); 
   
-  Log3 ($name, 5, "$name -> ################################################################");
-  Log3 ($name, 5, "$name -> ###      start of set/get data from SMA Sunny Portal         ###");
-  Log3 ($name, 5, "$name -> ################################################################"); 
-  Log3 ($name, 5, "$name - verbose 5 data are specified by attribute \"verbose5Data\": $v5d");     
-  Log3 ($name, 5, "$name - Start getting data with CookieLocation: $cookieLocation and UserAgent: $useragent");
+  if($set ne "none") {
+      # Verbraucher soll in den Status $op geschaltet werden
+      ($d,$op) = split(":",$set);
+  }
+  
+  Log3 ($name, 5, "$name - Start operation with CookieLocation: $cookieLocation and UserAgent: $useragent");
+  Log3 ($name, 5, "$name - data get: $get, data set: ".(($d && $op)?($d." ".$op):$set));
   
   my $ua = LWP::UserAgent->new;
 
@@ -636,94 +679,119 @@ sub GetData($) {
 
   if(($livedata->content =~ m/FeedIn/i) && ($livedata->content !~ m/expired/i)) {
       Log3 $name, 4, "$name - Login to SMA-Portal succesful";
+          # JSON Live Daten
+          $livedata_content = $livedata->content;
+          $login_state      = 1;
+          Log3 ($name, 4, "$name - Getting live data");
+          Log3 ($name, 5, "$name - Data received:\n".Dumper decode_json($livedata_content)) if($v5d eq "liveData");
       
-      # JSON Live Daten
-      $livedata_content = $livedata->content;
-      $login_state = 1;
-      Log3 ($name, 4, "$name - Getting live data");
-      Log3 ($name, 5, "$name - Data received:\n".Dumper decode_json($livedata_content)) if($v5d eq "liveData");
-      
-      # JSON Wetterdaten
-      Log3 ($name, 4, "$name - Getting weather data");
-      my $weatherdata = $ua->get('https://www.sunnyportal.com/Dashboard/Weather');
-      $weatherdata_content = $weatherdata->content;
-      Log3 ($name, 5, "$name - Data received:\n".Dumper decode_json($weatherdata_content)) if($v5d eq "weatherData");
-      
-      # JSON Forecast Daten
-      my $dl = AttrVal($name, "detailLevel", 1);
-      if($dl > 1) {
-          Log3 ($name, 4, "$name - Getting forecast data");
-
-          my $forecast_page = $ua->get('https://www.sunnyportal.com/HoMan/Forecast/LoadRecommendationData');
-          Log3 ($name, 5, "$name - Return Code: ".$forecast_page->code) if($v5d eq "forecastData"); 
-
-          if ($forecast_page->content =~ m/ForecastChartDataPoint/i) {
-              $forecast_content = $forecast_page->content;
-              Log3 ($name, 5, "$name - Forecast data received:\n".Dumper decode_json($forecast_content)) if($v5d eq "forecastData"); 
+      ### einen Verbraucher schalten mit POST 
+      if($set ne "none") {                                      
+          my ($serial,$id);
+          foreach my $key (keys %{$hash->{HELPER}{CONSUMER}}) {
+              my $h = $hash->{HELPER}{CONSUMER}{$key}{DeviceName};
+              if($h && $h eq $d) {
+                  $serial = $hash->{HELPER}{CONSUMER}{$key}{SerialNumber};
+                  $id     = $hash->{HELPER}{CONSUMER}{$key}{SUSyID};
+              }
+          }
+          my $plantOid = $hash->{HELPER}{PLANTOID};
+          my $res      = $ua->post('https://www.sunnyportal.com/Homan/ConsumerBalance/SetOperatingMode', {'mode' => $op, 'serialNumber' => $serial, 'SUSyID' => $id, 'plantOid' => $plantOid} );
+          $res = $res->decoded_content();
+          Log3 ($name, 3, "$name - Set \"$d $op\" result: ".$res);
+          if($res eq "true") {
+              $state = "ok - switched consumer $d to $op";
+              BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "all", "none"], 0);
+          } else {
+              $state = "Error - couldn't switched consumer $d to $op";
           }
       }
       
-      # JSON Consumer Livedaten und historische Energiedaten
-      if($dl > 2) {
-          Log3 ($name, 4, "$name - Getting consumer live data");
-
-          my $consumerlivedata = $ua->get('https://www.sunnyportal.com/Homan/ConsumerBalance/GetLiveProxyValues');
+      ### Daten abrufen mit GET
+      if($get ne "none") {                                   
           
-          Log3 ($name, 5, "$name - Return Code: ".$consumerlivedata->code) if($v5d eq "consumerLiveData"); 
+          # JSON Wetterdaten
+          Log3 ($name, 4, "$name - Getting weather data");
+          my $weatherdata = $ua->get('https://www.sunnyportal.com/Dashboard/Weather');
+          $weatherdata_content = $weatherdata->content;
+          Log3 ($name, 5, "$name - Data received:\n".Dumper decode_json($weatherdata_content)) if($v5d eq "weatherData");
+          
+          # JSON Forecast Daten
+          my $dl = AttrVal($name, "detailLevel", 1);
+          if($dl > 1) {
+              Log3 ($name, 4, "$name - Getting forecast data");
 
-          if ($consumerlivedata->content =~ m/HoManConsumerLiveData/i) {
-              $consumerlivedata_content = $consumerlivedata->content;
-              Log3 ($name, 5, "$name - Consumer live data received:\n".Dumper decode_json($consumerlivedata_content)) if($v5d eq "consumerLiveData"); 
+              my $forecast_page = $ua->get('https://www.sunnyportal.com/HoMan/Forecast/LoadRecommendationData');
+              Log3 ($name, 5, "$name - Return Code: ".$forecast_page->code) if($v5d eq "forecastData"); 
+
+              if ($forecast_page->content =~ m/ForecastChartDataPoint/i) {
+                  $forecast_content = $forecast_page->content;
+                  Log3 ($name, 5, "$name - Forecast data received:\n".Dumper decode_json($forecast_content)) if($v5d eq "forecastData"); 
+              }
           }
           
-          if($hash->{HELPER}{PLANTOID}) {              
-              my $PlantOid = $hash->{HELPER}{PLANTOID};
-              my $dds      = (split(/\s+/,TimeNow()))[0];
-              my $dde      = (split(/\s+/,FmtDateTime(time()+86400)))[0];
-              $dds         =~ /(.*)-(.*)-(.*)/;
-              my $mds      = "$1-$2-01";
-              my $me       = (($2+1)<=12)?$2+1:1;
-              $me          = sprintf("%02d", $me);
-              my $ye       = ($2>$me)?$1+1:$1;
-              my $mde      = "$ye-$me-01";
-              my $yds      = "$1-01-01";
-              my $yde      = ($1+1)."-01-01";
-              
-              # Energiedaten aktueller Tag
-              Log3 ($name, 4, "$name - Getting consumer energy data of current day");
-              Log3 ($name, 4, "$name - Request date -> start: $dds, end: $dde");  
-              my $ccdaydata = $ua->get('https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=2&'.$PlantOid.'&StartTime='.$dds.'&EndTime='.$dde.'');
-              
-              Log3 ($name, 5, "$name - Return Code: ".$ccdaydata->code) if($v5d eq "consumerDayData"); 
+          # JSON Consumer Livedaten und historische Energiedaten
+          if($dl > 2) {
+              Log3 ($name, 4, "$name - Getting consumer live data");
 
-              if ($ccdaydata->content =~ m/ConsumerBalanceDeviceInfo/i) {
-                  $ccdaydata_content = $ccdaydata->content;
-                  Log3 ($name, 5, "$name - Consumer energy data of current day received:\n".Dumper decode_json($ccdaydata_content)) if($v5d eq "consumerDayData"); 
+              my $consumerlivedata = $ua->get('https://www.sunnyportal.com/Homan/ConsumerBalance/GetLiveProxyValues');
+              
+              Log3 ($name, 5, "$name - Return Code: ".$consumerlivedata->code) if($v5d eq "consumerLiveData"); 
+
+              if ($consumerlivedata->content =~ m/HoManConsumerLiveData/i) {
+                  $consumerlivedata_content = $consumerlivedata->content;
+                  Log3 ($name, 5, "$name - Consumer live data received:\n".Dumper decode_json($consumerlivedata_content)) if($v5d eq "consumerLiveData"); 
               }
-
-              # Energiedaten aktueller Monat
-              Log3 ($name, 4, "$name - Getting consumer energy data of current month");
-              Log3 ($name, 4, "$name - Request date -> start: $mds, end: $mde"); 
-              my $ccmonthdata = $ua->get('https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=4&'.$PlantOid.'&StartTime='.$mds.'&EndTime='.$mde.'');
               
-              Log3 ($name, 5, "$name - Return Code: ".$ccmonthdata->code) if($v5d eq "consumerMonthData"); 
+              if($hash->{HELPER}{PLANTOID}) {              
+                  my $PlantOid = $hash->{HELPER}{PLANTOID};
+                  my $dds      = (split(/\s+/,TimeNow()))[0];
+                  my $dde      = (split(/\s+/,FmtDateTime(time()+86400)))[0];
+                  $dds         =~ /(.*)-(.*)-(.*)/;
+                  my $mds      = "$1-$2-01";
+                  my $me       = (($2+1)<=12)?$2+1:1;
+                  $me          = sprintf("%02d", $me);
+                  my $ye       = ($2>$me)?$1+1:$1;
+                  my $mde      = "$ye-$me-01";
+                  my $yds      = "$1-01-01";
+                  my $yde      = ($1+1)."-01-01";
+                  
+                  # Energiedaten aktueller Tag
+                  Log3 ($name, 4, "$name - Getting consumer energy data of current day");
+                  Log3 ($name, 4, "$name - Request date -> start: $dds, end: $dde");  
+                  my $ccdaydata = $ua->get('https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=2&'.$PlantOid.'&StartTime='.$dds.'&EndTime='.$dde.'');
+                  
+                  Log3 ($name, 5, "$name - Return Code: ".$ccdaydata->code) if($v5d eq "consumerDayData"); 
 
-              if ($ccmonthdata->content =~ m/ConsumerBalanceDeviceInfo/i) {
-                  $ccmonthdata_content = $ccmonthdata->content;
-                  Log3 ($name, 5, "$name - Consumer energy data of current month received:\n".Dumper decode_json($ccmonthdata_content)) if($v5d eq "consumerMonthData"); 
-              }       
+                  if ($ccdaydata->content =~ m/ConsumerBalanceDeviceInfo/i) {
+                      $ccdaydata_content = $ccdaydata->content;
+                      Log3 ($name, 5, "$name - Consumer energy data of current day received:\n".Dumper decode_json($ccdaydata_content)) if($v5d eq "consumerDayData"); 
+                  }
 
-              # Energiedaten aktuelles Jahr
-              Log3 ($name, 4, "$name - Getting consumer energy data of current year");
-              Log3 ($name, 4, "$name - Request date -> start: $yds, end: $yde"); 
-              my $ccyeardata = $ua->get('https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=5&'.$PlantOid.'&StartTime='.$yds.'&EndTime='.$yde.'');
-              
-              Log3 ($name, 5, "$name - Return Code: ".$ccyeardata->code) if($v5d eq "consumerMonthData"); 
+                  # Energiedaten aktueller Monat
+                  Log3 ($name, 4, "$name - Getting consumer energy data of current month");
+                  Log3 ($name, 4, "$name - Request date -> start: $mds, end: $mde"); 
+                  my $ccmonthdata = $ua->get('https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=4&'.$PlantOid.'&StartTime='.$mds.'&EndTime='.$mde.'');
+                  
+                  Log3 ($name, 5, "$name - Return Code: ".$ccmonthdata->code) if($v5d eq "consumerMonthData"); 
 
-              if ($ccyeardata->content =~ m/ConsumerBalanceDeviceInfo/i) {
-                  $ccyeardata_content = $ccyeardata->content;
-                  Log3 ($name, 5, "$name - Consumer energy data of current year received:\n".Dumper decode_json($ccyeardata_content)) if($v5d eq "consumerYearData"); 
-              }               
+                  if ($ccmonthdata->content =~ m/ConsumerBalanceDeviceInfo/i) {
+                      $ccmonthdata_content = $ccmonthdata->content;
+                      Log3 ($name, 5, "$name - Consumer energy data of current month received:\n".Dumper decode_json($ccmonthdata_content)) if($v5d eq "consumerMonthData"); 
+                  }       
+
+                  # Energiedaten aktuelles Jahr
+                  Log3 ($name, 4, "$name - Getting consumer energy data of current year");
+                  Log3 ($name, 4, "$name - Request date -> start: $yds, end: $yde"); 
+                  my $ccyeardata = $ua->get('https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=5&'.$PlantOid.'&StartTime='.$yds.'&EndTime='.$yde.'');
+                  
+                  Log3 ($name, 5, "$name - Return Code: ".$ccyeardata->code) if($v5d eq "consumerMonthData"); 
+
+                  if ($ccyeardata->content =~ m/ConsumerBalanceDeviceInfo/i) {
+                      $ccyeardata_content = $ccyeardata->content;
+                      Log3 ($name, 5, "$name - Consumer energy data of current year received:\n".Dumper decode_json($ccyeardata_content)) if($v5d eq "consumerYearData"); 
+                  }               
+              }
           }
       }
   
@@ -763,18 +831,19 @@ sub GetData($) {
   }
   
   my ($reread,$retry) = analivedat($hash,$livedata_content);
-  
-  # Daten müssen als Einzeiler zurückgegeben werden
-  my ($lc,$fc,$wc,$cl,$cd,$cm,$cy) = ("","","","","","","");
-  $lc = encode_base64($livedata_content,"");
-  $fc = encode_base64($forecast_content,"") if($forecast_content);
-  $wc = encode_base64($weatherdata_content,"") if($weatherdata_content);
-  $cl = encode_base64($consumerlivedata_content,"") if($consumerlivedata_content);
-  $cd = encode_base64($ccdaydata_content,"") if($ccdaydata_content);
-  $cm = encode_base64($ccmonthdata_content,"") if($ccmonthdata_content);
-  $cy = encode_base64($ccyeardata_content,"") if($ccyeardata_content);
 
-return "$name|$login_state|$reread|$retry|$lc|$fc|$wc|$cl|$cd|$cm|$cy";
+  # Daten müssen als Einzeiler zurückgegeben werden
+  my ($st,$lc,$fc,$wc,$cl,$cd,$cm,$cy) = ("","","","","","","","");
+  $st = encode_base64($state,"");
+  $lc = encode_base64($livedata_content,"");
+  $fc = encode_base64($forecast_content,"")         if($forecast_content);
+  $wc = encode_base64($weatherdata_content,"")      if($weatherdata_content);
+  $cl = encode_base64($consumerlivedata_content,"") if($consumerlivedata_content);
+  $cd = encode_base64($ccdaydata_content,"")        if($ccdaydata_content);
+  $cm = encode_base64($ccmonthdata_content,"")      if($ccmonthdata_content);
+  $cy = encode_base64($ccyeardata_content,"")       if($ccyeardata_content);
+
+return "$name|$login_state|$reread|$retry|$get|$set|$st|$lc|$fc|$wc|$cl|$cd|$cm|$cy";
 }
 
 ################################################################
@@ -788,13 +857,16 @@ sub ParseData($) {
   my $login_state = $a[1];
   my $reread      = $a[2];
   my $retry       = $a[3];
-  my $lc          = decode_base64($a[4]);
-  my $fc          = decode_base64($a[5])  if($a[5]);
-  my $wc          = decode_base64($a[6])  if($a[6]);
-  my $cl          = decode_base64($a[7])  if($a[7]);
-  my $cd          = decode_base64($a[8])  if($a[8]);
-  my $cm          = decode_base64($a[9])  if($a[9]);
-  my $cy          = decode_base64($a[10]) if($a[10]);
+  my $get         = $a[4];
+  my $set         = $a[5];
+  my $state       = decode_base64($a[6]);
+  my $lc          = decode_base64($a[7]);
+  my $fc          = decode_base64($a[8])  if($a[8]);
+  my $wc          = decode_base64($a[9])  if($a[9]);
+  my $cl          = decode_base64($a[10]) if($a[10]);
+  my $cd          = decode_base64($a[11]) if($a[11]);
+  my $cm          = decode_base64($a[12]) if($a[12]);
+  my $cy          = decode_base64($a[13]) if($a[13]);
   
   my $livedata_content         = decode_json($lc);
   my $forecast_content         = decode_json($fc) if($fc);
@@ -804,15 +876,13 @@ sub ParseData($) {
   my $ccmonthdata_content      = decode_json($cm) if($cm);
   my $ccyeardata_content       = decode_json($cy) if($cy);
   
-  my $state = "ok";
-  
   my $timeout = AttrVal($name, "timeout", 30);
   if($reread) {
       # login war erfolgreich, aber Daten müssen jetzt noch gelesen werden
 	  delete($hash->{HELPER}{RUNNING_PID});
       readingsSingleUpdate($hash, "L1_Login-Status", "successful", 1);
       $hash->{HELPER}{oldlogintime}          = gettimeofday();
-	  $hash->{HELPER}{RUNNING_PID}           = BlockingCall("FHEM::SMAPortal::GetData", $name, "FHEM::SMAPortal::ParseData", $timeout, "FHEM::SMAPortal::ParseAborted", $hash);
+	  $hash->{HELPER}{RUNNING_PID}           = BlockingCall("FHEM::SMAPortal::GetSetData", "$name|$get|$set", "FHEM::SMAPortal::ParseData", $timeout, "FHEM::SMAPortal::ParseAborted", $hash);
       $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057
       return;
   }
@@ -893,9 +963,9 @@ sub ParseData($) {
                   $batteryout = 1;
               }        
               
-              $errMsg                    = 1 if($k =~ /^ErrorMessages$/);
-              $warnMsg                   = 1 if($k =~ /^WarningMessages$/);
-              $infoMsg                   = 1 if($k =~ /^InfoMessages$/);
+              $errMsg  = 1 if($k =~ /^ErrorMessages$/);
+              $warnMsg = 1 if($k =~ /^WarningMessages$/);
+              $infoMsg = 1 if($k =~ /^InfoMessages$/);
 
               Log3 $name, 4, "$name -> $k - $new_val";
               readingsBulkUpdate($hash, "L1_$k", $new_val);
@@ -965,12 +1035,19 @@ sub ParseData($) {
   
   readingsBeginUpdate($hash);
   if($login_state) {
+      if($set ne "none") {
+          my ($d,$op) = split(":",$set);
+          $op = ($op eq "auto")?"off (automatic)":$op;
+          readingsBulkUpdate($hash, "L3_${d}_Switch", $op);
+      }
       readingsBulkUpdate($hash, "state", $state);
       readingsBulkUpdate($hash, "summary", "$sum W");
   } 
   readingsEndUpdate($hash, 1);
   
   delete($hash->{HELPER}{RUNNING_PID});
+  $hash->{HELPER}{GETTER} = "all";
+  $hash->{HELPER}{SETTER} = "none";
   SPGRefresh($hash,0,1);
   
 return;
@@ -987,6 +1064,8 @@ sub ParseAborted($) {
   Log3 ($name, 1, "$name -> BlockingCall $hash->{HELPER}{RUNNING_PID}{fn} pid:$hash->{HELPER}{RUNNING_PID}{pid} $cause");
 
   delete($hash->{HELPER}{RUNNING_PID});
+  $hash->{HELPER}{GETTER} = "all";
+  $hash->{HELPER}{SETTER} = "none";
   
 return;
 }
@@ -1568,6 +1647,19 @@ return;
 }
 
 ################################################################
+#              
+################################################################
+sub setFromBlocking($$$) {
+  my ($name,$get,$set) = @_;
+  my $hash             = $defs{$name};
+
+  $hash->{HELPER}{GETTER} = $get;
+  $hash->{HELPER}{SETTER} = $set;
+
+return;
+}
+
+################################################################
 #                 analysiere Livedaten
 ################################################################
 sub analivedat($$) {
@@ -1626,8 +1718,11 @@ sub retrygetdata($) {
   my ($hash)  = @_;
   my $name    = $hash->{NAME};
   my $timeout = AttrVal($name, "timeout", 30);
+  
+  my $get = $hash->{HELPER}{GETTER};
+  my $set = $hash->{HELPER}{SETTER};
 
-  $hash->{HELPER}{RUNNING_PID} = BlockingCall("FHEM::SMAPortal::GetData", $name, "FHEM::SMAPortal::ParseData", $timeout, "FHEM::SMAPortal::ParseAborted", $hash);
+  $hash->{HELPER}{RUNNING_PID} = BlockingCall("FHEM::SMAPortal::GetSetData", "$name|$get|$set", "FHEM::SMAPortal::ParseData", $timeout, "FHEM::SMAPortal::ParseAborted", $hash);
   $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057
 	  
 return;
@@ -1737,18 +1832,23 @@ sub PortalAsHtml ($$) {
   ($legend_style, $legend) = split('_',AttrVal($wlname,'consumerLegend','icon_top'));
 
   $legend = '' if(($legend_style eq 'none') || (!int(@pgCDev)));
-
+  
+  # Verbraucherlegende und Steuerung
   if ($legend) {
       foreach (@pgCDev) {
           my($txt,$im) = split(':',$_);                                                            # $txt ist der Verbrauchername
-		  my $swstate  = ReadingsVal($name,"L3_".$txt."_Switch", "undef");
+		  my $cmdon   = "\"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name $txt on')\"";
+          my $cmdoff  = "\"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name $txt off')\"";
+          my $cmdauto = "\"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name $txt auto')\"";
+          
+          my $swstate  = ReadingsVal($name,"L3_".$txt."_Switch", "undef");
 		  my $swicon   = "<img src=\"$FW_ME/www/images/default/1px-spacer.png\">";
 		  if($swstate eq "off") {
-		      $swicon = "<img src=\"$FW_ME/www/images/default/10px-kreis-rot.png\">";
+		      $swicon = "<a onClick=$cmdon><img src=\"$FW_ME/www/images/default/10px-kreis-rot.png\">";
 		  } elsif ($swstate eq "on") {
-		      $swicon = "<img src=\"$FW_ME/www/images/default/10px-kreis-gruen.png\">";
+		      $swicon = "<a onClick=$cmdauto><img src=\"$FW_ME/www/images/default/10px-kreis-gruen.png\">";
 		  } elsif ($swstate =~ /off.*automatic.*/i) {
-		      $swicon = "<img src=\"$FW_ME/www/images/default/10px-kreis-gelb.png\">";
+		      $swicon = "<a onClick=$cmdoff><img src=\"$FW_ME/www/images/default/10px-kreis-gelb.png\">";
 		  }
 		  
           if ($legend_style eq 'icon') {                                                           # mögliche Umbruchstellen mit normalen Blanks vorsehen !
@@ -2531,6 +2631,15 @@ return;
      <li><b> set &lt;name&gt; credentials &lt;username&gt; &lt;password&gt; </b> </li>  
      Setzt Username / Passwort zum Login in das SMA Sunny Portal.   
      </ul> 
+     <br>
+     
+     <ul>
+     <li><b> set &lt;name&gt; &lt;Verbrauchername&gt; &lt;on | off | auto&gt; </b> </li>  
+     Ist das Atttribut detailLevel auf 3 oder höher gesetzt, werden Verbraucherdaten aus dem SMA Sunny Portal abgerufen.
+     Sobald diese Werte vorliegen, werden die vorhandenen Verbraucher im Set angezeigt und können eingeschaltet, ausgeschaltet
+     bzw. auf die Steuerung durch den Sunny Home Manager umgeschaltet werden (auto).     
+     </ul>
+   
    </ul>
    <br><br>
    
