@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
- - feature: 73_AutoShuttersControl: add new attribut
+ - change:  55_PIFACE: now WiringPI V >= 2.46 supported
+ - feature: 73_AutoShuttersControl: add new attribut 
                ASC_Sgading_MinMax_Elevation, many bug fixes
  - bugfix:  88_HMCCU: Fixed noInitialUpdate bug
  - bugfix:  70_BOTVAC: set robotSounds filter
