@@ -8,13 +8,7 @@
 #  TCM_120_User_Manual_V1.53_02.pdf
 #  EnOcean Serial Protocol 3 (ESP3) (for the TCM 310, TCM 400J, TCM 515)
 
-# TODO:
-# Check BSC Temp
-# Check Stick Temp
-# Check Stick WriteRadio
-
 package main;
-
 use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday usleep);
@@ -26,7 +20,7 @@ if( $^O =~ /Win/ ) {
 sub TCM_Read($);
 sub TCM_ReadAnswer($$);
 sub TCM_Ready($);
-sub TCM_Write($$$);
+sub TCM_Write($$$$);
 sub TCM_Parse120($$$);
 sub TCM_Parse310($$$);
 sub TCM_CRC8($);
@@ -95,6 +89,7 @@ sub TCM_Define($$){
 sub TCM_InitSerialCom($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
+  delete $hash->{helper}{init_done};
   if ($hash->{STATE} eq "disconnected") {
     Log3 $name, 2, "TCM $name not initialized";
     return undef;
@@ -142,7 +137,6 @@ sub TCM_InitSerialCom($) {
     $hash->{BaseID} = $baseID;
     $hash->{LastID} = sprintf "%08X", (hex $baseID) + 127;
   } elsif ($comType ne "RS485" && $hash->{DeviceName} ne "none") {
-    #$hash->{PARTIAL} = '';
     my @getBaseID = ("get", "baseID");
     if (TCM_Get($hash, @getBaseID) =~ /[Ff]{2}[\dA-Fa-f]{6}/) {
       $hash->{BaseID} = sprintf "%08X", hex $&;
@@ -154,7 +148,6 @@ sub TCM_InitSerialCom($) {
   }
   if ($hash->{MODEL} eq "ESP3" && $comType ne "RS485" && $hash->{DeviceName} ne "none") {
     # get chipID
-    #$hash->{PARTIAL} = '';
     my @getChipID = ('get', 'version');
     if (TCM_Get($hash, @getChipID) =~ m/ChipID:.([\dA-Fa-f]{8})/) {
       $hash->{ChipID} = sprintf "%08X", hex $1;
@@ -194,16 +187,15 @@ sub TCM_InitSerialCom($) {
     }
   }
   #CommandSave(undef, undef);
+  $hash->{helper}{init_done} = 1;
   readingsSingleUpdate($hash, "state", "initialized", 1);
   Log3 $name, 2, "TCM $name initialized";
   return undef;
 }
 
-sub
-TCM_Fingerprint($$)
-{
+sub TCM_Fingerprint($$) {
   my ($IODev, $msg) = @_;
-  return  ($IODev, $msg) if (AttrVal($IODev, "fingerprint", 'off') eq 'off');
+  return ($IODev, $msg) if (AttrVal($IODev, "fingerprint", 'off') eq 'off');
   my @msg = split(":", $msg);
 
   if ($msg[1] == 1) {
@@ -242,34 +234,31 @@ TCM_Fingerprint($$)
 }
 
 # Write
-# Input is header and data (HEX), without CRC
-sub
-TCM_Write($$$)
-{
-  my ($hash,$fn,$msg) = @_;
+sub TCM_Write($$$$) {
+  # Input is header and data (HEX), without CRC
+  my ($hash, $shash, $header, $msg) = @_;
+  return if (!exists($hash->{helper}{init_done}) && $hash != $shash);
+  # return if (!defined($header));
   my $name = $hash->{NAME};
-
-  return if (!defined($fn));
-
   my $bstring;
   if ($hash->{MODEL} eq "ESP2") {
     # TCM 120 (ESP2)
-    if (!$fn) {
+    if (!$header) {
       # command with ESP2 format
       $bstring = $msg;
     } else {
       # command with ESP3 format
-      my $packetType = hex(substr($fn, 6, 2));
+      my $packetType = hex(substr($header, 6, 2));
       if ($packetType != 1) {
         Log3 $name, 1, "TCM $name Packet Type not supported.";
         return;
       }
-      my $odataLen = hex(substr($fn, 4, 2));
+      my $odataLen = hex(substr($header, 4, 2));
       if ($odataLen != 0) {
         Log3 $name, 1, "TCM $name Radio Telegram with optional Data not supported.";
         return;
       }
-      #my $mdataLen = hex(substr($fn, 0, 4));
+      #my $mdataLen = hex(substr($header, 0, 4));
       my $rorg = substr ($msg, 0, 2);
       # translate the RORG to ORG
       my %rorgmap = ("F6"=>"05",
@@ -290,7 +279,7 @@ TCM_Write($$$)
     $bstring = "A55A" . $bstring . TCM_CSUM($bstring);
   } else {
     # TCM 310 (ESP3)
-    $bstring = "55" . $fn . TCM_CRC8($fn) . $msg . TCM_CRC8($msg);
+    $bstring = "55" . $header . TCM_CRC8($header) . $msg . TCM_CRC8($msg);
     if (exists($hash->{helper}{telegramSentTimeLast}) && $hash->{helper}{telegramSentTimeLast} < gettimeofday() - 6) {
       # clear outdated response control list
       delete $hash->{helper}{awaitCmdResp};
@@ -415,7 +404,7 @@ TCM_Read($)
         if ($blockSenderID eq "own" && ((hex($id) >= $baseID && hex($id) <= $lastID) || $chipID == hex($id))) {
           Log3 $name, 4, "TCM $name own telegram from $id blocked.";
         } else {
-          Dispatch($hash, "EnOcean:$packetType:$org:$d1:$id:$status:01FFFFFFFF0000", undef);
+          Dispatch($hash, "EnOcean:$packetType:$org:$d1:$id:$status:01FFFFFFFF0000", undef) if (exists $hash->{helper}{init_done});
         }
 
       } else {
@@ -438,7 +427,7 @@ TCM_Read($)
           if ($blockSenderID eq "own" && ((hex($id) >= $baseID && hex($id) <= $lastID) || $chipID == hex($id))) {
             Log3 $name, 4, "TCM $name own telegram from $id blocked.";
           } else {
-            Dispatch($hash, "EnOcean:$packetType:$org:$d1:$id:$status:01FFFFFFFF0000", undef);
+            Dispatch($hash, "EnOcean:$packetType:$org:$d1:$id:$status:01FFFFFFFF0000", undef)  if (exists $hash->{helper}{init_done});
           }
          }
       }
@@ -503,7 +492,7 @@ TCM_Read($)
           Log3 $name, 4, "TCM $name own telegram from $id blocked.";
         } else {
           #EnOcean:PacketType:RORG:MessageData:SourceID:Status:OptionalData
-          Dispatch($hash, "EnOcean:$packetType:$org:$d1:$id:$status:$odata", \%addvals);
+          Dispatch($hash, "EnOcean:$packetType:$org:$d1:$id:$status:$odata", \%addvals) if (exists $hash->{helper}{init_done});
         }
 
       } elsif ($packetType == 2) {
@@ -581,7 +570,7 @@ TCM_Read($)
         $mdata =~ m/^(..)(.*)$/;
         $packetType = sprintf "%01X", $packetType;
         #EnOcean:PacketType:smartAckCode:MessageData
-        Dispatch($hash, "EnOcean:$packetType:$1:$2", undef);
+        Dispatch($hash, "EnOcean:$packetType:$1:$2", undef) if (exists $hash->{helper}{init_done});
 
       } elsif ($packetType == 7) {
         # packet type REMOTE_MAN_COMMAND
@@ -607,7 +596,7 @@ TCM_Read($)
           Log3 $name, 4, "TCM $name own telegram from $2 blocked.";
         } else {
           #EnOcean:PacketType:RORG:MessageData:SourceID:DestinationID:FunctionNumber:ManufacturerID:RSSI:Delay
-          Dispatch($hash, "EnOcean:$packetType:C5:$messageData:$2:$1:$function:$manufID:$RSSI:$4", \%addvals);
+          Dispatch($hash, "EnOcean:$packetType:C5:$messageData:$2:$1:$function:$manufID:$RSSI:$4", \%addvals) if (exists $hash->{helper}{init_done});
         }
 
       } elsif ($packetType == 9) {
@@ -769,9 +758,7 @@ TCM_Parse310($$$)
 }
 
 # Ready
-sub
-TCM_Ready($)
-{
+sub TCM_Ready($) {
   my ($hash) = @_;
 
   return DevIo_OpenDev($hash, 1, undef)
@@ -827,7 +814,7 @@ TCM_Get($@)
     return "Unknown argument $cmd, choose one of " . join(':noArg ', sort keys %gets120) . ':noArg' if(!defined($rawcmd));
     Log3 $name, 3, "TCM $name get $cmd";
     $rawcmd .= "000000000000000000";
-    TCM_Write($hash, "", $rawcmd);
+    TCM_Write($hash, $hash, "", $rawcmd);
     ($err, $msg) = TCM_ReadAnswer($hash, "get $cmd");
     $msg = TCM_Parse120($hash, $msg, 1) if(!$err);
 
@@ -840,8 +827,8 @@ TCM_Get($@)
     my $oCmdHex = '';
     $oCmdHex = $cmdhash->{oCmd} if (exists $cmdhash->{oCmd});
     $hash->{helper}{SetAwaitCmdResp} = 1;
-    #TCM_Write($hash, sprintf("%04X00%02X", length($cmdHex)/2, $cmdhash->{packetType}), $cmdHex);
-    TCM_Write($hash, sprintf("%04X%02X%02X", length($cmdHex)/2, length($oCmdHex)/2, $cmdhash->{packetType}), $cmdHex . $oCmdHex);
+    #TCM_Write($hash, $hash, sprintf("%04X00%02X", length($cmdHex)/2, $cmdhash->{packetType}), $cmdHex);
+    TCM_Write($hash, $hash, sprintf("%04X%02X%02X", length($cmdHex)/2, length($oCmdHex)/2, $cmdhash->{packetType}), $cmdHex . $oCmdHex);
     ($err, $msg) = TCM_ReadAnswer($hash, "get $cmd");
     $msg = TCM_Parse310($hash, $msg, $cmdhash) if(!$err);
 
@@ -975,7 +962,7 @@ sub TCM_Set($@)
       return "";
     }
     $cmdHex .= "0"x(22-length($cmdHex));  # Padding with 0
-    TCM_Write($hash, "", $cmdHex);
+    TCM_Write($hash, $hash, "", $cmdHex);
     ($err, $msg) = TCM_ReadAnswer($hash, "get $cmd");
     $msg = TCM_Parse120($hash, $msg, 1) if(!$err);
 
@@ -993,7 +980,7 @@ sub TCM_Set($@)
       return;
     }
     $hash->{helper}{SetAwaitCmdResp} = 1;
-    TCM_Write($hash, sprintf("%04X00%02X", length($cmdHex)/2, $cmdhash->{packetType}), $cmdHex);
+    TCM_Write($hash, $hash, sprintf("%04X00%02X", length($cmdHex)/2, $cmdhash->{packetType}), $cmdHex);
     ($err, $msg) = TCM_ReadAnswer($hash, "set $cmd");
     if(!$err) {
       $msg = TCM_Parse310($hash, $msg, $cmdhash);
@@ -1163,7 +1150,7 @@ sub TCM_ReadAnswer($$)
             Log3 $name, 4, "TCM $name own telegram from $id blocked.";
           } else {
             #EnOcean:PacketType:RORG:MessageData:SourceID:Status:OptionalData
-            Dispatch($hash, "EnOcean:$packetType:$org:$d1:$id:$status:$odata", \%addvals);
+            Dispatch($hash, "EnOcean:$packetType:$org:$d1:$id:$status:$odata", \%addvals) if (exists $hash->{helper}{init_done});
           }
           $data = $rest;
           $hash->{PARTIAL} = $rest;
@@ -1343,9 +1330,7 @@ sub TCM_Notify(@) {
 }
 
 # Undef
-sub
-TCM_Undef($$)
-{
+sub TCM_Undef($$) {
   my ($hash, $arg) = @_;
   my $name = $hash->{NAME};
 
@@ -1360,6 +1345,7 @@ TCM_Undef($$)
       }
   }
   DevIo_CloseDev($hash);
+  delete $hash->{helper}{init_done};
   return undef;
 }
 

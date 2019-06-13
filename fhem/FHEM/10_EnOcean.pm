@@ -1,7 +1,6 @@
 # $Id$
 
 package main;
-
 use strict;
 use warnings;
 my $cryptFunc;
@@ -7837,7 +7836,7 @@ sub EnOcean_Parse($$)
       # calc wakeup cycle
       if ($summerMode eq 'off') {
         $summerMode = 0;
-        if ($timeDiff == 0  || $window eq 'open') {
+        if ($timeDiff == 0 || $window eq 'open') {
           $wakeUpCycle = 1200;
         } elsif ($timeDiff < 120) {
           $wakeUpCycle = 120;
@@ -14773,25 +14772,23 @@ sub EnOcean_calcPID($) {
       $retStr = " with return-value:" . $ret if ( defined($ret) && ( $ret ne '' ) );
       #PID20_Log $hash, 3, "<$cmd> " . $retStr;
     }
-    my $updateAlive = ($actuation ne "")
-      && EnOcean_TimeDiff(ReadingsTimestamp($name, 'setpointSet', undef)) >= $hash->{helper}{updateInterval};
-      #&& EnOcean_TimeDiff( ReadingsTimestamp( $name, 'setpointSet', gettimeofday() ) ) >= $hash->{helper}{updateInterval};
-
+  # my $updateAlive = ($actuation ne "")
+  #   && EnOcean_TimeDiff(ReadingsTimestamp($name, 'setpointSet', ReadingsTimestamp($name, 'setpoint', undef))) >= $hash->{helper}{updateInterval};
+  #   && EnOcean_TimeDiff( ReadingsTimestamp( $name, 'setpointSet', gettimeofday() ) ) >= $hash->{helper}{updateInterval};
   # my $updateReq = ( ( $actuationReq || $updateAlive ) && $actuation ne "" );
   # PID20_Log $hash, 2, "U1 actReq:$actuationReq updateAlive:$updateAlive -->  updateReq:$updateReq" if ($DEBUG_Update);
 
     # ---------------- update request
-    if ($readingUpdateReq)
-    {
+    if ($readingUpdateReq) {
       readingsBeginUpdate($hash);
       #readingsBulkUpdate( $hash, $hash->{helper}{desiredName},  $desired )       if ( $desired ne "" );
       #readingsBulkUpdate( $hash, $hash->{helper}{measuredName}, $sensorValue )   if ( $sensorValue ne "" );
-      readingsBulkUpdate( $hash, 'p_p',                         $pPortion )      if ( $pPortion ne "" );
-      readingsBulkUpdate( $hash, 'p_d',                         $dPortion )      if ( $dPortion ne "" );
-      readingsBulkUpdate( $hash, 'p_i',                         $iPortion )      if ( $iPortion ne "" );
+      readingsBulkUpdate( $hash, 'p_p', $pPortion ) if ( $pPortion ne "" );
+      readingsBulkUpdate( $hash, 'p_d', $dPortion ) if ( $dPortion ne "" );
+      readingsBulkUpdate( $hash, 'p_i', $iPortion ) if ( $iPortion ne "" );
       readingsBulkUpdate( $hash, 'setpointSet', $actuationDone) if ($actuationDone ne "");
-      readingsBulkUpdate( $hash, 'setpointCalc',               $actuationCalc ) if ( $actuationCalc ne "" );
-      readingsBulkUpdate( $hash, 'delta',                       $delta )         if ( $delta ne "" );
+      readingsBulkUpdate( $hash, 'setpointCalc', $actuationCalc) if ( $actuationCalc ne "" );
+      readingsBulkUpdate( $hash, 'delta', $delta ) if ( $delta ne "" );
       readingsEndUpdate( $hash, 1 );
       #PID20_Log $hash, 5, "readings updated";
     }
@@ -15631,8 +15628,7 @@ sub EnOcean_SndCdm($$$$$$$$)
 }
 
 # send ESP3 Packet Type Radio
-sub EnOcean_SndRadio($$$$$$$$)
-{
+sub EnOcean_SndRadio($$$$$$$$) {
   my ($ctrl, $hash, $packetType, $rorg, $data, $senderID, $status, $destinationID) = @_;
   if (!defined $data) {
     Log3 $hash->{NAME}, 5, "EnOcean $hash->{NAME} EnOcean_SndRadio SenderID: $senderID DestinationID: $destinationID " .
@@ -15685,20 +15681,19 @@ sub EnOcean_SndRadio($$$$$$$$)
   }
   if (defined $ctrl) {
     # sent telegram delayed
-    my @param = ($hash, $header, $data);
+    my @param = ($hash, $hash, $header, $data);
     InternalTimer(gettimeofday() + $ctrl, 'EnOcean_IOWriteTimer', \@param, 0);
   } else {
-    IOWrite($hash, $header, $data);
+    IOWrite($hash, $hash, $header, $data);
   }
   return;
 }
 
 #
-sub EnOcean_IOWriteTimer($)
-{
+sub EnOcean_IOWriteTimer($) {
   my ($ioParam) = @_;
-  my ($hash, $header, $data) = @$ioParam;
-  IOWrite($hash, $header, $data);
+  my ($hash, $shash, $header, $data) = @$ioParam;
+  IOWrite($hash, $shash, $header, $data);
   return;
 }
 
