@@ -13,6 +13,8 @@ attr global sendStatistics never
 attr global statefile ./demolog/fhem.save
 attr global verbose 3
 
+define telnet telnet 7072 global
+
 define WEB FHEMWEB 8083 global
 setuuid WEB 5c8aad22-f33f-c296-41f4-900a80ef379174b0
 attr WEB JavaScripts codemirror/fhem_codemirror.js
@@ -610,7 +612,6 @@ attr rg_Guest4 rg_autoGoneAfter 0.01
 attr rg_Guest4 rg_realname alias
 attr rg_Guest4 room Residents
 attr rg_Guest4 sortby 1
-attr rg_Guest4 subType minor
 attr rg_Guest4 webCmd state
 define rr_Father ROOMMATE rgr_Residents,rgr_Parents
 setuuid rr_Father 5c8aad22-f33f-c296-729e-ae6ad0649b98055d
