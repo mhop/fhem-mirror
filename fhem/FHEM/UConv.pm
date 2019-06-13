@@ -20,6 +20,22 @@ use Time::Local;
 my $DEG = pi / 180.0;
 my $RAD = 180. / pi;
 
+my %roman = (
+    1       => 'I',
+    5       => 'V',
+    10      => 'X',
+    50      => 'L',
+    100     => 'C',
+    500     => 'D',
+    1000    => 'M',
+    5000    => '(V)',
+    10000   => '(X)',
+    50000   => '(L)',
+    100000  => '(C)',
+    500000  => '(D)',
+    1000000 => '(M)',
+);
+
 sub GetSeason (;$$$);
 sub _GetSeasonPheno ($$;$$);
 sub _ReplaceStringByHashKey($$;$);
@@ -1041,6 +1057,57 @@ sub duration ($$;$) {
 #################################
 ### Textual unit conversions
 ###
+
+sub arabic2roman ($) {
+    my ($n) = @_;
+    my %items = ();
+    my @r;
+    return "" if ( !$n || $n eq "" || $n !~ m/^\d+(?:\.\d+)?$/ || $n == 0. );
+    return $n
+      if ( $n >= 1000001. );    # numbers above cannot be displayed/converted
+
+    for my $v ( sort { $b <=> $a } keys %roman ) {
+        my $c = int( $n / $v );
+        next unless ($c);
+        $items{ $roman{$v} } = $c;
+        $n -= $v * $c;
+    }
+
+    my @th = sort { $a <=> $b } keys %roman;
+
+    for ( my $i = 0 ; $i < @th ; $i++ ) {
+        my $v = $th[$i];
+        next if ( $v >= 1000000. );    # numbers above have no greater icon
+        my $k = $roman{$v};
+        my $c = $items{$k};
+        next unless ($c);
+
+        my $gv = $th[ $i + 1. ];
+        my $gk = $roman{$gv};
+
+        if ( $c == 4 || ( $gv / $v == $c ) ) {
+            $items{$gk}++;
+            $c = $gv - $c * $v;
+            $items{$k} = $c * -1;
+
+        }
+    }
+
+    for my $v ( sort { $b <=> $a } keys %roman ) {
+        my $l = $roman{$v};
+        my $c = $items{$l};
+        next unless ($c);
+
+        if ( $c > 0 ) {
+            push @r, $l for ( 1 .. $c );
+        }
+        else {
+            push @r, ( $l, pop @r );
+        }
+    }
+
+    return join '', @r;
+}
 
 ######## humanReadable #########################################
 # What  : Formats a number or text string to be more readable for humans
