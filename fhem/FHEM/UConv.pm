@@ -8,15 +8,17 @@ sub UConv_Initialize() { }
 package UConv;
 use strict;
 use warnings;
-
-# use locale;
 use POSIX;
 
-use Time::Local;
+use Math::Trig;
 use Scalar::Util qw(looks_like_number);
-use Data::Dumper;
+use Time::HiRes qw(gettimeofday);
+use Time::Local;
 
-# require "95_Astro.pm";
+#use Data::Dumper;
+
+my $DEG = pi / 180.0;
+my $RAD = 180. / pi;
 
 sub GetSeason (;$$$);
 sub _GetSeasonPheno ($$;$$);
@@ -989,21 +991,20 @@ sub distance($$$$;$$) {
     return _round( "0.000000000", $rnd )
       if ( $lat1 eq $lat2 && $lng1 eq $lng2 );
 
-    use constant M_PI => 4 * atan2( 1, 1 );
-    my $pi80 = M_PI / 180;
-    $lat1 *= $pi80;
-    $lng1 *= $pi80;
-    $lat2 *= $pi80;
-    $lng2 *= $pi80;
+    my $aearth = 6378.137;    # GRS80/WGS84 semi major axis of earth ellipsoid
 
-    my $r    = 6372.797;        # mean radius of Earth in km
+    $lat1 *= $DEG;
+    $lng1 *= $DEG;
+    $lat2 *= $DEG;
+    $lng2 *= $DEG;
+
     my $dlat = $lat2 - $lat1;
     my $dlng = $lng2 - $lng1;
     my $a =
-      sin( $dlat / 2 ) * sin( $dlat / 2 ) +
-      cos($lat1) * cos($lat2) * sin( $dlng / 2 ) * sin( $dlng / 2 );
-    my $c = 2 * atan2( sqrt($a), sqrt( 1 - $a ) );
-    my $km = $r * $c;
+      sin( $dlat / 2. ) * sin( $dlat / 2. ) +
+      cos($lat1) * cos($lat2) * sin( $dlng / 2. ) * sin( $dlng / 2. );
+    my $c = 2. * atan2( sqrt($a), sqrt( 1. - $a ) );
+    my $km = $aearth * $c;
 
     return _round(
         (
@@ -1414,6 +1415,38 @@ sub h2hms($) {
     return sprintf( "%02d:%02d:%02d", $h, $m, $s );
 }
 
+sub DaysOfMonth (;$$) {
+    my $y = shift;
+    my $m = shift;
+
+    return undef
+      unless ( !$y
+        || $y =~ /^\d{10}(?:\.\d+)?$/
+        || ( $y =~ /^[1-2]\d{3}$/ && ( !$m || $m =~ /^\d{1,2}$/ ) ) );
+
+    my $t = ( $y =~ /^\d{10}(?:\.\d+)?$/ ? $y : gettimeofday() );
+    $y = 1900. + ( localtime($t) )[5] unless ($y);
+    $m = 1. + ( localtime($t) )[4] if ( !$y || $y !~ /^[1-2]\d{3}$/ );
+    $y = 1900. + ( localtime($t) )[5] if ( $y !~ /^[1-2]\d{3}$/ );
+
+    if ( $m < 8. ) {
+        if ( $m % 2 ) {
+            return 31.;
+        }
+        else {
+            return 28. + IsLeapYear($y)
+              if ( $m == 2. );
+            return 30.;
+        }
+    }
+    elsif ( $m % 2. ) {
+        return 30.;
+    }
+    else {
+        return 31.;
+    }
+}
+
 sub IsLeapYear (;$) {
 
     # Either the value 0 or the value 1 is returned.
@@ -1426,10 +1459,9 @@ sub IsLeapYear (;$) {
     return undef
       unless ( !$y || $y =~ /^\d{10}(?:\.\d+)?$/ || $y =~ /^[1-2]\d{3}$/ );
 
-    if ( !$y || $y !~ /^[1-2]\d{3}$/ ) {
-        my $today = _time($y);
-        $y = $today->{year};
-    }
+    my $t = ( $y =~ /^\d{10}(?:\.\d+)?$/ ? $y : gettimeofday() );
+    $y = 1900. + ( localtime($t) )[5] unless ($y);
+    $y = 1900. + ( localtime($t) )[5] if ( $y !~ /^[1-2]\d{3}$/ );
 
     # If $year is not evenly divisible by 4, it is
     #     not a leap year; therefore, we return the
