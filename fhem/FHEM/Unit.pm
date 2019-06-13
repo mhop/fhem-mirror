@@ -3391,7 +3391,7 @@ sub replaceTemplate ($$$$;$) {
         my $vdm = $desc->{$k};
         next if ( ref($vdm) );
 
-        $vdm = UConv::decimal_mark( $vdm, $desc->{decimal_mark} )
+        $vdm = UConv::decimal_mark( $vdm )
           if ( defined( $desc->{decimal_mark} ) );
         $txt =~ s/%$k%/$vdm/g;
         Unit_Log3( $device, $reading, $odesc, 10,
@@ -3466,7 +3466,7 @@ sub replaceTemplate ($$$$;$) {
             my $vdm = $desc->{$k};
             next if ( ref($vdm) );
 
-            $vdm = UConv::decimal_mark( $vdm, $desc->{decimal_mark} )
+            $vdm = UConv::decimal_mark( $vdm )
               if ( defined( $desc->{decimal_mark} ) );
             $txt_long =~ s/%$k%/$vdm/g;
             Unit_Log3( $device, $reading, $odesc, 10,

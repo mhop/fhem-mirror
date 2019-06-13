@@ -20,22 +20,6 @@ use Time::Local;
 my $DEG = pi / 180.0;
 my $RAD = 180. / pi;
 
-my %roman = (
-    1       => 'I',
-    5       => 'V',
-    10      => 'X',
-    50      => 'L',
-    100     => 'C',
-    500     => 'D',
-    1000    => 'M',
-    5000    => '(V)',
-    10000   => '(X)',
-    50000   => '(L)',
-    100000  => '(C)',
-    500000  => '(D)',
-    1000000 => '(M)',
-);
-
 sub GetSeason (;$$$);
 sub _GetSeasonPheno ($$;$$);
 sub _ReplaceStringByHashKey($$;$);
@@ -1066,6 +1050,22 @@ sub arabic2roman ($) {
     return $n
       if ( $n >= 1000001. );    # numbers above cannot be displayed/converted
 
+    my %roman = (
+        1       => 'I',
+        5       => 'V',
+        10      => 'X',
+        50      => 'L',
+        100     => 'C',
+        500     => 'D',
+        1000    => 'M',
+        5000    => '(V)',
+        10000   => '(X)',
+        50000   => '(L)',
+        100000  => '(C)',
+        500000  => '(D)',
+        1000000 => '(M)',
+    );
+
     for my $v ( sort { $b <=> $a } keys %roman ) {
         my $c = int( $n / $v );
         next unless ($c);
@@ -2088,19 +2088,34 @@ sub _GetSeasonPheno ($$;$$) {
 ####################
 # HELPER FUNCTIONS
 
-sub decimal_mark ($$) {
-    my ( $val, $f ) = @_;
-    return $val unless ( looks_like_number($val) && $f );
+sub decimal_mark ($;$) {
+  return $_[0] unless ( looks_like_number($_[0]) );
+  my $d = reverse $_[0];
+  my $locale = ( $_[1] ? $_[1] : undef );
 
-    my $text = reverse $val;
-    if ( $f eq "2" ) {
-        $text =~ s:\.:,:g;
-        $text =~ s/(\d\d\d)(?=\d)(?!\d*,)/$1./g;
-    }
-    else {
-        $text =~ s/(\d\d\d)(?=\d)(?!\d*\.)/$1,/g;
-    }
-    return scalar reverse $text;
+  my $old_locale = setlocale(LC_NUMERIC);
+  setlocale(LC_NUMERIC, $locale) if ($locale);
+  use locale ':not_characters';
+  my ( $decimal_point, $thousands_sep, $grouping ) =
+    @{ localeconv() }{ 'decimal_point', 'thousands_sep', 'grouping' };
+  setlocale(LC_NUMERIC, "");
+  setlocale(LC_NUMERIC, $old_locale);
+  no locale;
+
+  $thousands_sep = ($decimal_point && $decimal_point eq ',' ? '.' : ',')
+    unless ($thousands_sep);
+  my @grouping =
+    $grouping && $grouping =~ /^\d+$/ ? unpack( "C*", $grouping ) : (3);
+
+  if ( $thousands_sep eq '.' ) {
+    $d =~ s/\./$decimal_point/g;
+    $d =~ s/(\d{$grouping[0]})(?=\d)(?!\d*,)/$1$thousands_sep/g;
+  }
+  else {
+    $d =~ s/(\d{$grouping[0]})(?=\d)(?!\d*\.)/$1$thousands_sep/g;
+  }
+
+  return scalar reverse $d;
 }
 
 sub _round($;$) {
