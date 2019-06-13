@@ -1085,7 +1085,7 @@ attr DEVICE setList\
   on:noArg shellies/DEVNAME/color/0/command on\
   white:colorpicker,BRI,0,1,100 shellies/DEVNAME/color/0/set {"turn":"on","white":"$EVTPART1"}\
   gain:colorpicker,BRI,0,1,100 shellies/DEVNAME/color/0/set {"turn":"on","gain":"$EVTPART1"}\
-  rgb:colorpicker,RGB {$EVTPART1=~/(..)(..)(..)/;if($1 ne $2 || $2 ne $3) {"shellies/DEVNAME/color/0/set{\"turn\":\"on\",\"mode\":\"color\",\"gain\":\"100\",\"red\":".hex($1).",\"green\":".hex($2).",\"blue\":".hex($3)."}"}else{"shellies/shellybulb-3CC533/color/0/set {\"turn\":\"on\",\"mode\":\"white\",\"brightness\":".int(hex($1)/2.55)."}"}}\
+  rgb:colorpicker,RGB {$EVTPART1=~/(..)(..)(..)/;if($1 ne $2 || $2 ne $3) {"shellies/DEVNAME/color/0/set {\"turn\":\"on\",\"mode\":\"color\",\"gain\":\"100\",\"red\":".hex($1).",\"green\":".hex($2).",\"blue\":".hex($3)."}"}else{"shellies/DEVNAME/color/0/set {\"turn\":\"on\",\"mode\":\"white\",\"brightness\":".int(hex($1)/2.55)."}"}}\
   effect:select,0,1,2,3 shellies/DEVNAME/color/0/set {"effect":"$EVTPART1"}\
   update:noArg shellies/DEVNAME/command update_fw
 deletereading -q DEVICE status_.*
@@ -1253,7 +1253,7 @@ attr milight_REMOTE_ID_0 setList\
   hue:colorpicker,HUE,0,1,359 BASE_ID/REMOTE_ID/BULB_TYPE/0 {"$EVTPART0":"$EVTPART1"}\
   command:uzsuSelectRadio,Weiss,Nacht BASE_ID/REMOTE_ID/BULB_TYPE/0 {"$EVTPART0":"$EVTPART1"}
 attr milight_REMOTE_ID_0 setStateList on off
-#attr milight_REMOTE_ID_0 userReadings rgb {sprintf("%02X%02X%02X", ReadingsVal($name,"color_r",255), ReadingsVal($name,"color_g",255), ReadingsVal($name,"color_b",255))}
+#attr milight_REMOTE_ID_0 userReadings rgb:color_r.* {sprintf("%02X%02X%02X", ReadingsVal($name,"color_r",255), ReadingsVal($name,"color_g",255), ReadingsVal($name,"color_b",255))}
 modify milight_REMOTE_ID_0 milight_REMOTE_ID_0
 attr milight_REMOTE_ID_0 model X_01a_esp_milight_hub_make_rgbw_group
 
@@ -1285,7 +1285,7 @@ attr DEVICE setList\
   program:uzsuSelectRadio,Mode,Faster,Slower BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"command":"$EVTPART1"}\
   mode:select,0,1,2,3,4,5,6,7,8 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
   dim:uzsuSelectRadio,Up,Down BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"command":"$EVTPART1"}
-#attr DEVICE userReadings rgb {sprintf("%02X%02X%02X", ReadingsVal($name,"color_r",255), ReadingsVal($name,"color_g",255), ReadingsVal($name,"color_b",255))}
+#attr DEVICE userReadings rgb:color_r.* {sprintf("%02X%02X%02X", ReadingsVal($name,"color_r",255), ReadingsVal($name,"color_g",255), ReadingsVal($name,"color_b",255))}
 attr DEVICE webCmd brightness:dim:hue:command:color_temp:program:saturation:mode
 attr DEVICE webCmdLabel   brightness:dim\
   :hue:command\
