@@ -8,6 +8,7 @@ sub UConv_Initialize() { }
 package UConv;
 use strict;
 use warnings;
+
 # use locale;
 use POSIX;
 
@@ -24,26 +25,133 @@ sub _ReplaceStringByHashKey($$;$);
 ####################
 # Translations
 
-our %compasspointss = (
+our %compasspoints = (
     en => [
-        'N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
-        'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'
+        [ "North",           "N" ],
+        [ "North-Northeast", "NNE" ],
+        [ "North-East",      "NE" ],
+        [ "East-Northeast",  "ENE" ],
+        [ "East",            "E" ],
+        [ "East-Southeast",  "ESE" ],
+        [ "Southeast",       "SE" ],
+        [ "South-Southeast", "SSE" ],
+        [ "South",           "S" ],
+        [ "South-Southwest", "SSW" ],
+        [ "Southwest",       "SW" ],
+        [ "West-Southwest",  "WSW" ],
+        [ "West",            "W" ],
+        [ "West-Northwest",  "WNW" ],
+        [ "Northwest",       "NW" ],
+        [ "North-Northwest", "NNW" ],
     ],
     de => [
-        'N', 'NNO', 'NO', 'ONO', 'O', 'OSO', 'SO', 'SSO',
-        'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'
+        [ "Norden",        "N" ],
+        [ "Nord-Nordost",  "NNO" ],
+        [ "Nord-Ost",      "NO" ],
+        [ "Ost-Nordost",   "ONO" ],
+        [ "Ost",           "O" ],
+        [ "Ost-Südost",   "OSO" ],
+        [ "Südost",       "SO" ],
+        [ "Süd-Südost",  "SSO" ],
+        [ "Süd",          "S" ],
+        [ "Süd-Südwest", "SSW" ],
+        [ "Südwest",      "SW" ],
+        [ "West-Südwest", "WSW" ],
+        [ "West",          "W" ],
+        [ "West-Nordwest", "WNW" ],
+        [ "Nordwest",      "NW" ],
+        [ "Nord-Nordwest", "NNW" ],
+    ],
+    es => [
+        [ "Norte",          "N" ],
+        [ "Norte-Noreste",  "NNE" ],
+        [ "Noreste",        "NE" ],
+        [ "Este-Noreste",   "ENE" ],
+        [ "Este",           "E" ],
+        [ "Este-Sureste",   "ESE" ],
+        [ "Sureste",        "SE" ],
+        [ "Sur-Sureste",    "SSE" ],
+        [ "Sur",            "S" ],
+        [ "Sudoeste",       "SDO" ],
+        [ "Sur-Oeste",      "SO" ],
+        [ "Oeste-Suroeste", "OSO" ],
+        [ "Oeste",          "O" ],
+        [ "Oeste-Noroeste", "ONO" ],
+        [ "Noroeste",       "NO" ],
+        [ "Norte-Noroeste", "NNE" ],
+
+    ],
+    it => [
+        [ "Nord",             "N" ],
+        [ "Nord-Nord-Est",    "NNE" ],
+        [ "Nord-Est",         "NE" ],
+        [ "Est-Nord-Est",     "ENE" ],
+        [ "Est",              "E" ],
+        [ "Est-Sud-Est",      "ESE" ],
+        [ "Sud-Est",          "SE" ],
+        [ "Sud-Sud-Est",      "SSE" ],
+        [ "Sud",              "S" ],
+        [ "Sud-Sud-Ovest",    "SSO" ],
+        [ "Sud-Ovest",        "SO" ],
+        [ "Ovest-Sud-Ovest",  "OSO" ],
+        [ "Ovest",            "O" ],
+        [ "Ovest-Nord-Ovest", "ONO" ],
+        [ "Nord-Ovest",       "NO" ],
+        [ "Nord-Nord-Ovest",  "NNO" ],
     ],
     nl => [
-        'N', 'NNO', 'NO', 'ONO', 'O', 'OZO', 'ZO', 'ZZO',
-        'Z', 'ZZW', 'ZW', 'WZW', 'W', 'WNW', 'NW', 'NNW'
+        [ "Noorden",           "N" ],
+        [ "Noord-Noordoosten", "NNO" ],
+        [ "Noordoosten",       "NO" ],
+        [ "Oost-Noordoost",    "ONO" ],
+        [ "Oosten",            "O" ],
+        [ "Oost-Zuidoost",     "OZO" ],
+        [ "Zuidoosten",        "ZO" ],
+        [ "Zuid-Zuidoost",     "ZZO" ],
+        [ "Zuiden",            "Z" ],
+        [ "Zuid-Zuidwest",     "ZZW" ],
+        [ "Zuidwest",          "ZW" ],
+        [ "West-Zuidwest",     "WZW" ],
+        [ "West",              "W" ],
+        [ "West-Noord-West",   "WNW" ],
+        [ "Noord-West",        "NW" ],
+        [ "Noord-Noord-West",  "NNW" ],
     ],
     fr => [
-        'N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
-        'S', 'SSO', 'SO', 'OSO', 'O', 'ONO', 'NO', 'NNO'
+        [ "Nord",             "N" ],
+        [ "Nord-Nord-Est",    "NNE" ],
+        [ "Nord-Est",         "NE" ],
+        [ "Est-Nord-Est",     "ENE" ],
+        [ "Est",              "E" ],
+        [ "Est-Sud-Est",      "ESE" ],
+        [ "Sud-Est",          "SE" ],
+        [ "Sud-Sud-Est",      "SSE" ],
+        [ "Sud",              "S" ],
+        [ "Sud-Sud-Ouest",    "SSW" ],
+        [ "Sud-Ouest",        "SW" ],
+        [ "Ouest-Sud-Ouest",  "OSO" ],
+        [ "Ouest",            "O" ],
+        [ "Ouest-Nord-Ouest", "ONO" ],
+        [ "Nord-Ouest",       "NO" ],
+        [ "Nord-Nord-Ouest",  "NNO" ],
     ],
     pl => [
-        'N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
-        'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'
+        [ "Północ",                        "N" ],
+        [ "Północny-Północny-Wschód",   "NNE" ],
+        [ "Północny-Wschód",              "NE" ],
+        [ "Wschód-Północny-Wschód",      "ENE" ],
+        [ "Wschód",                         "E" ],
+        [ "Wschód-Południowy-Wschód",     "ESE" ],
+        [ "Południowy-Południowy-Wschód", "SE" ],
+        [ "Południowy-Wschód",             "SSE" ],
+        [ "Południe",                       "S" ],
+        [ "Południowo-Południowy-Zachód", "SSW" ],
+        [ "Południowy-Zachód",             "SW" ],
+        [ "Zachód-Południowy-Zachód",     "WSW" ],
+        [ "Zachód",                         "W" ],
+        [ "Zachód-Północny-Zachód",      "WNW" ],
+        [ "Północny-Zachód",              "NW" ],
+        [ "Północno-Północny-Zachód",   "NNW" ],
     ],
 );
 
@@ -693,23 +801,22 @@ sub mi2km($;$) {
 ###
 
 # convert direction in degree to point of the compass
-sub direction2compasspoint($;$) {
-    my ( $azimuth, $lang ) = @_;
+sub direction2compasspoint($;$$) {
+    my ( $deg, $txt, $lang ) = @_;
+    my $i = floor( ( ( $deg + 11.25 ) % 360 ) / 22.5 );
+    return $i if ( defined($txt) && $txt == 0. );
+
     my $directions_txt_i18n;
+    $lang = main::AttrVal( "global", "language", "EN" ) unless ($lang);
 
-    $lang = $main::attr{global}{language} ? $main::attr{global}{language} : "EN"
-      unless ($lang);
-
-    if ( $lang && defined( $compasspointss{ lc($lang) } ) ) {
-        $directions_txt_i18n = $compasspointss{ lc($lang) };
+    if ( exists( $compasspoints{ lc($lang) } ) ) {
+        $directions_txt_i18n = $compasspoints{ lc($lang) };
     }
     else {
-        $directions_txt_i18n = $compasspointss{en};
+        $directions_txt_i18n = $compasspoints{en};
     }
-
-    return @$directions_txt_i18n[
-      int( ( ( $azimuth + 11.25 ) % 360 ) / 22.5 )
-    ];
+    return $directions_txt_i18n->[$i][0] if ( $txt && $txt == 2. );
+    return $directions_txt_i18n->[$i][1];
 }
 
 #################################
@@ -899,7 +1006,11 @@ sub distance($$$$;$$) {
     my $km = $r * $c;
 
     return _round(
-        ( $unit && $unit eq "nmi" ? km2nmi($km) : ( $unit ? km2mi($km) : $km ) ), $rnd );
+        (
+            $unit && $unit eq "nmi" ? km2nmi($km) : ( $unit ? km2mi($km) : $km )
+        ),
+        $rnd
+    );
 }
 
 sub duration ($$;$) {
