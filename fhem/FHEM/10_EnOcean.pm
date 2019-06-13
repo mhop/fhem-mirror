@@ -10185,7 +10185,10 @@ sub EnOcean_Parse($$)
         $sunSouth = $sunSouth < 1000 ? $brightness : $sunSouth;
         $sunWest = $sunWest < 1000 ? $brightness : $sunWest;
         $sunEast = $sunEast < 1000 ? $brightness : $sunEast;
-        push @event, "3:brightness:$sunMax" if ($sunMax > 999);
+        if ($sunMax > 999) {
+          push @event, "3:brightness:$sunMax";
+          $brightness = $sunMax;
+        }
         push @event, "3:hemisphere:" . ($db[0] & 4 ? "south" : "north");
         push @event, "3:sunWest:$sunWest";
         push @event, "3:sunSouth:$sunSouth";
