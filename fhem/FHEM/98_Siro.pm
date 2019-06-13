@@ -1407,7 +1407,7 @@ sub versionchange($) {
 	CommandAttr(undef,$name . ' SIRO_inversPosition ' . $attr) if ( AttrVal($name,'invers_position','undef') ne 'undef' );
 	fhem("deleteattr $name invers_position");
 
-	CommandAttr( undef,$name . ' devStateIcon {if (ReadingsVal( $name, \'state\', \'undef\' ) =~ m/[a-z]/ ) { return \'programming:edit_settings notAvaible:hue_room_garage runningUp.*:fts_shutter_up runningDown.*:fts_shutter_down\'}else{return \'[0-9]{1,3}:fts_shutter_1w_\'.(int($state/10)*10)}}' );
+	CommandAttr( undef,$name . ' devStateIcon {return FHEM::Siro::Siro_icon($name)}' );
     CommandAttr(undef,$name . ' webCmd stop:open:close:fav:pct');
 
 	$attr = AttrVal($name,'operation_mode','undef');
