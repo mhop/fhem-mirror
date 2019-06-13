@@ -4,7 +4,6 @@
 #       76_SMAPortalSPG.pm
 #
 #       (c) 2019 by Heiko Maaz  e-mail: Heiko dot Maaz at t-online dot de
-#       forked from 98_weblink.pm by Rudolf König
 #
 #       This Module is used by module 76_SMAPortal to create graphic devices.
 #       It can't be used standalone without any SMAPortal-Device.
@@ -35,6 +34,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SMAPortalSPG_vNotesIntern = (
+  "1.1.0"  => "13.06.2019  commandRef revised, changed attribute W/kW to Wh/kWh ",
   "1.0.0"  => "03.06.2019  initial Version "
 );
 
@@ -68,7 +68,7 @@ sub SMAPortalSPG_Initialize($) {
                                 "spaceSize ".
                                 "suggestIcon ".
                                 "layoutType:pv,co,pvco,diff ".
-                                "W/kW:W,kW ".
+                                "Wh/kWh:Wh,kWh ".
                                 "weatherColor:colorpicker,RGB ".                                
                                 $readingFnAttributes;
   $hash->{RenameFn}           = "SMAPortalSPG_Rename";
@@ -262,14 +262,244 @@ return;
 1;
 
 =pod
-=item summary    Definition of grapic devices by the SMAPortal module
+=item summary    Definition of graphic devices by the SMAPortal module
 =item summary_DE Erstellung von Grafik-Devices durch das SMAPortal-Modul
 =begin html
 
 <a name="SMAPortalSPG"></a>
 <h3>SMAPortalSPG</h3>
 
-  Is coming soon. 
+<br>
+The module SMAPortalSPG is a device module attuned to the module SMAPortal for definition of graphic devices. <br>
+
+<ul>
+  <a name="SMAPortalSPGdefine"></a>
+  <b>Define</b>
+  <br><br>
+  
+  <ul>
+    A SMAPortal graphic device is defined by the command "set &lt;name&gt; createPortalGraphic &lt;type&gt;" in an SMAPortal device.
+    Please see the description of SMAPortal <a href="#SMAPortalCreatePortalGraphic">"createPortalGraphic"</a> command.  
+    <br><br>
+  </ul>
+
+  <a name="SMAPortalSPGset"></a>
+  <b>Set</b> 
+  <ul>
+  N/A
+  </ul>
+  <br>
+  
+  <a name="SMAPortalSPGget"></a>
+  <b>Get</b> 
+  
+  <ul>
+  N/A
+  </ul>
+  <br>
+
+  <a name="SMAPortalSPGattr"></a>
+  <b>Attribute</b>
+  <br><br>
+  <ul>
+     <ul>
+        <a name="alias"></a>
+        <li><b>alias </b><br>
+          In conjunction with "showLink" a user-defined label for the device.
+        </li>
+        <br>  
+       
+       <a name="autoRefresh"></a>
+       <li><b>autoRefresh</b><br>
+         If set, active browser pages of the FHEMWEB device which has called the SMAPortalSPG device, are new reloaded after  
+         the specified time (seconds). Browser pages of a particular FHEMWEB device to be refreshed can be specified by 
+         attribute "autoRefreshFW" instead.
+       </li>
+       <br>
+    
+       <a name="autoRefreshFW"></a>
+       <li><b>autoRefreshFW</b><br>
+         If "autoRefresh" is activated, you can specify a particular FHEMWEB device whose active browser pages are refreshed 
+         periodically.
+       </li>
+       <br>
+    
+       <a name="beamColor"></a>
+       <li><b>beamColor </b><br>
+         Color selection for the primary beams.  
+       </li>
+       <br>
+       
+       <a name="beamColor2"></a>
+       <li><b>beamColor2 </b><br>
+         Color selection for the secondary beams. The second color only make sense for devices of type "Generation_Consumption" 
+         (Type pvco) and "Differential" (Type diff).
+       </li>
+       <br>  
+       
+       <a name="beamHeight"></a>
+       <li><b>beamHeight &lt;value&gt; </b><br>
+         Height of beams in px and therefore the determination of the whole graphic Height.
+         In conjunction with "hourCount" it is possible to create quite tiny graphics. (default: 200)
+       </li>
+       <br>
+       
+       <a name="beamWidth"></a>
+       <li><b>beamWidth &lt;value&gt; </b><br>
+         Width of the beams in px. (default: 6 (auto))
+       </li>
+       <br>  
+
+       <a name="consumerList"></a>
+       <li><b>consumerList &lt;Verbraucher1&gt;:&lt;Icon&gt;@&lt;Farbe&gt;,&lt;Verbraucher2&gt;:&lt;Icon&gt;@&lt;Farbe&gt;,...</b><br>
+         Comma separated list of consumers which are connected to the Sunny Home Manager. <br>
+	     Once the activation of a listed consumer is planned, the consumer icon will be shown in the beams of the planned period. 
+         The name of a consumer must be identical to its name in Reading "L3_&lt;consumer&gt;_Planned". <br><br>
+       
+         <b>Example: </b> <br>
+         attr &lt;name&gt; consumerList Trockner:scene_clothes_dryer@yellow,Waschmaschine:scene_washing_machine@lightgreen,Geschirrspueler:scene_dishwasher@orange
+         <br>
+       </li>
+       <br>  
+           
+       <a name="consumerLegend"></a>
+       <li><b>consumerLegend &ltnone | icon_top | icon_bottom | text_top | text_bottom&gt; </b><br>
+         Location respectively the method of the shown consumer legend.
+       </li>
+       <br>       
+  
+       <a name="disable"></a>
+       <li><b>disable</b><br>
+         Activate/deactivate the device.
+       </li>
+       <br>
+     
+       <a name="forcePageRefresh"></a>
+       <li><b>forcePageRefresh</b><br>
+         The attribute is evaluated by the SMAPortal module. <br>
+         If set, a reload of all browser pages with active FHEMWEB connections will be enforced when the parent SMAPortal device
+         was updated.
+       </li>
+       <br>
+       
+       <a name="hourCount"></a>
+       <li><b>hourCount &lt;4...24&gt; </b><br>
+         Amount of beams/hours to show. (default: 24)
+       </li>
+       <br>
+       
+       <a name="hourStyle"></a>
+       <li><b>hourStyle </b><br>
+         Format of time specification. <br><br>
+       
+	     <ul>   
+	     <table>  
+	     <colgroup> <col width=10%> <col width=90%> </colgroup>
+		    <tr><td> <b>not set</b>  </td><td>- only hours without minutes (default)</td></tr>
+	  	    <tr><td> <b>:00</b>      </td><td>- hours and minutes two-digit, e.g. 10:00 </td></tr>
+		    <tr><td> <b>:0</b>       </td><td>- hours and minutes one-digit, e.g. 8:0 </td></tr>
+	     </table>
+	     </ul>       
+       </li>
+       <br>
+ 
+       <a name="maxPV"></a>
+       <li><b>maxPV &lt;0...val&gt; </b><br>
+         Maximum yield per hour to calculate the beam height. (default: 0 -> dynamical)
+       </li>
+       <br>
+       
+       <a name="htmlStart"></a>
+       <li><b>htmlStart &lt;HTML-String&gt; </b><br>
+         A user-defined HTML-String issued before the graphic code. 
+       </li>
+       <br>
+
+       <a name="htmlEnd"></a>
+       <li><b>htmlEnd &lt;HTML-String&gt; </b><br>
+         A user-defined HTML-String issued after the graphic code. 
+       </li>
+       <br> 
+   
+       <a name="showDiff"></a>
+       <li><b>showDiff &lt;no | top | bottom&gt; </b><br>
+         Additional note of the difference "Generation - Consumption" as well as the device type Differential (diff) does. 
+         (default: no)
+       </li>
+       <br>
+       
+       <a name="showHeader"></a>
+       <li><b>showHeader </b><br>
+         Shows the header line with forecast data, Rest of the current day generation and the forecast of the next day 
+         (default: 1)
+       </li>
+       <br>
+       
+       <a name="showLink"></a>
+       <li><b>showLink </b><br>
+         Show the detail link above the graphic device. (default: 1)
+       </li>
+       <br>
+       
+       <a name="showNight"></a>
+       <li><b>showNight </b><br>
+         Show the night hours (without forecast values) additionally. (default: 0)
+       </li>
+       <br>
+
+       <a name="showWeather"></a>
+       <li><b>showWeather </b><br>
+         Show weather icons. (default: 1)
+       </li>
+       <br> 
+       
+       <a name="spaceSize"></a>
+       <li><b>spaceSize &lt;value&gt; </b><br>
+         Determines the space (px) above or below the beams (only when using the type "Differential" (diff)) to the shown values.
+         If styles are using  large fonts the default value may be too less.
+         In that cases please increase the value. (default: 24)
+       </li>
+       <br> 
+       
+       <a name="suggestIcon"></a>
+       <li><b>suggestIcon </b><br>
+         Set the icon used in periods with suggestion to switch consumers on. 
+         You can use the standard "Select Icon" function (down left in FHEMWEB) to select the wanted icon.
+       </li>  
+       <br>
+
+       <a name="layoutType"></a>
+       <li><b>layoutType &lt;pv | co | pvco | diff&gt; </b><br>
+       Layout type of Portal graphic. (default: pv)  <br><br>
+       
+	   <ul>   
+	   <table>  
+	   <colgroup> <col width=15%> <col width=85%> </colgroup>
+		  <tr><td> <b>pv</b>    </td><td>- Generation </td></tr>
+		  <tr><td> <b>co</b>    </td><td>- Consumption </td></tr>
+		  <tr><td> <b>pvco</b>  </td><td>- Generation and Consumption </td></tr>
+          <tr><td> <b>diff</b>  </td><td>- Differenz between Generation and Consumption </td></tr>
+	   </table>
+	   </ul>
+       </li>
+       <br> 
+       
+       <a name="Wh/kWh"></a>
+       <li><b>Wh/kWh &lt;Wh | kWh&gt; </b><br>
+         Switch the unit to W or to kW rounded to one position after decimal point. (default: W)
+       </li>
+       <br>   
+
+       <a name="weatherColor"></a>
+       <li><b>weatherColor </b><br>
+         Color of weather icons.
+       </li>
+       <br>        
+
+     </ul>
+  </ul>
+  
+</ul>
 
 =end html
 =begin html_DE
@@ -286,7 +516,7 @@ Das Modul SMAPortalSPG ist ein mit SMAPortal abgestimmtes Gerätemodul zur Defin
   <br><br>
   
   <ul>
-    Ein SMAPortal Grafik Device wird durch den SMAPortal Befehl "set &lt;name&gt; createPortalGraphic &lt;Typ&gt;" erstellt.
+    Ein SMAPortal Grafik-Device wird durch den SMAPortal Befehl "set &lt;name&gt; createPortalGraphic &lt;Typ&gt;" erstellt.
     Siehe auch die Beschreibung zum SMAPortal <a href="#SMAPortalCreatePortalGraphic">"createPortalGraphic"</a> Befehl.  
     <br><br>
   </ul>
@@ -313,7 +543,7 @@ Das Modul SMAPortalSPG ist ein mit SMAPortal abgestimmtes Gerätemodul zur Defin
      <ul>
         <a name="alias"></a>
         <li><b>alias </b><br>
-          In Verbindung mit "showLink" beliebiger Abzeigename.
+          In Verbindung mit "showLink" ein beliebiger Abzeigename.
         </li>
         <br>  
        
@@ -340,40 +570,40 @@ Das Modul SMAPortalSPG ist ein mit SMAPortal abgestimmtes Gerätemodul zur Defin
        
        <a name="beamColor2"></a>
        <li><b>beamColor2 </b><br>
-         Farbauswahl der sekundären Balken. Die zweite Farbe ist nur sinnvoll für Anzeigedevice "Generation_Consumption" 
-         (Type pvco) und "Differential" (Type diff).
+         Farbauswahl der sekundären Balken. Die zweite Farbe ist nur sinnvoll für den Anzeigedevice-Typ "Generation_Consumption" 
+         (pvco) und "Differential" (diff).
        </li>
        <br>  
        
        <a name="beamHeight"></a>
        <li><b>beamHeight &lt;value&gt; </b><br>
          Höhe der Balken in px und damit Bestimmung der gesammten Höhe.
-         In Verbindung mit hourCount lassen sich damit auch recht kleine Grafikausgaben erzeugen. (default: 200)
+         In Verbindung mit "hourCount" lassen sich damit auch recht kleine Grafikausgaben erzeugen. (default: 200)
        </li>
        <br>
        
        <a name="beamWidth"></a>
        <li><b>beamWidth &lt;value&gt; </b><br>
-         Breite der Balken in px. ( default: 6 (auto) )
+         Breite der Balken in px. (default: 6 (auto))
        </li>
        <br>  
 
        <a name="consumerList"></a>
-       <li><b>consumerList </b><br>
-         Komma getrennte Liste der am Sunny Home Manager angeschlossenen Geräte in der Form &lt;Verbrauchername&gt;:&lt;Icon&gt;@&lt;Farbe&gt;. <br>
-	     Sobald die Einschaltung einer der angegebenen Verbraucher geplant ist, wird der geplante Zeitraum in der Grafik 
+       <li><b>consumerList &lt;Verbraucher1&gt;:&lt;Icon&gt;@&lt;Farbe&gt;,&lt;Verbraucher2&gt;:&lt;Icon&gt;@&lt;Farbe&gt;,...</b><br>
+         Komma getrennte Liste der am SMA Sunny Home Manager angeschlossenen Geräte. <br>
+	     Sobald die Aktivierung einer der angegebenen Verbraucher geplant ist, wird der geplante Zeitraum in der Grafik 
          angezeigt. 
          Der Name des Verbrauchers muss dabei dem Namen im Reading "L3_&lt;Verbrauchername&gt;_Planned" entsprechen. <br><br>
        
          <b>Beispiel: </b> <br>
-         Trockner:scene_clothes_dryer@yellow,Waschmaschine:scene_washing_machine@lightgreen,Geschirrspueler:scene_dishwasher@orange
+         attr &lt;name&gt; consumerList Trockner:scene_clothes_dryer@yellow,Waschmaschine:scene_washing_machine@lightgreen,Geschirrspueler:scene_dishwasher@orange
          <br>
        </li>
        <br>  
            
        <a name="consumerLegend"></a>
        <li><b>consumerLegend &ltnone | icon_top | icon_bottom | text_top | text_bottom&gt; </b><br>
-         Lage bzw. Art und Weise der angezeigten Consumers Legende.
+         Lage bzw. Art und Weise der angezeigten Verbraucherlegende.
        </li>
        <br>       
   
@@ -385,9 +615,9 @@ Das Modul SMAPortalSPG ist ein mit SMAPortal abgestimmtes Gerätemodul zur Defin
      
        <a name="forcePageRefresh"></a>
        <li><b>forcePageRefresh</b><br>
-         Das Attribut wird durch SMAPortal ausgewertet. <br>
-         Wenn gesetzt, wird ein Reload aller Browserseiten mit aktiven FHEMWEB-Verbindungen nach dem Abschluß bestimmter 
-         SMAPortal-Befehle erzwungen.    
+         Das Attribut wird durch das SMAPortal-Device ausgewertet. <br>
+         Wenn gesetzt, wird ein Reload aller Browserseiten mit aktiven FHEMWEB-Verbindungen nach dem Update des 
+         Eltern-SMAPortal-Devices erzwungen.    
        </li>
        <br>
        
@@ -414,19 +644,19 @@ Das Modul SMAPortalSPG ist ein mit SMAPortal abgestimmtes Gerätemodul zur Defin
  
        <a name="maxPV"></a>
        <li><b>maxPV &lt;0...val&gt; </b><br>
-         Maximaler Ertrag in einer Stunde zur Berechnung der Balkenhöhe, 0 = dynamisch. (default: 0)
+         Maximaler Ertrag in einer Stunde zur Berechnung der Balkenhöhe. (default: 0 -> dynamisch)
        </li>
        <br>
        
        <a name="htmlStart"></a>
        <li><b>htmlStart &lt;HTML-String&gt; </b><br>
-         Angabe eines beliebigen HTML-Strings der vor der generierten Portalgrafik ausgegeben wird. 
+         Angabe eines beliebigen HTML-Strings der vor dem Grafik-Code ausgeführt wird. 
        </li>
        <br>
 
        <a name="htmlEnd"></a>
        <li><b>htmlEnd &lt;HTML-String&gt; </b><br>
-         Angabe eines beliebigen HTML-Strings der nach der generierten Portalgrafik ausgegeben wird. 
+         Angabe eines beliebigen HTML-Strings der nach dem Grafik-Code ausgeführt wird. 
        </li>
        <br> 
    
@@ -437,34 +667,34 @@ Das Modul SMAPortalSPG ist ein mit SMAPortal abgestimmtes Gerätemodul zur Defin
        <br>
        
        <a name="showHeader"></a>
-       <li><b>showHeader &lt;1|0&gt; </b><br>
+       <li><b>showHeader </b><br>
          Anzeige der Kopfzeile mit Prognosedaten, Rest des aktuellen Tages und des nächsten Tages (default: 1)
        </li>
        <br>
        
        <a name="showLink"></a>
-       <li><b>showLink &lt;1|0&gt; </b><br>
-         Anzeige des Device-Detaillinks über der grafischen Ausgabe (default: 1)
+       <li><b>showLink </b><br>
+         Anzeige des Detail-Links über dem Grafik-Device (default: 1)
        </li>
        <br>
        
        <a name="showNight"></a>
-       <li><b>showNight &lt;1|0&gt; </b><br>
-         Ebenfalls die Nachtstunden ohne Ertragsprognose anzeigen (default: 0)
+       <li><b>showNight </b><br>
+         Die Nachtstunden (ohne Ertragsprognose) werden mit angezeigt. (default: 0)
        </li>
        <br>
 
        <a name="showWeather"></a>
-       <li><b>showWeather &lt;1|0&gt; </b><br>
+       <li><b>showWeather </b><br>
          Wettericons anzeigen. (default: 1)
        </li>
        <br> 
        
        <a name="spaceSize"></a>
        <li><b>spaceSize &lt;value&gt; </b><br>
-         Legt fest wieviel Platz in px über den Balken (bei Anzeigetyp Differential (diff) auch unter diesen) zur Anzeige der 
-         Werte freigehalten wird. Bei Styles die große Fonts benutzen, kann der default-Wert zu klein sein, bzw. u.U. rutscht ein 
-         Balken über die Grundlinie. In diesen Fällen bitte den Wert erhöhen. (default: 24)
+         Legt fest wieviel Platz in px über oder unter den Balken (bei Anzeigetyp Differential (diff)) zur Anzeige der 
+         Werte freigehalten wird. Bei Styles mit große Fonts kann der default-Wert zu klein sein bzw. rutscht ein 
+         Balken u.U. über die Grundlinie. In diesen Fällen bitte den Wert erhöhen. (default: 24)
        </li>
        <br> 
        
@@ -492,9 +722,9 @@ Das Modul SMAPortalSPG ist ein mit SMAPortal abgestimmtes Gerätemodul zur Defin
        </li>
        <br> 
        
-       <a name="W/kW"></a>
-       <li><b>W/kW &lt;W | kW&gt; </b><br>
-         Wertanzeige in W oder in kW auf eine Nachkommastelle gerundet. (default: W)
+       <a name="Wh/kWh"></a>
+       <li><b>Wh/kWh &lt;Wh | kWh&gt; </b><br>
+         Definiert die Anzeigeeinheit in Wh oder in kWh auf eine Nachkommastelle gerundet. (default: W)
        </li>
        <br>   
 
@@ -530,7 +760,7 @@ Das Modul SMAPortalSPG ist ein mit SMAPortal abgestimmtes Gerätemodul zur Defin
     "refresh"
   ],
   "version": "v1.1.1",
-  "release_status": "testing",
+  "release_status": "stable",
   "author": [
     "Heiko Maaz <heiko.maaz@t-online.de>"
   ],

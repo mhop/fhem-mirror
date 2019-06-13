@@ -161,6 +161,7 @@ use vars qw($FW_ME);                                    # webname (default is fh
 
 # Versions History intern
 our %vNotesIntern = (
+  "2.3.1"  => "13.06.2019  switch Credentials read from RAM to verbose 4, changed W/h->Wh and kW/h->kWh in PortalAsHtml ",
   "2.3.0"  => "12.06.2019  add set on,off,automatic cmd for controlled devices ",
   "2.2.0"  => "10.06.2019  relocate RestOfDay and Tomorrow data from level 3 to level 2, change readings to start all with uppercase, ".
                            "add consumer energy data of current day/month/year, new attribute \"verbose5Data\" ",
@@ -526,7 +527,7 @@ sub getcredentials ($$) {
             
             my $logpw = AttrVal($name, "showPassInLog", "0") == 1 ? $passwd : "********";
         
-            Log3($name, 3, "$name - Credentials read from RAM: $username $logpw");
+            Log3($name, 4, "$name - Credentials read from RAM: $username $logpw");
         
         } else {
             Log3($name, 1, "$name - Credentials not set in RAM !");
@@ -1875,7 +1876,7 @@ sub PortalAsHtml ($$) {
   $html_end   =  AttrVal($wlname, 'htmlEnd',       undef);                              # beliebige HTML Strings die nach der Grafik ausgegeben werden
 
   $type       =  AttrVal($wlname, 'layoutType',     'pv');
-  $kw         =  AttrVal($wlname, 'W/kW',            'W');
+  $kw         =  AttrVal($wlname, 'Wh/kWh',         'Wh');
 
   $height     =  AttrNum($wlname, 'beamHeight',      200);
   $width      =  AttrNum($wlname, 'beamWidth',         6);                              # zu klein ist nicht problematisch
@@ -1904,20 +1905,20 @@ sub PortalAsHtml ($$) {
   my $pvRe = ReadingsNum($name,"L2_RestOfDay-PV", 0); 
   my $pvTo = ReadingsNum($name,"L2_Tomorrow-PV", 0);
 
-  if ($kw eq 'kW') {
-      $co4h = sprintf("%.1f" , $co4h/1000)."&nbsp;kW";
-      $coRe = sprintf("%.1f" , $coRe/1000)."&nbsp;kW";
-      $coTo = sprintf("%.1f" , $coTo/1000)."&nbsp;kW";
-      $pv4h = sprintf("%.1f" , $pv4h/1000)."&nbsp;kW";
-      $pvRe = sprintf("%.1f" , $pvRe/1000)."&nbsp;kW";
-      $pvTo = sprintf("%.1f" , $pvTo/1000)."&nbsp;kW";
+  if ($kw eq 'kWh') {
+      $co4h = sprintf("%.1f" , $co4h/1000)."&nbsp;kWh";
+      $coRe = sprintf("%.1f" , $coRe/1000)."&nbsp;kWh";
+      $coTo = sprintf("%.1f" , $coTo/1000)."&nbsp;kWh";
+      $pv4h = sprintf("%.1f" , $pv4h/1000)."&nbsp;kWh";
+      $pvRe = sprintf("%.1f" , $pvRe/1000)."&nbsp;kWh";
+      $pvTo = sprintf("%.1f" , $pvTo/1000)."&nbsp;kWh";
   } else {
-      $co4h .= "&nbsp;W";
-      $coRe .= "&nbsp;W";
-      $coTo .= "&nbsp;W";
-      $pv4h .= "&nbsp;W";
-      $pvRe .= "&nbsp;W";
-      $pvTo .= "&nbsp;W";
+      $co4h .= "&nbsp;Wh";
+      $coRe .= "&nbsp;Wh";
+      $coTo .= "&nbsp;Wh";
+      $pv4h .= "&nbsp;Wh";
+      $pvRe .= "&nbsp;Wh";
+      $pvTo .= "&nbsp;Wh";
   }
 
   # Headerzeile generieren
@@ -1932,8 +1933,8 @@ sub PortalAsHtml ($$) {
   if ($header) {
       my ($h1,$h2);
       if(AttrVal("global","language","EN") eq "DE") {
-          $h1 = "Prognose [pv] - nächste&nbsp;4&nbsp;Stunden:&nbsp;$pv4h/h&nbsp;/ Rest&nbsp;des&nbsp;Tages:&nbsp;$pvRe/h&nbsp;/ Morgen:&nbsp;$pvTo/h";
-          $h2 = "Prognose [co] - nächste&nbsp;4&nbsp;Stunden:&nbsp;$co4h/h&nbsp;/ Rest&nbsp;des&nbsp;Tages:&nbsp;$coRe/h&nbsp;/ Morgen:&nbsp;$coTo/h";
+          $h1 = "Prognose [pv] - nächste&nbsp;4&nbsp;Stunden:&nbsp;$pv4h&nbsp;/ Rest&nbsp;des&nbsp;Tages:&nbsp;$pvRe&nbsp;/ Morgen:&nbsp;$pvTo";
+          $h2 = "Prognose [co] - nächste&nbsp;4&nbsp;Stunden:&nbsp;$co4h&nbsp;/ Rest&nbsp;des&nbsp;Tages:&nbsp;$coRe&nbsp;/ Morgen:&nbsp;$coTo";
           my ($year, $month, $day, $hour, $min, $sec) = $lup =~ /(\d+)-(\d\d)-(\d\d)\s+(.*)/;
           $lup  = "$3.$2.$1 $4";
           $lupt = "letzte Aktualisierung:"; 
@@ -2378,7 +2379,7 @@ sub formatVal6($$;$) {
       $v = abs($v);
   }
 
-  if ($kw eq 'kW') {                                        # bei Anzeige in kW muss weniger aufgefüllt werden
+  if ($kw eq 'kWh') {                                       # bei Anzeige in kWh muss weniger aufgefüllt werden
       $v  = sprintf('%.1f',($v/1000));
       $v  += 0;                                             # keine 0.0 oder 6.0 etc
 
