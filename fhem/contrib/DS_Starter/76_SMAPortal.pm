@@ -161,6 +161,7 @@ use vars qw($FW_ME);                                    # webname (default is fh
 
 # Versions History intern
 our %vNotesIntern = (
+  "2.3.2"  => "14.06.2019  add request string to verbose 5, add battery data to live and historical consumer data ",
   "2.3.1"  => "13.06.2019  switch Credentials read from RAM to verbose 4, changed W/h->Wh and kW/h->kWh in PortalAsHtml ",
   "2.3.0"  => "12.06.2019  add set on,off,automatic cmd for controlled devices ",
   "2.2.0"  => "10.06.2019  relocate RestOfDay and Tomorrow data from level 3 to level 2, change readings to start all with uppercase, ".
@@ -431,7 +432,7 @@ sub DbLog_split($$) {
 	  $value   = $2;
 	  $unit    = $3;
   }   
-  if($event =~ m/Next04Hours-IsConsumption|RestOfDay-IsConsumption|Tomorrow-IsConsumption/) {
+  if($event =~ m/Next04Hours-IsConsumption|RestOfDay-IsConsumption|Tomorrow-IsConsumption|Battery/) {
       $event   =~ /^L(.*):\s(.*)\s(.*)/;
       $reading = "L".$1;
 	  $value   = $2;
@@ -760,11 +761,16 @@ sub GetSetData($) {
                   my $mde      = "$ye-$me-01";
                   my $yds      = "$1-01-01";
                   my $yde      = ($1+1)."-01-01";
-                  
+				  
+				  my $ccdd     = 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=2&'.$PlantOid.'&StartTime='.$dds.'&EndTime='.$dde.'';
+                  my $ccmd     = 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=4&'.$PlantOid.'&StartTime='.$mds.'&EndTime='.$mde.'';
+				  my $ccyd     = 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=5&'.$PlantOid.'&StartTime='.$yds.'&EndTime='.$yde.'';
+				  
                   # Energiedaten aktueller Tag
                   Log3 ($name, 4, "$name - Getting consumer energy data of current day");
-                  Log3 ($name, 4, "$name - Request date -> start: $dds, end: $dde");  
-                  my $ccdaydata = $ua->get('https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=2&'.$PlantOid.'&StartTime='.$dds.'&EndTime='.$dde.'');
+                  Log3 ($name, 4, "$name - Request date -> start: $dds, end: $dde");
+                  Log3 ($name, 5, "$name - Request consumer current day data string ->\n$ccdd");  				  
+				  my $ccdaydata = $ua->get($ccdd);
                   
                   Log3 ($name, 5, "$name - Return Code: ".$ccdaydata->code) if($v5d eq "consumerDayData"); 
 
@@ -776,7 +782,8 @@ sub GetSetData($) {
                   # Energiedaten aktueller Monat
                   Log3 ($name, 4, "$name - Getting consumer energy data of current month");
                   Log3 ($name, 4, "$name - Request date -> start: $mds, end: $mde"); 
-                  my $ccmonthdata = $ua->get('https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=4&'.$PlantOid.'&StartTime='.$mds.'&EndTime='.$mde.'');
+				  Log3 ($name, 5, "$name - Request consumer current month data string ->\n$ccmd");
+                  my $ccmonthdata = $ua->get($ccmd);
                   
                   Log3 ($name, 5, "$name - Return Code: ".$ccmonthdata->code) if($v5d eq "consumerMonthData"); 
 
@@ -788,7 +795,8 @@ sub GetSetData($) {
                   # Energiedaten aktuelles Jahr
                   Log3 ($name, 4, "$name - Getting consumer energy data of current year");
                   Log3 ($name, 4, "$name - Request date -> start: $yds, end: $yde"); 
-                  my $ccyeardata = $ua->get('https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=5&'.$PlantOid.'&StartTime='.$yds.'&EndTime='.$yde.'');
+				  Log3 ($name, 5, "$name - Request consumer current year data string ->\n$ccyd");
+                  my $ccyeardata = $ua->get($ccyd);
                   
                   Log3 ($name, 5, "$name - Return Code: ".$ccyeardata->code) if($v5d eq "consumerMonthData"); 
 
@@ -1517,7 +1525,7 @@ sub extractConsumerHistData($$$) {
   my ($hash,$chdata,$tf) = @_;
   my $name = $hash->{NAME};
   my %consumers;
-  my ($key,$val,$i,$res,$gcr,$gct,$pcr,$pct,$tct);
+  my ($key,$val,$i,$res,$gcr,$gct,$pcr,$pct,$tct,$bcr,$bct);
   
   my $dl = AttrVal($name, "detailLevel", 1);
   if($dl <= 2) {
@@ -1533,6 +1541,8 @@ sub extractConsumerHistData($$$) {
       $consumers{"${i}_ConsumerOid"}  = $c->{'ConsumerOid'};
       $consumers{"${i}_ConsumerLfd"}  = $i;
 	  my $cpower                      = $c->{'TotalEnergy'}{'Measurement'};       # Energieverbrauch im Timeframe in Wh
+	  my $bdc                         = $c->{'BatteryDischarging'};               # Batterieentladung in ?
+	  my $bc                          = $c->{'BatteryCharging'};                  # Batterieladung in ?                                          
 	  my $cn                          = $consumers{"${i}_ConsumerName"};          # Verbrauchername
       $cn                             = substUmlauts($cn);
       
@@ -1542,21 +1552,33 @@ sub extractConsumerHistData($$$) {
           $gct = $c->{'TotalEnergyMix'}{'GridConsumptionTotal'};               # Anteil des Netzbezugs im Timeframe am Gesamtverbrauch in Wh
           $pcr = $c->{'TotalEnergyMix'}{'PvConsumptionRelative'};              # Anteil des PV-Nutzung im Timeframe am Gesamtverbrauch in %
           $pct = $c->{'TotalEnergyMix'}{'PvConsumptionTotal'};                 # Anteil des PV-Nutzung im Timeframe am Gesamtverbrauch in Wh
+          $bcr = $c->{'TotalEnergyMix'}{'BatteryConsumptionRelative'};         # Anteil der Batterie-Nutzung im Timeframe am Gesamtverbrauch in %
+          $bct = $c->{'TotalEnergyMix'}{'BatteryConsumptionTotal'};            # Anteil der Batterie-Nutzung im Timeframe am Gesamtverbrauch in Wh
       }
       
       readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalDay",          sprintf("%.0f", $cpower)." Wh") if(defined($cpower) && $tf eq "day"); 
       readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalMonth",        sprintf("%.0f", $cpower)." Wh") if(defined($cpower) && $tf eq "month");  
-      readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalYear",         sprintf("%.0f", $cpower)." Wh") if(defined($cpower) && $tf eq "year");                  
+      readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalYear",         sprintf("%.0f", $cpower)." Wh") if(defined($cpower) && $tf eq "year");  
+      readingsBulkUpdate($hash, "L3_BatteryDischargingDay",         sprintf("%.0f", $bdc)         ) if(defined($bdc)    && $tf eq "day");	
+      readingsBulkUpdate($hash, "L3_BatteryDischargingMonth",       sprintf("%.0f", $bdc)         ) if(defined($bdc)    && $tf eq "month");	  
+      readingsBulkUpdate($hash, "L3_BatteryDischargingYear",        sprintf("%.0f", $bdc)         ) if(defined($bdc)    && $tf eq "year");
+      readingsBulkUpdate($hash, "L3_BatteryChargingDay",            sprintf("%.0f", $bc)          ) if(defined($bc)     && $tf eq "day");	
+      readingsBulkUpdate($hash, "L3_BatteryChargingMonth",          sprintf("%.0f", $bc)          ) if(defined($bc)     && $tf eq "month");	  
+      readingsBulkUpdate($hash, "L3_BatteryChargingYear",           sprintf("%.0f", $bc)          ) if(defined($bc)     && $tf eq "year");
 	  
       readingsBulkUpdate($hash, "L3_${cn}_EnergyRelativeMonthGrid", sprintf("%.0f", $gcr)." %")     if(defined($gcr) && $tf eq "month");            
       readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalMonthGrid",    sprintf("%.0f", $gct)." Wh")    if(defined($gct) && $tf eq "month");
       readingsBulkUpdate($hash, "L3_${cn}_EnergyRelativeMonthPV",   sprintf("%.0f", $pcr)." %")     if(defined($pcr) && $tf eq "month");                  
-      readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalMonthPV",      sprintf("%.0f", $pct)." Wh")    if(defined($pct) && $tf eq "month");                  
+      readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalMonthPV",      sprintf("%.0f", $pct)." Wh")    if(defined($pct) && $tf eq "month");
+      readingsBulkUpdate($hash, "L3_${cn}_EnergyRelativeMonthBatt", sprintf("%.0f", $bcr)." %")     if(defined($bcr) && $tf eq "month");   	
+      readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalMonthBatt",    sprintf("%.0f", $bct)." Wh")    if(defined($bct) && $tf eq "month");	  
 
 	  readingsBulkUpdate($hash, "L3_${cn}_EnergyRelativeYearGrid",  sprintf("%.0f", $gcr)." %")     if(defined($gcr) && $tf eq "year");            
       readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalYearGrid",     sprintf("%.0f", $gct)." Wh")    if(defined($gct) && $tf eq "year");
       readingsBulkUpdate($hash, "L3_${cn}_EnergyRelativeYearPV",    sprintf("%.0f", $pcr)." %")     if(defined($pcr) && $tf eq "year");                  
-      readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalYearPV",       sprintf("%.0f", $pct)." Wh")    if(defined($pct) && $tf eq "year");  
+      readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalYearPV",       sprintf("%.0f", $pct)." Wh")    if(defined($pct) && $tf eq "year");
+      readingsBulkUpdate($hash, "L3_${cn}_EnergyRelativeYearBatt",  sprintf("%.0f", $bcr)." %")     if(defined($bcr) && $tf eq "year");  
+      readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalYearBatt",     sprintf("%.0f", $bct)." Wh")    if(defined($bct) && $tf eq "year");	  
       
       $i++;
   }
@@ -2565,7 +2587,7 @@ return;
    <ul>
     <ul>
      <li>Live-Daten (Verbrauch und PV-Erzeugung) </li>
-     <li>Batteriedaten (In/Out) </li>
+     <li>Batteriedaten (In/Out) sowie Nutzungsdaten durch Verbraucher </li>
      <li>Wetter-Daten von SMA für den Anlagenstandort </li>
      <li>Prognosedaten (Verbrauch und PV-Erzeugung) inklusive Verbraucherempfehlung </li>
      <li>die durch den Sunny Home Manager geplanten Schaltzeiten und aktuellen Status von Verbrauchern (sofern vorhanden) </li>
@@ -2696,7 +2718,7 @@ return;
 	   <colgroup> <col width=5%> <col width=95%> </colgroup>
 		  <tr><td> <b>L1</b>  </td><td>- nur Live-Daten und Wetter-Daten werden generiert. </td></tr>
 		  <tr><td> <b>L2</b>  </td><td>- wie L1 und zusätzlich Prognose der aktuellen und nächsten 4 Stunden sowie PV-Erzeugung / Verbrauch des Resttages und des Folgetages </td></tr>
-		  <tr><td> <b>L3</b>  </td><td>- wie L2 und zusätzlich Prognosedaten der geplanten Einschaltzeiten von Verbrauchern, deren aktueller Status und Energiedaten</td></tr>
+		  <tr><td> <b>L3</b>  </td><td>- wie L2 und zusätzlich Prognosedaten der geplanten Einschaltzeiten von Verbrauchern, deren aktueller Status und Energiedaten sowie Batterie-Nutzungsdaten</td></tr>
           <tr><td> <b>L4</b>  </td><td>- wie L3 und zusätzlich die detaillierte Prognose der nächsten 24 Stunden </td></tr>
 	   </table>
 	   </ul>     
