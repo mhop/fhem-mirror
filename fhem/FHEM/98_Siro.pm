@@ -439,7 +439,7 @@ sub Parse($$) {
    
     my @args;
     my ( $hash, $msg ) = @_;
-    my $doubelmsgtime = 5;  # zeit in sek in der doppelte nachrichten blockiert werden
+    my $doubelmsgtime = 1;  # zeit in sek in der doppelte nachrichten blockiert werden
     my $favcheck = $doubelmsgtime +1;# zeit in der ein zweiter stop kommen muss/darf für fav
     my $testid  = substr( $msg, 4,  8 );
     my $testcmd = substr( $msg, 12, 2 );
