@@ -1532,6 +1532,8 @@ sub extractConsumerHistData($$$) {
       return;
   }
   
+  my $bataval = (definded(ReadingsNum($name,"L1_BatteryIn", undef)) || defined(ReadingsNum($name,"L1_BatteryOut", undef)))?1:0;     # Identifikation ist Battery vorhanden ?
+  
   readingsBeginUpdate($hash);
   
   # allen Consumer Objekte die ID zuordnen
@@ -1540,10 +1542,10 @@ sub extractConsumerHistData($$$) {
       $consumers{"${i}_ConsumerName"} = encode("utf8", $c->{'DeviceName'} );
       $consumers{"${i}_ConsumerOid"}  = $c->{'ConsumerOid'};
       $consumers{"${i}_ConsumerLfd"}  = $i;
-	  my $cpower                      = $c->{'TotalEnergy'}{'Measurement'};       # Energieverbrauch im Timeframe in Wh
-	  my $bdc                         = $c->{'BatteryDischarging'};               # Batterieentladung in ?
-	  my $bc                          = $c->{'BatteryCharging'};                  # Batterieladung in ?                                          
-	  my $cn                          = $consumers{"${i}_ConsumerName"};          # Verbrauchername
+	  my $cpower                      = $c->{'TotalEnergy'}{'Measurement'};    # Energieverbrauch im Timeframe in Wh
+	  my $bdc                         = $c->{'BatteryDischarging'};            # Batterieentladung in ?
+	  my $bc                          = $c->{'BatteryCharging'};               # Batterieladung in ?                                          
+	  my $cn                          = $consumers{"${i}_ConsumerName"};       # Verbrauchername
       $cn                             = substUmlauts($cn);
       
       if($tf =~ /month|year/) {
@@ -1570,15 +1572,15 @@ sub extractConsumerHistData($$$) {
       readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalMonthGrid",    sprintf("%.0f", $gct)." Wh")    if(defined($gct) && $tf eq "month");
       readingsBulkUpdate($hash, "L3_${cn}_EnergyRelativeMonthPV",   sprintf("%.0f", $pcr)." %")     if(defined($pcr) && $tf eq "month");                  
       readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalMonthPV",      sprintf("%.0f", $pct)." Wh")    if(defined($pct) && $tf eq "month");
-      readingsBulkUpdate($hash, "L3_${cn}_EnergyRelativeMonthBatt", sprintf("%.0f", $bcr)." %")     if(defined($bcr) && $tf eq "month");   	
-      readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalMonthBatt",    sprintf("%.0f", $bct)." Wh")    if(defined($bct) && $tf eq "month");	  
+      readingsBulkUpdate($hash, "L3_${cn}_EnergyRelativeMonthBatt", sprintf("%.0f", $bcr)." %")     if(defined($bcr) && $bataval && $tf eq "month");   	
+      readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalMonthBatt",    sprintf("%.0f", $bct)." Wh")    if(defined($bct) && $bataval && $tf eq "month");	  
 
 	  readingsBulkUpdate($hash, "L3_${cn}_EnergyRelativeYearGrid",  sprintf("%.0f", $gcr)." %")     if(defined($gcr) && $tf eq "year");            
       readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalYearGrid",     sprintf("%.0f", $gct)." Wh")    if(defined($gct) && $tf eq "year");
       readingsBulkUpdate($hash, "L3_${cn}_EnergyRelativeYearPV",    sprintf("%.0f", $pcr)." %")     if(defined($pcr) && $tf eq "year");                  
       readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalYearPV",       sprintf("%.0f", $pct)." Wh")    if(defined($pct) && $tf eq "year");
-      readingsBulkUpdate($hash, "L3_${cn}_EnergyRelativeYearBatt",  sprintf("%.0f", $bcr)." %")     if(defined($bcr) && $tf eq "year");  
-      readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalYearBatt",     sprintf("%.0f", $bct)." Wh")    if(defined($bct) && $tf eq "year");	  
+      readingsBulkUpdate($hash, "L3_${cn}_EnergyRelativeYearBatt",  sprintf("%.0f", $bcr)." %")     if(defined($bcr) && $bataval && $tf eq "year");  
+      readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalYearBatt",     sprintf("%.0f", $bct)." Wh")    if(defined($bct) && $bataval && $tf eq "year");	  
       
       $i++;
   }
