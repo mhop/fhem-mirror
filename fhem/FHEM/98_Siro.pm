@@ -377,22 +377,22 @@ sub SendCommand($@) {
 
 	if ( defined($hash->{helper}{exexcmd}) and $hash->{helper}{exexcmd} eq "off") # send kommand blockiert / keine ausf?hrung
 	{
-	Log3( $name, 5,"Siro_sendCommand: ausf?hrung durch helper blockiert ");
+	Log3( $name, 5,"Siro_sendCommand: ausfuehrung durch helper blockiert ");
 	return;
 	}
 	
 	 if ( defined($hash->{helper}{ignorecmd}) and $hash->{helper}{ignorecmd} eq "on") # send kommand blockiert / keine ausf?hrung
 	 {
-	 Log3( $name, 5,"Siro_sendCommand: ausführung einmalig blockiert ");
+	 Log3( $name, 5,"Siro_sendCommand: ausfuehrung einmalig blockiert ");
 	
 	 delete( $hash->{helper}{ignorecmd} );
 	 return;
 	
 	 }
 
-	#Log3( $name, 5,"Siro_sendCommand: args1 - $args[1]");
+	Log3( $name, 5,"Siro_sendCommand: args1 - $args[1]");
 
-   if ( defined($args[1]) and $args[1] eq "longstop" || defined $hash->{helper}{progmode} and $hash->{helper}{progmode} eq "on")
+   if ( (defined($args[1]) and $args[1] eq "longstop" )|| (defined $hash->{helper}{progmode} and $hash->{helper}{progmode} eq "on"))
 		{
 			$SignalRepeats = AttrVal( $name, 'SIRO_signalLongStopRepeats', '15' );
 		}
@@ -400,7 +400,9 @@ sub SendCommand($@) {
 		{
 			 $SignalRepeats = AttrVal( $name, 'SIRO_signalRepeats', '10' );
 		}
-		
+	
+	Log3( $name, 5,"Siro_sendCommand: repeats  - $SignalRepeats");
+	
     $chan = AttrVal( $name, 'SIRO_send_channel', undef );
     if ( !defined($chan) ) 
 		{
@@ -1582,17 +1584,20 @@ my ( $FW_wname, $d, $room, $pageHash ) =@_;    # pageHash is set for summaryFn.
 }
 
 #############################	
-sub Siro_icon($) 
+sub Siro_icon(@) 
 	{
-	my ($name) = @_;
+	my ($name,$icon) = @_;
 	my $hash = $defs{$name};
 	my $state = ReadingsVal( $name, 'state', 'undef' );
 
 	if ($state =~ m/[a-z].*/){$state=0;}
-
+	my $sticon = "fts_shutter_1w_";
+	$sticon = $icon if defined $icon;
+	
+	
 	my $invers = AttrVal( $name, 'SIRO_inversPosition',0 ); 
-	my $ret ="programming:edit_settings notAvaible:hue_room_garage runningUp.*:fts_shutter_up runningDown.*:fts_shutter_down ".$state.":fts_shutter_1w_".(int($state/10)*10);
-	$ret ="programming:edit_settings notAvaible:hue_room_garage runningUp.*:fts_shutter_up runningDown.*:fts_shutter_down ".$state.":fts_shutter_1w_".(100 - (int($state/10)*10)) if $invers eq "1";
+	my $ret ="programming:edit_settings notAvaible:hue_room_garage runningUp.*:fts_shutter_up runningDown.*:fts_shutter_down ".$state.":".$sticon.(int($state/10)*10);
+	$ret ="programming:edit_settings notAvaible:hue_room_garage runningUp.*:fts_shutter_up runningDown.*:fts_shutter_down ".$state.":".$sticon.(100 - (int($state/10)*10)) if $invers eq "1";
 	$ret =".*:fts_shutter_all" if ($hash->{CHANNEL_RECEIVE} eq '0');
 	return $ret;
 	}
