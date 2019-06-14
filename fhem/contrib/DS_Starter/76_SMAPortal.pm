@@ -1532,7 +1532,7 @@ sub extractConsumerHistData($$$) {
       return;
   }
   
-  my $bataval = (definded(ReadingsNum($name,"L1_BatteryIn", undef)) || defined(ReadingsNum($name,"L1_BatteryOut", undef)))?1:0;     # Identifikation ist Battery vorhanden ?
+  my $bataval = (defined(ReadingsNum($name,"L1_BatteryIn", undef)) || defined(ReadingsNum($name,"L1_BatteryOut", undef)))?1:0;     # Identifikation ist Battery vorhanden ?
   
   readingsBeginUpdate($hash);
   
