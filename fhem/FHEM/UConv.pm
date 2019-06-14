@@ -9,6 +9,7 @@ package UConv;
 use strict;
 use warnings;
 use POSIX;
+use utf8;
 
 use Math::Trig;
 use Scalar::Util qw(looks_like_number);
@@ -2089,33 +2090,32 @@ sub _GetSeasonPheno ($$;$$) {
 # HELPER FUNCTIONS
 
 sub decimal_mark ($;$) {
-  return $_[0] unless ( looks_like_number($_[0]) );
-  my $d = reverse $_[0];
-  my $locale = ( $_[1] ? $_[1] : undef );
+    return $_[0] unless ( looks_like_number( $_[0] ) );
+    my $d = reverse $_[0];
+    my $locale = ( $_[1] ? $_[1] : undef );
 
-  my $old_locale = setlocale(LC_NUMERIC);
-  setlocale(LC_NUMERIC, $locale) if ($locale);
-  use locale ':not_characters';
-  my ( $decimal_point, $thousands_sep, $grouping ) =
-    @{ localeconv() }{ 'decimal_point', 'thousands_sep', 'grouping' };
-  setlocale(LC_NUMERIC, "");
-  setlocale(LC_NUMERIC, $old_locale);
-  no locale;
+    my $old_locale = setlocale(LC_NUMERIC);
+    setlocale( LC_NUMERIC, $locale ) if ($locale);
+    use locale ':not_characters';
+    my ( $decimal_point, $thousands_sep, $grouping ) =
+      @{ localeconv() }{ 'decimal_point', 'thousands_sep', 'grouping' };
+    setlocale( LC_NUMERIC, "" );
+    setlocale( LC_NUMERIC, $old_locale );
+    no locale;
 
-  $thousands_sep = ($decimal_point && $decimal_point eq ',' ? '.' : ',')
-    unless ($thousands_sep);
-  my @grouping =
-    $grouping && $grouping =~ /^\d+$/ ? unpack( "C*", $grouping ) : (3);
+    $thousands_sep = chr(0x2009) unless ($thousands_sep);
+    my @grouping =
+      $grouping && $grouping =~ /^\d+$/ ? unpack( "C*", $grouping ) : (3);
 
-  if ( $thousands_sep eq '.' ) {
-    $d =~ s/\./$decimal_point/g;
-    $d =~ s/(\d{$grouping[0]})(?=\d)(?!\d*,)/$1$thousands_sep/g;
-  }
-  else {
-    $d =~ s/(\d{$grouping[0]})(?=\d)(?!\d*\.)/$1$thousands_sep/g;
-  }
+    if ( $thousands_sep ne ',' ) {
+        $d =~ s/\./$decimal_point/g;
+        $d =~ s/(\d{$grouping[0]})(?=\d)(?!\d*,)/$1$thousands_sep/g;
+    }
+    else {
+        $d =~ s/(\d{$grouping[0]})(?=\d)(?!\d*\.)/$1$thousands_sep/g;
+    }
 
-  return scalar reverse $d;
+    return scalar reverse $d;
 }
 
 sub _round($;$) {
