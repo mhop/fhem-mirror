@@ -236,8 +236,8 @@ sub ElsnerWS_Read($) {
       readingsBulkUpdateIfChanged($hash, "windStrength", $windStrength);
       readingsBulkUpdateIfChanged($hash, "isSunny", ElsnerWS_swayCtrl($hash, "isSunny", $brightness, "brightnessSunny", "brightnessSunnyDelay", 20000, 40000, 120, 30, 'no', 'yes'));
       readingsBulkUpdateIfChanged($hash, "isSunnySouth", ElsnerWS_swayCtrl($hash, "isSunnySouth", $sunSouth, "brightnessSunnySouth", "brightnessSunnySouthDelay", 20000, 40000, 120, 30, 'no', 'yes'));
-      readingsBulkUpdateIfChanged($hash, "isSunnyWest", ElsnerWS_swayCtrl($hash, "isSunnyWest", $sunSouth, "brightnessSunnyWest", "brightnessSunnyWestDelay", 20000, 40000, 120, 30, 'no', 'yes'));
-      readingsBulkUpdateIfChanged($hash, "isSunnyEast", ElsnerWS_swayCtrl($hash, "isSunnyEast", $sunSouth, "brightnessSunnyEast", "brightnessSunnyEastDelay", 20000, 40000, 120, 30, 'no', 'yes'));
+      readingsBulkUpdateIfChanged($hash, "isSunnyWest", ElsnerWS_swayCtrl($hash, "isSunnyWest", $sunWest, "brightnessSunnyWest", "brightnessSunnyWestDelay", 20000, 40000, 120, 30, 'no', 'yes'));
+      readingsBulkUpdateIfChanged($hash, "isSunnyEast", ElsnerWS_swayCtrl($hash, "isSunnyEast", $sunEast, "brightnessSunnyEast", "brightnessSunnyEastDelay", 20000, 40000, 120, 30, 'no', 'yes'));
       readingsBulkUpdateIfChanged($hash, "isStormy", ElsnerWS_swayCtrl($hash, "isStormy", $windSpeed, "windSpeedStormy", "windSpeedStormyDelay", 13.9, 17.2, 60, 3, 'no', 'yes'));
       readingsBulkUpdateIfChanged($hash, "isWindy", ElsnerWS_swayCtrl($hash, "isWindy", $windSpeed, "windSpeedWindy", "windSpeedWindyDelay", 1.6, 3.4, 60, 3, 'no', 'yes'));
     } else {
@@ -246,8 +246,8 @@ sub ElsnerWS_Read($) {
       readingsBulkUpdate($hash, "windStrength", $windStrength);
       readingsBulkUpdate($hash, "isSunny", ElsnerWS_swayCtrl($hash, "isSunny", $brightness, "brightnessSunny", "brightnessSunnyDelay", 20000, 40000, 120, 30, 'no', 'yes'));
       readingsBulkUpdate($hash, "isSunnySouth", ElsnerWS_swayCtrl($hash, "isSunnySouth", $sunSouth, "brightnessSunnySouth", "brightnessSunnySouthDelay", 20000, 40000, 120, 30, 'no', 'yes'));
-      readingsBulkUpdate($hash, "isSunnyWest", ElsnerWS_swayCtrl($hash, "isSunnyWest", $sunSouth, "brightnessSunnyWest", "brightnessSunnyWestDelay", 20000, 40000, 120, 30, 'no', 'yes'));
-      readingsBulkUpdate($hash, "isSunnyEast", ElsnerWS_swayCtrl($hash, "isSunnyEast", $sunSouth, "brightnessSunnyEast", "brightnessSunnyEastDelay", 20000, 40000, 120, 30, 'no', 'yes'));
+      readingsBulkUpdate($hash, "isSunnyWest", ElsnerWS_swayCtrl($hash, "isSunnyWest", $sunWest, "brightnessSunnyWest", "brightnessSunnyWestDelay", 20000, 40000, 120, 30, 'no', 'yes'));
+      readingsBulkUpdate($hash, "isSunnyEast", ElsnerWS_swayCtrl($hash, "isSunnyEast", $sunEast, "brightnessSunnyEast", "brightnessSunnyEastDelay", 20000, 40000, 120, 30, 'no', 'yes'));
       readingsBulkUpdate($hash, "isStormy", ElsnerWS_swayCtrl($hash, "isStormy", $windSpeed, "windSpeedStormy", "windSpeedStormyDelay", 13.9, 17.2, 60, 3, 'no', 'yes'));
       readingsBulkUpdate($hash, "isWindy", ElsnerWS_swayCtrl($hash, "isWindy", $windSpeed, "windSpeedWindy", "windSpeedWindyDelay", 1.6, 3.4, 60, 3, 'no', 'yes'));
     }

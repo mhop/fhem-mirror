@@ -10195,8 +10195,8 @@ sub EnOcean_Parse($$)
         push @event, "3:sunEast:$sunEast";
         push @event, "3:isSunny:" . EnOcean_swayCtrl($hash, "isSunny", $brightness, "brightnessSunny", "brightnessSunnyDelay", 20000, 40000, 120, 30, 'no', 'yes');
         push @event, "3:isSunnySouth:" . EnOcean_swayCtrl($hash, "isSunnySouth", $sunSouth, "brightnessSunnySouth", "brightnessSunnySouthDelay", 20000, 40000, 120, 30, 'no', 'yes');
-        push @event, "3:isSunnyWest:" . EnOcean_swayCtrl($hash, "isSunnyWest", $sunSouth, "brightnessSunnyWest", "brightnessSunnyWestDelay", 20000, 40000, 120, 30, 'no', 'yes');
-        push @event, "3:isSunnyEast:" . EnOcean_swayCtrl($hash, "isSunnyEast", $sunSouth, "brightnessSunnyEast", "brightnessSunnyEastDelay", 20000, 40000, 120, 30, 'no', 'yes');
+        push @event, "3:isSunnyWest:" . EnOcean_swayCtrl($hash, "isSunnyWest", $sunWest, "brightnessSunnyWest", "brightnessSunnyWestDelay", 20000, 40000, 120, 30, 'no', 'yes');
+        push @event, "3:isSunnyEast:" . EnOcean_swayCtrl($hash, "isSunnyEast", $sunEast, "brightnessSunnyEast", "brightnessSunnyEastDelay", 20000, 40000, 120, 30, 'no', 'yes');
       } elsif ($identifier == 3) {
         # Date exchange (EEP A5-13-03)
         push @event, "3:date:" . sprintf("%04d-%02d-%02d", $db[1] + 2000, $db[2], $db[3]);
