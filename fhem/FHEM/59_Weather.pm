@@ -576,6 +576,7 @@ sub Weather_Set($@) {
 sub Weather_RearmTimer($$) {
     my ( $hash, $t ) = @_;
 
+    Log3( $hash, 4, "Weather $hash->{NAME}: Rearm new Timer" );
     InternalTimer( $t, "Weather_GetUpdate", $hash, 0 );
 
 }
@@ -913,10 +914,11 @@ sub WeatherCheckOptions($@) {
       if ( !$defs{$d} || $defs{$d}->{TYPE} ne "Weather" );
 
     if ( AttrVal( $d, 'forecast', 'none' ) ne 'none' ) {
-        $f =
-          ( AttrVal( $d, 'forecast', 'none' ) eq 'daily'
+        $f = (
+            AttrVal( $d, 'forecast', 'none' ) eq 'daily'
             ? 'd'
-            : ( AttrVal( $d, 'forecast', 'none' ) eq 'every' ? $f : 'h' ) );
+            : ( AttrVal( $d, 'forecast', 'none' ) eq 'every' ? $f : 'h' )
+        );
     }
 
     $f = 'h' if ( !$f || length($f) > 1 );
