@@ -2,7 +2,7 @@
 #
 # Siro module for FHEM
 # Thanks for templates/coding from SIGNALduino team and Jarnsen_darkmission_ralf9
-# Thanks to Dr. Smagmag for decoding the protocol, which made this module possible
+# Thanks to Dr. Smag for decoding the protocol, which made this module possible
 # Needs SIGNALduino.
 # Published under GNU GPL License, v2
 # History:
@@ -894,7 +894,7 @@ sub Set($@) {
 	if (ReadingsVal( $name, 'lock_cmd', 'off' ) eq 'on' and $param ne "fakeremote" and $hash->{helper}{exexcmd} eq "on" )
 	
 	{
-	Log3( $name, 4, "Siro-Set: angefragte Aktion abgebrochen ( lock_cmd -> on)");
+	Log3( $name, 3, "Siro-Set: angefragte Aktion $comand abgebrochen (lock_cmd -> on)");
 	readingsSingleUpdate( $hash, "pct", $position , 1 );
 	readingsSingleUpdate( $hash, "position", $position , 1 );
 	
