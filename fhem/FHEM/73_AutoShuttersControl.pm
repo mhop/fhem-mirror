@@ -48,7 +48,7 @@ use strict;
 use warnings;
 use FHEM::Meta;
 
-my $version = '0.6.17';
+my $version = '0.6.18';
 
 sub AutoShuttersControl_Initialize($) {
     my ($hash) = @_;
@@ -717,6 +717,9 @@ sub ShuttersDeviceScan($) {
         $shutters->setPosSetCmd( $posSetCmds{ $defs{$_}->{TYPE} } );
         $shutters->setShadingStatus(
             ( $shutters->getStatus != $shutters->getShadingPos ? 'out' : 'in' )
+        );
+        $shutters->setShadingLastStatus(
+            ( $shutters->getStatus != $shutters->getShadingPos ? 'in' : 'out' )
         );
         readingsSingleUpdate( $defs{$_}, 'ASC_Enable', 'on', 0 )
           if ( ReadingsVal( $_, 'ASC_Enable', 'none' ) eq 'none' );
@@ -1823,6 +1826,7 @@ sub EventProcessingShadingBrightness($@) {
             and $shutters->getWindProtectionStatus eq 'unprotected' )
         {
             $shutters->setShadingStatus('out');
+            $shutters->setShadingLastStatus('in');
             ShadingProcessingDriveCommand( $hash, $shuttersDev );
         }
     }
@@ -1903,9 +1907,12 @@ sub EventProcessingTwilightDevice($@) {
                 );
             }
 
-            $shutters->setShadingStatus('out')
-              if ( not IsDay($shuttersDev)
-                and $shutters->getShadingStatus ne 'out' );
+            if ( not IsDay($shuttersDev)
+                and $shutters->getShadingStatus ne 'out' )
+            {
+                $shutters->setShadingStatus('out');
+                $shutters->setShadingLastStatus('in');
+            }
         }
     }
 }
@@ -1920,6 +1927,12 @@ sub ShadingProcessing($@) {
     ) = @_;
     my $name = $hash->{NAME};
     $shutters->setShuttersDev($shuttersDev);
+    $shutters->setShadingLastStatus( $shutters->getShadingStatus )
+      if (
+        $shutters->getShadingLastStatus ne $shutters->getShadingStatus
+        and (  $shutters->getShadingStatus eq 'in'
+            or $shutters->getShadingStatus eq 'out' )
+      );
 
     ASC_Debug(
             'ShadingProcessing: '
@@ -2088,8 +2101,14 @@ sub ShadingProcessing($@) {
     }
 
     ShadingProcessingDriveCommand( $hash, $shuttersDev )
-      if ( $shutters->getShadingStatus eq 'out'
-        or $shutters->getShadingStatus eq 'in' );
+      if (
+        (
+                $shutters->getShadingStatus eq 'out'
+            and $shutters->getShadingLastStatus eq 'in'
+        )
+        or (    $shutters->getShadingStatus eq 'in'
+            and $shutters->getShadingLastStatus eq 'out' )
+      );
 }
 
 sub ShadingProcessingDriveCommand($$) {
@@ -2626,11 +2645,18 @@ sub SunRiseShuttersAfterTimerFn($) {
                 or ( $ascDev->getSelfDefense eq 'on'
                     and CheckIfShuttersWindowRecOpen($shuttersDev) == 0 )
             )
-            and $shutters->getShadingStatus ne 'in'
           )
         {
-            $shutters->setLastDrive('day open');
-            ShuttersCommandSet( $hash, $shuttersDev, $shutters->getOpenPos );
+            if ( not $shutters->getIfInShading ) {
+                $shutters->setLastDrive('day open');
+                ShuttersCommandSet( $hash, $shuttersDev,
+                    $shutters->getOpenPos );
+            }
+            elsif ( $shutters->getIfInShading ) {
+                $shutters->setLastDrive('shading in');
+                ShuttersCommandSet( $hash, $shuttersDev,
+                    $shutters->getShadingPos );
+            }
         }
     }
 
@@ -4003,6 +4029,18 @@ sub setShadingStatus {
     return 0;
 }
 
+sub setShadingLastStatus {
+    my ( $self, $value ) = @_;
+    ### Werte für value = in, out
+
+    $self->{ $self->{shuttersDev} }{ShadingLastStatus}{VAL} = $value
+      if ( defined($value) );
+    $self->{ $self->{shuttersDev} }{ShadingLastStatus}{TIME} =
+      int( gettimeofday() )
+      if ( defined( $self->{ $self->{shuttersDev} }{ShadingLastStatus} ) );
+    return 0;
+}
+
 sub setWindProtectionStatus {    # Werte protected, unprotected
     my ( $self, $value ) = @_;
 
@@ -4027,15 +4065,23 @@ sub getShadingStatus {   # Werte für value = in, out, in reserved, out reserved
         and defined( $self->{ $self->{shuttersDev} }{ShadingStatus}{VAL} ) );
 }
 
+sub getShadingLastStatus {    # Werte für value = in, out
+    my $self = shift;
+
+    return $self->{ $self->{shuttersDev} }{ShadingLastStatus}{VAL}
+      if (  defined( $self->{ $self->{shuttersDev} }{ShadingLastStatus} )
+        and defined( $self->{ $self->{shuttersDev} }{ShadingLastStatus}{VAL} )
+      );
+}
+
 sub getIfInShading {
     my $self = shift;
 
     return (
         (
-                 $shutters->getShadingMode eq 'always'
-              or $shutters->getShadingMode eq 'home'
-        )
-          and $shutters->getShadingStatus eq 'in' ? 1 : 0
+                  $shutters->getShadingMode ne 'off'
+              and $shutters->getShadingStatus eq 'in'
+        ) ? 1 : 0
     );
 }
 
@@ -5738,7 +5784,7 @@ sub getblockAscDrivesAfterManual {
                     Shading is only available if the following prerequests are met:
                 <ul>
                     <li>
-                        The <em>ASC_autoShuttersControlShading</em> attribute is set to on, and there is a device
+                        The <em>controlShading</em> reading is set to on, and there is a device
                         of type Astro or Twilight configured to <em>ASC_twilightDevice</em>, and <em>ASC_tempSensor</em>
                         is set.
                     </li>
@@ -6112,7 +6158,7 @@ sub getblockAscDrivesAfterManual {
             <ul>
                 <strong><u>Beschreibung der Beschattungsfunktion</u></strong>
                 </br>Damit die Beschattung Funktion hat, m&uuml;ssen folgende Anforderungen erf&uuml;llt sein.
-                </br><strong>Im ASC Device</strong> das Attribut "ASC_autoShuttersControlShading" mit dem Wert on, sowie ein Astro/Twilight Device im Attribut "ASC_twilightDevice" und das Attribut "ASC_tempSensor".
+                </br><strong>Im ASC Device</strong> das Reading "controlShading" mit dem Wert on, sowie ein Astro/Twilight Device im Attribut "ASC_twilightDevice" und das Attribut "ASC_tempSensor".
                 </br><strong>In den Rollladendevices</strong> ben&ouml;tigt ihr ein Helligkeitssensor als Attribut "ASC_BrightnessSensor", sofern noch nicht vorhanden. Findet der Sensor nur f&uuml;r die Beschattung Verwendung ist der Wert DEVICENAME[:READING] ausreichend.
                 </br>Alle weiteren Attribute sind optional und wenn nicht gesetzt mit Default-Werten belegt. Ihr solltet sie dennoch einmal anschauen und entsprechend Euren Gegebenheiten setzen. Die Werte f&uumlr; die Fensterposition und den Vor- Nachlaufwinkel sowie die Grenzwerte f&uuml;r die StateChange_Cloudy und StateChange_Sunny solltet ihr besondere Beachtung dabei schenken.
                 <li><strong>ASC_Shading_Angle_Left</strong> - Vorlaufwinkel im Bezug zum Fenster, ab wann abgeschattet wird. Beispiel: Fenster 180° - 85° ==> ab Sonnenpos. 95° wird abgeschattet (default: 75)</li>
