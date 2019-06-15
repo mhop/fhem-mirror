@@ -17,7 +17,7 @@ package main;
 
 use strict;
 use warnings;
-my $version = "1.2";
+my $version = "1.3";
 
 
 sub Siro_Initialize($) {
@@ -151,7 +151,8 @@ my %sets = (
 	"sequenz"      => "noArg",
     "prog_mode_on"      => "noArg",
     "prog_mode_off" => "noArg",
-	"remote_lock" => "on,off",
+	"lock_remote" => "on,off",
+	"lock_cmd" => "on,off",
 	"reset_motor_term" => "noArg",
     "pct" => "slider,0,1,100",    # Wird nur bei vorhandenen time_to attributen gesetzt
 	"position" => "slider,0,1,100",    # Wird nur bei vorhandenen time_to attributen gesetzt
@@ -176,7 +177,8 @@ my %setsstandart = (
 	"sequenz"      => "noArg",
     "prog_mode_on"      => "noArg",
     "prog_mode_off" => "noArg",
-	"remote_lock" => "on,off",
+	"lock_remote" => "on,off",
+	"lock_cmd" => "on,off",
 	"reset_motor_term" => "noArg",
     "pct" => "slider,0,1,100",    # Wird nur bei vorhandenen time_to attributen gesetzt
 	"position" => "slider,0,1,100",    # Wird nur bei vorhandenen time_to attributen gesetzt
@@ -215,7 +217,8 @@ my %sendCommands = (
 	"reset_motor_term"  => "reset_motor_term",
     "up_for_timer" => "upfortimer",
 	"down_for_timer" => "downfortimer",
-	"remote_lock" => "remote_lock"
+	"lock_remote" => "lock_remote",
+	"lock_cmd" => "lock_cmd"
 	
 );
 
@@ -390,7 +393,7 @@ sub SendCommand($@) {
 	
 	 }
 
-	Log3( $name, 5,"Siro_sendCommand: args1 - $args[1]");
+	Log3( $name, 5,"Siro_sendCommand: args1 - $args[1]") if defined $args[1];
 
    if ( (defined($args[1]) and $args[1] eq "longstop" )|| (defined $hash->{helper}{progmode} and $hash->{helper}{progmode} eq "on"))
 		{
@@ -584,7 +587,7 @@ sub Parse($$) {
 			}
 
 			my $aktstate = ReadingsVal( $name, 'state', '0' );
-			my $lock =ReadingsVal( $name, 'remote_lock', 'off' );
+			my $lock =ReadingsVal( $name, 'lock_remote', 'off' );
 			
 			if ($defchannnel ne '0')
 			{
@@ -600,12 +603,12 @@ sub Parse($$) {
 
 			Log3 $lh, 5, "Siro_Parse: hash->{helper}{remotecmd} - ".$lh->{helper}{remotecmd};
 			Log3( $name, 3, "Siro-Parse ($name) : Signal FB emfangen -  $newstate");	
-			Log3( $name, 5, "Siro-Parse ($name) : test remote_lock - $lock");
+			Log3( $name, 5, "Siro-Parse ($name) : test lock_remote - $lock");
 
 			if ($lock eq 'on')
 			# remotelock
 			{
-			Log3( $name, 5, "Siro-Parse ($name) : founde remote_lock - target: $aktstate");
+			Log3( $name, 5, "Siro-Parse ($name) : founde lock_remote - target: $aktstate");
 			$lh->{helper}{savedcmds}{cmd1} = 'pct' ;
 			$lh->{helper}{savedcmds}{cmd1} = 'open' if $aktstate eq "0" ;
 			$lh->{helper}{savedcmds}{cmd1} = 'close' if $aktstate eq "100" ;
@@ -654,6 +657,7 @@ sub Set($@) {
 	my $cmd           = $args[0]; # eingehendes set
 	my $zielposition  = $args[1]; # eingehendes set position
 	my $param  = $args[1]; # eingehendes set position
+	$param = "" if !defined $param;
 	Log3( $name, 5, "Siro-Set: eingehendes Kommando $cmd") if $cmd ne "?";
 	### check for old version 
 	if (ReadingsVal( $name, 'last_reset_os', 'undef' ) ne 'undef' && $cmd ne "?")
@@ -827,7 +831,7 @@ sub Set($@) {
 	#############################
 	# befehl ist von distributor abgesetzt - kam von kanal 0
 	Log3( $name, 5, "Siro-Set: param - $param");
-	if ($param eq "fakeremote")
+	if (defined $param and $param eq "fakeremote") 
 	{
 	$hash->{helper}{exexcmd} = "off" ;
 	$aktcmdfrom = "remote";
@@ -874,12 +878,29 @@ sub Set($@) {
 			$zielposition = $downlimit;
 			}
 		}
-############################# remote_lock		
-	if ($comand eq "remote_lock")
+############################# lock_remote		
+	if ($comand eq "lock_remote")
 		{
-		readingsSingleUpdate( $hash, "remote_lock", $args[1], 1 ) ;
+		readingsSingleUpdate( $hash, "lock_remote", $args[1], 1 ) ;
 		return;
 		}
+		
+		############################# lock_cmd		
+	if ($comand eq "lock_cmd")
+		{
+		readingsSingleUpdate( $hash, "lock_cmd", $args[1], 1 ) ;
+		return;
+		}
+	if (ReadingsVal( $name, 'lock_cmd', 'off' ) eq 'on' and $param ne "fakeremote" and $hash->{helper}{exexcmd} eq "on" )
+	
+	{
+	Log3( $name, 4, "Siro-Set: angefragte Aktion abgebrochen ( lock_cmd -> on)");
+	readingsSingleUpdate( $hash, "pct", $position , 1 );
+	readingsSingleUpdate( $hash, "position", $position , 1 );
+	
+	
+	return;
+	}
 
 #############################
 	# set reset_motor_term   reset_motor_term
@@ -1589,16 +1610,22 @@ sub Siro_icon(@)
 	my ($name,$icon) = @_;
 	my $hash = $defs{$name};
 	my $state = ReadingsVal( $name, 'state', 'undef' );
-
+    my $move ="stop";
+	$move = "open" if $state eq "100";
+	$move = "close" if $state eq "0";
+	
 	if ($state =~ m/[a-z].*/){$state=0;}
 	my $sticon = "fts_shutter_1w_";
 	$sticon = $icon if defined $icon;
 	
 	
 	my $invers = AttrVal( $name, 'SIRO_inversPosition',0 ); 
-	my $ret ="programming:edit_settings notAvaible:hue_room_garage runningUp.*:fts_shutter_up runningDown.*:fts_shutter_down ".$state.":".$sticon.(int($state/10)*10);
-	$ret ="programming:edit_settings notAvaible:hue_room_garage runningUp.*:fts_shutter_up runningDown.*:fts_shutter_down ".$state.":".$sticon.(100 - (int($state/10)*10)) if $invers eq "1";
+	my $ret ="programming:edit_settings notAvaible:hue_room_garage runningUp.*:fts_shutter_up:stop runningDown.*:fts_shutter_down:stop ".$state.":".$sticon.(int($state/10)*10).":".$move;
+	$ret ="programming:edit_settings notAvaible:hue_room_garage runningUp.*:fts_shutter_up:stop runningDown.*:fts_shutter_down:stop ".$state.":".$sticon.(100 - (int($state/10)*10)).":".$move if $invers eq "1";
 	$ret =".*:fts_shutter_all" if ($hash->{CHANNEL_RECEIVE} eq '0');
+	$ret =".*:secur_locked\@red" if ReadingsVal( $name, 'lock_cmd', 'off' ) eq 'on';
+	
+	
 	return $ret;
 	}
 
