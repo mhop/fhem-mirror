@@ -1543,8 +1543,8 @@ sub extractConsumerHistData($$$) {
       $consumers{"${i}_ConsumerOid"}  = $c->{'ConsumerOid'};
       $consumers{"${i}_ConsumerLfd"}  = $i;
 	  my $cpower                      = $c->{'TotalEnergy'}{'Measurement'};    # Energieverbrauch im Timeframe in Wh
-	  my $bdc                         = $c->{'BatteryDischarging'};            # Batterieentladung in ?
-	  my $bc                          = $c->{'BatteryCharging'};               # Batterieladung in ?                                          
+	  my $bdc                         = $c->{'BatteryDischarging'};            # Batterieentladung in Wh
+	  my $bc                          = $c->{'BatteryCharging'};               # Batterieladung in Wh                                          
 	  my $cn                          = $consumers{"${i}_ConsumerName"};       # Verbrauchername
       $cn                             = substUmlauts($cn);
       
@@ -1561,12 +1561,12 @@ sub extractConsumerHistData($$$) {
       readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalDay",          sprintf("%.0f", $cpower)." Wh") if(defined($cpower) && $tf eq "day"); 
       readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalMonth",        sprintf("%.0f", $cpower)." Wh") if(defined($cpower) && $tf eq "month");  
       readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalYear",         sprintf("%.0f", $cpower)." Wh") if(defined($cpower) && $tf eq "year");  
-      readingsBulkUpdate($hash, "L3_BatteryDischargingDay",         sprintf("%.0f", $bdc)         ) if(defined($bdc)    && $tf eq "day");	
-      readingsBulkUpdate($hash, "L3_BatteryDischargingMonth",       sprintf("%.0f", $bdc)         ) if(defined($bdc)    && $tf eq "month");	  
-      readingsBulkUpdate($hash, "L3_BatteryDischargingYear",        sprintf("%.0f", $bdc)         ) if(defined($bdc)    && $tf eq "year");
-      readingsBulkUpdate($hash, "L3_BatteryChargingDay",            sprintf("%.0f", $bc)          ) if(defined($bc)     && $tf eq "day");	
-      readingsBulkUpdate($hash, "L3_BatteryChargingMonth",          sprintf("%.0f", $bc)          ) if(defined($bc)     && $tf eq "month");	  
-      readingsBulkUpdate($hash, "L3_BatteryChargingYear",           sprintf("%.0f", $bc)          ) if(defined($bc)     && $tf eq "year");
+      readingsBulkUpdate($hash, "L3_BatteryDischargingDay",         sprintf("%.0f", $bdc)   ." Wh") if(defined($bdc)    && $tf eq "day");	
+      readingsBulkUpdate($hash, "L3_BatteryDischargingMonth",       sprintf("%.0f", $bdc)   ." Wh") if(defined($bdc)    && $tf eq "month");	  
+      readingsBulkUpdate($hash, "L3_BatteryDischargingYear",        sprintf("%.0f", $bdc)   ." Wh") if(defined($bdc)    && $tf eq "year");
+      readingsBulkUpdate($hash, "L3_BatteryChargingDay",            sprintf("%.0f", $bc)    ." Wh") if(defined($bc)     && $tf eq "day");	
+      readingsBulkUpdate($hash, "L3_BatteryChargingMonth",          sprintf("%.0f", $bc)    ." Wh") if(defined($bc)     && $tf eq "month");	  
+      readingsBulkUpdate($hash, "L3_BatteryChargingYear",           sprintf("%.0f", $bc)    ." Wh") if(defined($bc)     && $tf eq "year");
 	  
       readingsBulkUpdate($hash, "L3_${cn}_EnergyRelativeMonthGrid", sprintf("%.0f", $gcr)." %")     if(defined($gcr) && $tf eq "month");            
       readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalMonthGrid",    sprintf("%.0f", $gct)." Wh")    if(defined($gct) && $tf eq "month");
