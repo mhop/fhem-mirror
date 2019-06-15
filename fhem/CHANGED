@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - update   98_Siro.pm: V1.3 fix perlwarnings
+                    addcmd lock_cmd
+                    addcmd lock_remote
+                    change devstateicon/cmd
  - change:  55_PIFACE: now WiringPI V >= 2.46 supported
  - feature: 73_AutoShuttersControl: add new attribut 
                ASC_Sgading_MinMax_Elevation, many bug fixes
