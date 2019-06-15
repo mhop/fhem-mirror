@@ -59,7 +59,7 @@ use strict;
 use warnings;
 use FHEM::Meta;
 
-my $version = '1.6.5';
+my $version = '1.6.6';
 
 sub GardenaSmartBridge_Initialize($) {
 
@@ -112,8 +112,79 @@ use HttpUtils;
 
 eval "use Encode qw(encode encode_utf8 decode_utf8);1"
   or $missingModul .= "Encode ";
-eval "use JSON;1"            or $missingModul .= 'JSON ';
+# eval "use JSON;1"            or $missingModul .= 'JSON ';
 eval "use IO::Socket::SSL;1" or $missingModul .= 'IO::Socket::SSL ';
+
+# try to use JSON::MaybeXS wrapper
+#   for chance of better performance + open code
+eval {
+    require JSON::MaybeXS;
+    import JSON::MaybeXS qw( decode_json encode_json );
+    1;
+};
+
+if ($@) {
+    $@ = undef;
+
+    # try to use JSON wrapper
+    #   for chance of better performance
+    eval {
+
+        # JSON preference order
+        local $ENV{PERL_JSON_BACKEND} =
+          'Cpanel::JSON::XS,JSON::XS,JSON::PP,JSON::backportPP'
+          unless ( defined( $ENV{PERL_JSON_BACKEND} ) );
+
+        require JSON;
+        import JSON qw( decode_json encode_json );
+        1;
+    };
+
+    if ($@) {
+        $@ = undef;
+
+        # In rare cases, Cpanel::JSON::XS may
+        #   be installed but JSON|JSON::MaybeXS not ...
+        eval {
+            require Cpanel::JSON::XS;
+            import Cpanel::JSON::XS qw(decode_json encode_json);
+            1;
+        };
+
+        if ($@) {
+            $@ = undef;
+
+            # In rare cases, JSON::XS may
+            #   be installed but JSON not ...
+            eval {
+                require JSON::XS;
+                import JSON::XS qw(decode_json encode_json);
+                1;
+            };
+
+            if ($@) {
+                $@ = undef;
+
+                # Fallback to built-in JSON which SHOULD
+                #   be available since 5.014 ...
+                eval {
+                    require JSON::PP;
+                    import JSON::PP qw(decode_json encode_json);
+                    1;
+                };
+
+                if ($@) {
+                    $@ = undef;
+
+                    # Fallback to JSON::backportPP in really rare cases
+                    require JSON::backportPP;
+                    import JSON::backportPP qw(decode_json encode_json);
+                    1;
+                }
+            }
+        }
+    }
+}
 
 BEGIN {
     GP_Import(
@@ -753,7 +824,8 @@ sub WriteReadings($$) {
                 scalar( @{ $decode_json->{zones} } ) );
         }
         elsif ( $decode_json->{id} ne $hash->{helper}{locations_id}
-            and ref( $decode_json->{abilities} ) eq 'ARRAY' )
+            and ref( $decode_json->{abilities} ) eq 'ARRAY'
+            and ref( $decode_json->{abilities}[0]{properties} ) eq 'ARRAY' )
         {
             my $properties =
               scalar( @{ $decode_json->{abilities}[0]{properties} } );
