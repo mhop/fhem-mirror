@@ -33,17 +33,17 @@
 # 2016-02-24 V 0204 commands open,close,my,stop and setClosure added
 # 2016-04-24 V 0205 commands taken from setup
 # 2016-06-16 V 0206 updateDevices called for devices created before setup has been read
-# 2016-11-15 V 0207 BLOCKING=0 can be used, all calls asynchron, attribut levelInvert inverts RollerShutter position
+# 2016-11-15 V 0207 BLOCKING=0 can be used, all calls asynchron, attribute levelInvert inverts RollerShutter position
 # 2016-11-29 V 0208 HttpUtils used instead of LWP::UserAgent, BLOCKING=0 set as default, umlaut can be used in Tahoma names
 # 2016-12-15 V 0209 perl warnings during startup and login eliminated
 # 2017-01-08 V 0210 tahoma_cancelExecutions: cancel command added
 # 2017-01-10 V 0211 tahoma_getStates: read all states based on table {setup}{devices}[n]{definition}{states}
 # 2017-01-24 V 0212 tahoma_getStates: read all states recovered
 # 2017-01-24 V 0212 start scene with launchActionGroup so cancel is working on scenes now
-# 2017-01-24 V 0212 Attribut interval used to disable or enable refreshAllstates
+# 2017-01-24 V 0212 Attribute interval used to disable or enable refreshAllstates
 # 2017-01-24 V 0212 Setup changes recognized for reading places
 # 2017-03-23 V 0213 username and password stored encrypted
-# 2017-05-07 V 0214 encryption can be disabled by new attribut cryptLoginData
+# 2017-05-07 V 0214 encryption can be disabled by new attribute cryptLoginData
 # 2017-05-07 V 0214 correct parameters of setClosureAndLinearSpeed caused syntax error
 # 2017-07-01 V 0215 creation of fid and device names for first autocreate extended
 # 2017-07-08 V 0215 login delay increased automatically up to 160s if login failed
@@ -54,7 +54,9 @@
 # 2018-06-01 V 0219 new Attributes for time interval of getEvents, getStates and refreshAllStates
 # 2018-06-11 V 0220 HttpUtils_Close before login, some newer Debug outputs deleted, Apply command separated, command responds verified
 # 2019-01-19 V 0221 communication updated to actual app standard
-# 2019-02-08 V 0221 new Attribut devName to set personal name instead of 'iPhone'
+# 2019-02-08 V 0221 new Attribute devName to set personal name instead of 'iPhone'
+# 2019-05-26 V 0222 correct parse of result in EnduserAPISetupGateways
+# 2019-06-15 V 0222 new Attribute levelRound
 
 package main;
 
@@ -100,6 +102,7 @@ sub tahoma_Initialize($)
                       "placeClasses ".
                       "levelInvert ".
                       "cryptLoginData ".
+                      "levelRound ".
                       "userAgent ";
   $hash->{AttrList} .= $readingFnAttributes;
 }
@@ -1165,6 +1168,10 @@ sub tahoma_parseGetEvents($$)
             next if (!defined($state->{name}) || !defined($state->{value}));
             if ($state->{name} eq "core:ClosureState") {
               $state->{value} = 100 - $state->{value} if ($attr{$d->{NAME}}{levelInvert});
+              if ($attr{$d->{NAME}}{levelRound}) {
+                my $round = int($attr{$d->{NAME}}{levelRound});
+                $state->{value} = int(($state->{value} + $round/2) / $round) * $round if ($round > 1);
+              }
               readingsBulkUpdate($d, "state", "dim".$state->{value});
             } elsif ($state->{name} eq "core:OpenClosedState") {
               readingsBulkUpdate($d, "devicestate", $state->{value});
@@ -1332,6 +1339,10 @@ sub tahoma_parseGetStates($$)
             next if (!defined($state->{name}) || !defined($state->{value}));
             if ($state->{name} eq "core:ClosureState") {
               $state->{value} = 100 - $state->{value} if ($attr{$d->{NAME}}{levelInvert});
+              if ($attr{$d->{NAME}}{levelRound}) {
+                my $round = int($attr{$d->{NAME}}{levelRound});
+                $state->{value} = int(($state->{value} + $round/2) / $round) * $round if ($round > 0);
+              }
               readingsBulkUpdate($d, "state", "dim".$state->{value});
             } elsif ($state->{name} eq "core:OpenClosedState") {
               readingsBulkUpdate($d, "devicestate", $state->{value});
@@ -1352,13 +1363,18 @@ sub tahoma_parseEnduserAPISetupGateways($$)
   my($hash, $json) = @_;
   my $name = $hash->{NAME};
   Log3 $name, 4, "$name: tahoma_parseEnduserAPISetupGateways";
-  if (ref($json) ne 'HASH') {
+  if ((ref($json) ne 'HASH') && (ref($json) ne 'ARRAY')) {
     Log3 $name, 3, "$name: tahoma_parseEnduserAPISetupGateways response is not a valid hash";
     return;
   }
-  
-  eval { $hash->{inGateway} = $json->{result}; };
-  eval { $hash->{inGateway} = $json->[0]{gatewayId}; };
+  if (ref($json) eq 'HASH') {
+    eval { $hash->{inGateway} = $json->{result}; } ;
+  }
+  if (ref($json) eq 'ARRAY') {
+    eval { $hash->{inGateway} = $json->[0]{gatewayId}; };
+  }
+  $hash->{gatewayId} = $hash->{inGateway};
+  Log3 $name, 4, "$name: tahoma_parseEnduserAPISetupGateways gatewayId=".$hash->{inGateway};
 }
 
 sub tahoma_parseGetCurrentExecutions($$)
@@ -1556,7 +1572,7 @@ sub tahoma_Attr($$$)
 
   if( $attrName eq "interval" ) {
     my $hash = $defs{$name};
-    return "Attribut 'interval' only usable for type ACCOUNT" if $hash->{SUBTYPE} ne "ACCOUNT";
+    return "Attribute 'interval' only usable for type ACCOUNT" if $hash->{SUBTYPE} ne "ACCOUNT";
     $attrVal = defined $attrVal ? int($attrVal) : 0;
     $attrVal = int($attrVal);
     $attrVal = 120 if ($attrVal < 120 && $attrVal != 0);
@@ -1564,20 +1580,20 @@ sub tahoma_Attr($$$)
     $hash->{getStatesInterval} = $attrVal;
   } elsif( $attrName eq "intervalRefresh" ) {
     my $hash = $defs{$name};
-    return "Attribut 'intervalRefresh' only usable for type ACCOUNT" if $hash->{SUBTYPE} ne "ACCOUNT";
+    return "Attribute 'intervalRefresh' only usable for type ACCOUNT" if $hash->{SUBTYPE} ne "ACCOUNT";
     $attrVal = defined $attrVal ? int($attrVal) : 120;
     $attrVal = 60 if ($attrVal < 60 && $attrVal != 0);
     $hash->{refreshStatesInterval} = $attrVal;
   } elsif( $attrName eq "intervalStates" ) {
     my $hash = $defs{$name};
-    return "Attribut 'intervalStates' only usable for type ACCOUNT" if $hash->{SUBTYPE} ne "ACCOUNT";
+    return "Attribute 'intervalStates' only usable for type ACCOUNT" if $hash->{SUBTYPE} ne "ACCOUNT";
     $attrVal = defined $attrVal ? int($attrVal) : 0;
     $attrVal = int($attrVal);
     $attrVal = 120 if ($attrVal < 120 && $attrVal != 0);
     $hash->{getStatesInterval} = $attrVal;
   } elsif( $attrName eq "intervalEvents" ) {
     my $hash = $defs{$name};
-    return "Attribut 'intervalEvents' only usable for type ACCOUNT" if $hash->{SUBTYPE} ne "ACCOUNT";
+    return "Attribute 'intervalEvents' only usable for type ACCOUNT" if $hash->{SUBTYPE} ne "ACCOUNT";
     $attrVal = defined $attrVal ? int($attrVal) : 2;
     $attrVal = int($attrVal);
     $attrVal = 2 if ($attrVal < 2 && $attrVal != 0);
@@ -1591,21 +1607,28 @@ sub tahoma_Attr($$$)
     }
   } elsif( $attrName eq "blocking" ) {
     my $hash = $defs{$name};
-    return "Attribut 'blocking' only usable for type ACCOUNT" if $hash->{SUBTYPE} ne "ACCOUNT";
+    return "Attribute 'blocking' only usable for type ACCOUNT" if $hash->{SUBTYPE} ne "ACCOUNT";
     $attrVal = defined $attrVal ? int($attrVal) : 0;
     $hash->{BLOCKING} = $attrVal;
   } elsif( $attrName eq "placeClasses" ) {
     my $hash = $defs{$name};
-    return "Attribut 'placeClasses' only usable for type PLACE" if $hash->{SUBTYPE} ne "PLACE";
+    return "Attribute 'placeClasses' only usable for type PLACE" if $hash->{SUBTYPE} ne "PLACE";
     $attrVal = defined $attrVal ? $attrVal : 'RollerShutter';
     $hash->{inClass} = $attrVal;
   }
   elsif ( $attrName eq "levelInvert" ) {
     my $hash = $defs{$name};
-    return "Attribut 'placeClasses' only usable for type DEVICE" if $hash->{SUBTYPE} ne "DEVICE";
+    return "Attribute 'levelInvert' only usable for type DEVICE" if $hash->{SUBTYPE} ne "DEVICE";
     $attrVal = defined $attrVal ? int($attrVal) : 0;
     my $device = tahoma_getDeviceDetail( $hash, $hash->{device} );
     $device->{levelInvert} = $attrVal if (defined $device);
+  }
+  elsif ( $attrName eq "levelRound" ) {
+    my $hash = $defs{$name};
+    return "Attribute 'levelRound' only usable for type DEVICE" if $hash->{SUBTYPE} ne "DEVICE";
+    $attrVal = defined $attrVal ? int($attrVal) : 0;
+    my $device = tahoma_getDeviceDetail( $hash, $hash->{device} );
+    $device->{levelRound} = $attrVal if (defined $device);
   }
   
   if( $cmd eq "set" ) {
@@ -1839,6 +1862,12 @@ sub tahoma_decrypt($)
     <ul>
       If the closure value 0..100 should be 100..0, the level can be inverted:<br>
       <code>attr tahoma_23234545 levelInvert 1</code><br><br>
+    </ul>
+    <ul>
+      The closure value can be rounded to the muliple of an integer:<br>
+      <code>attr tahoma_23234545 levelRound 10</code><br>
+      as result, the state and reading ClosureState is rounded to muliple of 10<br>
+      0..4 becomes 0, 5..14 becomes 10, 15..24 becomes 20, ...<br><br>
     </ul>
     <ul>
       The device can be disabled:<br>
