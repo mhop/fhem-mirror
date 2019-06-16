@@ -161,6 +161,7 @@ use vars qw($FW_ME);                                    # webname (default is fh
 
 # Versions History intern
 our %vNotesIntern = (
+  "2.3.3"  => "16.06.2019  change verbose 4 output, fix warning if no weather info was got ",
   "2.3.2"  => "14.06.2019  add request string to verbose 5, add battery data to live and historical consumer data ",
   "2.3.1"  => "13.06.2019  switch Credentials read from RAM to verbose 4, changed W/h->Wh and kW/h->kWh in PortalAsHtml ",
   "2.3.0"  => "12.06.2019  add set on,off,automatic cmd for controlled devices ",
@@ -628,9 +629,9 @@ sub CallInfo($) {
       my $get = $hash->{HELPER}{GETTER};
       my $set = $hash->{HELPER}{SETTER};
       
-      Log3 ($name, 4, "$name -> ################################################################");
-      Log3 ($name, 4, "$name -> ###      start of set/get data from SMA Sunny Portal         ###");
-      Log3 ($name, 4, "$name -> ################################################################"); 
+      Log3 ($name, 4, "$name - ################################################################");
+      Log3 ($name, 4, "$name - ###      start of set/get data from SMA Sunny Portal         ###");
+      Log3 ($name, 4, "$name - ################################################################"); 
   
 	  $hash->{HELPER}{RETRIES} = AttrVal($name, "getDataRetries", 3);
       $hash->{HELPER}{RUNNING_PID} = BlockingCall("FHEM::SMAPortal::GetSetData", "$name|$get|$set", "FHEM::SMAPortal::ParseData", $timeout, "FHEM::SMAPortal::ParseAborted", $hash);
@@ -684,7 +685,7 @@ sub GetSetData($) {
   my $livedata = $ua->get('https://www.sunnyportal.com/homemanager');
 
   if(($livedata->content =~ m/FeedIn/i) && ($livedata->content !~ m/expired/i)) {
-      Log3 $name, 4, "$name - Login to SMA-Portal succesful";
+      Log3 $name, 4, "$name - Login to SMA-Portal successful";
           # JSON Live Daten
           $livedata_content = $livedata->content;
           $login_state      = 1;
@@ -826,8 +827,8 @@ sub GetSetData($) {
       } else {    
           my $loginp = $ua->post('https://www.sunnyportal.com/Templates/Start.aspx',[$usernameField => $username, $passwordField => $password, "__EVENTTARGET" => $loginButton]);
         
-          Log3 ($name, 4, "$name -> ".$loginp->code);
-          Log3 ($name, 5, "$name -> Login-Page return: ".$loginp->content);
+          Log3 ($name, 4, "$name - ".$loginp->code);
+          Log3 ($name, 5, "$name - Login-Page return: ".$loginp->content);
         
           if( $loginp->content =~ /Logincontrol1_ErrorLabel/i ) {
               Log3 ($name, 1, "$name - Error: login to SMA-Portal failed");
@@ -839,7 +840,7 @@ sub GetSetData($) {
           }
 
           my $shmp = $ua->get('https://www.sunnyportal.com/FixedPages/HoManLive.aspx');
-          Log3 ($name, 5, "$name -> ".$shmp->code);
+          Log3 ($name, 5, "$name - ".$shmp->code);
       }
   }
   
@@ -909,6 +910,8 @@ sub ParseData($) {
   
   my $dl = AttrVal($name, "detailLevel", 1);
   delread($hash, $dl+1);
+  
+  Log3 ($name, 4, "$name - ##### extracting live data #### ");
   
   readingsBeginUpdate($hash);
   
@@ -980,7 +983,7 @@ sub ParseData($) {
               $warnMsg = 1 if($k =~ /^WarningMessages$/);
               $infoMsg = 1 if($k =~ /^InfoMessages$/);
 
-              Log3 $name, 4, "$name -> $k - $new_val";
+              Log3 ($name, 4, "$name - $k - $new_val");
               readingsBulkUpdate($hash, "L1_$k", $new_val);
           }
       }
@@ -1074,7 +1077,7 @@ sub ParseAborted($) {
   my $name = $hash->{NAME};
    
   $cause = $cause?$cause:"Timeout: process terminated";
-  Log3 ($name, 1, "$name -> BlockingCall $hash->{HELPER}{RUNNING_PID}{fn} pid:$hash->{HELPER}{RUNNING_PID}{pid} $cause");
+  Log3 ($name, 1, "$name - BlockingCall $hash->{HELPER}{RUNNING_PID}{fn} pid:$hash->{HELPER}{RUNNING_PID}{pid} $cause");
 
   delete($hash->{HELPER}{RUNNING_PID});
   $hash->{HELPER}{GETTER} = "all";
@@ -1134,6 +1137,8 @@ sub extractForecastData($$) {
   if($dl <= 1) {
       return;
   }
+  
+  Log3 ($name, 4, "$name - ##### extracting forecast data #### ");
    
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
   $year    += 1900;
@@ -1144,10 +1149,12 @@ sub extractForecastData($$) {
   my $consum_sum = 0;
   my $sum        = 0;
   
-  readingsBeginUpdate($hash);
-
   my $plantOid              = $forecast->{'ForecastTimeframes'}->{'PlantOid'};
   $hash->{HELPER}{PLANTOID} = $plantOid;                                           # wichtig für erweiterte Selektionen
+  Log3 ($name, 4, "$name - Plant ID set to: ".$hash->{HELPER}{PLANTOID});
+  
+  
+  readingsBeginUpdate($hash);
 
   # Counter for forecast objects
   my $obj_nr = 0;
@@ -1224,7 +1231,7 @@ sub extractForecastData($$) {
                   readingsBulkUpdate( $hash, "L4_${time_str}", (int($fc_obj->{'PvMeanPower'}->{'Amount'}) - int($fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600))." Wh" );
 		          
                   # add WeatherId Helper to show weather icon
-                  $hash->{HELPER}{"L4_".${time_str}."_WeatherId"} = int($fc_obj->{'WeatherId'});		  
+                  $hash->{HELPER}{"L4_".${time_str}."_WeatherId"} = int($fc_obj->{'WeatherId'}) if(defined $fc_obj->{'WeatherId'});		  
               }
               if($time_str =~ /ThisHour/ && $dl >= 2) {
                   readingsBulkUpdate( $hash, "L2_${time_str}_Time", TimeAdjust($hash,$fc_obj->{'TimeStamp'}->{'DateTime'},$tkind) );
@@ -1234,7 +1241,7 @@ sub extractForecastData($$) {
                   readingsBulkUpdate( $hash, "L2_${time_str}", (int($fc_obj->{'PvMeanPower'}->{'Amount'}) - int($fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600))." Wh" );
 		          
                   # add WeatherId Helper to show weather icon
-		          $hash->{HELPER}{"L2_".${time_str}."_WeatherId"} = int($fc_obj->{'WeatherId'});	           
+		          $hash->{HELPER}{"L2_".${time_str}."_WeatherId"} = int($fc_obj->{'WeatherId'}) if(defined $fc_obj->{'WeatherId'});	           
               }
           }
       }
@@ -1278,6 +1285,8 @@ sub extractWeatherData($$) {
   my $name = $hash->{NAME};
   my ($tsymbol,$ttoday,$ttomorrow);
   
+  Log3 ($name, 4, "$name - ##### extracting weather data #### ");
+  
   my $dl = AttrVal($name, "detailLevel", 1);
   
   readingsBeginUpdate($hash);
@@ -1319,7 +1328,7 @@ sub extractWeatherData($$) {
                           $k =~ s/t/T/;
                       }                      
                       
-                      Log3 $name, 4, "$name -> ${k}_${i} - $new_val";
+                      Log3 ($name, 4, "$name - ${k}_${i} - $new_val");
                       readingsBulkUpdate($hash, "L1_${k}_${i}", $new_val);
                   }
               }
@@ -1347,6 +1356,8 @@ sub extractPlantData($$) {
   if($dl <= 1) {
       return;
   }
+  
+  Log3 ($name, 4, "$name - ##### extracting plant data #### ");
   
   readingsBeginUpdate($hash);
   
@@ -1378,6 +1389,8 @@ sub extractConsumerData($$) {
   if($dl <= 1) {
       return;
   }
+  
+  Log3 ($name, 4, "$name - ##### extracting consumer data #### ");
   
   readingsBeginUpdate($hash);
   
@@ -1459,6 +1472,8 @@ sub extractConsumerLiveData($$) {
       return;
   }
   
+  Log3 ($name, 4, "$name - ##### extracting consumer live data #### ");
+  
   readingsBeginUpdate($hash);
   
   # allen Consumer Objekte die ID zuordnen
@@ -1531,6 +1546,8 @@ sub extractConsumerHistData($$$) {
   if($dl <= 2) {
       return;
   }
+  
+  Log3 ($name, 4, "$name - ##### extracting consumer history data #### ");
   
   my $bataval = (defined(ReadingsNum($name,"L1_BatteryIn", undef)) || defined(ReadingsNum($name,"L1_BatteryOut", undef)))?1:0;     # Identifikation ist Battery vorhanden ?
   
