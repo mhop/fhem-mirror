@@ -53,41 +53,6 @@
 ##
 ##
 
-package main;
-
-use strict;
-use warnings;
-use FHEM::Meta;
-
-my $version = '1.6.4';
-
-sub GardenaSmartDevice_Initialize($) {
-
-    my ($hash) = @_;
-
-    $hash->{Match} = '^{"id":".*';
-
-    $hash->{SetFn}   = "FHEM::GardenaSmartDevice::Set";
-    $hash->{DefFn}   = "FHEM::GardenaSmartDevice::Define";
-    $hash->{UndefFn} = "FHEM::GardenaSmartDevice::Undef";
-    $hash->{ParseFn} = "FHEM::GardenaSmartDevice::Parse";
-
-    $hash->{AttrFn} = "FHEM::GardenaSmartDevice::Attr";
-    $hash->{AttrList} =
-        "readingValueLanguage:de,en "
-      . "model:watering_computer,sensor,mower,ic24,power,electronic_pressure_pump "
-      . "IODev "
-      . $readingFnAttributes;
-
-    foreach my $d ( sort keys %{ $modules{GardenaSmartDevice}{defptr} } ) {
-
-        my $hash = $modules{GardenaSmartDevice}{defptr}{$d};
-        $hash->{VERSION} = $version;
-    }
-
-    return FHEM::Meta::InitMod( __FILE__, $hash );
-}
-
 ## unserer packagename
 package FHEM::GardenaSmartDevice;
 
@@ -100,10 +65,8 @@ use strict;
 use warnings;
 use POSIX;
 use FHEM::Meta;
-
 use Time::Local;
-
-# eval "use JSON;1" or $missingModul .= "JSON ";
+our $VERSION = '1.6.5';
 
 # try to use JSON::MaybeXS wrapper
 #   for chance of better performance + open code
@@ -177,7 +140,10 @@ if ($@) {
 }
 
 ## Import der FHEM Funktionen
+#-- Run before package compilation
 BEGIN {
+
+    # Import from main context
     GP_Import(
         qw(readingsSingleUpdate
           readingsBulkUpdate
@@ -188,12 +154,58 @@ BEGIN {
           CommandAttr
           AttrVal
           ReadingsVal
+          readingFnAttributes
           AssignIoPort
           modules
           IOWrite
           defs
           makeDeviceName)
     );
+}
+
+# _Export - Export references to main context using a different naming schema
+sub _Export {
+    no strict qw/refs/;    ## no critic
+    my $pkg  = caller(0);
+    my $main = $pkg;
+    $main =~ s/^(?:.+::)?([^:]+)$/main::$1\_/g;
+    foreach (@_) {
+        *{ $main . $_ } = *{ $pkg . '::' . $_ };
+    }
+}
+
+#-- Export to main context with different name
+_Export(
+    qw(
+      Initialize
+      )
+);
+
+sub Initialize($) {
+
+    my ($hash) = @_;
+
+    $hash->{Match} = '^{"id":".*';
+
+    $hash->{SetFn}   = "FHEM::GardenaSmartDevice::Set";
+    $hash->{DefFn}   = "FHEM::GardenaSmartDevice::Define";
+    $hash->{UndefFn} = "FHEM::GardenaSmartDevice::Undef";
+    $hash->{ParseFn} = "FHEM::GardenaSmartDevice::Parse";
+
+    $hash->{AttrFn} = "FHEM::GardenaSmartDevice::Attr";
+    $hash->{AttrList} =
+        "readingValueLanguage:de,en "
+      . "model:watering_computer,sensor,mower,ic24,power,electronic_pressure_pump "
+      . "IODev "
+      . $readingFnAttributes;
+
+    foreach my $d ( sort keys %{ $modules{GardenaSmartDevice}{defptr} } ) {
+
+        my $hash = $modules{GardenaSmartDevice}{defptr}{$d};
+        $hash->{VERSION} = $VERSION;
+    }
+
+    return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
 sub Define($$) {
@@ -214,7 +226,7 @@ sub Define($$) {
     my $category = $a[3];
 
     $hash->{DEVICEID}                = $deviceId;
-    $hash->{VERSION}                 = $version;
+    $hash->{VERSION}                 = $VERSION;
     $hash->{helper}{STARTINGPOINTID} = '';
 
     CommandAttr( undef,

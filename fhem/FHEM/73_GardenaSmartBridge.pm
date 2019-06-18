@@ -53,55 +53,9 @@
 ##
 ##
 
-package main;
-
-use strict;
-use warnings;
-use FHEM::Meta;
-
-my $version = '1.6.6';
-
-sub GardenaSmartBridge_Initialize($) {
-
-    my ($hash) = @_;
-
-    # Provider
-    $hash->{WriteFn}   = 'FHEM::GardenaSmartBridge::Write';
-    $hash->{Clients}   = ':GardenaSmartDevice:';
-    $hash->{MatchList} = { '1:GardenaSmartDevice' => '^{"id":".*' };
-
-    # Consumer
-    $hash->{SetFn}    = 'FHEM::GardenaSmartBridge::Set';
-    $hash->{DefFn}    = 'FHEM::GardenaSmartBridge::Define';
-    $hash->{UndefFn}  = 'FHEM::GardenaSmartBridge::Undef';
-    $hash->{DeleteFn} = 'FHEM::GardenaSmartBridge::Delete';
-    $hash->{RenameFn} = 'FHEM::GardenaSmartBridge::Rename';
-    $hash->{NotifyFn} = 'FHEM::GardenaSmartBridge::Notify';
-
-    $hash->{AttrFn} = 'FHEM::GardenaSmartBridge::Attr';
-    $hash->{AttrList} =
-        'debugJSON:0,1 '
-      . 'disable:1 '
-      . 'interval '
-      . 'disabledForIntervals '
-      . 'gardenaAccountEmail '
-      . 'gardenaBaseURL '
-      . $readingFnAttributes;
-
-    foreach my $d ( sort keys %{ $modules{GardenaSmartBridge}{defptr} } ) {
-
-        my $hash = $modules{GardenaSmartBridge}{defptr}{$d};
-        $hash->{VERSION} = $version;
-    }
-
-    return FHEM::Meta::InitMod( __FILE__, $hash );
-}
-
 package FHEM::GardenaSmartBridge;
 use GPUtils qw(GP_Import)
   ;    # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
-
-my $missingModul = '';
 
 use strict;
 use warnings;
@@ -109,9 +63,12 @@ use POSIX;
 use FHEM::Meta;
 
 use HttpUtils;
+our $VERSION = '1.6.7';
 
+my $missingModul = '';
 eval "use Encode qw(encode encode_utf8 decode_utf8);1"
   or $missingModul .= "Encode ";
+
 # eval "use JSON;1"            or $missingModul .= 'JSON ';
 eval "use IO::Socket::SSL;1" or $missingModul .= 'IO::Socket::SSL ';
 
@@ -186,7 +143,11 @@ if ($@) {
     }
 }
 
+## Import der FHEM Funktionen
+#-- Run before package compilation
 BEGIN {
+
+    # Import from main context
     GP_Import(
         qw(readingsSingleUpdate
           readingsBulkUpdate
@@ -203,6 +164,7 @@ BEGIN {
           getKeyValue
           getUniqueId
           RemoveInternalTimer
+          readingFnAttributes
           InternalTimer
           defs
           init_done
@@ -212,6 +174,60 @@ BEGIN {
           gettimeofday
           Dispatch)
     );
+}
+
+# _Export - Export references to main context using a different naming schema
+sub _Export {
+    no strict qw/refs/;    ## no critic
+    my $pkg  = caller(0);
+    my $main = $pkg;
+    $main =~ s/^(?:.+::)?([^:]+)$/main::$1\_/g;
+    foreach (@_) {
+        *{ $main . $_ } = *{ $pkg . '::' . $_ };
+    }
+}
+
+#-- Export to main context with different name
+_Export(
+    qw(
+      Initialize
+      )
+);
+
+sub Initialize($) {
+
+    my ($hash) = @_;
+
+    # Provider
+    $hash->{WriteFn}   = 'FHEM::GardenaSmartBridge::Write';
+    $hash->{Clients}   = ':GardenaSmartDevice:';
+    $hash->{MatchList} = { '1:GardenaSmartDevice' => '^{"id":".*' };
+
+    # Consumer
+    $hash->{SetFn}    = 'FHEM::GardenaSmartBridge::Set';
+    $hash->{DefFn}    = 'FHEM::GardenaSmartBridge::Define';
+    $hash->{UndefFn}  = 'FHEM::GardenaSmartBridge::Undef';
+    $hash->{DeleteFn} = 'FHEM::GardenaSmartBridge::Delete';
+    $hash->{RenameFn} = 'FHEM::GardenaSmartBridge::Rename';
+    $hash->{NotifyFn} = 'FHEM::GardenaSmartBridge::Notify';
+
+    $hash->{AttrFn} = 'FHEM::GardenaSmartBridge::Attr';
+    $hash->{AttrList} =
+        'debugJSON:0,1 '
+      . 'disable:1 '
+      . 'interval '
+      . 'disabledForIntervals '
+      . 'gardenaAccountEmail '
+      . 'gardenaBaseURL '
+      . $readingFnAttributes;
+
+    foreach my $d ( sort keys %{ $modules{GardenaSmartBridge}{defptr} } ) {
+
+        my $hash = $modules{GardenaSmartBridge}{defptr}{$d};
+        $hash->{VERSION} = $VERSION;
+    }
+
+    return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
 sub Define($$) {
@@ -235,7 +251,7 @@ sub Define($$) {
       AttrVal( $name, 'gardenaBaseURL',
         'https://sg-api.dss.husqvarnagroup.net' )
       . '/sg-1';
-    $hash->{VERSION}   = $version;
+    $hash->{VERSION}   = $VERSION;
     $hash->{INTERVAL}  = 60;
     $hash->{NOTIFYDEV} = "global,$name";
 
