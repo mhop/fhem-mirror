@@ -46,64 +46,11 @@ package main;
 
 use strict;
 use warnings;
-use FHEM::Meta;
-
-my $version = '0.6.18';
-
-sub AutoShuttersControl_Initialize($) {
-    my ($hash) = @_;
-
-   #    ### alte Attribute welche entfernt werden
-   #     my $oldAttr =
-   #         'ASC_temperatureSensor '
-   #       . 'ASC_temperatureReading '
-   #       . 'ASC_residentsDevice '
-   #       . 'ASC_residentsDeviceReading '
-   #       . 'ASC_rainSensorDevice '
-   #       . 'ASC_rainSensorReading '
-   #       . 'ASC_rainSensorShuttersClosedPos:0,10,20,30,40,50,60,70,80,90,100 '
-   #       . 'ASC_brightnessMinVal '
-   #       . 'ASC_brightnessMaxVal ';
-
-## Da ich mit package arbeite müssen in die Initialize für die jeweiligen hash Fn Funktionen der Funktionsname
-    #  und davor mit :: getrennt der eigentliche package Name des Modules
-    $hash->{SetFn}    = 'FHEM::AutoShuttersControl::Set';
-    $hash->{GetFn}    = 'FHEM::AutoShuttersControl::Get';
-    $hash->{DefFn}    = 'FHEM::AutoShuttersControl::Define';
-    $hash->{NotifyFn} = 'FHEM::AutoShuttersControl::Notify';
-    $hash->{UndefFn}  = 'FHEM::AutoShuttersControl::Undef';
-    $hash->{AttrFn}   = 'FHEM::AutoShuttersControl::Attr';
-    $hash->{AttrList} =
-        'ASC_tempSensor '
-      . 'ASC_brightnessDriveUpDown '
-      . 'ASC_autoShuttersControlMorning:on,off '
-      . 'ASC_autoShuttersControlEvening:on,off '
-      . 'ASC_autoShuttersControlComfort:on,off '
-      . 'ASC_residentsDev '
-      . 'ASC_rainSensor '
-      . 'ASC_autoAstroModeMorning:REAL,CIVIL,NAUTIC,ASTRONOMIC,HORIZON '
-      . 'ASC_autoAstroModeMorningHorizon:-9,-8,-7,-6,-5,-4,-3,-2,-1,0,1,2,3,4,5,6,7,8,9 '
-      . 'ASC_autoAstroModeEvening:REAL,CIVIL,NAUTIC,ASTRONOMIC,HORIZON '
-      . 'ASC_autoAstroModeEveningHorizon:-9,-8,-7,-6,-5,-4,-3,-2,-1,0,1,2,3,4,5,6,7,8,9 '
-      . 'ASC_freezeTemp:-5,-4,-3,-2,-1,0,1,2,3,4,5 '
-      . 'ASC_shuttersDriveOffset '
-      . 'ASC_twilightDevice '
-      . 'ASC_windSensor '
-      . 'ASC_expert:1 '
-      . 'ASC_blockAscDrivesAfterManual:0,1 '
-      . 'ASC_debug:1 '
-
-      #       . $oldAttr
-      . $readingFnAttributes;
-    $hash->{NotifyOrderPrefix} = '51-';    # Order Nummer für NotifyFn
-
-    return FHEM::Meta::InitMod( __FILE__, $hash );
-}
 
 sub ascAPIget($;$) {
     my ( $getCommand, $shutterDev ) = @_;
 
-    return FHEM::AutoShuttersControl::ascAPIget( $getCommand, $shutterDev );
+    return AutoShuttersControl_ascAPIget( $getCommand, $shutterDev );
 }
 
 ## unserer packagename
@@ -112,15 +59,14 @@ package FHEM::AutoShuttersControl;
 use strict;
 use warnings;
 use POSIX;
+use utf8;
 use FHEM::Meta;
 
 use GPUtils qw(:all)
   ;    # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 use Data::Dumper;    #only for Debugging
 use Date::Parse;
-
-# my $missingModul = '';
-# eval "use JSON qw(decode_json encode_json);1" or $missingModul .= 'JSON ';
+our $VERSION = 'v0.6.19';
 
 # try to use JSON::MaybeXS wrapper
 #   for chance of better performance + open code
@@ -194,9 +140,13 @@ if ($@) {
 }
 
 ## Import der FHEM Funktionen
+#-- Run before package compilation
 BEGIN {
+
+    # Import from main context
     GP_Import(
-        qw(devspec2array
+        qw(
+          devspec2array
           readingsSingleUpdate
           readingsBulkUpdate
           readingsBulkUpdateIfChanged
@@ -210,6 +160,7 @@ BEGIN {
           CommandDeleteAttr
           CommandDeleteReading
           CommandSet
+          readingFnAttributes
           AttrVal
           ReadingsVal
           Value
@@ -229,6 +180,25 @@ BEGIN {
           ReplaceEventMap)
     );
 }
+
+# _Export - Export references to main context using a different naming schema
+sub _Export {
+    no strict qw/refs/;    ## no critic
+    my $pkg  = caller(0);
+    my $main = $pkg;
+    $main =~ s/^(?:.+::)?([^:]+)$/main::$1\_/g;
+    foreach (@_) {
+        *{ $main . $_ } = *{ $pkg . '::' . $_ };
+    }
+}
+
+#-- Export to main context with different name
+_Export(
+    qw(
+      Initialize
+      ascAPIget
+      )
+);
 
 ## Die Attributsliste welche an die Rolläden verteilt wird. Zusammen mit Default Werten
 my %userAttrList = (
@@ -319,6 +289,56 @@ sub ascAPIget($;$) {
     }
 }
 
+sub Initialize($) {
+    my ($hash) = @_;
+
+   #    ### alte Attribute welche entfernt werden
+   #     my $oldAttr =
+   #         'ASC_temperatureSensor '
+   #       . 'ASC_temperatureReading '
+   #       . 'ASC_residentsDevice '
+   #       . 'ASC_residentsDeviceReading '
+   #       . 'ASC_rainSensorDevice '
+   #       . 'ASC_rainSensorReading '
+   #       . 'ASC_rainSensorShuttersClosedPos:0,10,20,30,40,50,60,70,80,90,100 '
+   #       . 'ASC_brightnessMinVal '
+   #       . 'ASC_brightnessMaxVal ';
+
+## Da ich mit package arbeite müssen in die Initialize für die jeweiligen hash Fn Funktionen der Funktionsname
+    #  und davor mit :: getrennt der eigentliche package Name des Modules
+    $hash->{SetFn}    = 'FHEM::AutoShuttersControl::Set';
+    $hash->{GetFn}    = 'FHEM::AutoShuttersControl::Get';
+    $hash->{DefFn}    = 'FHEM::AutoShuttersControl::Define';
+    $hash->{NotifyFn} = 'FHEM::AutoShuttersControl::Notify';
+    $hash->{UndefFn}  = 'FHEM::AutoShuttersControl::Undef';
+    $hash->{AttrFn}   = 'FHEM::AutoShuttersControl::Attr';
+    $hash->{AttrList} =
+        'ASC_tempSensor '
+      . 'ASC_brightnessDriveUpDown '
+      . 'ASC_autoShuttersControlMorning:on,off '
+      . 'ASC_autoShuttersControlEvening:on,off '
+      . 'ASC_autoShuttersControlComfort:on,off '
+      . 'ASC_residentsDev '
+      . 'ASC_rainSensor '
+      . 'ASC_autoAstroModeMorning:REAL,CIVIL,NAUTIC,ASTRONOMIC,HORIZON '
+      . 'ASC_autoAstroModeMorningHorizon:-9,-8,-7,-6,-5,-4,-3,-2,-1,0,1,2,3,4,5,6,7,8,9 '
+      . 'ASC_autoAstroModeEvening:REAL,CIVIL,NAUTIC,ASTRONOMIC,HORIZON '
+      . 'ASC_autoAstroModeEveningHorizon:-9,-8,-7,-6,-5,-4,-3,-2,-1,0,1,2,3,4,5,6,7,8,9 '
+      . 'ASC_freezeTemp:-5,-4,-3,-2,-1,0,1,2,3,4,5 '
+      . 'ASC_shuttersDriveOffset '
+      . 'ASC_twilightDevice '
+      . 'ASC_windSensor '
+      . 'ASC_expert:1 '
+      . 'ASC_blockAscDrivesAfterManual:0,1 '
+      . 'ASC_debug:1 '
+
+      #       . $oldAttr
+      . $readingFnAttributes;
+    $hash->{NotifyOrderPrefix} = '51-';    # Order Nummer für NotifyFn
+
+    return FHEM::Meta::InitMod( __FILE__, $hash );
+}
+
 sub Define($$) {
     my ( $hash, $def ) = @_;
     my @a = split( '[ \t][ \t]*', $def );
@@ -338,7 +358,7 @@ sub Define($$) {
 
     my $name = $a[0];
 
-    $hash->{VERSION} = $version;
+    $hash->{VERSION} = $VERSION;
     $hash->{MID}     = 'da39a3ee5e6b4b0d3255bfef95601890afd80709'
       ; # eine Ein Eindeutige ID für interne FHEM Belange / nicht weiter wichtig
     $hash->{NOTIFYDEV} = 'global,'
