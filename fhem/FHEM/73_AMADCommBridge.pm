@@ -58,65 +58,20 @@
 ##
 ##
 
-package main;
-
-use strict;
-use warnings;
-use FHEM::Meta;
-
-my $modulversion   = '4.4.2';
-my $flowsetversion = '4.4.1';
-
-sub AMADCommBridge_Initialize($) {
-
-    my ($hash) = @_;
-
-    # Provider
-    $hash->{ReadFn}    = 'FHEM::AMADCommBridge::Read';
-    $hash->{WriteFn}   = 'FHEM::AMADCommBridge::Write';
-    $hash->{Clients}   = ':AMADDevice:';
-    $hash->{MatchList} = { "1:AMADDevice" => '{"amad": \{"amad_id":.+}}' };
-
-    # Consumer
-    $hash->{SetFn}   = 'FHEM::AMADCommBridge::Set';
-    $hash->{DefFn}   = 'FHEM::AMADCommBridge::Define';
-    $hash->{UndefFn} = 'FHEM::AMADCommBridge::Undef';
-
-    $hash->{AttrFn} = 'FHEM::AMADCommBridge::Attr';
-    $hash->{AttrList} =
-        'fhemControlMode:trigger,setControl,thirdPartControl '
-      . 'debugJSON:0,1 '
-      . 'enableSubCalls:0,1 '
-      . 'disable:1 '
-      . 'allowfrom '
-      . 'fhemServerIP '
-      . $readingFnAttributes;
-
-    foreach my $d ( sort keys %{ $modules{AMADCommBridge}{defptr} } ) {
-
-        my $hash = $modules{AMADCommBridge}{defptr}{$d};
-        $hash->{VERSIONMODUL}   = $modulversion;
-        $hash->{VERSIONFLOWSET} = $flowsetversion;
-    }
-
-    return FHEM::Meta::InitMod( __FILE__, $hash );
-}
-
 package FHEM::AMADCommBridge;
 
 use strict;
 use warnings;
 use POSIX;
 use FHEM::Meta;
-
 use GPUtils qw(GP_Import)
   ;    # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
-
-my $missingModul = '';
-
 use HttpUtils;
 use TcpServerUtils;
+our $MODULVERSION   = 'v4.4.2';
+our $FLOWSETVERSION = 'v4.4.1';
 
+my $missingModul = '';
 eval "use Encode qw(encode encode_utf8);1" or $missingModul .= 'Encode ';
 
 # try to use JSON::MaybeXS wrapper
@@ -188,9 +143,13 @@ if ($@) {
             }
         }
     }
+}
 
 ## Import der FHEM Funktionen
+#-- Run before package compilation
 BEGIN {
+
+    # Import from main context
     GP_Import(
         qw(readingsSingleUpdate
           readingsBulkUpdate
@@ -202,6 +161,7 @@ BEGIN {
           CommandAttr
           CommandDelete
           CommandSet
+          readingFnAttributes
           attr
           AttrVal
           ReadingsVal
@@ -215,6 +175,59 @@ BEGIN {
           AnalyzeCommandChain
           AnalyzePerlCommand)
     );
+}
+
+# _Export - Export references to main context using a different naming schema
+sub _Export {
+    no strict qw/refs/;    ## no critic
+    my $pkg  = caller(0);
+    my $main = $pkg;
+    $main =~ s/^(?:.+::)?([^:]+)$/main::$1\_/g;
+    foreach (@_) {
+        *{ $main . $_ } = *{ $pkg . '::' . $_ };
+    }
+}
+
+#-- Export to main context with different name
+_Export(
+    qw(
+      Initialize
+      )
+);
+
+sub Initialize($) {
+
+    my ($hash) = @_;
+
+    # Provider
+    $hash->{ReadFn}    = 'FHEM::AMADCommBridge::Read';
+    $hash->{WriteFn}   = 'FHEM::AMADCommBridge::Write';
+    $hash->{Clients}   = ':AMADDevice:';
+    $hash->{MatchList} = { "1:AMADDevice" => '{"amad": \{"amad_id":.+}}' };
+
+    # Consumer
+    $hash->{SetFn}   = 'FHEM::AMADCommBridge::Set';
+    $hash->{DefFn}   = 'FHEM::AMADCommBridge::Define';
+    $hash->{UndefFn} = 'FHEM::AMADCommBridge::Undef';
+
+    $hash->{AttrFn} = 'FHEM::AMADCommBridge::Attr';
+    $hash->{AttrList} =
+        'fhemControlMode:trigger,setControl,thirdPartControl '
+      . 'debugJSON:0,1 '
+      . 'enableSubCalls:0,1 '
+      . 'disable:1 '
+      . 'allowfrom '
+      . 'fhemServerIP '
+      . $readingFnAttributes;
+
+    foreach my $d ( sort keys %{ $modules{AMADCommBridge}{defptr} } ) {
+
+        my $hash = $modules{AMADCommBridge}{defptr}{$d};
+        $hash->{VERSIONMODUL}   = $MODULVERSION;
+        $hash->{VERSIONFLOWSET} = $FLOWSETVERSION;
+    }
+
+    return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
 sub Define($$) {
@@ -240,8 +253,8 @@ sub Define($$) {
 
     $hash->{BRIDGE}         = 1;
     $hash->{PORT}           = $port;
-    $hash->{VERSIONMODUL}   = $modulversion;
-    $hash->{VERSIONFLOWSET} = $flowsetversion;
+    $hash->{VERSIONMODUL}   = $MODULVERSION;
+    $hash->{VERSIONFLOWSET} = $FLOWSETVERSION;
 
     CommandAttr( undef, $name . ' room AMAD' )
       if ( AttrVal( $name, 'room', 'none' ) eq 'none' );
@@ -898,7 +911,7 @@ sub ProcessRead($$) {
     if ( $data =~ /currentFlowsetUpdate.xml/ ) {
 
         $response =
-qx(cat $fhempath/FHEM/lib/74_AMADautomagicFlowset_$flowsetversion.xml);
+qx(cat $fhempath/FHEM/lib/74_AMADautomagicFlowset_$FLOWSETVERSION.xml);
         $c = $hash->{CD};
         print $c "HTTP/1.1 200 OK\r\n",
           "Content-Type: text/plain\r\n",
@@ -912,7 +925,7 @@ qx(cat $fhempath/FHEM/lib/74_AMADautomagicFlowset_$flowsetversion.xml);
     elsif ( $data =~ /currentTaskersetUpdate.prj.xml/ ) {
 
         $response =
-          qx(cat $fhempath/FHEM/lib/74_AMADtaskerset_$flowsetversion.prj.xml);
+          qx(cat $fhempath/FHEM/lib/74_AMADtaskerset_$FLOWSETVERSION.prj.xml);
         $c = $hash->{CD};
         print $c "HTTP/1.1 200 OK\r\n",
           "Content-Type: text/plain\r\n",

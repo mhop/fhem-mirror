@@ -44,68 +44,6 @@
 #
 #
 
-package main;
-
-use strict;
-use warnings;
-use FHEM::Meta;
-
-my $modulversion   = '4.4.2';
-my $flowsetversion = '4.4.1';
-
-sub AMADDevice_Initialize($) {
-
-    my ($hash) = @_;
-
-    $hash->{Match} = '{"amad": \{"amad_id":.+}}';
-
-    $hash->{SetFn}    = 'FHEM::AMADDevice::Set';
-    $hash->{DefFn}    = 'FHEM::AMADDevice::Define';
-    $hash->{UndefFn}  = 'FHEM::AMADDevice::Undef';
-    $hash->{AttrFn}   = 'FHEM::AMADDevice::Attr';
-    $hash->{NotifyFn} = 'FHEM::AMADDevice::Notify';
-    $hash->{ParseFn}  = 'FHEM::AMADDevice::Parse';
-
-    $hash->{AttrList} =
-        'setOpenApp '
-      . 'checkActiveTask '
-      . 'setFullscreen:0,1 '
-      . 'setScreenOrientation:0,1 '
-      . 'setScreenBrightness:noArg '
-      . 'setBluetoothDevice '
-      . 'setScreenlockPIN '
-      . 'setScreenOnForTimer '
-      . 'setOpenUrlBrowser '
-      . 'setNotifySndFilePath '
-      . 'setTtsMsgSpeed '
-      . 'setTtsMsgLang:de,en '
-      . 'setTtsMsgVol '
-      . 'setUserFlowState '
-      . 'setVolUpDownStep:1,2,4,5 '
-      . 'setVolMax '
-      . 'setVolFactor:2,3,4,5 '
-      . 'setNotifyVolMax '
-      . 'setRingSoundVolMax '
-      . 'setAPSSID '
-      . 'root:0,1 '
-      . 'disable:1 '
-      . 'IODev '
-      . 'remoteServer:Automagic,Autoremote,TNES,other '
-      . 'setTakeScreenshotResolution:1280x720,1920x1080,1920x1200 '
-      . 'setTakePictureResolution:800x600,1024x768,1280x720,1600x1200,1920x1080 '
-      . 'setTakePictureCamera:Back,Front '
-      . $readingFnAttributes;
-
-    foreach my $d ( sort keys %{ $modules{AMADDevice}{defptr} } ) {
-
-        my $hash = $modules{AMADDevice}{defptr}{$d};
-        $hash->{VERSIONMODUL}   = $modulversion;
-        $hash->{VERSIONFLOWSET} = $flowsetversion;
-    }
-
-    return FHEM::Meta::InitMod( __FILE__, $hash );
-}
-
 ## unserer packagename
 package FHEM::AMADDevice;
 
@@ -115,12 +53,12 @@ use POSIX;
 use FHEM::Meta;
 
 use Data::Dumper;    #only for Debugging
-
 use GPUtils qw(GP_Import)
   ;    # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
+our $MODULVERSION   = 'v4.4.2';
+our $FLOWSETVERSION = 'v4.4.1';
 
 my $missingModul = '';
-
 eval "use Encode qw(encode encode_utf8);1" or $missingModul .= 'Encode ';
 
 # try to use JSON::MaybeXS wrapper
@@ -192,9 +130,13 @@ if ($@) {
             }
         }
     }
+}
 
 ## Import der FHEM Funktionen
+#-- Run before package compilation
 BEGIN {
+
+    # Import from main context
     GP_Import(
         qw(readingsSingleUpdate
           readingsBulkUpdate
@@ -204,6 +146,7 @@ BEGIN {
           CommandDeleteReading
           defs
           modules
+          readingFnAttributes
           Log3
           CommandAttr
           attr
@@ -221,6 +164,77 @@ BEGIN {
           urlEncode
           AssignIoPort)
     );
+}
+
+# _Export - Export references to main context using a different naming schema
+sub _Export {
+    no strict qw/refs/;    ## no critic
+    my $pkg  = caller(0);
+    my $main = $pkg;
+    $main =~ s/^(?:.+::)?([^:]+)$/main::$1\_/g;
+    foreach (@_) {
+        *{ $main . $_ } = *{ $pkg . '::' . $_ };
+    }
+}
+
+#-- Export to main context with different name
+_Export(
+    qw(
+      Initialize
+      )
+);
+
+sub Initialize($) {
+
+    my ($hash) = @_;
+
+    $hash->{Match} = '{"amad": \{"amad_id":.+}}';
+
+    $hash->{SetFn}    = 'FHEM::AMADDevice::Set';
+    $hash->{DefFn}    = 'FHEM::AMADDevice::Define';
+    $hash->{UndefFn}  = 'FHEM::AMADDevice::Undef';
+    $hash->{AttrFn}   = 'FHEM::AMADDevice::Attr';
+    $hash->{NotifyFn} = 'FHEM::AMADDevice::Notify';
+    $hash->{ParseFn}  = 'FHEM::AMADDevice::Parse';
+
+    $hash->{AttrList} =
+        'setOpenApp '
+      . 'checkActiveTask '
+      . 'setFullscreen:0,1 '
+      . 'setScreenOrientation:0,1 '
+      . 'setScreenBrightness:noArg '
+      . 'setBluetoothDevice '
+      . 'setScreenlockPIN '
+      . 'setScreenOnForTimer '
+      . 'setOpenUrlBrowser '
+      . 'setNotifySndFilePath '
+      . 'setTtsMsgSpeed '
+      . 'setTtsMsgLang:de,en '
+      . 'setTtsMsgVol '
+      . 'setUserFlowState '
+      . 'setVolUpDownStep:1,2,4,5 '
+      . 'setVolMax '
+      . 'setVolFactor:2,3,4,5 '
+      . 'setNotifyVolMax '
+      . 'setRingSoundVolMax '
+      . 'setAPSSID '
+      . 'root:0,1 '
+      . 'disable:1 '
+      . 'IODev '
+      . 'remoteServer:Automagic,Autoremote,TNES,other '
+      . 'setTakeScreenshotResolution:1280x720,1920x1080,1920x1200 '
+      . 'setTakePictureResolution:800x600,1024x768,1280x720,1600x1200,1920x1080 '
+      . 'setTakePictureCamera:Back,Front '
+      . $readingFnAttributes;
+
+    foreach my $d ( sort keys %{ $modules{AMADDevice}{defptr} } ) {
+
+        my $hash = $modules{AMADDevice}{defptr}{$d};
+        $hash->{VERSIONMODUL}   = $MODULVERSION;
+        $hash->{VERSIONFLOWSET} = $FLOWSETVERSION;
+    }
+
+    return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
 sub Define($$) {
@@ -245,8 +259,8 @@ sub Define($$) {
 
     $hash->{HOST}           = $host;
     $hash->{AMAD_ID}        = $amad_id;
-    $hash->{VERSIONMODUL}   = $modulversion;
-    $hash->{VERSIONFLOWSET} = $flowsetversion;
+    $hash->{VERSIONMODUL}   = $MODULVERSION;
+    $hash->{VERSIONFLOWSET} = $FLOWSETVERSION;
     $hash->{NOTIFYDEV}      = 'global,' . $name;
     $hash->{MODEL}          = $remoteServer;
 
