@@ -647,6 +647,8 @@ my %EnO_gpValueEnum = (
                             enumInv => {"auto" => 0, "comfort" => 1, "standby" => 2, "economy" => 3, "building_protection" => 4}},
   5 => {name => "changeoverMode", enum => {0 => "auto", 1 => "cooling", 2 => "heating"},
                                   enumInv => {"auto" => 0,"cooling" => 1,"heating" => 2}},
+  6 => {name => "time"},
+  7 => {name => "battery", unit => "%"},
 );
 
 my %EnO_gpValueFlag = (
@@ -711,6 +713,8 @@ my %EnO_gpValueData = (
   28 => {name => "voltage", unit => "V"},
   29 => {name => "volume", unit => "m3"},
   30 => {name => "volumetric_flow", unit => "m3/s"},
+  31 => {name => "sound_pressure_level", unit => "dB"},
+  32 => {name => "correlated_color_temperature", unit => "K"},
 );
 
 # Initialize
@@ -6675,6 +6679,12 @@ sub EnOcean_Set($@)
           $data = $EnO_gpValueEnum{$signalType}{enumInv}{$a[1]};
           #Log3 $name, 3, "EnOcean set $name header: $header channel: $channel data: $data";
           shift @a;
+        } elsif ($signalType == 6 && $a[1] =~ m/^\d+$/ && $a[1] <= 0xFFFFFFFF) {
+          # time
+          $data = shift @a;
+        } elsif ($signalType == 7 && $a[1] =~ m/^\d+(\.\d+)?$/ && $a[1] <= 100) {
+          # battery
+          $data = int(shift(@a) * 2);
         } else {
           return "Usage: $a[1] is unknown";
         }
@@ -12149,12 +12159,21 @@ sub EnOcean_Parse($$)
       while (length($data) >= 12) {
         last if ($cntr > 64);
         $cntr ++;
-        $data =~ m/^(..)(.{8})(.*)$/;
+        $data =~ m/^(..)(.*)$/;
         $channelType = unpack('C', pack('B8', '000000' . $1));
-        $signalType = unpack('C', pack('B8', $2));
-        $data = $3;
+        $data = $2;
+        if ($channelType == 0) {
+          $data =~ m/^(.{6})(.*)$/;
+          $signalType =  unpack('C', pack('B8', '00' . $1));
+          $data = $2;
+        } else {
+          $data =~ m/^(.{8})(.*)$/;
+          $signalType =  unpack('C', pack('B8', $1));
+          $data = $2;
+        }
         #Log3 $name, 2, "EnOcean $name parse GPTI channel: $channel channelType: $channelType signalType: $signalType data: $data";
 
+######
         if ($channelType == 0) {
           # teach-in information
           if ($signalType == 1) {
@@ -12169,6 +12188,8 @@ sub EnOcean_Parse($$)
             $data =~ m/^(.{32})(.*)$/;
             $attr{$name}{productID} = EnOcean_convBitToHex($1);
             $data = $2;
+          } else {
+
           }
 
         } elsif ($channelType == 1) {
@@ -16566,6 +16587,9 @@ sub EnOcean_gpConvDataToValue($$$$$) {
     if (defined $EnO_gpValueEnum{$signalType}{enum}{$data})  {
       $readingValue = $EnO_gpValueEnum{$signalType}{enum}{$data};
       $readingFormat = '%s';
+    } elsif ($signalType == 7) {
+      $readingValue = $data / 2;
+      $readingFormat = '%0.1f';
     }
 
   } elsif ($channelType == 2) {
