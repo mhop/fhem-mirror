@@ -30,15 +30,151 @@
 #
 ###############################################################################
 
-package main;
+## unserer packagename
+package FHEM::AptToDate;
 
 use strict;
 use warnings;
+use POSIX;
 use FHEM::Meta;
 
-my $version = "1.4.4";
+use GPUtils qw(GP_Import)
+  ;    # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 
-sub AptToDate_Initialize($) {
+use Data::Dumper;    #only for Debugging
+our $VERSION = 'v1.4.5';
+
+# try to use JSON::MaybeXS wrapper
+#   for chance of better performance + open code
+eval {
+    require JSON::MaybeXS;
+    import JSON::MaybeXS qw( decode_json encode_json );
+    1;
+};
+
+if ($@) {
+    $@ = undef;
+
+    # try to use JSON wrapper
+    #   for chance of better performance
+    eval {
+
+        # JSON preference order
+        local $ENV{PERL_JSON_BACKEND} =
+          'Cpanel::JSON::XS,JSON::XS,JSON::PP,JSON::backportPP'
+          unless ( defined( $ENV{PERL_JSON_BACKEND} ) );
+
+        require JSON;
+        import JSON qw( decode_json encode_json );
+        1;
+    };
+
+    if ($@) {
+        $@ = undef;
+
+        # In rare cases, Cpanel::JSON::XS may
+        #   be installed but JSON|JSON::MaybeXS not ...
+        eval {
+            require Cpanel::JSON::XS;
+            import Cpanel::JSON::XS qw(decode_json encode_json);
+            1;
+        };
+
+        if ($@) {
+            $@ = undef;
+
+            # In rare cases, JSON::XS may
+            #   be installed but JSON not ...
+            eval {
+                require JSON::XS;
+                import JSON::XS qw(decode_json encode_json);
+                1;
+            };
+
+            if ($@) {
+                $@ = undef;
+
+                # Fallback to built-in JSON which SHOULD
+                #   be available since 5.014 ...
+                eval {
+                    require JSON::PP;
+                    import JSON::PP qw(decode_json encode_json);
+                    1;
+                };
+
+                if ($@) {
+                    $@ = undef;
+
+                    # Fallback to JSON::backportPP in really rare cases
+                    require JSON::backportPP;
+                    import JSON::backportPP qw(decode_json encode_json);
+                    1;
+                }
+            }
+        }
+    }
+}
+
+## Import der FHEM Funktionen
+#-- Run before package compilation
+BEGIN {
+
+    # Import from main context
+    GP_Import(
+        qw(readingsSingleUpdate
+          readingsBulkUpdate
+          readingsBulkUpdateIfChanged
+          readingsBeginUpdate
+          readingsEndUpdate
+          ReadingsTimestamp
+          defs
+          readingFnAttributes
+          modules
+          Log3
+          CommandAttr
+          attr
+          AttrVal
+          ReadingsVal
+          Value
+          IsDisabled
+          deviceEvents
+          init_done
+          gettimeofday
+          InternalTimer
+          RemoveInternalTimer)
+    );
+}
+
+# _Export - Export references to main context using a different naming schema
+sub _Export {
+    no strict qw/refs/;    ## no critic
+    my $pkg  = caller(0);
+    my $main = $pkg;
+    $main =~ s/^(?:.+::)?([^:]+)$/main::$1\_/g;
+    foreach (@_) {
+        *{ $main . $_ } = *{ $pkg . '::' . $_ };
+    }
+}
+
+#-- Export to main context with different name
+_Export(
+    qw(
+      Initialize
+      )
+);
+
+my %regex = (
+    'en' => {
+        'update'  => '^Reading package lists...$',
+        'upgrade' => '^Unpacking (\S+)\s\((\S+)\)\s+over\s+\((\S+)\)'
+    },
+    'de' => {
+        'update'  => '^Paketlisten werden gelesen...$',
+        'upgrade' => '^Entpacken von (\S+)\s\((\S+)\)\s+über\s+\((\S+)\)'
+    }
+);
+
+sub Initialize($) {
 
     my ($hash) = @_;
 
@@ -57,64 +193,11 @@ sub AptToDate_Initialize($) {
 
     foreach my $d ( sort keys %{ $modules{AptToDate}{defptr} } ) {
         my $hash = $modules{AptToDate}{defptr}{$d};
-        $hash->{VERSION} = $version;
+        $hash->{VERSION} = $VERSION;
     }
     
     return FHEM::Meta::InitMod( __FILE__, $hash );
 }
-
-## unserer packagename
-package FHEM::AptToDate;
-
-use strict;
-use warnings;
-use POSIX;
-use FHEM::Meta;
-
-use GPUtils qw(GP_Import)
-  ;    # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
-
-use Data::Dumper;    #only for Debugging
-
-my $missingModul = "";
-eval "use JSON;1" or $missingModul .= "JSON ";
-
-## Import der FHEM Funktionen
-BEGIN {
-    GP_Import(
-        qw(readingsSingleUpdate
-          readingsBulkUpdate
-          readingsBulkUpdateIfChanged
-          readingsBeginUpdate
-          readingsEndUpdate
-          ReadingsTimestamp
-          defs
-          modules
-          Log3
-          CommandAttr
-          attr
-          AttrVal
-          ReadingsVal
-          Value
-          IsDisabled
-          deviceEvents
-          init_done
-          gettimeofday
-          InternalTimer
-          RemoveInternalTimer)
-    );
-}
-
-my %regex = (
-    'en' => {
-        'update'  => '^Reading package lists...$',
-        'upgrade' => '^Unpacking (\S+)\s\((\S+)\)\s+over\s+\((\S+)\)'
-    },
-    'de' => {
-        'update'  => '^Paketlisten werden gelesen...$',
-        'upgrade' => '^Entpacken von (\S+)\s\((\S+)\)\s+über\s+\((\S+)\)'
-    }
-);
 
 sub Define($$) {
 
@@ -123,14 +206,11 @@ sub Define($$) {
 
     return $@ unless ( FHEM::Meta::SetInternals($hash) );
     return "too few parameters: define <name> AptToDate <HOST>" if ( @a != 3 );
-    return
-      "Cannot define AptToDate device. Perl modul ${missingModul}is missing."
-      if ($missingModul);
 
     my $name = $a[0];
     my $host = $a[2];
 
-    $hash->{VERSION}   = $version;
+    $hash->{VERSION}   = $VERSION;
     $hash->{HOST}      = $host;
     $hash->{NOTIFYDEV} = "global,$name";
 
