@@ -2090,11 +2090,13 @@ sub _GetSeasonPheno ($$;$$) {
 # HELPER FUNCTIONS
 
 sub decimal_mark ($;$) {
+    my $s;
     my $i;
     my $f;
-    if ( $_[0] =~ /^(\d+)(?:\.(\d+))?$/ ) {
-        $i = reverse $1;
-        $f = $2;
+    if ( $_[0] =~ /^(\-|\+)?(\d+)(?:\.(\d+))?$/ ) {
+        $s = $1;
+        $i = reverse $2;
+        $f = $3;
     }
     else {
         return $_[0];
@@ -2122,7 +2124,7 @@ sub decimal_mark ($;$) {
     $f =~ s/(\d{$grouping[0]})(?=\d)/$1$thousands_sep/g
       if ( defined($f) && $f ne '' );
 
-    return (reverse $i)
+    return ( $s ? $s : '' ) . ( reverse $i )
       . ( defined($f) && $f ne '' ? $decimal_point . $f : '' );
 }
 
