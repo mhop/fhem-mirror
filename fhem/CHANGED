@@ -1,5 +1,17 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - update:  95_Astro: v2.0.0
+                   device attributes for language, timezone and locale settings
+                   new set command "update"
+                   new attribute recomputeAt
+                   support for disable attribute
+                   improved startup and readings update behaviour
+                   different custom horizon for morning/evening twilight
+                   unit and label support for text
+                   regional settings for numeric values and time in text format
+                   enhanced options for Astro_Get()
+                   fix some typos
+                   stability improvements
  - feature: 73_GardenaSmartBridge: change package code
  - feature: 73_AMADCommBridge: change package code
  - feature: 42_AptToDate: change every package code
