@@ -2092,7 +2092,7 @@ sub _GetSeasonPheno ($$;$$) {
 sub decimal_mark ($;$) {
     my $i;
     my $f;
-    if ( $_[0] =~ /^(\d+)(?:\.(\d+))?/ ) {
+    if ( $_[0] =~ /^(\d+)(?:\.(\d+))?$/ ) {
         $i = reverse $1;
         $f = $2;
     }
