@@ -2090,8 +2090,16 @@ sub _GetSeasonPheno ($$;$$) {
 # HELPER FUNCTIONS
 
 sub decimal_mark ($;$) {
-    return $_[0] unless ( looks_like_number( $_[0] ) );
-    my $d = reverse $_[0];
+    my $i;
+    my $f;
+    if ( $_[0] =~ /^(\d+)(?:\.(\d+))?/ ) {
+        $i = reverse $1;
+        $f = $2;
+    }
+    else {
+        return $_[0];
+    }
+
     my $locale = ( $_[1] ? $_[1] : undef );
 
     my $old_locale = setlocale(LC_NUMERIC);
@@ -2103,19 +2111,19 @@ sub decimal_mark ($;$) {
     setlocale( LC_NUMERIC, $old_locale );
     no locale;
 
-    $thousands_sep = chr(0x2009) unless ($thousands_sep);
+    $decimal_point = '.'
+      unless ( defined($decimal_point) && $decimal_point ne '' );
+    $thousands_sep = chr(0x202F)
+      unless ( defined($thousands_sep) && $thousands_sep ne "" );
     my @grouping =
       $grouping && $grouping =~ /^\d+$/ ? unpack( "C*", $grouping ) : (3);
 
-    if ( $thousands_sep ne ',' ) {
-        $d =~ s/\./$decimal_point/g;
-        $d =~ s/(\d{$grouping[0]})(?=\d)(?!\d*,)/$1$thousands_sep/g;
-    }
-    else {
-        $d =~ s/(\d{$grouping[0]})(?=\d)(?!\d*\.)/$1$thousands_sep/g;
-    }
+    $i =~ s/(\d{$grouping[0]})(?=\d)/$1$thousands_sep/g;
+    $f =~ s/(\d{$grouping[0]})(?=\d)/$1$thousands_sep/g
+      if ( defined($f) && $f ne '' );
 
-    return scalar reverse $d;
+    return (reverse $i)
+      . ( defined($f) && $f ne '' ? $decimal_point . $f : '' );
 }
 
 sub _round($;$) {
