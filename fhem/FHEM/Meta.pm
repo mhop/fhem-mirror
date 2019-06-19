@@ -3243,6 +3243,14 @@ sub __SetXVersion {
           );
     }
 
+    # from META.json only
+    elsif ( $modMeta->{x_file}[7] eq 'META.json' )
+    {
+        $modMeta->{x_version} =
+            $modMeta->{x_file}[2] . ':'
+          . version->parse( $modMeta->{version} )->normal;
+    }
+
     # Generate generic version to fill the gap
     elsif ( $modMeta->{x_file}[7] eq 'generated/blank' ) {
         $modMeta->{x_version} = $modMeta->{x_file}[2] . ':?';
@@ -3294,7 +3302,7 @@ sub __SetXVersion {
       "abstract": "FHEM Entwickler Paket, um Metadaten Unterstützung zu aktivieren"
     }
   },
-  "version": "v0.6.3",
+  "version": "v0.6.4",
   "release_status": "testing",
   "x_changelog": {
     "2019-04-18": {
