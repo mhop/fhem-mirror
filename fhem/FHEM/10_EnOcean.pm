@@ -6417,11 +6417,11 @@ sub EnOcean_Set($@)
           if ($setChannelName eq "?") {
             $channelName = "none";
             if ($channelType == 1 && defined $EnO_gpValueData{$signalType}{name}) {
-                $channelName = $EnO_gpValueData{$signalType}{name};
+              $channelName = $EnO_gpValueData{$signalType}{name};
             } elsif ($channelType == 2 && defined $EnO_gpValueFlag{$signalType}{name}) {
-                $channelName = $EnO_gpValueFlag{$signalType}{name};
+              $channelName = $EnO_gpValueFlag{$signalType}{name};
             } elsif ($channelType == 3 && defined $EnO_gpValueEnum{$signalType}{name}) {
-                $channelName = $EnO_gpValueEnum{$signalType}{name};
+              $channelName = $EnO_gpValueEnum{$signalType}{name};
             }
           } else {
             $channelName = $setChannelName;
@@ -12150,7 +12150,7 @@ sub EnOcean_Parse($$)
       my $channelName;
       my $channelType;
       my $cntr = 0;
-      my $dataOutboundDefLen = 0;
+      my $teachInDataLen = 0;
       my @gpDef;
       my $signalType;
       #Log3 $name, 2, "EnOcean $name parse GPTI header: $header data: $data start";
@@ -12173,23 +12173,42 @@ sub EnOcean_Parse($$)
         }
         #Log3 $name, 2, "EnOcean $name parse GPTI channel: $channel channelType: $channelType signalType: $signalType data: $data";
 
-######
         if ($channelType == 0) {
           # teach-in information
+          $data =~ m/^(.{8})(.*)$/;
+          $teachInDataLen = unpack('C', pack('B8', $1)) * 8;
+          $data = $2;
           if ($signalType == 1) {
-            # outbound channel description
+            # outbound channels description following
             $channelDir = "O";
-            $data =~ m/^(.{8})(.*)$/;
-            $dataOutboundDefLen = unpack('C', pack('B8', $1));
-            $data = $2;
-
           } elsif ($signalType == 2) {
             # produkt ID
-            $data =~ m/^(.{32})(.*)$/;
+            $data =~ m/^(.{$teachInDataLen})(.*)$/;
             $attr{$name}{productID} = EnOcean_convBitToHex($1);
             $data = $2;
+          } elsif ($signalType == 3) {
+######
+            # Connected GSI Sensor IDs
+            my $gsiIdDataLen =  $teachInDataLen - 16;
+            $data =~ m/^(.{8})(.{8})(.{$gsiIdDataLen})(.*)$/;
+            $attr{$name}{gsiSocket} = unpack('C', pack('B8', $1));
+            my ($sensors, $gsiIdData) = (unpack('C', pack('B8', $2)), $3);
+            $data = $4;
+            my $gsiSensorName;
+            for (my $i = 0; $i <= $sensors; $i++) {
+              $gsiIdData =~ m/^(.{8})(.{16})(.{24})(.*)$/;
+              $gsiSensorName = sprintf "gsiSensor-%03d", $i;
+              $attr{$name}{$gsiSensorName} = sprintf "%02s:%04s:%06s", EnOcean_convBitToHex($1), EnOcean_convBitToHex($2), EnOcean_convBitToHex($3);
+              $gsiIdData = $4;
+            }
           } else {
-
+            if ($teachInDataLen == 0) {
+              Log3 $name, 2, "EnOcean $name parse GPTI teach-in info signalType: $signalType not supported";
+            } else {
+              $data =~ m/^(.{$teachInDataLen})(.*)$/;
+              Log3 $name, 2, "EnOcean $name parse GPTI teach-in info signalType: $signalType data: " . EnOcean_convBitToHex($1) . " not supported";
+              $data = $2;
+            }
           }
 
         } elsif ($channelType == 1) {
@@ -12848,7 +12867,7 @@ sub EnOcean_Parse($$)
       my $channelDef;
       my $channelName;
       my $channelType;
-      my $dataOutboundDefLen = 0;
+      my $teachInDataLen = 0;
       my $gpData;
       my @gpDef;
       my $gpIdx;
@@ -16584,6 +16603,9 @@ sub EnOcean_gpConvDataToValue($$$$$) {
 
   if ($channelType == 3) {
     # enumeration
+    if (defined $EnO_gpValueEnum{$signalType}{unit})  {
+      $readingUnit = $EnO_gpValueEnum{$signalType}{unit};
+    }
     if (defined $EnO_gpValueEnum{$signalType}{enum}{$data})  {
       $readingValue = $EnO_gpValueEnum{$signalType}{enum}{$data};
       $readingFormat = '%s';
