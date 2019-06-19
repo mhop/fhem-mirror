@@ -759,8 +759,7 @@ sub Define ($@) {
  # for the very first definition, set some default attributes
  if ( $init_done && !defined( $hash->{OLDDEF} ) ) {
    $attr{$name}{icon}        = 'telescope';
-   $attr{$name}{recomputeAt} = 'NewDay,SunRise,SunSet,AstroTwilightEvening,AstroTwilightMorning,CivilTwilightEvening,CivilTwilightMorning,CustomTwilightEvening,CustomTwilightMorning
-';
+   $attr{$name}{recomputeAt} = 'NewDay,SunRise,SunSet,AstroTwilightEvening,AstroTwilightMorning,CivilTwilightEvening,CivilTwilightMorning,CustomTwilightEvening,CustomTwilightMorning';
  }
 
  return undef;
