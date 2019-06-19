@@ -1292,6 +1292,12 @@ HUEDevice_Parse($$)
     }
 
     return undef;
+
+      #Eurotronic Eurotronic Spirit ZigBee (SPZB0001)
+      $readings{heatsetpoint} = $config->{heatsetpoint} * 0.01 if( defined ($config->{heatsetpoint}) );
+      $readings{locked} = $config->{locked}?'true':'false' if( defined ($config->{locked}) );
+      $readings{displayflipped} = $config->{displayflipped}?'true':'false' if( defined ($config->{displayflipped}) );
+      $readings{mode} = $config->{mode} if( defined ($config->{mode}) );
   }
 
   $hash->{modelid} = $result->{modelid} if( defined($result->{modelid}) );
@@ -1357,6 +1363,9 @@ HUEDevice_Parse($$)
         $sec += $offset;
         $lastupdated_local = FmtDateTime($sec);
       }else{
+
+      #Eurotronic Eurotronic Spirit ZigBee (SPZB0001)
+      $readings{valve} = ceil((100/255) * $state->{valve}) if( defined ($state->{valve}) );
         $lastupdated_local = $lastupdated;
       }
 
