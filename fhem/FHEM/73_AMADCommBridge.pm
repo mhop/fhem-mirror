@@ -64,12 +64,11 @@ use strict;
 use warnings;
 use POSIX;
 use FHEM::Meta;
-use GPUtils qw(GP_Import)
-  ;    # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
+use GPUtils qw(GP_Import);
 use HttpUtils;
 use TcpServerUtils;
-our $MODULVERSION   = '4.4.2';
-our $FLOWSETVERSION = '4.4.1';
+
+my $flowsetversion = '4.4.1';
 
 my $missingModul = '';
 eval "use Encode qw(encode encode_utf8);1" or $missingModul .= 'Encode ';
@@ -192,6 +191,7 @@ sub _Export {
 _Export(
     qw(
       Initialize
+      Flowsetversion
       )
 );
 
@@ -220,13 +220,6 @@ sub Initialize($) {
       . 'fhemServerIP '
       . $readingFnAttributes;
 
-    foreach my $d ( sort keys %{ $modules{AMADCommBridge}{defptr} } ) {
-
-        my $hash = $modules{AMADCommBridge}{defptr}{$d};
-        $hash->{VERSIONMODUL}   = $MODULVERSION;
-        $hash->{VERSIONFLOWSET} = $FLOWSETVERSION;
-    }
-
     return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
@@ -237,6 +230,8 @@ sub Define($$) {
     my @a = split( '[ \t][ \t]*', $def );
 
     return $@ unless ( FHEM::Meta::SetInternals($hash) );
+    use version 0.44; our $VERSION = FHEM::Meta::Get( $hash, 'version' );
+
     return 'too few parameters: define <name> AMADCommBridge <tcp-port>'
       if ( @a < 2 and @a > 3 );
     return
@@ -253,8 +248,8 @@ sub Define($$) {
 
     $hash->{BRIDGE}         = 1;
     $hash->{PORT}           = $port;
-    $hash->{VERSIONMODUL}   = $MODULVERSION;
-    $hash->{VERSIONFLOWSET} = $FLOWSETVERSION;
+    $hash->{VERSION}        = version->parse($VERSION)->normal;
+    $hash->{VERSIONFLOWSET} = $flowsetversion;
 
     CommandAttr( undef, $name . ' room AMAD' )
       if ( AttrVal( $name, 'room', 'none' ) eq 'none' );
@@ -911,7 +906,7 @@ sub ProcessRead($$) {
     if ( $data =~ /currentFlowsetUpdate.xml/ ) {
 
         $response =
-qx(cat $fhempath/FHEM/lib/74_AMADautomagicFlowset_$FLOWSETVERSION.xml);
+qx(cat $fhempath/FHEM/lib/74_AMADautomagicFlowset_$flowsetversion.xml);
         $c = $hash->{CD};
         print $c "HTTP/1.1 200 OK\r\n",
           "Content-Type: text/plain\r\n",
@@ -925,7 +920,7 @@ qx(cat $fhempath/FHEM/lib/74_AMADautomagicFlowset_$FLOWSETVERSION.xml);
     elsif ( $data =~ /currentTaskersetUpdate.prj.xml/ ) {
 
         $response =
-          qx(cat $fhempath/FHEM/lib/74_AMADtaskerset_$FLOWSETVERSION.prj.xml);
+          qx(cat $fhempath/FHEM/lib/74_AMADtaskerset_$flowsetversion.prj.xml);
         $c = $hash->{CD};
         print $c "HTTP/1.1 200 OK\r\n",
           "Content-Type: text/plain\r\n",
@@ -1291,6 +1286,10 @@ sub ParseMsg($$) {
     return ( $msg, $tail );
 }
 
+sub Flowsetversion() {
+    return $flowsetversion;
+}
+
 ##### bleibt zu Anschauungszwecken erhalten
 #sub Header2Hash($) {
 #
@@ -1479,6 +1478,7 @@ sub ParseMsg($$) {
   ],
   "release_status": "stable",
   "license": "GPL_2",
+  "version": "v4.4.2",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],

@@ -51,12 +51,10 @@ use strict;
 use warnings;
 use POSIX;
 use FHEM::Meta;
-
 use Data::Dumper;    #only for Debugging
-use GPUtils qw(GP_Import)
-  ;    # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
-our $MODULVERSION   = '4.4.2';
-our $FLOWSETVERSION = '4.4.1';
+use GPUtils qw(GP_Import);
+
+require FHEM::73_AMADCommBridge;
 
 my $missingModul = '';
 eval "use Encode qw(encode encode_utf8);1" or $missingModul .= 'Encode ';
@@ -154,6 +152,7 @@ BEGIN {
           ReadingsVal
           IsDisabled
           deviceEvents
+          AMADCommBridge_Flowsetversion
           init_done
           gettimeofday
           getUniqueId
@@ -227,13 +226,6 @@ sub Initialize($) {
       . 'setTakePictureCamera:Back,Front '
       . $readingFnAttributes;
 
-    foreach my $d ( sort keys %{ $modules{AMADDevice}{defptr} } ) {
-
-        my $hash = $modules{AMADDevice}{defptr}{$d};
-        $hash->{VERSIONMODUL}   = $MODULVERSION;
-        $hash->{VERSIONFLOWSET} = $FLOWSETVERSION;
-    }
-
     return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
@@ -243,6 +235,8 @@ sub Define($$) {
     my @a = split( '[ \t]+', $def );
 
     return $@ unless ( FHEM::Meta::SetInternals($hash) );
+    use version 0.44; our $VERSION = FHEM::Meta::Get( $hash, 'version' );
+
     return
 'too few parameters: define <name> AMADDevice <HOST-IP> <amad_id> <remoteServer>'
       if ( @a != 5 );
@@ -259,8 +253,8 @@ sub Define($$) {
 
     $hash->{HOST}           = $host;
     $hash->{AMAD_ID}        = $amad_id;
-    $hash->{VERSIONMODUL}   = $MODULVERSION;
-    $hash->{VERSIONFLOWSET} = $FLOWSETVERSION;
+    $hash->{VERSION}        = version->parse($VERSION)->normal;
+    $hash->{VERSIONFLOWSET} = AMADCommBridge_Flowsetversion();
     $hash->{NOTIFYDEV}      = 'global,' . $name;
     $hash->{MODEL}          = $remoteServer;
 
@@ -1695,6 +1689,7 @@ sub CreateChangeBtDeviceValue($$) {
   ],
   "release_status": "stable",
   "license": "GPL_2",
+  "version": "v4.4.2",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
