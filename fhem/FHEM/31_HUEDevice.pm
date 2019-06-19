@@ -178,6 +178,7 @@ sub HUEDevice_Initialize($)
                       "transitiontime ".
                       "model:".join(",", sort map { $_ =~ s/ /#/g ;$_} keys %hueModels)." ".
                       "setList:textField-long ".
+                      "configList:textField-long ".
                       "subType:extcolordimmer,colordimmer,ctdimmer,dimmer,switch ".
                       $readingFnAttributes;
 
@@ -701,7 +702,12 @@ HUEDevice_Set($@)
       return undef;
 
     } elsif( $cmd eq 'json' ) {
-      return HUEBridge_Set( $shash, $shash->{NAME}, 'setsensor', $id, @args );
+      return "usage: json [setsensor|configsensor] <json>" if( !@args );
+      my $type = 'setsensor';
+      if( $args[0] eq 'setsensor' || $args[0] eq 'configsensor' ) {
+        $type = shift @args;
+       }
+      return HUEBridge_Set( $shash, $shash->{NAME}, $type, $id, @args );
 
       return undef;
 
@@ -722,6 +728,24 @@ HUEDevice_Set($@)
 
         }
       }
+
+    } elsif( my @match = grep { $cmd eq $_ } keys %{($hash->{helper}{configList}{cmds}?$hash->{helper}{configList}{cmds}:{})} ) {
+      return HUEBridge_Set( $shash, $shash->{NAME}, 'configsensor', $id, $hash->{helper}{configList}{cmds}{$match[0]} );
+
+    } elsif( my $entries = $hash->{helper}{configList}{regex} ) {
+      foreach my $entry (@{$entries}) {
+        if( join(' ', @aa) =~ /$entry->{regex}/ ) {
+          my $VALUE1 = $1;
+          my $VALUE2 = $2;
+          my $VALUE3 = $3;
+          my $json = $entry->{json};
+          $json =~ s/\$1/$VALUE1/;
+          $json =~ s/\$2/$VALUE2/;
+          $json =~ s/\$3/$VALUE3/;
+          return HUEBridge_Set( $shash, $shash->{NAME}, 'configsensor', $id, $json );
+
+        }
+      }
     }
 
     my $list = 'statusRequest:noArg';
@@ -729,6 +753,14 @@ HUEDevice_Set($@)
     $list .= ' '. join( ':noArg ', keys %{$hash->{helper}{setList}{cmds}} ) if( $hash->{helper}{setList}{cmds} );
     $list .= ':noArg' if( $hash->{helper}{setList}{cmds} );
     if( my $entries = $hash->{helper}{setList}{regex} ) {
+      foreach my $entry (@{$entries}) {
+        $list .= ' ';
+        $list .= (split( ' ', $entry->{regex} ))[0];
+      }
+    }
+    $list .= ' '. join( ':noArg ', keys %{$hash->{helper}{configList}{cmds}} ) if( $hash->{helper}{configList}{cmds} );
+    $list .= ':noArg' if( $hash->{helper}{configList}{cmds} );
+    if( my $entries = $hash->{helper}{configList}{regex} ) {
       foreach my $entry (@{$entries}) {
         $list .= ' ';
         $list .= (split( ' ', $entry->{regex} ))[0];
@@ -1584,20 +1616,20 @@ HUEDevice_Attr($$$;$)
 {
   my ($cmd, $name, $attrName, $attrVal) = @_;
 
-  if( $attrName eq "setList" ) {
+  if( $attrName eq 'setList' || $attrName eq 'configList' ) {
     my $hash = $defs{$name};
-    delete $hash->{helper}{setList};
+    delete $hash->{helper}{$attrName};
     return "$name is not a sensor device" if( $hash->{helper}->{devtype} ne 'S' );
-    return "$name is not a CLIP sensor device" if( $hash->{type} && $hash->{type} !~ m/^CLIP/ );
+    #return "$name is not a CLIP sensor device" if( $hash->{type} && $hash->{type} !~ m/^CLIP/ );
     if( $cmd eq "set" && $attrVal ) {
       foreach my $line ( split( "\n", $attrVal ) ) {
         my($cmd,$json) = split( ":", $line,2 );
         if( $cmd =~ m'^/(.*)/$' ) {
           my $regex = $1;
-          $hash->{helper}{setList}{'regex'} = [] if( !$hash->{helper}{setList}{':regex'} );
-          push @{$hash->{helper}{setList}{'regex'}}, { regex => $regex, json => $json };
+          $hash->{helper}{$attrName}{'regex'} = [] if( !$hash->{helper}{$attrName}{'regex'} );
+          push @{$hash->{helper}{$attrName}{'regex'}}, { regex => $regex, json => $json };
         } else {
-          $hash->{helper}{setList}{cmds}{$cmd} = $json;
+          $hash->{helper}{$attrName}{cmds}{$cmd} = $json;
         }
       }
     }
@@ -1724,6 +1756,8 @@ HUEDevice_Attr($$$;$)
       The lights are given as a comma sparated list of fhem device names or bridge light numbers.</li>
       <li>rename &lt;new name&gt;<br>
       Renames the device in the bridge and changes the fhem alias.</li>
+      <li>json [setsensor|configsensor] &lt;json&gt;<br>
+      send &lt;json&gt; to the state or config endpoints for this device.</li>
       <br>
       <li><a href="#setExtensions"> set extensions</a> are supported.</li>
       <br>
@@ -1764,6 +1798,9 @@ HUEDevice_Attr($$$;$)
       The list of know set commands for sensor type devices. one command per line, eg.: <code><br>
    attr mySensor setList present:{&lt;json&gt;}\<br>
 absent:{&lt;json&gt;}</code></li>
+    <li>configList<br>
+      The list of know config commands for sensor type devices. one command per line, eg.: <code><br>
+mode:{&lt;json&gt;}</code></li>
     <li>subType<br>
       extcolordimmer -> device has rgb and color temperatur control<br>
       colordimmer -> device has rgb controll<br>
