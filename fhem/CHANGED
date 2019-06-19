@@ -2,6 +2,8 @@
 # Do not insert empty lines here, update check depends on it.
  - feature: 31HUEDevice: added configList attribute
                          added optional setsensor|configsensor param to set json
+                         added support for Eurotronic Spirit ZigBee thermostat
+                                                                      (by Shojo)
  - bugfix: 73_AMADCommBridge: fix $version bug
  - update:  95_Astro: v2.0.0
                    device attributes for language, timezone and locale settings
