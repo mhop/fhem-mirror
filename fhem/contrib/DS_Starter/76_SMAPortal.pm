@@ -161,6 +161,7 @@ use vars qw($FW_ME);                                    # webname (default is fh
 
 # Versions History intern
 our %vNotesIntern = (
+  "2.3.4"  => "19.06.2019  change some readingnames, delete L4_plantOid, next04hours_state ",
   "2.3.3"  => "16.06.2019  change verbose 4 output, fix warning if no weather info was got ",
   "2.3.2"  => "14.06.2019  add request string to verbose 5, add battery data to live and historical consumer data ",
   "2.3.1"  => "13.06.2019  switch Credentials read from RAM to verbose 4, changed W/h->Wh and kW/h->kWh in PortalAsHtml ",
@@ -439,7 +440,7 @@ sub DbLog_split($$) {
 	  $value   = $2;
 	  $unit    = $3;
   }   
-  if($event =~ m/summary|next04hours_state/) {
+  if($event =~ m/summary/) {
       $event   =~ /(.*):\s(.*)\s(.*)/;
       $reading = $1;
 	  $value   = $2;
@@ -1228,7 +1229,7 @@ sub extractForecastData($$) {
                   readingsBulkUpdate( $hash, "L4_${time_str}_PvMeanPower", int( $fc_obj->{'PvMeanPower'}->{'Amount'} )." Wh" );                                     # in W als Durchschnitt geliefet, d.h. eine Stunde -> Wh
                   readingsBulkUpdate( $hash, "L4_${time_str}_Consumption", int( $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600 )." Wh" );                      # {'ConsumptionForecast'}->{'Amount'} wird als J = Ws geliefert
                   readingsBulkUpdate( $hash, "L4_${time_str}_IsConsumptionRecommended", ($fc_obj->{'IsConsumptionRecommended'} ? "yes" : "no") );
-                  readingsBulkUpdate( $hash, "L4_${time_str}", (int($fc_obj->{'PvMeanPower'}->{'Amount'}) - int($fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600))." Wh" );
+                  readingsBulkUpdate( $hash, "L4_${time_str}_Total", (int($fc_obj->{'PvMeanPower'}->{'Amount'}) - int($fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600))." Wh" );
 		          
                   # add WeatherId Helper to show weather icon
                   $hash->{HELPER}{"L4_".${time_str}."_WeatherId"} = int($fc_obj->{'WeatherId'}) if(defined $fc_obj->{'WeatherId'});		  
@@ -1238,7 +1239,7 @@ sub extractForecastData($$) {
                   readingsBulkUpdate( $hash, "L2_${time_str}_PvMeanPower", int( $fc_obj->{'PvMeanPower'}->{'Amount'} )." Wh" );                                     # in W als Durchschnitt geliefet, d.h. eine Stunde -> Wh
                   readingsBulkUpdate( $hash, "L2_${time_str}_Consumption", int( $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600 )." Wh" );                      # {'ConsumptionForecast'}->{'Amount'} wird als J = Ws geliefert
                   readingsBulkUpdate( $hash, "L2_${time_str}_IsConsumptionRecommended", ($fc_obj->{'IsConsumptionRecommended'} ? "yes" : "no") );
-                  readingsBulkUpdate( $hash, "L2_${time_str}", (int($fc_obj->{'PvMeanPower'}->{'Amount'}) - int($fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600))." Wh" );
+                  readingsBulkUpdate( $hash, "L2_${time_str}_Total", (int($fc_obj->{'PvMeanPower'}->{'Amount'}) - int($fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600))." Wh" );
 		          
                   # add WeatherId Helper to show weather icon
 		          $hash->{HELPER}{"L2_".${time_str}."_WeatherId"} = int($fc_obj->{'WeatherId'}) if(defined $fc_obj->{'WeatherId'});	           
@@ -1251,25 +1252,20 @@ sub extractForecastData($$) {
   }
   
   if($dl >= 2) {
-      readingsBulkUpdate($hash, "L2_Next04Hours-Consumption",              int( $nextFewHoursSum{'Consumption'} )." Wh" );
-      readingsBulkUpdate($hash, "L2_Next04Hours-PV",                       int( $nextFewHoursSum{'PV'}          )." Wh" );
-      readingsBulkUpdate($hash, "L2_Next04Hours-Total",                    int( $nextFewHoursSum{'Total'}       )." Wh" );
-      readingsBulkUpdate($hash, "L2_Next04Hours-IsConsumptionRecommended", int( $nextFewHoursSum{'ConsumpRcmd'} )." h" );
-      readingsBulkUpdate($hash, "next04hours_state",                       int( $nextFewHoursSum{'PV'} )." Wh" );
-      readingsBulkUpdate($hash, "L2_Forecast-Today-Consumption",           $consum_sum." Wh" );                           
-      readingsBulkUpdate($hash, "L2_Forecast-Today-PV",                    $PV_sum." Wh");                                 
-      readingsBulkUpdate($hash, "L2_RestOfDay-Consumption",                int( $restOfDaySum{'Consumption'} )." Wh" );
-      readingsBulkUpdate($hash, "L2_RestOfDay-PV",                         int( $restOfDaySum{'PV'}          )." Wh" );
-      readingsBulkUpdate($hash, "L2_RestOfDay-Total",                      int( $restOfDaySum{'Total'}       )." Wh" );
-      readingsBulkUpdate($hash, "L2_RestOfDay-IsConsumptionRecommended",   int( $restOfDaySum{'ConsumpRcmd'} )." h" );
-      readingsBulkUpdate($hash, "L2_Tomorrow-Consumption",                 int( $tomorrowSum{'Consumption'} )." Wh" );
-      readingsBulkUpdate($hash, "L2_Tomorrow-PV",                          int( $tomorrowSum{'PV'}          )." Wh" );
-      readingsBulkUpdate($hash, "L2_Tomorrow-Total",                       int( $tomorrowSum{'Total'}       )." Wh" );
-      readingsBulkUpdate($hash, "L2_Tomorrow-IsConsumptionRecommended",    int( $tomorrowSum{'ConsumpRcmd'} )." h" );
-  }
-  
-  if($dl >= 4) {  
-      readingsBulkUpdate($hash,"L4_plantOid",$plantOid);
+      readingsBulkUpdate($hash, "L2_Next04Hours_Consumption",              int( $nextFewHoursSum{'Consumption'} )." Wh" );
+      readingsBulkUpdate($hash, "L2_Next04Hours_PV",                       int( $nextFewHoursSum{'PV'}          )." Wh" );
+      readingsBulkUpdate($hash, "L2_Next04Hours_Total",                    int( $nextFewHoursSum{'Total'}       )." Wh" );
+      readingsBulkUpdate($hash, "L2_Next04Hours_IsConsumptionRecommended", int( $nextFewHoursSum{'ConsumpRcmd'} )." h" );
+      readingsBulkUpdate($hash, "L2_ForecastToday_Consumption",            $consum_sum." Wh" );                           
+      readingsBulkUpdate($hash, "L2_ForecastToday_PV",                     $PV_sum." Wh");                                 
+      readingsBulkUpdate($hash, "L2_RestOfDay_Consumption",                int( $restOfDaySum{'Consumption'} )." Wh" );
+      readingsBulkUpdate($hash, "L2_RestOfDay_PV",                         int( $restOfDaySum{'PV'}          )." Wh" );
+      readingsBulkUpdate($hash, "L2_RestOfDay_Total",                      int( $restOfDaySum{'Total'}       )." Wh" );
+      readingsBulkUpdate($hash, "L2_RestOfDay_IsConsumptionRecommended",   int( $restOfDaySum{'ConsumpRcmd'} )." h" );
+      readingsBulkUpdate($hash, "L2_Tomorrow_Consumption",                 int( $tomorrowSum{'Consumption'} )." Wh" );
+      readingsBulkUpdate($hash, "L2_Tomorrow_PV",                          int( $tomorrowSum{'PV'}          )." Wh" );
+      readingsBulkUpdate($hash, "L2_Tomorrow_Total",                       int( $tomorrowSum{'Total'}       )." Wh" );
+      readingsBulkUpdate($hash, "L2_Tomorrow_IsConsumptionRecommended",    int( $tomorrowSum{'ConsumpRcmd'} )." h" );
   }
 
   readingsEndUpdate($hash, 1);
@@ -1938,13 +1934,13 @@ sub PortalAsHtml ($$) {
  
   $icon    = FW_makeImage($icon) if (defined($icon));
  
-  my $co4h = ReadingsNum($name,"L2_Next04Hours-Consumption", 0);
-  my $coRe = ReadingsNum($name,"L2_RestOfDay-Consumption", 0); 
-  my $coTo = ReadingsNum($name,"L2_Tomorrow-Consumption", 0);
+  my $co4h = ReadingsNum($name,"L2_Next04Hours_Consumption", 0);
+  my $coRe = ReadingsNum($name,"L2_RestOfDay_Consumption", 0); 
+  my $coTo = ReadingsNum($name,"L2_Tomorrow_Consumption", 0);
 
-  my $pv4h = ReadingsNum($name,"L2_Next04Hours-PV", 0);
-  my $pvRe = ReadingsNum($name,"L2_RestOfDay-PV", 0); 
-  my $pvTo = ReadingsNum($name,"L2_Tomorrow-PV", 0);
+  my $pv4h = ReadingsNum($name,"L2_Next04Hours_PV", 0);
+  my $pvRe = ReadingsNum($name,"L2_RestOfDay_PV", 0); 
+  my $pvTo = ReadingsNum($name,"L2_Tomorrow_PV", 0);
 
   if ($kw eq 'kWh') {
       $co4h = sprintf("%.1f" , $co4h/1000)."&nbsp;kWh";
