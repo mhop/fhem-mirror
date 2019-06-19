@@ -55,8 +55,8 @@ use FHEM::Meta;
 use Data::Dumper;    #only for Debugging
 use GPUtils qw(GP_Import)
   ;    # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
-our $MODULVERSION   = 'v4.4.2';
-our $FLOWSETVERSION = 'v4.4.1';
+our $MODULVERSION   = '4.4.2';
+our $FLOWSETVERSION = '4.4.1';
 
 my $missingModul = '';
 eval "use Encode qw(encode encode_utf8);1" or $missingModul .= 'Encode ';
