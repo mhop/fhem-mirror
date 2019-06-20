@@ -3,6 +3,8 @@
 text       { font-family:Times; font-size:12px; }
 text.title { font-size:16px; }
 text.legend { cursor:pointer; }
+text.copy  { text-decoration:underline; stroke:none; fill:blue; cursor:pointer;}
+text.paste { text-decoration:underline; stroke:none; fill:blue; cursor:pointer;}
 circle#svgmarker { color:#278727; opacity:0.5; }
 
 path.SVGplot     { stroke:black; fill:none; }
@@ -22,21 +24,49 @@ polyline.SVGplot { stroke:black; fill:none; }
 .SVGplot.l6     { stroke:olive;   }
 .SVGplot.l7     { stroke:gray;    }
 .SVGplot.l8     { stroke:yellow;  }
-.SVGplot.l0fill { stroke:#f00; fill:url(#gr_0); }
-.SVGplot.l1fill { stroke:#291; fill:url(#gr_1); }
-.SVGplot.l2fill { stroke:#00f; fill:url(#gr_2); }
-.SVGplot.l3fill { stroke:#f0f; fill:url(#gr_3); }
-.SVGplot.l4fill { stroke:#ff0; fill:url(#gr_4); }
-.SVGplot.l5fill { stroke:#0ff; fill:url(#gr_5); }
-.SVGplot.l6fill { stroke:#000; fill:url(#gr_6); }
-.SVGplot.l0dot  { stroke:red;   stroke-dasharray:2,4; }
-.SVGplot.l1dot  { stroke:green; stroke-dasharray:2,4; }
-.SVGplot.l0fill_stripe { stroke:red; fill:url(#gr0_stripe);}
-.SVGplot.l1fill_stripe { stroke:green; fill:url(#gr1_stripe);}
-.SVGplot.l0fill_gyr    { stroke:red; fill:url(#gr0_gyr);}
 
-text.SVGplot.l0     { stroke:none; fill:red;     } 
-text.SVGplot.l1     { stroke:none; fill:green;   } 
+.SVGplot.l0fill { stroke:red;         fill:url(#gr_0); }
+.SVGplot.l1fill { stroke:forestgreen; fill:url(#gr_1); }
+.SVGplot.l2fill { stroke:blue;        fill:url(#gr_2); }
+.SVGplot.l3fill { stroke:magenta;     fill:url(#gr_3); }
+.SVGplot.l4fill { stroke:yellow;      fill:url(#gr_4); }
+.SVGplot.l5fill { stroke:cyan;        fill:url(#gr_5); }
+.SVGplot.l6fill { stroke:black;       fill:url(#gr_6); }
+.SVGplot.l7fill { stroke:brown;       fill:url(#gr_7); }
+.SVGplot.l8fill { stroke:olive;       fill:url(#gr_8); }
+
+.SVGplot.l0dot  { stroke:red;     stroke-dasharray:2,4; }
+.SVGplot.l1dot  { stroke:green;   stroke-dasharray:2,4; }
+.SVGplot.l2dot  { stroke:blue;    stroke-dasharray:2,4; }
+.SVGplot.l3dot  { stroke:magenta; stroke-dasharray:2,4; }
+.SVGplot.l4dot  { stroke:brown;   stroke-dasharray:2,4; }
+.SVGplot.l5dot  { stroke:black;   stroke-dasharray:2,4; }
+.SVGplot.l6dot  { stroke:olive;   stroke-dasharray:2,4; }
+.SVGplot.l7dot  { stroke:gray;    stroke-dasharray:2,4; }
+.SVGplot.l8dot  { stroke:yellow;  stroke-dasharray:2,4; }
+
+.SVGplot.l0fill_stripe { stroke:red;     fill:url(#gr0_stripe);}
+.SVGplot.l1fill_stripe { stroke:green;   fill:url(#gr1_stripe);}
+.SVGplot.l2fill_stripe { stroke:blue;    fill:url(#gr2_stripe);}
+.SVGplot.l3fill_stripe { stroke:magenta; fill:url(#gr3_stripe);}
+.SVGplot.l4fill_stripe { stroke:brown;   fill:url(#gr4_stripe);}
+.SVGplot.l5fill_stripe { stroke:black;   fill:url(#gr5_stripe);}
+.SVGplot.l6fill_stripe { stroke:olive;   fill:url(#gr6_stripe);}
+.SVGplot.l7fill_stripe { stroke:gray;    fill:url(#gr7_stripe);}
+.SVGplot.l8fill_stripe { stroke:yellow;  fill:url(#gr8_stripe);}
+
+.SVGplot.l0fill_gyr    { stroke:red;     fill:url(#gr0_gyr);}
+.SVGplot.l1fill_gyr    { stroke:green;   fill:url(#gr1_gyr);}
+.SVGplot.l2fill_gyr    { stroke:blue;    fill:url(#gr2_gyr);}
+.SVGplot.l3fill_gyr    { stroke:magenta; fill:url(#gr3_gyr);}
+.SVGplot.l4fill_gyr    { stroke:brown;   fill:url(#gr4_gyr);}
+.SVGplot.l5fill_gyr    { stroke:black;   fill:url(#gr5_gyr);}
+.SVGplot.l6fill_gyr    { stroke:olive;   fill:url(#gr6_gyr);}
+.SVGplot.l7fill_gyr    { stroke:gray;    fill:url(#gr7_gyr);}
+.SVGplot.l8fill_gyr    { stroke:yellow;  fill:url(#gr8_gyr);}
+
+text.SVGplot.l0     { stroke:none; fill:red;     }
+text.SVGplot.l1     { stroke:none; fill:green;   }
 text.SVGplot.l2     { stroke:none; fill:blue;    }
 text.SVGplot.l3     { stroke:none; fill:magenta; }
 text.SVGplot.l4     { stroke:none; fill:brown;   }
@@ -44,15 +74,43 @@ text.SVGplot.l5     { stroke:none; fill:black;   }
 text.SVGplot.l6     { stroke:none; fill:olive;   }
 text.SVGplot.l7     { stroke:none; fill:gray;    }
 text.SVGplot.l8     { stroke:none; fill:yellow;  }
-text.SVGplot.l0fill { stroke:none; fill:#f00;    }
-text.SVGplot.l1fill { stroke:none; fill:#291;    }
-text.SVGplot.l2fill { stroke:none; fill:#00f;    }
-text.SVGplot.l3fill { stroke:none; fill:#f0f;    }
-text.SVGplot.l4fill { stroke:none; fill:#ff0;    }
-text.SVGplot.l5fill { stroke:none; fill:#0ff;    }
-text.SVGplot.l6fill { stroke:none; fill:#000;    }
-text.SVGplot.l0dot  { stroke:none; fill:red;     } 
-text.SVGplot.l1dot  { stroke:none; fill:green;   } 
-text.SVGplot.l0fill_stripe {stroke:none; fill:red;  }
-text.SVGplot.l1fill_stripe {stroke:none; fill:green;}
-text.SVGplot.l0fill_gyr    {stroke:none; fill:red;  }
+
+text.SVGplot.l0fill { stroke:none; fill:red;         }
+text.SVGplot.l1fill { stroke:none; fill:forestgreen; }
+text.SVGplot.l2fill { stroke:none; fill:blue;        }
+text.SVGplot.l3fill { stroke:none; fill:magenta;     }
+text.SVGplot.l4fill { stroke:none; fill:yellow;      }
+text.SVGplot.l5fill { stroke:none; fill:cyan;        }
+text.SVGplot.l6fill { stroke:none; fill:black;       }
+text.SVGplot.l7fill { stroke:none; fill:brown;       }
+text.SVGplot.l8fill { stroke:none; fill:olive;       }
+
+text.SVGplot.l0dot  { stroke:none; fill:red;     }
+text.SVGplot.l1dot  { stroke:none; fill:green;   }
+text.SVGplot.l2dot  { stroke:none; fill:blue;    }
+text.SVGplot.l3dot  { stroke:none; fill:magenta; }
+text.SVGplot.l4dot  { stroke:none; fill:brown;   }
+text.SVGplot.l5dot  { stroke:none; fill:black;   }
+text.SVGplot.l6dot  { stroke:none; fill:olive;   }
+text.SVGplot.l7dot  { stroke:none; fill:gray;    }
+text.SVGplot.l8dot  { stroke:none; fill:yellow;  }
+
+text.SVGplot.l0fill_stripe {stroke:none; fill:red;     }
+text.SVGplot.l1fill_stripe {stroke:none; fill:green;   }
+text.SVGplot.l2fill_stripe {stroke:none; fill:blue;    }
+text.SVGplot.l3fill_stripe {stroke:none; fill:magenta; }
+text.SVGplot.l4fill_stripe {stroke:none; fill:brown;   }
+text.SVGplot.l5fill_stripe {stroke:none; fill:black;   }
+text.SVGplot.l6fill_stripe {stroke:none; fill:olive;   }
+text.SVGplot.l7fill_stripe {stroke:none; fill:gray;    }
+text.SVGplot.l8fill_stripe {stroke:none; fill:yellow;  }
+
+text.SVGplot.l0fill_gyr    {stroke:none; fill:red;     }
+text.SVGplot.l1fill_gyr    {stroke:none; fill:green;   }
+text.SVGplot.l2fill_gyr    {stroke:none; fill:blue;    }
+text.SVGplot.l3fill_gyr    {stroke:none; fill:magenta; }
+text.SVGplot.l4fill_gyr    {stroke:none; fill:brown;   }
+text.SVGplot.l5fill_gyr    {stroke:none; fill:black;   }
+text.SVGplot.l6fill_gyr    {stroke:none; fill:olive;   }
+text.SVGplot.l7fill_gyr    {stroke:none; fill:gray;    }
+text.SVGplot.l8fill_gyr    {stroke:none; fill:yellow;  }
