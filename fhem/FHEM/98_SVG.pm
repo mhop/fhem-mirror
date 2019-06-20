@@ -1770,7 +1770,8 @@ SVG_render($$$$$$$$$$)
 
     my $scale = "y".($axis)."scale"; $scale = "yscale" if( $axis == 1 );
     my $log = ""; $log = $conf{$scale} if( $conf{$scale} );
-    my $f_log = int($hmax{$a}) ? (SVG_log10($hmax{$a}) / $hmax{$a}) : 1;
+    my $f_log = int($hmax{$a}) ? ((SVG_log10($hmax{$a})-SVG_log10($hmin{$a})) /
+                        ($hmax{$a}-$hmin{$a})) : 1;
 
     # offsets
     my ($align,$display,$cll);
@@ -1811,8 +1812,8 @@ SVG_render($$$$$$$$$$)
     if($tic && $tic !~ m/mirror/) {
       $tic =~ s/^\((.*)\)$/$1/;   # Strip ()
       for(my $decimal = 0;
-          $decimal < ($log eq 'log'?SVG_log10($hmax{$a}):1);
-          $decimal++ ) {
+          $decimal <($log eq 'log'?SVG_log10($hmax{$a})-SVG_log10($hmin{$a}):1);
+          $decimal++) {
       foreach my $onetic (split(",", $tic)) {
         $onetic =~ s/^ *(.*) *$/$1/;
         my ($tlabel, $tvalue) = split(" ", $onetic);
@@ -1822,7 +1823,8 @@ SVG_render($$$$$$$$$$)
         $tlabel = $tvalue if( !$tlabel );
 
         $off2 = int($y+($hmax{$a}-$tvalue)*$hmul);
-        $off2 = int($y+($hmax{$a}-SVG_log10($tvalue)/$f_log)*$hmul)
+        $off2 = int($y+($hmax{$a}-
+                        (SVG_log10($tvalue)-SVG_log10($hmin{$a}))/$f_log)*$hmul)
                 if( $log eq 'log' );
         #-- tics
         SVG_pO "<polyline points=\"$off3,$off2 $off4,$off2\" $cll/>";
@@ -1844,13 +1846,18 @@ SVG_render($$$$$$$$$$)
     #-- tics automatically 
     } elsif( $hstep{$a}>0 ) {            
       for(my $decimal = 0;
-          $decimal < ($log eq 'log'?SVG_log10($hmax{$a}):1);
-          $decimal++ ) {
-      for(my $i = $hmin{$a}; $i <= $hmax{$a}; $i += $hstep{$a}) {
+          $decimal <($log eq 'log'?SVG_log10($hmax{$a})-SVG_log10($hmin{$a}):1);
+          $decimal++) {
+      for(my $i = ($log eq 'log' ? 0 : $hmin{$a});
+             $i <= $hmax{$a}; $i += $hstep{$a}) {
         my $i = $i / 10 ** $decimal;
-        $off2 = int($y+($hmax{$a}-$i)*$hmul);
-        $off2 = int($y+($hmax{$a}-SVG_log10($i)/$f_log)*$hmul)
-                if( $log eq 'log' );
+        if( $log eq 'log' ) {
+          next if( $i < $hmin{$a} );
+          $off2 = int($y + ($hmax{$a} -
+                    (SVG_log10($i) - SVG_log10($hmin{$a})) / $f_log) * $hmul);
+        } else {
+          $off2 = int($y+($hmax{$a}-$i)*$hmul);
+        }
         #-- tics
         SVG_pO "  <polyline points=\"$off3,$off2 $off4,$off2\" $cll/>";
         #--grids
@@ -1899,10 +1906,11 @@ SVG_render($$$$$$$$$$)
     SVG_pO "<!-- Warning: No data item $idx defined -->" if(!defined($dxp));
     next if(!defined($dxp));
 
-    my $f_log = int($hmax{$a}) ? (SVG_log10($hmax{$a}) / $hmax{$a}) : 1;
+    my $f_log = int($hmax{$a}) ? ((SVG_log10($hmax{$a}) -
+                        SVG_log10($hmin{$a})) / ($hmax{$a}-$hmin{$a})) : 1;
     if( $log eq 'log' ) {
       foreach my $i (1..int(@{$dxp})-1) {
-        $dyp->[$i] = SVG_log10($dyp->[$i]) / $f_log;
+        $dyp->[$i] = (SVG_log10($dyp->[$i])-SVG_log10($hmin{$a})) / $f_log;
       }
     }
 

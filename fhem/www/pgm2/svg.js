@@ -304,7 +304,9 @@ sv_menu(evt, embed)
 
     if( par.log_scale ) {
       y *= par.log_scale;
-      y = Math.pow(10,y) - 1;
+      if( par.y_min )
+        y += Math.log(par.y_min)/Math.log(10);
+      y = Math.pow(10,y);
     }
 
     y = y.toFixed(par.decimals);
