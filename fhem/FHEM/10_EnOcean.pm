@@ -6453,7 +6453,8 @@ sub EnOcean_Set($@)
         $destinationID = "FFFFFFFF";
 	my $productID = AttrVal($name, "productID", undef);
 	if (defined $productID) {
-	  $productID = '0000000010' . EnOcean_convHexToBit($productID);
+	  # GP V1.1 definition
+	  $productID = '0000001000000100' . EnOcean_convHexToBit($productID);
 	} else {
 	  $productID = '';
 	}
@@ -6521,7 +6522,10 @@ sub EnOcean_Set($@)
             # fill with trailing zeroes to x bytes
             $gpDefI .= 0 x (8 - length($gpDefI) % 8);
           }
-          $teachInInfo = '0000000001' . unpack('B8', pack('C', length($gpDefI) / 4));
+          # GP V1.0 definition
+          #$teachInInfo = '0000000001' . unpack('B8', pack('C', length($gpDefI) / 4));
+          # GP V1.1 definition
+          $teachInInfo = '0000000100000000';
         }
         #Log3 $name, 3, "EnOcean set $name header: $header O: $gpDefO Info: $teachInInfo I: $gpDefI";
         # DophinView GP profile error if Product ID sent
