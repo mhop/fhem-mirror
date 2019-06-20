@@ -64,11 +64,9 @@ use strict;
 use warnings;
 use POSIX;
 use FHEM::Meta;
-use GPUtils qw(GP_Import);
+use GPUtils qw(GP_Import GP_Export);
 use HttpUtils;
 use TcpServerUtils;
-
-my $flowsetversion = '4.4.1';
 
 my $missingModul = '';
 eval "use Encode qw(encode encode_utf8);1" or $missingModul .= 'Encode ';
@@ -176,22 +174,10 @@ BEGIN {
     );
 }
 
-# _Export - Export references to main context using a different naming schema
-sub _Export {
-    no strict qw/refs/;    ## no critic
-    my $pkg  = caller(0);
-    my $main = $pkg;
-    $main =~ s/^(?:.+::)?([^:]+)$/main::$1\_/g;
-    foreach (@_) {
-        *{ $main . $_ } = *{ $pkg . '::' . $_ };
-    }
-}
-
 #-- Export to main context with different name
-_Export(
+GP_Export(
     qw(
       Initialize
-      Flowsetversion
       )
 );
 
@@ -249,7 +235,7 @@ sub Define($$) {
     $hash->{BRIDGE}         = 1;
     $hash->{PORT}           = $port;
     $hash->{VERSION}        = version->parse($VERSION)->normal;
-    $hash->{VERSIONFLOWSET} = $flowsetversion;
+    $hash->{VERSIONFLOWSET} = FHEM::Meta::Get( $hash, 'x_flowsetversion' );
 
     CommandAttr( undef, $name . ' room AMAD' )
       if ( AttrVal( $name, 'room', 'none' ) eq 'none' );
@@ -890,6 +876,8 @@ sub ProcessRead($$) {
 
     my ( $hash, $buf ) = @_;
     my $name = $hash->{NAME};
+    my $flowsetversion =
+      $modules{AMADCommBridge}{defptr}{BRIDGE}->{VERSIONFLOWSET};
 
     my @data   = split( '\R\R', $buf );
     my $data   = $data[0];
@@ -1286,10 +1274,6 @@ sub ParseMsg($$) {
     return ( $msg, $tail );
 }
 
-sub Flowsetversion() {
-    return $flowsetversion;
-}
-
 ##### bleibt zu Anschauungszwecken erhalten
 #sub Header2Hash($) {
 #
@@ -1478,7 +1462,8 @@ sub Flowsetversion() {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v4.4.2",
+  "version": "v4.4.3",
+  "x_flowsetversion": "4.4.1",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],

@@ -52,9 +52,9 @@ use warnings;
 use POSIX;
 use FHEM::Meta;
 use Data::Dumper;    #only for Debugging
-use GPUtils qw(GP_Import);
+use GPUtils qw(GP_Import GP_Export);
 
-require FHEM::73_AMADCommBridge;
+require '73_AMADCommBridge.pm';
 
 my $missingModul = '';
 eval "use Encode qw(encode encode_utf8);1" or $missingModul .= 'Encode ';
@@ -165,19 +165,8 @@ BEGIN {
     );
 }
 
-# _Export - Export references to main context using a different naming schema
-sub _Export {
-    no strict qw/refs/;    ## no critic
-    my $pkg  = caller(0);
-    my $main = $pkg;
-    $main =~ s/^(?:.+::)?([^:]+)$/main::$1\_/g;
-    foreach (@_) {
-        *{ $main . $_ } = *{ $pkg . '::' . $_ };
-    }
-}
-
 #-- Export to main context with different name
-_Export(
+GP_Export(
     qw(
       Initialize
       )
@@ -251,12 +240,11 @@ sub Define($$) {
     my $amad_id      = $a[3];
     my $remoteServer = $a[4];
 
-    $hash->{HOST}           = $host;
-    $hash->{AMAD_ID}        = $amad_id;
-    $hash->{VERSION}        = version->parse($VERSION)->normal;
-    $hash->{VERSIONFLOWSET} = AMADCommBridge_Flowsetversion();
-    $hash->{NOTIFYDEV}      = 'global,' . $name;
-    $hash->{MODEL}          = $remoteServer;
+    $hash->{HOST}      = $host;
+    $hash->{AMAD_ID}   = $amad_id;
+    $hash->{VERSION}   = version->parse($VERSION)->normal;
+    $hash->{NOTIFYDEV} = 'global,' . $name;
+    $hash->{MODEL}     = $remoteServer;
 
     $hash->{PORT} = 8090 if ( $remoteServer eq 'Automagic' );
     $hash->{PORT} = 1817 if ( $remoteServer eq 'Autoremote' );
@@ -288,6 +276,9 @@ sub Define($$) {
     }
 
     $iodev = $hash->{IODev}->{NAME};
+
+#     $hash->{VERSIONFLOWSET} = FHEM::Meta::Get( $defs{$iodev}, 'x_flowsetversion' );
+    $hash->{VERSIONFLOWSET} = $defs{$iodev}->{VERSIONFLOWSET};
 
     my $d = $modules{AMADDevice}{defptr}{$amad_id};
 
@@ -1689,7 +1680,7 @@ sub CreateChangeBtDeviceValue($$) {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v4.4.2",
+  "version": "v4.4.3",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
