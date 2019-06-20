@@ -1536,7 +1536,8 @@ return;
 ################################################################
 sub extractConsumerHistData($$$) {
   my ($hash,$chdata,$tf) = @_;
-  my $name = $hash->{NAME};
+  my $name               = $hash->{NAME};
+  my ($bdcd,$bcd);
   my %consumers;
   my ($key,$val,$i,$res,$gcr,$gct,$pcr,$pct,$tct,$bcr,$bct);
   
@@ -1549,13 +1550,15 @@ sub extractConsumerHistData($$$) {
   
   my $bataval = (defined(ReadingsNum($name,"L1_BatteryIn", undef)) || defined(ReadingsNum($name,"L1_BatteryOut", undef)))?1:0;     # Identifikation ist Battery vorhanden ?
   
-  my ($bdcd,$bcd) = (0,0);
-  foreach my $di (@{$chdata->{'BatteryDischarging'}}) {
-      $bdcd += $di->{'Measurement'}/4;                                           # aufsummierte Batterieentladung pro Zeiteinheit (day) in Wh
-  }
-  
-  foreach my $ch (@{$chdata->{'BatteryCharging'}}) {
-      $bcd += $ch->{'Measurement'}/4;                                            # aufsummierte Batterieladung pro Zeiteinheit (day) in Wh 
+  if($tf =~ /day/) {
+      ($bdcd,$bcd) = (0,0);
+      foreach my $di (@{$chdata->{'BatteryDischarging'}}) {
+          $bdcd += $di->{'Measurement'}/4;                                           # aufsummierte Batterieentladung pro Zeiteinheit (day) in Wh
+      }
+      
+      foreach my $ch (@{$chdata->{'BatteryCharging'}}) {
+          $bcd += $ch->{'Measurement'}/4;                                            # aufsummierte Batterieladung pro Zeiteinheit (day) in Wh 
+      }
   }
       
   readingsBeginUpdate($hash);
