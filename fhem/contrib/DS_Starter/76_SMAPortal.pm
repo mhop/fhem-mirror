@@ -161,6 +161,7 @@ use vars qw($FW_ME);                                    # webname (default is fh
 
 # Versions History intern
 our %vNotesIntern = (
+  "2.3.5"  => "20.06.2019  subroutine consinject added to pv, pvco style ",
   "2.3.4"  => "19.06.2019  change some readingnames, delete L4_plantOid, next04hours_state ",
   "2.3.3"  => "16.06.2019  change verbose 4 output, fix warning if no weather info was got ",
   "2.3.2"  => "14.06.2019  add request string to verbose 5, add battery data to live and historical consumer data ",
@@ -2257,21 +2258,9 @@ sub PortalAsHtml ($$) {
 
               ##################################
               # inject the new icon if defined
-              my $show = 0;                                                    # wurde bereits für diese Stunde ein Geräte Icon ausgegeben ?
-              foreach (@pgCDev) {
-                  if ($_) {
-                      my ($cons,$im,$start,$end) = split (':', $_);
-                      Log3($name, 4, "$name - Consumer to show -> $cons, relative to current time -> start: $start, end: $end") if($i<1); 
-                      if ($im && ($i >= $start) && ($i <= $end)) {
-                          $ret .= FW_makeImage($im);
-                          # $show = 1; # nachher dann kein normales Icon mehr anzeigen, oder doch ?
-                          # oder noch ein extra Attr machen zum auswählen ?
-                          # eventuell den Block wieder nach unten schieben und den normalen Birnen
-                          # Vorrang geben
-                     }
-                  }
-              }
+              $ret .= consinject($hash,$i,@pgCDev) if($ret);
               
+			  my $show = 0;                                                    # wurde bereits für diese Stunde ein Geräte Icon ausgegeben ?
               $ret .= $is{$i} if (defined ($is{$i}) && !$show);
               $ret .= "</td></tr>";
          }           
@@ -2312,7 +2301,13 @@ sub PortalAsHtml ($$) {
 
          $ret .= "<tr class='odd' style='height:".$z2."px'>";
          $ret .= "<td align='center' class='smaportal' ".$style1.">$val";
+				  
          $ret .= $is{$i} if (defined $is{$i});
+		 
+         ##################################
+         # inject the new icon if defined
+         $ret .= consinject($hash,$i,@pgCDev) if($ret);
+		 
          $ret .= "</td></tr>";
 
          if ($z3) {                                                         # die Zone 3 lassen wir bei zu kleinen Werten auch ganz weg 
@@ -2393,6 +2388,27 @@ sub PortalAsHtml ($$) {
   $ret .= "</html>";
   
 return $ret;  
+}
+
+################################################################
+#                 Inject consumer icon
+################################################################
+sub consinject($$@) {
+  my ($hash,$i,@pgCDev) = @_;
+  my $name              = $hash->{NAME};
+  my $ret               = "";
+
+  foreach (@pgCDev) {
+	  if ($_) {
+		  my ($cons,$im,$start,$end) = split (':', $_);
+		  Log3($name, 4, "$name - Consumer to show -> $cons, relative to current time -> start: $start, end: $end") if($i<1); 
+		  if ($im && ($i >= $start) && ($i <= $end)) {
+			  $ret = FW_makeImage($im);
+		 }
+	  }
+  }
+	  
+return $ret;
 }
 
 ###############################################################################
