@@ -1551,11 +1551,11 @@ sub extractConsumerHistData($$$) {
   
   my ($bdcd,$bcd) = (0,0);
   foreach my $di (@{$chdata->{'BatteryDischarging'}}) {
-      $bdcd += $di->{'Measurement'};                                           # aufsummierte Batterieentladung pro Zeiteinheit (day) in Wh
+      $bdcd += $di->{'Measurement'}/4;                                           # aufsummierte Batterieentladung pro Zeiteinheit (day) in Wh
   }
   
   foreach my $ch (@{$chdata->{'BatteryCharging'}}) {
-      $bcd += $ch->{'Measurement'};                                            # aufsummierte Batterieladung pro Zeiteinheit (day) in Wh 
+      $bcd += $ch->{'Measurement'}/4;                                            # aufsummierte Batterieladung pro Zeiteinheit (day) in Wh 
   }
       
   readingsBeginUpdate($hash);
@@ -1583,8 +1583,6 @@ sub extractConsumerHistData($$$) {
       readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalDay",          sprintf("%.0f", $cpower)." Wh") if(defined($cpower) && $tf eq "day"); 
       readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalMonth",        sprintf("%.0f", $cpower)." Wh") if(defined($cpower) && $tf eq "month");  
       readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalYear",         sprintf("%.0f", $cpower)." Wh") if(defined($cpower) && $tf eq "year");  
-      readingsBulkUpdate($hash, "L3_BatteryDischargingDay",         sprintf("%.0f", $bdcd)  ." Wh") if(defined($bdcd)   && $bataval && $tf eq "day");	
-      readingsBulkUpdate($hash, "L3_BatteryChargingDay",            sprintf("%.0f", $bcd)   ." Wh") if(defined($bcd)    && $bataval && $tf eq "day");	
 	  
       readingsBulkUpdate($hash, "L3_${cn}_EnergyRelativeMonthGrid", sprintf("%.0f", $gcr)." %")     if(defined($gcr) && $tf eq "month");            
       readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalMonthGrid",    sprintf("%.0f", $gct)." Wh")    if(defined($gct) && $tf eq "month");
@@ -1602,6 +1600,9 @@ sub extractConsumerHistData($$$) {
       
       $i++;
   }
+  
+  readingsBulkUpdate($hash, "L3_BatteryDischargingDay",    sprintf("%.0f", $bdcd)  ." Wh") if(defined($bdcd)   && $bataval && $tf eq "day");	
+  readingsBulkUpdate($hash, "L3_BatteryChargingDay",       sprintf("%.0f", $bcd)   ." Wh") if(defined($bcd)    && $bataval && $tf eq "day");	
   
   readingsEndUpdate($hash, 1); 
   
