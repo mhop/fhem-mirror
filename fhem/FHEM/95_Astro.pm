@@ -38,7 +38,7 @@ use utf8;
 
 use Encode;
 use FHEM::Meta;
-use GPUtils qw(GP_Import);
+use GPUtils qw(GP_Import GP_Export);
 use Math::Trig;
 use Time::HiRes qw(gettimeofday);
 use Time::Local;
@@ -687,7 +687,7 @@ BEGIN {
 }
 
 #-- Export to main context with different name
-_Export(
+GP_Export(
     qw(
       Get
       Initialize
@@ -760,6 +760,7 @@ sub Define ($@) {
  if ( $init_done && !defined( $hash->{OLDDEF} ) ) {
    $attr{$name}{icon}        = 'telescope';
    $attr{$name}{recomputeAt} = 'NewDay,SunRise,SunSet,AstroTwilightEvening,AstroTwilightMorning,CivilTwilightEvening,CivilTwilightMorning,CustomTwilightEvening,CustomTwilightMorning';
+   $hash->{RECOMPUTEAT} = $attr{$name}{recomputeAt};
  }
 
  return undef;
@@ -968,22 +969,6 @@ sub _tzoffset($) {
       $local+=3600;
     }
     return (($local - $utc)/36);
-}
-
-########################################################################################################
-#
-# _Export - Export references to main context using a different naming schema
-# 
-########################################################################################################
-
-sub _Export {
-    no strict qw/refs/;    ## no critic
-    my $pkg = caller(0);
-    my $main = $pkg;
-    $main =~ s/^(?:.+::)?([^:]+)$/main::$1\_/g;
-    foreach (@_) {
-        *{ $main . $_ } = *{ $pkg . '::' . $_ };
-    }
 }
 
 ########################################################################################################
@@ -2919,7 +2904,7 @@ sub Get($@) {
 =end html_DE
 =for :application/json;q=META.json 95_Astro.pm
 {
-  "version": "v2.0.0",
+  "version": "v2.0.1",
   "author": [
     "Prof. Dr. Peter A. Henning <>",
     "Julian Pawlowski <>",
