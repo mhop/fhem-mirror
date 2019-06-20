@@ -161,6 +161,7 @@ use vars qw($FW_ME);                                    # webname (default is fh
 
 # Versions History intern
 our %vNotesIntern = (
+  "2.3.6"  => "20.06.2019  BatteryDischarging, BatteryCharging summary of daily measurement",                        
   "2.3.5"  => "20.06.2019  subroutine consinject added to pv, pvco style ",
   "2.3.4"  => "19.06.2019  change some readingnames, delete L4_plantOid, next04hours_state ",
   "2.3.3"  => "16.06.2019  change verbose 4 output, fix warning if no weather info was got ",
@@ -1548,6 +1549,15 @@ sub extractConsumerHistData($$$) {
   
   my $bataval = (defined(ReadingsNum($name,"L1_BatteryIn", undef)) || defined(ReadingsNum($name,"L1_BatteryOut", undef)))?1:0;     # Identifikation ist Battery vorhanden ?
   
+  my ($bdcd,$bcd) = (0,0);
+  foreach my $di (@{$chdata->{'BatteryDischarging'}}) {
+      $bdcd += $di->{'Measurement'};                                           # aufsummierte Batterieentladung pro Zeiteinheit (day) in Wh
+  }
+  
+  foreach my $ch (@{$chdata->{'BatteryCharging'}}) {
+      $bcd += $ch->{'Measurement'};                                            # aufsummierte Batterieladung pro Zeiteinheit (day) in Wh 
+  }
+      
   readingsBeginUpdate($hash);
   
   # allen Consumer Objekte die ID zuordnen
@@ -1556,9 +1566,7 @@ sub extractConsumerHistData($$$) {
       $consumers{"${i}_ConsumerName"} = encode("utf8", $c->{'DeviceName'} );
       $consumers{"${i}_ConsumerOid"}  = $c->{'ConsumerOid'};
       $consumers{"${i}_ConsumerLfd"}  = $i;
-	  my $cpower                      = $c->{'TotalEnergy'}{'Measurement'};    # Energieverbrauch im Timeframe in Wh
-	  my $bdc                         = $c->{'BatteryDischarging'};            # Batterieentladung in Wh
-	  my $bc                          = $c->{'BatteryCharging'};               # Batterieladung in Wh                                          
+	  my $cpower                      = $c->{'TotalEnergy'}{'Measurement'};    # Energieverbrauch im Timeframe in Wh                                         
 	  my $cn                          = $consumers{"${i}_ConsumerName"};       # Verbrauchername
       $cn                             = substUmlauts($cn);
       
@@ -1575,12 +1583,8 @@ sub extractConsumerHistData($$$) {
       readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalDay",          sprintf("%.0f", $cpower)." Wh") if(defined($cpower) && $tf eq "day"); 
       readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalMonth",        sprintf("%.0f", $cpower)." Wh") if(defined($cpower) && $tf eq "month");  
       readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalYear",         sprintf("%.0f", $cpower)." Wh") if(defined($cpower) && $tf eq "year");  
-      readingsBulkUpdate($hash, "L3_BatteryDischargingDay",         sprintf("%.0f", $bdc)   ." Wh") if(defined($bdc)    && $tf eq "day");	
-      readingsBulkUpdate($hash, "L3_BatteryDischargingMonth",       sprintf("%.0f", $bdc)   ." Wh") if(defined($bdc)    && $tf eq "month");	  
-      readingsBulkUpdate($hash, "L3_BatteryDischargingYear",        sprintf("%.0f", $bdc)   ." Wh") if(defined($bdc)    && $tf eq "year");
-      readingsBulkUpdate($hash, "L3_BatteryChargingDay",            sprintf("%.0f", $bc)    ." Wh") if(defined($bc)     && $tf eq "day");	
-      readingsBulkUpdate($hash, "L3_BatteryChargingMonth",          sprintf("%.0f", $bc)    ." Wh") if(defined($bc)     && $tf eq "month");	  
-      readingsBulkUpdate($hash, "L3_BatteryChargingYear",           sprintf("%.0f", $bc)    ." Wh") if(defined($bc)     && $tf eq "year");
+      readingsBulkUpdate($hash, "L3_BatteryDischargingDay",         sprintf("%.0f", $bdcd)  ." Wh") if(defined($bdcd)   && $bataval && $tf eq "day");	
+      readingsBulkUpdate($hash, "L3_BatteryChargingDay",            sprintf("%.0f", $bcd)   ." Wh") if(defined($bcd)    && $bataval && $tf eq "day");	
 	  
       readingsBulkUpdate($hash, "L3_${cn}_EnergyRelativeMonthGrid", sprintf("%.0f", $gcr)." %")     if(defined($gcr) && $tf eq "month");            
       readingsBulkUpdate($hash, "L3_${cn}_EnergyTotalMonthGrid",    sprintf("%.0f", $gct)." Wh")    if(defined($gct) && $tf eq "month");
@@ -2255,13 +2259,14 @@ sub PortalAsHtml ($$) {
 
               $ret .= "<tr class='odd' style='height:".$z3."px;'>";
               $ret .= "<td align='center' class='smaportal' ".$style.">";
+              
+			  my $sicon = 1;                                                    
+              $ret .= $is{$i} if (defined ($is{$i}) && $sicon);
 
               ##################################
               # inject the new icon if defined
               $ret .= consinject($hash,$i,@pgCDev) if($ret);
               
-			  my $show = 0;                                                    # wurde bereits für diese Stunde ein Geräte Icon ausgegeben ?
-              $ret .= $is{$i} if (defined ($is{$i}) && !$show);
               $ret .= "</td></tr>";
          }           
          
