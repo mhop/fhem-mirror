@@ -1,4 +1,4 @@
-REV 19657
+REV 19661
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -183,7 +183,7 @@ UPD 2016-01-15_07:45:16 6136 FHEM/30_pilight_temp.pm
 UPD 2019-04-03_07:45:02 17081 FHEM/30_tradfri.pm
 UPD 2019-01-03_07:45:02 27812 FHEM/31_Aurora.pm
 UPD 2015-07-28_14:05:31 4627 FHEM/31_ENECSYSINV.pm
-UPD 2019-06-20_07:45:03 71324 FHEM/31_HUEDevice.pm
+UPD 2019-06-20_10:05:58 71303 FHEM/31_HUEDevice.pm
 UPD 2019-03-02_07:45:03 36260 FHEM/31_LightScene.pm
 UPD 2018-02-05_07:45:02 98839 FHEM/31_MilightDevice.pm
 UPD 2017-11-20_07:45:02 22207 FHEM/31_Nello.pm
@@ -494,7 +494,7 @@ UPD 2016-02-05_07:45:11 34730 FHEM/98_PID20.pm
 UPD 2017-01-24_07:45:02 27747 FHEM/98_QRCode.pm
 UPD 2019-04-29_07:45:03 24261 FHEM/98_RandomTimer.pm
 UPD 2019-05-30_07:45:03 95845 FHEM/98_SVG.pm
-UPD 2019-06-15_07:45:09 72486 FHEM/98_Siro.pm
+UPD 2019-06-20_10:05:58 75576 FHEM/98_Siro.pm
 UPD 2018-11-12_07:45:03 80535 FHEM/98_SmarterCoffee.pm
 UPD 2017-05-04_07:45:02 52568 FHEM/98_THRESHOLD.pm
 UPD 2018-03-19_07:45:04 49956 FHEM/98_TRAFFIC.pm
@@ -724,8 +724,8 @@ UPD 2019-06-20_07:45:06 4063796 docs/commandref.html
 UPD 2019-06-16_07:45:08 2506205 docs/commandref_DE.html
 UPD 2019-05-12_07:45:03 79232 docs/commandref_frame.html
 UPD 2019-05-12_07:45:03 88924 docs/commandref_frame_DE.html
-UPD 2019-06-20_07:45:10 216024 docs/commandref_modular.html
-UPD 2019-06-20_07:45:11 226924 docs/commandref_modular_DE.html
+UPD 2019-06-20_10:06:05 216024 docs/commandref_modular.html
+UPD 2019-06-20_10:06:06 226924 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2135,8 +2135,8 @@ UPD 2017-02-18_07:45:02 1064 www/pgm2/darkCommon.css
 UPD 2015-07-28_14:05:34 4334 www/pgm2/darkfloorplanstyle.css
 UPD 2018-10-08_07:45:02 5419 www/pgm2/darksmallscreenstyle.css
 UPD 2018-11-17_07:45:02 5751 www/pgm2/darkstyle.css
-UPD 2015-11-22_17:53:09 2502 www/pgm2/darksvg_defs.svg
-UPD 2015-07-28_14:05:34 2808 www/pgm2/darksvg_style.css
+UPD 2019-06-20_10:05:58 6801 www/pgm2/darksvg_defs.svg
+UPD 2019-06-20_10:05:58 5705 www/pgm2/darksvg_style.css
 UPD 2015-07-28_14:05:34 30 www/pgm2/darktouchpadstyle.css
 UPD 2017-03-09_07:45:02 41450 www/pgm2/dashboard.js
 UPD 2015-07-28_14:05:34 14618 www/pgm2/dashboard_darkstyle.css
@@ -2222,8 +2222,8 @@ UPD 2018-12-17_07:45:02 789397 www/pgm2/sscam_hls.js
 UPD 2018-12-16_07:45:03 36555 www/pgm2/sscam_tooltip.js
 UPD 2015-07-28_14:05:34 649 www/pgm2/style.css
 UPD 2019-01-21_07:45:02 13993 www/pgm2/svg.js
-UPD 2015-07-28_14:05:34 2502 www/pgm2/svg_defs.svg
-UPD 2015-07-28_14:05:34 2578 www/pgm2/svg_style.css
+UPD 2019-06-20_10:05:58 6801 www/pgm2/svg_defs.svg
+UPD 2019-06-20_10:05:58 5637 www/pgm2/svg_style.css
 UPD 2019-01-15_07:45:03 14976 www/pgm2/todoist.js
 UPD 2015-07-28_14:05:34 639 www/pgm2/touchpadstyle.css
 UPD 2019-03-01_07:45:02 18900 www/pgm2/yaahm.js
