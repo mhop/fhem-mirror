@@ -7,7 +7,7 @@ use Exporter qw( import );
 use strict;
 use warnings;
 
-our %EXPORT_TAGS = (all => [qw(GP_Define GP_Catch GP_ForallClients GP_Import)]);
+our %EXPORT_TAGS = (all => [qw(GP_Define GP_Catch GP_ForallClients GP_Import GP_Export)]);
 Exporter::export_ok_tags('all');
 
 #add FHEM/lib to @INC if it's not allready included. Should rather be in fhem.pl than here though...
@@ -61,6 +61,17 @@ sub GP_Import(@)
   foreach (@_) {
     *{$pkg.'::'.$_} = *{'main::'.$_};
   }
+}
+
+sub GP_Export(@)
+{
+    no strict qw/refs/;    ## no critic
+    my $pkg  = caller(0);
+    my $main = $pkg;
+    $main =~ s/^(?:.+::)?([^:]+)$/main::$1\_/g;
+    foreach (@_) {
+        *{ $main . $_ } = *{ $pkg . '::' . $_ };
+    }
 }
 
 1;

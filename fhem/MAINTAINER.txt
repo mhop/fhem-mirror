@@ -540,7 +540,7 @@ FHEM/CoProcess.pm            justme1968           Sonstiges
 FHEM/DarkSkyAPI.pm           CoolTux              Unterstützende Dienste/Wettermodule
 FHEM/DevIo.pm                rudolfkoenig         Sonstiges
 FHEM/FritzBoxUtils.pm        rudolfkoenig         FRITZ!Box
-FHEM/GPUtils.pm              ntruchsess           FHEM Development
+FHEM/GPUtils.pm              CoolTux              FHEM Development
 FHEM/HMCCUConf.pm            zap                  HomeMatic
 FHEM/HMConfig.pm             martinp876           HomeMatic
 FHEM/HOMESTATEtk.pm          loredo               Automatisierung
