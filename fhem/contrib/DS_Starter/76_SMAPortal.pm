@@ -161,7 +161,7 @@ use vars qw($FW_ME);                                    # webname (default is fh
 
 # Versions History intern
 our %vNotesIntern = (
-  "2.3.6"  => "20.06.2019  BatteryDischarging, BatteryCharging summary of daily measurement",                        
+  "2.3.6"  => "21.06.2019  revise commandref ",                        
   "2.3.5"  => "20.06.2019  subroutine consinject added to pv, pvco style ",
   "2.3.4"  => "19.06.2019  change some readingnames, delete L4_plantOid, next04hours_state ",
   "2.3.3"  => "16.06.2019  change verbose 4 output, fix warning if no weather info was got ",
@@ -1549,17 +1549,6 @@ sub extractConsumerHistData($$$) {
   Log3 ($name, 4, "$name - ##### extracting consumer history data #### ");
   
   my $bataval = (defined(ReadingsNum($name,"L1_BatteryIn", undef)) || defined(ReadingsNum($name,"L1_BatteryOut", undef)))?1:0;     # Identifikation ist Battery vorhanden ?
-  
-  if($tf =~ /day/) {
-      ($bdcd,$bcd) = (0,0);
-      foreach my $di (@{$chdata->{'BatteryDischarging'}}) {
-          $bdcd += $di->{'Measurement'}/4;                                           # aufsummierte Batterieentladung pro Zeiteinheit (day) in Wh
-      }
-      
-      foreach my $ch (@{$chdata->{'BatteryCharging'}}) {
-          $bcd += $ch->{'Measurement'}/4;                                            # aufsummierte Batterieladung pro Zeiteinheit (day) in Wh 
-      }
-  }
       
   readingsBeginUpdate($hash);
   
@@ -1603,10 +1592,7 @@ sub extractConsumerHistData($$$) {
       
       $i++;
   }
-  
-  readingsBulkUpdate($hash, "L3_BatteryDischargingDay",    sprintf("%.0f", $bdcd)  ." Wh") if(defined($bdcd)   && $bataval && $tf eq "day");	
-  readingsBulkUpdate($hash, "L3_BatteryChargingDay",       sprintf("%.0f", $bcd)   ." Wh") if(defined($bcd)    && $bataval && $tf eq "day");	
-  
+    
   readingsEndUpdate($hash, 1); 
   
 return;
@@ -2606,11 +2592,201 @@ return;
 
 <a name="SMAPortal"></a>
 <h3>SMAPortal</h3>
-
 <ul>
-  <br>
+
+   With this module it is possible to fetch data from the <a href="https://www.sunnyportal.com">SMA Sunny Portal</a> and switch
+   consumers (e.g. bluetooth plug sockets) if any are present.
+   At the momentent that are the following data: <br><br>
+   <ul>
+    <ul>
+     <li>Live data (Consumption and PV-Generation) </li>
+     <li>Battery data (In/Out) and usage data of consumers </li>
+     <li>Weather data delivered from SMA for the facility location </li>
+     <li>Forecast data (Consumption and PV-Generation) inclusive suggestion times to switch comsumers on </li>
+     <li>the planned times by the Sunny Home Manager to switch consumers on and the current state of consumers (if present) </li>
+    </ul> 
+   </ul>
+   <br>
+   
+   <b>Preparation </b> <br><br>
+    
+   <ul>   
+    This module use the Perl module JSON which has typically to be installed discrete. <br>
+	On Debian linux based systems that can be done by command: <br><br>
+    
+    <code>sudo apt-get install libjson-perl</code>      <br><br>
+    
+    Subsequent there are an overview of used Perl modules: <br><br>
+    
+    POSIX           <br>
+    JSON            <br>
+    Data::Dumper    <br>                  
+    Time::HiRes     <br>
+    Time::Local     <br>
+	Blocking        (FHEM-Modul) <br>
+    GPUtils         (FHEM-Modul) <br>
+    FHEM::Meta      (FHEM-Modul) <br>
+	LWP::UserAgent  <br>
+	HTTP::Cookies   <br>
+    MIME::Base64    <br>
+    Encode          <br>
+    
+    <br><br>  
+   </ul>
   
-  Is coming soon ...
+   <a name="SMAPortalDefine"></a>
+   <b>Definition</b>
+   <ul>
+    <br>
+    A SMAPortal device will be defined by: <br><br>
+	
+    <ul>
+      <b><code>define &lt;name&gt; SMAPortal</code></b> <br><br>
+    </ul>
+   
+    After the definition of the device the credentials for the SMA Sunny Portal must be saved with the 
+    following command: <br><br>
+   
+    <ul> 
+     set &lt;name&gt; credentials &lt;Username&gt; &lt;Password&gt;
+    </ul>     
+   </ul>
+   <br><br>   
+    
+   <a name="SMAPortalSet"></a>
+   <b>Set </b>
+   <ul>
+   <br>
+     <ul>
+     <li><b> set &lt;name&gt; createPortalGraphic &lt;Generation | Consumption | Generation_Consumption | Differential&gt; </b> </li>  
+     Creates graphical devices to show the SMA Sunny Portal forecast data in several layouts. 
+     The attribute "detailLevel" has to be set to level 4. The command set this attribut to the needed value automatically. <br>
+     With the <a href="#SMAPortalSPGattr">"attributes of the graphic device"</a> the appearance and coloration of the forecast 
+     data in the created graphic device can be adjusted.     
+     </ul>   
+     <br>
+     
+     <ul>
+     <li><b> set &lt;name&gt; credentials &lt;username&gt; &lt;password&gt; </b> </li>  
+     Set Username / Password used for the login into the SMA Sunny Portal.   
+     </ul> 
+     <br>
+     
+     <ul>
+     <li><b> set &lt;name&gt; &lt;consumer name&gt; &lt;on | off | auto&gt; </b> </li>  
+     If the attribute "detailLevel" is set to 3 or higher, consumer data are fetched from the SMA Sunny Portal.
+     Once these data are available, the consumer are shown in the Set and can be switched to on, off or the automatic mode (auto)
+     that means the consumer are controlled by the Sunny Home Manager.     
+     </ul>
+   
+   </ul>
+   <br><br>
+   
+   <a name="SMAPortalGet"></a>
+   <b>Get</b>
+   <ul>
+    <br>
+    <ul>
+      <li><b> get &lt;name&gt; data </b> </li>  
+      This command fetch the data from the SMA Sunny Portal manually. 
+    </ul>
+    <br>
+    
+    <ul>
+      <li><b> get &lt;name&gt; storedCredentials </b> </li>  
+      The saved credentials are displayed in a popup window.
+    </ul>
+   </ul>  
+   <br><br>
+   
+   <a name="SMAPortalAttr"></a>
+   <b>Attributes</b>
+   <ul>
+     <br>
+     <ul>
+       <a name="cookielifetime"></a>
+       <li><b>cookielifetime &lt;Sekunden&gt; </b><br>
+       Validity period of a received Cookie (default: 3000 seconds).  
+       </li><br>
+       
+       <a name="cookieLocation"></a>
+       <li><b>cookieLocation &lt;Pfad/File&gt; </b><br>
+       The path and filename of received Cookies (default: ./log/mycookies.txt).
+       <br><br> 
+  
+        <ul>
+		 <b>Example:</b><br>
+         attr &lt;name&gt; cookieLocation ./log/cookies.txt <br>    
+        </ul>        
+       </li><br>
+       
+       <a name="detailLevel"></a>
+       <li><b>detailLevel </b><br>
+       Adjust the complexity of the generated data. 
+       <br><br>
+	
+	   <ul>   
+	   <table>  
+	   <colgroup> <col width=5%> <col width=95%> </colgroup>
+		  <tr><td> <b>L1</b>  </td><td>- only live data and weather data are generated. </td></tr>
+		  <tr><td> <b>L2</b>  </td><td>- as L1 and additional forecast of the current data, the data of the next 4 hours as well as PV-Generation / Consumption the rest of day and the next day </td></tr>
+		  <tr><td> <b>L3</b>  </td><td>- as L2 and additional forecast of the planned switch-on times of consumers, whose current state and energy data as well as their battery usage data </td></tr>
+          <tr><td> <b>L4</b>  </td><td>- as L3 and additional a detailed forecast of the next 24 hours </td></tr>
+	   </table>
+	   </ul>     
+	   <br>       
+       </li><br>
+       
+       <a name="disable"></a>
+       <li><b>disable</b><br>
+       Deactivate/activate the device. </li><br>
+       
+       <a name="getDataRetries"></a>
+       <li><b>getDataRetries &lt;Anzahl&gt; </b><br>
+       Number of repetitions (get data) in case of no live data are fetched from the SMA Sunny Portal (default: 3). </li><br>
+
+       <a name="interval"></a>
+       <li><b>interval &lt;seconds&gt; </b><br>
+       Time interval for continuous data retrieval from the aus dem SMA Sunny Portal (default: 300 seconds). <br>
+       if the "interval = 0" is set, no continuous data retrieval is executed and has to be triggered by the 
+       "get &lt;name&gt; data" command manually. 
+       If a value of 120 seconds or less (but >0) should be set, the value will be corrected to 120 soconds. <br><br>
+       
+       <b>Note:</b> 
+       The retrieval interval should not be less than 120 seconds. As of previous experiences SMA suffers an interval of  
+       120 seconds although the SMA terms and conditions don't permit an automatic data fetch by computer programs.
+       </li><br>
+       
+       <a name="showPassInLog"></a>
+       <li><b>showPassInLog</b><br>
+       If set, the used password will be displayed in Logfile output. 
+       (default = 0) </li><br>
+       
+       <a name="timeout"></a>
+       <li><b>timeout &lt;seconds&gt; </b><br>
+       Timeout value for HTTP-calls to the SMA Sunny Portal (default: 30 seconds).  
+       </li><br>
+       
+       <a name="userAgent"></a>
+       <li><b>userAgent &lt;identifier&gt; </b><br>
+       An user agent identifier for identifikation against the SMA Sunny Portal can be specified.
+       <br><br> 
+  
+        <ul>
+		 <b>Example:</b><br>
+         attr &lt;name&gt; userAgent Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:65.0) Gecko/20100101 Firefox/65.0 <br>    
+        </ul>           
+       </li><br> 
+
+       <a name="verbose5Data"></a>
+       <li><b>verbose5Data </b><br>
+       If verbose 5 is set, huge data are generated. With this attribute only the interesting verbose 5 output
+       can be specified. (default: none).  
+       </li><br>       
+   
+     </ul>
+   </ul>
+   <br> 
 
 </ul>
 
@@ -2671,8 +2847,8 @@ return;
       <b><code>define &lt;Name&gt; SMAPortal</code></b> <br><br>
     </ul>
    
-    Nach der Definition des Devices müssen noch die Zugangsparameter für das SMA-Portal gespeichert werden. 
-    Das geschieht mit dem Befehl: <br><br>
+    Nach der Definition des Devices müssen die Zugangsparameter für das SMA Sunny Portal gespeichert werden 
+    mit dem Befehl: <br><br>
    
     <ul> 
      set &lt;Name&gt; credentials &lt;Username&gt; &lt;Passwort&gt;
@@ -2716,7 +2892,7 @@ return;
     <br>
     <ul>
       <li><b> get &lt;name&gt; data </b> </li>  
-      Mit diesem Befehl werden die Daten aus dem SMA-Portal manuell abgerufen. 
+      Mit diesem Befehl werden die Daten aus dem SMA Sunny Portal manuell abgerufen. 
     </ul>
     <br>
     
@@ -2771,14 +2947,14 @@ return;
        
        <a name="getDataRetries"></a>
        <li><b>getDataRetries &lt;Anzahl&gt; </b><br>
-       Anzahl der Wiederholungen (get data) im Fall dass keine Live-Daten vom SMA-Portal geliefert 
+       Anzahl der Wiederholungen (get data) im Fall dass keine Live-Daten vom SMA Sunny Portal geliefert 
        wurden (default: 3). </li><br>
 
        <a name="interval"></a>
        <li><b>interval &lt;Sekunden&gt; </b><br>
-       Zeitintervall zum kontinuierlichen Datenabruf aus dem SMA-Portal (Default: 300 Sekunden). <br>
+       Zeitintervall zum kontinuierlichen Datenabruf aus dem SMA Sunny Portal (Default: 300 Sekunden). <br>
        Ist "interval = 0" gesetzt, erfolgt kein automatischer Datenabruf und muss mit "get &lt;name&gt; data" manuell
-       erfolgen. Wird ein Wert kleiner 120 Sekunden (und >0) angegeben, wird der Wert auf 120 Sekunden korrigiert. <br><br>
+       erfolgen. Wird ein Wert kleiner 120 Sekunden (aber >0) angegeben, wird der Wert auf 120 Sekunden korrigiert. <br><br>
        
        <b>Hinweis:</b> 
        Das Abfrageintervall sollte nicht kleiner 120 Sekunden sein. Nach bisherigen Erfahrungen toleriert SMA ein 
@@ -2792,12 +2968,12 @@ return;
        
        <a name="timeout"></a>
        <li><b>timeout &lt;Sekunden&gt; </b><br>
-       Timeout-Wert für HTTP-Aufrufe zum SMA-Portal (default: 30 Sekunden).  
+       Timeout-Wert für HTTP-Aufrufe zum SMA Sunny Portal (default: 30 Sekunden).  
        </li><br>
        
        <a name="userAgent"></a>
        <li><b>userAgent &lt;Kennung&gt; </b><br>
-       Es kann die User-Agent-Kennung zur Identifikation gegenüber dem Portal angegeben werden.
+       Es kann die User-Agent-Kennung zur Identifikation gegenüber dem SMA Sunny Portal angegeben werden.
        <br><br> 
   
         <ul>
@@ -2836,7 +3012,7 @@ return;
     "smaportal"
   ],
   "version": "v1.1.1",
-  "release_status": "testing",
+  "release_status": "stable",
   "author": [
     "Heiko Maaz <heiko.maaz@t-online.de>",
     "Wzut",
