@@ -762,9 +762,11 @@ while (1) {
         my $ret;
         eval { $ret = syswrite($hash->{CD}, $wb); };
         if($@) {
-          Log 4, "Syswrite: $@, deleting $hash->{NAME}";
-          TcpServer_Close($hash);
-          CommandDelete(undef, $hash->{NAME});
+          Log 4, "$hash->{NAME} syswrite: $@";
+          if($hash->{TEMPORARY}) {
+            TcpServer_Close($hash);
+            CommandDelete(undef, $hash->{NAME});
+          }
           next;
         }
 
@@ -776,9 +778,11 @@ while (1) {
             if(TcpServer_WantRead($hash));
 
         } elsif(!$ret) { # zero=EOF, undef=error
-          Log 4, "Write error to $p, deleting $hash->{NAME}";
-          TcpServer_Close($hash);
-          CommandDelete(undef, $hash->{NAME});
+          Log 4, "$hash->{NAME} write error to $p";
+          if($hash->{TEMPORARY}) {
+            TcpServer_Close($hash);
+            CommandDelete(undef, $hash->{NAME})
+          }
 
         } else {
           if($ret >= length($wb)) { # for the > see Forum #29963
