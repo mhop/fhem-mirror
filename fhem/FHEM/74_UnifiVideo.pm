@@ -385,13 +385,23 @@ UnifiVideo_Read($)
     my $line;
     ($line,$data) = split("\n", $data, 2);
 
+    my($cam, $type);
     if( $line =~ m/password/ ) {
       UnifiVideo_killLogWatcher($hash);
 
     } elsif( $line =~ m/Camera\[([^\]]+)\].*type:([^\s]+)/ ) {
-      my $cam = $1;
-      my $type = $2;
+      $cam = $1;
+      $type = $2;
 
+    } elsif( $line =~ m/AnalyticsService[^[]+\[([^|]+).*type:([^\s]+)/ ) {
+      $cam = $1;
+      $type = $2;
+
+    } else {
+      Log3 $name, 2, "$name: got unknown event: $line";
+    }
+
+    if( $cam && $type ) {
       if( $type eq 'start' ) {
         my $json = $hash->{helper}{json};
         $json = [] if( !$json );
@@ -399,22 +409,20 @@ UnifiVideo_Read($)
         foreach my $entry (@{$json->{data}}) {
           last if( $entry->{mac} eq $cam );
           ++$i;
-          }
-          if( $i >= $json->{meta}{totalCount} ) {
-            Log3 $name, 2, "$name: got motion event for unknown cam: $cam";
+        }
+        if( $i >= $json->{meta}{totalCount} ) {
+          Log3 $name, 2, "$name: got motion event for unknown cam: $cam";
 
-          } else {
-            readingsSingleUpdate($hash, "cam${i}motion", $type, 1);
-          }
-
-        } elsif( $type eq 'stop' ) {
         } else {
-          Log3 $name, 2, "$name: got unknown event type from cam: $cam";
+          readingsSingleUpdate($hash, "cam${i}motion", $type, 1);
         }
 
-    } else {
-      Log3 $name, 2, "$name: got unknown event: $line";
+      } elsif( $type eq 'stop' ) {
+      } else {
+        Log3 $name, 2, "$name: got unknown event type from cam: $cam";
+      }
     }
+
   }
 
   $hash->{PARTIAL} = $data
