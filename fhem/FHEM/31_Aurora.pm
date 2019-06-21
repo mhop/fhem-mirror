@@ -339,99 +339,114 @@ Aurora_SetParam($$@)
   $cmd = "off" if($cmd eq "pct" && $value == 0 );
 
   if($cmd eq 'on') {
-    $obj->{'on'}  = JSON::true;
-    $obj->{'transitiontime'} = $value * 10 if( defined($value) );
+    $obj->{on} = { value => JSON::true };
+    $obj->{on}{duration} = $value * 10 if( defined($value) );
 
   } elsif($cmd eq 'off') {
-    $obj->{'on'}  = JSON::false;
-    $obj->{'transitiontime'} = $value * 10 if( defined($value) );
+    $obj->{on} = { value => JSON::false };
+    $obj->{on}{duration} = $value * 10 if( defined($value) );
 
   } elsif($cmd eq "pct") {
     $value = 0 if( $value < 0 );
     $value = 100 if( $value > 100 );
-    $obj->{'on'}  = JSON::true;
-    $obj->{'brightness'}  = int($value);
-    $obj->{'transitiontime'} = $value2 * 10 if( defined($value2) );
+    $obj->{on} = { value => JSON::true } if( !$defs{$name}->{helper}{on} );
+    $obj->{brightness} = { value => int($value) };
+    $obj->{brightness}{duration} = $value2 * 10 if( defined($value2) );
 
   } elsif($name && $cmd eq "dimUp") {
-    my $pct = ReadingsVal($name,"pct","0");
-    $pct += 10;
-    $pct = 100 if( $pct > 100 );
-    $obj->{'on'}  = JSON::true if( !$defs{$name}->{helper}{on} );
-    $obj->{'brightness'}  = 0+$pct;
-    $obj->{'transitiontime'} = 1;
-    #$obj->{'transitiontime'} = $value * 10 if( defined($value) );
+    $obj->{on} = { value => JSON::true } if( !$defs{$name}->{helper}{on} );
+    $obj->{brightness} = { increment => 10 };
+    $obj->{brightness} = { increment => 0+$value } if( defined($value) );
+    $obj->{brightness}{duration} = $value2 * 10 if( defined($value2) );
     $defs{$name}->{helper}->{update_timeout} = 0;
 
   } elsif($name && $cmd eq "dimDown") {
-    my $pct = ReadingsVal($name,"pct","0");
-    $pct -= 10;
-    $pct = 0 if( $pct < 0 );
-    $obj->{'on'}  = JSON::true if( !$defs{$name}->{helper}{on} );
-    $obj->{'brightness'}  = 0+$pct;
-    $obj->{'transitiontime'} = 1;
-    #$obj->{'transitiontime'} = $value * 10 if( defined($value) );
+    $obj->{on} = { value => JSON::true } if( !$defs{$name}->{helper}{on} );
+    $obj->{brightness} = { increment => -10 };
+    $obj->{brightness} = { increment => 0-$value } if( defined($value) );
+    $obj->{brightness}{duration} = $value2 * 10 if( defined($value2) );
     $defs{$name}->{helper}->{update_timeout} = 0;
 
   } elsif($cmd eq "satUp") {
-      $obj->{'on'}  = JSON::true if( !$defs{$name}->{helper}{on} );
-      $obj->{'sat_inc'}  = 10;
-      $obj->{'sat_inc'} = 0+$value if( defined($value) );
+    $obj->{on} = { value => JSON::true } if( !$defs{$name}->{helper}{on} );
+    $obj->{sat} = { increment => 10 };
+    $obj->{sat} = { increment => 0+$value } if( defined($value) );
+    $obj->{sat}{duration} = $value2 * 10 if( defined($value2) );
+
   } elsif($cmd eq "satDown") {
-      $obj->{'on'}  = JSON::true if( !$defs{$name}->{helper}{on} );
-      $obj->{'sat_inc'}  = -10;
-      $obj->{'sat_inc'} = 0+$value if( defined($value) );
+    $obj->{on} = { value => JSON::true } if( !$defs{$name}->{helper}{on} );
+    $obj->{sat} = { increment => 10 };
+    $obj->{sat} = { increment => 0-$value } if( defined($value) );
+    $obj->{sat}{duration} = $value2 * 10 if( defined($value2) );
 
   } elsif($cmd eq "hueUp") {
-      $obj->{'on'}  = JSON::true if( !$defs{$name}->{helper}{on} );
-      $obj->{'hue_inc'}  = 30;
-      $obj->{'hue_inc'} = 0+$value if( defined($value) );
+    $obj->{on} = { value => JSON::true } if( !$defs{$name}->{helper}{on} );
+    $obj->{hue} = { increment => 10 };
+    $obj->{hue} = { increment => 0+$value } if( defined($value) );
+    $obj->{hue}{duration} = $value2 * 10 if( defined($value2) );
+
   } elsif($cmd eq "hueDown") {
-      $obj->{'on'}  = JSON::true if( !$defs{$name}->{helper}{on} );
-      $obj->{'hue_inc'}  = -30;
-      $obj->{'hue_inc'} = 0+$value if( defined($value) );
+    $obj->{on} = { value => JSON::true } if( !$defs{$name}->{helper}{on} );
+    $obj->{hue} = { increment => 10 };
+    $obj->{hue} = { increment => 0-$value } if( defined($value) );
+    $obj->{hue}{duration} = $value2 * 10 if( defined($value2) );
 
   } elsif($cmd eq "ctUp") {
-      $obj->{'on'}  = JSON::true if( !$defs{$name}->{helper}{on} );
-      $obj->{'ct_inc'}  = 16;
-      $obj->{'ct_inc'} = 0+$value if( defined($value) );
+    $obj->{on} = { value => JSON::true } if( !$defs{$name}->{helper}{on} );
+    $obj->{ct} = { increment => 16 };
+    $obj->{ct} = { increment => 0+$value } if( defined($value) );
+    $obj->{ct}{duration} = $value2 * 10 if( defined($value2) );
+
   } elsif($cmd eq "ctDown") {
-      $obj->{'on'}  = JSON::true if( !$defs{$name}->{helper}{on} );
-      $obj->{'ct_inc'}  = -16;
-      $obj->{'ct_inc'} = 0+$value if( defined($value) );
+    $obj->{on} = { value => JSON::true } if( !$defs{$name}->{helper}{on} );
+    $obj->{ct} = { increment => 16 };
+    $obj->{ct} = { increment => 0-$value } if( defined($value) );
+    $obj->{ct}{duration} = $value2 * 10 if( defined($value2) );
 
   } elsif($cmd eq "ct") {
-    $obj->{'on'}  = JSON::true;
+    $obj->{on} = { value => JSON::true } if( !$defs{$name}->{helper}{on} );
     $value = int(1000000/$value) if( $value < 1000 );
-    $obj->{'ct'}  = 0+$value;
-    $obj->{'transitiontime'} = $value2 * 10 if( defined($value2) );
+    $obj->{ct} = { value => 0+$value };
+    $obj->{ct}{duration} = $value2 * 10 if( defined($value2) );
+
   } elsif($cmd eq "hue") {
-    $obj->{'on'}  = JSON::true;
-    $obj->{'hue'}  = 0+$value;
-    $obj->{'transitiontime'} = $value2 * 10 if( defined($value2) );
+    $obj->{on} = { value => JSON::true } if( !$defs{$name}->{helper}{on} );
+    $obj->{hue} = 0+$value;
+    $obj->{hue}{duration} = $value2 * 10 if( defined($value2) );
+
   } elsif($cmd eq "sat") {
-    $obj->{'on'}  = JSON::true;
-    $obj->{'sat'}  = 0+$value;
-    $obj->{'transitiontime'} = $value2 * 10 if( defined($value2) );
+    $obj->{on} = { value => JSON::true } if( !$defs{$name}->{helper}{on} );
+    $obj->{sat} = 0+$value;
+    $obj->{sat}{duration} = $value2 * 10 if( defined($value2) );
+
   } elsif( $cmd eq "rgb" && $value =~ m/^(..)(..)(..)/) {
     my( $r, $g, $b ) = (hex($1)/255.0, hex($2)/255.0, hex($3)/255.0);
 
-      my( $h, $s, $v ) = Color::rgb2hsv($r,$g,$b);
+    my( $h, $s, $v ) = Color::rgb2hsv($r,$g,$b);
 
-      $obj->{'on'}  = JSON::true;
-      $obj->{'hue'} = int( $h * 359 );
-      $obj->{'sat'} = int( $s * 100 );
-      $obj->{'brightness'} = int( $v * 100 );
+    $obj->{on} = { value => JSON::true } if( !$defs{$name}->{helper}{on} );
+    $obj->{hue} = { value => int( $h * 359 ) };
+    $obj->{sat} = { value => int( $s * 100 ) };
+    $obj->{brightness} = { value => int( $v * 100 ) };
+    $obj->{hue}{duration} = $value2 * 10 if( defined($value2) );
+    $obj->{sat}{duration} = $value2 * 10 if( defined($value2) );
+    $obj->{brightness}{duration} = $value2 * 10 if( defined($value2) );
+
   } elsif( $cmd eq "hsv" && $value =~ m/^(..)(..)(..)/) {
     my( $h, $s, $v ) = (hex($1), hex($2), hex($3));
 
-    $s = 100 if( $s > 100 );
-    $v = 100 if( $v > 100 );
+    $h =  int(255 / $h * 356);
+    $s =  int(255 / $s * 100);
+    $v =  int(255 / $v * 100);
 
-    $obj->{'on'}  = JSON::true;
-    $obj->{'hue'}  = int($h*100);
-    $obj->{'sat'}  = 0+$s;
-    $obj->{'brightness'}  = 0+$v;
+    $obj->{on} = { value => JSON::true } if( !$defs{$name}->{helper}{on} );
+    $obj->{hue} = { value => 0+$h };
+    $obj->{sat} = { value => 0+$s };
+    $obj->{brightness} = { value => 0+$v };
+    $obj->{hue}{duration} = $value2 * 10 if( defined($value2) );
+    $obj->{sat}{duration} = $value2 * 10 if( defined($value2) );
+    $obj->{brightness}{duration} = $value2 * 10 if( defined($value2) );
+
   } elsif( $cmd eq "effect" ) {
     $obj->{'select'} = "$value";
     $obj->{'select'} .= " $value2" if( $value2 );
@@ -799,9 +814,9 @@ Aurora_Parse($$)
   $attr{$name}{devStateIcon} = '{(Aurora_devStateIcon($name),"toggle")}' if( !defined( $attr{$name}{devStateIcon} ) );
 
   if( !defined($attr{$name}{webCmd}) ) {
-    $attr{$name}{webCmd} = 'rgb:rgb ff0000:rgb 00ff00:rgb 0000ff:ct 490:ct 380:ct 270:ct 160:effect:on:off';
+    $attr{$name}{webCmd} = 'rgb:rgb ff0000:rgb 00ff00:rgb 0000ff:color 2040:color 2600:color 3700:color 6250:effect:on:off';
     #$attr{$name}{webCmd} = 'hue:rgb:rgb ff0000:rgb 00ff00:rgb 0000ff:toggle:on:off';
-    #$attr{$name}{webCmd} = 'ct:ct 490:ct 380:ct 270:ct 160:toggle:on:off';
+    #$attr{$name}{webCmd} = 'color 2040:color 2600:color 3700:color 6250:toggle:on:off';
     #$attr{$name}{webCmd} = 'pct:toggle:on:off';
     #$attr{$name}{webCmd} = 'toggle:on:off';
   }
