@@ -54,7 +54,7 @@ use FHEM::Meta;
 use Data::Dumper;    #only for Debugging
 use GPUtils qw(GP_Import GP_Export);
 
-require '73_AMADCommBridge.pm';
+require '73_AMADCommBridge.pm' unless ( defined( *{"main::AMADCommBridge_Initialize"} ) );
 
 my $missingModul = '';
 eval "use Encode qw(encode encode_utf8);1" or $missingModul .= 'Encode ';
@@ -1680,7 +1680,7 @@ sub CreateChangeBtDeviceValue($$) {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v4.4.3",
+  "version": "v4.4.4",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
