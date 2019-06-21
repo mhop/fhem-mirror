@@ -1985,8 +1985,8 @@ sub PortalAsHtml ($$) {
           $lup  = "$3.$2.$1 $4";
           $lupt = "letzte Aktualisierung:"; 
       } else {
-          $h1 = "forecast&nbsp;data&nbsp;[pv]&nbsp;- next&nbsp;4&nbsp;hours:&nbsp;$pv4h/h&nbsp;/ rest&nbsp;of&nbsp;day:&nbsp;$pvRe&nbsp;/ tomorrow:&nbsp;$pvTo/h";
-          $h2 = "forecast&nbsp;data&nbsp;[co]&nbsp;- next&nbsp;4&nbsp;hours:&nbsp;$co4h/h&nbsp;/ rest&nbsp;of&nbsp;day:&nbsp;$coRe&nbsp;/ tomorrow:&nbsp;$coTo/h";
+          $h1 = "forecast&nbsp;data&nbsp;[pv]&nbsp;- next&nbsp;4&nbsp;hours:&nbsp;$pv4h&nbsp;/ rest&nbsp;of&nbsp;day:&nbsp;$pvRe&nbsp;/ tomorrow:&nbsp;$pvTo";
+          $h2 = "forecast&nbsp;data&nbsp;[co]&nbsp;- next&nbsp;4&nbsp;hours:&nbsp;$co4h&nbsp;/ rest&nbsp;of&nbsp;day:&nbsp;$coRe&nbsp;/ tomorrow:&nbsp;$coTo";
       }
 
       $lup = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;($lupt $lup)";
