@@ -34,6 +34,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SMAPortalSPG_vNotesIntern = (
+  "1.2.0"  => "21.06.2019  GetFn -> get <name> html ",
   "1.1.0"  => "13.06.2019  commandRef revised, changed attribute W/kW to Wh/kWh ",
   "1.0.0"  => "03.06.2019  initial Version "
 );
@@ -45,6 +46,7 @@ sub SMAPortalSPG_Initialize($) {
   my $fwd = join(",",devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized")); 
   
   $hash->{DefFn}              = "SMAPortalSPG_Define";
+  $hash->{GetFn}              = "SMAPortalSPG_Get";
   $hash->{AttrList}           = "autoRefresh:selectnumbers,120,0.2,1800,0,log10 ".
                                 "autoRefreshFW:$fwd ".
                                 "beamColor:colorpicker,RGB ".
@@ -86,7 +88,9 @@ sub SMAPortalSPG_Initialize($) {
 return; 
 }
 
-################################################################
+###############################################################
+#                  SMAPortalSPG Define
+###############################################################
 sub SMAPortalSPG_Define($$) {
   my ($hash, $def) = @_;
   my ($name, $type, $link) = split("[ \t]+", $def, 3);
@@ -107,6 +111,23 @@ sub SMAPortalSPG_Define($$) {
   readingsSingleUpdate($hash,"state", "initialized", 1);                           # Init für "state" 
   
 return undef;
+}
+
+###############################################################
+#                  SMAPortalSPG Get
+###############################################################
+sub SMAPortalSPG_Get($@) {
+ my ($hash, @a) = @_;
+ return "\"get X\" needs at least an argument" if ( @a < 2 );
+ my $name = shift @a;
+ my $cmd  = shift @a;
+       
+ if ($cmd eq "html") {
+     return SMAPortalSPG_AsHtml($hash);
+ } 
+ 
+return undef;
+return "Unknown argument $cmd, choose one of html:noArg";
 }
 
 ################################################################
@@ -257,6 +278,39 @@ sub SMAPortalSPG_setVersionInfo($) {
   }
   
 return;
+}
+
+################################################################
+#    Grafik als HTML zurück liefern    (z.B. für Widget)
+################################################################
+sub SMAPortalSPG_AsHtml($) { 
+  my ($hash) = @_;
+  my $name   = $hash->{NAME};
+  my $link   = $hash->{LINK};
+  my $height;
+  
+  $link = AnalyzePerlCommand(undef, $link) if($link =~ m/^{(.*)}$/s);
+
+  my $alias = AttrVal($name, "alias", $name);                            # Linktext als Aliasname oder Devicename setzen
+  my $dlink = "<a href=\"/fhem?detail=$name\">$alias</a>"; 
+  
+  my $ret = "<html>";
+  if(IsDisabled($name)) {
+	  $height = AttrNum($name, 'beamHeight', 200);   
+	  $ret   .= "<table class='roomoverview'>";
+      $ret   .= "<tr style='height:".$height."px'>";
+	  $ret   .= "<td>";
+	  $ret   .= "SMA Portal graphic device <a href=\"/fhem?detail=$name\">$name</a> is disabled"; 
+	  $ret   .= "</td>";
+	  $ret   .= "</tr>";
+	  $ret   .= "</table>";
+  } else {
+	  $ret .= "<span>$dlink </span><br>"  if(AttrVal($name,"showLink",0));
+	  $ret .= $link;  
+  }    
+  $ret .= "</html>";
+  
+return $ret;
 }
 
 1;
