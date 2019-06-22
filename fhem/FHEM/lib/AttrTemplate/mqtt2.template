@@ -1230,6 +1230,7 @@ attr DEVICE setList\
   command:uzsuSelectRadio,Weiss,Nacht BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}
 attr DEVICE userReadings hex:color_r.* {Color::rgb2hex(ReadingsVal($name,"color_r",255),ReadingsVal($name,"color_g",255),ReadingsVal($name,"color_b",255))}, hue:bulb_mode.*white {"0"}
 attr DEVICE setStateList on off
+attr DEVICE comment To switch device also on when changing brightness, change payload pattern to {"status":"ON","$EVTPART0":"$EVTPART1"} or add a new element to setList, similar to brightness, e.g.brightness_on and change payload pattern as described.
 attr DEVICE setExtensionsEvent 1
 attr DEVICE model X_01_esp_milight_hub_rgbw_bulb
 
@@ -1296,6 +1297,7 @@ attr DEVICE webCmdLabel   brightness:dim\
   :saturation:mode
 attr DEVICE setStateList on off
 # computed_color will send RGB = 255,255,255 when in white mode. This is useful for HomeAssistant where it always expects the color to be set.
+attr DEVICE comment To switch device also on when changing brightness, change payload pattern to {"status":"ON","$EVTPART0":"$EVTPART1"} or add a new element to setList, similar to brightness, e.g.brightness_on and change payload pattern as described.
 attr DEVICE model X_01a_esp_milight_hub_rgb_cct_bulb
 
 #cct-only-bulb
@@ -1327,6 +1329,7 @@ attr DEVICE webCmd brightness:dim:command:program:mode
 attr DEVICE webCmdLabel :dim\
   :::
 attr DEVICE setStateList on off
+attr DEVICE comment To switch device also on when changing brightness, change payload pattern to {"status":"ON","$EVTPART0":"$EVTPART1"} or add a new element to setList, similar to brightness, e.g.brightness_on and change payload pattern as described.
 attr DEVICE model X_01b_esp_milight_hub_cct_only_bulb
 
 #rgbw-bulb
@@ -1365,5 +1368,6 @@ attr DEVICE webCmdLabel An:Aus\
   :Farb-Temp:Programm\
   :Sättigung:Modus
 attr DEVICE eventMap /set_white:Weiss/night_mode:Nacht/white_mode:white/on:on/off:off/ON:on/OFF:off/next_mode:Mode/mode_speed_up:Faster/mode_speed_down:Slower/level_up:Up/level_down:Down/
+attr DEVICE comment To switch device also on when changing brightness, change payload pattern to {"status":"ON","$EVTPART0":"$EVTPART1"} or add a new element to setList, similar to brightness, e.g.brightness_on and change payload pattern as described.
 attr DEVICE model X_01x_esp_milight_hub_max_features_bulb
 
