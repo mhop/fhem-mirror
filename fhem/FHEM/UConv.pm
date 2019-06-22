@@ -12,14 +12,14 @@ use POSIX;
 use utf8;
 
 use Math::Trig;
+use Math::Trig ':pi';
+use Math::Trig ':radial';
+use Math::Trig ':great_circle';
 use Scalar::Util qw(looks_like_number);
 use Time::HiRes qw(gettimeofday);
 use Time::Local;
 
 #use Data::Dumper;
-
-my $DEG = pi / 180.0;
-my $RAD = 180. / pi;
 
 sub GetSeason (;$$$);
 sub _GetSeasonPheno ($$;$$);
@@ -800,7 +800,7 @@ sub mi2km($;$) {
 }
 
 #################################
-### Angular conversions
+### Plane angle conversions
 ###
 
 # convert direction in degree to point of the compass
@@ -993,19 +993,8 @@ sub distance($$$$;$$) {
       if ( $lat1 eq $lat2 && $lng1 eq $lng2 );
 
     my $aearth = 6378.137;    # GRS80/WGS84 semi major axis of earth ellipsoid
-
-    $lat1 *= $DEG;
-    $lng1 *= $DEG;
-    $lat2 *= $DEG;
-    $lng2 *= $DEG;
-
-    my $dlat = $lat2 - $lat1;
-    my $dlng = $lng2 - $lng1;
-    my $a =
-      sin( $dlat / 2. ) * sin( $dlat / 2. ) +
-      cos($lat1) * cos($lat2) * sin( $dlng / 2. ) * sin( $dlng / 2. );
-    my $c = 2. * atan2( sqrt($a), sqrt( 1. - $a ) );
-    my $km = $aearth * $c;
+    my $km = great_circle_distance( deg2rad($lat1), pi/2. - deg2rad($lng1),
+        deg2rad($lat2), pi/2. - deg2rad($lng2), $aearth );
 
     return _round(
         (
