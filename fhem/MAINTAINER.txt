@@ -342,7 +342,6 @@ FHEM/70_VIERA.pm             teevau               Sonstiges
 FHEM/70_VolumeLink.pm        rapster              Multimedia
 FHEM/70_WINCONNECT.pm        michael.winkler      Sonstige Systeme
 FHEM/70_WS3600.pm            Josch                Sonstiges
-FHEM/70_XBMC.pm              vbs                  Multimedia
 FHEM/70_ZoneMinder.pm        delmar               Sonstige Systeme
 FHEM/71_ONKYO_AVR_ZONE.pm    delmar               Multimedia
 FHEM/71_PHILIPS_AUDIO.pm     ra666ack             Multimedia
