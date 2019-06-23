@@ -409,8 +409,9 @@ HttpUtils_Connect($)
             my $errno = unpack("I",$packed);
             if($errno) {
               HttpUtils_Close($hash);
-              my $msg = "$host: ".strerror($errno);
+              my $msg = "$host: ".strerror($errno)." ($errno)";
               Log3 $hash, $hash->{loglevel}, "HttpUtils: $msg";
+              $hash->{errno} = $errno;
               return $hash->{callback}($hash, $msg, "");
             }
 
