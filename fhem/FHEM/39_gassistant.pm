@@ -82,6 +82,7 @@ gassistant_Define($$)
     #create dummy on/off device
     CommandDefine(undef, "GoogleAssistant_dummy dummy");
     CommandAttr(undef, "GoogleAssistant_dummy alias Testlight");
+    CommandAttr(undef, "GoogleAssistant_dummy genericDeviceType light");
     CommandAttr(undef, "GoogleAssistant_dummy setList on off");
     CommandAttr(undef, "GoogleAssistant_dummy room GoogleAssistant");
   }
