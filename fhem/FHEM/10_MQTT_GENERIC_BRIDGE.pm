@@ -2128,7 +2128,7 @@ sub checkPublishDeviceReadingsUpdates($$) {
       $devreading = 'state';
     }
 
-    if(defined $devreading and defined $devval) {
+    if(defined($devreading) and defined($devval)) {
     #Log3($hash->{NAME},1,">MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] event: $event, '".((defined $devreading) ? $devreading : "-undef-")."', '".((defined $devval) ? $devval : "-undef-")."'");
       # wenn ueberwachtes device and reading
       # pruefen, ob die Aenderung von der Bridge selbst getriggert wurde   TODO TEST
@@ -2145,6 +2145,7 @@ sub checkPublishDeviceReadingsUpdates($$) {
           #       => damit verhindert, dass wert verloren geht, wenn eine endere REading dazwischenkommt
           $dev->{'.mqttGenericBridge_triggeredReading_val'} = $devval;
         }
+        #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] Notify publishDeviceUpdate: $dev, 'R', $devreading, $devval");
       publishDeviceUpdate($hash, $dev, 'R', $devreading, $devval);
       } else {
         delete $dev->{'.mqttGenericBridge_triggeredReading'};
@@ -2220,7 +2221,7 @@ sub defineGlobalTypeExclude($;$) {
 #     $valueName: Werteliste im Textformat fuer [pub:|sub:]DeviceName:reading Excludes (getrennt durch Leerzeichen).
 #       Ein einzelner Wert bedeutet, dass ein Geraet mit diesem Namen komplett ignoriert wird (also fuer alle seine Readings und jede Richtung).
 #       Durch ein Doppelpunkt getrennte Paare werden als DeviceName:Reading interptretiert. 
-#       Das Bedeutet, dass an dem gegebenen Geraet die genannte Reading nicht uebertragen wird.
+#       Das Bedeutet, dass an dem gegebenen Geraet die genannte Readings nicht uebertragen wird.
 #       Ein Stern anstatt Reading bedeutet, dass alle Readings eines Geraets ignoriert werden.
 #       Ein Stern anstatt des Geraetenamens ist nicht erlaubt (benutzen Sie in diesem Fall GlobalTypeExclude).
 #       Zusaetzlich kann auch die Richtung optional angegeben werden (pub oder sub). Dann gilt die Ausnahme entsprechend nur fuers Senden oder nur fuer Empfang.
@@ -2398,9 +2399,10 @@ sub doPublish($$$$$$$$) {
     readingsSingleUpdate($hash,"outgoing-count",$hash->{+HELPER}->{+HS_PROP_NAME_OUTGOING_CNT},1);
     return undef;
   } elsif (isIODevMQTT($hash)) { #elsif ($hash->{+HELPER}->{+IO_DEV_TYPE} eq 'MQTT') {
-    #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] doPublish for $devn, $reading, $value, topic: $topic, message: $message");
+    #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] doPublish for $device, $reading, topic: $topic, message: $message");
     my $msgid;
     if(defined($topic) and defined($message)) {
+      #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] send_publish: topic: $topic, message: $message");
       $msgid = send_publish($hash->{IODev}, topic => $topic, message => $message, qos => $qos, retain => $retain);
       readingsSingleUpdate($hash,"transmission-state","outgoing publish sent",1);
       $hash->{+HELPER}->{+HS_PROP_NAME_OUTGOING_CNT}++;
@@ -2446,12 +2448,12 @@ sub publishDeviceUpdate($$$$$) {
 
   #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] publishDeviceUpdate for $devn, $reading, $value");
   my $pubRecList = getDevicePublishRec($hash, $devn, $reading);
-  #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] publishDeviceUpdate pubRec: ".Dumper($pubRec));
+  #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] publishDeviceUpdate pubRec: ".Dumper($pubRecList));
   if(defined($pubRecList)) {
     foreach my $pubRec (@$pubRecList) {
   if(defined($pubRec)) {
     # my $msgid;
-
+        #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] publishDeviceUpdate pubRec: ".Dumper($pubRec));
     my $defMap = $pubRec->{'.defaultMap'};
 
     my $topic = $pubRec->{'topic'}; # 'normale' Readings
@@ -2523,6 +2525,7 @@ sub publishDeviceUpdate($$$$$) {
         $updated = 1 unless defined $r;
       }
     } else {
+            #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> DEBUG: publish: Topic: $topic Msg: $message");
             my $r = doPublish($hash,$devn,$reading,$topic,$message,$qos,$retain,$resendOnConnect)  if defined $topic and defined $message;
         $updated = 1 unless defined $r;
     }
@@ -2876,9 +2879,9 @@ sub onmessage($$$) {
  <ul>
  <p>
         This module is a MQTT bridge, which simultaneously collects data from several FHEM devices
-        and passes their readings via MQTT or set readings from the incoming MQTT messages or executes them
-        as a 'set' command on the configured FHEM device.
-     <br/>One fo the device types could serve as IODev: <a href="#MQTT">MQTT</a>, 
+        and passes their readings via MQTT, sets readings from incoming MQTT messages or executes incoming messages
+       as a 'set' command for the configured FHEM device.
+     <br/>One for the device types could serve as IODev: <a href="#MQTT">MQTT</a>,
      <a href="#MQTT2_CLIENT">MQTT2_CLIENT</a> or <a href="#MQTT2_SERVER">MQTT2_SERVER</a>.
  </p>
  <p>The (minimal) configuration of the bridge itself is basically very simple.</p>
@@ -2997,7 +3000,7 @@ sub onmessage($$$) {
    <li>
     <p>globalTypeExclude<br/>
         Defines (device) types and readings that should not be considered in the transmission.
-        Values can be specified separately for each direction (buplish or subscribe). Use prefixes 'pub:' and 'sub:' for this purpose.
+        Values can be specified separately for each direction (publish or subscribe). Use prefixes 'pub:' and 'sub:' for this purpose.
         A single value means that a device is completely ignored (for all its readings and both directions). 
         Colon separated pairs are interpreted as '[sub:|pub:]Type:Reading'. 
         This means that the given reading is not transmitted on all devices of the given type. 
@@ -3009,7 +3012,7 @@ sub onmessage($$$) {
    <li>
     <p>globalDeviceExclude<br/>
         Defines device names and readings that should not be transferred. 
-        Values can be specified separately for each direction (buplish or subscribe). Use prefixes 'pub:' and 'sub:' for this purpose.
+        Values can be specified separately for each direction (publish or subscribe). Use prefixes 'pub:' and 'sub:' for this purpose.
         A single value means that a device with that name is completely ignored (for all its readings and both directions).
         Colon-separated pairs are interpreted as '[sub:|pub:]Device:Reading'. 
         This means that the given reading is not transmitted to the given device.</p>
@@ -3308,9 +3311,9 @@ sub onmessage($$$) {
    </li>
    <li>
      <p>devinfo [&lt;name (regex)&gt;]<br/>
-     Gibt eine Liste der ueberwachten Geraete aus, deren Namen zu dem optionalen regulaerem Ausdruck entsprechen. 
+     Gibt eine Liste der ueberwachten Geraete aus, deren Namen dem optionalen regulaeren Ausdruck entsprechen.
      Fehlt der Ausdruck, werden alle Geraete aufgelistet. Zusaetzlich werden bei 'publish' und 'subscribe' 
-     verwendete Topics angezeigt incl. der entsprechenden Readinsnamen.</p>
+     verwendete Topics angezeigt incl. der entsprechenden Readingsnamen.</p>
    </li>
  </ul>
 
@@ -3323,7 +3326,7 @@ sub onmessage($$$) {
    </li>
    <li>
      <p>incoming-count<br/>
-     Anzahl eingehenden Nachrichten</p>
+     Anzahl eingehender Nachrichten</p>
    </li>
    <li>
      <p>outgoing-count<br/>
@@ -3392,10 +3395,10 @@ sub onmessage($$$) {
    <li>
     <p>globalTypeExclude<br/>
         Definiert (Geraete-)Typen und Readings, die nicht bei der Uebertragung beruecksichtigt werden. 
-        Werte koennen getrennt fuer jede Richtung (buplish oder subscribe) vorangestellte Prefixe 'pub:' und 'sub:' angegeben werden.
+        Werte koennen getrennt fuer jede Richtung (publish oder subscribe) vorangestellte Prefixe 'pub:' und 'sub:' angegeben werden.
         Ein einzelner Wert bedeutet, dass ein Geraet diesen Types komplett ignoriert wird (also fuer alle seine Readings und beide Richtungen).
-        Durch ein Doppelpunkt getrennte Paare werden als [sub:|pub:]Type:Reading interptretiert. 
-        Das Bedeutet, dass an dem gegebenen Type die genannte Reading nicht uebertragen wird.
+        Durch einen Doppelpunkt getrennte Paare werden als [sub:|pub:]Type:Reading interpretiert.
+        Das bedeutet, dass an dem gegebenen Type die genannte Reading nicht uebertragen wird.
         Ein Stern anstatt Type oder auch Reading bedeutet, dass alle Readings eines Geretaetyps
         bzw. genannte Readings an jedem Geraetetyp ignoriert werden. </p>
         <p>Beispiel:<br/>
@@ -3405,17 +3408,17 @@ sub onmessage($$$) {
    <li>
     <p>globalDeviceExclude<br/>
         Definiert Geraetenamen und Readings, die nicht uebertragen werden.
-        Werte koennen getrennt fuer jede Richtung (buplish oder subscribe) vorangestellte Prefixe 'pub:' und 'sub:' angegeben werden.
+        Werte koennen getrennt fuer jede Richtung (publish oder subscribe) vorangestellte Prefixe 'pub:' und 'sub:' angegeben werden.
         Ein einzelner Wert bedeutet, dass ein Geraet mit diesem Namen komplett ignoriert wird (also fuer alle seine Readings und beide Richtungen).
         Durch ein Doppelpunkt getrennte Paare werden als [sub:|pub:]Device:Reading interptretiert. 
-        Das Bedeutet, dass an dem gegebenen Geraet die genannte Reading nicht uebertragen wird.</p>
+        Das bedeutet, dass an dem gegebenen Geraet die genannte Readings nicht uebertragen wird.</p>
         <p>Beispiel:<br/>
             <code>attr &lt;dev&gt; globalDeviceExclude Test Bridge:transmission-state</code></p>
    </li>
 
    <p>Fuer die ueberwachten Geraete wird eine Liste der moeglichen Attribute automatisch um mehrere weitere Eintraege ergaenzt. 
-      Sie fangen alle mit vorher in der Bridge definiertem Prefix an. Ueber diese Attribute wird die eigentliche MQTT-Anbindung konfiguriert.<br/>
-      Defaultmaessig werden folgende Attributnamen verwendet: mqttDefaults, mqttAlias, mqttPublish, mqttSubscribe.
+      Sie fangen alle mit vorher mit dem in der Bridge definiertem Prefix an. Ueber diese Attribute wird die eigentliche MQTT-Anbindung konfiguriert.<br/>
+      Als Standardwert werden folgende Attributnamen verwendet: mqttDefaults, mqttAlias, mqttPublish, mqttSubscribe.
       <br/>Die Bedeutung dieser Attribute wird im Folgenden erklaert.
     </p>
 
@@ -3461,7 +3464,7 @@ sub onmessage($$$) {
   
     <li>
         <p><a name="MQTT_GENERIC_BRIDGEmqttPublish">mqttPublish</a><br/>
-            Hier werden konkrette Topics definiet und den Readings zugeordnet (Format: &lt;reading&gt;:topic=&lt;topic&gt;). 
+            Hier werden konkrete Topics definiert und den Readings zugeordnet (Format: &lt;reading&gt;:topic=&lt;topic&gt;). 
             Weiterhin koennen diese einzeln mit 'qos'- und 'retain'-Flags versehen werden. <br/>
             Topics koennen auch als Perl-Expression mit Variablen definiert werden ($reading, $device, $name, $base).<br/>
             'topic' kann auch als 'readings-topic' geschrieben werden.<br/>
@@ -3473,19 +3476,19 @@ sub onmessage($$$) {
             Sollten fuer ein Event mehrere Nachrichten (sinnvollerweise an verschiedene Topics) versendet werden, muessen jeweilige Definitionen durch Anhaengen von
             einmaligen Suffixen (getrennt von dem Readingnamen durch ein !-Zeichen) unterschieden werden: reading!1:topic=... reading!2:topic=....<br/>
             Weiterhin koennen auch Expressions (reading:expression=...) definiert werden. <br/>
-            Die Expressions koenne sinnvollerweise entweder Variablen ($value, $topic, $qos, $retain, $message, $uid) veraendern, oder einen Wert != undef zurrueckgeben.<br/>
+            Die Expressions koennen sinnvollerweise entweder Variablen ($value, $topic, $qos, $retain, $message, $uid) veraendern, oder einen Wert != undef zurrueckgeben.<br/>
             Der Rueckhgabe wert wird als neue Nachricht-Value verwendet, die Aenderung der Variablen hat dabei jedoch Vorrang.<br/>
             Ist der Rueckgabewert undef, dann wird das Setzen/Ausfuehren unterbunden. <br/>
             Ist die Rueckgabe ein Hash (nur 'topic'), werden seine Schluesselwerte als Topic verwendet, 
             die Inhalte der Nachrichten sind entsprechend die Werte aus dem Hash.</p>
             <p>Option 'resendOnConnect' erlaubt eine Speicherung der Nachrichten, 
             wenn keine Verbindung zu dem MQTT-Server besteht.
-            Die zu sendende Nachrichten in einer Warteschlange gespeichet. 
+            Die zu sendende Nachrichten werden in einer Warteschlange gespeichert. 
             Wird die Verbindung aufgebaut, werden die Nachrichten in der ursprungichen Reihenfolge verschickt.
             <ul>Moegliche Werte: 
               <li>none<br/>alle verwerfen</li>
               <li>last<br/>immer nur die letzte Nachricht speichern</li>
-              <li>first<br/>immer nur die erste Nachricht speichern danach folgende verwerfen</li>
+              <li>first<br/>immer nur die erste Nachricht speichern, danach folgende verwerfen</li>
               <li>all<br/>alle speichern, allerdings existiert eine Obergrenze von 100, 
               wird es mehr, werden aelteste ueberzaelige Nachrichten verworfen.</li>
             </ul>
@@ -3511,23 +3514,23 @@ sub onmessage($$$) {
             Aufrufe von 'set'-Befehl an dem Geraet ('stopic' oder 'set-topic') definiert werden. <br/>
             Ebenso koennen auch Attribute gesetzt werden ('atopic' oder 'attr-topic').</br>
             Mit Hilfe von zusaetzlichen auszufuehrenden Perl-Expressions ('expression') kann das Ergebnis vor dem Setzen/Ausfueren noch beeinflusst werden.<br/>
-            In der Expression sind folgende Variablen verfuegbar: $device, $reading, $message (initial gleich $value).
-            Die Expression kann dabei entweder Variable $value veraendern, oder einen Wert != undef zurueckgeben. Redefinition der Variable hat Vorrang.
+            In der Expression sind die folgenden Variablen verfuegbar: $device, $reading, $message (initial gleich $value).
+            Die Expression kann dabei entweder die Variable $value veraendern, oder einen Wert != undef zurueckgeben. Redefinition der Variable hat Vorrang.
             Ist der Rueckgabewert undef, dann wird das Setzen/Ausfuehren unterbunden (es sei denn, $value hat einen neuen Wert). <br/>
             Ist die Rueckgabe ein Hash (nur fuer 'topic' und 'stopic'), dann werden seine Schluesselwerte als Readingsnamen bzw. 'set'-Parameter verwendet, 
-            die zu setzenden Werte sind entsprechend die Werte aus dem Hash.<br/>
+            die zu setzenden Werte sind entsprechend den Werten aus dem Hash.<br/>
             Weiterhin kann das Attribut 'qos' angegeben werden ('retain' macht dagegen keinen Sinn).<br/>
             In der Topic-Definition koennen MQTT-Wildcards (+ und #) verwendet werden. <br/>
             Falls der Reading-Name mit einem '*'-Zeichen am Anfang definiert wird, gilt dieser als 'Platzhalter'.
             Mehrere Definitionen mit '*' sollten somit z.B. in folgender Form verwendet werden: *1:topic=... *2:topic=...
-            Der tatsaechliche Name der Reading (und ggf. des Geraetes) wird dabei durch Variablen aus dem Topic 
+            Der tatsaechliche Name des Readings (und ggf. des Geraetes) wird dabei durch Variablen aus dem Topic 
             definiert ($device (nur fuer globale Definition in der Bridge), $reading, $name).
-            Im Topic wirken diese Variablen als Wildcards, macht natuerlich nur Sinn, wenn Reading-Name auch nicht fest definiert ist 
+            Im Topic wirken diese Variablen als Wildcards, nur sinnvoll wenn Reading-Name auch nicht fest definiert ist 
             (also faengt mit '*' an, oder mehrere Namen durch '|' getrennt definiert werden).  <br/>
-            Die Variable $name wird im Unterschied zu $reading ggf. ueber die in 'mqttAlias' definierten Aliases beeinflusst.
+            Die Variable $name wird im Unterschied zu $reading ggf. ueber die in 'mqttAlias' definierten Aliase beeinflusst.
             Auch Verwendung von $base ist erlaubt.<br/>
-            Bei Verwendung von 'stopic' wird das 'set'-Befehl als 'set &lt;dev&gt; &lt;reading&gt; &lt;value&gt;' ausgefuert.
-            Fuer ein 'set &lt;dev&gt; &lt;value&gt;' soll als Reading-Name 'state' verwendet werden.</p>
+            Bei Verwendung von 'stopic' wird das 'set'-Befehl als 'set &lt;dev&gt; &lt;reading&gt; &lt;value&gt;' ausgefuehrt.
+            Fuer 'set &lt;dev&gt; &lt;value&gt;' soll als Reading-Name 'state' verwendet werden.</p>
             <p>Die oft angefragte JSON-Unterst&uuml;tzung kann einfach mit Hilfe von 'expression' realisiert werden.
             Daf&uuml;r eignet sich eine in fhem.pl bereits vorhandene Methode: json2nameValue. Als Parameter soll $message verwendet werden.</p>
             <p>Beispiele:<br/>
@@ -3544,7 +3547,7 @@ sub onmessage($$$) {
 
     <li>
         <p><a name="MQTT_GENERIC_BRIDGEmqttForward">mqttForward</a><br/>
-            Dieses Attribut definiert was passiert, wenn eine und dieselbe Reading sowohl aboniert als auch gepublisht wird. 
+            Dieses Attribut definiert was passiert, wenn eine und dasselbe Reading sowohl aboniert als auch gepublisht wird. 
             Moegliche Werte: 'all' und 'none'. <br/>
             Bei 'none' werden per MQTT angekommene Nachrichten nicht aus dem selben Gerät per MQTT weiter gesendet.<br/>
             Die Einstellung 'all' bewirkt das Gegenteil, also damit wird das Weiterleiten ermoeglicht.<br/>
@@ -3604,7 +3607,7 @@ sub onmessage($$$) {
     </li>
      
     <li>
-        <p>Topicsdefinition mit Auslagerung von dem gemeinsamen Teilnamen in 'base'-Variable:<br/>
+        <p>Topic-Definition mit Auslagerung des gemeinsamen Teilnamens in 'base'-Variable:<br/>
             <code>defmod sensor XXX<br/>
                 attr sensor mqttDefaults base={"/$device/$reading"}<br/>
                 attr sensor mqttPublish *:topic={"$base"}</code></p>
@@ -3612,7 +3615,7 @@ sub onmessage($$$) {
     </li>
 
     <li>
-        <p>Topicsdefinition nur fuer bestimmte Readings mit deren gleichzeitigen Umbennenung (Alias):<br/>
+        <p>Topic-Definition nur fuer bestimmte Readings mit deren gleichzeitigen Umbennenung (Alias):<br/>
             <code>defmod sensor XXX<br/>
                 attr sensor mqttAlias temperature=temp humidity=hum<br/>
                 attr sensor mqttDefaults base={"/$device/$name"}<br/>
@@ -3621,7 +3624,7 @@ sub onmessage($$$) {
     </li>
 
     <li>
-        <p>Beispiel fuer eine zentralle Konfiguration in der Bridge fuer alle Devices, die Reading 'temperature' besitzen:<br/>
+        <p>Beispiel fuer eine zentrale Konfiguration in der Bridge fuer alle Devices, die Reading 'temperature' besitzen:<br/>
             <code>defmod mqttGeneric MQTT_GENERIC_BRIDGE <br/>
                 attr mqttGeneric IODev mqtt <br/>
                 attr mqttGeneric defaults sub:qos=2 pub:qos=0 retain=0 <br/>
@@ -3631,8 +3634,8 @@ sub onmessage($$$) {
     </li>
 
     <li>
-        <p>Beispiel fuer eine zentralle Konfiguration in der Bridge fuer alle Devices <br/>
-                (wegen einer schlechte uebersicht und einer unnoetig grossen Menge eher nicht zu empfehlen):<br/>
+        <p>Beispiel fuer eine zentrale Konfiguration in der Bridge fuer alle Devices <br/>
+                (wegen einer schlechten Uebersicht und einer unnoetig grossen Menge eher nicht zu empfehlen):<br/>
             <code>defmod mqttGeneric MQTT_GENERIC_BRIDGE <br/>
                 attr mqttGeneric IODev mqtt <br/>
                 attr mqttGeneric defaults sub:qos=2 pub:qos=0 retain=0 <br/>
@@ -3644,11 +3647,11 @@ sub onmessage($$$) {
 <p><b>Einschraenkungen:</b></p>
 
 <ul>
-      <li>Wenn mehrere Readings das selbe Topic abonieren, sind dabei keine unterschiedlichen QOS moeglich.</li>
+      <li>Wenn mehrere Readings das selbe Topic abonnieren, sind dabei keine unterschiedlichen QOS moeglich.</li>
       <li>Wird in so einem Fall QOS ungleich 0 benoetigt, sollte dieser entweder fuer alle Readings gleich einzeln definiert werden,
-      oder allgemeinguetltig ueber Defaults. <br/>
-      Ansonsten wird beim Erstellen von Abonements der erst gefundene Wert verwendet. </li>
-      <li>Abonements werden nur erneuert, wenn sich das Topic aendert, QOS-Flag-Aenderung alleine wirkt sich daher erst nach einem Neustart aus.</li>
+      oder allgemeingueltig ueber Defaults. <br/>
+      Ansonsten wird beim Erstellen von Abonnements der erst gefundene Wert verwendet. </li>
+      <li>Abonnements werden nur erneuert, wenn sich das Topic aendert; QOS-Flag-Aenderung alleine wirkt sich daher erst nach einem Neustart aus.</li>
 </ul>
 
 <!--TODO-->
