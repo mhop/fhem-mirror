@@ -1770,8 +1770,9 @@ SVG_render($$$$$$$$$$)
 
     my $scale = "y".($axis)."scale"; $scale = "yscale" if( $axis == 1 );
     my $log = ""; $log = $conf{$scale} if( $conf{$scale} );
-    my $f_log = int($hmax{$a}) ? ((SVG_log10($hmax{$a})-SVG_log10($hmin{$a})) /
-                        ($hmax{$a}-$hmin{$a})) : 1;
+    my $f_log = (int($hmax{$a}) && $dh > 0) ? 
+                    ((SVG_log10($hmax{$a})-SVG_log10($hmin{$a})) / $dh) :
+                    1;
 
     # offsets
     my ($align,$display,$cll);
