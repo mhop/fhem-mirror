@@ -48,8 +48,8 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
-  "8.14.1" => "23.06.2019  Presets and Patrols containing spaces in its names are replaced by \"_\", deletion of Presets corrected ",.
-                           "bugfix userattr when changing Prests",
+  "8.14.1" => "23.06.2019  Presets and Patrols containing spaces in its names are replaced by \"_\", deletion of Presets corrected ".
+                           "bugfix userattr when changing Prests ",
   "8.14.0" => "01.06.2019  Link to Cam/SVS-Setup Screen and online help in Detailview ",
   "8.13.6" => "26.05.2019  enhanced log entries of snapinfos with debugactivetoken ",
   "8.13.5" => "23.05.2019  StmKey quoted depending on attr noQuotesForSID (Forum: https://forum.fhem.de/index.php/topic,45671.msg938236.html#msg938236), ".
