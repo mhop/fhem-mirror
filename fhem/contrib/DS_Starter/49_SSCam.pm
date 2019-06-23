@@ -7023,8 +7023,7 @@ sub SSCam_addptzattr($) {
       my @h;
       my $arg = "ptzPanel_Home";
       my @ua  = split(" ", $attr{$name}{userattr});
-      foreach (@ua) {
-          Log3($name, 1, "$name - key: ".$_); 
+      foreach (@ua) { 
           push(@h,$_) if($_ !~ m/$arg.*/);
       }
          
