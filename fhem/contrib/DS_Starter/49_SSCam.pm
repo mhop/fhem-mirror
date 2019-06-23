@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 49_SSCam.pm 19470 2019-05-26 20:37:39Z DS_Starter $
+# $Id: 49_SSCam.pm 19552 2019-06-04 21:13:25Z DS_Starter $
 #########################################################################################################################
 #       49_SSCam.pm
 #
@@ -48,6 +48,8 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.14.1" => "23.06.2019  Presets and Patrols containing spaces in its names are replaced by \"_\", deletion of Presets corrected ",.
+                           "bugfix userattr when changing Prests",
   "8.14.0" => "01.06.2019  Link to Cam/SVS-Setup Screen and online help in Detailview ",
   "8.13.6" => "26.05.2019  enhanced log entries of snapinfos with debugactivetoken ",
   "8.13.5" => "23.05.2019  StmKey quoted depending on attr noQuotesForSID (Forum: https://forum.fhem.de/index.php/topic,45671.msg938236.html#msg938236), ".
@@ -150,7 +152,7 @@ our %SSCam_vNotesIntern = (
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
-  "8.14.0" => "01.06.2019 In detailview now there are buttons to open the camera setup screen or Synology Surveillance Station and the Synology Surveillance Station online help. ",
+  "8.14.0" => "01.06.2019 In detailview are buttons provided to open the camera native setup screen or Synology Surveillance Station and the Synology Surveillance Station online help. ",
   "8.12.0" => "25.03.2019 Delay FHEM shutdown as long as sessions are not terminated, but not longer than global attribute \"maxShutdownDelay\". ",
   "8.11.0" => "25.02.2019 compatibility set to SVS version 8.2.3, Popup possible for streaming devices of type \"generic\", ".
               "support for \"genericStrmHtmlTag\" in streaming devices ",
@@ -5238,8 +5240,9 @@ sub SSCam_camop_parse ($) {
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
                 
-                my $dp = $hash->{HELPER}{DELPRESETNAME};               
-                Log3($name, 3, "$name - Preset \"$dp\" of camera \"$camname\" was deleted successfully");
+                my $dp = $hash->{HELPER}{DELPRESETNAME};
+                delete $hash->{HELPER}{ALLPRESETS}{$dp};                
+                Log3($name, 3, "$name - Preset \"$dp\" of camera \"$camname\" has been deleted");
                 SSCam_getptzlistpreset($hash);
             
 			} elsif ($OpMode eq "piract") {              
@@ -6227,11 +6230,13 @@ sub SSCam_camop_parse ($) {
                 my $cnt = 0;
          
                 # alle Presets der Kamera mit Id's in Assoziatives Array einlesen
+                delete $hash->{HELPER}{ALLPRESETS};                                      # besetehende Presets löschen und neu einlesen
                 my $home = "not set";
                 while ($cnt < $presetcnt) {
                     # my $presid = $data->{'data'}->{'presets'}->[$cnt]->{'id'};
                     my $presid   = $data->{'data'}->{'presets'}->[$cnt]->{'position'};
                     my $presname = $data->{'data'}->{'presets'}->[$cnt]->{'name'};
+                    $presname    =~ s/\s+/_/g;                                           # Leerzeichen im Namen ersetzen falls vorhanden  
                     $hash->{HELPER}{ALLPRESETS}{$presname} = "$presid";
                     my $ptype = $data->{'data'}->{'presets'}->[$cnt]->{'type'};
                     if ($ptype) {
@@ -6265,6 +6270,7 @@ sub SSCam_camop_parse ($) {
                 while ($cnt < $patrolcnt) {
                     $patrolid = $data->{'data'}->{'patrols'}->[$cnt]->{'id'};
                     $patrolname = $data->{'data'}->{'patrols'}->[$cnt]->{'name'};
+                    $patrolname =~ s/\s+/_/g;                                            # Leerzeichen im Namen ersetzen falls vorhanden
                     $hash->{HELPER}{ALLPATROLS}{$patrolname} = $patrolid;
                     $cnt += 1;
                 }
@@ -7011,10 +7017,19 @@ sub SSCam_addptzattr($) {
       $n = sprintf("%2.2d",$n);
       addToDevAttrList($name, "ptzPanel_row$n");
   }
-  if(ReadingsVal("$name","Presets","") ne "") {
-      $attr{$name}{userattr} =~ s/ptzPanel_Home:$hash->{HELPER}{OLDPRESETS}//g if($hash->{HELPER}{OLDPRESETS} && ReadingsVal("$name","Presets","") ne $hash->{HELPER}{OLDPRESETS});
-      $hash->{HELPER}{OLDPRESETS} = ReadingsVal("$name","Presets","");
-      addToDevAttrList($name, "ptzPanel_Home:".ReadingsVal("$name","Presets",""));
+  
+  my $p = ReadingsVal("$name","Presets","");
+  if($p ne "") {
+      my @h;
+      my $arg = "ptzPanel_Home";
+      my @ua  = split(" ", $attr{$name}{userattr});
+      foreach (@ua) {
+          Log3($name, 1, "$name - key: ".$_); 
+          push(@h,$_) if($_ !~ m/$arg.*/);
+      }
+         
+      $attr{$name}{userattr} = join(' ',@h);
+      addToDevAttrList($name, "ptzPanel_Home:".$p);
   }
   addToDevAttrList($name, "ptzPanel_iconPrefix");
   addToDevAttrList($name, "ptzPanel_iconPath");
@@ -8938,12 +8953,12 @@ sub SSCam_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 49_SSCam.pm 19470 2019-05-26 20:37:39Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 49_SSCam.pm 19552 2019-06-04 21:13:25Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCam.pm 19470 2019-05-26 20:37:39Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCam.pm 19552 2019-06-04 21:13:25Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
