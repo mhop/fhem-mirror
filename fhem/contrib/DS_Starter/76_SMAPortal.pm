@@ -161,6 +161,7 @@ use vars qw($FW_ME);                                    # webname (default is fh
 
 # Versions History intern
 our %vNotesIntern = (
+  "2.3.7"  => "24.06.2019  replace suggestIcon by consumerAdviceIcon ",
   "2.3.6"  => "21.06.2019  revise commandref ",                        
   "2.3.5"  => "20.06.2019  subroutine consinject added to pv, pvco style ",
   "2.3.4"  => "19.06.2019  change some readingnames, delete L4_plantOid, next04hours_state ",
@@ -338,7 +339,7 @@ sub Set($@) {
       # alle Werte enstprechen eh den AttrVal/ AttrNum default Werten
       
       CommandAttr($hash->{CL},"$htmldev hourCount 24");
-      CommandAttr($hash->{CL},"$htmldev suggestIcon on");
+      CommandAttr($hash->{CL},"$htmldev consumerAdviceIcon on");
       CommandAttr($hash->{CL},"$htmldev showHeader 1");
       CommandAttr($hash->{CL},"$htmldev showLink 1");
       CommandAttr($hash->{CL},"$htmldev spaceSize 24");
@@ -1899,29 +1900,29 @@ sub PortalAsHtml ($$) {
   }
 
   # Parameter f. Anzeige extrahieren
-  $maxhours   =  AttrNum($wlname, 'hourCount',        24);
-  $hourstyle  =  AttrVal($wlname, 'hourStyle',     undef);
-  $colorv     =  AttrVal($wlname, 'beamColor',     undef);
-  $colorc     =  AttrVal($wlname, 'beamColor2', '000000');                              # schwarz wenn keine Userauswahl;
-  $icon       =  AttrVal($wlname, 'suggestIcon',   undef);
-  $html_start =  AttrVal($wlname, 'htmlStart',     undef);                              # beliebige HTML Strings die vor der Grafik ausgegeben werden
-  $html_end   =  AttrVal($wlname, 'htmlEnd',       undef);                              # beliebige HTML Strings die nach der Grafik ausgegeben werden
+  $maxhours   =  AttrNum($wlname, 'hourCount',             24);
+  $hourstyle  =  AttrVal($wlname, 'hourStyle',          undef);
+  $colorv     =  AttrVal($wlname, 'beamColor',          undef);
+  $colorc     =  AttrVal($wlname, 'beamColor2',      '000000');                         # schwarz wenn keine Userauswahl;
+  $icon       =  AttrVal($wlname, 'consumerAdviceIcon', undef);
+  $html_start =  AttrVal($wlname, 'htmlStart',          undef);                         # beliebige HTML Strings die vor der Grafik ausgegeben werden
+  $html_end   =  AttrVal($wlname, 'htmlEnd',            undef);                         # beliebige HTML Strings die nach der Grafik ausgegeben werden
 
-  $type       =  AttrVal($wlname, 'layoutType',     'pv');
-  $kw         =  AttrVal($wlname, 'Wh/kWh',         'Wh');
+  $type       =  AttrVal($wlname, 'layoutType',          'pv');
+  $kw         =  AttrVal($wlname, 'Wh/kWh',              'Wh');
 
-  $height     =  AttrNum($wlname, 'beamHeight',      200);
-  $width      =  AttrNum($wlname, 'beamWidth',         6);                              # zu klein ist nicht problematisch
+  $height     =  AttrNum($wlname, 'beamHeight',           200);
+  $width      =  AttrNum($wlname, 'beamWidth',              6);                         # zu klein ist nicht problematisch
   $w          =  $width*$maxhours;                                                      # gesammte Breite der Ausgabe , WetterIcon braucht ca. 34px
-  $fsize      =  AttrNum($wlname, 'spaceSize',        24);
-  $maxVal     =  AttrNum($wlname, 'maxPV',             0);                              # dyn. Anpassung der Balkenhöhe oder statisch ?
+  $fsize      =  AttrNum($wlname, 'spaceSize',             24);
+  $maxVal     =  AttrNum($wlname, 'maxPV',                  0);                         # dyn. Anpassung der Balkenhöhe oder statisch ?
 
-  $show_night =  AttrNum($wlname, 'showNight',         0);                              # alle Balken (Spalten) anzeigen ?
-  $show_diff  =  AttrVal($wlname, 'showDiff',       'no');                              # zusätzliche Anzeige $di{} in allen Typen
-  $weather    =  AttrNum($wlname, 'showWeather',       1);
-  $colorw     =  AttrVal($wlname, 'weatherColor',  undef);
+  $show_night =  AttrNum($wlname, 'showNight',              0);                         # alle Balken (Spalten) anzeigen ?
+  $show_diff  =  AttrVal($wlname, 'showDiff',            'no');                         # zusätzliche Anzeige $di{} in allen Typen
+  $weather    =  AttrNum($wlname, 'showWeather',            1);
+  $colorw     =  AttrVal($wlname, 'weatherColor',       undef);
 
-  $wlalias    =  AttrVal($wlname, 'alias',       $wlname);
+  $wlalias    =  AttrVal($wlname, 'alias',            $wlname);
   $header     = (AttrNum($wlname, 'showHeader', 1)) ? 1 : undef; 
 
   # Icon Erstellung, mit @<Farbe> ergänzen falls einfärben
