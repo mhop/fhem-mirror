@@ -2308,13 +2308,14 @@ sub Update($@) {
 #
 # FormatReading - Convert a reading into text format
 #
-#  Parameter r = reading name, h = parameter hash, locale = locale string
+#  Parameter r = reading name, h = parameter hash, locale = locale string, val = optional value
 #
 ########################################################################################################
 
-sub FormatReading($$;$) {
-  my ( $r, $h, $lc_numeric ) = @_;
+sub FormatReading($$;$$) {
+  my ( $r, $h, $lc_numeric, $val ) = @_;
   my $ret;
+  $val = $Astro{$r} unless ( defined($val) );
 
   my $f = "%s";
 
@@ -2345,7 +2346,7 @@ sub FormatReading($$;$) {
   $f = "%.0f"  if ( $r eq "SunDistanceObserver" );
   $f = "%2.1f" if ( $r eq "SunLon" );
 
-  $ret = sprintf( $f, $Astro{$r} );
+  $ret = $val ne "" ? sprintf( $f, $val ) : "";
   $ret = UConv::decimal_mark( $ret, $lc_numeric )
     unless ( $h && ref($h) && defined( $h->{html} ) && $h->{html} eq "0" );
 
@@ -2388,81 +2389,86 @@ sub FormatReading($$;$) {
 
     #-- add text if desired
     if ( $h->{long} ) {
-      $ret = $tt->{"twilightastro"} . " " . $ret
+      my $sep = " ";
+      $sep = ": "
+        if ( $h->{long} > 1. && ( $h->{long} < 4. || $r !~ /^Sun|Moon/ ) );
+      $sep = "" if ($ret eq "");
+
+      $ret = $tt->{"twilightastro"} . $sep . $ret
         if ( $r eq "AstroTwilightEvening" );
-      $ret = $tt->{"twilightastro"} . " " . $ret
+      $ret = $tt->{"twilightastro"} . $sep . $ret
         if ( $r eq "AstroTwilightMorning" );
-      $ret = $tt->{"twilightcivil"} . " " . $ret
+      $ret = $tt->{"twilightcivil"} . $sep . $ret
         if ( $r eq "CivilTwilightEvening" );
-      $ret = $tt->{"twilightcivil"} . " " . $ret
+      $ret = $tt->{"twilightcivil"} . $sep . $ret
         if ( $r eq "CivilTwilightMorning" );
-      $ret = $tt->{"twilightcustom"} . " " . $ret
+      $ret = $tt->{"twilightcustom"} . $sep . $ret
         if ( $r eq "CustomTwilightEvening" );
-      $ret = $tt->{"twilightcustom"} . " " . $ret
+      $ret = $tt->{"twilightcustom"} . $sep . $ret
         if ( $r eq "CustomTwilightMorning" );
-      $ret = $tt->{"age"} . " " . $ret      if ( $r eq "MoonAge" );
-      $ret = $tt->{"alt"} . " " . $ret      if ( $r eq "MoonAlt" );
-      $ret = $tt->{"az"} . " " . $ret       if ( $r eq "MoonAz" );
-      $ret = $tt->{"dec"} . " " . $ret      if ( $r eq "MoonDec" );
-      $ret = $tt->{"diameter"} . " " . $ret if ( $r eq "MoonDiameter" );
-      $ret = $ret . " " . $tt->{"toce"}
+      $ret = $tt->{"age"} . $sep . $ret      if ( $r eq "MoonAge" );
+      $ret = $tt->{"alt"} . $sep . $ret      if ( $r eq "MoonAlt" );
+      $ret = $tt->{"az"} . $sep . $ret       if ( $r eq "MoonAz" );
+      $ret = $tt->{"dec"} . $sep . $ret      if ( $r eq "MoonDec" );
+      $ret = $tt->{"diameter"} . $sep . $ret if ( $r eq "MoonDiameter" );
+      $ret = $ret . $sep . $tt->{"toce"}
         if ( $r eq "MoonDistance" );
-      $ret = $ret . " " . $tt->{"toobs"}
+      $ret = $ret . $sep . $tt->{"toobs"}
         if ( $r eq "MoonDistanceObserver" );
-      $ret = $tt->{"hoursofvisibility"} . " " . $ret
+      $ret = $tt->{"hoursofvisibility"} . $sep . $ret
         if ( $r eq "MoonHrsVisible" );
-      $ret = $tt->{"latecl"} . " " . $ret  if ( $r eq "MoonLat" );
-      $ret = $tt->{"lonecl"} . " " . $ret  if ( $r eq "MoonLon" );
-      $ret = $tt->{"phase"} . " " . $ret   if ( $r eq "MoonPhaseN" );
-      $ret = $tt->{"phase"} . " " . $ret   if ( $r eq "MoonPhaseS" );
-      $ret = $tt->{"ra"} . " " . $ret      if ( $r eq "MoonRa" );
-      $ret = $tt->{"rise"} . " " . $ret    if ( $r eq "MoonRise" );
-      $ret = $tt->{"set"} . " " . $ret     if ( $r eq "MoonSet" );
-      $ret = $tt->{"sign"} . " " . $ret    if ( $r eq "MoonSign" );
-      $ret = $tt->{"transit"} . " " . $ret if ( $r eq "MoonTransit" );
-      $ret = $tt->{"twilightnautic"} . " " . $ret
+      $ret = $tt->{"latecl"} . $sep . $ret  if ( $r eq "MoonLat" );
+      $ret = $tt->{"lonecl"} . $sep . $ret  if ( $r eq "MoonLon" );
+      $ret = $tt->{"phase"} . $sep . $ret   if ( $r eq "MoonPhaseN" );
+      $ret = $tt->{"phase"} . $sep . $ret   if ( $r eq "MoonPhaseS" );
+      $ret = $tt->{"ra"} . $sep . $ret      if ( $r eq "MoonRa" );
+      $ret = $tt->{"rise"} . $sep . $ret    if ( $r eq "MoonRise" );
+      $ret = $tt->{"set"} . $sep . $ret     if ( $r eq "MoonSet" );
+      $ret = $tt->{"sign"} . $sep . $ret    if ( $r eq "MoonSign" );
+      $ret = $tt->{"transit"} . $sep . $ret if ( $r eq "MoonTransit" );
+      $ret = $tt->{"twilightnautic"} . $sep . $ret
         if ( $r eq "NauticTwilightEvening" );
-      $ret = $tt->{"twilightnautic"} . " " . $ret
+      $ret = $tt->{"twilightnautic"} . $sep . $ret
         if ( $r eq "NauticTwilightMorning" );
-      $ret = $ret . " " . $tt->{"altitude"}  if ( $r eq "ObsAlt" );
-      $ret = $tt->{"date"} . " " . $ret      if ( $r eq "ObsDate" );
-      $ret = $ret . " " . $tt->{"dayofyear"} if ( $r eq "ObsDayofyear" );
-      $ret = $tt->{"alt"} . " " . $ret       if ( $r eq "ObsHorEvening" );
-      $ret = $tt->{"alt"} . " " . $ret       if ( $r eq "ObsHorMorning" );
+      $ret = $ret . $sep . $tt->{"altitude"}  if ( $r eq "ObsAlt" );
+      $ret = $tt->{"date"} . $sep . $ret      if ( $r eq "ObsDate" );
+      $ret = $ret . $sep . $tt->{"dayofyear"} if ( $r eq "ObsDayofyear" );
+      $ret = $tt->{"alt"} . $sep . $ret       if ( $r eq "ObsHorEvening" );
+      $ret = $tt->{"alt"} . $sep . $ret       if ( $r eq "ObsHorMorning" );
       $ret = ( $Astro{$r} == 1. ? $tt->{"dst"} : $tt->{"nt"} )
         if ( $r eq "ObsIsDST" );
-      $ret = $tt->{"jdate"} . " " . $ret     if ( $r eq "ObsJD" );
-      $ret = $tt->{"lmst"} . " " . $ret      if ( $r eq "ObsLMST" );
-      $ret = $ret . " " . $tt->{"latitude"}  if ( $r eq "ObsLat" );
-      $ret = $ret . " " . $tt->{"longitude"} if ( $r eq "ObsLon" );
-      $ret = $tt->{"season"} . " " . $ret    if ( $r eq "ObsSeason" );
-      $ret = $tt->{"time"} . " " . $ret      if ( $r eq "ObsTime" );
-      $ret = $tt->{"timezone"} . " " . $ret  if ( $r eq "ObsTimezone" );
-      $ret = $tt->{"alt"} . " " . $ret       if ( $r eq "SunAlt" );
-      $ret = $tt->{"az"} . " " . $ret        if ( $r eq "SunAz" );
-      $ret = $tt->{"dec"} . " " . $ret       if ( $r eq "SunDec" );
-      $ret = $tt->{"diameter"} . " " . $ret  if ( $r eq "SunDiameter" );
-      $ret = $ret . " " . $tt->{"toce"}
+      $ret = $tt->{"jdate"} . $sep . $ret     if ( $r eq "ObsJD" );
+      $ret = $tt->{"lmst"} . $sep . $ret      if ( $r eq "ObsLMST" );
+      $ret = $ret . $sep . $tt->{"latitude"}  if ( $r eq "ObsLat" );
+      $ret = $ret . $sep . $tt->{"longitude"} if ( $r eq "ObsLon" );
+      $ret = $tt->{"season"} . $sep . $ret    if ( $r eq "ObsSeason" );
+      $ret = $tt->{"time"} . $sep . $ret      if ( $r eq "ObsTime" );
+      $ret = $tt->{"timezone"} . $sep . $ret  if ( $r eq "ObsTimezone" );
+      $ret = $tt->{"alt"} . $sep . $ret       if ( $r eq "SunAlt" );
+      $ret = $tt->{"az"} . $sep . $ret        if ( $r eq "SunAz" );
+      $ret = $tt->{"dec"} . $sep . $ret       if ( $r eq "SunDec" );
+      $ret = $tt->{"diameter"} . $sep . $ret  if ( $r eq "SunDiameter" );
+      $ret = $ret . $sep . $tt->{"toce"}
         if ( $r eq "SunDistance" );
-      $ret = $ret . " " . $tt->{"toobs"}
+      $ret = $ret . $sep . $tt->{"toobs"}
         if ( $r eq "SunDistanceObserver" );
-      $ret = $tt->{"hoursofnight"} . " " . $ret
+      $ret = $tt->{"hoursofnight"} . $sep . $ret
         if ( $r eq "SunHrsInvisible" );
-      $ret = $tt->{"hoursofsunlight"} . " " . $ret
+      $ret = $tt->{"hoursofsunlight"} . $sep . $ret
         if ( $r eq "SunHrsVisible" );
-      $ret = $tt->{"lonecl"} . " " . $ret  if ( $r eq "SunLon" );
-      $ret = $tt->{"ra"} . " " . $ret      if ( $r eq "SunRa" );
-      $ret = $tt->{"rise"} . " " . $ret    if ( $r eq "SunRise" );
-      $ret = $tt->{"set"} . " " . $ret     if ( $r eq "SunSet" );
-      $ret = $tt->{"sign"} . " " . $ret    if ( $r eq "SunSign" );
-      $ret = $tt->{"transit"} . " " . $ret if ( $r eq "SunTransit" );
+      $ret = $tt->{"lonecl"} . $sep . $ret  if ( $r eq "SunLon" );
+      $ret = $tt->{"ra"} . $sep . $ret      if ( $r eq "SunRa" );
+      $ret = $tt->{"rise"} . $sep . $ret    if ( $r eq "SunRise" );
+      $ret = $tt->{"set"} . $sep . $ret     if ( $r eq "SunSet" );
+      $ret = $tt->{"sign"} . $sep . $ret    if ( $r eq "SunSign" );
+      $ret = $tt->{"transit"} . $sep . $ret if ( $r eq "SunTransit" );
 
       #-- add prefix for Sun/Moon if desired
-      if ( $h->{long} > 1. && $r =~ /^Sun|Moon/ ) {
+      if ( $h->{long} > 2. && $r =~ /^Sun|Moon/ ) {
         $ret = " " . $ret;
 
         #-- add a separator after prefix if desired
-        $ret = ":" . $ret if ( $h->{long} > 2. );
+        $ret = ":" . $ret if ( $h->{long} > 3. );
 
         $ret = $tt->{"sun"} . $ret
           if ( $r =~ /^Sun/ );
@@ -2674,7 +2680,7 @@ sub Get($@) {
       $ret = "<html>" . $ret . "</html>" if (defined($html) && $html ne "0");
     }
     else {
-      $h->{long} = 1;
+      $h->{long} = 1 unless ( defined( $h->{long} ) );
 
       $ret = FormatReading( "ObsDate", $h, $lc_numeric ) . " " . $Astro{ObsTime};
       $ret .= (
@@ -2867,8 +2873,9 @@ sub Get($@) {
                       <ul>
                       <li><i>unit=1</i> = Will add a unit to numerical values. Depending on attribute lc_numeric, the decimal separator will be in regional format as well.</li>
                       <li><i>long=1</i> = A describtive label will be added to the value.</li>
-                      <li><i>long=2</i> = Same as long=1 but Sun or Moon will be added as a prefix.</li>
-                      <li><i>long=3</i> = Same as long=2 but <code>&lt;: &gt;</code> will be used as an additional separator.</li>
+                      <li><i>long=2</i> = Same as long=1 but the label will be separated from the value by a colon.</li>
+                      <li><i>long=3</i> = Same as long=2 but Sun or Moon will be added as a prefix.</li>
+                      <li><i>long=4</i> = Same as long=3 but the separator will be used to separate Sun/Moon instead.</li>
                       </ul></li>
             <li><a name="Astro_version"></a>
                 <code>get &lt;name&gt; version</code>
