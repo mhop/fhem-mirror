@@ -639,13 +639,9 @@ our @zodiac = ("aries","taurus","gemini","cancer","leo","virgo",
 our @phases = ("newmoon","waxingcrescent", "firstquarter", "waxingmoon", 
     "fullmoon", "waningmoon", "lastquarter", "waningcrescent");
 
-our @seasons = ( "winter", "spring", "summer", "fall" );
-
-our %seasonn = (
-    "spring" => [ 80,  172 ],    #21./22.3. - 20.6.
-    "summer" => [ 173, 265 ],    #21.06. bis 21./22.09.
-    "fall"   => [ 266, 353 ],    #22./23.09. bis 20./21.12.
-    "winter" => [ 354, 79 ]
+our %seasons = (
+    N => [ "winter", "spring", "summer", "fall" ],
+    S => [ "summer", "fall", "winter", "spring" ]
 );
 
 #-- Run before package compilation
@@ -684,15 +680,15 @@ BEGIN {
           toJSON
           )
     );
-}
 
-#-- Export to main context with different name
-GP_Export(
-    qw(
-      Get
-      Initialize
-      )
-);
+    # Export to main context
+    GP_Export(
+        qw(
+          Get
+          Initialize
+          )
+    );
+}
 
 _LoadOptionalPackages();
 
@@ -749,7 +745,6 @@ sub Define ($@) {
  return $@ unless ( FHEM::Meta::SetInternals($hash) );
  use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );
 
- # $hash->{VERSION} = $VERSION;
  $hash->{NOTIFYDEV} = "global";
  $hash->{INTERVAL} = 3600;
  readingsSingleUpdate( $hash, "state", "Initialized", $init_done ); 
@@ -1089,20 +1084,35 @@ sub HHMMSS($){
 
 ########################################################################################################
 #
-# CalcJD - Calculate Julian date: valid only from 1.3.1901 to 28.2.2100
+# Date2JD - Calculate Julian date, adopted from Perl CPAN module Astro::Coord::ECI::Utils
 #
 ########################################################################################################
 
-sub CalcJD($$$) {
-  my ($day,$month,$year) = @_;
-  my $jd = 2415020.5-64; # 1.1.1900 - correction of algorithm
-  if ($month<=2) { 
-    $year--; 
-    $month += 12; 
-  }
-  $jd += int( ($year-1900)*365.25 );
-  $jd += int( 30.6001*(1+$month) );
-  return($jd + $day);
+sub Date2JD {
+    my @args = @_;
+    unshift @args, 0 while @args < 6.;
+    my ( $sec, $min, $hr, $day, $mon, $yr ) = @args;
+    return undef if ( ( $yr < -4712. ) or ( $mon < 1. || $mon > 12. ) );
+    if ( $mon < 3. ) {
+        --$yr;
+        $mon += 12.;
+    }
+
+    my $JD_GREGORIAN = 2299160.5;
+    my $A            = floor( $yr / 100 );
+    my $B            = 2 - $A + floor( $A / 4 );
+    my $jd =
+      floor( 365.25 *  ( $yr + 4716 ) ) +
+      floor( 30.6001 * ( $mon + 1 ) ) +
+      $day + $B - 1524.5 +
+      ( ( ( $sec || 0 ) / 60 + ( $min || 0 ) ) / 60 + ( $hr || 0 ) ) / 24;
+    $jd < $JD_GREGORIAN
+      and $jd =
+      floor( 365.25 *  ( $yr + 4716 ) ) +
+      floor( 30.6001 * ( $mon + 1 ) ) +
+      $day - 1524.5 +
+      ( ( ( $sec || 0 ) / 60 + ( $min || 0 ) ) / 60 + ( $hr || 0 ) ) / 24;
+    return $jd;
 }
 
 ########################################################################################################
@@ -1171,7 +1181,7 @@ sub Ecl2Equ($$$){
 
 ########################################################################################################
 #
-# Equ2Altaz - Transform equatorial coordinates (RA/Dec) to horizonal coordinates 
+# Equ2Altaz - Transform equatorial coordinates (RA/Dec) to horizontal coordinates 
 #                   (azimuth/altitude). Refraction is ignored
 #
 ########################################################################################################
@@ -1309,15 +1319,16 @@ sub SunPosition($$$){
   my $distance  = (1-$e*$e)/(1+$e*cos($nu));   # distance in astronomical units
   $sunCoor{diameter} = $diameter0/$distance;        # angular diameter
   $sunCoor{distance} = $distance*$a;                # distance in km
-  $sunCoor{parallax} = 6378.137/$sunCoor{distance};          # horizonal parallax
+  $sunCoor{parallax} = 6378.137/$sunCoor{distance};          # horizontal parallax
 
   ($sunCoor{ra},$sunCoor{dec}) = Ecl2Equ($sunCoor{lon}, $sunCoor{lat}, $TDT);
   
-  #-- calculate horizonal coordinates of sun, if geographic positions is given
+  #-- calculate horizontal coordinates of sun, if geographic positions is given
   if (defined($observerlat) && defined($lmst) ) {
     ($sunCoor{az},$sunCoor{alt}) = Equ2Altaz($sunCoor{ra}, $sunCoor{dec}, $TDT, $observerlat, $lmst);
   }
-  $sunCoor{sig} = $zodiac[floor($sunCoor{lon}*$RAD/30)];
+  $sunCoor{sign}    = floor($sunCoor{lon}*$RAD/30.);
+  $sunCoor{sig}     = $zodiac[$sunCoor{sign}];
   
   return ( \%sunCoor );
 }
@@ -1372,7 +1383,7 @@ sub MoonPosition($$$$$$$){
   $moonCoor{parallax} = $parallax0/$distance; # horizontal parallax in radians
   $moonCoor{distance} = $distance*$a;         # distance in km
 
-  #-- Calculate horizonal coordinates of moon, if geographic positions is given
+  #-- Calculate horizontal coordinates of moon, if geographic positions is given
 
   #-- backup geocentric coordinates
   $moonCoor{raGeocentric}       = $moonCoor{ra}; 
@@ -1403,7 +1414,8 @@ sub MoonPosition($$$$$$$){
   $p = $p % 8;
   $moonCoor{phases} = $phases[$p]; 
   $moonCoor{phasei} = $p;
-  $moonCoor{sig}    = $zodiac[floor($moonCoor{lon}*$RAD/30)];
+  $moonCoor{sign}   = floor($moonCoor{lon}*$RAD/30);
+  $moonCoor{sig}    = $zodiac[$moonCoor{sign}];
 
   return ( \%moonCoor );
 }
@@ -1796,6 +1808,26 @@ sub MoonRise($$$$$$$){
 
 ########################################################################################################
 #
+# Season - Find astronomical season
+# 
+########################################################################################################
+
+sub Season($$;$) {
+    my ( $JD0, $deltaT, $lat ) = @_;
+
+    # season starts during the day so we need to
+    #  look for tomorrows quarter at noon
+    my $sunCoor = SunPosition( $JD0 + 1. + $deltaT / 86400.0, undef, undef );
+    my $quarter = ceil( rad2deg( $sunCoor->{lon} ) / 90. ) % 4;
+
+    return
+      wantarray
+      ? ( $quarter, $seasons{ $lat && $lat < 0 ? 'S' : 'N' }[$quarter] )
+      : $quarter;
+}
+
+########################################################################################################
+#
 # SetTime - update of the %Date hash for today
 # 
 ########################################################################################################
@@ -1948,7 +1980,7 @@ sub Compute($;$){
   #  return;
   #}
 
-  my $JD0 = CalcJD( $Date{day}, $Date{month}, $Date{year} );
+  my $JD0 = Date2JD( $Date{day}, $Date{month}, $Date{year} );
   my $JD  = $JD0 + ( $Date{hour} - $Date{zonedelta} + $Date{min}/60. + $Date{sec}/3600.)/24;
   my $TDT = $JD  + $deltaT/86400.0; 
   
@@ -1975,6 +2007,7 @@ sub Compute($;$){
   $Astro{SunAz}   = _round($sunCoor->{az} *$RAD,1);
   $Astro{SunAlt}  = _round($sunCoor->{alt}*$RAD + Refraction($sunCoor->{alt}),1);  # including refraction WARNUNG => *RAD ???
   $Astro{SunSign} = $tt->{$sunCoor->{sig}};
+  $Astro{SunSignN}= $sunCoor->{sign};
   $Astro{SunDiameter}=_round($sunCoor->{diameter}*$RAD*60,1); #angular diameter in arc seconds
   $Astro{SunDistance}=_round($sunCoor->{distance},0);
   
@@ -2052,6 +2085,7 @@ sub Compute($;$){
   $Astro{MoonAz}  = _round($moonCoor->{az} *$RAD,1);
   $Astro{MoonAlt} = _round($moonCoor->{alt}*$RAD + Refraction($moonCoor->{alt}),1);  # including refraction WARNUNG => *RAD ???
   $Astro{MoonSign}     = $tt->{$moonCoor->{sig}};
+  $Astro{MoonSignN}    = $moonCoor->{sign};
   $Astro{MoonDistance} = _round($moonCoor->{distance},0);
   $Astro{MoonDiameter} = _round($moonCoor->{diameter}*$RAD*60.,1); # angular diameter in arc seconds
   $Astro{MoonAge}      = _round($moonCoor->{age}*$RAD,1);
@@ -2132,17 +2166,9 @@ sub Compute($;$){
   $Astro{".wday"}      = $Date{wday};
 
   #-- check astro season
-  my $doj = $Astro{ObsDayofyear};
-
-  for( my $i=0;$i<4;$i++){
-    my $key = $seasons[$i];
-    if(   (($seasonn{$key}[0] < $seasonn{$key}[1]) &&  ($seasonn{$key}[0] <= $doj) && ($seasonn{$key}[1] >= $doj))
-       || (($seasonn{$key}[0] > $seasonn{$key}[1]) && (($seasonn{$key}[0] <= $doj) || ($seasonn{$key}[1] >= $doj))) ){
-       $Astro{ObsSeason}  = $tt->{$key};
-       $Astro{ObsSeasonN} = $i; 
-       last;
-    }  
-  }
+  my ($seasonn, $season) = Season($JD0, $deltaT, $Astro{ObsLat});
+  $Astro{ObsSeason}  = $tt->{$season};
+  $Astro{ObsSeasonN} = $seasonn;
 
   delete local $ENV{TZ};
   tzset();
@@ -2446,7 +2472,7 @@ sub FormatReading($$;$) {
     }
   }
 
-  return $ret;
+  return encode_utf8($ret);
 }
 
 ########################################################################################################
@@ -2633,7 +2659,7 @@ sub Get($@) {
         next if (!defined($Astro{$_}) || ref($Astro{$_}));
         $ret .= $html && $html eq "1" ? "<br/>\n" : "\n"
           if ( $ret ne "" );
-        $ret .= encode_utf8(FormatReading( $_, $h, $lc_numeric )) unless($_ =~ /^\./);
+        $ret .= FormatReading( $_, $h, $lc_numeric ) unless($_ =~ /^\./);
         $ret .= encode_utf8($Astro{$_}) if ($_ =~ /^\./);
       }
       $ret = "<html>" . $ret . "</html>" if (defined($html) && $html ne "0");
@@ -2764,7 +2790,7 @@ sub Get($@) {
         <li><i>Diameter</i> = virtual diameter (in arc minutes) of body</li>
         <li><i>Distance,DistanceObserver</i> = distance (in km) of body to center of earth or to observer</li>
         <li><i>PhaseN,PhaseS</i> = Numerical and string value for phase of body</li>
-	    <li><i>Sign</i> = Circadian sign for body along its track</li>
+	    <li><i>Sign,SignN</i> = Circadian sign for body along its track</li>
 	    <li><i>Rise,Transit,Set</i> = times (in HH:MM) for rise and set as well as for highest position of body</li>
         </ul>
         <p>
@@ -2802,7 +2828,7 @@ sub Get($@) {
         </li>
         <li>
         It is not necessary to define an Astro device to use the data provided by this module.<br/>
-        To use its data in any other module, you just need to put <code>require "95_Astro.pm";</code> <br/>
+        To use its data in any other module, you just need to put <code>LoadModule("Astro");</code> <br/>
         at the start of your own code, and then may call, for example, the function<br/> 
         <ul><code>Astro_Get( SOME_HASH_REFERENCE,"dummy","text", "SunRise","2019-12-24");</code></ul>
         to acquire the sunrise on Christmas Eve 2019. The hash reference may also be undefined or an existing device name of any type. Note that device attributes of the respective device will be respected as long as their name matches those mentioned for an Astro device.
@@ -2904,7 +2930,7 @@ sub Get($@) {
 =end html_DE
 =for :application/json;q=META.json 95_Astro.pm
 {
-  "version": "v2.0.1",
+  "version": "v2.0.2",
   "author": [
     "Prof. Dr. Peter A. Henning <>",
     "Julian Pawlowski <>",

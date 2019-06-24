@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  95_Astro: v2.0.2: Calculate astronomical season based on ecliptic
+                      latitude instead of static day of the year to make season
+                      transition times more reliable. Also, seasons for
+                      southern hemisphere are now reflected correctly.
  - change:  49_SSCam: Presets and Patrols can contain spaces in its name if the
                       Preset or Patrol was definined in SVS or Cam Webinterface
  - bugfix:  74_AMADDevice: fix PERL WARNING: Subroutine redefined
