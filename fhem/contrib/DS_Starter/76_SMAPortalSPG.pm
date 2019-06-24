@@ -34,6 +34,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SMAPortalSPG_vNotesIntern = (
+  "1.3.0"  => "24.06.2019  replace suggestIcon by consumerAdviceIcon ",
   "1.2.0"  => "21.06.2019  GetFn -> get <name> html ",
   "1.1.0"  => "13.06.2019  commandRef revised, changed attribute W/kW to Wh/kWh ",
   "1.0.0"  => "03.06.2019  initial Version "
@@ -68,7 +69,7 @@ sub SMAPortalSPG_Initialize($) {
                                 "showNight:1,0 ".
                                 "showWeather:1,0 ".
                                 "spaceSize ".
-                                "suggestIcon ".
+                                "consumerAdviceIcon ".   
                                 "layoutType:pv,co,pvco,diff ".
                                 "Wh/kWh:Wh,kWh ".
                                 "weatherColor:colorpicker,RGB ".                                
@@ -179,7 +180,7 @@ sub SMAPortalSPG_Attr($$$$) {
     }
     
     if($aName eq "icon") {
-        $_[2] = "suggestIcon";
+        $_[2] = "consumerAdviceIcon";
     }
 
 return undef;
@@ -515,8 +516,8 @@ The module SMAPortalSPG is a device module attuned to the module SMAPortal for d
        </li>
        <br> 
        
-       <a name="suggestIcon"></a>
-       <li><b>suggestIcon </b><br>
+       <a name="consumerAdviceIcon"></a>
+       <li><b>consumerAdviceIcon </b><br>
          Set the icon used in periods with suggestion to switch consumers on. 
          You can use the standard "Select Icon" function (down left in FHEMWEB) to select the wanted icon.
        </li>  
@@ -752,8 +753,8 @@ Das Modul SMAPortalSPG ist ein mit SMAPortal abgestimmtes Gerätemodul zur Defin
        </li>
        <br> 
        
-       <a name="suggestIcon"></a>
-       <li><b>suggestIcon </b><br>
+       <a name="consumerAdviceIcon"></a>
+       <li><b>consumerAdviceIcon </b><br>
          Setzt das Icon zur Darstellung der Zeiten mit Verbraucherempfehlung. 
          Dazu kann ein beliebiges Icon mit Hilfe der Standard "Select Icon"-Funktion (links unten im FHEMWEB) direkt ausgewählt 
          werden. 
