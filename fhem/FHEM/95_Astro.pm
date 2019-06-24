@@ -113,6 +113,8 @@ our %transtable = (
         "sign"              => "Zodiac sign",
         "dst"               => "daylight saving time",
         "nt"                => "standard time",
+        "switchtodst"       => "Time change ahead to daylight saving time",
+        "switchtont"        => "Time change back to standard time",
         "hoursofsunlight"   => "Hours of sunlight",
         "hoursofnight"      => "Hours of night",
         "hoursofvisibility" => "Visibility",
@@ -192,6 +194,8 @@ our %transtable = (
         "sign"              => "Tierkreiszeichen",
         "dst"               => "Sommerzeit",
         "nt"                => "Normalzeit",
+        "switchtodst"       => "Umstellung vorwärts auf Sommerzeit",
+        "switchtont"        => "Umstellung zurück auf Normalzeit",
         "hoursofsunlight"   => "Tagesstunden",
         "hoursofnight"      => "Nachtstunden",
         "hoursofvisibility" => "Sichtbarkeit",
@@ -269,7 +273,9 @@ our %transtable = (
         "twilightcustom"    => "Crepúsculo personalizado",
         "sign"              => "Signo del zodiaco",
         "dst"               => "horario de verano",
-        "nt"                => "tiempo estándar",
+        "nt"                => "hora estándar",
+        "switchtodst"       => "Conversión adelante a la hora de verano",
+        "switchtont"        => "Conversión hacia atrás a la hora estándar",
         "hoursofsunlight"   => "Horas de luz solar",
         "hoursofnight"      => "Horas de la noche",
         "hoursofvisibility" => "Visibilidad",
@@ -348,6 +354,8 @@ our %transtable = (
         "sign"              => "Signe du zodiaque",
         "dst"               => "heure d'été",
         "nt"                => "heure normale",
+        "switchtodst"       => "Conversion en avant à l'heure d'été",
+        "switchtont"        => "Conversion de retour à l'heure normale",
         "hoursofsunlight"   => "Heures de soleil",
         "hoursofnight"      => "Heures de la nuit",
         "hoursofvisibility" => "Visibilité",
@@ -426,6 +434,8 @@ our %transtable = (
         "sign"              => "Segno zodiacale",
         "dst"               => "ora legale",
         "nt"                => "ora standard",
+        "switchtodst"       => "Conversione in avanti a ora legale",
+        "switchtont"        => "Conversione a ritroso in ora standard",
         "hoursofsunlight"   => "Ore di luce solare",
         "hoursofnight"      => "Ore della notte",
         "hoursofvisibility" => "Visibilità",
@@ -503,7 +513,9 @@ our %transtable = (
         "twilightcustom"    => "Aangepaste Schemering",
         "sign"              => "Sterrenbeeld",
         "dst"               => "Zomertijd",
-        "nt"                => "Standaard Tijd",
+        "nt"                => "Standaardtijd",
+        "switchtodst"       => "Voorwaartse omschakeling naar de zomertijd",
+        "switchtont"        => "Omzetting terug naar de normale tijd",
         "hoursofsunlight"   => "Dagen Uur",
         "hoursofnight"      => "Uren van de Nacht",
         "hoursofvisibility" => "Zichtbaarheid",
@@ -582,6 +594,8 @@ our %transtable = (
         "sign"              => "Znak zodiaku",
         "dst"               => "czas letni",
         "nt"                => "standardowy czas",
+        "switchtodst"       => "Przeliczenie napastnicy na czas letni",
+        "switchtont"        => "Przeliczanie wstecz do czasu normalnego",
         "hoursofsunlight"   => "Godziny światła słonecznego",
         "hoursofnight"      => "Godziny nocy",
         "hoursofvisibility" => "Widoczność",
@@ -2350,6 +2364,9 @@ sub FormatReading($$;$$) {
   $ret = UConv::decimal_mark( $ret, $lc_numeric )
     unless ( $h && ref($h) && defined( $h->{html} ) && $h->{html} eq "0" );
 
+  $ret = ( $val == 1. ? $tt->{"dst"} : $tt->{"nt"} )
+    if ( $r eq "ObsIsDST" );
+
   if ( $h && ref($h) && ( !$h->{html} || $h->{html} ne "0" ) ) {
 
     #-- add unit if desired
@@ -2435,7 +2452,7 @@ sub FormatReading($$;$$) {
       $ret = $ret . $sep . $tt->{"dayofyear"} if ( $r eq "ObsDayofyear" );
       $ret = $tt->{"alt"} . $sep . $ret       if ( $r eq "ObsHorEvening" );
       $ret = $tt->{"alt"} . $sep . $ret       if ( $r eq "ObsHorMorning" );
-      $ret = ( $Astro{$r} == 1. ? $tt->{"dst"} : $tt->{"nt"} )
+      $ret = ( $val == 1. ? $tt->{"switchtodst"} : $tt->{"switchtont"} )
         if ( $r eq "ObsIsDST" );
       $ret = $tt->{"jdate"} . $sep . $ret     if ( $r eq "ObsJD" );
       $ret = $tt->{"lmst"} . $sep . $ret      if ( $r eq "ObsLMST" );
@@ -2685,7 +2702,7 @@ sub Get($@) {
       $ret = FormatReading( "ObsDate", $h, $lc_numeric ) . " " . $Astro{ObsTime};
       $ret .= (
         ( $Astro{ObsIsDST} == 1 )
-        ? " (" . FormatReading( "ObsIsDST", $h ) . ")"
+        ? " (" . FormatReading( "ObsIsDST", undef ) . ")"
         : ""
       );
       $ret .= ", " . FormatReading( "ObsTimezone", $h ) . "\n";
