@@ -4144,8 +4144,8 @@ delFromDevAttrList($$)
   my $ua = $attr{$dev}{userattr};
   $ua = "" if(!$ua);
   my %hash = map { ($_ => 1) }
-             grep { " $arg " !~ m/ $_ / }
-             split(" ", "$ua $arg");
+             grep { $_ !~ m/^$arg(:.+)?$/ }
+             split(" ", $ua);
   $attr{$dev}{userattr} = join(" ", sort keys %hash);
   delete $attr{$dev}{userattr}
         if(!keys %hash && defined($attr{$dev}{userattr}));
