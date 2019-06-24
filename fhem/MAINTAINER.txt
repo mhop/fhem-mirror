@@ -145,13 +145,13 @@ FHEM/21_OWTHERM.pm           pahenning            1Wire
 FHEM/21_OWVAR.pm             pahenning            1Wire
 FHEM/21_SONOSPLAYER          Reinerlein           Multimedia
 FHEM/21_VBUSDEV.pm           Tobias/pejonp        Sonstige Systeme
-FHEM/22_ALL3076.pm           sachag               Sonstiges
+FHEM/22_ALL3076.pm           jeschkec             Sonstiges
 FHEM/22_HOMEMODE.pm          DeeSPe               Automatisierung
-FHEM/23_ALL4027.pm           sachag               Sonstiges
+FHEM/23_ALL4027.pm           jeschkec             Sonstiges
 FHEM/23_KOSTALPIKO.pm        john                 CodeSchnipsel
 FHEM/23_LUXTRONIK2.pm        tupol                Heizungssteuerung/Raumklima (link als PM an tupol)
-FHEM/23_WEBIO.pm             sachag               Sonstiges
-FHEM/23_WEBIO_12DIGITAL.pm   sachag               Sonstiges
+FHEM/23_WEBIO.pm             jeschkec             Sonstiges
+FHEM/23_WEBIO_12DIGITAL.pm   jeschkec               Sonstiges
 FHEM/24_Iluminize.pm         VolkerKettenbach     Sonstige Systeme
 FHEM/24_NetIO230B.pm         rudolfkoenig/orphan  Sonstiges
 FHEM/24_TPLinkHS110.pm       VolkerKettenbach     Sonstige Systeme
@@ -397,7 +397,7 @@ FHEM/83_IOhomecontrol.pm     neubert              Sonstige Systeme
 FHEM/84_IOhomecontrolDevice.pm neubert            Sonstige Systeme
 FHEM/86_Robonect.pm          andi291              Sonstige Systeme
 FHEM/87_WS2000.pm            tdressler            Sonstiges
-FHEM/88_ALL4000T.pm          sachag               Sonstiges
+FHEM/88_ALL4000T.pm          jeschkec             Sonstiges
 FHEM/88_HMCCU.pm             zap                  HomeMatic
 FHEM/88_HMCCUCHN.pm          zap                  HomeMatic
 FHEM/88_HMCCUDEV.pm          zap                  HomeMatic
@@ -405,10 +405,10 @@ FHEM/88_HMCCURPC.pm          zap                  HomeMatic
 FHEM/88_HMCCURPCPROC.pm      zap                  HomeMatic
 FHEM/88_IPWE.pm              tdressler            Sonstiges
 FHEM/88_Itach_IRDevice       ulimaass             Sonstige Systeme
-FHEM/88_Itach_Relay.pm       sachag               Automatisierung
-FHEM/88_LINDY_HDMI_SWITCH.pm sachag               Multimedia
-FHEM/88_VantagePro2.pm       sachag               Sonstiges
-FHEM/88_WEBCOUNT.pm          sachag               Sonstiges
+FHEM/88_Itach_Relay.pm       jeschkec             Automatisierung
+FHEM/88_LINDY_HDMI_SWITCH.pm jeschkec             Multimedia
+FHEM/88_VantagePro2.pm       jeschkec             Sonstiges
+FHEM/88_WEBCOUNT.pm          jeschkec             Sonstiges
 FHEM/88_xs1Bridge.pm         HomeAuto_User        Sonstige Systeme
 FHEM/88_xs1Dev.pm            HomeAuto_User        Sonstige Systeme
 FHEM/89_FULLY.pm             zap                  Frontends
@@ -583,7 +583,7 @@ FHEM/lib/SHC_packet_layout.xml  rr2000            Sonstige Systeme
 FHEM/lib/SWAP/*              justme1968           Sonstige Systeme
 FHEM/lib/UPnP/*              Reinerlein           Multimedia
 
-contrib/23_WEBTHERM.pm       betateilchen/sachag  Sonstiges
+contrib/23_WEBTHERM.pm       jeschkec             Sonstiges
 contrib/70_ONKYO_AVR_PULL.pm loredo               (deprecated)
 contrib/92_rsyslog.pm        DS_Starter           Automatisierung
 contrib/98_EDIPLUG.pm        Wzut                 Sonstige Systeme
