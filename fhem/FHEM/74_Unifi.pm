@@ -69,10 +69,12 @@
 #  - fixed:   74_Unifi: fixed Loglevel
 # V 3.3.2
 #  - fixed:   74_Unifi: fixed restore clients at fhem restart
+# V 3.3.3
+#  - fixed:   74_Unifi: fixed (un)blockClient for UC Version 5.10.24
 
 
 package main;
-my $version="3.3.1";
+my $version="3.3.3";
 # Default für clientReadings setzen. Die Readings waren der Standard vor Einführung des Attributes customClientReadings.
 # Eine Änderung hat Auswirkungen auf (alte) Moduldefinitionen ohne dieses Attribut.
 my $defaultClientReadings=".:^accesspoint|^essid|^hostname|^last_seen|^snr|^uptime"; #ist wegen snr vs rssi nur halb korrekt, wird aber auch nicht wirklich verwendet ;-)
@@ -1785,7 +1787,7 @@ sub Unifi_BlockClient_Send($$) {
     %{$hash->{httpParams}},
     url   => $hash->{unifi}->{url}."cmd/stamgr",
     callback => \&Unifi_BlockClient_Receive,
-    data => "{\"mac\":\"$mac\",\"cmd\":\"block-sta\"}",
+    data => "{\"cmd\":\"block-sta\", \"mac\":\"".$mac."\"}",
   } );
   
   return undef;
@@ -1825,7 +1827,7 @@ sub Unifi_UnblockClient_Send($$) {
     %{$hash->{httpParams}},
     url   => $hash->{unifi}->{url}."cmd/stamgr",
     callback => \&Unifi_UnblockClient_Receive,
-    data => "{\"mac\":\"$mac\",\"cmd\":\"unblock-sta\"}",
+    data => "{\"cmd\":\"unblock-sta\", \"mac\":\"".$mac."\"}",
   } );	
   return undef;
 }
