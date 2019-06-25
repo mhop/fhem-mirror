@@ -823,8 +823,13 @@ sub LaMetric2_ReceiveCommand($$$) {
 
             # If we received a response to a write command,
             # make that data available
-            if ( $method ne "GET" && $method ne "DELETE" ) {
-                my $endpoint = $response->{success}->{path};
+            if (   $method ne "GET"
+                && $method ne "DELETE"
+                && defined( $response->{success} )
+                && defined( $response->{success}{path} )
+                && defined( $response->{success}{data} ) )
+            {
+                my $endpoint = $response->{success}{path};
                 $endpoint =~ s/^(.*[\\\/])//;
                 $response->{$endpoint} = $response->{success}{data};
             }
@@ -2749,7 +2754,7 @@ Leider keine deutsche Dokumentation vorhanden. Die englische Version gibt es hie
 
 =for :application/json;q=META.json 70_LaMetric2.pm
 {
-  "version": "v2.3.2",
+  "version": "v2.3.3",
   "release_status": "stable",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
