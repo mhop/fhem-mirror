@@ -783,7 +783,8 @@ attr DEVICE readingList \
   shellies/DEVNAME/relay/0:.* relay0\
   shellies/DEVNAME/input/0:.* input0\
   shellies/DEVNAME/online:.* online\
-  shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }
+  shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
+  shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : undef }
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model A_10_shelly1
 
@@ -812,6 +813,7 @@ attr DEVICE readingList \
   shellies/DEVNAME/relay/0:.* relay0\
   shellies/DEVNAME/input/0:.* input0\
   shellies/DEVNAME/online:.* online\
+  shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : undef }\
   shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
   shellies/DEVNAME/relay/0/power:.* relay_0_power\
   shellies/DEVNAME/temperature:.* temperature\
@@ -842,6 +844,7 @@ attr DEVICE readingList \
   shellies/DEVNAME/status/0/rollers:.* power\
   shellies/DEVNAME/online:.* online\
   shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
+  shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : undef }\
   shellies/DEVNAME/roller/0:.* state\
   shellies/DEVNAME/input/1:.* input1\
   shellies/DEVNAME/input/0:.* input0
@@ -872,6 +875,7 @@ attr DEVICE readingList \
   shellies/DEVNAME/status/0/rollers:.* power\
   shellies/DEVNAME/online:.* online\
   shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
+  shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : undef }\
   shellies/DEVNAME/roller/0:.* current\
   shellies/DEVNAME/roller/0:open {{'state' => 'opening'}}\
   shellies/DEVNAME/roller/0:close {{'state' => 'closing'}}\
@@ -912,6 +916,7 @@ attr DEVICE readingList \
   shellies/DEVNAME/status/0/rollers:.* power\
   shellies/DEVNAME/online:.* online\
   shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
+  shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : undef }\
   shellies/DEVNAME/roller/0:.* current\
   shellies/DEVNAME/roller/0:open {{'state' => 'opening'}}\
   shellies/DEVNAME/roller/0:close {{'state' => 'closing'}}\
@@ -1022,6 +1027,7 @@ attr DEVICE readingList \
   shellies/DEVNAME/input/3:.* input3\
   shellies/DEVNAME/online:.* online\
   shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
+  shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : undef }\
   shellies/DEVNAME/relay/0/power:.* power0\
   shellies/DEVNAME/relay/1/power:.* power1\
   shellies/DEVNAME/relay/2/power:.* power2\
@@ -1049,9 +1055,12 @@ par:DEVNAME;name of this shelly;{ AttrVal("DEVICE","readingList","") =~ m,shelli
 attr DEVICE setList\
   off:noArg shellies/DEVNAME/color/0/command off\
   on:noArg shellies/DEVNAME/color/0/command on\
-  pct:colorpicker,BRI,0,1,100 shellies/DEVNAME/color/0/set {"turn":"on","gain":"$EVTPART1","brightness":"$EVTPART1"}\
-  ct:colorpicker,CT,3000,10,6500 {$EVTPART1=3000 if ($EVTPART1<3000);"shellies/DEVNAME/color/0/set {\"turn\":\"on\",\"mode\":\"white\",\"temp\":\"$EVTPART1\"}"}\
-  rgb:colorpicker,RGB {$EVTPART1=~/(..)(..)(..)/;if($1 ne $2 || $2 ne $3){"shellies/DEVNAME/color/0/set {\"turn\":\"on\",\"mode\":\"color\",\"gain\":\"100\",\"red\":".hex($1).",\"green\":".hex($2).",\"blue\":".hex($3)."}"}else{"shellies/shellybulb-3CC533/color/0/set {\"turn\":\"on\",\"mode\":\"white\",\"brightness\":".int(hex($1)/2.55)."}"}}\
+  pct:colorpicker,BRI,0,1,100 shellies/DEVNAME/color/0/set {"gain":"$EVTPART1","brightness":"$EVTPART1"}\
+  pct_on:colorpicker,BRI,0,1,100 shellies/DEVNAME/color/0/set {"turn":"on","gain":"$EVTPART1","brightness":"$EVTPART1"}\
+  ct:colorpicker,CT,3000,10,6500 {$EVTPART1=3000 if ($EVTPART1<3000);"shellies/DEVNAME/color/0/set {\"mode\":\"white\",\"temp\":\"$EVTPART1\"}"}\
+  ct_on:colorpicker,CT,3000,10,6500 {$EVTPART1=3000 if ($EVTPART1<3000);"shellies/DEVNAME/color/0/set {\"turn\":\"on\",\"mode\":\"white\",\"temp\":\"$EVTPART1\"}"}\
+  rgb:colorpicker,RGB {$EVTPART1=~/(..)(..)(..)/;if($1 ne $2 || $2 ne $3){"shellies/DEVNAME/color/0/set {\"mode\":\"color\",\"gain\":\"100\",\"red\":".hex($1).",\"green\":".hex($2).",\"blue\":".hex($3)."}"}else{"shellies/DEVNAME/color/0/set {\"turn\":\"on\",\"mode\":\"white\",\"brightness\":".int(hex($1)/2.55)."}"}}\
+  rgb_on:colorpicker,RGB {$EVTPART1=~/(..)(..)(..)/;if($1 ne $2 || $2 ne $3){"shellies/DEVNAME/color/0/set {\"turn\":\"on\",\"mode\":\"color\",\"gain\":\"100\",\"red\":".hex($1).",\"green\":".hex($2).",\"blue\":".hex($3)."}"}else{"shellies/DEVNAME/color/0/set {\"turn\":\"on\",\"mode\":\"white\",\"brightness\":".int(hex($1)/2.55)."}"}}\
   x_update:noArg shellies/DEVNAME/command update_fw\
   x_mqttcom shellies/DEVNAME/command $EVTPART1
 deletereading -q DEVICE status_.*
@@ -1094,12 +1103,13 @@ attr DEVICE setList\
 deletereading -q DEVICE status_.*
 attr DEVICE readingList \
   shellies/DEVNAME/color/0/status:.* {json2nameValue($EVENT)}\
-  shellies/DEVNAME/color/0:.* state
+  shellies/DEVNAME/color/0:.* state\
+  shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : undef }
 attr DEVICE userReadings rgb:red.* {if(ReadingsVal($name,"mode","") eq "color"){sprintf("%02X%02X%02X", ReadingsVal($name,"red",99), ReadingsVal($name,"green",99), ReadingsVal($name,"blue",99))}else{my $a=sprintf("%02X",ReadingsVal($name,"brightness",0)*2.555);"$a$a$a"}}
 attr DEVICE webCmd on:off:white:gain:rgb:effect
 attr DEVICE setStateList on off
 attr DEVICE icon light_control
-attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot";; my $light = ReadingsVal($name,"state","off");; "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a>"}
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot";; my $light = ReadingsVal($name,"state","off");; my $cons = ReadingsVal($name,"power","unknown");; "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a><div>Verbrauch: $cons</div>"}
 attr DEVICE model A_17_shelly2rgbw_color
 
 #contributed by user sledge
@@ -1110,10 +1120,12 @@ par:DEVNAME;name of this shelly;{ AttrVal("DEVICE","readingList","") =~ m,shelli
 attr DEVICE readingList shellies/DEVNAME/white/0/status:.* {json2nameValue($EVENT)}\
   shellies/DEVNAME/white/0:.* state\
   shellies/DEVNAME/white/0/set:.* { json2nameValue($EVENT) }\
-  shellies/DEVNAME/online:.* online
+  shellies/DEVNAME/online:.* online\
+  shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : undef }
 attr DEVICE setList off:noArg shellies/DEVNAME/white/0/command off\
   on:noArg shellies/DEVNAME/white/0/command on\
-  brightness:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/0/set {"ison":"true","mode":"white","brightness":"$EVTPART1"}\
+  brightness:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/0/set {"mode":"white","brightness":"$EVTPART1"}\
+  brightness_on:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/0/set {"ison":"true","mode":"white","brightness":"$EVTPART1"}\
   x_update:noArg shellies/DEVNAME/command update_fw\
   x_mqttcom shellies/DEVNAME/command $EVTPART1
 deletereading -q DEVICE (?!associatedWith).*
@@ -1132,7 +1144,8 @@ attr DEVICE_CH2 readingList shellies/DEVNAME/white/1/status:.* {json2nameValue($
   shellies/DEVNAME/online:.* online
 attr DEVICE_CH2 setList off:noArg shellies/DEVNAME/white/1/command off\
   on:noArg shellies/DEVNAME/white/1/command on\
-  brightness:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/1/set {"ison":"true","mode":"white","brightness":"$EVTPART1"}
+  brightness:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/1/set {"mode":"white","brightness":"$EVTPART1"}\
+  brightness_on:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/1/set {"ison":"true","mode":"white","brightness":"$EVTPART1"}
 attr DEVICE_CH2 setStateList on off
 copy DEVICE DEVICE_CH3
 setreading DEVICE_CH3 associatedWith DEVICE,DEVICE_CH2,DEVICE_CH4
@@ -1142,7 +1155,8 @@ attr DEVICE_CH3 readingList shellies/DEVNAME/white/2/status:.* {json2nameValue($
   shellies/DEVNAME/online:.* online
 attr DEVICE_CH3 setList off:noArg shellies/DEVNAME/white/2/command off\
   on:noArg shellies/DEVNAME/white/2/command on\
-  brightness:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/2/set {"ison":"true","mode":"white","brightness":"$EVTPART1"}
+  brightness:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/2/set {"mode":"white","brightness":"$EVTPART1"}\
+  brightness_on:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/2/set {"ison":"true","mode":"white","brightness":"$EVTPART1"}
 attr DEVICE_CH3 setStateList on off
 copy DEVICE DEVICE_CH4
 attr DEVICE_CH4 readingList shellies/DEVNAME/white/3/status:.* {json2nameValue($EVENT)}\
@@ -1151,7 +1165,8 @@ shellies/DEVNAME/white/3/set:.* { json2nameValue($EVENT) }\
 shellies/DEVNAME/online:.* online
 attr DEVICE_CH4 setList off:noArg shellies/DEVNAME/white/3/command off\
   on:noArg shellies/DEVNAME/white/3/command on\
-  brightness:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/3/set {"ison":"true","mode":"white","brightness":"$EVTPART1"}
+  brightness:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/3/set {"mode":"white","brightness":"$EVTPART1"}\
+  brightness_on:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/3/set {"ison":"true","mode":"white","brightness":"$EVTPART1"}
 setreading DEVICE_CH4 associatedWith DEVICE,DEVICE_CH2,DEVICE_CH3
 attr DEVICE_CH4 setStateList on off
 
