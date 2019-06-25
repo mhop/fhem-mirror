@@ -657,12 +657,14 @@ MQTT2_DEVICE_nlData($)
 
       $h{$n}{title} = $v;
       $fo = $n if(!$fo);
-      my @a;
-      $h{$n}{neighbors} = \@a;
+      my @a; $h{$n}{neighbors} = \@a;
+      my @b; $h{$n}{neighborstyles} = \@b;
 
-    } elsif($l =~ m/^\s*"([^"]+)"\s*->\s*"([^"]+)"\s\[label="([^"]*)"/) {
-      push @{$h{$1}{neighbors}}, $2;
-      $h{$1}{title} .= "${div}lqi:$3";
+    } elsif($l =~ m/^\s*"([^"]+)"\s*->\s*"([^"]+)".*label="([^"]*)"/) {
+      my ($from,$to,$title) = ($1,$2,$3);
+      push @{$h{$from}{neighbors}}, $to;
+      $h{$from}{title} .= "${div}lqi:$title";
+      push @{$h{$from}{neighborstyles}}, ($l =~ m/style="([^"]+)"/ ? $1 : "");
     }
   }
 
@@ -672,13 +674,15 @@ MQTT2_DEVICE_nlData($)
 
   for my $k (keys %h) {
     my $n = $h{$k}{neighbors};
+    my $ns = $h{$k}{neighborstyles};
     push @ret, '"'.$k.'":{'.
         '"class":"'.$h{$k}{class}.' col_link col_oddrow",'.
         '"img":"'.$h{$k}{img}.'",'.
         '"txt":"'.$h{$k}{txt}.'",'.
         '"title":"'.$h{$k}{title}.'",'.
         '"pos":['.($dp{$k} ? $dp{$k} : '').'],'.
-        '"neighbors":['. (@{$n} ? ('"'.join('","',@{$n}).'"'):'').']}';
+        '"neighbors":['. (@{$n} ? ('"'.join('","',@{$n}).'"'):'').'],'.
+        '"neighborstyles":['. (@{$ns} ? ('"'.join('","',@{$ns}).'"'):'').']}';
   }
 
   my $r = '{"firstObj":"'.$fo.'","el":{'.join(",",@ret).'},'.

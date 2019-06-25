@@ -169,6 +169,7 @@ svg.zw_nr .zwBox    { stroke-width:2px; }
 svg.zw_nr .zwDongle { stroke:red;     stroke-width:2px; }
 svg.zw_nr .zwMargin { stroke-width:1px; fill:none; }
 svg.zw_nr .zwLine   { stroke-width:1px; }
+svg.zw_nr .zwLine.dashed { stroke-dasharray:5,5 }
 svg.zw_nr .zwArrowHead { stroke-width:1px; }
 svg.zw_nr { height:auto; width:auto; margin:0; }
 
