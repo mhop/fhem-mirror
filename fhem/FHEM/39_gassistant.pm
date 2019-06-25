@@ -77,15 +77,6 @@ gassistant_Define($$)
   my $name = $a[0];
   $hash->{NAME} = $name;
 
-  if( !defined( $attr{$hash->{NAME}}{room} ) ) {
-    $attr{$hash->{NAME}}{room} = "GoogleAssistant";
-    #create dummy on/off device
-    CommandDefine(undef, "GoogleAssistant_dummy dummy");
-    CommandAttr(undef, "GoogleAssistant_dummy alias Testlight");
-    CommandAttr(undef, "GoogleAssistant_dummy genericDeviceType light");
-    CommandAttr(undef, "GoogleAssistant_dummy setList on off");
-    CommandAttr(undef, "GoogleAssistant_dummy room GoogleAssistant");
-  }
 
   my $d = $modules{$hash->{TYPE}}{defptr};
   return "$hash->{TYPE} device already defined as $d->{NAME}." if( defined($d) && $name ne $d->{NAME} );
@@ -106,6 +97,16 @@ gassistant_Define($$)
   if( !AttrVal($name, 'devStateIcon', undef ) ) {
     CommandAttr(undef, "$name stateFormat gassistant-fhem");
     CommandAttr(undef, "$name devStateIcon stopped:control_home\@red:start stopping:control_on_off\@orange running.*:control_on_off\@green:stop")
+  }
+
+  if( 0 && !AttrVal($name, 'room', undef ) ) {
+    $attr{$hash->{NAME}}{room} = "GoogleAssistant";
+    #create dummy on/off device
+    CommandDefine(undef, "GoogleAssistant_dummy dummy");
+    CommandAttr(undef, "GoogleAssistant_dummy alias Testlight");
+    CommandAttr(undef, "GoogleAssistant_dummy genericDeviceType light");
+    CommandAttr(undef, "GoogleAssistant_dummy setList on off");
+    CommandAttr(undef, "GoogleAssistant_dummy room GoogleAssistant");
   }
 
   $hash->{CoProcess} = {  name => 'gassistant-fhem',
