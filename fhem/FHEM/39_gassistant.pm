@@ -99,15 +99,10 @@ gassistant_Define($$)
     CommandAttr(undef, "$name devStateIcon stopped:control_home\@red:start stopping:control_on_off\@orange running.*:control_on_off\@green:stop")
   }
 
-  if( 0 && !AttrVal($name, 'room', undef ) ) {
+  if( !AttrVal($name, 'room', undef ) ) {
     $attr{$hash->{NAME}}{room} = "GoogleAssistant";
-    #create dummy on/off device
-    CommandDefine(undef, "GoogleAssistant_dummy dummy");
-    CommandAttr(undef, "GoogleAssistant_dummy alias Testlight");
-    CommandAttr(undef, "GoogleAssistant_dummy genericDeviceType light");
-    CommandAttr(undef, "GoogleAssistant_dummy setList on off");
-    CommandAttr(undef, "GoogleAssistant_dummy room GoogleAssistant");
   }
+
 
   $hash->{CoProcess} = {  name => 'gassistant-fhem',
                          cmdFn => 'gassistant_getCMD',
@@ -519,6 +514,15 @@ gassistant_Set($$@)
   } elsif( $cmd eq 'authcode' ) {
     return "usage: set $name $cmd <authcode>" if( !@args );
     my $authcode = $args[0];
+
+    #create dummy on/off device
+    if (!$main::defs{'GoogleAssistant_dummy'}) {
+      CommandDefine(undef, "GoogleAssistant_dummy dummy");
+      CommandAttr(undef, "GoogleAssistant_dummy alias Testlight");
+      CommandAttr(undef, "GoogleAssistant_dummy genericDeviceType light");
+      CommandAttr(undef, "GoogleAssistant_dummy setList on off");
+      CommandAttr(undef, "GoogleAssistant_dummy room GoogleAssistant");
+    }
 
     $hash->{".triggerUsed"} = 1;
 
