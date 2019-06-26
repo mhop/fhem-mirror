@@ -1643,15 +1643,18 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
     <a name="holiday2we"></a>
     <li>holiday2we<br>
         Wenn dieses Attribut gesetzt wurde, dann wird die <a
-        href="#perl">$we</a> Variable als &quot;true&quot; betrachtet, wenn der
-        Wert der <a href="#holiday">holiday</a> Variable zu diesem Attribut
-        nicht &quot;none&quot; ist.<br>
+        href="#perl">$we</a> Variable als &quot;true&quot; betrachtet, wenn
+        heute entweder Samstag/Sonntag ist, oder der Wert der <a
+        href="#holiday">holiday</a> Variable zu diesem Attribut nicht
+        &quot;none&quot; ist.<br>
         Falls es eine Komma getrennte Liste ist, dann ist es wahr, falls einer
         der referenzierten Instanzen nicht &quot;none&quot; ist.<br>
         Beispiel:<br>
         <ul>
           attr global holiday2we hessen
         </ul>
+        Falls sich einer der Elemente dieser Liste weekEnd nennt, dann wird
+        nicht auf Samstag/Sonntag gepr&uuml;ft.
     </li><br>
 
     <a name="httpcompress"></a>
