@@ -22,6 +22,7 @@
 #  This copyright notice MUST APPEAR in all copies of the script!
 #
 ################################################################
+#	$Id$
 
 ##############################################
 package main;
@@ -98,6 +99,10 @@ LINDY_HDMI_SWITCH_Define($$)
 1;
 
 =pod
+=item device
+=item summary    Controls LINDY HDMI 38054 4:2 switch
+=item summary_DE Steuert LINDY HDMI 38054 4:2 Umschalter
+
 =begin html
 
 <a name="LINDY_HDMI_SWITCH"></a>
