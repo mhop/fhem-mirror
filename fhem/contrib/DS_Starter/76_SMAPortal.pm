@@ -161,6 +161,7 @@ use vars qw($FW_ME);                                    # webname (default is fh
 
 # Versions History intern
 our %vNotesIntern = (
+  "2.4.0"  => "26.06.2019  support for FTUI-Widget ",
   "2.3.7"  => "24.06.2019  replace suggestIcon by consumerAdviceIcon ",
   "2.3.6"  => "21.06.2019  revise commandref ",                        
   "2.3.5"  => "20.06.2019  subroutine consinject added to pv, pvco style ",
@@ -1823,10 +1824,10 @@ return($txt);
 ###############################################################################
 #                  Subroutine für Portalgrafik
 ###############################################################################
-sub PortalAsHtml ($$) { 
-  my ($name,$wlname) = @_;
-  my $hash           = $defs{$name};
-  my $ret            = "";
+sub PortalAsHtml ($$;$) { 
+  my ($name,$wlname,$ftui) = @_;
+  my $hash                 = $defs{$name};
+  my $ret                  = "";
   
   my ($i,$icon,$colorv,$colorc,$maxhours,$hourstyle,$header,$legend,$legend_txt,$legend_style);
   my ($val,$height,$fsize,$html_start,$html_end,$wlalias,$weather,$colorw,$maxVal,$show_night,$type,$kw);
@@ -1878,6 +1879,12 @@ sub PortalAsHtml ($$) {
 		  my $cmdon   = "\"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name $txt on')\"";
           my $cmdoff  = "\"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name $txt off')\"";
           my $cmdauto = "\"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name $txt auto')\"";
+          
+          if ($ftui && $ftui eq "ftui") {
+              $cmdon   = "\"ftui.setFhemStatus('set $name $txt on')\"";
+              $cmdoff  = "\"ftui.setFhemStatus('set $name $txt off')\"";
+              $cmdauto = "\"ftui.setFhemStatus('set $name $txt auto')\"";      
+          }
           
           my $swstate  = ReadingsVal($name,"L3_".$txt."_Switch", "undef");
 		  my $swicon   = "<img src=\"$FW_ME/www/images/default/1px-spacer.png\">";

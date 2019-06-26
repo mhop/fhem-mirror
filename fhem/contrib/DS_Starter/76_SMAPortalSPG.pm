@@ -34,11 +34,14 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SMAPortalSPG_vNotesIntern = (
+  "1.4.0"  => "26.06.2019  support for FTUI-Widget ",
   "1.3.0"  => "24.06.2019  replace suggestIcon by consumerAdviceIcon ",
   "1.2.0"  => "21.06.2019  GetFn -> get <name> html ",
   "1.1.0"  => "13.06.2019  commandRef revised, changed attribute W/kW to Wh/kWh ",
   "1.0.0"  => "03.06.2019  initial Version "
 );
+
+sub SMAPortalSPG_AsHtml($;$$);
 
 ################################################################
 sub SMAPortalSPG_Initialize($) {
@@ -125,6 +128,10 @@ sub SMAPortalSPG_Get($@) {
        
  if ($cmd eq "html") {
      return SMAPortalSPG_AsHtml($hash);
+ } 
+ 
+ if ($cmd eq "ftui") {
+     return SMAPortalSPG_AsHtml($hash,"ftui");
  } 
  
 return undef;
@@ -284,11 +291,17 @@ return;
 ################################################################
 #    Grafik als HTML zurück liefern    (z.B. für Widget)
 ################################################################
-sub SMAPortalSPG_AsHtml($) { 
-  my ($hash) = @_;
-  my $name   = $hash->{NAME};
-  my $link   = $hash->{LINK};
+sub SMAPortalSPG_AsHtml($;$) { 
+  my ($hash,$ftui) = @_;
+  my $name         = $hash->{NAME};
+  my $link         = $hash->{LINK};
   my $height;
+
+  if ($ftui && $ftui eq "ftui") {
+      # Aufruf aus TabletUI -> FW_cmd ersetzen gemäß FTUI Syntax
+      my $s = substr($link,0,length($link)-2);
+      $link = $s.",'$ftui')}";
+  }
   
   $link = AnalyzePerlCommand(undef, $link) if($link =~ m/^{(.*)}$/s);
 
