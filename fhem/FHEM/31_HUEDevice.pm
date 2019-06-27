@@ -624,6 +624,8 @@ HUEDevice_Set($@)
   my ($cmd, @args) = @aa;
 
   my %obj;
+  my @match;
+  my $entries;
 
   $hash->{helper}->{update_timeout} =  AttrVal($name, "delayedUpdate", 1);
 
@@ -711,37 +713,53 @@ HUEDevice_Set($@)
 
       return undef;
 
-    } elsif( my @match = grep { $cmd eq $_ } keys %{($hash->{helper}{setList}{cmds}?$hash->{helper}{setList}{cmds}:{})} ) {
+    } elsif( @match = grep { $cmd eq $_ } keys %{($hash->{helper}{setList}{cmds}?$hash->{helper}{setList}{cmds}:{})} ) {
       return HUEBridge_Set( $shash, $shash->{NAME}, 'setsensor', $id, $hash->{helper}{setList}{cmds}{$match[0]} );
 
-    } elsif( my $entries = $hash->{helper}{setList}{regex} ) {
+    } elsif( $entries = $hash->{helper}{setList}{regex} ) {
       foreach my $entry (@{$entries}) {
         if( join(' ', @aa) =~ /$entry->{regex}/ ) {
           my $VALUE1 = $1;
           my $VALUE2 = $2;
           my $VALUE3 = $3;
           my $json = $entry->{json};
-          $json =~ s/\$1/$VALUE1/;
-          $json =~ s/\$2/$VALUE2/;
-          $json =~ s/\$3/$VALUE3/;
+          if( $json =~ m/^perl:{(.*)}$/ ) {
+            $json = eval $json;
+            if($@) {
+              Log3 $name, 3, "$name: configList: ". join(' ', @aa). ": ". $@;
+              return "error: ". join(' ', @aa). ": ". $@;
+            }
+          } else {
+            $json =~ s/\$1/$VALUE1/;
+            $json =~ s/\$2/$VALUE2/;
+            $json =~ s/\$3/$VALUE3/;
+          }
           return HUEBridge_Set( $shash, $shash->{NAME}, 'setsensor', $id, $json );
 
         }
       }
 
-    } elsif( my @match = grep { $cmd eq $_ } keys %{($hash->{helper}{configList}{cmds}?$hash->{helper}{configList}{cmds}:{})} ) {
+    } elsif( @match = grep { $cmd eq $_ } keys %{($hash->{helper}{configList}{cmds}?$hash->{helper}{configList}{cmds}:{})} ) {
       return HUEBridge_Set( $shash, $shash->{NAME}, 'configsensor', $id, $hash->{helper}{configList}{cmds}{$match[0]} );
 
-    } elsif( my $entries = $hash->{helper}{configList}{regex} ) {
+    } elsif( $entries = $hash->{helper}{configList}{regex} ) {
       foreach my $entry (@{$entries}) {
         if( join(' ', @aa) =~ /$entry->{regex}/ ) {
           my $VALUE1 = $1;
           my $VALUE2 = $2;
           my $VALUE3 = $3;
           my $json = $entry->{json};
-          $json =~ s/\$1/$VALUE1/;
-          $json =~ s/\$2/$VALUE2/;
-          $json =~ s/\$3/$VALUE3/;
+          if( $json =~ m/^perl:{(.*)}$/ ) {
+            $json = eval $json;
+            if($@) {
+              Log3 $name, 3, "$name: configList: ". join(' ', @aa). ": ". $@;
+              return "error: ". join(' ', @aa). ": ". $@;
+            }
+          } else {
+            $json =~ s/\$1/$VALUE1/;
+            $json =~ s/\$2/$VALUE2/;
+            $json =~ s/\$3/$VALUE3/;
+          }
           return HUEBridge_Set( $shash, $shash->{NAME}, 'configsensor', $id, $json );
 
         }
@@ -1810,7 +1828,8 @@ HUEDevice_Attr($$$;$)
 absent:{&lt;json&gt;}</code></li>
     <li>configList<br>
       The list of know config commands for sensor type devices. one command per line, eg.: <code><br>
-mode:{&lt;json&gt;}</code></li>
+attr mySensor mode:{&lt;json&gt;}\<br>
+/heatsetpoint (.*)/:perl:{'{"heatsetpoint":'. $VALUE1 * 100 .'}'}</code></li>
     <li>subType<br>
       extcolordimmer -> device has rgb and color temperatur control<br>
       colordimmer -> device has rgb controll<br>
