@@ -59,7 +59,10 @@ holiday_refresh($;$$)
     $fordate = sprintf("%02d-%02d", $lt[4]+1, $lt[3]);
     @fd = @lt;
   } else {
-    my ($m,$d) = split("-", $fordate);
+    $fordate !~ m/^((\d{4})-)?([01]\d)-([0-3]\d)$/; # fmt is already checked
+    my ($m,$d) = ($3,$4);
+    $fordate = "$m-$d";
+    $lt[5] = $2-1900 if($2);
     @fd = localtime(mktime(1,1,1,$d,$m-1,$lt[5],0,0,-1));
   }
 
@@ -184,17 +187,17 @@ holiday_refresh($;$$)
       if ( $a[1] =~ /^-([0-9])*$/ ) {
         $tgtmin -= $1*$weeksecs; # Minimum: target date minus $1 weeks
         $tgtmax = $tgtmin+$weeksecs; # Maximum: one week after minimum
-	# needs to be lower than max and greater than or equal to min
+        # needs to be lower than max and greater than or equal to min
         if( ($cd ge $tgtmin) && ( $cd lt $tgtmax) ) {
           $found=$a[5];
-	}
+        }
       } elsif ( $a[1] =~ /^\+?([0-9])*$/ ) {
         $tgtmin += ($1-1)*$weeksecs; # Minimum: target date plus $1-1 weeks
         $tgtmax = $tgtmin+$weeksecs; # Maximum: one week after minimum
-	# needs to be lower than or equal to max and greater min
+        # needs to be lower than or equal to max and greater min
         if( ($cd gt $tgtmin) && ( $cd le $tgtmax) ) {
           $found=$a[5];
-	}
+        }
       } else {
         Log 1, "Wrong distance spec: $l";
         next;
@@ -281,11 +284,11 @@ holiday_Get($@)
 {
   my ($hash, @a) = @_;
 
-  shift(@a) if($a[1] && $a[1] eq "MM-DD");
+  shift(@a) if($a[1] && $a[1] eq "MM-DD" || $a[1] eq "YYYY-MM-DD");
   return "argument is missing" if(int(@a) < 2);
   my $arg;
 
-  if($a[1] =~ m/^[01]\d-[0-3]\d/) {
+  if($a[1] =~ m/^(\d{4}-)?[01]\d-[0-3]\d/) {
     $arg = $a[1];
 
   } elsif($a[1] =~ m/^(yesterday|today|tomorrow)$/) {
@@ -302,7 +305,8 @@ holiday_Get($@)
 
   } else {
     return "unknown argument $a[1], choose one of ".
-      "yesterday:noArg today:noArg tomorrow:noArg days:2,3,4,5,6,7 MM-DD";
+      "yesterday:noArg today:noArg tomorrow:noArg ".
+      "days:2,3,4,5,6,7 MM-DD YYYY-MM-DD";
 
   }
   return holiday_refresh($hash->{NAME}, $arg);
@@ -494,6 +498,7 @@ holiday_FW_detailFn($$$$)
   <a name="holidayget"></a>
   <b>Get</b>
     <ul>
+      <code>get &lt;name&gt; &lt;YYYY-MM-DD&gt;</code><br>
       <code>get &lt;name&gt; &lt;MM-DD&gt;</code><br>
       <code>get &lt;name&gt; yesterday</code><br>
       <code>get &lt;name&gt; today</code><br>
@@ -648,6 +653,7 @@ holiday_FW_detailFn($$$$)
   <a name="holidayget"></a>
   <b>Get</b>
     <ul>
+      <code>get &lt;name&gt; &lt;YYYY-MM-DD&gt;</code><br>
       <code>get &lt;name&gt; &lt;MM-DD&gt;</code><br>
       <code>get &lt;name&gt; yesterday</code><br>
       <code>get &lt;name&gt; today</code><br>
