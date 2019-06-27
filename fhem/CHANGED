@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - new:     huedevice.template: New template for HUEDevice
  - feature: 31_HUEDevice: allow perl code with setList and configList attributes
  - bugfix:  95_Astro: v2.0.2: Calculate astronomical season based on ecliptic
                       latitude instead of static day of the year to make season

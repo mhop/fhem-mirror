@@ -1,0 +1,93 @@
+###########################################
+# $Id: $
+#
+# Comments start with #. Empty lines are ignored.
+# Syntax of one entry: name: line, one optional filter: line, zero or more par: lines,  FHEM-Commands
+# filter:INTERNAL=VALUE (optional)
+# par: name of the parameter; comment; perl_code (optional)
+# perl_code returns a value for the parameter, or undef.
+# If undef, the user has to specify them (the comment is shown to the user)
+
+
+###########################################
+# Eurotronic Spirit ZigBee (SPZB0001)
+name:C_01_Eurotronic_SPZB0001_Spirit_ZigBee
+filter:TYPE=HUEDevice
+desc: All necessary attr are set and also a helper CMDAlias for the Eurotronic Spirit ZigBee thermostat.<br><a href="https://eurotronic.org/produkte/zigbee-heizkoerperthermostat/spirit-zigbee/">Manufacturer link: Klick me</a>
+attr DEVICE configList /mode (.*)/:{"mode":"$1"}\
+/heatsetpoint (.*)/:perl:{'{"heatsetpoint":' . $VALUE1 * 100 . '}'}\
+/displayflipped (.*)/:{"displayflipped": $1 }\
+lock:{"locked": true }\
+unlock:{"locked": false }
+attr DEVICE widgetOverride mode:auto,heat,off displayflipped:true,false heatsetpoint:16,16.5,17,17.5,18,18.5,19,19.5,20,20.5,21,21.5,22
+attr DEVICE icon max_heizungsthermostat
+# Helper CMDAlias heatsetpointX100
+#par:DeviceRoom;Room of the Device.;{AttrVal("heatsetpointX100","room","HUEDevice" )}
+#defmod heatsetpointX100 cmdalias set .* heatsetpoint .* AS {fhem("set $EVTPART0 $EVTPART1 ". $EVTPART2 * 100)}
+#attr heatsetpointX100 room DeviceRoom
+#attr heatsetpointX100 comment This is an help CMDAlias for the Eurotronic Eurotronic Spirit ZigBee (SPZB0001).\
+#This CMDAlias prepares the value of heatsetpoint for the Hue/deCONZ API (multiplies the value by 100).
+
+
+###########################################
+# Xiaomi/Aqara MCCGQ11LM Fenster Tür Sensor
+name:D_01_Xiaomi_Aqara_MCCGQ11LM_Window_Door_Sensor
+filter:TYPE=HUEDevice
+desc: The Xiaomi/Aqara window door sensor is a single sensor and interprets a normally closed contact .<br><a href="https://www.aqara.com/en/door_and_window_sensor-product.html">Manufacturer link: Klick me</a>
+attr DEVICE devStateIcon open:fts_window_1w_open@#e56524 closed:fts_window_1w
+
+
+###########################################
+# Xiaomi/Aqara WSDCGQ11LM Temperatur Sensor
+name:E_01a_Xiaomi_Aqara_WSDCGQ11LM_Temperature_Sensor
+filter:TYPE=HUEDevice
+desc: The Xiaomi/Aqara temperature, humidity and pressure sensor is a multisensor, and is interpreted by ZigBee as three sensors that is temperature sensor.<br><a href="https://www.aqara.com/en/temperature_and_humidity_sensor-product.html">Manufacturer link: Klick me</a>
+attr DEVICE icon xiaomi_multi
+attr DEVICE stateFormat T: temperature °C
+
+# Xiaomi/Aqara WSDCGQ11LM Pressure Sensor
+name:E_01b_Xiaomi_Aqara_WSDCGQ11LM_Pressure_Sensor
+filter:TYPE=HUEDevice
+desc: The Xiaomi/Aqara temperature, humidity and pressure sensor is a multisensor, and is interpreted by ZigBee as three sensors that is pressure sensor.<br><a href="https://www.aqara.com/en/temperature_and_humidity_sensor-product.html">Manufacturer link: Klick me</a>
+attr DEVICE icon xiaomi_multi
+attr DEVICE stateFormat P: pressure hPa
+
+# Xiaomi/Aqara WSDCGQ11LM Humidity Sensor
+name:E_01c_Xiaomi_Aqara_WSDCGQ11LM_Humidity_Sensor
+filter:TYPE=HUEDevice
+desc: The Xiaomi/Aqara temperature, humidity and pressure sensor is a multisensor, and is interpreted by ZigBee as three sensors that is humidity sensor.<br><a href="https://www.aqara.com/en/temperature_and_humidity_sensor-product.html">Manufacturer link: Klick me</a>
+attr DEVICE icon xiaomi_multi
+attr DEVICE stateFormat H: humidity %
+
+
+###########################################
+# Xiaomi/Aqara RTCGQ11LM Motion Sensor
+name:F_01a_Xiaomi_Aqara_RTCGQ11LM_Motion_Sensor
+filter:TYPE=HUEDevice
+desc: The Xiaomi/Aqara motion sensor is a multisensor, and is interpreted by ZigBee as two sensors that is motion sensor.<br><a href="https://www.aqara.com/en/motion_sensor.html">Manufacturer link: Klick me</a>
+attr DEVICE devStateIcon motion:people_sensor nomotion:message_presence
+attr DEVICE icon motion_detector
+
+# Xiaomi/Aqara RTCGQ11LM Lightlevel Sensor
+name:F_01a_Xiaomi_Aqara_RTCGQ11LM_Lightlevel_Sensor
+filter:TYPE=HUEDevice
+desc: The Xiaomi/Aqara motion sensor is a multisensor, and is interpreted by ZigBee as two sensors that is lightlevel sensor.<br><a href="https://www.aqara.com/en/motion_sensor.html">Manufacturer link: Klick me</a>
+attr DEVICE icon IR
+attr DEVICE stateFormat lux Lux
+
+
+###########################################
+# Xiaomi/Aqara WXKG02LM Double Switch
+name:G_01_Xiaomi_Aqara_WXKG02LM_Double_Switch
+filter:TYPE=HUEDevice
+desc: The Xiaomi/Aqara Double Switch is double switch.<br><a href="https://www.aqara.com/en/86plug.html">Manufacturer link: Klick me</a>
+attr DEVICE eventMap 1001:LeftLongPress\
+1002:LeftShortPress \
+1004:LeftDoublePress\
+2001:RightLongPress \
+2002:RightShortPress\
+2004:RightDoublePress\
+3001:DoubleLongPress\
+3002:DoubleShortPress \
+3004:DoubleDoublePress
+attr DEVICE icon taster

@@ -570,6 +570,7 @@ FHEM/FhemUtils/*             mfr69bs              Sonstiges
 FHEM/holiday/*               jeschkec             Sonstiges
 FHEM/lib/*deviceconfig.xml.gz        krikan       ZWave
 FHEM/lib/*manufacturer_specific.xml  krikan       ZWave
+FHEM/lib/AttrTemplate/huedevice.template Shojo    https://forum.fhem.de/index.php/topic,97694.0.html
 FHEM/lib/AttrTemplate/httpmod.template Beta-User  https://forum.fhem.de/index.php/topic,97694.0.html
 FHEM/lib/AttrTemplate/mqtt2.template Beta-User    https://forum.fhem.de/index.php/topic,94494.0.html
 FHEM/lib/AttrTemplate/mysensors.template Beta-User Bastelecke/MySensors
