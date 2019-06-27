@@ -5965,7 +5965,10 @@ IsWe(;$$)
   my ($we, $wf);
   foreach my $h2we (split(",", AttrVal("global", "holiday2we", ""))) {
     my $b = ReadingsVal($h2we, $when, 0);
-    $we = 1 if($b && $b ne "none");
+    if($b && $b ne "none") {
+      return 0 if($h2we eq "noWeekEnd");
+      $we = 1 if($b && $b ne "none");
+    }
     $wf = 1 if($h2we eq "weekEnd");
   }
 
