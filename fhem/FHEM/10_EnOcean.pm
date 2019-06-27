@@ -751,7 +751,8 @@ EnOcean_Initialize($)
                       "blockFanSpeed:no,yes blockKey:no,yes " .
                       "brightnessDayNight brightnessDayNightCtrl:custom,sensor brightnessDayNightDelay " .
                       "brightnessSunny brightnessSunnySouth brightnessSunnyWest brightnessSunnyEast " .
-                      "brightnessSunnyDelay brightnessSunnySouthDelay brightnessSunnyWestDelay brightnessSunnyEastDelay " .                      "comMode:confirm,biDir,uniDir creator:autocreate,manual " .
+                      "brightnessSunnyDelay brightnessSunnySouthDelay brightnessSunnyWestDelay brightnessSunnyEastDelay " .
+                      "calAtEndpoints:no,yes comMode:confirm,biDir,uniDir creator:autocreate,manual " .
                       "daylightSavingTime:supported,not_supported dataEnc:VAES,AES-CBC " .
                       "defaultChannel:" . join(",", @EnO_defaultChannel) . " " .
                       "demandRespAction demandRespRefDev demandRespMax:A0,AI,B0,BI,C0,CI,D0,DI ".
@@ -4400,6 +4401,7 @@ sub EnOcean_Set($@)
                 $position = $a[1] + $angleTime / $shutTimeSet * 100;
                 if ($position >= 100) {
                   $position = 100;
+                  $shutTime = $shutTimeCloses if (AttrVal($name, 'calAtEndpoints', 'no') eq 'yes');
                 }
                 $shutCmd = 2;
                 if ($angleTime) {
@@ -4418,6 +4420,7 @@ sub EnOcean_Set($@)
                 if ($position <= 0) {
                   $position = 0;
                   $anglePos = 0;
+                  $shutTime = $shutTimeCloses if (AttrVal($name, 'calAtEndpoints', 'no') eq 'yes');
                 }
                 $shutCmd = 1;
                 if ($angleTime && $a[1] > 0) {
@@ -13174,6 +13177,13 @@ sub EnOcean_Attr(@)
       }
     }
 
+  } elsif ($attrName eq "calAtEndpoints") {
+    if (!defined $attrVal){
+
+    } elsif ($attrVal !~ m/^no|yes$/) {
+      $err = "attribute-value [$attrName] = $attrVal wrong";
+    }
+
   } elsif ($attrName eq "comMode") {
     if (!defined $attrVal){
 
@@ -18851,6 +18861,8 @@ EnOcean_Delete($$)
       If <a href="#EnOcean_settingAccuracy">settingAccuracy</a> is set to high, the run-time is sent in 1/10 increments.<br>
       Set attr subType to manufProfile, manufID to 00D and attr model to Eltako_FSB14|FSB61|FSB70|FSB_ACK manually.
       If the attribute model is set to Eltako_FSB_ACK, with the status "open_ack" the readings position and anglePos are also updated.<br>
+      If the attribute <a href="#EnOcean_calAtEndpoints">calAtEndpoints</a>is to yes, the roller blind positions are calibrated when
+      the endpoints are driven.<br>
       Use the sensor type "Szenentaster/PC" for Eltako devices.
     </li>
     <br><br>
@@ -19629,6 +19641,10 @@ EnOcean_Delete($$)
      [brightnessSunnyDelay] = 0...99000:0...99000, 120:30 is default.<br>
      Set switching delay for reading isSunnyWest based on the reading sunWest. The reading isSunnyWest is reset or set
      if the thresholds are permanently undershot or exceed during the delay time.
+   </li>
+   <li><a name="EnOcean_calAtEndpoints">calAtEndpoints</a> no|yes, [calAtEndpoints] = no is default<br>
+     Callibrize shutter position at the endpoints. The shutter motor is switched on with the time of
+     <a href="#shutTimeCloses">shutTimeCloses</a> if the end positions are selected.
    </li>
     <li><a name="EnOcean_comMode">comMode</a> biDir|confirm|uniDir, [comMode] = uniDir is default.<br>
       Communication Mode between an enabled EnOcean device and Fhem.<br>
