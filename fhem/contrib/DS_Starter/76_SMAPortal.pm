@@ -1156,7 +1156,11 @@ sub extractForecastData($$) {
   
   my $plantOid              = $forecast->{'ForecastTimeframes'}->{'PlantOid'};
   $hash->{HELPER}{PLANTOID} = $plantOid;                                           # wichtig für erweiterte Selektionen
-  Log3 ($name, 4, "$name - Plant ID set to: ".$hash->{HELPER}{PLANTOID});
+  if ($hash->{HELPER}{PLANTOID}) {
+      Log3 ($name, 4, "$name - Plant ID set to: ".$hash->{HELPER}{PLANTOID});
+  } else {
+      Log3 ($name, 4, "$name - Plant ID  not set !");
+  }
   
   
   readingsBeginUpdate($hash);

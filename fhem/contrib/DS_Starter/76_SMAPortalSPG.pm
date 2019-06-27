@@ -41,8 +41,6 @@ our %SMAPortalSPG_vNotesIntern = (
   "1.0.0"  => "03.06.2019  initial Version "
 );
 
-sub SMAPortalSPG_AsHtml($;$$);
-
 ################################################################
 sub SMAPortalSPG_Initialize($) {
   my ($hash) = @_;
