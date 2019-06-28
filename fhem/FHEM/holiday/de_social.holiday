@@ -14,13 +14,16 @@
 # Festtage
 1 02-14 Valentinstag
 1 04-30 Tanz in den Mai
-1 10-31 Halloween
-1 11-02 Allerseelen
+3 2 Sun 05 Muttertag
+2 49 Pfingsten
+2 50 Pfingsten
+2 39 Vatertag
+3 1 Sun 10 Erntedankfest
 1 11-11 Martinstag
 5 -1 Wed 11 24 Buß- und Bettag
+5 -6 Sun 12 25 Volkstrauertag
+5 -5 Sun 12 25 Totensonntag
 1 12-06 Nikolaus
-1 12-24 Heiligabend
-1 12-31 Silvester
 
 # Faschingszeit
 2 -52 Weiberfastnacht
@@ -279,14 +282,34 @@
 1 12-21 Adventszeit
 1 12-22 Adventszeit
 1 12-23 Adventszeit
-1 12-24 Adventszeit
+
+# Weihnachtszeit
+1 12-24 Heiligabend
+1 12-24 Weihnachtszeit
+1 12-25 1. Weihnachtstag
+1 12-25 Weihnachtszeit
+1 12-26 2. Weihnachtstag
+1 12-26 Weihnachtszeit
+1 12-27 Weihnachtszeit
+1 12-28 Weihnachtszeit
+1 12-29 Weihnachtszeit
+1 12-30 Weihnachtszeit
+1 12-31 Weihnachtszeit
+1 01-01 Weihnachtszeit
+1 01-02 Weihnachtszeit
+1 01-03 Weihnachtszeit
+1 01-04 Weihnachtszeit
+1 01-05 Weihnachtszeit
+1 01-06 Weihnachtszeit
 
 # Jahreswechsel
 1 12-27 Jahreswechsel
 1 12-28 Jahreswechsel
 1 12-29 Jahreswechsel
 1 12-30 Jahreswechsel
+1 12-31 Silvester
 1 12-31 Jahreswechsel
+1 01-01 Neujahr
 1 01-01 Jahreswechsel
 1 01-02 Jahreswechsel
 1 01-03 Jahreswechsel
