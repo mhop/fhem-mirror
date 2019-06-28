@@ -210,6 +210,7 @@
 2 46 Osterzeit
 2 47 Osterzeit
 2 48 Osterzeit
+2 49 Osterzeit
 
 # Oktoberfest
 5 1 Sat 09 15 Beginn Oktoberfest
@@ -283,6 +284,21 @@
 1 12-22 Adventszeit
 1 12-23 Adventszeit
 
+# Jahreswechsel
+1 12-27 Jahreswechsel
+1 12-28 Jahreswechsel
+1 12-29 Jahreswechsel
+1 12-30 Jahreswechsel
+1 12-31 Silvester
+1 12-31 Jahreswechsel
+1 01-01 Neujahr
+1 01-01 Jahreswechsel
+1 01-02 Jahreswechsel
+1 01-03 Jahreswechsel
+1 01-04 Jahreswechsel
+1 01-05 Jahreswechsel
+1 01-06 Jahreswechsel
+
 # Weihnachtszeit
 1 12-24 Heiligabend
 1 12-24 Weihnachtszeit
@@ -301,18 +317,3 @@
 1 01-04 Weihnachtszeit
 1 01-05 Weihnachtszeit
 1 01-06 Weihnachtszeit
-
-# Jahreswechsel
-1 12-27 Jahreswechsel
-1 12-28 Jahreswechsel
-1 12-29 Jahreswechsel
-1 12-30 Jahreswechsel
-1 12-31 Silvester
-1 12-31 Jahreswechsel
-1 01-01 Neujahr
-1 01-01 Jahreswechsel
-1 01-02 Jahreswechsel
-1 01-03 Jahreswechsel
-1 01-04 Jahreswechsel
-1 01-05 Jahreswechsel
-1 01-06 Jahreswechsel
