@@ -1,4 +1,4 @@
-# $Id: de_social.holiday 14332 2017-05-20 14:06:57Z loredo $
+# $Id$
 # Festtage und regional-soziale Jahreszeiten in Deutschland
 # (nicht zu verwechseln mit tatsächlichen, gesetzlichen Feiertagen)
 #
@@ -22,63 +22,113 @@
 1 12-24 Heiligabend
 1 12-31 Silvester
 
-# Fasching
-2 -52 Fasching: Weiberfastnacht
-2 -51 Fasching
-2 -50 Fasching: Fastnachtssamstag
-2 -49 Fasching: Fastnachtssonntag
-2 -48 Fasching: Rosenmontag
-2 -47 Fasching: Fastnacht
+# Faschingszeit
+2 -52 Weiberfastnacht
+2 -52 Faschingszeit
+2 -51 Faschingszeit
+2 -50 Fastnachtssamstag
+2 -50 Faschingszeit
+2 -49 Fastnachtssonntag
+2 -49 Faschingszeit
+2 -48 Rosenmontag
+2 -48 Faschingszeit
+2 -47 Fastnacht
+2 -47 Faschingszeit
 2 -46 Aschermittwoch
 
-# Fastenzeit / Starkbierzeit
+# Fastenzeit
 2 -46 Beginn der Fastenzeit
-2 -45 Fastenzeit: Woche 1
-2 -44 Fastenzeit: Woche 1
-2 -43 Fastenzeit: Woche 1
-2 -42 Fastenzeit: Woche 1
-2 -41 Fastenzeit: Woche 2
-2 -40 Fastenzeit: Woche 2
-2 -39 Fastenzeit: Woche 2
-2 -38 Fastenzeit: Woche 2
-2 -37 Fastenzeit: Woche 2
-2 -36 Fastenzeit: Woche 2
-2 -35 Fastenzeit: Woche 2
-2 -34 Fastenzeit: Woche 3
-2 -33 Fastenzeit: Woche 3
-2 -32 Fastenzeit: Woche 3
-2 -31 Fastenzeit: Woche 3
-2 -30 Fastenzeit: Woche 3
-2 -29 Fastenzeit: Woche 3
-2 -28 Fastenzeit: Woche 3
-2 -27 Fastenzeit: Woche 4
-2 -26 Fastenzeit: Woche 4
-2 -25 Fastenzeit: Woche 4
-2 -24 Fastenzeit: Woche 4
-2 -23 Fastenzeit: Woche 4
-2 -22 Fastenzeit: Woche 4
-2 -21 Fastenzeit: Woche 4
-2 -20 Fastenzeit: Woche 5
-2 -19 Fastenzeit: Woche 5
-2 -18 Fastenzeit: Woche 5
-2 -17 Fastenzeit: Woche 5
-2 -16 Fastenzeit: Woche 5
-2 -15 Fastenzeit: Woche 5
-2 -14 Fastenzeit: Woche 5
-2 -13 Fastenzeit: Woche 6
-2 -12 Fastenzeit: Woche 6
-2 -11 Fastenzeit: Woche 6
-2 -10 Fastenzeit: Woche 6
-2  -9 Fastenzeit: Woche 6
-2  -8 Fastenzeit: Woche 6
-2  -7 Fastenzeit: Woche 6
-2  -6 Fastenzeit: Große Woche
-2  -5 Fastenzeit: Große Woche
-2  -4 Fastenzeit: Große Woche
+2 -45 Fastenwoche 1
+2 -44 Fastenwoche 1
+2 -43 Fastenwoche 1
+2 -42 Fastenwoche 1
+2 -41 Fastenwoche 2
+2 -40 Fastenwoche 2
+2 -39 Fastenwoche 2
+2 -38 Fastenwoche 2
+2 -37 Fastenwoche 2
+2 -36 Fastenwoche 2
+2 -35 Fastenwoche 2
+2 -34 Fastenwoche 3
+2 -33 Fastenwoche 3
+2 -32 Fastenwoche 3
+2 -31 Fastenwoche 3
+2 -30 Fastenwoche 3
+2 -29 Fastenwoche 3
+2 -28 Fastenwoche 3
+2 -27 Fastenwoche 4
+2 -26 Fastenwoche 4
+2 -25 Fastenwoche 4
+2 -24 Fastenwoche 4
+2 -23 Fastenwoche 4
+2 -22 Fastenwoche 4
+2 -21 Fastenwoche 4
+2 -20 Fastenwoche 5
+2 -19 Fastenwoche 5
+2 -18 Fastenwoche 5
+2 -17 Fastenwoche 5
+2 -16 Fastenwoche 5
+2 -15 Fastenwoche 5
+2 -14 Fastenwoche 5
+2 -13 Fastenwoche 6
+2 -12 Fastenwoche 6
+2 -11 Fastenwoche 6
+2 -10 Fastenwoche 6
+2  -9 Fastenwoche 6
+2  -8 Fastenwoche 6
+2  -7 Fastenwoche 6
+2  -6 Große Fastenwoche
+2  -5 Große Fastenwoche
+2  -4 Große Fastenwoche
 2  -3 Ende der Fastenzeit
+2 -46 Fastenzeit
+2 -45 Fastenzeit
+2 -44 Fastenzeit
+2 -43 Fastenzeit
+2 -42 Fastenzeit
+2 -41 Fastenzeit
+2 -40 Fastenzeit
+2 -39 Fastenzeit
+2 -38 Fastenzeit
+2 -37 Fastenzeit
+2 -36 Fastenzeit
+2 -35 Fastenzeit
+2 -34 Fastenzeit
+2 -33 Fastenzeit
+2 -32 Fastenzeit
+2 -31 Fastenzeit
+2 -30 Fastenzeit
+2 -29 Fastenzeit
+2 -28 Fastenzeit
+2 -27 Fastenzeit
+2 -26 Fastenzeit
+2 -25 Fastenzeit
+2 -24 Fastenzeit
+2 -23 Fastenzeit
+2 -22 Fastenzeit
+2 -21 Fastenzeit
+2 -20 Fastenzeit
+2 -19 Fastenzeit
+2 -18 Fastenzeit
+2 -17 Fastenzeit
+2 -16 Fastenzeit
+2 -15 Fastenzeit
+2 -14 Fastenzeit
+2 -13 Fastenzeit
+2 -12 Fastenzeit
+2 -11 Fastenzeit
+2 -10 Fastenzeit
+2  -9 Fastenzeit
+2  -8 Fastenzeit
+2  -7 Fastenzeit
+2  -6 Fastenzeit
+2  -5 Fastenzeit
+2  -4 Fastenzeit
+2  -3 Fastenzeit
 
 # Passionszeit
 2 -14 Passionssonntag
+2 -14 Passionszeit
 2 -13 Passionszeit
 2 -12 Passionszeit
 2 -11 Passionszeit
@@ -96,7 +146,9 @@
 2  -5 Karwoche
 2  -4 Karwoche
 2  -3 Gründonnerstag
+2  -3 Karwoche
 2  -1 Karsamstag
+2  -1 Karwoche
 
 # Osterzeit
 2  2 Osterzeit
@@ -151,22 +203,27 @@
 
 # Oktoberfest
 5 1 Sat 09 15 Beginn Oktoberfest
-5 1 Sun 09 15 Wiesnzeit
-5 1 Mon 09 15 Wiesnzeit
-5 1 Tue 09 15 Wiesnzeit
-5 1 Wed 09 15 Wiesnzeit
-5 1 Thu 09 15 Wiesnzeit
-5 1 Fri 09 15 Wiesnzeit
-5 2 Sat 09 15 Wiesnzeit
-5 2 Sun 09 15 Wiesnzeit
-5 2 Mon 09 15 Wiesnzeit
-5 2 Tue 09 15 Wiesnzeit
-5 2 Wed 09 15 Wiesnzeit
-5 2 Thu 09 15 Wiesnzeit
-5 2 Fri 09 15 Wiesnzeit
-5 3 Sat 09 15 Wiesnzeit
-5 3 Sun 09 15 Wiesnzeit
-#TODO variable Tage: Verlängerung bis 3.10., wenn 1.10. oder 2.10. ein Sonntag ist
+5 1 Sat 09 15 Oktoberfestzeit
+5 1 Sun 09 15 Oktoberfestzeit
+5 1 Mon 09 15 Oktoberfestzeit
+5 1 Tue 09 15 Oktoberfestzeit
+5 1 Wed 09 15 Oktoberfestzeit
+5 1 Thu 09 15 Oktoberfestzeit
+5 1 Fri 09 15 Oktoberfestzeit
+5 2 Sat 09 15 Oktoberfestzeit
+5 2 Sun 09 15 Oktoberfestzeit
+5 2 Mon 09 15 Oktoberfestzeit
+5 2 Tue 09 15 Oktoberfestzeit
+5 2 Wed 09 15 Oktoberfestzeit
+5 2 Thu 09 15 Oktoberfestzeit
+5 2 Fri 09 15 Oktoberfestzeit
+5 3 Sat 09 15 Oktoberfestzeit
+5 3 Sun 09 15 Oktoberfestzeit
+5 3 Mon 09 15 Oktoberfestzeit
+5 3 Tue 09 15 Oktoberfestzeit
+5 3 Wed 09 15 Oktoberfestzeit
+5 3 Thu 09 15 Oktoberfestzeit
+5 3 Fri 09 15 Oktoberfestzeit
 
 # Halloweenzeit
 1 10-24 Halloweenzeit
@@ -175,31 +232,52 @@
 1 10-27 Halloweenzeit
 1 10-28 Halloweenzeit
 1 10-29 Halloweenzeit
+1 10-30 Halloween
 1 10-30 Halloweenzeit
 
 # Adventszeit
+5 -4 Sun 12 25 1. Advent
+5 -4 Sun 12 25 Adventszeit
 5 -3 Mon 12 25 Adventszeit
 5 -3 Tue 12 25 Adventszeit
 5 -3 Wed 12 25 Adventszeit
 5 -3 Thu 12 25 Adventszeit
 5 -3 Fri 12 25 Adventszeit
 5 -3 Sat 12 25 Adventszeit
+5 -3 Sun 12 25 2. Advent
+5 -3 Sun 12 25 Adventszeit
 5 -2 Mon 12 25 Adventszeit
 5 -2 Tue 12 25 Adventszeit
 5 -2 Wed 12 25 Adventszeit
 5 -2 Thu 12 25 Adventszeit
 5 -2 Fri 12 25 Adventszeit
 5 -2 Sat 12 25 Adventszeit
+5 -2 Sun 12 25 3. Advent
+5 -2 Sun 12 25 Adventszeit
 5 -1 Mon 12 25 Adventszeit
 5 -1 Tue 12 25 Adventszeit
 5 -1 Wed 12 25 Adventszeit
 5 -1 Thu 12 25 Adventszeit
 5 -1 Fri 12 25 Adventszeit
 5 -1 Sat 12 25 Adventszeit
-#TODO Zeit zwischen 4. Advent und Heiligabend (inkl.)
+5 -1 Sun 12 25 4. Advent
+5 -1 Sun 12 25 Adventszeit
+1 12-19 Adventszeit
+1 12-20 Adventszeit
+1 12-21 Adventszeit
+1 12-22 Adventszeit
+1 12-23 Adventszeit
+1 12-24 Adventszeit
 
 # Jahreswechsel
 1 12-27 Jahreswechsel
 1 12-28 Jahreswechsel
 1 12-29 Jahreswechsel
 1 12-30 Jahreswechsel
+1 12-31 Jahreswechsel
+1 01-01 Jahreswechsel
+1 01-02 Jahreswechsel
+1 01-03 Jahreswechsel
+1 01-04 Jahreswechsel
+1 01-05 Jahreswechsel
+1 01-06 Jahreswechsel
