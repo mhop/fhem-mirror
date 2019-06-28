@@ -59,7 +59,7 @@ holiday_refresh($;$$)
     $fordate = sprintf("%02d-%02d", $lt[4]+1, $lt[3]);
     @fd = @lt;
   } else {
-    $fordate !~ m/^((\d{4})-)?([01]\d)-([0-3]\d)$/; # fmt is already checked
+    $fordate =~ m/^((\d{4})-)?([01]\d)-([0-3]\d)$/; # fmt is already checked
     my ($m,$d) = ($3,$4);
     $fordate = "$m-$d";
     $lt[5] = $2-1900 if($2);
@@ -216,7 +216,7 @@ holiday_refresh($;$$)
            $found = $args[3];
         }
     }
-    push @foundList, $found if($found);
+    push @foundList, $found if($found && !grep(m/^$found$/,@foundList));
 
   }
 
