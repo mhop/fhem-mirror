@@ -30,6 +30,9 @@
 # 
 # CHANGE LOG
 # 
+# 25.06.2019 1.2.6
+# bugfix     : globalPublish ohne funktion
+#
 # 06.06.2019 1.2.5
 # bugfix     : Korrekte Trennung von Events mit mehrzeiligen Werten 
 #              (regex Schalter /sm)
@@ -360,7 +363,7 @@ use warnings;
 
 #my $DEBUG = 1;
 my $cvsid = '$Id$';
-my $VERSION = "version 1.2.5 by hexenmeister\n$cvsid";
+my $VERSION = "version 1.2.6 by hexenmeister\n$cvsid";
 
 my %sets = (
 );
@@ -1088,7 +1091,10 @@ sub getDevicePublishRec($$$) {
   my $globalMap = $map->{':global'};
   my $devMap = $map->{$dev};
 
+  #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] getDevicePublishRec> devmap: ".Dumper($devMap));
+  
   foreach my $key (keys %{$devMap->{':publish'}} ) {
+    #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] getDevicePublishRec> dev: $key");
     my($keyRName,$keyPostfix) = split("!",$key);
     if($keyRName eq $reading) {
       my $devRec = getDevicePublishRecIntern($hash, $devMap, $globalMap, $dev, $key, $reading, $keyPostfix);
@@ -1100,6 +1106,7 @@ sub getDevicePublishRec($$$) {
   if(!@$ret) {
     #push(@$ret, getDevicePublishRecIntern($hash, $devMap, $globalMap, $dev, $reading, $reading, undef));
     foreach my $key (keys %{$devMap->{':publish'}} ) {
+      #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] getDevicePublishRec> dev: $key");
       my($keyRName,$keyPostfix) = split("!",$key);
       if($keyRName eq '*') {
         my $devRec = getDevicePublishRecIntern($hash, $devMap, $globalMap, $dev, $key, $reading, $keyPostfix);
@@ -1107,6 +1114,13 @@ sub getDevicePublishRec($$$) {
         push(@$ret, $devRec);
       }
     }
+  }
+
+  # wenn immer noch keine explizite Readings gefunden wurden, dann noch einmal in globalPublishMap suchen
+  if(!@$ret) {
+    my $devRec = getDevicePublishRecIntern($hash, $devMap, $globalMap, $dev, $reading, $reading, '');
+    #$devRec->{'postfix'}=defined($keyPostfix)?$keyPostfix:'';
+    push(@$ret, $devRec) if defined $devRec;
   }
 
   return $ret;
@@ -1145,8 +1159,8 @@ sub getDevicePublishRecIntern($$$$$$$) {
 
   #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] getDevicePublishRec> readingMap ".Dumper($readingMap));
   #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] getDevicePublishRec> wildcardReadingMap ".Dumper($wildcardReadingMap));
-  #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] getDevicePublishRec> readingMap ".Dumper($globalReadingMap));
-  #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] getDevicePublishRec> wildcardReadingMap ".Dumper($globalWildcardReadingsMap));
+  #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] getDevicePublishRec> global readingMap ".Dumper($globalReadingMap));
+  #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] getDevicePublishRec> global wildcardReadingMap ".Dumper($globalWildcardReadingsMap));
   # topic
   my $topic = undef;
   $topic = $readingMap->{'topic'} if defined $readingMap;
