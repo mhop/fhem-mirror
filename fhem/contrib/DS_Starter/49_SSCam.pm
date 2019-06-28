@@ -2211,7 +2211,7 @@ sub SSCam_wdpollcaminfo ($) {
     my $camname  = $hash->{CAMNAME};
     my $pcia     = AttrVal($name,"pollcaminfoall",0); 
     my $pnl      = AttrVal($name,"pollnologging",0); 
-    my $watchdogtimer = 90;
+    my $watchdogtimer = 60+rand(30);
     my $lang     = AttrVal("global","language","EN");
     
     RemoveInternalTimer($hash, "SSCam_wdpollcaminfo");
