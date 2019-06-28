@@ -723,7 +723,7 @@ HUEDevice_Set($@)
           my $VALUE2 = $2;
           my $VALUE3 = $3;
           my $json = $entry->{json};
-          if( $json =~ m/^perl:{(.*)}$/ ) {
+          if( $json =~ m/^perl:\{(.*)\}$/ ) {
             $json = eval $json;
             if($@) {
               Log3 $name, 3, "$name: configList: ". join(' ', @aa). ": ". $@;
@@ -749,7 +749,7 @@ HUEDevice_Set($@)
           my $VALUE2 = $2;
           my $VALUE3 = $3;
           my $json = $entry->{json};
-          if( $json =~ m/^perl:{(.*)}$/ ) {
+          if( $json =~ m/^perl:\{(.*)\}$/ ) {
             $json = eval $json;
             if($@) {
               Log3 $name, 3, "$name: configList: ". join(' ', @aa). ": ". $@;
