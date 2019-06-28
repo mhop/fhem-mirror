@@ -15,9 +15,9 @@
 1 02-14 Valentinstag
 1 04-30 Tanz in den Mai
 3 2 Sun 05 Muttertag
+2 39 Vatertag
 2 49 Pfingsten
 2 50 Pfingsten
-2 39 Vatertag
 3 1 Sun 10 Erntedankfest
 1 11-11 Martinstag
 5 -1 Wed 11 24 Buß- und Bettag
@@ -67,50 +67,52 @@
 2  -4 Passionszeit
 
 # Fastenzeit
-2 -46 Beginn der Fastenzeit
+2 -46 Fastenwoche 1
 2 -45 Fastenwoche 1
 2 -44 Fastenwoche 1
 2 -43 Fastenwoche 1
-2 -42 Fastenwoche 1
+2 -42 Fastenwoche 2
 2 -41 Fastenwoche 2
 2 -40 Fastenwoche 2
 2 -39 Fastenwoche 2
 2 -38 Fastenwoche 2
 2 -37 Fastenwoche 2
 2 -36 Fastenwoche 2
-2 -35 Fastenwoche 2
+2 -35 Fastenwoche 3
 2 -34 Fastenwoche 3
 2 -33 Fastenwoche 3
 2 -32 Fastenwoche 3
 2 -31 Fastenwoche 3
 2 -30 Fastenwoche 3
 2 -29 Fastenwoche 3
-2 -28 Fastenwoche 3
+2 -28 Fastenwoche 4
 2 -27 Fastenwoche 4
 2 -26 Fastenwoche 4
 2 -25 Fastenwoche 4
 2 -24 Fastenwoche 4
 2 -23 Fastenwoche 4
 2 -22 Fastenwoche 4
-2 -21 Fastenwoche 4
+2 -21 Fastenwoche 5
 2 -20 Fastenwoche 5
 2 -19 Fastenwoche 5
 2 -18 Fastenwoche 5
 2 -17 Fastenwoche 5
 2 -16 Fastenwoche 5
 2 -15 Fastenwoche 5
-2 -14 Fastenwoche 5
+2 -14 Fastenwoche 6
 2 -13 Fastenwoche 6
 2 -12 Fastenwoche 6
 2 -11 Fastenwoche 6
 2 -10 Fastenwoche 6
 2  -9 Fastenwoche 6
 2  -8 Fastenwoche 6
-2  -7 Fastenwoche 6
+2  -7 Große Fastenwoche
 2  -6 Große Fastenwoche
 2  -5 Große Fastenwoche
 2  -4 Große Fastenwoche
-2  -3 Ende der Fastenzeit
+2  -3 Große Fastenwoche
+2  -2 Große Fastenwoche
+2  -1 Große Fastenwoche
 2 -46 Fastenzeit
 2 -45 Fastenzeit
 2 -44 Fastenzeit
@@ -155,6 +157,8 @@
 2  -5 Fastenzeit
 2  -4 Fastenzeit
 2  -3 Fastenzeit
+2  -2 Fastenzeit
+2  -1 Fastenzeit
 
 # Osterzeit
 2  0 Ostersonntag
@@ -213,7 +217,6 @@
 2 49 Osterzeit
 
 # Oktoberfest
-5 1 Sat 09 15 Beginn Oktoberfest
 5 1 Sat 09 15 Oktoberfestzeit
 5 1 Sun 09 15 Oktoberfestzeit
 5 1 Mon 09 15 Oktoberfestzeit
