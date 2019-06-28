@@ -36,6 +36,33 @@
 2 -47 Faschingszeit
 2 -46 Aschermittwoch
 
+# Karwoche
+2  -7 Palmsonntag
+2  -7 Karwoche
+2  -6 Karwoche
+2  -5 Karwoche
+2  -4 Karwoche
+2  -3 Gründonnerstag
+2  -3 Karwoche
+2  -2 Karfreitag
+2  -2 Karwoche
+2  -1 Karsamstag
+2  -1 Karwoche
+
+# Passionszeit
+2 -14 Passionssonntag
+2 -14 Passionszeit
+2 -13 Passionszeit
+2 -12 Passionszeit
+2 -11 Passionszeit
+2 -10 Passionszeit
+2  -9 Passionszeit
+2  -8 Passionszeit
+2  -7 Passionszeit
+2  -6 Passionszeit
+2  -5 Passionszeit
+2  -4 Passionszeit
+
 # Fastenzeit
 2 -46 Beginn der Fastenzeit
 2 -45 Fastenwoche 1
@@ -126,31 +153,11 @@
 2  -4 Fastenzeit
 2  -3 Fastenzeit
 
-# Passionszeit
-2 -14 Passionssonntag
-2 -14 Passionszeit
-2 -13 Passionszeit
-2 -12 Passionszeit
-2 -11 Passionszeit
-2 -10 Passionszeit
-2  -9 Passionszeit
-2  -8 Passionszeit
-2  -7 Passionszeit
-2  -6 Passionszeit
-2  -5 Passionszeit
-2  -4 Passionszeit
-
-# Karwoche
-2  -7 Karwoche
-2  -6 Karwoche
-2  -5 Karwoche
-2  -4 Karwoche
-2  -3 Gründonnerstag
-2  -3 Karwoche
-2  -1 Karsamstag
-2  -1 Karwoche
-
 # Osterzeit
+2  0 Ostersonntag
+2  0 Osterzeit
+2  1 Ostermontag
+2  1 Osterzeit
 2  2 Osterzeit
 2  3 Osterzeit
 2  4 Osterzeit
