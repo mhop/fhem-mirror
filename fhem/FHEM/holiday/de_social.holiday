@@ -40,7 +40,7 @@
 2 -46 Aschermittwoch
 
 # Karwoche
-2  -7 Palmsonntag
+2  -7 Palm- und Passionssonntag
 2  -7 Karwoche
 2  -6 Karwoche
 2  -5 Karwoche
@@ -52,70 +52,55 @@
 2  -1 Karsamstag
 2  -1 Karwoche
 
-# Passionszeit
-2 -14 Passionssonntag
-2 -14 Passionszeit
-2 -13 Passionszeit
-2 -12 Passionszeit
-2 -11 Passionszeit
-2 -10 Passionszeit
-2  -9 Passionszeit
-2  -8 Passionszeit
-2  -7 Passionszeit
-2  -6 Passionszeit
-2  -5 Passionszeit
-2  -4 Passionszeit
-2  -3 Passionszeit
-2  -2 Passionszeit
-2  -1 Passionszeit
-
-# Fastenzeit
-2 -46 Fastenwoche 1
+# Fasten- und Passionszeit
+2 -46 Begin der Fastenzeit
 2 -45 Fastenwoche 1
 2 -44 Fastenwoche 1
 2 -43 Fastenwoche 1
-2 -42 Fastenwoche 2
+2 -42 1. Fastensonntag
 2 -41 Fastenwoche 2
 2 -40 Fastenwoche 2
 2 -39 Fastenwoche 2
 2 -38 Fastenwoche 2
 2 -37 Fastenwoche 2
 2 -36 Fastenwoche 2
-2 -35 Fastenwoche 3
+2 -35 2. Fastensonntag
 2 -34 Fastenwoche 3
 2 -33 Fastenwoche 3
 2 -32 Fastenwoche 3
 2 -31 Fastenwoche 3
 2 -30 Fastenwoche 3
 2 -29 Fastenwoche 3
-2 -28 Fastenwoche 4
+2 -28 3. Fastensonntag
 2 -27 Fastenwoche 4
 2 -26 Fastenwoche 4
 2 -25 Fastenwoche 4
 2 -24 Fastenwoche 4
 2 -23 Fastenwoche 4
 2 -22 Fastenwoche 4
-2 -21 Fastenwoche 5
+2 -21 4. Fastensonntag
 2 -20 Fastenwoche 5
 2 -19 Fastenwoche 5
 2 -18 Fastenwoche 5
 2 -17 Fastenwoche 5
 2 -16 Fastenwoche 5
 2 -15 Fastenwoche 5
-2 -14 Fastenwoche 6
+2 -14 5. Fastensonntag
 2 -13 Fastenwoche 6
 2 -12 Fastenwoche 6
 2 -11 Fastenwoche 6
 2 -10 Fastenwoche 6
 2  -9 Fastenwoche 6
 2  -8 Fastenwoche 6
-2  -7 Große Fastenwoche
+2  -7 6. Fastensonntag
 2  -6 Große Fastenwoche
 2  -5 Große Fastenwoche
 2  -4 Große Fastenwoche
 2  -3 Große Fastenwoche
 2  -2 Große Fastenwoche
-2  -1 Große Fastenwoche
+2  -1 Ende der Fastenzeit
+
+# Fastenzeit
 2 -46 Fastenzeit
 2 -45 Fastenzeit
 2 -44 Fastenzeit
@@ -279,7 +264,10 @@
 5 -1 Sat 12 25 Adventszeit
 5 -1 Sun 12 25 4. Advent
 5 -1 Sun 12 25 Adventszeit
-#TODO 11-28, 11-29 und 11-30 wenn der 1. Advent auf den 27.11. fällt
+1 11-27 Adventszeit
+1 11-28 Adventszeit
+1 11-29 Adventszeit
+1 11-30 Adventszeit
 1 12-01 Adventszeit
 1 12-02 Adventszeit
 1 12-03 Adventszeit
