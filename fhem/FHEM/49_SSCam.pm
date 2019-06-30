@@ -48,6 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.14.2" => "28.06.2019  increase get SID timeout to at least 60 s, set compatibility to SVS 8.2.4, improve disable/enable behavior ",
   "8.14.1" => "23.06.2019  Presets and Patrols containing spaces in its names are replaced by \"_\", deletion of Presets corrected ".
                            "bugfix userattr when changing Prests ",
   "8.14.0" => "01.06.2019  Link to Cam/SVS-Setup Screen and online help in Detailview ",
@@ -265,7 +266,7 @@ our %SSCam_vNotesExtern = (
 );
 
 # getestete SVS-Version
-my $compstat = "8.2.3";
+my $compstat = "8.2.4";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -629,6 +630,12 @@ sub SSCam_Attr($$$$) {
             $val = ($do == 1 ? "inactive" : "off");
 		} else {
 		    $val = ($do == 1 ? "disabled" : "initialized");
+		}
+		
+		if ($do == 1) {
+		    RemoveInternalTimer($hash);
+		} else {
+		    InternalTimer(gettimeofday()+int(rand(30)), "SSCam_initonboot", $hash, 0);
 		}
     
         readingsSingleUpdate($hash, "state", $val, 1);
@@ -2204,7 +2211,7 @@ sub SSCam_wdpollcaminfo ($) {
     my $camname  = $hash->{CAMNAME};
     my $pcia     = AttrVal($name,"pollcaminfoall",0); 
     my $pnl      = AttrVal($name,"pollnologging",0); 
-    my $watchdogtimer = 90;
+    my $watchdogtimer = 60+rand(30);
     my $lang     = AttrVal("global","language","EN");
     
     RemoveInternalTimer($hash, "SSCam_wdpollcaminfo");
@@ -4562,7 +4569,7 @@ sub SSCam_camop ($) {
    Log3($name, 4, "$name - --- Begin Function $OpMode nonblocking ---");
 
    $httptimeout = AttrVal($name, "httptimeout", 4);
-   $httptimeout = $httptimeout+90 if($OpMode =~ /setoptpar|Disable/);   # setzen der Optimierungsparameter/Disable dauert lange !
+   $httptimeout = $httptimeout+90 if($OpMode =~ /setoptpar|Disable/);                          # setzen der Optimierungsparameter/Disable dauert lange !
    
    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
    
@@ -6355,8 +6362,9 @@ sub SSCam_login ($$) {
       return;
   }
 
-  my $httptimeout = AttrVal($name,"httptimeout",4);
-  Log3($name, 5, "$name - HTTP-Call login will be done with httptimeout-Value: $httptimeout s");
+  my $httptimeout = AttrVal($name,"httptimeout",60);
+  $httptimeout    = 60 if($httptimeout < 60);
+  Log3($name, 4, "$name - HTTP-Call login will be done with httptimeout-Value: $httptimeout s");
   
   my $urlwopw;      # nur zur Anzeige bei verbose >= 4 und "showPassInLog" == 0
   
