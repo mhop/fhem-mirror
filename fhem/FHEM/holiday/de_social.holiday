@@ -13,25 +13,53 @@
 
 # Festtage
 1 02-14 Valentinstag
-1 04-30 Tanz in den Mai
+1 04-30 Walpurgisnacht
 3 2 Sun 05 Muttertag
 2 39 Vatertag
-2 49 Pfingsten
-2 50 Pfingsten
 3 1 Sun 10 Erntedankfest
+1 11-10 Martinisingen
 1 11-11 Martinstag
-5 -1 Wed 11 24 Buß- und Bettag
 5 -6 Sun 12 25 Volkstrauertag
 5 -5 Sun 12 25 Totensonntag
 1 12-06 Nikolaus
 
+# (Teilweise) Feiertage, hier jedoch als Festtage
+1 01-06 Heilige Drei Könige
+1 03-08 Internationaler Frauentag
+1 03-17 St. Patrick's Day
+# 1 05-01 Tag der Arbeit
+1 05-08 Tag der Befreiung
+# 2 39 Christi Himmelfahrt
+2 49 Pfingstsonntag
+# 2 50 Pfingstmontag
+2 60 Fronleichnam
+1 08-15 Mariä Himmelfahrt
+1 09-20 Weltkindertag
+1 10-03 Tag der Deutschen Einheit
+1 10-31 Reformationstag
+1 11-01 Allerheiligen
+1 11-02 Allerseelen
+5 -1 Wed 11 23 Buß- und Bettag
+
 # Faschingszeit
+2 -63 Faschingszeit
+2 -62 Faschingszeit
+2 -61 Faschingszeit
+2 -60 Faschingszeit
+2 -59 Faschingszeit
+2 -58 Faschingszeit
+2 -57 Faschingszeit
+2 -56 Faschingszeit
+2 -55 Faschingszeit
+2 -54 Faschingszeit
+2 -53 Faschingszeit
 2 -52 Weiberfastnacht
 2 -52 Faschingszeit
+2 -51 Rußiger Freitag
 2 -51 Faschingszeit
-2 -50 Fastnachtssamstag
+2 -50 Faschingssamstag
 2 -50 Faschingszeit
-2 -49 Fastnachtssonntag
+2 -49 Faschingssonntag
 2 -49 Faschingszeit
 2 -48 Rosenmontag
 2 -48 Faschingszeit
@@ -53,7 +81,7 @@
 2  -1 Karwoche
 
 # Fasten- und Passionszeit
-2 -46 Begin der Fastenzeit
+2 -46 Beginn der Fastenzeit
 2 -45 Fastenwoche 1
 2 -44 Fastenwoche 1
 2 -43 Fastenwoche 1
@@ -234,8 +262,9 @@
 1 10-27 Halloweenzeit
 1 10-28 Halloweenzeit
 1 10-29 Halloweenzeit
-1 10-30 Halloween
 1 10-30 Halloweenzeit
+1 10-31 Halloween
+1 10-31 Halloweenzeit
 
 # Adventszeit
 5 -4 Sun 12 25 1. Advent
