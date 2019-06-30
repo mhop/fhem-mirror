@@ -1,4 +1,4 @@
-REV 19742
+REV 19745
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -603,7 +603,7 @@ UPD 2019-06-29_07:45:02 380 FHEM/holiday/be.holiday
 UPD 2019-06-29_07:45:02 427 FHEM/holiday/bw.holiday
 UPD 2019-06-29_07:45:02 452 FHEM/holiday/by.holiday
 UPD 2019-06-29_07:45:02 1092 FHEM/holiday/by_ext.holiday
-UPD 2019-06-29_07:45:02 6631 FHEM/holiday/de_social.holiday
+UPD 2019-06-30_07:45:03 6457 FHEM/holiday/de_social.holiday
 UPD 2017-09-10_16:01:38 1031 FHEM/holiday/en.holiday
 UPD 2019-06-29_07:45:02 370 FHEM/holiday/hb.holiday
 UPD 2019-06-29_07:45:02 285 FHEM/holiday/he.holiday
@@ -726,8 +726,8 @@ UPD 2019-06-28_07:45:06 4064420 docs/commandref.html
 UPD 2019-06-28_07:45:08 2506569 docs/commandref_DE.html
 UPD 2019-06-27_07:45:02 79462 docs/commandref_frame.html
 UPD 2019-06-27_07:45:02 89220 docs/commandref_frame_DE.html
-UPD 2019-06-29_07:45:09 216286 docs/commandref_modular.html
-UPD 2019-06-29_07:45:10 227250 docs/commandref_modular_DE.html
+UPD 2019-06-30_07:45:10 216286 docs/commandref_modular.html
+UPD 2019-06-30_07:45:11 227250 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
