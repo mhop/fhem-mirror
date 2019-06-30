@@ -152,13 +152,21 @@ Level_Parse($$)
   push(@list, $rname);
 
   $rhash->{Level_lastRcv} = TimeNow();
+  $rhash->{SensorType} = $type;
 
   readingsBeginUpdate($rhash);
   
   my $litresPerCm = AttrVal( $rname, "litersPerCm", 1);
   my $distanceToBottom = AttrVal( $rname, "distanceToBottom", 100);
   
-  my $level = $distanceToBottom - $distance;
+  my $level = -273;
+  if($type eq 1) {
+    $level = $distance;
+  }
+  else {
+    $level = $distanceToBottom - $distance;
+  }
+  
   
   my $litres = 0;
   my $formula = AttrVal( $rname, "formula", undef);
@@ -178,7 +186,9 @@ Level_Parse($$)
   
   $litres = int($litres);
   
-  readingsBulkUpdate($rhash, "distance", $distance);
+  if($type ne 1) {
+    readingsBulkUpdate($rhash, "distance", $distance);
+  }
   readingsBulkUpdate($rhash, "level", $level);
   readingsBulkUpdate($rhash, "liters", $litres);
   readingsBulkUpdate($rhash, "temperature", $temperature);
