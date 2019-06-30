@@ -1552,7 +1552,7 @@ desiredListNloop:
          # Configure Timer according to provided parameters
         YAMAHA_NP_SendCmd($hash, "PUT:System,Misc,Timer,Param:"
                                 ."<Start_Time>".sprintf("%02d", $timerHour).":".sprintf("%02d", $timerMinute)."</Start_Time>"
-                                ."<Volume>$timerVolume</Volume>"
+                                ."<Volume><Lvl>$timerVolume</Lvl></Volume>"
                                 ."<Repeat>$timerRepeat</Repeat>", $what, $a[2], 0);
       }
       else
