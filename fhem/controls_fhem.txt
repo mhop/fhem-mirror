@@ -1,4 +1,4 @@
-REV 19745
+REV 19751
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2019-06-28_07:45:03 298378 ./CHANGED
+UPD 2019-07-01_07:45:03 298643 ./CHANGED
 UPD 2019-06-28_07:45:03 41413 ./MAINTAINER.txt
 UPD 2019-06-02_07:45:03 39782 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
@@ -215,7 +215,7 @@ UPD 2017-07-14_07:45:02 36839 FHEM/36_JeeLink.pm
 UPD 2017-02-28_07:45:02 7273 FHEM/36_KeyValueProtocol.pm
 UPD 2019-01-06_07:45:02 20126 FHEM/36_LaCrosse.pm
 UPD 2019-01-18_07:45:03 33269 FHEM/36_LaCrosseGateway.pm
-UPD 2019-05-26_07:45:02 7380 FHEM/36_Level.pm
+UPD 2019-07-01_07:45:03 7519 FHEM/36_Level.pm
 UPD 2016-08-23_07:45:12 9997 FHEM/36_PCA301.pm
 UPD 2019-01-06_07:45:02 17434 FHEM/36_PrecipitationSensor.pm
 UPD 2019-06-06_07:45:02 56781 FHEM/36_Shelly.pm
@@ -273,7 +273,7 @@ UPD 2018-01-24_07:45:02 18229 FHEM/46_TeslaPowerwall2AC.pm
 UPD 2019-02-16_07:45:06 37067 FHEM/47_OBIS.pm
 UPD 2019-03-14_07:45:02 59185 FHEM/49_Arlo.pm
 UPD 2019-02-06_07:45:03 27160 FHEM/49_IPCAM.pm
-UPD 2019-06-24_07:45:02 660739 FHEM/49_SSCam.pm
+UPD 2019-07-01_07:45:03 661106 FHEM/49_SSCam.pm
 UPD 2019-03-28_07:45:03 27611 FHEM/49_SSCamSTRM.pm
 UPD 2018-03-12_07:45:04 46280 FHEM/49_TBot_List.pm
 UPD 2019-04-26_07:45:03 63794 FHEM/50_HP1000.pm
@@ -362,7 +362,7 @@ UPD 2017-06-27_07:45:02 24467 FHEM/71_PIONEERAVRZONE.pm
 UPD 2018-10-17_07:45:02 166011 FHEM/71_YAMAHA_AVR.pm
 UPD 2017-09-27_07:45:02 51988 FHEM/71_YAMAHA_BD.pm
 UPD 2019-03-28_07:45:03 210125 FHEM/71_YAMAHA_MC.pm
-UPD 2018-01-29_07:45:02 123938 FHEM/71_YAMAHA_NP.pm
+UPD 2019-07-01_07:45:03 123949 FHEM/71_YAMAHA_NP.pm
 UPD 2019-02-06_07:45:03 18948 FHEM/71_ZM_Monitor.pm
 UPD 2019-01-09_07:45:02 88476 FHEM/72_FB_CALLLIST.pm
 UPD 2019-06-02_07:45:03 120756 FHEM/72_FB_CALLMONITOR.pm
@@ -598,30 +598,30 @@ UPD 2016-10-02_07:45:11 49235 FHEM/firmware/SIGNALduino_promini328.hex
 UPD 2016-10-02_07:45:11 49235 FHEM/firmware/SIGNALduino_uno.hex
 UPD 2017-01-07_07:45:02 99233 FHEM/firmware/esptool.py
 UPD 2019-06-29_07:45:02 759 FHEM/holiday/aut.holiday
-UPD 2019-06-29_07:45:02 375 FHEM/holiday/bb.holiday
-UPD 2019-06-29_07:45:02 380 FHEM/holiday/be.holiday
-UPD 2019-06-29_07:45:02 427 FHEM/holiday/bw.holiday
-UPD 2019-06-29_07:45:02 452 FHEM/holiday/by.holiday
-UPD 2019-06-29_07:45:02 1092 FHEM/holiday/by_ext.holiday
-UPD 2019-06-30_07:45:03 6457 FHEM/holiday/de_social.holiday
+UPD 2019-07-01_07:45:03 399 FHEM/holiday/bb.holiday
+UPD 2019-07-01_07:45:03 384 FHEM/holiday/be.holiday
+UPD 2019-07-01_07:45:03 431 FHEM/holiday/bw.holiday
+UPD 2019-07-01_07:45:03 456 FHEM/holiday/by.holiday
+UPD 2019-07-01_07:45:03 1101 FHEM/holiday/by_ext.holiday
+UPD 2019-07-01_07:45:03 7138 FHEM/holiday/de_social.holiday
 UPD 2017-09-10_16:01:38 1031 FHEM/holiday/en.holiday
-UPD 2019-06-29_07:45:02 370 FHEM/holiday/hb.holiday
-UPD 2019-06-29_07:45:02 285 FHEM/holiday/he.holiday
-UPD 2019-06-29_07:45:02 371 FHEM/holiday/hh.holiday
+UPD 2019-07-01_07:45:03 374 FHEM/holiday/hb.holiday
+UPD 2019-07-01_07:45:03 289 FHEM/holiday/he.holiday
+UPD 2019-07-01_07:45:03 375 FHEM/holiday/hh.holiday
 UPD 2017-09-10_16:01:38 430 FHEM/holiday/islam2017.holiday
 UPD 2017-09-10_16:01:38 430 FHEM/holiday/islam2018.holiday
 UPD 2017-09-10_16:01:38 430 FHEM/holiday/islam2019.holiday
 UPD 2019-06-29_07:45:02 390 FHEM/holiday/islam2020.holiday
-UPD 2019-06-29_07:45:02 386 FHEM/holiday/mv.holiday
-UPD 2019-06-29_07:45:02 307 FHEM/holiday/ni.holiday
-UPD 2019-06-29_07:45:02 418 FHEM/holiday/ns.holiday
-UPD 2019-06-29_07:45:02 399 FHEM/holiday/nw.holiday
-UPD 2019-06-29_07:45:02 395 FHEM/holiday/rp.holiday
-UPD 2019-06-29_07:45:02 382 FHEM/holiday/sh.holiday
-UPD 2019-06-29_07:45:02 381 FHEM/holiday/sl.holiday
-UPD 2019-06-29_07:45:02 424 FHEM/holiday/sn.holiday
-UPD 2019-06-29_07:45:02 407 FHEM/holiday/st.holiday
-UPD 2019-06-29_07:45:02 416 FHEM/holiday/th.holiday
+UPD 2019-07-01_07:45:03 390 FHEM/holiday/mv.holiday
+UPD 2019-07-01_07:45:03 311 FHEM/holiday/ni.holiday
+UPD 2019-07-01_07:45:03 422 FHEM/holiday/ns.holiday
+UPD 2019-07-01_07:45:03 403 FHEM/holiday/nw.holiday
+UPD 2019-07-01_07:45:03 399 FHEM/holiday/rp.holiday
+UPD 2019-07-01_07:45:03 386 FHEM/holiday/sh.holiday
+UPD 2019-07-01_07:45:03 385 FHEM/holiday/sl.holiday
+UPD 2019-07-01_07:45:03 428 FHEM/holiday/sn.holiday
+UPD 2019-07-01_07:45:03 411 FHEM/holiday/st.holiday
+UPD 2019-07-01_07:45:03 421 FHEM/holiday/th.holiday
 UPD 2019-05-09_07:45:02 333578 FHEM/lib/74_AMADautomagicFlowset_4.4.1.xml
 UPD 2019-05-09_07:45:02 442824 FHEM/lib/74_AMADtaskerset_4.4.1.prj.xml
 UPD 2019-05-05_07:45:03 27701 FHEM/lib/AttrTemplate/httpmod.template
@@ -726,8 +726,8 @@ UPD 2019-06-28_07:45:06 4064420 docs/commandref.html
 UPD 2019-06-28_07:45:08 2506569 docs/commandref_DE.html
 UPD 2019-06-27_07:45:02 79462 docs/commandref_frame.html
 UPD 2019-06-27_07:45:02 89220 docs/commandref_frame_DE.html
-UPD 2019-06-30_07:45:10 216286 docs/commandref_modular.html
-UPD 2019-06-30_07:45:11 227250 docs/commandref_modular_DE.html
+UPD 2019-07-01_07:45:10 216286 docs/commandref_modular.html
+UPD 2019-07-01_07:45:11 227250 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
