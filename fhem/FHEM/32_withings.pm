@@ -1220,7 +1220,7 @@ sub withings_getDeviceDetail($) {
     Log3 $name, 2, "$name: json evaluation error on getDeviceDetail ".$@;
     return undef;
   }
-  Log3 $name, 1, "withings: getDeviceDetail json error ".$json->{error} if(defined($json->{error}));
+  Log3 $name, 1, "$name: getDeviceDetail json error ".$json->{error} if(defined($json->{error}));
 
   if($json)
   {
@@ -1945,6 +1945,9 @@ sub withings_parseMeasureGroups($$) {
             Log3 $name, 1, "$name: unknown measure type: $measure->{type} ".Dumper($measure);
             next;
           }
+
+          #fix for duplicate pulseWave value
+          $reading = "pulseWaveRaw" if($measure->{type} == 91 && $measuregrp->{attrib} == 0);
 
           my $value = $measure->{value} * 10 ** $measure->{unit};
 
@@ -3675,7 +3678,7 @@ sub withings_AuthApp($;$) {
   $userhash->{helper}{OAuthValid} = (int(time)+$json->{expires_in}) if(defined($json->{expires_in}));
   readingsSingleUpdate( $userhash, ".refresh_token", $json->{refresh_token}, 1 ) if(defined($json->{refresh_token}));
 
-  InternalTimer(gettimeofday()+$json->{expires_in}, "withings_AuthRefresh", $userhash, 0);
+  InternalTimer(gettimeofday()+$json->{expires_in}-60, "withings_AuthRefresh", $userhash, 0);
 
 
   #https://wbsapi.withings.net/notify?action=subscribe&access_token=a639e912dfc31a02cc01ea4f38de7fa4a1464c2e&callbackurl=http://fhem:remote@gu9mohkaxqdgpix5.myfritz.net/fhem/withings&appli=1&comment=fhem
@@ -3728,7 +3731,7 @@ sub withings_AuthRefresh($) {
   $hash->{helper}{OAuthValid} = (int(time)+$json->{expires_in}) if(defined($json->{expires_in}));
   readingsSingleUpdate( $hash, ".refresh_token", $json->{refresh_token}, 1 ) if(defined($json->{refresh_token}));
 
-  InternalTimer(gettimeofday()+$json->{expires_in}, "withings_AuthRefresh", $hash, 0);
+  InternalTimer(gettimeofday()+$json->{expires_in}-60, "withings_AuthRefresh", $hash, 0);
 
   #https://wbsapi.withings.net/notify?action=subscribe&access_token=a639e912dfc31a02cc01ea4f38de7fa4a1464c2e&callbackurl=http://fhem:remote@gu9mohkaxqdgpix5.myfritz.net/fhem/withings&appli=1&comment=fhem
 
@@ -3908,6 +3911,11 @@ sub withings_DbLog_splitFn($) {
   {
     $reading = 'heartPulse';
     $unit = 'bpm';
+  }
+  elsif($event =~ m/pulseWaveRaw/)
+  {
+    $reading = 'pulseWaveRaw';
+    $unit = 'm/s';
   }
   elsif($event =~ m/pulseWave/)
   {

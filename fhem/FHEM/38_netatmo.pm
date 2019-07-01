@@ -6599,7 +6599,7 @@ sub netatmo_weatherIcon()
     <li><a name="videoquality">videoquality</a><br>
       video quality for playlists (HOME - default: medium)</li>
     <li><a name="webhookURL">webhookURL</a><br>
-      webhook URL - can include basic auth and ports: http://user:pass@your.url:8080/fhem/netatmo (WEBHOOK)</li>
+      webhook URL - can include basic auth and port (80 or 443 only!): http://user:pass@your.url:80/fhem/netatmo (WEBHOOK)</li>
     <li><a name="webhookPoll">webhookPoll</a><br>
       poll home after event from webhook (WEBHOOK - default: 0)</li>
     <li><a name="ignored_device_ids">ignored_device_ids</a><br>
