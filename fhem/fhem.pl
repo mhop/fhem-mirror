@@ -5960,7 +5960,7 @@ IsWe(;$$)
 {
   my ($when, $wday) = @_;
   $wday = (localtime(gettimeofday()))[6] if(!defined($wday));
-  $when = "state" if(!$when || $when !~ m/^(yesterday|tomorrow)$/);
+  $when = "state" if(!$when);
   
   my ($we, $wf);
   foreach my $h2we (split(",", AttrVal("global", "holiday2we", ""))) {
