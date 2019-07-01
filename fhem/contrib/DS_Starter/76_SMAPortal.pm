@@ -128,7 +128,8 @@ BEGIN {
           InternalTimer
           IsDisabled
           Log
-          Log3         
+          Log3    
+          makeReadingName          
           modules          
           readingsSingleUpdate
           readingsBulkUpdate
@@ -161,6 +162,7 @@ use vars qw($FW_ME);                                    # webname (default is fh
 
 # Versions History intern
 our %vNotesIntern = (
+  "2.4.1"  => "01.07.2019  replace space in consumer name by a valid sign for reading creation ",
   "2.4.0"  => "26.06.2019  support for FTUI-Widget ",
   "2.3.7"  => "24.06.2019  replace suggestIcon by consumerAdviceIcon ",
   "2.3.6"  => "21.06.2019  revise commandref ",                        
@@ -1435,7 +1437,7 @@ sub extractConsumerData($$) {
                $key    =~ /^(\d+)_.*$/;
                my $lfn = $1; 
                my $cn  = $consumers{"${lfn}_ConsumerName"};            # Verbrauchername
-               $cn     = substUmlauts($cn);                            # evtl. Umlaute im Verbrauchernamen ersetzen
+               $cn     = replaceJunkSigns($cn);                        # evtl. Umlaute/Leerzeichen im Verbrauchernamen ersetzen
                my $pos = $consumers{"${lfn}_PlannedOpTimeStart"};      # geplanter Start
                my $poe = $consumers{"${lfn}_PlannedOpTimeEnd"};        # geplantes Ende
                my $rb  = "L3_${cn}_PlannedOpTimeBegin"; 
@@ -1488,7 +1490,7 @@ sub extractConsumerLiveData($$) {
       $consumers{"${i}_ConsumerLfd"}  = $i;
 	  my $cpower                      = $c->{'Consume'}{'Measurement'};           # aktueller Energieverbrauch in W
 	  my $cn                          = $consumers{"${i}_ConsumerName"};          # Verbrauchername
-      $cn                             = substUmlauts($cn);
+      $cn                             = replaceJunkSigns($cn);
       
       $hash->{HELPER}{CONSUMER}{$i}{DeviceName}   = $cn;
       $hash->{HELPER}{CONSUMER}{$i}{ConsumerOid}  = $consumers{"${i}_ConsumerOid"};
@@ -1512,7 +1514,7 @@ sub extractConsumerLiveData($$) {
           my $OperationAutoEna = $c->{'Parameters'}[2]{'Value'};                                           # Automatic Betrieb erlaubt ?
 		  my $ltchange         = TimeAdjust($hash,$c->{'Parameters'}[0]{'Timestamp'}{'DateTime'},$tkind);  # letzter Schaltzeitpunkt der Bluetooth-Steckdose (Verbraucher)
           my $cn  = $consumers{"${i}_ConsumerName"};                                                       # Verbrauchername
-          $cn     = substUmlauts($cn);                                                                     # evtl. Umlaute im Verbrauchernamen ersetzen
+          $cn     = replaceJunkSigns($cn);                                                                 # evtl. Umlaute/Leerzeichen im Verbrauchernamen ersetzen
           
           if(!$GriSwStt && $GriSwAuto) {
               $res = "off (automatic)";
@@ -1566,7 +1568,7 @@ sub extractConsumerHistData($$$) {
       $consumers{"${i}_ConsumerLfd"}  = $i;
 	  my $cpower                      = $c->{'TotalEnergy'}{'Measurement'};    # Energieverbrauch im Timeframe in Wh                                         
 	  my $cn                          = $consumers{"${i}_ConsumerName"};       # Verbrauchername
-      $cn                             = substUmlauts($cn);
+      $cn                             = replaceJunkSigns($cn);
       
       if($tf =~ /month|year/) {
           $tct = $c->{'TotalEnergyMix'}{'TotalConsumptionTotal'};              # Gesamtverbrauch im Timeframe in Wh
@@ -1809,20 +1811,21 @@ sub TimeAdjust($$$) {
 }
 
 ###############################################################################
-#              Umlaute für Readingerstellung ersetzen 
+#       Umlaute und ungültige Zeichen für Readingerstellung ersetzen 
 ###############################################################################
-sub substUmlauts ($) { 
-  my ($txt) = @_;
+sub replaceJunkSigns ($) { 
+  my ($rn) = @_;
 
-  $txt =~ s/ß/ss/g;
-  $txt =~ s/ä/ae/g;
-  $txt =~ s/ö/oe/g;
-  $txt =~ s/ü/ue/g;
-  $txt =~ s/Ä/Ae/g;
-  $txt =~ s/Ö/Oe/g;
-  $txt =~ s/Ü/Ue/g;     
+  $rn =~ s/ß/ss/g;
+  $rn =~ s/ä/ae/g;
+  $rn =~ s/ö/oe/g;
+  $rn =~ s/ü/ue/g;
+  $rn =~ s/Ä/Ae/g;
+  $rn =~ s/Ö/Oe/g;
+  $rn =~ s/Ü/Ue/g; 
+  $rn = makeReadingName($rn);  
   
-return($txt);
+return($rn);
 }
 
 ###############################################################################
