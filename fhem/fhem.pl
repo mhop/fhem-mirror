@@ -5959,12 +5959,21 @@ sub
 IsWe(;$$)
 {
   my ($when, $wday) = @_;
-  $wday = (localtime(gettimeofday()))[6] if(!defined($wday));
-  $when = "state" if(!$when);
-  
+
+  my $dt = ($when && $when =~ m/^((\d{4})-)?([01]\d)-([0-3]\d)$/);
+  $when = "state" if(!$when || ($when !~ m/^(yesterday|tomorrow)$/ && !$dt));
+  if(!defined($wday)) {
+    if($dt) {
+      my ($y,$m,$d) = ($2 ? $2-1900 : (localtime())[5], $3-1, $4);
+      $wday = (localtime(mktime(1,1,1,$d,$m,$y,0,0,-1)))[6];
+    } else {
+      $wday = (localtime(gettimeofday()))[6];
+    }
+  }
+
   my ($we, $wf);
   foreach my $h2we (split(",", AttrVal("global", "holiday2we", ""))) {
-    my $b = ReadingsVal($h2we, $when, 0);
+    my $b = $dt ? CommandGet(undef,"$h2we $when") : ReadingsVal($h2we,$when,0);
     if($b && $b ne "none") {
       return 0 if($h2we eq "noWeekEnd");
       $we = 1 if($b && $b ne "none");
@@ -5974,8 +5983,8 @@ IsWe(;$$)
 
   if(!$wf && !$we) {
     $we = ($when eq "yesterday" ? ($wday==0 || $wday==1) :
-          ($when eq "state"     ? ($wday==6 || $wday==0) :
-                                   ($wday==5 || $wday==6))); # tomorrow
+          ($when ne "tomorrow"  ? ($wday==6 || $wday==0) :
+                                  ($wday==5 || $wday==6))); # tomorrow
   }
   return $we ? 1 : 0;
 }
