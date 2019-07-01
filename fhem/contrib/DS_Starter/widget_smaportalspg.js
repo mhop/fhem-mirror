@@ -56,6 +56,8 @@ var Modul_smaportalspg = function () {
                         ftui.sendFhemCommand(cmd)
                             .done(function (data, dev) {
                             //console.log('received update for dynamic html : ', $(this) );
+							data = '<link rel="stylesheet" href="' + ftui.config.basedir + 'css/ftui_smaportalspg.css" type="text/css" />'
+									+ data;
                             elem.html(data);
                         });
                     }
